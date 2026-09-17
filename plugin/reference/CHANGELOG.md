@@ -1,5 +1,14 @@
 # CHANGELOG — reference
 
+## [v2.5.6] — 2026-09-17 (hotfix v2.63.2 — profondeur de spawn B1/B2)
+
+**Patch** :
+
+- **Pattern 12 (cloisonnement des outils)** aligné sur le constat mesuré le 2026-09-17 :
+  l'allowlist `Agent(...)` déclarée dans le frontmatter d'un agent est un contrat déclaré,
+  pas un mur d'exécution appliqué côté runtime à l'appel.
+- Autorisation : arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
+
 ## [v2.5.5] — 2026-09-16 (Phase 40.1)
 
 **Patch** :

@@ -5,7 +5,8 @@ description: "Utiliser quand la demande de dev ne désigne aucun geste précis �
 
 # vf-dev — Point d'entrée générique
 
-Incarne (ou dispatche via Task) l'agent **`vibeflow-head`** : c'est lui qui porte la carte
+Incarne l'agent **`vibeflow-head`** — jamais dispatché en Task (B1, `head-governance.md`
+préambule) : c'est lui qui porte la carte
 d'intention canonique (`dev-orchestrator-references/intent-routing.md`), détecte le geste que
 la demande appelle, **gouverne et lance l'équipe** qui le porte (`Task(vf-coder)` pour une tâche
 courte, `Task(vf-dev-manager)` au-delà — jamais un skill `gsd-*` en direct, A1) et propose le

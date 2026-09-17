@@ -9,10 +9,13 @@ Deux faits mesurés le 2026-09-15 (spike SKIL-01, Phase 34) qui gouvernent toute
 POSE un agent ou un skill puis veut le VOIR :
 
 1. **Le registre est résolu au démarrage de session.** Un fichier d'agent ou de skill créé en
-   cours de mission n'est PAS vu par un dispatch interne à cette même session. De plus, l'outil
-   `Agent` d'un worker est borné par un allowlist de `subagent_type` fixe : un nom arbitraire
-   fraîchement posé n'y est pas. Donc **aucune mesure « l'artefact est-il atteignable ? » n'est
-   jouable depuis la session courante** — elle mesurerait le registre d'il y a une heure.
+   cours de mission n'est PAS vu par un dispatch interne à cette même session — c'est le
+   registre de `subagent_type` connus qui est figé au démarrage, pas l'allowlist `Agent(...)` du
+   frontmatter (celle-ci n'est **pas appliquée à l'appel**, mesure du 2026-09-17,
+   `team-kernel.md` §Marge de profondeur de dispatch : un worker a lancé des types absents de sa
+   liste, qui ont démarré). Donc **aucune mesure « l'artefact est-il atteignable ? » n'est
+   jouable depuis la session courante** — elle mesurerait le registre d'il y a une heure, pas
+   l'allowlist.
 
 2. **Le contournement spontané des workers est un process `claude` CLI frais**, du type
    `claude --agent <nom> -p "…" --permission-mode bypassPermissions --allowedTools Skill`.

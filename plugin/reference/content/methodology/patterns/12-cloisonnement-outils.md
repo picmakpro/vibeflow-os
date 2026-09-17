@@ -57,16 +57,22 @@ consigne.
    qui ne doivent jamais se mélanger (ex. code applicatif vs tests), ce sont **deux agents**,
    chacun cloisonné sur sa zone. La distinction fine de chemins est portée par le corps.
 4. **Double barrière.** Outil retiré **ET** consigne dans le corps. Jamais l'un sans l'autre.
-5. **Allowlist de dispatch.** Un orchestrateur ne reçoit pas un droit de dispatch *générique* : il
-   déclare **la liste exacte** des agents qu'il peut lancer, via `tools: …, Agent(worker-a, worker-b)`.
-   Il ne peut alors spawner que ces workers-là, pas un agent arbitraire. C'est la forme forte du
-   couloir : le lead ne convoque que son équipe.
+5. **Allowlist de dispatch.** Un orchestrateur déclare **la liste exacte** des agents qu'il peut
+   lancer, via `tools: …, Agent(worker-a, worker-b)`. C'est un **contrat déclaré, lint-vérifié**
+   (`check-agents.sh --strict` en valide la syntaxe) et documenté au lecteur (« le lead ne convoque
+   que son équipe ») — **pas un mur d'exécution** : mesuré le 2026-09-17, le runtime ne l'applique
+   **pas à l'appel** (un agent a lancé des types absents de sa liste, qui ont démarré sans
+   refus). Le mur réel qui borne effectivement le fan-out est la **profondeur de dispatch**
+   (`conductor/references/team-kernel.md` §Marge de profondeur de dispatch) : les outils `Agent`/
+   `Task` sont absents à la profondeur 3, quelle que soit l'allowlist déclarée.
 
 > **Limite connue (Claude Code, 2026)** : il n'existe **pas** de champ frontmatter natif rendant un
 > agent « interne seulement » (invocable par un autre agent mais jamais auto-délégué). `deny`
 > bloquerait aussi le dispatch légitime. La parade documentée = **allowlist côté orchestrateur**
-> (règle 5) **+ description dissuasive** du worker (« worker interne, dispatché uniquement par X »).
-> C'est une heuristique robuste, pas une barrière dure — à garder en tête.
+> (règle 5, contrat déclaré — pas un mur d'exécution) **+ description dissuasive** du worker
+> (« worker interne, dispatché uniquement par X ») **+ la marge de profondeur réelle**, qui borne
+> le fan-out là où l'allowlist ne le fait pas. C'est une heuristique robuste, pas une barrière
+> dure — à garder en tête.
 >
 > **Convention VibeFlow `vf-internal: true`** : un worker interne le déclare dans son frontmatter.
 > Le générateur de commandes d'incarnation (ADR-042) **saute** ces agents — pas de `/<worker>`

@@ -13,6 +13,36 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *Rien pour l'instant.*
 
+## [v2.63.2] — 2026-09-17
+
+**Patch** (correctif de doctrine, aucune nouvelle capacité) :
+
+- **Hotfix « profondeur de spawn » (B1/B2)** — arbitrages Samuel, AskUserQuestion session
+  principale, 2026-09-17. B1 : `vibeflow-head` est désormais incarné en session principale
+  (via `/vf-dev`), jamais dispatché en `Task` — profondeurs visées manager 1, `vf-coder` 2,
+  briques GSD 3. B2 : `vf-coder` vérifie la présence de l'outil `Agent` avant d'agir ; présent →
+  `gsd-quick --validate` obligatoire (l'allowlist déclarée ne le bride pas à l'exécution) ;
+  absent → `blocked` avec `cause: "profondeur"`, mandat intact, sans coder.
+- **Extension de B1 à `vibeflow-design`** — origine factuelle : finding F3 de la tâche rapide
+  260917-ihf (`AGENT.md` du head design disait encore « Invocable via Task ») ; arbitrage
+  Samuel, AskUserQuestion session principale, 2026-09-17 (décision distincte de l'arbitrage
+  B1/B2 ci-dessus, même date). Le head design est désormais incarné en session principale (via
+  `/vf-design`, y compris quand `vibeflow-head` route une phase de design vers ce verbe) ou en
+  autonomie, jamais dispatché lui-même en `Task` — même renvoi `team-kernel.md` §Marge de
+  profondeur de dispatch.
+- Constat mesuré le 2026-09-17 à l'origine du hotfix : les outils `Agent`/`Task` sont absents
+  à la profondeur 3, l'allowlist `Agent(...)` d'un agent n'est pas appliquée à l'appel côté
+  runtime — limite non documentée qui peut évoluer avec Claude Code. L'incident Phase 40.1 est
+  expliqué dans `head-governance.md`.
+- Nouveaux cas de test : `T38` (dev-orchestrator, discriminant par mutation sur le contrôle
+  de profondeur B1/B2), `T76` réécrit (conductor, `test-check-agents.sh`) sur le constat vivant,
+  `T10` (design-orchestrator, discriminant par mutation sur l'extension de B1 à
+  `vibeflow-design`).
+- Manuel FR/EN : une phrase précise que le head tourne en session principale, jamais en
+  sous-agent. Pattern 12 (cloisonnement des outils) aligné sur le constat de l'allowlist.
+- Modules : `dev-orchestrator` v2.22.2 → v2.22.3, `conductor` v1.38.0 → v1.38.1,
+  `reference` v2.5.5 → v2.5.6 (patch chacun), `design-orchestrator` v1.5.7 → v1.5.8.
+
 ## [v2.62.0] — 2026-09-15
 
 **Le plafond de 250 lignes d'ADR-029 est machine-enforced pour la première fois — et une charge

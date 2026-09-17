@@ -1,5 +1,15 @@
 # Changelog — conductor
 
+## [v1.38.1] — 2026-09-17 (hotfix v2.63.2 — profondeur de spawn B1/B2)
+
+**Patch** (correctif de doctrine, aucune nouvelle capacité) :
+
+- `references/team-kernel.md` : documente le constat mesuré le 2026-09-17 — outils `Agent`/`Task`
+  absents à la profondeur 3, allowlist `Agent(...)` d'un agent non appliquée à l'appel côté
+  runtime (l'allowlist reste un contrat déclaré, pas un mur d'exécution).
+- `test-check-agents.sh` (`T76`) réécrit sur ce constat vivant.
+- Autorisation : arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
+
 ## [v1.38.0] — 2026-09-16 (Phase 40.1 — révision ADR-029 et du gate du budget d'instructions)
 
 **Minor** (contrat observable du gate modifié — règle de numérotation appliquée à toute la

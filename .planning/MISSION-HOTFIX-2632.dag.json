@@ -1,0 +1,115 @@
+{
+  "nodes": [
+    {
+      "id": "exec-b2-coder",
+      "step": "B2 vf-coder, manager, kernel, contrats, memoire",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-b1-head",
+      "step": "B1 head incarne",
+      "stage": "",
+      "deps": [
+        "exec-b2-coder"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-tests",
+      "step": "test discriminant et mutation",
+      "stage": "",
+      "deps": [
+        "exec-b1-head"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-release",
+      "step": "bump v2.63.2",
+      "stage": "",
+      "deps": [
+        "exec-tests"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "revue diff complet",
+      "stage": "",
+      "deps": [
+        "exec-release"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates",
+      "step": "rejeu gates CI",
+      "stage": "",
+      "deps": [
+        "exec-release"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr",
+      "step": "push et PR",
+      "stage": "",
+      "deps": [
+        "revue",
+        "gates"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-b1-design",
+      "step": "B1 etendu a vibeflow-design",
+      "stage": "",
+      "deps": [
+        "pr"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-design",
+      "step": "revue diff design",
+      "stage": "",
+      "deps": [
+        "exec-b1-design"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "gates-design",
+      "step": "rejeu gates",
+      "stage": "",
+      "deps": [
+        "exec-b1-design"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "push-design",
+      "step": "push PR 79",
+      "stage": "",
+      "deps": [
+        "revue-design",
+        "gates-design"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

@@ -10,6 +10,13 @@
 > agent `gsd-*`. La colonne « Mind » ci-dessous nomme toujours l'équipe dispatchée
 > (`Task(vf-coder)`, `Task(vf-dev-manager)`, …), jamais un geste `gsd-*` exécuté en direct par le
 > head : ce geste est celui que l'équipe porte une fois mandatée.
+>
+> **B1 — Place du head** (arbitrage Samuel, AskUserQuestion session principale, 2026-09-17) : le
+> head est **incarné dans la session principale** (via `/vf-dev`) ou lancé en autonomie
+> (`vf-auto`) — **jamais dispatché lui-même comme sous-agent (`Task(vibeflow-head)`)**.
+> Profondeurs visées : manager 1, `vf-coder` 2, briques GSD 3 (`team-kernel.md` §Marge de
+> profondeur de dispatch). Dispatcher le head en Task l'enfoncerait d'un cran et briserait cette
+> marge dès son premier geste.
 
 ---
 
@@ -99,6 +106,19 @@ Quatre codes de sortie, et une conduite par code :
 - **indéterminé** : la mission est traitée comme **non prouvée** — jamais annoncée verte, et le
   head le dit explicitement à son propre rapport.
 - **outillage illisible** : escalade humaine.
+
+**Cas `blocked` + `cause: "profondeur"`** (B2, `mission-contracts.md` §Retour « bloqué :
+profondeur ») — ce n'est **pas un cinquième code** parmi les quatre codes de sortie du gate
+ci-dessus (sain / manque(s) nommé(s) / indéterminé / outillage illisible) : ceux-ci restent au
+nombre de quatre. Ce cas relève d'une taxonomie distincte, celle du contrat canonique Pattern C
+(`mission-contracts.md`), dont le rapport typé garde lui aussi ses quatre statuts
+(`passed|gaps_found|human_needed|blocked`) — et celui-ci reste `"statut": "blocked"` (jamais
+`human_needed`). Un `vf-coder` a
+constaté l'outil `Agent` absent et rendu son mandat intact via son manager. Le head **ne
+redispatche jamais au même niveau** (ce qui reproduirait la même profondeur) et ne code jamais à
+sa place (ADR-031) : il relance le mandat **depuis la session principale**, au niveau où l'outil
+de lancement est disponible (profondeur 1 ou 2), en citant `mission-contracts.md` §Retour
+« bloqué : profondeur » plutôt que de trancher seul.
 
 Trois règles de conduite s'y ajoutent :
 

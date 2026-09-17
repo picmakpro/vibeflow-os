@@ -5,8 +5,9 @@ description: "Utiliser dès que l'intention touche au design ou à l'UI/UX, sous
 
 # vf-design — Point d'entrée design
 
-Analyse l'intention design de la demande, **détecte la stack du projet**, puis **délègue à
-l'agent `vibeflow-design`** (qui porte la table de routage canonique et la doctrine) :
+Analyse l'intention design de la demande, **détecte la stack du projet**, puis **incarne l'agent
+`vibeflow-design`** — jamais dispatché en Task (profondeur 1 réservée au manager qu'il lance, `team-kernel.md` §Marge de profondeur de dispatch) — qui porte
+la table de routage canonique et la doctrine :
 
 - définir l'identité visuelle / la DA / from scratch → workflow **DA-INIT**
 - modifier / refondre / améliorer l'UI → workflow **DESIGN-WORKFLOW** (routing complexité :

@@ -1,5 +1,23 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.22.3] — 2026-09-17 (hotfix v2.63.2 — profondeur de spawn B1/B2)
+
+**Patch** (correctif de doctrine, aucune nouvelle capacité) :
+
+- B1 : `vibeflow-head` est désormais incarné en session principale (via `/vf-dev`), jamais
+  dispatché en `Task` — profondeurs visées manager 1, `vf-coder` 2, briques GSD 3.
+- B2 : `vf-coder` vérifie la présence de l'outil `Agent` avant d'agir ; présent →
+  `gsd-quick --validate` obligatoire (l'allowlist déclarée ne le bride pas à l'exécution) ;
+  absent → `blocked` avec `cause: "profondeur"`, mandat intact, sans coder.
+- Constat mesuré le 2026-09-17 : outils `Agent`/`Task` absents à la profondeur 3, allowlist
+  `Agent(...)` d'un agent non appliquée à l'appel côté runtime (limite non documentée pouvant
+  évoluer avec Claude Code). Incident Phase 40.1 expliqué dans `references/head-governance.md`.
+- Nouveau `T38` (`test-dev-orchestrator.sh`) : discriminant par mutation sur le contrôle de
+  profondeur B1/B2.
+- Manuel FR/EN (`the-agents-that-ship.md` / `les-agents-livres.md`) : une phrase précise que le
+  head tourne en session principale, jamais en sous-agent.
+- Autorisation : arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
+
 ## [v2.22.2] — 2026-09-16 (Phase 40.1)
 
 **Patch** (correctif de gate, aucune nouvelle capacité) :

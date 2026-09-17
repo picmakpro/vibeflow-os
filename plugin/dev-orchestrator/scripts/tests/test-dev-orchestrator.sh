@@ -6684,5 +6684,293 @@ rm -rf "$T37_TMPDIR"
 [ "$t37_ok" -eq 1 ] && ok "T37 : le head ne route plus vers un gsd-* en direct dans ses deux tables de référence, détection prouvée discriminante par mutation"
 
 # ---------------------------------------------------------------------------
+# T38 (hotfix v2.63.2, B1/B2) — contrôle de profondeur : vf-coder.md porte le contrôle de
+# présence de l'outil Agent AVANT action et le caractère obligatoire de `gsd-quick --validate`,
+# le retour `"cause": "profondeur"` + `mandat` ; mission-contracts.md porte la section « bloqué :
+# profondeur » (cause/mandat, « aucun cinquième » statut) ; vf-dev-manager.md porte la conduite
+# sur `cause: "profondeur"` ; et aucune prescription AFFIRMATIVE de dispatch du head en Task
+# (AGENT.md, skills/vf-dev, skills/vf-auto, head-governance.md), qui disent au contraire
+# « incarné » en session principale (vf-dev/AGENT.md/head-governance).
+# ---------------------------------------------------------------------------
+t38_ok=1
+T38_CODER="$MOD/agents/vf-coder.md"
+T38_CONTRACTS="$MOD/references/mission-contracts.md"
+T38_MANAGER="$MOD/agents/vf-dev-manager.md"
+T38_AGENT="$MOD/AGENT.md"
+T38_GOV="$MOD/references/head-governance.md"
+T38_VFDEV="$MOD/skills/vf-dev/SKILL.md"
+T38_VFAUTO="$MOD/skills/vf-auto/SKILL.md"
+
+# (a) vf-coder.md : contrôle d'entrée de l'outil Agent, obligation de gsd-quick --validate,
+# retour cause/mandat. Trois motifs distincts, aucun ne doit manquer.
+t38a_gate() { # <file> -> imprime les 3 lignes trouvées (ou moins) pour trace
+  "$GREP" -n 'outil `Agent`\|outil Agent' "$1"
+}
+t38a_obligatoire() { # <file>
+  "$GREP" -n 'obligatoire' "$1" | "$GREP" -i 'gsd-quick'
+}
+t38a_retour_cause() { # <file>
+  "$GREP" -n '"cause": "profondeur"' "$1" | "$GREP" -i 'mandat'
+}
+if [ ! -f "$T38_CODER" ]; then
+  ko "T38 (a) : $T38_CODER introuvable"; t38_ok=0
+else
+  t38a_gate_hit="$(t38a_gate "$T38_CODER")"
+  t38a_oblig_hit="$(t38a_obligatoire "$T38_CODER")"
+  t38a_cause_hit="$(t38a_retour_cause "$T38_CODER")"
+  if [ -z "$t38a_gate_hit" ]; then
+    ko "T38 (a) : vf-coder.md ne porte plus le contrôle d'entrée de l'outil Agent"; t38_ok=0
+  elif [ -z "$t38a_oblig_hit" ]; then
+    ko "T38 (a) : vf-coder.md ne rend plus gsd-quick --validate obligatoire"; t38_ok=0
+  elif [ -z "$t38a_cause_hit" ]; then
+    ko "T38 (a) : vf-coder.md ne porte plus le retour cause=profondeur + mandat"; t38_ok=0
+  else
+    ok "T38 (a) : vf-coder.md porte le contrôle Agent, l'obligation gsd-quick --validate et le retour cause/mandat"
+  fi
+fi
+
+# (b) mission-contracts.md : section « bloqué : profondeur » avec cause/mandat + « aucun
+# cinquième » statut.
+t38b_section() {
+  awk '/^## Retour . bloqué : profondeur/{flag=1} flag && /^## / && !/^## Retour . bloqué : profondeur/{exit} flag{print}' "$1"
+}
+if [ ! -f "$T38_CONTRACTS" ]; then
+  ko "T38 (b) : $T38_CONTRACTS introuvable"; t38_ok=0
+else
+  t38b_sec="$(t38b_section "$T38_CONTRACTS")"
+  t38b_lines="$(printf '%s\n' "$t38b_sec" | awk 'END{print NR}')"
+  if [ "$t38b_lines" -lt 15 ]; then
+    ko "T38 (b) : section « bloqué : profondeur » à $t38b_lines ligne(s) (< 15) — anti vert-à-vide"; t38_ok=0
+  elif ! printf '%s\n' "$t38b_sec" | "$GREP" -q '"cause": "profondeur"'; then
+    ko "T38 (b) : section « bloqué : profondeur » sans le champ cause"; t38_ok=0
+  elif ! printf '%s\n' "$t38b_sec" | "$GREP" -q '"mandat"'; then
+    ko "T38 (b) : section « bloqué : profondeur » sans le champ mandat"; t38_ok=0
+  elif ! printf '%s' "$t38b_sec" | tr '\n' ' ' | "$GREP" -qi 'aucun[[:space:]]*cinquième'; then
+    ko "T38 (b) : section « bloqué : profondeur » ne dit plus « aucun cinquième » statut"; t38_ok=0
+  else
+    ok "T38 (b) : mission-contracts.md porte la section « bloqué : profondeur » complète ($t38b_lines lignes)"
+  fi
+fi
+
+# (c) vf-dev-manager.md : conduite sur cause: "profondeur" dans §Contrôle de flux.
+if [ ! -f "$T38_MANAGER" ]; then
+  ko "T38 (c) : $T38_MANAGER introuvable"; t38_ok=0
+elif "$GREP" -q 'cause: "profondeur"' "$T38_MANAGER"; then
+  ok "T38 (c) : vf-dev-manager.md porte la conduite sur cause: \"profondeur\""
+else
+  ko "T38 (c) : vf-dev-manager.md ne porte plus la conduite sur cause: \"profondeur\""; t38_ok=0
+fi
+
+# (d) Aucune prescription AFFIRMATIVE de dispatch du head en Task, dans les 4 fichiers. Monde
+# fermé (hotfix v2.63.2, tour 3 — abandon de l'analyse de négation en langue naturelle) :
+#   Tour 1 : négation cherchée sur la ligne entière — une négation dans une autre clause masquait
+#   une occurrence affirmative.
+#   Tour 2 (commit `7bbaeea`) : négation bornée à une fenêtre de clause (séparateurs de
+#   ponctuation et « mais »/« puis » entre espaces, portable sed BSD/GNU).
+#   Tour 3 (revue) : nouvelles repros. L'expansion `%%` coupe à la 1re occurrence du littéral ;
+#   « Mais » et « JAMAIS » en capitales passent ; une négation d'une autre clause sans séparateur
+#   passe ; « n'est pas de dispatch » neutralise à tort une vraie prescription. Chaque patch a
+#   fermé des cas et en a rouvert d'autres : on abandonne donc l'analyse de négation.
+# Mécanique retenue : par fichier, nombre d'occurrences non chevauchantes du littéral
+# `Task(vibeflow-head)` (t38_count_literal, awk + index() en boucle) moins la somme des
+# occurrences de chaque forme de T38_CANON_FORMS. Seules ces formes CANONIQUES exactes, énumérées
+# dans une liste courte, échappent à la détection — une forme canonique ne blanchit qu'une seule
+# occurrence. Conséquence assumée : toute nouvelle tournure négative qui cite le littéral est
+# détectée tant que sa forme exacte n'est pas ajoutée à la liste. Ajouter une forme devient un
+# diff relu, pas une heuristique.
+# Jumeau `t10_affirmative_hits`/`t10_count_literal` dans test-design-orchestrator.sh — le corps de
+# comptage y est vérifié identique caractère pour caractère par T10 (d).
+T38_CANON_FORMS=(
+  'jamais dispatché lui-même comme sous-agent (`Task(vibeflow-head)`)'
+)
+
+t38_count_literal() { # <file> <literal> -> imprime le nombre d'occurrences non chevauchantes
+  local f="$1" lit="$2"
+  [ -f "$f" ] || { printf '0'; return; }
+  awk -v lit="$lit" '
+    { line = $0; start = 1; n = length(lit)
+      while (1) {
+        idx = index(substr(line, start), lit)
+        if (idx == 0) break
+        count++
+        start = start + idx + n - 1
+      }
+    }
+    END { print count + 0 }
+  ' "$f"
+}
+
+t38d_affirmative_hits() { # <file>
+  local f="$1" hits=""
+  hits="$("$GREP" -n 'Invocable via Task\|Incarne (ou dispatche via Task)' "$f" 2>/dev/null)"
+  local task_count canon_total=0 t38d_forme
+  task_count="$(t38_count_literal "$f" 'Task(vibeflow-head)')"
+  for t38d_forme in "${T38_CANON_FORMS[@]}"; do
+    canon_total=$((canon_total + $(t38_count_literal "$f" "$t38d_forme")))
+  done
+  if [ $((task_count - canon_total)) -gt 0 ]; then
+    hits="$(printf '%s\n%s' "$hits" "$("$GREP" -n -F -- 'Task(vibeflow-head)' "$f" 2>/dev/null)")"
+  fi
+  printf '%s' "$hits" | sed '/^$/d'
+}
+t38d_ok=1
+for t38d_file in "$T38_AGENT" "$T38_GOV" "$T38_VFDEV" "$T38_VFAUTO"; do
+  if [ ! -f "$t38d_file" ]; then
+    ko "T38 (d) : $t38d_file introuvable"; t38d_ok=0; continue
+  fi
+  t38d_hit="$(t38d_affirmative_hits "$t38d_file")"
+  if [ -n "$t38d_hit" ]; then
+    ko "T38 (d) : prescription affirmative de dispatch du head en Task dans $t38d_file — $(printf '%s' "$t38d_hit" | head -1)"
+    t38d_ok=0
+  fi
+done
+if [ "$t38d_ok" -eq 1 ]; then
+  # Vérifie en plus que vf-dev/SKILL.md, AGENT.md et head-governance.md disent l'incarnation.
+  if "$GREP" -qi 'incarn' "$T38_VFDEV" && "$GREP" -qi 'incarn' "$T38_AGENT" 2>/dev/null || "$GREP" -qi 'incarn' "$T38_GOV"; then
+    :
+  fi
+  if "$GREP" -qi 'incarn' "$T38_VFDEV" && "$GREP" -qi 'incarn' "$T38_GOV"; then
+    ok "T38 (d) : aucune prescription affirmative de dispatch du head en Task ; vf-dev/SKILL.md et head-governance.md disent l'incarnation"
+  else
+    ko "T38 (d) : vf-dev/SKILL.md ou head-governance.md ne dit plus l'incarnation en session principale"; t38_ok=0
+  fi
+else
+  t38_ok=0
+fi
+
+# (e) DISCRIMINANT par mutation, permanent et interne à la suite : réinjecter chaque motif
+# affirmatif dans une COPIE temporaire et vérifier que la même fonction de détection rend rouge,
+# avec la ligne détectée en trace.
+T38_TMPDIR="$(mktemp -d)"; vf_tmp_track "$T38_TMPDIR"
+[ -d "$T38_TMPDIR" ] || { ko "T38 (e) : mktemp -d a échoué, impossible de construire les mutants de contre-épreuve"; t38_ok=0; }
+
+# (e.1) vf-coder.md — retirer le contrôle d'entrée (motif (a)).
+if [ -f "$T38_CODER" ]; then
+  t38e_coder_mut="$T38_TMPDIR/vf-coder-mutant.md"
+  "$GREP" -v 'outil `Agent`\|outil Agent' "$T38_CODER" > "$t38e_coder_mut"
+  if [ -z "$(t38a_gate "$t38e_coder_mut")" ]; then
+    ok "T38 (e.1) (DISCRIMINANT) : mutant sans contrôle Agent détecté KO par la même fonction"
+  else
+    ko "T38 (e.1) NON DISCRIMINANTE : le mutant sans contrôle Agent reste détecté OK"; t38_ok=0
+  fi
+fi
+
+# (e.2) mission-contracts.md — retirer le champ cause de la section « bloqué : profondeur ».
+if [ -f "$T38_CONTRACTS" ]; then
+  t38e_contracts_mut="$T38_TMPDIR/mission-contracts-mutant.md"
+  "$GREP" -v '"cause": "profondeur"' "$T38_CONTRACTS" > "$t38e_contracts_mut"
+  t38e_contracts_sec="$(t38b_section "$t38e_contracts_mut")"
+  if ! printf '%s\n' "$t38e_contracts_sec" | "$GREP" -q '"cause": "profondeur"'; then
+    ok "T38 (e.2) (DISCRIMINANT) : mutant sans le champ cause détecté KO par la même fonction"
+  else
+    ko "T38 (e.2) NON DISCRIMINANTE : le mutant sans le champ cause reste détecté OK"; t38_ok=0
+  fi
+fi
+
+# (e.3) vf-dev-manager.md — retirer la ligne cause: "profondeur".
+if [ -f "$T38_MANAGER" ]; then
+  t38e_manager_mut="$T38_TMPDIR/vf-dev-manager-mutant.md"
+  "$GREP" -v 'cause: "profondeur"' "$T38_MANAGER" > "$t38e_manager_mut"
+  if ! "$GREP" -q 'cause: "profondeur"' "$t38e_manager_mut"; then
+    ok "T38 (e.3) (DISCRIMINANT) : mutant sans cause: \"profondeur\" détecté KO par la même fonction"
+  else
+    ko "T38 (e.3) NON DISCRIMINANTE : le mutant sans cause: \"profondeur\" reste détecté OK"; t38_ok=0
+  fi
+fi
+
+# (e.4) skills/vf-dev/SKILL.md — réinjecter la tournure affirmative légitime d'origine
+# (« Incarne (ou dispatche via Task) l'agent ») ET une réinjection de « Invocable via Task ».
+if [ -f "$T38_VFDEV" ]; then
+  t38e_vfdev_mut1="$T38_TMPDIR/vf-dev-mutant-incarne.md"
+  sed 's/^Incarne l.agent \*\*`vibeflow-head`\*\* — jamais dispatché en Task.*/Incarne (ou dispatche via Task) l'"'"'agent **`vibeflow-head`** :/' "$T38_VFDEV" > "$t38e_vfdev_mut1"
+  t38e_vfdev_hit1="$(t38d_affirmative_hits "$t38e_vfdev_mut1")"
+  if [ -n "$t38e_vfdev_hit1" ]; then
+    ok "T38 (e.4a) (DISCRIMINANT) : réinjection « Incarne (ou dispatche via Task) » détectée — $(printf '%s' "$t38e_vfdev_hit1" | head -1)"
+  else
+    ko "T38 (e.4a) NON DISCRIMINANTE : la tournure affirmative réinjectée n'est pas détectée"; t38_ok=0
+  fi
+
+  t38e_vfdev_mut2="$T38_TMPDIR/vf-dev-mutant-invocable.md"
+  { echo "Invocable via Task, l'agent vibeflow-head..."; cat "$T38_VFDEV"; } > "$t38e_vfdev_mut2"
+  t38e_vfdev_hit2="$(t38d_affirmative_hits "$t38e_vfdev_mut2")"
+  if [ -n "$t38e_vfdev_hit2" ]; then
+    ok "T38 (e.4b) (DISCRIMINANT) : réinjection « Invocable via Task » détectée — $(printf '%s' "$t38e_vfdev_hit2" | head -1)"
+  else
+    ko "T38 (e.4b) NON DISCRIMINANTE : « Invocable via Task » réinjecté n'est pas détecté"; t38_ok=0
+  fi
+
+  # Contre-épreuve : la formulation négative LÉGITIME actuelle du fichier réel reste verte
+  # (aucun faux positif sur la tournure qui doit rester en place).
+  if [ -z "$(t38d_affirmative_hits "$T38_VFDEV")" ]; then
+    ok "T38 (e.4c) (CONTRE-ÉPREUVE) : la formulation négative légitime de vf-dev/SKILL.md ne déclenche pas la détection"
+  else
+    ko "T38 (e.4c) : faux positif — la formulation négative légitime de vf-dev/SKILL.md déclenche la détection"; t38_ok=0
+  fi
+fi
+
+# (e.5) DISCRIMINANT — 6 repros de contournement du tour 3 (revue), toutes NON canoniques : le
+# monde fermé ne blanchit qu'une forme EXACTE de T38_CANON_FORMS, donc chacune de ces tournures
+# (capitales, absence de séparateur, reformulation de la négation, clause voisine) reste détectée.
+# Fichiers `synthetic-closed-<k>.md` sous $T38_TMPDIR, un par phrase.
+T38_E5_PHRASES=(
+  "On dit jamais Task(vibeflow-head), pourtant le manager appelle bel et bien Task(vibeflow-head) chaque nuit."
+  "on ne fait jamais ca Mais on lance quand meme Task(vibeflow-head) chaque nuit"
+  "on ne fait JAMAIS ca mais on lance quand meme Task(vibeflow-head) chaque nuit"
+  "Le crafter n'est jamais dispatché seul, mais le manager lance Task(vibeflow-head) chaque nuit."
+  "vibeflow-head n'est pas de dispatch via Task(vibeflow-head)."
+  "le manager attend jamais bien longtemps puis dispatche Task(vibeflow-head) sans discuter."
+)
+t38e5_k=0
+for t38e5_phrase in "${T38_E5_PHRASES[@]}"; do
+  t38e5_k=$((t38e5_k + 1))
+  t38e5_file="$T38_TMPDIR/synthetic-closed-$t38e5_k.md"
+  printf '%s\n' "$t38e5_phrase" > "$t38e5_file"
+  t38e5_hit="$(t38d_affirmative_hits "$t38e5_file")"
+  if [ -n "$t38e5_hit" ]; then
+    ok "T38 (e.5.$t38e5_k) (DISCRIMINANT) : phrase non canonique détectée — $(printf '%s' "$t38e5_hit" | head -1)"
+  else
+    ko "T38 (e.5.$t38e5_k) NON DISCRIMINANTE : phrase non canonique non détectée — « $t38e5_phrase »"; t38_ok=0
+  fi
+done
+
+# (e.6) CONTRE-ÉPREUVE — la forme canonique SEULE, construite depuis T38_CANON_FORMS (jamais
+# retapée), reste non détectée (1 − 1 = 0).
+t38e6_file="$T38_TMPDIR/synthetic-canon-seule.md"
+printf '%s\n' "vibeflow-head est incarné en session principale — ${T38_CANON_FORMS[0]}." > "$t38e6_file"
+t38e6_hit="$(t38d_affirmative_hits "$t38e6_file")"
+if [ -z "$t38e6_hit" ]; then
+  ok "T38 (e.6) (CONTRE-ÉPREUVE) : forme canonique seule non détectée (1 − 1 = 0)"
+else
+  ko "T38 (e.6) : faux positif — forme canonique seule détectée — $(printf '%s' "$t38e6_hit" | head -1)"; t38_ok=0
+fi
+
+# (e.7) DISCRIMINANT — forme canonique ET occurrence affirmative sur la MÊME ligne : la forme ne
+# blanchit qu'une seule occurrence, la seconde doit être détectée (2 − 1 = 1).
+t38e7_file="$T38_TMPDIR/synthetic-canon-plus-affirmatif.md"
+printf '%s\n' "${T38_CANON_FORMS[0]} mais aussi via Task(vibeflow-head) en direct." > "$t38e7_file"
+t38e7_hit="$(t38d_affirmative_hits "$t38e7_file")"
+if [ -n "$t38e7_hit" ]; then
+  ok "T38 (e.7) (DISCRIMINANT) : forme canonique + occurrence affirmative sur la même ligne détectée (2 − 1 = 1) — $(printf '%s' "$t38e7_hit" | head -1)"
+else
+  t38e7_line="$(cat "$t38e7_file")"
+  ko "T38 (e.7) NON DISCRIMINANTE : forme canonique + occurrence affirmative non détectée — « $t38e7_line »"; t38_ok=0
+fi
+
+# (e.8) CONTRE-ÉPREUVE — deux formes canoniques sur la MÊME ligne : chacune blanchit sa propre
+# occurrence, aucune ne reste (2 − 2 = 0).
+t38e8_file="$T38_TMPDIR/synthetic-canon-deux-fois.md"
+printf '%s\n' "${T38_CANON_FORMS[0]} ${T38_CANON_FORMS[0]}" > "$t38e8_file"
+t38e8_hit="$(t38d_affirmative_hits "$t38e8_file")"
+if [ -z "$t38e8_hit" ]; then
+  ok "T38 (e.8) (CONTRE-ÉPREUVE) : deux formes canoniques sur la même ligne non détectées (2 − 2 = 0)"
+else
+  ko "T38 (e.8) : faux positif — deux formes canoniques détectées — $(printf '%s' "$t38e8_hit" | head -1)"; t38_ok=0
+fi
+
+rm -rf "$T38_TMPDIR"
+
+[ "$t38_ok" -eq 1 ] && ok "T38 : contrôle de profondeur (B1/B2) présent sur les 4 fichiers de doctrine, détection prouvée discriminante par mutation"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]

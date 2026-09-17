@@ -248,6 +248,47 @@ absent quand le statut n'est pas `blocked`. Doctrine complète (grain étape, bu
 contre le contournement mécanique, invisibilité amont nommée) : `mission-flow.md` §Pattern E §6
 Épuisement du budget — ne pas la reformuler ici (ADR-030).
 
+## Retour « bloqué : profondeur » (arbitrages B1/B2, 2026-09-17)
+
+**Constat mesuré** (sonde en session principale, 2026-09-17). Aux profondeurs 1 et 2, l'outil
+`Agent` est visible et un lancement est accepté. À la profondeur 3, `Agent` et `Task` sont
+**absents**, quel que soit le type d'agent : `ToolSearch` `select:Agent,Task` rend « No matching
+deferred tools found. ». L'allowlist `Agent(type, …)` du frontmatter n'est **pas appliquée à
+l'appel** : `vf-coder` a lancé `gsd-executor` et `gsd-planner`, absents de sa liste ; `gsd-executor`
+lancé avec `isolation: "worktree"` démarre. Limite **observée, non documentée par Anthropic** :
+elle peut changer avec une version de Claude Code — une nouvelle sonde la re-mesure.
+
+**Incidents fondateurs.** Phase 40.1 : head dispatché en `Task` (1) → `vf-dev-manager` (2) →
+`vf-coder` (3), sans outil de lancement. 2026-09-17 : un `vf-coder` à la profondeur 1 n'a pas tenté
+`gsd-quick --validate`, croyant à tort que son allowlist l'en empêchait.
+
+**B1 — place du head** (arbitrage Samuel, AskUserQuestion session principale, 2026-09-17) : le head
+est incarné dans la session principale (via `/vf-dev`), jamais dispatché comme sous-agent (`Task`).
+Profondeurs visées : manager 1, `vf-coder` 2, briques GSD 3.
+
+**B2 — `vf-coder` sans l'outil `Agent`** (arbitrage Samuel, AskUserQuestion session principale,
+2026-09-17) : `vf-coder` vérifie d'abord la présence de l'outil `Agent`. Présent →
+`gsd-quick --validate` obligatoire sur le chemin court, le pipeline GSD sur un mandat d'étape — son
+allowlist ne le bride pas. Absent → il s'arrête sans coder à la main et rend « bloqué : profondeur »,
+mandat intact, pour que son dispatcheur relance au bon niveau.
+
+**Le contrat.** Le bloc typé (Pattern C, `mission-flow.md`) garde ses quatre statuts : **aucun
+cinquième**. Le retour porte `"statut": "blocked"` plus deux champs **optionnels** frères de
+`statut`/`findings`/`noeuds_debloques` :
+
+```
+"cause": "profondeur",
+"mandat": "<le mandat reçu, recopié intact>"
+```
+
+Présents **uniquement** sur ce retour — absents de tout autre `blocked`. `mandat` est recopié
+verbatim (même règle que les champs frères : jamais résumé, jamais reformulé) ; aucun commit n'a été
+produit, puisque rien n'a été codé.
+
+**La conduite du dispatcheur.** Relancer le mandat au bon niveau — jamais le coder à la place, jamais
+le redispatcher au même niveau, qui reproduirait la même profondeur. Côté manager : `vf-dev-manager.md`
+§Contrôle de flux (remonter le mandat intact). Côté head : relance depuis la session principale (B1).
+
 ## Étage revue — deux objets disjoints (ADR-060 / ADR-061)
 
 La revue de **diff de code** (`vf-reviewer` → `gsd-code-reviewer`, nœud `revue-N` posé
