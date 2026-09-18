@@ -40,22 +40,11 @@ stopped_at: >-
 last_updated: "2026-09-18T15:51:00.000Z"
 last_activity: 2026-09-18
 last_activity_desc: >-
-  Phase 41, périmètre sans admin (option (a), arbitrage Samuel, AskUserQuestion session principale,
-  2026-09-17) exécuté intégralement sur `feat/phase-41-protection-depot` : plans 41-14 à 41-19,
-  41-16-SUMMARY.md reconstitué (gap comblé), revue de jointure + correctifs ciblés + revue finale
-  PASS. Trois gardes in-repo (G-1/G-2/G-3) et doctrine ADR-072 livrées et vérifiées vertes (`gates`
-  rc=0 13 étapes, `tests` rc=0 82 suites). Ledger PROT-01 (non coché, hors d'atteinte) à PROT-05
-  (cochés) mis à jour dans `REQUIREMENTS.md`. Reliquats manager : mise à jour ROADMAP/STATE (ce
-  geste), PR vers `main` à ouvrir, décision de release à trancher par Samuel. Compteurs de
-  `progress` inchangés (le périmètre livré est une posture in-repo, pas une clôture de milestone
-  au sens des phases comptées).
-  Précédemment (2026-09-17) : Phase 41 cadrée puis planifiée sur `feat/phase-41-protection-depot`
-  (missions vf-dev-manager, go de Samuel, AskUserQuestion session principale, 2026-09-17) :
-  `41-CONTEXT.md` (D-01 à D-10 verrouillés, AskUserQuestion session principale, 2026-09-17 ; D-M1 à
-  D-M14), 13 plans en 13 vagues séquentielles, vérificateur de plans frais sur 3 tours (dernier : 0
-  bloquant, 3 avertissements corrigés non re-vérifiés). Arbitrage en attente : force push et
-  suppression de `main` dans le ruleset (`REGLES_MAIN_FORCE_PUSH_SUPPRESSION`, reste en attente
-  d'accès admin). Aucune configuration GitHub modifiée, aucun push.
+  Phase 41, périmètre sans admin (arbitrage Samuel, AskUserQuestion session principale, 2026-09-17)
+  exécuté sur `feat/phase-41-protection-depot` : plans 41-14 à 41-19, gap 41-16-SUMMARY.md comblé,
+  revue + correctifs + revue finale PASS. G-1/G-2/G-3 + ADR-072 verts (`gates` rc=0, `tests` rc=0).
+  Ledger `REQUIREMENTS.md` : PROT-01 non coché (hors d'atteinte), PROT-02..05 cochés. Détail complet
+  en `## Current Position` et `### Decisions`. Reliquats manager : PR à ouvrir, release à trancher.
 progress:
   total_phases: 12
   completed_phases: 11
