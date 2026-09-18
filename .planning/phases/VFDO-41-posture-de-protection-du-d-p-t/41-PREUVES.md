@@ -67,3 +67,20 @@ SAUTEE) ; étape de mesure réelle de G-3, `check-push-sans-pr (G-3, PROT-05 —
 push vers main)` (conditionnelle `main`, SAUTEE — son étape de fixture sans condition, elle, est
 rejouée et verte, `G3-FIXTURE` ci-dessus). Job `gates` : 1 étape action sautée en tête (checkout,
 nom vide en sortie de l'outil), 3 sautee(s) au bilan.
+
+CRITERE-1-ROADMAP: inatteignable_sans_admin raison=exige un ruleset actif sur main ; rulesets du
+depot lus a vide, permissions admin false
+CRITERE-2-ROADMAP: inatteignable_sans_admin raison=exige le refus reel d'un merge, donc une regle
+cote serveur
+CRITERE-3-ROADMAP: inatteignable_sans_admin raison=exige le rejeu du flux de release SOUS la
+regle ; la regle n'existe pas
+PROT-01-STATUT: non_coche hors_d_atteinte declencheur=acces admin accorde ou transfert du depot
+ROADMAP-NON-TOUCHE: oui
+STATE-NON-TOUCHE: oui
+RELEASE: aucune version=v2.63.2 inchangee tag=aucun release_github=aucune modules_bumpes=0
+LIMITE-DE-FOND: exiges=10 porteurs=10 manquants=aucun
+
+Note sur ROADMAP-NON-TOUCHE / STATE-NON-TOUCHE : aucun plan de cette phase ne modifie
+`.planning/ROADMAP.md` ni `.planning/STATE.md` ; leur mise à jour (réécriture des critères de
+succès sur le périmètre arbitré) est prise en charge par le manager (décision du 2026-09-17),
+nommée ici comme reliquat tracé, jamais comme un oubli.
