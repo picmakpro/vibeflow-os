@@ -163,6 +163,15 @@ qu'écrite : `41-PREUVES.md` § 41-15 porte ses sept clés mesurées, et le reje
 `gates` (11 étapes, 0 échec) et `tests` (80 suites, 0 échec) de `ci.yml` est vert. Le plan est
 clos.**
 
+## Limite de fond
+
+`tools/check-aucune-fermeture.sh` et `tools/check-trace-arbitrage.sh` vivent dans ce dépôt, comme
+toute garde de cette phase : chacune peut être modifiée par la PR qu'elle juge — la même PR peut
+changer l'outil, sa suite et l'étape CI qui l'invoque et rester verte. Elles rendent visible et
+tracent une co-occurrence sujet x achèvement ou une invocation d'autorité humaine sans citation
+conforme ; elles ne verrouillent rien. Aucun droit admin n'existe dans ce périmètre pour poser une
+règle côté GitHub qui empêcherait cette même PR de neutraliser l'un ou l'autre outil.
+
 ## Performance
 
 - **Durée :** ~1h10 ce tour (resserrement du détecteur + Task 3 + rejeu CI complet, deux fois)
@@ -284,6 +293,24 @@ Aucune — ce tour applique fidèlement la décision du manager (option c) puis 
 telle qu'écrite dans le plan. Aucun bug, aucune fonctionnalité manquante, aucun blocage
 technique n'a nécessité de correction Rule 1/2/3 ce tour : le seul geste était le resserrement
 explicitement commandité, et il a fonctionné du premier coup (rc=0 sans itération).
+
+### Correctif mécanique post-clôture (2026-09-18)
+
+Une re-vérification indépendante a mesuré `bash tools/check-aucune-fermeture.sh` à rc=1 sur ce
+même SUMMARY, alors que ce fichier affirmait déjà `manquants=aucun` : la réécriture finale du
+SUMMARY (commit `05b856f`) est intervenue APRÈS le dernier rejeu du recensement par la Task 3, et
+n'a pas reporté le fragment canonique de la limite de fond dans son propre corps — `41-15-
+SUMMARY.md` est lui-même l'un des quatre porteurs exigés par la sonde (glob `41-1*-SUMMARY.md`).
+Rule 3 (blocage mécanique, pas une décision) : section « Limite de fond » ajoutée ci-dessus,
+portant le fragment `modifiée par la PR qu'elle juge` dans un énoncé qui a un sens réel pour ce
+plan. Rejeu après correctif : `check-aucune-fermeture.sh` rc=0 (fichiers=20, hits=0, limite
+exiges=7 porteurs=4 manquants=aucun) ; `check-trace-arbitrage.sh` rc=0 (commits=19, citants=2,
+croissance attendue depuis la mesure `commits=17` de `41-PREUVES.md`, déjà documentée comme
+propriété normale de cette clé) ; les deux suites (`test-check-aucune-fermeture.sh` 15/15,
+`test-check-trace-arbitrage.sh` 20/20) toujours vertes, aucune régression. `41-PREUVES.md` § 41-15
+n'a pas eu besoin d'être retouché : ses valeurs `RECENSEMENT-FERMETURE` et `LIMITE-DE-FOND`
+déjà écrites correspondent exactement à l'état mesuré après ce correctif. Aucune autre décision de
+ce plan n'a été rouverte (allowlist à 3, six marqueurs fermés du détecteur de trace inchangés).
 
 ## Issues Encountered
 
