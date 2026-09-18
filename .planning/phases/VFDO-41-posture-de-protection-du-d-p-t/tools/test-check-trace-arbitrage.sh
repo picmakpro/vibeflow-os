@@ -5,16 +5,26 @@
 # construit SON PROPRE depot jetable sous mktemp -d, JAMAIS le depot reel ; identite git passee
 # par -c, jamais la configuration du poste. Une suite incapable de rougir est un defaut.
 #
-# QUATORZE cas (C0..C13) plus QUATRE mutants opposables (MUT-1 a MUT-4), un par comparaison du
-# script sous test — regle de comptage (avertissement 3 du verificateur frais, decision du
-# manager du 2026-09-17) : chaque mutant asserte le rc EXACT sur le mutant ET sur l'original, et
+# QUATORZE cas (C0..C13) plus SIX mutants opposables (MUT-1 a MUT-6) — MUT-1 a MUT-4 un par
+# comparaison du script sous test, MUT-5 et MUT-6 sur la PORTE D'ENTREE du detecteur (liste des
+# marqueurs d'invocation, decision du manager, reprise 2026-09-18, resserrement de
+# check-trace-arbitrage.sh) — regle de comptage (avertissement 3 du verificateur frais, decision
+# du manager du 2026-09-17) : chaque mutant asserte le rc EXACT sur le mutant ET sur l'original, et
 # n'est credite que par une ligne de forme canonique
 # « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ». Un mutant qui
-# « echoue » par un plantage ou une plage vide n'est PAS compte comme tue.
+# « echoue » par un plantage ou une plage vide n'est PAS compte comme tue. MUT-5 est le SEUL
+# mutant de cette suite juge sur la plage REELLE du depot (jamais une fixture jetable) : le
+# resserrement lui-meme n'est prouve que par sa capacite a distinguer un detecteur large (rouge
+# sur l'historique reel) d'un detecteur resserre (vert sur ce meme historique).
 set -uo pipefail
 
-SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-trace-arbitrage.sh"
+TOOLS_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT="$TOOLS_DIR/check-trace-arbitrage.sh"
 TARGET="$SCRIPT"
+# REAL_ROOT — racine du depot reel, calculee EXACTEMENT comme DEFAULT_ROOT dans le script sous
+# test (meme nombre de niveaux depuis tools/), utilisee UNIQUEMENT par MUT-5 (jamais par les
+# controles C0..C13 ni MUT-1..MUT-4, tous sur fixture jetable).
+REAL_ROOT="$(cd "$TOOLS_DIR/../../../.." && pwd)"
 
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
@@ -245,7 +255,7 @@ mk_preuves "$D" "BASE-TRACE-ARBITRAGE: 0000000000000000000000000000000000000000"
 safe_run out rc --root "$D"
 [ "$rc" -eq 2 ] && ok "C13 registre avec valeur non resoluble -> rc 2" || ko "C13" "rc=2" "rc=$rc :: $out"
 
-echo "== test-check-trace-arbitrage : MUTANTS (MUT-1 a MUT-4) =="
+echo "== test-check-trace-arbitrage : MUTANTS (MUT-1 a MUT-6) =="
 
 # --- MUT-1 : neutralise le controle de forme -> C1 devient vert sur le mutant ----------------
 MUT1_OLD='  if [ "$nmatches" -eq 0 ]; then'
@@ -338,6 +348,51 @@ else
   TARGET="$SCRIPT"; safe_run out_orig rc_orig --root "$D" --base-ref "$B"
   if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then okmut 4 "$rc_mut" 1 "$rc_orig" 0
   else komut 4 "normalisation des blancs neutralisee" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
+# --- MUT-5 : elargit la porte d'entree a la simple occurrence du mot racine (sans exiger un
+# marqueur d'invocation) -> doit rendre ROUGE la mesure sur la PLAGE REELLE du depot, alors que
+# l'original reste VERT (decision du manager, reprise 2026-09-18, point 4 premier mutant). SEUL
+# mutant de cette suite juge sur REAL_ROOT, jamais une fixture jetable : le resserrement n'est
+# prouve que par sa capacite a distinguer un detecteur large (rouge sur l'historique reel, ou des
+# mentions informelles pre-existent) d'un detecteur resserre (vert sur ce meme historique).
+MUT5_OLD="MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+MUT5_NEW="MARKER_REGEX='arbitrage|arbitrages|décision|décisions|decision|decisions'"
+set +e
+MUT5_PATH="$(make_mutant mut5 "$MUT5_OLD" "$MUT5_NEW")"
+MUT5_STAT=$?
+set -e
+if [ "$MUT5_STAT" -eq 1 ]; then komut 5 "porte d'entree elargie au mot racine" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
+elif [ "$MUT5_STAT" -eq 2 ]; then komut 5 "porte d'entree elargie au mot racine" "bash -n OK sur le mutant" "syntaxe invalide"
+else
+  TARGET="$MUT5_PATH"; safe_run out_mut rc_mut --root "$REAL_ROOT"
+  TARGET="$SCRIPT"; safe_run out_orig rc_orig --root "$REAL_ROOT"
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then okmut 5 "$rc_mut" 1 "$rc_orig" 0
+  else komut 5 "porte d'entree elargie au mot racine (depot reel)" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
+# --- MUT-6 : retire un marqueur d'invocation de la liste (« arbitrage Samuel ») -> doit rendre
+# VERT un cas de fixture qui invoque CE marqueur sans citation canonique complete, alors que
+# l'original reste ROUGE sur ce meme cas (decision du manager, reprise 2026-09-18, point 4 second
+# mutant). Reutilise le scenario de C1 (citation sans canal ni date), sur une fixture jetable
+# dediee — jamais le depot reel.
+MUT6_OLD="MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+MUT6_NEW="MARKER_REGEX='sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+set +e
+MUT6_PATH="$(make_mutant mut6 "$MUT6_OLD" "$MUT6_NEW")"
+MUT6_STAT=$?
+set -e
+D="$(mk_repo mut6)"; B="$(rev "$D" HEAD)"
+commit_msg "$D" "feat: hausse quelque chose
+
+arbitrage Samuel, sans canal ni date ici"
+if [ "$MUT6_STAT" -eq 1 ]; then komut 6 "marqueur arbitrage Samuel retire de la liste" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
+elif [ "$MUT6_STAT" -eq 2 ]; then komut 6 "marqueur arbitrage Samuel retire de la liste" "bash -n OK sur le mutant" "syntaxe invalide"
+else
+  TARGET="$MUT6_PATH"; safe_run out_mut rc_mut --root "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run out_orig rc_orig --root "$D" --base-ref "$B"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 6 "$rc_mut" 0 "$rc_orig" 1
+  else komut 6 "marqueur arbitrage Samuel retire de la liste" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
 fi
 
 TARGET="$SCRIPT"
