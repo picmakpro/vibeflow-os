@@ -24,6 +24,24 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
   sur ce dépôt (option (a)) : O-3 passe à « signalée et tracée ».
   `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
   arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
+- **G-2 (PROT-05, QUAL-01) — garde « la PR modifie ce qui la juge », marqueur déclaratif
+  `Gate-Touche:`** — `scripts/check-gate-touche.sh` + sa suite
+  `scripts/tests/test-check-gate-touche.sh` (cinq mutants opposables) + une étape à quatre
+  bascules de fixture dans le job `gates` de `.github/workflows/ci.yml`. Surveille CINQ classes
+  de la surface de gate : `plugin/conductor/scripts/check-*.sh`, `scripts/check-*.sh`, leurs
+  suites `plugin/conductor/scripts/tests/test-*.sh` et `scripts/tests/test-*.sh` (une seule
+  classe combinée), `.github/workflows/ci.yml`, et tout chemin sous `scripts/hooks/` — les gates
+  des AUTRES modules sont hors surface par l'arbitrage du périmètre sans admin, pas par oubli.
+  Exige un trailer déclaratif `Gate-Touche: <chemin-ou-motif> — <raison>` (séparateur nominal
+  tiret cadratin, tiret simple aussi accepté) sur un commit non-merge de la branche, PORTÉE
+  BRANCHE (n'importe quel commit de la plage, jamais nécessairement celui qui touche le chemin) —
+  la garde vérifie la FORME du marqueur, jamais la véracité de la raison citée. LIMITE DE FOND :
+  cette garde vit dans le dépôt — la PR qu'elle juge peut la modifier (elle, sa suite, son étape
+  CI) et rester verte ; elle rend visible et trace, elle ne verrouille rien. Traite la seconde
+  phrase d'O-3 du `25-SECURITY.md` (« une même PR peut modifier le gate, sa suite et l'étape CI »)
+  faute d'accès admin sur ce dépôt (option (a)) : signalée et tracée, jamais fermée.
+  `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
+  arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
 
 ## [v2.63.2] — 2026-09-17
 

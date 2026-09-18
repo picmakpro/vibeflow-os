@@ -1046,9 +1046,9 @@ jobs:
         # LIMITE DE FOND (formule canonique, sonde `check-aucune-fermeture.sh`, plan 41-15) :
         # cette étape et la garde qu'elle invoque peuvent être modifiée par la PR qu'elle juge —
         # reprise ici mot pour mot pour que la sonde ne signale plus ce fichier comme muet sur sa
-        # propre limite de fond. Une seule bascule isolée dans cette tâche (plan 41-16, Task 1) :
-        # dépôt jetable, chemin de surface touché sans trailer conforme → attendu rc 1,
-        # CHEMIN-NON-DECLARE. Task 3 du même plan complète à quatre bascules.
+        # propre limite de fond. QUATRE bascules isolées (plan 41-16, Task 3), chacune sur un
+        # dépôt jetable reconstruit DEPUIS ZÉRO par write_base() — une mutation à la fois, jamais
+        # cumulée, patron check-baseline-arbitrage (plus haut dans ce même job).
         run: |
           set -eu
 
@@ -1068,7 +1068,7 @@ jobs:
           fi
           echo "== check-gate-touche : ref de référence pour le journal = $REF =="
 
-          # --- Bascule isolée, dépôt jetable reconstruit ici -------------------------------------
+          # --- QUATRE bascules ISOLÉES sur dépôt jetable, chacune reconstruite depuis zéro --------
           FIX="$(mktemp -d)"
           trap 'rm -rf "$FIX"' EXIT
 
@@ -1083,23 +1083,61 @@ jobs:
             git_id commit -q -m "fixture: état initial"
           }
 
-          # 1/1 (Task 1) : chemin de surface touché sans trailer → attendu rc 1, CHEMIN-NON-DECLARE
+          # 1/4 chemin de surface touché et couvert par un trailer conforme → attendu rc 0
           write_base
           B1="$(git_id rev-parse HEAD)"
           printf 'echo demo v2\n' > "$FIX/scripts/check-demo.sh"
           git_id add -A
-          git_id commit -q -m "modifie le gate demo sans trailer"
+          MSG1="$(printf '%s\n\n%s\n' 'modifie le gate demo, couvert' 'Gate-Touche: scripts/check-demo.sh — bascule 1/4 de la preuve CI, chemin couvert')"
+          git_id commit -q -m "$MSG1"
           rc=0
           out="$(bash "$S" --root "$FIX" --base-ref "$B1" 2>&1)" || rc=$?
-          echo "== 1/1 chemin surface sans trailer : rc=$rc =="; printf '%s\n' "$out"
+          echo "== 1/4 chemin surface couvert : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *DECLARE*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "1/4 chemin surface couvert : rc=$rc (attendu 0), DECLARE=$has (attendu 1)"; fi
+
+          # 2/4 chemin de surface touché sans trailer → attendu rc 1, CHEMIN-NON-DECLARE
+          write_base
+          B2="$(git_id rev-parse HEAD)"
+          printf 'echo demo v2\n' > "$FIX/scripts/check-demo.sh"
+          git_id add -A
+          git_id commit -q -m "modifie le gate demo sans trailer"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B2" 2>&1)" || rc=$?
+          echo "== 2/4 chemin surface sans trailer : rc=$rc =="; printf '%s\n' "$out"
           has=0; case "$out" in *CHEMIN-NON-DECLARE*) has=1 ;; esac
-          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "1/1 chemin surface sans trailer : rc=$rc (attendu 1), CHEMIN-NON-DECLARE=$has (attendu 1)"; fi
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "2/4 chemin surface sans trailer : rc=$rc (attendu 1), CHEMIN-NON-DECLARE=$has (attendu 1)"; fi
+
+          # 3/4 trailer présent mais sans séparateur ni raison → attendu rc 1, MARQUEUR-MAL-FORME
+          write_base
+          B3="$(git_id rev-parse HEAD)"
+          printf 'echo demo v2\n' > "$FIX/scripts/check-demo.sh"
+          git_id add -A
+          MSG3="$(printf '%s\n\n%s\n' 'modifie le gate demo, trailer casse' 'Gate-Touche: scripts/check-demo.sh sans separateur du tout dans cette ligne')"
+          git_id commit -q -m "$MSG3"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B3" 2>&1)" || rc=$?
+          echo "== 3/4 trailer sans séparateur : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *MARQUEUR-MAL-FORME*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "3/4 trailer sans séparateur : rc=$rc (attendu 1), MARQUEUR-MAL-FORME=$has (attendu 1)"; fi
+
+          # 4/4 seul un chemin hors surface touché → attendu rc 3, RIEN-A-JUGER
+          write_base
+          B4="$(git_id rev-parse HEAD)"
+          printf 'contenu\n' > "$FIX/README.md"
+          git_id add -A
+          git_id commit -q -m "touche readme seul, hors surface"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B4" 2>&1)" || rc=$?
+          echo "== 4/4 hors surface seul : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *RIEN-A-JUGER*) has=1 ;; esac
+          if [ "$rc" -ne 3 ] || [ "$has" -ne 1 ]; then note "4/4 hors surface seul : rc=$rc (attendu 3), RIEN-A-JUGER=$has (attendu 1)"; fi
 
           rm -rf "$FIX"
 
-          echo "== BILAN preuve fixture : $fail écart(s) sur 1 verdict =="
+          echo "== BILAN preuve fixture : $fail écart(s) sur 4 verdicts =="
           if [ "$fail" -ne 0 ]; then exit 1; fi
-          echo "== check-gate-touche DISCRIMINANT en CI : la bascule isolée est prouvée =="
+          echo "== check-gate-touche DISCRIMINANT en CI : les quatre bascules isolées sont prouvées, l'étape sait rougir sur chacun de ses trois verdicts bloquants/non bloquants =="
 
           # --- Mesure du dépôt réel ---------------------------------------------------------------
           rc=0
