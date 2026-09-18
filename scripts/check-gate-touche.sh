@@ -67,7 +67,18 @@
 #   2. Recolte des marqueurs — messages de TOUS les commits de `git rev-list <base>..HEAD`,
 #      merges compris (un commit de documentation peut porter les trailers d'un lot).
 #   3. Forme du marqueur — separateur + raison, decrits plus haut ; un trailer non conforme est
-#      IGNORE pour la couverture et signale par MARQUEUR-MAL-FORME, ligne recopiee.
+#      IGNORE pour la couverture et signale par MARQUEUR-MAL-FORME, ligne recopiee. BORNE SUR LE
+#      MOTIF, nommee ici et pas seulement dans le code : un motif (premier champ, avant le
+#      separateur) qui contient une VIRGULE LITTERALE est TOUJOURS MARQUEUR-MAL-FORME, meme si le
+#      reste de la forme (separateur, raison de 10 caracteres) est par ailleurs correct. Raison :
+#      `case "$chemin" in ($motif)` (comparaison 4) ne fait JAMAIS d'union sur une virgule — un
+#      motif du genre `a.sh, b.sh` ne matchera JAMAIS ni `a.sh` ni `b.sh` via `case`, il se
+#      declarerait conforme sans jamais rien couvrir. Angle mort mesure : le commit `6e7c727`
+#      (plan 41-14) porte exactement ce trailer, inoffensif aujourd'hui puisque les deux chemins
+#      qu'il visait sont couverts par ailleurs — mais un futur contributeur qui reprendrait ce
+#      style croirait couvrir deux chemins avec un seul trailer et se retrouverait avec une
+#      couverture nulle, sans diagnostic pointant la vraie cause. « Un trailer = un chemin ou
+#      motif, jamais une liste separee par virgule. »
 #   4. Correspondance chemin <-> motif — `case "$chemin" in ($motif) …` (jamais `eval`, jamais une
 #      regex construite par concatenation) : un motif glob (`scripts/check-*.sh`) couvre tout
 #      chemin qu'il apparie, pas seulement une egalite exacte.
@@ -243,6 +254,12 @@ while IFS= read -r c; do
           echo "MARQUEUR-MAL-FORME: ${trimmed}"
           continue
         fi
+        case "$motif" in
+          *,*)
+            echo "MARQUEUR-MAL-FORME: ${trimmed} (motif contient une virgule — un trailer = un chemin ou motif, jamais une liste separee par virgule ; \`case\` ne fait pas d'union sur une virgule)"
+            continue
+            ;;
+        esac
         reason_stripped="$(printf '%s' "$reason" | tr -d '[:space:]')"
         if [ "${#reason_stripped}" -lt 10 ]; then
           echo "MARQUEUR-MAL-FORME: ${trimmed}"

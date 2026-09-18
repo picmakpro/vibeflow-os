@@ -9,12 +9,13 @@
 # PR qu'elle juge — elle, cette suite, et l'etape CI qui l'invoque — et rester verte. Une suite
 # incapable de rougir est un defaut, au meme titre que le gate qu'elle verifie.
 #
-# Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et CINQ mutants opposables
-# (MUT-1 a MUT-5), un par comparaison du script sous test — regle de comptage (decision du
-# manager, 2026-09-17, reprise du plan 41-14) : chaque mutant asserte le rc EXACT attendu sur le
-# mutant ET sur l'original. Un mutant qui « echoue » par un plantage (rc 2) ou une plage vide
-# (rc 3) la ou le cas attendait un autre flip n'est PAS compte comme tue. La ligne de succes d'un
-# mutant a une forme UNIQUE, exigee par le verify du plan :
+# Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et SIX mutants opposables
+# (MUT-1 a MUT-6), un par comparaison du script sous test (MUT-6 cible la borne sur la virgule du
+# motif, ajoutee dans la meme comparaison 3) — regle de comptage (decision du manager, 2026-09-17,
+# reprise du plan 41-14) : chaque mutant asserte le rc EXACT attendu sur le mutant ET sur
+# l'original. Un mutant qui « echoue » par un plantage (rc 2) ou une plage vide (rc 3) la ou le
+# cas attendait un autre flip n'est PAS compte comme tue. La ligne de succes d'un mutant a une
+# forme UNIQUE, exigee par le verify du plan :
 # « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
 set -uo pipefail
 
@@ -294,6 +295,22 @@ case "$out" in *"CHEMIN-NON-DECLARE: scripts/tests/test-check-demo.sh"*) hasgood
 if [ "$rc" -eq 1 ] && [ "$nverdicts" -eq 1 ] && [ "$hasgood" -eq 1 ]; then ok "FAIL deux chemins un seul declare -> rc 1, un seul verdict de chemin"
 else ko "FAIL deux chemins un seul declare" "rc=1, 1 verdict CHEMIN-NON-DECLARE (test-check-demo.sh)" "rc=$rc verdicts=$nverdicts :: $out"; fi
 
+# --- FAIL 6 : motif du trailer contient une virgule litterale (deux chemins listes) -> rc1 ----------
+# MARQUEUR-MAL-FORME (le motif ne matchera JAMAIS ni l'un ni l'autre chemin via `case`), et les
+# DEUX chemins restent CHEMIN-NON-DECLARE. Fixture inspiree du trailer reel du commit `6e7c727`
+# (plan 41-14) : `scripts/check-demo.sh, scripts/tests/test-check-demo.sh — raison...`.
+D="$(mk_repo fail6)"; B="$(base_of "$D")"
+printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh"
+printf '#!/bin/sh\necho v2\n' > "$D/scripts/tests/test-check-demo.sh"
+commit_avec "$D" "feat: touche deux chemins, motif malforme avec virgule
+
+Gate-Touche: scripts/check-demo.sh, scripts/tests/test-check-demo.sh — motif malforme avec virgule litterale ici"
+safe_run out rc "$D" --base-ref "$B"
+case "$out" in *MARQUEUR-MAL-FORME*) hasm=1 ;; *) hasm=0 ;; esac
+nverdicts=$(printf '%s\n' "$out" | awk '/^CHEMIN-NON-DECLARE:/ { c++ } END { print c + 0 }')
+if [ "$rc" -eq 1 ] && [ "$hasm" -eq 1 ] && [ "$nverdicts" -eq 2 ]; then ok "FAIL motif avec virgule litterale -> rc 1 MARQUEUR-MAL-FORME + 2 CHEMIN-NON-DECLARE"
+else ko "FAIL motif avec virgule litterale" "rc=1 MARQUEUR-MAL-FORME + 2 CHEMIN-NON-DECLARE" "rc=$rc verdicts=$nverdicts :: $out"; fi
+
 echo "== test-check-gate-touche : BRUYANT =="
 
 # --- BRUYANT 1 : --base-ref vers une ref inexistante -------------------------------------------------
@@ -347,7 +364,7 @@ safe_run out rc "$TMP/chemin-inexistant-xyz"
 safe_run out rc "$TMP" --base-ref
 [ "$rc" -eq 64 ] && ok "USAGE --base-ref sans valeur -> 64" || ko "USAGE --base-ref sans valeur" "rc=64" "rc=$rc :: $out"
 
-echo "== test-check-gate-touche : MUTANTS (MUT-1 a MUT-5) =="
+echo "== test-check-gate-touche : MUTANTS (MUT-1 a MUT-6) =="
 
 # --- MUT-1 : retire la classe des suites (scripts/tests/test-*.sh) ----------------------------------
 MUT1_OLD='    if (p ~ /^scripts\/tests\/test-[^\/]+\.sh$/) return "suite"'
@@ -437,7 +454,54 @@ else
   else komut 5 "derivation de la base par adjacence HEAD^" "rc_mutant=3 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
 fi
 
+# --- MUT-6 : neutralise le rejet des motifs a virgule litterale (comparaison 3, borne ajoutee) -------
+# Fixture : un SEUL chemin de surface, nomme litteralement avec une virgule et un espace dans son
+# propre nom de fichier (`scripts/check-demo.sh, foo.sh` — nom de fichier valide sous Unix), dont
+# le trailer reprend EXACTEMENT ce nom comme motif. Original : le motif contient une virgule ->
+# MARQUEUR-MAL-FORME, jamais ajoute a TRAILERS_OK -> le chemin reste CHEMIN-NON-DECLARE -> rc 1.
+# Mutant (le controle de virgule neutralise) : le motif est accepte tel quel et, n'ayant aucun
+# metacaractere de glob, correspond EXACTEMENT (case) au chemin homonyme -> covered=1 -> rc 0. Ce
+# flip 1->0 est la preuve que le controle ajoute, et lui seul, empeche cette couverture accidentelle.
+MUT6_OLD='          *,*)'
+MUT6_NEW='          *NEVER-MATCH-COMMA-XYZ*)'
+MUT6_PATH="$(make_mutant mut6 "$MUT6_OLD" "$MUT6_NEW")"; MUT6_STAT=$?
+D="$(mk_repo mut6)"; B="$(base_of "$D")"
+printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh, foo.sh"
+commit_avec "$D" "feat: touche un chemin nomme avec virgule litterale (fixture MUT-6)
+
+Gate-Touche: scripts/check-demo.sh, foo.sh — motif reprend exactement le nom de fichier a virgule"
+if [ "$MUT6_STAT" -eq 1 ]; then komut 6 "rejet des motifs a virgule neutralise" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
+elif [ "$MUT6_STAT" -eq 2 ]; then komut 6 "rejet des motifs a virgule neutralise" "bash -n OK sur le mutant" "syntaxe invalide"
+else
+  TARGET="$MUT6_PATH"; safe_run _mutout rc_mut "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D" --base-ref "$B"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 6 "$rc_mut" 0 "$rc_orig" 1
+  else komut 6 "rejet des motifs a virgule neutralise" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
 TARGET="$SCRIPT"
+
+echo "== test-check-gate-touche : AUTO-DEFENSE (regression bash -e) =="
+
+# --- AUTODEF 1 : la suite ELLE-MEME doit atteindre sa ligne de bilan sous invocation stricte
+# `bash --noprofile --norc -e` — meme motif que test-check-baseline-arbitrage.sh (plan 41-14,
+# correctif documente ; correctif de revue de jointure, 2026-09-18, correctif 3). Garde de
+# recursion (_TCGT_NORECURSE) : l'instance enfant SAUTE ce meme bloc, sinon recursion infinie.
+if [ "${_TCGT_NORECURSE:-}" != "1" ]; then
+  SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  set +e
+  CHILD_OUT="$(_TCGT_NORECURSE=1 bash --noprofile --norc -e "$SELF" 2>&1)"
+  CHILD_RC=$?
+  set -e
+  case "$CHILD_OUT" in *"== bilan : "*) reached_bilan=1 ;; *) reached_bilan=0 ;; esac
+  if [ "$reached_bilan" -eq 1 ]; then
+    ok "AUTODEF suite rejouee sous bash -e strict -> atteint sa ligne de bilan (rc enfant=$CHILD_RC)"
+  else
+    ko "AUTODEF suite rejouee sous bash -e strict -> atteint sa ligne de bilan" \
+      "presence de '== bilan : ' dans la sortie de l'enfant" \
+      "rc enfant=$CHILD_RC, bilan absent — derniere ligne : $(printf '%s\n' "$CHILD_OUT" | tail -1)"
+  fi
+fi
 
 echo "== bilan : $PASS ok, $FAIL ko =="
 if [ "$FAIL" -ne 0 ]; then exit 1; fi
