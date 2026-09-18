@@ -1,0 +1,42 @@
+{
+  "nodes": [
+    {
+      "id": "recherche-doc",
+      "step": "doc GitHub rulesets (web)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "escalade",
+      "step": "questions de fond relayees a main",
+      "stage": "",
+      "deps": [
+        "recherche-doc"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "context",
+      "step": "redaction 41-CONTEXT.md",
+      "stage": "",
+      "deps": [
+        "escalade"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-context",
+      "step": "juge frais du CONTEXT",
+      "stage": "",
+      "deps": [
+        "context"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

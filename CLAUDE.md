@@ -59,3 +59,28 @@ correctif / doc / durcissement → **patch**. Le tag reprend **exactement** la v
   « arbitrage Samuel » a la même forme qu'il soit vrai ou fabriqué : c'est le lecteur d'après qui
   paie. Adoptée le 2026-09-10, née du commit `8fc4b45` (Phase 39), dont personne ne pouvait vérifier
   l'attribution — un manager a dû remonter la chaîne pour l'établir.
+
+## Gardes in-repo — ce qui est gardé, ce qui ne l'est pas
+
+`main` n'est protégée par aucune règle côté serveur — aucun accès admin sur ce dépôt (ADR-072) —
+donc les gardes ci-dessous rendent visible et tracent, elles ne verrouillent rien.
+
+- `scripts/check-baseline-arbitrage.sh` (G-1) : rougit sur une hausse de la colonne des
+  instructions de la baseline du budget d'instructions, ou sur une sentinelle d'armement
+  neutralisée, sans citation d'arbitrage conforme dans le commit qui porte le changement.
+- `scripts/check-gate-touche.sh` (G-2) : rougit quand un gate, sa suite, `.github/workflows/ci.yml`
+  ou un hook sont touchés sans marqueur déclaratif dans un commit de la branche.
+- `scripts/check-push-sans-pr.sh` (G-3) : alarme après coup, un commit arrivé sur `main` sans PR
+  associée — quand elle rougit, le commit est déjà sur `main`.
+
+**Marqueur** : tout commit qui touche un gate, sa suite, le workflow CI ou un hook porte un trailer
+`Gate-Touche: <chemin-ou-motif> — <raison>`. Déclaratif — forme et présence vérifiées, jamais la
+véracité de la raison — de portée branche : un commit ultérieur peut couvrir un chemin touché plus
+tôt.
+
+**Baseline** : toute hausse d'une valeur de la baseline du budget d'instructions exige, dans le
+commit qui la fait, une citation d'arbitrage avec son canal et sa date — la convention de
+traçabilité déjà énoncée plus haut dans ce fichier.
+
+**Limite de fond** : une garde qui vit dans le dépôt peut être modifiée par la PR qu'elle juge.
+Détail complet : ADR-072.

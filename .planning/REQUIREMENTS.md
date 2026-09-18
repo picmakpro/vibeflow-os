@@ -850,7 +850,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SKIL-01 | Phase 34 | Done — cadrage rendu, verdict NO-GO, 2026-09-15 — `34-SPIKE-SKIL.md` |
 | AGTS-01 | Phase 34 | Done — verdict par gap rendu, 2026-09-15 — `34-AUDIT-AGTS.md` |
 | AGTS-02 | Phase 34 | Reportée avec trace — run réel ROUGE, 2026-09-15 — `34-RUN-MOBILE.md`, déclencheur de reprise au BACKLOG |
-| QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35, 40.1 | Pending — satisfait sur les phases 30, 31 et 32 livrées (30/31 : 3 issues + mutation rouge prouvée ; 32 : amendé à **4** issues par D-32-QUAL — PASS/DENY/imparsable-silencieux/indisponible-BRUYANT — les 4 couvertes, cf. `32-RELIQUATS.md` §5) ; **non déclenché sur la Phase 35** (2026-08-26, option A) — aucun gate ni comparateur neuf n'y naît, donc rien à satisfaire ; **satisfait sur la Phase 25 le 2026-09-16** (`check-instruction-budget.sh` : trois issues exercées sur fixtures, quatre mutants vérifiés par `cmp` dont un par métrique, mutation rouge sur le dépôt armé) ; **satisfait sur la Phase 40.1 le 2026-09-17** (sept mutants du gate tués, dont MUT-2 remplacé ; contrôles négatifs du recensement ; frontière de l'auditeur) ; reste à tenir sur 33, 18 |
+| QUAL-01 | Transverse — Phases 30, 31, 32, 33, 18, 25, 35, 40.1, 41 | Pending — satisfait sur les phases 30, 31 et 32 livrées (30/31 : 3 issues + mutation rouge prouvée ; 32 : amendé à **4** issues par D-32-QUAL — PASS/DENY/imparsable-silencieux/indisponible-BRUYANT — les 4 couvertes, cf. `32-RELIQUATS.md` §5) ; **non déclenché sur la Phase 35** (2026-08-26, option A) — aucun gate ni comparateur neuf n'y naît, donc rien à satisfaire ; **satisfait sur la Phase 25 le 2026-09-16** (`check-instruction-budget.sh` : trois issues exercées sur fixtures, quatre mutants vérifiés par `cmp` dont un par métrique, mutation rouge sur le dépôt armé) ; **satisfait sur la Phase 40.1 le 2026-09-17** (sept mutants du gate tués, dont MUT-2 remplacé ; contrôles négatifs du recensement ; frontière de l'auditeur) ; **satisfait sur la Phase 41 le 2026-09-18** (trois gates neufs — `check-baseline-arbitrage.sh` neuf mutants tués, `check-gate-touche.sh` six mutants tués, `check-push-sans-pr.sh` cinq mutants tués, chacun avec ses trois issues PASS/FAIL/imparsable-BRUYANT — vingt mutants tués mesurés sur les trois gardes CI ; plus les deux outils de la phase — recensement trois mutants tués, contrôle de trace six mutants tués — total mesuré vingt-neuf mutants tués, ligne canonique `✓ MUT-<n> TUE`, rc=0 sur les cinq suites) ; reste à tenir sur 33, 18 |
 | PART-01 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-02 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-03 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
@@ -860,6 +860,11 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | PART-07 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-08 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-09 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PROT-01 | Phase 41 | Hors d'atteinte — 2026-09-18 : exige un accès admin (permissions mesurées le 2026-09-17, `admin: false, maintain: false, push: true`), différé au `BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ », déclencheur de reprise écrit |
+| PROT-02 | Phase 41 | Complete — 2026-09-18, plan 41-17/41-19 : ordre des étapes avant `check-release-tag`, absence d'entrée `tags:` dans le déclencheur, voie `merge-commit-sha` pour les merges par rebase, hook `pre-push` conservé |
+| PROT-03 | Phase 41 | Complete — 2026-09-18, plan 41-18 : ADR-072 (doctrine des trois gardes et de leur limite de fond) et son résumé dans `CLAUDE.md` |
+| PROT-04 | Phase 41 | Complete — 2026-09-18, plan 41-14 : `check-baseline-arbitrage.sh`, neuf mutants tués, observation O-3 du `25-SECURITY.md` signalée et tracée |
+| PROT-05 | Phase 41 | Complete — 2026-09-18, plans 41-16/41-17 : exigence née du recadrage sans admin (décision du manager, 2026-09-17), `check-gate-touche.sh` (six mutants tués) et `check-push-sans-pr.sh` (cinq mutants tués) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -907,6 +912,9 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   un gate (30, 31, 32, 33, 18, 25, 35), vérifié à chaque livraison de gate plutôt qu'en une phase
   propre. La Phase 34 (AGTS-01/02 + SKIL-01) n'attend aucun gate neuf — QUAL-01 s'y appliquerait de
   plein droit si un gate y naissait.
+- La famille PROT (5 IDs) est inscrite par la Phase 41 le 2026-09-18, portant le ledger du
+  milestone à 35 IDs — dont PROT-01 hors d'atteinte sans accès admin (mesuré le 2026-09-17) et
+  PROT-05 créée en cours de phase par le recadrage sans admin (décision du manager, 2026-09-17).
 
 ## Milestone fiabilite-v1.0 — « ce qui survit » (démarré 2026-08-15)
 
@@ -953,6 +961,42 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **BUDG-02**: Le gate est en ratchet — avertit d'abord, bloque au merge, jamais rouge des semaines — **close le 2026-09-16** (plan 25-04) : avertissement CI non bloquant pendant la première PR (conductor v1.37.0), sentinelle posée dans le même commit que la baseline, gate armé rendant 0 sur le dépôt (jamais entré rouge) ; mutation rouge prouvée sur le dépôt réel (ligne ajoutée à `vf-dev-manager.md` → exit 1) ; conductor v1.37.1
 - [x] **BUDG-04**: Le plafond ADR-029 des agents vaut 300 lignes partout où il est énoncé ou mesuré (gate, CI, suites de modules, auditeur de densité et méthodologie distribués, doctrine, manuel), avec un avertissement non bloquant dès 251 ; chaque outil garde sa mesure (fichier entier ou body) — Phase 40.1, D-01/D-05/D-06 — **close le 2026-09-17** (plan 40.1-14) : recensement versionné final rc 0, contrôles négatifs vérifiés (fixtures et clone réel), rejeu CI tests+gates vert
 - [x] **BUDG-05**: Le ratchet du budget ne bloque plus que les ajouts d'instructions, par fichier ; une croissance de lignes sans instruction sous le plafond reste verte — prouvé par bascules sur fixture dans l'étape CI elle-même — Phase 40.1, D-02/D-07 — **close le 2026-09-17** (plan 40.1-14) : bascules CI prouvées par mutants (plan 40.1-03), invariants de phase verts, rejeu gates+tests vert
+
+### Posture de protection du dépôt (Phase 41 — périmètre sans admin)
+- [ ] **PROT-01**: Rulesets de branche et de tags posés et prouvés par un refus réel. **NON COCHÉ**
+  — hors d'atteinte sans accès admin : mesure `admin: false, maintain: false, push: true` sur le
+  dépôt, 2026-09-17, deux lectures indépendantes ; le compte `picmakpro`, seul admin, appartient à
+  un tiers. Déclencheur de reprise : un accès admin accordé, ou un transfert du dépôt. Renvoi :
+  `BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ » et `41-CONTEXT.md` § Prémisse
+  renversée (D-01 à D-08 suspendus, non annulés). Ni abandonné, ni requalifié : il attend.
+- [x] **PROT-02**: Compatibilité avec la discipline de release du `CLAUDE.md`. **COCHÉ** —
+  clôture citant les clés `REJEU-GATES` et `G3-FIXTURE` (registre `41-PREUVES.md` § 41-19) et les
+  trois preuves du plan 41-17 : ordre des étapes avant `check-release-tag`, absence d'entrée
+  `tags:` dans le déclencheur, voie `merge-commit-sha` pour les merges par rebase — plus le hook
+  `pre-push` conservé.
+- [x] **PROT-03**: Politique de contournement et de hotfix écrite. **COCHÉ** — clôture citant
+  ADR-072 (plan 41-18) et son résumé dans `CLAUDE.md`, avec la précision que l'amendement d'ADR-059
+  est hors périmètre faute de règle serveur qui l'appliquerait.
+- [x] **PROT-04**: Observation O-3 du `25-SECURITY.md`, **signalée et tracée** par des gardes
+  in-repo — non plus par `CODEOWNERS` et revue code owner, inatteignables sans admin. **COCHÉ** —
+  clôture citant `check-baseline-arbitrage.sh` (plan 41-14), ses neuf mutants tués, les clés
+  `G1-REEL` et `RECENSEMENT-FINAL` (registre `41-PREUVES.md` § 41-19). Ce script est le seul foyer
+  de PROT-04 depuis la décision du manager du 2026-09-17 ; `check-gate-touche.sh` relève de
+  PROT-05. Le changement de moyen (`CODEOWNERS` → gardes in-repo) est un arbitrage du 2026-09-17,
+  pas une réduction silencieuse. Le statut d'O-3 reste « signalée et tracée » — objet distinct de
+  la clôture de l'exigence, écrit dans une phrase séparée.
+- [x] **PROT-05** *(exigence née du recadrage sans admin — décision du manager du 2026-09-17 sur
+  remontée du planificateur, arbitrage Samuel, AskUserQuestion session principale, 2026-09-17)*:
+  Les gardes in-repo de la surface de gate et du flux d'arrivée sur `main` rendent une atteinte
+  visible et tracée ; aucune n'est présentée comme une protection absolue. **COCHÉ** — clôture
+  citant `check-gate-touche.sh` et `check-push-sans-pr.sh` (plans 41-16 et 41-17), leurs mutants
+  tués (six et cinq), les clés `G2-REEL` et `G3-FIXTURE` (registre `41-PREUVES.md` § 41-19). Née de
+  la suspension de D-01 à D-08 (2026-09-17) : ces deux scripts se retrouvaient sans foyer
+  d'exigence. La clause « aucune n'est présentée comme une protection absolue » est opposable —
+  vérifiée par machine par `tools/check-aucune-fermeture.sh` (interdiction de co-occurrence, sonde
+  de limite de fond). L'énoncé a été **reformulé** le 2026-09-17 (décision du manager, bloquant 2
+  du vérificateur frais) : la première rédaction portait un jeton d'achèvement et déclenchait son
+  propre recensement ; la reformulation n'en contient aucun, sans quatrième entrée d'allowlist.
 
 ### Ré-armement worktree (phase conditionnelle — jamais bloquante ; close 2026-08-26, option A)
 - [~] **WKTR-01** *(requalifié, pas livré)*: la précondition externe (gsd-core > 1.10.0 releasé ET installé) est bien tombée, mais l'attestation prévue (`# vf-provides: worktree-baseref` porté par `ensure-deps.sh`) n'est pas satisfiable honnêtement — `ensure-deps.sh` ne doit pas écrire `worktree.baseRef`, donc il ne peut pas l'attester sans produire une couverture déclarée sans couverture effective (Borne 4)
@@ -1129,7 +1173,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   `guard-driver-lock.sh`.
 
 ### Transverse
-- [ ] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée
+- [ ] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée — **satisfait sur la Phase 41 le 2026-09-18** : G-1/G-2/G-3 naissent chacun avec ses trois issues, vingt mutants tués mesurés sur les trois gardes plus neuf sur les deux outils de phase (recensement, contrôle de trace), total mesuré vingt-neuf, ligne canonique `✓ MUT-<n> TUE`, rc=0 sur les cinq suites
 
 ### Out of Scope (audité le 2026-08-15 — chaque exclusion a son alternative dans le périmètre)
 - **Auto-steal du lock au TTL** — lock périmé ≠ mission morte (constaté 2026-08-02) → LOCK-01 + LOCK-04. *Réévaluable post-LOCK-01 : auto-takeover sur battement mort (pas sur TTL).*

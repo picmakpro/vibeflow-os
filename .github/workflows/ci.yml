@@ -863,6 +863,392 @@ jobs:
           if [ "$fail" -ne 0 ]; then exit 1; fi
           echo "== check-divergence.sh VERT en CI : le flip 0 → 1 sur mutation réelle est prouvé, la racine n'a pas bougé =="
 
+      - name: check-baseline-arbitrage (G-1, PROT-04 — hausse de baseline sans arbitrage cité)
+        # POURQUOI CETTE ÉTAPE EXISTE. G-1 traite O-3 du `25-SECURITY.md` (T-25-16, restée
+        # procédurale) faute d'accès admin sur ce dépôt (option (a), arbitrage Samuel,
+        # AskUserQuestion session principale, 2026-09-17) : elle rend visible et trace toute hausse
+        # de la colonne INSTRUCTIONS de `.planning/instruction-budget-baselines.tsv`, ou toute
+        # neutralisation d'une sentinelle `.planning/.*-armed`, sans citation d'arbitrage conforme
+        # dans le commit qui porte le changement. LIMITE DE FOND : la garde vit dans le dépôt — la PR
+        # qu'elle juge peut la modifier (elle, sa suite, cette étape) et rester verte. Elle rend
+        # visible et trace, elle ne verrouille rien ; O-3 devient « signalée et tracée », jamais
+        # « fermée ». Une étape qui se contenterait de mesurer le dépôt réel serait verte par
+        # construction si elle perdait sa capacité à discriminer — la bascule isolée ci-dessous, sur
+        # dépôt jetable reconstruit à chaque fois, existe pour que cette étape prouve elle-même
+        # qu'elle sait encore rendre rouge, patron `check-instruction-budget` (plus haut dans ce même
+        # job). SIX bascules isolées, chacune sur un dépôt jetable reconstruit depuis zéro par
+        # write_base() — une seule mutation à la fois, jamais cumulée (plan 41-14 Task 3).
+        # FORMULE CANONIQUE (sonde de limite de fond, check-aucune-fermeture.sh, plan 41-15, mandat
+        # élargi du manager de mission, 2026-09-17) : cette étape et la garde qu'elle invoque peuvent
+        # être modifiée par la PR qu'elle juge — reprise ici mot pour mot pour que la sonde ne
+        # signale plus ce fichier comme muet sur sa propre limite de fond.
+        run: |
+          set -eu
+
+          S="scripts/check-baseline-arbitrage.sh"
+          fail=0
+          note() { echo "::error::check-baseline-arbitrage CI : $1"; fail=$((fail + 1)); }
+
+          # --- Résolution de la ref de référence pour le journal, remédiation nommée si absente -----
+          REF=""
+          for r in refs/remotes/origin/main origin/main refs/heads/main main; do
+            if git rev-parse --verify -q "${r}^{commit}" >/dev/null 2>&1; then REF="$r"; break; fi
+          done
+          if [ -z "$REF" ]; then
+            echo "::warning::check-baseline-arbitrage CI : aucune ref main résoluble localement, git fetch origin main (remédiation nommée, jamais un repli silencieux)"
+            git fetch origin main:refs/remotes/origin/main
+            REF="refs/remotes/origin/main"
+          fi
+          echo "== check-baseline-arbitrage : ref de référence pour le journal = $REF =="
+
+          # --- Bloc 1 — SIX bascules ISOLÉES sur dépôt jetable, chacune reconstruite depuis zéro ----
+          FIX="$(mktemp -d)"
+          trap 'rm -rf "$FIX"' EXIT
+
+          git_id() { git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false "$@"; }
+
+          write_base() {
+            rm -rf "$FIX"
+            mkdir -p "$FIX/.planning" "$FIX/demo"
+            git init -q -b main "$FIX"
+            {
+              printf '%s\n' '# baseline de fixture CI'
+              printf 'demo/a.md\t10\t5\n'
+            } > "$FIX/.planning/instruction-budget-baselines.tsv"
+            : > "$FIX/.planning/.instruction-budget-armed"
+            printf 'contenu a\n' > "$FIX/demo/a.md"
+            git_id add -A
+            git_id commit -q -m "fixture: état initial"
+          }
+
+          # 1/6 dépôt conforme, plage non vide → attendu 0
+          write_base
+          B1="$(git_id rev-parse HEAD)"
+          git_id commit -q --allow-empty -m "chore: rien ne change"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B1" 2>&1)" || rc=$?
+          echo "== 1/6 fixture conforme : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "1/6 fixture conforme : rc=$rc, attendu 0"
+
+          # 2/6 hausse d'INSTRUCTIONS sans citation → attendu 1, HAUSSE-SANS-ARBITRAGE
+          write_base
+          B2="$(git_id rev-parse HEAD)"
+          { printf '%s\n' '# baseline de fixture CI'; printf 'demo/a.md\t10\t9\n'; } > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git_id add -A
+          git_id commit -q -m "hausse instructions sans citation"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B2" 2>&1)" || rc=$?
+          echo "== 2/6 hausse instructions sans citation : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *HAUSSE-SANS-ARBITRAGE*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "2/6 hausse instructions sans citation : rc=$rc (attendu 1), HAUSSE-SANS-ARBITRAGE=$has (attendu 1)"; fi
+
+          # 3/6 hausse de la seule colonne LIGNES, sans citation → attendu 0, AVERTISSEMENT-LIGNES-EN-HAUSSE,
+          #     jamais de verdict de hausse bloquante (D-02/D-H6 : colonne informative)
+          write_base
+          B3="$(git_id rev-parse HEAD)"
+          { printf '%s\n' '# baseline de fixture CI'; printf 'demo/a.md\t15\t5\n'; } > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git_id add -A
+          git_id commit -q -m "hausse lignes seule sans citation"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B3" 2>&1)" || rc=$?
+          echo "== 3/6 hausse lignes seule : rc=$rc =="; printf '%s\n' "$out"
+          hasw=0; case "$out" in *AVERTISSEMENT-LIGNES-EN-HAUSSE*) hasw=1 ;; esac
+          hasb=0; case "$out" in *HAUSSE-SANS-ARBITRAGE*|*HAUSSE-NON-IMPUTABLE*) hasb=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$hasw" -ne 1 ] || [ "$hasb" -ne 0 ]; then note "3/6 hausse lignes seule : rc=$rc (attendu 0), AVERTISSEMENT-LIGNES-EN-HAUSSE=$hasw (attendu 1), verdict bloquant présent=$hasb (attendu 0)"; fi
+
+          # 4/6 sentinelle .planning/.instruction-budget-armed supprimée sans citation → attendu 1,
+          #     SENTINELLE-NEUTRALISEE
+          write_base
+          B4="$(git_id rev-parse HEAD)"
+          rm -f "$FIX/.planning/.instruction-budget-armed"
+          git_id add -A
+          git_id commit -q -m "retire la sentinelle armed sans citation"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B4" 2>&1)" || rc=$?
+          echo "== 4/6 sentinelle retirée : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *SENTINELLE-NEUTRALISEE*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "4/6 sentinelle retirée : rc=$rc (attendu 1), SENTINELLE-NEUTRALISEE=$has (attendu 1)"; fi
+
+          # 5/6 ligne de baseline retirée, TROIS volets comptés comme UNE bascule (règle finale du
+          #     manager, 2026-09-17) : cible présente sans citation → 1 ; cible présente avec
+          #     citation conforme → 0 ; cible également disparue de l'arbre → 0
+          write_base
+          B5A="$(git_id rev-parse HEAD)"
+          printf '%s\n' '# baseline de fixture CI' > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git_id add -A
+          git_id commit -q -m "retire a.md de la baseline sans citation, fichier reste"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B5A" 2>&1)" || rc=$?
+          echo "== 5a/6 ligne retirée, cible présente, sans citation : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "5a/6 ligne retirée cible présente sans citation : rc=$rc (attendu 1), verdict=$has (attendu 1)"; fi
+
+          write_base
+          B5B="$(git_id rev-parse HEAD)"
+          printf '%s\n' '# baseline de fixture CI' > "$FIX/.planning/instruction-budget-baselines.tsv"
+          git_id add -A
+          MSG5B="$(printf '%s\n\n%s\n' 'retire a.md de la baseline, fichier conservé' 'arbitrage Samuel, AskUserQuestion session principale, 2026-09-17')"
+          git_id commit -q -m "$MSG5B"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B5B" 2>&1)" || rc=$?
+          echo "== 5b/6 ligne retirée, cible présente, avec citation : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *AVERTISSEMENT-LIGNE-RETIREE-ARBITREE*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "5b/6 ligne retirée cible présente avec citation : rc=$rc (attendu 0), verdict=$has (attendu 1)"; fi
+
+          write_base
+          B5C="$(git_id rev-parse HEAD)"
+          printf '%s\n' '# baseline de fixture CI' > "$FIX/.planning/instruction-budget-baselines.tsv"
+          rm -f "$FIX/demo/a.md"
+          git_id add -A
+          git_id commit -q -m "retire a.md de la baseline et du dépôt, sans citation (cible disparue)"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B5C" 2>&1)" || rc=$?
+          echo "== 5c/6 ligne retirée, cible disparue : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *AVERTISSEMENT-LIGNE-RETIREE-CIBLE-DISPARUE*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "5c/6 ligne retirée cible disparue : rc=$rc (attendu 0), verdict=$has (attendu 1)"; fi
+
+          # 6/6 --base-ref égal à HEAD → attendu 3, PLAGE-VIDE
+          write_base
+          H6="$(git_id rev-parse HEAD)"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$H6" 2>&1)" || rc=$?
+          echo "== 6/6 base-ref égal à HEAD : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *PLAGE-VIDE*) has=1 ;; esac
+          if [ "$rc" -ne 3 ] || [ "$has" -ne 1 ]; then note "6/6 base-ref égal à HEAD : rc=$rc (attendu 3), PLAGE-VIDE=$has (attendu 1)"; fi
+
+          rm -rf "$FIX"
+
+          echo "== BILAN preuve fixture : $fail écart(s) sur 6 verdicts =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-baseline-arbitrage DISCRIMINANT en CI : les six bascules isolées sont prouvées, dont la colonne lignes non bloquante et les trois volets du retrait de ligne =="
+
+          # --- Bloc 2 — Mesure du dépôt réel ------------------------------------------------------
+          rc=0
+          out="$(bash "$S" 2>&1)" || rc=$?
+          echo "== dépôt réel : rc=$rc =="; printf '%s\n' "$out"
+          case "$rc" in
+            0|3) : ;;
+            *)
+              verdict="$(printf '%s\n' "$out" | tail -1)"
+              echo "::error::check-baseline-arbitrage : dépôt réel rc=$rc — verdict : $verdict"
+              exit 1
+              ;;
+          esac
+
+      - name: check-gate-touche (G-2, PROT-05 — la PR modifie ce qui la juge)
+        # POURQUOI CETTE ÉTAPE EXISTE. G-2 traite la seconde phrase d'O-3 du `25-SECURITY.md` :
+        # une même PR peut modifier le gate, sa suite et l'étape CI, et rester verte — faute
+        # d'accès admin (option (a), arbitrage Samuel, AskUserQuestion session principale,
+        # 2026-09-17), rien côté GitHub ne peut l'en empêcher. La garde ne verrouille rien : elle
+        # exige un marqueur déclaratif `Gate-Touche: <chemin-ou-motif> — <raison>` dans un commit
+        # non-merge de la branche qui touche la surface de gate (cinq classes : gates et suites
+        # `plugin/conductor/scripts/` et `scripts/`, `.github/workflows/ci.yml`, `scripts/hooks/`).
+        # LIMITE DE FOND (formule canonique, sonde `check-aucune-fermeture.sh`, plan 41-15) :
+        # cette étape et la garde qu'elle invoque peuvent être modifiée par la PR qu'elle juge —
+        # reprise ici mot pour mot pour que la sonde ne signale plus ce fichier comme muet sur sa
+        # propre limite de fond. QUATRE bascules isolées (plan 41-16, Task 3), chacune sur un
+        # dépôt jetable reconstruit DEPUIS ZÉRO par write_base() — une mutation à la fois, jamais
+        # cumulée, patron check-baseline-arbitrage (plus haut dans ce même job).
+        run: |
+          set -eu
+
+          S="scripts/check-gate-touche.sh"
+          fail=0
+          note() { echo "::error::check-gate-touche CI : $1"; fail=$((fail + 1)); }
+
+          # --- Résolution de la ref de référence pour le journal, remédiation nommée si absente --
+          REF=""
+          for r in refs/remotes/origin/main origin/main refs/heads/main main; do
+            if git rev-parse --verify -q "${r}^{commit}" >/dev/null 2>&1; then REF="$r"; break; fi
+          done
+          if [ -z "$REF" ]; then
+            echo "::warning::check-gate-touche CI : aucune ref main résoluble localement, git fetch origin main (remédiation nommée, jamais un repli silencieux)"
+            git fetch origin main:refs/remotes/origin/main
+            REF="refs/remotes/origin/main"
+          fi
+          echo "== check-gate-touche : ref de référence pour le journal = $REF =="
+
+          # --- QUATRE bascules ISOLÉES sur dépôt jetable, chacune reconstruite depuis zéro --------
+          FIX="$(mktemp -d)"
+          trap 'rm -rf "$FIX"' EXIT
+
+          git_id() { git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false "$@"; }
+
+          write_base() {
+            rm -rf "$FIX"
+            mkdir -p "$FIX/scripts"
+            git init -q -b main "$FIX"
+            printf 'echo demo\n' > "$FIX/scripts/check-demo.sh"
+            git_id add -A
+            git_id commit -q -m "fixture: état initial"
+          }
+
+          # 1/4 chemin de surface touché et couvert par un trailer conforme → attendu rc 0
+          write_base
+          B1="$(git_id rev-parse HEAD)"
+          printf 'echo demo v2\n' > "$FIX/scripts/check-demo.sh"
+          git_id add -A
+          MSG1="$(printf '%s\n\n%s\n' 'modifie le gate demo, couvert' 'Gate-Touche: scripts/check-demo.sh — bascule 1/4 de la preuve CI, chemin couvert')"
+          git_id commit -q -m "$MSG1"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B1" 2>&1)" || rc=$?
+          echo "== 1/4 chemin surface couvert : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *DECLARE*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "1/4 chemin surface couvert : rc=$rc (attendu 0), DECLARE=$has (attendu 1)"; fi
+
+          # 2/4 chemin de surface touché sans trailer → attendu rc 1, CHEMIN-NON-DECLARE
+          write_base
+          B2="$(git_id rev-parse HEAD)"
+          printf 'echo demo v2\n' > "$FIX/scripts/check-demo.sh"
+          git_id add -A
+          git_id commit -q -m "modifie le gate demo sans trailer"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B2" 2>&1)" || rc=$?
+          echo "== 2/4 chemin surface sans trailer : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *CHEMIN-NON-DECLARE*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "2/4 chemin surface sans trailer : rc=$rc (attendu 1), CHEMIN-NON-DECLARE=$has (attendu 1)"; fi
+
+          # 3/4 trailer présent mais sans séparateur ni raison → attendu rc 1, MARQUEUR-MAL-FORME
+          write_base
+          B3="$(git_id rev-parse HEAD)"
+          printf 'echo demo v2\n' > "$FIX/scripts/check-demo.sh"
+          git_id add -A
+          MSG3="$(printf '%s\n\n%s\n' 'modifie le gate demo, trailer casse' 'Gate-Touche: scripts/check-demo.sh sans separateur du tout dans cette ligne')"
+          git_id commit -q -m "$MSG3"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B3" 2>&1)" || rc=$?
+          echo "== 3/4 trailer sans séparateur : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *MARQUEUR-MAL-FORME*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "3/4 trailer sans séparateur : rc=$rc (attendu 1), MARQUEUR-MAL-FORME=$has (attendu 1)"; fi
+
+          # 4/4 seul un chemin hors surface touché → attendu rc 3, RIEN-A-JUGER
+          write_base
+          B4="$(git_id rev-parse HEAD)"
+          printf 'contenu\n' > "$FIX/README.md"
+          git_id add -A
+          git_id commit -q -m "touche readme seul, hors surface"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B4" 2>&1)" || rc=$?
+          echo "== 4/4 hors surface seul : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *RIEN-A-JUGER*) has=1 ;; esac
+          if [ "$rc" -ne 3 ] || [ "$has" -ne 1 ]; then note "4/4 hors surface seul : rc=$rc (attendu 3), RIEN-A-JUGER=$has (attendu 1)"; fi
+
+          rm -rf "$FIX"
+
+          echo "== BILAN preuve fixture : $fail écart(s) sur 4 verdicts =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-gate-touche DISCRIMINANT en CI : les quatre bascules isolées sont prouvées, l'étape sait rougir sur chacun de ses trois verdicts bloquants/non bloquants =="
+
+          # --- Mesure du dépôt réel ---------------------------------------------------------------
+          rc=0
+          out="$(bash "$S" 2>&1)" || rc=$?
+          echo "== dépôt réel : rc=$rc =="; printf '%s\n' "$out"
+          case "$rc" in
+            0|3) : ;;
+            *)
+              verdict="$(printf '%s\n' "$out" | tail -1)"
+              echo "::error::check-gate-touche : dépôt réel rc=$rc — verdict : $verdict"
+              exit 1
+              ;;
+          esac
+
+      - name: check-push-sans-pr (G-3 — preuve par fixture, sans condition)
+        # POURQUOI DEUX ÉTAPES. Une étape GitHub Actions ne porte qu'une seule condition. La
+        # mesure réelle ne peut tourner que sur un push vers `main` (elle a besoin de GH_TOKEN et
+        # d'un sha réellement poussé) — mais une étape conditionnelle `main` est SAUTÉE sur toute
+        # PR et toute branche de feature, donc ELLE NE PEUT JAMAIS PROUVER sa capacité à rougir
+        # depuis un run de PR. D'où cette étape de fixture, SANS CONDITION : elle tourne sur tout
+        # run (PR comme push de branche) et prouve, à chaque exécution, que
+        # `scripts/check-push-sans-pr.sh` sait effectivement distinguer ses quatre verdicts —
+        # sans jamais appeler le réseau (fixtures `--pulls-file` / `--closed-pulls-file`).
+        # ALARME APRÈS COUP, JAMAIS UN VERROU : cette étape ne bloque aucun push direct sur
+        # `main` — voir l'en-tête de `scripts/check-push-sans-pr.sh`.
+        # QUATRE BASCULES ISOLÉES (plan 41-17, Task 3), chacune sur des fichiers JSON réécrits
+        # depuis zéro (patron `check-gate-touche` / `check-baseline-arbitrage`, plus haut dans ce
+        # même job) : une mutation de scénario à la fois, jamais cumulée.
+        run: |
+          set -eu
+
+          S="scripts/check-push-sans-pr.sh"
+          T="$(mktemp -d)"
+          trap 'rm -rf "$T"' EXIT
+
+          fail=0
+          note() { echo "::error::check-push-sans-pr CI : $1"; fail=$((fail + 1)); }
+
+          SHA="1111111111111111111111111111111111111111"
+          BEFORE="2222222222222222222222222222222222222222"
+
+          # 1/4 première lecture porte une PR -> attendu rc 0, voie=commits-pulls
+          printf '[{"number":9}]\n' > "$T/1_pulls.json"
+          rc=0
+          out="$(bash "$S" --repo o/r --sha "$SHA" --before "$BEFORE" --pulls-file "$T/1_pulls.json" 2>&1)" || rc=$?
+          echo "== 1/4 première lecture associée : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *"voie=commits-pulls"*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "1/4 première lecture associée : rc=$rc (attendu 0), voie=commits-pulls=$has (attendu 1)"; fi
+
+          # 2/4 première vide, seconde porte le merge_commit_sha du sha jugé (merge par rebase) -> rc 0
+          printf '[]\n' > "$T/2_pulls.json"
+          printf '[{"number":11,"merge_commit_sha":"%s"}]\n' "$SHA" > "$T/2_closed.json"
+          rc=0
+          out="$(bash "$S" --repo o/r --sha "$SHA" --before "$BEFORE" --pulls-file "$T/2_pulls.json" --closed-pulls-file "$T/2_closed.json" 2>&1)" || rc=$?
+          echo "== 2/4 merge par rebase (cascade merge_commit_sha) : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *"voie=merge-commit-sha"*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "2/4 merge par rebase : rc=$rc (attendu 0), voie=merge-commit-sha=$has (attendu 1)"; fi
+
+          # 3/4 les deux lectures vides -> attendu rc 1, PUSH-SANS-PR
+          printf '[]\n' > "$T/3_pulls.json"
+          printf '[]\n' > "$T/3_closed.json"
+          rc=0
+          out="$(bash "$S" --repo o/r --sha "$SHA" --before "$BEFORE" --pulls-file "$T/3_pulls.json" --closed-pulls-file "$T/3_closed.json" 2>&1)" || rc=$?
+          echo "== 3/4 deux lectures vides : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *PUSH-SANS-PR*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "3/4 deux lectures vides : rc=$rc (attendu 1), PUSH-SANS-PR=$has (attendu 1)"; fi
+
+          # 4/4 réponse d'erreur d'API au lieu d'un tableau -> attendu rc 2, JAMAIS rc 1
+          # (précédent nommé : faux négatif d'auth de la v2.39.0 le 2026-07-26)
+          printf '{"message":"Bad credentials"}\n' > "$T/4_pulls.json"
+          rc=0
+          out="$(bash "$S" --repo o/r --sha "$SHA" --before "$BEFORE" --pulls-file "$T/4_pulls.json" 2>&1)" || rc=$?
+          echo "== 4/4 échec d'auth simulé : rc=$rc =="; printf '%s\n' "$out"
+          if [ "$rc" -ne 2 ]; then note "4/4 échec d'auth simulé : rc=$rc (attendu 2, jamais 1 — précédent v2.39.0 du 2026-07-26)"; fi
+
+          echo "== BILAN preuve fixture : $fail écart(s) sur 4 verdicts =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-push-sans-pr DISCRIMINANT en CI : les quatre bascules isolées sont prouvées, l'étape sait rendre chacun de ses quatre verdicts =="
+
+      - name: check-push-sans-pr (G-3, PROT-05 — mesure réelle sur un push vers main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # Seule cette étape porte GH_TOKEN et interroge réellement GitHub — sur un push vers
+        # `main` uniquement (même garde que `check-release-tag`, juste après). Sans jeton, le `gh`
+        # du runner échoue en auth : lire cet échec comme « aucune PR » serait exactement le faux
+        # négatif d'auth vécu sur la v2.39.0 le 2026-07-26 — `check-push-sans-pr.sh` distingue déjà
+        # cet échec (rc 2 NON-VERIFIABLE) d'une liste vide (rc 1 PUSH-SANS-PR), jamais confondus.
+        # Cette étape est une ALARME APRÈS COUP : le commit qu'elle juge est déjà sur `main`.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          rc=0
+          out="$(bash scripts/check-push-sans-pr.sh \
+            --repo "${{ github.repository }}" \
+            --sha "${{ github.sha }}" \
+            --before "${{ github.event.before }}" 2>&1)" || rc=$?
+          echo "== mesure réelle : rc=$rc =="; printf '%s\n' "$out"
+          case "$rc" in
+            0|3) : ;;
+            1)
+              verdict="$(printf '%s\n' "$out" | tail -1)"
+              echo "::error::check-push-sans-pr : PUSH SANS PR ASSOCIÉE sur main — alarme après coup, le commit est déjà arrivé — $verdict"
+              exit 1
+              ;;
+            *)
+              verdict="$(printf '%s\n' "$out" | tail -1)"
+              echo "::error::check-push-sans-pr : mesure réelle NON-VERIFIABLE rc=$rc — $verdict"
+              exit 1
+              ;;
+          esac
+
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         # GH_TOKEN requis : sans lui le gh du runner échoue en auth et le gate lisait cet

@@ -39,6 +39,7 @@
 | ADR-068 | 2026-08-04 | Profils de contexte du moteur refusés (rien à activer, notre contrat typé est per-rôle et plus strict) — et `workflow.inline_plan_threshold` inchangé à 2, la mesure étant le livrable | Validée |
 | ADR-069 | 2026-08-04 | Les workstreams GSD sont adoptés, avec leurs quatre limites datées, la condition dure « aucune partition tant qu'une phase est en vol », la révision de l'Iron Law 2 et l'amendement d'ADR-064 | Validée — amendée le 2026-09-09 (risque (b) migré au niveau commit, D-10 rouverte en équipe, couverture re-mesurée) |
 | ADR-070 | 2026-08-06 | Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin | Validée |
+| ADR-072 | 2026-09-17 | Gardes in-repo sans règle côté serveur — ce qui est gardé, ce qui ne l'est pas, ce qui attend un accès admin | Validée |
 
 > **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
 > `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
@@ -2420,3 +2421,131 @@ absolu figé à l'install + traduction dans chaque script, sans lanceur) ne suff
 une entrée dont le classement bloquant repose sur un code de sortie non nul plutôt que sur une
 décision JSON (`guard-planning-updated.sh`, explicitement exclue de toute normalisation par
 `docs/HOOKS-CONTRAT-SORTIE.md` §6, car son blocage par code de sortie est voulu).
+
+## ADR-072 : Gardes in-repo sans règle côté serveur — ce qui est gardé, ce qui ne l'est pas, ce qui attend un accès admin
+
+**Date** : 2026-09-17 · **Statut** : Validée · **Décideur** : Samuel · **Voisines** : ADR-053
+(volet swarm, DAG et lock de driver — même registre de gouvernance machine), ADR-059 (PR
+obligatoire par convention, pas par règle serveur) · **Contexte** :
+`.planning/phases/VFDO-41-posture-de-protection-du-d-p-t/41-CONTEXT.md` § Prémisse renversée,
+`.planning/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-SECURITY.md`
+(observation O-3)
+
+### Contexte
+
+Le compte `picmakpro`, seul admin du dépôt, appartient à un tiers ; les permissions mesurées le
+2026-09-17 sont `admin: false, maintain: false, push: true`. Personne, dans les conditions
+actuelles, ne peut poser un ruleset, une PR obligatoire, un check requis ni une revue code owner.
+La Phase 41 a donc été recadrée sur ce qui est faisable avec le seul droit `push` (option (a),
+arbitrage Samuel, AskUserQuestion session principale, 2026-09-17). Origine du besoin : O-3 du
+`25-SECURITY.md` — une hausse de baseline n'était gardée que par la relecture, et une même PR peut
+modifier un gate, sa suite et l'étape CI qui l'invoque. Fait mesuré à citer : `892f89a`
+(2026-09-16) est arrivé sur `main` sans PR, avec un run CI rouge, sans que rien ne l'arrête.
+
+### Décision — ce qui est gardé
+
+Trois gardes, décrites telles qu'elles sont livrées (verdicts et codes de sortie recopiés des
+SUMMARY et des en-têtes des scripts, jamais l'intention du plan).
+
+- **G-1 `scripts/check-baseline-arbitrage.sh`** (PROT-04, QUAL-01). Rougit sur deux objets : une
+  hausse de la colonne INSTRUCTIONS de `.planning/instruction-budget-baselines.tsv`, ou une
+  sentinelle `.planning/.*-armed` neutralisée (supprimée ou vidée) — dans les deux cas, faute
+  d'une citation d'arbitrage conforme (mot-clé, canal, date) dans le commit non-merge propre à la
+  branche qui porte le changement. Treize verdicts nommés, cinq codes de sortie (0/1/2/3/64), base
+  dérivée par `git merge-base` (jamais l'adjacence du journal). Prouvée par 34 assertions et neuf
+  mutants opposables (`scripts/tests/test-check-baseline-arbitrage.sh`), câblée dans le job
+  `gates` à six bascules de fixture isolées.
+- **G-2 `scripts/check-gate-touche.sh`** (PROT-05, QUAL-01). Rougit quand un chemin d'une des
+  CINQ classes de la surface de gate est touché sans marqueur déclaratif conforme dans un commit
+  non-merge de la branche : `plugin/conductor/scripts/check-*.sh`, `scripts/check-*.sh`, leurs
+  suites (`plugin/conductor/scripts/tests/test-*.sh` et `scripts/tests/test-*.sh`, une seule
+  classe combinée), `.github/workflows/ci.yml`, et tout chemin sous `scripts/hooks/`. Marqueur :
+  `Gate-Touche: <chemin-ou-motif> — <raison>`, portée BRANCHE (n'importe quel commit de la plage,
+  pas nécessairement celui qui touche le chemin). Cinq codes de sortie (0/1/2/3/64), vert à vide
+  interdit (rc 3 si aucun chemin de la surface n'est touché). Prouvée par sa propre suite à six
+  mutants opposables, câblée à quatre bascules de fixture.
+- **G-3 `scripts/check-push-sans-pr.sh`** (PROT-05, QUAL-01). Alarme APRÈS COUP : constate qu'un
+  commit est arrivé sur `main` sans PR associée, par deux lectures GitHub en cascade (les PR qui
+  référencent le sha jugé, puis, si vide, le `merge_commit_sha` des PR closes — nécessaire pour ce
+  dépôt qui merge par rebase). Distingue strictement un échec d'API (rc 2) d'une liste vide (rc 1),
+  et traite la création de ref (rc 3). Câblée sur `push` vers `main` seulement, en deux étapes du
+  job `gates` : une preuve par fixture à quatre bascules sans condition, et une mesure réelle
+  conditionnée. Prouvée par 21 assertions et cinq mutants opposables, sans aucun appel réseau dans
+  le fichier de suite.
+
+Chacune est câblée dans le job `gates` de `ci.yml` et prouvée capable de rougir par des bascules de
+fixture dans son étape et par des mutants dans sa suite.
+
+**Écart d'interface nommé, pas seulement constaté (correctif de revue de jointure, 2026-09-18,
+correctif 2).** G-3 n'a PAS le même patron de surface CLI que G-1/G-2 : options `--repo`/`--sha`/
+`--before`/`--pulls-file`/`--closed-pulls-file` au lieu de `--root`/`--base-ref`, une fonction
+`usage()` séparée au lieu d'un `-h`/`--help` inline, des sections d'en-tête numérotées `(1)(2)(3)`
+au lieu du format ALL-CAPS non numéroté de G-1/G-2. Écart fonctionnellement justifié — G-3 juge un
+`sha` ponctuel via l'API GitHub (après coup, sur `push`), pas un diff de branche local comme
+G-1/G-2 — mais un lecteur de cette seule doctrine ne doit pas s'attendre à `--root`/`--base-ref`
+sur G-3.
+
+### Décision — les deux bornes de G-1, avec leur motif
+
+Décisions du manager, 2026-09-17, sur remontée du planificateur.
+
+1. **Seule la colonne des instructions est bloquante.** Une hausse de la seule colonne des lignes
+   produit un avertissement non bloquant. Motif : depuis la Phase 40.1 le ratchet ne porte que sur
+   les instructions ; la colonne lignes est publiée mais jamais comparée pour décider d'un code de
+   sortie ; exiger un arbitrage humain pour une colonne informative fabriquerait de la friction
+   sans rien garder.
+2. **Le retrait d'une ligne de baseline suit trois cas**, avec la même exigence de trace qu'une
+   hausse : (a) la cible est encore présente dans l'arbre et aucun arbitrage n'est cité dans le
+   commit qui retire la ligne → bloquant ; (b) la cible est encore présente et un arbitrage est
+   cité (canal et date) → avertissement non bloquant, la citation étant recopiée dans le rapport ;
+   (c) la cible a disparu du dépôt → avertissement non bloquant, il n'y a rien à citer. Motif : une
+   recalibration légitime peut sortir un fichier du corpus sans le supprimer ; la garde ne l'en
+   empêche pas, elle exige que ce soit dit et daté — on rend visible et tracé, on ne ferme pas.
+
+Comme partout dans cette posture, la garde vérifie la FORME de la citation, jamais sa véracité.
+
+### Décision — l'exigence PROT-05
+
+Le recadrage sans admin a laissé G-2 et G-3 sans foyer d'exigence. Le manager a créé le 2026-09-17
+l'exigence **PROT-05** : « les gardes in-repo de la surface de gate et du flux d'arrivée sur `main`
+rendent une atteinte visible et tracée ; aucune n'est présentée comme une protection absolue ».
+PROT-04 reste le foyer de G-1 (statut d'O-3), PROT-03 celui de cette ADR, et PROT-02 garde son
+énoncé d'origine.
+
+### Décision — ce qui n'est PAS gardé
+
+Sans ambiguïté et sans adoucissement : aucune PR n'est obligatoire, aucun check n'est requis,
+aucune revue n'est exigée, aucun push n'est refusé. La limite de fond, à écrire en toutes lettres :
+une garde qui vit dans le dépôt peut être modifiée par la PR qu'elle juge ; une même PR peut
+changer le gate, sa suite et l'étape CI qui l'invoque, et rester verte. G-2 rend ce geste visible
+et tracé ; elle ne l'empêche pas, et G-2 est elle-même dans la surface qu'elle surveille. G-3
+constate après coup : quand elle rougit, le commit est déjà sur `main`. Le marqueur de G-2 et la
+citation de G-1 sont DÉCLARATIFS : les gardes vérifient une forme, jamais une véracité. Cette phase
+ne clôt rien, elle rend visible et tracé.
+
+### Décision — ce qui attend un accès admin
+
+Rulesets de branche et de tags, liste de bypass, revue code owner et `CODEOWNERS`, PR obligatoire,
+checks requis épinglés, mesures M-1 à M-4, fermeture de la PR #29, rejeu du flux de release sous la
+règle. Renvoi nommé au `.planning/BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ » et au
+`41-CONTEXT.md` § Prémisse renversée : les décisions **D-01 à D-08** sont SUSPENDUES, pas annulées,
+et reprennent vie telles quelles le jour où l'accès existe. Déclencheur de reprise : un accès admin
+accordé, ou un transfert du dépôt.
+
+### Politique de contournement et de hotfix (PROT-03)
+
+La question du contournement ne se pose pas au sens strict, puisque rien n'est bloqué : la
+discipline tient par quatre gestes — PR par défaut ; marqueur `Gate-Touche:` sur toute modification
+de la surface de gate ; citation d'arbitrage, canal et date, sur toute hausse de baseline ; et
+l'acceptation que G-3 signale, daté, tout commit entré en direct. Un hotfix urgent passe par une
+PR ; s'il passe en direct, il est signalé après coup et c'est le prix assumé. **L'amendement
+d'ADR-059 sur la PR obligatoire est hors périmètre** de cette phase : aucune règle côté serveur ne
+l'appliquerait ici, donc l'écrire serait déclarer une couverture sans couverture effective.
+
+### Compatibilité du flux de release (PROT-02)
+
+Le flux du `CLAUDE.md` est inchangé : bump → PR → merge → tag annoté → release GitHub →
+`check-release-tag --remote` ✓. Les trois étapes neuves (G-1, G-2, G-3) sont insérées avant
+l'étape `check-release-tag` et ne changent ni sa condition ni son contenu. Le push d'un tag ne
+déclenche pas la CI (`on.push.branches`, aucune entrée `tags:`), donc G-3 ne peut pas rougir sur
+une release. Le hook `pre-push` reste tel quel : son durcissement (G-5) a été écarté du périmètre.
