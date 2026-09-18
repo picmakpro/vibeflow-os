@@ -1035,6 +1035,85 @@ jobs:
               ;;
           esac
 
+      - name: check-gate-touche (G-2, PROT-05 — la PR modifie ce qui la juge)
+        # POURQUOI CETTE ÉTAPE EXISTE. G-2 traite la seconde phrase d'O-3 du `25-SECURITY.md` :
+        # une même PR peut modifier le gate, sa suite et l'étape CI, et rester verte — faute
+        # d'accès admin (option (a), arbitrage Samuel, AskUserQuestion session principale,
+        # 2026-09-17), rien côté GitHub ne peut l'en empêcher. La garde ne verrouille rien : elle
+        # exige un marqueur déclaratif `Gate-Touche: <chemin-ou-motif> — <raison>` dans un commit
+        # non-merge de la branche qui touche la surface de gate (cinq classes : gates et suites
+        # `plugin/conductor/scripts/` et `scripts/`, `.github/workflows/ci.yml`, `scripts/hooks/`).
+        # LIMITE DE FOND (formule canonique, sonde `check-aucune-fermeture.sh`, plan 41-15) :
+        # cette étape et la garde qu'elle invoque peuvent être modifiée par la PR qu'elle juge —
+        # reprise ici mot pour mot pour que la sonde ne signale plus ce fichier comme muet sur sa
+        # propre limite de fond. Une seule bascule isolée dans cette tâche (plan 41-16, Task 1) :
+        # dépôt jetable, chemin de surface touché sans trailer conforme → attendu rc 1,
+        # CHEMIN-NON-DECLARE. Task 3 du même plan complète à quatre bascules.
+        run: |
+          set -eu
+
+          S="scripts/check-gate-touche.sh"
+          fail=0
+          note() { echo "::error::check-gate-touche CI : $1"; fail=$((fail + 1)); }
+
+          # --- Résolution de la ref de référence pour le journal, remédiation nommée si absente --
+          REF=""
+          for r in refs/remotes/origin/main origin/main refs/heads/main main; do
+            if git rev-parse --verify -q "${r}^{commit}" >/dev/null 2>&1; then REF="$r"; break; fi
+          done
+          if [ -z "$REF" ]; then
+            echo "::warning::check-gate-touche CI : aucune ref main résoluble localement, git fetch origin main (remédiation nommée, jamais un repli silencieux)"
+            git fetch origin main:refs/remotes/origin/main
+            REF="refs/remotes/origin/main"
+          fi
+          echo "== check-gate-touche : ref de référence pour le journal = $REF =="
+
+          # --- Bascule isolée, dépôt jetable reconstruit ici -------------------------------------
+          FIX="$(mktemp -d)"
+          trap 'rm -rf "$FIX"' EXIT
+
+          git_id() { git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false "$@"; }
+
+          write_base() {
+            rm -rf "$FIX"
+            mkdir -p "$FIX/scripts"
+            git init -q -b main "$FIX"
+            printf 'echo demo\n' > "$FIX/scripts/check-demo.sh"
+            git_id add -A
+            git_id commit -q -m "fixture: état initial"
+          }
+
+          # 1/1 (Task 1) : chemin de surface touché sans trailer → attendu rc 1, CHEMIN-NON-DECLARE
+          write_base
+          B1="$(git_id rev-parse HEAD)"
+          printf 'echo demo v2\n' > "$FIX/scripts/check-demo.sh"
+          git_id add -A
+          git_id commit -q -m "modifie le gate demo sans trailer"
+          rc=0
+          out="$(bash "$S" --root "$FIX" --base-ref "$B1" 2>&1)" || rc=$?
+          echo "== 1/1 chemin surface sans trailer : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *CHEMIN-NON-DECLARE*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "1/1 chemin surface sans trailer : rc=$rc (attendu 1), CHEMIN-NON-DECLARE=$has (attendu 1)"; fi
+
+          rm -rf "$FIX"
+
+          echo "== BILAN preuve fixture : $fail écart(s) sur 1 verdict =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-gate-touche DISCRIMINANT en CI : la bascule isolée est prouvée =="
+
+          # --- Mesure du dépôt réel ---------------------------------------------------------------
+          rc=0
+          out="$(bash "$S" 2>&1)" || rc=$?
+          echo "== dépôt réel : rc=$rc =="; printf '%s\n' "$out"
+          case "$rc" in
+            0|3) : ;;
+            *)
+              verdict="$(printf '%s\n' "$out" | tail -1)"
+              echo "::error::check-gate-touche : dépôt réel rc=$rc — verdict : $verdict"
+              exit 1
+              ;;
+          esac
+
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         # GH_TOKEN requis : sans lui le gh du runner échoue en auth et le gate lisait cet
