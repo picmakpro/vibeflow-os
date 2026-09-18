@@ -22,6 +22,27 @@
 # porterait tout le contenu de la PR et son message ne peut jamais porter de citation. Il est
 # exclu du compte de decouverte ET de l'imputation.
 #
+# PORTEE DE LA DETECTION — MARQUEURS D'INVOCATION EXPLICITES, LISTE FERMEE (decision du manager,
+# reprise 2026-09-18). Ce controle ne rougit QUE sur une INVOCATION d'autorite humaine, reconnue
+# par un jeu de marqueurs explicites et FERMES : « arbitrage Samuel », « sur arbitrage »,
+# « décision de Samuel », une cle `D-01`..`D-10`, une cle generique `*-DECISION:` (n'importe quel
+# prefixe suivi de `-DECISION:`), ou `REGLES_MAIN_FORCE_PUSH_SUPPRESSION`. Une mention informelle
+# des mots « décision » ou « arbitrage » HORS de ces marqueurs est HORS PERIMETRE PAR CONCEPTION —
+# ce n'est plus un cas qui fait rougir cet outil. Motif : une garde qui rougit sur de la prose
+# descriptive apprend au lecteur a l'ignorer, et une garde qu'on apprend a ignorer ne garde plus
+# rien. Fait mesure qui a conduit a ce resserrement : AVANT lui, 4 commits de la plage jugee
+# rougissaient en FORME-NON-CONFORME alors qu'aucun n'invoquait la moindre autorisation humaine —
+# tous des mentions informelles (« les decisions du manager du 2026-09-17 », « une citation
+# d'arbitrage pourtant conforme », « anterieurs a la decision de sonde du 2026-09-17 », un message
+# de commit documentant honnetement cette meme mesure) ; c'est le mode de defaut exact que cette
+# phase combat, applique cette fois au detecteur lui-meme. « décision du manager » (la decision qui
+# a produit CE resserrement, et le libelle que chaque commit de cette reprise doit porter par
+# convention de dispatch) n'est PAS un marqueur : ce n'est pas une autorite humaine, et l'ajouter
+# ferait rougir sur sa propre reformulation. Une invocation reconnue exige TOUJOURS la citation
+# canonique complete (nom, canal, date ISO), comparee apres normalisation des blancs, exactement
+# comme avant ce resserrement — seule la PORTE D'ENTREE (quels mots declenchent le controle) a
+# change, jamais l'exigence de forme une fois la porte franchie.
+#
 # NORMALISATION DES BLANCS AVANT TOUTE COMPARAISON (bloquant 1 (a) du verificateur frais). Le
 # message integral de chaque commit (`git log -1 --format=%B`) est joint en une seule chaine
 # (retours a la ligne remplaces par une espace), puis toute suite de blancs est reduite a une
@@ -152,14 +173,18 @@ is_ephemeral_merge() {  # <message normalise> sur stdin -> exit 0 si forme "Merg
   grep -Eq '^Merge [0-9a-fA-F]{40} into [0-9a-fA-F]{40}$'
 }
 
-KEYWORDS="arbitrage arbitrages décision décisions decision decisions"
+# MARQUEURS D'INVOCATION — LISTE FERMEE ET EXPLICITE (voir PORTEE DE LA DETECTION en en-tete).
+# Regex etendue (ERE, testee via `[[ =~ ]]` bash) : chaque alternative est un marqueur EXACT, pas
+# un mot-racine generique. « décision du manager » n'y figure PAS (decision du manager elle-meme,
+# point 3 : ce n'est pas une autorite humaine).
+MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_]|$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'
 CANON="arbitrage Samuel, AskUserQuestion session principale, 2026-09-17"
 
-# IDENTIFIANTS EXCLUS DE LA DETECTION DE MOT-CLE (pas du texte imprime). Le nom de fichier
+# IDENTIFIANTS EXCLUS DE LA DETECTION DE MARQUEUR (pas du texte imprime). Le nom de fichier
 # `check-baseline-arbitrage.sh` contient le jeton `arbitrage` comme simple COMPOSANT
 # D'IDENTIFIANT (script G-1), jamais comme citation d'un arbitrage humain — le mentionner (dans
 # un message de commit, un trailer Gate-Touche, ...) ne doit pas etre traite comme une tentative
-# de citation. Retire AVANT la detection de mot-cle et l'extraction de citation ; la chaine
+# de citation. Retire AVANT la detection de marqueur et l'extraction de citation ; la chaine
 # imprimee en cas d'ecart reste `$norm` (non filtree), pour ne rien cacher au lecteur.
 FILENAME_TOKENS="check-baseline-arbitrage.sh check-baseline-arbitrage"
 
@@ -171,12 +196,9 @@ scan_strip() {  # <chaine normalisee> -> meme chaine, identifiants de fichier re
   printf '%s' "$s"
 }
 
-kw_present() {  # <chaine de scan> -> exit 0 si au moins un mot-cle est present
-  local s="$1" k
-  for k in $KEYWORDS; do
-    case "$s" in *"$k"*) return 0 ;; esac
-  done
-  return 1
+kw_present() {  # <chaine de scan> -> exit 0 si au moins un marqueur d'invocation EXACT est present
+  local s="$1"
+  [[ "$s" =~ $MARKER_REGEX ]]
 }
 
 N=0
