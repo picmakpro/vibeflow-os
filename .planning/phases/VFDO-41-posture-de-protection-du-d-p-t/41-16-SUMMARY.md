@@ -14,8 +14,8 @@ provides:
   - "scripts/check-gate-touche.sh — garde G-2 (PROT-05) : une PR qui touche la surface de gate
     (gates, suites, `.github/workflows/ci.yml`, `scripts/hooks/`) sans marqueur déclaratif
     `Gate-Touche:` dans un commit non-merge de la branche rend rc 1"
-  - "scripts/tests/test-check-gate-touche.sh — suite QUAL-01, 29 assertions, cinq mutants
-    opposables (MUT-1 à MUT-5)"
+  - "scripts/tests/test-check-gate-touche.sh — suite QUAL-01, 33 assertions, six mutants
+    opposables (MUT-1 à MUT-6)"
   - "étape `check-gate-touche` dans le job `gates` de `.github/workflows/ci.yml`, à quatre
     bascules de fixture isolées"
   - "CHANGELOG.md § Non releasé — entrée G-2 sous celle de G-1"
@@ -89,13 +89,13 @@ coverage:
         status: pass
     human_judgment: false
   - id: D2
-    description: "scripts/tests/test-check-gate-touche.sh — suite QUAL-01, 29 assertions, cinq
-      mutants opposables MUT-1 à MUT-5, chacun tracé en forme canonique
+    description: "scripts/tests/test-check-gate-touche.sh — suite QUAL-01, 33 assertions, six
+      mutants opposables MUT-1 à MUT-6, chacun tracé en forme canonique
       `✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y>`"
     requirement: QUAL-01
     verification:
       - kind: unit
-        ref: "scripts/tests/test-check-gate-touche.sh (29 assertions vertes, 0 ko, MUT-1 à MUT-5
+        ref: "scripts/tests/test-check-gate-touche.sh (33 assertions vertes, 0 ko, MUT-1 à MUT-6
           tués)"
         status: pass
     human_judgment: false
@@ -132,13 +132,18 @@ status: complete
 completed: 2026-09-18
 ---
 
+
+> **Mise à jour 2026-09-18.** Les décomptes de ce SUMMARY décrivent l'état au commit de la
+> Task 2 (`633be34`) : 29 assertions, cinq mutants. Depuis, `4ac7aa0` (6e mutant, motifs à
+> virgule littérale) puis `03861b9` (correctif de revue F2, comptage de caractères) portent la
+> suite à **33 assertions et six mutants (MUT-1 à MUT-6)** — chiffre mesuré par exécution.
 # Phase 41 Plan 16: G-2 — garde CI « la PR modifie ce qui la juge », marqueur déclaratif Gate-Touche Summary
 
 **Garde in-repo bash `check-gate-touche.sh` qui rend visible et trace le fait qu'une PR modifie
 CE QUI LA JUGE — un gate, sa suite, l'étape CI qui l'invoque, ou un hook — en exigeant un trailer
 déclaratif `Gate-Touche: <chemin-ou-motif> — <raison>` dans un commit non-merge de la branche.
 Cinq classes de surface, cinq verdicts, cinq codes de sortie. Suite QUAL-01 à 29 assertions et
-cinq mutants opposables (MUT-1 à MUT-5). Câblée dans le job `gates` à quatre bascules isolées de
+six mutants opposables (MUT-1 à MUT-6). Câblée dans le job `gates` à quatre bascules isolées de
 fixture. La couverture rétroactive de la branche est déjà acquise (rc 0) sans commit de
 documentation supplémentaire — les trailers portés par les deux premiers commits de ce plan
 suffisent.**
