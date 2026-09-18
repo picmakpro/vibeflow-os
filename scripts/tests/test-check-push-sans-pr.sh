@@ -319,6 +319,29 @@ fi
 
 TARGET="$SCRIPT"
 
+echo "== test-check-push-sans-pr : AUTO-DEFENSE (regression bash -e) =="
+
+# --- AUTODEF 1 : la suite ELLE-MEME doit atteindre sa ligne de bilan sous invocation stricte
+# `bash --noprofile --norc -e` — meme motif que test-check-baseline-arbitrage.sh (plan 41-14,
+# correctif documente) et test-check-gate-touche.sh (plan 41-16) — correctif de revue de
+# jointure, 2026-09-18, correctif 3. Garde de recursion (_TCPS_NORECURSE) : l'instance enfant
+# SAUTE ce meme bloc, sinon recursion infinie.
+if [ "${_TCPS_NORECURSE:-}" != "1" ]; then
+  SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  set +e
+  CHILD_OUT="$(_TCPS_NORECURSE=1 bash --noprofile --norc -e "$SELF" 2>&1)"
+  CHILD_RC=$?
+  set -e
+  case "$CHILD_OUT" in *"== bilan : "*) reached_bilan=1 ;; *) reached_bilan=0 ;; esac
+  if [ "$reached_bilan" -eq 1 ]; then
+    ok "AUTODEF suite rejouee sous bash -e strict -> atteint sa ligne de bilan (rc enfant=$CHILD_RC)"
+  else
+    ko "AUTODEF suite rejouee sous bash -e strict -> atteint sa ligne de bilan" \
+      "presence de '== bilan : ' dans la sortie de l'enfant" \
+      "rc enfant=$CHILD_RC, bilan absent — derniere ligne : $(printf '%s\n' "$CHILD_OUT" | tail -1)"
+  fi
+fi
+
 echo "== bilan : $PASS ok, $FAIL ko =="
 if [ "$FAIL" -ne 0 ]; then exit 1; fi
 exit 0
