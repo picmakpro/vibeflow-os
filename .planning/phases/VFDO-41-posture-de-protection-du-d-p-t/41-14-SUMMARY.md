@@ -105,7 +105,8 @@ coverage:
     human_judgment: true
     rationale: "Absence d'un mot d'achèvement est une propriété textuelle relue par un humain,
       pas assertée par une commande — le vérificateur doit confirmer qu'aucun texte produit par ce
-      plan n'utilise 'fermé'/'clos'/'close' au sujet d'O-3."
+      plan n'associe O-3 à l'un des jetons interdits : racine « ferm » plus suffixe
+      « é »/« ée »/« és »/« ées », ou racine « clo » plus suffixe « s »/« se »/« ses »/« sed »."
 status: complete
 duration: 2h05min
 completed: 2026-09-18
@@ -244,8 +245,8 @@ None - aucune configuration de service externe requise.
 - G-1 est posée, prouvée et câblée — la tranche verticale (script `scripts/`, suite
   `scripts/tests/`, étape du job `gates`, trace au CHANGELOG) que G-2 (plan 41-16) et G-3/G-4
   (41-17 à 41-19) réutiliseront est disponible.
-- O-3 du `25-SECURITY.md` passe à « signalée et tracée » — jamais « fermée » : aucun texte produit
-  par ce plan ne l'associe à un mot d'achèvement.
+- O-3 du `25-SECURITY.md` reste signalée et tracée : aucun texte produit par ce plan ne l'associe
+  à un mot d'achèvement.
 - `41-PREUVES.md` § `## 41-14 — base de la garde de trace` borne, pour toute la suite du périmètre
   sans admin, la plage que le contrôle de trace du plan 41-15 a le droit de juger
   (`f1d658957f7fe9c446b341bc447c19d6a0a0ed3a..HEAD`) — la section `## 41-01` reste intacte.

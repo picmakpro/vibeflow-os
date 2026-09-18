@@ -21,7 +21,7 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
   branche qui porte le changement. LIMITE DE FOND : cette garde vit dans le dépôt — la PR
   qu'elle juge peut la modifier (elle, sa suite, son étape CI) et rester verte ; elle rend
   visible et trace, elle ne verrouille rien. Traite O-3 du `25-SECURITY.md` faute d'accès admin
-  sur ce dépôt (option (a)) : O-3 passe à « signalée et tracée », jamais « fermée ».
+  sur ce dépôt (option (a)) : O-3 passe à « signalée et tracée ».
   `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
   arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
 
