@@ -2462,7 +2462,7 @@ SUMMARY et des en-têtes des scripts, jamais l'intention du plan).
   classe combinée), `.github/workflows/ci.yml`, et tout chemin sous `scripts/hooks/`. Marqueur :
   `Gate-Touche: <chemin-ou-motif> — <raison>`, portée BRANCHE (n'importe quel commit de la plage,
   pas nécessairement celui qui touche le chemin). Cinq codes de sortie (0/1/2/3/64), vert à vide
-  interdit (rc 3 si aucun chemin de la surface n'est touché). Prouvée par sa propre suite à cinq
+  interdit (rc 3 si aucun chemin de la surface n'est touché). Prouvée par sa propre suite à six
   mutants opposables, câblée à quatre bascules de fixture.
 - **G-3 `scripts/check-push-sans-pr.sh`** (PROT-05, QUAL-01). Alarme APRÈS COUP : constate qu'un
   commit est arrivé sur `main` sans PR associée, par deux lectures GitHub en cascade (les PR qui

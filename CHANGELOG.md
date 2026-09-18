@@ -26,7 +26,7 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
   arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
 - **G-2 (PROT-05, QUAL-01) — garde « la PR modifie ce qui la juge », marqueur déclaratif
   `Gate-Touche:`** — `scripts/check-gate-touche.sh` + sa suite
-  `scripts/tests/test-check-gate-touche.sh` (cinq mutants opposables) + une étape à quatre
+  `scripts/tests/test-check-gate-touche.sh` (six mutants opposables) + une étape à quatre
   bascules de fixture dans le job `gates` de `.github/workflows/ci.yml`. Surveille CINQ classes
   de la surface de gate : `plugin/conductor/scripts/check-*.sh`, `scripts/check-*.sh`, leurs
   suites `plugin/conductor/scripts/tests/test-*.sh` et `scripts/tests/test-*.sh` (une seule
