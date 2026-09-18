@@ -576,6 +576,19 @@ in-repo visibles et tracées — baseline du budget d'instructions, modification
 à écrire partout** : une garde qui vit dans le dépôt peut être modifiée par la PR qu'elle juge ;
 sans règle côté serveur, on ne ferme rien, on rend visible et tracé.
 
+**Statut partiel (2026-09-18, Phase 41) :** le périmètre sans admin est livré par les plans 41-14 à
+41-19 (trois gardes in-repo — G-1 baseline, G-2 surface de gate, G-3 push sans PR — et la doctrine
+ADR-072). Le volet côté serveur ci-dessus reste différé tel quel, son déclencheur de reprise
+inchangé ; les décisions D-01 à D-08 restent suspendues. Renvoi : `docs/ADR.md` § ADR-072.
+
+## Ligne d'index absente pour ADR-071 dans `docs/ADR.md` — DIFFÉRÉ (2026-09-18)
+
+**Constat mesuré le 2026-09-17**, en posant ADR-072 (Phase 41, plan 41-18) : la table d'index de
+`docs/ADR.md` s'arrête à la ligne ADR-070, alors que la section `## ADR-071` existe plus bas dans
+le fichier — aucune ligne d'index ne la référence. **Hors périmètre de la Phase 41**, non corrigé
+au passage pour ne pas mêler une dérive non arbitrée au diff d'une phase dédiée à une autre
+doctrine. **Déclencheur de reprise** : prochain passage sur `docs/ADR.md`.
+
 ## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15)
 
 **Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — ouvrir une **phase
@@ -606,6 +619,12 @@ après le tag) ; sort du hook `pre-push` optionnel (`scripts/hooks`) ; effet sur
 
 **Déclencheur de reprise** : inscription au ROADMAP par la session principale après le merge de
 la PR #67.
+
+**Statut partiel (2026-09-18, Phase 41) :** la phase a été ouverte et cadrée, sa prémisse s'est
+renversée (accès admin absent, cf. l'item ci-dessus), et le cahier des charges est désormais
+scindé — la partie in-repo est traitée par ADR-072 (`docs/ADR.md`), la partie côté serveur reste
+au premier item de cette page. La forme attendue décrite ici (« un ruleset exigeant la CI verte
+avant merge ») n'existe pas encore : cet item n'est pas marqué achevé.
 
 ## T-25-SC — journal de sécurité de la Phase 25 : TRANCHÉ, geste de clôture (2026-09-15)
 
