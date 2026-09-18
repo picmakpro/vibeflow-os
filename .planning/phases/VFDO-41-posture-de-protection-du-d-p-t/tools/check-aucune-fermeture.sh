@@ -16,6 +16,15 @@
 # affirmee dans un en-tete que rien ne mesure (avertissement 7 du verificateur frais, decision du
 # manager du 2026-09-17 : la cle auto-declarative anterieure `ecrite_en_entete=oui` est supprimee).
 #
+# CLAUDE.md HORS DE LA LISTE DES PORTEURS, A CE STADE (mandat elargi du manager de mission, reprise
+# du 2026-09-18, point 3). C'est le plan 41-18 (G-4) qui ECRIT la doctrine de cette phase dans
+# `CLAUDE.md` — l'exiger comme porteur AVANT que ce contenu existe reviendrait a punir un fichier de
+# ne pas porter une formule que personne n'y a encore posee. La sonde n'exige un artefact que s'il
+# existe DEJA ou est CENSE exister a ce stade de la phase (cf. R11 : un artefact absent n'est jamais
+# compte en manquants). `CLAUDE.md` redevient un porteur EXIGE a partir du plan 41-18 (qui y ecrit la
+# formule) ; le controle final de cloture 41-19 l'inclura dans son compte complet. Ecrit ici
+# explicitement pour qu'un lecteur ne prenne pas cette absence pour un oubli.
+#
 # JETONS. Le sujet et l'achevement sont des donnees de configuration (comparaison 1 plus bas), pas
 # une phrase redigee : cet outil vit sous `.planning/phases/VFDO-41-.../tools/`, HORS du perimetre
 # qu'il scanne (`scripts/check-*.sh` ne le designe pas) — il ne peut donc pas se signaler lui-meme.
@@ -230,7 +239,9 @@ EXIGES=0
 PORTEURS_N=0
 MANQUANTS=()
 
-FIXED_PORTEURS="scripts/check-baseline-arbitrage.sh scripts/check-gate-touche.sh scripts/check-push-sans-pr.sh .github/workflows/ci.yml CLAUDE.md"
+# CLAUDE.md est volontairement ABSENT de cette liste a ce stade — voir le paragraphe d'en-tete
+# « CLAUDE.md HORS DE LA LISTE DES PORTEURS ». Ne pas le rajouter avant le plan 41-18.
+FIXED_PORTEURS="scripts/check-baseline-arbitrage.sh scripts/check-gate-touche.sh scripts/check-push-sans-pr.sh .github/workflows/ci.yml"
 for p in $FIXED_PORTEURS; do
   EXIGES=$((EXIGES + 1))
   if [ -f "$ROOT/$p" ]; then

@@ -181,18 +181,22 @@ safe_run out rc "$D" --option-bidon
 [ "$rc" -eq 64 ] && ok "R8 option inconnue -> rc 64" || ko "R8 option inconnue -> rc 64" "rc=64" "rc=$rc :: $out"
 
 # --- R9 : artefact porteur existant PRIVE de la formule -> rc 1, LIMITE-DE-FOND-ABSENTE ------
+# Porteur utilise pour R9/R10/MUT-3 : scripts/check-baseline-arbitrage.sh (CLAUDE.md est HORS
+# liste des porteurs a ce stade, voir en-tete du script sous test).
 D="$(mk_repo r9)"
-printf '%s\n' '# CLAUDE.md de fixture' 'Rien sur la limite de fond ici.' > "$D/CLAUDE.md"
-commit_all "$D" "fixture: CLAUDE.md sans la formule"
+mkdir -p "$D/scripts"
+printf '%s\n' '#!/usr/bin/env bash' 'Rien sur la limite de fond ici.' > "$D/scripts/check-baseline-arbitrage.sh"
+commit_all "$D" "fixture: porteur sans la formule"
 safe_run out rc "$D"
-case "$out" in *"LIMITE-DE-FOND-ABSENTE: CLAUDE.md"*) hasabs=1 ;; *) hasabs=0 ;; esac
-if [ "$rc" -eq 1 ] && [ "$hasabs" -eq 1 ]; then ok "R9 CLAUDE.md sans formule -> rc 1, LIMITE-DE-FOND-ABSENTE"
-else ko "R9 CLAUDE.md sans formule -> rc 1, LIMITE-DE-FOND-ABSENTE" "rc=1 LIMITE-DE-FOND-ABSENTE: CLAUDE.md" "rc=$rc :: $out"; fi
+case "$out" in *"LIMITE-DE-FOND-ABSENTE: scripts/check-baseline-arbitrage.sh"*) hasabs=1 ;; *) hasabs=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$hasabs" -eq 1 ]; then ok "R9 porteur sans formule -> rc 1, LIMITE-DE-FOND-ABSENTE"
+else ko "R9 porteur sans formule -> rc 1, LIMITE-DE-FOND-ABSENTE" "rc=1 LIMITE-DE-FOND-ABSENTE: scripts/check-baseline-arbitrage.sh" "rc=$rc :: $out"; fi
 
 # --- R10 : meme artefact, formule COUPEE par un retour a la ligne -> rc 0 (normalisation) ----
 D="$(mk_repo r10)"
-printf '%s\n' 'Cette garde peut être' "modifiée par la PR" "qu'elle juge, et rien de plus." > "$D/CLAUDE.md"
-commit_all "$D" "fixture: CLAUDE.md formule coupee"
+mkdir -p "$D/scripts"
+printf '%s\n' '#!/usr/bin/env bash' 'Cette garde peut être' "modifiée par la PR" "qu'elle juge, et rien de plus." > "$D/scripts/check-baseline-arbitrage.sh"
+commit_all "$D" "fixture: porteur formule coupee"
 safe_run out rc "$D"
 case "$out" in *"LIMITE-DE-FOND-ABSENTE"*) hasabs=1 ;; *) hasabs=0 ;; esac
 if [ "$rc" -eq 0 ] && [ "$hasabs" -eq 0 ]; then ok "R10 formule coupee par retour a la ligne -> rc 0 (normalisation)"
@@ -203,9 +207,9 @@ D="$(mk_repo r11)"
 printf '%s\n' '# changelog de fixture' 'rien a signaler ici non plus' > "$D/CHANGELOG.md"
 commit_all "$D" "fixture: aucun porteur present"
 safe_run out rc "$D"
-case "$out" in *"limite: exiges=6 porteurs=0 manquants=aucun"*) limok=1 ;; *) limok=0 ;; esac
-if [ "$rc" -eq 0 ] && [ "$limok" -eq 1 ]; then ok "R11 aucun porteur present -> rc 0, exiges=6 porteurs=0 manquants=aucun"
-else ko "R11 aucun porteur present -> rc 0, exiges=6 porteurs=0 manquants=aucun" "rc=0 exiges=6 porteurs=0 manquants=aucun" "rc=$rc :: $out"; fi
+case "$out" in *"limite: exiges=5 porteurs=0 manquants=aucun"*) limok=1 ;; *) limok=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$limok" -eq 1 ]; then ok "R11 aucun porteur present -> rc 0, exiges=5 porteurs=0 manquants=aucun"
+else ko "R11 aucun porteur present -> rc 0, exiges=5 porteurs=0 manquants=aucun" "rc=0 exiges=5 porteurs=0 manquants=aucun" "rc=$rc :: $out"; fi
 
 echo "== test-check-aucune-fermeture : MUTANTS (MUT-1 a MUT-3) =="
 
@@ -254,7 +258,8 @@ MUT3_PATH="$(make_mutant mut3 "$MUT3_OLD" "$MUT3_NEW")"
 MUT3_STAT=$?
 set -e
 D="$(mk_repo mut3)"
-printf '%s\n' '# CLAUDE.md de fixture' 'Rien sur la limite de fond ici.' > "$D/CLAUDE.md"
+mkdir -p "$D/scripts"
+printf '%s\n' '#!/usr/bin/env bash' 'Rien sur la limite de fond ici.' > "$D/scripts/check-baseline-arbitrage.sh"
 commit_all "$D" "fixture: R9 rejouee pour MUT-3"
 if [ "$MUT3_STAT" -eq 1 ]; then komut 3 "sonde de limite de fond neutralisee" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
 elif [ "$MUT3_STAT" -eq 2 ]; then komut 3 "sonde de limite de fond neutralisee" "bash -n OK sur le mutant" "syntaxe invalide"
