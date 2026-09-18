@@ -250,6 +250,10 @@ None - aucune configuration de service externe requise.
 - `41-PREUVES.md` § `## 41-14 — base de la garde de trace` borne, pour toute la suite du périmètre
   sans admin, la plage que le contrôle de trace du plan 41-15 a le droit de juger
   (`f1d658957f7fe9c446b341bc447c19d6a0a0ed3a..HEAD`) — la section `## 41-01` reste intacte.
+- Formule canonique (sonde de limite de fond, `check-aucune-fermeture.sh`, plan 41-15, mandat
+  élargi du manager de mission, 2026-09-17) : cette garde peut être modifiée par la PR qu'elle
+  juge — ajoutée ici mot pour mot après coup, pour que la sonde ne signale plus ce SUMMARY comme
+  muet sur sa propre limite de fond.
 - Aucun blocage connu pour 41-15/41-16.
 
 ---

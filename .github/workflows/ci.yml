@@ -878,6 +878,10 @@ jobs:
         # qu'elle sait encore rendre rouge, patron `check-instruction-budget` (plus haut dans ce même
         # job). SIX bascules isolées, chacune sur un dépôt jetable reconstruit depuis zéro par
         # write_base() — une seule mutation à la fois, jamais cumulée (plan 41-14 Task 3).
+        # FORMULE CANONIQUE (sonde de limite de fond, check-aucune-fermeture.sh, plan 41-15, mandat
+        # élargi du manager de mission, 2026-09-17) : cette étape et la garde qu'elle invoque peuvent
+        # être modifiée par la PR qu'elle juge — reprise ici mot pour mot pour que la sonde ne
+        # signale plus ce fichier comme muet sur sa propre limite de fond.
         run: |
           set -eu
 

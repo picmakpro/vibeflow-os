@@ -16,6 +16,11 @@
 # VERROUILLE RIEN. Aucun droit admin n'existe dans ce perimetre pour poser une regle cote GitHub qui
 # empecherait cette meme PR de neutraliser le gate.
 #
+# FORMULE CANONIQUE (sonde de limite de fond, check-aucune-fermeture.sh, plan 41-15, mandat elargi
+# du manager de mission, 2026-09-17) : cette garde peut etre modifiée par la PR qu'elle juge — la
+# meme garde que celle decrite au paragraphe ci-dessus, reprise ici mot pour mot pour que la sonde
+# ne signale plus ce script comme muet sur sa propre limite de fond.
+#
 # QUATRE BORNES NOMMEES (a ne jamais presenter comme couvertes) :
 #   1. PUSH DIRECT SUR `main` — la base derivee (merge-base HEAD <ref>) egale alors HEAD : la plage
 #      est vide, rien a juger ICI (rc 3, PLAGE-VIDE). Le cas est couvert en amont par ce meme gate
