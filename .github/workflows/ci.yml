@@ -1152,6 +1152,73 @@ jobs:
               ;;
           esac
 
+      - name: check-push-sans-pr (G-3 — preuve par fixture, sans condition)
+        # POURQUOI DEUX ÉTAPES. Une étape GitHub Actions ne porte qu'une seule condition. La
+        # mesure réelle ne peut tourner que sur un push vers `main` (elle a besoin de GH_TOKEN et
+        # d'un sha réellement poussé) — mais une étape conditionnelle `main` est SAUTÉE sur toute
+        # PR et toute branche de feature, donc ELLE NE PEUT JAMAIS PROUVER sa capacité à rougir
+        # depuis un run de PR. D'où cette étape de fixture, SANS CONDITION : elle tourne sur tout
+        # run (PR comme push de branche) et prouve, à chaque exécution, que
+        # `scripts/check-push-sans-pr.sh` sait effectivement rendre `PUSH-SANS-PR` quand les deux
+        # lectures GitHub sont vides — sans jamais appeler le réseau (fixtures `--pulls-file` /
+        # `--closed-pulls-file`).
+        # ALARME APRÈS COUP, JAMAIS UN VERROU : cette étape ne bloque aucun push direct sur
+        # `main` — voir l'en-tête de `scripts/check-push-sans-pr.sh`.
+        run: |
+          set -eu
+
+          S="scripts/check-push-sans-pr.sh"
+          T="$(mktemp -d)"
+          trap 'rm -rf "$T"' EXIT
+
+          printf '[]\n' > "$T/vide.json"
+          printf '[{"number":1,"merge_commit_sha":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}]\n' > "$T/closed.json"
+
+          rc=0
+          out="$(bash "$S" --repo o/r \
+            --sha 1111111111111111111111111111111111111111 \
+            --before 2222222222222222222222222222222222222222 \
+            --pulls-file "$T/vide.json" --closed-pulls-file "$T/closed.json" 2>&1)" || rc=$?
+          echo "== fixture deux lectures vides : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *PUSH-SANS-PR*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then
+            echo "::error::check-push-sans-pr CI : fixture deux lectures vides rc=$rc (attendu 1), PUSH-SANS-PR=$has (attendu 1)"
+            exit 1
+          fi
+          echo "== check-push-sans-pr DISCRIMINANT en CI : la fixture sans condition prouve que l'étape sait rougir =="
+
+      - name: check-push-sans-pr (G-3, PROT-05 — mesure réelle sur un push vers main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # Seule cette étape porte GH_TOKEN et interroge réellement GitHub — sur un push vers
+        # `main` uniquement (même garde que `check-release-tag`, juste après). Sans jeton, le `gh`
+        # du runner échoue en auth : lire cet échec comme « aucune PR » serait exactement le faux
+        # négatif d'auth vécu sur la v2.39.0 le 2026-07-26 — `check-push-sans-pr.sh` distingue déjà
+        # cet échec (rc 2 NON-VERIFIABLE) d'une liste vide (rc 1 PUSH-SANS-PR), jamais confondus.
+        # Cette étape est une ALARME APRÈS COUP : le commit qu'elle juge est déjà sur `main`.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          rc=0
+          out="$(bash scripts/check-push-sans-pr.sh \
+            --repo "${{ github.repository }}" \
+            --sha "${{ github.sha }}" \
+            --before "${{ github.event.before }}" 2>&1)" || rc=$?
+          echo "== mesure réelle : rc=$rc =="; printf '%s\n' "$out"
+          case "$rc" in
+            0|3) : ;;
+            1)
+              verdict="$(printf '%s\n' "$out" | tail -1)"
+              echo "::error::check-push-sans-pr : PUSH SANS PR ASSOCIÉE sur main — alarme après coup, le commit est déjà arrivé — $verdict"
+              exit 1
+              ;;
+            *)
+              verdict="$(printf '%s\n' "$out" | tail -1)"
+              echo "::error::check-push-sans-pr : mesure réelle NON-VERIFIABLE rc=$rc — $verdict"
+              exit 1
+              ;;
+          esac
+
       - name: check-release-tag (main uniquement — VERSION doit être taggée et poussée)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         # GH_TOKEN requis : sans lui le gh du runner échoue en auth et le gate lisait cet
