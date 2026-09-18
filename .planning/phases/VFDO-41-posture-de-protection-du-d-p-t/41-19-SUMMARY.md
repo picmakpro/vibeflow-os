@@ -182,7 +182,8 @@ une, passerait par la section `## Non releasé` du `CHANGELOG.md` racine.
 
 1. **Task 1 : rejeu final, recensements, inventaire des SUMMARY** — `ed5f186` (docs)
 2. **Task 2 : ledger REQUIREMENTS — famille PROT, PROT-01 hors d'atteinte, QUAL-01** — `42828a1` (docs)
-3. **Task 3 : constat d'inatteignabilité, reliquats nommés, ce SUMMARY** — commit de clôture (voir historique après ce fichier)
+3. **Task 3 : constat d'inatteignabilité, reliquats nommés, ce SUMMARY** — `f1efc4c` (docs, registre
+   et SUMMARY dans le même commit)
 
 _Base (`plan_head_before`) : `832b310` (dernier commit avant ce plan, correction ciblée
 post-revue). `commits` mesuré (`git rev-list --count 832b310..HEAD`) : 3._
@@ -285,6 +286,8 @@ vide en sortie de l'outil), 3 sautee(s) au bilan au total.
 ## Self-Check: PASSED
 
 Fichiers vérifiés modifiés : `41-PREUVES.md`, `REQUIREMENTS.md`. Commits vérifiés présents dans
-l'historique : `ed5f186`, `42828a1`.
+l'historique : `ed5f186`, `42828a1`, `f1efc4c` (ce dernier ajoute aussi ce SUMMARY lui-même — sha
+antérieur à l'amendement de cette phrase, non recalculé après coup, cf. la même remarque pour
+`BASE-TRACE-ARBITRAGE` en `41-PREUVES.md` § 41-14).
 
 Cette garde peut être modifiée par la PR qu'elle juge.
