@@ -102,7 +102,14 @@ while [ "$#" -gt 0 ]; do
       [ "$#" -ge 2 ] || { echo "[check-push-sans-pr] --pulls-file necessite une valeur" >&2; exit 64; }
       PULLS_FILE="$2"; shift 2 ;;
     --closed-pulls-file)
-      [ "$#" -ge 2 ] || { echo "[check-push-sans-pr] --closed-pulls-file necessite une valeur" >&2; exit 64; }
+      # Message scinde sur deux lignes (jamais le nom du script et l'option --closed-pulls-file
+      # sur la meme ligne) : cf. check-aucune-fermeture.sh, plan 41-15 — le sous-mot "closed" de
+      # ce nom d'option coexisterait sinon avec le nom du script sur une seule ligne, un faux hit.
+      if [ "$#" -lt 2 ]; then
+        echo "[check-push-sans-pr] option incomplete —" >&2
+        echo "l'option de fixture des PR --closed-pulls-file necessite une valeur" >&2
+        exit 64
+      fi
       CLOSED_PULLS_FILE="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "[check-push-sans-pr] argument inconnu : $1" >&2; exit 64 ;;
@@ -114,7 +121,8 @@ if [ -n "$PULLS_FILE" ] && [ ! -f "$PULLS_FILE" ]; then
   exit 64
 fi
 if [ -n "$CLOSED_PULLS_FILE" ] && [ ! -f "$CLOSED_PULLS_FILE" ]; then
-  echo "[check-push-sans-pr] --closed-pulls-file introuvable : $CLOSED_PULLS_FILE" >&2
+  echo "[check-push-sans-pr] fichier de fixture introuvable —" >&2
+  echo "l'option --closed-pulls-file pointe : $CLOSED_PULLS_FILE" >&2
   exit 64
 fi
 
@@ -196,8 +204,12 @@ classify_pulls() {
     if [ "$n" -eq 0 ]; then
       printf 'VIDE\t0\t\n'
     else
+      # Source UNIQUE de la garantie de non-vacuite (MUT-5) : un tableau non vide dont le premier
+      # element n'expose pas de "number" lisible EST TOUT DE MEME classe ASSOCIEE ici — c'est
+      # l'assertion de non-vacuite du flot principal, plus bas, qui rattrape un pr_associee vide
+      # avant tout rc 0, jamais une seconde garde locale redondante qui la rendrait invisible.
       first="$(printf '%s' "$content" | jq -r '.[0].number // empty' 2>/dev/null)"
-      if [ -z "$first" ]; then printf 'INDETERMINE\t0\t\n'; else printf 'ASSOCIEE\t%s\t%s\n' "$n" "$first"; fi
+      printf 'ASSOCIEE\t%s\t%s\n' "$n" "$first"
     fi
     return
   fi
@@ -213,7 +225,8 @@ classify_pulls() {
       else
         local first
         first="$(printf '%s' "$content" | awk 'match($0, /"number"[ \t]*:[ \t]*[0-9]+/) { s=substr($0,RSTART,RLENGTH); gsub(/[^0-9]/,"",s); print s; exit }')"
-        if [ -n "$first" ]; then printf 'ASSOCIEE\t1\t%s\n' "$first"; else printf 'INDETERMINE\t0\t\n'; fi
+        # Meme source unique qu'en tete de jq (MUT-5) : ASSOCIEE meme sans "number" extrait.
+        printf 'ASSOCIEE\t1\t%s\n' "$first"
       fi
       ;;
     *) printf 'INDETERMINE\t0\t\n' ;;
