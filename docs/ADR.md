@@ -2476,6 +2476,15 @@ SUMMARY et des en-têtes des scripts, jamais l'intention du plan).
 Chacune est câblée dans le job `gates` de `ci.yml` et prouvée capable de rougir par des bascules de
 fixture dans son étape et par des mutants dans sa suite.
 
+**Écart d'interface nommé, pas seulement constaté (correctif de revue de jointure, 2026-09-18,
+correctif 2).** G-3 n'a PAS le même patron de surface CLI que G-1/G-2 : options `--repo`/`--sha`/
+`--before`/`--pulls-file`/`--closed-pulls-file` au lieu de `--root`/`--base-ref`, une fonction
+`usage()` séparée au lieu d'un `-h`/`--help` inline, des sections d'en-tête numérotées `(1)(2)(3)`
+au lieu du format ALL-CAPS non numéroté de G-1/G-2. Écart fonctionnellement justifié — G-3 juge un
+`sha` ponctuel via l'API GitHub (après coup, sur `push`), pas un diff de branche local comme
+G-1/G-2 — mais un lecteur de cette seule doctrine ne doit pas s'attendre à `--root`/`--base-ref`
+sur G-3.
+
 ### Décision — les deux bornes de G-1, avec leur motif
 
 Décisions du manager, 2026-09-17, sur remontée du planificateur.
