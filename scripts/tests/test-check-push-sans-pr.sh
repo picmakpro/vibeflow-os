@@ -75,6 +75,23 @@ ecrire_json() {  # <chemin> <contenu>
   printf '%s' "$2" > "$1"
 }
 
+# mk_fake_gh <dir> -> pose un binaire `gh` jetable dans <dir>, jamais un appel reseau : il lit son
+# comportement dans trois variables d'environnement (FAKE_GH_STDOUT, FAKE_GH_STDERR, FAKE_GH_RC)
+# fixees par l'appelant juste avant l'invocation. Sert UNIQUEMENT au cas F3 ci-dessous, qui doit
+# emprunter le VRAI chemin d'appel du script sous test (sans --pulls-file/--closed-pulls-file, qui
+# court-circuitent ce chemin) pour prouver que stdout et stderr restent bien separes.
+mk_fake_gh() {
+  local dir="$1"
+  mkdir -p "$dir"
+  cat > "$dir/gh" <<'GHSTUB'
+#!/bin/sh
+[ -n "${FAKE_GH_STDOUT:-}" ] && cat "$FAKE_GH_STDOUT"
+[ -n "${FAKE_GH_STDERR:-}" ] && printf '%s' "$FAKE_GH_STDERR" >&2
+exit "${FAKE_GH_RC:-0}"
+GHSTUB
+  chmod +x "$dir/gh"
+}
+
 # make_mutant <name> <old_line> <new_line> -> imprime le chemin du mutant ; retour 0 = opposable
 # et valide, 1 = identique a l'original (NON OPPOSABLE), 2 = syntaxe invalide. Substitution par
 # ligne exacte, jamais sed -i — meme patron que test-check-gate-touche.sh.
@@ -127,6 +144,25 @@ safe_run out rc --pulls-file "$P" --closed-pulls-file "$C"
 case "$out" in *"voie=merge-commit-sha"*) hasv=1 ;; *) hasv=0 ;; esac
 if [ "$rc" -eq 0 ] && [ "$hasv" -eq 1 ]; then ok "PASS merge_commit_sha casse differente (insensible a la casse) -> rc 0"
 else ko "PASS casse differente" "rc=0 voie=merge-commit-sha" "rc=$rc :: $out"; fi
+
+# --- PASS 5 : notice sur stderr du binaire `gh`, JSON valide sur stdout (revue F3, 2026-09-18) -----
+# Reproduction exacte : avant le fix, la sortie de l'appel etait capturee flux fusionnes (stdout ET
+# stderr dans la meme variable) avant d'etre passee au parseur JSON — une notice sur stderr cassait
+# alors le parsing et rendait NON-VERIFIABLE/rc 2 sur un appel par ailleurs reussi (exit 0, JSON
+# valide). Ce cas emprunte le VRAI chemin d'appel (aucun --pulls-file) via un binaire `gh` jetable
+# sur le PATH.
+FAKEBIN="$TMP/fakebin"; mk_fake_gh "$FAKEBIN"
+export FAKE_GH_STDOUT="$TMP/pass5_pulls.json"
+ecrire_json "$FAKE_GH_STDOUT" '[{"number":42}]'
+export FAKE_GH_STDERR='Warning: cette notice ne doit jamais rejoindre le flux JSON de stdout'
+export FAKE_GH_RC=0
+set +e
+out="$(PATH="$FAKEBIN:$PATH" bash "$TARGET" --repo o/r --sha "$SHA" --before "$BEFORE" 2>&1)"; rc=$?
+set -e
+unset FAKE_GH_STDOUT FAKE_GH_STDERR FAKE_GH_RC
+case "$out" in *"pr_associee=42"*) hasp=1 ;; *) hasp=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$hasp" -eq 1 ]; then ok "PASS notice stderr sans corrompre le JSON de stdout -> rc 0 pr_associee=42"
+else ko "PASS notice stderr du binaire gh, JSON stdout intact" "rc=0 pr_associee=42" "rc=$rc :: $out"; fi
 
 echo "== test-check-push-sans-pr : CONTROLE NEGATIF =="
 

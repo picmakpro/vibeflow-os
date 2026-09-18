@@ -186,6 +186,14 @@ else
   fi
 fi
 
+# Fichier jetable pour la sortie stderr de `gh api`, JAMAIS fusionnee au JSON de stdout (revue F3,
+# 2026-09-18) : une notice ou un avertissement `gh` sur stderr faisait auparavant echouer `jq -e
+# 'type == "array"'` sur un flux qui n'etait plus du JSON pur, rendant NON-VERIFIABLE/rc 2 — faux
+# rouge qui casse l'etape CI main-only de G-3 sans que la PR jugee y soit pour rien. stdout et
+# stderr sont maintenant captures separement ; stderr reste imprime au diagnostic sur echec.
+GH_STDERR_TMP="$(mktemp 2>/dev/null || printf '/tmp/check-push-sans-pr.stderr.%s' "$$")"
+trap 'rm -f "$GH_STDERR_TMP"' EXIT
+
 # --- Classification a trois etats, partagee par les deux lectures ---------------------------------
 # classify_pulls <contenu> <rc_appel> -> imprime "ETAT<TAB>N<TAB>PREMIER_NUMERO"
 # ETAT in {ASSOCIEE, VIDE, INDETERMINE}. Jamais VIDE si aucun des deux parseurs ne conclut.
@@ -321,7 +329,9 @@ else
   if ! command -v gh >/dev/null 2>&1; then
     PULLS_RAW=""; PULLS_CALL_RC=127
   else
-    PULLS_RAW="$(gh api "repos/${REPO}/commits/${SHA}/pulls" 2>&1)"; PULLS_CALL_RC=$?
+    : > "$GH_STDERR_TMP"
+    PULLS_RAW="$(gh api "repos/${REPO}/commits/${SHA}/pulls" 2>"$GH_STDERR_TMP")"; PULLS_CALL_RC=$?
+    PULLS_STDERR="$(cat "$GH_STDERR_TMP" 2>/dev/null)"
   fi
 fi
 
@@ -332,6 +342,7 @@ PULLS_LUES="${N1:-0}"
 if [ "$ETAT1" = "INDETERMINE" ]; then
   echo "NON-VERIFIABLE: premiere lecture indeterminee (rc appel=${PULLS_CALL_RC})" >&2
   printf '%s\n' "$PULLS_RAW" | head -5 >&2
+  [ -n "${PULLS_STDERR:-}" ] && { echo "-- stderr gh api --" >&2; printf '%s\n' "$PULLS_STDERR" | head -5 >&2; }
   exit 2
 fi
 
@@ -354,7 +365,9 @@ else
   if ! command -v gh >/dev/null 2>&1; then
     CLOSED_RAW=""; CLOSED_CALL_RC=127
   else
-    CLOSED_RAW="$(gh api "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=30" 2>&1)"; CLOSED_CALL_RC=$?
+    : > "$GH_STDERR_TMP"
+    CLOSED_RAW="$(gh api "repos/${REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=30" 2>"$GH_STDERR_TMP")"; CLOSED_CALL_RC=$?
+    CLOSED_STDERR="$(cat "$GH_STDERR_TMP" 2>/dev/null)"
   fi
 fi
 
@@ -365,6 +378,7 @@ CLOSED_EXAMINEES="${N2:-0}"
 if [ "$ETAT2" = "INDETERMINE" ]; then
   echo "NON-VERIFIABLE: seconde lecture indeterminee (rc appel=${CLOSED_CALL_RC})" >&2
   printf '%s\n' "$CLOSED_RAW" | head -5 >&2
+  [ -n "${CLOSED_STDERR:-}" ] && { echo "-- stderr gh api --" >&2; printf '%s\n' "$CLOSED_STDERR" | head -5 >&2; }
   exit 2
 fi
 
