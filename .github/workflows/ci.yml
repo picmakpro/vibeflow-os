@@ -1159,11 +1159,13 @@ jobs:
         # PR et toute branche de feature, donc ELLE NE PEUT JAMAIS PROUVER sa capacité à rougir
         # depuis un run de PR. D'où cette étape de fixture, SANS CONDITION : elle tourne sur tout
         # run (PR comme push de branche) et prouve, à chaque exécution, que
-        # `scripts/check-push-sans-pr.sh` sait effectivement rendre `PUSH-SANS-PR` quand les deux
-        # lectures GitHub sont vides — sans jamais appeler le réseau (fixtures `--pulls-file` /
-        # `--closed-pulls-file`).
+        # `scripts/check-push-sans-pr.sh` sait effectivement distinguer ses quatre verdicts —
+        # sans jamais appeler le réseau (fixtures `--pulls-file` / `--closed-pulls-file`).
         # ALARME APRÈS COUP, JAMAIS UN VERROU : cette étape ne bloque aucun push direct sur
         # `main` — voir l'en-tête de `scripts/check-push-sans-pr.sh`.
+        # QUATRE BASCULES ISOLÉES (plan 41-17, Task 3), chacune sur des fichiers JSON réécrits
+        # depuis zéro (patron `check-gate-touche` / `check-baseline-arbitrage`, plus haut dans ce
+        # même job) : une mutation de scénario à la fois, jamais cumulée.
         run: |
           set -eu
 
@@ -1171,21 +1173,49 @@ jobs:
           T="$(mktemp -d)"
           trap 'rm -rf "$T"' EXIT
 
-          printf '[]\n' > "$T/vide.json"
-          printf '[{"number":1,"merge_commit_sha":"deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}]\n' > "$T/closed.json"
+          fail=0
+          note() { echo "::error::check-push-sans-pr CI : $1"; fail=$((fail + 1)); }
 
+          SHA="1111111111111111111111111111111111111111"
+          BEFORE="2222222222222222222222222222222222222222"
+
+          # 1/4 première lecture porte une PR -> attendu rc 0, voie=commits-pulls
+          printf '[{"number":9}]\n' > "$T/1_pulls.json"
           rc=0
-          out="$(bash "$S" --repo o/r \
-            --sha 1111111111111111111111111111111111111111 \
-            --before 2222222222222222222222222222222222222222 \
-            --pulls-file "$T/vide.json" --closed-pulls-file "$T/closed.json" 2>&1)" || rc=$?
-          echo "== fixture deux lectures vides : rc=$rc =="; printf '%s\n' "$out"
+          out="$(bash "$S" --repo o/r --sha "$SHA" --before "$BEFORE" --pulls-file "$T/1_pulls.json" 2>&1)" || rc=$?
+          echo "== 1/4 première lecture associée : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *"voie=commits-pulls"*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "1/4 première lecture associée : rc=$rc (attendu 0), voie=commits-pulls=$has (attendu 1)"; fi
+
+          # 2/4 première vide, seconde porte le merge_commit_sha du sha jugé (merge par rebase) -> rc 0
+          printf '[]\n' > "$T/2_pulls.json"
+          printf '[{"number":11,"merge_commit_sha":"%s"}]\n' "$SHA" > "$T/2_closed.json"
+          rc=0
+          out="$(bash "$S" --repo o/r --sha "$SHA" --before "$BEFORE" --pulls-file "$T/2_pulls.json" --closed-pulls-file "$T/2_closed.json" 2>&1)" || rc=$?
+          echo "== 2/4 merge par rebase (cascade merge_commit_sha) : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *"voie=merge-commit-sha"*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "2/4 merge par rebase : rc=$rc (attendu 0), voie=merge-commit-sha=$has (attendu 1)"; fi
+
+          # 3/4 les deux lectures vides -> attendu rc 1, PUSH-SANS-PR
+          printf '[]\n' > "$T/3_pulls.json"
+          printf '[]\n' > "$T/3_closed.json"
+          rc=0
+          out="$(bash "$S" --repo o/r --sha "$SHA" --before "$BEFORE" --pulls-file "$T/3_pulls.json" --closed-pulls-file "$T/3_closed.json" 2>&1)" || rc=$?
+          echo "== 3/4 deux lectures vides : rc=$rc =="; printf '%s\n' "$out"
           has=0; case "$out" in *PUSH-SANS-PR*) has=1 ;; esac
-          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then
-            echo "::error::check-push-sans-pr CI : fixture deux lectures vides rc=$rc (attendu 1), PUSH-SANS-PR=$has (attendu 1)"
-            exit 1
-          fi
-          echo "== check-push-sans-pr DISCRIMINANT en CI : la fixture sans condition prouve que l'étape sait rougir =="
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "3/4 deux lectures vides : rc=$rc (attendu 1), PUSH-SANS-PR=$has (attendu 1)"; fi
+
+          # 4/4 réponse d'erreur d'API au lieu d'un tableau -> attendu rc 2, JAMAIS rc 1
+          # (précédent nommé : faux négatif d'auth de la v2.39.0 le 2026-07-26)
+          printf '{"message":"Bad credentials"}\n' > "$T/4_pulls.json"
+          rc=0
+          out="$(bash "$S" --repo o/r --sha "$SHA" --before "$BEFORE" --pulls-file "$T/4_pulls.json" 2>&1)" || rc=$?
+          echo "== 4/4 échec d'auth simulé : rc=$rc =="; printf '%s\n' "$out"
+          if [ "$rc" -ne 2 ]; then note "4/4 échec d'auth simulé : rc=$rc (attendu 2, jamais 1 — précédent v2.39.0 du 2026-07-26)"; fi
+
+          echo "== BILAN preuve fixture : $fail écart(s) sur 4 verdicts =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-push-sans-pr DISCRIMINANT en CI : les quatre bascules isolées sont prouvées, l'étape sait rendre chacun de ses quatre verdicts =="
 
       - name: check-push-sans-pr (G-3, PROT-05 — mesure réelle sur un push vers main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

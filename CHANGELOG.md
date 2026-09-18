@@ -42,6 +42,27 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
   faute d'accès admin sur ce dépôt (option (a)) : signalée et tracée, jamais fermée.
   `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
   arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
+- **G-3 (PROT-05, QUAL-01) — alarme après coup sur un push direct vers `main` sans PR associée** —
+  `scripts/check-push-sans-pr.sh` + sa suite `scripts/tests/test-check-push-sans-pr.sh` (cinq
+  mutants opposables) + deux étapes dans le job `gates` de `.github/workflows/ci.yml` : preuve par
+  fixture à quatre bascules (sans condition, tourne sur tout run) et mesure réelle (conditionnée
+  push vers `main`, avec `GH_TOKEN`). Deux lectures GitHub en cascade — les PR qui référencent le
+  sha jugé, puis (si vide) le `merge_commit_sha` des PR closes, pour couvrir le merge par rebase de
+  ce dépôt (PR #71 `72259f4`, PR #72 `306e25d`, le tag `v2.63.0` pointe sur le commit rebasé) —
+  sans cette seconde lecture, la garde rougirait sur des merges parfaitement réguliers de ce dépôt.
+  Distingue strictement un échec d'API d'une liste vide (rc 2 jamais rc 1, précédent
+  d'authentification nommé, v2.39.0 du 2026-07-26) et traite la création de ref (`--before` nul,
+  rc 3). Juge le seul SOMMET du push, borne écrite en en-tête, jamais prétendue couverte au-delà.
+  LIMITE DE FOND : cette garde vit dans le dépôt — la PR qu'elle juge peut la modifier (elle, sa
+  suite, son étape CI) et rester verte ; elle rend visible et trace, elle ne verrouille rien.
+  ALARME APRÈS COUP : quand elle rougit, le commit est déjà sur `main` — elle ne peut rien
+  empêcher, le précédent `892f89a` (2026-09-16) l'illustre. Le hook `pre-push` n'est pas touché.
+  Traite PROT-05 (exigence créée par le manager le 2026-09-17, sur remontée du planificateur, née
+  du recadrage sans admin) : signalée et tracée. Compatibilité PROT-02 (flux de release) prouvée
+  sur pièce : le déclencheur `on.push.branches` ne porte aucune entrée `tags:`, donc le push d'un
+  tag annoté ne peut jamais faire rougir cette étape.
+  `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
+  arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
 
 ## [v2.63.2] — 2026-09-17
 
