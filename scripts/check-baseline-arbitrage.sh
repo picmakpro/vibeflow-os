@@ -78,8 +78,10 @@
 #   0  = CONFORME (peut porter des AVERTISSEMENT-* non bloquants)
 #   1  = au moins un verdict bloquant : HAUSSE-SANS-ARBITRAGE, HAUSSE-NON-IMPUTABLE,
 #        LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE, ou SENTINELLE-NEUTRALISEE
-#   2  = NON VERIFIABLE — aucune ref de base resoluble, hors d'un arbre git, ou baseline de la base
-#        imparsable (moins de 3 champs, ou colonne 2/3 non entierement numerique)
+#   2  = NON VERIFIABLE — aucune ref de base resoluble, hors d'un arbre git, ou baseline (a la base
+#        OU A HEAD) imparsable (moins de 3 champs, ou colonne 2/3 non entierement numerique) : une
+#        comparaison arithmetique sur une valeur non numerique doit rester detectee, jamais avalee
+#        en silence par `set -uo pipefail` (sans -e)
 #   3  = silence non bloquant — plage vide (base egale HEAD, ou aucun commit non-merge dans la
 #        plage), ou BASELINE-ABSENTE (absente a la base ET a HEAD)
 #   64 = erreur d'usage (argument inconnu, --root/--base-ref sans valeur, --root inexistant)
@@ -254,14 +256,27 @@ if [ "$BASE_EXISTS" -eq 0 ] && [ "$HEAD_EXISTS" -eq 1 ]; then
   echo "BASELINE-CREEE: ${BASELINE_PATH} absente a la base, presente a HEAD — aucune hausse possible, verification des sentinelles seule"
 fi
 
-if [ "$BASE_EXISTS" -eq 1 ]; then
-  BAD_LINE="$(printf '%s\n' "$BASE_DATA_RAW" | awk -F'\t' '
+check_parsable() {
+  # $1 = donnees TSV brutes, $2 = libelle (base|HEAD) pour le message d'erreur
+  printf '%s\n' "$1" | awk -F'\t' '
     NF < 3 { print; exit }
     $2 !~ /^[0-9]+$/ { print; exit }
     $3 !~ /^[0-9]+$/ { print; exit }
-  ')"
+  '
+}
+
+if [ "$BASE_EXISTS" -eq 1 ]; then
+  BAD_LINE="$(check_parsable "$BASE_DATA_RAW" base)"
   if [ -n "$BAD_LINE" ]; then
     echo "[check-baseline-arbitrage] baseline de la base imparsable : ${BAD_LINE}" >&2
+    exit 2
+  fi
+fi
+
+if [ "$HEAD_EXISTS" -eq 1 ]; then
+  BAD_LINE="$(check_parsable "$HEAD_DATA_RAW" head)"
+  if [ -n "$BAD_LINE" ]; then
+    echo "[check-baseline-arbitrage] baseline de HEAD imparsable : ${BAD_LINE}" >&2
     exit 2
   fi
 fi

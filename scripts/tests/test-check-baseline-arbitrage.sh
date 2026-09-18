@@ -268,6 +268,24 @@ git_c "$D" commit -q --allow-empty -m "chore: commit suivant"
 safe_run out rc "$D" --base-ref "$BAD"
 [ "$rc" -eq 2 ] && ok "BRUYANT baseline a deux champs -> rc 2" || ko "BRUYANT baseline a deux champs" "rc=2" "rc=$rc :: $out"
 
+# --- BRUYANT 5 : colonne non numerique a HEAD (reproduction exacte de la revue, finding F1) ---------------
+# La base reste valide (fixture mk_repo) ; c'est HEAD qui porte la valeur imparsable. Avant le fix,
+# la comparaison arithmetique `$((10#${hi:-0}))` sur "NONNUM" plantait sous `set -uo pipefail` (sans
+# -e), l'erreur arithmetique etait avalee et le script rendait CONFORME/rc 0 malgre la hausse non
+# imputable a une citation.
+D="$(mk_repo bru5)"; B="$(base_of "$D")"
+printf '%s\n' '# baseline de fixture' "demo/a.md${TAB}10${TAB}NONNUM" | w_baseline "$D"
+commit_avec "$D" "chore: colonne instructions non numerique a HEAD, sans citation"
+safe_run out rc "$D" --base-ref "$B"
+[ "$rc" -eq 2 ] && ok "BRUYANT colonne non numerique a HEAD -> rc 2" || ko "BRUYANT colonne non numerique a HEAD" "rc=2" "rc=$rc :: $out"
+
+# --- BRUYANT 6 : baseline a deux champs a HEAD --------------------------------------------------------------
+D="$(mk_repo bru6)"; B="$(base_of "$D")"
+printf '%s\n' '# baseline de fixture' "plugin/demo/a.md${TAB}10" "plugin/demo/b.md${TAB}20${TAB}8" | w_baseline "$D"
+commit_avec "$D" "chore: ligne a deux champs a HEAD"
+safe_run out rc "$D" --base-ref "$B"
+[ "$rc" -eq 2 ] && ok "BRUYANT baseline a deux champs a HEAD -> rc 2" || ko "BRUYANT baseline a deux champs a HEAD" "rc=2" "rc=$rc :: $out"
+
 # --- BRUYANT 3 : --base-ref vers une ref inexistante --------------------------------------------------------
 D="$(mk_repo bru3)"
 git_c "$D" commit -q --allow-empty -m "chore: avance HEAD"
