@@ -271,6 +271,28 @@ case "$out" in *MARQUEUR-MAL-FORME*) hasm=1 ;; *) hasm=0 ;; esac
 if [ "$rc" -eq 1 ] && [ "$hasm" -eq 1 ]; then ok "FAIL trailer raison trop courte -> rc 1 MARQUEUR-MAL-FORME"
 else ko "FAIL trailer raison trop courte" "rc=1 MARQUEUR-MAL-FORME" "rc=$rc :: $out"; fi
 
+# --- FAIL 3b : verdict identique sous LC_ALL=C et LC_ALL=en_US.UTF-8 (revue F2, raison accentuee) ---
+# Reproduction exacte de la revue : "éàçèùî" fait 6 caracteres mais 12 octets en UTF-8. Avant le
+# fix, ${#reason_stripped} comptait des octets sous une locale byte-oriented (LC_ALL=C) et rendait
+# DECLARE/rc 0 (12 >= 10) alors que la meme raison rendait a bon droit MARQUEUR-MAL-FORME/rc 1 sous
+# une locale UTF-8 (6 < 10) — un verdict qui dependait de la locale d'invocation, pas du contenu.
+D="$(mk_repo fail3b)"; B="$(base_of "$D")"
+printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh"
+commit_avec "$D" "feat: touche gate scripts, raison accentuee 6 caracteres
+
+Gate-Touche: scripts/check-demo.sh — éàçèùî"
+set +e
+out_c="$(LC_ALL=C bash "$TARGET" --root "$D" --base-ref "$B" 2>&1)"; rc_c=$?
+out_u="$(LC_ALL=en_US.UTF-8 bash "$TARGET" --root "$D" --base-ref "$B" 2>&1)"; rc_u=$?
+set -e
+case "$out_c" in *MARQUEUR-MAL-FORME*) hasm_c=1 ;; *) hasm_c=0 ;; esac
+case "$out_u" in *MARQUEUR-MAL-FORME*) hasm_u=1 ;; *) hasm_u=0 ;; esac
+if [ "$rc_c" -eq 1 ] && [ "$rc_u" -eq 1 ] && [ "$hasm_c" -eq 1 ] && [ "$hasm_u" -eq 1 ]; then
+  ok "FAIL raison accentuee 6 car -> MARQUEUR-MAL-FORME identique sous LC_ALL=C et LC_ALL=en_US.UTF-8"
+else
+  ko "FAIL raison accentuee, verdict stable par locale" "rc=1 MARQUEUR-MAL-FORME (les deux locales)" "LC_ALL=C: rc=$rc_c hasm=$hasm_c :: LC_ALL=en_US.UTF-8: rc=$rc_u hasm=$hasm_u"
+fi
+
 # --- FAIL 4 : trailer dont le motif n'apparie pas le chemin touche -> rc1 ----------------------------
 D="$(mk_repo fail4)"; B="$(base_of "$D")"
 printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh"
@@ -399,7 +421,7 @@ else
 fi
 
 # --- MUT-3 : neutralise le controle de forme du marqueur (raison vide/courte acceptee) ---------------
-MUT3_OLD='        if [ "${#reason_stripped}" -lt 10 ]; then'
+MUT3_OLD='        if [ "${reason_charcount:-0}" -lt 10 ]; then'
 MUT3_NEW='        if [ "0" -eq 1 ]; then'
 MUT3_PATH="$(make_mutant mut3 "$MUT3_OLD" "$MUT3_NEW")"; MUT3_STAT=$?
 D="$(mk_repo mut3)"; B="$(base_of "$D")"

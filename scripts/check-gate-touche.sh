@@ -261,7 +261,17 @@ while IFS= read -r c; do
             ;;
         esac
         reason_stripped="$(printf '%s' "$reason" | tr -d '[:space:]')"
-        if [ "${#reason_stripped}" -lt 10 ]; then
+        # ${#var} compte des OCTETS quand la locale d'execution est byte-oriented (LC_ALL=C) — une
+        # raison accentuee (ex. "éàçèùî", 6 caracteres, 12 octets en UTF-8) franchirait alors le
+        # seuil de 10 sans jamais avoir 10 caracteres reels : verdict qui depend de la locale du
+        # shell appelant plutot que du contenu du trailer (revue F2, 2026-09-18). Fix : compte de
+        # CODEPOINTS UTF-8, jamais d'octets, par une methode qui ne depend d'AUCUNE locale installee
+        # (contrairement a `LC_ALL=C.UTF-8 wc -m`, non garanti present sur toute image CI) — od
+        # dumpe les octets en decimal, awk ne garde que les octets qui ne sont PAS une suite de
+        # continuation UTF-8 (10xxxxxx, soit 128-191) : chaque octet ASCII ou tete de sequence
+        # multi-octets compte pour un caractere, chaque octet de continuation ne compte pas.
+        reason_charcount="$(printf '%s' "$reason_stripped" | od -An -tu1 | tr -s ' \n' '\n' | awk 'NF && ($1 < 128 || $1 >= 192) { n++ } END { print n + 0 }')"
+        if [ "${reason_charcount:-0}" -lt 10 ]; then
           echo "MARQUEUR-MAL-FORME: ${trimmed}"
           continue
         fi
