@@ -197,6 +197,18 @@ case "$out" in *"decouverte: commits=1 "*) n1=1 ;; *) n1=0 ;; esac
 if [ "$rc" -eq 0 ] && [ "$n1" -eq 1 ]; then ok "C6 merge ephemere exclu, commit normal juge -> rc 0, commits=1"
 else ko "C6" "rc=0 decouverte: commits=1" "rc=$rc :: $out"; fi
 
+# --- C6b : identifiant compose "D-01-suite", sans aucune citation -> rc 0 (revue F5, 2026-09-18) -
+# Avant le fix, MARKER_REGEX excluait le tiret a GAUCHE de D-NN mais pas a DROITE : "D-01-suite"
+# matchait a tort la porte d'entree (M+=1), et puisque ce commit ne porte aucune citation complete
+# derriere, il rendait FORME-NON-CONFORME/rc 1 — faux rouge sur un identifiant compose qui n'a
+# jamais invoque d'autorite humaine. Apres le fix, ce meme identifiant ne franchit plus la porte
+# d'entree : le commit reste hors jugement, plage non vide, rc 0.
+D="$(mk_repo c6b)"; B="$(rev "$D" HEAD)"
+commit_msg "$D" "chore: reference D-01-suite dans ce message, aucune citation ici"
+safe_run out rc --root "$D" --base-ref "$B"
+if [ "$rc" -eq 0 ]; then ok "C6b identifiant compose D-01-suite, aucune citation -> rc 0"
+else ko "C6b identifiant compose D-01-suite" "rc=0" "rc=$rc :: $out"; fi
+
 # --- C7 : --base-ref egal a HEAD -> rc 3 PLAGE-VIDE ------------------------------------------
 D="$(mk_repo c7)"; H="$(rev "$D" HEAD)"
 safe_run out rc --root "$D" --base-ref "$H"
@@ -356,7 +368,7 @@ fi
 # mutant de cette suite juge sur REAL_ROOT, jamais une fixture jetable : le resserrement n'est
 # prouve que par sa capacite a distinguer un detecteur large (rouge sur l'historique reel, ou des
 # mentions informelles pre-existent) d'un detecteur resserre (vert sur ce meme historique).
-MUT5_OLD="MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+MUT5_OLD="MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
 MUT5_NEW="MARKER_REGEX='arbitrage|arbitrages|décision|décisions|decision|decisions'"
 set +e
 MUT5_PATH="$(make_mutant mut5 "$MUT5_OLD" "$MUT5_NEW")"
@@ -376,8 +388,8 @@ fi
 # l'original reste ROUGE sur ce meme cas (decision du manager, reprise 2026-09-18, point 4 second
 # mutant). Reutilise le scenario de C1 (citation sans canal ni date), sur une fixture jetable
 # dediee — jamais le depot reel.
-MUT6_OLD="MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
-MUT6_NEW="MARKER_REGEX='sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+MUT6_OLD="MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+MUT6_NEW="MARKER_REGEX='sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
 set +e
 MUT6_PATH="$(make_mutant mut6 "$MUT6_OLD" "$MUT6_NEW")"
 MUT6_STAT=$?

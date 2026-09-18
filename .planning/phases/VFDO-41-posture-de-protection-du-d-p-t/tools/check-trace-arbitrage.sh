@@ -177,7 +177,11 @@ is_ephemeral_merge() {  # <message normalise> sur stdin -> exit 0 si forme "Merg
 # Regex etendue (ERE, testee via `[[ =~ ]]` bash) : chaque alternative est un marqueur EXACT, pas
 # un mot-racine generique. « décision du manager » n'y figure PAS (decision du manager elle-meme,
 # point 3 : ce n'est pas une autorite humaine).
-MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_]|$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'
+# BORNE SYMETRIQUE, LES DEUX COTES DE D-NN (revue F5, 2026-09-18) : le cote gauche exclut deja le
+# tiret ([^0-9A-Za-z_-]) pour qu'un identifiant compose ne matche pas ("xD-01" ne matche pas) ;
+# avant le fix, le cote droit ([^0-9A-Za-z_]) omettait le tiret et laissait "D-01-suite" matcher a
+# tort (un identifiant compose se terminant par un suffixe, jamais une citation D-NN reelle).
+MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'
 CANON="arbitrage Samuel, AskUserQuestion session principale, 2026-09-17"
 
 # IDENTIFIANTS EXCLUS DE LA DETECTION DE MARQUEUR (pas du texte imprime). Le nom de fichier
