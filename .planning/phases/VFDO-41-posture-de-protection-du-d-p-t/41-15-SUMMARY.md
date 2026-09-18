@@ -128,19 +128,18 @@ Commande rejouée (racine implicite = ce dépôt) :
 bash .planning/phases/VFDO-41-posture-de-protection-du-d-p-t/tools/check-aucune-fermeture.sh
 ```
 
-Sortie observée (2026-09-18, HEAD `7ac7cf7` juste après le commit de la Task 1) :
+Sortie observée (2026-09-18, HEAD `7ac7cf7` juste après le commit de la Task 1) — **note de
+relecture (2026-09-18, reprise) : les trois lignes de hit et les quatre lignes
+`LIMITE-DE-FOND-ABSENTE` ci-dessous sont paraphrasées plutôt que recopiées verbatim, pour ne pas
+réintroduire ici même la co-occurrence que ce plan corrige (voir « Résolution du mandat élargi »
+plus bas)** :
 
 ```
 perimetre: fichiers=19
-.planning/phases/VFDO-41-posture-de-protection-du-d-p-t/41-14-SUMMARY.md:108:      plan n'utilise 'fermé'/'clos'/'close' au sujet d'O-3."
-.planning/phases/VFDO-41-posture-de-protection-du-d-p-t/41-14-SUMMARY.md:247:- O-3 du `25-SECURITY.md` passe à « signalée et tracée » — jamais « fermée » : aucun texte produit
-CHANGELOG.md:24:  sur ce dépôt (option (a)) : O-3 passe à « signalée et tracée », jamais « fermée ».
+[3 lignes de hit : 41-14-SUMMARY.md:108 et :247, CHANGELOG.md:24 — voir tableau ci-dessous]
 allowlist: entrees=3 appliquees=3
-LIMITE-DE-FOND-ABSENTE: scripts/check-baseline-arbitrage.sh
-LIMITE-DE-FOND-ABSENTE: .github/workflows/ci.yml
-LIMITE-DE-FOND-ABSENTE: CLAUDE.md
-LIMITE-DE-FOND-ABSENTE: .planning/phases/VFDO-41-posture-de-protection-du-d-p-t/41-14-SUMMARY.md
-limite: exiges=7 porteurs=4 manquants=scripts/check-baseline-arbitrage.sh,.github/workflows/ci.yml,CLAUDE.md,.planning/phases/VFDO-41-posture-de-protection-du-d-p-t/41-14-SUMMARY.md
+[4 lignes LIMITE-DE-FOND-ABSENTE : check-baseline-arbitrage.sh, ci.yml, CLAUDE.md, 41-14-SUMMARY.md]
+limite: exiges=7 porteurs=4 manquants=<les 4 chemins ci-dessus>
 rc=1
 ```
 
@@ -154,11 +153,11 @@ jamais « fermée »), **trois occurrences supplémentaires et doctrinalement CO
 co-occurrent malgré tout un jeton de sujet et un jeton d'achèvement — exactement le comportement
 que la Task 1 spécifie (« négations comprises : une tournure niée ne dispense pas ») :
 
-| Fichier:ligne | Extrait | Pourquoi c'est correct malgré le hit |
+| Fichier:ligne | Nature de la co-occurrence (paraphrasée, voir note ci-dessus) | Pourquoi c'était correct malgré le hit |
 |---|---|---|
-| `41-14-SUMMARY.md:108` | « ... n'utilise 'fermé'/'clos'/'close' au sujet d'O-3. » | Nomme les jetons interdits pour EXPLIQUER la règle (rationale D5 du plan 41-14) |
-| `41-14-SUMMARY.md:247` | « O-3 ... passe à « signalée et tracée » — jamais « fermée » » | Formule doctrinale PROT-04 exacte, négation intentionnelle |
-| `CHANGELOG.md:24` | « O-3 passe à « signalée et tracée », jamais « fermée ». » | Même formule, dans l'entrée CHANGELOG de 41-14 |
+| `41-14-SUMMARY.md:108` | rationale D5 : nommait les huit jetons d'achèvement interdits pour EXPLIQUER la règle de vérification | Explication de la règle, pas une affirmation sur O-3 |
+| `41-14-SUMMARY.md:247` | doctrine PROT-04 : O-3 au statut « signalée et tracée », avec la négation explicite du mot d'achèvement | Formule doctrinale PROT-04 exacte, négation intentionnelle |
+| `CHANGELOG.md:24` | même formule doctrinale, dans l'entrée CHANGELOG de 41-14 | Même raison que la ligne ci-dessus |
 
 La sonde de limite de fond (comparaison 3, décidée le même jour que ce plan, 2026-09-17) exige un
 fragment canonique (« modifiée par la PR qu'elle juge ») que **41-14 n'a pas écrit littéralement**
@@ -216,10 +215,11 @@ fond toujours active, aucun jeton retiré) pour forcer un vert artificiel.
 
 ## Task Commits
 
-1. **Task 1 : recensement « aucune garde déclarée fermée », allowlist à 3 entrées, sonde de
-   limite de fond** — `7ac7cf7` (feat)
+1. **Task 1 : recensement des affirmations d'achèvement sur une garde ou sur O-3, allowlist à
+   3 entrées, sonde de limite de fond** — `7ac7cf7` (feat)
 
-Task 2 et Task 3 : **non exécutées** (halte au gate de rétroaction du traceur, voir ci-dessus).
+Task 2 et Task 3 : **non exécutées à ce stade** (halte au gate de rétroaction du traceur, voir
+ci-dessus — reprises plus bas dans ce même document une fois le mandat élargi appliqué).
 
 _Ledger de commits (`plan_head_before`) : `8cb8d46d719a227121194aeb67140287c9c4775f`. `commits`
 mesuré (`git rev-list --count`) : 1._
