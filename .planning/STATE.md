@@ -37,16 +37,25 @@ stopped_at: >-
   ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
   armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
   existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
-last_updated: "2026-09-17T15:52:00.000Z"
-last_activity: 2026-09-17
+last_updated: "2026-09-18T15:51:00.000Z"
+last_activity: 2026-09-18
 last_activity_desc: >-
-  Phase 41 cadrée puis planifiée sur `feat/phase-41-protection-depot` (missions vf-dev-manager, go
-  de Samuel, AskUserQuestion session principale, 2026-09-17) : `41-CONTEXT.md` (D-01 à D-10
-  verrouillés, AskUserQuestion session principale, 2026-09-17 ; D-M1 à D-M14), 13 plans en 13 vagues
-  séquentielles, vérificateur de plans frais sur 3 tours (dernier : 0 bloquant, 3 avertissements
-  corrigés non re-vérifiés). Arbitrage en attente : force push et suppression de `main` dans le
-  ruleset (`REGLES_MAIN_FORCE_PUSH_SUPPRESSION`). Aucune configuration GitHub modifiée, aucun push.
-  Compteurs de `progress` inchangés (planification seule).
+  Phase 41, périmètre sans admin (option (a), arbitrage Samuel, AskUserQuestion session principale,
+  2026-09-17) exécuté intégralement sur `feat/phase-41-protection-depot` : plans 41-14 à 41-19,
+  41-16-SUMMARY.md reconstitué (gap comblé), revue de jointure + correctifs ciblés + revue finale
+  PASS. Trois gardes in-repo (G-1/G-2/G-3) et doctrine ADR-072 livrées et vérifiées vertes (`gates`
+  rc=0 13 étapes, `tests` rc=0 82 suites). Ledger PROT-01 (non coché, hors d'atteinte) à PROT-05
+  (cochés) mis à jour dans `REQUIREMENTS.md`. Reliquats manager : mise à jour ROADMAP/STATE (ce
+  geste), PR vers `main` à ouvrir, décision de release à trancher par Samuel. Compteurs de
+  `progress` inchangés (le périmètre livré est une posture in-repo, pas une clôture de milestone
+  au sens des phases comptées).
+  Précédemment (2026-09-17) : Phase 41 cadrée puis planifiée sur `feat/phase-41-protection-depot`
+  (missions vf-dev-manager, go de Samuel, AskUserQuestion session principale, 2026-09-17) :
+  `41-CONTEXT.md` (D-01 à D-10 verrouillés, AskUserQuestion session principale, 2026-09-17 ; D-M1 à
+  D-M14), 13 plans en 13 vagues séquentielles, vérificateur de plans frais sur 3 tours (dernier : 0
+  bloquant, 3 avertissements corrigés non re-vérifiés). Arbitrage en attente : force push et
+  suppression de `main` dans le ruleset (`REGLES_MAIN_FORCE_PUSH_SUPPRESSION`, reste en attente
+  d'accès admin). Aucune configuration GitHub modifiée, aucun push.
 progress:
   total_phases: 12
   completed_phases: 11
@@ -94,7 +103,33 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
-Phase: **40.1** (Révision ADR-029 et du gate du budget d'instructions) — **EXÉCUTÉE le 2026-09-17** sur `feat/phase-40.1-revision-adr-029-budget` : 15/15 plans, SUMMARY et `40.1-VERIFICATION.md` (passed) sur disque, BUDG-04/05 cochés. PR vers main ouverte ; merge, tag et release restent des gestes humains. Next : merge de la PR, puis cadrage de la Phase 41 (posture de protection du dépôt).
+Phase: **41** (Posture de protection du dépôt) — **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ le 2026-09-18** sur
+`feat/phase-41-protection-depot` (branche `worktree-agent-a10225b33e6f3c645`). **Prémisse renversée
+le 2026-09-17** (constat + arbitrage Samuel, AskUserQuestion session principale, 2026-09-17) : le
+compte `picmakpro`, seul admin du dépôt, appartient à un tiers (`admin: false, maintain: false,
+push: true`, mesuré deux fois) — aucun ruleset ne peut être posé dans aucune session. Périmètre
+recadré (option (a)) sur ce qui est faisable avec le seul droit `push` : six plans exécutés
+(41-14 à 41-19, dont 41-16-SUMMARY.md reconstitué rétroactivement — gap découvert par deux workers
+indépendants, comblé sans réécrire les commits 41-16 déjà posés), une revue `vf-reviewer` de
+jointure avec 3 correctifs ciblés (angle mort des trailers `Gate-Touche:` à motif virgule, écart
+CLI de G-3 non documenté, AUTODEF manquant sur G-2/G-3 — commits `4ac7aa0`/`8dc0656`/`832b310`),
+une seconde revue finale **PASS**. Livré : trois gardes in-repo qui SIGNALENT et TRACENT sans
+jamais verrouiller — G-1 `scripts/check-baseline-arbitrage.sh` (9 mutants), G-2
+`scripts/check-gate-touche.sh` (6 mutants), G-3 `scripts/check-push-sans-pr.sh` (5 mutants) — plus
+la doctrine ADR-072, un résumé dans `CLAUDE.md`, deux renvois `BACKLOG.md`, et O-3 (`25-SECURITY.md`)
+portée à **« signalée et tracée »** (jamais « fermée »). Ledger `REQUIREMENTS.md` : PROT-01
+**non coché** (hors d'atteinte sans accès admin, déclencheur de reprise écrit), PROT-02/03/04/05
+cochés sur pièce. Les critères de succès 1, 2 et 3 du ROADMAP restent **inatteignables sans accès
+admin** — constat explicite au registre `41-PREUVES.md`, pas de réécriture du ROADMAP par les
+plans de la phase (fait par ce geste de manager, voir `### Roadmap Evolution`). Rejeu final `gates`
+rc=0 (13 étapes) et `tests` rc=0 (82 suites, 0 échec). Aucune release : `VERSION` racine `v2.63.2`
+intacte, aucun bump de module. **Reliquats explicitement hors du périmètre de la phase, pris en
+charge par le manager** : mise à jour ROADMAP/STATE (ce geste), PR vers `main` (à ouvrir), décision
+de release (à trancher par Samuel). Plans 41-01 à 41-13 (partie admin : rulesets, CODEOWNERS,
+mesures M-1 à M-4, fermeture #29) restent **différés**, `BACKLOG.md` § « Protection de `main` côté
+GitHub — DIFFÉRÉ ».
+
+Précédemment (2026-09-17) : Phase: **40.1** (Révision ADR-029 et du gate du budget d'instructions) — **EXÉCUTÉE le 2026-09-17** sur `feat/phase-40.1-revision-adr-029-budget` : 15/15 plans, SUMMARY et `40.1-VERIFICATION.md` (passed) sur disque, BUDG-04/05 cochés. PR vers main ouverte ; merge, tag et release restent des gestes humains. Next : merge de la PR, puis cadrage de la Phase 41 (posture de protection du dépôt).
 
 Précédemment (2026-09-16) : Phase: **25** (Budget d'instructions) — **COMPLÈTE le 2026-09-16** : plan 25-04 exécuté sur `feat/phase-25-04-calibration`, ratchet `check-instruction-budget` armé (31 fichiers, conductor v1.37.1), BUDG-01/02 cochés. Seconde PR de la phase à ouvrir (geste humain). Next : cadrage de la Phase 41 (posture de protection du dépôt) après merge de cette PR.
 
@@ -591,6 +626,18 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
 
+- **2026-09-17 — Phase 41, prémisse renversée + recadrage sans admin (option (a))**
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-09-17) : le compte `picmakpro`, seul
+  admin du dépôt GitHub, appartient à un **tiers** (`admin: false, maintain: false, push: true`,
+  mesuré deux fois) — aucune session ne peut poser de ruleset. Les décisions D-01 à D-08 du
+  `41-CONTEXT.md` sont **suspendues, non annulées** ; la phase garde ce qui est faisable avec le
+  seul droit `push` : trois gardes in-repo (G-1/G-2/G-3) qui signalent et tracent sans jamais
+  verrouiller, plus la doctrine ADR-072 (D-M10). PROT-05 est une exigence **née de ce recadrage**
+  (décision du manager du 2026-09-17 sur remontée du planificateur) : G-2 et G-3 se retrouvaient
+  sans foyer d'exigence après la suspension de D-01 à D-08. Le critère de succès 2 du ROADMAP est
+  reformulé (P-1) : « une PR rouge est refusée par défaut ; la contourner demande un geste explicite
+  et laisse une trace ». Déclencheur de reprise du volet admin : un accès admin accordé, ou un
+  transfert du dépôt — `BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ ».
 - **2026-09-15 — Phase 40, D-19 (élargissement du périmètre aux émetteurs E6, option b)**
   (arbitrage Samuel, AskUserQuestion session principale, 2026-09-15) : le contrat de preuves E6
   posé par le lot 40-02 (`mission-contracts.md`) n'avait **aucun émetteur** — `grep -ic exit_code`

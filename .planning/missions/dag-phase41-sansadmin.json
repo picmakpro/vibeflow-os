@@ -1,0 +1,129 @@
+{
+  "nodes": [
+    {
+      "id": "exec-14",
+      "step": "41-14",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-15",
+      "step": "41-15",
+      "stage": "",
+      "deps": [
+        "exec-14"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-16",
+      "step": "41-16",
+      "stage": "",
+      "deps": [
+        "exec-15"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-17",
+      "step": "41-17",
+      "stage": "",
+      "deps": [
+        "exec-16"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-18",
+      "step": "41-18",
+      "stage": "",
+      "deps": [
+        "exec-17"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "revue du diff (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "exec-18"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-19",
+      "step": "41-19 cloture",
+      "stage": "",
+      "deps": [
+        "revue"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif",
+      "step": "verification de phase",
+      "stage": "",
+      "deps": [
+        "exec-19"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "pr",
+      "step": "push + PR (merge humain)",
+      "stage": "",
+      "deps": [
+        "verif"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "fix-summary-4116",
+      "step": "41-16-SUMMARY.md manquant — reconstitution retroactive",
+      "stage": "",
+      "deps": [
+        "exec-18"
+      ],
+      "scope": [
+        ".planning/phases/VFDO-41-posture-de-protection-du-d-p-t/41-16-SUMMARY.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "corr-1",
+      "step": "correction ciblee findings revue (comparaison 3 virgule, asymetrie CLI G-3, AUTODEF)",
+      "stage": "",
+      "deps": [
+        "revue"
+      ],
+      "scope": [
+        "scripts/check-gate-touche.sh",
+        "scripts/tests/test-check-gate-touche.sh",
+        "scripts/tests/test-check-push-sans-pr.sh",
+        "docs/ADR.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-2",
+      "step": "revue finale vf-reviewer branche complete (post 41-19)",
+      "stage": "",
+      "deps": [
+        "exec-19"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

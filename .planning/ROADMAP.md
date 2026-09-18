@@ -1604,8 +1604,26 @@ ADR-072), PROT-04 (O-3 « gardée par défaut + tracée » : CODEOWNERS `@picmak
 > (gardes in-repo visibles et tracées) est proposé à l'arbitrage — il remplacera les critères de
 > succès de cette phase une fois tranché.
 
+> **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ ET CLOS le 2026-09-18** (option (a), arbitrage Samuel,
+> AskUserQuestion session principale, 2026-09-17) : six plans neufs (41-14 à 41-19, ci-dessous)
+> livrent trois gardes in-repo qui SIGNALENT et TRACENT sans jamais verrouiller — G-1
+> `scripts/check-baseline-arbitrage.sh` (PROT-04), G-2 `scripts/check-gate-touche.sh` (PROT-05),
+> G-3 `scripts/check-push-sans-pr.sh` (PROT-05) — plus la doctrine `docs/ADR.md` § ADR-072
+> (PROT-03) et O-3 du `25-SECURITY.md` portée à **« signalée et tracée »**. Ledger
+> `.planning/REQUIREMENTS.md` : PROT-02/03/04/05 **cochés sur pièce** ; **PROT-01 reste NON COCHÉ**
+> — hors d'atteinte sans accès admin, déclencheur de reprise écrit. **Les critères de succès 1, 2
+> et 3 ci-dessus restent INATTEIGNABLES sans accès admin** (constat explicite,
+> `41-PREUVES.md` § 41-19) et ne sont **pas** réécrits ici — ils décrivent la posture serveur
+> différée, pas le périmètre livré. Critère 4 (QUAL-01) satisfait : 3 gates neufs, 29 mutants
+> mesurés tués au total (G-1=9, G-2=6, G-3=5, plus les deux outils de phase). Rejeu final `gates`
+> rc=0 (13 étapes) et `tests` rc=0 (82 suites, 0 échec). Les plans 41-01 (T2/T3), 41-02, 41-04 à
+> 41-09, 41-11 à 41-13 restent **différés faute d'accès admin**, tels quels, non exécutés
+> (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »).
+
 **Plans:** 13 plans en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
-dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré
+dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré. **Six plans supplémentaires
+(41-14 à 41-19) ajoutés et exécutés le 2026-09-18** pour le périmètre sans admin (option (a)) — voir
+liste ci-dessous.
 
 Plans:
 
@@ -1622,3 +1640,12 @@ Plans:
 - [ ] 41-11-PLAN.md — bump dérivé d'`origin/main` sur la branche B, entrée sur `main` sans contournement (humain)
 - [ ] 41-12-PLAN.md — tag, release GitHub, `check-release-tag --remote`, invariants de phase (humain)
 - [ ] 41-13-PLAN.md — clôture : ledger coché, SUMMARY, artefacts post-merge par PR
+
+Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-18) :
+
+- [x] 41-14-PLAN.md — G-1 `scripts/check-baseline-arbitrage.sh` (PROT-04) : hausse de baseline ou sentinelle neutralisée sans arbitrage cité, 9 mutants
+- [x] 41-15-PLAN.md — outillage de preuve de phase (`tools/check-aucune-fermeture.sh`, `tools/check-trace-arbitrage.sh`, `41-PREUVES.md`)
+- [x] 41-16-PLAN.md — G-2 `scripts/check-gate-touche.sh` (PROT-05) : surface de gate touchée sans marqueur déclaratif `Gate-Touche:`, 6 mutants
+- [x] 41-17-PLAN.md — G-3 `scripts/check-push-sans-pr.sh` (PROT-05) : alarme après coup sur un push direct vers `main` sans PR associée, 5 mutants
+- [x] 41-18-PLAN.md — doctrine : ADR-072, résumé `CLAUDE.md`, renvois `BACKLOG.md`, O-3 « signalée et tracée »
+- [x] 41-19-PLAN.md — clôture du périmètre sans admin : rejeu final, ledger `REQUIREMENTS.md` (PROT-01 non coché, PROT-02/03/04/05 cochés), constat d'inatteignabilité des critères 1-3
