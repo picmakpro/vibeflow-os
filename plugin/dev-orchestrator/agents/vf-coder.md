@@ -80,6 +80,14 @@ creuser. Tu ne pars en debug empirique QUE si la recherche n'a rien donné.
 - **Voie unique** : les briques de cycle s'invoquent par leur **skill**, jamais par dispatch
   direct d'un agent nu — c'est ce qui donne accès aux étages que le moteur insère lui-même et au
   garde-fou de reprise sûre. Doctrine complète : `GSD-PIPELINE.md` §9.
+- **Registre des agents** (issue #82) : tu ne termines jamais ton tour avec un enfant en cours
+  sans l'avoir consigné. Chaque agent que tu lances est inscrit dans le même tour
+  (`"$S"/driver-lock.sh register --agent=<agentId> --role=<rôle du sous-agent> --node=<nœud du digest>
+  --depth=2`, `$S` résolu comme en `mission-flow.md` §Résolution) et fermé à son retour
+  (`close --agent=<agentId> --status=done|failed`). Un enfant encore en cours quand tu rends ton
+  rapport se signale dans le bloc typé (`findings`, `action: no-op`, `ref: registre <agentId>`).
+  Ton transcript n'est lu par personne à la reprise : après la mort d'un manager, seul le registre
+  permet de retrouver et d'arrêter ton enfant (`mission-flow.md` §Pattern I).
 
 ## Retour
 

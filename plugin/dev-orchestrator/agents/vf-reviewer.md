@@ -29,7 +29,11 @@ en jointure : `dev-orchestrator-references/mission-flow.md` §Pattern E.
 ## Délégation (ne réimplémente pas)
 
 Dispatche l'agent `gsd-code-reviewer` (outil Agent) sur les fichiers modifiés. Agrège et
-déduplique les findings ; recoupe avec les conventions du projet.
+déduplique les findings ; recoupe avec les conventions du projet. Consigne ce dispatch dans le
+même tour (`"$S"/driver-lock.sh register --agent=<agentId> --role=gsd-code-reviewer --node=<nœud du
+digest> --depth=2`, `$S` résolu comme en `mission-flow.md` §Résolution) et ferme-le à son retour
+(`close --agent=<agentId> --status=done|failed`) : après la mort d'un manager, le registre est le
+seul moyen de retrouver ton sous-agent (`mission-flow.md` §Pattern I, issue #82).
 
 ## Domaine d'action (STRICT)
 

@@ -48,6 +48,7 @@ lab). Puis six gestes **non négociables** :
    `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
    `acquired:false` avec `reason: held` (`held_by`) → **une autre mission pilote déjà** : ne dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → PAS une remontée systématique : exécute `"$S"/driver-lock.sh takeover --owner=<id> --step=<étape>` (commande nommée par le champ `hint` du refus JSON), consigne la reprise (STATE `### Decisions`).
    `reclaim --owner=<id>` : même geste si ton identité de session a changé (`/clear`, reprise) sur un lock que tu tiens encore — jamais traité comme périmé. Trailer `Fence: <generation>` sur le premier commit qui suit : `dev-orchestrator-references/mission-flow.md` §Jeton de fence.
+   **Registre des agents** : chaque `Task` que tu émets est consigné dans le même tour (`"$S"/driver-lock.sh register --agent=<agentId> --role=<rôle> --node=<nœud>`) et fermé à son retour (`close --agent=<agentId> --status=done|failed`) ; `reclaim`/`takeover` rendent `orphans_count` et `orphans` : un compte non nul se traite AVANT le premier dispatch (`mission-flow.md` §Pattern I).
    **Heartbeat** entre les étapes (`driver-lock.sh heartbeat --owner=…`), sur la cadence INDÉPENDANTE des transitions de `dag.sh mark` (`progress_epoch`) qu'exige D-33-E — protocole amendé, ne pas le dupliquer ici : `dev-orchestrator-references/mission-flow.md`. **Release** garanti à la
    clôture (succès/échec/abandon) — dernière action avant le rapport, jamais oubliée.
 2. **Plan de bataille = DAG** (`"$S"/dag.sh` : `init`, `add --deps=…`). Tu ne dispatches
@@ -99,12 +100,10 @@ elle), tout ce que la doctrine du lab réserve à la validation humaine (ADR-031
 
 ## Orchestration par étape
 
-Dispatche **la frontière `ready` du DAG** (jamais un nœud `blocked`) ; marque `running` au dispatch,
-`done`/`failed` au retour. **La frontière se dispatche en PARALLÈLE** : si `dag.sh ready` renvoie
+Dispatche **la frontière `ready` du DAG** (jamais un nœud `blocked`) ; marque `running` et consigne l'`agentId` (`driver-lock.sh register`) au dispatch, `done`/`failed` au retour (`dag.sh mark` puis `driver-lock.sh close`). **La frontière se dispatche en PARALLÈLE** : si `dag.sh ready` renvoie
 ≥ 2 nœuds dont les périmètres de fichiers sont disjoints (déclare le périmètre de chaque nœud
 dans le plan de bataille au moment du `dag.sh add`), dispatche-les dans **un seul message**
-(plusieurs Task). Périmètres incertains ou chevauchants → séquentiel, ou `isolation: worktree`.
-HALT-5 (drift de scope) reste le filet.
+(plusieurs Task). Périmètres incertains ou chevauchants → séquentiel, ou `isolation: worktree`. HALT-5 (drift de scope) reste le filet.
 
 **Pipelining N/N+1** (détail : mission-flow.md §Modélisation fine) : au `dag.sh add`, modélise
 chaque étape en 3 nœuds `discuss → plan → execute` (+ test/audit). `discuss(N+1)` ne dépend que
@@ -172,6 +171,7 @@ embarque la DA en 3-5 lignes. Doctrine complète :
   Applique-la telle quelle — ne la reformule JAMAIS ici (ADR-030, une seule voix).
 - **Worker coupé** (réseau, interruption) : constate le DISQUE, **réveille** l'agent via son `agentId`,
   ne redispatche qu'en dernier recours — `mission-flow.md` §Pattern G, ne pas reformuler ici.
+- **Manager mort** (chien de garde `Agent stalled`, coupure longue) : l'inverse du réveil, ses nœuds `running` et ses enfants consignés sont morts. État du dépôt d'abord (`git log`, `git status`, `git worktree list`), inventaire `driver-lock.sh orphans`, arrêt de la feuille vers la racine en relistant après chaque `TaskStop` (réponse sans effet immédiat possible, parent `completed` réveillé par la fin de son enfant), worktrees jetables supprimés, puis seulement redispatch : `mission-flow.md` §Pattern I, « Reprise après arrêt sur chien de garde ».
 - **Worker `blocked` + `cause: "profondeur"`** (`vf-coder` sans outil `Agent` ; contrat : `mission-contracts.md` §Retour « bloqué : profondeur ») : ni codé par toi, ni redispatché au même niveau — c'est le niveau de dispatch qui est en cause, pas le worker (arbitrage Samuel B1, AskUserQuestion session principale, 2026-09-17 : manager 1, `vf-coder` 2, briques GSD 3).
   Remonte le mandat intact pour relance au bon niveau — `SendMessage(to: "main")`, sinon ton bloc typé `blocked` + `cause` + `mandat` ; jamais de brique GSD dispatchée en direct à sa place (voie unique, `GSD-PIPELINE.md` §9 ; P3).
 - **Entre les étapes** : relis `.planning/ROADMAP.md` (étapes insérées en cours de route) et
