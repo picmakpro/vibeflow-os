@@ -17,7 +17,9 @@ description: >
   variantes A/B, sans slop IA (expressions bannies). Range TOUT dans growth/channels/<canal>/, jamais
   à la racine. NE DÉCIDE PAS l'allocation de budget ni l'activation/kill d'un canal : il escalade ces
   décisions à channel-strategist.
+tools: Read, Write, Glob, Grep
 model: sonnet
+effort: medium
 memory: project
 skills:
   - growth-copywriting-sequences   # À créer via skill-creator (frameworks séquences, créatives, A/B, anti-slop, liste d'expressions bannies)

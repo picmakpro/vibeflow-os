@@ -15,7 +15,9 @@ description: >
   Stratège éditorial du lab content. Invoquer EN PREMIER sur tout brief de pièce ou de campagne :
   arbitre l'angle, garde la ligne éditoriale, cadre la structure AVANT toute production. Ne rédige
   jamais le texte final, ne code jamais.
+tools: Read, Write, Glob, Grep
 model: sonnet
+effort: medium
 memory: project
 skills: [clarity-feature, audit-architecture]
 ---

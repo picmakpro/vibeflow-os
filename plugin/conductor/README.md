@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.39.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.40.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -86,9 +86,10 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
 
 ## Scripts (27) — par famille
 
-*(Compte re-dérivé au 2026-09-15 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
-'*.sh' | awk 'END{print NR}'` → 27, croisé par `git ls-files`. Le compte « 26 » datait du
-2026-09-10 et gagne `check-instruction-budget.sh` (+1, Phase 25) au-dessus d'un écart préexistant
+*(Compte re-dérivé au 2026-09-22 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
+'*.sh' | awk 'END{print NR}'` → 28, croisé par `git ls-files`. Il gagne `check-blueprints.sh`
+(+1, correctif de conformité des blueprints du 2026-09-22) au-dessus du compte 27 du 2026-09-15,
+lui-même issu de `check-instruction-budget.sh` (+1, Phase 25) et d'un écart préexistant
 de 5 scripts non répertoriés ci-dessous (`check-artifact-fidelity.sh`,
 `check-description-fidelity.sh`, `notify.sh`, `runtime-registry.sh`,
 `verify-runtime-reversibility.sh`), hors périmètre de cette correction — non catalogués ici faute
@@ -157,7 +158,7 @@ SessionStart), `vf-update-run.sh` (re-matérialise les modules depuis le cache p
 ADR-042) et `generate-agent-commands.sh` (une commande slash d'incarnation par agent posé — saute
 les workers `vf-internal: true`, Pattern 12).
 
-**Tests** : 27 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
+**Tests** : 29 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
 `test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`, `test-check-divergence.sh`
 neuve en Phase 39, 17 cas dont 3 mutants — 10 cas à la livraison du plan 39-01, +7 le
 2026-09-14 pour couvrir la sortie `2` et la normalisation base 10, tuant 5 mutations survivantes). *(Compte re-dérivé au 2026-09-10 :
@@ -175,7 +176,7 @@ conductor/
     vf-calibrate/SKILL.md          # propagation update + migration
     vf-update/SKILL.md             # mise à jour plugin + modules
     vf-notify/SKILL.md             # toggle notifications OS (opt-in, D-33-H)
-  scripts/                         # 26 scripts (familles ci-dessus) + tests/ (27 suites)
+  scripts/                         # 28 scripts (familles ci-dessus) + tests/ (29 suites)
   references/
     team-kernel.md                 # contrat du noyau d'équipe (manager/workers/juges)
     contracts.md                   # escalade sous-agents → conductor

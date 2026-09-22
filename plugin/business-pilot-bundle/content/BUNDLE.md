@@ -131,7 +131,11 @@ Chacun s'instancie en agent natif **≤ 300 lignes** (ADR-029) ; le savoir est *
 
 3. **Instancier les 3 agents** — pour chaque `content/agents/*.blueprint.md`, créer un agent natif
    dans `.claude/agents/` du lab :
-   - frontmatter cible du blueprint (`name`, `description`, `model`, `memory: project`, `skills: [...]`) — sans `description` l'agent n'est JAMAIS auto-routé ; conformité vérifiée par `check-agents.sh` (ADR-044) ;
+   - frontmatter cible du blueprint, **recopié intégralement** — ne jamais en énumérer les champs
+     ici : une liste dupliquée dérive (mesuré le 2026-09-22, `effort` manquait aux 9 blueprints et
+     bloquait l'écriture de l'agent). Sans `description` l'agent n'est JAMAIS auto-routé ;
+     conformité vérifiée par `check-blueprints.sh` en amont et `check-agents.sh` sur l'agent posé
+     (ADR-044) ;
    - corps **≤ 300 lignes** (ADR-029) — savoir déporté en skills, jamais inliné ;
    - les **skills déclarés** sont créés **via `skill-creator`** s'ils n'existent pas (ne pas inventer
      un nom de skill sans le matérialiser).

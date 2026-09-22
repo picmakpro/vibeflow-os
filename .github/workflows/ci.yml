@@ -326,6 +326,17 @@ jobs:
           echo "== $found dossier(s) vérifiés en monde fermé, $fail échec(s) =="
           [ "$fail" -eq 0 ]
 
+      - name: check-blueprints (le frontmatter cible passe le gate qu'il vise)
+        # POURQUOI CETTE ÉTAPE EXISTE : un blueprint publie un « frontmatter cible » que vf-new-lab
+        # recopie dans l'agent instancié — et ce frontmatter n'était soumis à AUCUN gate. Mesuré le
+        # 2026-09-22 : les 9 blueprints omettaient tous `effort:`, bloquant depuis la Phase 24. Un
+        # lab fabriqué depuis l'un d'eux voyait donc son Write REFUSÉ par guard-agent-write.sh : la
+        # fabrique et son contrôleur avaient divergé sans qu'aucun témoin ne le voie.
+        # PAS de --strict ici, et c'est délibéré : les skills déclarés par un blueprint sont créés
+        # DANS LE LAB à l'instanciation, pas présents dans le plugin. Les exiger ici rendrait le
+        # gate faux par construction — il refuserait des blueprints corrects.
+        run: bash plugin/conductor/scripts/check-blueprints.sh
+
       - name: check-version-sync (canon VERSION ↔ plugin.json ↔ marketplace ↔ badges ↔ triade par module)
         run: bash scripts/check-version-sync.sh
 
