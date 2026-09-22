@@ -1,5 +1,32 @@
 # Changelog — conductor
 
+## [v1.39.0], 2026-09-22 : registre des agents dispatchés (issue #82)
+
+**Minor** (nouvelle capacité du team-kernel) :
+
+- `scripts/driver-lock.sh` : trois verbes nouveaux, `register`, `close`, `orphans`, qui tiennent
+  un registre des agents dispatchés à côté du verrou (`<lock>.children.jsonl`, JSON Lines
+  append-only, variable `VF_DRIVER_CHILDREN`). Une entrée par `agent_id` : rôle, nœud DAG, parent,
+  profondeur, owner et génération du verrou au dispatch, horodatage, statut consigné (`running`,
+  `done`, `failed`, `stopped`). `orphans` liste les entrées encore `running` de la feuille vers la
+  racine, l'ordre d'arrêt imposé par la reprise.
+- Champs additifs sur les verbes existants : `status` porte `children_running` (verrou présent ou
+  non) ; `acquire` (voie libre), `takeover` et `reclaim` rendent `orphans_count` et `orphans` ;
+  `release` relâche quand même avec des enfants ouverts (geste RAII) mais garde le registre et le
+  signale, et supprime le registre sur une clôture propre. Aucun champ existant ne change.
+- `register` refuse bruyamment (exit 1, `registry-unwritable`) si le fichier ne s'écrit pas, à
+  l'inverse du journal des reprises : un dispatch non consigné est l'orphelin introuvable que le
+  registre existe pour empêcher.
+- `references/team-kernel.md` : la ligne « Verrou de driver » du kernel nomme le registre et le
+  renvoi vers la doctrine de reprise (`dev-orchestrator-references/mission-flow.md` §Pattern I).
+- `test-driver-lock.sh` : T59 à T66 (60 assertions) : inventaire feuille vers racine, `close`
+  par append et refus sur agent inconnu ou statut invalide, inventaire rendu par `reclaim` et
+  `takeover`, registre conservé ou supprimé par `release`, cas sans registre, assainissement des
+  champs, propriété append-only.
+- Motif : après la mort d'un manager (chien de garde 600 s, coupure réseau), ses workers et
+  leurs sous-agents survivaient sans propriétaire et aucun fichier ne portait leur identifiant
+  (issue #82, lié à #81).
+
 ## [v1.38.1] — 2026-09-17 (hotfix v2.63.2 — profondeur de spawn B1/B2)
 
 **Patch** (correctif de doctrine, aucune nouvelle capacité) :

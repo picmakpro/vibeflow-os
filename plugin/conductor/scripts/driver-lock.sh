@@ -26,13 +26,19 @@
 #   driver-lock.sh heartbeat --owner=<id> [--step=<etape>] # rafraichit le heartbeat entre etapes
 #   driver-lock.sh mark-progress --owner=<id>              # avance progress_epoch (D-33-A), JAMAIS heartbeat_epoch
 #   driver-lock.sh release   --owner=<id>                  # relache (clôture RAII : succes/echec/abandon)
-#   driver-lock.sh status                                  # etat courant (JSON)
+#   driver-lock.sh status                                  # etat courant (JSON, + children_running)
 #   driver-lock.sh recover                                 # elague un lock perime (sinon refuse)
+#
+# Registre des agents dispatches (issue #82), frere du lock, JAMAIS dedans :
+#   driver-lock.sh register --agent=<id> --role=<role> [--node=<id DAG>] [--parent=<id>] [--depth=<n>] [--owner=<id>]
+#   driver-lock.sh close    --agent=<id> --status=done|failed|stopped   # ferme une entree (append)
+#   driver-lock.sh orphans                                              # entrees encore `running`, feuille -> racine
 #
 # Sortie : JSON une ligne (parsing). Exit 0 = action reussie ; exit 1 = refus (lock tenu, pas owner…).
 #
 # Variables : VF_DRIVER_LOCK (defaut .planning/DRIVER.lock), VF_DRIVER_TTL (defaut 1800 s),
-#             VF_DRIVER_SESSION_MAX (defaut 8, plafond LRU de session_ids).
+#             VF_DRIVER_SESSION_MAX (defaut 8, plafond LRU de session_ids),
+#             VF_DRIVER_CHILDREN (defaut <lock>.children.jsonl, registre des agents dispatches).
 # Reference : ADR-053 + .planning/phases/VFDO-09-*/09-CADRAGE-swarm.md §2.
 
 set -uo pipefail
@@ -45,11 +51,18 @@ SESSION_MAX="${VF_DRIVER_SESSION_MAX:-8}"
 case "$SESSION_MAX" in ''|*[!0-9]*) SESSION_MAX=8 ;; esac  # meme garde que TTL (D-32-03, plafond LRU)
 
 ACTION=""; OWNER=""; STEP=""
+AGENT=""; ROLE=""; NODE=""; PARENT=""; DEPTH=""; CSTATUS=""
 for arg in "$@"; do
   case "$arg" in
-    acquire|heartbeat|release|status|recover|takeover|reclaim|mark-progress) ACTION="$arg" ;;
-    --owner=*) OWNER="${arg#*=}" ;;
-    --step=*)  STEP="${arg#*=}" ;;
+    acquire|heartbeat|release|status|recover|takeover|reclaim|mark-progress|register|close|orphans) ACTION="$arg" ;;
+    --owner=*)  OWNER="${arg#*=}" ;;
+    --step=*)   STEP="${arg#*=}" ;;
+    --agent=*)  AGENT="${arg#*=}" ;;
+    --role=*)   ROLE="${arg#*=}" ;;
+    --node=*)   NODE="${arg#*=}" ;;
+    --parent=*) PARENT="${arg#*=}" ;;
+    --depth=*)  DEPTH="${arg#*=}" ;;
+    --status=*) CSTATUS="${arg#*=}" ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
@@ -319,9 +332,120 @@ journal_event() {
   fi
 }
 
+# ---------------------------------------------------------------------------------------------
+# Registre des agents dispatches (issue #82).
+#
+# POURQUOI ICI, et pas dans le dag.json de mission. Quand un manager meurt (chien de garde,
+# coupure), ses workers et leurs propres sous-agents survivent sans proprietaire ; un manager de
+# remplacement doit pouvoir les retrouver AVANT de savoir quoi que ce soit de la mission. Le lock
+# est le seul chemin fixe et connu de tous (manager, workers, gate de sortie) : le registre vit
+# donc a cote de lui, sous un nom derive du sien, comme le journal des reprises. Le dag.json, lui,
+# est un fichier par mission dont le chemin n'est connu que du manager qui l'a cree ; un worker
+# qui dispatche une brique GSD ne l'a pas sous la main, et un noeud peut porter plusieurs agents
+# au fil des relances.
+#
+# FORME : JSON Lines, APPEND-ONLY. Chaque ligne est un evenement complet (`register` ou `close`)
+# ecrit d'un seul printf en O_APPEND : plusieurs workers d'un meme etage peuvent consigner en meme
+# temps sans mutex ni lecture-modification-ecriture, et une mort entre deux lignes ne corrompt
+# rien. L'etat courant se DERIVE en repliant les lignes (derniere ligne par agent_id gagne) ;
+# `registry_fold` ci-dessous est l'unique lecteur, jamais un parse a la main ailleurs.
+#
+# FRERE du lock, JAMAIS dedans : `drop_lock`/`takeover` detruisent la generation, or les
+# orphelins a retrouver sont precisement ceux de la generation qui vient de mourir. Le registre
+# survit donc a la reprise ; il n'est supprime que par un `release` sans enfant `running`.
+#
+# STATUT CONSIGNE, pas statut runtime : le registre dit ce que les agents ont DECLARE. La verite
+# de vie d'un agent reste `ListAgents` cote Claude Code ; `orphans` liste ce qu'il faut ALLER
+# verifier, et `close --status=stopped` se pose apres la verification, jamais avant.
+# ---------------------------------------------------------------------------------------------
+REG="${VF_DRIVER_CHILDREN:-$LOCK_PARENT/${LOCK_BASE}.children.jsonl}"
+TAB="$(printf '\t')"
+
+# Champ libre du registre (role, node) : meme classe que sanitize_field, plus la tabulation, qui
+# est le separateur interne de registry_fold.
+sanitize_reg_field() { printf '%s' "$1" | tr -d '"\\\n\t'; }
+
+# Replie le registre en une table TSV, une ligne par agent_id, dans l'ordre de premiere
+# apparition. Colonnes :
+#   1 agent_id · 2 parent · 3 role · 4 node · 5 owner · 6 generation · 7 dispatched_at
+#   8 epoch · 9 depth (explicite au register, sinon derivee de la chaine parent, sinon 1)
+#   10 status (derniere ligne gagne ; un `close` d'un agent jamais consigne est ignore)
+# Registre absent -> aucune sortie, code 0.
+registry_fold() {
+  [ -f "$REG" ] || return 0
+  awk '
+    function val(s, key,   m) {
+      if (match(s, "\"" key "\": \"[^\"]*\"")) {
+        m = substr(s, RSTART, RLENGTH); sub(/^[^:]*: "/, "", m); sub(/"$/, "", m); return m
+      }
+      return ""
+    }
+    function num(s, key,   m) {
+      if (match(s, "\"" key "\": [0-9]+")) {
+        m = substr(s, RSTART, RLENGTH); sub(/^[^:]*: /, "", m); return m
+      }
+      return ""
+    }
+    {
+      ev = val($0, "event"); id = val($0, "agent_id")
+      if (id == "") next
+      if (ev == "register") {
+        if (!(id in seen)) { order[++n] = id; seen[id] = 1 }
+        parent[id] = val($0, "parent"); role[id] = val($0, "role"); node[id] = val($0, "node")
+        owner[id] = val($0, "owner"); gen[id] = val($0, "generation")
+        at[id] = val($0, "dispatched_at"); ep[id] = num($0, "epoch"); dp[id] = num($0, "depth")
+        status[id] = "running"
+      } else if (ev == "close") {
+        if (!(id in seen)) next
+        s = val($0, "status"); if (s != "") status[id] = s
+      }
+    }
+    END {
+      for (i = 1; i <= n; i++) {
+        id = order[i]
+        d = dp[id]
+        if (d == "") {
+          d = 1; p = parent[id]; hops = 0
+          while (p != "" && (p in seen) && hops < 64) { d++; p = parent[p]; hops++ }
+        }
+        printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", id, parent[id], role[id], node[id],
+               owner[id], gen[id], at[id], (ep[id] == "" ? 0 : ep[id]), d, status[id]
+      }
+    }
+  ' "$REG"
+}
+
+# Entrees encore `running`, ordonnees FEUILLE -> RACINE (profondeur decroissante, puis dispatch
+# le plus recent d'abord). C'est l'ordre d'arret impose par la doctrine de reprise, car tuer un
+# parent avant son enfant laisse l'enfant reveiller un parent que la session croit fini.
+orphans_tsv() { registry_fold | awk -F'\t' '$10 == "running"' | sort -t "$TAB" -k9,9nr -k8,8nr; }
+orphans_count() { orphans_tsv | awk 'END { print NR }'; }
+orphans_ids_json() {
+  local out; out="$(orphans_tsv | awk -F'\t' '{ printf "%s\"%s\"", (NR > 1 ? ", " : ""), $1 }')"
+  printf '[%s]' "$out"
+}
+orphans_json() {
+  local nowts; nowts="$(now)"
+  local out; out="$(orphans_tsv | awk -F'\t' -v now="$nowts" '{
+    printf "%s{\"agent_id\": \"%s\", \"parent\": \"%s\", \"role\": \"%s\", \"node\": \"%s\", \"owner\": \"%s\", \"generation\": \"%s\", \"dispatched_at\": \"%s\", \"age_seconds\": %d, \"depth\": %d, \"status\": \"running\"}",
+      (NR > 1 ? ", " : ""), $1, $2, $3, $4, $5, $6, $7, ($8 > 0 ? now - $8 : 0), $9
+  }')"
+  printf '[%s]' "$out"
+}
+# Enfants directs encore `running` d'un agent donne (ids JSON) : rendu par `close`, pour qu'un
+# parent qui se ferme voie ce qu'il laisse derriere lui.
+children_running_of_json() {
+  local out; out="$(orphans_tsv | awk -F'\t' -v p="$1" '$2 == p { printf "%s\"%s\"", (c++ > 0 ? ", " : ""), $1 }')"
+  printf '[%s]' "$out"
+}
+
 json_status() {
+  # children_running (issue #82) : nombre d'entrees du registre encore `running`, sur les DEUX
+  # branches (lock absent compris) : un lock relache avec des enfants consignes ouverts est
+  # exactement le cas « manager termine, enfant jamais ferme » que le gate de sortie doit voir.
+  local children; children="$(orphans_count)"
   if [ "$1" = false ]; then
-    printf '{"present": false, "lock": "%s"}\n' "$LOCK_DIR"; return
+    printf '{"present": false, "lock": "%s", "children_running": %s}\n' "$LOCK_DIR" "$children"; return
   fi
   local o s age stale gen sids lease guard_eff pe page
   o="$(meta_get owner)"; s="$(meta_get step)"; age="$(lock_age)"
@@ -342,8 +466,8 @@ json_status() {
   pe="$(meta_get progress_epoch)"
   case "$pe" in ''|*[!0-9]*) pe="null" ;; esac
   page="$(progress_age)" && : || page="null"
-  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s}\n' \
-    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page"
+  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s, "children_running": %s}\n' \
+    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page" "$children"
 }
 
 require_owner() {
@@ -370,8 +494,13 @@ case "$ACTION" in
     gen="$(new_generation)" || { echo '{"acquired": false, "reason": "generation-failed"}'; exit 1; }
     if ! lock_present && ln_atomic "$gen" "$LOCK_DIR"; then
       _lease="$(lease_age)" && : || _lease="null"
-      printf '{"acquired": true, "owner": "%s", "step": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s}\n' \
-        "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease"
+      # orphans_count (issue #82) : un registre laisse par une mission precedente (release avec
+      # enfants ouverts, ou lock elague par `recover`) est signale des l'acquisition, le nouveau
+      # manager inventorie et arrete AVANT son premier dispatch (mission-flow.md §Pattern I).
+      _orph="$(orphans_count)"
+      [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running avant cette acquisition. Inventorier (orphans) avant tout dispatch"
+      printf '{"acquired": true, "owner": "%s", "step": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s}\n' \
+        "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)"
       exit 0
     fi
     # 2. OCCUPE — notre generation ne sert pas encore ; on la garde pour une eventuelle
@@ -460,8 +589,12 @@ case "$ACTION" in
       rm -f "$mutex"; trap - EXIT INT TERM
       _lease="$(lease_age)" && : || _lease="null"
       journal_event takeover "$held" "$OWNER" "" "$age" "$(lock_gen)"
-      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s}\n' \
-        "$OWNER" "$STEP" "$held" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease"
+      # orphans (issue #82) : les agents consignes par le tenant mort sont rendus ICI, feuille ->
+      # racine, parce que c'est le moment ou le repreneur decide de son premier dispatch.
+      _orph="$(orphans_count)"
+      [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) par l'ancien tenant encore running. Les arreter (feuille -> racine) avant tout dispatch"
+      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s}\n' \
+        "$OWNER" "$STEP" "$held" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)"
       exit 0
     fi
     rm -f "${LOCK_DIR}.new.$$"; rm -rf "${LOCK_PARENT:?}/$gen"
@@ -518,8 +651,12 @@ case "$ACTION" in
     rm -f "$mutex"; trap - EXIT INT TERM
     _lease="$(lease_age)" && : || _lease="null"
     journal_event reclaim "" "$OWNER" "$sid" "$age" "$observed_gen"
-    printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s}\n' \
-      "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease"
+    # orphans (issue #82) : un reclaim est le geste d'une reprise de session, donc le manager qui
+    # revient (ou son remplacant, meme owner) voit d'un coup ce qui tourne encore en son nom.
+    _orph="$(orphans_count)"
+    [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running sous ce lock. Verifier ListAgents, arreter feuille -> racine, puis close --status=stopped"
+    printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s, "orphans_count": %s, "orphans": %s}\n' \
+      "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease" "$_orph" "$(orphans_ids_json)"
     exit 0
     ;;
 
@@ -564,7 +701,19 @@ case "$ACTION" in
     held="$(meta_get owner)"
     if [ "$held" = "$OWNER" ]; then
       drop_lock
-      printf '{"released": true, "owner": "%s"}\n' "$OWNER"; exit 0
+      # Registre (issue #82) : un release avec des enfants consignes encore `running` RELACHE quand
+      # meme (geste RAII, jamais conditionnel) mais garde le registre et le dit, c'est le cas
+      # « manager termine, enfant jamais ferme » ; le gate de sortie le lit via status. Sans enfant
+      # ouvert, le registre est supprime : la mission est close proprement, rien a retrouver.
+      _orph="$(orphans_count)"
+      if [ "$_orph" -gt 0 ]; then
+        log "release avec $_orph agent(s) consigne(s) encore running : registre conserve ($REG), a inventorier (orphans)"
+        printf '{"released": true, "owner": "%s", "children_running": %s, "orphans": %s}\n' "$OWNER" "$_orph" "$(orphans_ids_json)"
+      else
+        rm -f "$REG"
+        printf '{"released": true, "owner": "%s", "children_running": 0}\n' "$OWNER"
+      fi
+      exit 0
     fi
     printf '{"released": false, "reason": "not-owner", "held_by": "%s"}\n' "$held"; exit 1
     ;;
@@ -612,8 +761,78 @@ case "$ACTION" in
     exit 1
     ;;
 
+  register)
+    # Consigne un dispatch (issue #82). Aucune condition sur le lock : un worker qui dispatche une
+    # brique GSD ne tient pas le lock et ne connait pas forcement son owner, il consigne quand
+    # meme, c'est tout l'objet. owner/generation sont RELEVES sur le lock courant s'il existe
+    # (sauf --owner explicite), pour que l'inventaire puisse dire « consigne sous quel mandat ».
+    AGENT="$(sanitize_session_id "$AGENT")"
+    [ -n "$AGENT" ] || { log "--agent requis pour 'register'"; echo '{"registered": false, "reason": "agent-required"}'; exit 1; }
+    ROLE="$(sanitize_reg_field "$ROLE")"
+    [ -n "$ROLE" ] || { log "--role requis pour 'register'"; echo '{"registered": false, "reason": "role-required"}'; exit 1; }
+    NODE="$(sanitize_reg_field "$NODE")"; PARENT="$(sanitize_session_id "$PARENT")"
+    case "$DEPTH" in ''|*[!0-9]*) DEPTH="" ;; esac
+    _reg_owner="$OWNER"; _reg_gen=""
+    if lock_present; then
+      [ -n "$_reg_owner" ] || _reg_owner="$(meta_get owner)"
+      _reg_gen="$(lock_gen)"
+    fi
+    _reg_gen="$(printf '%s' "$_reg_gen" | tr -dc 'A-Za-z0-9._-')"
+    mkdir -p "$LOCK_PARENT" 2>/dev/null || true
+    # depth n'est ecrit que s'il est explicite : absent, registry_fold le derive de la chaine parent.
+    _depth_field=""; [ -n "$DEPTH" ] && _depth_field=", \"depth\": $DEPTH"
+    if ! printf '{"event": "register", "agent_id": "%s", "parent": "%s", "role": "%s", "node": "%s", "owner": "%s", "generation": "%s", "status": "running", "dispatched_at": "%s", "epoch": %s%s}\n' \
+        "$AGENT" "$PARENT" "$ROLE" "$NODE" "$_reg_owner" "$_reg_gen" "$(iso)" "$(now)" "$_depth_field" >> "$REG" 2>/dev/null; then
+      # BRUYANT et non nul, a l'inverse du journal des reprises : un dispatch non consigne est
+      # precisement l'orphelin introuvable que ce registre existe pour empecher.
+      log "registre inaccessible en ecriture ($REG) : dispatch NON consigne"
+      printf '{"registered": false, "reason": "registry-unwritable", "registry": "%s"}\n' "$REG"; exit 1
+    fi
+    printf '{"registered": true, "agent_id": "%s", "role": "%s", "node": "%s", "parent": "%s", "owner": "%s", "registry": "%s"}\n' \
+      "$AGENT" "$ROLE" "$NODE" "$PARENT" "$_reg_owner" "$REG"
+    exit 0
+    ;;
+
+  close)
+    # Ferme une entree par APPEND (jamais une reecriture du registre) : `done`/`failed` au retour
+    # normal d'un agent, `stopped` apres un arret verifie par ListAgents (jamais sur la seule
+    # reponse de TaskStop, qui peut etre sans effet immediat).
+    AGENT="$(sanitize_session_id "$AGENT")"
+    [ -n "$AGENT" ] || { log "--agent requis pour 'close'"; echo '{"closed": false, "reason": "agent-required"}'; exit 1; }
+    case "$CSTATUS" in
+      done|failed|stopped) ;;
+      *) log "--status attendu parmi done|failed|stopped pour 'close'"; printf '{"closed": false, "reason": "invalid-status", "status": "%s"}\n' "$(sanitize_reg_field "$CSTATUS")"; exit 1 ;;
+    esac
+    [ -f "$REG" ] || { echo '{"closed": false, "reason": "no-registry"}'; exit 1; }
+    _known="$(registry_fold | awk -F'\t' -v a="$AGENT" '$1 == a { print $10; exit }')"
+    [ -n "$_known" ] || { printf '{"closed": false, "reason": "unknown-agent", "agent_id": "%s"}\n' "$AGENT"; exit 1; }
+    if ! printf '{"event": "close", "agent_id": "%s", "status": "%s", "closed_at": "%s", "epoch": %s}\n' \
+        "$AGENT" "$CSTATUS" "$(iso)" "$(now)" >> "$REG" 2>/dev/null; then
+      log "registre inaccessible en ecriture ($REG) : fermeture NON consignee"
+      printf '{"closed": false, "reason": "registry-unwritable", "registry": "%s"}\n' "$REG"; exit 1
+    fi
+    # children_running : ce que ce parent laisse derriere lui. Un parent ferme avec un enfant
+    # encore running est le motif exact du reveil d'un parent « completed » (issue #82, cas 2 et 3).
+    _kids="$(children_running_of_json "$AGENT")"
+    [ "$_kids" != "[]" ] && log "close $AGENT : des enfants consignes tournent encore ($_kids). Les fermer ou les arreter, sinon ils restent orphelins"
+    printf '{"closed": true, "agent_id": "%s", "status": "%s", "previous_status": "%s", "children_running": %s}\n' \
+      "$AGENT" "$CSTATUS" "$_known" "$_kids"
+    exit 0
+    ;;
+
+  orphans)
+    # Lecture seule, exit 0 dans tous les cas (registre absent compris) : c'est un inventaire, pas
+    # un verdict. Ordre FEUILLE -> RACINE, l'ordre d'arret impose par la reprise.
+    if [ -f "$REG" ]; then
+      printf '{"present": true, "registry": "%s", "count": %s, "orphans": %s}\n' "$REG" "$(orphans_count)" "$(orphans_json)"
+    else
+      printf '{"present": false, "registry": "%s", "count": 0, "orphans": []}\n' "$REG"
+    fi
+    exit 0
+    ;;
+
   *)
-    echo "Usage: $0 {acquire|takeover|reclaim|heartbeat|mark-progress|release|status|recover} [--owner=ID] [--step=X]" >&2
+    echo "Usage: $0 {acquire|takeover|reclaim|heartbeat|mark-progress|release|status|recover|register|close|orphans} [--owner=ID] [--step=X] [--agent=ID] [--role=R] [--node=N] [--parent=ID] [--depth=D] [--status=S]" >&2
     exit 1
     ;;
 esac

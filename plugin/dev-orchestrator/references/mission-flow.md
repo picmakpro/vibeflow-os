@@ -506,6 +506,142 @@ OS de fin de nœud DAG (`done`/`failed`) émis par `notify.sh`. Le harness fait 
 via `config_off`/`user_present` : VibeFlow n'ajoute aucun toggle superposé sur ce vecteur-ci — les
 deux canaux restent disjoints en code, en doctrine et en gate.
 
+## Pattern I : registre des agents dispatchés et reprise après arrêt sur chien de garde (issue #82)
+
+Le modèle « dispatcher puis terminer son tour » (Pattern G, parade retenue contre les boucles
+d'attente de #81) laisse un angle mort : un parent qui termine son tour avec un enfant en cours
+n'est plus le propriétaire de rien. Si ce parent meurt (chien de garde `Agent stalled: no progress
+for 600s`, coupure réseau, fenêtre fermée), l'enfant continue sans que personne ne l'attende, et
+ni le `dag.json`, ni le verrou, ni le rapport ne portent d'identifiant d'agent : une reprise ne
+peut pas retrouver ses orphelins. Mesuré le 2026-09-22 (issue #82) : un `vf-reviewer` encore
+vivant 39 minutes après la mort de son manager, un `gsd-planner` orphelin dont l'arrêt a réveillé
+un `vf-coder` `completed` depuis 43 minutes, deux chaînes prêtes à écrire dans le même dépôt.
+
+Ce Pattern ne touche pas au modèle de dispatch : il ajoute un registre autour, et une discipline
+de reprise qui commence par l'inventaire. Scripts : `"$S"/driver-lock.sh register | close |
+orphans` (conductor v1.39.0).
+
+### 1. Un seul emplacement canonique : le registre à côté du verrou
+
+`.planning/DRIVER.lock.children.jsonl` (variable `VF_DRIVER_CHILDREN`), écrit et lu par
+`driver-lock.sh` seul, frère du verrou comme le journal des reprises, jamais dans la génération du
+verrou (qui meurt au `takeover`). Pourquoi là, et pas dans le `dag.json` de mission :
+
+- le manager de remplacement touche le verrou AVANT de connaître quoi que ce soit de la mission
+  (`reclaim` ou `takeover` est son premier geste) : l'inventaire vit là où la reprise commence,
+  et ces deux verbes le rendent d'eux-mêmes (`orphans_count`, `orphans`) ;
+- un worker qui dispatche une brique GSD ne connaît pas le chemin du `dag.json` ; le verrou, lui,
+  est à un chemin fixe connu de tous (manager, workers, gate de sortie `check-mission-exit.sh`) ;
+- un identifiant d'agent est un fait de runtime, pas de plan : un nœud est relancé plusieurs fois
+  (`reopen`, correction ciblée), un même nœud porte donc plusieurs agents au fil du temps ;
+- le registre est en JSON Lines append-only : plusieurs workers d'un même étage consignent en
+  parallèle sans mutex, une mort entre deux lignes ne corrompt rien, et l'état courant se dérive
+  (dernière ligne par agent gagne). Le `dag.json`, lui, est réécrit entier à chaque `mark`.
+
+Le `dag.json` reste le plan de bataille ; le registre porte qui tourne pour quel nœud (`--node`).
+Chaque entrée : `agent_id`, `role`, `node`, `parent`, `depth`, `owner` et `generation` du verrou au
+moment du dispatch, `dispatched_at`, `status` (`running`, puis `done`, `failed` ou `stopped`).
+
+### 2. Consigner à chaque dispatch, fermer à chaque retour (manager ET worker)
+
+Aucun hook ne le fait : c'est une étape obligatoire de l'agent, dans le même tour que le `Task`.
+Le résultat de l'outil `Task` porte l'identifiant de l'agent lancé (`agentId`) ; c'est cette
+valeur, telle quelle, qui est consignée.
+
+Manager, juste après chaque `Task(...)`, avant de terminer son tour :
+```bash
+"$S"/driver-lock.sh register --agent="<agentId>" --role="<vf-coder|vf-reviewer|vf-auditer|...>" --node="<id du nœud DAG>"
+```
+Au retour du worker (rapport typé reçu), dans le même tour que `dag.sh mark` :
+```bash
+"$S"/driver-lock.sh close --agent="<agentId>" --status=done     # ou failed
+```
+Worker qui dispatche lui-même (`vf-coder` vers `gsd-planner`, `gsd-plan-checker`, ...) : même
+geste, avec la profondeur explicite et le nœud reçu au digest :
+```bash
+"$S"/driver-lock.sh register --agent="<agentId>" --role="gsd-planner" --node="<nœud du digest>" --depth=2
+```
+`--parent=<agentId du worker>` s'ajoute quand le worker connaît son propre identifiant ; sinon
+`--depth=2` suffit à l'ordre feuille vers racine. Le worker ferme l'entrée de son enfant à son
+retour (`close --status=done|failed`) ; un enfant que le worker laisse tourner en terminant son
+tour reste `running` au registre, et c'est voulu : c'est exactement ce que le manager, ou son
+remplaçant, doit pouvoir retrouver.
+
+`register` refuse bruyamment (exit 1, `registry-unwritable`) si le fichier ne s'écrit pas : un
+dispatch non consigné est l'orphelin introuvable que le registre existe pour empêcher. Le statut
+consigné est déclaratif : la vérité de vie d'un agent reste `ListAgents`, et `close
+--status=stopped` se pose après cette vérification, jamais avant.
+
+### 3. Reprise après arrêt sur chien de garde
+
+Distinct du Pattern G. Pattern G traite la coupure d'un WORKER dont le manager est vivant : on
+réveille. Ici c'est le MANAGER qui est mort (chien de garde, coupure longue, fenêtre fermée) : ses
+nœuds `running` sont morts avec lui, personne ne les attend plus, et ses enfants sont des
+orphelins à arrêter, pas à réveiller. Ordre imposé, dans cet ordre exact :
+
+1. **Repartir de l'état du dépôt, jamais du DAG.** `git log --oneline -20`, `git status`,
+   `git worktree list`. Le `dag.json` d'un manager mort dit ce qu'il croyait en cours, pas ce qui
+   a été produit : un nœud `running` dont le worker a été coupé avec lui est un nœud MORT. Ce que
+   le disque montre commité est acquis ; ce qui est écrit non commité se récupère et se commite ;
+   le reste se redispatche.
+2. **Reprendre le verrou, qui rend l'inventaire.** `reclaim` (même owner, verrou vivant) ou
+   `takeover` (verrou périmé) : la réponse porte `orphans_count` et `orphans` (identifiants,
+   feuille vers racine). Le détail (rôle, nœud, profondeur, âge) :
+   ```bash
+   "$S"/driver-lock.sh orphans
+   ```
+   Le lecteur de statut du verrou (`status`) porte aussi `children_running`, verrou présent ou non.
+3. **Arrêter les orphelins de la feuille vers la racine, en relistant après chaque arrêt, avant
+   tout nouveau dispatch.** Pour chaque identifiant, dans l'ordre rendu : `TaskStop`, puis
+   `ListAgents` pour constater l'arrêt réel (§4 : la réponse de `TaskStop` ne suffit pas), puis
+   seulement :
+   ```bash
+   "$S"/driver-lock.sh close --agent="<agentId>" --status=stopped
+   "$S"/driver-lock.sh orphans     # relister : la liste peut avoir changé
+   ```
+   Un agent qui n'apparaît plus dans `ListAgents` (déjà fini) se ferme de la même façon. Un parent
+   `completed` qui repasse `running` après l'arrêt de son enfant (§4) est un orphelin de plus : il
+   s'arrête à son tour, puis on reliste.
+4. **Supprimer les worktrees jetables restants.** `git worktree list` : tout arbre de travail d'un
+   mandat mort (`agent-<id>`, `worktree-agent-<id>`, ou le dossier posé par `isolation: worktree`)
+   est supprimé après vérification qu'il ne porte rien de non commité à récupérer :
+   `git worktree remove --force <chemin>` puis `git worktree prune`.
+5. **Marquer le DAG, puis redispatcher.** Les nœuds `running` du manager mort passent `failed`
+   (`dag.sh mark --status=failed`) ou sont rouverts (`dag.sh reopen`) selon ce que le disque
+   montre ; seule la frontière `ready` recalculée se redispatche, chaque dispatch consigné (§2),
+   avec le jeton de la génération neuve sur le premier commit (§Jeton de fence).
+
+Tant que `orphans` rend un compte non nul, aucun `Task` neuf : deux chaînes écriraient dans le
+même dépôt, c'est le scénario mesuré de l'issue.
+
+### 4. Deux comportements de Claude Code à connaître, que le plugin ne peut que contourner
+
+- **`TaskStop` peut répondre `Successfully stopped` sans effet immédiat.** Mesuré : un
+  `ListAgents` juste après montrait le planner encore `running` ; le second `TaskStop` l'a passé
+  `killed`. Conséquence : ne consigner `stopped` et ne redispatcher qu'après relecture de
+  `ListAgents`, réitérée si besoin, jamais sur la seule réponse de `TaskStop`.
+- **La fin d'un enfant réveille un parent `completed`.** Mesuré : la notification de fin du
+  planner tué a repassé son parent `vf-coder` (fini depuis 43 minutes) en `running`, et il a
+  repris le mandat du manager mort dans l'arbre du nouveau manager. Conséquence : arrêter de la
+  feuille vers la racine ne suffit pas, il faut RELISTER après chaque arrêt et traiter le parent
+  réveillé comme un orphelin de plus ; côté rapport, un `completed` assorti de « background work of
+  its own still running » n'est pas inerte tant que ses enfants consignés ne sont pas fermés.
+
+Ces deux points sont des limites observées du runtime, non documentées par Anthropic, qui peuvent
+changer avec une version de Claude Code ; la discipline ci-dessus les rend inoffensives plutôt que
+de s'y fier.
+
+### 5. Règle pour les workers
+
+Un worker ne termine jamais son tour avec un enfant en cours sans l'avoir consigné (§2). Le
+transcript de l'agent n'est pas un registre : personne ne le relit à la reprise. Un worker qui
+rend son rapport pendant que son enfant tourne encore le dit dans le bloc typé (`findings`,
+`severity: mineur`, `action: no-op`, `ref: registre <agentId>`), pour que le manager sache qu'un
+`close` reste à poser. À la clôture d'une mission, un `release` avec `children_running` non nul
+relâche quand même (geste RAII) mais garde le registre et le signale ; le gate de sortie
+(`check-mission-exit.sh`, E1) le lit comme un manque : une mission terminée avec un enfant ouvert
+n'est pas une mission inerte.
+
 ## Lignes rouges (rappel ADR-053)
 
 Pas de bus UDS / channels / `dm` temps réel (modèle `Task` = dispatch-and-join). Pas de RAII machine : le

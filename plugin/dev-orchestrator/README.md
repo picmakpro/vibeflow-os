@@ -8,7 +8,7 @@
 > d'intention unique**. Plus de façade de verbes : GSD est l'interface directe des équipes,
 > l'agent est l'entrée conversationnelle optionnelle.
 
-**Version** : v2.22.3
+**Version** : v2.23.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -106,7 +106,7 @@ dev-orchestrator/
     ├── GSD-PIPELINE.md             # ordre canonique du cycle + model profiles
     ├── gsd-skills-index.md         # auto-généré (NE PAS ÉDITER)
     ├── mission-contracts.md        # Brief / Digest / Rapport de mission + SEUIL_EQUIPE
-    ├── mission-flow.md             # lock + DAG + rapports typés (ADR-053)
+    ├── mission-flow.md             # lock + DAG + rapports typés (ADR-053) + registre des agents et reprise (Pattern I, #82)
     ├── head-governance.md          # échelle d'allocation, séquencement, gate de sortie (Phase 40)
     ├── ingestion-flow.md           # ingestion BRDG-01/03, chargée on-demand
     ├── docs-flow.md                # sortie doc DOCF-01/04, chargée on-demand (Phase 22)
@@ -282,7 +282,11 @@ bash dev-orchestrator/scripts/tests/test-check-mission-exit.sh
   dans la sortie), la discrimination machine sain/manque/indéterminé, le cas E6-tableau-de-preuves
   vide, la lecture seule du dépôt inspecté (D-10), la garde D-11 (aucune sous-commande mutante du
   verrou) prouvée par mutation du script lui-même, et les deux causes d'indétermination E1
-  départagées (cascade non résolue vs `driver-lock.sh` absent).
+  départagées (cascade non résolue vs `driver-lock.sh` absent). Cas 23 à 27 (issue #82, 28 cas au
+  total) : E1 lit
+  aussi `children_running` du registre des agents dispatchés (verrou relâché mais enfant consigné
+  encore `running` = manque ; valeur non numérique = indéterminé ; champ absent = kernel antérieur,
+  sous-contrôle non applicable, sain).
 
 Exit 0 si tout passe (les SKIP, ex. GSD absent, ne font pas échouer la suite).
 

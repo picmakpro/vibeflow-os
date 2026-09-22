@@ -25,6 +25,12 @@
 #         même patron que T41b) · T48 owner/step assainis à l'écriture, JSON reste parsable ·
 #     T49 guard_effective observable (session_ids vide vs peuplé) · T50 recover journalise
 #         new_owner/session_id quand connus, sans exiger --owner
+# T59-T66 registre des agents dispatchés (issue #82) : T59 register + orphans feuille -> racine ·
+#     T60 close (done/failed/stopped, unknown-agent, invalid-status, enfants restants) · T61 reclaim
+#     inventorie les orphelins · T62 takeover inventorie les orphelins du tenant mort · T63 release
+#     garde le registre si enfants running, le supprime sinon, acquire suivant les signale ·
+#     T64 sans registre : aucun verbe ne plante, compte 0 · T65 assainissement des champs (JSON
+#     toujours parsable) · T66 append-only (une ligne par évènement, jamais de réécriture)
 #
 # Exit 0 si tout passe, 1 sinon.
 
@@ -848,6 +854,153 @@ _t58_pe_before=$(grep '^progress_epoch=' "$_t58_meta" | cut -d= -f2-)
 _t58_pe_after=$(grep '^progress_epoch=' "$_t58_meta" | cut -d= -f2-)
 assert "T58.1 — progress_epoch inchangé après heartbeat" "$_t58_pe_after" "$_t58_pe_before"
 "$SCRIPT" release --owner=A58 >/dev/null 2>&1
+
+# ---------------------------------------------------------------------------------------------------
+# T59-T66 : registre des agents dispatchés (issue #82). Le registre vit à côté du lock
+# (<lock>.children.jsonl) ; les cas ne connaissent jamais sa forme interne, sauf T66 qui teste
+# précisément la propriété append-only (une ligne par évènement).
+# ---------------------------------------------------------------------------------------------------
+REG_FILE="$VF_DRIVER_LOCK.children.jsonl"
+json_field() { printf '%s' "$1" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d'"$2"')' 2>/dev/null; }
+
+echo "=== T59, register + orphans : inventaire feuille -> racine, statut consigné ==="
+rm -rf "$VF_DRIVER_LOCK" "$REG_FILE"
+out=$("$SCRIPT" orphans); rc=$?
+assert "T59.1, orphans sans registre : present false, count 0" "$out" '"present": false, "registry": "'"$REG_FILE"'", "count": 0, "orphans": []'
+assert_exit "T59.2, orphans sans registre : exit 0 (inventaire, pas un verdict)" "$rc" 0
+"$SCRIPT" acquire --owner=M59 --step=exec-A >/dev/null
+out=$("$SCRIPT" register --agent=ag-coder --role=vf-coder --node=exec-A); rc=$?
+assert "T59.3, register rend registered true + agent_id + owner relevé sur le lock" "$out" '"registered": true, "agent_id": "ag-coder", "role": "vf-coder", "node": "exec-A", "parent": "", "owner": "M59"'
+assert_exit "T59.4, register exit 0" "$rc" 0
+"$SCRIPT" register --agent=ag-planner --role=gsd-planner --node=exec-A --parent=ag-coder >/dev/null
+"$SCRIPT" register --agent=ag-reviewer --role=vf-reviewer --node=revue-A >/dev/null
+out=$("$SCRIPT" register --agent= --role=x); rc=$?
+assert "T59.5, register sans --agent refusé" "$out" '"reason": "agent-required"'
+assert_exit "T59.6, register sans --agent : exit 1" "$rc" 1
+out=$("$SCRIPT" register --agent=ag-x); rc=$?
+assert "T59.7, register sans --role refusé" "$out" '"reason": "role-required"'
+out=$("$SCRIPT" orphans); rc=$?
+json_ok "$out"; assert_exit "T59.8, orphans : JSON parsable" $? 0
+assert "T59.9, orphans : count 3" "$out" '"count": 3'
+_t59_first=$(json_field "$out" '["orphans"][0]["agent_id"]')
+_t59_depth=$(json_field "$out" '["orphans"][0]["depth"]')
+_t59_last=$(json_field "$out" '["orphans"][2]["depth"]')
+assert "T59.10, la FEUILLE (enfant du worker) vient en premier" "$_t59_first" 'ag-planner'
+assert "T59.11, profondeur dérivée de la chaîne parent = 2" "$_t59_depth" '2'
+assert "T59.12, les racines (profondeur 1) viennent en dernier" "$_t59_last" '1'
+assert "T59.13, chaque entrée porte owner, generation, dispatched_at, status running" "$out" '"owner": "M59", "generation": "DRIVER.lock.gen.'
+st=$("$SCRIPT" status)
+assert "T59.14, status expose children_running = 3" "$st" '"children_running": 3'
+out=$("$SCRIPT" register --agent=ag-deep --role=gsd-plan-checker --node=exec-A --depth=3); rc=$?
+_t59_deep=$(json_field "$("$SCRIPT" orphans)" '["orphans"][0]["depth"]')
+assert "T59.15, --depth explicite prime sur la dérivation et remonte en tête" "$_t59_deep" '3'
+
+echo "=== T60, close : done/failed/stopped par append, refus sur inconnu et statut invalide ==="
+out=$("$SCRIPT" close --agent=ag-coder --status=done); rc=$?
+assert "T60.1, close done : closed true, previous_status running" "$out" '"closed": true, "agent_id": "ag-coder", "status": "done", "previous_status": "running"'
+assert "T60.2, close d'un parent nomme ses enfants encore running" "$out" '"children_running": ["ag-planner"]'
+assert_exit "T60.3, close exit 0" "$rc" 0
+out=$("$SCRIPT" orphans)
+assert "T60.4, l'agent fermé sort de l'inventaire (count 3)" "$out" '"count": 3'
+case "$out" in *'"agent_id": "ag-coder"'*) echo "  ❌ FAIL : T60.5 : ag-coder encore listé après close"; FAIL=$((FAIL+1));; *) echo "  ✅ PASS : T60.5 : ag-coder absent de l'inventaire après close"; PASS=$((PASS+1));; esac
+out=$("$SCRIPT" close --agent=ag-inconnu --status=done); rc=$?
+assert "T60.6, close d'un agent jamais consigné refusé (unknown-agent)" "$out" '"reason": "unknown-agent"'
+assert_exit "T60.7, unknown-agent : exit 1" "$rc" 1
+out=$("$SCRIPT" close --agent=ag-planner --status=killed); rc=$?
+assert "T60.8, statut hors done|failed|stopped refusé" "$out" '"reason": "invalid-status"'
+assert_exit "T60.9, invalid-status : exit 1" "$rc" 1
+out=$("$SCRIPT" close --agent=ag-planner --status=stopped)
+assert "T60.10, close stopped accepté" "$out" '"closed": true, "agent_id": "ag-planner", "status": "stopped"'
+out=$("$SCRIPT" close --agent=ag-planner --status=failed)
+assert "T60.11, re-close idempotent : previous_status = stopped, jamais une erreur" "$out" '"previous_status": "stopped"'
+st=$("$SCRIPT" status)
+assert "T60.12, status children_running retombe à 2 (reviewer + deep)" "$st" '"children_running": 2'
+
+echo "=== T61, reclaim inventorie les orphelins consignés sous le lock (feuille -> racine) ==="
+out=$(CLAUDE_CODE_SESSION_ID=sess-t61 "$SCRIPT" reclaim --owner=M59); rc=$?
+assert "T61.1, reclaim rend orphans_count 2" "$out" '"orphans_count": 2'
+assert "T61.2, reclaim rend la liste des ids, profondeur décroissante" "$out" '"orphans": ["ag-deep", "ag-reviewer"]'
+assert_exit "T61.3, reclaim exit 0" "$rc" 0
+json_ok "$out"; assert_exit "T61.4, JSON de reclaim parsable avec le registre" $? 0
+
+echo "=== T62, takeover d'un lock périmé inventorie les orphelins du tenant mort ==="
+age_stale "$VF_DRIVER_LOCK"
+out=$("$SCRIPT" takeover --owner=M62 --step=exec-A); rc=$?
+assert "T62.1, takeover acquired true" "$out" '"acquired": true'
+assert "T62.2, takeover rend orphans_count 2 (registre survit au remplacement de génération)" "$out" '"orphans_count": 2, "orphans": ["ag-deep", "ag-reviewer"]'
+out=$("$SCRIPT" orphans)
+assert "T62.3, les entrées portent encore l'owner du tenant mort (M59)" "$out" '"owner": "M59"'
+_t62_present=$([ -f "$REG_FILE" ] && echo yes || echo no)
+assert "T62.4, le registre n'est PAS dans la génération : il survit au takeover" "$_t62_present" 'yes'
+
+echo "=== T63, release : registre conservé si enfants running, supprimé sinon ; acquire suivant les signale ==="
+out=$("$SCRIPT" release --owner=M62); rc=$?
+assert "T63.1, release relâche QUAND MÊME (RAII) et compte les enfants" "$out" '"released": true, "owner": "M62", "children_running": 2, "orphans": ["ag-deep", "ag-reviewer"]'
+assert_exit "T63.2, release exit 0 malgré les orphelins" "$rc" 0
+_t63_present=$([ -f "$REG_FILE" ] && echo yes || echo no)
+assert "T63.3, registre conservé après un release avec enfants ouverts" "$_t63_present" 'yes'
+st=$("$SCRIPT" status)
+assert "T63.4, status lock absent expose children_running 2 (le gate de sortie le lit)" "$st" '"present": false, "lock": "'"$VF_DRIVER_LOCK"'", "children_running": 2'
+out=$("$SCRIPT" acquire --owner=M63 --step=exec-B); rc=$?
+assert "T63.5, l'acquisition suivante signale les orphelins hérités" "$out" '"orphans_count": 2, "orphans": ["ag-deep", "ag-reviewer"]'
+"$SCRIPT" close --agent=ag-deep --status=stopped >/dev/null
+"$SCRIPT" close --agent=ag-reviewer --status=stopped >/dev/null
+out=$("$SCRIPT" release --owner=M63)
+assert "T63.6, release sans enfant running : children_running 0" "$out" '"released": true, "owner": "M63", "children_running": 0}'
+_t63_gone=$([ -f "$REG_FILE" ] && echo yes || echo no)
+assert "T63.7, registre supprimé par un release propre" "$_t63_gone" 'no'
+
+echo "=== T64, sans registre : aucun verbe ne plante, compte 0 partout ==="
+rm -rf "$VF_DRIVER_LOCK" "$REG_FILE"
+out=$(CLAUDE_CODE_SESSION_ID=sess-t64 "$SCRIPT" acquire --owner=M64 --step=x)
+assert "T64.1, acquire sans registre : orphans_count 0, orphans []" "$out" '"orphans_count": 0, "orphans": []'
+out=$(CLAUDE_CODE_SESSION_ID=sess-t64b "$SCRIPT" reclaim --owner=M64)
+assert "T64.2, reclaim sans registre : orphans_count 0" "$out" '"reclaimed": true'
+assert "T64.3, reclaim sans registre : orphans []" "$out" '"orphans_count": 0, "orphans": []'
+out=$("$SCRIPT" close --agent=ag-x --status=done); rc=$?
+assert "T64.4, close sans registre : no-registry" "$out" '"reason": "no-registry"'
+assert_exit "T64.5, close sans registre : exit 1" "$rc" 1
+st=$("$SCRIPT" status)
+assert "T64.6, status sans registre : children_running 0" "$st" '"children_running": 0'
+age_stale "$VF_DRIVER_LOCK"
+out=$("$SCRIPT" takeover --owner=M64b --step=x)
+assert "T64.7, takeover sans registre : orphans_count 0" "$out" '"orphans_count": 0, "orphans": []'
+"$SCRIPT" release --owner=M64b >/dev/null 2>&1
+
+echo "=== T65, assainissement des champs du registre : JSON toujours parsable ==="
+rm -rf "$VF_DRIVER_LOCK" "$REG_FILE"
+"$SCRIPT" acquire --owner=M65 --step=x >/dev/null
+out=$("$SCRIPT" register --agent='ag"65,x' --role='vf"coder\' --node='exec"A'); rc=$?
+json_ok "$out"; assert_exit "T65.1, register avec guillemets/virgule/antislash : JSON parsable" $? 0
+assert "T65.2, agent_id réduit à sa classe d'identifiant" "$out" '"agent_id": "ag65x"'
+assert "T65.3, role/node sans guillemet ni antislash" "$out" '"role": "vfcoder", "node": "execA"'
+out=$("$SCRIPT" orphans)
+json_ok "$out"; assert_exit "T65.4, orphans après champs hostiles : JSON parsable" $? 0
+out=$("$SCRIPT" register --agent=ag-tab --role="$(printf 'vf\tcoder')" --node=n)
+out=$("$SCRIPT" orphans)
+json_ok "$out"; assert_exit "T65.5, tabulation dans un champ : JSON parsable, fold intact" $? 0
+assert "T65.6, la tabulation est retirée du champ" "$out" '"role": "vfcoder", "node": "n"'
+"$SCRIPT" close --agent=ag65x --status=done >/dev/null; "$SCRIPT" close --agent=ag-tab --status=done >/dev/null
+"$SCRIPT" release --owner=M65 >/dev/null 2>&1
+
+echo "=== T66, append-only : une ligne par évènement, jamais de réécriture ==="
+rm -rf "$VF_DRIVER_LOCK" "$REG_FILE"
+"$SCRIPT" acquire --owner=M66 --step=x >/dev/null
+"$SCRIPT" register --agent=ag-a --role=vf-coder --node=n >/dev/null
+"$SCRIPT" register --agent=ag-b --role=vf-reviewer --node=n >/dev/null
+"$SCRIPT" close --agent=ag-a --status=done >/dev/null
+_t66_lines=$(awk 'END { print NR }' "$REG_FILE")
+assert "T66.1, 2 register + 1 close = 3 lignes" "$_t66_lines" '3'
+_t66_first=$(head -1 "$REG_FILE")
+assert "T66.2, la première ligne (register ag-a) est intacte après le close" "$_t66_first" '"event": "register", "agent_id": "ag-a"'
+_t66_valid=0
+while IFS= read -r _l; do printf '%s' "$_l" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null || _t66_valid=1; done < "$REG_FILE"
+assert_exit "T66.3, chaque ligne du registre est un JSON valide" "$_t66_valid" 0
+out=$("$SCRIPT" orphans)
+assert "T66.4, repli : dernière ligne par agent gagne (ag-a fermé, ag-b running)" "$out" '"count": 1'
+assert "T66.5, ag-b seul dans l'inventaire" "$out" '"agent_id": "ag-b"'
+"$SCRIPT" close --agent=ag-b --status=done >/dev/null
+"$SCRIPT" release --owner=M66 >/dev/null 2>&1
 
 echo ""
 echo "=================================="
