@@ -11,6 +11,21 @@ sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 release au-dessus de la première ligne qui commence par `## [` — une section « non releasé »
 entre crochets se retrouverait publiée SOUS la version suivante.*
 
+## [v2.64.0] — 2026-09-22
+
+**Mineure** (deux modules montent en mineure, trois gardes CI nouvelles) :
+
+- **Registre des agents dispatchés et reprise après arrêt sur chien de garde** (PR #83, ferme
+  #82, réf. #81) — `conductor` v1.39.0 : `driver-lock.sh` gagne `register` / `close` / `orphans`,
+  registre `<lock>.children.jsonl` append-only à côté du verrou, `acquire` / `takeover` / `reclaim`
+  rendent les orphelins de la feuille vers la racine, `release` garde le registre tant que des
+  enfants sont ouverts (T59 à T66). `dev-orchestrator` v2.23.0 : `mission-flow.md` § Pattern I
+  (emplacement du registre, commandes exactes manager et workers, section « Reprise après arrêt
+  sur chien de garde » qui repart de l'état du dépôt et jamais du DAG, les deux comportements de
+  Claude Code à contourner : `TaskStop` sans effet immédiat, réveil d'un parent `completed` par la
+  fin de son enfant) ; `vf-dev-manager.md`, `vf-coder.md`, `vf-reviewer.md` alignés ;
+  `check-mission-exit.sh` E1 lit `children_running` (cas 23 à 27). Origine : session lab du
+  2026-09-22, manager mort deux fois sur coupure réseau, enfants orphelins ressuscitant leur parent.
 - **G-1 (PROT-04, QUAL-01) — garde de hausse de baseline sans arbitrage cité** —
   `scripts/check-baseline-arbitrage.sh` + sa suite `scripts/tests/test-check-baseline-arbitrage.sh`
   (neuf mutants opposables) + une étape à six bascules de fixture dans le job `gates` de
@@ -63,6 +78,7 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
   tag annoté ne peut jamais faire rougir cette étape.
   `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
   arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
+
 
 ## [v2.63.2] — 2026-09-17
 
