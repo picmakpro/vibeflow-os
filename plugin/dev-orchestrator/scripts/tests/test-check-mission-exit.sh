@@ -5,6 +5,8 @@
 # fixture (une par contrôle E1-E6) et deux mutations structurelles (D-11, cascade E1). Fixtures
 # isolées via mktemp -d + git init + dépôt nu, jamais sur le repo réel. Chaque cas capture la
 # sortie ET le code de retour dans deux variables distinctes, assertées séparément.
+# Cas 23-27 (issue #82) : E1 lit aussi `children_running` du registre des agents dispatchés
+# (verrou relâché mais enfant consigné running = manque ; champ absent = kernel antérieur, sain).
 #
 # HOME et CLAUDE_PLUGIN_ROOT sont SCRUBBÉS pour chaque invocation (run_gate) : sur ce poste,
 # $HOME/.claude/scripts porte un dag.sh réel — sans ce scrub, la cascade de résolution des
@@ -78,6 +80,20 @@ case "$1" in
   *) exit 1 ;;
 esac
 EOF
+  chmod +x "$1/driver-lock.sh"
+}
+
+# --- Talon de verrou ABSENT mais registre d'agents renseigné (issue #82, cas 23-26) -------------------
+write_lock_stub_children() { # <dir> <present:true|false> <children_running (brut, injecté tel quel)>
+  mkdir -p "$1"
+  : > "$1/dag.sh"; chmod +x "$1/dag.sh"
+  if [ "$2" = "true" ]; then
+    printf '#!/usr/bin/env bash\ncase "$1" in\n  status) echo %s; exit 0 ;;\n  *) exit 1 ;;\nesac\n' \
+      "'{\"present\": true, \"owner\": \"mission-x\", \"step\": \"exec-gate\", \"age_seconds\": 12, \"children_running\": $3}'" > "$1/driver-lock.sh"
+  else
+    printf '#!/usr/bin/env bash\ncase "$1" in\n  status) echo %s; exit 0 ;;\n  *) exit 1 ;;\nesac\n' \
+      "'{\"present\": false, \"lock\": \".planning/DRIVER.lock\", \"children_running\": $3}'" > "$1/driver-lock.sh"
+  fi
   chmod +x "$1/driver-lock.sh"
 }
 
@@ -331,6 +347,47 @@ if [ "$rc" -eq 4 ] && [ "$names_b" -eq 1 ] && [ "$names_a" -eq 0 ]; then
 else
   ko "22 E1 cause (b) \$S résolu, driver-lock.sh absent — code 4, texte dédié, PAS le texte de la cause (a)" "rc=$rc names_a=$names_a names_b=$names_b err=[$err]"
 fi
+
+# === Cas 23 : registre d'agents (issue #82), verrou relâché mais 2 enfants consignés running ==========
+D="$(mk_sane_fixture c23)"
+write_lock_stub_children "$D/.claude/scripts" false 2
+out="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+named=0; case "$out" in *"[E1] verrou relâché mais 2 agent(s) consigné(s) encore running"*) named=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$named" -eq 1 ]; then ok "23 E1 registre : verrou relâché, children_running=2, code 0, manque nommé sur E1"
+else ko "23 E1 registre : verrou relâché, children_running=2, code 0, manque nommé sur E1" "rc=$rc out=[$out]"; fi
+
+# === Cas 24 : registre d'agents, verrou relâché et 0 enfant running = SAIN ============================
+D="$(mk_sane_fixture c24)"
+write_lock_stub_children "$D/.claude/scripts" false 0
+out="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "24 E1 registre : children_running=0, code 3, stdout vide"
+else ko "24 E1 registre : children_running=0, code 3, stdout vide" "rc=$rc out=[$out]"; fi
+
+# === Cas 25 : registre d'agents, children_running non numérique = INDÉTERMINÉ =========================
+D="$(mk_sane_fixture c25)"
+write_lock_stub_children "$D/.claude/scripts" false '"abc"'
+out="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+err="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>&1 1>/dev/null)"
+named=0; case "$err" in *"children_running non numérique"*) named=1 ;; esac
+if [ "$rc" -eq 4 ] && [ "$named" -eq 1 ]; then ok "25 E1 registre : children_running non numérique, code 4, diagnostic dédié"
+else ko "25 E1 registre : children_running non numérique, code 4, diagnostic dédié" "rc=$rc err=[$err]"; fi
+
+# === Cas 26 : registre d'agents, verrou présent ET enfants running : un seul manque E1, enrichi =======
+D="$(mk_sane_fixture c26)"
+write_lock_stub_children "$D/.claude/scripts" true 1
+out="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+lines="$(printf '%s\n' "$out" | grep -c '^\[E1\]')"
+named=0; case "$out" in *"verrou de driver présent"*"children_running=1"*) named=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$lines" -eq 1 ] && [ "$named" -eq 1 ]; then ok "26 E1 registre : verrou présent + enfant running, une seule ligne E1 portant children_running=1"
+else ko "26 E1 registre : verrou présent + enfant running, une seule ligne E1 portant children_running=1" "rc=$rc lines=$lines out=[$out]"; fi
+
+# === Cas 27 : kernel antérieur (status sans children_running) : sous-contrôle non applicable, SAIN ====
+D="$(mk_sane_fixture c27)"
+out="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+err="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>&1 1>/dev/null)"
+named=0; case "$err" in *"registre des agents non exposé"*) named=1 ;; esac
+if [ "$rc" -eq 3 ] && [ "$named" -eq 1 ]; then ok "27 E1 registre : champ absent (kernel antérieur), code 3, non-applicabilité dite sur stderr"
+else ko "27 E1 registre : champ absent (kernel antérieur), code 3, non-applicabilité dite sur stderr" "rc=$rc err=[$err]"; fi
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="

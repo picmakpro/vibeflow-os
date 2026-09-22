@@ -38,7 +38,10 @@
 # Les six contrôles :
 #   E1 — le verrou de driver est relâché (lu via `driver-lock.sh status`, JAMAIS via une
 #        sous-commande qui le modifie — D-11 : ce script LIT seulement, il n'invoque jamais un
-#        verbe qui libère, reprend ou récupère quoi que ce soit).
+#        verbe qui libère, reprend ou récupère quoi que ce soit). Même lecture pour le registre
+#        des agents dispatchés (issue #82) : un verrou relâché avec `children_running` > 0 est
+#        un manque (mission terminée mais pas inerte) ; champ absent = kernel antérieur, le
+#        sous-contrôle est dit non applicable sur la sortie d'erreur.
 #   E2 — l'arbre de travail est propre (`git status --porcelain` capturé en variable, JAMAIS
 #        canalisé dans un compteur de lignes — une sortie vide y devient une ligne sous un hook
 #        de proxy de commandes actif, piège déjà tracé de ce dépôt).
@@ -169,19 +172,36 @@ else
     E1_MSG="[E1] driver-lock.sh status a rendu un code non nul ($E1_RC)"
   else
     E1_PRESENT="$(printf '%s' "$E1_OUT" | jq -r 'if has("present") then (.present | tostring) else "" end' 2>/dev/null)"
+    # Registre des agents dispatchés (issue #82) : `status` porte `children_running` depuis
+    # conductor v1.39.0, le nombre d'agents consignés encore `running`. Un manager qui a rendu
+    # son rapport en laissant un enfant consigné ouvert est le cas « terminé mais pas inerte »
+    # de l'issue : lu ici, jamais via le verbe `orphans` (D-11, un seul verbe, en lecture seule).
+    # Champ absent (kernel antérieur) → sous-contrôle non applicable, dit sur la sortie
+    # d'erreur, jamais un vert sur un manque non lu ; valeur non numérique → indéterminé.
+    E1_CHILDREN="$(printf '%s' "$E1_OUT" | jq -r 'if has("children_running") then (.children_running | tostring) else "" end' 2>/dev/null)"
+    case "$E1_CHILDREN" in
+      "") say "[E1] registre des agents non exposé par driver-lock.sh status (kernel antérieur) : sous-contrôle des enfants non applicable" ;;
+      *[!0-9]*) E1_STATUS="indet"; E1_MSG="[E1] champ children_running non numérique ($E1_CHILDREN)" ;;
+    esac
     case "$E1_PRESENT" in
       "")
         E1_STATUS="indet"
         E1_MSG="[E1] JSON de driver-lock.sh status dépourvu du champ present"
         ;;
       false)
-        E1_STATUS="sain"
+        if [ "$E1_STATUS" = "sain" ] && [ -n "$E1_CHILDREN" ] && [ "$E1_CHILDREN" -gt 0 ]; then
+          E1_STATUS="manque"
+          E1_MSG="[E1] verrou relâché mais $E1_CHILDREN agent(s) consigné(s) encore running dans le registre (driver-lock.sh orphans) : mission terminée, pas inerte"
+        fi
         ;;
       true)
         E1_OWNER="$(printf '%s' "$E1_OUT" | jq -r '.owner // "?"' 2>/dev/null)"
         E1_STEP="$(printf '%s' "$E1_OUT" | jq -r '.step // "?"' 2>/dev/null)"
         E1_STATUS="manque"
         E1_MSG="[E1] verrou de driver présent — owner=$E1_OWNER step=$E1_STEP"
+        if [ -n "$E1_CHILDREN" ] && [ "$E1_CHILDREN" -gt 0 ] 2>/dev/null; then
+          E1_MSG="$E1_MSG children_running=$E1_CHILDREN"
+        fi
         ;;
       *)
         E1_STATUS="indet"
