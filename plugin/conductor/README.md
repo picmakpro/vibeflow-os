@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.38.1 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.39.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -37,6 +37,7 @@ Ce que le kernel fournit (invariant) :
 | Brique | Support | Garantie |
 |---|---|---|
 | **Lock de driver** | `scripts/driver-lock.sh` (acquire / heartbeat / release / **takeover** / **reclaim**, TTL séparé de la lease) | une seule mission pilote à la fois ; `acquire` ne récupère plus jamais un lock périmé (rupture de contrat, Phase 32) — reprise **toujours explicite** via `takeover` (lock périmé) ou `reclaim` (lock sans identité de session), toutes deux tracées dans un journal append-only avec l'identité du repreneur |
+| **Registre des agents dispatchés** | `scripts/driver-lock.sh` (**register** / **close** / **orphans**, fichier `<lock>.children.jsonl` append-only à côté du verrou) | chaque `Task` émis par un manager ou un worker est consigné (`agent_id`, rôle, nœud DAG, profondeur, horodatage) et fermé à son retour ; `reclaim`/`takeover`/`acquire` rendent l'inventaire des agents encore `running`, feuille vers racine, `status` expose `children_running` (lu par le gate de sortie E1) ; un manager de remplacement arrête ces orphelins avant tout dispatch (issue #82, doctrine `dev-orchestrator-references/mission-flow.md` §Pattern I) |
 | **Guard du verrou** | `scripts/guard-driver-lock.sh` (hook `PreToolUse(Bash\|Write\|Edit)`, **bloquant**) | refuse par décision JSON les gestes mutants (commit, checkout, switch, push, écriture sous `.planning/`, etc.) d'une session tierce sous un lock vivant ; motif nommant owner/étape/branche/âge et la commande de reprise ; garde anti-accident, pas anti-adversaire (Phase 32, LOCK-02/03) |
 | **Hook doctor du parc** | `scripts/check-guard-health.sh` (hook `SessionStart`, **advisory**) | lecteur générique des marqueurs de santé de TOUS les gardes du parc — ferme l'issue « garde indisponible → fail-open bruyant » de QUAL-01 (Phase 32) |
 | **Plan de bataille en DAG** | `scripts/dag.sh` (init / add --deps **--scope** / ready / mark / reopen / status) | contrôle de flux déterministe ; la frontière `ready` se dispatche **en parallèle** sur périmètres disjoints ; `reopen` force `review_regime=full` sur tout nœud de revue/jointure rouvert (D-14, Phase 20) |
