@@ -11,7 +11,58 @@ sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 release au-dessus de la première ligne qui commence par `## [` — une section « non releasé »
 entre crochets se retrouverait publiée SOUS la version suivante.*
 
-*Rien pour l'instant.*
+- **G-1 (PROT-04, QUAL-01) — garde de hausse de baseline sans arbitrage cité** —
+  `scripts/check-baseline-arbitrage.sh` + sa suite `scripts/tests/test-check-baseline-arbitrage.sh`
+  (neuf mutants opposables) + une étape à six bascules de fixture dans le job `gates` de
+  `.github/workflows/ci.yml`. Garde deux objets : une valeur de la colonne INSTRUCTIONS de
+  `.planning/instruction-budget-baselines.tsv` qui MONTE, et une sentinelle
+  `.planning/.*-armed` qui est NEUTRALISÉE (supprimée, ou vidée) — dans les deux cas, exige une
+  citation d'arbitrage conforme (mot-clé, canal, date) dans le commit non-merge propre à la
+  branche qui porte le changement. LIMITE DE FOND : cette garde vit dans le dépôt — la PR
+  qu'elle juge peut la modifier (elle, sa suite, son étape CI) et rester verte ; elle rend
+  visible et trace, elle ne verrouille rien. Traite O-3 du `25-SECURITY.md` faute d'accès admin
+  sur ce dépôt (option (a)) : O-3 passe à « signalée et tracée ».
+  `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
+  arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
+- **G-2 (PROT-05, QUAL-01) — garde « la PR modifie ce qui la juge », marqueur déclaratif
+  `Gate-Touche:`** — `scripts/check-gate-touche.sh` + sa suite
+  `scripts/tests/test-check-gate-touche.sh` (six mutants opposables) + une étape à quatre
+  bascules de fixture dans le job `gates` de `.github/workflows/ci.yml`. Surveille CINQ classes
+  de la surface de gate : `plugin/conductor/scripts/check-*.sh`, `scripts/check-*.sh`, leurs
+  suites `plugin/conductor/scripts/tests/test-*.sh` et `scripts/tests/test-*.sh` (une seule
+  classe combinée), `.github/workflows/ci.yml`, et tout chemin sous `scripts/hooks/` — les gates
+  des AUTRES modules sont hors surface par l'arbitrage du périmètre sans admin, pas par oubli.
+  Exige un trailer déclaratif `Gate-Touche: <chemin-ou-motif> — <raison>` (séparateur nominal
+  tiret cadratin, tiret simple aussi accepté) sur un commit non-merge de la branche, PORTÉE
+  BRANCHE (n'importe quel commit de la plage, jamais nécessairement celui qui touche le chemin) —
+  la garde vérifie la FORME du marqueur, jamais la véracité de la raison citée. LIMITE DE FOND :
+  cette garde vit dans le dépôt — la PR qu'elle juge peut la modifier (elle, sa suite, son étape
+  CI) et rester verte ; elle rend visible et trace, elle ne verrouille rien. Traite la seconde
+  phrase d'O-3 du `25-SECURITY.md` (« une même PR peut modifier le gate, sa suite et l'étape CI »)
+  faute d'accès admin sur ce dépôt (option (a)) : signalée et tracée, jamais fermée.
+  `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
+  arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
+- **G-3 (PROT-05, QUAL-01) — alarme après coup sur un push direct vers `main` sans PR associée** —
+  `scripts/check-push-sans-pr.sh` + sa suite `scripts/tests/test-check-push-sans-pr.sh` (cinq
+  mutants opposables) + deux étapes dans le job `gates` de `.github/workflows/ci.yml` : preuve par
+  fixture à quatre bascules (sans condition, tourne sur tout run) et mesure réelle (conditionnée
+  push vers `main`, avec `GH_TOKEN`). Deux lectures GitHub en cascade — les PR qui référencent le
+  sha jugé, puis (si vide) le `merge_commit_sha` des PR closes, pour couvrir le merge par rebase de
+  ce dépôt (PR #71 `72259f4`, PR #72 `306e25d`, le tag `v2.63.0` pointe sur le commit rebasé) —
+  sans cette seconde lecture, la garde rougirait sur des merges parfaitement réguliers de ce dépôt.
+  Distingue strictement un échec d'API d'une liste vide (rc 2 jamais rc 1, précédent
+  d'authentification nommé, v2.39.0 du 2026-07-26) et traite la création de ref (`--before` nul,
+  rc 3). Juge le seul SOMMET du push, borne écrite en en-tête, jamais prétendue couverte au-delà.
+  LIMITE DE FOND : cette garde vit dans le dépôt — la PR qu'elle juge peut la modifier (elle, sa
+  suite, son étape CI) et rester verte ; elle rend visible et trace, elle ne verrouille rien.
+  ALARME APRÈS COUP : quand elle rougit, le commit est déjà sur `main` — elle ne peut rien
+  empêcher, le précédent `892f89a` (2026-09-16) l'illustre. Le hook `pre-push` n'est pas touché.
+  Traite PROT-05 (exigence créée par le manager le 2026-09-17, sur remontée du planificateur, née
+  du recadrage sans admin) : signalée et tracée. Compatibilité PROT-02 (flux de release) prouvée
+  sur pièce : le déclencheur `on.push.branches` ne porte aucune entrée `tags:`, donc le push d'un
+  tag annoté ne peut jamais faire rougir cette étape.
+  `scripts/` est l'outillage du dépôt, pas un module distribué — aucun bump de module dû. Autorisation :
+  arbitrage Samuel, AskUserQuestion session principale, 2026-09-17.
 
 ## [v2.63.2] — 2026-09-17
 

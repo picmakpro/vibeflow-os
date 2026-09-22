@@ -548,6 +548,47 @@ tôt si quelqu'un ajoute `shell: bash` à une étape du job `gates`.
   `|| true`) ;
 - points 2 et 3 inchangés, toujours différés.
 
+## Protection de `main` côté GitHub — DIFFÉRÉ, en attente d'un accès admin (2026-09-17)
+
+**Constat et arbitrage** : Samuel, AskUserQuestion session principale, 2026-09-17 — le compte
+`picmakpro`, seul **admin** du dépôt, appartient à un **tiers**. Mesure : `gh api
+repos/picmakpro/vibeflow-os --jq .permissions` → `admin: false, maintain: false, push: true`.
+**Personne, dans cette session, ne peut poser un ruleset**, ni une revue code owner requise, ni une
+PR obligatoire côté serveur.
+
+**Ce qui est différé, tel quel, sans réécriture** : rulesets de branche et de tags, bypass, revue
+code owner requise, PR obligatoire, mesures M-1 à M-4, fermeture de la PR #29, rejeu du flux de
+release sous la règle. Décisions D-01 à D-08 du `41-CONTEXT.md` : **suspendues**, pas annulées.
+Plans concernés : 41-01 (Task 2 et 3), 41-04 à 41-09, et la partie « sous la règle » de 41-11 à
+41-13. Travail conservé : `41-PREUVES.md` (`CONTEXTES-CHECKS` mesuré).
+
+**Déclencheur de reprise** : un accès **admin** au dépôt (droit accordé à un compte de Samuel, ou
+geste posé par le détenteur de `picmakpro` sous dictée). Ce jour-là, la posture visée est déjà
+écrite : `41-CONTEXT.md` § Arbitrages, et les plans différés se rejouent dans l'ordre.
+
+**Demande en cours depuis le 2026-09-17** : Samuel demande au détenteur du compte `picmakpro` soit
+l'**accès admin**, soit le **transfert du dépôt**. Consigné, non traité par la phase. Le volet
+différé reprend à la première des deux réponses ; d'ici là, aucune garde côté serveur n'existe.
+
+**Ce qui reste faisable sans admin** (à arbitrer avec le nouveau périmètre de la Phase 41) : gardes
+in-repo visibles et tracées — baseline du budget d'instructions, modification d'un gate ou de
+`ci.yml`, détection après coup d'un push direct, durcissement du hook `pre-push`. **Limite de fond,
+à écrire partout** : une garde qui vit dans le dépôt peut être modifiée par la PR qu'elle juge ;
+sans règle côté serveur, on ne ferme rien, on rend visible et tracé.
+
+**Statut partiel (2026-09-18, Phase 41) :** le périmètre sans admin est livré par les plans 41-14 à
+41-19 (trois gardes in-repo — G-1 baseline, G-2 surface de gate, G-3 push sans PR — et la doctrine
+ADR-072). Le volet côté serveur ci-dessus reste différé tel quel, son déclencheur de reprise
+inchangé ; les décisions D-01 à D-08 restent suspendues. Renvoi : `docs/ADR.md` § ADR-072.
+
+## Ligne d'index absente pour ADR-071 dans `docs/ADR.md` — DIFFÉRÉ (2026-09-18)
+
+**Constat mesuré le 2026-09-17**, en posant ADR-072 (Phase 41, plan 41-18) : la table d'index de
+`docs/ADR.md` s'arrête à la ligne ADR-070, alors que la section `## ADR-071` existe plus bas dans
+le fichier — aucune ligne d'index ne la référence. **Hors périmètre de la Phase 41**, non corrigé
+au passage pour ne pas mêler une dérive non arbitrée au diff d'une phase dédiée à une autre
+doctrine. **Déclencheur de reprise** : prochain passage sur `docs/ADR.md`.
+
 ## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15)
 
 **Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — ouvrir une **phase
@@ -578,6 +619,12 @@ après le tag) ; sort du hook `pre-push` optionnel (`scripts/hooks`) ; effet sur
 
 **Déclencheur de reprise** : inscription au ROADMAP par la session principale après le merge de
 la PR #67.
+
+**Statut partiel (2026-09-18, Phase 41) :** la phase a été ouverte et cadrée, sa prémisse s'est
+renversée (accès admin absent, cf. l'item ci-dessus), et le cahier des charges est désormais
+scindé — la partie in-repo est traitée par ADR-072 (`docs/ADR.md`), la partie côté serveur reste
+au premier item de cette page. La forme attendue décrite ici (« un ruleset exigeant la CI verte
+avant merge ») n'existe pas encore : cet item n'est pas marqué achevé.
 
 ## T-25-SC — journal de sécurité de la Phase 25 : TRANCHÉ, geste de clôture (2026-09-15)
 

@@ -81,7 +81,7 @@
 - [x] Phase 39: Workstreams — partition du planning et collaboration concurrente (cadrée 2026-09-09, exécutée 2026-09-10, 3 plans clos avec SUMMARY, revue ×3 + audit infra + juge frais sur le diff de correction ; **SHIPPÉE v2.60.0 le 2026-09-14 — PR #62** (conductor v1.35.0 : `check-divergence.sh` S2/S4/S5 + suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré sur `--git-common-dir` après RCE démontrée, étape CI ; dev-orchestrator v2.20.4 : dispatch `--ws` explicite ; `PART-01..09` gravées, `GSDA-19` superseded, ADR-069 amendé). Hotfix PR #61 regroupé dans la même release (arbitrage Samuel, AskUserQuestion session principale, 2026-09-14). **Dépôt volontairement NON partitionné** — partition réelle = geste humain séparé, déclencheur D-02 en STATE § Decisions. Réserves : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel)
 - [x] Phase 40: vibeflow-head — head of minds du dev-orchestrator (exécutée le 2026-09-15 sur `feat/phase-40-vibeflow-head` — `vibeflow-dev` renommé `vibeflow-head`, 5 plans/3 vagues, zéro agent neuf, kernel intact (diff nul), renommage sur 22 chemins + garde anti-alias T36 (mutation prouvée), `head-governance.md` neuf, `check-mission-exit.sh` E1-E6 codes 3/0/4/64 (23/23 cas, 6 mutations rouges), contrat de preuves E6 + ses trois émetteurs (D-19, amendement post-cadrage), racine bumpée v2.63.0, `dev-orchestrator` v2.22.0 — **PR, tag et release GitHub restent des gestes humains non posés à cette date**. **HEAD-01 partiellement close** — `intent-routing.md` jamais mis à jour pour renvoyer à `head-governance.md`, laissée ouverte au ledger, détail `40-SUMMARY.md`)
 - [x] Phase 40.1: Révision ADR-029 et du gate du budget d'instructions (INSERTED 2026-09-16 — plafond 300 lignes, ratchet sur les instructions seules ; arbitrages Samuel AskUserQuestion session principale ; avant la 41)
-- [ ] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04)
+- [ ] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -1567,19 +1567,23 @@ hotfix urgents.
 **Depends on**: aucune dépendance de code. Séquencée **après la Phase 40 et la calibration 25-04** :
 les deux PR en attente ne doivent pas changer de règles de merge en vol — même raison qui a fait
 différer cette inscription après le merge de la PR #67.
-**Requirements**: TBD — famille candidate `PROT-` (préfixe libre au ledger, vérifié le
-2026-09-15), à ledgeriser au cadrage : PROT-01 (ruleset posé et prouvé), PROT-02 (compatibilité
-avec la discipline de release du `CLAUDE.md` — `check-release-tag` `main`-only qui échoue par
-construction au merge et se rejoue après le tag, tag et release GitHub post-merge, sort du hook
-`pre-push` optionnel de `scripts/hooks`), PROT-03 (politique hotfix documentée).
+**Requirements**: PROT-01, PROT-02, PROT-03, PROT-04 (cadrage du 2026-09-17, `41-CONTEXT.md`) —
+PROT-01 (rulesets de branche et de tags posés et prouvés), PROT-02 (compatibilité avec la
+discipline de release du `CLAUDE.md` — `check-release-tag` `main`-only, tag et release GitHub
+post-merge, hook `pre-push` conservé), PROT-03 (politique hotfix et de contournement écrite,
+ADR-072), PROT-04 (O-3 « gardée par défaut + tracée » : CODEOWNERS `@picmakpro` + revue code owner).
 **Success Criteria** (what must be TRUE):
 
   1. `gh api repos/picmakpro/vibeflow-os/rulesets` ne rend plus `[]` : un ruleset actif sur
      `main` exige le statut CI vert avant merge (PROT-01).
 
-  2. Une PR dont la CI est rouge **ne peut pas être mergée** — prouvé par un essai réel tracé
-     (PR jetable, tentative de merge refusée, référence de la PR dans le SUMMARY), jamais par
-     la seule lecture de la configuration (PROT-01).
+  2. Une PR rouge est **refusée par défaut** ; la contourner demande un **geste explicite** et
+     laisse une **trace dans GitHub** — prouvé en deux temps par des essais réels tracés (refus
+     d'un merge sans contournement sur une PR jetable ; trace d'un contournement lue dans les rule
+     suites), références des PR dans le SUMMARY, jamais par la seule lecture de la configuration
+     (PROT-01). *Reformulé le 2026-09-17 — arbitrage Samuel, AskUserQuestion session principale,
+     2026-09-17 (P-1 du `41-CONTEXT.md`) : le bypass est accordé au rôle `write`, le libellé
+     d'origine « ne peut pas être mergée » était inatteignable.*
 
   3. Le flux de release est rejoué vert sous la nouvelle règle : bump → PR → merge → tag annoté
      → release GitHub → `bash scripts/check-release-tag.sh --remote` ✓ ; la politique hotfix
@@ -1589,4 +1593,59 @@ construction au merge et se rejoue après le tag, tag et release GitHub post-mer
   4. QUAL-01 s'applique si un gate naît (mutation rouge prouvée) ; sinon la phase n'en crée
      aucun et le dit.
 
-**Plans**: TBD
+> **PRÉMISSE RENVERSÉE le 2026-09-17** (constat et arbitrage Samuel, AskUserQuestion session
+> principale, 2026-09-17) : le compte `picmakpro`, seul admin, appartient à un **tiers** ;
+> `permissions` du dépôt = `admin: false, maintain: false, push: true`. **Aucun ruleset ne peut être
+> posé dans cette session.** Les critères de succès 1, 2 et 3 ci-dessus sont **inatteignables sans
+> accès admin** ; les décisions D-01 à D-08 du `41-CONTEXT.md` sont **suspendues** et les plans
+> 41-01 (T2/T3), 41-04 à 41-09 et la partie « sous la règle » de 41-11 à 41-13 sont **différés en
+> attente d'accès** (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »). L'exécution a
+> été arrêtée après 41-01 Task 1 (registre `41-PREUVES.md` conservé). Un **périmètre sans admin**
+> (gardes in-repo visibles et tracées) est proposé à l'arbitrage — il remplacera les critères de
+> succès de cette phase une fois tranché.
+
+> **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ ET CLOS le 2026-09-18** (option (a), arbitrage Samuel,
+> AskUserQuestion session principale, 2026-09-17) : six plans neufs (41-14 à 41-19, ci-dessous)
+> livrent trois gardes in-repo qui SIGNALENT et TRACENT sans jamais verrouiller — G-1
+> `scripts/check-baseline-arbitrage.sh` (PROT-04), G-2 `scripts/check-gate-touche.sh` (PROT-05),
+> G-3 `scripts/check-push-sans-pr.sh` (PROT-05) — plus la doctrine `docs/ADR.md` § ADR-072
+> (PROT-03) et O-3 du `25-SECURITY.md` portée à **« signalée et tracée »**. Ledger
+> `.planning/REQUIREMENTS.md` : PROT-02/03/04/05 **cochés sur pièce** ; **PROT-01 reste NON COCHÉ**
+> — hors d'atteinte sans accès admin, déclencheur de reprise écrit. **Les critères de succès 1, 2
+> et 3 ci-dessus restent INATTEIGNABLES sans accès admin** (constat explicite,
+> `41-PREUVES.md` § 41-19) et ne sont **pas** réécrits ici — ils décrivent la posture serveur
+> différée, pas le périmètre livré. Critère 4 (QUAL-01) satisfait : 3 gates neufs, 29 mutants
+> mesurés tués au total (G-1=9, G-2=6, G-3=5, plus les deux outils de phase). Rejeu final `gates`
+> rc=0 (13 étapes) et `tests` rc=0 (82 suites, 0 échec). Les plans 41-01 (T2/T3), 41-02, 41-04 à
+> 41-09, 41-11 à 41-13 restent **différés faute d'accès admin**, tels quels, non exécutés
+> (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »).
+
+**Plans:** 13 plans en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
+dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré. **Six plans supplémentaires
+(41-14 à 41-19) ajoutés et exécutés le 2026-09-18** pour le périmètre sans admin (option (a)) — voir
+liste ci-dessous.
+
+Plans:
+
+- [ ] 41-01-PLAN.md — fermeture de #29 (humain), `actor_id` du rôle write mesuré par sonde, JSON des deux rulesets
+- [ ] 41-02-PLAN.md — `.github/CODEOWNERS` étroit, ledger PROT-01..04 non cochés
+- [ ] 41-03-PLAN.md — ADR-072 (contournement et hotfix), amendement d'ADR-059, `CLAUDE.md`
+- [ ] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
+- [ ] 41-05-PLAN.md — pose des rulesets par `picmakpro` (humain), critère 1, mesure M-2
+- [ ] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement
+- [ ] 41-07-PLAN.md — PR rouge jetable : mesure M-1, refus, fermeture sans merge
+- [ ] 41-08-PLAN.md — contournement réel et trace dans les rule suites, mesure M-3
+- [ ] 41-09-PLAN.md — refus du push direct, mesure M-4 (tag de test)
+- [ ] 41-10-PLAN.md — doctrine post-preuves (O-3 « gardée par défaut + tracée », BACKLOG, ADR-072)
+- [ ] 41-11-PLAN.md — bump dérivé d'`origin/main` sur la branche B, entrée sur `main` sans contournement (humain)
+- [ ] 41-12-PLAN.md — tag, release GitHub, `check-release-tag --remote`, invariants de phase (humain)
+- [ ] 41-13-PLAN.md — clôture : ledger coché, SUMMARY, artefacts post-merge par PR
+
+Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-18) :
+
+- [x] 41-14-PLAN.md — G-1 `scripts/check-baseline-arbitrage.sh` (PROT-04) : hausse de baseline ou sentinelle neutralisée sans arbitrage cité, 9 mutants
+- [x] 41-15-PLAN.md — outillage de preuve de phase (`tools/check-aucune-fermeture.sh`, `tools/check-trace-arbitrage.sh`, `41-PREUVES.md`)
+- [x] 41-16-PLAN.md — G-2 `scripts/check-gate-touche.sh` (PROT-05) : surface de gate touchée sans marqueur déclaratif `Gate-Touche:`, 6 mutants
+- [x] 41-17-PLAN.md — G-3 `scripts/check-push-sans-pr.sh` (PROT-05) : alarme après coup sur un push direct vers `main` sans PR associée, 5 mutants
+- [x] 41-18-PLAN.md — doctrine : ADR-072, résumé `CLAUDE.md`, renvois `BACKLOG.md`, O-3 « signalée et tracée »
+- [x] 41-19-PLAN.md — clôture du périmètre sans admin : rejeu final, ledger `REQUIREMENTS.md` (PROT-01 non coché, PROT-02/03/04/05 cochés), constat d'inatteignabilité des critères 1-3

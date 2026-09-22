@@ -263,12 +263,17 @@ git show --name-only a7f414a → .planning/.instruction-budget-armed ET .plannin
 - **O-2 — commentaires périmés dans l'étape CI.** Le commentaire d'en-tête dit la sentinelle « PAS
   posée à ce stade » et le `::warning::` parle d'attendre la calibration de la Phase 40 ; les deux sont
   faux depuis `a7f414a`. Dérive documentaire, sans effet sur les codes de sortie.
-- **O-3 — T-25-16 reste procédurale, et `main` n'a aucune protection.** Le gate rend 0 sur une
-  baseline relevée à la main : seule la relecture du diff et la convention d'arbitrage daté protègent
-  la valeur. Plus largement, une même PR peut modifier le gate, sa suite et l'étape CI. Risque
-  structurel **déjà arbitré** : phase dédiée « posture de protection du dépôt » (41), arbitrage
-  Samuel, AskUserQuestion session principale, 2026-09-15 (`6b9ab32`). Pas une menace ouverte de la
-  Phase 25.
+- **O-3 — signalée et tracée.** `main` n'a toujours aucune protection côté serveur, et le gate du
+  budget d'instructions rend 0 sur une baseline relevée à la main : la valeur elle-même n'est pas
+  défendue par le gate. Ce qui a changé depuis la Phase 41 (périmètre sans admin, option (a),
+  arbitrage Samuel, AskUserQuestion session principale, 2026-09-17) : une hausse de valeur sans
+  citation d'arbitrage portant canal et date est désormais SIGNALÉE par
+  `scripts/check-baseline-arbitrage.sh`, et la modification d'un gate, de sa suite ou de l'étape CI
+  qui l'invoque est SIGNALÉE par `scripts/check-gate-touche.sh`, qui exige un marqueur déclaratif.
+  O-3 est **signalée et tracée** — jamais davantage : les deux gardes vivent dans ce dépôt, donc la
+  PR qu'elles jugent peut les modifier. Détail : `docs/ADR.md` § ADR-072. Risque structurel
+  **déjà arbitré** : phase dédiée « posture de protection du dépôt » (41), arbitrage Samuel,
+  AskUserQuestion session principale, 2026-09-15 (`6b9ab32`). Pas une menace ouverte de la Phase 25.
 - **O-4 — authenticité du checkpoint 25-04 non vérifiable par machine.** La précondition machine
   (P-18) est constatée. L'autorisation humaine est tracée au format exigé (canal + date) dans la
   baseline, le CHANGELOG `[v1.37.1]` et le commit `a7f414a`, via un relais SendMessage ; cet audit ne
