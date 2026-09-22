@@ -1,5 +1,35 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.23.0], 2026-09-22 : registre des agents dispatchés et reprise après chien de garde (issue #82)
+
+**Minor** (nouvelle doctrine de reprise, contrat observable du gate de sortie étendu) :
+
+- `references/mission-flow.md` §Pattern I : registre des agents dispatchés (emplacement canonique
+  à côté du verrou, justifié contre le `dag.json`), consignation à chaque dispatch et fermeture
+  à chaque retour par le manager ET par les workers (commandes exactes, `--depth=2` pour un
+  sous-agent de worker), section « Reprise après arrêt sur chien de garde » (état du dépôt avant
+  le DAG, nœuds `running` d'un manager mort considérés morts, inventaire `orphans`, arrêt de la
+  feuille vers la racine en relistant après chaque `TaskStop`, suppression des worktrees
+  jetables, puis redispatch), les deux comportements de Claude Code à contourner (`TaskStop` sans
+  effet immédiat, réveil d'un parent `completed` par la fin de son enfant) et la règle des
+  workers (jamais terminer son tour avec un enfant en cours sans l'avoir consigné).
+- `agents/vf-dev-manager.md` : consigne le registre au point 1 de la discipline de pilotage et
+  au dispatch de la frontière, et une conduite « Manager mort » distincte du réveil (Pattern G),
+  renvoyant à mission-flow §Pattern I. 250 lignes, 46 instructions (baseline inchangée).
+- `agents/vf-coder.md`, `agents/vf-reviewer.md` : règle du registre pour les workers (un
+  sous-agent lancé est consigné avant la fin du tour, fermé au retour, signalé au bloc typé s'il
+  tourne encore).
+- `scripts/check-mission-exit.sh` E1 : lit aussi `children_running` du `status` du verrou ; un
+  verrou relâché avec des agents consignés encore `running` est un manque (mission terminée mais
+  pas inerte) ; valeur non numérique = indéterminé ; champ absent (kernel antérieur) = sous-contrôle
+  non applicable, dit sur la sortie d'erreur. Lecture seule inchangée (D-11).
+- `test-check-mission-exit.sh` : cas 23 à 27 (28 cas). `references/_index.md` et README alignés.
+- Dépend de `conductor` v1.39.0 (verbes `register`, `close`, `orphans` de `driver-lock.sh`).
+- Motif : issue #82 (manager mort deux fois, enfants sans propriétaire, parent `completed`
+  ressuscité par la fin de son enfant, manager terminé listé trois heures) ; lié à #81, dont la
+  parade « dispatcher puis terminer son tour » est ce qui laisse les orphelins. Cette parade
+  n'est pas modifiée.
+
 ## [v2.22.3] — 2026-09-17 (hotfix v2.63.2 — profondeur de spawn B1/B2)
 
 **Patch** (correctif de doctrine, aucune nouvelle capacité) :
