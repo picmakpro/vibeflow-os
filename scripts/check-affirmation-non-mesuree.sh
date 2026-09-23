@@ -20,7 +20,9 @@
 # elle-meme (mandat point 4). Elle ne juge que la FORME de l'affirmation et la FRAICHEUR/le
 # CONTENU de la mesure — jamais si la mesure elle-meme a ete honnetement prise.
 #
-# PORTEE (ADR-074, arbitrage Samuel, AskUserQuestion session principale, 2026-09-23) : BLOQUANTE.
+# PORTEE (ADR-074) : BLOQUANTE — decision de la session principale (vibeflow-head), 2026-09-23,
+# EN ATTENTE DE CONFIRMATION DE SAMUEL ; voir la PR qui a pose cette garde pour les deux lectures
+# et la bascule consultative reversible en une ligne.
 # Le critere d'ADR-074 n'est PAS « fait technique contre prose » — c'est la DECIDABILITE PAR
 # MACHINE : un gate bloque quand le defaut se tranche sans jugement de valeur. Ici, soit la mesure
 # versionnee existe, est fraiche et confirme l'affirmation, soit non — aucune opinion n'intervient,

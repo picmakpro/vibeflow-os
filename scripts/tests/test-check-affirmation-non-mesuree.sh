@@ -147,7 +147,7 @@ else ko "NEANT aucun fichier porteur" "rc=3, NEANT present" "rc=$rc, NEANT=$has 
 
 echo "== test-check-affirmation-non-mesuree : BASCULE CONSULTATIVE (VF_AFFIRMATION_GATE_CONSULTATIF) =="
 
-# ADR-074 (arbitrage Samuel, 2026-09-23) : la bascule bloquant -> consultatif doit etre UN SEUL
+# ADR-074 : la bascule bloquant -> consultatif doit etre UN SEUL
 # DRAPEAU, jamais une refonte. Meme fixture qu'un cas bloquant (CAS 1 ci-dessous), verdict imprime
 # tel quel, mais rc=0 et un marqueur CONSULTATIF additionnel.
 DCONS="$(mk_repo consultatif 'Toute mise a jour de `main` passe par une PR (0 approbation).')"
