@@ -210,6 +210,54 @@ if [ "$rc" -eq 1 ] && printf '%s' "$out" | grep -qF 'S2' && printf '%s' "$out" |
   ok "14 normalisation base 10 : 08-a et 8-b dupliquent le numéro 8 → exit 1"
 else ko "14 normalisation base 10 (08-a/8-b)" "rc=$rc (attendu 1) out=[$out]"; fi
 
+# === Cas 15 — WSAW-01 : `workstreams/` NON VIDE mais entièrement filtré → exit 2, JAMAIS 0 =======
+# Le trou fermé par la Phase 41.1 : avant elle, `workstreams/` contenant uniquement un lien
+# symbolique épuisait la boucle inline sans jamais mettre `CHECKED=1`, tombait dans le `else` de fin
+# de script (« présent mais vide ») et rendait 0 — un « rien à signaler » sur un état que le gate
+# n'avait pas pu inspecter. MESURÉ sur le code d'avant ce plan : rc=0. Désormais `vf_ws_enumerate`
+# rend 2 et `check-divergence.sh` PROPAGE ce 2 au lieu de le faire disparaître.
+D="$(mk_git_root c15)"
+mkdir -p "$D/.planning/workstreams" "$D/.planning/cible-hors-workstreams/phases/01-un"
+ln -s "$D/.planning/cible-hors-workstreams" "$D/.planning/workstreams/lien-seul"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qE 'lien symbolique|non vérifiable'; then
+  ok "15 WSAW-01 : workstreams/ non vide mais entièrement filtré (un seul lien symbolique) → exit 2, jamais 0"
+else ko "15 WSAW-01 workstreams/ tout-lien" "rc=$rc (attendu 2, le code d'avant la Phase 41.1 rendait 0) out=[$out]"; fi
+
+# === Cas 16 — FLAG-6 : un code de sortie IMPRÉVU de `vf_ws_enumerate` → exit 2, jamais un 0 =======
+# `vf_ws_enumerate` n'a que trois codes contractuels (0/2/3, D-01). Ce cas prouve que le `case` de
+# `check-divergence.sh` possède une branche par défaut FAIL-CLOSED : sans elle, un quatrième code
+# traverserait sans toucher `CHECKED` et le script rendrait 0 en fin de fichier — exactement le
+# trou que ce plan ferme. Mutation SUR LA COPIE (même discipline que MUT-2/MUT-3), jamais sur la
+# source : `vf_ws_enumerate` est neutralisée en `return 99` dans la copie de `workstream-policy.sh`
+# posée à côté de la copie du script — que celui-ci résout en PREMIER candidat.
+F6D="$TMP/flag6"; mkdir -p "$F6D"
+cp "$SCRIPT" "$F6D/check-divergence.sh"
+POLICY_SRC="$(dirname "$SCRIPT")/../../planning-core/scripts/workstream-policy.sh"
+awk '
+  { print }
+  !fait && /^vf_ws_enumerate\(\) \{/ { print "  return 99"; fait = 1 }
+' "$POLICY_SRC" > "$F6D/workstream-policy.sh"
+
+D="$(mk_git_root c16)"
+mkdir -p "$D/.planning/workstreams/iota/phases/01-un"
+printf '%s\n' "### Phase 1: un" > "$D/.planning/workstreams/iota/ROADMAP.md"
+if cmp -s "$F6D/workstream-policy.sh" "$POLICY_SRC"; then
+  ko "16 FLAG-6 code de sortie imprévu" "la mutation n'a RIEN changé (motif introuvable) — mutant NON OPPOSABLE, pas mutant satisfait"
+elif ! bash -n "$F6D/workstream-policy.sh" 2>/dev/null; then
+  ko "16 FLAG-6 code de sortie imprévu" "la copie mutée n'est pas un script valide : elle rougirait pour la mauvaise raison"
+else
+  _target_save="$TARGET"; TARGET="$F6D/check-divergence.sh"
+  out="$(run "$D")"; rc=$?
+  TARGET="$_target_save"
+  # Témoin d'opposabilité : la MÊME fixture sur le script NON muté doit être verte (rc=0), sans
+  # quoi le 2 observé ci-dessus pourrait venir de la fixture et non de la branche par défaut.
+  out_t="$(run "$D")"; rc_t=$?
+  if [ "$rc" -eq 2 ] && printf '%s' "$out" | grep -qF 'imprévu' && [ "$rc_t" -eq 0 ]; then
+    ok "16 FLAG-6 : vf_ws_enumerate rend 99 (hors contrat) → exit 2 sur la branche par défaut, et la même fixture est verte (rc=$rc_t) sur le script non muté"
+  else ko "16 FLAG-6 code de sortie imprévu" "rc_mutant=$rc (attendu 2) rc_temoin=$rc_t (attendu 0) out=[$out]"; fi
+fi
+
 echo ""
 echo "== mutants =="
 
