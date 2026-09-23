@@ -1729,7 +1729,7 @@ d'artefacts de planning recensés hors suites de tests :
 sur le disque**, par un mécanisme **partagé** qui dérive ses chemins du disque et jamais de
 l'environnement ; en oublier un devient impossible sans que la CI le dise.
 
-**Requirements**: WSAW-01, WSAW-02, WSAW-03, WSAW-04, WSAW-05, WSAW-06
+**Requirements**: WSAW-01, WSAW-02, WSAW-03, WSAW-04, WSAW-05, WSAW-06, WSAW-07
 **Depends on:** Phase 39 (le patron de `check-divergence.sh` et sa suite à 17 cas) et la partition
 réelle D-02 (PR #94, mergée 2026-09-23). **Prérequis de la Phase 41.2** : sans ce balayage, la preuve
 d'usage de la 41.2 (« gates verts sur chaque compartiment ») n'est pas mesurable.
@@ -1785,7 +1785,19 @@ d'usage de la 41.2 (« gates verts sur chaque compartiment ») n'est pas mesurab
      prochain lecteur refera le raccourci. *Décision de la session principale (`vibeflow-head`),
      2026-09-23 — pas un arbitrage de Samuel* (WSAW-06).
 
-  8. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa **mutation rouge prouvée**.
+  8. **La doctrine des compartiments est à jour et exacte** (WSAW-07). `workstreams.md` est
+     aujourd'hui muet sur le **choix** (les mots « choix », « démarrage », « init » n'y figurent pas)
+     et porte en §3 une affirmation **devenue fausse** depuis la PR #94 — « sur un dépôt non
+     partitionné il sort en 3 sans un mot : c'est l'état nominal de tous nos labs à ce jour ». Le
+     fichier énonce : le **choix au démarrage**, sa **valeur** (deux flux qui avancent en parallèle
+     sur des périmètres disjoints), le **non-choix par défaut** pour un lab solo (un `--ws` partout
+     pour rien), et la **procédure de bascule** avec sa précondition vérifiable — aujourd'hui absente
+     (§1 ne dit que « `create <nom> --migrate-name <nom>` », sans procédure ni précondition).
+     *Cette phase est le seul écrivain de `workstreams.md` et de `docs/ADR.md` : la 41.2 lui fournit
+     le contenu, elle ne touche ni l'un ni l'autre — c'est ce qui rend les deux chantiers
+     parallélisables sans conflit d'écriture.*
+
+  9. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa **mutation rouge prouvée**.
 
 **Plans:** TBD (run /gsd-plan-phase 41.1 to break down)
 
@@ -1835,9 +1847,10 @@ sur chaque compartiment sans réparation manuelle**.
      **sans aucune réparation manuelle**. Sinon la capacité ne fait que déplacer chez l'utilisateur les
      13 commits qu'a coûtés la partition de ce dépôt (WSCH-04).
 
-  5. La doctrine (`workstreams.md`, ADR-069) énonce le **choix au démarrage**, la **valeur** (deux flux
-     qui avancent en parallèle sur des périmètres disjoints) et le **non-choix par défaut** — un lab
-     solo n'y gagne rien et paie un `--ws` partout (WSCH-05).
+  5. Le **contenu doctrinal** du choix — sa valeur, son non-choix par défaut, la procédure de bascule
+     et sa précondition — est **remis au manager**, qui le fait porter par WSAW-07. Cette phase
+     **n'écrit ni `workstreams.md` ni `docs/ADR.md`** : deux écrivains sur un même fichier de doctrine
+     est précisément le conflit que la parallélisation des deux chantiers doit éviter (WSCH-05).
 
   6. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa mutation rouge prouvée.
 
