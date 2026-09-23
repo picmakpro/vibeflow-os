@@ -54,3 +54,11 @@ collision portant sur `STATE.md`.
 **zéro conflit git** tout en laissant une phase orpheline à la racine pendant que le STATE la
 déclare en cours (5 484 lignes divergentes, silencieuses). Voir
 [[verifier-fraicheur-avant-audit]] — l'absence de conflit git n'est pas une preuve d'intégrité.
+
+**Règles de collaboration posées par Sam (WhatsApp, 2026-09-23)** : **une branche par PR** — empiler une
+PR sur une autre (base = la branche de la PR parente) plutôt que mélanger deux sujets ; et **une
+release seulement pour une évolution fonctionnelle** (inscrite au `CLAUDE.md` par la PR #87). Ordre
+convenu : Willy pose le volet admin de la Phase 41 (rulesets, CODEOWNERS — lui seul a les droits),
+Sam publie et clôt `fiabilite-v1.0`, puis seulement on exécute le jalon `gouvernance-labs-v1.0`
+(Phases 42-50). **How to apply:** ne jamais lancer `gsd-execute-phase` sur une phase 42+ tant que
+`fiabilite-v1.0` n'est pas clos ; vérifier au `ROADMAP.md` § Milestones.
