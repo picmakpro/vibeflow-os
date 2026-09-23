@@ -15,7 +15,9 @@ description: >
   Agent de repurposing/distribution du lab content. Invoquer UNIQUEMENT sur une pièce VALIDÉE (gate de
   clarté passé + validation humaine) : décline la pièce en variantes multi-plateformes sans dénaturer
   l'angle, maintient le calendrier. Ne publie jamais en autonomie sensible. Ne code jamais.
+tools: Read, Write, Glob, Grep
 model: sonnet
+effort: medium
 memory: project
 skills: [audit-architecture]
 ---

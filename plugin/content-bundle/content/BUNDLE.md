@@ -166,7 +166,9 @@ Selon `registres.md` : `DECISIONS.md`, `LEARNINGS.md`, `BLOCKERS.md`, `JOURNAL.m
 
 ### Étape 5 — Instancier les 3 agents (≤300L chacun)
 Pour chaque blueprint de `agents/` :
-1. Lire le frontmatter cible (name, description, model, memory:project, skills:[...]) — les recopier TOUS (gate `check-agents.sh`, ADR-044).
+1. Lire le frontmatter cible du blueprint et le **recopier intégralement** — ne jamais en énumérer
+   les champs ici : une liste dupliquée dérive (mesuré le 2026-09-22, `effort` manquait aux 9
+   blueprints). Gates : `check-blueprints.sh` en amont, `check-agents.sh` sur l'agent posé (ADR-044).
 2. Créer l'agent natif dans `.claude/agents/<name>.md` du lab, **≤300L** (passer
    `agent-density-auditor` en gate si disponible).
 3. Si un skill déclaré n'existe pas encore, le **créer via `skill-creator`** (ne PAS inliner le savoir

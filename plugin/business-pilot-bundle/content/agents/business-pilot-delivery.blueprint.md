@@ -13,7 +13,9 @@
 name: business-pilot-delivery
 description: >-
   Exécute et suit la livraison des prestations vendues — onboarding, jalons, SLA, satisfaction — avec gate de vérification avant tout envoi. Use when une opportunité gagnée passe en delivery, un jalon arrive à échéance, un livrable est prêt à envoyer, ou un signal d'upsell ou de churn apparaît.
+tools: Read, Write, Glob, Grep
 model: sonnet
+effort: medium
 memory: project
 skills:
   - delivery-tracking         # suivi onboarding/jalons/SLA paramétrables — à créer via skill-creator

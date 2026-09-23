@@ -18,7 +18,9 @@ description: >
   nouveau canal en dupliquant channels/_TEMPLATE/. NE RÉDIGE NI N'ANALYSE LUI-MÊME : il délègue la
   rédaction à copywriter-sequences et la mesure à campaign-analyst. Escalade au conductor pour tout
   ce qui touche la structure du lab.
+tools: Read, Write, Glob, Grep
 model: opus
+effort: medium
 memory: project
 skills:
   - metier-orchestration           # Boucle de mission de l'orchestrateur métier (ADR-048) — copié verbatim par vf-new-lab, préchargé

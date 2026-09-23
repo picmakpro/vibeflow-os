@@ -15,7 +15,9 @@ description: >
   Rédacteur/idéateur du lab content. Invoquer APRÈS le cadrage du strategist : produit 3 hooks
   alternatifs puis rédige le livrable complet selon l'angle et la structure validés. Ne code jamais.
   Sa sortie passe ensuite par le gate de clarté (audit-architecture) avant toute validation humaine.
+tools: Read, Write, Glob, Grep
 model: sonnet
+effort: medium
 memory: project
 skills: [audit-architecture, verification-before-completion]
 ---

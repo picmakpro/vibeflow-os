@@ -1,5 +1,31 @@
 # Changelog — conductor
 
+## [v1.40.0] — 2026-09-22 (conformité des blueprints à leur propre gate)
+
+**Minor** (nouveau script, nouvelle suite, câblage CI) :
+
+- **`scripts/check-blueprints.sh`** (neuf) : matérialise le « frontmatter cible » de chaque
+  `*.blueprint.md` en agent jetable et le soumet à `check-agents.sh`. Ferme la classe de défaut
+  « la fabrique produit ce que le contrôleur refuse » — mesurée le 2026-09-22 : **les 9 blueprints
+  du dépôt omettaient tous `effort:`**, bloquant depuis la Phase 24, donc un lab fabriqué par
+  `vf-new-lab` depuis l'un d'eux voyait son `Write` **refusé** par `guard-agent-write.sh`. Un seul
+  référentiel : le gate ne réimplémente aucune règle, il délègue à celui qui s'appliquera vraiment.
+  Trois codes de sortie — `0` conforme, `1` refus, `3` **INDÉTERMINÉ** sur cible vide (jamais un
+  vert sur rien mesuré). Pas de `--strict` par défaut, et c'est délibéré : les skills déclarés par
+  un blueprint sont créés **dans le lab** à l'instanciation, les exiger ici serait faux par
+  construction.
+- **`scripts/tests/test-check-blueprints.sh`** (neuve) : **21 cas**, avec un témoin par code de
+  sortie (0/1/3), un témoin de portée (le corpus réel du dépôt), un témoin de message sous `--hook`
+  (silence de code, jamais silence de message) et un **jumeau négatif** — une mutation d'un
+  blueprint réel doit faire rougir le gate, la mutation étant elle-même prouvée par `cmp`.
+- **Étape CI** `check-blueprints` armée dans le job des gates ; la suite est découverte par le
+  balayage existant `*/tests/test-*.sh`.
+- Les **9 blueprints** gagnent `tools:` et `effort:`, alignés sur les agents livrés équivalents
+  (`sonnet` / `medium` / `Read, Write, Glob, Grep`).
+- Les **trois `BUNDLE.md`** cessent d'énumérer les champs du frontmatter à recopier et renvoient au
+  blueprint entier : c'est l'énumération dupliquée qui avait dérivé.
+- Autorisation : arbitrage Willy, AskUserQuestion session principale, 2026-09-22.
+
 ## [v1.39.0], 2026-09-22 : registre des agents dispatchés (issue #82)
 
 **Minor** (nouvelle capacité du team-kernel) :

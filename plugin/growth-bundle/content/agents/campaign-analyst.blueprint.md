@@ -17,7 +17,9 @@ description: >
   et remonte les LEARNINGS PAR CANAL avec tag-canal obligatoire (zéro contamination inter-canaux).
   N'INVENTE JAMAIS une métrique : une valeur non sourcée est marquée « inconnue ». Ne décide pas
   l'allocation de budget : il fournit la donnée et le verdict, channel-strategist tranche.
+tools: Read, Write, Glob, Grep
 model: sonnet
+effort: medium
 memory: project
 skills:
   - growth-metrics-analysis        # À créer via skill-creator (calcul CAC/ROAS, ICE/PXL, lecture sources, anti-invention)
