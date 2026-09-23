@@ -1,15 +1,15 @@
 ---
 schema_version: 1
-open_count: 0
+open_count: 2
 waived_count: 1
 fixed_count: 4
-total_count: 5
-last_updated: 2026-08-04T17:22:55.728Z
+total_count: 7
+last_updated: 2026-09-23T12:29:54.478Z
 ---
 
 # Broken Windows Ledger
 
-> Cross-phase defect register. `/gsd-ship` blocks while `open_count > 0`.
+> Cross-phase defect register. With `workflow.windows_enforce` enabled, `/gsd-ship` blocks while `open_count > 0`.
 > Waive with `gsd-tools windows waive <id> "<reason>"` (reason required).
 > Mark fixed with `gsd-tools windows fixed <id>`.
 
@@ -20,6 +20,8 @@ last_updated: 2026-08-04T17:22:55.728Z
 | 3 | 20 | deviation | plugin/dev-orchestrator/agents/vf-reviewer.md |  | Recette humaine différée : valider test_sim/build_sim/clean (vf-mcp-tools) contre un serveur XcodeBuildMCP vivant sur un lab iOS équipé (D-03, pas de .mcp.json dans ce repo) | waived | Recette humaine XcodeBuildMCP structurellement infermable dans ce dépôt : aucun .mcp.json, aucun projet iOS, aucun simulateur — valider test_sim/build_sim/clean exige un serveur XcodeBuildMCP vivant, donc un lab iOS équipé. vibeflow-os est le repo de distribution du plugin : la fenêtre ne peut pas y être fermée, seulement ailleurs. Dérogée en Phase 24 (ADR-066) ; à rouvrir si ce dépôt acquiert un projet iOS et un .mcp.json. | 2026-07-31T10:25:47.970Z | 2026-08-04T17:22:55.728Z |
 | 4 | 20 | todo | plugin/dev-orchestrator/scripts/inject-mcp-tools.sh |  | Le gate ne valide pas qu'un nom de serveur cité dans un token vf-mcp-tools/mcp__ existe réellement — dette connue, hors périmètre des 7 critères de la phase | fixed |  | 2026-07-31T10:25:48.044Z | 2026-07-31T16:05:33.000Z |
 | 5 | 21 | deviation | README.md |  | Compteur « N suites » des 2 README racine régressé à 45 (le plan 21-04 a ajouté test-check-state-integrity.sh) après la clôture de la fenêtre #2 sur 44 — CI rouge sur check-version-sync.sh, signalé par 21-VERIFICATION.md, corrigé par 21-05 dans le même commit | fixed |  | 2026-07-31T18:15:08.000Z | 2026-07-31T19:00:00.000Z |
+| 6 | 41 | deviation | plugin/_internal/runtime-adapter/tests/test-register-codex-agent-path-traversal.sh |  | T4 [majuscules] accepté à tort (rc=0) — rouge préexistant, reproduit à l'identique sur une extraction git archive d'origin/main (6a7b15b), hors périmètre du plan 41-01 (JSON de rulesets), jamais neutralisé ni fixé sans validation humaine (ADR-031) | open |  | 2026-09-23T12:29:52.109Z |  |
+| 7 | 41 | deviation | plugin/conductor/scripts/tests/test-check-description-fidelity.sh |  | 36 KO — module Python PyYAML introuvable pour python3 (passe A) sur ce poste — rouge préexistant, reproduit à l'identique sur une extraction git archive d'origin/main (6a7b15b), hors périmètre du plan 41-01, environnement d'exécution jamais modifié sans validation humaine (ADR-031) | open |  | 2026-09-23T12:29:54.478Z |  |
 
 ````json
 [
@@ -82,6 +84,32 @@ last_updated: 2026-08-04T17:22:55.728Z
     "reason": "",
     "recorded_at": "2026-07-31T18:15:08.000Z",
     "resolved_at": "2026-07-31T19:00:00.000Z"
+  },
+  {
+    "id": 6,
+    "kind": "deviation",
+    "phase": "41",
+    "file": "plugin/_internal/runtime-adapter/tests/test-register-codex-agent-path-traversal.sh",
+    "line": null,
+    "description": "T4 [majuscules] accepté à tort (rc=0) — rouge préexistant, reproduit à l'identique sur une extraction git archive d'origin/main (6a7b15b), hors périmètre du plan 41-01 (JSON de rulesets), jamais neutralisé ni fixé sans validation humaine (ADR-031)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-23T12:29:52.109Z",
+    "resolved_at": null,
+    "milestone": null
+  },
+  {
+    "id": 7,
+    "kind": "deviation",
+    "phase": "41",
+    "file": "plugin/conductor/scripts/tests/test-check-description-fidelity.sh",
+    "line": null,
+    "description": "36 KO — module Python PyYAML introuvable pour python3 (passe A) sur ce poste — rouge préexistant, reproduit à l'identique sur une extraction git archive d'origin/main (6a7b15b), hors périmètre du plan 41-01, environnement d'exécution jamais modifié sans validation humaine (ADR-031)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-23T12:29:54.478Z",
+    "resolved_at": null,
+    "milestone": null
   }
 ]
 ````
