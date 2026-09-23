@@ -17,9 +17,9 @@ indépendant sur ce point, pas un acquiescement.
 
 **Labs réels à auditer pour tout diagnostic terrain** (il travaille avec la méthode dessus,
 donc ils sont la vérité d'usage — surtout les deux ContentFlow et BusinessFlow) :
-- `/Users/makwilmak/BusinessFlow-Lab` — `.planning/` = config.json + INDEX.md + PROJECT.md + STATE.md
-- `/Users/makwilmak/ContentFlow-Lab` — `.planning/` complet façon GSD (ROADMAP, phases/, REQUIREMENTS, MILESTONES)
-- `/Users/makwilmak/ContentFlow-Scale` — `.planning/` = BOARD.md + PROJECT.md + STATE.md
+- `~/BusinessFlow-Lab` — `.planning/` = config.json + INDEX.md + PROJECT.md + STATE.md
+- `~/ContentFlow-Lab` — `.planning/` complet façon GSD (ROADMAP, phases/, REQUIREMENTS, MILESTONES)
+- `~/ContentFlow-Scale` — `.planning/` = BOARD.md + PROJECT.md + STATE.md
 Autres labs existants : GS ADVISORY, AVMA / AVMA - VF, ABC - Marketing, EFIREHA-COMMERCIAL,
 SAV - LAB, ProjetFlow / ProjetFlow2, VibeFlow-Hub-v2/v3, gs-advisory-lab.
 Attention : plusieurs chemins contiennent des espaces — tout script doit les gérer.
