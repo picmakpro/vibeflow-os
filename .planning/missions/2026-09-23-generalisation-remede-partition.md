@@ -193,3 +193,112 @@ libres sur tout le dépôt (43 préfixes déjà occupés dans le ledger).
 | E6-06 | v2.65.0 ne touche aucun script | `git show --stat 3617ec0` | 11 fichiers, 0 `.sh`, 0 `ci.yml` |
 
 *(les preuves des chantiers A et B s'ajoutent ci-dessous à mesure de leur exécution)*
+
+---
+
+## Cadrage et plans — ce que les deux chantiers ont produit
+
+| | Phase 41.1 (chantier A) | Phase 41.2 (chantier B) |
+|---|---|---|
+| Branche | `feat/phase-41-1-gates-workstream-aware` | `feat/phase-41-2-choix-partition` |
+| Worktree | `.claude/worktrees/partition-a` | `.claude/worktrees/partition-b` |
+| Cadrage | `41.1-CONTEXT.md` (D-01..D-06) | `41.2-CONTEXT.md` (D-01..D-14) |
+| Plans | **8**, 5 vagues | **3**, 3 vagues |
+| Statut | plans corrigés (`3664ed9`), 3ᵉ passage de juge en cours | parqués, `human_needed` levé sur D-09 |
+
+**Décision D-01 (41.1)** : la primitive d'énumération `vf_ws_enumerate` vivra dans
+`plugin/planning-core/scripts/workstream-policy.sh` — le module qui porte déjà la politique de nom
+« une seule écriture, jamais recopiée », et dont la fermeture de dépendances est réduite à lui-même.
+
+**Décision D-03 (41.1)** : mécanisme anti-oubli à **deux couches** — recensement versionné des
+consommateurs + lint rejoué en CI. L'un sans l'autre ne suffit pas.
+
+**Décision D-04 (41.1)**, contre ADR-074, gate par gate : `check-divergence.sh` et le fan-out
+`check-state-integrity`/R5 restent **bloquants** (objet gardé = état du planning) ;
+`check-planning-state.sh`, `detect-gsd-engine.sh`, `discover-unintegrated-docs.sh` restent des hooks
+**non bloquants** mais cessent d'être faux ; `detect-planning-debt.sh` et `planning-task-context.sh`
+sont **hors périmètre** (altitude lab), déclarés plutôt qu'omis.
+
+**Décision D-09 (41.2), tranchée par la session principale le 2026-09-23** : WSCH-02 se satisfait
+d'un **état légitime et non bloquant** (conforme OU non initialisé), pas d'un « conforme » forcé.
+Motif retenu : une fois « non initialisé » posé comme verdict propre, le compartiment neuf est **déjà
+vert**, donc la preuve d'usage est satisfaite sans rien pré-poser ; forcer « conforme » obligerait
+VibeFlow à maintenir un gabarit au format d'un autre outil, resynchronisé à chaque évolution de
+`gsd-core` — dette permanente contre gain ponctuel.
+
+---
+
+## Le contrôle qui a payé : trois passages de juge, pas un
+
+Le premier plan-checker (interne au cycle du worker) a trouvé 1 bloquant et 1 avertissement, que
+**l'auteur des plans a corrigés lui-même, sans qu'aucun juge ne re-vérifie**. Un **juge frais**
+dispatché en direct a alors trouvé **2 bloquants de plus** et 6 FLAG.
+
+**Le bloquant qui comptait** : le fan-out classait un compartiment « non initialisé » par
+`grep -q 'non initialis'` sur la sortie de `check-state-integrity.sh` — **sous-chaîne que ce script
+n'émet jamais**. Sur `gouvernance`, le gate tombe en `exit 2`, le `grep` ne matche pas, la branche
+d'échec s'arme, `exit 1`. **L'étape aurait rendu la CI rouge sur `gouvernance` au checkout réel** —
+l'inverse exact du critère 5 que la session principale venait de trancher.
+
+Le second bloquant était l'absence totale de preuve rougissante sur ce fan-out : sur le checkout
+réel, `fiabilite` est conforme et `gouvernance` non initialisé, donc **les deux branches sont
+vertes** et neutraliser l'appel à `note` ne faisait échouer aucune assertion.
+
+**Leçon consignée** : dans ce lab, un constat de juge exact suivi d'une **correction non vérifiée**
+est un mode de défaut récurrent. Le juge frais a aussi **confirmé bonnes** les deux corrections du
+premier passage, sur mesure propre (28 paires de plans comparées, `same_wave_overlaps = 0` ; surface
+de `check-gate-touche.sh` lue **dans son code** l.208-212, pas dans son en-tête).
+
+---
+
+## Mesures qui corrigent des faits sur lesquels la mission construisait
+
+Mesuré sur fixture jetable (`gsd-core` 1.14.0), traces exécutées :
+
+| Fait tenu pour vrai | Ce que la mesure dit |
+|---|---|
+| Le stub de `workstream create` rend **rc=2** | **Faux — rc=1** (« 0 ligne `^Phase:` », non-conformité structurelle). Le rc=2 du dépôt réel a une **autre cause** : `milestone` absent des DEUX côtés → garde fail-closed. Deux modes d'échec distincts confondus en un seul (erreur du manager). |
+| Le crochet `workstream.cjs:183` préserve un `STATE.md` pré-posé | **Faux — c'est un no-op.** Un garde **antérieur l.110** rend `already_exists` dès qu'un `STATE.md` existe. La pré-pose fonctionne (SHA identique, gate rc=0) mais par l.110. Vérifié par le cas complémentaire (dossier sans STATE.md → le moteur atteint l.183 et écrit son stub). |
+| `gsd-new-milestone --ws <nom>` est le pivot ergonomique | **Non invocable sans interaction** : workflow en prose de 719 lignes, **7 gates `AskUserQuestion`** + une question libre, aucun drapeau de bypass. Reste **proposable à l'utilisateur** — c'est ce que l'exigence demande. Le chemin **scriptable** mesuré est `gsd-tools query state.milestone-switch --milestone <v> --name <n> --ws <nom>` : rc=1 → **rc=0**. |
+| `check-divergence.sh` participe à distinguer les trois états | **Ne discrimine pas** : rc=0 sur le stub comme sur le compartiment complet. Toute la discrimination vient de `check-state-integrity.sh`. Piège d'usage : `--path` attend la **racine du lab** ; pointé sur un compartiment il rend rc=3 (SILENCE). |
+
+**Désaccord définition / juge, remonté et non tranché** : D-02 exige `current_phase` dans le
+frontmatter ; **aucun chemin mesuré ne l'écrit** (`state.milestone-switch` produit
+`gsd_state_version, milestone, milestone_name, status, last_updated, last_activity, progress`), et le
+gate rend **0** quand même — il ne vérifie pas ce champ. La définition en prose est plus stricte que
+le juge qui l'applique. Recommandation du manager : **aligner D-02 sur ce que le gate vérifie** — une
+définition qu'aucun juge ne fait respecter est une prose, pas un contrat.
+
+---
+
+## Incident inter-agent — un worker a refusé un relais de manager, et il a eu raison
+
+En relayant la définition D-02 au worker de la 41.2, le manager a écrit qu'une primitive
+`vf_ws_enumerate` « **vit dans** `plugin/planning-core/scripts/workstream-policy.sh` » — un présent
+qui affirme un fait qui n'en était pas un : c'est une **décision de plan non exécutée**.
+
+Le worker a **vérifié** : zéro occurrence dans tout le dépôt ; `ROADMAP.md` §41.1 disant
+`Plans: TBD` (les artefacts vivent sur une autre branche, invisible depuis son worktree) ; et la
+définition à quatre champs ne figurant pas mot pour mot dans le ROADMAP. **Il a refusé la correction,
+reverté sa propre mise à jour et documenté l'incident** — puis re-vérifié lui-même la source une fois
+celle-ci fournie (`git show origin/feat/phase-41-1-…:41.1-CONTEXT.md`, commit `12850f8`).
+
+C'est le défaut que la garde **G-4** a été écrite pour attraper le matin même, commis dans le message
+qui demandait d'en tenir compte.
+
+**Deux règles retenues** : un relais de manager **porte sa source vérifiable sur disque** ; et un
+worker qui ne peut pas authentifier un message **a raison de ne pas le traiter comme une
+autorisation**. Un relais n'est pas une autorité, un message n'est pas une preuve.
+
+---
+
+## Preuves E6 (suite)
+
+| # | Affirmation | Commande | Résultat |
+|---|---|---|---|
+| E6-07 | La CI accepte l'inscription | `gh pr checks 98` / rollup | **tous SUCCESS** sur `fe301d9` puis `1f4dd5d` |
+| E6-08 | Le stub d'un compartiment neuf n'est pas conforme | `check-state-integrity.sh --file <fixture>/…/STATE.md` | **rc=1** (« 0 ligne `^Phase:` ») |
+| E6-09 | Le chemin scriptable rend le compartiment conforme | `gsd-tools query state.milestone-switch --ws <nom>` puis le gate | **rc=1 → rc=0** (contrôle négatif : discrimine) |
+| E6-10 | Un `STATE.md` pré-posé est préservé | SHA avant/après `workstream create` | **identique**, gate rc=0 — via l.110, pas l.183 |
+| E6-11 | `gsd-new-milestone` n'est pas scriptable | `awk` sur les drapeaux de bypass du workflow | **7 `AskUserQuestion`**, aucun bypass |
+| E6-12 | La base de mission est bien `main` courant | `git merge-base --is-ancestor a962065 origin/main` | **OUI**, zéro commit d'écart |
