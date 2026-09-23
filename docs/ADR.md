@@ -28,7 +28,7 @@
 | ADR-056 | 2026-07-25 | Vigilance support runtime (scission du double emploi d'ADR-031) | Validée |
 | ADR-057 | 2026-07-25 | Frontières avec les briques tierces — détection outillée des recouvrements | Validée |
 | ADR-058 | 2026-07-28 | Le moteur GSD entre dans le périmètre de `/vf-update` | Validée |
-| ADR-059 | 2026-07-28 | Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut | Validée |
+| ADR-059 | 2026-07-28 | Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut | Validée — amendée le 2026-09-23 (Phase 41 : PR obligatoire sur main de ce dépôt, ADR-072) |
 | ADR-060 | 2026-07-29 | La revue devient un étage de premier rang, piloté par le manager | Validée |
 | ADR-061 | 2026-07-31 | Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints | Validée |
 | ADR-062 | 2026-07-31 | Les deux hooks 1.9.0 non câblés restent hors périmètre de `merge-hooks.sh` | Validée |
@@ -39,7 +39,7 @@
 | ADR-068 | 2026-08-04 | Profils de contexte du moteur refusés (rien à activer, notre contrat typé est per-rôle et plus strict) — et `workflow.inline_plan_threshold` inchangé à 2, la mesure étant le livrable | Validée |
 | ADR-069 | 2026-08-04 | Les workstreams GSD sont adoptés, avec leurs quatre limites datées, la condition dure « aucune partition tant qu'une phase est en vol », la révision de l'Iron Law 2 et l'amendement d'ADR-064 | Validée — amendée le 2026-09-09 (risque (b) migré au niveau commit, D-10 rouverte en équipe, couverture re-mesurée) |
 | ADR-070 | 2026-08-06 | Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin | Validée |
-| ADR-072 | 2026-09-17 | Gardes in-repo sans règle côté serveur — ce qui est gardé, ce qui ne l'est pas, ce qui attend un accès admin | Validée |
+| ADR-072 | 2026-09-17 | Gardes in-repo sans règle côté serveur — ce qui est gardé, ce qui ne l'est pas, ce qui attend un accès admin | Validée — amendée le 2026-09-23 (volet admin : rulesets de main et des tags v*, contournement nommé Samuel et Willy) |
 | ADR-073 | 2026-09-23 | Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag | Validée (non gatée machine) |
 | ADR-074 | 2026-09-23 | Portée des gates : bloquant pour l'intégrité technique, consultatif pour le jugement métier | Validée |
 
@@ -1059,6 +1059,19 @@ le même arbre de travail. Une branche par mission ne les sépare pas entre elle
 Applique ADR-031 (jamais d'action irréversible sans validation humaine) au **merge** : le manager
 peut tout produire, il ne peut rien intégrer. Complète la discipline de release du `CLAUDE.md`
 racine, qui gouvernait l'aval (tag, release) sans rien dire de l'amont. Aucune rule nouvelle.
+
+> **ADR-059 : amendement du 2026-09-23 (Phase 41, volet admin)** — sur ce dépôt, l'option
+> « Branche pour tout travail de phase », écartée le 2026-07-28 (§ Options Considérées ci-dessus),
+> **deviendra** la règle par défaut une fois le ruleset posé côté GitHub (ADR-072) — **pas encore
+> posé** : `gh api repos/picmakpro/vibeflow-os/rulesets` rend `[]` (mesuré le 2026-09-23). Une fois
+> posé : toute mise à jour de `main` passera par une PR, 0 approbation (D-03, arbitrage Samuel,
+> AskUserQuestion session principale, 2026-09-17) ; le serveur refusera le push direct de tout
+> acteur hors liste de contournement (ruleset de branche, ADR-072) ; Samuel et Willy pourront
+> passer outre, et leur passage sera tracé (D-02bis, arbitrage Willy, AskUserQuestion session
+> principale, 2026-09-23) ; les commits directs de documentation ou d'ouverture de phase cesseront
+> d'être acceptés sans PR. La décision d'origine et son tableau d'options restent lisibles tels
+> quels ci-dessus ; la doctrine distribuée aux labs (hors de ce dépôt) n'est pas modifiée par cet
+> amendement.
 
 ## ADR-060 : La revue devient un étage de premier rang, piloté par le manager
 
@@ -2439,10 +2452,13 @@ Le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt — c'est lui
 l'admin, pas un tiers anonyme. Les permissions mesurées le 2026-09-17 sont celles du compte de
 Samuel (`samuel-neveugall`) : `admin: false, maintain: false, push: true`. Dans la session qui a
 mesuré ce fait, personne ne pouvait poser de ruleset, de PR obligatoire, de check requis ni de
-revue code owner — Willy a depuis accepté de poser ce volet lui-même (WhatsApp, 2026-09-23), une
-fois le jalon `fiabilite-v1.0` clos (cf. Phase 42 du ROADMAP). La Phase 41 a donc été recadrée sur
-ce qui est faisable avec le seul droit `push` (option (a),
-arbitrage Samuel, AskUserQuestion session principale, 2026-09-17). Origine du besoin : O-3 du
+revue code owner — Willy a depuis accepté de poser ce volet lui-même (WhatsApp, 2026-09-23),
+**avant** la clôture du jalon `fiabilite-v1.0` puisque PROT-01 en fait partie (correction du
+2026-09-23 : une formulation antérieure, ailleurs dans le planning, inversait cette séquence — cf.
+`BACKLOG.md` § « Protection de `main` côté GitHub »). Séquence réelle : Willy pose les rulesets →
+preuve → clôture du jalon → ouverture du jalon de Willy (cf. Phase 42 du ROADMAP). La Phase 41 a
+donc été recadrée sur ce qui est faisable avec le seul droit `push` (option (a), arbitrage Samuel,
+AskUserQuestion session principale, 2026-09-17). Origine du besoin : O-3 du
 `25-SECURITY.md` — une hausse de baseline n'était gardée que par la relecture, et une même PR peut
 modifier un gate, sa suite et l'étape CI qui l'invoque. Fait mesuré à citer : `892f89a`
 (2026-09-16) est arrivé sur `main` sans PR, avec un run CI rouge, sans que rien ne l'arrête.
@@ -2554,6 +2570,128 @@ Le flux du `CLAUDE.md` est inchangé : bump → PR → merge → tag annoté →
 l'étape `check-release-tag` et ne changent ni sa condition ni son contenu. Le push d'un tag ne
 déclenche pas la CI (`on.push.branches`, aucune entrée `tags:`), donc G-3 ne peut pas rougir sur
 une release. Le hook `pre-push` reste tel quel : son durcissement (G-5) a été écarté du périmètre.
+
+### Amendement du 2026-09-23 — posture côté serveur (volet admin)
+
+> **ADR-072 : amendement du 2026-09-23 (Phase 41, volet admin)** — la Phase 41 reprend son volet
+> admin : accès admin constaté (`picmakpro` = Willy), rulesets sourcés en vue de leur pose,
+> contournement accordé nommément à Samuel et Willy (D-02bis). Les sections précédentes décrivent
+> l'état du 2026-09-17/18 et restent l'historique ; cette sous-section les complète sans les
+> réécrire. Note de cohérence avec ADR-073 (même registre de gouvernance déclarative, ADR-073
+> insérée le même jour) : aucune des deux ADR ne contredit l'autre — ADR-073 dit QUAND publier une
+> release, cette sous-section dit QUI et COMMENT contourne une règle serveur.
+
+**Contexte de la reprise**
+
+`picmakpro` est le compte de Willy, admin du dépôt (mesuré le 2026-09-23 — `gh api user` et
+`gh api repos/picmakpro/vibeflow-os --jq .permissions` → `admin: true, maintain: true, push: true` ;
+`41-CONTEXT.md` § REPRISE). Les sections précédentes de cette ADR décrivent l'état du 2026-09-17/18
+et restent l'historique — elles ne sont ni réécrites ni supprimées. L'affirmation antérieure
+(« L'amendement d'ADR-059 sur la PR obligatoire est hors périmètre de cette phase ») est dépassée
+par la reprise : ADR-059 est amendée par la même PR (amendement daté dans ADR-059 elle-même). Les
+gardes in-repo G-1, G-2, G-3 restent en place, inchangées par cet amendement.
+
+**Décision**
+
+Rulesets plutôt que la protection de branche classique (D-M1) : seuls les rulesets offrent une
+liste de bypass sur un dépôt personnel, sont lisibles par tout lecteur (`rules/branches/main`) et
+exportables en JSON. Sources versionnées : `.github/rulesets/main.json` et
+`.github/rulesets/tags-v.json`, posées octet pour octet depuis `origin/main` par l'exécutant sous
+le jeton admin de Willy, après une confirmation explicite (checkpoint de décision du plan 41-05 —
+D-M6 amendée : la pose n'est plus un geste manuel improvisé, elle reste gardée par une décision
+humaine). CODEOWNERS `.github/CODEOWNERS` (D-05, périmètre étroit `@picmakpro`). Règles de `main` :
+PR obligatoire à 0 approbation (D-03, arbitrage Samuel, AskUserQuestion session principale,
+2026-09-17), les 4 jobs requis épinglés sur l'intégration 15368 et branche à jour avant merge
+(D-04, arbitrage Samuel, AskUserQuestion session principale, 2026-09-17), revue code owner (D-05,
+arbitrage Samuel, AskUserQuestion session principale, 2026-09-17), suppression de `main` et force
+push interdits hors liste de contournement (arbitrage Samuel, AskUserQuestion session principale,
+2026-09-17), méthodes de merge non restreintes — merge, squash, rebase (D-10, arbitrage Samuel,
+AskUserQuestion session principale, 2026-09-17) ; ni historique linéaire ni commits signés exigés
+(D-M2, D-M3). Tags `v*` : ruleset dédié, création libre (D-07, arbitrage Samuel, AskUserQuestion
+session principale, 2026-09-17).
+
+**Contournement (D-02bis — arbitrage Willy, AskUserQuestion session principale, 2026-09-23)**
+
+garde-fou par défaut et trace, pas verrou (D-02) : deux entrées `User` en mode `always` —
+`samuel-neveugall` (151974738) et `picmakpro` (203482067) — aucune entrée par rôle, jamais `exempt`
+(`exempt` ne laisse aucune entrée d'audit).
+
+| Règle | Qui peut contourner | Geste | Trace |
+|---|---|---|---|
+| PR obligatoire et push direct sur `main` | tout autre acteur — clé de déploiement, application, futur collaborateur — REFUSÉ ; Samuel et Willy : push ACCEPTÉ par le serveur | push direct | avertissement « Bypassed rule violations », entrée de rule suite `bypass`, alarme G-3 après coup |
+| Checks requis et revue code owner | Samuel et Willy | geste explicite : case de contournement de l'interface, ou `gh pr merge --admin` ; appel REST direct : comportement mesuré, M-3 | rule suite `bypass` lisible par `GET /repos/{owner}/{repo}/rulesets/rule-suites` |
+| Suppression et force push de `main` | refusés hors liste ; pour Samuel et Willy : acceptés et tracés | suppression ou push --force | rule suite `bypass`, alarme G-3 |
+| Tags `v*` | création libre pour tous (D-07) ; réécriture, suppression, force push refusés hors liste, acceptés et tracés pour Samuel et Willy | selon le geste | rule suite `bypass` |
+| Désactivation d'un ruleset | admin seul | `enforcement=disabled` | historique du ruleset `GET …/rulesets/{id}/history`, non exercé |
+
+Mode `exempt` : jamais utilisé, sur aucune règle.
+
+**Conséquence de D-02bis, écrite sans adoucir**
+
+Pour Samuel et Willy, D-03 devient « par défaut + tracé », pas un verrou : la PR reste la règle,
+mais le push direct reste possible pour ces deux comptes et laisse une trace. D-M12 (mode
+`pull_request`), qui empêchait ce push direct pour les comptes `write`, est REMPLACÉE par D-02bis.
+La borne de D-M5 (un SHA poussé directement sur `main` y porte un run `gates` rouge jusqu'au tag)
+redevient atteignable par ces deux comptes.
+
+**`check-release-tag`**
+
+N'est PAS un check requis — c'est une étape du job `gates`, `main`-only, sautée sur une PR. Elle
+rougit le push de merge sur `main` tant que le tag n'est pas posé (signal « tag à poser »), relance
+possible, non systématique (D-M5 ; demande de Samuel, WhatsApp, 2026-09-23).
+
+**Politique hotfix**
+
+Branche et PR comme tout travail (D-03) ; si la CI ne peut pas verdir à temps, Samuel ou Willy
+merge en contournant explicitement — la PR et la rule suite en gardent la trace ; le push direct
+leur reste techniquement ouvert, tracé et signalé par G-3, à éviter. Tag annoté et release GitHub
+après le merge, inchangés (cf. ADR-073 pour le QUAND de la release elle-même). Hook `pre-push`
+conservé (D-M9).
+
+**PR en vol**
+
+La pose change les conditions de merge de toute PR ouverte vers `main` (au 2026-09-23 : #87 ; #88
+vise une autre branche) — inventoriées avant et après la pose (plan 41-05), jamais mergées par
+cette phase. Une PR ouverte par `picmakpro` qui touche un chemin CODEOWNERS ne peut pas recevoir
+l'approbation de son propre auteur et passe par un contournement tracé.
+
+**Retour arrière** (écrit avant la pose)
+
+L'admin repasse chaque ruleset en `disabled` :
+`gh api -X PUT repos/picmakpro/vibeflow-os/rulesets/<id> -f enforcement=disabled` ; témoin
+`gh api repos/picmakpro/vibeflow-os/rules/branches/main` rend `[]` pour le ruleset de branche.
+
+**Conséquences pour O-3**
+
+Une fois la pose prouvée, O-3 passe de « signalée et tracée » à « gardée par défaut + tracée » (une
+hausse de baseline exige l'approbation de `@picmakpro` ou un contournement explicite tracé) —
+statut daté écrit au plan 41-10 ; critère 2 reformulé (D-09).
+
+**Renforcement possible non retenu**
+
+`dismiss_stale_reviews_on_push` reste au défaut `false` ; l'activer est une décision à prendre,
+aucun arbitrage ne la couvre.
+
+**Inconnus mesurés à la pose**
+
+M-1 (les quatre jobs tournent deux fois sur le même SHA, `push` et `pull_request` : lequel compte
+pour le check requis) ; M-2 (les deux entrées `User` relues côté serveur après la pose,
+`current_user_can_bypass` de `picmakpro` ; celui de `samuel-neveugall` n'est pas mesurable depuis
+le poste de Willy) ; M-3 (ce que contournent exactement `gh pr merge --admin` et un merge REST
+direct pour un compte `always`, et leur trace) ; M-4 (tags : refus pour un acteur hors liste — clé
+de déploiement temporaire — et trace `bypass` pour un compte de la liste) — résultats consignés
+dans `41-PREUVES.md` et reportés dans cette ADR au plan 41-10.
+
+**Ne couvre pas**
+
+Les idées différées du CONTEXT (contrôle de dérive en CI, garde de baseline indépendante de
+GitHub, signatures, passage en organisation).
+
+**QUAL-01**
+
+Le volet admin ne crée aucun script de gate (D-M11) : CODEOWNERS et rulesets sont de la
+configuration, pas des gates ; les trois gates de la phase (G-1, G-2, G-3) restent celles du
+périmètre sans admin.
 
 ## ADR-073 : Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag
 

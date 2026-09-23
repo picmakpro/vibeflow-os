@@ -84,3 +84,12 @@ Note sur ROADMAP-NON-TOUCHE / STATE-NON-TOUCHE : aucun plan de cette phase ne mo
 `.planning/ROADMAP.md` ni `.planning/STATE.md` ; leur mise à jour (réécriture des critères de
 succès sur le périmètre arbitré) est prise en charge par le manager (décision du 2026-09-17),
 nommée ici comme reliquat tracé, jamais comme un oubli.
+
+## 41-01 — reprise du volet admin (2026-09-23)
+
+IDENTITE-REPRISE: login=picmakpro id=203482067 admin=true source=gh_api_user
+ACTEURS-CONTOURNEMENT: samuel-neveugall=151974738 picmakpro=203482067 collaborateurs=2 source=collaborators
+PR29-FERMEE: state=CLOSED closedAt=2026-09-23T10:48:32Z
+RULESETS-AVANT: n=0
+PR-EN-VOL-REPRISE: numeros=#87,#88 detail=#87:main:de46daa3,#88:main:ed95ac5a
+CONTEXTES-CHECKS-REPRISE: sha=6a7b15b3c74a1f45f4f1ad380a35d97d62cf1514 n=4 app=15368 ci_inclus_dans_api=oui egal_2026-09-17=oui check_release_tag_contexte=non
