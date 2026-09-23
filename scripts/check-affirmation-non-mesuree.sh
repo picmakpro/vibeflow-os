@@ -20,16 +20,21 @@
 # elle-meme (mandat point 4). Elle ne juge que la FORME de l'affirmation et la FRAICHEUR/le
 # CONTENU de la mesure — jamais si la mesure elle-meme a ete honnetement prise.
 #
-# PORTEE (ADR-074) : BLOQUANTE — decision de la session principale (vibeflow-head), 2026-09-23,
-# EN ATTENTE DE CONFIRMATION DE SAMUEL ; voir la PR qui a pose cette garde pour les deux lectures
-# et la bascule consultative reversible en une ligne.
+# PORTEE (ADR-074) : CONSULTATIVE — arbitrage Samuel, session principale, 2026-09-23. La garde
+# imprime ses verdicts et ses codes de sortie tels quels, mais ne fait jamais echouer le job CI.
+# La session principale (vibeflow-head) avait propose BLOQUANTE au motif que le critere d'ADR-074
+# est la decidabilite par machine ; Samuel a tranche l'autre lecture — la cible jugee est de la
+# prose, et ADR-074 reserve le bloquant a l'integrite technique. Bascule inverse : mettre le
+# drapeau ci-dessous a "0" (une ligne, jamais une refonte).
 # Le critere d'ADR-074 n'est PAS « fait technique contre prose » — c'est la DECIDABILITE PAR
-# MACHINE : un gate bloque quand le defaut se tranche sans jugement de valeur. Ici, soit la mesure
-# versionnee existe, est fraiche et confirme l'affirmation, soit non — aucune opinion n'intervient,
-# le support (un fichier de prose) n'est pas le critere. Les couts sont asymetriques : un faux
-# negatif laisse quelqu'un agir sur une protection qu'il croit posee (defaut reel de la PR #90,
-# sur ce meme fichier) ; un faux positif coute de qualifier une phrase. Le blocage va du cote cher.
-# PREUVE PAR MUTATION exigee par ADR-074 pour rester bloquante : quatre mutants tues
+# MACHINE — c'est la lecture que la session principale avait retenue pour proposer BLOQUANTE :
+# soit la mesure versionnee existe, est fraiche et confirme l'affirmation, soit non, aucune opinion
+# n'intervient. Samuel a tranche l'autre lecture : le support jugé EST un fichier de prose, et
+# ADR-074 reserve le bloquant a l'integrite technique. Consequence pratique : le defaut reel de la
+# PR #90 (affirmer une protection non posee) serait aujourd'hui SIGNALE, pas refuse — c'est un
+# choix assume, pas un oubli, et le cout d'un faux negatif reste porte par le relecteur.
+# PREUVE PAR MUTATION, toujours exigee bien que la garde soit consultative — sans elle, plus rien
+# ne prouve que la detection fonctionne encore : quatre mutants tues
 # (`scripts/tests/test-check-affirmation-non-mesuree.sh`, MUT-1 a MUT-4) et un couple reel a SHA
 # figes — rouge `6243c46` (CLAUDE.md, present sans mesure), vert `f5db5145f239c5c38bbe7abcd74a15981bead3c3`
 # (meme fichier, meme puce, section qualifiee). N'invoque PAS la coherence avec G-1/G-2/G-3
@@ -37,13 +42,15 @@
 # ADR-074 (posee le meme jour que G-4) — un precedent non valide ne prouve rien, s'en servir
 # reviendrait a propager une decision que personne n'a prise. Cette portee ne rejuge PAS G-1/G-2/G-3.
 #
-# CONDITION DU BLOCAGE, PAS UN DETAIL D'IMPLEMENTATION — si l'un des trois casse, cette garde
-# DOIT redescendre consultative (signaler sans faire echouer le job CI) : (1) la liste FERMEE de
-# formes interdites (jamais une regex ouverte sur de la prose) ; (2) la liste DECLAREE de fichiers
-# porteurs (jamais un balayage du depot entier) ; (3) la degradation honnete (mesure absente,
-# illisible ou perimee -> NON VERIFIABLE, jamais vert). Bascule bloquant -> consultatif : UN SEUL
-# DRAPEAU, ci-dessous — jamais une refonte du script.
-VF_AFFIRMATION_GATE_CONSULTATIF="${VF_AFFIRMATION_GATE_CONSULTATIF:-0}"  # "1" = consultatif (n'echoue jamais le job, meme verdicts/exit codes affiches)
+# CONDITIONS DE VALIDITE, PAS DES DETAILS D'IMPLEMENTATION — elles valaient comme conditions du
+# blocage ; la garde etant desormais consultative, elles restent les conditions pour que ses
+# verdicts meritent d'etre lus : (1) la liste FERMEE de formes interdites (jamais une regex ouverte
+# sur de la prose) ; (2) la liste DECLAREE de fichiers porteurs (jamais un balayage du depot
+# entier) ; (3) la degradation honnete (mesure absente, illisible ou perimee -> NON VERIFIABLE,
+# jamais vert). Un gate consultatif qui rougit a tort n'est pas inoffensif : il apprend au lecteur
+# a ignorer ses avertissements, et c'est ainsi qu'un gate meurt sans que personne ne le retire.
+# Bascule consultatif -> bloquant : UN SEUL DRAPEAU, ci-dessous — jamais une refonte du script.
+VF_AFFIRMATION_GATE_CONSULTATIF="${VF_AFFIRMATION_GATE_CONSULTATIF:-1}"  # "1" = consultatif (n'echoue jamais le job, meme verdicts/exit codes affiches) — DEFAUT depuis l'arbitrage du 2026-09-23 ; mettre "0" pour rendre la garde bloquante
 #
 # FORMES INTERDITES (liste fermee, JAMAIS une regex ouverte sur de la prose) — chacune est
 # l'affirmation, au present, d'une protection cote serveur MESURABLE par

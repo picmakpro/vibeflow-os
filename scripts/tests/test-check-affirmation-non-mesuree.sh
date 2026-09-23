@@ -20,6 +20,14 @@ set -uo pipefail
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-affirmation-non-mesuree.sh"
 TARGET="$SCRIPT"
 
+# PORTEE PAR DEFAUT = CONSULTATIVE (arbitrage Samuel, session principale, 2026-09-23) : le script
+# rend 0 quoi qu'il trouve. La SEMANTIQUE DE DETECTION (rc 1/2/3) reste celle-ci et doit rester
+# prouvable — sinon la preuve par mutation exigee par ADR-074 meurt avec la bascule : tous les
+# mutants sortiraient 0 comme l'original et AUCUN ne serait tue. Les cas ci-dessous forcent donc
+# explicitement le mode bloquant pour mesurer la detection. Deux assertions dediees verifient a
+# part que le DEFAUT, lui, est bien consultatif.
+export VF_AFFIRMATION_GATE_CONSULTATIF=0
+
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
 ko() {
@@ -159,6 +167,23 @@ if [ "$rc" -eq 0 ] && [ "$has_verdict" -eq 1 ] && [ "$has_marker" -eq 1 ]; then
 else
   ko "bascule consultative" "rc=0, verdict + marqueur CONSULTATIF" "rc=$rc, verdict=$has_verdict, marqueur=$has_marker :: $out"
 fi
+
+# DEFAUT DE LA GARDE, sans aucune variable d'environnement : consultatif (arbitrage Samuel,
+# session principale, 2026-09-23). Mesure le script tel qu'un appelant nu l'invoquerait — c'est
+# ce que fait la CI. `env -u` retire la variable exportee en tete de cette suite.
+rc=0; out="$(env -u VF_AFFIRMATION_GATE_CONSULTATIF bash "$TARGET" --root "$DCONS" --ref HEAD 2>&1)" || rc=$?
+has_verdict=0; case "$out" in *MESURE-ABSENTE-OU-PERIMEE*) has_verdict=1 ;; esac
+has_marker=0; case "$out" in *CONSULTATIF:*) has_marker=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_verdict" -eq 1 ] && [ "$has_marker" -eq 1 ]; then
+  ok "defaut sans variable : consultatif (rc=0, verdict imprime, marqueur present)"
+else
+  ko "defaut sans variable = consultatif" "rc=0, verdict + marqueur CONSULTATIF" "rc=$rc, verdict=$has_verdict, marqueur=$has_marker :: $out"
+fi
+
+# ... et le mode bloquant reste atteignable explicitement, sinon la bascule serait a sens unique.
+rc=0; out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$TARGET" --root "$DCONS" --ref HEAD 2>&1)" || rc=$?
+if [ "$rc" -eq 2 ]; then ok "bascule inverse : VF_AFFIRMATION_GATE_CONSULTATIF=0 rend le gate bloquant (rc=2)"
+else ko "bascule inverse vers bloquant" "rc=2" "rc=$rc :: $out"; fi
 
 echo "== test-check-affirmation-non-mesuree : QUATRE CAS NOMINAUX DU MANDAT =="
 

@@ -1207,7 +1207,7 @@ jobs:
           # 1/5 affirmation au présent, sans mesure -> attendu 2, MESURE-ABSENTE-OU-PERIMEE
           write_repo 'Toute mise à jour de `main` passe par une PR (0 approbation).'
           rc=0
-          out="$(bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
           echo "== 1/5 affirmation sans mesure : rc=$rc =="; printf '%s\n' "$out"
           has=0; case "$out" in *MESURE-ABSENTE-OU-PERIMEE*) has=1 ;; esac
           if [ "$rc" -ne 2 ] || [ "$has" -ne 1 ]; then note "1/5 affirmation sans mesure : rc=$rc (attendu 2), MESURE-ABSENTE-OU-PERIMEE=$has (attendu 1)"; fi
@@ -1215,7 +1215,7 @@ jobs:
           # 2/5 même affirmation, mesure fraîche et CONTREDIT (rulesets vides) -> attendu 1, bloquant
           write_repo 'Toute mise à jour de `main` passe par une PR (0 approbation).' "$FRAICHE_CONTREDIT"
           rc=0
-          out="$(bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
           echo "== 2/5 affirmation contredite par mesure fraîche : rc=$rc =="; printf '%s\n' "$out"
           has=0; case "$out" in *AFFIRMATION-CONTREDITE-PAR-MESURE*) has=1 ;; esac
           if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "2/5 affirmation contredite : rc=$rc (attendu 1), AFFIRMATION-CONTREDITE-PAR-MESURE=$has (attendu 1)"; fi
@@ -1223,7 +1223,7 @@ jobs:
           # 3/5 même phrase QUALIFIÉE ("à la pose") -> attendu 0, licite quelle que soit la mesure
           write_repo 'À la pose, toute mise à jour de `main` passe par une PR (0 approbation).'
           rc=0
-          out="$(bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
           echo "== 3/5 affirmation qualifiée : rc=$rc =="; printf '%s\n' "$out"
           has=0; case "$out" in *AVERTISSEMENT-AFFIRMATION-QUALIFIEE*) has=1 ;; esac
           if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "3/5 affirmation qualifiée : rc=$rc (attendu 0), AVERTISSEMENT-AFFIRMATION-QUALIFIEE=$has (attendu 1)"; fi
@@ -1231,7 +1231,7 @@ jobs:
           # 4/5 affirmation adossée à une mesure fraîche qui la CONFIRME -> attendu 0, licite
           write_repo 'Toute mise à jour de `main` passe par une PR (0 approbation).' "$FRAICHE_CONFIRME"
           rc=0
-          out="$(bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
           echo "== 4/5 affirmation confirmée par mesure fraîche : rc=$rc =="; printf '%s\n' "$out"
           has=0; case "$out" in *AVERTISSEMENT-AFFIRMATION-CONFIRMEE-PAR-MESURE*) has=1 ;; esac
           if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "4/5 affirmation confirmée : rc=$rc (attendu 0), AVERTISSEMENT-AFFIRMATION-CONFIRMEE-PAR-MESURE=$has (attendu 1)"; fi
@@ -1239,7 +1239,7 @@ jobs:
           # 5/5 mesure PÉRIMÉE (horodatage figé dans le passé) avec affirmation présente -> attendu 2
           write_repo 'Toute mise à jour de `main` passe par une PR (0 approbation).' "$PERIMEE_CONFIRME"
           rc=0
-          out="$(bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
           echo "== 5/5 mesure périmée : rc=$rc =="; printf '%s\n' "$out"
           hasgen=0; case "$out" in *mesure_statut=perimee*) hasgen=1 ;; esac
           if [ "$rc" -ne 2 ] || [ "$hasgen" -ne 1 ]; then note "5/5 mesure périmée : rc=$rc (attendu 2), mesure_statut=perimee=$hasgen (attendu 1)"; fi
@@ -1251,17 +1251,28 @@ jobs:
           echo "== check-affirmation-non-mesuree DISCRIMINANT en CI : les cinq bascules isolées sont prouvées =="
 
           # --- Mesure du dépôt réel (les fichiers porteurs à HEAD, la mesure versionnée si présente) -
+          # PORTÉE CONSULTATIVE (arbitrage Samuel, session principale, 2026-09-23) : la garde rend 0
+          # quoi qu'elle trouve, donc cette étape ne fait JAMAIS échouer le job sur le dépôt réel.
+          # Elle remonte un ::warning:: — un gate consultatif qui n'imprimerait qu'au fond du log
+          # serait invisible, ce qui est pire qu'absent : « consultatif » veut dire signalé et tracé,
+          # pas silencieux. Les cinq bascules ci-dessus forcent VF_AFFIRMATION_GATE_CONSULTATIF=0
+          # parce qu'elles mesurent la SÉMANTIQUE DE DÉTECTION (rc 1/2/3) : au défaut consultatif
+          # elles rendraient toutes 0 et ne prouveraient plus rien — la preuve par mutation exigée
+          # par ADR-074 mourrait avec la bascule.
           rc=0
           out="$(bash "$S" 2>&1)" || rc=$?
           echo "== dépôt réel : rc=$rc =="; printf '%s\n' "$out"
-          case "$rc" in
-            0|3) : ;;
-            *)
-              verdict="$(printf '%s\n' "$out" | tail -1)"
-              echo "::error::check-affirmation-non-mesuree : dépôt réel rc=$rc — verdict : $verdict"
-              exit 1
-              ;;
+          signale=0
+          case "$out" in
+            *AFFIRMATION-CONTREDITE-PAR-MESURE*|*MESURE-ABSENTE-OU-PERIMEE*) signale=1 ;;
           esac
+          if [ "$signale" -eq 1 ]; then
+            verdict="$(printf '%s\n' "$out" | grep -E 'AFFIRMATION-CONTREDITE-PAR-MESURE|MESURE-ABSENTE-OU-PERIMEE' | head -1)"
+            echo "::warning::check-affirmation-non-mesuree (G-4, consultatif) : $verdict"
+          fi
+          if [ "$rc" -eq 3 ]; then
+            echo "::warning::check-affirmation-non-mesuree : NÉANT — aucun fichier porteur résolu (misconfiguration, jamais un vert à vide)"
+          fi
 
       - name: check-push-sans-pr (G-3 — preuve par fixture, sans condition)
         # POURQUOI DEUX ÉTAPES. Une étape GitHub Actions ne porte qu'une seule condition. La
