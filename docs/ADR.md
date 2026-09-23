@@ -28,7 +28,7 @@
 | ADR-056 | 2026-07-25 | Vigilance support runtime (scission du double emploi d'ADR-031) | Validée |
 | ADR-057 | 2026-07-25 | Frontières avec les briques tierces — détection outillée des recouvrements | Validée |
 | ADR-058 | 2026-07-28 | Le moteur GSD entre dans le périmètre de `/vf-update` | Validée |
-| ADR-059 | 2026-07-28 | Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut | Validée |
+| ADR-059 | 2026-07-28 | Une mission d'équipe travaille sur sa propre branche, jamais sur la branche par défaut | Validée — amendée le 2026-09-23 (Phase 41 : PR obligatoire sur main de ce dépôt, ADR-072) |
 | ADR-060 | 2026-07-29 | La revue devient un étage de premier rang, piloté par le manager | Validée |
 | ADR-061 | 2026-07-31 | Les lanes de revue cross-AI de plans (amont) et l'étage de revue de code (ADR-060) sont des objets disjoints | Validée |
 | ADR-062 | 2026-07-31 | Les deux hooks 1.9.0 non câblés restent hors périmètre de `merge-hooks.sh` | Validée |
@@ -1058,6 +1058,17 @@ le même arbre de travail. Une branche par mission ne les sépare pas entre elle
 Applique ADR-031 (jamais d'action irréversible sans validation humaine) au **merge** : le manager
 peut tout produire, il ne peut rien intégrer. Complète la discipline de release du `CLAUDE.md`
 racine, qui gouvernait l'aval (tag, release) sans rien dire de l'amont. Aucune rule nouvelle.
+
+> **ADR-059 : amendement du 2026-09-23 (Phase 41, volet admin)** — sur ce dépôt, l'option
+> « Branche pour tout travail de phase », écartée le 2026-07-28 (§ Options Considérées ci-dessus),
+> devient la règle par défaut : toute mise à jour de `main` passe désormais par une PR, 0
+> approbation (D-03, arbitrage Samuel, AskUserQuestion session principale, 2026-09-17) ; le
+> serveur refuse le push direct de tout acteur hors liste de contournement (ruleset de branche,
+> ADR-072) ; Samuel et Willy peuvent passer outre, et leur passage est tracé (D-02bis, arbitrage
+> Willy, AskUserQuestion session principale, 2026-09-23) ; les commits directs de documentation ou
+> d'ouverture de phase cessent. La décision d'origine et son tableau d'options restent lisibles
+> tels quels ci-dessus ; la doctrine distribuée aux labs (hors de ce dépôt) n'est pas modifiée par
+> cet amendement.
 
 ## ADR-060 : La revue devient un étage de premier rang, piloté par le manager
 

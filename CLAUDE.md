@@ -69,10 +69,29 @@ correctif / durcissement → **patch**. Le tag reprend **exactement** la valeur 
   paie. Adoptée le 2026-09-10, née du commit `8fc4b45` (Phase 39), dont personne ne pouvait vérifier
   l'attribution — un manager a dû remonter la chaîne pour l'établir.
 
+## Protection côté serveur — main et tags v*
+
+Source versionnée `.github/rulesets/` et `.github/CODEOWNERS`, posée par l'admin après le merge de
+sa source, état réel lisible par `gh api repos/picmakpro/vibeflow-os/rules/branches/main` (ADR-072
+§ Amendement du 2026-09-23).
+
+- Toute mise à jour de `main` passe par une PR (0 approbation), 4 jobs CI verts épinglés sur GitHub
+  Actions, branche à jour, revue `@picmakpro` sur `.github/`, la baseline du budget d'instructions
+  et les sentinelles `.planning/.*-armed`, et `scripts/hooks/` (D-03, D-04, D-05).
+- `check-release-tag` n'est pas un check requis — étape du job `gates`, rouge au push de merge tant
+  que le tag n'est pas posé (demande de Samuel, WhatsApp, 2026-09-23 ; D-M5), hook `pre-push`
+  conservé (D-M9).
+- Garde-fou par défaut + trace, pas verrou : seuls Samuel et Willy peuvent contourner (D-02bis),
+  par un geste explicite sur une PR (case de contournement, `gh pr merge --admin`) — un push direct
+  de leur part est accepté par le serveur, inscrit dans les rule suites et signalé par G-3.
+- Tags `v*` : création libre, réécriture et suppression refusées hors liste, contournables et
+  tracées pour Samuel et Willy (D-07).
+
 ## Gardes in-repo — ce qui est gardé, ce qui ne l'est pas
 
-`main` n'est protégée par aucune règle côté serveur — aucun accès admin sur ce dépôt (ADR-072) —
-donc les gardes ci-dessous rendent visible et tracent, elles ne verrouillent rien.
+Les gardes ci-dessous vivent dans le dépôt : elles rendent visible et tracent, elles ne
+verrouillent rien. Elles restent en place à côté de la protection côté serveur décrite à la
+section précédente (ADR-072).
 
 - `scripts/check-baseline-arbitrage.sh` (G-1) : rougit sur une hausse de la colonne des
   instructions de la baseline du budget d'instructions, ou sur une sentinelle d'armement
