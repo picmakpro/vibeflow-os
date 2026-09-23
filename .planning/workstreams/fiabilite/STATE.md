@@ -1,8 +1,7 @@
 ---
-gsd_state_version: 1.0
+gsd_state_version: "1.0"
 milestone: fiabilite-v1.0
-milestone_name: « ce qui survit »
-current_phase: 41
+milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
 current_phase_name: Posture de protection du dépôt
 status: executing
 stopped_at: >-
@@ -37,20 +36,20 @@ stopped_at: >-
   ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
   armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
   existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
-last_updated: "2026-09-23T18:00:00.000Z"
+last_updated: "2026-09-23T18:10:59.000Z"
 last_activity: 2026-09-23
 last_activity_desc: >-
-  Déclencheur de reprise D-02 exécuté (arbitrage Samuel, AskUserQuestion session principale,
-  2026-09-23) : `.planning/` partitionné pour de vrai en deux compartiments GSD workstream,
-  `fiabilite` (ce fichier, compartiment par défaut) et `gouvernance` (jalon gouvernance-labs-v1.0,
-  Phases 42-50). Détail : `.planning/missions/2026-09-23-partition-planning-d02.md`, § Decisions
-  ci-dessous. Frontmatter borné à 60 lignes (check-dev-bootstrap).
+  Partition D-02 exécutée (arbitrage Samuel, AskUserQuestion session principale, 2026-09-23) ;
+  Phase 41, plan 41-05 exécuté le même jour : rulesets posés (main 23892920, tags v* 23892922),
+  D-02bis relu CONFORME (arbitrage Willy, AskUserQuestion session principale, 2026-09-23).
+  Détail : § Current Position. Frontmatter borné à 60 lignes (check-dev-bootstrap).
 progress:
-  total_phases: 12
+  total_phases: 14
   completed_phases: 11
-  total_plans: 70
-  completed_plans: 70
-  percent: 92
+  total_plans: 94
+  completed_plans: 83
+  percent: 79
+current_phase: 41
 ---
 
 # Project State
@@ -133,8 +132,26 @@ répondu « already merged » ; la PR a en réalité été mergée par `samuel-n
 `origin/main`, porte désormais toutes les écritures (D-03). Rejeu `gates` vert (14 étapes, 0 en
 échec) ; rejeu `tests` 84 suites / 2 échecs = WINDOWS #6/#7, mêmes rouges locaux préexistants déjà
 consignés (path-traversal T4, PyYAML absent), reproduits à l'identique sur B, non régressifs, hors
-périmètre, jamais neutralisés sans validation humaine (ADR-031). Next : plan 41-05 (pose des
-rulesets).
+périmètre, jamais neutralisés sans validation humaine (ADR-031).
+
+**Note (2026-09-23, plan 41-05) : les deux rulesets sont POSÉS — critère de succès 1 du ROADMAP
+atteint.** `POSE-DECISION: option=poser` (Willy, AskUserQuestion session principale, 2026-09-23),
+sur pièce, avant tout appel d'écriture. Pose depuis `origin/main` (source mergée, exactement deux
+appels `POST /rulesets`, aucun `POSE-ECHEC:`) : branche `main` id `23892920`, tags `v*` id
+`23892922`, tous deux `enforcement=active`. D-02bis mesuré CONFORME : les deux entrées
+`bypass_actors` relues sont exactement `User:151974738` (Samuel) et `User:203482067`
+(Willy/picmakpro), mode `always`, sur les deux rulesets ; `current_user_can_bypass` de `picmakpro`
+relu `always` sur les deux — `M2-VERDICT: CONFORME`, Task 4 (checkpoint conditionnel) non
+déclenchée. Accès aux rule suites mesuré (`picmakpro=ok`). PR en vol : `#93` (seule de
+`PR-EN-VOL-AVANT:`) déjà mergée par `samuel-neveugall` avant la pose ; `#96` et `#98` apparues
+entre-temps, relevées en lecture seule, aucune touchée par la phase. `origin/main` a avancé de 27
+commits pendant l'exécution (dont la release `v2.65.0`) sans effet sur la conformité des sources
+(`.github/rulesets/*.json`, `.github/CODEOWNERS` inchangés sur cette plage). Rejeu `gates` vert
+(14/14) ; rejeu `tests` 84 suites / 2 échecs = mêmes WINDOWS #6/#7 préexistants, confirmés non
+régressifs par les 4 checks CI réels verts de la tête d'`origin/main`. Détail complet :
+`41-05-SUMMARY.md`, section `## 41-05 — pose` de `41-PREUVES.md`. Fenêtre de preuves ouverte côté
+serveur ; Samuel reste à prévenir par la session principale (`fenetre_preuves_annoncee=non`,
+hors périmètre de l'exécuteur). Next : plan 41-06 (revue code owner, M-1).
 
 Précédemment (2026-09-18) — **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ le 2026-09-18** sur
 `feat/phase-41-protection-depot` (branche `worktree-agent-a10225b33e6f3c645`). **Prémisse renversée
@@ -204,6 +221,7 @@ Status: phase_complete
 
 **Vérifications conduites avant le cadrage** — deux conditions d'invalidation du STUDY §8, jouées
 par commande parce que l'une pouvait supprimer la phase :
+
 - **D1 non satisfaite** — `complete-milestone.md:433,501` supprime toujours sans condition en
   gsd-core **1.10.0**. La phase garde sa raison d'être.
 - **D3 non satisfaite** — RFC `open-gsd/gsd-core#3556` **OPEN**, réponse amont du 2026-08-15 avec
@@ -1500,6 +1518,7 @@ Stopped at: **Phase 34 EXÉCUTÉE et MERGÉE** (PR #66, merge `bf34d49`, 2026-09
 **Reprendre par** : arbitrage du **périmètre sans admin** de la Phase 41 (proposition relayée à la session principale le 2026-09-17), puis replanification de ce périmètre seul. **Prémisse renversée le 2026-09-17** (Samuel, AskUserQuestion session principale) : `picmakpro`, seul admin, est un **tiers** ; `admin: false` mesuré — aucun ruleset posable ici, D-01 à D-08 suspendus, 10 plans différés (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »). Exécution arrêtée après 41-01 Task 1. Ancien pointeur, désormais caduc : exécution de la Phase 41 à partir de 41-01 sur `feat/phase-41-protection-depot` (13 plans prêts ; force push et suppression de `main` interdits, arbitrage Samuel, AskUserQuestion session principale, 2026-09-17). Dette déclarée : la vérification « arbitrage cité » passe à tort sur un message à plusieurs clés `*-DECISION` — une seule clé par commit à l'exécution (détail : `.planning/missions/2026-09-17-phase41-cadrage.md`).
 
 **Ce qui reste fermé, quoi qu'il arrive** :
+
 - **Budget d'instructions armé depuis le 2026-09-16** (`check-instruction-budget.sh`) : une baseline de `.planning/instruction-budget-baselines.tsv` ne remonte jamais sans arbitrage humain nommé avec canal et date ; elle descend librement dans le commit de remédiation.
 - **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10).
 - **Issue amont `init-progress` NON ENVOYÉE** — `.planning/upstream/2026-09-09-init-progress-project-md-not-resolved-under-workstream.md`, Samuel poste.

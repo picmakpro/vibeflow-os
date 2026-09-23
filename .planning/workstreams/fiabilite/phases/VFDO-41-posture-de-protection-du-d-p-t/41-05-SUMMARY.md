@@ -34,7 +34,7 @@ key-decisions:
   - "POSE-DECISION: option=poser — Willy, AskUserQuestion session principale, 2026-09-23 (fenêtre de preuves non encore annoncée à Samuel au moment de la décision)"
   - "Pas de merge d'origin/main dans la branche B des preuves malgré 27 commits atterris sur main pendant l'exécution : les sources des rulesets (.github/rulesets/*.json, .github/CODEOWNERS) sont inchangées sur cette plage, la pose lit origin/main directement (jamais l'arbre de travail de B)"
 
-requirements-completed: [PROT-01]
+requirements-completed: []  # PROT-01 avance (rulesets posés) mais reste explicitement NON coché : REQUIREMENTS.md gate sa clôture au plan 41-13 (« Coché seulement à la clôture, sur pièce »), pas à ce plan
 
 coverage:
   - id: D1
