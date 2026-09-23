@@ -107,3 +107,31 @@ merge, `samuel-neveugall` a poussé un commit de fusion supplémentaire sur la b
 (`f5db514`, « Merge origin/main dans feat/phase-41-volet-admin (débogage PR #90) ») rattrapant
 7 commits arrivés sur `main` entre-temps (PR #91) ; c'est ce sha de tête qui a été mergé. Fait
 consigné tel quel : Willy n'a pas mergé cette PR.
+
+## 41-05 — pose
+
+RETOUR-ARRIERE-ECRIT: admin=picmakpro gh_api_-X_PUT_repos/picmakpro/vibeflow-os/rulesets/<id>_-f_enforcement=disabled temoin=rules/branches/main_vide
+
+Retour arrière, écrit AVANT toute pose : si un ruleset posé ne se comporte pas comme arbitré, ou
+bloque un merge à tort, l'admin (`picmakpro`) le repasse en `disabled` pour chacun des deux ids
+posés — `gh api -X PUT repos/picmakpro/vibeflow-os/rulesets/<id> -f enforcement=disabled` — et
+vérifie que `gh api repos/picmakpro/vibeflow-os/rules/branches/main` rend `[]` (plus aucune règle
+effective sur la branche `main`). Exercé seulement sur décision humaine (Task 4 de ce plan, si
+`M2-VERDICT: ECART` ou `POSE-ECHEC:`), jamais de la propre initiative de l'exécutant.
+
+MAIN-VERTE-AVANT-POSE: sha=c78b238725ea24b181668efb1a5c4501569b6694 tests=success lab_frais=success lab_frais_arme=success gates=success gates_echec=aucun
+
+PR-EN-VOL-AVANT: numeros=#93 detail=#93:base=main:etat=CLEAN:revue=aucune:codeowners=oui
+
+Note sur `PR-EN-VOL-AVANT:` : une seule PR ouverte vers `main` au moment de la relecture (2026-09-23,
+après le merge de la PR de la phase #90 et de la PR #91) — `#93` (`feat/garde-affirmation-non-mesuree`
+→ `main`), ouverte par `samuel-neveugall` à `2026-09-23T14:55:10Z`, titre « feat(scripts): garde G-4 —
+affirmation non mesurée de protection serveur ». Fichiers touchés :
+`.github/workflows/ci.yml`, `.planning/server-rulesets-measurement.json`, `README.fr.md`,
+`README.md`, `scripts/check-affirmation-non-mesuree.sh`, `scripts/measure-server-rulesets.sh`,
+`scripts/tests/test-check-affirmation-non-mesuree.sh`. `.github/workflows/ci.yml` tombe sous le
+motif `/.github/` de `.github/CODEOWNERS` (`origin/main`) → `codeowners=oui` : ouverte par
+`samuel-neveugall`, pas par `picmakpro`, cette PR n'est pas bloquée par le cas « auteur = seul code
+owner » ; elle passera par la revue `@picmakpro` normale une fois la règle posée, pas par un
+contournement. `mergeStateStatus=CLEAN`, `reviewDecision` vide (aucune revue exigée tant qu'aucun
+ruleset n'est actif).
