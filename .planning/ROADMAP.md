@@ -1653,7 +1653,7 @@ par deux utilisateurs nommés (D-02bis, arbitrage Willy, AskUserQuestion session
 2026-09-23), plans 41-01 à 41-13 révisés puis vérifiés (vérificateur frais, passé). Voir
 `41-CONTEXT.md` § REPRISE.
 
-**Plans:** 7/19 plans executed en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
+**Plans:** 8/19 plans executed en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
 dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré. **Six plans supplémentaires
 (41-14 à 41-19) ajoutés et exécutés le 2026-09-18** pour le périmètre sans admin (option (a)) — voir
 liste ci-dessous.
@@ -1661,7 +1661,7 @@ liste ci-dessous.
 Plans:
 
 - [x] 41-01-PLAN.md — préalables re-mesurés (identité admin, collaborateurs, #29, checks requis), JSON des deux rulesets à deux `User` `always` (D-02bis, révisé 2026-09-23)
-- [ ] 41-02-PLAN.md — `.github/CODEOWNERS` étroit, ledger PROT-01..04 non cochés
+- [x] 41-02-PLAN.md — `.github/CODEOWNERS` étroit, ledger PROT-01..04 non cochés
 - [ ] 41-03-PLAN.md — ADR-072 (contournement et hotfix), amendement d'ADR-059, `CLAUDE.md`
 - [ ] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
 - [ ] 41-05-PLAN.md — décision explicite avant pose, pose par l'exécutant, relecture serveur des deux `User`, état des PR en vol, mesure M-2 (révisé 2026-09-23)

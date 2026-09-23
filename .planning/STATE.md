@@ -37,7 +37,7 @@ stopped_at: >-
   ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
   armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
   existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
-last_updated: "2026-09-23T12:35:00.000Z"
+last_updated: "2026-09-23T12:53:59.000Z"
 last_activity: 2026-09-23
 last_activity_desc: >-
   Phase 41, volet admin repris le 2026-09-23 (accès admin constaté, D-02bis : contournement par
@@ -102,7 +102,12 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 Phase: **41** (Posture de protection du dépôt) — **Note (2026-09-23, plan 41-01) : reprise du
 volet admin sur `feat/phase-41-volet-admin` — plan 41-01 exécuté (2/2 tâches).** Détail complet :
 `41-01-SUMMARY.md`. Sources JSON des rulesets écrites (`.github/rulesets/main.json`,
-`.github/rulesets/tags-v.json`, D-02bis), rien posé chez GitHub. Next : plan 41-02.
+`.github/rulesets/tags-v.json`, D-02bis), rien posé chez GitHub.
+**Note (2026-09-23, plan 41-02) : `.github/CODEOWNERS` posé (périmètre étroit D-05, quatre
+règles), ledger `REQUIREMENTS.md` amendé — PROT-01 repris (`- [ ]`, non coché), traçabilité
+« Pending — reprise du 2026-09-23 ».** Détail complet : `41-02-SUMMARY.md`. Un rouge préexistant
+du rejeu `gates` (`check-dev-bootstrap.sh`, hors périmètre) consigné au ledger
+`.planning/WINDOWS.md` (#8), en plus des deux déjà ouverts (#6, #7). Next : plan 41-03.
 
 Précédemment (2026-09-18) — **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ le 2026-09-18** sur
 `feat/phase-41-protection-depot` (branche `worktree-agent-a10225b33e6f3c645`). **Prémisse renversée
