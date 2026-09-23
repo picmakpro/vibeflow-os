@@ -696,3 +696,28 @@ principe que les leçons `check-overlaps.sh` / `check-instruction-budget.sh` : u
 se re-dérive, il ne se fige jamais dans le test qui le vérifie.
 
 **Déclencheur de reprise :** le prochain cas où ce test casse sur un ajout légitime de référence.
+
+## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23)
+
+**Capturé :** 2026-09-23, mission « partition réelle du planning D-02 » (`.planning/missions/2026-09-23-partition-planning-d02.md`).
+
+**Le défaut :** l'étape CI « check-state-integrity (anti-régression du frontmatter … ADR-063) »
+(`.github/workflows/ci.yml:353`) cible explicitement `.planning/workstreams/fiabilite/STATE.md` —
+en dur, pas résolu par `GSD_WORKSTREAM` ni par le pointeur partagé. C'est le bon remède contre le
+détournement du gate par l'environnement (défense en profondeur ADR-063, déjà la doctrine avant
+cette mission) — mais son effet de bord est que la CI ne vérifie QUE ce compartiment. Mesuré
+concret : `.planning/workstreams/gouvernance/STATE.md` (compartiment tout juste créé, gabarit frais
+du moteur, pas encore de champ `milestone:` ni de ligne `^Phase:`) rend `rc=2` (« milestone
+introuvable ») si on le vérifie explicitement — et la CI ne le verra JAMAIS, ni pour le dire cassé
+ni pour le dire bon. L'angle mort grandit mécaniquement avec chaque compartiment ajouté (aujourd'hui
+2 : `fiabilite`/`gouvernance` ; demain N).
+
+**Piste de fix :** ne pas revenir à une résolution par `GSD_WORKSTREAM`/pointeur (c'est précisément
+le vecteur de détournement qu'ADR-063 a fermé). À la place, itérer sur les compartiments PRÉSENTS
+SUR LE DISQUE (`.planning/workstreams/*/`) au moment du run CI et appeler
+`check-state-integrity.sh --file .planning/workstreams/<nom>/STATE.md` pour chacun explicitement —
+chemins toujours en dur, énumération dynamique. Même logique que `check-divergence.sh`, qui
+inspecte déjà tous les compartiments présents sans se fier à un pointeur.
+
+**Déclencheur de reprise :** l'ajout d'un troisième compartiment, ou le premier incident réel où un
+compartiment autre que `fiabilite` régresse sans que la CI ne le voie.

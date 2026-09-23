@@ -1092,6 +1092,61 @@ else
   ko "MUTATION G1 — construction du mutant a échoué" "la double lecture normalisée est retirée du fichier muté" "grep ne la trouve pas / bash -n échoue"
 fi
 
+# === Cas 28 (partition D-02, 2026-09-23) — lab partitionné, mode diff : le ledger VIVANT lu/proposé
+# est celui du compartiment ACTIF (.planning/workstreams/<nom>/REQUIREMENTS.md), pas la racine —
+# preuve par DIVERGENCE : le compartiment a déjà un ledger PRÉSENT (rien à reconstituer, exit 1,
+# fichier compartiment intact), la racine n'a AUCUN ledger et proposerait une reconstitution si
+# elle était lue à tort (exit 0). L'archive (partagée, à la racine) reste inchangée dans les deux cas.
+D="$(mk_root c28)"
+w_milestones "$D" "$CLOSED_H2"
+w_archive "$D" "demo-v1" "$DEMO_ARCHIVE"
+mkdir -p "$D/.planning/workstreams/demo-ws"
+printf '%s' $'# Requirements\n- [x] **ZZZZ-01**: deja present dans le compartiment\n' > "$D/.planning/workstreams/demo-ws/REQUIREMENTS.md"
+printf '%s' "demo-ws" > "$D/.planning/active-workstream"
+before_ws="$(cat "$D/.planning/workstreams/demo-ws/REQUIREMENTS.md")"
+out="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+after_ws="$(cat "$D/.planning/workstreams/demo-ws/REQUIREMENTS.md")"
+root_created=0; [ -e "$D/.planning/REQUIREMENTS.md" ] && root_created=1
+if [ "$rc" -eq 1 ] && [ -z "$out" ] && [ "$before_ws" = "$after_ws" ] && [ "$root_created" -eq 0 ]; then
+  ok "28 lab partitionné (pointeur store-partagé), mode diff → ledger du compartiment actif lu (déjà présent, rien à reconstituer), racine jamais créée"
+else
+  ko "28 lab partitionné (pointeur store-partagé), mode diff → ledger du compartiment actif lu" "rc=1 out=[] compartiment inchangé racine absente" "rc=$rc out=[$out] compartiment inchangé=$([ "$before_ws" = "$after_ws" ] && echo oui || echo NON) racine créée=$root_created"
+fi
+
+# === Cas 29 (partition D-02) — MÊME fixture, --write : la reconstitution ATTERRIT dans le
+# compartiment actif, jamais à la racine (l'archive partagée reste la source, elle est inchangée).
+D2="$(mk_root c29)"
+w_milestones "$D2" "$CLOSED_H2"
+w_archive "$D2" "demo-v1" "$DEMO_ARCHIVE"
+mkdir -p "$D2/.planning/workstreams/demo-ws"
+printf '%s' "demo-ws" > "$D2/.planning/active-workstream"
+archive_before="$(cat "$D2/.planning/milestones/demo-v1-REQUIREMENTS.md")"
+out2="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM bash "$SCRIPT" --path "$D2" --write 2>/dev/null)"; rc2=$?
+archive_after="$(cat "$D2/.planning/milestones/demo-v1-REQUIREMENTS.md")"
+ws_written=0; [ -f "$D2/.planning/workstreams/demo-ws/REQUIREMENTS.md" ] && ws_written=1
+root_written=0; [ -e "$D2/.planning/REQUIREMENTS.md" ] && root_written=1
+if [ "$rc2" -eq 0 ] && [ "$ws_written" -eq 1 ] && [ "$root_written" -eq 0 ] && [ "$archive_before" = "$archive_after" ]; then
+  ok "29 lab partitionné, --write → reconstitution écrite dans le compartiment actif, jamais à la racine, archive partagée intacte"
+else
+  ko "29 lab partitionné, --write → reconstitution écrite dans le compartiment actif" "rc=0 compartiment écrit=1 racine écrite=0 archive intacte" "rc=$rc2 compartiment écrit=$ws_written racine écrite=$root_written archive intacte=$([ "$archive_before" = "$archive_after" ] && echo oui || echo NON)"
+fi
+
+# === Cas 30 (partition D-02) — CONTRÔLE de discriminance des cas 28/29 : MÊME fixture, mais sans
+# aucun canal composable résolu (pas de pointeur) → repli sur la racine (comportement historique,
+# labs non partitionnés) : diff proposé depuis la racine, jamais depuis le compartiment.
+D3="$(mk_root c30)"
+w_milestones "$D3" "$CLOSED_H2"
+w_archive "$D3" "demo-v1" "$DEMO_ARCHIVE"
+mkdir -p "$D3/.planning/workstreams/demo-ws"
+printf '%s' $'# Requirements\n- [x] **ZZZZ-01**: ne doit jamais etre lu ici\n' > "$D3/.planning/workstreams/demo-ws/REQUIREMENTS.md"
+out3="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM bash "$SCRIPT" --path "$D3" 2>/dev/null)"; rc3=$?
+has3=0; case "$out3" in *"proposition de reconstitution"*"demo-v1"*) has3=1 ;; esac
+if [ "$rc3" -eq 0 ] && [ "$has3" -eq 1 ]; then
+  ok "30 CONTRÔLE — même fixture SANS canal composable → repli racine, reconstitution proposée (les cas 28/29 sont bien discriminants)"
+else
+  ko "30 CONTRÔLE — même fixture SANS canal composable → repli racine, reconstitution proposée" "rc=0 out contient « proposition de reconstitution » et demo-v1" "rc=$rc3 out=[$out3]"
+fi
+
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
 [ "$FAIL" -eq 0 ]

@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "migration",
+      "step": "Partition mécanique + carve-out fiabilite/gouvernance",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "ci-rewrite",
+      "step": "Réécriture CI + 4 gates aveugles workstream-aware",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".github/workflows/ci.yml",
+        "plugin/conductor/scripts/check-instruction-budget.sh",
+        "plugin/dev-orchestrator/scripts/check-requirements-survival.sh",
+        "plugin/dev-orchestrator/scripts/restore-requirements-ledger.sh",
+        "plugin/dev-orchestrator/scripts/requirements-survival-detect.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "Revue vf-reviewer sur le diff complet",
+      "stage": "",
+      "deps": [
+        "migration",
+        "ci-rewrite"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "Hygiène documentaire finale (STATE/ROADMAP à la main, ledger)",
+      "stage": "",
+      "deps": [
+        "revue"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "phase36-fix",
+      "step": "Documente Phase 36 (option c, arbitrage Samuel) dans ROADMAP fiabilite",
+      "stage": "",
+      "deps": [
+        "migration",
+        "ci-rewrite"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/ROADMAP.md"
+      ],
+      "status": "done"
+    }
+  ]
+}

@@ -345,9 +345,12 @@ jobs:
         # l'environnement (GSD_WORKSTREAM, pointeur in-repo) et un simple `export` suffirait à
         # détourner le gate vers un autre STATE.md — ou à le désarmer. Le script fait primer
         # `--file` sur toute résolution de workstream (FILE_REL_EXPLICIT) : c'est précisément le
-        # remède, il suffit que la CI l'utilise. Ce qui est protégé ici est le STATE.md de la
-        # RACINE, celui dont ADR-063 garde les compteurs.
-        run: bash plugin/conductor/scripts/check-state-integrity.sh --file .planning/STATE.md
+        # remède, il suffit que la CI l'utilise. Ce qui est protégé ici est le STATE.md VIVANT,
+        # celui dont ADR-063 garde les compteurs — depuis la partition D-02 (2026-09-23) ce fichier
+        # vit sous le compartiment par défaut `.planning/workstreams/fiabilite/`, plus à la racine
+        # (même cible que le R5 du bloc « conformité de la racine réelle », plus bas dans ce même
+        # fichier — cohérent avec lui).
+        run: bash plugin/conductor/scripts/check-state-integrity.sh --file .planning/workstreams/fiabilite/STATE.md
 
       - name: check-capability-activation (une entrée de doc ne promet pas un geste inerte, GSDA-09)
         # POURQUOI CE CÂBLAGE EXISTE. Le gate était livré, testé, distribué dans chaque lab — et
@@ -720,97 +723,141 @@ jobs:
 
           rm -rf "$FIX"
 
-          # ═══ BLOC 2 — ASSERTION DE NON-RÉGRESSION sur le CHECKOUT RACINE ════════════════════
-          # CE QUE CE BLOC PROUVE, ET CE QU'IL NE PROUVE PAS. Les quatre gates sont verts PAR
-          # CONSTRUCTION sur un arbre non partitionné : ce bloc ne démontre donc AUCUNE capacité —
-          # il démontre seulement que l'ajout de la résolution de workstream n'a RIEN changé là où
-          # il ne devait rien changer. C'est une assertion de NON-RÉGRESSION, à ne jamais confondre
-          # à la relecture avec les six verdicts du bloc 1, qui sont des assertions de CAPACITÉ.
-          #
-          # LIMITE DE PREUVE (fait de gouvernance) : aucune exécution d'intégration continue n'a eu
-          # lieu sur la branche de la Phase 23. Tant que la branche de la Phase 24 n'est pas poussée,
-          # CE JOB N'AURA JAMAIS TOURNÉ POUR DE VRAI — les verdicts ci-dessous ont été rejoués à la
-          # main, rien de plus.
-          #
-          # ÉCART MESURÉ CONTRE LA FICHE F-35 (24-CONTEXT.md), le 2026-08-04 : F-35 donne « projet
-          # complètement cadré — orientation gsd-engine » comme verdict de référence du gate de
-          # démarrage sur la racine. Il est aujourd'hui PÉRIMÉ — le frontmatter de .planning/STATE.md
-          # fait 81 lignes, au-delà de la garde anti-gel de 60 lignes de check-dev-bootstrap.sh :
-          # state3_signal échoue et le script retombe sur sa soupape de sûreté D-04, exit 3 avec un
-          # stdout VIDE. Asserter la sous-chaîne de F-35 rendrait ce job rouge dès sa première
-          # exécution ; asserter « stdout vide » graverait l'état dégradé comme la norme et rougirait
-          # le jour où le frontmatter est raccourci. L'assertion retenue tient dans les deux cas et
-          # mesure ce que ce bloc doit mesurer : l'INVARIANCE de la sortie, workstream posé ou non.
-          echo "== non-régression sur le checkout racine (arbre NON partitionné) =="
+          # ═══ BLOC 2a — NON-RÉGRESSION sur un ARBRE FLAT SYNTHÉTIQUE (jamais partitionné) ═══
+          # CE QUE CE BLOC PROUVE, ET CE QU'IL NE PROUVE PAS. Avant la partition D-02 (2026-09-23),
+          # ce bloc rejouait R1/R2/R3 contre le checkout RACINE de ce dépôt, en s'appuyant sur le
+          # fait qu'il n'était pas partitionné — cette garantie protégeait tous les labs qui
+          # installent VibeFlow SANS jamais partitionner leur `.planning/`. La migration a rendu la
+          # racine DE CE dépôt partitionnée par défaut : la réutiliser comme cible « non
+          # partitionnée » serait désormais FAUX PAR CONSTRUCTION. Ce bloc reconstruit donc sa
+          # propre fixture FLAT jetable (ROADMAP.md + STATE.md triviaux à la racine du `.planning/`
+          # de la fixture, AUCUN `.planning/workstreams/`) et rejoue EXACTEMENT le même contrat
+          # qu'avant — rc=3/stdout invariant, rc=3/stdout vide, rc=0/extrait non vide — contre CETTE
+          # fixture plutôt que contre `.`. C'est une assertion de NON-RÉGRESSION, à ne jamais
+          # confondre à la relecture avec les six verdicts du bloc 1, qui sont des assertions de
+          # CAPACITÉ sur un arbre partitionné.
+          echo "== 2a : non-régression sur une fixture FLAT jetable (jamais partitionnée) =="
 
-          # R1 — gate de démarrage : exit 3, stdout strictement INVARIANT selon GSD_WORKSTREAM, et
-          # stderr invariant HORS la ligne de repli DOCUMENTÉE de l'injecteur.
-          #
-          # POURQUOI STDOUT ET STDERR SONT DÉSORMAIS DISTINGUÉS, à rebours de la fusion posée le
-          # 2026-08-04. À cette date le stdout de ce gate était VIDE sur la racine (soupape D-04 :
-          # frontmatter de .planning/STATE.md hors garde anti-gel) — comparer deux stdout vides ne
-          # pouvait RIEN opposer, d'où la fusion des deux canaux pour rester discriminant.
-          # MESURÉ DEPUIS (frontmatter raccourci sous la garde) : stdout porte désormais le signal
-          # métier réel (« … orientation gsd-engine », 137 octets), IDENTIQUE avec et sans
-          # GSD_WORKSTREAM — la fusion n'est plus nécessaire pour rester opposable, ET elle était
-          # devenue FAUSSE : elle absorbait aussi la ligne de repli de l'injecteur — LÉGITIME et
-          # VOULUE par le rôle « INJECTEUR DE CONTEXTE » de workstream-policy.sh (« repli sur la
-          # racine PLUS une ligne qui NOMME le workstream ») — et la faisait lire comme une fuite
-          # (243 vs 356 octets, mesuré CI Linux, run 30963492481). Le contrat GSDA-13 porte sur ce
-          # que la session REÇOIT (stdout) ; la ligne de repli sur stderr, elle, est le contrat
-          # INVERSE (l'injecteur DOIT nommer le workstream quand il replie) et ne doit pas faire
-          # rougir celui-ci. `say()` (check-dev-bootstrap.sh) préfixe TOUTES ses lignes de
-          # `[check-dev-bootstrap] ` et les trois variantes de repli finissent par
-          # « lecture sur la racine. » (workstream résolu-dossier-absent, compartiment refusé,
-          # politique introuvable) : le motif ci-dessous couvre les trois, rien d'autre — un AUTRE
-          # écart de stderr (une erreur inattendue, un message qui change de forme) reste attrapé.
-          FALLBACK_RE='^\[check-dev-bootstrap\] .*lecture sur la racine\.$'
-          err_sans_file="$(mktemp)"; err_avec_file="$(mktemp)"
+          FIX2="$(mktemp -d)"
+          trap 'rm -rf "$FIX" "$FIX2"' EXIT
+
+          mkdir -p "$FIX2/.planning"
+          printf '# Feuille de route\n\n## Phase 1 : fixture\n\nObjectif synthétique.\n' \
+            > "$FIX2/.planning/ROADMAP.md"
+          cat > "$FIX2/.planning/STATE.md" <<'STATEEOF2'
+          ---
+          milestone: fixture
+          current_phase: 1
+          status: in_progress
+          progress:
+            completed_phases: 0
+            completed_plans: 0
+            total_plans: 1
+          ---
+
+          Phase: 1 — fixture flat
+
+          Etat synthetique construit par la CI.
+          STATEEOF2
+
+          git -C "$FIX2" init -q
+          git -C "$FIX2" add .planning
+          git -C "$FIX2" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q -m "fixture-flat"
+
+          # --- Assertion de CONSTRUCTION, AVANT toute mesure (même contrat que le BLOC 1) ---
+          for f in .planning/ROADMAP.md .planning/STATE.md; do
+            if [ ! -f "$FIX2/$f" ]; then
+              echo "::error::fixture flat non construite : $f manquant — refus de mesurer une cible absente"
+              exit 1
+            fi
+          done
+          if [ -d "$FIX2/.planning/workstreams" ]; then
+            echo "::error::fixture flat non discriminante : .planning/workstreams/ existe alors que la fixture doit rester NON partitionnée"
+            exit 1
+          fi
+          echo "== fixture flat construite et commitée : $FIX2 =="
+
+          # R1 — gate de démarrage : exit 3, stdout strictement INVARIANT selon GSD_WORKSTREAM.
           rc=0
-          root_sans_out="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM \
-            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>"$err_sans_file")" || rc=$?
+          out1="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM \
+            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path "$FIX2" 2>/dev/null)" || rc=$?
           rc2=0
-          root_avec_out="$(env -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM GSD_WORKSTREAM=dev \
-            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>"$err_avec_file")" || rc2=$?
-          root_sans_err="$(grep -Ev "$FALLBACK_RE" "$err_sans_file" || true)"
-          root_avec_err="$(grep -Ev "$FALLBACK_RE" "$err_avec_file" || true)"
-          rm -f "$err_sans_file" "$err_avec_file"
-          echo "== R1 check-dev-bootstrap racine : rc(sans)=$rc rc(avec)=$rc2, stdout ${#root_sans_out}/${#root_avec_out} octet(s), stderr hors-repli ${#root_sans_err}/${#root_avec_err} octet(s) =="
-          [ "$rc" -eq 3 ] || note "R1 check-dev-bootstrap racine sans workstream : rc=$rc, attendu 3"
-          [ "$rc2" -eq 3 ] || note "R1 check-dev-bootstrap racine avec workstream : rc=$rc2, attendu 3 (un arbre non partitionné ne doit pas changer de verdict)"
-          # PLANCHER D'OPPOSABILITÉ, avant le verdict : deux stdout vides ne peuvent RIEN opposer.
-          # Le dire est un échec, jamais un succès — patron `NON OPPOSABLE` de
-          # test-check-capability-activation.sh, qui refuse le même repli sur `cmp -s`.
-          if [ -z "$root_sans_out" ] && [ -z "$root_avec_out" ]; then
-            note "R1 check-dev-bootstrap racine : les DEUX stdout sont vides — l'assertion d'invariance est NON OPPOSABLE (elle comparerait deux chaînes vides et serait verte quoi qu'il arrive au sujet)"
-          elif [ "$root_sans_out" != "$root_avec_out" ]; then
-            note "R1 check-dev-bootstrap racine : le stdout CHANGE selon GSD_WORKSTREAM sur un arbre NON partitionné — la résolution de workstream a fui hors de son domaine"
-          fi
-          if [ "$root_sans_err" != "$root_avec_err" ]; then
-            note "R1 check-dev-bootstrap racine : le stderr change AU-DELÀ de la ligne de repli documentée de l'injecteur — écart non attendu"
-          fi
+          out2="$(env -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM GSD_WORKSTREAM=dev \
+            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path "$FIX2" 2>/dev/null)" || rc2=$?
+          echo "== R1 check-dev-bootstrap (fixture flat) : rc(sans)=$rc rc(avec)=$rc2, stdout ${#out1}/${#out2} octet(s) =="
+          [ "$rc" -eq 3 ] || note "R1 check-dev-bootstrap flat sans workstream : rc=$rc, attendu 3"
+          [ "$rc2" -eq 3 ] || note "R1 check-dev-bootstrap flat avec workstream : rc=$rc2, attendu 3 (un arbre non partitionné ne doit pas changer de verdict)"
+          [ "$out1" = "$out2" ] || note "R1 check-dev-bootstrap flat : le stdout CHANGE selon GSD_WORKSTREAM sur un arbre NON partitionné — la résolution de workstream a fui hors de son domaine"
 
-          # R2 — gate de pointeur : exit 3 ET stdout STRICTEMENT VIDE (le dépôt n'est pas
-          # partitionné, il n'a rien à dire ; son diagnostic part sur stderr).
+          # R2 — gate de pointeur : exit 3 ET stdout STRICTEMENT VIDE.
           rc=0
           out="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM \
-            bash plugin/conductor/scripts/check-workstream-pointer.sh --path . 2>/dev/null)" || rc=$?
-          echo "== R2 check-workstream-pointer racine : rc=$rc, stdout de ${#out} octet(s) =="
-          [ "$rc" -eq 3 ] || note "R2 check-workstream-pointer racine : rc=$rc, attendu 3 (silence, dépôt non partitionné)"
-          [ -z "$out" ] || note "R2 check-workstream-pointer racine : stdout NON vide sur un dépôt non partitionné — le coût de la garde doit être nul là où il n'y a rien à garder"
+            bash plugin/conductor/scripts/check-workstream-pointer.sh --path "$FIX2" 2>/dev/null)" || rc=$?
+          echo "== R2 check-workstream-pointer (fixture flat) : rc=$rc, stdout de ${#out} octet(s) =="
+          [ "$rc" -eq 3 ] || note "R2 check-workstream-pointer flat : rc=$rc, attendu 3 (silence, dépôt non partitionné)"
+          [ -z "$out" ] || note "R2 check-workstream-pointer flat : stdout NON vide sur un dépôt non partitionné — le coût de la garde doit être nul là où il n'y a rien à garder"
 
-          # R3 — injecteur de contexte : exit 0 et extrait NON VIDE.
+          # R3 — injecteur de contexte : exit 0 et extrait NON VIDE. Pas un gate bloquant au sens
+          # ADR-074 (contrat fail-open déjà documenté plus haut, verdict 3/6 du BLOC 1) : version
+          # simplifiée, rc=0 + extrait non vide suffit.
           rc=0
           out="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_CONTEXT_WORKSTREAM \
-            bash plugin/planning-core/scripts/planning-context.sh --path .planning 2>/dev/null)" || rc=$?
-          echo "== R3 planning-context racine : rc=$rc, $(printf '%s\n' "$out" | awk 'END{print NR}') ligne(s) =="
-          [ "$rc" -eq 0 ] || note "R3 planning-context racine : rc=$rc, attendu 0"
-          [ -n "$out" ] || note "R3 planning-context racine : extrait VIDE — l'injection de contexte ne produit plus rien"
+            bash plugin/planning-core/scripts/planning-context.sh --path "$FIX2/.planning" 2>/dev/null)" || rc=$?
+          echo "== R3 planning-context (fixture flat) : rc=$rc, $(printf '%s\n' "$out" | awk 'END{print NR}') ligne(s) =="
+          [ "$rc" -eq 0 ] || note "R3 planning-context flat : rc=$rc, attendu 0"
+          [ -n "$out" ] || note "R3 planning-context flat : extrait VIDE — l'injection de contexte ne produit plus rien"
+
+          rm -rf "$FIX2"
+
+          # ═══ BLOC 2b — CONFORMITÉ de la RACINE RÉELLE, PARTITIONNÉE PAR DÉFAUT ═══════════════
+          # Depuis le 2026-09-23 la racine de CE dépôt est un arbre partitionné VALIDE (deux
+          # compartiments `fiabilite`/`gouvernance`, pointeur committé `.planning/active-workstream`
+          # pointant sur `fiabilite`). Ce bloc vérifie que les gates la jugent CONFORME sans aucun
+          # `GSD_WORKSTREAM` dans l'environnement — c'est une garantie PLUS FORTE que l'ancienne
+          # assertion de non-régression : elle porte sur le dépôt RÉEL, pas sur une fixture.
+          #
+          # PREUVE QUE CETTE SECTION PEUT RENDRE ROUGE (ADR-074) : REJOUÉE LOCALEMENT le 2026-09-23
+          # (mandat worker `partition-planning-d02`), jamais en CI permanente — muter la racine
+          # réelle dans une étape CI serait une mutation destructive du dépôt lui-même. Protocole :
+          # `mv .planning/active-workstream .planning/active-workstream.bak`, rejeu de
+          # `check-workstream-pointer.sh --path .` → bascule observée rc=0 → rc=1, message
+          # « aucun canal composable ne résout de workstream », restauration IMMÉDIATE du fichier
+          # avant toute suite. Le même witness que le verdict 6/6 du BLOC 1, sur le dépôt réel.
+          echo "== 2b : conformité de la racine réelle (partitionnée par défaut) =="
+
+          rc=0
+          err="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM \
+            bash plugin/conductor/scripts/check-workstream-pointer.sh --path . 2>&1 >/dev/null)" || rc=$?
+          echo "== R4 check-workstream-pointer racine : rc=$rc =="; printf '%s\n' "$err"
+          [ "$rc" -eq 0 ] || note "R4 check-workstream-pointer racine : rc=$rc, attendu 0 (racine partitionnée, pointeur committé résout fiabilite)"
+          case "$err" in
+            *"store-partage"*) : ;;
+            *) note "R4 check-workstream-pointer racine : le canal store-partagé n'est pas nommé dans le verdict" ;;
+          esac
+          case "$err" in
+            *"fiabilite"*) : ;;
+            *) note "R4 check-workstream-pointer racine : le workstream « fiabilite » n'est pas nommé dans le verdict" ;;
+          esac
+
+          rc=0
+          out="$(bash plugin/conductor/scripts/check-state-integrity.sh --file .planning/workstreams/fiabilite/STATE.md 2>&1)" || rc=$?
+          echo "== R5 check-state-integrity racine (compartiment fiabilite) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "R5 check-state-integrity racine : rc=$rc, attendu 0 (conforme)"
+
+          rc=0
+          out="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM \
+            bash plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh --path . 2>/dev/null)" || rc=$?
+          echo "== R6 check-dev-bootstrap racine (compartiment fiabilite résolu par défaut) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 3 ] || note "R6 check-dev-bootstrap racine : rc=$rc, attendu 3 (orientation gsd-engine, même famille que le cas GSD_WORKSTREAM=dev du BLOC 1)"
+          case "$out" in
+            *"[bootstrap]"*"feuille de route absente"*) note "R6 check-dev-bootstrap racine : signal [bootstrap] « feuille de route absente » — le compartiment fiabilite n'a pas été résolu par défaut" ;;
+          esac
 
           # ═══ BILAN UNIQUE — aucun `|| true` sur une invocation de gate, aucun écart toléré ═══
-          echo "== BILAN : $fail écart(s) sur 6 verdicts partitionnés + 3 verdicts racine =="
+          echo "== BILAN : $fail écart(s) sur 6 verdicts partitionnés (BLOC 1) + 3 verdicts flat (2a) + 3 verdicts racine (2b) =="
           if [ "$fail" -ne 0 ]; then exit 1; fi
-          echo "== gates workstream VERTS : la partition est vue, elle est discriminante, et la racine n'a pas bougé =="
+          echo "== gates workstream VERTS : la partition synthétique est vue, discriminante, la fixture flat reste silencieuse, et la racine réelle est conforme =="
 
       - name: check-divergence.sh en CI (C17, 2026-09-10) — mutation rouge sur fixture divergente, pas seulement présence du gate
         # POURQUOI CETTE ÉTAPE EXISTE (arbitrage Samuel, 2026-09-10, C17 revisité — plan 39-01,
@@ -864,11 +911,18 @@ jobs:
 
           rm -rf "$FIX"
 
-          # --- 3. Non-régression racine : ce dépôt, aujourd'hui non partitionné, reste silencieux --
+          # --- 3. Racine : ce dépôt est maintenant partitionné, conforme par construction si la
+          #        partition tient. CHANGÉ le 2026-09-23 (partition D-02, mandat worker
+          #        `partition-planning-d02`) : avant la migration, la racine n'était pas
+          #        partitionnée et le gate y restait silencieux (rc=3) — c'est l'ancienne
+          #        assertion. Depuis la migration, la racine expose deux compartiments
+          #        (`fiabilite`/`gouvernance`) et le gate doit désormais s'y prononcer CONFORME
+          #        (rc=0, aucun signal S2/S4/S5), au même titre que le point 1/3 sur la fixture
+          #        propre.
           rc=0
           out="$(bash plugin/conductor/scripts/check-divergence.sh --path . 2>&1)" || rc=$?
-          echo "== 3/3 racine (checkout CI, non partitionné) : rc=$rc =="; printf '%s\n' "$out"
-          [ "$rc" -eq 3 ] || note "3/3 racine : rc=$rc, attendu 3 (silence, dépôt non partitionné)"
+          echo "== 3/3 racine (checkout CI, partitionnée par défaut) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "3/3 racine : rc=$rc, attendu 0 (dépôt partitionné conforme, aucun signal S2/S4/S5)"
 
           echo "== BILAN check-divergence CI : $fail écart(s) sur 3 verdicts (propre, mutation rouge, racine) =="
           if [ "$fail" -ne 0 ]; then exit 1; fi
