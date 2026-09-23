@@ -21,6 +21,13 @@
 # Ce script N'INVOQUE JAMAIS git : il lit deux fichiers sur disque (MILESTONES.md, REQUIREMENTS.md)
 # et une archive optionnelle. Le durcissement git_safe() de T-17-06 est donc sans objet ici.
 #
+# RÉSOLUTION DE WORKSTREAM (partition D-02, 2026-09-23, mandat worker `partition-planning-d02`) :
+# une fois le lab partitionné, le ledger VIVANT (REQUIREMENTS.md) lu par ce gate est celui du
+# compartiment ACTIF (`.planning/workstreams/<nom>/REQUIREMENTS.md`), résolu via
+# workstream-policy.sh — MILESTONES.md et l'archive milestones/ restent PARTAGÉS à la racine, non
+# affectés. Best-effort, fail-open : politique introuvable ou nom non résolu replient sur le
+# comportement historique (`.planning/REQUIREMENTS.md`). Codes de sortie INCHANGÉS.
+#
 # Usage:
 #   check-requirements-survival.sh [--path <dir>] [--hook] [--quiet]
 # Defaults: --path .
@@ -87,7 +94,33 @@ if [ -z "$PRIMITIVE" ] || ! . "$PRIMITIVE" 2>/dev/null || ! command -v vf_ledger
   exit 0
 fi
 
-vf_ledger_state "$PLANNING_DIR"
+# --- Résolution du compartiment du ledger VIVANT (partition D-02, 2026-09-23) --------------------
+# MILESTONES.md et l'archive milestones/ restent PARTAGÉS à la racine du .planning/ — seul le
+# ledger VIVANT (REQUIREMENTS.md) vit sous le compartiment actif une fois le lab partitionné.
+# Politique de résolution PARTAGÉE (workstream-policy.sh, même fonction que
+# check-workstream-pointer.sh/check-divergence.sh) : GSD_WORKSTREAM en canal nominal, puis le
+# pointeur partagé .planning/active-workstream. Best-effort et FAIL-OPEN, en cohérence avec la
+# doctrine de ce gate (D-18-10, jamais un FAIL sur le contenu) : politique introuvable, nom
+# rejeté, ou compartiment refusé (lien symbolique) replient silencieusement sur le comportement
+# historique (<planning_dir>/REQUIREMENTS.md, labs non partitionnés).
+LIVE_REQ=""
+for _wscand in "$_SCRIPT_DIR/../../planning-core/scripts/workstream-policy.sh" \
+               "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+  if [ -n "$_wscand" ] && [ -r "$_wscand" ]; then
+    # shellcheck source=/dev/null
+    . "$_wscand"
+    break
+  fi
+done
+if command -v vf_ws_resolve >/dev/null 2>&1; then
+  vf_ws_resolve "$PLANNING_DIR"
+  if [ -n "${VF_WS_NAME:-}" ] && command -v vf_ws_dir_resolve >/dev/null 2>&1; then
+    vf_ws_dir_resolve "$PLANNING_DIR" "$VF_WS_NAME"
+    [ -n "${VF_WS_DIR:-}" ] && LIVE_REQ="$VF_WS_DIR/REQUIREMENTS.md"
+  fi
+fi
+
+vf_ledger_state "$PLANNING_DIR" "$LIVE_REQ"
 state_rc=$?
 
 case "$state_rc" in

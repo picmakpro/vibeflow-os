@@ -4,9 +4,19 @@
 # deux dans dev-orchestrator (A-18-03) : check-requirements-survival.sh (ce plan) et
 # restore-requirements-ledger.sh (rattrapage, plan 18-02).
 #
-# Expose vf_ledger_state <planning_dir>. Contrat de retour : CODE DE SORTIE discriminant + variables
-# VF_LEDGER_* — jamais de parsing de sortie texte entre scripts (D-18-06, une primitive deux
-# consommateurs).
+# Expose vf_ledger_state <planning_dir> [<live_requirements_override>]. Contrat de retour : CODE DE
+# SORTIE discriminant + variables VF_LEDGER_* — jamais de parsing de sortie texte entre scripts
+# (D-18-06, une primitive deux consommateurs).
+#
+# PARAMÈTRE OPTIONNEL <live_requirements_override> (partition D-02, 2026-09-23, mandat worker
+# `partition-planning-d02`) : le ledger VIVANT (REQUIREMENTS.md) est le SEUL des trois fichiers lus
+# par cette primitive qui vit sous un compartiment de workstream une fois le lab partitionné —
+# MILESTONES.md et l'archive milestones/<jalon>-REQUIREMENTS.md restent PARTAGÉS à la racine du
+# `.planning/`, jamais déplacés. Les deux appelants (check-requirements-survival.sh,
+# restore-requirements-ledger.sh) résolvent le compartiment actif eux-mêmes (workstream-policy.sh,
+# même politique que check-workstream-pointer.sh/check-divergence.sh) et passent le chemin résolu
+# ici ; omis ou vide, le comportement historique est inchangé (`<planning_dir>/REQUIREMENTS.md`,
+# labs non partitionnés).
 #
 #   Code | VF_LEDGER_STATE     | Sens
 #   0    | absent_after_close  | jalon déclaré clos ET REQUIREMENTS.md absent
@@ -71,8 +81,8 @@ vf_ancestor_symlink_found() { # <path> <boundary_dir>
   done
 }
 
-vf_ledger_state() { # <planning_dir>
-  local planning_dir="$1"
+vf_ledger_state() { # <planning_dir> [<live_requirements_override>]
+  local planning_dir="$1" live_override="${2:-}"
   VF_LEDGER_STATE="" VF_LEDGER_MILESTONE="" VF_LEDGER_ARCHIVE="" VF_LEDGER_ARMED=""
   VF_LEDGER_REASON="" VF_LEDGER_MISSING_IDS="" VF_LEDGER_MISSING_COUNT="0"
 
@@ -137,7 +147,7 @@ vf_ledger_state() { # <planning_dir>
   VF_LEDGER_MILESTONE="$label"
 
   local archive="$planning_dir/milestones/${label}-REQUIREMENTS.md"
-  local live="$planning_dir/REQUIREMENTS.md"
+  local live="${live_override:-$planning_dir/REQUIREMENTS.md}"
 
   if [ -f "$live" ]; then
     # Trace bien formée (D-18-12) : le jeton, exactement une espace, puis une étiquette conforme
