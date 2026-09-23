@@ -101,9 +101,17 @@ et l'unification MCP (Phase 43) ; le hook central par rôle (Phase 45) ; tout §
   module** (VERSION, CHANGELOG). `mobile-test-team`, `dev-orchestrator` et `design-orchestrator`
   sont de la polarité de Samuel : la PR le nomme en relecteur de ces commits-là, et le cadrage le
   consigne ici plutôt que de le découvrir en revue.
-- **D-13 : le test qui verrouille une affirmation périmée est corrigé dans cette phase**
-  (fabrique §1.1, ligne 4 ; candidat mesuré : T76 de `test-check-agents.sh`, à confirmer par la
-  recherche).
+- **D-13 [informational] : sans objet — constaté par la recherche du 2026-09-23.** T76 (le test
+  que la fabrique §1.1 ligne 4 disait périmé) a été corrigé par le hotfix v2.63.2 le 2026-09-17,
+  cinq jours avant la spec ; il passe contre le `team-kernel.md` réel. Aucune tâche ne doit le viser.
+- **D-16 : le manifeste est copié chez l'utilisateur dans la même vague qu'il est posé.**
+  Constat de recherche : `copy_module_scripts()` de `plugin/_internal/vibeflow-update.sh` ne copie
+  que `*.sh`/`*.mjs`/`*.js` et `*.txt` — un manifeste `.json` ne serait copié nulle part, et D-03
+  refuserait alors partout. Le glob est étendu et la copie prouvée par un lab frais.
+- **D-17 : les identifiants d'outils réellement manquants sont 3, pas 6** (`ListAgents`,
+  `SendFeedback`, `SubagentHandback`) ; `BashOutput` et `KillShell` sont d'anciens noms déjà
+  couverts (`TaskOutput`, alias de `TaskStop`), `SlashCommand` n'est dans aucune doc officielle.
+  Le manifeste ne s'aligne que sur la doc officielle citée, jamais sur la liste de la spec.
 
 ### Ordre avec la PR #85
 - **D-14 : on planifie maintenant et on exécute depuis `main` après le merge de la #85.** Le plan
@@ -118,7 +126,7 @@ et l'unification MCP (Phase 43) ; le hook central par rôle (Phase 45) ; tout §
 - **FABR-02** fraîcheur : INDÉTERMINÉ en CI, avertissement chez l'utilisateur, jamais de refus sur liste fermée périmée (D-02, D-04, D-05).
 - **FABR-03** invariants I1-I7, définitions D-06 à D-09, chacun avec un jumeau négatif (mutation prouvée rouge).
 - **FABR-04** découverte récursive avec exclusions testées (D-10).
-- **FABR-05** corpus conforme sous `--strict` et `--resolve-agents=strict` (D-11, D-12, D-13).
+- **FABR-05** corpus conforme sous `--strict` et `--resolve-agents=strict` (D-11, D-12) ; T76 sans objet (D-13).
 
 ### Claude's Discretion
 - Nom et emplacement exact du fichier manifeste, nom de l'option CI de fraîcheur.
