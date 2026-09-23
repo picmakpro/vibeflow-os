@@ -11,7 +11,16 @@
 #                                   # ET qu'une release GitHub existe pour ce tag
 #   check-release-tag.sh --help
 #
-# Codes de sortie : 0 = conforme · 1 = tag manquant · 2 = usage/erreur
+# Fenêtre de grâce (ADR-073) : le tag et la release GitHub sont posés quelques minutes APRÈS
+# le merge (CLAUDE.md § Règle non négociable, étape 2), alors que ce gate tourne au push sur
+# main, c'est-à-dire au moment du merge. Si le tag est absent ET que le commit HEAD est récent
+# (< VF_RELEASE_TAG_GRACE_SECONDS, défaut 900s = 15 min), le gate rend un verdict d'ATTENTE non
+# bloquant (exit 3) plutôt qu'un échec — au-delà de la fenêtre, il échoue comme avant (exit 1).
+# Le mode --remote garde son exigence actuelle inchangée sur le tag poussé et la release GitHub :
+# la fenêtre de grâce ne couvre QUE l'absence totale du tag local.
+#
+# Codes de sortie : 0 = conforme · 1 = tag manquant (hors fenêtre de grâce) · 2 = usage/erreur
+#                    · 3 = tag manquant mais release récente (fenêtre de grâce, non bloquant)
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "[check-release-tag] pas un repo git" >&2; exit 2; }
@@ -33,7 +42,21 @@ raw="$(tr -d '[:space:]' < "$VERSION_FILE")"
 case "$raw" in v*) tag="$raw" ;; *) tag="v$raw" ;; esac
 
 if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-  echo "[check-release-tag] ✗ VERSION=$raw mais AUCUN tag local $tag." >&2
+  grace="${VF_RELEASE_TAG_GRACE_SECONDS:-900}"
+  head_ts="$(git log -1 --format=%ct HEAD 2>/dev/null || echo 0)"
+  now_ts="$(date +%s)"
+  if [ "$head_ts" -gt 0 ] 2>/dev/null; then
+    age=$(( now_ts - head_ts ))
+  else
+    age=-1
+  fi
+  if [ "$age" -ge 0 ] && [ "$age" -lt "$grace" ]; then
+    remaining=$(( grace - age ))
+    echo "[check-release-tag] … VERSION=$raw sans tag $tag pour l'instant — fenêtre de grâce (commit vieux de ${age}s, fenêtre ${grace}s, ${remaining}s restantes)." >&2
+    echo "  → pose le tag maintenant (git tag -a $tag -m \"$tag — <résumé>\" <commit> && git push origin $tag), ou relance ce job une fois le tag poussé." >&2
+    exit 3
+  fi
+  echo "[check-release-tag] ✗ VERSION=$raw mais AUCUN tag local $tag (hors fenêtre de grâce de ${grace}s)." >&2
   echo "  → git tag -a $tag -m \"$tag — <résumé>\" <commit> && git push origin $tag" >&2
   exit 1
 fi
