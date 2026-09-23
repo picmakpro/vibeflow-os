@@ -38,3 +38,16 @@ sans vérifier lequel prime — `--ws` court-circuite toujours l'environnement).
 
 **Rappel non modifié par cette partition** : aucune exécution du jalon avant la clôture de
 `fiabilite-v1.0` (Samuel, WhatsApp, 2026-09-23) — être inscrite ici ne vaut pas feu vert.
+
+**Ce fichier rend `rc=2` (« milestone introuvable ») si tu rejoues `check-state-integrity.sh`
+dessus tel quel.** C'est attendu, pas une corruption : le frontmatter d'un compartiment tout juste
+créé par le moteur n'a pas encore de champ `milestone:` ni de ligne `^Phase:` — c'est la
+dégradation honnête d'un compartiment neuf. Ça se résorbe tout seul au premier geste GSD réel ici
+(`gsd-new-milestone --ws gouvernance`, ou l'équivalent qui pose ces champs).
+
+**La CI de ce dépôt ne vérifie QUE le compartiment `fiabilite`** (`ci.yml:353`, cible en dur
+`.planning/workstreams/fiabilite/STATE.md` — choisie exprès pour qu'un `export GSD_WORKSTREAM` ne
+puisse pas détourner le gate vers un autre fichier). Elle ne se prononcera donc JAMAIS sur l'état de
+`gouvernance` — ni pour dire que c'est cassé, ni pour dire que c'est bon. Si tu veux savoir où en
+est ton compartiment, rejoue le gate toi-même avec `--file .planning/workstreams/gouvernance/STATE.md`
+explicitement ; n'attends rien de la CI sur ce point.
