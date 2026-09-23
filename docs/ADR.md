@@ -41,6 +41,7 @@
 | ADR-070 | 2026-08-06 | Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin | Validée |
 | ADR-072 | 2026-09-17 | Gardes in-repo sans règle côté serveur — ce qui est gardé, ce qui ne l'est pas, ce qui attend un accès admin | Validée |
 | ADR-073 | 2026-09-23 | Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag | Validée (non gatée machine) |
+| ADR-074 | 2026-09-23 | Portée des gates : bloquant pour l'intégrité technique, consultatif pour le jugement métier | Validée |
 
 > **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
 > `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
@@ -2434,10 +2435,13 @@ obligatoire par convention, pas par règle serveur) · **Contexte** :
 
 ### Contexte
 
-Le compte `picmakpro`, seul admin du dépôt, appartient à un tiers ; les permissions mesurées le
-2026-09-17 sont `admin: false, maintain: false, push: true`. Personne, dans les conditions
-actuelles, ne peut poser un ruleset, une PR obligatoire, un check requis ni une revue code owner.
-La Phase 41 a donc été recadrée sur ce qui est faisable avec le seul droit `push` (option (a),
+Le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt — c'est lui qui détient
+l'admin, pas un tiers anonyme. Les permissions mesurées le 2026-09-17 sont celles du compte de
+Samuel (`samuel-neveugall`) : `admin: false, maintain: false, push: true`. Dans la session qui a
+mesuré ce fait, personne ne pouvait poser de ruleset, de PR obligatoire, de check requis ni de
+revue code owner — Willy a depuis accepté de poser ce volet lui-même (WhatsApp, 2026-09-23), une
+fois le jalon `fiabilite-v1.0` clos (cf. Phase 42 du ROADMAP). La Phase 41 a donc été recadrée sur
+ce qui est faisable avec le seul droit `push` (option (a),
 arbitrage Samuel, AskUserQuestion session principale, 2026-09-17). Origine du besoin : O-3 du
 `25-SECURITY.md` — une hausse de baseline n'était gardée que par la relecture, et une même PR peut
 modifier un gate, sa suite et l'étape CI qui l'invoque. Fait mesuré à citer : `892f89a`
@@ -2625,3 +2629,51 @@ bloquant (avertissement CI, job vert) et tout autre code non nul comme un échec
 Aucune convention machine-lisible « fonctionnel vs doc » n'est posée : un futur gate qui voudrait
 distinguer automatiquement ces deux catégories de PR devra d'abord faire exister ce signal
 (label, chemin, préfixe) — cette ADR documente l'intention, pas son application outillée.
+
+## ADR-074 : Portée des gates — bloquant pour l'intégrité technique, consultatif pour le jugement métier
+
+**Date** : 2026-09-23 · **Statut** : Validée · **Décideur** : Samuel · **Voisines** : ADR-031
+(toute validation reste humaine — précisée ici, pas abrogée), ADR-072 (gardes in-repo qui
+signalent et tracent sans verrouiller — même registre de gouvernance machine) · **Contexte** :
+`.planning/notes/2026-09-16-doctrine-agentique-ouverte-collaboration-humaine.md`, jalon
+`gouvernance-labs-v1.0` (Phase 45, `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md`
+§5) — arbitrage Samuel, AskUserQuestion session principale, 2026-09-23.
+
+### Contexte / Tension constatée
+
+La note du 2026-09-16 pose des gates de rôle **consultatifs** : un refus porté par les managers
+(script advisory + refus humain), jamais par un hook, au titre d'ADR-031 (« toute validation reste
+humaine »). La Phase 45 du jalon `gouvernance-labs-v1.0` prévoit à l'inverse des hooks qui
+**refusent** — un hook central lit `agent_type` et bloque par rôle, les gates d'écriture G1, G5,
+G6 et G7 refusent par `permissionDecision: deny`. Les deux textes citent la même doctrine de fond
+(ADR-031) pour justifier des mécaniques opposées. Sans distinction explicite, la Phase 45 lirait
+comme une contradiction de la note du 2026-09-16 plutôt que comme son complément.
+
+### Décision
+
+Les deux portées coexistent, et se distinguent par leur objet — pas par le fait qu'un hook existe
+ou non :
+
+- **Bloquant**, réservé à l'**intégrité technique** : état du planning, écriture concurrente,
+  verrous et baux, cohérence d'un fichier que plusieurs écrivains touchent. Un défaut y est
+  **objectif** — il se constate par machine, sans jugement de valeur (un bail périmé, un fichier
+  d'état corrompu, une écriture hors de son verrou sont des faits, pas des opinions).
+- **Consultatif**, réservé au **jugement métier** : pertinence, qualité, opportunité d'un contenu
+  ou d'une action. Le refus y appartient à un manager ou à un humain, **jamais à un hook** — c'est
+  la doctrine déjà posée par la note du 2026-09-16 et par ADR-031, inchangée.
+
+### Conséquence
+
+La Phase 45 doit dire, **gate par gate**, de quelle portée il relève, et le justifier par la nature
+du défaut qu'il détecte (objectif/technique vs jugement/métier), pas par commodité d'implémentation.
+Un gate déclaré bloquant doit pouvoir **montrer qu'il rend rouge** — une mutation réelle exécutée,
+pas seulement décrite (même exigence que documentée ailleurs dans ce registre pour les gardes
+in-repo, ADR-072) ; à défaut, il redescend en consultatif. Cette ADR ne pré-classe pas G1/G2/G5/G6/G7
+elle-même — ce classement se fait au cadrage de la Phase 45, contre les deux critères ci-dessus.
+
+### Ce que cette ADR ne change pas
+
+**ADR-031 n'est pas abrogée, elle est précisée.** « Toute validation reste humaine » continue de
+gouverner le jugement métier — c'est le nouveau critère « consultatif » qui le dit explicitement.
+Rien dans cette ADR n'autorise un hook bloquant à juger de la qualité, de la pertinence ou de
+l'opportunité d'un travail : cette frontière est le point même de la décision.
