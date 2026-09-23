@@ -11,6 +11,23 @@ sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 release au-dessus de la première ligne qui commence par `## [` — une section « non releasé »
 entre crochets se retrouverait publiée SOUS la version suivante.*
 
+## [v2.65.0] — 2026-09-23
+
+**Patch** (rattrapage de publication : trois commits fonctionnels mergés sur `main` depuis
+`v2.64.0` sans jamais être publiés) :
+
+- **`dev-orchestrator` v2.23.1** — le ledger d'exigences (`check-requirements-survival.sh`,
+  `restore-requirements-ledger.sh`, `requirements-survival-detect.sh`, LEDG-01/02) et E4 de
+  `check-mission-exit.sh` sont rendus workstream-aware : ils résolvaient jusqu'ici toujours
+  littéralement `.planning/REQUIREMENTS.md`/`ROADMAP.md`/`STATE.md` à la racine, jamais le
+  compartiment de workstream actif, une fois un lab partitionné (D-02, 2026-09-23). Un lab dont le
+  planning est partitionné en workstreams voit désormais ces gardes et ce ledger fonctionner sur
+  son compartiment actif au lieu de rater silencieusement leur cible ; un lab non partitionné
+  garde le comportement historique inchangé. Correctif (patch, pas une capacité neuve) : ces
+  scripts étaient cassés sur un dépôt partitionné.
+- `conductor` v1.40.0 : déjà bumpé et changelogué (commit `62ea935`, cf.
+  `plugin/conductor/CHANGELOG.md`) — inclus dans cette release faute d'avoir été publié plus tôt.
+
 ## [v2.64.0] — 2026-09-22
 
 **Mineure** (deux modules montent en mineure, trois gardes CI nouvelles) :

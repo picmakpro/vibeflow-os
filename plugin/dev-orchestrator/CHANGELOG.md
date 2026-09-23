@@ -1,5 +1,33 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.23.1], 2026-09-23 : ledger d'exigences et E4 de check-mission-exit.sh rendus workstream-aware (D-02)
+
+**Patch** (correctif : ces scripts étaient cassés sur un dépôt partitionné, pas une capacité
+neuve) :
+
+- **`check-requirements-survival.sh` / `restore-requirements-ledger.sh` / `requirements-survival-detect.sh`**
+  (LEDG-01/02) : résolvaient toujours littéralement `<path>/.planning/REQUIREMENTS.md` — jamais
+  le compartiment de workstream actif, une fois le lab partitionné (D-02, 2026-09-23).
+  `vf_ledger_state()` accepte désormais un second paramètre optionnel
+  `<live_requirements_override>` (rétrocompatible, omis = comportement historique) ; les deux
+  scripts résolvent le compartiment actif via `workstream-policy.sh` (même politique partagée que
+  `check-workstream-pointer.sh`/`check-divergence.sh` : canal `GSD_WORKSTREAM` puis pointeur
+  `.planning/active-workstream`), best-effort et fail-open (D-18-10 : jamais un FAIL sur le
+  contenu). `MILESTONES.md` et l'archive `milestones/<jalon>-REQUIREMENTS.md` restent partagés à
+  la racine du `.planning/` — seul le ledger vivant est déplacé. Codes de sortie inchangés.
+  Nouveaux cas de test (39-41 côté `check-requirements-survival`, 28-30 côté
+  `restore-requirements-ledger`) : preuve par divergence qu'un compartiment nommé avec son propre
+  `REQUIREMENTS.md` est bien lu (et écrit, sous `--write`), pas la racine.
+- **`check-mission-exit.sh`** — E4_ROADMAP et E4_STATE résolvaient toujours littéralement
+  `<root>/.planning/ROADMAP.md` et `.planning/STATE.md` — jamais le compartiment de workstream
+  actif. Même patron que ci-dessus : source `workstream-policy.sh`, cible
+  `<root>/.planning/workstreams/<nom>/{ROADMAP,STATE}.md` si un workstream résout, replie sur
+  `<root>/.planning/{ROADMAP,STATE}.md` sinon (labs non partitionnés, comportement historique
+  inchangé). Sémantique et codes de sortie d'E4 inchangés. Suite existante rejouée sans
+  régression (28/28).
+- Motif : issue amont, angle mort découvert lors de la partition D-02 de ce dépôt le 2026-09-23 —
+  ces gardes et ce ledger supposaient jusqu'ici un planning non partitionné.
+
 ## [v2.23.0], 2026-09-22 : registre des agents dispatchés et reprise après chien de garde (issue #82)
 
 **Minor** (nouvelle doctrine de reprise, contrat observable du gate de sortie étendu) :
