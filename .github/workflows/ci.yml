@@ -1264,9 +1264,21 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         # GH_TOKEN requis : sans lui le gh du runner échoue en auth et le gate lisait cet
         # échec comme « aucune release » (faux négatif, vécu v2.39.0 le 2026-07-26).
+        # exit 3 = fenêtre de grâce (ADR-073) : le tag/la release sont posés quelques minutes
+        # après le merge, ce job tourne AU merge — un tag absent mais commit récent n'est pas
+        # un échec, c'est une attente. Non bloquant : avertissement, job vert.
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash scripts/check-release-tag.sh --remote
+        run: |
+          set -eu
+          rc=0
+          out="$(bash scripts/check-release-tag.sh --remote 2>&1)" || rc=$?
+          printf '%s\n' "$out"
+          case "$rc" in
+            0) : ;;
+            3) echo "::warning::check-release-tag : fenêtre de grâce — $(printf '%s\n' "$out" | tail -1)" ;;
+            *) exit "$rc" ;;
+          esac
 
   lab-frais:
     name: Lab frais (install baseline + Gate C — leçon UAT 2026-07-25, F2)
