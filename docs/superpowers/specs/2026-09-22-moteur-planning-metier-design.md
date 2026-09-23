@@ -296,6 +296,18 @@ invariant quel que soit le métier »* et *« ce que chaque métier paramètre �
 **Trois points d'entrée pour le métier, tous des fichiers** : les décisions du domaine, les
 gabarits de procédure, les rubriques de juge.
 
+> **Addendum (arbitrage Samuel, 2026-09-23, relayé à Willy par WhatsApp le même jour) — contraintes
+> gravées à l'inscription de la Phase 48 (ROADMAP.md § Phase 48, non planifiée ici).**
+> `plugin/conductor/references/team-kernel.md` est lu par les managers dev ET design ET les
+> bundles business/content ; les quatre rôles génériques ci-dessus dédoublent `gsd-discuss-phase`,
+> `gsd-plan-phase`, le plan-checker et `vf-coder` côté dev. Deux contraintes s'appliquent au
+> cadrage : (1) aucun ajout dans le `team-kernel` partagé si c'est évitable — les agents
+> génériques de cycle vivent dans le module du moteur métier ; toute modification du noyau reste
+> additive, explicitement portée non-dev, et sa nécessité démontrée ; (2) zéro régression sur les
+> labs dev, prouvée par une mesure qui peut rendre rouge (mutation exécutée), jamais déclarée —
+> routage du head, hooks de démarrage de session et doctrine des managers dev identiques
+> avant/après. Voir aussi la contrainte de profondeur au §7.1 (même addendum).
+
 ---
 
 ## 5. Les gates
@@ -498,6 +510,14 @@ chose injectée par défaut.**
 Mesuré : l'INDEX généré fait **1 392 octets** pour Keystone (~400 tokens), contre **36 800 octets**
 pour le `STATE.md` qu'il remplace. **Il est 26× plus petit.** Le §7 ne coûte pas de contexte, il en
 économise environ 10 000 tokens par injection.
+
+> **Addendum (arbitrage Samuel, 2026-09-23, relayé à Willy par WhatsApp le même jour) — contraintes
+> gravées à l'inscription de la Phase 48 (ROADMAP.md § Phase 48, non planifiée ici).** L'injection
+> d'index est **réservée aux labs pilotés par le moteur métier** : un lab dev garde ses messages
+> GSD — jamais deux moteurs qui injectent un état, donc jamais deux vérités sur la phase courante.
+> Contrainte de profondeur associée, mesurée en v2.63.2 le 2026-09-17 : tout agent générique de
+> cycle (cadreur, planificateur, contrôleur de plan, orchestrateur, §4) qui en dispatche un autre
+> vérifie la chaîne complète — l'outil Agent est absent à la profondeur 3.
 
 ### 7.2 Trois défauts corrigés
 

@@ -1784,6 +1784,28 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 47.
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §4, §7.1-7.3, §7.5, §8, §9.2 (exemption de re-cadrage des procédures). **Ouvert** : registre cible d'une clôture (§7.5), blocage par un tiers (§8).
+
+**Contraintes (arbitrage Samuel, 2026-09-23)** : risque mesuré au moment de l'inscription —
+`plugin/conductor/references/team-kernel.md` est lu par les managers dev ET design ET les bundles
+business/content ; les rôles génériques visés (cadreur, planificateur, contrôleur de plan,
+orchestrateur) dédoublent `gsd-discuss-phase`, `gsd-plan-phase`, le plan-checker et `vf-coder` ; un
+lab dev reçoit déjà son état par les hooks GSD au démarrage de session. Relayé à Willy par
+WhatsApp le 2026-09-23.
+
+1. **Aucun ajout dans le `team-kernel` partagé si c'est évitable.** Les agents génériques de cycle
+   vivent dans le module du moteur métier. Si une modification du noyau s'avère nécessaire, elle
+   est **additive**, explicitement **portée non-dev**, et sa nécessité est démontrée (pourquoi le
+   module seul ne suffit pas).
+2. **Zéro régression sur les labs dev — exigence non négociable, prouvée par une mesure, pas
+   déclarée.** Ce dépôt est un lab dev ; comportement identique avant/après sur le routage du head,
+   les hooks de démarrage de session et la doctrine des managers dev. La preuve doit pouvoir
+   rendre rouge (mutation exécutée), sinon elle ne compte pas.
+3. **Injection d'index réservée aux labs pilotés par le moteur métier.** Un lab dev garde ses
+   messages GSD : jamais deux moteurs qui injectent un état, donc jamais deux vérités sur la phase
+   courante.
+4. **Contrainte de profondeur (v2.63.2, mesurée le 2026-09-17)** : tout agent générique qui en
+   dispatche un autre vérifie la chaîne complète — l'outil Agent est absent à la profondeur 3.
+
 **Plans:** 0 plans
 
 Plans:
