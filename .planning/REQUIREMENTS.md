@@ -860,7 +860,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | PART-07 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-08 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-09 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
-| PROT-01 | Phase 41 | Hors d'atteinte — 2026-09-18 : exige un accès admin (permissions mesurées le 2026-09-17, `admin: false, maintain: false, push: true`), différé au `BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ », déclencheur de reprise écrit |
+| PROT-01 | Phase 41 | Pending — reprise du 2026-09-23 (accès admin constaté, D-02bis) : volet côté serveur replanifié en 41-01 à 41-13 ; statut antérieur : hors d'atteinte (2026-09-18) |
 | PROT-02 | Phase 41 | Complete — 2026-09-18, plan 41-17/41-19 : ordre des étapes avant `check-release-tag`, absence d'entrée `tags:` dans le déclencheur, voie `merge-commit-sha` pour les merges par rebase, hook `pre-push` conservé |
 | PROT-03 | Phase 41 | Complete — 2026-09-18, plan 41-18 : ADR-072 (doctrine des trois gardes et de leur limite de fond) et son résumé dans `CLAUDE.md` |
 | PROT-04 | Phase 41 | Complete — 2026-09-18, plan 41-14 : `check-baseline-arbitrage.sh`, neuf mutants tués, observation O-3 du `25-SECURITY.md` signalée et tracée |
@@ -974,6 +974,11 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   un tiers. Déclencheur de reprise : un accès admin accordé, ou un transfert du dépôt. Renvoi :
   `BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ » et `41-CONTEXT.md` § Prémisse
   renversée (D-01 à D-08 suspendus, non annulés). Ni abandonné, ni requalifié : il attend.
+  Reprise (2026-09-23) : fait corrigé — `picmakpro` est le compte de Willy, admin du dépôt
+  (`41-CONTEXT.md` § REPRISE) ; accès admin constaté, volet côté serveur replanifié (plans
+  41-01 à 41-13) ; contournement accordé à Samuel et Willy nommément, mode `always` (D-02bis
+  — arbitrage Willy, AskUserQuestion session principale, 2026-09-23). Coché seulement à la
+  clôture, sur pièce (`41-PREUVES.md`, plan 41-13).
 - [x] **PROT-02**: Compatibilité avec la discipline de release du `CLAUDE.md`. **COCHÉ** —
   clôture citant les clés `REJEU-GATES` et `G3-FIXTURE` (registre `41-PREUVES.md` § 41-19) et les
   trois preuves du plan 41-17 : ordre des étapes avant `check-release-tag`, absence d'entrée
