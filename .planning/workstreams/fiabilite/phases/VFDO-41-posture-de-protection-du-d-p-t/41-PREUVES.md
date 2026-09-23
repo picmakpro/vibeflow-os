@@ -135,3 +135,5 @@ motif `/.github/` de `.github/CODEOWNERS` (`origin/main`) → `codeowners=oui` :
 owner » ; elle passera par la revue `@picmakpro` normale une fois la règle posée, pas par un
 contournement. `mergeStateStatus=CLEAN`, `reviewDecision` vide (aucune revue exigée tant qu'aucun
 ruleset n'est actif).
+
+POSE-DECISION: option=poser decideur=Willy canal=AskUserQuestion-session-principale date=2026-09-23 fenetre_preuves_annoncee=non
