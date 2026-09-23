@@ -1693,7 +1693,7 @@ Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-1
 ### Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents
 
 **Goal:** Le gate des agents (`check-agents.sh`) lit ses listes de référence — outils, champs, types natifs, modèles, modes, niveaux d'effort — dans un **manifeste daté** et rend **INDÉTERMINÉ** quand ce manifeste est périmé ; il tient les invariants de doctrine I1 à I7 et découvre les agents récursivement.
-**Requirements**: TBD (posés au cadrage)
+**Requirements**: FABR-01, FABR-02, FABR-03, FABR-04, FABR-05
 **Depends on:** Phase 41 (ordre de la ROADMAP). **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — ouverte au 2026-09-23, CI rouge sur G-2 faute de trailer `Gate-Touche:`.
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §1.1-1.3, §3, §4, B-01. Hors périmètre : §8 (`skills:`, `cacheTtl`, `maxTurns`, `color:`).
 **Plans:** 0 plans
