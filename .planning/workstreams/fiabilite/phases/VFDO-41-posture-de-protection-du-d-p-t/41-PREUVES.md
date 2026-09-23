@@ -137,3 +137,69 @@ contournement. `mergeStateStatus=CLEAN`, `reviewDecision` vide (aucune revue exi
 ruleset n'est actif).
 
 POSE-DECISION: option=poser decideur=Willy canal=AskUserQuestion-session-principale date=2026-09-23 fenetre_preuves_annoncee=non
+
+Pose effectuée par l'exécutant (jeton admin `picmakpro` de la session), exactement deux appels
+d'écriture, dans l'ordre imposé, chacun depuis `origin/main` (sha
+`a9620659c24103a103a5ca35c882faedb255b2c4`, tête au moment de la pose — postérieure aux mesures
+de `MAIN-VERTE-AVANT-POSE:` et `PR-EN-VOL-AVANT:` : 27 commits supplémentaires atterris sur `main`
+entre-temps, dont un rattrapage de release `v2.65.0` et le merge de la PR `#93` elle-même ;
+`.github/rulesets/main.json`, `.github/rulesets/tags-v.json` et `.github/CODEOWNERS` inchangés sur
+cette plage — `git diff c78b238..origin/main -- .github/rulesets/main.json
+.github/rulesets/tags-v.json .github/CODEOWNERS` vide, source toujours celle relue conforme à la
+Task 1) : `git show origin/main:.github/rulesets/main.json | gh api -X POST
+repos/picmakpro/vibeflow-os/rulesets --input -` puis la même commande avec
+`.github/rulesets/tags-v.json`. Aucun `POSE-ECHEC:` — les deux appels ont réussi au premier essai.
+
+POSE-BRANCHE: id=23892920 enforcement=active pose_par=picmakpro source=origin/main:a9620659c24103a103a5ca35c882faedb255b2c4
+POSE-TAGS: id=23892922 enforcement=active pose_par=picmakpro source=origin/main:a9620659c24103a103a5ca35c882faedb255b2c4
+
+POSE-BYPASS-RELU: branche=User:151974738:always,User:203482067:always tags=User:151974738:always,User:203482067:always lu_par=picmakpro
+
+POSE-MSG: branche={"_links":{"html":{"href":"https://github.com/picmakpro/vibeflow-os/rules/23892920"},"self":{"href":"https://api.github.com/repos/picmakpro/vibeflow-os/rulesets/23892920"}},"bypass_actors":[{"actor_id":151974738,"actor_type":"User","bypass_mode":"always"},{"actor_id":203482067,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":[],"include":["refs/heads/main"]}},"created_at":"2026-09-23T19:56:30.490+02:00","current_user_can_bypass":"always","enforcement":"active","id":23892920,"name":"main — PR obligatoire, 4 checks requis, revue code owner (Phase 41)","node_id":"RRS_lACqUmVwb3NpdG9yec5KZh8BzgFsk7g","rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"parameters":{"allowed_merge_methods":["merge","squash","rebase"],"dismiss_stale_reviews_on_push":false,"require_code_owner_review":true,"require_extra_approval_for_unattributed_changes":true,"require_last_push_approval":false,"required_approving_review_count":0,"required_review_thread_resolution":false,"required_reviewers":[]},"type":"pull_request"},{"parameters":{"do_not_enforce_on_create":false,"required_status_checks":[{"context":"Gates de qualité (mode strict)","integration_id":15368},{"context":"Lab frais (install baseline + Gate C — leçon UAT 2026-07-25, F2)","integration_id":15368},{"context":"Lab frais arme (as-installed testing — le gate installe, sur un univers non vide, #38)","integration_id":15368},{"context":"Suites de tests (découverte non vide)","integration_id":15368}],"strict_required_status_checks_policy":true},"type":"required_status_checks"}],"source":"picmakpro/vibeflow-os","source_type":"Repository","target":"branch","updated_at":"2026-09-23T19:56:30.592+02:00"} tags={"_links":{"html":{"href":"https://github.com/picmakpro/vibeflow-os/rules/23892922"},"self":{"href":"https://api.github.com/repos/picmakpro/vibeflow-os/rulesets/23892922"}},"bypass_actors":[{"actor_id":151974738,"actor_type":"User","bypass_mode":"always"},{"actor_id":203482067,"actor_type":"User","bypass_mode":"always"}],"conditions":{"ref_name":{"exclude":[],"include":["refs/tags/v*"]}},"created_at":"2026-09-23T19:56:35.140+02:00","current_user_can_bypass":"always","enforcement":"active","id":23892922,"name":"tags v* — réécriture et suppression tracées, création libre (Phase 41)","node_id":"RRS_lACqUmVwb3NpdG9yec5KZh8BzgFsk7o","rules":[{"type":"deletion"},{"type":"non_fast_forward"},{"type":"update"}],"source":"picmakpro/vibeflow-os","source_type":"Repository","target":"tag","updated_at":"2026-09-23T19:56:35.201+02:00"}
+
+POSE-CONFORME: branche=oui tags=oui contextes_egaux_source=oui rules_branches_main=oui
+
+M2: picmakpro_branche=always picmakpro_tags=always relue_picmakpro=oui samuel_branche=non_mesure samuel_tags=non_mesure bypass_users_relus=oui
+
+M2-VERDICT: CONFORME — les deux entrées `bypass_actors` relues sur chacun des deux rulesets sont
+exactement les deux `User` de `ACTEURS-CONTOURNEMENT:` (151974738, 203482067) en mode `always` ;
+`current_user_can_bypass` de `picmakpro` relu à `always` sur les deux ; `POSE-CONFORME:` à `oui`
+partout ; aucun `POSE-ECHEC:`.
+
+ACCES-RULE-SUITES: picmakpro=ok samuel-neveugall=non_mesure
+
+Note sur `ACCES-RULE-SUITES:` : `gh api "repos/picmakpro/vibeflow-os/rulesets/rule-suites?time_period=hour"`
+rend `[]` (liste vide, aucun contournement mesuré dans l'heure — attendu, aucune PR n'a encore été
+mergée en contournant depuis la pose) ; l'appel lui-même réussit (rc=0) sous le jeton admin
+`picmakpro`, donc `ok`. `samuel-neveugall` reste `non_mesure` : aucun jeton de Samuel sur ce poste.
+
+PR-EN-VOL-APRES: numeros=#93,#96,#98 detail=#93:etat=MERGED:revue=aucune:fusionnee_par=samuel-neveugall,#96:etat=BEHIND:revue=aucune:fusionnee_par=aucun,#98:etat=CLEAN:revue=aucune:fusionnee_par=aucun
+
+Note sur `PR-EN-VOL-APRES:` : la PR `#93` (seule PR de `PR-EN-VOL-AVANT:`) a été mergée par
+`samuel-neveugall` (commit `e23bbe3`) AVANT la pose des rulesets — relecture faite quelques minutes
+après la pose, état `MERGED`, `mergeStateStatus` API `UNKNOWN` (relu deux fois : valeur stable,
+attendue pour une PR déjà fermée — GitHub ne calcule plus la mergeabilité d'une PR non ouverte) ;
+`reviewDecision` vide → `revue=aucune`. Rien n'a été fait sur cette PR par la phase. Deux PR
+ouvertes vers `main` sont apparues depuis la mesure `PR-EN-VOL-AVANT:` (ouvertes avant la pose,
+toujours ouvertes après) : `#96` (`docs/backlog-partition-au-demarrage`, `mergeStateStatus=BEHIND`
+après relecture — un premier `UNKNOWN` relu) et `#98`
+(`chore/phases-41-1-41-2-inscription`, `mergeStateStatus=CLEAN`) ; ni l'une ni l'autre commentée,
+mise à jour, fermée ou mergée par cette phase — état relevé en lecture seule uniquement.
+
+REJEU-GATES-41-05: rc=0 etapes=14 sautees=3 en_echec=0
+REJEU-TESTS-41-05: rc=1 suites=84 echecs=2 echecs_preexistants_ledger=WINDOWS#6,WINDOWS#7
+
+Note sur le rejeu `tests` après la pose : `bash …/replay-ci-jobs.sh --job tests` rend 84 suites,
+2 échecs — `plugin/_internal/runtime-adapter/tests/test-register-codex-agent-path-traversal.sh`
+(cas `T4 [majuscules]`, macOS filesystem insensible à la casse) et
+`plugin/conductor/scripts/tests/test-check-description-fidelity.sh` (36 KO, module Python PyYAML
+introuvable pour `python3` sur ce poste). Les DEUX sont déjà consignés `open` dans
+`.planning/WINDOWS.md` (id 6 et 7, phase 41, plan 41-01) — rouges préexistants, hors périmètre de
+ce plan (JSON/pose de rulesets), reproduits à l'identique sur une extraction d'`origin/main`
+indépendante de tout travail de ce plan ; ni neutralisés ni fixés sans validation humaine
+(ADR-031). Confirmation indépendante que ce ne sont pas des régressions de la pose : les 4 checks
+CI réels de la tête d'`origin/main` (`a9620659…`, source de la pose) sont `success`, y compris
+« Suites de tests (découverte non vide) » — l'écart est un artefact d'environnement local
+(sensibilité à la casse du système de fichiers, dépendance Python absente), pas un état réel du
+dépôt. `gates` rejoué sans écart (14 étapes, 3 sautées par construction — conditionnelles à
+`main`/push —, 0 en échec).
