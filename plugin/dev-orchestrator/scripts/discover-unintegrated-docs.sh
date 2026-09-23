@@ -155,9 +155,12 @@ fi
 # Le script reste NON BLOQUANT : une ligne de stderr n'est pas un blocage, les codes de sortie
 # (0/3/64) sont INCHANGÉS.
 if [ -n "$WS_POLICY" ]; then
-  _WS_LIST="$(mktemp)" || _WS_LIST=""
-  if [ -n "$_WS_LIST" ]; then
-    vf_ws_enumerate "$PLANNING_DIR" > "$_WS_LIST"   # stderr NON redirigé : la raison reste audible
+  _WS_TMP="$(mktemp)" || _WS_TMP=""
+  if [ -n "$_WS_TMP" ]; then
+    # Nom en *TMP* EXIGÉ par l'invariant T21b de test-dev-orchestrator.sh (SC5) : toute
+    # redirection d'écriture de ce script cible /dev/null, un descripteur, ou une variable dont le
+    # nom contient TMP. Mesuré : `_WS_LIST` faisait rougir T21b.
+    vf_ws_enumerate "$PLANNING_DIR" > "$_WS_TMP"   # stderr NON redirigé : la raison reste audible
     _ws_rc=$?
     case "$_ws_rc" in
       0)
@@ -167,7 +170,7 @@ if [ -n "$WS_POLICY" ]; then
                    "$_wsdir/PROJECT.md" "$_wsdir/milestones"/*.md; do
             [ -f "$r" ] && cat "$r" >> "$REG_TMP"
           done
-        done < "$_WS_LIST"
+        done < "$_WS_TMP"
         ;;
       3)
         : # SILENCE LÉGITIME — dépôt non partitionné. Le repli racine ci-dessous est l'univers
@@ -180,7 +183,7 @@ if [ -n "$WS_POLICY" ]; then
         echo "[discover-unintegrated-docs] vf_ws_enumerate : code de sortie imprévu ($_ws_rc, attendu 0/2/3) — registre par compartiment sauté, la liste ci-dessous peut sur-signaler" >&2
         ;;
     esac
-    rm -f "$_WS_LIST"
+    rm -f "$_WS_TMP"
   else
     echo "[discover-unintegrated-docs] mktemp a échoué pour l'énumération des compartiments — registre par compartiment sauté, repli racine seul" >&2
   fi
