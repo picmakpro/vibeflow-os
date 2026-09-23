@@ -1,5 +1,33 @@
 # CHANGELOG — dev-orchestrator
 
+## Non releasé
+
+> Section **transitoire** : le plan `41.1-08` de la Phase 41.1 l'absorbe dans l'entrée versionnée
+> qu'il pose (fusion du contenu, puis retrait de cet en-tête). Aucun bump de `VERSION` ici.
+
+**Doctrine (Phase 41.1, lot L07 — WSAW-05/06/07)** — origine : l'angle mort constaté à la
+partition D-02 du 2026-09-23 (PR #94), repris à l'ouverture de la Phase 41.1 depuis le ROADMAP.
+
+- **`references/workstreams.md` §1** : la **procédure de bascule** et sa **précondition
+  vérifiable** — absentes jusqu'ici, §1 ne donnait que `create <nom> --migrate-name <nom>`. La
+  précondition est la condition dure du §5 (« aucune partition tant qu'une phase est en vol »),
+  nommée comme un **champ du disque** à lire, jamais présumée depuis la mémoire d'une session.
+- **`references/workstreams.md` §3** : l'affirmation devenue **fausse** depuis la PR #94 (« l'état
+  nominal de tous nos labs à ce jour ») est corrigée — elle distingue désormais **ce** dépôt
+  (`vibeflow-os`, partitionné depuis le 2026-09-23) des **labs qui installent VibeFlow**, où le
+  non-partitionné reste le défaut.
+- **`references/workstreams.md` chapeau** : le **choix** de partitionner et son **démarrage**
+  entrent dans le vocabulaire du fichier ; le contenu doctrinal de ce choix appartient à la
+  Phase 41.2.
+- **`references/workstreams.md` §6 (neuf)** : la **définition unique** de « compartiment
+  conforme » — la trichotomie D-02 **amendée** (conforme / non initialisé sur le frontmatter
+  seul / verdict nommé d'ambiguïté, une notice jamais un échec / corrompu), recopiée **verbatim**
+  du cadrage et vérifiée par `cmp`. Elle vit désormais dans un artefact **versionné et
+  distribué** : la Phase 41.2 la consomme (WSCH-02) sans avoir accès au CONTEXT d'une phase close.
+- **`docs/ADR.md` (ce dépôt, hors module)** : ADR-069 gagne un amendement daté 2026-09-23 qui pose
+  la **frontière gate/workflow** par le rôle — `GSD_WORKSTREAM` reste le canal nominal de ce qui
+  travaille, un gate ne dérive jamais sa cible d'une valeur qu'un `export` peut changer.
+
 ## [v2.23.1], 2026-09-23 : ledger d'exigences et E4 de check-mission-exit.sh rendus workstream-aware (D-02)
 
 **Patch** (correctif : ces scripts étaient cassés sur un dépôt partitionné, pas une capacité

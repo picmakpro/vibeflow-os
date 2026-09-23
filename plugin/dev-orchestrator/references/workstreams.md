@@ -7,6 +7,9 @@
 > et leurs dates appartiennent à **ADR-069** : ce fichier ne la rejoue pas, il dit comment
 > travailler avec. Toutes les mesures ci-dessous sont de première main sur `@opengsd/gsd-core`
 > **1.9.1**, au **2026-08-04**.
+>
+> Le CHOIX de partitionner se pose au DÉMARRAGE d'un lab (Phase 41.2 de ce dépôt) — ce fichier
+> décrit comment travailler UNE FOIS le choix fait, dans un sens comme dans l'autre.
 
 ---
 
@@ -30,6 +33,22 @@ Toute autre valeur produit la liste d'erreur amont, à citer plutôt qu'à devin
 La fonction de migration est **exportée sans sous-commande propre** : il n'existe pas de
 `workstream migrate`. La partition d'un dépôt passe donc par `create <nom> --migrate-name <nom>`,
 jamais par une commande de migration dédiée qu'on chercherait en vain.
+
+**Procédure de bascule, et sa précondition.** Partitionner un dépôt qui ne l'est pas encore suit
+trois gestes, dans cet ordre :
+
+1. **Vérifier la précondition** — **aucune phase en vol**, la condition dure du §5 ci-dessous, lue
+   sur un **champ du disque** et jamais présumée depuis la mémoire d'une session : dans le
+   `STATE.md` visé, `status` différent de `executing` sur la phase courante, et aucun dossier de
+   phase dont le `SUMMARY.md` manque encore. La règle n'est pas reformulée ici : c'est celle du
+   §5, une seule écriture.
+2. **`create <nom> --migrate-name <nom>`** pour le premier compartiment — c'est lui qui migre le
+   contenu resté à la racine.
+3. **`create <nom>`** pour chaque compartiment supplémentaire, créé vide.
+
+Le **choix** de partitionner **au démarrage** d'un lab, avant toute phase, est le geste le moins
+coûteux : la précondition du point 1 y est vraie sans rien avoir à attendre. L'ergonomie de ce
+choix appartient à la Phase 41.2 de ce dépôt, pas à ce fichier.
 
 ## 2. La résolution du compartiment actif — trois niveaux court-circuitants
 
@@ -89,8 +108,12 @@ tomberait sur le canal in-repo et n'aurait pas ce problème — ne généralise 
 sans un mot. Le gate `check-workstream-pointer.sh` (module `conductor`) existe pour rendre cet
 échec audible : il ne consulte que les **deux canaux composables** (`GSD_WORKSTREAM`, puis le
 pointeur partagé in-repo) et échoue bruyamment quand aucun des deux ne résout sur un dépôt
-partitionné. Sur un dépôt non partitionné il sort en 3 sans un mot : c'est l'état nominal de tous
-nos labs à ce jour, pas un manque.
+partitionné. Sur un dépôt non partitionné il sort en 3 sans un mot — l'état nominal d'un **lab qui
+installe VibeFlow**, où le non-partitionné reste le défaut (Phase 41.2, WSCH-01 : une question,
+jamais imposé). **Ce dépôt lui-même (`vibeflow-os`) est partitionné depuis le 2026-09-23** (PR #94,
+D-02) : l'affirmation antérieure de ce paragraphe (« l'état nominal de tous nos labs ») ne décrivait
+plus l'état de ce dépôt-ci, et elle est corrigée ici pour ne plus confondre **ce** dépôt et les labs
+qu'il distribue.
 
 ## 4. Les quatre risques mesurés, chacun avec son geste
 
@@ -171,3 +194,79 @@ Ce n'est pas une recommandation, c'est une interdiction. Sa raison est le risque
 cours est exactement l'état où un dossier de phase existe des deux côtés de la partition, donc
 exactement le cas où la divergence invisible frappe — sans que Git ait rien à en dire. On
 partitionne entre deux phases, jamais pendant.
+
+## 6. La définition unique de « compartiment conforme »
+
+**Cette section est la source.** Tout gate, tout skill, toute phase qui a besoin de juger l'état
+d'un compartiment classe selon la trichotomie ci-dessous, et ne la redéfinit jamais ailleurs. Elle
+est recopiée **verbatim** de la décision D-02 du cadrage de la Phase 41.1 (`41.1-CONTEXT.md`, D-02
+dans sa rédaction amendée du 2026-09-23) — le CONTEXT en est la trace de décision, ce fichier en
+est le porteur **versionné et distribué**, parce qu'une définition dont le seul porteur est le
+CONTEXT d'une phase close est inaccessible à qui devra l'appliquer.
+
+> Un compartiment `.planning/workstreams/<nom>/` est **conforme** quand (1) `STATE.md` existe, est
+> lisible, et son frontmatter porte au minimum `gsd_state_version`, `milestone`, `current_phase` et
+> `status` renseignés (au-delà de la seule facture nominale `workstream create`) ; (2) aucune des
+> divergences S2 (orphan)/S4 (roadmap-conflict)/S5 (rootonly) de `check-divergence.sh` n'y est
+> détectée pour ce compartiment.
+>
+> Il est **non initialisé** quand le dossier existe, `vf_ws_path_nolink` le valide (pas un lien),
+> et que son `STATE.md` ne porte QUE la facture nominale de `workstream create` — frontmatter
+> réduit à `workstream:` + `created:`, sans `gsd_state_version`. Le critère porte sur le
+> **frontmatter seul** : la présence ou l'absence de `ROADMAP.md`/`REQUIREMENTS.md`/`phases/` de
+> contenu n'entre PAS dans la classification. C'est un compartiment créé, jamais travaillé côté
+> état — verdict propre et visible, **jamais un échec**. `gouvernance/STATE.md` (frontmatter à
+> 2 clés, rc=2 mesuré le 2026-09-23) relève de cette catégorie.
+>
+> **Verdict nommé d'ambiguïté (amendement du 2026-09-23, arbitrage Samuel, AskUserQuestion session
+> principale — Q1 option b).** Quand un `STATE.md` au frontmatter nominal coexiste AVEC du contenu
+> (`ROADMAP.md` non vide, `REQUIREMENTS.md` non vide, ou au moins un dossier sous `phases/`), le
+> gate émet EN PLUS du verdict « non initialisé » une **notice nommée d'ambiguïté** — une notice,
+> **jamais un échec**. Cette notice **nomme les DEUX lectures possibles et n'en choisit aucune** :
+>
+> - lecture (i) — compartiment **neuf alimenté par carve-out** : la partition a déplacé du contenu
+>   dans un compartiment dont l'état n'a pas encore été initialisé (le cas de `gouvernance`) ;
+> - lecture (ii) — compartiment **travaillé dont l'état a été tronqué** : un `STATE.md` amputé en
+>   plein cycle d'écriture — le cas que le paragraphe « corrompu » ci-dessous nomme mot pour mot.
+>
+> Motif : les deux situations ont la **même signature sur disque**. Aucune règle locale ne peut les
+> départager. Discriminer par l'historique git a été **explicitement écarté** (l'arbitrage nomme
+> le motif : cela ferait dépendre le verdict d'un passé que rien ne garantit présent — un dépôt
+> fraîchement cloné en shallow, un compartiment jamais commité). Le gate rend donc les deux
+> lectures visibles plutôt que d'en exempter une en silence : `gouvernance` reste vert, et une
+> troncature réelle **cesse d'être invisible**.
+>
+> Invariant : les deux verdicts — non-initialisé simple et non-initialisé + notice d'ambiguïté —
+> sont des **non-échecs**. Le gate ne rougit sur aucun des deux.
+>
+> Il est **corrompu** dans tout autre cas : fichier illisible pour une raison qui n'est PAS « jamais
+> initialisé » (permissions, frontmatter tronqué au milieu d'un cycle d'écriture, `current_phase`
+> incohérent avec les dossiers de phase réellement présents, etc.) — c'est-à-dire tout état qui
+> n'est NI le frontmatter minimal nominal du moteur NI structurellement sain selon (1)-(2)
+> ci-dessus.
+>
+> **Frontière avec la notice d'ambiguïté :** une troncature qui laisse EXACTEMENT le frontmatter
+> nominal à 2 clés est indiscernable d'une création — elle relève de « non initialisé » et déclenche
+> la notice d'ambiguïté ci-dessus dès qu'il y a du contenu à côté. Une troncature qui laisse tout
+> AUTRE chose (3 clés, une clé orpheline, un frontmatter non fermé, `gsd_state_version` présent mais
+> `current_phase` manquant) relève de « corrompu » et reste un écart.
+
+**HORS DÉFINITION — la présence de `ROADMAP.md` et `REQUIREMENTS.md` (correction C1-2, juge frais
+tour 4).** La rédaction précédente faisait de « `ROADMAP.md` et `REQUIREMENTS.md` existent et sont
+lisibles » une clause de la conformité. AUCUN gate du périmètre de cette phase ne l'établit —
+MESURÉ le 2026-09-23 : `check-divergence.sh` traite un `ROADMAP.md` absent comme un NON-ÉCART
+(`check_s4a`, l.194-197 : « S4 non applicable — pas de ROADMAP.md dans ce compartiment », puis
+`return 0`), et `REQUIREMENTS.md` n'est lu par AUCUN script du périmètre (0 occurrence dans
+`check-divergence.sh`, `check-state-integrity.sh` et `workstream-policy.sh`). La clause est donc
+RETIRÉE de la définition, au lieu d'y rester écrite sans que rien ne la mesure : la Phase 41.2
+(WSCH-02) ne doit pas hériter d'un critère qu'aucun gate ne sait appliquer, sinon WSCH-04 (« les
+gates passent au vert sur chaque compartiment ») serait VRAI sur un compartiment que WSCH-02
+déclarerait non conforme. Même motif pour l'exemple « `ROADMAP.md` absent alors que `STATE.md`
+atteste d'un `current_phase` > 0 », retiré de la liste des formes corrompues : il n'est mesuré par
+rien. Le besoin reste légitime et part au BACKLOG — le mesurer demande un gate neuf, hors périmètre
+d'une phase déjà à neuf plans et trois tours de jugement.
+
+Cette trichotomie est **indépendante** de la primitive d'énumération D-01 (qui ne fait que lister
+des chemins) : elle est appliquée PAR CHAQUE GATE qui a besoin de juger un compartiment, pas par la
+primitive elle-même — un gate consulte `vf_ws_enumerate`, puis classe chaque chemin retourné selon
+cette définition.
