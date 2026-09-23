@@ -1,7 +1,7 @@
 # Phase 41: Posture de protection du dépôt - Context
 
 **Gathered:** 2026-09-17
-**Status:** PRÉMISSE RENVERSÉE le 2026-09-17 — exécution ARRÊTÉE après 41-01 Task 1. Aucun droit admin dans cette session : D-01 à D-08 sont **suspendus**, les plans qui en dépendent sont **différés en attente d'accès** (§ Prémisse renversée). Un périmètre sans admin est à cadrer et à arbitrer — proposition relayée à la session principale le 2026-09-17.
+**Status:** REPRISE le 2026-09-23 (accès admin constaté, D-02bis) — PRÉMISSE RENVERSÉE le 2026-09-17 — exécution ARRÊTÉE après 41-01 Task 1. Aucun droit admin dans cette session : D-01 à D-08 sont **suspendus**, les plans qui en dépendent sont **différés en attente d'accès** (§ Prémisse renversée). Un périmètre sans admin est à cadrer et à arbitrer — proposition relayée à la session principale le 2026-09-17.
 
 <domain>
 ## Phase Boundary
@@ -29,7 +29,44 @@ toutes les PR ouvertes). Le dépôt n'en porte que la **source versionnée**, la
 </domain>
 
 <facts>
-## Prémisse renversée — 2026-09-17 (à lire AVANT tout le reste)
+## REPRISE — 2026-09-23 (à lire AVANT la section du 2026-09-17, qu'elle amende)
+
+Le **déclencheur de reprise** du `BACKLOG.md` (§ « Protection de `main` côté GitHub — DIFFÉRÉ ») est
+**tombé** le 2026-09-23. Faits mesurés par la session principale (vibeflow-dev, Willy) ce jour :
+
+1. **`picmakpro` est le compte de Willy, et il est admin du dépôt.** `gh api user` → `picmakpro`
+   (id 203482067) ; `gh api repos/picmakpro/vibeflow-os --jq .permissions` → `admin: true,
+   maintain: true, push: true`. Le « tiers » du 2026-09-17 est Willy, co-auteur du plugin.
+2. **Collaborateurs mesurés** (`gh api repos/picmakpro/vibeflow-os/collaborators`) : `samuel-neveugall`
+   (id 151974738, `write`) et `picmakpro` (id 203482067, `admin`). **`BatoEnLambo` et `Djeee8` ne sont
+   plus collaborateurs** : D-06 est **sans objet**.
+3. **Rulesets actuels** : `gh api repos/picmakpro/vibeflow-os/rulesets` → `[]` (longueur 0).
+4. **Demande de reprise** : Samuel à Willy (WhatsApp, 2026-09-23) : « Vu que j'ai pas des droits
+   admins pour clore la phase 41, tu pourrais le faire stp ? » — réponse de Willy : « Okok » ; même
+   message : `check-release-tag` échoue toujours au moment du merge (le tag arrive après), **ne pas
+   l'exiger avant un merge**.
+5. **Feu vert d'exécution** : Willy, AskUserQuestion session principale, 2026-09-23 — « Oui,
+   maintenant » (volet admin : plans différés 41-01 à 41-13).
+
+### Arbitrage qui amende D-02 — contournement par deux utilisateurs nommés
+
+**D-02bis** (Willy, AskUserQuestion session principale, 2026-09-23) : le contournement des deux
+rulesets est accordé à **Samuel et Willy, nommément** — deux entrées `bypass_actors` de type
+`User` : `samuel-neveugall` (151974738) et `picmakpro` (203482067), mode `always`. **Plus aucun
+contournement par rôle** : le `RepositoryRole` `write` de D-02 est abandonné, la sonde de son
+`actor_id` (41-01 Task 2) devient sans objet. Faisabilité vérifiée le 2026-09-23 dans la doc REST
+des rulesets : `User` est un `actor_type` accepté, sans restriction pour les dépôts personnels
+(seul `OrganizationAdmin` l'est). **À mesurer à la pose, jamais supposé** : que les deux entrées
+soient bien relues depuis `GET /rulesets/{id}`.
+
+Conséquence : la doctrine de D-02 (« garde-fou par défaut + trace, personne bloqué en urgence »)
+**tient** pour Samuel et Willy ; elle ne vaut plus pour un compte `write` quelconque — il n'y en a
+plus d'autre aujourd'hui. D-01 reste faux comme fait daté ; **D-03, D-04, D-05, D-07, D-08, D-09,
+D-10 reprennent vie tels quels** ; D-06 sans objet ; D-04 à lire avec le point 4 ci-dessus
+(`check-release-tag` n'est pas un des 4 jobs requis — à vérifier contre `CONTEXTES-CHECKS` de
+`41-PREUVES.md`).
+
+## Prémisse renversée — 2026-09-17 (historique — amendée par la section REPRISE ci-dessus)
 
 Arbitrage et constat Samuel, AskUserQuestion session principale, 2026-09-17, relayés au manager par
 SendMessage le même jour :
