@@ -1217,6 +1217,117 @@ jobs:
               ;;
           esac
 
+      - name: check-affirmation-non-mesuree (G-4 — affirmation de prose non mesurée)
+        # POURQUOI CETTE ÉTAPE EXISTE. La PR #90 a écrit dans `CLAUDE.md` que « le serveur refuse
+        # le push direct » et que « toute mise à jour de `main` passe par une PR », au présent de
+        # l'indicatif — alors que `gh api repos/picmakpro/vibeflow-os/rulesets` rendait `[]` au
+        # même moment : rien ne comparait une affirmation de prose à l'état réel du serveur. G-4
+        # interdit qu'un fichier porteur (CLAUDE.md, docs/ADR.md, README.md, README.fr.md,
+        # manual/**/*.md) affirme, au présent et sans qualificateur, une protection serveur que la
+        # mesure versionnée (`.planning/server-rulesets-measurement.json`, écrite par
+        # `scripts/measure-server-rulesets.sh`, JAMAIS interrogée en réseau par la garde
+        # elle-même) ne confirme pas ou ne confirme plus (périmée). LIMITE DE FOND, comme G-1/G-2/
+        # G-3 : la garde vit dans le dépôt, vérifie la forme jamais la véracité, ne verrouille
+        # rien — la PR qu'elle juge peut la modifier et rester verte. CINQ bascules isolées,
+        # chacune sur un dépôt jetable reconstruit depuis zéro, patron `check-gate-touche` /
+        # `check-baseline-arbitrage` (plus haut dans ce même job), pour que cette étape prouve
+        # elle-même qu'elle sait encore rendre chacun de ses quatre verdicts.
+        run: |
+          set -eu
+
+          S="scripts/check-affirmation-non-mesuree.sh"
+          fail=0
+          note() { echo "::error::check-affirmation-non-mesuree CI : $1"; fail=$((fail + 1)); }
+
+          FIX="$(mktemp -d)"
+          trap 'rm -rf "$FIX"' EXIT
+
+          git_id() { git -C "$FIX" -c user.name=CI -c user.email=ci@vibeflow.invalid -c commit.gpgsign=false "$@"; }
+
+          write_repo() {  # <corps CLAUDE.md> [<mesure JSON ou vide>]
+            rm -rf "$FIX"
+            mkdir -p "$FIX/.planning"
+            git init -q -b main "$FIX"
+            printf '%s\n' "$1" > "$FIX/CLAUDE.md"
+            if [ -n "${2:-}" ]; then printf '%s\n' "$2" > "$FIX/.planning/server-rulesets-measurement.json"; fi
+            git_id add -A
+            git_id commit -q -m "fixture: état initial"
+          }
+
+          FRAICHE_CONFIRME="{\"measured_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"repo\": \"o/r\", \"ruleset_count\": 1, \"active_count\": 1, \"rulesets\": [{\"id\":1,\"enforcement\":\"active\"}]}"
+          FRAICHE_CONTREDIT="{\"measured_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\", \"repo\": \"o/r\", \"ruleset_count\": 0, \"active_count\": 0, \"rulesets\": []}"
+          PERIMEE_CONFIRME='{"measured_at": "2020-01-01T00:00:00Z", "repo": "o/r", "ruleset_count": 1, "active_count": 1, "rulesets": [{"id":1,"enforcement":"active"}]}'
+
+          # 1/5 affirmation au présent, sans mesure -> attendu 2, MESURE-ABSENTE-OU-PERIMEE
+          write_repo 'Toute mise à jour de `main` passe par une PR (0 approbation).'
+          rc=0
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          echo "== 1/5 affirmation sans mesure : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *MESURE-ABSENTE-OU-PERIMEE*) has=1 ;; esac
+          if [ "$rc" -ne 2 ] || [ "$has" -ne 1 ]; then note "1/5 affirmation sans mesure : rc=$rc (attendu 2), MESURE-ABSENTE-OU-PERIMEE=$has (attendu 1)"; fi
+
+          # 2/5 même affirmation, mesure fraîche et CONTREDIT (rulesets vides) -> attendu 1, bloquant
+          write_repo 'Toute mise à jour de `main` passe par une PR (0 approbation).' "$FRAICHE_CONTREDIT"
+          rc=0
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          echo "== 2/5 affirmation contredite par mesure fraîche : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *AFFIRMATION-CONTREDITE-PAR-MESURE*) has=1 ;; esac
+          if [ "$rc" -ne 1 ] || [ "$has" -ne 1 ]; then note "2/5 affirmation contredite : rc=$rc (attendu 1), AFFIRMATION-CONTREDITE-PAR-MESURE=$has (attendu 1)"; fi
+
+          # 3/5 même phrase QUALIFIÉE ("à la pose") -> attendu 0, licite quelle que soit la mesure
+          write_repo 'À la pose, toute mise à jour de `main` passe par une PR (0 approbation).'
+          rc=0
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          echo "== 3/5 affirmation qualifiée : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *AVERTISSEMENT-AFFIRMATION-QUALIFIEE*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "3/5 affirmation qualifiée : rc=$rc (attendu 0), AVERTISSEMENT-AFFIRMATION-QUALIFIEE=$has (attendu 1)"; fi
+
+          # 4/5 affirmation adossée à une mesure fraîche qui la CONFIRME -> attendu 0, licite
+          write_repo 'Toute mise à jour de `main` passe par une PR (0 approbation).' "$FRAICHE_CONFIRME"
+          rc=0
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          echo "== 4/5 affirmation confirmée par mesure fraîche : rc=$rc =="; printf '%s\n' "$out"
+          has=0; case "$out" in *AVERTISSEMENT-AFFIRMATION-CONFIRMEE-PAR-MESURE*) has=1 ;; esac
+          if [ "$rc" -ne 0 ] || [ "$has" -ne 1 ]; then note "4/5 affirmation confirmée : rc=$rc (attendu 0), AVERTISSEMENT-AFFIRMATION-CONFIRMEE-PAR-MESURE=$has (attendu 1)"; fi
+
+          # 5/5 mesure PÉRIMÉE (horodatage figé dans le passé) avec affirmation présente -> attendu 2
+          write_repo 'Toute mise à jour de `main` passe par une PR (0 approbation).' "$PERIMEE_CONFIRME"
+          rc=0
+          out="$(VF_AFFIRMATION_GATE_CONSULTATIF=0 bash "$S" --root "$FIX" --ref HEAD 2>&1)" || rc=$?
+          echo "== 5/5 mesure périmée : rc=$rc =="; printf '%s\n' "$out"
+          hasgen=0; case "$out" in *mesure_statut=perimee*) hasgen=1 ;; esac
+          if [ "$rc" -ne 2 ] || [ "$hasgen" -ne 1 ]; then note "5/5 mesure périmée : rc=$rc (attendu 2), mesure_statut=perimee=$hasgen (attendu 1)"; fi
+
+          rm -rf "$FIX"
+
+          echo "== BILAN preuve fixture : $fail écart(s) sur 5 verdicts =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-affirmation-non-mesuree DISCRIMINANT en CI : les cinq bascules isolées sont prouvées =="
+
+          # --- Mesure du dépôt réel (les fichiers porteurs à HEAD, la mesure versionnée si présente) -
+          # PORTÉE CONSULTATIVE (arbitrage Samuel, session principale, 2026-09-23) : la garde rend 0
+          # quoi qu'elle trouve, donc cette étape ne fait JAMAIS échouer le job sur le dépôt réel.
+          # Elle remonte un ::warning:: — un gate consultatif qui n'imprimerait qu'au fond du log
+          # serait invisible, ce qui est pire qu'absent : « consultatif » veut dire signalé et tracé,
+          # pas silencieux. Les cinq bascules ci-dessus forcent VF_AFFIRMATION_GATE_CONSULTATIF=0
+          # parce qu'elles mesurent la SÉMANTIQUE DE DÉTECTION (rc 1/2/3) : au défaut consultatif
+          # elles rendraient toutes 0 et ne prouveraient plus rien — la preuve par mutation exigée
+          # par ADR-074 mourrait avec la bascule.
+          rc=0
+          out="$(bash "$S" 2>&1)" || rc=$?
+          echo "== dépôt réel : rc=$rc =="; printf '%s\n' "$out"
+          signale=0
+          case "$out" in
+            *AFFIRMATION-CONTREDITE-PAR-MESURE*|*MESURE-ABSENTE-OU-PERIMEE*) signale=1 ;;
+          esac
+          if [ "$signale" -eq 1 ]; then
+            verdict="$(printf '%s\n' "$out" | grep -E 'AFFIRMATION-CONTREDITE-PAR-MESURE|MESURE-ABSENTE-OU-PERIMEE' | head -1)"
+            echo "::warning::check-affirmation-non-mesuree (G-4, consultatif) : $verdict"
+          fi
+          if [ "$rc" -eq 3 ]; then
+            echo "::warning::check-affirmation-non-mesuree : NÉANT — aucun fichier porteur résolu (misconfiguration, jamais un vert à vide)"
+          fi
+
       - name: check-push-sans-pr (G-3 — preuve par fixture, sans condition)
         # POURQUOI DEUX ÉTAPES. Une étape GitHub Actions ne porte qu'une seule condition. La
         # mesure réelle ne peut tourner que sur un push vers `main` (elle a besoin de GH_TOKEN et
