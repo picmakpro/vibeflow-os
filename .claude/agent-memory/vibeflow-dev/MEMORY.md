@@ -8,3 +8,4 @@
 - [Collision .planning gouvernance ↔ main](project_collision-planning-gouvernance.md) — 116 des 135 conflits viennent d'un arbitrage de structure, pas de texte
 - [La loi de l'état dérivé du disque](project_loi-etat-derive-du-disque.md) — pourquoi le planning dev tient et le métier non, mesuré dans le code
 - [Ce qu'est un lab](project_definition-du-lab.md) — agents + mémoire + objectif ; la frontière est l'objectif, les labs emboîtés sont légitimes
+- [Cadrage : questions neutres](feedback_cadrage-questions-neutres.md) — aucune option recommandée ; décisions secondaires déléguées puis marquées
