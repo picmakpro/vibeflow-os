@@ -46,8 +46,10 @@ pas son tag. Câblage `pre-push` optionnel (bloque uniquement les push vers `mai
 VibeFlow** — un comportement qui change dans ce qu'un utilisateur installe. Une PR qui ne porte que
 de la documentation, des specs ou du planning (`docs/`, `.planning/`, mémoire d'agents) se merge
 **sans release** : sinon les utilisateurs reçoivent une mise à jour qui ne contient rien. Ces
-changements partent avec la prochaine release fonctionnelle. Règle posée par Samuel (WhatsApp,
-2026-09-23) après la revue de la PR #86, inscrite ici à la demande de Willy (même canal, même date).
+changements partent avec la prochaine release fonctionnelle. Doctrine complète et motif :
+`docs/ADR.md` § **ADR-073** (arbitrage Samuel, AskUserQuestion session principale, 2026-09-23) ;
+inscrite ici à la demande de Willy (WhatsApp, 2026-09-23). Non gatée par machine : c'est au geste de
+release de la tenir.
 
 **Numérotation** : `vMAJOR.MINOR.PATCH`. Nouveau module / nouvelle capacité → **minor** ;
 correctif / durcissement → **patch**. Le tag reprend **exactement** la valeur de `VERSION`
