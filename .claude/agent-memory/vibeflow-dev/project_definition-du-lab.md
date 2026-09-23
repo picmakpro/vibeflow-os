@@ -30,4 +30,17 @@ projet de code (`gsd_state_version`). Tout autre est orphelin — et un orphelin
 mourra. Corollaire de méthode : une passe adversariale hérite des prémisses fausses de ce qu'elle
 audite ; elle vérifie des affirmations, elle ne rattrape pas un cadrage erroné.
 
+**La frontière d'un lab est un objectif, pas un métier.** Précisé par Willy le 2026-09-23 :
+BusinessFlow-Lab réunit un commercial, un juriste, un financier — plusieurs métiers, **un seul
+objectif**, faire tourner son business. Ses deux erreurs de structure (un compartiment de création
+de produits, un compartiment de formation) ne sont pas des erreurs de taille mais **des objectifs
+différents logés au même endroit**. Le test qui en découle : *« si l'objectif principal
+disparaissait, ce sous-objectif aurait-il encore un sens ? »* — non, même lab ; oui, lab à part, ou
+lab emboîté si c'est lié. Et un lab « trop gros » est un lab mal architecturé : le savoir volumineux
+va dans une base interrogeable (FileFlow), jamais réparti dans des skills.
+
+**How to apply (suite) :** avant de proposer de découper ou de fusionner des labs, raisonner en
+objectifs, jamais en nombre de livrables ou d'agents. Un lab à beaucoup de livrables est sain s'ils
+servent tous la même finalité.
+
 Voir [[loi-etat-derive-du-disque]] et [[verifier-fraicheur-avant-audit]].

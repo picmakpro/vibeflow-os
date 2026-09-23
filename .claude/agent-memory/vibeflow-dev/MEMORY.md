@@ -7,4 +7,4 @@
 - [Préférer les mécanismes déterministes](feedback_mecanismes-deterministes.md) — gate qui échoue plutôt que convention documentée ou jugement d'agent
 - [Collision .planning gouvernance ↔ main](project_collision-planning-gouvernance.md) — 116 des 135 conflits viennent d'un arbitrage de structure, pas de texte
 - [La loi de l'état dérivé du disque](project_loi-etat-derive-du-disque.md) — pourquoi le planning dev tient et le métier non, mesuré dans le code
-- [Ce qu'est un lab](project_definition-du-lab.md) — agents + mémoire + objectif ; les labs emboîtés sont légitimes, les plannings orphelins meurent
+- [Ce qu'est un lab](project_definition-du-lab.md) — agents + mémoire + objectif ; la frontière est l'objectif, les labs emboîtés sont légitimes
