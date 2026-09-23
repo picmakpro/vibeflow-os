@@ -563,3 +563,33 @@ Relecture humaine de cette spec, en particulier des décisions déléguées (V-0
 question rouverte sur V-05 (§15). Puis plan
 d'implémentation, dans cet ordre : inventaire de contact dérivé (il sert aussi `infrastructure-audit`),
 journal et CLI, collecteur des harnais, collecteur des pratiques, signal de démarrage, gates.
+
+---
+
+## 19. Addendum — arbitrage Samuel, session principale, 2026-09-23
+
+Trois demandes à traiter au cadrage, pas encore des décisions à part V-19.
+
+- **V-18 (à trancher au cadrage)** : quand une trouvaille est retenue, la veille peut **ouvrir une
+  PR en brouillon (draft)** portant le changement proposé, en plus du statut « à trancher » de
+  V-08. La garantie de fond de §17 ne bouge pas : rien n'est mergé sans humain, `main` n'est jamais
+  touché directement, une PR draft reste une proposition. Reste à cadrer : qui écrit le contenu de
+  la PR, comment elle cite la trouvaille et la décision contestée (V-12), et ce qu'on fait des PR
+  drafts jamais tranchées (péremption). Contredit potentiellement la lettre de §17 (« toute
+  modification automatique d'un fichier de `main` » est hors périmètre) — une PR draft ne modifie
+  pas `main`, mais §17 est à relire à la lumière de V-18 pour lever toute ambiguïté au cadrage.
+- **V-19 (à trancher au cadrage)** : un **tri et une qualification réguliers des issues GitHub**
+  ouvertes, pour améliorer le projet en continu — la spec actuelle ne traite que la découverte de
+  sources (V-06), pas les issues elles-mêmes. `gsd-inbox` (skill installé) fait déjà ce tri à la
+  demande ; ce qui manque est la **cadence** et la **trace**. Reste à cadrer : périmètre (issues
+  seules, ou issues + PR), qui qualifie, ce qui est écrit et où (le registre de la veille, ou un
+  registre séparé).
+- **V-05 rouverte (décision prise, mode d'exécution à cadrer)** : la cadence tourne en **workflow
+  GitHub Actions planifié**, pas en cron local (launchd). Motif : si personne n'ouvre le projet
+  pendant trois semaines, il n'y a pas eu de veille pendant trois semaines — une cadence qui dépend
+  d'un poste allumé n'est pas une cadence. §15 pointait déjà `traffic-snapshot.yml` comme précédent
+  qui fait exactement cela. Préférence : Actions + clé API facturée à l'usage sur le runner GitHub,
+  pour la simplicité — à évaluer au cadrage contre un runner auto-hébergé sur un VPS, sur le seul
+  critère du coût et du mode d'exécution. Question ouverte, non tranchée : stockage, portée et
+  rotation du secret (clé API) dans les secrets du dépôt. Cette décision annule V-05 et le §4.2/§13
+  qui en découlent — à harmoniser au cadrage, dans l'esprit déjà anticipé par §15.
