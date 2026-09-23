@@ -1687,14 +1687,15 @@ Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-1
 > produit ce que le moteur consomme et doit donc s'écrire contre un moteur existant. Premier geste
 > de l'initialisation : le script des trois gates de la grille (C-14).
 > Découpage, jalon distinct et ordre : arbitrage Willy, AskUserQuestion session principale,
-> 2026-09-23. **Être inscrite ne vaut pas feu vert d'exécution** : chaque phase passe par
+> 2026-09-23. **Aucune exécution avant la clôture de `fiabilite-v1.0`** (Samuel, WhatsApp, 2026-09-23) :
+> la planification avance, l'exécution attend. **Être inscrite ne vaut pas feu vert d'exécution** : chaque phase passe par
 > `gsd-discuss-phase` puis `gsd-plan-phase`.
 
 ### Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents
 
 **Goal:** Le gate des agents (`check-agents.sh`) lit ses listes de référence — outils, champs, types natifs, modèles, modes, niveaux d'effort — dans un **manifeste daté** et rend **INDÉTERMINÉ** quand ce manifeste est périmé ; il tient les invariants de doctrine I1 à I7 et découvre les agents récursivement.
 **Requirements**: FABR-01, FABR-02, FABR-03, FABR-04, FABR-05
-**Depends on:** Phase 41 (ordre de la ROADMAP). **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — ouverte au 2026-09-23, CI rouge sur G-2 faute de trailer `Gate-Touche:`.
+**Depends on:** Phase 41 et **clôture du jalon `fiabilite-v1.0`** — volet admin de la 41 posé par Willy, release, clôture, puis ouverture de celui-ci (Samuel, WhatsApp, 2026-09-23). **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — ouverte au 2026-09-23, CI rouge sur G-2 faute de trailer `Gate-Touche:`.
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §1.1-1.3, §3, §4, B-01. Hors périmètre : §8 (`skills:`, `cacheTtl`, `maxTurns`, `color:`).
 **Plans:** 6 plans
 
@@ -1719,10 +1720,10 @@ Plans:
 
 ### Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator
 
-**Goal:** Chaque skill déclare sa nature (`vf-nature: referentiel | outil | procedure`, défaut « outil ») ; une procédure sans `ecrit:` ni rubrique de juge est refusée ; la dérive de forme procédurale non déclarée est détectée ; `skill-creator` demande la nature ; les deux conventions MCP concurrentes n'en font plus qu'une.
+**Goal:** Chaque skill déclare sa nature (`vf-nature: referentiel | outil | procedure`, défaut « outil ») ; une procédure sans `ecrit:` ni rubrique de juge est refusée ; la dérive de forme procédurale non déclarée est détectée ; `skill-creator` demande la nature ; les deux conventions MCP concurrentes n'en font plus qu'une. Les trois marqueurs de détection de dérive (un gate bloquant, un livrable remis à un tiers, une couche de qualité) forment **un contrat unique** : l'initialisation les pose tels quels en questions factuelles (C-15), sans redéfinir la nature.
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 42 (le manifeste daté et la découverte récursive servent aussi ce gate).
-**Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §6, §7.2, B-03. **C'est le contrôle machine qui manque à la décision D-07** du moteur (`docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §2, §9).
+**Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §6, §7.2, B-03. **C'est le contrôle machine qui manque à la décision D-07** du moteur (`docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §2, §9). `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-15, §5.2 (la case « trois marqueurs de B-03 » remplace « qui en répond »).
 **Plans:** 0 plans
 
 Plans:
@@ -1755,10 +1756,10 @@ Plans:
 
 ### Phase 46: Moteur — gates de clôture et verdicts hachés
 
-**Goal:** La clôture d'une tâche est refusée quand un livrable déclaré manque (G3) ou qu'un constat du verdict échoue (G4) ; un rapport de sous-agent sans sortie brute est refusé (G4′) ; `VERDICT.md` porte le hash de l'artefact jugé et un numéro de tentative ; `FileChanged` trace toute écriture surveillée (D1).
+**Goal:** La clôture d'une tâche est refusée quand un livrable déclaré manque (G3) ou qu'un constat du verdict échoue (G4) ; un rapport de sous-agent sans sortie brute est refusé (G4′) ; `VERDICT.md` porte le hash de l'artefact jugé et un numéro de tentative ; `FileChanged` trace toute écriture surveillée (D1) ; au premier cycle, le canary joue la **sortie piégée** que l'initialisation a préparée pour chaque juge, et signale le juge qui ne la refuse pas (C-16).
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 45.
-**Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5 (G3, G4, G4′, D1), §10, D-02 (le juge ne bloque que sur ses constats).
+**Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5 (G3, G4, G4′, D1), §10, D-02 (le juge ne bloque que sur ses constats) ; `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-16, §10 (préparer la preuve sans l'exécuter, B-01).
 **Plans:** 0 plans
 
 Plans:
@@ -1791,10 +1792,10 @@ Plans:
 
 ### Phase 49: Initialisation — script des trois gates de la grille
 
-**Goal:** Un script exécute les trois gates de la grille — aucune case sans disposition, aucune case sans usage, aucun élément sans case — ignore les marqueurs dans les blocs de code, traite le fichier absent comme un refus et lit les dispositions quel que soit le format de ligne ; ses tests prouvent qu'il refuse.
+**Goal:** Un script exécute les trois gates de la grille — aucune case sans disposition, aucune case sans usage, aucun élément sans case — ignore les marqueurs dans les blocs de code, traite le fichier absent comme un refus et lit les dispositions quel que soit le format de ligne (item `-`, `*` ou numéroté, citation `>`, gras, espace avant les deux-points, sans accent) ; la famille 0 (l'interlocuteur) est exemptée du gate 2 **par déclaration explicite dans le schéma de la grille**, jamais par jugement du script ; ses tests prouvent qu'il refuse.
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 48 — **le moteur précède l'initialisation**, qui produit ce qu'il consomme (arbitrage Willy, AskUserQuestion session principale, 2026-09-23). Premier geste de l'initialisation.
-**Sources:** `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` §5.4, §11, C-01, C-14.
+**Sources:** `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` §3, §5.4, §11, §15, C-01, C-14 (version corrigée après passe adversariale, `ca4dada`).
 **Plans:** 0 plans
 
 Plans:
@@ -1803,10 +1804,10 @@ Plans:
 
 ### Phase 50: Initialisation — grille, interview et fabrique des producteurs et juges
 
-**Goal:** `/vf-new-lab` calibre l'interlocuteur, inventorie l'existant, remplit la grille à dix familles par récit puis questions avec un critère d'arrêt déterministe, échange des faits sourcés, cartographie le contexte, et ne fabrique que des producteurs et des juges — chaque juge prouvé sur une sortie mauvaise.
+**Goal:** `/vf-new-lab` calibre l'interlocuteur, inventorie l'existant, remplit la grille à dix familles par récit puis questions avec un critère d'arrêt déterministe, échange des faits sourcés, cartographie le contexte, et ne fabrique que des producteurs et des juges. Le **mode express** passe à quatre cases (objectif mesurable, livrables, critère de réussite, critère d'échec) **plus le plancher complet** — récit d'ancrage, pré-mortem, validation du récapitulatif — (arbitrage Willy, AskUserQuestion, 2026-09-23) ; les contrôles humains proposés ne se valident jamais d'un geste (C-13) ; la nature de chaque livrable se déclare par les trois marqueurs de B-03 (C-15) ; chaque juge reçoit une sortie piégée tirée de l'exemple raté, préparée mais non exécutée (C-16).
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 49.
-**Sources:** `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` §3-§11, C-01 à C-13. Hors périmètre : couche interrogeable de FileFlow, veille, restructuration de BusinessFlow-Lab (§13).
+**Sources:** `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` §3-§12, §15, C-01 à C-16. Hors périmètre : couche interrogeable de FileFlow, veille, restructuration de BusinessFlow-Lab (§13).
 **Plans:** 0 plans
 
 Plans:
