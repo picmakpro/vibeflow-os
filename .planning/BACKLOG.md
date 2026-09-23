@@ -551,10 +551,12 @@ tôt si quelqu'un ajoute `shell: bash` à une étape du job `gates`.
 ## Protection de `main` côté GitHub — DIFFÉRÉ, en attente d'un accès admin (2026-09-17)
 
 **Constat et arbitrage** : Samuel, AskUserQuestion session principale, 2026-09-17 — le compte
-`picmakpro`, seul **admin** du dépôt, appartient à un **tiers**. Mesure : `gh api
-repos/picmakpro/vibeflow-os --jq .permissions` → `admin: false, maintain: false, push: true`.
-**Personne, dans cette session, ne peut poser un ruleset**, ni une revue code owner requise, ni une
-PR obligatoire côté serveur.
+`picmakpro` est celui de **Willy, co-mainteneur du dépôt** : c'est lui qui détient l'admin, pas un
+tiers anonyme. Mesure : `gh api repos/picmakpro/vibeflow-os --jq .permissions` →
+`admin: false, maintain: false, push: true` sur le compte de Samuel (`samuel-neveugall`).
+**Dans cette session, personne ne pouvait poser de ruleset**, ni de revue code owner requise, ni de
+PR obligatoire côté serveur — Willy a depuis accepté de poser ce volet lui-même (WhatsApp,
+2026-09-23), une fois le jalon `fiabilite-v1.0` clos (cf. Phase 42 du ROADMAP).
 
 **Ce qui est différé, tel quel, sans réécriture** : rulesets de branche et de tags, bypass, revue
 code owner requise, PR obligatoire, mesures M-1 à M-4, fermeture de la PR #29, rejeu du flux de
@@ -563,12 +565,14 @@ Plans concernés : 41-01 (Task 2 et 3), 41-04 à 41-09, et la partie « sous la 
 41-13. Travail conservé : `41-PREUVES.md` (`CONTEXTES-CHECKS` mesuré).
 
 **Déclencheur de reprise** : un accès **admin** au dépôt (droit accordé à un compte de Samuel, ou
-geste posé par le détenteur de `picmakpro` sous dictée). Ce jour-là, la posture visée est déjà
-écrite : `41-CONTEXT.md` § Arbitrages, et les plans différés se rejouent dans l'ordre.
+geste posé par Willy lui-même sur `picmakpro`). Ce jour-là, la posture visée est déjà écrite :
+`41-CONTEXT.md` § Arbitrages, et les plans différés se rejouent dans l'ordre.
 
-**Demande en cours depuis le 2026-09-17** : Samuel demande au détenteur du compte `picmakpro` soit
-l'**accès admin**, soit le **transfert du dépôt**. Consigné, non traité par la phase. Le volet
-différé reprend à la première des deux réponses ; d'ici là, aucune garde côté serveur n'existe.
+**Accord obtenu le 2026-09-23** : Willy a accepté de poser lui-même le volet rulesets sur
+`picmakpro` (WhatsApp, 2026-09-23), une fois le jalon `fiabilite-v1.0` clos — geste séquencé après
+la clôture de ce jalon (cf. Phase 42 du ROADMAP, « volet admin de la 41 posé par Willy, release,
+clôture, puis ouverture de celui-ci »). Le volet reste différé jusqu'à ce geste ; d'ici là, aucune
+garde côté serveur n'existe.
 
 **Ce qui reste faisable sans admin** (à arbitrer avec le nouveau périmètre de la Phase 41) : gardes
 in-repo visibles et tracées — baseline du budget d'instructions, modification d'un gate ou de

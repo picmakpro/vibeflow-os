@@ -970,10 +970,12 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 ### Posture de protection du dépôt (Phase 41 — périmètre sans admin)
 - [ ] **PROT-01**: Rulesets de branche et de tags posés et prouvés par un refus réel. **NON COCHÉ**
   — hors d'atteinte sans accès admin : mesure `admin: false, maintain: false, push: true` sur le
-  dépôt, 2026-09-17, deux lectures indépendantes ; le compte `picmakpro`, seul admin, appartient à
-  un tiers. Déclencheur de reprise : un accès admin accordé, ou un transfert du dépôt. Renvoi :
-  `BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ » et `41-CONTEXT.md` § Prémisse
-  renversée (D-01 à D-08 suspendus, non annulés). Ni abandonné, ni requalifié : il attend.
+  compte de Samuel (`samuel-neveugall`), 2026-09-17, deux lectures indépendantes ; le compte
+  `picmakpro`, seul admin, est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce
+  volet lui-même (WhatsApp, 2026-09-23) une fois `fiabilite-v1.0` clos. Déclencheur de reprise : ce
+  geste, ou un accès admin accordé à un compte de Samuel. Renvoi : `BACKLOG.md` § « Protection de
+  `main` côté GitHub — DIFFÉRÉ » et `41-CONTEXT.md` § Prémisse renversée (D-01 à D-08 suspendus,
+  non annulés). Ni abandonné, ni requalifié : il attend.
 - [x] **PROT-02**: Compatibilité avec la discipline de release du `CLAUDE.md`. **COCHÉ** —
   clôture citant les clés `REJEU-GATES` et `G3-FIXTURE` (registre `41-PREUVES.md` § 41-19) et les
   trois preuves du plan 41-17 : ordre des étapes avant `check-release-tag`, absence d'entrée
