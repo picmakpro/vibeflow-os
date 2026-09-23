@@ -1854,8 +1854,10 @@ sur chaque compartiment sans réparation manuelle**.
 
   6. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa mutation rouge prouvée.
 
-**Plans:** TBD (run /gsd-plan-phase 41.2 to break down)
+**Plans:** 3 plans (3 waves)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 41.2 to break down)
+- [ ] 41.2-01-PLAN.md — hook D-01..D-08 dans vf-new-lab + preuve réelle d'invocation moteur (WSCH-01, WSCH-02)
+- [ ] 41.2-02-PLAN.md — check-planning-not-inflight.sh + skill vf-split-planning + trampoline (WSCH-03)
+- [ ] 41.2-03-PLAN.md — checkpoint D-09 + handoff doctrinal WSAW-07 + dépendance WSCH-04 documentée + version du module (WSCH-04, WSCH-05)
