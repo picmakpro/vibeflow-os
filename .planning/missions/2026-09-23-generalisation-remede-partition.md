@@ -302,3 +302,59 @@ autorisation**. Un relais n'est pas une autorité, un message n'est pas une preu
 | E6-10 | Un `STATE.md` pré-posé est préservé | SHA avant/après `workstream create` | **identique**, gate rc=0 — via l.110, pas l.183 |
 | E6-11 | `gsd-new-milestone` n'est pas scriptable | `awk` sur les drapeaux de bypass du workflow | **7 `AskUserQuestion`**, aucun bypass |
 | E6-12 | La base de mission est bien `main` courant | `git merge-base --is-ancestor a962065 origin/main` | **OUI**, zéro commit d'écart |
+
+---
+
+## Trois passages de juge, deux tours de correction — le bilan
+
+| tour | qui | trouvé |
+|---|---|---|
+| 1 | plan-checker interne au cycle du worker | 1 bloquant + 1 avertissement — **corrigés par l'auteur, non re-vérifiés** |
+| 2 | **juge frais** dispatché en direct | corrections du tour 1 **vérifiées bonnes** ; **2 bloquants de plus** + 6 FLAG |
+| 3 | **juge frais** sur les corrections | 6/8 corrections bonnes ; **la correction du bloquant 2 en avait introduit 2 autres** |
+| — | 2ᵉ tour de correction | les 2 nouveaux bloquants corrigés **avec trace exécutée**, + fermeture du fail-open |
+
+**Ce que le tour 3 a trouvé, et qui n'aurait été vu par aucune relecture :**
+- la fixture de mutation était **verte des deux côtés** — l'appel omettait `--path` et passait un chemin
+  absolu, ce qui neutralise l'invariant 1 du gate. La preuve n'était pas « incapable de rougir » :
+  elle était **incapable de verdir**, et l'assertion aurait rendu l'étape CI rouge en permanence ;
+- l'édition 2 **effaçait le tally R1-R4** de l'étape : en bash, une fonction et une affectation faites
+  à l'intérieur d'une fonction sans `local` sont **globales**. `fail` retombait à 0 et le `note()` de
+  l'étape était remplacé définitivement.
+
+**Ce que le 2ᵉ tour de correction a livré, chaque bascule RÉELLEMENT EXÉCUTÉE avant d'être écrite :**
+
+```
+BLOCK-A  0/3 fixture saine (commitée)                          rc=0
+         1/3 MUTATION du working tree (candidat cassé)         rc=1  ← rouge
+         2/3 RÉPARATION                                        rc=0  ← vert
+BLOCK-B  R4 échec → fail=1 ; fanout tourne ; fail TOUJOURS 1 ; R6 échec → fail=2
+FLAG-5   univers vide → rc=2 (non vérifiable)   ·  câblage en dur présent → rc=1
+41.1-09  --file absolu AVANT patch  rc=0   ·   APRÈS patch  rc=64 (cause nommée)
+         même artefact en relatif   rc=2   ·   deux cas légitimes  rc=0 (non-régression)
+```
+
+**Un enseignement de construction, trouvé en exécutant** : il faut committer la fixture **saine**
+puis muter le **working tree** — committer un état cassé puis « réparer » ne reverdit jamais, parce
+que `HEAD` reste cassé. La première tentative de bascule ne reverdissait pas ; l'auteur l'a vue
+échouer avant de corriger la construction. C'est exactement la différence entre une preuve écrite et
+une preuve exécutée.
+
+**Convergence à noter** (demandée par la session principale) : le juge frais et la mesure de matrice
+ont trouvé **la même cause par deux chemins indépendants** — le fail-open du chemin absolu. Un
+recoupement de cette nature vaut plus que deux constats séparés.
+
+---
+
+## Ce qui reste ouvert à la clôture de cette mission
+
+1. **Quatrième vérification des plans de la 41.1** (`f1532f3`) — non faite. Les deux tours précédents
+   ont chacun trouvé quelque chose ; rien n'autorise à supposer que celui-ci fait exception, même si
+   les bascules sont cette fois exécutées et tracées.
+2. **Aucune exécution lancée**, ni 41.1 ni 41.2. Les deux phases sont planifiées, pas livrées.
+3. **La preuve d'usage WSCH-04 n'a pas de chemin établi** : aucune commande unique du moteur ne
+   produit un compartiment pleinement conforme, et `state.milestone-switch --ws` ne suffit pas
+   (rc=2). À mesurer avant d'écrire l'étape CI — ne pas le combler à l'aveugle.
+4. **Dette consignée au BACKLOG**, non réparée : la classe « gate qui saute un invariant en silence »
+   au-delà du cas fermé, `check-dev-bootstrap` qui est un routeur et non un gate, et l'absence de
+   juge pour `REQUIREMENTS.md` en compartiment.
