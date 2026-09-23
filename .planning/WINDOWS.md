@@ -22,7 +22,7 @@ last_updated: 2026-09-23T12:41:46.003Z
 | 5 | 21 | deviation | README.md |  | Compteur « N suites » des 2 README racine régressé à 45 (le plan 21-04 a ajouté test-check-state-integrity.sh) après la clôture de la fenêtre #2 sur 44 — CI rouge sur check-version-sync.sh, signalé par 21-VERIFICATION.md, corrigé par 21-05 dans le même commit | fixed |  | 2026-07-31T18:15:08.000Z | 2026-07-31T19:00:00.000Z |
 | 6 | 41 | deviation | plugin/_internal/runtime-adapter/tests/test-register-codex-agent-path-traversal.sh |  | T4 [majuscules] accepté à tort (rc=0) — rouge préexistant, reproduit à l'identique sur une extraction git archive d'origin/main (6a7b15b), hors périmètre du plan 41-01 (JSON de rulesets), jamais neutralisé ni fixé sans validation humaine (ADR-031) | open |  | 2026-09-23T12:29:52.109Z |  |
 | 7 | 41 | deviation | plugin/conductor/scripts/tests/test-check-description-fidelity.sh |  | 36 KO — module Python PyYAML introuvable pour python3 (passe A) sur ce poste — rouge préexistant, reproduit à l'identique sur une extraction git archive d'origin/main (6a7b15b), hors périmètre du plan 41-01, environnement d'exécution jamais modifié sans validation humaine (ADR-031) | open |  | 2026-09-23T12:29:54.478Z |  |
-| 8 | 41 | deviation | .planning/STATE.md |  | check-dev-bootstrap.sh (gate CI 'Gates workstream-aware...') rougit sur ce dépôt : le frontmatter de STATE.md dépasse la fenêtre de 60 lignes attendue par extract_frontmatter (délimiteur fermant à la ligne 61), lecture jugée illisible (D-04), assertion R1 non opposable (stdout vide des deux côtés) — rouge préexistant, reproduit à l'identique avant toute tâche du plan 41-02 (commit 5488993), hors périmètre du plan (CODEOWNERS + REQUIREMENTS.md), jamais neutralisé ni fixé sans validation humaine (ADR-031) | open |  | 2026-09-23T12:41:46.003Z |  |
+| 8 | 41 | deviation | .planning/STATE.md |  | check-dev-bootstrap.sh (gate CI 'Gates workstream-aware...') rougit sur ce dépôt : le frontmatter de STATE.md dépasse la fenêtre de 60 lignes attendue par extract_frontmatter (délimiteur fermant à la ligne 61), lecture jugée illisible (D-04), assertion R1 non opposable (stdout vide des deux côtés) — rouge préexistant, reproduit à l'identique avant toute tâche du plan 41-02 (commit 5488993), hors périmètre du plan (CODEOWNERS + REQUIREMENTS.md), jamais neutralisé ni fixé sans validation humaine (ADR-031) | fixed | Cause réelle : régression de la branche feat/phase-41-volet-admin, pas de l'existant — le plan 41-01 avait porté last_activity_desc à 12 lignes, fermant le frontmatter ligne 61 (ligne 54 sur origin/main). Corrigé par l'orchestrateur le 2026-09-23 : détail déplacé dans ## Current Position, frontmatter fermé ligne 52 ; rejeu gates 14/14 vert, test-check-dev-bootstrap 35/35. | 2026-09-23T12:41:46.003Z | 2026-09-23T13:10:00.000Z |
 
 ````json
 [
@@ -119,10 +119,10 @@ last_updated: 2026-09-23T12:41:46.003Z
     "file": ".planning/STATE.md",
     "line": null,
     "description": "check-dev-bootstrap.sh (gate CI 'Gates workstream-aware...') rougit sur ce dépôt : le frontmatter de STATE.md dépasse la fenêtre de 60 lignes attendue par extract_frontmatter (délimiteur fermant à la ligne 61), lecture jugée illisible (D-04), assertion R1 non opposable (stdout vide des deux côtés) — rouge préexistant, reproduit à l'identique avant toute tâche du plan 41-02 (commit 5488993), hors périmètre du plan (CODEOWNERS + REQUIREMENTS.md), jamais neutralisé ni fixé sans validation humaine (ADR-031)",
-    "status": "open",
-    "reason": "",
+    "status": "fixed",
+    "reason": "Cause réelle : régression de la branche feat/phase-41-volet-admin, pas de l'existant — le plan 41-01 avait porté last_activity_desc à 12 lignes, fermant le frontmatter ligne 61 (ligne 54 sur origin/main). Corrigé par l'orchestrateur le 2026-09-23 : détail déplacé dans ## Current Position, frontmatter fermé ligne 52 ; rejeu gates 14/14 vert, test-check-dev-bootstrap 35/35.",
     "recorded_at": "2026-09-23T12:41:46.003Z",
-    "resolved_at": null,
+    "resolved_at": "2026-09-23T13:10:00.000Z",
     "milestone": null
   }
 ]

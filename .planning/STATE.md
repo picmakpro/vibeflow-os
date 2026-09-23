@@ -40,18 +40,9 @@ stopped_at: >-
 last_updated: "2026-09-23T12:53:59.000Z"
 last_activity: 2026-09-23
 last_activity_desc: >-
-  Phase 41, volet admin repris le 2026-09-23 (accès admin constaté, D-02bis : contournement par
-  samuel-neveugall et picmakpro, arbitrage Willy, AskUserQuestion session principale, 2026-09-23) :
-  exécution des plans 41-01 à 41-13 révisés, sur `feat/phase-41-volet-admin` (worktree dédié).
-  **Plan 41-01 EXÉCUTÉ le 2026-09-23** (2/2 tâches, `41-01-SUMMARY.md` sur disque) : préalables
-  re-mesurés à la reprise (identité `picmakpro` admin, deux acteurs de contournement mesurés,
-  #29 constatée close, rulesets vides, PR en vol, 4 contextes de checks), sources versionnées
-  `.github/rulesets/main.json` et `.github/rulesets/tags-v.json` écrites (D-02bis appliquée : deux
-  `User` en `always`). Rien posé chez GitHub, `PROT-01` reste non coché
-  (`requirements.ready-ids` confirme 0/1 prêt). Rejeu `gates` vert (14 étapes) ; rejeu `tests`
-  bilan 83 suites / 2 échecs, les deux confirmés préexistants par extraction `git archive`
-  d'`origin/main` et hors périmètre de ce plan, consignés au ledger `.planning/WINDOWS.md`
-  (entrées #6/#7, `human_needed`). Next : plan 41-02.
+  Phase 41, volet admin repris le 2026-09-23 (D-02bis, arbitrage Willy, AskUserQuestion session
+  principale, 2026-09-23) : plans 41-01 à 41-13 en exécution sur `feat/phase-41-volet-admin`.
+  Détail par plan : `## Current Position`. Frontmatter borné à 60 lignes (check-dev-bootstrap).
 progress:
   total_phases: 12
   completed_phases: 11
@@ -98,6 +89,22 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 `*.txt` ci-dessus ne les couvre pas (ce sont des `.md` dans un sous-dossier).
 
 ## Current Position
+
+**Reprise du volet admin (2026-09-23)** — détail déplacé du frontmatter, qui doit se fermer
+avant la ligne 60 lue par `check-dev-bootstrap.sh` :
+
+  Phase 41, volet admin repris le 2026-09-23 (accès admin constaté, D-02bis : contournement par
+  samuel-neveugall et picmakpro, arbitrage Willy, AskUserQuestion session principale, 2026-09-23) :
+  exécution des plans 41-01 à 41-13 révisés, sur `feat/phase-41-volet-admin` (worktree dédié).
+  **Plan 41-01 EXÉCUTÉ le 2026-09-23** (2/2 tâches, `41-01-SUMMARY.md` sur disque) : préalables
+  re-mesurés à la reprise (identité `picmakpro` admin, deux acteurs de contournement mesurés,
+  #29 constatée close, rulesets vides, PR en vol, 4 contextes de checks), sources versionnées
+  `.github/rulesets/main.json` et `.github/rulesets/tags-v.json` écrites (D-02bis appliquée : deux
+  `User` en `always`). Rien posé chez GitHub, `PROT-01` reste non coché
+  (`requirements.ready-ids` confirme 0/1 prêt). Rejeu `gates` vert (14 étapes) ; rejeu `tests`
+  bilan 83 suites / 2 échecs, les deux confirmés préexistants par extraction `git archive`
+  d'`origin/main` et hors périmètre de ce plan, consignés au ledger `.planning/WINDOWS.md`
+  (entrées #6/#7, `human_needed`). Next : plan 41-02.
 
 Phase: **41** (Posture de protection du dépôt) — **Note (2026-09-23, plan 41-01) : reprise du
 volet admin sur `feat/phase-41-volet-admin` — plan 41-01 exécuté (2/2 tâches).** Détail complet :
