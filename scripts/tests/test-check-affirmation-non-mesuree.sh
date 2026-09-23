@@ -145,6 +145,21 @@ has=0; case "$out" in *NEANT*) has=1 ;; esac
 if [ "$rc" -eq 3 ] && [ "$has" -eq 1 ]; then ok "NEANT aucun fichier porteur -> rc 3"
 else ko "NEANT aucun fichier porteur" "rc=3, NEANT present" "rc=$rc, NEANT=$has :: $out"; fi
 
+echo "== test-check-affirmation-non-mesuree : BASCULE CONSULTATIVE (VF_AFFIRMATION_GATE_CONSULTATIF) =="
+
+# ADR-074 (arbitrage Samuel, 2026-09-23) : la bascule bloquant -> consultatif doit etre UN SEUL
+# DRAPEAU, jamais une refonte. Meme fixture qu'un cas bloquant (CAS 1 ci-dessous), verdict imprime
+# tel quel, mais rc=0 et un marqueur CONSULTATIF additionnel.
+DCONS="$(mk_repo consultatif 'Toute mise a jour de `main` passe par une PR (0 approbation).')"
+out="$(VF_AFFIRMATION_GATE_CONSULTATIF=1 bash "$TARGET" --root "$DCONS" --ref HEAD 2>&1)"; rc=$?
+has_verdict=0; case "$out" in *MESURE-ABSENTE-OU-PERIMEE*) has_verdict=1 ;; esac
+has_marker=0; case "$out" in *CONSULTATIF:*) has_marker=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has_verdict" -eq 1 ] && [ "$has_marker" -eq 1 ]; then
+  ok "bascule consultative : rc=0, verdict imprime, marqueur CONSULTATIF present"
+else
+  ko "bascule consultative" "rc=0, verdict + marqueur CONSULTATIF" "rc=$rc, verdict=$has_verdict, marqueur=$has_marker :: $out"
+fi
+
 echo "== test-check-affirmation-non-mesuree : QUATRE CAS NOMINAUX DU MANDAT =="
 
 # --- Cas 1 : affirmation au present, sans mesure confirmante (mesure ABSENTE) -> NON VERIFIABLE (2)
@@ -191,18 +206,52 @@ has=0; case "$out" in *AFFIRMATION-CONTREDITE-PAR-MESURE*|*MESURE-ABSENTE-OU-PER
 if [ "$rc" -eq 0 ] || [ "$rc" -eq 3 ]; then ok "depot reel (HEAD, branche de la tache) -> rc=$rc, aucun bloquant/non-verifiable"
 else ko "depot reel (HEAD)" "rc=0 ou 3, aucun bloquant" "rc=$rc, verdicts bloquants=$has :: $out"; fi
 
-echo "== test-check-affirmation-non-mesuree : TEMOIN REEL (branche feat/phase-41-volet-admin) =="
+echo "== test-check-affirmation-non-mesuree : TEMOIN REEL (couple rouge/vert, SHA figes) =="
 
-# Reconstruit, dans un depot jetable, EXACTEMENT la ligne portee par le CLAUDE.md de la branche
-# distante feat/phase-41-volet-admin (recuperee par `git show`, jamais checkoutee ni modifiee —
-# voir le mandat) : « Toute mise a jour de `main` passe par une PR (0 approbation), ... ». Sans
-# mesure confirmante committee sur cette branche a ce jour, le verdict reel est NON VERIFIABLE
-# (rc 2) — jamais vert : c'est le temoin qui prouve que la garde attrape le vrai defaut de la
-# PR #90, que la mesure existe deja (rc 1, cas 1bis) ou pas encore (rc 2, cas 1).
-DWILLY="$(mk_repo temoin-willy 'Toute mise a jour de `main` passe par une PR (0 approbation), 4 jobs CI verts epingles sur GitHub Actions.')"
-safe_run out rc "$DWILLY" --ref HEAD
-if [ "$rc" -ne 0 ]; then ok "TEMOIN branche feat/phase-41-volet-admin (contenu reconstruit) -> rc=$rc, PAS vert"
-else ko "TEMOIN branche feat/phase-41-volet-admin" "rc != 0" "rc=$rc :: $out"; fi
+# Couple de temoins sur le MEME fichier, reconstruit VERBATIM (paragraphe complet, pas seulement
+# la puce) depuis deux commits FIGES de la branche feat/phase-41-volet-admin — jamais l'etat
+# courant d'une ref mouvante (correctif de cap du coordinateur, 2026-09-23) : la branche a ete
+# corrigee apres le depart de cette tache, son SHA de tete bougera encore (merge de la PR #90),
+# le SHA rouge et le SHA vert ci-dessous, eux, ne bougeront plus.
+#   - ROUGE : `git show 6243c46:CLAUDE.md` — « toute mise a jour de `main` passe par une PR »,
+#     present de l'indicatif, section SANS aucun des qualificateurs de cette garde, sans mesure.
+#   - VERT  : `git show f5db5145f239c5c38bbe7abcd74a15981bead3c3:CLAUDE.md` (tete de la branche au
+#     moment du correctif) — MEME puce, MEME phrase, mais section titree « (PAS ENCORE POSEE) »
+#     dont le paragraphe d'intro porte "a la pose" et "une fois pos[e]" : c'est le couple qui
+#     prouve que la portee SECTION (et non un simple ±1 ligne) de la qualification est necessaire.
+TEMOIN_ROUGE='## Protection côté serveur — main et tags v*
+
+Source versionnée `.github/rulesets/` et `.github/CODEOWNERS`, posée par l'"'"'admin après le merge de
+sa source, état réel lisible par `gh api repos/picmakpro/vibeflow-os/rules/branches/main` (ADR-072
+§ Amendement du 2026-09-23).
+
+- Toute mise à jour de `main` passe par une PR (0 approbation), 4 jobs CI verts épinglés sur GitHub
+  Actions, branche à jour, revue `@picmakpro` sur `.github/`, la baseline du budget d'"'"'instructions
+  et les sentinelles `.planning/.*-armed`, et `scripts/hooks/` (D-03, D-04, D-05).'
+
+TEMOIN_VERT='## Protection côté serveur — main et tags v* (PAS ENCORE POSÉE)
+
+Source versionnée dans ce dépôt (`.github/rulesets/`, `.github/CODEOWNERS`), mais **rien n'"'"'est
+encore posé côté GitHub** : `gh api repos/picmakpro/vibeflow-os/rulesets` rend `[]` (mesuré le
+2026-09-23). Les règles ci-dessous décrivent ce qui **s'"'"'appliquera une fois posé**, pas l'"'"'état
+actuel — même régime qu'"'"'ADR-072 : la protection s'"'"'applique **à la pose**, pas avant.
+
+Une fois posée, la protection prévue est :
+
+- Toute mise à jour de `main` passe par une PR (0 approbation), 4 jobs CI verts épinglés sur GitHub
+  Actions, branche à jour, revue `@picmakpro` sur `.github/`, la baseline du budget d'"'"'instructions
+  et les sentinelles `.planning/.*-armed`, et `scripts/hooks/` (D-03, D-04, D-05).'
+
+DROUGE="$(mk_repo temoin-rouge-6243c46 "$TEMOIN_ROUGE")"
+safe_run out rc "$DROUGE" --ref HEAD
+if [ "$rc" -ne 0 ]; then ok "TEMOIN ROUGE (contenu figé du commit 6243c46) -> rc=$rc, PAS vert"
+else ko "TEMOIN ROUGE (commit 6243c46)" "rc != 0" "rc=$rc :: $out"; fi
+
+DVERT="$(mk_repo temoin-vert-f5db514 "$TEMOIN_VERT")"
+safe_run out rc "$DVERT" --ref HEAD
+has=0; case "$out" in *AVERTISSEMENT-AFFIRMATION-QUALIFIEE*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "TEMOIN VERT (contenu figé du commit f5db514) -> rc=0, qualifiée par la section"
+else ko "TEMOIN VERT (commit f5db514)" "rc=0, AVERTISSEMENT-AFFIRMATION-QUALIFIEE present" "rc=$rc, qualifiee=$has :: $out"; fi
 
 echo "== test-check-affirmation-non-mesuree : MUTANTS (MUT-1 a MUT-4) =="
 

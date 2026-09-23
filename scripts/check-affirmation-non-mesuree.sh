@@ -8,17 +8,40 @@
 # posee. Rien dans ce depot ne comparait une affirmation de prose a l'etat reel du serveur avant
 # cette garde (tache courte, mandat vibeflow-head, 2026-09-23).
 #
-# LIMITE DE FOND, a lire avant tout le reste — meme formule que G-1/G-2/G-3 (ADR-072). Cette
-# garde VIT DANS LE DEPOT : la PR qu'elle juge peut la modifier — elle, sa suite
-# `scripts/tests/test-check-affirmation-non-mesuree.sh`, et l'etape CI qui l'invoque — et rester
-# verte. Elle verifie la FORME d'une affirmation face a une MESURE DATEE, jamais sa veracite au
-# moment ou quelqu'un LIT la phrase : une mesure fraiche au moment du commit peut avoir peri au
-# moment de la lecture, sans que rien ici ne le detecte. Elle ne verrouille rien.
+# LIMITE DE FOND, a lire avant tout le reste. Cette garde VIT DANS LE DEPOT : la PR qu'elle juge
+# peut la modifier — elle, sa suite `scripts/tests/test-check-affirmation-non-mesuree.sh`, et
+# l'etape CI qui l'invoque — et rester verte. Elle verifie la FORME d'une affirmation face a une
+# MESURE DATEE, jamais sa veracite au moment ou quelqu'un LIT la phrase : une mesure fraiche au
+# moment du commit peut avoir peri au moment de la lecture, sans que rien ici ne le detecte. Elle
+# ne verrouille rien.
 #
 # CE QUE CETTE GARDE NE FAIT PAS. Elle ne parle JAMAIS au reseau — elle lit uniquement le fichier
 # de mesure ecrit par le compagnon `scripts/measure-server-rulesets.sh`, jamais `gh api`
 # elle-meme (mandat point 4). Elle ne juge que la FORME de l'affirmation et la FRAICHEUR/le
 # CONTENU de la mesure — jamais si la mesure elle-meme a ete honnetement prise.
+#
+# PORTEE (ADR-074, arbitrage Samuel, AskUserQuestion session principale, 2026-09-23) : BLOQUANTE.
+# Le critere d'ADR-074 n'est PAS « fait technique contre prose » — c'est la DECIDABILITE PAR
+# MACHINE : un gate bloque quand le defaut se tranche sans jugement de valeur. Ici, soit la mesure
+# versionnee existe, est fraiche et confirme l'affirmation, soit non — aucune opinion n'intervient,
+# le support (un fichier de prose) n'est pas le critere. Les couts sont asymetriques : un faux
+# negatif laisse quelqu'un agir sur une protection qu'il croit posee (defaut reel de la PR #90,
+# sur ce meme fichier) ; un faux positif coute de qualifier une phrase. Le blocage va du cote cher.
+# PREUVE PAR MUTATION exigee par ADR-074 pour rester bloquante : quatre mutants tues
+# (`scripts/tests/test-check-affirmation-non-mesuree.sh`, MUT-1 a MUT-4) et un couple reel a SHA
+# figes — rouge `6243c46` (CLAUDE.md, present sans mesure), vert `f5db5145f239c5c38bbe7abcd74a15981bead3c3`
+# (meme fichier, meme puce, section qualifiee). N'invoque PAS la coherence avec G-1/G-2/G-3
+# (ADR-072) comme justification : ces trois gardes n'ont jamais ete elles-memes rejugees sous
+# ADR-074 (posee le meme jour que G-4) — un precedent non valide ne prouve rien, s'en servir
+# reviendrait a propager une decision que personne n'a prise. Cette portee ne rejuge PAS G-1/G-2/G-3.
+#
+# CONDITION DU BLOCAGE, PAS UN DETAIL D'IMPLEMENTATION — si l'un des trois casse, cette garde
+# DOIT redescendre consultative (signaler sans faire echouer le job CI) : (1) la liste FERMEE de
+# formes interdites (jamais une regex ouverte sur de la prose) ; (2) la liste DECLAREE de fichiers
+# porteurs (jamais un balayage du depot entier) ; (3) la degradation honnete (mesure absente,
+# illisible ou perimee -> NON VERIFIABLE, jamais vert). Bascule bloquant -> consultatif : UN SEUL
+# DRAPEAU, ci-dessous — jamais une refonte du script.
+VF_AFFIRMATION_GATE_CONSULTATIF="${VF_AFFIRMATION_GATE_CONSULTATIF:-0}"  # "1" = consultatif (n'echoue jamais le job, meme verdicts/exit codes affiches)
 #
 # FORMES INTERDITES (liste fermee, JAMAIS une regex ouverte sur de la prose) — chacune est
 # l'affirmation, au present, d'une protection cote serveur MESURABLE par
@@ -35,9 +58,14 @@
 # rouge sur `main`. Verifie par grep avant livraison (aucune des six formes ci-dessus n'apparait
 # aujourd'hui sur `main` dans les fichiers porteurs par defaut).
 #
-# QUALIFICATEURS (liste fermee) — une forme interdite trouvee dans la FENETRE (ligne precedente +
-# ligne courante + ligne suivante) d'un de ces marqueurs est LICITE (cas a du mandat), quelle que
-# soit la mesure :
+# QUALIFICATEURS (liste fermee) — une forme interdite trouvee dans la SECTION MARKDOWN englobante
+# (du titre `#+` qui precede immediatement la ligne jusqu'au titre suivant, ou la fin de fichier —
+# JAMAIS un ±1 ligne : une section reelle qualifie souvent son intro puis liste chaque regle au
+# present sans repeter le qualificatif par puce, ex. « (PAS ENCORE POSEE) [...] la protection
+# s'applique a la pose, pas avant » suivi d'une liste de regles non requalifiees) d'un de ces
+# marqueurs est LICITE (cas a du mandat), quelle que soit la mesure. BORNE NOMMEE : une section qui
+# melangerait sous le MEME titre un enonce qualifie et un enonce non apparente mais non qualifie
+# sous-declarerait ce second enonce — prix assume de la portee section :
 #   1. "a la pose"          -- explicite : pas encore vrai, vrai au moment de la pose
 #   2. "une fois pos"       -- couvre "une fois pose/posee/poses"
 #   3. "prevu"              -- couvre "prevu/prevue/prevus"
@@ -214,13 +242,31 @@ scan_carrier() {
     }
     { lines[NR] = $0; ll[NR] = lower_fr($0) }
     END {
+      # Portee de la fenetre de qualification : la SECTION markdown englobante (du titre `#+`
+      # qui precede immediatement la ligne jusqu au titre suivant, ou la fin de fichier), pas
+      # seulement les lignes immediatement adjacentes. Motif reel qui a impose ce choix (retour
+      # du mandat, 2026-09-23) : une section peut ouvrir sur « (PAS ENCORE POSEE) » puis
+      # « la protection s applique a la pose, pas avant » dans son paragraphe d intro, et lister
+      # ensuite CHAQUE regle a la ligne suivante, au present, sans repeter le qualificatif sur
+      # chaque puce — un ±1 ligne aurait manque cette qualification pourtant explicite. BORNE
+      # NOMMEE, pas cachee : une section qui melangerait un enonce qualifie et un enonce non
+      # apparente mais non qualifie sous le MEME titre sous-declarerait ce second enonce — le prix
+      # assume de cesser de rater les qualifications qui se lisent, en prose reelle, au niveau de
+      # la section et non de la ligne.
+      nh = 0
+      for (j = 1; j <= NR; j++) { if (lines[j] ~ /^#+[ \t]/) { nh++; head[nh] = j } }
       for (i = 1; i <= NR; i++) {
         hit = ""
         for (k = 1; k <= nf; k++) {
           if (index(ll[i], forb[k]) > 0) { hit = forb[k]; break }
         }
         if (hit == "") continue
-        win = (i > 1 ? ll[i-1] : "") " " ll[i] " " (i < NR ? ll[i+1] : "")
+        sec_start = 1
+        for (j = 1; j <= nh; j++) { if (head[j] <= i) sec_start = head[j]; else break }
+        sec_end = NR
+        for (j = 1; j <= nh; j++) { if (head[j] > i) { sec_end = head[j] - 1; break } }
+        win = ""
+        for (j = sec_start; j <= sec_end; j++) { win = win " " ll[j] }
         qualified = 0
         for (k = 1; k <= nq; k++) { if (index(win, qual[k]) > 0) { qualified = 1; break } }
         extrait = lines[i]
@@ -314,6 +360,17 @@ while IFS="$(printf '\t')" read -r fichier lineno forme qualified extrait; do
 done < "$FACTS_TMP"
 
 echo "decouverte: fichiers_portants=${FICHIERS_PORTANTS} affirmations_trouvees=${AFFIRMATIONS} qualifiees=${QUALIFIEES} mesure_statut=${MESURE_STATUT}"
+
+# --- Bascule bloquant -> consultatif : UN SEUL DRAPEAU (voir LIMITE DE FOND / PORTEE en tete) -----
+# En consultatif, les memes verdicts ci-dessus restent imprimes tels quels (rien de cache), mais
+# le code de sortie ne fait plus jamais echouer un appelant qui teste rc != 0 — CONSULTATIF est
+# imprime en plus de CONFORME/verdicts, jamais a la place.
+if [ "$VF_AFFIRMATION_GATE_CONSULTATIF" = "1" ]; then
+  if [ "$RC1" -eq 1 ] || [ "$RC2" -eq 1 ]; then
+    echo "CONSULTATIF: verdict ci-dessus signale, non bloquant (VF_AFFIRMATION_GATE_CONSULTATIF=1)"
+  fi
+  exit 0
+fi
 
 if [ "$RC1" -eq 1 ]; then
   exit 1
