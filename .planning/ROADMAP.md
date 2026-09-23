@@ -1648,6 +1648,11 @@ ADR-072), PROT-04 (O-3 « gardée par défaut + tracée » : CODEOWNERS `@picmak
 > 41-09, 41-11 à 41-13 restent **différés faute d'accès admin**, tels quels, non exécutés
 > (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »).
 
+**Reprise du volet admin le 2026-09-23** : accès admin constaté (`picmakpro`, Willy), contournement
+par deux utilisateurs nommés (D-02bis, arbitrage Willy, AskUserQuestion session principale,
+2026-09-23), plans 41-01 à 41-13 révisés puis vérifiés (vérificateur frais, passé). Voir
+`41-CONTEXT.md` § REPRISE.
+
 **Plans:** 13 plans en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
 dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré. **Six plans supplémentaires
 (41-14 à 41-19) ajoutés et exécutés le 2026-09-18** pour le périmètre sans admin (option (a)) — voir
@@ -1655,19 +1660,19 @@ liste ci-dessous.
 
 Plans:
 
-- [ ] 41-01-PLAN.md — fermeture de #29 (humain), `actor_id` du rôle write mesuré par sonde, JSON des deux rulesets
+- [ ] 41-01-PLAN.md — préalables re-mesurés (identité admin, collaborateurs, #29, checks requis), JSON des deux rulesets à deux `User` `always` (D-02bis, révisé 2026-09-23)
 - [ ] 41-02-PLAN.md — `.github/CODEOWNERS` étroit, ledger PROT-01..04 non cochés
 - [ ] 41-03-PLAN.md — ADR-072 (contournement et hotfix), amendement d'ADR-059, `CLAUDE.md`
 - [ ] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
-- [ ] 41-05-PLAN.md — pose des rulesets par `picmakpro` (humain), critère 1, mesure M-2
+- [ ] 41-05-PLAN.md — décision explicite avant pose, pose par l'exécutant, relecture serveur des deux `User`, état des PR en vol, mesure M-2 (révisé 2026-09-23)
 - [ ] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement
 - [ ] 41-07-PLAN.md — PR rouge jetable : mesure M-1, refus, fermeture sans merge
 - [ ] 41-08-PLAN.md — contournement réel et trace dans les rule suites, mesure M-3
-- [ ] 41-09-PLAN.md — refus du push direct, mesure M-4 (tag de test)
+- [ ] 41-09-PLAN.md — push direct refusé pour un acteur hors liste (clé de déploiement temporaire), règles de tags, mesure M-4 (révisé 2026-09-23)
 - [ ] 41-10-PLAN.md — doctrine post-preuves (O-3 « gardée par défaut + tracée », BACKLOG, ADR-072)
-- [ ] 41-11-PLAN.md — bump dérivé d'`origin/main` sur la branche B, entrée sur `main` sans contournement (humain)
+- [ ] 41-11-PLAN.md — décision du mode de release (« Quand publier »), bump éventuel, PR des preuves entrée sur `main` sans contournement (révisé 2026-09-23)
 - [ ] 41-12-PLAN.md — tag, release GitHub, `check-release-tag --remote`, invariants de phase (humain)
-- [ ] 41-13-PLAN.md — clôture : ledger coché, SUMMARY, artefacts post-merge par PR
+- [ ] 41-13-PLAN.md — clôture : PROT-01 coché sur preuve, ROADMAP/STATE, éligibilité de la clôture du jalon (révisé 2026-09-23)
 
 Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-18) :
 
