@@ -1212,11 +1212,13 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-09-15 — Phase 40 EXÉCUTÉE (clôture documentaire) : HEAD-02, HEAD-03, HEAD-04
+*Last updated: 2026-09-23 — **HEAD-01 fermée** (correction d'un ledger périmé) :
+`intent-routing.md` renvoie déjà à `head-governance.md` (lignes 15 et 17, commit `5829bd0`,
+2026-09-15) et la case ci-dessus est déjà cochée avec sa preuve — seule cette note de bas de
+fichier était restée en contradiction avec le disque, corrigée sans rouvrir de travail ; précédent :
+2026-09-15 — Phase 40 EXÉCUTÉE (clôture documentaire) : HEAD-02, HEAD-03, HEAD-04
 cochées avec preuve sur pièce (`check-mission-exit.sh` 23/23 cas + 6 mutations, contrat de preuves
-E6 + ses trois émetteurs, garde anti-alias T36 avec mutation discriminante) ; **HEAD-01 laissée
-ouverte** — `intent-routing.md`, nommé par l'exigence, ne renvoie jamais à `head-governance.md`
-(0 occurrence, jamais touché par un lot `40-0x` en ce sens) ; précédent : 2026-09-15 — Phase 40
+E6 + ses trois émetteurs, garde anti-alias T36 avec mutation discriminante) ; précédent : 2026-09-15 — Phase 40
 (vibeflow-head — head of minds du dev-orchestrator) : 4 exigences neuves en une famille
 (HEAD-01..04), dérivées du cadrage `40-CONTEXT.md` (D-01..D-18, seize arbitrages Samuel), préfixe
 `HEAD` vérifié libre par grep exhaustif ; QUAL-01 transverse s'applique de plein droit (HEAD-02
