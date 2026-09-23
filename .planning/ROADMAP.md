@@ -490,7 +490,7 @@ Plans:
 | 22. Hygiène documentaire — doctrine de sortie | — | 3/3 | Complete — **mergée dans `main`** (PR #23, `474c3eb`), `dev-orchestrator` v2.9.0 + `design-orchestrator` v1.4.0 | 2026-07-31 |
 | 23. Couplage explicite au moteur GSD | agentique-v1.0 | 8/8 | Complete — 8 SUMMARYs sur disque | 2026-08-04 |
 | 24. Activation et mesure du moteur GSD | agentique-v1.0 | 12/12 | Complete — 12 SUMMARYs sur disque | 2026-08-04 |
-| 25. Budget d'instructions | fiabilite-v1.0 | 4/4 | Complete — première PR (25-01 à 25-03) mergée v2.62.0 ; 25-04 exécutée (ratchet armé), seconde PR à ouvrir | 2026-09-16 |
+| 25. Budget d'instructions | fiabilite-v1.0 | 4/4 | Complete — première PR (25-01 à 25-03) mergée v2.62.0 ; 25-04 exécutée (ratchet armé), seconde PR **mergée** (PR #73, 2026-09-16) ; rapport de sécurité suivi (PR #74) — correction du 2026-09-23, affirmation périmée | 2026-09-16 |
 | 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | agentique-v1.0 | 3/3 | Complete — PR #42, release `v2.52.0`, CI main verte, gate + `lab-frais-arme` livrés | 2026-08-15 |
@@ -892,9 +892,9 @@ conditions E1/E2 du STUDY §8 — pas déclarée sans objet.
 **Plans**: 18-01 (LEDG-02, gate `check-requirements-survival.sh` + primitive
 `requirements-survival-detect.sh`), 18-02 (LEDG-01, rattrapage `restore-requirements-ledger.sh`),
 18-03 (doctrine D-18-14 + bump module `dev-orchestrator` v2.18.0 → v2.19.0). Les 3 plans sont
-**exécutés** (`18-01-SUMMARY.md`, `18-02-SUMMARY.md`, `18-03-SUMMARY.md`) ; la phase n'est **pas
-encore shippée** — PR, tag et release restent des gestes humains non posés (CLAUDE.md racine,
-ADR-031).
+**exécutés** (`18-01-SUMMARY.md`, `18-02-SUMMARY.md`, `18-03-SUMMARY.md`). **Correction du
+2026-09-23** (affirmation périmée) : la phase EST shippée — **PR #51 mergée le 2026-08-23, release
+GitHub `v2.57.0`**, vérifié sur `gh pr view 51` et `gh release view v2.57.0`.
 
 ### Phase 34: Gaps agency-agents & cadrage skill-installer
 
@@ -1015,7 +1015,9 @@ Plans:
 exact de 250 lignes (`vf-dev-manager.md`, `validator/AGENT.md`), accepté par Samuel au checkpoint.
 Livrée en **deux PR** (D-06 bis) : la première (25-01 à 25-03, v2.62.0) posait le gate sans rien
 armer, la seconde (25-04) calibre sur le corpus final du milestone, après les Phases 34 et 40 —
-ne jamais graver sur un corpus qui bouge. **Hors périmètre, explicitement** : la remédiation des
+ne jamais graver sur un corpus qui bouge. **Correction du 2026-09-23** (affirmation périmée) : la
+seconde PR est **mergée** (PR #73, 2026-09-16) et le rapport de sécurité de la phase l'a suivie
+(PR #74, 2026-09-16), vérifié sur `gh pr view`. **Hors périmètre, explicitement** : la remédiation des
 fichiers les plus chargés, le budget des SKILL.md et du bootstrap, BUDG-03 (étage d'alignement
 court, différé).
 
