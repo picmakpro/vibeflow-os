@@ -219,3 +219,9 @@ aucune perte de travail. Pas de dérive de portée.
 ---
 *Phase: VFDO-41-posture-de-protection-du-d-p-t*
 *Completed: 2026-09-23*
+
+## Self-Check: PASSED
+- `.github/rulesets/main.json` : FOUND
+- `.github/rulesets/tags-v.json` : FOUND
+- `41-01-SUMMARY.md` : FOUND
+- Commits `20448bf`, `d6323c9`, `620a1e5`, `abe7e1f` : FOUND dans `git log`
