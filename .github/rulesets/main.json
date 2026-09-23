@@ -1,0 +1,73 @@
+{
+  "name": "main — PR obligatoire, 4 checks requis, revue code owner (Phase 41)",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/main"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "require_code_owner_review": true,
+        "allowed_merge_methods": [
+          "merge",
+          "squash",
+          "rebase"
+        ],
+        "dismiss_stale_reviews_on_push": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": false
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "required_status_checks": [
+          {
+            "context": "Gates de qualité (mode strict)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Lab frais (install baseline + Gate C — leçon UAT 2026-07-25, F2)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Lab frais arme (as-installed testing — le gate installe, sur un univers non vide, #38)",
+            "integration_id": 15368
+          },
+          {
+            "context": "Suites de tests (découverte non vide)",
+            "integration_id": 15368
+          }
+        ],
+        "strict_required_status_checks_policy": true,
+        "do_not_enforce_on_create": false
+      }
+    }
+  ],
+  "bypass_actors": [
+    {
+      "actor_id": 151974738,
+      "actor_type": "User",
+      "bypass_mode": "always"
+    },
+    {
+      "actor_id": 203482067,
+      "actor_type": "User",
+      "bypass_mode": "always"
+    }
+  ]
+}
