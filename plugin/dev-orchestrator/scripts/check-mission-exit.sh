@@ -282,7 +282,36 @@ if [ -z "$STEPS" ]; then
   E4_STATUS="indet"
   E4_MSG="[E4] aucune étape déclarée en argument — rien à vérifier"
 else
-  E4_ROADMAP="$ROOT/.planning/ROADMAP.md"
+  # --- Résolution du compartiment ACTIF (partition D-02, 2026-09-23) -----------------------------
+  # Même politique et même best-effort fail-open que check-requirements-survival.sh/
+  # restore-requirements-ledger.sh (voir leur en-tête) : ROADMAP.md et STATE.md VIVANTS lus par E4
+  # sont ceux du compartiment ACTIF (`.planning/workstreams/<nom>/`), résolus via
+  # workstream-policy.sh — GSD_WORKSTREAM en canal nominal, puis le pointeur partagé
+  # .planning/active-workstream. Politique introuvable, nom rejeté ou compartiment refusé replient
+  # silencieusement sur le comportement historique (`$ROOT/.planning/{ROADMAP,STATE}.md`, labs non
+  # partitionnés). Codes de sortie et sémantique E4 inchangés.
+  E4_PLANNING_DIR="$ROOT/.planning"
+  _SCRIPT_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd -P)"
+  for _wscand in "$_SCRIPT_DIR/../../planning-core/scripts/workstream-policy.sh" \
+                 "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+    if [ -n "$_wscand" ] && [ -r "$_wscand" ]; then
+      # shellcheck source=/dev/null
+      . "$_wscand"
+      break
+    fi
+  done
+  E4_ROADMAP="$E4_PLANNING_DIR/ROADMAP.md"
+  E4_STATE_OVERRIDE=""
+  if command -v vf_ws_resolve >/dev/null 2>&1; then
+    vf_ws_resolve "$E4_PLANNING_DIR"
+    if [ -n "${VF_WS_NAME:-}" ] && command -v vf_ws_dir_resolve >/dev/null 2>&1; then
+      vf_ws_dir_resolve "$E4_PLANNING_DIR" "$VF_WS_NAME"
+      if [ -n "${VF_WS_DIR:-}" ]; then
+        E4_ROADMAP="$VF_WS_DIR/ROADMAP.md"
+        E4_STATE_OVERRIDE="$VF_WS_DIR/STATE.md"
+      fi
+    fi
+  fi
   if [ ! -r "$E4_ROADMAP" ]; then
     E4_STATUS="indet"
     E4_MSG="[E4] feuille de route absente : $E4_ROADMAP"
@@ -307,7 +336,7 @@ else
     done <<EOF
 $STEPS
 EOF
-    E4_STATE="$ROOT/.planning/STATE.md"
+    E4_STATE="${E4_STATE_OVERRIDE:-$E4_PLANNING_DIR/STATE.md}"
     if [ ! -r "$E4_STATE" ]; then
       E4_LINES="${E4_LINES}[E4] fichier d'état absent : ${E4_STATE}"$'\n'
     else
