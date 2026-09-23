@@ -556,7 +556,13 @@ tiers anonyme. Mesure : `gh api repos/picmakpro/vibeflow-os --jq .permissions` �
 `admin: false, maintain: false, push: true` sur le compte de Samuel (`samuel-neveugall`).
 **Dans cette session, personne ne pouvait poser de ruleset**, ni de revue code owner requise, ni de
 PR obligatoire côté serveur — Willy a depuis accepté de poser ce volet lui-même (WhatsApp,
-2026-09-23), une fois le jalon `fiabilite-v1.0` clos (cf. Phase 42 du ROADMAP).
+2026-09-23).
+
+**Correction du 2026-09-23** : la séquence écrite plus bas dans cette entrée (« une fois le jalon
+`fiabilite-v1.0` clos ») était fausse et circulaire — **PROT-01 appartient à ce jalon**, il ne peut
+donc pas se clore avant que les rulesets soient posés. La séquence réelle, demandée par Samuel à
+Willy par WhatsApp le 2026-09-23 : Willy pose les rulesets → on prouve → on clôt le jalon → son
+jalon à lui (Phase 42) démarre.
 
 **Ce qui est différé, tel quel, sans réécriture** : rulesets de branche et de tags, bypass, revue
 code owner requise, PR obligatoire, mesures M-1 à M-4, fermeture de la PR #29, rejeu du flux de
@@ -569,10 +575,11 @@ geste posé par Willy lui-même sur `picmakpro`). Ce jour-là, la posture visée
 `41-CONTEXT.md` § Arbitrages, et les plans différés se rejouent dans l'ordre.
 
 **Accord obtenu le 2026-09-23** : Willy a accepté de poser lui-même le volet rulesets sur
-`picmakpro` (WhatsApp, 2026-09-23), une fois le jalon `fiabilite-v1.0` clos — geste séquencé après
-la clôture de ce jalon (cf. Phase 42 du ROADMAP, « volet admin de la 41 posé par Willy, release,
-clôture, puis ouverture de celui-ci »). Le volet reste différé jusqu'à ce geste ; d'ici là, aucune
-garde côté serveur n'existe.
+`picmakpro` (WhatsApp, 2026-09-23) — geste séquencé **avant** la clôture du jalon `fiabilite-v1.0`
+(PROT-01 en fait partie), pas après (correction du 2026-09-23 de la formulation initialement écrite
+ici, qui inversait la séquence). Séquence réelle : Willy pose les rulesets → preuve → clôture du
+jalon → ouverture du jalon de Willy (cf. Phase 42 du ROADMAP). Le volet reste différé jusqu'à ce
+geste ; d'ici là, aucune garde côté serveur n'existe.
 
 **Ce qui reste faisable sans admin** (à arbitrer avec le nouveau périmètre de la Phase 41) : gardes
 in-repo visibles et tracées — baseline du budget d'instructions, modification d'un gate ou de
