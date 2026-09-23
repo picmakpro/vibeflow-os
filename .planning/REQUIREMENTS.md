@@ -972,8 +972,9 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   — hors d'atteinte sans accès admin : mesure `admin: false, maintain: false, push: true` sur le
   compte de Samuel (`samuel-neveugall`), 2026-09-17, deux lectures indépendantes ; le compte
   `picmakpro`, seul admin, est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce
-  volet lui-même (WhatsApp, 2026-09-23) une fois `fiabilite-v1.0` clos. Déclencheur de reprise : ce
-  geste, ou un accès admin accordé à un compte de Samuel. Renvoi : `BACKLOG.md` § « Protection de
+  volet lui-même (WhatsApp, 2026-09-23) — **avant** la clôture de `fiabilite-v1.0`, puisque PROT-01
+  en fait partie (correction du 2026-09-23 : la formulation précédente inversait la séquence).
+  Déclencheur de reprise : ce geste, ou un accès admin accordé à un compte de Samuel. Renvoi : `BACKLOG.md` § « Protection de
   `main` côté GitHub — DIFFÉRÉ » et `41-CONTEXT.md` § Prémisse renversée (D-01 à D-08 suspendus,
   non annulés). Ni abandonné, ni requalifié : il attend.
 - [x] **PROT-02**: Compatibilité avec la discipline de release du `CLAUDE.md`. **COCHÉ** —

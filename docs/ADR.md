@@ -2439,8 +2439,12 @@ Le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt — c'est lui
 l'admin, pas un tiers anonyme. Les permissions mesurées le 2026-09-17 sont celles du compte de
 Samuel (`samuel-neveugall`) : `admin: false, maintain: false, push: true`. Dans la session qui a
 mesuré ce fait, personne ne pouvait poser de ruleset, de PR obligatoire, de check requis ni de
-revue code owner — Willy a depuis accepté de poser ce volet lui-même (WhatsApp, 2026-09-23), une
-fois le jalon `fiabilite-v1.0` clos (cf. Phase 42 du ROADMAP). La Phase 41 a donc été recadrée sur
+revue code owner — Willy a depuis accepté de poser ce volet lui-même (WhatsApp, 2026-09-23),
+**avant** la clôture du jalon `fiabilite-v1.0` puisque PROT-01 en fait partie (correction du
+2026-09-23 : une formulation antérieure, ailleurs dans le planning, inversait cette séquence — cf.
+`BACKLOG.md` § « Protection de `main` côté GitHub »). Séquence réelle : Willy pose les rulesets →
+preuve → clôture du jalon → ouverture du jalon de Willy (cf. Phase 42 du ROADMAP). La Phase 41 a
+donc été recadrée sur
 ce qui est faisable avec le seul droit `push` (option (a),
 arbitrage Samuel, AskUserQuestion session principale, 2026-09-17). Origine du besoin : O-3 du
 `25-SECURITY.md` — une hausse de baseline n'était gardée que par la relecture, et une même PR peut
