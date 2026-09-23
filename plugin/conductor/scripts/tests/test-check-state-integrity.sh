@@ -492,16 +492,17 @@ else
   ko "22b discrimination du rejet" "rc_racine=$rc_racine22 rc_dev=$rc_dev22"
 fi
 
-# === Cas 23 — Contrat de sortie : aucun code hors {0, 1, 2, 64} =======================================
+# === Cas 23 — Contrat de sortie : aucun code hors {0, 1, 2, 3, 64} =======================================
 codes_ok=1
 for e in "GSD_WORKSTREAM=dev" "GSD_WORKSTREAM=inexistant" "GSD_WORKSTREAM=../workstreams/dev" "VF_STATE_WORKSTREAM=dev"; do
   r=$(env "$e" bash "$SCRIPT" --path "$D" >/dev/null 2>&1; echo $?)
-  case "$r" in 0|1|2|64) : ;; *) codes_ok=0 ;; esac
+  case "$r" in 0|1|2|3|64) : ;; *) codes_ok=0 ;; esac
 done
-if [ "$codes_ok" -eq 1 ]; then ok "23 contrat de sortie inchangé — aucun code hors {0, 1, 2, 64}"; else ko "23 contrat de sortie {0,1,2,64}" "code hors contrat"; fi
+if [ "$codes_ok" -eq 1 ]; then ok "23 contrat de sortie respecté — aucun code hors {0, 1, 2, 3, 64}"; else ko "23 contrat de sortie {0,1,2,3,64}" "code hors contrat"; fi
 
 # ======================================================================================================
-# Fermeture du fail-open de la baseline (plan 41.1-09). Deux vecteurs, deux libellés + une bascule.
+# Fermeture du fail-open de la baseline (plan 41.1-09). Deux vecteurs gardés (ABSOLU-64, Q2-NOBASE)
+# + une observation documentaire NON DISCRIMINANTE (OBS-REL-ABS), qui ne garde rien.
 # ======================================================================================================
 
 # === Cas ABSOLU-64 — un `--file` ABSOLU explicite est une ERREUR D'USAGE, jamais un vert dégradé =====
@@ -518,16 +519,19 @@ else
   ko "ABSOLU-64 --file absolu explicite → exit 64" "rc=$rc_abs err=[$err_abs]"
 fi
 
-# === Cas BASCULE-REL-ABS — DISCRIMINANCE sur le MÊME artefact (patron des cas 5/5b et 10/10b) =======
-# Le silence est FERMÉ, pas DÉPLACÉ : le même contenu de fichier corrompu doit rendre DEUX verdicts
-# distincts selon la forme de l'appel — 64 en absolu (usage invalide), et un rouge réel en relatif
-# bien formé (le gate reste capable de juger). `cmp` confirme que les deux codes DIFFÈRENT.
+# === Cas OBS-REL-ABS — OBSERVATION documentaire, NON DISCRIMINANTE (ne garde rien) =================
+# ATTENTION AU CRÉDIT QU'ON LUI ACCORDE : ce cas est VERT contre le script pré-correctif COMME après
+# (avant : rc_abs=0 != rc_rel=2 ; après : rc_abs=64 != rc_rel=2 — les codes diffèrent dans les deux
+# états). Il ne peut donc PAS détecter la régression : il n'est pas un témoin de bascule, il DOCUMENTE
+# seulement que le même contenu corrompu rend deux verdicts distincts selon la forme de l'appel.
+# La garde effective de la fermeture du fail-open est le cas `ABSOLU-64`, lui mesuré ROUGE contre le
+# script pré-correctif. Ne pas compter ce cas comme une seconde garde.
 err_rel="$(bash "$SCRIPT" --path "$D" --file .planning/STATE.md 2>&1 >/dev/null)"; rc_rel=$?
 printf '%s' "$rc_abs" > "$TMP/rc-abs"; printf '%s' "$rc_rel" > "$TMP/rc-rel"
 if [ "$rc_rel" -ne 0 ] && [ "$rc_rel" -ne 64 ] && ! cmp -s "$TMP/rc-abs" "$TMP/rc-rel"; then
-  ok "BASCULE-REL-ABS même artefact corrompu — rc(absolu)=$rc_abs != rc(relatif)=$rc_rel, codes distincts (cmp)"
+  ok "OBS-REL-ABS observation NON DISCRIMINANTE (verte des deux côtés, ne garde rien — la garde est ABSOLU-64) — rc(absolu)=$rc_abs != rc(relatif)=$rc_rel, codes distincts (cmp)"
 else
-  ko "BASCULE-REL-ABS bascule discriminance relatif/absolu" "rc_abs=$rc_abs rc_rel=$rc_rel err_rel=[$err_rel]"
+  ko "OBS-REL-ABS observation relatif/absolu (documentaire)" "rc_abs=$rc_abs rc_rel=$rc_rel err_rel=[$err_rel]"
 fi
 
 # === Cas Q2-NOBASE — compartiment NON COMMITÉ (absent de HEAD) + frontmatter CASSÉ ==================
