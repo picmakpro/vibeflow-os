@@ -2251,6 +2251,58 @@ exit 0 à exit 1 EN CI), pas seulement la présence du gate — même leçon gra
 aucun vert auto-déclaré ne tient. Le Critère de succès 4 (« existe et est bruyant ») est donc vrai à
 la fois localement (hook) et sur le chemin dominant de ce dépôt (CI).
 
+### Amendement 2026-09-23 — la frontière gate/workflow, posée explicitement, et une correction d'ancrage
+
+**Origine.** La PR #94 a partitionné `.planning/` en deux compartiments (`fiabilite`,
+`gouvernance`) et a laissé un angle mort : le **commentaire** de l'étape `check-state-integrity
+(anti-régression du frontmatter .planning/STATE.md, ADR-063)` de `.github/workflows/ci.yml`
+portait la règle « un gate ne dérive jamais sa cible de `GSD_WORKSTREAM` — il la reçoit en
+argument explicite », sans qu'aucune ADR ni référence de module ne la **pose**. L'étape est
+désignée par son **nom**, jamais par un numéro de ligne : la Phase 41.1 la **réécrit
+entièrement** (plan `41.1-06`, vague 3, postérieur au plan qui écrit cet amendement en vague 2),
+donc tout numéro gravé ici serait périmé à la livraison même de la phase qui l'écrit — la classe
+de défaut exacte que cet amendement corrige. Constaté à la mission
+`2026-09-23-partition-planning-d02.md`, repris à l'ouverture de la Phase 41.1 (ROADMAP, demande de
+Samuel, session principale, 2026-09-23 : « généralise le remède à VibeFlow »).
+
+**Correction d'ancrage.** L'investigation qui a ouvert cette phase a d'abord ancré la règle
+ci-dessus sur **ADR-063**. Cet ancrage est **ERRONÉ** : ADR-063 (2026-07-31) porte sur l'anomalie
+d'agrégation du frontmatter de `.planning/STATE.md` et ne contient **aucune** occurrence du mot
+« workstream » (re-mesuré à l'exécution : 0 occurrence sur les 168 lignes de la section). La règle
+réelle relève d'ADR-069 (cette entrée) et d'ADR-064 (canal nominal), jamais d'ADR-063.
+
+Le raccourci vient de l'**investigation**, pas du commentaire de `ci.yml` : relu le 2026-09-23, ce
+commentaire énonce la règle **sans citer d'ADR**, et ne mentionne ADR-063 que pour son objet
+réel — « ce qui est protégé ici est le `STATE.md` VIVANT, celui dont ADR-063 garde les
+compteurs » —, ce qui est **exact**. Le nom de l'étape le cite au même titre, et légitimement.
+Cette précision est écrite ici pour qu'un futur lecteur ne reproduise ni le raccourci d'ancrage,
+ni le contresens sur sa source.
+
+**La frontière, posée par le RÔLE, pas par le mécanisme.**
+
+> `GSD_WORKSTREAM` et le pointeur `.planning/active-workstream` restent le canal **nominal de ce
+> qui TRAVAILLE** — workflows, agents, worktrees (§3 de `workstreams.md`, inchangé par cet
+> amendement). Un **gate** — un script dont le verdict décide d'un merge, d'une CI, d'une
+> intégrité d'état — ne dérive **jamais** sa cible d'une valeur qu'un simple `export` peut
+> changer, **parce qu'il juge précisément celui-là même qui pourrait l'exporter**. Un gate reçoit
+> sa cible en argument **explicite** (`--file`, `--path`), ou l'**énumère depuis le disque**
+> (`vf_ws_enumerate`, Phase 41.1) — jamais depuis l'environnement de son propre appelant.
+
+Cette frontière **était déjà appliquée par construction** sur `check-state-integrity.sh` (`--file`
+explicite, exposé en CI dès la partition) — elle n'était simplement jamais **écrite** ailleurs
+qu'en commentaire de step. Cet amendement la rend explicite pour tout futur gate, sans changer
+aucun comportement existant.
+
+**Ce que cet amendement ne change pas.** La décision d'adoption des workstreams et la condition
+dure (« aucune partition tant qu'une phase est en vol ») restent inchangées, ci-dessus. Cette
+précision ne rouvre ni l'une ni l'autre. Elle ne tranche pas non plus le cas d'un
+`.planning/workstreams` présent en **fichier régulier**, sur lequel les verdicts des gardes
+existantes divergent : cette contradiction est **antérieure** à cette phase, elle reste
+**ouverte**, et elle devra être tranchée pour elle-même — la figer ici dans un second contrat
+écrit serait décider par inadvertance un cas que rien n'a instruit.
+
+*Décision de la session principale (`vibeflow-head`), 2026-09-23 — pas un arbitrage de Samuel.*
+
 ---
 
 ## ADR-070 : Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin
