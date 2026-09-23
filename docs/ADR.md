@@ -40,6 +40,7 @@
 | ADR-069 | 2026-08-04 | Les workstreams GSD sont adoptés, avec leurs quatre limites datées, la condition dure « aucune partition tant qu'une phase est en vol », la révision de l'Iron Law 2 et l'amendement d'ADR-064 | Validée — amendée le 2026-09-09 (risque (b) migré au niveau commit, D-10 rouverte en équipe, couverture re-mesurée) |
 | ADR-070 | 2026-08-06 | Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin | Validée |
 | ADR-072 | 2026-09-17 | Gardes in-repo sans règle côté serveur — ce qui est gardé, ce qui ne l'est pas, ce qui attend un accès admin | Validée |
+| ADR-073 | 2026-09-23 | Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag | Validée (non gatée machine) |
 
 > **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
 > `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
@@ -2549,3 +2550,78 @@ Le flux du `CLAUDE.md` est inchangé : bump → PR → merge → tag annoté →
 l'étape `check-release-tag` et ne changent ni sa condition ni son contenu. Le push d'un tag ne
 déclenche pas la CI (`on.push.branches`, aucune entrée `tags:`), donc G-3 ne peut pas rougir sur
 une release. Le hook `pre-push` reste tel quel : son durcissement (G-5) a été écarté du périmètre.
+
+## ADR-073 : Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag
+
+**Date** : 2026-09-23 · **Statut** : Validée (non gatée machine) · **Décideur** : Samuel ·
+**Voisines** : le `CLAUDE.md` racine (discipline de tag intacte : toute version = un tag + une
+release GitHub — cette ADR dit QUAND bumper, pas comment publier), ADR-072 (gardes in-repo sans
+règle côté serveur — même registre de gouvernance déclarative, non machine-enforced) · **Contexte** :
+demande de Willy (compte `picmakpro`, co-mainteneur) le 2026-09-23, tranchée par Samuel — arbitrage
+Samuel, AskUserQuestion session principale, 2026-09-23 ; faux rouges répétés du gate
+`scripts/check-release-tag.sh` sur `main` (v2.63.1, v2.63.2, v2.64.0 — cette dernière restée rouge
+du 22 au 23 septembre 2026 jusqu'à relance manuelle du job).
+
+### Contexte / Problème
+
+Deux problèmes distincts, remontés le même jour, réglés par cette ADR :
+
+1. **Quand une release est justifiée.** Rien dans ce dépôt ne dit à quel moment un bump de
+   `VERSION` est légitime. Une PR qui ne touche que la documentation, les specs, le planning ou des
+   artefacts de phase peut aujourd'hui déclencher une release au même titre qu'une évolution du
+   framework — l'utilisateur du plugin voit alors un bandeau de mise à jour pour une version qui ne
+   change rien à son usage, ce qui use sa confiance dans ce signal.
+2. **Le gate de tag rougit après CHAQUE release, pas seulement quand il le devrait.** Le job
+   `check-release-tag` (main uniquement, cf. `.github/workflows/ci.yml`) tourne au push sur `main`,
+   c'est-à-dire au moment du merge — alors que le tag annoté et la release GitHub ne sont posés que
+   quelques minutes après, une fois le merge confirmé (`CLAUDE.md` § Règle non négociable, étape
+   2). Le gate ne distingue pas ce délai structurel d'une vraie omission de tag.
+
+### Décision — quand une release est justifiée
+
+Une release publie une **évolution fonctionnelle du framework** : nouveau module ou nouvelle
+capacité, correctif de comportement, durcissement d'un gate. Une PR qui ne touche que
+documentation, specs, planning ou artefacts de phase **ne déclenche aucune release** — son contenu
+s'accumule jusqu'à la prochaine release qui, elle, porte un changement fonctionnel.
+
+Motif : publier une version sans changement fonctionnel fait voir aux utilisateurs du plugin une
+mise à jour vide au bandeau de démarrage de session — ce signal perd sa valeur d'alerte s'il se
+déclenche pour du bruit. La discipline de tag posée par le `CLAUDE.md` racine (toute version = un
+tag + une release GitHub) reste intacte et n'est pas rouverte ici : cette ADR répond à une question
+en amont — quand bumper — pas à comment publier une fois le bump décidé.
+
+**Cette règle n'est pas gatée machine à ce stade.** Aucun script ne distingue aujourd'hui une PR
+« fonctionnelle » d'une PR « doc/specs/planning » sans une convention supplémentaire (label, chemin
+de fichiers touchés, préfixe de commit) qui n'existe pas encore dans ce dépôt — l'écrire sans cette
+convention produirait un gate incapable de juger, donc un vert par défaut qui ne protège rien
+(même écueil que documenté pour les gardes déclaratives d'ADR-072). La règle reste donc une
+discipline humaine au moment du bump, revue au meilleur effort par quiconque prépare une release,
+jusqu'à ce qu'un signal fiable existe pour la border. Ne pas prétendre qu'elle est fermée.
+
+### Décision — fenêtre de grâce du gate de tag
+
+`scripts/check-release-tag.sh` distingue désormais deux cas de tag absent :
+
+- **absent ET commit de release récent** (âge du commit `HEAD` inférieur à la fenêtre de grâce) →
+  verdict **d'attente, non bloquant** (`exit 3`), avec message explicite (poser le tag maintenant,
+  ou relancer le job une fois le tag poussé) ;
+- **absent ET hors fenêtre** → échec comme aujourd'hui (`exit 1`).
+
+Fenêtre par défaut : **900 secondes (15 minutes)**, configurable via la variable d'environnement
+`VF_RELEASE_TAG_GRACE_SECONDS`. Codes de sortie alignés sur les conventions déjà en usage dans ce
+dépôt (0/1/2/3/64, cf. `scripts/check-push-sans-pr.sh`) : `3` reprend le sens déjà porté ailleurs
+dans le parc — un verdict non bloquant, informationnel, distinct d'un vrai échec.
+
+Le mode `--remote` **garde son exigence actuelle inchangée** : une fois le tag présent en local (à
+l'intérieur ou après la fenêtre de grâce), la vérification du tag poussé sur `origin` et de la
+release GitHub associée reste stricte, sans fenêtre de grâce — seule l'absence totale du tag local
+juste après un merge bénéficie du délai.
+
+L'étape `check-release-tag` de `.github/workflows/ci.yml` traite désormais `exit 3` comme non
+bloquant (avertissement CI, job vert) et tout autre code non nul comme un échec inchangé.
+
+### Ce que cette ADR ne tranche pas
+
+Aucune convention machine-lisible « fonctionnel vs doc » n'est posée : un futur gate qui voudrait
+distinguer automatiquement ces deux catégories de PR devra d'abord faire exister ce signal
+(label, chemin, préfixe) — cette ADR documente l'intention, pas son application outillée.
