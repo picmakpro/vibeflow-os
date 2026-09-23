@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: fiabilite-v1.0
 milestone_name: « ce qui survit »
-current_phase: 39
-current_phase_name: Workstreams — partition du planning et collaboration concurrente
-status: completed
+current_phase: 41
+current_phase_name: Posture de protection du dépôt
+status: executing
 stopped_at: >-
   Phase 39 shipped - PR 62 - v2.60.0 (2026-09-14). Exécutée 2026-09-10 (3 plans, SUMMARY sur disque),
   revue ×3 + audit infra + juge frais sur le diff de correction post-revue (mitigation de sécurité
@@ -37,14 +37,12 @@ stopped_at: >-
   ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
   armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
   existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
-last_updated: "2026-09-18T15:51:00.000Z"
-last_activity: 2026-09-18
+last_updated: "2026-09-23T12:10:00.000Z"
+last_activity: 2026-09-23
 last_activity_desc: >-
-  Phase 41, périmètre sans admin (arbitrage Samuel, AskUserQuestion session principale, 2026-09-17)
-  exécuté sur `feat/phase-41-protection-depot` : plans 41-14 à 41-19, gap 41-16-SUMMARY.md comblé,
-  revue + correctifs + revue finale PASS. G-1/G-2/G-3 + ADR-072 verts (`gates` rc=0, `tests` rc=0).
-  Ledger `REQUIREMENTS.md` : PROT-01 non coché (hors d'atteinte), PROT-02..05 cochés. Détail complet
-  en `## Current Position` et `### Decisions`. Reliquats manager : PR à ouvrir, release à trancher.
+  Phase 41, volet admin repris le 2026-09-23 (accès admin constaté, D-02bis : contournement par
+  samuel-neveugall et picmakpro, arbitrage Willy, AskUserQuestion session principale, 2026-09-23) :
+  exécution des plans 41-01 à 41-13 révisés, sur `feat/phase-41-volet-admin` (worktree dédié).
 progress:
   total_phases: 12
   completed_phases: 11
