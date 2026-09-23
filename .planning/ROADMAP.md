@@ -1696,11 +1696,26 @@ Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-1
 **Requirements**: FABR-01, FABR-02, FABR-03, FABR-04, FABR-05
 **Depends on:** Phase 41 (ordre de la ROADMAP). **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — ouverte au 2026-09-23, CI rouge sur G-2 faute de trailer `Gate-Touche:`.
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §1.1-1.3, §3, §4, B-01. Hors périmètre : §8 (`skills:`, `cacheTtl`, `maxTurns`, `color:`).
-**Plans:** 0 plans
+**Plans:** 6 plans
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 42 to break down)
+- [ ] 42-01-PLAN.md — vague 1 (tracer) : manifeste daté lu par le gate, posé par l'installeur (`*.json`), refus sur manifeste illisible ; T54, T77-T82 (FABR-01)
+- [ ] 42-02-PLAN.md — vague 1 : corpus — mobile-test-team (I3), business-pilot-bundle et content-bundle (I5/I6), un commit et un bump patch par module (FABR-05)
+- [ ] 42-03-PLAN.md — vague 1 : corpus — growth-bundle et design-orchestrator (I5/I6), un commit et un bump patch par module (FABR-05)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 42-04-PLAN.md — vague 2 : fraîcheur — INDÉTERMINÉ sous `--manifest-freshness=strict` en CI, avertissement chez l'utilisateur, rétrogradation D-05 ; T83-T90, MUT-F1/F2 (FABR-02)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 42-05-PLAN.md — vague 3 : invariants locaux I1, I4, I5, I6, I7 en erreur, jumeaux négatifs et mutants ; corpus et blueprints verts (FABR-03, FABR-05)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 42-06-PLAN.md — vague 4 : découverte récursive (D-10), I2/I3 en monde fermé (D-09), conductor en mineure, relevé de relecture Samuel (FABR-03, FABR-04, FABR-05)
 
 ### Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator
 

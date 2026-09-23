@@ -38,15 +38,26 @@ created: "2026-09-23"
 
 ## Per-Task Verification Map
 
-*Rempli par le planificateur (une ligne par tâche) ; état initial ci-dessous par exigence.*
+*Rempli par le planificateur (une ligne par tâche). Chaque tâche de gate écrit ses cas AVANT
+l'implémentation (tdd) : la colonne « File Exists » dit si le fichier de test existe déjà, les cas
+eux-mêmes naissent dans la tâche.*
 
-| Requirement | Behavior | Test Type | Automated Command | File Exists | Status |
-|-------------|----------|-----------|-------------------|-------------|--------|
-| FABR-01 | manifeste absent/illisible → refus explicite | unit + mutation | `bash plugin/conductor/scripts/tests/test-check-agents.sh` | ❌ W0 | ⬜ pending |
-| FABR-02 | périmé → avertissement hors CI, exit 3 sous l'option CI, jamais de refus sur liste fermée | unit + mutation (`verifie_le` reculé) | idem | ❌ W0 | ⬜ pending |
-| FABR-03 | I1-I7, jumeau négatif par invariant | unit + mutation | idem | ❌ W0 | ⬜ pending |
-| FABR-04 | découverte récursive + exclusions | unit (fixture synthétique) | idem | ❌ W0 | ⬜ pending |
-| FABR-05 | corpus réel conforme `--strict` + `--resolve-agents=strict` | integration | 3 étapes CI rejouées localement | ✅ | ⬜ pending |
+| Task | Plan | Wave | Requirement | Behavior | Test Type | Automated Command | File Exists | Status |
+|------|------|------|-------------|----------|-----------|-------------------|-------------|--------|
+| 42-01-T1 (tracer) | 42-01 | 1 | FABR-01 | manifeste lu par le gate, posé par l'installeur, refus dans un lab sans manifeste ; T54 | E2E lab frais + unit installeur | commande TRACER-OK du plan ; `bash plugin/_internal/tests/test-vibeflow-update.sh` | ✅ (suite installeur) / manifeste à créer | ⬜ pending |
+| 42-01-T2 | 42-01 | 1 | FABR-01 | harnais à manifeste du jour ; T77-T82 (absent, illisible, schéma, source unique, D-17, hook, garde) | unit + mutation de données | `bash plugin/conductor/scripts/tests/test-check-agents.sh` | ✅ | ⬜ pending |
+| 42-02-T1 | 42-02 | 1 | FABR-05 | vf-test-orchestrator interne (I3), corps inchangé, bump patch | integration (gate sur le module) | commande CORPUS-MTT-OK + awk INSTR-INCHANGE | ✅ | ⬜ pending |
+| 42-02-T2 | 42-02 | 1 | FABR-05 | quality-gate-client omitClaudeMd, vf-business-manager SendMessage | integration + suite de module | CORPUS-BPB-OK | ✅ | ⬜ pending |
+| 42-02-T3 | 42-02 | 1 | FABR-05 | content-clarity-judge omitClaudeMd, vf-content-manager SendMessage | integration + suite de module | CORPUS-CB-OK | ✅ | ⬜ pending |
+| 42-03-T1 | 42-03 | 1 | FABR-05 | growth-quality-judge omitClaudeMd, vf-growth-manager SendMessage | integration + suite de module | CORPUS-GB-OK | ✅ | ⬜ pending |
+| 42-03-T2 | 42-03 | 1 | FABR-05 | vf-design-judge omitClaudeMd, vf-design-manager SendMessage (T8 du module) | integration + suite de module | CORPUS-DO-OK | ✅ | ⬜ pending |
+| 42-04-T1 | 42-04 | 2 | FABR-02 | T83-T90 (rétrogradation, INDETERMINE, bornes, date future, hook, portée D-05, garde), MUT-F1, MUT-F2 | unit + mutation de code (QUAL-01) | `bash plugin/conductor/scripts/tests/test-check-agents.sh` | ✅ | ⬜ pending |
+| 42-04-T2 | 42-04 | 2 | FABR-02 | `--manifest-freshness=strict` aux 4 appels CI | integration (rejeu CI + Gate C lab frais) | CI-REPLAY fail=0 ; GATE-C-OK ; YAML-OK | ✅ | ⬜ pending |
+| 42-05-T1 | 42-05 | 3 | FABR-03 | I1, I4, I7 : T91, T92, T95, mutations réelles, MUT-I1, MUT-I4, MUT-I7 | unit + mutation (données réelles et code) | `bash plugin/conductor/scripts/tests/test-check-agents.sh` | ✅ | ⬜ pending |
+| 42-05-T2 | 42-05 | 3 | FABR-03, FABR-05 | I5, I6 : T93, T94, T96 (corpus réel + blueprints), MUT-I5, MUT-I6 | unit + mutation + integration | suite + CI-REPLAY fail=0 (avec check-blueprints) | ✅ | ⬜ pending |
+| 42-06-T1 | 42-06 | 4 | FABR-04 | T97-T99 (récursion, exclusions, résolution), MUT-D1, MUT-D2, lab frais avec `-references` | unit + mutation + E2E lab frais | suite + LAB-RECURSIF-OK | ✅ | ⬜ pending |
+| 42-06-T2 | 42-06 | 4 | FABR-03, FABR-05 | I2, I3 : T100-T102 (monde fermé réel muté), MUT-I2, MUT-I3 | unit + mutation + integration | suite + MONDE-FERME fail=0 | ✅ | ⬜ pending |
+| 42-06-T3 | 42-06 | 4 | FABR-05 | conductor en mineure, docs, T76 intact, rejeu complet, G-2 | integration (toutes suites + gates) | REJEU-FIN sans ligne rouge ; G2 rc=0 ; ✓ T76 | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -54,8 +65,8 @@ created: "2026-09-23"
 
 ## Wave 0 Requirements
 
-- [ ] Nouveaux cas `T77+` dans `plugin/conductor/scripts/tests/test-check-agents.sh` (manifeste absent, illisible, périmé lenient/strict, I1-I7 avec mutation, découverte récursive + exclusion)
-- [ ] Cas de test de l'installeur prouvant qu'un `.json` sous `<module>/scripts/` est copié (D-16)
+- [ ] Nouveaux cas `T77+` dans `plugin/conductor/scripts/tests/test-check-agents.sh` (manifeste absent, illisible, périmé lenient/strict, I1-I7 avec mutation, découverte récursive + exclusion) — T77-T82 en 42-01-T2, T83-T90 en 42-04-T1, T91-T96 en 42-05, T97-T102 en 42-06 ; harnais à manifeste du jour (`mk_manifest`, `mk_gate_dir`) posé en 42-01-T2, helpers de mutation QUAL-01 (`make_gate_mutant`, `okmut`, `komut`) en 42-04-T1
+- [ ] Cas de test de l'installeur prouvant qu'un `.json` sous `<module>/scripts/` est copié (D-16) — T54 de `plugin/_internal/tests/test-vibeflow-update.sh`, écrit rouge avant la boucle d'installeur (42-01-T1)
 
 ---
 

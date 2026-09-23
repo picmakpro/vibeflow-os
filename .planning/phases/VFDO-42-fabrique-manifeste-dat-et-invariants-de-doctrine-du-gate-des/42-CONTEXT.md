@@ -63,15 +63,15 @@ et l'unification MCP (Phase 43) ; le hook central par rôle (Phase 45) ; tout §
   `--strict` à cause d'une liste en retard.
 
 ### Les invariants — définitions retenues
-- **D-06 : I1 se lit sur le marqueur `Worker interne` dans `description:`.** Mesuré : les
+- **D-06 :** I1 se lit sur le marqueur `Worker interne` dans `description:`. Mesuré : les
   19 agents `vf-internal: true` le portent tous, et aucun agent non interne ne le porte. Le gate
   vérifie la corrélation dans les deux sens.
 - **D-07 : un « manager » au sens d'I6 = porteur d'un `Agent(...)` non vide ET non `vf-internal`.**
   La définition de la spec (« porteur d'un `Agent(...)` non vide ») est trop large. Mesuré : elle
   classe manager `vf-reviewer`, `vf-auditer` et `vf-coder`, des workers internes qui dispatchent
   des briques `gsd-*`. **Écart assumé par rapport à la spec §4.**
-- **D-08 : un « juge » au sens d'I5 = `disallowedTools` qui retire `Write` et `Edit` ET aucun
-  `Agent(...)`.** Dans la définition de la spec, `omitClaudeMd: true` tomberait aussi sur
+- **D-08 :** un « juge » au sens d'I5 = `disallowedTools` qui retire `Write` et `Edit` ET aucun
+  `Agent(...)`. Dans la définition de la spec, `omitClaudeMd: true` tomberait aussi sur
   `vf-reviewer` et `vf-auditer`, qui ont besoin des conventions du projet pour relire. Exiger
   qu'ils l'ignorent casserait leur fonction. Avec cette définition, les juges visés sont 4 :
   `quality-gate-client`, `content-clarity-judge`, `growth-quality-judge`, `vf-design-judge`.
@@ -97,8 +97,8 @@ et l'unification MCP (Phase 43) ; le hook central par rôle (Phase 45) ; tout §
     `vf-test-orchestrator` si le correctif I3 le laisse porteur d'un `Agent(...)` (à trancher par le
     planificateur au vu du fichier) ;
   - I1, I2, I4, I7 : **zéro violation**.
-- **D-12 : un commit par module touché, séparé des commits du gate, avec le bump de patch du
-  module** (VERSION, CHANGELOG). `mobile-test-team`, `dev-orchestrator` et `design-orchestrator`
+- **D-12 :** un commit par module touché, séparé des commits du gate, avec le bump de patch du
+  module (VERSION, CHANGELOG). `mobile-test-team`, `dev-orchestrator` et `design-orchestrator`
   sont de la polarité de Samuel : la PR le nomme en relecteur de ces commits-là, et le cadrage le
   consigne ici plutôt que de le découvrir en revue.
 - **D-13 [informational] : sans objet — constaté par la recherche du 2026-09-23.** T76 (le test
@@ -118,8 +118,8 @@ et l'unification MCP (Phase 43) ; le hook central par rôle (Phase 45) ; tout §
   pose le merge de la #85 comme précondition de sa première vague. Sa CI est rouge sur G-2
   (`check-gate-touche.sh`) faute de trailer `Gate-Touche:`. La correction appartient à cette PR,
   pas à la phase.
-- **D-15 : tout commit de la phase qui touche le gate, sa suite, `ci.yml` ou un hook porte le
-  trailer `Gate-Touche:`** (CLAUDE.md, G-2). C'est précisément ce qui a mis la #85 au rouge.
+- **D-15 :** tout commit de la phase qui touche le gate, sa suite, `ci.yml` ou un hook porte le
+  trailer `Gate-Touche:` (CLAUDE.md, G-2). C'est précisément ce qui a mis la #85 au rouge.
 
 ### Exigences proposées (à graver au ledger par le planificateur)
 - **FABR-01** manifeste daté, source unique des listes ; absent = refus (D-01, D-03).

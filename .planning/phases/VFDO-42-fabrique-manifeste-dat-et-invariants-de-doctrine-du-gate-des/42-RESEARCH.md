@@ -609,9 +609,9 @@ diff /tmp/before.txt /tmp/after.txt   # attendu : SEULE la colonne LIGNES bouge 
 **Si cette table est vide :** non applicable — 4 assomptions identifiées, toutes de risque faible à
 moyen, aucune ne remet en cause une décision verrouillée de CONTEXT.md.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **`vf-test-orchestrator` reste-t-il un « manager » au sens I6 après le correctif I3 ?**
+1. **`vf-test-orchestrator` reste-t-il un « manager » au sens I6 après le correctif I3 ?** — RESOLVED : worker interne sans `SendMessage`, lecture littérale de D-07 (plan 42-02, tâche 1).
    - What we know : ajouter `vf-internal: true` + marqueur `Worker interne` résout I3 (dispatché par
      `vf-dev-manager`, désormais correctement marqué interne) ET, par la définition D-07 elle-même
      (« manager = Agent(...) non vide ET **non vf-internal** »), le sort AUTOMATIQUEMENT de la
@@ -627,7 +627,7 @@ moyen, aucune ne remet en cause une décision verrouillée de CONTEXT.md.
      sur `vf-coder`/`vf-reviewer`/`vf-auditer` (tous trois managers-au-sens-large mais vf-internal,
      donc hors I6).
 
-2. **`dev-orchestrator` a-t-il réellement besoin d'un commit de correctif de corpus ?**
+2. **`dev-orchestrator` a-t-il réellement besoin d'un commit de correctif de corpus ?** — RESOLVED : non, aucun `files_modified` dans ce module (constat consigné au plan 42-06).
    - What we know : D-12 nomme `dev-orchestrator` comme un des trois modules « de la polarité de
      Samuel » à faire relire. La recherche n'a trouvé AUCUNE violation I1-I7 sur les agents propres à
      `dev-orchestrator` (`vf-dev-manager` porte déjà `SendMessage` ; `vf-coder`/`vf-reviewer`/
@@ -642,7 +642,7 @@ moyen, aucune ne remet en cause une décision verrouillée de CONTEXT.md.
      commits de patch prévus par D-12, tout en gardant Samuel nommé relecteur des commits
      `mobile-test-team`/`design-orchestrator` qui, eux, sont bien nécessaires.
 
-3. **Nom exact de l'option CI de fraîcheur et du fichier manifeste.**
+3. **Nom exact de l'option CI de fraîcheur et du fichier manifeste.** — RESOLVED : `--manifest-freshness` et `check-agents-manifest.json` (plan 42-01).
    - What we know : Claude's Discretion explicite (CONTEXT.md). Le patron `--resolve-agents=lenient|
      strict` est déjà établi dans ce même script pour un besoin structurellement identique (un mode
      par défaut sûr, un mode strict réservé à la CI).
