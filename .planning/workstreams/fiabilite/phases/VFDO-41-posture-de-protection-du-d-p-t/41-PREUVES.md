@@ -93,3 +93,17 @@ PR29-FERMEE: state=CLOSED closedAt=2026-09-23T10:48:32Z
 RULESETS-AVANT: n=0
 PR-EN-VOL-REPRISE: numeros=#87,#88 detail=#87:main:de46daa3,#88:main:ed95ac5a
 CONTEXTES-CHECKS-REPRISE: sha=6a7b15b3c74a1f45f4f1ad380a35d97d62cf1514 n=4 app=15368 ci_inclus_dans_api=oui egal_2026-09-17=oui check_release_tag_contexte=non
+
+## 41-04 — PR de la phase
+
+PR-PHASE: #90 merge=e70b22b71b5271c596ed5ff9cd053b498feefc8e tete=f5db5145f239c5c38bbe7abcd74a15981bead3c3 checks_tete=8/8 codeowners_errors=0 rulesets_au_merge=0 fusionne_par=samuel-neveugall fusionne_le=2026-09-23T14:41:20Z
+
+Note : décision de merge de Willy (AskUserQuestion session principale, 2026-09-23 — « Je merge
+depuis la session »), mais au moment de la commande `gh pr merge 90 --merge`, GitHub a répondu
+« already merged » : la PR #90 avait déjà été mergée par `samuel-neveugall` (id 151974738) à
+2026-09-23T14:41:20Z, commit de merge `e70b22b71b5271c596ed5ff9cd053b498feefc8e`, état `MERGED`
+(témoin `gh pr view 90 --json state,mergeCommit,mergedBy`). Entre l'ouverture de la PR et son
+merge, `samuel-neveugall` a poussé un commit de fusion supplémentaire sur la branche A
+(`f5db514`, « Merge origin/main dans feat/phase-41-volet-admin (débogage PR #90) ») rattrapant
+7 commits arrivés sur `main` entre-temps (PR #91) ; c'est ce sha de tête qui a été mergé. Fait
+consigné tel quel : Willy n'a pas mergé cette PR.
