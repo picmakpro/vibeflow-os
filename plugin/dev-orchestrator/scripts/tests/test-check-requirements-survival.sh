@@ -781,6 +781,41 @@ out="$(bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
 has=0; case "$out" in "[ledger-illisible]"*"trace_malformed"*) has=1 ;; esac
 if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "38 (G3) trace carried-from: réellement tronquée (sans backtick, sans valeur) → illisible trace_malformed"; else ko "38 (G3) trace carried-from: réellement tronquée (sans backtick, sans valeur) → illisible trace_malformed" "rc=0 out contient trace_malformed" "rc=$rc out=[$out]"; fi
 
+# === Cas 39 (partition D-02, 2026-09-23) — lab partitionné : le ledger VIVANT lu est celui du
+# compartiment ACTIF (.planning/workstreams/<nom>/REQUIREMENTS.md), pas la racine — preuve par
+# DIVERGENCE : la racine porte un ledger dont le jalon clos serait signalé ABSENT, le compartiment
+# porte un ledger PRÉSENT et complet. Si la résolution de workstream n'avait pas eu lieu, ce cas
+# lirait la racine et rendrait [ledger-absent] au lieu du silence attendu.
+D="$(mk_root c39)"
+w_milestones "$D" "$CLOSED_H2"
+mkdir -p "$D/.planning/workstreams/demo-ws"
+printf '%s' "demo-ws" > "$D/.planning/active-workstream"
+printf '%s' "$(archive_one_id BBBB-01)" > "$D/.planning/workstreams/demo-ws/REQUIREMENTS.md"
+out="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM bash "$GATE" --path "$D" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "39 lab partitionné (pointeur store-partagé) → ledger du compartiment actif lu, silence attendu (racine, elle, serait ledger-absent)"; else ko "39 lab partitionné (pointeur store-partagé) → ledger du compartiment actif lu, silence attendu" "rc=3 out=[]" "rc=$rc out=[$out]"; fi
+
+# === Cas 40 (partition D-02) — MÊME fixture, canal GSD_WORKSTREAM (rang nominal ADR-064) plutôt
+# que le pointeur partagé : même verdict, canal différent — preuve que les deux canaux composables
+# sont bien exercés, pas seulement le pointeur.
+D2="$(mk_root c40)"
+w_milestones "$D2" "$CLOSED_H2"
+mkdir -p "$D2/.planning/workstreams/demo-ws"
+printf '%s' "$(archive_one_id CCCC-01)" > "$D2/.planning/workstreams/demo-ws/REQUIREMENTS.md"
+out2="$(env -u VF_WORKSTREAM GSD_WORKSTREAM=demo-ws bash "$GATE" --path "$D2" 2>/dev/null)"; rc2=$?
+if [ "$rc2" -eq 3 ] && [ -z "$out2" ]; then ok "40 lab partitionné (GSD_WORKSTREAM) → ledger du compartiment actif lu, silence attendu"; else ko "40 lab partitionné (GSD_WORKSTREAM) → ledger du compartiment actif lu, silence attendu" "rc=3 out=[]" "rc=$rc2 out=[$out2]"; fi
+
+# === Cas 41 (partition D-02) — CONTRÔLE de discriminance du cas 39 : MÊME fixture, mais sans aucun
+# canal composable résolu (env nettoyé, pas de pointeur) → repli sur la racine, [ledger-absent].
+# Sans ce contrôle, le cas 39 pourrait être vert par un tout autre chemin (ex. silence par défaut).
+D3="$(mk_root c41)"
+w_milestones "$D3" "$CLOSED_H2"
+w_archive "$D3" "demo-v1" "$(archive_one_id AAAA-01)"
+mkdir -p "$D3/.planning/workstreams/demo-ws"
+printf '%s' "$(archive_one_id DDDD-01)" > "$D3/.planning/workstreams/demo-ws/REQUIREMENTS.md"
+out3="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM bash "$GATE" --path "$D3" 2>/dev/null)"; rc3=$?
+has3=0; case "$out3" in "[ledger-absent]"*"demo-v1"*) has3=1 ;; esac
+if [ "$rc3" -eq 0 ] && [ "$has3" -eq 1 ]; then ok "41 CONTRÔLE — même fixture SANS canal composable → repli racine, [ledger-absent] (le cas 39 est bien discriminant)"; else ko "41 CONTRÔLE — même fixture SANS canal composable → repli racine, [ledger-absent]" "rc=0 out contient [ledger-absent] et demo-v1" "rc=$rc3 out=[$out3]"; fi
+
 # --- MUTATION G3 : réintroduire le bras trop large (`carried-from:[[:space:]]*$`, sans exigence de
 # backtick) dans une COPIE de la primitive — doit faire ROUGIR le cas 38 (la trace tronquée redevient
 # silencieusement absorbée), en laissant VERT le cas 24 (mention nue en prose, backtick, inchangée).
@@ -812,8 +847,8 @@ fi
 # constaté par exécution : `-v` cassait la comparaison d'égalité de ligne, silencieusement).
 MUTCRLF_DIR="$TMP/mut-crlf"; mkdir -p "$MUTCRLF_DIR"
 export MUT_CRLF_OLD1 MUT_CRLF_OLD2 MUT_CRLF_NEW1 MUT_CRLF_NEW2
-MUT_CRLF_OLD1="$(sed -n '98p' "$PRIMITIVE")"
-MUT_CRLF_OLD2="$(sed -n '105p' "$PRIMITIVE")"
+MUT_CRLF_OLD1="$(sed -n '108p' "$PRIMITIVE")"
+MUT_CRLF_OLD2="$(sed -n '115p' "$PRIMITIVE")"
 MUT_CRLF_NEW1='  heading="$(awk '"'"''
 MUT_CRLF_NEW2='  '"'"' "$milestones")"'
 awk '

@@ -22,6 +22,13 @@
 # Ce script n'est JAMAIS appelé par un hook (A-18-11) : le gate SessionStart du plan 18-01 se
 # contente d'IMPRIMER ce geste, il ne l'exécute jamais. Aucune contrainte de latence de session ici.
 #
+# RÉSOLUTION DE WORKSTREAM (partition D-02, 2026-09-23, mandat worker `partition-planning-d02`) :
+# une fois le lab partitionné, `$LIVE` (lu ET, sous --write, écrit) est celui du compartiment ACTIF
+# (`.planning/workstreams/<nom>/REQUIREMENTS.md`), résolu via workstream-policy.sh — MILESTONES.md
+# et l'archive milestones/ restent PARTAGÉS à la racine, non affectés. Best-effort, fail-open :
+# politique introuvable ou nom non résolu replient sur le comportement historique
+# (`.planning/REQUIREMENTS.md`). Codes de sortie INCHANGÉS.
+#
 # Usage:
 #   restore-requirements-ledger.sh [--path <dir>] [--write] [--overwrite-live] [--quiet] [-h|--help]
 # Defaults: --path .  (mode diff, aucune écriture)
@@ -78,7 +85,29 @@ if [ -z "$PRIMITIVE" ] || ! . "$PRIMITIVE" 2>/dev/null || ! command -v vf_ledger
   exit 1
 fi
 
-vf_ledger_state "$PLANNING_DIR"
+# --- Résolution du compartiment du ledger VIVANT (partition D-02, 2026-09-23) --------------------
+# Même politique et même best-effort fail-open que check-requirements-survival.sh (voir son
+# en-tête) : MILESTONES.md et l'archive milestones/ restent PARTAGÉS à la racine, $LIVE est
+# redirigé vers le compartiment actif s'il en résout un, sinon le comportement historique tient.
+# `$LIVE` porte AUSSI l'écriture (`--write`) : c'est le ledger reconstitué qui atterrit dans le
+# compartiment actif, pas à la racine, une fois le lab partitionné.
+for _wscand in "$_SCRIPT_DIR/../../planning-core/scripts/workstream-policy.sh" \
+               "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+  if [ -n "$_wscand" ] && [ -r "$_wscand" ]; then
+    # shellcheck source=/dev/null
+    . "$_wscand"
+    break
+  fi
+done
+if command -v vf_ws_resolve >/dev/null 2>&1; then
+  vf_ws_resolve "$PLANNING_DIR"
+  if [ -n "${VF_WS_NAME:-}" ] && command -v vf_ws_dir_resolve >/dev/null 2>&1; then
+    vf_ws_dir_resolve "$PLANNING_DIR" "$VF_WS_NAME"
+    [ -n "${VF_WS_DIR:-}" ] && LIVE="$VF_WS_DIR/REQUIREMENTS.md"
+  fi
+fi
+
+vf_ledger_state "$PLANNING_DIR" "$LIVE"
 state_rc=$?
 
 # --overwrite-live est le SEUL cas où ce script continue malgré un $LIVE présent : vf_ledger_state
