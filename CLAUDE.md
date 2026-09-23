@@ -42,8 +42,15 @@ intermédiaires irretrouvables.
 pas son tag. Câblage `pre-push` optionnel (bloque uniquement les push vers `main`) :
 `git config core.hooksPath scripts/hooks` (une seule fois par clone).
 
+**Quand publier** : une release ne se déclenche **que pour une évolution fonctionnelle de
+VibeFlow** — un comportement qui change dans ce qu'un utilisateur installe. Une PR qui ne porte que
+de la documentation, des specs ou du planning (`docs/`, `.planning/`, mémoire d'agents) se merge
+**sans release** : sinon les utilisateurs reçoivent une mise à jour qui ne contient rien. Ces
+changements partent avec la prochaine release fonctionnelle. Règle posée par Samuel (WhatsApp,
+2026-09-23) après la revue de la PR #86, inscrite ici à la demande de Willy (même canal, même date).
+
 **Numérotation** : `vMAJOR.MINOR.PATCH`. Nouveau module / nouvelle capacité → **minor** ;
-correctif / doc / durcissement → **patch**. Le tag reprend **exactement** la valeur de `VERSION`
+correctif / durcissement → **patch**. Le tag reprend **exactement** la valeur de `VERSION`
 (préfixe `v` inclus).
 
 ## Conventions transverses
