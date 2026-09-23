@@ -25,9 +25,15 @@
 #   <sources>/plans/*.md  → grain plan
 #
 # Registres de citation consultés :
-#   <planning>/ROADMAP.md, <planning>/REQUIREMENTS.md, <planning>/MILESTONES.md,
-#   <planning>/PROJECT.md, <planning>/milestones/*.md, <adr>
-#   <planning>/phases/** est EXCLU : ce sont des sorties du moteur, pas des entrées.
+#   Pour CHAQUE compartiment de workstream présent sur le disque (<planning>/workstreams/*/, énuméré
+#   par vf_ws_enumerate — phase 41.1, D-04) :
+#     <compartiment>/ROADMAP.md, <compartiment>/REQUIREMENTS.md, <compartiment>/MILESTONES.md,
+#     <compartiment>/PROJECT.md, <compartiment>/milestones/*.md
+#   PLUS, hors compartiment par nature et lus une seule fois :
+#     <planning>/ROADMAP.md, <planning>/REQUIREMENTS.md, <planning>/MILESTONES.md,
+#     <planning>/PROJECT.md, <planning>/milestones/*.md, <adr>
+#   <planning>/phases/** est EXCLU : ce sont des sorties du moteur, pas des entrées — y compris
+#   <planning>/workstreams/<nom>/phases/**.
 #
 # Règle de citation : un document est « intégré » si son basename (extension .md incluse), borné
 # des DEUX côtés (début/fin de ligne ou caractère hors [0-9A-Za-z._-]), apparaît dans une ligne
@@ -117,11 +123,81 @@ if [ ! -s "$DOCS_TMP" ]; then
   hook_exit 3
 fi
 
-# --- Concaténation des registres existants (les lignes glob sont filtrées au moment du match) ---
+# --- Registres PAR COMPARTIMENT, plus les fichiers hors compartiment par nature -----------------
+# (les lignes glob sont filtrées au moment du match, règle de citation inchangée)
+#
+# Sourcing de la politique de workstream : recherche à DEUX candidats, patron de check-divergence.sh
+# — à plat (`.claude/scripts/` chez l'utilisateur, où copy_module_scripts pose tous les modules sur
+# un seul niveau) puis inter-module dans l'arbre du dépôt. `dev-orchestrator` requiert `conductor`,
+# qui requiert `planning-core` : le fichier est toujours dans la chaîne d'install.
+WS_POLICY=""
+for _cand in "$(dirname "$0")/workstream-policy.sh" \
+             "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+  [ -r "$_cand" ] && { WS_POLICY="$_cand"; break; }
+done
+if [ -n "$WS_POLICY" ]; then
+  # shellcheck source=/dev/null
+  . "$WS_POLICY"
+fi
+
+# AUCUNE DÉGRADATION SILENCIEUSE (invariant de mission, correction C-06 du juge frais). Patron
+# IDENTIQUE aux plans 41.1-02 et 41.1-03, et pour les mêmes raisons :
+#   - énumération vers un FICHIER TEMPORAIRE, jamais une substitution de commande/processus : elle
+#     perd le code de retour par construction ;
+#   - rc CAPTURÉ dans une variable préfixée (`set -e` n'est pas actif ici, l.51 `set -uo pipefail`,
+#     donc `_ws_rc=$?` juste après l'appel est sûr) ;
+#   - stderr LAISSÉ PASSER, jamais `2>/dev/null` ;
+#   - `case` avec branche `*)` NOMMÉE.
+# MESURE qui motive : les DEUX formes de rc=2 de `vf_ws_enumerate` (lien symbolique sur
+# `workstreams/`, vide après filtrage anti-lien) rendent 0 ligne sur stdout et portent leur raison
+# UNIQUEMENT sur stderr — jetées, elles rendent un `.planning/workstreams` détourné en lien
+# symbolique INDISTINGUABLE d'un dépôt non partitionné (rc=3, également 0 ligne).
+# Le script reste NON BLOQUANT : une ligne de stderr n'est pas un blocage, les codes de sortie
+# (0/3/64) sont INCHANGÉS.
+if [ -n "$WS_POLICY" ]; then
+  _WS_LIST="$(mktemp)" || _WS_LIST=""
+  if [ -n "$_WS_LIST" ]; then
+    vf_ws_enumerate "$PLANNING_DIR" > "$_WS_LIST"   # stderr NON redirigé : la raison reste audible
+    _ws_rc=$?
+    case "$_ws_rc" in
+      0)
+        while IFS= read -r _wsdir; do
+          [ -n "$_wsdir" ] || continue
+          for r in "$_wsdir/ROADMAP.md" "$_wsdir/REQUIREMENTS.md" "$_wsdir/MILESTONES.md" \
+                   "$_wsdir/PROJECT.md" "$_wsdir/milestones"/*.md; do
+            [ -f "$r" ] && cat "$r" >> "$REG_TMP"
+          done
+        done < "$_WS_LIST"
+        ;;
+      3)
+        : # SILENCE LÉGITIME — dépôt non partitionné. Le repli racine ci-dessous est l'univers
+          # complet, aucune dégradation : rien à annoncer.
+        ;;
+      2)
+        echo "[discover-unintegrated-docs] vf_ws_enumerate : $PLANNING_DIR/workstreams présent mais NON VÉRIFIABLE (lien symbolique, non-répertoire, ou vide après filtrage) — registre PAR COMPARTIMENT sauté, seul le repli racine est consulté ; la liste ci-dessous peut SUR-signaler des documents pourtant cités dans un compartiment" >&2
+        ;;
+      *)
+        echo "[discover-unintegrated-docs] vf_ws_enumerate : code de sortie imprévu ($_ws_rc, attendu 0/2/3) — registre par compartiment sauté, la liste ci-dessous peut sur-signaler" >&2
+        ;;
+    esac
+    rm -f "$_WS_LIST"
+  else
+    echo "[discover-unintegrated-docs] mktemp a échoué pour l'énumération des compartiments — registre par compartiment sauté, repli racine seul" >&2
+  fi
+else
+  echo "[discover-unintegrated-docs] workstream-policy.sh introuvable (recherche à deux candidats) — registre par compartiment indisponible, repli racine seul, comportement d'avant la phase 41.1 ; ce hook reste NON BLOQUANT" >&2
+fi
+
+# Repli racine — layout legacy non partitionné, ou dépôt PARTIELLEMENT partitionné : mêmes quatre
+# fichiers lus À LA RACINE de $PLANNING_DIR, comportement identique à avant ce plan. Délibérément
+# PAS un `elif` : les deux univers sont vus ensemble, une citation dans l'un OU l'autre suffit à
+# marquer intégré — cohérent avec la sémantique déjà en place (concaténation en un seul buffer).
 for r in "$PLANNING_DIR/ROADMAP.md" "$PLANNING_DIR/REQUIREMENTS.md" "$PLANNING_DIR/MILESTONES.md" \
-         "$PLANNING_DIR/PROJECT.md" "$PLANNING_DIR/milestones"/*.md "$ADR_FILE"; do
+         "$PLANNING_DIR/PROJECT.md" "$PLANNING_DIR/milestones"/*.md; do
   [ -f "$r" ] && cat "$r" >> "$REG_TMP"
 done
+# $ADR_FILE reste hors compartiment par nature — lu UNE SEULE FOIS, inchangé.
+[ -f "$ADR_FILE" ] && cat "$ADR_FILE" >> "$REG_TMP"
 
 # Un document est cité si son basename, borné des DEUX côtés (par le début/fin de ligne ou un
 # caractère hors [0-9A-Za-z._-]), apparaît dans une ligne NON glob d'un registre. Padding d'un
