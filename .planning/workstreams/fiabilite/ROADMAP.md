@@ -76,6 +76,7 @@
 - [x] Phase 33: Watchdog & notifications des missions (completed 2026-08-17)
 - [x] Phase 34: Gaps agency-agents & cadrage skill-installer (completed 2026-09-15 — 6/6 plans, mergée PR #66, AGTS-01 close, SKIL-01 NO-GO, AGTS-02 reportée avec trace ; pas de release)
 - [x] Phase 35: Ré-armement worktree (conditionnelle) — CLOSE 2026-08-26, option A (pas de ré-armement)
+- [x] Phase 36: RÉSERVÉ — dossier orphelin conservé, aucune exécution prévue ici (documenté 2026-09-23, contenu réel isolé sur `spike/cockpit-live`)
 - [x] Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi) (completed 2026-08-28 — spike + étude livrés, décisions rendues ; suite → Phase 38)
 - [x] Phase 38: Portabilité multi-runtime — livraison (canal d'install, migration de lab, adaptateur) (exécutée 2026-08-29, **mesurée 2026-08-30** sur clé API — **critère 2 PROUVÉ sur Codex** : profondeur ≥ 2 constatée EN BASE (`thread_spawn_edges`, `root→vf-dev-manager→vf-coder`), 3/3 sur les **4 critères réels** ; le **critère 5 est SANS OBJET sous clé API** (vert à vide, jamais « atteint ») et le **critère 4 est plus faible que son libellé** (`--output-schema` non propagé aux sous-agents, dette D-38-S). **kimi-code n'est plus un inconnu déclaré** : I-1 **31/31**, I-2 `disallowedTools` bloque (0/4 contre 3/3 au contrôle positif), I-3 hooks déclenchés 3/3, `vf-internal` **sans équivalent** (Pattern 12 non tenu, déclaré par le gate de fidélité). **Critère 1 toujours partiel** : hooks non portés, perte déclarée. Coûts : Codex 1,01 $, kimi ~0,018 $. **SHIPPÉE v2.59.0 le 2026-08-31** (Samuel a autorisé le ship après revue ; PR + tag + release GitHub) — test bout-en-bout install **et** usage refait sur Codex (délégation de rôle → code réel) ET Kimi (`--agent-file` → code + rapport typé) le 2026-08-31, manifeste `.codex-plugin/` natif ajouté. Preuves : `38-MESURE-CODEX-CRITERE-2.md`, `38-MESURE-KIMI.md`)
 - [x] Phase 39: Workstreams — partition du planning et collaboration concurrente (cadrée 2026-09-09, exécutée 2026-09-10, 3 plans clos avec SUMMARY, revue ×3 + audit infra + juge frais sur le diff de correction ; **SHIPPÉE v2.60.0 le 2026-09-14 — PR #62** (conductor v1.35.0 : `check-divergence.sh` S2/S4/S5 + suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré sur `--git-common-dir` après RCE démontrée, étape CI ; dev-orchestrator v2.20.4 : dispatch `--ws` explicite ; `PART-01..09` gravées, `GSDA-19` superseded, ADR-069 amendé). Hotfix PR #61 regroupé dans la même release (arbitrage Samuel, AskUserQuestion session principale, 2026-09-14). **Dépôt volontairement NON partitionné** — partition réelle = geste humain séparé, déclencheur D-02 en STATE § Decisions. Réserves : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel)
@@ -1045,6 +1046,34 @@ livré)*, WKTR-02 *(done, option A)* — *(WKTR-03, la veille, reste portée par
 neuf (option A), donc rien à tester ; ce n'est pas une dette.
 **Plans**: aucun — clôture documentaire directe (mandat de clôture ciblée vf-coder, 2026-08-26),
 pas de PLAN.md d'exécution.
+
+### Phase 36: RÉSERVÉ — dossier orphelin conservé, aucune exécution prévue ici
+
+> **Ceci n'est pas une phase à exécuter.** Cette entrée documente un dossier `.planning/`
+> volontairement conservé plutôt qu'un travail à planifier — ne pas la traiter comme un Goal/
+> Success Criteria classiques, il n'y en a pas.
+
+**Statut** : dossier conservé, contenu réel isolé sur `spike/cockpit-live`, aucune exécution
+prévue ici.
+
+**Faits établis** (source : `STATE.md` § « chirurgie d'historique », entrée 2026-08-16, point 4) :
+
+  1. Un spike cockpit-live — 8 commits d'une session tierce, dont le commit `998a531` qui posait
+     une entrée « roadmap Phase 36 » — a été **isolé de l'historique principal** de la Phase 30 par
+     une chirurgie d'historique documentée, vers la branche `spike/cockpit-live`. Ce contenu n'a
+     **jamais** vécu sur une branche de phase de ce compartiment.
+  2. Le dossier `.planning/workstreams/fiabilite/phases/VFDO-36-cockpit-v1-1-signal-au-travail-fiable-et-am-liorations-ux/`
+     (avec son `.gitkeep`) est **conservé délibérément** par l'arbitrage du commit `306e25d`
+     (2026-09-16) : « ce commit met le dépôt en conformité au lieu de supprimer pour verdir ». Ne
+     pas le supprimer.
+  3. Aucun travail n'est attendu sur cette phase dans ce compartiment — le contenu réel du spike,
+     s'il devait être repris un jour, vit sur `spike/cockpit-live`, pas ici.
+
+**Origine de cette entrée** : ajoutée le 2026-09-23 pour combler l'écart de cardinalité détecté par
+`plugin/conductor/scripts/check-divergence.sh` (signal S4(a) : un dossier de phase sans en-tête
+ROADMAP correspondant) — écart pré-existant sur `origin/main`, rendu visible par la partition du
+planning, pas introduit par elle (arbitrage Samuel, AskUserQuestion session principale, 2026-09-23,
+option c).
 
 ### Phase 37: Portabilité multi-runtime — spike (Codex, OpenCode, Kimi)
 
