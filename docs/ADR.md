@@ -2815,3 +2815,46 @@ elle-même — ce classement se fait au cadrage de la Phase 45, contre les deux 
 gouverner le jugement métier — c'est le nouveau critère « consultatif » qui le dit explicitement.
 Rien dans cette ADR n'autorise un hook bloquant à juger de la qualité, de la pertinence ou de
 l'opportunité d'un travail : cette frontière est le point même de la décision.
+
+### Amendement du 2026-09-23 — un défaut décidable par machine ne suffit pas à rendre un gate bloquant
+
+**Arbitrage Samuel, session principale, 2026-09-23**, sur le cas réel de la garde **G-4**
+(`scripts/check-affirmation-non-mesuree.sh`, PR #93) : elle interdit qu'un fichier porteur
+(`CLAUDE.md`, `docs/ADR.md`, les README, `manual/**`) affirme au présent une protection côté
+serveur que la mesure versionnée ne confirme pas. Née d'un défaut réel — la PR #90 écrivait
+« toute mise à jour de `main` passe par une PR » alors que `gh api .../rulesets` rendait `[]` au
+même moment.
+
+**La tension.** Le défaut que G-4 détecte est parfaitement objectif : une forme close de prose
+confrontée à une mesure datée sur disque, sans qu'aucune opinion n'intervienne. La session
+principale en avait conclu que le critère porteur de cette ADR était la **décidabilité par
+machine**, dont les verrous et les baux ne seraient que des instances — et avait proposé G-4
+**bloquante**.
+
+**Ce qui a été tranché.** Non : le critère est l'**objet gardé**, pas seulement la nature du
+défaut. Un gate ne bloque que s'il garde l'**intégrité technique** — état, concurrence, verrous,
+cohérence d'un fichier à plusieurs écrivains. La **documentation n'en relève pas**, même quand sa
+contradiction avec un fait se mesure sans jugement. G-4 est donc **consultative** : elle imprime
+ses verdicts et remonte un avertissement en CI, elle ne fait jamais échouer un job.
+
+**Conséquence assumée, écrite dans le script :** le défaut réel de la PR #90 serait aujourd'hui
+*signalé*, pas refusé. Le coût d'un faux négatif reste porté par le relecteur — c'est le prix de
+ne pas laisser un hook arbitrer une phrase.
+
+**Deux conséquences de méthode, apprises en posant G-4 :**
+
+1. **La preuve par mutation reste exigée d'un gate consultatif.** En basculant G-4 en consultatif,
+   sa suite a d'abord perdu sa capacité à tuer ses quatre mutants : le script rendant `0` quoi
+   qu'il trouve, mutants et original sortaient identiques. Une suite doit donc forcer le mode
+   bloquant pour mesurer la **sémantique de détection**, et vérifier à part que le **défaut** est
+   bien consultatif. Sans cela, la bascule emporte la preuve avec elle et plus rien n'atteste que
+   la garde détecte encore quoi que ce soit.
+2. **Consultatif veut dire signalé, jamais silencieux.** Un gate consultatif dont le code de sortie
+   est toujours `0` n'imprime qu'au fond d'un log que personne ne lit. Il doit remonter un
+   avertissement visible (`::warning::` en CI). Un gate invisible est pire qu'un gate absent : il
+   donne la couverture sans la vigilance.
+
+**Ce que cet amendement ne fait pas.** Il ne rejuge pas G-1/G-2/G-3 (ADR-072), restées bloquantes
+et jamais examinées sous cette ADR — un précédent non validé ne prouve rien, et leur cas devra
+être tranché pour lui-même. Il ne change pas non plus le classement des gates de la Phase 45, qui
+se fera à son cadrage.
