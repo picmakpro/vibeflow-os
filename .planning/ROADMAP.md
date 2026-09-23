@@ -88,7 +88,7 @@
 - [x] Phase 39: Workstreams — partition du planning et collaboration concurrente (cadrée 2026-09-09, exécutée 2026-09-10, 3 plans clos avec SUMMARY, revue ×3 + audit infra + juge frais sur le diff de correction ; **SHIPPÉE v2.60.0 le 2026-09-14 — PR #62** (conductor v1.35.0 : `check-divergence.sh` S2/S4/S5 + suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré sur `--git-common-dir` après RCE démontrée, étape CI ; dev-orchestrator v2.20.4 : dispatch `--ws` explicite ; `PART-01..09` gravées, `GSDA-19` superseded, ADR-069 amendé). Hotfix PR #61 regroupé dans la même release (arbitrage Samuel, AskUserQuestion session principale, 2026-09-14). **Dépôt volontairement NON partitionné** — partition réelle = geste humain séparé, déclencheur D-02 en STATE § Decisions. Réserves : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel)
 - [x] Phase 40: vibeflow-head — head of minds du dev-orchestrator (exécutée le 2026-09-15 sur `feat/phase-40-vibeflow-head` — `vibeflow-dev` renommé `vibeflow-head`, 5 plans/3 vagues, zéro agent neuf, kernel intact (diff nul), renommage sur 22 chemins + garde anti-alias T36 (mutation prouvée), `head-governance.md` neuf, `check-mission-exit.sh` E1-E6 codes 3/0/4/64 (23/23 cas, 6 mutations rouges), contrat de preuves E6 + ses trois émetteurs (D-19, amendement post-cadrage), racine bumpée v2.63.0, `dev-orchestrator` v2.22.0 — **PR, tag et release GitHub restent des gestes humains non posés à cette date**. **HEAD-01 partiellement close** — `intent-routing.md` jamais mis à jour pour renvoyer à `head-governance.md`, laissée ouverte au ledger, détail `40-SUMMARY.md`)
 - [x] Phase 40.1: Révision ADR-029 et du gate du budget d'instructions (INSERTED 2026-09-16 — plafond 300 lignes, ratchet sur les instructions seules ; arbitrages Samuel AskUserQuestion session principale ; avant la 41)
-- [ ] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date)
+- [x] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date — **PÉRIMÈTRE RECADRÉ SANS ADMIN LIVRÉ le 2026-09-18, mergée PR #80, SHIPPÉE v2.64.0** : trois gardes in-repo qui signalent et tracent sans jamais verrouiller (G-1 `check-baseline-arbitrage.sh`, G-2 `check-gate-touche.sh`, G-3 `check-push-sans-pr.sh`) + doctrine ADR-072 ; **critères de succès 1 à 3 du ROADMAP d'origine restent HORS D'ATTEINTE sans accès admin GitHub** (PROT-01 non coché, `REQUIREMENTS.md`) ; volet rulesets côté serveur **DIFFÉRÉ au BACKLOG** avec son déclencheur de reprise — le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce volet une fois `fiabilite-v1.0` clos (WhatsApp, 2026-09-23))
 - [ ] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -490,7 +490,7 @@ Plans:
 | 22. Hygiène documentaire — doctrine de sortie | — | 3/3 | Complete — **mergée dans `main`** (PR #23, `474c3eb`), `dev-orchestrator` v2.9.0 + `design-orchestrator` v1.4.0 | 2026-07-31 |
 | 23. Couplage explicite au moteur GSD | agentique-v1.0 | 8/8 | Complete — 8 SUMMARYs sur disque | 2026-08-04 |
 | 24. Activation et mesure du moteur GSD | agentique-v1.0 | 12/12 | Complete — 12 SUMMARYs sur disque | 2026-08-04 |
-| 25. Budget d'instructions | fiabilite-v1.0 | 4/4 | Complete — première PR (25-01 à 25-03) mergée v2.62.0 ; 25-04 exécutée (ratchet armé), seconde PR à ouvrir | 2026-09-16 |
+| 25. Budget d'instructions | fiabilite-v1.0 | 4/4 | Complete — première PR (25-01 à 25-03) mergée v2.62.0 ; 25-04 exécutée (ratchet armé), seconde PR **mergée** (PR #73, 2026-09-16) ; rapport de sécurité suivi (PR #74) — correction du 2026-09-23, affirmation périmée | 2026-09-16 |
 | 26. Manuel utilisateur VibeFlow (manual/) | gsd-alignement | — | Complete (PR #28) | 2026-08-02 |
 | 27. Parallélisation d'exécution — granulaire, simple, sans collision | gsd-alignement | 6/6 | Complete (PR #35) — spike `claude_orchestration` refusé par écrit | 2026-08-10 |
 | 28. Preuve que ce qui est armé dans le plugin est armé chez l'utilisateur | agentique-v1.0 | 3/3 | Complete — PR #42, release `v2.52.0`, CI main verte, gate + `lab-frais-arme` livrés | 2026-08-15 |
@@ -892,9 +892,9 @@ conditions E1/E2 du STUDY §8 — pas déclarée sans objet.
 **Plans**: 18-01 (LEDG-02, gate `check-requirements-survival.sh` + primitive
 `requirements-survival-detect.sh`), 18-02 (LEDG-01, rattrapage `restore-requirements-ledger.sh`),
 18-03 (doctrine D-18-14 + bump module `dev-orchestrator` v2.18.0 → v2.19.0). Les 3 plans sont
-**exécutés** (`18-01-SUMMARY.md`, `18-02-SUMMARY.md`, `18-03-SUMMARY.md`) ; la phase n'est **pas
-encore shippée** — PR, tag et release restent des gestes humains non posés (CLAUDE.md racine,
-ADR-031).
+**exécutés** (`18-01-SUMMARY.md`, `18-02-SUMMARY.md`, `18-03-SUMMARY.md`). **Correction du
+2026-09-23** (affirmation périmée) : la phase EST shippée — **PR #51 mergée le 2026-08-23, release
+GitHub `v2.57.0`**, vérifié sur `gh pr view 51` et `gh release view v2.57.0`.
 
 ### Phase 34: Gaps agency-agents & cadrage skill-installer
 
@@ -1015,7 +1015,9 @@ Plans:
 exact de 250 lignes (`vf-dev-manager.md`, `validator/AGENT.md`), accepté par Samuel au checkpoint.
 Livrée en **deux PR** (D-06 bis) : la première (25-01 à 25-03, v2.62.0) posait le gate sans rien
 armer, la seconde (25-04) calibre sur le corpus final du milestone, après les Phases 34 et 40 —
-ne jamais graver sur un corpus qui bouge. **Hors périmètre, explicitement** : la remédiation des
+ne jamais graver sur un corpus qui bouge. **Correction du 2026-09-23** (affirmation périmée) : la
+seconde PR est **mergée** (PR #73, 2026-09-16) et le rapport de sécurité de la phase l'a suivie
+(PR #74, 2026-09-16), vérifié sur `gh pr view`. **Hors périmètre, explicitement** : la remédiation des
 fichiers les plus chargés, le budget des SKILL.md et du bootstrap, BUDG-03 (étage d'alignement
 court, différé).
 
@@ -1789,6 +1791,28 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 47.
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §4, §7.1-7.3, §7.5, §8, §9.2 (exemption de re-cadrage des procédures). **Ouvert** : registre cible d'une clôture (§7.5), blocage par un tiers (§8).
+
+**Contraintes (arbitrage Samuel, 2026-09-23)** : risque mesuré au moment de l'inscription —
+`plugin/conductor/references/team-kernel.md` est lu par les managers dev ET design ET les bundles
+business/content ; les rôles génériques visés (cadreur, planificateur, contrôleur de plan,
+orchestrateur) dédoublent `gsd-discuss-phase`, `gsd-plan-phase`, le plan-checker et `vf-coder` ; un
+lab dev reçoit déjà son état par les hooks GSD au démarrage de session. Relayé à Willy par
+WhatsApp le 2026-09-23.
+
+1. **Aucun ajout dans le `team-kernel` partagé si c'est évitable.** Les agents génériques de cycle
+   vivent dans le module du moteur métier. Si une modification du noyau s'avère nécessaire, elle
+   est **additive**, explicitement **portée non-dev**, et sa nécessité est démontrée (pourquoi le
+   module seul ne suffit pas).
+2. **Zéro régression sur les labs dev — exigence non négociable, prouvée par une mesure, pas
+   déclarée.** Ce dépôt est un lab dev ; comportement identique avant/après sur le routage du head,
+   les hooks de démarrage de session et la doctrine des managers dev. La preuve doit pouvoir
+   rendre rouge (mutation exécutée), sinon elle ne compte pas.
+3. **Injection d'index réservée aux labs pilotés par le moteur métier.** Un lab dev garde ses
+   messages GSD : jamais deux moteurs qui injectent un état, donc jamais deux vérités sur la phase
+   courante.
+4. **Contrainte de profondeur (v2.63.2, mesurée le 2026-09-17)** : tout agent générique qui en
+   dispatche un autre vérifie la chaîne complète — l'outil Agent est absent à la profondeur 3.
+
 **Plans:** 0 plans
 
 Plans:

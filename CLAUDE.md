@@ -69,11 +69,17 @@ correctif / durcissement → **patch**. Le tag reprend **exactement** la valeur 
   paie. Adoptée le 2026-09-10, née du commit `8fc4b45` (Phase 39), dont personne ne pouvait vérifier
   l'attribution — un manager a dû remonter la chaîne pour l'établir.
 
-## Protection côté serveur — main et tags v*
+## Protection côté serveur — main et tags v* (PAS ENCORE POSÉE)
 
-Source versionnée `.github/rulesets/` et `.github/CODEOWNERS`, posée par l'admin après le merge de
-sa source, état réel lisible par `gh api repos/picmakpro/vibeflow-os/rules/branches/main` (ADR-072
-§ Amendement du 2026-09-23).
+Source versionnée dans ce dépôt (`.github/rulesets/`, `.github/CODEOWNERS`), mais **rien n'est
+encore posé côté GitHub** : `gh api repos/picmakpro/vibeflow-os/rulesets` rend `[]` (mesuré le
+2026-09-23). Les règles ci-dessous décrivent ce qui **s'appliquera une fois posé**, pas l'état
+actuel — même régime qu'ADR-072 : la protection s'applique **à la pose**, pas avant. La pose est un
+geste de Willy (seul compte admin, `picmakpro`), octet pour octet depuis `origin/main`, après une
+confirmation explicite (ADR-072 § Amendement du 2026-09-23). État réel toujours à vérifier via
+`gh api repos/picmakpro/vibeflow-os/rules/branches/main`, jamais supposé depuis ce fichier.
+
+Une fois posée, la protection prévue est :
 
 - Toute mise à jour de `main` passe par une PR (0 approbation), 4 jobs CI verts épinglés sur GitHub
   Actions, branche à jour, revue `@picmakpro` sur `.github/`, la baseline du budget d'instructions
