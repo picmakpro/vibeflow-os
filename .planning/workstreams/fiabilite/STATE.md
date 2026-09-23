@@ -37,12 +37,14 @@ stopped_at: >-
   ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
   armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
   existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
-last_updated: "2026-09-23T13:15:36.000Z"
+last_updated: "2026-09-23T18:00:00.000Z"
 last_activity: 2026-09-23
 last_activity_desc: >-
-  Phase 41, volet admin repris le 2026-09-23 (D-02bis, arbitrage Willy, AskUserQuestion session
-  principale, 2026-09-23) : plans 41-01 à 41-13 en exécution sur `feat/phase-41-volet-admin`.
-  Détail par plan : `## Current Position`. Frontmatter borné à 60 lignes (check-dev-bootstrap).
+  Déclencheur de reprise D-02 exécuté (arbitrage Samuel, AskUserQuestion session principale,
+  2026-09-23) : `.planning/` partitionné pour de vrai en deux compartiments GSD workstream,
+  `fiabilite` (ce fichier, compartiment par défaut) et `gouvernance` (jalon gouvernance-labs-v1.0,
+  Phases 42-50). Détail : `.planning/missions/2026-09-23-partition-planning-d02.md`, § Decisions
+  ci-dessous. Frontmatter borné à 60 lignes (check-dev-bootstrap).
 progress:
   total_phases: 12
   completed_phases: 11
@@ -658,6 +660,30 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 Decisions are logged in PROJECT.md Key Decisions table (D1–D6).
 Recent decisions affecting current work:
+
+- **2026-09-23 — Déclencheur D-02 exécuté : partition réelle du planning en `fiabilite` /
+  `gouvernance`.** Arbitrage Samuel (AskUserQuestion session principale, 2026-09-23 : « il faut
+  absolument finir la phase 39 »), sur le déclencheur de reprise posé par le plan 39-03 (§ ci-dessous,
+  entrée du 2026-09-10). Mission `.planning/missions/2026-09-23-partition-planning-d02.md`. Résumé :
+  `gsd-tools workstream create gouvernance --migrate-name fiabilite` a déplacé `ROADMAP.md`,
+  `STATE.md` (ce fichier), `REQUIREMENTS.md` et `phases/` vers `.planning/workstreams/fiabilite/` ;
+  le jalon `gouvernance-labs-v1.0` (section ROADMAP, `FABR-01..05`, dossier `VFDO-42-.../` déjà
+  planifié) a été extrait verbatim vers `.planning/workstreams/gouvernance/` — aucun contenu
+  réécrit. Pointeur par défaut committé : `.planning/active-workstream` = `fiabilite`. Chantier CI
+  inclus dans le même mandat (sans lui la partition n'aurait pas été utilisable) :
+  `check-state-integrity` recible le nouveau chemin, l'étape « Gates workstream-aware » distingue
+  désormais une fixture FLAT jetable (garantie historique labs non partitionnés) d'une assertion de
+  conformité sur la racine réelle (désormais partitionnée par défaut, preuve de mutation rouge
+  rejouée localement), `check-divergence.sh` attend `rc=0` sur la racine ; `check-requirements-survival.sh`/
+  `restore-requirements-ledger.sh`/`requirements-survival-detect.sh`/E4 de `check-mission-exit.sh`
+  rendus conscients des compartiments (repli sur la racine si non partitionné, comportement des
+  labs non partitionnés inchangé). Gap **pré-existant** découvert et comblé en chemin : le dossier
+  orphelin `VFDO-36-cockpit-v1-1-.../` (`.gitkeep` délibéré, commit `306e25d` du 2026-09-16) n'avait
+  aucun en-tête ROADMAP — jamais visible tant que `check-divergence.sh` restait muet (`rc=3`) sur un
+  dépôt non partitionné ; comblé par une entrée `### Phase 36: RÉSERVÉ` qui documente l'état réel
+  (spike cockpit-live isolé sur `spike/cockpit-live`), sans toucher au `.gitkeep`. Revue `vf-reviewer`
+  PASS après un cycle de correction ciblée (deux findings : `ci.yml:350` bloquant, E4 de
+  `check-mission-exit.sh` majeur — tous deux corrigés et re-vérifiés).
 
 - **2026-09-17 — Phase 41, prémisse renversée + recadrage sans admin (option (a))**
   (arbitrage Samuel, AskUserQuestion session principale, 2026-09-17) : le compte `picmakpro`, seul

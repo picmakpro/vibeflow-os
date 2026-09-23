@@ -858,7 +858,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | PART-05 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-06 | Phase 39 | Done — plan 39-02 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-07 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
-| PART-08 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
+| PART-08 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) ; déclencheur de reprise exécuté le 2026-09-23 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-23) — voir `.planning/missions/2026-09-23-partition-planning-d02.md` |
 | PART-09 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PROT-01 | Phase 41 | Pending — reprise du 2026-09-23 (accès admin constaté, D-02bis) : volet côté serveur replanifié en 41-01 à 41-13 ; statut antérieur : hors d'atteinte (2026-09-18) |
 | PROT-02 | Phase 41 | Complete — 2026-09-18, plan 41-17/41-19 : ordre des étapes avant `check-release-tag`, absence d'entrée `tags:` dans le déclencheur, voie `merge-commit-sha` pour les merges par rebase, hook `pre-push` conservé |
