@@ -37,7 +37,7 @@ stopped_at: >-
   ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
   armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
   existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
-last_updated: "2026-09-23T12:53:59.000Z"
+last_updated: "2026-09-23T13:15:36.000Z"
 last_activity: 2026-09-23
 last_activity_desc: >-
   Phase 41, volet admin repris le 2026-09-23 (D-02bis, arbitrage Willy, AskUserQuestion session
@@ -114,7 +114,12 @@ volet admin sur `feat/phase-41-volet-admin` — plan 41-01 exécuté (2/2 tâche
 règles), ledger `REQUIREMENTS.md` amendé — PROT-01 repris (`- [ ]`, non coché), traçabilité
 « Pending — reprise du 2026-09-23 ».** Détail complet : `41-02-SUMMARY.md`. Un rouge préexistant
 du rejeu `gates` (`check-dev-bootstrap.sh`, hors périmètre) consigné au ledger
-`.planning/WINDOWS.md` (#8), en plus des deux déjà ouverts (#6, #7). Next : plan 41-03.
+`.planning/WINDOWS.md` (#8), en plus des deux déjà ouverts (#6, #7).
+**Note (2026-09-23, plan 41-03) : ADR-072 amendée (contournement nommé D-02bis, hotfix, retour
+arrière), ADR-059 amendée (« Branche pour tout travail de phase » devient la règle par défaut),
+`CLAUDE.md` reçoit la section « Protection côté serveur » et corrige l'ouverture de « Gardes
+in-repo ».** Détail complet : `41-03-SUMMARY.md`. WINDOWS.md #8 confirmé fermé (rejeu `gates`
+14/14 vert) ; #6/#7 toujours ouverts, hors périmètre. Next : plan 41-04.
 
 Précédemment (2026-09-18) — **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ le 2026-09-18** sur
 `feat/phase-41-protection-depot` (branche `worktree-agent-a10225b33e6f3c645`). **Prémisse renversée
