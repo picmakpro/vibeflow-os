@@ -235,6 +235,15 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-09-23 : **Jalon `gouvernance-labs-v1.0` inscrit — Phases 42 à 50** (polarité gouvernance,
+  Willy). Section de jalon distincte dans la ROADMAP plate, **sans `gsd-new-milestone`** : le
+  frontmatter de ce STATE (jalon `fiabilite-v1.0`, `current_phase: 39`) n'est pas touché, la
+  Phase 41 de Samuel restant ouverte. Numéros rendus par `phase.add` ; checklist du moteur complétée
+  à la main (`phase.add` ne la pose pas). Ordre : fabrique (42-43), moteur (44-48), initialisation
+  (49-50). Sources : les trois specs `docs/superpowers/specs/2026-09-2{2,3}-*-design.md`. Découpage,
+  jalon distinct, branche empilée sur les specs et Phase 42 cadrée en premier : arbitrage Willy,
+  AskUserQuestion session principale, 2026-09-23. Dépendance externe : la Phase 42 suppose la PR #85
+  mergée (ouverte, CI rouge sur G-2 au 2026-09-23).
 - 2026-09-16 : **Phase 40.1 insérée avant la 41 — révision d'ADR-029 et du gate du budget
   d'instructions.** Née juste après le merge de la PR #73 (ratchet armé) : le ratchet sur les
   lignes bloque toute ligne ajoutée à n'importe quel agent. Arbitrages Samuel (AskUserQuestion
