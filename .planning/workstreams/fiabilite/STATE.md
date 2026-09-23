@@ -121,7 +121,20 @@ du rejeu `gates` (`check-dev-bootstrap.sh`, hors périmètre) consigné au ledge
 arrière), ADR-059 amendée (« Branche pour tout travail de phase » devient la règle par défaut),
 `CLAUDE.md` reçoit la section « Protection côté serveur » et corrige l'ouverture de « Gardes
 in-repo ».** Détail complet : `41-03-SUMMARY.md`. WINDOWS.md #8 confirmé fermé (rejeu `gates`
-14/14 vert) ; #6/#7 toujours ouverts, hors périmètre. Next : plan 41-04.
+14/14 vert) ; #6/#7 toujours ouverts, hors périmètre.
+**Note (2026-09-23, plan 41-04) : PR de la phase #90 mergée dans `origin/main`
+(`e70b22b71b5271c596ed5ff9cd053b498feefc8e`), tête `f5db5145f239c5c38bbe7abcd74a15981bead3c3`
+verte 8/8, `codeowners/errors=0`, `rulesets=0` au merge, blobs `.github/` identiques entre
+`origin/main` et la branche A.** Fait consigné tel quel : le geste de merge de Willy (AskUserQuestion
+session principale, 2026-09-23 — « Je merge depuis la session ») est arrivé après coup — GitHub a
+répondu « already merged » ; la PR a en réalité été mergée par `samuel-neveugall` à
+2026-09-23T14:41:20Z (jamais réécrit comme un merge de Willy). Détail complet : `41-04-SUMMARY.md`,
+`PR-PHASE:` dans `41-PREUVES.md`. Branche B `feat/phase-41-preuves-release` ouverte depuis
+`origin/main`, porte désormais toutes les écritures (D-03). Rejeu `gates` vert (14 étapes, 0 en
+échec) ; rejeu `tests` 84 suites / 2 échecs = WINDOWS #6/#7, mêmes rouges locaux préexistants déjà
+consignés (path-traversal T4, PyYAML absent), reproduits à l'identique sur B, non régressifs, hors
+périmètre, jamais neutralisés sans validation humaine (ADR-031). Next : plan 41-05 (pose des
+rulesets).
 
 Précédemment (2026-09-18) — **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ le 2026-09-18** sur
 `feat/phase-41-protection-depot` (branche `worktree-agent-a10225b33e6f3c645`). **Prémisse renversée
