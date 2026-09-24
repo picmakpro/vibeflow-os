@@ -1,5 +1,15 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v2.0.10] — 2026-09-24 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **Le manager déclare `SendMessage`** (invariant I6, D-07) — `vf-business-manager` est porteur
+  d'un `Agent(...)` non vide et non `vf-internal` : c'est un manager au sens du gate, qui doit
+  porter `SendMessage` pour la vue sur ses pairs. Frontmatter seul, compte d'instructions
+  inchangé. Décisions de cadrage de Claude (délégation de Willy, AskUserQuestion session
+  principale, 2026-09-23), ratifiées par Samuel (WhatsApp, 2026-09-23), 42-CONTEXT.md D-07, D-11.
+
 ## [v2.0.9] — 2026-09-16 (Phase 40.1)
 
 **Patch** :
