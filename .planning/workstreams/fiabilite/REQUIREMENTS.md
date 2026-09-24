@@ -860,7 +860,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | PART-07 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-08 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) ; déclencheur de reprise exécuté le 2026-09-23 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-23) — voir `.planning/missions/2026-09-23-partition-planning-d02.md` |
 | PART-09 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
-| PROT-01 | Phase 41 | Pending — reprise du 2026-09-23 (accès admin constaté, D-02bis) : volet côté serveur replanifié en 41-01 à 41-13 ; statut antérieur : hors d'atteinte (2026-09-18) |
+| PROT-01 | Phase 41 | Complete — 2026-09-24, mandat direct (hors plan 41-13 jamais exécuté) : rulesets posés par Willy (`picmakpro`) le 2026-09-23 19h56, re-mesurés `gh api` le 2026-09-24 (2 rulesets `enforcement: active`, bypass `always` Samuel + Willy) — voir `41-PREUVES.md` § « Clôture PROT-01 » |
 | PROT-02 | Phase 41 | Complete — 2026-09-18, plan 41-17/41-19 : ordre des étapes avant `check-release-tag`, absence d'entrée `tags:` dans le déclencheur, voie `merge-commit-sha` pour les merges par rebase, hook `pre-push` conservé |
 | PROT-03 | Phase 41 | Complete — 2026-09-18, plan 41-18 : ADR-072 (doctrine des trois gardes et de leur limite de fond) et son résumé dans `CLAUDE.md` |
 | PROT-04 | Phase 41 | Complete — 2026-09-18, plan 41-14 : `check-baseline-arbitrage.sh`, neuf mutants tués, observation O-3 du `25-SECURITY.md` signalée et tracée |
@@ -963,7 +963,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **BUDG-05**: Le ratchet du budget ne bloque plus que les ajouts d'instructions, par fichier ; une croissance de lignes sans instruction sous le plafond reste verte — prouvé par bascules sur fixture dans l'étape CI elle-même — Phase 40.1, D-02/D-07 — **close le 2026-09-17** (plan 40.1-14) : bascules CI prouvées par mutants (plan 40.1-03), invariants de phase verts, rejeu gates+tests vert
 
 ### Posture de protection du dépôt (Phase 41 — périmètre sans admin)
-- [ ] **PROT-01**: Rulesets de branche et de tags posés et prouvés par un refus réel. **NON COCHÉ**
+- [x] **PROT-01**: Rulesets de branche et de tags posés et prouvés par un refus réel.
   — hors d'atteinte sans accès admin : mesure `admin: false, maintain: false, push: true` sur le
   dépôt, 2026-09-17, deux lectures indépendantes (compte de Samuel `samuel-neveugall` :
   `admin: false, maintain: false, push: true`) ; le compte `picmakpro`, seul admin, est celui de
@@ -973,10 +973,29 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   `always` (D-02bis — arbitrage Willy, AskUserQuestion session principale, 2026-09-23). Séquence :
   Willy pose les rulesets → preuve → clôture du jalon `fiabilite-v1.0` (PROT-01 en fait partie, ne
   peut donc pas se clore avant — correction du 2026-09-23 d'une formulation antérieure qui
-  inversait cette séquence, cf. `BACKLOG.md` § « Protection de `main` côté GitHub »). Coché
-  seulement à la clôture, sur pièce (`41-PREUVES.md`, plan 41-13). Renvoi : `BACKLOG.md` §
-  « Protection de `main` côté GitHub — DIFFÉRÉ » et `41-CONTEXT.md` § Prémisse renversée (D-01 à
-  D-08 suspendus, non annulés). Ni abandonné, ni requalifié : il attend.
+  inversait cette séquence, cf. `BACKLOG.md` § « Protection de `main` côté GitHub »). Renvoi :
+  `BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ » et `41-CONTEXT.md` § Prémisse
+  renversée (D-01 à D-08 suspendus, non annulés).
+  - **Exigence close le 2026-09-24** (mandat direct, hors plan 41-13 jamais exécuté) — preuves :
+    rulesets posés par Willy (`picmakpro`) le 2026-09-23 19h56 et re-mesurés le 2026-09-24
+    (`gh api repos/picmakpro/vibeflow-os/rulesets`, `41-PREUVES.md` § « Clôture PROT-01 ») :
+    `RULESETS-APRES` — deux rulesets `enforcement: active` (`23892920` sur `refs/heads/main`,
+    `23892922` sur `refs/tags/v*`) ; `RULESET-MAIN` — règles `pull_request` (0 approbation requise,
+    `require_code_owner_review: true`, méthodes merge/squash/rebase), `required_status_checks` (4
+    contextes épinglés `integration_id: 15368`, politique stricte), `deletion`, `non_fast_forward` ;
+    `RULESET-TAGS` — `deletion`, `non_fast_forward`, `update`, création libre ; `BYPASS-ACTEURS` —
+    `current_user_can_bypass: always` mesuré en direct pour Samuel (`samuel-neveugall`, id
+    `151974738`), relayé de la mesure de la session principale du 2026-09-24 pour Willy
+    (`picmakpro`, id `203482067`, non re-vérifié depuis ce compte faute de moyen de s'y
+    authentifier) — les deux `actor_id` correspondent à `ACTEURS-CONTOURNEMENT` (41-01, reprise) et
+    aux `bypass_actors` des deux sources versionnées `.github/rulesets/*.json`. `ECART-DEFAUT-SERVEUR` —
+    le champ `require_extra_approval_for_unattributed_changes: true` figure côté serveur sur les
+    deux rulesets, absent des sources versionnées ; défaut GitHub non demandé, sans effet observé
+    sur le comportement décrit par cette exigence, consigné et non corrigé (`BACKLOG.md` §
+    « Protection de `main` côté GitHub »). Aucun refus réel de merge n'a été rejoué dans ce mandat
+    (pas de PR de test délibérément non conforme poussée) — la preuve du refus tient à la
+    configuration serveur mesurée (revue code owner + 4 checks requis, 0 bypass hors liste), pas à
+    un rejeu observé ; recensé comme tel, jamais présenté comme un rejeu réel.
 - [x] **PROT-02**: Compatibilité avec la discipline de release du `CLAUDE.md`. **COCHÉ** —
   clôture citant les clés `REJEU-GATES` et `G3-FIXTURE` (registre `41-PREUVES.md` § 41-19) et les
   trois preuves du plan 41-17 : ordre des étapes avant `check-release-tag`, absence d'entrée

@@ -592,6 +592,20 @@ sans règle côté serveur, on ne ferme rien, on rend visible et tracé.
 ADR-072). Le volet côté serveur ci-dessus reste différé tel quel, son déclencheur de reprise
 inchangé ; les décisions D-01 à D-08 restent suspendues. Renvoi : `docs/ADR.md` § ADR-072.
 
+**Rulesets posés — PROT-01 clos (2026-09-23/24).** Willy a posé les deux rulesets sur `picmakpro`
+le 2026-09-23 19h56 (`refs/heads/main` id `23892920`, `refs/tags/v*` id `23892922`, tous deux
+`enforcement: active`), re-mesurés le 2026-09-24 (session principale puis mandat de clôture,
+`REQUIREMENTS.md` § PROT-01, `41-PREUVES.md` § « Clôture PROT-01 »). **Écart consigné, non
+corrigé** : le champ `require_extra_approval_for_unattributed_changes: true` est présent côté
+serveur sur les deux rulesets (mesuré `gh api repos/picmakpro/vibeflow-os/rulesets/<id>`) mais
+absent des sources versionnées `.github/rulesets/main.json` et `.github/rulesets/tags-v.json` —
+c'est un défaut posé par GitHub à la création du ruleset, jamais demandé dans les sources, sans
+effet observé sur le comportement décrit par PROT-01 (revue code owner + 4 checks requis, refus de
+merge hors bypass nommé). La divergence entre le fichier relu et l'état réel reste ouverte :
+**déclencheur de reprise** — soit aligner les sources sur la valeur réelle du serveur, soit
+demander à GitHub Support pourquoi ce défaut est appliqué sans qu'il figure dans le payload de
+création envoyé.
+
 ## Ligne d'index absente pour ADR-071 dans `docs/ADR.md` — DIFFÉRÉ (2026-09-18)
 
 **Constat mesuré le 2026-09-17**, en posant ADR-072 (Phase 41, plan 41-18) : la table d'index de
