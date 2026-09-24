@@ -1,5 +1,14 @@
 # CHANGELOG — growth-bundle
 
+## [v2.0.10] — 2026-09-24 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **`SendMessage` sur `vf-growth-manager`** (invariant I6, D-07) — le manager n'avait jusqu'ici
+  que `AskUserQuestion`, qui n'existe pas en sous-agent : il était muet. Frontmatter seul, corps
+  inchangé. Décisions de cadrage de Claude (délégation de Willy, AskUserQuestion session
+  principale, 2026-09-23), ratifiées par Samuel (WhatsApp, 2026-09-23), 42-CONTEXT.md D-07, D-11.
+
 ## [v2.0.9] — 2026-09-16 (Phase 40.1)
 
 **Patch** :
