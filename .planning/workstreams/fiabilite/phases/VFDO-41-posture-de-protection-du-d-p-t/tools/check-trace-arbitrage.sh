@@ -16,11 +16,27 @@
 # qui en aurait fait un rouge permanent — donc un verificateur qu'on finit par desarmer. La garde
 # juge ce que la phase ECRIT ENCORE, et le dit.
 #
-# BORNE DU MERGE EPHEMERE DE GITHUB. Un commit dont le message entier (normalise) correspond a
-# « Merge <40 hex> into <40 hex> » est un artefact de fusion genere par GitHub pour previsualiser
-# une PR, jamais ecrit par un humain ni par un agent de la phase — son diff premier-parent
-# porterait tout le contenu de la PR et son message ne peut jamais porter de citation. Il est
-# exclu du compte de decouverte ET de l'imputation.
+# BORNE DES MERGES DE PR GENERES PAR GITHUB (elargie le 2026-09-24, defaut mesure sur le depot
+# reel : commit 0cec964, "Merge pull request #94 from picmakpro/feat/partition-planning-d02",
+# rendait FORME-NON-CONFORME a cause d'un "D-02" cite dans le titre de PR fusionne — un identifiant
+# de migration sans rapport avec une citation d'arbitrage). DEUX formes, toutes deux generees par
+# GitHub, jamais ecrites par un humain ni par un agent de la phase, exclues du compte de
+# decouverte ET de l'imputation :
+#   1. Un commit dont le message entier (normalise) correspond exactement a
+#      « Merge <40 hex> into <40 hex> » — artefact de previsualisation de PR (merge ephemere).
+#   2. Un commit dont le message normalise COMMENCE PAR « Merge pull request #<N> from <branche> »
+#      — le commit de fusion reel qu'une PR merge sur GitHub, dont le corps porte le TITRE de la
+#      PR (choisi par un humain, mais jamais une citation d'arbitrage : c'est un residu descriptif
+#      du contenu fusionne, pas une invocation d'autorite). Seul le PREFIXE est verifie (pas de
+#      `$` final) car le titre qui suit varie ; son diff premier-parent porte deja tout le contenu
+#      de la PR, deja juge commit par commit dans la plage.
+#
+# BORNE DES COMMITS DE RELEASE (ajoutee le 2026-09-24, meme defaut mesure : commit 3617ec0,
+# "release(v2.65.0): ...", cite lui aussi "(D-02)" en decrivant un correctif inclus dans le paquet
+# publie — jamais une invocation d'arbitrage). Un commit de release ne decide rien : il publie une
+# decision deja prise et deja citee dans le commit qui l'a prise. Un commit dont le message
+# normalise COMMENCE PAR « release(<version>): » (convention de ce depot, CLAUDE.md § Discipline de
+# release) est exclu du compte de decouverte ET de l'imputation, au meme titre qu'un merge de PR.
 #
 # PORTEE DE LA DETECTION — MARQUEURS D'INVOCATION EXPLICITES, LISTE FERMEE (decision du manager,
 # reprise 2026-09-18). Ce controle ne rougit QUE sur une INVOCATION d'autorite humaine, reconnue
@@ -50,10 +66,20 @@
 # normalisee, JAMAIS sur les lignes brutes : une citation coupee en fin de ligne est CONFORME —
 # la refuser serait le meme faux rouge que celui deja corrige sur le ledger de ce depot.
 #
+# CITATIONS MULTIPLES, ACCEPTEES QUAND TOUTES SONT CONFORMES (fix du 2026-09-24, defaut mesure :
+# 5 commits reels — 76985e3, 7b0ba33, b90c6bc, 6243c46, 849f29e — citaient CHACUN deux arbitrages
+# DISTINCTS et CONFORMES dans le meme message et rendaient pourtant FORME-NON-CONFORME/
+# CITATIONS-MULTIPLES : un commit qui trace deux decisions humaines est PLUS tracable qu'un commit
+# qui n'en trace qu'une, jamais moins — la regle punissait ce qu'elle voulait obtenir. N citations
+# distinctes dans un meme commit sont desormais acceptees des lors que CHACUNE, prise
+# individuellement, passe le controle de perimetre ci-dessous (comparaison 3) : l'INTENTION
+# D'ORIGINE de ce controle — ne jamais laisser une citation douteuse se noyer dans un paquet de
+# bonnes — est preservee, elle change seulement d'echelle : du message entier a la citation.
+#
 # CODES DE SORTIE.
 #   0  plage non vide, tous les commits juges conformes
-#   1  au moins un ecart : FORME-NON-CONFORME, CITATIONS-MULTIPLES, ou
-#      ARBITRAGE-DE-PERIMETRE-MAL-CITE
+#   1  au moins un ecart : FORME-NON-CONFORME ou ARBITRAGE-DE-PERIMETRE-MAL-CITE (au moins une
+#      citation, parmi celles trouvees dans le commit, ne respecte pas le perimetre)
 #   2  hors d'un arbre git, ou BASE-TRACE-ARBITRAGE absente/illisible/non hexadecimale/non
 #      resoluble en commit dans ce depot (NON-VERIFIABLE — jamais un vert, jamais un repli
 #      silencieux sur merge-base ou HEAD^)
@@ -88,7 +114,7 @@ BASE-TRACE-ARBITRAGE: du registre 41-PREUVES.md, jamais derivee.
 
 Codes de sortie :
   0  plage non vide, tous les commits juges conformes
-  1  au moins un ecart (FORME-NON-CONFORME, CITATIONS-MULTIPLES, ARBITRAGE-DE-PERIMETRE-MAL-CITE)
+  1  au moins un ecart (FORME-NON-CONFORME, ARBITRAGE-DE-PERIMETRE-MAL-CITE)
   2  hors d'un arbre git, ou BASE-TRACE-ARBITRAGE absente/illisible/non resoluble en commit
   3  PLAGE-VIDE
   64 argument invalide
@@ -196,14 +222,23 @@ HEAD_SHA="$(git -C "$ROOT" rev-parse HEAD)"
 echo "borne: sha=$BASE_SHA source=$BASE_SOURCE"
 
 # ---------------------------------------------------------------------------------------------
-# DECOUVERTE — merges compris, sauf le merge ephemere de GitHub (exclu de n ET de l'imputation).
+# DECOUVERTE — merges compris, sauf les merges de PR generes par GitHub et les commits de release
+# (exclus de N ET de l'imputation, voir BORNE DES MERGES DE PR... et BORNE DES COMMITS DE RELEASE
+# en en-tete).
 # ---------------------------------------------------------------------------------------------
 normalize() {  # <message brut> sur stdin -> chaine normalisee sur stdout (une seule ligne)
   tr '\n' ' ' | tr -s '[:space:]' ' ' | sed -e 's/^ //' -e 's/ $//'
 }
 
-is_ephemeral_merge() {  # <message normalise> sur stdin -> exit 0 si forme "Merge <hex40> into <hex40>"
-  grep -Eq '^Merge [0-9a-fA-F]{40} into [0-9a-fA-F]{40}$'
+is_merge_de_pr() {  # <message normalise> sur stdin -> exit 0 si merge de PR genere par GitHub
+  # Deux formes, JAMAIS une seconde regle concurrente : la forme ephemere de previsualisation
+  # (match EXACT du message entier) et la forme reelle du bouton "Merge pull request" de GitHub
+  # (match du PREFIXE seulement, le titre de PR qui suit varie).
+  grep -Eq '^Merge [0-9a-fA-F]{40} into [0-9a-fA-F]{40}$|^Merge pull request #[0-9]+ from [^[:space:]]+'
+}
+
+is_release_commit() {  # <message normalise> sur stdin -> exit 0 si commit "release(<version>): ..."
+  grep -Eq '^release\([^)]+\):'
 }
 
 # MARQUEURS D'INVOCATION — LISTE FERMEE ET EXPLICITE (voir PORTEE DE LA DETECTION en en-tete).
@@ -214,7 +249,12 @@ is_ephemeral_merge() {  # <message normalise> sur stdin -> exit 0 si forme "Merg
 # tiret ([^0-9A-Za-z_-]) pour qu'un identifiant compose ne matche pas ("xD-01" ne matche pas) ;
 # avant le fix, le cote droit ([^0-9A-Za-z_]) omettait le tiret et laissait "D-01-suite" matcher a
 # tort (un identifiant compose se terminant par un suffixe, jamais une citation D-NN reelle).
-MARKER_REGEX='arbitrage Samuel|sur arbitrage|décision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'
+# INSENSIBLE A LA CASSE SUR LE MOT DECLENCHEUR (fix du 2026-09-24, defaut mesure : 557b6fc citait
+# « Arbitrage Willy, AskUserQuestion session principale, 2026-09-23 » avec un A majuscule et
+# rendait FORME-NON-CONFORME au stade de l'extraction — voir comparaison 1 plus bas, meme defaut,
+# meme fix). Seule la premiere lettre du mot varie ([Aa]/[Dd]) ; les marqueurs structures (D-NN,
+# *-DECISION:, REGLES_MAIN...) restent des conventions figees, non touches.
+MARKER_REGEX='[Aa]rbitrage Samuel|sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'
 CANON="arbitrage Samuel, AskUserQuestion session principale, 2026-09-17"
 
 # IDENTIFIANTS EXCLUS DE LA DETECTION DE MARQUEUR (pas du texte imprime). Le nom de fichier
@@ -249,7 +289,10 @@ while IFS= read -r sha; do
   raw_msg="$(git -C "$ROOT" log -1 --format=%B "$sha")"
   norm="$(printf '%s\n' "$raw_msg" | normalize)"
 
-  if printf '%s\n' "$norm" | is_ephemeral_merge; then
+  if printf '%s\n' "$norm" | is_merge_de_pr; then
+    continue
+  fi
+  if printf '%s\n' "$norm" | is_release_commit; then
     continue
   fi
   N=$((N + 1))
@@ -262,18 +305,19 @@ while IFS= read -r sha; do
 
   short="$(git -C "$ROOT" rev-parse --short "$sha")"
 
-  # Comparaison 1 + 2 — extraction des citations CONFORMES distinctes (mot-cle, deux virgules,
-  # date ISO), sur la chaine de scan (identifiants de fichier retires). PORTEE BORNEE entre
-  # mot-cle/virgules/date ({0,80} caracteres, ni virgule ni point) : une citation reelle est
-  # courte et locale (« arbitrage Samuel, AskUserQuestion session principale, 2026-09-17 ») ; sans
-  # cette borne, `[^,]*` non borne peut relier deux virgules et une date SANS RAPPORT situees
-  # dans un paragraphe ou un trailer plus loin dans un long message de commit, fabriquant une
-  # fausse conformite (mesure empiriquement pendant l'ecriture de cet outil, mandat elargi
-  # 2026-09-18).
+  # Comparaison 1 — extraction des citations CONFORMES EN FORME distinctes (mot-cle
+  # INSENSIBLE A LA CASSE sur sa premiere lettre — fix du 2026-09-24, voir MARKER_REGEX plus haut
+  # —, deux virgules, date ISO), sur la chaine de scan (identifiants de fichier retires). PORTEE
+  # BORNEE entre mot-cle/virgules/date ({0,80} caracteres, ni virgule ni point) : une citation
+  # reelle est courte et locale (« arbitrage Samuel, AskUserQuestion session principale,
+  # 2026-09-17 ») ; sans cette borne, `[^,]*` non borne peut relier deux virgules et une date SANS
+  # RAPPORT situees dans un paragraphe ou un trailer plus loin dans un long message de commit,
+  # fabriquant une fausse conformite (mesure empiriquement pendant l'ecriture de cet outil, mandat
+  # elargi 2026-09-18).
   matches="$(printf '%s\n' "$scan" | awk '
     {
       s = $0
-      while (match(s, /(arbitrage|arbitrages|décision|décisions|decision|decisions)[^,.]{0,80},[^,.]{0,80},[^,.]{0,40}[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)) {
+      while (match(s, /([Aa]rbitrage|[Aa]rbitrages|[Dd]écision|[Dd]écisions|[Dd]ecision|[Dd]ecisions)[^,.]{0,80},[^,.]{0,80},[^,.]{0,40}[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)) {
         print substr(s, RSTART, RLENGTH)
         s = substr(s, RSTART + RLENGTH)
       }
@@ -289,29 +333,39 @@ while IFS= read -r sha; do
     DEVIATIONS=$((DEVIATIONS + 1))
     continue
   fi
-  if [ "$nmatches" -gt 1 ]; then
-    echo "$short CITATIONS-MULTIPLES : $norm"
+
+  # Comparaison 3 — arbitrage du perimetre, JUGEE CITATION PAR CITATION (fix du 2026-09-24, voir
+  # « CITATIONS MULTIPLES, ACCEPTEES... » en en-tete) : N citations distinctes dans le meme commit
+  # sont acceptees des lors que CHACUNE passe ce controle individuellement — jamais le message
+  # entier. Une citation est forme-conforme (comparaison 1), mais si ELLE cite `arbitrage` ET la
+  # date `2026-09-17`, elle doit porter la chaine EXACTE de l'arbitrage du perimetre (le CANON est
+  # une phrase connue, toujours ecrite en minuscules dans l'historique et CLAUDE.md — la
+  # comparaison au CANON reste sensible a la casse par construction, seule la DETECTION du
+  # declencheur "arbitrage" est insensible a la casse, pour ne jamais laisser passer en silence
+  # une variante en capitale qui ne serait pas la citation exacte connue). Une seule citation non
+  # conforme dans le lot suffit a faire rougir le commit — l'intention d'origine de ce controle
+  # (ne pas laisser une citation douteuse se noyer dans un paquet de bonnes) survit au changement
+  # d'echelle.
+  bad_match=0
+  while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    has_arbitrage=0
+    case "$m" in *[Aa]rbitrage*) has_arbitrage=1 ;; esac
+    has_date_perimetre=0
+    case "$m" in *"2026-09-17"*) has_date_perimetre=1 ;; esac
+    if [ "$has_arbitrage" -eq 1 ] && [ "$has_date_perimetre" -eq 1 ]; then
+      case "$m" in
+        *"$CANON"*) : ;;
+        *) bad_match=1 ;;
+      esac
+    fi
+  done <<EOM
+$matches
+EOM
+  if [ "$bad_match" -eq 1 ]; then
+    echo "$short ARBITRAGE-DE-PERIMETRE-MAL-CITE : $norm"
     DEVIATIONS=$((DEVIATIONS + 1))
     continue
-  fi
-
-  # Comparaison 3 — arbitrage du perimetre : forme generique conforme, mais si le commit cite
-  # `arbitrage` ET la date `2026-09-17`, il doit porter la chaine EXACTE de l'arbitrage du
-  # perimetre (comparee elle aussi apres normalisation, donc insensible a une coupure de ligne).
-  # Sur `$scan` (identifiants de fichier retires), meme raison que comparaison 1.
-  has_arbitrage=0
-  case "$scan" in *arbitrage*) has_arbitrage=1 ;; esac
-  has_date_perimetre=0
-  case "$scan" in *"2026-09-17"*) has_date_perimetre=1 ;; esac
-  if [ "$has_arbitrage" -eq 1 ] && [ "$has_date_perimetre" -eq 1 ]; then
-    case "$norm" in
-      *"$CANON"*) : ;;
-      *)
-        echo "$short ARBITRAGE-DE-PERIMETRE-MAL-CITE : $norm"
-        DEVIATIONS=$((DEVIATIONS + 1))
-        continue
-        ;;
-    esac
   fi
 done <<EOF
 $ALL_SHAS
