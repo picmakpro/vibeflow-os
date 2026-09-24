@@ -346,3 +346,9 @@ porte donc le trailer `Gate-Touche: scripts/tests/test-preuve-41-m1.sh — …` 
 Comportement local de la suite de preuve, identique dans les deux variantes : `c0_push=0 c0_pr=0
 a_push=0 a_pr=1 b_push=1 b_pr=0`. Aucun push, aucune PR ouverte ou fermée, `PR-R-COMMITS:` non
 consigné en attente de la décision.
+
+PR-R-DECISION: option=REPLANIFIER decideur=Willy canal=AskUserQuestion-session-principale date=2026-09-24
+
+Le plan 41-07 est renvoyé au planificateur pour intégrer la contrainte `check-version-sync` à la
+source (arbitrage Willy, AskUserQuestion session principale, 2026-09-24). Les commits construits
+localement (les deux variantes) ne sont pas publiés.
