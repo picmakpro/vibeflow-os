@@ -492,6 +492,7 @@ jobs:
           ---
           Phase: 1'
           git -C "$T" init -q
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`sain`/`candidat`) : noms synthetiques construits par cette etape, jamais des compartiments du depot. Portee REGION et non step : le bloc 3/6 ci-dessous mesure la RACINE REELLE et doit rester sous le lint.
           mkdir -p "$T/.planning/workstreams/sain" "$T/.planning/workstreams/candidat"
           printf '%s\n' "$SAIN_FM" > "$T/.planning/workstreams/sain/STATE.md"
           printf '%s\n' "$SAIN_FM" > "$T/.planning/workstreams/candidat/STATE.md"
@@ -521,6 +522,7 @@ jobs:
 
           # --- 2/6 RÉPARATION : working tree restauré À L'IDENTIQUE du contenu commité ------------
           printf '%s\n' "$SAIN_FM" > "$T/.planning/workstreams/candidat/STATE.md"
+          # vf-allow-unregistered-planning-path:end
           rc=0; fanout_check_state_integrity "$T" >"$T/out2" 2>&1 || rc=$?
           cat "$T/out2"
           echo "== 2/6 fixture réparée : rc=$rc =="
@@ -557,8 +559,10 @@ jobs:
           T6=$(mktemp -d); git -C "$T6" init -q
           git -C "$T6" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
             commit -q --allow-empty -m init
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`neuf`) : compartiment synthetique non commite.
           mkdir -p "$T6/.planning/workstreams/neuf"
           printf '%s\n' '---' 'gsd_state_version: 1.0' 'milestone:' '---' 'Phase: 1' > "$T6/.planning/workstreams/neuf/STATE.md"
+          # vf-allow-unregistered-planning-path:end
           rc=0; fanout_check_state_integrity "$T6" >"$T6/out5" 2>&1 || rc=$?
           cat "$T6/out5"
           echo "== 5/6 compartiment NON COMMITÉ, frontmatter cassé : rc=$rc =="
@@ -580,10 +584,12 @@ jobs:
           T7=$(mktemp -d); git -C "$T7" init -q
           git -C "$T7" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
             commit -q --allow-empty -m init
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`carve`/`vierge`) : compartiments synthetiques de l'ambiguite D-02.
           mkdir -p "$T7/.planning/workstreams/carve" "$T7/.planning/workstreams/vierge"
           printf '%s\n' '---' 'workstream: carve' 'created: 2026-09-23' '---' > "$T7/.planning/workstreams/carve/STATE.md"
           printf '%s\n' '---' 'workstream: vierge' 'created: 2026-09-23' '---' > "$T7/.planning/workstreams/vierge/STATE.md"
           printf '# Feuille de route\n\n## Phase 1\n' > "$T7/.planning/workstreams/carve/ROADMAP.md"
+          # vf-allow-unregistered-planning-path:end
           rc=0; fanout_check_state_integrity "$T7" >"$T7/out6" 2>&1 || rc=$?
           cat "$T7/out6"
           echo "== 6/6 ambiguïté D-02 : rc=$rc =="
@@ -826,6 +832,7 @@ jobs:
           FIX="$(mktemp -d)"
           trap 'rm -rf "$FIX"' EXIT
 
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`dev`) du BLOC 1 : arbre partitionne synthetique. Portee REGION et non step, MESURE : le bloc 2b et R5 de la MEME etape mesurent la racine REELLE — une exemption au step desarmerait le lint sur l'angle mort d'origine.
           mkdir -p "$FIX/.planning/workstreams/dev"
           printf '# Projet fixture\n\nArbre synthétique construit par la CI.\n' > "$FIX/.planning/PROJECT.md"
           printf '{ "workflow": {} }\n' > "$FIX/.planning/config.json"
@@ -896,6 +903,7 @@ jobs:
             *".planning/workstreams/dev/STATE.md conforme"*) : ;;
             *) note "2/6 check-state-integrity : le fichier vérifié n'est pas .planning/workstreams/dev/STATE.md — la résolution de workstream n'a pas eu lieu" ;;
           esac
+          # vf-allow-unregistered-planning-path:end
 
           # --- 3/6 : injecteur de contexte. Contrat FAIL-OPEN : il sort TOUJOURS 0, l'assertion qui
           # porte la preuve est donc celle sur sa SORTIE, jamais celle sur son code. ---
@@ -1225,6 +1233,7 @@ jobs:
           ---
           Phase: 1'
           git -C "$T5" init -q
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`sain`/`candidat`) de la bascule R5a : noms synthetiques.
           mkdir -p "$T5/.planning/workstreams/sain" "$T5/.planning/workstreams/candidat"
           printf '%s\n' "$SAIN_FM" > "$T5/.planning/workstreams/sain/STATE.md"
           printf '%s\n' "$SAIN_FM" > "$T5/.planning/workstreams/candidat/STATE.md"
@@ -1251,6 +1260,7 @@ jobs:
           fi
           # bascule inverse : réparé à l'identique du commit -> doit reverdir
           printf '%s\n' "$SAIN_FM" > "$T5/.planning/workstreams/candidat/STATE.md"
+          # vf-allow-unregistered-planning-path:end
           rc=0
           fanout_check_state_integrity "$T5" >"$T5/r5out1b" 2>&1 || rc=$?
           echo "== R5a' fixture réparée : rc=$rc =="
@@ -1309,6 +1319,7 @@ jobs:
           trap 'rm -rf "$FIX"' EXIT
 
           # --- 1. Fixture PROPRE, partitionnée, un seul numéro de phase enregistré ---------------
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`alpha`/`beta`/`gamma`) de check-divergence : trois compartiments synthetiques. Le bloc 5/5 ci-dessous, hors region, mesure la racine REELLE.
           mkdir -p "$FIX/.planning/workstreams/alpha/phases/VFDO-05-x-registered"
           echo stub > "$FIX/.planning/workstreams/alpha/phases/VFDO-05-x-registered/PLAN.md"
           printf '%s\n' "### Phase 05: registered" > "$FIX/.planning/workstreams/alpha/ROADMAP.md"
@@ -1374,6 +1385,7 @@ jobs:
           #        de rougir sur `alpha`.
           mkdir -p "$FIX/.planning/workstreams/alpha/phases/VFDO-05-y-orphan"
           echo stub > "$FIX/.planning/workstreams/alpha/phases/VFDO-05-y-orphan/PLAN.md"
+          # vf-allow-unregistered-planning-path:end
 
           rc=0
           out="$(bash plugin/conductor/scripts/check-divergence.sh --path "$FIX" 2>&1)" || rc=$?
@@ -1398,6 +1410,89 @@ jobs:
           echo "== BILAN check-divergence CI : $fail écart(s) sur 5 verdicts (3 compartiments propres, gamma cassé, gamma réparé, alpha muté, racine) =="
           if [ "$fail" -ne 0 ]; then exit 1; fi
           echo "== check-divergence.sh VERT en CI : le flip 0 → 1 sur mutation réelle est prouvé, la racine n'a pas bougé =="
+
+      - name: check-planning-consumers-registered (D-03 — un consommateur de chemin de planning oublié est VU)
+        # POURQUOI CETTE ÉTAPE EXISTE (D-03 de la Phase 41.1, WSAW-02/WSAW-04). Les plans 41.1-02,
+        # 03, 04 et 06 ferment le cas d'un compartiment NEUF apparaissant sur le disque. Ce lint
+        # ferme le cas SYMÉTRIQUE, que rien ne gardait : un CONSOMMATEUR NEUF, écrit plus tard,
+        # qui recode `.planning/workstreams/<nom>` ou `.planning/STATE.md` en dur sans que personne
+        # ne le voie. Un recensement sans lint est une intention ; D-03 exige les DEUX.
+        #
+        # LIMITE DE FOND, à lire avant le reste. La garde vit DANS le dépôt : la PR qu'elle juge
+        # peut la modifier — elle, sa suite, cette étape — et rester verte. Elle vérifie qu'un
+        # consommateur est SU, jamais que le statut déclaré est VRAI (T-41.1-09, disposition
+        # `accept`). Même limite que G-1/G-2/G-3 (ADR-072) : elle rend visible et trace, elle ne
+        # verrouille rien.
+        #
+        # UNE ÉTAPE QUI NE MESURERAIT QUE LE DÉPÔT RÉEL SERAIT VERTE PAR CONSTRUCTION, puisque le
+        # recensement est écrit conforme dans la même PR que le lint. Les deux premiers verdicts
+        # sont donc une bascule isolée sur fixture jetable, patron `check-instruction-budget` et
+        # `check-baseline-arbitrage` (plus bas dans ce même job) — ROUGE sur l'oubli, VERT une fois
+        # le marqueur posé. Sans la bascule INVERSE, un rouge seul ne distinguerait pas « sait
+        # détecter » de « rend toujours 1 ».
+        run: |
+          set -eu
+
+          fail=0
+          note() { echo "::error::check-planning-consumers-registered : $1"; fail=$((fail + 1)); }
+
+          GATE=plugin/conductor/scripts/check-planning-consumers-registered.sh
+
+          # --- 1/4 BASCULE sur fixture jetable : un consommateur hors recensement doit ROUGIR ----
+          # La fixture n'a pas de `.github/workflows/ci.yml` : le second volet du lint est donc
+          # sauté par sa propre garde, et le rc=1 n'est imputable QU'AU volet `.sh`.
+          T="$(mktemp -d)"
+          trap 'rm -rf "$T"' EXIT
+          git -C "$T" init -q
+          mkdir -p "$T/plugin/synthetique/scripts"
+          printf '%s\n' '#!/usr/bin/env bash' 'echo .planning/workstreams' \
+            > "$T/plugin/synthetique/scripts/oublie.sh"
+          git -C "$T" add -A
+          git -C "$T" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q -m "fixture-consommateur-oublie"
+
+          rc=0
+          out="$(bash "$GATE" --path "$T" 2>&1)" || rc=$?
+          echo "== 1/4 fixture : consommateur hors recensement : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 1 ] || note "1/4 : rc=$rc, attendu 1 — un script référençant un chemin d'artefact de planning sans figurer au recensement DOIT faire échouer le lint"
+          case "$out" in
+            *"plugin/synthetique/scripts/oublie.sh"*) : ;;
+            *) note "1/4 : le script fautif n'est pas NOMMÉ dans le rapport — un verdict qui ne nomme pas sa cause n'est pas actionnable" ;;
+          esac
+
+          # --- 2/4 BASCULE INVERSE : le marqueur de ligne éteint le signal, il ne le fabrique pas -
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'echo .planning/workstreams   # vf-allow-unregistered-planning-path : le littéral EST le sujet' \
+            > "$T/plugin/synthetique/scripts/oublie.sh"
+          git -C "$T" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q -am "marqueur de ligne pose"
+
+          rc=0
+          out="$(bash "$GATE" --path "$T" 2>&1)" || rc=$?
+          echo "== 2/4 même fixture, marqueur de ligne posé : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "2/4 : rc=$rc, attendu 0 — l'échappatoire de ligne doit éteindre le signal sur la ligne où elle est écrite, sinon la bascule 1/4 ne prouve pas une détection"
+          rm -rf "$T"
+
+          # --- 3/4 DÉPÔT RÉEL : le recensement doit couvrir l'univers que le lint mesure ---------
+          # C'est l'égalité d'ensembles, jamais un nombre de lignes attendu. Ce verdict couvre AUSSI
+          # le second volet du lint : aucun nom de compartiment réel recodé en dur dans ce fichier
+          # hors d'une région de fixture jetable bornée.
+          rc=0
+          out="$(bash "$GATE" 2>&1)" || rc=$?
+          echo "== 3/4 dépôt réel : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "3/4 dépôt réel : rc=$rc, attendu 0 — un consommateur mesuré manque au recensement, ou ce fichier recode un nom de compartiment en dur"
+
+          # --- 4/4 la suite du gate, invoquée ICI en plus du job `tests` : un gate dont la preuve
+          #         par mutation ne tourne pas dans le même job que lui peut devenir inerte sans
+          #         que ce job le dise. ----------------------------------------------------------
+          rc=0
+          out="$(bash plugin/conductor/scripts/tests/test-check-planning-consumers-registered.sh 2>&1)" || rc=$?
+          echo "== 4/4 suite du gate : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "4/4 suite du gate : rc=$rc, attendu 0 — mutant de retrait de ligne non tué, ou échappatoire non prouvée"
+
+          echo "== BILAN check-planning-consumers-registered : $fail écart(s) sur 4 verdicts (oubli, marqueur, dépôt réel, suite) =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-planning-consumers-registered VERT : l'oubli d'un consommateur est vu, l'échappatoire est bornée, et le recensement couvre l'univers mesuré =="
 
       - name: check-baseline-arbitrage (G-1, PROT-04 — hausse de baseline sans arbitrage cité)
         # POURQUOI CETTE ÉTAPE EXISTE. G-1 traite O-3 du `25-SECURITY.md` (T-25-16, restée
