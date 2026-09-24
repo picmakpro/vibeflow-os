@@ -78,6 +78,10 @@
 # Codes de sortie : 0 = conforme · 1 = non conforme (agents non conformes, OU invocation
 #   invalide — ex. --resolve-agents=<valeur inconnue>) · 3 = INDÉTERMINÉ (--strict sur cible
 #   absente/vide : aucun verdict rendu — un vert sans rien vérifier serait un faux vert, F13).
+#   D-20 (Phase 42) : hors --hook, une cible ABSENTE (dossier introuvable) sort désormais
+#   INDÉTERMINÉ (exit 3, jeton CIBLE-ABSENTE) dans tous les modes, y compris sans --strict — une
+#   cible PRÉSENTE mais vide garde le régime F13 déjà documenté ci-dessus, inchangé.
+#   --allow-empty tolère aussi une cible ABSENTE, au même titre qu'une cible vide.
 
 set -uo pipefail
 
@@ -709,9 +713,21 @@ if single:
     else:
         errors.append(f\"fichier introuvable : {single}\")
 else:
+    # D-20 : une cible ABSENTE (dossier introuvable) est distincte d'une cible PRESENTE et vide —
+    # ligne UNIQUE, cible du mutant MUT-D20 (42-04). single vaut toujours une chaine (jamais None :
+    # le bash exporte VF_SINGLE=\"$SINGLE_FILE\" inconditionnellement, lu ci-dessus par
+    # os.environ[\"VF_SINGLE\"] — sans --file c'est \"\", donc 'not single' teste la chaine vide).
+    cible_absente = (not single) and not os.path.isdir(agents_dir)
     files = sorted(glob.glob(os.path.join(agents_dir, \"*.md\")))
     files = [f for f in files if os.path.basename(f) not in NOT_AGENTS]
     if not files:
+        # D-20 (Phase 42) : hors --hook, une cible ABSENTE sort desormais INDETERMINE (exit 3,
+        # jeton CIBLE-ABSENTE) dans TOUS les modes, y compris sans --strict — --allow-empty
+        # tolere aussi une cible absente, au meme titre qu'une cible vide (I2). Cette branche ne
+        # touche PAS le contrat F13 ci-dessous (cible PRESENTE et vide, T21/T22/T23 inchanges).
+        if cible_absente and not hook and not allow_empty:
+            print(f\"[check-agents] ✗ INDETERMINE : {agents_dir} — CIBLE-ABSENTE, aucun verdict rendu (D-20)\")
+            sys.exit(3)
         # Contrat de decouverte (F13, vacuous green) : en --strict, zero cible = zero verdict.
         # exit 3 = INDETERMINE, distinct de 0 = CONFORME. --allow-empty pour les cas legitimes.
         # Le code de sortie (3) est desormais INCONDITIONNEL — la traduction vers 0 sous --hook

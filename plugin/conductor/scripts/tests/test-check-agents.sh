@@ -92,6 +92,14 @@
 #         MANIFESTE-ILLISIBLE ; ListAgents/SendFeedback/SubagentHandback et experimental acceptes
 #   T82 — --hook : manifeste absent → rc=0 ET sortie contenant MANIFESTE-ILLISIBLE (silence de
 #         code, jamais de message) ; garde d'ecriture sur agent conforme → sortie vide (fail-open)
+#
+# Invocation nue sur cible absente (Phase 42, D-20, CONCERNS.md:349) :
+#   T103 — cible ABSENTE (aucun .claude/agents sur le chemin), invocation SANS AUCUN FLAG (ni
+#          --strict, ni --hook, ni --agents-dir, ni --file) → rc=3, sortie contenant INDETERMINE
+#          et CIBLE-ABSENTE (jeton distinct du jeton F13 existant) ; jumeau vert : meme invocation
+#          mais .claude/agents PRESENT et VIDE → rc=0, "rien a verifier", jamais CIBLE-ABSENTE
+#          (regime T23 inchange) ; T55 et T56 rejoues verts sans modification (non-regression
+#          explicite du harnais D-24 existant)
 
 set -uo pipefail
 
@@ -1195,6 +1203,29 @@ rm -rf "$DEFAULT_PRESENT"
 
 # T58 — le cwd de la suite est inchange : les 3 deplacements ci-dessus sont confines a des sous-shells
 [ "$(pwd)" = "$PWD_BEFORE" ] && ok "T58 cwd de la suite inchange apres les cas chemin par defaut" || ko "T58 cwd altere : $(pwd) != $PWD_BEFORE"
+
+# T103 — invocation NUE sur cible ABSENTE, hors --hook (Phase 42, D-20, CONCERNS.md:349) : le
+# faux vert historique (exit 0 "rien a verifier") devient INDETERMINE (exit 3, CIBLE-ABSENTE).
+T103_ABSENT="$(mktemp -d)"
+OUT="$(cd "$T103_ABSENT" && bash "$CHECK" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "INDETERMINE" && echo "$OUT" | grep -q "CIBLE-ABSENTE"; then
+  ok "T103 invocation nue, cible absente, hors --hook → rc=3 INDÉTERMINÉ, jeton CIBLE-ABSENTE (D-20)"
+else
+  ko "T103 (rc=$RC) : $OUT"
+fi
+rm -rf "$T103_ABSENT"
+
+# T103 (jumeau vert) — meme invocation nue, mais .claude/agents PRESENT et VIDE : regime F13
+# deja en place (T23), CIBLE-ABSENTE ne doit JAMAIS apparaitre.
+T103_PRESENT_VIDE="$(mktemp -d)"
+mkdir -p "$T103_PRESENT_VIDE/.claude/agents"
+OUT="$(cd "$T103_PRESENT_VIDE" && bash "$CHECK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "CIBLE-ABSENTE"; then
+  ok "T103 (jumeau vert) invocation nue, .claude/agents présent et vide → rc=0, jamais CIBLE-ABSENTE (régime T23 inchangé)"
+else
+  ko "T103 (jumeau vert, rc=$RC) : $OUT"
+fi
+rm -rf "$T103_PRESENT_VIDE"
 
 # ---------- D-18/D-19 (perimetre hooks.json, hors perimetre de CE script) + D-21/D-22/D-05 ----------
 
