@@ -721,3 +721,16 @@ inspecte déjà tous les compartiments présents sans se fier à un pointeur.
 
 **Déclencheur de reprise :** l'ajout d'un troisième compartiment, ou le premier incident réel où un
 compartiment autre que `fiabilite` régresse sans que la CI ne le voie.
+
+## Mise en conformité du corpus de skills en dérive procédurale non déclarée (différé de la Phase 43, 2026-09-24)
+
+**Capturé :** 2026-09-24, cadrage de la Phase 43 (compartiment `gouvernance`, `43-CONTEXT.md` D-Q5).
+
+**Le défaut :** le futur `check-skills.sh` signalera les skills dont la forme est procédurale (gate
+bloquant, livrable remis à un tiers, couche de qualité) sans que leur nature le déclare. Dans cette
+phase, il ne fait qu'**avertir** : réponse de Willy (AskUserQuestion, session principale, 2026-09-24).
+C'est un écart assumé par rapport à la doctrine D-11 de la Phase 42 (invariants armés en erreur,
+corpus corrigé dans la même phase).
+
+**Déclencheur de reprise :** le gate existe et a mesuré le corpus réel (25 `SKILL.md` sous `plugin/`
+au 2026-09-24). Reprendre avec la liste des skills signalés, puis décider de l'armement en erreur.
