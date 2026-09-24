@@ -291,3 +291,17 @@ ROADMAP : il documente que la preuve prévue par ce plan (refus observable par t
 contournement) n'est pas observable depuis le seul compte actuellement disponible pour la tenter,
 `picmakpro`, parce que ce compte est lui-même en contournement `always`. Arrêt sur la Task 4
 (checkpoint de décision), comme prévu par le plan sur `CO-VERDICT: ECART`.
+
+### Task 4 — décision humaine, 2026-09-24
+
+CO-DECISION: option=accepter-et-documenter decideur=Willy canal=AskUserQuestion-session-principale date=2026-09-24
+
+Écart accepté et documenté tel que mesuré, sans l'adoucir : les deux seuls collaborateurs du dépôt
+(`samuel-neveugall`, `picmakpro`) ont le contournement `always` (D-02bis) ; `mergeStateStatus` et
+`reviewDecision` sont calculés pour le compte lecteur ; aucun acteur réel du dépôt n'observe donc le
+refus par défaut ni la revue code owner exigée — la règle est posée et effective
+(`rules/branches/main`), mais elle ne s'impose qu'à un acteur hors liste, ce que le plan 41-09
+mesurera avec une clé de déploiement temporaire pour le push direct. Le critère 2 du ROADMAP n'est
+pas tenu tel que formulé ; consigné tel quel, sans correction. Suite prescrite par le plan : fermer
+PR-BASELINE (#102) et PR-SENTINELLE (#103), et supprimer leurs branches, au pas 0 de la Task 2 du
+plan 41-07 (pas ici) ; PR-P (#101) reste ouverte pour le temps (ii) du plan 41-08.
