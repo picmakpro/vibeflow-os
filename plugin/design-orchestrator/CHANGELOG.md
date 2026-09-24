@@ -1,5 +1,16 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.9] — 2026-09-24 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **`SendMessage` sur `vf-design-manager`** (invariant I6, D-07) — le manager n'avait jusqu'ici
+  que `AskUserQuestion`, qui n'existe pas en sous-agent : il était muet. Frontmatter seul, corps
+  inchangé, allowlist `Agent(...)` intouchée (T8 de `test-design-orchestrator.sh` reste vert).
+  Décisions de cadrage de Claude (délégation de Willy, AskUserQuestion session principale,
+  2026-09-23), ratifiées par Samuel (WhatsApp, 2026-09-23), 42-CONTEXT.md D-07, D-11 — relecture
+  de Samuel demandée en PR (D-12).
+
 ## [v1.5.8] — 2026-09-17 (hotfix v2.63.2 — B1 étendu à vibeflow-design)
 
 **Patch** — aucune logique de routage ne change ; la doctrine d'invocation du head design rejoint
