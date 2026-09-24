@@ -721,3 +721,25 @@ inspecte déjà tous les compartiments présents sans se fier à un pointeur.
 
 **Déclencheur de reprise :** l'ajout d'un troisième compartiment, ou le premier incident réel où un
 compartiment autre que `fiabilite` régresse sans que la CI ne le voie.
+
+## ADPT-06 — canal `hooks`/`plugins` du dépôt jugé jamais répété — DIFFÉRÉ (2026-09-24)
+
+**Capturé :** 2026-09-24, audit de clôture du jalon `fiabilite-v1.0` (compartiment `fiabilite`,
+`.planning/workstreams/fiabilite/REQUIREMENTS.md`).
+
+**Le défaut :** ADPT-06 exige la preuve de fermeture du canal d'injection en RÉPÉTITIONS (≥ 3 runs,
+marqueur attendu 0/N), « jamais en un run » — livrée et cochée sur cette base. Mais la preuve
+mesurée (`0/5`) ne couvre QUE le canal `skills`/`AGENTS.md` du dépôt jugé. **Le second canal
+possible d'injection, `hooks`/`plugins` du même dépôt jugé, n'a jamais eu ses propres
+répétitions** — voir le commit `3b7de24`, qui porte la preuve du premier canal sans toucher au
+second. L'exigence est donc livrée pour un canal sur deux, pas les deux comme son intitulé («
+fermeture du canal d'injection ») pourrait le laisser lire.
+
+**Piste de fix :** reproduire le protocole de répétition déjà validé pour `skills`/`AGENTS.md`
+(≥ 3 runs sur le banc témoin, marqueur attendu 0/N) pour le canal `hooks`/`plugins`. Même
+discipline, même seuil de non-déterminisme (2/3 mesuré sur l'autre canal — un run propre ne prouve
+rien).
+
+**Déclencheur de reprise :** avant toute déclaration publique de fermeture COMPLÈTE du canal
+d'injection du dépôt jugé (les deux canaux), ou la prochaine fois qu'ADPT-06 (ou son équivalent)
+est rouvert pour un autre motif.
