@@ -7,12 +7,15 @@ current_phase: 42
 current_phase_name: Fabrique — manifeste daté et invariants de doctrine du gate des agents
 status: executing
 created: 2026-09-23
-last_updated: "2026-09-25T00:00:00.000Z"
+last_updated: "2026-09-25T00:35:00.000Z"
 last_activity: 2026-09-25
 last_activity_desc: >-
-  Vague 2 exécutée (vf-coder, nœud exec-42-w2) : plan 42-04 (fraîcheur du manifeste, FABR-02) vert,
-  3 commits sur gouvernance/phase-42-fabrique. Vague 3 (42-05, dépend de 42-04/42-02/42-03) non
-  lancée — hors mandat. STATE tenu à la main (jamais state.begin-phase / state.record-session).
+  Vague 3 (vf-coder, nœud exec-42-w3a) : plan 42-05 — Tâche 1 (I1, I4, I7 armés en erreur, T91/
+  T91b/T92/T95, MUT-I1/I4/I7 : 135 OK · 0 KO) exécutée et committée (23009b4). Tâche 2 (checkpoint
+  D-19/D-08, gate blocking) atteinte : sonde jouée sur 42-D19-MESURE.md, verdict ARBITRAGE-ABSENT
+  rc=1 — aucune section « ## Arbitrage D-08 » à ce jour. Exécution ARRÊTÉE là (décision de mission
+  revise-42c) : Tâche 3 (I5/I6) NON exécutée. SUMMARY partiel committé (26901d2, status: halted).
+  STATE tenu à la main (jamais state.begin-phase / state.record-session).
 progress:
   total_phases: 9
   completed_phases: 0
@@ -25,19 +28,19 @@ progress:
 
 ## Current Position
 
-Phase: 42 (Fabrique — manifeste daté et invariants de doctrine du gate des agents) — EXECUTING (vague 2/4 terminée : 42-01, 42-02, 42-03, 42-04)
+Phase: 42 (Fabrique — manifeste daté et invariants de doctrine du gate des agents) — EXECUTING (vague 3/4 : 42-05 arrêté au checkpoint D-19/D-08, ARBITRAGE-ABSENT — attente arbitrage Samuel)
 **Last Activity:** 2026-09-25
-**Last Activity Description:** Vague 2 exécutée (nœud exec-42-w2) : 42-04 (fraîcheur du manifeste — détection D-02, rétrogradation D-05, INDÉTERMINÉ sous --manifest-freshness=strict, D-04 ; T83-T90, MUT-F1, MUT-F2, MUT-D20 ; les quatre appels CI durcis) — vert, 3 commits.
+**Last Activity Description:** Vague 3 exécutée (nœud exec-42-w3a) : plan 42-05 — Tâche 1 (I1, I4, I7 armés en erreur ; 135 OK · 0 KO ; corpus réel des six `plugin/*/agents` + neuf blueprints conforme, zéro diagnostic « invariant I ») exécutée et committée (23009b4). Tâche 2 (checkpoint `gate="blocking"`) atteinte : sonde D-19/D-08 jouée (4 auto-tests jetables + sonde réelle sur 42-D19-MESURE.md, jamais modifié) → `ARBITRAGE-ABSENT`, rc=1. Conformément à la décision de mission (nœud revise-42c, B1/B2) : ARRÊT RÉEL, Tâche 3 (I5, I6) NON exécutée. SUMMARY partiel committé (26901d2, `status: halted`). check-gate-touche.sh → DECLARE (rc=0).
 
 ## Progress
 
 **Phases Complete:** 0
-**Current Plan:** Vague 3 (42-05, dépend de 42-04/42-02/42-03) — non lancée, hors mandat exec-42-w2
+**Current Plan:** 42-05 (vague 3, dépend de 42-04/42-02/42-03) — arrêté au checkpoint Tâche 2, en attente de l'arbitrage de Samuel sur D-08 (canal WhatsApp)
 
 ## Session Continuity
 
-**Stopped At:** Fin de la vague 2 (42-04), mandat exec-42-w2 borné à cette seule vague
-**Resume File:** None
+**Stopped At:** Checkpoint D-19/D-08 de 42-05 (Tâche 2), ARBITRAGE-ABSENT — Tâche 1 complète et committée, Tâche 3 non atteinte
+**Resume File:** `.planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/42-D19-MESURE.md` (attend la transcription de l'arbitrage de Samuel sous la forme `## Arbitrage D-08` à trois champs prescrite par le plan 42-05 Tâche 2)
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
