@@ -5,19 +5,20 @@
 # construit SON PROPRE depot jetable sous mktemp -d, JAMAIS le depot reel ; identite git passee
 # par -c, jamais la configuration du poste. Une suite incapable de rougir est un defaut.
 #
-# DIX-NEUF cas (C0..C15, plus C2b, C6b, C6c) plus NEUF mutants opposables (MUT-1 a MUT-9) — MUT-1
-# a MUT-2 un par comparaison du script sous test (MUT-2 REPURPOSE le 2026-09-24 : l'ancien
+# VINGT-ET-UN cas (C0..C17, plus C2b, C6b, C6c) plus DIX mutants opposables (MUT-1 a MUT-10) —
+# MUT-1 a MUT-2 un par comparaison du script sous test (MUT-2 REPURPOSE le 2026-09-24 : l'ancien
 # comptage d'unicite qu'il tuait a ete retire, voir fix defaut A ci-dessous), MUT-3 a MUT-4 sur les
 # deux autres comparaisons, MUT-5 et MUT-6 sur la PORTE D'ENTREE du detecteur (liste des marqueurs
 # d'invocation, decision du manager, reprise 2026-09-18), MUT-7 a MUT-9 AJOUTES le 2026-09-24 sur
 # les trois defauts corriges ce jour-la (merges de PR reels, commits de release, insensibilite a
-# la casse du mot declencheur — voir C6c/MUT-7, C14/MUT-8, C15/MUT-9) — regle de comptage
-# (avertissement 3 du verificateur frais, decision du manager du 2026-09-17) : chaque mutant
-# asserte le rc EXACT sur le mutant ET sur l'original, et n'est credite que par une ligne de forme
-# canonique « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ». Un mutant
-# qui « echoue » par un plantage ou une plage vide n'est PAS compte comme tue. MUT-5 est le SEUL
-# mutant de cette suite juge sur la plage REELLE du depot (jamais une fixture jetable) : le
-# resserrement lui-meme n'est prouve que par sa capacite a distinguer un detecteur large (rouge
+# la casse du mot declencheur — voir C6c/MUT-7, C14/MUT-8, C15/MUT-9), MUT-10 AJOUTE le 2026-09-24
+# (ADR-075) sur le prefixe de registre obligatoire P41-D-NN (voir C16/C17/MUT-10) — regle de
+# comptage (avertissement 3 du verificateur frais, decision du manager du 2026-09-17) : chaque
+# mutant asserte le rc EXACT sur le mutant ET sur l'original, et n'est credite que par une ligne
+# de forme canonique « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
+# Un mutant qui « echoue » par un plantage ou une plage vide n'est PAS compte comme tue. MUT-5 est
+# le SEUL mutant de cette suite juge sur la plage REELLE du depot (jamais une fixture jetable) :
+# le resserrement lui-meme n'est prouve que par sa capacite a distinguer un detecteur large (rouge
 # sur l'historique reel) d'un detecteur resserre (vert sur ce meme historique).
 #
 # FIX DU 2026-09-24 (arbitrage Samuel, AskUserQuestion session principale) — TROIS defauts de
@@ -29,6 +30,16 @@
 #   B2. Les commits de release (« release(vX.Y.Z): ... ») sont exclus du jugement (voir C14/MUT-8).
 #   B3. Le mot declencheur de l'extraction (« arbitrage »/« décision ») est desormais insensible
 #       a la casse (voir C15/MUT-9).
+#
+# FIX DU 2026-09-24, SEPARE (arbitrage Samuel, AskUserQuestion session principale, ADR-075) — UN
+# QUATRIEME defaut, distinct des trois ci-dessus (ceux-ci corrigeaient la FORME de la citation ;
+# celui-ci corrige la PORTE D'ENTREE elle-meme) : un identifiant `D-01`..`D-10` NU franchissait la
+# porte d'entree quel que soit son registre d'origine. Mesure sur le depot reel : la mission
+# « partition reelle du planning » a numerote sa propre decision `D-02` le 2026-09-23, sans rapport
+# avec le registre de cette phase, et des commits qui la citaient sans invoquer d'arbitrage
+# rendaient pourtant FORME-NON-CONFORME (contourne a l'epoque en avancant BASE-TRACE-ARBITRAGE,
+# voir 41-PREUVES.md § 41-14). Le detecteur n'engage desormais son controle que sur la forme
+# prefixee par SON PROPRE registre, `P41-D-01`..`P41-D-10` (voir C16/C17/MUT-10).
 set -uo pipefail
 
 TOOLS_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -239,13 +250,15 @@ if [ "$rc" -eq 0 ]; then ok "C6b identifiant compose D-01-suite, aucune citation
 else ko "C6b identifiant compose D-01-suite" "rc=0" "rc=$rc :: $out"; fi
 
 # --- C6c : merge REEL d'une PR GitHub (« Merge pull request #N from <branche> »), titre portant un
-# marqueur D-NN mais AUCUNE citation -> exclu du jugement (fix defaut B1, 2026-09-24 : depot reel,
-# commit 0cec964, "Merge pull request #94 from picmakpro/feat/partition-planning-d02", rendait
-# FORME-NON-CONFORME a cause du marqueur D-02 dans le titre de PR fusionne).
+# marqueur P41-D-NN mais AUCUNE citation -> exclu du jugement (fix defaut B1, 2026-09-24 : depot
+# reel, commit 0cec964, "Merge pull request #94 from picmakpro/feat/partition-planning-d02",
+# rendait FORME-NON-CONFORME a cause du marqueur D-02 dans le titre de PR fusionne — marqueur de
+# fixture prefixe P41-D-05 depuis le fix ADR-075, un D-NN nu ne franchissant plus la porte
+# d'entree, voir PREFIXE DE REGISTRE OBLIGATOIRE dans le script sous test).
 D="$(mk_repo c6c)"; B="$(rev "$D" HEAD)"
 commit_msg "$D" "Merge pull request #94 from acme/feature-D-05-something
 
-Partition reelle du planning — D-05 (sans rapport avec une citation)"
+Partition reelle du planning — P41-D-05 (sans rapport avec une citation)"
 commit_msg "$D" "chore: commit normal qui suit le merge de PR"
 safe_run out rc --root "$D" --base-ref "$B"
 case "$out" in *"decouverte: commits=1 "*) n1=1 ;; *) n1=0 ;; esac
@@ -310,14 +323,15 @@ mk_preuves "$D" "BASE-TRACE-ARBITRAGE: 0000000000000000000000000000000000000000"
 safe_run out rc --root "$D"
 [ "$rc" -eq 2 ] && ok "C13 registre avec valeur non resoluble -> rc 2" || ko "C13" "rc=2" "rc=$rc :: $out"
 
-# --- C14 : commit de release ("release(vX.Y.Z): ...") portant un marqueur D-NN mais AUCUNE
+# --- C14 : commit de release ("release(vX.Y.Z): ...") portant un marqueur P41-D-NN mais AUCUNE
 # citation -> exclu du jugement (fix defaut B2, 2026-09-24 : depot reel, commit 3617ec0,
 # "release(v2.65.0): ...", rendait FORME-NON-CONFORME a cause du marqueur D-02 decrivant un
-# correctif inclus dans le paquet publie).
+# correctif inclus dans le paquet publie — marqueur de fixture prefixe P41-D-05 depuis le fix
+# ADR-075, un D-NN nu ne franchissant plus la porte d'entree).
 D="$(mk_repo c14)"; B="$(rev "$D" HEAD)"
 commit_msg "$D" "release(v9.9.9): rattrapage de publication
 
-Depuis v9.9.8, un correctif (D-05) avait touche le plugin distribue sans
+Depuis v9.9.8, un correctif (P41-D-05) avait touche le plugin distribue sans
 jamais etre publie — bump patch, sans rapport avec une citation."
 commit_msg "$D" "chore: commit normal qui suit la release"
 safe_run out rc --root "$D" --base-ref "$B"
@@ -327,17 +341,44 @@ else ko "C14" "rc=0 decouverte: commits=1" "rc=$rc :: $out"; fi
 
 # --- C15 : citation avec un A majuscule ("Arbitrage Willy, ...") -> rc 0 (fix defaut B3,
 # 2026-09-24 : depot reel, commit 557b6fc, rendait FORME-NON-CONFORME au stade de l'extraction
-# faute d'insensibilite a la casse sur le mot declencheur). Marqueur D-02 ajoute pour faire
+# faute d'insensibilite a la casse sur le mot declencheur). Marqueur P41-D-02 ajoute pour faire
 # franchir la PORTE D'ENTREE (sans lui, "Arbitrage Willy" seul ne matche aucun marqueur de
-# MARKER_REGEX — exactement la situation du commit reel 557b6fc, ou D-02 etait le declencheur).
+# MARKER_REGEX — exactement la situation du commit reel 557b6fc, ou D-02 etait le declencheur ;
+# forme prefixee depuis le fix ADR-075, un D-NN nu ne franchissant plus cette porte).
 D="$(mk_repo c15)"; B="$(rev "$D" HEAD)"
-commit_msg "$D" "feat: hausse quelque chose (D-02)
+commit_msg "$D" "feat: hausse quelque chose (P41-D-02)
 
 Arbitrage Willy, AskUserQuestion session principale, 2026-09-23"
 safe_run out rc --root "$D" --base-ref "$B"
 [ "$rc" -eq 0 ] && ok "C15 citation avec A majuscule -> rc 0" || ko "C15" "rc=0" "rc=$rc :: $out"
 
-echo "== test-check-trace-arbitrage : MUTANTS (MUT-1 a MUT-9) =="
+# --- C16 : identifiant D-NN NU, d'un AUTRE registre que celui de cette phase, sans aucune
+# citation -> rc 0 (fix ADR-075, defaut mesure : la mission "partition reelle du planning" a
+# numerote sa propre decision D-02 le 2026-09-23, sans rapport avec le registre P41-D-01..
+# P41-D-10 de cette phase ; un commit qui la cite ne doit plus franchir la porte d'entree de ce
+# detecteur). Reproduit la sonde reelle jouee en session : un message qui cite "D-02 au sens de
+# la mission de partition" n'engage aucun arbitrage de cette phase.
+D="$(mk_repo c16)"; B="$(rev "$D" HEAD)"
+commit_msg "$D" "docs(sonde): reprend le chantier lance par la mission D-02 (partition du planning)
+
+Commit temoin : cite D-02 au sens de la mission de partition, pas du registre
+de decisions de la phase 41. Aucun arbitrage engage."
+safe_run out rc --root "$D" --base-ref "$B"
+if [ "$rc" -eq 0 ]; then ok "C16 identifiant D-02 d'un registre etranger, aucune citation -> rc 0"
+else ko "C16 identifiant D-02 d'un registre etranger" "rc=0" "rc=$rc :: $out"; fi
+
+# --- C17 : identifiant P41-D-NN, du registre DE CETTE PHASE, sans aucune citation -> rc 1
+# FORME-NON-CONFORME (temoin inverse de C16 : le resserrement au prefixe P41- ne doit PAS
+# desarmer le detecteur sur son propre registre — un identifiant qui franchit la porte d'entree
+# reste juge, exactement comme avant le fix, seule la porte d'entree a change).
+D="$(mk_repo c17)"; B="$(rev "$D" HEAD)"
+commit_msg "$D" "feat: applique la decision P41-D-02 sans citer d'arbitrage"
+safe_run out rc --root "$D" --base-ref "$B"
+case "$out" in *FORME-NON-CONFORME*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "C17 identifiant P41-D-02 du registre de la phase, aucune citation -> rc 1 FORME-NON-CONFORME"
+else ko "C17 identifiant P41-D-02 du registre de la phase" "rc=1 FORME-NON-CONFORME" "rc=$rc :: $out"; fi
+
+echo "== test-check-trace-arbitrage : MUTANTS (MUT-1 a MUT-10) =="
 
 # --- MUT-1 : neutralise le controle de forme -> C1 devient vert sur le mutant ----------------
 MUT1_OLD='  if [ "$nmatches" -eq 0 ]; then'
@@ -443,7 +484,7 @@ fi
 # mutant de cette suite juge sur REAL_ROOT, jamais une fixture jetable : le resserrement n'est
 # prouve que par sa capacite a distinguer un detecteur large (rouge sur l'historique reel, ou des
 # mentions informelles pre-existent) d'un detecteur resserre (vert sur ce meme historique).
-MUT5_OLD="MARKER_REGEX='[Aa]rbitrage Samuel|sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+MUT5_OLD="MARKER_REGEX='[Aa]rbitrage Samuel|sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])P41-D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
 MUT5_NEW="MARKER_REGEX='arbitrage|arbitrages|décision|décisions|decision|decisions'"
 set +e
 MUT5_PATH="$(make_mutant mut5 "$MUT5_OLD" "$MUT5_NEW")"
@@ -463,8 +504,8 @@ fi
 # l'original reste ROUGE sur ce meme cas (decision du manager, reprise 2026-09-18, point 4 second
 # mutant). Reutilise le scenario de C1 (citation sans canal ni date), sur une fixture jetable
 # dediee — jamais le depot reel.
-MUT6_OLD="MARKER_REGEX='[Aa]rbitrage Samuel|sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
-MUT6_NEW="MARKER_REGEX='sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+MUT6_OLD="MARKER_REGEX='[Aa]rbitrage Samuel|sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])P41-D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+MUT6_NEW="MARKER_REGEX='sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])P41-D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
 set +e
 MUT6_PATH="$(make_mutant mut6 "$MUT6_OLD" "$MUT6_NEW")"
 MUT6_STAT=$?
@@ -495,7 +536,7 @@ set -e
 D="$(mk_repo mut7)"; B="$(rev "$D" HEAD)"
 commit_msg "$D" "Merge pull request #94 from acme/feature-D-05-something
 
-Partition reelle du planning — D-05 (sans rapport avec une citation)"
+Partition reelle du planning — P41-D-05 (sans rapport avec une citation)"
 commit_msg "$D" "chore: commit normal qui suit le merge de PR"
 if [ "$MUT7_STAT" -eq 1 ]; then komut 7 "exclusion du merge reel de PR neutralisee" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
 elif [ "$MUT7_STAT" -eq 2 ]; then komut 7 "exclusion du merge reel de PR neutralisee" "bash -n OK sur le mutant" "syntaxe invalide"
@@ -524,7 +565,7 @@ set -e
 D="$(mk_repo mut8)"; B="$(rev "$D" HEAD)"
 commit_msg "$D" "release(v9.9.9): rattrapage de publication
 
-Depuis v9.9.8, un correctif (D-05) avait touche le plugin distribue sans
+Depuis v9.9.8, un correctif (P41-D-05) avait touche le plugin distribue sans
 jamais etre publie — bump patch, sans rapport avec une citation."
 commit_msg "$D" "chore: commit normal qui suit la release"
 if [ "$MUT8_STAT" -eq 1 ]; then komut 8 "exclusion des commits de release neutralisee" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
@@ -547,7 +588,7 @@ MUT9_PATH="$(make_mutant mut9 "$MUT9_OLD" "$MUT9_NEW")"
 MUT9_STAT=$?
 set -e
 D="$(mk_repo mut9)"; B="$(rev "$D" HEAD)"
-commit_msg "$D" "feat: hausse quelque chose (D-02)
+commit_msg "$D" "feat: hausse quelque chose (P41-D-02)
 
 Arbitrage Willy, AskUserQuestion session principale, 2026-09-23"
 if [ "$MUT9_STAT" -eq 1 ]; then komut 9 "insensibilite a la casse de l'extraction neutralisee" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
@@ -557,6 +598,31 @@ else
   TARGET="$SCRIPT"; safe_run out_orig rc_orig --root "$D" --base-ref "$B"
   if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then okmut 9 "$rc_mut" 1 "$rc_orig" 0
   else komut 9 "insensibilite a la casse de l'extraction neutralisee" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
+# --- MUT-10 : retire le prefixe de registre obligatoire (fix ADR-075, 2026-09-24) -> le mutant
+# redevient sensible a un D-NN NU, quel que soit son registre d'origine ; sur la fixture C16
+# (identifiant D-02 de la mission de partition, sans aucune citation d'arbitrage), le mutant
+# compte le commit et le fait rougir FORME-NON-CONFORME, alors que l'original l'exclut toujours
+# (rc 0) — c'est la preuve que le resserrement au prefixe P41- est reel, pas seulement documente.
+MUT10_OLD="MARKER_REGEX='[Aa]rbitrage Samuel|sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])P41-D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+MUT10_NEW="MARKER_REGEX='[Aa]rbitrage Samuel|sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|\$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'"
+set +e
+MUT10_PATH="$(make_mutant mut10 "$MUT10_OLD" "$MUT10_NEW")"
+MUT10_STAT=$?
+set -e
+D="$(mk_repo mut10)"; B="$(rev "$D" HEAD)"
+commit_msg "$D" "docs(sonde): reprend le chantier lance par la mission D-02 (partition du planning)
+
+Commit temoin : cite D-02 au sens de la mission de partition, pas du registre
+de decisions de la phase 41. Aucun arbitrage engage."
+if [ "$MUT10_STAT" -eq 1 ]; then komut 10 "prefixe de registre obligatoire neutralise" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
+elif [ "$MUT10_STAT" -eq 2 ]; then komut 10 "prefixe de registre obligatoire neutralise" "bash -n OK sur le mutant" "syntaxe invalide"
+else
+  TARGET="$MUT10_PATH"; safe_run out_mut rc_mut --root "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run out_orig rc_orig --root "$D" --base-ref "$B"
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then okmut 10 "$rc_mut" 1 "$rc_orig" 0
+  else komut 10 "prefixe de registre obligatoire neutralise" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
 fi
 
 TARGET="$SCRIPT"

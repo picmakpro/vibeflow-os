@@ -41,8 +41,11 @@
 # PORTEE DE LA DETECTION — MARQUEURS D'INVOCATION EXPLICITES, LISTE FERMEE (decision du manager,
 # reprise 2026-09-18). Ce controle ne rougit QUE sur une INVOCATION d'autorite humaine, reconnue
 # par un jeu de marqueurs explicites et FERMES : « arbitrage Samuel », « sur arbitrage »,
-# « décision de Samuel », une cle `D-01`..`D-10`, une cle generique `*-DECISION:` (n'importe quel
-# prefixe suivi de `-DECISION:`), ou `REGLES_MAIN_FORCE_PUSH_SUPPRESSION`. Une mention informelle
+# « décision de Samuel », une cle PREFIXEE PAR CE REGISTRE `P41-D-01`..`P41-D-10` (fix du
+# 2026-09-24, ADR-075 : une cle `D-01`..`D-10` nue, ou prefixee par un AUTRE registre, ne franchit
+# plus cette porte — voir PREFIXE DE REGISTRE OBLIGATOIRE plus bas), une cle generique
+# `*-DECISION:` (n'importe quel prefixe suivi de `-DECISION:`), ou
+# `REGLES_MAIN_FORCE_PUSH_SUPPRESSION`. Une mention informelle
 # des mots « décision » ou « arbitrage » HORS de ces marqueurs est HORS PERIMETRE PAR CONCEPTION —
 # ce n'est plus un cas qui fait rougir cet outil. Motif : une garde qui rougit sur de la prose
 # descriptive apprend au lecteur a l'ignorer, et une garde qu'on apprend a ignorer ne garde plus
@@ -245,16 +248,31 @@ is_release_commit() {  # <message normalise> sur stdin -> exit 0 si commit "rele
 # Regex etendue (ERE, testee via `[[ =~ ]]` bash) : chaque alternative est un marqueur EXACT, pas
 # un mot-racine generique. « décision du manager » n'y figure PAS (decision du manager elle-meme,
 # point 3 : ce n'est pas une autorite humaine).
-# BORNE SYMETRIQUE, LES DEUX COTES DE D-NN (revue F5, 2026-09-18) : le cote gauche exclut deja le
-# tiret ([^0-9A-Za-z_-]) pour qu'un identifiant compose ne matche pas ("xD-01" ne matche pas) ;
-# avant le fix, le cote droit ([^0-9A-Za-z_]) omettait le tiret et laissait "D-01-suite" matcher a
-# tort (un identifiant compose se terminant par un suffixe, jamais une citation D-NN reelle).
+# BORNE SYMETRIQUE, LES DEUX COTES DE P41-D-NN (revue F5, 2026-09-18) : le cote gauche exclut deja
+# le tiret ([^0-9A-Za-z_-]) pour qu'un identifiant compose ne matche pas ("xP41-D-01" ne matche
+# pas) ; avant le fix F5, le cote droit ([^0-9A-Za-z_]) omettait le tiret et laissait
+# "D-01-suite" matcher a tort (un identifiant compose se terminant par un suffixe, jamais une
+# citation D-NN reelle).
+# PREFIXE DE REGISTRE OBLIGATOIRE, P41-D-NN ET NON D-NN NU (fix du 2026-09-24, ADR-075, CLAUDE.md
+# § Traçabilité des arbitrages / Préfixage des identifiants de décision — arbitrage Samuel,
+# AskUserQuestion session principale, 2026-09-24). AVANT ce fix, la seule sequence "D-01".."D-10"
+# suffisait a franchir la porte d'entree, quel que soit le registre auquel elle appartenait :
+# mesure sur le depot reel, la mission "partition reelle du planning" a numerote sa propre
+# decision D-02 le 2026-09-23, sans aucun rapport avec le registre D-01..D-10 de cette phase, et
+# un commit qui la citait sans invoquer le moindre arbitrage rendait pourtant
+# FORME-NON-CONFORME (7 commits du 2026-09-23, contournes a l'epoque en avancant
+# BASE-TRACE-ARBITRAGE par-dessus eux, voir 41-PREUVES.md § 41-14). Ce detecteur n'engage
+# desormais son controle que sur la forme prefixee de SON PROPRE registre (P41-D-01..P41-D-10) ;
+# un "D-02" nu, ou prefixe par un autre registre (ex. "PART-D-02"), ne franchit plus la porte
+# d'entree et n'est jamais juge — au meme titre qu'un identifiant compose ("D-01-suite") deja
+# exclu par la borne symetrique ci-dessus. Convention prospective : les commits DEJA POSES avant
+# ce fix ne sont jamais reannotes, la borne BASE-TRACE-ARBITRAGE continue de couvrir l'anterieur.
 # INSENSIBLE A LA CASSE SUR LE MOT DECLENCHEUR (fix du 2026-09-24, defaut mesure : 557b6fc citait
 # « Arbitrage Willy, AskUserQuestion session principale, 2026-09-23 » avec un A majuscule et
 # rendait FORME-NON-CONFORME au stade de l'extraction — voir comparaison 1 plus bas, meme defaut,
-# meme fix). Seule la premiere lettre du mot varie ([Aa]/[Dd]) ; les marqueurs structures (D-NN,
-# *-DECISION:, REGLES_MAIN...) restent des conventions figees, non touches.
-MARKER_REGEX='[Aa]rbitrage Samuel|sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])D-(0[1-9]|10)([^0-9A-Za-z_-]|$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'
+# meme fix). Seule la premiere lettre du mot varie ([Aa]/[Dd]) ; les marqueurs structures
+# (P41-D-NN, *-DECISION:, REGLES_MAIN...) restent des conventions figees, non touches.
+MARKER_REGEX='[Aa]rbitrage Samuel|sur [Aa]rbitrage|[Dd]écision de Samuel|(^|[^0-9A-Za-z_-])P41-D-(0[1-9]|10)([^0-9A-Za-z_-]|$)|[A-Za-z0-9_]+-DECISION:|REGLES_MAIN_FORCE_PUSH_SUPPRESSION'
 CANON="arbitrage Samuel, AskUserQuestion session principale, 2026-09-17"
 
 # IDENTIFIANTS EXCLUS DE LA DETECTION DE MARQUEUR (pas du texte imprime). Le nom de fichier
