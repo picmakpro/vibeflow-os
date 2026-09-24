@@ -38,8 +38,9 @@
 
 **Goal:** Le gate des agents (`check-agents.sh`) lit ses listes de référence — outils, champs, types natifs, modèles, modes, niveaux d'effort — dans un **manifeste daté** et rend **INDÉTERMINÉ** quand ce manifeste est périmé ; il tient les invariants de doctrine I1 à I7 et découvre les agents récursivement.
 **Requirements**: FABR-01, FABR-02, FABR-03, FABR-04, FABR-05
-**Depends on:** Phase 41 et **clôture du jalon `fiabilite-v1.0`** — volet admin de la 41 posé par Willy, release, clôture, puis ouverture de celui-ci (Samuel, WhatsApp, 2026-09-23). **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — ouverte au 2026-09-23, CI rouge sur G-2 faute de trailer `Gate-Touche:`.
+**Depends on:** Phase 41 et **clôture du jalon `fiabilite-v1.0`** — volet admin de la 41 posé par Willy, release, clôture, puis ouverture de celui-ci (Samuel, WhatsApp, 2026-09-23). **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — **mergée le 2026-09-23** (11:11 UTC, après ajout du trailer `Gate-Touche:` par Samuel) : précondition levée.
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §1.1-1.3, §3, §4, B-01. Hors périmètre : §8 (`skills:`, `cacheTtl`, `maxTurns`, `color:`).
+**Revue de Samuel (WhatsApp, 2026-09-23)** : décisions de corpus ratifiées ; trois ajouts au cadrage — D-18 (`vf-test-orchestrator` nomme `vf-dev-manager` et `vf-auto`), D-19 (effet d'`omitClaudeMd` sur `.claude/rules/*.md` mesuré, pas déduit), D-20 (faux vert de l'invocation nue de `check-agents.sh`, `.planning/codebase/CONCERNS.md:349`). **Plans à réviser avant exécution.**
 **Plans:** 6 plans
 
 Plans:
@@ -67,6 +68,7 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 42 (le manifeste daté et la découverte récursive servent aussi ce gate).
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §6, §7.2, B-03. **C'est le contrôle machine qui manque à la décision D-07** du moteur (`docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §2, §9). `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-15, §5.2 (la case « trois marqueurs de B-03 » remplace « qui en répond »).
+**À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : budget des `SKILL.md` et du bootstrap sans enforcement machine — `.planning/BACKLOG.md:450` ; la phase touche les skills, elle le prend au passage.
 **Plans:** 0 plans
 
 Plans:
@@ -115,6 +117,7 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 46 (G2′ se branche sur le même événement `TaskCompleted` que G3/G4 ; il vit ici parce qu'il consomme le bail).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §6 (6.1 à 6.4), §5 (G2′), D-04.
+**À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : `save()` de `dag.sh` sans verrou ni écriture atomique, lost update silencieux — `.planning/BACKLOG.md:74`. C'est la même classe d'écriture concurrente que les baux : le jeton monotone doit la couvrir, ou la phase dit pourquoi non.
 **Plans:** 0 plans
 
 Plans:
@@ -123,7 +126,7 @@ Plans:
 
 ### Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire
 
-**Goal:** Les agents génériques de cycle — cadreur, planificateur, contrôleur de plan, orchestrateur de phase, plus chercheur et cartographe — sont livrés par le plugin dans le `team-kernel` ; l'index est injecté sur toutes les sources de session ; les lignes `ARBITRÉ` structurantes sont promues en mémoire à la clôture ; les cycles récurrents ont une cadence.
+**Goal:** Les agents génériques de cycle — cadreur, planificateur, contrôleur de plan, orchestrateur de phase, plus chercheur et cartographe — sont livrés par le plugin **dans le module du moteur métier, pas dans le `team-kernel` partagé** (contrainte 1 ci-dessous ; libellé aligné le 2026-09-23, il disait l'inverse) ; l'index est injecté sur toutes les sources de session ; les lignes `ARBITRÉ` structurantes sont promues en mémoire à la clôture ; les cycles récurrents ont une cadence.
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 47.
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §4, §7.1-7.3, §7.5, §8, §9.2 (exemption de re-cadrage des procédures). **Ouvert** : registre cible d'une clôture (§7.5), blocage par un tiers (§8).

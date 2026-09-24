@@ -33,7 +33,15 @@ bump de version réservé à un commit de release dédié sur `main` par une seu
 filtrées de `.planning/` (exige de ne jamais mélanger `plugin/` et `.planning/` dans un même
 commit). Voir [[willy-perimetre-gouvernance]].
 
-⛔ **Ne PLUS proposer `gsd-workstreams` pour partitionner l'état** — tenté le 2026-08-02 (PR #27),
+✅ **Mise à jour du 2026-09-23 — le dépôt EST partitionné, par Sam lui-même** (PR #94, déclencheur
+D-02 de sa Phase 39) : `.planning/workstreams/fiabilite/` (défaut) et `.planning/workstreams/gouvernance/`
+(jalon de Willy, Phases 42-50). Le paragraphe ci-dessous raconte l'échec de 2026-08-02 : il reste vrai
+comme histoire (proposition de Willy refusée), mais la partition est désormais le fait, et c'est Sam
+qui en porte les outils. **How to apply:** travailler les phases 42+ avec `--ws gouvernance` ou
+`GSD_WORKSTREAM=gouvernance` ; la CI ne vérifie QUE `fiabilite` — rejouer les gates à la main sur le
+compartiment gouvernance. Ne pas re-proposer de schéma de partition : c'est tranché.
+
+⛔ *(historique)* **Ne PLUS proposer `gsd-workstreams` pour partitionner l'état** — tenté le 2026-08-02 (PR #27),
 **fermé** sur revue de Sam. Trois motifs, tous vérifiés et non spéculatifs :
 1. Le pointeur de workstream est indexé sur le chemin absolu réel
    (`active-workstream-store.cjs:93`, `realpathSync.native`) → chaque worktree repart sans
@@ -61,4 +69,11 @@ release seulement pour une évolution fonctionnelle** (inscrite au `CLAUDE.md` p
 convenu : Willy pose le volet admin de la Phase 41 (rulesets, CODEOWNERS — lui seul a les droits),
 Sam publie et clôt `fiabilite-v1.0`, puis seulement on exécute le jalon `gouvernance-labs-v1.0`
 (Phases 42-50). **How to apply:** ne jamais lancer `gsd-execute-phase` sur une phase 42+ tant que
-`fiabilite-v1.0` n'est pas clos ; vérifier au `ROADMAP.md` § Milestones.
+`fiabilite-v1.0` n'est pas clos ; vérifier au `.planning/workstreams/fiabilite/ROADMAP.md`.
+
+**Sam est très actif en parallèle** (le 2026-09-23 : 8 PR mergées en quelques heures, dont une
+qu'il a mergée pendant que je m'apprêtais à le faire, et un commit de débogage poussé sur une de mes
+branches). **How to apply:** avant chaque geste qui dépend de `main` (rebase, mesure, pose, merge),
+`git fetch` et relire `gh pr list --state all` ; ne jamais supposer qu'une PR est encore ouverte ou
+que `main` n'a pas bougé. Une preuve qui exige « aucun merge sur `main` » demande un créneau convenu
+avec lui, explicitement.
