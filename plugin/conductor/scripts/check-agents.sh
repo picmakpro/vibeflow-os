@@ -95,6 +95,21 @@
 # sinon par le frontmatter `name:` des SKILL.md installés — un skill peut porter un name différent
 # de son dossier (ex. module planning-core → skill `vf-planning`).
 #
+# INVARIANTS DE DOCTRINE (Phase 42, spec fabrique §4) — BLOQUANTS dans tous les modes (D-11) :
+# ce ne sont jamais des avertissements, quel que soit --strict — check-blueprints.sh (qui appelle
+# ce gate en mode par défaut) les voit donc aussi. Chacun a son jumeau négatif et sa mutation
+# prouvée rouge (MUT-I1, MUT-I4, MUT-I7, plus MUT-I5/MUT-I6 selon l'arbitrage D-08, 42-05 Tâche 3).
+#   I1 (D-06) : `vf-internal: true` doit coïncider, dans les DEUX sens, avec le marqueur littéral
+#     « Worker interne » (sensible à la casse) dans `description:`. Écart assumé par rapport à la
+#     spec §4 : le marqueur est lu dans `description:`, jamais dans le corps de l'agent, et le
+#     nombre de dispatcheurs nommés après le marqueur n'entre jamais en ligne de compte (D-18).
+#   I4 : `disallowedTools` ne tolère AUCUN jeton porteur d'un spécifieur parenthésé
+#     (`Bash(rm:*)`) : il retire l'outil ENTIER, il ne le restreint pas — un spécifieur y laisse
+#     croire à une restriction fine qui n'existe pas côté runtime.
+#   I7 : toute clé de frontmatter commençant par `vf-mcp-` exige `vf-requires` citant
+#     l'identifiant `mcp-servers` — même jointure que la règle 4 de
+#     plugin/dev-orchestrator/scripts/check-capability-activation.sh.
+#
 # Codes de sortie : 0 = conforme · 1 = non conforme (agents non conformes, OU invocation
 #   invalide — ex. --resolve-agents=<valeur inconnue>) · 3 = INDÉTERMINÉ (--strict sur cible
 #   absente/vide : aucun verdict rendu — un vert sans rien vérifier serait un faux vert, F13).
@@ -636,6 +651,69 @@ def bare_tokens(fmlines, field):
         return set()
     return {t.strip() for t in tokens if t.strip() and \"(\" not in t}
 
+# ---- Invariants de doctrine locaux (Phase 42, spec fabrique §4, FABR-03) -----------------------
+# Toujours des ERREURS (D-11), jamais affectees par --strict. Chaque fonction rend une LISTE de
+# messages (jamais un booleen ni une exception) — check_file() les etend a errors via UNE ligne
+# d'appel unique par invariant (errors.extend(invariant_iN(...))), cible des mutants MUT-I1/I4/I7.
+
+def invariant_i1(base, fm):
+    \"\"\"I1 (D-06) : vf-internal: true doit coincider, dans les DEUX sens, avec le marqueur
+    litteral « Worker interne » (sensible a la casse — une variante de casse est traitee comme
+    absente) dans description: (chaine ou liste jointe par un espace). Le nombre de dispatcheurs
+    nommes apres le marqueur (D-18, forme a deux dispatcheurs) n'entre jamais en ligne de compte :
+    seule la PRESENCE du marqueur est lue.\"\"\"
+    is_internal = str(fm.get(\"vf-internal\", \"\")) == \"true\"
+    desc = fm.get(\"description\")
+    if isinstance(desc, list):
+        desc_text = \" \".join(str(d) for d in desc)
+    else:
+        desc_text = str(desc) if desc is not None else \"\"
+    has_marker = \"Worker interne\" in desc_text
+    if is_internal and not has_marker:
+        return [f\"{base} : invariant I1 — vf-internal: true sans le marqueur « Worker interne » dans description: (D-06)\"]
+    if has_marker and not is_internal:
+        return [f\"{base} : invariant I1 — description: porte « Worker interne » sans vf-internal: true (D-06)\"]
+    return []
+
+def invariant_i4(base, fmlines):
+    \"\"\"I4 : disallowedTools ne tolere aucun jeton porteur d'un specifieur parenthese — il
+    retire l'outil ENTIER, il ne le restreint pas. Jetons via extract_raw_field + tokenize_field
+    (memes fonctions que le lint principal, jamais un second tokenizer) ; liste vide si le champ
+    est absent ou si la profondeur de parentheses est non nulle (l'erreur de syntaxe correspondante
+    est deja levee par lint_tool_field, I4 ne la duplique jamais).\"\"\"
+    mode, raw = extract_raw_field(fmlines, \"disallowedTools\")
+    if mode is None:
+        return []
+    tokens, depth = tokenize_field(mode, raw)
+    if depth != 0:
+        return []
+    msgs = []
+    for raw_tok in tokens:
+        tok = raw_tok.strip()
+        if \"(\" in tok:
+            msgs.append(f\"{base} : invariant I4 — disallowedTools porte un specifieur '{tok}' : il retire l'outil ENTIER, il ne le restreint pas\")
+    return msgs
+
+_VF_REQUIRES_SPLIT_RE = re.compile(r\"[,\s]+\")
+
+def invariant_i7(base, fm):
+    \"\"\"I7 : toute cle commencant par vf-mcp- exige vf-requires citant l'identifiant
+    mcp-servers — meme jointure (virgules/espaces) que la regle 4 de
+    check-capability-activation.sh. vf-requires peut etre une chaine ou une liste.\"\"\"
+    mcp_keys = sorted(k for k in fm if k.startswith(\"vf-mcp-\"))
+    if not mcp_keys:
+        return []
+    vr = fm.get(\"vf-requires\")
+    tokens = set()
+    if isinstance(vr, list):
+        for item in vr:
+            tokens.update(t for t in _VF_REQUIRES_SPLIT_RE.split(str(item)) if t)
+    elif isinstance(vr, str):
+        tokens.update(t for t in _VF_REQUIRES_SPLIT_RE.split(vr) if t)
+    if \"mcp-servers\" in tokens:
+        return []
+    return [f\"{base} : invariant I7 — {k} sans vf-requires citant mcp-servers\" for k in mcp_keys]
+
 def check_file(path):
     base = os.path.basename(path)
     try:
@@ -765,6 +843,12 @@ def check_file(path):
         if mode is None:
             continue
         lint_tool_field(base, field, mode, raw, do_resolution)
+
+    # Invariants de doctrine locaux (Phase 42, FABR-03) — TOUJOURS des erreurs (D-11), jamais
+    # affectees par --strict. Une ligne d'appel UNIQUE par invariant, cible des mutants QUAL-01.
+    errors.extend(invariant_i1(base, fm))
+    errors.extend(invariant_i4(base, fmlines))
+    errors.extend(invariant_i7(base, fm))
 
     # Regle anti-regression (Phase 20) : memory: reinjecte SILENCIEUSEMENT Write+Edit au
     # runtime par-dessus l'allowlist tools: (contrat Claude Code confirme par sonde). Un agent

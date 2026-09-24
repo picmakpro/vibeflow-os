@@ -134,6 +134,33 @@
 #         os.path.isdir(agents_dir)` → `cible_absente = False` sur le gate déjà modifié par 42-01
 #         (fixture T103, rejouée nue) : rc_original=3, rc_mutant=0 — posé ici car les helpers de
 #         mutation (make_gate_mutant/okmut/komut) n'existent qu'à partir de cette tâche
+#
+# Invariants de doctrine (Phase 42, FABR-03, D-06 à D-11) — TOUJOURS des erreurs, jamais des
+# avertissements, quel que soit --strict (D-11) ; chacun a son jumeau négatif et sa mutation
+# QUAL-01 prouvée rouge, I1 et I7 en plus sur un porteur RÉEL du dépôt (mutation opposée par cmp,
+# patron T75, via le helper `juger_mutation_reelle`) :
+#   T91 — I1 (D-06) : vf-internal: true sans le marqueur « Worker interne » dans description: →
+#         rc=1 invariant I1 ; marqueur sans vf-internal: true → rc=1 invariant I1 ; les deux ou
+#         aucun des deux → rc=0 ; mutation réelle sur `plugin/mobile-test-team/agents/
+#         vf-test-runner.md` (copie dont le marqueur perd « interne » après « Worker ») → rouge,
+#         copie restaurée → verte
+#   T91b — I1 (D-18) : forme à DEUX dispatcheurs nommés de `vf-test-orchestrator` (« Worker
+#         interne — dispatché par vf-dev-manager ou par le mode autonome (vf-auto)… ») avec
+#         vf-internal: true → rc=0, aucun invariant I1 (le nombre de dispatcheurs nommés n'entre
+#         jamais en ligne de compte) ; jumeau négatif : même description sans vf-internal: true →
+#         rc=1 invariant I1
+#   T92 — I4 : disallowedTools: Bash(rm:*) (spécifieur) → rc=1 invariant I4 ; disallowedTools:
+#         Bash (sans spécifieur) → rc=0
+#   T95 — I7 : vf-mcp-consumer: true sans vf-requires → rc=1 invariant I7 ; vf-requires:
+#         autre-chose (sans mcp-servers) → rc=1 invariant I7 ; vf-mcp-tools + vf-requires:
+#         mcp-servers → rc=0 ; mutation réelle sur vf-test-runner.md (copie sans sa ligne
+#         vf-requires) → rouge, copie restaurée → verte
+#   MUT-I1, MUT-I4, MUT-I7 — `errors.extend(invariant_i1(` (resp. i4, i7) → `pass` sur la fixture
+#         rouge de l'invariant correspondant : rc_original=1, rc_mutant=0
+#   Fixtures préexistantes remises en conformité par l'armement de I7 : T67/T68 (vf-mcp-tools /
+#         vf-mcp-tool sans vf-requires) reçoivent `vf-requires: mcp-servers`, rc/assertions
+#         inchangés — aucune fixture préexistante n'est affaiblie par I1 ou I4 (zéro fixture
+#         portant vf-internal/« Worker interne » ou un disallowedTools à spécifieur avant T91/T92)
 
 set -uo pipefail
 
@@ -285,6 +312,28 @@ make_gate_mutant() { # <id> <age_jours> <motif> <remplacement> [operation]
   mv "$tmp" "$orig"
   printf '%s' "$dir"
   return 0
+}
+
+# juger_mutation_reelle <id> <copie-originale> <copie-mutee> <jeton> (patron T75, invariants
+# I1/I4/I5/I6/I7, Phase 42 42-05) : refuse « NON OPPOSABLE » si les deux copies sont identiques
+# (cmp, jamais diff — proxifie et menteur sur ce runtime) ; sinon joue le gate ($CHECK --file,
+# mode PAR DEFAUT — les invariants sont des erreurs dans tous les modes, D-11) sur la copie
+# mutee (attend rc=1 et le jeton dans la sortie) puis sur la copie originale (attend rc=0). Les
+# deux copies vivent sous $WORK, jamais un fichier du depot modifie en place.
+juger_mutation_reelle() { # <id> <orig> <mut> <jeton>
+  local id="$1" orig="$2" mut="$3" jeton="$4"
+  if cmp -s "$orig" "$mut"; then
+    ko "$id mutation reelle NON OPPOSABLE (copies identiques, cmp) : $orig vs $mut"
+    return 1
+  fi
+  local out_mut rc_mut out_orig rc_orig
+  out_mut="$(bash "$CHECK" --file "$mut" --skills-dir="$SK" 2>&1)"; rc_mut=$?
+  out_orig="$(bash "$CHECK" --file "$orig" --skills-dir="$SK" 2>&1)"; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && echo "$out_mut" | grep -q "$jeton" && [ "$rc_orig" -eq 0 ]; then
+    ok "$id mutation reelle sur $(basename "$orig") : rouge ($jeton, rc=1) puis restauree → verte (rc=0)"
+  else
+    ko "$id (rc_mut=$rc_mut rc_orig=$rc_orig, jeton attendu='$jeton') mutant:[$out_mut] original:[$out_orig]"
+  fi
 }
 
 GATE_DIR="$(mk_gate_dir "$WORK/gate" 0)"
@@ -1427,6 +1476,7 @@ memory: project
 tools: Read
 disallowedTools: Write, Edit
 vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
+vf-requires: mcp-servers
 ---
 corps
 EOF
@@ -1447,6 +1497,7 @@ effort: medium
 memory: project
 tools: Read
 vf-mcp-tool: XcodeBuildMCP:test_sim
+vf-requires: mcp-servers
 ---
 corps
 EOF
@@ -2172,6 +2223,325 @@ else
     ok "T72 arbre reel : $T72_N agent(s) memory:+tools: sans Write/Edit, tous barres par disallowedTools: Write, Edit"
   else
     ko "T72 arbre reel : disallowedTools: Write, Edit manquant sur :$T72_BAD"
+  fi
+fi
+
+# ---------- T91/T91b : invariant I1 (D-06, D-18) — Phase 42, FABR-03, 42-05 Tache 1 ----------
+cat > "$AG/i1-les-deux.md" <<'EOF'
+---
+name: i1-les-deux
+description: Agent de test. Worker interne de la boucle, dispatche uniquement par un manager.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91 vf-internal: true + marqueur present -> rc=0, aucun invariant I1"
+else
+  ko "T91 (les deux presents, rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-les-deux.md"
+
+cat > "$AG/i1-aucun.md" <<'EOF'
+---
+name: i1-aucun
+description: Agent de test tout ce qu il y a de plus normal, sans aucun marqueur particulier.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91 aucun des deux (ni vf-internal, ni marqueur) -> rc=0, aucun invariant I1"
+else
+  ko "T91 (aucun, rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-aucun.md"
+
+cat > "$AG/i1-internal-sans-marqueur.md" <<'EOF'
+---
+name: i1-internal-sans-marqueur
+description: Agent de test interne mais dont la description ne porte pas le marqueur attendu.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91 vf-internal: true sans marqueur -> rc=1, invariant I1"
+else
+  ko "T91 (internal sans marqueur, rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-internal-sans-marqueur.md"
+
+cat > "$AG/i1-marqueur-sans-internal.md" <<'EOF'
+---
+name: i1-marqueur-sans-internal
+description: Agent de test. Worker interne de la boucle, dispatche uniquement par un manager.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91 marqueur sans vf-internal: true -> rc=1, invariant I1"
+else
+  ko "T91 (marqueur sans internal, rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-marqueur-sans-internal.md"
+
+# T91 — mutation reelle sur le porteur reel de I1 (vf-test-runner.md) : le marqueur perd
+# « interne » apres « Worker » -> rouge (invariant I1) ; copie restauree -> verte.
+T91_CARRIER="$REPO_ROOT/plugin/mobile-test-team/agents/vf-test-runner.md"
+if [ -f "$T91_CARRIER" ]; then
+  T91_ORIG_DIR="$WORK/t91-original"; T91_MUT_DIR="$WORK/t91-mutant"
+  mkdir -p "$T91_ORIG_DIR" "$T91_MUT_DIR"
+  T91_BASE="$(basename "$T91_CARRIER")"
+  cp "$T91_CARRIER" "$T91_ORIG_DIR/$T91_BASE"
+  sed 's/Worker interne/Worker/' "$T91_CARRIER" > "$T91_MUT_DIR/$T91_BASE"
+  juger_mutation_reelle "T91" "$T91_ORIG_DIR/$T91_BASE" "$T91_MUT_DIR/$T91_BASE" "invariant I1"
+else
+  ko "T91 mutation reelle : porteur introuvable ($T91_CARRIER)"
+fi
+
+# T91b (D-18) — forme a DEUX dispatcheurs nommes, description REELLE de vf-test-orchestrator
+# (posee en 42-02) : tolerance du gate a cette formulation, jamais un decompte de dispatcheurs.
+cat > "$AG/i1-deux-dispatcheurs.md" <<'EOF'
+---
+name: i1-deux-dispatcheurs
+description: "Orchestrateur de test. Worker interne — dispatché par vf-dev-manager ou par le mode autonome (vf-auto) sur ce type de projet, pas en usage direct."
+model: sonnet
+effort: high
+memory: project
+vf-internal: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91b forme a deux dispatcheurs nommes (D-18) + vf-internal: true -> rc=0, aucun invariant I1"
+else
+  ko "T91b (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-deux-dispatcheurs.md"
+
+cat > "$AG/i1-deux-dispatcheurs-negatif.md" <<'EOF'
+---
+name: i1-deux-dispatcheurs-negatif
+description: "Orchestrateur de test. Worker interne — dispatché par vf-dev-manager ou par le mode autonome (vf-auto) sur ce type de projet, pas en usage direct."
+model: sonnet
+effort: high
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91b jumeau negatif (meme description, sans vf-internal: true) -> rc=1, invariant I1"
+else
+  ko "T91b-negatif (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-deux-dispatcheurs-negatif.md"
+
+# ---------- T92 : invariant I4 — disallowedTools sans specifieur (Phase 42, FABR-03) ----------
+cat > "$AG/i4-specifier.md" <<'EOF'
+---
+name: i4-specifier
+description: Agent de test qui restreint disallowedTools avec un specifieur au lieu de le retirer.
+model: sonnet
+effort: low
+memory: project
+tools: Read, Write, Edit, Bash
+disallowedTools: Bash(rm:*)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I4"; then
+  ok "T92 disallowedTools: Bash(rm:*) (specifieur) -> rc=1, invariant I4"
+else
+  ko "T92 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i4-specifier.md"
+
+cat > "$AG/i4-clean.md" <<'EOF'
+---
+name: i4-clean
+description: Agent de test dont disallowedTools retire l outil entier, sans specifieur.
+model: sonnet
+effort: low
+memory: project
+tools: Read, Write, Edit, Bash
+disallowedTools: Bash
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I4"; then
+  ok "T92 disallowedTools: Bash (sans specifieur) -> rc=0, aucun invariant I4"
+else
+  ko "T92-jumeau (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i4-clean.md"
+
+# ---------- T95 : invariant I7 — vf-mcp-* exige vf-requires: mcp-servers (Phase 42, FABR-03) ----
+cat > "$AG/i7-sans-requires.md" <<'EOF'
+---
+name: i7-sans-requires
+description: Agent de test qui declare vf-mcp-consumer sans vf-requires correspondant.
+model: sonnet
+effort: low
+memory: project
+vf-mcp-consumer: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I7"; then
+  ok "T95 vf-mcp-consumer: true sans vf-requires -> rc=1, invariant I7"
+else
+  ko "T95 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i7-sans-requires.md"
+
+cat > "$AG/i7-requires-autre.md" <<'EOF'
+---
+name: i7-requires-autre
+description: Agent de test qui declare vf-mcp-consumer avec vf-requires ne citant pas mcp-servers.
+model: sonnet
+effort: low
+memory: project
+vf-mcp-consumer: true
+vf-requires: autre-chose
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I7"; then
+  ok "T95 vf-requires: autre-chose (sans mcp-servers) -> rc=1, invariant I7"
+else
+  ko "T95-autre (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i7-requires-autre.md"
+
+cat > "$AG/i7-ok.md" <<'EOF'
+---
+name: i7-ok
+description: Agent de test qui declare vf-mcp-tools avec vf-requires citant mcp-servers.
+model: sonnet
+effort: low
+memory: project
+vf-mcp-tools: XcodeBuildMCP:build_sim
+vf-requires: mcp-servers
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I7"; then
+  ok "T95 vf-mcp-tools + vf-requires: mcp-servers -> rc=0, aucun invariant I7"
+else
+  ko "T95-ok (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i7-ok.md"
+
+# T95 — mutation reelle sur le porteur reel de I7 (vf-test-runner.md) : la ligne vf-requires
+# disparait -> rouge (invariant I7) ; copie restauree -> verte.
+if [ -f "$T91_CARRIER" ]; then
+  T95_ORIG_DIR="$WORK/t95-original"; T95_MUT_DIR="$WORK/t95-mutant"
+  mkdir -p "$T95_ORIG_DIR" "$T95_MUT_DIR"
+  T95_BASE="$(basename "$T91_CARRIER")"
+  cp "$T91_CARRIER" "$T95_ORIG_DIR/$T95_BASE"
+  grep -v '^vf-requires:' "$T91_CARRIER" > "$T95_MUT_DIR/$T95_BASE"
+  juger_mutation_reelle "T95" "$T95_ORIG_DIR/$T95_BASE" "$T95_MUT_DIR/$T95_BASE" "invariant I7"
+else
+  ko "T95 mutation reelle : porteur introuvable ($T91_CARRIER)"
+fi
+
+# ---------- MUT-I1 / MUT-I4 / MUT-I7 : mutants QUAL-01 sur les lignes d'appel (Tache 1, 42-05) --
+MUT_I1_DIR="$(make_gate_mutant I1 0 'errors.extend(invariant_i1(' 'pass')"
+MUT_I1_RC=$?
+if [ "$MUT_I1_RC" -eq 0 ]; then
+  MUT_I1_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I1-orig" 0)"
+  MUT_I1_AG="$WORK/mut-I1-ag"; mkdir -p "$MUT_I1_AG"
+  cat > "$MUT_I1_AG/agent-muti1.md" <<'EOF'
+---
+name: agent-muti1
+description: Agent de test interne mais sans le marqueur attendu, fixture de mutation MUT-I1.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I1_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I1_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I1_DIR/check-agents.sh" --agents-dir="$MUT_I1_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I1 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I1 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+MUT_I4_DIR="$(make_gate_mutant I4 0 'errors.extend(invariant_i4(' 'pass')"
+MUT_I4_RC=$?
+if [ "$MUT_I4_RC" -eq 0 ]; then
+  MUT_I4_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I4-orig" 0)"
+  MUT_I4_AG="$WORK/mut-I4-ag"; mkdir -p "$MUT_I4_AG"
+  cat > "$MUT_I4_AG/agent-muti4.md" <<'EOF'
+---
+name: agent-muti4
+description: Agent de test dont disallowedTools porte un specifieur, fixture de mutation MUT-I4.
+model: sonnet
+effort: low
+memory: project
+tools: Read, Write, Edit, Bash
+disallowedTools: Bash(rm:*)
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I4_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I4_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I4_DIR/check-agents.sh" --agents-dir="$MUT_I4_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I4 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I4 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+MUT_I7_DIR="$(make_gate_mutant I7 0 'errors.extend(invariant_i7(' 'pass')"
+MUT_I7_RC=$?
+if [ "$MUT_I7_RC" -eq 0 ]; then
+  MUT_I7_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I7-orig" 0)"
+  MUT_I7_AG="$WORK/mut-I7-ag"; mkdir -p "$MUT_I7_AG"
+  cat > "$MUT_I7_AG/agent-muti7.md" <<'EOF'
+---
+name: agent-muti7
+description: Agent de test qui declare vf-mcp-consumer sans vf-requires, fixture de mutation MUT-I7.
+model: sonnet
+effort: low
+memory: project
+vf-mcp-consumer: true
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I7_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I7_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I7_DIR/check-agents.sh" --agents-dir="$MUT_I7_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I7 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I7 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
   fi
 fi
 
