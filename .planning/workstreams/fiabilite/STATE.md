@@ -175,13 +175,18 @@ reste ouverte pour le temps (ii) du plan 41-08. Next : plan 41-07 (mesure M-1, P
 sa précondition dure lit `CO-DECISION: option=accepter-et-documenter` ET
 `CO-I: merge_sans_contournement=non_tente` (pas `refuse`), à statuer par son propre exécuteur.
 
-**Note (2026-09-24, plan 41-07) : Task 1 arrêtée avant consignation des commits de mesure, en
-attente d'une décision de Willy.** Précondition D-02ter tenue (`CO-VERDICT: ECART` accepté,
-`origin/main` inchangée). Prémisse contredite (`PR-R-PREMISSE:` dans `41-PREUVES.md`) : la seule
-suite de preuve ferait rougir `check-version-sync` (README « 85 suites » contre 86 réelles), donc
-le job requis `gates` sur C0 — verdict M-1 `INDETERMINE` par construction. Variante verte mesurée
-(README alignés à 86 dans C0), contraire au critère `autres_fichiers=0` : non retenue sans
-décision. Aucun geste chez GitHub ; #101, #102, #103 toujours ouvertes.
+**Note (2026-09-24, plan 41-07) : Task 1 faite après REPLANIFIER, arrêt au checkpoint de la
+Task 2 (gestes humains de Willy).** Premier passage : prémisse contredite (`PR-R-PREMISSE:`, la
+seule suite de preuve rougissait `check-version-sync`), `PR-R-DECISION: option=REPLANIFIER`
+(arbitrage Willy, AskUserQuestion session principale, 2026-09-24), plan révisé : C0 aligne « 86
+suites » des deux README sur la seule branche jetable. Reprise : `origin/main` inchangée
+(`a962065`), triplet c0=`755650c` a=`a3bf40f` b=`3b49306` repris tel quel ; blocs 1 à 3 de la
+Task 1 rc 0 ; `PR-R-REJEU-LOCAL:` `gates` 0 en échec sur C0 et B, G-2 `DECLARE`, `tests` sur C0 86
+suites, 2 échecs tolérés (#6, #7 du ledger), preuve `PASS`. Aucun geste chez GitHub par l'agent ;
+#101, #102, #103 toujours ouvertes. À reporter au SUMMARY de 41-07 : `lab-frais` et
+`lab-frais-arme` couverts seulement par construction et par la CI réelle ; les blocs `tests` de
+41-07 n'ont pas le contrôle du nombre d'étapes en échec reçu par 41-08 à 41-13 (trou inactif, une
+seule étape rejouée). Next : pas 0 puis étapes C0/A/B/fermeture de la Task 2 (Willy), puis Task 3.
 
 Précédemment (2026-09-18) — **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ le 2026-09-18** sur
 `feat/phase-41-protection-depot` (branche `worktree-agent-a10225b33e6f3c645`). **Prémisse renversée
