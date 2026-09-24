@@ -222,3 +222,72 @@ MAIN-AVANT-PREUVES: a9620659c24103a103a5ca35c882faedb255b2c4
 PR-P-COMMITS: p1=dc05507ce215df774d81b3ff64a1c0288e225f4b p2=20fdad050eaaff2d987c20b00a05dfc75d3655b0 base=a9620659c24103a103a5ca35c882faedb255b2c4
 
 PR-CO-COMMITS: baseline=ce9f30e0f5ee5b08f57209836b7ef677095c4b86 sentinelle=863215be527e781d9c69139cf9ca52284a2b053e base=a9620659c24103a103a5ca35c882faedb255b2c4
+
+### Task 2 — gestes humains de Willy (`picmakpro`), 2026-09-24
+
+Publié tel que collé au checkpoint : `preuve/41-contournement`=dc05507ce215df774d81b3ff64a1c0288e225f4b,
+`preuve/41-codeowner-baseline`=ce9f30e0f5ee5b08f57209836b7ef677095c4b86,
+`preuve/41-codeowner-sentinelle`=863215be527e781d9c69139cf9ca52284a2b053e. PR ouvertes : PR-P=#101,
+PR-BASELINE=#102, PR-SENTINELLE=#103. `gh pr checks 101 --watch` : rc=0, tous verts. Étape 4 :
+`mergeStateStatus=CLEAN` (jamais `BLOCKED`) et `reviewDecision=""` sur les trois PR, lues par
+`picmakpro`. Conformément à l'instruction de la Task 2 (« SEULEMENT si 4 rend `mergeStateStatus` =
+`BLOCKED` »), `gh pr merge` n'a pas été tenté — l'état n'était pas `BLOCKED`. Témoin étape 6 :
+`gh pr view 101 --json state` → `OPEN`. Aucune PR fermée.
+
+### Task 3 — relecture API et consignation, 2026-09-24
+
+PR-P: #101 branche=preuve/41-contournement auteur=picmakpro
+PR-BASELINE: #102 branche=preuve/41-codeowner-baseline auteur=picmakpro
+PR-SENTINELLE: #103 branche=preuve/41-codeowner-sentinelle auteur=picmakpro
+
+CO-I: tete=dc05507ce215df774d81b3ff64a1c0288e225f4b checks_verts_deux_evenements=4/4 behind_by=0 review=vide etat=CLEAN merge_sans_contournement=non_tente provenance=indeterminee gh_version=2.83.2 etat_pr_apres=OPEN
+
+CO-I-MSG: non_tente — mergeStateStatus lu CLEAN (jamais BLOCKED) à l'étape 4 de la Task 2, donc gh pr merge n'a pas été exécuté conformément à l'instruction, aucune sortie à coller.
+
+CO-I-GH-MSG: gh version 2.83.2 (2025-12-10)
+
+CO-BASELINE: auteur=picmakpro review=vide relue=oui
+CO-SENTINELLE: auteur=picmakpro review=vide relue=oui
+
+CO-VERDICT: ECART
+
+Note sur l'écart mesuré (Task 3, 2026-09-24) : les trois PR de preuve (#101, #102, #103), toutes
+ouvertes par `picmakpro`, sont lues `mergeStateStatus=CLEAN` et `reviewDecision=""` (vide, ni
+`REVIEW_REQUIRED` ni `BLOCKED`) — vérifié deux fois, par le collage de la Task 2 et par une lecture
+indépendante de l'agent (`gh pr view --json mergeStateStatus,reviewDecision`, ce document même,
+2026-09-24), toutes deux sous le jeton `picmakpro`. Pourtant les 4 checks CI de PR-P sont verts sur
+les deux événements (`checks_verts_deux_evenements=4/4`, mesuré `repos/.../commits/<tete>/check-runs`
+filtré `app.id=15368` et `conclusion=success`, groupé par nom de job), `behind_by=0` (mesuré
+`compare/main...<tete>`), et le ruleset de branche exige bien `require_code_owner_review: true` avec
+`required_approving_review_count: 0` (`POSE-MSG:`, 41-05) sur les trois chemins visés (`.github/`,
+la baseline, la sentinelle — les trois sous `.github/CODEOWNERS`). La seule variable qui distingue
+cet état d'un `BLOCKED` est `current_user_can_bypass=always` de `picmakpro`, relu à nouveau ici sur
+le ruleset `23892920` (`bypass_actors` inchangés : `User:151974738:always`, `User:203482067:always`
+— cf. `ACTEURS-CONTOURNEMENT:`, 41-01 reprise, et `POSE-BYPASS-RELU:`, 41-05).
+
+L'hypothèse relayée dans `<user_response>` — `mergeStateStatus` et `reviewDecision` sont calculés
+pour le compte qui lit, et un compte en contournement `always` voit la PR déjà mergeable — n'est
+PAS recopiée ici comme un fait établi ; elle est la seule explication compatible avec l'ensemble des
+mesures ci-dessus (CI verte, à jour, ruleset actif et code-owner exigé sur les trois chemins, mais
+`CLEAN`/vide plutôt que `BLOCKED`/`REVIEW_REQUIRED`), mais elle reste **non prouvée au sens strict** :
+aucun compte hors liste de contournement (`samuel-neveugall` et `picmakpro` sont les deux seuls
+collaborateurs, et les deux sont en `always` — `ACTEURS-CONTOURNEMENT:`) n'a pu relire ces trois PR
+pendant que la session dispose d'un jeton pour trancher entre « revue non exigée sur ce chemin » et
+« revue exigée mais invisible pour un compte en contournement toujours actif ». C'est exactement le
+témoin discriminant que T-41-62 et l'option « REJOUER AVEC DES PR OUVERTES PAR SAMUEL » de la Task 4
+visent à produire.
+
+`merge_sans_contournement=non_tente` (ni `refuse` ni `merge`) : conforme à l'instruction de la Task 2,
+qui interdisait la tentative hors `BLOCKED` — la première tentative de merge sans contournement de la
+phase n'a donc PAS eu lieu ici ; l'ordre de sûreté de T-41-23 (jamais sur la PR rouge, seulement sur
+un support inoffensif, et seulement sur `BLOCKED`) reste respecté, rien n'a menacé d'atterrir sur
+`main`. `provenance=indeterminee` : aucune sortie de `gh pr merge` à classer, donc ni `serveur` ni
+`client_gh`.
+
+`CO-VERDICT: ECART` — recalculé par les blocs `<automated>` de la Task 3 (`etat != BLOCKED`,
+`review != REVIEW_REQUIRED` sur les trois PR) ; consigné tel quel, sans correction (ADR-031, règle du
+plan : « un écart de valeur n'est jamais corrigé »). Ce constat ne clôt ni PROT-04 ni le critère 2 du
+ROADMAP : il documente que la preuve prévue par ce plan (refus observable par tentative de merge sans
+contournement) n'est pas observable depuis le seul compte actuellement disponible pour la tenter,
+`picmakpro`, parce que ce compte est lui-même en contournement `always`. Arrêt sur la Task 4
+(checkpoint de décision), comme prévu par le plan sur `CO-VERDICT: ECART`.
