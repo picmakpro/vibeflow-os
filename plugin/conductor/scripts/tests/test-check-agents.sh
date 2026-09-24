@@ -73,24 +73,131 @@
 #         marquee PERIMEE par la mesure du 2026-09-17 : outils Agent/Task ABSENTS a la
 #         profondeur 3, profondeurs visees manager 1 / vf-coder 2 / briques GSD 3, descripteur
 #         verbatim (7 champs) toujours recopie
+#
+# Manifeste daté (Phase 42, FABR-01, D-01/D-03/D-17) — la suite juge la LOGIQUE du gate contre un
+# manifeste DATE DU JOUR (harnais mk_gate_dir/mk_manifest, verifie_le recalcule a chaque run) :
+# source unique (D-01, aucune copie de repli dans le script), refus explicite sur manifeste absent
+# ou invalide (D-03), contenu D-17 (trois outils ajoutes, aucun retire), silence de code sous
+# --hook et fail-open documente de la garde d'ecriture. La fraicheur du manifeste VERSIONNE (celui
+# du depot) est jugee par la CI (42-04), jamais ici.
+#   T77 — manifeste absent + agent conforme, --strict → rc=1, MANIFESTE-ILLISIBLE ; dossier
+#         d'agents vide, --strict → rc=3 (F13 inchange, manifeste non requis)
+#   T78 — manifeste tronque (JSON invalide) + agent conforme, --strict → rc=1, MANIFESTE-ILLISIBLE
+#   T79 — schema invalide (9 sous-cas : valide_jours absent/0/booleen, liste absente, valeurs
+#         vides, verifie_le non ISO, source non https, liste inconnue, valeur hors charset) →
+#         rc=1, MANIFESTE-ILLISIBLE dans chaque cas
+#   T80 — source unique (D-01) : manifeste prive d'un outil/champ → refus/avertissement le citant ;
+#         manifeste complet → absent
+#   T81 — manifeste VERSIONNE copie tel quel (dates d'origine) → agent conforme sans
+#         MANIFESTE-ILLISIBLE ; ListAgents/SendFeedback/SubagentHandback et experimental acceptes
+#   T82 — --hook : manifeste absent → rc=0 ET sortie contenant MANIFESTE-ILLISIBLE (silence de
+#         code, jamais de message) ; garde d'ecriture sur agent conforme → sortie vide (fail-open)
 
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$(cd "$TESTS_DIR/.." && pwd)"
-CHECK="$SCRIPTS_DIR/check-agents.sh"
-GUARD="$SCRIPTS_DIR/guard-agent-write.sh"
+REAL_CHECK="$SCRIPTS_DIR/check-agents.sh"
+REAL_MANIFEST="$SCRIPTS_DIR/check-agents-manifest.json"
+GUARD_SRC="$SCRIPTS_DIR/guard-agent-write.sh"
+
+# ADR-054 : meme resolution PYBIN que le gate (stub Microsoft Store, repli python).
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else echo "[test-check-agents] python3 requis" >&2; exit 1; fi ;;
+esac
 
 pass=0; fail=0
 ok() { echo "  ✓ $1"; pass=$((pass+1)); }
 ko() { echo "  ✗ $1"; fail=$((fail+1)); }
 
-echo "== test-check-agents (gate: $CHECK) =="
-
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 AG="$WORK/agents"; SK="$WORK/skills"
 mkdir -p "$AG" "$SK/petit-skill" "$SK/gros-skill" "$SK/forbidden-skill"
+
+# ---------- Manifeste daté (Phase 42, FABR-01, D-01/D-03/D-17) : harnais a manifeste du jour ----
+# La suite juge la LOGIQUE du gate contre un manifeste daté DU JOUR (verifie_le recalcule a
+# chaque run) — jamais contre le manifeste VERSIONNE du depot tel quel : sa fraicheur est jugee
+# par la CI (42-04), jamais ici, sinon T28/T73 et consorts rougiraient a l'echeance des 30 jours.
+mk_manifest() { # <destination> <age_jours> [operation]
+  local dest="$1" age="$2" op="${3:-}"
+  "$PYBIN" - "$REAL_MANIFEST" "$dest" "$age" "$op" <<'PYEOF'
+import json, sys
+from datetime import date, timedelta
+
+real_path, dest, age_s, op = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+age = int(age_s)
+with open(real_path, encoding="utf-8") as fh:
+    m = json.load(fh)
+verifie_le = (date.today() - timedelta(days=age)).isoformat()
+
+if op == "tronque":
+    text = json.dumps(m, indent=2, ensure_ascii=False)
+    text = text[: len(text) // 2]
+    with open(dest, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    sys.exit(0)
+
+if op != "dates-reelles":
+    for liste in m["listes"].values():
+        liste["verifie_le"] = verifie_le
+
+if op in ("", "dates-reelles"):
+    pass
+elif op == "sans-valide-jours":
+    del m["valide_jours"]
+elif op.startswith("valide-jours="):
+    m["valide_jours"] = json.loads(op[len("valide-jours="):])
+elif op.startswith("sans-liste="):
+    del m["listes"][op[len("sans-liste="):]]
+elif op.startswith("liste-vide="):
+    m["listes"][op[len("liste-vide="):]]["valeurs"] = []
+elif op.startswith("date-invalide="):
+    m["listes"][op[len("date-invalide="):]]["verifie_le"] = "23/09/2026"
+elif op.startswith("date-future="):
+    m["listes"][op[len("date-future="):]]["verifie_le"] = (date.today() + timedelta(days=10)).isoformat()
+elif op.startswith("source-invalide="):
+    m["listes"][op[len("source-invalide="):]]["source"] = "http://exemple.invalide/pas-https"
+elif op == "liste-inconnue":
+    m["listes"]["liste-fantome"] = {"verifie_le": verifie_le, "source": "https://exemple.invalide/x", "valeurs": ["a"]}
+elif op.startswith("valeur-hors-charset="):
+    cle = op[len("valeur-hors-charset="):]
+    m["listes"][cle]["valeurs"] = list(m["listes"][cle]["valeurs"]) + ["valeur; interdite"]
+elif op.startswith("retire="):
+    cle, _, val = op[len("retire="):].partition(":")
+    m["listes"][cle]["valeurs"] = [v for v in m["listes"][cle]["valeurs"] if v != val]
+else:
+    print(f"mk_manifest: operation inconnue '{op}'", file=sys.stderr)
+    sys.exit(2)
+
+with open(dest, "w", encoding="utf-8") as fh:
+    json.dump(m, fh, indent=2, ensure_ascii=False)
+PYEOF
+}
+
+mk_gate_dir() { # <dossier> <age_jours> [operation] -> imprime le chemin du dossier
+  local dir="$1" age="$2" op="${3:-}"
+  mkdir -p "$dir"
+  cp "$REAL_CHECK" "$dir/check-agents.sh"
+  cp "$GUARD_SRC" "$dir/guard-agent-write.sh"
+  if [ "$op" != "absent" ]; then
+    mk_manifest "$dir/check-agents-manifest.json" "$age" "$op"
+  fi
+  printf '%s' "$dir"
+}
+
+GATE_DIR="$(mk_gate_dir "$WORK/gate" 0)"
+CHECK="$GATE_DIR/check-agents.sh"
+GUARD="$GATE_DIR/guard-agent-write.sh"
+if [ ! -f "$GATE_DIR/check-agents-manifest.json" ]; then
+  ko "harnais : manifeste du jour absent de $GATE_DIR — anti vert-a-vide"
+  echo ""
+  echo "== Résultat : $pass OK · $fail KO =="
+  exit 1
+fi
+
+echo "== test-check-agents (gate: $CHECK) =="
 
 printf -- '---\nname: petit-skill\ndescription: petit skill de test\n---\ncontenu court\n' > "$SK/petit-skill/SKILL.md"
 { printf -- '---\nname: gros-skill\ndescription: gros skill de test\n---\n'; for i in $(seq 1 260); do echo "ligne $i"; done; } > "$SK/gros-skill/SKILL.md"
@@ -1455,6 +1562,174 @@ else
     esac
   fi
   rm -f "$T76_MUT"
+fi
+
+# ---------- T77-T82 : Manifeste daté (Phase 42, FABR-01, D-01/D-03/D-17) ----------
+# Chaque cas travaille dans son propre dossier de gate (mk_gate_dir) et son propre dossier
+# d'agents, agent conforme produit par mk_conforme_agent (meme patron que good_agent, mais un
+# nom parametrable pour eviter les collisions entre sous-cas).
+mk_conforme_agent() { # <dossier> <nom>
+  cat > "$1/$2.md" <<EOF
+---
+name: $2
+description: Agent conforme utilise par le harnais manifeste date pour prouver un verdict.
+tools: Read
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+}
+
+T_MANIFESTE_AG="$WORK/t-manifeste-ag"; mkdir -p "$T_MANIFESTE_AG"
+mk_conforme_agent "$T_MANIFESTE_AG" "conforme"
+
+# T77 — manifeste absent
+T77_DIR="$(mk_gate_dir "$WORK/t77" 0 absent)"
+OUT="$(bash "$T77_DIR/check-agents.sh" --strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+  ok "T77 manifeste absent + agent conforme, --strict → rc=1, MANIFESTE-ILLISIBLE"
+else
+  ko "T77 (rc=$RC) : $OUT"
+fi
+T77_AG_VIDE="$WORK/t77-vide"; mkdir -p "$T77_AG_VIDE"
+OUT="$(bash "$T77_DIR/check-agents.sh" --strict --agents-dir="$T77_AG_VIDE" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && ! echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+  ok "T77 (jumeau F13) manifeste absent + dossier d'agents vide, --strict → rc=3 (manifeste non requis)"
+else
+  ko "T77 (jumeau F13, rc=$RC) : $OUT"
+fi
+
+# T78 — manifeste tronque (JSON invalide)
+T78_DIR="$(mk_gate_dir "$WORK/t78" 0 tronque)"
+OUT="$(bash "$T78_DIR/check-agents.sh" --strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+  ok "T78 manifeste tronqué (JSON invalide) + agent conforme, --strict → rc=1, MANIFESTE-ILLISIBLE"
+else
+  ko "T78 (rc=$RC) : $OUT"
+fi
+
+# T79 — schema invalide, un sous-cas par defaut (9 sous-cas)
+T79_CASES="sans-valide-jours valide-jours=0 valide-jours=true sans-liste=outils liste-vide=outils date-invalide=outils source-invalide=outils liste-inconnue valeur-hors-charset=outils"
+T79_ALL_OK=1
+for t79op in $T79_CASES; do
+  t79_safe="$(printf '%s' "$t79op" | tr '=:' '__')"
+  T79_DIR="$(mk_gate_dir "$WORK/t79-$t79_safe" 0 "$t79op")"
+  OUT="$(bash "$T79_DIR/check-agents.sh" --strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+  if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+    :
+  else
+    T79_ALL_OK=0
+    ko "T79 schema invalide ($t79op) → attendu rc=1+MANIFESTE-ILLISIBLE, obtenu rc=$RC : $OUT"
+  fi
+done
+[ "$T79_ALL_OK" -eq 1 ] && ok "T79 schema invalide — 9 sous-cas (valide_jours absent/0/booléen, liste absente, valeurs vides, verifie_le non ISO, source non https, liste inconnue, valeur hors charset) → rc=1 + MANIFESTE-ILLISIBLE"
+OUT="$(bash "$GATE_DIR/check-agents.sh" --strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then
+  ok "T79 (jumeau vert) même agent, manifeste du jour complet → rc=0"
+else
+  ko "T79 (jumeau vert, rc=$RC) : $OUT"
+fi
+
+# T80 — source unique (D-01) : c'est le manifeste qui decide, aucune copie dans le script
+T80_MISS_DIR="$(mk_gate_dir "$WORK/t80-miss-tool" 0 "retire=outils:ListAgents")"
+T80_AG1="$WORK/t80-ag1"; mkdir -p "$T80_AG1"
+cat > "$T80_AG1/agent-listagents.md" <<'EOF'
+---
+name: agent-listagents
+description: Agent qui declare ListAgents dans tools, pour prouver D-01 (source unique).
+tools: Read, ListAgents
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+OUT="$(bash "$T80_MISS_DIR/check-agents.sh" --strict --agents-dir="$T80_AG1" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "outil hors du set connu 'ListAgents'"; then
+  ok "T80 manifeste PRIVÉ de ListAgents + agent le déclarant, --strict → rc=1 (outil hors du set connu)"
+else
+  ko "T80 (rc=$RC) : $OUT"
+fi
+OUT="$(bash "$GATE_DIR/check-agents.sh" --strict --agents-dir="$T80_AG1" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then
+  ok "T80 manifeste COMPLET (ListAgents présent) + même agent, --strict → rc=0"
+else
+  ko "T80 (manifeste complet, rc=$RC) : $OUT"
+fi
+
+T80_MISS2_DIR="$(mk_gate_dir "$WORK/t80-miss-field" 0 "retire=champs_frontmatter:omitClaudeMd")"
+T80_AG2="$WORK/t80-ag2"; mkdir -p "$T80_AG2"
+cat > "$T80_AG2/agent-omitclaudemd.md" <<'EOF'
+---
+name: agent-omitclaudemd
+description: Agent qui declare omitClaudeMd, pour prouver D-01 (source unique, champ de frontmatter).
+tools: Read
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+omitClaudeMd: true
+---
+corps
+EOF
+OUT="$(bash "$T80_MISS2_DIR/check-agents.sh" --agents-dir="$T80_AG2" 2>&1)"; RC=$?
+if echo "$OUT" | grep -qE "champ inconnu du runtime.*omitClaudeMd"; then
+  ok "T80 manifeste PRIVÉ d'omitClaudeMd + agent le portant → avertissement champ inconnu présent"
+else
+  ko "T80 (champ manquant, rc=$RC) : $OUT"
+fi
+OUT="$(bash "$GATE_DIR/check-agents.sh" --agents-dir="$T80_AG2" 2>&1)"; RC=$?
+if ! echo "$OUT" | grep -qE "champ inconnu du runtime.*omitClaudeMd"; then
+  ok "T80 manifeste COMPLET (omitClaudeMd présent) + même agent → avertissement absent"
+else
+  ko "T80 (manifeste complet, champ) : $OUT"
+fi
+
+# T81 — manifeste VERSIONNE copie tel quel (dates d'origine)
+T81_DIR="$(mk_gate_dir "$WORK/t81" 0 dates-reelles)"
+T81_AG="$WORK/t81-ag"; mkdir -p "$T81_AG"
+cat > "$T81_AG/agent-t81.md" <<'EOF'
+---
+name: agent-t81
+description: Agent qui declare les trois outils ajoutes et experimental, pour prouver T81 (D-17).
+tools: Read, ListAgents, SendFeedback, SubagentHandback
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+experimental: true
+---
+corps
+EOF
+OUT="$(bash "$T81_DIR/check-agents.sh" --strict --agents-dir="$T81_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE" \
+   && ! echo "$OUT" | grep -qE "champ inconnu du runtime.*experimental"; then
+  ok "T81 manifeste VERSIONNÉ (dates d'origine) + agent conforme, --strict → rc=0, ListAgents/SendFeedback/SubagentHandback et experimental acceptés"
+else
+  ko "T81 (rc=$RC) : $OUT"
+fi
+
+# T82 — --hook (silence de code, jamais de message) + garde (fail-open documenté)
+T82_DIR="$(mk_gate_dir "$WORK/t82" 0 absent)"
+OUT="$(bash "$T82_DIR/check-agents.sh" --hook --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+  ok "T82 --hook, manifeste absent + agent → rc=0 ET sortie contenant MANIFESTE-ILLISIBLE (silence de code, jamais de message)"
+else
+  ko "T82 (--hook, rc=$RC) : '$OUT'"
+fi
+
+mkdir -p "$WORK/t82-lab/.claude/agents"
+T82_GOOD="$WORK/t82-good-src.md"
+mk_conforme_agent "$WORK" "t82-good-src"
+OUT_GUARD="$(payload_write "$WORK/t82-lab/.claude/agents/t82-good-src.md" "$T82_GOOD" | ( cd "$WORK/t82-lab" && bash "$T82_DIR/guard-agent-write.sh" 2>/dev/null ))"
+if [ -z "$OUT_GUARD" ]; then
+  ok "T82 (garde) manifeste absent, agent conforme → sortie vide (fail-open documenté, laisse passer)"
+else
+  ko "T82 (garde) sortie non vide : $OUT_GUARD"
 fi
 
 # ---------- T72 : assertion sur l'arbre REEL (pas une fixture) — WINDOWS #1 ----------
