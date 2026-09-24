@@ -17,8 +17,11 @@
 # documenté, désormais enforcé PAR CE LINT (et seulement par lui). Elle redevient une vraie
 # restriction runtime uniquement pour un agent incarné en thread principal (`claude --agent`).
 #
-# Référentiel : frontmatter officiel Claude Code (docs sub-agents, vérifié 2026-07-05) +
-# charte VibeFlow (souveraineté : model explicite + memory explicite + skills câblés).
+# Référentiel : manifeste daté check-agents-manifest.json (même dossier que ce script) — six
+# listes, verifie_le + source par liste, valide_jours porté par le manifeste ; absent, illisible
+# ou invalide → MANIFESTE-ILLISIBLE, rc 1 (0 sous --hook) ; chargé seulement s'il y a au moins un
+# agent à juger ; la garde d'écriture traite cet incident comme une panne du contrôleur.
+# + charte VibeFlow (souveraineté : model explicite + memory explicite + skills câblés).
 #
 # Usage:
 #   check-agents.sh                     # lint .claude/agents/*.md · exit 1 si non conforme
@@ -35,8 +38,9 @@
 #   check-agents.sh --agent-registry-dir=PATH    # répétable, dirs de résolution supplémentaires
 #
 # BLOQUANT : frontmatter absent · name absent/invalide · description absente ·
-#   model absent ou hors {sonnet,opus,haiku,fable,inherit,claude-*} · memory absente ou hors
-#   {user,project,local} · effort/permissionMode/isolation/background/maxTurns invalides ·
+#   model absent ou hors du set du manifeste daté (+ claude-<id>) · memory absente ou hors
+#   {user,project,local} · effort absent ou hors du set du manifeste daté ·
+#   permissionMode/isolation/background/maxTurns invalides ·
 #   allowlist Agent(...)/Task(...)/Bash(...)/etc malformée (parenthèse non fermée, allowlist
 #   vide, entrée vide, espace avant la parenthèse, token hors charset).
 # WARNING : skills absent · skill déclaré introuvable (ERROR en --strict) · description < 30c ·
@@ -143,6 +147,11 @@ hook_exit() { # <code>
   exit "$code"
 }
 
+# D-01/D-03 : chemin du manifeste daté dérivé du dossier du script (patron check-blueprints.sh),
+# JAMAIS de l'environnement appelant ni du cwd — aucune option de substitution du manifeste.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+VF_MANIFEST="$SCRIPT_DIR/check-agents-manifest.json"
+
 # ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
 # CHEMIN (zéro spawn), repli `python` ; sinon message + exit 0 (advisory, comme avant).
 PYBIN=python3
@@ -153,9 +162,11 @@ esac
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
 VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" \
 VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" VF_RESOLVE_AGENTS="$RESOLVE_AGENTS" \
-VF_REGISTRY_DIRS="$REGISTRY_DIRS" "$PYBIN" -c "
-import glob, os, re, sys
+VF_REGISTRY_DIRS="$REGISTRY_DIRS" VF_MANIFEST="$VF_MANIFEST" "$PYBIN" -c "
+import glob, json, os, re, sys
+from datetime import date
 
+manifest_path = os.environ[\"VF_MANIFEST\"]
 agents_dir = os.environ[\"VF_AGENTS_DIR\"]
 skills_dir = os.environ[\"VF_SKILLS_DIR\"]
 strict = os.environ[\"VF_STRICT\"] == \"true\"
@@ -166,44 +177,94 @@ third_party_prefixes = [p for p in os.environ.get(\"VF_THIRD_PARTY_PREFIXES\", \
 resolve_agents_strict = os.environ.get(\"VF_RESOLVE_AGENTS\", \"lenient\") == \"strict\"
 registry_dirs = [p for p in os.environ.get(\"VF_REGISTRY_DIRS\", \"\").split(\":\") if p]
 
-# Champs officiels Claude Code (docs sub-agents, 2026-07-05) — base du lint.
-# + conventions VibeFlow : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12) ;
+# Conventions VibeFlow restees en dur (D-01 borne le manifeste aux SIX listes d'origine native ;
+# ces quatre champs sont des conventions du depot, jamais sujettes a la peremption d'une doc
+# Anthropic externe) : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12) ;
 #   vf-mcp-consumer (agent exécutant recevant l'allowlist MCP dérivée du lab à l'install, ADR-051) ;
 #   vf-mcp-tools (allowlist MCP NOMMÉE — un serveur, une liste d'outils explicites — consommée par
 #   le script d'injection du module dev-orchestrator ; coexiste avec vf-mcp-consumer sans le remplacer) ;
 #   vf-requires (identifiant de précondition externe déclarée par l'artefact — jointure par id avec
 #   # vf-provides: côté script, consommée par la règle 4 de check-capability-activation.sh, Phase 28).
-KNOWN = {\"name\", \"description\", \"tools\", \"disallowedTools\", \"model\", \"permissionMode\",
-         \"maxTurns\", \"skills\", \"mcpServers\", \"hooks\", \"memory\", \"background\", \"effort\",
-         \"isolation\", \"color\", \"initialPrompt\", \"vf-internal\", \"vf-mcp-consumer\", \"vf-mcp-tools\",
-         \"vf-requires\"}
-MODELS = {\"sonnet\", \"opus\", \"haiku\", \"fable\", \"inherit\"}
+VIBEFLOW_FIELDS = {\"vf-internal\", \"vf-mcp-consumer\", \"vf-mcp-tools\", \"vf-requires\"}
 MEMORY = {\"user\", \"project\", \"local\"}
-EFFORT = {\"low\", \"medium\", \"high\", \"xhigh\", \"max\"}
-PERM = {\"default\", \"acceptEdits\", \"auto\", \"dontAsk\", \"bypassPermissions\", \"plan\", \"manual\"}
 NOT_AGENTS = {\"contracts.md\", \"README.md\", \"AGENTS.md\"}
-
-# Types natifs Claude Code (doc code.claude.com/docs/en/sub-agents, verifiee 2026-07-27).
-# ATTENTION rouille : Explore/Plan requierent min-version 2.1.198 ; fork requiert
-# CLAUDE_CODE_FORK_SUBAGENT=1 (pas actif par defaut) ; CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS=1
-# et CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS=1 peuvent desactiver tout ou partie de cette liste ;
-# un agent utilisateur peut surcharger un nom natif. C'est PRECISEMENT pourquoi \"nom non resolu\"
-# reste un WARNING (jamais une ERREUR par defaut) : la rouille de cette liste degrade en jaune.
-NATIVE_TYPES = {\"explore\", \"plan\", \"general-purpose\", \"statusline-setup\", \"claude-code-guide\", \"fork\"}
-
-# Set ferme des identifiants d'outils (doc code.claude.com/docs/en/tools-reference, verifiee
-# 2026-07-27 — 43 identifiants + alias Task confirmes mot pour mot, aucun ecart).
-TOOL_NAMES = {
-    \"Agent\", \"Artifact\", \"AskUserQuestion\", \"Bash\", \"CronCreate\", \"CronDelete\", \"CronList\",
-    \"Edit\", \"EndConversation\", \"EnterPlanMode\", \"EnterWorktree\", \"ExitPlanMode\", \"ExitWorktree\",
-    \"Glob\", \"Grep\", \"ListMcpResourcesTool\", \"LSP\", \"Monitor\", \"NotebookEdit\", \"PowerShell\",
-    \"PushNotification\", \"Read\", \"ReadMcpResourceTool\", \"RemoteTrigger\", \"ReportFindings\",
-    \"ScheduleWakeup\", \"SendMessage\", \"SendUserFile\", \"ShareOnboardingGuide\", \"Skill\", \"TaskCreate\",
-    \"TaskGet\", \"TaskList\", \"TaskOutput\", \"TaskStop\", \"TaskUpdate\", \"TodoWrite\", \"ToolSearch\",
-    \"WaitForMcpServers\", \"WebFetch\", \"WebSearch\", \"Workflow\", \"Write\",
-}
 # Task = alias legacy d'Agent depuis Claude Code v2.1.63 — traite a l'identique partout.
 AGENT_TOOL_NAMES = {\"Agent\", \"Task\"}
+
+# D-01/D-02/D-03 : les six listes de reference (identifiants d'outils, champs de frontmatter,
+# types natifs, modeles, modes de permission, niveaux d'effort) ne vivent plus ici — elles sont
+# chargees depuis le manifeste daté check-agents-manifest.json (meme dossier que ce script).
+# AUCUNE valeur par defaut n'est portee par ce script (D-02) : un manifeste absent, illisible ou
+# au schema invalide est un refus explicite (D-03), jamais une liste vide qui laisse tout passer.
+_VALEUR_RE = re.compile(r\"^[A-Za-z0-9_-]+$\")
+
+def charger_manifeste(chemin):
+    \"\"\"Lit et valide le manifeste daté — toute absence/malformation leve une ValueError qui
+    nomme la cle et le motif (jamais un defaut silencieux, jamais un skip ligne a ligne).\"\"\"
+    with open(chemin, encoding=\"utf-8\") as fh:
+        m = json.load(fh)
+    if not isinstance(m, dict):
+        raise ValueError(\"racine du manifeste — attendu un objet JSON\")
+    cles_racine = {\"valide_jours\", \"rafraichissement\", \"listes\"}
+    for cle in cles_racine:
+        if cle not in m:
+            raise ValueError(f\"cle de premier niveau manquante — {cle}\")
+    extra = set(m.keys()) - cles_racine
+    if extra:
+        raise ValueError(f\"cle(s) de premier niveau inconnue(s) — {sorted(extra)}\")
+    valide_jours = m[\"valide_jours\"]
+    if not isinstance(valide_jours, int) or isinstance(valide_jours, bool) or valide_jours <= 0:
+        raise ValueError(\"valide_jours — attendu un entier strictement positif\")
+    listes = m[\"listes\"]
+    if not isinstance(listes, dict):
+        raise ValueError(\"listes — attendu un objet JSON\")
+    cles_listes = {\"outils\", \"champs_frontmatter\", \"types_natifs\", \"modeles\", \"modes_permission\", \"niveaux_effort\"}
+    if set(listes.keys()) != cles_listes:
+        raise ValueError(f\"listes — attendu exactement les six cles {sorted(cles_listes)}, trouve {sorted(listes.keys())}\")
+    for nom_liste, liste in listes.items():
+        if not isinstance(liste, dict):
+            raise ValueError(f\"listes.{nom_liste} — attendu un objet JSON\")
+        verifie_le = liste.get(\"verifie_le\")
+        if not isinstance(verifie_le, str):
+            raise ValueError(f\"listes.{nom_liste}.verifie_le — attendu une date ISO\")
+        try:
+            date.fromisoformat(verifie_le)
+        except ValueError:
+            raise ValueError(f\"listes.{nom_liste}.verifie_le — date ISO invalide ({verifie_le})\")
+        source = liste.get(\"source\")
+        if not isinstance(source, str) or not source.startswith(\"https://\"):
+            raise ValueError(f\"listes.{nom_liste}.source — attendu une chaine https:// ({source})\")
+        valeurs = liste.get(\"valeurs\")
+        if not isinstance(valeurs, list) or not valeurs:
+            raise ValueError(f\"listes.{nom_liste}.valeurs — attendu une liste non vide\")
+        for v in valeurs:
+            if not isinstance(v, str) or not _VALEUR_RE.fullmatch(v):
+                raise ValueError(f\"listes.{nom_liste}.valeurs — valeur hors charset [A-Za-z0-9_-]+ ({v!r})\")
+    return m
+
+KNOWN = TOOL_NAMES = NATIVE_TYPES = MODELS = PERM = EFFORT = None
+MODELS_ORDERED = EFFORT_ORDERED = []
+
+def charger_referentiel():
+    \"\"\"Charge le manifeste (D-01/D-03) et peuple les ensembles/ordres consommes par le lint.
+    Appelee SEULEMENT s'il existe au moins une cible a juger (chargement PARESSEUX) — la branche
+    cible vide (F13, exit 3 en --strict / 0 sinon) ne l'appelle jamais et reste inchangee.\"\"\"
+    global KNOWN, TOOL_NAMES, NATIVE_TYPES, MODELS, PERM, EFFORT, MODELS_ORDERED, EFFORT_ORDERED
+    try:
+        m = charger_manifeste(manifest_path)
+    except (OSError, ValueError) as e:
+        cause = str(e).replace(\" : \", \" - \")
+        print(f\"[check-agents] ✗ MANIFESTE-ILLISIBLE ({manifest_path}) — {cause} — aucun verdict rendu (D-03)\")
+        sys.exit(0 if hook else 1)
+    listes = m[\"listes\"]
+    KNOWN = set(listes[\"champs_frontmatter\"][\"valeurs\"]) | VIBEFLOW_FIELDS
+    TOOL_NAMES = set(listes[\"outils\"][\"valeurs\"])
+    NATIVE_TYPES = set(listes[\"types_natifs\"][\"valeurs\"])
+    MODELS_ORDERED = list(listes[\"modeles\"][\"valeurs\"])
+    MODELS = set(MODELS_ORDERED)
+    PERM = set(listes[\"modes_permission\"][\"valeurs\"])
+    EFFORT_ORDERED = list(listes[\"niveaux_effort\"][\"valeurs\"])
+    EFFORT = set(EFFORT_ORDERED)
 
 errors, warnings = [], []
 # Deux compteurs DISTINCTS (jamais un skip mal decrit) : thirdparty_files_total = fichiers
@@ -520,9 +581,9 @@ def check_file(path):
 
     model = fm.get(\"model\")
     if not model:
-        errors.append(f\"{base} : model absent — souverainete modele requise (sonnet|opus|haiku|fable|inherit)\")
+        errors.append(f\"{base} : model absent — souverainete modele requise ({'|'.join(MODELS_ORDERED)})\")
     elif model not in MODELS and not re.fullmatch(r\"claude-[a-z0-9.-]+\", str(model)):
-        errors.append(f\"{base} : model invalide ({model}) — attendu sonnet|opus|haiku|fable|inherit|claude-<id>\")
+        errors.append(f\"{base} : model invalide ({model}) — attendu {'|'.join(MODELS_ORDERED)}|claude-<id>\")
 
     memory = fm.get(\"memory\")
     if not memory:
@@ -538,9 +599,9 @@ def check_file(path):
     # --third-party-prefix ne passent jamais ici (skip en amont, boucle principale).
     effort = fm.get(\"effort\")
     if not effort:
-        errors.append(f\"{base} : effort absent — bareme par role requis (low|medium|high|xhigh|max)\")
+        errors.append(f\"{base} : effort absent — bareme par role requis ({'|'.join(EFFORT_ORDERED)})\")
     elif effort not in EFFORT:
-        errors.append(f\"{base} : effort invalide ({effort}) — attendu low|medium|high|xhigh|max\")
+        errors.append(f\"{base} : effort invalide ({effort}) — attendu {'|'.join(EFFORT_ORDERED)}\")
     pm = fm.get(\"permissionMode\")
     if pm and pm not in PERM:
         errors.append(f\"{base} : permissionMode invalide ({pm})\")
@@ -643,6 +704,7 @@ def check_file(path):
 
 if single:
     if os.path.isfile(single):
+        charger_referentiel()
         check_file(single)
     else:
         errors.append(f\"fichier introuvable : {single}\")
@@ -655,6 +717,7 @@ else:
         # Le code de sortie (3) est desormais INCONDITIONNEL — la traduction vers 0 sous --hook
         # est la responsabilite du shell (hook_exit, hors de ce bloc Python) : seul l'AFFICHAGE
         # reste conditionne a 'not hook' (le silence de flux, lui, reste un contrat du shell).
+        # Chargement PARESSEUX (D-01/D-03) : une cible vide ne lit JAMAIS le manifeste.
         if strict and not allow_empty:
             if not hook:
                 print(f\"[check-agents] ✗ INDETERMINE : aucun agent dans {agents_dir} — cible absente ou vide, aucun verdict rendu (--allow-empty pour tolerer)\")
@@ -662,6 +725,7 @@ else:
         if not hook:
             print(f\"[check-agents] aucun agent dans {agents_dir} — rien a verifier\")
         sys.exit(0)
+    charger_referentiel()
     for f in files:
         try:
             ftext = open(f, encoding=\"utf-8-sig\").read()
