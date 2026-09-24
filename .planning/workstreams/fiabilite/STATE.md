@@ -175,6 +175,14 @@ reste ouverte pour le temps (ii) du plan 41-08. Next : plan 41-07 (mesure M-1, P
 sa précondition dure lit `CO-DECISION: option=accepter-et-documenter` ET
 `CO-I: merge_sans_contournement=non_tente` (pas `refuse`), à statuer par son propre exécuteur.
 
+**Note (2026-09-24, plan 41-07) : Task 1 arrêtée avant consignation des commits de mesure, en
+attente d'une décision de Willy.** Précondition D-02ter tenue (`CO-VERDICT: ECART` accepté,
+`origin/main` inchangée). Prémisse contredite (`PR-R-PREMISSE:` dans `41-PREUVES.md`) : la seule
+suite de preuve ferait rougir `check-version-sync` (README « 85 suites » contre 86 réelles), donc
+le job requis `gates` sur C0 — verdict M-1 `INDETERMINE` par construction. Variante verte mesurée
+(README alignés à 86 dans C0), contraire au critère `autres_fichiers=0` : non retenue sans
+décision. Aucun geste chez GitHub ; #101, #102, #103 toujours ouvertes.
+
 Précédemment (2026-09-18) — **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ le 2026-09-18** sur
 `feat/phase-41-protection-depot` (branche `worktree-agent-a10225b33e6f3c645`). **Prémisse renversée
 le 2026-09-17** (constat + arbitrage Samuel, AskUserQuestion session principale, 2026-09-17) : le
