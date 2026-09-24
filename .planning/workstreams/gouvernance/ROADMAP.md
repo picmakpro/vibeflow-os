@@ -54,7 +54,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 42-04-PLAN.md — vague 2 : fraîcheur — INDÉTERMINÉ sous `--manifest-freshness=strict` en CI, avertissement chez l'utilisateur, rétrogradation D-05 ; T83-T90, MUT-F1/F2 (FABR-02)
+- [x] 42-04-PLAN.md — vague 2 : fraîcheur — INDÉTERMINÉ sous `--manifest-freshness=strict` en CI, avertissement chez l'utilisateur, rétrogradation D-05 ; T83-T90, T103, MUT-F1/F2/D20 (FABR-02) — Complete (2026-09-25)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 

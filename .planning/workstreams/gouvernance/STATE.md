@@ -7,36 +7,36 @@ current_phase: 42
 current_phase_name: Fabrique — manifeste daté et invariants de doctrine du gate des agents
 status: executing
 created: 2026-09-23
-last_updated: "2026-09-24T21:15:00.000Z"
-last_activity: 2026-09-24
+last_updated: "2026-09-25T00:00:00.000Z"
+last_activity: 2026-09-25
 last_activity_desc: >-
-  Vague 1 exécutée (vf-coder, nœud exec-42-w1) : plans 42-01, 42-02, 42-03 tous verts, 14 commits
-  sur gouvernance/phase-42-fabrique. Vague 2 (42-04, dépend de 42-01) non lancée — hors mandat.
-  STATE tenu à la main (jamais state.begin-phase / state.record-session).
+  Vague 2 exécutée (vf-coder, nœud exec-42-w2) : plan 42-04 (fraîcheur du manifeste, FABR-02) vert,
+  3 commits sur gouvernance/phase-42-fabrique. Vague 3 (42-05, dépend de 42-04/42-02/42-03) non
+  lancée — hors mandat. STATE tenu à la main (jamais state.begin-phase / state.record-session).
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 6
-  completed_plans: 3
-  percent: 50
+  completed_plans: 4
+  percent: 67
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 42 (Fabrique — manifeste daté et invariants de doctrine du gate des agents) — EXECUTING (vague 1/4 terminée : 42-01, 42-02, 42-03)
-**Last Activity:** 2026-09-24
-**Last Activity Description:** Vague 1 exécutée (nœud exec-42-w1) : 42-01 (manifeste daté + gate fail-closed + D-20), 42-02 (I3/I6 mobile-test-team, business-pilot-bundle, content-bundle), 42-03 (I6 growth-bundle, design-orchestrator) — tous verts, 14 commits.
+Phase: 42 (Fabrique — manifeste daté et invariants de doctrine du gate des agents) — EXECUTING (vague 2/4 terminée : 42-01, 42-02, 42-03, 42-04)
+**Last Activity:** 2026-09-25
+**Last Activity Description:** Vague 2 exécutée (nœud exec-42-w2) : 42-04 (fraîcheur du manifeste — détection D-02, rétrogradation D-05, INDÉTERMINÉ sous --manifest-freshness=strict, D-04 ; T83-T90, MUT-F1, MUT-F2, MUT-D20 ; les quatre appels CI durcis) — vert, 3 commits.
 
 ## Progress
 
 **Phases Complete:** 0
-**Current Plan:** Vague 2 (42-04, dépend de 42-01) — non lancée, hors mandat exec-42-w1
+**Current Plan:** Vague 3 (42-05, dépend de 42-04/42-02/42-03) — non lancée, hors mandat exec-42-w2
 
 ## Session Continuity
 
-**Stopped At:** Fin de la vague 1 (42-01/02/03), mandat exec-42-w1 borné à cette seule vague
+**Stopped At:** Fin de la vague 2 (42-04), mandat exec-42-w2 borné à cette seule vague
 **Resume File:** None
 
 ## Note pour Willy (2026-09-23, partition D-02)
@@ -90,3 +90,12 @@ explicitement ; n'attends rien de la CI sur ce point.
   sans `--force-isolation` se re-résout à chaud depuis la capacité de l'hôte et efface le
   précédent, un garde `PreToolUse` bloquant sinon le dispatch suivant (observé entre 42-01 et
   42-02, corrigé avant 42-03).
+
+- **2026-09-25 — vague 2 (vf-coder, nœud exec-42-w2)** : même dégradation d'isolation que la
+  vague 1 (`worktree.base-check` : HEAD e3ba8f9 divergent d'`origin/HEAD` — attendu, sentinel
+  re-persisté en `none` avant le dispatch de l'exécuteur de 42-04). La vague 1 avait touché
+  `check-agents.sh` et `test-check-agents.sh` (commits ba312e0, bb36787, a9e98ac) sans trailer
+  `Gate-Touche` — corrigé rétroactivement dans le premier commit de cette vague qui touche
+  `check-agents.sh` (8c507e7), portée branche de la garde G-2 : `check-gate-touche.sh` confirme
+  `marqueurs: lus=8 conformes=8`, `DECLARE`, `rc=0`. `requirements.mark-complete` non appelé par
+  l'exécuteur (mandat override) : FABR-02 coché à la main ci-dessous dans `REQUIREMENTS.md`.
