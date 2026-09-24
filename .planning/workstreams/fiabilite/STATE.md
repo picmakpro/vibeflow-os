@@ -123,6 +123,32 @@ arrière), ADR-059 amendée (« Branche pour tout travail de phase » devient la
 in-repo ».** Détail complet : `41-03-SUMMARY.md`. WINDOWS.md #8 confirmé fermé (rejeu `gates`
 14/14 vert) ; #6/#7 toujours ouverts, hors périmètre. Next : plan 41-04.
 
+**Note (2026-09-23/24, PHASE 41.1 EXÉCUTÉE — 9 plans, branche
+`feat/phase-41-1-gates-workstream-aware`, non poussée au moment de cette écriture).** `current_phase`
+reste à **41** : `41.1` s'insère sous la Phase 41 et ce champ, gaté en anti-régression par
+`check-state-integrity.sh`, ne décroît pas au sein d'un même jalon — même précédent que les Phases 23
+et 34 (§ Roadmap Evolution). Détail par plan : les neuf `41.1-0X-SUMMARY.md` sur disque ; contexte de
+cadrage et décisions : `41.1-CONTEXT.md` (D-01 à D-06, dont D-02 amendée en cours de mission).
+Livré : `planning-core` v2.7.1 (`vf_ws_enumerate`, codes 0/2/3 ; `detect-gsd-engine.sh` et
+`check-planning-state.sh` cessent d'être faux sur un dépôt partitionné), `conductor` v1.41.0 —
+**minor**, deux artefacts neufs et distribués (`check-planning-consumers-registered.sh` et son
+recensement de 21 consommateurs) plus `check-divergence.sh` et `check-state-integrity.sh` durcis —,
+`dev-orchestrator` v2.23.2 (`discover-unintegrated-docs.sh`, `references/workstreams.md` §1/§3/§6),
+`ci.yml` (fan-out par compartiment, fixture à trois compartiments) et l'amendement d'ADR-069.
+`WSAW-01..07` cochées sur pièce au ledger. **Aucune release** : `VERSION` racine, `plugin.json`,
+`marketplace.json` et les README racine intouchés — geste humain gaté.
+Mesures de clôture relevées : `gates` rc=0 (16 rejouées, 3 sautées, 0 en échec), `tests` rc=0
+(87 suites, 0 échec), `check-version-sync` rc=0, G-1/G-2/G-4 rc=0, `check-machine-paths` rc=0.
+**Réserve inscrite** : l'oracle de la branche est le run CI distant sur la PR, pas ce rejeu local
+séquentiel — deux rejeux `tests` antérieurs ont rougi sur des suites différentes, toutes vertes en
+isolation (flakes consignés, voir `### Blockers/Concerns`).
+Restent ouverts, consignés sans être fermés : la notice `AMBIGUITE-D02` sur le compartiment
+`gouvernance` (par conception D-06, jamais un écart) ; la contradiction pré-existante entre la
+primitive (rc=2) et la garde de tête de `check-divergence.sh` (rc=3) sur un `workstreams` en fichier
+régulier — aucun artefact de la phase ne la tranche, par décision ; trois trailers `Gate-Touche:` à
+motif virgule sur les commits de planning de la branche, que seul un rebase corrigerait (G-2 rc=0,
+17 marqueurs conformes couvrent les chemins de surface).
+
 Précédemment (2026-09-18) — **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ le 2026-09-18** sur
 `feat/phase-41-protection-depot` (branche `worktree-agent-a10225b33e6f3c645`). **Prémisse renversée
 le 2026-09-17** (constat + arbitrage Samuel, AskUserQuestion session principale, 2026-09-17) : le

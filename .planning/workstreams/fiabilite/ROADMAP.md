@@ -83,7 +83,7 @@
 - [x] Phase 40: vibeflow-head — head of minds du dev-orchestrator (exécutée le 2026-09-15 sur `feat/phase-40-vibeflow-head` — `vibeflow-dev` renommé `vibeflow-head`, 5 plans/3 vagues, zéro agent neuf, kernel intact (diff nul), renommage sur 22 chemins + garde anti-alias T36 (mutation prouvée), `head-governance.md` neuf, `check-mission-exit.sh` E1-E6 codes 3/0/4/64 (23/23 cas, 6 mutations rouges), contrat de preuves E6 + ses trois émetteurs (D-19, amendement post-cadrage), racine bumpée v2.63.0, `dev-orchestrator` v2.22.0 — **PR, tag et release GitHub restent des gestes humains non posés à cette date**. **HEAD-01 partiellement close** — `intent-routing.md` jamais mis à jour pour renvoyer à `head-governance.md`, laissée ouverte au ledger, détail `40-SUMMARY.md`)
 - [x] Phase 40.1: Révision ADR-029 et du gate du budget d'instructions (INSERTED 2026-09-16 — plafond 300 lignes, ratchet sur les instructions seules ; arbitrages Samuel AskUserQuestion session principale ; avant la 41)
 - [x] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date — **PÉRIMÈTRE RECADRÉ SANS ADMIN LIVRÉ le 2026-09-18, mergée PR #80, SHIPPÉE v2.64.0** : trois gardes in-repo qui signalent et tracent sans jamais verrouiller (G-1 `check-baseline-arbitrage.sh`, G-2 `check-gate-touche.sh`, G-3 `check-push-sans-pr.sh`) + doctrine ADR-072 ; **critères de succès 1 à 3 du ROADMAP d'origine restent HORS D'ATTEINTE sans accès admin GitHub** (PROT-01 non coché, `REQUIREMENTS.md`) ; volet rulesets côté serveur **DIFFÉRÉ au BACKLOG** avec son déclencheur de reprise — le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce volet (WhatsApp, 2026-09-23) **avant** la clôture de `fiabilite-v1.0`, puisque PROT-01 en fait partie (correction du 2026-09-23 : la formulation précédente inversait la séquence — cf. `BACKLOG.md` § « Protection de `main` côté GitHub »))
-- [ ] Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED 2026-09-23, demande Samuel session principale : « généralise le remède, ça ne doit plus se reproduire »)
+- [x] Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED 2026-09-23, demande Samuel session principale : « généralise le remède, ça ne doit plus se reproduire »)
 - [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage)
 
 <details>
@@ -1799,11 +1799,19 @@ d'usage de la 41.2 (« gates verts sur chaque compartiment ») n'est pas mesurab
 
   9. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa **mutation rouge prouvée**.
 
-**Plans:** TBD (run /gsd-plan-phase 41.1 to break down)
+**Plans:** 9, tous exécutés le 2026-09-23/24 (un `*-SUMMARY.md` par plan sur disque).
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 41.1 to break down)
+- [x] 41.1-01 — `vf_ws_enumerate`, la primitive d'énumération partagée (D-01)
+- [x] 41.1-02 — `check-divergence.sh` consomme la primitive : dédup des deux boucles + fermeture du trou exit-0
+- [x] 41.1-03 — `check-planning-state.sh` et `detect-gsd-engine.sh` cessent d'être faux sur un dépôt partitionné
+- [x] 41.1-04 — `discover-unintegrated-docs.sh` : registre de citation élargi à chaque compartiment
+- [x] 41.1-05 — recensement versionné des consommateurs + lint anti-oubli rejoué en CI
+- [x] 41.1-06 — CI : fan-out `check-state-integrity`/R5 par compartiment, fixture à trois compartiments dont un cassé
+- [x] 41.1-07 — doctrine : amendement d'ADR-069 + `workstreams.md` §1/§3/§6 (définition unique des trois états)
+- [x] 41.1-08 — bump des trois modules touchés, CHANGELOG, rejeu final
+- [x] 41.1-09 — `check-state-integrity.sh` : fermeture des deux vecteurs de fail-open (ajouté en 2ᵉ passe de cadrage)
 
 ### Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED)
 
