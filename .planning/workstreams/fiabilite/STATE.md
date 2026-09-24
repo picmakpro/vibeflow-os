@@ -161,8 +161,9 @@ lues `mergeStateStatus=CLEAN` et `reviewDecision` vide — contre `BLOCKED`/`REV
 attendus par un ruleset actif exigeant `require_code_owner_review: true`. Explication la plus
 compatible (non prouvée au sens strict) : les deux seuls collaborateurs du dépôt
 (`samuel-neveugall`, `picmakpro`) ont le contournement `always` (D-02bis), et `mergeStateStatus`/
-`reviewDecision` sont calculés pour le compte lecteur — aucun acteur réel n'observe donc le refus
-par défaut ni la revue code owner exigée. `merge_sans_contournement=non_tente` (jamais tenté hors
+`reviewDecision` sont calculés pour le compte lecteur. **Explication contredite le 2026-09-24** :
+la #100 (auteur `samuel-neveugall`) est vue `BLOCKED` par `picmakpro` ; la variable observée est
+l'auteur seul code owner, pas le contournement (détail : 41-CONTEXT § Correction de la prémisse). `merge_sans_contournement=non_tente` (jamais tenté hors
 `BLOCKED`) : aucune menace d'atterrissage sur `main`. Décision de Willy (AskUserQuestion session
 principale, 2026-09-24) : **ACCEPTER ET DOCUMENTER** —
 `CO-DECISION: option=accepter-et-documenter decideur=Willy canal=AskUserQuestion-session-principale

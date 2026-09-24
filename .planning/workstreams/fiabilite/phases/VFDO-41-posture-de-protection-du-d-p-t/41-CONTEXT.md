@@ -90,6 +90,26 @@ sont révisés pour ne prouver que le prouvable**, puis la phase continue (41-09
 Aucune tentative de merge sur une PR rouge, jamais. Le critère 2 du ROADMAP n'est pas tenu tel que
 formulé ; la phase le dit, sans le réécrire.
 
+**Correction de la prémisse — 2026-09-24** (arbitrage Willy, AskUserQuestion session principale,
+2026-09-24 : « Garder, en corrigeant la prémisse ») : les phrases ci-dessus « Seule variable :
+`current_user_can_bypass=always` », « aucun acteur réel n'observe le refus par défaut ni la revue
+code owner exigée » et « état qu'aucun compte ne voit » sont **fausses** et ne doivent plus être
+citées. Mesure de lecture seule du 2026-09-24, compte `picmakpro` (en contournement `always`) :
+
+| PR | Auteur | Chemin CODEOWNERS touché | `mergeStateStatus` vu par `picmakpro` |
+|---|---|---|---|
+| #100 | `samuel-neveugall` | `.github/workflows/ci.yml` | `BLOCKED`, revue demandée à `picmakpro` |
+| #101 | `picmakpro` | `.github/rulesets/README.md` | `CLEAN` |
+| #102 | `picmakpro` | baseline du budget d'instructions | `CLEAN` |
+| #103 | `picmakpro` | sentinelle d'armement | `CLEAN` |
+
+Le contournement ne masque donc pas l'état bloqué. La variable discriminante observée est **l'auteur
+de la PR, lui-même seul code owner** (`@picmakpro`), et non le contournement. Cette explication est
+une lecture des mesures, **pas une règle documentée par GitHub** vérifiée ici. Le refus observé sur
+la #100 est consigné comme **observation**, sans valeur de preuve du critère 2. Les plans révisés
+41-07 à 41-13 sont conservés tels quels (D-02ter maintenu) ; 41-08 remesure ce fait au checkpoint qui
+précède le merge de la #101.
+
 ## Prémisse renversée — 2026-09-17 (historique — amendée par la section REPRISE ci-dessus)
 
 Arbitrage et constat Samuel, AskUserQuestion session principale, 2026-09-17, relayés au manager par

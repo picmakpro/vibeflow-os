@@ -305,3 +305,13 @@ mesurera avec une clé de déploiement temporaire pour le push direct. Le critè
 pas tenu tel que formulé ; consigné tel quel, sans correction. Suite prescrite par le plan : fermer
 PR-BASELINE (#102) et PR-SENTINELLE (#103), et supprimer leurs branches, au pas 0 de la Task 2 du
 plan 41-07 (pas ici) ; PR-P (#101) reste ouverte pour le temps (ii) du plan 41-08.
+
+**Correction de l'explication, 2026-09-24** (arbitrage Willy, AskUserQuestion session principale,
+2026-09-24) : la mesure `CO-VERDICT: ECART` reste valide. En revanche, l'explication ci-dessus, selon
+laquelle le contournement `always` empêche tout acteur réel d'observer le refus, est **contredite**.
+Lecture seule du même jour, par `picmakpro` : la #100, ouverte par `samuel-neveugall` et qui touche
+`.github/workflows/ci.yml`, est vue `BLOCKED` avec une revue demandée à `picmakpro`, alors que la
+#101, la #102 et la #103, ouvertes par `picmakpro`, sont vues `CLEAN`. La variable qui départage les
+deux cas est l'auteur, lui-même seul code owner, et non le contournement. C'est une lecture des
+mesures, pas une règle GitHub vérifiée. Ce constat est consigné comme simple observation, sans
+valeur de preuve du critère 2. La ligne `CO-DECISION` ci-dessus n'est pas modifiée.
