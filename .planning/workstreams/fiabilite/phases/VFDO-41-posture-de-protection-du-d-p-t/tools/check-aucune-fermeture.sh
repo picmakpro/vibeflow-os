@@ -51,8 +51,13 @@
 #   64 argument invalide (option inconnue, --root sans valeur ou inexistant)
 set -uo pipefail
 
+# RESOLUTION DE RACINE — jamais un comptage de `../` (fragile a toute repartition du planning,
+# defaut mesure le 2026-09-24 : la partition workstreams/fiabilite/ a insere deux niveaux entre
+# `.planning/` et `phases/`, rendant le perimetre vide, donc rc 2, silencieusement). `git rev-parse
+# --show-toplevel` depuis SCRIPT_DIR, JAMAIS derive silencieusement : echoue -> DEFAULT_ROOT reste
+# vide, et un usage reel (sans --root) sort en erreur explicite plus bas, jamais une racine devinee.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DEFAULT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
+DEFAULT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
 
 usage() {
   cat <<'USAGE'
@@ -67,6 +72,7 @@ USAGE
 }
 
 ROOT="$DEFAULT_ROOT"
+ROOT_OVERRIDDEN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --root)
@@ -75,6 +81,7 @@ while [ $# -gt 0 ]; do
         exit 64
       fi
       ROOT="$2"
+      ROOT_OVERRIDDEN=1
       shift 2
       ;;
     -h|--help)
@@ -87,6 +94,11 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+if [ "$ROOT_OVERRIDDEN" -eq 0 ] && [ -z "$DEFAULT_ROOT" ]; then
+  echo "ERREUR: impossible de resoudre la racine du depot (git rev-parse --show-toplevel a echoue depuis $SCRIPT_DIR — hors d'un arbre git, ou git absent)" >&2
+  exit 2
+fi
 
 if [ ! -d "$ROOT" ]; then
   echo "ERREUR: racine inexistante: $ROOT" >&2

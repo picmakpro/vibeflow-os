@@ -62,9 +62,22 @@
 #      inexistant)
 set -uo pipefail
 
+# RESOLUTION DE RACINE — jamais un comptage de `../` (fragile a toute repartition du planning,
+# defaut mesure le 2026-09-24 : la partition workstreams/fiabilite/ a insere deux niveaux entre
+# `.planning/` et `phases/`, rendant NON-VERIFIABLE un controle qui rendait FORME-NON-CONFORME
+# avant elle). `git rev-parse --show-toplevel` depuis SCRIPT_DIR, JAMAIS derive silencieusement :
+# echoue -> DEFAULT_ROOT reste vide, et un usage reel (sans --root) sort en NON-VERIFIABLE (rc 2)
+# plus bas, jamais une racine devinee.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DEFAULT_ROOT="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
-PREUVES_REL=".planning/phases/VFDO-41-posture-de-protection-du-d-p-t/41-PREUVES.md"
+DEFAULT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
+# 41-PREUVES.md est VOISIN du script (dossier parent de tools/), mais sa position n'est JAMAIS
+# calculee depuis $0 : un script copie ailleurs pour un test de mutation (tools/test-check-*.sh)
+# n'a plus ce voisinage sur le disque. Localise a la place par un SUFFIXE STABLE (le nom de la
+# phase, qui ne bouge pas avec une repartition du planning) cherche sous $ROOT/.planning — jamais
+# un nombre de niveaux compte. Suit le fichier quel que soit --root (racine reelle OU fixture
+# jetable de test), et jamais une racine devinee : zero ou plusieurs correspondances sortent en
+# NON-VERIFIABLE plus bas.
+PREUVES_SUFFIX="phases/VFDO-41-posture-de-protection-du-d-p-t/41-PREUVES.md"
 
 usage() {
   cat <<'USAGE'
@@ -83,6 +96,7 @@ USAGE
 }
 
 ROOT="$DEFAULT_ROOT"
+ROOT_OVERRIDDEN=0
 BASE_REF_OVERRIDE=""
 HAS_BASE_REF_OVERRIDE=0
 while [ $# -gt 0 ]; do
@@ -93,6 +107,7 @@ while [ $# -gt 0 ]; do
         exit 64
       fi
       ROOT="$2"
+      ROOT_OVERRIDDEN=1
       shift 2
       ;;
     --base-ref)
@@ -115,6 +130,11 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ "$ROOT_OVERRIDDEN" -eq 0 ] && [ -z "$DEFAULT_ROOT" ]; then
+  echo "NON-VERIFIABLE: impossible de resoudre la racine du depot (git rev-parse --show-toplevel a echoue depuis $SCRIPT_DIR — hors d'un arbre git, ou git absent)" >&2
+  exit 2
+fi
+
 if [ ! -d "$ROOT" ]; then
   echo "ERREUR: racine inexistante: $ROOT" >&2
   exit 64
@@ -133,15 +153,28 @@ if [ "$HAS_BASE_REF_OVERRIDE" -eq 1 ]; then
   BASE_RAW="$BASE_REF_OVERRIDE"
   BASE_SOURCE="--base-ref (fixture)"
 else
-  PREUVES_PATH="$ROOT/$PREUVES_REL"
-  BASE_SOURCE="$PREUVES_REL"
-  if [ ! -f "$PREUVES_PATH" ]; then
-    echo "NON-VERIFIABLE: registre absent: $PREUVES_REL" >&2
+  if [ ! -d "$ROOT/.planning" ]; then
+    echo "NON-VERIFIABLE: pas de .planning sous $ROOT — registre introuvable (suffixe attendu: $PREUVES_SUFFIX)" >&2
     exit 2
   fi
+  PREUVES_MATCHES="$(find "$ROOT/.planning" -type f -path "*/$PREUVES_SUFFIX" 2>/dev/null | LC_ALL=C sort)"
+  PREUVES_N=0
+  if [ -n "$PREUVES_MATCHES" ]; then
+    PREUVES_N="$(printf '%s\n' "$PREUVES_MATCHES" | awk 'NF{c++} END{print c+0}')"
+  fi
+  if [ "$PREUVES_N" -eq 0 ]; then
+    echo "NON-VERIFIABLE: registre introuvable sous $ROOT/.planning (suffixe attendu: $PREUVES_SUFFIX)" >&2
+    exit 2
+  fi
+  if [ "$PREUVES_N" -gt 1 ]; then
+    echo "NON-VERIFIABLE: registre ambigu, $PREUVES_N correspondances sous $ROOT/.planning (suffixe attendu: $PREUVES_SUFFIX)" >&2
+    exit 2
+  fi
+  PREUVES_PATH="$(printf '%s\n' "$PREUVES_MATCHES" | head -1)"
+  BASE_SOURCE="$PREUVES_PATH (localise par suffixe stable)"
   BASE_RAW="$(awk '/^BASE-TRACE-ARBITRAGE: /{sub(/^BASE-TRACE-ARBITRAGE: /, ""); print; exit}' "$PREUVES_PATH")"
   if [ -z "$BASE_RAW" ]; then
-    echo "NON-VERIFIABLE: cle BASE-TRACE-ARBITRAGE absente ou illisible dans $PREUVES_REL" >&2
+    echo "NON-VERIFIABLE: cle BASE-TRACE-ARBITRAGE absente ou illisible dans $PREUVES_PATH" >&2
     exit 2
   fi
 fi

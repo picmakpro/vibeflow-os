@@ -22,9 +22,10 @@ TOOLS_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$TOOLS_DIR/check-trace-arbitrage.sh"
 TARGET="$SCRIPT"
 # REAL_ROOT — racine du depot reel, calculee EXACTEMENT comme DEFAULT_ROOT dans le script sous
-# test (meme nombre de niveaux depuis tools/), utilisee UNIQUEMENT par MUT-5 (jamais par les
-# controles C0..C13 ni MUT-1..MUT-4, tous sur fixture jetable).
-REAL_ROOT="$(cd "$TOOLS_DIR/../../../.." && pwd)"
+# test (git rev-parse --show-toplevel depuis TOOLS_DIR, jamais un comptage de `../` — meme defaut
+# mesure et corrige le 2026-09-24 cf. check-trace-arbitrage.sh), utilisee UNIQUEMENT par MUT-5
+# (jamais par les controles C0..C13 ni MUT-1..MUT-4, tous sur fixture jetable).
+REAL_ROOT="$(git -C "$TOOLS_DIR" rev-parse --show-toplevel)"
 
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS + 1)); }
