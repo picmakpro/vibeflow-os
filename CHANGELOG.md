@@ -11,6 +11,24 @@ sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 release au-dessus de la première ligne qui commence par `## [` — une section « non releasé »
 entre crochets se retrouverait publiée SOUS la version suivante.*
 
+**Minor à venir** (branche `feat/presets-install-et-confiance-typee`, 2026-09-24 — suite à la
+comparaison avec `dream-num/univer` et à l'étude Jev/AnyJev, carte blanche Samuel, session
+principale, 2026-09-24) :
+
+- **Presets d'installation** (`plugin/_internal/presets.json`, `resolve-preset.sh`, suite
+  `test-resolve-preset.sh` — 15 cas dont 3 mutants) : un lab de dev se choisit par un nom
+  (`dev`, `dev-mobile`, `dev-audite`), la fermeture des `requires` est déléguée à
+  `resolve-deps.sh`, un preset qui référencerait un module `proposable:false` est refusé en
+  entier. `/vibeflow-install` étape 4 (INST-02c) lit les presets depuis les données — aucun nom
+  en dur dans le skill. README EN/FR § Modules.
+- **`dev-orchestrator` v2.24.0** — champ `confiance` optionnel sur les rapports typés,
+  `SEUIL_CONFIANCE`, requalification d'un vert de jugement trop peu sûr ; allocation du head en
+  trois questions (coordination, incertitude, conséquence).
+- **`conductor` v1.41.0** — `team-kernel.md` Pattern C porte la forme `confiance?` et renvoie à
+  la doctrine.
+- **`docs/research/2026-09-24-jev-system-one.md`** — note de recherche (ce que Jev est et n'est
+  pas, reproductions ouvertes, résultats indépendants, ce qu'on retient, spike proposé).
+
 ## [v2.65.0] — 2026-09-23
 
 **Patch** (rattrapage de publication : trois commits fonctionnels mergés sur `main` depuis
