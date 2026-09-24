@@ -43,7 +43,7 @@
         "sonde-d19"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-42-w2",
@@ -53,15 +53,16 @@
         "exec-42-w1"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-42-w3",
-      "step": "exécution 42 vague 3 (42-05, arme I5)",
+      "step": "exécution 42 vague 3 suite : 42-05 Tâche 3 (I5 selon arbitrage, I6) — après arbitrage D-08",
       "stage": "",
       "deps": [
-        "exec-42-w2",
-        "arbitrage-d08"
+        "exec-42-w3a",
+        "arbitrage-d08",
+        "sonde-d19b"
       ],
       "scope": [],
       "status": "blocked"
@@ -245,6 +246,60 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "exec-42-w3a",
+      "step": "exécution 42 vague 3 partielle : 42-05 Tâche 1 (I1/I4/I7) + sonde checkpoint D-19 (arrêt sur ARBITRAGE-ABSENT)",
+      "stage": "",
+      "deps": [
+        "exec-42-w2"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-agents.sh",
+        "plugin/conductor/scripts/tests/test-check-agents.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-42-partiel",
+      "step": "revue du diff livré 13fcd27..HEAD (vf-reviewer), phase non close",
+      "stage": "",
+      "deps": [
+        "exec-42-w3a"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "nonreg-42-partiel",
+      "step": "non-régression découverte complète sur l'état livré (manager)",
+      "stage": "",
+      "deps": [
+        "exec-42-w3a"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "pr-42-draft",
+      "step": "PR brouillon Phase 42 (non close), pas de merge",
+      "stage": "",
+      "deps": [
+        "revue-42-partiel",
+        "nonreg-42-partiel"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "sonde-d19b",
+      "step": "seconde sonde D-19 : règles .claude/rules à paths: sous omitClaudeMd (décision Willy, AskUserQuestion, session principale, 2026-09-24)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/42-D19-MESURE.md"
+      ],
+      "status": "failed"
     }
   ]
 }
