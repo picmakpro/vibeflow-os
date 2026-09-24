@@ -216,3 +216,9 @@ feat/phase-41-1-gates-workstream-aware), toutes deux ouvertes vers `main`. Aucun
 cette liste (`#96`, `#98`, `#99`, `#100`) n'est mergée ni touchée par cette phase pendant la fenêtre
 sans merge convenue avec Samuel, relayée par Willy, session principale, 2026-09-24 — la mesure de
 Phase 41 reste valide tant que la fenêtre tient.
+
+MAIN-AVANT-PREUVES: a9620659c24103a103a5ca35c882faedb255b2c4
+
+PR-P-COMMITS: p1=dc05507ce215df774d81b3ff64a1c0288e225f4b p2=20fdad050eaaff2d987c20b00a05dfc75d3655b0 base=a9620659c24103a103a5ca35c882faedb255b2c4
+
+PR-CO-COMMITS: baseline=ce9f30e0f5ee5b08f57209836b7ef677095c4b86 sentinelle=863215be527e781d9c69139cf9ca52284a2b053e base=a9620659c24103a103a5ca35c882faedb255b2c4
