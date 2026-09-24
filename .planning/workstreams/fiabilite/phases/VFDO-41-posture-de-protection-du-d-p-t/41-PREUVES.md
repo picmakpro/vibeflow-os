@@ -315,3 +315,34 @@ Lecture seule du même jour, par `picmakpro` : la #100, ouverte par `samuel-neve
 deux cas est l'auteur, lui-même seul code owner, et non le contournement. C'est une lecture des
 mesures, pas une règle GitHub vérifiée. Ce constat est consigné comme simple observation, sans
 valeur de preuve du critère 2. La ligne `CO-DECISION` ci-dessus n'est pas modifiée.
+
+## 41-07 — M-1 par lecture, PR rouge jamais mergée (D-02ter)
+
+### Task 1 — précondition et construction, 2026-09-24 (arrêt avant consignation des commits)
+
+PRECONDITION-41-07: identite=picmakpro CO-VERDICT=ECART CO-DECISION=accepter-et-documenter tenue=oui origin_main=a9620659c24103a103a5ca35c882faedb255b2c4 prs_ouvertes_hors_inventaire=#101,#102,#103
+
+PR-R-PREMISSE: ecart etape=check-version-sync job=gates suites_readme=85 suites_avec_preuve=86 rejeu_gates_seule_suite=rc1_1_en_echec rejeu_gates_readme_aligne=rc0_0_en_echec g2_trailer_gate_touche=requis source=rejeu_local_clone_jetable
+
+Note sur `PR-R-PREMISSE:` (mesuré le 2026-09-24, avant tout geste chez GitHub) : le plan suppose
+qu'un commit qui n'ajoute QUE `scripts/tests/test-preuve-41-m1.sh` laisse les trois autres jobs
+verts sur les deux événements (C0 témoin vert, `autres_jobs_verts=6/6`). C'est faux. Le gate
+`scripts/check-version-sync.sh` (point 9, job `gates`, contexte requis « Gates de qualité (mode
+strict) ») compare le compte « N suites » cité par `README.md` et `README.fr.md` au nombre de
+fichiers `*/tests/test-*.sh` sous `plugin` et `scripts` : 85 cités, 86 avec la suite de preuve. Le
+job `gates`, rejoué localement (outil `replay-ci-jobs.sh --job gates`) sur un clone jetable dont la
+tête est le B construit selon le plan, rend `15 rejouee(s), 3 sautee(s), 1 en echec` — l'étape
+`check-version-sync` en échec avec `README.md : '85 suites' ≠ réel=86`. Toute suite découverte par
+l'étape `find plugin scripts -type f -path '*/tests/test-*.sh'` est aussi comptée par ce gate :
+aucun emplacement ne la fait lancer par le job de tests sans la faire compter. Joué tel quel, C0
+porterait donc un check requis en échec, l'agrégat de C0 ne vaudrait pas `SUCCESS`, et le verdict
+serait `INDETERMINE` par construction. Second constat, déjà traité sans écart au contrat : la
+suite de preuve tombe dans la surface de G-2 (`scripts/tests/test-*.sh`) ; chaque commit C0, A, B
+porte donc le trailer `Gate-Touche: scripts/tests/test-preuve-41-m1.sh — …` (G-2 rejoué sur B :
+`DECLARE`, rc=0). Variante mesurée verte : C0 aligne en plus « 86 suites » dans les deux README
+(une ligne chacun), A et B ne touchent que la suite ; `gates` rejoué sur cette tête B :
+`15 rejouee(s), 3 sautee(s), 0 en echec`. Elle contredit le critère `autres_fichiers=0` du plan
+(deux fichiers existants modifiés dans C0, aucun gate) : non retenue sans décision humaine.
+Comportement local de la suite de preuve, identique dans les deux variantes : `c0_push=0 c0_pr=0
+a_push=0 a_pr=1 b_push=1 b_pr=0`. Aucun push, aucune PR ouverte ou fermée, `PR-R-COMMITS:` non
+consigné en attente de la décision.
