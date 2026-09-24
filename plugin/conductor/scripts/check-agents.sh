@@ -23,6 +23,22 @@
 # agent à juger ; la garde d'écriture traite cet incident comme une panne du contrôleur.
 # + charte VibeFlow (souveraineté : model explicite + memory explicite + skills câblés).
 #
+# Fraîcheur du manifeste (Phase 42, FABR-02, D-02/D-04/D-05) : chaque liste porte son échéance
+# (verifie_le + valide_jours, lus dans le manifeste, jamais en dur ici). Une liste est PÉRIMÉE
+# quand son verifie_le a plus de valide_jours jours, OU quand il est postérieur à aujourd'hui
+# (DATE-FUTURE, non vérifiable). Effet (D-04, D-05) : l'INDÉTERMINÉ (exit 3, MANIFESTE-PERIME)
+# n'est rendu QUE sous --manifest-freshness=strict — c'est la CI du dépôt qui l'active à ses
+# quatre appels de check-agents.sh, seul endroit avec la légitimité de rafraîchir le manifeste.
+# Partout ailleurs (hook SessionStart, garde d'écriture, CLI sans l'option), un manifeste périmé
+# ne produit qu'un AVERTISSEMENT — jamais un refus — et rétrograde en avertissement les erreurs
+# « outil hors du set connu » et « nom d'agent non résolu » (suffixe [MANIFESTE-PERIME —
+# retrograde en avertissement, D-05]) ; « champ inconnu » reste un avertissement inchangé ;
+# model/memory/effort/permissionMode restent bloquants dans tous les cas (Pitfall 3 : un modèle
+# inventé reste inventé, indépendamment de la fraîcheur de la doc). Le seul geste qui lève le
+# rouge est de rafraîchir check-agents-manifest.json (relire chaque source, comparer, re-dater) —
+# conséquence connue : la CI rougit à ses quatre appels à l'échéance, et T20 de
+# test-dev-orchestrator.sh (qui compte les avertissements d'un AGENT.md) en compte un de plus.
+#
 # Usage:
 #   check-agents.sh                     # lint .claude/agents/*.md · exit 1 si non conforme
 #   check-agents.sh --strict            # GATE init : + les skills déclarés doivent EXISTER
@@ -36,6 +52,10 @@
 #   check-agents.sh --resolve-agents=lenient|strict  # défaut lenient (monde ouvert) — toute
 #                                                 # autre valeur est REJETÉE (exit 1, jamais un skip muet)
 #   check-agents.sh --agent-registry-dir=PATH    # répétable, dirs de résolution supplémentaires
+#   check-agents.sh --manifest-freshness=lenient|strict  # défaut lenient — strict seul rend
+#                                                 # INDETERMINE (exit 3) sur manifeste perime,
+#                                                 # reserve a la CI du depot (D-04) ; toute autre
+#                                                 # valeur est REJETEE (exit 1, jamais un skip muet)
 #
 # BLOQUANT : frontmatter absent · name absent/invalide · description absente ·
 #   model absent ou hors du set du manifeste daté (+ claude-<id>) · memory absente ou hors
@@ -82,6 +102,10 @@
 #   INDÉTERMINÉ (exit 3, jeton CIBLE-ABSENTE) dans tous les modes, y compris sans --strict — une
 #   cible PRÉSENTE mais vide garde le régime F13 déjà documenté ci-dessus, inchangé.
 #   --allow-empty tolère aussi une cible ABSENTE, au même titre qu'une cible vide.
+#   Fraîcheur (Phase 42, FABR-02, D-04) : hors --hook, sous --manifest-freshness=strict, un
+#   manifeste périmé rend aussi INDÉTERMINÉ (exit 3, jeton MANIFESTE-PERIME) — jamais la ligne
+#   « ✓ agents conformes ». Sans l'option (défaut lenient), un manifeste périmé reste un
+#   avertissement, jamais un exit 3 ni un exit 1.
 
 set -uo pipefail
 
@@ -94,6 +118,7 @@ SINGLE_FILE=""
 THIRD_PARTY_PREFIXES="gsd-"
 RESOLVE_AGENTS="lenient"
 REGISTRY_DIRS=""
+MANIFEST_FRESHNESS="lenient"
 
 for arg in "$@"; do
   case "$arg" in
@@ -113,6 +138,7 @@ for arg in "$@"; do
       v="${arg#*=}"
       if [ -z "$REGISTRY_DIRS" ]; then REGISTRY_DIRS="$v"; else REGISTRY_DIRS="$REGISTRY_DIRS:$v"; fi
       ;;
+    --manifest-freshness=*) MANIFEST_FRESHNESS="${arg#*=}" ;;
     -h|--help)        grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
   esac
 done
@@ -131,6 +157,17 @@ case "$RESOLVE_AGENTS" in
   lenient|strict) ;;
   *)
     echo "[check-agents] ✗ --resolve-agents invalide '$RESOLVE_AGENTS' — attendu lenient|strict" >&2
+    exit 1
+    ;;
+esac
+
+# --manifest-freshness : même régime que --resolve-agents ci-dessus (D-14, Phase 42) — toute
+# valeur hors lenient|strict est un rejet explicite, jamais un repli muet sur lenient (qui
+# masquerait silencieusement un manifeste périmé en CI).
+case "$MANIFEST_FRESHNESS" in
+  lenient|strict) ;;
+  *)
+    echo "[check-agents] ✗ --manifest-freshness invalide '$MANIFEST_FRESHNESS' — attendu lenient|strict" >&2
     exit 1
     ;;
 esac
@@ -166,7 +203,8 @@ esac
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
 VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" \
 VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" VF_RESOLVE_AGENTS="$RESOLVE_AGENTS" \
-VF_REGISTRY_DIRS="$REGISTRY_DIRS" VF_MANIFEST="$VF_MANIFEST" "$PYBIN" -c "
+VF_REGISTRY_DIRS="$REGISTRY_DIRS" VF_MANIFEST="$VF_MANIFEST" \
+VF_MANIFEST_FRESHNESS="$MANIFEST_FRESHNESS" "$PYBIN" -c "
 import glob, json, os, re, sys
 from datetime import date
 
@@ -180,6 +218,7 @@ single = os.environ[\"VF_SINGLE\"]
 third_party_prefixes = [p for p in os.environ.get(\"VF_THIRD_PARTY_PREFIXES\", \"\").split(\":\") if p]
 resolve_agents_strict = os.environ.get(\"VF_RESOLVE_AGENTS\", \"lenient\") == \"strict\"
 registry_dirs = [p for p in os.environ.get(\"VF_REGISTRY_DIRS\", \"\").split(\":\") if p]
+manifest_freshness_strict = os.environ.get(\"VF_MANIFEST_FRESHNESS\", \"lenient\") == \"strict\"
 
 # Conventions VibeFlow restees en dur (D-01 borne le manifeste aux SIX listes d'origine native ;
 # ces quatre champs sont des conventions du depot, jamais sujettes a la peremption d'une doc
@@ -248,12 +287,36 @@ def charger_manifeste(chemin):
 
 KNOWN = TOOL_NAMES = NATIVE_TYPES = MODELS = PERM = EFFORT = None
 MODELS_ORDERED = EFFORT_ORDERED = []
+# Fraîcheur (Phase 42, FABR-02, D-02/D-04/D-05) : defauts surs si charger_referentiel() n'est
+# JAMAIS appelee (ex. --file sur une cible introuvable) — une cible non jugee ne peut jamais
+# etre consideree perimee, et le rapport de fraicheur ci-dessous reste silencieux dans ce cas.
+perimees = []
+retrograder = False
+
+def manifeste_perime(manifest, aujourd_hui):
+    \"\"\"Rend, dans l'ordre des listes, une description par liste PERIMEE (D-02) : verifie_le
+    posterieur a aujourd'hui (DATE-FUTURE, non verifiable — horloge forgee, T-42-13) ; ou age en
+    jours strictement superieur a valide_jours (l'un et l'autre LUS dans le manifeste, aucune
+    valeur par defaut de validite ici, D-02). Liste vide = manifeste frais.\"\"\"
+    valide_jours = manifest[\"valide_jours\"]
+    descriptions = []
+    for nom_liste, liste in manifest[\"listes\"].items():
+        verifie_le = date.fromisoformat(liste[\"verifie_le\"])
+        if verifie_le > aujourd_hui:
+            descriptions.append(f\"{nom_liste} (DATE-FUTURE : verifiee le {verifie_le.isoformat()}, posterieure a aujourd'hui — non verifiable)\")
+            continue
+        age = (aujourd_hui - verifie_le).days
+        if age > valide_jours:
+            descriptions.append(f\"{nom_liste} (verifiee le {verifie_le.isoformat()}, {age} j, validite {valide_jours} j)\")
+    return descriptions
 
 def charger_referentiel():
     \"\"\"Charge le manifeste (D-01/D-03) et peuple les ensembles/ordres consommes par le lint.
     Appelee SEULEMENT s'il existe au moins une cible a juger (chargement PARESSEUX) — la branche
-    cible vide (F13, exit 3 en --strict / 0 sinon) ne l'appelle jamais et reste inchangee.\"\"\"
+    cible vide (F13, exit 3 en --strict / 0 sinon) ne l'appelle jamais et reste inchangee ; la
+    fraicheur (perimees/retrograder) n'est donc, elle non plus, JAMAIS evaluee sur cible vide.\"\"\"
     global KNOWN, TOOL_NAMES, NATIVE_TYPES, MODELS, PERM, EFFORT, MODELS_ORDERED, EFFORT_ORDERED
+    global perimees, retrograder
     try:
         m = charger_manifeste(manifest_path)
     except (OSError, ValueError) as e:
@@ -269,6 +332,10 @@ def charger_referentiel():
     PERM = set(listes[\"modes_permission\"][\"valeurs\"])
     EFFORT_ORDERED = list(listes[\"niveaux_effort\"][\"valeurs\"])
     EFFORT = set(EFFORT_ORDERED)
+    # Cibles de mutation MUT-F1/MUT-F2 (42-04) : DEUX lignes distinctes et uniques dans le
+    # fichier, jamais fusionnees — la mutation de l'une ne doit jamais affecter l'autre.
+    perimees = manifeste_perime(m, date.today())
+    retrograder = bool(perimees)
 
 errors, warnings = [], []
 # Deux compteurs DISTINCTS (jamais un skip mal decrit) : thirdparty_files_total = fichiers
@@ -493,7 +560,16 @@ def lint_tool_field(base, field, mode, raw, do_agent_resolution):
         is_agent_tool = name in AGENT_TOOL_NAMES
         if name not in TOOL_NAMES and not is_agent_tool and not name.startswith(\"mcp__\"):
             msg = f\"{base} : {field} — outil hors du set connu '{name}' (typo ? nouvel outil non encore reference ?)\"
-            (errors if strict else warnings).append(msg)
+            # D-05 (Phase 42) : un manifeste perime ne peut plus REFUSER sur cette liste fermee —
+            # erreur seulement si strict ET manifeste frais ; sinon avertissement, suffixe
+            # [MANIFESTE-PERIME — retrograde en avertissement, D-05] uniquement quand c'est bien
+            # la peremption qui a evite le refus (jamais sur le regime lenient normal).
+            if strict and not retrograder:
+                errors.append(msg)
+            else:
+                if retrograder:
+                    msg += \" [MANIFESTE-PERIME — retrograde en avertissement, D-05]\"
+                warnings.append(msg)
         if is_agent_tool:
             if agent_names is None:
                 if field == \"tools\":
@@ -505,9 +581,13 @@ def lint_tool_field(base, field, mode, raw, do_agent_resolution):
                         thirdparty_entries_total += 1
                     elif verdict == \"unresolved\":
                         msg = f\"{base} : {field} — nom d'agent non resolu '{a}' (ni type natif, ni fichier {agents_dir}/{a}.md, ni registre)\"
-                        if resolve_agents_strict:
+                        # D-05 (Phase 42) : meme regime que ci-dessus — erreur sous
+                        # --resolve-agents=strict seulement si le manifeste est frais.
+                        if resolve_agents_strict and not retrograder:
                             errors.append(msg + \" [--resolve-agents=strict]\")
                         else:
+                            if retrograder:
+                                msg += \" [MANIFESTE-PERIME — retrograde en avertissement, D-05]\"
                             warnings.append(msg)
     if bare_agent:
         warnings.append(f\"{base} : tools — 'Agent' sans allowlist parenthesee = dispatch non cloisonne\")
@@ -758,7 +838,21 @@ else:
         check_file(f)
 
 n_err, n_warn = len(errors), len(warnings)
+
+def rapport_manifeste_perime():
+    \"\"\"Ligne de rapport de fraicheur (D-05) — ne contient JAMAIS ✗ (avertissement, pas un
+    refus) ; imprimee des que perimees est non vide, hook ou pas.\"\"\"
+    desc = \"; \".join(perimees)
+    return (f\"[check-agents] ⚠ MANIFESTE-PERIME — {desc} — listes fermees retrogradees en \"
+            \"avertissement (D-05) ; rafraichir check-agents-manifest.json : relire chaque \"
+            \"source, comparer, re-dater\")
+
 if hook:
+    # Sous --hook, la ligne de fraicheur est imprimee des que perimees est non vide — MEME
+    # sans aucun autre avertissement (jamais silence de message, D-05) — puis le flux --hook
+    # existant (compte errors/warnings) suit inchange, et sort 0 comme aujourd'hui.
+    if perimees:
+        print(rapport_manifeste_perime())
     if n_err:
         print(f\"[check-agents] ✗ {n_err} agent(s) non conforme(s) :\")
         for e in errors:
@@ -771,6 +865,9 @@ if hook:
         print(f\"[check-agents] ⚠ {n_warn} avertissement(s) — detail : bash .claude/scripts/check-agents.sh\")
     sys.exit(0)
 
+# Hors --hook, la ligne de fraicheur PRECEDE la liste des avertissements (D-05).
+if perimees:
+    print(rapport_manifeste_perime())
 for w in warnings:
     print(f\"  ⚠ {w}\")
 if thirdparty_files_total or thirdparty_entries_total:
@@ -780,7 +877,15 @@ if n_err:
     print(f\"[check-agents] ✗ {n_err} non-conformite(s) bloquante(s) :\")
     for e in errors:
         print(f\"  ✗ {e}\")
-    sys.exit(1)
+    if not (perimees and manifest_freshness_strict):
+        sys.exit(1)
+# D-04 (Phase 42) : l'INDETERMINE (exit 3) n'est rendu QUE sous --manifest-freshness=strict —
+# la CI du depot, seule legitime a rafraichir le manifeste. Prime sur un eventuel rc 1 deja
+# imprime ci-dessus (lecture litterale de FABR-02) ; la ligne '✓ agents conformes' n'est JAMAIS
+# imprimee dans ce cas.
+if perimees and manifest_freshness_strict:
+    print(\"[check-agents] ✗ INDETERMINE — MANIFESTE-PERIME : aucun verdict rendu (D-04) — rafraichir check-agents-manifest.json puis relancer\")
+    sys.exit(3)
 print(f\"[check-agents] ✓ agents conformes (natif + charte VibeFlow){' · ' + str(n_warn) + ' warning(s)' if n_warn else ''}\")
 sys.exit(0)
 "

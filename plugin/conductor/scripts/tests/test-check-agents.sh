@@ -100,6 +100,40 @@
 #          mais .claude/agents PRESENT et VIDE → rc=0, "rien a verifier", jamais CIBLE-ABSENTE
 #          (regime T23 inchange) ; T55 et T56 rejoues verts sans modification (non-regression
 #          explicite du harnais D-24 existant)
+#
+# Fraîcheur du manifeste (Phase 42, FABR-02, D-02/D-04/D-05) — la suite juge la LOGIQUE de
+# rétrogradation contre un manifeste daté DU JOUR (mk_gate_dir/mk_manifest, même harnais que
+# T77-T82) : l'INDÉTERMINÉ (exit 3) n'est rendu que sous --manifest-freshness=strict (D-04), un
+# manifeste périmé rétrograde en avertissement « outil hors du set connu » et « nom d'agent non
+# résolu » (suffixe retrograde) dans tous les autres contextes (D-05), jamais « champ inconnu »,
+# jamais model/memory/effort (Pitfall 3). Deux mutants QUAL-01 (MUT-F1, MUT-F2) et un troisième
+# posé ici pour la ligne cible_absente de 42-01 (MUT-D20, faute de harnais de mutation plus tôt) :
+#   T83 — manifeste périmé + agent `tools: Read, Reed` + --strict → rc=0, warning suffixé
+#         retrograde ; jumeau frais → rc=1 sans retrograde
+#   T84 — périmé + --manifest-freshness=strict + agent conforme → rc=3 INDETERMINE
+#         MANIFESTE-PERIME, jamais « ✓ agents conformes » ; frais + même option → rc=0 ; périmé
+#         sans option → rc=0, MANIFESTE-PERIME présent, jamais ✗
+#   T85 — bornes : âge = valide_jours → rc=0 sans MANIFESTE-PERIME ; âge = valide_jours + 1 →
+#         rc=3 ; valide-jours=5 : âge 5 → rc=0, âge 6 → rc=3
+#   T86 — date-future=outils (autres listes du jour) + option strict → rc=3, DATE-FUTURE ; sans
+#         option → rc=0, MANIFESTE-PERIME
+#   T87 — --hook : périmé + agent conforme (skills déclaré) → rc=0, sortie avec MANIFESTE-PERIME ;
+#         frais + même agent → sortie vide ; dossier vide + --strict + périmé → rc=3 sans
+#         MANIFESTE-PERIME (fraîcheur non évaluée, F13 inchangé)
+#   T88 — Pitfall 3 : périmé + model/memory/effort invalides → rc=1, les trois restent bloquants
+#   T89 — périmé + --resolve-agents=strict + allowlist non résolue (registre T30) → rc=0, « non
+#         resolu » et retrograde ; jumeau frais → rc=1
+#   T90 — garde d'écriture : dossier périmé + `tools: Read, Reed` → sortie vide (laisse passer) ;
+#         dossier frais → refus JSON citant « outil hors du set connu » ; valeur d'option
+#         inconnue → rc=1, « --manifest-freshness invalide »
+#   MUT-F1 — `perimees = manifeste_perime(` → `perimees = []` (fixture T84) : rc_original=3,
+#         rc_mutant=0
+#   MUT-F2 — `retrograder = bool(perimees)` → `retrograder = False` (fixture T83) : rc_original=0,
+#         rc_mutant=1
+#   MUT-D20 (CORRECTIF DE REVUE, mission revise-42c) — `cible_absente = (not single) and not
+#         os.path.isdir(agents_dir)` → `cible_absente = False` sur le gate déjà modifié par 42-01
+#         (fixture T103, rejouée nue) : rc_original=3, rc_mutant=0 — posé ici car les helpers de
+#         mutation (make_gate_mutant/okmut/komut) n'existent qu'à partir de cette tâche
 
 set -uo pipefail
 
@@ -118,6 +152,20 @@ esac
 pass=0; fail=0
 ok() { echo "  ✓ $1"; pass=$((pass+1)); }
 ko() { echo "  ✗ $1"; fail=$((fail+1)); }
+# okmut/komut (patron test-check-gate-touche.sh l.35-44, QUAL-01) : un mutant n'est tue que si
+# les DEUX rc sont exacts — un plantage (rc inattendu) ou une derive de sortie ne comptent jamais
+# comme tue, meme si un seul des deux rc matchait par accident.
+okmut() {  # <id> <rc_mutant> <attendu_mut> <rc_original> <attendu_orig>
+  echo "  ✓ MUT-$1 TUE : rc_mutant=$2 attendu $3, rc_original=$4 attendu $5"
+  pass=$((pass+1))
+}
+komut() {  # <id> <assertion> <attendu> <obtenu>
+  echo "  ✗ MUT-$1 NON TUE : $2"
+  echo "    assertion : MUT-$1 $2"
+  echo "    attendu   : $3"
+  echo "    obtenu    : $4"
+  fail=$((fail+1))
+}
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -193,6 +241,50 @@ mk_gate_dir() { # <dossier> <age_jours> [operation] -> imprime le chemin du doss
     mk_manifest "$dir/check-agents-manifest.json" "$age" "$op"
   fi
   printf '%s' "$dir"
+}
+
+# make_gate_mutant <id> <age_jours> <motif-fixe> <remplacement> [operation] -> imprime le chemin
+# du dossier mutant ; rc 0 = mutant opposable et syntaxiquement valide, rc 1 = refuse (deja
+# comptabilise via komut). Meme discipline que make_mutant (scripts/tests/test-check-gate-touche.sh
+# l.109-132) : les valeurs transitent par ENVIRON, JAMAIS par awk -v (echappement C sur \/,
+# casserait toute comparaison exacte des lors que le motif porte un antislash) ; refus si la
+# copie mutee est identique a l'original (cmp) ou si bash -n echoue. Le mutant vit a cote d'un
+# manifeste du MEME age/operation que le run original (mk_gate_dir) : D-03 n'interfere jamais.
+make_gate_mutant() { # <id> <age_jours> <motif> <remplacement> [operation]
+  local id="$1" age="$2" motif="$3" remplacement="$4" op="${5:-}"
+  local dir orig n tmp
+  dir="$(mk_gate_dir "$WORK/mut-$id" "$age" "$op")"
+  orig="$dir/check-agents.sh"
+  n="$(grep -Fc -- "$motif" "$orig")"
+  if [ "$n" -ne 1 ]; then
+    komut "$id" "motif fixe unique dans check-agents.sh" "exactement 1 occurrence" "MOTIF AMBIGU OU ABSENT (n=$n)"
+    printf '%s' "$dir"
+    return 1
+  fi
+  tmp="$orig.mut"
+  MUT_MOTIF_ENV="$motif" MUT_REPL_ENV="$remplacement" awk '
+    index($0, ENVIRON["MUT_MOTIF_ENV"]) {
+      match($0, /^[ \t]*/)
+      print substr($0, RSTART, RLENGTH) ENVIRON["MUT_REPL_ENV"]
+      next
+    }
+    { print }
+  ' "$orig" > "$tmp"
+  if cmp -s "$tmp" "$orig"; then
+    komut "$id" "mutation produit un fichier different de l'original" "fichiers distincts" "NON OPPOSABLE (identique)"
+    rm -f "$tmp"
+    printf '%s' "$dir"
+    return 1
+  fi
+  if ! bash -n "$tmp" 2>/dev/null; then
+    komut "$id" "mutant syntaxiquement valide" "bash -n reussit" "bash -n ECHOUE"
+    rm -f "$tmp"
+    printf '%s' "$dir"
+    return 1
+  fi
+  mv "$tmp" "$orig"
+  printf '%s' "$dir"
+  return 0
 }
 
 GATE_DIR="$(mk_gate_dir "$WORK/gate" 0)"
@@ -1761,6 +1853,284 @@ if [ -z "$OUT_GUARD" ]; then
   ok "T82 (garde) manifeste absent, agent conforme → sortie vide (fail-open documenté, laisse passer)"
 else
   ko "T82 (garde) sortie non vide : $OUT_GUARD"
+fi
+
+# ---------- T83-T90 : fraîcheur du manifeste (Phase 42, FABR-02, D-02/D-04/D-05) ----------
+# Age périmé = valide_jours du manifeste VERSIONNÉ + 1, lu par Python (mk_manifest), jamais un
+# 31 écrit en dur — si le manifeste versionné change un jour de valide_jours, ces cas suivent.
+PERIME_AGE="$("$PYBIN" -c "import json,sys; print(json.load(open(sys.argv[1]))['valide_jours'] + 1)" "$REAL_MANIFEST")"
+
+# T83 — outil hors du set connu, périmé : warning suffixé retrograde ; frais : erreur sans suffixe
+T83_PERIME_DIR="$(mk_gate_dir "$WORK/t83-perime" "$PERIME_AGE")"
+T83_AG="$WORK/t83-ag"; mkdir -p "$T83_AG"
+cat > "$T83_AG/agent-t83.md" <<'EOF'
+---
+name: agent-t83
+description: Agent qui declare l'outil Reed (typo), pour prouver la retrogradation D-05.
+tools: Read, Reed
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+OUT="$(bash "$T83_PERIME_DIR/check-agents.sh" --strict --agents-dir="$T83_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "outil hors du set connu 'Reed'" \
+   && echo "$OUT" | grep -q "retrograde" && echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T83 manifeste périmé + tools: Read, Reed, --strict → rc=0, warning suffixé retrograde, MANIFESTE-PERIME"
+else
+  ko "T83 (rc=$RC) : $OUT"
+fi
+T83_FRAIS_DIR="$(mk_gate_dir "$WORK/t83-frais" 0)"
+OUT="$(bash "$T83_FRAIS_DIR/check-agents.sh" --strict --agents-dir="$T83_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && ! echo "$OUT" | grep -q "retrograde"; then
+  ok "T83 (jumeau frais) même agent, manifeste frais, --strict → rc=1 sans retrograde"
+else
+  ko "T83 (jumeau frais, rc=$RC) : $OUT"
+fi
+
+# T84 — INDÉTERMINÉ (D-04) sous --manifest-freshness=strict seulement ; jamais « ✓ agents conformes »
+T84_PERIME_DIR="$(mk_gate_dir "$WORK/t84-perime" "$PERIME_AGE")"
+OUT="$(bash "$T84_PERIME_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "INDETERMINE" && echo "$OUT" | grep -q "MANIFESTE-PERIME" \
+   && ! echo "$OUT" | grep -q "agents conformes"; then
+  ok "T84 périmé + --manifest-freshness=strict + agent conforme → rc=3 INDETERMINE MANIFESTE-PERIME, jamais « ✓ agents conformes »"
+else
+  ko "T84 (rc=$RC) : $OUT"
+fi
+T84_FRAIS_DIR="$(mk_gate_dir "$WORK/t84-frais" 0)"
+OUT="$(bash "$T84_FRAIS_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then
+  ok "T84 (jumeau frais) même option, manifeste frais → rc=0"
+else
+  ko "T84 (jumeau frais, rc=$RC) : $OUT"
+fi
+OUT="$(bash "$T84_PERIME_DIR/check-agents.sh" --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-PERIME" && ! echo "$OUT" | grep -q "✗"; then
+  ok "T84 périmé SANS option → rc=0, MANIFESTE-PERIME présent, aucun ✗"
+else
+  ko "T84 (sans option, rc=$RC) : $OUT"
+fi
+
+# T85 — bornes exactes (age == valide_jours vs valide_jours + 1), y compris valide_jours custom
+T85_EQ_DIR="$(mk_gate_dir "$WORK/t85-eq" 30)"
+OUT="$(bash "$T85_EQ_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T85 âge = valide_jours (30) → rc=0, aucun MANIFESTE-PERIME"
+else
+  ko "T85 (âge=valide_jours, rc=$RC) : $OUT"
+fi
+T85_PLUS1_DIR="$(mk_gate_dir "$WORK/t85-plus1" 31)"
+OUT="$(bash "$T85_PLUS1_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "T85 âge = valide_jours + 1 (31) → rc=3" || ko "T85 (âge=valide_jours+1, rc=$RC) : $OUT"
+T85_V5_EQ_DIR="$(mk_gate_dir "$WORK/t85-v5-eq" 5 "valide-jours=5")"
+OUT="$(bash "$T85_V5_EQ_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "T85 valide-jours=5, âge=5 → rc=0" || ko "T85 (valide-jours=5 âge=5, rc=$RC) : $OUT"
+T85_V5_PLUS1_DIR="$(mk_gate_dir "$WORK/t85-v5-plus1" 6 "valide-jours=5")"
+OUT="$(bash "$T85_V5_PLUS1_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "T85 valide-jours=5, âge=6 → rc=3" || ko "T85 (valide-jours=5 âge=6, rc=$RC) : $OUT"
+
+# T86 — date-future (T-42-13) : une seule liste forgée dans le futur, les autres du jour
+T86_STRICT_DIR="$(mk_gate_dir "$WORK/t86-strict" 0 "date-future=outils")"
+OUT="$(bash "$T86_STRICT_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "DATE-FUTURE"; then
+  ok "T86 date-future=outils (autres listes du jour) + option strict → rc=3, DATE-FUTURE"
+else
+  ko "T86 (strict, rc=$RC) : $OUT"
+fi
+T86_SANS_DIR="$(mk_gate_dir "$WORK/t86-sans" 0 "date-future=outils")"
+OUT="$(bash "$T86_SANS_DIR/check-agents.sh" --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T86 date-future=outils sans option → rc=0, MANIFESTE-PERIME"
+else
+  ko "T86 (sans option, rc=$RC) : $OUT"
+fi
+
+# T87 — --hook (silence total sous manifeste frais, jamais sous manifeste périmé) + cible vide
+T87_PERIME_DIR="$(mk_gate_dir "$WORK/t87-perime" "$PERIME_AGE")"
+T87_AG="$WORK/t87-ag"; mkdir -p "$T87_AG"
+cat > "$T87_AG/agent-t87.md" <<'EOF'
+---
+name: agent-t87
+description: Agent entierement conforme (skills declare), pour prouver le silence total sous --hook.
+tools: Read
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+skills:
+  - petit-skill
+---
+corps
+EOF
+OUT="$(bash "$T87_PERIME_DIR/check-agents.sh" --hook --agents-dir="$T87_AG" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T87 --hook, périmé + agent conforme (skills déclaré) → rc=0, sortie contenant MANIFESTE-PERIME"
+else
+  ko "T87 (hook périmé, rc=$RC) : '$OUT'"
+fi
+T87_FRAIS_DIR="$(mk_gate_dir "$WORK/t87-frais" 0)"
+OUT="$(bash "$T87_FRAIS_DIR/check-agents.sh" --hook --agents-dir="$T87_AG" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && [ -z "$OUT" ]; then
+  ok "T87 --hook, frais + même agent → sortie vide"
+else
+  ko "T87 (hook frais, rc=$RC) : '$OUT'"
+fi
+T87_VIDE_AG="$WORK/t87-vide"; mkdir -p "$T87_VIDE_AG"
+OUT="$(bash "$T87_PERIME_DIR/check-agents.sh" --strict --agents-dir="$T87_VIDE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && ! echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T87 dossier vide + --strict + périmé → rc=3 sans MANIFESTE-PERIME (fraîcheur non évaluée)"
+else
+  ko "T87 (dossier vide, rc=$RC) : $OUT"
+fi
+
+# T88 — Pitfall 3 : model/memory/effort invalides restent bloquants même sous manifeste périmé
+T88_DIR="$(mk_gate_dir "$WORK/t88" "$PERIME_AGE")"
+T88_AG="$WORK/t88-ag"; mkdir -p "$T88_AG"
+cat > "$T88_AG/agent-t88.md" <<'EOF'
+---
+name: agent-t88
+description: Agent aux enums invalides, pour prouver que model/memory/effort restent bloquants meme sous manifeste perime.
+model: gpt-4
+memory: global
+effort: extreme
+---
+corps
+EOF
+OUT="$(bash "$T88_DIR/check-agents.sh" --agents-dir="$T88_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "model invalide" && echo "$OUT" | grep -q "memory invalide" \
+   && echo "$OUT" | grep -q "effort invalide"; then
+  ok "T88 (Pitfall 3) manifeste périmé + model/memory/effort invalides → rc=1, les trois restent bloquants"
+else
+  ko "T88 (rc=$RC) : $OUT"
+fi
+
+# T89 — --resolve-agents=strict + allowlist non résolue (registre de T30) : rétrogradée si périmé
+T89_PERIME_DIR="$(mk_gate_dir "$WORK/t89-perime" "$PERIME_AGE")"
+T89_AG="$WORK/t89-ag"; mkdir -p "$T89_AG"
+cat > "$T89_AG/agent-t89.md" <<'EOF'
+---
+name: agent-t89
+description: Agent qui declare une allowlist non resolue, pour prouver la retrogradation D-05 sous --resolve-agents=strict.
+tools: Read, SendMessage, Agent(vf-codeur)
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+OUT="$(bash "$T89_PERIME_DIR/check-agents.sh" --resolve-agents=strict --agent-registry-dir="$REG" --agents-dir="$T89_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "non resolu" && echo "$OUT" | grep -q "retrograde"; then
+  ok "T89 périmé + --resolve-agents=strict + allowlist non résolue (registre T30) → rc=0, non resolu + retrograde"
+else
+  ko "T89 (rc=$RC) : $OUT"
+fi
+T89_FRAIS_DIR="$(mk_gate_dir "$WORK/t89-frais" 0)"
+OUT="$(bash "$T89_FRAIS_DIR/check-agents.sh" --resolve-agents=strict --agent-registry-dir="$REG" --agents-dir="$T89_AG" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "T89 (jumeau frais) même allowlist, manifeste frais → rc=1" || ko "T89 (jumeau frais, rc=$RC) : $OUT"
+
+# T90 — garde d'écriture : laisse passer sous manifeste périmé, refuse sous manifeste frais ;
+# --manifest-freshness=<valeur inconnue> → rc=1 explicite, jamais un repli muet
+T90_PERIME_DIR="$(mk_gate_dir "$WORK/t90-perime" "$PERIME_AGE")"
+T90_FRAIS_DIR="$(mk_gate_dir "$WORK/t90-frais" 0)"
+T90_SRC="$WORK/t90-reed-src.md"
+cat > "$T90_SRC" <<'EOF'
+---
+name: agent-t90
+description: Agent qui declare l'outil Reed (typo), pour prouver le comportement de la garde sous manifeste perime.
+tools: Read, Reed
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+mkdir -p "$WORK/t90-lab/.claude/agents"
+OUT_GUARD="$(payload_write "$WORK/t90-lab/.claude/agents/agent-t90.md" "$T90_SRC" | ( cd "$WORK/t90-lab" && bash "$T90_PERIME_DIR/guard-agent-write.sh" 2>/dev/null ))"
+if [ -z "$OUT_GUARD" ]; then
+  ok "T90 garde : dossier de gate périmé + tools: Read, Reed → sortie vide (laisse passer)"
+else
+  ko "T90 (garde périmé) sortie non vide : $OUT_GUARD"
+fi
+OUT_GUARD="$(payload_write "$WORK/t90-lab/.claude/agents/agent-t90.md" "$T90_SRC" | ( cd "$WORK/t90-lab" && bash "$T90_FRAIS_DIR/guard-agent-write.sh" 2>/dev/null ))"
+if echo "$OUT_GUARD" | grep -q "outil hors du set connu"; then
+  ok "T90 garde : dossier frais → refus JSON citant « outil hors du set connu »"
+else
+  ko "T90 (garde frais) sortie : $OUT_GUARD"
+fi
+OUT="$(bash "$T90_FRAIS_DIR/check-agents.sh" --manifest-freshness=stricte --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q -- "--manifest-freshness invalide"; then
+  ok "T90 --manifest-freshness=stricte (typo) → rc=1, « --manifest-freshness invalide »"
+else
+  ko "T90 (option invalide, rc=$RC) : $OUT"
+fi
+
+# ---------- MUT-F1/MUT-F2/MUT-D20 : mutation QUAL-01 (fraîcheur + D-20) ----------
+
+# MUT-F1 — perimees = manifeste_perime( → perimees = [] (fixture T84) : rc_orig=3, rc_mut=0
+MUT_F1_DIR="$(make_gate_mutant F1 "$PERIME_AGE" 'perimees = manifeste_perime(' 'perimees = []')"
+MUT_F1_RC=$?
+if [ "$MUT_F1_RC" -eq 0 ]; then
+  MUT_F1_ORIG_DIR="$(mk_gate_dir "$WORK/mut-F1-orig" "$PERIME_AGE")"
+  RC_ORIG=0; bash "$MUT_F1_ORIG_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_F1_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_MUT" -eq 0 ] && [ "$RC_ORIG" -eq 3 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut F1 "$RC_MUT" 0 "$RC_ORIG" 3
+  else
+    komut F1 "rc_mutant=0 et rc_original=3, sans Traceback" "rc_mutant=0, rc_original=3" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# MUT-F2 — retrograder = bool(perimees) → retrograder = False (fixture T83) : rc_orig=0, rc_mut=1
+MUT_F2_DIR="$(make_gate_mutant F2 "$PERIME_AGE" 'retrograder = bool(perimees)' 'retrograder = False')"
+MUT_F2_RC=$?
+if [ "$MUT_F2_RC" -eq 0 ]; then
+  MUT_F2_ORIG_DIR="$(mk_gate_dir "$WORK/mut-F2-orig" "$PERIME_AGE")"
+  MUT_F2_AG="$WORK/mut-F2-ag"; mkdir -p "$MUT_F2_AG"
+  cat > "$MUT_F2_AG/agent-mutf2.md" <<'EOF'
+---
+name: agent-mutf2
+description: Agent qui declare l'outil Reed (typo), fixture de mutation MUT-F2.
+tools: Read, Reed
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_F2_ORIG_DIR/check-agents.sh" --strict --agents-dir="$MUT_F2_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_F2_DIR/check-agents.sh" --strict --agents-dir="$MUT_F2_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 0 ] && [ "$RC_MUT" -eq 1 ] && echo "$OUT_MUT" | grep -q "outil hors du set connu" \
+     && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut F2 "$RC_MUT" 1 "$RC_ORIG" 0
+  else
+    komut F2 "rc_mutant=1 et rc_original=0, sortie mutant avec outil hors du set connu, sans Traceback" "rc_mutant=1, rc_original=0" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# MUT-D20 (CORRECTIF DE REVUE, mission revise-42c) — cible_absente = (not single) and not
+# os.path.isdir(agents_dir) → cible_absente = False (fixture T103, rejouée nue) : rc_orig=3,
+# rc_mut=0. Posé ici (42-04) : les helpers de mutation n'existent qu'à partir de cette tâche —
+# 42-01 (vague 1) ne pouvait pas les présupposer.
+MUT_D20_DIR="$(make_gate_mutant D20 0 'cible_absente = (not single) and not os.path.isdir(agents_dir)' 'cible_absente = False')"
+MUT_D20_RC=$?
+if [ "$MUT_D20_RC" -eq 0 ]; then
+  MUT_D20_ORIG_DIR="$(mk_gate_dir "$WORK/mut-D20-orig" 0)"
+  MUT_D20_ABSENT_ORIG="$(mktemp -d)"
+  RC_ORIG=0; ( cd "$MUT_D20_ABSENT_ORIG" && bash "$MUT_D20_ORIG_DIR/check-agents.sh" ) >/dev/null 2>&1 || RC_ORIG=$?
+  rm -rf "$MUT_D20_ABSENT_ORIG"
+  MUT_D20_ABSENT_MUT="$(mktemp -d)"
+  OUT_MUT="$( cd "$MUT_D20_ABSENT_MUT" && bash "$MUT_D20_DIR/check-agents.sh" 2>&1 )"; RC_MUT=$?
+  rm -rf "$MUT_D20_ABSENT_MUT"
+  if [ "$RC_ORIG" -eq 3 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut D20 "$RC_MUT" 0 "$RC_ORIG" 3
+  else
+    komut D20 "rc_mutant=0 et rc_original=3, sans Traceback" "rc_mutant=0, rc_original=3" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
 fi
 
 # ---------- T72 : assertion sur l'arbre REEL (pas une fixture) — WINDOWS #1 ----------
