@@ -203,3 +203,16 @@ CI réels de la tête d'`origin/main` (`a9620659…`, source de la pose) sont `s
 (sensibilité à la casse du système de fichiers, dépendance Python absente), pas un état réel du
 dépôt. `gates` rejoué sans écart (14 étapes, 3 sautées par construction — conditionnelles à
 `main`/push —, 0 en échec).
+
+## 41-06 — revue code owner
+
+PR-EN-VOL-41-06: numeros=#96,#98,#99,#100 date=2026-09-24T07:27:37Z note=fenetre-sans-merge-convenue-avec-Samuel-relayee-par-Willy-session-principale-2026-09-24
+
+Note sur `PR-EN-VOL-41-06:` : `PR-EN-VOL-APRES:` (41-05) reste telle quelle, non réécrite — c'est une
+mesure historique d'après la pose. Cette ligne est une mesure nouvelle et distincte, prise le
+2026-09-24 avant la Task 1 de ce plan : `#93` est sortie de l'inventaire (mergée, déjà fermée) et
+deux PR sont apparues depuis (`#99` gouvernance/remarques-revue-sam, `#100`
+feat/phase-41-1-gates-workstream-aware), toutes deux ouvertes vers `main`. Aucune des quatre PR de
+cette liste (`#96`, `#98`, `#99`, `#100`) n'est mergée ni touchée par cette phase pendant la fenêtre
+sans merge convenue avec Samuel, relayée par Willy, session principale, 2026-09-24 — la mesure de
+Phase 41 reste valide tant que la fenêtre tient.
