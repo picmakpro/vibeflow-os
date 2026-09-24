@@ -1,6 +1,6 @@
 {
   "name": "dev-orchestrator",
-  "version": "v2.23.1",
+  "version": "v2.23.2",
   "type": "agent+skills",
   "description": "Orchestrateur de développement en modèle agentique : l'agent vibeflow-head détecte l'intention en langage naturel, gouverne et lance l'équipe (vf-coder pour une tâche courte, vf-dev-manager au-delà) qui porte les briques gsd-*/superpowers installées — jamais un skill gsd-* en direct côté head (carte d'intention unique, next steps depuis la feuille de route, hygiène documentaire, garde-fou first-use). Le head applique aussi une gouvernance de sortie (`references/head-governance.md`, ADR-030) : échelle d'allocation à sens unique, contrôle de fin de mission sur témoin machine via `scripts/check-mission-exit.sh` (E1-E6, codes 3/0/4/64), jamais un rejeu d'étage déjà prouvé. Inclut l'équipe de mission (vf-dev-manager — DAG, lock de driver, rapports typés, digest de mission, dispatch parallèle revue ∥ audit — + workers sonnet vf-coder/vf-reviewer/vf-auditer), 2 skills (vf-auto : porte d'autonomie avec seuil équipe ; vf-dev : point d'entrée générique), un fragment hooks/hooks.json (SessionStart : 6 signaux de démarrage advisory — bootstrap, onboard, orientation moteur GSD, dérive documentaire, survie du ledger d'exigences à la clôture d'un jalon, péremption des chemins de hook figés à l'install), le rattrapage outillé restore-requirements-ledger.sh (roll-forward LEDG-01) et la doctrine des garde-fous de boucle autonome.",
   "requires": [

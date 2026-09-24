@@ -1,9 +1,12 @@
 # CHANGELOG — dev-orchestrator
 
-## Non releasé
+## [v2.23.2] — 2026-09-24 (registre de citation et doctrine workstream-aware, Phase 41.1)
 
-> Section **transitoire** : le plan `41.1-08` de la Phase 41.1 l'absorbe dans l'entrée versionnée
-> qu'il pose (fusion du contenu, puis retrait de cet en-tête). Aucun bump de `VERSION` ici.
+**Patch** (durcissement et doctrine, pas une capacité neuve) :
+
+- **`scripts/discover-unintegrated-docs.sh`** : le registre de citation ne lit plus seulement la
+  racine de `.planning/` — il cite **chaque compartiment** présent sur le disque, et quand il ne
+  peut PAS le faire, il le **dit sur stderr** au lieu de se taire.
 
 **Doctrine (Phase 41.1, lot L07 — WSAW-05/06/07)** — origine : l'angle mort constaté à la
 partition D-02 du 2026-09-23 (PR #94), repris à l'ouverture de la Phase 41.1 depuis le ROADMAP.

@@ -1,5 +1,24 @@
 # Changelog — conductor
 
+## [v1.41.0] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
+
+**Minor** (gate neuf `check-planning-consumers-registered.sh` + recensement versionné, Phase 41.1) :
+
+- **`scripts/check-planning-consumers-registered.sh`** (neuf) : lint anti-oubli qui refuse un
+  consommateur de chemin de planning absent du recensement — la classe de défaut « un gate de plus
+  qui résout littéralement `.planning/…` et redevient faux au prochain compartiment » cesse de
+  n'être détectable qu'à la lecture. Câblé en **étape propre** du job `gates` du CI, avec sa suite.
+- **`references/workstream-planning-consumers.md`** (neuf) : recensement **versionné et distribué**
+  des **21 consommateurs** de chemins de planning du dépôt, avec leur état vis-à-vis de la
+  partition — la référence que le lint ci-dessus fait respecter.
+- **`scripts/check-divergence.sh`** : consomme `vf_ws_enumerate` (`planning-core`) comme **source
+  unique** de compartiments — ferme le trou exit-0 qui rendait le gate muet sur un dépôt
+  partitionné, et déduplique les deux boucles d'énumération qui divergeaient.
+- **`scripts/check-state-integrity.sh`** : deux `fail-open` fermés — `--file` avec un chemin absolu
+  hors du dépôt rend désormais **64** (erreur d'argument) au lieu d'un vert sur rien, et une
+  baseline absente de `HEAD` rend **3** (« conforme SOUS RÉSERVE ») au lieu de 0. Contrat de sortie
+  documenté et gardé : **{0,1,2,3,64}**.
+
 ## [v1.40.0] — 2026-09-22 (conformité des blueprints à leur propre gate)
 
 **Minor** (nouveau script, nouvelle suite, câblage CI) :
