@@ -9,10 +9,12 @@ Apply response_language to all user-facing prose — narration between tool call
 > Willy en format AskUserQuestion, options neutres, par `vf-coder` faute d'outil de question — le
 > manager a relayé. Second temps (2026-09-24) : réponses de Willy (AskUserQuestion, session
 > principale, 2026-09-24) rapportées par `vf-dev-manager`, plus quatre détails secondaires que
-> Willy a explicitement délégués (même canal, même date), tranchés ici et marqués comme tels.
-> **Q3 (unification MCP) reste ouverte** : Willy a demandé une comparaison argumentée avant de
-> trancher ; un panel de recherche tourne. Elle est consignée en question ouverte, pas en décision —
-> rien dans ce document ne la tranche implicitement.
+> Willy a explicitement délégués (même canal, même date), tranchés ici et marqués comme tels. Q3
+> (unification MCP) restait ouverte à ce stade — un panel de recherche tournait.
+> **Troisième temps (2026-09-24) : Q3 est tranchée.** Willy a répondu au panel (AskUserQuestion,
+> session principale, 2026-09-24) : les deux déclarations (`vf-mcp-consumer` / `vf-mcp-tools`) sont
+> conservées, aucune migration. Voir D-Q3. Plus aucune zone grise structurante n'est ouverte dans ce
+> document.
 
 <domain>
 ## Phase Boundary
@@ -21,14 +23,15 @@ Chaque skill déclare sa nature (`vf-nature: referentiel | outil | procedure`, d
 une procédure sans `ecrit:` ni rubrique de juge est refusée ; la dérive de forme procédurale non
 déclarée est détectée (en avertissement pour cette phase — D-Q5) ; `skill-creator` demande la
 nature, dans son moteur interne ET son workflow templaté (D-Q6) ; le budget des `SKILL.md` **et**
-du bootstrap gagne un enforcement machine (D-Q4). **La fusion des deux conventions MCP
-(`vf-mcp-consumer` / `vf-mcp-tools`) reste une question ouverte (Q3, non tranchée) — voir
-`<open_questions>`.**
+du bootstrap gagne un enforcement machine (D-Q4). **Les deux conventions MCP
+(`vf-mcp-consumer` / `vf-mcp-tools`) sont conservées telles quelles — pas de fusion** ; la spec
+fabrique est amendée pour corriger trois erreurs factuelles et acter la décision 1 d'ADR-051, et
+trois durcissements ciblés sont posés côté gate et injecteur (D-Q3).
 
-**Dans le périmètre** : fabrique §6 (gate des skills, `vf-nature`, détection de dérive), §7.2
-(unification MCP — **suspendu à Q3**), B-03 ; `.planning/BACKLOG.md:450` (budget SKILL.md et
-bootstrap) ; initialisation §C-15/§5.2 (les trois marqueurs de B-03, question factuelle, pas de
-redéfinition de la nature).
+**Dans le périmètre** : fabrique §6 (gate des skills, `vf-nature`, détection de dérive), §7.2 et
+§1.2 (amendement — D-Q3), B-03 ; `.planning/BACKLOG.md:450` (budget SKILL.md et bootstrap) ;
+initialisation §C-15/§5.2 (les trois marqueurs de B-03, question factuelle, pas de redéfinition de
+la nature).
 
 **Hors périmètre** : §7.1 (blueprints, déjà livré ailleurs) ; §7.3 (nomenclature des prompts, pas
 un gate) ; le hook central par rôle (Phase 45) ; la mise en conformité du corpus détecté par la
@@ -48,7 +51,7 @@ dérive (backlog séparé, D-Q5 — voir `entree_backlog_a_poser` du rapport de 
   2026-09-24) : « Les deux, en écart ».
   — **Reversibility:** costly — le format du frontmatter et le vocabulaire de motifs sont lus par le
   gate et par `skill-creator` (qui doit poser les mêmes questions factuelles, C-15) ; changer l'un
-  des deux without l'autre romprait la cohérence outil↔déclaration.
+  des deux sans l'autre romprait la cohérence outil↔déclaration.
 
 ### Collision de nom `vf-nature` / « nature du sujet » (Q2)
 - **D-Q2 : deux questions distinctes, sans fusion.** `vf-nature` (referentiel/outil/procedure, B-03)
@@ -82,10 +85,45 @@ dérive (backlog séparé, D-Q5 — voir `entree_backlog_a_poser` du rapport de 
   corpus corrigé dans cette phase, la CI passe déjà `--strict` »).** Ce n'est pas une incohérence :
   Phase 42 armait un invariant déjà mesuré et borné (corpus nommé skill par skill, I3/I5/I6, D-11) sur un gate
   existant renforcé ; Phase 43 pose un **nouveau** gate sur un corpus non encore mesuré dans ce
-  dépôt (voir D-Q7bis) — l'avertissement est le choix assumé de Willy pour ce premier tour, pas une
-  dérogation silencieuse à la doctrine.
+  dépôt (mesure du corpus, Claude's Discretion ci-dessous) — l'avertissement est le choix assumé de
+  Willy pour ce premier tour, pas une dérogation silencieuse à la doctrine.
   — **Reversibility:** reversible — passer de l'avertissement au refus est un changement de sévérité
   local dans le gate, pas une migration de format.
+
+### Unification MCP — tranchée (Q3)
+- **D-Q3 : les deux déclarations `vf-mcp-consumer` / `vf-mcp-tools` sont conservées, aucune
+  migration.** L'option « une clé, deux formes de valeur » (fusion mécanique en gardant les rôles)
+  est écartée. Réponse de Willy (AskUserQuestion, session principale, 2026-09-24), après un panel
+  de recherche : « garder les deux déclarations ».
+  **La spec est amendée**, pas le code : `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md`
+  §1.2 et §7.2 prennent acte que `vf-mcp-consumer` (produire un verdict de compilation, moindre
+  privilège large et dérivé) et `vf-mcp-tools` (vérifier un verdict, moindre privilège étroit et
+  nommé) répondent à deux besoins distincts — décision 1 d'ADR-051, pas « un même besoin ». Trois
+  erreurs factuelles de §1.2 sont corrigées dans le même geste :
+  - `vf-mcp-consumer: true` porte sur **4** agents, pas 3 : `vf-coder`, `vf-test-runner`,
+    `vf-test-orchestrator`, `vf-app-fixer` (mesuré : `grep -rl "vf-mcp-consumer: true" plugin/*/agents/*.md`) ;
+  - `vf-reviewer` **est** un consommateur Xcode (`plugin/dev-orchestrator/agents/vf-reviewer.md:10` —
+    `vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean`), pas un cas générique isolé ;
+  - la formule « deux conventions concurrentes pour un même besoin » contredit la décision 1
+    d'ADR-051 elle-même et doit être reformulée en « deux besoins distincts, deux déclarations ».
+  **Trois durcissements sont posés dans cette phase**, sur le mécanisme conservé :
+  - (a) `check-skills.sh` (et/ou `check-agents.sh`, à trancher au plan) valide la **grammaire** de
+    `vf-mcp-tools` — aujourd'hui une valeur malformée passe le gate silencieusement et ne produit
+    rien à l'install (`plugin/dev-orchestrator/scripts/inject-mcp-tools.sh:549-551`, no-op sur
+    grammaire malformée, couvert par le cas T22 de `test-inject-mcp-tools.sh`) ;
+  - (b) l'injecteur **signale** un serveur nommé absent au lieu d'un no-op muet
+    (`inject-mcp-tools.sh:554`, cas T16 de la même suite) — motif réel mesuré : `getsentry/XcodeBuildMCP`
+    redirige désormais vers `MobileBuildMCP`, un nom couramment obsolète dans les `.mcp.json` de labs ;
+  - (c) les textes qui ne nomment que `vf-mcp-consumer` sans mentionner `vf-mcp-tools` sont corrigés :
+    `plugin/_internal/vibeflow-update.sh:1276,1308,2413`, `plugin/conductor/skills/vf-calibrate/SKILL.md:92`.
+  **Hors périmètre de cette phase** : l'union des scopes projet et global du mode large
+  (`vf-mcp-consumer` chez `vf-app-fixer` ne résout que `./.mcp.json` projet, pas `~/.claude.json`
+  global — contrairement à `vf-calibrate` qui union les deux depuis Phase 21, ADR-051-B, absent de
+  la spec fabrique). Finding pour Samuel, consigné au BACKLOG par `vf-dev-manager` (commit
+  `f4cc09b`), sans correctif dans cette phase.
+  — **Reversibility:** reversible — aucun changement de contrat de frontmatter existant ; les
+  durcissements (a)(b) ajoutent des diagnostics sur des chemins aujourd'hui silencieux, (c) est
+  une correction de prose.
 
 ### `skill-creator` — quel(s) fichier(s) s'alignent (Q6)
 - **D-Q6 : les deux fichiers demandent la nature, même défaut « outil ».** `plugin/skill-creator/skills/skill-creator/SKILL.md`
@@ -117,40 +155,28 @@ Claude, 2026-09-24 :
   cas de test — le chiffre 9/142 conformes et 32/142 en dérive de la spec fabrique §6 vient d'un
   autre corpus que ce dépôt de distribution.
 
+### Exigences proposées (à graver au ledger par le planificateur)
+- **FABR-06** gate des skills — `vf-nature` (défaut « outil »), procédure sans `ecrit:` ni rubrique
+  de juge refusée (D-Q1, D-Q2).
+- **FABR-07** détection de dérive procédurale en écart déclaration/prose, avertissement (pas refus)
+  cette phase, corpus non corrigé ici (D-Q1, D-Q5).
+- **FABR-08** `skill-creator` (moteur interne ET workflow templaté) pose `vf-nature`, même défaut
+  (D-Q6).
+- **FABR-09** budget des `SKILL.md` et du bootstrap étendus via `check-instruction-budget.sh`
+  (socle repris) (D-Q4).
+- **FABR-10** amendement de la spec fabrique §1.2/§7.2 (deux besoins d'ADR-051, trois corrections
+  factuelles) ; durcissements (a) grammaire `vf-mcp-tools` validée, (b) serveur nommé absent
+  signalé, (c) textes à une seule clé corrigés (D-Q3).
+
 </decisions>
 
 <open_questions>
-## Question ouverte — non tranchée
+## Questions ouvertes
 
-### Q3 : unification des deux conventions MCP (§7.2 de la spec fabrique)
-§7.2 de `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` demande que « les deux
-conventions concurrentes fusionnent en une seule ». Le code réel porte deux champs :
-`vf-mcp-consumer: true` (allowlist large dérivée du lab à l'install, agents exécutants —
-`vf-coder`, `vf-test-runner`, `vf-app-fixer`, `vf-test-orchestrator`) et `vf-mcp-tools: <serveur>:<outils>`
-(allowlist nommée étroite, `vf-reviewer` seul). `plugin/conductor/scripts/check-agents.sh:171-173`
-documente explicitement leur coexistence comme voulue : « coexiste avec vf-mcp-consumer sans le
-remplacer ». `docs/ADR.md` ADR-051 pose ce couple comme un choix délibéré de moindre privilège
-différencié par rôle (l'exécutant produit un verdict de compilation, moindre privilège = large mais
-dérivé ; le relecteur vérifie un verdict, moindre privilège = étroit et nommé).
-
-**Willy a demandé une comparaison argumentée plutôt qu'un tranchage direct** (AskUserQuestion,
-session principale, 2026-09-24) ; un panel de recherche est en cours au moment de ce cadrage.
-
-Options neutres présentées (aucune consommée, aucune écartée) :
-- **Oui, fusionner ces deux-là** — un seul mécanisme remplace les deux champs, quitte à revoir le
-  moindre privilège différencié d'ADR-051.
-- **Non, autre chevauchement visé** — `vf-mcp-consumer`/`vf-mcp-tools` restent tels quels (design
-  ADR-051 intact) ; la fusion visée par §7.2 est ailleurs, p. ex. le champ officiel `mcpServers:`
-  natif vs le mécanisme maison — déjà tranché en faveur du maison dans la même section.
-- **Fusionner la mécanique, garder les rôles** — un seul script/format d'injection sous-jacent, mais
-  deux façons de le déclarer (large vs nommé) subsistent en frontmatter.
-
-**Ce qui en dépend, suspendu à Q3** : le volet MCP du goal de phase (« les deux conventions MCP
-concurrentes n'en font plus qu'une ») ; toute tâche du futur plan qui toucherait
-`check-agents.sh:171-173`, `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` ou le frontmatter
-`vf-mcp-consumer`/`vf-mcp-tools` des cinq agents cités. `gsd-plan-phase` ne doit pas planifier ce
-volet avant que Q3 soit tranchée — les cinq autres décisions (D-Q1, D-Q2, D-Q4, D-Q5, D-Q6) sont
-indépendantes et peuvent être planifiées sans attendre.
+**Aucune.** Q3 (unification MCP), seule zone grise structurante restée ouverte au second temps de
+ce cadrage, a été tranchée au troisième temps (2026-09-24) — voir D-Q3 dans `<decisions>` et
+`43-DISCUSSION-LOG.md`. Plus rien n'est marqué « suspendu à Q3 » dans ce document : le volet MCP du
+goal de phase est planifiable au même titre que les cinq autres décisions.
 
 </open_questions>
 
@@ -161,7 +187,8 @@ indépendantes et peuvent être planifiées sans attendre.
 
 ### Specs du chantier
 - `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §6 (gate des skills,
-  `vf-nature`, détection de dérive), §7.2 (unification MCP — **Q3 ouverte**), B-03.
+  `vf-nature`, détection de dérive), §1.2 et §7.2 (MCP — **à amender**, D-Q3, trois erreurs
+  factuelles listées dans D-Q3), B-03.
 - `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §2, §9 — D-07 du moteur,
   dont le gate des skills est le contrôle machine manquant.
 - `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-15, §5.2 — les trois marqueurs
@@ -173,9 +200,20 @@ indépendantes et peuvent être planifiées sans attendre.
   D-01 (manifeste unique, une seule vérité), D-10 (découverte récursive testée), D-11 (invariants
   armés en erreur, corpus corrigé dans la même phase — écart assumé par D-Q5 de cette phase).
 - `plugin/conductor/scripts/check-agents.sh` — contrat de sortie (0/1/3, F13, silence de code sous
-  `--hook`) que `check-skills.sh` reprend ; lignes 171-173 pour la coexistence MCP (Q3).
+  `--hook`) que `check-skills.sh` reprend ; lignes 171-173 pour la coexistence MCP voulue (D-Q3).
 - `plugin/conductor/scripts/check-instruction-budget.sh` — socle à étendre pour D-Q4 (lignes 14-15 :
   glob à un seul niveau, ne couvre pas `SKILL.md`, motif propre aux agents non transposable).
+
+### MCP — durcissements (D-Q3)
+- `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh:549-551` — no-op silencieux sur `vf-mcp-tools`
+  malformée (durcissement a, cas T22 de `tests/test-inject-mcp-tools.sh`).
+- `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh:554` — no-op silencieux sur serveur nommé
+  absent (durcissement b, cas T16 de la même suite).
+- `plugin/_internal/vibeflow-update.sh:1276,1308,2413` et
+  `plugin/conductor/skills/vf-calibrate/SKILL.md:92` — textes ne nommant que `vf-mcp-consumer`
+  (durcissement c).
+- `docs/ADR.md` ADR-051 §Décision point 1 — la distinction produire/vérifier que la spec doit
+  désormais citer explicitement.
 
 ### skill-creator
 - `plugin/skill-creator/skills/skill-creator/SKILL.md` — moteur interne, non templaté (D-Q6).
@@ -185,7 +223,8 @@ indépendantes et peuvent être planifiées sans attendre.
 ### Doctrine du dépôt
 - `CLAUDE.md` — ADR-029 (densité, SKILL.md ≤ 500 lignes, bootstrap ≤ 2000 tokens), ADR-044 (agents
   natifs machine-enforced), G-2 (trailer `Gate-Touche:` si ce gate ou sa suite sont touchés).
-- `docs/ADR.md` ADR-051 — allowlist MCP dérivée du lab, le design du couple mis en question par Q3.
+- `docs/ADR.md` ADR-051 — allowlist MCP dérivée du lab, le design du couple confirmé par D-Q3
+  (décision 1 : produire ≠ vérifier).
 
 </canonical_refs>
 
@@ -223,11 +262,13 @@ indépendantes et peuvent être planifiées sans attendre.
 <deferred>
 ## Deferred Ideas
 
-- Mise en conformité du corpus de skills détecté en dérive (D-Q5) : backlog séparé, à poser par
-  `vf-dev-manager` (hors périmètre de ce mandat de cadrage).
-- Unification `vf-mcp-consumer` / `vf-mcp-tools` : **question ouverte Q3**, pas un différé — un
-  panel de recherche est en cours, le tranchage reviendra dans une itération ultérieure du cadrage,
-  pas dans une phase distincte.
+- Mise en conformité du corpus de skills détecté en dérive (D-Q5) : backlog séparé, posé par
+  `vf-dev-manager` (`.planning/BACKLOG.md`, commit `e36e6f2`) — hors périmètre de ce mandat de
+  cadrage.
+- Union des scopes projet/global du mode large MCP (`vf-mcp-consumer` chez `vf-app-fixer` ne
+  résout que `./.mcp.json`, contrairement à `vf-calibrate` qui union projet + global depuis
+  ADR-051-B) : finding pour Samuel, sans correctif dans cette phase (D-Q3) — posé au BACKLOG par
+  `vf-dev-manager`, commit `f4cc09b`.
 
 </deferred>
 

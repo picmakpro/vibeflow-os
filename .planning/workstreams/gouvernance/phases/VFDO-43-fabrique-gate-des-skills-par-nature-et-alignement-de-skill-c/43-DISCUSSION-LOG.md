@@ -43,18 +43,33 @@ fusion.
 
 ## Q3 — Unification des deux conventions MCP
 
+**Premier tour (second temps du cadrage) :**
+
 | Option | Description | Selected |
 |--------|-------------|----------|
 | Oui, fusionner ces deux-là | Un seul mécanisme remplace vf-mcp-consumer et vf-mcp-tools, quitte à revoir le moindre privilège différencié d'ADR-051. | |
 | Non, autre chevauchement visé | vf-mcp-consumer/vf-mcp-tools restent tels quels ; la fusion visée est ailleurs (mcpServers: natif vs mécanisme maison, déjà tranché en faveur du maison). | |
 | Fusionner la mécanique, garder les rôles | Un seul script/format d'injection sous-jacent, mais deux façons de le déclarer (large vs nommé) subsistent en frontmatter. | |
 
-**User's choice:** **Aucune — question restée ouverte.** Willy a demandé une comparaison
-argumentée plutôt qu'un tranchage direct ; un panel de recherche est en cours au moment de ce
-cadrage.
-**Notes:** Canal — AskUserQuestion, session principale, 2026-09-24. Consignée en question ouverte
-dans `43-CONTEXT.md` (`<open_questions>`), avec le volet MCP du goal de phase et toute tâche future
-qui toucherait les cinq agents concernés marqués « suspendu à Q3 ».
+**User's choice (premier tour) :** aucune des trois — Willy a demandé une comparaison argumentée
+plutôt qu'un tranchage direct ; un panel de recherche a tourné.
+
+**Second tour (troisième temps du cadrage, 2026-09-24) — options du panel :**
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Garder les deux déclarations | vf-mcp-consumer et vf-mcp-tools restent deux champs séparés, aucune migration ; la spec est corrigée pour reconnaître les deux besoins d'ADR-051 (produire ≠ vérifier). | ✓ |
+| Une clé, deux formes de valeur | Un seul champ frontmatter (p. ex. vf-mcp: true ou vf-mcp: <serveur>:<outils>), la forme de la valeur portant la distinction large/nommé. | |
+| (option écartée sans être formellement présentée : fusion complète avec perte du moindre privilège différencié) | — | |
+
+**User's choice (second tour) :** « Garder les deux déclarations. » Aucune migration ; l'option
+« une clé, deux formes de valeur » (1a) est écartée.
+**Notes:** Canal — AskUserQuestion, session principale, 2026-09-24 (rapporté par `vf-dev-manager`).
+Willy amende aussi la spec (§1.2, §7.2 — deux besoins d'ADR-051, trois erreurs factuelles
+corrigées) et durcit trois points du mécanisme conservé (grammaire `vf-mcp-tools`, serveur nommé
+absent signalé, textes à une seule clé corrigés). Un finding hors périmètre (union des scopes
+projet/global) part au BACKLOG pour Samuel, sans correctif ici. Décision tracée dans
+`43-CONTEXT.md` sous D-Q3 ; plus aucune mention « suspendu à Q3 » dans ce document.
 
 ---
 
@@ -124,7 +139,7 @@ Quatre détails que Willy a explicitement délégués (AskUserQuestion, session 
 
 ## Deferred Ideas
 
-- Mise en conformité du corpus détecté par la dérive (Q5) : backlog séparé, nommé mais non créé par
-  ce mandat.
-- Unification MCP (Q3) : non différée à une autre phase — question ouverte à trancher lors d'une
-  prochaine itération du cadrage, une fois le panel de recherche de Willy revenu.
+- Mise en conformité du corpus détecté par la dérive (Q5) : backlog séparé, posé par
+  `vf-dev-manager` (`.planning/BACKLOG.md`, commit `e36e6f2`).
+- Union des scopes projet/global du mode large MCP (D-Q3, hors périmètre de cette phase) : finding
+  pour Samuel, posé au BACKLOG par `vf-dev-manager` (commit `f4cc09b`), sans correctif ici.
