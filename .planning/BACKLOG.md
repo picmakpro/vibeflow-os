@@ -722,10 +722,17 @@ inspecte déjà tous les compartiments présents sans se fier à un pointeur.
 **Déclencheur de reprise :** l'ajout d'un troisième compartiment, ou le premier incident réel où un
 compartiment autre que `fiabilite` régresse sans que la CI ne le voie.
 
-## ADPT-06 — canal `hooks`/`plugins` du dépôt jugé jamais répété — DIFFÉRÉ (2026-09-24)
+## ADPT-06 — canal `hooks`/`plugins` du dépôt jugé jamais répété — RÉSORBÉ (2026-09-24)
 
 **Capturé :** 2026-09-24, audit de clôture du jalon `fiabilite-v1.0` (compartiment `fiabilite`,
-`.planning/workstreams/fiabilite/REQUIREMENTS.md`).
+`.planning/workstreams/fiabilite/REQUIREMENTS.md`). **Résorbé :** 2026-09-24, preuve
+`.planning/workstreams/fiabilite/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-ADPT06-HOOKS-REPETITIONS.md`
+(commit `78648ca`) — répétitions du canal `hooks`/`plugins` menées (5 runs, marqueur `0/5`), deux
+gates indépendants vérifiés séparément (confiance par défaut du projet/des hooks ; les deux
+drapeaux `features.hooks=false`/`features.plugins=false`). Limite déclarée dans ce même document :
+dépôt jugé jamais trusté et sans `--dangerously-bypass-hook-trust`, un seul type de hook mesuré
+(`SessionStart`), pas de plugin réel construit, non reproductible en suite automatisée (appel
+réseau requis).
 
 **Le défaut :** ADPT-06 exige la preuve de fermeture du canal d'injection en RÉPÉTITIONS (≥ 3 runs,
 marqueur attendu 0/N), « jamais en un run » — livrée et cochée sur cette base. Mais la preuve
