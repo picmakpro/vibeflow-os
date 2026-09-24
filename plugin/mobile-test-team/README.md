@@ -4,7 +4,7 @@
 > vraiment »**. Ce module ajoute la boucle manquante : trois agents cloisonnés qui testent
 > l'app réelle sur cible mobile, corrigent, et re-testent jusqu'au vert — sans jamais tricher.
 
-**Type** : agents + rules · **Version** : v1.4.5 · **Dépend de** : `mobile-test`
+**Type** : agents + rules · **Version** : v1.4.6 · **Dépend de** : `mobile-test`
 
 ---
 
@@ -102,13 +102,15 @@ se passe :
 
 | Agent | Rôle | `tools:` (le couloir) | Interne |
 |-------|------|----------------------|:---:|
-| `vf-test-orchestrator` | tient la boucle, applique garde-fous et halts, porte la recherche doc (ADR-045), rapport typé ADR-053 | Read, Write, Bash, Glob, Grep, **WebSearch, WebFetch**, `Agent(vf-test-runner, vf-app-fixer)` — ne peut spawner **que** ses 2 workers | non |
+| `vf-test-orchestrator` | tient la boucle, applique garde-fous et halts, porte la recherche doc (ADR-045), rapport typé ADR-053 | Read, Write, Bash, Glob, Grep, **WebSearch, WebFetch**, `Agent(vf-test-runner, vf-app-fixer)` — ne peut spawner **que** ses 2 workers | `vf-internal: true` (dispatché par `vf-dev-manager` / `vf-auto`) |
 | `vf-test-runner` | possède les tests : écrit les flows manquants (**jamais affaiblir un assert**), joue le pipeline, diagnostic structuré | Read, Edit, Write, Bash, Glob, Grep — écrit **uniquement** dans `maestroFlowsDir` ; pas de `Task`, pas de web | `vf-internal: true` |
 | `vf-app-fixer` | corrige **uniquement** le code app, un fix = un commit atomique ; remonte `doc-research-required` plutôt que bricoler | Read, Edit, Write, Bash, Glob, Grep — interdit d'écrire dans les tests ; pas de `Task`, pas de web | `vf-internal: true` |
 
 Les 3 agents : `model: sonnet`, `memory: project`, `vf-mcp-consumer: true` (allowlist MCP dérivée
 du lab). Les workers `vf-internal` n'ont pas de commande d'incarnation (Pattern 12 / ADR-044) —
-seuls l'orchestrateur les dispatche.
+seuls leurs dispatcheurs les invoquent. Depuis la version bumpée, `vf-test-orchestrator` est
+lui-même un worker interne (`vf-internal: true`, dispatché par `vf-dev-manager` ou `vf-auto`) :
+il ne reçoit donc plus de commande d'incarnation à l'install.
 
 ### Rules et références
 
