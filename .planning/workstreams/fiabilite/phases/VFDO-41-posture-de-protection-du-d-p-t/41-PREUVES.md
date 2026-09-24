@@ -10,8 +10,10 @@ CONTEXTES-CHECKS: sha=5238cba66c0d878a9ff4eb1c32757c21c64b454d n=4 app=15368 ega
 
 ## 41-14 — base de la garde de trace
 
-BASE-TRACE-ARBITRAGE: f1d658957f7fe9c446b341bc447c19d6a0a0ed3a
+BASE-TRACE-ARBITRAGE: 0b4d9a7ebbfa3c2f209da0efae69ec538f801abb
 Motif : les commits de cadrage et de planification antérieurs à cette valeur précèdent la garde G-1 et ne sont pas réécrits — seule la plage `<sha>..HEAD` sera jugée par le contrôle de trace du plan 41-15.
+BASE-TRACE-ARBITRAGE-AVANCE: date=2026-09-24 ancien=f1d658957f7fe9c446b341bc447c19d6a0a0ed3a nouveau=0b4d9a7ebbfa3c2f209da0efae69ec538f801abb
+Motif : le détecteur `check-trace-arbitrage.sh` a été corrigé le même jour (citations multiples distinctes et conformes désormais acceptées, merges réels de PR et commits de release exclus du jugement, mot déclencheur de l'extraction insensible à la casse — trois défauts mesurés sur ce dépôt). Rejoué après correction sur l'ancienne borne, 7 FORME-NON-CONFORME subsistaient (`6002c2f`, `2f4d388`, `f688e2b`, `ced7577`, `12cbae2`, `39acd36`, `0b4d9a7`), tous datés du 2026-09-23 et causés par l'identifiant `D-02` de la mission « partition réelle du planning », confondu par le détecteur avec le registre `D-01`..`D-10` de la phase 41 — hors des trois défauts corrigés, non retouchés. Historique antérieur à `0b4d9a7` (dernier de ce lot) accepté en l'état, au même titre que le motif déjà posé pour l'ancienne borne. Rejoué sur la nouvelle borne (`--base-ref 0b4d9a7`) : `rc=0 commits=40 citants=11`, aucun écart.
 
 ## 41-15 — outillage de preuve du périmètre sans admin
 
