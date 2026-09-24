@@ -734,3 +734,30 @@ corpus corrigé dans la même phase).
 
 **Déclencheur de reprise :** le gate existe et a mesuré le corpus réel (25 `SKILL.md` sous `plugin/`
 au 2026-09-24). Reprendre avec la liste des skills signalés, puis décider de l'armement en erreur.
+
+## Pour Samuel — le mode large `vf-mcp-consumer` injecte les serveurs du scope global, dont context7 chez `vf-app-fixer` (constaté 2026-09-24)
+
+**Capturé :** 2026-09-24, panel de décision sur la question MCP du cadrage de la Phase 43 (compartiment
+`gouvernance`). Hors périmètre de la Phase 43 : sur décision de Willy (AskUserQuestion, session
+principale, 2026-09-24), il est inscrit comme finding pour Samuel, **sans correctif dans cette mission**
+(ADR-031). Polarité : `dev-orchestrator` et `mobile-test-team` (Samuel).
+
+**Le défaut :** `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` réunit les serveurs du scope
+projet (`.mcp.json`) et ceux du scope global (`~/.claude.json`, clé `mcpServers`) pour tout agent qui
+porte `vf-mcp-consumer: true` (l.26-31, l.222). Il en résulte un écart de doctrine :
+- ADR-051 (« Cloisonnement », `docs/ADR.md:469`) garde à `vf-app-fixer` son interdiction ADR-045
+  (pas de context7, pas de web) ;
+- les conséquences négatives d'ADR-051 disent qu'un serveur déclaré au seul niveau utilisateur n'est
+  pas injecté « par conception » ;
+- le script justifie l'union par « ADR-051-B », un addendum **absent** de `docs/ADR.md`.
+
+**Preuve rejouée** (2026-09-24, copie jetable de `vf-app-fixer.md` dans le scratchpad de session, sans
+`.mcp.json` de projet) :
+`inject-mcp-tools.sh --target <copie>/agents --mcp-json <absent> --dry-run` →
+`vf-app-fixer.md : (dry-run) ajouterait mcp__context7__*, mcp__xpoz-mcp__*`. Ce sont exactement les
+deux serveurs de `~/.claude.json` de ce poste.
+
+**À trancher par Samuel :** filtrer le scope global pour les agents cloisonnés, ou revenir au seul
+scope projet pour le mode large, ou écrire l'addendum ADR-051-B qui assume l'union et amende ADR-045.
+Tant que rien n'est tranché, tout lab dont `~/.claude.json` déclare context7 donne context7 à
+`vf-app-fixer` à l'installation.
