@@ -420,6 +420,38 @@ miss=0
 rm -rf "$LAB"
 
 # ---------------------------------------------------------------------------
+# T54 (Phase 42, D-16, DISCRIMINANT) — les fichiers de DONNÉES *.json d'un module (le manifeste
+# daté du gate des agents, check-agents-manifest.json) sont posés chez l'utilisateur. Même dette
+# que T9, glob distinct (*.json) : sans le Site #3bis de copy_module_scripts(), le manifeste
+# n'arriverait JAMAIS à l'install et D-03 (check-agents.sh) refuserait le gate partout. Quatre
+# assertions : le .json est posé, non exécutable, le résidu .bak est écarté, et la ligne exacte
+# figure au manifeste d'installation (même preuve que T6b de test-manifest.sh).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+mkdir -p "$CACHE/jsonful/scripts"
+echo v1.0.0 > "$CACHE/jsonful/VERSION"
+printf '{"name":"jsonful","version":"v1.0.0"}\n' > "$CACHE/jsonful/module.json"
+printf '#!/usr/bin/env bash\necho x\n' > "$CACHE/jsonful/scripts/jsonful.sh"
+printf '{"valide_jours":30}\n' > "$CACHE/jsonful/scripts/jsonful-manifest.json"
+printf '{"residu":true}\n' > "$CACHE/jsonful/scripts/jsonful-manifest.json.bak"
+(cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+   bash "$INSTALLER" install jsonful >/dev/null 2>&1) || true
+miss=0
+[ -f "$LAB/.claude/scripts/jsonful-manifest.json" ] \
+  || { ko "T54 : jsonful-manifest.json non posé — le manifeste daté n'atteint jamais l'utilisateur"; miss=1; }
+[ ! -x "$LAB/.claude/scripts/jsonful-manifest.json" ] \
+  || { ko "T54 : jsonful-manifest.json marqué exécutable — c'est une donnée, pas un script"; miss=1; }
+[ ! -f "$LAB/.claude/scripts/jsonful-manifest.json.bak" ] \
+  || { ko "T54 : résidu .json.bak posé — le glob de données ratisse trop large"; miss=1; }
+MANI54="$LAB/.claude/scripts/.vibeflow-manifest-jsonful"
+{ [ -f "$MANI54" ] && awk '$0=="scripts/jsonful-manifest.json"{f=1} END{exit !f}' "$MANI54"; } \
+  || { ko "T54 : ligne scripts/jsonful-manifest.json absente du manifeste d'installation"; miss=1; }
+[ "$miss" -eq 0 ] \
+  && ok "T54 (DISCRIMINANT) : *.json posé non exécutable et consigné, résidu .json.bak écarté"
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Helper (Phase 30 tâche 07, PORT-02) — vérifie la forme exec TELLE QU'INSTALLÉE dans un
 # settings*.json : chaque entrée VF (clé `args` présente) porte un `command` ABSOLU, EXISTANT,
 # EXÉCUTABLE sur cette machine, et aucun placeholder {{...}} ne subsiste dans le fichier entier.
