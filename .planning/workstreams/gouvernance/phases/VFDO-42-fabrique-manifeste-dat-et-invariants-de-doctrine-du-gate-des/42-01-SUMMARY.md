@@ -205,3 +205,9 @@ None - aucune configuration de service externe requise.
 ---
 *Phase: 42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des*
 *Completed: 2026-09-24*
+
+## Self-Check: PASSED
+
+- FOUND: plugin/conductor/scripts/check-agents-manifest.json
+- FOUND: 42-01-SUMMARY.md (ce fichier)
+- FOUND: commits 672a8fe, ba312e0, bb36787, a9e98ac, ef9a824
