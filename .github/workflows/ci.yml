@@ -259,7 +259,12 @@ jobs:
             found=$((found + 1))
             echo "== $d =="
             # --strict : skills déclarés doivent exister + cible vide → exit 3 (INDÉTERMINÉ ≠ vert)
-            bash plugin/conductor/scripts/check-agents.sh --strict --agents-dir="$d" || fail=$((fail + 1))
+            # --manifest-freshness=strict (Phase 42, D-04) : SEUL endroit où un manifeste
+            # check-agents-manifest.json périmé rend INDÉTERMINÉ (exit 3, étape rouge) — c'est la
+            # CI du dépôt, seule légitime à rafraîchir le manifeste (relire chaque source, comparer,
+            # re-dater plugin/conductor/scripts/check-agents-manifest.json). Chez l'utilisateur
+            # (hook SessionStart, garde d'écriture), un manifeste périmé reste un avertissement.
+            bash plugin/conductor/scripts/check-agents.sh --strict --manifest-freshness=strict --agents-dir="$d" || fail=$((fail + 1))
           done
           if [ "$found" -eq 0 ]; then
             echo "::error::aucun dossier plugin/*/agents découvert — la CI refuse de rendre un verdict vide"
@@ -289,7 +294,7 @@ jobs:
             [ -f "$f" ] || continue
             found=$((found + 1))
             echo "== $f =="
-            bash plugin/conductor/scripts/check-agents.sh --strict --file "$f" || fail=$((fail + 1))
+            bash plugin/conductor/scripts/check-agents.sh --strict --manifest-freshness=strict --file "$f" || fail=$((fail + 1))
           done
           if [ "$found" -eq 0 ]; then
             echo "::error::aucun plugin/*/AGENT.md découvert — la CI refuse de rendre un verdict vide"
@@ -317,7 +322,7 @@ jobs:
             [ -d "$d" ] || continue
             found=$((found + 1))
             echo "== monde fermé : $d =="
-            bash plugin/conductor/scripts/check-agents.sh --strict --resolve-agents=strict --agents-dir="$d" "${registry_args[@]}" || fail=$((fail + 1))
+            bash plugin/conductor/scripts/check-agents.sh --strict --resolve-agents=strict --manifest-freshness=strict --agents-dir="$d" "${registry_args[@]}" || fail=$((fail + 1))
           done
           if [ "$found" -eq 0 ]; then
             echo "::error::aucun dossier plugin/*/agents découvert — la CI refuse de rendre un verdict vide"
@@ -1486,7 +1491,7 @@ jobs:
           set -eu
           cd "$LAB"
           echo "== check-agents --strict sur les agents installés =="
-          bash .claude/scripts/check-agents.sh --strict
+          bash .claude/scripts/check-agents.sh --strict --manifest-freshness=strict
           echo "== check-registres --strict (registres canoniques posés ?) =="
           # Exigence DURE, plus de tolérance. L'ancienne forme passait `--allow-empty`, qui convertit
           # « 5 registres canon manquants » (rc=1) en « lab vierge, indéterminé » (rc=3), puis
