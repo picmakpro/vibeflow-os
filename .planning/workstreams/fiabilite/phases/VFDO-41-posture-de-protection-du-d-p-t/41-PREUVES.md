@@ -352,3 +352,26 @@ PR-R-DECISION: option=REPLANIFIER decideur=Willy canal=AskUserQuestion-session-p
 Le plan 41-07 est renvoyé au planificateur pour intégrer la contrainte `check-version-sync` à la
 source (arbitrage Willy, AskUserQuestion session principale, 2026-09-24). Les commits construits
 localement (les deux variantes) ne sont pas publiés.
+
+### Task 1 — reprise après REPLANIFIER, 2026-09-24
+
+PRECONDITION-41-07-REPRISE: identite=picmakpro CO-VERDICT=ECART CO-DECISION=accepter-et-documenter PR-R-DECISION=REPLANIFIER origin_main=a9620659c24103a103a5ca35c882faedb255b2c4 prs_ouvertes_hors_inventaire=#101,#102,#103
+
+PR-R-COMMITS: c0=755650c0dd34dbc399247da80cf7391c74cf7ae1 a=a3bf40f4a254e0bc72b441408be5ff486d164401 b=3b493061251f952bad57f7cb2a61a7f7aab8e85b base=a9620659c24103a103a5ca35c882faedb255b2c4 readme_suites=85->86 reprise=oui
+
+MAIN-AVANT-PR-R: a9620659c24103a103a5ca35c882faedb255b2c4
+
+PR-R-REJEU-LOCAL: c0_gates=0/0 b_gates=0/0 b_g2=0:DECLARE c0_suites=86 c0_echecs_ledger=2 c0_echecs_hors_ledger=0 preuve_c0=PASS source=clone_jetable non_rejoue=etapes_uses,etapes_if_main,commit_de_merge_pull_request,dodo_420s
+
+Note sur la reprise (2026-09-24) : `origin/main` relue à `a9620659…`, inchangée ; les trois objets
+du premier passage existent, chaînés sur elle, sans aucune ref locale : repris tels quels
+(`reprise=oui`). `gates` rejoué sur C0 et sur B : `15 rejouee(s), 3 sautee(s), 0 en echec` chacun ;
+G-2 sur B : `DECLARE`, rc 0. `tests` rejoué sur C0 (`GITHUB_EVENT_NAME=pull_request`,
+`PREUVE41_DODO=0`) : 86 suites, rc 1 dû aux deux seuls échecs
+`plugin/_internal/runtime-adapter/tests/test-register-codex-agent-path-traversal.sh` et
+`plugin/conductor/scripts/tests/test-check-description-fidelity.sh`, entrées `open` #6 et #7 du
+ledger `.planning/WINDOWS.md` (rouges d'environnement de ce poste, absents de la CI) ; suite de
+preuve `PASS`. Non couverts par ce rejeu : les jobs `lab-frais` et `lab-frais-arme` (hors de portée
+de l'outil ; invariance tenue par construction, `plugin=0`, et relue sur la CI réelle à la Task 3) ;
+et, dans le job `tests`, le contrôle du nombre d'étapes en échec que les blocs de 41-08 à 41-13 ont
+reçu n'existe pas dans ceux de 41-07 (trou inactif ici : une seule étape rejouée).
