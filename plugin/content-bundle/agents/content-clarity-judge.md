@@ -22,7 +22,9 @@ se faire, tu juges le texte tel qu'il est sur le disque.
 `pieces/<slug>/piece.md` (ou `variantes.md` pour un re-scoring de déclinaison) +
 `pieces/<slug>/cadrage.md` (l'angle et la structure promis) + le digest du manager
 (sources autorisées, ton de la ligne). Références au besoin :
-`editorial/LIGNE-EDITORIALE.md`, `editorial/FORMATS.md`, `editorial/AUDIENCE.md`.
+`editorial/LIGNE-EDITORIALE.md`, `editorial/FORMATS.md`, `editorial/AUDIENCE.md`, le
+`CLAUDE.md` du lab pour ses règles RGPD — lu explicitement via l'outil Read
+(`omitClaudeMd` coupe seulement le chargement automatique).
 
 ## Rubric de clarté (/100)
 

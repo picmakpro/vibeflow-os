@@ -1,5 +1,18 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.12] — 2026-09-25 (Phase 42, correction ciblée post-revue/audit — nœud fix-42-juges)
+
+**Patch** :
+
+- **`content-clarity-judge` cite désormais le `CLAUDE.md` du lab (interdits RGPD) comme
+  source à lire explicitement avec l'outil Read**, dans la liste des sources existante de
+  la section Entrée — `omitClaudeMd: true` coupe le chargement automatique de `CLAUDE.md`
+  (invariant I5, D-08), mais ne dispense pas d'une lecture voulue de la doctrine du lab
+  quand le juge score une pièce. `tools: Read, Glob, Grep` vérifié inchangé. Décision
+  déléguée par Willy au head (« tranche et avançons »), session principale, 2026-09-25 —
+  rend vraie la mitigation T-42-07 (`42-05-SUMMARY.md`), fausse depuis la 42-06 pour ce
+  juge et quality-gate-client (business-pilot-bundle).
+
 ## [v2.0.11] — 2026-09-25 (Phase 42 — invariants de doctrine du gate des agents)
 
 **Patch** :
