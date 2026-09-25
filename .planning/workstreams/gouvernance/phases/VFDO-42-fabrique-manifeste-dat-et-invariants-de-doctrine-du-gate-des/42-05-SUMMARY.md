@@ -302,6 +302,37 @@ jugé sans conséquence pratique (le `CLAUDE.md` projet en contexte dev ne porte
 nécessairement d'interdits RGPD/design distincts). Consigné aussi comme entrée `.planning/BACKLOG.md`
 (racine) et dans `### Dette / à rafraîchir` du STATE gouvernance.
 
+## Correction — arbitrage du budget d'instructions (nœud fix-42-condition-2, 2026-09-25)
+
+**Épisode « garde-fous » et sa cause** : après le commit `f0e3340` (design-orchestrator v1.5.11)
+et le commit précédent équivalent côté growth (`5bc4518`), `vf-growth-manager.md` (25 vs
+baseline 24) et `vf-design-manager.md`/`vf-design-judge.md` (30/9 vs baseline 29/8) dépassaient
+leur baseline d'instructions. Plutôt que d'arbitrer la baseline, les commits `6ca1de8` et
+`f257306` avaient remplacé « interdits » par « garde-fous » dans les paragraphes de digest
+concernés — un contournement du marqueur textuel D-01 (`jamais|toujours|...|interdit|...`),
+jamais une baisse de charge réelle : le sens de la consigne restait identique.
+
+**Précision sur le message de `6ca1de8`** : ce commit attribue à tort le dépassement à
+**deux** fichiers (« `growth-quality-judge.md` et `vf-growth-manager.md`... DEPASSEMENT-INSTR »).
+Mesure refaite sur l'état de `growth-quality-judge.md` à ce commit : 8 instructions pour une
+baseline de 8 — aucun dépassement sur ce fichier. Seul `vf-growth-manager.md` dépassait
+(25 pour une baseline de 24). Aucune réécriture d'historique ; erreur consignée ici pour mémoire.
+
+**Arbitrage (option b)** : « arbitrage Willy, AskUserQuestion session principale, 2026-09-25 ».
+« Interdits » est rétabli dans les trois fichiers (`vf-growth-manager.md`,
+`vf-design-manager.md`, `vf-design-judge.md`), et la baseline de
+`.planning/instruction-budget-baselines.tsv` est montée en conséquence, sur la même citation :
+`vf-growth-manager.md` 24 → 25, `vf-design-manager.md` 29 → 30, `vf-design-judge.md` 8 → 9
+(cette dernière hausse due à la restauration d'une clause de scoring retirée par `f257306`
+pour la même raison de budget, indépendante du mot « interdits »). Le commit de hausse de
+baseline ne touche que ce `.tsv`. Voir aussi le CHANGELOG des deux modules (entrées v2.0.12 /
+v1.5.11, sans nouveau bump — versions non publiées).
+
+**F1 (revue `revue-42-condition`)** : `vf-design-judge.md` citait encore le `CLAUDE.md` dans
+sa section « ## Entrée » en plus de la « ## Méthode de scoring » (doublon) — retiré. Assertion
+T11 de `test-design-orchestrator.sh` complétée d'une clause anti-doublon (miroir de T15 business,
+T13 content, T13 growth), rejouée rouge sur l'état pré-correction (git show HEAD) puis verte.
+
 ## Next Phase Readiness
 
 - **42-05 est COMPLETE** (les trois taches executees) ; **FABR-03 reste PARTIELLE au sens de REQUIREMENTS.md** — I1, I4, I5, I6, I7 (locaux) sont armes, mais I2 et I3 (monde ferme, D-09) restent a 42-06. La case FABR-03 de REQUIREMENTS.md n'a donc pas ete cochee par ce plan.

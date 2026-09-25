@@ -30,7 +30,7 @@ last_activity_desc: >-
   FABR-03/04/05 cochées à la main ci-dessous dans REQUIREMENTS.md (requirements.mark-complete
   résout vers fiabilite sur ce dépôt, jamais appelé). STATE tenu à la main (jamais
   state.begin-phase / state.record-session).
-stopped_at: "Phase 42 exécutée, corrigée et condition de Samuel exécutée — ARRÊT sur arbitrage-budget-42 (« garde-fous » vs « interdits » + hausse de baseline citée), puis fix-42-condition-2 ; PR #108 en brouillon ; écart vf-dev-manager → vf-design-judge (D-12) consigné en dette"
+stopped_at: "Phase 42 complète, PR #108 prête pour revue code owner ; nœud fix-42-condition-2 exécuté (arbitrage Willy (b), « interdits » rétabli, baseline instruction-budget montée) ; écart vf-dev-manager → vf-design-judge (D-12) consigné en dette"
 progress:
   total_phases: 9
   completed_phases: 0
@@ -130,6 +130,16 @@ explicitement ; n'attends rien de la CI sur ce point.
   s'authentifie pas sous HOME temporaire. Willy a choisi un jeton dédié (AskUserQuestion, session
   principale, 2026-09-24), déposé hors dépôt ; la sonde tourne dès qu'il existe. Limite à
   consigner avec elle : la première sonde (`sonde-d19`) tournait avec le HOME réel.
+
+- **2026-09-25 — fix-42-condition-2 (vf-coder), arbitrage du budget d'instructions, option (b)** :
+  les commits `6ca1de8`/`f257306` avaient remplacé « interdits » par « garde-fous » dans les
+  digests de `vf-growth-manager`/`vf-design-manager` pour repasser sous la baseline de
+  `check-instruction-budget.sh` — un contournement du marqueur textuel D-01. Rejeté : « arbitrage
+  Willy, AskUserQuestion session principale, 2026-09-25 » — « interdits » rétabli dans les trois
+  fichiers concernés (`vf-growth-manager.md`, `vf-design-manager.md`, `vf-design-judge.md`), et
+  `.planning/instruction-budget-baselines.tsv` monté en conséquence sur la même citation
+  (24→25, 29→30, 8→9). Détail : `42-05-SUMMARY.md` § Correction — arbitrage du budget
+  d'instructions.
 
 ### Dette / à rafraîchir
 
