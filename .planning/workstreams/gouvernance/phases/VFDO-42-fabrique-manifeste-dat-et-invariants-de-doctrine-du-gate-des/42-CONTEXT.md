@@ -113,6 +113,35 @@ et l'unification MCP (Phase 43) ; le hook central par rôle (Phase 45) ; tout §
   couverts (`TaskOutput`, alias de `TaskStop`), `SlashCommand` n'est dans aucune doc officielle.
   Le manifeste ne s'aligne que sur la doc officielle citée, jamais sur la liste de la spec.
 
+### Revue de Samuel — WhatsApp, 2026-09-23 (validation humaine et trois ajouts)
+Samuel a relu les décisions qui touchent sa polarité et en fait des décisions **validées par un
+humain**, plus seulement prises par Claude : le passage de `vf-test-orchestrator` en `vf-internal`
+(il a vérifié qu'aucun skill ni aucune commande ne l'incarne, rien ne disparaît côté utilisateur),
+`omitClaudeMd` sur les 4 juges (« ils jugent contre une rubrique, pas contre les conventions du
+repo »), `SendMessage` sur les 4 managers (« `vf-design-manager` n'a que AskUserQuestion, qui
+n'existe pas en sous-agent : il est muet aujourd'hui »). D-07, D-08 et D-11 sont donc ratifiées
+(Samuel, WhatsApp, 2026-09-23).
+- **D-18 : la description de `vf-test-orchestrator` nomme ses deux dispatcheurs réels,
+  `vf-dev-manager` ET `vf-auto`** (`plugin/dev-orchestrator/skills/vf-auto/SKILL.md:75` le
+  dispatche vraiment). Sans cela, la formule « dispatché uniquement par le manager » rend ce second
+  dispatch illégitime sur le papier. Demande de Samuel, WhatsApp, 2026-09-23. L'invariant I1 (D-06)
+  doit tolérer cette formulation à deux dispatcheurs.
+- **D-19 : l'effet d'`omitClaudeMd` sur `.claude/rules/*.md` se MESURE, il ne se déduit pas.** La
+  recherche l'a inféré du silence de la documentation (`42-RESEARCH.md`) : c'est exactement le
+  genre de déduction qui a déjà coûté cher à ce dépôt. Une tâche de la phase pose un agent de test
+  avec le champ, qui rapporte s'il a reçu une règle témoin de `.claude/rules/`, et le verdict est
+  consigné avant qu'I5 ne soit armé. Si les règles sont omises aussi, D-08 est réexaminée avec
+  Samuel. Demande de Samuel, WhatsApp, 2026-09-23 ; complète D-08.
+- **D-20 : le faux vert de l'invocation nue est fermé dans cette phase.** `check-agents.sh` sans
+  argument sort `exit 0` (« aucun agent dans .claude/agents — rien a verifier ») sur ce dépôt, où
+  `.claude/agents` est absent, alors que c'est l'invocation que prescrivent des critères
+  d'acceptation (`.planning/codebase/CONCERNS.md:349`, sévérité MEDIUM). La phase réécrit ce gate :
+  elle embarque le correctif (INDÉTERMINÉ, exit 3, sur cible absente hors `--hook`, dans l'esprit de
+  F13). Signalé par Samuel, WhatsApp, 2026-09-23.
+- **Conséquence pour l'exécution** : les six plans ont été écrits avant D-18 à D-20. Ils doivent être
+  **révisés** (révision du planificateur puis vérificateur frais) avant `gsd-execute-phase 42` ; le
+  contrôle de couverture des décisions refusera sinon de marquer la phase planifiée.
+
 ### Ordre avec la PR #85
 - **D-14 : on planifie maintenant et on exécute depuis `main` après le merge de la #85.** Le plan
   pose le merge de la #85 comme précondition de sa première vague. Sa CI est rouge sur G-2
