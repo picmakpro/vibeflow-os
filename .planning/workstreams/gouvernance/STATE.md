@@ -30,7 +30,7 @@ last_activity_desc: >-
   FABR-03/04/05 cochées à la main ci-dessous dans REQUIREMENTS.md (requirements.mark-complete
   résout vers fiabilite sur ce dépôt, jamais appelé). STATE tenu à la main (jamais
   state.begin-phase / state.record-session).
-stopped_at: "Phase 42 exécutée et corrigée après revue/audit (fix-42-juges) puis après la condition de Samuel sur D-08 (fix-42-condition-samuel) — PR #108 à sortir du brouillon ; écart vf-dev-manager → vf-design-judge (D-12) consigné en dette"
+stopped_at: "Phase 42 exécutée, corrigée et condition de Samuel exécutée — ARRÊT sur arbitrage-budget-42 (« garde-fous » vs « interdits » + hausse de baseline citée), puis fix-42-condition-2 ; PR #108 en brouillon ; écart vf-dev-manager → vf-design-judge (D-12) consigné en dette"
 progress:
   total_phases: 9
   completed_phases: 0

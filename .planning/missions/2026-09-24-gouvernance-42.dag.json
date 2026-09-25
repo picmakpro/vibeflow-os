@@ -311,10 +311,12 @@
         "audit-42",
         "nonreg-42",
         "docs",
-        "revue-42-fix"
+        "revue-42-fix",
+        "revue-42-condition",
+        "fix-42-condition-2"
       ],
       "scope": [],
-      "status": "running"
+      "status": "blocked"
     },
     {
       "id": "arbitrage-juges-42",
@@ -343,6 +345,42 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "fix-42-condition-samuel",
+      "step": "condition de Samuel (e568307) : consigne Read explicite sur les 4 juges + assertion, digest des interdits chez vf-growth-manager et vf-design-manager ; vf-dev-manager non touché (D-12), écart écrit",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-42-condition",
+      "step": "revue ciblée du diff de la condition de Samuel",
+      "stage": "",
+      "deps": [
+        "fix-42-condition-samuel"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-budget-42",
+      "step": "HUMAIN : garde-fous (a) ou interdits + hausse de baseline citée (b) — vf-growth-manager, vf-design-manager, vf-design-judge",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "fix-42-condition-2",
+      "step": "correction ciblée : F1 doublon vf-design-judge + assertion T11, F3 CHANGELOG, F4 T11, F2 note SUMMARY, selon arbitrage-budget-42",
+      "stage": "",
+      "deps": [
+        "arbitrage-budget-42"
+      ],
+      "scope": [],
+      "status": "blocked"
     }
   ]
 }
