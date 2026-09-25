@@ -650,6 +650,7 @@ de détection, périmètre exact du corpus, seuil d'avertissement skill).
      `vf-rubrique-juge:` ou une forme qui référence le juge par son nom d'agent), et le faire
      coïncider avec ce que pose l'initialisation (spec `2026-09-23-initialisation-lab-design.md`,
      hors périmètre direct de cette phase mais consommateur potentiel du même champ).
+   - Resolution : tranchée par `43-01-PLAN.md` (Tâche 1, décision a — clés `ecrit` et `vf-rubrique-juge`).
 
 2. **Le corpus `plugin/reference/**` doit-il être inclus ou exclu du gate des skills ?**
    - What we know : `module.json` du module `reference` déclare `"type": "doc-only"` ; ses 4
@@ -661,6 +662,7 @@ de détection, périmètre exact du corpus, seuil d'avertissement skill).
      `*-references/` déjà exclus pour les agents).
    - Recommendation : exclure par défaut (cohérence avec l'exclusion agents existante), documenter le
      choix explicitement dans le plan plutôt que de le laisser implicite dans le code.
+   - Resolution : tranchée par `43-01-PLAN.md` (Tâche 1, décision c, et cas T4 — exclusion lue sur le type `doc-only` du `module.json`, jamais un nom de module en dur).
 
 3. **Le budget bootstrap doit-il compter TOUS les skills découverts, ou seulement un sous-ensemble
    « chargé automatiquement » ?**
@@ -676,6 +678,7 @@ de détection, périmètre exact du corpus, seuil d'avertissement skill).
      la plus stricte et la plus simple à implémenter, cohérente avec le mécanisme natif documenté
      par skill-creator) ou sur un sous-ensemble à définir — et documenter le choix, car c'est la
      zone de plus grande ambiguïté de toute cette recherche (Pitfall 5).
+   - Resolution : renvoyée au checkpoint de `43-04-PLAN.md` (Tâche 2, checkpoint:decision — corpus et mode d'enforcement du bootstrap arbitrés par Willy, option consignée dans `43-04-SUMMARY.md`).
 
 ## Environment Availability
 

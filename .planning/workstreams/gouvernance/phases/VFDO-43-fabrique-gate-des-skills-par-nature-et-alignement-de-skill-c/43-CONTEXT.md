@@ -129,6 +129,7 @@ dérive (backlog séparé, D-Q5 — voir `entree_backlog_a_poser` du rapport de 
   sur son absence. Conséquence pour le plan : le durcissement (b) « serveur nommé absent » se
   juge contre l'**union** des deux scopes, jamais contre le seul `./.mcp.json`. Décision D-Q3
   inchangée ; hors périmètre inchangé.
+  **Erratum (révision des plans, 2026-09-26) — relevé de ligne du durcissement (c).** Le troisième site de `plugin/_internal/vibeflow-update.sh` cité en (c) ci-dessus et dans les Canonical refs est la l.2423, pas la l.2413 (dérive de +10 lignes, 43-RESEARCH.md Pitfall 4 ; `grep -n vf-mcp-consumer` mesuré ce jour : 1276, 1308, 2423) ; ledger FABR-10 de REQUIREMENTS.md corrigé, paragraphes ci-dessus inchangés.
   — **Reversibility:** reversible — aucun changement de contrat de frontmatter existant ; les
   durcissements (a)(b) ajoutent des diagnostics sur des chemins aujourd'hui silencieux, (c) est
   une correction de prose.
