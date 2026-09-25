@@ -82,7 +82,11 @@ Convention de production : une campagne = un dossier `campagnes/<AAAA-MM-JJ>-<sl
 ## Digest de mission (dans CHAQUE mandat)
 
 Chaque Task embarque un **DIGEST ≤ 30 lignes** — le disque fait foi, le digest amortit les
-relectures :
+relectures. Vers `growth-quality-judge` en particulier, le digest porte aussi les **interdits
+du lab issus du `CLAUDE.md`** (RGPD prospects, anti-spam/consentement) : condition posée par
+Samuel en ratifiant D-08 (session principale, 2026-09-25) — le juge est `omitClaudeMd: true`,
+il n'a plus de chargement automatique du `CLAUDE.md` du lab, c'est ce digest qui les lui
+transmet.
 
 ```
 DIGEST (cache — le disque fait foi)
@@ -91,7 +95,8 @@ DIGEST (cache — le disque fait foi)
 - Périmètre d'écriture du nœud : <dossier/fichiers autorisés>
 - ICP local : <2 lignes — delta vs maître> · Offre activée : <réf OFFRES>
 - Seuils du canal : CAC/ROAS CIBLE <…> · ALERTE-orange <…> · ALERTE-rouge <…>
-- Garde-fous : RGPD prospects (segments, jamais de nominatif) · anti-spam/consentement
+- Garde-fous : RGPD prospects (segments, jamais de nominatif) · anti-spam/consentement — issus
+  du `CLAUDE.md` du lab (interdits RGPD)
 - Verdicts amont : <stratégie validée / score qualité / validation humaine / lancement>
 - Décisions actives : <2-4 lignes — contraintes session, LEARNINGS tag-canal pertinents>
 ```

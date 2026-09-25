@@ -1,5 +1,27 @@
 # CHANGELOG — growth-bundle
 
+## [v2.0.12] — 2026-09-25 (Phase 42, correction ciblée — nœud fix-42-condition-samuel)
+
+**Patch** :
+
+- **`growth-quality-judge` lit désormais explicitement le `CLAUDE.md` du lab (INTERDITS
+  RGPD) dans le DÉROULÉ (section « Méthode de scoring »)**, avant de scorer le critère 2
+  (consentement/anti-spam/RGPD) — `omitClaudeMd: true` a coupé son chargement automatique.
+  La mention retirée des « Références au besoin » pour éviter le doublon : ce qu'un juge
+  doit vérifier vit dans sa procédure, jamais dans une référence annexe. `tools: Read, Glob,
+  Grep` vérifié inchangé.
+- **`vf-growth-manager` — sa section « Digest de mission » porte désormais explicitement les
+  interdits du lab issus du `CLAUDE.md`** (RGPD prospects, anti-spam/consentement) : condition
+  posée par Samuel en ratifiant D-08. C'est le manager qui transmet cette doctrine au juge
+  frais, puisque celui-ci ne la charge plus automatiquement.
+- Assertion machine T13 ajoutée à `test-growth-bundle.sh`, ancrée sur la section « ## Méthode
+  de scoring » du juge (jamais sur une mention perdue dans les références) et sur la section
+  « ## Digest de mission » du manager, avec témoin discriminant par mutation. Rejouée rouge
+  sur les fichiers pré-correction (git show HEAD, 0 occurrence attendue).
+
+Décision déléguée par Willy au head, session principale, 2026-09-25, en exécution de la
+condition de Samuel (e568307).
+
 ## [v2.0.11] — 2026-09-25 (Phase 42 — invariants de doctrine du gate des agents)
 
 **Patch** :
