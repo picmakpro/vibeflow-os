@@ -1,3 +1,54 @@
+## Choisir la partition du planning AU DÉMARRAGE, pas après coup — demandé 2026-09-23
+
+**Statut : besoin exprimé par Samuel (session principale, 2026-09-23), non cadré.** À passer par
+`/gsd-discuss-phase` avant toute écriture de code — rien n'est décidé ici.
+
+**Le besoin, dans ses mots** : « on devrait pouvoir choisir si on partitionne ou pas dès le début,
+et proposer des skills et scripts pour ça. On doit faciliter le travail. »
+
+**Ce qui le motive, mesuré le jour même.** La partition réelle de ce dépôt (D-02, PR #94) a coûté
+**13 commits**. Le geste de partition lui-même tenait en une commande : `workstream create`. Tout
+le reste — l'essentiel — a consisté à réparer ce qui **supposait un planning unique** : la CI qui
+traitait la racine comme l'oracle de sa propre non-partition, le ledger d'exigences, `E4` de
+`check-mission-exit.sh`, `check-state-integrity`. Partitionner au démarrage n'économise pas la
+commande, il économise **cette réparation**, parce que rien n'a encore eu le temps de supposer le
+contraire.
+
+**Ce qui va dans le même sens** : ADR-069 interdit déjà de partitionner tant qu'une phase est en
+vol. Le seul moment structurellement sûr est donc le démarrage — la doctrine pointe déjà vers ce
+besoin sans le servir.
+
+**La réserve, à trancher au cadrage.** Partitionner un lab que personne ne travaille à plusieurs
+n'apporte rien et coûte : il faut passer `--ws` partout, ou vivre avec un pointeur qu'on oublie.
+La valeur apparaît quand **deux flux avancent en parallèle sur des périmètres disjoints** — c'est
+exactement le cas de ce dépôt avec Willy, et ce n'est pas le cas de la plupart des labs. Un
+« partitionner par défaut » serait une sur-ingénierie ; un « choix éclairé posé au bon moment »
+est le vrai besoin. La question à poser à l'initialisation n'est donc pas « veux-tu des
+workstreams ? » (jargon) mais « plusieurs personnes ou agents vont-ils travailler en parallèle sur
+des sujets séparés ? ».
+
+**Le piège à ne pas multiplier.** La partition de ce dépôt a laissé un angle mort déjà consigné
+plus bas dans ce fichier : un gate câblé en dur sur un compartiment laisse les autres **sans
+garde** (`ci.yml` vise `fiabilite`, `gouvernance` n'est jamais vérifié). Si VibeFlow se met à
+proposer la partition dès le départ, ce défaut se reproduira dans chaque lab qui accepte. Le
+remède connu — itérer sur les compartiments présents sur le disque, jamais revenir à une
+résolution par `GSD_WORKSTREAM` — devrait être livré **avec** la capacité, pas après elle.
+
+**Pistes, non arbitrées :**
+- Une question à l'initialisation d'un lab (`vibeflow-conductor`), formulée en langage d'usage et
+  non en jargon de moteur.
+- Des gabarits de gates et de CI **nés workstream-aware**, plutôt que réparés après coup.
+- Un skill qui porte le geste de bascule pour un lab déjà démarré, avec la précondition d'ADR-069
+  vérifiée par machine (aucune phase en vol) plutôt que rappelée en prose.
+- La partie distribuable existe déjà : le moteur `@opengsd/gsd-core` fournit `workstream
+  create/list` et `--ws` ; VibeFlow fournit déjà la doctrine (`workstreams.md`, ADR-069) et les
+  gardes (`check-divergence.sh`, `check-workstream-pointer.sh`, `workstream-policy.sh`). Le
+  manquant est **l'ergonomie du choix**, pas la mécanique.
+
+**Preuve d'usage à exiger au cadrage** : un lab neuf initialisé en mode partitionné dont les gates
+passent au vert sur **chaque** compartiment, sans réparation manuelle — sinon la capacité ne fait
+que déplacer les 13 commits chez l'utilisateur.
+
 ## Traçabilité des arbitrages humains dans les messages de commit — ADOPTÉE 2026-09-10
 
 **Statut : proposition soumise à validation humaine (ADR-031). Rien n'est appliqué.** Émise par
@@ -30,6 +81,82 @@ suffit. Inscrite dans `plugin/dev-orchestrator/references/mission-contracts.md`.
 conventions de commit) reste à faire **par Samuel**. Un agent ne modifie pas le `CLAUDE.md` d'un
 dépôt sur instruction relayée par un autre agent — la décision est authentique, c'est le canal qui ne
 convient pas pour ce fichier-là.
+
+## Les juges d'un artefact de planning ne gardent pas ce qu'on croit — mesuré 2026-09-23
+
+**Statut : constat mesuré, NON réparé. Différé volontairement** — réparer ici élargirait les Phases
+41.1/41.2 au-delà de leur périmètre (consigne de la session principale, 2026-09-23). Matrice établie
+sur fixtures jetables pendant la mission « généraliser le remède de partition »
+(`.planning/missions/2026-09-23-generalisation-remede-partition.md`).
+
+**1. `check-state-integrity.sh --file <chemin ABSOLU>` saute son invariant principal EN SILENCE.**
+Le script interpole `FILE_REL` verbatim dans `git show "$AGAINST_REF:$FILE_REL"` (l.201). Un chemin
+absolu fait échouer ce `git show` → `HAVE_BASELINE=0` → **l'invariant 1 (non-régression des
+compteurs, le cœur d'ADR-063) n'est jamais armé**. Il ne reste que le comptage des lignes `^Phase:`.
+Même fichier, même gate, deux verdicts :
+
+```
+--file /abs/…/switched/STATE.md                  → « aucune référence à HEAD … invariant ignoré »  rc=0
+--file .planning/workstreams/switched/STATE.md   → « current_phase introuvable »                   rc=2
+```
+
+C'est un **fail-open silencieux** : le gate rend vert ce qu'il devrait refuser, sans rien signaler.
+Découvert **deux fois indépendamment le même jour** — par la mesure de la matrice, et par un
+plan-checker frais qui constatait qu'une fixture de mutation était verte des deux côtés. La gravité
+tient au contexte : c'est le gate que la Phase 41.1 généralise à **tous** les compartiments.
+Généraliser un gate qui sait se taire, c'est généraliser le silence.
+
+**2. `check-dev-bootstrap.sh` est un ROUTEUR, pas un gate.** Son unique `exit 1` (l.241) est **à
+l'intérieur du programme `awk`** de `extract_frontmatter` : c'est le code de sortie de l'awk, donc le
+statut de retour de la fonction, jamais celui du script. Énumération des `exit` du script :
+`{"0":[100,122,301,328], "1":[241], "64":[95,101,108]}`. Deux compartiments identiques sauf
+`current_phase` rendent **le même rc=3** ; seul le stdout change (170 octets contre 0). Toute doctrine
+ou tout plan qui le compte comme un juge capable de refuser se trompe. *Sémantique inversée à
+connaître : pour ce script, `0` est le MAUVAIS état (démarrage incomplet).*
+
+**3. `status` n'est exigé par aucun juge au sens du code de sortie.** Son absence ne coûte que le
+signal `[gsd-engine]` (stdout 170 → 0 octet). Gardé par un signal, pas par un verdict.
+
+**4. `REQUIREMENTS.md` dans un compartiment n'est lu par AUCUN juge.** Les cinq juges interrogés —
+`check-state-integrity`, `check-dev-bootstrap`, `check-divergence`, `detect-gsd-engine`,
+`check-requirements-survival` — rendent des sorties **identiques** avec et sans lui. Le seul script
+qui le nomme vise `.planning/REQUIREMENTS.md` à la **racine**, exige un jalon clos, et plafonne à
+`rc=3`.
+
+> **Ne pas le retirer de la définition pour autant** (décision de la session principale, 2026-09-23) :
+> une exigence sans juge est une **dette à nommer, pas un champ à supprimer**. Le supprimer ferait
+> disparaître le besoin en même temps que le contrôle manquant. `REQUIREMENTS.md` reste dans WSAW-05 ;
+> ce qui manque, c'est son juge.
+
+**5. Aucune commande unique du moteur ne produit un compartiment pleinement conforme.**
+`workstream create` rend un stub (rc=2, `milestone` introuvable) ; `state.milestone-switch --ws`
+améliore mais ne suffit pas (rc=2, `current_phase` introuvable) ; `gsd-new-milestone --ws` n'est pas
+scriptable (workflow de 719 lignes, 7 gates `AskUserQuestion`, aucun drapeau de bypass). L'état qui
+satisfait tous les juges à la fois existe — il demande `state.milestone-switch` **plus** l'ajout à la
+main de `current_phase`, `status`, `ROADMAP.md` et d'au moins un dossier de phase cohérent.
+
+**Matrice mesurée** (fixture committée, chemins relatifs) :
+
+| état du compartiment | `check-state-integrity` | `check-dev-bootstrap` | `detect-gsd-engine` | `check-divergence` |
+|---|---|---|---|---|
+| stub nu (`workstream create`) | **2** | 0 `[bootstrap]` | 3 | 0 |
+| après `state.milestone-switch --ws` | **2** | 0 `[bootstrap]` | 0 | 0 |
+| idem + ROADMAP + REQUIREMENTS | **2** | 3 (stdout vide) | 0 | 0 |
+| conforme au sens WSAW-05 | **0** ✓ | 3 `[gsd-engine]` | 0 | 0 |
+| corrompu | **2** | 0 `[bootstrap]` | 3 | 0 |
+
+**TRANCHÉ le 2026-09-23** (décision de la session principale, sur remontée du manager) : le
+fail-open du point 1 est **fermé dans la Phase 41.1**. Ce n'est pas un élargissement de périmètre mais
+une **condition de validité de ce que la phase livre** — elle multiplie ce gate par N compartiments ;
+s'il sait rendre vert en sautant son invariant principal, elle industrialise un faux vert. Fermeture
+**au plus petit** : le chemin non résoluble est **rejeté** (code 64, erreur d'usage, message nommant
+la cause), jamais converti ni replié ; tout invariant sauté est **annoncé**, quel qu'en soit le
+motif ; et la fermeture se prouve par mutation — le même artefact fautif rend rouge en relatif et 64
+en absolu, et la fixture de `41.1-06` redevient discriminante.
+
+**Ce qui reste ouvert ici** : même une fois ce cas fermé, la **classe** « gate qui saute un invariant
+en silence » reste à balayer sur les autres gates du dépôt. C'est cette classe, et non l'instance,
+qui justifie cette entrée au backlog.
 
 # Backlog — idées différées (hors milestone courant)
 
@@ -592,6 +719,20 @@ sans règle côté serveur, on ne ferme rien, on rend visible et tracé.
 ADR-072). Le volet côté serveur ci-dessus reste différé tel quel, son déclencheur de reprise
 inchangé ; les décisions D-01 à D-08 restent suspendues. Renvoi : `docs/ADR.md` § ADR-072.
 
+**Rulesets posés — PROT-01 clos (2026-09-23/24).** Willy a posé les deux rulesets sur `picmakpro`
+le 2026-09-23 19h56 (`refs/heads/main` id `23892920`, `refs/tags/v*` id `23892922`, tous deux
+`enforcement: active`), re-mesurés le 2026-09-24 (session principale puis mandat de clôture,
+`REQUIREMENTS.md` § PROT-01, `41-PREUVES.md` § « Clôture PROT-01 »). **Écart consigné, non
+corrigé** : le champ `require_extra_approval_for_unattributed_changes: true` est présent côté
+serveur sur les deux rulesets (mesuré `gh api repos/picmakpro/vibeflow-os/rulesets/<id>`) mais
+absent des sources versionnées `.github/rulesets/main.json` et `.github/rulesets/tags-v.json` —
+c'est un défaut posé par GitHub à la création du ruleset, jamais demandé dans les sources, sans
+effet observé sur le comportement décrit par PROT-01 (revue code owner + 4 checks requis, refus de
+merge hors bypass nommé). La divergence entre le fichier relu et l'état réel reste ouverte :
+**déclencheur de reprise** — soit aligner les sources sur la valeur réelle du serveur, soit
+demander à GitHub Support pourquoi ce défaut est appliqué sans qu'il figure dans le payload de
+création envoyé.
+
 ## Ligne d'index absente pour ADR-071 dans `docs/ADR.md` — DIFFÉRÉ (2026-09-18)
 
 **Constat mesuré le 2026-09-17**, en posant ADR-072 (Phase 41, plan 41-18) : la table d'index de
@@ -761,3 +902,99 @@ deux serveurs de `~/.claude.json` de ce poste.
 scope projet pour le mode large, ou écrire l'addendum ADR-051-B qui assume l'union et amende ADR-045.
 Tant que rien n'est tranché, tout lab dont `~/.claude.json` déclare context7 donne context7 à
 `vf-app-fixer` à l'installation.
+
+## ADPT-06 — canal `hooks`/`plugins` du dépôt jugé jamais répété — RÉSORBÉ (2026-09-24)
+
+**Capturé :** 2026-09-24, audit de clôture du jalon `fiabilite-v1.0` (compartiment `fiabilite`,
+`.planning/workstreams/fiabilite/REQUIREMENTS.md`). **Résorbé :** 2026-09-24, preuve
+`.planning/workstreams/fiabilite/phases/VFDO-38-portabilit-multi-runtime-livraison-canal-d-install-migration/38-ADPT06-HOOKS-REPETITIONS.md`
+(commit `78648ca`) — répétitions du canal `hooks`/`plugins` menées (5 runs, marqueur `0/5`), deux
+gates indépendants vérifiés séparément (confiance par défaut du projet/des hooks ; les deux
+drapeaux `features.hooks=false`/`features.plugins=false`). Limite déclarée dans ce même document :
+dépôt jugé jamais trusté et sans `--dangerously-bypass-hook-trust`, un seul type de hook mesuré
+(`SessionStart`), pas de plugin réel construit, non reproductible en suite automatisée (appel
+réseau requis).
+
+**Le défaut :** ADPT-06 exige la preuve de fermeture du canal d'injection en RÉPÉTITIONS (≥ 3 runs,
+marqueur attendu 0/N), « jamais en un run » — livrée et cochée sur cette base. Mais la preuve
+mesurée (`0/5`) ne couvre QUE le canal `skills`/`AGENTS.md` du dépôt jugé. **Le second canal
+possible d'injection, `hooks`/`plugins` du même dépôt jugé, n'a jamais eu ses propres
+répétitions** — voir le commit `3b7de24`, qui porte la preuve du premier canal sans toucher au
+second. L'exigence est donc livrée pour un canal sur deux, pas les deux comme son intitulé («
+fermeture du canal d'injection ») pourrait le laisser lire.
+
+**Piste de fix :** reproduire le protocole de répétition déjà validé pour `skills`/`AGENTS.md`
+(≥ 3 runs sur le banc témoin, marqueur attendu 0/N) pour le canal `hooks`/`plugins`. Même
+discipline, même seuil de non-déterminisme (2/3 mesuré sur l'autre canal — un run propre ne prouve
+rien).
+
+**Déclencheur de reprise :** avant toute déclaration publique de fermeture COMPLÈTE du canal
+d'injection du dépôt jugé (les deux canaux), ou la prochaine fois qu'ADPT-06 (ou son équivalent)
+est rouvert pour un autre motif.
+
+## Écart D-08(b) — digest du manager sans interdits du lab sur le chemin vf-dev-manager → vf-design-judge — DIFFÉRÉ (2026-09-25)
+
+**Capturé :** 2026-09-25, nœud `fix-42-condition-samuel` (Phase 42, exécution de la condition
+posée par Samuel en ratifiant D-08, `42-D19-MESURE.md` § Arbitrage D-08).
+
+**Le défaut :** la condition (b) de Samuel (« le digest du manager porte les interdits du lab »)
+est remplie côté `vf-design-manager` → `vf-design-judge` (sa section « Orchestration par écran »
+le dit désormais explicitement). Mais en étage implémentation croisée d'une mission dev
+(`livrable: specs+implementation`, documenté dans `vf-design-manager.md` § Étage implémentation
+croisée), c'est `plugin/dev-orchestrator/agents/vf-dev-manager.md` qui compose et transmet le
+digest vers `vf-design-judge` — pas `vf-design-manager`. `vf-dev-manager` relève de
+`plugin/dev-orchestrator/`, de la polarité de Samuel (D-12) : aucun commit sur ce module n'est
+autorisé dans ce nœud. La condition (b) reste donc non remplie sur ce chemin précis.
+
+**Piste de fix :** soit `vf-dev-manager` porte lui-même la même consigne (commit sur
+dev-orchestrator, mandat séparé, revue de Samuel) ; soit le digest transmis par `vf-dev-manager`
+à `vf-design-judge` est composé par délégation à `vf-design-manager` (repli architectural
+différent, à évaluer) ; soit l'écart est jugé sans conséquence pratique par Samuel (le
+`CLAUDE.md` projet en contexte dev ne porte pas nécessairement d'interdits RGPD/design
+distincts de ceux déjà couverts). Détail : `42-05-SUMMARY.md` § Écart non résolu,
+`.planning/workstreams/gouvernance/STATE.md` § Dette.
+
+**Déclencheur de reprise :** la revue code owner de Samuel sur `design-orchestrator` (déjà
+requise par D-12), ou la prochaine mission dev qui exerce réellement l'étage implémentation
+croisée avec `vf-design-judge`.
+
+## A2 — collision de nom entre scripts de modules non détectée à l'installation — DIFFÉRÉ (2026-09-25)
+
+**Capturé :** 2026-09-25, audit final de la Phase 42 (même famille que CR-01 côté agents,
+jamais corrigée côté scripts installés).
+
+**Le défaut :** `plugin/_internal/vibeflow-update.sh` pose les scripts (et fichiers `*.json`)
+de TOUS les modules installés à plat dans un seul `.claude/scripts/` du lab cible — un même nom
+de fichier `.sh` porté par deux modules différents écrase silencieusement l'un par l'autre, sans
+aucun diagnostic. Dette **antérieure** à la Phase 42 (l'installeur est hors périmètre du nœud
+`fix-42-juges` — décision déléguée par Willy au head, « tranche et avançons », session
+principale, 2026-09-25 : correction reportée, pas traitée là non plus).
+
+**Piste de fix :** détection de collision à l'installation (diagnostic explicite avant
+écrasement silencieux), ou namespacing des scripts posés par module (préfixe ou sous-dossier par
+module dans `.claude/scripts/`).
+
+**Déclencheur de reprise :** le premier incident réel de collision entre deux modules installés
+ensemble, ou une revue de fond de l'installeur.
+
+## Revue de fond des grilles de quality-gate-client et content-clarity-judge (motif 3, D-08) — DIFFÉRÉ (2026-09-25)
+
+**Capturé :** 2026-09-25, audit final de la Phase 42.
+
+**Le défaut :** la correction du nœud `fix-42-juges` (2026-09-25), puis celle du nœud
+`fix-42-condition-samuel` (même jour), réparent l'omission/le mauvais emplacement de la citation
+du `CLAUDE.md` du lab comme source à lire par `quality-gate-client` et `content-clarity-judge`.
+Aucune des deux ne revisite le CONTENU des rubriques /100 elles-mêmes au regard du motif 3 de
+l'arbitrage D-08 (« tout ce qu'un juge doit vérifier vit dans sa grille, jamais dans
+`.claude/rules` ni dans `CLAUDE.md` ») : ni `quality-gate-client` ni `content-clarity-judge` ne
+portent aujourd'hui de critère RGPD EXPLICITE dans leur tableau de rubrique (contrairement à
+`growth-quality-judge`, critère 2 « Consentement / anti-spam / RGPD », éliminatoire) — la
+lecture du `CLAUDE.md` comme source ne garantit pas, à elle seule, qu'un manquement RGPD fasse
+baisser le score ou déclenche un éliminatoire.
+
+**Piste de fix :** ajouter un critère RGPD explicite (avec pondération et statut éliminatoire le
+cas échéant) au tableau de rubrique des deux juges, sur le modèle du critère 2 de
+`growth-quality-judge`.
+
+**Déclencheur de reprise :** la prochaine revue de fond des grilles des juges business/content,
+ou un incident où un manquement RGPD n'a pas fait baisser le score d'un livrable jugé.

@@ -232,5 +232,45 @@ fi
 [ "$t12_ok" -eq 1 ] && ok "T12 rubric : /100 + seuil 80 + éliminatoire (chiffres sourcés) dans le juge"
 
 # ---------------------------------------------------------------------------
+# T13 — [D-08] Lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ du juge, pas
+#        seulement dans la liste « Références au besoin » (condition posée par Samuel en
+#        ratifiant D-08, session principale, 2026-09-25). Une mention restée dans les
+#        références NE DOIT PAS suffire — d'où l'extraction de section.
+# ---------------------------------------------------------------------------
+t13_ok=1
+t13_extract_methode() {
+  awk '/^## Méthode de scoring$/{f=1;next} f&&/^## /{exit} f' "$1"
+}
+if [ -f "$JUDGE" ]; then
+  methode=$(t13_extract_methode "$JUDGE")
+  if [ -z "$methode" ]; then
+    ko "T13 D-08 : section « ## Méthode de scoring » introuvable dans le juge"; t13_ok=0
+  else
+    echo "$methode" | "$GREP" -q 'Read' \
+      || { ko "T13 D-08 : consigne de lecture par l'outil Read absente du DÉROULÉ"; t13_ok=0; }
+    echo "$methode" | "$GREP" -q 'CLAUDE.md' \
+      || { ko "T13 D-08 : CLAUDE.md absent du DÉROULÉ (Méthode de scoring)"; t13_ok=0; }
+    entree=$(awk '/^## Entrée$/{f=1;next} f&&/^## /{exit} f' "$JUDGE")
+    echo "$entree" | "$GREP" -q 'CLAUDE.md' \
+      && { ko "T13 D-08 : CLAUDE.md encore mentionné dans l'Entrée/Références (doublon, doit être retiré)"; t13_ok=0; }
+
+    # Témoin DISCRIMINANT par mutation : une copie du juge dont la ligne du DÉROULÉ citant
+    # Read+CLAUDE.md est retirée ne doit plus passer T13 (rouge attendu sur la copie).
+    t13_tmp="$(mktemp -t t13-judge-mutant-XXXX.md)"
+    "$GREP" -v 'Lis explicitement, par' "$JUDGE" > "$t13_tmp"
+    methode_mut=$(t13_extract_methode "$t13_tmp")
+    if echo "$methode_mut" | "$GREP" -q 'CLAUDE.md'; then
+      ko "T13 (DISCRIMINANT) NON DISCRIMINANTE : le mutant sans la ligne Read+CLAUDE.md reste détecté OK"; t13_ok=0
+    else
+      ok "T13 (DISCRIMINANT) : le mutant sans la ligne Read+CLAUDE.md est bien rejeté (rouge attendu)"
+    fi
+    rm -f "$t13_tmp"
+  fi
+else
+  ko "T13 D-08 : $JUDGE introuvable"; t13_ok=0
+fi
+[ "$t13_ok" -eq 1 ] && ok "T13 D-08 : lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ (Méthode de scoring), pas dans les seules références"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]

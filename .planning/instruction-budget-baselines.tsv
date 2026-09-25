@@ -30,8 +30,8 @@ plugin/content-bundle/agents/vf-content-strategist.md	78	8
 plugin/content-bundle/agents/vf-content-writer.md	83	10
 plugin/design-orchestrator/AGENT.md	193	30
 plugin/design-orchestrator/agents/vf-crafter.md	77	12
-plugin/design-orchestrator/agents/vf-design-judge.md	85	8
-plugin/design-orchestrator/agents/vf-design-manager.md	192	29
+plugin/design-orchestrator/agents/vf-design-judge.md	85	9
+plugin/design-orchestrator/agents/vf-design-manager.md	192	30
 plugin/dev-orchestrator/AGENT.md	209	33
 plugin/dev-orchestrator/agents/vf-auditer.md	59	3
 plugin/dev-orchestrator/agents/vf-coder.md	122	23
@@ -41,7 +41,7 @@ plugin/growth-bundle/agents/campaign-analyst.md	111	15
 plugin/growth-bundle/agents/channel-strategist.md	87	13
 plugin/growth-bundle/agents/copywriter-sequences.md	99	14
 plugin/growth-bundle/agents/growth-quality-judge.md	84	8
-plugin/growth-bundle/agents/vf-growth-manager.md	167	24
+plugin/growth-bundle/agents/vf-growth-manager.md	167	25
 plugin/kpi-analyst/AGENT.md	96	13
 plugin/mobile-test-team/agents/vf-app-fixer.md	48	9
 plugin/mobile-test-team/agents/vf-test-orchestrator.md	60	8

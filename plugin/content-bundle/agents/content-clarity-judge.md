@@ -6,6 +6,7 @@ disallowedTools: Write, Edit
 model: sonnet
 effort: high
 memory: project
+omitClaudeMd: true
 vf-internal: true
 ---
 
@@ -42,11 +43,14 @@ se faire, tu juges le texte tel qu'il est sur le disque.
 1. Lis la pièce en entier, puis le cadrage. Score chaque critère indépendamment, avec
    pour chaque point perdu une **citation précise** (le passage fautif) — jamais de
    déduction vague.
-2. **Critère 1 d'abord** : liste chaque donnée chiffrée de la pièce et sa source. Une
+2. Lis explicitement, par l'outil Read, le `CLAUDE.md` du lab (règles RGPD) avant de
+   scorer : `omitClaudeMd: true` a coupé son chargement automatique — sans cette lecture
+   volontaire, la doctrine du lab n'existe plus pour ce juge.
+3. **Critère 1 d'abord** : liste chaque donnée chiffrée de la pièce et sa source. Une
    affirmation chiffrée sans source primaire autorisée → verdict échoué immédiat
    (le reste est quand même scoré pour guider la correction).
-3. Ne re-score pas l'auto-contrôle du writer : ignore ses cases cochées, vérifie le texte.
-4. Sur une **variante**, vérifie en plus que l'adaptation ne dégrade pas l'original
+4. Ne re-score pas l'auto-contrôle du writer : ignore ses cases cochées, vérifie le texte.
+5. Sur une **variante**, vérifie en plus que l'adaptation ne dégrade pas l'original
    (critères 1-5) et que l'angle d'origine est préservé (critère 6).
 
 ## Contraintes

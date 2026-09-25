@@ -1,5 +1,60 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.11] — 2026-09-25 (Phase 42, correction ciblée — nœud fix-42-condition-samuel, exécution de la condition posée par Samuel en ratifiant D-08)
+
+**Patch** :
+
+- **`vf-design-judge` lit désormais explicitement le `CLAUDE.md` du projet (section design)
+  dans le DÉROULÉ (section « Méthode de scoring »)**, avant de scorer les dimensions —
+  `omitClaudeMd: true` a coupé son chargement automatique. La consigne vit dans la procédure,
+  **plus du tout citée dans l'Entrée** (doublon retiré, revue `revue-42-condition` F1) :
+  ce qu'un juge doit vérifier vit dans sa procédure, jamais dans une référence annexe.
+  `tools: Read, Bash, Glob, Grep` vérifié inchangé.
+- **`vf-design-manager` — sa section « Orchestration par écran » porte désormais
+  explicitement que le digest transmis à `vf-design-judge` contient les interdits du lab
+  issus du `CLAUDE.md`** (section design) : c'est le manager qui transmet cette doctrine,
+  puisque le juge ne la charge plus automatiquement.
+- Assertion machine T11 ajoutée à `test-design-orchestrator.sh`, ancrée sur la section
+  « ## Méthode de scoring » du juge et « ## Orchestration par écran » du manager, avec témoin
+  discriminant par mutation, complétée d'une assertion anti-doublon sur la section « ## Entrée »
+  du juge (F1). Rejouée rouge sur les fichiers pré-correction (git show HEAD, doublon détecté
+  dans l'Entrée).
+- **Épisode « garde-fous » (2026-09-25, entre-temps) et son rejet** : pour repasser sous la
+  baseline de `check-instruction-budget.sh` après l'ajout ci-dessus, le commit f257306 avait
+  remplacé « interdits » par « garde-fous » dans la section « Orchestration par écran » de
+  `vf-design-manager` — un contournement du marqueur textuel D-01, jamais une baisse de charge
+  réelle. Rejeté par arbitrage (option b) : « arbitrage Willy, AskUserQuestion session
+  principale, 2026-09-25 ». « Interdits » est rétabli ; la baseline de
+  `.planning/instruction-budget-baselines.tsv` est montée en conséquence
+  (`vf-design-manager.md` 29 → 30, `vf-design-judge.md` 8 → 9 instructions), sur la même
+  citation d'arbitrage.
+
+Exécution de la condition posée par Samuel en ratifiant D-08 (session principale,
+2026-09-25) — décision déléguée par Willy au head, en exécution de sa condition (e568307).
+
+## [v1.5.10] — 2026-09-25 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **`vf-design-judge` déclare `omitClaudeMd: true`** (invariant I5, D-08) — le juge frais n'a
+  aucune allowlist `Agent(...)` et retire déjà `Write`/`Edit` : au sens du gate, c'est un juge,
+  qui ne doit jamais charger la doctrine du `CLAUDE.md` du projet — un regard frais ne charge
+  pas la doctrine. Frontmatter seul, corps inchangé, compte d'instructions inchangé. Arbitrage
+  D-08 (maintenir) : session principale, décision déléguée par Willy au head (« tranche et
+  avançons »), 2026-09-25 — 42-D19-MESURE.md, 42-CONTEXT.md D-08, D-11 — relecture de Samuel
+  demandée en PR (D-12).
+
+## [v1.5.9] — 2026-09-24 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **`SendMessage` sur `vf-design-manager`** (invariant I6, D-07) — le manager n'avait jusqu'ici
+  que `AskUserQuestion`, qui n'existe pas en sous-agent : il était muet. Frontmatter seul, corps
+  inchangé, allowlist `Agent(...)` intouchée (T8 de `test-design-orchestrator.sh` reste vert).
+  Décisions de cadrage de Claude (délégation de Willy, AskUserQuestion session principale,
+  2026-09-23), ratifiées par Samuel (WhatsApp, 2026-09-23), 42-CONTEXT.md D-07, D-11 — relecture
+  de Samuel demandée en PR (D-12).
+
 ## [v1.5.8] — 2026-09-17 (hotfix v2.63.2 — B1 étendu à vibeflow-design)
 
 **Patch** — aucune logique de routage ne change ; la doctrine d'invocation du head design rejoint

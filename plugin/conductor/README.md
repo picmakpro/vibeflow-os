@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.40.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.43.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -99,9 +99,15 @@ de mandat pour le faire correctement.)*
 - `check-agents.sh` — lint de conformité native des agents (ADR-044) : frontmatter, champs requis,
   skills déclarés existants, `vf-internal`, et depuis la Phase 16 le contenu du champ
   `tools:`/`disallowedTools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`, noms d'outils,
-  résolution graduée des noms d'agents avec préfixes tiers). Il ne mesure ni lignes ni charge
-  d'instructions (contrat réel `check-agents.sh:23-77`) : cette capacité est celle de
-  `check-instruction-budget.sh`, entrée propre ci-dessous (D-05, corrigé Phase 25).
+  résolution graduée des noms d'agents avec préfixes tiers). Référentiel porté par un manifeste
+  daté (`check-agents-manifest.json`, même dossier que le script) : validité portée par le
+  manifeste lui-même, `--manifest-freshness=strict` réservé à la CI (Phase 42). Invariants de
+  doctrine I1, I2, I3, I4, I5, I6, I7 TOUJOURS armés en erreur, jamais affectés par `--strict`
+  (I2/I3 actifs seulement sous `--resolve-agents=strict`, monde fermé de la CI) ; découverte des
+  agents désormais RÉCURSIVE (sous-dossiers inclus, dossiers cachés et `*-references/` exclus).
+  Il ne mesure ni lignes ni charge d'instructions (contrat réel `check-agents.sh:23-77`) : cette
+  capacité est celle de `check-instruction-budget.sh`, entrée propre ci-dessous (D-05, corrigé
+  Phase 25).
 - `guard-agent-write.sh` — enforcement du gate ci-dessus à l'écriture (hook Write).
 - `check-debug-research.sh` — phase de recherche documentaire avant debug dans les briques de
   dépannage (ADR-045).

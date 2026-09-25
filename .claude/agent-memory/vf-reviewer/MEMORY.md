@@ -22,3 +22,5 @@
 - [2>&1 masque une affirmation de flux](feedback_2to1-merge-hides-stream-claim.md) — un test qui fusionne stdout+stderr ne peut jamais prouver "sur stdout" ; T41/38-04 le confond avec log() >&2
 - [Garde précoce mord tous les verbes](feedback_flag-guard-scoped-to-all-verbs.md) — cmd="$1" arrive tard (l.2724) ; une garde --target non scopée bloque aussi status/sync/no-op (D-38-P, phase 38)
 - [Mutant sans dépendance sœur = échec précoce masqué](feedback_mutant-sibling-dependency-masks-vacuity.md) — MUT-2/39-01 : rc=2 identique avec/sans mutation ciblée, `|| true` avale aussi le return
+- [Phase 42 corpus avant armement invariant](project_phase42-corpus-ahead-of-invariant.md) — CHANGELOG cite I3/I6 non encore armes dans check-agents.sh : sequence D-11 voulue, pas une preuve fabriquee
+- [Correctif défensif hors d'atteinte de la CLI réelle](feedback_defensive-fix-unreachable-via-real-cli.md) — WR-01/42 : sonde blanche exec() prouve la forme, pas un chemin d'entrée réel

@@ -62,7 +62,9 @@
 # Note : `--file` attend un chemin RELATIF (au `--path`, résolu en objet git via `<ref>:<relpath>`) —
 # un `--file` absolu combiné à `--current-ref` n'est pas un usage supporté.
 #
-# Codes de sortie : 0 = conforme · 1 = régression ou invariant rompu (message stderr précise lequel)
+# Codes de sortie : 0 = conforme, les DEUX invariants réellement vérifiés (une baseline existait à
+#                       `--against`, l'Invariant 1 a donc été évalué, pas seulement l'Invariant 2)
+#                   1 = régression ou invariant rompu (message stderr précise lequel)
 #                   2 = erreur d'intégrité (hors dépôt git, fichier/ref illisible, champ imparsable,
 #                       workstream résolu dont le dossier `.planning/workstreams/<nom>/` est
 #                       introuvable, OU nom/pointeur REJETÉ par la politique amont — même posture
@@ -71,7 +73,14 @@
 #                       que l'on n'a pas vérifié. Le rejet d'un nom retombait précisément sur la
 #                       racine en rendant « exit 0 conforme » — fail-OPEN, l'exact inverse de ce
 #                       que cette ligne jure.)
-#                   64 = usage
+#                   3 = conforme SOUS RÉSERVE, Invariant 1 SAUTÉ faute de baseline — N'EST PAS un
+#                       échec. Le fichier est absent de `--against` (compartiment neuf, non commité,
+#                       premier commit du fichier) : seul l'Invariant 2 a pu être vérifié. Faire
+#                       échouer ce cas rougirait sur TOUT compartiment neuf et casserait l'invariant
+#                       à trois états (conforme / non initialisé / corrompu). Le code existe parce
+#                       qu'une ligne de stderr n'est PAS un contrat pour un appelant qui ne juge que
+#                       le code de sortie — la dégradation cesse d'être silencieuse.
+#                   64 = usage (dont : `--file` ABSOLU, rejeté à l'entrée avant toute tentative git)
 set -uo pipefail
 
 ROOT="."
@@ -98,6 +107,21 @@ while [ "$#" -gt 0 ]; do
     *) echo "[check-state-integrity] argument inconnu : $1" >&2; exit 64 ;;
   esac
 done
+
+# CORRECTION (fermeture fail-open, feu vert session principale 2026-09-23, plan 41.1-09) : un
+# --file ABSOLU explicite rend git show "REF:$FILE_REL" structurellement irrésoluble (git ne
+# résout jamais un chemin absolu en objet de dépôt) -> HAVE_BASELINE=0 en silence -> Invariant 1
+# (non-régression des compteurs, ADR-063) sauté sans que ce soit une erreur d'usage annoncée.
+# Rejet AU PLUS PETIT, à l'entrée, code 64, avant toute tentative git — jamais une conversion
+# automatique en relatif, jamais un repli : le gate refuse de juger ce qu'il ne sait pas lire.
+if [ "$FILE_REL_EXPLICIT" -eq 1 ]; then
+  case "$FILE_REL" in
+    /*)
+      echo "[check-state-integrity] --file doit être un chemin RELATIF à --path — reçu un chemin absolu ($FILE_REL). git show '<ref>:<chemin>' ne résout jamais un chemin absolu : l'Invariant 1 serait sauté en silence. Usage invalide." >&2
+      exit 64
+      ;;
+  esac
+fi
 
 export GIT_CONFIG_NOSYSTEM=1
 export GIT_TERMINAL_PROMPT=0
@@ -272,6 +296,17 @@ if [ "$phase_lines" -ne 1 ]; then
 fi
 
 if [ "$FAIL" -eq 0 ]; then
+  # CORRECTION Q2 (arbitrage session principale 2026-09-23, option b) : quand l'Invariant 1
+  # (non-régression des compteurs, ADR-063) a été SAUTÉ faute de baseline, le verdict n'est pas le
+  # même que « conforme, les deux invariants vérifiés ». Sortir en 3 — code LIBRE (0/1/2/64 seuls en
+  # usage) et déjà porteur du sens « SILENCE / distinct du nominal » dans ce dépôt.
+  # 3 N'EST PAS UN ÉCHEC : faire échouer HAVE_BASELINE=0 rougirait sur TOUT compartiment neuf et
+  # casserait l'invariant à trois états de D-02. Ce qui change, c'est que la dégradation cesse d'être
+  # SILENCIEUSE POUR L'APPELANT — un code de sortie est un contrat, une ligne de stderr n'en est pas un.
+  if [ "$HAVE_BASELINE" -eq 0 ]; then
+    echo "[check-state-integrity] ✓ $FILE_REL conforme SOUS RÉSERVE — Invariant 1 (non-régression des compteurs) SAUTÉ faute de baseline à $AGAINST_REF. Seul l'Invariant 2 (compte de lignes '^Phase:') a été vérifié."
+    exit 3
+  fi
   echo "[check-state-integrity] ✓ $FILE_REL conforme (compteurs non régressés, 1 ligne '^Phase:')"
   exit 0
 fi

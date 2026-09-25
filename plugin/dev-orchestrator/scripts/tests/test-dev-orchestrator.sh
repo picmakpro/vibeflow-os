@@ -1514,6 +1514,23 @@ if [ -f "$CONTRACTS" ]; then
   else
     ko "T9 renvois : $renvois/3 renvois vers mission-contracts.md"
   fi
+  # T9c — Confiance d'un jugement (2026-09-24) : le seuil SEUIL_CONFIANCE est DÉFINI ici et
+  # seulement ici (une valeur), le kernel y RENVOIE (il cite le nom, jamais la valeur) — même
+  # régime DRY que SEUIL_EQUIPE. Un chiffre recopié dans team-kernel.md dériverait en silence.
+  if "$GREP" -q 'SEUIL_CONFIANCE = 0\.[0-9]' "$CONTRACTS" \
+     && md_folded "$CONTRACTS" | "$GREP" -qiE "Confiance[[:space:]]+d'un[[:space:]]+jugement"; then
+    ok "T9c confiance : SEUIL_CONFIANCE défini dans mission-contracts.md (§Confiance d'un jugement)"
+  else
+    ko "T9c confiance : SEUIL_CONFIANCE ou §Confiance d'un jugement absent de mission-contracts.md"
+  fi
+  KERNEL_REF="$(cd "$MOD/.." && pwd)/conductor/references/team-kernel.md"
+  if [ -f "$KERNEL_REF" ]; then
+    if "$GREP" -q 'SEUIL_CONFIANCE' "$KERNEL_REF" && ! "$GREP" -q 'SEUIL_CONFIANCE = ' "$KERNEL_REF"; then
+      ok "T9c renvoi : team-kernel.md cite SEUIL_CONFIANCE sans en recopier la valeur"
+    else
+      ko "T9c renvoi : team-kernel.md doit citer SEUIL_CONFIANCE (nom seul, jamais « = valeur »)"
+    fi
+  fi
 else
   ko "T9 contrats : $CONTRACTS introuvable"
 fi

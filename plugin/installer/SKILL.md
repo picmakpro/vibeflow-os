@@ -48,6 +48,7 @@ bug d'install vécu sur le terrain, ADR-054) :
 | Préflight prérequis (étape 0) | `bash "$VIBEFLOW_CACHE/installer/scripts/preflight.sh"` |
 | Catalogue modules (étapes 3–4) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/installer/scripts/build-module-catalog.sh"` |
 | Résolveur de deps (étape 5) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/resolve-deps.sh" <modules…>` |
+| Presets (étape 4) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/resolve-preset.sh" list` puis `… resolve-preset.sh <preset>` |
 | Engine status/install/uninstall | `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" …` |
 | Bootstrap GSD/Superpowers (étape 5, branche dev) | `VF_SCOPE=<s> bash "$VIBEFLOW_CACHE/dev-orchestrator/scripts/ensure-deps.sh"` |
 
@@ -94,8 +95,15 @@ bug d'install vécu sur le terrain, ADR-054) :
 
 4. **Choix du type de lab (INST-02b — single-select).** Une fois le socle posé, **un seul** choix
    structurant, via l'UI de questions (pas un TUI bash) :
-   - **Lab de développement** → poser le module `dev-orchestrator` (entrée `optional` du catalogue)
-     + amorcer ses dépendances de dev.
+   - **Lab de développement** → un **preset** (INST-02c). Lister les presets (invocation exacte
+     dans la table « Chemins réels ») : chaque ligne `name<TAB>titre<TAB>description<TAB>modules`
+     devient une option de la question, le preset `dev` pré-coché (titre + description telle
+     quelle — **aucun nom de preset ni de module en dur dans ce skill**, tout sort de
+     `presets.json`). Le preset retenu est résolu par `resolve-preset.sh <preset>` : sa sortie
+     (un module par ligne, fermeture des `requires` déjà calculée) est la liste à poser à l'étape 5.
+     Un preset qui référencerait un module WIP est **refusé** par le résolveur, jamais élagué.
+     Sans réponse exploitable, ou si la liste des presets est vide, retomber sur le seul module
+     `dev-orchestrator` (entrée `optional` du catalogue) + amorcer ses dépendances de dev.
    - **Nouveau lab (autre métier)** → ne rien poser de plus ici : la suite passe par **`/vf-new-lab`**
      (porté par `conductor`, déjà posé), qui mène la clarification du métier et **câble lui-même**
      les modules pertinents (auditeurs, planning, etc.). On ne présume jamais « dev ».
@@ -117,7 +125,8 @@ bug d'install vécu sur le terrain, ADR-054) :
      plan fichier-par-fichier qui enrichit le récapitulatif ci-dessus. `--dry-run` n'écrit rien et
      est refusé sur `uninstall` — il ne protège pas ce verbe-là.
    - **Modules VibeFlow** → `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> install --with-deps <module>`
-     (conductor d'office, puis `dev-orchestrator` si branche dev).
+     (conductor d'office, puis les modules rendus par le preset si branche dev — passés tels
+     quels, un par argument).
      `--with-deps` recâble lui-même le résolveur côté engine.
    - **GSD + Superpowers** → `VF_SCOPE=<s> bash "$VIBEFLOW_CACHE/dev-orchestrator/scripts/ensure-deps.sh"`
      (uniquement si `dev-orchestrator` est posé, ou sur demande).
@@ -170,7 +179,9 @@ correspondre à celui où les modules ont été posés (sinon l'engine cherche a
   *lab de développement* vs *nouveau lab métier (`vf-new-lab`)* — pas une liste brute de modules.
 - **Jamais proposer un module `proposable:false`** : exclu du catalogue par construction (bundles
   métier WIP). Ne le reproposer qu'une fois finalisé (repasser `proposable` à true / l'omettre).
-- **Ne réimplémente jamais** une brique : route et délègue (catalogue, `resolve-deps.sh`,
+- **Presets = données, pas prose** : les presets proposés sortent de `resolve-preset.sh list`
+  (`_internal/presets.json`) ; en ajouter un = éditer ce fichier, jamais ce skill.
+- **Ne réimplémente jamais** une brique : route et délègue (catalogue, `resolve-preset.sh`, `resolve-deps.sh`,
   `vibeflow-update.sh --scope`, `ensure-deps.sh` via `VF_SCOPE` — invocations exactes : table
   « Chemins réels » ci-dessus).
 - **Reframe en vocabulaire VibeFlow** ; ne nomme jamais GSD ni Superpowers à l'utilisateur

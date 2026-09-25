@@ -1,5 +1,57 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.24.1] — 2026-09-25 (registre de citation et doctrine workstream-aware, Phase 41.1)
+
+**Patch** (durcissement et doctrine, pas une capacité neuve) :
+
+- **`scripts/discover-unintegrated-docs.sh`** : le registre de citation ne lit plus seulement la
+  racine de `.planning/` — il cite **chaque compartiment** présent sur le disque, et quand il ne
+  peut PAS le faire, il le **dit sur stderr** au lieu de se taire.
+
+**Doctrine (Phase 41.1, lot L07 — WSAW-05/06/07)** — origine : l'angle mort constaté à la
+partition D-02 du 2026-09-23 (PR #94), repris à l'ouverture de la Phase 41.1 depuis le ROADMAP.
+
+- **`references/workstreams.md` §1** : la **procédure de bascule** et sa **précondition
+  vérifiable** — absentes jusqu'ici, §1 ne donnait que `create <nom> --migrate-name <nom>`. La
+  précondition est la condition dure du §5 (« aucune partition tant qu'une phase est en vol »),
+  nommée comme un **champ du disque** à lire, jamais présumée depuis la mémoire d'une session.
+- **`references/workstreams.md` §3** : l'affirmation devenue **fausse** depuis la PR #94 (« l'état
+  nominal de tous nos labs à ce jour ») est corrigée — elle distingue désormais **ce** dépôt
+  (`vibeflow-os`, partitionné depuis le 2026-09-23) des **labs qui installent VibeFlow**, où le
+  non-partitionné reste le défaut.
+- **`references/workstreams.md` chapeau** : le **choix** de partitionner et son **démarrage**
+  entrent dans le vocabulaire du fichier ; le contenu doctrinal de ce choix appartient à la
+  Phase 41.2.
+- **`references/workstreams.md` §6 (neuf)** : la **définition unique** de « compartiment
+  conforme » — la trichotomie D-02 **amendée** (conforme / non initialisé sur le frontmatter
+  seul / verdict nommé d'ambiguïté, une notice jamais un échec / corrompu), recopiée **verbatim**
+  du cadrage et vérifiée par `cmp`. Elle vit désormais dans un artefact **versionné et
+  distribué** : la Phase 41.2 la consomme (WSCH-02) sans avoir accès au CONTEXT d'une phase close.
+- **`docs/ADR.md` (ce dépôt, hors module)** : ADR-069 gagne un amendement daté 2026-09-23 qui pose
+  la **frontière gate/workflow** par le rôle — `GSD_WORKSTREAM` reste le canal nominal de ce qui
+  travaille, un gate ne dérive jamais sa cible d'une valeur qu'un `export` peut changer.
+## [v2.24.0], 2026-09-24 : confiance d'un jugement dans les rapports typés + allocation du head en trois questions
+
+**Minor** (deux contrats évoluent, additifs — absent = comportement inchangé) :
+
+- **`references/mission-contracts.md` §Confiance d'un jugement** : le bloc typé (et chaque
+  finding) gagne un champ optionnel `confiance` (0–1). Il ne qualifie qu'un **jugement** (revue,
+  audit, critique scorée, allocation), jamais une preuve machine. `SEUIL_CONFIANCE = 0.6`, défini
+  ici et seulement ici (même régime DRY que `SEUIL_EQUIPE`) : un `passed` de jugement sous le
+  seuil est requalifié `gaps_found` + finding `ask-user` par le manager — aucun mécanisme neuf,
+  l'escalade humaine existante fait le reste. Les confiances sont recopiées verbatim dans le
+  « Rapport de mission » (bullet `Confiances (si portées)`), jamais moyennées : c'est la matière
+  d'une future mesure du seuil, pas une statistique. Inspiré du contrat des modèles de décision
+  typée (`docs/research/2026-09-24-jev-system-one.md`).
+- **`references/head-governance.md` §1 « Trois questions avant l'échelle »** : avant de lire la
+  table d'allocation, le head note séparément coordination, incertitude et conséquence ; niveau =
+  max(coordination, incertitude), une conséquence forte abaisse d'un cran le palier de montée.
+  Sous `SEUIL_CONFIANCE`, il propose au lieu de dispatcher d'office, même en boucle autonome.
+  `SEUIL_EQUIPE` et les signaux « mission » restent la référence : ces questions disent où lire
+  la table, pas quoi lancer.
+- **Suite** : T9c vérifie que `SEUIL_CONFIANCE` est défini dans `mission-contracts.md` et que
+  `team-kernel.md` le cite sans en recopier la valeur.
+
 ## [v2.23.1], 2026-09-23 : ledger d'exigences et E4 de check-mission-exit.sh rendus workstream-aware (D-02)
 
 **Patch** (correctif : ces scripts étaient cassés sur un dépôt partitionné, pas une capacité

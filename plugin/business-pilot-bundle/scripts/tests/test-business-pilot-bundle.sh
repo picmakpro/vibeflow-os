@@ -285,5 +285,45 @@ fi
 [ "$t14_ok" -eq 1 ] && ok "T14 chiffres : zéro chiffre inventé (Iron Law finance + manager, éliminatoire au gate)"
 
 # ---------------------------------------------------------------------------
+# T15 — [D-08] Lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ du gate, pas
+#        seulement dans la liste « Références au besoin » (condition posée par Samuel en
+#        ratifiant D-08, session principale, 2026-09-25). Une mention restée dans les
+#        références NE DOIT PAS suffire — d'où l'extraction de section.
+# ---------------------------------------------------------------------------
+t15_ok=1
+t15_extract_methode() {
+  awk '/^## Méthode de scoring$/{f=1;next} f&&/^## /{exit} f' "$1"
+}
+if [ -f "$GATE" ]; then
+  methode=$(t15_extract_methode "$GATE")
+  if [ -z "$methode" ]; then
+    ko "T15 D-08 : section « ## Méthode de scoring » introuvable dans le gate"; t15_ok=0
+  else
+    echo "$methode" | "$GREP" -q 'Read' \
+      || { ko "T15 D-08 : consigne de lecture par l'outil Read absente du DÉROULÉ"; t15_ok=0; }
+    echo "$methode" | "$GREP" -q 'CLAUDE.md' \
+      || { ko "T15 D-08 : CLAUDE.md absent du DÉROULÉ (Méthode de scoring)"; t15_ok=0; }
+    entree=$(awk '/^## Entrée$/{f=1;next} f&&/^## /{exit} f' "$GATE")
+    echo "$entree" | "$GREP" -q 'CLAUDE.md' \
+      && { ko "T15 D-08 : CLAUDE.md encore mentionné dans l'Entrée/Références (doublon, doit être retiré)"; t15_ok=0; }
+
+    # Témoin DISCRIMINANT par mutation : une copie du gate dont la ligne du DÉROULÉ citant
+    # Read+CLAUDE.md est retirée ne doit plus passer T15 (rouge attendu sur la copie).
+    t15_tmp="$(mktemp -t t15-gate-mutant-XXXX.md)"
+    "$GREP" -v 'Lis explicitement, par' "$GATE" > "$t15_tmp"
+    methode_mut=$(t15_extract_methode "$t15_tmp")
+    if echo "$methode_mut" | "$GREP" -q 'CLAUDE.md'; then
+      ko "T15 (DISCRIMINANT) NON DISCRIMINANTE : le mutant sans la ligne Read+CLAUDE.md reste détecté OK"; t15_ok=0
+    else
+      ok "T15 (DISCRIMINANT) : le mutant sans la ligne Read+CLAUDE.md est bien rejeté (rouge attendu)"
+    fi
+    rm -f "$t15_tmp"
+  fi
+else
+  ko "T15 D-08 : $GATE introuvable"; t15_ok=0
+fi
+[ "$t15_ok" -eq 1 ] && ok "T15 D-08 : lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ (Méthode de scoring), pas dans les seules références"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]

@@ -64,6 +64,13 @@ if [ "$HOOK" -eq 1 ] && [ "$QUIET" -eq 1 ]; then
   exit 64
 fi
 
+# Politique de workstream (Phase 41.1 / D-01) — sourcing DIRECT : ce script vit dans
+# `planning-core/scripts/`, voisin du fichier de politique, et `planning-core: requires: []` n'a
+# besoin d'aucun repli inter-module. Si le sourcing échoue, `vf_ws_enumerate` sera introuvable et
+# le `case` du bloc 2 retombera sur sa branche `*)` (code imprévu 127) — annoncée, jamais muette.
+# shellcheck source=/dev/null
+. "$(dirname "$0")/workstream-policy.sh"
+
 say() { [ "$QUIET" -eq 1 ] || echo "[planning-state] $*"; }
 # say_diag : MÊME contenu que say(), mais sur STDERR — réservé au cas nominal « rien à signaler »
 # (STATE.md frais). D-06/D-07 : le chemin nominal silencieux doit avoir un stdout STRICTEMENT
@@ -110,10 +117,59 @@ if [ ! -d "$PLANNING_DIR" ]; then
 fi
 
 STATE_FILE="$PLANNING_DIR/STATE.md"
-# 2. STATE présent ? (clé de voûte)
+# 2. STATE présent ? (clé de voûte) — SEULEMENT si ce dépôt n'est pas partitionné en workstreams
+#    ou si un repli racine legacy (.planning/phases/) est encore en jeu. Patron D-01/D-04, même
+#    posture SILENCE que check-divergence.sh : sur un dépôt partitionné avec au moins un
+#    compartiment, l'absence du STATE.md RACINE n'est plus un défaut, c'est l'état nominal.
+# CORRECTION C-06 (juge frais, 2e passe) : rc CAPTURÉ via fichier temporaire, stderr LAISSÉ PASSER,
+# `case` à branche `*)` nommée — patron des plans 41.1-02 et 41.1-04. Sans cela, rc=2 (workstreams/
+# détourné en lien) et rc=3 (dépôt non partitionné) sont indistinguables, et ce script
+# réimprimerait « STATE.md ABSENT » — le faux rouge même que ce plan existe pour fermer — sans
+# qu'aucune ligne ne dise pourquoi. Les codes de sortie du script sont INCHANGÉS ; seul le MESSAGE
+# change sur le chemin non vérifiable, pour qu'il cesse de mentir.
 if [ ! -f "$STATE_FILE" ]; then
-  say "$PLANNING_DIR/ existe mais STATE.md (clé de voûte) est ABSENT. Le recréer via /vf-planning."
-  hook_exit 2
+  _cps_tmp="$(mktemp)" || _cps_tmp=""
+  if [ -z "$_cps_tmp" ]; then
+    say "$PLANNING_DIR/ : STATE.md racine absent, et l'énumération des compartiments n'a pas pu être faite (mktemp en échec) — état NON VÉRIFIABLE, ce diagnostic n'est pas concluant."
+    hook_exit 2
+  fi
+  vf_ws_enumerate "$PLANNING_DIR" > "$_cps_tmp" 2>&2
+  _cps_rc=$?
+  case "$_cps_rc" in
+    0)
+      n_ws="$(awk 'NF>0{c++} END{print c+0}' "$_cps_tmp")"
+      rm -f "$_cps_tmp"
+      if [ -d "$PLANNING_DIR/phases" ]; then
+        # repli racine legacy encore en jeu : comportement d'avant cette phase, INCHANGÉ
+        say "$PLANNING_DIR/ existe mais STATE.md (clé de voûte) est ABSENT. Le recréer via /vf-planning."
+        hook_exit 2
+      fi
+      say_diag "OK — dépôt partitionné, $n_ws compartiment(s) de workstream sur le disque, pas de STATE.md racine attendu."
+      exit 0
+      ;;
+    3)
+      # SILENCE — `workstreams/` absent : dépôt NON PARTITIONNÉ. Le message ABSENT est LÉGITIME,
+      # c'est le vrai lab non amorcé. Comportement d'avant cette phase, INCHANGÉ, aucune annonce.
+      rm -f "$_cps_tmp"
+      say "$PLANNING_DIR/ existe mais STATE.md (clé de voûte) est ABSENT. Le recréer via /vf-planning."
+      hook_exit 2
+      ;;
+    2)
+      rm -f "$_cps_tmp"
+      echo "[check-planning-state] vf_ws_enumerate : workstreams/ présent mais AUCUN compartiment vérifiable (lien symbolique, illisible, ou vide après filtrage anti-lien)" >&2
+      # Le message n'emprunte PAS le mot ABSENT : l'état n'est pas « rien n'a été créé », il est
+      # « on ne peut pas savoir ». Dire ABSENT ici serait rouvrir le faux rouge D-04 sous un autre
+      # motif — exactement la dégradation silencieuse que l'invariant de mission interdit.
+      say "$PLANNING_DIR/ : STATE.md racine absent ET workstreams/ non vérifiable — état NON VÉRIFIABLE. Inspecter $PLANNING_DIR/workstreams (lien symbolique ? droits ?) avant d'en conclure quoi que ce soit."
+      hook_exit 2
+      ;;
+    *)
+      rm -f "$_cps_tmp"
+      echo "[check-planning-state] vf_ws_enumerate : code de sortie imprévu ($_cps_rc, attendu 0/2/3)" >&2
+      say "$PLANNING_DIR/ : STATE.md racine absent et l'énumération des compartiments a rendu un code imprévu ($_cps_rc) — état NON VÉRIFIABLE."
+      hook_exit 2
+      ;;
+  esac
 fi
 
 # 3. Fraîcheur : lire last_updated dans le frontmatter YAML.
