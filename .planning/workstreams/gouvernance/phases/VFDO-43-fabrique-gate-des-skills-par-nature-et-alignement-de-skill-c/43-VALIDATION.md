@@ -50,13 +50,14 @@ created: "2026-09-25"
 | 43-04-T3 | 43-04 | 1 | FABR-09 | T-43-30, T-43-31, T-43-34 | bootstrap mesuré et borné selon l'option ; baseline citée | unit (bash) + mutation + G-1 | BOOT-1..5, MUT-11 ; `REEL-BOOT rc=0` ; `G1 rc=0/3` | ❌ W0 | ⬜ pending |
 | 43-05-T1 (tracer) | 43-05 | 2 | FABR-10 | T-43-43, T-43-45 | serveur nommé absent de l'union signalé jusqu'au journal d'installation | unit (bash) + lab frais (HOME temporaire) | test-inject-mcp-tools.sh T16, T32, T33 ; test-vibeflow-update.sh T55 ; `TRACER-MCP-OK` | ✅ suites existantes, cas ajoutés | ⬜ pending |
 | 43-05-T2 | 43-05 | 2 | FABR-10 | T-43-40, T-43-41, T-43-42, T-43-44 | vf-mcp-tools malformée refusée à l'install et au gate | unit (bash) + mutation | T22a-d, T34, MUT-A ; T56 ; T108, T109, MUT-M1 ; `CORPUS-AGENTS fail=0` | ✅ suites existantes | ⬜ pending |
-| 43-05-T3 | 43-05 | 2 | FABR-10 | — | spec §1.2/§7.2 amendée, dev-orchestrator en patch | grep + check-version-sync | `DEV-ORCH-VERSION-OK` | ✅ | ⬜ pending |
-| 43-06-T1 | 43-06 | 3 | FABR-10 (c) + docs | T-43-50, T-43-51 | vf-calibrate à deux clés, conductor en mineure | grep + check-version-sync | `CONDUCTOR-VERSION-OK` | ✅ | ⬜ pending |
-| 43-06-T2 | 43-06 | 3 | tous | T-43-52 | rejeu complet, G-1, G-2, labs frais | rejeu | `REJEU-FIN`, `CORPUS-REEL fail=0`, `G2 rc=0`, `LAB-FRAIS-FIN-OK` | ✅ | ⬜ pending |
+| 43-07-T1 | 43-07 | 3 | FABR-10 | T-43-60, T-43-62 | spec §1.2/§7.2 amendée, citation D-Q3, fusion écartée | grep | 4 comptes de la spec (ancienne formule à 0, les trois autres > 0) | ✅ | ⬜ pending |
+| 43-07-T2 | 43-07 | 3 | FABR-10 | T-43-60, T-43-61 | dev-orchestrator en patch, aucun bump racine | grep + check-version-sync | `DEV-ORCH-VERSION-OK` ; fichiers de version racine touchés = 0 | ✅ | ⬜ pending |
+| 43-06-T1 | 43-06 | 4 | FABR-10 (c) + docs | T-43-50, T-43-51 | vf-calibrate à deux clés, conductor en mineure | grep + check-version-sync | `CONDUCTOR-VERSION-OK` | ✅ | ⬜ pending |
+| 43-06-T2 | 43-06 | 4 | tous | T-43-52 | rejeu complet, G-1, G-2, labs frais | rejeu | `REJEU-FIN`, `CORPUS-REEL fail=0`, `G2 rc=0`, `LAB-FRAIS-FIN-OK` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
-*Table remplie par le planificateur le 2026-09-25 (plans 43-01 à 43-06).*
+*Table remplie par le planificateur le 2026-09-25 (plans 43-01 à 43-06) ; révisée le même jour : l'ancienne 43-05-T3 devient 43-07 (T1 spec, T2 version), 43-06 passe en vague 4.*
 
 ---
 
