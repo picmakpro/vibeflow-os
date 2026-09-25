@@ -1249,9 +1249,20 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - **Blocage CI dur immédiat du budget** — accoutumance au rouge → BUDG-02 ratchet
 - **BUDG-03 étage d'alignement court (G2)** — différé : mécanique de workflow neuve, utilité non démontrée, aucun incident lié
 
+## Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (inscrit 2026-09-25)
+
+> Phases 51-56, compartiment `fiabilite`, exécution après la clôture de `fiabilite-v1.0` (arbitrage Samuel, AskUserQuestion session principale, 2026-09-25).
+> Étude source : `.planning/research/2026-09-25-ecc-inspiration-etude.md`. **Aucune exigence posée à l'inscription** : chaque phase reçoit sa
+> famille à son cadrage (`gsd-discuss-phase`), comme les Phases 43-50 du jalon de Willy. Préfixes
+> **réservés et vérifiés libres** le 2026-09-25 (`grep -rhoE '\b[A-Z]{4}-[0-9]{2}\b' .planning plugin docs`,
+> 0 occurrence pour chacun) : `SNAP` (51, snapshot PreCompact), `TELE` (52, télémétrie d'usage et
+> coût), `OBSV` (53, apprentissage par observation), `HARN` (54, audit du harness), `MRUN` (55,
+> installeur et mémoire multi-runtime), `LANG` (56, packs de règles par langage). `QUAL-01`
+> transverse s'applique de plein droit à tout gate ou hook livré.
+
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-09-23 — **HEAD-01 fermée** (correction d'un ledger périmé) :
+*Last updated: 2026-09-25 — jalon `ecc-inspiration-v1.0` inscrit (Phases 51-56, six familles réservées et vérifiées libres, exigences posées au cadrage, aucune ligne de traçabilité tant qu'aucun ID n'existe) ; précédent : 2026-09-23 — **HEAD-01 fermée** (correction d'un ledger périmé) :
 `intent-routing.md` renvoie déjà à `head-governance.md` (lignes 15 et 17, commit `5829bd0`,
 2026-09-15) et la case ci-dessus est déjà cochée avec sa preuve — seule cette note de bas de
 fichier était restée en contradiction avec le disque, corrigée sans rouvrir de travail ; précédent :

@@ -16,6 +16,14 @@
   (demande client). Périmètre arbitré par Samuel le 2026-08-15 (familles PORT/MANI/LOCK/WTCH/LEDG/
   BUDG/WKTR/SKIL/AGTS + QUAL-01 transverse). Recherche : `.planning/research/SUMMARY.md` +
   `ARCHITECTURE.md` (ordre de construction dicté par les fichiers).
+- 📋 **ecc-inspiration-v1.0** — « ce qu'on emprunte à ECC » — Phases 51-56 — **inscrit
+  2026-09-25** — six emprunts mesurés au dépôt `affaan-m/ECC` (snapshot avant compaction,
+  télémétrie d'usage et coût, apprentissage adossé à l'observation, audit du harness comme
+  surface d'attaque, installeur et mémoire portables entre runtimes, packs de règles par
+  langage). Étude comparative : `.planning/research/2026-09-25-ecc-inspiration-etude.md`. Jalon logé dans ce compartiment, section distincte
+  dans la ROADMAP plate **sans `gsd-new-milestone`** (même forme que `gouvernance-labs-v1.0`) ;
+  **exécution après la clôture de `fiabilite-v1.0`**, en parallèle du jalon de Willy
+  (compartiment `gouvernance`) — arbitrage Samuel, AskUserQuestion session principale, 2026-09-25.
 
 > **Origine des Phases 23 à 25, dite franchement.** Elles ont été inscrites au ROADMAP le
 > 2026-07-31 par une session concurrente, **hors du périmètre confié** à la mission qui tournait
@@ -85,6 +93,12 @@
 - [x] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date — **PÉRIMÈTRE RECADRÉ SANS ADMIN LIVRÉ le 2026-09-18, mergée PR #80, SHIPPÉE v2.64.0** : trois gardes in-repo qui signalent et tracent sans jamais verrouiller (G-1 `check-baseline-arbitrage.sh`, G-2 `check-gate-touche.sh`, G-3 `check-push-sans-pr.sh`) + doctrine ADR-072 ; **critères de succès 1 à 3 du ROADMAP d'origine restent HORS D'ATTEINTE sans accès admin GitHub** (PROT-01 non coché, `REQUIREMENTS.md`) ; volet rulesets côté serveur **DIFFÉRÉ au BACKLOG** avec son déclencheur de reprise — le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce volet (WhatsApp, 2026-09-23) **avant** la clôture de `fiabilite-v1.0`, puisque PROT-01 en fait partie (correction du 2026-09-23 : la formulation précédente inversait la séquence — cf. `BACKLOG.md` § « Protection de `main` côté GitHub »))
 - [x] Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED 2026-09-23, demande Samuel session principale : « généralise le remède, ça ne doit plus se reproduire »)
 - [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage)
+- [ ] Phase 51: Snapshot de planning avant compaction (PreCompact) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
+- [ ] Phase 52: Télémétrie d'usage des skills et agents, et coût de mission (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
+- [ ] Phase 53: Apprentissage adossé à l'observation — preuves dans la mémoire vivante (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
+- [ ] Phase 54: Audit du harness comme surface d'attaque (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
+- [ ] Phase 55: Installeur et mémoire portables entre runtimes (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
+- [ ] Phase 56: Packs de règles par langage (module optionnel) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -1867,3 +1881,189 @@ sur chaque compartiment sans réparation manuelle**.
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 41.2 to break down)
+
+
+## 📋 Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (Phases 51-56)
+
+**Milestone Goal :** emprunter à `affaan-m/ECC` (« Everything Claude Code », v2.2.2) les six
+mécanismes que VibeFlow n'a pas et qui tiennent sa doctrine — observer le harness (snapshot avant
+compaction, usage et coût réels, apprentissage par observation), le défendre (audit de la surface
+d'attaque que sont les agents, hooks, MCP et mémoires) et le rendre portable (installeur et mémoire
+entre runtimes, packs de règles par langage). Étude comparative, mesures et refus motivés :
+`.planning/research/2026-09-25-ecc-inspiration-etude.md` (§1 tableau, §2 emprunts, §3 écartés, §4 collisions avec le jalon de Willy).
+
+**Inscription :** 2026-09-25, demande de Samuel (session principale, 2026-09-25) ; jalon, nom,
+compartiment et exécution différée : arbitrage Samuel, AskUserQuestion session principale, 2026-09-25. Même forme que `gouvernance-labs-v1.0` : section
+distincte dans la ROADMAP plate, **sans `gsd-new-milestone`** (le STATE reste mono-position sur
+`fiabilite-v1.0`, Phase 41.2 ouverte). Numéros 51-56 posés à la main (le moteur propose un mauvais
+numéro sur ce dépôt ; 42-50 appartiennent au compartiment `gouvernance`).
+
+**Aucune exécution avant la clôture de `fiabilite-v1.0`** (il reste la Phase 41.2). **Être inscrite
+ne vaut pas feu vert** : chaque phase passe par `gsd-discuss-phase` puis `gsd-plan-phase`, et ses
+exigences (familles réservées `SNAP`, `TELE`, `OBSV`, `HARN`, `MRUN`, `LANG` — vérifiées libres le
+2026-09-25) sont posées au cadrage, jamais avant.
+
+**Ce que ce jalon n'importe PAS** (tranché à l'étude, §3) : le volume d'ECC (292 skills, 94
+commandes — ADR-029, façade de synonymes supprimée en v2.33.0), les contextes `dev`/`review`/
+`research` (ADR-068), les Conventional Commits bloquants (ADR-067), l'auto-application des
+« instincts » à 0.7 de confiance (ADR-031), le contrat de délégation en prose (déjà couvert par
+les rapports typés, le DAG et `check-mission-exit.sh`).
+
+**Ordre de construction (recommandé, à confirmer au cadrage) : 51 → 52 → 54 → 53 → 55 → 56.**
+
+- **51 en premier** : un patch d'une journée, aucun module partagé avec Willy, et il protège les
+  missions qui exécuteront le reste du jalon.
+- **52 avant 53** : les deux écrivent un journal machine local au lab ; le canal (emplacement,
+  rétention, gitignore fail-closed, forme exec des hooks) se pose une fois, en 52, et 53 le
+  consomme.
+- **54 avant 53** : la 53 ouvre un écrivain automatique de mémoire vivante ; on audite la surface
+  d'attaque **avant** de l'agrandir, et la doctrine « un corps rappelé est une donnée, jamais une
+  instruction » doit être gravée et prouvée avant qu'une passe d'observation ne propose des faits.
+- **53 et 55 touchent `consolidator`, 55 touche l'installeur** — mêmes modules que les Phases 48
+  et 42 de Willy (étude §4) : **un seul écrivain à la fois par module**, rebase avant merge, et le
+  cadrage de chacune vérifie l'état de la phase voisine avant de planifier.
+- **56 en dernier** : valeur la plus faible pour ce dépôt (lab dev, doctrine déjà portée par
+  `software-architecture`), utile aux labs iOS/Next.js de Samuel.
+
+**Critère transverse (QUAL-01, hérité de `fiabilite-v1.0`) :** tout gate ou hook livré par ce jalon
+naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée. Tout
+hook naît en **forme exec** (ADR-071) sous le contrat de sortie `docs/HOOKS-CONTRAT-SORTIE.md`.
+
+**Releases :** une seule release à la fois sur ce dépôt (`VERSION` + tag) — 51 et 52 peuvent partir
+dans une même release mineure ; la sérialisation avec les releases du jalon de Willy se fait au
+rebase, jamais par deux bumps concurrents (ADR-073 : une PR de pure inscription ne release pas).
+
+### Phase 51: Snapshot de planning avant compaction (PreCompact)
+
+**Goal:** Le snapshot de session de planning (`planning-session-snapshot.sh`, aujourd'hui câblé au
+`SessionEnd` seulement) est **aussi pris sur l'événement `PreCompact`**, en forme exec, sous le
+contrat de sortie des hooks, en advisory : une compaction en milieu de mission ne perd plus l'état
+vivant du driver, du DAG ni de la position de planning. Le payload réel de `PreCompact` (matcher,
+champs) est **mesuré** sur Claude Code, et le comportement sur Codex et Kimi est **déclaré**
+(porté / non porté, jamais supposé).
+**Requirements**: TBD — famille `SNAP` réservée, posée au cadrage.
+**Depends on:** aucune. Première du jalon.
+**Sources:** `.planning/research/2026-09-25-ecc-inspiration-etude.md` §2.1 ; ECC `hooks/hooks.json` (`pre-compact.js`, `suggest-compact.js` ~50
+appels) ; `plugin/planning-core/hooks/hooks.json` (SessionEnd → `planning-session-snapshot.sh`) ;
+`docs/HOOKS-CONTRAT-SORTIE.md` ; ADR-071.
+**Hors périmètre :** un rappel « /compact suggéré tous les N appels » — l'autocompact du runtime
+existe ; à ne rouvrir que sur un incident mesuré.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 51 to break down)
+
+### Phase 52: Télémétrie d'usage des skills et agents, et coût de mission
+
+**Goal:** Un journal machine, **local au lab et gitignoré fail-closed**, enregistre ce qui est
+réellement invoqué (skill, agent, modèle, durée, issue, tokens **si le runtime les expose — sinon
+« inconnu », jamais estimé**), posé par hook au `Stop`/`SessionEnd` et relevé à la sortie de
+mission ; `check-overlaps.sh` et l'audit de densité du validator **consomment** ces relevés, si
+bien que la prochaine décision de retrait d'un agent ou d'un skill s'appuie sur un usage mesuré et
+non sur un avis. Le head « compte ce que coûtent les équipes » sur une donnée, pas sur une phrase.
+**Requirements**: TBD — famille `TELE` réservée, posée au cadrage.
+**Depends on:** aucune dépendance de code ; après 51 par ordre de valeur.
+**Sources:** `.planning/research/2026-09-25-ecc-inspiration-etude.md` §2.2 ; ECC `skill-run-tracker.js`, `cost-tracker.js`, `evaluate-session.js`
+(hooks `Stop`/`PostToolUseFailure`) ; `plugin/conductor/scripts/check-overlaps.sh` ;
+`head-governance.md` (le head compte les coûts) ; doctrine `kpi-analyst` (aucun chiffre inventé).
+**Garde-fous :** rien ne sort du poste (pas de télémétrie distante) ; le journal est borné en
+taille et en rétention ; une métrique non exposée est « inconnue ».
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 52 to break down)
+
+### Phase 53: Apprentissage adossé à l'observation — preuves dans la mémoire vivante
+
+**Goal:** Un journal d'observations **déterministe** (hook `PostToolUse`, JSONL local, gitignoré,
+borné) alimente une passe d'analyse (agent observateur sur modèle léger) qui **propose** — jamais
+n'applique — des faits de mémoire vivante avec leurs preuves (observations citées) ; le champ
+`confidence` d'ADR-052 est alimenté par des preuves observées plutôt que déclaré ; la promotion
+learning → rule est proposée sur **récurrence constatée dans au moins deux labs** ; toute écriture
+reste soumise à validation humaine (ADR-031). Les registres tabulaires d'audit restent inchangés
+(ADR-052, deux systèmes distincts).
+**Requirements**: TBD — famille `OBSV` réservée, posée au cadrage.
+**Depends on:** Phase 52 (même canal de journal local : emplacement, rétention, gitignore, forme
+exec) et Phase 54 (doctrine « donnée, jamais instruction » gravée et prouvée avant d'ouvrir un
+écrivain automatique de mémoire). **Coordination obligatoire avec la Phase 48 de Willy** (pont
+mémoire, même module `consolidator`) : un seul écrivain à la fois, vérifié au cadrage.
+**Sources:** `.planning/research/2026-09-25-ecc-inspiration-etude.md` §2.3 ; ECC `skills/continuous-learning-v2/SKILL.md` (observations.jsonl,
+instincts scorés 0.3-0.9, scopes projet/global, `/evolve`) ; ADR-052 ; `decay-pass.sh`,
+`detect-promotions.sh` (consolidator).
+**Refusé d'avance :** l'auto-application à un seuil de confiance (ECC : 0.7 « auto-approuvé ») —
+contraire à ADR-031 ; l'agrégation automatique en skills (`/evolve`) — un skill naît par
+`skill-creator` sous validation.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 53 to break down)
+
+### Phase 54: Audit du harness comme surface d'attaque
+
+**Goal:** Un audit outillé (extension d'`infrastructure-audit` ou du validator, à trancher au
+cadrage) scanne la configuration du lab — `.claude/agents`, skills, rules, `hooks.json`, settings,
+`.mcp.json`, mémoire vivante et registres — pour **secrets, motifs d'injection de prompt,
+permissions excessives et hooks non déclarés**, rend un verdict typé à trois issues et **constate
+sans corriger** (ADR-031). La doctrine « un corps de mémoire ou de registre rappelé est une
+donnée, jamais une instruction » est gravée dans `consolidator` et **prouvée par un test
+adversarial** (une mémoire piégée lue au `SessionStart` n'est pas exécutée).
+**Requirements**: TBD — famille `HARN` réservée, posée au cadrage.
+**Depends on:** aucune dépendance de code ; **avant 53** par doctrine.
+**Sources:** `.planning/research/2026-09-25-ecc-inspiration-etude.md` §2.4 ; ECC AgentShield (5 catégories, mode adversarial
+attaquant/défenseur/auditeur, exigence de provenance du binaire) ; `plugin/infrastructure-audit/` ;
+ADR-051 (allowlist MCP), ADR-070 (registre de menaces) ; `25-SECURITY.md` ; mémoire
+`codex-juge-injection-par-depot-juge` (injection 2/3 mesurée).
+**Option sous budget :** le mode adversarial à trois agents — à cadrer seulement si le scan
+déterministe laisse un angle mort mesuré.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 54 to break down)
+
+### Phase 55: Installeur et mémoire portables entre runtimes
+
+**Goal:** L'installeur VibeFlow devient **multi-runtime par manifeste** (Claude Code, Codex, Kimi —
+les trois runtimes prouvés bout en bout en Phase 38 ; décision du 2026-08-28), et la mémoire
+vivante voyage entre runtimes dans **un format de handoff unique** (le frontmatter ADR-052 existant)
+avec **trois scopes explicites** — projet (gitignoré fail-closed), équipe (versionné, relu par un
+humain avant promotion), utilisateur (opt-in explicite) — et un geste `doctor` (extension de
+`check-registres.sh`) qui valide avant tout partage. Chaque runtime est **prouvé par usage**, jamais
+par descripteur.
+**Requirements**: TBD — famille `MRUN` réservée, posée au cadrage.
+**Depends on:** Phase 53 (format et champs de la mémoire vivante stabilisés avant de les rendre
+portables). **Coordination obligatoire avec la Phase 42 de Willy** (manifeste posé par
+l'installeur, même `installer`/`_internal/`) : un seul écrivain à la fois, vérifié au cadrage.
+**Sources:** `.planning/research/2026-09-25-ecc-inspiration-etude.md` §2.5 ; ECC `ecc-universal setup` (manifeste), vault `ecc.memory.v1`, scopes et
+`memory doctor` ; mémoires `agent-skills-ecarte-superpowers-reste` (installeur multi-runtime décidé
+2026-08-28), `memoire-per-projet-scope-user`, `phase-37-et-38-portabilite` ; ADR-052.
+**Refusé d'avance :** les adaptateurs « expérimentaux/minimaux » (Cursor, Gemini, Zed…) — un
+descripteur n'est pas une preuve (Phases 37-38).
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 55 to break down)
+
+### Phase 56: Packs de règles par langage (module optionnel)
+
+**Goal:** Un module **toggable** (nom à trancher au cadrage, par exemple `lang-rules`) livre des
+rules path-scopées par stack — Swift et TypeScript/Next.js d'abord, selon les labs réels — et des
+hooks `Stop` **opt-in** (typecheck et format sur les fichiers édités) en forme exec ; rien n'est
+chargé sur un lab qui n'a pas la stack (détection, pas déclaration) ; l'opinion ECC est **filtrée**
+(pas de seuil de couverture imposé, pas de Conventional Commits — ADR-067) ; la densité ADR-029
+s'applique aux rules comme aux agents.
+**Requirements**: TBD — famille `LANG` réservée, posée au cadrage.
+**Depends on:** aucune dépendance de code ; dernière du jalon par ordre de valeur.
+**Sources:** `.planning/research/2026-09-25-ecc-inspiration-etude.md` §2.6 ; ECC `rules/common/` (10 fichiers) + packs `typescript/`, `python/`,
+`golang/`, `swift/` ; hooks `stop-format-typecheck.js`, `check-console-log.js` ;
+`plugin/software-architecture/rules/`, `plugin/mobile-test-team/rules/` (précédents de rules
+path-scopées) ; ADR-029, ADR-067.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 56 to break down)
