@@ -83,12 +83,12 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 43-02-PLAN.md — vague 2 : dérive procédurale en écart déclaration/prose, dans les deux sens, en avertissement ; corpus réel mesuré, non corrigé (FABR-07)
 - [ ] 43-03-PLAN.md — vague 2 : `skill-creator` (moteur interne et workflow templaté) pose `vf-nature`, défaut « outil », distincte de la nature du sujet (FABR-08)
 - [ ] 43-05-PLAN.md — vague 2 (tracer) : durcissements MCP — serveur nommé absent de l'union signalé jusqu'au journal d'installation, `vf-mcp-tools` malformée refusée à l'install et au gate, textes de l'installeur à deux déclarations, relecture Samuel (FABR-10)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
+- [ ] 43-02-PLAN.md — vague 3 (après 43-03, révision du 2026-09-26) : dérive procédurale en écart déclaration/prose, dans les deux sens, en avertissement ; portée de détection suspendue à la réponse de Willy ; corpus réel mesuré, non corrigé (FABR-07)
 - [ ] 43-07-PLAN.md — vague 3 : spec fabrique §1.2/§7.2 amendée (deux besoins distincts, fusion écartée, D-Q3), dev-orchestrator en patch — détaché de 43-05 à la révision du 2026-09-25 (FABR-10)
 
 **Wave 4** *(blocked on Wave 3 completion)*
