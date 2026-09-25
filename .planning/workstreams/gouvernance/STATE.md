@@ -102,3 +102,24 @@ explicitement ; n'attends rien de la CI sur ce point.
   `check-agents.sh` (8c507e7), portée branche de la garde G-2 : `check-gate-touche.sh` confirme
   `marqueurs: lus=8 conformes=8`, `DECLARE`, `rc=0`. `requirements.mark-complete` non appelé par
   l'exécuteur (mandat override) : FABR-02 coché à la main ci-dessous dans `REQUIREMENTS.md`.
+
+- **2026-09-25 — reprise de mission (vf-dev-manager)** : la mission s'est interrompue sur une erreur
+  API après le nœud `exec-42-w3a` ; verrou de driver repris par `takeover` (même owner, génération
+  DRIVER.lock.gen.1790330288.41231), un seul orphelin (le relecteur, déjà rendu) fermé. **42-06
+  (vague 4) est tenue derrière l'arbitrage D-08** : son frontmatter dépend de 42-05, qui n'est pas
+  complet ; elle modifie le même `check-agents.sh` que la Tâche 3 de 42-05 et fige la mineure et le
+  CHANGELOG de `conductor`, qui doivent décrire l'état d'I5/I6 après arbitrage. L'exécuter avant
+  rendrait provisoire la Tâche 3 de 42-05.
+- **2026-09-25 — seconde sonde D-19 (`sonde-d19b`, règles à `paths:`)** : décidée par Willy
+  (AskUserQuestion, session principale, 2026-09-24). Bloquée une première fois : `claude -p` ne
+  s'authentifie pas sous HOME temporaire. Willy a choisi un jeton dédié (AskUserQuestion, session
+  principale, 2026-09-24), déposé hors dépôt ; la sonde tourne dès qu'il existe. Limite à
+  consigner avec elle : la première sonde (`sonde-d19`) tournait avec le HOME réel.
+
+### Dette / à rafraîchir
+
+- **Manifeste daté de `check-agents` périmé le 2026-10-24** (`verifie_le` 2026-09-23 sur les six
+  listes, `valide_jours` 30 : frais jusqu'au 2026-10-23 inclus). La CI passe
+  `--manifest-freshness=strict` : sans rafraîchissement des six listes (sources officielles relues,
+  `verifie_le` redaté), les étapes `check-agents` de la CI rendront INDÉTERMINÉ (rc=3, étape rouge)
+  à partir de cette date. Relevé par la revue `revue-42-partiel` (2026-09-25).
