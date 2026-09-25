@@ -377,3 +377,17 @@ preuve `PASS`. Non couverts par ce rejeu : les jobs `lab-frais` et `lab-frais-ar
 de l'outil ; invariance tenue par construction, `plugin=0`, et relue sur la CI réelle à la Task 3) ;
 et, dans le job `tests`, le contrôle du nombre d'étapes en échec que les blocs de 41-08 à 41-13 ont
 reçu n'existe pas dans ceux de 41-07 (trou inactif ici : une seule étape rejouée).
+
+## Clôture PROT-01 — mesure du 2026-09-24 (hors plan 41-13, mandat direct)
+
+Note : le plan 41-13 ci-dessus décrit un chemin de clôture jamais exécuté (aucun 41-10 à 41-13
+SUMMARY sur disque ; les rulesets ont été posés par Willy hors de ce plan, par WhatsApp le
+2026-09-23 19h56). Les clés ci-dessous sont mesurées directement par `gh api`, pas dérivées du
+protocole `POSE-CONFORME`/`M1-VERDICT` du plan (jamais joué).
+
+RULESETS-APRES: n=2 enforcement_actifs=2 id_main=23892920 id_tags=23892922 mesure=gh_api_rulesets
+RULESET-MAIN: cible=refs/heads/main regles=deletion,non_fast_forward,pull_request,required_status_checks approbations_requises=0 code_owner_review=true checks=4 checks_app_id=15368 strict=true bypass_samuel=always bypass_picmakpro=always
+RULESET-TAGS: cible=refs/tags/v* regles=deletion,non_fast_forward,update bypass_samuel=always bypass_picmakpro=always
+BYPASS-ACTEURS: samuel-neveugall=151974738 picmakpro=203482067 — actor_id identiques à ACTEURS-CONTOURNEMENT (41-01 reprise) et aux bypass_actors des deux sources `.github/rulesets/*.json`
+ECART-DEFAUT-SERVEUR: champ `require_extra_approval_for_unattributed_changes=true` présent côté serveur sur les deux rulesets (mesuré `gh api`), absent des sources versionnées `.github/rulesets/main.json` et `.github/rulesets/tags-v.json` — défaut GitHub non demandé, sans effet observé sur le comportement décrit par PROT-01 (refus de merge sans revue code owner + 4 checks). Consigné, pas corrigé (BACKLOG.md § « Protection de `main` côté GitHub »).
+COMPTE-MESURE: gh auth status → Samuel-Learnity (bypass_samuel confirmé en direct) ; bypass_picmakpro relayé de la mesure de la session principale du 2026-09-24, non re-vérifié depuis ce compte (pas de moyen de s'authentifier comme `picmakpro` depuis cette session).
