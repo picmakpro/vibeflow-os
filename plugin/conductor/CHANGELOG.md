@@ -46,6 +46,9 @@
 - **T76 inchangé** (D-13) : le test qui verrouillait une affirmation périmée de `team-kernel.md`
   était déjà corrigé par le hotfix v2.63.2 (2026-09-17), cinq jours avant la spec de cette phase —
   aucune tâche ne le vise.
+- **Traçabilité de l'arbitrage D-08** : l'armement d'I5 est une décision de cadrage de Claude sous
+  délégation explicite de Willy (session principale, 2026-09-25) — jamais présentée comme un
+  arbitrage humain.
 - Décisions de cadrage de Claude prises sous délégation explicite de Willy (AskUserQuestion,
   session principale, 2026-09-23 — voir `42-CONTEXT.md`) ; D-07, D-08 et D-11 ratifiées par
   Samuel (WhatsApp, 2026-09-23), D-18 demandée par Samuel (WhatsApp, 2026-09-23) — jamais
