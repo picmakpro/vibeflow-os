@@ -344,5 +344,136 @@ else
   ko "C3 discriminance par mutation" "mutation NON APPLIQUEE a la copie — cas non opposable"
 fi
 
+# =============================================================================================
+# D. vf_ws_enumerate — enumeration DISQUE des compartiments (WSAW-01, plan 41.1-01)
+# =============================================================================================
+# POURQUOI CES CAS : la primitive est le PRODUCTEUR dont les gates de planning derivent « quels
+# compartiments existent ». Deux proprietes la rendent opposable, et aucune des deux ne se relit :
+#   - elle ne consulte AUCUN des quatre canaux (GSD_WORKSTREAM, VF_WORKSTREAM, VF_STATE_WORKSTREAM,
+#     le pointeur .planning/active-workstream) — sans WSENUM-6, une lecture d'environnement passerait
+#     inapercue tant que l'environnement de test est vide ;
+#   - elle ne rend JAMAIS un 0 a vide (WSENUM-5, WSENUM-7) — c'est le trou WSAW-01 lui-meme.
+# Chaque cas porte un libelle propre `WSENUM-<n>` : c'est la garde de couverture, un plancher sur le
+# nombre total de `✓` etant deja satisfait par les 14 cas d'avant cette phase.
+ENUM="$TMP/enum"; mkdir -p "$ENUM"
+
+# --- WSENUM-1 : deux compartiments reels -> rc=0, deux lignes, chemins ABSOLUS existants ---------
+E1="$ENUM/e1"; mkdir -p "$E1/workstreams/dev" "$E1/workstreams/qa"
+e1_out="$(vf_ws_enumerate "$E1" 2>/dev/null)"; e1_rc=$?
+printf '%s\n' "$e1_out" > "$ENUM/e1.out"
+e1_n=$(awk 'NF>0 { c++ } END { print c+0 }' "$ENUM/e1.out")
+e1_relatifs=$(awk 'NF>0 && $0 !~ /^\// { c++ } END { print c+0 }' "$ENUM/e1.out")
+e1_absents=0
+while IFS= read -r l; do
+  [ -n "$l" ] || continue
+  [ -d "$l" ] || e1_absents=$((e1_absents+1))
+done < "$ENUM/e1.out"
+if [ "$e1_rc" -eq 0 ] && [ "$e1_n" -eq 2 ] && [ "$e1_relatifs" -eq 0 ] && [ "$e1_absents" -eq 0 ]; then
+  ok "WSENUM-1 : deux compartiments reels -> rc=0, $e1_n lignes, chemins ABSOLUS tous existants"
+else
+  ko "WSENUM-1 deux compartiments" "rc=$e1_rc lignes=$e1_n relatifs=$e1_relatifs inexistants=$e1_absents"
+fi
+
+# --- WSENUM-2 : workstreams/ absent -> rc=3 (SILENCE, depot non partitionne), stdout vide --------
+E2="$ENUM/e2"; mkdir -p "$E2"
+e2_out="$(vf_ws_enumerate "$E2" 2>/dev/null)"; e2_rc=$?
+if [ "$e2_rc" -eq 3 ] && [ -z "$e2_out" ]; then
+  ok "WSENUM-2 : workstreams/ absent -> rc=3 (SILENCE nominal), stdout vide"
+else
+  ko "WSENUM-2 workstreams absent" "rc=$e2_rc (attendu 3) sortie=[$e2_out]"
+fi
+
+# --- WSENUM-3 : lien symbolique sur workstreams/ LUI-MEME -> rc=2, stdout vide, stderr nomme -----
+E3="$ENUM/e3"; mkdir -p "$E3" "$ENUM/e3-cible/dev"
+ln -s "$ENUM/e3-cible" "$E3/workstreams"
+e3_out="$(vf_ws_enumerate "$E3" 2>"$ENUM/e3.err")"; e3_rc=$?
+e3_msg=$(awk '/lien symbolique/ { c++ } END { print c+0 }' "$ENUM/e3.err")
+if [ "$e3_rc" -eq 2 ] && [ -z "$e3_out" ] && [ "$e3_msg" -ge 1 ]; then
+  ok "WSENUM-3 : lien symbolique sur workstreams/ -> rc=2, stdout vide, refus NOMME sur stderr"
+else
+  ko "WSENUM-3 lien sur workstreams/" "rc=$e3_rc (attendu 2) sortie=[$e3_out] messages_lien=$e3_msg"
+fi
+
+# --- WSENUM-4 : lien sur UN compartiment, un legitime a cote -> rc=0, UNE ligne (le legitime) ----
+# Cas porteur du mutant MUT-1 plus bas : c'est le seul ou suivre le lien produit une ligne de plus.
+E4="$ENUM/e4"; mkdir -p "$E4/workstreams/dev" "$ENUM/e4-hors-lab"
+ln -s "$ENUM/e4-hors-lab" "$E4/workstreams/qa"
+e4_out="$(vf_ws_enumerate "$E4" 2>/dev/null)"; e4_rc=$?
+printf '%s\n' "$e4_out" > "$ENUM/e4.out"
+e4_n=$(awk 'NF>0 { c++ } END { print c+0 }' "$ENUM/e4.out")
+e4_qa=$(awk '/\/qa$/ { c++ } END { print c+0 }' "$ENUM/e4.out")
+if [ "$e4_rc" -eq 0 ] && [ "$e4_n" -eq 1 ] && [ "$e4_qa" -eq 0 ]; then
+  ok "WSENUM-4 : lien sur un compartiment -> exclu, le compartiment legitime reste liste (rc=0, $e4_n ligne)"
+else
+  ko "WSENUM-4 lien sur un compartiment" "rc=$e4_rc lignes=$e4_n (attendu 1) lien_suivi=$e4_qa (attendu 0)"
+fi
+
+# --- WSENUM-5 : workstreams/ existe mais VIDE -> rc=2, JAMAIS un 0 a vide (trou WSAW-01) --------
+E5="$ENUM/e5"; mkdir -p "$E5/workstreams"
+e5_out="$(vf_ws_enumerate "$E5" 2>/dev/null)"; e5_rc=$?
+if [ "$e5_rc" -eq 2 ] && [ -z "$e5_out" ]; then
+  ok "WSENUM-5 : workstreams/ present mais vide -> rc=2 (non verifiable), jamais un 0 de complaisance"
+else
+  ko "WSENUM-5 workstreams vide" "rc=$e5_rc (attendu 2) sortie=[$e5_out]"
+fi
+
+# --- WSENUM-6 : indifference aux QUATRE canaux — trois variables ET le pointeur fichier ---------
+# Meme repertoire dans les deux mesures : la comparaison est donc directe, sans normalisation de
+# chemin. La seconde mesure ajoute un pointeur `active-workstream` divergent SUR LE DISQUE et
+# exporte les trois variables a des valeurs qui ne correspondent a AUCUN compartiment reel : si un
+# seul de ces canaux etait consulte, la sortie changerait.
+E6="$ENUM/e6"; mkdir -p "$E6/workstreams/dev" "$E6/workstreams/qa"
+vf_ws_enumerate "$E6" > "$ENUM/e6.sans" 2>/dev/null; e6_rc_sans=$?
+printf '%s\n' "un-nom-qui-ne-correspond-a-aucun-compartiment-reel" > "$E6/active-workstream"
+( export GSD_WORKSTREAM=autrechose VF_WORKSTREAM=encoreautrechose VF_STATE_WORKSTREAM=xyz
+  vf_ws_enumerate "$E6" ) > "$ENUM/e6.avec" 2>/dev/null; e6_rc_avec=$?
+e6_cmp=$(cmp -s "$ENUM/e6.sans" "$ENUM/e6.avec"; echo $?)
+e6_n=$(awk 'NF>0 { c++ } END { print c+0 }' "$ENUM/e6.sans")
+if [ "$e6_cmp" -eq 0 ] && [ "$e6_rc_sans" -eq 0 ] && [ "$e6_rc_avec" -eq 0 ] && [ "$e6_n" -eq 2 ]; then
+  ok "WSENUM-6 : sortie IDENTIQUE (cmp=0, $e6_n lignes) avec GSD_WORKSTREAM/VF_WORKSTREAM/VF_STATE_WORKSTREAM exportes ET un pointeur active-workstream divergent"
+else
+  ko "WSENUM-6 indifference aux 4 canaux" "cmp=$e6_cmp rc_sans=$e6_rc_sans rc_avec=$e6_rc_avec lignes=$e6_n"
+fi
+
+# --- WSENUM-7 : workstreams existe en FICHIER REGULIER -> rc=2 (present mais illisible), pas 3 ---
+E7="$ENUM/e7"; mkdir -p "$E7"
+: > "$E7/workstreams"
+e7_out="$(vf_ws_enumerate "$E7" 2>"$ENUM/e7.err")"; e7_rc=$?
+e7_msg=$(awk -v P="illisible" 'index($0, P) > 0 { c++ } END { print c+0 }' "$ENUM/e7.err")
+if [ "$e7_rc" -eq 2 ] && [ -z "$e7_out" ] && [ "$e7_msg" -ge 1 ]; then
+  ok "WSENUM-7 : workstreams en FICHIER REGULIER -> rc=2 (present mais illisible), jamais le rc=3 d'un depot non partitionne"
+else
+  ko "WSENUM-7 workstreams en fichier regulier" "rc=$e7_rc (attendu 2) sortie=[$e7_out] messages=$e7_msg"
+fi
+
+# --- MUT-1 DISCRIMINANCE PAR MUTATION : le filtre anti-lien sait-il rougir ? ---------------------
+# Sans ce cas, WSENUM-4 pourrait etre vert parce qu'il ne mesure rien. On mute une COPIE de la
+# politique pour y neutraliser l'appel a `vf_ws_path_nolink` sur l'ENTREE individuelle (remplace par
+# un `rc=0` code en dur) : sur la fixture de WSENUM-4, le mutant doit SUIVRE le lien et rendre DEUX
+# lignes la ou l'original en rend UNE. La copie mutee est sourcee dans un SOUS-SHELL — sans quoi
+# elle ecraserait les definitions saines pour tout ce qui suit.
+MUTE="$TMP/mutenum"; mkdir -p "$MUTE"
+awk '
+  index($0, "vf_ws_path_nolink \"$entry\"; rc=$?") > 0 { print "    rc=0"; next }
+  { print }
+' "$POLICY" > "$MUTE/workstream-policy.sh"
+mut_applique=1
+cmp -s "$POLICY" "$MUTE/workstream-policy.sh" && mut_applique=0
+bash -n "$MUTE/workstream-policy.sh" 2>/dev/null || mut_applique=0
+awk 'index($0, "vf_ws_path_nolink \"$entry\"") > 0 { f=1 } END { exit !f }' "$MUTE/workstream-policy.sh" \
+  && mut_applique=0
+if [ "$mut_applique" -eq 0 ]; then
+  ko "MUT-1 discriminance du filtre anti-lien" "mutation NON APPLIQUEE (copie identique, non parsable, ou appel toujours present) — cas non opposable"
+else
+  ( . "$MUTE/workstream-policy.sh"; vf_ws_enumerate "$E4" 2>/dev/null ) > "$ENUM/mut.out"
+  mut_n=$(awk 'NF>0 { c++ } END { print c+0 }' "$ENUM/mut.out")
+  orig_n="$e4_n"
+  if [ "$mut_n" -eq 2 ] && [ "$orig_n" -eq 1 ]; then
+    ok "MUT-1 TUE : lignes_mutant=$mut_n attendu 2, lignes_original=$orig_n attendu 1 — le filtre anti-lien est bien la propriete mesuree"
+  else
+    ko "MUT-1 discriminance du filtre anti-lien" "lignes_mutant=$mut_n (attendu 2) lignes_original=$orig_n (attendu 1) — le mutant n'est pas opposable"
+  fi
+fi
+
 echo "== resultat : $PASS ok, $FAIL ko, $SKIP skip =="
 [ "$FAIL" -eq 0 ]

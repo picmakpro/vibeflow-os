@@ -11,7 +11,7 @@ pipeline (scoping → plan → execution → proof), and **machine gates** verif
 Claude Code is the reference runtime; install and usage are also measured end to end on **Codex**
 and **kimi-code**.
 
-[![Version](https://img.shields.io/badge/version-2.65.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.66.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#-install)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
@@ -124,8 +124,10 @@ loss list: [Installing outside Claude Code](./manual/en/01-get-started/other-run
 ## 📦 Modules
 
 17 modules, each versioned with its own `CHANGELOG.md`. At install: `conductor` is the
-**mandatory baseline**, then one choice — *dev lab* or *tailor-made domain lab*. Each
-module's README is its full documentation — same structure everywhere.
+**mandatory baseline**, then one choice — *dev lab* or *tailor-made domain lab*. A dev lab is
+picked from **presets** (`dev`, `dev-mobile`, `dev-audite` — one name, dependencies resolved
+for you; à-la-carte modules remain for the advanced user). Each module's README is its full
+documentation — same structure everywhere.
 
 → [Module catalog](./manual/en/03-modules/catalog.md) ·
 [commands](./manual/en/06-reference/commands.md) ·
@@ -137,7 +139,7 @@ module's README is its full documentation — same structure everywhere.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (85 suites in CI — the newest
+- **Auditable**: bash + `jq`, every script covered by its suite (89 suites in CI — the newest
   ones prove the multi-runtime CLI dispatch (RUNT-01/02) and the dev-scope hooks' exec form as
   actually installed, their exit-code contract, and the shared Python resolution), **idempotent**
   install with backup before overwrite.
@@ -158,6 +160,7 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)**, the single canon — the table
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.66.0` | 2026-09-25 | **Install presets, confidence on typed reports, workstream-aware planning gates (minor).** `/vibeflow-install` picks a dev lab from named presets (`dev`, `dev-mobile`, `dev-audite`) resolved from data. Typed reports gain an optional `confiance` field with a single `SEUIL_CONFIANCE`: a low-confidence judgment is never a green. The head allocates a team from three independent questions. Planning gates enumerate every workstream compartment on disk (`planning-core` v2.7.1, `conductor` v1.42.0, `dev-orchestrator` v2.24.1), `measure-server-rulesets.sh --dry-run` no longer mutates what it measures, and decision ids carry their registry (ADR-075). |
 | `v2.65.0` | 2026-09-23 | **Catch-up release: `dev-orchestrator`'s requirements ledger and mission-exit gate become workstream-aware (patch, D-02).** `check-requirements-survival.sh`, `restore-requirements-ledger.sh`, `requirements-survival-detect.sh` (LEDG-01/02) and `check-mission-exit.sh`'s E4 always resolved `.planning/REQUIREMENTS.md`/`ROADMAP.md`/`STATE.md` at the repo root, never the active workstream compartment, once a lab is partitioned. A lab with partitioned planning now sees these guards and this ledger operate on its active compartment instead of silently missing their target; a non-partitioned lab keeps the historical behavior. `dev-orchestrator` v2.23.1. Also ships `conductor` v1.40.0 (blueprints now pass the gate they target), previously merged but never released. |
 | `v2.64.0` | 2026-09-22 | **Dispatched-agent registry and watchdog recovery (PR #83, closes #82).** `conductor` v1.39.0: `driver-lock.sh` gains `register` / `close` / `orphans`, an append-only `<lock>.children.jsonl` next to the lock, and `acquire` / `takeover` / `reclaim` list orphans leaf first. `dev-orchestrator` v2.23.0: `mission-flow.md` Pattern I (registry location, exact manager and worker commands, recovery after a watchdog stop that restarts from repository state, never from the DAG, the two Claude Code behaviours to work around), agents aligned, `check-mission-exit.sh` E1 reads `children_running`. Also ships the three Phase 41 CI guards (G-1 baseline arbitration, G-2 `Gate-Touche:` marker, G-3 direct-push alarm). |
 | `v2.63.2` | 2026-09-17 | **Hotfix: spawn-depth doctrine (B1/B2).** B1: `vibeflow-head` is now embodied in the main session (via `/vf-dev`), never dispatched as a `Task` — target depths manager 1, `vf-coder` 2, GSD bricks 3. B1 also covers `vibeflow-design`, embodied via `/vf-design`, never dispatched as a `Task` (`T10`, design-orchestrator). B2: `vf-coder` checks for the `Agent` tool before acting; present → `gsd-quick --validate` is mandatory (a declared allowlist doesn't gate it at call time); absent → `blocked` with `cause: "profondeur"`, mandate untouched, no coding. Measured on 2026-09-17: `Agent`/`Task` absent at depth 3, an agent's declared `Agent(...)` allowlist not enforced at call time — an undocumented limit that may change with Claude Code. New `T38` (discriminating by mutation) on B1/B2, `T76` rewritten on the live finding. Manual FR/EN: one line stating the head runs in the main session, never as a sub-agent. Pattern 12 aligned. |

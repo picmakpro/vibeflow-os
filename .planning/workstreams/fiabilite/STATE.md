@@ -1,8 +1,7 @@
 ---
-gsd_state_version: 1.0
+gsd_state_version: "1.0"
 milestone: fiabilite-v1.0
-milestone_name: « ce qui survit »
-current_phase: 41
+milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
 current_phase_name: Posture de protection du dépôt
 status: executing
 stopped_at: >-
@@ -37,20 +36,20 @@ stopped_at: >-
   ADR-063). Le ratchet du budget d'instructions EST désormais armé** — `check-instruction-budget`
   armé le 2026-09-16, `.planning/.instruction-budget-armed` et `.planning/instruction-budget-baselines.tsv`
   existent ; la phrase précédente « aucun ratchet armé » décrit l'état du 2026-09-15.
-last_updated: "2026-09-23T18:00:00.000Z"
-last_activity: 2026-09-23
+last_updated: "2026-09-24T08:13:16.937Z"
+last_activity: 2026-09-24
 last_activity_desc: >-
-  Déclencheur de reprise D-02 exécuté (arbitrage Samuel, AskUserQuestion session principale,
-  2026-09-23) : `.planning/` partitionné pour de vrai en deux compartiments GSD workstream,
-  `fiabilite` (ce fichier, compartiment par défaut) et `gouvernance` (jalon gouvernance-labs-v1.0,
-  Phases 42-50). Détail : `.planning/missions/2026-09-23-partition-planning-d02.md`, § Decisions
-  ci-dessous. Frontmatter borné à 60 lignes (check-dev-bootstrap).
+  Phase 41 : rulesets posés (41-05, 2026-09-23) ; plan 41-06 exécuté le 2026-09-24 — revue code
+  owner non observable depuis les deux comptes en contournement always, CO-VERDICT: ECART accepté
+  et documenté (arbitrage Willy, AskUserQuestion session principale, 2026-09-24).
+  Détail : § Current Position. Frontmatter borné à 60 lignes (check-dev-bootstrap).
 progress:
-  total_phases: 12
+  total_phases: 15
   completed_phases: 11
-  total_plans: 70
-  completed_plans: 70
-  percent: 92
+  total_plans: 94
+  completed_plans: 84
+  percent: 73
+current_phase: 41
 ---
 
 # Project State
@@ -92,6 +91,20 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
+**PROT-01 clos sur pièce (2026-09-24)** — mandat direct de Samuel (session principale,
+2026-09-24), hors plan 41-13 (jamais exécuté, aucun SUMMARY 41-10 à 41-13 sur disque). Rulesets
+posés par Willy (`picmakpro`) le 2026-09-23 19h56, re-mesurés `gh api` le 2026-09-24 : détail
+`REQUIREMENTS.md` § PROT-01 et `41-PREUVES.md` § « Clôture PROT-01 ». Écart consigné, non corrigé :
+`require_extra_approval_for_unattributed_changes` présent côté serveur, absent des sources
+versionnées (`BACKLOG.md` § « Protection de `main` côté GitHub »).
+**La clôture du jalon `fiabilite-v1.0` elle-même N'EST PAS jouée par ce mandat** : le ledger
+`REQUIREMENTS.md` porte, hors familles PROT, plusieurs dizaines d'exigences encore décochées sous
+la section `## Milestone fiabilite-v1.0` (`PORT-01..05`, `MANI-04`, `WKTR-03`, `AGTS-02`,
+`FIDE-01..03`, `RUNT-01..02`, `ROLL-01..05`, `TGT-01..04`, `ADPT-01/05/06`, `MIGR-01..05`,
+`QUAL-01`) — constat remonté à Samuel par `SendMessage` le 2026-09-24 plutôt que tranché ici. Ce
+paragraphe documente le seul geste fait : PROT-01. `ROADMAP.md` et `MILESTONES.md` ne sont pas
+touchés par ce mandat.
+
 **Reprise du volet admin (2026-09-23)** — détail déplacé du frontmatter, qui doit se fermer
 avant la ligne 60 lue par `check-dev-bootstrap.sh` :
 
@@ -121,7 +134,99 @@ du rejeu `gates` (`check-dev-bootstrap.sh`, hors périmètre) consigné au ledge
 arrière), ADR-059 amendée (« Branche pour tout travail de phase » devient la règle par défaut),
 `CLAUDE.md` reçoit la section « Protection côté serveur » et corrige l'ouverture de « Gardes
 in-repo ».** Détail complet : `41-03-SUMMARY.md`. WINDOWS.md #8 confirmé fermé (rejeu `gates`
-14/14 vert) ; #6/#7 toujours ouverts, hors périmètre. Next : plan 41-04.
+14/14 vert) ; #6/#7 toujours ouverts, hors périmètre.
+**Note (2026-09-23, plan 41-04) : PR de la phase #90 mergée dans `origin/main`
+(`e70b22b71b5271c596ed5ff9cd053b498feefc8e`), tête `f5db5145f239c5c38bbe7abcd74a15981bead3c3`
+verte 8/8, `codeowners/errors=0`, `rulesets=0` au merge, blobs `.github/` identiques entre
+`origin/main` et la branche A.** Fait consigné tel quel : le geste de merge de Willy (AskUserQuestion
+session principale, 2026-09-23 — « Je merge depuis la session ») est arrivé après coup — GitHub a
+répondu « already merged » ; la PR a en réalité été mergée par `samuel-neveugall` à
+2026-09-23T14:41:20Z (jamais réécrit comme un merge de Willy). Détail complet : `41-04-SUMMARY.md`,
+`PR-PHASE:` dans `41-PREUVES.md`. Branche B `feat/phase-41-preuves-release` ouverte depuis
+`origin/main`, porte désormais toutes les écritures (D-03). Rejeu `gates` vert (14 étapes, 0 en
+échec) ; rejeu `tests` 84 suites / 2 échecs = WINDOWS #6/#7, mêmes rouges locaux préexistants déjà
+consignés (path-traversal T4, PyYAML absent), reproduits à l'identique sur B, non régressifs, hors
+périmètre, jamais neutralisés sans validation humaine (ADR-031).
+
+**Note (2026-09-23, plan 41-05) : les deux rulesets sont POSÉS — critère de succès 1 du ROADMAP
+atteint.** `POSE-DECISION: option=poser` (Willy, AskUserQuestion session principale, 2026-09-23),
+sur pièce, avant tout appel d'écriture. Pose depuis `origin/main` (source mergée, exactement deux
+appels `POST /rulesets`, aucun `POSE-ECHEC:`) : branche `main` id `23892920`, tags `v*` id
+`23892922`, tous deux `enforcement=active`. D-02bis mesuré CONFORME : les deux entrées
+`bypass_actors` relues sont exactement `User:151974738` (Samuel) et `User:203482067`
+(Willy/picmakpro), mode `always`, sur les deux rulesets ; `current_user_can_bypass` de `picmakpro`
+relu `always` sur les deux — `M2-VERDICT: CONFORME`, Task 4 (checkpoint conditionnel) non
+déclenchée. Accès aux rule suites mesuré (`picmakpro=ok`). PR en vol : `#93` (seule de
+`PR-EN-VOL-AVANT:`) déjà mergée par `samuel-neveugall` avant la pose ; `#96` et `#98` apparues
+entre-temps, relevées en lecture seule, aucune touchée par la phase. `origin/main` a avancé de 27
+commits pendant l'exécution (dont la release `v2.65.0`) sans effet sur la conformité des sources
+(`.github/rulesets/*.json`, `.github/CODEOWNERS` inchangés sur cette plage). Rejeu `gates` vert
+(14/14) ; rejeu `tests` 84 suites / 2 échecs = mêmes WINDOWS #6/#7 préexistants, confirmés non
+régressifs par les 4 checks CI réels verts de la tête d'`origin/main`. Détail complet :
+`41-05-SUMMARY.md`, section `## 41-05 — pose` de `41-PREUVES.md`. Fenêtre de preuves ouverte côté
+serveur ; Samuel reste à prévenir par la session principale (`fenetre_preuves_annoncee=non`,
+hors périmètre de l'exécuteur).
+
+**Note (2026-09-24, plan 41-06) : trois PR de preuve ouvertes par Willy et lues côté serveur —
+`CO-VERDICT: ECART`, accepté et documenté.** PR-P (#101, README `.github/rulesets/`), PR-BASELINE
+(#102, `.planning/instruction-budget-baselines.tsv`), PR-SENTINELLE (#103,
+`.planning/.instruction-budget-armed`) : CI verte sur les deux événements, `behind_by=0`, mais
+lues `mergeStateStatus=CLEAN` et `reviewDecision` vide — contre `BLOCKED`/`REVIEW_REQUIRED`
+attendus par un ruleset actif exigeant `require_code_owner_review: true`. Explication la plus
+compatible (non prouvée au sens strict) : les deux seuls collaborateurs du dépôt
+(`samuel-neveugall`, `picmakpro`) ont le contournement `always` (D-02bis), et `mergeStateStatus`/
+`reviewDecision` sont calculés pour le compte lecteur. **Explication contredite le 2026-09-24** :
+la #100 (auteur `samuel-neveugall`) est vue `BLOCKED` par `picmakpro` ; la variable observée est
+l'auteur seul code owner, pas le contournement (détail : 41-CONTEXT § Correction de la prémisse). `merge_sans_contournement=non_tente` (jamais tenté hors
+`BLOCKED`) : aucune menace d'atterrissage sur `main`. Décision de Willy (AskUserQuestion session
+principale, 2026-09-24) : **ACCEPTER ET DOCUMENTER** —
+`CO-DECISION: option=accepter-et-documenter decideur=Willy canal=AskUserQuestion-session-principale
+date=2026-09-24`. Le critère 2 du ROADMAP n'est pas tenu tel que formulé ; écart tracé au ledger
+`.planning/WINDOWS.md` (#9, `status=open`). Détail complet : `41-06-SUMMARY.md`, section
+`## 41-06 — revue code owner` de `41-PREUVES.md`. Suite prescrite par le plan : PR-BASELINE et
+PR-SENTINELLE fermées sans merge au pas 0 de la Task 2 du plan 41-07 (pas encore fait) ; PR-P
+reste ouverte pour le temps (ii) du plan 41-08. Next : plan 41-07 (mesure M-1, PR rouge jetable) —
+sa précondition dure lit `CO-DECISION: option=accepter-et-documenter` ET
+`CO-I: merge_sans_contournement=non_tente` (pas `refuse`), à statuer par son propre exécuteur.
+
+**Note (2026-09-24, plan 41-07) : Task 1 faite après REPLANIFIER, arrêt au checkpoint de la
+Task 2 (gestes humains de Willy).** Premier passage : prémisse contredite (`PR-R-PREMISSE:`, la
+seule suite de preuve rougissait `check-version-sync`), `PR-R-DECISION: option=REPLANIFIER`
+(arbitrage Willy, AskUserQuestion session principale, 2026-09-24), plan révisé : C0 aligne « 86
+suites » des deux README sur la seule branche jetable. Reprise : `origin/main` inchangée
+(`a962065`), triplet c0=`755650c` a=`a3bf40f` b=`3b49306` repris tel quel ; blocs 1 à 3 de la
+Task 1 rc 0 ; `PR-R-REJEU-LOCAL:` `gates` 0 en échec sur C0 et B, G-2 `DECLARE`, `tests` sur C0 86
+suites, 2 échecs tolérés (#6, #7 du ledger), preuve `PASS`. Aucun geste chez GitHub par l'agent ;
+#101, #102, #103 toujours ouvertes. À reporter au SUMMARY de 41-07 : `lab-frais` et
+`lab-frais-arme` couverts seulement par construction et par la CI réelle ; les blocs `tests` de
+41-07 n'ont pas le contrôle du nombre d'étapes en échec reçu par 41-08 à 41-13 (trou inactif, une
+seule étape rejouée). Next : pas 0 puis étapes C0/A/B/fermeture de la Task 2 (Willy), puis Task 3.
+
+**Note (2026-09-23/24, PHASE 41.1 EXÉCUTÉE — 9 plans, branche
+`feat/phase-41-1-gates-workstream-aware`, non poussée au moment de cette écriture).** `current_phase`
+reste à **41** : `41.1` s'insère sous la Phase 41 et ce champ, gaté en anti-régression par
+`check-state-integrity.sh`, ne décroît pas au sein d'un même jalon — même précédent que les Phases 23
+et 34 (§ Roadmap Evolution). Détail par plan : les neuf `41.1-0X-SUMMARY.md` sur disque ; contexte de
+cadrage et décisions : `41.1-CONTEXT.md` (D-01 à D-06, dont D-02 amendée en cours de mission).
+Livré : `planning-core` v2.7.1 (`vf_ws_enumerate`, codes 0/2/3 ; `detect-gsd-engine.sh` et
+`check-planning-state.sh` cessent d'être faux sur un dépôt partitionné), `conductor` v1.41.0 —
+**minor**, deux artefacts neufs et distribués (`check-planning-consumers-registered.sh` et son
+recensement de 21 consommateurs) plus `check-divergence.sh` et `check-state-integrity.sh` durcis —,
+`dev-orchestrator` v2.23.2 (`discover-unintegrated-docs.sh`, `references/workstreams.md` §1/§3/§6),
+`ci.yml` (fan-out par compartiment, fixture à trois compartiments) et l'amendement d'ADR-069.
+`WSAW-01..07` cochées sur pièce au ledger. **Aucune release** : `VERSION` racine, `plugin.json`,
+`marketplace.json` et les README racine intouchés — geste humain gaté.
+Mesures de clôture relevées : `gates` rc=0 (16 rejouées, 3 sautées, 0 en échec), `tests` rc=0
+(87 suites, 0 échec), `check-version-sync` rc=0, G-1/G-2/G-4 rc=0, `check-machine-paths` rc=0.
+**Réserve inscrite** : l'oracle de la branche est le run CI distant sur la PR, pas ce rejeu local
+séquentiel — deux rejeux `tests` antérieurs ont rougi sur des suites différentes, toutes vertes en
+isolation (flakes consignés, voir `### Blockers/Concerns`).
+Restent ouverts, consignés sans être fermés : la notice `AMBIGUITE-D02` sur le compartiment
+`gouvernance` (par conception D-06, jamais un écart) ; la contradiction pré-existante entre la
+primitive (rc=2) et la garde de tête de `check-divergence.sh` (rc=3) sur un `workstreams` en fichier
+régulier — aucun artefact de la phase ne la tranche, par décision ; trois trailers `Gate-Touche:` à
+motif virgule sur les commits de planning de la branche, que seul un rebase corrigerait (G-2 rc=0,
+17 marqueurs conformes couvrent les chemins de surface).
 
 Précédemment (2026-09-18) — **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ le 2026-09-18** sur
 `feat/phase-41-protection-depot` (branche `worktree-agent-a10225b33e6f3c645`). **Prémisse renversée
@@ -191,6 +296,7 @@ Status: phase_complete
 
 **Vérifications conduites avant le cadrage** — deux conditions d'invalidation du STUDY §8, jouées
 par commande parce que l'une pouvait supprimer la phase :
+
 - **D1 non satisfaite** — `complete-milestone.md:433,501` supprime toujours sans condition en
   gsd-core **1.10.0**. La phase garde sa raison d'être.
 - **D3 non satisfaite** — RFC `open-gsd/gsd-core#3556` **OPEN**, réponse amont du 2026-08-15 avec
@@ -1487,6 +1593,7 @@ Stopped at: **Phase 34 EXÉCUTÉE et MERGÉE** (PR #66, merge `bf34d49`, 2026-09
 **Reprendre par** : arbitrage du **périmètre sans admin** de la Phase 41 (proposition relayée à la session principale le 2026-09-17), puis replanification de ce périmètre seul. **Prémisse renversée le 2026-09-17** (Samuel, AskUserQuestion session principale) : `picmakpro`, seul admin, est un **tiers** ; `admin: false` mesuré — aucun ruleset posable ici, D-01 à D-08 suspendus, 10 plans différés (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »). Exécution arrêtée après 41-01 Task 1. Ancien pointeur, désormais caduc : exécution de la Phase 41 à partir de 41-01 sur `feat/phase-41-protection-depot` (13 plans prêts ; force push et suppression de `main` interdits, arbitrage Samuel, AskUserQuestion session principale, 2026-09-17). Dette déclarée : la vérification « arbitrage cité » passe à tort sur un message à plusieurs clés `*-DECISION` — une seule clé par commit à l'exécution (détail : `.planning/missions/2026-09-17-phase41-cadrage.md`).
 
 **Ce qui reste fermé, quoi qu'il arrive** :
+
 - **Budget d'instructions armé depuis le 2026-09-16** (`check-instruction-budget.sh`) : une baseline de `.planning/instruction-budget-baselines.tsv` ne remonte jamais sans arbitrage humain nommé avec canal et date ; elle descend librement dans le commit de remédiation.
 - **Aucune partition réelle de `vibeflow-os`** sans geste humain explicite — déclencheur D-02 (§ Decisions, 2026-09-10).
 - **Issue amont `init-progress` NON ENVOYÉE** — `.planning/upstream/2026-09-09-init-progress-project-md-not-resolved-under-workstream.md`, Samuel poste.

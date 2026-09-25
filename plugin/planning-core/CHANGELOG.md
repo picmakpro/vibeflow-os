@@ -1,5 +1,17 @@
 # Changelog — planning-core
 
+## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
+
+**Patch** (durcissement de gates workstream-aware, Phase 41.1) :
+
+- **`scripts/workstream-policy.sh`** : `vf_ws_enumerate` (neuve) — primitive **unique**
+  d'énumération disque des compartiments `.planning/workstreams/<nom>/`, contrat de sortie
+  `0` (au moins un compartiment) / `2` (dépôt non partitionné) / `3` (indéterminé), filtrée
+  anti-lien symbolique. Les gates cessent de réimplémenter chacun leur propre balayage.
+- **`scripts/detect-gsd-engine.sh`** et **`scripts/check-planning-state.sh`** : cessent d'être faux
+  sur un dépôt partitionné — ils balaient les compartiments au lieu de résoudre littéralement la
+  racine de `.planning/`, et sans jamais dégrader en silence quand le balayage est indéterminé.
+
 ## [v2.7.0] — 2026-08-16 (Portabilité Windows II — codes de sortie, PORT-03/D-07)
 
 ### Changé

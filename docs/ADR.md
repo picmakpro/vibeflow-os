@@ -2251,6 +2251,58 @@ exit 0 à exit 1 EN CI), pas seulement la présence du gate — même leçon gra
 aucun vert auto-déclaré ne tient. Le Critère de succès 4 (« existe et est bruyant ») est donc vrai à
 la fois localement (hook) et sur le chemin dominant de ce dépôt (CI).
 
+### Amendement 2026-09-23 — la frontière gate/workflow, posée explicitement, et une correction d'ancrage
+
+**Origine.** La PR #94 a partitionné `.planning/` en deux compartiments (`fiabilite`,
+`gouvernance`) et a laissé un angle mort : le **commentaire** de l'étape `check-state-integrity
+(anti-régression du frontmatter .planning/STATE.md, ADR-063)` de `.github/workflows/ci.yml`
+portait la règle « un gate ne dérive jamais sa cible de `GSD_WORKSTREAM` — il la reçoit en
+argument explicite », sans qu'aucune ADR ni référence de module ne la **pose**. L'étape est
+désignée par son **nom**, jamais par un numéro de ligne : la Phase 41.1 la **réécrit
+entièrement** (plan `41.1-06`, vague 3, postérieur au plan qui écrit cet amendement en vague 2),
+donc tout numéro gravé ici serait périmé à la livraison même de la phase qui l'écrit — la classe
+de défaut exacte que cet amendement corrige. Constaté à la mission
+`2026-09-23-partition-planning-d02.md`, repris à l'ouverture de la Phase 41.1 (ROADMAP, demande de
+Samuel, session principale, 2026-09-23 : « généralise le remède à VibeFlow »).
+
+**Correction d'ancrage.** L'investigation qui a ouvert cette phase a d'abord ancré la règle
+ci-dessus sur **ADR-063**. Cet ancrage est **ERRONÉ** : ADR-063 (2026-07-31) porte sur l'anomalie
+d'agrégation du frontmatter de `.planning/STATE.md` et ne contient **aucune** occurrence du mot
+« workstream » (re-mesuré à l'exécution : 0 occurrence sur les 168 lignes de la section). La règle
+réelle relève d'ADR-069 (cette entrée) et d'ADR-064 (canal nominal), jamais d'ADR-063.
+
+Le raccourci vient de l'**investigation**, pas du commentaire de `ci.yml` : relu le 2026-09-23, ce
+commentaire énonce la règle **sans citer d'ADR**, et ne mentionne ADR-063 que pour son objet
+réel — « ce qui est protégé ici est le `STATE.md` VIVANT, celui dont ADR-063 garde les
+compteurs » —, ce qui est **exact**. Le nom de l'étape le cite au même titre, et légitimement.
+Cette précision est écrite ici pour qu'un futur lecteur ne reproduise ni le raccourci d'ancrage,
+ni le contresens sur sa source.
+
+**La frontière, posée par le RÔLE, pas par le mécanisme.**
+
+> `GSD_WORKSTREAM` et le pointeur `.planning/active-workstream` restent le canal **nominal de ce
+> qui TRAVAILLE** — workflows, agents, worktrees (§3 de `workstreams.md`, inchangé par cet
+> amendement). Un **gate** — un script dont le verdict décide d'un merge, d'une CI, d'une
+> intégrité d'état — ne dérive **jamais** sa cible d'une valeur qu'un simple `export` peut
+> changer, **parce qu'il juge précisément celui-là même qui pourrait l'exporter**. Un gate reçoit
+> sa cible en argument **explicite** (`--file`, `--path`), ou l'**énumère depuis le disque**
+> (`vf_ws_enumerate`, Phase 41.1) — jamais depuis l'environnement de son propre appelant.
+
+Cette frontière **était déjà appliquée par construction** sur `check-state-integrity.sh` (`--file`
+explicite, exposé en CI dès la partition) — elle n'était simplement jamais **écrite** ailleurs
+qu'en commentaire de step. Cet amendement la rend explicite pour tout futur gate, sans changer
+aucun comportement existant.
+
+**Ce que cet amendement ne change pas.** La décision d'adoption des workstreams et la condition
+dure (« aucune partition tant qu'une phase est en vol ») restent inchangées, ci-dessus. Cette
+précision ne rouvre ni l'une ni l'autre. Elle ne tranche pas non plus le cas d'un
+`.planning/workstreams` présent en **fichier régulier**, sur lequel les verdicts des gardes
+existantes divergent : cette contradiction est **antérieure** à cette phase, elle reste
+**ouverte**, et elle devra être tranchée pour elle-même — la figer ici dans un second contrat
+écrit serait décider par inadvertance un cas que rien n'a instruit.
+
+*Décision de la session principale (`vibeflow-head`), 2026-09-23 — pas un arbitrage de Samuel.*
+
 ---
 
 ## ADR-070 : Une disposition `accept` de registre de menaces borne le vecteur qu'elle couvre, jamais le risque en bloc — RCE CWD dans `dag.sh`, 5ᵉ passage du motif de confinement de chemin
@@ -2858,3 +2910,60 @@ ne pas laisser un hook arbitrer une phrase.
 et jamais examinées sous cette ADR — un précédent non validé ne prouve rien, et leur cas devra
 être tranché pour lui-même. Il ne change pas non plus le classement des gates de la Phase 45, qui
 se fera à son cadrage.
+
+## ADR-075 : Les identifiants de décision courts se préfixent par leur registre d'origine — un `D-NN` nu n'engage plus un détecteur d'arbitrage
+
+**Date** : 2026-09-24 · **Statut** : Validée · **Décideur** : Samuel · **Voisines** : la convention
+« Traçabilité des arbitrages » du `CLAUDE.md` racine (cette ADR en est le prolongement direct, pas
+une règle concurrente), ADR-072 (gardes in-repo qui signalent et tracent sans verrouiller — même
+registre de gouvernance) · **Contexte** : faux positif mesuré sur
+`.planning/workstreams/fiabilite/phases/VFDO-41-posture-de-protection-du-d-p-t/tools/check-trace-arbitrage.sh`
+— arbitrage Samuel, AskUserQuestion session principale, 2026-09-24.
+
+### Contexte / Problème
+
+`check-trace-arbitrage.sh` reconnaît une clé `D-01`..`D-10` comme un marqueur d'invocation
+d'autorité humaine — au même titre que « arbitrage Samuel » ou « décision de Samuel » — parce que
+le registre de décisions de la Phase 41 numérote les siennes `D-01`..`D-10`. Le 2026-09-23, la
+mission « partition réelle du planning » (`.planning/missions/2026-09-23-partition-planning-d02.md`)
+a numéroté sa propre décision `D-02`, sans lien avec le registre de la Phase 41. Rejoué sur le
+dépôt réel, ce détecteur a rendu `FORME-NON-CONFORME` sur des commits qui citaient ce `D-02` de
+partition sans jamais invoquer d'arbitrage (`6002c2f`, `2f4d388`, `f688e2b`, `ced7577`, `12cbae2`,
+`39acd36`, `0b4d9a7`, tous du 2026-09-23) — contourné à l'époque en avançant la borne
+`BASE-TRACE-ARBITRAGE` par-dessus ce lot (`f1d6589` → `0b4d9a7`, `41-PREUVES.md` § 41-14). Le
+défaut de fond restait entier pour tout commit futur : deux registres qui numérotent chacun leurs
+décisions à partir de `D-01` finissent par se recouvrir, et rien ne dit au détecteur de quel
+registre relève un `D-02` donné.
+
+Mesuré une seconde fois par sonde dans cette session : un commit vide dont le message cite « D-02
+au sens de la mission de partition » sans invoquer d'arbitrage rendait `rc=1 FORME-NON-CONFORME`.
+
+### Décision
+
+Un identifiant de décision est désormais **préfixé par son registre d'origine** :
+`P41-D-02` pour la décision D-02 du registre de la Phase 41, `PART-D-02` pour celle de la mission
+de partition. Le détecteur `check-trace-arbitrage.sh` n'engage plus son contrôle que sur la forme
+préfixée de **son propre registre** (`P41-D-01`..`P41-D-10`) — un `D-02` nu, ou préfixé par un
+autre registre, ne franchit plus sa porte d'entrée et n'est jamais jugé. Un identifiant nu reste
+lisible en prose (« la décision D-02 »), mais cesse d'engager un outil qui cherche une citation
+d'arbitrage : c'est la forme préfixée seule qui le fait. Convention posée au niveau du dépôt
+(`CLAUDE.md` § Traçabilité des arbitrages), pas seulement dans ce script — tout futur détecteur ou
+registre de décisions hérite de la même règle.
+
+### Alternative écartée
+
+**Restreindre le déclenchement du détecteur aux seuls chemins gardés par la phase 41** (ne juger
+que les commits qui touchent `.planning/workstreams/fiabilite/phases/VFDO-41-.../`, `scripts/`,
+`.github/`, …) plutôt que d'exiger un préfixe. Écartée : elle rétrécit la garde pour éteindre un
+faux positif — un commit qui touche un chemin hors de cette liste mais invoque quand même une
+décision de la Phase 41 sans preuve cesserait d'être jugé, ce qui est exactement le mode de défaut
+que cette phase combat (une garde qu'on affaiblit pour la faire taire). Le préfixage résout la
+collision sans réduire la portée de ce que le détecteur regarde.
+
+### Conséquence sur l'historique
+
+**Les commits déjà posés ne sont jamais annotés rétroactivement.** La convention est prospective :
+elle s'applique aux identifiants écrits à partir de son adoption, jamais en réécrivant un message
+de commit existant. La borne `BASE-TRACE-ARBITRAGE` du registre de la Phase 41 continue de couvrir
+l'antérieur — c'est elle, et non une réécriture d'historique, qui absorbe le lot de commits
+`D-02` de partition déjà posés avant cette décision.
