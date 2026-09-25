@@ -73,11 +73,23 @@ Plans:
 **Depends on:** Phase 42 (le manifeste daté et la découverte récursive servent aussi ce gate).
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §6, §7.2, B-03. **C'est le contrôle machine qui manque à la décision D-07** du moteur (`docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §2, §9). `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-15, §5.2 (la case « trois marqueurs de B-03 » remplace « qui en répond »).
 **À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : budget des `SKILL.md` et du bootstrap sans enforcement machine — `.planning/BACKLOG.md:450` ; la phase touche les skills, elle le prend au passage.
-**Plans:** 0 plans
+**Plans:** 6 plans
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 43 to break down)
+- [ ] 43-01-PLAN.md — vague 1 (tracer) : `check-skills.sh` lit le manifeste daté élargi à sept listes, découvre le corpus réel à ses trois profondeurs, refuse une procédure sans `ecrit:`/`vf-rubrique-juge` ; valeurs validées strictement ; parité de contrat avec `check-agents.sh` (FABR-06, FABR-09 clause manifeste)
+- [ ] 43-04-PLAN.md — vague 1 (tracer + checkpoint) : plafond de 500 lignes des SKILL.md dans `check-instruction-budget.sh` ; checkpoint humain sur le corpus et le mode du bootstrap (socle mesuré ≈ 2 500 tokens pour un plafond de 2 000) avant toute hausse de baseline (FABR-09)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 43-02-PLAN.md — vague 2 : dérive procédurale en écart déclaration/prose, dans les deux sens, en avertissement ; corpus réel mesuré, non corrigé (FABR-07)
+- [ ] 43-03-PLAN.md — vague 2 : `skill-creator` (moteur interne et workflow templaté) pose `vf-nature`, défaut « outil », distincte de la nature du sujet (FABR-08)
+- [ ] 43-05-PLAN.md — vague 2 (tracer) : durcissements MCP — serveur nommé absent de l'union signalé jusqu'au journal d'installation, `vf-mcp-tools` malformée refusée à l'install et au gate, spec §1.2/§7.2 amendée, dev-orchestrator en patch, relecture Samuel (FABR-10)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 43-06-PLAN.md — vague 3 : `vf-calibrate` à deux déclarations, conductor en mineure, rejeu complet (suites, corpus réel, G-1, G-2, labs frais), relevés de relecture et de résidus (FABR-06, FABR-07, FABR-09, FABR-10)
 
 ### Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque
 

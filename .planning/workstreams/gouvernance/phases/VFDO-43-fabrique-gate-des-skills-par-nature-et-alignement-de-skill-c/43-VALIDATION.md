@@ -38,15 +38,25 @@ created: "2026-09-25"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | 0 | FABR-06 | — | `vf-nature: procedure` sans `ecrit:`/rubrique de juge refusé ; avec les deux, conforme | unit (bash) | `bash plugin/conductor/scripts/tests/test-check-skills.sh` | ❌ W0 (nouveau fichier) | ⬜ pending |
-| TBD | TBD | TBD | FABR-07 | — | Écart déclaration/prose signalé en avertissement (exit 0), jamais en refus | unit (bash) | même suite, jumeau positif + jumeau négatif par marqueur | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | FABR-08 | — | `skill-creator`/`skill-creator-workflow` posent `vf-nature`, défaut « outil » | manuel — changement de prompt agentique, pas de code exécutable | — | n/a — pas un gate machine | ⬜ pending |
-| TBD | TBD | TBD | FABR-09 | — | Budget SKILL.md (500L) + bootstrap (2000 tokens) refusés au-delà | unit (bash) | extension de `bash plugin/conductor/scripts/tests/test-check-instruction-budget.sh` | ❌ W0 (nouveaux cas) | ⬜ pending |
-| TBD | TBD | TBD | FABR-10 | — | Grammaire `vf-mcp-tools` malformée refusée/signalée (a) ; serveur absent de l'union des scopes signalé (b) ; textes à une clé corrigés (c) | unit (bash) | extension de `bash plugin/dev-orchestrator/scripts/tests/test-inject-mcp-tools.sh` (durcir T16/T22) | ✅ suite existante, cas à durcir | ⬜ pending |
+| 43-01-T1 (tracer) | 43-01 | 1 | FABR-06, FABR-09 | T-43-06 | gate lit le manifeste à 7 listes, procédure sans les deux champs refusée, lab frais vert | unit (bash) + lab frais (HOME temporaire) | `bash plugin/conductor/scripts/tests/test-check-skills.sh` (T1-T5) ; `test-check-agents.sh` (T107) ; témoin `TRACER-SKILLS-OK` | ❌ W0 (créé par la tâche) | ⬜ pending |
+| 43-01-T2 | 43-01 | 1 | FABR-06 | T-43-01, T-43-02, T-43-04 | valeurs malformées refusées, jamais un défaut silencieux | unit (bash) + mutation | test-check-skills.sh T6-T13, MUT-S1..S3 | ❌ W0 | ⬜ pending |
+| 43-01-T3 | 43-01 | 1 | FABR-06 | T-43-05, T-43-07, T-43-08 | découverte, exclusions, symlinks, F13, --hook identiques à check-agents | unit (bash) + mutation | test-check-skills.sh T14-T21, MUT-SD1/SD2 | ❌ W0 | ⬜ pending |
+| 43-02-T1 | 43-02 | 2 | FABR-07 | T-43-11, T-43-12 | écart déclaration/prose dans les deux sens, avertissement (exit 0), jamais refus | unit (bash) + mutation | test-check-skills.sh T22-T29, MUT-DR1/DR2 | ❌ W0 | ⬜ pending |
+| 43-02-T2 | 43-02 | 2 | FABR-07 | T-43-11 | écart marqueurs/nature ; corpus réel mesuré, vert | unit (bash) + arbre réel | test-check-skills.sh T30-T32, MUT-DR3 ; `CORPUS-DERIVE fail=0` | ❌ W0 | ⬜ pending |
+| 43-03-T1 | 43-03 | 2 | FABR-08 | T-43-20, T-43-21 | moteur interne pose vf-nature, ≤ 500 lignes | grep + gate `--file` + relecture | commandes de vérification de la tâche (`MOTEUR-FIN`) | ✅ fichier existant | ⬜ pending |
+| 43-03-T2 | 43-03 | 2 | FABR-08 | T-43-20, T-43-22 | workflow templaté pose vf-nature, étape 4 intacte, mineure cohérente | grep + gate `--file` + relecture | `GATE rc=0`, `SKILL-CREATOR-VERSION-OK` | ✅ fichier existant | ⬜ pending |
+| 43-04-T1 (tracer) | 43-04 | 1 | FABR-09 | T-43-32, T-43-33 | SKILL.md > 500 lignes refusé, découverte = find hors doc-only, CI inchangée | unit (bash) + mutation + dépôt réel | test-check-instruction-budget.sh SKILL-1..6, MUT-8..10 ; `REEL rc=0` | ❌ W0 (nouveaux cas) | ⬜ pending |
+| 43-04-T2 | 43-04 | 1 | FABR-09 | T-43-30 | checkpoint:decision — option bootstrap arbitrée par Willy, citée | humain (bloquant) | — | n/a | ⬜ pending |
+| 43-04-T3 | 43-04 | 1 | FABR-09 | T-43-30, T-43-31, T-43-34 | bootstrap mesuré et borné selon l'option ; baseline citée | unit (bash) + mutation + G-1 | BOOT-1..5, MUT-11 ; `REEL-BOOT rc=0` ; `G1 rc=0/3` | ❌ W0 | ⬜ pending |
+| 43-05-T1 (tracer) | 43-05 | 2 | FABR-10 | T-43-43, T-43-45 | serveur nommé absent de l'union signalé jusqu'au journal d'installation | unit (bash) + lab frais (HOME temporaire) | test-inject-mcp-tools.sh T16, T32, T33 ; test-vibeflow-update.sh T55 ; `TRACER-MCP-OK` | ✅ suites existantes, cas ajoutés | ⬜ pending |
+| 43-05-T2 | 43-05 | 2 | FABR-10 | T-43-40, T-43-41, T-43-42, T-43-44 | vf-mcp-tools malformée refusée à l'install et au gate | unit (bash) + mutation | T22a-d, T34, MUT-A ; T56 ; T108, T109, MUT-M1 ; `CORPUS-AGENTS fail=0` | ✅ suites existantes | ⬜ pending |
+| 43-05-T3 | 43-05 | 2 | FABR-10 | — | spec §1.2/§7.2 amendée, dev-orchestrator en patch | grep + check-version-sync | `DEV-ORCH-VERSION-OK` | ✅ | ⬜ pending |
+| 43-06-T1 | 43-06 | 3 | FABR-10 (c) + docs | T-43-50, T-43-51 | vf-calibrate à deux clés, conductor en mineure | grep + check-version-sync | `CONDUCTOR-VERSION-OK` | ✅ | ⬜ pending |
+| 43-06-T2 | 43-06 | 3 | tous | T-43-52 | rejeu complet, G-1, G-2, labs frais | rejeu | `REJEU-FIN`, `CORPUS-REEL fail=0`, `G2 rc=0`, `LAB-FRAIS-FIN-OK` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
-*Table à remplir avec les vrais Task ID/Plan/Wave par le planificateur.*
+*Table remplie par le planificateur le 2026-09-25 (plans 43-01 à 43-06).*
 
 ---
 
