@@ -7,16 +7,27 @@
 - **`vf-design-judge` lit désormais explicitement le `CLAUDE.md` du projet (section design)
   dans le DÉROULÉ (section « Méthode de scoring »)**, avant de scorer les dimensions —
   `omitClaudeMd: true` a coupé son chargement automatique. La consigne vit dans la procédure,
-  pas seulement citée comme source dans l'Entrée. `tools: Read, Bash, Glob, Grep` vérifié
-  inchangé.
+  **plus du tout citée dans l'Entrée** (doublon retiré, revue `revue-42-condition` F1) :
+  ce qu'un juge doit vérifier vit dans sa procédure, jamais dans une référence annexe.
+  `tools: Read, Bash, Glob, Grep` vérifié inchangé.
 - **`vf-design-manager` — sa section « Orchestration par écran » porte désormais
   explicitement que le digest transmis à `vf-design-judge` contient les interdits du lab
   issus du `CLAUDE.md`** (section design) : c'est le manager qui transmet cette doctrine,
   puisque le juge ne la charge plus automatiquement.
 - Assertion machine T11 ajoutée à `test-design-orchestrator.sh`, ancrée sur la section
   « ## Méthode de scoring » du juge et « ## Orchestration par écran » du manager, avec témoin
-  discriminant par mutation. Rejouée rouge sur les fichiers pré-correction (git show HEAD,
-  0 occurrence attendue dans les deux sections).
+  discriminant par mutation, complétée d'une assertion anti-doublon sur la section « ## Entrée »
+  du juge (F1). Rejouée rouge sur les fichiers pré-correction (git show HEAD, doublon détecté
+  dans l'Entrée).
+- **Épisode « garde-fous » (2026-09-25, entre-temps) et son rejet** : pour repasser sous la
+  baseline de `check-instruction-budget.sh` après l'ajout ci-dessus, le commit f257306 avait
+  remplacé « interdits » par « garde-fous » dans la section « Orchestration par écran » de
+  `vf-design-manager` — un contournement du marqueur textuel D-01, jamais une baisse de charge
+  réelle. Rejeté par arbitrage (option b) : « arbitrage Willy, AskUserQuestion session
+  principale, 2026-09-25 ». « Interdits » est rétabli ; la baseline de
+  `.planning/instruction-budget-baselines.tsv` est montée en conséquence
+  (`vf-design-manager.md` 29 → 30, `vf-design-judge.md` 8 → 9 instructions), sur la même
+  citation d'arbitrage.
 
 Exécution de la condition posée par Samuel en ratifiant D-08 (session principale,
 2026-09-25) — décision déléguée par Willy au head, en exécution de sa condition (e568307).

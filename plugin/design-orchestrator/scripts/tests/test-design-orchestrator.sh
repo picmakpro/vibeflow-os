@@ -1091,9 +1091,10 @@ rm -rf "$T10_TMPDIR"
 
 # ---------------------------------------------------------------------------
 # T11 — [D-08] Lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ du juge (section
-#        « ## Méthode de scoring », jamais une simple citation de source), et digest du
-#        manager (section « ## Orchestration par écran ») portant les interdits du lab
-#        (condition posée par Samuel en ratifiant D-08, session principale, 2026-09-25).
+#        « ## Méthode de scoring », jamais une simple citation de source, ni un doublon dans
+#        « ## Entrée »), et digest du manager (section « ## Orchestration par écran ») portant
+#        les interdits du lab (condition posée par Samuel en ratifiant D-08, session
+#        principale, 2026-09-25).
 # ---------------------------------------------------------------------------
 t11_ok=1
 t11_extract_methode() {
@@ -1108,6 +1109,9 @@ if [ -f "$JUDGE" ]; then
       || { ko "T11 D-08 : consigne de lecture par l'outil Read absente du DÉROULÉ"; t11_ok=0; }
     echo "$methode" | "$GREP" -q 'CLAUDE.md' \
       || { ko "T11 D-08 : CLAUDE.md absent du DÉROULÉ (Méthode de scoring)"; t11_ok=0; }
+    entree=$(awk '/^## Entrée$/{f=1;next} f&&/^## /{exit} f' "$JUDGE")
+    echo "$entree" | "$GREP" -q 'CLAUDE.md' \
+      && { ko "T11 D-08 : CLAUDE.md encore mentionné dans l'Entrée/Références (doublon, doit être retiré)"; t11_ok=0; }
 
     # Témoin DISCRIMINANT par mutation : une copie du juge dont la ligne du DÉROULÉ citant
     # Read+CLAUDE.md est retirée ne doit plus passer T11 (rouge attendu sur la copie).
@@ -1126,12 +1130,12 @@ else
 fi
 if [ -f "$MANAGER" ]; then
   orchestration=$(awk '/^## Orchestration par écran$/{f=1;next} f&&/^## /{exit} f' "$MANAGER")
-  echo "$orchestration" | "$GREP" -qi 'garde-fous' \
-    || { ko "T11 D-08 : section « Orchestration par écran » du manager ne mentionne pas les garde-fous du lab"; t11_ok=0; }
+  echo "$orchestration" | "$GREP" -qi 'interdits' \
+    || { ko "T11 D-08 : section « Orchestration par écran » du manager ne mentionne pas les interdits du lab"; t11_ok=0; }
   echo "$orchestration" | "$GREP" -q 'CLAUDE.md' \
     || { ko "T11 D-08 : section « Orchestration par écran » du manager ne cite pas le CLAUDE.md comme source"; t11_ok=0; }
 fi
-[ "$t11_ok" -eq 1 ] && ok "T11 D-08 : lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ du juge + digest du manager portant les interdits du lab"
+[ "$t11_ok" -eq 1 ] && ok "T11 D-08 : lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ du juge, sans doublon dans l'Entrée, + digest du manager portant les interdits du lab"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
