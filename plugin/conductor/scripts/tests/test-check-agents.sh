@@ -171,15 +171,24 @@
 #         (sans parenthèses) → rc=0, aucun invariant I6 ; mutation réelle sur
 #         `plugin/business-pilot-bundle/agents/vf-business-manager.md` (copie sans son jeton
 #         SendMessage) → rouge, copie restaurée → verte
+#   T93 — I5 (D-08, seulement si ARBITRAGE-MAINTENIR) : disallowedTools: Write, Edit + aucune
+#         allowlist Agent(...)/Task(...) non vide, sans omitClaudeMd: true → rc=1 invariant I5 ;
+#         même agent avec omitClaudeMd: true → rc=0 ; forme vf-reviewer (allowlist Agent(...) non
+#         vide + disallowedTools Write, Edit, sans omitClaudeMd) → rc=0, aucun invariant I5 ;
+#         mutation réelle sur `plugin/content-bundle/agents/content-clarity-judge.md` (copie sans
+#         sa ligne omitClaudeMd, posée par cette même tâche) → rouge, copie restaurée → verte
 #   T96 — corpus réel + check-blueprints.sh, adapté à la branche de l'arbitrage : les six
 #         plugin/*/agents et plugin/*/AGENT.md passent --strict sans « invariant I6 » (ni
 #         « invariant I5 » si armé) ; anti-vert-à-vide (au moins 6 dossiers découverts)
-#   MUT-I6 (toujours) — `errors.extend(invariant_i6(` → `pass` sur la fixture rouge
-#         correspondante : rc_original=1, rc_mutant=0
+#   MUT-I6 (toujours), MUT-I5 (seulement si ARBITRAGE-MAINTENIR) — `errors.extend(invariant_i6(`
+#         (resp. `invariant_i5(`) → `pass` sur la fixture rouge correspondante : rc_original=1,
+#         rc_mutant=0
 #   Fixtures préexistantes remises en conformité par l'armement de I6 (TOUJOURS, manager-shaped,
 #         un `SendMessage` ajouté avant leur `Agent(`/`Task(` : T25, T28, T28b, T29, T30b, T31,
-#         T33, T35, T36, T53) — rc attendus et assertions inchangés dans tous les cas. Le volet
-#         I5 (D-08) arme dans un second commit distinct de cette même Tâche 3.
+#         T33, T35, T36, T53) et de I5 (SEULEMENT si ARBITRAGE-MAINTENIR, juge-shaped, un
+#         `omitClaudeMd: true` ajouté : T59, T62-T66, T67, T70, T77/T78/T79/T82/T84/T85/T86 (via
+#         `mk_conforme_agent`), T80 (agent-listagents), T81, T83, T87, T90, MUT-F2) — rc attendus
+#         et assertions inchangés dans tous les cas.
 
 set -uo pipefail
 
@@ -1400,6 +1409,7 @@ effort: medium
 memory: project
 tools: Read
 disallowedTools: Write, Edit
+omitClaudeMd: true
 skills:
   - petit-skill
 ---
@@ -1455,6 +1465,7 @@ effort: medium
 memory: project
 tools: Read, $2
 disallowedTools: Write, Edit
+omitClaudeMd: true
 ---
 corps
 EOF
@@ -1495,6 +1506,7 @@ effort: medium
 memory: project
 tools: Read
 disallowedTools: Write, Edit
+omitClaudeMd: true
 vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
 vf-requires: mcp-servers
 ---
@@ -1562,6 +1574,7 @@ effort: medium
 memory: project
 tools: Read, Bash
 disallowedTools: Write, Edit
+omitClaudeMd: true
 ---
 corps
 EOF
@@ -1769,6 +1782,7 @@ name: $2
 description: Agent conforme utilise par le harnais manifeste date pour prouver un verdict.
 tools: Read
 disallowedTools: Write, Edit
+omitClaudeMd: true
 model: sonnet
 memory: project
 effort: low
@@ -1836,6 +1850,7 @@ name: agent-listagents
 description: Agent qui declare ListAgents dans tools, pour prouver D-01 (source unique).
 tools: Read, ListAgents
 disallowedTools: Write, Edit
+omitClaudeMd: true
 model: sonnet
 memory: project
 effort: low
@@ -1892,6 +1907,7 @@ name: agent-t81
 description: Agent qui declare les trois outils ajoutes et experimental, pour prouver T81 (D-17).
 tools: Read, ListAgents, SendFeedback, SubagentHandback
 disallowedTools: Write, Edit
+omitClaudeMd: true
 model: sonnet
 memory: project
 effort: low
@@ -1940,6 +1956,7 @@ name: agent-t83
 description: Agent qui declare l'outil Reed (typo), pour prouver la retrogradation D-05.
 tools: Read, Reed
 disallowedTools: Write, Edit
+omitClaudeMd: true
 model: sonnet
 memory: project
 effort: low
@@ -2027,6 +2044,7 @@ name: agent-t87
 description: Agent entierement conforme (skills declare), pour prouver le silence total sous --hook.
 tools: Read
 disallowedTools: Write, Edit
+omitClaudeMd: true
 model: sonnet
 memory: project
 effort: low
@@ -2113,6 +2131,7 @@ name: agent-t90
 description: Agent qui declare l'outil Reed (typo), pour prouver le comportement de la garde sous manifeste perime.
 tools: Read, Reed
 disallowedTools: Write, Edit
+omitClaudeMd: true
 model: sonnet
 memory: project
 effort: low
@@ -2167,6 +2186,7 @@ name: agent-mutf2
 description: Agent qui declare l'outil Reed (typo), fixture de mutation MUT-F2.
 tools: Read, Reed
 disallowedTools: Write, Edit
+omitClaudeMd: true
 model: sonnet
 memory: project
 effort: low
@@ -2684,6 +2704,136 @@ EOF
   fi
 fi
 
+# ---------- Precondition de la Tache 3 : rejeu de la sonde ARBITRAGE-* (D-19/D-08) ----------
+# Jamais relue en prose seule — decide si T93/MUT-I5 s'executent (branche MAINTENIR uniquement).
+D19_MESURE_PATH="$REPO_ROOT/.planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/42-D19-MESURE.md"
+ARBITRAGE_VERDICT="$("$PYBIN" -c "
+import re, sys, unicodedata
+p = sys.argv[1]
+try:
+    s = unicodedata.normalize('NFC', open(p, encoding='utf-8').read())
+except FileNotFoundError:
+    print('ARBITRAGE-ABSENT'); sys.exit(1)
+sec = re.search(r'^##\s+Arbitrage D-08\b(.*?)(?=\n##\s|\Z)', s, re.S | re.M)
+if not sec:
+    print('ARBITRAGE-ABSENT'); sys.exit(1)
+m = re.search(r'\*\*D.cision\s*:\*\*\s*(maintenir|renoncer)\b.*?\*\*Canal\s*:\*\*\s*(\S.*?)\s*\n.*?\*\*Date\s*:\*\*\s*(\d{4}-\d{2}-\d{2})', sec.group(1), re.S)
+if not m:
+    print('ARBITRAGE-ABSENT'); sys.exit(1)
+print('ARBITRAGE-' + m.group(1).upper()); sys.exit(0)
+" "$D19_MESURE_PATH")"
+ARBITRAGE_RC=$?
+
+if [ "$ARBITRAGE_VERDICT" = "ARBITRAGE-MAINTENIR" ]; then
+  # ---------- T93 : invariant I5 — juge (disallowedTools retire Write/Edit, aucune allowlist)
+  # sans omitClaudeMd: true (D-08, SEULEMENT SI ARBITRAGE-MAINTENIR) ----------
+  cat > "$AG/i5-sans-omit.md" <<'EOF'
+---
+name: i5-sans-omit
+description: Agent de test juge (disallowedTools retire Write/Edit) sans omitClaudeMd.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+---
+corps
+EOF
+  OUT="$(run_check 2>&1)"; RC=$?
+  if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I5"; then
+    ok "T93 juge sans omitClaudeMd -> rc=1, invariant I5"
+  else
+    ko "T93 (rc=$RC) : $OUT"
+  fi
+  rm -f "$AG/i5-sans-omit.md"
+
+  cat > "$AG/i5-avec-omit.md" <<'EOF'
+---
+name: i5-avec-omit
+description: Agent de test juge (disallowedTools retire Write/Edit) avec omitClaudeMd: true.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+corps
+EOF
+  OUT="$(run_check 2>&1)"; RC=$?
+  if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I5"; then
+    ok "T93 juge avec omitClaudeMd: true -> rc=0, aucun invariant I5"
+  else
+    ko "T93-avec (rc=$RC) : $OUT"
+  fi
+  rm -f "$AG/i5-avec-omit.md"
+
+  cat > "$AG/i5-forme-reviewer.md" <<'EOF'
+---
+name: i5-forme-reviewer
+description: Agent de test. Worker interne, forme vf-reviewer (allowlist Agent non vide + disallowedTools Write, Edit).
+model: sonnet
+effort: high
+memory: project
+tools: Read, Bash, Glob, Grep, Agent(outil-tiers)
+disallowedTools: Write, Edit
+vf-internal: true
+---
+corps
+EOF
+  OUT="$(run_check 2>&1)"; RC=$?
+  if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I5"; then
+    ok "T93 forme vf-reviewer (allowlist non vide) -> rc=0, aucun invariant I5 (hors classe juge)"
+  else
+    ko "T93-reviewer (rc=$RC) : $OUT"
+  fi
+  rm -f "$AG/i5-forme-reviewer.md"
+
+  # T93 — mutation reelle sur le porteur reel de I5 (content-clarity-judge.md, deja porteur
+  # d'omitClaudeMd: true depuis cette meme tache 42-05) : la ligne omitClaudeMd disparait
+  # -> rouge (invariant I5) ; copie restauree -> verte.
+  T93_CARRIER="$REPO_ROOT/plugin/content-bundle/agents/content-clarity-judge.md"
+  if [ -f "$T93_CARRIER" ] && grep -q '^omitClaudeMd: true' "$T93_CARRIER"; then
+    T93_ORIG_DIR="$WORK/t93-original"; T93_MUT_DIR="$WORK/t93-mutant"
+    mkdir -p "$T93_ORIG_DIR" "$T93_MUT_DIR"
+    T93_BASE="$(basename "$T93_CARRIER")"
+    cp "$T93_CARRIER" "$T93_ORIG_DIR/$T93_BASE"
+    grep -v '^omitClaudeMd: true' "$T93_CARRIER" > "$T93_MUT_DIR/$T93_BASE"
+    juger_mutation_reelle "T93" "$T93_ORIG_DIR/$T93_BASE" "$T93_MUT_DIR/$T93_BASE" "invariant I5"
+  else
+    ko "T93 mutation reelle : porteur introuvable ou sans omitClaudeMd ($T93_CARRIER)"
+  fi
+
+  # ---------- MUT-I5 : mutant QUAL-01 sur la ligne d'appel invariant_i5 (SEULEMENT SI MAINTENIR) ----------
+  MUT_I5_DIR="$(make_gate_mutant I5 0 'errors.extend(invariant_i5(' 'pass')"
+  MUT_I5_RC=$?
+  if [ "$MUT_I5_RC" -eq 0 ]; then
+    MUT_I5_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I5-orig" 0)"
+    MUT_I5_AG="$WORK/mut-I5-ag"; mkdir -p "$MUT_I5_AG"
+    cat > "$MUT_I5_AG/agent-muti5.md" <<'EOF'
+---
+name: agent-muti5
+description: Agent de test juge sans omitClaudeMd, fixture de mutation MUT-I5.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+---
+corps
+EOF
+    RC_ORIG=0; bash "$MUT_I5_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I5_AG" >/dev/null 2>&1 || RC_ORIG=$?
+    OUT_MUT="$(bash "$MUT_I5_DIR/check-agents.sh" --agents-dir="$MUT_I5_AG" 2>&1)"; RC_MUT=$?
+    if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+      okmut I5 "$RC_MUT" 0 "$RC_ORIG" 1
+    else
+      komut I5 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+    fi
+  fi
+else
+  echo "  (info) T93/MUT-I5 non executes : sonde ARBITRAGE-* = $ARBITRAGE_VERDICT (rc=$ARBITRAGE_RC), attendu ARBITRAGE-MAINTENIR"
+fi
+
 # ---------- T96 : corpus reel + check-blueprints.sh (TOUJOURS, adapte a la branche) ----------
 T96_FAIL=0
 T96_DIRS_FOUND=0
@@ -2694,6 +2844,10 @@ for d in "$REPO_ROOT"/plugin/*/agents; do
   if [ "$RC_T96" -ne 0 ] || echo "$OUT_T96" | grep -q "invariant I6"; then
     T96_FAIL=1
     ko "T96 corpus reel ($d) : invariant I6 ou rc!=0 -> $OUT_T96"
+  fi
+  if [ "$ARBITRAGE_VERDICT" = "ARBITRAGE-MAINTENIR" ] && echo "$OUT_T96" | grep -q "invariant I5"; then
+    T96_FAIL=1
+    ko "T96 corpus reel ($d) : invariant I5 inattendu -> $OUT_T96"
   fi
 done
 if [ "$T96_DIRS_FOUND" -lt 6 ]; then
@@ -2713,7 +2867,7 @@ if [ "$RC_T96BP" -ne 0 ]; then
   T96_FAIL=1
   ko "T96 check-blueprints.sh : rc=$RC_T96BP attendu 0"
 fi
-[ "$T96_FAIL" -eq 0 ] && ok "T96 corpus reel (>= $T96_DIRS_FOUND dossiers) + AGENT.md + check-blueprints.sh -> aucun invariant I6, rc=0"
+[ "$T96_FAIL" -eq 0 ] && ok "T96 corpus reel (>= $T96_DIRS_FOUND dossiers) + AGENT.md + check-blueprints.sh -> aucun invariant I6 (I5 si arme), rc=0"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="

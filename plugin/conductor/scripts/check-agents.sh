@@ -116,6 +116,14 @@
 #     spec §4 : un agent interne qui dispatche (`vf-coder`, `vf-reviewer`, `vf-auditer`,
 #     `vf-test-orchestrator` — des workers internes du team-kernel) n'est jamais un manager ici ;
 #     un `Agent` nu sans allowlist parenthésée non plus (rien à notifier).
+#   I5 (D-08) : un agent dont `disallowedTools:` retire À LA FOIS `Write` ET `Edit` ET dont
+#     l'allowlist de dispatch (même analyse pure) est VIDE est un JUGE au sens de cet invariant —
+#     il doit porter `omitClaudeMd: true`, sinon il charge la doctrine du `CLAUDE.md` du projet
+#     malgré son regard censé être frais. Écart assumé : un agent porteur d'une allowlist non
+#     vide (forme `vf-reviewer`/`vf-auditer` — un dispatcheur qui garde le `CLAUDE.md` du projet
+#     dont il a besoin pour relire) n'est jamais un juge ici, quel que soit son
+#     `disallowedTools:`. Arbitrage D-08 (maintenir) : session principale, décision déléguée par
+#     Willy au head (« tranche et avançons »), 2026-09-25 — 42-D19-MESURE.md.
 #
 # Codes de sortie : 0 = conforme · 1 = non conforme (agents non conformes, OU invocation
 #   invalide — ex. --resolve-agents=<valeur inconnue>) · 3 = INDÉTERMINÉ (--strict sur cible
@@ -766,6 +774,22 @@ def invariant_i6(base, fm, fmlines, dispatch):
         return []
     return [f\"{base} : invariant I6 — manager (allowlist Agent(...) non vide, non vf-internal) sans SendMessage dans tools: (D-07)\"]
 
+def invariant_i5(base, fm, fmlines, dispatch):
+    \"\"\"I5 (D-08, SEULEMENT SI ARBITRAGE-MAINTENIR au checkpoint D-19, Phase 42 42-05 Tache 3) :
+    juge si Write ET Edit sont dans bare_tokens(fmlines, \\\"disallowedTools\\\") ET dispatch (issu
+    de allowlist_agents) est vide. Un juge sans omitClaudeMd valant « true » est une erreur — un
+    regard frais ne charge pas la doctrine du CLAUDE.md du projet. Un agent porteur d'une
+    allowlist Agent(...)/Task(...) non vide (forme vf-reviewer, vf-auditer) n'est jamais un juge
+    au sens de cet invariant, quel que soit son disallowedTools.\"\"\"
+    disallowed = bare_tokens(fmlines, \"disallowedTools\")
+    if not (\"Write\" in disallowed and \"Edit\" in disallowed):
+        return []
+    if dispatch:
+        return []
+    if str(fm.get(\"omitClaudeMd\", \"\")) == \"true\":
+        return []
+    return [f\"{base} : invariant I5 — juge (disallowedTools retire Write et Edit, aucune allowlist Agent(...)) sans omitClaudeMd: true — un regard frais ne charge pas la doctrine (D-08)\"]
+
 def check_file(path):
     base = os.path.basename(path)
     try:
@@ -903,6 +927,7 @@ def check_file(path):
     errors.extend(invariant_i7(base, fm))
     dispatch = allowlist_agents(fmlines)
     errors.extend(invariant_i6(base, fm, fmlines, dispatch))
+    errors.extend(invariant_i5(base, fm, fmlines, dispatch))
 
     # Regle anti-regression (Phase 20) : memory: reinjecte SILENCIEUSEMENT Write+Edit au
     # runtime par-dessus l'allowlist tools: (contrat Claude Code confirme par sonde). Un agent
