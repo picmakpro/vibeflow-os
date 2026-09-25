@@ -1,5 +1,26 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.11] — 2026-09-25 (Phase 42, correction ciblée — nœud fix-42-condition-samuel, exécution de la condition posée par Samuel en ratifiant D-08)
+
+**Patch** :
+
+- **`vf-design-judge` lit désormais explicitement le `CLAUDE.md` du projet (section design)
+  dans le DÉROULÉ (section « Méthode de scoring »)**, avant de scorer les dimensions —
+  `omitClaudeMd: true` a coupé son chargement automatique. La consigne vit dans la procédure,
+  pas seulement citée comme source dans l'Entrée. `tools: Read, Bash, Glob, Grep` vérifié
+  inchangé.
+- **`vf-design-manager` — sa section « Orchestration par écran » porte désormais
+  explicitement que le digest transmis à `vf-design-judge` contient les interdits du lab
+  issus du `CLAUDE.md`** (section design) : c'est le manager qui transmet cette doctrine,
+  puisque le juge ne la charge plus automatiquement.
+- Assertion machine T11 ajoutée à `test-design-orchestrator.sh`, ancrée sur la section
+  « ## Méthode de scoring » du juge et « ## Orchestration par écran » du manager, avec témoin
+  discriminant par mutation. Rejouée rouge sur les fichiers pré-correction (git show HEAD,
+  0 occurrence attendue dans les deux sections).
+
+Exécution de la condition posée par Samuel en ratifiant D-08 (session principale,
+2026-09-25) — décision déléguée par Willy au head, en exécution de sa condition (e568307).
+
 ## [v1.5.10] — 2026-09-25 (Phase 42 — invariants de doctrine du gate des agents)
 
 **Patch** :

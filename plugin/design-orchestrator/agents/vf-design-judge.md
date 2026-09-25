@@ -56,6 +56,15 @@ majeur : −3, mineur : −1) en citant la preuve (`fichier:ligne` ou élément 
 preuve = pas de déduction. Une dimension sans objet pour l'écran (ex. pas de texte) → reporte
 ses points au prorata et note-le.
 
+## Méthode de scoring
+
+1. Lis `DESIGN.md`, le design system et les fichiers de l'écran. Lis aussi, explicitement
+   par l'outil Read, la section design du `CLAUDE.md` du projet — `omitClaudeMd: true` a
+   coupé son chargement automatique ; sans cette lecture volontaire, ses invariants design
+   n'existent plus pour ce juge.
+2. Score chaque dimension indépendamment ; toute déduction cite sa preuve
+   (`fichier:ligne` ou élément de spec) — jamais de déduction vague.
+
 ## Verdict
 
 - **Score ≥ seuil** (fourni par le manager ; défaut **70/100**) → `passed`.

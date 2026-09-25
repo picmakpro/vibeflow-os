@@ -1090,5 +1090,49 @@ rm -rf "$T10_TMPDIR"
 [ "$t10_ok" -eq 1 ] && ok "T10 : B1 étendu à vibeflow-design (AGENT.md + vf-design/SKILL.md), mêmes littéraux et même mécanique de comptage que T38 (synchro vérifiée), discriminants par mutation, contre-épreuve"
 
 # ---------------------------------------------------------------------------
+# T11 — [D-08] Lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ du juge (section
+#        « ## Méthode de scoring », jamais une simple citation de source), et digest du
+#        manager (section « ## Orchestration par écran ») portant les interdits du lab
+#        (condition posée par Samuel en ratifiant D-08, session principale, 2026-09-25).
+# ---------------------------------------------------------------------------
+t11_ok=1
+t11_extract_methode() {
+  awk '/^## Méthode de scoring$/{f=1;next} f&&/^## /{exit} f' "$1"
+}
+if [ -f "$JUDGE" ]; then
+  methode=$(t11_extract_methode "$JUDGE")
+  if [ -z "$methode" ]; then
+    ko "T11 D-08 : section « ## Méthode de scoring » introuvable dans le juge"; t11_ok=0
+  else
+    echo "$methode" | "$GREP" -q 'Read' \
+      || { ko "T11 D-08 : consigne de lecture par l'outil Read absente du DÉROULÉ"; t11_ok=0; }
+    echo "$methode" | "$GREP" -q 'CLAUDE.md' \
+      || { ko "T11 D-08 : CLAUDE.md absent du DÉROULÉ (Méthode de scoring)"; t11_ok=0; }
+
+    # Témoin DISCRIMINANT par mutation : une copie du juge dont la ligne du DÉROULÉ citant
+    # Read+CLAUDE.md est retirée ne doit plus passer T11 (rouge attendu sur la copie).
+    t11_tmp="$(mktemp -t t11-judge-mutant-XXXX.md)"
+    "$GREP" -v 'section design du .CLAUDE.md. du projet — .omitClaudeMd' "$JUDGE" > "$t11_tmp"
+    methode_mut=$(t11_extract_methode "$t11_tmp")
+    if echo "$methode_mut" | "$GREP" -q 'CLAUDE.md'; then
+      ko "T11 (DISCRIMINANT) NON DISCRIMINANTE : le mutant sans la ligne Read+CLAUDE.md reste détecté OK"; t11_ok=0
+    else
+      ok "T11 (DISCRIMINANT) : le mutant sans la ligne Read+CLAUDE.md est bien rejeté (rouge attendu)"
+    fi
+    rm -f "$t11_tmp"
+  fi
+else
+  ko "T11 D-08 : $JUDGE introuvable"; t11_ok=0
+fi
+if [ -f "$MANAGER" ]; then
+  orchestration=$(awk '/^## Orchestration par écran$/{f=1;next} f&&/^## /{exit} f' "$MANAGER")
+  echo "$orchestration" | "$GREP" -qi 'interdits' \
+    || { ko "T11 D-08 : section « Orchestration par écran » du manager ne mentionne pas les interdits du lab"; t11_ok=0; }
+  echo "$orchestration" | "$GREP" -q 'CLAUDE.md' \
+    || { ko "T11 D-08 : section « Orchestration par écran » du manager ne cite pas le CLAUDE.md comme source"; t11_ok=0; }
+fi
+[ "$t11_ok" -eq 1 ] && ok "T11 D-08 : lecture explicite du CLAUDE.md ancrée dans le DÉROULÉ du juge + digest du manager portant les interdits du lab"
+
+# ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]

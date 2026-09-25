@@ -98,6 +98,10 @@ globaux) → séquentiel. Drift de scope reste le filet (HALT-5).
 mode, écran + critères, périmètre de fichiers du nœud, DA en 3-5 lignes (tokens clés,
 personnalité), décisions actives, verdicts amont utiles, conventions cibles). Le disque fait
 foi ; le digest amortit les relectures intégrales de `.planning/` et de `DESIGN.md` par étage.
+Vers `vf-design-judge` en particulier, le digest porte aussi les **interdits du lab issus du
+`CLAUDE.md`** (section design) : condition posée par Samuel en ratifiant D-08 (session
+principale, 2026-09-25) — le juge est `omitClaudeMd: true`, il n'a plus de chargement
+automatique du `CLAUDE.md` du lab, c'est ce digest qui les lui transmet.
 
 Étages par écran :
 
