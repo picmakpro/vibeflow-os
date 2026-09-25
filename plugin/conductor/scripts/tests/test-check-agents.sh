@@ -73,24 +73,345 @@
 #         marquee PERIMEE par la mesure du 2026-09-17 : outils Agent/Task ABSENTS a la
 #         profondeur 3, profondeurs visees manager 1 / vf-coder 2 / briques GSD 3, descripteur
 #         verbatim (7 champs) toujours recopie
+#
+# Manifeste daté (Phase 42, FABR-01, D-01/D-03/D-17) — la suite juge la LOGIQUE du gate contre un
+# manifeste DATE DU JOUR (harnais mk_gate_dir/mk_manifest, verifie_le recalcule a chaque run) :
+# source unique (D-01, aucune copie de repli dans le script), refus explicite sur manifeste absent
+# ou invalide (D-03), contenu D-17 (trois outils ajoutes, aucun retire), silence de code sous
+# --hook et fail-open documente de la garde d'ecriture. La fraicheur du manifeste VERSIONNE (celui
+# du depot) est jugee par la CI (42-04), jamais ici.
+#   T77 — manifeste absent + agent conforme, --strict → rc=1, MANIFESTE-ILLISIBLE ; dossier
+#         d'agents vide, --strict → rc=3 (F13 inchange, manifeste non requis)
+#   T78 — manifeste tronque (JSON invalide) + agent conforme, --strict → rc=1, MANIFESTE-ILLISIBLE
+#   T79 — schema invalide (9 sous-cas : valide_jours absent/0/booleen, liste absente, valeurs
+#         vides, verifie_le non ISO, source non https, liste inconnue, valeur hors charset) →
+#         rc=1, MANIFESTE-ILLISIBLE dans chaque cas
+#   T80 — source unique (D-01) : manifeste prive d'un outil/champ → refus/avertissement le citant ;
+#         manifeste complet → absent
+#   T81 — manifeste VERSIONNE copie tel quel (dates d'origine) → agent conforme sans
+#         MANIFESTE-ILLISIBLE ; ListAgents/SendFeedback/SubagentHandback et experimental acceptes
+#   T82 — --hook : manifeste absent → rc=0 ET sortie contenant MANIFESTE-ILLISIBLE (silence de
+#         code, jamais de message) ; garde d'ecriture sur agent conforme → sortie vide (fail-open)
+#
+# Invocation nue sur cible absente (Phase 42, D-20, CONCERNS.md:349) :
+#   T103 — cible ABSENTE (aucun .claude/agents sur le chemin), invocation SANS AUCUN FLAG (ni
+#          --strict, ni --hook, ni --agents-dir, ni --file) → rc=3, sortie contenant INDETERMINE
+#          et CIBLE-ABSENTE (jeton distinct du jeton F13 existant) ; jumeau vert : meme invocation
+#          mais .claude/agents PRESENT et VIDE → rc=0, "rien a verifier", jamais CIBLE-ABSENTE
+#          (regime T23 inchange) ; T55 et T56 rejoues verts sans modification (non-regression
+#          explicite du harnais D-24 existant)
+#
+# Fraîcheur du manifeste (Phase 42, FABR-02, D-02/D-04/D-05) — la suite juge la LOGIQUE de
+# rétrogradation contre un manifeste daté DU JOUR (mk_gate_dir/mk_manifest, même harnais que
+# T77-T82) : l'INDÉTERMINÉ (exit 3) n'est rendu que sous --manifest-freshness=strict (D-04), un
+# manifeste périmé rétrograde en avertissement « outil hors du set connu » et « nom d'agent non
+# résolu » (suffixe retrograde) dans tous les autres contextes (D-05), jamais « champ inconnu »,
+# jamais model/memory/effort (Pitfall 3). Deux mutants QUAL-01 (MUT-F1, MUT-F2) et un troisième
+# posé ici pour la ligne cible_absente de 42-01 (MUT-D20, faute de harnais de mutation plus tôt) :
+#   T83 — manifeste périmé + agent `tools: Read, Reed` + --strict → rc=0, warning suffixé
+#         retrograde ; jumeau frais → rc=1 sans retrograde
+#   T84 — périmé + --manifest-freshness=strict + agent conforme → rc=3 INDETERMINE
+#         MANIFESTE-PERIME, jamais « ✓ agents conformes » ; frais + même option → rc=0 ; périmé
+#         sans option → rc=0, MANIFESTE-PERIME présent, jamais ✗
+#   T85 — bornes : âge = valide_jours → rc=0 sans MANIFESTE-PERIME ; âge = valide_jours + 1 →
+#         rc=3 ; valide-jours=5 : âge 5 → rc=0, âge 6 → rc=3
+#   T86 — date-future=outils (autres listes du jour) + option strict → rc=3, DATE-FUTURE ; sans
+#         option → rc=0, MANIFESTE-PERIME
+#   T87 — --hook : périmé + agent conforme (skills déclaré) → rc=0, sortie avec MANIFESTE-PERIME ;
+#         frais + même agent → sortie vide ; dossier vide + --strict + périmé → rc=3 sans
+#         MANIFESTE-PERIME (fraîcheur non évaluée, F13 inchangé)
+#   T88 — Pitfall 3 : périmé + model/memory/effort invalides → rc=1, les trois restent bloquants
+#   T89 — périmé + --resolve-agents=strict + allowlist non résolue (registre T30) → rc=0, « non
+#         resolu » et retrograde ; jumeau frais → rc=1
+#   T90 — garde d'écriture : dossier périmé + `tools: Read, Reed` → sortie vide (laisse passer) ;
+#         dossier frais → refus JSON citant « outil hors du set connu » ; valeur d'option
+#         inconnue → rc=1, « --manifest-freshness invalide »
+#   MUT-F1 — `perimees = manifeste_perime(` → `perimees = []` (fixture T84) : rc_original=3,
+#         rc_mutant=0
+#   MUT-F2 — `retrograder = bool(perimees)` → `retrograder = False` (fixture T83) : rc_original=0,
+#         rc_mutant=1
+#   MUT-D20 (CORRECTIF DE REVUE, mission revise-42c) — `cible_absente = (not single) and not
+#         os.path.isdir(agents_dir)` → `cible_absente = False` sur le gate déjà modifié par 42-01
+#         (fixture T103, rejouée nue) : rc_original=3, rc_mutant=0 — posé ici car les helpers de
+#         mutation (make_gate_mutant/okmut/komut) n'existent qu'à partir de cette tâche
+#
+# Invariants de doctrine (Phase 42, FABR-03, D-06 à D-11) — TOUJOURS des erreurs, jamais des
+# avertissements, quel que soit --strict (D-11) ; chacun a son jumeau négatif et sa mutation
+# QUAL-01 prouvée rouge, I1 et I7 en plus sur un porteur RÉEL du dépôt (mutation opposée par cmp,
+# patron T75, via le helper `juger_mutation_reelle`) :
+#   T91 — I1 (D-06) : vf-internal: true sans le marqueur « Worker interne » dans description: →
+#         rc=1 invariant I1 ; marqueur sans vf-internal: true → rc=1 invariant I1 ; les deux ou
+#         aucun des deux → rc=0 ; mutation réelle sur `plugin/mobile-test-team/agents/
+#         vf-test-runner.md` (copie dont le marqueur perd « interne » après « Worker ») → rouge,
+#         copie restaurée → verte
+#   T91b — I1 (D-18) : forme à DEUX dispatcheurs nommés de `vf-test-orchestrator` (« Worker
+#         interne — dispatché par vf-dev-manager ou par le mode autonome (vf-auto)… ») avec
+#         vf-internal: true → rc=0, aucun invariant I1 (le nombre de dispatcheurs nommés n'entre
+#         jamais en ligne de compte) ; jumeau négatif : même description sans vf-internal: true →
+#         rc=1 invariant I1
+#   T92 — I4 : disallowedTools: Bash(rm:*) (spécifieur) → rc=1 invariant I4 ; disallowedTools:
+#         Bash (sans spécifieur) → rc=0
+#   T95 — I7 : vf-mcp-consumer: true sans vf-requires → rc=1 invariant I7 ; vf-requires:
+#         autre-chose (sans mcp-servers) → rc=1 invariant I7 ; vf-mcp-tools + vf-requires:
+#         mcp-servers → rc=0 ; mutation réelle sur vf-test-runner.md (copie sans sa ligne
+#         vf-requires) → rouge, copie restaurée → verte
+#   MUT-I1, MUT-I4, MUT-I7 — `errors.extend(invariant_i1(` (resp. i4, i7) → `pass` sur la fixture
+#         rouge de l'invariant correspondant : rc_original=1, rc_mutant=0
+#   Fixtures préexistantes remises en conformité par l'armement de I7 : T67/T68 (vf-mcp-tools /
+#         vf-mcp-tool sans vf-requires) reçoivent `vf-requires: mcp-servers`, rc/assertions
+#         inchangés — aucune fixture préexistante n'est affaiblie par I1 ou I4 (zéro fixture
+#         portant vf-internal/« Worker interne » ou un disallowedTools à spécifieur avant T91/T92)
+#
+# Invariants I5/I6 — analyse pure des allowlists (Phase 42, FABR-03, D-07/D-08, 42-05 Tâche 3) :
+# I6 est TOUJOURS armé (indépendant de l'arbitrage D-19). I5 est armé SEULEMENT sur
+# ARBITRAGE-MAINTENIR (sonde de la Tâche 2 rejouée avant cette tâche) :
+#   T94 — I6 (D-07, toujours) : tools: Agent(...) non vide, non vf-internal, sans SendMessage →
+#         rc=1 invariant I6 ; même allowlist avec SendMessage → rc=0 ; même allowlist avec
+#         vf-internal: true + marqueur « Worker interne » → rc=0, aucun invariant I6 ; `Agent` nu
+#         (sans parenthèses) → rc=0, aucun invariant I6 ; mutation réelle sur
+#         `plugin/business-pilot-bundle/agents/vf-business-manager.md` (copie sans son jeton
+#         SendMessage) → rouge, copie restaurée → verte
+#   T93 — I5 (D-08, seulement si ARBITRAGE-MAINTENIR) : disallowedTools: Write, Edit + aucune
+#         allowlist Agent(...)/Task(...) non vide, sans omitClaudeMd: true → rc=1 invariant I5 ;
+#         même agent avec omitClaudeMd: true → rc=0 ; forme vf-reviewer (allowlist Agent(...) non
+#         vide + disallowedTools Write, Edit, sans omitClaudeMd) → rc=0, aucun invariant I5 ;
+#         mutation réelle sur `plugin/content-bundle/agents/content-clarity-judge.md` (copie sans
+#         sa ligne omitClaudeMd, posée par cette même tâche) → rouge, copie restaurée → verte
+#   T96 — corpus réel + check-blueprints.sh, adapté à la branche de l'arbitrage : les six
+#         plugin/*/agents et plugin/*/AGENT.md passent --strict sans « invariant I6 » (ni
+#         « invariant I5 » si armé) ; anti-vert-à-vide (au moins 6 dossiers découverts)
+#   MUT-I6 (toujours), MUT-I5 (seulement si ARBITRAGE-MAINTENIR) — `errors.extend(invariant_i6(`
+#         (resp. `invariant_i5(`) → `pass` sur la fixture rouge correspondante : rc_original=1,
+#         rc_mutant=0
+#   Fixtures préexistantes remises en conformité par l'armement de I6 (TOUJOURS, manager-shaped,
+#         un `SendMessage` ajouté avant leur `Agent(`/`Task(` : T25, T28, T28b, T29, T30b, T31,
+#         T33, T35, T36, T53) et de I5 (SEULEMENT si ARBITRAGE-MAINTENIR, juge-shaped, un
+#         `omitClaudeMd: true` ajouté : T59, T62-T66, T67, T70, T77/T78/T79/T82/T84/T85/T86 (via
+#         `mk_conforme_agent`), T80 (agent-listagents), T81, T83, T87, T90, MUT-F2) — rc attendus
+#         et assertions inchangés dans tous les cas.
+#
+# Découverte récursive (Phase 42, FABR-04, D-10, 42-06 Tâche 1) — la cible est parcourue
+# récursivement (os.walk, followlinks=False), avec deux exclusions prouvées par mutation, et
+# resolve_agent_name résout via la MÊME découverte (index_agents), jamais un second mécanisme :
+#   T97 — récursion : `$AG/equipe/sous-agent.md` sans model + agent conforme à la racine → rc=1,
+#         cite sous-agent.md et « model absent » ; le même sous-agent rendu conforme → rc=0
+#   T98 — exclusions : agent conforme à la racine + `$AG/lab-references/lead-knowledge.md` (sans
+#         frontmatter) + `$AG/equipe/README.md` + `$AG/.cache/x.md` → rc=0, aucun des trois cité
+#   T99 — résolution : `$AG/equipe/sous-agent.md` interne (vf-internal + « Worker interne ») +
+#         agent racine `tools: Read, SendMessage, Agent(sous-agent)` → rc=0 sous
+#         `--resolve-agents=strict`, aucun « non resolu »
+#   MUT-D1 — l'élagage des dossiers cachés remplacé par un élagage total (plus aucune descente) →
+#         fixture T97 : rc_original=1, rc_mutant=0
+#   MUT-D2 — l'élagage des dossiers -references neutralisé → fixture T98 : rc_original=0,
+#         rc_mutant=1
+#   Témoin lab frais (LAB-RECURSIF-OK, vérification externe du plan) : `.claude/agents/
+#         conductor-references/*.md` posé par l'installeur reste vert sous
+#         `--strict --manifest-freshness=strict`, jamais pris pour un agent.
+#
+# Invariants de monde fermé (Phase 42, FABR-03, D-09, 42-06 Tâche 2) — I2/I3, actifs SEULEMENT
+# sous `--resolve-agents=strict`, réutilisent l'univers déjà connu de la CI (aucun registre écrit
+# à la main), jamais imputés à un fichier de registre :
+#   T100 — I2 : `$AG/worker-orphelin.md` (vf-internal + « Worker interne ») + registre vide de
+#         tout dispatch → rc=1 « invariant I2 » ; sans `--resolve-agents=strict` → rc=0 ; un
+#         manager du registre (SendMessage + `Agent(worker-orphelin)`) → rc=0
+#   T101 — I3 : `$AG/worker-expose.md` (non interne, sans marqueur) + registre dont un manager
+#         dispatche `worker-expose` → rc=1 « invariant I3 » nommant ce manager ; sans le monde
+#         fermé → rc=0 ; en lintant le REGISTRE (le manager) avec `$AG` en registre → aucun
+#         « invariant I3 » (imputation au seul dossier linté)
+#   T102 — monde fermé réel : copie des six `plugin/*/agents` sous un univers jetable, chaque
+#         dossier linté avec tous les registres → rc=0 partout, aucun « invariant I » ; mutation 1
+#         (vf-test-orchestrator perd `vf-internal` + son marqueur, gagne `SendMessage`) → rc=1
+#         « invariant I3 », sans I1 ni I6 ; mutation 2 (`vf-test-runner` retiré de l'allowlist de
+#         vf-test-orchestrator) → rc=1 « invariant I2 » sur vf-test-runner.md ; chaque mutation
+#         prouvée par `cmp`, puis restaurée → rc=0
+#   MUT-I2, MUT-I3 — `errors.extend(invariant_i2(` (puis `invariant_i3(`) remplacé par `pass` →
+#         fixture T100 (puis T101) : rc_original=1, rc_mutant=0
 
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPTS_DIR="$(cd "$TESTS_DIR/.." && pwd)"
-CHECK="$SCRIPTS_DIR/check-agents.sh"
-GUARD="$SCRIPTS_DIR/guard-agent-write.sh"
+REAL_CHECK="$SCRIPTS_DIR/check-agents.sh"
+REAL_MANIFEST="$SCRIPTS_DIR/check-agents-manifest.json"
+GUARD_SRC="$SCRIPTS_DIR/guard-agent-write.sh"
+
+# ADR-054 : meme resolution PYBIN que le gate (stub Microsoft Store, repli python).
+PYBIN=python3
+case "$(command -v python3 2>/dev/null)" in
+  ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else echo "[test-check-agents] python3 requis" >&2; exit 1; fi ;;
+esac
 
 pass=0; fail=0
 ok() { echo "  ✓ $1"; pass=$((pass+1)); }
 ko() { echo "  ✗ $1"; fail=$((fail+1)); }
-
-echo "== test-check-agents (gate: $CHECK) =="
+# okmut/komut (patron test-check-gate-touche.sh l.35-44, QUAL-01) : un mutant n'est tue que si
+# les DEUX rc sont exacts — un plantage (rc inattendu) ou une derive de sortie ne comptent jamais
+# comme tue, meme si un seul des deux rc matchait par accident.
+okmut() {  # <id> <rc_mutant> <attendu_mut> <rc_original> <attendu_orig>
+  echo "  ✓ MUT-$1 TUE : rc_mutant=$2 attendu $3, rc_original=$4 attendu $5"
+  pass=$((pass+1))
+}
+komut() {  # <id> <assertion> <attendu> <obtenu>
+  echo "  ✗ MUT-$1 NON TUE : $2"
+  echo "    assertion : MUT-$1 $2"
+  echo "    attendu   : $3"
+  echo "    obtenu    : $4"
+  fail=$((fail+1))
+}
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 AG="$WORK/agents"; SK="$WORK/skills"
 mkdir -p "$AG" "$SK/petit-skill" "$SK/gros-skill" "$SK/forbidden-skill"
+
+# ---------- Manifeste daté (Phase 42, FABR-01, D-01/D-03/D-17) : harnais a manifeste du jour ----
+# La suite juge la LOGIQUE du gate contre un manifeste daté DU JOUR (verifie_le recalcule a
+# chaque run) — jamais contre le manifeste VERSIONNE du depot tel quel : sa fraicheur est jugee
+# par la CI (42-04), jamais ici, sinon T28/T73 et consorts rougiraient a l'echeance des 30 jours.
+mk_manifest() { # <destination> <age_jours> [operation]
+  local dest="$1" age="$2" op="${3:-}"
+  "$PYBIN" - "$REAL_MANIFEST" "$dest" "$age" "$op" <<'PYEOF'
+import json, sys
+from datetime import date, timedelta
+
+real_path, dest, age_s, op = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+age = int(age_s)
+with open(real_path, encoding="utf-8") as fh:
+    m = json.load(fh)
+verifie_le = (date.today() - timedelta(days=age)).isoformat()
+
+if op == "tronque":
+    text = json.dumps(m, indent=2, ensure_ascii=False)
+    text = text[: len(text) // 2]
+    with open(dest, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    sys.exit(0)
+
+if op != "dates-reelles":
+    for liste in m["listes"].values():
+        liste["verifie_le"] = verifie_le
+
+if op in ("", "dates-reelles"):
+    pass
+elif op == "sans-valide-jours":
+    del m["valide_jours"]
+elif op.startswith("valide-jours="):
+    m["valide_jours"] = json.loads(op[len("valide-jours="):])
+elif op.startswith("sans-liste="):
+    del m["listes"][op[len("sans-liste="):]]
+elif op.startswith("liste-vide="):
+    m["listes"][op[len("liste-vide="):]]["valeurs"] = []
+elif op.startswith("date-invalide="):
+    m["listes"][op[len("date-invalide="):]]["verifie_le"] = "23/09/2026"
+elif op.startswith("date-future="):
+    m["listes"][op[len("date-future="):]]["verifie_le"] = (date.today() + timedelta(days=10)).isoformat()
+elif op.startswith("source-invalide="):
+    m["listes"][op[len("source-invalide="):]]["source"] = "http://exemple.invalide/pas-https"
+elif op == "liste-inconnue":
+    m["listes"]["liste-fantome"] = {"verifie_le": verifie_le, "source": "https://exemple.invalide/x", "valeurs": ["a"]}
+elif op.startswith("valeur-hors-charset="):
+    cle = op[len("valeur-hors-charset="):]
+    m["listes"][cle]["valeurs"] = list(m["listes"][cle]["valeurs"]) + ["valeur; interdite"]
+elif op.startswith("retire="):
+    cle, _, val = op[len("retire="):].partition(":")
+    m["listes"][cle]["valeurs"] = [v for v in m["listes"][cle]["valeurs"] if v != val]
+else:
+    print(f"mk_manifest: operation inconnue '{op}'", file=sys.stderr)
+    sys.exit(2)
+
+with open(dest, "w", encoding="utf-8") as fh:
+    json.dump(m, fh, indent=2, ensure_ascii=False)
+PYEOF
+}
+
+mk_gate_dir() { # <dossier> <age_jours> [operation] -> imprime le chemin du dossier
+  local dir="$1" age="$2" op="${3:-}"
+  mkdir -p "$dir"
+  cp "$REAL_CHECK" "$dir/check-agents.sh"
+  cp "$GUARD_SRC" "$dir/guard-agent-write.sh"
+  if [ "$op" != "absent" ]; then
+    mk_manifest "$dir/check-agents-manifest.json" "$age" "$op"
+  fi
+  printf '%s' "$dir"
+}
+
+# make_gate_mutant <id> <age_jours> <motif-fixe> <remplacement> [operation] -> imprime le chemin
+# du dossier mutant ; rc 0 = mutant opposable et syntaxiquement valide, rc 1 = refuse (deja
+# comptabilise via komut). Meme discipline que make_mutant (scripts/tests/test-check-gate-touche.sh
+# l.109-132) : les valeurs transitent par ENVIRON, JAMAIS par awk -v (echappement C sur \/,
+# casserait toute comparaison exacte des lors que le motif porte un antislash) ; refus si la
+# copie mutee est identique a l'original (cmp) ou si bash -n echoue. Le mutant vit a cote d'un
+# manifeste du MEME age/operation que le run original (mk_gate_dir) : D-03 n'interfere jamais.
+make_gate_mutant() { # <id> <age_jours> <motif> <remplacement> [operation]
+  local id="$1" age="$2" motif="$3" remplacement="$4" op="${5:-}"
+  local dir orig n tmp
+  dir="$(mk_gate_dir "$WORK/mut-$id" "$age" "$op")"
+  orig="$dir/check-agents.sh"
+  n="$(grep -Fc -- "$motif" "$orig")"
+  if [ "$n" -ne 1 ]; then
+    komut "$id" "motif fixe unique dans check-agents.sh" "exactement 1 occurrence" "MOTIF AMBIGU OU ABSENT (n=$n)"
+    printf '%s' "$dir"
+    return 1
+  fi
+  tmp="$orig.mut"
+  MUT_MOTIF_ENV="$motif" MUT_REPL_ENV="$remplacement" awk '
+    index($0, ENVIRON["MUT_MOTIF_ENV"]) {
+      match($0, /^[ \t]*/)
+      print substr($0, RSTART, RLENGTH) ENVIRON["MUT_REPL_ENV"]
+      next
+    }
+    { print }
+  ' "$orig" > "$tmp"
+  if cmp -s "$tmp" "$orig"; then
+    komut "$id" "mutation produit un fichier different de l'original" "fichiers distincts" "NON OPPOSABLE (identique)"
+    rm -f "$tmp"
+    printf '%s' "$dir"
+    return 1
+  fi
+  if ! bash -n "$tmp" 2>/dev/null; then
+    komut "$id" "mutant syntaxiquement valide" "bash -n reussit" "bash -n ECHOUE"
+    rm -f "$tmp"
+    printf '%s' "$dir"
+    return 1
+  fi
+  mv "$tmp" "$orig"
+  printf '%s' "$dir"
+  return 0
+}
+
+# juger_mutation_reelle <id> <copie-originale> <copie-mutee> <jeton> (patron T75, invariants
+# I1/I4/I5/I6/I7, Phase 42 42-05) : refuse « NON OPPOSABLE » si les deux copies sont identiques
+# (cmp, jamais diff — proxifie et menteur sur ce runtime) ; sinon joue le gate ($CHECK --file,
+# mode PAR DEFAUT — les invariants sont des erreurs dans tous les modes, D-11) sur la copie
+# mutee (attend rc=1 et le jeton dans la sortie) puis sur la copie originale (attend rc=0). Les
+# deux copies vivent sous $WORK, jamais un fichier du depot modifie en place.
+juger_mutation_reelle() { # <id> <orig> <mut> <jeton>
+  local id="$1" orig="$2" mut="$3" jeton="$4"
+  if cmp -s "$orig" "$mut"; then
+    ko "$id mutation reelle NON OPPOSABLE (copies identiques, cmp) : $orig vs $mut"
+    return 1
+  fi
+  local out_mut rc_mut out_orig rc_orig
+  out_mut="$(bash "$CHECK" --file "$mut" --skills-dir="$SK" 2>&1)"; rc_mut=$?
+  out_orig="$(bash "$CHECK" --file "$orig" --skills-dir="$SK" 2>&1)"; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && echo "$out_mut" | grep -q "$jeton" && [ "$rc_orig" -eq 0 ]; then
+    ok "$id mutation reelle sur $(basename "$orig") : rouge ($jeton, rc=1) puis restauree → verte (rc=0)"
+  else
+    ko "$id (rc_mut=$rc_mut rc_orig=$rc_orig, jeton attendu='$jeton') mutant:[$out_mut] original:[$out_orig]"
+  fi
+}
+
+GATE_DIR="$(mk_gate_dir "$WORK/gate" 0)"
+CHECK="$GATE_DIR/check-agents.sh"
+GUARD="$GATE_DIR/guard-agent-write.sh"
+if [ ! -f "$GATE_DIR/check-agents-manifest.json" ]; then
+  ko "harnais : manifeste du jour absent de $GATE_DIR — anti vert-a-vide"
+  echo ""
+  echo "== Résultat : $pass OK · $fail KO =="
+  exit 1
+fi
+
+echo "== test-check-agents (gate: $CHECK) =="
 
 printf -- '---\nname: petit-skill\ndescription: petit skill de test\n---\ncontenu court\n' > "$SK/petit-skill/SKILL.md"
 { printf -- '---\nname: gros-skill\ndescription: gros skill de test\n---\n'; for i in $(seq 1 260); do echo "ligne $i"; done; } > "$SK/gros-skill/SKILL.md"
@@ -106,6 +427,26 @@ effort: medium
 memory: project
 skills:
   - petit-skill
+---
+Corps de l agent.
+EOF
+}
+
+# good_internal_agent (Phase 42, D-09, 42-06 Tache 2) : meme gabarit que good_agent, mais
+# vf-internal: true + marqueur "Worker interne" — fidele aux VRAIS vf-coder.md/vf-reviewer.md du
+# depot (tous deux vf-internal: true). Necessaire des que ces fixtures sont dispatchees sous
+# --resolve-agents=strict : sans le marqueur, I3 (D-09) les signalerait a tort comme "exposees".
+good_internal_agent() {
+  cat > "$AG/$1.md" <<EOF
+---
+name: $1
+description: Pilote les tests du lab de bout en bout. Worker interne, use when une suite de tests doit etre lancee ou analysee.
+model: sonnet
+effort: medium
+memory: project
+skills:
+  - petit-skill
+vf-internal: true
 ---
 Corps de l agent.
 EOF
@@ -402,7 +743,9 @@ rm -f "$AG"/*.md; rm -rf "$SK/planning-core"
 
 # ---------- Phase 16 : lint des allowlists Agent(...)/Task(...) ----------
 
-good_agent "vf-coder"
+# vf-coder.md : vf-internal (fidele au vrai vf-coder.md du depot) — dispatche sous
+# --resolve-agents=strict par nom-ok.md (T30b, D-09) : sans le marqueur, I3 le signalerait a tort.
+good_internal_agent "vf-coder"
 good_agent "vf-reviewer"
 
 # T25 — allowlist reelle mixte (natif + tiers + cross-module) reste VERTE en --strict
@@ -413,7 +756,7 @@ description: Agent de test avec allowlist mixte native, tierce et cross-module, 
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Write, Agent(vf-coder, vf-reviewer, general-purpose, gsd-planner)
+tools: Read, Write, SendMessage, Agent(vf-coder, vf-reviewer, general-purpose, gsd-planner)
 ---
 corps
 EOF
@@ -465,7 +808,7 @@ description: Agent de test declarant l'outil Reed (typo) au lieu de Read.
 model: sonnet
 effort: medium
 memory: project
-tools: Reed, Agent(vf-coder)
+tools: Reed, SendMessage, Agent(vf-coder)
 ---
 corps
 EOF
@@ -484,7 +827,7 @@ description: Agent de test avec l'outil Read correctement orthographie, non-regr
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent(vf-coder)
+tools: Read, SendMessage, Agent(vf-coder)
 disallowedTools: Write, Edit
 ---
 corps
@@ -503,7 +846,7 @@ description: Agent de test declarant un nom d'agent mal orthographie dans son al
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent(vf-codeur)
+tools: Read, SendMessage, Agent(vf-codeur)
 disallowedTools: Write, Edit
 ---
 corps
@@ -517,8 +860,11 @@ fi
 
 # T30 — le MEME mutant (vf-codeur) sous --resolve-agents=strict + registre → exit 1 ;
 # vf-coder (nom correct, fichier present) reste vert sous la meme resolution stricte.
+# REG reste SANS copie de vf-coder.md (CR-01, Phase 42 correction ciblee) : vf-coder.md est deja
+# present dans $AG, donc "vf-coder" resout directement via agents_dir_local — dupliquer le meme
+# nom de base sous REG creerait une COLLISION D'IDENTITE reelle (deux chemins reels distincts,
+# cf. T103) et ferait echouer T30b a tort, sans rien prouver de plus sur la resolution via registre.
 REG="$WORK/registry"; mkdir -p "$REG"
-cp "$AG/vf-coder.md" "$REG/vf-coder.md"
 RC=0; run_check --resolve-agents=strict --agent-registry-dir="$REG" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 1 ] && ok "T30 vf-codeur (typo) sous --resolve-agents=strict → exit 1 (discriminance prouvee)" || ko "T30 (rc=$RC)"
 rm -f "$AG/typo-nom.md"
@@ -529,7 +875,7 @@ description: Agent de test avec un nom d'agent correctement resolu via le regist
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent(vf-coder)
+tools: Read, SendMessage, Agent(vf-coder)
 ---
 corps
 EOF
@@ -545,7 +891,7 @@ description: Agent de test declarant son allowlist en flow list YAML entre croch
 model: sonnet
 effort: medium
 memory: project
-tools: [Read, Agent(x, y), Bash(git:*)]
+tools: [Read, SendMessage, Agent(x, y), Bash(git:*)]
 disallowedTools: Write, Edit
 ---
 corps
@@ -590,7 +936,7 @@ description: Agent de test utilisant l'alias legacy Task au lieu d'Agent dans to
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Task(vf-coder)
+tools: Read, SendMessage, Task(vf-coder)
 disallowedTools: Write, Edit
 ---
 corps
@@ -621,7 +967,7 @@ rm -f "$AG"/*.md
 
 # ---------- Correctifs post-revue (re-entree Phase 16, 2 juges independants) ----------
 
-good_agent "vf-coder"
+good_internal_agent "vf-coder"
 
 # T35 — defaut 1 : champ tools: ENTIEREMENT quote (YAML valide) ne doit plus produire de
 # faux BLOQUANT (charset / parenthese non fermee sur les guillemets eux-memes).
@@ -632,7 +978,7 @@ description: Agent de test avec un champ tools entierement quote entre guillemet
 model: sonnet
 effort: medium
 memory: project
-tools: "Read, Write, Agent(vf-coder)"
+tools: "Read, Write, SendMessage, Agent(vf-coder)"
 ---
 corps
 EOF
@@ -656,6 +1002,7 @@ effort: medium
 memory: project
 tools:
   - Read
+  - SendMessage
 
   - Agent(vf-inexistant-improvise)
 ---
@@ -1005,7 +1352,7 @@ description: Agent de test dont l'allowlist reference un agent tiers jamais mate
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent(gsd-jamais-cree)
+tools: Read, SendMessage, Agent(gsd-jamais-cree)
 ---
 corps
 EOF
@@ -1089,6 +1436,29 @@ rm -rf "$DEFAULT_PRESENT"
 # T58 — le cwd de la suite est inchange : les 3 deplacements ci-dessus sont confines a des sous-shells
 [ "$(pwd)" = "$PWD_BEFORE" ] && ok "T58 cwd de la suite inchange apres les cas chemin par defaut" || ko "T58 cwd altere : $(pwd) != $PWD_BEFORE"
 
+# T103 — invocation NUE sur cible ABSENTE, hors --hook (Phase 42, D-20, CONCERNS.md:349) : le
+# faux vert historique (exit 0 "rien a verifier") devient INDETERMINE (exit 3, CIBLE-ABSENTE).
+T103_ABSENT="$(mktemp -d)"
+OUT="$(cd "$T103_ABSENT" && bash "$CHECK" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "INDETERMINE" && echo "$OUT" | grep -q "CIBLE-ABSENTE"; then
+  ok "T103 invocation nue, cible absente, hors --hook → rc=3 INDÉTERMINÉ, jeton CIBLE-ABSENTE (D-20)"
+else
+  ko "T103 (rc=$RC) : $OUT"
+fi
+rm -rf "$T103_ABSENT"
+
+# T103 (jumeau vert) — meme invocation nue, mais .claude/agents PRESENT et VIDE : regime F13
+# deja en place (T23), CIBLE-ABSENTE ne doit JAMAIS apparaitre.
+T103_PRESENT_VIDE="$(mktemp -d)"
+mkdir -p "$T103_PRESENT_VIDE/.claude/agents"
+OUT="$(cd "$T103_PRESENT_VIDE" && bash "$CHECK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "CIBLE-ABSENTE"; then
+  ok "T103 (jumeau vert) invocation nue, .claude/agents présent et vide → rc=0, jamais CIBLE-ABSENTE (régime T23 inchangé)"
+else
+  ko "T103 (jumeau vert, rc=$RC) : $OUT"
+fi
+rm -rf "$T103_PRESENT_VIDE"
+
 # ---------- D-18/D-19 (perimetre hooks.json, hors perimetre de CE script) + D-21/D-22/D-05 ----------
 
 # T59 — hook, 0 erreur 0 avertissement → silence total (regime nominal inchange)
@@ -1101,6 +1471,7 @@ effort: medium
 memory: project
 tools: Read
 disallowedTools: Write, Edit
+omitClaudeMd: true
 skills:
   - petit-skill
 ---
@@ -1156,6 +1527,7 @@ effort: medium
 memory: project
 tools: Read, $2
 disallowedTools: Write, Edit
+omitClaudeMd: true
 ---
 corps
 EOF
@@ -1196,7 +1568,9 @@ effort: medium
 memory: project
 tools: Read
 disallowedTools: Write, Edit
+omitClaudeMd: true
 vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
+vf-requires: mcp-servers
 ---
 corps
 EOF
@@ -1217,6 +1591,7 @@ effort: medium
 memory: project
 tools: Read
 vf-mcp-tool: XcodeBuildMCP:test_sim
+vf-requires: mcp-servers
 ---
 corps
 EOF
@@ -1261,6 +1636,7 @@ effort: medium
 memory: project
 tools: Read, Bash
 disallowedTools: Write, Edit
+omitClaudeMd: true
 ---
 corps
 EOF
@@ -1457,6 +1833,459 @@ else
   rm -f "$T76_MUT"
 fi
 
+# ---------- T77-T82 : Manifeste daté (Phase 42, FABR-01, D-01/D-03/D-17) ----------
+# Chaque cas travaille dans son propre dossier de gate (mk_gate_dir) et son propre dossier
+# d'agents, agent conforme produit par mk_conforme_agent (meme patron que good_agent, mais un
+# nom parametrable pour eviter les collisions entre sous-cas).
+mk_conforme_agent() { # <dossier> <nom>
+  cat > "$1/$2.md" <<EOF
+---
+name: $2
+description: Agent conforme utilise par le harnais manifeste date pour prouver un verdict.
+tools: Read
+disallowedTools: Write, Edit
+omitClaudeMd: true
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+}
+
+T_MANIFESTE_AG="$WORK/t-manifeste-ag"; mkdir -p "$T_MANIFESTE_AG"
+mk_conforme_agent "$T_MANIFESTE_AG" "conforme"
+
+# T77 — manifeste absent
+T77_DIR="$(mk_gate_dir "$WORK/t77" 0 absent)"
+OUT="$(bash "$T77_DIR/check-agents.sh" --strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+  ok "T77 manifeste absent + agent conforme, --strict → rc=1, MANIFESTE-ILLISIBLE"
+else
+  ko "T77 (rc=$RC) : $OUT"
+fi
+T77_AG_VIDE="$WORK/t77-vide"; mkdir -p "$T77_AG_VIDE"
+OUT="$(bash "$T77_DIR/check-agents.sh" --strict --agents-dir="$T77_AG_VIDE" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && ! echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+  ok "T77 (jumeau F13) manifeste absent + dossier d'agents vide, --strict → rc=3 (manifeste non requis)"
+else
+  ko "T77 (jumeau F13, rc=$RC) : $OUT"
+fi
+
+# T78 — manifeste tronque (JSON invalide)
+T78_DIR="$(mk_gate_dir "$WORK/t78" 0 tronque)"
+OUT="$(bash "$T78_DIR/check-agents.sh" --strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+  ok "T78 manifeste tronqué (JSON invalide) + agent conforme, --strict → rc=1, MANIFESTE-ILLISIBLE"
+else
+  ko "T78 (rc=$RC) : $OUT"
+fi
+
+# T79 — schema invalide, un sous-cas par defaut (9 sous-cas)
+T79_CASES="sans-valide-jours valide-jours=0 valide-jours=true sans-liste=outils liste-vide=outils date-invalide=outils source-invalide=outils liste-inconnue valeur-hors-charset=outils"
+T79_ALL_OK=1
+for t79op in $T79_CASES; do
+  t79_safe="$(printf '%s' "$t79op" | tr '=:' '__')"
+  T79_DIR="$(mk_gate_dir "$WORK/t79-$t79_safe" 0 "$t79op")"
+  OUT="$(bash "$T79_DIR/check-agents.sh" --strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+  if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+    :
+  else
+    T79_ALL_OK=0
+    ko "T79 schema invalide ($t79op) → attendu rc=1+MANIFESTE-ILLISIBLE, obtenu rc=$RC : $OUT"
+  fi
+done
+[ "$T79_ALL_OK" -eq 1 ] && ok "T79 schema invalide — 9 sous-cas (valide_jours absent/0/booléen, liste absente, valeurs vides, verifie_le non ISO, source non https, liste inconnue, valeur hors charset) → rc=1 + MANIFESTE-ILLISIBLE"
+OUT="$(bash "$GATE_DIR/check-agents.sh" --strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then
+  ok "T79 (jumeau vert) même agent, manifeste du jour complet → rc=0"
+else
+  ko "T79 (jumeau vert, rc=$RC) : $OUT"
+fi
+
+# T80 — source unique (D-01) : c'est le manifeste qui decide, aucune copie dans le script
+T80_MISS_DIR="$(mk_gate_dir "$WORK/t80-miss-tool" 0 "retire=outils:ListAgents")"
+T80_AG1="$WORK/t80-ag1"; mkdir -p "$T80_AG1"
+cat > "$T80_AG1/agent-listagents.md" <<'EOF'
+---
+name: agent-listagents
+description: Agent qui declare ListAgents dans tools, pour prouver D-01 (source unique).
+tools: Read, ListAgents
+disallowedTools: Write, Edit
+omitClaudeMd: true
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+OUT="$(bash "$T80_MISS_DIR/check-agents.sh" --strict --agents-dir="$T80_AG1" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "outil hors du set connu 'ListAgents'"; then
+  ok "T80 manifeste PRIVÉ de ListAgents + agent le déclarant, --strict → rc=1 (outil hors du set connu)"
+else
+  ko "T80 (rc=$RC) : $OUT"
+fi
+OUT="$(bash "$GATE_DIR/check-agents.sh" --strict --agents-dir="$T80_AG1" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then
+  ok "T80 manifeste COMPLET (ListAgents présent) + même agent, --strict → rc=0"
+else
+  ko "T80 (manifeste complet, rc=$RC) : $OUT"
+fi
+
+T80_MISS2_DIR="$(mk_gate_dir "$WORK/t80-miss-field" 0 "retire=champs_frontmatter:omitClaudeMd")"
+T80_AG2="$WORK/t80-ag2"; mkdir -p "$T80_AG2"
+cat > "$T80_AG2/agent-omitclaudemd.md" <<'EOF'
+---
+name: agent-omitclaudemd
+description: Agent qui declare omitClaudeMd, pour prouver D-01 (source unique, champ de frontmatter).
+tools: Read
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+omitClaudeMd: true
+---
+corps
+EOF
+OUT="$(bash "$T80_MISS2_DIR/check-agents.sh" --agents-dir="$T80_AG2" 2>&1)"; RC=$?
+if echo "$OUT" | grep -qE "champ inconnu du runtime.*omitClaudeMd"; then
+  ok "T80 manifeste PRIVÉ d'omitClaudeMd + agent le portant → avertissement champ inconnu présent"
+else
+  ko "T80 (champ manquant, rc=$RC) : $OUT"
+fi
+OUT="$(bash "$GATE_DIR/check-agents.sh" --agents-dir="$T80_AG2" 2>&1)"; RC=$?
+if ! echo "$OUT" | grep -qE "champ inconnu du runtime.*omitClaudeMd"; then
+  ok "T80 manifeste COMPLET (omitClaudeMd présent) + même agent → avertissement absent"
+else
+  ko "T80 (manifeste complet, champ) : $OUT"
+fi
+
+# T81 — manifeste VERSIONNE copie tel quel (dates d'origine)
+T81_DIR="$(mk_gate_dir "$WORK/t81" 0 dates-reelles)"
+T81_AG="$WORK/t81-ag"; mkdir -p "$T81_AG"
+cat > "$T81_AG/agent-t81.md" <<'EOF'
+---
+name: agent-t81
+description: Agent qui declare les trois outils ajoutes et experimental, pour prouver T81 (D-17).
+tools: Read, ListAgents, SendFeedback, SubagentHandback
+disallowedTools: Write, Edit
+omitClaudeMd: true
+model: sonnet
+memory: project
+effort: low
+experimental: true
+---
+corps
+EOF
+OUT="$(bash "$T81_DIR/check-agents.sh" --strict --agents-dir="$T81_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE" \
+   && ! echo "$OUT" | grep -qE "champ inconnu du runtime.*experimental"; then
+  ok "T81 manifeste VERSIONNÉ (dates d'origine) + agent conforme, --strict → rc=0, ListAgents/SendFeedback/SubagentHandback et experimental acceptés"
+else
+  ko "T81 (rc=$RC) : $OUT"
+fi
+
+# T82 — --hook (silence de code, jamais de message) + garde (fail-open documenté)
+T82_DIR="$(mk_gate_dir "$WORK/t82" 0 absent)"
+OUT="$(bash "$T82_DIR/check-agents.sh" --hook --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+  ok "T82 --hook, manifeste absent + agent → rc=0 ET sortie contenant MANIFESTE-ILLISIBLE (silence de code, jamais de message)"
+else
+  ko "T82 (--hook, rc=$RC) : '$OUT'"
+fi
+
+mkdir -p "$WORK/t82-lab/.claude/agents"
+T82_GOOD="$WORK/t82-good-src.md"
+mk_conforme_agent "$WORK" "t82-good-src"
+OUT_GUARD="$(payload_write "$WORK/t82-lab/.claude/agents/t82-good-src.md" "$T82_GOOD" | ( cd "$WORK/t82-lab" && bash "$T82_DIR/guard-agent-write.sh" 2>/dev/null ))"
+if [ -z "$OUT_GUARD" ]; then
+  ok "T82 (garde) manifeste absent, agent conforme → sortie vide (fail-open documenté, laisse passer)"
+else
+  ko "T82 (garde) sortie non vide : $OUT_GUARD"
+fi
+
+# ---------- T83-T90 : fraîcheur du manifeste (Phase 42, FABR-02, D-02/D-04/D-05) ----------
+# Age périmé = valide_jours du manifeste VERSIONNÉ + 1, lu par Python (mk_manifest), jamais un
+# 31 écrit en dur — si le manifeste versionné change un jour de valide_jours, ces cas suivent.
+PERIME_AGE="$("$PYBIN" -c "import json,sys; print(json.load(open(sys.argv[1]))['valide_jours'] + 1)" "$REAL_MANIFEST")"
+
+# T83 — outil hors du set connu, périmé : warning suffixé retrograde ; frais : erreur sans suffixe
+T83_PERIME_DIR="$(mk_gate_dir "$WORK/t83-perime" "$PERIME_AGE")"
+T83_AG="$WORK/t83-ag"; mkdir -p "$T83_AG"
+cat > "$T83_AG/agent-t83.md" <<'EOF'
+---
+name: agent-t83
+description: Agent qui declare l'outil Reed (typo), pour prouver la retrogradation D-05.
+tools: Read, Reed
+disallowedTools: Write, Edit
+omitClaudeMd: true
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+OUT="$(bash "$T83_PERIME_DIR/check-agents.sh" --strict --agents-dir="$T83_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "outil hors du set connu 'Reed'" \
+   && echo "$OUT" | grep -q "retrograde" && echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T83 manifeste périmé + tools: Read, Reed, --strict → rc=0, warning suffixé retrograde, MANIFESTE-PERIME"
+else
+  ko "T83 (rc=$RC) : $OUT"
+fi
+T83_FRAIS_DIR="$(mk_gate_dir "$WORK/t83-frais" 0)"
+OUT="$(bash "$T83_FRAIS_DIR/check-agents.sh" --strict --agents-dir="$T83_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && ! echo "$OUT" | grep -q "retrograde"; then
+  ok "T83 (jumeau frais) même agent, manifeste frais, --strict → rc=1 sans retrograde"
+else
+  ko "T83 (jumeau frais, rc=$RC) : $OUT"
+fi
+
+# T84 — INDÉTERMINÉ (D-04) sous --manifest-freshness=strict seulement ; jamais « ✓ agents conformes »
+T84_PERIME_DIR="$(mk_gate_dir "$WORK/t84-perime" "$PERIME_AGE")"
+OUT="$(bash "$T84_PERIME_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "INDETERMINE" && echo "$OUT" | grep -q "MANIFESTE-PERIME" \
+   && ! echo "$OUT" | grep -q "agents conformes"; then
+  ok "T84 périmé + --manifest-freshness=strict + agent conforme → rc=3 INDETERMINE MANIFESTE-PERIME, jamais « ✓ agents conformes »"
+else
+  ko "T84 (rc=$RC) : $OUT"
+fi
+T84_FRAIS_DIR="$(mk_gate_dir "$WORK/t84-frais" 0)"
+OUT="$(bash "$T84_FRAIS_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then
+  ok "T84 (jumeau frais) même option, manifeste frais → rc=0"
+else
+  ko "T84 (jumeau frais, rc=$RC) : $OUT"
+fi
+OUT="$(bash "$T84_PERIME_DIR/check-agents.sh" --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-PERIME" && ! echo "$OUT" | grep -q "✗"; then
+  ok "T84 périmé SANS option → rc=0, MANIFESTE-PERIME présent, aucun ✗"
+else
+  ko "T84 (sans option, rc=$RC) : $OUT"
+fi
+
+# T85 — bornes exactes (age == valide_jours vs valide_jours + 1), y compris valide_jours custom
+T85_EQ_DIR="$(mk_gate_dir "$WORK/t85-eq" 30)"
+OUT="$(bash "$T85_EQ_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T85 âge = valide_jours (30) → rc=0, aucun MANIFESTE-PERIME"
+else
+  ko "T85 (âge=valide_jours, rc=$RC) : $OUT"
+fi
+T85_PLUS1_DIR="$(mk_gate_dir "$WORK/t85-plus1" 31)"
+OUT="$(bash "$T85_PLUS1_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "T85 âge = valide_jours + 1 (31) → rc=3" || ko "T85 (âge=valide_jours+1, rc=$RC) : $OUT"
+T85_V5_EQ_DIR="$(mk_gate_dir "$WORK/t85-v5-eq" 5 "valide-jours=5")"
+OUT="$(bash "$T85_V5_EQ_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "T85 valide-jours=5, âge=5 → rc=0" || ko "T85 (valide-jours=5 âge=5, rc=$RC) : $OUT"
+T85_V5_PLUS1_DIR="$(mk_gate_dir "$WORK/t85-v5-plus1" 6 "valide-jours=5")"
+OUT="$(bash "$T85_V5_PLUS1_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "T85 valide-jours=5, âge=6 → rc=3" || ko "T85 (valide-jours=5 âge=6, rc=$RC) : $OUT"
+
+# T86 — date-future (T-42-13) : une seule liste forgée dans le futur, les autres du jour
+T86_STRICT_DIR="$(mk_gate_dir "$WORK/t86-strict" 0 "date-future=outils")"
+OUT="$(bash "$T86_STRICT_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "DATE-FUTURE"; then
+  ok "T86 date-future=outils (autres listes du jour) + option strict → rc=3, DATE-FUTURE"
+else
+  ko "T86 (strict, rc=$RC) : $OUT"
+fi
+T86_SANS_DIR="$(mk_gate_dir "$WORK/t86-sans" 0 "date-future=outils")"
+OUT="$(bash "$T86_SANS_DIR/check-agents.sh" --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T86 date-future=outils sans option → rc=0, MANIFESTE-PERIME"
+else
+  ko "T86 (sans option, rc=$RC) : $OUT"
+fi
+
+# T87 — --hook (silence total sous manifeste frais, jamais sous manifeste périmé) + cible vide
+T87_PERIME_DIR="$(mk_gate_dir "$WORK/t87-perime" "$PERIME_AGE")"
+T87_AG="$WORK/t87-ag"; mkdir -p "$T87_AG"
+cat > "$T87_AG/agent-t87.md" <<'EOF'
+---
+name: agent-t87
+description: Agent entierement conforme (skills declare), pour prouver le silence total sous --hook.
+tools: Read
+disallowedTools: Write, Edit
+omitClaudeMd: true
+model: sonnet
+memory: project
+effort: low
+skills:
+  - petit-skill
+---
+corps
+EOF
+OUT="$(bash "$T87_PERIME_DIR/check-agents.sh" --hook --agents-dir="$T87_AG" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T87 --hook, périmé + agent conforme (skills déclaré) → rc=0, sortie contenant MANIFESTE-PERIME"
+else
+  ko "T87 (hook périmé, rc=$RC) : '$OUT'"
+fi
+T87_FRAIS_DIR="$(mk_gate_dir "$WORK/t87-frais" 0)"
+OUT="$(bash "$T87_FRAIS_DIR/check-agents.sh" --hook --agents-dir="$T87_AG" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && [ -z "$OUT" ]; then
+  ok "T87 --hook, frais + même agent → sortie vide"
+else
+  ko "T87 (hook frais, rc=$RC) : '$OUT'"
+fi
+T87_VIDE_AG="$WORK/t87-vide"; mkdir -p "$T87_VIDE_AG"
+OUT="$(bash "$T87_PERIME_DIR/check-agents.sh" --strict --agents-dir="$T87_VIDE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && ! echo "$OUT" | grep -q "MANIFESTE-PERIME"; then
+  ok "T87 dossier vide + --strict + périmé → rc=3 sans MANIFESTE-PERIME (fraîcheur non évaluée)"
+else
+  ko "T87 (dossier vide, rc=$RC) : $OUT"
+fi
+
+# T88 — Pitfall 3 : model/memory/effort invalides restent bloquants même sous manifeste périmé
+T88_DIR="$(mk_gate_dir "$WORK/t88" "$PERIME_AGE")"
+T88_AG="$WORK/t88-ag"; mkdir -p "$T88_AG"
+cat > "$T88_AG/agent-t88.md" <<'EOF'
+---
+name: agent-t88
+description: Agent aux enums invalides, pour prouver que model/memory/effort restent bloquants meme sous manifeste perime.
+model: gpt-4
+memory: global
+effort: extreme
+---
+corps
+EOF
+OUT="$(bash "$T88_DIR/check-agents.sh" --agents-dir="$T88_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "model invalide" && echo "$OUT" | grep -q "memory invalide" \
+   && echo "$OUT" | grep -q "effort invalide"; then
+  ok "T88 (Pitfall 3) manifeste périmé + model/memory/effort invalides → rc=1, les trois restent bloquants"
+else
+  ko "T88 (rc=$RC) : $OUT"
+fi
+
+# T89 — --resolve-agents=strict + allowlist non résolue (registre de T30) : rétrogradée si périmé
+T89_PERIME_DIR="$(mk_gate_dir "$WORK/t89-perime" "$PERIME_AGE")"
+T89_AG="$WORK/t89-ag"; mkdir -p "$T89_AG"
+cat > "$T89_AG/agent-t89.md" <<'EOF'
+---
+name: agent-t89
+description: Agent qui declare une allowlist non resolue, pour prouver la retrogradation D-05 sous --resolve-agents=strict.
+tools: Read, SendMessage, Agent(vf-codeur)
+disallowedTools: Write, Edit
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+OUT="$(bash "$T89_PERIME_DIR/check-agents.sh" --resolve-agents=strict --agent-registry-dir="$REG" --agents-dir="$T89_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "non resolu" && echo "$OUT" | grep -q "retrograde"; then
+  ok "T89 périmé + --resolve-agents=strict + allowlist non résolue (registre T30) → rc=0, non resolu + retrograde"
+else
+  ko "T89 (rc=$RC) : $OUT"
+fi
+T89_FRAIS_DIR="$(mk_gate_dir "$WORK/t89-frais" 0)"
+OUT="$(bash "$T89_FRAIS_DIR/check-agents.sh" --resolve-agents=strict --agent-registry-dir="$REG" --agents-dir="$T89_AG" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "T89 (jumeau frais) même allowlist, manifeste frais → rc=1" || ko "T89 (jumeau frais, rc=$RC) : $OUT"
+
+# T90 — garde d'écriture : laisse passer sous manifeste périmé, refuse sous manifeste frais ;
+# --manifest-freshness=<valeur inconnue> → rc=1 explicite, jamais un repli muet
+T90_PERIME_DIR="$(mk_gate_dir "$WORK/t90-perime" "$PERIME_AGE")"
+T90_FRAIS_DIR="$(mk_gate_dir "$WORK/t90-frais" 0)"
+T90_SRC="$WORK/t90-reed-src.md"
+cat > "$T90_SRC" <<'EOF'
+---
+name: agent-t90
+description: Agent qui declare l'outil Reed (typo), pour prouver le comportement de la garde sous manifeste perime.
+tools: Read, Reed
+disallowedTools: Write, Edit
+omitClaudeMd: true
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+mkdir -p "$WORK/t90-lab/.claude/agents"
+OUT_GUARD="$(payload_write "$WORK/t90-lab/.claude/agents/agent-t90.md" "$T90_SRC" | ( cd "$WORK/t90-lab" && bash "$T90_PERIME_DIR/guard-agent-write.sh" 2>/dev/null ))"
+if [ -z "$OUT_GUARD" ]; then
+  ok "T90 garde : dossier de gate périmé + tools: Read, Reed → sortie vide (laisse passer)"
+else
+  ko "T90 (garde périmé) sortie non vide : $OUT_GUARD"
+fi
+OUT_GUARD="$(payload_write "$WORK/t90-lab/.claude/agents/agent-t90.md" "$T90_SRC" | ( cd "$WORK/t90-lab" && bash "$T90_FRAIS_DIR/guard-agent-write.sh" 2>/dev/null ))"
+if echo "$OUT_GUARD" | grep -q "outil hors du set connu"; then
+  ok "T90 garde : dossier frais → refus JSON citant « outil hors du set connu »"
+else
+  ko "T90 (garde frais) sortie : $OUT_GUARD"
+fi
+OUT="$(bash "$T90_FRAIS_DIR/check-agents.sh" --manifest-freshness=stricte --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q -- "--manifest-freshness invalide"; then
+  ok "T90 --manifest-freshness=stricte (typo) → rc=1, « --manifest-freshness invalide »"
+else
+  ko "T90 (option invalide, rc=$RC) : $OUT"
+fi
+
+# ---------- MUT-F1/MUT-F2/MUT-D20 : mutation QUAL-01 (fraîcheur + D-20) ----------
+
+# MUT-F1 — perimees = manifeste_perime( → perimees = [] (fixture T84) : rc_orig=3, rc_mut=0
+MUT_F1_DIR="$(make_gate_mutant F1 "$PERIME_AGE" 'perimees = manifeste_perime(' 'perimees = []')"
+MUT_F1_RC=$?
+if [ "$MUT_F1_RC" -eq 0 ]; then
+  MUT_F1_ORIG_DIR="$(mk_gate_dir "$WORK/mut-F1-orig" "$PERIME_AGE")"
+  RC_ORIG=0; bash "$MUT_F1_ORIG_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_F1_DIR/check-agents.sh" --manifest-freshness=strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_MUT" -eq 0 ] && [ "$RC_ORIG" -eq 3 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut F1 "$RC_MUT" 0 "$RC_ORIG" 3
+  else
+    komut F1 "rc_mutant=0 et rc_original=3, sans Traceback" "rc_mutant=0, rc_original=3" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# MUT-F2 — retrograder = bool(perimees) → retrograder = False (fixture T83) : rc_orig=0, rc_mut=1
+MUT_F2_DIR="$(make_gate_mutant F2 "$PERIME_AGE" 'retrograder = bool(perimees)' 'retrograder = False')"
+MUT_F2_RC=$?
+if [ "$MUT_F2_RC" -eq 0 ]; then
+  MUT_F2_ORIG_DIR="$(mk_gate_dir "$WORK/mut-F2-orig" "$PERIME_AGE")"
+  MUT_F2_AG="$WORK/mut-F2-ag"; mkdir -p "$MUT_F2_AG"
+  cat > "$MUT_F2_AG/agent-mutf2.md" <<'EOF'
+---
+name: agent-mutf2
+description: Agent qui declare l'outil Reed (typo), fixture de mutation MUT-F2.
+tools: Read, Reed
+disallowedTools: Write, Edit
+omitClaudeMd: true
+model: sonnet
+memory: project
+effort: low
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_F2_ORIG_DIR/check-agents.sh" --strict --agents-dir="$MUT_F2_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_F2_DIR/check-agents.sh" --strict --agents-dir="$MUT_F2_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 0 ] && [ "$RC_MUT" -eq 1 ] && echo "$OUT_MUT" | grep -q "outil hors du set connu" \
+     && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut F2 "$RC_MUT" 1 "$RC_ORIG" 0
+  else
+    komut F2 "rc_mutant=1 et rc_original=0, sortie mutant avec outil hors du set connu, sans Traceback" "rc_mutant=1, rc_original=0" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# MUT-D20 (CORRECTIF DE REVUE, mission revise-42c) — cible_absente = (not single) and not
+# os.path.isdir(agents_dir) → cible_absente = False (fixture T103, rejouée nue) : rc_orig=3,
+# rc_mut=0. Posé ici (42-04) : les helpers de mutation n'existent qu'à partir de cette tâche —
+# 42-01 (vague 1) ne pouvait pas les présupposer.
+MUT_D20_DIR="$(make_gate_mutant D20 0 'cible_absente = (not single) and not os.path.isdir(agents_dir)' 'cible_absente = False')"
+MUT_D20_RC=$?
+if [ "$MUT_D20_RC" -eq 0 ]; then
+  MUT_D20_ORIG_DIR="$(mk_gate_dir "$WORK/mut-D20-orig" 0)"
+  MUT_D20_ABSENT_ORIG="$(mktemp -d)"
+  RC_ORIG=0; ( cd "$MUT_D20_ABSENT_ORIG" && bash "$MUT_D20_ORIG_DIR/check-agents.sh" ) >/dev/null 2>&1 || RC_ORIG=$?
+  rm -rf "$MUT_D20_ABSENT_ORIG"
+  MUT_D20_ABSENT_MUT="$(mktemp -d)"
+  OUT_MUT="$( cd "$MUT_D20_ABSENT_MUT" && bash "$MUT_D20_DIR/check-agents.sh" 2>&1 )"; RC_MUT=$?
+  rm -rf "$MUT_D20_ABSENT_MUT"
+  if [ "$RC_ORIG" -eq 3 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut D20 "$RC_MUT" 0 "$RC_ORIG" 3
+  else
+    komut D20 "rc_mutant=0 et rc_original=3, sans Traceback" "rc_mutant=0, rc_original=3" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
 # ---------- T72 : assertion sur l'arbre REEL (pas une fixture) — WINDOWS #1 ----------
 # team-kernel.md affirmait l'anti-triche P12 "verifie par les suites de test de chaque module" —
 # faux (aucune suite de module n'y touche, cf. team-kernel.md ligne 23 corrigee). Le seul
@@ -1496,6 +2325,1230 @@ else
     ok "T72 arbre reel : $T72_N agent(s) memory:+tools: sans Write/Edit, tous barres par disallowedTools: Write, Edit"
   else
     ko "T72 arbre reel : disallowedTools: Write, Edit manquant sur :$T72_BAD"
+  fi
+fi
+
+# ---------- T91/T91b : invariant I1 (D-06, D-18) — Phase 42, FABR-03, 42-05 Tache 1 ----------
+cat > "$AG/i1-les-deux.md" <<'EOF'
+---
+name: i1-les-deux
+description: Agent de test. Worker interne de la boucle, dispatche uniquement par un manager.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91 vf-internal: true + marqueur present -> rc=0, aucun invariant I1"
+else
+  ko "T91 (les deux presents, rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-les-deux.md"
+
+cat > "$AG/i1-aucun.md" <<'EOF'
+---
+name: i1-aucun
+description: Agent de test tout ce qu il y a de plus normal, sans aucun marqueur particulier.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91 aucun des deux (ni vf-internal, ni marqueur) -> rc=0, aucun invariant I1"
+else
+  ko "T91 (aucun, rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-aucun.md"
+
+cat > "$AG/i1-internal-sans-marqueur.md" <<'EOF'
+---
+name: i1-internal-sans-marqueur
+description: Agent de test interne mais dont la description ne porte pas le marqueur attendu.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91 vf-internal: true sans marqueur -> rc=1, invariant I1"
+else
+  ko "T91 (internal sans marqueur, rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-internal-sans-marqueur.md"
+
+cat > "$AG/i1-marqueur-sans-internal.md" <<'EOF'
+---
+name: i1-marqueur-sans-internal
+description: Agent de test. Worker interne de la boucle, dispatche uniquement par un manager.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91 marqueur sans vf-internal: true -> rc=1, invariant I1"
+else
+  ko "T91 (marqueur sans internal, rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-marqueur-sans-internal.md"
+
+# T91 — mutation reelle sur le porteur reel de I1 (vf-test-runner.md) : le marqueur perd
+# « interne » apres « Worker » -> rouge (invariant I1) ; copie restauree -> verte.
+T91_CARRIER="$REPO_ROOT/plugin/mobile-test-team/agents/vf-test-runner.md"
+if [ -f "$T91_CARRIER" ]; then
+  T91_ORIG_DIR="$WORK/t91-original"; T91_MUT_DIR="$WORK/t91-mutant"
+  mkdir -p "$T91_ORIG_DIR" "$T91_MUT_DIR"
+  T91_BASE="$(basename "$T91_CARRIER")"
+  cp "$T91_CARRIER" "$T91_ORIG_DIR/$T91_BASE"
+  sed 's/Worker interne/Worker/' "$T91_CARRIER" > "$T91_MUT_DIR/$T91_BASE"
+  juger_mutation_reelle "T91" "$T91_ORIG_DIR/$T91_BASE" "$T91_MUT_DIR/$T91_BASE" "invariant I1"
+else
+  ko "T91 mutation reelle : porteur introuvable ($T91_CARRIER)"
+fi
+
+# T91b (D-18) — forme a DEUX dispatcheurs nommes, description REELLE de vf-test-orchestrator
+# (posee en 42-02) : tolerance du gate a cette formulation, jamais un decompte de dispatcheurs.
+cat > "$AG/i1-deux-dispatcheurs.md" <<'EOF'
+---
+name: i1-deux-dispatcheurs
+description: "Orchestrateur de test. Worker interne — dispatché par vf-dev-manager ou par le mode autonome (vf-auto) sur ce type de projet, pas en usage direct."
+model: sonnet
+effort: high
+memory: project
+vf-internal: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91b forme a deux dispatcheurs nommes (D-18) + vf-internal: true -> rc=0, aucun invariant I1"
+else
+  ko "T91b (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-deux-dispatcheurs.md"
+
+cat > "$AG/i1-deux-dispatcheurs-negatif.md" <<'EOF'
+---
+name: i1-deux-dispatcheurs-negatif
+description: "Orchestrateur de test. Worker interne — dispatché par vf-dev-manager ou par le mode autonome (vf-auto) sur ce type de projet, pas en usage direct."
+model: sonnet
+effort: high
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I1"; then
+  ok "T91b jumeau negatif (meme description, sans vf-internal: true) -> rc=1, invariant I1"
+else
+  ko "T91b-negatif (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i1-deux-dispatcheurs-negatif.md"
+
+# ---------- T92 : invariant I4 — disallowedTools sans specifieur (Phase 42, FABR-03) ----------
+cat > "$AG/i4-specifier.md" <<'EOF'
+---
+name: i4-specifier
+description: Agent de test qui restreint disallowedTools avec un specifieur au lieu de le retirer.
+model: sonnet
+effort: low
+memory: project
+tools: Read, Write, Edit, Bash
+disallowedTools: Bash(rm:*)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I4"; then
+  ok "T92 disallowedTools: Bash(rm:*) (specifieur) -> rc=1, invariant I4"
+else
+  ko "T92 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i4-specifier.md"
+
+cat > "$AG/i4-clean.md" <<'EOF'
+---
+name: i4-clean
+description: Agent de test dont disallowedTools retire l outil entier, sans specifieur.
+model: sonnet
+effort: low
+memory: project
+tools: Read, Write, Edit, Bash
+disallowedTools: Bash
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I4"; then
+  ok "T92 disallowedTools: Bash (sans specifieur) -> rc=0, aucun invariant I4"
+else
+  ko "T92-jumeau (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i4-clean.md"
+
+# ---------- T95 : invariant I7 — vf-mcp-* exige vf-requires: mcp-servers (Phase 42, FABR-03) ----
+cat > "$AG/i7-sans-requires.md" <<'EOF'
+---
+name: i7-sans-requires
+description: Agent de test qui declare vf-mcp-consumer sans vf-requires correspondant.
+model: sonnet
+effort: low
+memory: project
+vf-mcp-consumer: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I7"; then
+  ok "T95 vf-mcp-consumer: true sans vf-requires -> rc=1, invariant I7"
+else
+  ko "T95 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i7-sans-requires.md"
+
+cat > "$AG/i7-requires-autre.md" <<'EOF'
+---
+name: i7-requires-autre
+description: Agent de test qui declare vf-mcp-consumer avec vf-requires ne citant pas mcp-servers.
+model: sonnet
+effort: low
+memory: project
+vf-mcp-consumer: true
+vf-requires: autre-chose
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I7"; then
+  ok "T95 vf-requires: autre-chose (sans mcp-servers) -> rc=1, invariant I7"
+else
+  ko "T95-autre (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i7-requires-autre.md"
+
+cat > "$AG/i7-ok.md" <<'EOF'
+---
+name: i7-ok
+description: Agent de test qui declare vf-mcp-tools avec vf-requires citant mcp-servers.
+model: sonnet
+effort: low
+memory: project
+vf-mcp-tools: XcodeBuildMCP:build_sim
+vf-requires: mcp-servers
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I7"; then
+  ok "T95 vf-mcp-tools + vf-requires: mcp-servers -> rc=0, aucun invariant I7"
+else
+  ko "T95-ok (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i7-ok.md"
+
+# T95 — mutation reelle sur le porteur reel de I7 (vf-test-runner.md) : la ligne vf-requires
+# disparait -> rouge (invariant I7) ; copie restauree -> verte.
+if [ -f "$T91_CARRIER" ]; then
+  T95_ORIG_DIR="$WORK/t95-original"; T95_MUT_DIR="$WORK/t95-mutant"
+  mkdir -p "$T95_ORIG_DIR" "$T95_MUT_DIR"
+  T95_BASE="$(basename "$T91_CARRIER")"
+  cp "$T91_CARRIER" "$T95_ORIG_DIR/$T95_BASE"
+  grep -v '^vf-requires:' "$T91_CARRIER" > "$T95_MUT_DIR/$T95_BASE"
+  juger_mutation_reelle "T95" "$T95_ORIG_DIR/$T95_BASE" "$T95_MUT_DIR/$T95_BASE" "invariant I7"
+else
+  ko "T95 mutation reelle : porteur introuvable ($T91_CARRIER)"
+fi
+
+# ---------- MUT-I1 / MUT-I4 / MUT-I7 : mutants QUAL-01 sur les lignes d'appel (Tache 1, 42-05) --
+MUT_I1_DIR="$(make_gate_mutant I1 0 'errors.extend(invariant_i1(' 'pass')"
+MUT_I1_RC=$?
+if [ "$MUT_I1_RC" -eq 0 ]; then
+  MUT_I1_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I1-orig" 0)"
+  MUT_I1_AG="$WORK/mut-I1-ag"; mkdir -p "$MUT_I1_AG"
+  cat > "$MUT_I1_AG/agent-muti1.md" <<'EOF'
+---
+name: agent-muti1
+description: Agent de test interne mais sans le marqueur attendu, fixture de mutation MUT-I1.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I1_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I1_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I1_DIR/check-agents.sh" --agents-dir="$MUT_I1_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I1 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I1 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+MUT_I4_DIR="$(make_gate_mutant I4 0 'errors.extend(invariant_i4(' 'pass')"
+MUT_I4_RC=$?
+if [ "$MUT_I4_RC" -eq 0 ]; then
+  MUT_I4_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I4-orig" 0)"
+  MUT_I4_AG="$WORK/mut-I4-ag"; mkdir -p "$MUT_I4_AG"
+  cat > "$MUT_I4_AG/agent-muti4.md" <<'EOF'
+---
+name: agent-muti4
+description: Agent de test dont disallowedTools porte un specifieur, fixture de mutation MUT-I4.
+model: sonnet
+effort: low
+memory: project
+tools: Read, Write, Edit, Bash
+disallowedTools: Bash(rm:*)
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I4_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I4_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I4_DIR/check-agents.sh" --agents-dir="$MUT_I4_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I4 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I4 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+MUT_I7_DIR="$(make_gate_mutant I7 0 'errors.extend(invariant_i7(' 'pass')"
+MUT_I7_RC=$?
+if [ "$MUT_I7_RC" -eq 0 ]; then
+  MUT_I7_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I7-orig" 0)"
+  MUT_I7_AG="$WORK/mut-I7-ag"; mkdir -p "$MUT_I7_AG"
+  cat > "$MUT_I7_AG/agent-muti7.md" <<'EOF'
+---
+name: agent-muti7
+description: Agent de test qui declare vf-mcp-consumer sans vf-requires, fixture de mutation MUT-I7.
+model: sonnet
+effort: low
+memory: project
+vf-mcp-consumer: true
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I7_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I7_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I7_DIR/check-agents.sh" --agents-dir="$MUT_I7_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I7 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I7 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- T94 : invariant I6 — manager (allowlist Agent(...) non vide, non vf-internal) sans
+# SendMessage (D-07, TOUJOURS arme, Phase 42, FABR-03, 42-05 Tache 3) ----------
+cat > "$AG/i6-sans-sendmessage.md" <<'EOF'
+---
+name: i6-sans-sendmessage
+description: Agent de test manager (allowlist non vide) sans SendMessage dans tools.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Write, Agent(worker-a, worker-b)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I6"; then
+  ok "T94 manager sans SendMessage -> rc=1, invariant I6"
+else
+  ko "T94 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i6-sans-sendmessage.md"
+
+cat > "$AG/i6-avec-sendmessage.md" <<'EOF'
+---
+name: i6-avec-sendmessage
+description: Agent de test manager (allowlist non vide) avec SendMessage dans tools.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Write, SendMessage, Agent(worker-a, worker-b)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I6"; then
+  ok "T94 manager avec SendMessage -> rc=0, aucun invariant I6"
+else
+  ko "T94-avec (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i6-avec-sendmessage.md"
+
+cat > "$AG/i6-interne.md" <<'EOF'
+---
+name: i6-interne
+description: Agent de test. Worker interne, dispatche uniquement par un manager du team-kernel.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Write, Agent(worker-a, worker-b)
+vf-internal: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I6"; then
+  ok "T94 allowlist + vf-internal: true + marqueur -> rc=0, aucun invariant I6"
+else
+  ko "T94-interne (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i6-interne.md"
+
+cat > "$AG/i6-agent-nu.md" <<'EOF'
+---
+name: i6-agent-nu
+description: Agent de test declarant Agent sans aucune allowlist parenthesee (dispatch nu).
+model: sonnet
+effort: high
+memory: project
+tools: Read, Agent
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I6"; then
+  ok "T94 Agent nu (sans allowlist) -> rc=0, aucun invariant I6"
+else
+  ko "T94-nu (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i6-agent-nu.md"
+
+# T94 — mutation reelle sur le porteur reel de I6 (vf-business-manager.md) : le jeton
+# SendMessage disparait -> rouge (invariant I6) ; copie restauree -> verte.
+T94_CARRIER="$REPO_ROOT/plugin/business-pilot-bundle/agents/vf-business-manager.md"
+if [ -f "$T94_CARRIER" ]; then
+  T94_ORIG_DIR="$WORK/t94-original"; T94_MUT_DIR="$WORK/t94-mutant"
+  mkdir -p "$T94_ORIG_DIR" "$T94_MUT_DIR"
+  T94_BASE="$(basename "$T94_CARRIER")"
+  cp "$T94_CARRIER" "$T94_ORIG_DIR/$T94_BASE"
+  sed 's/SendMessage, //' "$T94_CARRIER" > "$T94_MUT_DIR/$T94_BASE"
+  juger_mutation_reelle "T94" "$T94_ORIG_DIR/$T94_BASE" "$T94_MUT_DIR/$T94_BASE" "invariant I6"
+else
+  ko "T94 mutation reelle : porteur introuvable ($T94_CARRIER)"
+fi
+
+# ---------- MUT-I6 : mutant QUAL-01 sur la ligne d'appel invariant_i6 (TOUJOURS) ----------
+MUT_I6_DIR="$(make_gate_mutant I6 0 'errors.extend(invariant_i6(' 'pass')"
+MUT_I6_RC=$?
+if [ "$MUT_I6_RC" -eq 0 ]; then
+  MUT_I6_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I6-orig" 0)"
+  MUT_I6_AG="$WORK/mut-I6-ag"; mkdir -p "$MUT_I6_AG"
+  cat > "$MUT_I6_AG/agent-muti6.md" <<'EOF'
+---
+name: agent-muti6
+description: Agent de test manager sans SendMessage, fixture de mutation MUT-I6.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Write, Agent(worker-a, worker-b)
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I6_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I6_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I6_DIR/check-agents.sh" --agents-dir="$MUT_I6_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I6 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I6 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- Precondition de la Tache 3 : rejeu de la sonde ARBITRAGE-* (D-19/D-08) ----------
+# Jamais relue en prose seule — decide si T93/MUT-I5 s'executent (branche MAINTENIR uniquement).
+D19_MESURE_PATH="$REPO_ROOT/.planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/42-D19-MESURE.md"
+ARBITRAGE_VERDICT="$("$PYBIN" -c "
+import re, sys, unicodedata
+p = sys.argv[1]
+try:
+    s = unicodedata.normalize('NFC', open(p, encoding='utf-8').read())
+except FileNotFoundError:
+    print('ARBITRAGE-ABSENT'); sys.exit(1)
+sec = re.search(r'^##\s+Arbitrage D-08\b(.*?)(?=\n##\s|\Z)', s, re.S | re.M)
+if not sec:
+    print('ARBITRAGE-ABSENT'); sys.exit(1)
+m = re.search(r'\*\*D.cision\s*:\*\*\s*(maintenir|renoncer)\b.*?\*\*Canal\s*:\*\*\s*(\S.*?)\s*\n.*?\*\*Date\s*:\*\*\s*(\d{4}-\d{2}-\d{2})', sec.group(1), re.S)
+if not m:
+    print('ARBITRAGE-ABSENT'); sys.exit(1)
+print('ARBITRAGE-' + m.group(1).upper()); sys.exit(0)
+" "$D19_MESURE_PATH")"
+ARBITRAGE_RC=$?
+
+if [ "$ARBITRAGE_VERDICT" = "ARBITRAGE-MAINTENIR" ]; then
+  # ---------- T93 : invariant I5 — juge (disallowedTools retire Write/Edit, aucune allowlist)
+  # sans omitClaudeMd: true (D-08, SEULEMENT SI ARBITRAGE-MAINTENIR) ----------
+  cat > "$AG/i5-sans-omit.md" <<'EOF'
+---
+name: i5-sans-omit
+description: Agent de test juge (disallowedTools retire Write/Edit) sans omitClaudeMd.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+---
+corps
+EOF
+  OUT="$(run_check 2>&1)"; RC=$?
+  if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I5"; then
+    ok "T93 juge sans omitClaudeMd -> rc=1, invariant I5"
+  else
+    ko "T93 (rc=$RC) : $OUT"
+  fi
+  rm -f "$AG/i5-sans-omit.md"
+
+  cat > "$AG/i5-avec-omit.md" <<'EOF'
+---
+name: i5-avec-omit
+description: Agent de test juge (disallowedTools retire Write/Edit) avec omitClaudeMd: true.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+corps
+EOF
+  OUT="$(run_check 2>&1)"; RC=$?
+  if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I5"; then
+    ok "T93 juge avec omitClaudeMd: true -> rc=0, aucun invariant I5"
+  else
+    ko "T93-avec (rc=$RC) : $OUT"
+  fi
+  rm -f "$AG/i5-avec-omit.md"
+
+  cat > "$AG/i5-forme-reviewer.md" <<'EOF'
+---
+name: i5-forme-reviewer
+description: Agent de test. Worker interne, forme vf-reviewer (allowlist Agent non vide + disallowedTools Write, Edit).
+model: sonnet
+effort: high
+memory: project
+tools: Read, Bash, Glob, Grep, Agent(outil-tiers)
+disallowedTools: Write, Edit
+vf-internal: true
+---
+corps
+EOF
+  OUT="$(run_check 2>&1)"; RC=$?
+  if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I5"; then
+    ok "T93 forme vf-reviewer (allowlist non vide) -> rc=0, aucun invariant I5 (hors classe juge)"
+  else
+    ko "T93-reviewer (rc=$RC) : $OUT"
+  fi
+  rm -f "$AG/i5-forme-reviewer.md"
+
+  # T93 — mutation reelle sur le porteur reel de I5 (content-clarity-judge.md, deja porteur
+  # d'omitClaudeMd: true depuis cette meme tache 42-05) : la ligne omitClaudeMd disparait
+  # -> rouge (invariant I5) ; copie restauree -> verte.
+  T93_CARRIER="$REPO_ROOT/plugin/content-bundle/agents/content-clarity-judge.md"
+  if [ -f "$T93_CARRIER" ] && grep -q '^omitClaudeMd: true' "$T93_CARRIER"; then
+    T93_ORIG_DIR="$WORK/t93-original"; T93_MUT_DIR="$WORK/t93-mutant"
+    mkdir -p "$T93_ORIG_DIR" "$T93_MUT_DIR"
+    T93_BASE="$(basename "$T93_CARRIER")"
+    cp "$T93_CARRIER" "$T93_ORIG_DIR/$T93_BASE"
+    grep -v '^omitClaudeMd: true' "$T93_CARRIER" > "$T93_MUT_DIR/$T93_BASE"
+    juger_mutation_reelle "T93" "$T93_ORIG_DIR/$T93_BASE" "$T93_MUT_DIR/$T93_BASE" "invariant I5"
+  else
+    ko "T93 mutation reelle : porteur introuvable ou sans omitClaudeMd ($T93_CARRIER)"
+  fi
+
+  # ---------- MUT-I5 : mutant QUAL-01 sur la ligne d'appel invariant_i5 (SEULEMENT SI MAINTENIR) ----------
+  MUT_I5_DIR="$(make_gate_mutant I5 0 'errors.extend(invariant_i5(' 'pass')"
+  MUT_I5_RC=$?
+  if [ "$MUT_I5_RC" -eq 0 ]; then
+    MUT_I5_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I5-orig" 0)"
+    MUT_I5_AG="$WORK/mut-I5-ag"; mkdir -p "$MUT_I5_AG"
+    cat > "$MUT_I5_AG/agent-muti5.md" <<'EOF'
+---
+name: agent-muti5
+description: Agent de test juge sans omitClaudeMd, fixture de mutation MUT-I5.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+---
+corps
+EOF
+    RC_ORIG=0; bash "$MUT_I5_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I5_AG" >/dev/null 2>&1 || RC_ORIG=$?
+    OUT_MUT="$(bash "$MUT_I5_DIR/check-agents.sh" --agents-dir="$MUT_I5_AG" 2>&1)"; RC_MUT=$?
+    if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+      okmut I5 "$RC_MUT" 0 "$RC_ORIG" 1
+    else
+      komut I5 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+    fi
+  fi
+else
+  echo "  (info) T93/MUT-I5 non executes : sonde ARBITRAGE-* = $ARBITRAGE_VERDICT (rc=$ARBITRAGE_RC), attendu ARBITRAGE-MAINTENIR"
+fi
+
+# ---------- T96 : corpus reel + check-blueprints.sh (TOUJOURS, adapte a la branche) ----------
+T96_FAIL=0
+T96_DIRS_FOUND=0
+for d in "$REPO_ROOT"/plugin/*/agents; do
+  [ -d "$d" ] || continue
+  T96_DIRS_FOUND=$((T96_DIRS_FOUND+1))
+  OUT_T96="$(bash "$REAL_CHECK" --strict --skills-dir="$WORK/no-such-skills-dir" --agents-dir="$d" 2>&1)"; RC_T96=$?
+  if [ "$RC_T96" -ne 0 ] || echo "$OUT_T96" | grep -q "invariant I6"; then
+    T96_FAIL=1
+    ko "T96 corpus reel ($d) : invariant I6 ou rc!=0 -> $OUT_T96"
+  fi
+  if [ "$ARBITRAGE_VERDICT" = "ARBITRAGE-MAINTENIR" ] && echo "$OUT_T96" | grep -q "invariant I5"; then
+    T96_FAIL=1
+    ko "T96 corpus reel ($d) : invariant I5 inattendu -> $OUT_T96"
+  fi
+done
+if [ "$T96_DIRS_FOUND" -lt 6 ]; then
+  T96_FAIL=1
+  ko "T96 anti-vert-a-vide : seulement $T96_DIRS_FOUND dossier(s) plugin/*/agents decouvert(s), attendu >= 6"
+fi
+for f in "$REPO_ROOT"/plugin/*/AGENT.md; do
+  [ -f "$f" ] || continue
+  RC_T96F=0; bash "$REAL_CHECK" --strict --file "$f" >/dev/null 2>&1 || RC_T96F=$?
+  if [ "$RC_T96F" -ne 0 ]; then
+    T96_FAIL=1
+    ko "T96 AGENT.md ($f) : rc=$RC_T96F attendu 0"
+  fi
+done
+RC_T96BP=0; bash "$REPO_ROOT/plugin/conductor/scripts/check-blueprints.sh" >/dev/null 2>&1 || RC_T96BP=$?
+if [ "$RC_T96BP" -ne 0 ]; then
+  T96_FAIL=1
+  ko "T96 check-blueprints.sh : rc=$RC_T96BP attendu 0"
+fi
+[ "$T96_FAIL" -eq 0 ] && ok "T96 corpus reel (>= $T96_DIRS_FOUND dossiers) + AGENT.md + check-blueprints.sh -> aucun invariant I6 (I5 si arme), rc=0"
+
+# ---------- T97/T98/T99, MUT-D1, MUT-D2 : decouverte recursive avec exclusions prouvees ----------
+# (Phase 42, FABR-04, D-10, 42-06 Tache 1) ---------------------------------------------------------
+rm -rf "${AG:?}"/*
+
+# T97 — recursion : sous-dossier equipe/sous-agent.md sans model -> rc=1, cite sous-agent.md et
+# "model absent" ; rendu conforme -> rc=0.
+mkdir -p "$AG/equipe"
+cat > "$AG/equipe/sous-agent.md" <<'EOF'
+---
+name: sous-agent
+description: Agent de test place dans un sous-dossier, sans model, pour prouver la recursion.
+effort: low
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "sous-agent.md" && echo "$OUT" | grep -q "model absent"; then
+  ok "T97 decouverte recursive : equipe/sous-agent.md sans model -> rc=1, cite sous-agent.md et model absent"
+else
+  ko "T97 (rc=$RC) : $OUT"
+fi
+cat > "$AG/equipe/sous-agent.md" <<'EOF'
+---
+name: sous-agent
+description: Agent de test place dans un sous-dossier, rendu conforme, pour prouver la recursion.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T97 sous-agent rendu conforme -> rc=0" || ko "T97-conforme (rc=$RC)"
+rm -rf "$AG/equipe"
+
+# T98 — exclusions : agent conforme a la racine + lab-references/lead-knowledge.md (sans
+# frontmatter) + equipe/README.md + .cache/x.md -> rc=0, aucun des trois cite.
+good_agent "racine-t98"
+mkdir -p "$AG/lab-references" "$AG/equipe" "$AG/.cache"
+printf 'contenu de reference, pas un agent\n' > "$AG/lab-references/lead-knowledge.md"
+printf 'pas un agent\n' > "$AG/equipe/README.md"
+printf 'cache, jamais parcouru\n' > "$AG/.cache/x.md"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "lead-knowledge.md" && ! echo "$OUT" | grep -q "README.md" && ! echo "$OUT" | grep -q "x.md"; then
+  ok "T98 exclusions : -references/, README.md en profondeur, dossier cache -> rc=0, aucun cite"
+else
+  ko "T98 (rc=$RC) : $OUT"
+fi
+rm -rf "$AG/lab-references" "$AG/equipe" "$AG/.cache"
+rm -f "$AG/racine-t98.md"
+
+# T99 — resolution : sous-agent interne dispatche depuis equipe/ -> rc=0 sous
+# --resolve-agents=strict, aucun "non resolu" (MEME decouverte pour la cible et la resolution).
+mkdir -p "$AG/equipe"
+cat > "$AG/equipe/sous-agent.md" <<'EOF'
+---
+name: sous-agent
+description: Agent de test. Worker interne, dispatche par un agent racine (T99, recursion).
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+cat > "$AG/racine-t99.md" <<'EOF'
+---
+name: racine-t99
+description: Agent de test racine qui dispatche un sous-agent via la meme decouverte recursive.
+model: sonnet
+effort: high
+memory: project
+tools: Read, SendMessage, Agent(sous-agent)
+disallowedTools: Write, Edit
+---
+corps
+EOF
+OUT="$(run_check --resolve-agents=strict 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -qi "non resolu"; then
+  ok "T99 resolution via la meme decouverte : sous-agent dispatche depuis equipe/ -> rc=0 sous --resolve-agents=strict, aucun 'non resolu'"
+else
+  ko "T99 (rc=$RC) : $OUT"
+fi
+rm -rf "$AG/equipe"
+rm -f "$AG/racine-t99.md"
+
+# ---------- MUT-D1 : elagage des dossiers caches remplace par un elagage total (plus aucune ----------
+# ---------- descente) — fixture T97 : rc_original=1, rc_mutant=0 -------------------------------
+MUT_D1_AG="$WORK/mut-D1-ag"; mkdir -p "$MUT_D1_AG/equipe"
+cat > "$MUT_D1_AG/racine-mutd1.md" <<'EOF'
+---
+name: racine-mutd1
+description: Agent de test racine conforme, fixture de mutation MUT-D1.
+model: sonnet
+effort: low
+memory: project
+skills:
+  - petit-skill
+---
+corps
+EOF
+cat > "$MUT_D1_AG/equipe/sous-agent-mutd1.md" <<'EOF'
+---
+name: sous-agent-mutd1
+description: Agent de test en sous-dossier, sans model, fixture de mutation MUT-D1.
+effort: low
+memory: project
+---
+corps
+EOF
+MUT_D1_DIR="$(make_gate_mutant D1 0 "dirnames[:] = [d for d in dirnames if not d.startswith('.')]" 'dirnames[:] = []')"
+MUT_D1_RC=$?
+if [ "$MUT_D1_RC" -eq 0 ]; then
+  MUT_D1_ORIG_DIR="$(mk_gate_dir "$WORK/mut-D1-orig" 0)"
+  RC_ORIG=0; bash "$MUT_D1_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_D1_AG" --skills-dir="$SK" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_D1_DIR/check-agents.sh" --agents-dir="$MUT_D1_AG" --skills-dir="$SK" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut D1 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut D1 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- MUT-D2 : elagage des dossiers -references neutralise — fixture T98 : ----------
+# ---------- rc_original=0, rc_mutant=1 ----------------------------------------------------------
+MUT_D2_AG="$WORK/mut-D2-ag"; mkdir -p "$MUT_D2_AG/lab-references"
+cat > "$MUT_D2_AG/racine-mutd2.md" <<'EOF'
+---
+name: racine-mutd2
+description: Agent de test racine conforme, fixture de mutation MUT-D2.
+model: sonnet
+effort: low
+memory: project
+skills:
+  - petit-skill
+---
+corps
+EOF
+printf 'contenu de reference, pas un agent, fixture MUT-D2\n' > "$MUT_D2_AG/lab-references/lead-knowledge-mutd2.md"
+MUT_D2_DIR="$(make_gate_mutant D2 0 "dirnames[:] = [d for d in dirnames if not d.endswith('-references')]" 'pass')"
+MUT_D2_RC=$?
+if [ "$MUT_D2_RC" -eq 0 ]; then
+  MUT_D2_ORIG_DIR="$(mk_gate_dir "$WORK/mut-D2-orig" 0)"
+  RC_ORIG=0; bash "$MUT_D2_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_D2_AG" --skills-dir="$SK" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_D2_DIR/check-agents.sh" --agents-dir="$MUT_D2_AG" --skills-dir="$SK" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 0 ] && [ "$RC_MUT" -eq 1 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut D2 "$RC_MUT" 1 "$RC_ORIG" 0
+  else
+    komut D2 "rc_mutant=1 et rc_original=0, sans Traceback" "rc_mutant=1, rc_original=0" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- T100/T101/T102, MUT-I2, MUT-I3 : invariants de monde ferme (Phase 42, FABR-03, ----------
+# ---------- D-09, 42-06 Tache 2) ----------------------------------------------------------------
+rm -rf "${AG:?}"/*
+
+# T100 — I2 : worker vf-internal orphelin (aucune allowlist connue ne le dispatche).
+cat > "$AG/worker-orphelin.md" <<'EOF'
+---
+name: worker-orphelin
+description: Agent de test. Worker interne, orphelin de toute allowlist connue.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+T100_REG="$WORK/t100-registry"; mkdir -p "$T100_REG"
+OUT="$(run_check --resolve-agents=strict --agent-registry-dir="$T100_REG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I2"; then
+  ok "T100 worker vf-internal orphelin sous --resolve-agents=strict -> rc=1, invariant I2"
+else
+  ko "T100 (rc=$RC) : $OUT"
+fi
+
+OUT="$(run_check --agent-registry-dir="$T100_REG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I2"; then
+  ok "T100 sans --resolve-agents=strict -> rc=0, aucun invariant I2"
+else
+  ko "T100-sans-strict (rc=$RC) : $OUT"
+fi
+
+cat > "$T100_REG/manager-orphelin.md" <<'EOF'
+---
+name: manager-orphelin
+description: Agent de test manager qui dispatche worker-orphelin, registre du monde ferme.
+model: sonnet
+effort: high
+memory: project
+tools: Read, SendMessage, Agent(worker-orphelin)
+---
+corps
+EOF
+OUT="$(run_check --resolve-agents=strict --agent-registry-dir="$T100_REG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I2"; then
+  ok "T100 manager du registre dispatche worker-orphelin -> rc=0, aucun invariant I2"
+else
+  ko "T100-avec-manager (rc=$RC) : $OUT"
+fi
+rm -f "$AG/worker-orphelin.md"
+
+# T101 — I3 : worker non interne, expose par erreur par une allowlist du monde ferme.
+cat > "$AG/worker-expose.md" <<'EOF'
+---
+name: worker-expose
+description: Agent de test. Worker non interne, sans marqueur, dispatche par erreur.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+T101_REG="$WORK/t101-registry"; mkdir -p "$T101_REG"
+cat > "$T101_REG/manager-expose.md" <<'EOF'
+---
+name: manager-expose
+description: Agent de test manager qui dispatche worker-expose par erreur, registre du monde ferme.
+model: sonnet
+effort: high
+memory: project
+tools: Read, SendMessage, Agent(worker-expose)
+---
+corps
+EOF
+OUT="$(run_check --resolve-agents=strict --agent-registry-dir="$T101_REG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I3" && echo "$OUT" | grep -q "manager-expose"; then
+  ok "T101 worker expose par une allowlist du monde ferme -> rc=1, invariant I3, nomme manager-expose"
+else
+  ko "T101 (rc=$RC) : $OUT"
+fi
+
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I3"; then
+  ok "T101 sans le monde ferme (pas de --resolve-agents=strict) -> rc=0, aucun invariant I3"
+else
+  ko "T101-sans-monde-ferme (rc=$RC) : $OUT"
+fi
+
+# En lintant le REGISTRE (le manager) avec $AG en registre : jamais d'imputation a un fichier de
+# registre (worker-expose n'est jamais lui-meme LINTE dans ce run).
+OUT="$(bash "$CHECK" --agents-dir="$T101_REG" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I3"; then
+  ok "T101 lint du registre (manager) avec \$AG en registre -> rc=0, aucun invariant I3 (imputation au seul dossier linte)"
+else
+  ko "T101-registre-linte (rc=$RC) : $OUT"
+fi
+rm -f "$AG/worker-expose.md"
+
+# ---------- MUT-I2 : mutant QUAL-01 sur la ligne d'appel invariant_i2 ----------
+MUT_I2_DIR="$(make_gate_mutant I2 0 'errors.extend(invariant_i2(' 'pass')"
+MUT_I2_RC=$?
+if [ "$MUT_I2_RC" -eq 0 ]; then
+  MUT_I2_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I2-orig" 0)"
+  MUT_I2_AG="$WORK/mut-I2-ag"; mkdir -p "$MUT_I2_AG"
+  cat > "$MUT_I2_AG/agent-muti2.md" <<'EOF'
+---
+name: agent-muti2
+description: Agent de test. Worker interne orphelin, fixture de mutation MUT-I2.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I2_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I2_AG" --resolve-agents=strict >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I2_DIR/check-agents.sh" --agents-dir="$MUT_I2_AG" --resolve-agents=strict 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I2 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I2 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- MUT-I3 : mutant QUAL-01 sur la ligne d'appel invariant_i3 ----------
+MUT_I3_DIR="$(make_gate_mutant I3 0 'errors.extend(invariant_i3(' 'pass')"
+MUT_I3_RC=$?
+if [ "$MUT_I3_RC" -eq 0 ]; then
+  MUT_I3_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I3-orig" 0)"
+  MUT_I3_AG="$WORK/mut-I3-ag"; mkdir -p "$MUT_I3_AG"
+  MUT_I3_REG="$WORK/mut-I3-reg"; mkdir -p "$MUT_I3_REG"
+  cat > "$MUT_I3_AG/agent-muti3.md" <<'EOF'
+---
+name: agent-muti3
+description: Agent de test. Worker non interne, expose par erreur, fixture de mutation MUT-I3.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+  cat > "$MUT_I3_REG/manager-muti3.md" <<'EOF'
+---
+name: manager-muti3
+description: Agent de test manager qui dispatche agent-muti3, fixture de mutation MUT-I3.
+model: sonnet
+effort: high
+memory: project
+tools: Read, SendMessage, Agent(agent-muti3)
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I3_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I3_AG" --resolve-agents=strict --agent-registry-dir="$MUT_I3_REG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I3_DIR/check-agents.sh" --agents-dir="$MUT_I3_AG" --resolve-agents=strict --agent-registry-dir="$MUT_I3_REG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I3 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I3 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- T102 : monde ferme REEL (six plugin/*/agents copies), zero invariant, deux ----------
+# ---------- mutations opposees par cmp ------------------------------------------------------------
+T102_UNIVERS="$WORK/univers-t102"
+mkdir -p "$T102_UNIVERS"
+for d in "$REPO_ROOT"/plugin/*/agents; do
+  [ -d "$d" ] || continue
+  mod="$(basename "$(dirname "$d")")"
+  mkdir -p "$T102_UNIVERS/$mod/agents"
+  cp "$d"/*.md "$T102_UNIVERS/$mod/agents/" 2>/dev/null
+done
+
+T102_REG_ARGS=()
+for d in "$T102_UNIVERS"/*/agents; do
+  [ -d "$d" ] || continue
+  T102_REG_ARGS+=("--agent-registry-dir=$d")
+done
+
+T102_SKILLS_ABSENTE="$WORK/no-such-skills-dir-t102"
+T102_FAIL=0
+T102_DIRS=0
+for d in "$T102_UNIVERS"/*/agents; do
+  [ -d "$d" ] || continue
+  T102_DIRS=$((T102_DIRS+1))
+  OUT_T102="$(bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$d" "${T102_REG_ARGS[@]}" 2>&1)"; RC_T102=$?
+  if [ "$RC_T102" -ne 0 ] || echo "$OUT_T102" | grep -q "invariant I"; then
+    T102_FAIL=1
+    ko "T102 monde ferme reel ($d) : rc=$RC_T102 ou invariant I inattendu -> $OUT_T102"
+  fi
+done
+if [ "$T102_DIRS" -lt 6 ]; then
+  T102_FAIL=1
+  ko "T102 anti-vert-a-vide : seulement $T102_DIRS dossier(s), attendu >= 6"
+fi
+[ "$T102_FAIL" -eq 0 ] && ok "T102 monde ferme reel (>= $T102_DIRS dossiers) -> rc=0 partout, aucun invariant I"
+
+# Mutation 1 : vf-test-orchestrator.md perd vf-internal + son marqueur, gagne SendMessage ->
+# invariant I3 (identite non-interne dispatchee par vf-dev-manager), sans I1 ni I6.
+T102_ORCH="$T102_UNIVERS/mobile-test-team/agents/vf-test-orchestrator.md"
+T102_ORCH_BAK="$WORK/t102-orch.orig"
+cp "$T102_ORCH" "$T102_ORCH_BAK"
+"$PYBIN" - "$T102_ORCH" <<'PYEOF'
+import sys
+p = sys.argv[1]
+text = open(p, encoding="utf-8").read()
+text = text.replace("vf-internal: true\n", "")
+text = text.replace("Worker interne", "Worker", 1)
+text = text.replace("Agent(vf-test-runner", "SendMessage, Agent(vf-test-runner", 1)
+open(p, "w", encoding="utf-8").write(text)
+PYEOF
+if cmp -s "$T102_ORCH_BAK" "$T102_ORCH"; then
+  ko "T102 mutation 1 NON OPPOSABLE (copies identiques)"
+else
+  OUT_MUT1="$(bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$T102_UNIVERS/mobile-test-team/agents" "${T102_REG_ARGS[@]}" 2>&1)"; RC_MUT1=$?
+  if [ "$RC_MUT1" -eq 1 ] && echo "$OUT_MUT1" | grep -q "invariant I3" && ! echo "$OUT_MUT1" | grep -q "invariant I1" && ! echo "$OUT_MUT1" | grep -q "invariant I6"; then
+    ok "T102 mutation 1 (vf-test-orchestrator sans vf-internal) -> rc=1, invariant I3, sans I1 ni I6"
+  else
+    ko "T102 mutation 1 (rc=$RC_MUT1) : $OUT_MUT1"
+  fi
+fi
+cp "$T102_ORCH_BAK" "$T102_ORCH"
+RC_RESTORE1=0; bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$T102_UNIVERS/mobile-test-team/agents" "${T102_REG_ARGS[@]}" >/dev/null 2>&1 || RC_RESTORE1=$?
+[ "$RC_RESTORE1" -eq 0 ] && ok "T102 mutation 1 restauree -> rc=0" || ko "T102 mutation 1 restauration (rc=$RC_RESTORE1)"
+
+# Mutation 2 : vf-test-runner retire de l'allowlist de vf-test-orchestrator -> invariant I2 sur
+# vf-test-runner.md (worker vf-internal devenu orphelin : plus personne ne le dispatche).
+T102_ORCH_BAK2="$WORK/t102-orch2.orig"
+cp "$T102_ORCH" "$T102_ORCH_BAK2"
+sed 's/Agent(vf-test-runner, vf-app-fixer)/Agent(vf-app-fixer)/' "$T102_ORCH_BAK2" > "$WORK/t102-orch2.mut"
+cp "$WORK/t102-orch2.mut" "$T102_ORCH"
+if cmp -s "$T102_ORCH_BAK2" "$T102_ORCH"; then
+  ko "T102 mutation 2 NON OPPOSABLE (copies identiques)"
+else
+  OUT_MUT2="$(bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$T102_UNIVERS/mobile-test-team/agents" "${T102_REG_ARGS[@]}" 2>&1)"; RC_MUT2=$?
+  if [ "$RC_MUT2" -eq 1 ] && echo "$OUT_MUT2" | grep -q "vf-test-runner.md : invariant I2"; then
+    ok "T102 mutation 2 (vf-test-runner retire de l'allowlist) -> rc=1, invariant I2 sur vf-test-runner.md"
+  else
+    ko "T102 mutation 2 (rc=$RC_MUT2) : $OUT_MUT2"
+  fi
+fi
+cp "$T102_ORCH_BAK2" "$T102_ORCH"
+RC_RESTORE2=0; bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$T102_UNIVERS/mobile-test-team/agents" "${T102_REG_ARGS[@]}" >/dev/null 2>&1 || RC_RESTORE2=$?
+[ "$RC_RESTORE2" -eq 0 ] && ok "T102 mutation 2 restauree -> rc=0" || ko "T102 mutation 2 restauration (rc=$RC_RESTORE2)"
+
+# ============================================================================================
+# Corrections ciblees post-revue/audit (Phase 42, nœud fix-42-juges) : CR-01, A1, WR-01, WR-02
+# ============================================================================================
+
+# ---------- T103 — CR-01 : collision d'identite dans l'univers connu (agents_dir + registre) --
+# ---------- doit ERREUR (rc=1, diagnostic nommant les deux chemins), jamais un vert -----------
+T103_A="$WORK/t103-a"; T103_B="$WORK/t103-b"
+mkdir -p "$T103_A" "$T103_B"
+cat > "$T103_A/reviewer.md" <<'EOF'
+---
+name: reviewer
+description: Worker interne de revue cote A, jamais dispatche depuis l'exterieur (fixture T103).
+model: sonnet
+effort: medium
+memory: project
+vf-internal: true
+tools: Read
+---
+corps
+EOF
+cat > "$T103_B/reviewer.md" <<'EOF'
+---
+name: reviewer
+description: Worker interne de revue cote B, dispatche par dispatcher-t103 (fixture T103).
+model: sonnet
+effort: medium
+memory: project
+vf-internal: true
+tools: Read
+---
+corps
+EOF
+cat > "$T103_B/dispatcher-t103.md" <<'EOF'
+---
+name: dispatcher-t103
+description: Agent qui dispatche reviewer depuis le registre B (fixture T103, description assez longue).
+model: sonnet
+effort: medium
+memory: project
+tools: Read, Agent(reviewer)
+---
+corps du dispatcher
+EOF
+OUT="$(bash "$CHECK" --agents-dir="$T103_A" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$T103_B" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "collision d'identite" && echo "$OUT" | grep -qF "$T103_A/reviewer.md" && echo "$OUT" | grep -qF "$T103_B/reviewer.md"; then
+  ok "T103 collision d'identite (deux chemins reels distincts, meme nom) -> rc=1, diagnostic nommant les deux chemins"
+else
+  ko "T103 (rc=$RC) : $OUT"
+fi
+
+# Contre-epreuve (D-10) : le MEME fichier atteint par deux chemins (realpath identique, via un
+# dossier en lien symbolique) n'est JAMAIS une collision — seul l'invariant I2 legitime demeure.
+T103_MIRROR="$WORK/t103-a-doublure"
+ln -s "$T103_A" "$T103_MIRROR"
+OUT="$(bash "$CHECK" --agents-dir="$T103_A" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$T103_MIRROR" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && ! echo "$OUT" | grep -q "collision d'identite" && echo "$OUT" | grep -q "invariant I2"; then
+  ok "T103b meme fichier atteint par deux chemins (realpath identique) -> aucune collision, seul I2 legitime"
+else
+  ko "T103b (rc=$RC) : $OUT"
+fi
+rm -f "$T103_MIRROR"
+
+# MUT-CR1 : detection de collision neutralisee -> la fixture T103 (masquee) repasse rc=0
+MUT_CR1_DIR="$(make_gate_mutant CR1 0 "collisions = {nom: sorted(chms) for nom, chms in noms_vers_chemins.items() if len(chms) > 1}" "collisions = {}")"
+MUT_CR1_RC=$?
+if [ "$MUT_CR1_RC" -eq 0 ]; then
+  MUT_CR1_ORIG_DIR="$(mk_gate_dir "$WORK/mut-CR1-orig" 0)"
+  RC_ORIG=0; bash "$MUT_CR1_ORIG_DIR/check-agents.sh" --agents-dir="$T103_A" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$T103_B" >/dev/null 2>&1 || RC_ORIG=$?
+  RC_MUT=0; bash "$MUT_CR1_DIR/check-agents.sh" --agents-dir="$T103_A" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$T103_B" >/dev/null 2>&1 || RC_MUT=$?
+  if [ "$RC_MUT" -eq 0 ] && [ "$RC_ORIG" -eq 1 ]; then
+    okmut CR1 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut CR1 "rc_mutant=0 (masque) et rc_original=1 (detecte)" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
+  fi
+fi
+
+# ---------- T104 — A1 : un .md en lien symbolique est REFUSE comme un dossier, son contenu ----
+# ---------- n'est JAMAIS ouvert ni reflete dans la sortie (PoC audit : secret hors arbre) -----
+T104_DIR="$WORK/t104"; mkdir -p "$T104_DIR/agents"
+T104_TOKEN="SECRET-A1-$$-$(date +%s 2>/dev/null || echo x)"
+cat > "$T104_DIR/outside-secret.md" <<EOF
+---
+name: LEAK_${T104_TOKEN}_INVALID
+description: fixture T104 hors arbre — ne doit jamais etre lue par check-agents.sh.
+model: sonnet
+effort: medium
+memory: project
+---
+corps hors arbre
+EOF
+ln -s "$T104_DIR/outside-secret.md" "$T104_DIR/agents/evil.md"
+OUT="$(bash "$CHECK" --agents-dir="$T104_DIR/agents" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "evil.md : lien symbolique refuse" && ! echo "$OUT" | grep -qF "$T104_TOKEN"; then
+  ok "T104 .md en lien symbolique (PoC audit) -> rc=1, diagnostic de refus, jeton hors arbre jamais reflete"
+else
+  ko "T104 (rc=$RC) : $OUT"
+fi
+
+# MUT-A1 : garde de refus neutralisee -> le jeton (contenu hors arbre) reapparait dans la sortie
+MUT_A1_DIR="$(make_gate_mutant A1 0 "if os.path.islink(full):" "if False:")"
+MUT_A1_RC=$?
+if [ "$MUT_A1_RC" -eq 0 ]; then
+  OUT_MUT="$(bash "$MUT_A1_DIR/check-agents.sh" --agents-dir="$T104_DIR/agents" --skills-dir="$SK" 2>&1)"
+  if echo "$OUT_MUT" | grep -qF "$T104_TOKEN"; then
+    ok "MUT-A1 TUE : garde retiree -> le jeton reapparait dans la sortie (evil.md lu et reflete)"
+  else
+    ko "MUT-A1 : jeton absent malgre la garde neutralisee : $OUT_MUT"
+  fi
+fi
+
+# ---------- T105 — WR-01 : index_agents doit etre CLE par ses parametres (agents_dir_local, ---
+# ---------- registry_dirs_local), jamais un cache global unique (blanc, white-box) -------------
+T105_DIR_A="$WORK/t105-a"; T105_DIR_B="$WORK/t105-b"
+mkdir -p "$T105_DIR_A" "$T105_DIR_B"
+cat > "$T105_DIR_A/alpha.md" <<'EOF'
+---
+name: alpha
+description: Fixture T105 — agent alpha, seul present sous t105-a.
+model: sonnet
+effort: medium
+memory: project
+---
+corps
+EOF
+cat > "$T105_DIR_B/beta.md" <<'EOF'
+---
+name: beta
+description: Fixture T105 — agent beta, seul present sous t105-b.
+model: sonnet
+effort: medium
+memory: project
+---
+corps
+EOF
+
+# Sonde blanche (WR-01) : extrait le corps python embarque de check-agents.sh (entre le "-c \""
+# d'ouverture et le "\nPY_RC=$?" de fermeture, deseachappe \" -> "), le tronque AVANT "if single:"
+# (aucune instruction executable de tete, seulement des def/assignations), l'exec() dans un
+# namespace prive puis appelle index_agents() deux fois de suite avec des dossiers DIFFERENTS —
+# un cache non cle par parametres rendrait a tort le meme index aux deux appels.
+T105_PROBE="$WORK/t105-probe.py"
+cat > "$T105_PROBE" <<'PYEOF'
+import os, sys
+src_path, manifest_path, dir_a, dir_b = sys.argv[1:5]
+text = open(src_path, encoding="utf-8").read()
+start_marker = '"$PYBIN" -c "'
+start = text.index(start_marker) + len(start_marker)
+end = text.index('\nPY_RC=$?')
+body = text[start:end].rstrip()
+if body.endswith('"'):
+    body = body[:-1]
+body = body.replace('\\"', '"')
+cut = body.index("\nif single:")
+body = body[:cut]
+os.environ.setdefault("VF_AGENTS_DIR", dir_a)
+os.environ.setdefault("VF_SKILLS_DIR", "/nonexistent-skills-t105")
+os.environ.setdefault("VF_STRICT", "false")
+os.environ.setdefault("VF_HOOK", "false")
+os.environ.setdefault("VF_ALLOW_EMPTY", "false")
+os.environ.setdefault("VF_SINGLE", "")
+os.environ.setdefault("VF_THIRD_PARTY_PREFIXES", "")
+os.environ.setdefault("VF_RESOLVE_AGENTS", "lenient")
+os.environ.setdefault("VF_REGISTRY_DIRS", "")
+os.environ.setdefault("VF_MANIFEST_FRESHNESS", "lenient")
+os.environ.setdefault("VF_MANIFEST", manifest_path)
+ns = {}
+exec(compile(body, "<check-agents-extract>", "exec"), ns)
+idx1 = ns["index_agents"](dir_a, [])
+idx2 = ns["index_agents"](dir_b, [])
+print("IDX1:" + ",".join(sorted(idx1.keys())))
+print("IDX2:" + ",".join(sorted(idx2.keys())))
+PYEOF
+T105_OUT="$("$PYBIN" "$T105_PROBE" "$CHECK" "$GATE_DIR/check-agents-manifest.json" "$T105_DIR_A" "$T105_DIR_B" 2>&1)"
+if echo "$T105_OUT" | grep -q "^IDX1:alpha$" && echo "$T105_OUT" | grep -q "^IDX2:beta$"; then
+  ok "T105 index_agents CLE par ses parametres : un second appel a agents_dir different rend un index different"
+else
+  ko "T105 (WR-01) : $T105_OUT"
+fi
+
+# MUT-WR1 : cache index_agents NON cle par parametres -> le second appel (dir B) recoit a tort
+# l'index du premier appel (dir A) — masquage prouve.
+MUT_WR1_DIR="$(make_gate_mutant WR1 0 "cle = (agents_dir_local, tuple(registry_dirs_local))" 'cle = ("__mutant__",)')"
+MUT_WR1_RC=$?
+if [ "$MUT_WR1_RC" -eq 0 ]; then
+  T105_OUT_MUT="$("$PYBIN" "$T105_PROBE" "$MUT_WR1_DIR/check-agents.sh" "$MUT_WR1_DIR/check-agents-manifest.json" "$T105_DIR_A" "$T105_DIR_B" 2>&1)"
+  if echo "$T105_OUT_MUT" | grep -q "^IDX2:alpha$"; then
+    ok "MUT-WR1 TUE : cache non cle -> le second appel (dir B) retourne a tort l'index de dir A"
+  else
+    ko "MUT-WR1 : cache mutant ne masque pas la distinction attendue : $T105_OUT_MUT"
+  fi
+fi
+
+# ---------- T106 — WR-02 : --file exclut un agent tiers comme le fait le mode repertoire -------
+# ---------- (matched_prefix), AVANT check_file()/linted_paths ----------------------------------
+T106_TIERS="$WORK/t106-gsd-planner.md"
+cat > "$T106_TIERS" <<'EOF'
+---
+name: gsd-planner
+description: Agent tiers GSD sans model ni memory, fixture T106 pour --file.
+---
+corps
+EOF
+OUT="$(bash "$CHECK" --file "$T106_TIERS" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "fichier(s) agent tiers non linte"; then
+  ok "T106 --file sur un agent tiers (prefixe gsd- par defaut) -> ignore comme en mode repertoire, exit 0"
+else
+  ko "T106 (rc=$RC) : $OUT"
+fi
+RC=0; bash "$CHECK" --file "$T106_TIERS" --skills-dir="$SK" --no-third-party-prefix >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T106b --file + --no-third-party-prefix -> gsd-planner linte normalement -> exit 1" || ko "T106b (rc=$RC)"
+
+# MUT-WR2 : exclusion neutralisee en mode --file -> l'agent tiers redevient linte (rc=1) meme
+# sans --no-third-party-prefix (le mode repertoire, lui, reste protege — motif propre au mode --file).
+MUT_WR2_DIR="$(make_gate_mutant WR2 0 "            if matched_prefix:" "            if False:")"
+MUT_WR2_RC=$?
+if [ "$MUT_WR2_RC" -eq 0 ]; then
+  RC_MUT=0; bash "$MUT_WR2_DIR/check-agents.sh" --file "$T106_TIERS" --skills-dir="$SK" >/dev/null 2>&1 || RC_MUT=$?
+  RC_ORIG=0; bash "$CHECK" --file "$T106_TIERS" --skills-dir="$SK" >/dev/null 2>&1 || RC_ORIG=$?
+  if [ "$RC_MUT" -eq 1 ] && [ "$RC_ORIG" -eq 0 ]; then
+    okmut WR2 "$RC_MUT" 1 "$RC_ORIG" 0
+  else
+    komut WR2 "rc_mutant=1 (linte a tort) et rc_original=0 (exclu)" "rc_mutant=1, rc_original=0" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
   fi
 fi
 

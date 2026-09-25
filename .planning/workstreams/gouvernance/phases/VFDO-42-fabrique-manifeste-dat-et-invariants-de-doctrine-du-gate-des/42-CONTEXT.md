@@ -77,7 +77,9 @@ et l'unification MCP (Phase 43) ; le hook central par rôle (Phase 45) ; tout §
   `quality-gate-client`, `content-clarity-judge`, `growth-quality-judge`, `vf-design-judge`.
   **Écart assumé par rapport à la spec §4.** À vérifier par la recherche : la sémantique exacte de
   `omitClaudeMd` dans la doc officielle (charge-t-il encore les règles `.claude/rules/` ? le
-  `CLAUDE.md` utilisateur ?).
+  `CLAUDE.md` utilisateur ?). Arbitrage D-08 (maintenir, motif 3) : tout ce qu'un juge doit
+  vérifier vit dans sa grille, jamais dans `.claude/rules` ni dans `CLAUDE.md` — session
+  principale, décision déléguée par Willy au head (« tranche et avançons »), 2026-09-25.
 - **D-09 : I2 et I3 réutilisent le monde fermé existant.** Aucun registre écrit à la main : la
   liste des dispatchés se dérive des allowlists `Agent(...)` de l'union des agents, exactement
   comme l'étape CI `--resolve-agents=strict` (avec les `--agent-registry-dir` répétés). I2 et I3

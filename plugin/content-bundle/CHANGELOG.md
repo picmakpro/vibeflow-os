@@ -1,5 +1,53 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.13] — 2026-09-25 (Phase 42, correction ciblée — nœud fix-42-condition-samuel)
+
+**Patch** :
+
+- **`content-clarity-judge` porte la consigne de lecture explicite du `CLAUDE.md` dans le
+  DÉROULÉ (section « Méthode de scoring »), pas seulement dans la liste des références** —
+  la v2.0.12 l'avait posée dans « Références au besoin », ce qui ne satisfaisait pas la
+  condition de Samuel (« le DÉROULÉ, pas la liste des références ») : ce qu'un juge doit
+  vérifier vit dans sa grille/procédure, jamais dans une mention annexe. La mention retirée
+  de l'Entrée pour éviter le doublon. `tools: Read, Glob, Grep` vérifié inchangé. Assertion
+  machine T13 ajoutée à `test-content-bundle.sh`, ancrée sur la section, discriminante par
+  mutation. Décision déléguée par Willy au head, session principale, 2026-09-25, en
+  exécution de la condition de Samuel (e568307).
+
+## [v2.0.12] — 2026-09-25 (Phase 42, correction ciblée post-revue/audit — nœud fix-42-juges)
+
+**Patch** :
+
+- **`content-clarity-judge` cite désormais le `CLAUDE.md` du lab (interdits RGPD) comme
+  source à lire explicitement avec l'outil Read**, dans la liste des sources existante de
+  la section Entrée — `omitClaudeMd: true` coupe le chargement automatique de `CLAUDE.md`
+  (invariant I5, D-08), mais ne dispense pas d'une lecture voulue de la doctrine du lab
+  quand le juge score une pièce. `tools: Read, Glob, Grep` vérifié inchangé. Décision
+  déléguée par Willy au head (« tranche et avançons »), session principale, 2026-09-25 —
+  rend vraie la mitigation T-42-07 (`42-05-SUMMARY.md`), fausse depuis la 42-06 pour ce
+  juge et quality-gate-client (business-pilot-bundle).
+
+## [v2.0.11] — 2026-09-25 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **`content-clarity-judge` déclare `omitClaudeMd: true`** (invariant I5, D-08) — le juge frais
+  n'a aucune allowlist `Agent(...)` et retire déjà `Write`/`Edit` : au sens du gate, c'est un
+  juge, qui ne doit jamais charger la doctrine du `CLAUDE.md` du projet — un regard frais ne
+  charge pas la doctrine. Frontmatter seul, corps inchangé, compte d'instructions inchangé.
+  Arbitrage D-08 (maintenir) : session principale, décision déléguée par Willy au head
+  (« tranche et avançons »), 2026-09-25 — 42-D19-MESURE.md, 42-CONTEXT.md D-08, D-11.
+
+## [v2.0.10] — 2026-09-24 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **Le manager déclare `SendMessage`** (invariant I6, D-07) — `vf-content-manager` est porteur
+  d'un `Agent(...)` non vide et non `vf-internal` : manager au sens du gate, qui doit porter
+  `SendMessage` pour la vue sur ses pairs. Frontmatter seul, compte d'instructions inchangé.
+  Décisions de cadrage de Claude (délégation de Willy, AskUserQuestion session principale,
+  2026-09-23), ratifiées par Samuel (WhatsApp, 2026-09-23), 42-CONTEXT.md D-07, D-11.
+
 ## [v2.0.9] — 2026-09-16 (Phase 40.1)
 
 **Patch** :

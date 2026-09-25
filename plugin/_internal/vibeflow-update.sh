@@ -1993,9 +1993,19 @@ copy_module_scripts() {
   # JAMAIS chez l'utilisateur : c'est exactement ce qui est arrive a `known-versions.txt`
   # (infrastructure-audit), lu par audit-infra.sh en $SCRIPTS_DIR/known-versions.txt et absent de
   # toute install. Glob volontairement borne a *.txt — assez large pour la whitelist, assez etroit
-  # pour ne pas ramasser les residus (*.bak) ni les manifestes de config. Pas de mode exec : ce
-  # sont des donnees, pas des executables.
+  # pour ne pas ramasser les residus (*.bak) ; les manifestes de config JSON sont poses par la
+  # boucle suivante. Pas de mode exec : ce sont des donnees, pas des executables.
   for f in "$module_dir/scripts/"*.txt; do
+    [ -f "$f" ] && vf_place_file "$f" "$TARGET_ROOT/scripts/$(basename "$f")"
+  done
+  # Site #3bis (Phase 42, D-16). Meme motif de garde que #3, glob etendu aux fichiers de DONNEES
+  # JSON accompagnant les scripts (le manifeste date du gate des agents). Sans cette boucle, le
+  # manifeste n'arriverait chez AUCUN utilisateur et D-03 (check-agents.sh) refuserait le gate
+  # partout — meme defaut que known-versions.txt (Site #3 ci-dessus). Le glob ne ramasse ni les
+  # residus *.json.bak ni les fichiers caches (dont .vibeflow-manifest-<mod>, le manifeste
+  # d'INSTALLATION de l'engine — concept distinct). Pas de mode exec : ce sont des donnees, pas
+  # des executables.
+  for f in "$module_dir/scripts/"*.json; do
     [ -f "$f" ] && vf_place_file "$f" "$TARGET_ROOT/scripts/$(basename "$f")"
   done
   # Site #4 (31-03) : globs de FICHIERS restreints (tests/*.sh, tests/fixtures/*), PAS la pose

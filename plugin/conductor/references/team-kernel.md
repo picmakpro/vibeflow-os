@@ -241,7 +241,7 @@ là-bas.
 | Équipe | Module | Manager | Workers | Juges | « Vert » |
 |---|---|---|---|---|---|
 | Dev (référence) | dev-orchestrator | `vf-dev-manager` | `vf-coder` (+ `vf-crafter` en étage design croisé) | `vf-reviewer`, `vf-auditer` (+ `vf-design-judge` en étage design croisé) | tests + revue PASS (+ critique ≥ seuil si étage design) |
-| Mobile (boucle test) | mobile-test-team | `vf-test-orchestrator` | `vf-app-fixer`, `vf-test-runner` | (le test EST le juge) | flows Maestro verts |
+| Mobile (boucle test) | mobile-test-team | `vf-test-orchestrator` — orchestrateur de boucle, worker interne (`vf-internal`) dispatché par `vf-dev-manager` / `vf-auto`, hors classe manager du gate (I6, D-07) | `vf-app-fixer`, `vf-test-runner` | (le test EST le juge) | flows Maestro verts |
 | Design | design-orchestrator | `vf-design-manager` | `vf-crafter` (+ `vf-coder` en étage implémentation croisé) | `vf-design-judge` (+ `vf-reviewer` en étage implémentation croisé) | critique scorée ≥ seuil contre la DA (+ revue PASS si implémentation) |
 
 Étages croisés (Phase 15) : chaque manager peut dispatcher des workers/juges de l'autre métier —
