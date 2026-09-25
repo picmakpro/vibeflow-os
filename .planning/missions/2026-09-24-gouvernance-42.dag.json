@@ -313,10 +313,11 @@
         "docs",
         "revue-42-fix",
         "revue-42-condition",
-        "fix-42-condition-2"
+        "fix-42-condition-2",
+        "revue-42-condition-2"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "arbitrage-juges-42",
@@ -370,7 +371,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-42-condition-2",
@@ -380,7 +381,17 @@
         "arbitrage-budget-42"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
+    },
+    {
+      "id": "revue-42-condition-2",
+      "step": "revue ciblée de fix-42-condition-2",
+      "stage": "",
+      "deps": [
+        "fix-42-condition-2"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }

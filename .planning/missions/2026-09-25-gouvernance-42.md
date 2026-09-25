@@ -6,18 +6,32 @@
 
 ## Verdict
 
-**`human_needed`.** La Phase 42 est exécutée (6/6 plans), vérifiée (`gsd-verifier` 5/5 must-haves,
-FABR-01 à FABR-05), revue, auditée et corrigée. Samuel a ratifié D-08 en posant une condition
-(e568307) ; elle est exécutée (bdb1491..f257306). **La PR #108 reste en brouillon** : la revue ciblée
-de cette exécution a relevé un contournement du gate du budget d'instructions (« interdits »
-remplacé par « garde-fous » pour passer sous la baseline). Il faut choisir entre (a) garder le synonyme
-et (b) rétablir « interdits » avec une hausse de baseline citée. Voir § Point ouvert. Pas de merge, pas
-de tag, pas de release (aucune release gouvernance avant la clôture de `fiabilite-v1.0`).
+**`passed`, en attente de la revue code owner.** La Phase 42 est exécutée (6/6 plans), vérifiée
+(`gsd-verifier` 5/5 must-haves, FABR-01 à FABR-05), revue, auditée et corrigée. La condition posée par
+Samuel en ratifiant D-08 (e568307) est exécutée, et le contournement du budget d'instructions a été
+tranché par l'option (b) (« arbitrage Willy, AskUserQuestion session principale, 2026-09-25 »).
+**La PR #108 est sortie du brouillon.** Pas de merge, pas de tag, pas de release (aucune release
+gouvernance avant la clôture de `fiabilite-v1.0`).
 
-Le merge attendra ensuite la relecture de Samuel sur les chemins CODEOWNERS (`.github/workflows/ci.yml`)
-et sur les modules de sa polarité (D-12, relevé par `42-VERIFICATION.md`, `status: human_needed`).
+Le merge attend la relecture de Samuel :
+- chemins CODEOWNERS : `.github/workflows/ci.yml` et `.planning/instruction-budget-baselines.tsv`, hausse de +1 sur trois lignes ;
+- modules de sa polarité ;
+- écart vf-dev-manager → vf-design-judge.
 
-## Point ouvert (2026-09-25) — nœud `arbitrage-budget-42`
+D-12 et `42-VERIFICATION.md` (`status: human_needed`) le relevaient déjà.
+
+## Arbitrage du budget d'instructions (2026-09-25), résolu
+
+Option (b), « arbitrage Willy, AskUserQuestion session principale, 2026-09-25 ». Correction
+`fix-42-condition-2` en quatre commits :
+- 71677a4 et e28e129 : « interdits du lab » rétabli, même formulation chez growth et design, et doublon F1 retiré.
+- 4b72e3c : baseline montée de +1 sur exactement trois lignes, citation dans le commit.
+- 7dc6a29 : F2 et l'épisode « garde-fous » consignés dans 42-05-SUMMARY.md.
+
+Revue ciblée `revue-42-condition-2` : PASS. G-1 rend `CONFORME` avec la citation. Sa contre-épreuve,
+le même commit dépouillé de la citation dans une copie en /tmp, rend `HAUSSE-SANS-ARBITRAGE`, rc=1.
+
+### Historique du point ouvert
 
 Revue `revue-42-condition` (bdb1491..f257306) : gaps_found.
 - **F5 / contournement.** L'ajout des interdits dépassait réellement la baseline de trois agents
@@ -109,7 +123,7 @@ revient à 8 OK / 36 KO, comme à la base.
 
 ## Coûts (décompte sur mandats émis et blocs reçus)
 
-16 dispatches, un tour chacun. Jetons rendus par les notifications (15 sur 16) :
+18 dispatches, un tour chacun. Jetons rendus par les notifications (17 sur 18) :
 
 | Nœud | Agent | Jetons |
 |---|---|---|
@@ -128,7 +142,9 @@ revient à 8 OK / 36 KO, comme à la base.
 | revue-42-fix | vf-reviewer | 131 058 |
 | fix-42-condition-samuel | vf-coder | 244 991 |
 | revue-42-condition | vf-reviewer | 169 259 |
-| **Total connu** | | **2 830 657** |
+| fix-42-condition-2 | vf-coder | 169 140 |
+| revue-42-condition-2 | vf-reviewer | 119 304 |
+| **Total connu** | | **3 119 101** |
 
 `estimate` : absent de tous les plans. `actuals` relayés verbatim : 42-04 `tokens: 9353, tasks: 2, commits: 2` ;
 42-05 (Tâche 1) `tokens: 5507, tasks: 1, commits: 1`. `verdicts` : aucun hook code_review/nyquist/secure rendu.
@@ -162,7 +178,12 @@ revient à 8 OK / 36 KO, comme à la base.
     {"verdict": "gate:ci-gates", "commande": "bash .planning/workstreams/fiabilite/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/replay-ci-jobs.sh --job gates", "exit_code": 0, "sha": "f2573062423c110fe11ffe37a6f27074a8bec193"},
     {"verdict": "test-growth-bundle.sh", "commande": "bash plugin/growth-bundle/scripts/tests/test-growth-bundle.sh", "exit_code": 0, "sha": "f2573062423c110fe11ffe37a6f27074a8bec193"},
     {"verdict": "test-design-orchestrator.sh", "commande": "bash plugin/design-orchestrator/scripts/tests/test-design-orchestrator.sh", "exit_code": 0, "sha": "f2573062423c110fe11ffe37a6f27074a8bec193"},
-    {"verdict": "revue-condition", "commande": "check-instruction-budget.sh sur l'extraction du commit f0e3340 (design avant reformulation)", "exit_code": 3, "sha": "f0e334095128eab328f08d356807d8edbd4be5c8"}
+    {"verdict": "revue-condition", "commande": "check-instruction-budget.sh sur l'extraction du commit f0e3340 (design avant reformulation)", "exit_code": 3, "sha": "f0e334095128eab328f08d356807d8edbd4be5c8"},
+    {"verdict": "gate:G-1", "commande": "bash scripts/check-baseline-arbitrage.sh", "exit_code": 0, "sha": "7dc6a29c93dd125e0105512e4d7d9a24d6feb4a6"},
+    {"verdict": "gate:G-2", "commande": "bash scripts/check-gate-touche.sh", "exit_code": 0, "sha": "7dc6a29c93dd125e0105512e4d7d9a24d6feb4a6"},
+    {"verdict": "gate:ci-gates", "commande": "bash .planning/workstreams/fiabilite/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/replay-ci-jobs.sh --job gates", "exit_code": 0, "sha": "7dc6a29c93dd125e0105512e4d7d9a24d6feb4a6"},
+    {"verdict": "gate:instruction-budget", "commande": "bash plugin/conductor/scripts/check-instruction-budget.sh", "exit_code": 0, "sha": "7dc6a29c93dd125e0105512e4d7d9a24d6feb4a6"},
+    {"verdict": "revue-condition-2", "preuve": "amont"}
   ]
 }
 ```
@@ -172,7 +193,7 @@ ensemble, même détail). Celui de la repro CR-01 est le rouge attendu d'une col
 
 ## Prochaine étape
 
-Trancher `arbitrage-budget-42` : (a) ou (b). Puis correction ciblée `fix-42-condition-2`, revue
-ciblée, gates, sortie du brouillon de la PR #108. Ensuite la relecture de Samuel (CODEOWNERS `.github/`
-et baseline, modules de sa polarité, écart vf-dev-manager), puis le merge par un humain. Enfin, le plan
-de la Phase 43 : rebase de `gouvernance/phase-43-cadrage` sur la 42 finale.
+Relecture code owner de Samuel sur la PR #108 : `.github/workflows/ci.yml`, la hausse de baseline
+(trois lignes), les modules de sa polarité et l'écart vf-dev-manager → vf-design-judge. Merge ensuite
+par un humain. Puis le plan de la Phase 43 : rebase de `gouvernance/phase-43-cadrage` sur la 42 finale,
+plan et plan-checker frais.
