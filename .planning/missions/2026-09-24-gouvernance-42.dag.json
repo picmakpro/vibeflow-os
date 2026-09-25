@@ -85,7 +85,8 @@
         "exec-42-w4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "audit-42",
@@ -268,7 +269,7 @@
         "exec-42-w3a"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "nonreg-42-partiel",
@@ -278,7 +279,7 @@
         "exec-42-w3a"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "pr-42-draft",
@@ -289,7 +290,7 @@
         "nonreg-42-partiel"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "sonde-d19b",
@@ -299,7 +300,7 @@
       "scope": [
         ".planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/42-D19-MESURE.md"
       ],
-      "status": "failed"
+      "status": "ready"
     }
   ]
 }
