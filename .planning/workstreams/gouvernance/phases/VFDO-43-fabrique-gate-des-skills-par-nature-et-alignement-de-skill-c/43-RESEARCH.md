@@ -636,7 +636,7 @@ silencieux deviennent des signaux).
 des points de conception explicitement laissés ouverts par `43-CONTEXT.md` (noms de clés, vocabulaire
 de détection, périmètre exact du corpus, seuil d'avertissement skill).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Quel nom de clé frontmatter pour `ecrit:` et la rubrique de juge ?**
    - What we know : la spec §5.2 de l'initialisation (Famille 2) nomme le concept (« lieu de vie —
