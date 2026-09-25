@@ -860,8 +860,11 @@ fi
 
 # T30 — le MEME mutant (vf-codeur) sous --resolve-agents=strict + registre → exit 1 ;
 # vf-coder (nom correct, fichier present) reste vert sous la meme resolution stricte.
+# REG reste SANS copie de vf-coder.md (CR-01, Phase 42 correction ciblee) : vf-coder.md est deja
+# present dans $AG, donc "vf-coder" resout directement via agents_dir_local — dupliquer le meme
+# nom de base sous REG creerait une COLLISION D'IDENTITE reelle (deux chemins reels distincts,
+# cf. T103) et ferait echouer T30b a tort, sans rien prouver de plus sur la resolution via registre.
 REG="$WORK/registry"; mkdir -p "$REG"
-cp "$AG/vf-coder.md" "$REG/vf-coder.md"
 RC=0; run_check --resolve-agents=strict --agent-registry-dir="$REG" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 1 ] && ok "T30 vf-codeur (typo) sous --resolve-agents=strict → exit 1 (discriminance prouvee)" || ko "T30 (rc=$RC)"
 rm -f "$AG/typo-nom.md"
@@ -3323,6 +3326,231 @@ fi
 cp "$T102_ORCH_BAK2" "$T102_ORCH"
 RC_RESTORE2=0; bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$T102_UNIVERS/mobile-test-team/agents" "${T102_REG_ARGS[@]}" >/dev/null 2>&1 || RC_RESTORE2=$?
 [ "$RC_RESTORE2" -eq 0 ] && ok "T102 mutation 2 restauree -> rc=0" || ko "T102 mutation 2 restauration (rc=$RC_RESTORE2)"
+
+# ============================================================================================
+# Corrections ciblees post-revue/audit (Phase 42, nœud fix-42-juges) : CR-01, A1, WR-01, WR-02
+# ============================================================================================
+
+# ---------- T103 — CR-01 : collision d'identite dans l'univers connu (agents_dir + registre) --
+# ---------- doit ERREUR (rc=1, diagnostic nommant les deux chemins), jamais un vert -----------
+T103_A="$WORK/t103-a"; T103_B="$WORK/t103-b"
+mkdir -p "$T103_A" "$T103_B"
+cat > "$T103_A/reviewer.md" <<'EOF'
+---
+name: reviewer
+description: Worker interne de revue cote A, jamais dispatche depuis l'exterieur (fixture T103).
+model: sonnet
+effort: medium
+memory: project
+vf-internal: true
+tools: Read
+---
+corps
+EOF
+cat > "$T103_B/reviewer.md" <<'EOF'
+---
+name: reviewer
+description: Worker interne de revue cote B, dispatche par dispatcher-t103 (fixture T103).
+model: sonnet
+effort: medium
+memory: project
+vf-internal: true
+tools: Read
+---
+corps
+EOF
+cat > "$T103_B/dispatcher-t103.md" <<'EOF'
+---
+name: dispatcher-t103
+description: Agent qui dispatche reviewer depuis le registre B (fixture T103, description assez longue).
+model: sonnet
+effort: medium
+memory: project
+tools: Read, Agent(reviewer)
+---
+corps du dispatcher
+EOF
+OUT="$(bash "$CHECK" --agents-dir="$T103_A" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$T103_B" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "collision d'identite" && echo "$OUT" | grep -qF "$T103_A/reviewer.md" && echo "$OUT" | grep -qF "$T103_B/reviewer.md"; then
+  ok "T103 collision d'identite (deux chemins reels distincts, meme nom) -> rc=1, diagnostic nommant les deux chemins"
+else
+  ko "T103 (rc=$RC) : $OUT"
+fi
+
+# Contre-epreuve (D-10) : le MEME fichier atteint par deux chemins (realpath identique, via un
+# dossier en lien symbolique) n'est JAMAIS une collision — seul l'invariant I2 legitime demeure.
+T103_MIRROR="$WORK/t103-a-doublure"
+ln -s "$T103_A" "$T103_MIRROR"
+OUT="$(bash "$CHECK" --agents-dir="$T103_A" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$T103_MIRROR" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && ! echo "$OUT" | grep -q "collision d'identite" && echo "$OUT" | grep -q "invariant I2"; then
+  ok "T103b meme fichier atteint par deux chemins (realpath identique) -> aucune collision, seul I2 legitime"
+else
+  ko "T103b (rc=$RC) : $OUT"
+fi
+rm -f "$T103_MIRROR"
+
+# MUT-CR1 : detection de collision neutralisee -> la fixture T103 (masquee) repasse rc=0
+MUT_CR1_DIR="$(make_gate_mutant CR1 0 "collisions = {nom: sorted(chms) for nom, chms in noms_vers_chemins.items() if len(chms) > 1}" "collisions = {}")"
+MUT_CR1_RC=$?
+if [ "$MUT_CR1_RC" -eq 0 ]; then
+  MUT_CR1_ORIG_DIR="$(mk_gate_dir "$WORK/mut-CR1-orig" 0)"
+  RC_ORIG=0; bash "$MUT_CR1_ORIG_DIR/check-agents.sh" --agents-dir="$T103_A" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$T103_B" >/dev/null 2>&1 || RC_ORIG=$?
+  RC_MUT=0; bash "$MUT_CR1_DIR/check-agents.sh" --agents-dir="$T103_A" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$T103_B" >/dev/null 2>&1 || RC_MUT=$?
+  if [ "$RC_MUT" -eq 0 ] && [ "$RC_ORIG" -eq 1 ]; then
+    okmut CR1 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut CR1 "rc_mutant=0 (masque) et rc_original=1 (detecte)" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
+  fi
+fi
+
+# ---------- T104 — A1 : un .md en lien symbolique est REFUSE comme un dossier, son contenu ----
+# ---------- n'est JAMAIS ouvert ni reflete dans la sortie (PoC audit : secret hors arbre) -----
+T104_DIR="$WORK/t104"; mkdir -p "$T104_DIR/agents"
+T104_TOKEN="SECRET-A1-$$-$(date +%s 2>/dev/null || echo x)"
+cat > "$T104_DIR/outside-secret.md" <<EOF
+---
+name: LEAK_${T104_TOKEN}_INVALID
+description: fixture T104 hors arbre — ne doit jamais etre lue par check-agents.sh.
+model: sonnet
+effort: medium
+memory: project
+---
+corps hors arbre
+EOF
+ln -s "$T104_DIR/outside-secret.md" "$T104_DIR/agents/evil.md"
+OUT="$(bash "$CHECK" --agents-dir="$T104_DIR/agents" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "evil.md : lien symbolique refuse" && ! echo "$OUT" | grep -qF "$T104_TOKEN"; then
+  ok "T104 .md en lien symbolique (PoC audit) -> rc=1, diagnostic de refus, jeton hors arbre jamais reflete"
+else
+  ko "T104 (rc=$RC) : $OUT"
+fi
+
+# MUT-A1 : garde de refus neutralisee -> le jeton (contenu hors arbre) reapparait dans la sortie
+MUT_A1_DIR="$(make_gate_mutant A1 0 "if os.path.islink(full):" "if False:")"
+MUT_A1_RC=$?
+if [ "$MUT_A1_RC" -eq 0 ]; then
+  OUT_MUT="$(bash "$MUT_A1_DIR/check-agents.sh" --agents-dir="$T104_DIR/agents" --skills-dir="$SK" 2>&1)"
+  if echo "$OUT_MUT" | grep -qF "$T104_TOKEN"; then
+    ok "MUT-A1 TUE : garde retiree -> le jeton reapparait dans la sortie (evil.md lu et reflete)"
+  else
+    ko "MUT-A1 : jeton absent malgre la garde neutralisee : $OUT_MUT"
+  fi
+fi
+
+# ---------- T105 — WR-01 : index_agents doit etre CLE par ses parametres (agents_dir_local, ---
+# ---------- registry_dirs_local), jamais un cache global unique (blanc, white-box) -------------
+T105_DIR_A="$WORK/t105-a"; T105_DIR_B="$WORK/t105-b"
+mkdir -p "$T105_DIR_A" "$T105_DIR_B"
+cat > "$T105_DIR_A/alpha.md" <<'EOF'
+---
+name: alpha
+description: Fixture T105 — agent alpha, seul present sous t105-a.
+model: sonnet
+effort: medium
+memory: project
+---
+corps
+EOF
+cat > "$T105_DIR_B/beta.md" <<'EOF'
+---
+name: beta
+description: Fixture T105 — agent beta, seul present sous t105-b.
+model: sonnet
+effort: medium
+memory: project
+---
+corps
+EOF
+
+# Sonde blanche (WR-01) : extrait le corps python embarque de check-agents.sh (entre le "-c \""
+# d'ouverture et le "\nPY_RC=$?" de fermeture, deseachappe \" -> "), le tronque AVANT "if single:"
+# (aucune instruction executable de tete, seulement des def/assignations), l'exec() dans un
+# namespace prive puis appelle index_agents() deux fois de suite avec des dossiers DIFFERENTS —
+# un cache non cle par parametres rendrait a tort le meme index aux deux appels.
+T105_PROBE="$WORK/t105-probe.py"
+cat > "$T105_PROBE" <<'PYEOF'
+import os, sys
+src_path, manifest_path, dir_a, dir_b = sys.argv[1:5]
+text = open(src_path, encoding="utf-8").read()
+start_marker = '"$PYBIN" -c "'
+start = text.index(start_marker) + len(start_marker)
+end = text.index('\nPY_RC=$?')
+body = text[start:end].rstrip()
+if body.endswith('"'):
+    body = body[:-1]
+body = body.replace('\\"', '"')
+cut = body.index("\nif single:")
+body = body[:cut]
+os.environ.setdefault("VF_AGENTS_DIR", dir_a)
+os.environ.setdefault("VF_SKILLS_DIR", "/nonexistent-skills-t105")
+os.environ.setdefault("VF_STRICT", "false")
+os.environ.setdefault("VF_HOOK", "false")
+os.environ.setdefault("VF_ALLOW_EMPTY", "false")
+os.environ.setdefault("VF_SINGLE", "")
+os.environ.setdefault("VF_THIRD_PARTY_PREFIXES", "")
+os.environ.setdefault("VF_RESOLVE_AGENTS", "lenient")
+os.environ.setdefault("VF_REGISTRY_DIRS", "")
+os.environ.setdefault("VF_MANIFEST_FRESHNESS", "lenient")
+os.environ.setdefault("VF_MANIFEST", manifest_path)
+ns = {}
+exec(compile(body, "<check-agents-extract>", "exec"), ns)
+idx1 = ns["index_agents"](dir_a, [])
+idx2 = ns["index_agents"](dir_b, [])
+print("IDX1:" + ",".join(sorted(idx1.keys())))
+print("IDX2:" + ",".join(sorted(idx2.keys())))
+PYEOF
+T105_OUT="$("$PYBIN" "$T105_PROBE" "$CHECK" "$GATE_DIR/check-agents-manifest.json" "$T105_DIR_A" "$T105_DIR_B" 2>&1)"
+if echo "$T105_OUT" | grep -q "^IDX1:alpha$" && echo "$T105_OUT" | grep -q "^IDX2:beta$"; then
+  ok "T105 index_agents CLE par ses parametres : un second appel a agents_dir different rend un index different"
+else
+  ko "T105 (WR-01) : $T105_OUT"
+fi
+
+# MUT-WR1 : cache index_agents NON cle par parametres -> le second appel (dir B) recoit a tort
+# l'index du premier appel (dir A) — masquage prouve.
+MUT_WR1_DIR="$(make_gate_mutant WR1 0 "cle = (agents_dir_local, tuple(registry_dirs_local))" 'cle = ("__mutant__",)')"
+MUT_WR1_RC=$?
+if [ "$MUT_WR1_RC" -eq 0 ]; then
+  T105_OUT_MUT="$("$PYBIN" "$T105_PROBE" "$MUT_WR1_DIR/check-agents.sh" "$MUT_WR1_DIR/check-agents-manifest.json" "$T105_DIR_A" "$T105_DIR_B" 2>&1)"
+  if echo "$T105_OUT_MUT" | grep -q "^IDX2:alpha$"; then
+    ok "MUT-WR1 TUE : cache non cle -> le second appel (dir B) retourne a tort l'index de dir A"
+  else
+    ko "MUT-WR1 : cache mutant ne masque pas la distinction attendue : $T105_OUT_MUT"
+  fi
+fi
+
+# ---------- T106 — WR-02 : --file exclut un agent tiers comme le fait le mode repertoire -------
+# ---------- (matched_prefix), AVANT check_file()/linted_paths ----------------------------------
+T106_TIERS="$WORK/t106-gsd-planner.md"
+cat > "$T106_TIERS" <<'EOF'
+---
+name: gsd-planner
+description: Agent tiers GSD sans model ni memory, fixture T106 pour --file.
+---
+corps
+EOF
+OUT="$(bash "$CHECK" --file "$T106_TIERS" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "fichier(s) agent tiers non linte"; then
+  ok "T106 --file sur un agent tiers (prefixe gsd- par defaut) -> ignore comme en mode repertoire, exit 0"
+else
+  ko "T106 (rc=$RC) : $OUT"
+fi
+RC=0; bash "$CHECK" --file "$T106_TIERS" --skills-dir="$SK" --no-third-party-prefix >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T106b --file + --no-third-party-prefix -> gsd-planner linte normalement -> exit 1" || ko "T106b (rc=$RC)"
+
+# MUT-WR2 : exclusion neutralisee en mode --file -> l'agent tiers redevient linte (rc=1) meme
+# sans --no-third-party-prefix (le mode repertoire, lui, reste protege — motif propre au mode --file).
+MUT_WR2_DIR="$(make_gate_mutant WR2 0 "            if matched_prefix:" "            if False:")"
+MUT_WR2_RC=$?
+if [ "$MUT_WR2_RC" -eq 0 ]; then
+  RC_MUT=0; bash "$MUT_WR2_DIR/check-agents.sh" --file "$T106_TIERS" --skills-dir="$SK" >/dev/null 2>&1 || RC_MUT=$?
+  RC_ORIG=0; bash "$CHECK" --file "$T106_TIERS" --skills-dir="$SK" >/dev/null 2>&1 || RC_ORIG=$?
+  if [ "$RC_MUT" -eq 1 ] && [ "$RC_ORIG" -eq 0 ]; then
+    okmut WR2 "$RC_MUT" 1 "$RC_ORIG" 0
+  else
+    komut WR2 "rc_mutant=1 (linte a tort) et rc_original=0 (exclu)" "rc_mutant=1, rc_original=0" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
+  fi
+fi
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="

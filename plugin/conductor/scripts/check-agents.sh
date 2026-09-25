@@ -288,33 +288,46 @@ NOT_AGENTS = {\"contracts.md\", \"README.md\", \"AGENTS.md\"}
 # Task = alias legacy d'Agent depuis Claude Code v2.1.63 — traite a l'identique partout.
 AGENT_TOOL_NAMES = {\"Agent\", \"Task\"}
 
-def decouvrir_agents(racine):
+def decouvrir_agents(racine, refuses=None):
     \"\"\"D-10 (Phase 42, FABR-04) : decouverte RECURSIVE des agents sous racine, avec deux
     exclusions PROUVEES par mutation (MUT-D1, MUT-D2), chacune sur sa PROPRE ligne, unique dans
     le fichier : les dossiers caches (nom commencant par un point) et les dossiers *-references
     poses par l'installeur (plugin/_internal/vibeflow-update.sh, D7 — de la doc, jamais des
     agents). Aucun lien symbolique de dossier suivi (followlinks=False, pas de boucle). Fichiers
-    retenus : *.md dont le nom n'est pas dans NOT_AGENTS, a TOUTE profondeur. Rend une liste
-    TRIEE par chemin.\"\"\"
+    retenus : *.md dont le nom n'est pas dans NOT_AGENTS, a TOUTE profondeur, ET qui n'est pas
+    lui-meme un lien symbolique (A1, Phase 42 correction ciblee) — un .md en lien symbolique (vers
+    n'importe ou, a fortiori hors de racine) est REFUSE comme un dossier : jamais ajoute a
+    trouves, son contenu n'est jamais ouvert par cette fonction ni par un appelant. Quand
+    'refuses' est fourni (liste), chaque chemin refuse y est ajoute pour diagnostic par
+    l'appelant ; les appelants qui ne fournissent rien (index/registres) excluent silencieusement.
+    Rend une liste TRIEE par chemin.\"\"\"
     trouves = []
     for dirpath, dirnames, filenames in os.walk(racine, followlinks=False):
         dirnames[:] = [d for d in dirnames if not d.startswith('.')]
         dirnames[:] = [d for d in dirnames if not d.endswith('-references')]
         for fn in filenames:
             if fn.endswith('.md') and fn not in NOT_AGENTS:
-                trouves.append(os.path.join(dirpath, fn))
+                full = os.path.join(dirpath, fn)
+                if os.path.islink(full):
+                    if refuses is not None:
+                        refuses.append(full)
+                    continue
+                trouves.append(full)
     return sorted(trouves)
 
-_agent_index = None
+_agent_index_cache = {}
 def index_agents(agents_dir_local, registry_dirs_local):
     \"\"\"Index paresseux nom-de-fichier -> chemin (D-10) : decouvrir_agents sur agents_dir_local
     PUIS sur chaque registre (le PREMIER trouve l'emporte, agents_dir_local d'abord). Une SEULE
     decouverte sert la cible ET la resolution — resolve_agent_name la consulte au lieu de tester
-    <dossier>/<nom>.md a un seul niveau. Construite une fois par processus (parametres invariants
-    au sein d'un run).\"\"\"
-    global _agent_index
-    if _agent_index is not None:
-        return _agent_index
+    <dossier>/<nom>.md a un seul niveau. Cache CLE par ses parametres (WR-01, Phase 42 correction
+    ciblee) : un appel a agents_dir_local/registry_dirs_local differents ne doit JAMAIS reutiliser
+    l'index d'un appel precedent — sinon un second appel dans le meme run (agents_dir ou registre
+    different) recevrait silencieusement l'index du premier.\"\"\"
+    global _agent_index_cache
+    cle = (agents_dir_local, tuple(registry_dirs_local))
+    if cle in _agent_index_cache:
+        return _agent_index_cache[cle]
     index = {}
     for d in [agents_dir_local] + list(registry_dirs_local):
         if not d or not os.path.isdir(d):
@@ -322,7 +335,7 @@ def index_agents(agents_dir_local, registry_dirs_local):
         for p in decouvrir_agents(d):
             nom = os.path.basename(p)[:-3]
             index.setdefault(nom, p)
-    _agent_index = index
+    _agent_index_cache[cle] = index
     return index
 
 # D-01/D-02/D-03 : les six listes de reference (identifiants d'outils, champs de frontmatter,
@@ -860,9 +873,16 @@ def invariant_i5(base, fm, fmlines, dispatch):
 def construire_univers_dispatch(agents_dir_local, registry_dirs_local, single_local):
     \"\"\"I2/I3 (D-09) : univers = decouvrir_agents(agents_dir_local) (ou le seul fichier en mode
     --file) PLUS decouvrir_agents de chaque registre, deduplique par chemin REEL
-    (os.path.realpath). Rend la carte dispatched_by : nom-de-base -> liste des noms de fichiers
-    dispatcheurs (un agent qui se cite lui-meme ne compte pas) — la MEME resolution que le lint
-    des allowlists (resolve_agent_name), jamais un second mecanisme.\"\"\"
+    (os.path.realpath). Rend un tuple (dispatched_by, collisions) : dispatched_by = nom-de-base ->
+    liste des noms de fichiers dispatcheurs (un agent qui se cite lui-meme ne compte pas) — la
+    MEME resolution que le lint des allowlists (resolve_agent_name), jamais un second mecanisme.
+    collisions (CR-01, Phase 42 correction ciblee) = nom-de-base -> liste des chemins REELS
+    distincts qui le portent, des que ce nom est porte par PLUS D'UN chemin reel dans l'univers
+    connu (dossier linte + registres) : un meme fichier atteint par deux chemins (realpath
+    identique) n'en fait pas partie (deja deduplique ci-dessus), mais deux fichiers DISTINCTS de
+    meme nom de base masquent silencieusement l'un l'autre dans resolve_agent_name/index_agents
+    (premier trouve gagne) — I2/I3 doivent alors REFUSER de trancher plutot que de rendre un
+    verdict qui ignore la collision.\"\"\"
     chemins = [single_local] if single_local else decouvrir_agents(agents_dir_local)
     for rd in registry_dirs_local:
         if rd:
@@ -875,6 +895,10 @@ def construire_univers_dispatch(agents_dir_local, registry_dirs_local, single_lo
             continue
         vus.add(rp)
         univers.append(p)
+    noms_vers_chemins = {}
+    for p in univers:
+        noms_vers_chemins.setdefault(os.path.basename(p)[:-3], []).append(p)
+    collisions = {nom: sorted(chms) for nom, chms in noms_vers_chemins.items() if len(chms) > 1}
     dispatched_by = {}
     for p in univers:
         base_sans_ext = os.path.basename(p)[:-3]
@@ -894,7 +918,7 @@ def construire_univers_dispatch(agents_dir_local, registry_dirs_local, single_lo
             verdict = resolve_agent_name(nom_dispatche, agents_dir_local, registry_dirs_local, third_party_prefixes)
             if verdict == \"resolved\":
                 dispatched_by.setdefault(nom_dispatche, []).append(base_sans_ext)
-    return dispatched_by
+    return dispatched_by, collisions
 
 def invariant_i2(base, fm, dispatched_by):
     \"\"\"I2 (D-09, monde ferme, actif SEULEMENT sous --resolve-agents=strict) : un worker
@@ -1079,10 +1103,28 @@ def check_file(path):
             warnings.append(f\"{base} : champ inconnu du runtime — {k} (typo ? champ invente ? verifier la doc)\")
 
 if single:
-    if os.path.isfile(single):
+    if os.path.islink(single):
+        # A1 (Phase 42 correction ciblee) : un .md en lien symbolique est REFUSE comme un
+        # dossier — jamais ouvert, jamais reflete dans la sortie (le jeton d'un fichier vise
+        # hors arbre ne doit apparaitre ni en stdout ni en stderr).
+        errors.append(f\"{os.path.basename(single)} : lien symbolique refuse (A1) — un agent .md ne doit jamais etre un lien symbolique, contenu non lu\")
+    elif os.path.isfile(single):
         charger_referentiel()
-        check_file(single)
-        linted_paths.append(single)
+        try:
+            ftext = open(single, encoding=\"utf-8-sig\").read()
+        except OSError as e:
+            errors.append(f\"{os.path.basename(single)} : illisible ({e})\")
+        else:
+            # WR-02 (Phase 42 correction ciblee) : meme exclusion des agents tiers que la boucle
+            # par repertoire (matched_prefix) AVANT check_file()/linted_paths — sinon --file
+            # lintait un agent tiers que le mode repertoire aurait ecarte.
+            dname = agent_display_name(single, ftext)
+            matched_prefix = next((p for p in third_party_prefixes if p and dname.startswith(p)), None)
+            if matched_prefix:
+                thirdparty_files_total += 1
+            else:
+                check_file(single)
+                linted_paths.append(single)
     else:
         errors.append(f\"fichier introuvable : {single}\")
 else:
@@ -1091,8 +1133,16 @@ else:
     # le bash exporte VF_SINGLE=\"$SINGLE_FILE\" inconditionnellement, lu ci-dessus par
     # os.environ[\"VF_SINGLE\"] — sans --file c'est \"\", donc 'not single' teste la chaine vide).
     cible_absente = (not single) and not os.path.isdir(agents_dir)
-    files = decouvrir_agents(agents_dir)
-    if not files:
+    symlinks_refuses = []
+    files = decouvrir_agents(agents_dir, symlinks_refuses)
+    # A1 (Phase 42 correction ciblee) : chaque .md en lien symbolique sous agents_dir est REFUSE
+    # avec un diagnostic (comme les dossiers) — son contenu n'est jamais ouvert ici.
+    for sp in symlinks_refuses:
+        errors.append(f\"{os.path.basename(sp)} : lien symbolique refuse (A1) — un agent .md ne doit jamais etre un lien symbolique, contenu non lu\")
+    # Un dossier qui ne contient QUE des liens symboliques refuses n'est pas une cible vide
+    # (F13) : il porte deja au moins un refus explicite — le rc doit rester 1, jamais 0/3 par la
+    # branche cible-absente-ou-vide ci-dessous.
+    if not files and not symlinks_refuses:
         # D-20 (Phase 42) : hors --hook, une cible ABSENTE sort desormais INDETERMINE (exit 3,
         # jeton CIBLE-ABSENTE) dans TOUS les modes, y compris sans --strict — --allow-empty
         # tolere aussi une cible absente, au meme titre qu'une cible vide (I2). Cette branche ne
@@ -1134,7 +1184,14 @@ else:
 # apres la boucle de lint et avant le rapport. Jamais impute a un fichier de registre : seuls les
 # fichiers de linted_paths (reellement LINTES dans ce run, non tiers) sont soumis a I2/I3.
 if resolve_agents_strict and linted_paths:
-    dispatched_by = construire_univers_dispatch(agents_dir, registry_dirs, single if single else None)
+    dispatched_by, collisions_univers = construire_univers_dispatch(agents_dir, registry_dirs, single if single else None)
+    # CR-01 (Phase 42 correction ciblee) : une collision de nom dans l'univers connu (deux
+    # chemins REELS distincts partageant le meme nom de base) rend I2/I3 incapables de trancher
+    # correctement (resolve_agent_name/index_agents retiennent le premier trouve et masquent
+    # l'autre) — ERREUR explicite nommant les deux chemins, jamais un vert silencieux.
+    for nom_collision, chemins_collision in sorted(collisions_univers.items()):
+        chemins_str = \" et \".join(chemins_collision)
+        errors.append(f\"collision d'identite dans l'univers connu (D-09) — le nom '{nom_collision}' est porte par {chemins_str} : I2/I3 ne peuvent pas distinguer lequel est dispatche (monde ferme)\")
     for p in linted_paths:
         base = os.path.basename(p)
         try:
