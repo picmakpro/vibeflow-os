@@ -7,41 +7,44 @@ current_phase: 42
 current_phase_name: Fabrique — manifeste daté et invariants de doctrine du gate des agents
 status: executing
 created: 2026-09-23
-last_updated: "2026-09-25T00:35:00.000Z"
+last_updated: "2026-09-25T17:20:00.000Z"
 last_activity: 2026-09-25
 last_activity_desc: >-
-  Vague 3 (vf-coder, nœud exec-42-w3a) : plan 42-05 — Tâche 1 (I1, I4, I7 armés en erreur, T91/
-  T91b/T92/T95, MUT-I1/I4/I7 : 135 OK · 0 KO) exécutée et committée (23009b4). Tâche 2 (checkpoint
-  D-19/D-08, gate blocking) atteinte : sonde jouée sur 42-D19-MESURE.md, verdict ARBITRAGE-ABSENT
-  rc=1 — aucune section « ## Arbitrage D-08 » à ce jour. Exécution ARRÊTÉE là (décision de mission
-  revise-42c) : Tâche 3 (I5/I6) NON exécutée. SUMMARY partiel committé (26901d2, status: halted).
+  Vague 3 (vf-coder, nœud exec-42-w3) : reprise de 42-05 à la Tâche 3. Premier geste : sonde
+  de la Tâche 2 rejouée → ARBITRAGE-MAINTENIR, rc=0. Tâche 3 exécutée intégralement : quatre
+  juges reçoivent omitClaudeMd: true (un commit + bump patch séparé par module :
+  business-pilot-bundle/content-bundle/growth-bundle v2.0.11, design-orchestrator v1.5.10),
+  puis invariant_i6 (D-07, toujours armé) et invariant_i5 (D-08, armé car MAINTENIR) dans deux
+  commits distincts sur le gate — T93/T94/T96, MUT-I5/MUT-I6, 21 fixtures préexistantes remises
+  en conformité (147 OK · 0 KO). Doctrine du motif 3 consignée (42-CONTEXT.md + spec fabrique).
+  SUMMARY complet (Tâches 1-3), 42-05 coché au ROADMAP. FABR-03 reste non cochée (I2/I3 à 42-06).
   STATE tenu à la main (jamais state.begin-phase / state.record-session).
-stopped_at: "42-05 Tâche 2 franchie : arbitrage D-08 consigné (maintenir, 2026-09-25) — reprise sur 42-05 Tâche 3 (I5, I6)"
+stopped_at: "42-05 complet — prochain : 42-06 (découverte récursive D-10, I2/I3 monde fermé D-09)"
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 6
-  completed_plans: 4
-  percent: 67
+  completed_plans: 5
+  percent: 83
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 42 (Fabrique — manifeste daté et invariants de doctrine du gate des agents) — EXECUTING (vague 3/4 : 42-05 arrêté au checkpoint D-19/D-08, ARBITRAGE-ABSENT — attente arbitrage Samuel)
+Phase: 42 (Fabrique — manifeste daté et invariants de doctrine du gate des agents) — EXECUTING (vague 3/4 : 42-05 COMPLET — I1, I4, I5, I6, I7 armés ; prochain : 42-06)
 **Last Activity:** 2026-09-25
-**Last Activity Description:** Vague 3 exécutée (nœud exec-42-w3a) : plan 42-05 — Tâche 1 (I1, I4, I7 armés en erreur ; 135 OK · 0 KO ; corpus réel des six `plugin/*/agents` + neuf blueprints conforme, zéro diagnostic « invariant I ») exécutée et committée (23009b4). Tâche 2 (checkpoint `gate="blocking"`) atteinte : sonde D-19/D-08 jouée (4 auto-tests jetables + sonde réelle sur 42-D19-MESURE.md, jamais modifié) → `ARBITRAGE-ABSENT`, rc=1. Conformément à la décision de mission (nœud revise-42c, B1/B2) : ARRÊT RÉEL, Tâche 3 (I5, I6) NON exécutée. SUMMARY partiel committé (26901d2, `status: halted`). check-gate-touche.sh → DECLARE (rc=0).
+**Last Activity Description:** Vague 3 (nœud exec-42-w3) : reprise de 42-05 à la Tâche 3 sous ARBITRAGE-MAINTENIR (sonde de la Tâche 2 rejouée en premier geste, rc=0). Tâche 3 exécutée intégralement : quatre juges (`quality-gate-client`, `content-clarity-judge`, `growth-quality-judge`, `vf-design-judge`) reçoivent `omitClaudeMd: true` (un commit + bump patch séparé par module), puis `invariant_i6` (D-07, toujours armé) et `invariant_i5` (D-08, armé car MAINTENIR) dans deux commits distincts sur le gate. T93/T94/T96, MUT-I5/MUT-I6 tués ; 21 fixtures préexistantes remises en conformité (147 OK · 0 KO, CI-REPLAY fail=0). Doctrine du motif 3 de l'arbitrage consignée (42-CONTEXT.md D-08 + spec fabrique I5). SUMMARY de 42-05 complet (Tâches 1-3), 42-05 coché au ROADMAP. FABR-03 reste NON cochée dans REQUIREMENTS.md (I2/I3, monde fermé, restent à 42-06). check-gate-touche.sh → DECLARE (rc=0).
 
 ## Progress
 
 **Phases Complete:** 0
-**Current Plan:** 42-05 (vague 3, dépend de 42-04/42-02/42-03) — arrêté au checkpoint Tâche 2, en attente de l'arbitrage de Samuel sur D-08 (canal WhatsApp)
+**Current Plan:** 42-05 COMPLET (vague 3) — prochain plan : 42-06 (vague 4, découverte récursive D-10, I2/I3 en monde fermé D-09, conductor en mineure)
 
 ## Session Continuity
 
-**Stopped At:** Checkpoint D-19/D-08 de 42-05 (Tâche 2), ARBITRAGE-ABSENT — Tâche 1 complète et committée, Tâche 3 non atteinte
-**Resume File:** `.planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/42-D19-MESURE.md` (attend la transcription de l'arbitrage de Samuel sous la forme `## Arbitrage D-08` à trois champs prescrite par le plan 42-05 Tâche 2)
+**Stopped At:** 42-05 complet (Tâches 1-3) — prochain geste : orchestration de 42-06 par le manager
+**Resume File:** aucun — 42-06 n'a pas encore été exécuté ; son plan (`42-06-PLAN.md`) est déjà posé sous `.planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/`
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
