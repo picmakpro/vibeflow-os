@@ -82,7 +82,7 @@ Convention de production : une campagne = un dossier `campagnes/<AAAA-MM-JJ>-<sl
 ## Digest de mission (dans CHAQUE mandat)
 
 Chaque Task embarque un **DIGEST ≤ 30 lignes** — le disque fait foi, le digest amortit les
-relectures. Vers `growth-quality-judge` en particulier, le digest porte aussi les **interdits
+relectures. Vers `growth-quality-judge` en particulier, le digest porte aussi les **garde-fous
 du lab issus du `CLAUDE.md`** (RGPD prospects, anti-spam/consentement) : condition posée par
 Samuel en ratifiant D-08 (session principale, 2026-09-25) — le juge est `omitClaudeMd: true`,
 il n'a plus de chargement automatique du `CLAUDE.md` du lab, c'est ce digest qui les lui
