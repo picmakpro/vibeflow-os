@@ -18,6 +18,14 @@
   de scoring » du juge (jamais sur une mention perdue dans les références) et sur la section
   « ## Digest de mission » du manager, avec témoin discriminant par mutation. Rejouée rouge
   sur les fichiers pré-correction (git show HEAD, 0 occurrence attendue).
+- **Épisode « garde-fous » (2026-09-25, entre-temps) et son rejet** : pour repasser sous la
+  baseline de `check-instruction-budget.sh` après l'ajout ci-dessus, les commits 6ca1de8/
+  f257306 avaient remplacé « interdits » par « garde-fous » dans le paragraphe du digest de
+  `vf-growth-manager` — un contournement du marqueur textuel D-01, jamais une baisse de charge
+  réelle. Rejeté par arbitrage (option b) : « arbitrage Willy, AskUserQuestion session
+  principale, 2026-09-25 ». « Interdits » est rétabli ; la baseline de
+  `.planning/instruction-budget-baselines.tsv` est montée en conséquence (`vf-growth-manager.md`
+  24 → 25 instructions), sur la même citation d'arbitrage.
 
 Décision déléguée par Willy au head, session principale, 2026-09-25, en exécution de la
 condition de Samuel (e568307).
