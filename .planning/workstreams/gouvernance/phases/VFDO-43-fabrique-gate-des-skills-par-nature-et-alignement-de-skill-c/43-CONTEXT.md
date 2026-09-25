@@ -121,6 +121,14 @@ dérive (backlog séparé, D-Q5 — voir `entree_backlog_a_poser` du rapport de 
   global — contrairement à `vf-calibrate` qui union les deux depuis Phase 21, ADR-051-B, absent de
   la spec fabrique). Finding pour Samuel, consigné au BACKLOG par `vf-dev-manager` (commit
   `f4cc09b`), sans correctif dans cette phase.
+  **Erratum (vf-dev-manager, 2026-09-25) — le paragraphe ci-dessus inverse le fait.** Le mode large
+  UNIT déjà les deux scopes : `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` l.26-31 et
+  l.222 (« UNION scope projet + scope global, ADR-051-B »), prouvé par le dry-run consigné au
+  `.planning/BACKLOG.md` (commit `f4cc09b` : `vf-app-fixer` recevrait `mcp__context7__*`,
+  `mcp__xpoz-mcp__*` depuis `~/.claude.json`). Le finding pour Samuel porte sur cette union, pas
+  sur son absence. Conséquence pour le plan : le durcissement (b) « serveur nommé absent » se
+  juge contre l'**union** des deux scopes, jamais contre le seul `./.mcp.json`. Décision D-Q3
+  inchangée ; hors périmètre inchangé.
   — **Reversibility:** reversible — aucun changement de contrat de frontmatter existant ; les
   durcissements (a)(b) ajoutent des diagnostics sur des chemins aujourd'hui silencieux, (c) est
   une correction de prose.
@@ -268,7 +276,8 @@ goal de phase est planifiable au même titre que les cinq autres décisions.
 - Union des scopes projet/global du mode large MCP (`vf-mcp-consumer` chez `vf-app-fixer` ne
   résout que `./.mcp.json`, contrairement à `vf-calibrate` qui union projet + global depuis
   ADR-051-B) : finding pour Samuel, sans correctif dans cette phase (D-Q3) — posé au BACKLOG par
-  `vf-dev-manager`, commit `f4cc09b`.
+  `vf-dev-manager`, commit `f4cc09b`. **Même erratum qu'en D-Q3 (2026-09-25)** : le mode large
+  unit déjà projet et global ; le finding porte sur cette union.
 
 </deferred>
 
