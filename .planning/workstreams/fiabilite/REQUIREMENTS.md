@@ -865,6 +865,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | PROT-03 | Phase 41 | Complete — 2026-09-18, plan 41-18 : ADR-072 (doctrine des trois gardes et de leur limite de fond) et son résumé dans `CLAUDE.md` |
 | PROT-04 | Phase 41 | Complete — 2026-09-18, plan 41-14 : `check-baseline-arbitrage.sh`, neuf mutants tués, observation O-3 du `25-SECURITY.md` signalée et tracée |
 | PROT-05 | Phase 41 | Complete — 2026-09-18, plans 41-16/41-17 : exigence née du recadrage sans admin (décision du manager, 2026-09-17), `check-gate-touche.sh` (six mutants tués) et `check-push-sans-pr.sh` (cinq mutants tués) |
+| WSAW-01 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| WSAW-02 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| WSAW-03 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| WSAW-04 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| WSAW-05 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| WSAW-06 | Phase 41.1 | Pending — inscrite 2026-09-23 (décision session principale `vibeflow-head`, 2026-09-23) |
+| WSAW-07 | Phase 41.1 | Pending — inscrite 2026-09-23 ; seul écrivain de la doctrine pour les deux phases (décision du manager, 2026-09-23) |
+| WSCH-01 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| WSCH-02 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| WSCH-03 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| WSCH-04 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| WSCH-05 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1179,6 +1191,22 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   l'alias dans un fichier ordinaire, l'exempte dans un `CHANGELOG.md`, les deux dans la même
   fixture) ; diff nul vérifié sur `team-kernel.md`, `driver-lock.sh`, `dag.sh`,
   `guard-driver-lock.sh`.
+
+### Gates de planning workstream-aware (Phase 41.1 — INSERTED 2026-09-23)
+- [ ] **WSAW-01**: Un mécanisme **partagé** d'énumération des compartiments, dérivé du patron de `check-divergence.sh`, rend un chemin explicite par compartiment **présent sur le disque** ; il refuse de suivre un lien symbolique, ne consulte jamais `GSD_WORKSTREAM`/`VF_WORKSTREAM`/`.planning/active-workstream`, et ne rend pas vert sur zéro compartiment découvert dans un dépôt partitionné (trou d'`exit 0` de `check-divergence.sh` fermé, double boucle inline dédupliquée).
+- [ ] **WSAW-02**: Les consommateurs recensés en catégorie (b) « câblé en dur » — `ci.yml:353` et le verdict R5 `ci.yml:844` — et en catégorie (c) « suppose la racine » — `check-planning-state.sh`, `detect-gsd-engine.sh`, `discover-unintegrated-docs.sh` — passent par le mécanisme ou déclarent pourquoi ils n'en relèvent pas ; le recensement est versionné et rejoué par la CI.
+- [ ] **WSAW-03**: La CI rend **rouge** sur une fixture jetable à **trois** compartiments dont un cassé, et **vert** sur la même fixture sans le compartiment cassé — bascule exécutée dans l'étape CI elle-même, pas seulement dans la suite du module.
+- [ ] **WSAW-04**: Ajouter un compartiment suffit à le faire inspecter **sans modifier aucun câblage** — prouvé par mutation (ajout d'un troisième compartiment cassé) ; un mécanisme qui cesserait d'énumérer rend **rouge**, jamais vert à vide.
+- [ ] **WSAW-05**: Un gate de planning distingue **trois** états — conforme / **non initialisé** (compartiment créé, jamais travaillé : verdict propre et visible, jamais un échec) / corrompu. `gouvernance/STATE.md` (sortie nominale de `workstream create`, rc=2 mesuré le 2026-09-23) relève de « non initialisé » : généraliser le balayage ne transforme pas « muet » en « rouge ». Classement justifié gate par gate contre ADR-074, jamais par une exception nominative sur un compartiment. **Porte la définition unique de « compartiment conforme »**, consommée par WSCH-02 — une seconde définition est une condition d'arrêt.
+- [ ] **WSAW-06**: `workstreams.md` et ADR-069 **posent** la frontière gate / workflow — formulée par le **rôle** (`GSD_WORKSTREAM` et le pointeur = canal nominal de ce qui travaille ; un gate ne dérive jamais sa cible d'une valeur qu'un `export` peut changer, parce qu'il juge celui qui pourrait l'exporter), écrite comme **précision** d'ADR-069 (forme d'ADR-074 précisant ADR-031), datée, origine nommée (angle mort de la partition D-02, 2026-09-23), et constat explicite que **l'ancrage ADR-063 initial était erroné**. Décision de la session principale (`vibeflow-head`), 2026-09-23 — pas un arbitrage de Samuel.
+- [ ] **WSAW-07**: `workstreams.md` énonce le **choix au démarrage**, sa valeur (deux flux disjoints en parallèle), le **non-choix par défaut** pour un lab solo, et la **procédure de bascule** avec sa précondition vérifiable (aujourd'hui absentes : §1 ne dit que « `create <nom> --migrate-name <nom>` ») ; l'affirmation de §3 « l'état nominal de tous nos labs à ce jour » — **fausse depuis la PR #94** — est corrigée. **Seul écrivain** de `workstreams.md` et `docs/ADR.md` pour les deux phases.
+
+### Choix de la partition au démarrage (Phase 41.2 — INSERTED 2026-09-23)
+- [ ] **WSCH-01**: L'initialisation d'un lab pose **une** question en langage d'usage (« plusieurs personnes ou agents vont-ils travailler en parallèle sur des sujets séparés ? ») ; **zéro occurrence du mot « workstream »** dans ce qui est montré à l'utilisateur ; question sautée, session non interactive ou réponse négative ⇒ **planning unique**.
+- [ ] **WSCH-02**: Répondre oui crée les compartiments **par le moteur** (`workstream create`, aucune réimplémentation VibeFlow), puis VibeFlow les rend conformes : un compartiment créé par VibeFlow **naît avec un frontmatter complet**, sans réparation manuelle. « Conforme » = la définition unique de WSAW-05, **consommée et jamais redéfinie**.
+- [ ] **WSCH-03**: Un skill de bascule porte le geste pour un lab déjà démarré et **refuse** quand une phase est en vol — précondition d'ADR-069 lue sur un **champ du disque** nommé dans le plan, jamais rappelée en prose ; refus **prouvé par mutation**.
+- [ ] **WSCH-04**: **Preuve d'usage (critère d'échec de la phase)** — un lab neuf initialisé en mode partitionné, sur fixture jetable en CI, voit les gates de planning passer au **vert sur chaque compartiment** sans aucune réparation manuelle.
+- [ ] **WSCH-05**: Le contenu doctrinal du choix (valeur, non-choix par défaut, procédure de bascule et précondition) est **remis au manager**, qui le fait porter par WSAW-07. Cette phase **n'écrit ni `workstreams.md` ni `docs/ADR.md`** — deux écrivains sur un fichier de doctrine est le conflit que la parallélisation doit éviter.
 
 ### Transverse
 - [ ] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée — **satisfait sur la Phase 41 le 2026-09-18** : G-1/G-2/G-3 naissent chacun avec ses trois issues, vingt mutants tués mesurés sur les trois gardes plus neuf sur les deux outils de phase (recensement, contrôle de trace), total mesuré vingt-neuf, ligne canonique `✓ MUT-<n> TUE`, rc=0 sur les cinq suites

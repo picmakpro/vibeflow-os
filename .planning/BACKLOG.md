@@ -82,6 +82,82 @@ conventions de commit) reste à faire **par Samuel**. Un agent ne modifie pas le
 dépôt sur instruction relayée par un autre agent — la décision est authentique, c'est le canal qui ne
 convient pas pour ce fichier-là.
 
+## Les juges d'un artefact de planning ne gardent pas ce qu'on croit — mesuré 2026-09-23
+
+**Statut : constat mesuré, NON réparé. Différé volontairement** — réparer ici élargirait les Phases
+41.1/41.2 au-delà de leur périmètre (consigne de la session principale, 2026-09-23). Matrice établie
+sur fixtures jetables pendant la mission « généraliser le remède de partition »
+(`.planning/missions/2026-09-23-generalisation-remede-partition.md`).
+
+**1. `check-state-integrity.sh --file <chemin ABSOLU>` saute son invariant principal EN SILENCE.**
+Le script interpole `FILE_REL` verbatim dans `git show "$AGAINST_REF:$FILE_REL"` (l.201). Un chemin
+absolu fait échouer ce `git show` → `HAVE_BASELINE=0` → **l'invariant 1 (non-régression des
+compteurs, le cœur d'ADR-063) n'est jamais armé**. Il ne reste que le comptage des lignes `^Phase:`.
+Même fichier, même gate, deux verdicts :
+
+```
+--file /abs/…/switched/STATE.md                  → « aucune référence à HEAD … invariant ignoré »  rc=0
+--file .planning/workstreams/switched/STATE.md   → « current_phase introuvable »                   rc=2
+```
+
+C'est un **fail-open silencieux** : le gate rend vert ce qu'il devrait refuser, sans rien signaler.
+Découvert **deux fois indépendamment le même jour** — par la mesure de la matrice, et par un
+plan-checker frais qui constatait qu'une fixture de mutation était verte des deux côtés. La gravité
+tient au contexte : c'est le gate que la Phase 41.1 généralise à **tous** les compartiments.
+Généraliser un gate qui sait se taire, c'est généraliser le silence.
+
+**2. `check-dev-bootstrap.sh` est un ROUTEUR, pas un gate.** Son unique `exit 1` (l.241) est **à
+l'intérieur du programme `awk`** de `extract_frontmatter` : c'est le code de sortie de l'awk, donc le
+statut de retour de la fonction, jamais celui du script. Énumération des `exit` du script :
+`{"0":[100,122,301,328], "1":[241], "64":[95,101,108]}`. Deux compartiments identiques sauf
+`current_phase` rendent **le même rc=3** ; seul le stdout change (170 octets contre 0). Toute doctrine
+ou tout plan qui le compte comme un juge capable de refuser se trompe. *Sémantique inversée à
+connaître : pour ce script, `0` est le MAUVAIS état (démarrage incomplet).*
+
+**3. `status` n'est exigé par aucun juge au sens du code de sortie.** Son absence ne coûte que le
+signal `[gsd-engine]` (stdout 170 → 0 octet). Gardé par un signal, pas par un verdict.
+
+**4. `REQUIREMENTS.md` dans un compartiment n'est lu par AUCUN juge.** Les cinq juges interrogés —
+`check-state-integrity`, `check-dev-bootstrap`, `check-divergence`, `detect-gsd-engine`,
+`check-requirements-survival` — rendent des sorties **identiques** avec et sans lui. Le seul script
+qui le nomme vise `.planning/REQUIREMENTS.md` à la **racine**, exige un jalon clos, et plafonne à
+`rc=3`.
+
+> **Ne pas le retirer de la définition pour autant** (décision de la session principale, 2026-09-23) :
+> une exigence sans juge est une **dette à nommer, pas un champ à supprimer**. Le supprimer ferait
+> disparaître le besoin en même temps que le contrôle manquant. `REQUIREMENTS.md` reste dans WSAW-05 ;
+> ce qui manque, c'est son juge.
+
+**5. Aucune commande unique du moteur ne produit un compartiment pleinement conforme.**
+`workstream create` rend un stub (rc=2, `milestone` introuvable) ; `state.milestone-switch --ws`
+améliore mais ne suffit pas (rc=2, `current_phase` introuvable) ; `gsd-new-milestone --ws` n'est pas
+scriptable (workflow de 719 lignes, 7 gates `AskUserQuestion`, aucun drapeau de bypass). L'état qui
+satisfait tous les juges à la fois existe — il demande `state.milestone-switch` **plus** l'ajout à la
+main de `current_phase`, `status`, `ROADMAP.md` et d'au moins un dossier de phase cohérent.
+
+**Matrice mesurée** (fixture committée, chemins relatifs) :
+
+| état du compartiment | `check-state-integrity` | `check-dev-bootstrap` | `detect-gsd-engine` | `check-divergence` |
+|---|---|---|---|---|
+| stub nu (`workstream create`) | **2** | 0 `[bootstrap]` | 3 | 0 |
+| après `state.milestone-switch --ws` | **2** | 0 `[bootstrap]` | 0 | 0 |
+| idem + ROADMAP + REQUIREMENTS | **2** | 3 (stdout vide) | 0 | 0 |
+| conforme au sens WSAW-05 | **0** ✓ | 3 `[gsd-engine]` | 0 | 0 |
+| corrompu | **2** | 0 `[bootstrap]` | 3 | 0 |
+
+**TRANCHÉ le 2026-09-23** (décision de la session principale, sur remontée du manager) : le
+fail-open du point 1 est **fermé dans la Phase 41.1**. Ce n'est pas un élargissement de périmètre mais
+une **condition de validité de ce que la phase livre** — elle multiplie ce gate par N compartiments ;
+s'il sait rendre vert en sautant son invariant principal, elle industrialise un faux vert. Fermeture
+**au plus petit** : le chemin non résoluble est **rejeté** (code 64, erreur d'usage, message nommant
+la cause), jamais converti ni replié ; tout invariant sauté est **annoncé**, quel qu'en soit le
+motif ; et la fermeture se prouve par mutation — le même artefact fautif rend rouge en relatif et 64
+en absolu, et la fixture de `41.1-06` redevient discriminante.
+
+**Ce qui reste ouvert ici** : même une fois ce cas fermé, la **classe** « gate qui saute un invariant
+en silence » reste à balayer sur les autres gates du dépôt. C'est cette classe, et non l'instance,
+qui justifie cette entrée au backlog.
+
 # Backlog — idées différées (hors milestone courant)
 
 ## Formats de sortie hétérogènes entre les 12 suites de `dev-orchestrator` — DIFFÉRÉ
