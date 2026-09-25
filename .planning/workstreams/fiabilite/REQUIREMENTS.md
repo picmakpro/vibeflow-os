@@ -865,13 +865,13 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | PROT-03 | Phase 41 | Complete — 2026-09-18, plan 41-18 : ADR-072 (doctrine des trois gardes et de leur limite de fond) et son résumé dans `CLAUDE.md` |
 | PROT-04 | Phase 41 | Complete — 2026-09-18, plan 41-14 : `check-baseline-arbitrage.sh`, neuf mutants tués, observation O-3 du `25-SECURITY.md` signalée et tracée |
 | PROT-05 | Phase 41 | Complete — 2026-09-18, plans 41-16/41-17 : exigence née du recadrage sans admin (décision du manager, 2026-09-17), `check-gate-touche.sh` (six mutants tués) et `check-push-sans-pr.sh` (cinq mutants tués) |
-| WSAW-01 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
-| WSAW-02 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
-| WSAW-03 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
-| WSAW-04 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
-| WSAW-05 | Phase 41.1 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
-| WSAW-06 | Phase 41.1 | Pending — inscrite 2026-09-23 (décision session principale `vibeflow-head`, 2026-09-23) |
-| WSAW-07 | Phase 41.1 | Pending — inscrite 2026-09-23 ; seul écrivain de la doctrine pour les deux phases (décision du manager, 2026-09-23) |
+| WSAW-01 | Phase 41.1 | Complete — 2026-09-23, plans 41.1-01/02 : `vf_ws_enumerate` (codes 0/2/3, cinq cas de contrat + deux mutants tués) et `check-divergence.sh` qui la consomme, les deux boucles inline dédupliquées, le repli `CHECKED=0` qui sortait en 0 fermé (rc=2 mesuré) |
+| WSAW-02 | Phase 41.1 | Complete — 2026-09-23/24, plans 41.1-03/04/05/06 : les consommateurs (b) et (c) passent par la primitive ou déclarent leur motif ; recensement versionné de 21 consommateurs, re-mesuré à l'exécution et rejoué par la CI |
+| WSAW-03 | Phase 41.1 | Complete — 2026-09-24, plan 41.1-06 : fixture jetable à trois compartiments (`alpha`/`beta`/`gamma`), bascule exécutée dans l'étape CI elle-même — rouge avec le cassé (« S2 : compartiment « gamma » »), vert sans |
+| WSAW-04 | Phase 41.1 | Complete — 2026-09-24, plans 41.1-05/06 : fan-out par compartiment sans câblage supplémentaire (sonde `cablage_dur_restant=0`), et lint anti-oubli qui rougit sur un consommateur non recensé — jamais vert à vide (assertion d'univers non vide sur les deux volets) |
+| WSAW-05 | Phase 41.1 | Complete — 2026-09-24, plans 41.1-06/07 : trichotomie appliquée par le fan-out (`gouvernance` → notice non-initialisé + `AMBIGUITE-D02`, jamais un écart ; corrompu → rc=2 compté), définition unique portée par `workstreams.md` §6, identité à D-02 prouvée par `cmp` et `comm` |
+| WSAW-06 | Phase 41.1 | Complete — 2026-09-24, plan 41.1-07 : amendement daté d'ADR-069, frontière formulée par le rôle, ancrage ADR-063 erroné nommé (zéro occurrence de « workstream » mesurée sur la section, témoin de plage prouvé par mutation) |
+| WSAW-07 | Phase 41.1 | Complete — 2026-09-24, plan 41.1-07 : `workstreams.md` — procédure de bascule et sa précondition, choix au démarrage et non-choix par défaut, affirmation de §3 devenue fausse depuis la PR #94 corrigée |
 | WSCH-01 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
 | WSCH-02 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
 | WSCH-03 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |

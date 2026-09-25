@@ -139,7 +139,7 @@ documentation — same structure everywhere.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (87 suites in CI — the newest
+- **Auditable**: bash + `jq`, every script covered by its suite (89 suites in CI — the newest
   ones prove the multi-runtime CLI dispatch (RUNT-01/02) and the dev-scope hooks' exec form as
   actually installed, their exit-code contract, and the shared Python resolution), **idempotent**
   install with backup before overwrite.

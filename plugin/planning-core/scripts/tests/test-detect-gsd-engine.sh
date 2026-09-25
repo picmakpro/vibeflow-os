@@ -132,6 +132,87 @@ FAKE_HOME19="$TMP/home19"; mkdir -p "$FAKE_HOME19/.claude"
 FAKE_CCD19="$TMP/ccd19"; mkdir -p "$FAKE_CCD19/gsd-core"
 ( cd "$LAB" && env -u GSD_HOME HOME="$FAKE_HOME19" CLAUDE_CONFIG_DIR="$FAKE_CCD19" bash "$DETECT" --quiet ); check_exit "cas 19 : résolution via CLAUDE_CONFIG_DIR" 0 $?
 
+# --- Cas 20-25 : workstream-aware (Phase 41.1 / plan 41.1-03, D-01/D-04) -----------------------
+# Avant cette phase, un dépôt partitionné SANS STATE.md racine faisait conclure « Aucun moteur de
+# planning en place » (rc=3) alors que des compartiments existaient bel et bien sur le disque.
+
+check_bool() { # <description> <rc_de_la_condition>
+  if [ "$2" -eq 0 ]; then echo "  ✓ $1"; PASS=$((PASS+1));
+  else echo "  ✗ $1"; FAIL=$((FAIL+1)); fi
+}
+
+mk_ws_state() { # <lab> <nom_compartiment> <contenu_frontmatter_via_stdin>
+  mkdir -p "$1/.planning/workstreams/$2"
+  cat > "$1/.planning/workstreams/$2/STATE.md"
+}
+
+# Cas 20 (WSAW-CONFORME) : aucun STATE.md racine, un compartiment porte gsd_state_version → exit 0.
+LAB="$TMP/lab20"; mkdir -p "$LAB"
+mk_ws_state "$LAB" dev <<'EOF'
+---
+gsd_state_version: 1.0
+milestone: x
+current_phase: 1
+status: in_progress
+---
+EOF
+( cd "$LAB" && GSD_HOME="$FAKE_GSD" bash "$DETECT" --quiet ); check_exit "WSAW-CONFORME : compartiment conforme seul, pas de STATE.md racine" 0 $?
+
+# Cas 21 (WSAW-NONINIT) : le cas de référence `gouvernance/STATE.md` — frontmatter à 2 clés, sortie
+# nominale de `workstream create` (D-02/D-06). Jamais un échec.
+LAB="$TMP/lab21"; mkdir -p "$LAB"
+mk_ws_state "$LAB" gouvernance <<'EOF'
+---
+workstream: gouvernance
+created: 2026-09-23
+---
+EOF
+( cd "$LAB" && GSD_HOME="$FAKE_GSD" bash "$DETECT" --quiet ); check_exit "WSAW-NONINIT : frontmatter réduit (workstream:+created:) n'est pas « aucun moteur »" 0 $?
+
+# Cas 22 (WSAW-NONINIT, volet FLAG-1) : le verdict imprimé n'EMPRUNTE PAS le nom de la classe D-02
+# « non initialisé » — ce script ne compte pas les clés du frontmatter, il n'a donc pas les moyens
+# d'établir cette classe (un compartiment corrompu portant AUSSI ces deux clés passerait le test).
+# L'assertion porte sur DEUX clauses indissociables : un verdict de compartiment est bien IMPRIMÉ
+# (il nomme « gouvernance ») ET il n'emprunte pas le nom de classe. Sans la première clause, le cas
+# serait vert À VIDE sur le code d'avant cette phase (qui n'imprimait aucun verdict de compartiment,
+# donc aucune occurrence à trouver) et ne garderait rien.
+out22=$( cd "$LAB" && GSD_HOME="$FAKE_GSD" bash "$DETECT" 2>&1 )
+printf '%s\n' "$out22" | awk '
+  index($0, "gouvernance") > 0 { nomme++ }
+  index($0, "non initialisé") > 0 { emprunte++ }
+  END { exit ((nomme+0 >= 1 && emprunte+0 == 0) ? 0 : 1) }'
+check_bool "WSAW-NONINIT (FLAG-1) : le verdict nomme le compartiment SANS emprunter le nom de classe D-02 « non initialisé »" $?
+
+# Cas 23 (non-régression) : ni compartiment ni racine → terrain libre, exit 3 INCHANGÉ.
+LAB="$TMP/lab23"; mkdir -p "$LAB/.planning"
+( cd "$LAB" && GSD_HOME="$FAKE_GSD" bash "$DETECT" --quiet ); check_exit "non-régression : aucun compartiment ni racine → terrain libre" 3 $?
+
+# Cas 24 (DEGRAD-2) : `workstreams/` détourné en LIEN SYMBOLIQUE — `vf_ws_enumerate` rend 2, stdout
+# VIDE, exactement comme rc=3. Invariant de mission « aucune dégradation silencieuse » : le saut de
+# la priorité 2bis doit être ANNONCÉ sur stderr, pas subi en silence. MESURÉ sur le code d'avant
+# cette phase : rc=3, stderr VIDE — ce cas était donc rouge avant, vert après.
+LAB="$TMP/lab24"; mkdir -p "$LAB/.planning"
+ln -s /nonexistent-cible "$LAB/.planning/workstreams"
+err24=$( cd "$LAB" && GSD_HOME="$FAKE_GSD" bash "$DETECT" 2>&1 >/dev/null )
+printf '%s\n' "$err24" | awk 'index($0, "vf_ws_enumerate") > 0 { c++ } END { exit (c+0 >= 1 ? 0 : 1) }'
+check_bool "DEGRAD-2 : workstreams/ non vérifiable → le saut de la priorité 2bis est annoncé sur stderr" $?
+
+# Cas 25 (MUT-1, QUAL-01) : MUTATION — la primitive `vf_ws_enumerate` est neutralisée (stub rendant
+# 3, stdout vide) dans une COPIE de la politique ; le script doit alors RETOMBER sur son ancien
+# comportement racine-seule (rc=3) sur la fixture du cas 20. Preuve que c'est bien la consommation
+# de la primitive — et non la fixture — qui discrimine. Un TÉMOIN non muté encadre la mesure.
+MUTD="$TMP/mut-detect"; mkdir -p "$MUTD"
+cp "$DETECT" "$MUTD/detect-gsd-engine.sh"
+cp "$SCRIPT_DIR/workstream-policy.sh" "$MUTD/workstream-policy.sh"
+( cd "$TMP/lab20" && GSD_HOME="$FAKE_GSD" bash "$MUTD/detect-gsd-engine.sh" --quiet ); rc_temoin=$?
+printf '\n%s\n' 'vf_ws_enumerate() { return 3; }' >> "$MUTD/workstream-policy.sh"
+( cd "$TMP/lab20" && GSD_HOME="$FAKE_GSD" bash "$MUTD/detect-gsd-engine.sh" --quiet ); rc_mutant=$?
+[ "$rc_temoin" -eq 0 ] && [ "$rc_mutant" -eq 3 ]
+check_bool "MUT-1 : mutant tué — primitive neutralisée → retour au verdict racine-seule (témoin=$rc_temoin, mutant=$rc_mutant)" $?
+# Le fichier réel n'a jamais été muté (seule une copie l'a été) — prouvé par cmp.
+cmp -s "$DETECT" "$MUTD/detect-gsd-engine.sh"
+check_bool "MUT-1 (hygiène, vert par construction — ne garde rien, atteste seulement que la mutation est restée confinée à la copie) : le script réel est intact" $?
+
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
 [ "$FAIL" -eq 0 ]

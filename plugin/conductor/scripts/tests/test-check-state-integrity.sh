@@ -158,12 +158,15 @@ mkdir -p "$D/empty"
 git -C "$D" -c user.email=t@t -c user.name=t add -A >/dev/null 2>&1
 git -C "$D" -c user.email=t@t -c user.name=t commit -q -m "premier commit sans STATE.md" >/dev/null 2>&1
 write_state "$D" "m1" 1 1 0 1 0 "Phase: 1 en cours"
+# MISE À JOUR ASSUMÉE (plan 41.1-09, Q2) : l'attendu passe de 0 à 3. Le skip de l'Invariant 1
+# faute de baseline reste un NON-ÉCHEC, mais il cesse d'être INDISTINGUABLE du nominal pour un
+# appelant qui ne juge que le code de sortie. C'est le SEUL cas préexistant touché par ce plan.
 err="$(bash "$SCRIPT" --path "$D" --against 'HEAD~1' 2>&1 >/dev/null)"; rc=$?
 mentions_skip=0; case "$err" in *"rien à régresser"*) mentions_skip=1 ;; esac
-if [ "$rc" -eq 0 ] && [ "$mentions_skip" -eq 1 ]; then
-  ok "6b ref valide sans le fichier (1er commit du fichier) → exit 0, skip explicite"
+if [ "$rc" -eq 3 ] && [ "$mentions_skip" -eq 1 ]; then
+  ok "6b ref valide sans le fichier (1er commit du fichier) → exit 3 (SOUS RÉSERVE), skip explicite"
 else
-  ko "6b ref valide sans le fichier → exit 0, skip explicite" "rc=$rc err=[$err]"
+  ko "6b ref valide sans le fichier → exit 3, skip explicite" "rc=$rc err=[$err]"
 fi
 
 # === Cas 7 — --against sur une chaîne qui ne résout à aucun commit → exit 2, jamais un skip silencieux
@@ -489,13 +492,82 @@ else
   ko "22b discrimination du rejet" "rc_racine=$rc_racine22 rc_dev=$rc_dev22"
 fi
 
-# === Cas 23 — Contrat de sortie : aucun code hors {0, 1, 2, 64} =======================================
+# === Cas 23 — Contrat de sortie : aucun code hors {0, 1, 2, 3, 64} =======================================
 codes_ok=1
 for e in "GSD_WORKSTREAM=dev" "GSD_WORKSTREAM=inexistant" "GSD_WORKSTREAM=../workstreams/dev" "VF_STATE_WORKSTREAM=dev"; do
   r=$(env "$e" bash "$SCRIPT" --path "$D" >/dev/null 2>&1; echo $?)
-  case "$r" in 0|1|2|64) : ;; *) codes_ok=0 ;; esac
+  case "$r" in 0|1|2|3|64) : ;; *) codes_ok=0 ;; esac
 done
-if [ "$codes_ok" -eq 1 ]; then ok "23 contrat de sortie inchangé — aucun code hors {0, 1, 2, 64}"; else ko "23 contrat de sortie {0,1,2,64}" "code hors contrat"; fi
+if [ "$codes_ok" -eq 1 ]; then ok "23 contrat de sortie respecté — aucun code hors {0, 1, 2, 3, 64}"; else ko "23 contrat de sortie {0,1,2,3,64}" "code hors contrat"; fi
+
+# ======================================================================================================
+# Fermeture du fail-open de la baseline (plan 41.1-09). Deux vecteurs gardés (ABSOLU-64, Q2-NOBASE)
+# + une observation documentaire NON DISCRIMINANTE (OBS-REL-ABS), qui ne garde rien.
+# ======================================================================================================
+
+# === Cas ABSOLU-64 — un `--file` ABSOLU explicite est une ERREUR D'USAGE, jamais un vert dégradé =====
+# `git show "<ref>:<chemin absolu>"` ne résout JAMAIS : `HAVE_BASELINE` retombait à 0 en silence,
+# l'Invariant 1 était sauté, et le gate rendait 0 « conforme » sur un frontmatter qui ne l'est pas.
+# Mesuré sur le script d'AVANT ce plan avec CETTE fixture : rc=0, « ✓ … conforme ».
+D="$(mk_git_root c-absolu)"
+write_state "$D" '""' 1 1 0 1 0 "Phase: 1 en cours"
+err_abs="$(bash "$SCRIPT" --file "$D/.planning/STATE.md" 2>&1 >/dev/null)"; rc_abs=$?
+nomme_abs=0; case "$err_abs" in *absolu*) nomme_abs=1 ;; esac
+if [ "$rc_abs" -eq 64 ] && [ "$nomme_abs" -eq 1 ]; then
+  ok "ABSOLU-64 --file absolu explicite → exit 64, message nomme « absolu » (jamais une réparation silencieuse)"
+else
+  ko "ABSOLU-64 --file absolu explicite → exit 64" "rc=$rc_abs err=[$err_abs]"
+fi
+
+# === Cas OBS-REL-ABS — OBSERVATION documentaire, NON DISCRIMINANTE (ne garde rien) =================
+# ATTENTION AU CRÉDIT QU'ON LUI ACCORDE : ce cas est VERT contre le script pré-correctif COMME après
+# (avant : rc_abs=0 != rc_rel=2 ; après : rc_abs=64 != rc_rel=2 — les codes diffèrent dans les deux
+# états). Il ne peut donc PAS détecter la régression : il n'est pas un témoin de bascule, il DOCUMENTE
+# seulement que le même contenu corrompu rend deux verdicts distincts selon la forme de l'appel.
+# La garde effective de la fermeture du fail-open est le cas `ABSOLU-64`, lui mesuré ROUGE contre le
+# script pré-correctif. Ne pas compter ce cas comme une seconde garde.
+err_rel="$(bash "$SCRIPT" --path "$D" --file .planning/STATE.md 2>&1 >/dev/null)"; rc_rel=$?
+printf '%s' "$rc_abs" > "$TMP/rc-abs"; printf '%s' "$rc_rel" > "$TMP/rc-rel"
+if [ "$rc_rel" -ne 0 ] && [ "$rc_rel" -ne 64 ] && ! cmp -s "$TMP/rc-abs" "$TMP/rc-rel"; then
+  ok "OBS-REL-ABS observation NON DISCRIMINANTE (verte des deux côtés, ne garde rien — la garde est ABSOLU-64) — rc(absolu)=$rc_abs != rc(relatif)=$rc_rel, codes distincts (cmp)"
+else
+  ko "OBS-REL-ABS observation relatif/absolu (documentaire)" "rc_abs=$rc_abs rc_rel=$rc_rel err_rel=[$err_rel]"
+fi
+
+# === Cas Q2-NOBASE — compartiment NON COMMITÉ (absent de HEAD) + frontmatter CASSÉ ==================
+# POURQUOI CE CAS EXISTE : le `--file` absolu n'était qu'UNE porte du fail-open. Le vecteur GÉNÉRAL
+# est « absent de HEAD » — un compartiment NEUF, chemin relatif BIEN FORMÉ, frontmatter cassé.
+# Il a survécu à trois tours de revue parce que TOUTES les fixtures de ce parc sont COMMITÉES, et que
+# le seul cas qui emprunte le chemin `HAVE_BASELINE=0` (le 6b) le fait sur un frontmatter SAIN : il
+# prouve que le skip est annoncé, jamais que le skip peut BLANCHIR un frontmatter cassé.
+# *Une fixture qui ne reproduit pas la condition du terrain ne prouve rien du terrain* — celle-ci est
+# donc délibérément ABSENTE DE `HEAD`. Mesuré sur le script d'AVANT ce plan : non commité → rc=0
+# « ✓ … conforme », commité → rc=2 « milestone introuvable ou illisible ». Deux verdicts opposés sur
+# le même contenu, la seule différence étant la présence dans `HEAD`.
+D="$(mk_git_root c-q2nobase)"
+: > "$D/.gitkeep"
+git -C "$D" -c user.email=t@t -c user.name=t add -A >/dev/null 2>&1
+git -C "$D" -c user.email=t@t -c user.name=t commit -q -m "premier commit, sans compartiment" >/dev/null 2>&1
+mkdir -p "$D/.planning/workstreams/neuf"
+{
+  printf -- '---\n'
+  printf 'gsd_state_version: 1.0\n'
+  printf 'milestone: ""\n'
+  printf 'current_phase: 1\n'
+  printf -- '---\n\n'
+  printf 'Phase: 1 en cours\n'
+} > "$D/.planning/workstreams/neuf/STATE.md"
+# VOLONTAIREMENT aucun `git add` / `git commit` ici : c'est la condition du terrain.
+out_nc="$(bash "$SCRIPT" --path "$D" --file .planning/workstreams/neuf/STATE.md 2>&1)"; rc_nc=$?
+git -C "$D" -c user.email=t@t -c user.name=t add -A >/dev/null 2>&1
+git -C "$D" -c user.email=t@t -c user.name=t commit -q -m "compartiment neuf commité" >/dev/null 2>&1
+out_c="$(bash "$SCRIPT" --path "$D" --file .planning/workstreams/neuf/STATE.md 2>&1)"; rc_c=$?
+annonce_saut=0; case "$out_nc" in *"SAUTÉ"*) annonce_saut=1 ;; esac
+if [ "$rc_nc" -eq 3 ] && [ "$rc_c" -eq 2 ] && [ "$rc_nc" -ne "$rc_c" ] && [ "$annonce_saut" -eq 1 ]; then
+  ok "Q2-NOBASE compartiment absent de HEAD + frontmatter cassé → rc=$rc_nc (Invariant 1 SAUTÉ, annoncé au CODE) != rc=$rc_c une fois commité"
+else
+  ko "Q2-NOBASE compartiment non commité + frontmatter cassé" "rc_non_commite=$rc_nc (attendu 3) rc_commite=$rc_c (attendu 2) annonce_saut=$annonce_saut out_nc=[$out_nc]"
+fi
 
 # === Cas 16 — bash -n passe sur le script (syntaxe) ===================================================
 if bash -n "$SCRIPT" 2>/dev/null; then ok "16 bash -n passe sur check-state-integrity.sh"; else ko "16 bash -n passe" "syntax error"; fi

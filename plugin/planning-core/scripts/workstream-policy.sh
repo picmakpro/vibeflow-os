@@ -68,6 +68,14 @@
 #            2 = REJETÉ — un nom/pointeur a bien été trouvé mais il est hors politique ou non
 #                lisible sûrement. VF_WS_REASON porte la raison (énumération fermée, imprimable) ;
 #                VF_WS_NAME est vide. L'appelant applique la gradation ci-dessus.
+#   vf_ws_enumerate <planning_dir>
+#       Énumère les compartiments PRÉSENTS SUR LE DISQUE sous <planning_dir>/workstreams/*/ — un
+#       chemin ABSOLU par ligne sur stdout, jamais depuis GSD_WORKSTREAM/VF_WORKSTREAM/le pointeur.
+#       Chaque entrée est filtrée par vf_ws_path_nolink (lien exclu, jamais suivi).
+#       Rend 0 = au moins un compartiment listé · 2 = workstreams/ présent mais illisible, lien
+#           symbolique, PRÉSENT SANS ÊTRE UN RÉPERTOIRE (fichier régulier), ou vide après filtrage
+#           (JAMAIS un 0 de complaisance) · 3 = SILENCE, workstreams/ absent (dépôt non
+#           partitionné, état nominal).
 #
 # FRONTIÈRE ASSUMÉE, commune aux quatre : le pointeur de SESSION en `os.tmpdir()` n'est PAS lu —
 # il est indexé sur un condensat du chemin absolu réel du `.planning` ET sur une clé de session que
@@ -248,6 +256,58 @@ vf_ws_dir_resolve() { # <planning_dir> <nom>
   [ -d "$dir" ] || return 1
   VF_WS_DIR="$dir"
   return 0
+}
+
+# ÉNUMÉRATION — le PLURIEL de vf_ws_dir_resolve. Là où celle-ci résout UN compartiment dont le nom
+# vient de l'environnement, celle-ci liste TOUS les compartiments PRÉSENTS SUR LE DISQUE, et ne lit
+# AUCUN des quatre canaux (`GSD_WORKSTREAM`, `VF_WORKSTREAM`, `VF_STATE_WORKSTREAM`, le pointeur
+# `<planning_dir>/active-workstream`) : un gate qui déduirait sa cible d'une de ces valeurs rendrait
+# un verdict qu'un simple `export` déplace. La source de vérité est le disque, au moment de l'appel.
+# Le filtre anti-lien de `vf_ws_dir_resolve` est réappliqué aux DEUX niveaux — `workstreams/`
+# lui-même puis chaque entrée — par la même primitive, jamais réimplémentée.
+# Codes, aucun implicite :
+#   0 = au moins un compartiment retenu, un chemin ABSOLU par ligne sur stdout
+#   2 = `workstreams/` présent mais illisible : lien symbolique, PRÉSENT SANS ÊTRE UN RÉPERTOIRE
+#       (un `workstreams` en fichier régulier), ou vide après filtrage (toutes les entrées exclues,
+#       ou aucune entrée du tout). JAMAIS un 0 de complaisance sur ces cas : un appelant qui lirait
+#       « rien à signaler » sur un état non vérifiable est exactement le trou que WSAW-01 ferme.
+#   3 = SILENCE, `workstreams/` absent — dépôt non partitionné, état NOMINAL (même code que
+#       `check-divergence.sh` pour cet état).
+# Fonction PURE au sens de ce fichier : aucune écriture, aucun `exit` (elle est SOURCÉE), toutes ses
+# variables sont `local`.
+vf_ws_enumerate() { # <planning_dir> -> un chemin absolu par compartiment retenu, un par ligne
+  local planning="$1" root rc found=0 entry name
+  root="$planning/workstreams"
+  vf_ws_path_nolink "$root"; rc=$?
+  if [ "$rc" -eq 1 ]; then return 3; fi
+  if [ "$rc" -eq 2 ]; then
+    echo "[vf_ws_enumerate] $root est un lien symbolique — refus de le suivre, non vérifiable" >&2
+    return 2
+  fi
+  # Arrivé ici, `vf_ws_path_nolink` a rendu 0 — `$root` EXISTE et n'est PAS un lien. S'il n'est pas
+  # un répertoire (un `workstreams` en fichier régulier), ce n'est pas le SILENCE d'un dépôt non
+  # partitionné : c'est « présent mais illisible », que D-01 range explicitement sous le code 2.
+  if [ ! -d "$root" ]; then
+    echo "[vf_ws_enumerate] $root existe mais n'est pas un répertoire — présent mais illisible, non vérifiable" >&2
+    return 2
+  fi
+  for entry in "$root"/*/; do
+    [ -e "$entry" ] || continue   # nullglob absent : glob non expansé si aucune entrée
+    entry="${entry%/}"
+    name="$(basename "$entry")"
+    vf_ws_path_nolink "$entry"; rc=$?
+    if [ "$rc" -eq 2 ]; then
+      echo "[vf_ws_enumerate] compartiment « $name » est un lien symbolique — refus de le suivre, ignoré" >&2
+      continue
+    fi
+    [ "$rc" -eq 0 ] || continue
+    [ -d "$entry" ] || continue
+    printf '%s\n' "$(cd "$entry" && pwd)"
+    found=1
+  done
+  [ "$found" -eq 1 ] && return 0
+  echo "[vf_ws_enumerate] $root présent mais vide après filtrage — non vérifiable, jamais un 0 de complaisance" >&2
+  return 2
 }
 
 # MÊME MOTIF, UN CRAN PLUS BAS — fermer le répertoire en laissant le fichier ouvert, c'est verrouiller

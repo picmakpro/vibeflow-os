@@ -47,6 +47,11 @@
 #        et nomme le(s) numéro(s) impliqué(s) sous leur forme NORMALISÉE).
 #   2  = NON VÉRIFIABLE — hors dépôt git, `.planning/` illisible, `workstreams/` illisible ou lien
 #        symbolique, `workstream-policy.sh` introuvable. Jamais un 0 de complaisance.
+#        Depuis la Phase 41.1 (WSAW-01), ce code couvre AUSSI le cas où `vf_ws_enumerate` ne peut
+#        rendre AUCUN compartiment vérifiable : `workstreams/` présent mais illisible, lien
+#        symbolique, ou vide après le filtre anti-lien (toutes les entrées exclues, ou aucune
+#        entrée du tout) — ainsi que tout code de sortie imprévu de cette primitive. Ce chemin
+#        rendait 0 avant cette phase (repli `CHECKED=0` tombant dans le `else` de fin de script).
 #   3  = SILENCE — `.planning/workstreams/` absent : dépôt non partitionné, rien à vérifier. C'est
 #        l'état nominal de ce dépôt aujourd'hui, et de tout lab non partitionné.
 #   64 = erreur d'usage (argument inconnu, option sans valeur).
@@ -243,16 +248,19 @@ check_s4b() { # <label> <phases_dir> <state_file>
 }
 
 # --- S5 : un numéro de phase de workstream réapparaît en en-tête à la RACINE du ROADMAP ------------
-check_s5() {
+check_s5() { # <fichier des compartiments énumérés : un chemin absolu par ligne>
+  # La découverte des compartiments n'est PLUS refaite ici (Phase 41.1, WSAW-01) : elle vient du
+  # fichier produit par l'appel UNIQUE à `vf_ws_enumerate` dans le corps principal. Le filtre
+  # anti-lien (`vf_ws_path_nolink`) y est déjà appliqué par la primitive — le rappeler ici serait
+  # une seconde source de vérité sur « quels compartiments existent ».
+  local ws_list="$1"
   local root_roadmap="$PLANNING/ROADMAP.md"
   [ -f "$root_roadmap" ] || return 0
   local ws_nums="$TMPD/s5_ws_nums"; : > "$ws_nums"
-  local wsdir wsname p name num norm rc
-  for wsdir in "$WS_ROOT"/*/; do
-    [ -d "$wsdir" ] || continue
+  local wsdir wsname name num norm
+  while IFS= read -r wsdir; do
+    [ -n "$wsdir" ] || continue
     wsname="$(basename "$wsdir")"
-    vf_ws_path_nolink "$wsdir"; rc=$?
-    [ "$rc" -eq 0 ] || continue
     [ -d "$wsdir/phases" ] || continue
     while IFS= read -r name; do
       [ -n "$name" ] || continue
@@ -260,7 +268,7 @@ check_s5() {
       norm="$(normalize_num "$num")"
       printf '%s\t%s\n' "$norm" "$wsname" >> "$ws_nums"
     done < <(list_phase_dirs "$wsdir/phases")
-  done
+  done < "$ws_list"
   [ -s "$ws_nums" ] || return 0
 
   local headers="$TMPD/s5_root_headers"; : > "$headers"
@@ -293,24 +301,46 @@ if [ -d "$PLANNING/phases" ]; then
   check_s4b "racine" "$PLANNING/phases" "$PLANNING/STATE.md" || true
 fi
 
-# --- Compartiments de workstream -----------------------------------------------------------------
-for _wsdir in "$WS_ROOT"/*/; do
-  [ -d "$_wsdir" ] || continue
-  _wsname="$(basename "$_wsdir")"
-  vf_ws_path_nolink "$_wsdir"; _rc=$?
-  if [ "$_rc" -eq 2 ]; then
-    echo "[check-divergence] compartiment « $_wsname » est un lien symbolique — refus de le suivre, ignoré" >&2
-    continue
-  fi
-  [ "$_rc" -eq 0 ] || continue
-  CHECKED=1
-  check_s2 "$_wsname" "$_wsdir/phases" || true
-  check_s4a "$_wsname" "$_wsdir/phases" "$_wsdir/ROADMAP.md" || true
-  check_s4b "$_wsname" "$_wsdir/phases" "$_wsdir/STATE.md" || true
-done
+# --- Compartiments de workstream — une seule énumération, deux consommateurs ------------------
+# Source de vérité unique sur « quels compartiments existent » : `vf_ws_enumerate`
+# (planning-core/scripts/workstream-policy.sh, Phase 41.1 / D-01). Elle applique le filtre
+# anti-lien aux DEUX niveaux et DISTINGUE par code de sortie — c'est cette distinction que ce
+# bloc PROPAGE, au lieu de la faire disparaître dans un `else` de complaisance en fin de script.
+WS_LIST_TMP="$TMPD/ws_list"
+vf_ws_enumerate "$PLANNING" > "$WS_LIST_TMP" 2>&2
+_ws_rc=$?
+case "$_ws_rc" in
+  0)
+    while IFS= read -r _wsdir; do
+      [ -n "$_wsdir" ] || continue
+      _wsname="$(basename "$_wsdir")"
+      CHECKED=1
+      check_s2 "$_wsname" "$_wsdir/phases" || true
+      check_s4a "$_wsname" "$_wsdir/phases" "$_wsdir/ROADMAP.md" || true
+      check_s4b "$_wsname" "$_wsdir/phases" "$_wsdir/STATE.md" || true
+    done < "$WS_LIST_TMP"
+    ;;
+  3)
+    # SILENCE — `workstreams/` absent. Normalement inatteignable ici : la garde de tête (l.~90 et
+    # l.~109) sort déjà en 3 dans ce cas, avant tout sourcing. Branche défensive, conservée pour
+    # que le `case` énumère les TROIS codes contractuels de la primitive sans implicite.
+    : ;;
+  2)
+    echo "[check-divergence] vf_ws_enumerate : workstreams/ non vérifiable — $WS_ROOT" >&2
+    exit 2
+    ;;
+  *)
+    # Un `case` sans branche par défaut laisserait traverser tout code que `vf_ws_enumerate`
+    # pourrait un jour rendre hors de son contrat documenté (0/2/3, D-01) SANS toucher CHECKED :
+    # le script atteindrait le bloc de fin et rendrait 0 par défaut de complaisance, rouvrant
+    # EXACTEMENT le trou que la Phase 41.1 ferme. Un code imprévu est fail-closed.
+    echo "[check-divergence] vf_ws_enumerate : code de sortie imprévu ($_ws_rc, attendu 0/2/3) — non vérifiable" >&2
+    exit 2
+    ;;
+esac
 
 # --- S5, une seule fois, sur l'ensemble des compartiments de workstream ---------------------------
-check_s5 || true
+check_s5 "$WS_LIST_TMP" || true
 
 if [ "${#FAIL_MSGS[@]}" -gt 0 ]; then
   for _m in "${FAIL_MSGS[@]}"; do

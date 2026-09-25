@@ -341,16 +341,263 @@ jobs:
         run: bash scripts/check-version-sync.sh
 
       - name: check-state-integrity (anti-régression du frontmatter .planning/STATE.md, ADR-063)
-        # `--file` EXPLICITE, en défense en profondeur : sans lui, le fichier vérifié dépend de
-        # l'environnement (GSD_WORKSTREAM, pointeur in-repo) et un simple `export` suffirait à
+        # FAN-OUT PAR COMPARTIMENT (Phase 41.1, plan 41.1-06, WSAW-02/03/04/05). Cette étape
+        # invoquait `check-state-integrity.sh` UNE SEULE FOIS, sur un chemin littéral
+        # `.planning/workstreams/fiabilite/` (le compteur de la recette de ce plan exige ZÉRO occurrence
+        # du littéral complet, prose comprise) : tout compartiment ajouté restait invisible du
+        # gate, sans qu'aucun signal ne le dise. Elle ÉNUMÈRE désormais les compartiments présents
+        # via `vf_ws_enumerate` (plan 41.1-01) et invoque le gate UNE FOIS PAR COMPARTIMENT. Le
+        # script lui-même est INCHANGÉ (a2, single-target par conception, D-04) — c'est l'APPELANT
+        # qui devient a1 par fan-out.
+        #
+        # NOM DE L'ÉTAPE INCHANGÉ, DÉLIBÉRÉMENT : l'amendement du 2026-09-23 d'ADR-069
+        # (`docs/ADR.md`) désigne cette étape PAR SON NOM, précisément pour survivre à la réécriture
+        # que fait ce plan. Le renommer rendrait cet amendement faux. Ne pas le renommer.
+        #
+        # `--file` reste EXPLICITE, en défense en profondeur : sans lui, le fichier vérifié dépend
+        # de l'environnement (GSD_WORKSTREAM, pointeur in-repo) et un simple `export` suffirait à
         # détourner le gate vers un autre STATE.md — ou à le désarmer. Le script fait primer
         # `--file` sur toute résolution de workstream (FILE_REL_EXPLICIT) : c'est précisément le
-        # remède, il suffit que la CI l'utilise. Ce qui est protégé ici est le STATE.md VIVANT,
-        # celui dont ADR-063 garde les compteurs — depuis la partition D-02 (2026-09-23) ce fichier
-        # vit sous le compartiment par défaut `.planning/workstreams/fiabilite/`, plus à la racine
-        # (même cible que le R5 du bloc « conformité de la racine réelle », plus bas dans ce même
-        # fichier — cohérent avec lui).
-        run: bash plugin/conductor/scripts/check-state-integrity.sh --file .planning/workstreams/fiabilite/STATE.md
+        # remède, il suffit que la CI l'utilise. `--path` et `--file` sont TOUJOURS passés ENSEMBLE,
+        # `--file` RELATIF à `--path` — un `--file` absolu est rejeté en 64 depuis le plan 41.1-09,
+        # après avoir été un fail-open silencieux (l'Invariant 1 sauté sans un mot).
+        run: |
+          set -eu
+          . plugin/planning-core/scripts/workstream-policy.sh
+
+          # Classification D-02 INCONDITIONNELLE, par lecture directe du frontmatter — jamais une
+          # dépendance de forme sur un libellé que `check-state-integrity.sh` n'émet pas (a2, D-04 ;
+          # mesuré : ce script n'émet JAMAIS la sous-chaîne « non initialis »). Variables locales et
+          # préfixées `_ini_` : `f`/`fm`/`keys`/`nkeys` en globales écraseraient les compteurs d'une
+          # étape appelante sans un mot.
+          is_non_init() { # <fichier STATE.md> -> rc 0 = non-initialisé, rc 1 = pas ce cas
+            local _ini_f="$1" _ini_fm _ini_keys _ini_nkeys
+            [ -r "$_ini_f" ] || return 1
+            _ini_fm="$(awk '/^---[[:space:]]*$/{n++; if(n==1) next; if(n==2) exit} {print}' "$_ini_f")"
+            _ini_keys="$(printf '%s\n' "$_ini_fm" | awk -F: 'NF>=2{gsub(/^[[:space:]]+|[[:space:]]+$/,"",$1); print $1}' | sort -u | awk 'NF')"
+            _ini_nkeys="$(printf '%s\n' "$_ini_keys" | wc -l | tr -d ' ')"
+            [ "$_ini_nkeys" -eq 2 ] || return 1
+            printf '%s\n' "$_ini_keys" | grep -qx 'workstream' || return 1
+            printf '%s\n' "$_ini_keys" | grep -qx 'created' || return 1
+            return 0
+          }
+
+          # D-02 AMENDÉE le 2026-09-23 (arbitrage Samuel, AskUserQuestion session principale, Q1
+          # option b) : « non initialisé » porte sur le FRONTMATTER SEUL. La clause « ET aucun
+          # ROADMAP/REQUIREMENTS de contenu » est RETIRÉE — elle classait `gouvernance` CORROMPU
+          # (STATE.md à 2 clés MAIS ROADMAP.md de 180 lignes, REQUIREMENTS.md, phases/), contre le
+          # critère tranché « un compartiment neuf ne doit jamais rougir ». Ce que `is_non_init`
+          # laisse passer EN SILENCE est le cas INVERSE — un STATE.md TRONQUÉ jusqu'aux 2 clés
+          # nominales avec du contenu bien rempli à côté. Les deux ont la MÊME SIGNATURE SUR DISQUE.
+          # D'où le VERDICT NOMMÉ D'AMBIGUÏTÉ plus bas : une NOTICE qui nomme les DEUX lectures et
+          # n'en choisit AUCUNE. (Discriminer par l'historique git a été explicitement écarté : cela
+          # ferait dépendre le verdict d'un passé que rien ne garantit présent.)
+          ws_has_content() { # <dossier compartiment> -> rc 0 = du contenu existe à côté du STATE.md
+            local _wsc_d="$1"
+            if [ -s "$_wsc_d/ROADMAP.md" ]; then return 0; fi
+            if [ -s "$_wsc_d/REQUIREMENTS.md" ]; then return 0; fi
+            if [ -d "$_wsc_d/phases" ] && [ -n "$(ls -A "$_wsc_d/phases" 2>/dev/null || true)" ]; then return 0; fi
+            return 1
+          }
+          # NOTE : un compartiment SANS STATE.md du tout (`[ -r ... ]` faux) n'est PAS classé
+          # non-init — il tombe au script, qui rougira. C'EST VOULU : l'absence totale de STATE.md
+          # n'est ni la facture nominale de `workstream create` (qui en écrit TOUJOURS un) ni un
+          # état sain — c'est corrompu par construction, et l'échec audible est la posture
+          # fail-closed cohérente avec le reste de cette étape.
+
+          # Toutes les variables/fonctions internes sont locales et préfixées `_fsi_` : appelée
+          # depuis une étape qui tient ses propres compteurs `fail`/`note`, cette fonction ne doit
+          # JAMAIS pouvoir en effacer un (défaut déjà introduit puis fermé dans ce dépôt).
+          fanout_check_state_integrity() { # <lab_root> -> bilan sur stdout, rc 0 = 0 écart, 1 = >=1
+            local lab_root="$1" lab_root_abs planning_dir
+            local _fsi_fail=0 _fsi_n=0 _fsi_rc=0 _fsi_wsdir _fsi_rel _fsi_statefile_rel _fsi_out _fsi_rc2 _fsi_ws_list
+            lab_root_abs="$(cd "$lab_root" && pwd)"
+            planning_dir="$lab_root_abs/.planning"
+            _fsi_note() { echo "::error::check-state-integrity : $1"; _fsi_fail=$((_fsi_fail + 1)); }
+            _fsi_ws_list="$(vf_ws_enumerate "$planning_dir")" || _fsi_rc=$?
+            # rc=3 EST NOMINAL, JAMAIS UN ÉCART : le plan 41.1-01, PRODUCTEUR de la primitive,
+            # déclare « 3 = SILENCE, workstreams/ absent (dépôt non partitionné, ÉTAT NOMINAL) ».
+            # Le traiter comme un 2 ferait rougir la CI sur l'état que son propre producteur déclare
+            # nominal — masqué sur CE dépôt (partitionné), mais la fixture voisine du MÊME job
+            # construit des arbres NON partitionnés (BLOC 2a « non-régression FLAT »).
+            case "$_fsi_rc" in
+              0) : ;;
+              3)
+                echo "::notice::$planning_dir : aucun compartiment de workstream (workstreams/ absent) — dépôt NON PARTITIONNÉ, état NOMINAL. Rien à mesurer, AUCUN écart."
+                return 0
+                ;;
+              2)
+                echo "::error::vf_ws_enumerate $planning_dir : workstreams/ présent mais AUCUN compartiment vérifiable (lien symbolique, illisible, ou vide après filtrage anti-lien) — NON VÉRIFIABLE, jamais un vert par défaut"
+                return 1
+                ;;
+              *)
+                echo "::error::vf_ws_enumerate $planning_dir : code de sortie imprévu ($_fsi_rc, attendu 0/2/3) — NON VÉRIFIABLE"
+                return 1
+                ;;
+            esac
+            while IFS= read -r _fsi_wsdir; do
+              [ -n "$_fsi_wsdir" ] || continue
+              _fsi_n=$((_fsi_n + 1))
+              _fsi_rel="${_fsi_wsdir#"$lab_root_abs"/}"
+              _fsi_statefile_rel="$_fsi_rel/STATE.md"
+              if is_non_init "$_fsi_wsdir/STATE.md"; then
+                echo "::notice::$_fsi_rel : non initialisé (D-02 amendée, frontmatter réduit à workstream:+created:), jamais compté comme écart (D-06)"
+                if ws_has_content "$_fsi_wsdir"; then
+                  echo "::notice::$_fsi_rel : AMBIGUITE-D02 — frontmatter nominal MAIS du contenu existe à côté (ROADMAP.md / REQUIREMENTS.md / phases/). DEUX lectures sont possibles et AUCUNE n'est choisie ici : (i) compartiment NEUF alimenté par carve-out ; (ii) compartiment TRAVAILLÉ dont le STATE.md a été TRONQUÉ en plein cycle d'écriture. Les deux ont la même signature sur disque. Ceci est une NOTICE, PAS un échec — à lever à la main."
+                fi
+                continue
+              fi
+              _fsi_rc2=0
+              _fsi_out="$(bash plugin/conductor/scripts/check-state-integrity.sh --path "$lab_root_abs" --file "$_fsi_statefile_rel" 2>&1)" || _fsi_rc2=$?
+              echo "== check-state-integrity $_fsi_rel : rc=$_fsi_rc2 =="; printf '%s\n' "$_fsi_out"
+              case "$_fsi_rc2" in
+                0) : ;;
+                3)
+                  # CONSOMMATION DU SIGNAL produit par le plan 41.1-09 (d'où le depends_on).
+                  # 3 = conforme SOUS RÉSERVE : l'Invariant 1 (non-régression des compteurs,
+                  # ADR-063) a été SAUTÉ faute de baseline à HEAD. Ce N'EST PAS un écart — le faire
+                  # échouer rougirait sur TOUT compartiment neuf et casserait l'invariant à trois
+                  # états de D-02. Ce qui change : ne juger QUE le code de sortie laissait
+                  # l'annonce du gate sur stderr SEULEMENT, donc INVISIBLE AU VERDICT.
+                  echo "::notice::$_fsi_rel : INVARIANT1-SAUTE — conforme SOUS RÉSERVE, aucune baseline à HEAD (compartiment absent de HEAD ?). Seul l'Invariant 2 (compte de lignes '^Phase:') a été vérifié. Ceci est une NOTICE, PAS un écart."
+                  ;;
+                *)
+                  _fsi_note "$_fsi_rel : rc=$_fsi_rc2, attendu 0 (conforme), 3 (Invariant 1 sauté) ou non-initialisé détecté en amont par is_non_init"
+                  ;;
+              esac
+            done <<< "$_fsi_ws_list"
+            [ "$_fsi_n" -ge 1 ] || { echo "::error::aucun compartiment énuméré — vérité vide"; return 1; }
+            echo "== BILAN check-state-integrity ($lab_root_abs) : $_fsi_fail écart(s) sur $_fsi_n compartiment(s) =="
+            [ "$_fsi_fail" -eq 0 ]
+          }
+
+          # --- 0/6 + 1/6 + 2/6 BASCULE sur fixture jetable, AVANT le checkout réel (QUAL-01, patron
+          # `check-instruction-budget`). Sans elle, les deux branches RÉELLES de ce dépôt
+          # (`fiabilite` conforme, `gouvernance` non-initialisé) sont toutes DEUX vertes et aucune
+          # assertion de cette étape ne peut rougir. CONSTRUCTION : la fixture est COMMITÉE dans un
+          # état CONFORME, la mutation vient APRÈS dans le WORKING TREE — c'est le diff
+          # working-tree/HEAD que `check-state-integrity.sh` compare. Committer directement un état
+          # cassé rendrait la « réparation » ultérieure incapable de reverdir. --------------------
+          T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+          SAIN_FM='---
+          gsd_state_version: 1.0
+          milestone: m1
+          current_phase: 1
+          status: executing
+          progress:
+            total_phases: 1
+            completed_phases: 0
+            total_plans: 1
+            completed_plans: 0
+          ---
+          Phase: 1'
+          git -C "$T" init -q
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`sain`/`candidat`) : noms synthetiques construits par cette etape, jamais des compartiments du depot. Portee REGION et non step : le bloc 3/6 ci-dessous mesure la RACINE REELLE et doit rester sous le lint.
+          mkdir -p "$T/.planning/workstreams/sain" "$T/.planning/workstreams/candidat"
+          printf '%s\n' "$SAIN_FM" > "$T/.planning/workstreams/sain/STATE.md"
+          printf '%s\n' "$SAIN_FM" > "$T/.planning/workstreams/candidat/STATE.md"
+          git -C "$T" add -A
+          git -C "$T" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q -m "fixture-saine-initiale (deux compartiments conformes, commités)"
+
+          rc=0; fanout_check_state_integrity "$T" >"$T/out0" 2>&1 || rc=$?
+          cat "$T/out0"
+          echo "== 0/6 fixture saine construite : rc=$rc =="
+          [ "$rc" -eq 0 ] || { echo "::error::0/6 : fixture saine construite mais rc=$rc — construction invalide avant même la mutation"; exit 1; }
+
+          # --- 1/6 MUTATION en place (working tree, NON commitée) : candidat -> cassé -------------
+          cat > "$T/.planning/workstreams/candidat/STATE.md" <<'EOF'
+          ---
+          workstream: candidat
+          created: "2026-09-23"
+          milestone: ""
+          ---
+          Phase: 1
+          EOF
+          rc=0; fanout_check_state_integrity "$T" >"$T/out1" 2>&1 || rc=$?
+          cat "$T/out1"
+          echo "== 1/6 mutation appliquée (candidat cassé) : rc=$rc =="
+          [ "$rc" -eq 1 ] || { echo "::error::1/6 : rc=$rc, attendu 1 — le compartiment candidat cassé doit faire échouer le fan-out"; exit 1; }
+          grep -q 'candidat' "$T/out1" || { echo "::error::1/6 : le compartiment fautif « candidat » n'est pas nommé dans le verdict"; exit 1; }
+
+          # --- 2/6 RÉPARATION : working tree restauré À L'IDENTIQUE du contenu commité ------------
+          printf '%s\n' "$SAIN_FM" > "$T/.planning/workstreams/candidat/STATE.md"
+          # vf-allow-unregistered-planning-path:end
+          rc=0; fanout_check_state_integrity "$T" >"$T/out2" 2>&1 || rc=$?
+          cat "$T/out2"
+          echo "== 2/6 fixture réparée : rc=$rc =="
+          [ "$rc" -eq 0 ] || { echo "::error::2/6 : rc=$rc, attendu 0 — réparé à l'identique du commit, candidat doit redevenir conforme"; exit 1; }
+
+          # --- 3/6 mesure du CHECKOUT RÉEL (`fiabilite` conforme, `gouvernance` non-initialisé —
+          # ne doit JAMAIS échouer à cause de `gouvernance`, D-06). Aucun nom de compartiment n'est
+          # cité ici : ils viennent tous de `vf_ws_enumerate`. -------------------------------------
+          rc=0; fanout_check_state_integrity "." || rc=$?
+          echo "== 3/6 checkout réel : rc=$rc =="
+          if [ "$rc" -ne 0 ]; then exit 1; fi
+
+          # --- 4/6 rc=3 NOMINAL : un arbre AVEC `.planning` mais SANS `workstreams/` est un dépôt
+          # NON PARTITIONNÉ — état nominal. rc=0 et une NOTICE, jamais une ::error:: ni un rc=1. ---
+          T4=$(mktemp -d); mkdir -p "$T4/.planning"; git -C "$T4" init -q
+          git -C "$T4" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q --allow-empty -m init
+          rc=0; fanout_check_state_integrity "$T4" >"$T4/out4" 2>&1 || rc=$?
+          cat "$T4/out4"
+          echo "== 4/6 dépôt NON partitionné (rc=3 attendu de la primitive) : rc=$rc =="
+          [ "$rc" -eq 0 ] || { echo "::error::4/6 : rc=$rc, attendu 0 — un dépôt non partitionné est l'état NOMINAL, jamais un écart"; exit 1; }
+          # NB : `grep -q X && { ...; }` est un PIÈGE sous `bash -e {0}` (la forme réelle de GitHub
+          # Actions) — quand grep NE trouve RIEN (le cas SOUHAITÉ ici), la liste AND rend non-zéro
+          # et `set -e` fait échouer l'étape. Toujours la forme `if ! grep ...` / `if grep ...`.
+          if grep -q '::error::' "$T4/out4"; then echo "::error::4/6 : une ::error:: a été émise sur l'état nominal"; exit 1; fi
+          grep -q 'NON PARTITIONNÉ' "$T4/out4" || { echo "::error::4/6 : le verdict nominal n'est pas NOMMÉ"; exit 1; }
+          rm -rf "$T4"
+
+          # --- 5/6 compartiment NON COMMITÉ, absent de HEAD, frontmatter CASSÉ. C'est LA CONDITION
+          # DU TERRAIN que trois tours de vérification ont manquée, parce que TOUTES les fixtures du
+          # parc sont commitées. Attendu : rc=0 (ce n'est PAS un écart, sinon tout compartiment neuf
+          # rougirait) MAIS la notice INVARIANT1-SAUTE PRÉSENTE — la dégradation cesse d'être
+          # invisible au verdict. ------------------------------------------------------------------
+          T6=$(mktemp -d); git -C "$T6" init -q
+          git -C "$T6" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q --allow-empty -m init
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`neuf`) : compartiment synthetique non commite.
+          mkdir -p "$T6/.planning/workstreams/neuf"
+          printf '%s\n' '---' 'gsd_state_version: 1.0' 'milestone:' '---' 'Phase: 1' > "$T6/.planning/workstreams/neuf/STATE.md"
+          # vf-allow-unregistered-planning-path:end
+          rc=0; fanout_check_state_integrity "$T6" >"$T6/out5" 2>&1 || rc=$?
+          cat "$T6/out5"
+          echo "== 5/6 compartiment NON COMMITÉ, frontmatter cassé : rc=$rc =="
+          [ "$rc" -eq 0 ] || { echo "::error::5/6 : rc=$rc, attendu 0 — un compartiment neuf ne doit jamais rougir"; exit 1; }
+          grep -q 'INVARIANT1-SAUTE' "$T6/out5" || { echo "::error::5/6 : l'Invariant 1 a été sauté SANS que le verdict le dise — dégradation silencieuse"; exit 1; }
+          # contre-épreuve : LE MÊME fichier, une fois COMMITÉ, doit redevenir un ÉCART (rc=1)
+          git -C "$T6" add -A
+          git -C "$T6" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q -m "neuf commité"
+          rc=0; fanout_check_state_integrity "$T6" >"$T6/out5b" 2>&1 || rc=$?
+          echo "== 5/6b MÊME contenu, commité : rc=$rc =="
+          [ "$rc" -eq 1 ] || { echo "::error::5/6b : rc=$rc, attendu 1 — le même frontmatter cassé, commité, DOIT compter comme écart ; sinon la bascule ne prouve rien"; cat "$T6/out5b"; exit 1; }
+          rm -rf "$T6"
+
+          # --- 6/6 VERDICT NOMMÉ D'AMBIGUÏTÉ (D-02 amendée) : frontmatter nominal (2 clés) + du
+          # contenu à côté = NOTICE qui nomme les DEUX lectures, jamais un échec. Le MÊME
+          # frontmatter SANS contenu à côté = non-initialisé SIMPLE, SANS la notice. Les deux
+          # restent des NON-ÉCHECS. ----------------------------------------------------------------
+          T7=$(mktemp -d); git -C "$T7" init -q
+          git -C "$T7" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q --allow-empty -m init
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`carve`/`vierge`) : compartiments synthetiques de l'ambiguite D-02.
+          mkdir -p "$T7/.planning/workstreams/carve" "$T7/.planning/workstreams/vierge"
+          printf '%s\n' '---' 'workstream: carve' 'created: 2026-09-23' '---' > "$T7/.planning/workstreams/carve/STATE.md"
+          printf '%s\n' '---' 'workstream: vierge' 'created: 2026-09-23' '---' > "$T7/.planning/workstreams/vierge/STATE.md"
+          printf '# Feuille de route\n\n## Phase 1\n' > "$T7/.planning/workstreams/carve/ROADMAP.md"
+          # vf-allow-unregistered-planning-path:end
+          rc=0; fanout_check_state_integrity "$T7" >"$T7/out6" 2>&1 || rc=$?
+          cat "$T7/out6"
+          echo "== 6/6 ambiguïté D-02 : rc=$rc =="
+          [ "$rc" -eq 0 ] || { echo "::error::6/6 : rc=$rc, attendu 0 — ni le non-initialisé simple ni l'ambiguïté ne sont des échecs (D-02 amendée)"; exit 1; }
+          n_amb=$(awk 'index($0, "AMBIGUITE-D02") > 0 {c++} END{print c+0}' "$T7/out6")
+          [ "$n_amb" -eq 1 ] || { echo "::error::6/6 : $n_amb notice(s) AMBIGUITE-D02, attendu EXACTEMENT 1 — « carve » (contenu à côté) doit la produire, « vierge » (rien à côté) doit NE PAS la produire"; exit 1; }
+          grep -q 'carve : AMBIGUITE-D02' "$T7/out6" || { echo "::error::6/6 : la notice ne nomme pas le bon compartiment"; exit 1; }
+          rm -rf "$T7"
 
       - name: check-capability-activation (une entrée de doc ne promet pas un geste inerte, GSDA-09)
         # POURQUOI CE CÂBLAGE EXISTE. Le gate était livré, testé, distribué dans chaque lab — et
@@ -585,6 +832,7 @@ jobs:
           FIX="$(mktemp -d)"
           trap 'rm -rf "$FIX"' EXIT
 
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`dev`) du BLOC 1 : arbre partitionne synthetique. Portee REGION et non step, MESURE : le bloc 2b et R5 de la MEME etape mesurent la racine REELLE — une exemption au step desarmerait le lint sur l'angle mort d'origine.
           mkdir -p "$FIX/.planning/workstreams/dev"
           printf '# Projet fixture\n\nArbre synthétique construit par la CI.\n' > "$FIX/.planning/PROJECT.md"
           printf '{ "workflow": {} }\n' > "$FIX/.planning/config.json"
@@ -655,6 +903,7 @@ jobs:
             *".planning/workstreams/dev/STATE.md conforme"*) : ;;
             *) note "2/6 check-state-integrity : le fichier vérifié n'est pas .planning/workstreams/dev/STATE.md — la résolution de workstream n'a pas eu lieu" ;;
           esac
+          # vf-allow-unregistered-planning-path:end
 
           # --- 3/6 : injecteur de contexte. Contrat FAIL-OPEN : il sort TOUJOURS 0, l'assertion qui
           # porte la preuve est donc celle sur sa SORTIE, jamais celle sur son code. ---
@@ -840,10 +1089,198 @@ jobs:
             *) note "R4 check-workstream-pointer racine : le workstream « fiabilite » n'est pas nommé dans le verdict" ;;
           esac
 
+          # ═══ R5 — FAN-OUT PAR COMPARTIMENT (Phase 41.1, plan 41.1-06) ═════════════════════════
+          # R5 invoquait `check-state-integrity.sh` sur un chemin LITTÉRAL
+          # `.planning/workstreams/fiabilite/` : le second compartiment réel de ce dépôt
+          # (`gouvernance`) n'était jamais mesuré ici. Il énumère désormais via `vf_ws_enumerate`.
+          #
+          # LE SOURCING EST PRESCRIT ICI, PAS SEULEMENT DANS L'AUTRE ÉDITION : un `run:` GitHub
+          # Actions est un process shell NEUF par step — rien ne se partage entre steps, ni les
+          # fonctions ni le `. `. Sans cette ligne, `vf_ws_enumerate` rend 127 (`command not
+          # found`), la branche `*)` du `case` classe ce code en imprévu, et R5 serait ROUGE EN
+          # PERMANENCE. Le fichier sourcé n'a AUCUN effet de bord au chargement : il n'initialise que
+          # des globales `VF_WS_*`, qui ne collisionnent avec aucune variable de cette étape
+          # (laquelle n'utilise que `fail`/`note`/`rc`/`out`/`err`).
+          #
+          # Les fonctions ci-dessous sont VERBATIM de l'étape `check-state-integrity` — deux process
+          # shell distincts, donc deux copies, patron `check-instruction-budget` déjà en usage dans
+          # ce fichier. Leur `local` + préfixe `_fsi_`/`_ini_`/`_wsc_` garantit que le `fail`/`note`
+          # DE CETTE ÉTAPE (R1-R6, définis plus haut dans le MÊME bloc `run:`) ne sont JAMAIS
+          # touchés — c'est la fonction elle-même qui le tient, pas un commentaire qui le promet.
+          . plugin/planning-core/scripts/workstream-policy.sh
+
+          # Classification D-02 INCONDITIONNELLE, par lecture directe du frontmatter — jamais une
+          # dépendance de forme sur un libellé que `check-state-integrity.sh` n'émet pas (a2, D-04 ;
+          # mesuré : ce script n'émet JAMAIS la sous-chaîne « non initialis »). Variables locales et
+          # préfixées `_ini_` : `f`/`fm`/`keys`/`nkeys` en globales écraseraient les compteurs d'une
+          # étape appelante sans un mot.
+          is_non_init() { # <fichier STATE.md> -> rc 0 = non-initialisé, rc 1 = pas ce cas
+            local _ini_f="$1" _ini_fm _ini_keys _ini_nkeys
+            [ -r "$_ini_f" ] || return 1
+            _ini_fm="$(awk '/^---[[:space:]]*$/{n++; if(n==1) next; if(n==2) exit} {print}' "$_ini_f")"
+            _ini_keys="$(printf '%s\n' "$_ini_fm" | awk -F: 'NF>=2{gsub(/^[[:space:]]+|[[:space:]]+$/,"",$1); print $1}' | sort -u | awk 'NF')"
+            _ini_nkeys="$(printf '%s\n' "$_ini_keys" | wc -l | tr -d ' ')"
+            [ "$_ini_nkeys" -eq 2 ] || return 1
+            printf '%s\n' "$_ini_keys" | grep -qx 'workstream' || return 1
+            printf '%s\n' "$_ini_keys" | grep -qx 'created' || return 1
+            return 0
+          }
+
+          # D-02 AMENDÉE le 2026-09-23 (arbitrage Samuel, AskUserQuestion session principale, Q1
+          # option b) : « non initialisé » porte sur le FRONTMATTER SEUL. La clause « ET aucun
+          # ROADMAP/REQUIREMENTS de contenu » est RETIRÉE — elle classait `gouvernance` CORROMPU
+          # (STATE.md à 2 clés MAIS ROADMAP.md de 180 lignes, REQUIREMENTS.md, phases/), contre le
+          # critère tranché « un compartiment neuf ne doit jamais rougir ». Ce que `is_non_init`
+          # laisse passer EN SILENCE est le cas INVERSE — un STATE.md TRONQUÉ jusqu'aux 2 clés
+          # nominales avec du contenu bien rempli à côté. Les deux ont la MÊME SIGNATURE SUR DISQUE.
+          # D'où le VERDICT NOMMÉ D'AMBIGUÏTÉ plus bas : une NOTICE qui nomme les DEUX lectures et
+          # n'en choisit AUCUNE. (Discriminer par l'historique git a été explicitement écarté : cela
+          # ferait dépendre le verdict d'un passé que rien ne garantit présent.)
+          ws_has_content() { # <dossier compartiment> -> rc 0 = du contenu existe à côté du STATE.md
+            local _wsc_d="$1"
+            if [ -s "$_wsc_d/ROADMAP.md" ]; then return 0; fi
+            if [ -s "$_wsc_d/REQUIREMENTS.md" ]; then return 0; fi
+            if [ -d "$_wsc_d/phases" ] && [ -n "$(ls -A "$_wsc_d/phases" 2>/dev/null || true)" ]; then return 0; fi
+            return 1
+          }
+          # NOTE : un compartiment SANS STATE.md du tout (`[ -r ... ]` faux) n'est PAS classé
+          # non-init — il tombe au script, qui rougira. C'EST VOULU : l'absence totale de STATE.md
+          # n'est ni la facture nominale de `workstream create` (qui en écrit TOUJOURS un) ni un
+          # état sain — c'est corrompu par construction, et l'échec audible est la posture
+          # fail-closed cohérente avec le reste de cette étape.
+
+          # Toutes les variables/fonctions internes sont locales et préfixées `_fsi_` : appelée
+          # depuis une étape qui tient ses propres compteurs `fail`/`note`, cette fonction ne doit
+          # JAMAIS pouvoir en effacer un (défaut déjà introduit puis fermé dans ce dépôt).
+          fanout_check_state_integrity() { # <lab_root> -> bilan sur stdout, rc 0 = 0 écart, 1 = >=1
+            local lab_root="$1" lab_root_abs planning_dir
+            local _fsi_fail=0 _fsi_n=0 _fsi_rc=0 _fsi_wsdir _fsi_rel _fsi_statefile_rel _fsi_out _fsi_rc2 _fsi_ws_list
+            lab_root_abs="$(cd "$lab_root" && pwd)"
+            planning_dir="$lab_root_abs/.planning"
+            _fsi_note() { echo "::error::check-state-integrity : $1"; _fsi_fail=$((_fsi_fail + 1)); }
+            _fsi_ws_list="$(vf_ws_enumerate "$planning_dir")" || _fsi_rc=$?
+            # rc=3 EST NOMINAL, JAMAIS UN ÉCART : le plan 41.1-01, PRODUCTEUR de la primitive,
+            # déclare « 3 = SILENCE, workstreams/ absent (dépôt non partitionné, ÉTAT NOMINAL) ».
+            # Le traiter comme un 2 ferait rougir la CI sur l'état que son propre producteur déclare
+            # nominal — masqué sur CE dépôt (partitionné), mais la fixture voisine du MÊME job
+            # construit des arbres NON partitionnés (BLOC 2a « non-régression FLAT »).
+            case "$_fsi_rc" in
+              0) : ;;
+              3)
+                echo "::notice::$planning_dir : aucun compartiment de workstream (workstreams/ absent) — dépôt NON PARTITIONNÉ, état NOMINAL. Rien à mesurer, AUCUN écart."
+                return 0
+                ;;
+              2)
+                echo "::error::vf_ws_enumerate $planning_dir : workstreams/ présent mais AUCUN compartiment vérifiable (lien symbolique, illisible, ou vide après filtrage anti-lien) — NON VÉRIFIABLE, jamais un vert par défaut"
+                return 1
+                ;;
+              *)
+                echo "::error::vf_ws_enumerate $planning_dir : code de sortie imprévu ($_fsi_rc, attendu 0/2/3) — NON VÉRIFIABLE"
+                return 1
+                ;;
+            esac
+            while IFS= read -r _fsi_wsdir; do
+              [ -n "$_fsi_wsdir" ] || continue
+              _fsi_n=$((_fsi_n + 1))
+              _fsi_rel="${_fsi_wsdir#"$lab_root_abs"/}"
+              _fsi_statefile_rel="$_fsi_rel/STATE.md"
+              if is_non_init "$_fsi_wsdir/STATE.md"; then
+                echo "::notice::$_fsi_rel : non initialisé (D-02 amendée, frontmatter réduit à workstream:+created:), jamais compté comme écart (D-06)"
+                if ws_has_content "$_fsi_wsdir"; then
+                  echo "::notice::$_fsi_rel : AMBIGUITE-D02 — frontmatter nominal MAIS du contenu existe à côté (ROADMAP.md / REQUIREMENTS.md / phases/). DEUX lectures sont possibles et AUCUNE n'est choisie ici : (i) compartiment NEUF alimenté par carve-out ; (ii) compartiment TRAVAILLÉ dont le STATE.md a été TRONQUÉ en plein cycle d'écriture. Les deux ont la même signature sur disque. Ceci est une NOTICE, PAS un échec — à lever à la main."
+                fi
+                continue
+              fi
+              _fsi_rc2=0
+              _fsi_out="$(bash plugin/conductor/scripts/check-state-integrity.sh --path "$lab_root_abs" --file "$_fsi_statefile_rel" 2>&1)" || _fsi_rc2=$?
+              echo "== check-state-integrity $_fsi_rel : rc=$_fsi_rc2 =="; printf '%s\n' "$_fsi_out"
+              case "$_fsi_rc2" in
+                0) : ;;
+                3)
+                  # CONSOMMATION DU SIGNAL produit par le plan 41.1-09 (d'où le depends_on).
+                  # 3 = conforme SOUS RÉSERVE : l'Invariant 1 (non-régression des compteurs,
+                  # ADR-063) a été SAUTÉ faute de baseline à HEAD. Ce N'EST PAS un écart — le faire
+                  # échouer rougirait sur TOUT compartiment neuf et casserait l'invariant à trois
+                  # états de D-02. Ce qui change : ne juger QUE le code de sortie laissait
+                  # l'annonce du gate sur stderr SEULEMENT, donc INVISIBLE AU VERDICT.
+                  echo "::notice::$_fsi_rel : INVARIANT1-SAUTE — conforme SOUS RÉSERVE, aucune baseline à HEAD (compartiment absent de HEAD ?). Seul l'Invariant 2 (compte de lignes '^Phase:') a été vérifié. Ceci est une NOTICE, PAS un écart."
+                  ;;
+                *)
+                  _fsi_note "$_fsi_rel : rc=$_fsi_rc2, attendu 0 (conforme), 3 (Invariant 1 sauté) ou non-initialisé détecté en amont par is_non_init"
+                  ;;
+              esac
+            done <<< "$_fsi_ws_list"
+            [ "$_fsi_n" -ge 1 ] || { echo "::error::aucun compartiment énuméré — vérité vide"; return 1; }
+            echo "== BILAN check-state-integrity ($lab_root_abs) : $_fsi_fail écart(s) sur $_fsi_n compartiment(s) =="
+            [ "$_fsi_fail" -eq 0 ]
+          }
+
+          # R5a — BASCULE FIXTURE (QUAL-01) : sans elle, les deux branches RÉELLES de ce dépôt
+          # (`fiabilite` conforme, `gouvernance` non-initialisé) sont toutes DEUX vertes et R5 ne
+          # porterait aucune assertion capable de rougir. Fixture COMMITÉE conforme, puis mutation
+          # du WORKING TREE, jamais un état cassé commité directement.
+          T5=$(mktemp -d)
+          SAIN_FM='---
+          gsd_state_version: 1.0
+          milestone: m1
+          current_phase: 1
+          status: executing
+          progress:
+            total_phases: 1
+            completed_phases: 0
+            total_plans: 1
+            completed_plans: 0
+          ---
+          Phase: 1'
+          git -C "$T5" init -q
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`sain`/`candidat`) de la bascule R5a : noms synthetiques.
+          mkdir -p "$T5/.planning/workstreams/sain" "$T5/.planning/workstreams/candidat"
+          printf '%s\n' "$SAIN_FM" > "$T5/.planning/workstreams/sain/STATE.md"
+          printf '%s\n' "$SAIN_FM" > "$T5/.planning/workstreams/candidat/STATE.md"
+          git -C "$T5" add -A
+          git -C "$T5" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q -m "fixture-saine-r5"
+          cat > "$T5/.planning/workstreams/candidat/STATE.md" <<'EOF'
+          ---
+          workstream: candidat
+          created: "2026-09-23"
+          milestone: ""
+          ---
+          Phase: 1
+          EOF
           rc=0
-          out="$(bash plugin/conductor/scripts/check-state-integrity.sh --file .planning/workstreams/fiabilite/STATE.md 2>&1)" || rc=$?
-          echo "== R5 check-state-integrity racine (compartiment fiabilite) : rc=$rc =="; printf '%s\n' "$out"
-          [ "$rc" -eq 0 ] || note "R5 check-state-integrity racine : rc=$rc, attendu 0 (conforme)"
+          fanout_check_state_integrity "$T5" >"$T5/r5out1" 2>&1 || rc=$?
+          cat "$T5/r5out1"
+          echo "== R5a bascule fixture (candidat cassé, non commité) : rc=$rc =="
+          if [ "$rc" -ne 1 ]; then
+            note "R5a : bascule fixture n'a pas rougi comme attendu (rc=$rc, attendu 1) — QUAL-01 non prouvée"
+          fi
+          if ! grep -q 'candidat' "$T5/r5out1"; then
+            note "R5a : le compartiment fautif « candidat » n'est pas nommé dans le verdict"
+          fi
+          # bascule inverse : réparé à l'identique du commit -> doit reverdir
+          printf '%s\n' "$SAIN_FM" > "$T5/.planning/workstreams/candidat/STATE.md"
+          # vf-allow-unregistered-planning-path:end
+          rc=0
+          fanout_check_state_integrity "$T5" >"$T5/r5out1b" 2>&1 || rc=$?
+          echo "== R5a' fixture réparée : rc=$rc =="
+          if [ "$rc" -ne 0 ]; then
+            note "R5a' : rc=$rc, attendu 0 — réparé à l'identique du commit, la fixture doit reverdir"
+            cat "$T5/r5out1b"
+          fi
+          rm -rf "$T5"
+
+          # R5 — CHECKOUT RÉEL : chaque compartiment présent est mesuré, aucun nom en dur.
+          # `gouvernance` (non-initialisé, D-06) n'y compte JAMAIS comme écart.
+          R5TMP=$(mktemp -d)
+          rc=0
+          fanout_check_state_integrity "." >"$R5TMP/r5out2" 2>&1 || rc=$?
+          cat "$R5TMP/r5out2"
+          echo "== R5 check-state-integrity racine (fan-out par compartiment énuméré) : rc=$rc =="
+          if [ "$rc" -ne 0 ]; then
+            note "R5 check-state-integrity racine : rc=$rc, attendu 0 — $(awk '/^== BILAN check-state-integrity/{l=$0} END{print l}' "$R5TMP/r5out2")"
+          fi
+          rm -rf "$R5TMP"
 
           rc=0
           out="$(env -u GSD_WORKSTREAM -u VF_WORKSTREAM -u VF_BOOTSTRAP_WORKSTREAM \
@@ -882,10 +1319,26 @@ jobs:
           trap 'rm -rf "$FIX"' EXIT
 
           # --- 1. Fixture PROPRE, partitionnée, un seul numéro de phase enregistré ---------------
+          # vf-allow-unregistered-planning-path:begin — FIXTURE JETABLE (`alpha`/`beta`/`gamma`) de check-divergence : trois compartiments synthetiques. Le bloc 5/5 ci-dessous, hors region, mesure la racine REELLE.
           mkdir -p "$FIX/.planning/workstreams/alpha/phases/VFDO-05-x-registered"
           echo stub > "$FIX/.planning/workstreams/alpha/phases/VFDO-05-x-registered/PLAN.md"
           printf '%s\n' "### Phase 05: registered" > "$FIX/.planning/workstreams/alpha/ROADMAP.md"
           printf '%s\n' "---" "progress:" "  completed_phases: 0" "---" > "$FIX/.planning/workstreams/alpha/STATE.md"
+
+          # --- 1bis. DEUX compartiments supplémentaires, dans la MÊME fixture (WSAW-03/D-05).
+          #     Ils sont créés AVANT le `git add` UNIQUE ci-dessous : aucun ajout partiel, sinon
+          #     `check-divergence.sh` serait aveugle à la casse du troisième (T-41.1-12).
+          #     Ni `beta` ni `gamma` n'est nommé AILLEURS dans ce fichier — ni dans une liste de
+          #     compartiments à vérifier, ni dans une condition. Leur seule présence sur le disque
+          #     de la fixture suffit à ce qu'ils soient inspectés : C'EST la preuve WSAW-04, pas une
+          #     assertion supplémentaire à écrire. -------------------------------------------------
+          mkdir -p "$FIX/.planning/workstreams/beta/phases/VFDO-02-x-registered"
+          echo stub > "$FIX/.planning/workstreams/beta/phases/VFDO-02-x-registered/PLAN.md"
+          printf '%s\n' "### Phase 02: registered" > "$FIX/.planning/workstreams/beta/ROADMAP.md"
+
+          mkdir -p "$FIX/.planning/workstreams/gamma/phases/VFDO-09-x-registered"
+          echo stub > "$FIX/.planning/workstreams/gamma/phases/VFDO-09-x-registered/PLAN.md"
+          printf '%s\n' "### Phase 09: registered" > "$FIX/.planning/workstreams/gamma/ROADMAP.md"
 
           # check-divergence.sh exige un dépôt git (--show-toplevel) — même contrainte que
           # check-state-integrity.sh dans l'étape précédente.
@@ -896,18 +1349,48 @@ jobs:
 
           rc=0
           out="$(bash plugin/conductor/scripts/check-divergence.sh --path "$FIX" 2>&1)" || rc=$?
-          echo "== 1/3 fixture propre : rc=$rc =="; printf '%s\n' "$out"
-          [ "$rc" -eq 0 ] || note "1/3 fixture propre : rc=$rc, attendu 0 (conforme)"
+          echo "== 1/5 fixture propre (3 compartiments : alpha, beta, gamma) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "1/5 fixture propre : rc=$rc, attendu 0 (conforme, 3 compartiments)"
 
-          # --- 2. MUTATION EN PLACE de la MÊME fixture (jamais reconstruite) : deuxième dossier ---
-          #        partageant le même préfixe numérique — le shape orphan/S2 déjà prouvé au Task 1.
-          mkdir -p "$FIX/.planning/workstreams/alpha/phases/VFDO-05-y-orphan"
-          echo stub > "$FIX/.planning/workstreams/alpha/phases/VFDO-05-y-orphan/PLAN.md"
+          # --- 2. MUTATION du TROISIÈME compartiment (`gamma`), sur la MÊME fixture, sans la
+          #        reconstruire : deuxième dossier de phase partageant le même préfixe numérique
+          #        (shape S2/orphan). `alpha` et `beta` restent CONFORMES à côté — leur conformité
+          #        ne doit pas masquer la casse de `gamma`. ------------------------------------------
+          mkdir -p "$FIX/.planning/workstreams/gamma/phases/VFDO-09-y-orphan"
+          echo stub > "$FIX/.planning/workstreams/gamma/phases/VFDO-09-y-orphan/PLAN.md"
 
           rc=0
           out="$(bash plugin/conductor/scripts/check-divergence.sh --path "$FIX" 2>&1)" || rc=$?
-          echo "== 2/3 fixture MUTÉE (même arbre, dossier dupliqué ajouté) : rc=$rc =="; printf '%s\n' "$out"
-          [ "$rc" -eq 1 ] || note "2/3 fixture mutée : rc=$rc, attendu 1 (S2, divergence détectée) — le step ne serait pas discriminant en CI réelle non plus"
+          echo "== 2/5 fixture MUTÉE (gamma cassé, alpha/beta intacts) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 1 ] || note "2/5 : rc=$rc, attendu 1 (S2 sur gamma ; alpha/beta conformes n'y font pas obstacle)"
+          case "$out" in
+            *"gamma"*) : ;;
+            *) note "2/5 : le compartiment fautif « gamma » n'est pas nommé dans le verdict" ;;
+          esac
+
+          # --- 3. RÉPARATION EN PLACE du troisième compartiment (dossier orphelin retiré) — la
+          #        bascule INVERSE exigée par le ROADMAP. Sans elle, une preuve rouge seule ne
+          #        distingue pas « sait détecter » de « rend toujours 1 par accident ». ------------
+          rm -rf "$FIX/.planning/workstreams/gamma/phases/VFDO-09-y-orphan"
+
+          rc=0
+          out="$(bash plugin/conductor/scripts/check-divergence.sh --path "$FIX" 2>&1)" || rc=$?
+          echo "== 3/5 fixture RÉPARÉE (gamma revenu conforme) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "3/5 : rc=$rc, attendu 0 (bascule inverse : cassé → réparé doit revenir vert)"
+
+          # --- 4. MUTATION EN PLACE de la MÊME fixture (jamais reconstruite) : deuxième dossier ---
+          #        partageant le même préfixe numérique — le shape orphan/S2 déjà prouvé au Task 1.
+          #        ASSERTION PRÉEXISTANTE, INCHANGÉE sur le fond (seul son numéro bouge) : elle
+          #        tourne désormais AU MILIEU d'une fixture à trois compartiments, et doit continuer
+          #        de rougir sur `alpha`.
+          mkdir -p "$FIX/.planning/workstreams/alpha/phases/VFDO-05-y-orphan"
+          echo stub > "$FIX/.planning/workstreams/alpha/phases/VFDO-05-y-orphan/PLAN.md"
+          # vf-allow-unregistered-planning-path:end
+
+          rc=0
+          out="$(bash plugin/conductor/scripts/check-divergence.sh --path "$FIX" 2>&1)" || rc=$?
+          echo "== 4/5 fixture MUTÉE (même arbre, dossier dupliqué ajouté sur alpha) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 1 ] || note "4/5 fixture mutée : rc=$rc, attendu 1 (S2, divergence détectée) — le step ne serait pas discriminant en CI réelle non plus"
 
           rm -rf "$FIX"
 
@@ -917,16 +1400,99 @@ jobs:
           #        partitionnée et le gate y restait silencieux (rc=3) — c'est l'ancienne
           #        assertion. Depuis la migration, la racine expose deux compartiments
           #        (`fiabilite`/`gouvernance`) et le gate doit désormais s'y prononcer CONFORME
-          #        (rc=0, aucun signal S2/S4/S5), au même titre que le point 1/3 sur la fixture
+          #        (rc=0, aucun signal S2/S4/S5), au même titre que le point 1/5 sur la fixture
           #        propre.
           rc=0
           out="$(bash plugin/conductor/scripts/check-divergence.sh --path . 2>&1)" || rc=$?
-          echo "== 3/3 racine (checkout CI, partitionnée par défaut) : rc=$rc =="; printf '%s\n' "$out"
-          [ "$rc" -eq 0 ] || note "3/3 racine : rc=$rc, attendu 0 (dépôt partitionné conforme, aucun signal S2/S4/S5)"
+          echo "== 5/5 racine (checkout CI, partitionnée par défaut) : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "5/5 racine : rc=$rc, attendu 0 (dépôt partitionné conforme, aucun signal S2/S4/S5)"
 
-          echo "== BILAN check-divergence CI : $fail écart(s) sur 3 verdicts (propre, mutation rouge, racine) =="
+          echo "== BILAN check-divergence CI : $fail écart(s) sur 5 verdicts (3 compartiments propres, gamma cassé, gamma réparé, alpha muté, racine) =="
           if [ "$fail" -ne 0 ]; then exit 1; fi
           echo "== check-divergence.sh VERT en CI : le flip 0 → 1 sur mutation réelle est prouvé, la racine n'a pas bougé =="
+
+      - name: check-planning-consumers-registered (D-03 — un consommateur de chemin de planning oublié est VU)
+        # POURQUOI CETTE ÉTAPE EXISTE (D-03 de la Phase 41.1, WSAW-02/WSAW-04). Les plans 41.1-02,
+        # 03, 04 et 06 ferment le cas d'un compartiment NEUF apparaissant sur le disque. Ce lint
+        # ferme le cas SYMÉTRIQUE, que rien ne gardait : un CONSOMMATEUR NEUF, écrit plus tard,
+        # qui recode `.planning/workstreams/<nom>` ou `.planning/STATE.md` en dur sans que personne
+        # ne le voie. Un recensement sans lint est une intention ; D-03 exige les DEUX.
+        #
+        # LIMITE DE FOND, à lire avant le reste. La garde vit DANS le dépôt : la PR qu'elle juge
+        # peut la modifier — elle, sa suite, cette étape — et rester verte. Elle vérifie qu'un
+        # consommateur est SU, jamais que le statut déclaré est VRAI (T-41.1-09, disposition
+        # `accept`). Même limite que G-1/G-2/G-3 (ADR-072) : elle rend visible et trace, elle ne
+        # verrouille rien.
+        #
+        # UNE ÉTAPE QUI NE MESURERAIT QUE LE DÉPÔT RÉEL SERAIT VERTE PAR CONSTRUCTION, puisque le
+        # recensement est écrit conforme dans la même PR que le lint. Les deux premiers verdicts
+        # sont donc une bascule isolée sur fixture jetable, patron `check-instruction-budget` et
+        # `check-baseline-arbitrage` (plus bas dans ce même job) — ROUGE sur l'oubli, VERT une fois
+        # le marqueur posé. Sans la bascule INVERSE, un rouge seul ne distinguerait pas « sait
+        # détecter » de « rend toujours 1 ».
+        run: |
+          set -eu
+
+          fail=0
+          note() { echo "::error::check-planning-consumers-registered : $1"; fail=$((fail + 1)); }
+
+          GATE=plugin/conductor/scripts/check-planning-consumers-registered.sh
+
+          # --- 1/4 BASCULE sur fixture jetable : un consommateur hors recensement doit ROUGIR ----
+          # La fixture n'a pas de `.github/workflows/ci.yml` : le second volet du lint est donc
+          # sauté par sa propre garde, et le rc=1 n'est imputable QU'AU volet `.sh`.
+          T="$(mktemp -d)"
+          trap 'rm -rf "$T"' EXIT
+          git -C "$T" init -q
+          mkdir -p "$T/plugin/synthetique/scripts"
+          printf '%s\n' '#!/usr/bin/env bash' 'echo .planning/workstreams' \
+            > "$T/plugin/synthetique/scripts/oublie.sh"
+          git -C "$T" add -A
+          git -C "$T" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q -m "fixture-consommateur-oublie"
+
+          rc=0
+          out="$(bash "$GATE" --path "$T" 2>&1)" || rc=$?
+          echo "== 1/4 fixture : consommateur hors recensement : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 1 ] || note "1/4 : rc=$rc, attendu 1 — un script référençant un chemin d'artefact de planning sans figurer au recensement DOIT faire échouer le lint"
+          case "$out" in
+            *"plugin/synthetique/scripts/oublie.sh"*) : ;;
+            *) note "1/4 : le script fautif n'est pas NOMMÉ dans le rapport — un verdict qui ne nomme pas sa cause n'est pas actionnable" ;;
+          esac
+
+          # --- 2/4 BASCULE INVERSE : le marqueur de ligne éteint le signal, il ne le fabrique pas -
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'echo .planning/workstreams   # vf-allow-unregistered-planning-path : le littéral EST le sujet' \
+            > "$T/plugin/synthetique/scripts/oublie.sh"
+          git -C "$T" -c user.email=ci@vibeflow.invalid -c user.name=CI -c commit.gpgsign=false \
+            commit -q -am "marqueur de ligne pose"
+
+          rc=0
+          out="$(bash "$GATE" --path "$T" 2>&1)" || rc=$?
+          echo "== 2/4 même fixture, marqueur de ligne posé : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "2/4 : rc=$rc, attendu 0 — l'échappatoire de ligne doit éteindre le signal sur la ligne où elle est écrite, sinon la bascule 1/4 ne prouve pas une détection"
+          rm -rf "$T"
+
+          # --- 3/4 DÉPÔT RÉEL : le recensement doit couvrir l'univers que le lint mesure ---------
+          # C'est l'égalité d'ensembles, jamais un nombre de lignes attendu. Ce verdict couvre AUSSI
+          # le second volet du lint : aucun nom de compartiment réel recodé en dur dans ce fichier
+          # hors d'une région de fixture jetable bornée.
+          rc=0
+          out="$(bash "$GATE" 2>&1)" || rc=$?
+          echo "== 3/4 dépôt réel : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "3/4 dépôt réel : rc=$rc, attendu 0 — un consommateur mesuré manque au recensement, ou ce fichier recode un nom de compartiment en dur"
+
+          # --- 4/4 la suite du gate, invoquée ICI en plus du job `tests` : un gate dont la preuve
+          #         par mutation ne tourne pas dans le même job que lui peut devenir inerte sans
+          #         que ce job le dise. ----------------------------------------------------------
+          rc=0
+          out="$(bash plugin/conductor/scripts/tests/test-check-planning-consumers-registered.sh 2>&1)" || rc=$?
+          echo "== 4/4 suite du gate : rc=$rc =="; printf '%s\n' "$out"
+          [ "$rc" -eq 0 ] || note "4/4 suite du gate : rc=$rc, attendu 0 — mutant de retrait de ligne non tué, ou échappatoire non prouvée"
+
+          echo "== BILAN check-planning-consumers-registered : $fail écart(s) sur 4 verdicts (oubli, marqueur, dépôt réel, suite) =="
+          if [ "$fail" -ne 0 ]; then exit 1; fi
+          echo "== check-planning-consumers-registered VERT : l'oubli d'un consommateur est vu, l'échappatoire est bornée, et le recensement couvre l'univers mesuré =="
 
       - name: check-baseline-arbitrage (G-1, PROT-04 — hausse de baseline sans arbitrage cité)
         # POURQUOI CETTE ÉTAPE EXISTE. G-1 traite O-3 du `25-SECURITY.md` (T-25-16, restée

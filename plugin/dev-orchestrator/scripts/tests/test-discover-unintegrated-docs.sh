@@ -2,8 +2,9 @@
 # test-discover-unintegrated-docs.sh — Suite de vérification de discover-unintegrated-docs.sh
 #                                       (BRDG-02, plan 13-01 + fix-13-01 ; --hook, plan 17-02).
 #
-# Un cas par piège (22 assertions : 16 du contrat historique grain<TAB>chemin, 6 du mode --hook
-# additif SIG-02). Fixtures isolées via mktemp -d + --path, jamais sur le repo réel.
+# Un cas par piège (26 assertions : 16 du contrat historique grain<TAB>chemin, 6 du mode --hook
+# additif SIG-02, 4 du registre par compartiment — phase 41.1 / D-04, cas 23 à 26 dont MUT-1 et
+# DEGRAD-2). Fixtures isolées via mktemp -d + --path, jamais sur le repo réel.
 # Modèle de structure : plugin/planning-core/scripts/tests/test-detect-gsd-engine.sh.
 # Les cas 1 à 16 ne sont JAMAIS modifiés — leur passage inchangé EST la preuve de non-régression
 # du contrat historique (D-06). Les cas 17+ continuent la numérotation, forme identique.
@@ -209,6 +210,102 @@ echo '# spec' > "$D/docs/superpowers/specs/2026-01-22-sept-design.md"
 out="$(bash "$SCRIPT" --hook --path "$D")"
 tabcount=0; case "$out" in *"$(printf '\t')"*) tabcount=1 ;; esac
 if [ "$tabcount" -eq 0 ]; then ok "22 --hook n'émet jamais de ligne tabulée"; else ko "22 --hook n'émet jamais de ligne tabulée" "out=[$out]"; fi
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# Phase 41.1 / D-04 — registre de citation élargi à CHAQUE compartiment de workstream.
+# Avant ce plan, les registres n'étaient lus qu'à la RACINE de .planning/ — absents sous le layout
+# partitionné, donc le hook signalait « non intégré » des documents pourtant cités (4 faux positifs
+# sur 5 mesurés le 2026-09-23).
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+# === Cas 23 — Document cité UNIQUEMENT dans le ROADMAP d'un compartiment → intégré ==============
+# C'EST le cas discriminant du plan : MESURÉ ROUGE sur le script d'avant (rc=0, la spec ressortait
+# « non intégré »), vert après. Le cas 24 ci-dessous, lui, est vert des deux côtés — il ne garde
+# que la non-régression, pas la propriété neuve.
+D="$(mk_root c23)"
+mkdir -p "$D/.planning/workstreams/dev"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-23-ws-design.md"
+printf 'Spec : docs/superpowers/specs/2026-01-23-ws-design.md\n' > "$D/.planning/workstreams/dev/ROADMAP.md"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "23 cité dans le ROADMAP d'un compartiment seul → intégré"; else ko "23 cité dans le ROADMAP d'un compartiment seul → intégré" "rc=$rc out=[$out]"; fi
+
+# === Cas 24 — Document cité NULLE PART, compartiment présent → reste signalé ====================
+# VERT PAR CONSTRUCTION DES DEUX CÔTÉS (avant comme après le plan 41.1-04) : il ne garde AUCUNE
+# propriété neuve, seulement la non-régression du comportement historique — la propriété neuve est
+# gardée par le cas 23 et son mutant MUT-1.
+D="$(mk_root c24)"
+mkdir -p "$D/.planning/workstreams/dev"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-24-orpheline.md"
+printf 'Rien a voir.\n' > "$D/.planning/workstreams/dev/ROADMAP.md"
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"; rc=$?
+expected="$(printf 'spec\tdocs/superpowers/specs/2026-01-24-orpheline.md')"
+if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then ok "24 non cité nulle part malgré un compartiment → reste signalé (non-régression, vert des deux côtés)"; else ko "24 non cité nulle part malgré un compartiment → reste signalé" "rc=$rc out=[$out] attendu=[$expected]"; fi
+
+# === Cas 25 (MUT-1) — mutant : la boucle sur les compartiments neutralisée doit RÉTABLIR le faux
+# positif. Le script est copié dans un répertoire PLAT avec workstream-policy.sh à côté (premier
+# candidat de la recherche de sourcing, le layout d'install réel) — donc le TÉMOIN non muté et le
+# MUTANT ne diffèrent QUE par la mutation, jamais par la résolution du sourcing. ================
+MUTDIR="$TMP/mut25"; mkdir -p "$MUTDIR"
+cp "$SCRIPT" "$MUTDIR/discover-unintegrated-docs.sh"
+POLICY_SRC="$(cd "$(dirname "$SCRIPT")/../../planning-core/scripts" && pwd)/workstream-policy.sh"
+cp "$POLICY_SRC" "$MUTDIR/workstream-policy.sh"
+D="$(mk_root c25)"
+mkdir -p "$D/.planning/workstreams/dev"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-25-mutant-design.md"
+printf 'Spec : docs/superpowers/specs/2026-01-25-mutant-design.md\n' > "$D/.planning/workstreams/dev/ROADMAP.md"
+# Témoin : la copie NON mutée doit se comporter comme l'original (intégré, rc=3).
+temoin_out="$(bash "$MUTDIR/discover-unintegrated-docs.sh" --path "$D" 2>/dev/null)"; temoin_rc=$?
+# Mutation : la boucle de lecture des compartiments ne s'exécute plus jamais.
+sed 's|^        while IFS= read -r _wsdir; do|        false \&\& while IFS= read -r _wsdir; do|' \
+  "$MUTDIR/discover-unintegrated-docs.sh" > "$MUTDIR/muté.sh"
+mut_applied=0
+if ! cmp -s "$MUTDIR/discover-unintegrated-docs.sh" "$MUTDIR/muté.sh"; then mut_applied=1; fi
+mut_out="$(bash "$MUTDIR/muté.sh" --path "$D" 2>/dev/null)"; mut_rc=$?
+mut_expected="$(printf 'spec\tdocs/superpowers/specs/2026-01-25-mutant-design.md')"
+if [ "$mut_applied" -eq 1 ] && [ "$temoin_rc" -eq 3 ] && [ -z "$temoin_out" ] \
+   && [ "$mut_rc" -eq 0 ] && [ "$mut_out" = "$mut_expected" ]; then
+  ok "25 MUT-1 TUE — boucle sur les compartiments neutralisée → le faux positif D-04 réapparaît (témoin non muté vert)"
+else
+  ko "25 MUT-1 TUE — boucle sur les compartiments neutralisée → le faux positif D-04 réapparaît" "mut_applied=$mut_applied temoin_rc=$temoin_rc temoin_out=[$temoin_out] mut_rc=$mut_rc mut_out=[$mut_out]"
+fi
+
+# === Cas 26 (DEGRAD-2) — rc=2 de vf_ws_enumerate ANNONCÉ sur stderr, muet sur la fixture nominale ==
+# Correction C-06 : aucune dégradation silencieuse. `.planning/workstreams` détourné en LIEN
+# SYMBOLIQUE → vf_ws_enumerate rend 2, stdout vide — indistinguable d'un dépôt non partitionné si
+# le rc est jeté. Ce cas est la SEULE garde machine du fait que ce rc reste audible : sans lui, un
+# futur `2>/dev/null` rétabli passerait vert.
+# Contre-épreuve dans la MÊME exécution : fixture au contenu IDENTIQUE, `workstreams` en répertoire
+# RÉEL — aucune de ces lignes ne doit paraître (sinon l'assertion est existentielle et ne
+# discrimine rien). Le code de sortie reste NORMAL des deux côtés (contrat 0/3/64 inchangé).
+D="$(mk_root c26lien)"
+mkdir -p "$D/ws-reel/dev"
+echo '# spec' > "$D/docs/superpowers/specs/2026-01-26-degrad-design.md"
+printf 'Spec : docs/superpowers/specs/2026-01-26-degrad-design.md\n' > "$D/ws-reel/dev/ROADMAP.md"
+ln -s "$D/ws-reel" "$D/.planning/workstreams"
+lien_err="$TMP/c26lien.err"
+lien_out="$(bash "$SCRIPT" --path "$D" 2>"$lien_err")"; lien_rc=$?
+lien_stderr="$(cat "$lien_err")"
+lien_annonce=0
+case "$lien_stderr" in *"NON VÉRIFIABLE"*) case "$lien_stderr" in *"repli racine"*) lien_annonce=1 ;; esac ;; esac
+lien_signale=0; case "$lien_out" in *"2026-01-26-degrad-design.md"*) lien_signale=1 ;; esac
+
+D2="$(mk_root c26reel)"
+mkdir -p "$D2/.planning/workstreams/dev"
+echo '# spec' > "$D2/docs/superpowers/specs/2026-01-26-degrad-design.md"
+printf 'Spec : docs/superpowers/specs/2026-01-26-degrad-design.md\n' > "$D2/.planning/workstreams/dev/ROADMAP.md"
+reel_err="$TMP/c26reel.err"
+reel_out="$(bash "$SCRIPT" --path "$D2" 2>"$reel_err")"; reel_rc=$?
+reel_stderr="$(cat "$reel_err")"
+reel_annonce=0
+case "$reel_stderr" in *"NON VÉRIFIABLE"*) reel_annonce=1 ;; esac
+case "$reel_stderr" in *"repli racine"*) reel_annonce=1 ;; esac
+
+if [ "$lien_annonce" -eq 1 ] && [ "$lien_rc" -eq 0 ] && [ "$lien_signale" -eq 1 ] \
+   && [ "$reel_annonce" -eq 0 ] && [ "$reel_rc" -eq 3 ] && [ -z "$reel_out" ]; then
+  ok "26 DEGRAD-2 : annonce de dégradation présente sur stderr (lien symbolique), absente sur la fixture nominale — code de sortie normal des deux côtés"
+else
+  ko "26 DEGRAD-2 : annonce de dégradation présente sur stderr" "lien_annonce=$lien_annonce lien_rc=$lien_rc lien_signale=$lien_signale lien_out=[$lien_out] lien_stderr=[$lien_stderr] reel_annonce=$reel_annonce reel_rc=$reel_rc reel_out=[$reel_out] reel_stderr=[$reel_stderr]"
+fi
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
