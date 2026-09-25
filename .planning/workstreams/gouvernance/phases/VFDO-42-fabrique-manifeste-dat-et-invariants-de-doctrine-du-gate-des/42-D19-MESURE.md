@@ -71,6 +71,15 @@ ouverte ; la doctrine du motif (3) ci-dessous la rend sans effet sur les juges.
 **Décision :** maintenir
 **Canal :** session principale, décision déléguée par Willy au head (« tranche et avançons »), 2026-09-25 — Samuel NON consulté malgré la condition D-19 ; il peut la rouvrir.
 **Date :** 2026-09-25
+**Ratification Samuel :** maintenir — arbitrage Samuel, AskUserQuestion session principale, 2026-09-25 (la condition D-19 « réexaminée avec Samuel » est ainsi remplie ; la décision déléguée ci-dessus n'est pas rouverte).
+
+**Condition posée par Samuel (même canal, même date), à porter par 42-05 Tâche 3 avec la pose
+d'`omitClaudeMd` :** les deux juges qui citent aujourd'hui le `CLAUDE.md` du lab comme source
+« au besoin » — `growth-quality-judge` (INTERDITS RGPD) et `vf-design-judge` (section design) — le
+lisent **explicitement** par `Read` quand leur grille en dépend, et le digest du manager porte les
+interdits du lab (motif 3 ci-dessus : ce qu'un juge doit vérifier vit dans sa grille ou son
+digest, jamais dans une injection automatique qui n'a plus lieu). Aucun changement de définition
+d'I5 : c'est une exigence sur la prose des deux juges, pas sur le gate.
 
 **Motifs :**
 1. Un juge évalue contre sa grille avec un regard neuf, pas contre les conventions du dépôt
