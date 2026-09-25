@@ -129,8 +129,10 @@ Commandes et liste complète des pertes :
 ## 📦 Modules
 
 17 modules, chacun versionné avec son `CHANGELOG.md`. À l'install : `conductor` est le
-**socle obligatoire**, puis un choix — *lab de dev* ou *lab métier sur mesure*. Le README de
-chaque module est sa documentation complète — même structure partout.
+**socle obligatoire**, puis un choix — *lab de dev* ou *lab métier sur mesure*. Un lab de dev se
+choisit parmi des **presets** (`dev`, `dev-mobile`, `dev-audite` — un nom, les dépendances
+résolues pour toi ; l'à-la-carte reste pour l'utilisateur averti). Le README de chaque module
+est sa documentation complète — même structure partout.
 
 → [Catalogue des modules](./manual/fr/03-modules/catalogue.md) ·
 [commandes](./manual/fr/06-reference/commandes.md) ·
@@ -142,7 +144,7 @@ chaque module est sa documentation complète — même structure partout.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`86 suites` en CI — les
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`87 suites` en CI — les
   nouvelles prouvent le dispatch CLI multi-runtime (RUNT-01/02) et la forme exec des hooks du
   périmètre dev telle qu'installée, leur contrat de sortie, et la résolution Python partagée),
   install **idempotente** avec backup avant écrasement.
