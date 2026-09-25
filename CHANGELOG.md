@@ -11,23 +11,57 @@ sous `plugin/<module>/`. Rappel : toute release = un tag git annoté `vX.Y.Z`
 release au-dessus de la première ligne qui commence par `## [` — une section « non releasé »
 entre crochets se retrouverait publiée SOUS la version suivante.*
 
-**Minor à venir** (branche `feat/presets-install-et-confiance-typee`, 2026-09-24 — suite à la
-comparaison avec `dream-num/univer` et à l'étude Jev/AnyJev, carte blanche Samuel, session
-principale, 2026-09-24) :
+*(vide)*
 
-- **Presets d'installation** (`plugin/_internal/presets.json`, `resolve-preset.sh`, suite
-  `test-resolve-preset.sh` — 15 cas dont 3 mutants) : un lab de dev se choisit par un nom
-  (`dev`, `dev-mobile`, `dev-audite`), la fermeture des `requires` est déléguée à
-  `resolve-deps.sh`, un preset qui référencerait un module `proposable:false` est refusé en
-  entier. `/vibeflow-install` étape 4 (INST-02c) lit les presets depuis les données — aucun nom
-  en dur dans le skill. README EN/FR § Modules.
-- **`dev-orchestrator` v2.24.0** — champ `confiance` optionnel sur les rapports typés,
-  `SEUIL_CONFIANCE`, requalification d'un vert de jugement trop peu sûr ; allocation du head en
-  trois questions (coordination, incertitude, conséquence).
-- **`conductor` v1.41.0** — `team-kernel.md` Pattern C porte la forme `confiance?` et renvoie à
-  la doctrine.
-- **`docs/research/2026-09-24-jev-system-one.md`** — note de recherche (ce que Jev est et n'est
-  pas, reproductions ouvertes, résultats indépendants, ce qu'on retient, spike proposé).
+## [v2.66.0] — 2026-09-25
+
+**Minor** (release unique de sept PR mergées le 2026-09-25 — merge et release décidés par Samuel,
+session principale, 2026-09-25 ; la #100 mergée par contournement admin tracé, arbitrage Samuel,
+AskUserQuestion session principale, 2026-09-25) :
+
+- **Presets d'installation** (PR #105) — `plugin/_internal/presets.json` + `resolve-preset.sh`
+  (délègue la fermeture des `requires` à `resolve-deps.sh`, aucun nom de module en dur, refus en
+  entier d'un preset qui pointe un module `proposable:false`) + suite `test-resolve-preset.sh`
+  (15 cas, 3 mutants). `/vibeflow-install` étape 4 (INST-02c) propose `dev` (défaut),
+  `dev-mobile`, `dev-audite` depuis les données. Né de la comparaison avec `dream-num/univer`
+  (Preset Mode vs Plugin Mode).
+- **`dev-orchestrator` v2.24.0 → v2.24.1** — v2.24.0 (PR #105) : champ optionnel `confiance`
+  (0–1) sur les rapports typés, `SEUIL_CONFIANCE = 0.6` défini une seule fois
+  (`mission-contracts.md` §Confiance d'un jugement), un `passed` de jugement sous le seuil
+  requalifié `gaps_found` + `ask-user`, jamais sur une preuve machine ; head : trois questions
+  (coordination, incertitude, conséquence) avant l'échelle d'allocation (T9c). v2.24.1 (PR #100,
+  Phase 41.1) : `discover-unintegrated-docs.sh` tient un registre par compartiment,
+  `references/workstreams.md` §6 définit le modèle à trois états (conforme / non initialisé /
+  corrompu).
+- **`conductor` v1.41.0 → v1.42.0** — v1.41.0 (PR #105) : `team-kernel.md` Pattern C porte la
+  forme `confiance?` et renvoie à la doctrine. v1.42.0 (PR #100) : gate neuf
+  `check-planning-consumers-registered.sh` + recensement versionné de 21 consommateurs de
+  planning (`references/workstream-planning-consumers.md`) ; `check-divergence.sh` et
+  `check-state-integrity.sh` durcis — deux fail-open fermés (`--file` absolu → rejet 64,
+  compartiment neuf absent de `HEAD` → code 3 « conforme sous réserve », consommé par le fan-out).
+- **`planning-core` v2.7.0 → v2.7.1** (PR #100) — `vf_ws_enumerate` (codes 0/2/3) ;
+  `detect-gsd-engine.sh` et `check-planning-state.sh` cessent d'être faux sur un dépôt
+  partitionné (le « STATE.md ABSENT » à chaque SessionStart disparaît).
+- **CI** (PR #100) — `ci.yml` fait le fan-out des gates de planning par compartiment découvert
+  sur le disque, fixture à trois compartiments dont un cassé ; un compartiment neuf produit des
+  `::notice::`, jamais un `::error::`.
+- **`scripts/measure-server-rulesets.sh --dry-run`** (PR #107) — mode inspection qui n'écrit
+  rien (même chemin de code que la pose, `build_measure_json`), diagnostics sur stderr, suite
+  neuve `test-measure-server-rulesets.sh` (20 assertions, 4 mutants tués). Un script de mesure
+  ne mute plus le dépôt qu'il mesure.
+- **Gardes** (PR #106) — les outils de la Phase 41 résolvent la racine par
+  `git rev-parse --show-toplevel` (plus jamais par comptage de `../`, cassé par la partition) ;
+  détecteur d'arbitrage : citations multiples acceptées citation par citation, merges de PR et
+  commits de release exclus ; **ADR-075** : un identifiant de décision porte son registre
+  (`P41-D-02`, `PART-D-02`), convention prospective inscrite au `CLAUDE.md`.
+- **Planning et doc** (PR #96, #98, #104, #106) — jalon `fiabilite-v1.0` : 28 exigences
+  décochées reclassées LIVRÉ (dette de ledger, pas reliquat), `PROT-01` close sur pièce
+  (rulesets posés le 2026-09-23, re-mesurés) ; `ADPT-06` refermé (0/5 sur les deux canaux,
+  témoin positif d'abord) ; Phases 41.1 et 41.2 inscrites ; backlog « choisir la partition au
+  démarrage » ; note de recherche `docs/research/2026-09-24-jev-system-one.md` (Jev / AnyJev :
+  ce qu'on retient, ce qu'on ne fait pas, spike proposé — non planifié).
+
+<!-- TODO: résumé de la release v2.66.0 -->
 
 ## [v2.65.0] — 2026-09-23
 
