@@ -39,6 +39,20 @@
 # conséquence connue : la CI rougit à ses quatre appels à l'échéance, et T20 de
 # test-dev-orchestrator.sh (qui compte les avertissements d'un AGENT.md) en compte un de plus.
 #
+# Découverte récursive (Phase 42, FABR-04, D-10) : la cible (--agents-dir ou chaque registre passé
+# à --agent-registry-dir) est parcourue RÉCURSIVEMENT (os.walk, followlinks=False — aucun lien
+# symbolique de dossier suivi, pas de boucle) : un agent posé dans un sous-dossier est désormais
+# linté au même titre qu'un agent posé à la racine. Deux exclusions, chacune une ligne unique du
+# fichier, prouvées par mutation (MUT-D1, MUT-D2) : tout dossier caché (nom commençant par un
+# point) et tout dossier dont le nom finit par -references — l'installeur
+# (plugin/_internal/vibeflow-update.sh) pose les références de chaque module agent sous
+# .claude/agents/<mod>-references/ (D7) : ce sont des DOCUMENTS, jamais des agents, et un lab
+# installé les porterait tous sans cette exclusion. NOT_AGENTS (contracts.md, README.md,
+# AGENTS.md) reste vérifié par nom de fichier, à TOUTE profondeur. La résolution d'une allowlist
+# Agent(...)/Task(...) (resolve_agent_name) consulte désormais le MÊME index construit par cette
+# découverte (index_agents) : une seule fonction sert la cible ET la résolution, jamais un second
+# mécanisme.
+#
 # Usage:
 #   check-agents.sh                     # lint .claude/agents/*.md · exit 1 si non conforme
 #   check-agents.sh --strict            # GATE init : + les skills déclarés doivent EXISTER
@@ -263,6 +277,43 @@ MEMORY = {\"user\", \"project\", \"local\"}
 NOT_AGENTS = {\"contracts.md\", \"README.md\", \"AGENTS.md\"}
 # Task = alias legacy d'Agent depuis Claude Code v2.1.63 — traite a l'identique partout.
 AGENT_TOOL_NAMES = {\"Agent\", \"Task\"}
+
+def decouvrir_agents(racine):
+    \"\"\"D-10 (Phase 42, FABR-04) : decouverte RECURSIVE des agents sous racine, avec deux
+    exclusions PROUVEES par mutation (MUT-D1, MUT-D2), chacune sur sa PROPRE ligne, unique dans
+    le fichier : les dossiers caches (nom commencant par un point) et les dossiers *-references
+    poses par l'installeur (plugin/_internal/vibeflow-update.sh, D7 — de la doc, jamais des
+    agents). Aucun lien symbolique de dossier suivi (followlinks=False, pas de boucle). Fichiers
+    retenus : *.md dont le nom n'est pas dans NOT_AGENTS, a TOUTE profondeur. Rend une liste
+    TRIEE par chemin.\"\"\"
+    trouves = []
+    for dirpath, dirnames, filenames in os.walk(racine, followlinks=False):
+        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        dirnames[:] = [d for d in dirnames if not d.endswith('-references')]
+        for fn in filenames:
+            if fn.endswith('.md') and fn not in NOT_AGENTS:
+                trouves.append(os.path.join(dirpath, fn))
+    return sorted(trouves)
+
+_agent_index = None
+def index_agents(agents_dir_local, registry_dirs_local):
+    \"\"\"Index paresseux nom-de-fichier -> chemin (D-10) : decouvrir_agents sur agents_dir_local
+    PUIS sur chaque registre (le PREMIER trouve l'emporte, agents_dir_local d'abord). Une SEULE
+    decouverte sert la cible ET la resolution — resolve_agent_name la consulte au lieu de tester
+    <dossier>/<nom>.md a un seul niveau. Construite une fois par processus (parametres invariants
+    au sein d'un run).\"\"\"
+    global _agent_index
+    if _agent_index is not None:
+        return _agent_index
+    index = {}
+    for d in [agents_dir_local] + list(registry_dirs_local):
+        if not d or not os.path.isdir(d):
+            continue
+        for p in decouvrir_agents(d):
+            nom = os.path.basename(p)[:-3]
+            index.setdefault(nom, p)
+    _agent_index = index
+    return index
 
 # D-01/D-02/D-03 : les six listes de reference (identifiants d'outils, champs de frontmatter,
 # types natifs, modeles, modes de permission, niveaux d'effort) ne vivent plus ici — elles sont
@@ -595,11 +646,8 @@ def resolve_agent_name(name, agents_dir_local, registry_dirs_local, prefixes):
     for pfx in prefixes:
         if pfx and name.startswith(pfx):
             return \"thirdparty\"
-    if os.path.isfile(os.path.join(agents_dir_local, name + \".md\")):
+    if name in index_agents(agents_dir_local, registry_dirs_local):
         return \"resolved\"
-    for rd in registry_dirs_local:
-        if rd and os.path.isfile(os.path.join(rd, name + \".md\")):
-            return \"resolved\"
     return \"unresolved\"
 
 def lint_tool_field(base, field, mode, raw, do_agent_resolution):
@@ -961,8 +1009,7 @@ else:
     # le bash exporte VF_SINGLE=\"$SINGLE_FILE\" inconditionnellement, lu ci-dessus par
     # os.environ[\"VF_SINGLE\"] — sans --file c'est \"\", donc 'not single' teste la chaine vide).
     cible_absente = (not single) and not os.path.isdir(agents_dir)
-    files = sorted(glob.glob(os.path.join(agents_dir, \"*.md\")))
-    files = [f for f in files if os.path.basename(f) not in NOT_AGENTS]
+    files = decouvrir_agents(agents_dir)
     if not files:
         # D-20 (Phase 42) : hors --hook, une cible ABSENTE sort desormais INDETERMINE (exit 3,
         # jeton CIBLE-ABSENTE) dans TOUS les modes, y compris sans --strict — --allow-empty

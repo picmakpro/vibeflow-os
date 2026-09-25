@@ -189,6 +189,24 @@
 #         `omitClaudeMd: true` ajouté : T59, T62-T66, T67, T70, T77/T78/T79/T82/T84/T85/T86 (via
 #         `mk_conforme_agent`), T80 (agent-listagents), T81, T83, T87, T90, MUT-F2) — rc attendus
 #         et assertions inchangés dans tous les cas.
+#
+# Découverte récursive (Phase 42, FABR-04, D-10, 42-06 Tâche 1) — la cible est parcourue
+# récursivement (os.walk, followlinks=False), avec deux exclusions prouvées par mutation, et
+# resolve_agent_name résout via la MÊME découverte (index_agents), jamais un second mécanisme :
+#   T97 — récursion : `$AG/equipe/sous-agent.md` sans model + agent conforme à la racine → rc=1,
+#         cite sous-agent.md et « model absent » ; le même sous-agent rendu conforme → rc=0
+#   T98 — exclusions : agent conforme à la racine + `$AG/lab-references/lead-knowledge.md` (sans
+#         frontmatter) + `$AG/equipe/README.md` + `$AG/.cache/x.md` → rc=0, aucun des trois cité
+#   T99 — résolution : `$AG/equipe/sous-agent.md` interne (vf-internal + « Worker interne ») +
+#         agent racine `tools: Read, SendMessage, Agent(sous-agent)` → rc=0 sous
+#         `--resolve-agents=strict`, aucun « non resolu »
+#   MUT-D1 — l'élagage des dossiers cachés remplacé par un élagage total (plus aucune descente) →
+#         fixture T97 : rc_original=1, rc_mutant=0
+#   MUT-D2 — l'élagage des dossiers -references neutralisé → fixture T98 : rc_original=0,
+#         rc_mutant=1
+#   Témoin lab frais (LAB-RECURSIF-OK, vérification externe du plan) : `.claude/agents/
+#         conductor-references/*.md` posé par l'installeur reste vert sous
+#         `--strict --manifest-freshness=strict`, jamais pris pour un agent.
 
 set -uo pipefail
 
@@ -2868,6 +2886,159 @@ if [ "$RC_T96BP" -ne 0 ]; then
   ko "T96 check-blueprints.sh : rc=$RC_T96BP attendu 0"
 fi
 [ "$T96_FAIL" -eq 0 ] && ok "T96 corpus reel (>= $T96_DIRS_FOUND dossiers) + AGENT.md + check-blueprints.sh -> aucun invariant I6 (I5 si arme), rc=0"
+
+# ---------- T97/T98/T99, MUT-D1, MUT-D2 : decouverte recursive avec exclusions prouvees ----------
+# (Phase 42, FABR-04, D-10, 42-06 Tache 1) ---------------------------------------------------------
+rm -rf "${AG:?}"/*
+
+# T97 — recursion : sous-dossier equipe/sous-agent.md sans model -> rc=1, cite sous-agent.md et
+# "model absent" ; rendu conforme -> rc=0.
+mkdir -p "$AG/equipe"
+cat > "$AG/equipe/sous-agent.md" <<'EOF'
+---
+name: sous-agent
+description: Agent de test place dans un sous-dossier, sans model, pour prouver la recursion.
+effort: low
+memory: project
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "sous-agent.md" && echo "$OUT" | grep -q "model absent"; then
+  ok "T97 decouverte recursive : equipe/sous-agent.md sans model -> rc=1, cite sous-agent.md et model absent"
+else
+  ko "T97 (rc=$RC) : $OUT"
+fi
+cat > "$AG/equipe/sous-agent.md" <<'EOF'
+---
+name: sous-agent
+description: Agent de test place dans un sous-dossier, rendu conforme, pour prouver la recursion.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+RC=0; run_check >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] && ok "T97 sous-agent rendu conforme -> rc=0" || ko "T97-conforme (rc=$RC)"
+rm -rf "$AG/equipe"
+
+# T98 — exclusions : agent conforme a la racine + lab-references/lead-knowledge.md (sans
+# frontmatter) + equipe/README.md + .cache/x.md -> rc=0, aucun des trois cite.
+good_agent "racine-t98"
+mkdir -p "$AG/lab-references" "$AG/equipe" "$AG/.cache"
+printf 'contenu de reference, pas un agent\n' > "$AG/lab-references/lead-knowledge.md"
+printf 'pas un agent\n' > "$AG/equipe/README.md"
+printf 'cache, jamais parcouru\n' > "$AG/.cache/x.md"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "lead-knowledge.md" && ! echo "$OUT" | grep -q "README.md" && ! echo "$OUT" | grep -q "x.md"; then
+  ok "T98 exclusions : -references/, README.md en profondeur, dossier cache -> rc=0, aucun cite"
+else
+  ko "T98 (rc=$RC) : $OUT"
+fi
+rm -rf "$AG/lab-references" "$AG/equipe" "$AG/.cache"
+rm -f "$AG/racine-t98.md"
+
+# T99 — resolution : sous-agent interne dispatche depuis equipe/ -> rc=0 sous
+# --resolve-agents=strict, aucun "non resolu" (MEME decouverte pour la cible et la resolution).
+mkdir -p "$AG/equipe"
+cat > "$AG/equipe/sous-agent.md" <<'EOF'
+---
+name: sous-agent
+description: Agent de test. Worker interne, dispatche par un agent racine (T99, recursion).
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+cat > "$AG/racine-t99.md" <<'EOF'
+---
+name: racine-t99
+description: Agent de test racine qui dispatche un sous-agent via la meme decouverte recursive.
+model: sonnet
+effort: high
+memory: project
+tools: Read, SendMessage, Agent(sous-agent)
+disallowedTools: Write, Edit
+---
+corps
+EOF
+OUT="$(run_check --resolve-agents=strict 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -qi "non resolu"; then
+  ok "T99 resolution via la meme decouverte : sous-agent dispatche depuis equipe/ -> rc=0 sous --resolve-agents=strict, aucun 'non resolu'"
+else
+  ko "T99 (rc=$RC) : $OUT"
+fi
+rm -rf "$AG/equipe"
+rm -f "$AG/racine-t99.md"
+
+# ---------- MUT-D1 : elagage des dossiers caches remplace par un elagage total (plus aucune ----------
+# ---------- descente) — fixture T97 : rc_original=1, rc_mutant=0 -------------------------------
+MUT_D1_AG="$WORK/mut-D1-ag"; mkdir -p "$MUT_D1_AG/equipe"
+cat > "$MUT_D1_AG/racine-mutd1.md" <<'EOF'
+---
+name: racine-mutd1
+description: Agent de test racine conforme, fixture de mutation MUT-D1.
+model: sonnet
+effort: low
+memory: project
+skills:
+  - petit-skill
+---
+corps
+EOF
+cat > "$MUT_D1_AG/equipe/sous-agent-mutd1.md" <<'EOF'
+---
+name: sous-agent-mutd1
+description: Agent de test en sous-dossier, sans model, fixture de mutation MUT-D1.
+effort: low
+memory: project
+---
+corps
+EOF
+MUT_D1_DIR="$(make_gate_mutant D1 0 "dirnames[:] = [d for d in dirnames if not d.startswith('.')]" 'dirnames[:] = []')"
+MUT_D1_RC=$?
+if [ "$MUT_D1_RC" -eq 0 ]; then
+  MUT_D1_ORIG_DIR="$(mk_gate_dir "$WORK/mut-D1-orig" 0)"
+  RC_ORIG=0; bash "$MUT_D1_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_D1_AG" --skills-dir="$SK" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_D1_DIR/check-agents.sh" --agents-dir="$MUT_D1_AG" --skills-dir="$SK" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut D1 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut D1 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- MUT-D2 : elagage des dossiers -references neutralise — fixture T98 : ----------
+# ---------- rc_original=0, rc_mutant=1 ----------------------------------------------------------
+MUT_D2_AG="$WORK/mut-D2-ag"; mkdir -p "$MUT_D2_AG/lab-references"
+cat > "$MUT_D2_AG/racine-mutd2.md" <<'EOF'
+---
+name: racine-mutd2
+description: Agent de test racine conforme, fixture de mutation MUT-D2.
+model: sonnet
+effort: low
+memory: project
+skills:
+  - petit-skill
+---
+corps
+EOF
+printf 'contenu de reference, pas un agent, fixture MUT-D2\n' > "$MUT_D2_AG/lab-references/lead-knowledge-mutd2.md"
+MUT_D2_DIR="$(make_gate_mutant D2 0 "dirnames[:] = [d for d in dirnames if not d.endswith('-references')]" 'pass')"
+MUT_D2_RC=$?
+if [ "$MUT_D2_RC" -eq 0 ]; then
+  MUT_D2_ORIG_DIR="$(mk_gate_dir "$WORK/mut-D2-orig" 0)"
+  RC_ORIG=0; bash "$MUT_D2_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_D2_AG" --skills-dir="$SK" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_D2_DIR/check-agents.sh" --agents-dir="$MUT_D2_AG" --skills-dir="$SK" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 0 ] && [ "$RC_MUT" -eq 1 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut D2 "$RC_MUT" 1 "$RC_ORIG" 0
+  else
+    komut D2 "rc_mutant=1 et rc_original=0, sans Traceback" "rc_mutant=1, rc_original=0" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
