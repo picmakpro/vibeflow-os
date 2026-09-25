@@ -109,6 +109,10 @@ Le gate doit désormais échouer si :
 des faux positifs garantis. **I8 est le plus important de la liste** : c'est lui qui empêche la
 fabrique et son contrôleur de rediverger.
 
+**I5 (arbitrage D-08, maintenir) :** tout ce qu'un juge doit vérifier vit dans sa grille, jamais
+dans `.claude/rules` ni dans `CLAUDE.md` — session principale, décision déléguée par Willy au head
+(« tranche et avançons »), 2026-09-25.
+
 La découverte des agents devient récursive.
 
 ---
