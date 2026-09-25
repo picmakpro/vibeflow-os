@@ -891,3 +891,70 @@ rien).
 **Déclencheur de reprise :** avant toute déclaration publique de fermeture COMPLÈTE du canal
 d'injection du dépôt jugé (les deux canaux), ou la prochaine fois qu'ADPT-06 (ou son équivalent)
 est rouvert pour un autre motif.
+
+## Écart D-08(b) — digest du manager sans interdits du lab sur le chemin vf-dev-manager → vf-design-judge — DIFFÉRÉ (2026-09-25)
+
+**Capturé :** 2026-09-25, nœud `fix-42-condition-samuel` (Phase 42, exécution de la condition
+posée par Samuel en ratifiant D-08, `42-D19-MESURE.md` § Arbitrage D-08).
+
+**Le défaut :** la condition (b) de Samuel (« le digest du manager porte les interdits du lab »)
+est remplie côté `vf-design-manager` → `vf-design-judge` (sa section « Orchestration par écran »
+le dit désormais explicitement). Mais en étage implémentation croisée d'une mission dev
+(`livrable: specs+implementation`, documenté dans `vf-design-manager.md` § Étage implémentation
+croisée), c'est `plugin/dev-orchestrator/agents/vf-dev-manager.md` qui compose et transmet le
+digest vers `vf-design-judge` — pas `vf-design-manager`. `vf-dev-manager` relève de
+`plugin/dev-orchestrator/`, de la polarité de Samuel (D-12) : aucun commit sur ce module n'est
+autorisé dans ce nœud. La condition (b) reste donc non remplie sur ce chemin précis.
+
+**Piste de fix :** soit `vf-dev-manager` porte lui-même la même consigne (commit sur
+dev-orchestrator, mandat séparé, revue de Samuel) ; soit le digest transmis par `vf-dev-manager`
+à `vf-design-judge` est composé par délégation à `vf-design-manager` (repli architectural
+différent, à évaluer) ; soit l'écart est jugé sans conséquence pratique par Samuel (le
+`CLAUDE.md` projet en contexte dev ne porte pas nécessairement d'interdits RGPD/design
+distincts de ceux déjà couverts). Détail : `42-05-SUMMARY.md` § Écart non résolu,
+`.planning/workstreams/gouvernance/STATE.md` § Dette.
+
+**Déclencheur de reprise :** la revue code owner de Samuel sur `design-orchestrator` (déjà
+requise par D-12), ou la prochaine mission dev qui exerce réellement l'étage implémentation
+croisée avec `vf-design-judge`.
+
+## A2 — collision de nom entre scripts de modules non détectée à l'installation — DIFFÉRÉ (2026-09-25)
+
+**Capturé :** 2026-09-25, audit final de la Phase 42 (même famille que CR-01 côté agents,
+jamais corrigée côté scripts installés).
+
+**Le défaut :** `plugin/_internal/vibeflow-update.sh` pose les scripts (et fichiers `*.json`)
+de TOUS les modules installés à plat dans un seul `.claude/scripts/` du lab cible — un même nom
+de fichier `.sh` porté par deux modules différents écrase silencieusement l'un par l'autre, sans
+aucun diagnostic. Dette **antérieure** à la Phase 42 (l'installeur est hors périmètre du nœud
+`fix-42-juges` — décision déléguée par Willy au head, « tranche et avançons », session
+principale, 2026-09-25 : correction reportée, pas traitée là non plus).
+
+**Piste de fix :** détection de collision à l'installation (diagnostic explicite avant
+écrasement silencieux), ou namespacing des scripts posés par module (préfixe ou sous-dossier par
+module dans `.claude/scripts/`).
+
+**Déclencheur de reprise :** le premier incident réel de collision entre deux modules installés
+ensemble, ou une revue de fond de l'installeur.
+
+## Revue de fond des grilles de quality-gate-client et content-clarity-judge (motif 3, D-08) — DIFFÉRÉ (2026-09-25)
+
+**Capturé :** 2026-09-25, audit final de la Phase 42.
+
+**Le défaut :** la correction du nœud `fix-42-juges` (2026-09-25), puis celle du nœud
+`fix-42-condition-samuel` (même jour), réparent l'omission/le mauvais emplacement de la citation
+du `CLAUDE.md` du lab comme source à lire par `quality-gate-client` et `content-clarity-judge`.
+Aucune des deux ne revisite le CONTENU des rubriques /100 elles-mêmes au regard du motif 3 de
+l'arbitrage D-08 (« tout ce qu'un juge doit vérifier vit dans sa grille, jamais dans
+`.claude/rules` ni dans `CLAUDE.md` ») : ni `quality-gate-client` ni `content-clarity-judge` ne
+portent aujourd'hui de critère RGPD EXPLICITE dans leur tableau de rubrique (contrairement à
+`growth-quality-judge`, critère 2 « Consentement / anti-spam / RGPD », éliminatoire) — la
+lecture du `CLAUDE.md` comme source ne garantit pas, à elle seule, qu'un manquement RGPD fasse
+baisser le score ou déclenche un éliminatoire.
+
+**Piste de fix :** ajouter un critère RGPD explicite (avec pondération et statut éliminatoire le
+cas échéant) au tableau de rubrique des deux juges, sur le modèle du critère 2 de
+`growth-quality-judge`.
+
+**Déclencheur de reprise :** la prochaine revue de fond des grilles des juges business/content,
+ou un incident où un manquement RGPD n'a pas fait baisser le score d'un livrable jugé.

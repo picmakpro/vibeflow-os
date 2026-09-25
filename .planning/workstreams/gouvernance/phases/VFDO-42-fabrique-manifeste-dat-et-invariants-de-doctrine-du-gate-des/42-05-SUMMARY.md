@@ -257,6 +257,51 @@ RGPD) comme source à lire explicitement avec l'outil Read, dans leur liste de s
 — commits `860b5aa` (business-pilot-bundle v2.0.12) et `d7971de` (content-bundle v2.0.12). La
 mitigation T-42-07 est vraie pour les quatre juges depuis ces deux commits.
 
+## Correction — exécution de la condition de Samuel (nœud fix-42-condition-samuel, 2026-09-25)
+
+Samuel a ratifié D-08 (maintenir) sous condition (`42-D19-MESURE.md` § Arbitrage D-08, session
+principale, 2026-09-25) : les juges qui citent le `CLAUDE.md` du lab doivent le lire
+**explicitement par `Read` dans leur DÉROULÉ** (section de procédure, pas la liste des
+références), et le digest du manager qui les mandate doit porter les interdits du lab. La
+correction `fix-42-juges` ci-dessus n'avait posé la citation que dans « Références au besoin »
+de l'Entrée — pas dans le DÉROULÉ — pour `quality-gate-client` et `content-clarity-judge`, et
+n'avait rien changé pour `growth-quality-judge` ni `vf-design-judge`.
+
+Corrigé sur les **quatre** juges (`quality-gate-client`, `content-clarity-judge`,
+`growth-quality-judge`, `vf-design-judge`) : la consigne de lecture explicite du `CLAUDE.md`
+(ou de sa section design pour `vf-design-judge`) vit désormais dans la section
+« ## Méthode de scoring » de chacun ; la mention retirée des références pour éviter le doublon.
+Sur `vf-growth-manager` et `vf-design-manager`, la section où ils composent le digest vers leur
+juge porte désormais explicitement que ce digest transmet les interdits du lab issus du
+`CLAUDE.md`. Assertion machine ajoutée à chacune des quatre suites de module (nouveau test,
+ancré sur la section DÉROULÉ, discriminant par mutation, rejoué rouge sur les fichiers
+pré-correction).
+
+Commits : `6217a8e` (business-pilot-bundle v2.0.13), `34ffb8c` (content-bundle v2.0.13),
+`5bc4518` (growth-bundle v2.0.12, judge + manager), `f0e3340` (design-orchestrator v1.5.11,
+judge + manager). Décision déléguée par Willy au head, session principale, 2026-09-25, en
+exécution de la condition de Samuel (`e568307`).
+
+## Écart non résolu — vf-dev-manager → vf-design-judge (D-12)
+
+La condition (b) de Samuel (« le digest du manager porte les interdits du lab ») **n'est PAS
+remplie** sur le chemin `vf-dev-manager` → `vf-design-judge` (étage design d'une mission dev,
+mode `livrable: specs+implementation` documenté dans `vf-design-manager.md` § Étage
+implémentation croisée) : dans ce chemin, c'est `vf-dev-manager` qui compose et transmet le
+digest vers `vf-design-judge`, pas `vf-design-manager`. Or `vf-dev-manager` relève de
+`plugin/dev-orchestrator/`, qui est de la **polarité de Samuel** (D-12) — ce mandat, comme la
+correction `fix-42-condition-samuel` qui le porte, exclut explicitement tout commit sur ce
+module. La correction posée ici ne couvre donc que `vf-design-manager` → `vf-design-judge`
+(mission design pure), pas la variante dev-manager.
+
+À trancher à la revue code owner de Samuel sur `design-orchestrator` (déjà requise par D-12) :
+soit `vf-dev-manager` porte lui-même la même consigne (commit sur dev-orchestrator, hors
+périmètre de ce nœud), soit le digest transmis par `vf-dev-manager` à `vf-design-judge` est
+composé par délégation à `vf-design-manager` (repli architectural différent), soit l'écart est
+jugé sans conséquence pratique (le `CLAUDE.md` projet en contexte dev ne porte pas
+nécessairement d'interdits RGPD/design distincts). Consigné aussi comme entrée `.planning/BACKLOG.md`
+(racine) et dans `### Dette / à rafraîchir` du STATE gouvernance.
+
 ## Next Phase Readiness
 
 - **42-05 est COMPLETE** (les trois taches executees) ; **FABR-03 reste PARTIELLE au sens de REQUIREMENTS.md** — I1, I4, I5, I6, I7 (locaux) sont armes, mais I2 et I3 (monde ferme, D-09) restent a 42-06. La case FABR-03 de REQUIREMENTS.md n'a donc pas ete cochee par ce plan.

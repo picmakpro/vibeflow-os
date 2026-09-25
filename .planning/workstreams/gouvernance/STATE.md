@@ -30,7 +30,7 @@ last_activity_desc: >-
   FABR-03/04/05 cochées à la main ci-dessous dans REQUIREMENTS.md (requirements.mark-complete
   résout vers fiabilite sur ce dépôt, jamais appelé). STATE tenu à la main (jamais
   state.begin-phase / state.record-session).
-stopped_at: "Phase 42 exécutée et corrigée après revue/audit — PR #108 à sortir du brouillon"
+stopped_at: "Phase 42 exécutée et corrigée après revue/audit (fix-42-juges) puis après la condition de Samuel sur D-08 (fix-42-condition-samuel) — PR #108 à sortir du brouillon ; écart vf-dev-manager → vf-design-judge (D-12) consigné en dette"
 progress:
   total_phases: 9
   completed_phases: 0
@@ -147,6 +147,15 @@ explicitement ; n'attends rien de la CI sur ce point.
   `fix-42-juges` — décision déléguée par Willy au head, « tranche et avançons », session
   principale, 2026-09-25 : correction reportée, pas traitée ici). Relevée par l'audit final de la
   Phase 42 (même famille que CR-01 côté agents, jamais corrigée côté scripts installés).
+
+- **Écart D-08(b) non résolu sur le chemin `vf-dev-manager` → `vf-design-judge`** : la
+  condition (b) de Samuel en ratifiant D-08 (« le digest du manager porte les interdits du
+  lab ») est remplie côté `vf-design-manager` → `vf-design-judge` (nœud
+  `fix-42-condition-samuel`, 2026-09-25), mais PAS sur le chemin `vf-dev-manager` →
+  `vf-design-judge` (étage design d'une mission dev, mode `specs+implementation`) : c'est
+  `vf-dev-manager` qui compose ce digest-là, et ce module relève de `plugin/dev-orchestrator/`,
+  de la polarité de Samuel (D-12) — hors périmètre de tout commit de ce nœud. Détail :
+  `42-05-SUMMARY.md` § Écart non résolu. À trancher à la revue code owner de Samuel.
 
 - **Revue de fond des grilles de `quality-gate-client` et `content-clarity-judge`** :
   la correction du nœud `fix-42-juges` (2026-09-25) répare uniquement l'omission de citation du
