@@ -1,5 +1,16 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.11] — 2026-09-25 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **`content-clarity-judge` déclare `omitClaudeMd: true`** (invariant I5, D-08) — le juge frais
+  n'a aucune allowlist `Agent(...)` et retire déjà `Write`/`Edit` : au sens du gate, c'est un
+  juge, qui ne doit jamais charger la doctrine du `CLAUDE.md` du projet — un regard frais ne
+  charge pas la doctrine. Frontmatter seul, corps inchangé, compte d'instructions inchangé.
+  Arbitrage D-08 (maintenir) : session principale, décision déléguée par Willy au head
+  (« tranche et avançons »), 2026-09-25 — 42-D19-MESURE.md, 42-CONTEXT.md D-08, D-11.
+
 ## [v2.0.10] — 2026-09-24 (Phase 42 — invariants de doctrine du gate des agents)
 
 **Patch** :
