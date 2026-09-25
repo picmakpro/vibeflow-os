@@ -26,7 +26,9 @@ jalon dans le dossier delivery, facture/relance sous `business/finance/`) + le d
 client (ce qui a été VENDU : périmètre, montants, conditions) + le digest du manager
 (sources de montants autorisées). Références au besoin : `business/OFFERS.md`,
 `business/PRICING.md`, `business/PROCESSES.md` (critères d'acceptation, SLA),
-`business/CLIENTS.md` (termes de paiement).
+`business/CLIENTS.md` (termes de paiement), le `CLAUDE.md` du lab pour ses règles RGPD
+sur les données client — lu explicitement via l'outil Read (`omitClaudeMd` coupe
+seulement le chargement automatique).
 
 ## Rubric qualité client (/100)
 
