@@ -244,6 +244,19 @@ None de nouveau dans cette session — le mandat de reprise a demarre par la hal
 
 None — aucune configuration de service externe requise.
 
+## Correction post-revue/audit (nœud fix-42-juges, 2026-09-25)
+
+La mitigation T-42-07 (42-05-PLAN.md:489 — « les quatre corps citent déjà ces fichiers comme
+sources à LIRE ») était **FAUSSE** pour deux des quatre juges cités : `quality-gate-client`
+(business-pilot-bundle) et `content-clarity-judge` (content-bundle) ne citaient PAS le
+`CLAUDE.md` du lab dans leur section Entrée — seuls `growth-quality-judge` et `vf-design-judge`
+le faisaient réellement. Écart relevé par la revue et l'audit finaux de la Phase 42, corrigé par
+`vf-coder` (nœud `fix-42-juges`, décision déléguée par Willy au head, « tranche et avançons »,
+session principale, 2026-09-25) : les deux corps citent désormais le `CLAUDE.md` du lab (règles
+RGPD) comme source à lire explicitement avec l'outil Read, dans leur liste de sources existante
+— commits `860b5aa` (business-pilot-bundle v2.0.12) et `d7971de` (content-bundle v2.0.12). La
+mitigation T-42-07 est vraie pour les quatre juges depuis ces deux commits.
+
 ## Next Phase Readiness
 
 - **42-05 est COMPLETE** (les trois taches executees) ; **FABR-03 reste PARTIELLE au sens de REQUIREMENTS.md** — I1, I4, I5, I6, I7 (locaux) sont armes, mais I2 et I3 (monde ferme, D-09) restent a 42-06. La case FABR-03 de REQUIREMENTS.md n'a donc pas ete cochee par ce plan.

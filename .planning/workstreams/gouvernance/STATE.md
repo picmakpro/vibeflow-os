@@ -30,7 +30,7 @@ last_activity_desc: >-
   FABR-03/04/05 cochées à la main ci-dessous dans REQUIREMENTS.md (requirements.mark-complete
   résout vers fiabilite sur ce dépôt, jamais appelé). STATE tenu à la main (jamais
   state.begin-phase / state.record-session).
-stopped_at: "42-06 complet, phase 42 exécutée et vérifiée (human_needed : relecture Samuel D-12 attendue avant merge) — prochain : revue par vf-reviewer puis clôture de phase par le manager"
+stopped_at: "Phase 42 exécutée et corrigée après revue/audit — PR #108 à sortir du brouillon"
 progress:
   total_phases: 9
   completed_phases: 0
@@ -138,3 +138,22 @@ explicitement ; n'attends rien de la CI sur ce point.
   `--manifest-freshness=strict` : sans rafraîchissement des six listes (sources officielles relues,
   `verifie_le` redaté), les étapes `check-agents` de la CI rendront INDÉTERMINÉ (rc=3, étape rouge)
   à partir de cette date. Relevé par la revue `revue-42-partiel` (2026-09-25).
+
+- **A2 — collision de nom entre scripts de modules non détectée à l'installation** :
+  `plugin/_internal/vibeflow-update.sh` pose les scripts (et fichiers `*.json`) de TOUS les
+  modules installés à plat dans un seul `.claude/scripts/` du lab cible — un même nom de fichier
+  `.sh` porté par deux modules différents écrase silencieusement l'un par l'autre, sans aucun
+  diagnostic. Dette **antérieure** à la Phase 42 (l'installeur est hors périmètre du nœud
+  `fix-42-juges` — décision déléguée par Willy au head, « tranche et avançons », session
+  principale, 2026-09-25 : correction reportée, pas traitée ici). Relevée par l'audit final de la
+  Phase 42 (même famille que CR-01 côté agents, jamais corrigée côté scripts installés).
+
+- **Revue de fond des grilles de `quality-gate-client` et `content-clarity-judge`** :
+  la correction du nœud `fix-42-juges` (2026-09-25) répare uniquement l'omission de citation du
+  `CLAUDE.md` du lab comme source (T-42-07). Elle ne revisite PAS le contenu des rubriques /100
+  elles-mêmes au regard du motif 3 de l'arbitrage D-08 (« tout ce qu'un juge vérifie vit dans sa
+  grille ») : ni `quality-gate-client` ni `content-clarity-judge` ne portent aujourd'hui de
+  critère RGPD EXPLICITE dans leur tableau de rubrique (contrairement à `growth-quality-judge`,
+  critère 2 « Consentement / anti-spam / RGPD », éliminatoire) — la citation du `CLAUDE.md` comme
+  source à lire ne garantit pas, à elle seule, qu'un manquement RGPD fasse baisser le score ou
+  déclenche un éliminatoire. Revue de fond à mener séparément, hors périmètre de ce nœud.
