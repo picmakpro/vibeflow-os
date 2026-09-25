@@ -92,6 +92,20 @@ templates-mémoire jamais posés à l'install (arbitrage engine, cf. §Decisions
 
 ## Current Position
 
+**PROT-01 clos sur pièce (2026-09-24)** — mandat direct de Samuel (session principale,
+2026-09-24), hors plan 41-13 (jamais exécuté, aucun SUMMARY 41-10 à 41-13 sur disque). Rulesets
+posés par Willy (`picmakpro`) le 2026-09-23 19h56, re-mesurés `gh api` le 2026-09-24 : détail
+`REQUIREMENTS.md` § PROT-01 et `41-PREUVES.md` § « Clôture PROT-01 ». Écart consigné, non corrigé :
+`require_extra_approval_for_unattributed_changes` présent côté serveur, absent des sources
+versionnées (`BACKLOG.md` § « Protection de `main` côté GitHub »).
+**La clôture du jalon `fiabilite-v1.0` elle-même N'EST PAS jouée par ce mandat** : le ledger
+`REQUIREMENTS.md` porte, hors familles PROT, plusieurs dizaines d'exigences encore décochées sous
+la section `## Milestone fiabilite-v1.0` (`PORT-01..05`, `MANI-04`, `WKTR-03`, `AGTS-02`,
+`FIDE-01..03`, `RUNT-01..02`, `ROLL-01..05`, `TGT-01..04`, `ADPT-01/05/06`, `MIGR-01..05`,
+`QUAL-01`) — constat remonté à Samuel par `SendMessage` le 2026-09-24 plutôt que tranché ici. Ce
+paragraphe documente le seul geste fait : PROT-01. `ROADMAP.md` et `MILESTONES.md` ne sont pas
+touchés par ce mandat.
+
 **Reprise du volet admin (2026-09-23)** — détail déplacé du frontmatter, qui doit se fermer
 avant la ligne 60 lue par `check-dev-bootstrap.sh` :
 
