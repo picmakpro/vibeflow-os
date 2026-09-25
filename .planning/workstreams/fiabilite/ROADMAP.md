@@ -83,6 +83,8 @@
 - [x] Phase 40: vibeflow-head — head of minds du dev-orchestrator (exécutée le 2026-09-15 sur `feat/phase-40-vibeflow-head` — `vibeflow-dev` renommé `vibeflow-head`, 5 plans/3 vagues, zéro agent neuf, kernel intact (diff nul), renommage sur 22 chemins + garde anti-alias T36 (mutation prouvée), `head-governance.md` neuf, `check-mission-exit.sh` E1-E6 codes 3/0/4/64 (23/23 cas, 6 mutations rouges), contrat de preuves E6 + ses trois émetteurs (D-19, amendement post-cadrage), racine bumpée v2.63.0, `dev-orchestrator` v2.22.0 — **PR, tag et release GitHub restent des gestes humains non posés à cette date**. **HEAD-01 partiellement close** — `intent-routing.md` jamais mis à jour pour renvoyer à `head-governance.md`, laissée ouverte au ledger, détail `40-SUMMARY.md`)
 - [x] Phase 40.1: Révision ADR-029 et du gate du budget d'instructions (INSERTED 2026-09-16 — plafond 300 lignes, ratchet sur les instructions seules ; arbitrages Samuel AskUserQuestion session principale ; avant la 41)
 - [x] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date — **PÉRIMÈTRE RECADRÉ SANS ADMIN LIVRÉ le 2026-09-18, mergée PR #80, SHIPPÉE v2.64.0** : trois gardes in-repo qui signalent et tracent sans jamais verrouiller (G-1 `check-baseline-arbitrage.sh`, G-2 `check-gate-touche.sh`, G-3 `check-push-sans-pr.sh`) + doctrine ADR-072 ; **critères de succès 1 à 3 du ROADMAP d'origine restent HORS D'ATTEINTE sans accès admin GitHub** (PROT-01 non coché, `REQUIREMENTS.md`) ; volet rulesets côté serveur **DIFFÉRÉ au BACKLOG** avec son déclencheur de reprise — le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce volet (WhatsApp, 2026-09-23) **avant** la clôture de `fiabilite-v1.0`, puisque PROT-01 en fait partie (correction du 2026-09-23 : la formulation précédente inversait la séquence — cf. `BACKLOG.md` § « Protection de `main` côté GitHub »))
+- [ ] Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED 2026-09-23, demande Samuel session principale : « généralise le remède, ça ne doit plus se reproduire »)
+- [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage)
 
 <details>
 <summary>✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04</summary>
@@ -1668,7 +1670,7 @@ par deux utilisateurs nommés (D-02bis, arbitrage Willy, AskUserQuestion session
 2026-09-23), plans 41-01 à 41-13 révisés puis vérifiés (vérificateur frais, passé). Voir
 `41-CONTEXT.md` § REPRISE.
 
-**Plans:** 9/19 plans executed en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
+**Plans:** 12/19 plans executed en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
 dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré. **Six plans supplémentaires
 (41-14 à 41-19) ajoutés et exécutés le 2026-09-18** pour le périmètre sans admin (option (a)) — voir
 liste ci-dessous.
@@ -1678,9 +1680,9 @@ Plans:
 - [x] 41-01-PLAN.md — préalables re-mesurés (identité admin, collaborateurs, #29, checks requis), JSON des deux rulesets à deux `User` `always` (D-02bis, révisé 2026-09-23)
 - [x] 41-02-PLAN.md — `.github/CODEOWNERS` étroit, ledger PROT-01..04 non cochés
 - [x] 41-03-PLAN.md — ADR-072 (contournement et hotfix), amendement d'ADR-059, `CLAUDE.md`
-- [ ] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
-- [ ] 41-05-PLAN.md — décision explicite avant pose, pose par l'exécutant, relecture serveur des deux `User`, état des PR en vol, mesure M-2 (révisé 2026-09-23)
-- [ ] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement
+- [x] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
+- [x] 41-05-PLAN.md — décision explicite avant pose, pose par l'exécutant, relecture serveur des deux `User`, état des PR en vol, mesure M-2 (révisé 2026-09-23)
+- [x] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement — `CO-VERDICT: ECART` accepté et documenté (Willy, 2026-09-24) : `mergeStateStatus`/`reviewDecision` masqués par le contournement `always` des deux seuls collaborateurs
 - [ ] 41-07-PLAN.md — PR rouge jetable : mesure M-1, refus, fermeture sans merge
 - [ ] 41-08-PLAN.md — contournement réel et trace dans les rule suites, mesure M-3
 - [ ] 41-09-PLAN.md — push direct refusé pour un acteur hors liste (clé de déploiement temporaire), règles de tags, mesure M-4 (révisé 2026-09-23)
@@ -1697,3 +1699,163 @@ Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-1
 - [x] 41-17-PLAN.md — G-3 `scripts/check-push-sans-pr.sh` (PROT-05) : alarme après coup sur un push direct vers `main` sans PR associée, 5 mutants
 - [x] 41-18-PLAN.md — doctrine : ADR-072, résumé `CLAUDE.md`, renvois `BACKLOG.md`, O-3 « signalée et tracée »
 - [x] 41-19-PLAN.md — clôture du périmètre sans admin : rejeu final, ledger `REQUIREMENTS.md` (PROT-01 non coché, PROT-02/03/04/05 cochés), constat d'inatteignabilité des critères 1-3
+### Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED)
+
+> **Origine** (2026-09-23, le jour même de la partition réelle du dépôt) : la PR #94 a partitionné
+> `.planning/` en deux compartiments (`fiabilite`, `gouvernance`) et a coûté **13 commits, dont un
+> seul pour le geste lui-même** — tout le reste a réparé ce qui supposait un planning unique. Elle a
+> laissé un angle mort consigné au BACKLOG : `.github/workflows/ci.yml:353` câble
+> `check-state-integrity.sh` **en dur** sur `.planning/workstreams/fiabilite/STATE.md`. La cible en
+> dur est le bon remède contre un `export` qui détournerait le gate — mais elle laisse **tous les
+> autres compartiments sans garde**. Demande de Samuel (session principale, 2026-09-23) :
+> « généralise le remède à VibeFlow, ça ne doit plus se reproduire ou être corrigé simplement. »
+
+**État mesuré au 2026-09-23** (reconnaissance de mission, commit `a962065`), 19 consommateurs
+d'artefacts de planning recensés hors suites de tests :
+
+- **1 seul** balaie tous les compartiments du disque (`check-divergence.sh`) — et sa boucle
+  d'énumération est **inline et dupliquée deux fois** dans le même fichier, sans fonction partagée ;
+  zéro compartiment découvert y rend **exit 0**, donc un verdict vide passe pour un verdict vert.
+- **8** sont workstream-aware mais ne résolvent que le **compartiment actif** (via `vf_ws_resolve`).
+- **2 étapes CI** sont câblées en dur sur `fiabilite` (`ci.yml:353` et le verdict R5 `ci.yml:844`).
+- **3** supposent encore la racine `.planning/` et sont **faux aujourd'hui** :
+  `check-planning-state.sh` (rc=2, imprime « STATE.md est ABSENT » à chaque `SessionStart`, y
+  compris sous `--hook` où le code est pourtant traduit en 0), `detect-gsd-engine.sh` (rc=3
+  « aucun moteur de planning » alors qu'il rend rc=0 sur le compartiment — et sa cascade **cause**
+  le faux rouge précédent), `discover-unintegrated-docs.sh` (rc=0 avec 4 faux positifs sur 5).
+- `plugin/planning-core/scripts/workstream-policy.sh` n'offre **aucune primitive d'énumération**.
+
+**Goal**: Tout gate qui porte sur un artefact de planning s'applique à **chaque compartiment présent
+sur le disque**, par un mécanisme **partagé** qui dérive ses chemins du disque et jamais de
+l'environnement ; en oublier un devient impossible sans que la CI le dise.
+
+**Requirements**: WSAW-01, WSAW-02, WSAW-03, WSAW-04, WSAW-05, WSAW-06, WSAW-07
+**Depends on:** Phase 39 (le patron de `check-divergence.sh` et sa suite à 17 cas) et la partition
+réelle D-02 (PR #94, mergée 2026-09-23). **Prérequis de la Phase 41.2** : sans ce balayage, la preuve
+d'usage de la 41.2 (« gates verts sur chaque compartiment ») n'est pas mesurable.
+**Success Criteria** (what must be TRUE):
+
+  1. Un **mécanisme partagé d'énumération** vit dans le module `conductor` (ou `planning-core`), dérivé
+     du patron de `check-divergence.sh` : il rend **un chemin explicite par compartiment présent sur
+     le disque**, refuse de suivre un lien symbolique, ne consulte **jamais** `GSD_WORKSTREAM`,
+     `VF_WORKSTREAM` ni le pointeur `.planning/active-workstream`, et **ne rend pas vert** quand il
+     découvre zéro compartiment sur un dépôt partitionné — le trou d'exit 0 de `check-divergence.sh`
+     est fermé, et sa double boucle inline est remplacée par un appel unique (WSAW-01).
+
+  2. Les **2 étapes CI câblées en dur** et les **3 scripts qui supposent la racine** passent par ce
+     mécanisme, ou déclarent explicitement pourquoi ils n'en relèvent pas. Le recensement des
+     consommateurs est **versionné** et rejoué par la CI, de sorte qu'un consommateur neuf qui
+     oublierait le mécanisme soit vu (WSAW-02).
+
+  3. **La CI voit un compartiment fautif** : sur fixture jetable à **trois** compartiments dont un
+     cassé, l'étape rend **rouge** ; la même fixture sans le compartiment cassé rend **vert**. La
+     bascule est exécutée dans l'étape CI elle-même, pas seulement dans la suite du module —
+     patron des sept bascules isolées de `check-instruction-budget` (WSAW-03).
+
+  4. **On ne peut plus en oublier un** : ajouter un compartiment à l'arbre suffit à le faire
+     inspecter, **sans qu'aucun câblage ne soit à modifier** — prouvé par mutation (ajout d'un
+     troisième compartiment cassé), pas par relecture. Le mode d'échec symétrique est couvert :
+     un mécanisme qui cesserait d'énumérer rend rouge au lieu de rendre vert à vide (WSAW-04).
+
+  5. **Trois états, pas deux.** Un gate de planning distingue **conforme** / **non initialisé**
+     (compartiment créé, jamais travaillé — verdict propre et visible, **jamais un échec**) /
+     **corrompu**. `.planning/workstreams/gouvernance/STATE.md` — sortie **nominale** de
+     `workstream create`, frontmatter réduit à `workstream:` + `created:`, **rc=2 mesuré le
+     2026-09-23** — relève de « non initialisé ». Généraliser le balayage ne doit **pas** transformer
+     « muet » en « rouge » : rougir sur la sortie nominale d'une commande du moteur que VibeFlow ne
+     contrôle pas ferait hériter à chaque lab d'un rouge qu'il n'a pas causé, et lui apprendrait à
+     ignorer le gate. Le classement est justifié gate par gate contre ADR-074 (objet gardé = état du
+     planning ⇒ intégrité technique ⇒ bloquant), et **jamais** porté par une exception nominative sur
+     un compartiment (WSAW-05).
+
+  6. **Une seule vérité sur ce qu'est un compartiment conforme**, définie ici et **consommée** par la
+     Phase 41.2 (WSCH-02) — deux définitions concurrentes sont une condition d'arrêt, pas un
+     arbitrage d'exécution (WSAW-05).
+
+  7. **La frontière gate / workflow est écrite.** `plugin/dev-orchestrator/references/workstreams.md`
+     et ADR-069 **posent** la règle — ils ne la rappellent pas, elle n'existait pas : elle vivait dans
+     un commentaire de `ci.yml:345-346`, pour un seul gate. Formulée **par le rôle** :
+     `GSD_WORKSTREAM` et le pointeur restent le **canal nominal de ce qui travaille** (workflows,
+     agents, worktrees) ; un **gate** ne dérive jamais sa cible d'une valeur qu'un `export` peut
+     changer, **parce qu'il juge celui-là même qui pourrait l'exporter**. Écrite comme une
+     **précision** d'ADR-069 — même forme qu'ADR-074 précisant ADR-031 sans l'abroger —, datée, avec
+     son origine (angle mort constaté à la partition D-02 du 2026-09-23) et le constat explicite que
+     **l'ancrage ADR-063 invoqué au départ était erroné** (ADR-063 date du 2026-07-31, porte sur
+     l'agrégation de `STATE.md` et ne contient aucune occurrence de « workstream »), sans quoi le
+     prochain lecteur refera le raccourci. *Décision de la session principale (`vibeflow-head`),
+     2026-09-23 — pas un arbitrage de Samuel* (WSAW-06).
+
+  8. **La doctrine des compartiments est à jour et exacte** (WSAW-07). `workstreams.md` est
+     aujourd'hui muet sur le **choix** (les mots « choix », « démarrage », « init » n'y figurent pas)
+     et porte en §3 une affirmation **devenue fausse** depuis la PR #94 — « sur un dépôt non
+     partitionné il sort en 3 sans un mot : c'est l'état nominal de tous nos labs à ce jour ». Le
+     fichier énonce : le **choix au démarrage**, sa **valeur** (deux flux qui avancent en parallèle
+     sur des périmètres disjoints), le **non-choix par défaut** pour un lab solo (un `--ws` partout
+     pour rien), et la **procédure de bascule** avec sa précondition vérifiable — aujourd'hui absente
+     (§1 ne dit que « `create <nom> --migrate-name <nom>` », sans procédure ni précondition).
+     *Cette phase est le seul écrivain de `workstreams.md` et de `docs/ADR.md` : la 41.2 lui fournit
+     le contenu, elle ne touche ni l'un ni l'autre — c'est ce qui rend les deux chantiers
+     parallélisables sans conflit d'écriture.*
+
+  9. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa **mutation rouge prouvée**.
+
+**Plans:** TBD (run /gsd-plan-phase 41.1 to break down)
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 41.1 to break down)
+
+### Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED)
+
+> **Origine** : `BACKLOG.md` § « Choisir la partition du planning AU DÉMARRAGE, pas après coup »
+> (2026-09-23). Besoin dans les mots de Samuel : « on devrait pouvoir choisir si on partitionne ou
+> pas dès le début, et proposer des skills et scripts pour ça. On doit faciliter le travail. »
+> ADR-069 interdit déjà de partitionner tant qu'une phase est en vol : **le seul moment
+> structurellement sûr est le démarrage** — la doctrine pointe vers ce besoin sans le servir.
+> La mécanique existe déjà côté moteur (`@opengsd/gsd-core` : `workstream create/list`, `--ws`) et
+> VibeFlow porte déjà la doctrine et les gardes. **Ce qui manque est l'ergonomie du choix, pas la
+> mécanique** — cette phase ne doit pas être gonflée au-delà de ça.
+
+**Goal**: Au démarrage d'un lab, VibeFlow pose **une** question en langage d'usage et crée — ou non —
+les compartiments ; le **défaut reste le planning unique** ; un lab déjà démarré bascule par un geste
+outillé qui vérifie **par machine** la précondition d'ADR-069 ; et un lab neuf partitionné est **vert
+sur chaque compartiment sans réparation manuelle**.
+
+**Requirements**: WSCH-01, WSCH-02, WSCH-03, WSCH-04, WSCH-05
+**Depends on:** **Phase 41.1** (sans le balayage, le critère 4 ci-dessous n'est pas mesurable).
+**Success Criteria** (what must be TRUE):
+
+  1. L'initialisation d'un lab pose **une** question en **langage d'usage** — « plusieurs personnes ou
+     agents vont-ils travailler en parallèle sur des sujets séparés ? » — et **aucune occurrence du
+     mot « workstream »** n'apparaît dans ce qui est montré à l'utilisateur. Question sautée, session
+     non interactive ou réponse négative ⇒ **planning unique**, sans compartiment : partitionner par
+     défaut est explicitement refusé comme sur-ingénierie (WSCH-01).
+
+  2. Répondre oui crée les compartiments **par le moteur** (`workstream create`, jamais une
+     réimplémentation VibeFlow), puis **VibeFlow les rend conformes** : là où le geste est sous notre
+     contrôle, un compartiment créé par VibeFlow **naît avec un frontmatter complet**, sans réparation
+     manuelle. La définition de « conforme » est celle de WSAW-05 — **consommée, jamais redéfinie
+     ici** ; en écrire une seconde est une condition d'arrêt (WSCH-02).
+
+  3. Un **skill de bascule** porte le geste pour un lab déjà démarré et **refuse** quand une phase est
+     en vol : la précondition d'ADR-069 est lue **sur un champ du disque** nommé dans le plan, jamais
+     rappelée en prose. Le refus est **prouvé par mutation** (un lab fixture avec une phase en vol
+     est refusé ; le même sans phase en vol est accepté) (WSCH-03).
+
+  4. **Preuve d'usage — critère d'échec de la phase** : un **lab neuf initialisé en mode partitionné**,
+     sur fixture jetable en CI, voit les gates de planning passer au **vert sur chaque compartiment**,
+     **sans aucune réparation manuelle**. Sinon la capacité ne fait que déplacer chez l'utilisateur les
+     13 commits qu'a coûtés la partition de ce dépôt (WSCH-04).
+
+  5. Le **contenu doctrinal** du choix — sa valeur, son non-choix par défaut, la procédure de bascule
+     et sa précondition — est **remis au manager**, qui le fait porter par WSAW-07. Cette phase
+     **n'écrit ni `workstreams.md` ni `docs/ADR.md`** : deux écrivains sur un même fichier de doctrine
+     est précisément le conflit que la parallélisation des deux chantiers doit éviter (WSCH-05).
+
+  6. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa mutation rouge prouvée.
+
+**Plans:** TBD (run /gsd-plan-phase 41.2 to break down)
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 41.2 to break down)
