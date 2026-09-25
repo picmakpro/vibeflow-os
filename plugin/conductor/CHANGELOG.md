@@ -1,5 +1,56 @@
 # Changelog — conductor
 
+## [v1.43.0] — 2026-09-25 (Phase 42 — manifeste daté et invariants de doctrine du gate des agents)
+
+**Minor** (nouvelle capacité du gate des agents) :
+
+- **Manifeste daté et source unique** (FABR-01, D-01, D-02, D-03) : `check-agents-manifest.json`
+  (même dossier que `check-agents.sh`) porte désormais les six listes de référence (identifiants
+  d'outils, champs de frontmatter connus, types d'agents natifs, modèles, modes de permission,
+  niveaux d'effort) — le script ne garde plus aucune copie de repli. Trois identifiants d'outils
+  et deux champs de frontmatter ajoutés, alignés sur la seule doc officielle citée par le
+  manifeste (D-17). L'installeur pose désormais les `*.json` des modules chez l'utilisateur
+  (D-16, commit `fix(engine)`), sans quoi le manifeste serait absent partout et refuserait tout.
+- **Fraîcheur du manifeste** (FABR-02, D-04, D-05) : l'INDÉTERMINÉ (exit 3) n'est rendu que sous
+  `--manifest-freshness=strict`, réservé aux quatre appels de `check-agents.sh` dans la CI du
+  dépôt — seule légitime à rafraîchir le manifeste. Chez l'utilisateur (garde d'écriture, hook
+  SessionStart), un manifeste périmé reste un AVERTISSEMENT, jamais un refus, et rétrograde en
+  avertissement les trois classes de listes fermées (« outil hors du set connu », « nom d'agent
+  non résolu », « champ inconnu » reste inchangé).
+- **Invariants de doctrine I1, I2, I3, I4, I5, I6, I7 en erreur (FABR-03) TOUJOURS**, jamais
+  affectés par `--strict` : I1 (D-06, marqueur « Worker interne » lu dans `description:`), I4
+  (spécifieur parenthésé dans `disallowedTools`), I7 (`vf-mcp-*` exige `vf-requires:
+  mcp-servers`), I6 (D-07, manager = allowlist `Agent(...)` non vide et NON `vf-internal` — écart
+  assumé par rapport à la spec §4, un worker interne qui dispatche n'est jamais un manager ici),
+  I5 (D-08, juge = `disallowedTools` retire `Write` et `Edit` ET aucune allowlist de dispatch —
+  armé sur arbitrage D-08 : maintenir, décision de cadrage de Claude sous délégation explicite de
+  Willy, session principale, 2026-09-25 : « tout ce qu'un juge doit vérifier vit dans sa grille,
+  jamais dans `.claude/rules` ni dans `CLAUDE.md` », `42-D19-MESURE.md`), I2 et I3 (D-09, monde
+  fermé : un worker `vf-internal` orphelin, ou un worker non interne dispatché par erreur —
+  actifs SEULEMENT sous `--resolve-agents=strict`, jamais imputés à un fichier de registre).
+- **Découverte récursive et exclusions** (FABR-04, D-10) : la cible est parcourue récursivement
+  (sous-dossiers inclus, aucun lien symbolique de dossier suivi), à l'exclusion des dossiers
+  cachés et des `*-references/` posés par l'installeur sous `.claude/agents/<mod>-references/`
+  (de la doc, jamais des agents) — un lab installé reste vert.
+- **Corpus mis en conformité** (FABR-05, D-11, D-12) : cinq modules bumpés en patch
+  (`mobile-test-team`, `business-pilot-bundle`, `content-bundle`, `growth-bundle`,
+  `design-orchestrator`), plus quatre de ces cinq modules bumpés une seconde fois en patch
+  séparé pour porter `omitClaudeMd: true` sur leurs juges (I5 armé, 42-05 Tâche 3).
+- **Échéance du manifeste** : `verifie_le` + 30 jours (`valide_jours`, lu dans le manifeste,
+  jamais en dur). À l'échéance : les quatre appels `check-agents` de la CI rougissent
+  (INDÉTERMINÉ), et T20 de `test-dev-orchestrator.sh` (qui compte les avertissements d'un
+  AGENT.md) en compte un de plus — geste unique de rafraîchissement : relire chaque source,
+  comparer, re-dater `check-agents-manifest.json`.
+- **Garde d'écriture** (`guard-agent-write.sh`) : reste fail-open sur un manifeste illisible — un
+  incident du contrôleur ne bloque jamais toutes les écritures d'agent.
+- **T76 inchangé** (D-13) : le test qui verrouillait une affirmation périmée de `team-kernel.md`
+  était déjà corrigé par le hotfix v2.63.2 (2026-09-17), cinq jours avant la spec de cette phase —
+  aucune tâche ne le vise.
+- Décisions de cadrage de Claude prises sous délégation explicite de Willy (AskUserQuestion,
+  session principale, 2026-09-23 — voir `42-CONTEXT.md`) ; D-07, D-08 et D-11 ratifiées par
+  Samuel (WhatsApp, 2026-09-23), D-18 demandée par Samuel (WhatsApp, 2026-09-23) — jamais
+  présentées comme une décision humaine sans cette précision.
+
 ## [v1.42.0] — 2026-09-25 (gates de planning workstream-aware, Phase 41.1)
 
 **Minor** (gate neuf `check-planning-consumers-registered.sh` + recensement versionné, Phase 41.1) :
