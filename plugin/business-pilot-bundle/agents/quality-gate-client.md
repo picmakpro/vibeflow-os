@@ -6,6 +6,7 @@ disallowedTools: Write, Edit
 model: sonnet
 effort: high
 memory: project
+omitClaudeMd: true
 vf-internal: true
 ---
 
