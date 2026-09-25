@@ -161,6 +161,25 @@
 #         vf-mcp-tool sans vf-requires) reçoivent `vf-requires: mcp-servers`, rc/assertions
 #         inchangés — aucune fixture préexistante n'est affaiblie par I1 ou I4 (zéro fixture
 #         portant vf-internal/« Worker interne » ou un disallowedTools à spécifieur avant T91/T92)
+#
+# Invariants I5/I6 — analyse pure des allowlists (Phase 42, FABR-03, D-07/D-08, 42-05 Tâche 3) :
+# I6 est TOUJOURS armé (indépendant de l'arbitrage D-19). I5 est armé SEULEMENT sur
+# ARBITRAGE-MAINTENIR (sonde de la Tâche 2 rejouée avant cette tâche) :
+#   T94 — I6 (D-07, toujours) : tools: Agent(...) non vide, non vf-internal, sans SendMessage →
+#         rc=1 invariant I6 ; même allowlist avec SendMessage → rc=0 ; même allowlist avec
+#         vf-internal: true + marqueur « Worker interne » → rc=0, aucun invariant I6 ; `Agent` nu
+#         (sans parenthèses) → rc=0, aucun invariant I6 ; mutation réelle sur
+#         `plugin/business-pilot-bundle/agents/vf-business-manager.md` (copie sans son jeton
+#         SendMessage) → rouge, copie restaurée → verte
+#   T96 — corpus réel + check-blueprints.sh, adapté à la branche de l'arbitrage : les six
+#         plugin/*/agents et plugin/*/AGENT.md passent --strict sans « invariant I6 » (ni
+#         « invariant I5 » si armé) ; anti-vert-à-vide (au moins 6 dossiers découverts)
+#   MUT-I6 (toujours) — `errors.extend(invariant_i6(` → `pass` sur la fixture rouge
+#         correspondante : rc_original=1, rc_mutant=0
+#   Fixtures préexistantes remises en conformité par l'armement de I6 (TOUJOURS, manager-shaped,
+#         un `SendMessage` ajouté avant leur `Agent(`/`Task(` : T25, T28, T28b, T29, T30b, T31,
+#         T33, T35, T36, T53) — rc attendus et assertions inchangés dans tous les cas. Le volet
+#         I5 (D-08) arme dans un second commit distinct de cette même Tâche 3.
 
 set -uo pipefail
 
@@ -669,7 +688,7 @@ description: Agent de test avec allowlist mixte native, tierce et cross-module, 
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Write, Agent(vf-coder, vf-reviewer, general-purpose, gsd-planner)
+tools: Read, Write, SendMessage, Agent(vf-coder, vf-reviewer, general-purpose, gsd-planner)
 ---
 corps
 EOF
@@ -721,7 +740,7 @@ description: Agent de test declarant l'outil Reed (typo) au lieu de Read.
 model: sonnet
 effort: medium
 memory: project
-tools: Reed, Agent(vf-coder)
+tools: Reed, SendMessage, Agent(vf-coder)
 ---
 corps
 EOF
@@ -740,7 +759,7 @@ description: Agent de test avec l'outil Read correctement orthographie, non-regr
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent(vf-coder)
+tools: Read, SendMessage, Agent(vf-coder)
 disallowedTools: Write, Edit
 ---
 corps
@@ -759,7 +778,7 @@ description: Agent de test declarant un nom d'agent mal orthographie dans son al
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent(vf-codeur)
+tools: Read, SendMessage, Agent(vf-codeur)
 disallowedTools: Write, Edit
 ---
 corps
@@ -785,7 +804,7 @@ description: Agent de test avec un nom d'agent correctement resolu via le regist
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent(vf-coder)
+tools: Read, SendMessage, Agent(vf-coder)
 ---
 corps
 EOF
@@ -801,7 +820,7 @@ description: Agent de test declarant son allowlist en flow list YAML entre croch
 model: sonnet
 effort: medium
 memory: project
-tools: [Read, Agent(x, y), Bash(git:*)]
+tools: [Read, SendMessage, Agent(x, y), Bash(git:*)]
 disallowedTools: Write, Edit
 ---
 corps
@@ -846,7 +865,7 @@ description: Agent de test utilisant l'alias legacy Task au lieu d'Agent dans to
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Task(vf-coder)
+tools: Read, SendMessage, Task(vf-coder)
 disallowedTools: Write, Edit
 ---
 corps
@@ -888,7 +907,7 @@ description: Agent de test avec un champ tools entierement quote entre guillemet
 model: sonnet
 effort: medium
 memory: project
-tools: "Read, Write, Agent(vf-coder)"
+tools: "Read, Write, SendMessage, Agent(vf-coder)"
 ---
 corps
 EOF
@@ -912,6 +931,7 @@ effort: medium
 memory: project
 tools:
   - Read
+  - SendMessage
 
   - Agent(vf-inexistant-improvise)
 ---
@@ -1261,7 +1281,7 @@ description: Agent de test dont l'allowlist reference un agent tiers jamais mate
 model: sonnet
 effort: medium
 memory: project
-tools: Read, Agent(gsd-jamais-cree)
+tools: Read, SendMessage, Agent(gsd-jamais-cree)
 ---
 corps
 EOF
@@ -2544,6 +2564,156 @@ EOF
     komut I7 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
   fi
 fi
+
+# ---------- T94 : invariant I6 — manager (allowlist Agent(...) non vide, non vf-internal) sans
+# SendMessage (D-07, TOUJOURS arme, Phase 42, FABR-03, 42-05 Tache 3) ----------
+cat > "$AG/i6-sans-sendmessage.md" <<'EOF'
+---
+name: i6-sans-sendmessage
+description: Agent de test manager (allowlist non vide) sans SendMessage dans tools.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Write, Agent(worker-a, worker-b)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I6"; then
+  ok "T94 manager sans SendMessage -> rc=1, invariant I6"
+else
+  ko "T94 (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i6-sans-sendmessage.md"
+
+cat > "$AG/i6-avec-sendmessage.md" <<'EOF'
+---
+name: i6-avec-sendmessage
+description: Agent de test manager (allowlist non vide) avec SendMessage dans tools.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Write, SendMessage, Agent(worker-a, worker-b)
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I6"; then
+  ok "T94 manager avec SendMessage -> rc=0, aucun invariant I6"
+else
+  ko "T94-avec (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i6-avec-sendmessage.md"
+
+cat > "$AG/i6-interne.md" <<'EOF'
+---
+name: i6-interne
+description: Agent de test. Worker interne, dispatche uniquement par un manager du team-kernel.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Write, Agent(worker-a, worker-b)
+vf-internal: true
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I6"; then
+  ok "T94 allowlist + vf-internal: true + marqueur -> rc=0, aucun invariant I6"
+else
+  ko "T94-interne (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i6-interne.md"
+
+cat > "$AG/i6-agent-nu.md" <<'EOF'
+---
+name: i6-agent-nu
+description: Agent de test declarant Agent sans aucune allowlist parenthesee (dispatch nu).
+model: sonnet
+effort: high
+memory: project
+tools: Read, Agent
+---
+corps
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I6"; then
+  ok "T94 Agent nu (sans allowlist) -> rc=0, aucun invariant I6"
+else
+  ko "T94-nu (rc=$RC) : $OUT"
+fi
+rm -f "$AG/i6-agent-nu.md"
+
+# T94 — mutation reelle sur le porteur reel de I6 (vf-business-manager.md) : le jeton
+# SendMessage disparait -> rouge (invariant I6) ; copie restauree -> verte.
+T94_CARRIER="$REPO_ROOT/plugin/business-pilot-bundle/agents/vf-business-manager.md"
+if [ -f "$T94_CARRIER" ]; then
+  T94_ORIG_DIR="$WORK/t94-original"; T94_MUT_DIR="$WORK/t94-mutant"
+  mkdir -p "$T94_ORIG_DIR" "$T94_MUT_DIR"
+  T94_BASE="$(basename "$T94_CARRIER")"
+  cp "$T94_CARRIER" "$T94_ORIG_DIR/$T94_BASE"
+  sed 's/SendMessage, //' "$T94_CARRIER" > "$T94_MUT_DIR/$T94_BASE"
+  juger_mutation_reelle "T94" "$T94_ORIG_DIR/$T94_BASE" "$T94_MUT_DIR/$T94_BASE" "invariant I6"
+else
+  ko "T94 mutation reelle : porteur introuvable ($T94_CARRIER)"
+fi
+
+# ---------- MUT-I6 : mutant QUAL-01 sur la ligne d'appel invariant_i6 (TOUJOURS) ----------
+MUT_I6_DIR="$(make_gate_mutant I6 0 'errors.extend(invariant_i6(' 'pass')"
+MUT_I6_RC=$?
+if [ "$MUT_I6_RC" -eq 0 ]; then
+  MUT_I6_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I6-orig" 0)"
+  MUT_I6_AG="$WORK/mut-I6-ag"; mkdir -p "$MUT_I6_AG"
+  cat > "$MUT_I6_AG/agent-muti6.md" <<'EOF'
+---
+name: agent-muti6
+description: Agent de test manager sans SendMessage, fixture de mutation MUT-I6.
+model: sonnet
+effort: high
+memory: project
+tools: Read, Write, Agent(worker-a, worker-b)
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I6_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I6_AG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I6_DIR/check-agents.sh" --agents-dir="$MUT_I6_AG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I6 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I6 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- T96 : corpus reel + check-blueprints.sh (TOUJOURS, adapte a la branche) ----------
+T96_FAIL=0
+T96_DIRS_FOUND=0
+for d in "$REPO_ROOT"/plugin/*/agents; do
+  [ -d "$d" ] || continue
+  T96_DIRS_FOUND=$((T96_DIRS_FOUND+1))
+  OUT_T96="$(bash "$REAL_CHECK" --strict --skills-dir="$WORK/no-such-skills-dir" --agents-dir="$d" 2>&1)"; RC_T96=$?
+  if [ "$RC_T96" -ne 0 ] || echo "$OUT_T96" | grep -q "invariant I6"; then
+    T96_FAIL=1
+    ko "T96 corpus reel ($d) : invariant I6 ou rc!=0 -> $OUT_T96"
+  fi
+done
+if [ "$T96_DIRS_FOUND" -lt 6 ]; then
+  T96_FAIL=1
+  ko "T96 anti-vert-a-vide : seulement $T96_DIRS_FOUND dossier(s) plugin/*/agents decouvert(s), attendu >= 6"
+fi
+for f in "$REPO_ROOT"/plugin/*/AGENT.md; do
+  [ -f "$f" ] || continue
+  RC_T96F=0; bash "$REAL_CHECK" --strict --file "$f" >/dev/null 2>&1 || RC_T96F=$?
+  if [ "$RC_T96F" -ne 0 ]; then
+    T96_FAIL=1
+    ko "T96 AGENT.md ($f) : rc=$RC_T96F attendu 0"
+  fi
+done
+RC_T96BP=0; bash "$REPO_ROOT/plugin/conductor/scripts/check-blueprints.sh" >/dev/null 2>&1 || RC_T96BP=$?
+if [ "$RC_T96BP" -ne 0 ]; then
+  T96_FAIL=1
+  ko "T96 check-blueprints.sh : rc=$RC_T96BP attendu 0"
+fi
+[ "$T96_FAIL" -eq 0 ] && ok "T96 corpus reel (>= $T96_DIRS_FOUND dossiers) + AGENT.md + check-blueprints.sh -> aucun invariant I6, rc=0"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="

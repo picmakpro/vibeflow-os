@@ -109,6 +109,13 @@
 #   I7 : toute clé de frontmatter commençant par `vf-mcp-` exige `vf-requires` citant
 #     l'identifiant `mcp-servers` — même jointure que la règle 4 de
 #     plugin/dev-orchestrator/scripts/check-capability-activation.sh.
+#   I6 (D-07) : un agent dont l'allowlist `Agent(...)/Task(...)` de `tools:` est non vide
+#     (analyse pure `allowlist_agents`, jamais un second tokenizer) ET qui ne porte pas
+#     `vf-internal: true` est un MANAGER au sens de cet invariant — il doit porter `SendMessage`
+#     dans `tools:`, sinon il est muet vis-à-vis de ses pairs. Écart assumé par rapport à la
+#     spec §4 : un agent interne qui dispatche (`vf-coder`, `vf-reviewer`, `vf-auditer`,
+#     `vf-test-orchestrator` — des workers internes du team-kernel) n'est jamais un manager ici ;
+#     un `Agent` nu sans allowlist parenthésée non plus (rien à notifier).
 #
 # Codes de sortie : 0 = conforme · 1 = non conforme (agents non conformes, OU invocation
 #   invalide — ex. --resolve-agents=<valeur inconnue>) · 3 = INDÉTERMINÉ (--strict sur cible
@@ -506,19 +513,21 @@ def tokenize_field(mode, raw):
         s = s[1:-1]
     return split_depth(s)
 
-def analyze_token(raw_tok, field, base):
-    \"\"\"Analyse structurelle d'UN token d'allowlist deja isole par tokenize_field.
-    Retourne (tool_name, agent_names) : agent_names est None si pas de parametres,
-    [] si allowlist vide 'Agent()', une liste sinon. Ajoute les erreurs de SYNTAXE
-    (classe non affectee par --strict, toujours bloquante) a la liste errors.\"\"\"
+def parse_token(raw_tok, field, base):
+    \"\"\"Analyse structurelle PURE d'UN token d'allowlist deja isole par tokenize_field.
+    AUCUN effet de bord (jamais rappelee pour classer un agent — Phase 42, § Don't Hand-Roll).
+    Retourne (tool_name, agent_names, message_ou_None) : agent_names est None si pas de
+    parametres, [] si allowlist vide 'Agent()', une liste sinon ; message_ou_None est le
+    message d'erreur de SYNTAXE (meme texte EXACT que l'ancien analyze_token), ou None si le
+    token est syntaxiquement propre — un token AVEC message n'est jamais retenu dans une
+    allowlist consommee ailleurs (allowlist_agents), meme quand il rend des agent_names non
+    vides (ex. 'Agent(a,,b)' : agent_names=['a','b'] mais message present -> jamais dispatch).\"\"\"
     tok = raw_tok.strip()
     if tok == \"\":
-        errors.append(f\"{base} : {field} — entree d'allowlist vide (virgule orpheline, ex. 'a,,b')\")
-        return None, None
+        return None, None, f\"{base} : {field} — entree d'allowlist vide (virgule orpheline, ex. 'a,,b')\"
     m_space = re.match(r\"^(\S+)\s+\(\", tok)
     if m_space:
-        errors.append(f\"{base} : {field} — espace avant la parenthese dans '{tok}' (attendu Nom(args))\")
-        return None, None
+        return None, None, f\"{base} : {field} — espace avant la parenthese dans '{tok}' (attendu Nom(args))\"
     m = re.match(r\"^([A-Za-z0-9_-]+)\((.*)$\", tok, re.S)
     if not m:
         # pas de parenthese : nom d'outil seul (Read, Bash, ...) OU forme MCP a joker TERMINAL
@@ -527,21 +536,49 @@ def analyze_token(raw_tok, field, base):
         # ni en tete, ni en milieu de chaine, ni dans le nom du serveur, ni suivi d'un suffixe
         # (mcp__*, mcp__Xcode*MCP__*, mcp__XcodeBuildMCP__*_sim restent hors charset).
         if not (re.fullmatch(r\"[A-Za-z0-9_-]+\", tok) or re.fullmatch(r\"mcp__[A-Za-z0-9_-]+__[*]\", tok)):
-            errors.append(f\"{base} : {field} — token hors charset attendu '{tok}'\")
-            return None, None
-        return tok, None
+            return None, None, f\"{base} : {field} — token hors charset attendu '{tok}'\"
+        return tok, None, None
     name, rest = m.group(1), m.group(2)
     if not rest.endswith(\")\"):
-        errors.append(f\"{base} : {field} — parenthese non fermee dans '{tok}'\")
-        return name, None
+        return name, None, f\"{base} : {field} — parenthese non fermee dans '{tok}'\"
     inner = rest[:-1]
     if inner.strip() == \"\":
-        errors.append(f\"{base} : {field} — allowlist vide '{name}()'\")
-        return name, []
+        return name, [], f\"{base} : {field} — allowlist vide '{name}()'\"
     agent_names = [a.strip() for a in inner.split(\",\") if a.strip() != \"\"]
     if len(agent_names) != len([a for a in inner.split(\",\")]):
-        errors.append(f\"{base} : {field} — entree vide dans l'allowlist de '{name}(...)'\")
+        return name, agent_names, f\"{base} : {field} — entree vide dans l'allowlist de '{name}(...)'\"
+    return name, agent_names, None
+
+def analyze_token(raw_tok, field, base):
+    \"\"\"Enveloppe historique d'analyze_token : appelle parse_token (analyse pure) et ajoute
+    son message a errors sous la forme EXACTE d'aujourd'hui (T26, T27, T37 a T41 assertent ces
+    textes). Comportement inchange pour tout appelant existant.\"\"\"
+    name, agent_names, message = parse_token(raw_tok, field, base)
+    if message is not None:
+        errors.append(message)
     return name, agent_names
+
+def allowlist_agents(fmlines):
+    \"\"\"I6 (D-07) : analyse PURE du champ tools: — jetons via extract_raw_field + tokenize_field
+    (memes fonctions que le lint principal, jamais un second tokenizer). Liste vide si le champ
+    est absent ou si la profondeur de parentheses est non nulle. Pour chaque jeton SANS message
+    d'erreur (parse_token) dont le nom est un outil de dispatch (AGENT_TOOL_NAMES) avec une
+    allowlist non vide, accumule ses noms d'agents — jamais analyze_token (qui ecrirait dans
+    errors une seconde fois, § Don't Hand-Roll : parse_token pur alimente cette fonction).\"\"\"
+    mode, raw = extract_raw_field(fmlines, \"tools\")
+    if mode is None:
+        return []
+    tokens, depth = tokenize_field(mode, raw)
+    if depth != 0:
+        return []
+    dispatch = []
+    for raw_tok in tokens:
+        name, agent_names, message = parse_token(raw_tok, \"tools\", \"\")
+        if message is not None or name is None:
+            continue
+        if name in AGENT_TOOL_NAMES and agent_names:
+            dispatch.extend(agent_names)
+    return dispatch
 
 def resolve_agent_name(name, agents_dir_local, registry_dirs_local, prefixes):
     low = name.lower()
@@ -714,6 +751,21 @@ def invariant_i7(base, fm):
         return []
     return [f\"{base} : invariant I7 — {k} sans vf-requires citant mcp-servers\" for k in mcp_keys]
 
+def invariant_i6(base, fm, fmlines, dispatch):
+    \"\"\"I6 (D-07, TOUJOURS arme, independant de l'arbitrage D-19) : manager si dispatch (issu
+    de allowlist_agents) non vide ET vf-internal ne vaut pas « true ». Un manager sans
+    SendMessage dans bare_tokens(fmlines, \\\"tools\\\") est une erreur — la vue sur ses pairs
+    (SendMessage) est requise pour tout dispatcheur non interne. Un agent interne porteur
+    d'une allowlist (vf-coder, vf-reviewer, vf-auditer, vf-test-orchestrator), ou un 'Agent' nu
+    sans allowlist parenthesee, n'est jamais un manager au sens de cet invariant.\"\"\"
+    if not dispatch:
+        return []
+    if str(fm.get(\"vf-internal\", \"\")) == \"true\":
+        return []
+    if \"SendMessage\" in bare_tokens(fmlines, \"tools\"):
+        return []
+    return [f\"{base} : invariant I6 — manager (allowlist Agent(...) non vide, non vf-internal) sans SendMessage dans tools: (D-07)\"]
+
 def check_file(path):
     base = os.path.basename(path)
     try:
@@ -849,6 +901,8 @@ def check_file(path):
     errors.extend(invariant_i1(base, fm))
     errors.extend(invariant_i4(base, fmlines))
     errors.extend(invariant_i7(base, fm))
+    dispatch = allowlist_agents(fmlines)
+    errors.extend(invariant_i6(base, fm, fmlines, dispatch))
 
     # Regle anti-regression (Phase 20) : memory: reinjecte SILENCIEUSEMENT Write+Edit au
     # runtime par-dessus l'allowlist tools: (contrat Claude Code confirme par sonde). Un agent
