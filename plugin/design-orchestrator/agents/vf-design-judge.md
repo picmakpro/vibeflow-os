@@ -63,7 +63,7 @@ ses points au prorata et note-le.
    coupé son chargement automatique ; sans cette lecture volontaire, ses invariants design
    n'existent plus pour ce juge.
 2. Score chaque dimension indépendamment ; toute déduction cite sa preuve
-   (`fichier:ligne` ou élément de spec) — jamais de déduction vague.
+   (`fichier:ligne` ou élément de spec).
 
 ## Verdict
 

@@ -1126,8 +1126,8 @@ else
 fi
 if [ -f "$MANAGER" ]; then
   orchestration=$(awk '/^## Orchestration par écran$/{f=1;next} f&&/^## /{exit} f' "$MANAGER")
-  echo "$orchestration" | "$GREP" -qi 'interdits' \
-    || { ko "T11 D-08 : section « Orchestration par écran » du manager ne mentionne pas les interdits du lab"; t11_ok=0; }
+  echo "$orchestration" | "$GREP" -qi 'garde-fous' \
+    || { ko "T11 D-08 : section « Orchestration par écran » du manager ne mentionne pas les garde-fous du lab"; t11_ok=0; }
   echo "$orchestration" | "$GREP" -q 'CLAUDE.md' \
     || { ko "T11 D-08 : section « Orchestration par écran » du manager ne cite pas le CLAUDE.md comme source"; t11_ok=0; }
 fi
