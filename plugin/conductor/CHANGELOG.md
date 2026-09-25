@@ -32,6 +32,16 @@
   (sous-dossiers inclus, aucun lien symbolique de dossier suivi), à l'exclusion des dossiers
   cachés et des `*-references/` posés par l'installeur sous `.claude/agents/<mod>-references/`
   (de la doc, jamais des agents) — un lab installé reste vert.
+- **Corrections post-revue/audit sur D-09/D-10** (nœud `fix-42-juges`, 2026-09-25, toujours dans
+  cette v1.43.0 non publiée — aucun bump supplémentaire) : une collision d'identité dans
+  l'univers connu (deux fichiers réels distincts de même nom de base sous le dossier linté et les
+  registres) masquait un orphelin I2 — désormais une ERREUR explicite nommant les deux chemins,
+  jamais un vert (contre-épreuve : un même fichier atteint par deux chemins de realpath identique
+  n'est toujours pas une collision). Un `.md` en lien symbolique est désormais REFUSÉ comme un
+  dossier — jamais ouvert, jamais reflété dans la sortie (PoC de l'audit : un lien vers un secret
+  hors arbre apparaissait deux fois dans la sortie avant correction, absent après). Le cache
+  `index_agents` est désormais clé par ses paramètres (agents_dir, registres). Le mode `--file`
+  applique désormais la même exclusion des agents tiers que la boucle par répertoire.
 - **Corpus mis en conformité** (FABR-05, D-11, D-12) : cinq modules bumpés en patch
   (`mobile-test-team`, `business-pilot-bundle`, `content-bundle`, `growth-bundle`,
   `design-orchestrator`), plus quatre de ces cinq modules bumpés une seconde fois en patch
