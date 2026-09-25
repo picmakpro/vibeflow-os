@@ -1670,7 +1670,7 @@ par deux utilisateurs nommés (D-02bis, arbitrage Willy, AskUserQuestion session
 2026-09-23), plans 41-01 à 41-13 révisés puis vérifiés (vérificateur frais, passé). Voir
 `41-CONTEXT.md` § REPRISE.
 
-**Plans:** 9/19 plans executed en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
+**Plans:** 12/19 plans executed en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
 dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré. **Six plans supplémentaires
 (41-14 à 41-19) ajoutés et exécutés le 2026-09-18** pour le périmètre sans admin (option (a)) — voir
 liste ci-dessous.
@@ -1680,9 +1680,9 @@ Plans:
 - [x] 41-01-PLAN.md — préalables re-mesurés (identité admin, collaborateurs, #29, checks requis), JSON des deux rulesets à deux `User` `always` (D-02bis, révisé 2026-09-23)
 - [x] 41-02-PLAN.md — `.github/CODEOWNERS` étroit, ledger PROT-01..04 non cochés
 - [x] 41-03-PLAN.md — ADR-072 (contournement et hotfix), amendement d'ADR-059, `CLAUDE.md`
-- [ ] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
-- [ ] 41-05-PLAN.md — décision explicite avant pose, pose par l'exécutant, relecture serveur des deux `User`, état des PR en vol, mesure M-2 (révisé 2026-09-23)
-- [ ] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement
+- [x] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
+- [x] 41-05-PLAN.md — décision explicite avant pose, pose par l'exécutant, relecture serveur des deux `User`, état des PR en vol, mesure M-2 (révisé 2026-09-23)
+- [x] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement — `CO-VERDICT: ECART` accepté et documenté (Willy, 2026-09-24) : `mergeStateStatus`/`reviewDecision` masqués par le contournement `always` des deux seuls collaborateurs
 - [ ] 41-07-PLAN.md — PR rouge jetable : mesure M-1, refus, fermeture sans merge
 - [ ] 41-08-PLAN.md — contournement réel et trace dans les rule suites, mesure M-3
 - [ ] 41-09-PLAN.md — push direct refusé pour un acteur hors liste (clé de déploiement temporaire), règles de tags, mesure M-4 (révisé 2026-09-23)

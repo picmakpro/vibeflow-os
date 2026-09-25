@@ -66,6 +66,50 @@ D-10 reprennent vie tels quels** ; D-06 sans objet ; D-04 à lire avec le point 
 (`check-release-tag` n'est pas un des 4 jobs requis — à vérifier contre `CONTEXTES-CHECKS` de
 `41-PREUVES.md`).
 
+### Constat d'observabilité et révision de 41-07 / 41-08 — 2026-09-24
+
+**Fait mesuré (41-06, `CO-VERDICT: ECART`)** : sur les trois PR de preuve (#101, #102, #103),
+`mergeStateStatus=CLEAN` et `reviewDecision` vide, alors que le ruleset 23892920 exige la revue code
+owner et les checks. Seule variable : `current_user_can_bypass=always`. Les deux seuls
+collaborateurs du dépôt ont ce contournement (D-02bis) : **aucun acteur réel n'observe le refus par
+défaut ni la revue code owner exigée.** Écart accepté et documenté (arbitrage Willy, AskUserQuestion
+session principale, 2026-09-24 ; `WINDOWS.md` #9).
+
+**Conséquence** : la précondition de 41-07 (`merge_sans_contournement=refuse`) est structurellement
+inatteignable — une tentative de merge n'est permise qu'en `BLOCKED`, état qu'aucun compte ne voit.
+
+**D-02ter** (arbitrage Willy, AskUserQuestion session principale, 2026-09-24) : **41-07 et 41-08
+sont révisés pour ne prouver que le prouvable**, puis la phase continue (41-09 à 41-13) :
+- ce que la machine peut établir sans observer de refus : quel run jumeau (push, pull_request)
+  compte pour un check requis ; qu'une PR rouge porte bien des checks requis en échec ; la **trace**
+  d'un contournement explicite dans les rule suites (merge de la #101 inoffensive, seule PR
+  autorisée à atterrir) ;
+- ce qui reste hors d'atteinte avec les acteurs actuels, dit tel quel : le refus par défaut vu
+  depuis un compte de la liste de contournement. La preuve qu'une règle mord un acteur hors liste
+  appartient à 41-09 (clé de déploiement temporaire).
+Aucune tentative de merge sur une PR rouge, jamais. Le critère 2 du ROADMAP n'est pas tenu tel que
+formulé ; la phase le dit, sans le réécrire.
+
+**Correction de la prémisse — 2026-09-24** (arbitrage Willy, AskUserQuestion session principale,
+2026-09-24 : « Garder, en corrigeant la prémisse ») : les phrases ci-dessus « Seule variable :
+`current_user_can_bypass=always` », « aucun acteur réel n'observe le refus par défaut ni la revue
+code owner exigée » et « état qu'aucun compte ne voit » sont **fausses** et ne doivent plus être
+citées. Mesure de lecture seule du 2026-09-24, compte `picmakpro` (en contournement `always`) :
+
+| PR | Auteur | Chemin CODEOWNERS touché | `mergeStateStatus` vu par `picmakpro` |
+|---|---|---|---|
+| #100 | `samuel-neveugall` | `.github/workflows/ci.yml` | `BLOCKED`, revue demandée à `picmakpro` |
+| #101 | `picmakpro` | `.github/rulesets/README.md` | `CLEAN` |
+| #102 | `picmakpro` | baseline du budget d'instructions | `CLEAN` |
+| #103 | `picmakpro` | sentinelle d'armement | `CLEAN` |
+
+Le contournement ne masque donc pas l'état bloqué. La variable discriminante observée est **l'auteur
+de la PR, lui-même seul code owner** (`@picmakpro`), et non le contournement. Cette explication est
+une lecture des mesures, **pas une règle documentée par GitHub** vérifiée ici. Le refus observé sur
+la #100 est consigné comme **observation**, sans valeur de preuve du critère 2. Les plans révisés
+41-07 à 41-13 sont conservés tels quels (D-02ter maintenu) ; 41-08 remesure ce fait au checkpoint qui
+précède le merge de la #101.
+
 ## Prémisse renversée — 2026-09-17 (historique — amendée par la section REPRISE ci-dessus)
 
 Arbitrage et constat Samuel, AskUserQuestion session principale, 2026-09-17, relayés au manager par
