@@ -860,7 +860,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | PART-07 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
 | PART-08 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) ; déclencheur de reprise exécuté le 2026-09-23 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-23) — voir `.planning/missions/2026-09-23-partition-planning-d02.md` |
 | PART-09 | Phase 39 | Done — plan 39-03 — shipped v2.60.0 (PR #62, 2026-09-14) |
-| PROT-01 | Phase 41 | Pending — reprise du 2026-09-23 (accès admin constaté, D-02bis) : volet côté serveur replanifié en 41-01 à 41-13 ; statut antérieur : hors d'atteinte (2026-09-18) |
+| PROT-01 | Phase 41 | Complete — 2026-09-24, mandat direct (hors plan 41-13 jamais exécuté) : rulesets posés par Willy (`picmakpro`) le 2026-09-23 19h56, re-mesurés `gh api` le 2026-09-24 (2 rulesets `enforcement: active`, bypass `always` Samuel + Willy) — voir `41-PREUVES.md` § « Clôture PROT-01 » |
 | PROT-02 | Phase 41 | Complete — 2026-09-18, plan 41-17/41-19 : ordre des étapes avant `check-release-tag`, absence d'entrée `tags:` dans le déclencheur, voie `merge-commit-sha` pour les merges par rebase, hook `pre-push` conservé |
 | PROT-03 | Phase 41 | Complete — 2026-09-18, plan 41-18 : ADR-072 (doctrine des trois gardes et de leur limite de fond) et son résumé dans `CLAUDE.md` |
 | PROT-04 | Phase 41 | Complete — 2026-09-18, plan 41-14 : `check-baseline-arbitrage.sh`, neuf mutants tués, observation O-3 du `25-SECURITY.md` signalée et tracée |
@@ -937,17 +937,17 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > MANI sans hash conffile, LOCK-03 en détection d'abord.
 
 ### Portabilité Windows II (prioritaire — demande client)
-- [ ] **PORT-01**: Les 3 fichiers du lot PYBIN passent par la lib partagée `vf-portable.sh` (contrat PR #29 consommé, jamais réinventé)
-- [ ] **PORT-02**: `merge-hooks.sh` apprend la forme exec (`args`) AVANT toute migration de fragments — ordre (a) moteur → (b) codes de sortie → (c) hooks.json encodé en vagues dépendantes du plan (spec §1.3)
-- [ ] **PORT-03**: Contrat de codes de sortie normalisé pour les scripts de hooks, inventaire des 19 entrées réalisé
-- [ ] **PORT-04**: L'affectation §3.2 (résolution du chemin absolu de bash à l'install) est tranchée avec Willy et documentée avant le plan de la phase
-- [ ] **PORT-05**: La portabilité est prouvée en CI sur lab frais (suites windows-crlf + windows-guards + gates verts)
+- [x] **PORT-01**: Les 3 fichiers du lot PYBIN passent par la lib partagée `vf-portable.sh` (contrat PR #29 consommé, jamais réinventé)
+- [x] **PORT-02**: `merge-hooks.sh` apprend la forme exec (`args`) AVANT toute migration de fragments — ordre (a) moteur → (b) codes de sortie → (c) hooks.json encodé en vagues dépendantes du plan (spec §1.3)
+- [x] **PORT-03**: Contrat de codes de sortie normalisé pour les scripts de hooks, inventaire des 19 entrées réalisé — **note (audit 2026-09-24)** : l'inventaire RÉEL mesuré fait **29 entrées, pas 19** ; le 19 de l'énoncé était un repère d'avant-mesure, jamais mis à jour après coup. Livré quand même : le contrat de codes de sortie couvre les 29 entrées réelles.
+- [x] **PORT-04**: L'affectation §3.2 (résolution du chemin absolu de bash à l'install) est tranchée avec Willy et documentée avant le plan de la phase — **note (audit 2026-09-24)** : l'affectation a en réalité été **tranchée unilatéralement par Samuel**, Willy informé APRÈS coup — pas un co-arbitrage comme l'énoncé le nomme. Écart assumé, documenté ici pour ne pas le lisser.
+- [x] **PORT-05**: La portabilité est prouvée en CI sur lab frais (suites windows-crlf + windows-guards + gates verts) — **note (audit 2026-09-24)** : la preuve porte sur des **fixtures qui SIMULENT Windows** (CRLF, guards) — aucun runner Windows réel n'a exécuté cette suite. Repli assumé et documenté (ADR-054), pas une preuve sur machine Windows.
 
 ### Manifeste d'install + dry-run (issue #20)
 - [x] **MANI-01**: Chaque module posé écrit son manifeste de chemins (`$TARGET_ROOT/scripts/.vibeflow-manifest-<module>`, LF trié, un chemin par ligne)
 - [x] **MANI-02**: `--dry-run` montre le plan de pose fichier-par-fichier sans rien écrire — même chemin de code que la pose (install + calibrate)
 - [x] **MANI-03**: L'update supprime les chemins de l'ancien manifeste absents du nouveau, avec backup systématique et liste signalée à l'utilisateur
-- [ ] **MANI-04**: L'issue GitHub #20 est close par livraison, réponse postée sur l'issue — **superseded par `31-CONTEXT.md` §4 point 8** : brouillon écrit (`31-ISSUE-20-REPLY.md`), poster et clore sont des gestes humains (ADR-031), non faits en mission
+- [x] **MANI-04**: L'issue GitHub #20 est close par livraison, réponse postée sur l'issue — **état exact (audit 2026-09-24, mis à jour après le geste)** : réponse postée sur l'issue le 2026-08-16 (commentaire de `samuel-neveugall`, corps identique au brouillon `31-ISSUE-20-REPLY.md`) ; issue **fermée le 2026-09-24 par la session principale, sur autorisation explicite de Samuel** (`✓ Closed issue picmakpro/vibeflow-os#20`). La mention antérieure « superseded / gestes humains non faits en mission » est périmée, retirée.
 
 ### Durcissement du driver-lock (Phase 32 livrée le 2026-08-17 — 64 suites / 0 échec)
 - [x] **LOCK-01**: Le heartbeat est séparé de la lease — un manager vivant renouvelle son battement, le TTL ne monte pas
@@ -975,7 +975,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **BUDG-05**: Le ratchet du budget ne bloque plus que les ajouts d'instructions, par fichier ; une croissance de lignes sans instruction sous le plafond reste verte — prouvé par bascules sur fixture dans l'étape CI elle-même — Phase 40.1, D-02/D-07 — **close le 2026-09-17** (plan 40.1-14) : bascules CI prouvées par mutants (plan 40.1-03), invariants de phase verts, rejeu gates+tests vert
 
 ### Posture de protection du dépôt (Phase 41 — périmètre sans admin)
-- [ ] **PROT-01**: Rulesets de branche et de tags posés et prouvés par un refus réel. **NON COCHÉ**
+- [x] **PROT-01**: Rulesets de branche et de tags posés et prouvés par un refus réel.
   — hors d'atteinte sans accès admin : mesure `admin: false, maintain: false, push: true` sur le
   dépôt, 2026-09-17, deux lectures indépendantes (compte de Samuel `samuel-neveugall` :
   `admin: false, maintain: false, push: true`) ; le compte `picmakpro`, seul admin, est celui de
@@ -985,10 +985,34 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   `always` (D-02bis — arbitrage Willy, AskUserQuestion session principale, 2026-09-23). Séquence :
   Willy pose les rulesets → preuve → clôture du jalon `fiabilite-v1.0` (PROT-01 en fait partie, ne
   peut donc pas se clore avant — correction du 2026-09-23 d'une formulation antérieure qui
-  inversait cette séquence, cf. `BACKLOG.md` § « Protection de `main` côté GitHub »). Coché
-  seulement à la clôture, sur pièce (`41-PREUVES.md`, plan 41-13). Renvoi : `BACKLOG.md` §
-  « Protection de `main` côté GitHub — DIFFÉRÉ » et `41-CONTEXT.md` § Prémisse renversée (D-01 à
-  D-08 suspendus, non annulés). Ni abandonné, ni requalifié : il attend.
+  inversait cette séquence, cf. `BACKLOG.md` § « Protection de `main` côté GitHub »). Renvoi :
+  `BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ » et `41-CONTEXT.md` § Prémisse
+  renversée (D-01 à D-08 suspendus, non annulés).
+  - **Exigence close le 2026-09-24** (mandat direct, hors plan 41-13 jamais exécuté) — preuves :
+    rulesets posés par Willy (`picmakpro`) le 2026-09-23 19h56 et re-mesurés le 2026-09-24
+    (`gh api repos/picmakpro/vibeflow-os/rulesets`, `41-PREUVES.md` § « Clôture PROT-01 ») :
+    `RULESETS-APRES` — deux rulesets `enforcement: active` (`23892920` sur `refs/heads/main`,
+    `23892922` sur `refs/tags/v*`) ; `RULESET-MAIN` — règles `pull_request` (0 approbation requise,
+    `require_code_owner_review: true`, méthodes merge/squash/rebase), `required_status_checks` (4
+    contextes épinglés `integration_id: 15368`, politique stricte), `deletion`, `non_fast_forward` ;
+    `RULESET-TAGS` — `deletion`, `non_fast_forward`, `update`, création libre ; `BYPASS-ACTEURS` —
+    `current_user_can_bypass: always` mesuré en direct pour Samuel (`samuel-neveugall`, id
+    `151974738`), relayé de la mesure de la session principale du 2026-09-24 pour Willy
+    (`picmakpro`, id `203482067`, non re-vérifié depuis ce compte faute de moyen de s'y
+    authentifier) — les deux `actor_id` correspondent à `ACTEURS-CONTOURNEMENT` (41-01, reprise) et
+    aux `bypass_actors` des deux sources versionnées `.github/rulesets/*.json`. `ECART-DEFAUT-SERVEUR` —
+    le champ `require_extra_approval_for_unattributed_changes: true` figure côté serveur sur les
+    deux rulesets, absent des sources versionnées ; défaut GitHub non demandé, sans effet observé
+    sur le comportement décrit par cette exigence, consigné et non corrigé (`BACKLOG.md` §
+    « Protection de `main` côté GitHub »). Aucun refus réel de merge n'a été rejoué dans ce mandat
+    (pas de PR de test délibérément non conforme poussée) — la preuve du refus tient à la
+    configuration serveur mesurée (revue code owner + 4 checks requis, 0 bypass hors liste), pas à
+    un rejeu observé ; recensé comme tel, jamais présenté comme un rejeu réel.
+  **Note (PR #106, arbitrage Willy, WhatsApp, 2026-09-24)** : une mesure de configuration
+  (lecture des rulesets) n'est pas un refus ; la PR #100, ouverte par `samuel-neveugall` et touchant
+  `.github/workflows/ci.yml`, a été vue `BLOCKED` par la revue code owner exigée malgré le
+  contournement disponible — c'est le refus réel observé. Son merge se fait par contournement
+  tracé (`gh pr merge --admin`, arbitrage Samuel, AskUserQuestion session principale, 2026-09-25).
 - [x] **PROT-02**: Compatibilité avec la discipline de release du `CLAUDE.md`. **COCHÉ** —
   clôture citant les clés `REJEU-GATES` et `G3-FIXTURE` (registre `41-PREUVES.md` § 41-19) et les
   trois preuves du plan 41-17 : ordre des étapes avant `check-release-tag`, absence d'entrée
@@ -1021,7 +1045,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 ### Ré-armement worktree (phase conditionnelle — jamais bloquante ; close 2026-08-26, option A)
 - [~] **WKTR-01** *(requalifié, pas livré)*: la précondition externe (gsd-core > 1.10.0 releasé ET installé) est bien tombée, mais l'attestation prévue (`# vf-provides: worktree-baseref` porté par `ensure-deps.sh`) n'est pas satisfiable honnêtement — `ensure-deps.sh` ne doit pas écrire `worktree.baseRef`, donc il ne peut pas l'attester sans produire une couverture déclarée sans couverture effective (Borne 4)
 - [x] **WKTR-02**: leg A prouvé (retour des commits, `2026-08-23-...md` + rejeu 2026-08-26 sur branche divergente) ; leg B mesuré (`2026-08-26-wktr-02-leg-b-base-de-fork.md`) — sûr (dégradation séquentielle si HEAD diverge) mais inerte en conditions de mission (ADR-059). **Décision humaine : ne pas ré-armer** — les deux gates (`check-agents.sh`, règle 4 de `check-capability-activation.sh`) restent en place
-- [ ] **WKTR-03** *(portée par la Phase 30, hors mandat de cette clôture)*: La veille de release gsd-core est active dès le jour 1
+- [x] **WKTR-03** *(portée par la Phase 30, hors mandat de cette clôture)*: La veille de release gsd-core est active dès le jour 1
 
 ### Skill-installer global (réduit à un cadrage)
 - [x] **SKIL-01**: Un cadrage go/no-go répond à « que fait-il de plus que le natif `/plugin` ? » — abandon documenté si la réponse est creuse ; aucun code avant le go — **cadrage rendu (NO-GO), 2026-09-15 : `34-SPIKE-SKIL.md`**. Règle appliquée : l'exigence demande un cadrage écrit, pas un GO — un NO-GO documenté la satisfait tout autant ; ne coche pas si le verdict avait été `MESURE INVALIDE`.
@@ -1034,36 +1058,36 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > Espace de noms dérivé au cadrage (38-CONTEXT.md) — `PORT-xx` est PRIS (Phase 30) et exclu.
 > 6 lots, ordre de dépendance imposé : FIDE → RUNT → ROLL → TGT → ADPT → MIGR.
 
-- [ ] **FIDE-01**: Un gate exécutable (`check-artifact-fidelity.sh`) compare, PAR EXÉCUTION RÉELLE de la conversion `gsd-core` (jamais une table recopiée à la main), un artefact VibeFlow source à sa forme convertie pour une cible mesurée (Codex tier-1) et rend, par champ (`model`/`memory`/`tools`/`disallowedTools`/`vf-internal`/`description`), l'un de trois verdicts : préservé / dégradé / perdu — plus le compte des marqueurs morts (`.claude/`, `Task(`) non réécrits
-- [ ] **FIDE-02**: L'install (`vibeflow-update.sh install`/`update`) affiche ce périmètre à la fin de la pose — jamais dans un rapport séparé qu'on ne relit pas ; sur Codex le rapport est VIDE (rien perdu, mesuré) ou ASSUMÉ (perte nommée), jamais silencieux
-- [ ] **FIDE-03**: Le gate déclare, par cible, le TROISIÈME fait de recette — sur Codex, `sandbox_mode`/`approval_policy`/`[permissions]` par rôle sont **acceptés puis inertes** : le confinement de `vf-reviewer`/`vf-auditer`/`vf-design-judge` n'est garanti QUE par la session read-only séparée. Déclaré au `status` ET à l'install, comme `multi_agent_v2` et `trust_level`. Le gate vérifie en outre que la commande de juge posée par 38-05 porte les QUATRE éléments (`-s read-only`, `approval_policy="never"`, `skills.include_instructions=false`, `project_doc_max_bytes=0`) et rend ROUGE s'il en manque un — c'est un ET, jamais un OU
+- [x] **FIDE-01**: Un gate exécutable (`check-artifact-fidelity.sh`) compare, PAR EXÉCUTION RÉELLE de la conversion `gsd-core` (jamais une table recopiée à la main), un artefact VibeFlow source à sa forme convertie pour une cible mesurée (Codex tier-1) et rend, par champ (`model`/`memory`/`tools`/`disallowedTools`/`vf-internal`/`description`), l'un de trois verdicts : préservé / dégradé / perdu — plus le compte des marqueurs morts (`.claude/`, `Task(`) non réécrits
+- [x] **FIDE-02**: L'install (`vibeflow-update.sh install`/`update`) affiche ce périmètre à la fin de la pose — jamais dans un rapport séparé qu'on ne relit pas ; sur Codex le rapport est VIDE (rien perdu, mesuré) ou ASSUMÉ (perte nommée), jamais silencieux
+- [x] **FIDE-03**: Le gate déclare, par cible, le TROISIÈME fait de recette — sur Codex, `sandbox_mode`/`approval_policy`/`[permissions]` par rôle sont **acceptés puis inertes** : le confinement de `vf-reviewer`/`vf-auditer`/`vf-design-judge` n'est garanti QUE par la session read-only séparée. Déclaré au `status` ET à l'install, comme `multi_agent_v2` et `trust_level`. Le gate vérifie en outre que la commande de juge posée par 38-05 porte les QUATRE éléments (`-s read-only`, `approval_policy="never"`, `skills.include_instructions=false`, `project_doc_max_bytes=0`) et rend ROUGE s'il en manque un — c'est un ET, jamais un OU
 
-- [ ] **RUNT-01**: Les sites CLI-couplés des 4 fichiers `ensure-deps.sh` / `ensure-design-deps.sh` / `check-plugin-update.sh` / `vf-update-run.sh` passent par une détection de runtime + une table de dispatch portant les 4 verbes (`list --json`, `install`, `enable`, `marketplace add`) au lieu d'un appel `claude` figé
-- [ ] **RUNT-02**: Sur un runtime non détecté ou non supporté (OpenCode, kimi-code — non mesurés au 2026-08-28), le comportement est une dégradation DÉCLARÉE (étapes manuelles affichées, code de sortie propre) — jamais un échec silencieux ni un crash
+- [x] **RUNT-01**: Les sites CLI-couplés des 4 fichiers `ensure-deps.sh` / `ensure-design-deps.sh` / `check-plugin-update.sh` / `vf-update-run.sh` passent par une détection de runtime + une table de dispatch portant les 4 verbes (`list --json`, `install`, `enable`, `marketplace add`) au lieu d'un appel `claude` figé
+- [x] **RUNT-02**: Sur un runtime non détecté ou non supporté (OpenCode, kimi-code — non mesurés au 2026-08-28), le comportement est une dégradation DÉCLARÉE (étapes manuelles affichées, code de sortie propre) — jamais un échec silencieux ni un crash
 
-- [ ] **ROLL-01**: `rollback_module` restaure `agents/${mod}.md` et `agents/${mod}-references/` en plus de `skills`/`scripts` (symétrie avec ce que `backup_module` sauvegarde déjà)
-- [ ] **ROLL-02**: `rollback_module` restaure le fragment de hooks (`hooks/hooks.json`) sauvegardé au backup, via `remove_module_hooks`/`merge_module_hooks` (primitives existantes, jamais réimplémentées) — le trou de `merge-hooks.sh` (cross-matcher, CONCERNS HIGH) reste une dette signalée, pas corrigée par ce lot
-- [ ] **ROLL-03**: `rollback_module` appelle `mark_installed "$mod" "$version"` avec la VERSION restaurée (capturée au moment du backup) — le registre ne ment plus après un rollback
-- [ ] **ROLL-04**: Le glob de sélection du backup exclut les répertoires `-removed` de convergence et échoue BRUYAMMENT (jamais un `✓ rollback OK` sur zéro action) quand aucun backup valide n'existe
-- [ ] **ROLL-05**: `--dry-run` fonctionne sur `rollback` — prévisualisation de ce qui serait restauré, sans écriture (révise D-31-09 sur ce point précis, ne migre PAS `rollback_module` vers le socle manifeste)
+- [x] **ROLL-01**: `rollback_module` restaure `agents/${mod}.md` et `agents/${mod}-references/` en plus de `skills`/`scripts` (symétrie avec ce que `backup_module` sauvegarde déjà)
+- [x] **ROLL-02**: `rollback_module` restaure le fragment de hooks (`hooks/hooks.json`) sauvegardé au backup, via `remove_module_hooks`/`merge_module_hooks` (primitives existantes, jamais réimplémentées) — le trou de `merge-hooks.sh` (cross-matcher, CONCERNS HIGH) reste une dette signalée, pas corrigée par ce lot
+- [x] **ROLL-03**: `rollback_module` appelle `mark_installed "$mod" "$version"` avec la VERSION restaurée (capturée au moment du backup) — le registre ne ment plus après un rollback
+- [x] **ROLL-04**: Le glob de sélection du backup exclut les répertoires `-removed` de convergence et échoue BRUYAMMENT (jamais un `✓ rollback OK` sur zéro action) quand aucun backup valide n'existe
+- [x] **ROLL-05**: `--dry-run` fonctionne sur `rollback` — prévisualisation de ce qui serait restauré, sans écriture (révise D-31-09 sur ce point précis, ne migre PAS `rollback_module` vers le socle manifeste)
 
-- [ ] **TGT-01**: `TARGET_ROOT` est résolu depuis un point d'injection (`--target`/variable d'environnement) en plus des deux littéraux `user`/`project`, avec repli rétro-compatible si absent
-- [ ] **TGT-02**: Les 16 littéraux résiduels (`gitignore_add_paths` ×14, `scripts_prefix_for_scope` ×2) suivent `TARGET_ROOT` au lieu d'un chemin `.claude` figé en dur
-- [ ] **TGT-03**: Le payload copié (skills/agents/commands/rules/scripts — 198 fichiers / 1130 occurrences `.claude/` mesurés) subit une réécriture des occurrences à la copie, sur le précédent `copyWithPathReplacement`
-- [ ] **TGT-04**: La sonde cross-module `conductor` → `dev-orchestrator` (cascade de présence de fichier, `vf-update/SKILL.md` `<S-moteur>`) résout toujours après l'évolution du layout — vérifiée par une tâche dédiée, jamais supposée
+- [x] **TGT-01**: `TARGET_ROOT` est résolu depuis un point d'injection (`--target`/variable d'environnement) en plus des deux littéraux `user`/`project`, avec repli rétro-compatible si absent
+- [x] **TGT-02**: Les 16 littéraux résiduels (`gitignore_add_paths` ×14, `scripts_prefix_for_scope` ×2) suivent `TARGET_ROOT` au lieu d'un chemin `.claude` figé en dur
+- [x] **TGT-03**: Le payload copié (skills/agents/commands/rules/scripts — 198 fichiers / 1130 occurrences `.claude/` mesurés) subit une réécriture des occurrences à la copie, sur le précédent `copyWithPathReplacement`
+- [x] **TGT-04**: La sonde cross-module `conductor` → `dev-orchestrator` (cascade de présence de fichier, `vf-update/SKILL.md` `<S-moteur>`) résout toujours après l'évolution du layout — vérifiée par une tâche dédiée, jamais supposée
 
-- [ ] **ADPT-01** *(résolu — nœud `probe-codex` levé en session réelle le 2026-08-28)*: Un adaptateur VibeFlow minimal écrit un rôle Codex au format RÉELLEMENT dispatchable mesuré (`.toml` sous `$CODEX_HOME/agents/vibeflow/`, `name`/`description`/`developer_instructions`, tirets conservés), avec digest explicite à 4 catégories (préservé / décoratif / perdu / limite de confinement) — `sandbox_mode`/`approval_policy` sont acceptés et validés par le schéma mais mesurés INERTES au spawn (#7b, session réelle) : jamais présentés comme un substitut réel à `disallowedTools`
+- [x] **ADPT-01** *(résolu — nœud `probe-codex` levé en session réelle le 2026-08-28)*: Un adaptateur VibeFlow minimal écrit un rôle Codex au format RÉELLEMENT dispatchable mesuré (`.toml` sous `$CODEX_HOME/agents/vibeflow/`, `name`/`description`/`developer_instructions`, tirets conservés), avec digest explicite à 4 catégories (préservé / décoratif / perdu / limite de confinement) — `sandbox_mode`/`approval_policy` sont acceptés et validés par le schéma mais mesurés INERTES au spawn (#7b, session réelle) : jamais présentés comme un substitut réel à `disallowedTools` — **note (audit 2026-09-24)** : le digest RÉELLEMENT posé porte **6 statuts mesurés**, pas les 4 catégories nommées par l'énoncé ; l'intention (préservé/décoratif/perdu/limite de confinement) est tenue AUTREMENT, avec un grain plus fin. Confirmé : `sandbox_mode`/`approval_policy` ne sont JAMAIS écrits dans le TOML posé.
 - [x] **ADPT-02**: aucun mapping de nommage des 31 agents n'est construit — l'inconnu #3 est CONFIRMÉ en session réelle (les tirets passent au dispatch, `agent_type` les accepte ; la contrainte `[a-z0-9_]+` frappe uniquement le `task_name` d'invocation, jamais le nom du rôle)
 - [x] **ADPT-03**: aucun forçage `fork_turns` n'est construit — l'inconnu #5 est INFIRMÉ en session réelle (mesure en base `state_5.sqlite` : le modèle enfant est enregistré identique en `fork_turns:"none"` et `"all"`) ; « un modèle par worker » tient nativement
 - [x] **ADPT-04** *(énoncé CORRIGÉ le 2026-08-29 — la formulation d'origine était mesurée FAUSSE)*: Le gate de l'adaptateur prouve qu'un rôle posé est **réellement chargé** par Codex. ⚠️ L'énoncé initial (« `codex doctor --json` COMPTE les rôles chargés ») ne tient pas : mesuré, `doctor` **n'énumère JAMAIS** les rôles par nom et reste **exit 0** même avec un rôle cassé présent. Le seul signal exposé est un `startup warning` référençant le **chemin d'un rôle malformé**. Le gate vérifie donc l'**ABSENCE** de ce warning pour le fichier posé — discriminant prouvé par mutation (T4b). L'intention est tenue (« jamais *pas de crash donc c'est bon* »), le mécanisme est celui que le binaire expose réellement
-- [ ] **ADPT-05**: La commande de juge en session séparée porte les DEUX drapeaux d'isolation — `-c skills.include_instructions=false` **ET** `-c project_doc_max_bytes=0` — et le gate de l'adaptateur EXIGE les deux, jamais l'un : le levier skills laisse ouvert le canal `AGENTS.md` du dépôt jugé (mesuré : marqueur toujours présent sans lui). Un seul drapeau donne une porte qu'on croit fermée.
-- [ ] **ADPT-06**: La fermeture du canal d'injection est prouvée en **RÉPÉTITIONS** (≥ 3 runs sur le banc témoin, marqueur attendu **0/N**), jamais en un run — l'injection mesurée est **non déterministe (2/3)** : un run propre ne prouve rien. Si un seul run sur N ressort le marqueur, la porte n'est PAS fermée.
+- [x] **ADPT-05**: La commande de juge en session séparée porte les DEUX drapeaux d'isolation — `-c skills.include_instructions=false` **ET** `-c project_doc_max_bytes=0` — et le gate de l'adaptateur EXIGE les deux, jamais l'un : le levier skills laisse ouvert le canal `AGENTS.md` du dépôt jugé (mesuré : marqueur toujours présent sans lui). Un seul drapeau donne une porte qu'on croit fermée.
+- [x] **ADPT-06**: La fermeture du canal d'injection est prouvée en **RÉPÉTITIONS** (≥ 3 runs sur le banc témoin, marqueur attendu **0/N**), jamais en un run — l'injection mesurée est **non déterministe (2/3)** : un run propre ne prouve rien. Si un seul run sur N ressort le marqueur, la porte n'est PAS fermée. Couvre désormais **les deux canaux** : `skills`/`AGENTS.md` (`0/5`, `3b7de24`) **et** `hooks`/`plugins` (`0/5`, `78648ca`, `38-ADPT06-HOOKS-REPETITIONS.md`) — deux gates vérifiés séparément sur ce second canal (confiance par défaut du projet/des hooks ; les drapeaux `features.hooks=false`/`features.plugins=false`). **Limite déclarée** : ne couvre qu'un dépôt jugé **jamais trusté** et une commande de juge sans `--dangerously-bypass-hook-trust` ; un seul type de hook mesuré (`SessionStart`) ; **pas de plugin réel construit** pour vérifier ce canal directement ; **non reproductible en suite automatisée** (nécessite un appel réseau réel).
 
-- [ ] **MIGR-01**: `.planning/config.json` porte le runtime actif ET les runtimes installés, rétro-compatible sur 3 cas (absent / scalaire / objet) — la clé `runtime` racine RESTE une chaîne (contrat `gsd-core` : `runtime-name-policy.cjs` ignore silencieusement tout candidat non-chaîne), la richesse « installés » vit dans une clé sœur dédiée à VibeFlow
-- [ ] **MIGR-02**: `vf-calibrate` expose la dualité propagation additive / migration soustractive explicitement DANS LA SKILL et DANS SA SORTIE — jamais implicite (D-38-A : extension, pas de verbe utilisateur neuf)
-- [ ] **MIGR-03**: La bascule (vs coexistence) est gatée dry-run → confirmation → écriture, jamais par défaut (ADR-031, D-38-B)
-- [ ] **MIGR-04**: Réversibilité prouvée fichier à fichier — install → bascule → retour, arbre comparé par `comm`, jamais par un compte de fichiers
-- [ ] **MIGR-05**: Un runtime coexistant qui opère sans hooks est déclaré par le gate de fidélité (FIDE) à l'install ET au `status` — pas enfoui dans un rapport qu'on ne relit pas
+- [x] **MIGR-01**: `.planning/config.json` porte le runtime actif ET les runtimes installés, rétro-compatible sur 3 cas (absent / scalaire / objet) — la clé `runtime` racine RESTE une chaîne (contrat `gsd-core` : `runtime-name-policy.cjs` ignore silencieusement tout candidat non-chaîne), la richesse « installés » vit dans une clé sœur dédiée à VibeFlow
+- [x] **MIGR-02**: `vf-calibrate` expose la dualité propagation additive / migration soustractive explicitement DANS LA SKILL et DANS SA SORTIE — jamais implicite (D-38-A : extension, pas de verbe utilisateur neuf)
+- [x] **MIGR-03**: La bascule (vs coexistence) est gatée dry-run → confirmation → écriture, jamais par défaut (ADR-031, D-38-B)
+- [x] **MIGR-04**: Réversibilité prouvée fichier à fichier — install → bascule → retour, arbre comparé par `comm`, jamais par un compte de fichiers
+- [x] **MIGR-05**: Un runtime coexistant qui opère sans hooks est déclaré par le gate de fidélité (FIDE) à l'install ET au `status` — pas enfoui dans un rapport qu'on ne relit pas
 
 ### Workstreams — partition du planning et collaboration concurrente (Phase 39)
 > Dérivé au cadrage le 2026-09-09, discipline de mesure `awk` + `comm` (jamais `grep | sort -u` ni
@@ -1209,7 +1233,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **WSCH-05**: Le contenu doctrinal du choix (valeur, non-choix par défaut, procédure de bascule et précondition) est **remis au manager**, qui le fait porter par WSAW-07. Cette phase **n'écrit ni `workstreams.md` ni `docs/ADR.md`** — deux écrivains sur un fichier de doctrine est le conflit que la parallélisation doit éviter.
 
 ### Transverse
-- [ ] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée — **satisfait sur la Phase 41 le 2026-09-18** : G-1/G-2/G-3 naissent chacun avec ses trois issues, vingt mutants tués mesurés sur les trois gardes plus neuf sur les deux outils de phase (recensement, contrôle de trace), total mesuré vingt-neuf, ligne canonique `✓ MUT-<n> TUE`, rc=0 sur les cinq suites
+- [x] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée — mesuré satisfait sur la Phase 41 le 2026-09-18 (vingt mutants tués sur les trois gardes plus neuf sur les deux outils de phase, total vingt-neuf, rc=0 sur les cinq suites), **puis RÉGRESSÉ** (partition du planning, PR #94, 2026-09-23, résolution de racine cassée), **réparé le 2026-09-24** (résolution par `git rev-parse --show-toplevel`), mesure alors incomplète à **28/29** (`check-trace-arbitrage.sh` refusait PAR CONCEPTION les citations multiples distinctes et conformes). **RE-SATISFAIT le 2026-09-24** : trois défauts de conception corrigés dans `check-trace-arbitrage.sh` (citations multiples distinctes conformes acceptées, merges réels de PR et commits de release exclus du jugement, mot déclencheur insensible à la casse — arbitrage Samuel, AskUserQuestion session principale, 2026-09-24), neuf cas de test et neuf mutants ajoutés (dont MUT-2 repurposé), `BASE-TRACE-ARBITRAGE` avancée de `f1d6589` à `0b4d9a7` (7 commits antérieurs acceptés en l'état, identifiant de migration sans rapport confondu avec le registre de décisions de la phase — hors des trois défauts corrigés). **Mesuré ce jour, rc=0 sur les cinq suites : `test-check-trace-arbitrage.sh` 9 mutants tués (MUT-1 à MUT-9), `test-check-aucune-fermeture.sh` 3 mutants tués (inchangé), plus les vingt mutants inchangés des trois gardes CI (`check-baseline-arbitrage.sh` 9, `check-gate-touche.sh` 6, `check-push-sans-pr.sh` 5) — total 32 mutants tués sur cinq suites, toutes vertes.**
 
 ### Out of Scope (audité le 2026-08-15 — chaque exclusion a son alternative dans le périmètre)
 - **Auto-steal du lock au TTL** — lock périmé ≠ mission morte (constaté 2026-08-02) → LOCK-01 + LOCK-04. *Réévaluable post-LOCK-01 : auto-takeover sur battement mort (pas sur TTL).*

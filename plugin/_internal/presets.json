@@ -1,0 +1,23 @@
+{
+  "_doc": "Presets d'installation — un preset = un nom stable + une liste de modules RACINES. La fermeture transitive des `requires` est calculée par resolve-preset.sh (qui délègue à resolve-deps.sh) : ne JAMAIS recopier ici une dépendance qu'un module.json déclare déjà. Un preset ne peut pointer que des modules proposables (proposable != false) — le résolveur refuse le preset entier sinon. Les modules `mandatory` (conductor, consolidator) sont posés d'office par l'installeur, hors preset.",
+  "presets": [
+    {
+      "name": "dev",
+      "titre": "Lab de développement",
+      "description": "Le cycle de dev spec-driven complet : head, équipe de mission (manager + workers), design croisé. Le lab par défaut pour un dépôt de code.",
+      "modules": ["dev-orchestrator"]
+    },
+    {
+      "name": "dev-mobile",
+      "titre": "Lab de développement mobile",
+      "description": "Le lab de dev plus la boucle de test réelle sur simulateur/émulateur (Maestro, mobile-mcp) et l'équipe test → fix autonome. Pour un projet Expo / React Native / iOS.",
+      "modules": ["dev-orchestrator", "mobile-test-team"]
+    },
+    {
+      "name": "dev-audite",
+      "titre": "Lab de développement audité",
+      "description": "Le lab de dev plus l'audit d'architecture logicielle et le validateur de conformité du lab (densité des agents, dette documentaire, infrastructure). Pour un dépôt qui vit longtemps ou à plusieurs.",
+      "modules": ["dev-orchestrator", "software-architecture", "validator"]
+    }
+  ]
+}

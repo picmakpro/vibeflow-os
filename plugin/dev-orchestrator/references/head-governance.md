@@ -37,6 +37,29 @@ de route au motif que ça se passe bien.
 | configuration du lab | `vibeflow-conductor` | hors dev |
 | conformité du lab | `/vf-audit` (validator) | chasse gardée, ADR-057 |
 
+### Trois questions avant l'échelle (2026-09-24)
+
+Avant de lire la table, le head répond à **trois questions indépendantes**, chacune notée
+`faible | moyen | fort` — jamais une impression globale de « difficulté » (une seule note
+mélange tout et se laisse tirer vers le bas par un cas qui *a l'air* simple) :
+
+1. **Coordination** — combien de parties du système bougent ensemble ? (un fichier ↔ plusieurs
+   modules ↔ un contrat entre modules ou un schéma partagé)
+2. **Incertitude** — la cause ou la conception sont-elles connues, ou faut-il investiguer pour
+   les découvrir ? (bug reproduit et localisé ↔ symptôme sans cause ↔ conception ouverte)
+3. **Conséquence** — qu'est-ce qu'une erreur coûte ? (réversible en un commit ↔ régression
+   visible ↔ données, sécurité, release)
+
+**Composition** : le niveau de travail retenu est le **max(coordination, incertitude)** ; une
+conséquence `fort` **abaisse d'un cran** ce qu'il faut pour monter d'un niveau (un `moyen`
+suffit alors à passer de `Task(vf-coder)` à `Task(vf-dev-manager)`). Pattern emprunté au
+routage typé des harnais de code (`docs/research/2026-09-24-jev-system-one.md` §Ce qu'on retient) :
+décomposer, puis composer dans le code, jamais demander au modèle « c'est gros ou pas ». Le head
+peut porter ces trois notes et le niveau retenu avec une `confiance` (`mission-contracts.md`
+§Confiance d'un jugement) ; sous `SEUIL_CONFIANCE`, il **propose** au lieu de dispatcher d'office,
+même sous boucle autonome. Ces questions ne remplacent ni `SEUIL_EQUIPE` ni les signaux
+« mission » : elles disent **où lire** la table, la table dit quoi lancer.
+
 Trois renvois, aucune recopie : la **correspondance** intention → brique reste dans
 `intent-routing.md` (source unique — cette table n'ajoute que l'échelle, jamais la carte) ; le
 seuil canonique `SEUIL_EQUIPE` est **défini dans** `mission-contracts.md` §Seuil de bascule — on le

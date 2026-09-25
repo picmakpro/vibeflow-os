@@ -2910,3 +2910,60 @@ ne pas laisser un hook arbitrer une phrase.
 et jamais examinées sous cette ADR — un précédent non validé ne prouve rien, et leur cas devra
 être tranché pour lui-même. Il ne change pas non plus le classement des gates de la Phase 45, qui
 se fera à son cadrage.
+
+## ADR-075 : Les identifiants de décision courts se préfixent par leur registre d'origine — un `D-NN` nu n'engage plus un détecteur d'arbitrage
+
+**Date** : 2026-09-24 · **Statut** : Validée · **Décideur** : Samuel · **Voisines** : la convention
+« Traçabilité des arbitrages » du `CLAUDE.md` racine (cette ADR en est le prolongement direct, pas
+une règle concurrente), ADR-072 (gardes in-repo qui signalent et tracent sans verrouiller — même
+registre de gouvernance) · **Contexte** : faux positif mesuré sur
+`.planning/workstreams/fiabilite/phases/VFDO-41-posture-de-protection-du-d-p-t/tools/check-trace-arbitrage.sh`
+— arbitrage Samuel, AskUserQuestion session principale, 2026-09-24.
+
+### Contexte / Problème
+
+`check-trace-arbitrage.sh` reconnaît une clé `D-01`..`D-10` comme un marqueur d'invocation
+d'autorité humaine — au même titre que « arbitrage Samuel » ou « décision de Samuel » — parce que
+le registre de décisions de la Phase 41 numérote les siennes `D-01`..`D-10`. Le 2026-09-23, la
+mission « partition réelle du planning » (`.planning/missions/2026-09-23-partition-planning-d02.md`)
+a numéroté sa propre décision `D-02`, sans lien avec le registre de la Phase 41. Rejoué sur le
+dépôt réel, ce détecteur a rendu `FORME-NON-CONFORME` sur des commits qui citaient ce `D-02` de
+partition sans jamais invoquer d'arbitrage (`6002c2f`, `2f4d388`, `f688e2b`, `ced7577`, `12cbae2`,
+`39acd36`, `0b4d9a7`, tous du 2026-09-23) — contourné à l'époque en avançant la borne
+`BASE-TRACE-ARBITRAGE` par-dessus ce lot (`f1d6589` → `0b4d9a7`, `41-PREUVES.md` § 41-14). Le
+défaut de fond restait entier pour tout commit futur : deux registres qui numérotent chacun leurs
+décisions à partir de `D-01` finissent par se recouvrir, et rien ne dit au détecteur de quel
+registre relève un `D-02` donné.
+
+Mesuré une seconde fois par sonde dans cette session : un commit vide dont le message cite « D-02
+au sens de la mission de partition » sans invoquer d'arbitrage rendait `rc=1 FORME-NON-CONFORME`.
+
+### Décision
+
+Un identifiant de décision est désormais **préfixé par son registre d'origine** :
+`P41-D-02` pour la décision D-02 du registre de la Phase 41, `PART-D-02` pour celle de la mission
+de partition. Le détecteur `check-trace-arbitrage.sh` n'engage plus son contrôle que sur la forme
+préfixée de **son propre registre** (`P41-D-01`..`P41-D-10`) — un `D-02` nu, ou préfixé par un
+autre registre, ne franchit plus sa porte d'entrée et n'est jamais jugé. Un identifiant nu reste
+lisible en prose (« la décision D-02 »), mais cesse d'engager un outil qui cherche une citation
+d'arbitrage : c'est la forme préfixée seule qui le fait. Convention posée au niveau du dépôt
+(`CLAUDE.md` § Traçabilité des arbitrages), pas seulement dans ce script — tout futur détecteur ou
+registre de décisions hérite de la même règle.
+
+### Alternative écartée
+
+**Restreindre le déclenchement du détecteur aux seuls chemins gardés par la phase 41** (ne juger
+que les commits qui touchent `.planning/workstreams/fiabilite/phases/VFDO-41-.../`, `scripts/`,
+`.github/`, …) plutôt que d'exiger un préfixe. Écartée : elle rétrécit la garde pour éteindre un
+faux positif — un commit qui touche un chemin hors de cette liste mais invoque quand même une
+décision de la Phase 41 sans preuve cesserait d'être jugé, ce qui est exactement le mode de défaut
+que cette phase combat (une garde qu'on affaiblit pour la faire taire). Le préfixage résout la
+collision sans réduire la portée de ce que le détecteur regarde.
+
+### Conséquence sur l'historique
+
+**Les commits déjà posés ne sont jamais annotés rétroactivement.** La convention est prospective :
+elle s'applique aux identifiants écrits à partir de son adoption, jamais en réécrivant un message
+de commit existant. La borne `BASE-TRACE-ARBITRAGE` du registre de la Phase 41 continue de couvrir
+l'antérieur — c'est elle, et non une réécriture d'historique, qui absorbe le lot de commits
+`D-02` de partition déjà posés avant cette décision.

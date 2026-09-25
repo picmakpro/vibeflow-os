@@ -1,6 +1,6 @@
 # Changelog — conductor
 
-## [v1.41.0] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
+## [v1.42.0] — 2026-09-25 (gates de planning workstream-aware, Phase 41.1)
 
 **Minor** (gate neuf `check-planning-consumers-registered.sh` + recensement versionné, Phase 41.1) :
 
@@ -18,6 +18,14 @@
   hors du dépôt rend désormais **64** (erreur d'argument) au lieu d'un vert sur rien, et une
   baseline absente de `HEAD` rend **3** (« conforme SOUS RÉSERVE ») au lieu de 0. Contrat de sortie
   documenté et gardé : **{0,1,2,3,64}**.
+## [v1.41.0] — 2026-09-24 (rapports typés : champ `confiance` optionnel)
+
+- **`references/team-kernel.md` Pattern C** : le contrat des rapports typés gagne `confiance?`
+  (0–1) au niveau du bloc et de chaque finding. Le kernel ne porte que la forme et le renvoi :
+  la doctrine (jugement vs preuve machine, requalification sous `SEUIL_CONFIANCE`, journal
+  verbatim) vit dans l'implémentation de référence, `dev-orchestrator-references/mission-contracts.md`
+  §Confiance d'un jugement — la valeur du seuil n'est **pas** recopiée ici (T9c, suite dev-orchestrator).
+  Additif : un worker qui n'écrit pas le champ n'est pas en faute.
 
 ## [v1.40.0] — 2026-09-22 (conformité des blueprints à leur propre gate)
 

@@ -124,8 +124,10 @@ loss list: [Installing outside Claude Code](./manual/en/01-get-started/other-run
 ## 📦 Modules
 
 17 modules, each versioned with its own `CHANGELOG.md`. At install: `conductor` is the
-**mandatory baseline**, then one choice — *dev lab* or *tailor-made domain lab*. Each
-module's README is its full documentation — same structure everywhere.
+**mandatory baseline**, then one choice — *dev lab* or *tailor-made domain lab*. A dev lab is
+picked from **presets** (`dev`, `dev-mobile`, `dev-audite` — one name, dependencies resolved
+for you; à-la-carte modules remain for the advanced user). Each module's README is its full
+documentation — same structure everywhere.
 
 → [Module catalog](./manual/en/03-modules/catalog.md) ·
 [commands](./manual/en/06-reference/commands.md) ·
@@ -137,7 +139,7 @@ module's README is its full documentation — same structure everywhere.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (87 suites in CI — the newest
+- **Auditable**: bash + `jq`, every script covered by its suite (89 suites in CI — the newest
   ones prove the multi-runtime CLI dispatch (RUNT-01/02) and the dev-scope hooks' exec form as
   actually installed, their exit-code contract, and the shared Python resolution), **idempotent**
   install with backup before overwrite.

@@ -1,6 +1,6 @@
 # CHANGELOG — dev-orchestrator
 
-## [v2.23.2] — 2026-09-24 (registre de citation et doctrine workstream-aware, Phase 41.1)
+## [v2.24.1] — 2026-09-25 (registre de citation et doctrine workstream-aware, Phase 41.1)
 
 **Patch** (durcissement et doctrine, pas une capacité neuve) :
 
@@ -30,6 +30,27 @@ partition D-02 du 2026-09-23 (PR #94), repris à l'ouverture de la Phase 41.1 de
 - **`docs/ADR.md` (ce dépôt, hors module)** : ADR-069 gagne un amendement daté 2026-09-23 qui pose
   la **frontière gate/workflow** par le rôle — `GSD_WORKSTREAM` reste le canal nominal de ce qui
   travaille, un gate ne dérive jamais sa cible d'une valeur qu'un `export` peut changer.
+## [v2.24.0], 2026-09-24 : confiance d'un jugement dans les rapports typés + allocation du head en trois questions
+
+**Minor** (deux contrats évoluent, additifs — absent = comportement inchangé) :
+
+- **`references/mission-contracts.md` §Confiance d'un jugement** : le bloc typé (et chaque
+  finding) gagne un champ optionnel `confiance` (0–1). Il ne qualifie qu'un **jugement** (revue,
+  audit, critique scorée, allocation), jamais une preuve machine. `SEUIL_CONFIANCE = 0.6`, défini
+  ici et seulement ici (même régime DRY que `SEUIL_EQUIPE`) : un `passed` de jugement sous le
+  seuil est requalifié `gaps_found` + finding `ask-user` par le manager — aucun mécanisme neuf,
+  l'escalade humaine existante fait le reste. Les confiances sont recopiées verbatim dans le
+  « Rapport de mission » (bullet `Confiances (si portées)`), jamais moyennées : c'est la matière
+  d'une future mesure du seuil, pas une statistique. Inspiré du contrat des modèles de décision
+  typée (`docs/research/2026-09-24-jev-system-one.md`).
+- **`references/head-governance.md` §1 « Trois questions avant l'échelle »** : avant de lire la
+  table d'allocation, le head note séparément coordination, incertitude et conséquence ; niveau =
+  max(coordination, incertitude), une conséquence forte abaisse d'un cran le palier de montée.
+  Sous `SEUIL_CONFIANCE`, il propose au lieu de dispatcher d'office, même en boucle autonome.
+  `SEUIL_EQUIPE` et les signaux « mission » restent la référence : ces questions disent où lire
+  la table, pas quoi lancer.
+- **Suite** : T9c vérifie que `SEUIL_CONFIANCE` est défini dans `mission-contracts.md` et que
+  `team-kernel.md` le cite sans en recopier la valeur.
 
 ## [v2.23.1], 2026-09-23 : ledger d'exigences et E4 de check-mission-exit.sh rendus workstream-aware (D-02)
 

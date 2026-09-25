@@ -238,6 +238,36 @@ point de hook de post-exécution **et** celui de post-vérification — donc **u
 `gsd-execute-phase` déclenche revue de code, validation nyquist et audit de sécurité. C'est ce fait,
 pas une préférence, qui justifie que le manager cesse de redemander ce qui est déjà fait.
 
+## Confiance d'un jugement (`confiance`, 2026-09-24)
+
+Le bloc typé (Pattern C, `team-kernel.md`) gagne un champ **optionnel** `confiance`, frère de
+`statut`/`findings`/`noeuds_debloques`, et chaque entrée de `findings` peut porter le sien : un
+nombre entre 0 et 1, la marge que celui qui rend le verdict s'accorde. Absent = **aucune
+information**, jamais un 1.0 implicite. Inspiré du contrat des modèles de décision typée (choix +
+probabilité, seuil tenu par le code, pas par le modèle — `docs/research/2026-09-24-jev-system-one.md`).
+
+**Ce qu'il qualifie, et ce qu'il ne qualifie jamais.** `confiance` ne s'attache qu'à un
+**jugement** — revue (`vf-reviewer`), audit (`vf-auditer`), critique scorée (`vf-design-judge`),
+allocation d'équipe par le head (`head-governance.md` §1). Une **preuve machine** (suite de tests,
+gate, `check-mission-exit.sh`) n'en porte pas : elle est verte ou rouge, et un `passed` qui repose
+sur une preuve machine reste un `passed` quel que soit le nombre écrit à côté. Le champ est un
+signal d'**aiguillage**, jamais une preuve, et jamais une probabilité calibrée : un chiffre
+auto-déclaré par un modèle de langage n'a été calibré contre rien.
+
+**Règle unique** — `SEUIL_CONFIANCE = 0.6` (valeur empruntée au seul retour d'exploitation publié,
+0,45 → 0,6 après mesure ; remontée ou abaissée uniquement par arbitrage humain daté, jamais par un
+manager en cours de mission). Un `passed` de jugement porté avec `confiance < SEUIL_CONFIANCE`
+**n'est pas un vert** : le manager le requalifie en `gaps_found` avec un finding unique
+`{ severity: "info", action: "ask-user", ref: <ce qui rend le verdict incertain, recopié du rapport> }`
+— l'escalade humaine impérative sur `ask-user` fait le reste, aucun mécanisme neuf. Un
+`gaps_found`/`blocked`/`human_needed` n'est jamais requalifié à la hausse par une confiance élevée.
+
+**Journal, pas recalcul.** Le manager recopie **verbatim** les confiances reçues dans son
+« Rapport de mission » (bullet `Confiances (si portées)`), jamais une moyenne de son cru : c'est
+la seule matière qui permettra un jour de mesurer si le seuil est bien placé (confiance déclarée
+vs verdict humain final). Tant que cette mesure n'existe pas, le champ reste **optionnel** et un
+worker qui ne le porte pas n'est pas en faute.
+
 ## Décompte de budget épuisé (D-26, D-27, D-28, plan 23-07)
 
 Le bloc typé de `vf-dev-manager` (Pattern C, `mission-flow.md`) gagne un **quatrième** champ
@@ -389,6 +419,7 @@ RAPPORT DE MISSION
 - Verdict global : ✅ | partiel | bloqué
 - Par sprint : fait / verdicts (recette, revue, audit + hooks moteur relayés verbatim) / commits (SHA)
 - Calibration (si portée) : estimate vs actuals par sprint — recopiés verbatim, jamais recalculés
+- Confiances (si portées) : par verdict de jugement, `confiance` recopiée verbatim + requalifications sous `SEUIL_CONFIANCE` — jamais une moyenne
 - Décisions prises en autonomie (et par quel panel)
 - Blocages & points nécessitant l'utilisateur
 - Décompte (si bloqué) : tours consommés par boucle + findings non résolus — recopié verbatim, jamais recalculé

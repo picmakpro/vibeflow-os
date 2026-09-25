@@ -68,6 +68,16 @@ correctif / durcissement → **patch**. Le tag reprend **exactement** la valeur 
   « arbitrage Samuel » a la même forme qu'il soit vrai ou fabriqué : c'est le lecteur d'après qui
   paie. Adoptée le 2026-09-10, née du commit `8fc4b45` (Phase 39), dont personne ne pouvait vérifier
   l'attribution — un manager a dû remonter la chaîne pour l'établir.
+- **Préfixage des identifiants de décision** (prolonge le point précédent) : un identifiant de
+  décision court (`D-01`, `D-02`, …) porte son registre d'origine en préfixe — `P41-D-02` pour la
+  décision D-02 du registre de la Phase 41, `PART-D-02` pour celle d'une mission nommée
+  « partition ». Motif : sans préfixe, deux registres qui numérotent chacun leurs décisions à
+  partir de `D-01` se confondent — un outil qui reconnaît `D-01`..`D-10` comme marqueur
+  d'arbitrage ne peut plus distinguer « la décision D-02 de la Phase 41 » de « la décision D-02
+  d'une mission sans rapport » ; c'est arrivé et c'est mesuré (`docs/ADR.md` § ADR-075). Un
+  identifiant nu reste lisible en prose (il ne ment à personne), mais n'engage plus un outil qui
+  cherche une citation d'arbitrage : seule la forme préfixée le fait. Cette convention est
+  prospective — elle ne réécrit jamais les identifiants déjà posés dans l'historique.
 
 ## Protection côté serveur — main et tags v* (PAS ENCORE POSÉE)
 
