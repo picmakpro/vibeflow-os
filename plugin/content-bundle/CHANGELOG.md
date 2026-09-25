@@ -1,5 +1,19 @@
 # CHANGELOG — content-bundle
 
+## [v2.0.13] — 2026-09-25 (Phase 42, correction ciblée — nœud fix-42-condition-samuel)
+
+**Patch** :
+
+- **`content-clarity-judge` porte la consigne de lecture explicite du `CLAUDE.md` dans le
+  DÉROULÉ (section « Méthode de scoring »), pas seulement dans la liste des références** —
+  la v2.0.12 l'avait posée dans « Références au besoin », ce qui ne satisfaisait pas la
+  condition de Samuel (« le DÉROULÉ, pas la liste des références ») : ce qu'un juge doit
+  vérifier vit dans sa grille/procédure, jamais dans une mention annexe. La mention retirée
+  de l'Entrée pour éviter le doublon. `tools: Read, Glob, Grep` vérifié inchangé. Assertion
+  machine T13 ajoutée à `test-content-bundle.sh`, ancrée sur la section, discriminante par
+  mutation. Décision déléguée par Willy au head, session principale, 2026-09-25, en
+  exécution de la condition de Samuel (e568307).
+
 ## [v2.0.12] — 2026-09-25 (Phase 42, correction ciblée post-revue/audit — nœud fix-42-juges)
 
 **Patch** :
