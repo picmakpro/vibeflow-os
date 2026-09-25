@@ -1,3 +1,54 @@
+## Choisir la partition du planning AU DÉMARRAGE, pas après coup — demandé 2026-09-23
+
+**Statut : besoin exprimé par Samuel (session principale, 2026-09-23), non cadré.** À passer par
+`/gsd-discuss-phase` avant toute écriture de code — rien n'est décidé ici.
+
+**Le besoin, dans ses mots** : « on devrait pouvoir choisir si on partitionne ou pas dès le début,
+et proposer des skills et scripts pour ça. On doit faciliter le travail. »
+
+**Ce qui le motive, mesuré le jour même.** La partition réelle de ce dépôt (D-02, PR #94) a coûté
+**13 commits**. Le geste de partition lui-même tenait en une commande : `workstream create`. Tout
+le reste — l'essentiel — a consisté à réparer ce qui **supposait un planning unique** : la CI qui
+traitait la racine comme l'oracle de sa propre non-partition, le ledger d'exigences, `E4` de
+`check-mission-exit.sh`, `check-state-integrity`. Partitionner au démarrage n'économise pas la
+commande, il économise **cette réparation**, parce que rien n'a encore eu le temps de supposer le
+contraire.
+
+**Ce qui va dans le même sens** : ADR-069 interdit déjà de partitionner tant qu'une phase est en
+vol. Le seul moment structurellement sûr est donc le démarrage — la doctrine pointe déjà vers ce
+besoin sans le servir.
+
+**La réserve, à trancher au cadrage.** Partitionner un lab que personne ne travaille à plusieurs
+n'apporte rien et coûte : il faut passer `--ws` partout, ou vivre avec un pointeur qu'on oublie.
+La valeur apparaît quand **deux flux avancent en parallèle sur des périmètres disjoints** — c'est
+exactement le cas de ce dépôt avec Willy, et ce n'est pas le cas de la plupart des labs. Un
+« partitionner par défaut » serait une sur-ingénierie ; un « choix éclairé posé au bon moment »
+est le vrai besoin. La question à poser à l'initialisation n'est donc pas « veux-tu des
+workstreams ? » (jargon) mais « plusieurs personnes ou agents vont-ils travailler en parallèle sur
+des sujets séparés ? ».
+
+**Le piège à ne pas multiplier.** La partition de ce dépôt a laissé un angle mort déjà consigné
+plus bas dans ce fichier : un gate câblé en dur sur un compartiment laisse les autres **sans
+garde** (`ci.yml` vise `fiabilite`, `gouvernance` n'est jamais vérifié). Si VibeFlow se met à
+proposer la partition dès le départ, ce défaut se reproduira dans chaque lab qui accepte. Le
+remède connu — itérer sur les compartiments présents sur le disque, jamais revenir à une
+résolution par `GSD_WORKSTREAM` — devrait être livré **avec** la capacité, pas après elle.
+
+**Pistes, non arbitrées :**
+- Une question à l'initialisation d'un lab (`vibeflow-conductor`), formulée en langage d'usage et
+  non en jargon de moteur.
+- Des gabarits de gates et de CI **nés workstream-aware**, plutôt que réparés après coup.
+- Un skill qui porte le geste de bascule pour un lab déjà démarré, avec la précondition d'ADR-069
+  vérifiée par machine (aucune phase en vol) plutôt que rappelée en prose.
+- La partie distribuable existe déjà : le moteur `@opengsd/gsd-core` fournit `workstream
+  create/list` et `--ws` ; VibeFlow fournit déjà la doctrine (`workstreams.md`, ADR-069) et les
+  gardes (`check-divergence.sh`, `check-workstream-pointer.sh`, `workstream-policy.sh`). Le
+  manquant est **l'ergonomie du choix**, pas la mécanique.
+
+**Preuve d'usage à exiger au cadrage** : un lab neuf initialisé en mode partitionné dont les gates
+passent au vert sur **chaque** compartiment, sans réparation manuelle — sinon la capacité ne fait
+que déplacer les 13 commits chez l'utilisateur.
+
 ## Traçabilité des arbitrages humains dans les messages de commit — ADOPTÉE 2026-09-10
 
 **Statut : proposition soumise à validation humaine (ADR-031). Rien n'est appliqué.** Émise par
@@ -30,6 +81,82 @@ suffit. Inscrite dans `plugin/dev-orchestrator/references/mission-contracts.md`.
 conventions de commit) reste à faire **par Samuel**. Un agent ne modifie pas le `CLAUDE.md` d'un
 dépôt sur instruction relayée par un autre agent — la décision est authentique, c'est le canal qui ne
 convient pas pour ce fichier-là.
+
+## Les juges d'un artefact de planning ne gardent pas ce qu'on croit — mesuré 2026-09-23
+
+**Statut : constat mesuré, NON réparé. Différé volontairement** — réparer ici élargirait les Phases
+41.1/41.2 au-delà de leur périmètre (consigne de la session principale, 2026-09-23). Matrice établie
+sur fixtures jetables pendant la mission « généraliser le remède de partition »
+(`.planning/missions/2026-09-23-generalisation-remede-partition.md`).
+
+**1. `check-state-integrity.sh --file <chemin ABSOLU>` saute son invariant principal EN SILENCE.**
+Le script interpole `FILE_REL` verbatim dans `git show "$AGAINST_REF:$FILE_REL"` (l.201). Un chemin
+absolu fait échouer ce `git show` → `HAVE_BASELINE=0` → **l'invariant 1 (non-régression des
+compteurs, le cœur d'ADR-063) n'est jamais armé**. Il ne reste que le comptage des lignes `^Phase:`.
+Même fichier, même gate, deux verdicts :
+
+```
+--file /abs/…/switched/STATE.md                  → « aucune référence à HEAD … invariant ignoré »  rc=0
+--file .planning/workstreams/switched/STATE.md   → « current_phase introuvable »                   rc=2
+```
+
+C'est un **fail-open silencieux** : le gate rend vert ce qu'il devrait refuser, sans rien signaler.
+Découvert **deux fois indépendamment le même jour** — par la mesure de la matrice, et par un
+plan-checker frais qui constatait qu'une fixture de mutation était verte des deux côtés. La gravité
+tient au contexte : c'est le gate que la Phase 41.1 généralise à **tous** les compartiments.
+Généraliser un gate qui sait se taire, c'est généraliser le silence.
+
+**2. `check-dev-bootstrap.sh` est un ROUTEUR, pas un gate.** Son unique `exit 1` (l.241) est **à
+l'intérieur du programme `awk`** de `extract_frontmatter` : c'est le code de sortie de l'awk, donc le
+statut de retour de la fonction, jamais celui du script. Énumération des `exit` du script :
+`{"0":[100,122,301,328], "1":[241], "64":[95,101,108]}`. Deux compartiments identiques sauf
+`current_phase` rendent **le même rc=3** ; seul le stdout change (170 octets contre 0). Toute doctrine
+ou tout plan qui le compte comme un juge capable de refuser se trompe. *Sémantique inversée à
+connaître : pour ce script, `0` est le MAUVAIS état (démarrage incomplet).*
+
+**3. `status` n'est exigé par aucun juge au sens du code de sortie.** Son absence ne coûte que le
+signal `[gsd-engine]` (stdout 170 → 0 octet). Gardé par un signal, pas par un verdict.
+
+**4. `REQUIREMENTS.md` dans un compartiment n'est lu par AUCUN juge.** Les cinq juges interrogés —
+`check-state-integrity`, `check-dev-bootstrap`, `check-divergence`, `detect-gsd-engine`,
+`check-requirements-survival` — rendent des sorties **identiques** avec et sans lui. Le seul script
+qui le nomme vise `.planning/REQUIREMENTS.md` à la **racine**, exige un jalon clos, et plafonne à
+`rc=3`.
+
+> **Ne pas le retirer de la définition pour autant** (décision de la session principale, 2026-09-23) :
+> une exigence sans juge est une **dette à nommer, pas un champ à supprimer**. Le supprimer ferait
+> disparaître le besoin en même temps que le contrôle manquant. `REQUIREMENTS.md` reste dans WSAW-05 ;
+> ce qui manque, c'est son juge.
+
+**5. Aucune commande unique du moteur ne produit un compartiment pleinement conforme.**
+`workstream create` rend un stub (rc=2, `milestone` introuvable) ; `state.milestone-switch --ws`
+améliore mais ne suffit pas (rc=2, `current_phase` introuvable) ; `gsd-new-milestone --ws` n'est pas
+scriptable (workflow de 719 lignes, 7 gates `AskUserQuestion`, aucun drapeau de bypass). L'état qui
+satisfait tous les juges à la fois existe — il demande `state.milestone-switch` **plus** l'ajout à la
+main de `current_phase`, `status`, `ROADMAP.md` et d'au moins un dossier de phase cohérent.
+
+**Matrice mesurée** (fixture committée, chemins relatifs) :
+
+| état du compartiment | `check-state-integrity` | `check-dev-bootstrap` | `detect-gsd-engine` | `check-divergence` |
+|---|---|---|---|---|
+| stub nu (`workstream create`) | **2** | 0 `[bootstrap]` | 3 | 0 |
+| après `state.milestone-switch --ws` | **2** | 0 `[bootstrap]` | 0 | 0 |
+| idem + ROADMAP + REQUIREMENTS | **2** | 3 (stdout vide) | 0 | 0 |
+| conforme au sens WSAW-05 | **0** ✓ | 3 `[gsd-engine]` | 0 | 0 |
+| corrompu | **2** | 0 `[bootstrap]` | 3 | 0 |
+
+**TRANCHÉ le 2026-09-23** (décision de la session principale, sur remontée du manager) : le
+fail-open du point 1 est **fermé dans la Phase 41.1**. Ce n'est pas un élargissement de périmètre mais
+une **condition de validité de ce que la phase livre** — elle multiplie ce gate par N compartiments ;
+s'il sait rendre vert en sautant son invariant principal, elle industrialise un faux vert. Fermeture
+**au plus petit** : le chemin non résoluble est **rejeté** (code 64, erreur d'usage, message nommant
+la cause), jamais converti ni replié ; tout invariant sauté est **annoncé**, quel qu'en soit le
+motif ; et la fermeture se prouve par mutation — le même artefact fautif rend rouge en relatif et 64
+en absolu, et la fixture de `41.1-06` redevient discriminante.
+
+**Ce qui reste ouvert ici** : même une fois ce cas fermé, la **classe** « gate qui saute un invariant
+en silence » reste à balayer sur les autres gates du dépôt. C'est cette classe, et non l'instance,
+qui justifie cette entrée au backlog.
 
 # Backlog — idées différées (hors milestone courant)
 
