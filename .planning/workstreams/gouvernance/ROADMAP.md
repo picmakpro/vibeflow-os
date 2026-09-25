@@ -58,7 +58,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 42-05-PLAN.md — vague 3 : invariants locaux I1, I4, I5, I6, I7 en erreur, jumeaux négatifs et mutants ; corpus et blueprints verts (FABR-03, FABR-05)
+- [x] 42-05-PLAN.md — vague 3 : invariants locaux I1, I4, I5, I6, I7 en erreur, jumeaux négatifs et mutants ; corpus et blueprints verts (FABR-03, FABR-05) — Complete (2026-09-25)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
