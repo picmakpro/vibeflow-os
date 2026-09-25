@@ -138,6 +138,16 @@
 #     dont il a besoin pour relire) n'est jamais un juge ici, quel que soit son
 #     `disallowedTools:`. Arbitrage D-08 (maintenir) : session principale, décision déléguée par
 #     Willy au head (« tranche et avançons »), 2026-09-25 — 42-D19-MESURE.md.
+#   I2 (D-09) : un agent `vf-internal: true` qu'AUCUNE allowlist `Agent(...)/Task(...)` résolue de
+#     l'univers connu (le dossier linté PLUS chaque `--agent-registry-dir`) ne dispatche est un
+#     WORKER ORPHELIN — actifs SEULEMENT sous `--resolve-agents=strict` (la CI, seule à connaître
+#     l'univers complet des agents du dépôt) ; jamais hors de ce mode, jamais imputé à un fichier
+#     de registre (seuls les fichiers réellement LINTÉS dans ce run peuvent porter I2).
+#   I3 (D-09) : un agent NON `vf-internal: true` dispatché par au moins une allowlist résolue de ce
+#     même univers est un WORKER EXPOSÉ PAR ERREUR — même régime que I2 (`--resolve-agents=strict`
+#     seulement, imputation au seul fichier linté). La carte « dispatché par » réutilise EXACTEMENT
+#     la résolution existante (`allowlist_agents` + `resolve_agent_name`) : aucun registre écrit à
+#     la main.
 #
 # Codes de sortie : 0 = conforme · 1 = non conforme (agents non conformes, OU invocation
 #   invalide — ex. --resolve-agents=<valeur inconnue>) · 3 = INDÉTERMINÉ (--strict sur cible
@@ -426,6 +436,9 @@ errors, warnings = [], []
 # tierces dans ses allowlists, ou l'inverse.
 thirdparty_files_total = 0
 thirdparty_entries_total = 0
+# D-09 (Phase 42) : cibles reellement LINTEES dans ce run (non tiers) — univers d'imputation
+# I2/I3, jamais un fichier de registre (voir construire_univers_dispatch plus bas).
+linted_paths = []
 
 def parse_frontmatter(text):
     lines = text.split(\"\n\")
@@ -838,6 +851,74 @@ def invariant_i5(base, fm, fmlines, dispatch):
         return []
     return [f\"{base} : invariant I5 — juge (disallowedTools retire Write et Edit, aucune allowlist Agent(...)) sans omitClaudeMd: true — un regard frais ne charge pas la doctrine (D-08)\"]
 
+# ---- Invariants de monde ferme (Phase 42, spec fabrique §4, FABR-03, D-09) ----------------------
+# I2/I3 : actifs SEULEMENT sous --resolve-agents=strict (la CI, seule a connaitre l'univers
+# complet). Reutilisent EXACTEMENT la resolution existante (allowlist_agents + resolve_agent_name)
+# — aucun registre ecrit a la main. Jamais impute a un fichier de registre : seuls les fichiers
+# reellement LINTES dans ce run (non tiers) peuvent porter I2/I3.
+
+def construire_univers_dispatch(agents_dir_local, registry_dirs_local, single_local):
+    \"\"\"I2/I3 (D-09) : univers = decouvrir_agents(agents_dir_local) (ou le seul fichier en mode
+    --file) PLUS decouvrir_agents de chaque registre, deduplique par chemin REEL
+    (os.path.realpath). Rend la carte dispatched_by : nom-de-base -> liste des noms de fichiers
+    dispatcheurs (un agent qui se cite lui-meme ne compte pas) — la MEME resolution que le lint
+    des allowlists (resolve_agent_name), jamais un second mecanisme.\"\"\"
+    chemins = [single_local] if single_local else decouvrir_agents(agents_dir_local)
+    for rd in registry_dirs_local:
+        if rd:
+            chemins = chemins + decouvrir_agents(rd)
+    vus = set()
+    univers = []
+    for p in chemins:
+        rp = os.path.realpath(p)
+        if rp in vus:
+            continue
+        vus.add(rp)
+        univers.append(p)
+    dispatched_by = {}
+    for p in univers:
+        base_sans_ext = os.path.basename(p)[:-3]
+        try:
+            texte = open(p, encoding=\"utf-8-sig\").read()
+        except OSError:
+            continue
+        dname = agent_display_name(p, texte)
+        if next((pfx for pfx in third_party_prefixes if pfx and dname.startswith(pfx)), None):
+            continue
+        fml = frontmatter_lines(texte)
+        if fml is None:
+            continue
+        for nom_dispatche in allowlist_agents(fml):
+            if nom_dispatche == base_sans_ext:
+                continue
+            verdict = resolve_agent_name(nom_dispatche, agents_dir_local, registry_dirs_local, third_party_prefixes)
+            if verdict == \"resolved\":
+                dispatched_by.setdefault(nom_dispatche, []).append(base_sans_ext)
+    return dispatched_by
+
+def invariant_i2(base, fm, dispatched_by):
+    \"\"\"I2 (D-09, monde ferme, actif SEULEMENT sous --resolve-agents=strict) : un worker
+    vf-internal absent de dispatched_by (aucune allowlist Agent(...)/Task(...) de l'univers connu
+    ne le dispatche) est un ORPHELIN.\"\"\"
+    nom = base[:-3] if base.endswith(\".md\") else base
+    if str(fm.get(\"vf-internal\", \"\")) != \"true\":
+        return []
+    if nom in dispatched_by:
+        return []
+    return [f\"{base} : invariant I2 — worker vf-internal orphelin : aucune allowlist Agent(...) de l'univers connu ne le dispatche (monde ferme, D-09)\"]
+
+def invariant_i3(base, fm, dispatched_by):
+    \"\"\"I3 (D-09, monde ferme, actif SEULEMENT sous --resolve-agents=strict) : un worker NON
+    vf-internal present dans dispatched_by (dispatche par une allowlist de l'univers connu) est
+    EXPOSE par erreur.\"\"\"
+    nom = base[:-3] if base.endswith(\".md\") else base
+    if nom not in dispatched_by:
+        return []
+    if str(fm.get(\"vf-internal\", \"\")) == \"true\":
+        return []
+    dispatcheurs = \", \".join(sorted(dispatched_by[nom]))
+    return [f\"{base} : invariant I3 — dispatche par {dispatcheurs} sans vf-internal : worker expose par erreur (monde ferme, D-09)\"]
+
 def check_file(path):
     base = os.path.basename(path)
     try:
@@ -1001,6 +1082,7 @@ if single:
     if os.path.isfile(single):
         charger_referentiel()
         check_file(single)
+        linted_paths.append(single)
     else:
         errors.append(f\"fichier introuvable : {single}\")
 else:
@@ -1046,6 +1128,24 @@ else:
             thirdparty_files_total += 1
             continue
         check_file(f)
+        linted_paths.append(f)
+
+# ---- Passe de monde ferme (Phase 42, D-09) : I2/I3, SEULEMENT sous --resolve-agents=strict, ----
+# apres la boucle de lint et avant le rapport. Jamais impute a un fichier de registre : seuls les
+# fichiers de linted_paths (reellement LINTES dans ce run, non tiers) sont soumis a I2/I3.
+if resolve_agents_strict and linted_paths:
+    dispatched_by = construire_univers_dispatch(agents_dir, registry_dirs, single if single else None)
+    for p in linted_paths:
+        base = os.path.basename(p)
+        try:
+            texte = open(p, encoding=\"utf-8-sig\").read()
+        except OSError:
+            continue
+        fm_i23 = parse_frontmatter(texte)
+        if fm_i23 is None:
+            continue
+        errors.extend(invariant_i2(base, fm_i23, dispatched_by))
+        errors.extend(invariant_i3(base, fm_i23, dispatched_by))
 
 n_err, n_warn = len(errors), len(warnings)
 

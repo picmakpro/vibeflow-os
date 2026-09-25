@@ -207,6 +207,25 @@
 #   Témoin lab frais (LAB-RECURSIF-OK, vérification externe du plan) : `.claude/agents/
 #         conductor-references/*.md` posé par l'installeur reste vert sous
 #         `--strict --manifest-freshness=strict`, jamais pris pour un agent.
+#
+# Invariants de monde fermé (Phase 42, FABR-03, D-09, 42-06 Tâche 2) — I2/I3, actifs SEULEMENT
+# sous `--resolve-agents=strict`, réutilisent l'univers déjà connu de la CI (aucun registre écrit
+# à la main), jamais imputés à un fichier de registre :
+#   T100 — I2 : `$AG/worker-orphelin.md` (vf-internal + « Worker interne ») + registre vide de
+#         tout dispatch → rc=1 « invariant I2 » ; sans `--resolve-agents=strict` → rc=0 ; un
+#         manager du registre (SendMessage + `Agent(worker-orphelin)`) → rc=0
+#   T101 — I3 : `$AG/worker-expose.md` (non interne, sans marqueur) + registre dont un manager
+#         dispatche `worker-expose` → rc=1 « invariant I3 » nommant ce manager ; sans le monde
+#         fermé → rc=0 ; en lintant le REGISTRE (le manager) avec `$AG` en registre → aucun
+#         « invariant I3 » (imputation au seul dossier linté)
+#   T102 — monde fermé réel : copie des six `plugin/*/agents` sous un univers jetable, chaque
+#         dossier linté avec tous les registres → rc=0 partout, aucun « invariant I » ; mutation 1
+#         (vf-test-orchestrator perd `vf-internal` + son marqueur, gagne `SendMessage`) → rc=1
+#         « invariant I3 », sans I1 ni I6 ; mutation 2 (`vf-test-runner` retiré de l'allowlist de
+#         vf-test-orchestrator) → rc=1 « invariant I2 » sur vf-test-runner.md ; chaque mutation
+#         prouvée par `cmp`, puis restaurée → rc=0
+#   MUT-I2, MUT-I3 — `errors.extend(invariant_i2(` (puis `invariant_i3(`) remplacé par `pass` →
+#         fixture T100 (puis T101) : rc_original=1, rc_mutant=0
 
 set -uo pipefail
 
@@ -408,6 +427,26 @@ effort: medium
 memory: project
 skills:
   - petit-skill
+---
+Corps de l agent.
+EOF
+}
+
+# good_internal_agent (Phase 42, D-09, 42-06 Tache 2) : meme gabarit que good_agent, mais
+# vf-internal: true + marqueur "Worker interne" — fidele aux VRAIS vf-coder.md/vf-reviewer.md du
+# depot (tous deux vf-internal: true). Necessaire des que ces fixtures sont dispatchees sous
+# --resolve-agents=strict : sans le marqueur, I3 (D-09) les signalerait a tort comme "exposees".
+good_internal_agent() {
+  cat > "$AG/$1.md" <<EOF
+---
+name: $1
+description: Pilote les tests du lab de bout en bout. Worker interne, use when une suite de tests doit etre lancee ou analysee.
+model: sonnet
+effort: medium
+memory: project
+skills:
+  - petit-skill
+vf-internal: true
 ---
 Corps de l agent.
 EOF
@@ -704,7 +743,9 @@ rm -f "$AG"/*.md; rm -rf "$SK/planning-core"
 
 # ---------- Phase 16 : lint des allowlists Agent(...)/Task(...) ----------
 
-good_agent "vf-coder"
+# vf-coder.md : vf-internal (fidele au vrai vf-coder.md du depot) — dispatche sous
+# --resolve-agents=strict par nom-ok.md (T30b, D-09) : sans le marqueur, I3 le signalerait a tort.
+good_internal_agent "vf-coder"
 good_agent "vf-reviewer"
 
 # T25 — allowlist reelle mixte (natif + tiers + cross-module) reste VERTE en --strict
@@ -923,7 +964,7 @@ rm -f "$AG"/*.md
 
 # ---------- Correctifs post-revue (re-entree Phase 16, 2 juges independants) ----------
 
-good_agent "vf-coder"
+good_internal_agent "vf-coder"
 
 # T35 — defaut 1 : champ tools: ENTIEREMENT quote (YAML valide) ne doit plus produire de
 # faux BLOQUANT (charset / parenthese non fermee sur les guillemets eux-memes).
@@ -3039,6 +3080,249 @@ if [ "$MUT_D2_RC" -eq 0 ]; then
     komut D2 "rc_mutant=1 et rc_original=0, sans Traceback" "rc_mutant=1, rc_original=0" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
   fi
 fi
+
+# ---------- T100/T101/T102, MUT-I2, MUT-I3 : invariants de monde ferme (Phase 42, FABR-03, ----------
+# ---------- D-09, 42-06 Tache 2) ----------------------------------------------------------------
+rm -rf "${AG:?}"/*
+
+# T100 — I2 : worker vf-internal orphelin (aucune allowlist connue ne le dispatche).
+cat > "$AG/worker-orphelin.md" <<'EOF'
+---
+name: worker-orphelin
+description: Agent de test. Worker interne, orphelin de toute allowlist connue.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+T100_REG="$WORK/t100-registry"; mkdir -p "$T100_REG"
+OUT="$(run_check --resolve-agents=strict --agent-registry-dir="$T100_REG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I2"; then
+  ok "T100 worker vf-internal orphelin sous --resolve-agents=strict -> rc=1, invariant I2"
+else
+  ko "T100 (rc=$RC) : $OUT"
+fi
+
+OUT="$(run_check --agent-registry-dir="$T100_REG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I2"; then
+  ok "T100 sans --resolve-agents=strict -> rc=0, aucun invariant I2"
+else
+  ko "T100-sans-strict (rc=$RC) : $OUT"
+fi
+
+cat > "$T100_REG/manager-orphelin.md" <<'EOF'
+---
+name: manager-orphelin
+description: Agent de test manager qui dispatche worker-orphelin, registre du monde ferme.
+model: sonnet
+effort: high
+memory: project
+tools: Read, SendMessage, Agent(worker-orphelin)
+---
+corps
+EOF
+OUT="$(run_check --resolve-agents=strict --agent-registry-dir="$T100_REG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I2"; then
+  ok "T100 manager du registre dispatche worker-orphelin -> rc=0, aucun invariant I2"
+else
+  ko "T100-avec-manager (rc=$RC) : $OUT"
+fi
+rm -f "$AG/worker-orphelin.md"
+
+# T101 — I3 : worker non interne, expose par erreur par une allowlist du monde ferme.
+cat > "$AG/worker-expose.md" <<'EOF'
+---
+name: worker-expose
+description: Agent de test. Worker non interne, sans marqueur, dispatche par erreur.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+T101_REG="$WORK/t101-registry"; mkdir -p "$T101_REG"
+cat > "$T101_REG/manager-expose.md" <<'EOF'
+---
+name: manager-expose
+description: Agent de test manager qui dispatche worker-expose par erreur, registre du monde ferme.
+model: sonnet
+effort: high
+memory: project
+tools: Read, SendMessage, Agent(worker-expose)
+---
+corps
+EOF
+OUT="$(run_check --resolve-agents=strict --agent-registry-dir="$T101_REG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "invariant I3" && echo "$OUT" | grep -q "manager-expose"; then
+  ok "T101 worker expose par une allowlist du monde ferme -> rc=1, invariant I3, nomme manager-expose"
+else
+  ko "T101 (rc=$RC) : $OUT"
+fi
+
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I3"; then
+  ok "T101 sans le monde ferme (pas de --resolve-agents=strict) -> rc=0, aucun invariant I3"
+else
+  ko "T101-sans-monde-ferme (rc=$RC) : $OUT"
+fi
+
+# En lintant le REGISTRE (le manager) avec $AG en registre : jamais d'imputation a un fichier de
+# registre (worker-expose n'est jamais lui-meme LINTE dans ce run).
+OUT="$(bash "$CHECK" --agents-dir="$T101_REG" --skills-dir="$SK" --resolve-agents=strict --agent-registry-dir="$AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "invariant I3"; then
+  ok "T101 lint du registre (manager) avec \$AG en registre -> rc=0, aucun invariant I3 (imputation au seul dossier linte)"
+else
+  ko "T101-registre-linte (rc=$RC) : $OUT"
+fi
+rm -f "$AG/worker-expose.md"
+
+# ---------- MUT-I2 : mutant QUAL-01 sur la ligne d'appel invariant_i2 ----------
+MUT_I2_DIR="$(make_gate_mutant I2 0 'errors.extend(invariant_i2(' 'pass')"
+MUT_I2_RC=$?
+if [ "$MUT_I2_RC" -eq 0 ]; then
+  MUT_I2_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I2-orig" 0)"
+  MUT_I2_AG="$WORK/mut-I2-ag"; mkdir -p "$MUT_I2_AG"
+  cat > "$MUT_I2_AG/agent-muti2.md" <<'EOF'
+---
+name: agent-muti2
+description: Agent de test. Worker interne orphelin, fixture de mutation MUT-I2.
+model: sonnet
+effort: low
+memory: project
+vf-internal: true
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I2_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I2_AG" --resolve-agents=strict >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I2_DIR/check-agents.sh" --agents-dir="$MUT_I2_AG" --resolve-agents=strict 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I2 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I2 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- MUT-I3 : mutant QUAL-01 sur la ligne d'appel invariant_i3 ----------
+MUT_I3_DIR="$(make_gate_mutant I3 0 'errors.extend(invariant_i3(' 'pass')"
+MUT_I3_RC=$?
+if [ "$MUT_I3_RC" -eq 0 ]; then
+  MUT_I3_ORIG_DIR="$(mk_gate_dir "$WORK/mut-I3-orig" 0)"
+  MUT_I3_AG="$WORK/mut-I3-ag"; mkdir -p "$MUT_I3_AG"
+  MUT_I3_REG="$WORK/mut-I3-reg"; mkdir -p "$MUT_I3_REG"
+  cat > "$MUT_I3_AG/agent-muti3.md" <<'EOF'
+---
+name: agent-muti3
+description: Agent de test. Worker non interne, expose par erreur, fixture de mutation MUT-I3.
+model: sonnet
+effort: low
+memory: project
+---
+corps
+EOF
+  cat > "$MUT_I3_REG/manager-muti3.md" <<'EOF'
+---
+name: manager-muti3
+description: Agent de test manager qui dispatche agent-muti3, fixture de mutation MUT-I3.
+model: sonnet
+effort: high
+memory: project
+tools: Read, SendMessage, Agent(agent-muti3)
+---
+corps
+EOF
+  RC_ORIG=0; bash "$MUT_I3_ORIG_DIR/check-agents.sh" --agents-dir="$MUT_I3_AG" --resolve-agents=strict --agent-registry-dir="$MUT_I3_REG" >/dev/null 2>&1 || RC_ORIG=$?
+  OUT_MUT="$(bash "$MUT_I3_DIR/check-agents.sh" --agents-dir="$MUT_I3_AG" --resolve-agents=strict --agent-registry-dir="$MUT_I3_REG" 2>&1)"; RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ] && ! echo "$OUT_MUT" | grep -q "Traceback"; then
+    okmut I3 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut I3 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG :: $OUT_MUT"
+  fi
+fi
+
+# ---------- T102 : monde ferme REEL (six plugin/*/agents copies), zero invariant, deux ----------
+# ---------- mutations opposees par cmp ------------------------------------------------------------
+T102_UNIVERS="$WORK/univers-t102"
+mkdir -p "$T102_UNIVERS"
+for d in "$REPO_ROOT"/plugin/*/agents; do
+  [ -d "$d" ] || continue
+  mod="$(basename "$(dirname "$d")")"
+  mkdir -p "$T102_UNIVERS/$mod/agents"
+  cp "$d"/*.md "$T102_UNIVERS/$mod/agents/" 2>/dev/null
+done
+
+T102_REG_ARGS=()
+for d in "$T102_UNIVERS"/*/agents; do
+  [ -d "$d" ] || continue
+  T102_REG_ARGS+=("--agent-registry-dir=$d")
+done
+
+T102_SKILLS_ABSENTE="$WORK/no-such-skills-dir-t102"
+T102_FAIL=0
+T102_DIRS=0
+for d in "$T102_UNIVERS"/*/agents; do
+  [ -d "$d" ] || continue
+  T102_DIRS=$((T102_DIRS+1))
+  OUT_T102="$(bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$d" "${T102_REG_ARGS[@]}" 2>&1)"; RC_T102=$?
+  if [ "$RC_T102" -ne 0 ] || echo "$OUT_T102" | grep -q "invariant I"; then
+    T102_FAIL=1
+    ko "T102 monde ferme reel ($d) : rc=$RC_T102 ou invariant I inattendu -> $OUT_T102"
+  fi
+done
+if [ "$T102_DIRS" -lt 6 ]; then
+  T102_FAIL=1
+  ko "T102 anti-vert-a-vide : seulement $T102_DIRS dossier(s), attendu >= 6"
+fi
+[ "$T102_FAIL" -eq 0 ] && ok "T102 monde ferme reel (>= $T102_DIRS dossiers) -> rc=0 partout, aucun invariant I"
+
+# Mutation 1 : vf-test-orchestrator.md perd vf-internal + son marqueur, gagne SendMessage ->
+# invariant I3 (identite non-interne dispatchee par vf-dev-manager), sans I1 ni I6.
+T102_ORCH="$T102_UNIVERS/mobile-test-team/agents/vf-test-orchestrator.md"
+T102_ORCH_BAK="$WORK/t102-orch.orig"
+cp "$T102_ORCH" "$T102_ORCH_BAK"
+"$PYBIN" - "$T102_ORCH" <<'PYEOF'
+import sys
+p = sys.argv[1]
+text = open(p, encoding="utf-8").read()
+text = text.replace("vf-internal: true\n", "")
+text = text.replace("Worker interne", "Worker", 1)
+text = text.replace("Agent(vf-test-runner", "SendMessage, Agent(vf-test-runner", 1)
+open(p, "w", encoding="utf-8").write(text)
+PYEOF
+if cmp -s "$T102_ORCH_BAK" "$T102_ORCH"; then
+  ko "T102 mutation 1 NON OPPOSABLE (copies identiques)"
+else
+  OUT_MUT1="$(bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$T102_UNIVERS/mobile-test-team/agents" "${T102_REG_ARGS[@]}" 2>&1)"; RC_MUT1=$?
+  if [ "$RC_MUT1" -eq 1 ] && echo "$OUT_MUT1" | grep -q "invariant I3" && ! echo "$OUT_MUT1" | grep -q "invariant I1" && ! echo "$OUT_MUT1" | grep -q "invariant I6"; then
+    ok "T102 mutation 1 (vf-test-orchestrator sans vf-internal) -> rc=1, invariant I3, sans I1 ni I6"
+  else
+    ko "T102 mutation 1 (rc=$RC_MUT1) : $OUT_MUT1"
+  fi
+fi
+cp "$T102_ORCH_BAK" "$T102_ORCH"
+RC_RESTORE1=0; bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$T102_UNIVERS/mobile-test-team/agents" "${T102_REG_ARGS[@]}" >/dev/null 2>&1 || RC_RESTORE1=$?
+[ "$RC_RESTORE1" -eq 0 ] && ok "T102 mutation 1 restauree -> rc=0" || ko "T102 mutation 1 restauration (rc=$RC_RESTORE1)"
+
+# Mutation 2 : vf-test-runner retire de l'allowlist de vf-test-orchestrator -> invariant I2 sur
+# vf-test-runner.md (worker vf-internal devenu orphelin : plus personne ne le dispatche).
+T102_ORCH_BAK2="$WORK/t102-orch2.orig"
+cp "$T102_ORCH" "$T102_ORCH_BAK2"
+sed 's/Agent(vf-test-runner, vf-app-fixer)/Agent(vf-app-fixer)/' "$T102_ORCH_BAK2" > "$WORK/t102-orch2.mut"
+cp "$WORK/t102-orch2.mut" "$T102_ORCH"
+if cmp -s "$T102_ORCH_BAK2" "$T102_ORCH"; then
+  ko "T102 mutation 2 NON OPPOSABLE (copies identiques)"
+else
+  OUT_MUT2="$(bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$T102_UNIVERS/mobile-test-team/agents" "${T102_REG_ARGS[@]}" 2>&1)"; RC_MUT2=$?
+  if [ "$RC_MUT2" -eq 1 ] && echo "$OUT_MUT2" | grep -q "vf-test-runner.md : invariant I2"; then
+    ok "T102 mutation 2 (vf-test-runner retire de l'allowlist) -> rc=1, invariant I2 sur vf-test-runner.md"
+  else
+    ko "T102 mutation 2 (rc=$RC_MUT2) : $OUT_MUT2"
+  fi
+fi
+cp "$T102_ORCH_BAK2" "$T102_ORCH"
+RC_RESTORE2=0; bash "$CHECK" --strict --resolve-agents=strict --skills-dir="$T102_SKILLS_ABSENTE" --agents-dir="$T102_UNIVERS/mobile-test-team/agents" "${T102_REG_ARGS[@]}" >/dev/null 2>&1 || RC_RESTORE2=$?
+[ "$RC_RESTORE2" -eq 0 ] && ok "T102 mutation 2 restauree -> rc=0" || ko "T102 mutation 2 restauration (rc=$RC_RESTORE2)"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
