@@ -16,6 +16,7 @@ last_activity_desc: >-
   rc=1 — aucune section « ## Arbitrage D-08 » à ce jour. Exécution ARRÊTÉE là (décision de mission
   revise-42c) : Tâche 3 (I5/I6) NON exécutée. SUMMARY partiel committé (26901d2, status: halted).
   STATE tenu à la main (jamais state.begin-phase / state.record-session).
+stopped_at: "42-05 Tâche 2 franchie : arbitrage D-08 consigné (maintenir, 2026-09-25) — reprise sur 42-05 Tâche 3 (I5, I6)"
 progress:
   total_phases: 9
   completed_phases: 0
