@@ -11,7 +11,7 @@ déroule le pipeline (cadrage → plan → exécution → preuve), et des **gate
 pas des promesses. Claude Code est le runtime de référence ; l'install et l'usage sont aussi
 mesurés de bout en bout sur **Codex** et **kimi-code**.
 
-[![Version](https://img.shields.io/badge/version-2.64.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.65.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#-installation)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
@@ -142,7 +142,7 @@ chaque module est sa documentation complète — même structure partout.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`85 suites` en CI — les
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`86 suites` en CI — les
   nouvelles prouvent le dispatch CLI multi-runtime (RUNT-01/02) et la forme exec des hooks du
   périmètre dev telle qu'installée, leur contrat de sortie, et la résolution Python partagée),
   install **idempotente** avec backup avant écrasement.
@@ -163,6 +163,7 @@ Historique complet : **[CHANGELOG.md](./CHANGELOG.md)**, canon unique — la tab
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.65.0` | 2026-09-23 | **Release de rattrapage : le ledger d'exigences et le gate de sortie de mission de `dev-orchestrator` deviennent workstream-aware (patch, D-02).** `check-requirements-survival.sh`, `restore-requirements-ledger.sh`, `requirements-survival-detect.sh` (LEDG-01/02) et E4 de `check-mission-exit.sh` résolvaient toujours `.planning/REQUIREMENTS.md`/`ROADMAP.md`/`STATE.md` à la racine, jamais le compartiment de workstream actif, une fois un lab partitionné. Un lab dont le planning est partitionné voit désormais ces gardes et ce ledger fonctionner sur son compartiment actif au lieu de rater silencieusement leur cible ; un lab non partitionné garde le comportement historique. `dev-orchestrator` v2.23.1. Embarque aussi `conductor` v1.40.0 (les blueprints passent désormais le gate qu'ils visent), déjà mergé mais jamais publié. |
 | `v2.64.0` | 2026-09-22 | **Registre des agents dispatchés et reprise après arrêt sur chien de garde (PR #83, ferme #82).** `conductor` v1.39.0 : `driver-lock.sh` gagne `register` / `close` / `orphans`, registre `<lock>.children.jsonl` append-only à côté du verrou, `acquire` / `takeover` / `reclaim` rendent les orphelins de la feuille vers la racine. `dev-orchestrator` v2.23.0 : `mission-flow.md` § Pattern I (emplacement du registre, commandes exactes manager et workers, reprise après chien de garde depuis l'état du dépôt et jamais du DAG, les deux comportements de Claude Code à contourner), agents alignés, `check-mission-exit.sh` E1 lit `children_running`. Embarque aussi les trois gardes CI de la Phase 41 (G-1 arbitrage de baseline, G-2 marqueur `Gate-Touche:`, G-3 alarme de push direct). |
 | `v2.63.2` | 2026-09-17 | **Hotfix : doctrine de profondeur de spawn (B1/B2).** B1 : `vibeflow-head` est désormais incarné en session principale (via `/vf-dev`), jamais dispatché en `Task` — profondeurs visées manager 1, `vf-coder` 2, briques GSD 3. B1 couvre aussi `vibeflow-design`, incarné via `/vf-design`, jamais dispatché en `Task` (`T10`, design-orchestrator). B2 : `vf-coder` vérifie l'outil `Agent` avant d'agir ; présent → `gsd-quick --validate` obligatoire (une allowlist déclarée ne le bride pas à l'appel) ; absent → `blocked` avec `cause: "profondeur"`, mandat intact, sans coder. Constat mesuré le 2026-09-17 : outils `Agent`/`Task` absents à la profondeur 3, allowlist `Agent(...)` d'un agent non appliquée à l'exécution — limite non documentée pouvant évoluer avec Claude Code. Nouveau `T38` (discriminant par mutation) sur B1/B2, `T76` réécrit sur le constat vivant. Manuel FR/EN : une phrase précisant que le head tourne en session principale, jamais en sous-agent. Pattern 12 aligné. |
 | `v2.63.1` | 2026-09-16 | **Hotfix : le head gouverne et lance des équipes — il n'invoque plus lui-même aucun skill ni agent `gsd-*`.** La `v2.63.0` documentait à tort `vibeflow-head` comme invoquant `gsd-quick` / `gsd-execute-phase` en direct ; il détecte désormais l'intention et dispatche `Task(vf-coder)` pour une tâche courte, sans impact archi, ou `Task(vf-dev-manager)`/`Task(vf-design-manager)` au-delà, `dev-orchestrator` v2.22.1. La carte d'intention du head et la colonne Mind de `head-governance.md` §1 ne nomment plus aucun `gsd-*` ; `vf-coder` gagne le mandat « tâche courte » dispatché en direct par le head. Nouveau `T37` : aucun `gsd-*` dans les deux tables de référence du head, détection prouvée discriminante par mutation. |

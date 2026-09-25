@@ -26,21 +26,33 @@
 #   }
 #
 # Usage:
-#   measure-server-rulesets.sh [--repo O/R] [--out FICHIER] [--rulesets-file FICHIER] [-h|--help]
+#   measure-server-rulesets.sh [--repo O/R] [--out FICHIER] [--rulesets-file FICHIER] [--dry-run] [-h|--help]
 #
 # Options reservees aux fixtures : --rulesets-file court-circuite l'appel reseau et lit son
 # contenu comme s'il etait la reponse brute de `gh api .../rulesets` — TOUTE invocation de
 # production (CI, hook, humain) l'omet et laisse l'appel reseau reel avoir lieu.
 #
+# --dry-run : mode INSPECTION, convention deja en usage dans ce depot (`vibeflow-update.sh
+# install/update --dry-run`). N'ECRIT RIEN sur disque — ni le fichier de mesure, ni le repertoire
+# --out — et emet sur STDOUT le JSON exact qui aurait ete ecrit, produit par le MEME chemin de
+# code que le mode normal (fonction `build_measure_json`, jamais une seconde implementation qui
+# pourrait deriver). Les lignes de diagnostic ("decouverte:", "MESURE-ECRITE:") vont sur STDERR
+# dans les deux modes, pour que STDOUT ne porte jamais que la donnee. --dry-run combine a --out
+# explicite est une CONTRADICTION D'USAGE refusee en rc 64 (jamais un --dry-run qui l'emporterait
+# en silence sur un --out que l'appelant a explicitement demande).
+#
 # Exit codes (meme convention que les gardes voisines) :
-#   0  = mesure ecrite (tableau JSON lu, vide ou non)
+#   0  = mesure ecrite (tableau JSON lu, vide ou non), ou emise sur stdout en --dry-run
 #   2  = NON VERIFIABLE — `gh` absent, echec d'API, ou reponse non-tableau
-#   64 = erreur d'usage (argument inconnu, option sans valeur, --out non inscriptible)
+#   64 = erreur d'usage (argument inconnu, option sans valeur, --out non inscriptible,
+#        --dry-run + --out combines)
 set -uo pipefail
 
 REPO=""
 OUT=".planning/server-rulesets-measurement.json"
+OUT_EXPLICIT=0
 RULESETS_FILE=""
+DRY_RUN=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -49,14 +61,20 @@ while [ "$#" -gt 0 ]; do
       REPO="$2"; shift 2 ;;
     --out)
       if [ "$#" -lt 2 ]; then echo "[measure-server-rulesets] --out necessite une valeur" >&2; exit 64; fi
-      OUT="$2"; shift 2 ;;
+      OUT="$2"; OUT_EXPLICIT=1; shift 2 ;;
     --rulesets-file)
       if [ "$#" -lt 2 ]; then echo "[measure-server-rulesets] --rulesets-file necessite une valeur" >&2; exit 64; fi
       RULESETS_FILE="$2"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[measure-server-rulesets] argument inconnu : $1" >&2; exit 64 ;;
   esac
 done
+
+if [ "$DRY_RUN" -eq 1 ] && [ "$OUT_EXPLICIT" -eq 1 ]; then
+  echo "[measure-server-rulesets] --dry-run et --out sont incompatibles (contradiction d'usage)" >&2
+  exit 64
+fi
 
 # --- Resolution du repo (owner/repo), jamais devinee sans source explicite ------------------------
 if [ -z "$REPO" ]; then
@@ -117,12 +135,11 @@ fi
 
 MEASURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-OUT_DIR="$(dirname "$OUT")"
-if [ -n "$OUT_DIR" ] && [ "$OUT_DIR" != "." ] && [ ! -d "$OUT_DIR" ]; then
-  mkdir -p "$OUT_DIR" 2>/dev/null || { echo "[measure-server-rulesets] --out repertoire non creable : $OUT_DIR" >&2; exit 64; }
-fi
-
-{
+# --- Construction du JSON de mesure — UN SEUL chemin de code, partage entre --dry-run (stdout)
+# et le mode normal (fichier --out). Jamais une seconde implementation qui pourrait deriver de
+# la premiere (contrainte du mandat, cf. vibeflow-update.sh --dry-run : plan et pose sortent du
+# meme appel de code).
+build_measure_json() {
   printf '{\n'
   printf '  "measured_at": "%s",\n' "$MEASURED_AT"
   printf '  "repo": "%s",\n' "$REPO"
@@ -130,8 +147,24 @@ fi
   printf '  "active_count": %s,\n' "$ACTIVE_COUNT"
   printf '  "rulesets": %s\n' "$CONTENT"
   printf '}\n'
-} > "$OUT" || { echo "[measure-server-rulesets] --out non inscriptible : $OUT" >&2; exit 64; }
+}
 
-echo "decouverte: repo=${REPO} ruleset_count=${RULESET_COUNT} active_count=${ACTIVE_COUNT} mesure_ecrite=${OUT}"
-echo "MESURE-ECRITE: ${MEASURED_AT}"
+if [ "$DRY_RUN" -eq 1 ]; then
+  # N'ECRIT RIEN : ni --out, ni son repertoire parent. La donnee (JSON) va sur stdout ; les
+  # diagnostics vont sur stderr, pour que stdout ne porte jamais que la mesure.
+  build_measure_json
+  echo "decouverte: repo=${REPO} ruleset_count=${RULESET_COUNT} active_count=${ACTIVE_COUNT} mesure_ecrite=(dry-run, rien ecrit)" >&2
+  echo "MESURE-ECRITE: ${MEASURED_AT} (dry-run)" >&2
+  exit 0
+fi
+
+OUT_DIR="$(dirname "$OUT")"
+if [ -n "$OUT_DIR" ] && [ "$OUT_DIR" != "." ] && [ ! -d "$OUT_DIR" ]; then
+  mkdir -p "$OUT_DIR" 2>/dev/null || { echo "[measure-server-rulesets] --out repertoire non creable : $OUT_DIR" >&2; exit 64; }
+fi
+
+build_measure_json > "$OUT" || { echo "[measure-server-rulesets] --out non inscriptible : $OUT" >&2; exit 64; }
+
+echo "decouverte: repo=${REPO} ruleset_count=${RULESET_COUNT} active_count=${ACTIVE_COUNT} mesure_ecrite=${OUT}" >&2
+echo "MESURE-ECRITE: ${MEASURED_AT}" >&2
 exit 0
