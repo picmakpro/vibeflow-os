@@ -65,7 +65,7 @@
         "sonde-d19b"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-42-w4",
@@ -75,7 +75,7 @@
         "exec-42-w3"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-42",
@@ -85,7 +85,7 @@
         "exec-42-w4"
       ],
       "scope": [],
-      "status": "blocked",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -96,7 +96,7 @@
         "exec-42-w4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "nonreg-42",
@@ -106,7 +106,7 @@
         "exec-42-w4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "plan-43",
@@ -118,7 +118,7 @@
         "arbitrage-q3"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "check-43",
@@ -138,7 +138,7 @@
         "exec-42-w4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "pr-42",
@@ -156,11 +156,11 @@
     },
     {
       "id": "arbitrage-d08",
-      "step": "HUMAIN : D-08 réexaminée avec Samuel (D-19 = règles omises)",
+      "step": "HUMAIN : D-08 réexaminée avec Samuel (D-19 = règles omises) — MAINTENIR, décision déléguée par Willy au head, session principale, 2026-09-25, Samuel non consulté (95a304d)",
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revise-42b",
@@ -294,13 +294,55 @@
     },
     {
       "id": "sonde-d19b",
-      "step": "seconde sonde D-19 : règles .claude/rules à paths: sous omitClaudeMd (décision Willy, AskUserQuestion, session principale, 2026-09-24)",
+      "step": "seconde sonde D-19 : règles .claude/rules à paths: sous omitClaudeMd (décision Willy, AskUserQuestion, session principale, 2026-09-24) — ABANDONNÉE 2026-09-25 (head), consignée en question ouverte non bloquante (95a304d)",
       "stage": "",
       "deps": [],
       "scope": [
         ".planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/42-D19-MESURE.md"
       ],
-      "status": "ready"
+      "status": "done"
+    },
+    {
+      "id": "pr-42-ready",
+      "step": "PR #108 sortie du brouillon (sans la 43, hors relance), pas de merge",
+      "stage": "",
+      "deps": [
+        "revue-42",
+        "audit-42",
+        "nonreg-42",
+        "docs",
+        "revue-42-fix"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "arbitrage-juges-42",
+      "step": "HUMAIN : sort des findings ask-user des juges finaux (CR-01, A1, A2, A3, spec)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-42-juges",
+      "step": "correction ciblée : CR-01, A1, A3, spec, WR-01, WR-02 ; A2 et revue des grilles en dette",
+      "stage": "",
+      "deps": [
+        "arbitrage-juges-42"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-42-fix",
+      "step": "revue ciblée du diff de correction (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-42-juges"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
