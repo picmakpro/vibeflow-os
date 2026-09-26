@@ -226,6 +226,14 @@
 #         prouvée par `cmp`, puis restaurée → rc=0
 #   MUT-I2, MUT-I3 — `errors.extend(invariant_i2(` (puis `invariant_i3(`) remplacé par `pass` →
 #         fixture T100 (puis T101) : rc_original=1, rc_mutant=0
+#
+# Manifeste étendu à sept listes (Phase 43, FABR-06/09, 43-01) — check-skills.sh (nouveau gate)
+# lit désormais le MÊME manifeste daté, étendu d'une septième liste champs_frontmatter_skills ;
+# check-agents.sh doit refuser tout autant qu'avant un manifeste qui ne porte pas exactement ce
+# nombre de listes, sept comprises :
+#   T107 — même manifeste amputé de la septième liste (champs_frontmatter_skills) → check-agents.sh
+#          rc=1, MANIFESTE-ILLISIBLE (non-régression : le schéma élargi refuse toujours un manifeste
+#          incomplet, jamais un skip silencieux sur les six listes historiques)
 
 set -uo pipefail
 
@@ -2058,7 +2066,7 @@ else
 fi
 OUT="$(bash "$T84_PERIME_DIR/check-agents.sh" --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
 if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-PERIME" && ! echo "$OUT" | grep -q "✗"; then
-  ok "T84 périmé SANS option → rc=0, MANIFESTE-PERIME présent, aucun ✗"
+  ok "T84 périmé SANS option → rc=0, MANIFESTE-PERIME présent, aucune ligne d'erreur"
 else
   ko "T84 (sans option, rc=$RC) : $OUT"
 fi
@@ -3550,6 +3558,15 @@ if [ "$MUT_WR2_RC" -eq 0 ]; then
   else
     komut WR2 "rc_mutant=1 (linte a tort) et rc_original=0 (exclu)" "rc_mutant=1, rc_original=0" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
   fi
+fi
+
+# ---------- T107 — manifeste amputé de la septième liste (Phase 43, FABR-09) --------------------
+T107_DIR="$(mk_gate_dir "$WORK/t107" 0 "sans-liste=champs_frontmatter_skills")"
+OUT="$(bash "$T107_DIR/check-agents.sh" --strict --agents-dir="$T_MANIFESTE_AG" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE"; then
+  ok "T107 manifeste amputé de la septième liste (champs_frontmatter_skills) → rc=1, MANIFESTE-ILLISIBLE"
+else
+  ko "T107 (rc=$RC) : $OUT"
 fi
 
 echo ""

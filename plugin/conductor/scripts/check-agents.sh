@@ -17,7 +17,7 @@
 # documenté, désormais enforcé PAR CE LINT (et seulement par lui). Elle redevient une vraie
 # restriction runtime uniquement pour un agent incarné en thread principal (`claude --agent`).
 #
-# Référentiel : manifeste daté check-agents-manifest.json (même dossier que ce script) — six
+# Référentiel : manifeste daté check-agents-manifest.json (même dossier que ce script) — sept
 # listes, verifie_le + source par liste, valide_jours porté par le manifeste ; absent, illisible
 # ou invalide → MANIFESTE-ILLISIBLE, rc 1 (0 sous --hook) ; chargé seulement s'il y a au moins un
 # agent à juger ; la garde d'écriture traite cet incident comme une panne du contrôleur.
@@ -274,7 +274,7 @@ resolve_agents_strict = os.environ.get(\"VF_RESOLVE_AGENTS\", \"lenient\") == \"
 registry_dirs = [p for p in os.environ.get(\"VF_REGISTRY_DIRS\", \"\").split(\":\") if p]
 manifest_freshness_strict = os.environ.get(\"VF_MANIFEST_FRESHNESS\", \"lenient\") == \"strict\"
 
-# Conventions VibeFlow restees en dur (D-01 borne le manifeste aux SIX listes d'origine native ;
+# Conventions VibeFlow restees en dur (D-01 borne le manifeste aux SEPT listes d'origine native ;
 # ces quatre champs sont des conventions du depot, jamais sujettes a la peremption d'une doc
 # Anthropic externe) : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12) ;
 #   vf-mcp-consumer (agent exécutant recevant l'allowlist MCP dérivée du lab à l'install, ADR-051) ;
@@ -338,7 +338,7 @@ def index_agents(agents_dir_local, registry_dirs_local):
     _agent_index_cache[cle] = index
     return index
 
-# D-01/D-02/D-03 : les six listes de reference (identifiants d'outils, champs de frontmatter,
+# D-01/D-02/D-03 : les sept listes de reference (identifiants d'outils, champs de frontmatter,
 # types natifs, modeles, modes de permission, niveaux d'effort) ne vivent plus ici — elles sont
 # chargees depuis le manifeste daté check-agents-manifest.json (meme dossier que ce script).
 # AUCUNE valeur par defaut n'est portee par ce script (D-02) : un manifeste absent, illisible ou
@@ -365,9 +365,9 @@ def charger_manifeste(chemin):
     listes = m[\"listes\"]
     if not isinstance(listes, dict):
         raise ValueError(\"listes — attendu un objet JSON\")
-    cles_listes = {\"outils\", \"champs_frontmatter\", \"types_natifs\", \"modeles\", \"modes_permission\", \"niveaux_effort\"}
+    cles_listes = {\"outils\", \"champs_frontmatter\", \"types_natifs\", \"modeles\", \"modes_permission\", \"niveaux_effort\", \"champs_frontmatter_skills\"}
     if set(listes.keys()) != cles_listes:
-        raise ValueError(f\"listes — attendu exactement les six cles {sorted(cles_listes)}, trouve {sorted(listes.keys())}\")
+        raise ValueError(f\"listes — attendu exactement les sept cles {sorted(cles_listes)}, trouve {sorted(listes.keys())}\")
     for nom_liste, liste in listes.items():
         if not isinstance(liste, dict):
             raise ValueError(f\"listes.{nom_liste} — attendu un objet JSON\")

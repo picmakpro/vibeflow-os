@@ -40,6 +40,14 @@
       "verifie_le": "2026-09-23",
       "source": "https://code.claude.com/docs/en/sub-agents",
       "valeurs": ["low", "medium", "high", "xhigh", "max"]
+    },
+    "champs_frontmatter_skills": {
+      "verifie_le": "2026-09-26",
+      "source": "https://code.claude.com/docs/en/skills",
+      "valeurs": ["name", "description", "when_to_use", "argument-hint", "arguments",
+        "disable-model-invocation", "user-invocable", "allowed-tools", "disallowed-tools",
+        "model", "effort", "context", "agent", "background", "hooks", "paths", "shell",
+        "metadata", "license", "compatibility"]
     }
   }
 }
