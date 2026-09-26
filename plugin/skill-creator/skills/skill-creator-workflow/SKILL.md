@@ -54,7 +54,16 @@ Ne JAMAIS colorer artificiellement un sujet agnostique avec du vocabulaire [NOM_
    - **Agnostique** → vocabulaire natif du domaine, pas de folklore [NOM_LAB] force
    - **Zone grise** → framing qui sert la pertinence du sujet
 
-5. **Livrable** : `<skill-path>-workspace/00-cadrage.md` (< 20 lignes).
+5. Declarer la nature du skill (`vf-nature`, B-03) — question DISTINCTE de la nature du sujet
+   (item 4), jamais fusionnee : poser les trois questions factuelles (gate bloquant ? livrable
+   remis a un tiers ? couche de qualite ?) et noter `vf-gate-bloquant`, `vf-livrable-tiers`,
+   `vf-couche-qualite` (true/false) ; au moins un oui → proposer `procedure`, declaree par
+   l'utilisateur ou [ORCHESTRATING_AGENT], jamais deduite ; defaut `outil` (cle omise). Si
+   `procedure`, capturer aussi `ecrit:` (lieu de vie du livrable) et `vf-rubrique-juge:` (grille
+   du juge) — sans les deux, `check-skills.sh` refuse.
+
+6. **Livrable** : `<skill-path>-workspace/00-cadrage.md` (< 20 lignes), qui consigne aussi la
+   nature declaree (`vf-nature`).
    - `<skill-path>` = `.claude/skills/<name>` ou `methodology/templates/skills/<name>` selon META/LIVRABLE
 
 ---
@@ -196,6 +205,8 @@ Retourne : resume en 5 bullets max + path du fichier produit.
 ### Checklist qualite (ordre par priorite)
 
 - [ ] **Type clair** (META ou LIVRABLE — si applicable) : skill au bon endroit
+- [ ] **vf-nature declaree** (B-03, defaut outil) ; si `procedure` : `ecrit:` et
+      `vf-rubrique-juge:` presents — `bash .claude/scripts/check-skills.sh --file <skill-path>/SKILL.md` rend 0
 - [ ] **Pertinence du sujet** : chaque section fait sens vis-a-vis du domaine natif
 - [ ] **Coherence stack figee** : aucun outil non figé pour skills LIVRABLES (ou DEC proposee)
 - [ ] **Clarte actionnable** : zero generalite "il faut bien faire"
