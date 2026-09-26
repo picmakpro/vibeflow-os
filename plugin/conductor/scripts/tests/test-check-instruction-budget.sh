@@ -36,6 +36,9 @@ set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-instruction-budget.sh"
 TARGET="$SCRIPT"
+# Racine du depot reel (43-04, BOOT-1..5) — pour copier plugin/_internal/resolve-deps.sh dans les
+# fixtures synthetiques du bootstrap : le resolveur canonique, jamais un second parseur de requires.
+REPO_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 
 # Constantes locales de la suite (Phase 40.1) — TOUTES les tailles de fixture de bord se dérivent
 # de ces deux valeurs, jamais d'un littéral de l'ancien plafond (constat B1 du checker, révision
@@ -629,6 +632,274 @@ out="$(run "$D")"; rc=$?
 if [ "$rc" -eq 2 ]; then ok "SKILL-6 — fixture sans SKILL.md et sans agent (repertoire vide) → rc 2 inchange"; else ko "SKILL-6 — repertoire vide" "rc=2" "rc=$rc out=[$out]"; fi
 
 # ===================================================================================================
+# BOOTSTRAP (43-04, FABR-09, D-Q4, ratchet-socle) — BOOT-1 a BOOT-5. Calcul independant du script
+# (boot_expected_bytes, reimplementation propre a la suite, jamais un appel a la fonction du
+# script) : la definition unique se rejoue a l'execution, jamais recopiee en dur.
+# ===================================================================================================
+echo ""
+echo "== BOOTSTRAP (43-04) =="
+
+boot_expected_bytes() { # <fichier> <cles pipe-separees> -> octets, calcul INDEPENDANT du script
+  local f="$1" keys="$2"
+  [ -r "$f" ] || { echo 0; return; }
+  LC_ALL=C awk -v keys="$keys" '
+    BEGIN {
+      started = 0; in_fm = 0; measuring = 0; bytes = 0
+      n = split(keys, karr, "|")
+      for (i = 1; i <= n; i++) keyset[karr[i]] = 1
+    }
+    NR==1 && /^---[[:space:]]*$/ { started = 1; in_fm = 1; next }
+    in_fm && /^---[[:space:]]*$/ { in_fm = 0; next }
+    !started { next }
+    in_fm {
+      if ($0 ~ /^[A-Za-z_][A-Za-z0-9_.-]*:/) {
+        key = $0
+        sub(/:.*$/, "", key)
+        if (key in keyset) { measuring = 1; bytes += length($0) + 1 } else { measuring = 0 }
+      } else if ($0 ~ /^[ \t]/) {
+        if (measuring) { bytes += length($0) + 1 }
+      } else {
+        measuring = 0
+      }
+    }
+    END { print bytes + 0 }
+  ' "$f"
+}
+
+# w_bootstrap_fixture <root> — socle minimal synthetique : conductor requiert dep (deux
+# module.json), un SKILL.md sous chacun, skill installer expose par plugin.json (sans
+# module.json), une commande, resolve-deps.sh copie du depot reel (REPO_ROOT). Reutilisee par
+# BOOT-1, BOOT-2, BOOT-4, MUT-11, MUT-12.
+w_bootstrap_fixture() {
+  local d="$1"
+  std_agent "$d"
+  mkdir -p "$d/plugin/conductor" "$d/plugin/dep" "$d/plugin/installer" "$d/plugin/commands" \
+    "$d/plugin/.claude-plugin" "$d/plugin/_internal"
+  w_lines "$d/plugin/conductor/module.json" '{' '  "requires": ["dep"]' '}'
+  w_lines "$d/plugin/dep/module.json" '{' '  "requires": []' '}'
+  w_lines "$d/plugin/conductor/SKILL.md" \
+    '---' \
+    'name: conductor-demo' \
+    'description: une description de conductor' \
+    '  qui continue sur une deuxieme ligne' \
+    'when_to_use: quand on a besoin de conductor' \
+    '---' \
+    'Corps de conductor.'
+  w_lines "$d/plugin/dep/SKILL.md" \
+    '---' \
+    'name: dep-demo' \
+    'description: une description de dep' \
+    'when_to_use: quand on a besoin de dep' \
+    '---' \
+    'Corps de dep.'
+  w_lines "$d/plugin/.claude-plugin/plugin.json" '{' '  "skills": "./installer"' '}'
+  w_lines "$d/plugin/installer/SKILL.md" \
+    '---' \
+    'name: installer-demo' \
+    'description: une description de installer' \
+    'when_to_use: quand on a besoin de installer' \
+    '---' \
+    'Corps de installer.'
+  w_lines "$d/plugin/commands/c.md" \
+    '---' \
+    'description: une description de commande' \
+    'when_to_use: quand on a besoin de la commande' \
+    '---' \
+    'Corps de commande.'
+  cp "$REPO_ROOT/plugin/_internal/resolve-deps.sh" "$d/plugin/_internal/resolve-deps.sh"
+  chmod +x "$d/plugin/_internal/resolve-deps.sh"
+}
+
+# boot_expected_total <root> — somme independante sur le socle complet de w_bootstrap_fixture
+# (conductor + dep + installer, tous les SKILL.md, + la commande c.md).
+boot_expected_total() {
+  local d="$1" total=0 b
+  for f in "$d/plugin/conductor/SKILL.md" "$d/plugin/dep/SKILL.md" "$d/plugin/installer/SKILL.md"; do
+    b="$(boot_expected_bytes "$f" "name|description|when_to_use")"
+    total=$((total + b))
+  done
+  b="$(boot_expected_bytes "$d/plugin/commands/c.md" "description|when_to_use")"
+  total=$((total + b))
+  echo "$total"
+}
+
+# w_bootstrap_fixture_big <root> <n_lignes> — meme socle, description de conductor gonflee de
+# <n_lignes> lignes de continuation pour depasser VF_BOOTSTRAP_TOKEN_CAP (2000 tokens, BOOT-5).
+w_bootstrap_fixture_big() {
+  local d="$1" n="$2" i
+  w_bootstrap_fixture "$d"
+  {
+    printf '%s\n' '---' 'name: conductor-demo' 'description: une description de conductor'
+    i=1
+    while [ "$i" -le "$n" ]; do
+      printf '  ligne de remplissage numero %04d pour gonfler le bootstrap au dela du plafond ADR-029.\n' "$i"
+      i=$((i + 1))
+    done
+    printf '%s\n' 'when_to_use: quand on a besoin de conductor' '---' 'Corps de conductor.'
+  } > "$d/plugin/conductor/SKILL.md"
+}
+
+# --- BOOT-1 : ligne BOOTSTRAP porte exactement le nombre de tokens attendu (calcul independant) ---
+D="$(mk_root boot1)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+out="$(run "$D")"; rc=$?
+gotline="$(printf '%s\n' "$out" | grep '^BOOTSTRAP :')"
+has=0; case "$gotline" in *"$EXPECTED_TOKENS tokens"*"sur socle (4 fichiers)"*) has=1 ;; esac
+if [ "$has" -eq 1 ]; then
+  ok "BOOT-1 — ligne BOOTSTRAP porte exactement le nombre de tokens attendu ($EXPECTED_TOKENS), calcule independamment (4 fichiers : 3 SKILL.md + 1 commande)"
+else
+  ko "BOOT-1 — mesure independante" "BOOTSTRAP : $EXPECTED_TOKENS tokens ... sur socle (4 fichiers)" "rc=$rc ligne=[$gotline]"
+fi
+
+# --- BOOT-2a : ligne @bootstrap:socle EGALE a la mesure, armee → rc 0 ------------------------------
+D="$(mk_root boot2a-egale)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 0 ]; then ok "BOOT-2a — ligne @bootstrap:socle egale a la mesure, armee → rc 0"; else ko "BOOT-2a — ligne egale a la mesure" "rc=0" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-2b : ligne STRICTEMENT SUPERIEURE a la mesure (baisse), armee → rc 0, AUCUNE occurrence -
+# --- de DEPASSEMENT (stdout+stderr) — une baisse n'est jamais un depassement ----------------------
+D="$(mk_root boot2b-baisse)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+LIGNE_BAISSE=$((EXPECTED_TOKENS + 5))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$LIGNE_BAISSE" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+nodep=1; case "$out" in *"DEPASSEMENT"*) nodep=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$nodep" -eq 1 ]; then ok "BOOT-2b — ligne strictement superieure a la mesure (baisse), armee → rc 0, aucune occurrence de DEPASSEMENT"; else ko "BOOT-2b — baisse" "rc=0, aucun DEPASSEMENT" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-2c : description allongee de 8 octets, baseline = mesure ORIGINALE, armee → rc 1, -------
+# --- DEPASSEMENT-BOOTSTRAP ; meme croissance SANS sentinelle → rc 3 (contrat existant du ratchet) -
+D="$(mk_root boot2c-croissance)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+# Allonge la description de dep de 8 octets exacts (" gagnee!" = 8 caracteres).
+w_lines "$D/plugin/dep/SKILL.md" \
+  '---' \
+  'name: dep-demo' \
+  'description: une description de dep gagnee!' \
+  'when_to_use: quand on a besoin de dep' \
+  '---' \
+  'Corps de dep.'
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"DEPASSEMENT-BOOTSTRAP"*) has=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "BOOT-2c — description allongee de 8 octets, baseline = mesure originale, armee → rc 1, DEPASSEMENT-BOOTSTRAP"; else ko "BOOT-2c — croissance armee" "rc=1, DEPASSEMENT-BOOTSTRAP" "rc=$rc out=[$out]"; fi
+
+D="$(mk_root boot2c-non-arme)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_lines "$D/plugin/dep/SKILL.md" \
+  '---' \
+  'name: dep-demo' \
+  'description: une description de dep gagnee!' \
+  'when_to_use: quand on a besoin de dep' \
+  '---' \
+  'Corps de dep.'
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 3 ]; then ok "BOOT-2c (non arme) — meme croissance SANS sentinelle → rc 3 (contrat existant du ratchet)"; else ko "BOOT-2c non arme" "rc=3" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-2d : ligne @bootstrap:socle ABSENTE, ratchet arme → rc 2 (contrat de baseline incomplet)
+D="$(mk_root boot2d-ligne-absente)"
+w_bootstrap_fixture "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 2 ]; then ok "BOOT-2d — ligne @bootstrap:socle absente, ratchet arme → rc 2"; else ko "BOOT-2d — ligne absente armee" "rc=2" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-2e : la ligne @bootstrap:socle n'est JAMAIS comptee comme orpheline (cas BOOT-2a rejoue,
+# --- verification explicite de l'absence du message d'orpheline) ----------------------------------
+D="$(mk_root boot2e-jamais-orpheline)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+noorph=1; case "$out" in *"entree de baseline orpheline : @bootstrap:socle"*) noorph=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$noorph" -eq 1 ]; then ok "BOOT-2e — la ligne @bootstrap:socle n'est jamais comptee comme orpheline"; else ko "BOOT-2e — jamais orpheline" "rc=0, aucun message d'orpheline sur @bootstrap:socle" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-3 : fixture SANS plugin/conductor/module.json (cas des sept bascules de la CI) → --------
+# --- BOOTSTRAP non applicable, rc et verdicts identiques a la Tache 1 ------------------------------
+D="$(mk_root boot3-sans-socle)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"BOOTSTRAP : non applicable"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "BOOT-3 — fixture sans plugin/conductor/module.json → BOOTSTRAP non applicable, rc et verdicts identiques a la Tache 1"; else ko "BOOT-3 — sans socle" "rc=0, BOOTSTRAP : non applicable" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-4 : socle present, resolveur (resolve-deps.sh) ABSENT → NON-VERIFIABLE avec la cause, ---
+# --- rc 2 --------------------------------------------------------------------------------------
+D="$(mk_root boot4-resolveur-absent)"
+w_bootstrap_fixture "$D"
+rm -f "$D/plugin/_internal/resolve-deps.sh"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t100\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"BOOTSTRAP"*"non verifiable"*"resolveur absent"*) has=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$has" -eq 1 ]; then ok "BOOT-4 — resolveur (resolve-deps.sh) absent, socle present → rc 2, NON-VERIFIABLE avec la cause"; else ko "BOOT-4 — resolveur absent" "rc=2, cause resolveur absent nommee" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-5a : mesure > 2000, ligne @bootstrap:socle EGALE a la mesure, armee → rc 0, ---------------
+# --- AU-DESSUS-PLAFOND-ADR029, aucune occurrence de DEPASSEMENT -----------------------------------
+D="$(mk_root boot5a-plafond-egale)"
+w_bootstrap_fixture_big "$D" 150
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"AU-DESSUS-PLAFOND-ADR029"*) has=1 ;; esac
+nodep=1; case "$out" in *"DEPASSEMENT"*) nodep=0 ;; esac
+depasse2000=0; [ "$EXPECTED_TOKENS" -gt 2000 ] && depasse2000=1
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ] && [ "$nodep" -eq 1 ] && [ "$depasse2000" -eq 1 ]; then
+  ok "BOOT-5a — mesure > 2000 ($EXPECTED_TOKENS), ligne egale a la mesure, armee → rc 0, AU-DESSUS-PLAFOND-ADR029, aucun DEPASSEMENT"
+else
+  ko "BOOT-5a — plafond, ligne egale" "rc=0, AU-DESSUS-PLAFOND-ADR029, aucun DEPASSEMENT, mesure>2000" "rc=$rc mesure=$EXPECTED_TOKENS out=[$out]"
+fi
+
+# --- BOOT-5b : mesure > 2000, ligne STRICTEMENT SUPERIEURE a la mesure, armee → rc 0, --------------
+# --- AU-DESSUS-PLAFOND-ADR029, aucune occurrence de DEPASSEMENT -----------------------------------
+D="$(mk_root boot5b-plafond-superieure)"
+w_bootstrap_fixture_big "$D" 150
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+LIGNE_SUP=$((EXPECTED_TOKENS + 10))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$LIGNE_SUP" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"AU-DESSUS-PLAFOND-ADR029"*) has=1 ;; esac
+nodep=1; case "$out" in *"DEPASSEMENT"*) nodep=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ] && [ "$nodep" -eq 1 ]; then
+  ok "BOOT-5b — mesure > 2000, ligne strictement superieure a la mesure, armee → rc 0, AU-DESSUS-PLAFOND-ADR029, aucun DEPASSEMENT"
+else
+  ko "BOOT-5b — plafond, ligne superieure" "rc=0, AU-DESSUS-PLAFOND-ADR029, aucun DEPASSEMENT" "rc=$rc out=[$out]"
+fi
+
+# --- BOOT-5c : mesure ≤ 2000 et ≤ ligne → verdict OK (contre-cas de BOOT-5a/b) ---------------------
+D="$(mk_root boot5c-sous-plafond)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"BOOTSTRAP :"*"verdict OK"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "BOOT-5c — mesure <= 2000 et <= ligne → verdict OK"; else ko "BOOT-5c — sous plafond" "rc=0, verdict OK" "rc=$rc out=[$out]"; fi
+
+# ===================================================================================================
 # Tâche 2 — quatre mutants vérifiés par cmp
 # ===================================================================================================
 echo ""
@@ -855,6 +1126,62 @@ else
     ok "MUT-10 elagage *-references neutralise (cmp confirme la mutation, bash -n OK) : fixture SKILL-3 (partie -references) devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig)"
   else
     ko "MUT-10 elagage *-references neutralise" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-11 : neutralise la comparaison de la mesure a la ligne @bootstrap:socle -------------------
+MUT11_OLD='  if [ "$BOOTSTRAP_HAS_BASELINE" -eq 1 ] && [ "$BOOTSTRAP_TOKENS" -gt "$BOOTSTRAP_BASELINE_VALUE" ]; then'
+MUT11_NEW='  if [ "0" = "1" ] && [ "$BOOTSTRAP_TOKENS" -gt "$BOOTSTRAP_BASELINE_VALUE" ]; then'
+awk -v old="$MUT11_OLD" -v new="$MUT11_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut11-bootstrap-cmp.sh"
+D="$(mk_root mut11)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_lines "$D/plugin/dep/SKILL.md" \
+  '---' \
+  'name: dep-demo' \
+  'description: une description de dep gagnee!' \
+  'when_to_use: quand on a besoin de dep' \
+  '---' \
+  'Corps de dep.'
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+if cmp -s "$MUTD/mut11-bootstrap-cmp.sh" "$SCRIPT"; then
+  ko "MUT-11 comparaison bootstrap neutralisee" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut11-bootstrap-cmp.sh" 2>/dev/null; then
+  ko "MUT-11 comparaison bootstrap neutralisee" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut11-bootstrap-cmp.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then
+    ok "MUT-11 comparaison bootstrap neutralisee (cmp confirme la mutation, bash -n OK) : fixture de croissance BOOT-2 reste (a tort) VERTE sur le mutant (rc=$rc_mut), ROUGE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-11 comparaison bootstrap neutralisee" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-12 : meme ligne de comparaison, -gt (tokens > ligne) reecrit en -ne (tokens != ligne) -----
+MUT12_OLD='  if [ "$BOOTSTRAP_HAS_BASELINE" -eq 1 ] && [ "$BOOTSTRAP_TOKENS" -gt "$BOOTSTRAP_BASELINE_VALUE" ]; then'
+MUT12_NEW='  if [ "$BOOTSTRAP_HAS_BASELINE" -eq 1 ] && [ "$BOOTSTRAP_TOKENS" -ne "$BOOTSTRAP_BASELINE_VALUE" ]; then'
+awk -v old="$MUT12_OLD" -v new="$MUT12_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut12-bootstrap-ne.sh"
+D="$(mk_root mut12)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+LIGNE_BAISSE=$((EXPECTED_TOKENS + 5))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$LIGNE_BAISSE" | w_baseline "$D"
+if cmp -s "$MUTD/mut12-bootstrap-ne.sh" "$SCRIPT"; then
+  ko "MUT-12 comparaison bootstrap -gt reecrite en -ne" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut12-bootstrap-ne.sh" 2>/dev/null; then
+  ko "MUT-12 comparaison bootstrap -gt reecrite en -ne" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut12-bootstrap-ne.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then
+    ok "MUT-12 comparaison bootstrap -gt reecrite en -ne (cmp confirme la mutation, bash -n OK) : fixture de baisse BOOT-2 devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig) — le mutant prend une baisse pour un depassement"
+  else
+    ko "MUT-12 comparaison bootstrap -gt reecrite en -ne" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
   fi
 fi
 

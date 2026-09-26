@@ -17,6 +17,15 @@
 # (bloque au-delà de 300 lignes, fichier entier, D-06) prime toujours sur la baseline.
 #
 # Format : chemin<TAB>lignes<TAB>instructions, trié LC_ALL=C.
+#
+# Clé @bootstrap:socle (Phase 43, FABR-09, D-Q4, option ratchet-socle) — décision déléguée par
+# Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26. Colonne lignes = 0
+# (sans objet pour cette clé) ; colonne instructions = tokens estimés (octets/4) du socle minimal
+# (fermeture resolve-deps.sh conductor + skill installer + commandes du plugin), mesure du jour
+# rendue par la ligne BOOTSTRAP de check-instruction-budget.sh. Toute hausse au-dessus de cette
+# ligne bloque (DEPASSEMENT-BOOTSTRAP) ; le plafond ADR-029 de 2000 tokens reste un objectif
+# (BACKLOG.md, commit 433fea0). Cette clé n'est jamais comptée comme entrée orpheline.
+@bootstrap:socle	0	2499
 plugin/business-pilot-bundle/agents/quality-gate-client.md	91	10
 plugin/business-pilot-bundle/agents/vf-business-commercial.md	97	17
 plugin/business-pilot-bundle/agents/vf-business-delivery.md	90	15
