@@ -11,8 +11,8 @@ last_updated: "2026-09-26T20:30:00.000Z"
 last_activity: 2026-09-26
 last_activity_desc: >-
   Phase 43 exécutée et vérifiée (mission vf-dev-manager 2026-09-26, exécution) : 7 plans en
-  4 vagues, 43-VERIFICATION.md passed 10/10, revue du diff complet PASS après trois tours de
-  correction ciblée, audit SECURED. Deux correctifs hors plan (témoin des merges restreint à
+  4 vagues, 43-VERIFICATION.md passed 10/10, revue du diff complet PASS après deux mandats de
+  correction ciblée (trois passes de revue), audit SECURED. Deux correctifs hors plan (témoin des merges restreint à
   l'amont ; compteur des README racine 89 → 90) et le faux vert de --verify laissé au BACKLOG
   (option B) : décision du head sous délégation technique de Willy, session principale,
   2026-09-26. STATE tenu à la main.
@@ -31,7 +31,7 @@ progress:
 
 Phase: 43 (Fabrique — gate des skills par nature et alignement de skill-creator) — EXÉCUTÉE ET VÉRIFIÉE (43-VERIFICATION.md passed 10/10), PR #111 en brouillon. Phase 42 : exécutée et vérifiée, PR #108 en attente de la revue code owner de Samuel.
 **Last Activity:** 2026-09-26
-**Last Activity Description:** Exécution de la Phase 43 (mission `.planning/missions/2026-09-26-gouvernance-43-exec.md`). Base de phase figée sur `22179fa` ; vagues 1 à 4 intégrées ; FABR-06..10 cochées au ledger ; revue PASS après trois tours de correction de 43-04 (`bb23de7`, `394c795`), audit SECURED, audit documentaire vert. Planification : `.planning/missions/2026-09-25-gouvernance-43-plan.md`.
+**Last Activity Description:** Exécution de la Phase 43 (mission `.planning/missions/2026-09-26-gouvernance-43-exec.md`). Base de phase figée sur `22179fa` ; vagues 1 à 4 intégrées ; FABR-06..10 cochées au ledger ; revue PASS après deux mandats de correction de 43-04 (`bb23de7`, `394c795`), audit SECURED, audit documentaire vert. Planification : `.planning/missions/2026-09-25-gouvernance-43-plan.md`.
 
 ## Progress
 

@@ -117,7 +117,7 @@
         "audit-43"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -138,7 +138,7 @@
         "docs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "rev-merges",
