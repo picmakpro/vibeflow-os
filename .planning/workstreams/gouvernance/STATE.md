@@ -5,45 +5,43 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 43
 current_phase_name: Fabrique — gate des skills par nature et alignement de skill-creator
-status: planning
+status: verifying
 created: 2026-09-23
-last_updated: "2026-09-26T12:00:00.000Z"
+last_updated: "2026-09-26T20:30:00.000Z"
 last_activity: 2026-09-26
 last_activity_desc: >-
-  Phase 43 planifiée (mission vf-dev-manager 2026-09-25/26, planification seule, aucune
-  exécution). Phase 42 intégrée par merge (30d9627, PR #108 non mergée). FABR-06 à FABR-10
-  gravées au ledger. 7 plans en 4 vagues (01 ; 03/04/05 ; 02/07 ; 06), RESEARCH, PATTERNS,
-  VALIDATION. Cinq tours de révision ciblée sur les verdicts de plan-checkers frais (4 bloquants
-  réels fermés, dont une base de phase qui glissait et un faux rouge zsh). Q1 (ratchet sur le
-  socle du bootstrap) et Q-PORTEE (deux marqueurs distincts en prose ou un en titre) tranchées :
-  décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale,
+  Phase 43 exécutée et vérifiée (mission vf-dev-manager 2026-09-26, exécution) : 7 plans en
+  4 vagues, 43-VERIFICATION.md passed 10/10, revue du diff complet PASS après trois tours de
+  correction ciblée, audit SECURED. Deux correctifs hors plan (témoin des merges restreint à
+  l'amont ; compteur des README racine 89 → 90) et le faux vert de --verify laissé au BACKLOG
+  (option B) : décision du head sous délégation technique de Willy, session principale,
   2026-09-26. STATE tenu à la main.
-stopped_at: "Phase 43 planifiée et vérifiée (7 plans, d823a05) ; PR de planification en brouillon empilée sur gouvernance/phase-42-fabrique ; exécution non lancée — attend le merge de la PR #108 (Phase 42) et la reprise des plans sur main"
+stopped_at: "Phase 43 exécutée et vérifiée ; PR #111 en brouillon, empilée sur gouvernance/phase-42-fabrique, en attente du merge de la PR #108 puis de la revue code owner de Samuel"
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 13
-  completed_plans: 6
-  percent: 46
+  completed_plans: 13
+  percent: 100
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 43 (Fabrique — gate des skills par nature et alignement de skill-creator) — PLANIFIÉE ET VÉRIFIÉE, exécution non lancée. Phase 42 : exécutée et vérifiée, PR #108 en attente de la revue code owner de Samuel.
+Phase: 43 (Fabrique — gate des skills par nature et alignement de skill-creator) — EXÉCUTÉE ET VÉRIFIÉE (43-VERIFICATION.md passed 10/10), PR #111 en brouillon. Phase 42 : exécutée et vérifiée, PR #108 en attente de la revue code owner de Samuel.
 **Last Activity:** 2026-09-26
-**Last Activity Description:** Planification de la Phase 43 (mission `.planning/missions/2026-09-25-gouvernance-43-plan.md`). Merge de `gouvernance/phase-42-fabrique` (`30d9627`), goal de la ROADMAP aligné sur D-Q3, FABR-06..10 au ledger, 7 plans en 4 vagues. Les plans ont été relus par des `gsd-plan-checker` frais, dix passes en tout, et révisés en cinq tours ciblés (`b2101e8`, `6a461e5`, `11ea417`, `3c83111`, `3a3f545`, puis le correctif `d823a05`). Q1 et Q-PORTEE sont tranchées (décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26).
+**Last Activity Description:** Exécution de la Phase 43 (mission `.planning/missions/2026-09-26-gouvernance-43-exec.md`). Base de phase figée sur `22179fa` ; vagues 1 à 4 intégrées ; FABR-06..10 cochées au ledger ; revue PASS après trois tours de correction de 43-04 (`bb23de7`, `394c795`), audit SECURED, audit documentaire vert. Planification : `.planning/missions/2026-09-25-gouvernance-43-plan.md`.
 
 ## Progress
 
-**Phases Complete:** 0 (Phase 42 exécutée et vérifiée, non clôturée ; Phase 43 planifiée)
-**Current Plan:** 43-01 (vague 1) — 0/7 plans exécutés sur la Phase 43 ; 6/6 sur la Phase 42
+**Phases Complete:** 0 (Phases 42 et 43 exécutées et vérifiées, non clôturées : PR #108 et #111 ouvertes)
+**Current Plan:** aucun — 7/7 plans exécutés sur la Phase 43 ; 6/6 sur la Phase 42
 
 ## Session Continuity
 
-**Stopped At:** Phase 43 planifiée et vérifiée (`d823a05`) ; PR de planification ouverte en brouillon, empilée sur `gouvernance/phase-42-fabrique`. Prochain geste : merge de la PR #108, puis rebascule de la PR de la 43 vers `main`, puis exécution de la vague 1 (43-01 consigne d'abord la base de phase figée `43-BASE-PHASE.md`).
-**Resume File:** `.planning/workstreams/gouvernance/phases/VFDO-43-fabrique-gate-des-skills-par-nature-et-alignement-de-skill-c/43-01-PLAN.md`
+**Stopped At:** Phase 43 exécutée et vérifiée ; PR #111 en brouillon, empilée sur `gouvernance/phase-42-fabrique`. Prochain geste : merge de la PR #108, puis rebascule de la #111 vers `main` (intégration amont par rebase uniquement, base de phase re-consignée selon la procédure de 43-01), puis revue code owner de Samuel.
+**Resume File:** `.planning/missions/2026-09-26-gouvernance-43-exec.md`
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
@@ -78,6 +76,15 @@ est ton compartiment, rejoue le gate toi-même avec `--file .planning/workstream
 explicitement ; n'attends rien de la CI sur ce point.
 
 ### Decisions
+
+- **2026-09-26 — mission d'exécution de la Phase 43 (vf-dev-manager)** : trois décisions du
+  head sous délégation technique de Willy, session principale, 2026-09-26. (1) Le témoin
+  `MERGES-DANS-LA-PLAGE` (43-01, 43-06) ne compte plus que les merges dont un parent n'a pas B43
+  pour ancêtre : les merges internes de la vague 2 sont admis, un merge de l'amont rougit toujours
+  (`f24fb79`). (2) Le compteur des README racine passe de 89 à 90 suites hors plan (`b2a1f0c`,
+  attributions corrigées en `31b4163`). (3) Le faux vert possible de `inject-mcp-tools.sh --verify`
+  sur un dossier mixte n'est pas corrigé dans cette phase : il est porté au BACKLOG (`a2201c1`) et
+  en tête des points à relire de la PR #111.
 
 - **2026-09-26 — mission de planification de la Phase 43 (vf-dev-manager)** : Q1 = ratchet sur le
   socle minimal du bootstrap (ligne de baseline `@bootstrap:socle` à la mesure du jour, ≈ 2 499

@@ -93,7 +93,7 @@
         "docs/**",
         ".planning/instruction-budget-baselines.tsv"
       ],
-      "status": "running",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -117,7 +117,7 @@
         "audit-43"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "docs",
