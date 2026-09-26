@@ -1,5 +1,30 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.24.2] — 2026-09-26 (Phase 43 — durcissements MCP, FABR-10)
+
+**Patch** (durcissement) :
+
+- **`scripts/inject-mcp-tools.sh`** : (a) une valeur `vf-mcp-tools` malformée (pas de séparateur,
+  liste d'outils vide, segment hors charset, serveur vide, guillemet non fermé, clé en double,
+  continuation indentée, espace avant le deux-points…) est désormais **refusée** en mode
+  injection — rc 1, fichier non modifié, les autres fichiers du dossier restent traités — au lieu
+  d'un no-op silencieux ; le mode `--verify` (lecture seule) est **inchangé**. (b) un serveur MCP
+  cité qui ne résout dans aucune source (union du scope projet et du scope global, ADR-051-B)
+  déclenche désormais un **message honnête qui NOMME le serveur et la source réellement
+  consultée**, au lieu d'un no-op muet — cas `test-inject-mcp-tools.sh#T32` (non-régression) et
+  `test-inject-mcp-tools.sh#T33` (WARNING nommant l'union).
+- **`plugin/_internal/vibeflow-update.sh`** : le moteur d'install **relaie désormais** dans le
+  journal d'installation les lignes `WARNING:`/`ERROR:` émises sur stderr par l'injecteur —
+  conséquence directe du durcissement (b), auparavant stdout et stderr de l'injecteur étaient
+  entièrement jetés.
+- **Constat** : les neuf cas de découverte du scope global documentés dans l'en-tête de
+  `test-inject-mcp-tools.sh` depuis la Phase 21 (`T23` à `T31`) n'ont jamais existé dans le code
+  de cette suite — fantômes, non restaurés par ce patch (hors périmètre, laissé à la revue de
+  Samuel).
+
+Décision citée : « D-Q3 — Willy, AskUserQuestion, session principale, 2026-09-24 » (« garder les
+deux déclarations »). Détail : `43-05-SUMMARY.md`.
+
 ## [v2.24.1] — 2026-09-25 (registre de citation et doctrine workstream-aware, Phase 41.1)
 
 **Patch** (durcissement et doctrine, pas une capacité neuve) :

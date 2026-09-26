@@ -1,0 +1,72 @@
+{
+  "nodes": [
+    {
+      "id": "merge-42",
+      "step": "integrer phase-42 par merge",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/BACKLOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "prep-43",
+      "step": "ROADMAP goal D-Q3 + exigences, erratum CONTEXT",
+      "stage": "",
+      "deps": [
+        "merge-42"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/ROADMAP.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-43",
+      "step": "FABR-06..10 au ledger + gsd-plan-phase 43 --ws gouvernance",
+      "stage": "",
+      "deps": [
+        "prep-43"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-43-fabrique-gate-des-skills-par-nature-et-alignement-de-skill-c",
+        ".planning/workstreams/gouvernance/REQUIREMENTS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-43",
+      "step": "plan-checker frais, deux juges",
+      "stage": "",
+      "deps": [
+        "plan-43"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "suivi-43",
+      "step": "ROADMAP+STATE a la main, gates --file",
+      "stage": "",
+      "deps": [
+        "plancheck-43"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/STATE.md",
+        ".planning/workstreams/gouvernance/ROADMAP.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "pr-43",
+      "step": "push + PR brouillon empilee sur phase-42",
+      "stage": "",
+      "deps": [
+        "suivi-43"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

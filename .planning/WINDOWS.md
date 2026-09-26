@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 3
 waived_count: 1
-fixed_count: 5
-total_count: 9
-last_updated: 2026-09-24T08:11:36.804Z
+fixed_count: 6
+total_count: 10
+last_updated: 2026-09-26T18:30:00.000Z
 ---
 
 # Broken Windows Ledger
@@ -24,6 +24,7 @@ last_updated: 2026-09-24T08:11:36.804Z
 | 7 | 41 | deviation | plugin/conductor/scripts/tests/test-check-description-fidelity.sh |  | 36 KO — module Python PyYAML introuvable pour python3 (passe A) sur ce poste — rouge préexistant, reproduit à l'identique sur une extraction git archive d'origin/main (6a7b15b), hors périmètre du plan 41-01, environnement d'exécution jamais modifié sans validation humaine (ADR-031) | open |  | 2026-09-23T12:29:54.478Z |  |
 | 8 | 41 | deviation | .planning/STATE.md |  | check-dev-bootstrap.sh (gate CI 'Gates workstream-aware...') rougit sur ce dépôt : le frontmatter de STATE.md dépasse la fenêtre de 60 lignes attendue par extract_frontmatter (délimiteur fermant à la ligne 61), lecture jugée illisible (D-04), assertion R1 non opposable (stdout vide des deux côtés) — rouge préexistant, reproduit à l'identique avant toute tâche du plan 41-02 (commit 5488993), hors périmètre du plan (CODEOWNERS + REQUIREMENTS.md), jamais neutralisé ni fixé sans validation humaine (ADR-031) | fixed | Cause réelle : régression de la branche feat/phase-41-volet-admin, pas de l'existant — le plan 41-01 avait porté last_activity_desc à 12 lignes, fermant le frontmatter ligne 61 (ligne 54 sur origin/main). Corrigé par l'orchestrateur le 2026-09-23 : détail déplacé dans ## Current Position, frontmatter fermé ligne 52 ; rejeu gates 14/14 vert, test-check-dev-bootstrap 35/35. | 2026-09-23T12:41:46.003Z | 2026-09-23T13:10:00.000Z |
 | 9 | 41 | deviation | .planning/workstreams/fiabilite/phases/VFDO-41-posture-de-protection-du-d-p-t/41-PREUVES.md |  | CO-VERDICT: ECART (plan 41-06) — mergeStateStatus=CLEAN et reviewDecision vide sur PR-P/#101, PR-BASELINE/#102, PR-SENTINELLE/#103 (attendu BLOCKED/REVIEW_REQUIRED) : explication initiale (contournement always de samuel-neveugall et picmakpro, D-02bis) contredite le 2026-09-24 : la #100 de samuel-neveugall est vue BLOCKED par picmakpro ; variable observée = auteur seul code owner, pas le contournement (lecture des mesures, non documentée par GitHub) — critère 2 du ROADMAP non tenu tel que formulé. CO-DECISION: option=accepter-et-documenter (Willy, AskUserQuestion session principale, 2026-09-24). PR-BASELINE/PR-SENTINELLE fermées au pas 0 de 41-07 ; PR-P gardée pour 41-08. | open |  | 2026-09-24T08:11:36.804Z |  |
+| 10 | 43 | deviation | README.md |  | Compteur « N suites » des 2 README racine reste à 89 alors que le réel est 90 (test-check-skills.sh créé par 43-01, commit c22e265, pas ajouté par 43-02/ac0147a) — reproduit et confirmé hors périmètre de 43-03 et 43-07, aucun files_modified de la Phase 43 ne portait les 2 README racine ; bloquait littéralement check-version-sync.sh sur le point 9 (compteur global), sans rapport avec les bumps de module vérifiés séparément | fixed | Corrigé par le commit "docs(readme): compteur de suites 89 → 90 (test-check-skills.sh, 43-01)" — décision du head sous délégation technique de Willy, session principale, 2026-09-26. | 2026-09-26T15:53:08.124Z | 2026-09-26T18:30:00.000Z |
 
 ````json
 [
@@ -137,6 +138,19 @@ last_updated: 2026-09-24T08:11:36.804Z
     "reason": "",
     "recorded_at": "2026-09-24T08:11:36.804Z",
     "resolved_at": null,
+    "milestone": null
+  },
+  {
+    "id": 10,
+    "kind": "deviation",
+    "phase": "43",
+    "file": "README.md",
+    "line": null,
+    "description": "Compteur « N suites » des 2 README racine reste à 89 alors que le réel est 90 (test-check-skills.sh créé par 43-01, commit c22e265, pas ajouté par 43-02/ac0147a) — reproduit et confirmé hors périmètre de 43-03 et 43-07, aucun files_modified de la Phase 43 ne portait les 2 README racine ; bloquait littéralement check-version-sync.sh sur le point 9 (compteur global), sans rapport avec les bumps de module vérifiés séparément",
+    "status": "fixed",
+    "reason": "Corrigé par le commit \"docs(readme): compteur de suites 89 → 90 (test-check-skills.sh, 43-01)\" — décision du head sous délégation technique de Willy, session principale, 2026-09-26.",
+    "recorded_at": "2026-09-26T15:53:08.124Z",
+    "resolved_at": "2026-09-26T18:30:00.000Z",
     "milestone": null
   }
 ]

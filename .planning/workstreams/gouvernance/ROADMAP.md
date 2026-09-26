@@ -66,16 +66,34 @@ Plans:
 
 ### Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator
 
-**Goal:** Chaque skill déclare sa nature (`vf-nature: referentiel | outil | procedure`, défaut « outil ») ; une procédure sans `ecrit:` ni rubrique de juge est refusée ; la dérive de forme procédurale non déclarée est détectée ; `skill-creator` demande la nature ; les deux conventions MCP concurrentes n'en font plus qu'une. Les trois marqueurs de détection de dérive (un gate bloquant, un livrable remis à un tiers, une couche de qualité) forment **un contrat unique** : l'initialisation les pose tels quels en questions factuelles (C-15), sans redéfinir la nature.
-**Requirements**: TBD (posés au cadrage)
+**Goal:** Chaque skill déclare sa nature (`vf-nature: referentiel | outil | procedure`, défaut « outil ») ; une procédure sans `ecrit:` ni rubrique de juge est refusée ; la dérive de forme procédurale non déclarée est détectée ; `skill-creator` demande la nature ; les deux déclarations MCP (`vf-mcp-consumer` / `vf-mcp-tools`) sont conservées comme réponses à deux besoins distincts (décision 1 d'ADR-051), la spec fabrique §1.2/§7.2 est amendée en ce sens et le mécanisme conservé est durci (grammaire de `vf-mcp-tools` validée, serveur nommé absent signalé, textes à une seule clé corrigés). Les trois marqueurs de détection de dérive (un gate bloquant, un livrable remis à un tiers, une couche de qualité) forment **un contrat unique** : l'initialisation les pose tels quels en questions factuelles (C-15), sans redéfinir la nature.
+**Requirements**: FABR-06, FABR-07, FABR-08, FABR-09, FABR-10
+**Exigences (2026-09-25)** : proposées par `43-CONTEXT.md` § Exigences proposées, gravées au ledger du compartiment à la planification.
+**Amendement du goal (2026-09-25)** : la clause d'origine « les deux conventions MCP concurrentes n'en font plus qu'une » est remplacée par la décision D-Q3 de `43-CONTEXT.md` — Willy, AskUserQuestion, session principale, 2026-09-24 : « garder les deux déclarations ». La fusion est écartée ; la spec est amendée, le mécanisme durci.
 **Depends on:** Phase 42 (le manifeste daté et la découverte récursive servent aussi ce gate).
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §6, §7.2, B-03. **C'est le contrôle machine qui manque à la décision D-07** du moteur (`docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §2, §9). `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-15, §5.2 (la case « trois marqueurs de B-03 » remplace « qui en répond »).
 **À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : budget des `SKILL.md` et du bootstrap sans enforcement machine — `.planning/BACKLOG.md:450` ; la phase touche les skills, elle le prend au passage.
-**Plans:** 0 plans
+**Plans:** 7/7 plans executed
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 43 to break down)
+- [x] 43-01-PLAN.md — vague 1 (tracer) : `check-skills.sh` lit le manifeste daté élargi à sept listes, découvre le corpus réel à ses trois profondeurs, refuse une procédure sans `ecrit:`/`vf-rubrique-juge` ; valeurs validées strictement ; parité de contrat avec `check-agents.sh` (FABR-06, FABR-09 clause manifeste)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 43-04-PLAN.md — vague 2 (après 43-01, seul propriétaire de la base de phase figée — révision du 2026-09-26) : plafond de 500 lignes des SKILL.md dans `check-instruction-budget.sh` ; bootstrap en ratchet sur le socle minimal (ligne de baseline `@bootstrap:socle` à la mesure du jour, ≈ 2 499 tokens pour un plafond ADR-029 de 2 000 qui reste un objectif, BACKLOG) — décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26 (FABR-09)
+- [x] 43-03-PLAN.md — vague 2 : `skill-creator` (moteur interne et workflow templaté) pose `vf-nature`, défaut « outil », distincte de la nature du sujet (FABR-08)
+- [x] 43-05-PLAN.md — vague 2 (tracer) : durcissements MCP — serveur nommé absent de l'union signalé jusqu'au journal d'installation, `vf-mcp-tools` malformée refusée à l'install et au gate, textes de l'installeur à deux déclarations, relecture Samuel (FABR-10)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 43-02-PLAN.md — vague 3 (après 43-03, révision du 2026-09-26) : dérive procédurale en écart déclaration/prose, dans les deux sens, en avertissement ; portée : tout le corps hors blocs de code, alerte à partir de deux marqueurs distincts en prose ou d'un seul dans un titre (décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26) ; corpus réel mesuré (10/21 au 2026-09-26), non corrigé (FABR-07)
+- [x] 43-07-PLAN.md — vague 3 : spec fabrique §1.2/§7.2 amendée (deux besoins distincts, fusion écartée, D-Q3), dev-orchestrator en patch — détaché de 43-05 à la révision du 2026-09-25 (FABR-10)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 43-06-PLAN.md — vague 4 : `vf-calibrate` à deux déclarations, conductor en mineure, rejeu complet (suites, corpus réel, G-1, G-2, labs frais), relevés de relecture et de résidus (FABR-06, FABR-07, FABR-09, FABR-10)
 
 ### Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque
 
