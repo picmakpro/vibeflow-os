@@ -25,7 +25,16 @@
 #         valeur → rc=1, aucun octet ESC brut dans la sortie
 #   MUT-S1/S2/S3 — invariant_procedure / valider_nature / valider_ecrit neutralisés → rc bascule
 #
-# La tâche suivante de 43-01 (parité de contrat T14-T21) étend cette suite dans son propre commit.
+# (43-01, Tâche 3 — parité de contrat avec check-agents.sh, TDD, T14 à T21, MUT-SD1/SD2) :
+#   T14 — découverte récursive à trois profondeurs, README/notes voisins ignorés
+#   T15 — exclusions *-references et dossiers cachés
+#   T16 — SKILL.md en lien symbolique refusé sans lecture, jeton hors arbre jamais reflété
+#   T17 — préfixe tiers (name: gsd-*) exclu du lint, compté à part ; --no-third-party-prefix relint
+#   T18 — CIBLE-ABSENTE / F13 (cible vide, --strict, --allow-empty, --skills-dir= vide)
+#   T19 — --hook : silence nominal, ligne compacte sur erreur/avertissement
+#   T20 — --file : conforme / violation / introuvable
+#   T21 — fraîcheur de champs_frontmatter_skills : périmée (avertissement), fraîche, absente
+#   MUT-SD1/SD2 — élagages de découverte neutralisés ; gardes du harnais MUT-SYNTAXE, MUT-REFUS-COMPTE
 
 set -uo pipefail
 
@@ -635,6 +644,222 @@ if make_gate_mutant S3 "errors.extend(valider_ecrit(rel, fm.get(\"ecrit\")))" "p
   else
     komut S3 "rc_mutant=0 (silence), rc_original=1 (T9 ../x)" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
   fi
+fi
+
+# ================================ Tâche 3 : T14 à T21, MUT-SD1/SD2 =================================
+
+# ---------- T14 — découverte récursive à trois profondeurs -----------------------------------------
+T14_DIR="$WORK/t14"; mkdir -p "$T14_DIR/a" "$T14_DIR/mod/skills/b" "$T14_DIR/c/sub/deep"
+cat > "$T14_DIR/SKILL.md" <<'EOF'
+---
+name: t14-racine
+description: Fixture T14 a la racine de --skills-dir (temoin MUT-SD1 — reste visible meme si
+  l'elagage des dossiers caches est neutralise, puisque le fichier de la racine n'exige aucune
+  descente pour etre decouvert).
+---
+Corps.
+EOF
+cat > "$T14_DIR/a/SKILL.md" <<'EOF'
+---
+name: t14-a
+description: Fixture T14 profondeur 1.
+---
+Corps.
+EOF
+cat > "$T14_DIR/mod/skills/b/SKILL.md" <<'EOF'
+---
+name: t14-b
+description: Fixture T14 profondeur 2.
+---
+Corps.
+EOF
+cat > "$T14_DIR/c/sub/deep/SKILL.md" <<'EOF'
+---
+name: t14-c-deep
+description: Fixture T14 profondeur 3, en violation.
+vf-nature: procedure
+---
+Corps.
+EOF
+echo "notes voisines" > "$T14_DIR/README.md"
+echo "notes voisines" > "$T14_DIR/c/sub/deep/notes.md"
+OUT="$(bash "$CHECK" --strict --skills-dir="$T14_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "c/sub/deep/SKILL.md" && ! echo "$OUT" | grep -q "README.md" && ! echo "$OUT" | grep -q "notes.md"; then
+  ok "T14 découverte à trois profondeurs, README/notes voisins ignorés, violation la plus profonde citée"
+else
+  ko "T14 (rc=$RC) : $OUT"
+fi
+
+# ---------- T15 — exclusions *-references et dossiers cachés ---------------------------------------
+T15_DIR="$WORK/t15"; mkdir -p "$T15_DIR/lab-references/x" "$T15_DIR/.cache/y" "$T15_DIR/conforme"
+cat > "$T15_DIR/lab-references/x/SKILL.md" <<'EOF'
+---
+name: t15-ref
+description: Fixture T15, dans un dossier -references, en violation.
+vf-nature: procedure
+---
+Corps.
+EOF
+cat > "$T15_DIR/.cache/y/SKILL.md" <<'EOF'
+---
+name: t15-cache
+description: Fixture T15, dans un dossier cache, en violation.
+vf-nature: procedure
+---
+Corps.
+EOF
+cat > "$T15_DIR/conforme/SKILL.md" <<'EOF'
+---
+name: t15-conforme
+description: Fixture T15, skill conforme.
+---
+Corps.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T15_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "lab-references" && ! echo "$OUT" | grep -q "\.cache"; then
+  ok "T15 exclusions *-references et dossiers cachés -> rc=0, aucun des deux cité"
+else
+  ko "T15 (rc=$RC) : $OUT"
+fi
+
+# ---------- T16 — SKILL.md en lien symbolique refusé sans lecture ----------------------------------
+T16_DIR="$WORK/t16"; mkdir -p "$T16_DIR/lien"
+JETON_T16="JETON-HORS-ARBRE-T16-$RANDOM"
+T16_HORS_ARBRE="$WORK/t16-hors-arbre.md"
+printf -- '---\nname: t16-hors-arbre\ndescription: %s\n---\nCorps.\n' "$JETON_T16" > "$T16_HORS_ARBRE"
+ln -s "$T16_HORS_ARBRE" "$T16_DIR/lien/SKILL.md"
+OUT_STDOUT="$(bash "$CHECK" --strict --skills-dir="$T16_DIR" 2>/tmp/t16-stderr-$$.txt)"; RC=$?
+OUT_STDERR="$(cat /tmp/t16-stderr-$$.txt)"; rm -f /tmp/t16-stderr-$$.txt
+if [ "$RC" -eq 1 ] && echo "$OUT_STDOUT$OUT_STDERR" | grep -q "lien symbolique refuse" && ! echo "$OUT_STDOUT$OUT_STDERR" | grep -q "$JETON_T16"; then
+  ok "T16 SKILL.md en lien symbolique -> rc=1 « lien symbolique refuse », jeton hors arbre jamais reflété"
+else
+  ko "T16 (rc=$RC) : $OUT_STDOUT$OUT_STDERR"
+fi
+
+# ---------- T17 — préfixe tiers exclu du lint, compté à part ---------------------------------------
+T17_DIR="$WORK/t17"; mkdir -p "$T17_DIR"
+cat > "$T17_DIR/SKILL.md" <<'EOF'
+---
+name: gsd-outil
+description: Fixture T17, skill tiers avec vf-nature invalide (ne doit jamais etre linte).
+vf-nature: bidon
+---
+Corps.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T17_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "1 skill(s) tiers non linte(s)"; then
+  ok "T17 skill tiers (name: gsd-outil) -> rc=0, « 1 skill(s) tiers non linte(s) »"
+else
+  ko "T17 (rc=$RC) : $OUT"
+fi
+OUT="$(bash "$CHECK" --strict --skills-dir="$T17_DIR" --no-third-party-prefix 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "T17 --no-third-party-prefix -> gsd-outil linté normalement -> rc=1" || ko "T17b (rc=$RC) : $OUT"
+
+# ---------- T18 — CIBLE-ABSENTE / F13 ---------------------------------------------------------------
+T18_ABSENT="$WORK/t18-absent-jamais-cree"
+OUT="$(bash "$CHECK" --skills-dir="$T18_ABSENT" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && echo "$OUT" | grep -q "CIBLE-ABSENTE" && ok "T18 cible absente -> rc=3, CIBLE-ABSENTE" || ko "T18a (rc=$RC) : $OUT"
+
+OUT="$(bash "$CHECK" --skills-dir="$T18_ABSENT" --hook 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "T18 cible absente + --hook -> rc=0, stdout vide" || ko "T18b (rc=$RC) : [$OUT]"
+
+T18_VIDE="$WORK/t18-vide"; mkdir -p "$T18_VIDE"
+OUT="$(bash "$CHECK" --skills-dir="$T18_VIDE" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "T18 cible présente vide -> rc=0" || ko "T18c (rc=$RC) : $OUT"
+
+OUT="$(bash "$CHECK" --strict --skills-dir="$T18_VIDE" 2>&1)"; RC=$?
+[ "$RC" -eq 3 ] && ok "T18 cible vide + --strict -> rc=3" || ko "T18d (rc=$RC) : $OUT"
+
+OUT="$(bash "$CHECK" --strict --allow-empty --skills-dir="$T18_VIDE" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "T18 cible vide + --strict --allow-empty -> rc=0" || ko "T18e (rc=$RC) : $OUT"
+
+RC=0; bash "$CHECK" "--skills-dir=" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 1 ] && ok "T18 --skills-dir= vide -> rc=1" || ko "T18f (rc=$RC)"
+
+# ---------- T19 — --hook -----------------------------------------------------------------------------
+OUT="$(bash "$CHECK" --hook --skills-dir="$T1_DIR" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -z "$OUT" ] && ok "T19 --hook sur corpus conforme -> rc=0, stdout vide" || ko "T19a (rc=$RC) : [$OUT]"
+
+OUT="$(bash "$CHECK" --hook --skills-dir="$T3_DIR" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && [ -n "$OUT" ] && ok "T19 --hook sur violation FABR-06 -> rc=0, ligne compacte d'erreur" || ko "T19b (rc=$RC) : [$OUT]"
+
+OUT="$(bash "$CHECK" --hook --skills-dir="$T12A_DIR" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "⚠" && ok "T19 --hook sur champ inconnu seul -> rc=0, ligne compacte « ⚠ »" || ko "T19c (rc=$RC) : [$OUT]"
+
+# ---------- T20 — --file --------------------------------------------------------------------------
+OUT="$(bash "$CHECK" --file "$T1_DIR/SKILL.md" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "T20 --file sur SKILL.md conforme -> rc=0" || ko "T20a (rc=$RC) : $OUT"
+
+OUT="$(bash "$CHECK" --file "$T3_DIR/SKILL.md" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && ok "T20 --file sur SKILL.md en violation -> rc=1" || ko "T20b (rc=$RC) : $OUT"
+
+OUT="$(bash "$CHECK" --file "$WORK/introuvable/SKILL.md" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "fichier introuvable" && ok "T20 --file sur chemin inexistant -> rc=1 « fichier introuvable »" || ko "T20c (rc=$RC) : $OUT"
+
+# ---------- T21 — fraîcheur de champs_frontmatter_skills --------------------------------------------
+T21_PERIME_DIR="$(mk_gate_dir "$WORK/t21-perime" 40)"
+OUT="$(bash "$T21_PERIME_DIR/check-skills.sh" --strict --skills-dir="$T1_DIR" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && echo "$OUT" | grep -q "MANIFESTE-PERIME" && ok "T21 septième liste périmée (40j) -> rc=0, ⚠ MANIFESTE-PERIME" || ko "T21a (rc=$RC) : $OUT"
+
+T21_FRAIS_DIR="$(mk_gate_dir "$WORK/t21-frais" 0)"
+OUT="$(bash "$T21_FRAIS_DIR/check-skills.sh" --strict --skills-dir="$T1_DIR" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "MANIFESTE-PERIME" && ok "T21 septième liste datée du jour -> rc=0, aucune ligne MANIFESTE-PERIME" || ko "T21b (rc=$RC) : $OUT"
+
+T21_ABSENT_DIR="$(mk_gate_dir "$WORK/t21-absent" 0 absent)"
+OUT="$(bash "$T21_ABSENT_DIR/check-skills.sh" --strict --skills-dir="$T1_DIR" 2>&1)"; RC=$?
+[ "$RC" -eq 1 ] && echo "$OUT" | grep -q "MANIFESTE-ILLISIBLE" && ok "T21 manifeste absent -> rc=1, MANIFESTE-ILLISIBLE" || ko "T21c (rc=$RC) : $OUT"
+OUT="$(bash "$T21_ABSENT_DIR/check-skills.sh" --strict --hook --skills-dir="$T1_DIR" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "T21 manifeste absent + --hook -> rc=0" || ko "T21d (rc=$RC) : $OUT"
+
+# ---------- MUT-SD1 — élagage des dossiers cachés neutralisé (vide TOUS les sous-dossiers) ----------
+if make_gate_mutant SD1 "dirnames[:] = [d for d in dirnames if not d.startswith('.')]" "dirnames[:] = []  # MUT-SD1"; then
+  M="$MUT_DIR/check-skills.sh"
+  OUT_MUT="$(bash "$M" --strict --skills-dir="$T14_DIR" 2>&1)"; RC_MUT=$?
+  OUT_ORIG="$(bash "$CHECK" --strict --skills-dir="$T14_DIR" 2>&1)"; RC_ORIG=$?
+  if [ "$RC_MUT" -eq 0 ] && [ "$RC_ORIG" -eq 1 ]; then
+    okmut SD1 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut SD1 "rc_mutant=0 (plus aucune descente), rc_original=1 (T14)" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
+  fi
+fi
+
+# ---------- MUT-SD2 — élagage des dossiers *-references neutralisé (pass) ---------------------------
+if make_gate_mutant SD2 "dirnames[:] = [d for d in dirnames if not d.endswith('-references')]" "pass  # MUT-SD2"; then
+  M="$MUT_DIR/check-skills.sh"
+  OUT_MUT="$(bash "$M" --strict --skills-dir="$T15_DIR" 2>&1)"; RC_MUT=$?
+  OUT_ORIG="$(bash "$CHECK" --strict --skills-dir="$T15_DIR" 2>&1)"; RC_ORIG=$?
+  if [ "$RC_MUT" -eq 1 ] && [ "$RC_ORIG" -eq 0 ] \
+     && echo "$OUT_MUT" | grep -q "lab-references/x/SKILL.md" && echo "$OUT_MUT" | grep -q "FABR-06" \
+     && ! echo "$OUT_ORIG" | grep -q "lab-references/x/SKILL.md"; then
+    okmut SD2 "$RC_MUT" 1 "$RC_ORIG" 0 "lab-references/x/SKILL.md en erreur FABR-06 sur le mutant, absent de l'original"
+  else
+    komut SD2 "rc_mutant=1 (lab-references/x/SKILL.md cité, FABR-06), rc_original=0 (T15)" "rc_mutant=1, rc_original=0" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
+  fi
+fi
+
+# ---------- MUT-SYNTAXE (garde du helper) : mutant Python invalide (parenthese non refermee) --------
+MUT_SYNTAXE_FILE="$WORK/mut-syntaxe-out.txt"
+( make_gate_mutant SYNTAXE "errors.extend(invariant_procedure(rel, fm))" "errors.extend(invariant_procedure(rel, fm"; echo "RC-HELPER=$?" ) > "$MUT_SYNTAXE_FILE" 2>&1
+if grep -q "^RC-HELPER=1$" "$MUT_SYNTAXE_FILE" && grep -q "NON TUE" "$MUT_SYNTAXE_FILE"; then
+  ok "MUT-SYNTAXE refuse : mutant Python invalide rejete par le helper"
+else
+  ko "MUT-SYNTAXE : le helper n'a pas refuse le mutant tronque"
+fi
+
+# ---------- MUT-REFUS-COMPTE (garde du harnais, I1) : un refus du helper compte KO --------------------
+MUT_REFUS_FILE="$WORK/mut-refus-compte-out.txt"
+(
+  BEFORE=$fail
+  make_gate_mutant REFUS "motif-absent-du-fichier-check-skills-XYZZY-jamais-present" "quelquechose"
+  RC=$?
+  AFTER=$fail
+  echo "DELTA-FAIL=$((AFTER - BEFORE))"
+  echo "RC-HELPER=$RC"
+) > "$MUT_REFUS_FILE" 2>&1
+if grep -q "^DELTA-FAIL=1$" "$MUT_REFUS_FILE" && grep -q "^RC-HELPER=1$" "$MUT_REFUS_FILE" && grep -q "NON TUE" "$MUT_REFUS_FILE"; then
+  ok "MUT-REFUS-COMPTE : refus du helper compte KO dans le shell appelant"
+else
+  ko "MUT-REFUS-COMPTE : $(cat "$MUT_REFUS_FILE" | tr '\n' ' ')"
 fi
 
 echo ""
