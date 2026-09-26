@@ -43,6 +43,9 @@ TARGET="$SCRIPT"
 # l'ancienne charte de densité).
 BORNE_AVERT=251
 PLAFOND=300
+# Plafond SKILL.md (43-04, FABR-09, D-Q4) — ADR-029 : skills ≤ 500 lignes, distinct du plafond
+# agent (300). Constante locale de la suite, jamais un littéral disperse dans les cas ci-dessous.
+PLAFOND_SKILL=500
 
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS+1)); }
@@ -498,6 +501,134 @@ has=0; case "$out" in *"plugin/demo/agents/a.md"*"MARGE"*) has=1 ;; esac
 if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "controle negatif B — baseline legitime tres grande (999999999) → reste OK/MARGE, rc 0, jamais un 2 de complaisance"; else ko "controle negatif B — baseline legitime tres grande (999999999) → reste OK/MARGE, rc 0, jamais un 2 de complaisance" "rc=0, verdict MARGE" "rc=$rc out=[$out]"; fi
 
 # ===================================================================================================
+# SKILL.md (43-04, FABR-09, D-Q4) — seconde découverte récursive et plafond de 500 lignes
+# (SKILL-1 à SKILL-6). Fixtures construites avec gen_lines (jamais un littéral de taille dispersé).
+# ===================================================================================================
+echo ""
+echo "== SKILL.md (43-04) =="
+
+# w_skill3_fixture <root> — module doc-only entierement exclu (1 SKILL.md), dossier *-references et
+# dossier cache elagues (2 SKILL.md supplementaires, aucun des trois jamais mesure). Reutilisee par
+# SKILL-3, MUT-9 et MUT-10.
+w_skill3_fixture() {
+  local d="$1"
+  std_agent "$d"
+  w_armed "$d"
+  printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$d"
+  mkdir -p "$d/plugin/doc/content/templates/skills/t"
+  w_lines "$d/plugin/doc/module.json" '{' '  "type": "doc-only"' '}'
+  gen_lines "$d/plugin/doc/content/templates/skills/t/SKILL.md" "$((PLAFOND_SKILL + 1))"
+  mkdir -p "$d/plugin/demo/skills/x-references/r" "$d/plugin/demo/.cache/s"
+  gen_lines "$d/plugin/demo/skills/x-references/r/SKILL.md" "$((PLAFOND_SKILL + 1))"
+  gen_lines "$d/plugin/demo/.cache/s/SKILL.md" "$((PLAFOND_SKILL + 1))"
+}
+
+# --- SKILL-1a : SKILL.md a PLAFOND_SKILL lignes exactement, fixture armee + baseline agent exacte -
+# --- → rc 0, ligne du fichier en verdict OK ---------------------------------------------------------
+D="$(mk_root skill1-ok)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s"
+gen_lines "$D/plugin/demo/skills/s/SKILL.md" "$PLAFOND_SKILL"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"plugin/demo/skills/s/SKILL.md | $PLAFOND_SKILL | $PLAFOND_SKILL | OK"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "SKILL-1a — SKILL.md a PLAFOND_SKILL lignes exactement → rc 0, verdict OK"; else ko "SKILL-1a — SKILL.md a PLAFOND_SKILL lignes exactement → rc 0, verdict OK" "rc=0, ligne SKILL OK" "rc=$rc out=[$out]"; fi
+
+# --- SKILL-1b : PLAFOND_SKILL+1 lignes, armee → rc 1, DEPASSEMENT-SKILL-ADR029 ---------------------
+D="$(mk_root skill1-depassement)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s"
+gen_lines "$D/plugin/demo/skills/s/SKILL.md" "$((PLAFOND_SKILL + 1))"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"plugin/demo/skills/s/SKILL.md"*"DEPASSEMENT-SKILL-ADR029"*) has=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "SKILL-1b — SKILL.md a PLAFOND_SKILL+1 lignes, armee → rc 1, DEPASSEMENT-SKILL-ADR029"; else ko "SKILL-1b — SKILL.md a PLAFOND_SKILL+1 lignes, armee → rc 1, DEPASSEMENT-SKILL-ADR029" "rc=1, DEPASSEMENT-SKILL-ADR029" "rc=$rc out=[$out]"; fi
+
+# --- SKILL-1c : meme fixture PLAFOND_SKILL+1, SANS sentinelle → rc 3, rapport imprime --------------
+D="$(mk_root skill1-non-arme)"
+std_agent "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s"
+gen_lines "$D/plugin/demo/skills/s/SKILL.md" "$((PLAFOND_SKILL + 1))"
+out="$(run "$D")"; rc=$?
+rows=$(printf '%s\n' "$out" | grep -c '^plugin/demo/skills/s/SKILL.md ')
+if [ "$rc" -eq 3 ] && [ "$rows" -eq 1 ]; then ok "SKILL-1c — meme fixture PLAFOND_SKILL+1 SANS sentinelle → rc 3, rapport imprime (1 ligne SKILL)"; else ko "SKILL-1c — meme fixture PLAFOND_SKILL+1 SANS sentinelle → rc 3, rapport imprime" "rc=3, 1 ligne SKILL" "rc=$rc rows=$rows out=[$out]"; fi
+
+# --- SKILL-2 : SKILL.md a la racine d'un module ET a trois niveaux de profondeur, tous deux ---------
+# --- mesures et en DEPASSEMENT-SKILL-ADR029 ---------------------------------------------------------
+D="$(mk_root skill2-profondeurs)"
+std_agent "$D"
+mkdir -p "$D/plugin/solo" "$D/plugin/demo/skills/profond/sous"
+gen_lines "$D/plugin/solo/SKILL.md" "$((PLAFOND_SKILL + 1))"
+gen_lines "$D/plugin/demo/skills/profond/sous/SKILL.md" "$((PLAFOND_SKILL + 1))"
+out="$(run "$D")"; rc=$?
+has1=0; case "$out" in *"plugin/solo/SKILL.md"*"DEPASSEMENT-SKILL-ADR029"*) has1=1 ;; esac
+has2=0; case "$out" in *"plugin/demo/skills/profond/sous/SKILL.md"*"DEPASSEMENT-SKILL-ADR029"*) has2=1 ;; esac
+if [ "$has1" -eq 1 ] && [ "$has2" -eq 1 ]; then
+  ok "SKILL-2 — SKILL.md a la racine d'un module et a trois niveaux de profondeur, tous deux mesures et en DEPASSEMENT-SKILL-ADR029"
+else
+  ko "SKILL-2 — trois profondeurs mesurees" "les deux chemins en DEPASSEMENT-SKILL-ADR029" "has1=$has1 has2=$has2 rc=$rc out=[$out]"
+fi
+
+# --- SKILL-3 : module doc-only entierement exclu, dossier *-references et dossier cache elagues ----
+D="$(mk_root skill3-exclusions)"
+w_skill3_fixture "$D"
+out="$(run "$D")"; rc=$?
+hasexcl=0; case "$out" in *"corpus skills decouvert : 0 SKILL.md (+ 1 exclu(s) sous un module doc-only)"*) hasexcl=1 ;; esac
+nodep=1; case "$out" in *"DEPASSEMENT-SKILL"*) nodep=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$hasexcl" -eq 1 ] && [ "$nodep" -eq 1 ]; then
+  ok "SKILL-3 — module doc-only entierement exclu (1), dossiers *-references et caches elagues → rc 0, aucun des trois SKILL.md mesure"
+else
+  ko "SKILL-3 — exclusions doc-only / -references / caches" "rc=0, corpus skills decouvert : 0 SKILL.md (+ 1 exclu(s)...), aucun DEPASSEMENT-SKILL" "rc=$rc out=[$out]"
+fi
+
+# --- SKILL-4a : SKILL.md au frontmatter jamais referme → rc 2, NON-VERIFIABLE, jamais ignore --------
+D="$(mk_root skill4-frontmatter-ouvert)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+w_lines "$D/plugin/demo/skills/s/SKILL.md" '---' 'name: s' 'Corps sans frontmatter jamais referme.'
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"plugin/demo/skills/s/SKILL.md"*"NON-VERIFIABLE"*) has=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$has" -eq 1 ]; then ok "SKILL-4a — SKILL.md au frontmatter jamais referme → rc 2, NON-VERIFIABLE, jamais ignore en silence"; else ko "SKILL-4a — frontmatter jamais referme" "rc=2, NON-VERIFIABLE" "rc=$rc out=[$out]"; fi
+
+# --- SKILL-4b : SKILL.md en lien symbolique → rc 2, NON-VERIFIABLE, jamais ignore -------------------
+D="$(mk_root skill4-symlink)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s" "$D/plugin/demo/elsewhere"
+w_lines "$D/plugin/demo/elsewhere/REAL.md" '---' 'name: s' '---' 'Contenu.'
+ln -s "../elsewhere/REAL.md" "$D/plugin/demo/skills/s/SKILL.md"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"plugin/demo/skills/s/SKILL.md"*"NON-VERIFIABLE"*) has=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$has" -eq 1 ]; then ok "SKILL-4b — SKILL.md en lien symbolique → rc 2, NON-VERIFIABLE, jamais ignore en silence"; else ko "SKILL-4b — lien symbolique" "rc=2, NON-VERIFIABLE" "rc=$rc out=[$out]"; fi
+
+# --- SKILL-5 : fixture sans aucun SKILL.md, ligne neutre ajoutee a l'agent (cas 2/7 de la CI) → -----
+# --- rc 0, LIGNES-EN-HAUSSE, aucune occurrence de DEPASSEMENT, corpus skills decouvert : 0 SKILL.md -
+D="$(mk_root skill5-sans-skill-ci-2-7)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t3\t1\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+hasl=0; case "$out" in *"LIGNES-EN-HAUSSE"*) hasl=1 ;; esac
+nodep=1; case "$out" in *"DEPASSEMENT"*) nodep=0 ;; esac
+hasc=0; case "$out" in *"corpus skills decouvert : 0 SKILL.md"*) hasc=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$hasl" -eq 1 ] && [ "$nodep" -eq 1 ] && [ "$hasc" -eq 1 ]; then
+  ok "SKILL-5 — fixture sans SKILL.md, ligne neutre ajoutee a l'agent (cas 2/7 CI) → rc 0, LIGNES-EN-HAUSSE, aucun DEPASSEMENT, corpus skills decouvert : 0 SKILL.md"
+else
+  ko "SKILL-5 — cas 2/7 CI sans SKILL.md" "rc=0, LIGNES-EN-HAUSSE, aucun DEPASSEMENT, corpus skills decouvert : 0 SKILL.md" "rc=$rc out=[$out]"
+fi
+
+# --- SKILL-6 : fixture sans SKILL.md et sans agent (repertoire vide, cas 7/7 de la CI) → rc 2 -------
+# --- inchange -----------------------------------------------------------------------------------
+D="$(mk_root skill6-vide)"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 2 ]; then ok "SKILL-6 — fixture sans SKILL.md et sans agent (repertoire vide) → rc 2 inchange"; else ko "SKILL-6 — repertoire vide" "rc=2" "rc=$rc out=[$out]"; fi
+
+# ===================================================================================================
 # Tâche 2 — quatre mutants vérifiés par cmp
 # ===================================================================================================
 echo ""
@@ -660,6 +791,70 @@ else
     ok "MUT-7 bord bas de la zone d'avertissement decale (cmp confirme la mutation, bash -n OK) : fixture BORNE_AVERT/BORNE_AVERT/0 perd (a tort) AVERTISSEMENT-ADR029 sur le mutant, le porte sur l'original"
   else
     ko "MUT-7 bord bas de la zone d'avertissement decale" "rc_mutant=0 rc_original=0, AVERTISSEMENT-ADR029 absent du mutant, present dans l'original" "rc_mutant=$rc_mut rc_original=$rc_orig av_mut=$av_mut av_orig=$av_orig"
+  fi
+fi
+
+# --- MUT-8 : neutralise la comparaison du plafond SKILL.md ("$lines" -gt "$VF_SKILL_LINE_CAP") ----
+MUT8_OLD='  if [ "$lines" -gt "$VF_SKILL_LINE_CAP" ]; then'
+MUT8_NEW='  if [ "0" = "1" ]; then'
+awk -v old="$MUT8_OLD" -v new="$MUT8_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut8-skill-plafond.sh"
+D="$(mk_root mut8)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s"
+gen_lines "$D/plugin/demo/skills/s/SKILL.md" "$((PLAFOND_SKILL + 1))"
+if cmp -s "$MUTD/mut8-skill-plafond.sh" "$SCRIPT"; then
+  ko "MUT-8 plafond SKILL.md neutralise" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut8-skill-plafond.sh" 2>/dev/null; then
+  ko "MUT-8 plafond SKILL.md neutralise" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut8-skill-plafond.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then
+    ok "MUT-8 plafond SKILL.md neutralise (cmp confirme la mutation, bash -n OK) : SKILL.md a PLAFOND_SKILL+1 lignes reste (a tort) VERT sur le mutant (rc=$rc_mut), ROUGE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-8 plafond SKILL.md neutralise" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-9 : neutralise la ligne d'exclusion doc-only (le module entier redevient scrute) ----------
+MUT9_OLD='  if [ -f "${d}module.json" ] && grep -Eq '"'"'"type"[[:space:]]*:[[:space:]]*"doc-only"'"'"' "${d}module.json" 2>/dev/null; then'
+MUT9_NEW='  if [ -f "${d}module.json" ] && grep -Eq '"'"'"type"[[:space:]]*:[[:space:]]*"mut9-neutralise"'"'"' "${d}module.json" 2>/dev/null; then'
+awk -v old="$MUT9_OLD" -v new="$MUT9_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut9-doc-only.sh"
+D="$(mk_root mut9)"
+w_skill3_fixture "$D"
+if cmp -s "$MUTD/mut9-doc-only.sh" "$SCRIPT"; then
+  ko "MUT-9 exclusion doc-only neutralisee" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut9-doc-only.sh" 2>/dev/null; then
+  ko "MUT-9 exclusion doc-only neutralisee" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut9-doc-only.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then
+    ok "MUT-9 exclusion doc-only neutralisee (cmp confirme la mutation, bash -n OK) : fixture SKILL-3 devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-9 exclusion doc-only neutralisee" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-10 : neutralise l'elagage des dossiers *-references (partie -references de SKILL-3) -------
+MUT10_OLD='  find "$d" '"'"'('"'"' -type d -name '"'"'.*'"'"' -prune '"'"')'"'"' -o '"'"'('"'"' -type d -name '"'"'*-references'"'"' -prune '"'"')'"'"' -o '"'"'('"'"' -type f -name SKILL.md -print '"'"')'"'"' -o '"'"'('"'"' -type l -name SKILL.md -print '"'"')'"'"' 2>/dev/null | while IFS= read -r f; do'
+MUT10_NEW='  find "$d" '"'"'('"'"' -type d -name '"'"'.*'"'"' -prune '"'"')'"'"' -o '"'"'('"'"' -type d -name '"'"'*-mut10-neutralise'"'"' -prune '"'"')'"'"' -o '"'"'('"'"' -type f -name SKILL.md -print '"'"')'"'"' -o '"'"'('"'"' -type l -name SKILL.md -print '"'"')'"'"' 2>/dev/null | while IFS= read -r f; do'
+awk -v old="$MUT10_OLD" -v new="$MUT10_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut10-references.sh"
+D="$(mk_root mut10)"
+w_skill3_fixture "$D"
+if cmp -s "$MUTD/mut10-references.sh" "$SCRIPT"; then
+  ko "MUT-10 elagage *-references neutralise" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut10-references.sh" 2>/dev/null; then
+  ko "MUT-10 elagage *-references neutralise" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut10-references.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then
+    ok "MUT-10 elagage *-references neutralise (cmp confirme la mutation, bash -n OK) : fixture SKILL-3 (partie -references) devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-10 elagage *-references neutralise" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
   fi
 fi
 

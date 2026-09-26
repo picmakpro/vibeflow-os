@@ -38,6 +38,21 @@
 # production (CI, hook, humain) les laisse absentes :
 #   VF_BUDGET_PLANNING_DIR   — redirige le dossier .planning (sentinelle + baseline)
 #   VF_BUDGET_BASELINE_FILE  — redirige le chemin du fichier de baselines
+#
+# SKILL.md (Phase 43, FABR-09, D-Q4). Seconde decouverte, INDEPENDANTE de celle des agents (D-03
+# inchangee) : recursive sous chaque module de plugin/*/, sauf un module ENTIEREMENT exclu quand
+# son module.json declare "type": "doc-only" (ses SKILL.md sont comptes dans une ligne d'exclusion,
+# jamais mesures) ; dossiers caches et *-references elagues (meme critere de pruning que
+# decouvrir_agents, check-agents.sh:291-316), aucun lien symbolique de DOSSIER suivi. Un SKILL.md
+# en lien symbolique n'est PAS exclu par la decouverte : il est retenu, puis rendu NON-VERIFIABLE a
+# la mesure (jamais ignore en silence, meme garde-fou que le frontmatter jamais referme). Plafond
+# ADR-029 : 500 lignes (fichier entier, meme mesure que les agents), lu depuis VF_SKILL_LINE_CAP —
+# jamais partage avec VF_BUDGET_LINE_CAP (300), les deux plafonds ont des sources et des valeurs
+# distinctes dans la charte. Aucun seuil d'avertissement pour les skills : ADR-029 n'en definit pas
+# (43-RESEARCH.md, Assumption A4) — un seuil invente introduirait une valeur non tracee. Aucun
+# ratchet d'instructions sur les SKILL.md : FABR-09 exige le refus au-dela de 500 lignes, pas une
+# baseline par fichier ; ajouter 21 lignes de baseline serait une hausse sans exigence (decision de
+# plan, 43-04-PLAN.md).
 set -uo pipefail
 
 ROOT="."
@@ -81,6 +96,10 @@ BASELINE="${VF_BUDGET_BASELINE_FILE:-$PLANNING_DIR/instruction-budget-baselines.
 VF_BUDGET_LINE_CAP=300
 VF_BUDGET_LINE_WARN_FROM=251
 
+# Plafond SKILL.md (Phase 43, FABR-09, D-Q4, ADR-029) : bloque au-dela de 500 lignes (fichier
+# entier), jamais compare a VF_BUDGET_LINE_CAP — deux corpus, deux plafonds.
+VF_SKILL_LINE_CAP=500
+
 # Marqueurs D-01, verses au gate tels quels, insensibles a la casse (tolower() cote awk).
 MARKER_RE='jamais|toujours|ne .* pas|doit|must|never|always|interdit|obligatoire'
 # Titres qui ROUVRENT le scope "puce imperative" — Claude's Discretion (D-01, forme mesuree).
@@ -111,6 +130,32 @@ if [ "$FOUND" -eq 0 ]; then
   echo "[check-instruction-budget] aucun fichier d'agent distribue decouvert — non verifiable" >&2
   exit 2
 fi
+
+# --- Decouverte SKILL.md, SECONDE et INDEPENDANTE (D-Q4, FABR-09) : recursive sous chaque ---------
+# --- plugin/*/, sauf un module ENTIEREMENT exclu (module.json "type": "doc-only", ses SKILL.md ----
+# --- comptes dans SKILL_EXCLUDED, jamais mesures) ; dossiers caches et *-references elagues, aucun -
+# --- lien symbolique de DOSSIER suivi (find sans -L). Un SKILL.md en lien symbolique n'est PAS ----
+# --- exclu ici : il est retenu, puis rendu NON-VERIFIABLE a la mesure plus bas. ---------------------
+SKILL_FILES_LIST="$TMPD/skill-files"
+: > "$SKILL_FILES_LIST"
+SKILL_EXCLUDED=0
+for d in "$ROOT"/plugin/*/; do
+  [ -d "$d" ] || continue
+  if [ -f "${d}module.json" ] && grep -Eq '"type"[[:space:]]*:[[:space:]]*"doc-only"' "${d}module.json" 2>/dev/null; then
+    n="$(find "$d" -name SKILL.md 2>/dev/null | awk 'END{print NR}')"
+    [ -n "$n" ] || n=0
+    SKILL_EXCLUDED=$((SKILL_EXCLUDED + n))
+    continue
+  fi
+  find "$d" '(' -type d -name '.*' -prune ')' -o '(' -type d -name '*-references' -prune ')' -o '(' -type f -name SKILL.md -print ')' -o '(' -type l -name SKILL.md -print ')' 2>/dev/null | while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    rel="${f#"$ROOT"/}"
+    printf '%s\n' "$rel" >> "$SKILL_FILES_LIST"
+  done
+done
+LC_ALL=C sort -u "$SKILL_FILES_LIST" -o "$SKILL_FILES_LIST"
+SKILL_FOUND=$(awk 'END{print NR}' "$SKILL_FILES_LIST" 2>/dev/null || echo 0)
+[ -n "$SKILL_FOUND" ] || SKILL_FOUND=0
 
 ARMED=0
 [ -f "$SENTINEL" ] && ARMED=1
@@ -347,6 +392,60 @@ while IFS= read -r rel; do
   printf '%s | %s | %s | %s | %s | %s\n' "$rel" "$lines" "$bl_lines" "$instr" "$bl_instr" "$verdict" >> "$REPORT"
 done < "$FILES_LIST"
 
+# --- Mesure + verdict des SKILL.md, meme ordre trie, plafond ADR-029 (500 lignes, D-Q4) : aucune ---
+# --- baseline requise pour les skills — FABR-09 exige le refus au-dela du plafond, pas un ratchet --
+# --- d'instructions par fichier (decision de plan). --------------------------------------------
+SKILL_REPORT="$TMPD/skill-report"
+: > "$SKILL_REPORT"
+
+SKILL_OVERRUN_COUNT=0
+SKILL_NONVERIF_COUNT=0
+
+while IFS= read -r rel; do
+  [ -n "$rel" ] || continue
+  f="$ROOT/$rel"
+
+  if [ -L "$f" ]; then
+    printf '%s | - | %s | NON-VERIFIABLE\n' "$rel" "$VF_SKILL_LINE_CAP" >> "$SKILL_REPORT"
+    echo "[check-instruction-budget] $rel : non verifiable — lien symbolique" >&2
+    SKILL_NONVERIF_COUNT=$((SKILL_NONVERIF_COUNT + 1))
+    continue
+  fi
+
+  if [ ! -r "$f" ]; then
+    printf '%s | - | %s | NON-VERIFIABLE\n' "$rel" "$VF_SKILL_LINE_CAP" >> "$SKILL_REPORT"
+    echo "[check-instruction-budget] $rel : non verifiable — illisible" >&2
+    SKILL_NONVERIF_COUNT=$((SKILL_NONVERIF_COUNT + 1))
+    continue
+  fi
+
+  fm_state="$(frontmatter_state "$f")"
+  if [ "$fm_state" = "open" ]; then
+    printf '%s | - | %s | NON-VERIFIABLE\n' "$rel" "$VF_SKILL_LINE_CAP" >> "$SKILL_REPORT"
+    echo "[check-instruction-budget] $rel : non verifiable — frontmatter jamais referme" >&2
+    SKILL_NONVERIF_COUNT=$((SKILL_NONVERIF_COUNT + 1))
+    continue
+  fi
+
+  lines="$(lines_count "$f")"
+  case "$lines" in
+    ''|*[!0-9]*)
+      printf '%s | - | %s | NON-VERIFIABLE\n' "$rel" "$VF_SKILL_LINE_CAP" >> "$SKILL_REPORT"
+      echo "[check-instruction-budget] $rel : non verifiable — comptage de lignes illisible" >&2
+      SKILL_NONVERIF_COUNT=$((SKILL_NONVERIF_COUNT + 1))
+      continue
+      ;;
+  esac
+
+  verdict="OK"
+  if [ "$lines" -gt "$VF_SKILL_LINE_CAP" ]; then
+    verdict="DEPASSEMENT-SKILL-ADR029"
+    SKILL_OVERRUN_COUNT=$((SKILL_OVERRUN_COUNT + 1))
+  fi
+
+  printf '%s | %s | %s | %s\n' "$rel" "$lines" "$VF_SKILL_LINE_CAP" "$verdict" >> "$SKILL_REPORT"
+done < "$SKILL_FILES_LIST"
+
 if [ "$ORPHAN_COUNT" -gt 0 ]; then
   while IFS= read -r orphan_path; do
     [ -n "$orphan_path" ] || continue
@@ -364,12 +463,22 @@ if [ "$ARMED" -eq 1 ]; then
   fi
 fi
 
+# --- SKILL_NONVERIF_COUNT rejoint la branche NON-VERIFIABLE (rc 2), SKILL_OVERRUN_COUNT rejoint ---
+# --- la branche depassement (rc 1 si arme) : aucun nouveau code de sortie (D-Q4, FABR-09). --------
+NONVERIF_ANY=0
+[ "$NONVERIF_COUNT" -gt 0 ] && NONVERIF_ANY=1
+[ "$SKILL_NONVERIF_COUNT" -gt 0 ] && NONVERIF_ANY=1
+
+OVERRUN_ANY=0
+[ "$OVERRUN_COUNT" -gt 0 ] && OVERRUN_ANY=1
+[ "$SKILL_OVERRUN_COUNT" -gt 0 ] && OVERRUN_ANY=1
+
 RC=0
-if [ "$NONVERIF_COUNT" -gt 0 ]; then
+if [ "$NONVERIF_ANY" -eq 1 ]; then
   RC=2
 elif [ "$ARMED" -eq 1 ] && [ "$BASELINE_CONTRACT_BAD" -eq 1 ]; then
   RC=2
-elif [ "$ARMED" -eq 1 ] && [ "$OVERRUN_COUNT" -gt 0 ]; then
+elif [ "$ARMED" -eq 1 ] && [ "$OVERRUN_ANY" -eq 1 ]; then
   RC=1
 elif [ "$ARMED" -eq 1 ]; then
   RC=0
@@ -390,5 +499,11 @@ printf 'FICHIER | LIGNES | BL-LIGNES | INSTR | BL-INSTR | VERDICT\n'
 cat "$REPORT"
 printf 'BILAN : %s fichier(s), %s depassement(s), %s avertissement(s) ADR-029, %s non verifiable(s), arme=%s, code=%s\n' \
   "$FOUND" "$OVERRUN_COUNT" "$WARN_COUNT" "$NONVERIF_COUNT" "$armed_label" "$RC"
+
+echo "[check-instruction-budget] corpus skills decouvert : $SKILL_FOUND SKILL.md (+ $SKILL_EXCLUDED exclu(s) sous un module doc-only)"
+printf 'SKILL | LIGNES | PLAFOND | VERDICT\n'
+cat "$SKILL_REPORT"
+printf 'BILAN-SKILLS : %s SKILL.md, %s depassement(s) du plafond %s, %s non verifiable(s), %s exclu(s)\n' \
+  "$SKILL_FOUND" "$SKILL_OVERRUN_COUNT" "$VF_SKILL_LINE_CAP" "$SKILL_NONVERIF_COUNT" "$SKILL_EXCLUDED"
 
 exit "$RC"
