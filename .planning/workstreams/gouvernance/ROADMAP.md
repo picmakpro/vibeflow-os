@@ -79,10 +79,10 @@ Plans:
 **Wave 1**
 
 - [ ] 43-01-PLAN.md — vague 1 (tracer) : `check-skills.sh` lit le manifeste daté élargi à sept listes, découvre le corpus réel à ses trois profondeurs, refuse une procédure sans `ecrit:`/`vf-rubrique-juge` ; valeurs validées strictement ; parité de contrat avec `check-agents.sh` (FABR-06, FABR-09 clause manifeste)
-- [ ] 43-04-PLAN.md — vague 1 (tracer + checkpoint) : plafond de 500 lignes des SKILL.md dans `check-instruction-budget.sh` ; checkpoint humain sur le corpus et le mode du bootstrap (socle mesuré ≈ 2 500 tokens pour un plafond de 2 000) avant toute hausse de baseline (FABR-09)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
+- [ ] 43-04-PLAN.md — vague 2 (après 43-01, seul propriétaire de la base de phase figée — révision du 2026-09-26) : plafond de 500 lignes des SKILL.md dans `check-instruction-budget.sh` ; checkpoint humain sur le corpus et le mode du bootstrap (socle mesuré ≈ 2 500 tokens pour un plafond de 2 000) avant toute hausse de baseline (FABR-09)
 - [ ] 43-03-PLAN.md — vague 2 : `skill-creator` (moteur interne et workflow templaté) pose `vf-nature`, défaut « outil », distincte de la nature du sujet (FABR-08)
 - [ ] 43-05-PLAN.md — vague 2 (tracer) : durcissements MCP — serveur nommé absent de l'union signalé jusqu'au journal d'installation, `vf-mcp-tools` malformée refusée à l'install et au gate, textes de l'installeur à deux déclarations, relecture Samuel (FABR-10)
 
