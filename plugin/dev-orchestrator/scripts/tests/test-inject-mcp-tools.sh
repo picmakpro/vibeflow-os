@@ -56,6 +56,16 @@
 #   T31 — --verify + --strict : conforme sur les tokens MCP attendus mais un serveur inconnu est
 #         cité ailleurs dans `tools:` → rc bascule 0 (sans --strict) → 1 (avec --strict).
 #
+# T23 à T31 : documentés ci-dessus en Phase 21, jamais présents dans le code de cette suite
+# (constat Phase 43, 2026-09-25, vérifié jusqu'au commit d89a60e) — relevé pour Samuel, non
+# restaurés ici.
+#
+# Durcissement WINDOWS #4 / union des scopes (Phase 43, FABR-10 b, D-Q3) :
+#   T32 — NON-RÉGRESSION : l'union scope projet ∪ scope global (déjà présente dans le code,
+#         inject-mcp-tools.sh l.245-259) reste opérante pendant que (b) réécrit les messages.
+#   T33 — Serveur cité absent des DEUX scopes : WARNING nommant « union » et les DEUX chemins de
+#         sources réellement consultées.
+#
 # Convention : asserts numérotés, helpers ok()/ko(), exit 0 si tout passe, 1 si ≥1 KO.
 # Calqué sur test-dev-orchestrator.sh.
 
@@ -349,13 +359,19 @@ else
   ko "T15 échec casse/orthographe (ligne=$line15)"
 fi
 
-# === T16 — Serveur nommé absent de la liste résolue : no-op, exit 0 ===========================
+# === T16 (durci, Phase 43 FABR-10 b, D-Q3) — Serveur nommé absent de l'union résolue : rc 0, ====
+# empreinte inchangée, mais le signal est désormais nommé sur stderr (WARNING, serveur cité,
+# source consultée) — plus un no-op muet.
 N16="$WORK/t16.md"; mk_named "$N16"; n16_before="$(md5of "$N16")"
-bash "$SCRIPT" --target "$N16" --servers "mobile-mcp" >/dev/null 2>&1; rc16=$?
-if [ "$rc16" -eq 0 ] && [ "$(md5of "$N16")" = "$n16_before" ]; then
-  ok "T16 serveur nommé absent du lab → no-op silencieux, exit 0"
+t16_out="$(bash "$SCRIPT" --target "$N16" --servers "mobile-mcp" 2>&1)"; rc16=$?
+if [ "$rc16" -eq 0 ] && [ "$(md5of "$N16")" = "$n16_before" ] && \
+   echo "$t16_out" | grep -q 'WARNING:' && \
+   echo "$t16_out" | grep -q 'XcodeBuildMCP' && \
+   echo "$t16_out" | grep -q 'liste --servers explicite' && \
+   ! echo "$t16_out" | grep -q 'silencieux'; then
+  ok "T16 serveur nommé absent de l'union → rc=0, empreinte inchangée, WARNING nommé (source, serveur), jamais un silence"
 else
-  ko "T16 échec (rc=$rc16)"
+  ko "T16 échec (rc=$rc16, sortie=[$t16_out])"
 fi
 
 # === T17 — Idempotence du mode nommé (2e run) ==================================================
@@ -468,7 +484,49 @@ else
   ko "T22b échec (rc=$rc22b)"
 fi
 
-# === T23 — Scope global SEUL (VF_CLAUDE_JSON), pas de .mcp.json ========================# === Bilan ===================================================================================
+# T23 à T31 : documentés en Phase 21, jamais présents dans le code de cette suite (constat
+# Phase 43, 2026-09-25) — relevé pour Samuel, non restaurés ici. Seuls T32 et T33 sont ajoutés
+# (43-05) pour juger (b) : l'union projet ∪ global existe déjà dans le code (Phase 21,
+# inject-mcp-tools.sh l.245-259), ce plan la TESTE, il ne la modifie pas.
+
+# === T32 (NON-RÉGRESSION, Phase 43 FABR-10 b) — union scope projet ∪ scope global : DÉJÀ ========
+# opérante avant toute écriture de ce plan (inject-mcp-tools.sh l.245-259) — ce cas la verrouille
+# pendant que (b) réécrit les messages de WINDOWS #4. Projet mobile-mcp, global XcodeBuildMCP.
+D32="$WORK/t32"; mkdir -p "$D32"
+N32="$D32/vf-reviewer.md"; mk_named "$N32"
+mk_mcp '{ "mcpServers": { "mobile-mcp": {} } }'
+T32_CLAUDE_JSON="$WORK/t32-claude.json"
+printf '%s\n' '{ "mcpServers": { "XcodeBuildMCP": {} } }' > "$T32_CLAUDE_JSON"
+t32_out="$(VF_CLAUDE_JSON="$T32_CLAUDE_JSON" bash "$SCRIPT" --target "$N32" --mcp-json "$WORK/.mcp.json" 2>&1)"; rc32=$?
+line32="$(toolsline "$N32")"
+if [ "$rc32" -eq 0 ] && echo "$line32" | grep -q 'mcp__XcodeBuildMCP__test_sim' && \
+   echo "$line32" | grep -q 'mcp__XcodeBuildMCP__build_sim' && \
+   echo "$line32" | grep -q 'mcp__XcodeBuildMCP__clean' && \
+   ! echo "$t32_out" | grep -q 'WARNING:'; then
+  ok "T32 (NON-RÉGRESSION) union scope projet ∪ scope global : serveur du scope global injecté, aucun WARNING"
+else
+  ko "T32 échec (rc=$rc32, ligne=$line32, sortie=[$t32_out])"
+fi
+
+# === T33 — Union scope projet ∪ scope global, serveur cité absent des DEUX : WARNING nommant =====
+# « union » et les DEUX chemins de sources (Phase 43, FABR-10 b).
+D33="$WORK/t33"; mkdir -p "$D33"
+N33="$D33/vf-reviewer.md"; mk_named "$N33"; n33_before="$(md5of "$N33")"
+mk_mcp '{ "mcpServers": { "mobile-mcp": {} } }'
+T33_CLAUDE_JSON="$WORK/t33-claude.json"
+printf '%s\n' '{ "mcpServers": { "context7": {} } }' > "$T33_CLAUDE_JSON"
+t33_out="$(VF_CLAUDE_JSON="$T33_CLAUDE_JSON" bash "$SCRIPT" --target "$N33" --mcp-json "$WORK/.mcp.json" 2>&1)"; rc33=$?
+if [ "$rc33" -eq 0 ] && [ "$(md5of "$N33")" = "$n33_before" ] && \
+   echo "$t33_out" | grep -q 'WARNING:' && \
+   echo "$t33_out" | grep -qi 'union' && \
+   echo "$t33_out" | grep -qF "$WORK/.mcp.json" && \
+   echo "$t33_out" | grep -qF "$T33_CLAUDE_JSON"; then
+  ok "T33 union scope projet ∪ scope global, serveur absent des DEUX : WARNING nommant union et les deux chemins de sources"
+else
+  ko "T33 échec (rc=$rc33, sortie=[$t33_out])"
+fi
+
+# === Bilan ===================================================================================
 echo ""
 echo "  Bilan : $pass OK, $fail KO"
 [ "$fail" -eq 0 ] || exit 1

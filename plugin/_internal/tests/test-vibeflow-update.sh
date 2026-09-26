@@ -2464,6 +2464,44 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T55 (Phase 43, FABR-10 b, plan 43-05, HOME temporaire) — serveur nommé absent de l'union
+# relayé jusqu'au journal d'installation : lab avec .mcp.json déclarant mobile-mcp (jamais
+# XcodeBuildMCP, le serveur cité par le vrai vf-reviewer.md du module), install de
+# dev-orchestrator sans filtre de sortie -> rc 0 (best-effort inchangé), journal contenant une
+# ligne WARNING qui cite vf-reviewer.md et XcodeBuildMCP, et .claude/agents/vf-coder.md
+# (vf-mcp-consumer: true) dont tools: porte mcp__mobile-mcp__*.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  printf '%s\n' '{ "mcpServers": { "mobile-mcp": {} } }' > "$LAB/.mcp.json"
+  T55_OUT="$(cd "$LAB" && HOME="$FAKE_HOME" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install dev-orchestrator 2>&1)"
+  T55_RC=$?
+  miss=0
+  [ "$T55_RC" -eq 0 ] || { ko "T55 : install rc=$T55_RC (attendu 0, best-effort) — $T55_OUT"; miss=1; }
+  echo "$T55_OUT" | grep -q 'WARNING:' \
+    || { ko "T55 : aucune ligne WARNING relayée dans le journal d'installation"; miss=1; }
+  echo "$T55_OUT" | grep 'WARNING:' | grep -q 'vf-reviewer.md' \
+    || { ko "T55 : WARNING ne cite pas vf-reviewer.md — $T55_OUT"; miss=1; }
+  echo "$T55_OUT" | grep 'WARNING:' | grep -q 'XcodeBuildMCP' \
+    || { ko "T55 : WARNING ne cite pas XcodeBuildMCP — $T55_OUT"; miss=1; }
+  if [ -f "$LAB/.claude/agents/vf-coder.md" ]; then
+    grep -q '^tools:.*mcp__mobile-mcp__\*' "$LAB/.claude/agents/vf-coder.md" \
+      || { ko "T55 : vf-coder.md ne porte pas mcp__mobile-mcp__* — $(grep '^tools:' "$LAB/.claude/agents/vf-coder.md")"; miss=1; }
+  else
+    ko "T55 : \$LAB/.claude/agents/vf-coder.md absent"; miss=1
+  fi
+  [ "$miss" -eq 0 ] \
+    && ok "T55 (HOME temporaire) : serveur nommé absent de l'union relayé au journal (vf-reviewer.md, XcodeBuildMCP), agent large injecté (mobile-mcp)"
+else
+  skip "T55 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude ET le vrai ~/.codex/agents/vibeflow sont inchangés
 # (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------

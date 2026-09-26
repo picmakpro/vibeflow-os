@@ -52,6 +52,10 @@
 # signalé (WARNING par défaut, ERROR bloquante en --strict — voir --strict plus bas) ; un serveur
 # CONNU peut encore porter des noms d'outils fantaisistes non détectés par ce script. La validation
 # des noms d'outils réels reste une recette humaine sur un lab équipé (WINDOWS #3, laissée ouverte).
+# Depuis la Phase 43 (FABR-10 b, D-Q3), ce WARNING n'est plus muet côté installation : la ligne
+# stderr est relayée par vibeflow-update.sh (inject_lab_mcp_into_agents) jusqu'au journal
+# d'installation — un serveur nommé absent de l'union des scopes n'est donc plus un silence de bout
+# en bout.
 #
 # Usage:
 #   inject-mcp-tools.sh --target <fichier|dossier> [options]
@@ -400,6 +404,13 @@ def unknown_server_refs(text, servers):
     return found
 
 unknown_found = False
+# Sources REELLEMENT consultees (Phase 43, FABR-10 b, D-Q3) : nommees dans le message plutot
+# qu un "sources decouvertes" generique — --servers explicite l emporte sur les deux sources
+# fichier (voir section 1), le message doit donc dire laquelle des deux formes a ete jugee.
+if servers_arg:
+    sources_desc = "liste --servers explicite"
+else:
+    sources_desc = "union scope projet %s ∪ scope global %s (ADR-051-B)" % (mcp_json, claude_json)
 for path in files:
     try:
         text = open(path, encoding="utf-8").read()
@@ -413,8 +424,7 @@ for path in files:
         continue
     for ctx, srv in unknown_server_refs(text, servers):
         unknown_found = True
-        msg = ("%s : serveur MCP '%s' (cite via %s) inconnu de toutes les sources decouvertes "
-               "(scope projet %s, scope global %s) — WINDOWS #4." % (base, srv, ctx, mcp_json, claude_json))
+        msg = ("%s : serveur MCP %s (cite via %s) inconnu de %s — WINDOWS #4." % (base, srv, ctx, sources_desc))
         if strict:
             errline(msg)
         else:
@@ -551,7 +561,8 @@ for path in files:
             continue
         file_want_tokens = named_tokens_for(text, servers)
         if not file_want_tokens:
-            logline("%s : serveur %s (vf-mcp-tools) absent du lab — no-op silencieux." % (base, req[0]))
+            logline("%s : rien injecte — serveur %s (vf-mcp-tools) absent des sources resolues "
+                    "(voir WARNING ci-dessus, durcissement b, D-Q3)." % (base, req[0]))
             continue
     else:
         file_want_tokens = want_tokens
