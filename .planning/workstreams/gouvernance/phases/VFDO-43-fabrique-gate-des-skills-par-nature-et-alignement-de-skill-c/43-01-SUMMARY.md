@@ -173,9 +173,17 @@ None au sens des Règles 1-3 (aucun bug, aucune fonctionnalité critique manquan
 - **Verification:** sur une copie jetable clonée depuis ce HEAD — ancienne commande sur HEAD (3 merges internes) : `MERGES-DANS-LA-PLAGE 3` ; nouvelle commande sur le même HEAD : `MERGES-DANS-LA-PLAGE 0`, rejouée sous `zsh` ET `bash` ; nouvelle commande après fabrication d'un merge amont jetable (branche forkée depuis `af0acb5`, parent de B43) : `MERGES-DANS-LA-PLAGE 1`, rejouée sous `zsh` ET `bash`. La règle « intégration amont par rebase uniquement » (43-01) reste inchangée — un merge de l'amont fait toujours rougir le témoin.
 - **Committed in:** commit de cette révision (voir `git log`)
 
+**4. [Correction hors plan, README racine] Compteur « N suites » porté à 90 sans qu'aucun plan de la Phase 43 ne porte les README racine**
+- **Found during:** second mandat ciblé, post-révision du témoin `MERGES-DANS-LA-PLAGE` (constat du manager : `bash scripts/check-version-sync.sh` rc=1)
+- **Issue:** la Tâche 1 de ce plan (commit `c22e265`) crée `plugin/conductor/scripts/tests/test-check-skills.sh`, portant le compte réel de suites de 89 (valeur à B43=22179fa, vérifiée par `git ls-tree -r --name-only 22179fa | grep -c '/tests/test-.*\.sh$'`) à 90 — sans qu'aucun `files_modified` de ce plan (ni d'aucun autre de la Phase 43) ne porte `README.md`/`README.fr.md` racine. `check-version-sync.sh` rouge depuis sur ce seul point ; deux attributions écrites ailleurs (43-03-SUMMARY.md, 43-07-SUMMARY.md, `deferred-items.md`, `WINDOWS.md` entrée 10) avaient à tort désigné le commit `ac0147a` (43-02) comme la cause — `ac0147a` ne fait qu'éditer un fichier déjà existant (103 lignes ajoutées à un fichier créé par `c22e265`), il ne l'ajoute pas
+- **Fix:** corrigé hors plan par un commit séparé, `README.md`/`README.fr.md` : « 89 suites » → « 90 suites », rien d'autre (ni bump, ni historique, ni badge). Attributions fausses corrigées à leur emplacement d'écriture (mention courte en place, cause réelle 43-01/`c22e265`)
+- **Files modified:** aucun dans ce plan-ci (le correctif README vit dans son propre commit, hors `files_modified` de 43-01)
+- **Verification:** `bash scripts/check-version-sync.sh` rejoué vert après le commit correctif (voir SUMMARY du mandat qui le porte)
+- **Committed in:** commit séparé « docs(readme): compteur de suites 89 → 90 (test-check-skills.sh, 43-01) », sur décision du head sous délégation technique de Willy, session principale, 2026-09-26
+
 ---
 
-**Total deviations:** 3 ajustements documentés, aucun auto-fix au sens des Règles 1-4 (aucun bug, aucune fonctionnalité manquante, aucun blocage, aucun changement architectural).
+**Total deviations:** 4 ajustements documentés, aucun auto-fix au sens des Règles 1-4 (aucun bug, aucune fonctionnalité manquante, aucun blocage, aucun changement architectural).
 **Impact on plan:** Aucun — le gate final, les 53 cas de `test-check-skills.sh` et les 177 cas de `test-check-agents.sh` (dont T107) sont conformes à toutes les `<acceptance_criteria>` des trois tâches, vérifiées ci-dessous.
 
 ## Issues Encountered

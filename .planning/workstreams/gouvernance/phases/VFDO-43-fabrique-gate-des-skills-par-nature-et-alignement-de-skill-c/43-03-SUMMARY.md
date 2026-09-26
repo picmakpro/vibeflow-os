@@ -80,7 +80,7 @@ coverage:
         ref: "bash scripts/check-version-sync.sh"
         status: fail
     human_judgment: true
-    rationale: "check-version-sync.sh sort rc=1 pour une cause SANS RAPPORT avec ce plan (compteur '89 suites' vs 90 réel dans README.md/README.fr.md racine, préexistant à la base du worktree, hors de files_modified de 43-03) — voir Deviations et deferred-items.md. Le bump de skill-creator lui-même est prouvé correct composant par composant."
+    rationale: "check-version-sync.sh sort rc=1 pour une cause SANS RAPPORT avec ce plan (compteur '89 suites' vs 90 réel dans README.md/README.fr.md racine, hors de files_modified de 43-03 [corrigé 2026-09-26 : cause réelle 43-01, c22e265 ; compte à B43 = 89]) — voir Deviations et deferred-items.md. Le bump de skill-creator lui-même est prouvé correct composant par composant."
 
 duration: ~25min (non chronométré précisément, timestamps de début non capturés)
 completed: 2026-09-26
@@ -135,7 +135,7 @@ Aucun auto-fix Rule 1-3 nécessaire — le code produit correspondait au plan d�
 
 **1. `scripts/check-version-sync.sh` échoue pour une cause sans rapport avec ce plan**
 - **Found during:** Tâche 2, troisième bloc `<automated>` du verify (comparaison de version)
-- **Issue:** `bash scripts/check-version-sync.sh` sort `rc=1` : `README.md`/`README.fr.md` (racine, hors `files_modified` de 43-03) affichent « 89 suites » alors que `find */tests/test-*.sh` en compte 90 réellement. Cette dérive est PRÉEXISTANTE à la base du worktree de ce plan (identique au commit `25a916b`, avant toute écriture de 43-03) — le script `check-version-sync.sh` lui-même est inchangé.
+- **Issue:** `bash scripts/check-version-sync.sh` sort `rc=1` : `README.md`/`README.fr.md` (racine, hors `files_modified` de 43-03) affichent « 89 suites » alors que `find */tests/test-*.sh` en compte 90 réellement. Cette dérive est déjà là au commit `25a916b` (avant toute écriture de 43-03) [corrigé 2026-09-26 : cause réelle 43-01, c22e265 ; compte à B43 = 89] — le script `check-version-sync.sh` lui-même est inchangé.
 - **Décision:** hors périmètre (SCOPE BOUNDARY) — corriger exigerait de toucher `README.md`/`README.fr.md` racine, absents de `files_modified` de ce plan, et sans rapport avec FABR-08/vf-nature. Non corrigé.
 - **Preuve que le bump skill-creator est correct malgré cet échec global :** vérification manuelle composant par composant (VERSION@B43=v1.0.4, attendu=v1.1.0, obtenu=v1.1.0 ; triade module.json/README/CHANGELOG alignée) — voir `deferred-items.md`.
 - **Files modified:** aucun (documentation seule)

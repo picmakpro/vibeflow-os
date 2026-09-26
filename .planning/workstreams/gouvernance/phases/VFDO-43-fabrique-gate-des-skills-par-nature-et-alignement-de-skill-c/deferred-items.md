@@ -33,6 +33,7 @@ CHANGELOG.md tête                                 = ## [v1.1.0] (alignée)
 **Action requise** : synchroniser le compteur de suites (90 réel) dans `README.md` et
 `README.fr.md` racine avant la prochaine release — hors du périmètre de ce plan, à traiter par
 un plan/commit séparé (mise à jour de doc, sans rapport avec FABR-08).
+[corrigé 2026-09-26 : voir section 43-07 ci-dessous]
 
 ## 43-07 : même dérive reproduite, confirmée hors périmètre de ce plan aussi
 
@@ -48,10 +49,13 @@ un plan/commit séparé (mise à jour de doc, sans rapport avec FABR-08).
 **Confirmation de la cause** : mesuré à `B43=22179fa50ad2c420ccdc6e3d7eb0fb6f0d054703` (base de
 phase figée) via `git ls-tree -r --name-only $B43 -- plugin scripts | grep -E '/tests/test-.*\.sh$'
 | wc -l` → **89**, exactement le compte que porte README.md/README.fr.md à cette base. La dérive
-naît donc À L'INTÉRIEUR de la Phase 43 elle-même : le commit `ac0147a` (43-02, Tâche 2, FABR-07)
+naît donc À L'INTÉRIEUR de la Phase 43 elle-même : le commit `c22e265` (43-01, Tâche 1, FABR-06 —
+pas `ac0147a`/43-02, qui ne fait qu'éditer ce fichier déjà existant [corrigé 2026-09-26])
 ajoute `plugin/conductor/scripts/tests/test-check-skills.sh`, portant le réel à 90 sans toucher les
-2 README racine — ni `43-02` ni `43-07` (ni `43-06`, mêmes contraintes de `files_modified`) ne
-portent ce fichier dans leur périmètre déclaré.
+2 README racine — ni `43-01` ni `43-02` ni `43-07` (ni `43-06`, mêmes contraintes de `files_modified`) ne
+portent les README racine dans leur périmètre déclaré. **Correctif** : compteur porté à 90 par le
+commit `docs(readme): compteur de suites 89 → 90 (test-check-skills.sh, 43-01)`, décision du head
+sous délégation technique de Willy, session principale, 2026-09-26.
 
 **Preuve que le bump de `dev-orchestrator` est correct malgré cet échec global** (mesuré
 composant par composant, cette session) :
@@ -67,6 +71,6 @@ check-version-sync.sh : triade par module OK, en-tête Version des README de mod
 le point 9 (compteur « N suites » des 2 README RACINE) rougit, sans rapport avec dev-orchestrator.
 ```
 
-**Action requise** : inchangée — synchroniser le compteur de suites (90 réel) dans `README.md` et
+**Action requise** : [corrigé 2026-09-26 : commit `docs(readme): compteur de suites 89 → 90 (test-check-skills.sh, 43-01)`, décision du head sous délégation technique de Willy, session principale, 2026-09-26 ; `check-version-sync.sh` vert sur ce point]. Ancienne action, conservée pour l'historique : synchroniser le compteur de suites (90 réel) dans `README.md` et
 `README.fr.md` racine avant la prochaine release, hors du périmètre de tout plan de cette phase
 (`files_modified` d'aucun des 43-02/43-06/43-07 ne porte les 2 README racine).
