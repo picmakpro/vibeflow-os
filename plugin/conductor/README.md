@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.43.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.44.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -84,30 +84,54 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   --hook` (**advisory**, Phase 32 : lecteur générique des marqueurs de santé du parc, silence
   nominal à 0 octet, une ligne si un garde s'est dégradé récemment).
 
-## Scripts (27) — par famille
+## Scripts (30) — par famille
 
-*(Compte re-dérivé au 2026-09-22 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
-'*.sh' | awk 'END{print NR}'` → 28, croisé par `git ls-files`. Il gagne `check-blueprints.sh`
-(+1, correctif de conformité des blueprints du 2026-09-22) au-dessus du compte 27 du 2026-09-15,
-lui-même issu de `check-instruction-budget.sh` (+1, Phase 25) et d'un écart préexistant
-de 5 scripts non répertoriés ci-dessous (`check-artifact-fidelity.sh`,
-`check-description-fidelity.sh`, `notify.sh`, `runtime-registry.sh`,
-`verify-runtime-reversibility.sh`), hors périmètre de cette correction — non catalogués ici faute
-de mandat pour le faire correctement.)*
+*(Compte re-dérivé au 2026-09-26 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
+'*.sh' | awk 'END{print NR}'` → 30, croisé par `git ls-files`. Il gagne `check-skills.sh` (+1,
+gate des skills par nature, FABR-06, Phase 43) au-dessus du compte 29 du 2026-09-22 (lui-même
+issu de `check-planning-consumers-registered.sh`, déjà présent à cette date mais non catalogué
+ci-dessous — hors périmètre de cette correction) et `check-blueprints.sh` (+1, correctif de
+conformité des blueprints du 2026-09-22) au-dessus du compte 27 du 2026-09-15, lui-même issu de
+`check-instruction-budget.sh` (+1, Phase 25) et d'un écart préexistant de 5 scripts non
+répertoriés ci-dessous (`check-artifact-fidelity.sh`, `check-description-fidelity.sh`,
+`notify.sh`, `runtime-registry.sh`, `verify-runtime-reversibility.sh`), hors périmètre de cette
+correction — non catalogués ici faute de mandat pour le faire correctement.)*
 
 **Gates machine (`check-*`)** :
 - `check-agents.sh` — lint de conformité native des agents (ADR-044) : frontmatter, champs requis,
   skills déclarés existants, `vf-internal`, et depuis la Phase 16 le contenu du champ
   `tools:`/`disallowedTools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`, noms d'outils,
   résolution graduée des noms d'agents avec préfixes tiers). Référentiel porté par un manifeste
-  daté (`check-agents-manifest.json`, même dossier que le script) : validité portée par le
-  manifeste lui-même, `--manifest-freshness=strict` réservé à la CI (Phase 42). Invariants de
-  doctrine I1, I2, I3, I4, I5, I6, I7 TOUJOURS armés en erreur, jamais affectés par `--strict`
+  daté (`check-agents-manifest.json`, même dossier que le script), désormais étendu à SEPT listes
+  natives (Phase 43, FABR-09 : `champs_frontmatter_skills` s'ajoute aux six listes de la Phase 42
+  — identifiants d'outils, champs de frontmatter d'agent, types d'agents natifs, modèles, modes de
+  permission, niveaux d'effort) : validité portée par le manifeste lui-même,
+  `--manifest-freshness=strict` réservé à la CI (Phase 42). Depuis la Phase 43 (FABR-10 a, D-Q3), le
+  gate valide aussi la grammaire du champ `vf-mcp-tools` (allowlist MCP nommée, syntaxe
+  `<serveur>:<outil1>,<outil2>,...`) — BLOQUANT dans tous les modes, jamais affecté par `--strict`,
+  même règle d'extraction que l'injecteur `inject-mcp-tools.sh` (parité gate/injecteur). Invariants
+  de doctrine I1, I2, I3, I4, I5, I6, I7 TOUJOURS armés en erreur, jamais affectés par `--strict`
   (I2/I3 actifs seulement sous `--resolve-agents=strict`, monde fermé de la CI) ; découverte des
   agents désormais RÉCURSIVE (sous-dossiers inclus, dossiers cachés et `*-references/` exclus).
   Il ne mesure ni lignes ni charge d'instructions (contrat réel `check-agents.sh:23-77`) : cette
   capacité est celle de `check-instruction-budget.sh`, entrée propre ci-dessous (D-05, corrigé
   Phase 25).
+- `check-skills.sh` — gate des skills par nature (Phase 43, FABR-06, FABR-09), miroir de
+  `check-agents.sh` : chaque `SKILL.md` déclare `vf-nature: referentiel | outil | procedure`
+  (défaut `outil` quand la clé est absente, jamais sur une valeur invalide) ; une `procedure` sans
+  `ecrit:` (périmètre d'écriture) NI `vf-rubrique-juge:` (rubrique de juge) est REFUSÉE (rc 1).
+  Détecte aussi la dérive déclaration/prose (FABR-07, D-Q5 : la Rubrique/Titre porte un marqueur
+  factuel — `vf-gate-bloquant`, `vf-livrable-tiers`, `vf-couche-qualite` — non déclaré, ou
+  l'inverse) : TOUJOURS un avertissement, jamais un refus, même sous `--strict`. Lit le MÊME
+  manifeste daté à sept listes que `check-agents.sh` (fraîcheur de la liste
+  `champs_frontmatter_skills` seule, avertissement uniquement). Contrat 0/1/3, mêmes options que
+  `check-agents.sh` (`--strict`, `--hook`, `--file`, `--skills-dir=`, `--third-party-prefix=`).
+  **N'est PAS câblé au `SessionStart` dans cette phase** — il est lancé par la CI (découverte des
+  suites de test + ses propres cas sur l'arbre réel) et par `skill-creator` (`--file`, à l'écriture
+  d'un `SKILL.md`) ; le câblage SessionStart/hook est différé à la mise en conformité du corpus
+  (26 avertissements de dérive mesurés sur 11/21 SKILL.md à la Phase 43, backlog `e36e6f2`) — tant
+  que le corpus n'est pas mis en conformité, câbler ce gate au démarrage de chaque session de
+  chaque lab porterait un avertissement permanent que l'utilisateur ne peut pas corriger.
 - `guard-agent-write.sh` — enforcement du gate ci-dessus à l'écriture (hook Write).
 - `check-debug-research.sh` — phase de recherche documentaire avant debug dans les briques de
   dépannage (ADR-045).
@@ -150,6 +174,14 @@ de mandat pour le faire correctement.)*
   (v1.37.1, plan 25-04) : 31 fichiers sous contrat, baselines gravées dans
   `.planning/instruction-budget-baselines.tsv` (3641 lignes, 487 instructions au total). Une
   baseline ne monte jamais sans arbitrage humain nommé avec canal et date ; elle descend librement.
+  Depuis la Phase 43 (FABR-09), le script mesure aussi une SECONDE découverte, celle des
+  `SKILL.md` distribués : plafond ADR-029 de 500 lignes (fichier entier, hors modules doc-only),
+  bloquant, aucun seuil d'avertissement — verdict `DEPASSEMENT-SKILL-ADR029`, ligne `BILAN-SKILLS`.
+  Et une métrique bootstrap (option ratchet-socle) : socle du bootstrap (fermeture de
+  `resolve-deps.sh conductor` + skill `installer` + commandes du plugin) borné par la ligne de
+  baseline `@bootstrap:socle` : toute hausse bloque (`DEPASSEMENT-BOOTSTRAP`) ; au-dessus du
+  plafond ADR-029 de 2000 tokens, `AU-DESSUS-PLAFOND-ADR029` est signalé sans bloquer (objectif).
+  décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26
 
 **Team-kernel** : `dag.sh` (plan de bataille persistant, frontière `ready`), `driver-lock.sh`
 (verrou de mission atomique par `mkdir`, battement séparé de la lease, verbes `takeover`/`reclaim`
@@ -164,12 +196,15 @@ SessionStart), `vf-update-run.sh` (re-matérialise les modules depuis le cache p
 ADR-042) et `generate-agent-commands.sh` (une commande slash d'incarnation par agent posé — saute
 les workers `vf-internal: true`, Pattern 12).
 
-**Tests** : 29 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
+**Tests** : 31 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
 `test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`, `test-check-divergence.sh`
 neuve en Phase 39, 17 cas dont 3 mutants — 10 cas à la livraison du plan 39-01, +7 le
-2026-09-14 pour couvrir la sortie `2` et la normalisation base 10, tuant 5 mutations survivantes). *(Compte re-dérivé au 2026-09-10 :
-`find plugin/conductor/scripts/tests -maxdepth 1 -type f -name 'test-*.sh' | wc -l` → 27 ; « 21
-suites » était déjà faux avant la Phase 39.)*
+2026-09-14 pour couvrir la sortie `2` et la normalisation base 10, tuant 5 mutations survivantes). *(Compte re-dérivé au 2026-09-26 :
+`find plugin/conductor/scripts/tests -maxdepth 1 -type f -name 'test-*.sh' | wc -l` → 31. Il gagne
+`test-check-skills.sh` (+1, Phase 43, FABR-06) au-dessus du compte 30 mesuré à la base de la
+Phase 43 (déjà 30 avant tout commit de cette phase, non catalogué ci-dessus — hors périmètre de
+cette correction), lui-même au-dessus du compte 27 re-dérivé le 2026-09-10 ; « 21 suites » était
+déjà faux avant la Phase 39.)*
 
 ## Contenu du module
 
@@ -182,7 +217,7 @@ conductor/
     vf-calibrate/SKILL.md          # propagation update + migration
     vf-update/SKILL.md             # mise à jour plugin + modules
     vf-notify/SKILL.md             # toggle notifications OS (opt-in, D-33-H)
-  scripts/                         # 28 scripts (familles ci-dessus) + tests/ (29 suites)
+  scripts/                         # 30 scripts (familles ci-dessus) + tests/ (31 suites)
   references/
     team-kernel.md                 # contrat du noyau d'équipe (manager/workers/juges)
     contracts.md                   # escalade sous-agents → conductor
