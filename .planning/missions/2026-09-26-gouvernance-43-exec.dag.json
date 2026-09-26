@@ -14,7 +14,7 @@
         "plugin/conductor/scripts/check-agents.sh",
         "plugin/conductor/scripts/tests/test-check-agents.sh"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-w2",
@@ -38,7 +38,7 @@
         "plugin/conductor/scripts/check-agents.sh",
         "plugin/conductor/scripts/tests/test-check-agents.sh"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-w3",
@@ -58,14 +58,16 @@
         "plugin/dev-orchestrator/README.md",
         "plugin/dev-orchestrator/CHANGELOG.md"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-w4",
       "step": "vague 4 : 43-06 + vérification de phase (gsd-verifier)",
       "stage": "",
       "deps": [
-        "exec-w3"
+        "exec-w3",
+        "rev-merges",
+        "fix-readme"
       ],
       "scope": [
         ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-06-*",
@@ -76,7 +78,7 @@
         "plugin/conductor/README.md",
         "plugin/conductor/CHANGELOG.md"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-43",
@@ -90,7 +92,7 @@
         "docs/**",
         ".planning/instruction-budget-baselines.tsv"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "audit-43",
@@ -102,7 +104,7 @@
       "scope": [
         "plugin/**"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "gates-43",
@@ -123,7 +125,7 @@
         "exec-w4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "pr-43",
@@ -135,6 +137,36 @@
       ],
       "scope": [],
       "status": "blocked"
+    },
+    {
+      "id": "rev-merges",
+      "step": "révision option A du témoin MERGES-DANS-LA-PLAGE (43-01, 43-06)",
+      "stage": "",
+      "deps": [
+        "exec-w3"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-01-PLAN.md",
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-06-PLAN.md",
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-01-SUMMARY.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-readme",
+      "step": "compteur 89→90 suites des README racine + attributions corrigées (option A)",
+      "stage": "",
+      "deps": [
+        "rev-merges"
+      ],
+      "scope": [
+        "README.md",
+        "README.fr.md",
+        ".planning/WINDOWS.md",
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-0[137]-SUMMARY.md",
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/deferred-items.md"
+      ],
+      "status": "done"
     }
   ]
 }
