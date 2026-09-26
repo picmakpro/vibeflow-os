@@ -1031,3 +1031,41 @@ ligne de baseline, et une baisse n'exige pas de citation.
 
 **Déclencheur de reprise :** exécution de la Phase 43 terminée (la ligne de baseline existe), ou
 tout ajout de skill au socle qui ferait rougir le ratchet.
+
+## FAUX VERT possible de `inject-mcp-tools.sh --verify` sur un dossier mixte — DIFFÉRÉ (2026-09-26)
+
+**Capturé :** 2026-09-26, correction ciblée des findings de revue de la Phase 43 (compartiment
+`gouvernance`, nœud 43-04/FABR-09). Décision : option B, « décision du head sous délégation
+technique de Willy, session principale, 2026-09-26 » — non corrigé dans ce mandat, hors périmètre
+déclaré (`plugin/dev-orchestrator/**` explicitement exclu).
+
+**Le défaut :** `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` l.505, la branche qui traite
+une valeur `vf-mcp-tools` malformée fait `continue` sans jamais appeler `indeterminate.append(base)`
+— à la différence de la branche « serveur absent du lab » juste en dessous (l.509-513), qui, elle,
+verse le fichier dans `indeterminate` avant de continuer. Un fichier dont la valeur est malformée
+sort donc du calcul de verdict global sans laisser de trace dans aucune des listes de comptage.
+
+**Scénario de reproduction :** un dossier contenant un agent avec une valeur `vf-mcp-tools`
+malformée et un second agent conforme ; `--verify` lancé sur ce dossier rend `rc=0` (« conforme »)
+sans que le fichier malformé ait jamais été comparé — son absence de `indeterminate.append` le
+rend invisible au bilan, alors qu'il aurait dû peser sur le verdict au même titre que le cas
+« serveur absent ».
+
+**Dépendance qui a motivé le report :** la règle 4 de `check-capability-activation.sh` lit ce mode
+`--verify` d'`inject-mcp-tools.sh` — c'est la raison pour laquelle 43-05 avait déjà laissé ce
+correctif hors mandat, et pourquoi ce mandat de correction ciblée (périmètre 43-04 uniquement) le
+laisse également hors de son propre périmètre.
+
+**Impact actuel :** aucun en production. `ensure-deps.sh`, le seul appelant connu, invoque
+`inject-mcp-tools.sh` fichier par fichier — jamais sur un dossier mixte — donc ce faux vert
+spécifique au mode dossier n'a pas de chemin d'appel réel aujourd'hui.
+
+**Les deux avis :** la revue de d7dc755 l'a classé « majeur » ; l'audit sécurité (SECURED) l'a
+classé « mineur ». L'écart entre les deux avis n'a pas été tranché ici — c'est au propriétaire de
+polarité de trancher au moment de la reprise.
+
+**Propriétaire à la relecture :** Samuel (polarité `dev-orchestrator`).
+
+**Déclencheur de reprise :** la prochaine évolution qui touche `inject-mcp-tools.sh` ou
+`check-capability-activation.sh`, ou un incident où un mode `--verify` en dossier mixte a rendu un
+verdict trompeur.
