@@ -73,7 +73,7 @@ Plans:
 **Depends on:** Phase 42 (le manifeste daté et la découverte récursive servent aussi ce gate).
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §6, §7.2, B-03. **C'est le contrôle machine qui manque à la décision D-07** du moteur (`docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §2, §9). `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-15, §5.2 (la case « trois marqueurs de B-03 » remplace « qui en répond »).
 **À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : budget des `SKILL.md` et du bootstrap sans enforcement machine — `.planning/BACKLOG.md:450` ; la phase touche les skills, elle le prend au passage.
-**Plans:** 6/7 plans executed
+**Plans:** 7/7 plans executed
 
 Plans:
 **Wave 1**
@@ -93,7 +93,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 43-06-PLAN.md — vague 4 : `vf-calibrate` à deux déclarations, conductor en mineure, rejeu complet (suites, corpus réel, G-1, G-2, labs frais), relevés de relecture et de résidus (FABR-06, FABR-07, FABR-09, FABR-10)
+- [x] 43-06-PLAN.md — vague 4 : `vf-calibrate` à deux déclarations, conductor en mineure, rejeu complet (suites, corpus réel, G-1, G-2, labs frais), relevés de relecture et de résidus (FABR-06, FABR-07, FABR-09, FABR-10)
 
 ### Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque
 
