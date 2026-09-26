@@ -159,3 +159,10 @@ None - no external service configuration required.
 ---
 *Phase: VFDO-43-fabrique-gate-des-skills-par-nature-et-alignement-de-skill-c*
 *Completed: 2026-09-26*
+
+## Self-Check: PASSED
+
+- Les 6 fichiers déclarés de `files_modified` sont présents sur disque (FOUND).
+- Le SUMMARY.md lui-même est présent sur disque (FOUND).
+- Les quatre commits (`38a99f8`, `92cc8c0`, `af2d305`, `4da55dd`) sont visibles dans `git log --oneline -5` sur la branche du worktree.
+- Aucun item manquant.
