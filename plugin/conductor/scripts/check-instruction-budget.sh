@@ -168,16 +168,29 @@ fi
 SKILL_FILES_LIST="$TMPD/skill-files"
 : > "$SKILL_FILES_LIST"
 SKILL_EXCLUDED=0
-# Correctif revue (43-04) : le code de sortie de `find` sur la partie NON doc-only est desormais
-# teste — un echec partiel (permission refusee sur un sous-dossier) rend le corpus SKILL
-# NON-VERIFIABLE (meme traitement que BOOTSTRAP_NONVERIF, rc 2), jamais un bilan "propre" avec un
-# compte simplement incomplet. `set -uo pipefail` (sans -e) rend `$?` apres le pipe fiable ici :
-# c'est le code de la derniere commande du pipe en echec (pipefail), le `while` en dernier maillon.
+# Correctif revue (43-04, tour 2 puis tour 3) : le code de sortie de `find` est desormais teste
+# aux DEUX sites d'appel de cette decouverte — la branche doc-only (l.180, comptage d'exclusion)
+# ET la branche de decouverte principale (l.192) — propriete de CLASSE, pas un correctif ad hoc
+# sur un seul find : aucun des deux ne peut echouer en silence. Un echec partiel (permission
+# refusee sur un sous-dossier) rend le corpus SKILL NON-VERIFIABLE (meme traitement que
+# BOOTSTRAP_NONVERIF, rc 2), jamais un bilan "propre" avec un compte simplement incomplet.
+# `set -uo pipefail` (sans -e) rend `$?` fiable dans les deux formes : apres un pipe direct
+# (`find | while ...; done`, le `while` en dernier maillon) et apres une affectation par
+# substitution de commande qui capture un pipe (`n="$(find | awk ...)"`) — verifie empiriquement
+# dans les deux cas, pipefail propage le code de la commande en echec du pipe jusqu'au `$?`
+# externe qui suit immediatement l'affectation.
 SKILL_FIND_FAILED=0
 for d in "$ROOT"/plugin/*/; do
   [ -d "$d" ] || continue
   if [ -f "${d}module.json" ] && grep -Eq '"type"[[:space:]]*:[[:space:]]*"doc-only"' "${d}module.json" 2>/dev/null; then
+    # Correctif revue, tour 3 (43-04) : ce find-la aussi doit voir son code de sortie teste —
+    # meme propriete de CLASSE que le find principal plus bas (l.185), pas un correctif ad hoc sur
+    # un seul site. Sous pipefail, "$?" juste apres l'affectation par substitution de commande
+    # porte le code de la commande en echec dans le pipe (verifie empiriquement), meme quand le
+    # pipe entier est capture par "n=$(...)".
     n="$(find "$d" -name SKILL.md 2>/dev/null | awk 'END{print NR}')"
+    docfind_rc=$?
+    [ "$docfind_rc" -eq 0 ] || SKILL_FIND_FAILED=1
     [ -n "$n" ] || n=0
     SKILL_EXCLUDED=$((SKILL_EXCLUDED + n))
     continue
@@ -550,9 +563,13 @@ if [ -f "$ROOT/plugin/conductor/module.json" ]; then
       if [ -f "$PLUGIN_JSON" ]; then
         SKILL_FIELD_MOD="$(grep -Eo '"skills"[[:space:]]*:[[:space:]]*"[^"]*"' "$PLUGIN_JSON" 2>/dev/null \
           | sed -E 's/.*"skills"[[:space:]]*:[[:space:]]*"\.?\/?([^"]*)".*/\1/')"
-        # Correctif revue (43-04) : un "/" final (ex. "./installer/") sortirait le module du
-        # calcul en silence — plugin/$mod/ ne matcherait jamais "plugin/installer//SKILL.md".
-        SKILL_FIELD_MOD="${SKILL_FIELD_MOD%/}"
+        # Correctif revue (43-04, tour 1 puis tour 3) : UN OU PLUSIEURS "/" finaux (ex.
+        # "./installer/", "./installer//") sortiraient le module du calcul en silence —
+        # plugin/$mod/ ne matcherait jamais "plugin/installer//SKILL.md". "${var%/}" ne retire
+        # qu'UNE seule occurrence ; boucle jusqu'a point fixe pour en retirer autant qu'il y en a.
+        while [ "$SKILL_FIELD_MOD" != "${SKILL_FIELD_MOD%/}" ]; do
+          SKILL_FIELD_MOD="${SKILL_FIELD_MOD%/}"
+        done
       fi
       SOCLE_MODULES="$TMPD/socle-modules"
       : > "$SOCLE_MODULES"

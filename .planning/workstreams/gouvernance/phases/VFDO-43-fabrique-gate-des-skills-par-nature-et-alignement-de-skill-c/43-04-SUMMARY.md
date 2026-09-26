@@ -214,6 +214,38 @@ Voir `key-decisions` en frontmatter : Q1 tranchée en amont (non rouverte), comm
 **Total deviations:** 1 auto-fixed (1 blocking)
 **Impact on plan:** Correction technique interne au harnais de test, sans effet sur le contrat public du gate (contrat de sortie, découverte, verdicts inchangés). Aucun élargissement de portée.
 
+## Note d'écart — correctifs post-revue (3 tours, mandats vf-coder ciblés)
+
+La revue sur `d7dc755` a rendu « correctifs requis » sur ce plan après sa clôture initiale. Trois
+mandats de correction CIBLÉE (aucun cadrage, aucune replanification) ont suivi, tous confinés au
+périmètre de ce plan (`check-instruction-budget.sh`, sa suite, `.planning/BACKLOG.md`) :
+
+- **Tour 1** (commits `bb23de7`, `a2201c1`) : trois findings — (1) [majeur] oracle de test
+  `boot_expected_bytes()` tautologique (copie littérale de `bootstrap_measure_file()` du script) ;
+  remplacé par une somme arithmétique de longueurs de chaînes littérales (`boot_line_bytes`,
+  `boot_expected_total`), indépendante du parseur ; nouveau mutant permanent `MUT-13` prouve la
+  discrimination (attendu 107 / obtenu 97 tokens sur le script muté, même sous-compte reproduit
+  par l'ancien oracle re-muté) ; (2) [majeur] code de sortie du `find` de découverte principale
+  (l.192 à ce jour) jamais testé — corrigé, corpus SKILL bascule en NON-VÉRIFIABLE (rc 2) sur
+  échec partiel ; (3) [mineur] `SKILL_FIELD_MOD` ne retirait pas un `/` final. Entrée BACKLOG
+  distincte pour le faux vert connu et non corrigé d'`inject-mcp-tools.sh --verify` (hors
+  périmètre `dev-orchestrator`, option B).
+- **Tour 3** (commit à suivre après cette note, HEAD `e5288f3` → au-delà) : la re-revue a clos les
+  findings 1 et 3 du tour 1 mais pas le 2 — incomplet : seul le `find` de la découverte principale
+  était instrumenté, pas celui de la branche doc-only (l.191, comptage `SKILL_EXCLUDED`), qui
+  partage exactement le même défaut de classe. Corrigé sur les DEUX sites d'appel de `find` du
+  script (liste exhaustive vérifiée : ce sont les deux seuls). Nouveau cas `SKILL-DISC-2` (chmod
+  000 sur un sous-dossier doc-only contenant un SKILL.md) : rouge avant (rc=0, « 0 exclu(s) »
+  silencieux — repro confirmée), vert après (rc=2, NON-VÉRIFIABLE). `${SKILL_FIELD_MOD%/}` ne
+  retirait qu'UNE occurrence de `/` final ; normalisé en boucle jusqu'à point fixe (cas `BOOT-7`,
+  `"./installer//"`). En-tête de section de la suite (l.665-668 à l'état du tour 1) corrigé —
+  nommait encore `boot_expected_bytes` (supprimée) et affirmait à tort « jamais recopiée en dur ».
+
+**Impact sur le plan :** aucun élargissement de portée — corrections internes au gate et à sa
+suite, contrat public (codes de sortie, verdicts, découverte) inchangé. Vérifié à chaque tour :
+rc du gate sur le dépôt réel inchangé (0 avant/après), `check-gate-touche.sh` et
+`check-baseline-arbitrage.sh` conformes.
+
 ## Issues Encountered
 
 None - au-delà de la déviation ci-dessus, résolue avant le premier commit.

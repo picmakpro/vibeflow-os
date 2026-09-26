@@ -662,10 +662,44 @@ else
   fi
 fi
 
+# --- SKILL-DISC-2 : meme propriete de CLASSE que SKILL-DISC-1, sur le SECOND site d'appel de -----
+# --- find — la branche doc-only (l.180-189, comptage d'exclusion). Repro du juge : un module -----
+# --- doc-only avec un sous-dossier chmod 000 CONTENANT un SKILL.md → avant le correctif tour 3, ---
+# --- ce find echouait en silence (rc reste 0, SKILL_EXCLUDED sous-compte, bilan "0 exclu(s)" au ---
+# --- lieu de signaler l'echec) ; apres, meme traitement que SKILL-DISC-1 → rc 2, NON-VERIFIABLE. --
+if [ "$(id -u)" -eq 0 ]; then
+  echo "  (ignore explicitement : suite executee en root, le cas find-echec (branche doc-only) sur permission n'est pas significatif — jamais compte vert)"
+else
+  D="$(mk_root skill-disc2-docfind-fail)"
+  std_agent "$D"
+  w_armed "$D"
+  printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+  mkdir -p "$D/plugin/doc/blocked"
+  w_lines "$D/plugin/doc/module.json" '{' '  "type": "doc-only"' '}'
+  w_lines "$D/plugin/doc/blocked/SKILL.md" '---' 'name: hidden-doc' '---' 'Contenu doc-only cache par permission.'
+  run_skill_disc2_docfind_fail() {
+    local blocked="$D/plugin/doc/blocked"
+    trap 'chmod 755 "$blocked" 2>/dev/null' RETURN
+    chmod 000 "$blocked"
+    run "$D"
+  }
+  out="$(run_skill_disc2_docfind_fail)"; rc=$?
+  restored=0; [ -x "$D/plugin/doc/blocked" ] && restored=1
+  has=0; case "$out" in *"decouverte SKILL.md"*"non verifiable"*"find a echoue"*) has=1 ;; esac
+  if [ "$rc" -eq 2 ] && [ "$has" -eq 1 ] && [ "$restored" -eq 1 ]; then
+    ok "SKILL-DISC-2 — find echoue (chmod 000) DANS LA BRANCHE DOC-ONLY (comptage d'exclusion) → rc 2, NON-VERIFIABLE, jamais un bilan 'propre' avec des exclusions sous-comptees, droits restaures par trap"
+  else
+    ko "SKILL-DISC-2 — find echoue dans la branche doc-only" "rc=2, message find non verifiable, droits restaures" "rc=$rc restored=$restored out=[$out]"
+  fi
+fi
+
 # ===================================================================================================
-# BOOTSTRAP (43-04, FABR-09, D-Q4, ratchet-socle) — BOOT-1 a BOOT-5. Calcul independant du script
-# (boot_expected_bytes, reimplementation propre a la suite, jamais un appel a la fonction du
-# script) : la definition unique se rejoue a l'execution, jamais recopiee en dur.
+# BOOTSTRAP (43-04, FABR-09, D-Q4, ratchet-socle) — BOOT-1 a BOOT-6. Oracle INDEPENDANT du script
+# (boot_line_bytes / boot_expected_total, voir juste en dessous) : somme arithmetique de longueurs
+# de chaines litterales connues a la construction de la fixture — pas une reimplementation du
+# parseur frontmatter/continuation du script (correctif revue 43-04, finding 1, tour 2 : l'ancien
+# boot_expected_bytes() etait justement une recopie de ce parseur, voir le commentaire ci-dessous).
+# BOOT-6 verifie en plus la normalisation du "/" final du champ "skills" de plugin.json.
 # ===================================================================================================
 echo ""
 echo "== BOOTSTRAP (43-04) =="
@@ -966,6 +1000,25 @@ if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then
   ok "BOOT-6 — plugin.json \"skills\" avec / final (./installer/) → normalise, installer compte comme sans / final ($EXPECTED_TOKENS tokens, 4 fichiers)"
 else
   ko "BOOT-6 — / final normalise" "rc=0, BOOTSTRAP : $EXPECTED_TOKENS tokens ... sur socle (4 fichiers)" "rc=$rc out=[$out]"
+fi
+
+# --- BOOT-7 : plugin.json "skills" porte DEUX "/" finaux ("./installer//") → "${var%/}" ne retire
+# --- qu'UNE seule occurrence, il en faut une boucle jusqu'a point fixe (correctif revue 43-04, ----
+# --- tour 3, mineur) — meme propriete que BOOT-6, sur un nombre different de "/" finaux -----------
+D="$(mk_root boot7-double-slash-final)"
+w_bootstrap_fixture "$D"
+w_lines "$D/plugin/.claude-plugin/plugin.json" '{' '  "skills": "./installer//"' '}'
+EXPECTED_BYTES="$(boot_expected_total)"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+gotline="$(printf '%s\n' "$out" | grep '^BOOTSTRAP :')"
+has=0; case "$gotline" in *"$EXPECTED_TOKENS tokens"*"sur socle (4 fichiers)"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then
+  ok "BOOT-7 — plugin.json \"skills\" avec DEUX / finaux (./installer//) → normalise jusqu'a point fixe, installer compte comme sans / final ($EXPECTED_TOKENS tokens, 4 fichiers)"
+else
+  ko "BOOT-7 — deux / finaux normalises" "rc=0, BOOTSTRAP : $EXPECTED_TOKENS tokens ... sur socle (4 fichiers)" "rc=$rc out=[$out]"
 fi
 
 # ===================================================================================================
