@@ -1,0 +1,140 @@
+{
+  "nodes": [
+    {
+      "id": "exec-w1",
+      "step": "vague 1 : 43-01 (base de phase, check-skills, manifeste)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-BASE-PHASE.md",
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-01-*",
+        "plugin/conductor/scripts/check-skills.sh",
+        "plugin/conductor/scripts/tests/test-check-skills.sh",
+        "plugin/conductor/scripts/check-agents-manifest.json",
+        "plugin/conductor/scripts/check-agents.sh",
+        "plugin/conductor/scripts/tests/test-check-agents.sh"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "exec-w2",
+      "step": "vague 2 : 43-03, 43-04, 43-05",
+      "stage": "",
+      "deps": [
+        "exec-w1"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-03-*",
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-04-*",
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-05-*",
+        "plugin/skill-creator/**",
+        "plugin/conductor/scripts/check-instruction-budget.sh",
+        "plugin/conductor/scripts/tests/test-check-instruction-budget.sh",
+        ".planning/instruction-budget-baselines.tsv",
+        "plugin/dev-orchestrator/scripts/inject-mcp-tools.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-inject-mcp-tools.sh",
+        "plugin/_internal/vibeflow-update.sh",
+        "plugin/_internal/tests/test-vibeflow-update.sh",
+        "plugin/conductor/scripts/check-agents.sh",
+        "plugin/conductor/scripts/tests/test-check-agents.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-w3",
+      "step": "vague 3 : 43-02, 43-07",
+      "stage": "",
+      "deps": [
+        "exec-w2"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-02-*",
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-07-*",
+        "plugin/conductor/scripts/check-skills.sh",
+        "plugin/conductor/scripts/tests/test-check-skills.sh",
+        "docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md",
+        "plugin/dev-orchestrator/VERSION",
+        "plugin/dev-orchestrator/module.json",
+        "plugin/dev-orchestrator/README.md",
+        "plugin/dev-orchestrator/CHANGELOG.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-w4",
+      "step": "vague 4 : 43-06 + vérification de phase (gsd-verifier)",
+      "stage": "",
+      "deps": [
+        "exec-w3"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-06-*",
+        ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-VERIFICATION.md",
+        "plugin/conductor/skills/vf-calibrate/SKILL.md",
+        "plugin/conductor/VERSION",
+        "plugin/conductor/module.json",
+        "plugin/conductor/README.md",
+        "plugin/conductor/CHANGELOG.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-43",
+      "step": "revue du diff complet de phase (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "exec-w4"
+      ],
+      "scope": [
+        "plugin/**",
+        "docs/**",
+        ".planning/instruction-budget-baselines.tsv"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-43",
+      "step": "audit sécurité gates + installeur (vf-auditer)",
+      "stage": "",
+      "deps": [
+        "exec-w4"
+      ],
+      "scope": [
+        "plugin/**"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "gates-43",
+      "step": "gates canoniques + non-régression complète (manager)",
+      "stage": "",
+      "deps": [
+        "revue-43",
+        "audit-43"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire (audit read-only)",
+      "stage": "",
+      "deps": [
+        "exec-w4"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-43",
+      "step": "suivi STATE/ROADMAP, push, PR #111",
+      "stage": "",
+      "deps": [
+        "gates-43",
+        "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
