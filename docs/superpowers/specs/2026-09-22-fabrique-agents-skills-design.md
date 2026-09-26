@@ -8,6 +8,7 @@
 > **Dépendance** : cette spec sert le moteur de planning métier
 > (`2026-09-22-moteur-planning-metier-design.md`). Le gate des skills (§6) **est** le contrôle
 > manquant de sa décision D-07 ; le hook par rôle (§5) **est** son gate G5.
+> **Amendement du 2026-09-26 (Phase 43, D-Q3)** : §1.2 et §7.2 corrigés — décision de Willy, AskUserQuestion, session principale, 2026-09-24 (« garder les deux déclarations ») ; la fusion prévue par §7.2 est écartée.
 
 ---
 
@@ -34,9 +35,14 @@ Les trois `BUNDLE.md` aggravent le premier défaut : ils répètent la liste inc
 - **`vf-test-orchestrator` n'a pas `vf-internal`** alors qu'aucun manager de son module ne le
   dispatche : il obtient donc une commande d'incarnation que les quatre autres orchestrateurs n'ont
   pas.
-- **Deux conventions MCP concurrentes** pour un même besoin : `vf-mcp-consumer` en booléen sur trois
-  agents, `vf-mcp-tools` en liste sur un seul — et ce seul est un agent de revue de code, pas un
-  consommateur Xcode.
+- **Deux déclarations MCP, deux besoins distincts** (décision 1 d'ADR-051 : produire ≠ vérifier) :
+  `vf-mcp-consumer: true` porte sur les quatre agents exécutants vf-app-fixer, vf-coder,
+  vf-test-orchestrator et vf-test-runner, qui PRODUISENT un verdict de compilation et reçoivent
+  tous les serveurs déclarés par le lab (moindre privilège large, dérivé du lab) ; `vf-mcp-tools`
+  porte sur vf-reviewer, consommateur Xcode (`XcodeBuildMCP:test_sim,build_sim,clean`), qui VÉRIFIE
+  un verdict et ne reçoit que les outils nommés (moindre privilège étroit). Ce qui tenait par
+  discipline : une valeur `vf-mcp-tools` malformée et un serveur nommé absent passaient en silence —
+  durcis en Phase 43 (FABR-10).
 - **La découverte des agents n'est pas récursive** : un sous-dossier rendrait le gate vert sur un
   corpus partiellement invisible.
 
@@ -173,13 +179,21 @@ Il débloque `/vf-new-lab` aujourd'hui. Mais il ne se livre **jamais seul** : il
 cas de test qui extrait le frontmatter cible d'un blueprint et le soumet au gate. Corriger les neuf
 instances sans fermer la classe garantit leur retour.
 
-### 7.2 MCP reste sur le mécanisme maison, unifié
+### 7.2 MCP reste sur le mécanisme maison, à deux déclarations
 
 `mcpServers:` est un champ officiel, mais **ignoré pour les sous-agents de plugin**. Le mécanisme
 maison ne fonctionne que parce que l'installeur copie les agents en portée projet ; basculer au natif
-créerait une dépendance à un mode de distribution qui n'est pas celui du plugin. En revanche les
-**deux conventions concurrentes fusionnent** en une seule — deux mécanismes pour un besoin sont la
-moitié d'une dérive.
+créerait une dépendance à un mode de distribution qui n'est pas celui du plugin. Les deux
+déclarations sont conservées : `vf-mcp-consumer` et `vf-mcp-tools` répondent aux deux besoins
+distincts de la décision 1 d'ADR-051 (produire un verdict de compilation, ce n'est pas le vérifier),
+décision de Willy, AskUserQuestion, session principale, 2026-09-24 : « garder les deux déclarations ».
+Trois durcissements sont posés en Phase 43 sur ce mécanisme conservé, d'après ce que 43-05 a
+réellement livré : la grammaire de `vf-mcp-tools` est désormais validée à l'identique par le gate des
+agents et par l'injecteur (une valeur malformée est refusée des deux côtés, plus jamais un no-op
+muet) ; un serveur MCP nommé absent de l'union des scopes projet et global est signalé jusqu'au
+journal d'installation au lieu d'un silence ; les textes de `vibeflow-update.sh` et de
+`vf-calibrate/SKILL.md` qui ne nommaient que `vf-mcp-consumer` nomment désormais les deux
+déclarations.
 
 ### 7.3 La nomenclature des prompts est doctrine, pas gate
 
