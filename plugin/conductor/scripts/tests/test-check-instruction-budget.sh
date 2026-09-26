@@ -36,6 +36,9 @@ set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-instruction-budget.sh"
 TARGET="$SCRIPT"
+# Racine du depot reel (43-04, BOOT-1..5) — pour copier plugin/_internal/resolve-deps.sh dans les
+# fixtures synthetiques du bootstrap : le resolveur canonique, jamais un second parseur de requires.
+REPO_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 
 # Constantes locales de la suite (Phase 40.1) — TOUTES les tailles de fixture de bord se dérivent
 # de ces deux valeurs, jamais d'un littéral de l'ancien plafond (constat B1 du checker, révision
@@ -43,6 +46,9 @@ TARGET="$SCRIPT"
 # l'ancienne charte de densité).
 BORNE_AVERT=251
 PLAFOND=300
+# Plafond SKILL.md (43-04, FABR-09, D-Q4) — ADR-029 : skills ≤ 500 lignes, distinct du plafond
+# agent (300). Constante locale de la suite, jamais un littéral disperse dans les cas ci-dessous.
+PLAFOND_SKILL=500
 
 PASS=0; FAIL=0
 ok() { echo "  ✓ $1"; PASS=$((PASS+1)); }
@@ -498,6 +504,402 @@ has=0; case "$out" in *"plugin/demo/agents/a.md"*"MARGE"*) has=1 ;; esac
 if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "controle negatif B — baseline legitime tres grande (999999999) → reste OK/MARGE, rc 0, jamais un 2 de complaisance"; else ko "controle negatif B — baseline legitime tres grande (999999999) → reste OK/MARGE, rc 0, jamais un 2 de complaisance" "rc=0, verdict MARGE" "rc=$rc out=[$out]"; fi
 
 # ===================================================================================================
+# SKILL.md (43-04, FABR-09, D-Q4) — seconde découverte récursive et plafond de 500 lignes
+# (SKILL-1 à SKILL-6). Fixtures construites avec gen_lines (jamais un littéral de taille dispersé).
+# ===================================================================================================
+echo ""
+echo "== SKILL.md (43-04) =="
+
+# w_skill3_fixture <root> — module doc-only entierement exclu (1 SKILL.md), dossier *-references et
+# dossier cache elagues (2 SKILL.md supplementaires, aucun des trois jamais mesure). Reutilisee par
+# SKILL-3, MUT-9 et MUT-10.
+w_skill3_fixture() {
+  local d="$1"
+  std_agent "$d"
+  w_armed "$d"
+  printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$d"
+  mkdir -p "$d/plugin/doc/content/templates/skills/t"
+  w_lines "$d/plugin/doc/module.json" '{' '  "type": "doc-only"' '}'
+  gen_lines "$d/plugin/doc/content/templates/skills/t/SKILL.md" "$((PLAFOND_SKILL + 1))"
+  mkdir -p "$d/plugin/demo/skills/x-references/r" "$d/plugin/demo/.cache/s"
+  gen_lines "$d/plugin/demo/skills/x-references/r/SKILL.md" "$((PLAFOND_SKILL + 1))"
+  gen_lines "$d/plugin/demo/.cache/s/SKILL.md" "$((PLAFOND_SKILL + 1))"
+}
+
+# --- SKILL-1a : SKILL.md a PLAFOND_SKILL lignes exactement, fixture armee + baseline agent exacte -
+# --- → rc 0, ligne du fichier en verdict OK ---------------------------------------------------------
+D="$(mk_root skill1-ok)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s"
+gen_lines "$D/plugin/demo/skills/s/SKILL.md" "$PLAFOND_SKILL"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"plugin/demo/skills/s/SKILL.md | $PLAFOND_SKILL | $PLAFOND_SKILL | OK"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "SKILL-1a — SKILL.md a PLAFOND_SKILL lignes exactement → rc 0, verdict OK"; else ko "SKILL-1a — SKILL.md a PLAFOND_SKILL lignes exactement → rc 0, verdict OK" "rc=0, ligne SKILL OK" "rc=$rc out=[$out]"; fi
+
+# --- SKILL-1b : PLAFOND_SKILL+1 lignes, armee → rc 1, DEPASSEMENT-SKILL-ADR029 ---------------------
+D="$(mk_root skill1-depassement)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s"
+gen_lines "$D/plugin/demo/skills/s/SKILL.md" "$((PLAFOND_SKILL + 1))"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"plugin/demo/skills/s/SKILL.md"*"DEPASSEMENT-SKILL-ADR029"*) has=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "SKILL-1b — SKILL.md a PLAFOND_SKILL+1 lignes, armee → rc 1, DEPASSEMENT-SKILL-ADR029"; else ko "SKILL-1b — SKILL.md a PLAFOND_SKILL+1 lignes, armee → rc 1, DEPASSEMENT-SKILL-ADR029" "rc=1, DEPASSEMENT-SKILL-ADR029" "rc=$rc out=[$out]"; fi
+
+# --- SKILL-1c : meme fixture PLAFOND_SKILL+1, SANS sentinelle → rc 3, rapport imprime --------------
+D="$(mk_root skill1-non-arme)"
+std_agent "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s"
+gen_lines "$D/plugin/demo/skills/s/SKILL.md" "$((PLAFOND_SKILL + 1))"
+out="$(run "$D")"; rc=$?
+rows=$(printf '%s\n' "$out" | grep -c '^plugin/demo/skills/s/SKILL.md ')
+if [ "$rc" -eq 3 ] && [ "$rows" -eq 1 ]; then ok "SKILL-1c — meme fixture PLAFOND_SKILL+1 SANS sentinelle → rc 3, rapport imprime (1 ligne SKILL)"; else ko "SKILL-1c — meme fixture PLAFOND_SKILL+1 SANS sentinelle → rc 3, rapport imprime" "rc=3, 1 ligne SKILL" "rc=$rc rows=$rows out=[$out]"; fi
+
+# --- SKILL-2 : SKILL.md a la racine d'un module ET a trois niveaux de profondeur, tous deux ---------
+# --- mesures et en DEPASSEMENT-SKILL-ADR029 ---------------------------------------------------------
+D="$(mk_root skill2-profondeurs)"
+std_agent "$D"
+mkdir -p "$D/plugin/solo" "$D/plugin/demo/skills/profond/sous"
+gen_lines "$D/plugin/solo/SKILL.md" "$((PLAFOND_SKILL + 1))"
+gen_lines "$D/plugin/demo/skills/profond/sous/SKILL.md" "$((PLAFOND_SKILL + 1))"
+out="$(run "$D")"; rc=$?
+has1=0; case "$out" in *"plugin/solo/SKILL.md"*"DEPASSEMENT-SKILL-ADR029"*) has1=1 ;; esac
+has2=0; case "$out" in *"plugin/demo/skills/profond/sous/SKILL.md"*"DEPASSEMENT-SKILL-ADR029"*) has2=1 ;; esac
+if [ "$has1" -eq 1 ] && [ "$has2" -eq 1 ]; then
+  ok "SKILL-2 — SKILL.md a la racine d'un module et a trois niveaux de profondeur, tous deux mesures et en DEPASSEMENT-SKILL-ADR029"
+else
+  ko "SKILL-2 — trois profondeurs mesurees" "les deux chemins en DEPASSEMENT-SKILL-ADR029" "has1=$has1 has2=$has2 rc=$rc out=[$out]"
+fi
+
+# --- SKILL-3 : module doc-only entierement exclu, dossier *-references et dossier cache elagues ----
+D="$(mk_root skill3-exclusions)"
+w_skill3_fixture "$D"
+out="$(run "$D")"; rc=$?
+hasexcl=0; case "$out" in *"corpus skills decouvert : 0 SKILL.md (+ 1 exclu(s) sous un module doc-only)"*) hasexcl=1 ;; esac
+nodep=1; case "$out" in *"DEPASSEMENT-SKILL"*) nodep=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$hasexcl" -eq 1 ] && [ "$nodep" -eq 1 ]; then
+  ok "SKILL-3 — module doc-only entierement exclu (1), dossiers *-references et caches elagues → rc 0, aucun des trois SKILL.md mesure"
+else
+  ko "SKILL-3 — exclusions doc-only / -references / caches" "rc=0, corpus skills decouvert : 0 SKILL.md (+ 1 exclu(s)...), aucun DEPASSEMENT-SKILL" "rc=$rc out=[$out]"
+fi
+
+# --- SKILL-4a : SKILL.md au frontmatter jamais referme → rc 2, NON-VERIFIABLE, jamais ignore --------
+D="$(mk_root skill4-frontmatter-ouvert)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+w_lines "$D/plugin/demo/skills/s/SKILL.md" '---' 'name: s' 'Corps sans frontmatter jamais referme.'
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"plugin/demo/skills/s/SKILL.md"*"NON-VERIFIABLE"*) has=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$has" -eq 1 ]; then ok "SKILL-4a — SKILL.md au frontmatter jamais referme → rc 2, NON-VERIFIABLE, jamais ignore en silence"; else ko "SKILL-4a — frontmatter jamais referme" "rc=2, NON-VERIFIABLE" "rc=$rc out=[$out]"; fi
+
+# --- SKILL-4b : SKILL.md en lien symbolique → rc 2, NON-VERIFIABLE, jamais ignore -------------------
+D="$(mk_root skill4-symlink)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s" "$D/plugin/demo/elsewhere"
+w_lines "$D/plugin/demo/elsewhere/REAL.md" '---' 'name: s' '---' 'Contenu.'
+ln -s "../elsewhere/REAL.md" "$D/plugin/demo/skills/s/SKILL.md"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"plugin/demo/skills/s/SKILL.md"*"NON-VERIFIABLE"*) has=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$has" -eq 1 ]; then ok "SKILL-4b — SKILL.md en lien symbolique → rc 2, NON-VERIFIABLE, jamais ignore en silence"; else ko "SKILL-4b — lien symbolique" "rc=2, NON-VERIFIABLE" "rc=$rc out=[$out]"; fi
+
+# --- SKILL-5 : fixture sans aucun SKILL.md, ligne neutre ajoutee a l'agent (cas 2/7 de la CI) → -----
+# --- rc 0, LIGNES-EN-HAUSSE, aucune occurrence de DEPASSEMENT, corpus skills decouvert : 0 SKILL.md -
+D="$(mk_root skill5-sans-skill-ci-2-7)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t3\t1\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+hasl=0; case "$out" in *"LIGNES-EN-HAUSSE"*) hasl=1 ;; esac
+nodep=1; case "$out" in *"DEPASSEMENT"*) nodep=0 ;; esac
+hasc=0; case "$out" in *"corpus skills decouvert : 0 SKILL.md"*) hasc=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$hasl" -eq 1 ] && [ "$nodep" -eq 1 ] && [ "$hasc" -eq 1 ]; then
+  ok "SKILL-5 — fixture sans SKILL.md, ligne neutre ajoutee a l'agent (cas 2/7 CI) → rc 0, LIGNES-EN-HAUSSE, aucun DEPASSEMENT, corpus skills decouvert : 0 SKILL.md"
+else
+  ko "SKILL-5 — cas 2/7 CI sans SKILL.md" "rc=0, LIGNES-EN-HAUSSE, aucun DEPASSEMENT, corpus skills decouvert : 0 SKILL.md" "rc=$rc out=[$out]"
+fi
+
+# --- SKILL-6 : fixture sans SKILL.md et sans agent (repertoire vide, cas 7/7 de la CI) → rc 2 -------
+# --- inchange -----------------------------------------------------------------------------------
+D="$(mk_root skill6-vide)"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 2 ]; then ok "SKILL-6 — fixture sans SKILL.md et sans agent (repertoire vide) → rc 2 inchange"; else ko "SKILL-6 — repertoire vide" "rc=2" "rc=$rc out=[$out]"; fi
+
+# ===================================================================================================
+# BOOTSTRAP (43-04, FABR-09, D-Q4, ratchet-socle) — BOOT-1 a BOOT-5. Calcul independant du script
+# (boot_expected_bytes, reimplementation propre a la suite, jamais un appel a la fonction du
+# script) : la definition unique se rejoue a l'execution, jamais recopiee en dur.
+# ===================================================================================================
+echo ""
+echo "== BOOTSTRAP (43-04) =="
+
+boot_expected_bytes() { # <fichier> <cles pipe-separees> -> octets, calcul INDEPENDANT du script
+  local f="$1" keys="$2"
+  [ -r "$f" ] || { echo 0; return; }
+  LC_ALL=C awk -v keys="$keys" '
+    BEGIN {
+      started = 0; in_fm = 0; measuring = 0; bytes = 0
+      n = split(keys, karr, "|")
+      for (i = 1; i <= n; i++) keyset[karr[i]] = 1
+    }
+    NR==1 && /^---[[:space:]]*$/ { started = 1; in_fm = 1; next }
+    in_fm && /^---[[:space:]]*$/ { in_fm = 0; next }
+    !started { next }
+    in_fm {
+      if ($0 ~ /^[A-Za-z_][A-Za-z0-9_.-]*:/) {
+        key = $0
+        sub(/:.*$/, "", key)
+        if (key in keyset) { measuring = 1; bytes += length($0) + 1 } else { measuring = 0 }
+      } else if ($0 ~ /^[ \t]/) {
+        if (measuring) { bytes += length($0) + 1 }
+      } else {
+        measuring = 0
+      }
+    }
+    END { print bytes + 0 }
+  ' "$f"
+}
+
+# w_bootstrap_fixture <root> — socle minimal synthetique : conductor requiert dep (deux
+# module.json), un SKILL.md sous chacun, skill installer expose par plugin.json (sans
+# module.json), une commande, resolve-deps.sh copie du depot reel (REPO_ROOT). Reutilisee par
+# BOOT-1, BOOT-2, BOOT-4, MUT-11, MUT-12.
+w_bootstrap_fixture() {
+  local d="$1"
+  std_agent "$d"
+  mkdir -p "$d/plugin/conductor" "$d/plugin/dep" "$d/plugin/installer" "$d/plugin/commands" \
+    "$d/plugin/.claude-plugin" "$d/plugin/_internal"
+  w_lines "$d/plugin/conductor/module.json" '{' '  "requires": ["dep"]' '}'
+  w_lines "$d/plugin/dep/module.json" '{' '  "requires": []' '}'
+  w_lines "$d/plugin/conductor/SKILL.md" \
+    '---' \
+    'name: conductor-demo' \
+    'description: une description de conductor' \
+    '  qui continue sur une deuxieme ligne' \
+    'when_to_use: quand on a besoin de conductor' \
+    '---' \
+    'Corps de conductor.'
+  w_lines "$d/plugin/dep/SKILL.md" \
+    '---' \
+    'name: dep-demo' \
+    'description: une description de dep' \
+    'when_to_use: quand on a besoin de dep' \
+    '---' \
+    'Corps de dep.'
+  w_lines "$d/plugin/.claude-plugin/plugin.json" '{' '  "skills": "./installer"' '}'
+  w_lines "$d/plugin/installer/SKILL.md" \
+    '---' \
+    'name: installer-demo' \
+    'description: une description de installer' \
+    'when_to_use: quand on a besoin de installer' \
+    '---' \
+    'Corps de installer.'
+  w_lines "$d/plugin/commands/c.md" \
+    '---' \
+    'description: une description de commande' \
+    'when_to_use: quand on a besoin de la commande' \
+    '---' \
+    'Corps de commande.'
+  cp "$REPO_ROOT/plugin/_internal/resolve-deps.sh" "$d/plugin/_internal/resolve-deps.sh"
+  chmod +x "$d/plugin/_internal/resolve-deps.sh"
+}
+
+# boot_expected_total <root> — somme independante sur le socle complet de w_bootstrap_fixture
+# (conductor + dep + installer, tous les SKILL.md, + la commande c.md).
+boot_expected_total() {
+  local d="$1" total=0 b
+  for f in "$d/plugin/conductor/SKILL.md" "$d/plugin/dep/SKILL.md" "$d/plugin/installer/SKILL.md"; do
+    b="$(boot_expected_bytes "$f" "name|description|when_to_use")"
+    total=$((total + b))
+  done
+  b="$(boot_expected_bytes "$d/plugin/commands/c.md" "description|when_to_use")"
+  total=$((total + b))
+  echo "$total"
+}
+
+# w_bootstrap_fixture_big <root> <n_lignes> — meme socle, description de conductor gonflee de
+# <n_lignes> lignes de continuation pour depasser VF_BOOTSTRAP_TOKEN_CAP (2000 tokens, BOOT-5).
+w_bootstrap_fixture_big() {
+  local d="$1" n="$2" i
+  w_bootstrap_fixture "$d"
+  {
+    printf '%s\n' '---' 'name: conductor-demo' 'description: une description de conductor'
+    i=1
+    while [ "$i" -le "$n" ]; do
+      printf '  ligne de remplissage numero %04d pour gonfler le bootstrap au dela du plafond ADR-029.\n' "$i"
+      i=$((i + 1))
+    done
+    printf '%s\n' 'when_to_use: quand on a besoin de conductor' '---' 'Corps de conductor.'
+  } > "$d/plugin/conductor/SKILL.md"
+}
+
+# --- BOOT-1 : ligne BOOTSTRAP porte exactement le nombre de tokens attendu (calcul independant) ---
+D="$(mk_root boot1)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+out="$(run "$D")"; rc=$?
+gotline="$(printf '%s\n' "$out" | grep '^BOOTSTRAP :')"
+has=0; case "$gotline" in *"$EXPECTED_TOKENS tokens"*"sur socle (4 fichiers)"*) has=1 ;; esac
+if [ "$has" -eq 1 ]; then
+  ok "BOOT-1 — ligne BOOTSTRAP porte exactement le nombre de tokens attendu ($EXPECTED_TOKENS), calcule independamment (4 fichiers : 3 SKILL.md + 1 commande)"
+else
+  ko "BOOT-1 — mesure independante" "BOOTSTRAP : $EXPECTED_TOKENS tokens ... sur socle (4 fichiers)" "rc=$rc ligne=[$gotline]"
+fi
+
+# --- BOOT-2a : ligne @bootstrap:socle EGALE a la mesure, armee → rc 0 ------------------------------
+D="$(mk_root boot2a-egale)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 0 ]; then ok "BOOT-2a — ligne @bootstrap:socle egale a la mesure, armee → rc 0"; else ko "BOOT-2a — ligne egale a la mesure" "rc=0" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-2b : ligne STRICTEMENT SUPERIEURE a la mesure (baisse), armee → rc 0, AUCUNE occurrence -
+# --- de DEPASSEMENT (stdout+stderr) — une baisse n'est jamais un depassement ----------------------
+D="$(mk_root boot2b-baisse)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+LIGNE_BAISSE=$((EXPECTED_TOKENS + 5))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$LIGNE_BAISSE" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+nodep=1; case "$out" in *"DEPASSEMENT"*) nodep=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$nodep" -eq 1 ]; then ok "BOOT-2b — ligne strictement superieure a la mesure (baisse), armee → rc 0, aucune occurrence de DEPASSEMENT"; else ko "BOOT-2b — baisse" "rc=0, aucun DEPASSEMENT" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-2c : description allongee de 8 octets, baseline = mesure ORIGINALE, armee → rc 1, -------
+# --- DEPASSEMENT-BOOTSTRAP ; meme croissance SANS sentinelle → rc 3 (contrat existant du ratchet) -
+D="$(mk_root boot2c-croissance)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+# Allonge la description de dep de 8 octets exacts (" gagnee!" = 8 caracteres).
+w_lines "$D/plugin/dep/SKILL.md" \
+  '---' \
+  'name: dep-demo' \
+  'description: une description de dep gagnee!' \
+  'when_to_use: quand on a besoin de dep' \
+  '---' \
+  'Corps de dep.'
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"DEPASSEMENT-BOOTSTRAP"*) has=1 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "BOOT-2c — description allongee de 8 octets, baseline = mesure originale, armee → rc 1, DEPASSEMENT-BOOTSTRAP"; else ko "BOOT-2c — croissance armee" "rc=1, DEPASSEMENT-BOOTSTRAP" "rc=$rc out=[$out]"; fi
+
+D="$(mk_root boot2c-non-arme)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_lines "$D/plugin/dep/SKILL.md" \
+  '---' \
+  'name: dep-demo' \
+  'description: une description de dep gagnee!' \
+  'when_to_use: quand on a besoin de dep' \
+  '---' \
+  'Corps de dep.'
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 3 ]; then ok "BOOT-2c (non arme) — meme croissance SANS sentinelle → rc 3 (contrat existant du ratchet)"; else ko "BOOT-2c non arme" "rc=3" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-2d : ligne @bootstrap:socle ABSENTE, ratchet arme → rc 2 (contrat de baseline incomplet)
+D="$(mk_root boot2d-ligne-absente)"
+w_bootstrap_fixture "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+if [ "$rc" -eq 2 ]; then ok "BOOT-2d — ligne @bootstrap:socle absente, ratchet arme → rc 2"; else ko "BOOT-2d — ligne absente armee" "rc=2" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-2e : la ligne @bootstrap:socle n'est JAMAIS comptee comme orpheline (cas BOOT-2a rejoue,
+# --- verification explicite de l'absence du message d'orpheline) ----------------------------------
+D="$(mk_root boot2e-jamais-orpheline)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+noorph=1; case "$out" in *"entree de baseline orpheline : @bootstrap:socle"*) noorph=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$noorph" -eq 1 ]; then ok "BOOT-2e — la ligne @bootstrap:socle n'est jamais comptee comme orpheline"; else ko "BOOT-2e — jamais orpheline" "rc=0, aucun message d'orpheline sur @bootstrap:socle" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-3 : fixture SANS plugin/conductor/module.json (cas des sept bascules de la CI) → --------
+# --- BOOTSTRAP non applicable, rc et verdicts identiques a la Tache 1 ------------------------------
+D="$(mk_root boot3-sans-socle)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"BOOTSTRAP : non applicable"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "BOOT-3 — fixture sans plugin/conductor/module.json → BOOTSTRAP non applicable, rc et verdicts identiques a la Tache 1"; else ko "BOOT-3 — sans socle" "rc=0, BOOTSTRAP : non applicable" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-4 : socle present, resolveur (resolve-deps.sh) ABSENT → NON-VERIFIABLE avec la cause, ---
+# --- rc 2 --------------------------------------------------------------------------------------
+D="$(mk_root boot4-resolveur-absent)"
+w_bootstrap_fixture "$D"
+rm -f "$D/plugin/_internal/resolve-deps.sh"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t100\n' | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"BOOTSTRAP"*"non verifiable"*"resolveur absent"*) has=1 ;; esac
+if [ "$rc" -eq 2 ] && [ "$has" -eq 1 ]; then ok "BOOT-4 — resolveur (resolve-deps.sh) absent, socle present → rc 2, NON-VERIFIABLE avec la cause"; else ko "BOOT-4 — resolveur absent" "rc=2, cause resolveur absent nommee" "rc=$rc out=[$out]"; fi
+
+# --- BOOT-5a : mesure > 2000, ligne @bootstrap:socle EGALE a la mesure, armee → rc 0, ---------------
+# --- AU-DESSUS-PLAFOND-ADR029, aucune occurrence de DEPASSEMENT -----------------------------------
+D="$(mk_root boot5a-plafond-egale)"
+w_bootstrap_fixture_big "$D" 150
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"AU-DESSUS-PLAFOND-ADR029"*) has=1 ;; esac
+nodep=1; case "$out" in *"DEPASSEMENT"*) nodep=0 ;; esac
+depasse2000=0; [ "$EXPECTED_TOKENS" -gt 2000 ] && depasse2000=1
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ] && [ "$nodep" -eq 1 ] && [ "$depasse2000" -eq 1 ]; then
+  ok "BOOT-5a — mesure > 2000 ($EXPECTED_TOKENS), ligne egale a la mesure, armee → rc 0, AU-DESSUS-PLAFOND-ADR029, aucun DEPASSEMENT"
+else
+  ko "BOOT-5a — plafond, ligne egale" "rc=0, AU-DESSUS-PLAFOND-ADR029, aucun DEPASSEMENT, mesure>2000" "rc=$rc mesure=$EXPECTED_TOKENS out=[$out]"
+fi
+
+# --- BOOT-5b : mesure > 2000, ligne STRICTEMENT SUPERIEURE a la mesure, armee → rc 0, --------------
+# --- AU-DESSUS-PLAFOND-ADR029, aucune occurrence de DEPASSEMENT -----------------------------------
+D="$(mk_root boot5b-plafond-superieure)"
+w_bootstrap_fixture_big "$D" 150
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+LIGNE_SUP=$((EXPECTED_TOKENS + 10))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$LIGNE_SUP" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"AU-DESSUS-PLAFOND-ADR029"*) has=1 ;; esac
+nodep=1; case "$out" in *"DEPASSEMENT"*) nodep=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ] && [ "$nodep" -eq 1 ]; then
+  ok "BOOT-5b — mesure > 2000, ligne strictement superieure a la mesure, armee → rc 0, AU-DESSUS-PLAFOND-ADR029, aucun DEPASSEMENT"
+else
+  ko "BOOT-5b — plafond, ligne superieure" "rc=0, AU-DESSUS-PLAFOND-ADR029, aucun DEPASSEMENT" "rc=$rc out=[$out]"
+fi
+
+# --- BOOT-5c : mesure ≤ 2000 et ≤ ligne → verdict OK (contre-cas de BOOT-5a/b) ---------------------
+D="$(mk_root boot5c-sous-plafond)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+out="$(run "$D")"; rc=$?
+has=0; case "$out" in *"BOOTSTRAP :"*"verdict OK"*) has=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "BOOT-5c — mesure <= 2000 et <= ligne → verdict OK"; else ko "BOOT-5c — sous plafond" "rc=0, verdict OK" "rc=$rc out=[$out]"; fi
+
+# ===================================================================================================
 # Tâche 2 — quatre mutants vérifiés par cmp
 # ===================================================================================================
 echo ""
@@ -660,6 +1062,126 @@ else
     ok "MUT-7 bord bas de la zone d'avertissement decale (cmp confirme la mutation, bash -n OK) : fixture BORNE_AVERT/BORNE_AVERT/0 perd (a tort) AVERTISSEMENT-ADR029 sur le mutant, le porte sur l'original"
   else
     ko "MUT-7 bord bas de la zone d'avertissement decale" "rc_mutant=0 rc_original=0, AVERTISSEMENT-ADR029 absent du mutant, present dans l'original" "rc_mutant=$rc_mut rc_original=$rc_orig av_mut=$av_mut av_orig=$av_orig"
+  fi
+fi
+
+# --- MUT-8 : neutralise la comparaison du plafond SKILL.md ("$lines" -gt "$VF_SKILL_LINE_CAP") ----
+MUT8_OLD='  if [ "$lines" -gt "$VF_SKILL_LINE_CAP" ]; then'
+MUT8_NEW='  if [ "0" = "1" ]; then'
+awk -v old="$MUT8_OLD" -v new="$MUT8_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut8-skill-plafond.sh"
+D="$(mk_root mut8)"
+std_agent "$D"
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n' | w_baseline "$D"
+mkdir -p "$D/plugin/demo/skills/s"
+gen_lines "$D/plugin/demo/skills/s/SKILL.md" "$((PLAFOND_SKILL + 1))"
+if cmp -s "$MUTD/mut8-skill-plafond.sh" "$SCRIPT"; then
+  ko "MUT-8 plafond SKILL.md neutralise" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut8-skill-plafond.sh" 2>/dev/null; then
+  ko "MUT-8 plafond SKILL.md neutralise" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut8-skill-plafond.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then
+    ok "MUT-8 plafond SKILL.md neutralise (cmp confirme la mutation, bash -n OK) : SKILL.md a PLAFOND_SKILL+1 lignes reste (a tort) VERT sur le mutant (rc=$rc_mut), ROUGE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-8 plafond SKILL.md neutralise" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-9 : neutralise la ligne d'exclusion doc-only (le module entier redevient scrute) ----------
+MUT9_OLD='  if [ -f "${d}module.json" ] && grep -Eq '"'"'"type"[[:space:]]*:[[:space:]]*"doc-only"'"'"' "${d}module.json" 2>/dev/null; then'
+MUT9_NEW='  if [ -f "${d}module.json" ] && grep -Eq '"'"'"type"[[:space:]]*:[[:space:]]*"mut9-neutralise"'"'"' "${d}module.json" 2>/dev/null; then'
+awk -v old="$MUT9_OLD" -v new="$MUT9_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut9-doc-only.sh"
+D="$(mk_root mut9)"
+w_skill3_fixture "$D"
+if cmp -s "$MUTD/mut9-doc-only.sh" "$SCRIPT"; then
+  ko "MUT-9 exclusion doc-only neutralisee" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut9-doc-only.sh" 2>/dev/null; then
+  ko "MUT-9 exclusion doc-only neutralisee" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut9-doc-only.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then
+    ok "MUT-9 exclusion doc-only neutralisee (cmp confirme la mutation, bash -n OK) : fixture SKILL-3 devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-9 exclusion doc-only neutralisee" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-10 : neutralise l'elagage des dossiers *-references (partie -references de SKILL-3) -------
+MUT10_OLD='  find "$d" '"'"'('"'"' -type d -name '"'"'.*'"'"' -prune '"'"')'"'"' -o '"'"'('"'"' -type d -name '"'"'*-references'"'"' -prune '"'"')'"'"' -o '"'"'('"'"' -type f -name SKILL.md -print '"'"')'"'"' -o '"'"'('"'"' -type l -name SKILL.md -print '"'"')'"'"' 2>/dev/null | while IFS= read -r f; do'
+MUT10_NEW='  find "$d" '"'"'('"'"' -type d -name '"'"'.*'"'"' -prune '"'"')'"'"' -o '"'"'('"'"' -type d -name '"'"'*-mut10-neutralise'"'"' -prune '"'"')'"'"' -o '"'"'('"'"' -type f -name SKILL.md -print '"'"')'"'"' -o '"'"'('"'"' -type l -name SKILL.md -print '"'"')'"'"' 2>/dev/null | while IFS= read -r f; do'
+awk -v old="$MUT10_OLD" -v new="$MUT10_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut10-references.sh"
+D="$(mk_root mut10)"
+w_skill3_fixture "$D"
+if cmp -s "$MUTD/mut10-references.sh" "$SCRIPT"; then
+  ko "MUT-10 elagage *-references neutralise" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut10-references.sh" 2>/dev/null; then
+  ko "MUT-10 elagage *-references neutralise" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut10-references.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then
+    ok "MUT-10 elagage *-references neutralise (cmp confirme la mutation, bash -n OK) : fixture SKILL-3 (partie -references) devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-10 elagage *-references neutralise" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-11 : neutralise la comparaison de la mesure a la ligne @bootstrap:socle -------------------
+MUT11_OLD='  if [ "$BOOTSTRAP_HAS_BASELINE" -eq 1 ] && [ "$BOOTSTRAP_TOKENS" -gt "$BOOTSTRAP_BASELINE_VALUE" ]; then'
+MUT11_NEW='  if [ "0" = "1" ] && [ "$BOOTSTRAP_TOKENS" -gt "$BOOTSTRAP_BASELINE_VALUE" ]; then'
+awk -v old="$MUT11_OLD" -v new="$MUT11_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut11-bootstrap-cmp.sh"
+D="$(mk_root mut11)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+w_lines "$D/plugin/dep/SKILL.md" \
+  '---' \
+  'name: dep-demo' \
+  'description: une description de dep gagnee!' \
+  'when_to_use: quand on a besoin de dep' \
+  '---' \
+  'Corps de dep.'
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$EXPECTED_TOKENS" | w_baseline "$D"
+if cmp -s "$MUTD/mut11-bootstrap-cmp.sh" "$SCRIPT"; then
+  ko "MUT-11 comparaison bootstrap neutralisee" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut11-bootstrap-cmp.sh" 2>/dev/null; then
+  ko "MUT-11 comparaison bootstrap neutralisee" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut11-bootstrap-cmp.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then
+    ok "MUT-11 comparaison bootstrap neutralisee (cmp confirme la mutation, bash -n OK) : fixture de croissance BOOT-2 reste (a tort) VERTE sur le mutant (rc=$rc_mut), ROUGE sur l'original (rc=$rc_orig)"
+  else
+    ko "MUT-11 comparaison bootstrap neutralisee" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"
+  fi
+fi
+
+# --- MUT-12 : meme ligne de comparaison, -gt (tokens > ligne) reecrit en -ne (tokens != ligne) -----
+MUT12_OLD='  if [ "$BOOTSTRAP_HAS_BASELINE" -eq 1 ] && [ "$BOOTSTRAP_TOKENS" -gt "$BOOTSTRAP_BASELINE_VALUE" ]; then'
+MUT12_NEW='  if [ "$BOOTSTRAP_HAS_BASELINE" -eq 1 ] && [ "$BOOTSTRAP_TOKENS" -ne "$BOOTSTRAP_BASELINE_VALUE" ]; then'
+awk -v old="$MUT12_OLD" -v new="$MUT12_NEW" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$MUTD/mut12-bootstrap-ne.sh"
+D="$(mk_root mut12)"
+w_bootstrap_fixture "$D"
+EXPECTED_BYTES="$(boot_expected_total "$D")"
+EXPECTED_TOKENS=$((EXPECTED_BYTES / 4))
+LIGNE_BAISSE=$((EXPECTED_TOKENS + 5))
+w_armed "$D"
+printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$LIGNE_BAISSE" | w_baseline "$D"
+if cmp -s "$MUTD/mut12-bootstrap-ne.sh" "$SCRIPT"; then
+  ko "MUT-12 comparaison bootstrap -gt reecrite en -ne" "mutation differente de l'original (cmp)" "mutant identique a l'original — NON OPPOSABLE"
+elif ! bash -n "$MUTD/mut12-bootstrap-ne.sh" 2>/dev/null; then
+  ko "MUT-12 comparaison bootstrap -gt reecrite en -ne" "bash -n OK sur le mutant" "syntaxe invalide — pas une preuve"
+else
+  TARGET="$MUTD/mut12-bootstrap-ne.sh"; run "$D" >/dev/null 2>&1; rc_mut=$?
+  TARGET="$SCRIPT"; run "$D" >/dev/null 2>&1; rc_orig=$?
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then
+    ok "MUT-12 comparaison bootstrap -gt reecrite en -ne (cmp confirme la mutation, bash -n OK) : fixture de baisse BOOT-2 devient (a tort) ROUGE sur le mutant (rc=$rc_mut), VERTE sur l'original (rc=$rc_orig) — le mutant prend une baisse pour un depassement"
+  else
+    ko "MUT-12 comparaison bootstrap -gt reecrite en -ne" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"
   fi
 fi
 
