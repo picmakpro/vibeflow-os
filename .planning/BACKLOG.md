@@ -998,3 +998,36 @@ cas échéant) au tableau de rubrique des deux juges, sur le modèle du critère
 
 **Déclencheur de reprise :** la prochaine revue de fond des grilles des juges business/content,
 ou un incident où un manquement RGPD n'a pas fait baisser le score d'un livrable jugé.
+
+## Ramener le socle du bootstrap sous 2 000 tokens (ADR-029) — DIFFÉRÉ (2026-09-26)
+
+**Capturé :** 2026-09-26, planification de la Phase 43 (compartiment `gouvernance`, checkpoint de
+`43-04-PLAN.md`). Décision : option « ratchet-socle », décision déléguée par Willy au head
+(/vf-decide), AskUserQuestion session principale, 2026-09-26. La mesure du jour devient une ligne
+de baseline `@bootstrap:socle` et toute hausse bloque. Le plafond ADR-029 n'est pas atteint : il
+reste un objectif.
+
+**Le défaut :** le socle minimal d'un lab (fermeture `resolve-deps.sh conductor` + skill installer
++ commandes du plugin) mesure **≈ 2 499 tokens** (9 997 octets des lignes `name`/`description`/
+`when_to_use` sous `LC_ALL=C`, ÷ 4 ; mesure du 2026-09-26, estimation du plan 43-04) pour un
+plafond de 2 000. Composition mesurée, sept modules de la fermeture plus deux autres sources :
+
+| Source | Octets | Tokens |
+|---|---|---|
+| conductor (vf-calibrate 1070, vf-new-lab 1174, vf-update 953, vf-notify 796) | 3 993 | 998 |
+| planning-core | 1 075 | 269 |
+| skill-creator (skill-creator-workflow 674, skill-creator 355) | 1 029 | 257 |
+| consolidator | 884 | 221 |
+| audit-architecture | 818 | 205 |
+| infrastructure-audit | 487 | 122 |
+| validator (aucun SKILL.md) | 0 | 0 |
+| installer (skill exposé, sans `module.json`) | 535 | 134 |
+| 7 commandes `plugin/commands/*.md` | 1 176 | 294 |
+
+**Piste de fix :** retirer environ 500 tokens (≈ 2 000 octets) de descriptions. Les descriptions
+sont le mécanisme de déclenchement des skills : chaque coupe se relit contre son effet sur le
+routage. Cibles les plus rentables : conductor, puis planning-core. Chaque coupe fait baisser la
+ligne de baseline, et une baisse n'exige pas de citation.
+
+**Déclencheur de reprise :** exécution de la Phase 43 terminée (la ligne de baseline existe), ou
+tout ajout de skill au socle qui ferait rougir le ratchet.
