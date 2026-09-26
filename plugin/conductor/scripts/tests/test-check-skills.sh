@@ -837,6 +837,331 @@ if make_gate_mutant SD2 "dirnames[:] = [d for d in dirnames if not d.endswith('-
   fi
 fi
 
+# ================================ 43-02 Tâche 1 : T22 à T29, MUT-DR1/DR2 ===========================
+# Détection de dérive (D-Q1, D-Q5, FABR-07) — écart entre déclaration frontmatter des trois
+# marqueurs B-03 et motifs constatés dans le corps, selon la règle Q-PORTEE (décision déléguée par
+# Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26) : toujours un
+# avertissement, jamais un refus.
+
+# ---------- T22 — marqueur en titre, aucune déclaration -> derive ----------------------------------
+T22_DIR="$WORK/t22"; mkdir -p "$T22_DIR"
+cat > "$T22_DIR/SKILL.md" <<'EOF'
+---
+name: t22-titre-gate
+description: Fixture T22, marqueur en titre sans declaration, Q-PORTEE.
+---
+## Gate de validation
+
+Corps du skill, aucune autre ligne a marqueur.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T22_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "derive" && echo "$OUT" | grep -q "vf-gate-bloquant" && echo "$OUT" | grep -q "Gate de validation"; then
+  ok "T22 titre « Gate de validation » sans déclaration -> rc=0, avertissement « derive » nommant vf-gate-bloquant et reprenant le titre"
+else
+  ko "T22 (rc=$RC) : $OUT"
+fi
+
+# ---------- T23 — même fixture + vf-gate-bloquant: true -> aucun avertissement pour ce marqueur ----
+T23_DIR="$WORK/t23"; mkdir -p "$T23_DIR"
+cat > "$T23_DIR/SKILL.md" <<'EOF'
+---
+name: t23-titre-gate-declare
+description: Fixture T23, meme titre + vf-gate-bloquant declare true, Q-PORTEE.
+vf-nature: procedure
+ecrit: clients/x/
+vf-rubrique-juge: grilles/diagnostic.md
+vf-gate-bloquant: true
+---
+## Gate de validation
+
+Corps du skill, aucune autre ligne a marqueur.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T23_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "derive"; then
+  ok "T23 même fixture + vf-gate-bloquant: true -> rc=0, aucun avertissement « derive » pour ce marqueur"
+else
+  ko "T23 (rc=$RC) : $OUT"
+fi
+
+# ---------- T24 — vf-gate-bloquant: true sans aucun motif -> ecart ---------------------------------
+T24_DIR="$WORK/t24"; mkdir -p "$T24_DIR"
+cat > "$T24_DIR/SKILL.md" <<'EOF'
+---
+name: t24-declare-sans-motif
+description: Fixture T24, vf-gate-bloquant declare true sans aucun motif dans le corps.
+vf-nature: procedure
+ecrit: clients/x/
+vf-rubrique-juge: grilles/diagnostic.md
+vf-gate-bloquant: true
+---
+Corps simple sans motif du vocabulaire.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T24_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "ecart" && echo "$OUT" | grep -q "vf-gate-bloquant: true declare sans motif"; then
+  ok "T24 vf-gate-bloquant: true sans aucun motif -> rc=0, avertissement « ecart — vf-gate-bloquant: true declare sans motif »"
+else
+  ko "T24 (rc=$RC) : $OUT"
+fi
+
+# ---------- T25 — vf-gate-bloquant: false + titre -> derive (déclaré false) ------------------------
+T25_DIR="$WORK/t25"; mkdir -p "$T25_DIR"
+cat > "$T25_DIR/SKILL.md" <<'EOF'
+---
+name: t25-declare-false
+description: Fixture T25, vf-gate-bloquant false + titre a marqueur.
+vf-gate-bloquant: false
+---
+### Verdict bloquant
+
+Corps du skill.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T25_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "derive"; then
+  ok "T25 vf-gate-bloquant: false + titre « Verdict bloquant » -> rc=0, avertissement « derive » (déclaré false)"
+else
+  ko "T25 (rc=$RC) : $OUT"
+fi
+
+# ---------- T26a — mots du vocabulaire hors portée (description: + bloc de code) -> aucun avert. ---
+T26A_DIR="$WORK/t26a"; mkdir -p "$T26A_DIR"
+cat > "$T26A_DIR/SKILL.md" <<'EOF'
+---
+name: t26a-hors-portee
+description: Fixture T26a, le mot gate figure ici dans description mais est hors portee.
+---
+Corps du skill.
+
+```
+## Gate en bloc de code, jamais lu
+```
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T26A_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "derive"; then
+  ok "T26a mot du vocabulaire dans description: et dans un titre en bloc de code délimité -> aucun avertissement"
+else
+  ko "T26a (rc=$RC) : $OUT"
+fi
+
+# ---------- T26b — un seul marqueur en prose (règle Q-PORTEE) -> aucun avertissement ---------------
+T26B_DIR="$WORK/t26b"; mkdir -p "$T26B_DIR"
+cat > "$T26B_DIR/SKILL.md" <<'EOF'
+---
+name: t26b-un-marqueur-prose
+description: Fixture T26b, un seul marqueur en prose, regle Q-PORTEE.
+---
+Ce skill passe un gate avant envoi.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T26B_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "derive"; then
+  ok "T26b un seul marqueur en prose (« Ce skill passe un gate avant envoi ») -> rc=0, AUCUN avertissement"
+else
+  ko "T26b (rc=$RC) : $OUT"
+fi
+
+# ---------- T26c — deux marqueurs DISTINCTS en prose -> deux avertissements « derive » -------------
+T26C_DIR="$WORK/t26c"; mkdir -p "$T26C_DIR"
+cat > "$T26C_DIR/SKILL.md" <<'EOF'
+---
+name: t26c-deux-marqueurs-prose
+description: Fixture T26c, deux marqueurs distincts en prose, regle Q-PORTEE.
+---
+Ce skill passe un gate avant envoi.
+Le livrable est remis au client.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T26C_DIR" 2>&1)"; RC=$?
+N_DERIVE="$(echo "$OUT" | grep -c "derive")"
+if [ "$RC" -eq 0 ] && [ "$N_DERIVE" -eq 2 ] && echo "$OUT" | grep -q "vf-gate-bloquant" && echo "$OUT" | grep -q "vf-livrable-tiers"; then
+  ok "T26c deux marqueurs distincts en prose -> rc=0, deux avertissements « derive » (vf-gate-bloquant, vf-livrable-tiers)"
+else
+  ko "T26c (rc=$RC, n_derive=$N_DERIVE) : $OUT"
+fi
+
+# ---------- T26d — un marqueur en TITRE (jumeau de T26b) -> un avertissement « derive » ------------
+T26D_DIR="$WORK/t26d"; mkdir -p "$T26D_DIR"
+cat > "$T26D_DIR/SKILL.md" <<'EOF'
+---
+name: t26d-un-marqueur-titre
+description: Fixture T26d, un marqueur en titre, jumeau de T26b.
+---
+## Passage du gate avant envoi
+
+Corps sans autre ligne a marqueur.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T26D_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "derive" && echo "$OUT" | grep -q "vf-gate-bloquant"; then
+  ok "T26d un marqueur en titre (« Passage du gate avant envoi ») -> rc=0, un avertissement « derive » nommant vf-gate-bloquant"
+else
+  ko "T26d (rc=$RC) : $OUT"
+fi
+
+# ---------- T26e — deux occurrences du MÊME marqueur en prose -> aucun avertissement ----------------
+T26E_DIR="$WORK/t26e"; mkdir -p "$T26E_DIR"
+cat > "$T26E_DIR/SKILL.md" <<'EOF'
+---
+name: t26e-meme-marqueur-repete
+description: Fixture T26e, deux occurrences du meme marqueur en prose.
+---
+Ce skill passe un gate avant envoi.
+Le gate reste bloquant.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T26E_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "derive"; then
+  ok "T26e deux occurrences du même marqueur en prose -> rc=0, AUCUN avertissement (un seul marqueur distinct)"
+else
+  ko "T26e (rc=$RC) : $OUT"
+fi
+
+# ---------- T26f — marqueurs dans des blocs de code délimités -> jamais détectés ni comptés ---------
+T26F_DIR="$WORK/t26f"; mkdir -p "$T26F_DIR"
+cat > "$T26F_DIR/SKILL.md" <<'EOF'
+---
+name: t26f-blocs-delimites
+description: Fixture T26f, marqueurs dans des blocs de code delimites, jamais comptes.
+---
+Ce skill passe un gate avant envoi.
+
+```
+Le livrable est remis au client.
+## Checklist qualite
+```
+
+~~~
+couche de jugement
+~~~
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T26F_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "derive"; then
+  ok "T26f marqueurs dans des blocs délimités (accents graves et tildes) -> rc=0, AUCUN avertissement (comptés, deux marqueurs distincts porteraient la prose au seuil)"
+else
+  ko "T26f (rc=$RC) : $OUT"
+fi
+
+# ---------- T26g — sens frontmatter -> corps, un mot isolé en prose n'est pas un motif --------------
+T26G_DIR="$WORK/t26g"; mkdir -p "$T26G_DIR"
+cat > "$T26G_DIR/SKILL.md" <<'EOF'
+---
+name: t26g-frontmatter-vers-corps
+description: Fixture T26g, vf-gate-bloquant declare true, un seul marqueur isole en prose.
+vf-nature: procedure
+ecrit: clients/x/
+vf-rubrique-juge: grilles/diagnostic.md
+vf-gate-bloquant: true
+---
+Ce skill passe un gate avant envoi.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T26G_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "ecart" && echo "$OUT" | grep -q "vf-gate-bloquant" && ! echo "$OUT" | grep -q "derive"; then
+  ok "T26g sens frontmatter -> corps, un mot isolé en prose n'est pas un motif -> rc=0, « ecart » nommant vf-gate-bloquant, aucune « derive »"
+else
+  ko "T26g (rc=$RC) : $OUT"
+fi
+
+# ---------- T26h — sens frontmatter -> corps, deux marqueurs distincts en prose, tous deux déclarés -
+T26H_DIR="$WORK/t26h"; mkdir -p "$T26H_DIR"
+cat > "$T26H_DIR/SKILL.md" <<'EOF'
+---
+name: t26h-frontmatter-vers-corps-deux
+description: Fixture T26h, deux marqueurs declares true, deux marqueurs distincts en prose.
+vf-nature: procedure
+ecrit: clients/x/
+vf-rubrique-juge: grilles/diagnostic.md
+vf-gate-bloquant: true
+vf-livrable-tiers: true
+---
+Ce skill passe un gate avant envoi.
+Le livrable est remis au client.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T26H_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "derive" && ! echo "$OUT" | grep -q "ecart"; then
+  ok "T26h sens frontmatter -> corps, deux marqueurs distincts en prose tous deux déclarés -> rc=0, aucun avertissement « derive » ni « ecart »"
+else
+  ko "T26h (rc=$RC) : $OUT"
+fi
+
+# ---------- T27 — qualificatif de « grille », titres livrable/qualité/jugement ----------------------
+T27A_DIR="$WORK/t27a"; mkdir -p "$T27A_DIR"
+printf -- '---\nname: t27a-livrable\ndescription: Fixture T27a, titre Livrable remis au client.\n---\n## Livrable remis au client\n\nCorps.\n' > "$T27A_DIR/SKILL.md"
+OUT="$(bash "$CHECK" --strict --skills-dir="$T27A_DIR" 2>&1)"; RC=$?
+T27_OK=1
+if [ "$RC" -ne 0 ] || ! echo "$OUT" | grep -q "vf-livrable-tiers"; then T27_OK=0; echo "    [T27a] $OUT"; fi
+
+T27B_DIR="$WORK/t27b"; mkdir -p "$T27B_DIR"
+printf -- '---\nname: t27b-checklist\ndescription: Fixture T27b, titre Checklist qualite.\n---\n### Checklist qualite\n\nCorps.\n' > "$T27B_DIR/SKILL.md"
+OUT="$(bash "$CHECK" --strict --skills-dir="$T27B_DIR" 2>&1)"; RC=$?
+if [ "$RC" -ne 0 ] || ! echo "$OUT" | grep -q "vf-couche-qualite"; then T27_OK=0; echo "    [T27b] $OUT"; fi
+
+T27C_DIR="$WORK/t27c"; mkdir -p "$T27C_DIR"
+printf -- '---\nname: t27c-couche\ndescription: Fixture T27c, titre Couche jugement.\n---\n## Couche jugement\n\nCorps.\n' > "$T27C_DIR/SKILL.md"
+OUT="$(bash "$CHECK" --strict --skills-dir="$T27C_DIR" 2>&1)"; RC=$?
+if [ "$RC" -ne 0 ] || ! echo "$OUT" | grep -q "vf-couche-qualite"; then T27_OK=0; echo "    [T27c] $OUT"; fi
+
+T27D_DIR="$WORK/t27d"; mkdir -p "$T27D_DIR"
+printf -- '---\nname: t27d-grille\ndescription: Fixture T27d, titre Grille tarifaire, non qualifiee.\n---\n## Grille tarifaire\n\nCorps.\n' > "$T27D_DIR/SKILL.md"
+OUT="$(bash "$CHECK" --strict --skills-dir="$T27D_DIR" 2>&1)"; RC=$?
+if [ "$RC" -ne 0 ] || echo "$OUT" | grep -q "derive"; then T27_OK=0; echo "    [T27d] $OUT"; fi
+
+if [ "$T27_OK" -eq 1 ]; then
+  ok "T27 titres Livrable/Checklist qualité/Couche jugement -> avertissements nommés ; Grille tarifaire (non qualifiée) -> aucun"
+else
+  ko "T27 (au moins une des quatre fixtures n'a pas rendu le verdict attendu)"
+fi
+
+# ---------- T28 — --strict jamais 1, --hook ligne compacte -----------------------------------------
+OUT="$(bash "$CHECK" --strict --skills-dir="$T22_DIR" 2>&1)"; RC=$?
+T28_OK=1
+[ "$RC" -eq 0 ] || { T28_OK=0; echo "    [T28-strict] rc=$RC"; }
+OUT_HOOK="$(bash "$CHECK" --hook --skills-dir="$T22_DIR" 2>&1)"; RC_HOOK=$?
+if [ "$RC_HOOK" -ne 0 ] || [ "$(echo "$OUT_HOOK" | wc -l | tr -d ' ')" -ne 1 ] || ! echo "$OUT_HOOK" | grep -q "⚠"; then
+  T28_OK=0; echo "    [T28-hook] rc=$RC_HOOK out=[$OUT_HOOK]"
+fi
+if [ "$T28_OK" -eq 1 ]; then
+  ok "T28 fixture T22 sous --strict -> rc=0 (jamais 1) ; sous --hook -> rc=0, une seule ligne compacte « ⚠ »"
+else
+  ko "T28 (voir détails ci-dessus)"
+fi
+
+# ---------- T29 — frontière de mot (HUMAN-GATED) ----------------------------------------------------
+T29_DIR="$WORK/t29"; mkdir -p "$T29_DIR"
+printf -- '---\nname: t29-human-gated\ndescription: Fixture T29, frontiere de mot, HUMAN-GATED.\n---\n## Deploiement HUMAN-GATED\n\nCorps.\n' > "$T29_DIR/SKILL.md"
+OUT="$(bash "$CHECK" --strict --skills-dir="$T29_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "derive"; then
+  ok "T29 titre « Déploiement HUMAN-GATED » -> rc=0, aucun avertissement (frontière de mot)"
+else
+  ko "T29 (rc=$RC) : $OUT"
+fi
+
+# ---------- MUT-DR1 — appel detecter_derive neutralisé (pass) --------------------------------------
+if make_gate_mutant DR1 "warnings.extend(detecter_derive(" "pass  # MUT-DR1"; then
+  M="$MUT_DIR/check-skills.sh"
+  OUT_MUT="$(bash "$M" --strict --skills-dir="$T22_DIR" 2>&1)"; RC_MUT=$?
+  OUT_ORIG="$(bash "$CHECK" --strict --skills-dir="$T22_DIR" 2>&1)"; RC_ORIG=$?
+  N_MUT="$(echo "$OUT_MUT" | grep -c "derive")"
+  N_ORIG="$(echo "$OUT_ORIG" | grep -c "derive")"
+  if [ "$RC_MUT" -eq 0 ] && [ "$RC_ORIG" -eq 0 ] && [ "$N_ORIG" -ge 1 ] && [ "$N_MUT" -eq 0 ]; then
+    okmut DR1 "$N_MUT" 0 "$N_ORIG" ">=1"
+  else
+    komut DR1 "compte « derive » >=1 sur l'original, 0 sur le mutant (T22)" "n_mut=0, n_orig>=1" "n_mut=$N_MUT, n_orig=$N_ORIG"
+  fi
+fi
+
+# ---------- MUT-DR2 — warnings.extend(detecter_derive(...)) devient errors.extend(...) -------------
+DR2_MOTIF="warnings.extend(detecter_derive("
+DR2_LIGNE_ORIG="$(grep -F "$DR2_MOTIF" "$REAL_CHECK" | sed 's/^[[:space:]]*//')"
+DR2_REMPLACEMENT="$(printf '%s' "$DR2_LIGNE_ORIG" | sed 's/^warnings/errors/')"
+if make_gate_mutant DR2 "$DR2_MOTIF" "$DR2_REMPLACEMENT"; then
+  M="$MUT_DIR/check-skills.sh"
+  OUT_MUT="$(bash "$M" --strict --skills-dir="$T22_DIR" 2>&1)"; RC_MUT=$?
+  OUT_ORIG="$(bash "$CHECK" --strict --skills-dir="$T22_DIR" 2>&1)"; RC_ORIG=$?
+  if [ "$RC_ORIG" -eq 0 ] && [ "$RC_MUT" -eq 1 ] \
+     && echo "$OUT_ORIG" | grep -qE '^  ⚠ .*derive' \
+     && ! echo "$OUT_ORIG" | grep -qE '^  ✗ .*derive' \
+     && echo "$OUT_MUT" | grep -qE '^  ✗ .*derive'; then
+    okmut DR2 "$RC_MUT" 1 "$RC_ORIG" 0 "derive en avertissement sur l'original, en erreur bloquante sur le mutant"
+  else
+    komut DR2 "derive en avertissement (⚠) sur l'original, en erreur bloquante (✗) sur le mutant (T22)" "rc_mutant=1, rc_original=0, trace deplacee" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
+  fi
+fi
+
 # ---------- MUT-SYNTAXE (garde du helper) : mutant Python invalide (parenthese non refermee) --------
 MUT_SYNTAXE_FILE="$WORK/mut-syntaxe-out.txt"
 ( make_gate_mutant SYNTAXE "errors.extend(invariant_procedure(rel, fm))" "errors.extend(invariant_procedure(rel, fm"; echo "RC-HELPER=$?" ) > "$MUT_SYNTAXE_FILE" 2>&1

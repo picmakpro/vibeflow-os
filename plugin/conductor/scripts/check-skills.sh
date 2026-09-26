@@ -76,6 +76,36 @@
 #
 # --third-party-prefix (défaut "gsd-") exclut, par le champ `name:`, un SKILL.md ENTIER du lint
 # FABR-06 (ce n'est pas notre skill) — compté séparément, jamais un skip muet.
+#
+# --- Détection de dérive (D-Q1, D-Q5, FABR-07) — posée en 43-02, sur ce même gate ---------------
+# Règle Q-PORTEE : décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26 (43-CONTEXT.md, bloc « Quatrième temps »).
+# Portée : TOUT le corps du SKILL.md après fermeture du frontmatter (description: comprise, jamais lue), hors blocs de code
+# délimités (bascule sur une ligne dont la partie non blanche commence par trois accents graves ou
+# trois tildes ; une ligne à l'intérieur n'est ni détectée ni comptée, titre compris) ; recherche
+# insensible à la casse. Titre = un à six dièses suivis d'un blanc ; prose = toute autre ligne du
+# corps (gras, puces, tableaux et code en ligne compris). Portée dans le code par
+# DERIVE_PROSE_MIN_DISTINCTS = 2 et DERIVE_TITRE_MIN = 1, chacune sur sa propre ligne. Avertissement
+# « derive » déclenché SEULEMENT SI au moins deux des trois marqueurs DISTINCTS (gate bloquant,
+# livrable remis à un tiers, couche de qualité) apparaissent en prose, OU si un seul marqueur
+# apparaît dans un titre — jamais un refus (D-Q5), toujours un avertissement, même sous --strict.
+# « Marqueur constaté » — définition UNIQUE lue par les DEUX sens de D-Q1 : un marqueur est
+# constaté s'il apparaît dans au moins un titre, OU s'il apparaît en prose alors qu'au moins un
+# second marqueur distinct apparaît aussi en prose (un mot isolé en prose n'est jamais un motif
+# présent, dans aucun des deux sens). Sens corps -> frontmatter : marqueur constaté et déclaration
+# absente ou false -> avertissement « derive ». Sens frontmatter -> corps : déclaration true et
+# marqueur non constaté -> avertissement « ecart ». `lignes_de_portee(texte)` rend les lignes du
+# corps dans la portée, chacune marquée titre ou prose ; `marqueurs_constates(lignes)` applique la
+# règle UNE fois ; `detecter_derive` lit ce seul résultat pour les DEUX sens (appel unique dans
+# check_file, toujours vers la liste des avertissements, JAMAIS vers les erreurs — cible
+# MUT-DR1/MUT-DR2).
+#
+# MOTIFS_MARQUEURS (vocabulaire, décision de plan, costly — 43-RESEARCH.md Pitfall 2, aucun
+# précédent codé) :
+#   vf-gate-bloquant   -> \bgates?\b | \bbloquant(e|s|es)?\b
+#   vf-livrable-tiers  -> \blivrables?\b | \bremis(e|es)?\s+(a|à|au|aux)\b | \bdestinataires?\b
+#   vf-couche-qualite  -> \bjuges?\b | \brubriques?\b |
+#     \bgrilles?\s+(de\s+)?(jug|notation|[ée]valuation|qualit) | checklist\s+qualit |
+#     couche\s+(de\s+)?(jugement|qualit|d.audit) | quality\s+gate
 
 set -uo pipefail
 
@@ -408,6 +438,116 @@ def skill_display_name(text):
         return fm["name"]
     return ""
 
+# --- Detection de derive (D-Q1, D-Q5, FABR-07) -- regle Q-PORTEE complete dans l'en-tete du script
+# (decision deleguee par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26)
+DERIVE_PROSE_MIN_DISTINCTS = 2
+DERIVE_TITRE_MIN = 1
+
+MOTIFS_MARQUEURS = {
+    "vf-gate-bloquant": [r"\bgates?\b", r"\bbloquant(e|s|es)?\b"],
+    "vf-livrable-tiers": [r"\blivrables?\b", r"\bremis(e|es)?\s+(a|à|au|aux)\b", r"\bdestinataires?\b"],
+    "vf-couche-qualite": [
+        r"\bjuges?\b",
+        r"\brubriques?\b",
+        r"\bgrilles?\s+(de\s+)?(jug|notation|[ée]valuation|qualit)",
+        r"checklist\s+qualit",
+        r"couche\s+(de\s+)?(jugement|qualit|d.audit)",
+        r"quality\s+gate",
+    ],
+}
+_MOTIFS_COMPILES = {k: [re.compile(p, re.IGNORECASE | re.UNICODE) for p in v] for k, v in MOTIFS_MARQUEURS.items()}
+
+
+def lignes_de_portee(texte):
+    """Rend la liste des lignes du CORPS (apres fermeture du frontmatter) dans la portee de la
+    regle Q-PORTEE, chacune marquee ('titre'|'prose', ligne_originale) -- hors blocs de code
+    delimites (bascule sur une ligne dont la partie non blanche commence par trois accents graves
+    ou trois tildes ; une ligne a l'interieur n'est ni detectee ni comptee, titre compris).
+    Resultat identique que la bascule soit lue en tout debut de ligne ou apres une indentation
+    (comparaison faite apres lstrip)."""
+    lines = texte.split("\n")
+    start = 0
+    if lines and lines[0].strip() == "---":
+        i = 1
+        while i < len(lines) and lines[i].strip() != "---":
+            i += 1
+        start = i + 1 if i < len(lines) else len(lines)
+    out = []
+    in_code = False
+    fence = None
+    for line in lines[start:]:
+        stripped = line.lstrip()
+        prefix = stripped[:3]
+        if not in_code and prefix in ("```", "~~~"):
+            in_code = True
+            fence = prefix
+            continue
+        if in_code:
+            if prefix == fence:
+                in_code = False
+                fence = None
+            continue
+        if re.match(r"^#{1,6}\s", line):
+            out.append(("titre", line))
+        else:
+            out.append(("prose", line))
+    return out
+
+
+def marqueurs_constates(lignes):
+    """Applique la regle Q-PORTEE UNE seule fois (D-Q1) : un marqueur trouve dans au moins un
+    titre (DERIVE_TITRE_MIN) est TOUJOURS constate ; un marqueur trouve en prose n'est constate
+    que si le nombre de marqueurs DISTINCTS trouves en prose atteint DERIVE_PROSE_MIN_DISTINCTS
+    (deux occurrences du meme marqueur, ou deux mots du vocabulaire d'un meme marqueur, ne comptent
+    que pour un). Rend, par marqueur constate, un tuple (emplacement, ligne_de_preuve) -- premier
+    titre, a defaut premiere ligne de prose."""
+    titre_trouves = {}
+    prose_trouves = {}
+    for typ, line in lignes:
+        cible = titre_trouves if typ == "titre" else prose_trouves
+        for cle, pats in _MOTIFS_COMPILES.items():
+            if cle in cible:
+                continue
+            for pat in pats:
+                if pat.search(line):
+                    cible[cle] = line.strip()
+                    break
+    constates = {}
+    if len(titre_trouves) >= DERIVE_TITRE_MIN:
+        for cle, preuve in titre_trouves.items():
+            constates[cle] = ("titre", preuve)
+    if len(prose_trouves) >= DERIVE_PROSE_MIN_DISTINCTS:
+        for cle, preuve in prose_trouves.items():
+            if cle not in constates:
+                constates[cle] = ("prose", preuve)
+    return constates
+
+
+def detecter_derive(rel, fm, lignes):
+    """FABR-07, D-Q1, D-Q5 : lit marqueurs_constates() UNE fois pour les DEUX sens (patron
+    invariant_i1 de check-agents.sh, jamais un message fusionne) : marqueur constate et
+    declaration absente ou false -> avertissement "derive" ; declaration true et marqueur non
+    constate -> avertissement "ecart". Toujours des warnings, jamais des errors (D-Q5) -- l'appel
+    unique est cible par MUT-DR1 (neutralisation) et MUT-DR2 (promotion en errors)."""
+    constates = marqueurs_constates(lignes)
+    msgs = []
+    for cle in MARQUEURS:
+        declare_true = fm.get(cle) == "true"
+        if cle in constates:
+            emplacement, preuve = constates[cle]
+            if not declare_true:
+                msgs.append(
+                    f"{rel} : derive — motif de {cle} en {emplacement} dans la ligne "
+                    f"« {esc(preuve)} » sans {cle}: true declare (D-Q1)"
+                )
+        elif declare_true:
+            msgs.append(
+                f"{rel} : ecart — {cle}: true declare sans motif de {cle} dans le corps "
+                f"(un titre, ou au moins deux marqueurs distincts en prose) (D-Q1)"
+            )
+    return msgs
+
+
 def check_file(rel, text):
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
@@ -422,6 +562,7 @@ def check_file(rel, text):
     errors.extend(valider_ecrit(rel, fm.get("ecrit")))
     errors.extend(valider_rubrique_juge(rel, fm.get("vf-rubrique-juge")))
     errors.extend(valider_marqueurs(rel, fm))
+    warnings.extend(detecter_derive(rel, fm, lignes_de_portee(text)))
     for k in fm:
         if k not in KNOWN:
             warnings.append(f"{rel} : champ inconnu — {k} (typo ? verifier la doc)")
