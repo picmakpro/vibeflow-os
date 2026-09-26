@@ -106,6 +106,10 @@
 #   vf-couche-qualite  -> \bjuges?\b | \brubriques?\b |
 #     \bgrilles?\s+(de\s+)?(jug|notation|[ée]valuation|qualit) | checklist\s+qualit |
 #     couche\s+(de\s+)?(jugement|qualit|d.audit) | quality\s+gate
+#
+# Écart nature <-> marqueurs (B-03, C-15, Tâche 2 de 43-02) : au moins un marqueur déclaré true et vf-nature différente de procedure (absente comptée comme outil) -> avertissement « ecart » citant B-03 et C-15 ; la nature n'est JAMAIS réécrite ni déduite (B-03 écarte la dérivation automatique). Appel unique dans check_file, vers la liste des avertissements (cible MUT-DR3).
+#
+# Mesure du corpus réel sous cette règle (2026-09-26, lecture seule, hors module doc-only, plugin/reference exclu) : 26 avertissements « derive » sur 11 SKILL.md/21 (0 « ecart » -- aucun marqueur encore déclaré true dans le corpus) ; liste complète au SUMMARY de 43-02 (CORPUS-DERIVE) — corpus laissé non corrigé (D-Q5, backlog séparé, .planning/BACKLOG.md entrée e36e6f2).
 
 set -uo pipefail
 
@@ -548,6 +552,24 @@ def detecter_derive(rel, fm, lignes):
     return msgs
 
 
+def ecart_nature_marqueurs(rel, fm):
+    """B-03, C-15 (Tache 2, 43-02) : au moins un marqueur declare true et vf-nature differente de
+    procedure (absente comptee comme outil) -> avertissement "ecart" -- la nature n'est JAMAIS
+    reecrite ni deduite (B-03 ecarte la derivation automatique)."""
+    declares = [cle for cle in MARQUEURS if fm.get(cle) == "true"]
+    if not declares:
+        return []
+    nature = fm.get("vf-nature", "outil")
+    if not isinstance(nature, str) or nature == "":
+        nature = "outil"
+    if nature == "procedure":
+        return []
+    liste = ", ".join(declares)
+    return [
+        f"{rel} : ecart — marqueur(s) {liste} declare(s) mais vf-nature: {nature} — au moins un "
+        f"marqueur designe une procedure (B-03, C-15) ; la nature reste declaree, jamais deduite"
+    ]
+
 def check_file(rel, text):
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
@@ -563,6 +585,7 @@ def check_file(rel, text):
     errors.extend(valider_rubrique_juge(rel, fm.get("vf-rubrique-juge")))
     errors.extend(valider_marqueurs(rel, fm))
     warnings.extend(detecter_derive(rel, fm, lignes_de_portee(text)))
+    warnings.extend(ecart_nature_marqueurs(rel, fm))
     for k in fm:
         if k not in KNOWN:
             warnings.append(f"{rel} : champ inconnu — {k} (typo ? verifier la doc)")

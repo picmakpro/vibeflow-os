@@ -1162,6 +1162,109 @@ if make_gate_mutant DR2 "$DR2_MOTIF" "$DR2_REMPLACEMENT"; then
   fi
 fi
 
+# ================================ 43-02 Tâche 2 : T30 à T32, MUT-DR3 ================================
+
+# ---------- T30 — écart nature <-> marqueurs (B-03, C-15) ------------------------------------------
+T30A_DIR="$WORK/t30a"; mkdir -p "$T30A_DIR"
+printf -- '---\nname: t30a-outil\ndescription: Fixture T30a, vf-couche-qualite declare true, vf-nature absente.\nvf-couche-qualite: true\n---\n## Checklist qualite\n\nCorps.\n' > "$T30A_DIR/SKILL.md"
+OUT="$(bash "$CHECK" --strict --skills-dir="$T30A_DIR" 2>&1)"; RC=$?
+T30_OK=1
+if [ "$RC" -ne 0 ] || ! echo "$OUT" | grep -q "ecart — marqueur(s) vf-couche-qualite declare(s) mais vf-nature: outil"; then
+  T30_OK=0; echo "    [T30a] (rc=$RC) : $OUT"
+fi
+
+T30B_DIR="$WORK/t30b"; mkdir -p "$T30B_DIR"
+cat > "$T30B_DIR/SKILL.md" <<'EOF'
+---
+name: t30b-procedure
+description: Fixture T30b, meme cas en vf-nature procedure -- aucun ecart de nature.
+vf-nature: procedure
+ecrit: clients/x/
+vf-rubrique-juge: grilles/diagnostic.md
+vf-couche-qualite: true
+---
+## Checklist qualite
+
+Corps.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T30B_DIR" 2>&1)"; RC=$?
+if [ "$RC" -ne 0 ] || echo "$OUT" | grep -q "vf-nature: outil"; then
+  T30_OK=0; echo "    [T30b] (rc=$RC) : $OUT"
+fi
+if [ "$T30_OK" -eq 1 ]; then
+  ok "T30 vf-couche-qualite: true + titre Checklist qualité + vf-nature absente -> écart nature (outil) ; en vf-nature: procedure -> aucun écart de nature"
+else
+  ko "T30 (voir détails ci-dessus)"
+fi
+
+# ---------- T31 — trois marqueurs à false, aucun motif, vf-nature absente -> aucun avertissement ---
+T31_DIR="$WORK/t31"; mkdir -p "$T31_DIR"
+cat > "$T31_DIR/SKILL.md" <<'EOF'
+---
+name: t31-tout-false
+description: Fixture T31, trois marqueurs a false, aucun motif du vocabulaire, vf-nature absente.
+vf-gate-bloquant: false
+vf-livrable-tiers: false
+vf-couche-qualite: false
+---
+Corps simple sans aucun mot du vocabulaire.
+EOF
+OUT="$(bash "$CHECK" --strict --skills-dir="$T31_DIR" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && ! echo "$OUT" | grep -q "derive" && ! echo "$OUT" | grep -q "ecart"; then
+  ok "T31 trois marqueurs à false, aucun motif, vf-nature absente -> rc=0, aucun avertissement"
+else
+  ko "T31 (rc=$RC) : $OUT"
+fi
+
+# ---------- T32 (arbre réel) — même boucle que T4, --strict rc=0 partout, compte publié ------------
+T32_FAIL=0
+T32_TOTAL=0
+T32_MODS=0
+for d in "$REPO_ROOT"/plugin/*/; do
+  mod="$(basename "$d")"
+  has_skill="$(find "$d" -name SKILL.md -type f -print -quit)"
+  [ -n "$has_skill" ] || continue
+  if [ -f "${d}module.json" ]; then
+    mtype="$("$PYBIN" -c "import json,sys
+try:
+    print(json.load(open(sys.argv[1])).get('type',''))
+except Exception:
+    print('')" "${d}module.json" 2>/dev/null)"
+  else
+    mtype=""
+  fi
+  [ "$mtype" = "doc-only" ] && continue
+  T32_MODS=$((T32_MODS+1))
+  OUT="$(bash "$REAL_CHECK" --strict --skills-dir="$d" 2>&1)"; RC=$?
+  if [ "$RC" -ne 0 ]; then
+    T32_FAIL=$((T32_FAIL+1))
+    echo "    [T32] ECHEC sur $mod (rc=$RC) : $OUT"
+  fi
+  n_avert="$(echo "$OUT" | grep -cE 'derive|ecart')"
+  T32_TOTAL=$((T32_TOTAL + n_avert))
+done
+echo "  [T32] modules jugés=$T32_MODS · avertissements derive/ecart=$T32_TOTAL"
+if [ "$T32_FAIL" -eq 0 ] && [ "$T32_MODS" -gt 0 ]; then
+  ok "T32 arbre réel : $T32_MODS module(s) non doc-only passent --strict (0 refus), $T32_TOTAL avertissement(s) derive/ecart publiés"
+else
+  ko "T32 (modules=$T32_MODS échecs=$T32_FAIL)"
+fi
+
+# ---------- MUT-DR3 — appel ecart_nature_marqueurs neutralisé (pass) -------------------------------
+if make_gate_mutant DR3 "warnings.extend(ecart_nature_marqueurs(" "pass  # MUT-DR3"; then
+  M="$MUT_DIR/check-skills.sh"
+  MSG_DR3="ecart — marqueur(s) vf-couche-qualite declare(s) mais vf-nature: outil"
+  OUT_MUT="$(bash "$M" --strict --skills-dir="$T30A_DIR" 2>&1)"; RC_MUT=$?
+  OUT_ORIG="$(bash "$CHECK" --strict --skills-dir="$T30A_DIR" 2>&1)"; RC_ORIG=$?
+  N_MUT="$(echo "$OUT_MUT" | grep -cF "$MSG_DR3")"
+  N_ORIG="$(echo "$OUT_ORIG" | grep -cF "$MSG_DR3")"
+  if [ "$RC_MUT" -eq 0 ] && [ "$RC_ORIG" -eq 0 ] && [ "$N_ORIG" -eq 1 ] && [ "$N_MUT" -eq 0 ]; then
+    okmut DR3 "$RC_MUT" 0 "$RC_ORIG" 0 "ecart de nature compte 1 sur l'original, 0 sur le mutant"
+  else
+    komut DR3 "compte du message d'écart de nature = 1 sur l'original, 0 sur le mutant (T30a)" "n_mut=0, n_orig=1, rc=0/0" "n_mut=$N_MUT, n_orig=$N_ORIG, rc_mut=$RC_MUT, rc_orig=$RC_ORIG"
+  fi
+fi
+
 # ---------- MUT-SYNTAXE (garde du helper) : mutant Python invalide (parenthese non refermee) --------
 MUT_SYNTAXE_FILE="$WORK/mut-syntaxe-out.txt"
 ( make_gate_mutant SYNTAXE "errors.extend(invariant_procedure(rel, fm))" "errors.extend(invariant_procedure(rel, fm"; echo "RC-HELPER=$?" ) > "$MUT_SYNTAXE_FILE" 2>&1
