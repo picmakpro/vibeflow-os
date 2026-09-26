@@ -85,14 +85,16 @@
       "step": "revue du diff complet de phase (vf-reviewer)",
       "stage": "",
       "deps": [
-        "exec-w4"
+        "exec-w4",
+        "fix-43"
       ],
       "scope": [
         "plugin/**",
         "docs/**",
         ".planning/instruction-budget-baselines.tsv"
       ],
-      "status": "running"
+      "status": "running",
+      "review_regime": "full"
     },
     {
       "id": "audit-43",
@@ -104,7 +106,7 @@
       "scope": [
         "plugin/**"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "gates-43",
@@ -165,6 +167,19 @@
         ".planning/WINDOWS.md",
         ".planning/workstreams/gouvernance/phases/VFDO-43-*/43-0[137]-SUMMARY.md",
         ".planning/workstreams/gouvernance/phases/VFDO-43-*/deferred-items.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-43",
+      "step": "correction ciblée des findings de revue (43-04)",
+      "stage": "",
+      "deps": [
+        "audit-43"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-instruction-budget.sh",
+        "plugin/conductor/scripts/tests/test-check-instruction-budget.sh"
       ],
       "status": "done"
     }

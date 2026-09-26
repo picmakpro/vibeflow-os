@@ -2,7 +2,7 @@
 
 **Pilote :** vf-dev-manager (owner du verrou `vfdm-g43-plan`).
 **Brief :** session principale, planification seule de la Phase 43 du jalon `gouvernance-labs-v1.0`, compartiment `gouvernance`, `design: off`. Aucune exécution de plan.
-**Racine :** `/Users/makwilmak/vibeflow-os/.claude/worktrees/gouvernance-43`, branche `gouvernance/phase-43-cadrage`.
+**Racine :** `<dépôt>/.claude/worktrees/gouvernance-43`, branche `gouvernance/phase-43-cadrage`.
 **Deux interruptions** sur la limite d'usage du compte (HTTP 429), reprises par la session principale. La première s'est traitée par un `takeover` du verrou périmé, avec un seul orphelin, le vf-coder déjà terminé, fermé `done`. À la seconde, deux checkers sont morts sans verdict et ont été fermés `failed`.
 
 ## Rapport typé
@@ -102,7 +102,7 @@ Les chiffres d'un même vf-coder réveillé peuvent être cumulatifs : ils ne so
 
 Commandes rejouées par le manager, avec leur sortie :
 
-- `pwd` → `/Users/makwilmak/vibeflow-os/.claude/worktrees/gouvernance-43`
+- `pwd` → `<dépôt>/.claude/worktrees/gouvernance-43`
 - `check-mission-invariants.sh` → `SAIN`, rc=3
 - `grep -c 'concurrentes pour un même besoin' docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` → `0` (bloquant B1 du tour 1 confirmé : la sonde est verte avant écriture)
 - `sed -n '290,296p' plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` → `NAMED_FLAG_RE = re.compile(r"^vf-mcp-tools:\s*(.*)$", re.M)` (R2 confirmé)
@@ -116,6 +116,17 @@ Commandes rejouées par le manager, avec leur sortie :
 - `git push origin gouvernance/phase-43-cadrage` → `b3d80e2..04bc4e2`
 - `gh pr create --draft --base gouvernance/phase-42-fabrique` → `https://github.com/picmakpro/vibeflow-os/pull/111`
 - `driver-lock.sh orphans` → `count: 0` à chaque retour de worker
+
+Bloc machine du contrat E6 (`mission-contracts.md` §Contrat de preuves E6), ajouté le 2026-09-26 par la mission d'exécution. Il ne reprend que les preuves dont le code de sortie ET le SHA sont établis. Le SHA du démarrage est dérivé, pas estimé : c'est le premier parent du merge `30d9627`, qui a suivi immédiatement le démarrage (`git rev-parse 30d9627^1` → `4f84534`). Plusieurs gates n'y figurent pas, parce qu'il manque le code de sortie ou le SHA et qu'on ne les reconstitue pas après coup : `check-dev-bootstrap` (rc=3 relevé, SHA non noté), `check-state-integrity`, `check-divergence`, `check-gate-touche`, `check-baseline-arbitrage` et `check-workstream-pointer`. Leur verdict textuel est listé ci-dessus. Le verdict de revue des plans est celui du `gsd-plan-checker` de clôture, relayé (`amont`). Chemins de machine remplacés par `<dépôt>` le même jour (gate `check-machine-paths`).
+
+```json
+{
+  "preuves": [
+    {"verdict": "gate:check-mission-invariants", "commande": "bash plugin/conductor/scripts/check-mission-invariants.sh", "exit_code": 3, "sha": "4f84534"},
+    {"verdict": "revue", "preuve": "amont"}
+  ]
+}
+```
 
 ## Témoin de sortie
 
