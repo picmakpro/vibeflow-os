@@ -3,59 +3,47 @@ gsd_state_version: 1.0
 workstream: gouvernance
 milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
-current_phase: 42
-current_phase_name: Fabrique — manifeste daté et invariants de doctrine du gate des agents
-status: executing
+current_phase: 43
+current_phase_name: Fabrique — gate des skills par nature et alignement de skill-creator
+status: planning
 created: 2026-09-23
-last_updated: "2026-09-25T18:45:00.000Z"
-last_activity: 2026-09-25
+last_updated: "2026-09-26T12:00:00.000Z"
+last_activity: 2026-09-26
 last_activity_desc: >-
-  Vague 4 (vf-coder, nœud exec-42-w4) : 42-06 exécuté intégralement (gsd-executor, mode
-  séquentiel, sentinel dispatch-isolation re-persisté en none). Tâche 1 : découverte récursive
-  (decouvrir_agents, os.walk followlinks=False, exclusions -references/ et dossiers cachés,
-  index_agents partagé par la cible et resolve_agent_name) — T97-T99, MUT-D1/MUT-D2 tués,
-  témoin lab frais LAB-RECURSIF-OK. Tâche 2 : invariants I2/I3 en monde fermé (D-09), actifs
-  sous --resolve-agents=strict seulement, imputés au seul dossier linté — T100-T102,
-  MUT-I2/MUT-I3 tués, rejeu CI monde fermé MONDE-FERME fail=0 (une fixture préexistante
-  vf-coder.md rendue vf-internal pour rester cohérente avec le corpus réel). Tâche 3 : conductor
-  bumpé en mineure v1.42.0 -> v1.43.0 (valeur sur disque + 0.1.0, jamais un numéro en dur) —
-  VERSION, module.json, README, CHANGELOG, team-kernel.md (ligne Mobile) ; aucun bump racine.
-  Suite complète 166 OK · 0 KO (onze mutants tués) ; rejeu des 9 suites voisines + budget +
-  version-sync + blueprints tous verts (REJEU-FIN) ; check-gate-touche.sh rc=0 (18/18 marqueurs
-  conformes). SUMMARY de clôture (42-06-SUMMARY.md) avec sections Relecture Samuel (D-12) et
-  Résidus signalés. Vérification de phase dispatchée (gsd-verifier, nœud exec-42-w4) :
-  42-VERIFICATION.md — 5/5 must-haves vérifiés (FABR-01 à FABR-05), statut human_needed (la
-  relecture Samuel sur le chemin CODEOWNERS .github/workflows/ci.yml et les modules de sa
-  polarité reste à obtenir avant merge — attendu par le plan lui-même, D-12, pas un manque).
-  FABR-03/04/05 cochées à la main ci-dessous dans REQUIREMENTS.md (requirements.mark-complete
-  résout vers fiabilite sur ce dépôt, jamais appelé). STATE tenu à la main (jamais
-  state.begin-phase / state.record-session).
-stopped_at: "Phase 42 complète, PR #108 prête pour revue code owner ; nœud fix-42-condition-2 exécuté (arbitrage Willy (b), « interdits » rétabli, baseline instruction-budget montée) ; écart vf-dev-manager → vf-design-judge (D-12) consigné en dette"
+  Phase 43 planifiée (mission vf-dev-manager 2026-09-25/26, planification seule, aucune
+  exécution). Phase 42 intégrée par merge (30d9627, PR #108 non mergée). FABR-06 à FABR-10
+  gravées au ledger. 7 plans en 4 vagues (01 ; 03/04/05 ; 02/07 ; 06), RESEARCH, PATTERNS,
+  VALIDATION. Cinq tours de révision ciblée sur les verdicts de plan-checkers frais (4 bloquants
+  réels fermés, dont une base de phase qui glissait et un faux rouge zsh). Q1 (ratchet sur le
+  socle du bootstrap) et Q-PORTEE (deux marqueurs distincts en prose ou un en titre) tranchées :
+  décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale,
+  2026-09-26. STATE tenu à la main.
+stopped_at: "Phase 43 planifiée et vérifiée (7 plans, d823a05) ; PR de planification en brouillon empilée sur gouvernance/phase-42-fabrique ; exécution non lancée — attend le merge de la PR #108 (Phase 42) et la reprise des plans sur main"
 progress:
   total_phases: 9
   completed_phases: 0
-  total_plans: 6
+  total_plans: 13
   completed_plans: 6
-  percent: 100
+  percent: 46
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 42 (Fabrique — manifeste daté et invariants de doctrine du gate des agents) — EXÉCUTÉE, EN ATTENTE DE REVUE/AUDIT (vague 4/4 : 42-06 COMPLET — découverte récursive D-10, I2/I3 monde fermé D-09, conductor v1.43.0)
-**Last Activity:** 2026-09-25
-**Last Activity Description:** Vague 4 (nœud exec-42-w4) : 42-06 exécuté intégralement par un gsd-executor séquentiel. Tâche 1 : découverte récursive (`decouvrir_agents`, `os.walk(followlinks=False)`, exclusions dossiers cachés et `-references/`, `index_agents` partagé par la cible et `resolve_agent_name`) — T97-T99, MUT-D1/MUT-D2 tués, témoin lab frais `LAB-RECURSIF-OK`. Tâche 2 : `invariant_i2`/`invariant_i3` en monde fermé (D-09), actifs sous `--resolve-agents=strict` seulement, imputés au seul dossier linté — T100-T102, MUT-I2/MUT-I3 tués, rejeu CI monde fermé `MONDE-FERME fail=0` (fixture préexistante `vf-coder.md` rendue `vf-internal` pour rester cohérente avec le corpus réel, déviation documentée au SUMMARY). Tâche 3 : conductor bumpé en mineure — valeur lue sur disque (v1.42.0, après merge de la PR #100) + 0.1.0 = v1.43.0 — VERSION, module.json, README, CHANGELOG, team-kernel.md (ligne Mobile) ; aucun bump racine. Suite complète `166 OK · 0 KO` (onze mutants tués) ; rejeu des 9 suites voisines + budget d'instructions + version-sync + blueprints tous verts (`REJEU-FIN`) ; `check-gate-touche.sh` rc=0 (18/18 marqueurs conformes). SUMMARY de clôture 42-06 avec sections « Relecture Samuel (D-12) » et « Résidus signalés ». Vérification de phase dispatchée (gsd-verifier) : `42-VERIFICATION.md` — 5/5 must-haves vérifiés (FABR-01 à FABR-05), statut `human_needed` : la relecture Samuel sur le chemin CODEOWNERS `.github/workflows/ci.yml` et les modules de sa polarité reste à obtenir avant merge — attendue par le plan lui-même (D-12), pas un manque d'implémentation. FABR-03/04/05 cochées à la main dans REQUIREMENTS.md (`requirements.mark-complete` résout vers `fiabilite` sur ce dépôt, jamais appelé).
+Phase: 43 (Fabrique — gate des skills par nature et alignement de skill-creator) — PLANIFIÉE ET VÉRIFIÉE, exécution non lancée. Phase 42 : exécutée et vérifiée, PR #108 en attente de la revue code owner de Samuel.
+**Last Activity:** 2026-09-26
+**Last Activity Description:** Planification de la Phase 43 (mission `.planning/missions/2026-09-25-gouvernance-43-plan.md`). Merge de `gouvernance/phase-42-fabrique` (`30d9627`), goal de la ROADMAP aligné sur D-Q3, FABR-06..10 au ledger, 7 plans en 4 vagues. Les plans ont été relus par des `gsd-plan-checker` frais, dix passes en tout, et révisés en cinq tours ciblés (`b2101e8`, `6a461e5`, `11ea417`, `3c83111`, `3a3f545`, puis le correctif `d823a05`). Q1 et Q-PORTEE sont tranchées (décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26).
 
 ## Progress
 
-**Phases Complete:** 0 (Phase 42 exécutée et vérifiée, en attente de revue de code et de la relecture Samuel avant clôture)
-**Current Plan:** 42-06 COMPLET (vague 4, dernier plan de la phase) — 6/6 plans
+**Phases Complete:** 0 (Phase 42 exécutée et vérifiée, non clôturée ; Phase 43 planifiée)
+**Current Plan:** 43-01 (vague 1) — 0/7 plans exécutés sur la Phase 43 ; 6/6 sur la Phase 42
 
 ## Session Continuity
 
-**Stopped At:** 42-06 complet, phase 42 exécutée et vérifiée (`human_needed` : relecture Samuel D-12 attendue avant merge, pas un manque d'implémentation) — prochain geste : revue de code par vf-reviewer (en direct par le manager) puis clôture de phase
-**Resume File:** aucun — les 6 plans de la Phase 42 sont exécutés et vérifiés ; `42-VERIFICATION.md` posé sous `.planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/`
+**Stopped At:** Phase 43 planifiée et vérifiée (`d823a05`) ; PR de planification ouverte en brouillon, empilée sur `gouvernance/phase-42-fabrique`. Prochain geste : merge de la PR #108, puis rebascule de la PR de la 43 vers `main`, puis exécution de la vague 1 (43-01 consigne d'abord la base de phase figée `43-BASE-PHASE.md`).
+**Resume File:** `.planning/workstreams/gouvernance/phases/VFDO-43-fabrique-gate-des-skills-par-nature-et-alignement-de-skill-c/43-01-PLAN.md`
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
@@ -90,6 +78,15 @@ est ton compartiment, rejoue le gate toi-même avec `--file .planning/workstream
 explicitement ; n'attends rien de la CI sur ce point.
 
 ### Decisions
+
+- **2026-09-26 — mission de planification de la Phase 43 (vf-dev-manager)** : Q1 = ratchet sur le
+  socle minimal du bootstrap (ligne de baseline `@bootstrap:socle` à la mesure du jour, ≈ 2 499
+  tokens ; le plafond ADR-029 de 2 000 reste un objectif, inscrit au BACKLOG). Q-PORTEE = la dérive
+  procédurale est cherchée dans tout le corps hors blocs de code ; elle est signalée à partir de
+  deux marqueurs distincts en prose, ou d'un seul dans un titre (10/21 SKILL.md au 2026-09-26),
+  toujours en avertissement. Décision déléguée par Willy au head (/vf-decide), AskUserQuestion
+  session principale, 2026-09-26. Le goal de la Phase 43 est amendé dans la ROADMAP selon D-Q3
+  (Willy, AskUserQuestion, session principale, 2026-09-24 : deux déclarations MCP conservées).
 
 - **2026-09-24 — mission Phase 42 (vf-dev-manager)** : recouvrement avec la PR #100 (`fiabilite`, Samuel)
   mesuré avant le premier dispatch. Il est **numérique, pas sémantique** : les deux PR bumpent `conductor`
