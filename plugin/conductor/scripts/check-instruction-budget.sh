@@ -168,6 +168,12 @@ fi
 SKILL_FILES_LIST="$TMPD/skill-files"
 : > "$SKILL_FILES_LIST"
 SKILL_EXCLUDED=0
+# Correctif revue (43-04) : le code de sortie de `find` sur la partie NON doc-only est desormais
+# teste — un echec partiel (permission refusee sur un sous-dossier) rend le corpus SKILL
+# NON-VERIFIABLE (meme traitement que BOOTSTRAP_NONVERIF, rc 2), jamais un bilan "propre" avec un
+# compte simplement incomplet. `set -uo pipefail` (sans -e) rend `$?` apres le pipe fiable ici :
+# c'est le code de la derniere commande du pipe en echec (pipefail), le `while` en dernier maillon.
+SKILL_FIND_FAILED=0
 for d in "$ROOT"/plugin/*/; do
   [ -d "$d" ] || continue
   if [ -f "${d}module.json" ] && grep -Eq '"type"[[:space:]]*:[[:space:]]*"doc-only"' "${d}module.json" 2>/dev/null; then
@@ -181,8 +187,13 @@ for d in "$ROOT"/plugin/*/; do
     rel="${f#"$ROOT"/}"
     printf '%s\n' "$rel" >> "$SKILL_FILES_LIST"
   done
+  find_rc=$?
+  [ "$find_rc" -eq 0 ] || SKILL_FIND_FAILED=1
 done
 LC_ALL=C sort -u "$SKILL_FILES_LIST" -o "$SKILL_FILES_LIST"
+if [ "$SKILL_FIND_FAILED" -eq 1 ]; then
+  echo "[check-instruction-budget] decouverte SKILL.md : non verifiable — find a echoue sur au moins un sous-dossier (permission refusee ou erreur d'E/S)" >&2
+fi
 SKILL_FOUND=$(awk 'END{print NR}' "$SKILL_FILES_LIST" 2>/dev/null || echo 0)
 [ -n "$SKILL_FOUND" ] || SKILL_FOUND=0
 
@@ -539,6 +550,9 @@ if [ -f "$ROOT/plugin/conductor/module.json" ]; then
       if [ -f "$PLUGIN_JSON" ]; then
         SKILL_FIELD_MOD="$(grep -Eo '"skills"[[:space:]]*:[[:space:]]*"[^"]*"' "$PLUGIN_JSON" 2>/dev/null \
           | sed -E 's/.*"skills"[[:space:]]*:[[:space:]]*"\.?\/?([^"]*)".*/\1/')"
+        # Correctif revue (43-04) : un "/" final (ex. "./installer/") sortirait le module du
+        # calcul en silence — plugin/$mod/ ne matcherait jamais "plugin/installer//SKILL.md".
+        SKILL_FIELD_MOD="${SKILL_FIELD_MOD%/}"
       fi
       SOCLE_MODULES="$TMPD/socle-modules"
       : > "$SOCLE_MODULES"
@@ -629,6 +643,7 @@ NONVERIF_ANY=0
 [ "$NONVERIF_COUNT" -gt 0 ] && NONVERIF_ANY=1
 [ "$SKILL_NONVERIF_COUNT" -gt 0 ] && NONVERIF_ANY=1
 [ "$BOOTSTRAP_NONVERIF" -eq 1 ] && NONVERIF_ANY=1
+[ "$SKILL_FIND_FAILED" -eq 1 ] && NONVERIF_ANY=1
 
 OVERRUN_ANY=0
 [ "$OVERRUN_COUNT" -gt 0 ] && OVERRUN_ANY=1
