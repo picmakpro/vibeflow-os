@@ -52,6 +52,9 @@ Start by understanding the user's intent. The current conversation might already
 2. When should this skill trigger? (what user phrases/contexts)
 3. What's the expected output format?
 4. Should we set up test cases to verify the skill works? Skills with objectively verifiable outputs (file transforms, data extraction, code generation, fixed workflow steps) benefit from test cases. Skills with subjective outputs (writing style, art) often don't need them. Suggest the appropriate default based on the skill type, but let the user decide.
+5. What's the skill's nature (`vf-nature`)? Ask three factual questions: does it carry a
+   blocking gate? does it hand a deliverable to a third party? does it carry a quality layer
+   (a judge, a rubric)? Note each answer as `vf-gate-bloquant`, `vf-livrable-tiers`, `vf-couche-qualite` (true/false) — at least one "yes" proposes `procedure`, which the user confirms or not (never fixed by default); none of them defaults to `outil`.
 
 ### Interview and Research
 
@@ -66,6 +69,11 @@ Based on the user interview, fill in these components:
 - **name**: Skill identifier
 - **description**: When to trigger, what it does. This is the primary triggering mechanism - include both what the skill does AND specific contexts for when to use it. All "when to use" info goes here, not in the body. Note: currently Claude has a tendency to "undertrigger" skills -- to not use them when they'd be useful. To combat this, please make the skill descriptions a little bit "pushy". So for instance, instead of "How to build a simple fast dashboard to display internal Anthropic data.", you might write "How to build a simple fast dashboard to display internal Anthropic data. Make sure to use this skill whenever the user mentions dashboards, data visualization, internal metrics, or wants to display any kind of company data, even if they don't explicitly ask for a 'dashboard.'"
 - **compatibility**: Required tools, dependencies (optional, rarely needed)
+- **vf-nature**: `referentiel` | `outil` | `procedure`, default `outil` (omitting the key keeps
+  the default). If `procedure`, also fill `ecrit:` (where the deliverable lives, relative
+  path(s)) and `vf-rubrique-juge:` (the judge's rubric: relative path or judge agent name) —
+  without both, `check-skills.sh` refuses the skill (B-03). Validate with
+  `bash plugin/conductor/scripts/check-skills.sh --file <skill-path>/SKILL.md`, rc 0 expected.
 - **the rest of the skill :)**
 
 ### Skill Writing Guide
