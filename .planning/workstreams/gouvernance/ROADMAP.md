@@ -82,13 +82,13 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 43-04-PLAN.md — vague 2 (après 43-01, seul propriétaire de la base de phase figée — révision du 2026-09-26) : plafond de 500 lignes des SKILL.md dans `check-instruction-budget.sh` ; checkpoint humain sur le corpus et le mode du bootstrap (socle mesuré ≈ 2 500 tokens pour un plafond de 2 000) avant toute hausse de baseline (FABR-09)
+- [ ] 43-04-PLAN.md — vague 2 (après 43-01, seul propriétaire de la base de phase figée — révision du 2026-09-26) : plafond de 500 lignes des SKILL.md dans `check-instruction-budget.sh` ; bootstrap en ratchet sur le socle minimal (ligne de baseline `@bootstrap:socle` à la mesure du jour, ≈ 2 499 tokens pour un plafond ADR-029 de 2 000 qui reste un objectif, BACKLOG) — décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26 (FABR-09)
 - [ ] 43-03-PLAN.md — vague 2 : `skill-creator` (moteur interne et workflow templaté) pose `vf-nature`, défaut « outil », distincte de la nature du sujet (FABR-08)
 - [ ] 43-05-PLAN.md — vague 2 (tracer) : durcissements MCP — serveur nommé absent de l'union signalé jusqu'au journal d'installation, `vf-mcp-tools` malformée refusée à l'install et au gate, textes de l'installeur à deux déclarations, relecture Samuel (FABR-10)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 43-02-PLAN.md — vague 3 (après 43-03, révision du 2026-09-26) : dérive procédurale en écart déclaration/prose, dans les deux sens, en avertissement ; portée de détection suspendue à la réponse de Willy ; corpus réel mesuré, non corrigé (FABR-07)
+- [ ] 43-02-PLAN.md — vague 3 (après 43-03, révision du 2026-09-26) : dérive procédurale en écart déclaration/prose, dans les deux sens, en avertissement ; portée : tout le corps hors blocs de code, alerte à partir de deux marqueurs distincts en prose ou d'un seul dans un titre (décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26) ; corpus réel mesuré (10/21 au 2026-09-26), non corrigé (FABR-07)
 - [ ] 43-07-PLAN.md — vague 3 : spec fabrique §1.2/§7.2 amendée (deux besoins distincts, fusion écartée, D-Q3), dev-orchestrator en patch — détaché de 43-05 à la révision du 2026-09-25 (FABR-10)
 
 **Wave 4** *(blocked on Wave 3 completion)*
