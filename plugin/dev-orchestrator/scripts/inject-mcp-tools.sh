@@ -52,6 +52,10 @@
 # signalé (WARNING par défaut, ERROR bloquante en --strict — voir --strict plus bas) ; un serveur
 # CONNU peut encore porter des noms d'outils fantaisistes non détectés par ce script. La validation
 # des noms d'outils réels reste une recette humaine sur un lab équipé (WINDOWS #3, laissée ouverte).
+# Depuis la Phase 43 (FABR-10 b, D-Q3), ce WARNING n'est plus muet côté installation : la ligne
+# stderr est relayée par vibeflow-update.sh (inject_lab_mcp_into_agents) jusqu'au journal
+# d'installation — un serveur nommé absent de l'union des scopes n'est donc plus un silence de bout
+# en bout.
 #
 # Usage:
 #   inject-mcp-tools.sh --target <fichier|dossier> [options]
@@ -89,8 +93,10 @@
 #     pas réécrit (mtime préservé). Re-jouable à volonté.
 #   - Best-effort : python3 absent, aucun serveur trouvé par aucune source, agent sans ligne `tools:`
 #     (hérite déjà tout) → no-op + log, JAMAIS d'échec (exit 0) — SAUF en --verify (voir ci-dessus,
-#     exit 3 systématique quand aucun verdict n'est possible) ou --strict avec serveur inconnu cité
-#     (exit 1). Args invalides → exit 1.
+#     exit 3 systématique quand aucun verdict n'est possible), --strict avec serveur inconnu cité
+#     (exit 1), OU une valeur `vf-mcp-tools` malformée en mode injection (Phase 43, FABR-10 a,
+#     D-Q3) : REFUSÉE — fichier non modifié, exit 1 en fin de balayage (les autres fichiers du
+#     dossier sont quand même traités, best-effort PAR FICHIER). Args invalides → exit 1.
 #   - Ne modifie QUE la ligne `tools:` du frontmatter ; le reste du fichier est préservé.
 #
 # Appelé par : vibeflow-update.sh (hook post-install, agents flaggés) · ensure-deps.sh (gsd-executor,
@@ -291,30 +297,61 @@ def has_flag(text):
 
 # --- Mode NOMMÉ (D-05) : clé dédiée `vf-mcp-tools`, grammaire <serveur>:<outil1>,<outil2>,… -------
 TOKEN_SEGMENT_RE = re.compile(r"^[A-Za-z0-9_-]+$")
-NAMED_FLAG_RE = re.compile(r"^vf-mcp-tools:\s*(.*)$", re.M)
+# Regle d extraction commune (43-05 etape 2), appliquee a l IDENTIQUE par check-agents.sh
+# (valider_mcp_tools) :
+#   (i)   PRESENCE — toute ligne du frontmatter, non indentee, qui commence par vf-mcp-tools puis
+#         des blancs horizontaux facultatifs puis un deux-points est une occurrence de la cle ;
+#         plus d une occurrence -> malformee, quel que soit l ordre ou la validite de chacune.
+#   (ii)  la valeur est le reste de la SEULE ligne de la cle, jamais la ligne suivante — y compris
+#         quand la cle est la DERNIERE ligne du frontmatter (aucune lecture hors du frontmatter).
+#   (iii) une ligne indentee qui suit IMMEDIATEMENT la ligne de la cle, si elle existe, rend la
+#         valeur malformee. "Indentee" = premier caractere espace ou tabulation (MCP_CONTINUATION_RE,
+#         meme constante et meme litteral cote check-agents.sh) — jamais le repli a 2 espaces de
+#         parse_frontmatter.
+#   (iv)  ORDRE UNIQUE : TRIM (str.strip()) PUIS retrait d une seule paire de guillemets englobante
+#         (double ou simple, identiques aux deux extremites) — jamais l inverse.
+#   (v)   puis la grammaire (partition sur le premier deux-points, charset [A-Za-z0-9_-]+).
+MCP_PRESENCE_RE = re.compile(r"^vf-mcp-tools[ \t]*:", re.M)
+NAMED_FLAG_RE = re.compile(r"^vf-mcp-tools:[ \t]*(.*)$")
+MCP_CONTINUATION_RE = re.compile(r"^[ \t]")
+QUOTE_CHARS = (chr(34), chr(39))
 
 def has_named(text):
-    """Présence de la clé `vf-mcp-tools` dans le frontmatter, valide ou non (pour découverte,
-    garde de mode fichier unique, et détection de coexistence avec vf-mcp-consumer)."""
+    """Présence de la clé `vf-mcp-tools` dans le frontmatter (motif de présence, règle (i)),
+    valide ou non (pour découverte, garde de mode fichier unique, et détection de coexistence
+    avec vf-mcp-consumer)."""
     span, lines = frontmatter_block(text)
     if span is None:
         return False
     fm = "\n".join(lines[span[0]:span[1]])
-    return bool(NAMED_FLAG_RE.search(fm))
+    return bool(MCP_PRESENCE_RE.search(fm))
 
 def named_request(text):
-    """Renvoie (serveur_declare, [outils]) depuis la cle vf-mcp-tools, ou None si la cle est
-    absente OU la valeur malformee (pas de deux-points, serveur vide, aucun outil declare, ou
-    caractere hors du charset autorise pour un segment de token MCP). Une valeur malformee est un
-    no-op journalise, jamais une erreur (best-effort, D-05)."""
+    """Renvoie (serveur_declare, [outils]) depuis la cle vf-mcp-tools, selon la regle d extraction
+    commune ci-dessus, ou None si la cle est absente OU la valeur malformee (plus d une occurrence,
+    deux-points non colle a la cle, ligne suivante indentee, pas de deux-points dans la valeur,
+    serveur vide, aucun outil declare, ou caractere hors du charset autorise pour un segment de
+    token MCP). Depuis la Phase 43 (FABR-10 a, D-Q3), une valeur malformee en mode NOMME est
+    REFUSEE en mode injection (voir malformed_found plus bas) — plus un no-op muet."""
     span, lines = frontmatter_block(text)
     if span is None:
         return None
-    fm = "\n".join(lines[span[0]:span[1]])
-    m = NAMED_FLAG_RE.search(fm)
+    fm_start, fm_end = span
+    fm_lines = lines[fm_start:fm_end]
+    occurrences = [i for i, l in enumerate(fm_lines) if MCP_PRESENCE_RE.match(l)]
+    if not occurrences:
+        return None
+    if len(occurrences) > 1:
+        return None
+    idx = occurrences[0]
+    m = NAMED_FLAG_RE.match(fm_lines[idx])
     if not m:
         return None
+    if idx + 1 < len(fm_lines) and MCP_CONTINUATION_RE.match(fm_lines[idx + 1]):
+        return None
     raw = m.group(1).strip()
+    if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in QUOTE_CHARS:
+        raw = raw[1:-1]
     if ":" not in raw:
         return None
     server_part, _, tools_part = raw.partition(":")
@@ -400,6 +437,13 @@ def unknown_server_refs(text, servers):
     return found
 
 unknown_found = False
+# Sources REELLEMENT consultees (Phase 43, FABR-10 b, D-Q3) : nommees dans le message plutot
+# qu un "sources decouvertes" generique — --servers explicite l emporte sur les deux sources
+# fichier (voir section 1), le message doit donc dire laquelle des deux formes a ete jugee.
+if servers_arg:
+    sources_desc = "liste --servers explicite"
+else:
+    sources_desc = "union scope projet %s ∪ scope global %s (ADR-051-B)" % (mcp_json, claude_json)
 for path in files:
     try:
         text = open(path, encoding="utf-8").read()
@@ -413,8 +457,7 @@ for path in files:
         continue
     for ctx, srv in unknown_server_refs(text, servers):
         unknown_found = True
-        msg = ("%s : serveur MCP '%s' (cite via %s) inconnu de toutes les sources decouvertes "
-               "(scope projet %s, scope global %s) — WINDOWS #4." % (base, srv, ctx, mcp_json, claude_json))
+        msg = ("%s : serveur MCP %s (cite via %s) inconnu de %s — WINDOWS #4." % (base, srv, ctx, sources_desc))
         if strict:
             errline(msg)
         else:
@@ -507,6 +550,10 @@ if verify:
 
 # --- 3. Injection idempotente sur la ligne tools: ------------------------------------------------
 changed_total = 0
+# malformed_found (Phase 43, FABR-10 a, D-Q3) : une valeur vf-mcp-tools malformee est REFUSEE —
+# le fichier n est jamais ecrit, mais le balayage continue sur les autres fichiers du dossier
+# (best-effort par fichier). Le balayage entier sort en rc 1 si au moins une a ete refusee.
+malformed_found = False
 for path in files:
     try:
         text = open(path, encoding="utf-8").read()
@@ -547,11 +594,14 @@ for path in files:
             logline("%s : vf-mcp-consumer ET vf-mcp-tools presents — mode NOMME retenu (moindre privilege)." % base)
         req = named_request(text)
         if req is None:
-            logline("%s : vf-mcp-tools malformee (attendu grammaire <serveur>:<outil1>,<outil2>,...) — no-op." % base)
+            errline("%s : vf-mcp-tools malformee — valeur refusee (attendu <serveur>:<outil1>,<outil2>,... ; "
+                    "segments [A-Za-z0-9_-]+) — fichier non modifie (durcissement a, D-Q3)." % base)
+            malformed_found = True
             continue
         file_want_tokens = named_tokens_for(text, servers)
         if not file_want_tokens:
-            logline("%s : serveur %s (vf-mcp-tools) absent du lab — no-op silencieux." % (base, req[0]))
+            logline("%s : rien injecte — serveur %s (vf-mcp-tools) absent des sources resolues "
+                    "(voir WARNING ci-dessus, durcissement b, D-Q3)." % (base, req[0]))
             continue
     else:
         file_want_tokens = want_tokens
@@ -583,6 +633,9 @@ for path in files:
     changed_total += 1
 
 logline("termine : %d fichier(s) modifie(s), serveurs = [%s]." % (changed_total, ", ".join(servers)))
+if malformed_found:
+    errline("au moins une valeur vf-mcp-tools malformee a ete refusee (durcissement a, D-Q3) — voir ERROR ci-dessus.")
+    sys.exit(1)
 if strict and unknown_found:
     errline("--strict signale au moins un serveur MCP inconnu cite (WINDOWS #4, voir ci-dessus) — exit 1.")
     sys.exit(1)

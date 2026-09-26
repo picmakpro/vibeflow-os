@@ -30,8 +30,18 @@
 #   T19 — --verify mode nommé, token manquant : exit 1, empreinte inchangée.
 #   T20 — --verify mode nommé complet : exit 0, empreinte inchangée.
 #   T21 — --verify mode nommé, serveur absent : exit 3 (INDÉTERMINÉ, jamais 0), empreinte inchangée.
-#   T22 — Valeur `vf-mcp-tools` malformée (sans séparateur (a), liste d'outils vide (b)) : no-op
-#         silencieux, exit 0.
+#   T22 (durci, Phase 43 FABR-10 a, D-Q3) — Valeur `vf-mcp-tools` malformée : REFUSÉE, exit 1,
+#         ERROR « malform », empreinte inchangée, valeur brute jamais recopiée : sans séparateur (a),
+#         liste d'outils vide (b), segment hors charset (c), serveur vide (d) ; entre guillemets
+#         valide (e) et invalide ; valeur lue sur la SEULE ligne de la clé — jamais la ligne
+#         suivante, jumeaux à 1 espace/1 tabulation (f) ; clé en double, deux ordres (g) ; ordre
+#         trim PUIS déquotage — espace/tabulation/CR finaux acceptés (h) ; clé en dernière ligne du
+#         frontmatter, vide refusée / valide acceptée, sans Traceback (i) ; espace avant le
+#         deux-points — reconnue présente, refusée (j).
+#   T34 — Dossier mixte (agent valide + agent malformé) : le valide reçoit ses tokens, le malformé
+#         reste identique, rc=1 pour le balayage entier.
+#   MUT-A — mutant sur la ligne unique qui passe malformed_found à vrai : rc_original=1 (T22a),
+#         rc_mutant=0.
 #
 # Découverte scope GLOBAL (Phase 21, ADR-051-B — union ./.mcp.json ∪ ~/.claude.json) :
 #   T23 — Scope global SEUL (via variable d'environnement VF_CLAUDE_JSON), pas de .mcp.json :
@@ -55,6 +65,16 @@
 #         avec --strict → exit 1.
 #   T31 — --verify + --strict : conforme sur les tokens MCP attendus mais un serveur inconnu est
 #         cité ailleurs dans `tools:` → rc bascule 0 (sans --strict) → 1 (avec --strict).
+#
+# T23 à T31 : documentés ci-dessus en Phase 21, jamais présents dans le code de cette suite
+# (constat Phase 43, 2026-09-25, vérifié jusqu'au commit d89a60e) — relevé pour Samuel, non
+# restaurés ici.
+#
+# Durcissement WINDOWS #4 / union des scopes (Phase 43, FABR-10 b, D-Q3) :
+#   T32 — NON-RÉGRESSION : l'union scope projet ∪ scope global (déjà présente dans le code,
+#         inject-mcp-tools.sh l.245-259) reste opérante pendant que (b) réécrit les messages.
+#   T33 — Serveur cité absent des DEUX scopes : WARNING nommant « union » et les DEUX chemins de
+#         sources réellement consultées.
 #
 # Convention : asserts numérotés, helpers ok()/ko(), exit 0 si tout passe, 1 si ≥1 KO.
 # Calqué sur test-dev-orchestrator.sh.
@@ -349,13 +369,19 @@ else
   ko "T15 échec casse/orthographe (ligne=$line15)"
 fi
 
-# === T16 — Serveur nommé absent de la liste résolue : no-op, exit 0 ===========================
+# === T16 (durci, Phase 43 FABR-10 b, D-Q3) — Serveur nommé absent de l'union résolue : rc 0, ====
+# empreinte inchangée, mais le signal est désormais nommé sur stderr (WARNING, serveur cité,
+# source consultée) — plus un no-op muet.
 N16="$WORK/t16.md"; mk_named "$N16"; n16_before="$(md5of "$N16")"
-bash "$SCRIPT" --target "$N16" --servers "mobile-mcp" >/dev/null 2>&1; rc16=$?
-if [ "$rc16" -eq 0 ] && [ "$(md5of "$N16")" = "$n16_before" ]; then
-  ok "T16 serveur nommé absent du lab → no-op silencieux, exit 0"
+t16_out="$(bash "$SCRIPT" --target "$N16" --servers "mobile-mcp" 2>&1)"; rc16=$?
+if [ "$rc16" -eq 0 ] && [ "$(md5of "$N16")" = "$n16_before" ] && \
+   echo "$t16_out" | grep -q 'WARNING:' && \
+   echo "$t16_out" | grep -q 'XcodeBuildMCP' && \
+   echo "$t16_out" | grep -q 'liste --servers explicite' && \
+   ! echo "$t16_out" | grep -q 'silencieux'; then
+  ok "T16 serveur nommé absent de l'union → rc=0, empreinte inchangée, WARNING nommé (source, serveur), jamais un silence"
 else
-  ko "T16 échec (rc=$rc16)"
+  ko "T16 échec (rc=$rc16, sortie=[$t16_out])"
 fi
 
 # === T17 — Idempotence du mode nommé (2e run) ==================================================
@@ -427,7 +453,8 @@ else
   ko "T21 échec (rc=$rc21, sortie=[$t21_out])"
 fi
 
-# === T22 — Valeur vf-mcp-tools malformée : no-op silencieux, exit 0 ============================
+# === T22 (durci, Phase 43 FABR-10 a, D-Q3) — Valeur vf-mcp-tools malformée : REFUSÉE, rc 1, =====
+# ERROR « malform », empreinte inchangée, valeur brute JAMAIS recopiée dans le message.
 N22A="$WORK/t22a.md"
 cat > "$N22A" <<'EOF'
 ---
@@ -441,11 +468,13 @@ vf-mcp-tools: XcodeBuildMCP-sans-separateur
 corps
 EOF
 n22a_before="$(md5of "$N22A")"
-bash "$SCRIPT" --target "$N22A" --servers "XcodeBuildMCP" >/dev/null 2>&1; rc22a=$?
-if [ "$rc22a" -eq 0 ] && [ "$(md5of "$N22A")" = "$n22a_before" ]; then
-  ok "T22a valeur malformée (pas de séparateur) : no-op silencieux, exit 0"
+t22a_out="$(bash "$SCRIPT" --target "$N22A" --servers "XcodeBuildMCP" 2>&1)"; rc22a=$?
+if [ "$rc22a" -eq 1 ] && [ "$(md5of "$N22A")" = "$n22a_before" ] && \
+   echo "$t22a_out" | grep -q 'ERROR:' && echo "$t22a_out" | grep -qi 'malform' && \
+   ! echo "$t22a_out" | grep -q 'XcodeBuildMCP-sans-separateur'; then
+  ok "T22a (durci) valeur malformée (pas de séparateur) : rc=1, ERROR malform, empreinte inchangée, valeur brute non recopiée"
 else
-  ko "T22a échec (rc=$rc22a)"
+  ko "T22a échec (rc=$rc22a, sortie=[$t22a_out])"
 fi
 
 N22B="$WORK/t22b.md"
@@ -461,14 +490,445 @@ vf-mcp-tools: XcodeBuildMCP:
 corps
 EOF
 n22b_before="$(md5of "$N22B")"
-bash "$SCRIPT" --target "$N22B" --servers "XcodeBuildMCP" >/dev/null 2>&1; rc22b=$?
-if [ "$rc22b" -eq 0 ] && [ "$(md5of "$N22B")" = "$n22b_before" ]; then
-  ok "T22b valeur malformée (liste d'outils vide) : no-op silencieux, exit 0"
+t22b_out="$(bash "$SCRIPT" --target "$N22B" --servers "XcodeBuildMCP" 2>&1)"; rc22b=$?
+if [ "$rc22b" -eq 1 ] && [ "$(md5of "$N22B")" = "$n22b_before" ] && \
+   echo "$t22b_out" | grep -q 'ERROR:' && echo "$t22b_out" | grep -qi 'malform'; then
+  ok "T22b (durci) valeur malformée (liste d'outils vide) : rc=1, ERROR malform, empreinte inchangée"
 else
-  ko "T22b échec (rc=$rc22b)"
+  ko "T22b échec (rc=$rc22b, sortie=[$t22b_out])"
 fi
 
-# === T23 — Scope global SEUL (VF_CLAUDE_JSON), pas de .mcp.json ========================# === Bilan ===================================================================================
+N22C="$WORK/t22c.md"
+cat > "$N22C" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: XcodeBuildMCP:test sim
+---
+corps
+EOF
+n22c_before="$(md5of "$N22C")"
+t22c_out="$(bash "$SCRIPT" --target "$N22C" --servers "XcodeBuildMCP" 2>&1)"; rc22c=$?
+if [ "$rc22c" -eq 1 ] && [ "$(md5of "$N22C")" = "$n22c_before" ] && echo "$t22c_out" | grep -qi 'malform'; then
+  ok "T22c valeur malformée (segment hors charset) : rc=1, ERROR malform, empreinte inchangée"
+else
+  ko "T22c échec (rc=$rc22c, sortie=[$t22c_out])"
+fi
+
+N22D="$WORK/t22d.md"
+cat > "$N22D" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: :test_sim
+---
+corps
+EOF
+n22d_before="$(md5of "$N22D")"
+t22d_out="$(bash "$SCRIPT" --target "$N22D" --servers "XcodeBuildMCP" 2>&1)"; rc22d=$?
+if [ "$rc22d" -eq 1 ] && [ "$(md5of "$N22D")" = "$n22d_before" ] && echo "$t22d_out" | grep -qi 'malform'; then
+  ok "T22d valeur malformée (serveur vide) : rc=1, ERROR malform, empreinte inchangée"
+else
+  ko "T22d échec (rc=$rc22d, sortie=[$t22d_out])"
+fi
+
+# === T34 — Dossier mixte : agent valide reçoit ses tokens, agent malformé refusé et inchangé, ===
+# rc 1 pour le balayage entier (Phase 43, FABR-10 a).
+D34="$WORK/t34"; mkdir -p "$D34"
+mk_named "$D34/vf-reviewer-ok.md"
+cat > "$D34/vf-reviewer-bad.md" <<'EOF'
+---
+name: vf-reviewer-bad
+description: revue de code, fixture malformee
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: XcodeBuildMCP-sans-separateur
+---
+corps
+EOF
+bad34_before="$(md5of "$D34/vf-reviewer-bad.md")"
+t34_out="$(bash "$SCRIPT" --target "$D34" --servers "XcodeBuildMCP" 2>&1)"; rc34=$?
+line34ok="$(toolsline "$D34/vf-reviewer-ok.md")"
+if [ "$rc34" -eq 1 ] && echo "$line34ok" | grep -q 'mcp__XcodeBuildMCP__test_sim' && \
+   [ "$(md5of "$D34/vf-reviewer-bad.md")" = "$bad34_before" ] && \
+   echo "$t34_out" | grep -q 'ERROR:' && echo "$t34_out" | grep -qi 'malform'; then
+  ok "T34 dossier mixte : agent valide injecté, agent malformé refusé et inchangé, rc=1"
+else
+  ko "T34 échec (rc=$rc34, ligne_ok=$line34ok, sortie=[$t34_out])"
+fi
+
+# === T22e (parité des guillemets, injecteur) — valeur entre guillemets acceptée, invalide ET =====
+# entre guillemets refusée (Phase 43, FABR-10 a, parité W5).
+N22E1="$WORK/t22e1.md"
+cat > "$N22E1" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: "XcodeBuildMCP:test_sim,build_sim"
+---
+corps
+EOF
+t22e1_out="$(bash "$SCRIPT" --target "$N22E1" --servers "XcodeBuildMCP" 2>&1)"; rc22e1=$?
+line22e1="$(toolsline "$N22E1")"
+if [ "$rc22e1" -eq 0 ] && echo "$line22e1" | grep -q 'mcp__XcodeBuildMCP__test_sim' && \
+   echo "$line22e1" | grep -q 'mcp__XcodeBuildMCP__build_sim' && ! echo "$t22e1_out" | grep -q 'ERROR:'; then
+  ok "T22e valeur entre guillemets doubles : rc=0, tokens injectés, aucune ERROR"
+else
+  ko "T22e (doubles) échec (rc=$rc22e1, ligne=$line22e1, sortie=[$t22e1_out])"
+fi
+
+N22E2="$WORK/t22e2.md"
+cat > "$N22E2" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: 'XcodeBuildMCP:test_sim'
+---
+corps
+EOF
+t22e2_out="$(bash "$SCRIPT" --target "$N22E2" --servers "XcodeBuildMCP" 2>&1)"; rc22e2=$?
+line22e2="$(toolsline "$N22E2")"
+if [ "$rc22e2" -eq 0 ] && echo "$line22e2" | grep -q 'mcp__XcodeBuildMCP__test_sim' && ! echo "$t22e2_out" | grep -q 'ERROR:'; then
+  ok "T22e valeur entre guillemets simples : rc=0, token injecté, aucune ERROR"
+else
+  ko "T22e (simples) échec (rc=$rc22e2, ligne=$line22e2, sortie=[$t22e2_out])"
+fi
+
+N22E3="$WORK/t22e3.md"
+cat > "$N22E3" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: "XcodeBuildMCP:test sim"
+---
+corps
+EOF
+n22e3_before="$(md5of "$N22E3")"
+t22e3_out="$(bash "$SCRIPT" --target "$N22E3" --servers "XcodeBuildMCP" 2>&1)"; rc22e3=$?
+if [ "$rc22e3" -eq 1 ] && [ "$(md5of "$N22E3")" = "$n22e3_before" ] && \
+   echo "$t22e3_out" | grep -q 'ERROR:' && echo "$t22e3_out" | grep -qi 'malform'; then
+  ok "T22e valeur entre guillemets ET hors charset : rc=1, ERROR malform, empreinte inchangée"
+else
+  ko "T22e (invalide guillemetée) échec (rc=$rc22e3, sortie=[$t22e3_out])"
+fi
+
+# === T22f (valeur lue sur la SEULE ligne de la clé, injecteur) ==================================
+N22F1="$WORK/t22f1.md"
+cat > "$N22F1" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+vf-mcp-tools:
+model: sonnet
+memory: project
+---
+corps
+EOF
+n22f1_before="$(md5of "$N22F1")"
+t22f1_out="$(bash "$SCRIPT" --target "$N22F1" --servers "XcodeBuildMCP" 2>&1)"; rc22f1=$?
+if [ "$rc22f1" -eq 1 ] && [ "$(md5of "$N22F1")" = "$n22f1_before" ] && \
+   echo "$t22f1_out" | grep -q 'ERROR:' && echo "$t22f1_out" | grep -qi 'malform'; then
+  ok "T22f clé vide suivie de model: sonnet : rc=1, ERROR malform (jamais lue comme serveur 'model')"
+else
+  ko "T22f (clé vide) échec (rc=$rc22f1, sortie=[$t22f1_out])"
+fi
+
+N22F2="$WORK/t22f2.md"
+cat > "$N22F2" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: XcodeBuildMCP:
+  test_sim
+---
+corps
+EOF
+n22f2_before="$(md5of "$N22F2")"
+t22f2_out="$(bash "$SCRIPT" --target "$N22F2" --servers "XcodeBuildMCP" 2>&1)"; rc22f2=$?
+if [ "$rc22f2" -eq 1 ] && [ "$(md5of "$N22F2")" = "$n22f2_before" ] && \
+   echo "$t22f2_out" | grep -q 'ERROR:' && echo "$t22f2_out" | grep -qi 'malform'; then
+  ok "T22f continuation indentée (clé vide + outil sur la ligne suivante) : rc=1, ERROR malform"
+else
+  ko "T22f (continuation) échec (rc=$rc22f2, sortie=[$t22f2_out])"
+fi
+
+# Jumeaux (révision tour 5) : valeur VALIDE sur la ligne de la clé, continuation à 1 espace / 1 tab.
+N22F3="$WORK/t22f-1espace.md"
+printf -- '---\nname: vf-reviewer\ndescription: revue de code\ntools: Read, Bash, Glob, Grep\nmodel: sonnet\nmemory: project\nvf-mcp-tools: XcodeBuildMCP:test_sim\n build_sim\n---\ncorps\n' > "$N22F3"
+n22f3_before="$(md5of "$N22F3")"
+t22f3_out="$(bash "$SCRIPT" --target "$N22F3" --servers "XcodeBuildMCP" 2>&1)"; rc22f3=$?
+if [ "$rc22f3" -eq 1 ] && [ "$(md5of "$N22F3")" = "$n22f3_before" ] && \
+   echo "$t22f3_out" | grep -q 'ERROR:' && echo "$t22f3_out" | grep -qi 'malform'; then
+  ok "T22f 1-espace : valeur valide + continuation indentée d'UNE espace : rc=1, ERROR malform"
+else
+  ko "T22f 1-espace échec (rc=$rc22f3, sortie=[$t22f3_out])"
+fi
+
+N22F4="$WORK/t22f-tabulation.md"
+printf -- '---\nname: vf-reviewer\ndescription: revue de code\ntools: Read, Bash, Glob, Grep\nmodel: sonnet\nmemory: project\nvf-mcp-tools: XcodeBuildMCP:test_sim\n\tbuild_sim\n---\ncorps\n' > "$N22F4"
+n22f4_before="$(md5of "$N22F4")"
+t22f4_out="$(bash "$SCRIPT" --target "$N22F4" --servers "XcodeBuildMCP" 2>&1)"; rc22f4=$?
+if [ "$rc22f4" -eq 1 ] && [ "$(md5of "$N22F4")" = "$n22f4_before" ] && \
+   echo "$t22f4_out" | grep -q 'ERROR:' && echo "$t22f4_out" | grep -qi 'malform'; then
+  ok "T22f tabulation : valeur valide + continuation indentée d'UNE tabulation : rc=1, ERROR malform"
+else
+  ko "T22f tabulation échec (rc=$rc22f4, sortie=[$t22f4_out])"
+fi
+
+# === T22g (clé en double, injecteur) — refusée dans les deux ordres =============================
+N22G1="$WORK/t22g1.md"
+cat > "$N22G1" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: XcodeBuildMCP:test_sim
+vf-mcp-tools: XcodeBuildMCP:
+---
+corps
+EOF
+n22g1_before="$(md5of "$N22G1")"
+t22g1_out="$(bash "$SCRIPT" --target "$N22G1" --servers "XcodeBuildMCP" 2>&1)"; rc22g1=$?
+if [ "$rc22g1" -eq 1 ] && [ "$(md5of "$N22G1")" = "$n22g1_before" ] && \
+   echo "$t22g1_out" | grep -q 'ERROR:' && echo "$t22g1_out" | grep -qi 'malform'; then
+  ok "T22g clé en double (valide puis vide) : rc=1, ERROR malform"
+else
+  ko "T22g (ordre 1) échec (rc=$rc22g1, sortie=[$t22g1_out])"
+fi
+
+N22G2="$WORK/t22g2.md"
+cat > "$N22G2" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: XcodeBuildMCP:
+vf-mcp-tools: XcodeBuildMCP:test_sim
+---
+corps
+EOF
+n22g2_before="$(md5of "$N22G2")"
+t22g2_out="$(bash "$SCRIPT" --target "$N22G2" --servers "XcodeBuildMCP" 2>&1)"; rc22g2=$?
+if [ "$rc22g2" -eq 1 ] && [ "$(md5of "$N22G2")" = "$n22g2_before" ] && \
+   echo "$t22g2_out" | grep -q 'ERROR:' && echo "$t22g2_out" | grep -qi 'malform'; then
+  ok "T22g clé en double (vide puis valide) : rc=1, ERROR malform"
+else
+  ko "T22g (ordre 2) échec (rc=$rc22g2, sortie=[$t22g2_out])"
+fi
+
+# === T22h (ordre trim PUIS déquotage, injecteur) — accepté malgré blanc/CR final ================
+N22H1="$WORK/t22h1.md"
+printf -- '---\nname: vf-reviewer\ndescription: revue de code\ntools: Read, Bash, Glob, Grep\nmodel: sonnet\nmemory: project\nvf-mcp-tools: "XcodeBuildMCP:test_sim" \n---\ncorps\n' > "$N22H1"
+t22h1_out="$(bash "$SCRIPT" --target "$N22H1" --servers "XcodeBuildMCP" 2>&1)"; rc22h1=$?
+line22h1="$(toolsline "$N22H1")"
+if [ "$rc22h1" -eq 0 ] && echo "$line22h1" | grep -q 'mcp__XcodeBuildMCP__test_sim' && ! echo "$t22h1_out" | grep -q 'ERROR:'; then
+  ok "T22h espace finale après guillemet fermant : rc=0, token injecté"
+else
+  ko "T22h (espace) échec (rc=$rc22h1, sortie=[$t22h1_out])"
+fi
+
+N22H2="$WORK/t22h2.md"
+printf -- '---\nname: vf-reviewer\ndescription: revue de code\ntools: Read, Bash, Glob, Grep\nmodel: sonnet\nmemory: project\nvf-mcp-tools: "XcodeBuildMCP:test_sim"\t\n---\ncorps\n' > "$N22H2"
+t22h2_out="$(bash "$SCRIPT" --target "$N22H2" --servers "XcodeBuildMCP" 2>&1)"; rc22h2=$?
+line22h2="$(toolsline "$N22H2")"
+if [ "$rc22h2" -eq 0 ] && echo "$line22h2" | grep -q 'mcp__XcodeBuildMCP__test_sim' && ! echo "$t22h2_out" | grep -q 'ERROR:'; then
+  ok "T22h tabulation finale après guillemet fermant : rc=0, token injecté"
+else
+  ko "T22h (tabulation) échec (rc=$rc22h2, sortie=[$t22h2_out])"
+fi
+
+N22H3="$WORK/t22h3.md"
+printf -- '---\nname: vf-reviewer\ndescription: revue de code\ntools: Read, Bash, Glob, Grep\nmodel: sonnet\nmemory: project\nvf-mcp-tools: "XcodeBuildMCP:test_sim"\r\n---\ncorps\n' > "$N22H3"
+t22h3_out="$(bash "$SCRIPT" --target "$N22H3" --servers "XcodeBuildMCP" 2>&1)"; rc22h3=$?
+line22h3="$(toolsline "$N22H3")"
+if [ "$rc22h3" -eq 0 ] && echo "$line22h3" | grep -q 'mcp__XcodeBuildMCP__test_sim' && ! echo "$t22h3_out" | grep -q 'ERROR:'; then
+  ok "T22h ligne de la clé terminée par CR LF : rc=0, token injecté (verrou, lecture texte déjà universelle)"
+else
+  ko "T22h (CR) échec (rc=$rc22h3, sortie=[$t22h3_out])"
+fi
+
+# === T22i (clé en DERNIÈRE ligne du frontmatter, injecteur) =====================================
+N22I1="$WORK/t22i1.md"
+cat > "$N22I1" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools:
+---
+corps
+EOF
+n22i1_before="$(md5of "$N22I1")"
+t22i1_out="$(bash "$SCRIPT" --target "$N22I1" --servers "XcodeBuildMCP" 2>&1)"; rc22i1=$?
+if [ "$rc22i1" -eq 1 ] && [ "$(md5of "$N22I1")" = "$n22i1_before" ] && \
+   echo "$t22i1_out" | grep -q 'ERROR:' && echo "$t22i1_out" | grep -qi 'malform' && \
+   ! echo "$t22i1_out" | grep -q 'Traceback'; then
+  ok "T22i clé vide en dernière ligne du frontmatter : rc=1, ERROR malform, aucun Traceback"
+else
+  ko "T22i (vide) échec (rc=$rc22i1, sortie=[$t22i1_out])"
+fi
+
+N22I2="$WORK/t22i2.md"
+cat > "$N22I2" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: XcodeBuildMCP:test_sim
+---
+corps
+EOF
+t22i2_out="$(bash "$SCRIPT" --target "$N22I2" --servers "XcodeBuildMCP" 2>&1)"; rc22i2=$?
+line22i2="$(toolsline "$N22I2")"
+if [ "$rc22i2" -eq 0 ] && echo "$line22i2" | grep -q 'mcp__XcodeBuildMCP__test_sim'; then
+  ok "T22i (jumeau valide) clé valide en dernière ligne du frontmatter : rc=0, token injecté"
+else
+  ko "T22i (jumeau) échec (rc=$rc22i2, sortie=[$t22i2_out])"
+fi
+
+# === T22j (espace avant le deux-points, injecteur) — reconnue PRÉSENTE, refusée =================
+N22J="$WORK/t22j.md"
+cat > "$N22J" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools : XcodeBuildMCP:test_sim
+---
+corps
+EOF
+n22j_before="$(md5of "$N22J")"
+t22j_out="$(bash "$SCRIPT" --target "$N22J" --servers "XcodeBuildMCP" 2>&1)"; rc22j=$?
+if [ "$rc22j" -eq 1 ] && [ "$(md5of "$N22J")" = "$n22j_before" ] && \
+   echo "$t22j_out" | grep -q 'ERROR:' && echo "$t22j_out" | grep -qi 'malform'; then
+  ok "T22j espace avant le deux-points : reconnue présente, rc=1, ERROR malform (jamais ignorée en silence)"
+else
+  ko "T22j échec (rc=$rc22j, sortie=[$t22j_out])"
+fi
+
+# ---------- MUT-A : mutant sur la ligne unique qui passe malformed_found à vrai (Tâche 2, 43-05) --
+# Cette suite n'a que ok()/ko() (l.67-68) — aucune fonction okmut ni helper de mutation : le cas
+# écrit lui-même, en toutes lettres, ses trois libellés. Le mutant est placé dans une arborescence
+# qui reproduit exactement plugin/dev-orchestrator/scripts/ + plugin/_internal/lib/, faute de quoi
+# le locator vf-portable.sh (remontée bornée) ne le trouve pas depuis un mktemp isolé.
+MUT_A_MOTIF='malformed_found = True'
+MUT_A_N="$(grep -Fc -- "$MUT_A_MOTIF" "$SCRIPT")"
+if [ "$MUT_A_N" -ne 1 ]; then
+  ko "MUT-A REFUSE : motif '$MUT_A_MOTIF' absent ou non unique dans $SCRIPT (n=$MUT_A_N)"
+else
+  MUT_A_TREE="$WORK/mut-a-tree"
+  mkdir -p "$MUT_A_TREE/plugin/dev-orchestrator/scripts" "$MUT_A_TREE/plugin/_internal/lib"
+  MUT_A_REAL_PORTABLE="$(cd "$(dirname "$SCRIPT")/../../_internal/lib" && pwd)/vf-portable.sh"
+  cp "$MUT_A_REAL_PORTABLE" "$MUT_A_TREE/plugin/_internal/lib/vf-portable.sh"
+  MUT_A_TMP="$MUT_A_TREE/plugin/dev-orchestrator/scripts/inject-mcp-tools.sh"
+  MUT_A_ENV="$MUT_A_MOTIF" awk '
+    index($0, ENVIRON["MUT_A_ENV"]) {
+      match($0, /^[ \t]*/)
+      print substr($0, RSTART, RLENGTH) "pass"
+      next
+    }
+    { print }
+  ' "$SCRIPT" > "$MUT_A_TMP"
+  if cmp -s "$MUT_A_TMP" "$SCRIPT"; then
+    ko "MUT-A REFUSE : mutation produit un fichier identique à l'original"
+  elif ! bash -n "$MUT_A_TMP" 2>/dev/null; then
+    ko "MUT-A REFUSE : bash -n échoue sur le mutant"
+  else
+    MUT_A_FIXTURE="$WORK/mut-a-fixture.md"
+    cat > "$MUT_A_FIXTURE" <<'EOF'
+---
+name: vf-reviewer
+description: revue de code
+tools: Read, Bash, Glob, Grep
+model: sonnet
+memory: project
+vf-mcp-tools: XcodeBuildMCP-sans-separateur
+---
+corps
+EOF
+    bash "$MUT_A_TMP" --target "$MUT_A_FIXTURE" --servers "XcodeBuildMCP" >/dev/null 2>&1; MUT_A_RC_MUTANT=$?
+    bash "$SCRIPT" --target "$MUT_A_FIXTURE" --servers "XcodeBuildMCP" >/dev/null 2>&1; MUT_A_RC_ORIG=$?
+    if [ "$MUT_A_RC_MUTANT" -eq 0 ] && [ "$MUT_A_RC_ORIG" -eq 1 ]; then
+      ok "MUT-A TUE : rc_mutant=0 attendu 0, rc_original=1 attendu 1"
+    else
+      ko "MUT-A NON TUE : rc_mutant=$MUT_A_RC_MUTANT attendu 0, rc_original=$MUT_A_RC_ORIG attendu 1"
+    fi
+  fi
+fi
+
+# T23 à T31 : documentés en Phase 21, jamais présents dans le code de cette suite (constat
+# Phase 43, 2026-09-25) — relevé pour Samuel, non restaurés ici. Seuls T32 et T33 sont ajoutés
+# (43-05) pour juger (b) : l'union projet ∪ global existe déjà dans le code (Phase 21,
+# inject-mcp-tools.sh l.245-259), ce plan la TESTE, il ne la modifie pas.
+
+# === T32 (NON-RÉGRESSION, Phase 43 FABR-10 b) — union scope projet ∪ scope global : DÉJÀ ========
+# opérante avant toute écriture de ce plan (inject-mcp-tools.sh l.245-259) — ce cas la verrouille
+# pendant que (b) réécrit les messages de WINDOWS #4. Projet mobile-mcp, global XcodeBuildMCP.
+D32="$WORK/t32"; mkdir -p "$D32"
+N32="$D32/vf-reviewer.md"; mk_named "$N32"
+mk_mcp '{ "mcpServers": { "mobile-mcp": {} } }'
+T32_CLAUDE_JSON="$WORK/t32-claude.json"
+printf '%s\n' '{ "mcpServers": { "XcodeBuildMCP": {} } }' > "$T32_CLAUDE_JSON"
+t32_out="$(VF_CLAUDE_JSON="$T32_CLAUDE_JSON" bash "$SCRIPT" --target "$N32" --mcp-json "$WORK/.mcp.json" 2>&1)"; rc32=$?
+line32="$(toolsline "$N32")"
+if [ "$rc32" -eq 0 ] && echo "$line32" | grep -q 'mcp__XcodeBuildMCP__test_sim' && \
+   echo "$line32" | grep -q 'mcp__XcodeBuildMCP__build_sim' && \
+   echo "$line32" | grep -q 'mcp__XcodeBuildMCP__clean' && \
+   ! echo "$t32_out" | grep -q 'WARNING:'; then
+  ok "T32 (NON-RÉGRESSION) union scope projet ∪ scope global : serveur du scope global injecté, aucun WARNING"
+else
+  ko "T32 échec (rc=$rc32, ligne=$line32, sortie=[$t32_out])"
+fi
+
+# === T33 — Union scope projet ∪ scope global, serveur cité absent des DEUX : WARNING nommant =====
+# « union » et les DEUX chemins de sources (Phase 43, FABR-10 b).
+D33="$WORK/t33"; mkdir -p "$D33"
+N33="$D33/vf-reviewer.md"; mk_named "$N33"; n33_before="$(md5of "$N33")"
+mk_mcp '{ "mcpServers": { "mobile-mcp": {} } }'
+T33_CLAUDE_JSON="$WORK/t33-claude.json"
+printf '%s\n' '{ "mcpServers": { "context7": {} } }' > "$T33_CLAUDE_JSON"
+t33_out="$(VF_CLAUDE_JSON="$T33_CLAUDE_JSON" bash "$SCRIPT" --target "$N33" --mcp-json "$WORK/.mcp.json" 2>&1)"; rc33=$?
+if [ "$rc33" -eq 0 ] && [ "$(md5of "$N33")" = "$n33_before" ] && \
+   echo "$t33_out" | grep -q 'WARNING:' && \
+   echo "$t33_out" | grep -qi 'union' && \
+   echo "$t33_out" | grep -qF "$WORK/.mcp.json" && \
+   echo "$t33_out" | grep -qF "$T33_CLAUDE_JSON"; then
+  ok "T33 union scope projet ∪ scope global, serveur absent des DEUX : WARNING nommant union et les deux chemins de sources"
+else
+  ko "T33 échec (rc=$rc33, sortie=[$t33_out])"
+fi
+
+# === Bilan ===================================================================================
 echo ""
 echo "  Bilan : $pass OK, $fail KO"
 [ "$fail" -eq 0 ] || exit 1

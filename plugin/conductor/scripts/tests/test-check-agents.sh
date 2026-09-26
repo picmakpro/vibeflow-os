@@ -3569,6 +3569,427 @@ else
   ko "T107 (rc=$RC) : $OUT"
 fi
 
+# ---------- T108-T115 — grammaire vf-mcp-tools au gate (Phase 43, FABR-10 a, D-Q3) ---------------
+# Parité gate <-> injecteur : même règle d'extraction (43-05 étape 2), même charset, même ordre
+# trim puis déquotage. T108 pose la fixture BASE (conforme, model/effort/memory/vf-requires:
+# mcp-servers) que T110-T115 réutilisent en ne faisant varier QUE la portion vf-mcp-tools.
+rm -f "$AG"/*.md
+
+# === T108 — fixture conforme vf-mcp-tools + vf-requires: mcp-servers -> rc=0 ; vrai vf-reviewer.md
+cat > "$AG/t108-ok.md" <<'EOF'
+---
+name: t108-ok
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: XcodeBuildMCP:test_sim,build_sim,clean
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(run_check 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then
+  ok "T108 fixture conforme vf-mcp-tools + vf-requires: mcp-servers -> rc=0"
+else
+  ko "T108 (rc=$RC) : $OUT"
+fi
+rm -f "$AG"/*.md
+
+REAL_VF_REVIEWER="$SCRIPTS_DIR/../../dev-orchestrator/agents/vf-reviewer.md"
+if [ -f "$REAL_VF_REVIEWER" ]; then
+  cp "$REAL_VF_REVIEWER" "$AG/vf-reviewer.md"
+  OUT="$(run_check 2>&1)"; RC=$?
+  if [ "$RC" -eq 0 ]; then
+    ok "T108 le vrai vf-reviewer.md copié -> rc=0"
+  else
+    ko "T108 (vf-reviewer.md réel, rc=$RC) : $OUT"
+  fi
+  rm -f "$AG"/*.md
+else
+  ko "T108 : vrai vf-reviewer.md introuvable ($REAL_VF_REVIEWER)"
+fi
+
+# === T109 — les quatre formes malformées de T22a-T22d sur la fixture de T108 -> rc=1 chacune =====
+T109A="$AG/t109a.md"
+cat > "$T109A" <<'EOF'
+---
+name: t109a
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: XcodeBuildMCP-sans-separateur
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T109A" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T109a (sans séparateur) -> rc=1, vf-mcp-tools malformee"
+else
+  ko "T109a (rc=$RC) : $OUT"
+fi
+
+T109B="$AG/t109b.md"
+cat > "$T109B" <<'EOF'
+---
+name: t109b
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: XcodeBuildMCP:
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T109B" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T109b (liste d'outils vide) -> rc=1, vf-mcp-tools malformee"
+else
+  ko "T109b (rc=$RC) : $OUT"
+fi
+
+T109C="$AG/t109c.md"
+cat > "$T109C" <<'EOF'
+---
+name: t109c
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: XcodeBuildMCP:test sim
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T109C" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T109c (segment hors charset) -> rc=1, vf-mcp-tools malformee"
+else
+  ko "T109c (rc=$RC) : $OUT"
+fi
+
+T109D="$AG/t109d.md"
+cat > "$T109D" <<'EOF'
+---
+name: t109d
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: :test_sim
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T109D" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T109d (serveur vide) -> rc=1, vf-mcp-tools malformee"
+else
+  ko "T109d (rc=$RC) : $OUT"
+fi
+rm -f "$AG"/*.md
+
+# === T110 (parité des guillemets, gate) — mêmes trois valeurs que T22e =========================
+T110A="$AG/t110a.md"
+cat > "$T110A" <<'EOF'
+---
+name: t110a
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: "XcodeBuildMCP:test_sim,build_sim"
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T110A" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then ok "T110 valeur entre guillemets doubles -> rc=0 (même verdict que T22e)"; else ko "T110a (rc=$RC) : $OUT"; fi
+
+T110B="$AG/t110b.md"
+cat > "$T110B" <<'EOF'
+---
+name: t110b
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: 'XcodeBuildMCP:test_sim'
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T110B" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then ok "T110 valeur entre guillemets simples -> rc=0 (même verdict que T22e)"; else ko "T110b (rc=$RC) : $OUT"; fi
+
+T110C="$AG/t110c.md"
+cat > "$T110C" <<'EOF'
+---
+name: t110c
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: "XcodeBuildMCP:test sim"
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T110C" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T110 valeur entre guillemets ET hors charset -> rc=1, vf-mcp-tools malformee (même verdict que T22e)"
+else
+  ko "T110c (rc=$RC) : $OUT"
+fi
+rm -f "$AG"/*.md
+
+# === T111 (valeur lue sur la seule ligne de la clé, gate) — mêmes fixtures que T22f =============
+T111A="$AG/t111a.md"
+cat > "$T111A" <<'EOF'
+---
+name: t111a
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+effort: medium
+memory: project
+vf-mcp-tools:
+model: sonnet
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T111A" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T111 clé vide suivie de model: sonnet -> rc=1, vf-mcp-tools malformee (même verdict que T22f)"
+else
+  ko "T111a (rc=$RC) : $OUT"
+fi
+
+T111B="$AG/t111b.md"
+cat > "$T111B" <<'EOF'
+---
+name: t111b
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: XcodeBuildMCP:
+  test_sim
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T111B" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T111 continuation indentée (clé vide + outil ligne suivante) -> rc=1, vf-mcp-tools malformee (même verdict que T22f)"
+else
+  ko "T111b (rc=$RC) : $OUT"
+fi
+
+T111C="$AG/t111-1espace.md"
+printf -- '---\nname: t111-1espace\ndescription: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.\nmodel: sonnet\neffort: medium\nmemory: project\nvf-mcp-tools: XcodeBuildMCP:test_sim\n build_sim\nvf-requires: mcp-servers\n---\nCorps de l agent.\n' > "$T111C"
+OUT="$(bash "$CHECK" --file "$T111C" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T111 1-espace : valeur valide + continuation à UNE espace -> rc=1, vf-mcp-tools malformee (même verdict que T22f 1-espace)"
+else
+  ko "T111 1-espace (rc=$RC) : $OUT"
+fi
+
+T111D="$AG/t111-tabulation.md"
+printf -- '---\nname: t111-tabulation\ndescription: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.\nmodel: sonnet\neffort: medium\nmemory: project\nvf-mcp-tools: XcodeBuildMCP:test_sim\n\tbuild_sim\nvf-requires: mcp-servers\n---\nCorps de l agent.\n' > "$T111D"
+OUT="$(bash "$CHECK" --file "$T111D" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T111 tabulation : valeur valide + continuation à UNE tabulation -> rc=1, vf-mcp-tools malformee (même verdict que T22f tabulation)"
+else
+  ko "T111 tabulation (rc=$RC) : $OUT"
+fi
+rm -f "$AG"/*.md
+
+# === T112 (clé en double, gate) — refusée dans les deux ordres, même verdict que T22g ===========
+T112A="$AG/t112a.md"
+cat > "$T112A" <<'EOF'
+---
+name: t112a
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: XcodeBuildMCP:test_sim
+vf-mcp-tools: XcodeBuildMCP:
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T112A" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T112 clé en double (valide puis vide) -> rc=1, vf-mcp-tools malformee (même verdict que T22g)"
+else
+  ko "T112a (rc=$RC) : $OUT"
+fi
+
+T112B="$AG/t112b.md"
+cat > "$T112B" <<'EOF'
+---
+name: t112b
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: XcodeBuildMCP:
+vf-mcp-tools: XcodeBuildMCP:test_sim
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T112B" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T112 clé en double (vide puis valide) -> rc=1, vf-mcp-tools malformee (même verdict que T22g)"
+else
+  ko "T112b (rc=$RC) : $OUT"
+fi
+rm -f "$AG"/*.md
+
+# === T113 (ordre trim PUIS déquotage, gate) — mêmes trois fixtures que T22h -> rc=0 chacune ======
+T113A="$AG/t113a.md"
+printf -- '---\nname: t113a\ndescription: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.\nmodel: sonnet\neffort: medium\nmemory: project\nvf-mcp-tools: "XcodeBuildMCP:test_sim" \nvf-requires: mcp-servers\n---\nCorps de l agent.\n' > "$T113A"
+OUT="$(bash "$CHECK" --file "$T113A" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then ok "T113 espace finale après guillemet fermant -> rc=0 (même verdict que T22h)"; else ko "T113a (rc=$RC) : $OUT"; fi
+
+T113B="$AG/t113b.md"
+printf -- '---\nname: t113b\ndescription: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.\nmodel: sonnet\neffort: medium\nmemory: project\nvf-mcp-tools: "XcodeBuildMCP:test_sim"\t\nvf-requires: mcp-servers\n---\nCorps de l agent.\n' > "$T113B"
+OUT="$(bash "$CHECK" --file "$T113B" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then ok "T113 tabulation finale après guillemet fermant -> rc=0 (même verdict que T22h)"; else ko "T113b (rc=$RC) : $OUT"; fi
+
+T113C="$AG/t113c.md"
+printf -- '---\nname: t113c\ndescription: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.\nmodel: sonnet\neffort: medium\nmemory: project\nvf-mcp-tools: "XcodeBuildMCP:test_sim"\r\nvf-requires: mcp-servers\n---\nCorps de l agent.\n' > "$T113C"
+OUT="$(bash "$CHECK" --file "$T113C" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then ok "T113 ligne de la clé terminée par CR LF -> rc=0 (même verdict que T22h)"; else ko "T113c (rc=$RC) : $OUT"; fi
+rm -f "$AG"/*.md
+
+# === T114 (clé en DERNIÈRE ligne du frontmatter, gate) — mêmes fixtures que T22i ================
+T114A="$AG/t114a.md"
+cat > "$T114A" <<'EOF'
+---
+name: t114a
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-requires: mcp-servers
+vf-mcp-tools:
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T114A" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee" && ! echo "$OUT" | grep -q "Traceback"; then
+  ok "T114 clé vide en dernière ligne du frontmatter -> rc=1, vf-mcp-tools malformee, aucun Traceback (même verdict que T22i)"
+else
+  ko "T114a (rc=$RC) : $OUT"
+fi
+
+T114B="$AG/t114b.md"
+cat > "$T114B" <<'EOF'
+---
+name: t114b
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-requires: mcp-servers
+vf-mcp-tools: XcodeBuildMCP:test_sim
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T114B" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ]; then
+  ok "T114 (jumeau valide) clé valide en dernière ligne du frontmatter -> rc=0 (même verdict que T22i)"
+else
+  ko "T114b (rc=$RC) : $OUT"
+fi
+rm -f "$AG"/*.md
+
+# === T115 (espace avant le deux-points, gate) — même fixture que T22j ===========================
+T115="$AG/t115.md"
+cat > "$T115" <<'EOF'
+---
+name: t115
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools : XcodeBuildMCP:test_sim
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+OUT="$(bash "$CHECK" --file "$T115" --skills-dir="$SK" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-mcp-tools malformee"; then
+  ok "T115 espace avant le deux-points -> rc=1, vf-mcp-tools malformee (même verdict que T22j, jamais ignorée en silence)"
+else
+  ko "T115 (rc=$RC) : $OUT"
+fi
+rm -f "$AG"/*.md
+
+# ---------- MUT-M1 : mutant sur la ligne d'appel de valider_mcp_tools (appel DIRECT, S6) --------
+# Patron distinct des 16 appels existants (Phase 42, substitution de commande) : ceux-là perdent
+# le comptage d'un refus dans le sous-shell créé par $(...). L'appel de MUT-M1 est DIRECT, sortie
+# redirigée vers un fichier du dossier de travail — jamais dans une substitution de commande — pour
+# qu'un refus du helper soit compté KO dans LE SHELL DE LA SUITE (MUT-M1-REFUS-COMPTE le prouve
+# juste après).
+MUT_M1_AG="$WORK/mut-m1-ag"; mkdir -p "$MUT_M1_AG"
+cat > "$MUT_M1_AG/agent-mutm1.md" <<'EOF'
+---
+name: agent-mutm1
+description: Pilote les tests du lab de bout en bout. Use when une suite de tests doit etre lancee.
+model: sonnet
+effort: medium
+memory: project
+vf-mcp-tools: XcodeBuildMCP-sans-separateur
+vf-requires: mcp-servers
+---
+Corps de l agent.
+EOF
+make_gate_mutant M1 0 'errors.extend(valider_mcp_tools(' 'pass' > "$WORK/mut-M1.chemin"
+MUT_M1_CALL_RC=$?
+if [ "$MUT_M1_CALL_RC" -eq 0 ]; then
+  MUT_M1_DIR="$(cat "$WORK/mut-M1.chemin")"
+  RC_ORIG=0; bash "$CHECK" --file "$MUT_M1_AG/agent-mutm1.md" --skills-dir="$SK" >/dev/null 2>&1 || RC_ORIG=$?
+  RC_MUT=0; bash "$MUT_M1_DIR/check-agents.sh" --file "$MUT_M1_AG/agent-mutm1.md" --skills-dir="$SK" >/dev/null 2>&1 || RC_MUT=$?
+  if [ "$RC_ORIG" -eq 1 ] && [ "$RC_MUT" -eq 0 ]; then
+    okmut M1 "$RC_MUT" 0 "$RC_ORIG" 1
+  else
+    komut M1 "rc_mutant=0 et rc_original=1, sans Traceback" "rc_mutant=0, rc_original=1" "rc_mutant=$RC_MUT, rc_original=$RC_ORIG"
+  fi
+else
+  cat "$WORK/mut-M1.chemin"
+fi
+
+# ---------- MUT-M1-REFUS-COMPTE (garde du harnais, même patron que MUT-REFUS-COMPTE de 43-01) ---
+# Preuve à l'exécution que l'appel DIRECT (forme exacte de MUT-M1 ci-dessus) compte un refus du
+# helper comme KO dans le shell APPELANT — jamais perdu dans un sous-shell. Le sous-shell
+# explicite ci-dessous imprime son delta de `fail` et le rc du helper dans un fichier ; son propre
+# incrément de `fail` (interne au sous-shell) est volontairement PERDU pour la suite globale — il
+# n'entre jamais dans le décompte final, exactement comme les 16 appels historiques en
+# substitution de commande.
+(
+  before_fail=$fail
+  make_gate_mutant REFUS-M1 0 'ce-motif-nexiste-jamais-dans-check-agents-sh-43-05' 'pass' > "$WORK/mut-refus-m1.out"
+  rc_helper=$?
+  delta=$((fail - before_fail))
+  echo "DELTA-FAIL=$delta"
+  echo "RC-HELPER=$rc_helper"
+) > "$WORK/mut-refus-m1-subshell.out"
+DELTA_LINE="$(grep '^DELTA-FAIL=' "$WORK/mut-refus-m1-subshell.out")"
+RC_HELPER_LINE="$(grep '^RC-HELPER=' "$WORK/mut-refus-m1-subshell.out")"
+if [ "$DELTA_LINE" = "DELTA-FAIL=1" ] && [ "$RC_HELPER_LINE" = "RC-HELPER=1" ] && \
+   grep -q 'MUT-REFUS-M1 NON TUE' "$WORK/mut-refus-m1.out"; then
+  ok "MUT-M1-REFUS-COMPTE : refus du helper compte KO dans le shell appelant (appel direct, sortie redirigee)"
+else
+  ko "MUT-M1-REFUS-COMPTE échec ($DELTA_LINE, $RC_HELPER_LINE, sortie helper=[$(cat "$WORK/mut-refus-m1.out")])"
+fi
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]

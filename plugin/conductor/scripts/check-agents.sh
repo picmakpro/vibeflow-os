@@ -76,7 +76,9 @@
 #   {user,project,local} · effort absent ou hors du set du manifeste daté ·
 #   permissionMode/isolation/background/maxTurns invalides ·
 #   allowlist Agent(...)/Task(...)/Bash(...)/etc malformée (parenthèse non fermée, allowlist
-#   vide, entrée vide, espace avant la parenthèse, token hors charset).
+#   vide, entrée vide, espace avant la parenthèse, token hors charset) ·
+#   vf-mcp-tools malformée (Phase 43, FABR-10 a, D-Q3 — grammaire <serveur>:<outil1>,<outil2>,...,
+#   même règle d'extraction que named_request de inject-mcp-tools.sh, valider_mcp_tools).
 # WARNING : skills absent · skill déclaré introuvable (ERROR en --strict) · description < 30c ·
 #   tools absent (hérite tout) · champ inconnu · name ≠ nom de fichier · outil hors du set
 #   fermé documenté (ERROR en --strict) · nom d'agent non résolu dans une allowlist Agent(...)
@@ -833,6 +835,61 @@ def invariant_i7(base, fm):
         return []
     return [f\"{base} : invariant I7 — {k} sans vf-requires citant mcp-servers\" for k in mcp_keys]
 
+# ---- Grammaire vf-mcp-tools (Phase 43, FABR-10 a, D-Q3) -----------------------------------------
+# Regle d'extraction commune (43-05 etape 2), appliquee a l'IDENTIQUE par named_request de
+# inject-mcp-tools.sh : (i) PRESENCE — motif ^vf-mcp-tools[ \t]*: sur une ligne BRUTE non indentee,
+# une seule occurrence tolerre ; (ii) valeur = reste de la SEULE ligne de la cle, jamais la ligne
+# suivante, meme en derniere ligne du frontmatter ; (iii) ligne indentee qui suit immediatement ->
+# malformee (MCP_CONTINUATION_RE, meme constante et meme litteral ^[ \t] que l'injecteur — jamais
+# le repli a 2 espaces de parse_frontmatter) ; (iv) ORDRE UNIQUE trim PUIS dequotage d'une seule
+# paire de guillemets englobante ; (v) grammaire <serveur>:<outil1>,<outil2>,... , charset
+# [A-Za-z0-9_-]+ (meme litteral que TOKEN_SEGMENT_RE de l'injecteur).
+_MCP_TOKEN_SEGMENT_RE = re.compile(r\"^[A-Za-z0-9_-]+$\")
+MCP_PRESENCE_RE = re.compile(r\"^vf-mcp-tools[ \t]*:\")
+_MCP_NAMED_VALUE_RE = re.compile(r\"^vf-mcp-tools:[ \t]*(.*)$\")
+MCP_CONTINUATION_RE = re.compile(r\"^[ \t]\")
+
+def valider_mcp_tools(base, lignes):
+    \"\"\"Grammaire vf-mcp-tools (FABR-10 a) : meme regle d'extraction que named_request de
+    inject-mcp-tools.sh (43-05 etape 2, voir ci-dessus), applique pas a pas dans le MEME ordre.
+    Lit les lignes BRUTES du frontmatter (frontmatter_lines), JAMAIS fm[] — parse_frontmatter
+    retient la DERNIERE occurrence d'une cle et replie une ligne indentee dans le scalaire,
+    precisement les deux ecarts avec l'injecteur que cette fonction evite. Rend une LISTE
+    (jamais un booleen), consommee via extend() par une ligne d'appel UNIQUE dans check_file,
+    cible du mutant MUT-M1.\"\"\"
+    if lignes is None:
+        return []
+    occurrences = [i for i, l in enumerate(lignes) if MCP_PRESENCE_RE.match(l)]
+    if not occurrences:
+        return []
+    malformed = len(occurrences) != 1
+    if not malformed:
+        idx = occurrences[0]
+        m = _MCP_NAMED_VALUE_RE.match(lignes[idx])
+        if not m:
+            malformed = True
+        elif idx + 1 < len(lignes) and MCP_CONTINUATION_RE.match(lignes[idx + 1]):
+            malformed = True
+        else:
+            raw = m.group(1).strip()
+            if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in (chr(34), chr(39)):
+                raw = raw[1:-1]
+            if \":\" not in raw:
+                malformed = True
+            else:
+                server_part, _, tools_part = raw.partition(\":\")
+                server = server_part.strip()
+                tools = [t.strip() for t in tools_part.split(\",\") if t.strip()]
+                if not server or not tools:
+                    malformed = True
+                elif not _MCP_TOKEN_SEGMENT_RE.match(server):
+                    malformed = True
+                elif any(not _MCP_TOKEN_SEGMENT_RE.match(t) for t in tools):
+                    malformed = True
+    if malformed:
+        return [f\"{base} : vf-mcp-tools malformee — attendu <serveur>:<outil1>,<outil2>,... (segments [A-Za-z0-9_-]+) ; la valeur serait refusee a l'install (FABR-10 a)\"]
+    return []
+
 def invariant_i6(base, fm, fmlines, dispatch):
     \"\"\"I6 (D-07, TOUJOURS arme, independant de l'arbitrage D-19) : manager si dispatch (issu
     de allowlist_agents) non vide ET vf-internal ne vaut pas « true ». Un manager sans
@@ -1078,6 +1135,9 @@ def check_file(path):
     errors.extend(invariant_i1(base, fm))
     errors.extend(invariant_i4(base, fmlines))
     errors.extend(invariant_i7(base, fm))
+    # Grammaire vf-mcp-tools (Phase 43, FABR-10 a) — BLOQUANT dans tous les modes, ligne d'appel
+    # UNIQUE, cible du mutant MUT-M1.
+    errors.extend(valider_mcp_tools(base, fmlines))
     dispatch = allowlist_agents(fmlines)
     errors.extend(invariant_i6(base, fm, fmlines, dispatch))
     errors.extend(invariant_i5(base, fm, fmlines, dispatch))
