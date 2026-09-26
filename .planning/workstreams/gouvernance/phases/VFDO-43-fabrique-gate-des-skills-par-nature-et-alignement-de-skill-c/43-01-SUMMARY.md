@@ -165,9 +165,17 @@ None au sens des Règles 1-3 (aucun bug, aucune fonctionnalité critique manquan
 - **Verification:** `git diff --stat` du commit `b2ad140` ne montre que `test-check-skills.sh` ; `bash scripts/check-gate-touche.sh` (hors périmètre de vérification de ce plan, non rejoué ici) resterait vert grâce aux trailers déjà posés en Tâches 1/2
 - **Committed in:** `b2ad140` (Tâche 3)
 
+**3. [Révision ciblée du témoin `MERGES-DANS-LA-PLAGE`, post-vague 2] Restriction aux merges de l'amont uniquement**
+- **Found during:** révision ciblée pré-vague 4 (43-06), après le constat que `B43..HEAD` contient 3 merges INTERNES à la vague 2 (`f8cba29`, `40b0da8`, `450ab9c`), dont tous les parents ont B43 pour ancêtre — le témoin d'origine les comptait tous, ce qui aurait fait rougir 43-06 à coup sûr sans qu'aucun commit étranger à la Phase 43 n'ait été introduit
+- **Issue:** le témoin d'origine (`git rev-list --merges "$B43"..HEAD | grep -c .`) ne distinguait pas un merge interne d'une vague (tous parents descendants de B43, inoffensif) d'un merge qui fait entrer l'amont (au moins un parent qui n'a pas B43 pour ancêtre, la vraie menace que le témoin doit garder)
+- **Fix:** le témoin compte désormais, parmi les commits de merge de `B43..HEAD`, ceux dont AU MOINS UN parent échoue `git merge-base --is-ancestor "$B43" <parent>` — un merge interne de vague reste admis, un merge de l'amont continue de faire rougir le témoin (VOULU, retour à l'humain). Forme de commande portable zsh/bash : `while IFS= read -r … ; done <<< "$var"` (pas de `for x in $var`, pas de compteur perdu dans un pipe). Décision : option A, « décision du head sous délégation technique de Willy, session principale, 2026-09-26 »
+- **Files modified:** `43-01-PLAN.md` (texte du témoin + commande), `43-06-PLAN.md` (commande du verify, `<fails_when>` correspondant)
+- **Verification:** sur une copie jetable clonée depuis ce HEAD — ancienne commande sur HEAD (3 merges internes) : `MERGES-DANS-LA-PLAGE 3` ; nouvelle commande sur le même HEAD : `MERGES-DANS-LA-PLAGE 0`, rejouée sous `zsh` ET `bash` ; nouvelle commande après fabrication d'un merge amont jetable (branche forkée depuis `af0acb5`, parent de B43) : `MERGES-DANS-LA-PLAGE 1`, rejouée sous `zsh` ET `bash`. La règle « intégration amont par rebase uniquement » (43-01) reste inchangée — un merge de l'amont fait toujours rougir le témoin.
+- **Committed in:** commit de cette révision (voir `git log`)
+
 ---
 
-**Total deviations:** 2 ajustements documentés, aucun auto-fix au sens des Règles 1-4 (aucun bug, aucune fonctionnalité manquante, aucun blocage, aucun changement architectural).
+**Total deviations:** 3 ajustements documentés, aucun auto-fix au sens des Règles 1-4 (aucun bug, aucune fonctionnalité manquante, aucun blocage, aucun changement architectural).
 **Impact on plan:** Aucun — le gate final, les 53 cas de `test-check-skills.sh` et les 177 cas de `test-check-agents.sh` (dont T107) sont conformes à toutes les `<acceptance_criteria>` des trois tâches, vérifiées ci-dessous.
 
 ## Issues Encountered
