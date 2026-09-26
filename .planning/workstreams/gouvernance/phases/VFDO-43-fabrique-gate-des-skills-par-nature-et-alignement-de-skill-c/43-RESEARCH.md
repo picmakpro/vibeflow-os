@@ -679,6 +679,7 @@ de détection, périmètre exact du corpus, seuil d'avertissement skill).
      par skill-creator) ou sur un sous-ensemble à définir — et documenter le choix, car c'est la
      zone de plus grande ambiguïté de toute cette recherche (Pitfall 5).
    - Resolution : renvoyée au checkpoint de `43-04-PLAN.md` (Tâche 2, checkpoint:decision — corpus et mode d'enforcement du bootstrap arbitrés par Willy, option consignée dans `43-04-SUMMARY.md`).
+   - Resolution finale (2026-09-26) : tranchée avant l'exécution — option ratchet-socle (corpus = socle minimal : fermeture `resolve-deps.sh conductor` + skill `installer` + commandes du plugin ; ligne de baseline `@bootstrap:socle`, toute hausse bloque ; plafond ADR-029 signalé par `AU-DESSUS-PLAFOND-ADR029`, non bloquant), décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26. La Tâche 2 de `43-04-PLAN.md` n'est plus un checkpoint ; voir `43-CONTEXT.md`, bloc « Quatrième temps (2026-09-26) ».
 
 ## Environment Availability
 

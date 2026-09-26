@@ -15,6 +15,11 @@ Apply response_language to all user-facing prose — narration between tool call
 > session principale, 2026-09-24) : les deux déclarations (`vf-mcp-consumer` / `vf-mcp-tools`) sont
 > conservées, aucune migration. Voir D-Q3. Plus aucune zone grise structurante n'est ouverte dans ce
 > document.
+> **Quatrième temps (2026-09-26) : Q1 (bootstrap) et Q-PORTEE sont tranchées.** Les deux questions de
+> planification laissées ouvertes par les tours de révision des plans — le checkpoint de
+> `43-04-PLAN.md` et la portée de la détection de dérive de `43-02-PLAN.md` — ont reçu une décision
+> déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26. Voir le
+> bloc « Quatrième temps (2026-09-26) » en fin de `<decisions>`. D-Q1 à D-Q6 sont inchangées.
 
 <domain>
 ## Phase Boundary
@@ -176,6 +181,59 @@ Claude, 2026-09-24 :
 - **FABR-10** amendement de la spec fabrique §1.2/§7.2 (deux besoins d'ADR-051, trois corrections
   factuelles) ; durcissements (a) grammaire `vf-mcp-tools` validée, (b) serveur nommé absent
   signalé, (c) textes à une seule clé corrigés (D-Q3).
+
+### Quatrième temps (2026-09-26)
+Deux décisions de planification, restées ouvertes aux tours 1 à 3 de révision des plans, sont
+tranchées : décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26.
+Elles appliquent D-Q4 (budget) et D-Q1/D-Q5 (dérive) sans les rouvrir ni les réécrire.
+
+- **Q1 — bootstrap (checkpoint de `43-04-PLAN.md`, Tâche 2) : option ratchet-socle.** La mesure du
+  jour du socle minimal d'un lab — fermeture `resolve-deps.sh conductor` (audit-architecture,
+  conductor, consolidator, infrastructure-audit, planning-core, skill-creator, validator), plus le
+  skill `installer`, plus les 7 commandes `plugin/commands/*.md`, ≈ 2 499 tokens estimés à la
+  planification (octets des lignes `name`/`description`/`when_to_use` sous `LC_ALL=C`, ÷ 4) —
+  devient une ligne de baseline `@bootstrap:socle` de `.planning/instruction-budget-baselines.tsv`,
+  dans le mécanisme de baseline que G-1 garde déjà. Une fois la ligne posée, toute HAUSSE bloque :
+  une mesure au-dessus de la ligne rend `DEPASSEMENT-BOOTSTRAP`, un échec (rc 1 sous ratchet armé),
+  jamais un simple avertissement ; relever la ligne elle-même exige une nouvelle décision citée
+  (G-1). Le plafond ADR-029 de 2000 tokens reste un OBJECTIF signalé (jeton
+  `AU-DESSUS-PLAFOND-ADR029`), non bloquant ; le retour sous 2000 est inscrit au BACKLOG (commit
+  `433fea0`, « Ramener le socle du bootstrap sous 2 000 tokens »). Le commit d'exécution qui ajoute
+  la ligne porte la citation ci-dessus, et cet ajout est signalé à la revue code owner de Samuel
+  (la baseline du budget d'instructions est un chemin CODEOWNERS).
+  Motifs, tels que donnés :
+  - Willy a choisi de couvrir réellement le bootstrap (Q4), ce qui écarte l'option « avertissement seul » ;
+  - un plafond dur bloquerait la Phase 43 sur des modules qui appartiennent à Samuel ;
+  - un ratchet sur tout le corpus distribué viserait un lab hypothétique, pas le socle réel que tout lab porte.
+  Conséquences dans les plans : la Tâche 2 de 43-04 n'est plus un checkpoint, elle consigne cette
+  décision dans `43-04-SUMMARY.md` ; 43-04 et 43-06 ne gardent que la branche ratchet-socle ; le
+  ledger FABR-09 (`REQUIREMENTS.md` du compartiment) est reformulé en conséquence.
+  — **Reversibility:** costly — la ligne vit dans une baseline CODEOWNERS lue par le gate et par la
+  CI ; la relever exige une nouvelle décision citée et la revue de Samuel, la baisser reste libre
+  (doctrine du ratchet). Le caractère one-way de D-Q4 (réserve du BACKLOG levée) est antérieur et
+  inchangé.
+
+- **Q-PORTEE — portée de la détection de dérive (`43-02-PLAN.md`) : règle définitive.** Aucune des
+  trois options listées aux tours précédents (titres, prose, titres+gras) n'est retenue telle quelle.
+  La recherche porte sur TOUT le corps du SKILL.md, hors frontmatter et hors blocs de code délimités ;
+  un avertissement « dérive » naît SEULEMENT SI au moins deux des trois marqueurs DISTINCTS (gate
+  bloquant, livrable remis à un tiers, couche de qualité) apparaissent dans le corps, OU si un seul
+  marqueur apparaît dans un TITRE (ligne Markdown `#`, `##`, etc.) ; il reste un avertissement
+  (D-Q5), jamais un refus (exit 1). Le sens inverse de D-Q1 (marqueur déclaré `true` sans motif →
+  avertissement « écart ») lit la MÊME règle : un marqueur compte comme motif présent s'il apparaît
+  dans un titre, ou en prose à côté d'au moins un second marqueur distinct en prose ; un mot isolé
+  en prose n'est un motif dans aucun des deux sens.
+  Motifs, tels que donnés : les procédures s'écrivent en prose, donc une détection limitée aux titres
+  seuls les rate ; un mot isolé en prose produirait un bruit qui finirait ignoré (d'où l'exigence de
+  DEUX marqueurs distincts en prose, ou un seul en titre — le titre est un signal plus fort qu'une
+  occurrence en prose).
+  Mesure de planification sous cette règle (2026-09-26, sur `433fea0`, lecture seule, indicative —
+  l'exécuteur de 43-02 re-mesure) : 10 SKILL.md sur 21 hors doc-only en dérive (5 avec un marqueur en
+  titre, 5 avec au moins deux marqueurs distincts en prose et aucun en titre) ; 4 ne portent qu'un
+  seul marqueur, en prose, sans avertissement ; 7 n'en portent aucun. Détail fichier par fichier :
+  bloc de contexte de `43-02-PLAN.md`.
+  — **Reversibility:** reversible — deux seuils locaux du gate, en avertissement (même argument que
+  D-Q5).
 
 </decisions>
 
