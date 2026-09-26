@@ -157,6 +157,7 @@ third_party_prefixes = [p for p in os.environ.get("VF_THIRD_PARTY_PREFIXES", "")
 VIBEFLOW_SKILL_FIELDS = {"vf-nature", "ecrit", "vf-rubrique-juge", "vf-gate-bloquant",
                          "vf-livrable-tiers", "vf-couche-qualite"}
 NATURES = {"referentiel", "outil", "procedure"}
+MARQUEURS = ("vf-gate-bloquant", "vf-livrable-tiers", "vf-couche-qualite")
 
 def decouvrir_skills(racine, refuses=None):
     """Decouverte RECURSIVE des SKILL.md sous racine (Claude's Discretion, reprend D-10 de la
@@ -345,6 +346,62 @@ def invariant_procedure(rel, fm):
         return [f"{rel} : vf-nature: procedure sans {' ni '.join(manquants)} (B-03, FABR-06)"]
     return []
 
+# V5 (43-RESEARCH.md § Security Domain) : enumeration stricte, refus explicite, jamais un defaut
+# silencieux sur une entree malformee. Charset Unicode-aware (\w admet les lettres accentuees) ;
+# espace, ';', '$', '(', ')', '|', '&', backtick et tout caractere de controle sont refuses.
+_ECRIT_ENTRY_RE = re.compile(r"^[\w./<>{}*-]+$", re.UNICODE)
+
+def entree_chemin_valide(v):
+    if not isinstance(v, str):
+        return False
+    v = v.strip()
+    if v == "":
+        return False
+    if v.startswith("/") or v.startswith("~"):
+        return False
+    if ".." in v.split("/"):
+        return False
+    return bool(_ECRIT_ENTRY_RE.fullmatch(v))
+
+def valider_ecrit(rel, valeur):
+    """ecrit: (scalaire ou liste) — chaque entree non vide doit etre un chemin relatif propre.
+    Une entree individuelle vide au sein d'une liste est tolere comme absente (invariant_procedure
+    la compte deja) ; seule une entree NON VIDE malformee est un refus."""
+    if is_absent_value(valeur):
+        return []
+    entries = valeur if isinstance(valeur, list) else [valeur]
+    msgs = []
+    for e in entries:
+        if isinstance(e, str) and e.strip() == "":
+            continue
+        if not entree_chemin_valide(e):
+            msgs.append(f"{rel} : ecrit: entree malformee {esc(e)} — chemin relatif attendu, sans '..', sans '/' ni '~' initial (FABR-06)")
+    return msgs
+
+def valider_rubrique_juge(rel, valeur):
+    """vf-rubrique-juge : SCALAIRE seulement (une liste est refusee), meme regle de forme
+    qu'une entree de ecrit:. Valeur vide/absente n'est jamais un refus ICI (invariant_procedure
+    la compte deja comme manquante pour FABR-06)."""
+    if is_absent_value(valeur):
+        return []
+    if isinstance(valeur, list):
+        return [f"{rel} : vf-rubrique-juge invalide {esc(valeur)} — scalaire attendu, pas une liste (FABR-06)"]
+    if not entree_chemin_valide(valeur):
+        return [f"{rel} : vf-rubrique-juge invalide {esc(valeur)} — chemin relatif ou nom d'agent attendu, sans '..', sans '/' ni '~' initial (FABR-06)"]
+    return []
+
+def valider_marqueurs(rel, fm):
+    """Les trois marqueurs de B-03/C-15 sont optionnels ; presents, ils n'acceptent que
+    true|false (minuscules) — D-Q1."""
+    msgs = []
+    for cle in MARQUEURS:
+        if cle not in fm:
+            continue
+        val = fm[cle]
+        if val not in ("true", "false"):
+            msgs.append(f"{rel} : {cle} invalide {esc(val)} — attendu true|false (D-Q1)")
+    return msgs
+
 def skill_display_name(text):
     fm = parse_frontmatter(text)
     if fm and isinstance(fm.get("name"), str) and fm.get("name"):
@@ -362,6 +419,12 @@ def check_file(rel, text):
         return
     errors.extend(valider_nature(rel, fm))
     errors.extend(invariant_procedure(rel, fm))
+    errors.extend(valider_ecrit(rel, fm.get("ecrit")))
+    errors.extend(valider_rubrique_juge(rel, fm.get("vf-rubrique-juge")))
+    errors.extend(valider_marqueurs(rel, fm))
+    for k in fm:
+        if k not in KNOWN:
+            warnings.append(f"{rel} : champ inconnu — {k} (typo ? verifier la doc)")
 
 if single:
     if os.path.islink(single):
