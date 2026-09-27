@@ -5,28 +5,27 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 44
 current_phase_name: Moteur — modèle de données et recalcul d'état dérivé du disque
-status: not_started
+status: "Ready to execute"
 created: 2026-09-23
-last_updated: "2026-09-27T00:00:00.000Z"
-last_activity: 2026-09-27
+last_updated: "2026-09-28T00:00:00.000Z"
+last_activity: 2026-09-28
 last_activity_desc: >-
-  Clôture planning des Phases 42 et 43 (mission vf-coder 2026-09-27, mandat court) : PR #108
-  (Phase 42, commit 0f3ede3) et PR #111 (Phase 43, commit 556452e) mergées sur main le
-  2026-09-27, par contournement de la revue code owner (D-02bis), arbitrage Willy, session
-  principale, 2026-09-27 — revue de Samuel sur les deux PR reste à faire après coup. Avant le
-  merge de la #111, main a été intégré deux fois dans sa branche par merge (a2517df, puis le
-  merge de la PR #112 en deba30f qui régénère l'index des capabilities pour gsd-core 1.15.0) :
-  intégration par merge plutôt que par rebase pour ne pas réécrire les SHA déjà cités, même
-  arbitrage. Phase 44 pas encore cadrée. STATE tenu à la main.
+  Planification de la Phase 44 (mission vf-coder, nœud plan-44, 2026-09-28) : exigences MOTR-01..18
+  posées dans REQUIREMENTS.md (9269ac3), recherche (44-RESEARCH.md, 49ae4a4), stratégie de
+  validation (44-VALIDATION.md, même commit), cartographie de patrons (44-PATTERNS.md, d4a3265),
+  5 plans en 4 vagues créés par gsd-planner (4e89601 : 44-01∥44-02 → 44-03 → 44-04 → 44-05),
+  vérifiés par gsd-plan-checker (VERIFICATION PASSED, 0 blocker, 1 warning advisoire sur le
+  passage lecture seule des labs réels en 44-05 — non bloquant), porte de couverture des
+  décisions passée (27/27 décisions P44-D-01..18 couvertes), annotation des dépendances de
+  vague ajoutée au ROADMAP (6f57447). STATE tenu à la main (state.planned-phase non appelé,
+  interdit par le mandat).
 stopped_at: >-
-  Phases 42 et 43 closes dans le planning (ROADMAP cochée, PR de clôture consignées) ; revue code
-  owner de Samuel toujours en attente sur les deux PR (contournement D-02bis tracé, pas encore
-  contre-vérifié). Prochain geste : cadrage de la Phase 44 (gsd-discuss-phase --ws gouvernance),
-  non entamé.
+  Phase 44 planifiée (5 plans, 4 vagues), vérification passée. Prochain geste : exécution
+  (`gsd-execute-phase 44 --ws gouvernance`), non entamée.
 progress:
   total_phases: 9
   completed_phases: 2
-  total_plans: 13
+  total_plans: 18
   completed_plans: 13
   percent: 22
 ---
@@ -35,19 +34,19 @@ progress:
 
 ## Current Position
 
-Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — PAS ENCORE CADRÉE. Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
-**Last Activity:** 2026-09-27
-**Last Activity Description:** Clôture planning des Phases 42 et 43 (mandat court vf-coder) : ROADMAP cochée, PR de clôture consignées (PR #108 commit 0f3ede3, PR #111 commit 556452e). Merges par contournement de la revue code owner, arbitrage Willy, session principale, 2026-09-27. Deux merges amont dans la branche de la 43 avant son merge final (a2517df, deba30f/PR #112 — régénération de l'index des capabilities pour gsd-core 1.15.0), intégrés par merge plutôt que par rebase pour préserver les SHA déjà cités, même arbitrage.
+Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — PLANIFIÉE (5 plans, 4 vagues), pas encore exécutée. Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
+**Last Activity:** 2026-09-28
+**Last Activity Description:** Planification de la Phase 44 (mission vf-coder, nœud plan-44) : MOTR-01..18 posées, recherche + patrons + validation Nyquist produits, 5 plans (44-01 à 44-05) créés et vérifiés (VERIFICATION PASSED, 1 avertissement non bloquant), porte de couverture des décisions à 27/27, ROADMAP annoté des dépendances de vague.
 
 ## Progress
 
 **Phases Complete:** 2 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux)
-**Current Plan:** aucun — Phase 44 pas encore planifiée (0/0 plans)
+**Current Plan:** aucun exécuté — Phase 44 planifiée, 5/5 plans écrits, 0/5 exécutés
 
 ## Session Continuity
 
-**Stopped At:** Phases 42 et 43 closes dans le planning ; PR #108 et #111 mergées sur main le 2026-09-27. Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis, arbitrage Willy, session principale, 2026-09-27). Prochain geste : cadrage de la Phase 44 (`gsd-discuss-phase --ws gouvernance`), non entamé.
-**Resume File:** `.planning/missions/2026-09-26-gouvernance-43-exec.md`
+**Stopped At:** Phase 44 planifiée et vérifiée (5 plans, 4 vagues : 44-01∥44-02 → 44-03 → 44-04 → 44-05). Prochain geste : `gsd-execute-phase 44 --ws gouvernance`, non entamé.
+**Resume File:** `.planning/missions/2026-09-27-gouvernance-44.dag.json`
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
