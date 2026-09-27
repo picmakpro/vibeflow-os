@@ -103,11 +103,15 @@ Plans:
 **Requirements**: MOTR-01..MOTR-18 (posées au cadrage, `44-CONTEXT.md`)
 **Depends on:** Phase 43 (seule une procédure ouvre une phase : la nature doit être déclarée avant que le moteur ne s'en serve).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §3, §7.1, §7.4, §10, D-03, D-09, D-10. **Ouvert au cadrage** : emplacements hors modèle (§7.3), arbitrage d'usage `phases_trace: false` (§11.2), premier banc d'essai.
-**Plans:** 0 plans
+**Plans:** 5 plans (4 vagues : 44-01 ∥ 44-02 → 44-03 → 44-04 → 44-05)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 44 to break down)
+- [ ] 44-01-PLAN.md — traceur : `recalc-planning.sh` (Python embarqué, voie a de P44-D-14) dérive le lab `traceur`, refuse sans adhésion `cycles-v1` ou sur GSD, lecture seule sans écriture, INDEX.md/STATE.md/cloture.log déterministes, lab frais
+- [ ] 44-02-PLAN.md — modèle : `references/modele-cycles.md` et huit gabarits `templates/cycles/` (choix délégués fixés)
+- [ ] 44-03-PLAN.md — matrice des huit états et des dérogations, jumeaux négatifs au banc, agrégation des plans et des cycles, gabarits conformes
+- [ ] 44-04-PLAN.md — hors modèle (P44-D-04) et garde-fous de chemin ; incrémental par hash du contenu (P44-D-13) ; contrôle croisé référence ↔ moteur
+- [ ] 44-05-PLAN.md — bump mineur de planning-core sans release, preuves de phase (P44-D-01a, P44-D-01b, P44-D-15), passage en lecture seule sur deux labs réels
 
 ### Phase 45: Moteur — hook central par rôle et gates d'écriture
 
