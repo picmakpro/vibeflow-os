@@ -2464,6 +2464,98 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T55 (Phase 43, FABR-10 b, plan 43-05, HOME temporaire) — serveur nommé absent de l'union
+# relayé jusqu'au journal d'installation : lab avec .mcp.json déclarant mobile-mcp (jamais
+# XcodeBuildMCP, le serveur cité par le vrai vf-reviewer.md du module), install de
+# dev-orchestrator sans filtre de sortie -> rc 0 (best-effort inchangé), journal contenant une
+# ligne WARNING qui cite vf-reviewer.md et XcodeBuildMCP, et .claude/agents/vf-coder.md
+# (vf-mcp-consumer: true) dont tools: porte mcp__mobile-mcp__*.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  printf '%s\n' '{ "mcpServers": { "mobile-mcp": {} } }' > "$LAB/.mcp.json"
+  T55_OUT="$(cd "$LAB" && HOME="$FAKE_HOME" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install dev-orchestrator 2>&1)"
+  T55_RC=$?
+  miss=0
+  [ "$T55_RC" -eq 0 ] || { ko "T55 : install rc=$T55_RC (attendu 0, best-effort) — $T55_OUT"; miss=1; }
+  echo "$T55_OUT" | grep -q 'WARNING:' \
+    || { ko "T55 : aucune ligne WARNING relayée dans le journal d'installation"; miss=1; }
+  echo "$T55_OUT" | grep 'WARNING:' | grep -q 'vf-reviewer.md' \
+    || { ko "T55 : WARNING ne cite pas vf-reviewer.md — $T55_OUT"; miss=1; }
+  echo "$T55_OUT" | grep 'WARNING:' | grep -q 'XcodeBuildMCP' \
+    || { ko "T55 : WARNING ne cite pas XcodeBuildMCP — $T55_OUT"; miss=1; }
+  if [ -f "$LAB/.claude/agents/vf-coder.md" ]; then
+    grep -q '^tools:.*mcp__mobile-mcp__\*' "$LAB/.claude/agents/vf-coder.md" \
+      || { ko "T55 : vf-coder.md ne porte pas mcp__mobile-mcp__* — $(grep '^tools:' "$LAB/.claude/agents/vf-coder.md")"; miss=1; }
+  else
+    ko "T55 : \$LAB/.claude/agents/vf-coder.md absent"; miss=1
+  fi
+  [ "$miss" -eq 0 ] \
+    && ok "T55 (HOME temporaire) : serveur nommé absent de l'union relayé au journal (vf-reviewer.md, XcodeBuildMCP), agent large injecté (mobile-mcp)"
+else
+  skip "T55 : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T56 (Phase 43, FABR-10 a, plan 43-05, HOME temporaire) — valeur vf-mcp-tools malformée relayée
+# au journal d'installation : module SYNTHÉTIQUE (mcpbad) dont l'unique agent porte une valeur
+# vf-mcp-tools malformée ; le cache contient dev-orchestrator/scripts/inject-mcp-tools.sh (find_mcp_injector
+# retombe dessus, hardcodé, faute d'un ./scripts/inject-mcp-tools.sh déjà posé par mcpbad lui-même)
+# et _internal/lib/vf-portable.sh (résolu par le locator de l'injecteur). Install sans filtre de
+# sortie -> rc 0 (best-effort inchangé), journal contenant une ligne ERROR « malform », agent
+# inchangé (fichier non modifié par l'injecteur refusé).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+mkdir -p "$CACHE/dev-orchestrator/scripts" "$CACHE/_internal/lib"
+if [ -f "$REPO/dev-orchestrator/scripts/inject-mcp-tools.sh" ] && [ -f "$REPO/_internal/lib/vf-portable.sh" ]; then
+  cp "$REPO/dev-orchestrator/scripts/inject-mcp-tools.sh" "$CACHE/dev-orchestrator/scripts/inject-mcp-tools.sh"
+  cp "$REPO/_internal/lib/vf-portable.sh" "$CACHE/_internal/lib/vf-portable.sh"
+  mkdir -p "$CACHE/mcpbad/agents"
+  echo v1.0.0 > "$CACHE/mcpbad/VERSION"
+  printf '{"name":"mcpbad","version":"v1.0.0"}\n' > "$CACHE/mcpbad/module.json"
+  cat > "$CACHE/mcpbad/agents/bad-agent.md" <<'EOF'
+---
+name: bad-agent
+description: agent de test T56 (module synthetique, valeur vf-mcp-tools malformee)
+tools: Read
+vf-mcp-tools: XcodeBuildMCP-sans-separateur
+---
+corps
+EOF
+  printf '%s\n' '{ "mcpServers": { "XcodeBuildMCP": {} } }' > "$LAB/.mcp.json"
+  bad_agent_before="$(md5 -q "$CACHE/mcpbad/agents/bad-agent.md" 2>/dev/null || md5sum "$CACHE/mcpbad/agents/bad-agent.md" | cut -d' ' -f1)"
+  T56_OUT="$(cd "$LAB" && HOME="$FAKE_HOME" VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+    bash "$INSTALLER" install mcpbad 2>&1)"
+  T56_RC=$?
+  miss=0
+  [ "$T56_RC" -eq 0 ] || { ko "T56 : install rc=$T56_RC (attendu 0, best-effort) — $T56_OUT"; miss=1; }
+  echo "$T56_OUT" | grep -q 'ERROR:' \
+    || { ko "T56 : aucune ligne ERROR relayée dans le journal d'installation — $T56_OUT"; miss=1; }
+  echo "$T56_OUT" | grep 'ERROR:' | grep -qi 'malform' \
+    || { ko "T56 : ERROR relayée ne cite pas 'malform' — $T56_OUT"; miss=1; }
+  if [ -f "$LAB/.claude/agents/bad-agent.md" ]; then
+    bad_agent_installed_md5="$(md5 -q "$LAB/.claude/agents/bad-agent.md" 2>/dev/null || md5sum "$LAB/.claude/agents/bad-agent.md" | cut -d' ' -f1)"
+    [ "$bad_agent_installed_md5" = "$bad_agent_before" ] \
+      || { ko "T56 : bad-agent.md installé a été modifié par l'injecteur malgré le refus"; miss=1; }
+  else
+    ko "T56 : \$LAB/.claude/agents/bad-agent.md absent après install"; miss=1
+  fi
+  [ "$miss" -eq 0 ] \
+    && ok "T56 (HOME temporaire) : valeur vf-mcp-tools malformée relayée au journal (ERROR, malform), install rc=0, agent inchangé"
+else
+  skip "T56 : inject-mcp-tools.sh ou vf-portable.sh introuvable dans le repo de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # Garde-fou final : le vrai ~/.claude ET le vrai ~/.codex/agents/vibeflow sont inchangés
 # (snapshot récursif avant=après).
 # ---------------------------------------------------------------------------

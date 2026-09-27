@@ -863,6 +863,46 @@ inspecte déjà tous les compartiments présents sans se fier à un pointeur.
 **Déclencheur de reprise :** l'ajout d'un troisième compartiment, ou le premier incident réel où un
 compartiment autre que `fiabilite` régresse sans que la CI ne le voie.
 
+## Mise en conformité du corpus de skills en dérive procédurale non déclarée (différé de la Phase 43, 2026-09-24)
+
+**Capturé :** 2026-09-24, cadrage de la Phase 43 (compartiment `gouvernance`, `43-CONTEXT.md` D-Q5).
+
+**Le défaut :** le futur `check-skills.sh` signalera les skills dont la forme est procédurale (gate
+bloquant, livrable remis à un tiers, couche de qualité) sans que leur nature le déclare. Dans cette
+phase, il ne fait qu'**avertir** : réponse de Willy (AskUserQuestion, session principale, 2026-09-24).
+C'est un écart assumé par rapport à la doctrine D-11 de la Phase 42 (invariants armés en erreur,
+corpus corrigé dans la même phase).
+
+**Déclencheur de reprise :** le gate existe et a mesuré le corpus réel (25 `SKILL.md` sous `plugin/`
+au 2026-09-24). Reprendre avec la liste des skills signalés, puis décider de l'armement en erreur.
+
+## Pour Samuel — le mode large `vf-mcp-consumer` injecte les serveurs du scope global, dont context7 chez `vf-app-fixer` (constaté 2026-09-24)
+
+**Capturé :** 2026-09-24, panel de décision sur la question MCP du cadrage de la Phase 43 (compartiment
+`gouvernance`). Hors périmètre de la Phase 43 : sur décision de Willy (AskUserQuestion, session
+principale, 2026-09-24), il est inscrit comme finding pour Samuel, **sans correctif dans cette mission**
+(ADR-031). Polarité : `dev-orchestrator` et `mobile-test-team` (Samuel).
+
+**Le défaut :** `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` réunit les serveurs du scope
+projet (`.mcp.json`) et ceux du scope global (`~/.claude.json`, clé `mcpServers`) pour tout agent qui
+porte `vf-mcp-consumer: true` (l.26-31, l.222). Il en résulte un écart de doctrine :
+- ADR-051 (« Cloisonnement », `docs/ADR.md:469`) garde à `vf-app-fixer` son interdiction ADR-045
+  (pas de context7, pas de web) ;
+- les conséquences négatives d'ADR-051 disent qu'un serveur déclaré au seul niveau utilisateur n'est
+  pas injecté « par conception » ;
+- le script justifie l'union par « ADR-051-B », un addendum **absent** de `docs/ADR.md`.
+
+**Preuve rejouée** (2026-09-24, copie jetable de `vf-app-fixer.md` dans le scratchpad de session, sans
+`.mcp.json` de projet) :
+`inject-mcp-tools.sh --target <copie>/agents --mcp-json <absent> --dry-run` →
+`vf-app-fixer.md : (dry-run) ajouterait mcp__context7__*, mcp__xpoz-mcp__*`. Ce sont exactement les
+deux serveurs de `~/.claude.json` de ce poste.
+
+**À trancher par Samuel :** filtrer le scope global pour les agents cloisonnés, ou revenir au seul
+scope projet pour le mode large, ou écrire l'addendum ADR-051-B qui assume l'union et amende ADR-045.
+Tant que rien n'est tranché, tout lab dont `~/.claude.json` déclare context7 donne context7 à
+`vf-app-fixer` à l'installation.
+
 ## ADPT-06 — canal `hooks`/`plugins` du dépôt jugé jamais répété — RÉSORBÉ (2026-09-24)
 
 **Capturé :** 2026-09-24, audit de clôture du jalon `fiabilite-v1.0` (compartiment `fiabilite`,
@@ -958,3 +998,74 @@ cas échéant) au tableau de rubrique des deux juges, sur le modèle du critère
 
 **Déclencheur de reprise :** la prochaine revue de fond des grilles des juges business/content,
 ou un incident où un manquement RGPD n'a pas fait baisser le score d'un livrable jugé.
+
+## Ramener le socle du bootstrap sous 2 000 tokens (ADR-029) — DIFFÉRÉ (2026-09-26)
+
+**Capturé :** 2026-09-26, planification de la Phase 43 (compartiment `gouvernance`, checkpoint de
+`43-04-PLAN.md`). Décision : option « ratchet-socle », décision déléguée par Willy au head
+(/vf-decide), AskUserQuestion session principale, 2026-09-26. La mesure du jour devient une ligne
+de baseline `@bootstrap:socle` et toute hausse bloque. Le plafond ADR-029 n'est pas atteint : il
+reste un objectif.
+
+**Le défaut :** le socle minimal d'un lab (fermeture `resolve-deps.sh conductor` + skill installer
++ commandes du plugin) mesure **≈ 2 499 tokens** (9 997 octets des lignes `name`/`description`/
+`when_to_use` sous `LC_ALL=C`, ÷ 4 ; mesure du 2026-09-26, estimation du plan 43-04) pour un
+plafond de 2 000. Composition mesurée, sept modules de la fermeture plus deux autres sources :
+
+| Source | Octets | Tokens |
+|---|---|---|
+| conductor (vf-calibrate 1070, vf-new-lab 1174, vf-update 953, vf-notify 796) | 3 993 | 998 |
+| planning-core | 1 075 | 269 |
+| skill-creator (skill-creator-workflow 674, skill-creator 355) | 1 029 | 257 |
+| consolidator | 884 | 221 |
+| audit-architecture | 818 | 205 |
+| infrastructure-audit | 487 | 122 |
+| validator (aucun SKILL.md) | 0 | 0 |
+| installer (skill exposé, sans `module.json`) | 535 | 134 |
+| 7 commandes `plugin/commands/*.md` | 1 176 | 294 |
+
+**Piste de fix :** retirer environ 500 tokens (≈ 2 000 octets) de descriptions. Les descriptions
+sont le mécanisme de déclenchement des skills : chaque coupe se relit contre son effet sur le
+routage. Cibles les plus rentables : conductor, puis planning-core. Chaque coupe fait baisser la
+ligne de baseline, et une baisse n'exige pas de citation.
+
+**Déclencheur de reprise :** exécution de la Phase 43 terminée (la ligne de baseline existe), ou
+tout ajout de skill au socle qui ferait rougir le ratchet.
+
+## FAUX VERT possible de `inject-mcp-tools.sh --verify` sur un dossier mixte — DIFFÉRÉ (2026-09-26)
+
+**Capturé :** 2026-09-26, correction ciblée des findings de revue de la Phase 43 (compartiment
+`gouvernance`, nœud 43-04/FABR-09). Décision : option B, « décision du head sous délégation
+technique de Willy, session principale, 2026-09-26 » — non corrigé dans ce mandat, hors périmètre
+déclaré (`plugin/dev-orchestrator/**` explicitement exclu).
+
+**Le défaut :** `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh` l.505, la branche qui traite
+une valeur `vf-mcp-tools` malformée fait `continue` sans jamais appeler `indeterminate.append(base)`
+— à la différence de la branche « serveur absent du lab » juste en dessous (l.509-513), qui, elle,
+verse le fichier dans `indeterminate` avant de continuer. Un fichier dont la valeur est malformée
+sort donc du calcul de verdict global sans laisser de trace dans aucune des listes de comptage.
+
+**Scénario de reproduction :** un dossier contenant un agent avec une valeur `vf-mcp-tools`
+malformée et un second agent conforme ; `--verify` lancé sur ce dossier rend `rc=0` (« conforme »)
+sans que le fichier malformé ait jamais été comparé — son absence de `indeterminate.append` le
+rend invisible au bilan, alors qu'il aurait dû peser sur le verdict au même titre que le cas
+« serveur absent ».
+
+**Dépendance qui a motivé le report :** la règle 4 de `check-capability-activation.sh` lit ce mode
+`--verify` d'`inject-mcp-tools.sh` — c'est la raison pour laquelle 43-05 avait déjà laissé ce
+correctif hors mandat, et pourquoi ce mandat de correction ciblée (périmètre 43-04 uniquement) le
+laisse également hors de son propre périmètre.
+
+**Impact actuel :** aucun en production. `ensure-deps.sh`, le seul appelant connu, invoque
+`inject-mcp-tools.sh` fichier par fichier — jamais sur un dossier mixte — donc ce faux vert
+spécifique au mode dossier n'a pas de chemin d'appel réel aujourd'hui.
+
+**Les deux avis :** la revue de d7dc755 l'a classé « majeur » ; l'audit sécurité (SECURED) l'a
+classé « mineur ». L'écart entre les deux avis n'a pas été tranché ici — c'est au propriétaire de
+polarité de trancher au moment de la reprise.
+
+**Propriétaire à la relecture :** Samuel (polarité `dev-orchestrator`).
+
+**Déclencheur de reprise :** la prochaine évolution qui touche `inject-mcp-tools.sh` ou
+`check-capability-activation.sh`, ou un incident où un mode `--verify` en dossier mixte a rendu un
+verdict trompeur.

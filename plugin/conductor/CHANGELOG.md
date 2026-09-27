@@ -1,5 +1,57 @@
 # Changelog — conductor
 
+## [v1.44.0] — 2026-09-26 (Phase 43 — gate des skills par nature, budget des SKILL.md et du bootstrap)
+
+**Minor** (nouveau gate des skills) :
+
+- **`check-skills.sh`** (FABR-06, D-Q1, D-Q2) : nouveau gate, miroir de `check-agents.sh`, qui lit
+  la nature déclarée de chaque `SKILL.md` (`vf-nature: referentiel | outil | procedure`, défaut
+  `outil` sur clé absente, jamais sur valeur invalide) et refuse (rc 1) une `procedure` déclarée
+  sans `ecrit:` (périmètre d'écriture) ni `vf-rubrique-juge:` (rubrique de juge).
+- **Détection de dérive déclaration/prose, mesure du corpus réel** (FABR-07, D-Q5, écart assumé
+  vis-à-vis de D-11 de la Phase 42) : `detecter_derive()` signale, TOUJOURS en avertissement,
+  jamais un refus même sous `--strict`, un marqueur factuel constaté en titre ou en prose (règle
+  Q-PORTEE : un marqueur en titre, ou au moins deux marqueurs distincts en prose) sans sa
+  déclaration `true` correspondante, et l'inverse (`ecart_nature_marqueurs`, marqueur déclaré
+  `true` avec une nature autre que `procedure`) — jamais une réécriture ni une déduction de la
+  nature. Corpus réel mesuré et publié (`43-02-SUMMARY.md`) : 26 avertissements « derive » sur
+  11/21 `SKILL.md`, 0 « ecart », laissé non corrigé (backlog `e36e6f2`) — ce gate avertit, il ne
+  corrige pas.
+- **Manifeste daté étendu à sept listes** (FABR-09) : `check-agents-manifest.json` porte désormais
+  une septième liste native, `champs_frontmatter_skills`, validée identiquement par
+  `check-agents.sh` et `check-skills.sh` — une seule vérité, une seule fraîcheur par liste.
+- **Plafond des `SKILL.md`** (FABR-09, D-Q4) : `check-instruction-budget.sh` mesure désormais aussi
+  les `SKILL.md` distribués, plafond ADR-029 de 500 lignes, bloquant, aucun seuil d'avertissement
+  (verdict `DEPASSEMENT-SKILL-ADR029`).
+- **Métrique bootstrap, option ratchet-socle** (FABR-09) : socle du bootstrap (fermeture de
+  `resolve-deps.sh conductor` + skill `installer` + commandes du plugin) borné par la ligne de
+  baseline `@bootstrap:socle` : toute hausse bloque (`DEPASSEMENT-BOOTSTRAP`) ; une mesure
+  au-dessus du plafond ADR-029 de 2000 tokens mais sans hausse sur la ligne publie
+  `AU-DESSUS-PLAFOND-ADR029`, non bloquant — le plafond ADR-029 de 2000 tokens reste un objectif,
+  retour sous 2000 inscrit au BACKLOG (commit `433fea0`).
+  décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26
+- **Grammaire `vf-mcp-tools` validée par le gate des agents, `vf-calibrate` à deux déclarations**
+  (FABR-10, D-Q3) : `check-agents.sh` refuse désormais (BLOQUANT, tous modes) une valeur
+  `vf-mcp-tools` malformée, avec la même règle d'extraction que l'injecteur
+  `inject-mcp-tools.sh` — parité gate/injecteur. `vf-calibrate/SKILL.md` réaffirme l'allowlist MCP
+  des agents flaggés `vf-mcp-consumer` (allowlist large) ET porteurs de `vf-mcp-tools` (allowlist
+  nommée, ex. `vf-reviewer`) — dernier texte du dépôt qui ne nommait qu'une seule des deux
+  déclarations MCP (durcissement c).
+- **Hook `SessionStart` non câblé pour `check-skills.sh`** : décision de plan, pas un oubli — tant
+  que le corpus n'est pas mis en conformité (26 avertissements mesurés), câbler ce gate au
+  démarrage de chaque session de chaque lab porterait un avertissement permanent que l'utilisateur
+  ne peut pas corriger (D-Q5). `check-skills.sh` est déjà atteint par la CI (découverte des suites
+  de test + ses propres cas sur l'arbre réel) et par `skill-creator` (`--file`) ; le câblage
+  SessionStart/hook est différé à la mise en conformité du corpus (backlog `e36e6f2`).
+- **Décisions de Willy** : la frontière D-Q3 (deux déclarations MCP conservées, fusion écartée) est
+  citée « Willy, AskUserQuestion, session principale, 2026-09-24 » ; les deux décisions du
+  2026-09-26 (Q1, option bootstrap ratchet-socle ; Q-PORTEE, règle de portée de la dérive
+  procédurale) sont citées « décision déléguée par Willy au head (/vf-decide), AskUserQuestion
+  session principale, 2026-09-26 ». Les décisions de planification de cette phase (noms des clés
+  de frontmatter, vocabulaire `MOTIFS_MARQUEURS` de la dérive, exclusion des modules doc-only,
+  mesure en octets ÷ 4) sont présentées comme telles — des décisions de cadrage, jamais un
+  arbitrage humain.
+
 ## [v1.43.0] — 2026-09-25 (Phase 42 — manifeste daté et invariants de doctrine du gate des agents)
 
 **Minor** (nouvelle capacité du gate des agents) :

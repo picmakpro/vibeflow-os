@@ -1273,9 +1273,12 @@ generate_agent_command_for() {
 
 # ---------- Injection MCP dérivée du lab (ADR-051) ----------
 # Un sous-agent (Task) n'hérite PAS des serveurs MCP de la session : il ne voit, côté MCP, que ce
-# que son `tools:` autorise (`mcp__<serveur>__*`). Les agents exécutants (flag vf-mcp-consumer:true)
-# doivent donc recevoir les serveurs que le LAB déclare dans son ./.mcp.json. Data-driven (aucun nom
-# de serveur ni d'agent en dur) ; best-effort (jamais faire échouer l'install). Idempotent.
+# que son `tools:` autorise (`mcp__<serveur>__*`). Deux déclarations coexistent, conservées
+# distinctes (D-Q3, ADR-051 décision 1) : `vf-mcp-consumer` (allowlist large, agents exécutants)
+# et `vf-mcp-tools` (allowlist nommée, un serveur + des outils explicites, ex. vf-reviewer). Les
+# deux reçoivent les serveurs que le LAB déclare dans l'UNION de son scope projet (./.mcp.json) et
+# de son scope global (~/.claude.json, ADR-051-B). Data-driven (aucun nom de serveur ni d'agent en
+# dur) ; best-effort (jamais faire échouer l'install). Idempotent.
 find_mcp_injector() {
   local c
   c="$TARGET_ROOT/scripts/inject-mcp-tools.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
@@ -1302,10 +1305,29 @@ inject_lab_mcp_into_agents() {
     log "  (injection MCP non exécutée — inject-mcp-tools.sh absent, best-effort)"
     return 0
   fi
-  # Source = ./.mcp.json du LAB (cwd projet), quel que soit le scope (les serveurs MCP du projet y
-  # vivent, pas dans TARGET_ROOT). Absent → le script no-op de lui-même.
-  if bash "$injector" --target "$TARGET_ROOT/agents" --mcp-json "./.mcp.json" >/dev/null 2>&1; then
-    log "  serveurs MCP du lab injectés dans les agents exécutants flaggés (vf-mcp-consumer, ADR-051)"
+  # Source PROJET = ./.mcp.json du LAB (cwd projet) ; l'injecteur y ajoute lui-même le scope
+  # GLOBAL (~/.claude.json, ADR-051-B) — UNION des deux, jamais un remplacement. Absent →
+  # le script no-op de lui-même.
+  #
+  # stdout jeté (verbeux, routine) ; stderr CAPTURÉ (Phase 43, FABR-10 b/c, D-Q3) : les lignes
+  # WARNING/ERROR de l'injecteur (serveur nommé absent de l'union, valeur vf-mcp-tools malformée)
+  # sont relayées dans CE journal au lieu d'être jetées avec le reste — avant cette Phase, le
+  # signal n'atteignait jamais la personne qui installe. Best-effort inchangé : la fonction rend
+  # toujours 0, quel que soit le rc de l'injecteur.
+  local mcp_out mcp_rc=0
+  # set -e (tete du fichier) : l echec d une substitution de commande DANS une simple assignation
+  # ferait sortir le shell avant meme la ligne suivante — le `|| mcp_rc=$?` exempte cette ligne
+  # (patron standard) tout en capturant le vrai code de sortie de l injecteur.
+  mcp_out="$(bash "$injector" --target "$TARGET_ROOT/agents" --mcp-json "./.mcp.json" 2>&1 1>/dev/null)" || mcp_rc=$?
+  if [ -n "$mcp_out" ]; then
+    while IFS= read -r mcp_line; do
+      case "$mcp_line" in
+        *WARNING:*|*ERROR:*) log "  $mcp_line" ;;
+      esac
+    done <<<"$mcp_out"
+  fi
+  if [ "$mcp_rc" -eq 0 ]; then
+    log "  serveurs MCP du lab injectés dans les agents exécutants (vf-mcp-consumer, vf-mcp-tools — ADR-051, ADR-051-B)"
     # Site #19 (31-03) : régime C (D-31-04). Verbe ~ : no-op sur le manifeste.
     vf_declare_write "~" "$TARGET_ROOT/agents" "effet de inject-mcp-tools.sh, contenu non énuméré"
   else
@@ -2420,8 +2442,10 @@ install_module() {
   fi
 
   # Injection MCP dérivée du lab (ADR-051) : si ce module a posé des agents, injecter dans les
-  # exécutants flaggés (vf-mcp-consumer) les serveurs MCP que le lab déclare dans ./.mcp.json.
-  # Le balayage est filtré par le flag → les agents planif/revue/audit restent inchangés.
+  # agents flaggés vf-mcp-consumer (allowlist large) ET vf-mcp-tools (allowlist nommée, D-Q3) les
+  # serveurs MCP que le lab déclare dans l'UNION de son scope projet (./.mcp.json) et de son scope
+  # global (~/.claude.json, ADR-051-B). Le balayage est filtré par ces deux clés → les agents
+  # planif/revue/audit qui n'en portent aucune restent inchangés.
   if [ -f "$module_dir/AGENT.md" ] || [ -d "$module_dir/agents" ]; then
     inject_lab_mcp_into_agents
   fi
