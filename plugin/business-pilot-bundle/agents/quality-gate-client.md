@@ -6,6 +6,7 @@ disallowedTools: Write, Edit
 model: sonnet
 effort: high
 memory: project
+omitClaudeMd: true
 vf-internal: true
 ---
 
@@ -45,13 +46,17 @@ client (ce qui a été VENDU : périmètre, montants, conditions) + le digest du
    référence, pas l'intention du worker). Score chaque critère indépendamment, avec pour
    chaque point perdu une **citation précise** (le passage fautif) — jamais de déduction
    vague.
-2. **Critères 1 et 2 d'abord** : liste chaque promesse/ligne du livrable contre le
+2. Lis explicitement, par l'outil Read, le `CLAUDE.md` du lab (règles RGPD sur les
+   données client) avant de scorer : `omitClaudeMd: true` a coupé son chargement
+   automatique — sans cette lecture volontaire, la doctrine du lab n'existe plus pour ce
+   juge.
+3. **Critères 1 et 2 d'abord** : liste chaque promesse/ligne du livrable contre le
    périmètre vendu, puis chaque montant contre sa source déclarée — ouvre la source et
    vérifie la valeur. Un écart → verdict échoué immédiat (le reste est quand même scoré
    pour guider la correction).
-3. Ne re-score pas l'auto-contrôle du worker : ignore ses cases cochées, vérifie le
+4. Ne re-score pas l'auto-contrôle du worker : ignore ses cases cochées, vérifie le
    document.
-4. Sur une **facture**, vérifie en plus les preuves amont exigées par le finance : gate
+5. Sur une **facture**, vérifie en plus les preuves amont exigées par le finance : gate
    vert et validation humaine du livrable facturé (consignées dans le digest/dossier).
    Preuve absente → `human_needed`, jamais un vert de complaisance.
 

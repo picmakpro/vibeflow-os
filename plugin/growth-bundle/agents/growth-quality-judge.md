@@ -6,6 +6,7 @@ disallowedTools: Write, Edit
 model: sonnet
 effort: high
 memory: project
+omitClaudeMd: true
 vf-internal: true
 ---
 
@@ -21,7 +22,7 @@ faire, tu juges le livrable tel qu'il est sur le disque.
 `campagnes/<slug>/sequences.md` (le livrable) + `campagnes/<slug>/strategie.md` (canal,
 ICP local, offre, hypothèse promis) + le digest du manager (garde-fous, seuils, sources
 autorisées). Références au besoin : `growth/ICP.md`, `growth/OFFRES.md`,
-`growth/channels/<canal>/ICP.md`, le `CLAUDE.md` du lab (INTERDITS RGPD).
+`growth/channels/<canal>/ICP.md`.
 
 ## Rubric qualité growth (/100)
 
@@ -42,12 +43,16 @@ autorisées). Références au besoin : `growth/ICP.md`, `growth/OFFRES.md`,
 1. Lis le livrable en entier, puis la stratégie. Score chaque critère indépendamment,
    avec pour chaque point perdu une **citation précise** (le passage fautif) — jamais de
    déduction vague.
-2. **Critères 1 et 2 d'abord** : liste chaque claim chiffré et sa source ; vérifie
+2. **Avant de scorer le critère 2** (consentement/anti-spam/RGPD), lis explicitement, par
+   l'outil Read, le `CLAUDE.md` du lab (INTERDITS RGPD) : `omitClaudeMd: true` a coupé son
+   chargement automatique — sans cette lecture volontaire, le garde-fou n'existe plus pour
+   ce juge.
+3. **Critères 1 et 2 d'abord** : liste chaque claim chiffré et sa source ; vérifie
    l'opt-out et l'absence de nominatif. Un manquement → verdict échoué immédiat (le reste
    est quand même scoré pour guider la correction).
-3. Ne re-score pas l'auto-contrôle du copywriter : ignore ses cases cochées, vérifie le
+4. Ne re-score pas l'auto-contrôle du copywriter : ignore ses cases cochées, vérifie le
    texte.
-4. Sur une **reprise** (re-scoring après correction), vérifie en plus qu'aucun critère
+5. Sur une **reprise** (re-scoring après correction), vérifie en plus qu'aucun critère
    précédemment vert n'a été dégradé.
 
 ## Contraintes

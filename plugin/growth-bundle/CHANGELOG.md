@@ -1,5 +1,55 @@
 # CHANGELOG — growth-bundle
 
+## [v2.0.12] — 2026-09-25 (Phase 42, correction ciblée — nœud fix-42-condition-samuel)
+
+**Patch** :
+
+- **`growth-quality-judge` lit désormais explicitement le `CLAUDE.md` du lab (INTERDITS
+  RGPD) dans le DÉROULÉ (section « Méthode de scoring »)**, avant de scorer le critère 2
+  (consentement/anti-spam/RGPD) — `omitClaudeMd: true` a coupé son chargement automatique.
+  La mention retirée des « Références au besoin » pour éviter le doublon : ce qu'un juge
+  doit vérifier vit dans sa procédure, jamais dans une référence annexe. `tools: Read, Glob,
+  Grep` vérifié inchangé.
+- **`vf-growth-manager` — sa section « Digest de mission » porte désormais explicitement les
+  interdits du lab issus du `CLAUDE.md`** (RGPD prospects, anti-spam/consentement) : condition
+  posée par Samuel en ratifiant D-08. C'est le manager qui transmet cette doctrine au juge
+  frais, puisque celui-ci ne la charge plus automatiquement.
+- Assertion machine T13 ajoutée à `test-growth-bundle.sh`, ancrée sur la section « ## Méthode
+  de scoring » du juge (jamais sur une mention perdue dans les références) et sur la section
+  « ## Digest de mission » du manager, avec témoin discriminant par mutation. Rejouée rouge
+  sur les fichiers pré-correction (git show HEAD, 0 occurrence attendue).
+- **Épisode « garde-fous » (2026-09-25, entre-temps) et son rejet** : pour repasser sous la
+  baseline de `check-instruction-budget.sh` après l'ajout ci-dessus, les commits 6ca1de8/
+  f257306 avaient remplacé « interdits » par « garde-fous » dans le paragraphe du digest de
+  `vf-growth-manager` — un contournement du marqueur textuel D-01, jamais une baisse de charge
+  réelle. Rejeté par arbitrage (option b) : « arbitrage Willy, AskUserQuestion session
+  principale, 2026-09-25 ». « Interdits » est rétabli ; la baseline de
+  `.planning/instruction-budget-baselines.tsv` est montée en conséquence (`vf-growth-manager.md`
+  24 → 25 instructions), sur la même citation d'arbitrage.
+
+Décision déléguée par Willy au head, session principale, 2026-09-25, en exécution de la
+condition de Samuel (e568307).
+
+## [v2.0.11] — 2026-09-25 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **`growth-quality-judge` déclare `omitClaudeMd: true`** (invariant I5, D-08) — le juge frais
+  n'a aucune allowlist `Agent(...)` et retire déjà `Write`/`Edit` : au sens du gate, c'est un
+  juge, qui ne doit jamais charger la doctrine du `CLAUDE.md` du projet — un regard frais ne
+  charge pas la doctrine. Frontmatter seul, corps inchangé, compte d'instructions inchangé.
+  Arbitrage D-08 (maintenir) : session principale, décision déléguée par Willy au head
+  (« tranche et avançons »), 2026-09-25 — 42-D19-MESURE.md, 42-CONTEXT.md D-08, D-11.
+
+## [v2.0.10] — 2026-09-24 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **`SendMessage` sur `vf-growth-manager`** (invariant I6, D-07) — le manager n'avait jusqu'ici
+  que `AskUserQuestion`, qui n'existe pas en sous-agent : il était muet. Frontmatter seul, corps
+  inchangé. Décisions de cadrage de Claude (délégation de Willy, AskUserQuestion session
+  principale, 2026-09-23), ratifiées par Samuel (WhatsApp, 2026-09-23), 42-CONTEXT.md D-07, D-11.
+
 ## [v2.0.9] — 2026-09-16 (Phase 40.1)
 
 **Patch** :

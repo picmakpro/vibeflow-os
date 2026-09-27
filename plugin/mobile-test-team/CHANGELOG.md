@@ -1,5 +1,21 @@
 # Changelog — mobile-test-team
 
+## [v1.4.6] — 2026-09-24 (Phase 42 — invariants de doctrine du gate des agents)
+
+**Patch** :
+
+- **`vf-test-orchestrator` devient worker interne** (invariant I3 : il était dispatché par
+  `vf-dev-manager` sans porter `vf-internal: true`) — ajout de `vf-internal: true` en frontmatter
+  et du marqueur `Worker interne` dans `description:`, qui nomme désormais ses deux dispatcheurs
+  réels (`vf-dev-manager` et `vf-auto`). Conséquence directe de la définition D-07 (« manager =
+  `Agent(...)` non vide ET non `vf-internal` ») : il sort de la classe manager, donc pas de
+  `SendMessage` exigé. Conséquence côté install : plus de commande d'incarnation générée
+  (`generate-agent-commands.sh`, `is_internal_agent()`) ; une commande déjà posée dans un lab
+  existant n'est pas retirée automatiquement (le script conserve une commande présente). Frontmatter
+  seul modifié, corps et compte d'instructions inchangés. Décision de cadrage de Claude (délégation
+  de Willy, AskUserQuestion session principale, 2026-09-23), ratifiée par Samuel (WhatsApp,
+  2026-09-23), 42-CONTEXT.md D-11 — relecture de Samuel demandée en PR (D-12).
+
 ## [v1.4.5] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :

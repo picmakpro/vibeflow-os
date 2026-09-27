@@ -17,8 +17,41 @@
 # documenté, désormais enforcé PAR CE LINT (et seulement par lui). Elle redevient une vraie
 # restriction runtime uniquement pour un agent incarné en thread principal (`claude --agent`).
 #
-# Référentiel : frontmatter officiel Claude Code (docs sub-agents, vérifié 2026-07-05) +
-# charte VibeFlow (souveraineté : model explicite + memory explicite + skills câblés).
+# Référentiel : manifeste daté check-agents-manifest.json (même dossier que ce script) — six
+# listes, verifie_le + source par liste, valide_jours porté par le manifeste ; absent, illisible
+# ou invalide → MANIFESTE-ILLISIBLE, rc 1 (0 sous --hook) ; chargé seulement s'il y a au moins un
+# agent à juger ; la garde d'écriture traite cet incident comme une panne du contrôleur.
+# + charte VibeFlow (souveraineté : model explicite + memory explicite + skills câblés).
+#
+# Fraîcheur du manifeste (Phase 42, FABR-02, D-02/D-04/D-05) : chaque liste porte son échéance
+# (verifie_le + valide_jours, lus dans le manifeste, jamais en dur ici). Une liste est PÉRIMÉE
+# quand son verifie_le a plus de valide_jours jours, OU quand il est postérieur à aujourd'hui
+# (DATE-FUTURE, non vérifiable). Effet (D-04, D-05) : l'INDÉTERMINÉ (exit 3, MANIFESTE-PERIME)
+# n'est rendu QUE sous --manifest-freshness=strict — c'est la CI du dépôt qui l'active à ses
+# quatre appels de check-agents.sh, seul endroit avec la légitimité de rafraîchir le manifeste.
+# Partout ailleurs (hook SessionStart, garde d'écriture, CLI sans l'option), un manifeste périmé
+# ne produit qu'un AVERTISSEMENT — jamais un refus — et rétrograde en avertissement les erreurs
+# « outil hors du set connu » et « nom d'agent non résolu » (suffixe [MANIFESTE-PERIME —
+# retrograde en avertissement, D-05]) ; « champ inconnu » reste un avertissement inchangé ;
+# model/memory/effort/permissionMode restent bloquants dans tous les cas (Pitfall 3 : un modèle
+# inventé reste inventé, indépendamment de la fraîcheur de la doc). Le seul geste qui lève le
+# rouge est de rafraîchir check-agents-manifest.json (relire chaque source, comparer, re-dater) —
+# conséquence connue : la CI rougit à ses quatre appels à l'échéance, et T20 de
+# test-dev-orchestrator.sh (qui compte les avertissements d'un AGENT.md) en compte un de plus.
+#
+# Découverte récursive (Phase 42, FABR-04, D-10) : la cible (--agents-dir ou chaque registre passé
+# à --agent-registry-dir) est parcourue RÉCURSIVEMENT (os.walk, followlinks=False — aucun lien
+# symbolique de dossier suivi, pas de boucle) : un agent posé dans un sous-dossier est désormais
+# linté au même titre qu'un agent posé à la racine. Deux exclusions, chacune une ligne unique du
+# fichier, prouvées par mutation (MUT-D1, MUT-D2) : tout dossier caché (nom commençant par un
+# point) et tout dossier dont le nom finit par -references — l'installeur
+# (plugin/_internal/vibeflow-update.sh) pose les références de chaque module agent sous
+# .claude/agents/<mod>-references/ (D7) : ce sont des DOCUMENTS, jamais des agents, et un lab
+# installé les porterait tous sans cette exclusion. NOT_AGENTS (contracts.md, README.md,
+# AGENTS.md) reste vérifié par nom de fichier, à TOUTE profondeur. La résolution d'une allowlist
+# Agent(...)/Task(...) (resolve_agent_name) consulte désormais le MÊME index construit par cette
+# découverte (index_agents) : une seule fonction sert la cible ET la résolution, jamais un second
+# mécanisme.
 #
 # Usage:
 #   check-agents.sh                     # lint .claude/agents/*.md · exit 1 si non conforme
@@ -33,10 +66,15 @@
 #   check-agents.sh --resolve-agents=lenient|strict  # défaut lenient (monde ouvert) — toute
 #                                                 # autre valeur est REJETÉE (exit 1, jamais un skip muet)
 #   check-agents.sh --agent-registry-dir=PATH    # répétable, dirs de résolution supplémentaires
+#   check-agents.sh --manifest-freshness=lenient|strict  # défaut lenient — strict seul rend
+#                                                 # INDETERMINE (exit 3) sur manifeste perime,
+#                                                 # reserve a la CI du depot (D-04) ; toute autre
+#                                                 # valeur est REJETEE (exit 1, jamais un skip muet)
 #
 # BLOQUANT : frontmatter absent · name absent/invalide · description absente ·
-#   model absent ou hors {sonnet,opus,haiku,fable,inherit,claude-*} · memory absente ou hors
-#   {user,project,local} · effort/permissionMode/isolation/background/maxTurns invalides ·
+#   model absent ou hors du set du manifeste daté (+ claude-<id>) · memory absente ou hors
+#   {user,project,local} · effort absent ou hors du set du manifeste daté ·
+#   permissionMode/isolation/background/maxTurns invalides ·
 #   allowlist Agent(...)/Task(...)/Bash(...)/etc malformée (parenthèse non fermée, allowlist
 #   vide, entrée vide, espace avant la parenthèse, token hors charset).
 # WARNING : skills absent · skill déclaré introuvable (ERROR en --strict) · description < 30c ·
@@ -71,9 +109,57 @@
 # sinon par le frontmatter `name:` des SKILL.md installés — un skill peut porter un name différent
 # de son dossier (ex. module planning-core → skill `vf-planning`).
 #
+# INVARIANTS DE DOCTRINE (Phase 42, spec fabrique §4) — BLOQUANTS dans tous les modes (D-11) :
+# ce ne sont jamais des avertissements, quel que soit --strict — check-blueprints.sh (qui appelle
+# ce gate en mode par défaut) les voit donc aussi. Chacun a son jumeau négatif et sa mutation
+# prouvée rouge (MUT-I1, MUT-I4, MUT-I7, plus MUT-I5/MUT-I6 selon l'arbitrage D-08, 42-05 Tâche 3).
+#   I1 (D-06) : `vf-internal: true` doit coïncider, dans les DEUX sens, avec le marqueur littéral
+#     « Worker interne » (sensible à la casse) dans `description:`. Écart assumé par rapport à la
+#     spec §4 : le marqueur est lu dans `description:`, jamais dans le corps de l'agent, et le
+#     nombre de dispatcheurs nommés après le marqueur n'entre jamais en ligne de compte (D-18).
+#   I4 : `disallowedTools` ne tolère AUCUN jeton porteur d'un spécifieur parenthésé
+#     (`Bash(rm:*)`) : il retire l'outil ENTIER, il ne le restreint pas — un spécifieur y laisse
+#     croire à une restriction fine qui n'existe pas côté runtime.
+#   I7 : toute clé de frontmatter commençant par `vf-mcp-` exige `vf-requires` citant
+#     l'identifiant `mcp-servers` — même jointure que la règle 4 de
+#     plugin/dev-orchestrator/scripts/check-capability-activation.sh.
+#   I6 (D-07) : un agent dont l'allowlist `Agent(...)/Task(...)` de `tools:` est non vide
+#     (analyse pure `allowlist_agents`, jamais un second tokenizer) ET qui ne porte pas
+#     `vf-internal: true` est un MANAGER au sens de cet invariant — il doit porter `SendMessage`
+#     dans `tools:`, sinon il est muet vis-à-vis de ses pairs. Écart assumé par rapport à la
+#     spec §4 : un agent interne qui dispatche (`vf-coder`, `vf-reviewer`, `vf-auditer`,
+#     `vf-test-orchestrator` — des workers internes du team-kernel) n'est jamais un manager ici ;
+#     un `Agent` nu sans allowlist parenthésée non plus (rien à notifier).
+#   I5 (D-08) : un agent dont `disallowedTools:` retire À LA FOIS `Write` ET `Edit` ET dont
+#     l'allowlist de dispatch (même analyse pure) est VIDE est un JUGE au sens de cet invariant —
+#     il doit porter `omitClaudeMd: true`, sinon il charge la doctrine du `CLAUDE.md` du projet
+#     malgré son regard censé être frais. Écart assumé : un agent porteur d'une allowlist non
+#     vide (forme `vf-reviewer`/`vf-auditer` — un dispatcheur qui garde le `CLAUDE.md` du projet
+#     dont il a besoin pour relire) n'est jamais un juge ici, quel que soit son
+#     `disallowedTools:`. Arbitrage D-08 (maintenir) : session principale, décision déléguée par
+#     Willy au head (« tranche et avançons »), 2026-09-25 — 42-D19-MESURE.md.
+#   I2 (D-09) : un agent `vf-internal: true` qu'AUCUNE allowlist `Agent(...)/Task(...)` résolue de
+#     l'univers connu (le dossier linté PLUS chaque `--agent-registry-dir`) ne dispatche est un
+#     WORKER ORPHELIN — actifs SEULEMENT sous `--resolve-agents=strict` (la CI, seule à connaître
+#     l'univers complet des agents du dépôt) ; jamais hors de ce mode, jamais imputé à un fichier
+#     de registre (seuls les fichiers réellement LINTÉS dans ce run peuvent porter I2).
+#   I3 (D-09) : un agent NON `vf-internal: true` dispatché par au moins une allowlist résolue de ce
+#     même univers est un WORKER EXPOSÉ PAR ERREUR — même régime que I2 (`--resolve-agents=strict`
+#     seulement, imputation au seul fichier linté). La carte « dispatché par » réutilise EXACTEMENT
+#     la résolution existante (`allowlist_agents` + `resolve_agent_name`) : aucun registre écrit à
+#     la main.
+#
 # Codes de sortie : 0 = conforme · 1 = non conforme (agents non conformes, OU invocation
 #   invalide — ex. --resolve-agents=<valeur inconnue>) · 3 = INDÉTERMINÉ (--strict sur cible
 #   absente/vide : aucun verdict rendu — un vert sans rien vérifier serait un faux vert, F13).
+#   D-20 (Phase 42) : hors --hook, une cible ABSENTE (dossier introuvable) sort désormais
+#   INDÉTERMINÉ (exit 3, jeton CIBLE-ABSENTE) dans tous les modes, y compris sans --strict — une
+#   cible PRÉSENTE mais vide garde le régime F13 déjà documenté ci-dessus, inchangé.
+#   --allow-empty tolère aussi une cible ABSENTE, au même titre qu'une cible vide.
+#   Fraîcheur (Phase 42, FABR-02, D-04) : hors --hook, sous --manifest-freshness=strict, un
+#   manifeste périmé rend aussi INDÉTERMINÉ (exit 3, jeton MANIFESTE-PERIME) — jamais la ligne
+#   « ✓ agents conformes ». Sans l'option (défaut lenient), un manifeste périmé reste un
+#   avertissement, jamais un exit 3 ni un exit 1.
 
 set -uo pipefail
 
@@ -86,6 +172,7 @@ SINGLE_FILE=""
 THIRD_PARTY_PREFIXES="gsd-"
 RESOLVE_AGENTS="lenient"
 REGISTRY_DIRS=""
+MANIFEST_FRESHNESS="lenient"
 
 for arg in "$@"; do
   case "$arg" in
@@ -105,6 +192,7 @@ for arg in "$@"; do
       v="${arg#*=}"
       if [ -z "$REGISTRY_DIRS" ]; then REGISTRY_DIRS="$v"; else REGISTRY_DIRS="$REGISTRY_DIRS:$v"; fi
       ;;
+    --manifest-freshness=*) MANIFEST_FRESHNESS="${arg#*=}" ;;
     -h|--help)        grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
   esac
 done
@@ -127,6 +215,17 @@ case "$RESOLVE_AGENTS" in
     ;;
 esac
 
+# --manifest-freshness : même régime que --resolve-agents ci-dessus (D-14, Phase 42) — toute
+# valeur hors lenient|strict est un rejet explicite, jamais un repli muet sur lenient (qui
+# masquerait silencieusement un manifeste périmé en CI).
+case "$MANIFEST_FRESHNESS" in
+  lenient|strict) ;;
+  *)
+    echo "[check-agents] ✗ --manifest-freshness invalide '$MANIFEST_FRESHNESS' — attendu lenient|strict" >&2
+    exit 1
+    ;;
+esac
+
 # --- Traduction du silence interne vers le harness (D-06/D-07, uniquement sous --hook) ----------
 # hook_exit <code> : sous --hook, le SEUL code de silence interne (3 = INDETERMINE sur cible vide
 # en --strict) devient 0 à la frontière du harness. Posée ici, au point où le SHELL rend la main
@@ -143,6 +242,11 @@ hook_exit() { # <code>
   exit "$code"
 }
 
+# D-01/D-03 : chemin du manifeste daté dérivé du dossier du script (patron check-blueprints.sh),
+# JAMAIS de l'environnement appelant ni du cwd — aucune option de substitution du manifeste.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+VF_MANIFEST="$SCRIPT_DIR/check-agents-manifest.json"
+
 # ADR-054 : stub Microsoft Store — `python3` présent dans le PATH mais inerte. Détection par
 # CHEMIN (zéro spawn), repli `python` ; sinon message + exit 0 (advisory, comme avant).
 PYBIN=python3
@@ -153,9 +257,12 @@ esac
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
 VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" \
 VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" VF_RESOLVE_AGENTS="$RESOLVE_AGENTS" \
-VF_REGISTRY_DIRS="$REGISTRY_DIRS" "$PYBIN" -c "
-import glob, os, re, sys
+VF_REGISTRY_DIRS="$REGISTRY_DIRS" VF_MANIFEST="$VF_MANIFEST" \
+VF_MANIFEST_FRESHNESS="$MANIFEST_FRESHNESS" "$PYBIN" -c "
+import glob, json, os, re, sys
+from datetime import date
 
+manifest_path = os.environ[\"VF_MANIFEST\"]
 agents_dir = os.environ[\"VF_AGENTS_DIR\"]
 skills_dir = os.environ[\"VF_SKILLS_DIR\"]
 strict = os.environ[\"VF_STRICT\"] == \"true\"
@@ -165,45 +272,174 @@ single = os.environ[\"VF_SINGLE\"]
 third_party_prefixes = [p for p in os.environ.get(\"VF_THIRD_PARTY_PREFIXES\", \"\").split(\":\") if p]
 resolve_agents_strict = os.environ.get(\"VF_RESOLVE_AGENTS\", \"lenient\") == \"strict\"
 registry_dirs = [p for p in os.environ.get(\"VF_REGISTRY_DIRS\", \"\").split(\":\") if p]
+manifest_freshness_strict = os.environ.get(\"VF_MANIFEST_FRESHNESS\", \"lenient\") == \"strict\"
 
-# Champs officiels Claude Code (docs sub-agents, 2026-07-05) — base du lint.
-# + conventions VibeFlow : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12) ;
+# Conventions VibeFlow restees en dur (D-01 borne le manifeste aux SIX listes d'origine native ;
+# ces quatre champs sont des conventions du depot, jamais sujettes a la peremption d'une doc
+# Anthropic externe) : vf-internal (worker interne — pas de commande d'incarnation, cf. Pattern 12) ;
 #   vf-mcp-consumer (agent exécutant recevant l'allowlist MCP dérivée du lab à l'install, ADR-051) ;
 #   vf-mcp-tools (allowlist MCP NOMMÉE — un serveur, une liste d'outils explicites — consommée par
 #   le script d'injection du module dev-orchestrator ; coexiste avec vf-mcp-consumer sans le remplacer) ;
 #   vf-requires (identifiant de précondition externe déclarée par l'artefact — jointure par id avec
 #   # vf-provides: côté script, consommée par la règle 4 de check-capability-activation.sh, Phase 28).
-KNOWN = {\"name\", \"description\", \"tools\", \"disallowedTools\", \"model\", \"permissionMode\",
-         \"maxTurns\", \"skills\", \"mcpServers\", \"hooks\", \"memory\", \"background\", \"effort\",
-         \"isolation\", \"color\", \"initialPrompt\", \"vf-internal\", \"vf-mcp-consumer\", \"vf-mcp-tools\",
-         \"vf-requires\"}
-MODELS = {\"sonnet\", \"opus\", \"haiku\", \"fable\", \"inherit\"}
+VIBEFLOW_FIELDS = {\"vf-internal\", \"vf-mcp-consumer\", \"vf-mcp-tools\", \"vf-requires\"}
 MEMORY = {\"user\", \"project\", \"local\"}
-EFFORT = {\"low\", \"medium\", \"high\", \"xhigh\", \"max\"}
-PERM = {\"default\", \"acceptEdits\", \"auto\", \"dontAsk\", \"bypassPermissions\", \"plan\", \"manual\"}
 NOT_AGENTS = {\"contracts.md\", \"README.md\", \"AGENTS.md\"}
-
-# Types natifs Claude Code (doc code.claude.com/docs/en/sub-agents, verifiee 2026-07-27).
-# ATTENTION rouille : Explore/Plan requierent min-version 2.1.198 ; fork requiert
-# CLAUDE_CODE_FORK_SUBAGENT=1 (pas actif par defaut) ; CLAUDE_CODE_DISABLE_EXPLORE_PLAN_AGENTS=1
-# et CLAUDE_AGENT_SDK_DISABLE_BUILTIN_AGENTS=1 peuvent desactiver tout ou partie de cette liste ;
-# un agent utilisateur peut surcharger un nom natif. C'est PRECISEMENT pourquoi \"nom non resolu\"
-# reste un WARNING (jamais une ERREUR par defaut) : la rouille de cette liste degrade en jaune.
-NATIVE_TYPES = {\"explore\", \"plan\", \"general-purpose\", \"statusline-setup\", \"claude-code-guide\", \"fork\"}
-
-# Set ferme des identifiants d'outils (doc code.claude.com/docs/en/tools-reference, verifiee
-# 2026-07-27 — 43 identifiants + alias Task confirmes mot pour mot, aucun ecart).
-TOOL_NAMES = {
-    \"Agent\", \"Artifact\", \"AskUserQuestion\", \"Bash\", \"CronCreate\", \"CronDelete\", \"CronList\",
-    \"Edit\", \"EndConversation\", \"EnterPlanMode\", \"EnterWorktree\", \"ExitPlanMode\", \"ExitWorktree\",
-    \"Glob\", \"Grep\", \"ListMcpResourcesTool\", \"LSP\", \"Monitor\", \"NotebookEdit\", \"PowerShell\",
-    \"PushNotification\", \"Read\", \"ReadMcpResourceTool\", \"RemoteTrigger\", \"ReportFindings\",
-    \"ScheduleWakeup\", \"SendMessage\", \"SendUserFile\", \"ShareOnboardingGuide\", \"Skill\", \"TaskCreate\",
-    \"TaskGet\", \"TaskList\", \"TaskOutput\", \"TaskStop\", \"TaskUpdate\", \"TodoWrite\", \"ToolSearch\",
-    \"WaitForMcpServers\", \"WebFetch\", \"WebSearch\", \"Workflow\", \"Write\",
-}
 # Task = alias legacy d'Agent depuis Claude Code v2.1.63 — traite a l'identique partout.
 AGENT_TOOL_NAMES = {\"Agent\", \"Task\"}
+
+def decouvrir_agents(racine, refuses=None):
+    \"\"\"D-10 (Phase 42, FABR-04) : decouverte RECURSIVE des agents sous racine, avec deux
+    exclusions PROUVEES par mutation (MUT-D1, MUT-D2), chacune sur sa PROPRE ligne, unique dans
+    le fichier : les dossiers caches (nom commencant par un point) et les dossiers *-references
+    poses par l'installeur (plugin/_internal/vibeflow-update.sh, D7 — de la doc, jamais des
+    agents). Aucun lien symbolique de dossier suivi (followlinks=False, pas de boucle). Fichiers
+    retenus : *.md dont le nom n'est pas dans NOT_AGENTS, a TOUTE profondeur, ET qui n'est pas
+    lui-meme un lien symbolique (A1, Phase 42 correction ciblee) — un .md en lien symbolique (vers
+    n'importe ou, a fortiori hors de racine) est REFUSE comme un dossier : jamais ajoute a
+    trouves, son contenu n'est jamais ouvert par cette fonction ni par un appelant. Quand
+    'refuses' est fourni (liste), chaque chemin refuse y est ajoute pour diagnostic par
+    l'appelant ; les appelants qui ne fournissent rien (index/registres) excluent silencieusement.
+    Rend une liste TRIEE par chemin.\"\"\"
+    trouves = []
+    for dirpath, dirnames, filenames in os.walk(racine, followlinks=False):
+        dirnames[:] = [d for d in dirnames if not d.startswith('.')]
+        dirnames[:] = [d for d in dirnames if not d.endswith('-references')]
+        for fn in filenames:
+            if fn.endswith('.md') and fn not in NOT_AGENTS:
+                full = os.path.join(dirpath, fn)
+                if os.path.islink(full):
+                    if refuses is not None:
+                        refuses.append(full)
+                    continue
+                trouves.append(full)
+    return sorted(trouves)
+
+_agent_index_cache = {}
+def index_agents(agents_dir_local, registry_dirs_local):
+    \"\"\"Index paresseux nom-de-fichier -> chemin (D-10) : decouvrir_agents sur agents_dir_local
+    PUIS sur chaque registre (le PREMIER trouve l'emporte, agents_dir_local d'abord). Une SEULE
+    decouverte sert la cible ET la resolution — resolve_agent_name la consulte au lieu de tester
+    <dossier>/<nom>.md a un seul niveau. Cache CLE par ses parametres (WR-01, Phase 42 correction
+    ciblee) : un appel a agents_dir_local/registry_dirs_local differents ne doit JAMAIS reutiliser
+    l'index d'un appel precedent — sinon un second appel dans le meme run (agents_dir ou registre
+    different) recevrait silencieusement l'index du premier.\"\"\"
+    global _agent_index_cache
+    cle = (agents_dir_local, tuple(registry_dirs_local))
+    if cle in _agent_index_cache:
+        return _agent_index_cache[cle]
+    index = {}
+    for d in [agents_dir_local] + list(registry_dirs_local):
+        if not d or not os.path.isdir(d):
+            continue
+        for p in decouvrir_agents(d):
+            nom = os.path.basename(p)[:-3]
+            index.setdefault(nom, p)
+    _agent_index_cache[cle] = index
+    return index
+
+# D-01/D-02/D-03 : les six listes de reference (identifiants d'outils, champs de frontmatter,
+# types natifs, modeles, modes de permission, niveaux d'effort) ne vivent plus ici — elles sont
+# chargees depuis le manifeste daté check-agents-manifest.json (meme dossier que ce script).
+# AUCUNE valeur par defaut n'est portee par ce script (D-02) : un manifeste absent, illisible ou
+# au schema invalide est un refus explicite (D-03), jamais une liste vide qui laisse tout passer.
+_VALEUR_RE = re.compile(r\"^[A-Za-z0-9_-]+$\")
+
+def charger_manifeste(chemin):
+    \"\"\"Lit et valide le manifeste daté — toute absence/malformation leve une ValueError qui
+    nomme la cle et le motif (jamais un defaut silencieux, jamais un skip ligne a ligne).\"\"\"
+    with open(chemin, encoding=\"utf-8\") as fh:
+        m = json.load(fh)
+    if not isinstance(m, dict):
+        raise ValueError(\"racine du manifeste — attendu un objet JSON\")
+    cles_racine = {\"valide_jours\", \"rafraichissement\", \"listes\"}
+    for cle in cles_racine:
+        if cle not in m:
+            raise ValueError(f\"cle de premier niveau manquante — {cle}\")
+    extra = set(m.keys()) - cles_racine
+    if extra:
+        raise ValueError(f\"cle(s) de premier niveau inconnue(s) — {sorted(extra)}\")
+    valide_jours = m[\"valide_jours\"]
+    if not isinstance(valide_jours, int) or isinstance(valide_jours, bool) or valide_jours <= 0:
+        raise ValueError(\"valide_jours — attendu un entier strictement positif\")
+    listes = m[\"listes\"]
+    if not isinstance(listes, dict):
+        raise ValueError(\"listes — attendu un objet JSON\")
+    cles_listes = {\"outils\", \"champs_frontmatter\", \"types_natifs\", \"modeles\", \"modes_permission\", \"niveaux_effort\"}
+    if set(listes.keys()) != cles_listes:
+        raise ValueError(f\"listes — attendu exactement les six cles {sorted(cles_listes)}, trouve {sorted(listes.keys())}\")
+    for nom_liste, liste in listes.items():
+        if not isinstance(liste, dict):
+            raise ValueError(f\"listes.{nom_liste} — attendu un objet JSON\")
+        verifie_le = liste.get(\"verifie_le\")
+        if not isinstance(verifie_le, str):
+            raise ValueError(f\"listes.{nom_liste}.verifie_le — attendu une date ISO\")
+        try:
+            date.fromisoformat(verifie_le)
+        except ValueError:
+            raise ValueError(f\"listes.{nom_liste}.verifie_le — date ISO invalide ({verifie_le})\")
+        source = liste.get(\"source\")
+        if not isinstance(source, str) or not source.startswith(\"https://\"):
+            raise ValueError(f\"listes.{nom_liste}.source — attendu une chaine https:// ({source})\")
+        valeurs = liste.get(\"valeurs\")
+        if not isinstance(valeurs, list) or not valeurs:
+            raise ValueError(f\"listes.{nom_liste}.valeurs — attendu une liste non vide\")
+        for v in valeurs:
+            if not isinstance(v, str) or not _VALEUR_RE.fullmatch(v):
+                raise ValueError(f\"listes.{nom_liste}.valeurs — valeur hors charset [A-Za-z0-9_-]+ ({v!r})\")
+    return m
+
+KNOWN = TOOL_NAMES = NATIVE_TYPES = MODELS = PERM = EFFORT = None
+MODELS_ORDERED = EFFORT_ORDERED = []
+# Fraîcheur (Phase 42, FABR-02, D-02/D-04/D-05) : defauts surs si charger_referentiel() n'est
+# JAMAIS appelee (ex. --file sur une cible introuvable) — une cible non jugee ne peut jamais
+# etre consideree perimee, et le rapport de fraicheur ci-dessous reste silencieux dans ce cas.
+perimees = []
+retrograder = False
+
+def manifeste_perime(manifest, aujourd_hui):
+    \"\"\"Rend, dans l'ordre des listes, une description par liste PERIMEE (D-02) : verifie_le
+    posterieur a aujourd'hui (DATE-FUTURE, non verifiable — horloge forgee, T-42-13) ; ou age en
+    jours strictement superieur a valide_jours (l'un et l'autre LUS dans le manifeste, aucune
+    valeur par defaut de validite ici, D-02). Liste vide = manifeste frais.\"\"\"
+    valide_jours = manifest[\"valide_jours\"]
+    descriptions = []
+    for nom_liste, liste in manifest[\"listes\"].items():
+        verifie_le = date.fromisoformat(liste[\"verifie_le\"])
+        if verifie_le > aujourd_hui:
+            descriptions.append(f\"{nom_liste} (DATE-FUTURE : verifiee le {verifie_le.isoformat()}, posterieure a aujourd'hui — non verifiable)\")
+            continue
+        age = (aujourd_hui - verifie_le).days
+        if age > valide_jours:
+            descriptions.append(f\"{nom_liste} (verifiee le {verifie_le.isoformat()}, {age} j, validite {valide_jours} j)\")
+    return descriptions
+
+def charger_referentiel():
+    \"\"\"Charge le manifeste (D-01/D-03) et peuple les ensembles/ordres consommes par le lint.
+    Appelee SEULEMENT s'il existe au moins une cible a juger (chargement PARESSEUX) — la branche
+    cible vide (F13, exit 3 en --strict / 0 sinon) ne l'appelle jamais et reste inchangee ; la
+    fraicheur (perimees/retrograder) n'est donc, elle non plus, JAMAIS evaluee sur cible vide.\"\"\"
+    global KNOWN, TOOL_NAMES, NATIVE_TYPES, MODELS, PERM, EFFORT, MODELS_ORDERED, EFFORT_ORDERED
+    global perimees, retrograder
+    try:
+        m = charger_manifeste(manifest_path)
+    except (OSError, ValueError) as e:
+        cause = str(e).replace(\" : \", \" - \")
+        print(f\"[check-agents] ✗ MANIFESTE-ILLISIBLE ({manifest_path}) — {cause} — aucun verdict rendu (D-03)\")
+        sys.exit(0 if hook else 1)
+    listes = m[\"listes\"]
+    KNOWN = set(listes[\"champs_frontmatter\"][\"valeurs\"]) | VIBEFLOW_FIELDS
+    TOOL_NAMES = set(listes[\"outils\"][\"valeurs\"])
+    NATIVE_TYPES = set(listes[\"types_natifs\"][\"valeurs\"])
+    MODELS_ORDERED = list(listes[\"modeles\"][\"valeurs\"])
+    MODELS = set(MODELS_ORDERED)
+    PERM = set(listes[\"modes_permission\"][\"valeurs\"])
+    EFFORT_ORDERED = list(listes[\"niveaux_effort\"][\"valeurs\"])
+    EFFORT = set(EFFORT_ORDERED)
+    # Cibles de mutation MUT-F1/MUT-F2 (42-04) : DEUX lignes distinctes et uniques dans le
+    # fichier, jamais fusionnees — la mutation de l'une ne doit jamais affecter l'autre.
+    perimees = manifeste_perime(m, date.today())
+    retrograder = bool(perimees)
 
 errors, warnings = [], []
 # Deux compteurs DISTINCTS (jamais un skip mal decrit) : thirdparty_files_total = fichiers
@@ -213,6 +449,9 @@ errors, warnings = [], []
 # tierces dans ses allowlists, ou l'inverse.
 thirdparty_files_total = 0
 thirdparty_entries_total = 0
+# D-09 (Phase 42) : cibles reellement LINTEES dans ce run (non tiers) — univers d'imputation
+# I2/I3, jamais un fichier de registre (voir construire_univers_dispatch plus bas).
+linted_paths = []
 
 def parse_frontmatter(text):
     lines = text.split(\"\n\")
@@ -359,19 +598,21 @@ def tokenize_field(mode, raw):
         s = s[1:-1]
     return split_depth(s)
 
-def analyze_token(raw_tok, field, base):
-    \"\"\"Analyse structurelle d'UN token d'allowlist deja isole par tokenize_field.
-    Retourne (tool_name, agent_names) : agent_names est None si pas de parametres,
-    [] si allowlist vide 'Agent()', une liste sinon. Ajoute les erreurs de SYNTAXE
-    (classe non affectee par --strict, toujours bloquante) a la liste errors.\"\"\"
+def parse_token(raw_tok, field, base):
+    \"\"\"Analyse structurelle PURE d'UN token d'allowlist deja isole par tokenize_field.
+    AUCUN effet de bord (jamais rappelee pour classer un agent — Phase 42, § Don't Hand-Roll).
+    Retourne (tool_name, agent_names, message_ou_None) : agent_names est None si pas de
+    parametres, [] si allowlist vide 'Agent()', une liste sinon ; message_ou_None est le
+    message d'erreur de SYNTAXE (meme texte EXACT que l'ancien analyze_token), ou None si le
+    token est syntaxiquement propre — un token AVEC message n'est jamais retenu dans une
+    allowlist consommee ailleurs (allowlist_agents), meme quand il rend des agent_names non
+    vides (ex. 'Agent(a,,b)' : agent_names=['a','b'] mais message present -> jamais dispatch).\"\"\"
     tok = raw_tok.strip()
     if tok == \"\":
-        errors.append(f\"{base} : {field} — entree d'allowlist vide (virgule orpheline, ex. 'a,,b')\")
-        return None, None
+        return None, None, f\"{base} : {field} — entree d'allowlist vide (virgule orpheline, ex. 'a,,b')\"
     m_space = re.match(r\"^(\S+)\s+\(\", tok)
     if m_space:
-        errors.append(f\"{base} : {field} — espace avant la parenthese dans '{tok}' (attendu Nom(args))\")
-        return None, None
+        return None, None, f\"{base} : {field} — espace avant la parenthese dans '{tok}' (attendu Nom(args))\"
     m = re.match(r\"^([A-Za-z0-9_-]+)\((.*)$\", tok, re.S)
     if not m:
         # pas de parenthese : nom d'outil seul (Read, Bash, ...) OU forme MCP a joker TERMINAL
@@ -380,21 +621,49 @@ def analyze_token(raw_tok, field, base):
         # ni en tete, ni en milieu de chaine, ni dans le nom du serveur, ni suivi d'un suffixe
         # (mcp__*, mcp__Xcode*MCP__*, mcp__XcodeBuildMCP__*_sim restent hors charset).
         if not (re.fullmatch(r\"[A-Za-z0-9_-]+\", tok) or re.fullmatch(r\"mcp__[A-Za-z0-9_-]+__[*]\", tok)):
-            errors.append(f\"{base} : {field} — token hors charset attendu '{tok}'\")
-            return None, None
-        return tok, None
+            return None, None, f\"{base} : {field} — token hors charset attendu '{tok}'\"
+        return tok, None, None
     name, rest = m.group(1), m.group(2)
     if not rest.endswith(\")\"):
-        errors.append(f\"{base} : {field} — parenthese non fermee dans '{tok}'\")
-        return name, None
+        return name, None, f\"{base} : {field} — parenthese non fermee dans '{tok}'\"
     inner = rest[:-1]
     if inner.strip() == \"\":
-        errors.append(f\"{base} : {field} — allowlist vide '{name}()'\")
-        return name, []
+        return name, [], f\"{base} : {field} — allowlist vide '{name}()'\"
     agent_names = [a.strip() for a in inner.split(\",\") if a.strip() != \"\"]
     if len(agent_names) != len([a for a in inner.split(\",\")]):
-        errors.append(f\"{base} : {field} — entree vide dans l'allowlist de '{name}(...)'\")
+        return name, agent_names, f\"{base} : {field} — entree vide dans l'allowlist de '{name}(...)'\"
+    return name, agent_names, None
+
+def analyze_token(raw_tok, field, base):
+    \"\"\"Enveloppe historique d'analyze_token : appelle parse_token (analyse pure) et ajoute
+    son message a errors sous la forme EXACTE d'aujourd'hui (T26, T27, T37 a T41 assertent ces
+    textes). Comportement inchange pour tout appelant existant.\"\"\"
+    name, agent_names, message = parse_token(raw_tok, field, base)
+    if message is not None:
+        errors.append(message)
     return name, agent_names
+
+def allowlist_agents(fmlines):
+    \"\"\"I6 (D-07) : analyse PURE du champ tools: — jetons via extract_raw_field + tokenize_field
+    (memes fonctions que le lint principal, jamais un second tokenizer). Liste vide si le champ
+    est absent ou si la profondeur de parentheses est non nulle. Pour chaque jeton SANS message
+    d'erreur (parse_token) dont le nom est un outil de dispatch (AGENT_TOOL_NAMES) avec une
+    allowlist non vide, accumule ses noms d'agents — jamais analyze_token (qui ecrirait dans
+    errors une seconde fois, § Don't Hand-Roll : parse_token pur alimente cette fonction).\"\"\"
+    mode, raw = extract_raw_field(fmlines, \"tools\")
+    if mode is None:
+        return []
+    tokens, depth = tokenize_field(mode, raw)
+    if depth != 0:
+        return []
+    dispatch = []
+    for raw_tok in tokens:
+        name, agent_names, message = parse_token(raw_tok, \"tools\", \"\")
+        if message is not None or name is None:
+            continue
+        if name in AGENT_TOOL_NAMES and agent_names:
+            dispatch.extend(agent_names)
+    return dispatch
 
 def resolve_agent_name(name, agents_dir_local, registry_dirs_local, prefixes):
     low = name.lower()
@@ -403,11 +672,8 @@ def resolve_agent_name(name, agents_dir_local, registry_dirs_local, prefixes):
     for pfx in prefixes:
         if pfx and name.startswith(pfx):
             return \"thirdparty\"
-    if os.path.isfile(os.path.join(agents_dir_local, name + \".md\")):
+    if name in index_agents(agents_dir_local, registry_dirs_local):
         return \"resolved\"
-    for rd in registry_dirs_local:
-        if rd and os.path.isfile(os.path.join(rd, name + \".md\")):
-            return \"resolved\"
     return \"unresolved\"
 
 def lint_tool_field(base, field, mode, raw, do_agent_resolution):
@@ -428,7 +694,16 @@ def lint_tool_field(base, field, mode, raw, do_agent_resolution):
         is_agent_tool = name in AGENT_TOOL_NAMES
         if name not in TOOL_NAMES and not is_agent_tool and not name.startswith(\"mcp__\"):
             msg = f\"{base} : {field} — outil hors du set connu '{name}' (typo ? nouvel outil non encore reference ?)\"
-            (errors if strict else warnings).append(msg)
+            # D-05 (Phase 42) : un manifeste perime ne peut plus REFUSER sur cette liste fermee —
+            # erreur seulement si strict ET manifeste frais ; sinon avertissement, suffixe
+            # [MANIFESTE-PERIME — retrograde en avertissement, D-05] uniquement quand c'est bien
+            # la peremption qui a evite le refus (jamais sur le regime lenient normal).
+            if strict and not retrograder:
+                errors.append(msg)
+            else:
+                if retrograder:
+                    msg += \" [MANIFESTE-PERIME — retrograde en avertissement, D-05]\"
+                warnings.append(msg)
         if is_agent_tool:
             if agent_names is None:
                 if field == \"tools\":
@@ -440,9 +715,13 @@ def lint_tool_field(base, field, mode, raw, do_agent_resolution):
                         thirdparty_entries_total += 1
                     elif verdict == \"unresolved\":
                         msg = f\"{base} : {field} — nom d'agent non resolu '{a}' (ni type natif, ni fichier {agents_dir}/{a}.md, ni registre)\"
-                        if resolve_agents_strict:
+                        # D-05 (Phase 42) : meme regime que ci-dessus — erreur sous
+                        # --resolve-agents=strict seulement si le manifeste est frais.
+                        if resolve_agents_strict and not retrograder:
                             errors.append(msg + \" [--resolve-agents=strict]\")
                         else:
+                            if retrograder:
+                                msg += \" [MANIFESTE-PERIME — retrograde en avertissement, D-05]\"
                             warnings.append(msg)
     if bare_agent:
         warnings.append(f\"{base} : tools — 'Agent' sans allowlist parenthesee = dispatch non cloisonne\")
@@ -491,6 +770,179 @@ def bare_tokens(fmlines, field):
         return set()
     return {t.strip() for t in tokens if t.strip() and \"(\" not in t}
 
+# ---- Invariants de doctrine locaux (Phase 42, spec fabrique §4, FABR-03) -----------------------
+# Toujours des ERREURS (D-11), jamais affectees par --strict. Chaque fonction rend une LISTE de
+# messages (jamais un booleen ni une exception) — check_file() les etend a errors via UNE ligne
+# d'appel unique par invariant (errors.extend(invariant_iN(...))), cible des mutants MUT-I1/I4/I7.
+
+def invariant_i1(base, fm):
+    \"\"\"I1 (D-06) : vf-internal: true doit coincider, dans les DEUX sens, avec le marqueur
+    litteral « Worker interne » (sensible a la casse — une variante de casse est traitee comme
+    absente) dans description: (chaine ou liste jointe par un espace). Le nombre de dispatcheurs
+    nommes apres le marqueur (D-18, forme a deux dispatcheurs) n'entre jamais en ligne de compte :
+    seule la PRESENCE du marqueur est lue.\"\"\"
+    is_internal = str(fm.get(\"vf-internal\", \"\")) == \"true\"
+    desc = fm.get(\"description\")
+    if isinstance(desc, list):
+        desc_text = \" \".join(str(d) for d in desc)
+    else:
+        desc_text = str(desc) if desc is not None else \"\"
+    has_marker = \"Worker interne\" in desc_text
+    if is_internal and not has_marker:
+        return [f\"{base} : invariant I1 — vf-internal: true sans le marqueur « Worker interne » dans description: (D-06)\"]
+    if has_marker and not is_internal:
+        return [f\"{base} : invariant I1 — description: porte « Worker interne » sans vf-internal: true (D-06)\"]
+    return []
+
+def invariant_i4(base, fmlines):
+    \"\"\"I4 : disallowedTools ne tolere aucun jeton porteur d'un specifieur parenthese — il
+    retire l'outil ENTIER, il ne le restreint pas. Jetons via extract_raw_field + tokenize_field
+    (memes fonctions que le lint principal, jamais un second tokenizer) ; liste vide si le champ
+    est absent ou si la profondeur de parentheses est non nulle (l'erreur de syntaxe correspondante
+    est deja levee par lint_tool_field, I4 ne la duplique jamais).\"\"\"
+    mode, raw = extract_raw_field(fmlines, \"disallowedTools\")
+    if mode is None:
+        return []
+    tokens, depth = tokenize_field(mode, raw)
+    if depth != 0:
+        return []
+    msgs = []
+    for raw_tok in tokens:
+        tok = raw_tok.strip()
+        if \"(\" in tok:
+            msgs.append(f\"{base} : invariant I4 — disallowedTools porte un specifieur '{tok}' : il retire l'outil ENTIER, il ne le restreint pas\")
+    return msgs
+
+_VF_REQUIRES_SPLIT_RE = re.compile(r\"[,\s]+\")
+
+def invariant_i7(base, fm):
+    \"\"\"I7 : toute cle commencant par vf-mcp- exige vf-requires citant l'identifiant
+    mcp-servers — meme jointure (virgules/espaces) que la regle 4 de
+    check-capability-activation.sh. vf-requires peut etre une chaine ou une liste.\"\"\"
+    mcp_keys = sorted(k for k in fm if k.startswith(\"vf-mcp-\"))
+    if not mcp_keys:
+        return []
+    vr = fm.get(\"vf-requires\")
+    tokens = set()
+    if isinstance(vr, list):
+        for item in vr:
+            tokens.update(t for t in _VF_REQUIRES_SPLIT_RE.split(str(item)) if t)
+    elif isinstance(vr, str):
+        tokens.update(t for t in _VF_REQUIRES_SPLIT_RE.split(vr) if t)
+    if \"mcp-servers\" in tokens:
+        return []
+    return [f\"{base} : invariant I7 — {k} sans vf-requires citant mcp-servers\" for k in mcp_keys]
+
+def invariant_i6(base, fm, fmlines, dispatch):
+    \"\"\"I6 (D-07, TOUJOURS arme, independant de l'arbitrage D-19) : manager si dispatch (issu
+    de allowlist_agents) non vide ET vf-internal ne vaut pas « true ». Un manager sans
+    SendMessage dans bare_tokens(fmlines, \\\"tools\\\") est une erreur — la vue sur ses pairs
+    (SendMessage) est requise pour tout dispatcheur non interne. Un agent interne porteur
+    d'une allowlist (vf-coder, vf-reviewer, vf-auditer, vf-test-orchestrator), ou un 'Agent' nu
+    sans allowlist parenthesee, n'est jamais un manager au sens de cet invariant.\"\"\"
+    if not dispatch:
+        return []
+    if str(fm.get(\"vf-internal\", \"\")) == \"true\":
+        return []
+    if \"SendMessage\" in bare_tokens(fmlines, \"tools\"):
+        return []
+    return [f\"{base} : invariant I6 — manager (allowlist Agent(...) non vide, non vf-internal) sans SendMessage dans tools: (D-07)\"]
+
+def invariant_i5(base, fm, fmlines, dispatch):
+    \"\"\"I5 (D-08, SEULEMENT SI ARBITRAGE-MAINTENIR au checkpoint D-19, Phase 42 42-05 Tache 3) :
+    juge si Write ET Edit sont dans bare_tokens(fmlines, \\\"disallowedTools\\\") ET dispatch (issu
+    de allowlist_agents) est vide. Un juge sans omitClaudeMd valant « true » est une erreur — un
+    regard frais ne charge pas la doctrine du CLAUDE.md du projet. Un agent porteur d'une
+    allowlist Agent(...)/Task(...) non vide (forme vf-reviewer, vf-auditer) n'est jamais un juge
+    au sens de cet invariant, quel que soit son disallowedTools.\"\"\"
+    disallowed = bare_tokens(fmlines, \"disallowedTools\")
+    if not (\"Write\" in disallowed and \"Edit\" in disallowed):
+        return []
+    if dispatch:
+        return []
+    if str(fm.get(\"omitClaudeMd\", \"\")) == \"true\":
+        return []
+    return [f\"{base} : invariant I5 — juge (disallowedTools retire Write et Edit, aucune allowlist Agent(...)) sans omitClaudeMd: true — un regard frais ne charge pas la doctrine (D-08)\"]
+
+# ---- Invariants de monde ferme (Phase 42, spec fabrique §4, FABR-03, D-09) ----------------------
+# I2/I3 : actifs SEULEMENT sous --resolve-agents=strict (la CI, seule a connaitre l'univers
+# complet). Reutilisent EXACTEMENT la resolution existante (allowlist_agents + resolve_agent_name)
+# — aucun registre ecrit a la main. Jamais impute a un fichier de registre : seuls les fichiers
+# reellement LINTES dans ce run (non tiers) peuvent porter I2/I3.
+
+def construire_univers_dispatch(agents_dir_local, registry_dirs_local, single_local):
+    \"\"\"I2/I3 (D-09) : univers = decouvrir_agents(agents_dir_local) (ou le seul fichier en mode
+    --file) PLUS decouvrir_agents de chaque registre, deduplique par chemin REEL
+    (os.path.realpath). Rend un tuple (dispatched_by, collisions) : dispatched_by = nom-de-base ->
+    liste des noms de fichiers dispatcheurs (un agent qui se cite lui-meme ne compte pas) — la
+    MEME resolution que le lint des allowlists (resolve_agent_name), jamais un second mecanisme.
+    collisions (CR-01, Phase 42 correction ciblee) = nom-de-base -> liste des chemins REELS
+    distincts qui le portent, des que ce nom est porte par PLUS D'UN chemin reel dans l'univers
+    connu (dossier linte + registres) : un meme fichier atteint par deux chemins (realpath
+    identique) n'en fait pas partie (deja deduplique ci-dessus), mais deux fichiers DISTINCTS de
+    meme nom de base masquent silencieusement l'un l'autre dans resolve_agent_name/index_agents
+    (premier trouve gagne) — I2/I3 doivent alors REFUSER de trancher plutot que de rendre un
+    verdict qui ignore la collision.\"\"\"
+    chemins = [single_local] if single_local else decouvrir_agents(agents_dir_local)
+    for rd in registry_dirs_local:
+        if rd:
+            chemins = chemins + decouvrir_agents(rd)
+    vus = set()
+    univers = []
+    for p in chemins:
+        rp = os.path.realpath(p)
+        if rp in vus:
+            continue
+        vus.add(rp)
+        univers.append(p)
+    noms_vers_chemins = {}
+    for p in univers:
+        noms_vers_chemins.setdefault(os.path.basename(p)[:-3], []).append(p)
+    collisions = {nom: sorted(chms) for nom, chms in noms_vers_chemins.items() if len(chms) > 1}
+    dispatched_by = {}
+    for p in univers:
+        base_sans_ext = os.path.basename(p)[:-3]
+        try:
+            texte = open(p, encoding=\"utf-8-sig\").read()
+        except OSError:
+            continue
+        dname = agent_display_name(p, texte)
+        if next((pfx for pfx in third_party_prefixes if pfx and dname.startswith(pfx)), None):
+            continue
+        fml = frontmatter_lines(texte)
+        if fml is None:
+            continue
+        for nom_dispatche in allowlist_agents(fml):
+            if nom_dispatche == base_sans_ext:
+                continue
+            verdict = resolve_agent_name(nom_dispatche, agents_dir_local, registry_dirs_local, third_party_prefixes)
+            if verdict == \"resolved\":
+                dispatched_by.setdefault(nom_dispatche, []).append(base_sans_ext)
+    return dispatched_by, collisions
+
+def invariant_i2(base, fm, dispatched_by):
+    \"\"\"I2 (D-09, monde ferme, actif SEULEMENT sous --resolve-agents=strict) : un worker
+    vf-internal absent de dispatched_by (aucune allowlist Agent(...)/Task(...) de l'univers connu
+    ne le dispatche) est un ORPHELIN.\"\"\"
+    nom = base[:-3] if base.endswith(\".md\") else base
+    if str(fm.get(\"vf-internal\", \"\")) != \"true\":
+        return []
+    if nom in dispatched_by:
+        return []
+    return [f\"{base} : invariant I2 — worker vf-internal orphelin : aucune allowlist Agent(...) de l'univers connu ne le dispatche (monde ferme, D-09)\"]
+
+def invariant_i3(base, fm, dispatched_by):
+    \"\"\"I3 (D-09, monde ferme, actif SEULEMENT sous --resolve-agents=strict) : un worker NON
+    vf-internal present dans dispatched_by (dispatche par une allowlist de l'univers connu) est
+    EXPOSE par erreur.\"\"\"
+    nom = base[:-3] if base.endswith(\".md\") else base
+    if nom not in dispatched_by:
+        return []
+    if str(fm.get(\"vf-internal\", \"\")) == \"true\":
+        return []
+    dispatcheurs = \", \".join(sorted(dispatched_by[nom]))
+    return [f\"{base} : invariant I3 — dispatche par {dispatcheurs} sans vf-internal : worker expose par erreur (monde ferme, D-09)\"]
+
 def check_file(path):
     base = os.path.basename(path)
     try:
@@ -520,9 +972,9 @@ def check_file(path):
 
     model = fm.get(\"model\")
     if not model:
-        errors.append(f\"{base} : model absent — souverainete modele requise (sonnet|opus|haiku|fable|inherit)\")
+        errors.append(f\"{base} : model absent — souverainete modele requise ({'|'.join(MODELS_ORDERED)})\")
     elif model not in MODELS and not re.fullmatch(r\"claude-[a-z0-9.-]+\", str(model)):
-        errors.append(f\"{base} : model invalide ({model}) — attendu sonnet|opus|haiku|fable|inherit|claude-<id>\")
+        errors.append(f\"{base} : model invalide ({model}) — attendu {'|'.join(MODELS_ORDERED)}|claude-<id>\")
 
     memory = fm.get(\"memory\")
     if not memory:
@@ -538,9 +990,9 @@ def check_file(path):
     # --third-party-prefix ne passent jamais ici (skip en amont, boucle principale).
     effort = fm.get(\"effort\")
     if not effort:
-        errors.append(f\"{base} : effort absent — bareme par role requis (low|medium|high|xhigh|max)\")
+        errors.append(f\"{base} : effort absent — bareme par role requis ({'|'.join(EFFORT_ORDERED)})\")
     elif effort not in EFFORT:
-        errors.append(f\"{base} : effort invalide ({effort}) — attendu low|medium|high|xhigh|max\")
+        errors.append(f\"{base} : effort invalide ({effort}) — attendu {'|'.join(EFFORT_ORDERED)}\")
     pm = fm.get(\"permissionMode\")
     if pm and pm not in PERM:
         errors.append(f\"{base} : permissionMode invalide ({pm})\")
@@ -621,6 +1073,15 @@ def check_file(path):
             continue
         lint_tool_field(base, field, mode, raw, do_resolution)
 
+    # Invariants de doctrine locaux (Phase 42, FABR-03) — TOUJOURS des erreurs (D-11), jamais
+    # affectees par --strict. Une ligne d'appel UNIQUE par invariant, cible des mutants QUAL-01.
+    errors.extend(invariant_i1(base, fm))
+    errors.extend(invariant_i4(base, fmlines))
+    errors.extend(invariant_i7(base, fm))
+    dispatch = allowlist_agents(fmlines)
+    errors.extend(invariant_i6(base, fm, fmlines, dispatch))
+    errors.extend(invariant_i5(base, fm, fmlines, dispatch))
+
     # Regle anti-regression (Phase 20) : memory: reinjecte SILENCIEUSEMENT Write+Edit au
     # runtime par-dessus l'allowlist tools: (contrat Claude Code confirme par sonde). Un agent
     # qui porte memory: et dont le tools: (declare) omet Write ET Edit DOIT fermer ce canal
@@ -642,19 +1103,59 @@ def check_file(path):
             warnings.append(f\"{base} : champ inconnu du runtime — {k} (typo ? champ invente ? verifier la doc)\")
 
 if single:
-    if os.path.isfile(single):
-        check_file(single)
+    if os.path.islink(single):
+        # A1 (Phase 42 correction ciblee) : un .md en lien symbolique est REFUSE comme un
+        # dossier — jamais ouvert, jamais reflete dans la sortie (le jeton d'un fichier vise
+        # hors arbre ne doit apparaitre ni en stdout ni en stderr).
+        errors.append(f\"{os.path.basename(single)} : lien symbolique refuse (A1) — un agent .md ne doit jamais etre un lien symbolique, contenu non lu\")
+    elif os.path.isfile(single):
+        charger_referentiel()
+        try:
+            ftext = open(single, encoding=\"utf-8-sig\").read()
+        except OSError as e:
+            errors.append(f\"{os.path.basename(single)} : illisible ({e})\")
+        else:
+            # WR-02 (Phase 42 correction ciblee) : meme exclusion des agents tiers que la boucle
+            # par repertoire (matched_prefix) AVANT check_file()/linted_paths — sinon --file
+            # lintait un agent tiers que le mode repertoire aurait ecarte.
+            dname = agent_display_name(single, ftext)
+            matched_prefix = next((p for p in third_party_prefixes if p and dname.startswith(p)), None)
+            if matched_prefix:
+                thirdparty_files_total += 1
+            else:
+                check_file(single)
+                linted_paths.append(single)
     else:
         errors.append(f\"fichier introuvable : {single}\")
 else:
-    files = sorted(glob.glob(os.path.join(agents_dir, \"*.md\")))
-    files = [f for f in files if os.path.basename(f) not in NOT_AGENTS]
-    if not files:
+    # D-20 : une cible ABSENTE (dossier introuvable) est distincte d'une cible PRESENTE et vide —
+    # ligne UNIQUE, cible du mutant MUT-D20 (42-04). single vaut toujours une chaine (jamais None :
+    # le bash exporte VF_SINGLE=\"$SINGLE_FILE\" inconditionnellement, lu ci-dessus par
+    # os.environ[\"VF_SINGLE\"] — sans --file c'est \"\", donc 'not single' teste la chaine vide).
+    cible_absente = (not single) and not os.path.isdir(agents_dir)
+    symlinks_refuses = []
+    files = decouvrir_agents(agents_dir, symlinks_refuses)
+    # A1 (Phase 42 correction ciblee) : chaque .md en lien symbolique sous agents_dir est REFUSE
+    # avec un diagnostic (comme les dossiers) — son contenu n'est jamais ouvert ici.
+    for sp in symlinks_refuses:
+        errors.append(f\"{os.path.basename(sp)} : lien symbolique refuse (A1) — un agent .md ne doit jamais etre un lien symbolique, contenu non lu\")
+    # Un dossier qui ne contient QUE des liens symboliques refuses n'est pas une cible vide
+    # (F13) : il porte deja au moins un refus explicite — le rc doit rester 1, jamais 0/3 par la
+    # branche cible-absente-ou-vide ci-dessous.
+    if not files and not symlinks_refuses:
+        # D-20 (Phase 42) : hors --hook, une cible ABSENTE sort desormais INDETERMINE (exit 3,
+        # jeton CIBLE-ABSENTE) dans TOUS les modes, y compris sans --strict — --allow-empty
+        # tolere aussi une cible absente, au meme titre qu'une cible vide (I2). Cette branche ne
+        # touche PAS le contrat F13 ci-dessous (cible PRESENTE et vide, T21/T22/T23 inchanges).
+        if cible_absente and not hook and not allow_empty:
+            print(f\"[check-agents] ✗ INDETERMINE : {agents_dir} — CIBLE-ABSENTE, aucun verdict rendu (D-20)\")
+            sys.exit(3)
         # Contrat de decouverte (F13, vacuous green) : en --strict, zero cible = zero verdict.
         # exit 3 = INDETERMINE, distinct de 0 = CONFORME. --allow-empty pour les cas legitimes.
         # Le code de sortie (3) est desormais INCONDITIONNEL — la traduction vers 0 sous --hook
         # est la responsabilite du shell (hook_exit, hors de ce bloc Python) : seul l'AFFICHAGE
         # reste conditionne a 'not hook' (le silence de flux, lui, reste un contrat du shell).
+        # Chargement PARESSEUX (D-01/D-03) : une cible vide ne lit JAMAIS le manifeste.
         if strict and not allow_empty:
             if not hook:
                 print(f\"[check-agents] ✗ INDETERMINE : aucun agent dans {agents_dir} — cible absente ou vide, aucun verdict rendu (--allow-empty pour tolerer)\")
@@ -662,6 +1163,7 @@ else:
         if not hook:
             print(f\"[check-agents] aucun agent dans {agents_dir} — rien a verifier\")
         sys.exit(0)
+    charger_referentiel()
     for f in files:
         try:
             ftext = open(f, encoding=\"utf-8-sig\").read()
@@ -676,9 +1178,48 @@ else:
             thirdparty_files_total += 1
             continue
         check_file(f)
+        linted_paths.append(f)
+
+# ---- Passe de monde ferme (Phase 42, D-09) : I2/I3, SEULEMENT sous --resolve-agents=strict, ----
+# apres la boucle de lint et avant le rapport. Jamais impute a un fichier de registre : seuls les
+# fichiers de linted_paths (reellement LINTES dans ce run, non tiers) sont soumis a I2/I3.
+if resolve_agents_strict and linted_paths:
+    dispatched_by, collisions_univers = construire_univers_dispatch(agents_dir, registry_dirs, single if single else None)
+    # CR-01 (Phase 42 correction ciblee) : une collision de nom dans l'univers connu (deux
+    # chemins REELS distincts partageant le meme nom de base) rend I2/I3 incapables de trancher
+    # correctement (resolve_agent_name/index_agents retiennent le premier trouve et masquent
+    # l'autre) — ERREUR explicite nommant les deux chemins, jamais un vert silencieux.
+    for nom_collision, chemins_collision in sorted(collisions_univers.items()):
+        chemins_str = \" et \".join(chemins_collision)
+        errors.append(f\"collision d'identite dans l'univers connu (D-09) — le nom '{nom_collision}' est porte par {chemins_str} : I2/I3 ne peuvent pas distinguer lequel est dispatche (monde ferme)\")
+    for p in linted_paths:
+        base = os.path.basename(p)
+        try:
+            texte = open(p, encoding=\"utf-8-sig\").read()
+        except OSError:
+            continue
+        fm_i23 = parse_frontmatter(texte)
+        if fm_i23 is None:
+            continue
+        errors.extend(invariant_i2(base, fm_i23, dispatched_by))
+        errors.extend(invariant_i3(base, fm_i23, dispatched_by))
 
 n_err, n_warn = len(errors), len(warnings)
+
+def rapport_manifeste_perime():
+    \"\"\"Ligne de rapport de fraicheur (D-05) — ne contient JAMAIS ✗ (avertissement, pas un
+    refus) ; imprimee des que perimees est non vide, hook ou pas.\"\"\"
+    desc = \"; \".join(perimees)
+    return (f\"[check-agents] ⚠ MANIFESTE-PERIME — {desc} — listes fermees retrogradees en \"
+            \"avertissement (D-05) ; rafraichir check-agents-manifest.json : relire chaque \"
+            \"source, comparer, re-dater\")
+
 if hook:
+    # Sous --hook, la ligne de fraicheur est imprimee des que perimees est non vide — MEME
+    # sans aucun autre avertissement (jamais silence de message, D-05) — puis le flux --hook
+    # existant (compte errors/warnings) suit inchange, et sort 0 comme aujourd'hui.
+    if perimees:
+        print(rapport_manifeste_perime())
     if n_err:
         print(f\"[check-agents] ✗ {n_err} agent(s) non conforme(s) :\")
         for e in errors:
@@ -691,6 +1232,9 @@ if hook:
         print(f\"[check-agents] ⚠ {n_warn} avertissement(s) — detail : bash .claude/scripts/check-agents.sh\")
     sys.exit(0)
 
+# Hors --hook, la ligne de fraicheur PRECEDE la liste des avertissements (D-05).
+if perimees:
+    print(rapport_manifeste_perime())
 for w in warnings:
     print(f\"  ⚠ {w}\")
 if thirdparty_files_total or thirdparty_entries_total:
@@ -700,7 +1244,15 @@ if n_err:
     print(f\"[check-agents] ✗ {n_err} non-conformite(s) bloquante(s) :\")
     for e in errors:
         print(f\"  ✗ {e}\")
-    sys.exit(1)
+    if not (perimees and manifest_freshness_strict):
+        sys.exit(1)
+# D-04 (Phase 42) : l'INDETERMINE (exit 3) n'est rendu QUE sous --manifest-freshness=strict —
+# la CI du depot, seule legitime a rafraichir le manifeste. Prime sur un eventuel rc 1 deja
+# imprime ci-dessus (lecture litterale de FABR-02) ; la ligne '✓ agents conformes' n'est JAMAIS
+# imprimee dans ce cas.
+if perimees and manifest_freshness_strict:
+    print(\"[check-agents] ✗ INDETERMINE — MANIFESTE-PERIME : aucun verdict rendu (D-04) — rafraichir check-agents-manifest.json puis relancer\")
+    sys.exit(3)
 print(f\"[check-agents] ✓ agents conformes (natif + charte VibeFlow){' · ' + str(n_warn) + ' warning(s)' if n_warn else ''}\")
 sys.exit(0)
 "

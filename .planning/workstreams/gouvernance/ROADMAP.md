@@ -33,12 +33,14 @@
 > 2026-09-23. **Aucune exécution avant la clôture de `fiabilite-v1.0`** (Samuel, WhatsApp, 2026-09-23) :
 > la planification avance, l'exécution attend. **Être inscrite ne vaut pas feu vert d'exécution** : chaque phase passe par
 > `gsd-discuss-phase` puis `gsd-plan-phase`.
+> **Amendement du 2026-09-24** : exécution en parallèle de `fiabilite` autorisée — autorisation Samuel du 2026-09-23 rapportée par Willy, session principale, 2026-09-24 (canal non précisé).
+> **Garde-fous de cette exécution anticipée** (posés par la mission du 2026-09-24) : (1) **aucune release du jalon gouvernance avant la clôture de `fiabilite-v1.0`** — les numéros de version des modules partagés, `conductor` en tête, entreraient en collision avec ceux de `fiabilite` (la PR #100 porte `conductor` v1.40.0 → v1.41.0) ; une PR de ce jalon qui bumpe un module partagé se rebase et se renumérote après les merges de `fiabilite`, jamais l'inverse ; (2) **les gates de planning de ce compartiment se rejouent à la main** (`--file .planning/workstreams/gouvernance/STATE.md`) tant que la Phase 41.1 (PR #100 de Samuel) n'est pas mergée : la CI ne vérifie que `fiabilite`.
 
 ### Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents
 
 **Goal:** Le gate des agents (`check-agents.sh`) lit ses listes de référence — outils, champs, types natifs, modèles, modes, niveaux d'effort — dans un **manifeste daté** et rend **INDÉTERMINÉ** quand ce manifeste est périmé ; il tient les invariants de doctrine I1 à I7 et découvre les agents récursivement.
 **Requirements**: FABR-01, FABR-02, FABR-03, FABR-04, FABR-05
-**Depends on:** Phase 41 et **clôture du jalon `fiabilite-v1.0`** — volet admin de la 41 posé par Willy, release, clôture, puis ouverture de celui-ci (Samuel, WhatsApp, 2026-09-23). **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — **mergée le 2026-09-23** (11:11 UTC, après ajout du trailer `Gate-Touche:` par Samuel) : précondition levée.
+**Depends on:** Phase 41 et **clôture du jalon `fiabilite-v1.0`** — volet admin de la 41 posé par Willy, release, clôture, puis ouverture de celui-ci (Samuel, WhatsApp, 2026-09-23). **Levée le 2026-09-24** pour l'exécution, pas pour la release : autorisation Samuel du 2026-09-23 rapportée par Willy, session principale, 2026-09-24 (canal non précisé) ; voir les garde-fous de l'en-tête du jalon. **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — **mergée le 2026-09-23** (11:11 UTC, après ajout du trailer `Gate-Touche:` par Samuel) : précondition levée.
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §1.1-1.3, §3, §4, B-01. Hors périmètre : §8 (`skills:`, `cacheTtl`, `maxTurns`, `color:`).
 **Revue de Samuel (WhatsApp, 2026-09-23)** : décisions de corpus ratifiées ; trois ajouts au cadrage — D-18 (`vf-test-orchestrator` nomme `vf-dev-manager` et `vf-auto`), D-19 (effet d'`omitClaudeMd` sur `.claude/rules/*.md` mesuré, pas déduit), D-20 (faux vert de l'invocation nue de `check-agents.sh`, `.planning/codebase/CONCERNS.md:349`). **Plans à réviser avant exécution.**
 **Plans:** 6 plans
@@ -46,21 +48,21 @@
 Plans:
 **Wave 1**
 
-- [ ] 42-01-PLAN.md — vague 1 (tracer) : manifeste daté lu par le gate, posé par l'installeur (`*.json`), refus sur manifeste illisible ; T54, T77-T82 (FABR-01)
-- [ ] 42-02-PLAN.md — vague 1 : corpus — mobile-test-team (I3), business-pilot-bundle et content-bundle (I5/I6), un commit et un bump patch par module (FABR-05)
-- [ ] 42-03-PLAN.md — vague 1 : corpus — growth-bundle et design-orchestrator (I5/I6), un commit et un bump patch par module (FABR-05)
+- [x] 42-01-PLAN.md — vague 1 (tracer) : manifeste daté lu par le gate, posé par l'installeur (`*.json`), refus sur manifeste illisible ; T54, T77-T82 (FABR-01) — Complete (2026-09-24)
+- [x] 42-02-PLAN.md — vague 1 : corpus — mobile-test-team (I3), business-pilot-bundle et content-bundle (I5/I6), un commit et un bump patch par module (FABR-05) — Complete (2026-09-24)
+- [x] 42-03-PLAN.md — vague 1 : corpus — growth-bundle et design-orchestrator (I5/I6), un commit et un bump patch par module (FABR-05) — Complete (2026-09-24)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 42-04-PLAN.md — vague 2 : fraîcheur — INDÉTERMINÉ sous `--manifest-freshness=strict` en CI, avertissement chez l'utilisateur, rétrogradation D-05 ; T83-T90, MUT-F1/F2 (FABR-02)
+- [x] 42-04-PLAN.md — vague 2 : fraîcheur — INDÉTERMINÉ sous `--manifest-freshness=strict` en CI, avertissement chez l'utilisateur, rétrogradation D-05 ; T83-T90, T103, MUT-F1/F2/D20 (FABR-02) — Complete (2026-09-25)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 42-05-PLAN.md — vague 3 : invariants locaux I1, I4, I5, I6, I7 en erreur, jumeaux négatifs et mutants ; corpus et blueprints verts (FABR-03, FABR-05)
+- [x] 42-05-PLAN.md — vague 3 : invariants locaux I1, I4, I5, I6, I7 en erreur, jumeaux négatifs et mutants ; corpus et blueprints verts (FABR-03, FABR-05) — Complete (2026-09-25)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 42-06-PLAN.md — vague 4 : découverte récursive (D-10), I2/I3 en monde fermé (D-09), conductor en mineure, relevé de relecture Samuel (FABR-03, FABR-04, FABR-05)
+- [x] 42-06-PLAN.md — vague 4 : découverte récursive (D-10), I2/I3 en monde fermé (D-09), conductor en mineure, relevé de relecture Samuel (FABR-03, FABR-04, FABR-05) — Complete (2026-09-25)
 
 ### Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator
 

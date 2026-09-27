@@ -96,18 +96,22 @@ Le gate doit désormais échouer si :
 
 | # | Condition |
 |---|---|
-| I1 | un agent porte `vf-internal: true` **sans** la prose correspondante dans son corps, ou l'inverse |
+| I1 | un agent porte `vf-internal: true` **sans** le marqueur littéral « Worker interne » dans `description:` (pas dans le corps, D-06), ou l'inverse |
 | I2 | un agent `vf-internal` n'est dispatché par aucun manager connu — **worker orphelin** |
 | I3 | un agent dispatché par un manager ne porte pas `vf-internal` — **worker exposé par erreur** |
 | I4 | un `disallowedTools` porte un spécifieur — il **retire l'outil entier**, alors que l'auteur croit le restreindre |
-| I5 | un juge (`disallowedTools: Write, Edit`) ne porte pas `omitClaudeMd: true` — un « regard frais » qui charge toute la doctrine n'est pas frais |
-| I6 | un manager (porteur d'un `Agent(...)` non vide) ne déclare pas `SendMessage` — sans lui, pas de vue sur ses pairs |
+| I5 | un juge — `disallowedTools` retire Write **et** Edit **et** aucune allowlist `Agent(...)` non vide — ne porte pas `omitClaudeMd: true` — un « regard frais » qui charge toute la doctrine n'est pas frais |
+| I6 | un manager — `Agent(...)` non vide **et** pas `vf-internal` — ne déclare pas `SendMessage` — sans lui, pas de vue sur ses pairs |
 | I7 | un agent porte `vf-mcp-*` sans `vf-requires` citant les serveurs MCP |
 | I8 | un blueprint publie un frontmatter cible qui, extrait et soumis au gate, sort non nul |
 
 **I2 et I3 ne s'activent qu'en monde fermé** (la CI), sinon les dispatches inter-modules produisent
 des faux positifs garantis. **I8 est le plus important de la liste** : c'est lui qui empêche la
 fabrique et son contrôleur de rediverger.
+
+**I5 (arbitrage D-08, maintenir) :** tout ce qu'un juge doit vérifier vit dans sa grille, jamais
+dans `.claude/rules` ni dans `CLAUDE.md` — session principale, décision déléguée par Willy au head
+(« tranche et avançons »), 2026-09-25.
 
 La découverte des agents devient récursive.
 
