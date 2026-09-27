@@ -106,11 +106,21 @@ Plans:
 **Plans:** 5 plans (4 vagues : 44-01 ∥ 44-02 → 44-03 → 44-04 → 44-05)
 
 Plans:
+**Wave 1**
 
 - [ ] 44-01-PLAN.md — traceur : `recalc-planning.sh` (Python embarqué, voie a de P44-D-14) dérive le lab `traceur`, refuse sans adhésion `cycles-v1` ou sur GSD, lecture seule sans écriture, INDEX.md/STATE.md/cloture.log déterministes, lab frais
 - [ ] 44-02-PLAN.md — modèle : `references/modele-cycles.md` et huit gabarits `templates/cycles/` (choix délégués fixés)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 44-03-PLAN.md — matrice des huit états et des dérogations, jumeaux négatifs au banc, agrégation des plans et des cycles, gabarits conformes
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 44-04-PLAN.md — hors modèle (P44-D-04) et garde-fous de chemin ; incrémental par hash du contenu (P44-D-13) ; contrôle croisé référence ↔ moteur
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 44-05-PLAN.md — bump mineur de planning-core sans release, preuves de phase (P44-D-01a, P44-D-01b, P44-D-15), passage en lecture seule sur deux labs réels
 
 ### Phase 45: Moteur — hook central par rôle et gates d'écriture
