@@ -455,8 +455,8 @@ n'est remise en cause** — ces quatre points sont hors du périmètre verrouill
 
 ## Open Questions
 
-1. **Format exact de frontmatter des cinq types de fichiers (CYCLE.md, CADRAGE.md, PLAN.md,
-   VERDICT.md, SUMMARY.md)**
+1. **(RESOLVED — 44-02, plan de phase) Format exact de frontmatter des cinq types de fichiers
+   (CYCLE.md, CADRAGE.md, PLAN.md, VERDICT.md, SUMMARY.md)**
    - What we know : les champs OBLIGATOIRES sont nommés (`ecrit:` sur PLAN.md, D-10 ; `statut:`
      nommant l'auteur sur les dérogations, D-07 ; `hash` + `tentative` sur VERDICT.md, D-09/spec
      §10 — mais sans nom de clé YAML précis donné par la spec) ; le format du registre
@@ -467,8 +467,15 @@ n'est remise en cause** — ces quatre points sont hors du périmètre verrouill
    - Recommendation : c'est un livrable de CETTE phase (deliverable #1, modèle de données) —
      le planificateur doit le fixer explicitement dans `references/modele-cycles.md`, en gardant
      la contrainte A2 ci-dessus (parsable par frontmatter minimal, pas de table Markdown).
+   - **Résolution :** `44-02-PLAN.md` (Tâche 1, `references/modele-cycles.md` § Fichiers du
+     modèle et § Grammaire du frontmatter ; Tâches 2-3, les huit gabarits de
+     `references/templates/cycles/`) fixe la clé `hash` et `tentative` sur `VERDICT.md`, la
+     structure en liste de mappings du registre `inconnues:` de `CADRAGE.md` (jamais un tableau
+     Markdown, conforme à A2), et les clés des cinq autres fichiers. `44-03-PLAN.md` (Tâche 1)
+     implémente `lire_registre`/`lire_derogation` contre ce même contrat.
 
-2. **Valeur exacte de `planning_version` signalant l'adhésion (D-02)**
+2. **(RESOLVED — 44-01/44-02, plan de phase) Valeur exacte de `planning_version` signalant
+   l'adhésion (D-02)**
    - What we know : la clé existante `planning_version` doit recevoir une valeur NOUVELLE,
      distincte de "1.0" et "2.0" déjà présents dans 5 emplacements du dépôt `[VERIFIED: grep
      exécuté ce jour]`.
@@ -478,8 +485,12 @@ n'est remise en cause** — ces quatre points sont hors du périmètre verrouill
      "1.0"/"2.0" incrémenté par erreur — ex. une chaîne non-numérique explicite, à documenter
      dans `references/modele-cycles.md` et dans `config.template.json` du nouveau modèle (à
      créer à côté de l'existant, sans écraser `config.template.json` actuel — D-01b).
+   - **Résolution :** `cycles-v1` — fixé par `44-01-PLAN.md` (Tâche 1, `SCHEMA_ADHESION` dans
+     `recalc-planning.sh`, § interfaces « Adhésion ») et repris par `44-02-PLAN.md` (Tâche 1,
+     `references/modele-cycles.md` § Adhésion ; Tâche 3, `config.template.json` sous
+     `references/templates/cycles/`).
 
-3. **Où vit exactement le cache sous `.planning/`**
+3. **(RESOLVED — 44-04, plan de phase) Où vit exactement le cache sous `.planning/`**
    - What we know : D-13 exige un cache, nom délégué, « sous `.planning/` ».
    - What's unclear : fichier unique vs répertoire, nom exact — D-04 précise seulement que « le
      cache du recalcul » fait partie du modèle lui-même (pas une entrée « annexe »), donc il doit
@@ -489,6 +500,10 @@ n'est remise en cause** — ces quatre points sont hors du périmètre verrouill
      `.vibeflow-manifest-<mod>` — patrons vus dans `vibeflow-update.sh` `[VERIFIED:
      plugin/_internal/vibeflow-update.sh, lignes 2027-2028, lu ce jour — cite ces deux noms de
      fichiers cachés existants]`).
+   - **Résolution :** `.planning/.recalc-cache.json`, fichier unique, `cache_schema_version: 1` —
+     fixé par `44-04-PLAN.md` (Tâche 2, `signature_unite`/`charger_cache`/`CACHE_SCHEMA_VERSION`
+     dans `recalc-planning.sh`, § interfaces « Cache ») et documenté dans
+     `references/modele-cycles.md` § Sorties générées (44-02, aligné par 44-04 si nécessaire).
 
 ## Environment Availability
 
