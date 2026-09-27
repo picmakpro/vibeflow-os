@@ -100,7 +100,7 @@ Plans:
 ### Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque
 
 **Goal:** Le modèle de données d'un lab (`cycles/`, `phases/`, `CADRAGE.md`, `PLAN.md` avec `ecrit:`, `VERDICT.md`, `SUMMARY.md`) existe, et un recalcul **en Python** dérive du disque les huit états (dont `indéterminé`) et génère `INDEX.md`, `STATE.md` et `cloture.log` — incrémental par hash du contenu, jamais par `mtime`.
-**Requirements**: TBD (posés au cadrage)
+**Requirements**: MOTR-01..MOTR-18 (posées au cadrage, `44-CONTEXT.md`)
 **Depends on:** Phase 43 (seule une procédure ouvre une phase : la nature doit être déclarée avant que le moteur ne s'en serve).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §3, §7.1, §7.4, §10, D-03, D-09, D-10. **Ouvert au cadrage** : emplacements hors modèle (§7.3), arbitrage d'usage `phases_trace: false` (§11.2), premier banc d'essai.
 **Plans:** 0 plans
