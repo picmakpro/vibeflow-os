@@ -141,6 +141,10 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 45.
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5 (G3, G4, G4′, D1), §10, D-02 (le juge ne bloque que sur ses constats) ; `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-16, §10 (préparer la preuve sans l'exécuter, B-01).
+**À envisager au cadrage** : un état de transition « à clore » pour le cas « verdict passé,
+SUMMARY absent » (le §3.1 ne le nomme pas, la Phase 44 le rend `indéterminé` par défaut,
+P44-D-08) — origine Phase 44, décision (a), head sous délégation technique de Willy, session
+principale, 2026-09-28.
 **Plans:** 0 plans
 
 Plans:
