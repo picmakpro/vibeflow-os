@@ -11,8 +11,8 @@
 
 ## Phases
 
-- [ ] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
-- [ ] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
+- [x] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #108
+- [x] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #111
 - [ ] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -43,7 +43,8 @@
 **Depends on:** Phase 41 et **clôture du jalon `fiabilite-v1.0`** — volet admin de la 41 posé par Willy, release, clôture, puis ouverture de celui-ci (Samuel, WhatsApp, 2026-09-23). **Levée le 2026-09-24** pour l'exécution, pas pour la release : autorisation Samuel du 2026-09-23 rapportée par Willy, session principale, 2026-09-24 (canal non précisé) ; voir les garde-fous de l'en-tête du jalon. **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — **mergée le 2026-09-23** (11:11 UTC, après ajout du trailer `Gate-Touche:` par Samuel) : précondition levée.
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §1.1-1.3, §3, §4, B-01. Hors périmètre : §8 (`skills:`, `cacheTtl`, `maxTurns`, `color:`).
 **Revue de Samuel (WhatsApp, 2026-09-23)** : décisions de corpus ratifiées ; trois ajouts au cadrage — D-18 (`vf-test-orchestrator` nomme `vf-dev-manager` et `vf-auto`), D-19 (effet d'`omitClaudeMd` sur `.claude/rules/*.md` mesuré, pas déduit), D-20 (faux vert de l'invocation nue de `check-agents.sh`, `.planning/codebase/CONCERNS.md:349`). **Plans à réviser avant exécution.**
-**Plans:** 6 plans
+**Plans:** 6/6 plans executed
+**Clôture :** PR #108 mergée le 2026-09-27 (contournement de la revue code owner D-02bis, arbitrage Willy, session principale, 2026-09-27 ; revue de Samuel à faire après coup).
 
 Plans:
 **Wave 1**
@@ -74,6 +75,7 @@ Plans:
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §6, §7.2, B-03. **C'est le contrôle machine qui manque à la décision D-07** du moteur (`docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §2, §9). `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-15, §5.2 (la case « trois marqueurs de B-03 » remplace « qui en répond »).
 **À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : budget des `SKILL.md` et du bootstrap sans enforcement machine — `.planning/BACKLOG.md:450` ; la phase touche les skills, elle le prend au passage.
 **Plans:** 7/7 plans executed
+**Clôture :** PR #111 mergée le 2026-09-27 (commit 556452e), après deux merges amont dans sa branche (a2517df et le merge de la PR #112, intégration par merge plutôt que rebase pour ne pas réécrire les SHA cités — arbitrage Willy, session principale, 2026-09-27). Contournement de la revue code owner D-02bis, arbitrage Willy, session principale, 2026-09-27 ; revue de Samuel à faire après coup.
 
 Plans:
 **Wave 1**

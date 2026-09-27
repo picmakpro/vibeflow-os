@@ -3,44 +3,50 @@ gsd_state_version: 1.0
 workstream: gouvernance
 milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
-current_phase: 43
-current_phase_name: Fabrique — gate des skills par nature et alignement de skill-creator
-status: verifying
+current_phase: 44
+current_phase_name: Moteur — modèle de données et recalcul d'état dérivé du disque
+status: not_started
 created: 2026-09-23
-last_updated: "2026-09-26T20:30:00.000Z"
-last_activity: 2026-09-26
+last_updated: "2026-09-27T00:00:00.000Z"
+last_activity: 2026-09-27
 last_activity_desc: >-
-  Phase 43 exécutée et vérifiée (mission vf-dev-manager 2026-09-26, exécution) : 7 plans en
-  4 vagues, 43-VERIFICATION.md passed 10/10, revue du diff complet PASS après deux mandats de
-  correction ciblée (trois passes de revue), audit SECURED. Deux correctifs hors plan (témoin des merges restreint à
-  l'amont ; compteur des README racine 89 → 90) et le faux vert de --verify laissé au BACKLOG
-  (option B) : décision du head sous délégation technique de Willy, session principale,
-  2026-09-26. STATE tenu à la main.
-stopped_at: "Phase 43 exécutée et vérifiée ; PR #111 en brouillon, empilée sur gouvernance/phase-42-fabrique, en attente du merge de la PR #108 puis de la revue code owner de Samuel"
+  Clôture planning des Phases 42 et 43 (mission vf-coder 2026-09-27, mandat court) : PR #108
+  (Phase 42, commit 0f3ede3) et PR #111 (Phase 43, commit 556452e) mergées sur main le
+  2026-09-27, par contournement de la revue code owner (D-02bis), arbitrage Willy, session
+  principale, 2026-09-27 — revue de Samuel sur les deux PR reste à faire après coup. Avant le
+  merge de la #111, main a été intégré deux fois dans sa branche par merge (a2517df, puis le
+  merge de la PR #112 en deba30f qui régénère l'index des capabilities pour gsd-core 1.15.0) :
+  intégration par merge plutôt que par rebase pour ne pas réécrire les SHA déjà cités, même
+  arbitrage. Phase 44 pas encore cadrée. STATE tenu à la main.
+stopped_at: >-
+  Phases 42 et 43 closes dans le planning (ROADMAP cochée, PR de clôture consignées) ; revue code
+  owner de Samuel toujours en attente sur les deux PR (contournement D-02bis tracé, pas encore
+  contre-vérifié). Prochain geste : cadrage de la Phase 44 (gsd-discuss-phase --ws gouvernance),
+  non entamé.
 progress:
   total_phases: 9
-  completed_phases: 0
+  completed_phases: 2
   total_plans: 13
   completed_plans: 13
-  percent: 100
+  percent: 22
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 43 (Fabrique — gate des skills par nature et alignement de skill-creator) — EXÉCUTÉE ET VÉRIFIÉE (43-VERIFICATION.md passed 10/10), PR #111 en brouillon. Phase 42 : exécutée et vérifiée, PR #108 en attente de la revue code owner de Samuel.
-**Last Activity:** 2026-09-26
-**Last Activity Description:** Exécution de la Phase 43 (mission `.planning/missions/2026-09-26-gouvernance-43-exec.md`). Base de phase figée sur `22179fa` ; vagues 1 à 4 intégrées ; FABR-06..10 cochées au ledger ; revue PASS après deux mandats de correction de 43-04 (`bb23de7`, `394c795`), audit SECURED, audit documentaire vert. Planification : `.planning/missions/2026-09-25-gouvernance-43-plan.md`.
+Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — PAS ENCORE CADRÉE. Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
+**Last Activity:** 2026-09-27
+**Last Activity Description:** Clôture planning des Phases 42 et 43 (mandat court vf-coder) : ROADMAP cochée, PR de clôture consignées (PR #108 commit 0f3ede3, PR #111 commit 556452e). Merges par contournement de la revue code owner, arbitrage Willy, session principale, 2026-09-27. Deux merges amont dans la branche de la 43 avant son merge final (a2517df, deba30f/PR #112 — régénération de l'index des capabilities pour gsd-core 1.15.0), intégrés par merge plutôt que par rebase pour préserver les SHA déjà cités, même arbitrage.
 
 ## Progress
 
-**Phases Complete:** 0 (Phases 42 et 43 exécutées et vérifiées, non clôturées : PR #108 et #111 ouvertes)
-**Current Plan:** aucun — 7/7 plans exécutés sur la Phase 43 ; 6/6 sur la Phase 42
+**Phases Complete:** 2 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux)
+**Current Plan:** aucun — Phase 44 pas encore planifiée (0/0 plans)
 
 ## Session Continuity
 
-**Stopped At:** Phase 43 exécutée et vérifiée ; PR #111 en brouillon, empilée sur `gouvernance/phase-42-fabrique`. Prochain geste : merge de la PR #108, puis rebascule de la #111 vers `main` (intégration amont par rebase uniquement, base de phase re-consignée selon la procédure de 43-01), puis revue code owner de Samuel.
+**Stopped At:** Phases 42 et 43 closes dans le planning ; PR #108 et #111 mergées sur main le 2026-09-27. Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis, arbitrage Willy, session principale, 2026-09-27). Prochain geste : cadrage de la Phase 44 (`gsd-discuss-phase --ws gouvernance`), non entamé.
 **Resume File:** `.planning/missions/2026-09-26-gouvernance-43-exec.md`
 
 ## Note pour Willy (2026-09-23, partition D-02)
