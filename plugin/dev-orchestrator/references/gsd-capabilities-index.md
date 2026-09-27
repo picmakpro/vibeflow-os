@@ -1,5 +1,5 @@
 # GSD Capabilities Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-09-07T17:43:14+02:00 par build-gsd-capabilities-index.sh
+> Généré le 2026-09-27T22:42:31+02:00 par build-gsd-capabilities-index.sh
 > Source : registre de capabilities du moteur GSD (`capability-registry.cjs`), schéma déclaré `1`
 
 **Ce que cette table dit.** Elle énumère ce que le moteur **déclare** à la version depuis
@@ -58,9 +58,8 @@ point existe et reste vide, pas qu'il est absent._
 
 ## `execute:wave:pre`
 
-| Capability | Nature | Toggle gouvernant | Bloquant | Conduite sur erreur |
-|---|---|---|---|---|
-| `claude-orchestration` | contribution | `claude_orchestration.enabled` | — | `skip` |
+_Aucun étage déclaré à ce point par le registre du moteur — l'information est que le
+point existe et reste vide, pas qu'il est absent._
 
 ## `execute:wave:post`
 
@@ -133,7 +132,6 @@ aucune — jamais qu'elle est introuvable.
 | `codex` | runtime | — |
 | `copilot` | runtime | — |
 | `cursor` | runtime | — |
-| `gemini` | reviewer | — |
 | `graphify` | feature | `graphify.enabled` |
 | `hermes` | runtime | — |
 | `kilo` | runtime | — |
@@ -226,4 +224,4 @@ rendre inerte : c'est exactement ce que `check-capability-activation.sh` confron
 
 ---
 
-> 12 point(s) de hook parcouru(s), 39 étage(s) déclaré(s) par le registre, 27 capability(ies) hors point de hook sur 46 déclarée(s), 26 toggle(s) gouvernant(s) distinct(s), 25 brique(s) routée(s).
+> 12 point(s) de hook parcouru(s), 38 étage(s) déclaré(s) par le registre, 26 capability(ies) hors point de hook sur 45 déclarée(s), 26 toggle(s) gouvernant(s) distinct(s), 25 brique(s) routée(s).
