@@ -1,0 +1,109 @@
+{
+  "nodes": [
+    {
+      "id": "cadrage-44",
+      "step": "cadrage Phase 44 (manager, gsd-discuss-phase --ws gouvernance)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-44",
+      "step": "plan Phase 44 (vf-coder, gsd-plan-phase --ws gouvernance)",
+      "stage": "",
+      "deps": [
+        "cadrage-44"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-44",
+      "step": "plan-checkers frais jusqu'au vert",
+      "stage": "",
+      "deps": [
+        "plan-44"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-44",
+      "step": "exécution Phase 44 (vf-coder, gsd-execute-phase 44 --ws gouvernance, verifier inclus)",
+      "stage": "",
+      "deps": [
+        "plancheck-44"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        ".planning/workstreams/gouvernance/phases/VFDO-44",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-44",
+      "step": "revue du diff complet (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "exec-44"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-44",
+      "step": "audit sécurité (vf-auditer, le moteur écrit sur disque)",
+      "stage": "",
+      "deps": [
+        "exec-44"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "banc-44",
+      "step": "banc réel lecture seule Keystone + BusinessFlow-Lab, hors CI",
+      "stage": "",
+      "deps": [
+        "exec-44"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-44/44-BANC-REEL.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire, audit lecture seule",
+      "stage": "",
+      "deps": [
+        "exec-44"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "livraison-44",
+      "step": "ROADMAP/STATE à la main, gates, push, PR hors brouillon (vf-coder)",
+      "stage": "",
+      "deps": [
+        "revue-44",
+        "audit-44",
+        "banc-44",
+        "docs"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance"
+      ],
+      "status": "done"
+    }
+  ]
+}
