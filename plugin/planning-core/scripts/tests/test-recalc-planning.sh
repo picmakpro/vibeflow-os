@@ -102,7 +102,11 @@ def parser_banc(texte):
 
     def clore_fichier():
         if lab_courant is not None and fichier_courant is not None:
-            labs[lab_courant]["fichiers"][fichier_courant] = "".join(l + "\n" for l in contenu_courant)
+            contenu = "".join(l + "\n" for l in contenu_courant)
+            if isinstance(fichier_courant, tuple) and fichier_courant[0] == "dehors":
+                labs[lab_courant]["fichiers_dehors"][fichier_courant[1]] = contenu
+            else:
+                labs[lab_courant]["fichiers"][fichier_courant] = contenu
 
     for ligne in lignes:
         if ligne.startswith("@@ "):
@@ -120,18 +124,44 @@ def parser_banc(texte):
                 for tok in morceaux_lab[1:]:
                     if tok.startswith("jumeau-de="):
                         jumeau_de = tok[len("jumeau-de="):]
-                labs[nom] = {"fichiers": {}, "dossiers": [], "attendus": [], "jumeau_de": jumeau_de}
+                labs[nom] = {
+                    "fichiers": {}, "fichiers_dehors": {}, "liens": [], "dossiers": [],
+                    "attendus": [], "attendus_hors_modele": [], "attendu_hors_modele_aucun": False,
+                    "jumeau_de": jumeau_de,
+                }
                 ordre_labs.append(nom)
                 lab_courant = nom
             elif directive.startswith("dossier "):
                 chemin = directive[len("dossier "):].strip()
                 _valider_chemin_banc(chemin)
                 labs[lab_courant]["dossiers"].append(chemin)
+            elif directive.startswith("fichier-dehors "):
+                chemin = directive[len("fichier-dehors "):].strip()
+                _valider_chemin_banc(chemin)
+                fichier_courant = ("dehors", chemin)
+                contenu_courant = []
             elif directive.startswith("fichier "):
                 chemin = directive[len("fichier "):].strip()
                 _valider_chemin_banc(chemin)
                 fichier_courant = chemin
                 contenu_courant = []
+            elif directive.startswith("lien "):
+                reste = directive[len("lien "):].strip()
+                if " -> " not in reste:
+                    raise ValueError("directive @@ lien mal formée (attendu ` -> `) : " + directive)
+                chemin_lien, cible = reste.split(" -> ", 1)
+                chemin_lien = chemin_lien.strip()
+                cible = cible.strip()
+                _valider_chemin_banc(chemin_lien)
+                labs[lab_courant]["liens"].append({"chemin": chemin_lien, "cible": cible})
+            elif directive == "attendu-hors-modele-aucun":
+                labs[lab_courant]["attendu_hors_modele_aucun"] = True
+            elif directive.startswith("attendu-hors-modele "):
+                reste = directive[len("attendu-hors-modele "):].strip()
+                morceaux_hm = [p.strip() for p in reste.split("::")]
+                chemin_hm = morceaux_hm[0]
+                type_hm = morceaux_hm[1] if len(morceaux_hm) > 1 else None
+                labs[lab_courant]["attendus_hors_modele"].append({"chemin": chemin_hm, "type": type_hm})
             elif directive.startswith("attendu "):
                 reste = directive[len("attendu "):].strip()
                 morceaux = [p.strip() for p in reste.split("::")]
@@ -162,6 +192,25 @@ def materialiser(banc_path, nom_lab, destination):
         os.makedirs(os.path.dirname(chemin_complet), exist_ok=True)
         with open(chemin_complet, "w", encoding="utf-8") as fh:
             fh.write(contenu)
+    # Bac à sable frère (44-04, § Interfaces) : HORS de la racine du lab, jamais dedans — sinon un
+    # `@@ lien ... -> DEHORS/x` pointerait vers l'intérieur du modèle qu'il est censé fuir.
+    dehors_dir = destination.rstrip("/") + "-dehors"
+    if lab["fichiers_dehors"]:
+        os.makedirs(dehors_dir, exist_ok=True)
+        for chemin, contenu in lab["fichiers_dehors"].items():
+            chemin_complet = os.path.join(dehors_dir, chemin)
+            os.makedirs(os.path.dirname(chemin_complet), exist_ok=True)
+            with open(chemin_complet, "w", encoding="utf-8") as fh:
+                fh.write(contenu)
+    for lien in lab["liens"]:
+        chemin_lien = os.path.join(destination, lien["chemin"])
+        os.makedirs(os.path.dirname(chemin_lien), exist_ok=True)
+        cible = lien["cible"]
+        if cible.startswith("DEHORS/"):
+            cible_resolue = os.path.join(dehors_dir, cible[len("DEHORS/"):])
+        else:
+            cible_resolue = os.path.join(destination, cible)
+        os.symlink(cible_resolue, chemin_lien)
     return lab["attendus"]
 
 
@@ -241,6 +290,17 @@ def coureur(banc_path, work_dir, recalc_sh):
                 tout_ok = False
                 continue
             print("✓ BANC " + nom + " " + unite + " : " + str(trouve["etat"]))
+        lab = labs[nom]
+        if lab["attendu_hors_modele_aucun"] or lab["attendus_hors_modele"]:
+            obtenu_hm = sorted((e["chemin"], e["type"]) for e in rapport.get("hors_modele", []))
+            voulu_hm = [] if lab["attendu_hors_modele_aucun"] else sorted(
+                (e["chemin"], e["type"]) for e in lab["attendus_hors_modele"]
+            )
+            if obtenu_hm == voulu_hm:
+                print("✓ BANC " + nom + " hors_modele : " + str(obtenu_hm))
+            else:
+                print("✗ BANC " + nom + " hors_modele : attendu=" + str(voulu_hm) + " obtenu=" + str(obtenu_hm))
+                tout_ok = False
     sys.exit(0 if tout_ok else 1)
 
 
@@ -289,6 +349,20 @@ def couverture(banc_path):
     sys.exit(0 if tout_ok else 1)
 
 
+def verifier_hors_modele(chemin_rapport, chemin_attendu):
+    """Compare `hors_modele` d'un rapport JSON (--read-only) à un ensemble attendu, tous deux
+    normalisés en liste triée de (chemin, type) — 44-04 § Interfaces, `@@ attendu-hors-modele`."""
+    rapport = json.load(open(chemin_rapport, encoding="utf-8"))
+    attendu = json.load(open(chemin_attendu, encoding="utf-8"))
+    obtenu = sorted((e["chemin"], e["type"]) for e in rapport.get("hors_modele", []))
+    voulu = sorted((e["chemin"], e["type"]) for e in attendu)
+    if obtenu == voulu:
+        print("OK " + json.dumps(obtenu, ensure_ascii=False))
+        sys.exit(0)
+    print("KO attendu=" + json.dumps(voulu, ensure_ascii=False) + " obtenu=" + json.dumps(obtenu, ensure_ascii=False))
+    sys.exit(1)
+
+
 def main():
     action = sys.argv[1]
     if action == "materialiser":
@@ -303,6 +377,9 @@ def main():
         return
     if action == "couverture":
         couverture(sys.argv[2])
+        return
+    if action == "verifier-hors-modele":
+        verifier_hors_modele(sys.argv[2], sys.argv[3])
         return
     print("action inconnue : " + action, file=sys.stderr)
     sys.exit(1)
@@ -899,6 +976,402 @@ else
 fi
 
 # ================================================================================================
+# 44-04 Tâche 1 — hors modèle et garde-fous de chemin (R40 à R46)
+# ================================================================================================
+
+# ---------- R40 — hors modèle à la racine (annexes exclues, intrus listés) ------------------------
+R40_DIR="$WORK/r40"
+materialiser hors-modele-racine "$R40_DIR"
+( cd "$R40_DIR" && bash "$RECALC" --read-only > "$WORK/r40-out.json" 2>"$WORK/r40-err.txt" )
+R40_RC=$?
+printf '%s' '[{"chemin":"BOARD.md","type":"fichier"},{"chemin":"intel","type":"fichier"},{"chemin":"notes.md","type":"fichier"},{"chemin":"phases","type":"dossier"},{"chemin":"workstreams","type":"dossier"}]' > "$WORK/r40-attendu.json"
+if [ "$R40_RC" -eq 0 ] && "$PYBIN" "$AIDES_PY" verifier-hors-modele "$WORK/r40-out.json" "$WORK/r40-attendu.json" >"$WORK/r40-verif.txt" 2>&1; then
+  ok "R40 hors modèle à la racine : cinq intrus listés avec leur type, les six annexes absentes"
+else
+  ko "R40 hors_modele racine" "BOARD.md/intel/notes.md (fichier), phases/workstreams (dossier)" "rc=$R40_RC $(cat "$WORK/r40-verif.txt" 2>/dev/null) $(cat "$WORK/r40-err.txt" 2>/dev/null)" "-"
+fi
+
+# ---------- R41 — hors modèle dans l'arbre cycles/ ; un intrus ne change aucun état ---------------
+R41_DIR="$WORK/r41"
+materialiser hors-modele-interne "$R41_DIR"
+( cd "$R41_DIR" && bash "$RECALC" --read-only > "$WORK/r41-out.json" 2>"$WORK/r41-err.txt" )
+R41_RC=$?
+printf '%s' '[{"chemin":"cycles/01-c/notes.md","type":"fichier"},{"chemin":"cycles/01-c/phases/01-p/brouillon.md","type":"fichier"},{"chemin":"cycles/01-c/phases/02-q/plans/01-x/annexe.txt","type":"fichier"},{"chemin":"cycles/brouillon.md","type":"fichier"},{"chemin":"cycles/sans-numero","type":"dossier"}]' > "$WORK/r41-attendu.json"
+if [ "$R41_RC" -eq 0 ] && "$PYBIN" "$AIDES_PY" verifier-hors-modele "$WORK/r41-out.json" "$WORK/r41-attendu.json" >"$WORK/r41-verif.txt" 2>&1; then
+  ok "R41 hors modèle dans l'arbre cycles/ : cinq intrus listés, triés (0 < b < s en ASCII)"
+else
+  ko "R41 hors_modele arbre" "cinq entrées triées" "rc=$R41_RC $(cat "$WORK/r41-verif.txt" 2>/dev/null) $(cat "$WORK/r41-err.txt" 2>/dev/null)" "-"
+fi
+R41J_DIR="$WORK/r41j"
+materialiser hors-modele-interne-jumeau "$R41J_DIR"
+( cd "$R41J_DIR" && bash "$RECALC" --read-only > "$WORK/r41j-out.json" 2>"$WORK/r41j-err.txt" )
+R41_ETATS_EGAUX="$("$PYBIN" -c '
+import json, sys
+a = json.load(open(sys.argv[1]))
+b = json.load(open(sys.argv[2]))
+def etats(d):
+    r = {}
+    for c in d["cycles"]:
+        r[c["chemin"]] = c["etat"]
+        for p in c["phases"]:
+            r[p["chemin"]] = p["etat"]
+            for pl in p.get("plans", []):
+                r[pl["chemin"]] = pl["etat"]
+    return r
+print(etats(a) == etats(b))
+' "$WORK/r41-out.json" "$WORK/r41j-out.json" 2>/dev/null || echo '?')"
+if [ "$R41_ETATS_EGAUX" = "True" ]; then
+  ok "R41 les intrus internes ne changent aucun état (identiques au jumeau sans intrus)"
+else
+  ko "R41 états identiques au jumeau" "True" "$R41_ETATS_EGAUX" "-"
+fi
+
+# ---------- R42 — emplacement du modèle du mauvais type : hors modèle en lecture, refus en écriture
+R42_DIR="$WORK/r42"
+materialiser modele-mauvais-type "$R42_DIR"
+( cd "$R42_DIR" && bash "$RECALC" --read-only > "$WORK/r42-out.json" 2>"$WORK/r42-err.txt" )
+R42_RC=$?
+printf '%s' '[{"chemin":"cycles","type":"fichier"},{"chemin":"INDEX.md","type":"dossier"}]' > "$WORK/r42-attendu.json"
+if [ "$R42_RC" -eq 0 ] && "$PYBIN" "$AIDES_PY" verifier-hors-modele "$WORK/r42-out.json" "$WORK/r42-attendu.json" >"$WORK/r42-verif.txt" 2>&1; then
+  ok "R42 lecture seule : cycles (fichier) et INDEX.md (dossier) tous deux hors modèle"
+else
+  ko "R42 hors_modele lecture seule" "cycles (fichier), INDEX.md (dossier)" "rc=$R42_RC $(cat "$WORK/r42-verif.txt" 2>/dev/null) $(cat "$WORK/r42-err.txt" 2>/dev/null)" "-"
+fi
+R42_NB_CYCLES="$("$PYBIN" -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["cycles"]))' "$WORK/r42-out.json" 2>/dev/null || echo '?')"
+if [ "$R42_NB_CYCLES" = "0" ]; then
+  ok "R42 lecture seule : aucun cycle dérivé (cycles est un fichier)"
+else
+  ko "R42 nombre de cycles" "0" "$R42_NB_CYCLES" "-"
+fi
+R42W_DIR="$WORK/r42w"
+materialiser modele-mauvais-type "$R42W_DIR"
+empreinte "$R42W_DIR" > "$WORK/r42w-avant.txt"
+( cd "$R42W_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r42w-out.txt" 2>"$WORK/r42w-err.txt" )
+R42W_RC=$?
+empreinte "$R42W_DIR" > "$WORK/r42w-apres.txt"
+if [ "$R42W_RC" -eq 1 ]; then ok "R42 écriture : code de sortie 1"; else ko "R42 écriture code" "1" "$R42W_RC" "$(cat "$WORK/r42w-out.txt")"; fi
+if grep -qF "INDEX.md" "$WORK/r42w-err.txt" 2>/dev/null && grep -q "emplacement occupé" "$WORK/r42w-err.txt" 2>/dev/null; then
+  ok "R42 écriture : stderr nomme le chemin fautif (INDEX.md)"
+else
+  ko "R42 écriture stderr" "emplacement occupé ... INDEX.md" "$(cat "$WORK/r42w-err.txt" 2>/dev/null)" "-"
+fi
+if cmp -s "$WORK/r42w-avant.txt" "$WORK/r42w-apres.txt"; then
+  ok "R42 écriture : empreinte du lab identique avant/après (rien écrit)"
+else
+  ko "R42 écriture empreinte" "identique" "diverge" "-"
+fi
+
+# ---------- R43 — lien de dossier jamais suivi (cycles/02-lien) -----------------------------------
+R43_DIR="$WORK/r43"
+materialiser lien-dossier-cycle "$R43_DIR"
+( cd "$R43_DIR" && bash "$RECALC" --read-only > "$WORK/r43-out.json" 2>"$WORK/r43-err.txt" )
+R43_RC=$?
+printf '%s' '[{"chemin":"cycles/02-lien","type":"lien"}]' > "$WORK/r43-attendu.json"
+if [ "$R43_RC" -eq 0 ] && "$PYBIN" "$AIDES_PY" verifier-hors-modele "$WORK/r43-out.json" "$WORK/r43-attendu.json" >"$WORK/r43-verif.txt" 2>&1; then
+  ok "R43 cycles/02-lien (lien vers un dossier) hors modèle, jamais suivi"
+else
+  ko "R43 hors_modele" "cycles/02-lien (lien)" "rc=$R43_RC $(cat "$WORK/r43-verif.txt" 2>/dev/null) $(cat "$WORK/r43-err.txt" 2>/dev/null)" "-"
+fi
+R43_UNITE_ABSENTE="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(not any(c["chemin"]=="cycles/02-lien" for c in d["cycles"]))' "$WORK/r43-out.json" 2>/dev/null || echo '?')"
+if [ "$R43_UNITE_ABSENTE" = "True" ]; then
+  ok "R43 aucune unité cycles/02-lien dans le JSON (jamais parcouru)"
+else
+  ko "R43 unité cycles/02-lien" "absente du JSON" "$R43_UNITE_ABSENTE" "-"
+fi
+
+# ---------- R44 — lien de fichier jamais suivi (PLAN.md) ------------------------------------------
+R44_DIR="$WORK/r44"
+materialiser lien-fichier-plan "$R44_DIR"
+( cd "$R44_DIR" && bash "$RECALC" --read-only > "$WORK/r44-out.json" 2>"$WORK/r44-err.txt" )
+R44_RC=$?
+R44_ETAT="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/r44-out.json" 2>/dev/null || echo '?')"
+R44_RAISON="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["raison"])' "$WORK/r44-out.json" 2>/dev/null || echo '?')"
+if [ "$R44_RC" -eq 0 ] && [ "$R44_ETAT" = "indéterminé" ] && [ "$R44_RAISON" = "fichier-non-regulier:PLAN.md" ]; then
+  ok "R44 PLAN.md en lien vers un fichier : indéterminé (fichier-non-regulier:PLAN.md), jamais suivi"
+else
+  ko "R44 état/raison" "indéterminé / fichier-non-regulier:PLAN.md" "rc=$R44_RC état=$R44_ETAT raison=$R44_RAISON" "-"
+fi
+if grep -q "JETON-DEHORS-44" "$WORK/r44-out.json" 2>/dev/null; then
+  ko "R44 jeton" "absent du JSON" "présent" "-"
+else
+  ok "R44 jeton JETON-DEHORS-44 absent du JSON (contenu jamais lu)"
+fi
+
+# ---------- R45 — nom d'unité à saut de ligne et accent grave : une entrée, échappée --------------
+# Le nom piégé ne s'écrit jamais dans le banc texte (un saut de ligne littéral y casserait le
+# format une-directive-par-ligne) : lab construit directement ici, comme prescrit par le plan.
+R45_NOM=$'01-x\n`y'
+R45_DIR="$WORK/r45"
+mkdir -p "$R45_DIR/.planning/cycles/$R45_NOM"
+printf '%s' '{"planning_version": "cycles-v1"}' > "$R45_DIR/.planning/config.json"
+( cd "$R45_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r45-out.txt" 2>"$WORK/r45-err.txt" )
+R45_RC=$?
+if [ "$R45_RC" -eq 0 ]; then ok "R45 code de sortie 0"; else ko "R45 code" "0" "$R45_RC" "$(cat "$WORK/r45-err.txt")"; fi
+if grep -qF '\u000a' "$R45_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R45 INDEX.md porte le nom échappé (\\u000a littéral, jamais un saut de ligne brut)"
+else
+  ko "R45 INDEX.md échappement" 'contient \u000a' "$(cat "$R45_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+R45_LIGNES_TOTAL="$(wc -l < "$R45_DIR/.planning/INDEX.md" 2>/dev/null | tr -d ' ')"
+if [ "$R45_LIGNES_TOTAL" = "11" ]; then
+  ok "R45 INDEX.md tient sur 11 lignes (le saut de ligne du nom ne casse pas le format)"
+else
+  ko "R45 lignes INDEX.md" "11" "$R45_LIGNES_TOTAL" "-"
+fi
+if [ ! -f "$R45_DIR/.planning/cloture.log" ]; then
+  ok "R45 cloture.log inchangé (aucune unité close, le nom piégé n'y atteint jamais)"
+else
+  ko "R45 cloture.log" "absent (aucune clôture observée)" "$(cat "$R45_DIR/.planning/cloture.log" 2>/dev/null)" "-"
+fi
+
+# ---------- R46 — rendu de INDEX.md en écriture : une ligne par entrée / "_Aucune entrée._" -------
+R46A_DIR="$WORK/r46a"
+materialiser hors-modele-racine "$R46A_DIR"
+( cd "$R46A_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r46a-out.txt" 2>"$WORK/r46a-err.txt" )
+if grep -q '^## Hors modèle$' "$R46A_DIR/.planning/INDEX.md" 2>/dev/null \
+   && [ "$(grep -c '^- ' "$R46A_DIR/.planning/INDEX.md" 2>/dev/null)" -eq 5 ]; then
+  ok "R46 lab porteur d'intrus : ## Hors modèle suivi de cinq lignes (une par entrée)"
+else
+  ko "R46 rendu avec intrus" "## Hors modèle + 5 lignes" "$(cat "$R46A_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+R46B_DIR="$WORK/r46b"
+materialiser hors-modele-interne-jumeau "$R46B_DIR"
+( cd "$R46B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r46b-out.txt" 2>"$WORK/r46b-err.txt" )
+if grep -qF '_Aucune entrée._' "$R46B_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R46 lab sans intrus : ## Hors modèle porte _Aucune entrée._"
+else
+  ko "R46 rendu sans intrus" "_Aucune entrée._" "$(cat "$R46B_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+
+# ================================================================================================
+# 44-04 Tâche 2 — incrémental par hash du contenu (R50 à R58)
+# ================================================================================================
+
+# ---------- R50 — premier recalcul en écriture : cache absent, tout recalculé ---------------------
+R50_DIR="$WORK/r50"
+materialiser traceur "$R50_DIR"
+( cd "$R50_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r50-out.json" 2>"$WORK/r50-err.txt" )
+R50_RC=$?
+R50_CACHE="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache"])' "$WORK/r50-out.json" 2>/dev/null || echo '?')"
+R50_UNITES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites"])' "$WORK/r50-out.json" 2>/dev/null || echo '?')"
+R50_RECALCULEES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/r50-out.json" 2>/dev/null || echo '?')"
+R50_ECRITS_CACHE="$("$PYBIN" -c 'import json,sys; print(".recalc-cache.json" in json.load(open(sys.argv[1]))["ecrits"])' "$WORK/r50-out.json" 2>/dev/null || echo '?')"
+if [ "$R50_RC" -eq 0 ] && [ "$R50_CACHE" = "absent" ] && [ "$R50_UNITES" = "$R50_RECALCULEES" ] && [ -f "$R50_DIR/.planning/.recalc-cache.json" ] && [ "$R50_ECRITS_CACHE" = "True" ]; then
+  ok "R50 premier recalcul : cache absent, unites_recalculees = unites ($R50_UNITES), .recalc-cache.json créé et listé dans ecrits"
+else
+  ko "R50 premier recalcul" "cache=absent, recalculees=unites, cache créé+listé" "rc=$R50_RC cache=$R50_CACHE unites=$R50_UNITES recalculees=$R50_RECALCULEES ecrits_cache=$R50_ECRITS_CACHE" "-"
+fi
+
+# ---------- R51 — second recalcul : cache valide, tout repris -------------------------------------
+( cd "$R50_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r51-out.json" 2>"$WORK/r51-err.txt" )
+R51_RC=$?
+R51_CACHE="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache"])' "$WORK/r51-out.json" 2>/dev/null || echo '?')"
+R51_REPRISES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_reprises"])' "$WORK/r51-out.json" 2>/dev/null || echo '?')"
+R51_RECALCULEES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/r51-out.json" 2>/dev/null || echo '?')"
+R51_ECRITS="$("$PYBIN" -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["ecrits"]))' "$WORK/r51-out.json" 2>/dev/null || echo '?')"
+if [ "$R51_RC" -eq 0 ] && [ "$R51_CACHE" = "valide" ] && [ "$R51_REPRISES" = "$R50_UNITES" ] && [ "$R51_RECALCULEES" = "0" ] && [ "$R51_ECRITS" = "0" ]; then
+  ok "R51 second recalcul : cache valide, unites_reprises = unites ($R50_UNITES), unites_recalculees 0, ecrits vide"
+else
+  ko "R51 second recalcul" "cache=valide, reprises=unites, recalculees=0, ecrits=0" "rc=$R51_RC cache=$R51_CACHE reprises=$R51_REPRISES recalculees=$R51_RECALCULEES ecrits=$R51_ECRITS" "-"
+fi
+
+# ---------- R52 — touch de tous les fichiers du modèle, contenu inchangé : rien recalculé ---------
+for f in CADRAGE.md PLAN.md CLOTURE.md VERDICT.md SUMMARY.md; do
+  cp "$R50_DIR/.planning/cycles/01-traceur/phases/01-livree/$f" "$WORK/r52-ref-$f"
+  touch "$R50_DIR/.planning/cycles/01-traceur/phases/01-livree/$f"
+done
+cp "$R50_DIR/.planning/INDEX.md" "$WORK/r52-index-avant.md"
+cp "$R50_DIR/.planning/STATE.md" "$WORK/r52-state-avant.md"
+cp "$R50_DIR/.planning/cloture.log" "$WORK/r52-cloture-avant.log"
+cp "$R50_DIR/.planning/.recalc-cache.json" "$WORK/r52-cache-avant.json"
+( cd "$R50_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r52-out.json" 2>"$WORK/r52-err.txt" )
+R52_RC=$?
+R52_RECALCULEES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/r52-out.json" 2>/dev/null || echo '?')"
+if [ "$R52_RC" -eq 0 ] && [ "$R52_RECALCULEES" = "0" ]; then
+  ok "R52 touch sans changement de contenu : unites_recalculees 0"
+else
+  ko "R52 recalculees" "0" "rc=$R52_RC recalculees=$R52_RECALCULEES" "-"
+fi
+if cmp -s "$WORK/r52-index-avant.md" "$R50_DIR/.planning/INDEX.md" \
+   && cmp -s "$WORK/r52-state-avant.md" "$R50_DIR/.planning/STATE.md" \
+   && cmp -s "$WORK/r52-cloture-avant.log" "$R50_DIR/.planning/cloture.log" \
+   && cmp -s "$WORK/r52-cache-avant.json" "$R50_DIR/.planning/.recalc-cache.json"; then
+  ok "R52 INDEX.md/STATE.md/cloture.log/.recalc-cache.json identiques octet pour octet"
+else
+  ko "R52 identité octet pour octet" "les quatre fichiers identiques" "au moins un diffère" "-"
+fi
+
+# ---------- R53 — contenu changé (passé -> échec, même taille), mtime restauré : vu et recalculé --
+R53_VERDICT="$R50_DIR/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+cp "$R53_VERDICT" "$WORK/r53-verdict-ref.md"
+"$PYBIN" -c "
+p = '$R53_VERDICT'
+t = open(p, encoding='utf-8').read()
+assert 'resultat: passé' in t, t
+t2 = t.replace('resultat: passé', 'resultat: échec')
+assert len(t.encode('utf-8')) == len(t2.encode('utf-8')), (len(t.encode('utf-8')), len(t2.encode('utf-8')))
+open(p, 'w', encoding='utf-8').write(t2)
+"
+touch -r "$WORK/r53-verdict-ref.md" "$R53_VERDICT"
+( cd "$R50_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r53-out.json" 2>"$WORK/r53-err.txt" )
+R53_RC=$?
+R53_RECALCULEES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/r53-out.json" 2>/dev/null || echo '?')"
+if [ "$R53_RC" -eq 0 ] && [ "$R53_RECALCULEES" -ge 1 ] 2>/dev/null; then
+  ok "R53 contenu changé à mtime restauré : unites_recalculees >= 1 ($R53_RECALCULEES)"
+else
+  ko "R53 recalculees" ">= 1" "rc=$R53_RC recalculees=$R53_RECALCULEES" "-"
+fi
+R53_LIGNE_ATTENDUE='indéterminé — phase `01-livree` indéterminée : SUMMARY.md avec un verdict en échec (cycles/01-traceur)'
+if grep -qF "$R53_LIGNE_ATTENDUE" "$R50_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R53 INDEX.md porte le libellé imbriqué exact (SUMMARY.md avec un verdict en échec)"
+else
+  ko "R53 libellé INDEX.md" "$R53_LIGNE_ATTENDUE" "$(cat "$R50_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+# Contrôle croisé : un recalcul COMPLET (sans cache préalable) sur le même contenu édité rend la
+# MÊME ligne — la reprise partielle du cache n'invente jamais une sortie que le recalcul complet
+# ne produirait pas.
+R53_TEMOIN_DIR="$WORK/r53-temoin"
+materialiser traceur "$R53_TEMOIN_DIR"
+cp "$R53_VERDICT" "$R53_TEMOIN_DIR/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+( cd "$R53_TEMOIN_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+if grep -qF "$R53_LIGNE_ATTENDUE" "$R53_TEMOIN_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R53 un recalcul complet sans cache rend la même ligne (le cache n'invente aucune sortie)"
+else
+  ko "R53 témoin sans cache" "$R53_LIGNE_ATTENDUE" "$(cat "$R53_TEMOIN_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+
+# ---------- R54 — cache non JSON : illisible, recalcul complet ------------------------------------
+# Comparaison à l'INDEX.md du MÊME lab (jamais d'un autre) : le dédoublonnage de cloture.log fait
+# que l'horodatage de « Dernier signe de vie » reste stable d'un passage à l'autre SUR LE MÊME
+# lab (couple verdict/tentative inchangé) — comparer à un AUTRE lab ferait diverger sur l'horodatage
+# seul, un faux négatif sans rapport avec le cache.
+R54_DIR="$WORK/r54"
+materialiser traceur "$R54_DIR"
+( cd "$R54_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+cp "$R54_DIR/.planning/INDEX.md" "$WORK/r54-index-premier-passage.md"
+printf 'ceci n'"'"'est pas du JSON' > "$R54_DIR/.planning/.recalc-cache.json"
+( cd "$R54_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r54-out.json" 2>"$WORK/r54-err.txt" )
+R54_RC=$?
+R54_CACHE="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache"])' "$WORK/r54-out.json" 2>/dev/null || echo '?')"
+if [ "$R54_RC" -eq 0 ] && [ "$R54_CACHE" = "illisible" ]; then
+  ok "R54 cache non JSON : statut illisible, recalcul complet"
+else
+  ko "R54 cache" "illisible" "rc=$R54_RC cache=$R54_CACHE" "-"
+fi
+if cmp -s "$WORK/r54-index-premier-passage.md" "$R54_DIR/.planning/INDEX.md"; then
+  ok "R54 INDEX.md identique à celui d'un passage à cache valide (même lab)"
+else
+  ko "R54 INDEX.md" "identique au premier passage du même lab" "$(diff "$WORK/r54-index-premier-passage.md" "$R54_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+
+# ---------- R55 — cache_schema_version 999 puis absent : autre-format, recalcul complet -----------
+R55_DIR="$WORK/r55"
+materialiser traceur "$R55_DIR"
+( cd "$R55_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+"$PYBIN" -c "
+import json
+p = '$R55_DIR/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+d['cache_schema_version'] = 999
+json.dump(d, open(p, 'w', encoding='utf-8'))
+"
+( cd "$R55_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r55a-out.json" 2>"$WORK/r55a-err.txt" )
+R55A_RC=$?
+R55A_CACHE="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache"])' "$WORK/r55a-out.json" 2>/dev/null || echo '?')"
+"$PYBIN" -c "
+import json
+p = '$R55_DIR/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+del d['cache_schema_version']
+json.dump(d, open(p, 'w', encoding='utf-8'))
+"
+( cd "$R55_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r55b-out.json" 2>"$WORK/r55b-err.txt" )
+R55B_RC=$?
+R55B_CACHE="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache"])' "$WORK/r55b-out.json" 2>/dev/null || echo '?')"
+if [ "$R55A_RC" -eq 0 ] && [ "$R55A_CACHE" = "autre-format" ] && [ "$R55B_RC" -eq 0 ] && [ "$R55B_CACHE" = "autre-format" ]; then
+  ok "R55 cache_schema_version 999 puis absent : autre-format les deux fois, recalcul complet"
+else
+  ko "R55 cache" "autre-format, autre-format" "rc=$R55A_RC/$R55B_RC cache=$R55A_CACHE/$R55B_CACHE" "-"
+fi
+
+# ---------- R56 — cache en lien symbolique hors du lab : illisible, cible inchangée ---------------
+R56_DIR="$WORK/r56"
+materialiser traceur "$R56_DIR"
+( cd "$R56_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+R56_CIBLE="$WORK/r56-cible-hors-lab.json"
+cp "$R56_DIR/.planning/.recalc-cache.json" "$R56_CIBLE"
+cp "$R56_CIBLE" "$WORK/r56-cible-avant.json"
+rm -f "$R56_DIR/.planning/.recalc-cache.json"
+ln -s "$R56_CIBLE" "$R56_DIR/.planning/.recalc-cache.json"
+( cd "$R56_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r56-out.json" 2>"$WORK/r56-err.txt" )
+R56_RC=$?
+R56_CACHE="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache"])' "$WORK/r56-out.json" 2>/dev/null || echo '?')"
+if [ "$R56_RC" -eq 0 ] && [ "$R56_CACHE" = "illisible" ]; then
+  ok "R56 cache en lien symbolique : illisible, recalcul complet"
+else
+  ko "R56 cache" "illisible" "rc=$R56_RC cache=$R56_CACHE" "-"
+fi
+if cmp -s "$WORK/r56-cible-avant.json" "$R56_CIBLE"; then
+  ok "R56 cible du lien inchangée octet pour octet"
+else
+  ko "R56 cible du lien" "inchangée" "modifiée" "-"
+fi
+if [ -f "$R56_DIR/.planning/.recalc-cache.json" ] && [ ! -L "$R56_DIR/.planning/.recalc-cache.json" ]; then
+  ok "R56 .recalc-cache.json redevenu un fichier régulier (le lien a été remplacé)"
+else
+  ko "R56 .recalc-cache.json" "fichier régulier (lien remplacé)" "toujours un lien ou absent" "-"
+fi
+
+# ---------- R57 — cache au bon format, entrée forgée : la lecture seule ne le lit jamais ----------
+R57_DIR="$WORK/r57"
+materialiser traceur "$R57_DIR"
+( cd "$R57_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+"$PYBIN" -c "
+import json
+p = '$R57_DIR/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+cle = 'cycles/01-traceur/phases/02-en-cours'
+entree = d['unites'][cle]
+entree['etat'] = 'close'
+entree['raison'] = None
+json.dump(d, open(p, 'w', encoding='utf-8'))
+"
+R57_SANS_CACHE_DIR="$WORK/r57-sans-cache"
+materialiser traceur "$R57_SANS_CACHE_DIR"
+( cd "$R57_SANS_CACHE_DIR" && bash "$RECALC" --read-only > "$WORK/r57-sans-cache-out.json" 2>/dev/null )
+empreinte "$R57_DIR" > "$WORK/r57-avant.txt"
+( cd "$R57_DIR" && bash "$RECALC" --read-only > "$WORK/r57-out.json" 2>"$WORK/r57-err.txt" )
+R57_RC=$?
+empreinte "$R57_DIR" > "$WORK/r57-apres.txt"
+R57_JSON_EGAL="$("$PYBIN" -c 'import json,sys; a=json.load(open(sys.argv[1]))["cycles"]; b=json.load(open(sys.argv[2]))["cycles"]; print(a==b)' "$WORK/r57-out.json" "$WORK/r57-sans-cache-out.json" 2>/dev/null || echo '?')"
+if [ "$R57_RC" -eq 0 ] && [ "$R57_JSON_EGAL" = "True" ]; then
+  ok "R57 --read-only : JSON identique à un lab sans cache (l'entrée forgée n'est jamais lue)"
+else
+  ko "R57 JSON --read-only" "identique au lab sans cache" "rc=$R57_RC égal=$R57_JSON_EGAL" "-"
+fi
+if cmp -s "$WORK/r57-avant.txt" "$WORK/r57-apres.txt"; then
+  ok "R57 empreinte du lab inchangée (--read-only ne lit ni n'écrit jamais le cache)"
+else
+  ko "R57 empreinte" "identique" "diverge" "-"
+fi
+
+# ---------- R58 — livrable supprimé après un passage à cache valide : vu malgré signature stable --
+R58_DIR="$WORK/r58"
+materialiser traceur "$R58_DIR"
+( cd "$R58_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+rm -f "$R58_DIR/livrables/rapport.md"
+( cd "$R58_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r58-out.json" 2>"$WORK/r58-err.txt" )
+R58_RC=$?
+# Rapport d'écriture : agrégats seulement (pas de détail par unité) — l'état/raison se lit dans
+# le rendu INDEX.md, comme R53.
+R58_LIGNE_ATTENDUE='indéterminé — phase `01-livree` indéterminée : livrable absent : livrables/rapport.md (cycles/01-traceur)'
+if [ "$R58_RC" -eq 0 ] && grep -qF "$R58_LIGNE_ATTENDUE" "$R58_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R58 livrable supprimé : indéterminé (livrable-absent:livrables/rapport.md) malgré signature stable"
+else
+  ko "R58 INDEX.md" "$R58_LIGNE_ATTENDUE" "rc=$R58_RC $(cat "$R58_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+
+# ================================================================================================
 # make_recalc_mutant — mute UNE ligne à motif fixe unique de recalc-planning.sh dans une copie
 # fraîche (moteur + detect-gsd-engine.sh + workstream-policy.sh), patron test-check-skills.sh
 # make_gate_mutant : bash -n sur l'enveloppe PUIS compilation du corps Python extrait du
@@ -1414,7 +1887,7 @@ then
 fi
 
 # ---------- MUT-TRI — énumération des cycles en ordre inverse ------------------------------------
-if make_recalc_mutant TRI 'key=lambda c: c["chemin"],' 'key=lambda c: c["chemin"], reverse=True,  # MUT-TRI'; then
+if make_recalc_mutant TRI 'key=lambda c: c["chemin"],  # tri, écriture' 'key=lambda c: c["chemin"], reverse=True,  # MUT-TRI'; then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-tri-cas"
   materialiser cycles-ordre "$DIR_CAS"
@@ -1460,6 +1933,247 @@ then
       komut PLANS-CLOS "ligne de cloture.log de la phase sur plans-tous-clos" "verdict=plans-clos (original)" "verdict=plans-clos (mutant non opposable)"
     else
       okmut PLANS-CLOS "ligne de cloture.log de la phase sur plans-tous-clos · attendu (original) : verdict=plans-clos · obtenu (mutant) : $(grep 'cycles/01-c/phases/01-p ' "$DIR_CAS/.planning/cloture.log" 2>/dev/null)"
+    fi
+  fi
+fi
+
+# ================================================================================================
+# Mutants du hors modèle et des garde-fous de chemin (44-04, Tâche 1) — MUT-HORS-MODELE,
+# MUT-ANNEXES, MUT-LIEN-FICHIER, MUT-LIEN-DOSSIER, MUT-ECHAPPEMENT, MUT-TYPE-ECRITURE.
+# ================================================================================================
+
+# ---------- MUT-HORS-MODELE — classement de la racine et de l'arbre neutralisé -------------------
+if make_recalc_mutant HORS-MODELE \
+  'hors = _classer_racine(planning) + _classer_arbre_cycles(planning)' \
+  'hors = []  # MUT-HORS-MODELE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-hors-modele-cas"
+  materialiser hors-modele-racine "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-hors-modele-out.json" 2>"$WORK/mut-hors-modele-err.txt" ); RC_M=$?
+  if ! _verifier_plantage HORS-MODELE "hors_modele de R40 (hors-modele-racine)" "$WORK/mut-hors-modele-out.json" "$WORK/mut-hors-modele-err.txt" "$RC_M"; then
+    HM_M="$("$PYBIN" -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["hors_modele"]))' "$WORK/mut-hors-modele-out.json" 2>/dev/null || echo '?')"
+    if [ "$HM_M" = "5" ]; then
+      komut HORS-MODELE "hors_modele de R40" "5 entrées (original)" "5 entrées (mutant non opposable)"
+    else
+      okmut HORS-MODELE "hors_modele de R40 · attendu (original) : 5 entrées (BOARD.md, intel, notes.md, phases, workstreams) · obtenu (mutant) : $HM_M entrée(s) (aucun intrus n'entre plus dans la dérivation)"
+    fi
+  fi
+fi
+
+# ---------- MUT-ANNEXES — liste des annexes vidée : les annexes apparaissent hors modèle ---------
+if make_recalc_mutant ANNEXES \
+  'ANNEXES = frozenset({"_bancs", "recherches", "intel", "sketches", "_archive", "registres"})' \
+  'ANNEXES = frozenset()  # MUT-ANNEXES'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-annexes-cas"
+  materialiser hors-modele-racine "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-annexes-out.json" 2>"$WORK/mut-annexes-err.txt" ); RC_M=$?
+  if ! _verifier_plantage ANNEXES "présence de _bancs dans hors_modele de R40" "$WORK/mut-annexes-out.json" "$WORK/mut-annexes-err.txt" "$RC_M"; then
+    if grep -q '"_bancs"' "$WORK/mut-annexes-out.json" 2>/dev/null; then
+      okmut ANNEXES "présence de _bancs dans hors_modele · attendu (original) : absent (annexe, jamais listée) · obtenu (mutant) : présent (les six annexes ne sont plus reconnues)"
+    else
+      komut ANNEXES "présence de _bancs dans hors_modele" "absent (original)" "absent (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-LIEN-FICHIER — garde de régularité neutralisée (PLAN.md en lien suivi) -----------
+if make_recalc_mutant LIEN-FICHIER \
+  'return stat.S_ISREG(os.lstat(chemin).st_mode)' \
+  'return True  # MUT-LIEN-FICHIER'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-lien-fichier-cas"
+  materialiser lien-fichier-plan "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-lien-fichier-out.json" 2>"$WORK/mut-lien-fichier-err.txt" ); RC_M=$?
+  if ! _verifier_plantage LIEN-FICHIER "raison de lien-fichier-plan (R44)" "$WORK/mut-lien-fichier-out.json" "$WORK/mut-lien-fichier-err.txt" "$RC_M"; then
+    RAISON_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0].get("raison"))' "$WORK/mut-lien-fichier-out.json" 2>/dev/null || echo '?')"
+    if [ "$RAISON_M" = "fichier-non-regulier:PLAN.md" ]; then
+      komut LIEN-FICHIER "raison de lien-fichier-plan" "fichier-non-regulier:PLAN.md (original)" "fichier-non-regulier:PLAN.md (mutant non opposable)"
+    else
+      okmut LIEN-FICHIER "raison de lien-fichier-plan · attendu (original) : fichier-non-regulier:PLAN.md · obtenu (mutant) : $RAISON_M (le lien n'est plus rejeté au premier rideau — le second rideau SANS_SUIVI_DE_LIEN rattrape sans jamais laisser le jeton fuiter)"
+    fi
+  fi
+  if grep -q "JETON-DEHORS-44" "$WORK/mut-lien-fichier-out.json" 2>/dev/null; then
+    ko "MUT-LIEN-FICHIER jeton" "absent (même mutée, la garde SANS_SUIVI_DE_LIEN ne laisse jamais fuiter le contenu)" "présent" "-"
+  fi
+fi
+
+# ---------- MUT-LIEN-DOSSIER — exclusion des liens de dossier neutralisée (cycles/02-lien suivi) -
+if make_recalc_mutant LIEN-DOSSIER \
+  'if type_ == "dossier" and NOM_UNITE.match(nom):  # cycle' \
+  'if NOM_UNITE.match(nom):  # MUT-LIEN-DOSSIER'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-lien-dossier-cas"
+  materialiser lien-dossier-cycle "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-lien-dossier-out.json" 2>"$WORK/mut-lien-dossier-err.txt" ); RC_M=$?
+  if ! _verifier_plantage LIEN-DOSSIER "hors_modele de lien-dossier-cycle (R43)" "$WORK/mut-lien-dossier-out.json" "$WORK/mut-lien-dossier-err.txt" "$RC_M"; then
+    if grep -q '"cycles/02-lien"' "$WORK/mut-lien-dossier-out.json" 2>/dev/null; then
+      komut LIEN-DOSSIER "hors_modele de lien-dossier-cycle" "cycles/02-lien présent (original)" "cycles/02-lien présent (mutant non opposable)"
+    else
+      okmut LIEN-DOSSIER "hors_modele de lien-dossier-cycle · attendu (original) : cycles/02-lien présent (type lien) · obtenu (mutant) : absent (le lien est désormais parcouru comme un cycle reconnu)"
+    fi
+  fi
+fi
+
+# ---------- MUT-ECHAPPEMENT — échappement de nom neutralisé dans le rendu de INDEX.md -------------
+if make_recalc_mutant ECHAPPEMENT \
+  'lignes.append("- `" + echapper_nom(entree["chemin"]) + "` (" + entree["type"] + ")")' \
+  'lignes.append("- `" + entree["chemin"] + "` (" + entree["type"] + ")")  # MUT-ECHAPPEMENT'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-echappement-cas"
+  MUT_NOM=$'01-x\n`y'
+  mkdir -p "$DIR_CAS/.planning/cycles/$MUT_NOM"
+  printf '%s' '{"planning_version": "cycles-v1"}' > "$DIR_CAS/.planning/config.json"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-echappement-out.txt" 2>"$WORK/mut-echappement-err.txt" ); RC_M=$?
+  if ! _verifier_plantage ECHAPPEMENT "présence de \\u000a littéral dans INDEX.md (R45)" "$WORK/mut-echappement-out.txt" "$WORK/mut-echappement-err.txt" "$RC_M"; then
+    if grep -qF '\u000a' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null; then
+      komut ECHAPPEMENT "présence de \\u000a littéral dans INDEX.md" "présent (original)" "présent (mutant non opposable)"
+    else
+      MUT_LIGNES="$(wc -l < "$DIR_CAS/.planning/INDEX.md" 2>/dev/null | tr -d ' ')"
+      okmut ECHAPPEMENT "présence de \\u000a littéral dans INDEX.md · attendu (original) : présent, 11 lignes · obtenu (mutant) : absent, $MUT_LIGNES lignes (le saut de ligne brut du nom casse le format une-entrée-par-ligne)"
+    fi
+  fi
+fi
+
+# ---------- MUT-TYPE-ECRITURE — garde de type sur les emplacements de SORTIE neutralisée ---------
+# Distincte de MUT-HORS-MODELE (classement en LECTURE) : celle-ci vise le refus en ÉCRITURE, posé
+# par 44-01 dans appliquer_ecritures, rejoué par R42 (volet écriture).
+if make_recalc_mutant TYPE-ECRITURE \
+  'if os.path.lexists(chemin_cible) and not os.path.isfile(chemin_cible):' \
+  'if False:  # MUT-TYPE-ECRITURE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-type-ecriture-cas"
+  materialiser modele-mauvais-type "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-type-ecriture-out.txt" 2>"$WORK/mut-type-ecriture-err.txt" ); RC_M=$?
+  if ! _verifier_plantage TYPE-ECRITURE "message stderr de R42 (écriture, INDEX.md dossier)" "$WORK/mut-type-ecriture-out.txt" "$WORK/mut-type-ecriture-err.txt" "$RC_M"; then
+    if grep -q "emplacement occupé" "$WORK/mut-type-ecriture-err.txt" 2>/dev/null; then
+      komut TYPE-ECRITURE "message stderr de R42 (écriture)" "emplacement occupé ... (original)" "emplacement occupé ... (mutant non opposable)"
+    else
+      okmut TYPE-ECRITURE "message stderr de R42 (écriture) · attendu (original) : « emplacement occupé par autre chose qu'un fichier régulier » citant INDEX.md · obtenu (mutant) : $(tr '\n' ' ' < "$WORK/mut-type-ecriture-err.txt" 2>/dev/null) (rattrapé par le filet de sécurité générique, jamais une trace Python)"
+    fi
+  fi
+fi
+
+# ================================================================================================
+# Mutants du cache incrémental (44-04, Tâche 2) — MUT-SIGNATURE-TEMPS, MUT-SCHEMA-CACHE,
+# MUT-LIVRABLES-CACHE, MUT-CACHE-LECTURE-SEULE.
+# ================================================================================================
+
+# ---------- MUT-SIGNATURE-TEMPS — signature construite sur la date de modification (stat) --------
+# Remplacement authoré dans la suite (jamais une API de date de fichier dans le moteur livré) :
+# une signature qui varie avec le SEUL horodatage du fichier plutôt qu'avec son contenu.
+if make_recalc_mutant SIGNATURE-TEMPS \
+  'h = hash_contenu(chemin_fichier)' \
+  'h = str(os.path.getmtime(chemin_fichier)) if os.path.exists(chemin_fichier) else None  # MUT-SIGNATURE-TEMPS'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-signature-temps-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+  for f in CADRAGE.md PLAN.md CLOTURE.md VERDICT.md SUMMARY.md; do
+    touch "$DIR_CAS/.planning/cycles/01-traceur/phases/01-livree/$f"
+  done
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-signature-temps-r52-out.json" 2>"$WORK/mut-signature-temps-r52-err.txt" ); RC_R52=$?
+  R52_RECALCULEES_M="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/mut-signature-temps-r52-out.json" 2>/dev/null || echo '?')"
+  MUT_VERDICT="$DIR_CAS/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+  cp "$MUT_VERDICT" "$WORK/mut-signature-temps-verdict-ref.md"
+  "$PYBIN" -c "
+p = '$MUT_VERDICT'
+t = open(p, encoding='utf-8').read()
+t2 = t.replace('resultat: passé', 'resultat: échec')
+open(p, 'w', encoding='utf-8').write(t2)
+"
+  touch -r "$WORK/mut-signature-temps-verdict-ref.md" "$MUT_VERDICT"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-signature-temps-r53-out.json" 2>"$WORK/mut-signature-temps-r53-err.txt" ); RC_R53=$?
+  R53_RECALCULEES_M="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/mut-signature-temps-r53-out.json" 2>/dev/null || echo '?')"
+  if ! _verifier_plantage SIGNATURE-TEMPS "unites_recalculees de R52/R53" "$WORK/mut-signature-temps-r53-out.json" "$WORK/mut-signature-temps-r53-err.txt" "$RC_R53"; then
+    if [ "$R52_RECALCULEES_M" = "0" ] && [ "$R53_RECALCULEES_M" != "0" ]; then
+      komut SIGNATURE-TEMPS "unites_recalculees de R52/R53" "0 puis >=1 (original)" "0 puis >=1 (mutant non opposable)"
+    else
+      okmut SIGNATURE-TEMPS "unites_recalculees de R52/R53 · attendu (original) : R52=0 (touch seul), R53>=1 (contenu changé) · obtenu (mutant) : R52=$R52_RECALCULEES_M, R53=$R53_RECALCULEES_M (au moins un des deux est inversé)"
+    fi
+  fi
+fi
+
+# ---------- MUT-SCHEMA-CACHE — contrôle de cache_schema_version neutralisé -----------------------
+if make_recalc_mutant SCHEMA-CACHE \
+  'if donnees.get("cache_schema_version") != CACHE_SCHEMA_VERSION:' \
+  'if False:  # MUT-SCHEMA-CACHE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-schema-cache-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+  "$PYBIN" -c "
+import json
+p = '$DIR_CAS/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+d['cache_schema_version'] = 999
+json.dump(d, open(p, 'w', encoding='utf-8'))
+"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-schema-cache-out.json" 2>"$WORK/mut-schema-cache-err.txt" ); RC_M=$?
+  if ! _verifier_plantage SCHEMA-CACHE "champ cache du rapport de R55 (version 999)" "$WORK/mut-schema-cache-out.json" "$WORK/mut-schema-cache-err.txt" "$RC_M"; then
+    CACHE_M="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache"])' "$WORK/mut-schema-cache-out.json" 2>/dev/null || echo '?')"
+    if [ "$CACHE_M" = "autre-format" ]; then
+      komut SCHEMA-CACHE "champ cache du rapport (version 999)" "autre-format (original)" "autre-format (mutant non opposable)"
+    else
+      okmut SCHEMA-CACHE "champ cache du rapport (version 999) · attendu (original) : autre-format · obtenu (mutant) : $CACHE_M (un cache d'un autre schéma est cru)"
+    fi
+  fi
+fi
+
+# ---------- MUT-LIVRABLES-CACHE — existence des livrables non revue à la reprise -----------------
+if make_recalc_mutant LIVRABLES-CACHE \
+  'if livrables_actuels == livrables_cache:' \
+  'if True:  # MUT-LIVRABLES-CACHE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-livrables-cache-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+  rm -f "$DIR_CAS/livrables/rapport.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-livrables-cache-out.json" 2>"$WORK/mut-livrables-cache-err.txt" ); RC_M=$?
+  if ! _verifier_plantage LIVRABLES-CACHE "état de la phase de R58 après suppression du livrable" "$WORK/mut-livrables-cache-out.json" "$WORK/mut-livrables-cache-err.txt" "$RC_M"; then
+    if grep -qF 'livrable absent : livrables/rapport.md' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null; then
+      komut LIVRABLES-CACHE "état de la phase de R58 après suppression du livrable" "indéterminé, livrable-absent (original)" "indéterminé, livrable-absent (mutant non opposable)"
+    else
+      okmut LIVRABLES-CACHE "état de la phase de R58 après suppression du livrable · attendu (original) : indéterminé (livrable-absent:livrables/rapport.md) · obtenu (mutant) : $(grep 'cycles/01-traceur' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null) (l'état repris du cache reste close malgré le livrable manquant)"
+    fi
+  fi
+fi
+
+# ---------- MUT-CACHE-LECTURE-SEULE — la lecture seule chargerait le cache -----------------------
+if make_recalc_mutant CACHE-LECTURE-SEULE \
+  '(deriver_cycle(c, racine_lab) for c in modele["cycles"]),' \
+  '(deriver_cycle(c, racine_lab, {"existant": (charger_cache(planning_abs)[1].get("unites") or {}), "nouveau": {}, "recalculees": 0, "reprises": 0}) for c in modele["cycles"]),  # MUT-CACHE-LECTURE-SEULE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-cache-lecture-seule-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+  "$PYBIN" -c "
+import json
+p = '$DIR_CAS/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+cle = 'cycles/01-traceur/phases/02-en-cours'
+entree = d['unites'][cle]
+entree['etat'] = 'close'
+entree['raison'] = None
+json.dump(d, open(p, 'w', encoding='utf-8'))
+"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-cache-lecture-seule-out.json" 2>"$WORK/mut-cache-lecture-seule-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CACHE-LECTURE-SEULE "état de 02-en-cours en --read-only sur cache forgé (R57)" "$WORK/mut-cache-lecture-seule-out.json" "$WORK/mut-cache-lecture-seule-err.txt" "$RC_M"; then
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][1]["etat"])' "$WORK/mut-cache-lecture-seule-out.json" 2>/dev/null || echo '?')"
+    if [ "$ETAT_M" = "à exécuter" ]; then
+      komut CACHE-LECTURE-SEULE "état de 02-en-cours en --read-only sur cache forgé" "à exécuter (original, cache jamais lu)" "à exécuter (mutant non opposable)"
+    else
+      okmut CACHE-LECTURE-SEULE "état de 02-en-cours en --read-only sur cache forgé · attendu (original) : à exécuter (cache jamais consulté) · obtenu (mutant) : $ETAT_M (le JSON de lecture seule reflète l'entrée forgée)"
     fi
   fi
 fi
