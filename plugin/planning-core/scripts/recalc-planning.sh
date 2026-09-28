@@ -66,6 +66,7 @@ esac
 
 "$PYBIN" - "$PLANNING_DIR" "$READ_ONLY" "$DETECT_GSD_SH" <<'PY_RECALC_PLANNING_EOF'
 import errno
+import hashlib
 import json
 import os
 import re
@@ -73,10 +74,12 @@ import stat
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from datetime import datetime
 
 # --- Constantes du contrat -----------------------------------------------------------------
 SCHEMA_ADHESION = "cycles-v1"
+CACHE_SCHEMA_VERSION = 1
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 NOM_UNITE = re.compile(r"^[0-9]{2,}-[\w.-]+$")
 ANNEXES = frozenset({"_bancs", "recherches", "intel", "sketches", "_archive", "registres"})
@@ -223,11 +226,7 @@ def _lire_liste_indentee(corps, depart):
 def _lire_frontmatter_fichier(chemin):
     """Lit chemin en frontmatter strict : fichier régulier requis (lstat, non suivi), ouverture
     O_NOFOLLOW, décodage UTF-8 strict."""
-    try:
-        est_regulier = stat.S_ISREG(os.lstat(chemin).st_mode)
-    except OSError:
-        est_regulier = False
-    if not est_regulier:
+    if not est_fichier_regulier(chemin):
         return ("absent", {})
     try:
         descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
@@ -238,11 +237,18 @@ def _lire_frontmatter_fichier(chemin):
     return lire_frontmatter(texte)
 
 
-def _est_regulier(chemin):
+def est_fichier_regulier(chemin):
+    """Garde UNIQUE de régularité (44-04, P44-D-04/T-44-17) : lstat + S_ISREG, jamais de suivi de
+    lien. Appelée avant toute ouverture d'un fichier du modèle — la lecture qui suit garde
+    `SANS_SUIVI_DE_LIEN` (O_NOFOLLOW) en second rideau, jamais le seul rempart."""
     try:
         return stat.S_ISREG(os.lstat(chemin).st_mode)
     except OSError:
         return False
+
+
+def _est_regulier(chemin):
+    return est_fichier_regulier(chemin)
 
 
 # --- Adhésion (P44-D-02) --------------------------------------------------------------------
@@ -252,11 +258,7 @@ def verifier_adhesion(planning):
     clé absente, autre valeur, valeur non chaîne sont TOUS non adhérents."""
     chemin = os.path.join(planning, "config.json")
     resultat = {"attendue": SCHEMA_ADHESION, "declaree": None, "adherente": False, "config": "absent"}
-    try:
-        est_regulier = stat.S_ISREG(os.lstat(chemin).st_mode)
-    except OSError:
-        est_regulier = False
-    if not est_regulier:
+    if not est_fichier_regulier(chemin):
         return resultat
     try:
         descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
@@ -401,7 +403,181 @@ def scanner(planning):
             "cycle_md": _est_regulier(os.path.join(chemin_cycle_abs, "CYCLE.md")),
             "phases": phases,
         })
-    return {"cycles": cycles, "hors_modele": []}
+    return {"cycles": cycles, "hors_modele": classer_entrees(planning)}
+
+
+# --- Hors modèle et garde-fous de chemin (44-04, P44-D-04) ----------------------------------
+NOMS_MODELE_RACINE_DOSSIERS = ("cycles", "baux", "missions")
+NOMS_MODELE_RACINE_FICHIERS = (
+    "PROJECT.md", "REQUIREMENTS.md", "config.json", "INDEX.md", "STATE.md",
+    "cloture.log", ".recalc-cache.json",
+)
+
+
+def _entrees_scandir(dossier):
+    """Liste triée par nom des os.DirEntry d'un dossier ; [] si absent, illisible ou non-dossier."""
+    try:
+        return sorted(os.scandir(dossier), key=lambda e: e.name)
+    except OSError:
+        return []
+
+
+def _type_entree_de(entree):
+    """('dossier'|'fichier'|'lien'|'autre') depuis un os.DirEntry — jamais un suivi de lien."""
+    try:
+        if entree.is_symlink():
+            return "lien"
+        if entree.is_dir(follow_symlinks=False):
+            return "dossier"
+        if entree.is_file(follow_symlinks=False):
+            return "fichier"
+    except OSError:
+        pass
+    return "autre"
+
+
+def echapper_nom(nom):
+    """Échappe tout caractère de catégorie Unicode C* en `\\uXXXX` (quatre chiffres hexadécimaux
+    en minuscules, complétés de zéros à gauche — même convention que `\\u000a`) pour un point de
+    code dans le plan de base (<= U+FFFF) ; au-delà du plan de base multilingue Unicode (P44-D-17,
+    correction de portée), la forme `\\UXXXXXXXX` (huit chiffres hexadécimaux en minuscules)
+    reprend la convention littérale Python pour un point de code supplémentaire — un private-use
+    de plan supplémentaire (catégorie Co) ou tout autre caractère de contrôle au-delà du BMP ne
+    serait sinon ni représentable ni tronqué en silence. L'accent grave devient `` \\` ``."""
+    resultat = []
+    for c in nom:
+        if c == "`":
+            resultat.append("\\`")
+            continue
+        if unicodedata.category(c).startswith("C"):
+            point_de_code = ord(c)
+            if point_de_code <= 0xFFFF:
+                resultat.append("\\u{:04x}".format(point_de_code))
+            else:
+                resultat.append("\\U{:08x}".format(point_de_code))
+            continue
+        resultat.append(c)
+    return "".join(resultat)
+
+
+def _classer_racine(planning):
+    """Racine de `.planning/` : les six annexes et les emplacements du modèle doivent être du bon
+    type (jamais lus s'ils sont annexes) ; tout le reste, un emplacement du mauvais type et tout
+    lien symbolique -> hors modèle (44-04 § Classement)."""
+    hors = []
+    for entree in _entrees_scandir(planning):
+        nom = entree.name
+        type_ = _type_entree_de(entree)
+        if type_ == "lien":
+            hors.append({"chemin": nom, "type": "lien"})
+            continue
+        if nom in ANNEXES:
+            if type_ != "dossier":
+                hors.append({"chemin": nom, "type": type_})
+            continue  # annexe reconnue : jamais lue, jamais descendue
+        if nom in NOMS_MODELE_RACINE_DOSSIERS:
+            if type_ != "dossier":
+                hors.append({"chemin": nom, "type": type_})
+            continue
+        if nom in NOMS_MODELE_RACINE_FICHIERS:
+            if type_ != "fichier":
+                hors.append({"chemin": nom, "type": type_})
+            continue
+        hors.append({"chemin": nom, "type": type_})
+    return hors
+
+
+def _classer_plan_entrees(chemin_plan_abs, chemin_plan_rel, hors):
+    for entree in _entrees_scandir(chemin_plan_abs):
+        nom = entree.name
+        chemin_rel = chemin_plan_rel + "/" + nom
+        if nom in NOMS_MODELE_PLAN:
+            continue  # nom reconnu ; le type reste le ressort de Φ1, jamais de classer_entrees
+        hors.append({"chemin": chemin_rel, "type": _type_entree_de(entree)})
+
+
+def _classer_plans_dir_entrees(dossier_plans_abs, chemin_plans_rel, hors):
+    for entree in _entrees_scandir(dossier_plans_abs):
+        nom = entree.name
+        type_ = _type_entree_de(entree)
+        chemin_rel = chemin_plans_rel + "/" + nom
+        if type_ == "dossier" and NOM_UNITE.match(nom):  # plan
+            _classer_plan_entrees(os.path.join(dossier_plans_abs, nom), chemin_rel, hors)
+            continue
+        hors.append({"chemin": chemin_rel, "type": type_})
+
+
+def _classer_phase_entrees(chemin_phase_abs, chemin_phase_rel, hors):
+    for entree in _entrees_scandir(chemin_phase_abs):
+        nom = entree.name
+        type_ = _type_entree_de(entree)
+        chemin_rel = chemin_phase_rel + "/" + nom
+        if nom in NOMS_MODELE_PHASE:
+            continue  # nom reconnu ; le type reste le ressort de Φ1, jamais de classer_entrees
+        if nom == "plans":
+            if type_ == "dossier":
+                _classer_plans_dir_entrees(os.path.join(chemin_phase_abs, nom), chemin_rel, hors)
+            else:
+                hors.append({"chemin": chemin_rel, "type": type_})
+            continue
+        hors.append({"chemin": chemin_rel, "type": type_})
+
+
+def _classer_phases_dir_entrees(dossier_phases_abs, chemin_phases_rel, hors):
+    for entree in _entrees_scandir(dossier_phases_abs):
+        nom = entree.name
+        type_ = _type_entree_de(entree)
+        chemin_rel = chemin_phases_rel + "/" + nom
+        if type_ == "dossier" and NOM_UNITE.match(nom):  # phase
+            _classer_phase_entrees(os.path.join(dossier_phases_abs, nom), chemin_rel, hors)
+            continue
+        hors.append({"chemin": chemin_rel, "type": type_})
+
+
+def _classer_cycle_entrees(chemin_cycle_abs, chemin_cycle_rel, hors):
+    for entree in _entrees_scandir(chemin_cycle_abs):
+        nom = entree.name
+        type_ = _type_entree_de(entree)
+        chemin_rel = chemin_cycle_rel + "/" + nom
+        if nom == "CYCLE.md":
+            continue  # nom reconnu ; le type reste le ressort de Φ1 (cycle_md), jamais ici
+        if nom == "phases":
+            if type_ == "dossier":
+                _classer_phases_dir_entrees(os.path.join(chemin_cycle_abs, nom), chemin_rel, hors)
+            else:
+                hors.append({"chemin": chemin_rel, "type": type_})
+            continue
+        hors.append({"chemin": chemin_rel, "type": type_})
+
+
+def _classer_arbre_cycles(planning):
+    """Arbre `cycles/` : dossiers d'unité au nom valide descendus récursivement ; tout autre nom,
+    un nom d'unité invalide, un dossier d'unité en lien -> hors modèle, jamais parcouru."""
+    hors = []
+    dossier_cycles = os.path.join(planning, "cycles")
+    try:
+        cycles_est_dossier_reel = stat.S_ISDIR(os.lstat(dossier_cycles).st_mode)
+    except OSError:
+        cycles_est_dossier_reel = False
+    if not cycles_est_dossier_reel:
+        return hors
+    for entree in _entrees_scandir(dossier_cycles):
+        nom = entree.name
+        type_ = _type_entree_de(entree)
+        chemin_rel = "cycles/" + nom
+        if type_ == "dossier" and NOM_UNITE.match(nom):  # cycle
+            _classer_cycle_entrees(os.path.join(dossier_cycles, nom), chemin_rel, hors)
+            continue
+        hors.append({"chemin": chemin_rel, "type": type_})
+    return hors
+
+
+def classer_entrees(planning):
+    """(hors_modele : liste triée de {chemin, type}) — racine puis arbre `cycles/`, interface
+    44-04 § Classement. Jamais un `os.listdir` (ni un `os.scandir`) dans un lien ni dans une
+    annexe."""
+    hors = _classer_racine(planning) + _classer_arbre_cycles(planning)
+    return sorted(hors, key=lambda e: e["chemin"])
 
 
 def _est_dossier(chemin):
@@ -513,11 +689,7 @@ def _verifier_fichiers_reguliers(chemin_abs, entrees, noms_modele):
         if nom not in entrees:
             continue
         chemin = os.path.join(chemin_abs, nom)
-        try:
-            est_regulier = stat.S_ISREG(os.lstat(chemin).st_mode)
-        except OSError:
-            est_regulier = False
-        if not est_regulier:
+        if not est_fichier_regulier(chemin):
             return "fichier-non-regulier:" + nom
         try:
             descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
@@ -619,6 +791,135 @@ def deriver_feuille(unite, racine_lab):
     return _r1_a_r8(chemin_abs, entrees, racine_lab, meta)
 
 
+# --- Incrémental par hash du contenu (44-04, P44-D-13) --------------------------------------
+def hash_contenu(chemin):
+    """sha256 du contenu d'un fichier régulier, lu par blocs, ouvert `SANS_SUIVI_DE_LIEN` après
+    `est_fichier_regulier` — jamais None silencieux vers une confiance aveugle : None si non
+    régulier ou illisible, jamais un hash d'un contenu partiel."""
+    if not est_fichier_regulier(chemin):
+        return None
+    try:
+        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+    except OSError:
+        return None
+    hacheur = hashlib.sha256()
+    try:
+        with os.fdopen(descripteur, "rb") as fh:
+            while True:
+                bloc = fh.read(65536)
+                if not bloc:
+                    break
+                hacheur.update(bloc)
+    except OSError:
+        return None
+    return hacheur.hexdigest()
+
+
+def signature_unite(unite, noms_modele, chemin_cadrage_supplementaire=None):
+    """sha256 du texte canonique (44-04, P44-D-13) : liste triée des entrées du dossier de
+    l'unité (nom + type) + (nom, sha256 du contenu) de chaque fichier de `noms_modele` PRÉSENT et
+    RÉGULIER + pour un plan (`chemin_cadrage_supplementaire` fourni), le sha256 du CADRAGE.md de
+    sa phase. Jamais une API de date de fichier — le contenu seul, jamais le moment où il a été
+    écrit."""
+    chemin_abs = unite["chemin_abs"]
+    lignes = []
+    for entree in _entrees_scandir(chemin_abs):
+        lignes.append("entree\t" + entree.name + "\t" + _type_entree_de(entree))
+    for nom in sorted(noms_modele):
+        chemin_fichier = os.path.join(chemin_abs, nom)
+        h = hash_contenu(chemin_fichier)
+        if h is not None:
+            lignes.append("fichier\t" + nom + "\t" + h)
+    if chemin_cadrage_supplementaire is not None:
+        h = hash_contenu(chemin_cadrage_supplementaire)
+        if h is not None:
+            lignes.append("cadrage\t" + h)
+    texte = "\n".join(lignes)
+    return hashlib.sha256(texte.encode("utf-8")).hexdigest()
+
+
+def _lire_ecrit_reel(chemin_abs):
+    """Liste triée des entrées `ecrit:` valides de PLAN.md, [] si absent, illisible ou invalide —
+    ne DÉCIDE rien (R2/R4 restent le seul juge de l'état), seulement ce que le cache doit
+    surveiller pour la reprise (P44-D-13, existence des livrables revue à chaque passage)."""
+    plan_statut, plan_donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "PLAN.md"))
+    if plan_statut != "ok":
+        return []
+    valeurs = _valeurs_ecrit(plan_donnees)
+    if not valeurs:
+        return []
+    return sorted(v for v in valeurs if entree_ecrit_valide(v))
+
+
+def charger_cache(planning):
+    """(statut, donnees) — statut in {'absent', 'illisible', 'autre-format', 'valide'}. Tout
+    statut hors 'valide' -> recalcul complet, jamais une confiance aveugle (44-04, P44-D-13) :
+    absent, lien symbolique, non régulier, JSON invalide, racine non objet, ou d'un
+    `cache_schema_version`/`moteur` différent sont TOUS traités à égalité."""
+    chemin = os.path.join(planning, ".recalc-cache.json")
+    if not est_fichier_regulier(chemin):
+        try:
+            os.lstat(chemin)
+        except OSError:
+            return ("absent", {})
+        return ("illisible", {})
+    try:
+        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        with os.fdopen(descripteur, "r", encoding="utf-8") as fh:
+            texte = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return ("illisible", {})
+    try:
+        donnees = json.loads(texte)
+    except ValueError:
+        return ("illisible", {})
+    if not isinstance(donnees, dict):
+        return ("autre-format", {})
+    if donnees.get("cache_schema_version") != CACHE_SCHEMA_VERSION:
+        return ("autre-format", {})
+    if donnees.get("moteur") != "recalc-planning":
+        return ("autre-format", {})
+    unites = donnees.get("unites")
+    if not isinstance(unites, dict):
+        return ("autre-format", {})
+    for cle, valeur in unites.items():
+        if not isinstance(cle, str) or not isinstance(valeur, dict):
+            return ("autre-format", {})
+        if "signature" not in valeur or "etat" not in valeur:
+            return ("autre-format", {})
+    return ("valide", donnees)
+
+
+def _deriver_feuille_cache(unite, racine_lab, cache_ctx, chemin_cadrage_supplementaire=None):
+    """Enveloppe de `deriver_feuille` consciente du cache (44-04, P44-D-13) : `cache_ctx` None ->
+    jamais consulté ni écrit (mode lecture seule, T-44-21) — délègue alors directement à
+    `deriver_feuille`. Sinon, reprend l'entrée du cache existant SI la signature ET l'existence
+    des livrables re-vérifiée à cet instant concordent toutes deux ; sinon recalcule et enregistre
+    la nouvelle entrée."""
+    if cache_ctx is None:
+        return deriver_feuille(unite, racine_lab)
+    chemin_rel = unite["chemin_rel"]
+    signature = signature_unite(unite, NOMS_MODELE_PLAN, chemin_cadrage_supplementaire)
+    entree_cache = (cache_ctx["existant"] or {}).get(chemin_rel)
+    if isinstance(entree_cache, dict) and entree_cache.get("signature") == signature:
+        ecrit_cache = entree_cache.get("ecrit") or []
+        livrables_cache = entree_cache.get("livrables") or {}
+        livrables_actuels = {v: os.path.lexists(os.path.join(racine_lab, v)) for v in ecrit_cache}
+        if livrables_actuels == livrables_cache:
+            cache_ctx["nouveau"][chemin_rel] = entree_cache
+            cache_ctx["reprises"] += 1
+            return (entree_cache.get("etat"), entree_cache.get("raison"), dict(entree_cache.get("meta") or {}))
+    etat, raison, meta = deriver_feuille(unite, racine_lab)
+    ecrit_reel = _lire_ecrit_reel(unite["chemin_abs"])
+    livrables_reel = {v: os.path.lexists(os.path.join(racine_lab, v)) for v in ecrit_reel}
+    cache_ctx["nouveau"][chemin_rel] = {
+        "signature": signature, "ecrit": ecrit_reel, "livrables": livrables_reel,
+        "etat": etat, "raison": raison, "meta": meta,
+    }
+    cache_ctx["recalculees"] += 1
+    return (etat, raison, meta)
+
+
 # --- Agrégation ----------------------------------------------------------------------------------
 def agreger(etats):
     """Première unité (déjà triée par nom) dont l'état n'est ni close ni abandonné ni remplacé ;
@@ -640,22 +941,24 @@ def _nom_premier_fichier_execution(entrees, a_plans_dir):
     return None
 
 
-def _agreger_plans(phase, racine_lab):
+def _agreger_plans(phase, racine_lab, cache_ctx=None):
     """Φ5, `plans/` présent sans fichier de plan au niveau phase : agrégation des plans de la
-    phase (P44-D-07). `plans/` sans aucun plan -> `à planifier`."""
+    phase (P44-D-07). `plans/` sans aucun plan -> `à planifier`. `cache_ctx` : voir
+    `_deriver_feuille_cache` — None en lecture seule (jamais consulté ni écrit)."""
     chemin_abs = phase["chemin_abs"]
     dossier_plans = os.path.join(chemin_abs, "plans")
     noms_plans = _lister_noms_unite(dossier_plans)
     meta_phase = {"auteur": "inconnu", "tentative": None, "hash_juge": None, "type_derivation": "plans-agregation"}
     if not noms_plans:
         return ("à planifier", None, meta_phase, [])
+    chemin_cadrage_phase = os.path.join(chemin_abs, "CADRAGE.md")
     plans_derives = []
     for nom_plan in noms_plans:
         chemin_plan_abs = os.path.join(dossier_plans, nom_plan)
         chemin_plan_rel = phase["chemin_rel"] + "/plans/" + nom_plan
         entrees_plan = _lister_entrees(chemin_plan_abs)
         unite = {"nom": nom_plan, "chemin_abs": chemin_plan_abs, "chemin_rel": chemin_plan_rel, "entrees": entrees_plan}
-        etat, raison, meta = deriver_feuille(unite, racine_lab)
+        etat, raison, meta = _deriver_feuille_cache(unite, racine_lab, cache_ctx, chemin_cadrage_phase)
         plans_derives.append({
             "nom": nom_plan, "chemin": chemin_plan_rel, "etat": etat, "raison": raison,
             "auteur": meta["auteur"], "tentative": meta["tentative"], "hash_juge": meta["hash_juge"],
@@ -673,8 +976,9 @@ def _agreger_plans(phase, racine_lab):
     return ("abandonné", None, meta_phase, plans_derives)
 
 
-def deriver_phase(phase, racine_lab):
-    """Φ0 à Φ5, dans l'ordre — la première règle qui s'applique gagne. (état, raison, méta, plans)."""
+def deriver_phase(phase, racine_lab, cache_ctx=None):
+    """Φ0 à Φ5, dans l'ordre — la première règle qui s'applique gagne. (état, raison, méta,
+    plans). `cache_ctx` : voir `_deriver_feuille_cache` — None en lecture seule."""
     chemin_abs = phase["chemin_abs"]
     entrees = phase["entrees"]
     meta = _meta_unite(chemin_abs, entrees)
@@ -716,19 +1020,19 @@ def deriver_phase(phase, racine_lab):
         nom = next((n for n in ("CLOTURE.md", "VERDICT.md", "SUMMARY.md") if n in entrees), None)
         if nom is not None:
             return ("indéterminé", "fichier-de-plan-au-niveau-phase:" + nom, meta, [])
-        return _agreger_plans(phase, racine_lab)
-    etat, raison_feuille, meta_feuille = _r1_a_r8(chemin_abs, entrees, racine_lab, meta)
+        return _agreger_plans(phase, racine_lab, cache_ctx)
+    etat, raison_feuille, meta_feuille = _deriver_feuille_cache(phase, racine_lab, cache_ctx)
     return (etat, raison_feuille, meta_feuille, [])
 
 
-def deriver_cycle(cycle, racine_lab):
+def deriver_cycle(cycle, racine_lab, cache_ctx=None):
     chemin = cycle["chemin_rel"]
     if not cycle["cycle_md"]:
         return {"nom": cycle["nom"], "chemin": chemin, "etat": "indéterminé", "raison": "CYCLE.md-absent",
                 "phase_courante": None, "phases": []}
     phases_derivees = []
     for phase in cycle["phases"]:
-        etat, raison, meta, plans = deriver_phase(phase, racine_lab)
+        etat, raison, meta, plans = deriver_phase(phase, racine_lab, cache_ctx)
         phases_derivees.append({
             "nom": phase["nom"], "chemin": phase["chemin_rel"], "etat": etat, "raison": raison,
             "auteur": meta["auteur"], "tentative": meta["tentative"], "hash_juge": meta["hash_juge"],
@@ -940,8 +1244,8 @@ def rendre_index(derivation, lignes_journal):
     lignes.append("")
     hors_modele = derivation.get("hors_modele") or []
     if hors_modele:
-        for entree in sorted(hors_modele):
-            lignes.append("- " + entree)
+        for entree in hors_modele:  # déjà triée par classer_entrees
+            lignes.append("- `" + echapper_nom(entree["chemin"]) + "` (" + entree["type"] + ")")
     else:
         lignes.append("_Aucune entrée._")
     lignes.append("")
@@ -980,13 +1284,18 @@ def rendre_state(derivation):
 # --- Écriture atomique et application (SEUL appelant : appliquer_ecritures) -------------------
 def ecrire_si_different(chemin, contenu):
     """Compare aux octets existants, ne réécrit que s'ils diffèrent — fichier temporaire dans le
-    même dossier + os.replace (jamais un save() non atomique)."""
+    même dossier + os.replace (jamais un save() non atomique). Un emplacement existant qui n'est
+    PAS un fichier régulier (lien symbolique compris — 44-04, R56) n'est jamais comparé à travers
+    lui : il compte comme différent, et `os.replace` le remplace par un fichier régulier — jamais
+    une écriture qui traverserait un lien en silence."""
     octets = contenu.encode("utf-8")
-    try:
-        with open(chemin, "rb") as fh:
-            existant = fh.read()
-    except OSError:
-        existant = None
+    existant = None
+    if est_fichier_regulier(chemin):
+        try:
+            with open(chemin, "rb") as fh:
+                existant = fh.read()
+        except OSError:
+            existant = None
     if existant == octets:
         return False
     dossier = os.path.dirname(chemin) or "."
@@ -1005,7 +1314,7 @@ def ecrire_si_different(chemin, contenu):
     return True
 
 
-def appliquer_ecritures(planning, racine_lab, derivation):
+def appliquer_ecritures(planning, racine_lab, derivation, cache_ctx, statut_cache):
     try:
         planning_est_lien = stat.S_ISLNK(os.lstat(planning).st_mode)
     except OSError:
@@ -1032,6 +1341,16 @@ def appliquer_ecritures(planning, racine_lab, derivation):
         ecrits.append("INDEX.md")
     if ecrire_si_different(os.path.join(planning, "STATE.md"), rendre_state(derivation)):
         ecrits.append("STATE.md")
+    nouveau_cache_texte = json.dumps(
+        {
+            "cache_schema_version": CACHE_SCHEMA_VERSION,
+            "moteur": "recalc-planning",
+            "unites": cache_ctx["nouveau"],
+        },
+        sort_keys=True, ensure_ascii=False,
+    )
+    if ecrire_si_different(os.path.join(planning, ".recalc-cache.json"), nouveau_cache_texte):
+        ecrits.append(".recalc-cache.json")
     unites = sum(len(c["phases"]) for c in derivation["cycles"])
     rapport = {
         "moteur": "recalc-planning",
@@ -1039,6 +1358,9 @@ def appliquer_ecritures(planning, racine_lab, derivation):
         "ecrits": sorted(ecrits),
         "cloture_ajouts": len(nouvelles_lignes),
         "unites": unites,
+        "cache": statut_cache,
+        "unites_recalculees": cache_ctx["recalculees"],
+        "unites_reprises": cache_ctx["reprises"],
     }
     return (0, rapport)
 
@@ -1074,13 +1396,15 @@ def main():
     planning_abs = os.path.abspath(planning_arg)
     racine_lab = os.path.dirname(planning_abs)
     modele = scanner(planning_abs)
-    cycles_derives = sorted(
-        (deriver_cycle(c, racine_lab) for c in modele["cycles"]),
-        key=lambda c: c["chemin"],
-    )
-    derivation = {"cycles": cycles_derives, "hors_modele": modele["hors_modele"]}
 
     if mode_lecture_seule:
+        # Le cache n'est JAMAIS consulté ni écrit en lecture seule (T-44-21, P44-D-02a) : la
+        # dérivation ci-dessous n'a aucune connaissance du cache (cache_ctx=None par défaut).
+        cycles_derives = sorted(
+            (deriver_cycle(c, racine_lab) for c in modele["cycles"]),
+            key=lambda c: c["chemin"],  # tri, lecture seule
+        )
+        derivation = {"cycles": cycles_derives, "hors_modele": modele["hors_modele"]}
         adhesion = verifier_adhesion(planning_abs)
         lignes_existantes, statut_journal = lire_journal(planning_abs)
         cloture_a_ajouter = [
@@ -1120,7 +1444,27 @@ def main():
         )
         sys.exit(3)
 
-    code, rapport = appliquer_ecritures(planning_abs, racine_lab, derivation)
+    # Cache chargé et consulté UNIQUEMENT ici — après les deux refus (P44-D-02, P44-D-02a), sur
+    # le chemin d'écriture garanti (44-04, T-44-21).
+    statut_cache, donnees_cache = charger_cache(planning_abs)
+    cache_existant = donnees_cache.get("unites") if statut_cache == "valide" else {}
+    if not isinstance(cache_existant, dict):
+        cache_existant = {}
+    cache_ctx = {"existant": cache_existant, "nouveau": {}, "recalculees": 0, "reprises": 0}
+    cycles_derives = sorted(
+        (deriver_cycle(c, racine_lab, cache_ctx) for c in modele["cycles"]),
+        key=lambda c: c["chemin"],  # tri, écriture
+    )
+    derivation = {"cycles": cycles_derives, "hors_modele": modele["hors_modele"]}
+
+    try:
+        code, rapport = appliquer_ecritures(planning_abs, racine_lab, derivation, cache_ctx, statut_cache)
+    except OSError as exc:
+        # Filet de sécurité (44-04, Rule 2) : une erreur d'entrée-sortie inattendue au-delà des
+        # gardes déjà posées (ex. un emplacement occupé contourné) ne doit jamais remonter comme
+        # une trace Python brute — toujours un message métier et un code de sortie du contrat.
+        print("[recalc-planning] échec d'écriture inattendu : " + str(exc), file=sys.stderr)
+        sys.exit(1)
     if code != 0:
         sys.exit(code)
     print(json.dumps(rapport, sort_keys=True, indent=2, ensure_ascii=False))

@@ -109,6 +109,17 @@ modèle »** dans `INDEX.md` : **jamais refusé, jamais déplacé, jamais suivi*
 La liste des six emplacements annexes vit dans le **code du moteur et dans cette référence**, pas
 dans `config.json` — option explicitement écartée par Willy (P44-D-04).
 
+**Rendu dans `INDEX.md`** (44-04) : `## Hors modèle` puis une ligne `` - `<chemin échappé>`
+(<type>) `` par entrée, triée, `<type>` valant `fichier`, `dossier`, `lien` ou `autre`. Le chemin
+est échappé par `echapper_nom` : tout caractère de catégorie Unicode C* (contrôle, format,
+private-use, substitut) devient `\uXXXX` (quatre chiffres hexadécimaux en minuscules, complétés de
+zéros à gauche) pour un point de code du plan de base (<= U+FFFF), ou `\UXXXXXXXX` (huit chiffres
+hexadécimaux en minuscules, convention littérale Python) au-delà — un private-use de plan
+supplémentaire (ex. U+100000) ne serait sinon ni représentable ni tronqué en silence. L'accent
+grave devient `` \` ``. Aucune autre transformation : un nom d'unité invalide reste lisible tel
+quel, seuls les caractères qui casseraient le format une-entrée-par-ligne ou le délimiteur
+`` ` `` sont touchés.
+
 ## Fichiers du modèle
 
 Un gabarit correspond à chaque fichier ci-dessous, sous
@@ -358,7 +369,16 @@ journalisée ; une ré-entrée au même couple n'est **pas** re-journalisée (d�
 signature sha256 du contenu des fichiers lus par unité. Absent, illisible, lien, ou d'un autre
 `cache_schema_version` → recalcul complet, **jamais** une confiance aveugle. Le cache est
 **incrémental par hash du contenu**, **jamais par `mtime`** (P44-D-13) — un `touch` sans
-changement de contenu ne change rien, un changement de contenu à `mtime` restauré est vu.
+changement de contenu ne change rien, un changement de contenu à `mtime` restauré est vu. Le
+cache n'est **jamais** lu ni écrit en mode `--read-only` (T-44-21).
+
+**Limite connue et acceptée du cache** (registre des menaces T-44-20, 44-04) : une entrée de cache
+**forgée au bon format et à la bonne signature** est reprise sans être rejugée — le cache n'est
+pas un fichier protégé contre l'écriture à la main. Ceci exige déjà un accès en écriture à
+`.planning/`, qui permet tout autant de réécrire n'importe quel fichier du modèle ; ce n'est donc
+pas une surface nouvelle. La protection du cache contre l'écriture à la main est **G6** (Phase 45,
+P44-D-15) — comme pour les autres fichiers générés, elle n'existe pas encore en Phase 44. La
+lecture seule n'est, elle, jamais affectée : elle ne consulte jamais le cache (voir ci-dessus).
 
 **Déterminisme** : deux recalculs sur le même disque rendent des fichiers identiques **octet pour
 octet** (P44-D-10).
