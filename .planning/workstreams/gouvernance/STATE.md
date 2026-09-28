@@ -41,7 +41,7 @@ progress:
 
 Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — EXÉCUTÉE (5/5 plans, 4 vagues), VÉRIFIÉE PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`, commit 267b041). Pas encore CLÔTURÉE dans le ROADMAP (nœud ultérieur du manager). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
 **Last Activity:** 2026-09-28
-**Last Activity Description:** Exécution de la Phase 44 (mission vf-coder, nœud exec-44) : 5 plans exécutés en 4 vagues, mergés successivement, vérifiés PASSED. Bump mineur planning-core v2.8.0 (D-18). Requirements et plans cochés à la main.
+**Last Activity Description:** Correction ciblée lots 1+2 (nœud `exec-44` rouvert, mission vf-coder, quick task `260928-b4c`) : gardes F3/F4/F5, couverture des 8 marqueurs restants de `detection_gsd()`, scindage du code 2/3 du détecteur GSD (lot 2 L1), assainissement structurel du journal (lot 2 L2), corrections de doc (DOC-44-02/03, F6, Banc F1). 171 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `gsd-verifier` PASSED 11/11. Commits `e4898a0`/`aa8420d`/`fda472a`.
 
 ## Progress
 
@@ -52,6 +52,12 @@ Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque
 
 **Stopped At:** Phase 44 exécutée et vérifiée PASSED (5 plans, 4 vagues : 44-01∥44-02 → 44-03 → 44-04 → 44-05, toutes mergées sur `gouvernance/phase-44-moteur`). Prochain geste : clôture de phase (nœud du manager), puis les nœuds `revue-44`/`audit-44`/`banc-44`/`docs` du plan de bataille.
 **Resume File:** `.planning/missions/2026-09-27-gouvernance-44.dag.json`
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260928-b4c | Correction ciblée lots 1+2, Phase 44 : gardes F3/F4/F5, couverture F2, scindage code 2/3 du détecteur GSD, assainissement du journal, corrections doc | 2026-09-28 | fda472a | passed | [260928-b4c-correction-cibl-e-lots-1-2-phase-44-gard](./quick/260928-b4c-correction-cibl-e-lots-1-2-phase-44-gard/) |
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
