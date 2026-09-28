@@ -57,25 +57,40 @@ détecteur rend 0/1/2/3/64, le recalcul les traduit en un verdict `gsd`/`non-gsd
 | Code détecteur | Sens | Verdict `detection_gsd()` | Écriture |
 |---|---|---|---|
 | 0 | moteur GSD actif | `gsd` | refusée |
-| 1, marqueur GSD trouvé (racine ou compartiment) | chaîne GSD absente de la machine, mais le disque porte un marqueur | `gsd` | refusée |
-| 1, aucun marqueur, **et** le disque porte lui-même un socle planning-core + signal de code | chaîne GSD absente, mais la combinaison qu'aurait vue la priorité 3 du détecteur (jamais atteinte : la priorité 1 sort avant) est reproduite indépendamment, en Python pur | `non-concluante` | **refusée** — jamais assimilée au cas suivant, quelle que soit la valeur de `GSD_HOME` ou de l'environnement hérité (audit, lot 3, décision du head sous délégation technique de Willy, session principale, 2026-09-28) |
-| 1, aucun marqueur, aucun signal disque | chaîne GSD absente, aucun signal disque | `non-gsd` | autorisée |
+| 1 | improbable (voir ci-dessous) — fail-closed, jamais une réimplémentation de ses priorités | `non-concluante` | **refusée** |
 | **2** | **signalement de MIGRATION** (socle planning-core + signal de code, ex. `package.json`) | `non-concluante` | **refusée** — jamais assimilée au code 3 (audit B, lot 2 L1, décision du head sous délégation technique de Willy, session principale, 2026-09-28) |
 | 3 | aucun moteur en place, terrain libre | `non-gsd` | autorisée |
 | tout autre code (ex. 64, détecteur défaillant) | non concluant | `non-concluante` | refusée |
 
+**Source UNIQUE de vérité — le VRAI détecteur, jamais une copie (correction de CLASSE, lot 4).**
 Le code 2 a **longtemps** été traité comme le code 3 (même verdict `non-gsd`), laissant écrire sur
-un socle planning-core que le détecteur signalait pourtant lui-même « migration à examiner » — corrigé
-en lot 2 de la correction ciblée de la Phase 44. Le repli du code 1 (chaîne GSD absente) souffrait du
-même trou par un autre chemin : la priorité 1 du détecteur (`detect-gsd-engine.sh`) sort **avant**
-d'avoir pu évaluer sa priorité 3, donc un environnement qui neutralise `GSD_HOME` (forcé vers un
-chemin inexistant, ou simplement hérité) contournait le refus « migration à examiner » sur un socle
-planning-core qui porte pourtant un signal de code — corrigé en lot 3 : `detection_gsd()` reproduit
-la combinaison EN PYTHON PUR, sans jamais sourcer ni dépendre du code de `detect-gsd-engine.sh`
-(P44-D-01b, P44-D-01d), donc indépendamment de toute valeur d'environnement. Ce qu'un lab métier qui
+un socle planning-core que le détecteur signalait pourtant lui-même « migration à examiner » —
+corrigé en lot 2. Le repli du code 1 (chaîne GSD absente) souffrait du même trou par un autre
+chemin : la priorité 1 du détecteur (`detect-gsd-engine.sh`) sort **avant** d'avoir pu évaluer sa
+priorité 3, donc un environnement qui neutralise `GSD_HOME` (forcé vers un chemin inexistant, ou
+simplement hérité) contournait le refus « migration à examiner » — le lot 3 a tenté de fermer ce
+trou en réimplémentant en Python pur les priorités 2/2bis/3 du détecteur (`_porte_marqueur_gsd`,
+`_porte_marqueur_partition`, `_porte_planning_version`, `_a_signal_de_code`). Cette copie a divergé
+mesurément de l'original sur trois cas (revue + audit, ca185e4) : un `package.json` en lien
+symbolique (bash `[ -f ]` le suit, `os.lstat` de la copie non), un `*.xcodeproj` en lien symbolique
+(même écart avec `[ -d ]`), et un `STATE.md` dont les octets UTF-8 sont invalides **après** le
+frontmatter (le décodage UTF-8 strict de la copie échouait sur le fichier entier, awk — qui ne lit
+que le frontmatter — trouvait le marqueur sans encombre). **Le lot 4 supprime cette réimplémentation
+et appelle le VRAI détecteur**, dans un environnement MAÎTRISÉ où `GSD_HOME` est fixé explicitement
+au dossier du détecteur lui-même — un dossier qui EXISTE TOUJOURS quand ce script tourne — plutôt
+que laissé à la cascade par défaut (qui dépend de `GSD_HOME`/`CLAUDE_CONFIG_DIR`/`HOME` hérités).
+Sous cet environnement, la priorité 1 du détecteur (`[ ! -d "$GSD_HOME" ]`) ne peut structurellement
+plus matcher : le code 1 devient improbable, et s'il survient quand même (course, détecteur
+remplacé après le contrôle de régularité), le moteur fait **fail-closed** — refus nommé, jamais une
+retombée en écriture. Propriété résultante : le verdict d'écriture est **indépendant** de
+`GSD_HOME`/`CLAUDE_CONFIG_DIR`/`HOME`/`PATH` hérités et du cwd, et correspond **toujours** à celui
+du vrai détecteur lancé avec un `GSD_HOME` valide (P44-D-01b, P44-D-01d — aucun sourcing, aucune
+dépendance de code vers `detect-gsd-engine.sh` : uniquement un sous-processus, sur son code de
+sortie seul). Détecteur absent, en lien symbolique, non régulier, illisible, ou dont le lancement
+échoue (interpréteur bash introuvable, exception, code hors de {0, 2, 3}) : refus fail-closed
+nommé, zéro fichier écrit ou modifié — jamais une retombée en écriture. Ce qu'un lab métier qui
 contient DU CODE fait de ce refus (le détecteur rend 2, le moteur refuse l'écriture) reste une
-question ouverte, à cadrer en
-Phase 45 (voir ROADMAP.md § Phase 45).
+question ouverte, à cadrer en Phase 45 (voir ROADMAP.md § Phase 45).
 
 ## Arborescence
 
@@ -394,15 +409,21 @@ l'auteur nommé par `statut:` pour une dérogation, `inconnu` sinon — **jamais
 ligne s'ajoute quand le couple verdict/tentative d'une unité **diffère** de sa dernière ligne
 journalisée ; une ré-entrée au même couple n'est **pas** re-journalisée (dédoublonnage).
 
-**Assainissement structurel de chaque champ** (`_jeton_journal`, lot 2 L2 de la correction ciblée
-de la Phase 44) : `chemin`, `auteur`, `verdict` et `tentative` sont chacun réduits à **un seul
-jeton** avant l'écriture — tout espace, tabulation ou retour à la ligne devient `_`, et tout `=`
-devient `_` aussi (aucune séquence `clé=` ne peut plus s'y former). Ces champs viennent de valeurs
-lues sans contrôle de SENS (P44-D-09 : `tentative:` par exemple est recopié tel quel depuis
-`VERDICT.md`, jamais interprété) — sans cet assainissement, une valeur piégée contenant
-`  verdict=… tentative=… date=observation` pouvait produire une ligne illisible par
-`LIGNE_JOURNAL_RE` ou faire lire plusieurs `verdict=`/`tentative=` sur une seule ligne. Toujours
-**aucun contrôle de sens** : la valeur assainie reste lue telle quelle, jamais validée.
+**Assainissement structurel INJECTIF de chaque champ** (`_jeton_journal`, lot 4 de la correction
+ciblée de la Phase 44 — remplace l'assainissement par `_` du lot 2 L2) : `chemin`, `auteur`,
+`verdict` et `tentative` sont chacun encodés en **pourcent** avant l'écriture — tout caractère
+considéré comme un espace par Python (`str.isspace()`, qui couvre U+2028 LIGNE SÉPARATRICE, U+0085
+NEL et tout espace Unicode, pas seulement l'ASCII), tout `=` (qui ouvrirait une séquence `clé=`
+lisible par `LIGNE_JOURNAL_RE`) et le caractère d'échappement `%` lui-même deviennent `%XX` — deux
+chiffres hexadécimaux majuscules par OCTET de l'encodage UTF-8 du caractère. Ces champs viennent de
+valeurs lues sans contrôle de SENS (P44-D-09 : `tentative:` par exemple est recopié tel quel depuis
+`VERDICT.md`, jamais interprété). L'ancien assainissement par `_` n'était **pas injectif** : `"3 4"`
+et `"3_4"` s'écrasaient sur le même jeton `"3_4"`, ce qui pouvait faire **manquer** au
+dédoublonnage une clôture réellement nouvelle (deux valeurs distinctes du même champ, au même
+chemin, confondues) — violation de P44-D-11 (préserver toute clôture réellement nouvelle),
+mesurée par une preuve générative (2000 paires aléatoires, zéro collision) et un round-trip réel à
+deux exécutions successives (`test-recalc-planning.sh`, R-INJECTIF-GENERATIF/R-INJECTIF-ROUNDTRIP).
+Toujours **aucun contrôle de sens** : la valeur assainie reste lue telle quelle, jamais validée.
 
 **`.recalc-cache.json`** : JSON, `cache_schema_version` = `1`, `moteur` = `"recalc-planning"`,
 signature sha256 du contenu des fichiers lus par unité. Absent, illisible, lien, ou d'un autre

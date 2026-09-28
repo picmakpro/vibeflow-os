@@ -66,11 +66,29 @@
   d'environnement (aucune dépendance de code vers `detect-gsd-engine.sh`, P44-D-01b/P44-D-01d).
   Accessoirement : le sous-processus du détecteur résout `bash` par un chemin absolu
   (`shutil.which`) plutôt que par le `PATH` hérité.
+- **Lot 4 (correction de CLASSE)** : la réimplémentation Python des priorités 2/2bis/3 du
+  détecteur, ajoutée au lot 3 pour fermer le repli du code 1, a elle-même divergé mesurément de
+  l'original sur trois cas (revue + audit) : un `package.json` en lien symbolique (bash `[ -f ]`
+  le suit, `os.lstat` non), un `*.xcodeproj` en lien symbolique (même écart avec `[ -d ]`), et un
+  `STATE.md` aux octets UTF-8 invalides **après** le frontmatter (le décodage UTF-8 strict du
+  fichier entier échouait, awk — qui ne lit que le frontmatter — trouvait le marqueur sans
+  encombre). Dans les trois cas, avec `GSD_HOME` inexistant, le moteur écrivait (exit 0) sur un
+  planning que le détecteur réel classe en code 2, et effaçait le marqueur `planning_version`.
+  `detection_gsd()` appelle désormais le VRAI détecteur bash — plus aucune réimplémentation — dans
+  un environnement MAÎTRISÉ (`GSD_HOME` fixé explicitement au dossier du détecteur, qui existe
+  toujours), neutralisant structurellement la priorité 1 du détecteur au lieu de la contourner ;
+  écriture autorisée SEULEMENT si le détecteur rend 3 ; détecteur absent, en lien symbolique, non
+  régulier, illisible, ou dont le lancement échoue → refus fail-closed nommé, jamais une retombée
+  en écriture. `_jeton_journal` (P44-D-11) passe d'un assainissement par `_` (non injectif — `"3
+  4"` et `"3_4"` s'écrasaient sur le même jeton, pouvant faire manquer une clôture réellement
+  nouvelle au dédoublonnage) à un encodage pourcent INJECTIF (preuve générative 2000 paires,
+  round-trip réel à deux exécutions).
 
 Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27. Correctifs
 lot 1 : vf-coder, mandat de correction ciblée, 2026-09-28. Lot 2 (code 2 du détecteur,
-assainissement du journal) et lot 3 (dédoublonnage assaini, repli code 1 sur socle+signal) :
-décision du head sous délégation technique de Willy, session principale, 2026-09-28.
+assainissement du journal), lot 3 (dédoublonnage assaini, repli code 1 sur socle+signal) et lot 4
+(source unique de vérité pour la détection GSD, encodage injectif du journal) : décision du head
+sous délégation technique de Willy, session principale, 2026-09-28.
 
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
 
