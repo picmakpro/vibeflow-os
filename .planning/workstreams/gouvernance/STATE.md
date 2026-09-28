@@ -5,47 +5,52 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 44
 current_phase_name: Moteur — modèle de données et recalcul d'état dérivé du disque
-status: "Ready to execute"
+status: "Phase 44 exécutée, vérifiée passed"
 created: 2026-09-23
 last_updated: "2026-09-28T00:00:00.000Z"
 last_activity: 2026-09-28
 last_activity_desc: >-
-  Planification de la Phase 44 (mission vf-coder, nœud plan-44, 2026-09-28) : exigences MOTR-01..18
-  posées dans REQUIREMENTS.md (9269ac3), recherche (44-RESEARCH.md, 49ae4a4), stratégie de
-  validation (44-VALIDATION.md, même commit), cartographie de patrons (44-PATTERNS.md, d4a3265),
-  5 plans en 4 vagues créés par gsd-planner (4e89601 : 44-01∥44-02 → 44-03 → 44-04 → 44-05),
-  vérifiés par gsd-plan-checker (VERIFICATION PASSED, 0 blocker, 1 warning advisoire sur le
-  passage lecture seule des labs réels en 44-05 — non bloquant), porte de couverture des
-  décisions passée (27/27 décisions P44-D-01..18 couvertes), annotation des dépendances de
-  vague ajoutée au ROADMAP (6f57447). STATE tenu à la main (state.planned-phase non appelé,
-  interdit par le mandat).
+  Exécution de la Phase 44 (mission vf-coder, nœud exec-44, 2026-09-28) : 5 plans exécutés en 4
+  vagues (44-01∥44-02 → 44-03 → 44-04 → 44-05), chacun dans un worktree isolé (harness-worktree)
+  puis mergé --no-ff sur la branche orchestrateur ; 152 OK/0 KO sur test-recalc-planning.sh, les
+  8 autres suites de planning-core restent vertes. Bump mineur planning-core v2.7.1→v2.8.0
+  (D-18, aucune VERSION racine, aucun tag). Passage en lecture seule sur les deux labs réels
+  (~/jarvis-keystone, ~/BusinessFlow-Lab) : empreintes identiques avant/après, aucune écriture.
+  Vérifiée par gsd-verifier (44-VERIFICATION.md, PASSED 18/18 MOTR-01..18, commit 267b041).
+  Deux corrections mineures du dernier plan-checker traitées en cours d'exécution (échapper_nom
+  au-delà de U+FFFF en 44-04, sonde bash/zsh sans résidu). check-gate-touche.sh :
+  RIEN-A-JUGER (aucune surface gate touchée). check-baseline-arbitrage.sh : CONFORME (aucune
+  hausse). Requirements MOTR-01..18 et plans 44-01..05 cochés à la main dans REQUIREMENTS.md/
+  ROADMAP.md (state.* et requirements.mark-complete non appelés, interdits par le mandat).
+  Phase NON close dans le ROADMAP (clôture = nœud ultérieur du manager).
 stopped_at: >-
-  Phase 44 planifiée (5 plans, 4 vagues), vérification passée. Prochain geste : exécution
-  (`gsd-execute-phase 44 --ws gouvernance`), non entamée.
+  Phase 44 exécutée et vérifiée PASSED (5/5 plans, verdict indéterminé sur "verdict passé sans
+  SUMMARY.md" non rencontré dans cette exécution). Prochain geste : clôture de phase (nœud du
+  manager), puis revue/audit/banc/docs selon le plan de bataille.
 progress:
   total_phases: 9
   completed_phases: 2
   total_plans: 18
-  completed_plans: 13
-  percent: 22
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — PLANIFIÉE (5 plans, 4 vagues), pas encore exécutée. Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
+Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — EXÉCUTÉE (5/5 plans, 4 vagues), VÉRIFIÉE PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`, commit 267b041). Pas encore CLÔTURÉE dans le ROADMAP (nœud ultérieur du manager). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
 **Last Activity:** 2026-09-28
-**Last Activity Description:** Planification de la Phase 44 (mission vf-coder, nœud plan-44) : MOTR-01..18 posées, recherche + patrons + validation Nyquist produits, 5 plans (44-01 à 44-05) créés et vérifiés (VERIFICATION PASSED, 1 avertissement non bloquant), porte de couverture des décisions à 27/27, ROADMAP annoté des dépendances de vague.
+**Last Activity Description:** Exécution de la Phase 44 (mission vf-coder, nœud exec-44) : 5 plans exécutés en 4 vagues, mergés successivement, vérifiés PASSED. Bump mineur planning-core v2.8.0 (D-18). Requirements et plans cochés à la main.
 
 ## Progress
 
-**Phases Complete:** 2 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux)
-**Current Plan:** aucun exécuté — Phase 44 planifiée, 5/5 plans écrits, 0/5 exécutés
+**Phases Complete:** 2 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux). Phase 44 : exécutée et vérifiée, non close.
+**Current Plan:** aucun en cours — Phase 44 exécutée, 5/5 plans faits, en attente de clôture
 
 ## Session Continuity
 
-**Stopped At:** Phase 44 planifiée et vérifiée (5 plans, 4 vagues : 44-01∥44-02 → 44-03 → 44-04 → 44-05). Prochain geste : `gsd-execute-phase 44 --ws gouvernance`, non entamé.
+**Stopped At:** Phase 44 exécutée et vérifiée PASSED (5 plans, 4 vagues : 44-01∥44-02 → 44-03 → 44-04 → 44-05, toutes mergées sur `gouvernance/phase-44-moteur`). Prochain geste : clôture de phase (nœud du manager), puis les nœuds `revue-44`/`audit-44`/`banc-44`/`docs` du plan de bataille.
 **Resume File:** `.planning/missions/2026-09-27-gouvernance-44.dag.json`
 
 ## Note pour Willy (2026-09-23, partition D-02)

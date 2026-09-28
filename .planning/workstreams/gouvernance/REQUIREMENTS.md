@@ -16,24 +16,24 @@
 | FABR-08 | Phase 43 | Complete — 43-VERIFICATION.md passed 10/10 (d7dc755) ; cochée à la main |
 | FABR-09 | Phase 43 | Complete — 43-VERIFICATION.md passed 10/10 (d7dc755) ; cochée à la main |
 | FABR-10 | Phase 43 | Complete — 43-VERIFICATION.md passed 10/10 (d7dc755) ; cochée à la main |
-| MOTR-01 | Phase 44 | Not started |
-| MOTR-02 | Phase 44 | Not started |
-| MOTR-03 | Phase 44 | Not started |
-| MOTR-04 | Phase 44 | Not started |
-| MOTR-05 | Phase 44 | Not started |
-| MOTR-06 | Phase 44 | Not started |
-| MOTR-07 | Phase 44 | Not started |
-| MOTR-08 | Phase 44 | Not started |
-| MOTR-09 | Phase 44 | Not started |
-| MOTR-10 | Phase 44 | Not started |
-| MOTR-11 | Phase 44 | Not started |
-| MOTR-12 | Phase 44 | Not started |
-| MOTR-13 | Phase 44 | Not started |
-| MOTR-14 | Phase 44 | Not started |
-| MOTR-15 | Phase 44 | Not started |
-| MOTR-16 | Phase 44 | Not started |
-| MOTR-17 | Phase 44 | Not started |
-| MOTR-18 | Phase 44 | Not started |
+| MOTR-01 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-02 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-03 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-04 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-05 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-06 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-07 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-08 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-09 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-10 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-11 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-12 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-13 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-14 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-15 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-16 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-17 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| MOTR-18 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
 
 ## Milestone gouvernance-labs-v1.0 — « le planning métier tenu par une machine » (inscrit 2026-09-23)
 
@@ -62,73 +62,73 @@
 > exigence dérive d'une décision de `44-CONTEXT.md` (préfixe `P44-D-NN` recommandé, ADR-075) et ne
 > pose aucune décision nouvelle.
 
-- [ ] **MOTR-01**: Le modèle de données d'un lab (`cycles/`, `phases/`, `CYCLE.md`, `CADRAGE.md`
+- [x] **MOTR-01**: Le modèle de données d'un lab (`cycles/`, `phases/`, `CYCLE.md`, `CADRAGE.md`
   avec sa colonne structurante, `PLAN.md` avec le champ `ecrit:`, le fichier marqueur de clôture,
   `VERDICT.md`, `SUMMARY.md`, la liste fermée des emplacements annexes) est écrit et outillé dans
   `plugin/planning-core/`, en remplacement de son socle métier existant, sans toucher à
   `~/.claude/gsd-core/`, `.claude/gsd-core/` ni `plugin/dev-orchestrator/`, ni dépendre de leur
   code (`44-CONTEXT.md` P44-D-01, P44-D-01a, P44-D-01d)
-- [ ] **MOTR-02**: L'altitude lab que `planning-core` sert aussi aux labs dev (index des projets,
+- [x] **MOTR-02**: L'altitude lab que `planning-core` sert aussi aux labs dev (index des projets,
   compartiments, `workstream-policy.sh`, `detect-planning-debt.sh`, hooks existants) reste
   inchangée à l'identique, prouvée par ses suites existantes
   (`plugin/planning-core/scripts/tests/*.sh`) vertes sans modification de ces suites ; un lab dev
   n'est jamais réécrit (P44-D-01b, P44-D-01c)
-- [ ] **MOTR-03**: Le recalcul n'écrit que si `.planning/config.json` déclare le nouveau schéma via
+- [x] **MOTR-03**: Le recalcul n'écrit que si `.planning/config.json` déclare le nouveau schéma via
   la clé `planning_version` existante (valeur nouvelle) ; sans cette déclaration, il refuse sans
   rien toucher (aucun fichier créé, modifié ou supprimé, cache compris), code de sortie non nul,
   message nommant la déclaration attendue (P44-D-02)
-- [ ] **MOTR-04**: Un mode lecture seule calcule la dérivation sur n'importe quel planning,
+- [x] **MOTR-04**: Un mode lecture seule calcule la dérivation sur n'importe quel planning,
   adhérent ou non, et l'écrit uniquement sur la sortie standard (aucun fichier écrit, pas même le
   cache) ; un planning GSD détecté est refusé en mode écriture même s'il déclare le schéma
   (P44-D-02a)
-- [ ] **MOTR-05**: Le marqueur de clôture d'un plan est un fichier à côté de `PLAN.md`, qui n'est
+- [x] **MOTR-05**: Le marqueur de clôture d'un plan est un fichier à côté de `PLAN.md`, qui n'est
   jamais modifié pour marquer la clôture (son hash reste stable) ; `à exécuter` = `PLAN.md`
   présent, marqueur absent (P44-D-03)
-- [ ] **MOTR-06**: Une liste fermée d'emplacements annexes nommés à la racine de `.planning/`
+- [x] **MOTR-06**: Une liste fermée d'emplacements annexes nommés à la racine de `.planning/`
   (`_bancs/`, `recherches/`, `intel/`, `sketches/`, `_archive/`, `registres/`) est ignorée par le
   recalcul ; tout le reste qui n'est ni un emplacement du modèle ni un emplacement annexe est
   signalé « hors modèle » dans `INDEX.md` (signalé, jamais refusé, jamais déplacé) ; la liste vit
   dans le code et la référence du modèle, pas dans `config.json` (P44-D-04)
-- [ ] **MOTR-07**: Les huit états s'appliquent aux phases et aux plans ; l'état d'un cycle est une
+- [x] **MOTR-07**: Les huit états s'appliquent aux phases et aux plans ; l'état d'un cycle est une
   agrégation de ses phases (règle écrite dans la référence du modèle) ; les dérogations (`abandonné
   | remplacé | gelé`) sont lues dans un champ `statut:` qui doit nommer son auteur — une dérogation
   sans auteur rend `indéterminé` (P44-D-07)
-- [ ] **MOTR-08**: Toute combinaison de signaux non prévue rend `indéterminé`, jamais une
+- [x] **MOTR-08**: Toute combinaison de signaux non prévue rend `indéterminé`, jamais une
   supposition ; le banc couvre au minimum `SUMMARY.md` sans `PLAN.md`, `VERDICT.md` sans marqueur
   de clôture, `SUMMARY.md` avec un verdict en échec, marqueur sans `PLAN.md` (P44-D-08)
-- [ ] **MOTR-09**: Le recalcul lit les constats de `VERDICT.md` (passé / échec) pour dériver `à
+- [x] **MOTR-09**: Le recalcul lit les constats de `VERDICT.md` (passé / échec) pour dériver `à
   corriger` et `close` ; les champs `hash` et `tentative` sont lus s'ils sont présents, sans être
   vérifiés (leur vérification relève de la Phase 46) (P44-D-09)
-- [ ] **MOTR-10**: `INDEX.md` (par cycle : état dérivé, phase courante, dernier signe de vie,
+- [x] **MOTR-10**: `INDEX.md` (par cycle : état dérivé, phase courante, dernier signe de vie,
   bail en cours toujours « aucun » en 44, liste des entrées hors modèle) et `STATE.md` (position
   courante) sont générés de façon déterministe : deux recalculs sur le même disque produisent des
   fichiers identiques octet pour octet (P44-D-10)
-- [ ] **MOTR-11**: `cloture.log` est append-only : le recalcul ajoute une ligne quand il observe
+- [x] **MOTR-11**: `cloture.log` est append-only : le recalcul ajoute une ligne quand il observe
   l'entrée d'une phase ou d'un plan en `close` (ou en dérogation), datée au moment de l'observation
   et signalée comme telle, jamais une ligne réécrite ou supprimée, format conforme (horodatage ISO
   avec fuseau, chemin, auteur, verdict), auteur résolu sans git (P44-D-11)
-- [ ] **MOTR-12**: Le recalcul est écrit en Python 3.9+, bibliothèque standard seule (pas de
+- [x] **MOTR-12**: Le recalcul est écrit en Python 3.9+, bibliothèque standard seule (pas de
   PyYAML, parser de frontmatter minimal écrit pour le modèle), aucune logique de recalcul en bash
   (P44-D-12)
-- [ ] **MOTR-13**: Le recalcul est incrémental par hash du contenu, jamais par `mtime` ; un cache
+- [x] **MOTR-13**: Le recalcul est incrémental par hash du contenu, jamais par `mtime` ; un cache
   absent, illisible ou d'un autre format provoque un recalcul complet, jamais une confiance
   aveugle ; preuve au banc dans les deux sens (un `touch` sans changement de contenu ne change
   rien ; un changement de contenu à `mtime` restauré est vu) (P44-D-13)
-- [ ] **MOTR-14**: Le recalcul est livrable par l'installeur existant sans modification de ses
+- [x] **MOTR-14**: Le recalcul est livrable par l'installeur existant sans modification de ses
   sites de pose (Python embarqué dans un `.sh`, motif `plugin/conductor/scripts/dag.sh`), sauf si
   le plan motive et documente le choix de l'extension à `*.py` sur tous les sites de l'installeur
   (P44-D-14)
-- [ ] **MOTR-15**: Aucun hook ni gate n'est câblé dans cette phase : le recalcul est une commande
+- [x] **MOTR-15**: Aucun hook ni gate n'est câblé dans cette phase : le recalcul est une commande
   autonome, sans protection des fichiers générés contre l'écriture à la main (P44-D-15)
-- [ ] **MOTR-16**: Les suites de test bash sous `plugin/planning-core/scripts/tests/` et les
+- [x] **MOTR-16**: Les suites de test bash sous `plugin/planning-core/scripts/tests/` et les
   fixtures du banc synthétique versionné couvrent les huit états, chacun avec son jumeau négatif,
   et chaque garde est prouvée par une mutation rouge avec sa trace (assertion, attendu, obtenu) ;
   les commandes de boucle rejouent sous zsh et bash avec au moins deux éléments (P44-D-17)
-- [ ] **MOTR-17**: Un banc synthétique versionné dans le dépôt couvre les huit états, les
+- [x] **MOTR-17**: Un banc synthétique versionné dans le dépôt couvre les huit états, les
   dérogations et les contradictions rendant `indéterminé`, et gate seul en CI ; un passage en
   lecture seule, hors CI, mesure le temps et le nombre d'`indéterminé` sur deux labs réels du poste
   sans y écrire (empreinte sha256 avant/après comparée octet par octet), chemins machine-locaux
   jamais dans le code livré ni une suite de CI (P44-D-06, P44-D-06a, P44-D-06b)
-- [ ] **MOTR-18**: `plugin/planning-core` reçoit un bump de version mineur (nouvelle capacité),
+- [x] **MOTR-18**: `plugin/planning-core` reçoit un bump de version mineur (nouvelle capacité),
   CHANGELOG et README du module mis à jour ; aucune release du jalon gouvernance (pas de bump de
   la `VERSION` racine, pas de tag) avant la clôture de `fiabilite-v1.0` (P44-D-18)
