@@ -1105,3 +1105,27 @@ figé de la base à `424cb23`, 1509=1509 (vert). L'écart a une seule source ide
 
 **Déclencheur de reprise :** la prochaine évolution qui touche `test-vibeflow-update.sh` ou son
 garde-fou d'intégrité de `~/.claude`, ou un incident où ce faux rouge a bloqué une CI/un push.
+
+## Pour Samuel — hooks GSD introuvables dans les worktrees (constaté 2026-09-28)
+
+**Capturé :** 2026-09-28, pendant la mission de la Phase 44 (worktree `gouvernance-44`). Arbitrage
+de l'inscription : Willy, session principale, 2026-09-28 (relayé par la session principale au
+manager de mission). Hors périmètre de la Phase 44 : ni l'installeur ni `merge-hooks.sh` ne sont
+touchés ici.
+
+**Le défaut** : les hooks posés dans `settings.local.json` pointent vers
+`"$CLAUDE_PROJECT_DIR"/.claude/hooks/gsd-context-monitor.js`. Dans un worktree
+`.claude/worktrees/<nom>`, `CLAUDE_PROJECT_DIR` vaut le worktree ; or `.claude/*` est ignoré par
+git (`.gitignore:24`) et n'y est donc pas recopié. Résultat : « Stop hook error: Cannot find
+module » (non bloquant), et le moniteur de contexte GSD ne tourne pas dans les worktrees.
+
+**Contournement posé** : un lien symbolique `.claude/hooks` vers le `.claude/hooks` du checkout
+principal, fait à la main worktree par worktree.
+
+**Piste durable** : l'installeur, ou `merge-hooks.sh`, émet une commande de hook qui se replie sur
+le checkout principal (`git rev-parse --git-common-dir`) quand le fichier manque dans le worktree.
+
+**Propriétaire à la relecture :** Samuel (installeur, polarité fiabilité).
+
+**Déclencheur de reprise :** la prochaine évolution de l'installeur ou de `merge-hooks.sh`, ou la
+création d'un worktree où le contournement n'a pas été posé.
