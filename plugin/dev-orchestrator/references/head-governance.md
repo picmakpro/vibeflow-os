@@ -121,6 +121,9 @@ Six contrôles, chacun bon marché et déterministe :
 - **E6** — chaque verdict du rapport porte sa preuve (commande + code de sortie + SHA) : voir le
   **Contrat de preuves E6 (verdict → head)** de `mission-contracts.md`.
 
+Hors gate, non bloquant : la section `## Budgets` du rapport (STATE, worktrees ; `mission-flow.md`
+§Budgets de méthode) est relayée telle quelle à l'utilisateur, jamais tue.
+
 Quatre codes de sortie, et une conduite par code :
 
 - **sain** : enchaîner.

@@ -642,6 +642,38 @@ relâche quand même (geste RAII) mais garde le registre et le signale ; le gate
 (`check-mission-exit.sh`, E1) le lit comme un manque : une mission terminée avec un enfant ouvert
 n'est pas une mission inerte.
 
+## Budgets de méthode : ce que la mission laisse derrière elle (v2.67.0)
+
+**Motif.** Une mission produit de la trace (point d'état, rapport, DAG, worktree) et rien ne la
+retire. Mesuré sur un lab client après deux mois : `STATE.md` à 195 Ko, un « Point du … » ajouté en
+tête à chaque mission ; 19 worktrees ouverts sur un dépôt, dont une partie déjà intégrée. Aucun agent
+ne relit plus un STATE de cette taille en entier, et chaque worktree oublié se paie en `pod install`,
+en Metro ou en « quelle branche ? ». La doctrine « STATE ne garde que le courant »
+(`planning-core/references/bridge-memory.md` §Pont 2) existait ; il manquait un seuil et un moment.
+
+**Seuils** (surchargeables, `VF_STATE_BUDGET_KB` et `VF_WORKTREE_BUDGET`) :
+
+- `STATE.md` (et chaque `STATE.md` de workstream) : **8 Ko** au plus.
+- Worktrees actifs : **3 par dépôt** au plus, arbre principal non compté.
+
+**Moment : la clôture, avant le relâchement du verrou.** Le manager lance
+`"$S"/check-method-budget.sh --quiet` (lecture seule, ne supprime rien) et agit sur ses constats :
+
+1. **STATE dépassé** : le point de la mission **remplace** la position courante, il ne s'ajoute pas
+   en tête. L'ancien contenu utile part dans `.planning/archives/state/` (fichier daté), jamais
+   supprimé. Le frontmatter GSD et les sections lues par l'outillage (`Current Position`,
+   `Project Reference`) restent en place.
+2. **Worktree RANGEABLE** (branche travaillée puis intégrée dans la branche de référence) créé par
+   la mission : `git worktree remove <chemin>`, **sans `--force`** ; un refus signale un changement
+   non vu, on s'arrête et on le rapporte. Un worktree d'une autre mission ou d'une session en cours
+   n'est jamais touché : il est cité au rapport.
+3. **ORPHELIN** (dossier disparu) : `git worktree prune`.
+4. Les constats restants (dépassement non résorbable par la mission) vont au rapport de mission,
+   section `## Budgets`, pour que le head les relaie.
+
+Non bloquant par défaut : le script rend 0 sur un dépassement. Un lab qui veut en faire un gate
+l'appelle avec `--strict` (rend 1).
+
 ## Lignes rouges (rappel ADR-053)
 
 Pas de bus UDS / channels / `dm` temps réel (modèle `Task` = dispatch-and-join). Pas de RAII machine : le

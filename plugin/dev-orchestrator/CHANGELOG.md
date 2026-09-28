@@ -1,5 +1,20 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.25.0] — 2026-09-28 (budgets de méthode à la clôture de mission)
+
+**Minor** (nouvelle étape de clôture) :
+
+- **`references/mission-flow.md` §Budgets de méthode** : à la clôture, avant le relâchement du
+  verrou, le manager lance `check-method-budget.sh --quiet` et agit : un STATE dépassé voit sa
+  position courante **remplacée** (l'ancien contenu part dans `.planning/archives/state/`), un
+  worktree RANGEABLE créé par la mission est retiré sans `--force`, un ORPHELIN est élagué ; le
+  reste va au rapport, section `## Budgets`. Motif mesuré sur un lab client : `STATE.md` à 195 Ko
+  (un point ajouté en tête à chaque mission), 19 worktrees sur un dépôt.
+- **`agents/vf-dev-manager.md`** : la ligne de clôture appelle le script avant le relâchement du
+  verrou (nombre de lignes inchangé, 250).
+- **`references/head-governance.md` §3** : la section `## Budgets` du rapport est relayée à
+  l'utilisateur, hors gate, non bloquante. E1 à E6 inchangés.
+
 ## [v2.24.2] — 2026-09-26 (Phase 43 — durcissements MCP, FABR-10)
 
 **Patch** (durcissement) :
