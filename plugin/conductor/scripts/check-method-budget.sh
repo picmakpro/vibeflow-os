@@ -17,8 +17,8 @@
 #
 # Usage :
 #   check-method-budget.sh [--root <dir>] [--repo <dir>]... [--strict] [--quiet]
-#   --root   racine du lab (défaut .). STATE.md lus : <root>/.planning/STATE.md et
-#            <root>/.planning/workstreams/*/STATE.md.
+#   --root   racine du lab (défaut .). STATE.md lus : <root>/.planning/STATE.md et celui de
+#            chaque compartiment de workstream (énumérés par vf_ws_enumerate).
 #   --repo   dépôt git dont compter les worktrees (répétable). Défaut : <root> s'il est un dépôt
 #            git, sinon chaque sous-dossier direct de <root> qui en est un (lab multi-dépôts).
 #   --strict un dépassement rend 1 (défaut : avertissement seul, rend 0).
@@ -30,7 +30,8 @@
 # du manager ou de l'humain, sans --force, après vérification qu'aucune session ne s'en sert.
 #
 # Codes : 0 = dans les budgets, ou dépassement sans --strict · 1 = dépassement avec --strict ·
-#         64 = argument invalide.
+#         2 = non vérifiable avec --strict (compartiments de workstream illisibles, politique
+#         introuvable) — jamais un 0 de complaisance sous --strict · 64 = argument invalide.
 set -uo pipefail
 
 ROOT="."
@@ -40,7 +41,7 @@ QUIET=0
 STATE_KB="${VF_STATE_BUDGET_KB:-8}"
 WT_MAX="${VF_WORKTREE_BUDGET:-3}"
 
-usage() { sed -n '17,24p' "$0" >&2; exit 64; }
+usage() { sed -n '/^# Usage :/,/^# Sortie standard/p' "$0" >&2; exit 64; }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -57,15 +58,47 @@ case "$WT_MAX" in ''|*[!0-9]*) echo "[budget] VF_WORKTREE_BUDGET invalide : $WT_
 [ -d "$ROOT" ] || { echo "[budget] racine introuvable : $ROOT" >&2; exit 64; }
 
 OVER=0
+UNVERIFIABLE=0
 say() { [ "$QUIET" -eq 1 ] || echo "[budget] $*"; }
 flag() { echo "[budget] $*"; }
 
 # --- Budget 1 : taille des fichiers d'état -------------------------------------------------
 STATE_FILES=()
 [ -f "$ROOT/.planning/STATE.md" ] && STATE_FILES+=("$ROOT/.planning/STATE.md")
-for f in "$ROOT"/.planning/workstreams/*/STATE.md; do
-  [ -f "$f" ] && STATE_FILES+=("$f")
-done
+# Compartiments de workstream : énumérés par la primitive unique `vf_ws_enumerate`
+# (planning-core/scripts/workstream-policy.sh, catégorie a1 du recensement
+# workstream-planning-consumers.md), jamais par un glob maison. Politique sourcée SEULEMENT si
+# `workstreams/` existe (même posture que check-divergence.sh) ; les trois codes du contrat sont
+# traités, un compartiment non vérifiable est DIT, jamais tu.
+if [ -e "$ROOT/.planning/workstreams" ]; then
+  WS_POLICY=""
+  for _cand in "$(dirname "$0")/workstream-policy.sh" \
+               "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+    [ -r "$_cand" ] && { WS_POLICY="$_cand"; break; }
+  done
+  if [ -z "$WS_POLICY" ]; then
+    UNVERIFIABLE=1
+    flag "STATE NON VÉRIFIABLE : workstream-policy.sh introuvable, compartiments de workstream non mesurés"
+  else
+    # shellcheck source=/dev/null
+    . "$WS_POLICY"
+    WS_LIST="$(vf_ws_enumerate "$ROOT/.planning")"; _ws_rc=$?
+    case "$_ws_rc" in
+      0)
+        while IFS= read -r _wsdir; do
+          [ -n "$_wsdir" ] && [ -f "$_wsdir/STATE.md" ] && STATE_FILES+=("$_wsdir/STATE.md")
+        done <<EOF
+$WS_LIST
+EOF
+        ;;
+      3) : ;;
+      *)
+        UNVERIFIABLE=1
+        flag "STATE NON VÉRIFIABLE : .planning/workstreams illisible (vf_ws_enumerate rc $_ws_rc)"
+        ;;
+    esac
+  fi
+fi
 if [ "${#STATE_FILES[@]}" -eq 0 ]; then
   say "STATE : aucun fichier d'état sous $ROOT/.planning, budget non applicable"
 fi
@@ -175,6 +208,9 @@ EOF
   [ -n "$details" ] && printf '%s\n' "${details#?}"
 done
 
+if [ "$STRICT" -eq 1 ] && [ "$UNVERIFIABLE" -eq 1 ]; then
+  exit 2
+fi
 if [ "$OVER" -eq 1 ] && [ "$STRICT" -eq 1 ]; then
   exit 1
 fi

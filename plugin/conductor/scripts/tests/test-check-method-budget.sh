@@ -3,6 +3,7 @@
 #
 #   S1/S2 — STATE sous et au-dessus du budget ; S3 — STATE de workstream compté aussi
 #   S4 — budget surchargé par l'environnement ; S5 — pas de .planning : non applicable, rend 0
+#   S6 — workstreams/ illisible : NON VÉRIFIABLE dit, rc 2 sous --strict (jamais un 0 de complaisance)
 #   W1 — worktrees sous le budget ; W2 — dépassement ; W3 — RANGEABLE (branche intégrée)
 #   W4 — worktree neuf (sans commit) jamais dit RANGEABLE ; W5 — ORPHELIN (dossier supprimé)
 #   W6 — lab multi-dépôts : worktree frère compté UNE fois, pas comme un dépôt de plus
@@ -53,6 +54,11 @@ OUT="$(bash "$CHECK" --root "$LAB")"
 assert "S3 — STATE de workstream compté" "$OUT" "workstreams/ws1/STATE.md fait 12 Ko"
 OUT="$(VF_STATE_BUDGET_KB=16 bash "$CHECK" --root "$LAB")"
 refute "S4 — budget relevé à 16 Ko par l'environnement : plus de dépassement" "$OUT" "DÉPASSÉ"
+mkdir -p "$LAB/.planning"; rm -rf "$LAB/.planning/workstreams"; echo x > "$LAB/.planning/workstreams"
+OUT="$(bash "$CHECK" --root "$LAB" 2>/dev/null)"; RC=$?
+assert "S6 — workstreams/ illisible (fichier) : non vérifiable, dit" "$OUT" "NON VÉRIFIABLE"
+assert_rc "S6 — sans --strict : rend 0" "$RC" 0
+bash "$CHECK" --root "$LAB" --strict >/dev/null 2>&1; assert_rc "S6 — avec --strict : rend 2, jamais 0" "$?" 2
 rm -rf "$LAB/.planning"
 OUT="$(bash "$CHECK" --root "$LAB")"; RC=$?
 assert "S5 — pas de .planning : non applicable" "$OUT" "non applicable"

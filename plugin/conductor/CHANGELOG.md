@@ -10,8 +10,9 @@
   principal non compté. Chaque worktree est classé actif, RANGEABLE (branche travaillée puis
   intégrée dans la branche de référence, reflog à l'appui : une branche neuve n'est jamais dite
   rangeable) ou ORPHELIN (dossier disparu). Lab multi-dépôts : les worktrees frères d'un dépôt sont
-  rattachés à lui, pas comptés comme des dépôts. Rend 0 par défaut, 1 sous `--strict`, 64 sur
-  argument invalide. Suite `tests/test-check-method-budget.sh` (28 assertions).
+  rattachés à lui, pas comptés comme des dépôts. Rend 0 par défaut, 1 sous `--strict` (2 si un compartiment de workstream est
+  illisible : jamais un 0 de complaisance), 64 sur argument invalide. Compartiments énumérés par
+  `vf_ws_enumerate`, inscrit au recensement `workstream-planning-consumers.md` (catégorie a1). Suite `tests/test-check-method-budget.sh` (31 assertions).
 - **`scripts/guard-driver-lock.sh`, périmètre du verrou** : le hook prenait le cwd de la session
   pour périmètre et ne lisait jamais la cible du geste. `cd <autre-dépôt> && git commit`, ou
   `git -C <autre-dépôt> push`, était refusé sous le verrou du lab, ce qui poussait au marqueur de

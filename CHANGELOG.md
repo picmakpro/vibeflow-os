@@ -25,7 +25,7 @@ session principale Claude Code, 2026-09-28) :
     (8 Ko) et les worktrees actifs par dépôt (3), classe chaque worktree actif / RANGEABLE /
     ORPHELIN (reflog à l'appui, une branche neuve n'est jamais rangeable), rattache les worktrees
     frères à leur dépôt dans un lab multi-dépôts. 0 par défaut, 1 sous `--strict`. Suite neuve
-    `test-check-method-budget.sh` (28 assertions).
+    `test-check-method-budget.sh` (31 assertions).
   - **`dev-orchestrator` v2.24.2 → v2.25.0** : `mission-flow.md` §Budgets de méthode, étape de
     clôture avant le relâchement du verrou (remplacer la position courante, archiver sous
     `.planning/archives/state/`, retirer sans `--force` les worktrees intégrés créés par la mission,
