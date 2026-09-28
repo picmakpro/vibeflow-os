@@ -13,7 +13,7 @@
 
 - [x] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #108
 - [x] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #111
-- [ ] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
+- [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
 - [ ] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -122,6 +122,17 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 44-05-PLAN.md — bump mineur de planning-core sans release, preuves de phase (P44-D-01a, P44-D-01b, P44-D-15), passage en lecture seule sur deux labs réels
+
+**Clôture :** 2026-09-28, mission `mgr-44-reprise`. Après la vérification (PASSED 18/18), huit lots
+de correction issus de la revue et de l'audit (quick tasks 260928-b4c, -ccz, -mgu, -ol3, -q6h, -s53,
+-vk9) : le moteur appelle le vrai détecteur dans un environnement construit de zéro et n'écrit que
+s'il a pu lire tout ce que le détecteur devait lire ; le journal `cloture.log` est encodé de façon
+injective. Audit final SECURED (constats A et B du tour 1 fermés). Lot 8 sans nouveau tour de juges
+et résidus acceptés (TOCTOU local, volume) : décision du head sous délégation technique de Willy,
+session principale, 2026-09-28 — documentés dans `plugin/planning-core/references/modele-cycles.md`
+et `.planning/BACKLOG.md`. PR vers `main` ouverte, sans merge, sans tag, sans release (garde-fou du
+jalon : aucune release gouvernance avant la clôture de `fiabilite-v1.0`). Rapport :
+`.planning/missions/2026-09-27-gouvernance-44.md`.
 
 ### Phase 45: Moteur — hook central par rôle et gates d'écriture
 

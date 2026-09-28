@@ -3,35 +3,29 @@ gsd_state_version: 1.0
 workstream: gouvernance
 milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
-current_phase: 44
-current_phase_name: Moteur — modèle de données et recalcul d'état dérivé du disque
-status: "Phase 44 exécutée, vérifiée passed"
+current_phase: 45
+current_phase_name: Moteur — hook central par rôle et gates d'écriture
+status: "Phase 44 close (PR vers main ouverte), Phase 45 à cadrer"
 created: 2026-09-23
 last_updated: "2026-09-28T00:00:00.000Z"
 last_activity: 2026-09-28
 last_activity_desc: >-
-  Correction de CLASSE lot 8 (quick 260928-vk9, mission mgr-44-reprise, nœud exec-44 rouvert,
-  CORRECTION MINIMALE, aucun nouveau tour de juges) : deux corrections indépendantes de la garde de
-  lecture du lot 7. (1) `os.path.isfile` remplace `os.path.lexists` aux deux sites qui jugent un
-  STATE.md (racine et compartiment) — mirroir exact de `[ -f ]` que lit le détecteur : un lien
-  symbolique CASSÉ est désormais ABSENT, jamais un refus « illisible » (sur-refus mesuré sur HEAD
-  345303e). Le STATE.md racine en lien cassé reste refusé, mais par la garde B (« emplacement
-  occupé »). (2) `_ouvrable` ouvre en O_NONBLOCK + fstat — un STATE.md en FIFO n'y bloque plus
-  (blocage indéfini mesuré sur 345303e). Correction de prose associée. 10 tests rouge sur 345303e
-  puis vert (313 OK/0 KO, 303 avant), 8 suites sœurs vertes, detect-gsd-engine.sh/workstream-policy.sh
-  inchangés depuis 424cb23. Doc (modele-cycles.md, CHANGELOG v2.8.0, aucun bump) et BACKLOG.md
-  (entrée Samuel complétée) mis à jour. Commit 0c284e3. gsd-verifier dispatché, verdict à consigner
-  par le manager. Précédent lot 7 (260928-s53, 4b666e9) : garde de lecture du détecteur, fidélité
-  par exécution de vf_ws_enumerate + lisibilité réelle — voir table Quick Tasks ci-dessous et
-  `44-VERIFICATION.md` (Phase 44 exécutée PASSED 18/18 MOTR-01..18, commit 267b041) pour le détail
-  antérieur.
+  Clôture de la Phase 44 (mission vf-dev-manager mgr-44-reprise, reprise du 2026-09-28) : lots de
+  correction 4 à 8 commités (vrai détecteur en environnement construit de zéro, clé de journal
+  injective, garde de lecture du détecteur, lien cassé = absent, FIFO non bloquante), revue et audit
+  finaux (audit SECURED sur 345303e, A/B/PERM/LF/C/D/T2/F1 fermés), lot 8 sans nouveau tour de juges
+  (décision du head sous délégation technique de Willy, session principale, 2026-09-28), 313 OK/0 KO
+  sur test-recalc-planning.sh, detect-gsd-engine.sh/workstream-policy.sh inchangés depuis 424cb23.
+  Résidus acceptés documentés (modele-cycles.md, BACKLOG) : TOCTOU local 1/15, volume ~98 s à 3000
+  compartiments. Rapport : .planning/missions/2026-09-27-gouvernance-44.md.
 stopped_at: >-
-  Phase 44 exécutée et vérifiée PASSED (5/5 plans, verdict indéterminé sur "verdict passé sans
-  SUMMARY.md" non rencontré dans cette exécution). Prochain geste : clôture de phase (nœud du
-  manager), puis revue/audit/banc/docs selon le plan de bataille.
+  Phase 44 close sur la branche gouvernance/phase-44-moteur, PR vers main ouverte (sans merge, sans
+  tag, sans release — aucune release gouvernance avant la clôture de fiabilite-v1.0). Prochain geste :
+  cadrage de la Phase 45 (--ws gouvernance), qui reprend la question d'adhésion d'un lab métier
+  contenant du code.
 progress:
   total_phases: 9
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 18
   completed_plans: 18
   percent: 100
@@ -41,9 +35,9 @@ progress:
 
 ## Current Position
 
-Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — EXÉCUTÉE (5/5 plans, 4 vagues), VÉRIFIÉE PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`, commit 267b041). Pas encore CLÔTURÉE dans le ROADMAP (nœud ultérieur du manager). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
+Phase: 45 (Moteur — hook central par rôle et gates d'écriture) — à cadrer. Phase 44 : exécutée (5/5 plans), vérifiée PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`), corrigée en 8 lots après revue et audit, CLOSE dans le ROADMAP le 2026-09-28 (PR vers main ouverte, non mergée). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
 **Last Activity:** 2026-09-28
-**Last Activity Description:** Correction de CLASSE lot 8 (quick 260928-vk9, mission `mgr-44-reprise`, nœud `exec-44` rouvert, CORRECTION MINIMALE, aucun nouveau tour de juges) — voir `last_activity_desc` en frontmatter pour le détail complet. Commit `0c284e3`.
+**Last Activity Description:** Clôture de la Phase 44 (mission `mgr-44-reprise`) — voir `last_activity_desc` en frontmatter. Dernier lot : correction de CLASSE lot 8 (quick 260928-vk9, CORRECTION MINIMALE, aucun nouveau tour de juges, gsd-verifier PASSED), commit `0c284e3`.
 
 Précédent : correction de CLASSE lot 5 (nœud `exec-44` rouvert, mission vf-coder `mgr-44-reprise`, quick task `260928-ol3`) : l'environnement « maîtrisé » du sous-processus détecteur (lot 4) était en réalité `dict(os.environ)` avec la seule surcharge de `GSD_HOME` — une copie intégrale du `PATH` hérité. Mesuré (attack probe direct, hors suite) : un `awk` factice en tête de PATH suffisait à faire écrire (exit 0) le moteur sur un lab GSD réel et à effacer le marqueur `gsd_state_version`. L'environnement est désormais construit DE ZÉRO (liste blanche `PATH_MAITRISE` + `GSD_HOME`, aucune autre variable héritée) ; `bash` résolu par `CANDIDATS_BASH` (deux chemins absolus fixes, validés par `lstat`), jamais `shutil.which` sur le PATH hérité. Correctifs voisins : `_jeton_journal` échappe aussi tout caractère non imprimable (NUL, contrôles C0/C1) ; un repli vide lève `ValueError` (jamais un jeton vide silencieux) ; « détecteur absent »/« détecteur non régulier » ont deux messages distincts ; `ecrire_si_different` lit par `O_NOFOLLOW`. Point explicitement NON retenu (avec preuve) : gater le code 3 sur une sortie stderr non vide — un `.planning/workstreams/` vide en produit légitimement. 233→270 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `detect-gsd-engine.sh`/`workstream-policy.sh` octet pour octet inchangés depuis `424cb23`. Le dispatch `gsd-executor` isolé n'a pas été retenté (expérience du lot 4 déjà consignée) ; un seul commit (correctifs trop imbriqués pour un découpage fix/test/docs). Vérifié PASSED 11/11 par `gsd-verifier`. Commit `9fe4a42`.
 
@@ -55,13 +49,13 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 
 ## Progress
 
-**Phases Complete:** 2 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux). Phase 44 : exécutée et vérifiée, non close.
-**Current Plan:** aucun en cours — Phase 44 exécutée, 5/5 plans faits, en attente de clôture
+**Phases Complete:** 3 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée).
+**Current Plan:** aucun en cours — Phase 45 à cadrer
 
 ## Session Continuity
 
-**Stopped At:** Phase 44 exécutée et vérifiée PASSED (5 plans, 4 vagues : 44-01∥44-02 → 44-03 → 44-04 → 44-05, toutes mergées sur `gouvernance/phase-44-moteur`). Prochain geste : clôture de phase (nœud du manager), puis les nœuds `revue-44`/`audit-44`/`banc-44`/`docs` du plan de bataille.
-**Resume File:** `.planning/missions/2026-09-27-gouvernance-44.dag.json`
+**Stopped At:** Phase 44 close (8 lots de correction, revue et audit finaux, PR vers main ouverte, sans merge). Prochain geste : cadrage de la Phase 45 (`--ws gouvernance`).
+**Resume File:** `.planning/missions/2026-09-27-gouvernance-44.md`
 
 ### Quick Tasks Completed
 
