@@ -1,5 +1,51 @@
 # Changelog — planning-core
 
+## [v2.8.0] — 2026-09-28 (moteur de planning métier — modèle par cycles et recalcul d'état dérivé du disque, Phase 44)
+
+**Minor** (nouvelle capacité) :
+
+- **`scripts/recalc-planning.sh`** — point d'entrée bash mince + moteur Python embarqué (motif
+  déjà en place dans `plugin/conductor/scripts/dag.sh`, aucun changement d'installeur : la voie
+  par défaut de P44-D-14 évite l'extension de `vibeflow-update.sh` à `*.py`). Dérive du disque
+  huit états (dont `indéterminé`) pour les cycles, phases et plans d'un lab métier — jamais un
+  état déclaré. Un lab n'obtient l'écriture qu'après adhésion explicite (`"planning_version":
+  "cycles-v1"` dans `.planning/config.json`) ; sans adhésion, ou sur un planning détecté comme
+  tenu par GSD, le recalcul refuse d'écrire, cache compris. Mode `--read-only` : dérive n'importe
+  quel planning, adhérent ou non, JSON sur la sortie standard uniquement, aucun fichier touché.
+- **`references/modele-cycles.md`** et **`references/templates/cycles/*`** (huit gabarits) —
+  le modèle : `cycles/`, `phases/`, `CYCLE.md`, `CADRAGE.md` (registre d'inconnues), `PLAN.md`
+  (champ de périmètre `ecrit:`), fichier marqueur de clôture de plan (jamais `PLAN.md` lui-même,
+  dont le hash reste stable), `VERDICT.md`, `SUMMARY.md`, liste fermée des six emplacements
+  annexes.
+- **Huit états dont `indéterminé`** : toute combinaison de signaux non prévue rend `indéterminé`,
+  jamais une supposition (« un faux vert est pire qu'un aveu »). Dérogations nominatives
+  (`abandonné | remplacé | gelé`, auteur obligatoire) ; une dérogation sans auteur rend
+  `indéterminé`.
+- **`INDEX.md`, `STATE.md`, `cloture.log`** régénérés à chaque passage — sortie déterministe
+  (deux recalculs sur le même disque produisent des fichiers identiques octet pour octet) ;
+  `cloture.log` en **ajout seul**, jamais une ligne réécrite ou supprimée.
+- **Incrémental par hash du contenu** (`.planning/.recalc-cache.json`, `cache_schema_version`),
+  jamais par `mtime` : un cache absent, illisible, en lien symbolique, ou d'un autre schéma/moteur
+  provoque un recalcul complet, jamais une confiance aveugle ; jamais chargé ni écrit en mode
+  `--read-only`.
+- **Hors modèle** : tout ce qui n'est ni le modèle ni l'une des six annexes est signalé « hors
+  modèle » dans `INDEX.md` — signalé, jamais refusé, jamais déplacé, jamais suivi (liens
+  symboliques de dossier ou de fichier compris) ; noms piégés (saut de ligne, catégorie Unicode
+  C*) échappés au rendu.
+- **Lecture seule** prouvée sans écriture sur deux labs réels du poste (empreinte sha256 de
+  l'arbre complet avant/après, identique) : voir `44-PASSAGE-LABS.md`.
+- **Banc synthétique versionné** (`scripts/tests/test-recalc-planning.sh`,
+  `scripts/tests/fixtures/recalc-planning-banc.txt`) — seul à gater en CI ; chaque garde prouvée
+  par une mutation rouge tracée.
+- **Ce qui n'est PAS livré dans cette phase** : aucun hook ni gate câblé (le recalcul est une
+  commande, pas encore branchée à un déclencheur — arrive en 45/48) ; les fichiers générés
+  (`INDEX.md`, `STATE.md`, `cloture.log`, cache) ne sont pas encore protégés contre l'écriture à
+  la main (G6, Phase 45) ; le socle métier existant de `planning-core` (`guard-planning-updated.sh`
+  et sa mesure par `mtime`) n'est **pas retiré** — le remplacement est additif, les labs qui
+  n'adhèrent pas restent sur l'existant.
+
+Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27.
+
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
 
 **Patch** (durcissement de gates workstream-aware, Phase 41.1) :
