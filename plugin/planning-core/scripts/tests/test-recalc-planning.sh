@@ -63,6 +63,9 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 FAKE_GSD="$WORK/gsd-home"
 mkdir -p "$FAKE_GSD"
+# Résolu AVANT toute restriction de PATH (MUT-SOUS-PROCESSUS) — un appel par chemin absolu n'a pas
+# besoin de chercher "bash" dans un PATH qu'on vient justement de vider de "bash".
+BASH_BIN="$(command -v bash)"
 # Instantané du script réel AVANT tout mutant (Tâche 2) — l'hygiène de fin de bloc compare contre
 # CET instantané, jamais contre le fichier lui-même (qui serait trivialement identique à soi).
 RECALC_SNAPSHOT="$WORK/recalc-planning-snapshot.sh"
@@ -1294,32 +1297,48 @@ else
   ko "R55 cache" "autre-format, autre-format" "rc=$R55A_RC/$R55B_RC cache=$R55A_CACHE/$R55B_CACHE" "-"
 fi
 
-# ---------- R56 — cache en lien symbolique hors du lab : illisible, cible inchangée ---------------
+# ---------- R56 — cache en lien symbolique hors du lab : écriture refusée, cible inchangée -------
+# Avant F4 (audit B), .recalc-cache.json n'était PAS dans la liste des emplacements vérifiés par
+# appliquer_ecritures : le lien était silencieusement remplacé par un fichier régulier (rc=0).
+# Depuis F4, .recalc-cache.json reçoit le même traitement que INDEX.md/STATE.md/cloture.log — un
+# lien à cet emplacement refuse TOUTE l'écriture (rc=1), rien n'est touché, la cible hors lab reste
+# intacte.
 R56_DIR="$WORK/r56"
 materialiser traceur "$R56_DIR"
 ( cd "$R56_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
 R56_CIBLE="$WORK/r56-cible-hors-lab.json"
 cp "$R56_DIR/.planning/.recalc-cache.json" "$R56_CIBLE"
 cp "$R56_CIBLE" "$WORK/r56-cible-avant.json"
+cp "$R56_DIR/.planning/INDEX.md" "$WORK/r56-index-avant.md"
+cp "$R56_DIR/.planning/STATE.md" "$WORK/r56-state-avant.md"
 rm -f "$R56_DIR/.planning/.recalc-cache.json"
 ln -s "$R56_CIBLE" "$R56_DIR/.planning/.recalc-cache.json"
 ( cd "$R56_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r56-out.json" 2>"$WORK/r56-err.txt" )
 R56_RC=$?
-R56_CACHE="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache"])' "$WORK/r56-out.json" 2>/dev/null || echo '?')"
-if [ "$R56_RC" -eq 0 ] && [ "$R56_CACHE" = "illisible" ]; then
-  ok "R56 cache en lien symbolique : illisible, recalcul complet"
+if [ "$R56_RC" -eq 1 ]; then
+  ok "R56 cache en lien symbolique : écriture refusée (rc=1, F4)"
 else
-  ko "R56 cache" "illisible" "rc=$R56_RC cache=$R56_CACHE" "-"
+  ko "R56 code de sortie" "1" "$R56_RC" "$(cat "$WORK/r56-out.json" 2>/dev/null)"
+fi
+if grep -qF "emplacement occupé par autre chose qu'un fichier régulier" "$WORK/r56-err.txt" && grep -qF ".recalc-cache.json" "$WORK/r56-err.txt"; then
+  ok "R56 stderr nomme .recalc-cache.json comme emplacement non régulier"
+else
+  ko "R56 stderr" "cite .recalc-cache.json comme emplacement non régulier" "$(cat "$WORK/r56-err.txt")" "-"
 fi
 if cmp -s "$WORK/r56-cible-avant.json" "$R56_CIBLE"; then
   ok "R56 cible du lien inchangée octet pour octet"
 else
   ko "R56 cible du lien" "inchangée" "modifiée" "-"
 fi
-if [ -f "$R56_DIR/.planning/.recalc-cache.json" ] && [ ! -L "$R56_DIR/.planning/.recalc-cache.json" ]; then
-  ok "R56 .recalc-cache.json redevenu un fichier régulier (le lien a été remplacé)"
+if [ -L "$R56_DIR/.planning/.recalc-cache.json" ]; then
+  ok "R56 .recalc-cache.json reste un lien (jamais remplacé, F4)"
 else
-  ko "R56 .recalc-cache.json" "fichier régulier (lien remplacé)" "toujours un lien ou absent" "-"
+  ko "R56 .recalc-cache.json" "toujours un lien" "remplacé ou absent" "-"
+fi
+if cmp -s "$WORK/r56-index-avant.md" "$R56_DIR/.planning/INDEX.md" && cmp -s "$WORK/r56-state-avant.md" "$R56_DIR/.planning/STATE.md"; then
+  ok "R56 INDEX.md/STATE.md inchangés (refus AVANT toute écriture)"
+else
+  ko "R56 INDEX.md/STATE.md" "inchangés" "modifiés" "-"
 fi
 
 # ---------- R57 — cache au bon format, entrée forgée : la lecture seule ne le lit jamais ----------
@@ -1597,6 +1616,13 @@ then
 fi
 
 # ---------- MUT-NOFOLLOW — SANS_SUIVI_DE_LIEN mis à 0 ----------------------------------------------
+# Depuis F4, .../cloture.log en lien reste refusé (rc=1) MÊME quand SANS_SUIVI_DE_LIEN est
+# neutralisé : le second rideau ajouté par F4 (est_fichier_regulier, lstat, dans la boucle de
+# appliquer_ecritures) rattrape ce que lire_journal ne détecte plus sans O_NOFOLLOW. Le code de
+# sortie seul ne distingue donc plus les deux rideaux — le message stderr, si : « journal des
+# clôtures inaccessible » (premier rideau, lire_journal) vs « emplacement occupé par autre chose
+# qu'un fichier régulier » (second rideau, F4). C'est ce message qui prouve SANS_SUIVI_DE_LIEN
+# encore chargé.
 if make_recalc_mutant NOFOLLOW 'SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)' 'SANS_SUIVI_DE_LIEN = 0  # MUT-NOFOLLOW'; then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-nofollow-cas"
@@ -1606,11 +1632,11 @@ if make_recalc_mutant NOFOLLOW 'SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0
   printf 'contenu-original\n' > "$CIBLE"
   ln -s "$CIBLE" "$DIR_CAS/.planning/cloture.log"
   ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-nofollow-out.txt" 2>"$WORK/mut-nofollow-err.txt" ); RC_M=$?
-  if ! _verifier_plantage NOFOLLOW "code de sortie et cible du lien de R11" "$WORK/mut-nofollow-out.txt" "$WORK/mut-nofollow-err.txt" "$RC_M"; then
-    if [ "$RC_M" -eq 1 ] && printf 'contenu-original\n' | cmp -s - "$CIBLE"; then
-      komut NOFOLLOW "code de sortie et cible du lien de R11" "code 1, cible inchangée (original)" "code 1, cible inchangée (mutant non opposable)"
+  if ! _verifier_plantage NOFOLLOW "message stderr (rideau lire_journal vs rideau F4) et cible du lien de R11" "$WORK/mut-nofollow-out.txt" "$WORK/mut-nofollow-err.txt" "$RC_M"; then
+    if [ "$RC_M" -eq 1 ] && printf 'contenu-original\n' | cmp -s - "$CIBLE" && grep -qF "journal des clôtures inaccessible" "$WORK/mut-nofollow-err.txt"; then
+      komut NOFOLLOW "message stderr (rideau lire_journal) et cible du lien de R11" "code 1, message lire_journal, cible inchangée (original)" "identique (mutant non opposable)"
     else
-      okmut NOFOLLOW "code de sortie et cible du lien de R11 · attendu (original) : code 1, cible inchangée · obtenu (mutant) : code $RC_M, cible $( printf 'contenu-original\n' | cmp -s - "$CIBLE" && echo inchangée || echo modifiée )"
+      okmut NOFOLLOW "message stderr (rideau lire_journal vs rideau F4) de R11 · attendu (original) : « journal des clôtures inaccessible » · obtenu (mutant, SANS_SUIVI_DE_LIEN neutralisé) : $(cat "$WORK/mut-nofollow-err.txt") (rattrapé par le second rideau F4, code $RC_M identique par coïncidence)"
     fi
   fi
 fi
@@ -2044,7 +2070,7 @@ fi
 # Distincte de MUT-HORS-MODELE (classement en LECTURE) : celle-ci vise le refus en ÉCRITURE, posé
 # par 44-01 dans appliquer_ecritures, rejoué par R42 (volet écriture).
 if make_recalc_mutant TYPE-ECRITURE \
-  'if os.path.lexists(chemin_cible) and not os.path.isfile(chemin_cible):' \
+  'if os.path.lexists(chemin_cible) and not est_fichier_regulier(chemin_cible):' \
   'if False:  # MUT-TYPE-ECRITURE'
 then
   MR="$MUT_DIR/recalc-planning.sh"
@@ -2175,6 +2201,433 @@ json.dump(d, open(p, 'w', encoding='utf-8'))
     else
       okmut CACHE-LECTURE-SEULE "état de 02-en-cours en --read-only sur cache forgé · attendu (original) : à exécuter (cache jamais consulté) · obtenu (mutant) : $ETAT_M (le JSON de lecture seule reflète l'entrée forgée)"
     fi
+  fi
+fi
+
+# ================================================================================================
+# F3 / F5 — corrections hors de la portée d'une mutation à motif fixe UNE LIGNE (structurelles :
+# F3 déplace une consommation d'itérateur DANS le try, F5 ajoute une branche de fermeture de
+# descripteur). Preuve par monkeypatch ciblé sur le corps Python réel extrait de $RECALC, jamais
+# une course sur disque (non déterministe). Le jumeau « régressé » est reconstruit par
+# remplacement de bloc EXACT (assert count==1), jamais deviné.
+# ================================================================================================
+F3F5_BODY_REEL="$WORK/f3f5-corps-reel.py"
+awk '/<<.PY_RECALC_PLANNING_EOF.$/{f=1;next} /^PY_RECALC_PLANNING_EOF$/{f=0} f' "$RECALC" > "$F3F5_BODY_REEL"
+
+F3F5_AIDE_PY="$WORK/f3f5-aide.py"
+cat > "$F3F5_AIDE_PY" <<'PY_F3F5_AIDE_EOF'
+import os
+import sys
+
+BLOC_F3_CORRIGE = '''def _lister_entrees(dossier):
+    try:
+        entrees = os.scandir(dossier)
+        return {e.name for e in entrees}
+    except OSError:
+        return set()'''
+
+BLOC_F3_REGRESSE = '''def _lister_entrees(dossier):
+    try:
+        entrees = os.scandir(dossier)
+    except OSError:
+        return set()
+    return {e.name for e in entrees}'''
+
+BLOC_F5_CORRIGE = '''    dossier = os.path.dirname(chemin) or "."
+    fd_tmp, chemin_tmp = tempfile.mkstemp(dir=dossier, prefix=".tmp-recalc-")
+    fd_non_adopte = True  # tant que os.fdopen n'a pas pris possession du descripteur (F5)
+    try:
+        os.fchmod(fd_tmp, 0o644)
+        with os.fdopen(fd_tmp, "wb") as fh:
+            fd_non_adopte = False
+            fh.write(octets)
+        os.replace(chemin_tmp, chemin)
+    except Exception:
+        if fd_non_adopte:
+            try:
+                os.close(fd_tmp)
+            except OSError:
+                pass
+        try:
+            os.remove(chemin_tmp)
+        except OSError:
+            pass
+        raise
+    return True'''
+
+BLOC_F5_REGRESSE = '''    dossier = os.path.dirname(chemin) or "."
+    fd_tmp, chemin_tmp = tempfile.mkstemp(dir=dossier, prefix=".tmp-recalc-")
+    try:
+        os.fchmod(fd_tmp, 0o644)
+        with os.fdopen(fd_tmp, "wb") as fh:
+            fh.write(octets)
+        os.replace(chemin_tmp, chemin)
+    except Exception:
+        try:
+            os.remove(chemin_tmp)
+        except OSError:
+            pass
+        raise
+    return True'''
+
+
+def charger_espace(chemin_corps):
+    src = open(chemin_corps, encoding="utf-8").read()
+    ns = {}
+    exec(compile(src.split("\ndef main()")[0], chemin_corps, "exec"), ns)
+    return ns
+
+
+def regresser(chemin_corps, bloc_corrige, bloc_regresse, suffixe):
+    src = open(chemin_corps, encoding="utf-8").read()
+    if src.count(bloc_corrige) != 1:
+        print("BLOC_INTROUVABLE")
+        sys.exit(2)
+    tmp = chemin_corps + suffixe
+    open(tmp, "w", encoding="utf-8").write(src.replace(bloc_corrige, bloc_regresse))
+    return tmp
+
+
+class FauxEntree:
+    def __init__(self, name):
+        self.name = name
+
+
+class FauxIterateurCasse:
+    def __init__(self):
+        self._n = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self._n += 1
+        if self._n == 1:
+            return FauxEntree("premier")
+        raise OSError("boom-mid-iteration")
+
+
+def sonder_f3(chemin_corps):
+    ns = charger_espace(chemin_corps)
+    _lister_entrees = ns["_lister_entrees"]
+    reel_scandir = os.scandir
+    os.scandir = lambda _d: FauxIterateurCasse()
+    try:
+        try:
+            resultat = _lister_entrees("/peu-importe-monkeypatch")
+            print("CRASH=False RESULTAT=%r" % (resultat,))
+        except OSError as e:
+            print("CRASH=True MESSAGE=%s" % (e,))
+    finally:
+        os.scandir = reel_scandir
+
+
+def sonder_f5(chemin_corps):
+    import resource
+    import tempfile
+    import shutil
+
+    ns = charger_espace(chemin_corps)
+    ecrire_si_different = ns["ecrire_si_different"]
+    work = tempfile.mkdtemp(prefix="f5-probe-")
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (48, hard))
+    reel_fchmod = os.fchmod
+    def fchmod_casse(fd, mode):
+        raise OSError("simulate-fchmod-failure")
+    os.fchmod = fchmod_casse
+    exhausted = False
+    try:
+        for i in range(200):
+            cible = os.path.join(work, "fichier-%d.txt" % i)
+            try:
+                ecrire_si_different(cible, "contenu-%d" % i)
+            except OSError as e:
+                if getattr(e, "errno", None) == 24 or "Too many open" in str(e):
+                    exhausted = True
+                    break
+                continue
+    finally:
+        os.fchmod = reel_fchmod
+        resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
+        shutil.rmtree(work, ignore_errors=True)
+    print("EXHAUSTED=%s" % exhausted)
+
+
+def sonder_l2(chemin_corps):
+    ns = charger_espace(chemin_corps)
+    _formater_ligne_journal = ns["_formater_ligne_journal"]
+    LIGNE_JOURNAL_RE = ns["LIGNE_JOURNAL_RE"]
+    payload = "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"
+    unite = {
+        "chemin": "cycles/00-temoin/phases/00-temoin",
+        "auteur": "quelquun",
+        "verdict": "passé",
+        "tentative": payload,
+    }
+    ligne = _formater_ligne_journal("2026-09-28T00:00:00+00:00", unite)
+    m = LIGNE_JOURNAL_RE.match(ligne)
+    print("LIGNE=%r" % ligne)
+    print("MATCH=%s" % bool(m))
+    print("NB_VERDICT=%d" % ligne.count("verdict="))
+    print("NB_TENTATIVE=%d" % ligne.count("tentative="))
+
+
+mode = sys.argv[1]
+chemin_corps_reel = sys.argv[2]
+if mode == "f3-fixed":
+    sonder_f3(chemin_corps_reel)
+elif mode == "f3-regresse":
+    sonder_f3(regresser(chemin_corps_reel, BLOC_F3_CORRIGE, BLOC_F3_REGRESSE, ".f3-regresse.py"))
+elif mode == "f5-fixed":
+    sonder_f5(chemin_corps_reel)
+elif mode == "f5-regresse":
+    sonder_f5(regresser(chemin_corps_reel, BLOC_F5_CORRIGE, BLOC_F5_REGRESSE, ".f5-regresse.py"))
+elif mode == "l2":
+    sonder_l2(chemin_corps_reel)
+else:
+    print("MODE_INCONNU")
+    sys.exit(2)
+PY_F3F5_AIDE_EOF
+
+# ---------- F3 — _lister_entrees : erreur d'itération toujours absorbée --------------------------
+F3_FIXE_OUT="$("$PYBIN" "$F3F5_AIDE_PY" f3-fixed "$F3F5_BODY_REEL" 2>&1)"
+if [ "$F3_FIXE_OUT" = "CRASH=False RESULTAT=set()" ]; then
+  ok "F3 _lister_entrees : erreur d'itération de scandir absorbée par le try, aucune trace Python brute"
+else
+  ko "F3 _lister_entrees (code réel)" "CRASH=False RESULTAT=set()" "$F3_FIXE_OUT" "-"
+fi
+
+F3_REGRESSE_OUT="$("$PYBIN" "$F3F5_AIDE_PY" f3-regresse "$F3F5_BODY_REEL" 2>&1)"
+if echo "$F3_REGRESSE_OUT" | grep -q "^CRASH=True"; then
+  okmut LISTER-ENTREES "erreur d'itération de scandir · attendu (original) : absorbée, set() · obtenu (mutant, consommation hors du try) : $F3_REGRESSE_OUT"
+else
+  komut LISTER-ENTREES "erreur d'itération de scandir" "CRASH=True (mutant)" "$F3_REGRESSE_OUT (mutant non opposable)"
+fi
+
+# ---------- F5 — ecrire_si_different : descripteur toujours fermé sur le chemin d'échec ----------
+F5_FIXE_OUT="$("$PYBIN" "$F3F5_AIDE_PY" f5-fixed "$F3F5_BODY_REEL" 2>&1)"
+if [ "$F5_FIXE_OUT" = "EXHAUSTED=False" ]; then
+  ok "F5 ecrire_si_different : descripteur toujours fermé (200 échecs de fchmod injectés, pas d'épuisement)"
+else
+  ko "F5 ecrire_si_different (code réel)" "EXHAUSTED=False" "$F5_FIXE_OUT" "-"
+fi
+
+F5_REGRESSE_OUT="$("$PYBIN" "$F3F5_AIDE_PY" f5-regresse "$F3F5_BODY_REEL" 2>&1)"
+if [ "$F5_REGRESSE_OUT" = "EXHAUSTED=True" ]; then
+  okmut ECRIRE-SI-DIFFERENT-FD "épuisement de descripteurs sur 200 échecs de fchmod injectés · attendu (original) : jamais · obtenu (mutant, fermeture retirée du chemin d'échec) : épuisé"
+else
+  komut ECRIRE-SI-DIFFERENT-FD "épuisement de descripteurs sur 200 échecs de fchmod injectés" "EXHAUSTED=True (mutant)" "$F5_REGRESSE_OUT (mutant non opposable)"
+fi
+
+# ================================================================================================
+# F2 — un mutant par marqueur `# motif-*` de detection_gsd(), chacun sur une fixture qui isole sa
+# branche (6 marqueurs qui n'avaient encore aucun mutant, plus les deux issus du scindage lot 2
+# de `motif-code-2-ou-3`). `motif-code-2-ou-3` lui-même reste hors mandat lot 1 (décision en
+# attente) — les deux marqueurs qui le remplacent sont couverts en fin de bloc (lot 2).
+# ================================================================================================
+
+# ---------- MUT-SOUS-PROCESSUS — repli « sous-processus en échec » changé en non-gsd -------------
+if make_recalc_mutant SOUS-PROCESSUS 'return "non-concluante"  # motif-sous-processus-en-echec' 'return "non-gsd"  # MUT-SOUS-PROCESSUS'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-sous-processus-cas"
+  materialiser traceur "$DIR_CAS"
+  MIN_PATH="$WORK/mut-sous-processus-path"
+  mkdir -p "$MIN_PATH"
+  ln -sf "$(command -v python3)" "$MIN_PATH/python3"
+  ln -sf "$(command -v dirname)" "$MIN_PATH/dirname"
+  # PATH restreint à python3+dirname : "bash" (invoqué par detection_gsd via subprocess.run)
+  # devient introuvable — FileNotFoundError, capturée par le except Exception qui rend
+  # motif-sous-processus-en-echec. "$BASH_BIN" (chemin absolu, résolu AVANT la restriction)
+  # contourne le même problème pour l'invocation du script lui-même.
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" PATH="$MIN_PATH" "$BASH_BIN" "$MR" >"$WORK/mut-sous-processus-out.txt" 2>"$WORK/mut-sous-processus-err.txt" ); RC_M=$?
+  if ! _verifier_plantage SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec (PATH sans bash)" "$WORK/mut-sous-processus-out.txt" "$WORK/mut-sous-processus-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré une détection non concluante)"
+    else
+      komut SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-MARQUEUR-RACINE — marqueur GSD racine (code 1) changé en non-gsd -----------------
+if make_recalc_mutant MARQUEUR-RACINE 'return "gsd"  # motif-marqueur-racine' 'return "non-gsd"  # MUT-MARQUEUR-RACINE'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-marqueur-racine-cas"
+  materialiser traceur "$DIR_CAS"
+  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$DIR_CAS/.planning/STATE.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-marqueur-racine-out.txt" 2>"$WORK/mut-marqueur-racine-err.txt" ); RC_M=$?
+  if ! _verifier_plantage MARQUEUR-RACINE "code de sortie (STATE.md racine porte gsd_state_version, chaîne GSD absente)" "$WORK/mut-marqueur-racine-out.txt" "$WORK/mut-marqueur-racine-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut MARQUEUR-RACINE "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré le marqueur GSD racine)"
+    else
+      komut MARQUEUR-RACINE "code de sortie" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-MARQUEUR-COMPARTIMENT — marqueur GSD d'un compartiment changé en non-gsd ---------
+if make_recalc_mutant MARQUEUR-COMPARTIMENT 'return "gsd"  # motif-marqueur-compartiment' 'return "non-gsd"  # MUT-MARQUEUR-COMPARTIMENT'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-marqueur-compartiment-cas"
+  materialiser traceur "$DIR_CAS"
+  mkdir -p "$DIR_CAS/.planning/workstreams/gouvernance-banc"
+  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$DIR_CAS/.planning/workstreams/gouvernance-banc/STATE.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-marqueur-compartiment-out.txt" 2>"$WORK/mut-marqueur-compartiment-err.txt" ); RC_M=$?
+  if ! _verifier_plantage MARQUEUR-COMPARTIMENT "code de sortie (compartiment porte gsd_state_version, racine et chaîne GSD absentes)" "$WORK/mut-marqueur-compartiment-out.txt" "$WORK/mut-marqueur-compartiment-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut MARQUEUR-COMPARTIMENT "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré le marqueur GSD d'un compartiment)"
+    else
+      komut MARQUEUR-COMPARTIMENT "code de sortie" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-PARTITION-COMPARTIMENT — frontmatter réduit (workstream:+created:) changé --------
+# Fixture DÉDIÉE (F2) : aucun test existant n'exerçait motif-partition-compartiment avant ce lot —
+# compartiment SANS gsd_state_version, seulement workstream:+created: (facture `workstream
+# create`), chaîne GSD absente de la machine.
+if make_recalc_mutant PARTITION-COMPARTIMENT 'return "gsd"  # motif-partition-compartiment' 'return "non-gsd"  # MUT-PARTITION-COMPARTIMENT'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-partition-compartiment-cas"
+  materialiser traceur "$DIR_CAS"
+  mkdir -p "$DIR_CAS/.planning/workstreams/gouvernance-banc"
+  printf -- '---\nworkstream: gouvernance-banc\ncreated: 2026-09-28\n---\n' > "$DIR_CAS/.planning/workstreams/gouvernance-banc/STATE.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-partition-compartiment-out.txt" 2>"$WORK/mut-partition-compartiment-err.txt" ); RC_M=$?
+  if ! _verifier_plantage PARTITION-COMPARTIMENT "code de sortie (compartiment workstream:+created: sans gsd_state_version, chaîne GSD absente)" "$WORK/mut-partition-compartiment-out.txt" "$WORK/mut-partition-compartiment-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut PARTITION-COMPARTIMENT "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré le frontmatter réduit d'un compartiment partitionné)"
+    else
+      komut PARTITION-COMPARTIMENT "code de sortie" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-CODE1-SANS-MARQUEUR — repli « aucun marqueur » changé en gsd ---------------------
+if make_recalc_mutant CODE1-SANS-MARQUEUR 'return "non-gsd"  # motif-code-1-sans-marqueur' 'return "gsd"  # MUT-CODE1-SANS-MARQUEUR'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-code1-sans-marqueur-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-code1-sans-marqueur-out.txt" 2>"$WORK/mut-code1-sans-marqueur-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CODE1-SANS-MARQUEUR "code de sortie (aucun marqueur nulle part, chaîne GSD absente — R13 (b))" "$WORK/mut-code1-sans-marqueur-out.txt" "$WORK/mut-code1-sans-marqueur-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 0 ]; then
+      okmut CODE1-SANS-MARQUEUR "code de sortie · attendu (original) : 0 · obtenu (mutant) : $RC_M (refus alors qu'aucun marqueur GSD n'est présent)"
+    else
+      komut CODE1-SANS-MARQUEUR "code de sortie" "0" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-REPLI-GENERIQUE — repli générique (code hors 0/1/2/3) changé en non-gsd ----------
+if make_recalc_mutant REPLI-GENERIQUE 'return "non-concluante"  # motif-repli-generique' 'return "non-gsd"  # MUT-REPLI-GENERIQUE'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-repli-generique-cas"
+  SCRIPTS_CAS="$WORK/mut-repli-generique-scripts"
+  materialiser traceur "$DIR_CAS"
+  mkdir -p "$SCRIPTS_CAS"
+  cp "$MR" "$SCRIPTS_CAS/recalc-planning.sh"
+  printf '#!/usr/bin/env bash\nexit 64\n' > "$SCRIPTS_CAS/detect-gsd-engine.sh"
+  chmod +x "$SCRIPTS_CAS/detect-gsd-engine.sh"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$SCRIPTS_CAS/recalc-planning.sh" >"$WORK/mut-repli-generique-out.txt" 2>"$WORK/mut-repli-generique-err.txt" ); RC_M=$?
+  if ! _verifier_plantage REPLI-GENERIQUE "code de sortie (détecteur sort 64, hors contrat 0/1/2/3 — R09 [sort64])" "$WORK/mut-repli-generique-out.txt" "$WORK/mut-repli-generique-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut REPLI-GENERIQUE "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré une détection non concluante)"
+    else
+      komut REPLI-GENERIQUE "code de sortie" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ================================================================================================
+# Lot 2 (décision du head sous délégation technique de Willy, session principale, 2026-09-28) —
+# L1 : scindage de motif-code-2-ou-3 en motif-code-3-terrain-libre (write autorisée) et
+# motif-code-2-migration (write refusée, régression de l'audit B : le code 2 était traité comme
+# le code 3 et laissait écrire sur un socle planning-core signalé « migration à examiner »).
+# ================================================================================================
+
+# ---------- R-CODE2-MIGRATION — régression de l'audit B : code 2 refuse désormais l'écriture ----
+R_C2M_DIR="$WORK/r-code2-migration"
+materialiser traceur "$R_C2M_DIR"
+printf -- '---\nplanning_version: "2.0"\n---\n' > "$R_C2M_DIR/.planning/STATE.md"
+printf '%s' '{}' > "$R_C2M_DIR/package.json"
+empreinte "$R_C2M_DIR" > "$WORK/r-code2-migration-avant.txt"
+( cd "$R_C2M_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-code2-migration-out.txt" 2>"$WORK/r-code2-migration-err.txt" )
+R_C2M_RC=$?
+empreinte "$R_C2M_DIR" > "$WORK/r-code2-migration-apres.txt"
+if [ "$R_C2M_RC" -eq 3 ]; then
+  ok "R-CODE2-MIGRATION code de sortie 3 (régression audit B : code 2 ne s'écrit plus comme le code 3)"
+else
+  ko "R-CODE2-MIGRATION code" "3" "$R_C2M_RC" "$(cat "$WORK/r-code2-migration-out.txt")"
+fi
+if grep -qF "P44-D-02a" "$WORK/r-code2-migration-err.txt" 2>/dev/null; then
+  ok "R-CODE2-MIGRATION message de refus P44-D-02a sur stderr"
+else
+  ko "R-CODE2-MIGRATION stderr" "mentionne P44-D-02a" "$(cat "$WORK/r-code2-migration-err.txt")" "-"
+fi
+if cmp -s "$WORK/r-code2-migration-avant.txt" "$WORK/r-code2-migration-apres.txt"; then
+  ok "R-CODE2-MIGRATION empreinte de .planning/ identique avant/après"
+else
+  ko "R-CODE2-MIGRATION empreinte" "identique" "diverge" "-"
+fi
+
+# ---------- MUT-CODE3-TERRAIN-LIBRE — code 3 (terrain libre) changé en refus ----------------------
+if make_recalc_mutant CODE3-TERRAIN-LIBRE 'return "non-gsd"  # motif-code-3-terrain-libre' 'return "non-concluante"  # MUT-CODE3-TERRAIN-LIBRE'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-code3-terrain-libre-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-code3-terrain-libre-out.txt" 2>"$WORK/mut-code3-terrain-libre-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CODE3-TERRAIN-LIBRE "code de sortie (lab vierge, détecteur rend 3 légitimement — R02)" "$WORK/mut-code3-terrain-libre-out.txt" "$WORK/mut-code3-terrain-libre-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 0 ]; then
+      okmut CODE3-TERRAIN-LIBRE "code de sortie · attendu (original) : 0 · obtenu (mutant) : $RC_M (refus alors qu'aucun moteur de planning n'est en place)"
+    else
+      komut CODE3-TERRAIN-LIBRE "code de sortie" "0" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-CODE2-MIGRATION — code 2 (migration) changé en écriture autorisée -----------------
+if make_recalc_mutant CODE2-MIGRATION 'return "non-concluante"  # motif-code-2-migration' 'return "non-gsd"  # MUT-CODE2-MIGRATION'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-code2-migration-cas"
+  materialiser traceur "$DIR_CAS"
+  printf -- '---\nplanning_version: "2.0"\n---\n' > "$DIR_CAS/.planning/STATE.md"
+  printf '%s' '{}' > "$DIR_CAS/package.json"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-code2-migration-out.txt" 2>"$WORK/mut-code2-migration-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CODE2-MIGRATION "code de sortie (socle planning-core + signal de code — audit B)" "$WORK/mut-code2-migration-out.txt" "$WORK/mut-code2-migration-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut CODE2-MIGRATION "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré un signalement de migration — régression de l'audit B)"
+    else
+      komut CODE2-MIGRATION "code de sortie" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ================================================================================================
+# Lot 2 L2 — assainissement STRUCTUREL de tout champ recopié dans cloture.log (_jeton_journal),
+# preuve avec la valeur piégée exacte de l'audit.
+# ================================================================================================
+
+# ---------- L2 — _formater_ligne_journal : un seul enregistrement, jamais un faux lisible --------
+L2_FIXE_OUT="$("$PYBIN" "$F3F5_AIDE_PY" l2 "$F3F5_BODY_REEL" 2>&1)"
+if echo "$L2_FIXE_OUT" | grep -q "^MATCH=True$" && echo "$L2_FIXE_OUT" | grep -q "^NB_VERDICT=1$" && echo "$L2_FIXE_OUT" | grep -q "^NB_TENTATIVE=1$"; then
+  ok "L2 _formater_ligne_journal : valeur piégée réduite à un jeton, un seul enregistrement lisible"
+else
+  ko "L2 _formater_ligne_journal (code réel)" "MATCH=True, NB_VERDICT=1, NB_TENTATIVE=1" "$L2_FIXE_OUT" "-"
+fi
+
+# ---------- MUT-JOURNAL-SANITIZE — assainissement de _jeton_journal neutralisé -------------------
+if make_recalc_mutant JOURNAL-SANITIZE \
+  'jeton = _JOURNAL_ESPACE_RE.sub("_", str(brute).strip()).replace("=", "_")' \
+  'jeton = str(brute)  # MUT-JOURNAL-SANITIZE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  MUT_L2_BODY="$WORK/mut-journal-sanitize-corps.py"
+  awk '/<<.PY_RECALC_PLANNING_EOF.$/{f=1;next} /^PY_RECALC_PLANNING_EOF$/{f=0} f' "$MR" > "$MUT_L2_BODY"
+  L2_MUT_OUT="$("$PYBIN" "$F3F5_AIDE_PY" l2 "$MUT_L2_BODY" 2>&1)"
+  if echo "$L2_MUT_OUT" | grep -q "^MATCH=True$" && echo "$L2_MUT_OUT" | grep -q "^NB_VERDICT=1$" && echo "$L2_MUT_OUT" | grep -q "^NB_TENTATIVE=1$"; then
+    komut JOURNAL-SANITIZE "un seul enregistrement lisible sur la valeur piégée" "propriété tenue (original)" "propriété tenue (mutant non opposable)"
+  else
+    okmut JOURNAL-SANITIZE "un seul enregistrement lisible sur la valeur piégée · attendu (original) : MATCH=True, NB_VERDICT=1, NB_TENTATIVE=1 · obtenu (mutant, assainissement désactivé) : $L2_MUT_OUT"
   fi
 fi
 
