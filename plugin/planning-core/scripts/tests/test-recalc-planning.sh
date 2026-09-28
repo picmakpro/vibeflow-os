@@ -30,6 +30,17 @@
 #   MUT-DEDOUBLONNAGE, MUT-NOFOLLOW, MUT-CHAINE-ABSENTE, MUT-PARTITION-ABSENTE, MUT-CHMOD,
 #   MUT-CHMOD-JOURNAL — chacun mute une ligne à motif unique de recalc-planning.sh, chacun prouvé
 #   par une trace assertion/attendu (original)/obtenu (mutant).
+#
+# Lot 3 (correction ciblée, décision du head sous délégation technique de Willy, session
+# principale, 2026-09-28) :
+#   R-DEDOUBLONNAGE-ASSAINI — round-trip réel (2 exécutions) : `tentative` piégée (espaces + `=`)
+#         → une seule ligne dans cloture.log, `cloture_ajouts` 0 au 2e recalcul (revue, constat 1).
+#   MUT-DEDOUBLONNAGE-BRUT — comparaison repliée sur la valeur brute au lieu du jeton assaini.
+#   R-GSD-HOME-SIGNAL — (a) environnement normal et (b) GSD_HOME inexistant sur un socle
+#         planning-core + signal de code : refus IDENTIQUE (code 3) dans les deux cas, empreinte
+#         inchangée (audit, constat 2).
+#   MUT-CODE1-SOCLE-SIGNAL — repli code 1 sur la combinaison socle+signal neutralisé.
+#
 #   MUT-SYNTAXE, MUT-REFUS-COMPTE, MUT-PLANTAGE — gardes du harnais lui-même (patron
 #   test-check-skills.sh).
 set -uo pipefail
@@ -1597,7 +1608,7 @@ fi
 
 # ---------- MUT-DEDOUBLONNAGE — comparaison au dernier couple journalisé neutralisée --------------
 if make_recalc_mutant DEDOUBLONNAGE \
-  'if dernier_couple.get(chemin) != (verdict, tentative):' \
+  'if dernier_couple.get(chemin_jeton) != couple_jeton:' \
   'if True:  # MUT-DEDOUBLONNAGE'
 then
   MR="$MUT_DIR/recalc-planning.sh"
@@ -2628,6 +2639,129 @@ then
     komut JOURNAL-SANITIZE "un seul enregistrement lisible sur la valeur piégée" "propriété tenue (original)" "propriété tenue (mutant non opposable)"
   else
     okmut JOURNAL-SANITIZE "un seul enregistrement lisible sur la valeur piégée · attendu (original) : MATCH=True, NB_VERDICT=1, NB_TENTATIVE=1 · obtenu (mutant, assainissement désactivé) : $L2_MUT_OUT"
+  fi
+fi
+
+# ================================================================================================
+# Lot 3 (correction ciblée, décision du head sous délégation technique de Willy, session
+# principale, 2026-09-28) — deux constats d'une revue et d'un audit frais, chacun avec un vrai
+# aller-retour d'exécution (jamais un appel de fonction isolé) et son mutant.
+# ================================================================================================
+
+# ---------- R-DEDOUBLONNAGE-ASSAINI — le dédoublonnage compare la valeur ASSAINIE, pas la brute --
+# Reproduction exacte de la revue (260928-b4c-VERIFICATION.md, truth #10, jamais éprouvée par un
+# aller-retour réel) : une `tentative` piégée contenant espaces ET `=` rejournalise à CHAQUE
+# exécution tant que la comparaison porte sur la valeur brute d'un côté et le jeton assaini
+# relu dans le fichier de l'autre.
+R_DEDASSAINI_DIR="$WORK/r-dedoublonnage-assaini"
+materialiser traceur "$R_DEDASSAINI_DIR"
+printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
+  > "$R_DEDASSAINI_DIR/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+( cd "$R_DEDASSAINI_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r-dedassaini-err1.txt" )
+R_DEDASSAINI_RC1=$?
+LIGNES_APRES_1="$(wc -l < "$R_DEDASSAINI_DIR/.planning/cloture.log" | tr -d ' ')"
+( cd "$R_DEDASSAINI_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-dedassaini-out2.json" 2>"$WORK/r-dedassaini-err2.txt" )
+R_DEDASSAINI_RC2=$?
+LIGNES_APRES_2="$(wc -l < "$R_DEDASSAINI_DIR/.planning/cloture.log" | tr -d ' ')"
+AJOUTS_DEDASSAINI="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cloture_ajouts"])' "$WORK/r-dedassaini-out2.json" 2>/dev/null || echo '?')"
+if [ "$R_DEDASSAINI_RC1" -eq 0 ] && [ "$R_DEDASSAINI_RC2" -eq 0 ]; then
+  ok "R-DEDOUBLONNAGE-ASSAINI deux exécutions réelles réussies (rc=0 chacune)"
+else
+  ko "R-DEDOUBLONNAGE-ASSAINI code" "0 et 0" "$R_DEDASSAINI_RC1 et $R_DEDASSAINI_RC2" "err1=$(cat "$WORK/r-dedassaini-err1.txt") err2=$(cat "$WORK/r-dedassaini-err2.txt")"
+fi
+if [ "$LIGNES_APRES_1" = "1" ] && [ "$LIGNES_APRES_2" = "1" ]; then
+  ok "R-DEDOUBLONNAGE-ASSAINI une seule ligne dans cloture.log après le 2e recalcul (valeur piégée espaces+=)"
+else
+  ko "R-DEDOUBLONNAGE-ASSAINI lignes cloture.log" "1 puis 1" "$LIGNES_APRES_1 puis $LIGNES_APRES_2" "$(cat "$R_DEDASSAINI_DIR/.planning/cloture.log")"
+fi
+if [ "$AJOUTS_DEDASSAINI" = "0" ]; then
+  ok "R-DEDOUBLONNAGE-ASSAINI cloture_ajouts=0 au 2e recalcul"
+else
+  ko "R-DEDOUBLONNAGE-ASSAINI cloture_ajouts" "0" "$AJOUTS_DEDASSAINI" "$(cat "$WORK/r-dedassaini-out2.json")"
+fi
+
+# ---------- MUT-DEDOUBLONNAGE-BRUT — comparaison assainie repliée sur la valeur brute ------------
+if make_recalc_mutant DEDOUBLONNAGE-BRUT \
+  'couple_jeton = (_jeton_journal(verdict, "-"), _jeton_journal(tentative, "-"))' \
+  'couple_jeton = (verdict, tentative)  # MUT-DEDOUBLONNAGE-BRUT'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-dedoublonnage-brut-cas"
+  materialiser traceur "$DIR_CAS"
+  printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
+    > "$DIR_CAS/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>"$WORK/mut-dedoublonnage-brut-err1.txt" )
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-dedoublonnage-brut-out2.txt" 2>"$WORK/mut-dedoublonnage-brut-err2.txt" ); RC_M=$?
+  if ! _verifier_plantage DEDOUBLONNAGE-BRUT "cloture_ajouts du second recalcul (valeur piégée espaces+=)" "$WORK/mut-dedoublonnage-brut-out2.txt" "$WORK/mut-dedoublonnage-brut-err2.txt" "$RC_M"; then
+    AJOUTS_M="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cloture_ajouts"])' "$WORK/mut-dedoublonnage-brut-out2.txt" 2>/dev/null || echo '?')"
+    if [ "$AJOUTS_M" = "0" ]; then
+      komut DEDOUBLONNAGE-BRUT "cloture_ajouts du second recalcul" "0 (original)" "0 (mutant non opposable)"
+    else
+      okmut DEDOUBLONNAGE-BRUT "cloture_ajouts du second recalcul · attendu (original) : 0 · obtenu (mutant, comparaison repliée sur la valeur brute) : $AJOUTS_M (ligne dupliquée)"
+    fi
+  fi
+fi
+
+# ---------- R-GSD-HOME-SIGNAL — le refus « migration à examiner » tient quel que soit GSD_HOME ---
+# Reproduction exacte de l'audit : socle planning-core (STATE.md `planning_version`, sans
+# `gsd_state_version`) + signal de code (`package.json`). (a) environnement normal : refus. (b)
+# GSD_HOME pointant vers un chemin inexistant (le détecteur sort en code 1 AVANT sa priorité 3) :
+# refus IDENTIQUE — jamais une écriture au seul motif que la chaîne GSD est absente.
+R_GHS_A_DIR="$WORK/r-gsd-home-signal-a"
+materialiser traceur "$R_GHS_A_DIR"
+printf -- '---\nplanning_version: "2.0"\n---\n' > "$R_GHS_A_DIR/.planning/STATE.md"
+printf '%s' '{}' > "$R_GHS_A_DIR/package.json"
+EMPREINTE_GHS_A_AVANT="$WORK/r-ghs-a-avant.txt"; empreinte "$R_GHS_A_DIR" > "$EMPREINTE_GHS_A_AVANT"
+( cd "$R_GHS_A_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-ghs-a-out.txt" 2>"$WORK/r-ghs-a-err.txt" )
+R_GHS_A_RC=$?
+EMPREINTE_GHS_A_APRES="$WORK/r-ghs-a-apres.txt"; empreinte "$R_GHS_A_DIR" > "$EMPREINTE_GHS_A_APRES"
+if [ "$R_GHS_A_RC" -eq 3 ]; then
+  ok "R-GSD-HOME-SIGNAL (a) environnement normal : code de sortie 3"
+else
+  ko "R-GSD-HOME-SIGNAL (a) code" "3" "$R_GHS_A_RC" "$(cat "$WORK/r-ghs-a-out.txt")"
+fi
+if cmp -s "$EMPREINTE_GHS_A_AVANT" "$EMPREINTE_GHS_A_APRES"; then
+  ok "R-GSD-HOME-SIGNAL (a) empreinte identique"
+else
+  ko "R-GSD-HOME-SIGNAL (a) empreinte" "identique" "diverge" "-"
+fi
+
+R_GHS_B_DIR="$WORK/r-gsd-home-signal-b"
+materialiser traceur "$R_GHS_B_DIR"
+printf -- '---\nplanning_version: "2.0"\n---\n' > "$R_GHS_B_DIR/.planning/STATE.md"
+printf '%s' '{}' > "$R_GHS_B_DIR/package.json"
+EMPREINTE_GHS_B_AVANT="$WORK/r-ghs-b-avant.txt"; empreinte "$R_GHS_B_DIR" > "$EMPREINTE_GHS_B_AVANT"
+( cd "$R_GHS_B_DIR" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$RECALC" >"$WORK/r-ghs-b-out.txt" 2>"$WORK/r-ghs-b-err.txt" )
+R_GHS_B_RC=$?
+EMPREINTE_GHS_B_APRES="$WORK/r-ghs-b-apres.txt"; empreinte "$R_GHS_B_DIR" > "$EMPREINTE_GHS_B_APRES"
+if [ "$R_GHS_B_RC" -eq 3 ]; then
+  ok "R-GSD-HOME-SIGNAL (b) GSD_HOME inexistant : code de sortie 3 (régression de l'audit : était 0)"
+else
+  ko "R-GSD-HOME-SIGNAL (b) code" "3" "$R_GHS_B_RC" "$(cat "$WORK/r-ghs-b-out.txt")"
+fi
+if cmp -s "$EMPREINTE_GHS_B_AVANT" "$EMPREINTE_GHS_B_APRES"; then
+  ok "R-GSD-HOME-SIGNAL (b) empreinte identique (STATE.md non écrasé)"
+else
+  ko "R-GSD-HOME-SIGNAL (b) empreinte" "identique" "diverge (STATE.md aurait été écrasé)" "-"
+fi
+
+# ---------- MUT-CODE1-SOCLE-SIGNAL — repli code 1 sur la combinaison socle+signal neutralisé -----
+if make_recalc_mutant CODE1-SOCLE-SIGNAL \
+  'if _porte_planning_version(os.path.join(planning_abs, "STATE.md")) and _a_signal_de_code(racine_lab):' \
+  'if False:  # MUT-CODE1-SOCLE-SIGNAL'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-code1-socle-signal-cas"
+  materialiser traceur "$DIR_CAS"
+  printf -- '---\nplanning_version: "2.0"\n---\n' > "$DIR_CAS/.planning/STATE.md"
+  printf '%s' '{}' > "$DIR_CAS/package.json"
+  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-code1-socle-signal-out.txt" 2>"$WORK/mut-code1-socle-signal-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CODE1-SOCLE-SIGNAL "code de sortie (socle planning-core + signal de code, chaîne GSD absente — R-GSD-HOME-SIGNAL (b))" "$WORK/mut-code1-socle-signal-out.txt" "$WORK/mut-code1-socle-signal-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut CODE1-SOCLE-SIGNAL "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré un signalement de migration, chaîne GSD absente — régression de l'audit)"
+    else
+      komut CODE1-SOCLE-SIGNAL "code de sortie" "3" "$RC_M (mutant non opposable)"
+    fi
   fi
 fi
 
