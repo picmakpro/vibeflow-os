@@ -1,82 +1,303 @@
 ---
 name: project-phase44-recalc-planning-findings
-description: Audit Phase 44 (recalc-planning.sh) tour 3 -- repli code-1 (lot 3) rouvert par 3 divergences I/O bash-vs-Python (symlink signal, UTF-8 strict), dedup token collision (sous-journalisation), ouvert au 2026-09-28
+description: Audit Phase 44 (recalc-planning.sh) tour 6 final -- OUVERT (HEAD 32b5d59) : lot 6 ferme le LF-COMPARTIMENT-MASQUE-GSD du tour 5 (285 OK suite de regression), MAIS variante vivante meme classe hors perimetre du lot 6 (compartiment workstream chmod 000/600 sans permission d_execution, cd echoue dans vf_ws_enumerate, marqueur gsd_state_version masque silencieusement, recalc-planning.sh ecrit sur un planning tenu par GSD)
 metadata:
   type: project
 ---
 
-Audit `audit-44` tour 3 (mandat vf-dev-manager-g44, re-audit ciblé lot 3) sur
-`plugin/planning-core/scripts/recalc-planning.sh` (HEAD `ca185e4`). Verdict OPEN_THREATS,
-statut `gaps_found`. Prolonge les findings A/B du tour
-initial, toujours ouverts, non redecrits ici) et de [[project-symlink-escape-gsd-scripts]].
+Audit `audit-44` tour 4 (mandat vf-dev-manager, mission mgr-44-reprise, mode autonome) sur
+`plugin/planning-core/scripts/recalc-planning.sh` HEAD `885d9b3`. Verdict SECURED, statut
+`gaps_found` (findings LOW residuels, aucune menace vivante). Referme l'etat OUVERT du tour 3
+de ce meme fichier de memoire.
 
-- **Tour 2 -> tour 3, ce qui est VRAIMENT ferme** : le contournement "GSD_HOME inexistant" du
-  tour 2 est ferme UNIQUEMENT pour le cas fichier REGULIER -- verifie en execution reelle (lab
-  jetable, GSD_HOME pointe vers un chemin absent, package.json fichier normal + STATE.md
-  `planning_version` valide) : refus exit 3, rien ecrit. Le lot 3 (commit `dab3f62`, fonctions
-  `_a_signal_de_code`/`_porte_planning_version`, recalc-planning.sh ~L302-407) reproduit en Python
-  pur la combinaison "socle + signal de code" independamment de l'environnement -- mais c'est une
-  REIMPLEMENTATION, pas un appel au detecteur bash reel, et elle diverge de lui sur la SEMANTIQUE
-  d'E/S, pas seulement sur la liste de noms de fichiers.
+- **A (forgerie tentative: dans cloture.log, tour 1) FERME** -- verifie par execution : 5
+  variantes rejouees en labs jetables reels (spaceeq "x y cle=INJECTED", U+2028, U+0085, CR,
+  NUL). Les 3 premieres + spaceeq produisent une ligne UNIQUE, `=`/espace correctement
+  pourcent-encodes (`_jeton_journal`, lot 4, injectif). Le CR ne survit meme pas jusqu'au
+  jeton : la lecture UTF-8 texte de `_lire_frontmatter_fichier` traduit tout CR isole en
+  `\n` (universal newlines Python), ce qui invalide le frontmatter en amont
+  (`ligne-non-reconnue`) -- fail-closed par une CAUSE DIFFERENTE mais tout aussi fermante.
+  Seul residu : le NUL (`\x00`) n'est PAS couvert par `str.isspace()` et traverse tel quel
+  dans le jeton (verifie : ligne cloture.log contient `x^@y` litteral) -- mais NUL ne
+  reproduit AUCUN des 3 separateurs structurels du format (`\n`, `"  "` litteral, `=`), donc
+  AUCUNE forgerie de ligne/champ n'est possible avec ce residu (confirme independamment par
+  gsd-security-auditor). Finding residuel LOW / auto-fix : NUL octet brut ecrit dans un
+  journal append-only, integrite pas exploitabilite.
 
-- **Finding C (HIGH, ask-user)** -- trois divergences I/O verifiees en execution reelle, memes
-  causes profondes, meme classe de contournement (`recalc-planning.sh` : `_a_signal_de_code`
-  ~L318-334, `_porte_planning_version`/`_lire_frontmatter_fichier` ~L232-243) :
-  1. **Symlink sur un fichier signal** (`package.json` etc.) : bash `[ -f "./$f" ]`
-     (`detect-gsd-engine.sh:177`) SUIT les liens ; Python `est_fichier_regulier` (lstat, jamais de
-     suivi) non. Lab avec `package.json` -> lien vers un fichier regulier EXTERNE au lab +
-     `STATE.md` `planning_version` valide + `GSD_HOME` inexistant : le moteur ECRIT
-     (`.recalc-cache.json`, `INDEX.md`, `STATE.md`, exit 0) alors que le meme disque avec `GSD_HOME`
-     EXISTANT (chaine presente) fait dire au detecteur reel "migration a examiner" (exit 2).
-     **L'ecriture DETRUIT le marqueur `planning_version` lui-meme** (le STATE.md regenere ne porte
-     plus que `genere_par: recalc-planning`, etc.) -- l'ecriture efface la preuve qui aurait du la
-     bloquer.
-  2. **Symlink sur un dossier `*.xcodeproj`** : bash `[ -d "$f" ]` (glob `./*.xcodeproj`) SUIT les
-     liens ; Python `entree.is_dir(follow_symlinks=False)` (~L330) explicitement non. Meme
-     exploit, meme resultat (exit 0 au lieu du refus) -- verifie separement en execution reelle.
-  3. **`STATE.md` avec des octets UTF-8 invalides APRES la fermeture du frontmatter** :
-     `_lire_frontmatter_fichier` decode tout le fichier en UTF-8 strict et echoue entierement des
-     qu'un octet invalide existe n'importe ou dans le fichier -> `_porte_planning_version` rend
-     False comme si le marqueur etait absent. Le detecteur bash reel (awk, ligne par ligne,
-     s'arrete a la fermeture `---`) trouve le marqueur meme avec du binaire apres. Verifie en
-     execution reelle : meme resultat (ecriture au lieu du refus).
-  Les trois partagent la meme cause : le repli Python du lot 3 reimplemente la LISTE de signaux du
-  detecteur bash mais pas sa SEMANTIQUE d'E/S (suivi de lien, tolerance aux octets invalides hors
-  frontmatter). Precondition realiste, pas seulement adverse : un `STATE.md` avec `planning_version`
-  (sans `gsd_state_version`) est PRECISEMENT le socle planning-core pre-migration que la priorite 3
-  existe pour proteger -- un `package.json` symlinke est un motif courant de monorepo, pas
-  necessairement une attaque. `ask-user` car la remediation touche la meme frontiere que Finding A
-  (P44-D-09/D-14 : jusqu'ou le repli doit-il fideliser le comportement du script bash source plutot
-  que sourcer/appeler le script lui-meme -- choix deja pose en P44-D-01b/D-01d).
+- **B (garde emplacement occupe, os.path.isfile -> lien suivi, tour 1) FERME** -- verifie
+  par execution sur les 4 cibles (INDEX.md, STATE.md, cloture.log, .recalc-cache.json) en
+  lien vers un fichier regulier EXTERNE au lab : refus exit 1, message "emplacement
+  occupe...", fichier victime hors du lab jamais touche (contenu verifie identique
+  avant/apres). `cloture.log` catche via `lire_journal`/ELOOP (O_NOFOLLOW a l'ouverture),
+  les 3 autres via `est_fichier_regulier` (lstat) dans la boucle d'`appliquer_ecritures`.
 
-- **Finding D (MEDIUM, auto-fix)** -- `_jeton_journal` (~L1247-1257) n'est PAS injective : elle
-  collabore les runs d'espaces et `=` en un seul `_`. Verifie par calcul direct :
-  `jeton("3 4") == jeton("3_4") == "3_4"`. Consequence dans `lignes_a_journaliser` (~L1210-1241,
-  fixee lot 3 pour comparer assaini-vs-assaini, commit `dab3f62`) : deux valeurs BRUTES distinctes
-  du champ `tentative` (lu tel quel depuis VERDICT.md, non valide -- P44-D-09) qui normalisent vers
-  le meme jeton sont vues comme un DOUBLON -> une cloture reellement nouvelle peut ne PAS etre
-  journalisee dans `cloture.log` si son `tentative` assaini collide avec le dernier jeton deja
-  ecrit. Gap de tracabilite, pas de bypass d'ecriture. Remediation suggeree : encodage injectif
-  (echappement caractere-par-caractere ou repr()/JSON) au lieu d'un remplacement qui collabore.
+- **C (3 divergences symlink/UTF-8 detecteur, tour 3) FERME PAR CORRECTION DE CLASSE (lot
+  4)** -- la reimplementation Python du detecteur GSD a ete SUPPRIMEE ; `detection_gsd()`
+  appelle desormais le VRAI `detect-gsd-engine.sh` en sous-processus, environnement copie
+  de `os.environ` avec SEULE surcharge `GSD_HOME` = dossier du detecteur (toujours
+  existant). Verifie par execution reelle sur les 3 labs adverses originaux (package.json
+  symlink -> fichier regulier externe, *.xcodeproj symlink -> dossier externe, STATE.md
+  avec octets UTF-8 invalides apres le frontmatter) + socle `planning_version` : les 3
+  refusent desormais exit 3 (P44-D-02a), ZERO fichier ecrit dans .planning/. Suite de
+  regression du depot (`test-recalc-planning.sh`, 233/233 OK) couvre les 3 memes labels +
+  matrice d'env -- tous verts, corrobore l'execution independante.
 
-- **Non confirme en execution, a verifier si pertinent** : aucune autre divergence trouvee sur
-  cwd, sous-dossiers pour signal de code (bash et Python cherchent tous deux SEULEMENT a la racine
-  -- symetrique), ni sur `CLAUDE_CONFIG_DIR`/autres variables d'env (le repli ne depend d'AUCUNE
-  variable d'env par design, seulement du disque -- coherent). Pas de lecture hors racine_lab, pas
-  de suivi de lien supplementaire, pas de lecture de fichier enorme constatee dans le repli lui-meme
-  (RAS sur ce point du mandat).
+- **D (collision de jeton "3 4"/"3_4", tour 3) FERME** -- `_jeton_journal` (lot 4)
+  remplace l'assainissement par `_` (non injectif) par un echappement pourcent injectif.
+  Verifie par execution reelle en DEUX passages sur le meme lab : run 1 avec
+  `tentative: "3 4"` -> ligne `tentative=3%204` ; VERDICT.md reecrit avec
+  `tentative: "3_4"` -> DEUXIEME ligne distincte `tentative=3_4` ajoutee
+  (`cloture_ajouts=1`, pas absorbee par le dedoublonnage).
 
-- Delegation `gsd-security-auditor` (tour 3) : verdict SECURED sur les 3 zones demandees
-  (9 menaces T-44-02/03/04/05/06/15/17/18/21 toutes COUVERTES) -- mais methodologie DECLARATIVE
-  (le code existe et correspond au motif attendu), jamais testee sur des entrees adverses. Preuve
-  que le recoupement apporte une valeur reelle : T-44-02 (refus migration tient quel que soit
-  GSD_HOME) marque COUVERT par le delegue sur la seule base du texte du code, alors que mes 3
-  essais en execution reelle (Finding C) le contredisent concretement pour le sous-cas
-  symlink/UTF-8. Meme lecon que le tour 1 (cf. [[feedback-execute-dont-trust-green]]) : un audit
-  declaratif ne remplace jamais l'execution adverse.
+- **T2 (GSD_HOME absent/mal cible -> code 1 -> ecriture, tour 2) FERME** -- `GSD_HOME` est
+  desormais TOUJOURS surcharge explicitement vers le dossier du detecteur lui-meme, qui
+  existe forcement des lors que le detecteur a deja ete verifie regulier. Verifie : tous
+  mes runs tournaient avec `GSD_HOME` ambiant VIDE sans aucun code-1 errone. Suite de
+  regression verte sur `R-GSD-HOME-SIGNAL (b) GSD_HOME inexistant`.
 
-Etat au 2026-09-28 (tour 3) : Finding A/B (tour 1) toujours ouverts et non retraites. Finding C/D
-neufs, transmis a vf-dev-manager. A verifier lors d'un futur audit si les trois sous-cas de C et le
-D ont ete corriges avant de les re-signaler comme neufs -- verifier chaque sous-cas SEPAREMENT
-(memes labs jetables : symlink fichier, symlink dossier, UTF-8 invalide en queue de STATE.md), pas
-seulement le cas nominal deja ferme au tour 2.
+- **Nouvelle surface lot 4 (env_maitrise = dict(os.environ), seule GSD_HOME surchargee) --
+  verifiee saine sur le point demande, DEUX findings residuels LOW trouves** :
+  - `GSD_WORKSTREAM`/`VF_WORKSTREAM` herites : AUCUN effet sur le verdict. Confirme par
+    lecture (grep) : `detect-gsd-engine.sh` n'appelle QUE `vf_ws_enumerate`, jamais
+    `vf_ws_resolve` (seule fonction qui lirait ces variables) ; `vf_ws_enumerate` n'enumere
+    que le DISQUE, aucune dependance a une variable d'environnement. Verifie aussi par
+    execution : `GSD_WORKSTREAM=malicious-nonexistent-ws` sur un lab deja refusant -- meme
+    refus, aucun changement de verdict.
+  - **Finding LOW/auto-fix -- `ecrire_si_different` (~L1327-1330) lit l'existant via
+    `open()` NU, sans O_NOFOLLOW**, seul site parmi 7. TOCTOU reel entre le `lstat` de
+    garde et cet `open()`. Impact borne : ce contenu ne sert qu'a une comparaison
+    d'octets (jamais expose/journalise), et l'ECRITURE qui suit passe par `os.replace`
+    (jamais de suivi de lien a la destination) -- donc pas d'evasion de `.planning/` ni de
+    fuite. Contredit litteralement l'invariant declare par le commentaire de
+    `est_fichier_regulier` ("jamais le seul rempart"). Trouve par delegation
+    gsd-security-auditor (lecture ligne par ligne), confirme par ma propre lecture.
+  - **Finding LOW/auto-fix -- `BASH_ENV`/`ENV` herites tels quels dans `env_maitrise`**,
+    jamais filtres avant le `subprocess.run`. PAS une nouvelle surface introduite par lot
+    4 : verifie empiriquement (lab jetable, `BASH_ENV` exporte pointant un payload,
+    wrapper `bash recalc-planning.sh` invoque) que le payload s'execute des le TOUT
+    PREMIER appel bash (le wrapper shell lui-meme, avant meme que Python ou le
+    sous-processus du detecteur ne tournent) -- l'outil est deja entierement compromis a
+    l'invocation si BASH_ENV est positionne cote appelant, independamment de
+    env_maitrise. Categorie "ce que l'appelant peut faire a lui-meme", PAS une elevation
+    via CONTENU DE LAB. Reste un ecart de coherence avec le docstring "environnement
+    MAITRISE" -- moindre privilege suggere, pas une menace vivante.
+  - Injection via `--path` (dossier commencant par `-`, avec espace) : verifiee saine par
+    execution (subprocess liste-based, jamais de shell ; chemin toujours absolu).
+  - Fail-closed (detecteur absent, symlink, dossier, timeout 30s) : verifie par execution
+    reelle, 4 sous-cas separes, ZERO octet ecrit dans chaque lab.
+
+- **Delegation gsd-security-auditor (tour 4)** : mandat cible sur 4 points precis avec
+  citation ligne par ligne exigee (pas un verdict declaratif global). A trouve les 2
+  findings LOW ci-dessus que mon execution initiale n'avait pas couverts, et a confirme
+  independamment A et GSD_WORKSTREAM. Nettement plus utile que les tours 1/3 (verdict
+  SECURED global sur simple pattern-matching) -- cadrer la delegation sur des questions
+  precises avec exigence de citation produit un vrai recoupement, cf.
+  [[feedback-execute-dont-trust-green]].
+
+Etat au 2026-09-28 (tour 4, HEAD 885d9b3) : A/B/C/D/T2 tous FERMES, verifies par execution
+reelle + corrobores par la suite de regression du depot (233/233 OK) + par
+gsd-security-auditor sur les points cibles. 3 findings LOW residuels ouverts, action
+auto-fix, aucun ne constitue une menace vivante (NUL non-forgeant dans le journal, TOCTOU
+de lecture sans impact d'evasion/fuite, BASH_ENV deja "game over" au niveau de l'appelant
+independamment de env_maitrise). Si un tour 5 est necessaire, verifier que ces 3 items ont
+ete corriges avant de les re-signaler comme neufs.
+
+---
+
+## Tour 5 (2026-09-28, HEAD 0be13a9, mission mgr-44-reprise, apres correction lot 5)
+
+Verdict global OPEN_THREATS (statut gaps_found) : le lot 5 (F44-05/06/07, F1, environnement du
+detecteur reconstruit de zero) est verifie FERME par execution reelle, mais une menace VIVANTE a
+ete decouverte HORS du diff du lot 5, dans une couche voisine que `recalc-planning.sh` appelle
+transitivement -- confirmee INDEPENDAMMENT par gsd-security-auditor (labo jetable separe, sans se
+fier a mon PoC initial).
+
+- **Rejoue et FERME par execution reelle sur HEAD 0be13a9** : A (forgerie tentative:, 5 variantes
+  y compris NUL -- desormais echappe en `%00`, F44-05 confirme corrige), B (les 4 cibles gardees
+  en lien vers un fichier regulier externe, refus + cible intacte), C (3 divergences symlink/
+  UTF-8 tour 3, toutes refusent), D (collision de jeton "3 4"/"3_4", 2 lignes distinctes), T2
+  (GSD_HOME ambiant poison sans aucun effet), F44-06 (O_NOFOLLOW sur la lecture d'
+  `ecrire_si_different`, plus confirme par la suite du depot : "F44-06 ecrire_si_different sur un
+  lien (TOCTOU simule)"), F1 (awk factice en tete de PATH ambiant, fonction exportee
+  `BASH_FUNC_awk%%`, `ENV`/`BASH_ENV` ambiants -- tous sans effet sur le verdict du detecteur ;
+  `BASH_ENV` execute bien un payload dans le WRAPPER EXTERNE lui-meme avant que Python ne demarre,
+  categorie deja close "l'appelant se compromet lui-meme", mais le verdict de SECURITE reste
+  correct malgre cette compromission -- confirmation plus forte qu'au tour 4). `_jeton_journal` :
+  ValueError sur repli vide confirme INATTEIGNABLE par grep exhaustif (6 sites d'appel, tous
+  litteraux non vides "-"/"inconnu") -- jamais un lab a moitie ecrit par ce chemin.
+  Suite de regression du depot rejouee en direct : `bash
+  plugin/planning-core/scripts/tests/test-recalc-planning.sh` -> **270 OK, 0 KO, exit 0** (HEAD
+  0be13a9 ; 233 au tour 4, la hausse vient des tests ajoutes par le lot 5 lui-meme).
+
+- **NOUVELLE MENACE OUVERTE, HORS PERIMETRE DU LOT 5 -- masquage d'un compartiment GSD par un
+  saut de ligne (LF) dans son NOM** (severite HIGH, action ask-user, PROPRIETE violee : P44-D-02a
+  "ne jamais ecrire sur un planning tenu par GSD"). `vf_ws_enumerate`
+  (`plugin/planning-core/scripts/workstream-policy.sh:294-311`) enumere les compartiments de
+  `.planning/workstreams/*/` et emet `printf '%s\n' "$(cd "$entry" && pwd)"` PAR COMPARTIMENT --
+  sans jamais appeler `vf_ws_name_valid` (alphabet `[A-Za-z0-9._-]`), qui ne governe QUE la
+  resolution d'un nom DECLARE (GSD_WORKSTREAM/pointeur), jamais l'enumeration depuis le disque. Un
+  nom de compartiment contenant un LF litteral (legal POSIX, seuls `/` et NUL sont interdits) fait
+  emettre PLUSIEURS lignes stdout pour UNE seule entree. Le consommateur
+  (`plugin/planning-core/scripts/detect-gsd-engine.sh:117-167`, boucle `while IFS= read -r
+  _wsdir`) est un lecteur strictement ligne-par-ligne, incapable de reconstituer le chemin reel :
+  le marqueur `gsd_state_version` du compartiment hostile devient INVISIBLE, sans le signaler
+  (stderr VIDE -- ni "present mais vide apres filtrage" ni aucun autre diagnostic, car
+  `vf_ws_enumerate` a reellement rendu 0/succes cote shell). `detect-gsd-engine.sh` retombe alors
+  sur la priorite 4 (terrain libre, exit 3) ; `detection_gsd()`
+  (`plugin/planning-core/scripts/recalc-planning.sh:414-426`) mappe ce 3 sur `"non-gsd"` ; `main()`
+  (memes fichier, lignes ~1587-1591) n'ecrit QUE si `verdict_gsd == "non-gsd"` -- **ecrit donc
+  reellement** INDEX.md/STATE.md/.recalc-cache.json a la racine de `.planning/` alors qu'un
+  compartiment est VRAIMENT tenu par GSD. Reproduit par MOI (labo jetable, compartiment
+  `compartiment-un<LF>marqueur-cache/STATE.md` avec `gsd_state_version: 3`, environnement maitrise
+  EXACT de `recalc-planning.sh` : PATH=`/usr/bin:/bin:/usr/sbin:/sbin`, GSD_HOME=dossier du
+  detecteur, `--noprofile --norc`) : detecteur seul -> exit 3 ; `recalc-planning.sh
+  --planning=.planning` (config.json adherent `cycles-v1`) -> **exit 0, ecrits =
+  [INDEX.md, STATE.md, .recalc-cache.json]**. **Confirme INDEPENDAMMENT par gsd-security-auditor**,
+  labo separe reconstruit de zero sans se fier a mon PoC, meme resultat, plus une citation
+  ligne-par-ligne complete des deux couches (emission + consommation) et un bonus : le meme
+  defaut affecte `check-planning-state.sh:136-141` (comptage `awk 'NF>0{c++}'` gonfle par un
+  compartiment LF -- impact borne, diagnostic seul, pas de porte d'ecriture, non verifie en
+  profondeur). Le bug vit ENTIEREMENT dans le protocole IPC ligne-par-ligne entre
+  `vf_ws_enumerate` et ses deux consommateurs (`workstream-policy.sh`, hors du diff du lot 5 --
+  fichier NON touche) : le durcissement du lot 5 (liste blanche d'environnement, resolution
+  stricte de bash, alphabet etendu de `_jeton_journal`) ne couvre AUCUNE partie de cette chaine.
+  Remediation suggeree (pas appliquee, hors mandat lecture seule) : echapper le LF a l'emission
+  (`vf_ws_enumerate`) OU delimiter par NUL des deux cotes (`printf '%s\0'` + `read -r -d ''`) --
+  decision de portage a trancher par le proprietaire de `workstream-policy.sh` (Phase 41.1), pas
+  par ce lot.
+
+- **2 findings LOW additionnels, non bloquants** (trouves par gsd-security-auditor, confirmes non
+  exploitables dans le chemin observe) :
+  - `_bash_candidat_valide`, cas fichier regulier DIRECT sans verification de proprietaire :
+    NON une regression -- `CANDIDATS_BASH` est une paire de chemins absolus FIXES, hors de portee
+    du contenu d'un lab (substituer `/bin/bash` exigerait une ecriture root sur `/bin`, hors du
+    modele de menace "contenu de lab").
+  - `assert jeton, "..."` en fin de `_jeton_journal` (`recalc-planning.sh:1315`) : eliminable sous
+    `python -O`/`PYTHONOPTIMIZE` -- mais la garde REELLE (`raise ValueError` sur repli vide, en
+    tete de fonction) reste active quel que soit `-O`, et l'invocation observee
+    (`PYBIN=python3` sans `-O`, ligne 55) ne declenche pas ce mode. Nit d'hygiene seulement.
+  - `--noprofile --norc` (ligne 407, nouveau au lot 5) : NE couvre PAS `BASH_ENV`/`ENV` (ces
+    flags ne suppriment que les fichiers de demarrage de shell INTERACTIF/login ; `BASH_ENV` est
+    un mecanisme distinct pour un shell NON interactif executant un script, deja et uniquement
+    couvert par la liste blanche d'environnement du lot 5). Pas une regression, juste une
+    precision -- le commentaire du code ne sur-promet d'ailleurs rien a ce sujet.
+
+Lecon pour un tour 6 eventuel : la question "le detecteur peut-il rendre 3 par erreur depuis le
+CONTENU d'un lab" (posee explicitement par le mandat du tour 5) etait la bonne question a poser --
+elle a immediatement fait surface une classe de bug entiere restee invisible aux tours 1/3/4, qui
+ne testaient que des cas nommes SAINEMENT (symlinks, UTF-8 invalide, mais jamais un NOM DE FICHIER
+hostile). Generaliser : chaque fois qu'un protocole IPC texte ligne-par-ligne (`vf_ws_enumerate`
+et consorts) transporte un chemin derive d'un NOM DE FICHIER/DOSSIER arbitraire, verifier
+explicitement le cas d'un separateur d'enregistrement (LF, mais aussi envisager CR/NUL bien que
+NUL soit interdit par POSIX) EMBARQUE DANS LE NOM lui-meme -- pas seulement dans le CONTENU d'un
+fichier.
+
+---
+
+## Tour 6 (2026-09-28, HEAD 32b5d59, mission mgr-44-reprise, apres correction lot 6, TOUR FINAL)
+
+Verdict global OPEN_THREATS (statut gaps_found) : le lot 6 (garde `_enumeration_workstreams_fidele`,
+`recalc-planning.sh:381-425`) FERME reellement le LF-COMPARTIMENT-MASQUE-GSD du tour 5 pour ses DEUX
+classes nommees (nom a saut de ligne, nom cache par un point) -- rejoue par execution directe sur
+HEAD, refus code 3 avec message explicite citant P44-D-02a. MAIS la garde ne couvre que le CONTENU
+du nom/chemin, jamais les PERMISSIONS du repertoire : une exploration systematique de la classe (nom
+tiret initial, nom avec caracteres de glob, segment de lien symbolique intermediaire dans le chemin
+du planning, inondation de 3000 decoys + 1 compartiment masque par LF, STATE.md en lien) a fait
+surface UNE VARIANTE VIVANTE non couverte -- meme mecanisme de silence que le tour 5, racine
+differente.
+
+- **A, B rejoues sur HEAD 32b5d59, FERMES par execution reelle** (methode : lab `traceur` du banc de
+  la suite du depot, materialise via `aides.py`/`banc.txt` extraits du harnais reel, jamais
+  reimplementes). A (forgerie `tentative:`, 8 variantes : saut de ligne, `cle=INJECTED`, espaces,
+  U+2028, U+0085, NUL, CR isole, controles C0) : les 6 premieres produisent chacune EXACTEMENT une
+  ligne dans `cloture.log`, tous les separateurs structurels (`%`, `=`, espace/U+2028/U+0085, NUL,
+  C0) desormais pourcent-encodes de facon injective (`_jeton_journal`, alphabet etendu
+  `not str.isprintable()` -- le residu NUL du tour 4 est CONFIRME CORRIGE, `tentative=x%00y`) ; LF et
+  CR isoles ne produisent AUCUNE ligne DU TOUT (`cloture_ajouts=0`, `cloture.log` absent) car le
+  frontmatter de VERDICT.md devient invalide en amont -- fail-closed par une cause differente, encore
+  plus fermante qu'un simple encodage. B (les 4 cibles gardees -- INDEX.md, STATE.md, cloture.log,
+  .recalc-cache.json -- en lien vers un fichier regulier ET vers un chemin hors du lab, y compris un
+  lien PENDANT hors du lab) : 8 sous-cas (4 cibles x {regulier-hors-lab, pendant-hors-lab}), refus
+  systematique (exit 1), lien jamais suivi, victime externe intacte octet pour octet, aucune cible
+  pendante jamais creee.
+
+- **LF-COMPARTIMENT-MASQUE-GSD (tour 5) : PoC exact rejoue sur HEAD -> LF FERME.** Message stderr de
+  `recalc-planning.sh` lui-meme (pas seulement du detecteur, desormais visible AVANT tout appel au
+  sous-processus) : « refus (P44-D-02a, garde de fidelite d'enumeration, lot 6) ... classes :
+  nom-compartiment-saut-de-ligne ». `INDEX.md`/`STATE.md`/`.recalc-cache.json` jamais crees.
+
+- **NOUVELLE VARIANTE VIVANTE, MEME CLASSE -- repertoire de compartiment SANS PERMISSION
+  D'EXECUTION (chmod 000 ou chmod 600) masque un compartiment GSD reel** (severite HIGH, action
+  ask-user, PROPRIETE violee : P44-D-02a, meme propriete que le tour 5). Mecanisme identique au tour
+  5, racine differente : `_enumeration_workstreams_fidele` (lot 6) ne verifie QUE le contenu du nom
+  et du chemin (saut de ligne, point initial) -- JAMAIS les bits de permission du repertoire. Dans
+  `vf_ws_enumerate` (`workstream-policy.sh:294-311`), l'entree chmod 000/600 passe `vf_ws_path_nolink`
+  (0 = existe, non-lien -- lstat n'exige aucune permission) et `[ -d "$entry" ]` (stat n'exige aucune
+  permission) : la garde d'exclusion ne se declenche PAS. `cd "$entry" && pwd` a l'interieur de la
+  substitution de commande ECHOUE (permission refusee, l'entree du repertoire etant illisible/non
+  traversable) -- verifie DIRECTEMENT en source cant `vf_ws_enumerate`
+  (`bash -c ". workstream-policy.sh; vf_ws_enumerate <planning>"`) : stdout = UNE LIGNE VIDE (`\n`),
+  stderr = `workstream-policy.sh: line 305: cd: <chemin>: Permission denied` (le diagnostic EXISTE a
+  ce niveau, mais `found=1` reste positionne malgre l'echec de `cd`, donc rc=0 -- succes cote appelant
+  malgre le contenu vide). Le consommateur (`detect-gsd-engine.sh:117-167`, `[ -n "$_wsdir" ] ||
+  continue`) saute silencieusement la ligne vide, ne trouve aucun marqueur, retombe sur priorite 3 ->
+  exit 3 -> `detection_gsd()` mappe en `"non-gsd"` -> ECRITURE REELLE. Verifie de bout en bout sur le
+  PIPELINE COMPLET (`recalc-planning.sh` reel, pas seulement le detecteur isole) : lab avec UN SEUL
+  compartiment `gsd_state_version: 1.0` en chmod 000 -> `rc=0`, stderr **completement vide** (le
+  diagnostic « Permission denied » vu au niveau du sous-shell de `vf_ws_enumerate` est integralement
+  AVALE par le `subprocess.run(..., stderr=PIPE)` de `detection_gsd()`, qui ne relaie JAMAIS le stderr
+  du detecteur sur le chemin de succes -- silence total cote operateur, PIRE que le tour 5 qui au
+  moins imprimait un message avant lot 6) -- `INDEX.md`/`STATE.md`/`.recalc-cache.json` reellement
+  ecrits, `STATE.md` genere porte `etat: aucun` en ecrasement d'un planning tenu par GSD. Rejoue a
+  l'identique avec chmod 600 (lisible, non traversable). Remediation suggeree (pas appliquee, hors
+  mandat lecture seule) : dans `_enumeration_workstreams_fidele`, ajouter une classe masquante
+  `nom-compartiment-illisible` des que `os.access(entree, os.X_OK)` est faux pour une entree deja
+  retenue comme dossier reel non-lien -- meme famille de correction que le lot 6, un seul predicat
+  supplementaire, sans toucher a `workstream-policy.sh` (P44-D-01b).
+
+- **Variantes de la meme classe testees SAINES (refusent correctement, aucune ecriture)** : nom
+  commencant par un tiret (`-compartiment-tiret`, glob shell transparent, aucun souci) ; nom avec
+  caracteres de glob litteraux (`*`, `[`, `]` dans le nom d'un repertoire reel -- le glob du DISQUE
+  matche les noms litteraux sans reinterpretation) ; segment de lien symbolique INTERMEDIAIRE dans le
+  chemin du dossier de planning lui-meme (`.planning` atteint via un repertoire parent en lien --
+  resolu de facon transparente par le noyau a chaque appel `lstat`/`stat`, aucune classe masquante) ;
+  inondation de 3000 compartiments-leurres plus un compartiment reellement masque par LF (le
+  detecteur de fidelite d'enumeration cite toujours la bonne classe malgre le volume, aucune perte
+  d'echelle) ; `STATE.md` d'un compartiment en lien vers un fichier REEL du meme compartiment portant
+  le marqueur (`[ -f ]` suit le lien, marqueur trouve, refus correct -- PLUS protecteur, pas moins) ;
+  `STATE.md` en lien PENDANT (cible inexistante -- `[ -f ]` echoue, traite comme absent : ce n'est PAS
+  un masquage d'un marqueur REEL, aucun marqueur n'existe nulle part dans ce cas, comportement
+  equivalent a un compartiment sans `STATE.md` du tout, pas une instance de la classe).
+
+- **Non-regression** : suite complete du depot rejouee en DIRECT (`bash
+  plugin/planning-core/scripts/tests/test-recalc-planning.sh`, HEAD 32b5d59) -> **285 OK, 0 KO, exit
+  0** (270 au tour 5, la hausse vient des 15 assertions R-ENUM-FIDELE-* du lot 6 lui-meme). Rejeux
+  standalone additionnels (hors suite, PoC personnels) : C (labs adverses, deja couverts par
+  R-LABS-ADVERSES de la suite, 11/11 verts, aucun rouge) ; D (collision de jeton "3 4"/"3_4", 2 passes
+  reelles sur le meme chemin de phase -> 2 lignes DISTINCTES `tentative=3%204` puis `tentative=3_4`) ;
+  T2 (GSD_HOME ambiant pointant vers un chemin totalement inexistant, planning avec un compartiment
+  REELLEMENT marque -> refus code 3 immuable, aucun effet du poison ambiant) ; F1-revue (faux `awk`
+  en tete de PATH ambiant + `BASH_ENV` pointant un payload inexistant, meme planning marque -> refus
+  code 3 identique, l'environnement maitrise en liste blanche neutralise les deux).
+
+Lecon pour un tour 7 eventuel : la MEME question posee au tour 5 ("le detecteur peut-il rendre 3 par
+erreur depuis le CONTENU d'un lab") reste feconde une fois DEPLACEE d'un axe (le NOM porte-t-il un
+octet structurant ?) a un axe voisin (le repertoire est-il TRAVERSABLE ?) -- chaque primitive du
+protocole IPC ligne-par-ligne (`vf_ws_enumerate`) qui peut echouer PARTIELLEMENT (ici : `cd` peut
+echouer alors que `lstat`/`[ -d ]` en amont ont reussi) sans faire echouer la fonction ENGLOBANTE
+(`found=1` deja positionne) est un candidat a la meme classe de bug. Generaliser encore : chercher
+systematiquement, dans toute fonction shell qui emet des lignes derivees du DISQUE, les ecarts entre
+« l'entree existe et son TYPE est correct » (ce que la garde deja posee verifie) et « l'entree est
+ENTIEREMENT LISIBLE au moment de l'emission » (ce qu'aucune garde ne verifie ici) -- permissions,
+mais aussi (non teste ce tour, a envisager pour un suivant) une entree qui disparait entre le
+`scandir`/`glob` et le `cd` (TOCTOU de suppression concurrente).
+
+**Confirme INDEPENDAMMENT par gsd-security-auditor** (labo separe reconstruit de zero, chmod 000 ET
+chmod 600, controle negatif 755 refermant correctement) -- verdict OPEN_THREATS, severite qualifiee
+"critical" (bypass complet et silencieux de l'unique garde d'ecriture P44-D-02a), citation
+supplementaire precise non relevee par moi : `found=1` (workstream-policy.sh:306, INCONDITIONNEL,
+jamais subordonne au succes du `cd` qui le precede) est la ligne exacte qui transforme l'echec de
+`cd` en succes cote appelant -- et `detection_gsd` (recalc-planning.sh:519-523) ne LIT ni ne
+REIMPRIME jamais `resultat.stderr` du sous-processus sur le chemin de succes, ce qui explique le
+silence total observe cote `recalc-planning.sh` malgre le diagnostic "Permission denied" reellement
+emis par le sous-shell de `vf_ws_enumerate`.
