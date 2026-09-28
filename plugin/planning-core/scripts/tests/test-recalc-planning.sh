@@ -86,6 +86,13 @@ case "$(command -v python3 2>/dev/null)" in
     ;;
 esac
 
+# mode_octal — lit les bits de permission d'un fichier en octal, portable GNU/BSD (R14, lot 8
+# portabilité) : `stat -f`/`stat -c` divergent entre coreutils (GNU) et BSD/macOS — `stat -f` sous
+# GNU désigne le système de fichiers, pas le format de sortie, et échoue silencieusement en
+# empruntant au repli `stat -c` un code non lié au fichier demandé. Une seule sémantique : l'appel
+# système via Python, déjà une dépendance de la suite (PYBIN).
+mode_octal() { "$PYBIN" -c 'import os,sys; print(format(os.stat(sys.argv[1]).st_mode & 0o777, "o"))' "$1"; }
+
 pass=0; fail=0
 ok() { echo "  ✓ $1"; pass=$((pass+1)); }
 ko() {
@@ -753,7 +760,7 @@ materialiser traceur "$R14_DIR"
 R14_OK=1
 R14_MODES=""
 for f in INDEX.md STATE.md cloture.log; do
-  MODE=$(stat -f "%Lp" "$R14_DIR/.planning/$f" 2>/dev/null || stat -c "%a" "$R14_DIR/.planning/$f" 2>/dev/null)
+  MODE=$(mode_octal "$R14_DIR/.planning/$f")
   R14_MODES="$R14_MODES $f=$MODE"
   [ "$MODE" = "644" ] || R14_OK=0
 done
@@ -1783,7 +1790,7 @@ if make_recalc_mutant CHMOD 'os.fchmod(fd_tmp, 0o644)' 'pass  # MUT-CHMOD'; then
   materialiser traceur "$DIR_CAS"
   ( cd "$DIR_CAS" && ( umask 0077; GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-chmod-out.txt" 2>"$WORK/mut-chmod-err.txt" ) ); RC_M=$?
   if ! _verifier_plantage CHMOD "mode de INDEX.md/STATE.md de R14 sous umask 0077" "$WORK/mut-chmod-out.txt" "$WORK/mut-chmod-err.txt" "$RC_M"; then
-    MODE_INDEX=$(stat -f "%Lp" "$DIR_CAS/.planning/INDEX.md" 2>/dev/null || stat -c "%a" "$DIR_CAS/.planning/INDEX.md" 2>/dev/null)
+    MODE_INDEX=$(mode_octal "$DIR_CAS/.planning/INDEX.md")
     if [ "$MODE_INDEX" = "644" ]; then
       komut CHMOD "mode de INDEX.md sous umask 0077" "0o644 (original)" "0o644 (mutant non opposable)"
     else
@@ -1799,7 +1806,7 @@ if make_recalc_mutant CHMOD-JOURNAL 'os.fchmod(fd_journal, 0o644)' 'pass  # MUT-
   materialiser traceur "$DIR_CAS"
   ( cd "$DIR_CAS" && ( umask 0077; GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-chmod-journal-out.txt" 2>"$WORK/mut-chmod-journal-err.txt" ) ); RC_M=$?
   if ! _verifier_plantage CHMOD-JOURNAL "mode de cloture.log de R14 sous umask 0077" "$WORK/mut-chmod-journal-out.txt" "$WORK/mut-chmod-journal-err.txt" "$RC_M"; then
-    MODE_CLOTURE=$(stat -f "%Lp" "$DIR_CAS/.planning/cloture.log" 2>/dev/null || stat -c "%a" "$DIR_CAS/.planning/cloture.log" 2>/dev/null)
+    MODE_CLOTURE=$(mode_octal "$DIR_CAS/.planning/cloture.log")
     if [ "$MODE_CLOTURE" = "644" ]; then
       komut CHMOD-JOURNAL "mode de cloture.log sous umask 0077" "0o644 (original)" "0o644 (mutant non opposable)"
     else
