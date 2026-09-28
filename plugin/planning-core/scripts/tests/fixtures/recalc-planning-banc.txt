@@ -1,0 +1,220 @@
+@@ # Banc synthétique versionné de recalc-planning.sh (P44-D-06). Format : une ligne qui commence
+@@ # par « @@ » est une directive, toute autre ligne appartient au fichier ouvert par le dernier
+@@ # « @@ fichier ». « @@ # <texte> » est un commentaire. « @@ lab <nom> » ouvre un lab (nom en
+@@ # [a-z0-9-]+, unique). « @@ dossier <chemin> » crée un dossier vide. « @@ fichier <chemin> »
+@@ # crée un fichier dont le contenu est l'ensemble des lignes suivantes jusqu'à la prochaine
+@@ # directive, chacune terminée par un saut de ligne. « @@ attendu <unité> :: <état> » déclare la
+@@ # dérivation attendue en lecture seule (unité = chemin relatif à .planning/, cycle, phase ou
+@@ # plan). Chemins relatifs à la racine du lab, sans segment `..` ni `/` ou `~` initial.
+@@ #
+@@ # Ce banc est un FICHIER TEXTE, pas une arborescence versionnée : le site de pose n°4 de
+@@ # l'installeur installe les fixtures à plat (glob non récursif), et aucun dossier `.planning/`
+@@ # imbriqué n'est versionné dans ce dépôt (guard-planning-updated.sh, planning-session-
+@@ # snapshot.sh le découvrent par `find`). Le dossier de planning s'écrit `.planning/` dans le
+@@ # banc : c'est du texte, aucun dossier `.planning/` n'est versionné.
+
+@@ lab traceur
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-traceur/CYCLE.md
+---
+titre: Cycle traceur
+rend:
+  - livrables/rapport.md
+ferme_quand:
+  - toutes les phases closes ou abandonnées
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Le périmètre du traceur est-il celui du plan 44-01 ?"
+    structurante: oui
+    statut: ARBITRÉ
+    par: willy
+    le: "2026-09-27"
+    ou: "session principale"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/PLAN.md
+---
+ecrit: livrables/suite.md
+---
+
+@@ fichier livrables/rapport.md
+Rapport livré par la phase 01-livree du lab traceur.
+
+@@ attendu cycles/01-traceur/phases/01-livree :: close
+@@ attendu cycles/01-traceur/phases/02-en-cours :: à exécuter
+@@ attendu cycles/01-traceur :: à exécuter
+
+@@ lab traceur-gsd
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/STATE.md
+---
+gsd_state_version: 1.0
+---
+
+@@ fichier .planning/cycles/01-traceur/CYCLE.md
+---
+titre: Cycle traceur
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Le périmètre du traceur est-il celui du plan 44-01 ?"
+    structurante: oui
+    statut: ARBITRÉ
+    par: willy
+    le: "2026-09-27"
+    ou: "session principale"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/PLAN.md
+---
+ecrit: livrables/suite.md
+---
+
+@@ fichier livrables/rapport.md
+Rapport livré par la phase 01-livree du lab traceur-gsd.
+
+@@ attendu cycles/01-traceur/phases/01-livree :: close
+@@ attendu cycles/01-traceur/phases/02-en-cours :: à exécuter
+@@ attendu cycles/01-traceur :: à exécuter
+
+@@ lab traceur-gsd-partition
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/workstreams/gouvernance-banc/STATE.md
+---
+gsd_state_version: 1.0
+---
+
+@@ fichier .planning/cycles/01-traceur/CYCLE.md
+---
+titre: Cycle traceur
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Le périmètre du traceur est-il celui du plan 44-01 ?"
+    structurante: oui
+    statut: ARBITRÉ
+    par: willy
+    le: "2026-09-27"
+    ou: "session principale"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/PLAN.md
+---
+ecrit: livrables/suite.md
+---
+
+@@ fichier livrables/rapport.md
+Rapport livré par la phase 01-livree du lab traceur-gsd-partition.
+
+@@ attendu cycles/01-traceur/phases/01-livree :: close
+@@ attendu cycles/01-traceur/phases/02-en-cours :: à exécuter
+@@ attendu cycles/01-traceur :: à exécuter
