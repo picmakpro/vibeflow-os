@@ -165,12 +165,60 @@ lui-même rendu illisible (mode `000`), le moteur allait jusqu'à **écraser** c
 marqueur `gsd_state_version` disparaissait.
 
 Les classes structurelles du lot 6 (nom à saut de ligne, nom caché, chemin de planning à risque)
-sont conservées comme diagnostic nommé, mais c'est désormais l'égalité d'ensembles par exécution
-(point 1 ci-dessus) qui décide du refus — elle couvre le trou ci-dessus SANS connaître son
-mécanisme exact, et couvrirait de la même façon une future variante du même trou ailleurs dans
-`vf_ws_enumerate`. Une entrée en lien symbolique reste une exclusion DÉCLARÉE du détecteur lui-même
-(avertissement sur stderr) — non masquante au sens de cette garde, volontairement pas retenue ici
-(ne pas sur-refuser un cas déjà connu et accepté du système).
+sont conservées comme diagnostic nommé, et sont FUSIONNÉES dans la même liste de décision que
+l'égalité d'ensembles par exécution (point 1) et la lisibilité réelle (point 2) — n'importe
+laquelle des trois, seule, suffit à refuser (correction de prose, lot 8 : la formulation
+précédente laissait entendre qu'elles n'étaient que descriptives). L'égalité d'ensembles couvre le
+trou ci-dessus SANS connaître son mécanisme exact, et couvrirait de la même façon une future
+variante du même trou ailleurs dans `vf_ws_enumerate`. Une entrée en lien symbolique reste une
+exclusion DÉCLARÉE du détecteur lui-même (avertissement sur stderr) — non masquante au sens de
+cette garde, volontairement pas retenue ici (ne pas sur-refuser un cas déjà connu et accepté du
+système).
+
+**Lien cassé = absent, FIFO refusée sans blocage (P44-D-02a, lot 8, correction de CLASSE)** —
+décision du head sous délégation technique de Willy, session principale, 2026-09-28. Deux
+corrections indépendantes de la garde de lecture du lot 7, mesurées à l'audit du 2026-09-28 :
+
+1. **Lien symbolique CASSÉ (cible absente) = ABSENT, comme pour le détecteur.** Le détecteur lit
+   `STATE.md` via `[ -f ]` (`detect-gsd-engine.sh:96,184`) : ce test **suit** le lien et exige un
+   fichier RÉGULIER à la cible ; sur une cible absente, `[ -f ]` est faux et **aucune lecture n'est
+   tentée**. La garde de lecture du lot 7 confondait ce cas avec une vraie erreur de lecture
+   (`os.path.lexists` — vrai même pour un lien cassé — suivi d'une tentative d'ouverture qui
+   échouait en `ENOENT`, classée « illisible ») : sur-refus mesuré (le moteur refusait d'écrire sur
+   un planning SANS AUCUN marqueur GSD nulle part, uniquement parce qu'un `STATE.md` de
+   compartiment était un lien cassé). `os.path.isfile` (mirroir exact de `[ -f ]`) remplace
+   désormais `os.path.lexists` pour le `STATE.md` racine ET de compartiment. Le `STATE.md` racine
+   en lien cassé reste TOUJOURS refusé, mais PAR AILLEURS — la garde B de `appliquer_ecritures`
+   (« emplacement occupé », `lstat` sans jamais suivre le lien, F4) — jamais un double refus, et la
+   cible du lien n'est jamais créée.
+2. **`STATE.md` en FIFO n'y bloque plus jamais.** `_ouvrable` ouvrait sans `O_NONBLOCK` : une FIFO
+   à cet emplacement bloquait le processus INDÉFINIMENT tant qu'aucun autre processus n'en tenait
+   l'extrémité écriture. `_ouvrable` ouvre désormais en `O_NONBLOCK` (sans effet sur un fichier
+   régulier, dont la lecture nominale ailleurs — `_lire_frontmatter_fichier` — n'est pas affectée)
+   et contrôle le type par `fstat` après ouverture : un type non régulier est un refus nommé,
+   jamais un faux `True`. Note : `os.path.isfile` (point 1) suffit déjà, seul, à éviter d'appeler
+   `_ouvrable` sur une FIFO depuis les deux sites d'appel actuels (`[ -f ]` est aussi faux pour une
+   FIFO — traitée comme absente) ; le durcissement `O_NONBLOCK` reste une défense en profondeur de
+   `_ouvrable` elle-même, exercée directement par la suite de tests, pour tout appel futur qui ne
+   passerait pas par ce même filtre.
+
+### Résidus acceptés (lot 8)
+
+- **TOCTOU entre la garde et le détecteur** : deux lectures indépendantes du disque (la garde de
+  lecture, puis le sous-processus détecteur relancé juste après) — mesuré à 1 écriture sur 15
+  essais avec un `mv` concurrent LOCAL pendant la fenêtre entre les deux lectures
+  (gsd-security-auditor, 2026-09-28). Exige un processus concurrent disposant du droit d'écriture
+  sur l'arbre — aucun contenu versionné (un fichier du modèle, un nom de compartiment) ne peut
+  produire cette fenêtre à lui seul. Résolution durable envisagée : une seule lecture partagée entre
+  la garde et le détecteur, ce qui suppose que le détecteur EXPOSE son énumération plutôt que de la
+  refaire en interne (P44-D-01b — hors périmètre de ce lot, transmis au BACKLOG).
+- **Volume** : `vf_ws_enumerate` mesurée à environ 98 secondes à 3000 compartiments — au-delà du
+  délai de 30 s (`timeout=30` de `_executer_vf_ws_enumerate`), l'exécution échoue et la garde refuse
+  fail-closed (`enumeration-execution-en-echec`), jamais une écriture indue. Un lab à ce volume de
+  compartiments ne peut donc plus jamais écrire par cette voie tant que le volume n'a pas baissé (ou
+  que le délai n'a pas été révisé) — comportement voulu (fail-closed), documenté ici pour qu'un
+  futur lecteur qui déboguerait un refus systématique sur un très gros lab partitionné trouve la
+  réponse ici plutôt qu'en relisant le code.
 
 **Limite assumée** : cette garde ferme la classe pour tout ce qui **voyage par git** (le disque, au
 moment de l'appel). Un résidu strictement local à un poste — un état de permissions qui ne

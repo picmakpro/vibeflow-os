@@ -390,16 +390,28 @@ def _resoudre_bash():
 # silencieux qui traiterait l'élément comme absent ou conforme (F2, revue du lot 6 : `is_symlink`/
 # `is_dir` sous exception faisaient `continue`/`est_dossier=False`, un fail-OPEN).
 # Classes structurelles du lot 6 (nom à saut de ligne, nom caché, chemin de planning à risque)
-# CONSERVÉES comme diagnostic nommé — un futur lecteur doit pouvoir citer le motif précis — mais
-# c'est désormais l'ÉGALITÉ D'ENSEMBLES (point 1) qui décide du refus, jamais ces classes seules :
-# une entrée en lien symbolique reste NON masquante (exclusion DÉCLARÉE du détecteur, F1, ne pas
-# sur-refuser un cas déjà connu et accepté).
+# CONSERVÉES comme diagnostic nommé — un futur lecteur doit pouvoir citer le motif précis. Elles
+# sont FUSIONNÉES dans la MÊME liste de décision que l'ÉGALITÉ D'ENSEMBLES (point 1) et la
+# LISIBILITÉ RÉELLE (point 2, lot 7/8) — correction de prose (revue, lot 8) : n'importe laquelle
+# des trois, seule, suffit à refuser (la décision finale, `len(vues) == 0`, porte sur l'ensemble
+# dédoublonné de TOUTES les classes accumulées, sans distinction de source). Une entrée en lien
+# symbolique reste NON masquante (exclusion DÉCLARÉE du détecteur, F1, ne pas sur-refuser un cas
+# déjà connu et accepté).
 def _ouvrable(chemin, est_dossier):
     """Le chemin est-il RÉELLEMENT ouvrable pour l'utilisateur courant ? Une ouverture RÉELLE —
     `os.scandir` pour un dossier (échoue immédiatement, à l'appel, si le bit `x` manque),
     `os.open` en lecture pour un fichier — JAMAIS `os.access` (déclaratif, pas une lecture, et
     peut mentir sous ACL POSIX ou montage réseau). Toute `OSError` -> False ; jamais une exception
-    qui remonte (F2)."""
+    qui remonte (F2).
+    Branche fichier — durcissement lot 8 (audit local, 2026-09-28) : `O_NONBLOCK` avant tout, puis
+    `fstat` du descripteur pour exiger un type RÉGULIER. Sans `O_NONBLOCK`, ouvrir une FIFO à cet
+    emplacement bloque le processus INDÉFINIMENT tant qu'aucun autre processus n'en tient
+    l'extrémité écriture — mesuré, ce `STATE.md` en FIFO pendait la garde de lecture sans jamais
+    rendre la main. `O_NONBLOCK` rend l'ouverture d'une FIFO immédiate dans tous les cas (POSIX) ;
+    sans effet sur un fichier régulier, dont la lecture nominale — ailleurs, via
+    `_lire_frontmatter_fichier`, sur un descripteur distinct — n'est donc jamais affectée. Le
+    `fstat` referme le cas où l'ouverture réussit malgré tout sur un type non régulier : refus
+    NOMMÉ (False) plutôt qu'un faux `True`."""
     try:
         if est_dossier:
             it = os.scandir(chemin)
@@ -408,8 +420,12 @@ def _ouvrable(chemin, est_dossier):
             finally:
                 it.close()
         else:
-            fd = os.open(chemin, os.O_RDONLY)
-            os.close(fd)
+            fd = os.open(chemin, os.O_RDONLY | os.O_NONBLOCK)
+            try:
+                if not stat.S_ISREG(os.fstat(fd).st_mode):
+                    return False  # _ouvrable : type non régulier (FIFO, périphérique...) -> refus nommé
+            finally:
+                os.close(fd)
         return True
     except OSError:
         return False  # _ouvrable : toute OSError -> refus nommé, jamais un fail-open (F2)
@@ -452,8 +468,19 @@ def _lecture_detecteur_fidele(planning_abs, bash_bin, workstream_policy_sh, env_
 
     # --- Lisibilité RÉELLE du STATE.md racine, s'il existe (priorités 2 ET 3 du détecteur en
     # dépendent TOUTES DEUX — un STATE.md racine illisible masque l'une comme l'autre) -----------
+    # Lot 8 (correction de CLASSE, audit du 2026-09-28) : `os.path.isfile` — jamais
+    # `os.path.lexists` — pour mirer EXACTEMENT la sémantique de `[ -f ]` que lit le détecteur
+    # (`detect-gsd-engine.sh:96,184`) : suit le lien, exige un fichier RÉGULIER à la cible. Un lien
+    # symbolique CASSÉ (cible absente) est donc traité comme ABSENT, exactement comme le détecteur
+    # (`[ -f ]` faux, aucune lecture tentée) — jamais un refus « illisible » (sur-refus mesuré,
+    # audit du 2026-09-28 : `_ouvrable` tentait d'ouvrir une cible qui n'existe pas, ENOENT confondu
+    # avec une vraie erreur de lecture). Un lien vers un régulier lisible reste jugé par
+    # `_ouvrable`, exactement comme avant (`os.path.isfile` suit le lien avant l'appel, `_ouvrable`
+    # aussi). Le `STATE.md` racine occupé par un lien CASSÉ reste refusé PAR AILLEURS — garde B de
+    # `appliquer_ecritures` (« emplacement occupé »), qui `lstat`e sans jamais suivre le lien —
+    # cette garde-ci ne double pas ce refus, elle cesse seulement de sur-refuser AVANT lui.
     etat_racine = os.path.join(planning_abs, "STATE.md")
-    if os.path.lexists(etat_racine) and not _ouvrable(etat_racine, est_dossier=False):
+    if os.path.isfile(etat_racine) and not _ouvrable(etat_racine, est_dossier=False):
         classes.append("state-racine-illisible")
 
     # --- workstreams/ absent, lien, ou non-dossier : rien de plus à vérifier ICI (déjà fermé
@@ -510,8 +537,11 @@ def _lecture_detecteur_fidele(planning_abs, bash_bin, workstream_policy_sh, env_
         if not _ouvrable(entree.path, est_dossier=True):
             classes.append("compartiment-illisible:" + entree.name)
         else:
+            # Lot 8 — même correction que pour `etat_racine` ci-dessus (`os.path.isfile`, jamais
+            # `os.path.lexists` : un lien CASSÉ ici aussi est ABSENT pour le détecteur, jamais
+            # illisible).
             etat_compartiment = os.path.join(entree.path, "STATE.md")
-            if os.path.lexists(etat_compartiment) and not _ouvrable(etat_compartiment, est_dossier=False):
+            if os.path.isfile(etat_compartiment) and not _ouvrable(etat_compartiment, est_dossier=False):
                 classes.append("compartiment-state-illisible:" + entree.name)
 
     # --- Point 1 : FIDÉLITÉ PAR EXÉCUTION — `vf_ws_enumerate` relancée pour de vrai --------------

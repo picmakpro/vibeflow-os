@@ -2312,8 +2312,11 @@ awk '/<<.PY_RECALC_PLANNING_EOF.$/{f=1;next} /^PY_RECALC_PLANNING_EOF$/{f=0} f' 
 
 F3F5_AIDE_PY="$WORK/f3f5-aide.py"
 cat > "$F3F5_AIDE_PY" <<'PY_F3F5_AIDE_EOF'
+import multiprocessing
 import os
 import sys
+import tempfile
+import time
 
 BLOC_F3_CORRIGE = '''def _lister_entrees(dossier):
     try:
@@ -2469,6 +2472,45 @@ def sonder_l2(chemin_corps):
     print("NB_TENTATIVE=%d" % ligne.count("tentative="))
 
 
+# ---------- Lot 8 — `_ouvrable` sur une FIFO, bornée par `multiprocessing` (aucun `timeout`/
+# `gtimeout` sur ce poste) : la fonction réelle est appelée dans un PROCESSUS FILS, `.join(delai)`
+# borne l'attente, `.terminate()` le tue s'il n'est pas revenu — jamais un blocage de la suite. -----
+BLOC_L8_ONONBLOCK_CORRIGE = '''            fd = os.open(chemin, os.O_RDONLY | os.O_NONBLOCK)'''
+
+BLOC_L8_ONONBLOCK_REGRESSE = '''            fd = os.open(chemin, os.O_RDONLY)  # MUT-LOT8-ONONBLOCK (retrait de O_NONBLOCK)'''
+
+
+def _l8_cible_ouvrable(chemin_corps, chemin_fifo, q):
+    ns = charger_espace(chemin_corps)
+    _ouvrable = ns["_ouvrable"]
+    q.put(_ouvrable(chemin_fifo, False))
+
+
+def sonder_ouvrable_fifo(chemin_corps, delai):
+    # Contexte `fork` EXPLICITE (jamais le défaut `spawn` de macOS/Windows) : ce script n'a pas de
+    # garde `if __name__ == "__main__":` — sous `spawn`, le processus fils RÉ-IMPORTE le module
+    # `__main__` et ré-exécute tout le code de niveau module (dont ce même appel), ce qui plante
+    # avant même d'atteindre la FIFO. `fork` (POSIX, toujours disponible sur ce poste bash/zsh) ne
+    # ré-exécute rien : le fils hérite de l'état déjà construit.
+    ctx = multiprocessing.get_context("fork")
+    d = tempfile.mkdtemp(prefix="l8-ouvrable-fifo-")
+    chemin_fifo = os.path.join(d, "FIFO")
+    os.mkfifo(chemin_fifo)
+    q = ctx.Queue()
+    p = ctx.Process(target=_l8_cible_ouvrable, args=(chemin_corps, chemin_fifo, q))
+    t0 = time.time()
+    p.start()
+    p.join(delai)
+    dt = time.time() - t0
+    if p.is_alive():
+        p.terminate()
+        p.join()
+        print("BLOQUE=oui DUREE=%.2f" % dt)
+    else:
+        resultat = q.get() if not q.empty() else None
+        print("BLOQUE=non DUREE=%.2f RESULTAT=%r" % (dt, resultat))
+
+
 mode = sys.argv[1]
 chemin_corps_reel = sys.argv[2]
 if mode == "f3-fixed":
@@ -2481,6 +2523,13 @@ elif mode == "f5-regresse":
     sonder_f5(regresser(chemin_corps_reel, BLOC_F5_CORRIGE, BLOC_F5_REGRESSE, ".f5-regresse.py"))
 elif mode == "l2":
     sonder_l2(chemin_corps_reel)
+elif mode == "ouvrable-fifo-fixed":
+    sonder_ouvrable_fifo(chemin_corps_reel, float(sys.argv[3]))
+elif mode == "ouvrable-fifo-regresse":
+    sonder_ouvrable_fifo(
+        regresser(chemin_corps_reel, BLOC_L8_ONONBLOCK_CORRIGE, BLOC_L8_ONONBLOCK_REGRESSE, ".l8-ononblock-regresse.py"),
+        float(sys.argv[3]),
+    )
 else:
     print("MODE_INCONNU")
     sys.exit(2)
@@ -3253,6 +3302,216 @@ else
       else
         komut OSERROR-IGNOREE "code de sortie" "3" "$RC_M (mutant non opposable)"
       fi
+    fi
+  fi
+fi
+
+# ================================================================================================
+# Lot 8 (correction de CLASSE, décision du head sous délégation technique de Willy, session
+# principale, 2026-09-28) — deux corrections indépendantes sur la garde de lecture du lot 7 :
+#   1. `os.path.isfile` (mirroir EXACT de `[ -f ]`, que lit le détecteur — `detect-gsd-engine.sh:
+#      96,184`) remplace `os.path.lexists` pour juger le `STATE.md` racine ET de compartiment — un
+#      lien symbolique CASSÉ (cible absente) est désormais traité comme ABSENT, exactement comme le
+#      détecteur, jamais un refus « illisible ». ROUGE sur HEAD 345303e (avant ce lot) : sur-refus
+#      côté compartiment (le moteur refusait d'écrire, motif « compartiment-state-illisible », sur
+#      un planning SANS AUCUN marqueur GSD nulle part — `ENOENT` confondu avec une vraie erreur de
+#      lecture) ; le STATE.md racine en lien cassé, lui, reste refusé PAR AILLEURS (garde B de
+#      `appliquer_ecritures`, « emplacement occupé » — inchangée par ce lot, la cible du lien n'est
+#      jamais créée).
+#   2. `_ouvrable` ouvre désormais en `O_NONBLOCK` et contrôle le type par `fstat` — un `STATE.md`
+#      en FIFO n'y bloque plus jamais. ROUGE sur HEAD 345303e : blocage INDÉFINI mesuré par
+#      exécution bornée dans le temps (`subprocess.run(timeout=…)` / `multiprocessing` — ce poste
+#      n'a NI `timeout` NI `gtimeout`).
+# ================================================================================================
+
+# ---------- Aide Python : exécution du moteur bornée dans le temps (aucun `timeout`/`gtimeout` sur
+# ce poste — subprocess.run(timeout=…) borne l'attente, le sous-processus est tué par Python même
+# s'il est bloqué en E/S) ---------------------------------------------------------------------
+LOT8_BORNE_PY="$WORK/lot8-borne.py"
+cat > "$LOT8_BORNE_PY" <<'PY_LOT8_BORNE_EOF'
+import subprocess
+import sys
+import time
+
+recalc, cwd, delai = sys.argv[1], sys.argv[2], float(sys.argv[3])
+t0 = time.time()
+try:
+    proc = subprocess.run(
+        ["bash", recalc, "--planning=.planning"],
+        cwd=cwd, timeout=delai, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+    )
+    dt = time.time() - t0
+    sys.stdout.write("BLOQUE=non\n")
+    sys.stdout.write("RC=%d\n" % proc.returncode)
+    sys.stdout.write("DUREE=%.2f\n" % dt)
+    sys.stdout.write("STDERR=%s\n" % proc.stderr.decode("utf-8", "replace").replace("\n", " | "))
+except subprocess.TimeoutExpired:
+    dt = time.time() - t0
+    sys.stdout.write("BLOQUE=oui\n")
+    sys.stdout.write("DUREE=%.2f\n" % dt)
+PY_LOT8_BORNE_EOF
+
+# ---------- R-LOT8-LIEN-CASSE-COMPARTIMENT — lien cassé, AUCUN marqueur GSD nulle part : traité
+# comme ABSENT, écriture AUTORISÉE (exit 0) -------------------------------------------------------
+L8_D1="$WORK/lot8-lien-casse-compartiment"
+rm -rf "$L8_D1"
+mkdir -p "$L8_D1/.planning/workstreams/gouvernance"
+printf '{"planning_version": "cycles-v1"}\n' > "$L8_D1/.planning/config.json"
+ln -s "$L8_D1/.planning/workstreams/gouvernance/ABSENT.md" "$L8_D1/.planning/workstreams/gouvernance/STATE.md"
+( cd "$L8_D1" && bash "$RECALC" "--planning=.planning" >"$L8_D1.out.txt" 2>"$L8_D1.err.txt" )
+L8_D1_RC=$?
+if [ "$L8_D1_RC" -eq 0 ] && [ -f "$L8_D1/.planning/STATE.md" ]; then
+  ok "R-LOT8-LIEN-CASSE-COMPARTIMENT : lien cassé traité comme absent, écriture autorisée (rc=0)"
+else
+  ko "R-LOT8-LIEN-CASSE-COMPARTIMENT" "rc=0, STATE.md racine écrit" "rc=$L8_D1_RC" "$(cat "$L8_D1.err.txt" | tr '\n' '|')"
+fi
+
+# ---------- R-LOT8-LIEN-CASSE-RACINE — lien cassé RACINE : TOUJOURS refusé (garde B, « emplacement
+# occupé »), la cible du lien n'est JAMAIS créée --------------------------------------------------
+L8_D2="$WORK/lot8-lien-casse-racine"
+rm -rf "$L8_D2"
+mkdir -p "$L8_D2/.planning"
+printf '{"planning_version": "cycles-v1"}\n' > "$L8_D2/.planning/config.json"
+ln -s "$L8_D2/.planning/ABSENT.md" "$L8_D2/.planning/STATE.md"
+( cd "$L8_D2" && bash "$RECALC" "--planning=.planning" >"$L8_D2.out.txt" 2>"$L8_D2.err.txt" )
+L8_D2_RC=$?
+if [ "$L8_D2_RC" -eq 1 ] && grep -qF "emplacement occupé" "$L8_D2.err.txt" && [ ! -e "$L8_D2/.planning/ABSENT.md" ]; then
+  ok "R-LOT8-LIEN-CASSE-RACINE : refus par la garde B (emplacement occupé), cible du lien jamais créée"
+else
+  L8_D2_CIBLE_EXISTE="non"; [ -e "$L8_D2/.planning/ABSENT.md" ] && L8_D2_CIBLE_EXISTE="oui"
+  ko "R-LOT8-LIEN-CASSE-RACINE" "rc=1, « emplacement occupé », cible jamais créée" "rc=$L8_D2_RC" "$(cat "$L8_D2.err.txt" | tr '\n' '|') · cible existe=$L8_D2_CIBLE_EXISTE"
+fi
+
+# ---------- R-LOT8-FIFO-RACINE — STATE.md racine en FIFO : refus RAPIDE (garde B), jamais de
+# blocage (borné à 6s) ------------------------------------------------------------------------
+L8_D3="$WORK/lot8-fifo-racine"
+rm -rf "$L8_D3"
+mkdir -p "$L8_D3/.planning"
+printf '{"planning_version": "cycles-v1"}\n' > "$L8_D3/.planning/config.json"
+mkfifo "$L8_D3/.planning/STATE.md"
+L8_D3_OUT="$("$PYBIN" "$LOT8_BORNE_PY" "$RECALC" "$L8_D3" 6)"
+if echo "$L8_D3_OUT" | grep -q "^BLOQUE=non$" && echo "$L8_D3_OUT" | grep -q "^RC=1$" && echo "$L8_D3_OUT" | grep -q "emplacement occupé"; then
+  ok "R-LOT8-FIFO-RACINE : refus RAPIDE (garde B), jamais de blocage ($(echo "$L8_D3_OUT" | grep '^DUREE='))"
+else
+  ko "R-LOT8-FIFO-RACINE" "BLOQUE=non, RC=1, « emplacement occupé », <6s" "$(echo "$L8_D3_OUT" | tr '\n' '|')" "-"
+fi
+
+# ---------- R-LOT8-FIFO-COMPARTIMENT — STATE.md de compartiment en FIFO, AUCUN marqueur ailleurs :
+# traité comme absent (`[ -f ]` faux sur une FIFO, comme pour le détecteur), écriture AUTORISÉE,
+# RAPIDE, jamais de blocage (borné à 6s) --------------------------------------------------------
+L8_D4="$WORK/lot8-fifo-compartiment"
+rm -rf "$L8_D4"
+mkdir -p "$L8_D4/.planning/workstreams/gouvernance"
+printf '{"planning_version": "cycles-v1"}\n' > "$L8_D4/.planning/config.json"
+mkfifo "$L8_D4/.planning/workstreams/gouvernance/STATE.md"
+L8_D4_OUT="$("$PYBIN" "$LOT8_BORNE_PY" "$RECALC" "$L8_D4" 6)"
+if echo "$L8_D4_OUT" | grep -q "^BLOQUE=non$" && echo "$L8_D4_OUT" | grep -q "^RC=0$"; then
+  ok "R-LOT8-FIFO-COMPARTIMENT : traité comme absent, écriture autorisée, RAPIDE ($(echo "$L8_D4_OUT" | grep '^DUREE='))"
+else
+  ko "R-LOT8-FIFO-COMPARTIMENT" "BLOQUE=non, RC=0, <6s" "$(echo "$L8_D4_OUT" | tr '\n' '|')" "-"
+fi
+
+# ---------- R-LOT8-OUVRABLE-FIFO — `_ouvrable` appelée DIRECTEMENT sur une FIFO (contourne le
+# gate `os.path.isfile` des deux sites d'appel ci-dessus, qui ne l'atteint jamais depuis eux avec
+# le correctif 1 — défense en profondeur exercée quand même, au niveau unitaire) : RAPIDE, refus
+# nommé (False), jamais de blocage --------------------------------------------------------------
+L8_OUVRABLE_FIXE_OUT="$("$PYBIN" "$F3F5_AIDE_PY" ouvrable-fifo-fixed "$F3F5_BODY_REEL" 6 2>&1)"
+if echo "$L8_OUVRABLE_FIXE_OUT" | grep -q "^BLOQUE=non" && echo "$L8_OUVRABLE_FIXE_OUT" | grep -q "RESULTAT=False"; then
+  ok "R-LOT8-OUVRABLE-FIFO : _ouvrable(FIFO) RAPIDE, refus nommé (False) ($L8_OUVRABLE_FIXE_OUT)"
+else
+  ko "R-LOT8-OUVRABLE-FIFO" "BLOQUE=non, RESULTAT=False, <6s" "$L8_OUVRABLE_FIXE_OUT" "-"
+fi
+
+# ---------- MUT-LOT8-ONONBLOCK — `O_NONBLOCK` retiré de `_ouvrable` : la FIFO bloque à nouveau ----
+L8_OUVRABLE_MUT_OUT="$("$PYBIN" "$F3F5_AIDE_PY" ouvrable-fifo-regresse "$F3F5_BODY_REEL" 6 2>&1)"
+if echo "$L8_OUVRABLE_MUT_OUT" | grep -q "BLOC_INTROUVABLE"; then
+  komut LOT8-ONONBLOCK "motif fixe unique (BLOC_L8_ONONBLOCK_CORRIGE) dans le corps extrait" "exactement 1 occurrence" "BLOC INTROUVABLE"
+elif echo "$L8_OUVRABLE_MUT_OUT" | grep -q "^BLOQUE=oui"; then
+  okmut LOT8-ONONBLOCK "_ouvrable(FIFO) · attendu (original, O_NONBLOCK) : RAPIDE, refus nommé (False) · obtenu (mutant, open() nu sans O_NONBLOCK) : BLOQUE ($L8_OUVRABLE_MUT_OUT)"
+else
+  komut LOT8-ONONBLOCK "_ouvrable(FIFO) bloque sans O_NONBLOCK" "BLOQUE=oui" "$L8_OUVRABLE_MUT_OUT (mutant non opposable)"
+fi
+
+# ---------- R-LOT8-TEMOIN — lien de COMPARTIMENT vers un fichier régulier interne (porteur de
+# `gsd_state_version`, puis SANS marqueur) : le verdict du moteur égale TOUJOURS celui du VRAI
+# détecteur lancé directement (oracle différentiel, patron lot 4). Compartiment plutôt que racine :
+# un lien à l'emplacement STATE.md RACINE est refusé par la garde B indépendamment du contenu visé
+# (F4, R-LOT8-LIEN-CASSE-RACINE ci-dessus) — ce n'est pas ce que ce témoin veut isoler. -------------
+lot8_temoin() { # <label> <fn_setup>
+  local label="$1" fn_setup="$2"
+  local dir_oracle="$WORK/lot8-temoin-$label-detecteur" dir_moteur="$WORK/lot8-temoin-$label-moteur"
+  local code_detecteur code_moteur code_attendu
+  materialiser traceur "$dir_oracle"; "$fn_setup" "$dir_oracle"
+  materialiser traceur "$dir_moteur"; "$fn_setup" "$dir_moteur"
+  ( cd "$dir_oracle" && GSD_HOME="$FAKE_GSD" bash "$DETECT" --quiet --path .planning >/dev/null 2>"$WORK/lot8-temoin-$label-detecteur-err.txt" )
+  code_detecteur=$?
+  ( cd "$dir_moteur" && bash "$RECALC" >"$WORK/lot8-temoin-$label-moteur-out.txt" 2>"$WORK/lot8-temoin-$label-moteur-err.txt" )
+  code_moteur=$?
+  case "$code_detecteur" in
+    3) code_attendu=0 ;;
+    0|2) code_attendu=3 ;;
+    *) ko "R-LOT8-TEMOIN [$label] code du détecteur direct" "0, 2 ou 3" "$code_detecteur" "-"; return ;;
+  esac
+  if [ "$code_moteur" -eq "$code_attendu" ]; then
+    ok "R-LOT8-TEMOIN [$label] détecteur direct=$code_detecteur -> moteur=$code_moteur (attendu $code_attendu)"
+  else
+    ko "R-LOT8-TEMOIN [$label] code moteur" "$code_attendu (détecteur direct=$code_detecteur)" "$code_moteur" "$(cat "$WORK/lot8-temoin-$label-moteur-out.txt")"
+  fi
+}
+setup_lot8_lien_vers_marqueur() {
+  mkdir -p "$1/.planning/workstreams/temoin-lot8"
+  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$1/.planning/workstreams/temoin-lot8/STATE.md.cible"
+  ln -s "$1/.planning/workstreams/temoin-lot8/STATE.md.cible" "$1/.planning/workstreams/temoin-lot8/STATE.md"
+}
+setup_lot8_lien_vers_sans_marqueur() {
+  mkdir -p "$1/.planning/workstreams/temoin-lot8"
+  printf -- '---\ntitre: sans marqueur\n---\n' > "$1/.planning/workstreams/temoin-lot8/STATE.md.cible"
+  ln -s "$1/.planning/workstreams/temoin-lot8/STATE.md.cible" "$1/.planning/workstreams/temoin-lot8/STATE.md"
+}
+lot8_temoin lien-vers-marqueur setup_lot8_lien_vers_marqueur
+lot8_temoin lien-vers-sans-marqueur setup_lot8_lien_vers_sans_marqueur
+
+# ---------- MUT-LOT8-LIEN-CASSE-COMPARTIMENT — `os.path.isfile` du compartiment reverti à
+# `os.path.lexists` : le sur-refus du lot 6/7 revient sur le cas R-LOT8-LIEN-CASSE-COMPARTIMENT ---
+if make_recalc_mutant LOT8-LIEN-CASSE-COMPARTIMENT \
+  'if os.path.isfile(etat_compartiment) and not _ouvrable(etat_compartiment, est_dossier=False):' \
+  'if os.path.lexists(etat_compartiment) and not _ouvrable(etat_compartiment, est_dossier=False):  # MUT-LOT8-LIEN-CASSE-COMPARTIMENT'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-lot8-lien-casse-compartiment-cas"
+  rm -rf "$DIR_CAS"
+  mkdir -p "$DIR_CAS/.planning/workstreams/gouvernance"
+  printf '{"planning_version": "cycles-v1"}\n' > "$DIR_CAS/.planning/config.json"
+  ln -s "$DIR_CAS/.planning/workstreams/gouvernance/ABSENT.md" "$DIR_CAS/.planning/workstreams/gouvernance/STATE.md"
+  ( cd "$DIR_CAS" && bash "$MR" >"$WORK/mut-lot8-lien-casse-compartiment-out.txt" 2>"$WORK/mut-lot8-lien-casse-compartiment-err.txt" ); RC_M=$?
+  if ! _verifier_plantage LOT8-LIEN-CASSE-COMPARTIMENT "code de sortie (lien cassé de compartiment, aucun marqueur GSD — R-LOT8-LIEN-CASSE-COMPARTIMENT)" "$WORK/mut-lot8-lien-casse-compartiment-out.txt" "$WORK/mut-lot8-lien-casse-compartiment-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 0 ]; then
+      okmut LOT8-LIEN-CASSE-COMPARTIMENT "code de sortie · attendu (original, os.path.isfile) : 0 · obtenu (mutant, os.path.lexists) : $RC_M (sur-refus : lien cassé confondu avec illisible, régression exacte de l'audit du 2026-09-28)"
+    else
+      komut LOT8-LIEN-CASSE-COMPARTIMENT "code de sortie" "0 (mutant non opposable)" "$RC_M"
+    fi
+  fi
+fi
+
+# ---------- MUT-LOT8-LIEN-CASSE-RACINE — `os.path.isfile` de la racine reverti à `os.path.lexists`
+# : le motif de refus change (garde de lecture, code 3) au lieu de la garde B (« emplacement
+# occupé », code 1) — même issue « refusé », mais pour la MAUVAISE raison (diagnostic divergent) ---
+if make_recalc_mutant LOT8-LIEN-CASSE-RACINE \
+  'if os.path.isfile(etat_racine) and not _ouvrable(etat_racine, est_dossier=False):' \
+  'if os.path.lexists(etat_racine) and not _ouvrable(etat_racine, est_dossier=False):  # MUT-LOT8-LIEN-CASSE-RACINE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-lot8-lien-casse-racine-cas"
+  rm -rf "$DIR_CAS"
+  mkdir -p "$DIR_CAS/.planning"
+  printf '{"planning_version": "cycles-v1"}\n' > "$DIR_CAS/.planning/config.json"
+  ln -s "$DIR_CAS/.planning/ABSENT.md" "$DIR_CAS/.planning/STATE.md"
+  ( cd "$DIR_CAS" && bash "$MR" >"$WORK/mut-lot8-lien-casse-racine-out.txt" 2>"$WORK/mut-lot8-lien-casse-racine-err.txt" ); RC_M=$?
+  if ! _verifier_plantage LOT8-LIEN-CASSE-RACINE "code de sortie (lien cassé racine — R-LOT8-LIEN-CASSE-RACINE)" "$WORK/mut-lot8-lien-casse-racine-out.txt" "$WORK/mut-lot8-lien-casse-racine-err.txt" "$RC_M"; then
+    if [ "$RC_M" -eq 3 ] && ! grep -qF "emplacement occupé" "$WORK/mut-lot8-lien-casse-racine-err.txt"; then
+      okmut LOT8-LIEN-CASSE-RACINE "code/motif de refus · attendu (original, os.path.isfile) : rc=1, « emplacement occupé » (garde B) · obtenu (mutant, os.path.lexists) : rc=$RC_M, « garde de lecture » (diagnostic divergent, régression de traçabilité)"
+    else
+      komut LOT8-LIEN-CASSE-RACINE "code/motif de refus" "rc=3 sans « emplacement occupé »" "rc=$RC_M · $(cat "$WORK/mut-lot8-lien-casse-racine-err.txt" | tr '\n' '|') (mutant non opposable)"
     fi
   fi
 fi

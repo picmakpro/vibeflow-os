@@ -148,6 +148,23 @@
   mal « absent » (code 3, silence nominal) de « lien/non-répertoire/illisible » (code 2) — corrigé.
   Le trou source dans `vf_ws_enumerate` reste hors de portée (P44-D-01b), transmis au BACKLOG pour
   Samuel (propriétaire de `workstream-policy.sh`, Phase 41.1).
+- **Lot 8 (correction de CLASSE, audit du 2026-09-28)** : deux corrections indépendantes de la
+  garde de lecture du lot 7. (1) Un lien symbolique CASSÉ (cible absente) à l'emplacement d'un
+  `STATE.md`, racine ou de compartiment, est désormais traité comme ABSENT — exactement comme le
+  détecteur, dont le `[ -f ]` (`detect-gsd-engine.sh:96,184`) suit le lien et n'y tente aucune
+  lecture sur une cible manquante. `os.path.isfile` (mirroir exact de `[ -f ]`) remplace
+  `os.path.lexists`, dont l'usage confondait un lien cassé (`ENOENT`, aucune lecture possible) avec
+  une vraie erreur de lecture : sur-refus mesuré (écriture refusée sur un planning SANS AUCUN
+  marqueur GSD, uniquement parce qu'un `STATE.md` de compartiment était un lien cassé). Le
+  `STATE.md` racine en lien cassé reste TOUJOURS refusé, mais par la garde B de
+  `appliquer_ecritures` (« emplacement occupé », F4) — jamais un double refus, jamais une écriture
+  à travers le lien. (2) `_ouvrable` ouvre désormais en `O_NONBLOCK` et contrôle le type par
+  `fstat` : un `STATE.md` en FIFO n'y bloque plus jamais (mesuré, blocage indéfini sur HEAD
+  345303e faute de tout processus tenant l'extrémité écriture). Correction de prose associée : le
+  commentaire de la garde de lecture laissait entendre que les classes structurelles du lot 6 « ne
+  décident jamais seules » — elles sont en réalité fusionnées dans la même liste de décision que
+  l'égalité d'ensembles et la lisibilité réelle, n'importe laquelle des trois suffisant seule à
+  refuser. `detect-gsd-engine.sh` et `workstream-policy.sh` restent INCHANGÉS (P44-D-01b).
 
 Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27. Correctifs
 lot 1 : vf-coder, mandat de correction ciblée, 2026-09-28. Lot 2 (code 2 du détecteur,
@@ -155,9 +172,10 @@ assainissement du journal), lot 3 (dédoublonnage assaini, repli code 1 sur socl
 (source unique de vérité pour la détection GSD, encodage injectif du journal), lot 5
 (environnement maîtrisé du sous-processus détecteur construit de zéro, alphabet du journal étendu
 aux contrôles C0/C1), lot 6 (garde de fidélité d'énumération des compartiments de workstream,
-correctifs de revue) et lot 7 (garde de lecture du détecteur, correction de classe — fidélité par
-exécution + lisibilité réelle) : décision du head sous délégation technique de Willy, session
-principale, 2026-09-28.
+correctifs de revue), lot 7 (garde de lecture du détecteur, correction de classe — fidélité par
+exécution + lisibilité réelle) et lot 8 (lien cassé traité comme absent, FIFO non bloquante,
+correction de prose) : décision du head sous délégation technique de Willy, session principale,
+2026-09-28.
 
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
 

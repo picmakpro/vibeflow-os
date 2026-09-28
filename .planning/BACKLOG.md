@@ -1196,6 +1196,24 @@ poser QUE si `cd` a réussi ; sur échec, un code de sortie DISTINCT (ni 0, ni l
 non partitionné) rendrait le cas AUDIBLE plutôt que silencieusement confondu avec « aucun
 compartiment ». Même remède de principe pour un `STATE.md` illisible côté `has_frontmatter_key`.
 
+**Coût à volume et fenêtre TOCTOU, mesurés lot 8 (2026-09-28)** — deux limites supplémentaires de
+cette même primitive, constatées en construisant la garde de lecture du moteur (`recalc-planning.sh`,
+`_lecture_detecteur_fidele`, qui relance `vf_ws_enumerate` pour de vrai à chaque appel du moteur) :
+- **Volume** : `vf_ws_enumerate` mesurée à environ 98 secondes à 3000 compartiments — plus du double
+  du délai de 30 s que la garde de lecture s'impose (`timeout=30`), qui refuse alors fail-closed
+  (`enumeration-execution-en-echec`) plutôt que d'attendre. Un lab partitionné à ce volume de
+  compartiments ne peut donc plus jamais écrire par cette voie tant que le volume n'a pas baissé (ou
+  que le délai côté appelant n'a pas été révisé) — pas un bug du moteur, mais un plafond de
+  performance de `vf_ws_enumerate` elle-même qui devient visible dès qu'un appelant la relance à
+  chaque recalcul plutôt qu'une seule fois par exécution du détecteur.
+- **Fenêtre TOCTOU** : la garde de lecture et le détecteur lisent le disque INDÉPENDAMMENT, à deux
+  instants distincts d'une même exécution — mesuré, 1 écriture sur 15 essais avec un `mv` concurrent
+  LOCAL exécuté entre les deux lectures (gsd-security-auditor, 2026-09-28). Résolution durable
+  envisagée côté appelant : une seule lecture partagée entre la garde et le détecteur, ce qui
+  suppose que `vf_ws_enumerate` (ou `detect-gsd-engine.sh`) EXPOSE son résultat d'énumération à
+  l'appelant plutôt que de le refaire deux fois en interne à chaque appel — hors périmètre de la
+  Phase 44 (P44-D-01b), à cadrer avec la piste durable ci-dessus si `workstream-policy.sh` évolue.
+
 **Propriétaire à la relecture :** Samuel (propriétaire de `workstream-policy.sh`, Phase 41.1).
 
 **Déclencheur de reprise :** la prochaine évolution de `workstream-policy.sh` ou de
