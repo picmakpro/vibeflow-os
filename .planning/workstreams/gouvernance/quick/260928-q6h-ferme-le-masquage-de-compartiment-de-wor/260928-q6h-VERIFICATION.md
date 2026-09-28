@@ -8,7 +8,7 @@ verifier: gsd-verifier (adversarial, independent re-execution)
 # Verification Report — 260928-q6h, garde de fidélité d'énumération (lot 6, Phase 44)
 
 Independent, adversarial re-verification. Every command below was re-executed by the verifier in
-this worktree (`/Users/makwilmak/vibeflow-os/.claude/worktrees/gouvernance-44`) — none of the
+this worktree (repo root, `gouvernance-44`) — none of the
 SUMMARY.md's claimed outputs were trusted without reproduction. No files outside this report were
 modified; no destructive git commands were run.
 
@@ -147,7 +147,7 @@ Built entirely from scratch by the verifier (not copied from SUMMARY.md's trace)
    compartment, materialized independently) and ran the CURRENT (HEAD) script against it, invoked
    directly from its real repo path (so it resolves its own real sibling `detect-gsd-engine.sh`):
    ```
-   $ cd lab-fresh && bash /Users/makwilmak/vibeflow-os/.claude/worktrees/gouvernance-44/plugin/planning-core/scripts/recalc-planning.sh --planning=.planning
+   $ cd lab-fresh && bash <repo-root>/plugin/planning-core/scripts/recalc-planning.sh --planning=.planning
    EXIT:3
    --- stdout ---
    (empty)
