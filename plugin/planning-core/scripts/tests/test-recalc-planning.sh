@@ -27,9 +27,9 @@
 #         racine ne la porte pas) → code 3.
 #   R14 — umask 0077 : INDEX.md/STATE.md/cloture.log portent 0o644 malgré le umask.
 #   MUT-ADHESION, MUT-LECTURE-SEULE, MUT-GSD, MUT-GSD-FERME, MUT-GSD-IRREGULIER, MUT-AJOUT,
-#   MUT-DEDOUBLONNAGE, MUT-NOFOLLOW, MUT-CHAINE-ABSENTE, MUT-PARTITION-ABSENTE, MUT-CHMOD,
-#   MUT-CHMOD-JOURNAL — chacun mute une ligne à motif unique de recalc-planning.sh, chacun prouvé
-#   par une trace assertion/attendu (original)/obtenu (mutant).
+#   MUT-DEDOUBLONNAGE, MUT-NOFOLLOW, MUT-CHMOD, MUT-CHMOD-JOURNAL — chacun mute une ligne à motif
+#   unique de recalc-planning.sh, chacun prouvé par une trace assertion/attendu (original)/obtenu
+#   (mutant).
 #
 # Lot 3 (correction ciblée, décision du head sous délégation technique de Willy, session
 # principale, 2026-09-28) :
@@ -39,10 +39,36 @@
 #   R-GSD-HOME-SIGNAL — (a) environnement normal et (b) GSD_HOME inexistant sur un socle
 #         planning-core + signal de code : refus IDENTIQUE (code 3) dans les deux cas, empreinte
 #         inchangée (audit, constat 2).
-#   MUT-CODE1-SOCLE-SIGNAL — repli code 1 sur la combinaison socle+signal neutralisé.
 #
 #   MUT-SYNTAXE, MUT-REFUS-COMPTE, MUT-PLANTAGE — gardes du harnais lui-même (patron
 #   test-check-skills.sh).
+#
+# Lot 4 (correction de CLASSE, décision du head sous délégation technique de Willy, session
+# principale, 2026-09-28) — la détection GSD n'est plus réimplémentée en Python (trois copies
+# mesurées divergentes au lot 3, ce qui a motivé ce lot) : le moteur appelle désormais le VRAI
+# détecteur bash, dans un environnement MAÎTRISÉ (GSD_HOME toujours existant), et REFUSE d'écrire
+# sur tout code de sortie hors {0, 2, 3} (fail-closed) :
+#   R-DETECTEUR-LIEN, R-DETECTEUR-ILLISIBLE, R-DETECTEUR-CODE1-INATTENDU — détecteur en lien
+#         symbolique / chmod 000 / factice sorti en 1 → refus (code 3), empreinte inchangée.
+#   R-ORACLE-DIFFERENTIEL — sur cinq scénarios (terrain libre, marqueur racine, marqueur de
+#         compartiment, partition, socle+signal), le verdict du moteur correspond TOUJOURS à celui
+#         du vrai détecteur lancé directement avec un GSD_HOME valide.
+#   R-MATRICE-ENV — les cinq mêmes scénarios, sous six colonnes d'environnement hérité (normal,
+#         GSD_HOME inexistant/vide/piégé, CLAUDE_CONFIG_DIR vide, HOME vide) : code de sortie et
+#         contenu écrit IDENTIQUES sur toutes les colonnes.
+#   R-LABS-ADVERSES — les trois divergences mesurées au lot 3 (`package.json` en lien, `*.xcodeproj`
+#         en lien, `STATE.md` aux octets UTF-8 invalides après le frontmatter), chacune combinée au
+#         socle planning-core : refus (code 3), marqueur STATE.md intact octet pour octet.
+#   R-INJECTIF-GENERATIF, R-INJECTIF-ROUNDTRIP — `_jeton_journal` encode désormais en pourcent, de
+#         façon INJECTIVE (P44-D-11) : preuve générative (2000 paires, graine fixe, zéro collision,
+#         round-trip pourcent) + round-trip réel à deux exécutions sur le même chemin de phase.
+#   MUT-ENV-NON-MAITRISE, MUT-CODE1-NON-GSD, MUT-JOURNAL-SANITIZE (mise à jour) — chacun mute une
+#         ligne à motif unique, chacun prouvé par une trace assertion/attendu (original)/obtenu
+#         (mutant). MUT-CHAINE-ABSENTE, MUT-PARTITION-ABSENTE, MUT-MARQUEUR-RACINE,
+#         MUT-MARQUEUR-COMPARTIMENT, MUT-PARTITION-COMPARTIMENT, MUT-CODE1-SANS-MARQUEUR et
+#         MUT-CODE1-SOCLE-SIGNAL sont RETIRÉS : leur cible (la réimplémentation Python) n'existe
+#         plus — R-ORACLE-DIFFERENTIEL et R-MATRICE-ENV couvrent désormais les mêmes scénarios
+#         contre la source unique de vérité.
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1652,41 +1678,97 @@ if make_recalc_mutant NOFOLLOW 'SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0
   fi
 fi
 
-# ---------- MUT-CHAINE-ABSENTE — lecture indépendante de STATE.md racine neutralisée -------------
-if make_recalc_mutant CHAINE-ABSENTE \
-  'if _porte_marqueur_gsd(os.path.join(planning_abs, "STATE.md")):' \
-  'if False:  # MUT-CHAINE-ABSENTE'
+# ================================================================================================
+# Lot 4 (correction de CLASSE, décision du head sous délégation technique de Willy, session
+# principale, 2026-09-28) — le moteur appelle désormais le VRAI détecteur bash dans un
+# environnement MAÎTRISÉ (GSD_HOME toujours existant) au lieu d'en réimplémenter les priorités en
+# Python ; écriture autorisée SEULEMENT si le détecteur rend 3 ; détecteur absent, en lien, non
+# régulier, illisible, ou dont l'exécution échoue -> refus fail-closed nommé.
+# ================================================================================================
+
+# ---------- R-DETECTEUR-LIEN — détecteur en lien symbolique : non régulier, refus -----------------
+R_DETLIEN_DIR="$WORK/r-detecteur-lien-cas"; R_DETLIEN_SCRIPTS="$WORK/r-detecteur-lien-scripts"
+materialiser traceur "$R_DETLIEN_DIR"
+mkdir -p "$R_DETLIEN_SCRIPTS"
+cp "$RECALC" "$R_DETLIEN_SCRIPTS/recalc-planning.sh"
+ln -s "$DETECT" "$R_DETLIEN_SCRIPTS/detect-gsd-engine.sh"
+empreinte "$R_DETLIEN_DIR" > "$WORK/r-detecteur-lien-avant.txt"
+( cd "$R_DETLIEN_DIR" && bash "$R_DETLIEN_SCRIPTS/recalc-planning.sh" >"$WORK/r-detecteur-lien-out.txt" 2>"$WORK/r-detecteur-lien-err.txt" )
+R_DETLIEN_RC=$?
+empreinte "$R_DETLIEN_DIR" > "$WORK/r-detecteur-lien-apres.txt"
+if [ "$R_DETLIEN_RC" -eq 3 ]; then ok "R-DETECTEUR-LIEN code de sortie 3"; else ko "R-DETECTEUR-LIEN code" "3" "$R_DETLIEN_RC" "$(cat "$WORK/r-detecteur-lien-out.txt")"; fi
+if grep -q "détecteur non régulier" "$WORK/r-detecteur-lien-err.txt"; then ok "R-DETECTEUR-LIEN stderr mentionne détecteur non régulier"; else ko "R-DETECTEUR-LIEN stderr" "détecteur non régulier" "$(cat "$WORK/r-detecteur-lien-err.txt")" "-"; fi
+if cmp -s "$WORK/r-detecteur-lien-avant.txt" "$WORK/r-detecteur-lien-apres.txt"; then ok "R-DETECTEUR-LIEN empreinte identique"; else ko "R-DETECTEUR-LIEN empreinte" "identique" "diverge" "-"; fi
+
+# ---------- R-DETECTEUR-ILLISIBLE — détecteur régulier, chmod 000 : non exécutable, refus ---------
+R_DETILL_DIR="$WORK/r-detecteur-illisible-cas"; R_DETILL_SCRIPTS="$WORK/r-detecteur-illisible-scripts"
+materialiser traceur "$R_DETILL_DIR"
+mkdir -p "$R_DETILL_SCRIPTS"
+cp "$RECALC" "$R_DETILL_SCRIPTS/recalc-planning.sh"
+cp "$DETECT" "$R_DETILL_SCRIPTS/detect-gsd-engine.sh"
+chmod 000 "$R_DETILL_SCRIPTS/detect-gsd-engine.sh"
+empreinte "$R_DETILL_DIR" > "$WORK/r-detecteur-illisible-avant.txt"
+( cd "$R_DETILL_DIR" && bash "$R_DETILL_SCRIPTS/recalc-planning.sh" >"$WORK/r-detecteur-illisible-out.txt" 2>"$WORK/r-detecteur-illisible-err.txt" )
+R_DETILL_RC=$?
+empreinte "$R_DETILL_DIR" > "$WORK/r-detecteur-illisible-apres.txt"
+chmod 700 "$R_DETILL_SCRIPTS/detect-gsd-engine.sh"
+if [ "$R_DETILL_RC" -eq 3 ]; then ok "R-DETECTEUR-ILLISIBLE code de sortie 3"; else ko "R-DETECTEUR-ILLISIBLE code" "3" "$R_DETILL_RC" "$(cat "$WORK/r-detecteur-illisible-out.txt")"; fi
+if cmp -s "$WORK/r-detecteur-illisible-avant.txt" "$WORK/r-detecteur-illisible-apres.txt"; then ok "R-DETECTEUR-ILLISIBLE empreinte identique"; else ko "R-DETECTEUR-ILLISIBLE empreinte" "identique" "diverge" "-"; fi
+
+# ---------- R-DETECTEUR-CODE1-INATTENDU — détecteur qui rend 1 malgré GSD_HOME maîtrisé : refus --
+# Fixture ARTIFICIELLE (le vrai détecteur ne peut plus rendre 1 sous environnement maîtrisé — c'est
+# précisément ce que ce lot garantit) : un détecteur FACTICE qui sort inconditionnellement en 1,
+# pour prouver que le repli fail-closed (jamais une retombée en écriture) tient MÊME sur ce code.
+R_DETC1_DIR="$WORK/r-detecteur-code1-cas"; R_DETC1_SCRIPTS="$WORK/r-detecteur-code1-scripts"
+materialiser traceur "$R_DETC1_DIR"
+mkdir -p "$R_DETC1_SCRIPTS"
+cp "$RECALC" "$R_DETC1_SCRIPTS/recalc-planning.sh"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$R_DETC1_SCRIPTS/detect-gsd-engine.sh"
+chmod +x "$R_DETC1_SCRIPTS/detect-gsd-engine.sh"
+empreinte "$R_DETC1_DIR" > "$WORK/r-detecteur-code1-avant.txt"
+( cd "$R_DETC1_DIR" && bash "$R_DETC1_SCRIPTS/recalc-planning.sh" >"$WORK/r-detecteur-code1-out.txt" 2>"$WORK/r-detecteur-code1-err.txt" )
+R_DETC1_RC=$?
+empreinte "$R_DETC1_DIR" > "$WORK/r-detecteur-code1-apres.txt"
+if [ "$R_DETC1_RC" -eq 3 ]; then ok "R-DETECTEUR-CODE1-INATTENDU code de sortie 3 (fail-closed)"; else ko "R-DETECTEUR-CODE1-INATTENDU code" "3" "$R_DETC1_RC" "$(cat "$WORK/r-detecteur-code1-out.txt")"; fi
+if cmp -s "$WORK/r-detecteur-code1-avant.txt" "$WORK/r-detecteur-code1-apres.txt"; then ok "R-DETECTEUR-CODE1-INATTENDU empreinte identique"; else ko "R-DETECTEUR-CODE1-INATTENDU empreinte" "identique" "diverge" "-"; fi
+
+# ---------- MUT-ENV-NON-MAITRISE — surcharge de GSD_HOME retirée : verdict qui dépend à nouveau --
+# de l'environnement hérité. Discriminant : R13 (b), jumeau sans aucun marqueur GSD (terrain
+# libre) — l'original écrit (code 0) quel que soit GSD_HOME hérité ; sans la surcharge, un
+# GSD_HOME hérité cassé fait sortir le VRAI détecteur en priorité 1 (code 1), et le fail-closed du
+# moteur refuse alors à tort (code 3) une écriture pourtant légitime.
+if make_recalc_mutant ENV-NON-MAITRISE \
+  'env_maitrise["GSD_HOME"] = os.path.dirname(detect_sh)' \
+  'pass  # MUT-ENV-NON-MAITRISE'
 then
   MR="$MUT_DIR/recalc-planning.sh"
-  DIR_CAS="$WORK/mut-chaine-absente-cas"
+  DIR_CAS="$WORK/mut-env-non-maitrise-cas"
   materialiser traceur "$DIR_CAS"
-  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$DIR_CAS/.planning/STATE.md"
-  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-chaine-absente-out.txt" 2>"$WORK/mut-chaine-absente-err.txt" ); RC_M=$?
-  if ! _verifier_plantage CHAINE-ABSENTE "code de sortie de R13 (a)" "$WORK/mut-chaine-absente-out.txt" "$WORK/mut-chaine-absente-err.txt" "$RC_M"; then
-    if [ "$RC_M" -ne 3 ]; then
-      okmut CHAINE-ABSENTE "code de sortie de R13 (a) · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré chaîne GSD absente de la machine)"
+  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-env-non-maitrise-out.txt" 2>"$WORK/mut-env-non-maitrise-err.txt" ); RC_M=$?
+  if ! _verifier_plantage ENV-NON-MAITRISE "code de sortie de R13 (b), GSD_HOME hérité cassé" "$WORK/mut-env-non-maitrise-out.txt" "$WORK/mut-env-non-maitrise-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 0 ]; then
+      okmut ENV-NON-MAITRISE "code de sortie de R13 (b) · attendu (original) : 0 · obtenu (mutant) : $RC_M (refus à tort d'un terrain libre, au seul motif d'un GSD_HOME hérité cassé)"
     else
-      komut CHAINE-ABSENTE "code de sortie de R13 (a)" "3" "$RC_M (mutant non opposable)"
+      komut ENV-NON-MAITRISE "code de sortie de R13 (b)" "0" "$RC_M (mutant non opposable)"
     fi
   fi
 fi
 
-# ---------- MUT-PARTITION-ABSENTE — énumération des compartiments neutralisée --------------------
-if make_recalc_mutant PARTITION-ABSENTE \
-  'compartiments = _lister_compartiments(planning_abs)' \
-  'compartiments = []  # MUT-PARTITION-ABSENTE'
-then
+# ---------- MUT-CODE1-NON-GSD — repli fail-closed du code 1 changé en écriture autorisée ---------
+if make_recalc_mutant CODE1-NON-GSD 'return "non-concluante"  # motif-code-1-ferme' 'return "non-gsd"  # MUT-CODE1-NON-GSD'; then
   MR="$MUT_DIR/recalc-planning.sh"
-  DIR_CAS="$WORK/mut-partition-absente-cas"
+  DIR_CAS="$WORK/mut-code1-non-gsd-cas"; SCRIPTS_CAS="$WORK/mut-code1-non-gsd-scripts"
   materialiser traceur "$DIR_CAS"
-  mkdir -p "$DIR_CAS/.planning/workstreams/gouvernance-banc"
-  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$DIR_CAS/.planning/workstreams/gouvernance-banc/STATE.md"
-  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-partition-absente-out.txt" 2>"$WORK/mut-partition-absente-err.txt" ); RC_M=$?
-  if ! _verifier_plantage PARTITION-ABSENTE "code de sortie de R13 (c)" "$WORK/mut-partition-absente-out.txt" "$WORK/mut-partition-absente-err.txt" "$RC_M"; then
+  mkdir -p "$SCRIPTS_CAS"
+  cp "$MR" "$SCRIPTS_CAS/recalc-planning.sh"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$SCRIPTS_CAS/detect-gsd-engine.sh"
+  chmod +x "$SCRIPTS_CAS/detect-gsd-engine.sh"
+  ( cd "$DIR_CAS" && bash "$SCRIPTS_CAS/recalc-planning.sh" >"$WORK/mut-code1-non-gsd-out.txt" 2>"$WORK/mut-code1-non-gsd-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CODE1-NON-GSD "code de sortie de R-DETECTEUR-CODE1-INATTENDU" "$WORK/mut-code1-non-gsd-out.txt" "$WORK/mut-code1-non-gsd-err.txt" "$RC_M"; then
     if [ "$RC_M" -ne 3 ]; then
-      okmut PARTITION-ABSENTE "code de sortie de R13 (c) · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture sur un planning GSD partitionné malgré la chaîne GSD absente)"
+      okmut CODE1-NON-GSD "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré un détecteur qui rend 1)"
     else
-      komut PARTITION-ABSENTE "code de sortie de R13 (c)" "3" "$RC_M (mutant non opposable)"
+      komut CODE1-NON-GSD "code de sortie" "3" "$RC_M (mutant non opposable)"
     fi
   fi
 fi
@@ -2438,7 +2520,32 @@ fi
 # attente) — les deux marqueurs qui le remplacent sont couverts en fin de bloc (lot 2).
 # ================================================================================================
 
+# ---------- MUT-BASH-INTROUVABLE — repli « bash introuvable » changé en non-gsd ------------------
+if make_recalc_mutant BASH-INTROUVABLE 'return "non-concluante"  # motif-bash-introuvable' 'return "non-gsd"  # MUT-BASH-INTROUVABLE'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-bash-introuvable-cas"
+  materialiser traceur "$DIR_CAS"
+  MIN_PATH="$WORK/mut-bash-introuvable-path"
+  mkdir -p "$MIN_PATH"
+  ln -sf "$(command -v python3)" "$MIN_PATH/python3"
+  ln -sf "$(command -v dirname)" "$MIN_PATH/dirname"
+  # PATH restreint à python3+dirname : shutil.which("bash") rend None — "$BASH_BIN" (chemin
+  # absolu, résolu AVANT la restriction) contourne le même problème pour l'invocation du script
+  # lui-même.
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" PATH="$MIN_PATH" "$BASH_BIN" "$MR" >"$WORK/mut-bash-introuvable-out.txt" 2>"$WORK/mut-bash-introuvable-err.txt" ); RC_M=$?
+  if ! _verifier_plantage BASH-INTROUVABLE "code de sortie sur bash introuvable (PATH sans bash)" "$WORK/mut-bash-introuvable-out.txt" "$WORK/mut-bash-introuvable-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut BASH-INTROUVABLE "code de sortie sur bash introuvable · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré un interpréteur bash introuvable)"
+    else
+      komut BASH-INTROUVABLE "code de sortie sur bash introuvable" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
 # ---------- MUT-SOUS-PROCESSUS — repli « sous-processus en échec » changé en non-gsd -------------
+# Scénario distinct de MUT-BASH-INTROUVABLE : "bash" est RÉSOLU par shutil.which (present dans le
+# PATH, bit exécutable posé), mais le FICHIER n'est pas un exécutable valide (aucun shebang) — exec
+# échoue à l'exécution (ENOEXEC), après la résolution, capturé par le except Exception générique.
 if make_recalc_mutant SOUS-PROCESSUS 'return "non-concluante"  # motif-sous-processus-en-echec' 'return "non-gsd"  # MUT-SOUS-PROCESSUS'; then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-sous-processus-cas"
@@ -2447,12 +2554,10 @@ if make_recalc_mutant SOUS-PROCESSUS 'return "non-concluante"  # motif-sous-proc
   mkdir -p "$MIN_PATH"
   ln -sf "$(command -v python3)" "$MIN_PATH/python3"
   ln -sf "$(command -v dirname)" "$MIN_PATH/dirname"
-  # PATH restreint à python3+dirname : "bash" (invoqué par detection_gsd via subprocess.run)
-  # devient introuvable — FileNotFoundError, capturée par le except Exception qui rend
-  # motif-sous-processus-en-echec. "$BASH_BIN" (chemin absolu, résolu AVANT la restriction)
-  # contourne le même problème pour l'invocation du script lui-même.
+  printf 'ceci-n-est-pas-un-script-valide\n' > "$MIN_PATH/bash"
+  chmod +x "$MIN_PATH/bash"
   ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" PATH="$MIN_PATH" "$BASH_BIN" "$MR" >"$WORK/mut-sous-processus-out.txt" 2>"$WORK/mut-sous-processus-err.txt" ); RC_M=$?
-  if ! _verifier_plantage SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec (PATH sans bash)" "$WORK/mut-sous-processus-out.txt" "$WORK/mut-sous-processus-err.txt" "$RC_M"; then
+  if ! _verifier_plantage SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec (bash résolu, exec invalide)" "$WORK/mut-sous-processus-out.txt" "$WORK/mut-sous-processus-err.txt" "$RC_M"; then
     if [ "$RC_M" -ne 3 ]; then
       okmut SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré une détection non concluante)"
     else
@@ -2461,73 +2566,169 @@ if make_recalc_mutant SOUS-PROCESSUS 'return "non-concluante"  # motif-sous-proc
   fi
 fi
 
-# ---------- MUT-MARQUEUR-RACINE — marqueur GSD racine (code 1) changé en non-gsd -----------------
-if make_recalc_mutant MARQUEUR-RACINE 'return "gsd"  # motif-marqueur-racine' 'return "non-gsd"  # MUT-MARQUEUR-RACINE'; then
-  MR="$MUT_DIR/recalc-planning.sh"
-  DIR_CAS="$WORK/mut-marqueur-racine-cas"
-  materialiser traceur "$DIR_CAS"
-  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$DIR_CAS/.planning/STATE.md"
-  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-marqueur-racine-out.txt" 2>"$WORK/mut-marqueur-racine-err.txt" ); RC_M=$?
-  if ! _verifier_plantage MARQUEUR-RACINE "code de sortie (STATE.md racine porte gsd_state_version, chaîne GSD absente)" "$WORK/mut-marqueur-racine-out.txt" "$WORK/mut-marqueur-racine-err.txt" "$RC_M"; then
-    if [ "$RC_M" -ne 3 ]; then
-      okmut MARQUEUR-RACINE "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré le marqueur GSD racine)"
-    else
-      komut MARQUEUR-RACINE "code de sortie" "3" "$RC_M (mutant non opposable)"
-    fi
-  fi
-fi
+# ================================================================================================
+# Aides partagées (item 2a/2b, lot 4) — cinq scénarios de détection matérialisés par une fonction
+# de setup dédiée, sur le socle commun `traceur`.
+# ================================================================================================
+setup_terrain_libre() { :; }
+setup_marqueur_racine() { printf -- '---\ngsd_state_version: 1.0\n---\n' > "$1/.planning/STATE.md"; }
+setup_marqueur_compartiment() {
+  mkdir -p "$1/.planning/workstreams/gouvernance-banc"
+  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$1/.planning/workstreams/gouvernance-banc/STATE.md"
+}
+setup_partition_compartiment() {
+  mkdir -p "$1/.planning/workstreams/gouvernance-banc"
+  printf -- '---\nworkstream: gouvernance-banc\ncreated: 2026-09-28\n---\n' > "$1/.planning/workstreams/gouvernance-banc/STATE.md"
+}
+setup_socle_signal() {
+  printf -- '---\nplanning_version: "2.0"\n---\n' > "$1/.planning/STATE.md"
+  printf '%s' '{}' > "$1/package.json"
+}
 
-# ---------- MUT-MARQUEUR-COMPARTIMENT — marqueur GSD d'un compartiment changé en non-gsd ---------
-if make_recalc_mutant MARQUEUR-COMPARTIMENT 'return "gsd"  # motif-marqueur-compartiment' 'return "non-gsd"  # MUT-MARQUEUR-COMPARTIMENT'; then
-  MR="$MUT_DIR/recalc-planning.sh"
-  DIR_CAS="$WORK/mut-marqueur-compartiment-cas"
-  materialiser traceur "$DIR_CAS"
-  mkdir -p "$DIR_CAS/.planning/workstreams/gouvernance-banc"
-  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$DIR_CAS/.planning/workstreams/gouvernance-banc/STATE.md"
-  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-marqueur-compartiment-out.txt" 2>"$WORK/mut-marqueur-compartiment-err.txt" ); RC_M=$?
-  if ! _verifier_plantage MARQUEUR-COMPARTIMENT "code de sortie (compartiment porte gsd_state_version, racine et chaîne GSD absentes)" "$WORK/mut-marqueur-compartiment-out.txt" "$WORK/mut-marqueur-compartiment-err.txt" "$RC_M"; then
-    if [ "$RC_M" -ne 3 ]; then
-      okmut MARQUEUR-COMPARTIMENT "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré le marqueur GSD d'un compartiment)"
-    else
-      komut MARQUEUR-COMPARTIMENT "code de sortie" "3" "$RC_M (mutant non opposable)"
-    fi
+# ================================================================================================
+# R-ORACLE-DIFFERENTIEL (item 2b, lot 4) — le verdict d'écriture du moteur correspond TOUJOURS à
+# celui du VRAI détecteur lancé directement avec un GSD_HOME valide : détecteur 3 -> moteur écrit
+# (0) ; détecteur 0 ou 2 -> moteur refuse (3). Deux labs distincts (jamais le même disque avant/
+# après) pour ne dépendre d'aucun ordre d'exécution.
+# ================================================================================================
+oracle_differentiel() { # <label> <fn_setup>
+  local label="$1" fn_setup="$2"
+  local dir_oracle="$WORK/oracle-$label-detecteur" dir_moteur="$WORK/oracle-$label-moteur"
+  local code_detecteur code_moteur code_attendu
+  materialiser traceur "$dir_oracle"; "$fn_setup" "$dir_oracle"
+  materialiser traceur "$dir_moteur"; "$fn_setup" "$dir_moteur"
+  ( cd "$dir_oracle" && GSD_HOME="$FAKE_GSD" bash "$DETECT" --quiet --path .planning >/dev/null 2>"$WORK/oracle-$label-detecteur-err.txt" )
+  code_detecteur=$?
+  ( cd "$dir_moteur" && bash "$RECALC" >"$WORK/oracle-$label-moteur-out.txt" 2>"$WORK/oracle-$label-moteur-err.txt" )
+  code_moteur=$?
+  case "$code_detecteur" in
+    3) code_attendu=0 ;;
+    0|2) code_attendu=3 ;;
+    *) ko "R-ORACLE-DIFFERENTIEL [$label] code du détecteur direct" "0, 2 ou 3" "$code_detecteur" "-"; return ;;
+  esac
+  if [ "$code_moteur" -eq "$code_attendu" ]; then
+    ok "R-ORACLE-DIFFERENTIEL [$label] détecteur direct=$code_detecteur -> moteur=$code_moteur (attendu $code_attendu)"
+  else
+    ko "R-ORACLE-DIFFERENTIEL [$label] code moteur" "$code_attendu (détecteur direct=$code_detecteur)" "$code_moteur" "$(cat "$WORK/oracle-$label-moteur-out.txt")"
   fi
-fi
+}
+oracle_differentiel terrain-libre setup_terrain_libre
+oracle_differentiel marqueur-racine setup_marqueur_racine
+oracle_differentiel marqueur-compartiment setup_marqueur_compartiment
+oracle_differentiel partition-compartiment setup_partition_compartiment
+oracle_differentiel socle-signal setup_socle_signal
 
-# ---------- MUT-PARTITION-COMPARTIMENT — frontmatter réduit (workstream:+created:) changé --------
-# Fixture DÉDIÉE (F2) : aucun test existant n'exerçait motif-partition-compartiment avant ce lot —
-# compartiment SANS gsd_state_version, seulement workstream:+created: (facture `workstream
-# create`), chaîne GSD absente de la machine.
-if make_recalc_mutant PARTITION-COMPARTIMENT 'return "gsd"  # motif-partition-compartiment' 'return "non-gsd"  # MUT-PARTITION-COMPARTIMENT'; then
-  MR="$MUT_DIR/recalc-planning.sh"
-  DIR_CAS="$WORK/mut-partition-compartiment-cas"
-  materialiser traceur "$DIR_CAS"
-  mkdir -p "$DIR_CAS/.planning/workstreams/gouvernance-banc"
-  printf -- '---\nworkstream: gouvernance-banc\ncreated: 2026-09-28\n---\n' > "$DIR_CAS/.planning/workstreams/gouvernance-banc/STATE.md"
-  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-partition-compartiment-out.txt" 2>"$WORK/mut-partition-compartiment-err.txt" ); RC_M=$?
-  if ! _verifier_plantage PARTITION-COMPARTIMENT "code de sortie (compartiment workstream:+created: sans gsd_state_version, chaîne GSD absente)" "$WORK/mut-partition-compartiment-out.txt" "$WORK/mut-partition-compartiment-err.txt" "$RC_M"; then
-    if [ "$RC_M" -ne 3 ]; then
-      okmut PARTITION-COMPARTIMENT "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré le frontmatter réduit d'un compartiment partitionné)"
-    else
-      komut PARTITION-COMPARTIMENT "code de sortie" "3" "$RC_M (mutant non opposable)"
-    fi
-  fi
-fi
+# ================================================================================================
+# R-MATRICE-ENV (item 2a, lot 4) — le verdict de détection ne dépend JAMAIS de l'environnement
+# hérité : code de sortie IDENTIQUE sous GSD_HOME normal/inexistant/vide/piégé (faux gsd-core), et
+# sous CLAUDE_CONFIG_DIR/HOME vides (GSD_HOME absent de l'environnement) — six colonnes, sur les
+# cinq mêmes scénarios. Quand le verdict écrit (code 0), le contenu produit (INDEX.md) est en plus
+# comparé octet pour octet à la première colonne qui a écrit.
+# ================================================================================================
+MATRICE_VIDE_1="$(mktemp -d)"; MATRICE_VIDE_2="$(mktemp -d)"; MATRICE_VIDE_3="$(mktemp -d)"
+MATRICE_FAUX_GSD="$(mktemp -d)"; mkdir -p "$MATRICE_FAUX_GSD/bin"
 
-# ---------- MUT-CODE1-SANS-MARQUEUR — repli « aucun marqueur » changé en gsd ---------------------
-if make_recalc_mutant CODE1-SANS-MARQUEUR 'return "non-gsd"  # motif-code-1-sans-marqueur' 'return "gsd"  # MUT-CODE1-SANS-MARQUEUR'; then
-  MR="$MUT_DIR/recalc-planning.sh"
-  DIR_CAS="$WORK/mut-code1-sans-marqueur-cas"
-  materialiser traceur "$DIR_CAS"
-  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-code1-sans-marqueur-out.txt" 2>"$WORK/mut-code1-sans-marqueur-err.txt" ); RC_M=$?
-  if ! _verifier_plantage CODE1-SANS-MARQUEUR "code de sortie (aucun marqueur nulle part, chaîne GSD absente — R13 (b))" "$WORK/mut-code1-sans-marqueur-out.txt" "$WORK/mut-code1-sans-marqueur-err.txt" "$RC_M"; then
-    if [ "$RC_M" -ne 0 ]; then
-      okmut CODE1-SANS-MARQUEUR "code de sortie · attendu (original) : 0 · obtenu (mutant) : $RC_M (refus alors qu'aucun marqueur GSD n'est présent)"
+matrice_env() { # <label> <fn_setup> <code_attendu>
+  local label="$1" fn_setup="$2" code_attendu="$3"
+  local combos="normal ghome-inexistant ghome-vide ghome-piege claude-config-vide home-vide"
+  local combo dir rc ref_index=""
+  for combo in $combos; do
+    dir="$WORK/matrice-$label-$combo"
+    materialiser traceur "$dir"
+    "$fn_setup" "$dir"
+    case "$combo" in
+      normal)
+        ( cd "$dir" && bash "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      ghome-inexistant)
+        ( cd "$dir" && GSD_HOME="$WORK/matrice-inexistant-$label" bash "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      ghome-vide)
+        ( cd "$dir" && GSD_HOME="$MATRICE_VIDE_1" bash "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      ghome-piege)
+        ( cd "$dir" && GSD_HOME="$MATRICE_FAUX_GSD" bash "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      claude-config-vide)
+        ( cd "$dir" && unset GSD_HOME; CLAUDE_CONFIG_DIR="$MATRICE_VIDE_2" bash "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      home-vide)
+        ( cd "$dir" && unset GSD_HOME CLAUDE_CONFIG_DIR; HOME="$MATRICE_VIDE_3" bash "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+    esac
+    rc=$?
+    if [ "$rc" -eq "$code_attendu" ]; then
+      ok "R-MATRICE-ENV [$label/$combo] code de sortie $code_attendu"
     else
-      komut CODE1-SANS-MARQUEUR "code de sortie" "0" "$RC_M (mutant non opposable)"
+      ko "R-MATRICE-ENV [$label/$combo] code" "$code_attendu" "$rc" "$(cat "$WORK/matrice-$label-$combo-out.txt" 2>/dev/null)"
     fi
+    if [ "$rc" -eq 0 ]; then
+      # STATE.md, pas INDEX.md : INDEX.md embarque « dernier signe de vie » (horodatage courant de
+      # cloture.log), qui diverge légitimement d'un passage à l'autre — STATE.md, lui, ne porte
+      # aucune horloge (cycle_courant/phase_courante/etat seuls), donc un comparateur STABLE du
+      # contenu dérivé du disque, indépendant de l'instant d'exécution.
+      if [ -z "$ref_index" ]; then
+        ref_index="$WORK/matrice-$label-ref-state.txt"
+        cp "$dir/.planning/STATE.md" "$ref_index" 2>/dev/null
+      elif cmp -s "$ref_index" "$dir/.planning/STATE.md" 2>/dev/null; then
+        ok "R-MATRICE-ENV [$label/$combo] STATE.md identique à la colonne de référence"
+      else
+        ko "R-MATRICE-ENV [$label/$combo] STATE.md" "identique à la référence" "diverge" "-"
+      fi
+    fi
+  done
+}
+matrice_env terrain-libre setup_terrain_libre 0
+matrice_env marqueur-racine setup_marqueur_racine 3
+matrice_env marqueur-compartiment setup_marqueur_compartiment 3
+matrice_env partition-compartiment setup_partition_compartiment 3
+matrice_env socle-signal setup_socle_signal 3
+
+# ================================================================================================
+# R-LABS-ADVERSES (item 2c, lot 4) — les trois divergences mesurées au lot 3 (audit) : un
+# `package.json` en lien symbolique, un `*.xcodeproj` en lien symbolique, et un `STATE.md` aux
+# octets UTF-8 invalides après le frontmatter — chacun combiné au socle planning-core
+# (`planning_version` sans `gsd_state_version`) -> refus (code 3), marqueur STATE.md INTACT
+# (cmp octet pour octet). La source unique de vérité (le vrai détecteur bash) ne peut plus
+# diverger d'elle-même sur ces trois cas, puisque c'est elle qui les tranche désormais — ce que la
+# copie Python du lot 3 avait mesuré divergent (lstat vs `[ -f ]`/`[ -d ]`, qui suivent les liens ;
+# décodage UTF-8 strict de tout le fichier vs lecture bornée au frontmatter par awk).
+# ================================================================================================
+adverse_lab() { # <label> <fn_setup>
+  local label="$1" fn_setup="$2"
+  local dir="$WORK/adverse-$label"
+  materialiser traceur "$dir"
+  printf -- '---\nplanning_version: "2.0"\n---\n' > "$dir/.planning/STATE.md"
+  "$fn_setup" "$dir"
+  cp "$dir/.planning/STATE.md" "$WORK/adverse-$label-state-avant.md"
+  ( cd "$dir" && bash "$RECALC" >"$WORK/adverse-$label-out.txt" 2>"$WORK/adverse-$label-err.txt" )
+  local rc=$?
+  if [ "$rc" -eq 3 ]; then
+    ok "R-LABS-ADVERSES [$label] code de sortie 3"
+  else
+    ko "R-LABS-ADVERSES [$label] code" "3" "$rc" "$(cat "$WORK/adverse-$label-out.txt")"
   fi
-fi
+  if cmp -s "$WORK/adverse-$label-state-avant.md" "$dir/.planning/STATE.md"; then
+    ok "R-LABS-ADVERSES [$label] STATE.md (marqueur planning_version) inchangé octet pour octet"
+  else
+    ko "R-LABS-ADVERSES [$label] STATE.md" "octets inchangés" "modifié" "-"
+  fi
+}
+setup_adverse_package_json() {
+  local dir="$1"
+  local cible="$WORK/adverse-cible-package.json"
+  [ -f "$cible" ] || printf '%s' '{}' > "$cible"
+  ln -s "$cible" "$dir/package.json"
+}
+setup_adverse_xcodeproj() {
+  local dir="$1"
+  local cible="$WORK/adverse-cible.xcodeproj"
+  mkdir -p "$cible"
+  ln -s "$cible" "$dir/App.xcodeproj"
+}
+setup_adverse_state_utf8_invalide() {
+  local dir="$1"
+  printf -- '---\nplanning_version: "2.0"\n---\n' > "$dir/.planning/STATE.md"
+  printf '\xff\xfe corps invalide\n' >> "$dir/.planning/STATE.md"
+  printf '%s' '{}' > "$dir/package.json"
+}
+adverse_lab package-json-lien setup_adverse_package_json
+adverse_lab xcodeproj-lien setup_adverse_xcodeproj
+adverse_lab state-utf8-invalide setup_adverse_state_utf8_invalide
 
 # ---------- MUT-REPLI-GENERIQUE — repli générique (code hors 0/1/2/3) changé en non-gsd ----------
 if make_recalc_mutant REPLI-GENERIQUE 'return "non-concluante"  # motif-repli-generique' 'return "non-gsd"  # MUT-REPLI-GENERIQUE'; then
@@ -2628,8 +2829,8 @@ fi
 
 # ---------- MUT-JOURNAL-SANITIZE — assainissement de _jeton_journal neutralisé -------------------
 if make_recalc_mutant JOURNAL-SANITIZE \
-  'jeton = _JOURNAL_ESPACE_RE.sub("_", str(brute).strip()).replace("=", "_")' \
-  'jeton = str(brute)  # MUT-JOURNAL-SANITIZE'
+  'if caractere == "%" or caractere == "=" or caractere.isspace():' \
+  'if False:  # MUT-JOURNAL-SANITIZE'
 then
   MR="$MUT_DIR/recalc-planning.sh"
   MUT_L2_BODY="$WORK/mut-journal-sanitize-corps.py"
@@ -2640,6 +2841,134 @@ then
   else
     okmut JOURNAL-SANITIZE "un seul enregistrement lisible sur la valeur piégée · attendu (original) : MATCH=True, NB_VERDICT=1, NB_TENTATIVE=1 · obtenu (mutant, assainissement désactivé) : $L2_MUT_OUT"
   fi
+fi
+
+# ================================================================================================
+# R-INJECTIF-GENERATIF (item 2.3, lot 4) — _jeton_journal encode de façon INJECTIVE (pourcent) une
+# valeur RECOPIÉE TELLE QUELLE dans cloture.log (P44-D-09) : deux valeurs distinctes produisent
+# TOUJOURS deux jetons distincts. Preuve en deux volets exécutés contre le CORPS RÉEL du moteur
+# (jamais une réimplémentation indépendante) : (1) paires de collision explicites de l'ancien
+# encodage par `_`, plus une preuve générative >= 2000 paires aléatoires à graine fixe — zéro
+# collision, `LIGNE_JOURNAL_RE` relit chaque jeton produit, décodage pourcent = valeur d'origine ;
+# (2) round-trip réel à deux exécutions successives sur le MÊME chemin de phase, plus bas.
+# ================================================================================================
+MOTEUR_EXTRAIT_CORPS="$WORK/moteur-extrait-corps.py"
+MOTEUR_EXTRAIT_PY="$WORK/moteur-extrait.py"
+awk '/<<.PY_RECALC_PLANNING_EOF.$/{f=1;next} /^PY_RECALC_PLANNING_EOF$/{f=0} f' "$RECALC" > "$MOTEUR_EXTRAIT_CORPS"
+"$PYBIN" -c '
+import sys
+lignes = open(sys.argv[1], encoding="utf-8").read().split("\n")
+while lignes and lignes[-1].strip() == "":
+    lignes.pop()
+if lignes and lignes[-1].strip() == "main()":
+    lignes.pop()
+open(sys.argv[2], "w", encoding="utf-8").write("\n".join(lignes))
+' "$MOTEUR_EXTRAIT_CORPS" "$MOTEUR_EXTRAIT_PY"
+
+INJECTIF_AIDE_PY="$WORK/injectif-aide.py"
+cat > "$INJECTIF_AIDE_PY" <<'PY_INJECTIF_AIDE_EOF'
+import importlib.util
+import random
+import re
+import sys
+
+chemin = sys.argv[1]
+spec = importlib.util.spec_from_file_location("moteur_extrait", chemin)
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+
+
+def decoder_pourcent(jeton):
+    resultat = bytearray()
+    i = 0
+    n = len(jeton)
+    while i < n:
+        c = jeton[i]
+        if c == "%" and i + 2 < n and re.match(r"^[0-9A-Fa-f]{2}$", jeton[i + 1:i + 3]):
+            resultat.append(int(jeton[i + 1:i + 3], 16))
+            i += 3
+        else:
+            resultat.extend(c.encode("utf-8"))
+            i += 1
+    return bytes(resultat).decode("utf-8")
+
+
+erreurs = []
+
+paires_explicites = [("3 4", "3_4"), ("a=b", "a_b"), ("cycles/01 traceur", "cycles/01_traceur")]
+for a, b in paires_explicites:
+    if m._jeton_journal(a, "-") == m._jeton_journal(b, "-"):
+        erreurs.append("collision explicite non resolue : %r vs %r" % (a, b))
+
+alphabet = list(" \t\n\r\v\f=%_") + [chr(0x2028), chr(0x0085), chr(0x00A0), chr(0x3000)] + \
+    [chr(c) for c in range(1, 10)] + list("abcXYZ09/-")
+random.seed(1729)
+vues = {}
+collisions = 0
+echecs_roundtrip = 0
+echecs_regex = 0
+NB = 2000
+for _ in range(NB):
+    k = random.randint(1, 8)
+    valeur = "".join(random.choice(alphabet) for _ in range(k))
+    jeton = m._jeton_journal(valeur, "-")
+    if jeton in vues and vues[jeton] != valeur:
+        collisions += 1
+    vues[jeton] = valeur
+    if decoder_pourcent(jeton) != valeur:
+        echecs_roundtrip += 1
+    ligne = "2026-09-28T00:00:00+00:00  " + jeton + "  auteur  verdict=passe  tentative=1  date=observation"
+    if m.LIGNE_JOURNAL_RE.match(ligne) is None:
+        echecs_regex += 1
+
+if collisions:
+    erreurs.append("collisions=%d sur %d paires generees" % (collisions, NB))
+if echecs_roundtrip:
+    erreurs.append("echecs_roundtrip=%d" % echecs_roundtrip)
+if echecs_regex:
+    erreurs.append("echecs_regex=%d" % echecs_regex)
+
+if erreurs:
+    print("ERREURS=" + " | ".join(erreurs))
+else:
+    print("OK NB=%d" % NB)
+PY_INJECTIF_AIDE_EOF
+
+INJECTIF_OUT="$("$PYBIN" "$INJECTIF_AIDE_PY" "$MOTEUR_EXTRAIT_PY" 2>&1)"
+if [ "$INJECTIF_OUT" = "OK NB=2000" ]; then
+  ok "R-INJECTIF-GENERATIF collisions/paires explicites/round-trip/LIGNE_JOURNAL_RE : 2000 paires, zéro échec"
+else
+  ko "R-INJECTIF-GENERATIF" "OK NB=2000" "$INJECTIF_OUT" "-"
+fi
+
+# ---------- R-INJECTIF-ROUNDTRIP — deux exécutions successives, valeur formellement « collidante »
+# sous l'ancien encodage ("3 4" puis "3_4" au MÊME chemin de phase) : DEUX lignes, jamais absorbée
+# par le dédoublonnage (P44-D-11 — une clôture réellement nouvelle ne doit jamais manquer).
+R_INJ_DIR="$WORK/r-injectif-roundtrip"
+materialiser traceur "$R_INJ_DIR"
+VERDICT_CIBLE="$R_INJ_DIR/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "3 4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+( cd "$R_INJ_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r-injectif-err1.txt" )
+R_INJ_RC1=$?
+printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "3_4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+( cd "$R_INJ_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-injectif-out2.json" 2>"$WORK/r-injectif-err2.txt" )
+R_INJ_RC2=$?
+NB_LIGNES_CLOTURE="$(grep -c "01-livree" "$R_INJ_DIR/.planning/cloture.log")"
+AJOUTS_INJ2="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cloture_ajouts"])' "$WORK/r-injectif-out2.json" 2>/dev/null || echo '?')"
+if [ "$R_INJ_RC1" -eq 0 ] && [ "$R_INJ_RC2" -eq 0 ]; then
+  ok "R-INJECTIF-ROUNDTRIP deux exécutions réelles réussies (rc=0 chacune)"
+else
+  ko "R-INJECTIF-ROUNDTRIP code" "0 et 0" "$R_INJ_RC1 et $R_INJ_RC2" "$(cat "$WORK/r-injectif-err1.txt") $(cat "$WORK/r-injectif-err2.txt")"
+fi
+if [ "$NB_LIGNES_CLOTURE" = "2" ]; then
+  ok "R-INJECTIF-ROUNDTRIP deux lignes distinctes journalisées (« 3 4 » puis « 3_4 », collidantes sous l'ancien encodage)"
+else
+  ko "R-INJECTIF-ROUNDTRIP lignes pour 01-livree" "2" "$NB_LIGNES_CLOTURE" "$(cat "$R_INJ_DIR/.planning/cloture.log")"
+fi
+if [ "$AJOUTS_INJ2" = "1" ]; then
+  ok "R-INJECTIF-ROUNDTRIP cloture_ajouts=1 au 2e recalcul (valeur réellement nouvelle, pas absorbée par le dédoublonnage)"
+else
+  ko "R-INJECTIF-ROUNDTRIP cloture_ajouts" "1" "$AJOUTS_INJ2" "$(cat "$WORK/r-injectif-out2.json")"
 fi
 
 # ================================================================================================
@@ -2743,26 +3072,6 @@ if cmp -s "$EMPREINTE_GHS_B_AVANT" "$EMPREINTE_GHS_B_APRES"; then
   ok "R-GSD-HOME-SIGNAL (b) empreinte identique (STATE.md non écrasé)"
 else
   ko "R-GSD-HOME-SIGNAL (b) empreinte" "identique" "diverge (STATE.md aurait été écrasé)" "-"
-fi
-
-# ---------- MUT-CODE1-SOCLE-SIGNAL — repli code 1 sur la combinaison socle+signal neutralisé -----
-if make_recalc_mutant CODE1-SOCLE-SIGNAL \
-  'if _porte_planning_version(os.path.join(planning_abs, "STATE.md")) and _a_signal_de_code(racine_lab):' \
-  'if False:  # MUT-CODE1-SOCLE-SIGNAL'
-then
-  MR="$MUT_DIR/recalc-planning.sh"
-  DIR_CAS="$WORK/mut-code1-socle-signal-cas"
-  materialiser traceur "$DIR_CAS"
-  printf -- '---\nplanning_version: "2.0"\n---\n' > "$DIR_CAS/.planning/STATE.md"
-  printf '%s' '{}' > "$DIR_CAS/package.json"
-  ( cd "$DIR_CAS" && GSD_HOME="$R13_GSD_HOME_INEXISTANT" bash "$MR" >"$WORK/mut-code1-socle-signal-out.txt" 2>"$WORK/mut-code1-socle-signal-err.txt" ); RC_M=$?
-  if ! _verifier_plantage CODE1-SOCLE-SIGNAL "code de sortie (socle planning-core + signal de code, chaîne GSD absente — R-GSD-HOME-SIGNAL (b))" "$WORK/mut-code1-socle-signal-out.txt" "$WORK/mut-code1-socle-signal-err.txt" "$RC_M"; then
-    if [ "$RC_M" -ne 3 ]; then
-      okmut CODE1-SOCLE-SIGNAL "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré un signalement de migration, chaîne GSD absente — régression de l'audit)"
-    else
-      komut CODE1-SOCLE-SIGNAL "code de sortie" "3" "$RC_M (mutant non opposable)"
-    fi
-  fi
 fi
 
 # ================================================================================================
