@@ -41,7 +41,9 @@ progress:
 
 Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — EXÉCUTÉE (5/5 plans, 4 vagues), VÉRIFIÉE PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`, commit 267b041). Pas encore CLÔTURÉE dans le ROADMAP (nœud ultérieur du manager). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
 **Last Activity:** 2026-09-28
-**Last Activity Description:** Correction ciblée lots 1+2 (nœud `exec-44` rouvert, mission vf-coder, quick task `260928-b4c`) : gardes F3/F4/F5, couverture des 8 marqueurs restants de `detection_gsd()`, scindage du code 2/3 du détecteur GSD (lot 2 L1), assainissement structurel du journal (lot 2 L2), corrections de doc (DOC-44-02/03, F6, Banc F1). 171 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `gsd-verifier` PASSED 11/11. Commits `e4898a0`/`aa8420d`/`fda472a`.
+**Last Activity Description:** Correction ciblée lot 3 (nœud `exec-44` rouvert, mission vf-coder, quick task `260928-ccz`) : dédoublonnage du journal comparé sur la valeur assainie des deux côtés (constat 1, revue — round-trip réel prouvé rouge/vert), refus « migration à examiner » de `detection_gsd()` indépendant de `GSD_HOME` sur le repli code 1 (constat 2, audit — combinaison socle+signal reproduite en Python pur, `detect-gsd-engine.sh` inchangé). 171→180 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `gsd-verifier` PASSED 7/7. Commits `dab3f62`/`89270fa`/`22381c1`.
+
+Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/F4/F5, couverture des 8 marqueurs restants de `detection_gsd()`, scindage du code 2/3 du détecteur GSD (lot 2 L1), assainissement structurel du journal (lot 2 L2), corrections de doc (DOC-44-02/03, F6, Banc F1). 171 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `gsd-verifier` PASSED 11/11. Commits `e4898a0`/`aa8420d`/`fda472a`.
 
 ## Progress
 
@@ -58,6 +60,7 @@ Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque
 | # | Description | Date | Commit | Status | Directory |
 |---|-------------|------|--------|--------|-----------|
 | 260928-b4c | Correction ciblée lots 1+2, Phase 44 : gardes F3/F4/F5, couverture F2, scindage code 2/3 du détecteur GSD, assainissement du journal, corrections doc | 2026-09-28 | fda472a | passed | [260928-b4c-correction-cibl-e-lots-1-2-phase-44-gard](./quick/260928-b4c-correction-cibl-e-lots-1-2-phase-44-gard/) |
+| 260928-ccz | Correction ciblée lot 3, Phase 44 : dédoublonnage du journal sur valeur assainie (constat 1, revue), refus code 1 sur socle+signal indépendant de GSD_HOME (constat 2, audit) | 2026-09-28 | 22381c1 | passed | [260928-ccz-correction-cibl-e-lot-3-phase-44-d-doubl](./quick/260928-ccz-correction-cibl-e-lot-3-phase-44-d-doubl/) |
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
