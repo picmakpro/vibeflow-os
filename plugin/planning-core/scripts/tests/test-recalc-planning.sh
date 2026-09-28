@@ -3082,6 +3082,182 @@ if make_recalc_mutant ENUM-FIDELE 'if not fidele:' 'if False:  # MUT-ENUM-FIDELE
 fi
 
 # ================================================================================================
+# Lot 7 (correction de CLASSE, audit du 2026-09-28) — garde de LECTURE du détecteur : le moteur
+# n'écrit que s'il a pu LIRE, pour de vrai, tout ce que le détecteur devait lire. Boucle GÉNÉRIQUE
+# sur chaque élément mesuré (workstreams/, un compartiment, le STATE.md d'un compartiment, le
+# STATE.md racine) × permissions dégradées (000/600/400) : masquant -> refus (rc=3, cite la garde
+# lot 7, empreinte inchangée) ; non masquant (fichier encore lisible par le propriétaire sous 600
+# ou 400) -> verdict INCHANGÉ, jamais la garde lot 7 qui déclenche (contrôle anti-sur-refus).
+# ROUGE sur HEAD 32b5d59 (avant ce lot) pour les quatre cas masquants ci-dessous : `écrit=oui`
+# mesuré par exécution directe (rapport de mission), le moteur écrivait silencieusement — pour le
+# cas `root-state`, il allait jusqu'à ÉCRASER le `STATE.md` racine et effacer son marqueur.
+# ================================================================================================
+_lot7_root_actif() { [ "$(id -u)" -eq 0 ]; }
+
+_lot7_build_lab_root() { # <dir> — SEUL le STATE.md racine porte le marqueur GSD
+  rm -rf "$1"
+  mkdir -p "$1/.planning"
+  printf '{"planning_version": "cycles-v1"}\n' > "$1/.planning/config.json"
+  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$1/.planning/STATE.md"
+}
+_lot7_build_lab_partition() { # <dir> — SEUL le STATE.md du compartiment porte le marqueur GSD
+  rm -rf "$1"
+  mkdir -p "$1/.planning/workstreams/gouvernance"
+  printf '{"planning_version": "cycles-v1"}\n' > "$1/.planning/config.json"
+  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$1/.planning/workstreams/gouvernance/STATE.md"
+}
+_lot7_restore_mode() { # <chemin> <type: dir|file>
+  if [ "$2" = "dir" ]; then chmod 755 "$1" 2>/dev/null; else chmod 644 "$1" 2>/dev/null; fi
+}
+
+if _lot7_root_actif; then
+  echo "  ⊘ R-LECTURE-FIDELE SKIP (UID 0 — les permissions dégradées ne s'appliquent pas à root, aucun cas ci-dessous vérifiable)"
+else
+  # <nom>|<labtype root|partition>|<chemin relatif dégradé>|<type dir|file>|<modes masquants>|<modes témoins non masquants>
+  LOT7_ENTREES=(
+    "root-state|root|.planning/STATE.md|file|000|600 400"
+    "workstreams-dir|partition|.planning/workstreams|dir|000 600 400|"
+    "compartiment-dir|partition|.planning/workstreams/gouvernance|dir|000 600 400|"
+    "compartiment-state|partition|.planning/workstreams/gouvernance/STATE.md|file|000|600 400"
+  )
+  for LOT7_ENTREE in "${LOT7_ENTREES[@]}"; do
+    IFS='|' read -r L7_NOM L7_LABTYPE L7_RELPATH L7_TYPE L7_MODES_MASQUANTS L7_MODES_TEMOINS <<< "$LOT7_ENTREE"
+    for L7_MODE in $L7_MODES_MASQUANTS; do
+      L7_DIR="$WORK/lot7-$L7_NOM-$L7_MODE"
+      if [ "$L7_LABTYPE" = "root" ]; then _lot7_build_lab_root "$L7_DIR"; else _lot7_build_lab_partition "$L7_DIR"; fi
+      L7_CIBLE="$L7_DIR/$L7_RELPATH"
+      empreinte "$L7_DIR" > "$L7_DIR.avant.txt"
+      chmod "$L7_MODE" "$L7_CIBLE"
+      ( cd "$L7_DIR" && bash "$RECALC" "--planning=.planning" >"$L7_DIR.out.txt" 2>"$L7_DIR.err.txt" )
+      L7_RC=$?
+      _lot7_restore_mode "$L7_CIBLE" "$L7_TYPE"
+      empreinte "$L7_DIR" > "$L7_DIR.apres.txt"
+      if [ "$L7_RC" -eq 3 ] && grep -qF "garde de lecture du détecteur, lot 7" "$L7_DIR.err.txt" \
+        && cmp -s "$L7_DIR.avant.txt" "$L7_DIR.apres.txt"; then
+        ok "R-LECTURE-FIDELE [$L7_NOM mode=$L7_MODE] masquant : refus via la garde lot 7, empreinte inchangée (aucune écriture)"
+      else
+        ko "R-LECTURE-FIDELE [$L7_NOM mode=$L7_MODE]" "rc=3, stderr cite « garde de lecture du détecteur, lot 7 », empreinte inchangée" "rc=3 attendu" "rc=$L7_RC · stderr=$(cat "$L7_DIR.err.txt" | tr '\n' '|')"
+      fi
+    done
+    for L7_MODE in $L7_MODES_TEMOINS; do
+      L7_DIR="$WORK/lot7-$L7_NOM-ctrl-$L7_MODE"
+      if [ "$L7_LABTYPE" = "root" ]; then _lot7_build_lab_root "$L7_DIR"; else _lot7_build_lab_partition "$L7_DIR"; fi
+      L7_CIBLE="$L7_DIR/$L7_RELPATH"
+      empreinte "$L7_DIR" > "$L7_DIR.avant.txt"
+      chmod "$L7_MODE" "$L7_CIBLE"
+      ( cd "$L7_DIR" && bash "$RECALC" "--planning=.planning" >"$L7_DIR.out.txt" 2>"$L7_DIR.err.txt" )
+      L7_RC=$?
+      _lot7_restore_mode "$L7_CIBLE" "$L7_TYPE"
+      empreinte "$L7_DIR" > "$L7_DIR.apres.txt"
+      if [ "$L7_RC" -eq 3 ] && ! grep -qF "garde de lecture du détecteur, lot 7" "$L7_DIR.err.txt" \
+        && cmp -s "$L7_DIR.avant.txt" "$L7_DIR.apres.txt"; then
+        ok "R-LECTURE-FIDELE [$L7_NOM mode=$L7_MODE] TÉMOIN non masquant : verdict inchangé (marqueur toujours lu), jamais la garde lot 7"
+      else
+        ko "R-LECTURE-FIDELE [$L7_NOM mode=$L7_MODE ctrl]" "rc=3, jamais « garde de lecture du détecteur, lot 7 », empreinte inchangée" "rc=3 attendu" "rc=$L7_RC · stderr=$(cat "$L7_DIR.err.txt" | tr '\n' '|')"
+      fi
+    done
+  done
+
+  # ---------- R-LECTURE-FIDELE-MULTI-NOMINAL — plusieurs compartiments réels, AUCUN marqueur GSD :
+  # le lab nominal partitionné est TOUJOURS écrit (non-régression, jamais un sur-refus) -----------
+  L7_MULTI_DIR="$WORK/lot7-multi-nominal"
+  rm -rf "$L7_MULTI_DIR"
+  mkdir -p "$L7_MULTI_DIR/.planning/workstreams/alpha" "$L7_MULTI_DIR/.planning/workstreams/beta" "$L7_MULTI_DIR/.planning/workstreams/gamma"
+  printf '{"planning_version": "cycles-v1"}\n' > "$L7_MULTI_DIR/.planning/config.json"
+  printf -- '---\nworkstream: alpha\ncreated: 2026-09-28\n---\n' > "$L7_MULTI_DIR/.planning/workstreams/alpha/notes.md"
+  printf -- '---\nworkstream: beta\ncreated: 2026-09-28\n---\n' > "$L7_MULTI_DIR/.planning/workstreams/beta/notes.md"
+  printf -- '---\nworkstream: gamma\ncreated: 2026-09-28\n---\n' > "$L7_MULTI_DIR/.planning/workstreams/gamma/notes.md"
+  ( cd "$L7_MULTI_DIR" && bash "$RECALC" "--planning=.planning" >"$L7_MULTI_DIR.out.txt" 2>"$L7_MULTI_DIR.err.txt" )
+  L7_MULTI_RC=$?
+  if [ "$L7_MULTI_RC" -eq 0 ]; then
+    ok "R-LECTURE-FIDELE-MULTI-NOMINAL code de sortie 0 (trois compartiments réels, aucun marqueur — écriture inchangée)"
+  else
+    ko "R-LECTURE-FIDELE-MULTI-NOMINAL code" "0" "$L7_MULTI_RC" "$(cat "$L7_MULTI_DIR.err.txt")"
+  fi
+  if [ -f "$L7_MULTI_DIR/.planning/STATE.md" ]; then
+    ok "R-LECTURE-FIDELE-MULTI-NOMINAL STATE.md créé"
+  else
+    ko "R-LECTURE-FIDELE-MULTI-NOMINAL STATE.md créé" "présent" "absent" "-"
+  fi
+
+  # ---------- R-LECTURE-FIDELE-MULTI-UN-ILLISIBLE — un seul compartiment illisible parmi trois :
+  # refus MÊME quand les deux autres sont parfaitement lisibles (jamais une moyenne, un seul suffit)
+  L7_MULTI2_DIR="$WORK/lot7-multi-un-illisible"
+  rm -rf "$L7_MULTI2_DIR"
+  mkdir -p "$L7_MULTI2_DIR/.planning/workstreams/alpha" "$L7_MULTI2_DIR/.planning/workstreams/beta"
+  printf '{"planning_version": "cycles-v1"}\n' > "$L7_MULTI2_DIR/.planning/config.json"
+  printf -- '---\nworkstream: alpha\ncreated: 2026-09-28\n---\n' > "$L7_MULTI2_DIR/.planning/workstreams/alpha/notes.md"
+  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$L7_MULTI2_DIR/.planning/workstreams/beta/STATE.md"
+  empreinte "$L7_MULTI2_DIR" > "$WORK/lot7-multi2-avant.txt"
+  chmod 000 "$L7_MULTI2_DIR/.planning/workstreams/beta"
+  ( cd "$L7_MULTI2_DIR" && bash "$RECALC" "--planning=.planning" >"$L7_MULTI2_DIR.out.txt" 2>"$L7_MULTI2_DIR.err.txt" )
+  L7_MULTI2_RC=$?
+  chmod 755 "$L7_MULTI2_DIR/.planning/workstreams/beta"
+  empreinte "$L7_MULTI2_DIR" > "$WORK/lot7-multi2-apres.txt"
+  if [ "$L7_MULTI2_RC" -eq 3 ] && grep -qF "garde de lecture du détecteur, lot 7" "$L7_MULTI2_DIR.err.txt"; then
+    ok "R-LECTURE-FIDELE-MULTI-UN-ILLISIBLE refus malgré deux compartiments lisibles sur trois"
+  else
+    ko "R-LECTURE-FIDELE-MULTI-UN-ILLISIBLE" "rc=3, cite la garde lot 7" "rc=3 attendu" "rc=$L7_MULTI2_RC · $(cat "$L7_MULTI2_DIR.err.txt" | tr '\n' '|')"
+  fi
+  if cmp -s "$WORK/lot7-multi2-avant.txt" "$WORK/lot7-multi2-apres.txt"; then
+    ok "R-LECTURE-FIDELE-MULTI-UN-ILLISIBLE empreinte identique avant/après"
+  else
+    ko "R-LECTURE-FIDELE-MULTI-UN-ILLISIBLE empreinte" "identique" "diverge" "-"
+  fi
+fi
+
+# ---------- MUT-LECTURE-FIDELE-PERM — la garde neutralisée (if False:), discriminant à PERMISSIONS
+# dégradées (distinct de MUT-ENUM-FIDELE, qui discrimine sur un nom à saut de ligne) : prouve que
+# la MÊME ligne de décision couvre aussi la classe « lisibilité réelle » du lot 7 -------------------
+if _lot7_root_actif; then
+  echo "  ⊘ MUT-LECTURE-FIDELE-PERM SKIP (UID 0)"
+else
+  if make_recalc_mutant LECTURE-FIDELE-PERM 'if not fidele:' 'if False:  # MUT-LECTURE-FIDELE-PERM (garde neutralisée)'; then
+    MR="$MUT_DIR/recalc-planning.sh"
+    DIR_CAS="$WORK/mut-lecture-fidele-perm-cas"
+    mkdir -p "$DIR_CAS/.planning/workstreams/gouvernance"
+    printf '{"planning_version": "cycles-v1"}\n' > "$DIR_CAS/.planning/config.json"
+    printf -- '---\ngsd_state_version: 1.0\n---\n' > "$DIR_CAS/.planning/workstreams/gouvernance/STATE.md"
+    chmod 000 "$DIR_CAS/.planning/workstreams/gouvernance"
+    ( cd "$DIR_CAS" && bash "$MR" >"$WORK/mut-lecture-fidele-perm-out.txt" 2>"$WORK/mut-lecture-fidele-perm-err.txt" ); RC_M=$?
+    chmod 755 "$DIR_CAS/.planning/workstreams/gouvernance"
+    if ! _verifier_plantage LECTURE-FIDELE-PERM "code de sortie (compartiment chmod 000, marqueur GSD à l'intérieur — R-LECTURE-FIDELE [compartiment-dir mode=000])" "$WORK/mut-lecture-fidele-perm-out.txt" "$WORK/mut-lecture-fidele-perm-err.txt" "$RC_M"; then
+      if [ "$RC_M" -ne 3 ]; then
+        okmut LECTURE-FIDELE-PERM "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture silencieuse sur un compartiment chmod 000 réellement tenu par GSD — régression exacte de l'audit du 2026-09-28)"
+      else
+        komut LECTURE-FIDELE-PERM "code de sortie" "3" "$RC_M (mutant non opposable)"
+      fi
+    fi
+  fi
+fi
+
+# ---------- MUT-OSERROR-IGNOREE — `_ouvrable` bascule en fail-open sur OSError (F2 rejoué) --------
+if _lot7_root_actif; then
+  echo "  ⊘ MUT-OSERROR-IGNOREE SKIP (UID 0)"
+else
+  if make_recalc_mutant OSERROR-IGNOREE \
+    'return False  # _ouvrable : toute OSError -> refus nommé, jamais un fail-open (F2)' \
+    'return True  # MUT-OSERROR-IGNOREE (fail-open)'
+  then
+    MR="$MUT_DIR/recalc-planning.sh"
+    DIR_CAS="$WORK/mut-oserror-ignoree-cas"
+    mkdir -p "$DIR_CAS/.planning/workstreams/gouvernance"
+    printf '{"planning_version": "cycles-v1"}\n' > "$DIR_CAS/.planning/config.json"
+    printf -- '---\ngsd_state_version: 1.0\n---\n' > "$DIR_CAS/.planning/workstreams/gouvernance/STATE.md"
+    chmod 000 "$DIR_CAS/.planning/workstreams/gouvernance/STATE.md"
+    ( cd "$DIR_CAS" && bash "$MR" >"$WORK/mut-oserror-ignoree-out.txt" 2>"$WORK/mut-oserror-ignoree-err.txt" ); RC_M=$?
+    chmod 644 "$DIR_CAS/.planning/workstreams/gouvernance/STATE.md"
+    if ! _verifier_plantage OSERROR-IGNOREE "code de sortie (STATE.md de compartiment chmod 000 — R-LECTURE-FIDELE [compartiment-state mode=000])" "$WORK/mut-oserror-ignoree-out.txt" "$WORK/mut-oserror-ignoree-err.txt" "$RC_M"; then
+      if [ "$RC_M" -ne 3 ]; then
+        okmut OSERROR-IGNOREE "code de sortie · attendu (original) : 3 · obtenu (mutant, _ouvrable fail-open sur OSError) : $RC_M (écriture silencieuse — le détecteur réel, lui, ne peut pas lire non plus ce STATE.md et retombe sur code 3 « terrain libre »)"
+      else
+        komut OSERROR-IGNOREE "code de sortie" "3" "$RC_M (mutant non opposable)"
+      fi
+    fi
+  fi
+fi
+
+# ================================================================================================
 # Lot 2 L2 — assainissement STRUCTUREL de tout champ recopié dans cloture.log (_jeton_journal),
 # preuve avec la valeur piégée exacte de l'audit.
 # ================================================================================================

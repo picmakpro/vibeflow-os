@@ -134,27 +134,55 @@ et non modifié par cette note : elle documente une conséquence déjà en place
 lecteur qui déboguerait un « toujours refus, jamais d'écriture » sur un tel système trouve la
 réponse ici plutôt qu'en relisant le code.
 
-**Garde de fidélité d'énumération (P44-D-02a, lot 6, correction ciblée)** — audit du 2026-09-28,
-mesuré par exécution : `vf_ws_enumerate` (workstream-policy.sh) émet un chemin absolu par ligne
-pour chaque compartiment de `<planning>/workstreams/` ; ce contrat suppose que ni le nom d'un
-compartiment ni le chemin du dossier de planning lui-même ne peuvent faire disparaître ou scinder
-une ligne. Deux classes mesurées le brisent, TOUTES DEUX SILENCIEUSES côté détecteur (code 3
-« terrain libre » sans aucune ligne stderr qui les distingue du cas nominal) : un nom de
-compartiment portant un saut de ligne (la ligne imprimée se scinde en deux, aucune des deux ne
-pointant vers un chemin qui existe) ; un nom de compartiment commençant par un point (le glob
-`"$root"/*/` de `vf_ws_enumerate`, sans `dotglob`, ne l'expand jamais). Une troisième, plus large,
-casse TOUTE l'énumération d'un coup : le chemin du dossier de planning lui-même porteur d'un saut
-de ligne (chaque ligne émise porte ce préfixe). `recalc-planning.sh` ferme cette classe **côté
-appelant**, avant même d'invoquer le détecteur : une fonction structurelle
-(`_enumeration_workstreams_fidele`) compare ce qui est réellement sur le disque à ce que
-l'énumération ligne-par-ligne pourrait restituer, sans jamais relire un `STATE.md` ni chercher un
-marqueur — P44-D-01b interdit toute modification de `detect-gsd-engine.sh` ou
-`workstream-policy.sh`, la propriété est donc obtenue entièrement en aval. Une entrée en lien
-symbolique reste, elle, une exclusion DÉCLARÉE du détecteur lui-même (avertissement sur stderr) —
-non masquante au sens de cette garde, volontairement pas retenue ici (ne pas sur-refuser un cas déjà
-connu et accepté du système). Reste hors de portée de ce lot, et transmis au BACKLOG pour Samuel
-(propriétaire de `workstream-policy.sh`, Phase 41.1) : la même primitive d'énumération, avec la même
-classe de trou, alimente aussi `check-planning-state.sh` (compteur, pas un gate d'écriture).
+**Garde de lecture du détecteur (P44-D-02a, lot 7, correction de CLASSE)** — principe (décision du
+head sous délégation technique de Willy, session principale, 2026-09-28) : **le moteur n'écrit que
+s'il a pu LIRE, pour de vrai, tout ce que le détecteur devait lire**. Pas une liste de cas
+particuliers — deux vérifications structurelles, appliquées AVANT tout appel réel au détecteur,
+côté appelant, sans jamais relire un `STATE.md` pour son CONTENU ni chercher un marqueur (P44-D-01b
+interdit toute modification de `detect-gsd-engine.sh` ou `workstream-policy.sh` ; ils restent
+APPELABLES, jamais réimplémentés) :
+
+1. **Fidélité PAR EXÉCUTION** : `vf_ws_enumerate` (workstream-policy.sh) est RELANCÉE, pour de
+   vrai, dans le même bash et le même environnement maîtrisé que ceux qui serviront à l'appel réel
+   du détecteur — jamais une réimplémentation Python de sa boucle. Son résultat est comparé à
+   l'ensemble des compartiments RÉELS du disque, dérivé indépendamment (`os.scandir`, jamais un
+   glob shell). Tout écart (ligne vide, ligne dupliquée, compartiment manquant) est un refus nommé.
+2. **Lisibilité RÉELLE** : chaque compartiment retenu par cette exécution, le `STATE.md` racine
+   s'il existe, et le `STATE.md` de chaque compartiment s'il existe, doivent être OUVRABLES pour de
+   vrai (ouverture réelle, jamais `os.access`, qui peut mentir sous ACL POSIX ou montage réseau).
+
+Constat qui motive ce lot (audit du 2026-09-28, mesuré par exécution, HEAD `32b5d59`) : la garde du
+lot 6 (fidélité STRUCTURELLE — noms à saut de ligne, noms cachés, chemin de planning à risque) ne
+couvrait pas la classe suivante, plus large. `vf_ws_enumerate` pose `found=1` **inconditionnellement
+après chaque `printf`**, même quand `cd "$entry" && pwd` a ÉCHOUÉ (compartiment sans bit `x` —
+mode `000`/`600`/`400`) : `cd` échoue, la substitution de commande capture une chaîne vide,
+`printf` imprime une ligne vide, et `found=1` est posé quand même (`workstream-policy.sh:305-306`).
+`detect-gsd-engine.sh` saute cette ligne vide en silence, la priorité 2bis retombe sur la priorité
+3/4 et rend le code 3 « terrain libre » sans aucun diagnostic — exactement le code que
+`detection_gsd` traduit en autorisation d'écrire. Mesuré : le moteur écrivait (exit 0) sur un
+compartiment réellement tenu par GSD ; quand le marqueur porté est au `STATE.md` **racine**
+lui-même rendu illisible (mode `000`), le moteur allait jusqu'à **écraser** ce `STATE.md` — le
+marqueur `gsd_state_version` disparaissait.
+
+Les classes structurelles du lot 6 (nom à saut de ligne, nom caché, chemin de planning à risque)
+sont conservées comme diagnostic nommé, mais c'est désormais l'égalité d'ensembles par exécution
+(point 1 ci-dessus) qui décide du refus — elle couvre le trou ci-dessus SANS connaître son
+mécanisme exact, et couvrirait de la même façon une future variante du même trou ailleurs dans
+`vf_ws_enumerate`. Une entrée en lien symbolique reste une exclusion DÉCLARÉE du détecteur lui-même
+(avertissement sur stderr) — non masquante au sens de cette garde, volontairement pas retenue ici
+(ne pas sur-refuser un cas déjà connu et accepté du système).
+
+**Limite assumée** : cette garde ferme la classe pour tout ce qui **voyage par git** (le disque, au
+moment de l'appel). Un résidu strictement local à un poste — un état de permissions qui ne
+survivrait pas à un `git clone` frais, ou une divergence propre à un montage réseau spécifique non
+reproduite dans les tests — n'est pas dans son périmètre de preuve ; s'il en subsiste un après ce
+lot, il est nommé précisément dans le rapport de mission plutôt que supposé couvert.
+
+Le trou source (`vf_ws_enumerate` pose `found=1` même quand `cd` échoue) reste hors de portée de ce
+lot (P44-D-01b) et est transmis au BACKLOG pour Samuel (propriétaire de `workstream-policy.sh`,
+Phase 41.1) : la correction à la source évite qu'une future consommatrice de cette primitive
+(`check-planning-state.sh`, un compteur, pas un gate d'écriture) hérite du même trou sans une garde
+équivalente.
 
 ## Arborescence
 

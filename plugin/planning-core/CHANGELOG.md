@@ -127,15 +127,37 @@
   (`references/modele-cycles.md`) et message stderr explicité ; l'invariant final de
   `_jeton_journal` (P44-D-11) passe d'un `assert` nu (désactivable par `python -O`) à une exception
   explicite toujours active.
+- **Lot 7 (correction de CLASSE, audit du 2026-09-28)** : la garde du lot 6 fermait deux classes
+  structurelles (noms piégés) mais pas la classe plus large mesurée ensuite — `vf_ws_enumerate`
+  (`workstream-policy.sh:305-306`, hors périmètre P44-D-01b) pose `found=1` inconditionnellement
+  après chaque `printf`, même quand `cd "$entry" && pwd` a ÉCHOUÉ (compartiment sans bit `x`,
+  mode `000`/`600`/`400`) : ligne vide silencieusement sautée par `detect-gsd-engine.sh`, priorité
+  2bis retombe sur le code 3 « terrain libre » sans aucun diagnostic. Mesuré : le moteur écrivait
+  (exit 0) sur un compartiment réellement tenu par GSD ; et, quand le marqueur porté est au
+  `STATE.md` **racine** lui-même rendu illisible (mode `000`), le moteur allait jusqu'à
+  **écraser** ce `STATE.md`, effaçant `gsd_state_version`. Principe retenu, plus large que le lot
+  6 (`_enumeration_workstreams_fidele` remplacée par `_lecture_detecteur_fidele`) : *le moteur
+  n'écrit que s'il a pu LIRE, pour de vrai, tout ce que le détecteur devait lire* — fidélité PAR
+  EXÉCUTION de `vf_ws_enumerate` (relancée dans le MÊME bash et le MÊME environnement maîtrisé que
+  le détecteur, comparée à l'ensemble réel du disque dérivé par `os.scandir`) et lisibilité RÉELLE
+  (ouverture effective, jamais `os.access`) de chaque compartiment retenu et de chaque `STATE.md`
+  (racine et compartiments). `detect-gsd-engine.sh` et `workstream-policy.sh` restent INCHANGÉS
+  (P44-D-01b) — appelés, jamais réimplémentés ni modifiés. Toute `OSError` rencontrée par la garde
+  est désormais un refus nommé (F2, revue du lot 6 : un `continue` silencieux sur `is_symlink()`/
+  `is_dir()` sous exception était un fail-open). F3 (revue) : le docstring de la garde distinguait
+  mal « absent » (code 3, silence nominal) de « lien/non-répertoire/illisible » (code 2) — corrigé.
+  Le trou source dans `vf_ws_enumerate` reste hors de portée (P44-D-01b), transmis au BACKLOG pour
+  Samuel (propriétaire de `workstream-policy.sh`, Phase 41.1).
 
 Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27. Correctifs
 lot 1 : vf-coder, mandat de correction ciblée, 2026-09-28. Lot 2 (code 2 du détecteur,
 assainissement du journal), lot 3 (dédoublonnage assaini, repli code 1 sur socle+signal), lot 4
 (source unique de vérité pour la détection GSD, encodage injectif du journal), lot 5
 (environnement maîtrisé du sous-processus détecteur construit de zéro, alphabet du journal étendu
-aux contrôles C0/C1) et lot 6 (garde de fidélité d'énumération des compartiments de workstream,
-correctifs de revue) : décision du head sous délégation technique de Willy, session principale,
-2026-09-28.
+aux contrôles C0/C1), lot 6 (garde de fidélité d'énumération des compartiments de workstream,
+correctifs de revue) et lot 7 (garde de lecture du détecteur, correction de classe — fidélité par
+exécution + lisibilité réelle) : décision du head sous délégation technique de Willy, session
+principale, 2026-09-28.
 
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
 

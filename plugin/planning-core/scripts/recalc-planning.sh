@@ -342,82 +342,188 @@ def _resoudre_bash():
     return None
 
 
-# --- Garde de fidélité d'énumération (P44-D-02a, lot 6, correction ciblée) --------------------
-# CONSTAT (audit du 2026-09-28, mesuré par exécution dans l'environnement maîtrisé exact du
-# moteur) : `vf_ws_enumerate` (workstream-policy.sh, PROPRIÉTÉ de la Phase 41.1, P44-D-01b —
-# INTERDITE à ce lot) émet « un chemin absolu par ligne » (`printf '%s\n' "$(cd "$entry" && pwd)"`)
-# pour chaque compartiment de `<planning>/workstreams/`. Ce contrat SUPPOSE que ni le chemin émis
-# ni le glob qui énumère les entrées (`"$root"/*/`, sans `dotglob`) ne peuvent faire disparaître ou
-# scinder un compartiment RÉEL. Deux classes mesurées le brisent, TOUTES DEUX SILENCIEUSES (aucune
-# ligne stderr qui les distingue du cas nominal « aucun compartiment » — F1 a déjà écarté le
-# gating sur stderr non vide pour cette raison même) :
-#   - un NOM de compartiment portant un saut de ligne : la ligne imprimée se scinde en deux lignes
-#     lues séparément par `while IFS= read -r` côté detect-gsd-engine.sh, aucune des deux ne
-#     pointant vers un chemin qui existe — le compartiment devient invisible à la détection ;
-#   - un NOM de compartiment commençant par un point : le glob `"$root"/*/` ne l'expand JAMAIS
-#     (pas de `dotglob`) — invisible dès l'énumération, sans même la ligne stderr du cas lien
-#     symbolique.
-# Mesuré aussi : si le CHEMIN DU DOSSIER DE PLANNING lui-même porte un saut de ligne, TOUTE
-# l'énumération casse (chaque ligne imprimée porte ce préfixe), pas seulement le compartiment visé.
-# Effet mesuré sur ce script (`detect-gsd-engine.sh --path <planning>` invoqué en aval) : le
-# compartiment porteur de `gsd_state_version` devient invisible à la priorité 2bis, le détecteur
-# retombe sur la priorité 3 et rend le code 3 « terrain libre » SANS AUCUN diagnostic — exactement
-# le code que `detection_gsd` ci-dessous traduit en autorisation d'écrire.
-# CORRECTION DE PORTÉE (P44-D-01b : `vf_ws_enumerate` et `detect-gsd-engine.sh` restent
-# INCHANGÉS — hors périmètre de ce lot) : la garde vit ENTIÈREMENT ici, côté appelant, et ne
-# rejoue JAMAIS les priorités 2/2bis/3 du détecteur — elle ne lit AUCUN `STATE.md`, ne cherche
-# AUCUN marqueur `gsd_state_version`. Elle juge une seule chose, structurelle : l'énumération
-# ligne-par-ligne peut-elle restituer FIDÈLEMENT chaque compartiment RÉEL présent sur le disque ?
-# Si non, le verdict du détecteur — quel qu'il soit — n'est pas VÉRIFIABLE : refus nommé,
-# `non-concluante`, AVANT même d'invoquer le détecteur (l'appel au sous-processus devient inutile
-# dès que sa réponse ne serait de toute façon pas fiable).
-# Classes mesurées NON masquantes, volontairement PAS gardées (F1, ne pas sur-refuser un cas
-# nominal) :
-#   - un caractère de contrôle isolé (ex. retour chariot `\r`) dans un nom : ne scinde PAS les
-#     lignes de `read -r` — mesuré vert, le marqueur reste trouvé ;
-#   - une entrée en lien symbolique : `vf_ws_enumerate` l'exclut déjà EXPLICITEMENT, avec un
-#     avertissement sur stderr — exclusion DÉCLARÉE, pas un silence, hors du périmètre de cette
-#     garde (comportement déjà connu et accepté du système, non touché ici).
-def _enumeration_workstreams_fidele(planning_abs):
-    """(fidele: bool, classes: list[str]) — `classes` NOMME chaque classe masquante rencontrée
-    (jamais un booléen nu : un futur lecteur doit pouvoir citer le motif exact du refus). Liste
-    vide et `fidele=True` si `<planning_abs>/workstreams/` est absent, en lien symbolique, non-
-    répertoire, ou illisible : ces cas sont DÉJÀ fermés par le détecteur lui-même (code 2), cette
-    garde ne double jamais un refus déjà couvert ailleurs."""
+# --- Garde de lecture du détecteur (P44-D-02a, lot 7, correction de CLASSE) --------------------
+# PRINCIPE (décision du head sous délégation technique de Willy, session principale, 2026-09-28,
+# lot 7) : le moteur n'écrit QUE s'il a pu LIRE, pour de vrai, tout ce que le détecteur devait
+# lire. Pas une liste de cas particuliers — un principe unique, appliqué par EXÉCUTION RÉELLE de
+# la même primitive que le détecteur consomme, jamais par une liste de noms de fichiers à vérifier
+# à la main (une telle liste diverge du détecteur à la première évolution des deux, côte à côte).
+#
+# CONSTAT qui motive ce lot (audit du 2026-09-28, mesuré par exécution directe de
+# `vf_ws_enumerate`, HEAD 32b5d59) — la garde du lot 6 (fidélité STRUCTURELLE, noms/chemins à
+# risque) ne couvrait PAS ceci : `vf_ws_enumerate` (workstream-policy.sh, boucle d'énumération)
+# pose `found=1` inconditionnellement après chaque `printf`, MÊME quand `cd "$entry" && pwd` a
+# ÉCHOUÉ (compartiment sans bit `x`, mode 000/600/400) — `cd` échoue, `$(...)` capture une chaîne
+# VIDE, `printf` imprime une ligne VIDE, et `found=1` est posé quand même. `detect-gsd-engine.sh`
+# lit cette ligne vide via `while IFS= read -r _wsdir; do [ -n "$_wsdir" ] || continue; ...`
+# (workstream-policy.sh:305-306) — la ligne vide est silencieusement sautée, AUCUNE autre ligne ne
+# suit, la priorité 2bis retombe sur la priorité 3/4 et rend le code 3 « terrain libre » SANS
+# AUCUN diagnostic. Exactement le code que `detection_gsd` traduit en autorisation d'écrire :
+# mesuré, le moteur ÉCRIT (exit 0) sur un compartiment réellement tenu par GSD, et quand le marqueur
+# porté est au `STATE.md` RACINE lui-même rendu illisible (mode 000), le moteur va jusqu'à
+# ÉCRASER ce `STATE.md` — le marqueur `gsd_state_version` disparaît. Le signalement de correction à
+# la SOURCE (`vf_ws_enumerate`, hors périmètre P44-D-01b de ce lot) est reporté au BACKLOG.
+#
+# CORRECTION DE PORTÉE, INCHANGÉE depuis le lot 6 (P44-D-01b : `vf_ws_enumerate` et
+# `detect-gsd-engine.sh` restent INCHANGÉS, APPELABLES jamais RÉIMPLÉMENTÉS) : la garde vit
+# ENTIÈREMENT ici, côté appelant. Elle ne lit AUCUN `STATE.md` pour son CONTENU (ni `gsd_state_
+# version`, ni `planning_version`) — elle juge deux choses, toutes deux structurelles :
+#   1. FIDÉLITÉ PAR EXÉCUTION — `vf_ws_enumerate` est RELANCÉE ici, pour de vrai, dans le MÊME
+#      bash et le MÊME environnement maîtrisé que ceux qui serviront à l'appel réel du détecteur
+#      (jamais une réimplémentation Python de cette boucle bash — c'est exactement cette
+#      réimplémentation qui a divergé au lot 3, cf. commentaire de `detection_gsd`). Son résultat
+#      (un nom de compartiment par ligne retenue) est comparé à l'ensemble des compartiments RÉELS
+#      du disque, dérivé INDÉPENDAMMENT en Python (`os.scandir`, jamais un glob shell). Toute
+#      différence — ligne vide, ligne dupliquée, compartiment manquant — est un refus nommé : elle
+#      couvre le trou ci-dessus SANS connaître son mécanisme exact (une future variante du même
+#      trou, ailleurs dans `vf_ws_enumerate`, romprait la même égalité et serait donc AUSSI
+#      couverte).
+#   2. LISIBILITÉ RÉELLE — chaque compartiment retenu par cette exécution, le `STATE.md` racine
+#      s'il existe, et le `STATE.md` de chaque compartiment s'il existe, doivent être OUVRABLES
+#      pour de vrai (`os.scandir`/`os.open`, JAMAIS `os.access`, qui peut mentir sous ACL POSIX ou
+#      montage réseau, et qui ne teste de toute façon qu'une PERMISSION déclarée, pas une lecture
+#      RÉELLE). Un compartiment ou un `STATE.md` non ouvrable est un refus nommé — c'est la classe
+#      qui couvre `compartiment-dir-000/600/400` et `STATE.md` racine ou de compartiment en 000,
+#      chacune mesurée réécrire silencieusement (ou, pour le `STATE.md` racine, l'ÉCRASER) avant
+#      ce lot.
+# Toute `OSError` rencontrée PENDANT cette garde est un refus NOMMÉ, jamais un `continue`
+# silencieux qui traiterait l'élément comme absent ou conforme (F2, revue du lot 6 : `is_symlink`/
+# `is_dir` sous exception faisaient `continue`/`est_dossier=False`, un fail-OPEN).
+# Classes structurelles du lot 6 (nom à saut de ligne, nom caché, chemin de planning à risque)
+# CONSERVÉES comme diagnostic nommé — un futur lecteur doit pouvoir citer le motif précis — mais
+# c'est désormais l'ÉGALITÉ D'ENSEMBLES (point 1) qui décide du refus, jamais ces classes seules :
+# une entrée en lien symbolique reste NON masquante (exclusion DÉCLARÉE du détecteur, F1, ne pas
+# sur-refuser un cas déjà connu et accepté).
+def _ouvrable(chemin, est_dossier):
+    """Le chemin est-il RÉELLEMENT ouvrable pour l'utilisateur courant ? Une ouverture RÉELLE —
+    `os.scandir` pour un dossier (échoue immédiatement, à l'appel, si le bit `x` manque),
+    `os.open` en lecture pour un fichier — JAMAIS `os.access` (déclaratif, pas une lecture, et
+    peut mentir sous ACL POSIX ou montage réseau). Toute `OSError` -> False ; jamais une exception
+    qui remonte (F2)."""
+    try:
+        if est_dossier:
+            it = os.scandir(chemin)
+            try:
+                pass
+            finally:
+                it.close()
+        else:
+            fd = os.open(chemin, os.O_RDONLY)
+            os.close(fd)
+        return True
+    except OSError:
+        return False  # _ouvrable : toute OSError -> refus nommé, jamais un fail-open (F2)
+
+
+def _executer_vf_ws_enumerate(bash_bin, workstream_policy_sh, planning_abs, env_maitrise, racine_lab):
+    """Exécute RÉELLEMENT `vf_ws_enumerate` (workstream-policy.sh, INCHANGÉE — P44-D-01b), dans
+    le MÊME bash et le MÊME environnement maîtrisé que ceux qui serviront à l'appel réel du
+    détecteur. JAMAIS une réimplémentation Python de cette fonction bash. Retourne
+    (ok: bool, lignes: list[str]) — `ok=False` sur tout échec de lancement ou code de sortie hors
+    de {0, 2, 3} (les codes propres de `vf_ws_enumerate`, voir l'en-tête de workstream-policy.sh) :
+    fail-closed, jamais une lecture partielle traitée comme fiable."""
+    script_source = '. "$1"\nvf_ws_enumerate "$2"\n'
+    try:
+        resultat = subprocess.run(
+            [bash_bin, "--noprofile", "--norc", "-c", script_source, "_",
+             workstream_policy_sh, planning_abs],
+            cwd=racine_lab, timeout=30, env=env_maitrise,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+    except Exception:
+        return (False, [])
+    if resultat.returncode not in (0, 2, 3):
+        return (False, [])
+    texte = resultat.stdout.decode("utf-8", "surrogateescape")
+    lignes = texte.split("\n")
+    if lignes and lignes[-1] == "":
+        lignes = lignes[:-1]
+    return (True, lignes)
+
+
+def _lecture_detecteur_fidele(planning_abs, bash_bin, workstream_policy_sh, env_maitrise, racine_lab):
+    """(fidele: bool, classes: list[str]) — `classes` NOMME chaque motif de refus rencontré
+    (jamais un booléen nu). Voir le commentaire de tête ci-dessus pour le principe. Liste vide et
+    `fidele=True` si `<planning_abs>/workstreams/` est absent (SILENCE, code 3 de
+    `vf_ws_enumerate` — dépôt NON partitionné, état NOMINAL), en lien symbolique, ou non-répertoire
+    (ces deux derniers cas sont DÉJÀ fermés par le détecteur lui-même, code 2 — cette garde ne
+    double jamais un refus déjà couvert ailleurs)."""
     classes = []
+
+    # --- Lisibilité RÉELLE du STATE.md racine, s'il existe (priorités 2 ET 3 du détecteur en
+    # dépendent TOUTES DEUX — un STATE.md racine illisible masque l'une comme l'autre) -----------
+    etat_racine = os.path.join(planning_abs, "STATE.md")
+    if os.path.lexists(etat_racine) and not _ouvrable(etat_racine, est_dossier=False):
+        classes.append("state-racine-illisible")
+
+    # --- workstreams/ absent, lien, ou non-dossier : rien de plus à vérifier ICI (déjà fermé
+    # ailleurs, ou SILENCE nominal) -----------------------------------------------------------
     ws_root = os.path.join(planning_abs, "workstreams")
     try:
         info_root = os.lstat(ws_root)
     except OSError:
-        return (True, [])
+        vues = []
+        for c in classes:
+            if c not in vues:
+                vues.append(c)
+        return (len(vues) == 0, vues)
     if stat.S_ISLNK(info_root.st_mode) or not stat.S_ISDIR(info_root.st_mode):
-        return (True, [])
+        vues = []
+        for c in classes:
+            if c not in vues:
+                vues.append(c)
+        return (len(vues) == 0, vues)
+
+    # --- Ensemble RÉEL des compartiments (Python, os.scandir — JAMAIS un glob shell) + lisibilité
+    # de chaque compartiment retenu et de son STATE.md s'il existe --------------------------------
+    reels = {}
     try:
         entrees = list(os.scandir(ws_root))
     except OSError:
-        return (True, [])
+        classes.append("workstreams-illisible")
+        entrees = []
     chemin_planning_a_risque = "\n" in planning_abs
     for entree in entrees:
         try:
             est_lien = entree.is_symlink()
         except OSError:
+            classes.append("compartiment-type-indetermine:" + entree.name)
             continue
         if est_lien:
-            continue  # exclusion DÉCLARÉE du détecteur (avertissement stderr) — pas masquant ici
+            continue  # exclusion DÉCLARÉE du détecteur — pas masquant ici (lot 6, inchangé, F1)
         try:
             est_dossier = entree.is_dir(follow_symlinks=False)
         except OSError:
-            est_dossier = False
+            classes.append("compartiment-type-indetermine:" + entree.name)
+            continue
         if not est_dossier:
             continue
-        # Ce compartiment RÉEL (ni lien, ni non-dossier) SERAIT normalement énumérable par
-        # `vf_ws_enumerate` — sauf classe masquante ci-dessous.
+        # Diagnostic structurel hérité du lot 6 (des NOMS, jamais la décision — voir le
+        # commentaire de tête : c'est l'égalité d'ensembles au point 1 ci-dessous qui décide) :
         if chemin_planning_a_risque:
             classes.append("chemin-planning-saut-de-ligne")
         if "\n" in entree.name:
             classes.append("nom-compartiment-saut-de-ligne")
         if entree.name.startswith("."):
             classes.append("nom-compartiment-cache:" + entree.name)
+        reels[entree.name] = entree.path
+        if not _ouvrable(entree.path, est_dossier=True):
+            classes.append("compartiment-illisible:" + entree.name)
+        else:
+            etat_compartiment = os.path.join(entree.path, "STATE.md")
+            if os.path.lexists(etat_compartiment) and not _ouvrable(etat_compartiment, est_dossier=False):
+                classes.append("compartiment-state-illisible:" + entree.name)
+
+    # --- Point 1 : FIDÉLITÉ PAR EXÉCUTION — `vf_ws_enumerate` relancée pour de vrai --------------
+    ok_exec, lignes = _executer_vf_ws_enumerate(bash_bin, workstream_policy_sh, planning_abs, env_maitrise, racine_lab)
+    if not ok_exec:
+        classes.append("enumeration-execution-en-echec")
+    else:
+        attendus = sorted(reels.keys())
+        obtenus = sorted(os.path.basename(l) for l in lignes)
+        if attendus != obtenus:
+            classes.append("enumeration-non-fidele")
+
     vues = []
     for c in classes:
         if c not in vues:
@@ -459,12 +565,13 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
     (`vf_ws_enumerate`) tout en rendant le code 3 racine correct ; gater dessus aurait refusé
     l'écriture sur ce cas nominal (prose documentaire, aucun chemin résolu par ce fichier —
     vf-allow-unregistered-planning-path).
-    Lot 6 (correction ciblée, audit du 2026-09-28) : AVANT tout appel au détecteur, une garde
-    structurelle (`_enumeration_workstreams_fidele`) vérifie que l'énumération ligne-par-ligne des
-    compartiments peut restituer FIDÈLEMENT ce qui est réellement sur le disque — un compartiment
-    qu'elle ne pourrait pas restituer (nom portant un saut de ligne, nom caché, chemin de planning
-    lui-même porteur d'un saut de ligne) rend TOUT verdict du détecteur non vérifiable : refus
-    nommé, sans même invoquer le sous-processus. Voir le commentaire de tête de cette fonction."""
+    Lot 7 (correction de CLASSE, audit du 2026-09-28) : AVANT tout appel au détecteur, une garde
+    (`_lecture_detecteur_fidele`) vérifie que le moteur peut LIRE, pour de vrai, tout ce que le
+    détecteur devait lire — fidélité PAR EXÉCUTION de `vf_ws_enumerate` (comparée à l'ensemble réel
+    du disque) et lisibilité RÉELLE (ouverture, jamais `os.access`) de chaque compartiment retenu
+    et de chaque `STATE.md` (racine et compartiments). Un écart rend TOUT verdict du détecteur non
+    vérifiable : refus nommé, sans même invoquer le sous-processus détecteur. Voir le commentaire
+    de tête de `_lecture_detecteur_fidele` pour le principe et le constat qui l'a motivée."""
     # F6 (revue) : « absent » (rien à cet emplacement) et « non régulier » (un dossier, un lien,
     # une FIFO...) partageaient jusqu'ici le même message stderr — deux causes distinctes,
     # confondues sous un même diagnostic. Deux motifs, deux messages désormais.
@@ -476,21 +583,6 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
     if not stat.S_ISREG(info_detecteur.st_mode):
         print("[recalc-planning] détecteur non régulier : " + detect_sh, file=sys.stderr)
         return "non-concluante"  # motif-detecteur-irregulier
-    # Lot 6 — garde de fidélité d'énumération, AVANT l'appel au détecteur (P44-D-02a) : si un
-    # compartiment réel de `<planning>/workstreams/` ne serait pas restitué fidèlement par
-    # l'énumération ligne-par-ligne que le détecteur consomme, aucun de ses verdicts (0/2/3) n'est
-    # vérifiable — inutile même d'invoquer le sous-processus.
-    fidele, classes_masquantes = _enumeration_workstreams_fidele(planning_abs)
-    if not fidele:
-        print(
-            "[recalc-planning] refus (P44-D-02a, garde de fidélité d'énumération, lot 6) : au "
-            "moins un compartiment réel sous workstreams/ ne serait pas restitué fidèlement par "
-            "l'énumération que le détecteur consomme (classes : "
-            + ", ".join(classes_masquantes) + ") — écriture refusée sans appeler le détecteur, "
-            "son verdict ne serait pas vérifiable",
-            file=sys.stderr,
-        )
-        return "non-concluante"  # motif-enumeration-non-fidele
     bash_bin = _resoudre_bash()
     if bash_bin is None:
         print(
@@ -506,8 +598,27 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
     # variable héritée : ni BASH_ENV, ni ENV, ni une fonction exportée BASH_FUNC_*%%, ni
     # SHELLOPTS/BASHOPTS/CDPATH/TMPDIR/HOME/GSD_WORKSTREAM. Jamais `os.environ` nu ni une copie
     # partielle passée au sous-processus (P44-D-01d, verdict indépendant de tout héritage).
+    # Résolu ICI, AVANT la garde de lecture (lot 7) : la garde relance `vf_ws_enumerate` dans ce
+    # MÊME environnement — le détecteur et la garde doivent voir EXACTEMENT le même monde.
     env_maitrise = {"PATH": PATH_MAITRISE}
     env_maitrise["GSD_HOME"] = os.path.dirname(detect_sh)
+    # Lot 7 — garde de lecture du détecteur, AVANT l'appel au détecteur (P44-D-02a) : si le moteur
+    # ne peut pas lire, pour de vrai, tout ce que le détecteur devait lire (énumération fidèle des
+    # compartiments PAR EXÉCUTION + lisibilité réelle de chaque élément), aucun de ses verdicts
+    # (0/2/3) n'est vérifiable — inutile même d'invoquer le sous-processus.
+    workstream_policy_sh = os.path.join(os.path.dirname(detect_sh), "workstream-policy.sh")
+    fidele, classes_masquantes = _lecture_detecteur_fidele(
+        planning_abs, bash_bin, workstream_policy_sh, env_maitrise, racine_lab,
+    )
+    if not fidele:
+        print(
+            "[recalc-planning] refus (P44-D-02a, garde de lecture du détecteur, lot 7) : le "
+            "moteur n'a pas pu lire, pour de vrai, tout ce que le détecteur devait lire (classes : "
+            + ", ".join(classes_masquantes) + ") — écriture refusée sans appeler le détecteur, "
+            "son verdict ne serait pas vérifiable",
+            file=sys.stderr,
+        )
+        return "non-concluante"  # motif-lecture-detecteur-non-fidele
     # `--noprofile --norc` (WR-02, revue) : ces deux drapeaux ne bloquent QUE le chargement de
     # `/etc/profile`, `~/.bash_profile` et `~/.bashrc` par un bash INTERACTIF ou de LOGIN — ils
     # n'ont AUCUN effet sur `BASH_ENV`/`ENV`, qu'un bash non-interactif lit indépendamment de ces

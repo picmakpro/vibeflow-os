@@ -1157,3 +1157,47 @@ d'autres classes de noms piégés).
 
 **Déclencheur de reprise :** la prochaine évolution de `workstream-policy.sh` ou de
 `check-planning-state.sh`, ou un incident où ce trou a masqué un compartiment réel.
+
+## Pour Samuel — `vf_ws_enumerate` pose `found=1` même quand `cd` échoue (constaté 2026-09-28)
+
+**Capturé :** 2026-09-28, pendant l'audit de la Phase 44 (worktree `gouvernance-44`), correction de
+classe lot 7 (`recalc-planning.sh`), reproduit par exécution dans l'environnement maîtrisé exact du
+moteur. Motif du report : P44-D-01b (`detect-gsd-engine.sh` et `workstream-policy.sh` restent
+INCHANGÉS en Phase 44 — le lot 7 a fermé la conséquence côté appelant, dans `recalc-planning.sh`
+seul, jamais dans ces deux fichiers). Voisine de l'entrée précédente (même primitive, même fichier,
+même classe de trou plus large) — pas un doublon : le trou de saut de ligne casse le CONTENU d'une
+ligne déjà émise, celui-ci fait émettre une ligne alors que l'émission elle-même a ÉCHOUÉ.
+
+**Le défaut** : dans la boucle d'énumération (`workstream-policy.sh:294-307`), pour chaque entrée
+retenue (dossier réel, non-lien), la ligne `printf '%s\n' "$(cd "$entry" && pwd)"` puis
+`found=1` s'exécutent INCONDITIONNELLEMENT — même quand `cd "$entry"` a ÉCHOUÉ (compartiment sans
+bit `x`, permissions dégradées en `000`/`600`/`400`). `cd` échoue, la substitution de commande
+`$(...)` capture une chaîne VIDE (le code de retour de `cd` n'est jamais testé), `printf` imprime
+une ligne VIDE, et `found=1` est posé quand même — comme si le compartiment avait été énuméré avec
+succès. `detect-gsd-engine.sh` (priorité 2bis, `workstream-policy.sh:305-306` côté lecture — même
+zone que l'entrée précédente) saute cette ligne vide en silence (`[ -n "$_wsdir" ] || continue`) :
+aucune autre ligne ne suit, la priorité 2bis retombe sur la priorité 3/4 et rend le code 3
+« terrain libre » SANS AUCUN diagnostic qui distingue ce cas du cas nominal (aucun compartiment).
+Mesuré : un compartiment RÉELLEMENT tenu par GSD, mais dont le mode empêche `cd`, devient
+indétectable par `vf_ws_enumerate` — le lot 7 ferme la conséquence côté appelant (garde de lecture
+qui relance `vf_ws_enumerate` pour de vrai et compare son résultat à l'ensemble réel du disque),
+mais la primitive elle-même reste silencieuse sur ce cas précis.
+
+**Mesuré aussi, même lot** : un `STATE.md` (racine ou de compartiment) rendu illisible (mode `000`)
+produit le même silence côté LECTEUR — `has_frontmatter_key` (`detect-gsd-engine.sh`) échoue à
+ouvrir le fichier, ne trouve donc pas la clé cherchée, et le code de sortie qui en résulte ne se
+distingue en rien d'un fichier simplement dépourvu du marqueur. Ce n'est pas un défaut de
+`vf_ws_enumerate` elle-même (elle n'ouvre aucun `STATE.md`) mais du même MOTIF, un cran plus loin :
+aucun des deux consommateurs de cette primitive ne distingue aujourd'hui « le marqueur est absent »
+de « je n'ai pas pu vérifier s'il était présent ».
+
+**Piste durable** : tester le code de retour de `cd` avant le `printf` — `found` ne devrait se
+poser QUE si `cd` a réussi ; sur échec, un code de sortie DISTINCT (ni 0, ni le 3 nominal du dépôt
+non partitionné) rendrait le cas AUDIBLE plutôt que silencieusement confondu avec « aucun
+compartiment ». Même remède de principe pour un `STATE.md` illisible côté `has_frontmatter_key`.
+
+**Propriétaire à la relecture :** Samuel (propriétaire de `workstream-policy.sh`, Phase 41.1).
+
+**Déclencheur de reprise :** la prochaine évolution de `workstream-policy.sh` ou de
+`detect-gsd-engine.sh`, ou un incident où ce trou a masqué un compartiment réel dont les
+permissions étaient dégradées.
