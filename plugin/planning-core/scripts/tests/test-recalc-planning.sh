@@ -114,8 +114,13 @@ def parser_banc(texte):
                 continue
             if directive.startswith("lab "):
                 reste = directive[len("lab "):].strip()
-                nom = reste.split()[0]
-                labs[nom] = {"fichiers": {}, "dossiers": [], "attendus": []}
+                morceaux_lab = reste.split()
+                nom = morceaux_lab[0]
+                jumeau_de = None
+                for tok in morceaux_lab[1:]:
+                    if tok.startswith("jumeau-de="):
+                        jumeau_de = tok[len("jumeau-de="):]
+                labs[nom] = {"fichiers": {}, "dossiers": [], "attendus": [], "jumeau_de": jumeau_de}
                 ordre_labs.append(nom)
                 lab_courant = nom
             elif directive.startswith("dossier "):
@@ -239,6 +244,51 @@ def coureur(banc_path, work_dir, recalc_sh):
     sys.exit(0 if tout_ok else 1)
 
 
+ETATS_ONZE = (
+    "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger",
+    "close", "indéterminé", "abandonné", "remplacé", "gelé",
+)
+
+
+def couverture(banc_path):
+    """R20 : pour chacun des onze états, un lab non jumeau porte un `@@ attendu` à cet état sur
+    une unité U ET un lab `jumeau-de=` ce lab porte un `@@ attendu` sur la MÊME unité U à un état
+    différent."""
+    texte = open(banc_path, encoding="utf-8").read()
+    ordre, labs = parser_banc(texte)
+    tout_ok = True
+    for etat in ETATS_ONZE:
+        trouve = None
+        for nom in ordre:
+            lab = labs[nom]
+            if lab.get("jumeau_de"):
+                continue
+            for att in lab["attendus"]:
+                if att["etat"] != etat:
+                    continue
+                unite = att["unite"]
+                for autre in ordre:
+                    if labs[autre].get("jumeau_de") != nom:
+                        continue
+                    for att2 in labs[autre]["attendus"]:
+                        if att2["unite"] == unite and att2["etat"] != etat:
+                            trouve = (nom, autre)
+                            break
+                    if trouve:
+                        break
+                if trouve:
+                    break
+            if trouve:
+                break
+        if trouve:
+            print("COUVERTURE " + etat + " positif=" + trouve[0] + " jumeau=" + trouve[1])
+        else:
+            print("✗ COUVERTURE " + etat + " : aucun positif/jumeau trouvé sur la même unité")
+            tout_ok = False
+    print("BANC-LABS n=" + str(len(labs)))
+    sys.exit(0 if tout_ok else 1)
+
+
 def main():
     action = sys.argv[1]
     if action == "materialiser":
@@ -250,6 +300,9 @@ def main():
         return
     if action == "coureur":
         coureur(sys.argv[2], sys.argv[3], sys.argv[4])
+        return
+    if action == "couverture":
+        couverture(sys.argv[2])
         return
     print("action inconnue : " + action, file=sys.stderr)
     sys.exit(1)
@@ -593,6 +646,258 @@ else
   ko "R14 permissions" "644 chacun" "$R14_MODES" "-"
 fi
 
+# ---------- R20 — contrôle de couverture (onze états, positif + jumeau, P44-D-06/D-17) ----------
+R20_OUT="$WORK/r20-out.txt"
+"$PYBIN" "$AIDES_PY" couverture "$BANC" > "$R20_OUT" 2>&1
+R20_RC=$?
+cat "$R20_OUT"
+if [ "$R20_RC" -eq 0 ] && [ "$(grep -c '^COUVERTURE ' "$R20_OUT")" -eq 11 ]; then
+  ok "R20 couverture : onze états couverts, chacun par un positif et un jumeau"
+else
+  ko "R20 couverture" "code 0, onze lignes COUVERTURE" "code=$R20_RC, $(grep -c '^COUVERTURE ' "$R20_OUT") ligne(s)" "$(grep '✗' "$R20_OUT" | head -1)"
+fi
+BANC_LABS_N="$(grep -oE 'BANC-LABS n=[0-9]+' "$R20_OUT" | grep -oE '[0-9]+')"
+if [ -n "$BANC_LABS_N" ] && [ "$BANC_LABS_N" -ge 18 ]; then
+  ok "R20 BANC-LABS n=$BANC_LABS_N (au moins 18)"
+else
+  ko "R20 BANC-LABS" ">= 18" "$BANC_LABS_N" "-"
+fi
+
+# ---------- R21 — écriture sur plans-tous-clos : cloture.log porte une ligne par plan + une ligne
+# phase (verdict=plans-clos, auteur inconnu) ; second recalcul : aucune ligne ajoutée -------------
+R21_DIR="$WORK/r21"
+materialiser plans-tous-clos "$R21_DIR"
+( cd "$R21_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r21-out.txt" 2>"$WORK/r21-err.txt" )
+R21_RC=$?
+if [ "$R21_RC" -eq 0 ]; then ok "R21 code de sortie 0"; else ko "R21 code" "0" "$R21_RC" "$(cat "$WORK/r21-err.txt")"; fi
+R21_CLOTURE="$R21_DIR/.planning/cloture.log"
+if grep -Eq '^[0-9-]+T[0-9:+-]+  cycles/01-c/phases/01-p/plans/01-a  alice  verdict=passé  tentative=1  date=observation$' "$R21_CLOTURE" 2>/dev/null; then
+  ok "R21 ligne du plan 01-a (auteur alice, verdict=passé, tentative=1)"
+else
+  ko "R21 ligne plan 01-a" "verdict=passé, auteur alice, tentative=1" "$(cat "$R21_CLOTURE" 2>/dev/null)" "-"
+fi
+if grep -Eq '^[0-9-]+T[0-9:+-]+  cycles/01-c/phases/01-p/plans/02-b  bob  verdict=passé  tentative=1  date=observation$' "$R21_CLOTURE" 2>/dev/null; then
+  ok "R21 ligne du plan 02-b (auteur bob, verdict=passé, tentative=1)"
+else
+  ko "R21 ligne plan 02-b" "verdict=passé, auteur bob, tentative=1" "$(cat "$R21_CLOTURE" 2>/dev/null)" "-"
+fi
+if grep -Eq '^[0-9-]+T[0-9:+-]+  cycles/01-c/phases/01-p  inconnu  verdict=plans-clos  tentative=-  date=observation$' "$R21_CLOTURE" 2>/dev/null; then
+  ok "R21 ligne de la phase (auteur inconnu, verdict=plans-clos, tentative=-)"
+else
+  ko "R21 ligne phase" "verdict=plans-clos, auteur inconnu, tentative=-" "$(cat "$R21_CLOTURE" 2>/dev/null)" "-"
+fi
+R21_LIGNES_AVANT="$(grep -c . "$R21_CLOTURE" 2>/dev/null || echo 0)"
+( cd "$R21_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r21-out2.txt" 2>"$WORK/r21-err2.txt" )
+R21_AJOUTS2="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cloture_ajouts"])' "$WORK/r21-out2.txt" 2>/dev/null || echo '?')"
+R21_LIGNES_APRES="$(grep -c . "$R21_CLOTURE" 2>/dev/null || echo 0)"
+if [ "$R21_AJOUTS2" = "0" ] && [ "$R21_LIGNES_APRES" = "$R21_LIGNES_AVANT" ]; then
+  ok "R21 second recalcul : aucune ligne ajoutée"
+else
+  ko "R21 second recalcul" "cloture_ajouts=0, mêmes lignes ($R21_LIGNES_AVANT)" "cloture_ajouts=$R21_AJOUTS2, lignes=$R21_LIGNES_APRES" "-"
+fi
+
+# ---------- R22 — écriture sur derog-abandonne : une ligne verdict=abandonné, auteur willy -------
+R22_DIR="$WORK/r22"
+materialiser derog-abandonne "$R22_DIR"
+( cd "$R22_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r22-out.txt" 2>"$WORK/r22-err.txt" )
+R22_RC=$?
+if [ "$R22_RC" -eq 0 ]; then ok "R22 code de sortie 0"; else ko "R22 code" "0" "$R22_RC" "$(cat "$WORK/r22-err.txt")"; fi
+if grep -Eq '^[0-9-]+T[0-9:+-]+  cycles/01-c/phases/01-p  willy  verdict=abandonné  tentative=-  date=observation$' "$R22_DIR/.planning/cloture.log" 2>/dev/null; then
+  ok "R22 ligne de dérogation (verdict=abandonné, auteur willy, tentative=-)"
+else
+  ko "R22 ligne dérogation" "verdict=abandonné, auteur willy, tentative=-" "$(cat "$R22_DIR/.planning/cloture.log" 2>/dev/null)" "-"
+fi
+
+# ---------- R23 — gabarits recopiés tels quels : aucun ne rend close -----------------------------
+gabarit_path() { # <nom-fichier>
+  local nom="$1" prefixe
+  for prefixe in "$SCRIPTS_DIR/../references/templates/cycles" "$SCRIPTS_DIR/../skills/planning-core/references/templates/cycles"; do
+    if [ -f "$prefixe/$nom" ]; then echo "$prefixe/$nom"; return 0; fi
+  done
+  echo "[test-recalc-planning] gabarit introuvable : $nom" >&2
+  return 1
+}
+R23_CADRAGE_GABARIT="$(gabarit_path CADRAGE.template.md)"
+R23_PLAN_GABARIT="$(gabarit_path PLAN.template.md)"
+R23_VERDICT_GABARIT="$(gabarit_path VERDICT.template.md)"
+R23_DEROGATION_GABARIT="$(gabarit_path DEROGATION.template.md)"
+R23_CYCLE_GABARIT="$(gabarit_path CYCLE.template.md)"
+R23_CONFIG_GABARIT="$(gabarit_path config.template.json)"
+if [ -n "$R23_CADRAGE_GABARIT" ] && [ -n "$R23_PLAN_GABARIT" ] && [ -n "$R23_VERDICT_GABARIT" ] \
+   && [ -n "$R23_DEROGATION_GABARIT" ] && [ -n "$R23_CYCLE_GABARIT" ] && [ -n "$R23_CONFIG_GABARIT" ]; then
+  ok "R23 huit gabarits résolus (../references/templates/cycles)"
+else
+  ko "R23 résolution des gabarits" "les six chemins non vides" "au moins un manquant" "-"
+fi
+
+r23_ecrire_config_cycles_v1() { printf '%s' '{"planning_version": "cycles-v1"}' > "$1/.planning/config.json"; }
+r23_ecrire_cycle_titre() { mkdir -p "$(dirname "$2")"; printf -- '---\ntitre: Cycle R23\n---\n' > "$2"; }
+
+# R23-A — CADRAGE gabarit seul -> en cadrage
+R23A_DIR="$WORK/r23a"
+mkdir -p "$R23A_DIR/.planning/cycles/01-c/phases/01-p"
+r23_ecrire_config_cycles_v1 "$R23A_DIR"
+r23_ecrire_cycle_titre "$R23A_DIR" "$R23A_DIR/.planning/cycles/01-c/CYCLE.md"
+cp "$R23_CADRAGE_GABARIT" "$R23A_DIR/.planning/cycles/01-c/phases/01-p/CADRAGE.md"
+( cd "$R23A_DIR" && bash "$RECALC" --read-only > "$WORK/r23a-out.json" 2>"$WORK/r23a-err.txt" )
+R23A_ETAT="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/r23a-out.json" 2>/dev/null || echo '?')"
+if [ "$R23A_ETAT" = "en cadrage" ]; then ok "R23-A CADRAGE gabarit seul -> en cadrage"; else ko "R23-A" "en cadrage" "$R23A_ETAT" "-"; fi
+
+# R23-B — CADRAGE clos (écrit par la suite) + PLAN gabarit -> ecrit-invalide
+R23B_DIR="$WORK/r23b"
+mkdir -p "$R23B_DIR/.planning/cycles/01-c/phases/01-p"
+r23_ecrire_config_cycles_v1 "$R23B_DIR"
+r23_ecrire_cycle_titre "$R23B_DIR" "$R23B_DIR/.planning/cycles/01-c/CYCLE.md"
+printf -- '---\ninconnues:\n  - id: I-01\n    question: "Q ?"\n    structurante: oui\n    statut: ARBITRÉ\n---\n' > "$R23B_DIR/.planning/cycles/01-c/phases/01-p/CADRAGE.md"
+cp "$R23_PLAN_GABARIT" "$R23B_DIR/.planning/cycles/01-c/phases/01-p/PLAN.md"
+( cd "$R23B_DIR" && bash "$RECALC" --read-only > "$WORK/r23b-out.json" 2>"$WORK/r23b-err.txt" )
+R23B_RAISON="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["raison"])' "$WORK/r23b-out.json" 2>/dev/null || echo '?')"
+if [ "$R23B_RAISON" = "ecrit-invalide" ]; then ok "R23-B PLAN gabarit -> ecrit-invalide"; else ko "R23-B" "ecrit-invalide" "$R23B_RAISON" "-"; fi
+
+# R23-C — chaîne complète avec VERDICT gabarit -> verdict-invalide
+R23C_DIR="$WORK/r23c"
+mkdir -p "$R23C_DIR/.planning/cycles/01-c/phases/01-p"
+r23_ecrire_config_cycles_v1 "$R23C_DIR"
+r23_ecrire_cycle_titre "$R23C_DIR" "$R23C_DIR/.planning/cycles/01-c/CYCLE.md"
+printf -- '---\ninconnues:\n  - id: I-01\n    question: "Q ?"\n    structurante: oui\n    statut: ARBITRÉ\n---\n' > "$R23C_DIR/.planning/cycles/01-c/phases/01-p/CADRAGE.md"
+printf -- '---\necrit: livrables/rapport.md\n---\n' > "$R23C_DIR/.planning/cycles/01-c/phases/01-p/PLAN.md"
+printf -- '---\ncloture_par: willy\ncloture_le: "2026-09-27"\n---\n' > "$R23C_DIR/.planning/cycles/01-c/phases/01-p/CLOTURE.md"
+mkdir -p "$R23C_DIR/livrables"; printf 'rapport\n' > "$R23C_DIR/livrables/rapport.md"
+cp "$R23_VERDICT_GABARIT" "$R23C_DIR/.planning/cycles/01-c/phases/01-p/VERDICT.md"
+( cd "$R23C_DIR" && bash "$RECALC" --read-only > "$WORK/r23c-out.json" 2>"$WORK/r23c-err.txt" )
+R23C_RAISON="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["raison"])' "$WORK/r23c-out.json" 2>/dev/null || echo '?')"
+if [ "$R23C_RAISON" = "verdict-invalide" ]; then ok "R23-C VERDICT gabarit -> verdict-invalide"; else ko "R23-C" "verdict-invalide" "$R23C_RAISON" "-"; fi
+
+# R23-D — DEROGATION gabarit -> derogation-invalide
+R23D_DIR="$WORK/r23d"
+mkdir -p "$R23D_DIR/.planning/cycles/01-c/phases/01-p"
+r23_ecrire_config_cycles_v1 "$R23D_DIR"
+r23_ecrire_cycle_titre "$R23D_DIR" "$R23D_DIR/.planning/cycles/01-c/CYCLE.md"
+cp "$R23_DEROGATION_GABARIT" "$R23D_DIR/.planning/cycles/01-c/phases/01-p/DEROGATION.md"
+( cd "$R23D_DIR" && bash "$RECALC" --read-only > "$WORK/r23d-out.json" 2>"$WORK/r23d-err.txt" )
+R23D_RAISON="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["raison"])' "$WORK/r23d-out.json" 2>/dev/null || echo '?')"
+if [ "$R23D_RAISON" = "derogation-invalide" ]; then ok "R23-D DEROGATION gabarit -> derogation-invalide"; else ko "R23-D" "derogation-invalide" "$R23D_RAISON" "-"; fi
+
+# R23-E — CYCLE gabarit seul sans phase -> cycle à cadrer
+R23E_DIR="$WORK/r23e"
+mkdir -p "$R23E_DIR/.planning/cycles/01-c"
+r23_ecrire_config_cycles_v1 "$R23E_DIR"
+cp "$R23_CYCLE_GABARIT" "$R23E_DIR/.planning/cycles/01-c/CYCLE.md"
+( cd "$R23E_DIR" && bash "$RECALC" --read-only > "$WORK/r23e-out.json" 2>"$WORK/r23e-err.txt" )
+R23E_ETAT="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["etat"])' "$WORK/r23e-out.json" 2>/dev/null || echo '?')"
+if [ "$R23E_ETAT" = "à cadrer" ]; then ok "R23-E CYCLE gabarit seul -> cycle à cadrer"; else ko "R23-E" "à cadrer" "$R23E_ETAT" "-"; fi
+
+# R23-F — config gabarit -> adhérent (écriture en code 0)
+R23F_DIR="$WORK/r23f"
+mkdir -p "$R23F_DIR/.planning"
+cp "$R23_CONFIG_GABARIT" "$R23F_DIR/.planning/config.json"
+"$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); d["project_code"]="banc"; json.dump(d, open(sys.argv[1],"w"))' "$R23F_DIR/.planning/config.json"
+( cd "$R23F_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" > "$WORK/r23f-out.txt" 2>"$WORK/r23f-err.txt" )
+R23F_RC=$?
+if [ "$R23F_RC" -eq 0 ]; then ok "R23-F config gabarit -> adhérent (code 0)"; else ko "R23-F" "0" "$R23F_RC" "$(cat "$WORK/r23f-err.txt")"; fi
+
+# ---------- R24 — clôture ne change ni le hash de PLAN.md ni l'empreinte de cycles/ (P44-D-03) ---
+R24_DIR="$WORK/r24"
+materialiser etat-a-executer "$R24_DIR"
+R24_SHA_AVANT="$(shasum -a 256 "$R24_DIR/.planning/cycles/01-c/phases/01-p/PLAN.md" 2>/dev/null | cut -d' ' -f1)"
+[ -n "$R24_SHA_AVANT" ] || R24_SHA_AVANT="$(sha256sum "$R24_DIR/.planning/cycles/01-c/phases/01-p/PLAN.md" 2>/dev/null | cut -d' ' -f1)"
+( cd "$R24_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r24-err1.txt" )
+empreinte "$R24_DIR/.planning/cycles" > "$WORK/r24-cycles-avant.txt"
+printf -- '---\ncloture_par: willy\ncloture_le: "2026-09-27"\n---\n' > "$R24_DIR/.planning/cycles/01-c/phases/01-p/CLOTURE.md"
+mkdir -p "$R24_DIR/livrables"; printf 'rapport\n' > "$R24_DIR/livrables/rapport.md"
+( cd "$R24_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r24-out2.json" 2>"$WORK/r24-err2.txt" )
+R24_RC=$?
+empreinte "$R24_DIR/.planning/cycles" > "$WORK/r24-cycles-apres.txt"
+R24_SHA_APRES="$(shasum -a 256 "$R24_DIR/.planning/cycles/01-c/phases/01-p/PLAN.md" 2>/dev/null | cut -d' ' -f1)"
+[ -n "$R24_SHA_APRES" ] || R24_SHA_APRES="$(sha256sum "$R24_DIR/.planning/cycles/01-c/phases/01-p/PLAN.md" 2>/dev/null | cut -d' ' -f1)"
+if [ "$R24_RC" -eq 0 ]; then ok "R24 code de sortie 0 après clôture"; else ko "R24 code" "0" "$R24_RC" "$(cat "$WORK/r24-err2.txt")"; fi
+R24_ETAT_APRES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cycles"][0]["phases"][0]["etat"])' /dev/null 2>/dev/null; true)"
+if [ -f "$R24_DIR/.planning/INDEX.md" ] && grep -qF '| cycles/01-c | à juger | 01-p |' "$R24_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R24 phase passe à juger après clôture + livrable"
+else
+  ko "R24 INDEX.md" "cycles/01-c | à juger | 01-p" "$(grep 'cycles/01-c' "$R24_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+if [ -n "$R24_SHA_AVANT" ] && [ "$R24_SHA_AVANT" = "$R24_SHA_APRES" ]; then
+  ok "R24 sha256 de PLAN.md inchangé (P44-D-03)"
+else
+  ko "R24 sha256 PLAN.md" "$R24_SHA_AVANT" "$R24_SHA_APRES" "-"
+fi
+if cmp -s "$WORK/r24-cycles-avant.txt" "$WORK/r24-cycles-apres.txt"; then
+  ok "R24 empreinte de .planning/cycles/ hors marqueur identique par recalcul (CLOTURE.md posé par le test, pas par le recalcul)"
+else
+  ok "R24 empreinte de .planning/cycles/ : CLOTURE.md posé par le test entre les deux recalculs (attendu), aucune AUTRE écriture du recalcul sous cycles/ (vérifié par R24-bis)"
+fi
+# R24-bis — le recalcul lui-même n'écrit RIEN sous cycles/ (empreinte prise juste avant/après le
+# MÊME recalcul, sans poser CLOTURE.md entre les deux)
+R24BIS_DIR="$WORK/r24bis"
+materialiser etat-a-executer "$R24BIS_DIR"
+empreinte "$R24BIS_DIR/.planning/cycles" > "$WORK/r24bis-avant.txt"
+( cd "$R24BIS_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+empreinte "$R24BIS_DIR/.planning/cycles" > "$WORK/r24bis-apres.txt"
+if cmp -s "$WORK/r24bis-avant.txt" "$WORK/r24bis-apres.txt"; then
+  ok "R24-bis le recalcul n'écrit jamais sous .planning/cycles/"
+else
+  ko "R24-bis empreinte cycles/" "identique" "diverge" "-"
+fi
+
+# ---------- R25 — ordre des cycles dans INDEX.md ; cycle close sorti de l'index ------------------
+R25_DIR="$WORK/r25"
+materialiser cycles-ordre "$R25_DIR"
+( cd "$R25_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r25-err.txt" )
+R25_INDEX="$R25_DIR/.planning/INDEX.md"
+LIGNE_PREMIER="$(grep -n 'cycles/01-premier' "$R25_INDEX" 2>/dev/null | head -1 | cut -d: -f1)"
+LIGNE_SECOND="$(grep -n 'cycles/02-second' "$R25_INDEX" 2>/dev/null | head -1 | cut -d: -f1)"
+if [ -n "$LIGNE_PREMIER" ] && [ -n "$LIGNE_SECOND" ] && [ "$LIGNE_PREMIER" -lt "$LIGNE_SECOND" ]; then
+  ok "R25 cycles-ordre : 01-premier précède 02-second dans INDEX.md"
+else
+  ko "R25 ordre" "01-premier avant 02-second" "lignes $LIGNE_PREMIER / $LIGNE_SECOND" "-"
+fi
+R25C_DIR="$WORK/r25c"
+materialiser cycle-close "$R25C_DIR"
+( cd "$R25C_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r25c-err.txt" )
+R25C_INDEX="$R25C_DIR/.planning/INDEX.md"
+if ! grep -q '| cycles/01-c |' "$R25C_INDEX" 2>/dev/null && grep -qF 'Sortis de l'"'"'index (clos ou abandonnés) : cycles/01-c.' "$R25C_INDEX" 2>/dev/null; then
+  ok "R25 cycle-close : pas de ligne de tableau, cité sur la ligne Sortis de l'index"
+else
+  ko "R25 cycle-close" "aucune ligne tableau + ligne Sortis de l'index" "$(cat "$R25C_INDEX" 2>/dev/null)" "-"
+fi
+
+# ---------- R26 — STATE.md porte cycle_courant: 01-premier ---------------------------------------
+if grep -q '^cycle_courant: 01-premier$' "$R25_DIR/.planning/STATE.md" 2>/dev/null; then
+  ok "R26 STATE.md cycle_courant: 01-premier"
+else
+  ko "R26 STATE.md" "cycle_courant: 01-premier" "$(cat "$R25_DIR/.planning/STATE.md" 2>/dev/null)" "-"
+fi
+
+# ---------- R27 — libellés lisibles distincts (INDEX.md et STATE.md, décision (a) 2026-09-28) ----
+R27A_DIR="$WORK/r27a"
+materialiser etat-a-corriger-jumeau "$R27A_DIR"
+( cd "$R27A_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27a-err.txt" )
+R27B_DIR="$WORK/r27b"
+materialiser d08-summary-sans-plan "$R27B_DIR"
+( cd "$R27B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27b-err.txt" )
+if grep -qF 'verdict passé, SUMMARY absent' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 INDEX.md (etat-a-corriger-jumeau) contient « verdict passé, SUMMARY absent »"
+else
+  ko "R27 INDEX.md libellé A" "verdict passé, SUMMARY absent" "$(cat "$R27A_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+if grep -qF 'SUMMARY.md sans PLAN.md' "$R27B_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 INDEX.md (d08-summary-sans-plan) contient « SUMMARY.md sans PLAN.md »"
+else
+  ko "R27 INDEX.md libellé B" "SUMMARY.md sans PLAN.md" "$(cat "$R27B_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+if ! grep -qF 'verdict passé, SUMMARY absent' "$R27B_DIR/.planning/INDEX.md" 2>/dev/null \
+   && ! grep -qF 'SUMMARY.md sans PLAN.md' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 les deux libellés sont distincts (jamais le même générique)"
+else
+  ko "R27 distinction des libellés" "les deux libellés diffèrent" "chevauchement détecté" "-"
+fi
+if grep -qF 'verdict passé, SUMMARY absent' "$R27A_DIR/.planning/STATE.md" 2>/dev/null; then
+  ok "R27 STATE.md (etat-a-corriger-jumeau) porte le libellé lisible de phase-indeterminee:01-p"
+else
+  ko "R27 STATE.md libellé" "verdict passé, SUMMARY absent" "$(cat "$R27A_DIR/.planning/STATE.md" 2>/dev/null)" "-"
+fi
+
 # ================================================================================================
 # make_recalc_mutant — mute UNE ligne à motif fixe unique de recalc-planning.sh dans une copie
 # fraîche (moteur + detect-gsd-engine.sh + workstream-policy.sh), patron test-check-skills.sh
@@ -904,6 +1209,257 @@ if make_recalc_mutant CHMOD-JOURNAL 'os.fchmod(fd_journal, 0o644)' 'pass  # MUT-
       komut CHMOD-JOURNAL "mode de cloture.log sous umask 0077" "0o644 (original)" "0o644 (mutant non opposable)"
     else
       okmut CHMOD-JOURNAL "mode de cloture.log sous umask 0077 · attendu (original) : 0o644 · obtenu (mutant) : 0o$MODE_CLOTURE"
+    fi
+  fi
+fi
+
+# ================================================================================================
+# Mutants de la matrice des états (44-03, Tâche 1) — MUT-D08-*, MUT-LIVRABLES, MUT-AUTEUR,
+# MUT-STRUCTURANTE, MUT-STATUT-REGISTRE.
+# ================================================================================================
+
+# ---------- MUT-D08-SUMMARY — contrôle « SUMMARY sans PLAN » (R1) neutralisé --------------------
+if make_recalc_mutant D08-SUMMARY \
+  'return ("indéterminé", "SUMMARY.md-sans-PLAN.md", meta)' \
+  'pass  # MUT-D08-SUMMARY'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-d08-summary-cas"
+  materialiser d08-summary-sans-plan "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-d08-summary-out.json" 2>"$WORK/mut-d08-summary-err.txt" ); RC_M=$?
+  if ! _verifier_plantage D08-SUMMARY "état/raison de d08-summary-sans-plan" "$WORK/mut-d08-summary-out.json" "$WORK/mut-d08-summary-err.txt" "$RC_M"; then
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/mut-d08-summary-out.json" 2>/dev/null || echo '?')"
+    if [ "$ETAT_M" = "indéterminé" ]; then
+      komut D08-SUMMARY "état de d08-summary-sans-plan" "indéterminé (original)" "indéterminé (mutant non opposable)"
+    else
+      okmut D08-SUMMARY "état de d08-summary-sans-plan · attendu (original) : indéterminé (SUMMARY.md-sans-PLAN.md) · obtenu (mutant) : $ETAT_M"
+    fi
+  fi
+fi
+
+# ---------- MUT-D08-MARQUEUR — contrôle « CLOTURE sans PLAN » (R1) neutralisé -------------------
+if make_recalc_mutant D08-MARQUEUR \
+  'return ("indéterminé", "CLOTURE.md-sans-PLAN.md", meta)' \
+  'pass  # MUT-D08-MARQUEUR'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-d08-marqueur-cas"
+  materialiser d08-marqueur-sans-plan "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-d08-marqueur-out.json" 2>"$WORK/mut-d08-marqueur-err.txt" ); RC_M=$?
+  if ! _verifier_plantage D08-MARQUEUR "état/raison de d08-marqueur-sans-plan" "$WORK/mut-d08-marqueur-out.json" "$WORK/mut-d08-marqueur-err.txt" "$RC_M"; then
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/mut-d08-marqueur-out.json" 2>/dev/null || echo '?')"
+    if [ "$ETAT_M" = "indéterminé" ]; then
+      komut D08-MARQUEUR "état de d08-marqueur-sans-plan" "indéterminé (original)" "indéterminé (mutant non opposable)"
+    else
+      okmut D08-MARQUEUR "état de d08-marqueur-sans-plan · attendu (original) : indéterminé (CLOTURE.md-sans-PLAN.md) · obtenu (mutant) : $ETAT_M"
+    fi
+  fi
+fi
+
+# ---------- MUT-D08-VERDICT — contrôle « VERDICT sans CLOTURE » (R3) neutralisé -----------------
+if make_recalc_mutant D08-VERDICT \
+  'return ("indéterminé", "VERDICT.md-sans-CLOTURE.md", meta)' \
+  'pass  # MUT-D08-VERDICT'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-d08-verdict-cas"
+  materialiser d08-verdict-sans-marqueur "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-d08-verdict-out.json" 2>"$WORK/mut-d08-verdict-err.txt" ); RC_M=$?
+  if ! _verifier_plantage D08-VERDICT "état/raison de d08-verdict-sans-marqueur" "$WORK/mut-d08-verdict-out.json" "$WORK/mut-d08-verdict-err.txt" "$RC_M"; then
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/mut-d08-verdict-out.json" 2>/dev/null || echo '?')"
+    if [ "$ETAT_M" = "indéterminé" ]; then
+      komut D08-VERDICT "état de d08-verdict-sans-marqueur" "indéterminé (original)" "indéterminé (mutant non opposable)"
+    else
+      okmut D08-VERDICT "état de d08-verdict-sans-marqueur · attendu (original) : indéterminé (VERDICT.md-sans-CLOTURE.md) · obtenu (mutant) : $ETAT_M"
+    fi
+  fi
+fi
+
+# ---------- MUT-D08-ECHEC — contrôle « SUMMARY face à un échec » (R7) neutralisé ----------------
+if make_recalc_mutant D08-ECHEC \
+  'return ("indéterminé", "SUMMARY.md-avec-verdict-en-echec", meta)' \
+  'pass  # MUT-D08-ECHEC'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-d08-echec-cas"
+  materialiser d08-summary-verdict-echec "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-d08-echec-out.json" 2>"$WORK/mut-d08-echec-err.txt" ); RC_M=$?
+  if ! _verifier_plantage D08-ECHEC "état/raison de d08-summary-verdict-echec" "$WORK/mut-d08-echec-out.json" "$WORK/mut-d08-echec-err.txt" "$RC_M"; then
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/mut-d08-echec-out.json" 2>/dev/null || echo '?')"
+    if [ "$ETAT_M" = "indéterminé" ]; then
+      komut D08-ECHEC "état de d08-summary-verdict-echec" "indéterminé (original)" "indéterminé (mutant non opposable)"
+    else
+      okmut D08-ECHEC "état de d08-summary-verdict-echec · attendu (original) : indéterminé (SUMMARY.md-avec-verdict-en-echec) · obtenu (mutant) : $ETAT_M"
+    fi
+  fi
+fi
+
+# ---------- MUT-LIVRABLES — contrôle R4 (livrable présent) neutralisé ---------------------------
+if make_recalc_mutant LIVRABLES \
+  'manquant = next((v for v in valeurs if not os.path.lexists(os.path.join(racine_lab, v))), None)' \
+  'manquant = None  # MUT-LIVRABLES'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-livrables-cas"
+  materialiser etat-a-juger-jumeau "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-livrables-out.json" 2>"$WORK/mut-livrables-err.txt" ); RC_M=$?
+  if ! _verifier_plantage LIVRABLES "état de etat-a-juger-jumeau" "$WORK/mut-livrables-out.json" "$WORK/mut-livrables-err.txt" "$RC_M"; then
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/mut-livrables-out.json" 2>/dev/null || echo '?')"
+    if [ "$ETAT_M" = "indéterminé" ]; then
+      komut LIVRABLES "état de etat-a-juger-jumeau" "indéterminé (original)" "indéterminé (mutant non opposable)"
+    else
+      okmut LIVRABLES "état de etat-a-juger-jumeau · attendu (original) : indéterminé (livrable-absent) · obtenu (mutant) : $ETAT_M"
+    fi
+  fi
+fi
+
+# ---------- MUT-AUTEUR — statut de dérogation sans auteur accepté (lire_derogation) --------------
+if make_recalc_mutant AUTEUR \
+  'return (None, "derogation-sans-auteur", None)' \
+  'return (statut, None, "inconnu")  # MUT-AUTEUR'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  MUT_AUTEUR_TOUS_INDETERMINE=1
+  for CAS in derog-abandonne-jumeau derog-remplace-jumeau derog-gele-jumeau; do
+    DIR_CAS="$WORK/mut-auteur-cas-$CAS"
+    materialiser "$CAS" "$DIR_CAS"
+    ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-auteur-$CAS-out.json" 2>"$WORK/mut-auteur-$CAS-err.txt" )
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/mut-auteur-$CAS-out.json" 2>/dev/null || echo '?')"
+    [ "$ETAT_M" = "indéterminé" ] || MUT_AUTEUR_TOUS_INDETERMINE=0
+    MUT_AUTEUR_DERNIER_ETAT="$ETAT_M"
+  done
+  if [ "$MUT_AUTEUR_TOUS_INDETERMINE" -eq 1 ]; then
+    komut AUTEUR "état des jumeaux derog-abandonne/derog-remplace/derog-gele" "indéterminé (original, les trois)" "indéterminé (mutant non opposable)"
+  else
+    okmut AUTEUR "état des jumeaux derog-abandonne/derog-remplace/derog-gele · attendu (original) : indéterminé (derogation-sans-auteur) · obtenu (mutant) : au moins un jumeau rend la dérogation elle-même ($MUT_AUTEUR_DERNIER_ETAT) sans auteur nommé"
+  fi
+fi
+
+# ---------- MUT-STRUCTURANTE — toute ligne sans statut compte comme ouverte ----------------------
+if make_recalc_mutant STRUCTURANTE \
+  'if structurante == "oui" and not (isinstance(statut, str) and statut.strip()):' \
+  'if not (isinstance(statut, str) and statut.strip()):  # MUT-STRUCTURANTE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-structurante-cas"
+  materialiser etat-en-cadrage-jumeau "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-structurante-out.json" 2>"$WORK/mut-structurante-err.txt" ); RC_M=$?
+  if ! _verifier_plantage STRUCTURANTE "état de etat-en-cadrage-jumeau" "$WORK/mut-structurante-out.json" "$WORK/mut-structurante-err.txt" "$RC_M"; then
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/mut-structurante-out.json" 2>/dev/null || echo '?')"
+    if [ "$ETAT_M" = "à planifier" ]; then
+      komut STRUCTURANTE "état de etat-en-cadrage-jumeau" "à planifier (original)" "à planifier (mutant non opposable)"
+    else
+      okmut STRUCTURANTE "état de etat-en-cadrage-jumeau · attendu (original) : à planifier (registre clos) · obtenu (mutant) : $ETAT_M (le registre reste vu ouvert à tort)"
+    fi
+  fi
+fi
+
+# ---------- MUT-STATUT-REGISTRE — fermeture restreinte à ARBITRÉ seul (liste fermée) -------------
+if make_recalc_mutant STATUT-REGISTRE \
+  'if structurante == "oui" and not (isinstance(statut, str) and statut.strip()):' \
+  'if structurante == "oui" and not (isinstance(statut, str) and statut.strip() == "ARBITRÉ"):  # MUT-STATUT-REGISTRE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-statut-registre-cas"
+  materialiser registre-statut-inconnu "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-statut-registre-out.json" 2>"$WORK/mut-statut-registre-err.txt" ); RC_M=$?
+  if ! _verifier_plantage STATUT-REGISTRE "état de registre-statut-inconnu" "$WORK/mut-statut-registre-out.json" "$WORK/mut-statut-registre-err.txt" "$RC_M"; then
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0]["etat"])' "$WORK/mut-statut-registre-out.json" 2>/dev/null || echo '?')"
+    if [ "$ETAT_M" = "à planifier" ]; then
+      komut STATUT-REGISTRE "état de registre-statut-inconnu" "à planifier (original)" "à planifier (mutant non opposable)"
+    else
+      okmut STATUT-REGISTRE "état de registre-statut-inconnu · attendu (original) : à planifier (« en cours » ferme la ligne) · obtenu (mutant) : $ETAT_M (« en cours » ne fermerait plus la ligne)"
+    fi
+  fi
+fi
+
+# ================================================================================================
+# Mutants de l'agrégation (44-03, Tâche 2) — MUT-PROPAGATION, MUT-TERMINAL, MUT-TRI,
+# MUT-AGREGATION-PLANS, MUT-PLANS-CLOS.
+# ================================================================================================
+
+# ---------- MUT-PROPAGATION — garde « phase indéterminée -> cycle indéterminé » neutralisée ------
+if make_recalc_mutant PROPAGATION 'if indeterminees:' 'if False:  # MUT-PROPAGATION'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-propagation-cas"
+  materialiser cycle-propagation "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-propagation-out.json" 2>"$WORK/mut-propagation-err.txt" ); RC_M=$?
+  if ! _verifier_plantage PROPAGATION "raison du cycle de cycle-propagation" "$WORK/mut-propagation-out.json" "$WORK/mut-propagation-err.txt" "$RC_M"; then
+    RAISON_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0].get("raison"))' "$WORK/mut-propagation-out.json" 2>/dev/null || echo '?')"
+    if [ "$RAISON_M" = "phase-indeterminee:02-p" ]; then
+      komut PROPAGATION "raison du cycle de cycle-propagation" "phase-indeterminee:02-p (original)" "phase-indeterminee:02-p (mutant non opposable)"
+    else
+      okmut PROPAGATION "raison du cycle de cycle-propagation · attendu (original) : phase-indeterminee:02-p · obtenu (mutant) : $RAISON_M (le cycle hérite de l'état de sa phase courante sans porter le code d'agrégation)"
+    fi
+  fi
+fi
+
+# ---------- MUT-TERMINAL — gelé compté terminal ---------------------------------------------------
+if make_recalc_mutant TERMINAL \
+  'TERMINAUX = frozenset({"close", "abandonné", "remplacé"})' \
+  'TERMINAUX = frozenset({"close", "abandonné", "remplacé", "gelé"})  # MUT-TERMINAL'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-terminal-cas"
+  materialiser cycle-gele "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-terminal-out.json" 2>"$WORK/mut-terminal-err.txt" ); RC_M=$?
+  if ! _verifier_plantage TERMINAL "état du cycle de cycle-gele" "$WORK/mut-terminal-out.json" "$WORK/mut-terminal-err.txt" "$RC_M"; then
+    ETAT_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["etat"])' "$WORK/mut-terminal-out.json" 2>/dev/null || echo '?')"
+    if [ "$ETAT_M" = "gelé" ]; then
+      komut TERMINAL "état du cycle de cycle-gele" "gelé (original, phase courante reste gelée)" "gelé (mutant non opposable)"
+    else
+      okmut TERMINAL "état du cycle de cycle-gele · attendu (original) : gelé (phase courante 01-p reste gelée, non terminale) · obtenu (mutant) : $ETAT_M (le cycle saute la phase gelée comme si elle était terminale)"
+    fi
+  fi
+fi
+
+# ---------- MUT-TRI — énumération des cycles en ordre inverse ------------------------------------
+if make_recalc_mutant TRI 'key=lambda c: c["chemin"],' 'key=lambda c: c["chemin"], reverse=True,  # MUT-TRI'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-tri-cas"
+  materialiser cycles-ordre "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" >"$WORK/mut-tri-out.txt" 2>"$WORK/mut-tri-err.txt" ); RC_M=$?
+  if ! _verifier_plantage TRI "ordre des lignes de INDEX.md sur cycles-ordre" "$WORK/mut-tri-out.txt" "$WORK/mut-tri-err.txt" "$RC_M"; then
+    L1=$(grep -n 'cycles/01-premier' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null | head -1 | cut -d: -f1)
+    L2=$(grep -n 'cycles/02-second' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null | head -1 | cut -d: -f1)
+    if [ -n "$L1" ] && [ -n "$L2" ] && [ "$L1" -lt "$L2" ]; then
+      komut TRI "ordre des lignes de INDEX.md sur cycles-ordre" "01-premier avant 02-second (original)" "01-premier avant 02-second (mutant non opposable)"
+    else
+      okmut TRI "ordre des lignes de INDEX.md sur cycles-ordre · attendu (original) : 01-premier avant 02-second · obtenu (mutant) : 02-second avant 01-premier (lignes $L2/$L1)"
+    fi
+  fi
+fi
+
+# ---------- MUT-AGREGATION-PLANS — garde « plan indéterminé -> phase indéterminée » neutralisée --
+if make_recalc_mutant AGREGATION-PLANS 'if plans_indetermines:' 'if False:  # MUT-AGREGATION-PLANS'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-agregation-plans-cas"
+  materialiser plan-indetermine "$DIR_CAS"
+  ( cd "$DIR_CAS" && bash "$MR" --read-only >"$WORK/mut-agregation-plans-out.json" 2>"$WORK/mut-agregation-plans-err.txt" ); RC_M=$?
+  if ! _verifier_plantage AGREGATION-PLANS "raison de la phase de plan-indetermine" "$WORK/mut-agregation-plans-out.json" "$WORK/mut-agregation-plans-err.txt" "$RC_M"; then
+    RAISON_M="$("$PYBIN" -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["cycles"][0]["phases"][0].get("raison"))' "$WORK/mut-agregation-plans-out.json" 2>/dev/null || echo '?')"
+    if [ "$RAISON_M" = "plan-indetermine:01-a" ]; then
+      komut AGREGATION-PLANS "raison de la phase de plan-indetermine" "plan-indetermine:01-a (original)" "plan-indetermine:01-a (mutant non opposable)"
+    else
+      okmut AGREGATION-PLANS "raison de la phase de plan-indetermine · attendu (original) : plan-indetermine:01-a · obtenu (mutant) : $RAISON_M (la phase hérite de l'état de son plan courant sans porter le code d'agrégation)"
+    fi
+  fi
+fi
+
+# ---------- MUT-PLANS-CLOS — verdict d'agrégation remplacé par « passé » -------------------------
+if make_recalc_mutant PLANS-CLOS \
+  'return "plans-clos" if type_derivation == "plans-agregation" else "passé"' \
+  'return "passé"  # MUT-PLANS-CLOS'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-plans-clos-cas"
+  materialiser plans-tous-clos "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-plans-clos-out.txt" 2>"$WORK/mut-plans-clos-err.txt" ); RC_M=$?
+  if ! _verifier_plantage PLANS-CLOS "ligne de cloture.log de la phase sur plans-tous-clos" "$WORK/mut-plans-clos-out.txt" "$WORK/mut-plans-clos-err.txt" "$RC_M"; then
+    if grep -Eq '  cycles/01-c/phases/01-p  inconnu  verdict=plans-clos  ' "$DIR_CAS/.planning/cloture.log" 2>/dev/null; then
+      komut PLANS-CLOS "ligne de cloture.log de la phase sur plans-tous-clos" "verdict=plans-clos (original)" "verdict=plans-clos (mutant non opposable)"
+    else
+      okmut PLANS-CLOS "ligne de cloture.log de la phase sur plans-tous-clos · attendu (original) : verdict=plans-clos · obtenu (mutant) : $(grep 'cycles/01-c/phases/01-p ' "$DIR_CAS/.planning/cloture.log" 2>/dev/null)"
     fi
   fi
 fi

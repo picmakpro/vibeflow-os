@@ -80,18 +80,31 @@ SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 NOM_UNITE = re.compile(r"^[0-9]{2,}-[\w.-]+$")
 ANNEXES = frozenset({"_bancs", "recherches", "intel", "sketches", "_archive", "registres"})
-FICHIERS_PHASE = ("CADRAGE.md", "PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md")
-ENSEMBLE_CLOSE = frozenset(FICHIERS_PHASE)
-ENSEMBLE_A_EXECUTER = frozenset({"CADRAGE.md", "PLAN.md"})
+NOMS_MODELE_PHASE = ("CADRAGE.md", "PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md", "DEROGATION.md")
+NOMS_MODELE_PLAN = ("PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md", "DEROGATION.md")
 TERMINAUX = frozenset({"close", "abandonné", "remplacé"})
+JOURNALISABLES = frozenset({"close", "abandonné", "remplacé", "gelé"})
 ETATS_TOUS = (
     "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger",
     "close", "indéterminé", "abandonné", "remplacé", "gelé",
 )
+# Table LIBELLES (code -> gabarit de phrase), reproduite depuis references/modele-cycles.md
+# § Lisibilité des causes indéterminées — forme identique au contrat, jamais un `<libellé>`
+# générique. Un code suffixé `:<x>` se sépare sur le premier `:` ; tout code absent de cette
+# table retombe sur lui-même avec `-` et `:` remplacés par des espaces (jamais un KeyError).
 LIBELLES = {
-    "CYCLE.md-absent": "CYCLE.md absent ou non régulier",
     "combinaison-non-prevue": "combinaison de signaux non prévue",
+    "verdict-passe-sans-SUMMARY.md": "verdict passé, SUMMARY absent",
+    "SUMMARY.md-sans-PLAN.md": "SUMMARY.md sans PLAN.md",
+    "CLOTURE.md-sans-PLAN.md": "CLOTURE.md sans PLAN.md",
+    "VERDICT.md-sans-CLOTURE.md": "VERDICT.md sans CLOTURE.md (marqueur)",
+    "SUMMARY.md-avec-verdict-en-echec": "SUMMARY.md avec un verdict en échec",
+    "derogation-sans-auteur": "dérogation sans auteur nommé",
+    "derogation-invalide": "dérogation invalide",
+    "CYCLE.md-absent": "CYCLE.md absent",
     "phase-indeterminee": "phase `{}` indéterminée",
+    "plan-indetermine": "plan `{}` indéterminé",
+    "livrable-absent": "livrable absent : {}",
 }
 
 
@@ -379,13 +392,9 @@ def scanner(planning):
             chemin_phase_abs = os.path.join(dossier_phases, nom_phase)
             chemin_phase_rel = chemin_cycle_rel + "/phases/" + nom_phase
             entrees = _lister_entrees(chemin_phase_abs)
-            fichiers = {
-                nom: (nom in entrees and _est_regulier(os.path.join(chemin_phase_abs, nom)))
-                for nom in FICHIERS_PHASE
-            }
             phases.append({
                 "nom": nom_phase, "chemin_abs": chemin_phase_abs, "chemin_rel": chemin_phase_rel,
-                "entrees": entrees, "fichiers": fichiers,
+                "entrees": entrees,
             })
         cycles.append({
             "nom": nom_cycle, "chemin_abs": chemin_cycle_abs, "chemin_rel": chemin_cycle_rel,
@@ -395,18 +404,52 @@ def scanner(planning):
     return {"cycles": cycles, "hors_modele": []}
 
 
-# --- Dérivation d'une feuille (phase) — traceur : deux combinaisons reconnues ----------------
-def _registre_clos(statut, donnees):
-    if statut != "ok":
+def _est_dossier(chemin):
+    try:
+        return stat.S_ISDIR(os.lstat(chemin).st_mode)
+    except OSError:
         return False
-    inconnues = donnees.get("inconnues")
+
+
+# --- Grammaire du registre de cadrage et du champ ecrit: --------------------------------------
+def lire_registre(donnees_cadrage):
+    """(registre_ok, registre_clos) depuis le frontmatter DÉJÀ analysé de CADRAGE.md. Φ3 : registre
+    absent ou mal formé (structurante hors oui/non, ligne qui n'est pas un mapping) -> registre_ok
+    faux (`registre-invalide`). Lecture littérale spec §3.1 l.213 : TOUTE valeur non vide de
+    `statut` ferme la ligne, quelle qu'elle soit — jamais une liste fermée, jamais un jugement de
+    la valeur elle-même. `inconnues: []` est clos."""
+    inconnues = donnees_cadrage.get("inconnues")
     if not isinstance(inconnues, list):
-        return False
+        return (False, False)
+    clos = True
     for item in inconnues:
         if not isinstance(item, dict):
-            return False
-        if item.get("structurante") == "oui" and not (item.get("statut") or "").strip():
-            return False
+            return (False, False)
+        structurante = item.get("structurante")
+        if structurante not in ("oui", "non"):
+            return (False, False)
+        statut = item.get("statut")
+        if structurante == "oui" and not (isinstance(statut, str) and statut.strip()):
+            clos = False
+    return (True, clos)
+
+
+def entree_ecrit_valide(entree):
+    """Une entrée `ecrit:` valide (§ Fichiers du modèle, PLAN.md) : chemin concret relatif à la
+    racine du lab, non vide, sans `/` ni `~` initial, sans segment `..`, sans caractère de
+    contrôle ni `\\`, sans métacaractère `*?[]{}<>` — jamais un motif."""
+    if not isinstance(entree, str) or entree == "":
+        return False
+    if entree.startswith("/") or entree.startswith("~"):
+        return False
+    if ".." in entree.split("/"):
+        return False
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in entree):
+        return False
+    if "\\" in entree:
+        return False
+    if any(c in entree for c in "*?[]{}<>"):
+        return False
     return True
 
 
@@ -419,82 +462,166 @@ def _valeurs_ecrit(donnees):
     return None
 
 
-def _chemin_ecrit_valide(chemin):
-    if not isinstance(chemin, str) or chemin == "":
-        return False
-    if chemin.startswith("/") or chemin.startswith("~"):
-        return False
-    if ".." in chemin.split("/"):
-        return False
-    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in chemin):
-        return False
-    if "\\" in chemin:
-        return False
-    if any(c in chemin for c in "*?[]{}<>"):
-        return False
-    return True
+# --- Dérogation nominative (Φ0, P44-D-07) ------------------------------------------------------
+DEROGATION_MOTS = ("abandonné", "remplacé", "gelé")
+DEROGATION_RE = re.compile(r"^(abandonné|remplacé|gelé) par (\S.*)$")
 
 
-def _ecrit_valide(statut, donnees):
-    if statut != "ok":
-        return False
-    valeurs = _valeurs_ecrit(donnees)
-    if not valeurs:
-        return False
-    return all(_chemin_ecrit_valide(v) for v in valeurs)
+def lire_derogation(chemin_derogation):
+    """(mot|None, raison|None, auteur|None) — regex `^(abandonné|remplacé|gelé) par (\\S.*)$` sur
+    `statut:`. Valeur exactement égale à l'un des trois mots (sans « par <auteur> ») ->
+    `derogation-sans-auteur`. Tout autre cas -> `derogation-invalide`."""
+    statut_fm, donnees = _lire_frontmatter_fichier(chemin_derogation)
+    if statut_fm != "ok":
+        return (None, "derogation-invalide", None)
+    statut = donnees.get("statut")
+    if not isinstance(statut, str):
+        return (None, "derogation-invalide", None)
+    m = DEROGATION_RE.match(statut)
+    if m:
+        mot, auteur = m.group(1), m.group(2).strip()
+        if auteur:
+            return (mot, None, auteur)
+        return (None, "derogation-invalide", None)
+    if statut in DEROGATION_MOTS:
+        return (None, "derogation-sans-auteur", None)
+    return (None, "derogation-invalide", None)
 
 
-def _livrables_presents(racine_lab, donnees_plan):
-    valeurs = _valeurs_ecrit(donnees_plan) or []
-    return all(os.path.lexists(os.path.join(racine_lab, v)) for v in valeurs)
-
-
-def _meta_phase(chemin_phase_abs, fichiers):
+# --- Méta commune (auteur, tentative, hash) -----------------------------------------------------
+def _meta_unite(chemin_abs, entrees):
     auteur = None
-    if fichiers.get("SUMMARY.md"):
-        statut, donnees = _lire_frontmatter_fichier(os.path.join(chemin_phase_abs, "SUMMARY.md"))
+    if "SUMMARY.md" in entrees:
+        statut, donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "SUMMARY.md"))
         if statut == "ok":
             auteur = donnees.get("auteur")
     tentative = None
     hash_juge = None
-    if fichiers.get("VERDICT.md"):
-        statut, donnees = _lire_frontmatter_fichier(os.path.join(chemin_phase_abs, "VERDICT.md"))
+    if "VERDICT.md" in entrees:
+        statut, donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "VERDICT.md"))
         if statut == "ok":
             tentative = donnees.get("tentative")
             hash_juge = donnees.get("hash")
-    return {"auteur": auteur or "inconnu", "tentative": tentative, "hash_juge": hash_juge}
+    return {"auteur": auteur or "inconnu", "tentative": tentative, "hash_juge": hash_juge, "type_derivation": None}
 
 
-def deriver_feuille(phase, racine_lab):
-    """(état, raison, méta) — le traceur reconnaît exactement deux combinaisons (P44-D-08) :
-    `close` et `à exécuter`. Toute autre combinaison rend `indéterminé`, jamais une supposition."""
-    entrees = phase["entrees"]
-    fichiers = phase["fichiers"]
-    chemin_abs = phase["chemin_abs"]
-    meta = _meta_phase(chemin_abs, fichiers)
-    cadrage_statut, cadrage_donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "CADRAGE.md"))
+# --- Φ1 : régularité et lisibilité des fichiers du modèle présents ------------------------------
+def _verifier_fichiers_reguliers(chemin_abs, entrees, noms_modele):
+    """Premier fichier du modèle présent mais non régulier -> `fichier-non-regulier:<nom>` ;
+    régulier mais illisible ou non UTF-8 -> `erreur-de-lecture:<nom>`. None si rien à signaler."""
+    for nom in noms_modele:
+        if nom not in entrees:
+            continue
+        chemin = os.path.join(chemin_abs, nom)
+        try:
+            est_regulier = stat.S_ISREG(os.lstat(chemin).st_mode)
+        except OSError:
+            est_regulier = False
+        if not est_regulier:
+            return "fichier-non-regulier:" + nom
+        try:
+            descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+            with os.fdopen(descripteur, "r", encoding="utf-8") as fh:
+                fh.read()
+        except (OSError, UnicodeDecodeError):
+            return "erreur-de-lecture:" + nom
+    return None
+
+
+# --- Φ0 : dérogation nominative, commune à une phase à plan direct et à un plan -----------------
+def _phi0(chemin_abs, entrees, meta):
+    if "DEROGATION.md" not in entrees:
+        return None
+    chemin_derog = os.path.join(chemin_abs, "DEROGATION.md")
+    if not _est_regulier(chemin_derog):
+        return None  # non régulier : Φ1 le rattrape (fichier-non-regulier:DEROGATION.md)
+    mot, raison, auteur = lire_derogation(chemin_derog)
+    if raison is not None:
+        return ("indéterminé", raison, meta)
+    meta2 = dict(meta)
+    meta2["auteur"] = auteur
+    meta2["type_derivation"] = "derogation"
+    return (mot, None, meta2)
+
+
+# --- R1 à R8 : règles de feuille (phase à plan direct, ou plan de plans/) -----------------------
+def _r1_a_r8(chemin_abs, entrees, racine_lab, meta):
+    plan_present = "PLAN.md" in entrees
+    cloture_present = "CLOTURE.md" in entrees
+    verdict_present = "VERDICT.md" in entrees
+    summary_present = "SUMMARY.md" in entrees
+    # R1
+    if not plan_present:
+        if summary_present:
+            return ("indéterminé", "SUMMARY.md-sans-PLAN.md", meta)
+        if cloture_present:
+            return ("indéterminé", "CLOTURE.md-sans-PLAN.md", meta)
+        if verdict_present:
+            return ("indéterminé", "VERDICT.md-sans-PLAN.md", meta)
+        return ("à planifier", None, meta)
+    # R2
     plan_statut, plan_donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "PLAN.md"))
-    registre_clos = _registre_clos(cadrage_statut, cadrage_donnees)
-    ecrit_valide = _ecrit_valide(plan_statut, plan_donnees)
-    if entrees == ENSEMBLE_CLOSE and all(fichiers[n] for n in ENSEMBLE_CLOSE) and registre_clos and ecrit_valide:
-        verdict_statut, verdict_donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "VERDICT.md"))
-        if verdict_statut == "ok":
-            constats = verdict_donnees.get("constats")
-            tous_passes = (
-                isinstance(constats, list) and len(constats) > 0
-                and all(isinstance(c, dict) and c.get("resultat") == "passé" for c in constats)
-            )
-            if tous_passes and _livrables_presents(racine_lab, plan_donnees):
-                return ("close", None, meta)
-        return ("indéterminé", "combinaison-non-prevue", meta)
-    if entrees == ENSEMBLE_A_EXECUTER and all(fichiers[n] for n in ENSEMBLE_A_EXECUTER) and registre_clos and ecrit_valide:
+    if plan_statut != "ok":
+        return ("indéterminé", "frontmatter-invalide:PLAN.md", meta)
+    valeurs = _valeurs_ecrit(plan_donnees)
+    if not valeurs or not all(entree_ecrit_valide(v) for v in valeurs):
+        return ("indéterminé", "ecrit-invalide", meta)
+    # R3
+    if not cloture_present:
+        if verdict_present:
+            return ("indéterminé", "VERDICT.md-sans-CLOTURE.md", meta)
+        if summary_present:
+            return ("indéterminé", "SUMMARY.md-sans-CLOTURE.md", meta)
         return ("à exécuter", None, meta)
-    return ("indéterminé", "combinaison-non-prevue", meta)
+    # R4
+    manquant = next((v for v in valeurs if not os.path.lexists(os.path.join(racine_lab, v))), None)
+    if manquant is not None:
+        return ("indéterminé", "livrable-absent:" + manquant, meta)
+    # R5
+    if not verdict_present:
+        if summary_present:
+            return ("indéterminé", "SUMMARY.md-sans-VERDICT.md", meta)
+        return ("à juger", None, meta)
+    # R6
+    verdict_statut, verdict_donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "VERDICT.md"))
+    if verdict_statut != "ok":
+        return ("indéterminé", "frontmatter-invalide:VERDICT.md", meta)
+    constats = verdict_donnees.get("constats")
+    if not isinstance(constats, list) or len(constats) == 0 or any(
+        not isinstance(c, dict) or c.get("resultat") not in ("passé", "échec") for c in constats
+    ):
+        return ("indéterminé", "verdict-invalide", meta)
+    # R7
+    if any(c.get("resultat") == "échec" for c in constats):
+        if summary_present:
+            return ("indéterminé", "SUMMARY.md-avec-verdict-en-echec", meta)
+        return ("à corriger", None, meta)
+    # R8
+    if summary_present:
+        meta2 = dict(meta)
+        meta2["type_derivation"] = "feuille"
+        return ("close", None, meta2)
+    return ("indéterminé", "verdict-passe-sans-SUMMARY.md", meta)
 
 
-# --- Agrégation d'un cycle --------------------------------------------------------------------
+def deriver_feuille(unite, racine_lab):
+    """Φ0 puis Φ1 puis R1 à R8 — pour une phase à plan direct (appelée depuis deriver_phase) ou un
+    plan de `plans/` (appelée directement). (état, raison, méta)."""
+    chemin_abs = unite["chemin_abs"]
+    entrees = unite["entrees"]
+    meta = _meta_unite(chemin_abs, entrees)
+    r = _phi0(chemin_abs, entrees, meta)
+    if r is not None:
+        return r
+    raison = _verifier_fichiers_reguliers(chemin_abs, entrees, NOMS_MODELE_PLAN)
+    if raison is not None:
+        return ("indéterminé", raison, meta)
+    return _r1_a_r8(chemin_abs, entrees, racine_lab, meta)
+
+
+# --- Agrégation ----------------------------------------------------------------------------------
 def agreger(etats):
-    """Première phase (déjà triée par nom) dont l'état n'est ni close ni abandonné ni remplacé ;
+    """Première unité (déjà triée par nom) dont l'état n'est ni close ni abandonné ni remplacé ;
     si toutes sont terminales, close prime dès qu'au moins une l'est, sinon abandonné."""
     non_terminaux = [e for e in etats if e["etat"] not in TERMINAUX]
     if non_terminaux:
@@ -504,6 +631,96 @@ def agreger(etats):
     return etats[-1]
 
 
+def _nom_premier_fichier_execution(entrees, a_plans_dir):
+    for nom in ("PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md"):
+        if nom in entrees:
+            return nom
+    if a_plans_dir:
+        return "plans"
+    return None
+
+
+def _agreger_plans(phase, racine_lab):
+    """Φ5, `plans/` présent sans fichier de plan au niveau phase : agrégation des plans de la
+    phase (P44-D-07). `plans/` sans aucun plan -> `à planifier`."""
+    chemin_abs = phase["chemin_abs"]
+    dossier_plans = os.path.join(chemin_abs, "plans")
+    noms_plans = _lister_noms_unite(dossier_plans)
+    meta_phase = {"auteur": "inconnu", "tentative": None, "hash_juge": None, "type_derivation": "plans-agregation"}
+    if not noms_plans:
+        return ("à planifier", None, meta_phase, [])
+    plans_derives = []
+    for nom_plan in noms_plans:
+        chemin_plan_abs = os.path.join(dossier_plans, nom_plan)
+        chemin_plan_rel = phase["chemin_rel"] + "/plans/" + nom_plan
+        entrees_plan = _lister_entrees(chemin_plan_abs)
+        unite = {"nom": nom_plan, "chemin_abs": chemin_plan_abs, "chemin_rel": chemin_plan_rel, "entrees": entrees_plan}
+        etat, raison, meta = deriver_feuille(unite, racine_lab)
+        plans_derives.append({
+            "nom": nom_plan, "chemin": chemin_plan_rel, "etat": etat, "raison": raison,
+            "auteur": meta["auteur"], "tentative": meta["tentative"], "hash_juge": meta["hash_juge"],
+            "type_derivation": meta.get("type_derivation"),
+        })
+    plans_indetermines = [p for p in plans_derives if p["etat"] == "indéterminé"]
+    if plans_indetermines:
+        premier = plans_indetermines[0]
+        return ("indéterminé", "plan-indetermine:" + premier["nom"], meta_phase, plans_derives)
+    courant = agreger(plans_derives)
+    if courant["etat"] not in TERMINAUX:
+        return (courant["etat"], None, meta_phase, plans_derives)
+    if any(p["etat"] == "close" for p in plans_derives):
+        return ("close", None, meta_phase, plans_derives)
+    return ("abandonné", None, meta_phase, plans_derives)
+
+
+def deriver_phase(phase, racine_lab):
+    """Φ0 à Φ5, dans l'ordre — la première règle qui s'applique gagne. (état, raison, méta, plans)."""
+    chemin_abs = phase["chemin_abs"]
+    entrees = phase["entrees"]
+    meta = _meta_unite(chemin_abs, entrees)
+    # Φ0
+    r = _phi0(chemin_abs, entrees, meta)
+    if r is not None:
+        etat, raison, meta2 = r
+        return (etat, raison, meta2, [])
+    # Φ1
+    raison = _verifier_fichiers_reguliers(chemin_abs, entrees, NOMS_MODELE_PHASE)
+    if raison is not None:
+        return ("indéterminé", raison, meta, [])
+    # Φ2
+    cadrage_present = "CADRAGE.md" in entrees
+    a_plans_dir = "plans" in entrees and _est_dossier(os.path.join(chemin_abs, "plans"))
+    if not cadrage_present:
+        nom = _nom_premier_fichier_execution(entrees, a_plans_dir)
+        if nom is not None:
+            return ("indéterminé", "hors-cadrage:" + nom, meta, [])
+        return ("à cadrer", None, meta, [])
+    # Φ3
+    cadrage_statut, cadrage_donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "CADRAGE.md"))
+    if cadrage_statut != "ok":
+        return ("indéterminé", "frontmatter-invalide:CADRAGE.md", meta, [])
+    registre_ok, registre_clos = lire_registre(cadrage_donnees)
+    if not registre_ok:
+        return ("indéterminé", "registre-invalide", meta, [])
+    # Φ4
+    if not registre_clos:
+        nom = _nom_premier_fichier_execution(entrees, a_plans_dir)
+        if nom is not None:
+            return ("indéterminé", "avant-cadrage-clos:" + nom, meta, [])
+        return ("en cadrage", None, meta, [])
+    # Φ5
+    plan_present = "PLAN.md" in entrees
+    if plan_present and a_plans_dir:
+        return ("indéterminé", "plan-direct-et-plans", meta, [])
+    if a_plans_dir:
+        nom = next((n for n in ("CLOTURE.md", "VERDICT.md", "SUMMARY.md") if n in entrees), None)
+        if nom is not None:
+            return ("indéterminé", "fichier-de-plan-au-niveau-phase:" + nom, meta, [])
+        return _agreger_plans(phase, racine_lab)
+    etat, raison_feuille, meta_feuille = _r1_a_r8(chemin_abs, entrees, racine_lab, meta)
+    return (etat, raison_feuille, meta_feuille, [])
+
+
 def deriver_cycle(cycle, racine_lab):
     chemin = cycle["chemin_rel"]
     if not cycle["cycle_md"]:
@@ -511,11 +728,12 @@ def deriver_cycle(cycle, racine_lab):
                 "phase_courante": None, "phases": []}
     phases_derivees = []
     for phase in cycle["phases"]:
-        etat, raison, meta = deriver_feuille(phase, racine_lab)
+        etat, raison, meta, plans = deriver_phase(phase, racine_lab)
         phases_derivees.append({
             "nom": phase["nom"], "chemin": phase["chemin_rel"], "etat": etat, "raison": raison,
             "auteur": meta["auteur"], "tentative": meta["tentative"], "hash_juge": meta["hash_juge"],
-            "plans": [],
+            "type_derivation": meta.get("type_derivation"),
+            "plans": plans,
         })
     if not phases_derivees:
         return {"nom": cycle["nom"], "chemin": chemin, "etat": "à cadrer", "raison": None,
@@ -600,16 +818,33 @@ def lire_journal(planning):
     return ([l for l in texte.split("\n") if l != ""], "lu")
 
 
-def _unites_closes(derivation):
+def _unites_journalisables(derivation):
+    """Une ligne s'ajoute quand le recalcul OBSERVE l'entrée d'une phase ou d'un plan en `close`
+    (ou en état de dérogation : `abandonné`, `remplacé`, `gelé`) — P44-D-11."""
     resultat = []
     for cycle in derivation["cycles"]:
         for phase in cycle["phases"]:
-            if phase["etat"] == "close":
+            if phase["etat"] in JOURNALISABLES:
                 resultat.append(phase)
             for plan in phase.get("plans", []):
-                if plan["etat"] == "close":
+                if plan["etat"] in JOURNALISABLES:
                     resultat.append(plan)
     return resultat
+
+
+def _verdict_journal(unite):
+    """Le verdict de la ligne de cloture.log — `passé` pour une feuille close, `plans-clos` pour
+    une phase à plans close, `plans-abandonnes` pour une phase à plans abandonné, ou le nom de la
+    dérogation (`abandonné`, `remplacé`, `gelé`) sinon (44-02 § Agrégation)."""
+    etat = unite["etat"]
+    type_derivation = unite.get("type_derivation")
+    if etat == "close":
+        return "plans-clos" if type_derivation == "plans-agregation" else "passé"
+    if etat == "abandonné" and type_derivation == "plans-agregation":
+        return "plans-abandonnes"
+    if etat in ("abandonné", "remplacé", "gelé"):
+        return etat
+    return None
 
 
 def lignes_a_journaliser(derivation, lignes_existantes):
@@ -621,11 +856,16 @@ def lignes_a_journaliser(derivation, lignes_existantes):
         if parsee is not None:
             dernier_couple[parsee["chemin"]] = (parsee["verdict"], parsee["tentative"])
     a_ajouter = []
-    for unite in _unites_closes(derivation):
+    for unite in _unites_journalisables(derivation):
         chemin = unite["chemin"]
-        verdict = "passé"
-        brute = unite.get("tentative")
-        tentative = str(brute) if brute not in (None, "") else "-"
+        verdict = _verdict_journal(unite)
+        if verdict is None:
+            continue
+        if verdict == "passé":
+            brute = unite.get("tentative")
+            tentative = str(brute) if brute not in (None, "") else "-"
+        else:
+            tentative = "-"
         if dernier_couple.get(chemin) != (verdict, tentative):
             a_ajouter.append({
                 "chemin": chemin, "auteur": unite.get("auteur") or "inconnu",
