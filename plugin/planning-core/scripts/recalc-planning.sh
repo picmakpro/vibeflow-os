@@ -312,7 +312,7 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
         detecteur_regulier = False
     if not detecteur_regulier:
         print("[recalc-planning] détecteur non régulier : " + detect_sh, file=sys.stderr)
-        return "non-concluante"
+        return "non-concluante"  # motif-detecteur-irregulier
     try:
         code = subprocess.run(
             ["bash", detect_sh, "--quiet", "--path", planning_abs],
@@ -320,21 +320,21 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         ).returncode
     except Exception:
-        return "non-concluante"
+        return "non-concluante"  # motif-sous-processus-en-echec
     if code == 0:
-        return "gsd"
+        return "gsd"  # motif-code-0
     if code in (2, 3):
-        return "non-gsd"
+        return "non-gsd"  # motif-code-2-ou-3
     if code == 1:
         if _porte_marqueur_gsd(os.path.join(planning_abs, "STATE.md")):
-            return "gsd"
+            return "gsd"  # motif-marqueur-racine
         compartiments = _lister_compartiments(planning_abs)
         if any(_porte_marqueur_gsd(os.path.join(c, "STATE.md")) for c in compartiments):
-            return "gsd"
+            return "gsd"  # motif-marqueur-compartiment
         if any(_porte_marqueur_partition(os.path.join(c, "STATE.md")) for c in compartiments):
-            return "gsd"
-        return "non-gsd"
-    return "non-concluante"
+            return "gsd"  # motif-partition-compartiment
+        return "non-gsd"  # motif-code-1-sans-marqueur
+    return "non-concluante"  # motif-repli-generique
 
 
 # --- Scanner du modèle (44-04 classe hors_modele ; l'interface est posée ici) ----------------
