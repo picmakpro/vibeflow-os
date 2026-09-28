@@ -10,11 +10,16 @@ created: 2026-09-23
 last_updated: "2026-09-28T00:00:00.000Z"
 last_activity: 2026-09-28
 last_activity_desc: >-
-  Correction ciblée lot 6 (quick 260928-q6h, mission mgr-44-reprise, nœud exec-44 rouvert) : garde
-  de fidélité d'énumération des compartiments de workstream côté appelant (recalc-planning.sh),
-  detect-gsd-engine.sh/workstream-policy.sh inchangés (P44-D-01b) ; 285 OK/0 KO sur
-  test-recalc-planning.sh, 8 suites sœurs vertes, gsd-verifier PASSED 10/10. Trou racine transmis
-  à Samuel (BACKLOG.md).
+  Correction de CLASSE lot 7 (quick, mission mgr-44-reprise, nœud exec-44 rouvert, DERNIER lot) :
+  garde de LECTURE du détecteur (recalc-planning.sh) — le moteur n'écrit que s'il a pu lire, pour
+  de vrai, tout ce que le détecteur devait lire (fidélité par EXÉCUTION de vf_ws_enumerate +
+  lisibilité réelle de chaque compartiment et STATE.md). Ferme le trou plus large que le lot 6 :
+  vf_ws_enumerate pose found=1 même quand `cd` échoue (compartiment chmod 000/600/400), masquant
+  un marqueur GSD réel ; un STATE.md racine illisible était même ÉCRASÉ. detect-gsd-engine.sh/
+  workstream-policy.sh inchangés (P44-D-01b). 303 OK/0 KO sur test-recalc-planning.sh, 8 suites
+  sœurs vertes, gsd-verifier à consigner. Trou racine transmis à Samuel (BACKLOG.md, 2 entrées).
+  Précédent lot 6 (quick 260928-q6h) : garde de fidélité d'énumération des compartiments de
+  workstream côté appelant, 285 OK/0 KO, gsd-verifier PASSED 10/10.
   Exécution de la Phase 44 (mission vf-coder, nœud exec-44, 2026-09-28) : 5 plans exécutés en 4
   vagues (44-01∥44-02 → 44-03 → 44-04 → 44-05), chacun dans un worktree isolé (harness-worktree)
   puis mergé --no-ff sur la branche orchestrateur ; 152 OK/0 KO sur test-recalc-planning.sh, les
@@ -73,6 +78,7 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 | 260928-mgu | Correction de CLASSE lot 4, Phase 44 : detection_gsd() appelle le vrai détecteur sous environnement maîtrisé (plus de réimplémentation Python), encodage injectif du journal | 2026-09-28 | 3d72452 | passed | [260928-mgu-correction-de-classe-lot-4-detection-gsd](./quick/260928-mgu-correction-de-classe-lot-4-detection-gsd/) |
 | 260928-ol3 | Correction de CLASSE lot 5, Phase 44 : environnement du sous-processus détecteur construit de zéro (jamais dict(os.environ)), bash résolu par une liste fixe de chemins absolus, alphabet du journal étendu (NUL/C0/C1), messages distincts, O_NOFOLLOW | 2026-09-28 | 9fe4a42 | passed | [260928-ol3-correction-de-classe-lot-5-environnement-maitrise](./quick/260928-ol3-correction-de-classe-lot-5-environnement-maitrise/) |
 | 260928-q6h | Correction ciblée lot 6, Phase 44 (audit HIGH) : garde de fidélité d'énumération des compartiments de workstream côté appelant, AVANT tout appel au détecteur (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) ; correctifs de revue WR-02/WR-03/IN-01/IN-02 | 2026-09-28 | 770c35b | passed | [260928-q6h-ferme-le-masquage-de-compartiment-de-wor](./quick/260928-q6h-ferme-le-masquage-de-compartiment-de-wor/) |
+| 260928-s53 | Correction de CLASSE lot 7, Phase 44 (DERNIER lot) : garde de lecture du détecteur — fidélité par EXÉCUTION de vf_ws_enumerate + lisibilité réelle de chaque compartiment/STATE.md, ferme la classe permissions dégradées (000/600/400) plus large que le lot 6 (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) | 2026-09-28 | 4b666e9 | passed | [260928-s53-correction-de-classe-lot-7-garde-de-lect](./quick/260928-s53-correction-de-classe-lot-7-garde-de-lect/) |
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
