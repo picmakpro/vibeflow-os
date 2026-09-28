@@ -70,6 +70,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -298,6 +299,41 @@ def _porte_marqueur_partition(chemin_state):
     return statut == "ok" and "workstream" in donnees and "created" in donnees
 
 
+def _porte_planning_version(chemin_state):
+    statut, donnees = _lire_frontmatter_fichier(chemin_state)
+    return statut == "ok" and "planning_version" in donnees
+
+
+# Reproduction PURE PYTHON de la priorité 3 de detect-gsd-engine.sh (has_code_signal), jamais un
+# sourcing ni une dépendance de code vers ce script (P44-D-01b, P44-D-01d) — seule la LISTE de
+# fichiers est reprise à l'identique. Nécessaire pour fermer le repli code 1 (audit, lot 3
+# constat 2) : quand la chaîne GSD est absente de la machine, le détecteur sort en priorité 1
+# AVANT d'avoir pu évaluer sa priorité 3, quel que soit le contenu réel du disque.
+_SIGNAUX_DE_CODE = (
+    "package.json", "go.mod", "Cargo.toml", "pyproject.toml", "pom.xml", "build.gradle",
+    "build.gradle.kts", "composer.json", "Gemfile", "tsconfig.json", "Package.swift",
+)
+
+
+def _a_signal_de_code(racine_lab):
+    for nom in _SIGNAUX_DE_CODE:
+        if est_fichier_regulier(os.path.join(racine_lab, nom)):
+            return True
+    try:
+        entrees = os.scandir(racine_lab)
+    except OSError:
+        return False
+    for entree in entrees:
+        if not entree.name.endswith(".xcodeproj"):
+            continue
+        try:
+            if entree.is_dir(follow_symlinks=False):
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def _lister_compartiments(planning_abs):
     """Énumère les sous-dossiers réels (jamais un lien, ni sur le dossier lui-même ni sur une
     entrée) du sous-dossier `workstreams` du planning."""
@@ -333,9 +369,10 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
     if not detecteur_regulier:
         print("[recalc-planning] détecteur non régulier : " + detect_sh, file=sys.stderr)
         return "non-concluante"  # motif-detecteur-irregulier
+    bash_bin = shutil.which("bash") or "bash"
     try:
         code = subprocess.run(
-            ["bash", detect_sh, "--quiet", "--path", planning_abs],
+            [bash_bin, detect_sh, "--quiet", "--path", planning_abs],
             cwd=racine_lab, timeout=30,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         ).returncode
@@ -358,6 +395,15 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
             return "gsd"  # motif-marqueur-compartiment
         if any(_porte_marqueur_partition(os.path.join(c, "STATE.md")) for c in compartiments):
             return "gsd"  # motif-partition-compartiment
+        # La chaîne GSD absente de la machine (GSD_HOME introuvable, environnement hérité ou
+        # forcé) fait sortir le détecteur en priorité 1, AVANT sa priorité 3 — le repli ci-dessus
+        # ne rejoue que les priorités 2/2bis. Sans ce contrôle, un environnement qui neutralise
+        # GSD_HOME contournait le refus « migration à examiner » (audit, lot 3 constat 2) : la
+        # combinaison socle planning-core + signal de code est donc reproduite ICI, en Python pur,
+        # indépendamment de toute valeur d'environnement — jamais un sourcing ni une dépendance de
+        # code vers detect-gsd-engine.sh (P44-D-01b, P44-D-01d).
+        if _porte_planning_version(os.path.join(planning_abs, "STATE.md")) and _a_signal_de_code(racine_lab):
+            return "non-concluante"  # motif-code-1-socle-et-signal
         return "non-gsd"  # motif-code-1-sans-marqueur
     return "non-concluante"  # motif-repli-generique
 
@@ -1163,7 +1209,11 @@ def _verdict_journal(unite):
 
 def lignes_a_journaliser(derivation, lignes_existantes):
     """Dédoublonnage lu dans le journal lui-même (dernier couple verdict/tentative par chemin),
-    jamais dans un cache."""
+    jamais dans un cache. La comparaison porte sur la valeur ASSAINIE (celle qui est, ou serait,
+    effectivement écrite) des DEUX côtés : le journal relu ne contient que des jetons déjà passés
+    par `_jeton_journal`, donc comparer la valeur BRUTE de l'unité courante à ce jeton assaini
+    rejournalise à chaque exécution dès qu'un champ (notamment `tentative`, lu tel quel depuis
+    VERDICT.md, jamais validé — P44-D-09) contient un espace ou un `=` (audit, lot 3 constat 1)."""
     dernier_couple = {}
     for ligne in lignes_existantes:
         parsee = _parser_ligne_journal(ligne)
@@ -1180,7 +1230,9 @@ def lignes_a_journaliser(derivation, lignes_existantes):
             tentative = str(brute) if brute not in (None, "") else "-"
         else:
             tentative = "-"
-        if dernier_couple.get(chemin) != (verdict, tentative):
+        chemin_jeton = _jeton_journal(chemin, "-")
+        couple_jeton = (_jeton_journal(verdict, "-"), _jeton_journal(tentative, "-"))
+        if dernier_couple.get(chemin_jeton) != couple_jeton:
             a_ajouter.append({
                 "chemin": chemin, "auteur": unite.get("auteur") or "inconnu",
                 "verdict": verdict, "tentative": tentative,
