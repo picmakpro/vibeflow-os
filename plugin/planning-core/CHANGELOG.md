@@ -43,7 +43,7 @@
   la main (G6, Phase 45) ; le socle métier existant de `planning-core` (`guard-planning-updated.sh`
   et sa mesure par `mtime`) n'est **pas retiré** — le remplacement est additif, les labs qui
   n'adhèrent pas restent sur l'existant.
-- **Correctifs de revue et d'audit (correction ciblée, lot 1 puis 2)** : consommation de
+- **Correctifs de revue et d'audit (correction ciblée, lot 1 puis 2 puis 3)** : consommation de
   `os.scandir` ramenée entièrement dans son `try` (`_lister_entrees`) ; un lien symbolique (ou
   tout emplacement non régulier au sens `lstat`) à la place d'`INDEX.md`, `STATE.md`,
   `cloture.log` ou `.recalc-cache.json` refuse désormais toute l'écriture au lieu d'être remplacé
@@ -53,11 +53,24 @@
   libre) — il refuse désormais l'écriture comme un moteur GSD détecté ou une détection non
   concluante ; assainissement structurel de tout champ recopié dans `cloture.log`
   (`_jeton_journal`, pas seulement `tentative`) contre l'injection d'un faux enregistrement.
+- **Lot 3** : `lignes_a_journaliser` comparait la valeur BRUTE de l'unité courante au jeton déjà
+  assaini relu dans `cloture.log` — une `tentative` contenant un espace ou un `=` (lue telle
+  quelle depuis `VERDICT.md`, jamais validée, P44-D-09) se rejournalisait à chaque exécution ; la
+  comparaison porte désormais sur la valeur assainie des deux côtés (revue, `260928-b4c-VERIFICATION.md`
+  truth #10, jamais éprouvée par un aller-retour réel). `detection_gsd()` : quand la chaîne GSD
+  est absente de la machine (`GSD_HOME` introuvable, forcé ou hérité de l'environnement), le
+  détecteur sortait en code 1 **avant** d'avoir pu évaluer sa priorité 3 (socle planning-core +
+  signal de code → migration à examiner) — le repli du code 1 ne rejouait que les priorités 2/2bis
+  (marqueurs GSD), laissant écrire sur un planning que l'environnement normal aurait refusé ; la
+  combinaison socle+signal est désormais reproduite en Python pur, indépendamment de toute valeur
+  d'environnement (aucune dépendance de code vers `detect-gsd-engine.sh`, P44-D-01b/P44-D-01d).
+  Accessoirement : le sous-processus du détecteur résout `bash` par un chemin absolu
+  (`shutil.which`) plutôt que par le `PATH` hérité.
 
 Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27. Correctifs
 lot 1 : vf-coder, mandat de correction ciblée, 2026-09-28. Lot 2 (code 2 du détecteur,
-assainissement du journal) : décision du head sous délégation technique de Willy, session
-principale, 2026-09-28.
+assainissement du journal) et lot 3 (dédoublonnage assaini, repli code 1 sur socle+signal) :
+décision du head sous délégation technique de Willy, session principale, 2026-09-28.
 
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
 

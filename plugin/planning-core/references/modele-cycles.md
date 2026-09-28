@@ -58,15 +58,23 @@ détecteur rend 0/1/2/3/64, le recalcul les traduit en un verdict `gsd`/`non-gsd
 |---|---|---|---|
 | 0 | moteur GSD actif | `gsd` | refusée |
 | 1, marqueur GSD trouvé (racine ou compartiment) | chaîne GSD absente de la machine, mais le disque porte un marqueur | `gsd` | refusée |
-| 1, aucun marqueur | chaîne GSD absente, aucun signal disque | `non-gsd` | autorisée |
+| 1, aucun marqueur, **et** le disque porte lui-même un socle planning-core + signal de code | chaîne GSD absente, mais la combinaison qu'aurait vue la priorité 3 du détecteur (jamais atteinte : la priorité 1 sort avant) est reproduite indépendamment, en Python pur | `non-concluante` | **refusée** — jamais assimilée au cas suivant, quelle que soit la valeur de `GSD_HOME` ou de l'environnement hérité (audit, lot 3, décision du head sous délégation technique de Willy, session principale, 2026-09-28) |
+| 1, aucun marqueur, aucun signal disque | chaîne GSD absente, aucun signal disque | `non-gsd` | autorisée |
 | **2** | **signalement de MIGRATION** (socle planning-core + signal de code, ex. `package.json`) | `non-concluante` | **refusée** — jamais assimilée au code 3 (audit B, lot 2 L1, décision du head sous délégation technique de Willy, session principale, 2026-09-28) |
 | 3 | aucun moteur en place, terrain libre | `non-gsd` | autorisée |
 | tout autre code (ex. 64, détecteur défaillant) | non concluant | `non-concluante` | refusée |
 
 Le code 2 a **longtemps** été traité comme le code 3 (même verdict `non-gsd`), laissant écrire sur
 un socle planning-core que le détecteur signalait pourtant lui-même « migration à examiner » — corrigé
-en lot 2 de la correction ciblée de la Phase 44. Ce qu'un lab métier qui contient DU CODE fait de ce
-refus (le détecteur rend 2, le moteur refuse l'écriture) reste une question ouverte, à cadrer en
+en lot 2 de la correction ciblée de la Phase 44. Le repli du code 1 (chaîne GSD absente) souffrait du
+même trou par un autre chemin : la priorité 1 du détecteur (`detect-gsd-engine.sh`) sort **avant**
+d'avoir pu évaluer sa priorité 3, donc un environnement qui neutralise `GSD_HOME` (forcé vers un
+chemin inexistant, ou simplement hérité) contournait le refus « migration à examiner » sur un socle
+planning-core qui porte pourtant un signal de code — corrigé en lot 3 : `detection_gsd()` reproduit
+la combinaison EN PYTHON PUR, sans jamais sourcer ni dépendre du code de `detect-gsd-engine.sh`
+(P44-D-01b, P44-D-01d), donc indépendamment de toute valeur d'environnement. Ce qu'un lab métier qui
+contient DU CODE fait de ce refus (le détecteur rend 2, le moteur refuse l'écriture) reste une
+question ouverte, à cadrer en
 Phase 45 (voir ROADMAP.md § Phase 45).
 
 ## Arborescence
