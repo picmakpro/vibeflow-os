@@ -118,8 +118,8 @@ travail déjà écrit. Le chemin de bout en bout (moteur → sous-processus → 
   N'appeler aucune commande `state.*`.
 
 <execution_context>
-@/Users/makwilmak/.claude/gsd-core/workflows/execute-plan.md
-@/Users/makwilmak/.claude/gsd-core/templates/summary.md
+@~/.claude/gsd-core/workflows/execute-plan.md
+@~/.claude/gsd-core/templates/summary.md
 </execution_context>
 
 <context>
