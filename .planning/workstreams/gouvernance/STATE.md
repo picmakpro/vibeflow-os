@@ -10,29 +10,21 @@ created: 2026-09-23
 last_updated: "2026-09-28T00:00:00.000Z"
 last_activity: 2026-09-28
 last_activity_desc: >-
-  Correction de CLASSE lot 7 (quick, mission mgr-44-reprise, nœud exec-44 rouvert, DERNIER lot) :
-  garde de LECTURE du détecteur (recalc-planning.sh) — le moteur n'écrit que s'il a pu lire, pour
-  de vrai, tout ce que le détecteur devait lire (fidélité par EXÉCUTION de vf_ws_enumerate +
-  lisibilité réelle de chaque compartiment et STATE.md). Ferme le trou plus large que le lot 6 :
-  vf_ws_enumerate pose found=1 même quand `cd` échoue (compartiment chmod 000/600/400), masquant
-  un marqueur GSD réel ; un STATE.md racine illisible était même ÉCRASÉ. detect-gsd-engine.sh/
-  workstream-policy.sh inchangés (P44-D-01b). 303 OK/0 KO sur test-recalc-planning.sh, 8 suites
-  sœurs vertes, gsd-verifier à consigner. Trou racine transmis à Samuel (BACKLOG.md, 2 entrées).
-  Précédent lot 6 (quick 260928-q6h) : garde de fidélité d'énumération des compartiments de
-  workstream côté appelant, 285 OK/0 KO, gsd-verifier PASSED 10/10.
-  Exécution de la Phase 44 (mission vf-coder, nœud exec-44, 2026-09-28) : 5 plans exécutés en 4
-  vagues (44-01∥44-02 → 44-03 → 44-04 → 44-05), chacun dans un worktree isolé (harness-worktree)
-  puis mergé --no-ff sur la branche orchestrateur ; 152 OK/0 KO sur test-recalc-planning.sh, les
-  8 autres suites de planning-core restent vertes. Bump mineur planning-core v2.7.1→v2.8.0
-  (D-18, aucune VERSION racine, aucun tag). Passage en lecture seule sur les deux labs réels
-  (~/jarvis-keystone, ~/BusinessFlow-Lab) : empreintes identiques avant/après, aucune écriture.
-  Vérifiée par gsd-verifier (44-VERIFICATION.md, PASSED 18/18 MOTR-01..18, commit 267b041).
-  Deux corrections mineures du dernier plan-checker traitées en cours d'exécution (échapper_nom
-  au-delà de U+FFFF en 44-04, sonde bash/zsh sans résidu). check-gate-touche.sh :
-  RIEN-A-JUGER (aucune surface gate touchée). check-baseline-arbitrage.sh : CONFORME (aucune
-  hausse). Requirements MOTR-01..18 et plans 44-01..05 cochés à la main dans REQUIREMENTS.md/
-  ROADMAP.md (state.* et requirements.mark-complete non appelés, interdits par le mandat).
-  Phase NON close dans le ROADMAP (clôture = nœud ultérieur du manager).
+  Correction de CLASSE lot 8 (quick 260928-vk9, mission mgr-44-reprise, nœud exec-44 rouvert,
+  CORRECTION MINIMALE, aucun nouveau tour de juges) : deux corrections indépendantes de la garde de
+  lecture du lot 7. (1) `os.path.isfile` remplace `os.path.lexists` aux deux sites qui jugent un
+  STATE.md (racine et compartiment) — mirroir exact de `[ -f ]` que lit le détecteur : un lien
+  symbolique CASSÉ est désormais ABSENT, jamais un refus « illisible » (sur-refus mesuré sur HEAD
+  345303e). Le STATE.md racine en lien cassé reste refusé, mais par la garde B (« emplacement
+  occupé »). (2) `_ouvrable` ouvre en O_NONBLOCK + fstat — un STATE.md en FIFO n'y bloque plus
+  (blocage indéfini mesuré sur 345303e). Correction de prose associée. 10 tests rouge sur 345303e
+  puis vert (313 OK/0 KO, 303 avant), 8 suites sœurs vertes, detect-gsd-engine.sh/workstream-policy.sh
+  inchangés depuis 424cb23. Doc (modele-cycles.md, CHANGELOG v2.8.0, aucun bump) et BACKLOG.md
+  (entrée Samuel complétée) mis à jour. Commit 0c284e3. gsd-verifier dispatché, verdict à consigner
+  par le manager. Précédent lot 7 (260928-s53, 4b666e9) : garde de lecture du détecteur, fidélité
+  par exécution de vf_ws_enumerate + lisibilité réelle — voir table Quick Tasks ci-dessous et
+  `44-VERIFICATION.md` (Phase 44 exécutée PASSED 18/18 MOTR-01..18, commit 267b041) pour le détail
+  antérieur.
 stopped_at: >-
   Phase 44 exécutée et vérifiée PASSED (5/5 plans, verdict indéterminé sur "verdict passé sans
   SUMMARY.md" non rencontré dans cette exécution). Prochain geste : clôture de phase (nœud du
@@ -51,7 +43,9 @@ progress:
 
 Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — EXÉCUTÉE (5/5 plans, 4 vagues), VÉRIFIÉE PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`, commit 267b041). Pas encore CLÔTURÉE dans le ROADMAP (nœud ultérieur du manager). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
 **Last Activity:** 2026-09-28
-**Last Activity Description:** Correction de CLASSE lot 5 (nœud `exec-44` rouvert, mission vf-coder `mgr-44-reprise`, quick task `260928-ol3`) : l'environnement « maîtrisé » du sous-processus détecteur (lot 4) était en réalité `dict(os.environ)` avec la seule surcharge de `GSD_HOME` — une copie intégrale du `PATH` hérité. Mesuré (attack probe direct, hors suite) : un `awk` factice en tête de PATH suffisait à faire écrire (exit 0) le moteur sur un lab GSD réel et à effacer le marqueur `gsd_state_version`. L'environnement est désormais construit DE ZÉRO (liste blanche `PATH_MAITRISE` + `GSD_HOME`, aucune autre variable héritée) ; `bash` résolu par `CANDIDATS_BASH` (deux chemins absolus fixes, validés par `lstat`), jamais `shutil.which` sur le PATH hérité. Correctifs voisins : `_jeton_journal` échappe aussi tout caractère non imprimable (NUL, contrôles C0/C1) ; un repli vide lève `ValueError` (jamais un jeton vide silencieux) ; « détecteur absent »/« détecteur non régulier » ont deux messages distincts ; `ecrire_si_different` lit par `O_NOFOLLOW`. Point explicitement NON retenu (avec preuve) : gater le code 3 sur une sortie stderr non vide — un `.planning/workstreams/` vide en produit légitimement. 233→270 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `detect-gsd-engine.sh`/`workstream-policy.sh` octet pour octet inchangés depuis `424cb23`. Le dispatch `gsd-executor` isolé n'a pas été retenté (expérience du lot 4 déjà consignée) ; un seul commit (correctifs trop imbriqués pour un découpage fix/test/docs). Vérifié PASSED 11/11 par `gsd-verifier`. Commit `9fe4a42`.
+**Last Activity Description:** Correction de CLASSE lot 8 (quick 260928-vk9, mission `mgr-44-reprise`, nœud `exec-44` rouvert, CORRECTION MINIMALE, aucun nouveau tour de juges) — voir `last_activity_desc` en frontmatter pour le détail complet. Commit `0c284e3`.
+
+Précédent : correction de CLASSE lot 5 (nœud `exec-44` rouvert, mission vf-coder `mgr-44-reprise`, quick task `260928-ol3`) : l'environnement « maîtrisé » du sous-processus détecteur (lot 4) était en réalité `dict(os.environ)` avec la seule surcharge de `GSD_HOME` — une copie intégrale du `PATH` hérité. Mesuré (attack probe direct, hors suite) : un `awk` factice en tête de PATH suffisait à faire écrire (exit 0) le moteur sur un lab GSD réel et à effacer le marqueur `gsd_state_version`. L'environnement est désormais construit DE ZÉRO (liste blanche `PATH_MAITRISE` + `GSD_HOME`, aucune autre variable héritée) ; `bash` résolu par `CANDIDATS_BASH` (deux chemins absolus fixes, validés par `lstat`), jamais `shutil.which` sur le PATH hérité. Correctifs voisins : `_jeton_journal` échappe aussi tout caractère non imprimable (NUL, contrôles C0/C1) ; un repli vide lève `ValueError` (jamais un jeton vide silencieux) ; « détecteur absent »/« détecteur non régulier » ont deux messages distincts ; `ecrire_si_different` lit par `O_NOFOLLOW`. Point explicitement NON retenu (avec preuve) : gater le code 3 sur une sortie stderr non vide — un `.planning/workstreams/` vide en produit légitimement. 233→270 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `detect-gsd-engine.sh`/`workstream-policy.sh` octet pour octet inchangés depuis `424cb23`. Le dispatch `gsd-executor` isolé n'a pas été retenté (expérience du lot 4 déjà consignée) ; un seul commit (correctifs trop imbriqués pour un découpage fix/test/docs). Vérifié PASSED 11/11 par `gsd-verifier`. Commit `9fe4a42`.
 
 Précédent : correction de CLASSE lot 4 (quick task `260928-mgu`) : `detection_gsd()` appelle le VRAI `detect-gsd-engine.sh` en sous-processus au lieu de réimplémenter ses priorités en Python, fermant les trois divergences mesurées de la copie du lot 3. `_jeton_journal` passe à un encodage pourcent injectif. 180→233 OK/0 KO, 8 suites sœurs vertes, `gsd-verifier` PASSED 7/7. Commits `b63da53`/`2fbbd65`/`3d72452`.
 
@@ -78,7 +72,8 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 | 260928-mgu | Correction de CLASSE lot 4, Phase 44 : detection_gsd() appelle le vrai détecteur sous environnement maîtrisé (plus de réimplémentation Python), encodage injectif du journal | 2026-09-28 | 3d72452 | passed | [260928-mgu-correction-de-classe-lot-4-detection-gsd](./quick/260928-mgu-correction-de-classe-lot-4-detection-gsd/) |
 | 260928-ol3 | Correction de CLASSE lot 5, Phase 44 : environnement du sous-processus détecteur construit de zéro (jamais dict(os.environ)), bash résolu par une liste fixe de chemins absolus, alphabet du journal étendu (NUL/C0/C1), messages distincts, O_NOFOLLOW | 2026-09-28 | 9fe4a42 | passed | [260928-ol3-correction-de-classe-lot-5-environnement-maitrise](./quick/260928-ol3-correction-de-classe-lot-5-environnement-maitrise/) |
 | 260928-q6h | Correction ciblée lot 6, Phase 44 (audit HIGH) : garde de fidélité d'énumération des compartiments de workstream côté appelant, AVANT tout appel au détecteur (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) ; correctifs de revue WR-02/WR-03/IN-01/IN-02 | 2026-09-28 | 770c35b | passed | [260928-q6h-ferme-le-masquage-de-compartiment-de-wor](./quick/260928-q6h-ferme-le-masquage-de-compartiment-de-wor/) |
-| 260928-s53 | Correction de CLASSE lot 7, Phase 44 (DERNIER lot) : garde de lecture du détecteur — fidélité par EXÉCUTION de vf_ws_enumerate + lisibilité réelle de chaque compartiment/STATE.md, ferme la classe permissions dégradées (000/600/400) plus large que le lot 6 (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) | 2026-09-28 | 4b666e9 | passed | [260928-s53-correction-de-classe-lot-7-garde-de-lect](./quick/260928-s53-correction-de-classe-lot-7-garde-de-lect/) |
+| 260928-s53 | Correction de CLASSE lot 7, Phase 44 : garde de lecture du détecteur — fidélité par EXÉCUTION de vf_ws_enumerate + lisibilité réelle de chaque compartiment/STATE.md, ferme la classe permissions dégradées (000/600/400) plus large que le lot 6 (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) | 2026-09-28 | 4b666e9 | passed | [260928-s53-correction-de-classe-lot-7-garde-de-lect](./quick/260928-s53-correction-de-classe-lot-7-garde-de-lect/) |
+| 260928-vk9 | Correction de CLASSE lot 8, Phase 44 (CORRECTION MINIMALE, dernier lot, aucun nouveau tour de juges) : lien symbolique cassé traité comme absent (`os.path.isfile`, mirroir de `[ -f ]`), `_ouvrable` non bloquante sur FIFO (O_NONBLOCK + fstat), correction de prose (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) | 2026-09-28 | 0c284e3 | passed | [260928-vk9-correction-de-classe-lot-8-garde-de-lect](./quick/260928-vk9-correction-de-classe-lot-8-garde-de-lect/) |
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
