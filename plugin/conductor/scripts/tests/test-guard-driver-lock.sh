@@ -130,9 +130,9 @@ assert "A5 — deny malgré le saut de ligne avant le commit" "$OUT_A5" '"permis
 
 echo ""
 echo "=== A6 (BL-2) — options globales de git avant le sous-verbe ==="
-PAY_A6a=$(mk_bash 'git -C /tmp commit -m x' sess-intrus .)
+PAY_A6a=$(mk_bash 'git -C sous-depot commit -m x' sess-intrus .)  # cible DANS le lab : un -C hors du lab relève de C7
 OUT_A6a="$(run_guard "$PAY_A6a")"
-assert "A6a — deny malgré 'git -C /tmp'" "$OUT_A6a" '"permissionDecision": "deny"'
+assert "A6a — deny malgré 'git -C sous-depot'" "$OUT_A6a" '"permissionDecision": "deny"'
 PAY_A6b=$(mk_bash 'git -c core.hooksPath=/dev/null commit -m x' sess-intrus .)
 OUT_A6b="$(run_guard "$PAY_A6b")"
 assert "A6b — deny malgré 'git -c core.hooksPath=/dev/null'" "$OUT_A6b" '"permissionDecision": "deny"'
@@ -392,6 +392,44 @@ if [ "$Q4_PREFLIGHT_OK" -eq 1 ]; then
   [ -f "$Q4_HEALTH/guard-driver-lock.sh.marker" ] && Q4_MARKER=present || Q4_MARKER=absent
   assert "Q4 — marqueur de santé écrit ($Q4_HEALTH/guard-driver-lock.sh.marker)" "$Q4_MARKER" "present"
 fi
+"$DRIVER" release --owner=mission-X >/dev/null 2>&1
+
+echo ""
+echo "=== C6/C7 — périmètre du lock : un AUTRE dépôt que le lab n'est pas sous le lock ==="
+rm -rf "$LOCK"
+CLAUDE_CODE_SESSION_ID=sess-holder "$DRIVER" acquire --owner=mission-X --step=c7 >/dev/null
+AUTRE="$WORK_DIR/autre-depot"; mkdir -p "$AUTRE/.planning"
+LAB="$(pwd)"
+DENY='"permissionDecision": "deny"'
+mk_write_cwd() { # file_path session_id cwd
+  python3 -c '
+import json, sys
+print(json.dumps({"tool_name": "Write", "tool_input": {"file_path": sys.argv[1], "content": "x"},
+                   "session_id": sys.argv[2], "cwd": sys.argv[3]}))' "$1" "$2" "$3"
+}
+# Gestes hors du lab, cible résolue avec certitude -> allow
+assert_empty "C7a — cd <hors-lab> && git commit : allow" "$(run_guard "$(mk_bash "cd $AUTRE && git commit -m x" sess-intrus "$LAB")")"
+assert_empty "C7b — git -C <hors-lab> push : allow" "$(run_guard "$(mk_bash "git -C $AUTRE push origin main" sess-intrus "$LAB")")"
+assert_empty "C7c — chaîne && entière hors du lab, message à parenthèses : allow" "$(run_guard "$(mk_bash "cd $AUTRE && git add F && git commit -m 'feat(x): y' && git push" sess-intrus "$LAB")")"
+assert_empty "C7d — gh pr dans un dépôt hors du lab : allow" "$(run_guard "$(mk_bash "cd $AUTRE && gh pr create --fill" sess-intrus "$LAB")")"
+assert_empty "C7e — saut de ligne final après la chaîne : allow" "$(run_guard "$(mk_bash "$(printf 'cd %s && git commit -m x\n' "$AUTRE")" sess-intrus "$LAB")")"
+assert_empty "C7p — redirection 2>&1 conservée : allow" "$(run_guard "$(mk_bash "cd $AUTRE && git push 2>&1" sess-intrus "$LAB")")"
+# Incertitude ou retour dans le lab -> le lock s applique toujours
+assert "C7f — cd <hors-lab> ; git commit (le cd peut échouer) : deny" "$(run_guard "$(mk_bash "cd $AUTRE; git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7g — cd <hors-lab> && x ; git commit (chaîne interrompue possible) : deny" "$(run_guard "$(mk_bash "cd $AUTRE && ls ; git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7h — sous-shell (cd <hors-lab>) && git commit : deny" "$(run_guard "$(mk_bash "(cd $AUTRE) && git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7i — cd <hors-lab> && cd <lab> && git commit : deny" "$(run_guard "$(mk_bash "cd $AUTRE && cd $LAB && git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7j — cible par variable : deny" "$(run_guard "$(mk_bash 'cd $X && git commit -m x' sess-intrus "$LAB")")" "$DENY"
+assert "C7k — un geste hors du lab ET un geste dans le lab : deny" "$(run_guard "$(mk_bash "git -C $AUTRE push && git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7l — git --git-dir= : cible indéterminée, deny" "$(run_guard "$(mk_bash "git --git-dir=$AUTRE/.git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7m — pipe après le cd : deny" "$(run_guard "$(mk_bash "cd $AUTRE && git commit -m x | tail -1" sess-intrus "$LAB")")" "$DENY"
+assert "C7n — gh -R : dépôt indéterminé, deny" "$(run_guard "$(mk_bash "cd $AUTRE && gh pr create -R o/r" sess-intrus "$LAB")")" "$DENY"
+assert "C7o — sous-dossier du lab : deny" "$(run_guard "$(mk_bash "cd $LAB/scripts && git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7q — cd sans argument (HOME) : deny" "$(run_guard "$(mk_bash "cd && git commit -m x" sess-intrus "$LAB")")" "$DENY"
+# Voie Write/Edit : le .planning/ d un autre dépôt n est pas celui du lab
+assert_empty "C6a — Write dans le .planning/ d'un autre dépôt : allow" "$(run_guard "$(mk_write_cwd "$AUTRE/.planning/STATE.md" sess-intrus "$LAB")")"
+assert "C6b — Write dans le .planning/ du lab (chemin absolu) : deny" "$(run_guard "$(mk_write_cwd "$LAB/.planning/STATE.md" sess-intrus "$LAB")")" "$DENY"
+assert "C6c — Write .planning/ relatif : deny" "$(run_guard "$(mk_write_cwd ".planning/STATE.md" sess-intrus "$LAB")")" "$DENY"
 "$DRIVER" release --owner=mission-X >/dev/null 2>&1
 
 echo ""
