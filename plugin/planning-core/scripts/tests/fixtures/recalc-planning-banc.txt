@@ -1664,3 +1664,168 @@ titre: Second cycle
 
 @@ attendu cycles/01-premier :: à cadrer
 @@ attendu cycles/02-second :: à cadrer
+
+@@ # ---- 44-04 Tâche 1 : hors modèle et garde-fous de chemin (R40 à R46) ----------------------
+
+@@ lab hors-modele-racine
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/notes.md
+note intruse à la racine, hors modèle
+
+@@ dossier .planning/phases
+
+@@ dossier .planning/workstreams
+
+@@ fichier .planning/BOARD.md
+tableau intrus, hors modèle
+
+@@ fichier .planning/intel
+fichier intrus nommé comme une annexe — pas un dossier, donc hors modèle
+
+@@ fichier .planning/_bancs/f.txt
+annexe _bancs, jamais lue
+
+@@ fichier .planning/recherches/f.txt
+annexe recherches, jamais lue
+
+@@ fichier .planning/sketches/f.txt
+annexe sketches, jamais lue
+
+@@ fichier .planning/_archive/f.txt
+annexe _archive, jamais lue
+
+@@ fichier .planning/registres/f.txt
+annexe registres, jamais lue
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle du modèle, jamais hors modèle
+---
+
+@@ attendu cycles/01-c :: à cadrer
+@@ attendu-hors-modele BOARD.md :: fichier
+@@ attendu-hors-modele intel :: fichier
+@@ attendu-hors-modele notes.md :: fichier
+@@ attendu-hors-modele phases :: dossier
+@@ attendu-hors-modele workstreams :: dossier
+
+@@ lab hors-modele-interne
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle avec intrus internes
+---
+
+@@ fichier .planning/cycles/01-c/notes.md
+notes internes au cycle, hors modèle
+
+@@ fichier .planning/cycles/01-c/phases/01-p/brouillon.md
+brouillon interne à la phase, hors modèle
+
+@@ fichier .planning/cycles/01-c/phases/02-q/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-q/plans/01-x/annexe.txt
+annexe interne au plan, hors modèle
+
+@@ fichier .planning/cycles/brouillon.md
+brouillon à la racine de cycles/, hors modèle
+
+@@ dossier .planning/cycles/sans-numero
+
+@@ attendu cycles/01-c/phases/01-p :: à cadrer
+@@ attendu cycles/01-c/phases/02-q :: à planifier
+@@ attendu cycles/01-c/phases/02-q/plans/01-x :: à planifier
+@@ attendu cycles/01-c :: à cadrer
+@@ attendu-hors-modele cycles/01-c/notes.md :: fichier
+@@ attendu-hors-modele cycles/01-c/phases/01-p/brouillon.md :: fichier
+@@ attendu-hors-modele cycles/01-c/phases/02-q/plans/01-x/annexe.txt :: fichier
+@@ attendu-hors-modele cycles/brouillon.md :: fichier
+@@ attendu-hors-modele cycles/sans-numero :: dossier
+
+@@ lab hors-modele-interne-jumeau jumeau-de=hors-modele-interne
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle sans intrus internes
+---
+
+@@ dossier .planning/cycles/01-c/phases/01-p
+
+@@ fichier .planning/cycles/01-c/phases/02-q/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ dossier .planning/cycles/01-c/phases/02-q/plans/01-x
+
+@@ attendu cycles/01-c/phases/01-p :: à cadrer
+@@ attendu cycles/01-c/phases/02-q :: à planifier
+@@ attendu cycles/01-c/phases/02-q/plans/01-x :: à planifier
+@@ attendu cycles/01-c :: à cadrer
+@@ attendu-hors-modele-aucun
+
+@@ lab modele-mauvais-type
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles
+ceci est un fichier, pas un dossier cycles/
+
+@@ dossier .planning/INDEX.md
+
+@@ attendu-hors-modele cycles :: fichier
+@@ attendu-hors-modele INDEX.md :: dossier
+
+@@ lab lien-dossier-cycle
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle réel
+---
+
+@@ fichier-dehors sandbox-lien-dossier/phases/01-p/marqueur.txt
+présence, jamais lue
+
+@@ lien .planning/cycles/02-lien -> DEHORS/sandbox-lien-dossier
+
+@@ attendu cycles/01-c :: à cadrer
+@@ attendu-hors-modele cycles/02-lien :: lien
+
+@@ lab lien-fichier-plan
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle réel
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier-dehors sandbox-lien-fichier/cible.txt
+JETON-DEHORS-44
+
+@@ lien .planning/cycles/01-c/phases/01-p/PLAN.md -> DEHORS/sandbox-lien-fichier/cible.txt
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: fichier-non-regulier:PLAN.md
+@@ attendu-hors-modele-aucun
