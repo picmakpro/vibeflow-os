@@ -1069,3 +1069,39 @@ polarité de trancher au moment de la reprise.
 **Déclencheur de reprise :** la prochaine évolution qui touche `inject-mcp-tools.sh` ou
 `check-capability-activation.sh`, ou un incident où un mode `--verify` en dossier mixte a rendu un
 verdict trompeur.
+
+## Référencer recalc-planning.sh / modele-cycles.md depuis le SKILL.md de planning-core — reporté (2026-09-28)
+
+**Capturé :** 2026-09-28, correction ciblée lot 2 de la Phase 44 (`.planning/workstreams/gouvernance/phases/VFDO-44-…`). Décision : « décision du head sous délégation technique de Willy, session principale, 2026-09-28 », lot 2 L3.
+
+**Le point** : `plugin/planning-core/SKILL.md` ne référence encore ni `scripts/recalc-planning.sh`
+ni `references/modele-cycles.md` — le moteur de recalcul d'état par cycles livré en Phase 44 n'est
+donc découvrable par aucun skill.
+
+**Motif du report** : P44-D-01e — `SKILL.md` reste intentionnellement intact en Phase 44 ; la
+commande n'est câblée nulle part (aucun hook, aucune gate) avant les Phases 45/48. Câbler la
+référence avant le câblage réel produirait une doc qui pointe vers une commande sans appelant.
+
+**Déclencheur de reprise :** Phase 48 (ou la phase qui câble effectivement `recalc-planning.sh` à
+un déclencheur).
+
+## Pour Samuel — faux rouge local de `test-vibeflow-update.sh` sur `~/.claude/skills/synced/` réécrit par le runtime (constaté 2026-09-28)
+
+**Capturé :** 2026-09-28, correction ciblée lot 2 de la Phase 44. Origine : manager de mission
+`vf-dev-manager-g44`, mesures du 2026-09-28. Hors périmètre de cette correction (jamais touché :
+`plugin/dev-orchestrator/**`, l'installeur, ni sa suite).
+
+**Le défaut** : le garde-fou « `~/.claude` intact » de
+`plugin/_internal/tests/test-vibeflow-update.sh` compte `~/.claude/skills/synced/`, un dossier que
+le runtime Claude Code réécrit lui-même pendant l'exécution du test (`.last-complete-round`,
+`manifest.json`) — d'où un faux rouge **local**, sans lien avec l'installeur.
+
+**Mesures du manager (2026-09-28)** : sur HEAD `72eb408`, avant=1510/après=1509 sur une exécution,
+puis avant=1509/après=1510 sur la suivante (KO les deux fois, en sens inverse) ; sur un export
+figé de la base à `424cb23`, 1509=1509 (vert). L'écart a une seule source identifiée :
+`skills/synced/`, réécrit par le runtime à 07:22:28 pendant l'exécution du test.
+
+**Propriétaire à la relecture :** Samuel (polarité fiabilité de l'installeur).
+
+**Déclencheur de reprise :** la prochaine évolution qui touche `test-vibeflow-update.sh` ou son
+garde-fou d'intégrité de `~/.claude`, ou un incident où ce faux rouge a bloqué une CI/un push.

@@ -52,8 +52,8 @@ en 44-01 ; aucune commande `git` n'a été lancée par cette tâche dans l'un ou
 Les 10 cycles ressortent tous `indéterminé` avec la raison `CYCLE.md-absent` : ce lab, comme prévu
 par 44-CONTEXT.md § Specific Ideas, n'a ni `CYCLE.md`, ni `VERDICT.md`, ni `PLAN.md` avec le champ
 de périmètre `ecrit:` — la dérivation s'arrête à la racine de chaque cycle sans descendre dans ses
-phases, d'où `0` unité dérivée malgré une arborescence `.planning/` de plusieurs milliers de
-fichiers. La mesure dit ce que le moteur fait d'un planning ancien, pas ce qu'il ferait d'un lab
+phases, d'où `0` unité dérivée malgré une arborescence `.planning/` d'environ 2 000 (2 021
+mesurés le 2026-09-28) fichiers. La mesure dit ce que le moteur fait d'un planning ancien, pas ce qu'il ferait d'un lab
 au nouveau modèle — c'est son intérêt (comparaison à la spec, 9,7 à 12,4 s à 3 000 phases, à
 l'ordre de grandeur seulement : structurellement non comparable ici, aucune phase n'étant
 descendue).

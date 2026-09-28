@@ -43,8 +43,21 @@
   la main (G6, Phase 45) ; le socle métier existant de `planning-core` (`guard-planning-updated.sh`
   et sa mesure par `mtime`) n'est **pas retiré** — le remplacement est additif, les labs qui
   n'adhèrent pas restent sur l'existant.
+- **Correctifs de revue et d'audit (correction ciblée, lot 1 puis 2)** : consommation de
+  `os.scandir` ramenée entièrement dans son `try` (`_lister_entrees`) ; un lien symbolique (ou
+  tout emplacement non régulier au sens `lstat`) à la place d'`INDEX.md`, `STATE.md`,
+  `cloture.log` ou `.recalc-cache.json` refuse désormais toute l'écriture au lieu d'être remplacé
+  en silence ; fuite de descripteur comblée dans `ecrire_si_different` sur le chemin d'échec de
+  `fchmod` ; six marqueurs de `detection_gsd()` reçoivent leur premier mutant de couverture ; le
+  code 2 du détecteur GSD (signalement de migration) n'est plus assimilé au code 3 (terrain
+  libre) — il refuse désormais l'écriture comme un moteur GSD détecté ou une détection non
+  concluante ; assainissement structurel de tout champ recopié dans `cloture.log`
+  (`_jeton_journal`, pas seulement `tentative`) contre l'injection d'un faux enregistrement.
 
-Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27.
+Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27. Correctifs
+lot 1 : vf-coder, mandat de correction ciblée, 2026-09-28. Lot 2 (code 2 du détecteur,
+assainissement du journal) : décision du head sous délégation technique de Willy, session
+principale, 2026-09-28.
 
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
 

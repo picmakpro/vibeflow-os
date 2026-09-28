@@ -51,6 +51,24 @@ réels (D-06a du contexte).
 Un **planning GSD détecté** (ou une détection non concluante) est refusé en mode écriture, **même
 s'il déclare `cycles-v1`** : code de sortie **3** (P44-D-02a).
 
+**Codes du détecteur (`detect-gsd-engine.sh`) et leur traitement par `detection_gsd()`** — le
+détecteur rend 0/1/2/3/64, le recalcul les traduit en un verdict `gsd`/`non-gsd`/`non-concluante` :
+
+| Code détecteur | Sens | Verdict `detection_gsd()` | Écriture |
+|---|---|---|---|
+| 0 | moteur GSD actif | `gsd` | refusée |
+| 1, marqueur GSD trouvé (racine ou compartiment) | chaîne GSD absente de la machine, mais le disque porte un marqueur | `gsd` | refusée |
+| 1, aucun marqueur | chaîne GSD absente, aucun signal disque | `non-gsd` | autorisée |
+| **2** | **signalement de MIGRATION** (socle planning-core + signal de code, ex. `package.json`) | `non-concluante` | **refusée** — jamais assimilée au code 3 (audit B, lot 2 L1, décision du head sous délégation technique de Willy, session principale, 2026-09-28) |
+| 3 | aucun moteur en place, terrain libre | `non-gsd` | autorisée |
+| tout autre code (ex. 64, détecteur défaillant) | non concluant | `non-concluante` | refusée |
+
+Le code 2 a **longtemps** été traité comme le code 3 (même verdict `non-gsd`), laissant écrire sur
+un socle planning-core que le détecteur signalait pourtant lui-même « migration à examiner » — corrigé
+en lot 2 de la correction ciblée de la Phase 44. Ce qu'un lab métier qui contient DU CODE fait de ce
+refus (le détecteur rend 2, le moteur refuse l'écriture) reste une question ouverte, à cadrer en
+Phase 45 (voir ROADMAP.md § Phase 45).
+
 ## Arborescence
 
 ```
@@ -276,7 +294,10 @@ Un plan applique Φ0 et Φ1 puis R1 à R8.
   `à corriger`.
 - **R8** — constats tous `passé` : SUMMARY présent → `close` ; sinon `indéterminé`
   (`verdict-passe-sans-SUMMARY.md`).
-- **Défaut défensif** : `combinaison-non-prevue`.
+- **Défaut défensif** : `combinaison-non-prevue` — clause de garde-fou pour une évolution
+  future des règles R1-R8/Φ0-Φ5 ; R1-R8 tel que codé aujourd'hui épuise déjà toute combinaison
+  possible de plan/cloture/verdict/summary/constats, ce libellé n'est donc produit par AUCUN
+  chemin du code actuel (F6, 2026-09-28).
 
 ### Le cas « verdict passé sans SUMMARY.md »
 
@@ -365,6 +386,16 @@ l'auteur nommé par `statut:` pour une dérogation, `inconnu` sinon — **jamais
 ligne s'ajoute quand le couple verdict/tentative d'une unité **diffère** de sa dernière ligne
 journalisée ; une ré-entrée au même couple n'est **pas** re-journalisée (dédoublonnage).
 
+**Assainissement structurel de chaque champ** (`_jeton_journal`, lot 2 L2 de la correction ciblée
+de la Phase 44) : `chemin`, `auteur`, `verdict` et `tentative` sont chacun réduits à **un seul
+jeton** avant l'écriture — tout espace, tabulation ou retour à la ligne devient `_`, et tout `=`
+devient `_` aussi (aucune séquence `clé=` ne peut plus s'y former). Ces champs viennent de valeurs
+lues sans contrôle de SENS (P44-D-09 : `tentative:` par exemple est recopié tel quel depuis
+`VERDICT.md`, jamais interprété) — sans cet assainissement, une valeur piégée contenant
+`  verdict=… tentative=… date=observation` pouvait produire une ligne illisible par
+`LIGNE_JOURNAL_RE` ou faire lire plusieurs `verdict=`/`tentative=` sur une seule ligne. Toujours
+**aucun contrôle de sens** : la valeur assainie reste lue telle quelle, jamais validée.
+
 **`.recalc-cache.json`** : JSON, `cache_schema_version` = `1`, `moteur` = `"recalc-planning"`,
 signature sha256 du contenu des fichiers lus par unité. Absent, illisible, lien, ou d'un autre
 `cache_schema_version` → recalcul complet, **jamais** une confiance aveugle. Le cache est
@@ -444,7 +475,7 @@ Le JSON, lui, garde **toujours** le code brut dans `raison` : la forme lisible n
 ## La commande recalc-planning.sh
 
 ```
-recalc-planning.sh [--planning=<dossier>] [--read-only]
+recalc-planning.sh [--planning=<dossier>] [--read-only] [-h|--help]
 ```
 
 Posée dans `.claude/scripts/` par l'installeur. Codes de sortie : **0** succès, **1** erreur

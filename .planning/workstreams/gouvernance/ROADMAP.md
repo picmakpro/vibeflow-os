@@ -129,6 +129,9 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 44 (les gates lisent le modèle et les états dérivés).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5, §5.1, §5.2, D-05 (G7) ; `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §5, B-02 — **une mécanique, deux chantiers**.
+**À envisager au cadrage** : comment un lab métier qui contient du code adhère-t-il (le détecteur
+rend 2 et le moteur refuse l'écriture en 44) — origine : Phase 44, décision du head sous
+délégation technique de Willy, session principale, 2026-09-28.
 **Plans:** 0 plans
 
 Plans:
