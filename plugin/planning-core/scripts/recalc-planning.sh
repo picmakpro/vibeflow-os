@@ -288,80 +288,25 @@ def verifier_adhesion(planning):
     return resultat
 
 
-# --- Détection GSD (P44-D-02a, P44-D-01b, P44-D-01c) ----------------------------------------
-def _porte_marqueur_gsd(chemin_state):
-    statut, donnees = _lire_frontmatter_fichier(chemin_state)
-    return statut == "ok" and "gsd_state_version" in donnees
-
-
-def _porte_marqueur_partition(chemin_state):
-    statut, donnees = _lire_frontmatter_fichier(chemin_state)
-    return statut == "ok" and "workstream" in donnees and "created" in donnees
-
-
-def _porte_planning_version(chemin_state):
-    statut, donnees = _lire_frontmatter_fichier(chemin_state)
-    return statut == "ok" and "planning_version" in donnees
-
-
-# Reproduction PURE PYTHON de la priorité 3 de detect-gsd-engine.sh (has_code_signal), jamais un
-# sourcing ni une dépendance de code vers ce script (P44-D-01b, P44-D-01d) — seule la LISTE de
-# fichiers est reprise à l'identique. Nécessaire pour fermer le repli code 1 (audit, lot 3
-# constat 2) : quand la chaîne GSD est absente de la machine, le détecteur sort en priorité 1
-# AVANT d'avoir pu évaluer sa priorité 3, quel que soit le contenu réel du disque.
-_SIGNAUX_DE_CODE = (
-    "package.json", "go.mod", "Cargo.toml", "pyproject.toml", "pom.xml", "build.gradle",
-    "build.gradle.kts", "composer.json", "Gemfile", "tsconfig.json", "Package.swift",
-)
-
-
-def _a_signal_de_code(racine_lab):
-    for nom in _SIGNAUX_DE_CODE:
-        if est_fichier_regulier(os.path.join(racine_lab, nom)):
-            return True
-    try:
-        entrees = os.scandir(racine_lab)
-    except OSError:
-        return False
-    for entree in entrees:
-        if not entree.name.endswith(".xcodeproj"):
-            continue
-        try:
-            if entree.is_dir(follow_symlinks=False):
-                return True
-        except OSError:
-            continue
-    return False
-
-
-def _lister_compartiments(planning_abs):
-    """Énumère les sous-dossiers réels (jamais un lien, ni sur le dossier lui-même ni sur une
-    entrée) du sous-dossier `workstreams` du planning."""
-    dossier_compartiments = os.path.join(planning_abs, "workstreams")
-    try:
-        if not stat.S_ISDIR(os.lstat(dossier_compartiments).st_mode):
-            return []
-    except OSError:
-        return []
-    try:
-        entrees = sorted(os.scandir(dossier_compartiments), key=lambda e: e.name)
-    except OSError:
-        return []
-    resultat = []
-    for entree in entrees:
-        try:
-            reel = entree.is_dir(follow_symlinks=False)
-        except OSError:
-            reel = False
-        if reel:
-            resultat.append(entree.path)
-    return resultat
-
-
+# --- Détection GSD (P44-D-02a, P44-D-01b, P44-D-01c, P44-D-01d) — lot 4 ----------------------
+# SOURCE UNIQUE DE VÉRITÉ (correction de CLASSE, lot 4) : aucune règle du détecteur bash
+# (detect-gsd-engine.sh) n'est plus reproduite en Python. Trois copies mesurées divergentes au
+# lot 3 (lien symbolique sur package.json, lien symbolique sur *.xcodeproj, STATE.md aux octets
+# UTF-8 invalides après le frontmatter) fermaient chacune UN cas mais laissaient la classe ouverte
+# — la seule fermeture réelle est d'appeler le VRAI détecteur, dans un environnement MAÎTRISÉ où
+# sa priorité 1 (« chaîne GSD absente », le seul point qui dépend de GSD_HOME/CLAUDE_CONFIG_DIR/
+# HOME hérités) ne peut plus jamais court-circuiter ses priorités 2/2bis/3. GSD_HOME est fixé
+# explicitement au dossier du détecteur lui-même — un dossier qui EXISTE TOUJOURS quand ce script
+# tourne (il contient detect-gsd-engine.sh, déjà vérifié régulier juste avant) — plutôt que laissé
+# à la cascade par défaut du détecteur (projet-local > global > legacy > défaut), qui dépend de
+# variables héritées. Aucun sourcing, aucune dépendance de code vers detect-gsd-engine.sh
+# (P44-D-01b, P44-D-01d) : seul un sous-processus, sur son verdict de sortie seul.
 def detection_gsd(detect_sh, planning_abs, racine_lab):
     """« gsd », « non-gsd » ou « non-concluante ». Polarité inverse d'un DAG classique :
-    l'incertitude ferme l'écriture. Quand le détecteur rend 1 (chaîne GSD absente de la machine,
-    jamais inspecté le planning), le moteur vérifie lui-même sans dépendre du détecteur."""
+    l'incertitude ferme l'écriture. Fail-closed intégral (lot 4) : détecteur absent, en lien
+    symbolique, non régulier, illisible, interpréteur bash introuvable, échec de lancement, ou
+    tout code de sortie hors de {0, 2, 3} (dont un 1 improbable, la priorité 1 étant neutralisée
+    par l'environnement maîtrisé ci-dessous) -> `non-concluante`, jamais une écriture."""
     try:
         detecteur_regulier = stat.S_ISREG(os.lstat(detect_sh).st_mode)
     except OSError:
@@ -369,11 +314,21 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
     if not detecteur_regulier:
         print("[recalc-planning] détecteur non régulier : " + detect_sh, file=sys.stderr)
         return "non-concluante"  # motif-detecteur-irregulier
-    bash_bin = shutil.which("bash") or "bash"
+    bash_bin = shutil.which("bash")
+    if bash_bin is None:
+        print("[recalc-planning] interpréteur bash introuvable pour lancer le détecteur", file=sys.stderr)
+        return "non-concluante"  # motif-bash-introuvable
+    # Environnement MAÎTRISÉ : copie de l'environnement hérité (PATH, etc. — le détecteur et
+    # workstream-policy.sh en ont besoin pour leurs propres outils, awk/mktemp/git compris), avec
+    # UNE seule surcharge volontaire : GSD_HOME pointé sur le dossier du détecteur, qui existe
+    # toujours. Jamais `os.environ` nu passé au sous-processus (P44-D-01d, verdict indépendant de
+    # GSD_HOME/CLAUDE_CONFIG_DIR/HOME hérités).
+    env_maitrise = dict(os.environ)
+    env_maitrise["GSD_HOME"] = os.path.dirname(detect_sh)
     try:
         code = subprocess.run(
             [bash_bin, detect_sh, "--quiet", "--path", planning_abs],
-            cwd=racine_lab, timeout=30,
+            cwd=racine_lab, timeout=30, env=env_maitrise,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         ).returncode
     except Exception:
@@ -388,23 +343,13 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
         # de Willy, session principale, 2026-09-28 — lot 2, L1).
         return "non-concluante"  # motif-code-2-migration
     if code == 1:
-        if _porte_marqueur_gsd(os.path.join(planning_abs, "STATE.md")):
-            return "gsd"  # motif-marqueur-racine
-        compartiments = _lister_compartiments(planning_abs)
-        if any(_porte_marqueur_gsd(os.path.join(c, "STATE.md")) for c in compartiments):
-            return "gsd"  # motif-marqueur-compartiment
-        if any(_porte_marqueur_partition(os.path.join(c, "STATE.md")) for c in compartiments):
-            return "gsd"  # motif-partition-compartiment
-        # La chaîne GSD absente de la machine (GSD_HOME introuvable, environnement hérité ou
-        # forcé) fait sortir le détecteur en priorité 1, AVANT sa priorité 3 — le repli ci-dessus
-        # ne rejoue que les priorités 2/2bis. Sans ce contrôle, un environnement qui neutralise
-        # GSD_HOME contournait le refus « migration à examiner » (audit, lot 3 constat 2) : la
-        # combinaison socle planning-core + signal de code est donc reproduite ICI, en Python pur,
-        # indépendamment de toute valeur d'environnement — jamais un sourcing ni une dépendance de
-        # code vers detect-gsd-engine.sh (P44-D-01b, P44-D-01d).
-        if _porte_planning_version(os.path.join(planning_abs, "STATE.md")) and _a_signal_de_code(racine_lab):
-            return "non-concluante"  # motif-code-1-socle-et-signal
-        return "non-gsd"  # motif-code-1-sans-marqueur
+        # Sous environnement MAÎTRISÉ, la priorité 1 du détecteur (`[ ! -d "$GSD_HOME" ]`) ne
+        # devrait plus jamais matcher — GSD_HOME ci-dessus existe toujours. Un code 1 malgré tout
+        # (course, détecteur remplacé après le contrôle de régularité) ne dit RIEN sur le disque
+        # du lab : fail-closed, jamais une réimplémentation Python de ses priorités 2/2bis/3
+        # (P44-D-01b, P44-D-01d — c'est exactement cette réimplémentation, mesurée divergente au
+        # lot 3, que ce lot supprime).
+        return "non-concluante"  # motif-code-1-ferme
     return "non-concluante"  # motif-repli-generique
 
 
@@ -1241,19 +1186,28 @@ def lignes_a_journaliser(derivation, lignes_existantes):
     return a_ajouter
 
 
-_JOURNAL_ESPACE_RE = re.compile(r"\s+")
-
-
 def _jeton_journal(valeur, repli):
-    """Réduit une valeur arbitraire (P44-D-09 : lue, jamais validée — aucun contrôle de SENS) à
-    UN jeton structurellement sûr pour une ligne de `cloture.log` : espaces/tabulations/retours à
-    la ligne réduits à `_`, puis tout `=` neutralisé en `_` — aucune séquence `clé=` ne peut plus
-    s'y former. Assainissement STRUCTUREL de CHAQUE champ recopié dans le journal (chemin, auteur,
-    verdict, tentative — et tout champ futur qui passerait par `_formater_ligne_journal`), pas
-    seulement `tentative` : un champ mal formé ne peut plus se faire passer pour un second
-    enregistrement lisible par `LIGNE_JOURNAL_RE` (audit B, lot 2 L2)."""
+    """Encode une valeur arbitraire (P44-D-09 : lue, jamais validée — aucun contrôle de SENS) en
+    UN jeton structurellement sûr pour une ligne de `cloture.log`, par un échappement pourcent
+    INJECTIF (lot 4, correction de classe — remplace l'ancien assainissement par `_`, qui
+    écrasait `"3 4"` et `"3_4"` sur le même jeton et pouvait donc faire manquer une clôture
+    réellement nouvelle au dédoublonnage, P44-D-11) : tout caractère considéré comme un espace
+    par Python (`str.isspace()` — couvre U+2028 LIGNE SÉPARATRICE, U+0085 NEL et tout espace
+    Unicode, pas seulement l'ASCII), tout `=` (qui ouvrirait une séquence `clé=` lisible par
+    `LIGNE_JOURNAL_RE`), et le caractère d'échappement `%` lui-même, sont réécrits en `%XX` — deux
+    chiffres hexadécimaux majuscules par OCTET de son encodage UTF-8 (un caractère multi-octets
+    produit plusieurs `%XX` consécutifs, jamais un seul jeton non réversible). Le jeton résultant
+    ne contient donc plus jamais d'espace, de saut de ligne ni de `=` : deux valeurs distinctes
+    produisent TOUJOURS deux jetons distincts (réversible par simple décodage pourcent)."""
     brute = valeur if valeur not in (None, "") else repli
-    jeton = _JOURNAL_ESPACE_RE.sub("_", str(brute).strip()).replace("=", "_")
+    morceaux = []
+    for caractere in str(brute):
+        if caractere == "%" or caractere == "=" or caractere.isspace():
+            for octet in caractere.encode("utf-8"):
+                morceaux.append("%{:02X}".format(octet))
+        else:
+            morceaux.append(caractere)
+    jeton = "".join(morceaux)
     return jeton or repli
 
 
