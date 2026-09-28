@@ -82,15 +82,45 @@ que laissé à la cascade par défaut (qui dépend de `GSD_HOME`/`CLAUDE_CONFIG_
 Sous cet environnement, la priorité 1 du détecteur (`[ ! -d "$GSD_HOME" ]`) ne peut structurellement
 plus matcher : le code 1 devient improbable, et s'il survient quand même (course, détecteur
 remplacé après le contrôle de régularité), le moteur fait **fail-closed** — refus nommé, jamais une
-retombée en écriture. Propriété résultante : le verdict d'écriture est **indépendant** de
-`GSD_HOME`/`CLAUDE_CONFIG_DIR`/`HOME`/`PATH` hérités et du cwd, et correspond **toujours** à celui
-du vrai détecteur lancé avec un `GSD_HOME` valide (P44-D-01b, P44-D-01d — aucun sourcing, aucune
-dépendance de code vers `detect-gsd-engine.sh` : uniquement un sous-processus, sur son code de
-sortie seul). Détecteur absent, en lien symbolique, non régulier, illisible, ou dont le lancement
-échoue (interpréteur bash introuvable, exception, code hors de {0, 2, 3}) : refus fail-closed
-nommé, zéro fichier écrit ou modifié — jamais une retombée en écriture. Ce qu'un lab métier qui
-contient DU CODE fait de ce refus (le détecteur rend 2, le moteur refuse l'écriture) reste une
-question ouverte, à cadrer en Phase 45 (voir ROADMAP.md § Phase 45).
+retombée en écriture.
+
+**Correction de classe F1/F44-07 (lot 5)** : au lot 4, l'environnement « maîtrisé » ci-dessus était
+en réalité `dict(os.environ)` — une COPIE INTÉGRALE de l'environnement hérité, avec la seule
+SURCHARGE de `GSD_HOME`. Ça neutralisait bien la priorité 1 du détecteur, mais laissait les
+priorités 2/2bis/3 — qui appellent `awk`/`mktemp`/`wc`/`cat`/`basename` via le `PATH` — entièrement
+soumises au `PATH` hérité de l'appelant : un `awk` factice en tête de PATH (ou `BASH_ENV`, ou une
+fonction exportée `BASH_FUNC_awk%%`, ou `ENV`) faisait mentir `has_frontmatter_key` sur la présence
+du marqueur `gsd_state_version`, sans jamais toucher au détecteur lui-même. Mesuré : sur un lab GSD
+réel (`STATE.md` portant `gsd_state_version`), un simple `awk` factice en tête de PATH suffisait à
+faire écrire (exit 0) le moteur et à **effacer le marqueur GSD**. L'environnement du sous-processus
+détecteur est désormais construit DE ZÉRO (liste blanche) : un `PATH` fixe de dossiers système
+(`/usr/bin:/bin:/usr/sbin:/sbin`) et `GSD_HOME` seul — aucune autre variable héritée (ni
+`BASH_ENV`, ni `ENV`, ni une fonction exportée, ni `SHELLOPTS`/`BASHOPTS`/`CDPATH`/`TMPDIR`/`HOME`/
+`GSD_WORKSTREAM`). De même, `bash` n'est plus résolu par `shutil.which("bash")` sur ce même `PATH`
+hérité (un `bash` factice en tête de PATH aurait rendu le sous-processus entier contrôlé par
+l'attaquant) mais par une liste FIXE de deux chemins absolus (`/bin/bash`, puis `/usr/bin/bash`),
+chacun validé par `lstat` (fichier régulier direct, ou lien symbolique dont la cible résolue est un
+fichier régulier appartenant à root) — aucun candidat valide : refus fail-closed nommé, jamais un
+repli sur le `PATH`. Propriété résultante, désormais réellement vraie et prouvée (`R-MATRICE-ENV`,
+`MUT-ENV-OS-ENVIRON`, `MUT-BASH-VIA-PATH`) : le verdict d'écriture est **indépendant** du `PATH`
+hérité, de `BASH_ENV`/`ENV`/des fonctions exportées, de `GSD_HOME`/`CLAUDE_CONFIG_DIR`/`HOME`
+hérités et du cwd, et correspond **toujours** à celui du vrai détecteur lancé dans cet environnement
+fixe (P44-D-01b, P44-D-01d — aucun sourcing, aucune dépendance de code vers
+`detect-gsd-engine.sh` : uniquement un sous-processus, sur son code de sortie seul). Ce que ce
+verdict NE garantit PAS : le wrapper `recalc-planning.sh` lui-même (son propre `bash`, son propre
+`python3`) reste résolu par l'appelant — il n'entre pas dans le domaine maîtrisé, qui ne couvre que
+le sous-processus détecteur.
+
+Détecteur absent (message distinct depuis lot 5 — `détecteur absent`, jamais confondu avec
+`détecteur non régulier`), en lien symbolique, non régulier, illisible, ou dont le lancement échoue
+(aucun candidat bash valide, exception, code hors de {0, 2, 3}) : refus fail-closed nommé, zéro
+fichier écrit ou modifié — jamais une retombée en écriture. Un code 3 avec une sortie stderr
+inattendue N'EST PAS traité comme non concluant (point envisagé et non retenu, lot 5) : mesuré, un
+`.planning/workstreams/` présent mais VIDE fait légitimement écrire deux lignes sur stderr
+(`vf_ws_enumerate`, priorité 2bis) tout en rendant le code 3 racine correct — gater dessus aurait
+refusé l'écriture sur ce cas nominal. Ce qu'un lab métier qui contient DU CODE fait de ce refus (le
+détecteur rend 2, le moteur refuse l'écriture) reste une question ouverte, à cadrer en Phase 45
+(voir ROADMAP.md § Phase 45).
 
 ## Arborescence
 
@@ -413,17 +443,23 @@ journalisée ; une ré-entrée au même couple n'est **pas** re-journalisée (d�
 ciblée de la Phase 44 — remplace l'assainissement par `_` du lot 2 L2) : `chemin`, `auteur`,
 `verdict` et `tentative` sont chacun encodés en **pourcent** avant l'écriture — tout caractère
 considéré comme un espace par Python (`str.isspace()`, qui couvre U+2028 LIGNE SÉPARATRICE, U+0085
-NEL et tout espace Unicode, pas seulement l'ASCII), tout `=` (qui ouvrirait une séquence `clé=`
-lisible par `LIGNE_JOURNAL_RE`) et le caractère d'échappement `%` lui-même deviennent `%XX` — deux
-chiffres hexadécimaux majuscules par OCTET de l'encodage UTF-8 du caractère. Ces champs viennent de
-valeurs lues sans contrôle de SENS (P44-D-09 : `tentative:` par exemple est recopié tel quel depuis
-`VERDICT.md`, jamais interprété). L'ancien assainissement par `_` n'était **pas injectif** : `"3 4"`
-et `"3_4"` s'écrasaient sur le même jeton `"3_4"`, ce qui pouvait faire **manquer** au
-dédoublonnage une clôture réellement nouvelle (deux valeurs distinctes du même champ, au même
-chemin, confondues) — violation de P44-D-11 (préserver toute clôture réellement nouvelle),
-mesurée par une preuve générative (2000 paires aléatoires, zéro collision) et un round-trip réel à
-deux exécutions successives (`test-recalc-planning.sh`, R-INJECTIF-GENERATIF/R-INJECTIF-ROUNDTRIP).
-Toujours **aucun contrôle de sens** : la valeur assainie reste lue telle quelle, jamais validée.
+NEL et tout espace Unicode, pas seulement l'ASCII), tout caractère NON IMPRIMABLE (`not
+str.isprintable()`, alphabet étendu F44-05/F7, lot 5 — couvre NUL et les contrôles C0/C1 qui
+restaient laissés bruts jusque-là, en plus des séparateurs Unicode déjà couverts par `isspace()`),
+tout `=` (qui ouvrirait une séquence `clé=` lisible par `LIGNE_JOURNAL_RE`) et le caractère
+d'échappement `%` lui-même deviennent `%XX` — deux chiffres hexadécimaux majuscules par OCTET de
+l'encodage UTF-8 du caractère. Ces champs viennent de valeurs lues sans contrôle de SENS (P44-D-09 :
+`tentative:` par exemple est recopié tel quel depuis `VERDICT.md`, jamais interprété). L'ancien
+assainissement par `_` n'était **pas injectif** : `"3 4"` et `"3_4"` s'écrasaient sur le même jeton
+`"3_4"`, ce qui pouvait faire **manquer** au dédoublonnage une clôture réellement nouvelle (deux
+valeurs distinctes du même champ, au même chemin, confondues) — violation de P44-D-11 (préserver
+toute clôture réellement nouvelle), mesurée par une preuve générative (2000 paires aléatoires, zéro
+collision) et un round-trip réel à deux exécutions successives (`test-recalc-planning.sh`,
+R-INJECTIF-GENERATIF/R-INJECTIF-ROUNDTRIP). Toujours **aucun contrôle de sens** : la valeur
+assainie reste lue telle quelle, jamais validée. Un jeton ne peut **jamais** rester vide (F5, lot
+5) : le paramètre de repli (toujours un littéral non vide chez tous les appelants) est un contrat
+interne vérifié par une erreur bruyante (`ValueError`) plutôt qu'une ligne de journal illisible
+produite en silence.
 
 **`.recalc-cache.json`** : JSON, `cache_schema_version` = `1`, `moteur` = `"recalc-planning"`,
 signature sha256 du contenu des fichiers lus par unité. Absent, illisible, lien, ou d'un autre

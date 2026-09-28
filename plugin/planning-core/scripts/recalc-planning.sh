@@ -70,7 +70,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import stat
 import subprocess
 import sys
@@ -82,6 +81,20 @@ from datetime import datetime
 SCHEMA_ADHESION = "cycles-v1"
 CACHE_SCHEMA_VERSION = 1
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
+# Candidats bash FIXES pour lancer le détecteur (F1/F44-07, correction de classe) : jamais
+# `shutil.which("bash")` sur le PATH hérité — un PATH détourné (un faux `bash` en tête) rendrait
+# le sous-processus lui-même contrôlé par l'attaquant, avant même que l'environnement maîtrisé
+# n'entre en jeu. Deux chemins absolus, dans cet ordre ; voir `_resoudre_bash` pour la garde.
+CANDIDATS_BASH = ("/bin/bash", "/usr/bin/bash")
+# Environnement MAÎTRISÉ du sous-processus détecteur (F1/F44-07) : liste blanche construite DE
+# ZÉRO, jamais `dict(os.environ)`. PATH fixe de dossiers système, aucune autre variable héritée
+# (ni `BASH_ENV`, ni `ENV`, ni une fonction exportée `BASH_FUNC_*%%`, ni `SHELLOPTS`/`BASHOPTS`/
+# `CDPATH`/`TMPDIR`/`HOME`/`GSD_WORKSTREAM`). `LC_ALL`/`LANG` volontairement ABSENTS : vérifié
+# vert (R-LABS-ADVERSES, STATE.md aux octets UTF-8 invalides) sous cet environnement strictement
+# réduit à PATH+GSD_HOME — awk ne lit que le frontmatter, borné par la clé recherchée, jamais le
+# corps du fichier, la locale n'y change donc rien de mesurable ; les ajouter sans besoin mesuré
+# serait une variable de plus à justifier.
+PATH_MAITRISE = "/usr/bin:/bin:/usr/sbin:/sbin"
 NOM_UNITE = re.compile(r"^[0-9]{2,}-[\w.-]+$")
 ANNEXES = frozenset({"_bancs", "recherches", "intel", "sketches", "_archive", "registres"})
 NOMS_MODELE_PHASE = ("CADRAGE.md", "PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md", "DEROGATION.md")
@@ -288,6 +301,47 @@ def verifier_adhesion(planning):
     return resultat
 
 
+# --- Résolution de bash pour le sous-processus détecteur (F1/F44-07, correction de classe) ----
+def _bash_candidat_valide(chemin):
+    """Un candidat de CANDIDATS_BASH est valide s'il est, au sens `lstat` (jamais un suivi de
+    lien implicite) : un fichier régulier DIRECT, ou un lien symbolique dont la cible RÉSOLUE
+    (`os.path.realpath`) est un fichier régulier appartenant à root (uid 0). Règle la plus
+    stricte qui reste vraie sur macOS et Linux courants (où `/bin` peut lui-même être un lien vers
+    `/usr/bin` sur un système à `/usr` fusionné — la résolution du RÉPERTOIRE parent par le noyau
+    laisse alors `lstat` du composant final `bash` voir directement le fichier régulier, sans
+    jamais passer par la branche lien symbolique ci-dessous) : le cas direct (candidat lui-même un
+    fichier régulier) n'exige donc PAS de vérification de propriétaire séparée — s'il était
+    substituable par un non-root, le système serait déjà compromis à un niveau que cette garde ne
+    peut pas traiter. La branche lien symbolique existe pour l'indirection explicite seulement."""
+    try:
+        info = os.lstat(chemin)
+    except OSError:
+        return False
+    if stat.S_ISREG(info.st_mode):
+        return True
+    if stat.S_ISLNK(info.st_mode):
+        cible = os.path.realpath(chemin)
+        try:
+            info_cible = os.stat(cible)
+        except OSError:
+            return False
+        return stat.S_ISREG(info_cible.st_mode) and info_cible.st_uid == 0
+    return False
+
+
+def _resoudre_bash():
+    """Premier candidat VALIDE de CANDIDATS_BASH (chemins absolus fixes) ; None si aucun ne l'est
+    — fail-closed nommé. Jamais `shutil.which("bash")` : sur un PATH détourné (un faux `bash` en
+    tête), c'est le SOUS-PROCESSUS lui-même qui serait alors sous contrôle de l'attaquant, avant
+    même que l'environnement maîtrisé de `detection_gsd` n'entre en jeu (F1/F44-07, mesuré : un
+    faux `awk` en tête de PATH suffisait à faire disparaître le marqueur `gsd_state_version` d'un
+    lab GSD, le PATH hérité entier étant jusqu'ici copié dans l'environnement du sous-processus)."""
+    for candidat in CANDIDATS_BASH:
+        if _bash_candidat_valide(candidat):
+            return candidat
+    return None
+
+
 # --- Détection GSD (P44-D-02a, P44-D-01b, P44-D-01c, P44-D-01d) — lot 4 ----------------------
 # SOURCE UNIQUE DE VÉRITÉ (correction de CLASSE, lot 4) : aucune règle du détecteur bash
 # (detect-gsd-engine.sh) n'est plus reproduite en Python. Trois copies mesurées divergentes au
@@ -301,41 +355,74 @@ def verifier_adhesion(planning):
 # à la cascade par défaut du détecteur (projet-local > global > legacy > défaut), qui dépend de
 # variables héritées. Aucun sourcing, aucune dépendance de code vers detect-gsd-engine.sh
 # (P44-D-01b, P44-D-01d) : seul un sous-processus, sur son verdict de sortie seul.
+#
+# F1/F44-07 (correction de classe, 2026-09-28) : l'environnement maîtrisé ci-dessous était en fait
+# `dict(os.environ)` — une COPIE INTÉGRALE du PATH (et de tout le reste) hérité, avec la seule
+# SURCHARGE de GSD_HOME. Ça neutralisait bien la priorité 1 (GSD_HOME toujours présent), mais
+# laissait les priorités 2/2bis/3 du détecteur, qui appellent `awk`/`mktemp`/`wc`/`cat`/`basename`
+# via le PATH, entièrement soumises à ce PATH : un `awk` factice en tête (ou `BASH_ENV`, ou une
+# fonction exportée `BASH_FUNC_awk%%`, ou `ENV`) fait mentir `has_frontmatter_key` sur la présence
+# du marqueur `gsd_state_version`, sans jamais toucher au détecteur lui-même. Mesuré : le moteur
+# écrivait (exit 0) sur un lab GSD réel et effaçait son marqueur. L'environnement est désormais
+# construit DE ZÉRO (liste blanche) : PATH fixe de dossiers système, GSD_HOME seul — rien d'autre.
 def detection_gsd(detect_sh, planning_abs, racine_lab):
     """« gsd », « non-gsd » ou « non-concluante ». Polarité inverse d'un DAG classique :
-    l'incertitude ferme l'écriture. Fail-closed intégral (lot 4) : détecteur absent, en lien
-    symbolique, non régulier, illisible, interpréteur bash introuvable, échec de lancement, ou
-    tout code de sortie hors de {0, 2, 3} (dont un 1 improbable, la priorité 1 étant neutralisée
-    par l'environnement maîtrisé ci-dessous) -> `non-concluante`, jamais une écriture."""
+    l'incertitude ferme l'écriture. Fail-closed intégral (lot 4, durci F1/F44-07) : détecteur
+    absent, en lien symbolique, non régulier, illisible, aucun candidat bash valide, échec de
+    lancement, ou tout code de sortie hors de {0, 2, 3} (dont un 1 improbable, la priorité 1 étant
+    neutralisée par l'environnement maîtrisé ci-dessous) -> `non-concluante`, jamais une écriture.
+    Point envisagé et NON retenu (F1) : gater le code 3 sur une sortie stderr non vide — mesuré,
+    un dossier de compartiments présent mais VIDE fait légitimement écrire deux lignes sur stderr
+    (`vf_ws_enumerate`) tout en rendant le code 3 racine correct ; gater dessus aurait refusé
+    l'écriture sur ce cas nominal (prose documentaire, aucun chemin résolu par ce fichier —
+    vf-allow-unregistered-planning-path)."""
+    # F6 (revue) : « absent » (rien à cet emplacement) et « non régulier » (un dossier, un lien,
+    # une FIFO...) partageaient jusqu'ici le même message stderr — deux causes distinctes,
+    # confondues sous un même diagnostic. Deux motifs, deux messages désormais.
     try:
-        detecteur_regulier = stat.S_ISREG(os.lstat(detect_sh).st_mode)
+        info_detecteur = os.lstat(detect_sh)
     except OSError:
-        detecteur_regulier = False
-    if not detecteur_regulier:
+        print("[recalc-planning] détecteur absent : " + detect_sh, file=sys.stderr)
+        return "non-concluante"  # motif-detecteur-absent
+    if not stat.S_ISREG(info_detecteur.st_mode):
         print("[recalc-planning] détecteur non régulier : " + detect_sh, file=sys.stderr)
         return "non-concluante"  # motif-detecteur-irregulier
-    bash_bin = shutil.which("bash")
+    bash_bin = _resoudre_bash()
     if bash_bin is None:
-        print("[recalc-planning] interpréteur bash introuvable pour lancer le détecteur", file=sys.stderr)
+        print(
+            "[recalc-planning] interpréteur bash introuvable pour lancer le détecteur "
+            "(candidats fixes épuisés : " + ", ".join(CANDIDATS_BASH) + ")",
+            file=sys.stderr,
+        )
         return "non-concluante"  # motif-bash-introuvable
-    # Environnement MAÎTRISÉ : copie de l'environnement hérité (PATH, etc. — le détecteur et
-    # workstream-policy.sh en ont besoin pour leurs propres outils, awk/mktemp/git compris), avec
-    # UNE seule surcharge volontaire : GSD_HOME pointé sur le dossier du détecteur, qui existe
-    # toujours. Jamais `os.environ` nu passé au sous-processus (P44-D-01d, verdict indépendant de
-    # GSD_HOME/CLAUDE_CONFIG_DIR/HOME hérités).
-    env_maitrise = dict(os.environ)
+    # Environnement MAÎTRISÉ construit DE ZÉRO (liste blanche, F1/F44-07) : PATH fixe de dossiers
+    # système, GSD_HOME pointé sur le dossier du détecteur (existe toujours). AUCUNE autre
+    # variable héritée : ni BASH_ENV, ni ENV, ni une fonction exportée BASH_FUNC_*%%, ni
+    # SHELLOPTS/BASHOPTS/CDPATH/TMPDIR/HOME/GSD_WORKSTREAM. Jamais `os.environ` nu ni une copie
+    # partielle passée au sous-processus (P44-D-01d, verdict indépendant de tout héritage).
+    env_maitrise = {"PATH": PATH_MAITRISE}
     env_maitrise["GSD_HOME"] = os.path.dirname(detect_sh)
     try:
-        code = subprocess.run(
-            [bash_bin, detect_sh, "--quiet", "--path", planning_abs],
+        resultat = subprocess.run(
+            [bash_bin, "--noprofile", "--norc", detect_sh, "--quiet", "--path", planning_abs],
             cwd=racine_lab, timeout=30, env=env_maitrise,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        ).returncode
+        )
     except Exception:
         return "non-concluante"  # motif-sous-processus-en-echec
+    code = resultat.returncode
     if code == 0:
         return "gsd"  # motif-code-0
     if code == 3:
+        # Point NON retenu (F1, sous-clause stderr ; prose documentaire, aucun chemin résolu ici —
+        # vf-allow-unregistered-planning-path) : un code 3 « --quiet » n'est PAS toujours
+        # silencieux en nominal — mesuré sur le banc (`hors-modele-racine`, dossier de
+        # compartiments présent mais VIDE) : `vf_ws_enumerate` (priorité 2bis de
+        # detect-gsd-engine.sh) écrit alors deux lignes sur stderr (« présent mais vide après
+        # filtrage », « priorité 2bis
+        # SAUTÉE ») tout en rendant légitimement le code 3 racine. Gater sur « stderr non vide »
+        # aurait donc refusé l'écriture sur ce cas nominal — stderr_nominal consigné dans le
+        # rapport de mission, jamais implémenté comme gate ici.
         return "non-gsd"  # motif-code-3-terrain-libre
     if code == 2:
         # Signalement de MIGRATION (socle planning-core + signal de code) : refus d'écriture,
@@ -1191,24 +1278,42 @@ def _jeton_journal(valeur, repli):
     UN jeton structurellement sûr pour une ligne de `cloture.log`, par un échappement pourcent
     INJECTIF (lot 4, correction de classe — remplace l'ancien assainissement par `_`, qui
     écrasait `"3 4"` et `"3_4"` sur le même jeton et pouvait donc faire manquer une clôture
-    réellement nouvelle au dédoublonnage, P44-D-11) : tout caractère considéré comme un espace
-    par Python (`str.isspace()` — couvre U+2028 LIGNE SÉPARATRICE, U+0085 NEL et tout espace
-    Unicode, pas seulement l'ASCII), tout `=` (qui ouvrirait une séquence `clé=` lisible par
-    `LIGNE_JOURNAL_RE`), et le caractère d'échappement `%` lui-même, sont réécrits en `%XX` — deux
-    chiffres hexadécimaux majuscules par OCTET de son encodage UTF-8 (un caractère multi-octets
-    produit plusieurs `%XX` consécutifs, jamais un seul jeton non réversible). Le jeton résultant
-    ne contient donc plus jamais d'espace, de saut de ligne ni de `=` : deux valeurs distinctes
-    produisent TOUJOURS deux jetons distincts (réversible par simple décodage pourcent)."""
+    réellement nouvelle au dédoublonnage, P44-D-11 ; alphabet étendu F44-05/F7 : tout caractère
+    NON IMPRIMABLE — `not str.isprintable()`, qui couvre NUL et les contrôles C0/C1, en plus des
+    séparateurs Unicode déjà couverts par `isspace()` — était encore laissé passer BRUT, ce qui
+    aurait permis d'injecter un octet de contrôle littéral dans `cloture.log`) : tout caractère
+    considéré comme un espace par Python (`str.isspace()` — couvre U+2028 LIGNE SÉPARATRICE,
+    U+0085 NEL et tout espace Unicode, pas seulement l'ASCII), tout caractère NON IMPRIMABLE
+    (`not str.isprintable()` — NUL, contrôles C0/C1, séparateurs Unicode restants), tout `=` (qui
+    ouvrirait une séquence `clé=` lisible par `LIGNE_JOURNAL_RE`), et le caractère d'échappement
+    `%` lui-même, sont réécrits en `%XX` — deux chiffres hexadécimaux majuscules par OCTET de son
+    encodage UTF-8 (un caractère multi-octets produit plusieurs `%XX` consécutifs, jamais un seul
+    jeton non réversible). Le jeton résultant ne contient donc plus jamais d'espace, de saut de
+    ligne, de `=`, ni d'octet de contrôle brut : deux valeurs distinctes produisent TOUJOURS deux
+    jetons distincts (réversible par simple décodage pourcent).
+
+    F5 (correction ciblée) : `return jeton or repli` laissait un jeton vide filer si `repli`
+    lui-même était vide (repli vide -> `jeton or repli` retombe sur `""`), produisant une ligne
+    que `LIGNE_JOURNAL_RE` (`\\S+` sur chaque champ) ne relirait plus jamais — une corruption
+    SILENCIEUSE du journal. `repli` est un contrat interne, toujours un littéral non vide chez
+    tous les appelants actuels (`"-"`, `"inconnu"`) : une erreur BRUYANTE immédiate (jamais une
+    ligne illisible produite en silence) si ce contrat est un jour rompu. Une fois `repli` garanti
+    non vide, `brute` (str) contient au moins un caractère, et chaque caractère produit au moins
+    un caractère de sortie (lui-même, ou au moins un `%XX`) : `jeton` est donc TOUJOURS non vide,
+    sans repli de dernier recours nécessaire."""
+    if not repli:
+        raise ValueError("_jeton_journal : 'repli' doit toujours être non vide (contrat interne)")
     brute = valeur if valeur not in (None, "") else repli
     morceaux = []
     for caractere in str(brute):
-        if caractere == "%" or caractere == "=" or caractere.isspace():
+        if caractere == "%" or caractere == "=" or caractere.isspace() or not caractere.isprintable():
             for octet in caractere.encode("utf-8"):
                 morceaux.append("%{:02X}".format(octet))
         else:
             morceaux.append(caractere)
     jeton = "".join(morceaux)
-    return jeton or repli
+    assert jeton, "_jeton_journal : jeton vide malgré un repli non vide (invariant violé)"
+    return jeton
 
 
 def _formater_ligne_journal(horodatage, unite):
@@ -1321,12 +1426,16 @@ def ecrire_si_different(chemin, contenu):
     même dossier + os.replace (jamais un save() non atomique). Un emplacement existant qui n'est
     PAS un fichier régulier (lien symbolique compris — 44-04, R56) n'est jamais comparé à travers
     lui : il compte comme différent, et `os.replace` le remplace par un fichier régulier — jamais
-    une écriture qui traverserait un lien en silence."""
+    une écriture qui traverserait un lien en silence. F44-06 (correction ciblée) : la lecture de
+    l'existant se faisait par `open()` nu, seul site des lectures du modèle sans `O_NOFOLLOW` —
+    alignée ici sur le patron du reste du fichier (`os.open(..., O_RDONLY | O_NOFOLLOW)`, ELOOP
+    comptant comme un échec de lecture, comme `_lire_frontmatter_fichier`)."""
     octets = contenu.encode("utf-8")
     existant = None
     if est_fichier_regulier(chemin):
         try:
-            with open(chemin, "rb") as fh:
+            descripteur_existant = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+            with os.fdopen(descripteur_existant, "rb") as fh:
                 existant = fh.read()
         except OSError:
             existant = None

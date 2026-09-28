@@ -64,8 +64,9 @@
   (marqueurs GSD), laissant écrire sur un planning que l'environnement normal aurait refusé ; la
   combinaison socle+signal est désormais reproduite en Python pur, indépendamment de toute valeur
   d'environnement (aucune dépendance de code vers `detect-gsd-engine.sh`, P44-D-01b/P44-D-01d).
-  Accessoirement : le sous-processus du détecteur résout `bash` par un chemin absolu
-  (`shutil.which`) plutôt que par le `PATH` hérité.
+  Accessoirement : le sous-processus du détecteur résout `bash` par `shutil.which` — **corrigé au
+  lot 5** : `shutil.which` résout toujours sur le `PATH` hérité de l'appelant, pas indépendamment
+  de lui ; voir l'entrée lot 5 ci-dessous.
 - **Lot 4 (correction de CLASSE)** : la réimplémentation Python des priorités 2/2bis/3 du
   détecteur, ajoutée au lot 3 pour fermer le repli du code 1, a elle-même divergé mesurément de
   l'original sur trois cas (revue + audit) : un `package.json` en lien symbolique (bash `[ -f ]`
@@ -83,12 +84,32 @@
   4"` et `"3_4"` s'écrasaient sur le même jeton, pouvant faire manquer une clôture réellement
   nouvelle au dédoublonnage) à un encodage pourcent INJECTIF (preuve générative 2000 paires,
   round-trip réel à deux exécutions).
+- **Lot 5 (F1/F44-07, correction de CLASSE — audit + revue)** : l'environnement « maîtrisé » du
+  lot 4 était en réalité `dict(os.environ)` avec la seule surcharge de `GSD_HOME` — une COPIE
+  INTÉGRALE du `PATH` hérité, qui laissait les priorités 2/2bis/3 du détecteur (`awk`/`mktemp`/
+  `wc`/`cat`/`basename`) entièrement soumises à ce `PATH`. Mesuré : un `awk` factice en tête de
+  PATH suffisait à faire écrire (exit 0) le moteur sur un lab GSD réel et à **effacer le marqueur**
+  `gsd_state_version`. L'environnement du sous-processus détecteur est désormais construit DE ZÉRO
+  (liste blanche PATH fixe + GSD_HOME, aucune autre variable héritée — ni `BASH_ENV`, ni `ENV`, ni
+  une fonction exportée `BASH_FUNC_*%%`) ; `bash` n'est plus résolu par `shutil.which` sur ce même
+  PATH mais par une liste fixe de deux chemins absolus (`/bin/bash`, `/usr/bin/bash`), chacun
+  validé par `lstat` — aucun candidat valide : refus fail-closed nommé. Prouvé par cinq nouvelles
+  colonnes de `R-MATRICE-ENV` (PATH empoisonné par un faux `awk`/`bash`, `BASH_ENV`, fonction
+  exportée, `ENV`) et deux mutants dédiés (`MUT-ENV-OS-ENVIRON`, `MUT-BASH-VIA-PATH`) tués sur le
+  scénario même qui a établi la trace rouge d'origine. Correctifs voisins de la même correction
+  ciblée : `_jeton_journal` échappe désormais aussi tout caractère non imprimable (NUL, contrôles
+  C0/C1), jamais laissé brut ; un jeton vide (repli vide) est une `ValueError` bruyante, jamais une
+  ligne de journal illisible écrite en silence ; « détecteur absent » et « détecteur non régulier »
+  portent deux messages stderr distincts ; `ecrire_si_different` lit l'existant par `O_NOFOLLOW`
+  (alignée sur le reste des lectures du modèle) au lieu d'un `open()` nu.
 
 Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27. Correctifs
 lot 1 : vf-coder, mandat de correction ciblée, 2026-09-28. Lot 2 (code 2 du détecteur,
-assainissement du journal), lot 3 (dédoublonnage assaini, repli code 1 sur socle+signal) et lot 4
-(source unique de vérité pour la détection GSD, encodage injectif du journal) : décision du head
-sous délégation technique de Willy, session principale, 2026-09-28.
+assainissement du journal), lot 3 (dédoublonnage assaini, repli code 1 sur socle+signal), lot 4
+(source unique de vérité pour la détection GSD, encodage injectif du journal) et lot 5
+(environnement maîtrisé du sous-processus détecteur construit de zéro, alphabet du journal étendu
+aux contrôles C0/C1) : décision du head sous délégation technique de Willy, session principale,
+2026-09-28.
 
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
 

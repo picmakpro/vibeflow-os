@@ -1572,7 +1572,10 @@ if make_recalc_mutant GSD 'return "gsd"  # motif-code-0' 'return "non-gsd"  # MU
 fi
 
 # ---------- MUT-GSD-FERME — repli « détecteur absent » changé en non-gsd -------------------------
-if make_recalc_mutant GSD-FERME 'return "non-concluante"  # motif-detecteur-irregulier' 'return "non-gsd"  # MUT-GSD-FERME'; then
+# Motif « motif-detecteur-absent » (F6, revue) : « absent » et « non régulier » (motif voisin,
+# couvert par MUT-GSD-IRREGULIER ci-dessous) partageaient jusqu'ici le même message ET la même
+# ligne de retour — désormais deux branches, deux marqueurs distincts.
+if make_recalc_mutant GSD-FERME 'return "non-concluante"  # motif-detecteur-absent' 'return "non-gsd"  # MUT-GSD-FERME'; then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-gsd-ferme-cas"; SCRIPTS_CAS="$WORK/mut-gsd-ferme-scripts"
   materialiser traceur "$DIR_CAS"
@@ -2520,49 +2523,90 @@ fi
 # attente) — les deux marqueurs qui le remplacent sont couverts en fin de bloc (lot 2).
 # ================================================================================================
 
+# ---------- recalc_forcer_candidats_bash — substitution de SCÉNARIO (pas un mutant sémantique) ---
+# F1/F44-07 (lot 5) : bash est désormais résolu par CANDIDATS_BASH (chemins absolus fixes), jamais
+# par le PATH hérité — restreindre PATH (ancienne technique MUT-BASH-INTROUVABLE/MUT-SOUS-PROCESSUS
+# ci-dessous) ne force plus la branche « aucun candidat valide », puisque `/bin/bash` reste résolu
+# quel que soit PATH. Cette fonction substitue la liste CANDIDATS_BASH elle-même dans une copie
+# déjà produite (même technique de substitution awk par motif fixe unique que make_recalc_mutant),
+# pour forcer le scénario SANS jamais toucher au `/bin` ou `/usr/bin` réels du poste.
+recalc_forcer_candidats_bash() { # <fichier_recalc> <nouvelle_expression_python_du_tuple>
+  local fichier="$1" nouveaux="$2"
+  local motif='CANDIDATS_BASH = ("/bin/bash", "/usr/bin/bash")'
+  local n tmp
+  n="$(grep -Fc -- "$motif" "$fichier")"
+  if [ "$n" -ne 1 ]; then
+    echo "recalc_forcer_candidats_bash: motif CANDIDATS_BASH absent ou ambigu (n=$n)" >&2
+    return 1
+  fi
+  tmp="$fichier.candidats"
+  RFCB_MOTIF_ENV="$motif" RFCB_REPL_ENV="CANDIDATS_BASH = $nouveaux" awk '
+    index($0, ENVIRON["RFCB_MOTIF_ENV"]) {
+      match($0, /^[ \t]*/)
+      print substr($0, RSTART, RLENGTH) ENVIRON["RFCB_REPL_ENV"]
+      next
+    }
+    { print }
+  ' "$fichier" > "$tmp"
+  if cmp -s "$tmp" "$fichier"; then
+    echo "recalc_forcer_candidats_bash: substitution sans effet" >&2
+    rm -f "$tmp"
+    return 1
+  fi
+  if ! bash -n "$tmp" 2>/dev/null; then
+    echo "recalc_forcer_candidats_bash: fichier résultant syntaxiquement invalide (bash -n)" >&2
+    rm -f "$tmp"
+    return 1
+  fi
+  mv "$tmp" "$fichier"
+  chmod +x "$fichier"
+  return 0
+}
+
 # ---------- MUT-BASH-INTROUVABLE — repli « bash introuvable » changé en non-gsd ------------------
+# CANDIDATS_BASH forcé vers deux chemins qui n'existent nulle part sous $WORK : aucun candidat
+# valide, quel que soit le PATH hérité — c'est désormais la SEULE façon d'atteindre cette branche.
 if make_recalc_mutant BASH-INTROUVABLE 'return "non-concluante"  # motif-bash-introuvable' 'return "non-gsd"  # MUT-BASH-INTROUVABLE'; then
   MR="$MUT_DIR/recalc-planning.sh"
-  DIR_CAS="$WORK/mut-bash-introuvable-cas"
-  materialiser traceur "$DIR_CAS"
-  MIN_PATH="$WORK/mut-bash-introuvable-path"
-  mkdir -p "$MIN_PATH"
-  ln -sf "$(command -v python3)" "$MIN_PATH/python3"
-  ln -sf "$(command -v dirname)" "$MIN_PATH/dirname"
-  # PATH restreint à python3+dirname : shutil.which("bash") rend None — "$BASH_BIN" (chemin
-  # absolu, résolu AVANT la restriction) contourne le même problème pour l'invocation du script
-  # lui-même.
-  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" PATH="$MIN_PATH" "$BASH_BIN" "$MR" >"$WORK/mut-bash-introuvable-out.txt" 2>"$WORK/mut-bash-introuvable-err.txt" ); RC_M=$?
-  if ! _verifier_plantage BASH-INTROUVABLE "code de sortie sur bash introuvable (PATH sans bash)" "$WORK/mut-bash-introuvable-out.txt" "$WORK/mut-bash-introuvable-err.txt" "$RC_M"; then
-    if [ "$RC_M" -ne 3 ]; then
-      okmut BASH-INTROUVABLE "code de sortie sur bash introuvable · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré un interpréteur bash introuvable)"
-    else
-      komut BASH-INTROUVABLE "code de sortie sur bash introuvable" "3" "$RC_M (mutant non opposable)"
+  if recalc_forcer_candidats_bash "$MR" "(\"$WORK/mut-bash-introuvable-inexistant-1\", \"$WORK/mut-bash-introuvable-inexistant-2\")"; then
+    DIR_CAS="$WORK/mut-bash-introuvable-cas"
+    materialiser traceur "$DIR_CAS"
+    ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" "$BASH_BIN" "$MR" >"$WORK/mut-bash-introuvable-out.txt" 2>"$WORK/mut-bash-introuvable-err.txt" ); RC_M=$?
+    if ! _verifier_plantage BASH-INTROUVABLE "code de sortie sur bash introuvable (aucun candidat CANDIDATS_BASH valide)" "$WORK/mut-bash-introuvable-out.txt" "$WORK/mut-bash-introuvable-err.txt" "$RC_M"; then
+      if [ "$RC_M" -ne 3 ]; then
+        okmut BASH-INTROUVABLE "code de sortie sur bash introuvable · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré un interpréteur bash introuvable)"
+      else
+        komut BASH-INTROUVABLE "code de sortie sur bash introuvable" "3" "$RC_M (mutant non opposable)"
+      fi
     fi
+  else
+    komut BASH-INTROUVABLE "substitution de CANDIDATS_BASH appliquée" "réussie" "ÉCHEC (voir stderr du harnais)"
   fi
 fi
 
 # ---------- MUT-SOUS-PROCESSUS — repli « sous-processus en échec » changé en non-gsd -------------
-# Scénario distinct de MUT-BASH-INTROUVABLE : "bash" est RÉSOLU par shutil.which (present dans le
-# PATH, bit exécutable posé), mais le FICHIER n'est pas un exécutable valide (aucun shebang) — exec
-# échoue à l'exécution (ENOEXEC), après la résolution, capturé par le except Exception générique.
+# Scénario distinct de MUT-BASH-INTROUVABLE : le premier candidat CANDIDATS_BASH est un fichier
+# RÉGULIER (donc résolu — `_bash_candidat_valide` ne vérifie que la régularité, jamais le bit
+# exécutable ni le contenu), mais ce n'est pas un exécutable valide (aucun shebang) — exec échoue à
+# l'exécution (ENOEXEC), après la résolution, capturé par le except Exception générique.
 if make_recalc_mutant SOUS-PROCESSUS 'return "non-concluante"  # motif-sous-processus-en-echec' 'return "non-gsd"  # MUT-SOUS-PROCESSUS'; then
   MR="$MUT_DIR/recalc-planning.sh"
-  DIR_CAS="$WORK/mut-sous-processus-cas"
-  materialiser traceur "$DIR_CAS"
-  MIN_PATH="$WORK/mut-sous-processus-path"
-  mkdir -p "$MIN_PATH"
-  ln -sf "$(command -v python3)" "$MIN_PATH/python3"
-  ln -sf "$(command -v dirname)" "$MIN_PATH/dirname"
-  printf 'ceci-n-est-pas-un-script-valide\n' > "$MIN_PATH/bash"
-  chmod +x "$MIN_PATH/bash"
-  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" PATH="$MIN_PATH" "$BASH_BIN" "$MR" >"$WORK/mut-sous-processus-out.txt" 2>"$WORK/mut-sous-processus-err.txt" ); RC_M=$?
-  if ! _verifier_plantage SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec (bash résolu, exec invalide)" "$WORK/mut-sous-processus-out.txt" "$WORK/mut-sous-processus-err.txt" "$RC_M"; then
-    if [ "$RC_M" -ne 3 ]; then
-      okmut SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré une détection non concluante)"
-    else
-      komut SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec" "3" "$RC_M (mutant non opposable)"
+  FAUX_BASH="$WORK/mut-sous-processus-faux-bash"
+  printf 'ceci-n-est-pas-un-script-valide\n' > "$FAUX_BASH"
+  chmod +x "$FAUX_BASH"
+  if recalc_forcer_candidats_bash "$MR" "(\"$FAUX_BASH\", \"$WORK/mut-sous-processus-inexistant\")"; then
+    DIR_CAS="$WORK/mut-sous-processus-cas"
+    materialiser traceur "$DIR_CAS"
+    ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" "$BASH_BIN" "$MR" >"$WORK/mut-sous-processus-out.txt" 2>"$WORK/mut-sous-processus-err.txt" ); RC_M=$?
+    if ! _verifier_plantage SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec (bash résolu, exec invalide)" "$WORK/mut-sous-processus-out.txt" "$WORK/mut-sous-processus-err.txt" "$RC_M"; then
+      if [ "$RC_M" -ne 3 ]; then
+        okmut SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture malgré une détection non concluante)"
+      else
+        komut SOUS-PROCESSUS "code de sortie sur sous-processus détecteur en échec" "3" "$RC_M (mutant non opposable)"
+      fi
     fi
+  else
+    komut SOUS-PROCESSUS "substitution de CANDIDATS_BASH appliquée" "réussie" "ÉCHEC (voir stderr du harnais)"
   fi
 fi
 
@@ -2628,9 +2672,25 @@ oracle_differentiel socle-signal setup_socle_signal
 MATRICE_VIDE_1="$(mktemp -d)"; MATRICE_VIDE_2="$(mktemp -d)"; MATRICE_VIDE_3="$(mktemp -d)"
 MATRICE_FAUX_GSD="$(mktemp -d)"; mkdir -p "$MATRICE_FAUX_GSD/bin"
 
+# Colonnes F1/F44-07 (lot 5, correction de classe) : le PATH hérité, BASH_ENV, ENV et une fonction
+# exportée ne doivent JAMAIS atteindre le sous-processus détecteur — mesuré : avant lot 5, un `awk`
+# factice en tête de PATH suffisait à faire mentir `has_frontmatter_key` (marqueur GSD introuvable)
+# et écrire sur un lab GSD réel. `ghome-piege` (déjà présent) reste INERTE sur le verdict, prouvant
+# seulement qu'un `bin/` vide sous GSD_HOME ne change rien — les colonnes ci-dessous testent le
+# PATH/l'environnement du sous-processus lui-même, jamais exercé jusqu'ici.
+MATRICE_FAUX_AWK_DIR="$(mktemp -d)"
+printf '#!/bin/sh\nexit 1\n' > "$MATRICE_FAUX_AWK_DIR/awk"
+chmod +x "$MATRICE_FAUX_AWK_DIR/awk"
+MATRICE_FAUX_BASH_DIR="$(mktemp -d)"
+printf '#!/bin/sh\nexit 66\n' > "$MATRICE_FAUX_BASH_DIR/bash"
+chmod +x "$MATRICE_FAUX_BASH_DIR/bash"
+MATRICE_BASH_ENV_AWK="$WORK/matrice-bash-env-awk.sh"
+printf 'awk() { return 1; }\n' > "$MATRICE_BASH_ENV_AWK"
+
 matrice_env() { # <label> <fn_setup> <code_attendu>
   local label="$1" fn_setup="$2" code_attendu="$3"
-  local combos="normal ghome-inexistant ghome-vide ghome-piege claude-config-vide home-vide"
+  local combos="normal ghome-inexistant ghome-vide ghome-piege claude-config-vide home-vide
+    awk-piege bash-piege bash-env-awk bash-func-awk env-var"
   local combo dir rc ref_index=""
   for combo in $combos; do
     dir="$WORK/matrice-$label-$combo"
@@ -2649,6 +2709,20 @@ matrice_env() { # <label> <fn_setup> <code_attendu>
         ( cd "$dir" && unset GSD_HOME; CLAUDE_CONFIG_DIR="$MATRICE_VIDE_2" bash "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
       home-vide)
         ( cd "$dir" && unset GSD_HOME CLAUDE_CONFIG_DIR; HOME="$MATRICE_VIDE_3" bash "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      awk-piege)
+        # `$BASH_BIN` (chemin absolu) pour l'invocation EXTÉRIEURE : le PATH poison est destiné au
+        # sous-processus détecteur, jamais à l'interpréteur qui lance recalc-planning.sh lui-même.
+        ( cd "$dir" && PATH="$MATRICE_FAUX_AWK_DIR:$PATH" "$BASH_BIN" "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      bash-piege)
+        ( cd "$dir" && PATH="$MATRICE_FAUX_BASH_DIR:$PATH" "$BASH_BIN" "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      bash-env-awk)
+        ( cd "$dir" && BASH_ENV="$MATRICE_BASH_ENV_AWK" "$BASH_BIN" "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      bash-func-awk)
+        # Fonction `awk` EXPORTÉE (mécanisme `BASH_FUNC_awk%%` de bash) depuis un sous-shell créé
+        # pour l'occasion, puis `exec` vers l'invocation normale — l'export survit à l'`exec`.
+        ( cd "$dir" && "$BASH_BIN" -c 'awk() { return 1; }; export -f awk; exec "$0" "$1"' "$BASH_BIN" "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
+      env-var)
+        ( cd "$dir" && ENV="$MATRICE_BASH_ENV_AWK" "$BASH_BIN" "$RECALC" >"$WORK/matrice-$label-$combo-out.txt" 2>"$WORK/matrice-$label-$combo-err.txt" ) ;;
     esac
     rc=$?
     if [ "$rc" -eq "$code_attendu" ]; then
@@ -2677,6 +2751,58 @@ matrice_env marqueur-racine setup_marqueur_racine 3
 matrice_env marqueur-compartiment setup_marqueur_compartiment 3
 matrice_env partition-compartiment setup_partition_compartiment 3
 matrice_env socle-signal setup_socle_signal 3
+
+# ================================================================================================
+# F1/F44-07 (correction de classe, lot 5) — deux mutants qui font régresser exactement le défaut
+# mesuré sur 885d9b3 : l'environnement du sous-processus détecteur redevenait dépendant du PATH
+# hérité (`dict(os.environ)`) ou de sa résolution `shutil.which` de bash. Chaque mutant est tué par
+# le SCÉNARIO qui a servi à établir la trace ROUGE d'origine : un lab GSD réel (marqueur racine) +
+# un PATH empoisonné, sur lequel l'original refuse (rc=3, marqueur intact) et le mutant écrit
+# (rc=0, marqueur GSD EFFACÉ).
+# ================================================================================================
+
+# ---------- MUT-ENV-OS-ENVIRON — retour à dict(os.environ) pour l'environnement du détecteur -----
+if make_recalc_mutant ENV-OS-ENVIRON \
+  'env_maitrise = {"PATH": PATH_MAITRISE}' \
+  'env_maitrise = dict(os.environ)  # MUT-ENV-OS-ENVIRON'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-env-os-environ-cas"
+  materialiser traceur "$DIR_CAS"
+  setup_marqueur_racine "$DIR_CAS"
+  ( cd "$DIR_CAS" && PATH="$MATRICE_FAUX_AWK_DIR:$PATH" GSD_HOME="$FAKE_GSD" "$BASH_BIN" "$MR" >"$WORK/mut-env-os-environ-out.txt" 2>"$WORK/mut-env-os-environ-err.txt" ); RC_M=$?
+  if ! _verifier_plantage ENV-OS-ENVIRON "code de sortie sous PATH empoisonné (awk factice) sur un lab GSD réel" "$WORK/mut-env-os-environ-out.txt" "$WORK/mut-env-os-environ-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut ENV-OS-ENVIRON "code de sortie sous PATH empoisonné (awk factice) sur un lab GSD réel · attendu (original) : 3 (refus, marqueur intact) · obtenu (mutant, dict(os.environ)) : $RC_M (écriture, marqueur GSD effacé)"
+    else
+      komut ENV-OS-ENVIRON "code de sortie sous PATH empoisonné (awk factice) sur un lab GSD réel" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-BASH-VIA-PATH — retour à shutil.which("bash") pour résoudre l'interpréteur -------
+MATRICE_FAUX_BASH3_DIR="$(mktemp -d)"
+printf '#!/bin/sh\nexit 3\n' > "$MATRICE_FAUX_BASH3_DIR/bash"
+chmod +x "$MATRICE_FAUX_BASH3_DIR/bash"
+if make_recalc_mutant BASH-VIA-PATH \
+  'bash_bin = _resoudre_bash()' \
+  'bash_bin = __import__("shutil").which("bash")  # MUT-BASH-VIA-PATH'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-bash-via-path-cas"
+  materialiser traceur "$DIR_CAS"
+  setup_marqueur_racine "$DIR_CAS"
+  # Faux `bash` en tête de PATH qui rend toujours 3 (« terrain libre »), quel que soit le script
+  # qu'on lui passe — avec `shutil.which`, c'est LUI qui tranche le verdict, pas le vrai détecteur.
+  ( cd "$DIR_CAS" && PATH="$MATRICE_FAUX_BASH3_DIR:$PATH" GSD_HOME="$FAKE_GSD" "$BASH_BIN" "$MR" >"$WORK/mut-bash-via-path-out.txt" 2>"$WORK/mut-bash-via-path-err.txt" ); RC_M=$?
+  if ! _verifier_plantage BASH-VIA-PATH "code de sortie sous PATH empoisonné (faux bash qui rend toujours 3) sur un lab GSD réel" "$WORK/mut-bash-via-path-out.txt" "$WORK/mut-bash-via-path-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut BASH-VIA-PATH "code de sortie sous PATH empoisonné (faux bash) sur un lab GSD réel · attendu (original) : 3 (refus, marqueur intact) · obtenu (mutant, shutil.which) : $RC_M (écriture, marqueur GSD effacé)"
+    else
+      komut BASH-VIA-PATH "code de sortie sous PATH empoisonné (faux bash) sur un lab GSD réel" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
 
 # ================================================================================================
 # R-LABS-ADVERSES (item 2c, lot 4) — les trois divergences mesurées au lot 3 (audit) : un
@@ -2829,7 +2955,7 @@ fi
 
 # ---------- MUT-JOURNAL-SANITIZE — assainissement de _jeton_journal neutralisé -------------------
 if make_recalc_mutant JOURNAL-SANITIZE \
-  'if caractere == "%" or caractere == "=" or caractere.isspace():' \
+  'if caractere == "%" or caractere == "=" or caractere.isspace() or not caractere.isprintable():' \
   'if False:  # MUT-JOURNAL-SANITIZE'
 then
   MR="$MUT_DIR/recalc-planning.sh"
@@ -2900,13 +3026,19 @@ for a, b in paires_explicites:
     if m._jeton_journal(a, "-") == m._jeton_journal(b, "-"):
         erreurs.append("collision explicite non resolue : %r vs %r" % (a, b))
 
+# Alphabet étendu F44-05/F7 (correction ciblée, lot 5) : NUL et les contrôles C0/C1 complets
+# (0x00-0x1F, DEL 0x7F, 0x80-0x9F) rejoignent les séparateurs Unicode déjà couverts — avant lot 5,
+# ces octets traversaient `_jeton_journal` BRUTS (seul `str.isspace()` les filtrait, et aucun des
+# deux groupes n'est un espace).
 alphabet = list(" \t\n\r\v\f=%_") + [chr(0x2028), chr(0x0085), chr(0x00A0), chr(0x3000)] + \
-    [chr(c) for c in range(1, 10)] + list("abcXYZ09/-")
+    [chr(c) for c in range(0, 0x20)] + [chr(0x7F)] + [chr(c) for c in range(0x80, 0xA0)] + \
+    list("abcXYZ09/-")
 random.seed(1729)
 vues = {}
 collisions = 0
 echecs_roundtrip = 0
 echecs_regex = 0
+echecs_non_imprimable = 0
 NB = 2000
 for _ in range(NB):
     k = random.randint(1, 8)
@@ -2917,6 +3049,10 @@ for _ in range(NB):
     vues[jeton] = valeur
     if decoder_pourcent(jeton) != valeur:
         echecs_roundtrip += 1
+    # F44-05/F7 : aucun octet de contrôle brut dans le jeton produit — chaque caractère du jeton
+    # final doit être imprimable (le `%` d'échappement et les chiffres hexadécimaux le sont tous).
+    if any(not ch.isprintable() for ch in jeton):
+        echecs_non_imprimable += 1
     ligne = "2026-09-28T00:00:00+00:00  " + jeton + "  auteur  verdict=passe  tentative=1  date=observation"
     if m.LIGNE_JOURNAL_RE.match(ligne) is None:
         echecs_regex += 1
@@ -2927,6 +3063,8 @@ if echecs_roundtrip:
     erreurs.append("echecs_roundtrip=%d" % echecs_roundtrip)
 if echecs_regex:
     erreurs.append("echecs_regex=%d" % echecs_regex)
+if echecs_non_imprimable:
+    erreurs.append("echecs_non_imprimable=%d (octet de controle brut dans le jeton)" % echecs_non_imprimable)
 
 if erreurs:
     print("ERREURS=" + " | ".join(erreurs))
@@ -2939,6 +3077,151 @@ if [ "$INJECTIF_OUT" = "OK NB=2000" ]; then
   ok "R-INJECTIF-GENERATIF collisions/paires explicites/round-trip/LIGNE_JOURNAL_RE : 2000 paires, zéro échec"
 else
   ko "R-INJECTIF-GENERATIF" "OK NB=2000" "$INJECTIF_OUT" "-"
+fi
+
+# ================================================================================================
+# F5 (correction ciblée, lot 5) — `_jeton_journal(valeur, repli="")` : un repli vide est une erreur
+# BRUYANTE (ValueError immédiate), jamais un jeton vide écrit en silence dans cloture.log.
+# ================================================================================================
+F5_JETON_VIDE_AIDE_PY="$WORK/f5-jeton-vide-aide.py"
+cat > "$F5_JETON_VIDE_AIDE_PY" <<'PY_F5_JETON_VIDE_EOF'
+import importlib.util
+import sys
+
+chemin = sys.argv[1]
+spec = importlib.util.spec_from_file_location("moteur_extrait", chemin)
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+
+try:
+    m._jeton_journal(None, "")
+    print("PAS-D-ERREUR")
+except ValueError:
+    print("VALUEERROR")
+except Exception as exc:
+    print("AUTRE-EXCEPTION=" + type(exc).__name__)
+PY_F5_JETON_VIDE_EOF
+F5_JETON_VIDE_OUT="$("$PYBIN" "$F5_JETON_VIDE_AIDE_PY" "$MOTEUR_EXTRAIT_PY" 2>&1)"
+if [ "$F5_JETON_VIDE_OUT" = "VALUEERROR" ]; then
+  ok "F5 _jeton_journal(None, repli=\"\") : ValueError bruyante, jamais un jeton vide silencieux"
+else
+  ko "F5 _jeton_journal(None, repli=\"\")" "VALUEERROR" "$F5_JETON_VIDE_OUT" "-"
+fi
+if make_recalc_mutant F5-JETON-VIDE \
+  'if not repli:' \
+  'if False:  # MUT-F5-JETON-VIDE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  MUT_F5_BODY_BRUT="$WORK/mut-f5-jeton-vide-corps-brut.py"
+  MUT_F5_BODY="$WORK/mut-f5-jeton-vide-corps.py"
+  awk '/<<.PY_RECALC_PLANNING_EOF.$/{f=1;next} /^PY_RECALC_PLANNING_EOF$/{f=0} f' "$MR" > "$MUT_F5_BODY_BRUT"
+  # `main()` retiré (comme MOTEUR_EXTRAIT_PY) : `importlib` exécute TOUT le module au chargement —
+  # sans ce retrait, l'appel final `main()` tournerait avec le mauvais `sys.argv` et planterait
+  # avant même d'atteindre `_jeton_journal`, faussant le verdict du mutant en « tué » par accident.
+  "$PYBIN" -c '
+import sys
+lignes = open(sys.argv[1], encoding="utf-8").read().split("\n")
+while lignes and lignes[-1].strip() == "":
+    lignes.pop()
+if lignes and lignes[-1].strip() == "main()":
+    lignes.pop()
+open(sys.argv[2], "w", encoding="utf-8").write("\n".join(lignes))
+' "$MUT_F5_BODY_BRUT" "$MUT_F5_BODY"
+  F5_MUT_OUT="$("$PYBIN" "$F5_JETON_VIDE_AIDE_PY" "$MUT_F5_BODY" 2>&1)"
+  if [ "$F5_MUT_OUT" = "VALUEERROR" ]; then
+    komut F5-JETON-VIDE "ValueError sur repli vide" "VALUEERROR (original)" "VALUEERROR (mutant non opposable)"
+  else
+    okmut F5-JETON-VIDE "ValueError sur repli vide · attendu (original) : VALUEERROR · obtenu (mutant, garde retirée) : $F5_MUT_OUT"
+  fi
+fi
+
+# ================================================================================================
+# F6 (revue) — détecteur ABSENT et détecteur NON RÉGULIER : deux messages stderr distincts. R09
+# [absent] (plus haut) ne vérifiait que le code de sortie ; ce test cible le TEXTE.
+# ================================================================================================
+F6_DIR="$WORK/f6-absent"; F6_SCRIPTS="$WORK/f6-absent-scripts"
+materialiser traceur "$F6_DIR"
+mkdir -p "$F6_SCRIPTS"
+cp "$RECALC" "$F6_SCRIPTS/recalc-planning.sh"
+# aucun detect-gsd-engine.sh dans $F6_SCRIPTS : cas « absent »
+( cd "$F6_DIR" && GSD_HOME="$FAKE_GSD" bash "$F6_SCRIPTS/recalc-planning.sh" >"$WORK/f6-absent-out.txt" 2>"$WORK/f6-absent-err.txt" )
+if grep -q "détecteur absent" "$WORK/f6-absent-err.txt" && ! grep -q "détecteur non régulier" "$WORK/f6-absent-err.txt"; then
+  ok "F6 détecteur absent : message « détecteur absent », jamais « détecteur non régulier »"
+else
+  ko "F6 détecteur absent stderr" "contient « détecteur absent », pas « détecteur non régulier »" "$(cat "$WORK/f6-absent-err.txt")" "-"
+fi
+
+# ================================================================================================
+# F44-06 (correction ciblée) — `ecrire_si_different` lisait l'existant par `open()` nu, seul site
+# des lectures du modèle sans `O_NOFOLLOW`. Discriminant RÉEL (pas un TOCTOU rejoué à l'aveugle,
+# « difficile à forcer » selon le mandat) : `est_fichier_regulier` est monkeypatché pour toujours
+# répondre « régulier » — ce qui SIMULE exactement l'instant d'un TOCTOU (lien substitué ENTRE le
+# contrôle et la lecture) sans dépendre d'une vraie course — puis `chemin` est un VRAI lien
+# symbolique vers un fichier cible dont le contenu est IDENTIQUE à ce qu'on demande d'écrire.
+# Ancien code (`open()` nu, suit le lien) : lit le contenu de la cible à travers le lien, le compare
+# au contenu demandé -> identiques -> ne réécrit PAS (`False`), la cible ayant été lue à travers le
+# lien. Nouveau code (`O_NOFOLLOW`, `ELOOP` intercepté) : ne lit jamais la cible -> `existant=None`
+# -> réécrit (`True`), remplace le LIEN par un fichier régulier — la cible, elle, reste intacte.
+# ================================================================================================
+F44_06_DIR="$WORK/f44-06"
+mkdir -p "$F44_06_DIR"
+F44_06_CIBLE="$F44_06_DIR/cible-secrete.txt"
+F44_06_LIEN="$F44_06_DIR/lien-vers-cible.txt"
+printf 'CONTENU-IDENTIQUE' > "$F44_06_CIBLE"
+ln -s "$F44_06_CIBLE" "$F44_06_LIEN"
+F44_06_AIDE_PY="$WORK/f44-06-aide.py"
+cat > "$F44_06_AIDE_PY" <<'PY_F44_06_AIDE_EOF'
+import importlib.util
+import os
+import sys
+
+chemin_module, cible, lien, contenu = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+spec = importlib.util.spec_from_file_location("moteur_extrait", chemin_module)
+m = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(m)
+
+# Simule l'instant d'un TOCTOU : le contrôle de régularité a déjà eu lieu et a répondu « régulier »
+# (c'est ce que `est_fichier_regulier` rendrait si `chemin` était encore le fichier régulier
+# original, avant sa substitution par le lien) — seule la LECTURE qui suit est sous test réel.
+m.est_fichier_regulier = lambda c: True
+
+resultat = m.ecrire_si_different(lien, contenu)
+print("RESULTAT=" + str(resultat))
+print("CIBLE=" + open(cible, encoding="utf-8").read())
+print("LIEN-EST-LIEN=" + str(os.path.islink(lien)))
+PY_F44_06_AIDE_EOF
+F44_06_OUT="$("$PYBIN" "$F44_06_AIDE_PY" "$MOTEUR_EXTRAIT_PY" "$F44_06_CIBLE" "$F44_06_LIEN" "CONTENU-IDENTIQUE" 2>&1)"
+if echo "$F44_06_OUT" | grep -q "^RESULTAT=True$" \
+   && echo "$F44_06_OUT" | grep -q "^CIBLE=CONTENU-IDENTIQUE$" \
+   && echo "$F44_06_OUT" | grep -q "^LIEN-EST-LIEN=False$"; then
+  ok "F44-06 ecrire_si_different sur un lien (TOCTOU simulé) : O_NOFOLLOW empêche la lecture à travers le lien, réécrit, cible intacte"
+else
+  ko "F44-06 ecrire_si_different sur un lien" "RESULTAT=True, CIBLE=CONTENU-IDENTIQUE, LIEN-EST-LIEN=False" "$F44_06_OUT" "-"
+fi
+if make_recalc_mutant F44-06-NOFOLLOW \
+  'descripteur_existant = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)' \
+  'descripteur_existant = os.open(chemin, os.O_RDONLY)  # MUT-F44-06-NOFOLLOW'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  MUT_F44_06_BODY_BRUT="$WORK/mut-f44-06-corps-brut.py"
+  MUT_F44_06_BODY="$WORK/mut-f44-06-corps.py"
+  awk '/<<.PY_RECALC_PLANNING_EOF.$/{f=1;next} /^PY_RECALC_PLANNING_EOF$/{f=0} f' "$MR" > "$MUT_F44_06_BODY_BRUT"
+  # `main()` retiré, même motif que MUT-F5-JETON-VIDE ci-dessus.
+  "$PYBIN" -c '
+import sys
+lignes = open(sys.argv[1], encoding="utf-8").read().split("\n")
+while lignes and lignes[-1].strip() == "":
+    lignes.pop()
+if lignes and lignes[-1].strip() == "main()":
+    lignes.pop()
+open(sys.argv[2], "w", encoding="utf-8").write("\n".join(lignes))
+' "$MUT_F44_06_BODY_BRUT" "$MUT_F44_06_BODY"
+  F44_06_MUT_OUT="$("$PYBIN" "$F44_06_AIDE_PY" "$MUT_F44_06_BODY" "$F44_06_CIBLE" "$F44_06_LIEN" "CONTENU-IDENTIQUE" 2>&1)"
+  if echo "$F44_06_MUT_OUT" | grep -q "^RESULTAT=True$"; then
+    komut F44-06-NOFOLLOW "RESULTAT sur lien (TOCTOU simulé)" "False (original, suit le lien)" "True (mutant non opposable)"
+  else
+    okmut F44-06-NOFOLLOW "RESULTAT sur lien (TOCTOU simulé) · attendu (original, O_NOFOLLOW) : True · obtenu (mutant, open() nu, suit le lien) : $F44_06_MUT_OUT"
+  fi
 fi
 
 # ---------- R-INJECTIF-ROUNDTRIP — deux exécutions successives, valeur formellement « collidante »
