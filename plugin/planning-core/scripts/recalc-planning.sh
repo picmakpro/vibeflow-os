@@ -342,6 +342,89 @@ def _resoudre_bash():
     return None
 
 
+# --- Garde de fidélité d'énumération (P44-D-02a, lot 6, correction ciblée) --------------------
+# CONSTAT (audit du 2026-09-28, mesuré par exécution dans l'environnement maîtrisé exact du
+# moteur) : `vf_ws_enumerate` (workstream-policy.sh, PROPRIÉTÉ de la Phase 41.1, P44-D-01b —
+# INTERDITE à ce lot) émet « un chemin absolu par ligne » (`printf '%s\n' "$(cd "$entry" && pwd)"`)
+# pour chaque compartiment de `<planning>/workstreams/`. Ce contrat SUPPOSE que ni le chemin émis
+# ni le glob qui énumère les entrées (`"$root"/*/`, sans `dotglob`) ne peuvent faire disparaître ou
+# scinder un compartiment RÉEL. Deux classes mesurées le brisent, TOUTES DEUX SILENCIEUSES (aucune
+# ligne stderr qui les distingue du cas nominal « aucun compartiment » — F1 a déjà écarté le
+# gating sur stderr non vide pour cette raison même) :
+#   - un NOM de compartiment portant un saut de ligne : la ligne imprimée se scinde en deux lignes
+#     lues séparément par `while IFS= read -r` côté detect-gsd-engine.sh, aucune des deux ne
+#     pointant vers un chemin qui existe — le compartiment devient invisible à la détection ;
+#   - un NOM de compartiment commençant par un point : le glob `"$root"/*/` ne l'expand JAMAIS
+#     (pas de `dotglob`) — invisible dès l'énumération, sans même la ligne stderr du cas lien
+#     symbolique.
+# Mesuré aussi : si le CHEMIN DU DOSSIER DE PLANNING lui-même porte un saut de ligne, TOUTE
+# l'énumération casse (chaque ligne imprimée porte ce préfixe), pas seulement le compartiment visé.
+# Effet mesuré sur ce script (`detect-gsd-engine.sh --path <planning>` invoqué en aval) : le
+# compartiment porteur de `gsd_state_version` devient invisible à la priorité 2bis, le détecteur
+# retombe sur la priorité 3 et rend le code 3 « terrain libre » SANS AUCUN diagnostic — exactement
+# le code que `detection_gsd` ci-dessous traduit en autorisation d'écrire.
+# CORRECTION DE PORTÉE (P44-D-01b : `vf_ws_enumerate` et `detect-gsd-engine.sh` restent
+# INCHANGÉS — hors périmètre de ce lot) : la garde vit ENTIÈREMENT ici, côté appelant, et ne
+# rejoue JAMAIS les priorités 2/2bis/3 du détecteur — elle ne lit AUCUN `STATE.md`, ne cherche
+# AUCUN marqueur `gsd_state_version`. Elle juge une seule chose, structurelle : l'énumération
+# ligne-par-ligne peut-elle restituer FIDÈLEMENT chaque compartiment RÉEL présent sur le disque ?
+# Si non, le verdict du détecteur — quel qu'il soit — n'est pas VÉRIFIABLE : refus nommé,
+# `non-concluante`, AVANT même d'invoquer le détecteur (l'appel au sous-processus devient inutile
+# dès que sa réponse ne serait de toute façon pas fiable).
+# Classes mesurées NON masquantes, volontairement PAS gardées (F1, ne pas sur-refuser un cas
+# nominal) :
+#   - un caractère de contrôle isolé (ex. retour chariot `\r`) dans un nom : ne scinde PAS les
+#     lignes de `read -r` — mesuré vert, le marqueur reste trouvé ;
+#   - une entrée en lien symbolique : `vf_ws_enumerate` l'exclut déjà EXPLICITEMENT, avec un
+#     avertissement sur stderr — exclusion DÉCLARÉE, pas un silence, hors du périmètre de cette
+#     garde (comportement déjà connu et accepté du système, non touché ici).
+def _enumeration_workstreams_fidele(planning_abs):
+    """(fidele: bool, classes: list[str]) — `classes` NOMME chaque classe masquante rencontrée
+    (jamais un booléen nu : un futur lecteur doit pouvoir citer le motif exact du refus). Liste
+    vide et `fidele=True` si `<planning_abs>/workstreams/` est absent, en lien symbolique, non-
+    répertoire, ou illisible : ces cas sont DÉJÀ fermés par le détecteur lui-même (code 2), cette
+    garde ne double jamais un refus déjà couvert ailleurs."""
+    classes = []
+    ws_root = os.path.join(planning_abs, "workstreams")
+    try:
+        info_root = os.lstat(ws_root)
+    except OSError:
+        return (True, [])
+    if stat.S_ISLNK(info_root.st_mode) or not stat.S_ISDIR(info_root.st_mode):
+        return (True, [])
+    try:
+        entrees = list(os.scandir(ws_root))
+    except OSError:
+        return (True, [])
+    chemin_planning_a_risque = "\n" in planning_abs
+    for entree in entrees:
+        try:
+            est_lien = entree.is_symlink()
+        except OSError:
+            continue
+        if est_lien:
+            continue  # exclusion DÉCLARÉE du détecteur (avertissement stderr) — pas masquant ici
+        try:
+            est_dossier = entree.is_dir(follow_symlinks=False)
+        except OSError:
+            est_dossier = False
+        if not est_dossier:
+            continue
+        # Ce compartiment RÉEL (ni lien, ni non-dossier) SERAIT normalement énumérable par
+        # `vf_ws_enumerate` — sauf classe masquante ci-dessous.
+        if chemin_planning_a_risque:
+            classes.append("chemin-planning-saut-de-ligne")
+        if "\n" in entree.name:
+            classes.append("nom-compartiment-saut-de-ligne")
+        if entree.name.startswith("."):
+            classes.append("nom-compartiment-cache:" + entree.name)
+    vues = []
+    for c in classes:
+        if c not in vues:
+            vues.append(c)
+    return (len(vues) == 0, vues)
+
+
 # --- Détection GSD (P44-D-02a, P44-D-01b, P44-D-01c, P44-D-01d) — lot 4 ----------------------
 # SOURCE UNIQUE DE VÉRITÉ (correction de CLASSE, lot 4) : aucune règle du détecteur bash
 # (detect-gsd-engine.sh) n'est plus reproduite en Python. Trois copies mesurées divergentes au
@@ -375,7 +458,13 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
     un dossier de compartiments présent mais VIDE fait légitimement écrire deux lignes sur stderr
     (`vf_ws_enumerate`) tout en rendant le code 3 racine correct ; gater dessus aurait refusé
     l'écriture sur ce cas nominal (prose documentaire, aucun chemin résolu par ce fichier —
-    vf-allow-unregistered-planning-path)."""
+    vf-allow-unregistered-planning-path).
+    Lot 6 (correction ciblée, audit du 2026-09-28) : AVANT tout appel au détecteur, une garde
+    structurelle (`_enumeration_workstreams_fidele`) vérifie que l'énumération ligne-par-ligne des
+    compartiments peut restituer FIDÈLEMENT ce qui est réellement sur le disque — un compartiment
+    qu'elle ne pourrait pas restituer (nom portant un saut de ligne, nom caché, chemin de planning
+    lui-même porteur d'un saut de ligne) rend TOUT verdict du détecteur non vérifiable : refus
+    nommé, sans même invoquer le sous-processus. Voir le commentaire de tête de cette fonction."""
     # F6 (revue) : « absent » (rien à cet emplacement) et « non régulier » (un dossier, un lien,
     # une FIFO...) partageaient jusqu'ici le même message stderr — deux causes distinctes,
     # confondues sous un même diagnostic. Deux motifs, deux messages désormais.
@@ -387,11 +476,28 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
     if not stat.S_ISREG(info_detecteur.st_mode):
         print("[recalc-planning] détecteur non régulier : " + detect_sh, file=sys.stderr)
         return "non-concluante"  # motif-detecteur-irregulier
+    # Lot 6 — garde de fidélité d'énumération, AVANT l'appel au détecteur (P44-D-02a) : si un
+    # compartiment réel de `<planning>/workstreams/` ne serait pas restitué fidèlement par
+    # l'énumération ligne-par-ligne que le détecteur consomme, aucun de ses verdicts (0/2/3) n'est
+    # vérifiable — inutile même d'invoquer le sous-processus.
+    fidele, classes_masquantes = _enumeration_workstreams_fidele(planning_abs)
+    if not fidele:
+        print(
+            "[recalc-planning] refus (P44-D-02a, garde de fidélité d'énumération, lot 6) : au "
+            "moins un compartiment réel sous workstreams/ ne serait pas restitué fidèlement par "
+            "l'énumération que le détecteur consomme (classes : "
+            + ", ".join(classes_masquantes) + ") — écriture refusée sans appeler le détecteur, "
+            "son verdict ne serait pas vérifiable",
+            file=sys.stderr,
+        )
+        return "non-concluante"  # motif-enumeration-non-fidele
     bash_bin = _resoudre_bash()
     if bash_bin is None:
         print(
             "[recalc-planning] interpréteur bash introuvable pour lancer le détecteur "
-            "(candidats fixes épuisés : " + ", ".join(CANDIDATS_BASH) + ")",
+            "(candidats fixes épuisés : " + ", ".join(CANDIDATS_BASH) + " — fail-closed voulu : "
+            "sur un système sans AUCUN des deux (Alpine sans bash, NixOS, image distroless), "
+            "ce script ne pourra plus jamais écrire, aucun repli sur un autre interpréteur)",
             file=sys.stderr,
         )
         return "non-concluante"  # motif-bash-introuvable
@@ -402,6 +508,13 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
     # partielle passée au sous-processus (P44-D-01d, verdict indépendant de tout héritage).
     env_maitrise = {"PATH": PATH_MAITRISE}
     env_maitrise["GSD_HOME"] = os.path.dirname(detect_sh)
+    # `--noprofile --norc` (WR-02, revue) : ces deux drapeaux ne bloquent QUE le chargement de
+    # `/etc/profile`, `~/.bash_profile` et `~/.bashrc` par un bash INTERACTIF ou de LOGIN — ils
+    # n'ont AUCUN effet sur `BASH_ENV`/`ENV`, qu'un bash non-interactif lit indépendamment de ces
+    # deux drapeaux. La protection réelle contre `BASH_ENV`/`ENV` vient EXCLUSIVEMENT de
+    # `env_maitrise` ci-dessus, qui ne les inclut jamais dans l'environnement du sous-processus —
+    # jamais des drapeaux eux-mêmes, conservés seulement en profondeur de défense si ce sous-
+    # processus était un jour relancé autrement (interactif ou login).
     try:
         resultat = subprocess.run(
             [bash_bin, "--noprofile", "--norc", detect_sh, "--quiet", "--path", planning_abs],
@@ -419,10 +532,9 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
         # silencieux en nominal — mesuré sur le banc (`hors-modele-racine`, dossier de
         # compartiments présent mais VIDE) : `vf_ws_enumerate` (priorité 2bis de
         # detect-gsd-engine.sh) écrit alors deux lignes sur stderr (« présent mais vide après
-        # filtrage », « priorité 2bis
-        # SAUTÉE ») tout en rendant légitimement le code 3 racine. Gater sur « stderr non vide »
-        # aurait donc refusé l'écriture sur ce cas nominal — stderr_nominal consigné dans le
-        # rapport de mission, jamais implémenté comme gate ici.
+        # filtrage », « priorité 2bis SAUTÉE ») tout en rendant légitimement le code 3 racine.
+        # Gater sur « stderr non vide » aurait donc refusé l'écriture sur ce cas nominal —
+        # stderr_nominal consigné dans le rapport de mission, jamais implémenté comme gate ici.
         return "non-gsd"  # motif-code-3-terrain-libre
     if code == 2:
         # Signalement de MIGRATION (socle planning-core + signal de code) : refus d'écriture,
@@ -1300,7 +1412,13 @@ def _jeton_journal(valeur, repli):
     ligne illisible produite en silence) si ce contrat est un jour rompu. Une fois `repli` garanti
     non vide, `brute` (str) contient au moins un caractère, et chaque caractère produit au moins
     un caractère de sortie (lui-même, ou au moins un `%XX`) : `jeton` est donc TOUJOURS non vide,
-    sans repli de dernier recours nécessaire."""
+    sans repli de dernier recours nécessaire.
+
+    IN-02 (revue, correction ciblée) : l'invariant final est vérifié par une exception EXPLICITE,
+    jamais un `assert` nu — un `assert` est désactivable en bloc par `python -O`/`PYTHONOPTIMIZE`,
+    et ce moteur ne garantit nulle part que son interpréteur tourne sans cette option. Une garde de
+    P44-D-11 (jamais de ligne illisible produite en silence dans `cloture.log`) reste active quel
+    que soit le mode d'exécution."""
     if not repli:
         raise ValueError("_jeton_journal : 'repli' doit toujours être non vide (contrat interne)")
     brute = valeur if valeur not in (None, "") else repli
@@ -1312,7 +1430,8 @@ def _jeton_journal(valeur, repli):
         else:
             morceaux.append(caractere)
     jeton = "".join(morceaux)
-    assert jeton, "_jeton_journal : jeton vide malgré un repli non vide (invariant violé)"
+    if not jeton:
+        raise AssertionError("_jeton_journal : jeton vide malgré un repli non vide (invariant violé)")
     return jeton
 
 
