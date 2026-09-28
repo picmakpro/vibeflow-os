@@ -5,3 +5,4 @@
 - [Vérifier l'arbre après mutation](feedback-verifier-arbre-apres-mutation.md) — cp -R vers scratchpad a montré une fuite vers le fichier réel du dépôt (2026-08-06), toujours cmp contre HEAD après restauration
 - [ICM w2 — basename + preuves fantômes](project-icm-w2-basename-et-preuves-fantomes.md) — basename fixé (vérifié), mais fixture tiret-initial récidive en preuve fantôme + oracle traversée p2_sens_a hors scope (2026-08-15)
 - [Traversée par libellé de jalon, Phase 18](project-traversal-libelle-jalon-phase18.md) — CLOS (code corrigé, `/` retiré de la classe l.134, recalé 2026-08-28) ; historique : restore-requirements-ledger.sh/check-requirements-survival.sh, ../ survit à la liste blanche, exploité jusqu'à l'écriture (2026-08-18)
+- [Phase 44 recalc-planning.sh, tour 3](project-phase44-recalc-planning-findings.md) — OUVERT (2026-09-28) : repli code-1 rouvert par symlink/UTF-8 (HIGH) + dedup token collision sous-journalise (MEDIUM) ; A/B tour 1 aussi ouverts

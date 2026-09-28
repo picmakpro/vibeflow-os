@@ -24,3 +24,4 @@
 - [Mutant sans dépendance sœur = échec précoce masqué](feedback_mutant-sibling-dependency-masks-vacuity.md) — MUT-2/39-01 : rc=2 identique avec/sans mutation ciblée, `|| true` avale aussi le return
 - [Phase 42 corpus avant armement invariant](project_phase42-corpus-ahead-of-invariant.md) — CHANGELOG cite I3/I6 non encore armes dans check-agents.sh : sequence D-11 voulue, pas une preuve fabriquee
 - [Correctif défensif hors d'atteinte de la CLI réelle](feedback_defensive-fix-unreachable-via-real-cli.md) — WR-01/42 : sonde blanche exec() prouve la forme, pas un chemin d'entrée réel
+- [Assainissement à l’écriture vs comparaison brute](feedback_writetime-sanitize-vs-compare-raw-mismatch.md) — un dédoublonnage qui compare la valeur brute contre du relu-donc-assaini échoue en silence (Phase 44, cloture.log)
