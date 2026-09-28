@@ -1129,3 +1129,31 @@ le checkout principal (`git rev-parse --git-common-dir`) quand le fichier manque
 
 **Déclencheur de reprise :** la prochaine évolution de l'installeur ou de `merge-hooks.sh`, ou la
 création d'un worktree où le contournement n'a pas été posé.
+
+## Pour Samuel — `vf_ws_enumerate` ne restitue pas fidèlement un compartiment à saut de ligne
+(constaté 2026-09-28)
+
+**Capturé :** 2026-09-28, pendant l'audit de la Phase 44 (worktree `gouvernance-44`), reproduit
+par exécution dans l'environnement maîtrisé exact du moteur. Motif du report : P44-D-01b
+(`detect-gsd-engine.sh` et `workstream-policy.sh` restent INCHANGÉS en Phase 44 — le lot 6 a fermé
+la conséquence côté appelant, dans `recalc-planning.sh` seul, jamais dans ces deux fichiers).
+
+**Le défaut** : `vf_ws_enumerate` (`workstream-policy.sh`) émet un chemin absolu par ligne
+(`printf '%s\n' "$(cd "$entry" && pwd)"`) pour chaque compartiment de `<planning>/workstreams/`.
+Un compartiment dont le nom porte un saut de ligne scinde sa propre ligne en deux à la lecture
+(`while IFS= read -r`), aucune des deux ne pointant vers un chemin qui existe : le compartiment
+devient invisible à tout consommateur de cette énumération, sans qu'aucune ligne stderr ne le
+signale — silence total, indistinguable d'un dépôt non partitionné. Mesuré : masque le marqueur
+`gsd_state_version` de ce compartiment pour `detect-gsd-engine.sh` (priorité 2bis), qui retombe
+alors sur la priorité 3 et rend le code 3 « terrain libre » sans diagnostic. Même primitive,
+même classe de trou, dans `check-planning-state.sh` (~L136-141) : compteur gonflé, diagnostic
+seul, pas un gate d'écriture — impact moindre mais même cause racine.
+
+**Piste durable** : délimiteur NUL des deux côtés (émission et lecture) plutôt que `\n`, ou
+échappement du nom de compartiment à l'émission (motif déjà en place ailleurs dans ce fichier pour
+d'autres classes de noms piégés).
+
+**Propriétaire à la relecture :** Samuel (propriétaire de `workstream-policy.sh`, Phase 41.1).
+
+**Déclencheur de reprise :** la prochaine évolution de `workstream-policy.sh` ou de
+`check-planning-state.sh`, ou un incident où ce trou a masqué un compartiment réel.

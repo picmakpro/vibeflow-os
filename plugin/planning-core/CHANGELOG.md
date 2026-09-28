@@ -102,13 +102,39 @@
   ligne de journal illisible écrite en silence ; « détecteur absent » et « détecteur non régulier »
   portent deux messages stderr distincts ; `ecrire_si_different` lit l'existant par `O_NOFOLLOW`
   (alignée sur le reste des lectures du modèle) au lieu d'un `open()` nu.
+- **Lot 6 (correction ciblée, audit du 2026-09-28)** : `vf_ws_enumerate` (`workstream-policy.sh`,
+  hors périmètre de cette phase, P44-D-01b) émet un chemin absolu par ligne pour chaque
+  compartiment de `workstreams/` — un contrat que deux classes RÉELLES brisent SILENCIEUSEMENT (le
+  détecteur rend le code 3 « terrain libre » sans aucun diagnostic distinct du cas nominal) : un
+  nom de compartiment portant un saut de ligne (la ligne imprimée se scinde en deux, invisible à la
+  lecture) et un nom de compartiment commençant par un point (invisible au glob sans `dotglob`) —
+  une troisième, le chemin du dossier de planning lui-même porteur d'un saut de ligne, casse
+  l'énumération entière d'un coup. Mesuré par exécution dans l'environnement maîtrisé exact du
+  moteur : un compartiment réellement porteur de `gsd_state_version`, masqué par l'une de ces
+  classes, faisait écrire (exit 0) `INDEX.md`/`STATE.md`/`.recalc-cache.json` sur un planning tenu
+  par GSD — violation directe de P44-D-02a. `recalc-planning.sh` ferme la conséquence entièrement
+  côté appelant (`_enumeration_workstreams_fidele`, AVANT tout appel au détecteur, jamais une
+  relecture de `STATE.md` ni une réimplémentation des priorités 2/2bis/3) : un compartiment réel
+  que l'énumération ne restituerait pas fidèlement rend le verdict du détecteur non vérifiable,
+  refus nommé, zéro octet écrit — `detect-gsd-engine.sh` et `workstream-policy.sh` restent
+  INCHANGÉS (P44-D-01b), le trou racine reste ouvert pour Samuel (BACKLOG.md, propriétaire de
+  `workstream-policy.sh`, Phase 41.1). Une entrée en lien symbolique reste une exclusion DÉCLARÉE
+  du détecteur lui-même (avertissement stderr), volontairement pas traitée comme masquante ici.
+  Correctifs de revue voisins (comportement inchangé) : commentaire corrigé sur `--noprofile
+  --norc` (n'affectent pas `BASH_ENV`/`ENV` en non-interactif — la protection vient exclusivement
+  de l'environnement maîtrisé construit de zéro) ; conséquence fail-closed totale de
+  `CANDIDATS_BASH` sur un système sans `/bin/bash` ni `/usr/bin/bash` documentée
+  (`references/modele-cycles.md`) et message stderr explicité ; l'invariant final de
+  `_jeton_journal` (P44-D-11) passe d'un `assert` nu (désactivable par `python -O`) à une exception
+  explicite toujours active.
 
 Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27. Correctifs
 lot 1 : vf-coder, mandat de correction ciblée, 2026-09-28. Lot 2 (code 2 du détecteur,
 assainissement du journal), lot 3 (dédoublonnage assaini, repli code 1 sur socle+signal), lot 4
-(source unique de vérité pour la détection GSD, encodage injectif du journal) et lot 5
+(source unique de vérité pour la détection GSD, encodage injectif du journal), lot 5
 (environnement maîtrisé du sous-processus détecteur construit de zéro, alphabet du journal étendu
-aux contrôles C0/C1) : décision du head sous délégation technique de Willy, session principale,
+aux contrôles C0/C1) et lot 6 (garde de fidélité d'énumération des compartiments de workstream,
+correctifs de revue) : décision du head sous délégation technique de Willy, session principale,
 2026-09-28.
 
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)

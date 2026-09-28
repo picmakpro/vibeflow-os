@@ -122,6 +122,40 @@ refusé l'écriture sur ce cas nominal. Ce qu'un lab métier qui contient DU COD
 détecteur rend 2, le moteur refuse l'écriture) reste une question ouverte, à cadrer en Phase 45
 (voir ROADMAP.md § Phase 45).
 
+**Conséquence non documentée de `CANDIDATS_BASH` (WR-03, revue, lot 6)** : les deux candidats fixes
+(`/bin/bash`, `/usr/bin/bash`) sont un fail-closed **total**, pas seulement local au sous-processus
+détecteur. Sur un système sans AUCUN des deux à ces emplacements exacts (une image Alpine sans
+`bash` installé — `sh` seul y est `ash`/`busybox` — une machine NixOS où les binaires système
+vivent sous `/nix/store/...` et non `/bin`/`/usr/bin`, ou une image distroless), `_resoudre_bash()`
+ne trouve jamais de candidat valide : `recalc-planning.sh` ne pourra alors **plus jamais écrire**
+sur ce système, quel que soit l'état réel du planning — aucun repli sur un autre interpréteur, aucun
+`shutil.which("bash")` (motif déjà justifié ci-dessus). Comportement VOULU (P44-D-01c/d, F1/F44-07)
+et non modifié par cette note : elle documente une conséquence déjà en place, pour qu'un futur
+lecteur qui déboguerait un « toujours refus, jamais d'écriture » sur un tel système trouve la
+réponse ici plutôt qu'en relisant le code.
+
+**Garde de fidélité d'énumération (P44-D-02a, lot 6, correction ciblée)** — audit du 2026-09-28,
+mesuré par exécution : `vf_ws_enumerate` (workstream-policy.sh) émet un chemin absolu par ligne
+pour chaque compartiment de `<planning>/workstreams/` ; ce contrat suppose que ni le nom d'un
+compartiment ni le chemin du dossier de planning lui-même ne peuvent faire disparaître ou scinder
+une ligne. Deux classes mesurées le brisent, TOUTES DEUX SILENCIEUSES côté détecteur (code 3
+« terrain libre » sans aucune ligne stderr qui les distingue du cas nominal) : un nom de
+compartiment portant un saut de ligne (la ligne imprimée se scinde en deux, aucune des deux ne
+pointant vers un chemin qui existe) ; un nom de compartiment commençant par un point (le glob
+`"$root"/*/` de `vf_ws_enumerate`, sans `dotglob`, ne l'expand jamais). Une troisième, plus large,
+casse TOUTE l'énumération d'un coup : le chemin du dossier de planning lui-même porteur d'un saut
+de ligne (chaque ligne émise porte ce préfixe). `recalc-planning.sh` ferme cette classe **côté
+appelant**, avant même d'invoquer le détecteur : une fonction structurelle
+(`_enumeration_workstreams_fidele`) compare ce qui est réellement sur le disque à ce que
+l'énumération ligne-par-ligne pourrait restituer, sans jamais relire un `STATE.md` ni chercher un
+marqueur — P44-D-01b interdit toute modification de `detect-gsd-engine.sh` ou
+`workstream-policy.sh`, la propriété est donc obtenue entièrement en aval. Une entrée en lien
+symbolique reste, elle, une exclusion DÉCLARÉE du détecteur lui-même (avertissement sur stderr) —
+non masquante au sens de cette garde, volontairement pas retenue ici (ne pas sur-refuser un cas déjà
+connu et accepté du système). Reste hors de portée de ce lot, et transmis au BACKLOG pour Samuel
+(propriétaire de `workstream-policy.sh`, Phase 41.1) : la même primitive d'énumération, avec la même
+classe de trou, alimente aussi `check-planning-state.sh` (compteur, pas un gate d'écriture).
+
 ## Arborescence
 
 ```
