@@ -165,6 +165,17 @@
   décident jamais seules » — elles sont en réalité fusionnées dans la même liste de décision que
   l'égalité d'ensembles et la lisibilité réelle, n'importe laquelle des trois suffisant seule à
   refuser. `detect-gsd-engine.sh` et `workstream-policy.sh` restent INCHANGÉS (P44-D-01b).
+- **Lot 9 (correction de portabilité GNU/BSD)** : le banc `scripts/tests/test-recalc-planning.sh`
+  rendait `✗ R14 permissions` sur le runner CI Linux (ubuntu-latest, run 36430707398) alors que
+  vert sous macOS — trois sites identiques `MODE=$(stat -f "%Lp" f 2>/dev/null || stat -c "%a" f
+  2>/dev/null)` (R14, MUT-CHMOD, MUT-CHMOD-JOURNAL) : sous GNU coreutils, `stat -f` désigne le
+  système de fichiers, pas le format de sortie — la commande échoue mais imprime déjà un bloc
+  `File:`/`ID:`/`Type:` sur stdout avant d'échouer, puis le repli `stat -c` s'exécute dans la MÊME
+  substitution de commande et ajoute `644` à la suite, produisant une chaîne multi-ligne jamais
+  égale à `"644"`. Remplacé par `mode_octal()`, une seule fonction lisant `os.stat(...).st_mode &
+  0o777` via `$PYBIN` (déjà une dépendance du banc) — une seule sémantique, indépendante du binaire
+  `stat` du PATH. Reste du banc balayé pour d'autres constructions GNU/BSD divergentes : aucune
+  autre correction nécessaire.
 
 Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27. Correctifs
 lot 1 : vf-coder, mandat de correction ciblée, 2026-09-28. Lot 2 (code 2 du détecteur,
@@ -173,9 +184,9 @@ assainissement du journal), lot 3 (dédoublonnage assaini, repli code 1 sur socl
 (environnement maîtrisé du sous-processus détecteur construit de zéro, alphabet du journal étendu
 aux contrôles C0/C1), lot 6 (garde de fidélité d'énumération des compartiments de workstream,
 correctifs de revue), lot 7 (garde de lecture du détecteur, correction de classe — fidélité par
-exécution + lisibilité réelle) et lot 8 (lien cassé traité comme absent, FIFO non bloquante,
-correction de prose) : décision du head sous délégation technique de Willy, session principale,
-2026-09-28.
+exécution + lisibilité réelle), lot 8 (lien cassé traité comme absent, FIFO non bloquante,
+correction de prose) et lot 9 (portabilité GNU/BSD du lecteur de mode du banc) : décision du head
+sous délégation technique de Willy, session principale, 2026-09-28.
 
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
 
