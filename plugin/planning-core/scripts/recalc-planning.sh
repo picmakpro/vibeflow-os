@@ -96,6 +96,11 @@ ETATS_TOUS = (
 # générique. Un code suffixé `:<x>` se sépare sur le premier `:` ; tout code absent de cette
 # table retombe sur lui-même avec `-` et `:` remplacés par des espaces (jamais un KeyError).
 LIBELLES = {
+    # combinaison-non-prevue : clause de garde-fou pour une ÉVOLUTION FUTURE des règles R1-R8/
+    # Φ0-Φ5 (modele-cycles.md § Défaut défensif) — _r1_a_r8() ci-dessous exhaustive déjà TOUTE
+    # combinaison possible de plan/cloture/verdict/summary/constats, aucun code actuel ne produit
+    # ce libellé (F6, 2026-09-28) ; il reste dans la table pour le jour où une règle nouvelle
+    # laisserait un trou.
     "combinaison-non-prevue": "combinaison de signaux non prévue",
     "verdict-passe-sans-SUMMARY.md": "verdict passé, SUMMARY absent",
     "SUMMARY.md-sans-PLAN.md": "SUMMARY.md sans PLAN.md",
@@ -338,8 +343,13 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
         return "non-concluante"  # motif-sous-processus-en-echec
     if code == 0:
         return "gsd"  # motif-code-0
-    if code in (2, 3):
-        return "non-gsd"  # motif-code-2-ou-3
+    if code == 3:
+        return "non-gsd"  # motif-code-3-terrain-libre
+    if code == 2:
+        # Signalement de MIGRATION (socle planning-core + signal de code) : refus d'écriture,
+        # jamais assimilé au code 3 « terrain libre » (décision du head sous délégation technique
+        # de Willy, session principale, 2026-09-28 — lot 2, L1).
+        return "non-concluante"  # motif-code-2-migration
     if code == 1:
         if _porte_marqueur_gsd(os.path.join(planning_abs, "STATE.md")):
             return "gsd"  # motif-marqueur-racine
@@ -377,9 +387,9 @@ def _lister_noms_unite(dossier):
 def _lister_entrees(dossier):
     try:
         entrees = os.scandir(dossier)
+        return {e.name for e in entrees}
     except OSError:
         return set()
-    return {e.name for e in entrees}
 
 
 def scanner(planning):
@@ -1179,11 +1189,29 @@ def lignes_a_journaliser(derivation, lignes_existantes):
     return a_ajouter
 
 
+_JOURNAL_ESPACE_RE = re.compile(r"\s+")
+
+
+def _jeton_journal(valeur, repli):
+    """Réduit une valeur arbitraire (P44-D-09 : lue, jamais validée — aucun contrôle de SENS) à
+    UN jeton structurellement sûr pour une ligne de `cloture.log` : espaces/tabulations/retours à
+    la ligne réduits à `_`, puis tout `=` neutralisé en `_` — aucune séquence `clé=` ne peut plus
+    s'y former. Assainissement STRUCTUREL de CHAQUE champ recopié dans le journal (chemin, auteur,
+    verdict, tentative — et tout champ futur qui passerait par `_formater_ligne_journal`), pas
+    seulement `tentative` : un champ mal formé ne peut plus se faire passer pour un second
+    enregistrement lisible par `LIGNE_JOURNAL_RE` (audit B, lot 2 L2)."""
+    brute = valeur if valeur not in (None, "") else repli
+    jeton = _JOURNAL_ESPACE_RE.sub("_", str(brute).strip()).replace("=", "_")
+    return jeton or repli
+
+
 def _formater_ligne_journal(horodatage, unite):
-    chemin = unite["chemin"]
-    auteur = re.sub(r"\s+", "_", (unite["auteur"] or "inconnu").strip()) or "inconnu"
+    chemin = _jeton_journal(unite["chemin"], "-")
+    auteur = _jeton_journal(unite["auteur"], "inconnu")
+    verdict = _jeton_journal(unite["verdict"], "-")
+    tentative = _jeton_journal(unite["tentative"], "-")
     return "{}  {}  {}  verdict={}  tentative={}  date=observation".format(
-        horodatage, chemin, auteur, unite["verdict"], unite["tentative"],
+        horodatage, chemin, auteur, verdict, tentative,
     )
 
 
@@ -1300,12 +1328,19 @@ def ecrire_si_different(chemin, contenu):
         return False
     dossier = os.path.dirname(chemin) or "."
     fd_tmp, chemin_tmp = tempfile.mkstemp(dir=dossier, prefix=".tmp-recalc-")
+    fd_non_adopte = True  # tant que os.fdopen n'a pas pris possession du descripteur (F5)
     try:
         os.fchmod(fd_tmp, 0o644)
         with os.fdopen(fd_tmp, "wb") as fh:
+            fd_non_adopte = False
             fh.write(octets)
         os.replace(chemin_tmp, chemin)
     except Exception:
+        if fd_non_adopte:
+            try:
+                os.close(fd_tmp)
+            except OSError:
+                pass
         try:
             os.remove(chemin_tmp)
         except OSError:
@@ -1326,9 +1361,12 @@ def appliquer_ecritures(planning, racine_lab, derivation, cache_ctx, statut_cach
     if statut_journal in ("lien", "illisible"):
         print("[recalc-planning] journal des clôtures inaccessible en écriture (statut=" + statut_journal + ")", file=sys.stderr)
         return (1, None)
-    for nom_cible in ("INDEX.md", "STATE.md", "cloture.log"):
+    for nom_cible in ("INDEX.md", "STATE.md", "cloture.log", ".recalc-cache.json"):
         chemin_cible = os.path.join(planning, nom_cible)
-        if os.path.lexists(chemin_cible) and not os.path.isfile(chemin_cible):
+        # `est_fichier_regulier` (lstat + S_ISREG, jamais de suivi de lien) — PAS `os.path.isfile`
+        # (traverse un lien symbolique) : un lien à cet emplacement, même pointant vers un fichier
+        # régulier existant hors de `.planning/`, est refusé plutôt que remplacé en silence (F4).
+        if os.path.lexists(chemin_cible) and not est_fichier_regulier(chemin_cible):
             print("[recalc-planning] emplacement occupé par autre chose qu'un fichier régulier : " + chemin_cible, file=sys.stderr)
             return (1, None)
     a_ajouter = lignes_a_journaliser(derivation, lignes_existantes)
