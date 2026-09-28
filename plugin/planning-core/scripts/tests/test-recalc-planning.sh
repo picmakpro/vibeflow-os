@@ -2941,6 +2941,147 @@ if make_recalc_mutant CODE2-MIGRATION 'return "non-concluante"  # motif-code-2-m
 fi
 
 # ================================================================================================
+# Lot 6 (correction ciblée, audit du 2026-09-28) — garde de fidélité d'énumération, AVANT tout
+# appel au détecteur : un compartiment RÉEL de `workstreams/` que l'énumération ligne-par-ligne de
+# `vf_ws_enumerate` ne restituerait pas fidèlement rend tout verdict du détecteur non vérifiable.
+# Preuve différentielle : les cas R-ENUM-FIDELE-* rejouent, sur le code ORIGINAL non corrigé
+# (git show 0be13a9), un exit=0 avec écriture silencieuse (rouge, tracé dans le rapport de
+# mission) ; sur le code corrigé ci-dessous, exit=3 et aucune écriture (vert). P44-D-01b :
+# `detect-gsd-engine.sh` et `workstream-policy.sh` ne sont JAMAIS mutés ni réimplémentés ici.
+# ================================================================================================
+
+# ---------- R-ENUM-FIDELE-LF — nom de compartiment à saut de ligne, marqueur GSD à l'intérieur --
+R_EFLF_DIR="$WORK/r-enum-fidele-lf"
+materialiser traceur "$R_EFLF_DIR"
+R_EFLF_NOM=$'compartiment-un\nmarqueur-cache'
+mkdir -p "$R_EFLF_DIR/.planning/workstreams/$R_EFLF_NOM"
+printf -- '---\ngsd_state_version: 1.0\n---\n' > "$R_EFLF_DIR/.planning/workstreams/$R_EFLF_NOM/STATE.md"
+empreinte "$R_EFLF_DIR" > "$WORK/r-enum-fidele-lf-avant.txt"
+( cd "$R_EFLF_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-enum-fidele-lf-out.txt" 2>"$WORK/r-enum-fidele-lf-err.txt" )
+R_EFLF_RC=$?
+empreinte "$R_EFLF_DIR" > "$WORK/r-enum-fidele-lf-apres.txt"
+if [ "$R_EFLF_RC" -eq 3 ]; then
+  ok "R-ENUM-FIDELE-LF code de sortie 3 (compartiment à saut de ligne masqué à l'énumération — refus, jamais un terrain libre de complaisance)"
+else
+  ko "R-ENUM-FIDELE-LF code" "3" "$R_EFLF_RC" "$(cat "$WORK/r-enum-fidele-lf-out.txt")"
+fi
+if grep -qF "nom-compartiment-saut-de-ligne" "$WORK/r-enum-fidele-lf-err.txt" 2>/dev/null; then
+  ok "R-ENUM-FIDELE-LF stderr nomme la classe masquante (nom-compartiment-saut-de-ligne)"
+else
+  ko "R-ENUM-FIDELE-LF stderr" "cite nom-compartiment-saut-de-ligne" "$(cat "$WORK/r-enum-fidele-lf-err.txt")" "-"
+fi
+if cmp -s "$WORK/r-enum-fidele-lf-avant.txt" "$WORK/r-enum-fidele-lf-apres.txt"; then
+  ok "R-ENUM-FIDELE-LF empreinte de .planning/ identique avant/après (aucune écriture)"
+else
+  ko "R-ENUM-FIDELE-LF empreinte" "identique" "diverge" "-"
+fi
+
+# ---------- R-ENUM-FIDELE-CACHE — nom de compartiment caché (point), marqueur GSD à l'intérieur --
+R_EFC_DIR="$WORK/r-enum-fidele-cache"
+materialiser traceur "$R_EFC_DIR"
+mkdir -p "$R_EFC_DIR/.planning/workstreams/.hidden-compartment"
+printf -- '---\ngsd_state_version: 1.0\n---\n' > "$R_EFC_DIR/.planning/workstreams/.hidden-compartment/STATE.md"
+empreinte "$R_EFC_DIR" > "$WORK/r-enum-fidele-cache-avant.txt"
+( cd "$R_EFC_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-enum-fidele-cache-out.txt" 2>"$WORK/r-enum-fidele-cache-err.txt" )
+R_EFC_RC=$?
+empreinte "$R_EFC_DIR" > "$WORK/r-enum-fidele-cache-apres.txt"
+if [ "$R_EFC_RC" -eq 3 ]; then
+  ok "R-ENUM-FIDELE-CACHE code de sortie 3 (compartiment caché invisible au glob — refus)"
+else
+  ko "R-ENUM-FIDELE-CACHE code" "3" "$R_EFC_RC" "$(cat "$WORK/r-enum-fidele-cache-out.txt")"
+fi
+if grep -qF "nom-compartiment-cache:.hidden-compartment" "$WORK/r-enum-fidele-cache-err.txt" 2>/dev/null; then
+  ok "R-ENUM-FIDELE-CACHE stderr nomme la classe masquante (nom-compartiment-cache)"
+else
+  ko "R-ENUM-FIDELE-CACHE stderr" "cite nom-compartiment-cache:.hidden-compartment" "$(cat "$WORK/r-enum-fidele-cache-err.txt")" "-"
+fi
+if cmp -s "$WORK/r-enum-fidele-cache-avant.txt" "$WORK/r-enum-fidele-cache-apres.txt"; then
+  ok "R-ENUM-FIDELE-CACHE empreinte de .planning/ identique avant/après (aucune écriture)"
+else
+  ko "R-ENUM-FIDELE-CACHE empreinte" "identique" "diverge" "-"
+fi
+
+# ---------- R-ENUM-FIDELE-CHEMIN — chemin du dossier de planning lui-même à saut de ligne ---------
+R_EFCH_ROOT="$WORK/r-enum-fidele-chemin"$'\n'"racine"
+mkdir -p "$R_EFCH_ROOT"
+materialiser traceur "$R_EFCH_ROOT"
+mkdir -p "$R_EFCH_ROOT/.planning/workstreams/compartiment-normal"
+printf -- '---\ngsd_state_version: 1.0\n---\n' > "$R_EFCH_ROOT/.planning/workstreams/compartiment-normal/STATE.md"
+empreinte "$R_EFCH_ROOT" > "$WORK/r-enum-fidele-chemin-avant.txt"
+( cd "$R_EFCH_ROOT" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-enum-fidele-chemin-out.txt" 2>"$WORK/r-enum-fidele-chemin-err.txt" )
+R_EFCH_RC=$?
+empreinte "$R_EFCH_ROOT" > "$WORK/r-enum-fidele-chemin-apres.txt"
+if [ "$R_EFCH_RC" -eq 3 ]; then
+  ok "R-ENUM-FIDELE-CHEMIN code de sortie 3 (chemin du planning à saut de ligne — TOUTE l'énumération casse, refus)"
+else
+  ko "R-ENUM-FIDELE-CHEMIN code" "3" "$R_EFCH_RC" "$(cat "$WORK/r-enum-fidele-chemin-out.txt")"
+fi
+if grep -qF "chemin-planning-saut-de-ligne" "$WORK/r-enum-fidele-chemin-err.txt" 2>/dev/null; then
+  ok "R-ENUM-FIDELE-CHEMIN stderr nomme la classe masquante (chemin-planning-saut-de-ligne)"
+else
+  ko "R-ENUM-FIDELE-CHEMIN stderr" "cite chemin-planning-saut-de-ligne" "$(cat "$WORK/r-enum-fidele-chemin-err.txt")" "-"
+fi
+if cmp -s "$WORK/r-enum-fidele-chemin-avant.txt" "$WORK/r-enum-fidele-chemin-apres.txt"; then
+  ok "R-ENUM-FIDELE-CHEMIN empreinte de .planning/ identique avant/après (aucune écriture)"
+else
+  ko "R-ENUM-FIDELE-CHEMIN empreinte" "identique" "diverge" "-"
+fi
+
+# ---------- R-ENUM-FIDELE-SYMLINK — entrée en lien symbolique : EXCLUSION DÉCLARÉE du détecteur,
+# PAS une classe masquante de cette garde (F1 : ne pas sur-refuser un cas déjà connu et accepté) --
+R_EFS_DIR="$WORK/r-enum-fidele-symlink"
+materialiser traceur "$R_EFS_DIR"
+mkdir -p "$R_EFS_DIR/.planning/workstreams" "$WORK/r-enum-fidele-symlink-cible"
+printf -- '---\ngsd_state_version: 1.0\n---\n' > "$WORK/r-enum-fidele-symlink-cible/STATE.md"
+ln -s "$WORK/r-enum-fidele-symlink-cible" "$R_EFS_DIR/.planning/workstreams/lien-compartiment"
+( cd "$R_EFS_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-enum-fidele-symlink-out.txt" 2>"$WORK/r-enum-fidele-symlink-err.txt" )
+R_EFS_RC=$?
+if grep -qF "nom-compartiment" "$WORK/r-enum-fidele-symlink-err.txt" 2>/dev/null; then
+  ko "R-ENUM-FIDELE-SYMLINK" "lien symbolique NON classé masquant par cette garde" "classé masquant à tort" "$(cat "$WORK/r-enum-fidele-symlink-err.txt")"
+else
+  ok "R-ENUM-FIDELE-SYMLINK lien symbolique jamais classé masquant par cette garde (exclusion déjà déclarée ailleurs, rc=$R_EFS_RC)"
+fi
+
+# ---------- R-ENUM-FIDELE-NOMINAL — compartiments réels aux noms sans piège, aucun marqueur GSD :
+# écriture INCHANGÉE (non-régression, la garde ne doit jamais sur-refuser un cas nominal) --------
+R_EFN_DIR="$WORK/r-enum-fidele-nominal"
+materialiser traceur "$R_EFN_DIR"
+mkdir -p "$R_EFN_DIR/.planning/workstreams/compartiment-normal"
+printf -- '---\nworkstream: compartiment-normal\ncreated: 2026-09-28\n---\n' > "$R_EFN_DIR/.planning/workstreams/compartiment-normal/notes.md"
+( cd "$R_EFN_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-enum-fidele-nominal-out.txt" 2>"$WORK/r-enum-fidele-nominal-err.txt" )
+R_EFN_RC=$?
+if [ "$R_EFN_RC" -eq 0 ]; then
+  ok "R-ENUM-FIDELE-NOMINAL code de sortie 0 (compartiments nominaux, aucun marqueur — écriture inchangée)"
+else
+  ko "R-ENUM-FIDELE-NOMINAL code" "0" "$R_EFN_RC" "$(cat "$WORK/r-enum-fidele-nominal-err.txt")"
+fi
+for f in INDEX.md STATE.md .recalc-cache.json; do
+  if [ -f "$R_EFN_DIR/.planning/$f" ]; then
+    ok "R-ENUM-FIDELE-NOMINAL $f créé"
+  else
+    ko "R-ENUM-FIDELE-NOMINAL $f créé" "présent" "absent" "-"
+  fi
+done
+
+# ---------- MUT-ENUM-FIDELE — la garde de fidélité d'énumération neutralisée (if False:) ---------
+if make_recalc_mutant ENUM-FIDELE 'if not fidele:' 'if False:  # MUT-ENUM-FIDELE (garde neutralisée)'; then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-enum-fidele-cas"
+  materialiser traceur "$DIR_CAS"
+  MUT_NOM=$'compartiment-un\nmarqueur-cache'
+  mkdir -p "$DIR_CAS/.planning/workstreams/$MUT_NOM"
+  printf -- '---\ngsd_state_version: 1.0\n---\n' > "$DIR_CAS/.planning/workstreams/$MUT_NOM/STATE.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-enum-fidele-out.txt" 2>"$WORK/mut-enum-fidele-err.txt" ); RC_M=$?
+  if ! _verifier_plantage ENUM-FIDELE "code de sortie (compartiment à saut de ligne masqué, marqueur GSD à l'intérieur — R-ENUM-FIDELE-LF)" "$WORK/mut-enum-fidele-out.txt" "$WORK/mut-enum-fidele-err.txt" "$RC_M"; then
+    if [ "$RC_M" -ne 3 ]; then
+      okmut ENUM-FIDELE "code de sortie · attendu (original) : 3 · obtenu (mutant) : $RC_M (écriture silencieuse sur un compartiment réellement tenu par GSD — régression exacte de l'audit du 2026-09-28)"
+    else
+      komut ENUM-FIDELE "code de sortie" "3" "$RC_M (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ================================================================================================
 # Lot 2 L2 — assainissement STRUCTUREL de tout champ recopié dans cloture.log (_jeton_journal),
 # preuve avec la valeur piégée exacte de l'audit.
 # ================================================================================================
