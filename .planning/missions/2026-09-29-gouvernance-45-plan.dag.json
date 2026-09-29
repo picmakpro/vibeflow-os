@@ -1,0 +1,71 @@
+{
+  "nodes": [
+    {
+      "id": "recherche-hooks",
+      "step": "recherche doc: payload agent_type, deny, fail-open harnais",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-45-scouting"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "cadrage-45",
+      "step": "cadrage Phase 45 (manager, questions Willy)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-45",
+        ".planning/workstreams/gouvernance/REQUIREMENTS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-45",
+      "step": "gsd-plan-phase 45 --ws gouvernance (vf-coder)",
+      "stage": "",
+      "deps": [
+        "cadrage-45",
+        "recherche-hooks"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-45"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-45",
+      "step": "plan-checkers frais jusqu'au vert",
+      "stage": "",
+      "deps": [
+        "plan-45"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "suivi-45",
+      "step": "ROADMAP + STATE à la main",
+      "stage": "",
+      "deps": [
+        "plancheck-45"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/ROADMAP.md",
+        ".planning/workstreams/gouvernance/STATE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "pr-45",
+      "step": "push + PR de planification",
+      "stage": "",
+      "deps": [
+        "suivi-45"
+      ],
+      "scope": [],
+      "status": "ready"
+    }
+  ]
+}
