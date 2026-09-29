@@ -426,6 +426,10 @@ assert "C7m — pipe après le cd : deny" "$(run_guard "$(mk_bash "cd $AUTRE && 
 assert "C7n — gh -R : dépôt indéterminé, deny" "$(run_guard "$(mk_bash "cd $AUTRE && gh pr create -R o/r" sess-intrus "$LAB")")" "$DENY"
 assert "C7o — sous-dossier du lab : deny" "$(run_guard "$(mk_bash "cd $LAB/scripts && git commit -m x" sess-intrus "$LAB")")" "$DENY"
 assert "C7q — cd sans argument (HOME) : deny" "$(run_guard "$(mk_bash "cd && git commit -m x" sess-intrus "$LAB")")" "$DENY"
+# popd dépile vers un dossier que le guard ne suit pas (régression v2.67.0) : le lock s applique
+assert "C7r — pushd <hors-lab> && git commit && popd && git commit : deny" "$(run_guard "$(mk_bash "pushd $AUTRE && git commit -m a && popd && git commit -m b" sess-intrus "$LAB")")" "$DENY"
+assert "C7s — cd <hors-lab> && popd && git commit : deny" "$(run_guard "$(mk_bash "cd $AUTRE && popd && git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert_empty "C7t — contrôle : pushd <hors-lab> && git commit sans popd : allow" "$(run_guard "$(mk_bash "pushd $AUTRE && git commit -m a" sess-intrus "$LAB")")"
 # Voie Write/Edit : le .planning/ d un autre dépôt n est pas celui du lab
 assert_empty "C6a — Write dans le .planning/ d'un autre dépôt : allow" "$(run_guard "$(mk_write_cwd "$AUTRE/.planning/STATE.md" sess-intrus "$LAB")")"
 assert "C6b — Write dans le .planning/ du lab (chemin absolu) : deny" "$(run_guard "$(mk_write_cwd "$LAB/.planning/STATE.md" sess-intrus "$LAB")")" "$DENY"

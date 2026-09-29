@@ -1,5 +1,16 @@
 # Changelog — conductor
 
+## [v1.45.1] — 2026-09-29 (correctif : `popd` contournait le verrou de driver)
+
+**Patch** (régression de v1.45.0) :
+
+- **`scripts/guard-driver-lock.sh`, règle C7** : le hook suivait `cd` et `pushd` mais pas `popd`.
+  Dans `pushd <autre-dépôt> && git commit && popd && git commit`, le second commit, fait dans le
+  lab, était jugé hors du lab et **autorisé** sous le verrou d'une autre session ; les versions
+  antérieures le refusaient. `popd` rend désormais la cible indéterminée, et le verrou s'applique au geste suivant.
+  Suite `tests/test-guard-driver-lock.sh` : 3 cas ajoutés (C7r et C7s rouges sans le correctif,
+  C7t contrôle : `pushd` sans `popd` reste autorisé).
+
 ## [v1.45.0] — 2026-09-28 (budgets de méthode, périmètre du verrou de driver)
 
 **Minor** (nouveau script, correctif du hook de verrou) :
