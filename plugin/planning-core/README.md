@@ -7,7 +7,7 @@
 > Sur un lab de code, le planning du **projet** appartient au moteur de développement : ce module
 > redirige vers le verbe adéquat au lieu de produire un format concurrent (ADR-055).
 
-**Type** : `skill + references + scripts` · **Version** : v2.7.1 · **Dépend de** : rien.
+**Type** : `skill + references + scripts` · **Version** : v2.8.0 · **Dépend de** : rien.
 
 ---
 
@@ -81,7 +81,9 @@ planning-core/
     domain-detection.md        # heuristiques métier → profil + auto-infusion (hook opt-in)
     example-lab-contenu.md     # exemple complet d'un socle adapté à un lab NON-dev
     gsd-handoff.md             # frontière d'altitude planning-core / moteur GSD (ADR-055)
+    modele-cycles.md           # référence du modèle par cycles (recalc-planning.sh)
     templates/                 # 10 gabarits universels neutres-métier
+    templates/cycles/          # 8 gabarits du modèle par cycles
   scripts/
     check-planning-state.sh    # garde-fou fraîcheur de STATE.md (advisory)
     detect-gsd-engine.sh       # fait « un moteur GSD est-il en place ? » (4 exits)
@@ -90,5 +92,18 @@ planning-core/
     planning-context.sh        # contexte planning injecté en session
     planning-session-snapshot.sh  # snapshot de fin de session
     planning-task-context.sh   # contexte par tâche
-    tests/                     # 5 suites (planning-core, hooks, hardening, detect-*)
+    recalc-planning.sh         # recalcul d'état dérivé du disque, modèle par cycles (Python embarqué)
+    tests/                     # 9 suites (planning-core, hooks, hardening, detect-*, recalc-planning)
 ```
+
+## Moteur par cycles (recalc-planning.sh)
+
+Recalcul d'état, dérivé du disque, jamais déclaré : un lab qui adhère explicitement au nouveau
+modèle (`"planning_version": "cycles-v1"` dans `.planning/config.json`) obtient huit états (dont
+`indéterminé`) recalculés pour ses cycles/phases/plans, `INDEX.md`, `STATE.md` et `cloture.log`
+(append-only) régénérés, avec un cache incrémental par hash du contenu. Sans cette adhésion, ou
+sur un planning détecté comme tenu par GSD, le recalcul **refuse d'écrire** — mode `--read-only`
+disponible sur n'importe quel planning, adhérent ou non, sortie JSON sur la sortie standard
+uniquement. Aucun hook n'est câblé dans cette phase (arrivera avec les gates, 45+) ; le socle
+existant décrit ci-dessus reste inchangé et toujours actif pour tout lab qui n'a pas adhéré.
+Détail complet : `references/modele-cycles.md`.

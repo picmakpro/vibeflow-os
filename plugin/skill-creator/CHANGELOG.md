@@ -1,5 +1,41 @@
 # CHANGELOG — skill-creator
 
+## [v1.1.1] — 2026-09-29 (correctif : le validateur refusait les clés que le skill demande)
+
+**Patch** (régression de v1.1.0) :
+
+- **`skills/skill-creator/scripts/quick_validate.py`** : v1.1.0 demandait d'écrire `vf-nature`
+  (et, pour une procédure, `ecrit:`, `vf-rubrique-juge:` et les trois marqueurs) dans le
+  frontmatter, mais le validateur ne connaissait que les clés Anthropic et rendait
+  « Unexpected key(s) in SKILL.md frontmatter: vf-nature » : un skill produit par ce flux échouait
+  à la validation et à l'empaquetage (`package_skill.py`). Les six clés du gate des skills sont
+  acceptées ; leurs valeurs restent validées par `conductor/scripts/check-skills.sh`.
+- **Suite `skills/skill-creator/scripts/tests/test-quick-validate.sh`** (nouvelle, 4 cas) : clés
+  acceptées, clé inconnue toujours refusée, et parité avec `VIBEFLOW_SKILL_FIELDS` de
+  `check-skills.sh` (une clé ajoutée au gate sans l'être au validateur rougit).
+
+## [v1.1.0] — 2026-09-26 (Phase 43 — nature des skills, FABR-08)
+
+**Minor** :
+
+- **Les deux étages de skill-creator demandent `vf-nature`** — le moteur interne
+  (`skills/skill-creator/SKILL.md`) et le workflow templaté
+  (`skills/skill-creator-workflow/SKILL.md`) posent chacun la question de nature
+  (`referentiel` | `outil` | `procedure`, défaut `outil`), à son propre étage (D-Q6).
+- **Question distincte de la nature du sujet** — dans le workflow templaté, l'étape `vf-nature`
+  (nouvel item 5 de Phase 1) reste séparée de l'étape existante « Evaluer la nature du sujet »
+  (item 4, méthodologique/agnostique/zone grise), sans fusion ni redéfinition (D-Q2).
+- **Trois marqueurs factuels** — les deux fichiers posent les trois questions factuelles de B-03
+  (gate bloquant, livrable remis à un tiers, couche de qualité) notées `vf-gate-bloquant`,
+  `vf-livrable-tiers`, `vf-couche-qualite` ; la nature reste déclarée par l'utilisateur ou
+  l'agent orchestrateur, jamais déduite (C-15).
+- **`ecrit:` et `vf-rubrique-juge:` exigés pour une procédure** — sans les deux, le gate des
+  skills refuse le SKILL.md produit.
+- **Validation par `check-skills.sh --file`** — les deux fichiers passent le gate des skills
+  posé en 43-01 (rc 0).
+
+Décisions citées : Willy, AskUserQuestion, session principale, 2026-09-24 (D-Q6, D-Q2).
+
 ## [v1.0.4] — 2026-08-30 (Phase 38 — description de frontmatter YAML strict, plan 38-08)
 
 **Patch** :

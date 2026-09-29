@@ -89,7 +89,8 @@ Pour les changements **structure/doctrine**, produire un plan explicite :
    (union des deux sources depuis Phase 21, ADR-051-B — un serveur déclaré seulement en scope
    global, cas courant sur ce parc, déclenche désormais aussi la ré-affirmation) — **sans** bump de
    module (l'`update` ne re-copie pas les agents à version inchangée), re-jouer l'injection
-   idempotente sur les agents flaggés `vf-mcp-consumer` :
+   idempotente sur les agents flaggés `vf-mcp-consumer` (allowlist large) ou porteurs de
+   `vf-mcp-tools` (allowlist nommée, ex. `vf-reviewer`) :
    ```sh
    .claude/scripts/inject-mcp-tools.sh --target .claude/agents --mcp-json ./.mcp.json
    ```

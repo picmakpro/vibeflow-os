@@ -11,9 +11,9 @@
 
 ## Phases
 
-- [ ] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
-- [ ] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
-- [ ] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
+- [x] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #108
+- [x] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #111
+- [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
 - [ ] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -33,59 +33,106 @@
 > 2026-09-23. **Aucune exécution avant la clôture de `fiabilite-v1.0`** (Samuel, WhatsApp, 2026-09-23) :
 > la planification avance, l'exécution attend. **Être inscrite ne vaut pas feu vert d'exécution** : chaque phase passe par
 > `gsd-discuss-phase` puis `gsd-plan-phase`.
+> **Amendement du 2026-09-24** : exécution en parallèle de `fiabilite` autorisée — autorisation Samuel du 2026-09-23 rapportée par Willy, session principale, 2026-09-24 (canal non précisé).
+> **Garde-fous de cette exécution anticipée** (posés par la mission du 2026-09-24) : (1) **aucune release du jalon gouvernance avant la clôture de `fiabilite-v1.0`** — les numéros de version des modules partagés, `conductor` en tête, entreraient en collision avec ceux de `fiabilite` (la PR #100 porte `conductor` v1.40.0 → v1.41.0) ; une PR de ce jalon qui bumpe un module partagé se rebase et se renumérote après les merges de `fiabilite`, jamais l'inverse ; (2) **les gates de planning de ce compartiment se rejouent à la main** (`--file .planning/workstreams/gouvernance/STATE.md`) tant que la Phase 41.1 (PR #100 de Samuel) n'est pas mergée : la CI ne vérifie que `fiabilite`.
 
 ### Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents
 
 **Goal:** Le gate des agents (`check-agents.sh`) lit ses listes de référence — outils, champs, types natifs, modèles, modes, niveaux d'effort — dans un **manifeste daté** et rend **INDÉTERMINÉ** quand ce manifeste est périmé ; il tient les invariants de doctrine I1 à I7 et découvre les agents récursivement.
 **Requirements**: FABR-01, FABR-02, FABR-03, FABR-04, FABR-05
-**Depends on:** Phase 41 et **clôture du jalon `fiabilite-v1.0`** — volet admin de la 41 posé par Willy, release, clôture, puis ouverture de celui-ci (Samuel, WhatsApp, 2026-09-23). **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — **mergée le 2026-09-23** (11:11 UTC, après ajout du trailer `Gate-Touche:` par Samuel) : précondition levée.
+**Depends on:** Phase 41 et **clôture du jalon `fiabilite-v1.0`** — volet admin de la 41 posé par Willy, release, clôture, puis ouverture de celui-ci (Samuel, WhatsApp, 2026-09-23). **Levée le 2026-09-24** pour l'exécution, pas pour la release : autorisation Samuel du 2026-09-23 rapportée par Willy, session principale, 2026-09-24 (canal non précisé) ; voir les garde-fous de l'en-tête du jalon. **PR #85 mergée** : elle porte le premier geste de la fabrique (correctif des 9 blueprints + I8, `check-blueprints.sh`) — **mergée le 2026-09-23** (11:11 UTC, après ajout du trailer `Gate-Touche:` par Samuel) : précondition levée.
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §1.1-1.3, §3, §4, B-01. Hors périmètre : §8 (`skills:`, `cacheTtl`, `maxTurns`, `color:`).
 **Revue de Samuel (WhatsApp, 2026-09-23)** : décisions de corpus ratifiées ; trois ajouts au cadrage — D-18 (`vf-test-orchestrator` nomme `vf-dev-manager` et `vf-auto`), D-19 (effet d'`omitClaudeMd` sur `.claude/rules/*.md` mesuré, pas déduit), D-20 (faux vert de l'invocation nue de `check-agents.sh`, `.planning/codebase/CONCERNS.md:349`). **Plans à réviser avant exécution.**
-**Plans:** 6 plans
+**Plans:** 6/6 plans executed
+**Clôture :** PR #108 mergée le 2026-09-27 (contournement de la revue code owner D-02bis, arbitrage Willy, session principale, 2026-09-27 ; revue de Samuel à faire après coup).
 
 Plans:
 **Wave 1**
 
-- [ ] 42-01-PLAN.md — vague 1 (tracer) : manifeste daté lu par le gate, posé par l'installeur (`*.json`), refus sur manifeste illisible ; T54, T77-T82 (FABR-01)
-- [ ] 42-02-PLAN.md — vague 1 : corpus — mobile-test-team (I3), business-pilot-bundle et content-bundle (I5/I6), un commit et un bump patch par module (FABR-05)
-- [ ] 42-03-PLAN.md — vague 1 : corpus — growth-bundle et design-orchestrator (I5/I6), un commit et un bump patch par module (FABR-05)
+- [x] 42-01-PLAN.md — vague 1 (tracer) : manifeste daté lu par le gate, posé par l'installeur (`*.json`), refus sur manifeste illisible ; T54, T77-T82 (FABR-01) — Complete (2026-09-24)
+- [x] 42-02-PLAN.md — vague 1 : corpus — mobile-test-team (I3), business-pilot-bundle et content-bundle (I5/I6), un commit et un bump patch par module (FABR-05) — Complete (2026-09-24)
+- [x] 42-03-PLAN.md — vague 1 : corpus — growth-bundle et design-orchestrator (I5/I6), un commit et un bump patch par module (FABR-05) — Complete (2026-09-24)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 42-04-PLAN.md — vague 2 : fraîcheur — INDÉTERMINÉ sous `--manifest-freshness=strict` en CI, avertissement chez l'utilisateur, rétrogradation D-05 ; T83-T90, MUT-F1/F2 (FABR-02)
+- [x] 42-04-PLAN.md — vague 2 : fraîcheur — INDÉTERMINÉ sous `--manifest-freshness=strict` en CI, avertissement chez l'utilisateur, rétrogradation D-05 ; T83-T90, T103, MUT-F1/F2/D20 (FABR-02) — Complete (2026-09-25)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 42-05-PLAN.md — vague 3 : invariants locaux I1, I4, I5, I6, I7 en erreur, jumeaux négatifs et mutants ; corpus et blueprints verts (FABR-03, FABR-05)
+- [x] 42-05-PLAN.md — vague 3 : invariants locaux I1, I4, I5, I6, I7 en erreur, jumeaux négatifs et mutants ; corpus et blueprints verts (FABR-03, FABR-05) — Complete (2026-09-25)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 42-06-PLAN.md — vague 4 : découverte récursive (D-10), I2/I3 en monde fermé (D-09), conductor en mineure, relevé de relecture Samuel (FABR-03, FABR-04, FABR-05)
+- [x] 42-06-PLAN.md — vague 4 : découverte récursive (D-10), I2/I3 en monde fermé (D-09), conductor en mineure, relevé de relecture Samuel (FABR-03, FABR-04, FABR-05) — Complete (2026-09-25)
 
 ### Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator
 
-**Goal:** Chaque skill déclare sa nature (`vf-nature: referentiel | outil | procedure`, défaut « outil ») ; une procédure sans `ecrit:` ni rubrique de juge est refusée ; la dérive de forme procédurale non déclarée est détectée ; `skill-creator` demande la nature ; les deux conventions MCP concurrentes n'en font plus qu'une. Les trois marqueurs de détection de dérive (un gate bloquant, un livrable remis à un tiers, une couche de qualité) forment **un contrat unique** : l'initialisation les pose tels quels en questions factuelles (C-15), sans redéfinir la nature.
-**Requirements**: TBD (posés au cadrage)
+**Goal:** Chaque skill déclare sa nature (`vf-nature: referentiel | outil | procedure`, défaut « outil ») ; une procédure sans `ecrit:` ni rubrique de juge est refusée ; la dérive de forme procédurale non déclarée est détectée ; `skill-creator` demande la nature ; les deux déclarations MCP (`vf-mcp-consumer` / `vf-mcp-tools`) sont conservées comme réponses à deux besoins distincts (décision 1 d'ADR-051), la spec fabrique §1.2/§7.2 est amendée en ce sens et le mécanisme conservé est durci (grammaire de `vf-mcp-tools` validée, serveur nommé absent signalé, textes à une seule clé corrigés). Les trois marqueurs de détection de dérive (un gate bloquant, un livrable remis à un tiers, une couche de qualité) forment **un contrat unique** : l'initialisation les pose tels quels en questions factuelles (C-15), sans redéfinir la nature.
+**Requirements**: FABR-06, FABR-07, FABR-08, FABR-09, FABR-10
+**Exigences (2026-09-25)** : proposées par `43-CONTEXT.md` § Exigences proposées, gravées au ledger du compartiment à la planification.
+**Amendement du goal (2026-09-25)** : la clause d'origine « les deux conventions MCP concurrentes n'en font plus qu'une » est remplacée par la décision D-Q3 de `43-CONTEXT.md` — Willy, AskUserQuestion, session principale, 2026-09-24 : « garder les deux déclarations ». La fusion est écartée ; la spec est amendée, le mécanisme durci.
 **Depends on:** Phase 42 (le manifeste daté et la découverte récursive servent aussi ce gate).
 **Sources:** `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §6, §7.2, B-03. **C'est le contrôle machine qui manque à la décision D-07** du moteur (`docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §2, §9). `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-15, §5.2 (la case « trois marqueurs de B-03 » remplace « qui en répond »).
 **À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : budget des `SKILL.md` et du bootstrap sans enforcement machine — `.planning/BACKLOG.md:450` ; la phase touche les skills, elle le prend au passage.
-**Plans:** 0 plans
+**Plans:** 7/7 plans executed
+**Clôture :** PR #111 mergée le 2026-09-27 (commit 556452e), après deux merges amont dans sa branche (a2517df et le merge de la PR #112, intégration par merge plutôt que rebase pour ne pas réécrire les SHA cités — arbitrage Willy, session principale, 2026-09-27). Contournement de la revue code owner D-02bis, arbitrage Willy, session principale, 2026-09-27 ; revue de Samuel à faire après coup.
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 43 to break down)
+- [x] 43-01-PLAN.md — vague 1 (tracer) : `check-skills.sh` lit le manifeste daté élargi à sept listes, découvre le corpus réel à ses trois profondeurs, refuse une procédure sans `ecrit:`/`vf-rubrique-juge` ; valeurs validées strictement ; parité de contrat avec `check-agents.sh` (FABR-06, FABR-09 clause manifeste)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 43-04-PLAN.md — vague 2 (après 43-01, seul propriétaire de la base de phase figée — révision du 2026-09-26) : plafond de 500 lignes des SKILL.md dans `check-instruction-budget.sh` ; bootstrap en ratchet sur le socle minimal (ligne de baseline `@bootstrap:socle` à la mesure du jour, ≈ 2 499 tokens pour un plafond ADR-029 de 2 000 qui reste un objectif, BACKLOG) — décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26 (FABR-09)
+- [x] 43-03-PLAN.md — vague 2 : `skill-creator` (moteur interne et workflow templaté) pose `vf-nature`, défaut « outil », distincte de la nature du sujet (FABR-08)
+- [x] 43-05-PLAN.md — vague 2 (tracer) : durcissements MCP — serveur nommé absent de l'union signalé jusqu'au journal d'installation, `vf-mcp-tools` malformée refusée à l'install et au gate, textes de l'installeur à deux déclarations, relecture Samuel (FABR-10)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 43-02-PLAN.md — vague 3 (après 43-03, révision du 2026-09-26) : dérive procédurale en écart déclaration/prose, dans les deux sens, en avertissement ; portée : tout le corps hors blocs de code, alerte à partir de deux marqueurs distincts en prose ou d'un seul dans un titre (décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26) ; corpus réel mesuré (10/21 au 2026-09-26), non corrigé (FABR-07)
+- [x] 43-07-PLAN.md — vague 3 : spec fabrique §1.2/§7.2 amendée (deux besoins distincts, fusion écartée, D-Q3), dev-orchestrator en patch — détaché de 43-05 à la révision du 2026-09-25 (FABR-10)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 43-06-PLAN.md — vague 4 : `vf-calibrate` à deux déclarations, conductor en mineure, rejeu complet (suites, corpus réel, G-1, G-2, labs frais), relevés de relecture et de résidus (FABR-06, FABR-07, FABR-09, FABR-10)
 
 ### Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque
 
 **Goal:** Le modèle de données d'un lab (`cycles/`, `phases/`, `CADRAGE.md`, `PLAN.md` avec `ecrit:`, `VERDICT.md`, `SUMMARY.md`) existe, et un recalcul **en Python** dérive du disque les huit états (dont `indéterminé`) et génère `INDEX.md`, `STATE.md` et `cloture.log` — incrémental par hash du contenu, jamais par `mtime`.
-**Requirements**: TBD (posés au cadrage)
+**Requirements**: MOTR-01..MOTR-18 (posées au cadrage, `44-CONTEXT.md`)
 **Depends on:** Phase 43 (seule une procédure ouvre une phase : la nature doit être déclarée avant que le moteur ne s'en serve).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §3, §7.1, §7.4, §10, D-03, D-09, D-10. **Ouvert au cadrage** : emplacements hors modèle (§7.3), arbitrage d'usage `phases_trace: false` (§11.2), premier banc d'essai.
-**Plans:** 0 plans
+**Plans:** 5 plans (4 vagues : 44-01 ∥ 44-02 → 44-03 → 44-04 → 44-05)
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 44 to break down)
+- [x] 44-01-PLAN.md — traceur : `recalc-planning.sh` (Python embarqué, voie a de P44-D-14) dérive le lab `traceur`, refuse sans adhésion `cycles-v1` ou sur GSD, lecture seule sans écriture, INDEX.md/STATE.md/cloture.log déterministes, lab frais
+- [x] 44-02-PLAN.md — modèle : `references/modele-cycles.md` et huit gabarits `templates/cycles/` (choix délégués fixés)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 44-03-PLAN.md — matrice des huit états et des dérogations, jumeaux négatifs au banc, agrégation des plans et des cycles, gabarits conformes
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 44-04-PLAN.md — hors modèle (P44-D-04) et garde-fous de chemin ; incrémental par hash du contenu (P44-D-13) ; contrôle croisé référence ↔ moteur
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 44-05-PLAN.md — bump mineur de planning-core sans release, preuves de phase (P44-D-01a, P44-D-01b, P44-D-15), passage en lecture seule sur deux labs réels
+
+**Clôture :** 2026-09-28, mission `mgr-44-reprise`. Après la vérification (PASSED 18/18), huit lots
+de correction issus de la revue et de l'audit (quick tasks 260928-b4c, -ccz, -mgu, -ol3, -q6h, -s53,
+-vk9) : le moteur appelle le vrai détecteur dans un environnement construit de zéro et n'écrit que
+s'il a pu lire tout ce que le détecteur devait lire ; le journal `cloture.log` est encodé de façon
+injective. Audit final SECURED (constats A et B du tour 1 fermés). Lot 8 sans nouveau tour de juges
+et résidus acceptés (TOCTOU local, volume) : décision du head sous délégation technique de Willy,
+session principale, 2026-09-28 — documentés dans `plugin/planning-core/references/modele-cycles.md`
+et `.planning/BACKLOG.md`. PR vers `main` ouverte, sans merge, sans tag, sans release (garde-fou du
+jalon : aucune release gouvernance avant la clôture de `fiabilite-v1.0`). Rapport :
+`.planning/missions/2026-09-27-gouvernance-44.md`.
 
 ### Phase 45: Moteur — hook central par rôle et gates d'écriture
 
@@ -93,6 +140,9 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 44 (les gates lisent le modèle et les états dérivés).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5, §5.1, §5.2, D-05 (G7) ; `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §5, B-02 — **une mécanique, deux chantiers**.
+**À envisager au cadrage** : comment un lab métier qui contient du code adhère-t-il (le détecteur
+rend 2 et le moteur refuse l'écriture en 44) — origine : Phase 44, décision du head sous
+délégation technique de Willy, session principale, 2026-09-28.
 **Plans:** 0 plans
 
 Plans:
@@ -105,6 +155,10 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 45.
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5 (G3, G4, G4′, D1), §10, D-02 (le juge ne bloque que sur ses constats) ; `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-16, §10 (préparer la preuve sans l'exécuter, B-01).
+**À envisager au cadrage** : un état de transition « à clore » pour le cas « verdict passé,
+SUMMARY absent » (le §3.1 ne le nomme pas, la Phase 44 le rend `indéterminé` par défaut,
+P44-D-08) — origine Phase 44, décision (a), head sous délégation technique de Willy, session
+principale, 2026-09-28.
 **Plans:** 0 plans
 
 Plans:

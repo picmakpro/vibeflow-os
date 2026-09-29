@@ -1,5 +1,157 @@
 # Changelog — conductor
 
+## [v1.45.1] — 2026-09-29 (correctif : `popd` contournait le verrou de driver)
+
+**Patch** (régression de v1.45.0) :
+
+- **`scripts/guard-driver-lock.sh`, règle C7** : le hook suivait `cd` et `pushd` mais pas `popd`.
+  Dans `pushd <autre-dépôt> && git commit && popd && git commit`, le second commit, fait dans le
+  lab, était jugé hors du lab et **autorisé** sous le verrou d'une autre session ; les versions
+  antérieures le refusaient. `popd` rend désormais la cible indéterminée, et le verrou s'applique au geste suivant.
+  Suite `tests/test-guard-driver-lock.sh` : 3 cas ajoutés (C7r et C7s rouges sans le correctif,
+  C7t contrôle : `pushd` sans `popd` reste autorisé).
+
+## [v1.45.0] — 2026-09-28 (budgets de méthode, périmètre du verrou de driver)
+
+**Minor** (nouveau script, correctif du hook de verrou) :
+
+- **`scripts/check-method-budget.sh`** (nouveau) : constate deux budgets de méthode d'un lab, en
+  lecture seule. `STATE.md` (et chaque `STATE.md` de workstream) au plus 8 Ko
+  (`VF_STATE_BUDGET_KB`) ; au plus 3 worktrees actifs par dépôt (`VF_WORKTREE_BUDGET`), arbre
+  principal non compté. Chaque worktree est classé actif, RANGEABLE (branche travaillée puis
+  intégrée dans la branche de référence, reflog à l'appui : une branche neuve n'est jamais dite
+  rangeable) ou ORPHELIN (dossier disparu). Lab multi-dépôts : les worktrees frères d'un dépôt sont
+  rattachés à lui, pas comptés comme des dépôts. Rend 0 par défaut, 1 sous `--strict` (2 si un compartiment de workstream est
+  illisible : jamais un 0 de complaisance), 64 sur argument invalide. Compartiments énumérés par
+  `vf_ws_enumerate`, inscrit au recensement `workstream-planning-consumers.md` (catégorie a1). Suite `tests/test-check-method-budget.sh` (31 assertions).
+- **`scripts/guard-driver-lock.sh`, périmètre du verrou** : le hook prenait le cwd de la session
+  pour périmètre et ne lisait jamais la cible du geste. `cd <autre-dépôt> && git commit`, ou
+  `git -C <autre-dépôt> push`, était refusé sous le verrou du lab, ce qui poussait au marqueur de
+  dérogation sur des gestes sans rapport (une dizaine au journal d'un lab client). Règle C7 : un
+  geste dont la cible se résout **avec certitude** hors du lab n'est plus sous le verrou. Règle
+  C6 : même chose pour Write/Edit dans le `.planning/` d'un autre dépôt. Analyse conservatrice :
+  variable, glob, substitution, sous-shell, pipe, arrière-plan, `cd` suivi d'autre chose que `&&`,
+  `--git-dir`/`--work-tree`, `gh -R` laissent le geste dans le périmètre. Un worktree rangé sous
+  le lab reste dans le périmètre. Suite `tests/test-guard-driver-lock.sh` : 20 cas ajoutés
+  (C6a-c, C7a-q), A6a déplacé sur une cible interne au lab (son objet, la lecture de `-C`, est
+  inchangé).
+
+## [v1.44.0] — 2026-09-26 (Phase 43 — gate des skills par nature, budget des SKILL.md et du bootstrap)
+
+**Minor** (nouveau gate des skills) :
+
+- **`check-skills.sh`** (FABR-06, D-Q1, D-Q2) : nouveau gate, miroir de `check-agents.sh`, qui lit
+  la nature déclarée de chaque `SKILL.md` (`vf-nature: referentiel | outil | procedure`, défaut
+  `outil` sur clé absente, jamais sur valeur invalide) et refuse (rc 1) une `procedure` déclarée
+  sans `ecrit:` (périmètre d'écriture) ni `vf-rubrique-juge:` (rubrique de juge).
+- **Détection de dérive déclaration/prose, mesure du corpus réel** (FABR-07, D-Q5, écart assumé
+  vis-à-vis de D-11 de la Phase 42) : `detecter_derive()` signale, TOUJOURS en avertissement,
+  jamais un refus même sous `--strict`, un marqueur factuel constaté en titre ou en prose (règle
+  Q-PORTEE : un marqueur en titre, ou au moins deux marqueurs distincts en prose) sans sa
+  déclaration `true` correspondante, et l'inverse (`ecart_nature_marqueurs`, marqueur déclaré
+  `true` avec une nature autre que `procedure`) — jamais une réécriture ni une déduction de la
+  nature. Corpus réel mesuré et publié (`43-02-SUMMARY.md`) : 26 avertissements « derive » sur
+  11/21 `SKILL.md`, 0 « ecart », laissé non corrigé (backlog `e36e6f2`) — ce gate avertit, il ne
+  corrige pas.
+- **Manifeste daté étendu à sept listes** (FABR-09) : `check-agents-manifest.json` porte désormais
+  une septième liste native, `champs_frontmatter_skills`, validée identiquement par
+  `check-agents.sh` et `check-skills.sh` — une seule vérité, une seule fraîcheur par liste.
+- **Plafond des `SKILL.md`** (FABR-09, D-Q4) : `check-instruction-budget.sh` mesure désormais aussi
+  les `SKILL.md` distribués, plafond ADR-029 de 500 lignes, bloquant, aucun seuil d'avertissement
+  (verdict `DEPASSEMENT-SKILL-ADR029`).
+- **Métrique bootstrap, option ratchet-socle** (FABR-09) : socle du bootstrap (fermeture de
+  `resolve-deps.sh conductor` + skill `installer` + commandes du plugin) borné par la ligne de
+  baseline `@bootstrap:socle` : toute hausse bloque (`DEPASSEMENT-BOOTSTRAP`) ; une mesure
+  au-dessus du plafond ADR-029 de 2000 tokens mais sans hausse sur la ligne publie
+  `AU-DESSUS-PLAFOND-ADR029`, non bloquant — le plafond ADR-029 de 2000 tokens reste un objectif,
+  retour sous 2000 inscrit au BACKLOG (commit `433fea0`).
+  décision déléguée par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26
+- **Grammaire `vf-mcp-tools` validée par le gate des agents, `vf-calibrate` à deux déclarations**
+  (FABR-10, D-Q3) : `check-agents.sh` refuse désormais (BLOQUANT, tous modes) une valeur
+  `vf-mcp-tools` malformée, avec la même règle d'extraction que l'injecteur
+  `inject-mcp-tools.sh` — parité gate/injecteur. `vf-calibrate/SKILL.md` réaffirme l'allowlist MCP
+  des agents flaggés `vf-mcp-consumer` (allowlist large) ET porteurs de `vf-mcp-tools` (allowlist
+  nommée, ex. `vf-reviewer`) — dernier texte du dépôt qui ne nommait qu'une seule des deux
+  déclarations MCP (durcissement c).
+- **Hook `SessionStart` non câblé pour `check-skills.sh`** : décision de plan, pas un oubli — tant
+  que le corpus n'est pas mis en conformité (26 avertissements mesurés), câbler ce gate au
+  démarrage de chaque session de chaque lab porterait un avertissement permanent que l'utilisateur
+  ne peut pas corriger (D-Q5). `check-skills.sh` est déjà atteint par la CI (découverte des suites
+  de test + ses propres cas sur l'arbre réel) et par `skill-creator` (`--file`) ; le câblage
+  SessionStart/hook est différé à la mise en conformité du corpus (backlog `e36e6f2`).
+- **Décisions de Willy** : la frontière D-Q3 (deux déclarations MCP conservées, fusion écartée) est
+  citée « Willy, AskUserQuestion, session principale, 2026-09-24 » ; les deux décisions du
+  2026-09-26 (Q1, option bootstrap ratchet-socle ; Q-PORTEE, règle de portée de la dérive
+  procédurale) sont citées « décision déléguée par Willy au head (/vf-decide), AskUserQuestion
+  session principale, 2026-09-26 ». Les décisions de planification de cette phase (noms des clés
+  de frontmatter, vocabulaire `MOTIFS_MARQUEURS` de la dérive, exclusion des modules doc-only,
+  mesure en octets ÷ 4) sont présentées comme telles — des décisions de cadrage, jamais un
+  arbitrage humain.
+
+## [v1.43.0] — 2026-09-25 (Phase 42 — manifeste daté et invariants de doctrine du gate des agents)
+
+**Minor** (nouvelle capacité du gate des agents) :
+
+- **Manifeste daté et source unique** (FABR-01, D-01, D-02, D-03) : `check-agents-manifest.json`
+  (même dossier que `check-agents.sh`) porte désormais les six listes de référence (identifiants
+  d'outils, champs de frontmatter connus, types d'agents natifs, modèles, modes de permission,
+  niveaux d'effort) — le script ne garde plus aucune copie de repli. Trois identifiants d'outils
+  et deux champs de frontmatter ajoutés, alignés sur la seule doc officielle citée par le
+  manifeste (D-17). L'installeur pose désormais les `*.json` des modules chez l'utilisateur
+  (D-16, commit `fix(engine)`), sans quoi le manifeste serait absent partout et refuserait tout.
+- **Fraîcheur du manifeste** (FABR-02, D-04, D-05) : l'INDÉTERMINÉ (exit 3) n'est rendu que sous
+  `--manifest-freshness=strict`, réservé aux quatre appels de `check-agents.sh` dans la CI du
+  dépôt — seule légitime à rafraîchir le manifeste. Chez l'utilisateur (garde d'écriture, hook
+  SessionStart), un manifeste périmé reste un AVERTISSEMENT, jamais un refus, et rétrograde en
+  avertissement les trois classes de listes fermées (« outil hors du set connu », « nom d'agent
+  non résolu », « champ inconnu » reste inchangé).
+- **Invariants de doctrine I1, I2, I3, I4, I5, I6, I7 en erreur (FABR-03) TOUJOURS**, jamais
+  affectés par `--strict` : I1 (D-06, marqueur « Worker interne » lu dans `description:`), I4
+  (spécifieur parenthésé dans `disallowedTools`), I7 (`vf-mcp-*` exige `vf-requires:
+  mcp-servers`), I6 (D-07, manager = allowlist `Agent(...)` non vide et NON `vf-internal` — écart
+  assumé par rapport à la spec §4, un worker interne qui dispatche n'est jamais un manager ici),
+  I5 (D-08, juge = `disallowedTools` retire `Write` et `Edit` ET aucune allowlist de dispatch —
+  armé sur arbitrage D-08 : maintenir, décision de cadrage de Claude sous délégation explicite de
+  Willy, session principale, 2026-09-25 : « tout ce qu'un juge doit vérifier vit dans sa grille,
+  jamais dans `.claude/rules` ni dans `CLAUDE.md` », `42-D19-MESURE.md`), I2 et I3 (D-09, monde
+  fermé : un worker `vf-internal` orphelin, ou un worker non interne dispatché par erreur —
+  actifs SEULEMENT sous `--resolve-agents=strict`, jamais imputés à un fichier de registre).
+- **Découverte récursive et exclusions** (FABR-04, D-10) : la cible est parcourue récursivement
+  (sous-dossiers inclus, aucun lien symbolique de dossier suivi), à l'exclusion des dossiers
+  cachés et des `*-references/` posés par l'installeur sous `.claude/agents/<mod>-references/`
+  (de la doc, jamais des agents) — un lab installé reste vert.
+- **Corrections post-revue/audit sur D-09/D-10** (nœud `fix-42-juges`, 2026-09-25, toujours dans
+  cette v1.43.0 non publiée — aucun bump supplémentaire) : une collision d'identité dans
+  l'univers connu (deux fichiers réels distincts de même nom de base sous le dossier linté et les
+  registres) masquait un orphelin I2 — désormais une ERREUR explicite nommant les deux chemins,
+  jamais un vert (contre-épreuve : un même fichier atteint par deux chemins de realpath identique
+  n'est toujours pas une collision). Un `.md` en lien symbolique est désormais REFUSÉ comme un
+  dossier — jamais ouvert, jamais reflété dans la sortie (PoC de l'audit : un lien vers un secret
+  hors arbre apparaissait deux fois dans la sortie avant correction, absent après). Le cache
+  `index_agents` est désormais clé par ses paramètres (agents_dir, registres). Le mode `--file`
+  applique désormais la même exclusion des agents tiers que la boucle par répertoire.
+- **Corpus mis en conformité** (FABR-05, D-11, D-12) : cinq modules bumpés en patch
+  (`mobile-test-team`, `business-pilot-bundle`, `content-bundle`, `growth-bundle`,
+  `design-orchestrator`), plus quatre de ces cinq modules bumpés une seconde fois en patch
+  séparé pour porter `omitClaudeMd: true` sur leurs juges (I5 armé, 42-05 Tâche 3).
+- **Échéance du manifeste** : `verifie_le` + 30 jours (`valide_jours`, lu dans le manifeste,
+  jamais en dur). À l'échéance : les quatre appels `check-agents` de la CI rougissent
+  (INDÉTERMINÉ), et T20 de `test-dev-orchestrator.sh` (qui compte les avertissements d'un
+  AGENT.md) en compte un de plus — geste unique de rafraîchissement : relire chaque source,
+  comparer, re-dater `check-agents-manifest.json`.
+- **Garde d'écriture** (`guard-agent-write.sh`) : reste fail-open sur un manifeste illisible — un
+  incident du contrôleur ne bloque jamais toutes les écritures d'agent.
+- **T76 inchangé** (D-13) : le test qui verrouillait une affirmation périmée de `team-kernel.md`
+  était déjà corrigé par le hotfix v2.63.2 (2026-09-17), cinq jours avant la spec de cette phase —
+  aucune tâche ne le vise.
+- **Traçabilité de l'arbitrage D-08** : l'armement d'I5 est une décision de cadrage de Claude sous
+  délégation explicite de Willy (session principale, 2026-09-25) — jamais présentée comme un
+  arbitrage humain.
+- Décisions de cadrage de Claude prises sous délégation explicite de Willy (AskUserQuestion,
+  session principale, 2026-09-23 — voir `42-CONTEXT.md`) ; D-07, D-08 et D-11 ratifiées par
+  Samuel (WhatsApp, 2026-09-23), D-18 demandée par Samuel (WhatsApp, 2026-09-23) — jamais
+  présentées comme une décision humaine sans cette précision.
+
 ## [v1.42.0] — 2026-09-25 (gates de planning workstream-aware, Phase 41.1)
 
 **Minor** (gate neuf `check-planning-consumers-registered.sh` + recensement versionné, Phase 41.1) :

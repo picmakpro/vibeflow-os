@@ -73,3 +73,7 @@
 - [Harness worktree : scripts non suivis refusés](project_harness-worktree-refuse-scripts-non-suivis.md) — rejouer la CI par `replay-ci-jobs.sh` suivi (40.1), jamais un extrait maison
 - [Périmètre strict contredit gsd-quick](feedback_mandat-perimetre-strict-contredit-gsd-quick.md) — 2 vf-coder sur 4 ont sauté B2 : autoriser les artefacts quick dans le mandat, exiger quick_id au retour
 - [Rejeu long : nohup détaché](project_rejeu-long-detache-nohup.md) — un run_in_background du manager meurt en fin de tour ; deux rejeux dans un worktree fabriquent un rouge
+- [Sonde `claude -p` sous HOME temporaire](project_sonde-claude-p-home-temporaire-sans-auth.md) — « Not logged in » : prévoir un jeton dédié déposé par l'humain, noter le HOME dans les limites
+- [Exit gate E4 suit le pointeur workstream](project_exit-gate-e4-suit-le-pointeur-workstream.md) — sans `GSD_WORKSTREAM`, E4 lit `fiabilite` : rc=0 à tort ; relayer les deux ; les vagues parallèles créent des merges
+- [Verify des plans sous zsh](project_verify-des-plans-sous-zsh.md) — `for c in $var` ne découpe pas sous zsh : faux rouge dès 2 éléments ; exiger le rejeu zsh ET bash
+- [Lire la CI de la branche dès la reprise](feedback_lire-la-ci-de-la-branche-des-la-reprise.md) — rouge Linux (`stat -f` GNU) invisible sous macOS pendant 5 lots ; rejeu `tests` toujours sous HOME=$(mktemp -d)

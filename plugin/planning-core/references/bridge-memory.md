@@ -35,7 +35,8 @@ elle engage l'archi ou la méthodo), elle est **promue** en DECISIONS dans la m�
 
 L'`Accumulated Context` de `STATE.md` (décisions de la session, focus) alimente le **JOURNAL /
 ITERATION_LOG** à la clôture de session. `STATE.md` ne garde que le **courant** ; l'historique long
-part en JOURNAL.
+part en JOURNAL. Seuil mesurable : **8 Ko** par `STATE.md` (`conductor/scripts/check-method-budget.sh`) ;
+un nouveau point **remplace** la position courante, l'ancien part dans `.planning/archives/state/`.
 
 ### Pont 3 — Jalons : `MILESTONES.md` ↔ Archivage
 

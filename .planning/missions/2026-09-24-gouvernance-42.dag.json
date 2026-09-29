@@ -1,0 +1,397 @@
+{
+  "nodes": [
+    {
+      "id": "sonde-d19",
+      "step": "D-19 : mesure omitClaudeMd vs .claude/rules (scratch, hors dépôt)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revise-42",
+      "step": "révision plans 42-01..06 (D-18/19/20, chemins compartiment) — wt gouvernance-42, .planning/workstreams/gouvernance/",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss-43",
+      "step": "cadrage Phase 43 — wt gouvernance-43, phases/VFDO-43*",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "check-42",
+      "step": "plan-checker frais 42 (lecture seule)",
+      "stage": "",
+      "deps": [
+        "revise-42"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-42-w1",
+      "step": "exécution 42 vague 1 (42-01,02,03)",
+      "stage": "",
+      "deps": [
+        "fix-42-05",
+        "sonde-d19"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-42-w2",
+      "step": "exécution 42 vague 2 (42-04)",
+      "stage": "",
+      "deps": [
+        "exec-42-w1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-42-w3",
+      "step": "exécution 42 vague 3 suite : 42-05 Tâche 3 (I5 selon arbitrage, I6) — après arbitrage D-08",
+      "stage": "",
+      "deps": [
+        "exec-42-w3a",
+        "arbitrage-d08",
+        "sonde-d19b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-42-w4",
+      "step": "exécution 42 vague 4 (42-06) + gsd-verifier",
+      "stage": "",
+      "deps": [
+        "exec-42-w3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-42",
+      "step": "revue du diff 42 (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "exec-42-w4"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-42",
+      "step": "audit infra/sécurité 42 (vf-auditer)",
+      "stage": "",
+      "deps": [
+        "exec-42-w4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "nonreg-42",
+      "step": "non-régression découverte complète (manager)",
+      "stage": "",
+      "deps": [
+        "exec-42-w4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan-43",
+      "step": "rebase 43 sur 42 final + plan Phase 43",
+      "stage": "",
+      "deps": [
+        "discuss-43",
+        "exec-42-w4",
+        "arbitrage-q3"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "check-43",
+      "step": "plan-checker frais 43",
+      "stage": "",
+      "deps": [
+        "plan-43"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire (audit lecture seule)",
+      "stage": "",
+      "deps": [
+        "exec-42-w4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr-42",
+      "step": "PR Phase 42 (+ PR empilée 43)",
+      "stage": "",
+      "deps": [
+        "revue-42",
+        "audit-42",
+        "nonreg-42",
+        "docs",
+        "check-43"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "arbitrage-d08",
+      "step": "HUMAIN : D-08 réexaminée avec Samuel (D-19 = règles omises) — MAINTENIR, décision déléguée par Willy au head, session principale, 2026-09-25, Samuel non consulté (95a304d)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revise-42b",
+      "step": "révision 2 (constats check-42 : B1/B2 restructurés derrière checkpoint D-19, W1-W7, I1, I3)",
+      "stage": "",
+      "deps": [
+        "check-42"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "check-42b",
+      "step": "plan-checker frais, 2e passe",
+      "stage": "",
+      "deps": [
+        "revise-42b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "panel-q3-opt1",
+      "step": "panel Q3 MCP option 1 (gsd-advisor-researcher, lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "panel-q3-opt2",
+      "step": "panel Q3 MCP option 2 (gsd-advisor-researcher, lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "panel-q3-opt3",
+      "step": "panel Q3 MCP option 3 (gsd-advisor-researcher, lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-q3",
+      "step": "HUMAIN : Willy tranche Q3 sur la synthèse du panel",
+      "stage": "",
+      "deps": [
+        "panel-q3-opt1",
+        "panel-q3-opt2",
+        "panel-q3-opt3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revise-42c",
+      "step": "révision 3 (constats check-42b, liste fermée)",
+      "stage": "",
+      "deps": [
+        "check-42b"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "check-42c",
+      "step": "vérification ciblée des lignes modifiées par revise-42c",
+      "stage": "",
+      "deps": [
+        "revise-42c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-42-05",
+      "step": "correctif ciblé 42-05/42-06 : sonde D-19 rc≠0 sur ABSENT",
+      "stage": "",
+      "deps": [
+        "check-42c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-42-w3a",
+      "step": "exécution 42 vague 3 partielle : 42-05 Tâche 1 (I1/I4/I7) + sonde checkpoint D-19 (arrêt sur ARBITRAGE-ABSENT)",
+      "stage": "",
+      "deps": [
+        "exec-42-w2"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-agents.sh",
+        "plugin/conductor/scripts/tests/test-check-agents.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-42-partiel",
+      "step": "revue du diff livré 13fcd27..HEAD (vf-reviewer), phase non close",
+      "stage": "",
+      "deps": [
+        "exec-42-w3a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "nonreg-42-partiel",
+      "step": "non-régression découverte complète sur l'état livré (manager)",
+      "stage": "",
+      "deps": [
+        "exec-42-w3a"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr-42-draft",
+      "step": "PR brouillon Phase 42 (non close), pas de merge",
+      "stage": "",
+      "deps": [
+        "revue-42-partiel",
+        "nonreg-42-partiel"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "sonde-d19b",
+      "step": "seconde sonde D-19 : règles .claude/rules à paths: sous omitClaudeMd (décision Willy, AskUserQuestion, session principale, 2026-09-24) — ABANDONNÉE 2026-09-25 (head), consignée en question ouverte non bloquante (95a304d)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-42-fabrique-manifeste-dat-et-invariants-de-doctrine-du-gate-des/42-D19-MESURE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "pr-42-ready",
+      "step": "PR #108 sortie du brouillon (sans la 43, hors relance), pas de merge",
+      "stage": "",
+      "deps": [
+        "revue-42",
+        "audit-42",
+        "nonreg-42",
+        "docs",
+        "revue-42-fix",
+        "revue-42-condition",
+        "fix-42-condition-2",
+        "revue-42-condition-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-juges-42",
+      "step": "HUMAIN : sort des findings ask-user des juges finaux (CR-01, A1, A2, A3, spec)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-42-juges",
+      "step": "correction ciblée : CR-01, A1, A3, spec, WR-01, WR-02 ; A2 et revue des grilles en dette",
+      "stage": "",
+      "deps": [
+        "arbitrage-juges-42"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-42-fix",
+      "step": "revue ciblée du diff de correction (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "fix-42-juges"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-42-condition-samuel",
+      "step": "condition de Samuel (e568307) : consigne Read explicite sur les 4 juges + assertion, digest des interdits chez vf-growth-manager et vf-design-manager ; vf-dev-manager non touché (D-12), écart écrit",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-42-condition",
+      "step": "revue ciblée du diff de la condition de Samuel",
+      "stage": "",
+      "deps": [
+        "fix-42-condition-samuel"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage-budget-42",
+      "step": "HUMAIN : garde-fous (a) ou interdits + hausse de baseline citée (b) — vf-growth-manager, vf-design-manager, vf-design-judge",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-42-condition-2",
+      "step": "correction ciblée : F1 doublon vf-design-judge + assertion T11, F3 CHANGELOG, F4 T11, F2 note SUMMARY, selon arbitrage-budget-42",
+      "stage": "",
+      "deps": [
+        "arbitrage-budget-42"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-42-condition-2",
+      "step": "revue ciblée de fix-42-condition-2",
+      "stage": "",
+      "deps": [
+        "fix-42-condition-2"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

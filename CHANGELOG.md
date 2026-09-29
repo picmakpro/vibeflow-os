@@ -13,6 +13,59 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.67.1] — 2026-09-29
+
+**Patch** (deux régressions de v2.67.0, trouvées à la relecture de la release ; hotfix demandé
+par Samuel, session principale Claude Code, 2026-09-29) :
+
+- **`popd` contournait le verrou de driver** (`conductor` v1.45.0 → v1.45.1,
+  `guard-driver-lock.sh`, règle C7). Le hook suivait `cd` et `pushd`, pas `popd` : dans
+  `pushd <autre-dépôt> && git commit && popd && git commit`, le second commit, fait dans le lab,
+  passait sous le verrou d'une autre session, alors que v2.66.0 le refusait. `popd` rend
+  désormais la cible indéterminée et le verrou s'applique. 3 cas ajoutés à
+  `test-guard-driver-lock.sh` (C7r et C7s rouges sans le correctif, C7t contrôle).
+- **skill-creator refusait les clés qu'il demande d'écrire** (`skill-creator` v1.1.0 → v1.1.1).
+  v1.1.0 fait écrire `vf-nature` (et `ecrit:`, `vf-rubrique-juge:`, les trois marqueurs) dans le
+  frontmatter ; `quick_validate.py` les rejetait (« Unexpected key(s) … vf-nature »), donc un
+  skill produit par ce flux échouait à la validation et à l'empaquetage. Les six clés du gate des
+  skills sont acceptées. Suite neuve `test-quick-validate.sh` (4 cas, dont la parité avec
+  `VIBEFLOW_SKILL_FIELDS` de `check-skills.sh`) : 92 suites.
+
+Coupée depuis le tag `v2.67.0`, pas depuis `main` : la Phase 44 (`planning-core` v2.8.0), mergée
+sur `main` sans release, n'est pas embarquée.
+
+## [v2.67.0] — 2026-09-28
+
+**Minor** (budgets de méthode, périmètre du verrou de driver ; release demandée par Samuel,
+session principale Claude Code, 2026-09-28) :
+
+- **Budgets de méthode** — né d'un bilan de méthode sur un lab client (ScrollOff, 2026-09-28) :
+  `STATE.md` à 195 Ko, un « Point du … » ajouté en tête à chaque mission ; 19 worktrees ouverts sur
+  un dépôt. La doctrine « STATE ne garde que le courant » existait sans seuil ni moment.
+  - **`conductor` v1.44.0 → v1.45.0** : `check-method-budget.sh` (lecture seule) mesure `STATE.md`
+    (8 Ko) et les worktrees actifs par dépôt (3), classe chaque worktree actif / RANGEABLE /
+    ORPHELIN (reflog à l'appui, une branche neuve n'est jamais rangeable), rattache les worktrees
+    frères à leur dépôt dans un lab multi-dépôts. 0 par défaut, 1 sous `--strict`. Suite neuve
+    `test-check-method-budget.sh` (31 assertions).
+  - **`dev-orchestrator` v2.24.2 → v2.25.0** : `mission-flow.md` §Budgets de méthode, étape de
+    clôture avant le relâchement du verrou (remplacer la position courante, archiver sous
+    `.planning/archives/state/`, retirer sans `--force` les worktrees intégrés créés par la mission,
+    élaguer les orphelins, reporter le reste en `## Budgets`) ; ligne de clôture de `vf-dev-manager`
+    (250 lignes, inchangé) ; `head-governance.md` §3 relaie la section, hors gate.
+  - **`planning-core` v2.7.1 → v2.7.2** : seuil et règle de tenue dans `bridge-memory.md` §Pont 2.
+- **Verrou de driver borné au lab** (`conductor` v1.45.0, `guard-driver-lock.sh`) : le hook prenait
+  le cwd de la session pour périmètre sans lire la cible du geste, si bien qu'un commit dans un
+  AUTRE dépôt était refusé et poussait au marqueur de dérogation (une dizaine au journal du même
+  lab). Règles C6 (Write/Edit dans le `.planning/` d'un autre dépôt) et C7 (geste dont la cible se
+  résout avec certitude hors du lab) ; toute ambiguïté (variable, sous-shell, pipe, `cd` non suivi
+  de `&&`, `--git-dir`, `gh -R`) garde le verrou. 20 cas ajoutés à `test-guard-driver-lock.sh`.
+- **Embarque aussi, mergé depuis v2.66.0 sans release** : Phase 42 (manifeste daté et invariants de
+  doctrine du gate des agents, `conductor` v1.43.0, PR #108), Phase 43 (gate des skills par nature,
+  budget des `SKILL.md` et du bootstrap, `conductor` v1.44.0, `dev-orchestrator` v2.24.2, PR #111),
+  index des capabilities régénéré contre gsd-core 1.15.0 (PR #112), clôture documentaire (PR #113),
+  et les montées de version des bundles qui les accompagnent (`skill-creator` v1.1.0,
+  `design-orchestrator` v1.5.11, `mobile-test-team` v1.4.6, bundles métier).
+
 ## [v2.66.0] — 2026-09-25
 
 **Minor** (release unique de sept PR mergées le 2026-09-25 — merge et release décidés par Samuel,

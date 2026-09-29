@@ -318,6 +318,105 @@ def bash_command_concerned(cmd):
                         return True
     return False
 
+# PÉRIMÈTRE DU LOCK (budgets de méthode, v2.67.0) : le lock protège le lab dont la session est
+# lancée, jamais un AUTRE dépôt. Avant ce correctif, le périmètre était le cwd de la session et
+# la cible du geste n était jamais lue : `cd ~/autre-depot && git commit` était refusé sous le
+# lock du lab, ce qui poussait au marqueur de dérogation sur des gestes sans rapport (mesuré sur
+# un lab client : une dizaine de dérogations au journal). Un geste qui vise EXPLICITEMENT un
+# dossier hors du lab sort donc de la surface. Analyse CONSERVATRICE, jamais un allow par défaut
+# d analyse : variable, glob, substitution, sous-shell, pipe, arrière-plan, `cd` suivi d autre
+# chose que `&&` (il peut échouer et laisser la suite dans le lab), `--git-dir`/`--work-tree`,
+# `gh -R` : tout ce qui ne se résout pas avec certitude reste DANS le périmètre, donc soumis au
+# lock. Un worktree rangé SOUS le lab reste dans le périmètre (il partage le dépôt du lab).
+SCOPE_BREAKERS = {"(", ")", "|", "&", "|&", "{", "}", ";;", ";&"}
+
+def resolve_dir(base, raw):
+    if base is None or not raw or any(c in raw for c in "$`*?[]"):
+        return None
+    p = os.path.expanduser(raw)
+    if not os.path.isabs(p):
+        p = os.path.join(base, p)
+    return os.path.realpath(p)
+
+def is_inside(path, root):
+    if path is None:
+        return True  # indéterminé -> dans le périmètre
+    return path == root or path.startswith(root.rstrip(os.sep) + os.sep)
+
+def git_target(toks, i, base):
+    """Dossier visé par un appel git : les -C successifs se composent (comme git lui-même)."""
+    target = base
+    n = len(toks)
+    while i < n:
+        t = toks[i]
+        if t == "-C":
+            target = resolve_dir(target, toks[i + 1] if i + 1 < n else "")
+            i += 2
+        elif t.startswith("-C") and len(t) > 2:
+            target = resolve_dir(target, t[2:])
+            i += 1
+        elif t.startswith("--git-dir") or t.startswith("--work-tree"):
+            return None
+        elif t == "-c":
+            i += 2
+        elif (t.startswith("-c") and len(t) > 2) or t.startswith("--exec-path=") or t == "-P":
+            i += 1
+        else:
+            break
+    return target
+
+def bash_targets_outside_lab(cmd, root):
+    """True si TOUS les gestes concernés de `cmd` visent avec certitude un dossier hors de `root`
+    (et qu il y en a au moins un). Toute incertitude rend False : le lock s applique."""
+    try:
+        import shlex
+        flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
+        lex = shlex.shlex(flat, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return False
+    if "`" in cmd or any(t in SCOPE_BREAKERS for t in toks):
+        return False
+    segs, ops, cur = [], [], []
+    for t in toks:
+        if t in ("&&", "||", ";"):
+            segs.append(cur)
+            ops.append(t)
+            cur = []
+        else:
+            cur.append(t)
+    segs.append(cur)
+    ops.append("")
+    base = root
+    outside = 0
+    for seg, op in zip(segs, ops):
+        positions = command_positions(seg)
+        if positions:
+            idx = positions[-1]
+            name = os.path.basename(seg[idx])
+            if name in ("cd", "pushd"):
+                args = [a for a in seg[idx + 1:] if not a.startswith("-")]
+                target = resolve_dir(base, args[0]) if args else None
+                base = target if op == "&&" else None
+                continue
+            if name == "popd":
+                base = None  # la pile de pushd n est pas suivie : dossier indéterminé, le lock s applique
+                continue
+            if bash_command_concerned(" ".join(shlex.quote(t) for t in seg)):
+                if name == "git":
+                    target = git_target(seg, idx + 1, base)
+                elif any(t in ("-R", "--repo") or t.startswith("--repo=") for t in seg):
+                    target = None
+                else:
+                    target = base
+                if is_inside(target, root):
+                    return False
+                outside += 1
+        if op in (";", "||") and base != root:
+            base = None  # la chaîne a pu s arrêter avant ou après le cd : dossier indéterminé
+    return outside > 0
+
 try:
     payload = json.load(sys.stdin)
 except Exception:
@@ -349,6 +448,10 @@ elif tool in ("Write", "Edit"):
     norm = fp.replace("\\\\", "/").replace("\\", "/")
     if not re.search(r"(^|/)\.planning/", norm):
         sys.exit(0)  # C4 : hors du dossier de planification -> allow, quel que soit le lock
+    root_w = os.path.realpath(cwd)
+    abs_w = norm if os.path.isabs(norm) else os.path.join(root_w, norm)
+    if not is_inside(os.path.realpath(abs_w), root_w):
+        sys.exit(0)  # C6 : le .planning/ d un AUTRE dépôt que le lab -> hors du périmètre du lock
     if tool == "Write":
         content = ti.get("content")
     else:
@@ -412,6 +515,8 @@ if not session_ids:
 if tool == "Bash":
     if not bash_command_concerned(cmd):
         sys.exit(0)  # aucun geste concerné en position de commande -> allow
+    if bash_targets_outside_lab(cmd, os.path.realpath(cwd)):
+        sys.exit(0)  # C7 : tous les gestes visent avec certitude un dépôt hors du lab -> allow
 # Write/Edit : déjà restreint au dossier de planification ci-dessus (C4) -> toujours concerné,
 # aucune analyse de verbe supplémentaire (D-32-B protège le CHEMIN, pas un sous-ensemble de gestes).
 
