@@ -137,7 +137,7 @@ jalon : aucune release gouvernance avant la clôture de `fiabilite-v1.0`). Rappo
 ### Phase 45: Moteur — hook central par rôle et gates d'écriture
 
 **Goal:** Un hook central lit `agent_type` et refuse par rôle (juge, worker, producteur) ; les gates d'écriture G1, G5, G6 et G7 refusent par `permissionDecision: deny`, G2 avertit ; chaque gate déclare son comportement fail-closed, se prouve en vie par un canary, mesure ses faux refus dans les deux sens, et la dérogation est nominative et journalisée.
-**Requirements**: TBD (posés au cadrage)
+**Requirements**: GATE-01..GATE-15 (posées au cadrage, `45-CONTEXT.md`, 2026-09-29)
 **Depends on:** Phase 44 (les gates lisent le modèle et les états dérivés).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5, §5.1, §5.2, D-05 (G7) ; `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §5, B-02 — **une mécanique, deux chantiers**.
 **À envisager au cadrage** : comment un lab métier qui contient du code adhère-t-il (le détecteur
