@@ -105,6 +105,28 @@ else
 fi
 rm -rf "$R"
 
+echo "=== W — .claude/worktrees jamais balayé (SOBR-03 a) ==="
+R=$(mkbp yaml avec)
+mkdir -p "$R/.claude/worktrees/x/content/agents"
+# copie non conforme (sans effort) sous un worktree : ne doit pas être jugée
+sed '/^effort:/d' "$R/content/agents/fixture.blueprint.md" > "$R/.claude/worktrees/x/content/agents/copie.blueprint.md"
+out=$(bash "$SCRIPT" --blueprints-dir="$R" 2>&1); code=$?
+assert_code "W1.1 — exit 0 : la copie de worktree n'est pas jugée" "$code" "0"
+assert "W1.2 — un seul blueprint compté" "$out" "1 blueprint(s)"
+# W2 — mutant : la même collecte SANS l'élagage doit rougir (le témoin discrimine)
+MUT="$(mktemp -d)"
+awk '{ if ($0 ~ /-path .\*\/node_modules. -o -path/) print "    find \"$ROOT\" -path \"*/node_modules\" -prune -o \\"; else print }' "$SCRIPT" > "$MUT/check-blueprints.sh"
+if cmp -s "$MUT/check-blueprints.sh" "$SCRIPT"; then
+  echo "  ❌ W2.0 — le mutant est identique à l'original, le témoin ne prouve rien"; FAIL=$((FAIL+1))
+else
+  echo "  ✅ W2.0 — le mutant (sans l'élagage de .claude/worktrees) diffère de l'original"; PASS=$((PASS+1))
+  cp "$(dirname "$SCRIPT")/check-agents.sh" "$MUT/" 2>/dev/null
+  out=$(bash "$MUT/check-blueprints.sh" --blueprints-dir="$R" 2>&1); code=$?
+  assert_code "W2.1 — sous mutant : exit 1 (la copie de worktree est jugée)" "$code" "1"
+  assert "W2.2 — pour le bon motif : la copie de worktree est nommée" "$out" ".claude/worktrees/x/content/agents/copie.blueprint.md"
+fi
+rm -rf "$R" "$MUT"
+
 echo "=== T9 — argument inconnu → refus, jamais un skip muet ==="
 out=$(bash "$SCRIPT" --nawak 2>&1); code=$?
 assert_code "T9.1 — exit 1" "$code" "1"
