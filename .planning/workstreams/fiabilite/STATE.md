@@ -372,6 +372,16 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-09-25 : **Jalon `ecc-inspiration-v1.0` inscrit — Phases 51 à 56** (six emprunts mesurés au
+  dépôt `affaan-m/ECC` : snapshot PreCompact, télémétrie d'usage et coût, apprentissage adossé à
+  l'observation, audit du harness, installeur et mémoire multi-runtime, packs de règles par
+  langage). Même forme que `gouvernance-labs-v1.0` : section distincte dans la ROADMAP plate, **sans
+  `gsd-new-milestone`**, frontmatter de ce STATE **non touché** (jalon `fiabilite-v1.0`, Phase 41.2
+  ouverte). Numéros 51-56 posés à la main (42-50 appartiennent au compartiment `gouvernance`),
+  checklist du moteur complétée à la main, familles d'exigences réservées mais posées au cadrage.
+  Ordre recommandé 51 → 52 → 54 → 53 → 55 → 56 ; collisions de modules avec les Phases 42 et 48 de
+  Willy consignées (`consolidator`, installeur). Étude : `.planning/research/2026-09-25-ecc-inspiration-etude.md`. Compartiment, nom et exécution
+  après la clôture de `fiabilite-v1.0` : arbitrage Samuel, AskUserQuestion session principale, 2026-09-25.
 - 2026-09-23 (suite) : **Phase 42 cadrée et planifiée** (6 plans, 4 vagues, vérificateur passé)
   sur la branche `gouvernance/plan-labs-metier`, **empilée sur la PR #86** (specs). Phases 43, 46,
   49 et 50 alignées sur la spec d'initialisation corrigée après passe adversariale (`ca4dada` :
