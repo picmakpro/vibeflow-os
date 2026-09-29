@@ -53,12 +53,12 @@ Rempli par les plans (`45-NN-PLAN.md`) ; la correspondance exigence -> commande 
 
 ## Wave 0 Requirements
 
-- [ ] `plugin/planning-core/scripts/tests/test-planning-hook-registered.sh` — extraction, arbre de labs, 6 modes de défaillance, 4 shells, mutations
+- [ ] `plugin/planning-core/scripts/tests/test-planning-hook-registered.sh` — extraction, arbre de labs, 6 modes de défaillance, 4 shells, dispatchs Agent et Task, chemins relatifs, mutations à quatre conditions (texte distinct et `sh -n`, témoin identique, verdict et non erreur de syntaxe, trace)
 - [ ] `plugin/planning-core/scripts/tests/test-planning-gates.sh` (+ fixtures) — sémantique gate par gate, jumeaux négatifs, mutations
 - [ ] `plugin/_internal/tests/test-planning-hook-installed.sh` — install réelle -> commande posée -> rejeu
 - [ ] `scripts/tests/test-role-hook-vs-check-agents.sh` — oracle différentiel
 - [ ] réécriture des tests `socle-signal` de `test-recalc-planning.sh` (GATE-14)
-- [ ] outil de rejeu lecture seule + sa suite
+- [ ] outil de rejeu lecture seule et geste de rejeu réel à empreinte de tout l'arbre prise hors de l'outil (`rejeu-reel.sh`) + leur suite
 
 ---
 
