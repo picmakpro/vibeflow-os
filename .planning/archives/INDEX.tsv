@@ -1,2 +1,3 @@
 date	type	source	archive	ref	motif
 2026-09-29	state	.planning/workstreams/fiabilite/STATE.md	.planning/archives/state/fiabilite-STATE-corps-2026-09-29.md	0d6f225a3b3cf90bc322caee91d98400526c097e	budget 8 Ko (SOBR-02)
+2026-09-29	stash	stash@{0} « On feat/phase-37-spike-portabilite-multi-runtime: wip-roadmap-phases-36-39-avant-hotfix-winpathconv »	.planning/archives/stash/stash-cb4c8ed4.patch	cb4c8ed438e9f1ba68c796f687ea498da3ab3ba3@fca17be9b3de97f3bb18ad4e83537af3dda44320	export avant drop
