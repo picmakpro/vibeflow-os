@@ -188,6 +188,14 @@ exécution + lisibilité réelle), lot 8 (lien cassé traité comme absent, FIFO
 correction de prose) et lot 9 (portabilité GNU/BSD du lecteur de mode du banc) : décision du head
 sous délégation technique de Willy, session principale, 2026-09-28.
 
+## [v2.7.2] — 2026-09-28 (seuil mesurable du STATE)
+
+**Patch** (doctrine) :
+
+- **`references/bridge-memory.md` §Pont 2** : « STATE ne garde que le courant » reçoit un seuil
+  (8 Ko, mesuré par `conductor/scripts/check-method-budget.sh`) et une règle de tenue : un nouveau
+  point remplace la position courante, l'ancien part dans `.planning/archives/state/`.
+
 ## [v2.7.1] — 2026-09-24 (gates de planning workstream-aware, Phase 41.1)
 
 **Patch** (durcissement de gates workstream-aware, Phase 41.1) :

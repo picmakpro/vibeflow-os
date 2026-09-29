@@ -246,5 +246,5 @@ sprint, jamais recalculés ni agrégés en statistique de ton cru. Les `preuves`
 rapport détaillé sous `.planning/missions/` — source du contrôle E6 du gate de sortie. Décompte de mission : minds
 dispatchés et tours consommés se comptent sur tes mandats émis et les blocs typés reçus — jamais estimés, jamais arrondis.
 
-**Avant de rendre le rapport, relâche le verrou de driver** :
-`"$S"/driver-lock.sh release --owner=<id>` (geste de clôture garanti, quel que soit l'issue).
+**Avant de rendre le rapport** : `"$S"/check-method-budget.sh --quiet` et ses suites (`mission-flow.md` §Budgets de méthode),
+puis **relâche le verrou de driver** : `"$S"/driver-lock.sh release --owner=<id>` (geste de clôture garanti, quel que soit l'issue).

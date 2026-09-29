@@ -1,5 +1,30 @@
 # Changelog — conductor
 
+## [v1.45.0] — 2026-09-28 (budgets de méthode, périmètre du verrou de driver)
+
+**Minor** (nouveau script, correctif du hook de verrou) :
+
+- **`scripts/check-method-budget.sh`** (nouveau) : constate deux budgets de méthode d'un lab, en
+  lecture seule. `STATE.md` (et chaque `STATE.md` de workstream) au plus 8 Ko
+  (`VF_STATE_BUDGET_KB`) ; au plus 3 worktrees actifs par dépôt (`VF_WORKTREE_BUDGET`), arbre
+  principal non compté. Chaque worktree est classé actif, RANGEABLE (branche travaillée puis
+  intégrée dans la branche de référence, reflog à l'appui : une branche neuve n'est jamais dite
+  rangeable) ou ORPHELIN (dossier disparu). Lab multi-dépôts : les worktrees frères d'un dépôt sont
+  rattachés à lui, pas comptés comme des dépôts. Rend 0 par défaut, 1 sous `--strict` (2 si un compartiment de workstream est
+  illisible : jamais un 0 de complaisance), 64 sur argument invalide. Compartiments énumérés par
+  `vf_ws_enumerate`, inscrit au recensement `workstream-planning-consumers.md` (catégorie a1). Suite `tests/test-check-method-budget.sh` (31 assertions).
+- **`scripts/guard-driver-lock.sh`, périmètre du verrou** : le hook prenait le cwd de la session
+  pour périmètre et ne lisait jamais la cible du geste. `cd <autre-dépôt> && git commit`, ou
+  `git -C <autre-dépôt> push`, était refusé sous le verrou du lab, ce qui poussait au marqueur de
+  dérogation sur des gestes sans rapport (une dizaine au journal d'un lab client). Règle C7 : un
+  geste dont la cible se résout **avec certitude** hors du lab n'est plus sous le verrou. Règle
+  C6 : même chose pour Write/Edit dans le `.planning/` d'un autre dépôt. Analyse conservatrice :
+  variable, glob, substitution, sous-shell, pipe, arrière-plan, `cd` suivi d'autre chose que `&&`,
+  `--git-dir`/`--work-tree`, `gh -R` laissent le geste dans le périmètre. Un worktree rangé sous
+  le lab reste dans le périmètre. Suite `tests/test-guard-driver-lock.sh` : 20 cas ajoutés
+  (C6a-c, C7a-q), A6a déplacé sur une cible interne au lab (son objet, la lecture de `-C`, est
+  inchangé).
+
 ## [v1.44.0] — 2026-09-26 (Phase 43 — gate des skills par nature, budget des SKILL.md et du bootstrap)
 
 **Minor** (nouveau gate des skills) :
