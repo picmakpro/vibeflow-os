@@ -1,5 +1,193 @@
 # Changelog — planning-core
 
+## [v2.8.0] — 2026-09-28 (moteur de planning métier — modèle par cycles et recalcul d'état dérivé du disque, Phase 44)
+
+**Minor** (nouvelle capacité) :
+
+- **`scripts/recalc-planning.sh`** — point d'entrée bash mince + moteur Python embarqué (motif
+  déjà en place dans `plugin/conductor/scripts/dag.sh`, aucun changement d'installeur : la voie
+  par défaut de P44-D-14 évite l'extension de `vibeflow-update.sh` à `*.py`). Dérive du disque
+  huit états (dont `indéterminé`) pour les cycles, phases et plans d'un lab métier — jamais un
+  état déclaré. Un lab n'obtient l'écriture qu'après adhésion explicite (`"planning_version":
+  "cycles-v1"` dans `.planning/config.json`) ; sans adhésion, ou sur un planning détecté comme
+  tenu par GSD, le recalcul refuse d'écrire, cache compris. Mode `--read-only` : dérive n'importe
+  quel planning, adhérent ou non, JSON sur la sortie standard uniquement, aucun fichier touché.
+- **`references/modele-cycles.md`** et **`references/templates/cycles/*`** (huit gabarits) —
+  le modèle : `cycles/`, `phases/`, `CYCLE.md`, `CADRAGE.md` (registre d'inconnues), `PLAN.md`
+  (champ de périmètre `ecrit:`), fichier marqueur de clôture de plan (jamais `PLAN.md` lui-même,
+  dont le hash reste stable), `VERDICT.md`, `SUMMARY.md`, liste fermée des six emplacements
+  annexes.
+- **Huit états dont `indéterminé`** : toute combinaison de signaux non prévue rend `indéterminé`,
+  jamais une supposition (« un faux vert est pire qu'un aveu »). Dérogations nominatives
+  (`abandonné | remplacé | gelé`, auteur obligatoire) ; une dérogation sans auteur rend
+  `indéterminé`.
+- **`INDEX.md`, `STATE.md`, `cloture.log`** régénérés à chaque passage — sortie déterministe
+  (deux recalculs sur le même disque produisent des fichiers identiques octet pour octet) ;
+  `cloture.log` en **ajout seul**, jamais une ligne réécrite ou supprimée.
+- **Incrémental par hash du contenu** (`.planning/.recalc-cache.json`, `cache_schema_version`),
+  jamais par `mtime` : un cache absent, illisible, en lien symbolique, ou d'un autre schéma/moteur
+  provoque un recalcul complet, jamais une confiance aveugle ; jamais chargé ni écrit en mode
+  `--read-only`.
+- **Hors modèle** : tout ce qui n'est ni le modèle ni l'une des six annexes est signalé « hors
+  modèle » dans `INDEX.md` — signalé, jamais refusé, jamais déplacé, jamais suivi (liens
+  symboliques de dossier ou de fichier compris) ; noms piégés (saut de ligne, catégorie Unicode
+  C*) échappés au rendu.
+- **Lecture seule** prouvée sans écriture sur deux labs réels du poste (empreinte sha256 de
+  l'arbre complet avant/après, identique) : voir `44-PASSAGE-LABS.md`.
+- **Banc synthétique versionné** (`scripts/tests/test-recalc-planning.sh`,
+  `scripts/tests/fixtures/recalc-planning-banc.txt`) — seul à gater en CI ; chaque garde prouvée
+  par une mutation rouge tracée.
+- **Ce qui n'est PAS livré dans cette phase** : aucun hook ni gate câblé (le recalcul est une
+  commande, pas encore branchée à un déclencheur — arrive en 45/48) ; les fichiers générés
+  (`INDEX.md`, `STATE.md`, `cloture.log`, cache) ne sont pas encore protégés contre l'écriture à
+  la main (G6, Phase 45) ; le socle métier existant de `planning-core` (`guard-planning-updated.sh`
+  et sa mesure par `mtime`) n'est **pas retiré** — le remplacement est additif, les labs qui
+  n'adhèrent pas restent sur l'existant.
+- **Correctifs de revue et d'audit (correction ciblée, lot 1 puis 2 puis 3)** : consommation de
+  `os.scandir` ramenée entièrement dans son `try` (`_lister_entrees`) ; un lien symbolique (ou
+  tout emplacement non régulier au sens `lstat`) à la place d'`INDEX.md`, `STATE.md`,
+  `cloture.log` ou `.recalc-cache.json` refuse désormais toute l'écriture au lieu d'être remplacé
+  en silence ; fuite de descripteur comblée dans `ecrire_si_different` sur le chemin d'échec de
+  `fchmod` ; six marqueurs de `detection_gsd()` reçoivent leur premier mutant de couverture ; le
+  code 2 du détecteur GSD (signalement de migration) n'est plus assimilé au code 3 (terrain
+  libre) — il refuse désormais l'écriture comme un moteur GSD détecté ou une détection non
+  concluante ; assainissement structurel de tout champ recopié dans `cloture.log`
+  (`_jeton_journal`, pas seulement `tentative`) contre l'injection d'un faux enregistrement.
+- **Lot 3** : `lignes_a_journaliser` comparait la valeur BRUTE de l'unité courante au jeton déjà
+  assaini relu dans `cloture.log` — une `tentative` contenant un espace ou un `=` (lue telle
+  quelle depuis `VERDICT.md`, jamais validée, P44-D-09) se rejournalisait à chaque exécution ; la
+  comparaison porte désormais sur la valeur assainie des deux côtés (revue, `260928-b4c-VERIFICATION.md`
+  truth #10, jamais éprouvée par un aller-retour réel). `detection_gsd()` : quand la chaîne GSD
+  est absente de la machine (`GSD_HOME` introuvable, forcé ou hérité de l'environnement), le
+  détecteur sortait en code 1 **avant** d'avoir pu évaluer sa priorité 3 (socle planning-core +
+  signal de code → migration à examiner) — le repli du code 1 ne rejouait que les priorités 2/2bis
+  (marqueurs GSD), laissant écrire sur un planning que l'environnement normal aurait refusé ; la
+  combinaison socle+signal est désormais reproduite en Python pur, indépendamment de toute valeur
+  d'environnement (aucune dépendance de code vers `detect-gsd-engine.sh`, P44-D-01b/P44-D-01d).
+  Accessoirement : le sous-processus du détecteur résout `bash` par `shutil.which` — **corrigé au
+  lot 5** : `shutil.which` résout toujours sur le `PATH` hérité de l'appelant, pas indépendamment
+  de lui ; voir l'entrée lot 5 ci-dessous.
+- **Lot 4 (correction de CLASSE)** : la réimplémentation Python des priorités 2/2bis/3 du
+  détecteur, ajoutée au lot 3 pour fermer le repli du code 1, a elle-même divergé mesurément de
+  l'original sur trois cas (revue + audit) : un `package.json` en lien symbolique (bash `[ -f ]`
+  le suit, `os.lstat` non), un `*.xcodeproj` en lien symbolique (même écart avec `[ -d ]`), et un
+  `STATE.md` aux octets UTF-8 invalides **après** le frontmatter (le décodage UTF-8 strict du
+  fichier entier échouait, awk — qui ne lit que le frontmatter — trouvait le marqueur sans
+  encombre). Dans les trois cas, avec `GSD_HOME` inexistant, le moteur écrivait (exit 0) sur un
+  planning que le détecteur réel classe en code 2, et effaçait le marqueur `planning_version`.
+  `detection_gsd()` appelle désormais le VRAI détecteur bash — plus aucune réimplémentation — dans
+  un environnement MAÎTRISÉ (`GSD_HOME` fixé explicitement au dossier du détecteur, qui existe
+  toujours), neutralisant structurellement la priorité 1 du détecteur au lieu de la contourner ;
+  écriture autorisée SEULEMENT si le détecteur rend 3 ; détecteur absent, en lien symbolique, non
+  régulier, illisible, ou dont le lancement échoue → refus fail-closed nommé, jamais une retombée
+  en écriture. `_jeton_journal` (P44-D-11) passe d'un assainissement par `_` (non injectif — `"3
+  4"` et `"3_4"` s'écrasaient sur le même jeton, pouvant faire manquer une clôture réellement
+  nouvelle au dédoublonnage) à un encodage pourcent INJECTIF (preuve générative 2000 paires,
+  round-trip réel à deux exécutions).
+- **Lot 5 (F1/F44-07, correction de CLASSE — audit + revue)** : l'environnement « maîtrisé » du
+  lot 4 était en réalité `dict(os.environ)` avec la seule surcharge de `GSD_HOME` — une COPIE
+  INTÉGRALE du `PATH` hérité, qui laissait les priorités 2/2bis/3 du détecteur (`awk`/`mktemp`/
+  `wc`/`cat`/`basename`) entièrement soumises à ce `PATH`. Mesuré : un `awk` factice en tête de
+  PATH suffisait à faire écrire (exit 0) le moteur sur un lab GSD réel et à **effacer le marqueur**
+  `gsd_state_version`. L'environnement du sous-processus détecteur est désormais construit DE ZÉRO
+  (liste blanche PATH fixe + GSD_HOME, aucune autre variable héritée — ni `BASH_ENV`, ni `ENV`, ni
+  une fonction exportée `BASH_FUNC_*%%`) ; `bash` n'est plus résolu par `shutil.which` sur ce même
+  PATH mais par une liste fixe de deux chemins absolus (`/bin/bash`, `/usr/bin/bash`), chacun
+  validé par `lstat` — aucun candidat valide : refus fail-closed nommé. Prouvé par cinq nouvelles
+  colonnes de `R-MATRICE-ENV` (PATH empoisonné par un faux `awk`/`bash`, `BASH_ENV`, fonction
+  exportée, `ENV`) et deux mutants dédiés (`MUT-ENV-OS-ENVIRON`, `MUT-BASH-VIA-PATH`) tués sur le
+  scénario même qui a établi la trace rouge d'origine. Correctifs voisins de la même correction
+  ciblée : `_jeton_journal` échappe désormais aussi tout caractère non imprimable (NUL, contrôles
+  C0/C1), jamais laissé brut ; un jeton vide (repli vide) est une `ValueError` bruyante, jamais une
+  ligne de journal illisible écrite en silence ; « détecteur absent » et « détecteur non régulier »
+  portent deux messages stderr distincts ; `ecrire_si_different` lit l'existant par `O_NOFOLLOW`
+  (alignée sur le reste des lectures du modèle) au lieu d'un `open()` nu.
+- **Lot 6 (correction ciblée, audit du 2026-09-28)** : `vf_ws_enumerate` (`workstream-policy.sh`,
+  hors périmètre de cette phase, P44-D-01b) émet un chemin absolu par ligne pour chaque
+  compartiment de `workstreams/` — un contrat que deux classes RÉELLES brisent SILENCIEUSEMENT (le
+  détecteur rend le code 3 « terrain libre » sans aucun diagnostic distinct du cas nominal) : un
+  nom de compartiment portant un saut de ligne (la ligne imprimée se scinde en deux, invisible à la
+  lecture) et un nom de compartiment commençant par un point (invisible au glob sans `dotglob`) —
+  une troisième, le chemin du dossier de planning lui-même porteur d'un saut de ligne, casse
+  l'énumération entière d'un coup. Mesuré par exécution dans l'environnement maîtrisé exact du
+  moteur : un compartiment réellement porteur de `gsd_state_version`, masqué par l'une de ces
+  classes, faisait écrire (exit 0) `INDEX.md`/`STATE.md`/`.recalc-cache.json` sur un planning tenu
+  par GSD — violation directe de P44-D-02a. `recalc-planning.sh` ferme la conséquence entièrement
+  côté appelant (`_enumeration_workstreams_fidele`, AVANT tout appel au détecteur, jamais une
+  relecture de `STATE.md` ni une réimplémentation des priorités 2/2bis/3) : un compartiment réel
+  que l'énumération ne restituerait pas fidèlement rend le verdict du détecteur non vérifiable,
+  refus nommé, zéro octet écrit — `detect-gsd-engine.sh` et `workstream-policy.sh` restent
+  INCHANGÉS (P44-D-01b), le trou racine reste ouvert pour Samuel (BACKLOG.md, propriétaire de
+  `workstream-policy.sh`, Phase 41.1). Une entrée en lien symbolique reste une exclusion DÉCLARÉE
+  du détecteur lui-même (avertissement stderr), volontairement pas traitée comme masquante ici.
+  Correctifs de revue voisins (comportement inchangé) : commentaire corrigé sur `--noprofile
+  --norc` (n'affectent pas `BASH_ENV`/`ENV` en non-interactif — la protection vient exclusivement
+  de l'environnement maîtrisé construit de zéro) ; conséquence fail-closed totale de
+  `CANDIDATS_BASH` sur un système sans `/bin/bash` ni `/usr/bin/bash` documentée
+  (`references/modele-cycles.md`) et message stderr explicité ; l'invariant final de
+  `_jeton_journal` (P44-D-11) passe d'un `assert` nu (désactivable par `python -O`) à une exception
+  explicite toujours active.
+- **Lot 7 (correction de CLASSE, audit du 2026-09-28)** : la garde du lot 6 fermait deux classes
+  structurelles (noms piégés) mais pas la classe plus large mesurée ensuite — `vf_ws_enumerate`
+  (`workstream-policy.sh:305-306`, hors périmètre P44-D-01b) pose `found=1` inconditionnellement
+  après chaque `printf`, même quand `cd "$entry" && pwd` a ÉCHOUÉ (compartiment sans bit `x`,
+  mode `000`/`600`/`400`) : ligne vide silencieusement sautée par `detect-gsd-engine.sh`, priorité
+  2bis retombe sur le code 3 « terrain libre » sans aucun diagnostic. Mesuré : le moteur écrivait
+  (exit 0) sur un compartiment réellement tenu par GSD ; et, quand le marqueur porté est au
+  `STATE.md` **racine** lui-même rendu illisible (mode `000`), le moteur allait jusqu'à
+  **écraser** ce `STATE.md`, effaçant `gsd_state_version`. Principe retenu, plus large que le lot
+  6 (`_enumeration_workstreams_fidele` remplacée par `_lecture_detecteur_fidele`) : *le moteur
+  n'écrit que s'il a pu LIRE, pour de vrai, tout ce que le détecteur devait lire* — fidélité PAR
+  EXÉCUTION de `vf_ws_enumerate` (relancée dans le MÊME bash et le MÊME environnement maîtrisé que
+  le détecteur, comparée à l'ensemble réel du disque dérivé par `os.scandir`) et lisibilité RÉELLE
+  (ouverture effective, jamais `os.access`) de chaque compartiment retenu et de chaque `STATE.md`
+  (racine et compartiments). `detect-gsd-engine.sh` et `workstream-policy.sh` restent INCHANGÉS
+  (P44-D-01b) — appelés, jamais réimplémentés ni modifiés. Toute `OSError` rencontrée par la garde
+  est désormais un refus nommé (F2, revue du lot 6 : un `continue` silencieux sur `is_symlink()`/
+  `is_dir()` sous exception était un fail-open). F3 (revue) : le docstring de la garde distinguait
+  mal « absent » (code 3, silence nominal) de « lien/non-répertoire/illisible » (code 2) — corrigé.
+  Le trou source dans `vf_ws_enumerate` reste hors de portée (P44-D-01b), transmis au BACKLOG pour
+  Samuel (propriétaire de `workstream-policy.sh`, Phase 41.1).
+- **Lot 8 (correction de CLASSE, audit du 2026-09-28)** : deux corrections indépendantes de la
+  garde de lecture du lot 7. (1) Un lien symbolique CASSÉ (cible absente) à l'emplacement d'un
+  `STATE.md`, racine ou de compartiment, est désormais traité comme ABSENT — exactement comme le
+  détecteur, dont le `[ -f ]` (`detect-gsd-engine.sh:96,184`) suit le lien et n'y tente aucune
+  lecture sur une cible manquante. `os.path.isfile` (mirroir exact de `[ -f ]`) remplace
+  `os.path.lexists`, dont l'usage confondait un lien cassé (`ENOENT`, aucune lecture possible) avec
+  une vraie erreur de lecture : sur-refus mesuré (écriture refusée sur un planning SANS AUCUN
+  marqueur GSD, uniquement parce qu'un `STATE.md` de compartiment était un lien cassé). Le
+  `STATE.md` racine en lien cassé reste TOUJOURS refusé, mais par la garde B de
+  `appliquer_ecritures` (« emplacement occupé », F4) — jamais un double refus, jamais une écriture
+  à travers le lien. (2) `_ouvrable` ouvre désormais en `O_NONBLOCK` et contrôle le type par
+  `fstat` : un `STATE.md` en FIFO n'y bloque plus jamais (mesuré, blocage indéfini sur HEAD
+  345303e faute de tout processus tenant l'extrémité écriture). Correction de prose associée : le
+  commentaire de la garde de lecture laissait entendre que les classes structurelles du lot 6 « ne
+  décident jamais seules » — elles sont en réalité fusionnées dans la même liste de décision que
+  l'égalité d'ensembles et la lisibilité réelle, n'importe laquelle des trois suffisant seule à
+  refuser. `detect-gsd-engine.sh` et `workstream-policy.sh` restent INCHANGÉS (P44-D-01b).
+- **Lot 9 (correction de portabilité GNU/BSD)** : le banc `scripts/tests/test-recalc-planning.sh`
+  rendait `✗ R14 permissions` sur le runner CI Linux (ubuntu-latest, run 36430707398) alors que
+  vert sous macOS — trois sites identiques `MODE=$(stat -f "%Lp" f 2>/dev/null || stat -c "%a" f
+  2>/dev/null)` (R14, MUT-CHMOD, MUT-CHMOD-JOURNAL) : sous GNU coreutils, `stat -f` désigne le
+  système de fichiers, pas le format de sortie — la commande échoue mais imprime déjà un bloc
+  `File:`/`ID:`/`Type:` sur stdout avant d'échouer, puis le repli `stat -c` s'exécute dans la MÊME
+  substitution de commande et ajoute `644` à la suite, produisant une chaîne multi-ligne jamais
+  égale à `"644"`. Remplacé par `mode_octal()`, une seule fonction lisant `os.stat(...).st_mode &
+  0o777` via `$PYBIN` (déjà une dépendance du banc) — une seule sémantique, indépendante du binaire
+  `stat` du PATH. Reste du banc balayé pour d'autres constructions GNU/BSD divergentes : aucune
+  autre correction nécessaire.
+
+Décisions P44-D-01 à P44-D-18 — Willy, AskUserQuestion session principale, 2026-09-27. Correctifs
+lot 1 : vf-coder, mandat de correction ciblée, 2026-09-28. Lot 2 (code 2 du détecteur,
+assainissement du journal), lot 3 (dédoublonnage assaini, repli code 1 sur socle+signal), lot 4
+(source unique de vérité pour la détection GSD, encodage injectif du journal), lot 5
+(environnement maîtrisé du sous-processus détecteur construit de zéro, alphabet du journal étendu
+aux contrôles C0/C1), lot 6 (garde de fidélité d'énumération des compartiments de workstream,
+correctifs de revue), lot 7 (garde de lecture du détecteur, correction de classe — fidélité par
+exécution + lisibilité réelle), lot 8 (lien cassé traité comme absent, FIFO non bloquante,
+correction de prose) et lot 9 (portabilité GNU/BSD du lecteur de mode du banc) : décision du head
+sous délégation technique de Willy, session principale, 2026-09-28.
+
 ## [v2.7.2] — 2026-09-28 (seuil mesurable du STATE)
 
 **Patch** (doctrine) :

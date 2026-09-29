@@ -1,0 +1,1831 @@
+@@ # Banc synthétique versionné de recalc-planning.sh (P44-D-06). Format : une ligne qui commence
+@@ # par « @@ » est une directive, toute autre ligne appartient au fichier ouvert par le dernier
+@@ # « @@ fichier ». « @@ # <texte> » est un commentaire. « @@ lab <nom> » ouvre un lab (nom en
+@@ # [a-z0-9-]+, unique). « @@ dossier <chemin> » crée un dossier vide. « @@ fichier <chemin> »
+@@ # crée un fichier dont le contenu est l'ensemble des lignes suivantes jusqu'à la prochaine
+@@ # directive, chacune terminée par un saut de ligne. « @@ attendu <unité> :: <état> » déclare la
+@@ # dérivation attendue en lecture seule (unité = chemin relatif à .planning/, cycle, phase ou
+@@ # plan). Chemins relatifs à la racine du lab, sans segment `..` ni `/` ou `~` initial.
+@@ #
+@@ # Ce banc est un FICHIER TEXTE, pas une arborescence versionnée : le site de pose n°4 de
+@@ # l'installeur installe les fixtures à plat (glob non récursif), et aucun dossier `.planning/`
+@@ # imbriqué n'est versionné dans ce dépôt (guard-planning-updated.sh, planning-session-
+@@ # snapshot.sh le découvrent par `find`). Le dossier de planning s'écrit `.planning/` dans le
+@@ # banc : c'est du texte, aucun dossier `.planning/` n'est versionné.
+
+@@ lab traceur
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-traceur/CYCLE.md
+---
+titre: Cycle traceur
+rend:
+  - livrables/rapport.md
+ferme_quand:
+  - toutes les phases closes ou abandonnées
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Le périmètre du traceur est-il celui du plan 44-01 ?"
+    structurante: oui
+    statut: ARBITRÉ
+    par: willy
+    le: "2026-09-27"
+    ou: "session principale"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/PLAN.md
+---
+ecrit: livrables/suite.md
+---
+
+@@ fichier livrables/rapport.md
+Rapport livré par la phase 01-livree du lab traceur.
+
+@@ attendu cycles/01-traceur/phases/01-livree :: close
+@@ attendu cycles/01-traceur/phases/02-en-cours :: à exécuter
+@@ attendu cycles/01-traceur :: à exécuter
+
+@@ lab traceur-gsd
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/STATE.md
+---
+gsd_state_version: 1.0
+---
+
+@@ fichier .planning/cycles/01-traceur/CYCLE.md
+---
+titre: Cycle traceur
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Le périmètre du traceur est-il celui du plan 44-01 ?"
+    structurante: oui
+    statut: ARBITRÉ
+    par: willy
+    le: "2026-09-27"
+    ou: "session principale"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/PLAN.md
+---
+ecrit: livrables/suite.md
+---
+
+@@ fichier livrables/rapport.md
+Rapport livré par la phase 01-livree du lab traceur-gsd.
+
+@@ attendu cycles/01-traceur/phases/01-livree :: close
+@@ attendu cycles/01-traceur/phases/02-en-cours :: à exécuter
+@@ attendu cycles/01-traceur :: à exécuter
+
+@@ lab traceur-gsd-partition
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/workstreams/gouvernance-banc/STATE.md
+---
+gsd_state_version: 1.0
+---
+
+@@ fichier .planning/cycles/01-traceur/CYCLE.md
+---
+titre: Cycle traceur
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Le périmètre du traceur est-il celui du plan 44-01 ?"
+    structurante: oui
+    statut: ARBITRÉ
+    par: willy
+    le: "2026-09-27"
+    ou: "session principale"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/01-livree/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-traceur/phases/02-en-cours/PLAN.md
+---
+ecrit: livrables/suite.md
+---
+
+@@ fichier livrables/rapport.md
+Rapport livré par la phase 01-livree du lab traceur-gsd-partition.
+
+@@ attendu cycles/01-traceur/phases/01-livree :: close
+@@ attendu cycles/01-traceur/phases/02-en-cours :: à exécuter
+@@ attendu cycles/01-traceur :: à exécuter
+
+@@ # ==============================================================================================
+@@ # Matrice des états d'une phase à plan direct (44-03, Tâche 1) — chaque lab porte ses `@@ attendu`
+@@ # sur la phase ET sur le cycle. Cycle `01-c`, phase `01-p` sauf mention contraire. Un jumeau
+@@ # (`jumeau-de=<positif>`) diffère d'un signal et rend un état différent sur la MÊME unité (R20).
+@@ # ==============================================================================================
+
+@@ lab etat-a-cadrer
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ dossier .planning/cycles/01-c/phases/01-p
+
+@@ attendu cycles/01-c/phases/01-p :: à cadrer
+@@ attendu cycles/01-c :: à cadrer
+
+@@ lab etat-a-cadrer-jumeau jumeau-de=etat-a-cadrer
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ""
+---
+
+@@ attendu cycles/01-c/phases/01-p :: en cadrage
+@@ attendu cycles/01-c :: en cadrage
+
+@@ lab etat-en-cadrage
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ""
+---
+
+@@ attendu cycles/01-c/phases/01-p :: en cadrage
+@@ attendu cycles/01-c :: en cadrage
+
+@@ lab etat-en-cadrage-jumeau jumeau-de=etat-en-cadrage
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: non
+    statut: ""
+---
+
+@@ attendu cycles/01-c/phases/01-p :: à planifier
+@@ attendu cycles/01-c :: à planifier
+
+@@ lab etat-a-planifier
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ attendu cycles/01-c/phases/01-p :: à planifier
+@@ attendu cycles/01-c :: à planifier
+
+@@ lab etat-a-planifier-jumeau jumeau-de=etat-a-planifier
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ attendu cycles/01-c/phases/01-p :: à exécuter
+@@ attendu cycles/01-c :: à exécuter
+
+@@ lab etat-a-executer
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ attendu cycles/01-c/phases/01-p :: à exécuter
+@@ attendu cycles/01-c :: à exécuter
+
+@@ lab etat-a-executer-jumeau jumeau-de=etat-a-executer
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier livrables/rapport.md
+Livrable de etat-a-executer-jumeau.
+
+@@ attendu cycles/01-c/phases/01-p :: à juger
+@@ attendu cycles/01-c :: à juger
+
+@@ lab etat-a-juger
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier livrables/rapport.md
+Livrable de etat-a-juger.
+
+@@ attendu cycles/01-c/phases/01-p :: à juger
+@@ attendu cycles/01-c :: à juger
+
+@@ lab etat-a-juger-jumeau jumeau-de=etat-a-juger
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: livrable-absent:livrables/rapport.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab etat-a-corriger
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: échec
+---
+
+@@ fichier livrables/rapport.md
+Livrable de etat-a-corriger.
+
+@@ attendu cycles/01-c/phases/01-p :: à corriger
+@@ attendu cycles/01-c :: à corriger
+
+@@ lab etat-a-corriger-jumeau jumeau-de=etat-a-corriger
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier livrables/rapport.md
+Livrable de etat-a-corriger-jumeau.
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: verdict-passe-sans-SUMMARY.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab etat-close
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier livrables/rapport.md
+Livrable de etat-close.
+
+@@ attendu cycles/01-c/phases/01-p :: close
+@@ attendu cycles/01-c :: close
+
+@@ lab etat-close-jumeau jumeau-de=etat-close
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: échec
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier livrables/rapport.md
+Livrable de etat-close-jumeau.
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: SUMMARY.md-avec-verdict-en-echec
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab etat-indetermine
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: SUMMARY.md-sans-PLAN.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab etat-indetermine-jumeau jumeau-de=etat-indetermine
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ attendu cycles/01-c/phases/01-p :: à planifier
+@@ attendu cycles/01-c :: à planifier
+
+@@ # ---------- Dérogations nominatives (P44-D-07) --------------------------------------------
+
+@@ lab derog-abandonne
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/DEROGATION.md
+---
+statut: "abandonné par willy"
+le: "2026-09-27"
+motif: "banc"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: abandonné
+@@ attendu cycles/01-c :: abandonné
+
+@@ lab derog-abandonne-jumeau jumeau-de=derog-abandonne
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/DEROGATION.md
+---
+statut: "abandonné"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: derogation-sans-auteur
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab derog-remplace
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/DEROGATION.md
+---
+statut: "remplacé par willy"
+remplace_par: "02-suivant"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: remplacé
+@@ attendu cycles/01-c :: abandonné
+
+@@ lab derog-remplace-jumeau jumeau-de=derog-remplace
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/DEROGATION.md
+---
+statut: "remplacé"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: derogation-sans-auteur
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab derog-gele
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/DEROGATION.md
+---
+statut: "gelé par willy"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: gelé
+@@ attendu cycles/01-c :: gelé
+
+@@ lab derog-gele-jumeau jumeau-de=derog-gele
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/DEROGATION.md
+---
+statut: "gelé"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: derogation-sans-auteur
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ # ---------- Contradictions nommées de P44-D-08 (pas de jumeau requis) ----------------------
+
+@@ lab d08-summary-sans-plan
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: SUMMARY.md-sans-PLAN.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab d08-verdict-sans-marqueur
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: VERDICT.md-sans-CLOTURE.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab d08-summary-verdict-echec
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: échec
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier livrables/rapport.md
+Livrable de d08-summary-verdict-echec.
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: SUMMARY.md-avec-verdict-en-echec
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab d08-marqueur-sans-plan
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: CLOTURE.md-sans-PLAN.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ # ---------- Règles de cadrage et de lecture (pas de jumeau requis) --------------------------
+
+@@ lab hors-cadrage
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: hors-cadrage:PLAN.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab avant-cadrage-clos
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ""
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: avant-cadrage-clos:PLAN.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab registre-statut-inconnu
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: "en cours"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: à planifier
+@@ attendu cycles/01-c :: à planifier
+
+@@ lab registre-invalide
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: "peut-être"
+    statut: ""
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: registre-invalide
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab ecrit-traversee
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: "../dehors.md"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: ecrit-invalide
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab ecrit-motif
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: "livrables/*.md"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: ecrit-invalide
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab frontmatter-cle-dupliquee
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+ecrit: livrables/autre.md
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: frontmatter-invalide:PLAN.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab derog-invalide
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/DEROGATION.md
+---
+statut: "suspendu par willy"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: derogation-invalide
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ # ==============================================================================================
+@@ # Agrégation — phases à plans et cycles (44-03, Tâche 2)
+@@ # ==============================================================================================
+
+@@ lab plans-agregation
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/PLAN.md
+---
+ecrit: livrables/plan-a.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/SUMMARY.md
+---
+auteur: alice
+---
+
+@@ fichier livrables/plan-a.md
+Livrable du plan 01-a.
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/02-b/PLAN.md
+---
+ecrit: livrables/plan-b.md
+---
+
+@@ attendu cycles/01-c/phases/01-p/plans/01-a :: close
+@@ attendu cycles/01-c/phases/01-p/plans/02-b :: à exécuter
+@@ attendu cycles/01-c/phases/01-p :: à exécuter
+@@ attendu cycles/01-c :: à exécuter
+
+@@ lab plans-tous-clos
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/PLAN.md
+---
+ecrit: livrables/plan-a.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/SUMMARY.md
+---
+auteur: alice
+---
+
+@@ fichier livrables/plan-a.md
+Livrable du plan 01-a.
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/02-b/PLAN.md
+---
+ecrit: livrables/plan-b.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/02-b/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/02-b/VERDICT.md
+---
+juge: relecteur-banc
+hash: fedcba9876543210fedcba9876543210fedcba9876543210fedcba98765432
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/02-b/SUMMARY.md
+---
+auteur: bob
+---
+
+@@ fichier livrables/plan-b.md
+Livrable du plan 02-b.
+
+@@ attendu cycles/01-c/phases/01-p/plans/01-a :: close
+@@ attendu cycles/01-c/phases/01-p/plans/02-b :: close
+@@ attendu cycles/01-c/phases/01-p :: close
+@@ attendu cycles/01-c :: close
+
+@@ lab plans-tous-abandonnes
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/DEROGATION.md
+---
+statut: "abandonné par willy"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/02-b/DEROGATION.md
+---
+statut: "abandonné par willy"
+---
+
+@@ attendu cycles/01-c/phases/01-p/plans/01-a :: abandonné
+@@ attendu cycles/01-c/phases/01-p/plans/02-b :: abandonné
+@@ attendu cycles/01-c/phases/01-p :: abandonné
+@@ attendu cycles/01-c :: abandonné
+
+@@ lab plans-vide
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ dossier .planning/cycles/01-c/phases/01-p/plans
+
+@@ attendu cycles/01-c/phases/01-p :: à planifier
+@@ attendu cycles/01-c :: à planifier
+
+@@ lab plans-et-plan-direct
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/PLAN.md
+---
+ecrit: livrables/plan-a.md
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: plan-direct-et-plans
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab plans-avec-verdict-phase
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/PLAN.md
+---
+ecrit: livrables/plan-a.md
+---
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: fichier-de-plan-au-niveau-phase:VERDICT.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab plan-indetermine
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/SUMMARY.md
+---
+auteur: alice
+---
+
+@@ attendu cycles/01-c/phases/01-p/plans/01-a :: indéterminé :: SUMMARY.md-sans-PLAN.md
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: plan-indetermine:01-a
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+@@ lab cycle-close
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier livrables/rapport.md
+Livrable de cycle-close.
+
+@@ attendu cycles/01-c/phases/01-p :: close
+@@ attendu cycles/01-c :: close
+
+@@ lab cycle-abandonne
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/DEROGATION.md
+---
+statut: "abandonné par willy"
+---
+
+@@ attendu cycles/01-c/phases/01-p :: abandonné
+@@ attendu cycles/01-c :: abandonné
+
+@@ lab cycle-gele
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/DEROGATION.md
+---
+statut: "gelé par willy"
+---
+
+@@ dossier .planning/cycles/01-c/phases/02-p
+
+@@ attendu cycles/01-c/phases/01-p :: gelé
+@@ attendu cycles/01-c/phases/02-p :: à cadrer
+@@ attendu cycles/01-c :: gelé
+
+@@ lab cycle-propagation
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier livrables/rapport.md
+Livrable de cycle-propagation, phase 01-p.
+
+@@ fichier .planning/cycles/01-c/phases/02-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ attendu cycles/01-c/phases/01-p :: close
+@@ attendu cycles/01-c/phases/02-p :: indéterminé :: SUMMARY.md-sans-PLAN.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:02-p
+
+@@ lab cycle-sans-cycle-md
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ dossier .planning/cycles/01-c/phases/01-p
+
+@@ attendu cycles/01-c :: indéterminé :: CYCLE.md-absent
+
+@@ lab cycle-vide
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ attendu cycles/01-c :: à cadrer
+
+@@ lab cycles-ordre
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-premier/CYCLE.md
+---
+titre: Premier cycle
+---
+
+@@ dossier .planning/cycles/01-premier/phases/01-p
+
+@@ fichier .planning/cycles/02-second/CYCLE.md
+---
+titre: Second cycle
+---
+
+@@ dossier .planning/cycles/02-second/phases/01-p
+
+@@ attendu cycles/01-premier :: à cadrer
+@@ attendu cycles/02-second :: à cadrer
+
+@@ # ---- 44-04 Tâche 1 : hors modèle et garde-fous de chemin (R40 à R46) ----------------------
+
+@@ lab hors-modele-racine
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/notes.md
+note intruse à la racine, hors modèle
+
+@@ dossier .planning/phases
+
+@@ dossier .planning/workstreams
+
+@@ fichier .planning/BOARD.md
+tableau intrus, hors modèle
+
+@@ fichier .planning/intel
+fichier intrus nommé comme une annexe — pas un dossier, donc hors modèle
+
+@@ fichier .planning/_bancs/f.txt
+annexe _bancs, jamais lue
+
+@@ fichier .planning/recherches/f.txt
+annexe recherches, jamais lue
+
+@@ fichier .planning/sketches/f.txt
+annexe sketches, jamais lue
+
+@@ fichier .planning/_archive/f.txt
+annexe _archive, jamais lue
+
+@@ fichier .planning/registres/f.txt
+annexe registres, jamais lue
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle du modèle, jamais hors modèle
+---
+
+@@ attendu cycles/01-c :: à cadrer
+@@ attendu-hors-modele BOARD.md :: fichier
+@@ attendu-hors-modele intel :: fichier
+@@ attendu-hors-modele notes.md :: fichier
+@@ attendu-hors-modele phases :: dossier
+@@ attendu-hors-modele workstreams :: dossier
+
+@@ lab hors-modele-interne
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle avec intrus internes
+---
+
+@@ fichier .planning/cycles/01-c/notes.md
+notes internes au cycle, hors modèle
+
+@@ fichier .planning/cycles/01-c/phases/01-p/brouillon.md
+brouillon interne à la phase, hors modèle
+
+@@ fichier .planning/cycles/01-c/phases/02-q/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-q/plans/01-x/annexe.txt
+annexe interne au plan, hors modèle
+
+@@ fichier .planning/cycles/brouillon.md
+brouillon à la racine de cycles/, hors modèle
+
+@@ dossier .planning/cycles/sans-numero
+
+@@ attendu cycles/01-c/phases/01-p :: à cadrer
+@@ attendu cycles/01-c/phases/02-q :: à planifier
+@@ attendu cycles/01-c/phases/02-q/plans/01-x :: à planifier
+@@ attendu cycles/01-c :: à cadrer
+@@ attendu-hors-modele cycles/01-c/notes.md :: fichier
+@@ attendu-hors-modele cycles/01-c/phases/01-p/brouillon.md :: fichier
+@@ attendu-hors-modele cycles/01-c/phases/02-q/plans/01-x/annexe.txt :: fichier
+@@ attendu-hors-modele cycles/brouillon.md :: fichier
+@@ attendu-hors-modele cycles/sans-numero :: dossier
+
+@@ lab hors-modele-interne-jumeau jumeau-de=hors-modele-interne
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle sans intrus internes
+---
+
+@@ dossier .planning/cycles/01-c/phases/01-p
+
+@@ fichier .planning/cycles/01-c/phases/02-q/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ dossier .planning/cycles/01-c/phases/02-q/plans/01-x
+
+@@ attendu cycles/01-c/phases/01-p :: à cadrer
+@@ attendu cycles/01-c/phases/02-q :: à planifier
+@@ attendu cycles/01-c/phases/02-q/plans/01-x :: à planifier
+@@ attendu cycles/01-c :: à cadrer
+@@ attendu-hors-modele-aucun
+
+@@ lab modele-mauvais-type
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles
+ceci est un fichier, pas un dossier cycles/
+
+@@ dossier .planning/INDEX.md
+
+@@ attendu-hors-modele cycles :: fichier
+@@ attendu-hors-modele INDEX.md :: dossier
+
+@@ lab lien-dossier-cycle
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle réel
+---
+
+@@ fichier-dehors sandbox-lien-dossier/phases/01-p/marqueur.txt
+présence, jamais lue
+
+@@ lien .planning/cycles/02-lien -> DEHORS/sandbox-lien-dossier
+
+@@ attendu cycles/01-c :: à cadrer
+@@ attendu-hors-modele cycles/02-lien :: lien
+
+@@ lab lien-fichier-plan
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle réel
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier-dehors sandbox-lien-fichier/cible.txt
+JETON-DEHORS-44
+
+@@ lien .planning/cycles/01-c/phases/01-p/PLAN.md -> DEHORS/sandbox-lien-fichier/cible.txt
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: fichier-non-regulier:PLAN.md
+@@ attendu-hors-modele-aucun
