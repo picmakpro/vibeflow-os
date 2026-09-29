@@ -1246,7 +1246,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **SOBR-03**: `check-blueprints` ne balaie plus `.claude/worktrees/` ; les hooks `$CLAUDE_PROJECT_DIR/.claude/*` fonctionnent dans un worktree (entrée BACKLOG du 2026-09-28).
 - [ ] **SOBR-04**: La procédure de release de `CLAUDE.md` exige une relecture adverse du diff fonctionnel avant le tag, avec au moins une sonde exécutée.
 - [ ] **SOBR-05**: Un ajout, un retrait — un nouveau gate, ADR, règle ou mémoire désigne ce qu'il remplace ou justifie qu'il n'en remplace aucun ; l'absence est visible par machine.
-- [ ] **SOBR-06**: Budgets étendus — plafonds mesurés sur le BACKLOG ouvert, l'index de mémoire et le ROADMAP, en plus de STATE et des worktrees ; le mode au-delà (archivage seul ou proposé) est tranché au cadrage contre ADR-031.
+- [ ] **SOBR-06**: Budgets étendus — plafonds mesurés sur le BACKLOG ouvert, l'index de mémoire et le ROADMAP, en plus de STATE et des worktrees ; au-delà, l'outil archive seul (déplacement tracé et réversible), écrit comme précision d'ADR-031.
 - [ ] **SOBR-07**: Nettoyage en fin de geste — la clôture d'une mission de manager **et** la fin d'un travail direct rangent worktrees, branches, stash et mémoires non versionnées ; gaté, pas facultatif.
 - [ ] **SOBR-08**: Prose plafonnée — une note de STATE ou une entrée de BACKLOG a une taille maximale ; un sujet clos quitte le fichier courant pour une archive.
 

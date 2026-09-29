@@ -1905,9 +1905,10 @@ après la 41.2, la 41.3 et les plans 41-07 à 41-09.
 **Arbitrages (Samuel, AskUserQuestion session principale, 2026-09-29)** : phase dans `fiabilite`
 avant clôture ; les quatre principes (un ajout un retrait, budgets étendus, nettoyage en fin de
 geste, prose plafonnée) ; **appliquer à ce dépôt d'abord**, généraliser ensuite.
-**Question ouverte au cadrage** : l'archivage automatique au-delà d'un budget touche ADR-031
-(jamais de correction sans validation humaine). Archiver déplace sans détruire ; le cadrage tranche
-s'il s'exécute seul ou se propose.
+**Archivage automatique, ADR-031 précisé** (arbitrage Samuel, AskUserQuestion session principale,
+2026-09-29) : au-delà d'un budget, l'outil archive seul. Archiver déplace sans détruire, tracé et
+réversible : ce n'est pas une correction. La phase l'écrit comme précision d'ADR-031, sur le modèle
+d'ADR-074.
 **Success Criteria** (what must be TRUE):
 
   1. Ce dépôt est sous budget, mesuré : chaque `STATE.md` ≤ 8 Ko (historique archivé, jamais
