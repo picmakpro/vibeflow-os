@@ -153,6 +153,13 @@ adhéré (Q2).
   (JSON échappé, chemins avec espaces ou guillemets) et, en cas de doute, **fermer** dans le
   doute pour un chemin sous un `.planning/` adhérent.
 
+- **P45-D-06b (manager, 2026-09-29, après le plan-check frais) :** quand le script ou `python3`
+  manque dans un lab adhérent, la commande enregistrée refuse `Write`, `Edit` et `NotebookEdit`,
+  et **aussi `Agent` et `Task`**, conformément à la lettre de Q6 (a). **`Bash` reste ouvert**,
+  pour que la réparation (poser le script, installer `python3`) reste possible. C'est une limite
+  déclarée, cohérente avec P45-D-10. Elle est écrite dans la référence du modèle et dans le relevé
+  du canary.
+
 ### Décisions déléguées, validées par Willy (même canal, reconfirmation après /clear)
 
 - **P45-D-07 :** la phase livre la **commande qui pose `VERDICT.md`**. Elle écrit le hash sha256
@@ -176,6 +183,11 @@ adhéré (Q2).
 - **P45-D-12 :** la **racine du lab** se dérive du **chemin écrit** (`tool_input.file_path`,
   toujours absolu), ou du `cwd` du payload pour un dispatch, **jamais** de `$CLAUDE_PROJECT_DIR`.
   Ce dernier ne suit pas `EnterWorktree` (`45-SCOUTING.md` A.5a).
+- **P45-D-12a (manager, 2026-09-29, après le plan-check frais) :** aucune variable
+  d'environnement ne change **l'armement** ni **l'adhésion**. **`HOME` est une entrée déclarée**
+  de la résolution des définitions d'agent (P45-D-05b), et elle seule. Un cas de test fixe ce
+  périmètre : un `HOME` différent change la résolution d'un agent du compte, mais jamais
+  l'adhésion ni l'état d'armement.
 - **P45-D-13 :** la **dérogation** est nominative : qui, canal, date, gate, chemin(s), avec une
   **raison qui n'est pas un placeholder** (vide, `TODO`, `xxx`, `…`, `<…>` sont refusés). Elle est
   inscrite par une commande dans un **journal append-only protégé par G6**. Elle n'est **jamais
