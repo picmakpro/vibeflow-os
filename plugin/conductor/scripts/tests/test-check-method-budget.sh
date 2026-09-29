@@ -9,6 +9,10 @@
 #   W6 — lab multi-dépôts : worktree frère compté UNE fois, pas comme un dépôt de plus
 #   X1 — sans --strict un dépassement rend 0 ; X2 — avec --strict il rend 1 ; X3 — arguments
 #        et budgets invalides rendent 64 ; X4 — lecture seule : rien n'est supprimé
+#   B1/B2 — branche locale mergée et travaillée / neuve ; S1/S2 — stash sans propriétaire / message
+#        illisible ; M1-M3 — mémoires hors git, hors index, sonde zz-probe-* ; R1-R6 — branches
+#        distantes : owner, jamais celles d'autrui, gh absent / en échec / JSON invalide, --no-remote ;
+#        X4 étendu — refs, stash et mémoires identiques avant/après ; M1-M3 (mutants) — QUAL-01
 #   Q5 — anti-vert-à-vide
 #
 # Convention du dossier : set -uo pipefail sans -e, mktemp -d + trap EXIT, fixtures jetables.
@@ -108,6 +112,133 @@ bash "$CHECK" --root "$WORK_DIR/absent" >/dev/null 2>&1; assert_rc "X3c — raci
 OUT="$(bash "$CHECK" --root "$LAB" --quiet)"
 refute "X5 — --quiet tait les constats conformes" "$OUT" "actif : $LAB/.claude/worktrees/w3"
 assert "X5 — --quiet garde les dépassements" "$OUT" "DÉPASSÉ"
+
+echo ""
+echo "=== B/S/M/R — rangement (SOBR-01) ==="
+# gh factice : jamais un appel réseau. Comportement piloté par FAKE_GH_USER, FAKE_GH_PRS, FAKE_GH_RC ;
+# chaque appel est journalisé dans FAKE_GH_LOG (témoin : --no-remote ne doit laisser aucune trace).
+FAKEBIN="$WORK_DIR/fakebin"; mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/gh" <<'GHSTUB'
+#!/bin/sh
+echo "$*" >> "${FAKE_GH_LOG:-/dev/null}"
+case "$1 $2" in
+  "api user") [ -n "${FAKE_GH_USER:-}" ] && { echo "$FAKE_GH_USER"; exit 0; }; exit 1 ;;
+  "pr list") [ -n "${FAKE_GH_PRS:-}" ] && cat "$FAKE_GH_PRS"; exit "${FAKE_GH_RC:-0}" ;;
+esac
+exit 1
+GHSTUB
+chmod +x "$FAKEBIN/gh"
+export FAKE_GH_LOG="$WORK_DIR/gh.log"
+PRS="$WORK_DIR/prs.json"
+printf '%s' '[{"headRefName":"feat-own","number":7,"author":{"login":"sam"}},{"headRefName":"feat-willy","number":8,"author":{"login":"picmakpro"}}]' > "$PRS"
+
+RG="$WORK_DIR/rg"; mk_repo "$RG"
+G -C "$RG" checkout -b done; echo d > "$RG/d"; G -C "$RG" add d; G -C "$RG" commit -m d
+G -C "$RG" checkout main; G -C "$RG" merge --ff-only done
+G -C "$RG" branch fresh
+# stash : un sur main (propriétaire vivant), un sur une branche supprimée, un au message illisible
+echo m > "$RG/a"; G -C "$RG" stash push -m "sur-main"
+G -C "$RG" checkout -b tmp; echo t > "$RG/a"; G -C "$RG" stash push -m "sur-tmp"
+G -C "$RG" checkout main; G -C "$RG" branch -D tmp
+# mémoires : non suivie, suivie hors index, sonde ignorée
+mkdir -p "$RG/.claude/agent-memory/ag" "$RG/.claude/agent-memory/zz-probe-x"
+echo "- [x](ok.md)" > "$RG/.claude/agent-memory/ag/MEMORY.md"; echo ok > "$RG/.claude/agent-memory/ag/ok.md"
+echo bar > "$RG/.claude/agent-memory/ag/bar.md"
+echo "zz-probe-*/" > "$RG/.gitignore"; echo probe > "$RG/.claude/agent-memory/zz-probe-x/p.md"
+G -C "$RG" add .gitignore .claude/agent-memory/ag/MEMORY.md .claude/agent-memory/ag/ok.md .claude/agent-memory/ag/bar.md
+G -C "$RG" commit -m mem
+echo nonsuivi > "$RG/.claude/agent-memory/ag/nouveau.md"
+# branches distantes intégrées : une de sam, une de picmakpro
+G -C "$RG" update-ref refs/remotes/origin/feat-own main
+G -C "$RG" update-ref refs/remotes/origin/feat-willy main
+
+rg_run() { VF_BUDGET_GH="$FAKEBIN/gh" bash "${CHECK_UNDER:-$CHECK}" --root "$RG" "$@" 2>&1; }
+snap() { { G_() { git -C "$RG" "$@"; }; G_ for-each-ref; G_ stash list; find "$RG/.claude/agent-memory" -type f | sort | xargs cat | cksum; } 2>&1; }
+
+SNAP0="$(snap)"
+OUT="$(FAKE_GH_PRS="$PRS" rg_run --owner sam)"; RC=$?
+assert "B1 — branche travaillée et mergée : RANGEABLE" "$OUT" "RANGEABLE branche : done déjà intégrée dans main"
+refute "B2 — branche neuve (reflog à 1 entrée) : rien" "$OUT" "RANGEABLE branche : fresh"
+assert "S1 — stash sur branche supprimée : RANGEABLE" "$OUT" "RANGEABLE stash : stash@{0}"
+refute "S1 — le stash d'une branche vivante (main) n'est pas rangeable" "$OUT" "RANGEABLE stash : stash@{1}"
+assert "M1 — mémoire non suivie : hors git" "$OUT" "RANGEABLE mémoire hors git : .claude/agent-memory/ag/nouveau.md"
+assert "M2 — mémoire suivie absente de son MEMORY.md : hors index" "$OUT" "RANGEABLE mémoire hors index : .claude/agent-memory/ag/bar.md"
+refute "M2 — mémoire présente dans son index : rien" "$OUT" "hors index : .claude/agent-memory/ag/ok.md"
+refute "M3 — zz-probe-* jamais rangeable" "$OUT" "RANGEABLE mémoire hors git : .claude/agent-memory/zz-probe"
+assert "M3 — zz-probe-* constatée" "$OUT" "zz-probe-*"
+[ "$(cat "$RG/.claude/agent-memory/zz-probe-x/p.md")" = probe ] && M3=intacte || M3=touchee
+assert "M3 — la sonde reste intacte" "$M3" "intacte"
+assert "R1 — PR de l'owner : À VALIDER" "$OUT" "À VALIDER branche distante : origin/feat-own (PR #7, sam)"
+refute "R2 — PR de picmakpro, owner autre : jamais candidate" "$OUT" "À VALIDER branche distante : origin/feat-willy"
+assert "R2 — le propriétaire est imprimé" "$OUT" "propriétaires : sam"
+FAKE_GH_PRS="$PRS" rg_run --owner sam --strict >/dev/null; assert_rc "X6 — RANGEABLE/À VALIDER comptent en dépassement sous --strict : 1 (ou 2 si un stash est illisible)" "$?" 1
+
+echo z >> "$RG/a"; SC="$(git -C "$RG" stash create)"; G -C "$RG" stash store -m "sans-branche" "$SC"
+OUT="$(FAKE_GH_PRS="$PRS" rg_run --owner sam)"
+assert "S2 — message de stash sans branche lisible : NON VÉRIFIABLE" "$OUT" "NON VÉRIFIABLE stash"
+FAKE_GH_PRS="$PRS" rg_run --owner sam --strict >/dev/null; assert_rc "S2 — sous --strict : 2" "$?" 2
+G -C "$RG" stash drop "stash@{0}"; git -C "$RG" checkout -q -- a
+
+: > "$FAKE_GH_LOG"
+OUT="$(FAKE_GH_PRS="$PRS" FAKE_GH_USER=sam rg_run)"
+assert "R1b — sans --owner : login résolu par gh api user" "$OUT" "À VALIDER branche distante : origin/feat-own"
+OUT="$(VF_BUDGET_GH="$WORK_DIR/absent/gh" bash "$CHECK" --root "$RG" --owner sam 2>&1)"
+assert "R3 — gh absent : NON VÉRIFIABLE" "$OUT" "NON VÉRIFIABLE branches distantes : gh introuvable"
+VF_BUDGET_GH="$WORK_DIR/absent/gh" bash "$CHECK" --root "$RG" --owner sam --strict >/dev/null 2>&1; assert_rc "R3 — gh absent sous --strict : 2" "$?" 2
+OUT="$(FAKE_GH_PRS="$PRS" FAKE_GH_RC=1 rg_run --owner sam)"
+assert "R3b — gh pr list échoue : NON VÉRIFIABLE, jamais liste vide" "$OUT" "NON VÉRIFIABLE branches distantes : gh pr list a échoué"
+printf '%s' 'ceci n est pas du json' > "$WORK_DIR/bad.json"
+OUT="$(FAKE_GH_PRS="$WORK_DIR/bad.json" rg_run --owner sam)"
+assert "R4 — JSON invalide : NON VÉRIFIABLE" "$OUT" "NON VÉRIFIABLE branches distantes : réponse de gh illisible"
+OUT="$(FAKE_GH_PRS="$PRS" rg_run --owner sam --no-remote)"
+[ -s "$FAKE_GH_LOG" ] && NC=appele || NC=jamais
+: > "$FAKE_GH_LOG"
+OUT2="$(FAKE_GH_PRS="$PRS" rg_run --owner sam)"; [ -s "$FAKE_GH_LOG" ] && WIT=appele || WIT=jamais
+assert "R5 — témoin positif : sans --no-remote, gh est appelé" "$WIT" "appele"
+: > "$FAKE_GH_LOG"
+OUT="$(FAKE_GH_PRS="$PRS" rg_run --owner sam --no-remote)"; [ -s "$FAKE_GH_LOG" ] && NC=appele || NC=jamais
+assert "R5 — --no-remote : gh jamais appelé" "$NC" "jamais"
+refute "R5 — --no-remote : aucune branche distante candidate" "$OUT" "À VALIDER"
+OUT="$(FAKE_GH_PRS="$PRS" rg_run --owner sam --quiet)"
+refute "R6 — --quiet tait le constat de non-propriétaire" "$OUT" "hors propriétaire"
+assert "R6 — --quiet garde le À VALIDER" "$OUT" "À VALIDER branche distante"
+
+FAKE_GH_PRS="$PRS" rg_run --owner sam --quiet >/dev/null
+assert "X4 — lecture seule étendue : refs, stash et mémoires identiques avant/après" "$(snap)" "$SNAP0"
+NDEL="$(grep -v '^[[:space:]]*#' "$CHECK" | grep -cE 'branch +-[dD]|stash +(drop|clear|pop)|push .*--delete|(^|[^a-z-])rm +-' || true)"
+assert_rc "X4 — aucun verbe de suppression dans le script" "$NDEL" 0
+
+# --- Mutants (QUAL-01) : chacun doit rougir l'assertion qu'il vise, et elle seule -----------------
+MUTD="$WORK_DIR/mut"; mkdir -p "$MUTD"; SCRIPT="$CHECK"
+make_mutant() { # <nom> <ligne exacte> <remplacement> : imprime le chemin ; 0 opposable, 1 identique, 2 syntaxe
+  local out="$MUTD/$1.sh"
+  MUT_OLD_ENV="$2" MUT_NEW_ENV="$3" awk '{ if ($0 == ENVIRON["MUT_OLD_ENV"]) print ENVIRON["MUT_NEW_ENV"]; else print }' "$SCRIPT" > "$out"
+  cmp -s "$out" "$SCRIPT" && { echo "$out"; return 1; }
+  bash -n "$out" 2>/dev/null || { echo "$out"; return 2; }
+  echo "$out"
+}
+kills() { # <nom> <sortie sous mutant> <sous-chaîne dont la présence rougit l'assertion visée> <attendu de l'assertion>
+  if [[ "$2" == *"$3"* ]]; then
+    echo "  ✅ PASS — mutant tué : $1"
+    echo "     assertion rouge sous mutant — attendu: $4"
+    echo "     obtenu: $(printf '%s\n' "$2" | grep -F -- "$3" | sed -n 1p)"; PASS=$((PASS+1))
+  else
+    echo "  ❌ FAIL — mutant SURVIVANT : $1"; echo "     attendu (sous-chaîne présente sous mutant): $3"; FAIL=$((FAIL+1))
+  fi
+}
+M1="$(make_mutant m1 '      is_owner "$a" || n=1' '      true || n=1')"; RM=$?
+assert_rc "M1 opposable" "$RM" 0
+OUT="$(CHECK_UNDER="$M1" FAKE_GH_PRS="$PRS" rg_run --owner sam)"
+kills "M1 filtre propriétaire neutralisé : R2 rougit (une PR de picmakpro devient candidate)" "$OUT" "À VALIDER branche distante : origin/feat-willy" "R2 — aucune ligne À VALIDER pour origin/feat-willy"
+M2="$(make_mutant m2 '  json=$(cd "$repo" && "$GH_BIN" pr list --state merged --limit 200 --json headRefName,number,author 2>/dev/null); rc=$?' '  json=$(cd "$repo" && "$GH_BIN" pr list --state merged --limit 200 --json headRefName,number,author 2>/dev/null) || json="[]"; rc=0')"; RM=$?
+assert_rc "M2 opposable" "$RM" 0
+OUT="$(CHECK_UNDER="$M2" FAKE_GH_PRS="$PRS" FAKE_GH_RC=1 rg_run --owner sam)"
+refute "M2 — sous mutant, R3b n'affiche plus NON VÉRIFIABLE (échec lu comme liste vide)" "$OUT" "gh pr list a échoué"
+kills "M2 échec gh lu comme liste vide : R3b rougit (attendu NON VÉRIFIABLE, obtenu silence)" "$OUT" "origin/feat-own : aucune PR mergée connue" "R3b — NON VÉRIFIABLE branches distantes : gh pr list a échoué"
+M3="$(make_mutant m3 '  [ "$(git -C "$1" reflog show --format=%H "refs/heads/$2" -- 2>/dev/null | grep -c .)" -gt 1 ]' '  true')"; RM=$?
+assert_rc "M3 opposable" "$RM" 0
+OUT="$(CHECK_UNDER="$M3" FAKE_GH_PRS="$PRS" rg_run --owner sam --no-remote)"
+kills "M3 règle reflog retirée : B2 rougit (la branche neuve devient rangeable)" "$OUT" "RANGEABLE branche : fresh" "B2 — aucune ligne RANGEABLE branche : fresh"
 
 echo ""
 echo "=== Q5 — anti-vert-à-vide ==="

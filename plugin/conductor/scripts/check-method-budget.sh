@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# check-method-budget.sh — Budgets de méthode d'un lab (v2.67.0) : taille du fichier d'état et
-# nombre de worktrees actifs. CONSTATE, ne corrige rien, ne supprime rien.
+# check-method-budget.sh — Budgets de méthode d'un lab (v2.67.0) : taille du fichier d'état,
+# nombre de worktrees actifs, et RANGEMENT (ce qui a été créé et n'a plus de raison d'être : branches
+# locales intégrées, stash sans propriétaire, mémoires d'agents hors git ou hors index, branches
+# distantes intégrées de leur seul propriétaire). CONSTATE, ne corrige rien, ne supprime rien.
 #
 # Pourquoi : la trace d'un lab ne fait que s'accumuler si rien ne la borne. Mesuré sur un lab
 # client après deux mois de missions : STATE.md à 195 Ko (1 406 lignes, un « Point du … » ajouté
@@ -17,12 +19,18 @@
 #
 # Usage :
 #   check-method-budget.sh [--root <dir>] [--repo <dir>]... [--strict] [--quiet]
+#                          [--owner <login>]... [--no-remote]
 #   --root   racine du lab (défaut .). STATE.md lus : <root>/.planning/STATE.md et celui de
 #            chaque compartiment de workstream (énumérés par vf_ws_enumerate).
 #   --repo   dépôt git dont compter les worktrees (répétable). Défaut : <root> s'il est un dépôt
 #            git, sinon chaque sous-dossier direct de <root> qui en est un (lab multi-dépôts).
 #   --strict un dépassement rend 1 (défaut : avertissement seul, rend 0).
-#   --quiet  n'imprime que les dépassements et les worktrees rangeables.
+#   --quiet  n'imprime que les dépassements et ce qui est rangeable.
+#   --owner  login GitHub dont les branches distantes intégrées sont candidates (répétable ; défaut :
+#            `gh api user --jq .login`). Une branche dont la PR est d'un autre auteur n'est JAMAIS
+#            candidate (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29 : jamais les
+#            branches de Willy). Variable VF_BUDGET_GH : binaire gh à appeler (défaut gh).
+#   --no-remote  ne consulte pas GitHub (aucun appel gh) : branches distantes non examinées.
 #
 # Sortie standard : une ligne par constat, préfixe [budget]. Pour chaque worktree actif, dit s'il
 # est RANGEABLE (sa branche ou sa tête est déjà intégrée dans la branche de référence du dépôt) ou
@@ -31,13 +39,17 @@
 #
 # Codes : 0 = dans les budgets, ou dépassement sans --strict · 1 = dépassement avec --strict ·
 #         2 = non vérifiable avec --strict (compartiments de workstream illisibles, politique
-#         introuvable) — jamais un 0 de complaisance sous --strict · 64 = argument invalide.
+#         introuvable, gh ou jq indisponible, stash illisible) — jamais un 0 de complaisance sous
+#         --strict · 64 = argument invalide. Sous --strict, tout RANGEABLE et tout À VALIDER
+#         compte comme un dépassement.
 set -uo pipefail
 
 ROOT="."
 REPOS=()
 STRICT=0
 QUIET=0
+NO_REMOTE=0
+OWNERS=""
 STATE_KB="${VF_STATE_BUDGET_KB:-8}"
 WT_MAX="${VF_WORKTREE_BUDGET:-3}"
 
@@ -49,6 +61,9 @@ while [ "$#" -gt 0 ]; do
     --repo) [ "$#" -ge 2 ] || usage; REPOS+=("$2"); shift 2 ;;
     --strict) STRICT=1; shift ;;
     --quiet) QUIET=1; shift ;;
+    --owner) [ "$#" -ge 2 ] || usage; OWNERS="$OWNERS
+$2"; shift 2 ;;
+    --no-remote) NO_REMOTE=1; shift ;;
     -h|--help) usage ;;
     *) echo "[budget] argument inconnu : $1" >&2; usage ;;
   esac
@@ -142,6 +157,175 @@ common_dir() { # <repo> -> dossier git commun, absolu (un worktree et son dépô
   (cd "$d" 2>/dev/null && pwd -P)
 }
 
+is_worked() { # <repo> <branche> : 0 si la branche a été travaillée (plus d'une entrée de reflog)
+  # Une branche NEUVE et une branche INTÉGRÉE ont la même topologie (tête ancêtre de la base) :
+  # seul le reflog les sépare. Une seule entrée (la création) = jamais travaillée = pas rangeable.
+  [ "$(git -C "$1" reflog show --format=%H "refs/heads/$2" -- 2>/dev/null | grep -c .)" -gt 1 ]
+}
+
+# --- Budget 3 : rangement (lecture seule, jamais un verbe de suppression) ------------------------
+GH_BIN="${VF_BUDGET_GH:-gh}"
+OWNERS_OK=0
+
+resolve_owners() { # <repo> : complète OWNERS via `gh api user` si aucun --owner ; rend 1 si impossible
+  [ "$OWNERS_OK" -eq 1 ] && return 0
+  if [ -z "${OWNERS//[$'\n ']/}" ]; then
+    local login
+    login=$(cd "$1" && "$GH_BIN" api user --jq .login 2>/dev/null) || return 1
+    [ -n "$login" ] || return 1
+    OWNERS="$login"
+  fi
+  OWNERS_OK=1
+}
+
+is_owner() { # <login> : 0 si le login figure parmi les propriétaires (insensible à la casse)
+  local want have
+  want=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  while IFS= read -r have; do
+    [ -n "$have" ] || continue
+    [ "$(printf '%s' "$have" | tr '[:upper:]' '[:lower:]')" = "$want" ] && return 0
+  done <<EOF2
+$OWNERS
+EOF2
+  return 1
+}
+
+rangement_branches() { # <repo> <base> <branches-en-worktree>
+  local repo="$1" base="$2" wtb="$3" bshort cur b list
+  bshort="${base#origin/}"
+  cur=$(git -C "$repo" symbolic-ref -q --short HEAD 2>/dev/null)
+  list=$(git -C "$repo" for-each-ref --merged "$base" --format='%(refname:short)' refs/heads 2>/dev/null)
+  while IFS= read -r b; do
+    [ -n "$b" ] || continue
+    [ "$b" = "$bshort" ] && continue
+    [ "$b" = "$cur" ] && continue
+    case "
+$wtb
+" in *"
+$b
+"*) continue ;; esac
+    is_worked "$repo" "$b" || continue
+    OVER=1
+    flag "RANGEABLE branche : $b déjà intégrée dans $base"
+  done <<EOF2
+$list
+EOF2
+}
+
+rangement_stash() { # <repo> <base>
+  local repo="$1" base="$2" bshort gd sha msg rest own list
+  bshort="${base#origin/}"
+  list=$(git -C "$repo" stash list --format='%gd%x09%H%x09%gs' 2>/dev/null)
+  while IFS=$'\t' read -r gd sha msg; do
+    [ -n "$gd" ] || continue
+    sha="${sha:0:8}"
+    case "$msg" in "WIP on "*) rest="${msg#WIP on }" ;; "On "*) rest="${msg#On }" ;; *) rest="" ;; esac
+    case "$rest" in *:*) own="${rest%%:*}" ;; *) own="" ;; esac
+    case "$own" in *"("*|*" "*) own="" ;; esac
+    if [ -z "$own" ]; then
+      UNVERIFIABLE=1
+      flag "NON VÉRIFIABLE stash : $gd $sha « $msg » (branche d'origine illisible)"
+      continue
+    fi
+    [ "$own" = "$bshort" ] && continue
+    if ! git -C "$repo" rev-parse -q --verify "refs/heads/$own" >/dev/null 2>&1; then
+      OVER=1; flag "RANGEABLE stash : $gd $sha « $msg »"
+    elif [ -n "$base" ] && is_worked "$repo" "$own" \
+         && git -C "$repo" merge-base --is-ancestor "refs/heads/$own" "$base" 2>/dev/null; then
+      OVER=1; flag "RANGEABLE stash : $gd $sha « $msg »"
+    fi
+  done <<EOF2
+$list
+EOF2
+}
+
+rangement_memoires() { # <repo>
+  local repo="$1" f idx list nprobe
+  [ -d "$repo/.claude/agent-memory" ] || return 0
+  list=$(git -C "$repo" ls-files --others --exclude-standard -- .claude/agent-memory 2>/dev/null | grep '\.md$')
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    OVER=1; flag "RANGEABLE mémoire hors git : $f"
+  done <<EOF2
+$list
+EOF2
+  list=$(git -C "$repo" ls-files -- '.claude/agent-memory/*/*.md' 2>/dev/null)
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    [ "${f##*/}" = MEMORY.md ] && continue
+    idx="$repo/${f%/*}/MEMORY.md"
+    grep -qF "${f##*/}" "$idx" 2>/dev/null && continue
+    OVER=1; flag "RANGEABLE mémoire hors index : $f"
+  done <<EOF2
+$list
+EOF2
+  nprobe=$(find "$repo/.claude/agent-memory" -maxdepth 1 -name 'zz-probe-*' 2>/dev/null | grep -c .)
+  [ "$nprobe" -eq 0 ] || say "constat : $nprobe dossier(s) zz-probe-* sous .claude/agent-memory (sondes, jamais touchées)"
+}
+
+rangement_distantes() { # <repo> <base>
+  local repo="$1" base="$2" bshort refs ref name json tsv rc auths a n pr
+  bshort="${base#origin/}"
+  refs=$(git -C "$repo" for-each-ref --merged "$base" --format='%(refname)' refs/remotes 2>/dev/null \
+    | sed 's|^refs/remotes/||' | grep -v '/HEAD$' | grep -v "^[^/]*/$bshort\$")
+  if [ -z "$refs" ]; then say "branches distantes : aucune intégrée dans $base"; return 0; fi
+  if ! command -v "$GH_BIN" >/dev/null 2>&1; then
+    UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : gh introuvable ($GH_BIN)"; return 0
+  fi
+  if ! command -v jq >/dev/null 2>&1; then
+    UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : jq introuvable"; return 0
+  fi
+  if ! resolve_owners "$repo"; then
+    UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : propriétaire illisible (gh api user a échoué, aucun --owner)"; return 0
+  fi
+  json=$(cd "$repo" && "$GH_BIN" pr list --state merged --limit 200 --json headRefName,number,author 2>/dev/null); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : gh pr list a échoué (rc $rc)"; return 0
+  fi
+  tsv=$(printf '%s' "$json" | jq -r 'if type=="array" then .[] | [.headRefName, (.number|tostring), (.author.login // "")] | @tsv else error("pas une liste") end' 2>/dev/null); rc=$?
+  if [ "$rc" -ne 0 ]; then
+    UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : réponse de gh illisible (JSON invalide)"; return 0
+  fi
+  say "branches distantes, propriétaires : $(printf '%s' "$OWNERS" | tr '\n' ' ' | sed 's/^ *//; s/ *$//')"
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    name="${ref#*/}"
+    auths=$(printf '%s\n' "$tsv" | NAME="$name" awk -F'\t' '$1 == ENVIRON["NAME"] { print $3 "\t" $2 }')
+    if [ -z "$auths" ]; then say "branche distante $ref : aucune PR mergée connue, jamais candidate"; continue; fi
+    n=0; pr=""
+    while IFS=$'\t' read -r a n_pr; do
+      [ -n "$pr" ] || pr="$n_pr"
+      is_owner "$a" || n=1
+    done <<EOF2
+$auths
+EOF2
+    if [ "$n" -eq 0 ]; then
+      OVER=1
+      flag "À VALIDER branche distante : $ref (PR #$pr, $(printf '%s' "$auths" | cut -f1 | sed -n 1p)) — suppression = geste humain"
+    else
+      say "branche distante $ref : hors propriétaire, jamais candidate"
+    fi
+  done <<EOF2
+$refs
+EOF2
+}
+
+rangement() { # <repo> <base> <branches-en-worktree>
+  local repo="$1" base="$2" wtb="$3"
+  if [ -n "$base" ]; then
+    rangement_branches "$repo" "$base" "$wtb"
+    rangement_stash "$repo" "$base"
+  else
+    say "rangement : branche de référence introuvable dans $repo, branches et stash non examinés"
+  fi
+  rangement_memoires "$repo"
+  if [ "$NO_REMOTE" -eq 1 ]; then
+    say "branches distantes : non examinées (--no-remote)"
+  elif [ -n "$base" ]; then
+    rangement_distantes "$repo" "$base"
+  fi
+}
+
 SEEN=" "
 for repo in "${REPOS[@]+"${REPOS[@]}"}"; do
   if ! is_repo "$repo"; then
@@ -171,16 +355,15 @@ for repo in "${REPOS[@]+"${REPOS[@]}"}"; do
     fi
     active=$((active + 1))
     local label="${branch:-HEAD détachée ${head:0:8}}"
-    # Une branche NEUVE et une branche INTÉGRÉE ont la même topologie (tête ancêtre de la base) :
-    # seul le reflog les sépare. Une seule entrée (la création) = jamais travaillée = pas rangeable.
     local worked=1
     if [ -n "$branch" ]; then
-      [ "$(git -C "$repo" reflog show --format=%H "refs/heads/$branch" -- 2>/dev/null | grep -c .)" -le 1 ] && worked=0
+      is_worked "$repo" "$branch" || worked=0
     fi
     if [ "$worked" -eq 0 ]; then
       [ "$QUIET" -eq 1 ] || details="$details
 [budget]   actif : $path [$label] neuf, aucun commit depuis sa création"
     elif [ -n "$base" ] && git -C "$repo" merge-base --is-ancestor "$head" "$base" 2>/dev/null; then
+      OVER=1
       details="$details
 [budget]   RANGEABLE : $path [$label] déjà intégrée dans $base"
     elif [ "$QUIET" -eq 0 ]; then
@@ -206,6 +389,8 @@ EOF
     say "worktrees ok : $repo en a $active actifs (budget $WT_MAX)"
   fi
   [ -n "$details" ] && printf '%s\n' "${details#?}"
+  wt_branches=$(printf '%s\n' "$porcelain" | sed -n 's|^branch refs/heads/||p')
+  rangement "$repo" "$base" "$wt_branches"
 done
 
 if [ "$STRICT" -eq 1 ] && [ "$UNVERIFIABLE" -eq 1 ]; then
