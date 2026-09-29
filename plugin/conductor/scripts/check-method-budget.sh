@@ -16,6 +16,7 @@
 # Budgets (surchargeables par l'environnement) :
 #   VF_STATE_BUDGET_KB   taille max d'un STATE.md, en Ko (défaut 8)
 #   VF_WORKTREE_BUDGET   worktrees actifs max par dépôt, hors arbre principal (défaut 3)
+#   VF_BUDGET_PR_LIMIT   nombre de PR mergées lues chez gh (défaut 200) ; l'atteindre = liste possiblement tronquée
 #
 # Usage :
 #   check-method-budget.sh [--root <dir>] [--repo <dir>]... [--strict] [--quiet]
@@ -30,11 +31,16 @@
 #            `gh api user --jq .login`). Une branche dont la PR est d'un autre auteur n'est JAMAIS
 #            candidate (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29 : jamais les
 #            branches de Willy). Variable VF_BUDGET_GH : binaire gh à appeler (défaut gh).
-#            Seules les refs du remote `origin` (celui dont origin/HEAD donne la base, et dont gh lit
-#            les PR) sont examinées : la ref d'un autre remote (fork) n'est jamais candidate, même si
-#            une PR du dépôt porte le même nom de branche. Une branche par défaut ou longue durée
-#            (main, master, develop, dev, trunk, staging, production, release/*, ou base d'une PR
-#            mergée) ne l'est jamais non plus.
+#            Seules les refs du remote `origin` sont examinées : la ref d'un autre remote (fork) n'est jamais
+#            candidate. Sont exclues de tout rangement, locales comme distantes, les branches par défaut ou
+#            longue durée : liste UNIQUE dans la fonction is_longlived du script (l'en-tête ne la recopie
+#            pas, pour ne pas dériver) ; ne l'est jamais non plus la base d'une PR mergée. Ce qui est
+#            MESURÉ avant de conclure, sinon NON VÉRIFIABLE : le dépôt que gh interroge (`gh repo view`) est
+#            celui de remote.origin.url ; seule une PR dont la tête vit DANS ce dépôt (isCrossRepository
+#            faux) rapproche une branche `origin/…` (une PR de fork homonyme ne compte pas) ; la liste des
+#            PR mergées n'est pas tronquée (VF_BUDGET_PR_LIMIT, défaut 200) ; un remote origin existe si
+#            aucun remote origin (ni URL, ni ref `origin/…`) alors que des refs distantes
+#            existent = branches distantes non examinées, dit.
 #   --no-remote  ne consulte pas GitHub (aucun appel gh) : branches distantes non examinées.
 #
 # Sortie standard : une ligne par constat, préfixe [budget]. Pour chaque worktree actif, dit s'il
@@ -57,6 +63,7 @@ QUIET=0
 NO_REMOTE=0
 OWNERS=""
 STATE_KB="${VF_STATE_BUDGET_KB:-8}"
+PR_LIMIT="${VF_BUDGET_PR_LIMIT:-200}"
 WT_MAX="${VF_WORKTREE_BUDGET:-3}"
 
 usage() { sed -n '/^# Usage :/,/^# Sortie standard/p' "$0" >&2; exit 64; }
@@ -76,6 +83,7 @@ $2"; shift 2 ;;
 done
 case "$STATE_KB" in ''|*[!0-9]*) echo "[budget] VF_STATE_BUDGET_KB invalide : $STATE_KB" >&2; exit 64 ;; esac
 case "$WT_MAX" in ''|*[!0-9]*) echo "[budget] VF_WORKTREE_BUDGET invalide : $WT_MAX" >&2; exit 64 ;; esac
+case "$PR_LIMIT" in ''|*[!0-9]*|0) echo "[budget] VF_BUDGET_PR_LIMIT invalide : $PR_LIMIT" >&2; exit 64 ;; esac
 [ -d "$ROOT" ] || { echo "[budget] racine introuvable : $ROOT" >&2; exit 64; }
 
 OVER=0
@@ -196,6 +204,13 @@ EOF2
   return 1
 }
 
+is_longlived() { # <nom de branche, sans préfixe de remote> : 0 si par défaut ou longue durée (source UNIQUE de la liste)
+  case "$1" in
+    main|master|develop|dev|development|trunk|staging|production|prod|stable|release/*|releases/*) return 0 ;;
+  esac
+  return 1
+}
+
 rangement_branches() { # <repo> <base> <branches-en-worktree>
   local repo="$1" base="$2" wtb="$3" bshort cur b list rc
   bshort="${base#origin/}"
@@ -206,6 +221,7 @@ rangement_branches() { # <repo> <base> <branches-en-worktree>
     [ -n "$b" ] || continue
     [ "$b" = "$bshort" ] && continue
     [ "$b" = "$cur" ] && continue
+    is_longlived "$b" && { say "branche $b : par défaut ou longue durée, jamais candidate"; continue; }
     case "
 $wtb
 " in *"
@@ -271,8 +287,20 @@ EOF2
 }
 
 rangement_distantes() { # <repo> <base>
-  local repo="$1" base="$2" bshort raw refs ref short name json tsv rc auths a n pr
+  local repo="$1" base="$2" bshort raw allr refs ref short name json tsv rc auths a n pr nprs trunc origin_url want have others
   bshort="${base#origin/}"
+  allr=$(git -C "$repo" for-each-ref --format='%(refname)' refs/remotes 2>/dev/null); rc=$?
+  [ "$rc" -eq 0 ] || { UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : git for-each-ref refs/remotes a échoué (rc $rc)"; return 0; }
+  origin_url=$(git -C "$repo" config --get remote.origin.url 2>/dev/null)
+  case "$allr" in
+    *refs/remotes/origin/*) ;;
+    *)
+      if [ -z "$origin_url" ]; then
+        if [ -z "$allr" ]; then say "branches distantes : aucune ref distante"; return 0; fi
+        others=$(printf '%s\n' "$allr" | sed -n 's|^refs/remotes/\([^/]*\)/.*|\1|p' | sort -u | tr '\n' ' ')
+        UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : aucun remote origin, branches distantes non examinées (refs d'autres remotes : ${others% })"; return 0
+      fi ;;
+  esac
   raw=$(git -C "$repo" for-each-ref --merged "$base" --format='%(refname)' refs/remotes 2>/dev/null); rc=$?
   [ "$rc" -eq 0 ] || { UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : git for-each-ref --merged $base a échoué (rc $rc)"; return 0; }
   refs=""
@@ -283,8 +311,8 @@ rangement_distantes() { # <repo> <base>
     case "$name" in
       HEAD) continue ;;
       "$bshort") continue ;;
-      main|master|develop|dev|development|trunk|staging|production|prod|stable|release/*|releases/*) say "branche distante $short : par défaut ou longue durée, jamais candidate"; continue ;;
     esac
+    is_longlived "$name" && { say "branche distante $short : par défaut ou longue durée, jamais candidate"; continue; }
     refs="$refs
 $short"
   done <<EOF2
@@ -301,15 +329,27 @@ EOF2
   if ! resolve_owners "$repo"; then
     UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : propriétaire illisible (gh api user a échoué, aucun --owner)"; return 0
   fi
-  json=$(cd "$repo" && "$GH_BIN" pr list --state merged --limit 200 --json headRefName,number,author,baseRefName 2>/dev/null); rc=$?
+  # Le dépôt que gh interroge doit être celui de remote.origin.url : sinon les PR lues ne sont pas celles de origin.
+  want=$(printf '%s' "$origin_url" | sed -E 's#/+$##; s#\.git$##; s#^.*[:/]([^:/]+/[^:/]+)$#\1#')
+  case "$want" in */*) ;; *) UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : remote.origin.url absent ou illisible (« $origin_url »), dépôt des PR non comparable"; return 0 ;; esac
+  have=$(cd "$repo" && "$GH_BIN" repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null); rc=$?
+  if [ "$rc" -ne 0 ] || [ -z "$have" ]; then
+    UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : gh repo view a échoué ou n'a rien rendu (rc $rc), dépôt interrogé inconnu"; return 0
+  fi
+  if [ "$(printf '%s' "$have" | tr '[:upper:]' '[:lower:]')" != "$(printf '%s' "$want" | tr '[:upper:]' '[:lower:]')" ]; then
+    UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : gh interroge $have mais remote.origin.url désigne $want, les PR lues ne sont pas celles de origin"; return 0
+  fi
+  json=$(cd "$repo" && "$GH_BIN" pr list --state merged --limit "$PR_LIMIT" --json headRefName,number,author,baseRefName,isCrossRepository 2>/dev/null); rc=$?
   if [ "$rc" -ne 0 ]; then
     UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : gh pr list a échoué (rc $rc)"; return 0
   fi
   case "$json" in *[![:space:]]*) ;; *) UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : gh pr list n'a rien rendu (sortie vide, rc 0)"; return 0 ;; esac
-  tsv=$(printf '%s' "$json" | jq -r 'if type=="array" then .[] | [.headRefName, (.number|tostring), (.author.login // ""), (.baseRefName // "")] | @tsv else error("pas une liste") end' 2>/dev/null); rc=$?
+  tsv=$(printf '%s' "$json" | jq -r 'if type=="array" then .[] | [.headRefName, (.number|tostring), (.author.login // ""), (.baseRefName // ""), (if .isCrossRepository == null then "inconnu" else (.isCrossRepository|tostring) end)] | @tsv else error("pas une liste") end' 2>/dev/null); rc=$?
   if [ "$rc" -ne 0 ]; then
     UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : réponse de gh illisible (JSON invalide)"; return 0
   fi
+  nprs=$(printf '%s\n' "$tsv" | grep -c .)
+  trunc=0; [ "$nprs" -ge "$PR_LIMIT" ] && trunc=1
   say "branches distantes, propriétaires : $(printf '%s' "$OWNERS" | tr '\n' ' ' | sed 's/^ *//; s/ *$//')"
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
@@ -317,8 +357,17 @@ EOF2
     if printf '%s\n' "$tsv" | NAME="$name" awk -F'\t' '$4 == ENVIRON["NAME"] { f = 1 } END { exit !f }'; then
       say "branche distante $ref : base d'une PR mergée (longue durée), jamais candidate"; continue
     fi
-    auths=$(printf '%s\n' "$tsv" | NAME="$name" awk -F'\t' '$1 == ENVIRON["NAME"] { print $3 "\t" $2 }')
-    if [ -z "$auths" ]; then say "branche distante $ref : aucune PR mergée connue, jamais candidate"; continue; fi
+    auths=$(printf '%s\n' "$tsv" | NAME="$name" awk -F'\t' '$1 == ENVIRON["NAME"] && $5 == "false" { print $3 "\t" $2 }')
+    if [ -z "$auths" ]; then
+      if [ "$trunc" -eq 1 ]; then
+        UNVERIFIABLE=1; flag "NON VÉRIFIABLE branche distante : $ref, aucune PR connue parmi les $nprs mergées lues (limite $PR_LIMIT atteinte, liste possiblement tronquée : VF_BUDGET_PR_LIMIT)"
+      elif printf '%s\n' "$tsv" | NAME="$name" awk -F'\t' '$1 == ENVIRON["NAME"] { f = 1 } END { exit !f }'; then
+        say "branche distante $ref : seule une PR de fork porte ce nom (aucune PR mergée connue de la tête dans origin), jamais candidate"
+      else
+        say "branche distante $ref : aucune PR mergée connue, jamais candidate"
+      fi
+      continue
+    fi
     n=0; pr=""
     while IFS=$'\t' read -r a n_pr; do
       [ -n "$pr" ] || pr="$n_pr"
