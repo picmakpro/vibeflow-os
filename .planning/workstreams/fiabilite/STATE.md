@@ -372,6 +372,9 @@ alors qu'elle est releasée en `v2.55.0`, et l'invariant *resume-incomplete-phas
 
 ### Roadmap Evolution
 
+- 2026-09-29 : **Phase 41.3 insérée — sobriété de méthode** (SOBR-01..08), dernière phase avant la
+  clôture du jalon ; arbitrage Samuel, AskUserQuestion session principale, 2026-09-29. Frontmatter
+  non touché.
 - 2026-09-25 : **Jalon `ecc-inspiration-v1.0` inscrit — Phases 51 à 56** (six emprunts mesurés au
   dépôt `affaan-m/ECC` : snapshot PreCompact, télémétrie d'usage et coût, apprentissage adossé à
   l'observation, audit du harness, installeur et mémoire multi-runtime, packs de règles par

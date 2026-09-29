@@ -93,6 +93,7 @@
 - [x] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date — **PÉRIMÈTRE RECADRÉ SANS ADMIN LIVRÉ le 2026-09-18, mergée PR #80, SHIPPÉE v2.64.0** : trois gardes in-repo qui signalent et tracent sans jamais verrouiller (G-1 `check-baseline-arbitrage.sh`, G-2 `check-gate-touche.sh`, G-3 `check-push-sans-pr.sh`) + doctrine ADR-072 ; **critères de succès 1 à 3 du ROADMAP d'origine restent HORS D'ATTEINTE sans accès admin GitHub** (PROT-01 non coché, `REQUIREMENTS.md`) ; volet rulesets côté serveur **DIFFÉRÉ au BACKLOG** avec son déclencheur de reprise — le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce volet (WhatsApp, 2026-09-23) **avant** la clôture de `fiabilite-v1.0`, puisque PROT-01 en fait partie (correction du 2026-09-23 : la formulation précédente inversait la séquence — cf. `BACKLOG.md` § « Protection de `main` côté GitHub »))
 - [x] Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED 2026-09-23, demande Samuel session principale : « généralise le remède, ça ne doit plus se reproduire »)
 - [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage)
+- [ ] Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED 2026-09-29, arbitrage Samuel AskUserQuestion session principale ; dernière phase avant la clôture du jalon)
 - [ ] Phase 51: Snapshot de planning avant compaction (PreCompact) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 52: Télémétrie d'usage des skills et agents, et coût de mission (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 53: Apprentissage adossé à l'observation — preuves dans la mémoire vivante (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
@@ -1882,6 +1883,53 @@ Plans:
 
 - [ ] TBD (run /gsd-plan-phase 41.2 to break down)
 
+
+### Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED)
+
+> **Origine** : audit du 2026-09-29 (session principale). Mesuré ce jour-là : `STATE.md` de
+> `fiabilite` à 146 Ko pour un budget de 8 Ko (v2.67.0) ; 9 worktrees et 37 branches locales déjà
+> mergés jamais rangés ; 12 mémoires d'agents hors de git et 2 orphelines de leur index ; BACKLOG à
+> 25 sujets ouverts pour 7 clos ; sur 30 jours, 57 % de commits `docs` et deux fois plus de fichiers
+> de planning touchés que de fichiers de `plugin/`. Le chantier « budgets de méthode » (v2.67.0, né
+> du bilan ScrollOff du 2026-09-28) ne mesure que STATE et worktrees, ne signale qu'à la clôture
+> d'une mission de manager, et ce dépôt ne se l'applique pas. Constat de Samuel : « on ajoute sans
+> nettoyer intelligemment derrière, on surcharge le contexte ».
+
+**Goal**: Ce dépôt passe sous ses propres budgets, puis la méthode les tient seule : tout ajout
+désigne ce qu'il retire, les fichiers vivants ont un plafond mesuré, et toute fin de geste range ce
+qu'elle a créé.
+
+**Requirements**: SOBR-01 à SOBR-08
+**Depends on:** aucune ; en parallèle possible de la 41.2 (fichiers disjoints). Le jalon se clôt
+après la 41.2, la 41.3 et les plans 41-07 à 41-09.
+**Arbitrages (Samuel, AskUserQuestion session principale, 2026-09-29)** : phase dans `fiabilite`
+avant clôture ; les quatre principes (un ajout un retrait, budgets étendus, nettoyage en fin de
+geste, prose plafonnée) ; **appliquer à ce dépôt d'abord**, généraliser ensuite.
+**Question ouverte au cadrage** : l'archivage automatique au-delà d'un budget touche ADR-031
+(jamais de correction sans validation humaine). Archiver déplace sans détruire ; le cadrage tranche
+s'il s'exécute seul ou se propose.
+**Success Criteria** (what must be TRUE):
+
+  1. Ce dépôt est sous budget, mesuré : chaque `STATE.md` ≤ 8 Ko (historique archivé, jamais
+     perdu, `check-state-integrity` vert), zéro worktree ou branche mergés, zéro mémoire d'agent
+     hors de git ou hors de son index (SOBR-01, SOBR-02).
+  2. Les deux défauts d'outillage relevés par l'audit sont fermés : `check-blueprints` ne lit plus
+     `.claude/worktrees/`, les hooks de `settings.local.json` tournent dans un worktree (SOBR-03).
+  3. Une release ne se tague qu'après une relecture adverse du diff fonctionnel, écrite dans la
+     procédure de `CLAUDE.md` (SOBR-04).
+  4. Les quatre principes sont gravés en un ADR court et **outillés** : le budget s'étend au
+     BACKLOG ouvert, à l'index de mémoire et au ROADMAP ; le nettoyage de fin de geste couvre la
+     mission de manager **et** le travail direct ; un ajout de gate ou d'ADR sans retrait ni
+     justification est visible par machine (SOBR-05 à SOBR-08).
+  5. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa mutation rouge.
+  6. **Critère de sobriété de la phase elle-même** : elle retire plus de lignes de planning qu'elle
+     n'en ajoute (mesuré sur son diff `.planning/`, hors archives).
+
+**Plans:** TBD (run /gsd-plan-phase 41.3 to break down)
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 41.3 to break down)
 
 ## 📋 Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (Phases 51-56)
 
