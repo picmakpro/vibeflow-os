@@ -28,9 +28,16 @@
 # pas une gêne cosmétique.
 .claude/agent-memory/
 
-# Hooks et gardes du projet : 22 commandes de settings.local.json visent
-# "$CLAUDE_PROJECT_DIR"/.claude/hooks/* et .claude/scripts/*, ignorés par git (.gitignore:24).
-# Dans un worktree, CLAUDE_PROJECT_DIR vaut le worktree : sans ces deux entrées, un garde
-# échoue sans bloquer, donc ne protège rien (« Cannot find module », non bloquant).
+# Hooks et gardes du projet : .claude/hooks/* et .claude/scripts/* sont ignorés par git (.gitignore:24)
+# et visés par des commandes de hook via "$CLAUDE_PROJECT_DIR". Constat daté et situé : poste de Willy,
+# Phase 44, 2026-09-28, consigné au BACKLOG — dans un worktree, CLAUDE_PROJECT_DIR vaut le worktree,
+# et un garde introuvable échoue sans bloquer (« Cannot find module »), donc ne protège rien. Le nombre
+# de commandes concernées n'est pas chiffré ici : le settings.local.json de ce checkout n'en porte aucune.
+#
+# Où ce fichier est lu (mesuré le 2026-09-29, deux sondes, worktree parti de 6e7c40d7 qui n'a PAS
+# ces lignes) : dans l'ARBRE DE TRAVAIL du checkout principal, pas dans le commit de base du worktree.
+# Ligne présente dans l'arbre principal : témoin sous .claude/hooks/ recopié ; ligne retirée : absent ;
+# témoin positif .claude/agent-memory/ présent les deux fois ; témoin négatif .claude/logs/ (non listé)
+# absent les deux fois.
 .claude/hooks/
 .claude/scripts/

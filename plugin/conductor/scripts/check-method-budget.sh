@@ -30,6 +30,11 @@
 #            `gh api user --jq .login`). Une branche dont la PR est d'un autre auteur n'est JAMAIS
 #            candidate (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29 : jamais les
 #            branches de Willy). Variable VF_BUDGET_GH : binaire gh à appeler (défaut gh).
+#            Seules les refs du remote `origin` (celui dont origin/HEAD donne la base, et dont gh lit
+#            les PR) sont examinées : la ref d'un autre remote (fork) n'est jamais candidate, même si
+#            une PR du dépôt porte le même nom de branche. Une branche par défaut ou longue durée
+#            (main, master, develop, dev, trunk, staging, production, release/*, ou base d'une PR
+#            mergée) ne l'est jamais non plus.
 #   --no-remote  ne consulte pas GitHub (aucun appel gh) : branches distantes non examinées.
 #
 # Sortie standard : une ligne par constat, préfixe [budget]. Pour chaque worktree actif, dit s'il
@@ -39,7 +44,8 @@
 #
 # Codes : 0 = dans les budgets, ou dépassement sans --strict · 1 = dépassement avec --strict ·
 #         2 = non vérifiable avec --strict (compartiments de workstream illisibles, politique
-#         introuvable, gh ou jq indisponible, stash illisible) — jamais un 0 de complaisance sous
+#         introuvable, gh ou jq indisponible ou muet, stash illisible, branche de référence introuvable
+#         ou orpheline, git for-each-ref en échec) — jamais un 0 de complaisance sous
 #         --strict · 64 = argument invalide. Sous --strict, tout RANGEABLE et tout À VALIDER
 #         compte comme un dépassement.
 set -uo pipefail
@@ -191,10 +197,11 @@ EOF2
 }
 
 rangement_branches() { # <repo> <base> <branches-en-worktree>
-  local repo="$1" base="$2" wtb="$3" bshort cur b list
+  local repo="$1" base="$2" wtb="$3" bshort cur b list rc
   bshort="${base#origin/}"
   cur=$(git -C "$repo" symbolic-ref -q --short HEAD 2>/dev/null)
-  list=$(git -C "$repo" for-each-ref --merged "$base" --format='%(refname:short)' refs/heads 2>/dev/null)
+  list=$(git -C "$repo" for-each-ref --merged "$base" --format='%(refname:short)' refs/heads 2>/dev/null); rc=$?
+  [ "$rc" -eq 0 ] || { UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches locales : git for-each-ref --merged $base a échoué (rc $rc)"; return 0; }
   while IFS= read -r b; do
     [ -n "$b" ] || continue
     [ "$b" = "$bshort" ] && continue
@@ -264,11 +271,27 @@ EOF2
 }
 
 rangement_distantes() { # <repo> <base>
-  local repo="$1" base="$2" bshort refs ref name json tsv rc auths a n pr
+  local repo="$1" base="$2" bshort raw refs ref short name json tsv rc auths a n pr
   bshort="${base#origin/}"
-  refs=$(git -C "$repo" for-each-ref --merged "$base" --format='%(refname)' refs/remotes 2>/dev/null \
-    | sed 's|^refs/remotes/||' | grep -v '/HEAD$' | grep -v "^[^/]*/$bshort\$")
-  if [ -z "$refs" ]; then say "branches distantes : aucune intégrée dans $base"; return 0; fi
+  raw=$(git -C "$repo" for-each-ref --merged "$base" --format='%(refname)' refs/remotes 2>/dev/null); rc=$?
+  [ "$rc" -eq 0 ] || { UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : git for-each-ref --merged $base a échoué (rc $rc)"; return 0; }
+  refs=""
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    short="${ref#refs/remotes/}"
+    case "$short" in origin/*) name="${short#origin/}" ;; *) say "branche distante $short : hors du remote origin, jamais candidate"; continue ;; esac
+    case "$name" in
+      HEAD) continue ;;
+      "$bshort") continue ;;
+      main|master|develop|dev|development|trunk|staging|production|prod|stable|release/*|releases/*) say "branche distante $short : par défaut ou longue durée, jamais candidate"; continue ;;
+    esac
+    refs="$refs
+$short"
+  done <<EOF2
+$raw
+EOF2
+  refs="${refs#?}"
+  if [ -z "$refs" ]; then say "branches distantes : aucune candidate intégrée dans $base"; return 0; fi
   if ! command -v "$GH_BIN" >/dev/null 2>&1; then
     UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : gh introuvable ($GH_BIN)"; return 0
   fi
@@ -278,11 +301,12 @@ rangement_distantes() { # <repo> <base>
   if ! resolve_owners "$repo"; then
     UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : propriétaire illisible (gh api user a échoué, aucun --owner)"; return 0
   fi
-  json=$(cd "$repo" && "$GH_BIN" pr list --state merged --limit 200 --json headRefName,number,author 2>/dev/null); rc=$?
+  json=$(cd "$repo" && "$GH_BIN" pr list --state merged --limit 200 --json headRefName,number,author,baseRefName 2>/dev/null); rc=$?
   if [ "$rc" -ne 0 ]; then
     UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : gh pr list a échoué (rc $rc)"; return 0
   fi
-  tsv=$(printf '%s' "$json" | jq -r 'if type=="array" then .[] | [.headRefName, (.number|tostring), (.author.login // "")] | @tsv else error("pas une liste") end' 2>/dev/null); rc=$?
+  case "$json" in *[![:space:]]*) ;; *) UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : gh pr list n'a rien rendu (sortie vide, rc 0)"; return 0 ;; esac
+  tsv=$(printf '%s' "$json" | jq -r 'if type=="array" then .[] | [.headRefName, (.number|tostring), (.author.login // ""), (.baseRefName // "")] | @tsv else error("pas une liste") end' 2>/dev/null); rc=$?
   if [ "$rc" -ne 0 ]; then
     UNVERIFIABLE=1; flag "NON VÉRIFIABLE branches distantes : réponse de gh illisible (JSON invalide)"; return 0
   fi
@@ -290,6 +314,9 @@ rangement_distantes() { # <repo> <base>
   while IFS= read -r ref; do
     [ -n "$ref" ] || continue
     name="${ref#*/}"
+    if printf '%s\n' "$tsv" | NAME="$name" awk -F'\t' '$4 == ENVIRON["NAME"] { f = 1 } END { exit !f }'; then
+      say "branche distante $ref : base d'une PR mergée (longue durée), jamais candidate"; continue
+    fi
     auths=$(printf '%s\n' "$tsv" | NAME="$name" awk -F'\t' '$1 == ENVIRON["NAME"] { print $3 "\t" $2 }')
     if [ -z "$auths" ]; then say "branche distante $ref : aucune PR mergée connue, jamais candidate"; continue; fi
     n=0; pr=""
@@ -300,8 +327,7 @@ rangement_distantes() { # <repo> <base>
 $auths
 EOF2
     if [ "$n" -eq 0 ]; then
-      OVER=1
-      flag "À VALIDER branche distante : $ref (PR #$pr, $(printf '%s' "$auths" | cut -f1 | sed -n 1p)) — suppression = geste humain"
+      OVER=1; flag "À VALIDER branche distante : $ref (PR #$pr, $(printf '%s' "$auths" | cut -f1 | sed -n 1p)) — suppression = geste humain"
     else
       say "branche distante $ref : hors propriétaire, jamais candidate"
     fi
@@ -315,8 +341,6 @@ rangement() { # <repo> <base> <branches-en-worktree>
   if [ -n "$base" ]; then
     rangement_branches "$repo" "$base" "$wtb"
     rangement_stash "$repo" "$base"
-  else
-    say "rangement : branche de référence introuvable dans $repo, branches et stash non examinés"
   fi
   rangement_memoires "$repo"
   if [ "$NO_REMOTE" -eq 1 ]; then
@@ -341,6 +365,9 @@ for repo in "${REPOS[@]+"${REPOS[@]}"}"; do
   [ -n "$repo" ] || continue
   porcelain=$(git -C "$repo" worktree list --porcelain 2>/dev/null)
   base=$(base_ref "$repo")
+  if [ -z "$base" ]; then UNVERIFIABLE=1; flag "NON VÉRIFIABLE rangement : branche de référence introuvable dans $repo (ni origin/HEAD, ni main, ni master) : worktrees, branches, stash et branches distantes non classés"
+  elif ! git -C "$repo" rev-parse -q --verify "$base^{commit}" >/dev/null 2>&1; then UNVERIFIABLE=1; flag "NON VÉRIFIABLE rangement : la branche de référence $base ne désigne aucun commit dans $repo (origin/HEAD orphelin ?) : worktrees, branches, stash et branches distantes non classés"; base=""
+  fi
   active=0
   details=""
   first=1
