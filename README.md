@@ -223,6 +223,13 @@ Main lab (private): [vibeflow-lab](https://github.com/picmakpro/vibeflow-lab) �
 - **[@picmakpro](https://github.com/picmakpro)** — creator of the VibeFlow methodology and repo owner. Laid the project's foundations and remains the guardian of its doctrine: the governance backbone (`conductor`, `planning-core`, `consolidator`), the scriptural hooks and guards that keep every lab honest. VibeFlow's identity — governance enforced by tools, not by prose — is his.
 - **Samuel Neveu — [@samuel-neveugall](https://github.com/samuel-neveugall)** — the project's driving force day to day: main contributor and release driver. Built the entire development side (`dev-orchestrator`, `design-orchestrator`, `mobile-test-team`), led the agentic pivot and the team-kernel, and steers the framework's evolution — including its migration onto the `@opengsd/gsd-core` engine.
 
+## 🤝 Contributing
+
+Contributions are welcome — no need to be a collaborator: fork, branch, open a pull request.
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) (workflow, tests, licensing of contributions), the
+[Code of Conduct](./CODE_OF_CONDUCT.md), and report vulnerabilities privately as described in
+[SECURITY.md](./SECURITY.md).
+
 ## 📄 License
 
 Source-available under a proprietary license — see [LICENSE](./LICENSE). Public code and

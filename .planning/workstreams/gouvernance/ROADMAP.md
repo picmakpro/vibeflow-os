@@ -13,7 +13,7 @@
 
 - [x] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #108
 - [x] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #111
-- [ ] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
+- [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
 - [ ] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -100,14 +100,39 @@ Plans:
 ### Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque
 
 **Goal:** Le modèle de données d'un lab (`cycles/`, `phases/`, `CADRAGE.md`, `PLAN.md` avec `ecrit:`, `VERDICT.md`, `SUMMARY.md`) existe, et un recalcul **en Python** dérive du disque les huit états (dont `indéterminé`) et génère `INDEX.md`, `STATE.md` et `cloture.log` — incrémental par hash du contenu, jamais par `mtime`.
-**Requirements**: TBD (posés au cadrage)
+**Requirements**: MOTR-01..MOTR-18 (posées au cadrage, `44-CONTEXT.md`)
 **Depends on:** Phase 43 (seule une procédure ouvre une phase : la nature doit être déclarée avant que le moteur ne s'en serve).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §3, §7.1, §7.4, §10, D-03, D-09, D-10. **Ouvert au cadrage** : emplacements hors modèle (§7.3), arbitrage d'usage `phases_trace: false` (§11.2), premier banc d'essai.
-**Plans:** 0 plans
+**Plans:** 5 plans (4 vagues : 44-01 ∥ 44-02 → 44-03 → 44-04 → 44-05)
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 44 to break down)
+- [x] 44-01-PLAN.md — traceur : `recalc-planning.sh` (Python embarqué, voie a de P44-D-14) dérive le lab `traceur`, refuse sans adhésion `cycles-v1` ou sur GSD, lecture seule sans écriture, INDEX.md/STATE.md/cloture.log déterministes, lab frais
+- [x] 44-02-PLAN.md — modèle : `references/modele-cycles.md` et huit gabarits `templates/cycles/` (choix délégués fixés)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 44-03-PLAN.md — matrice des huit états et des dérogations, jumeaux négatifs au banc, agrégation des plans et des cycles, gabarits conformes
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 44-04-PLAN.md — hors modèle (P44-D-04) et garde-fous de chemin ; incrémental par hash du contenu (P44-D-13) ; contrôle croisé référence ↔ moteur
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 44-05-PLAN.md — bump mineur de planning-core sans release, preuves de phase (P44-D-01a, P44-D-01b, P44-D-15), passage en lecture seule sur deux labs réels
+
+**Clôture :** 2026-09-28, mission `mgr-44-reprise`. Après la vérification (PASSED 18/18), huit lots
+de correction issus de la revue et de l'audit (quick tasks 260928-b4c, -ccz, -mgu, -ol3, -q6h, -s53,
+-vk9) : le moteur appelle le vrai détecteur dans un environnement construit de zéro et n'écrit que
+s'il a pu lire tout ce que le détecteur devait lire ; le journal `cloture.log` est encodé de façon
+injective. Audit final SECURED (constats A et B du tour 1 fermés). Lot 8 sans nouveau tour de juges
+et résidus acceptés (TOCTOU local, volume) : décision du head sous délégation technique de Willy,
+session principale, 2026-09-28 — documentés dans `plugin/planning-core/references/modele-cycles.md`
+et `.planning/BACKLOG.md`. PR vers `main` ouverte, sans merge, sans tag, sans release (garde-fou du
+jalon : aucune release gouvernance avant la clôture de `fiabilite-v1.0`). Rapport :
+`.planning/missions/2026-09-27-gouvernance-44.md`.
 
 ### Phase 45: Moteur — hook central par rôle et gates d'écriture
 
@@ -115,6 +140,9 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 44 (les gates lisent le modèle et les états dérivés).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5, §5.1, §5.2, D-05 (G7) ; `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §5, B-02 — **une mécanique, deux chantiers**.
+**À envisager au cadrage** : comment un lab métier qui contient du code adhère-t-il (le détecteur
+rend 2 et le moteur refuse l'écriture en 44) — origine : Phase 44, décision du head sous
+délégation technique de Willy, session principale, 2026-09-28.
 **Plans:** 0 plans
 
 Plans:
@@ -127,6 +155,10 @@ Plans:
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 45.
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5 (G3, G4, G4′, D1), §10, D-02 (le juge ne bloque que sur ses constats) ; `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-16, §10 (préparer la preuve sans l'exécuter, B-01).
+**À envisager au cadrage** : un état de transition « à clore » pour le cas « verdict passé,
+SUMMARY absent » (le §3.1 ne le nomme pas, la Phase 44 le rend `indéterminé` par défaut,
+P44-D-08) — origine Phase 44, décision (a), head sous délégation technique de Willy, session
+principale, 2026-09-28.
 **Plans:** 0 plans
 
 Plans:

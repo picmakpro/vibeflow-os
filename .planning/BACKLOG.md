@@ -1069,3 +1069,166 @@ polarité de trancher au moment de la reprise.
 **Déclencheur de reprise :** la prochaine évolution qui touche `inject-mcp-tools.sh` ou
 `check-capability-activation.sh`, ou un incident où un mode `--verify` en dossier mixte a rendu un
 verdict trompeur.
+
+## Référencer recalc-planning.sh / modele-cycles.md depuis le SKILL.md de planning-core — reporté (2026-09-28)
+
+**Capturé :** 2026-09-28, correction ciblée lot 2 de la Phase 44 (`.planning/workstreams/gouvernance/phases/VFDO-44-…`). Décision : « décision du head sous délégation technique de Willy, session principale, 2026-09-28 », lot 2 L3.
+
+**Le point** : `plugin/planning-core/SKILL.md` ne référence encore ni `scripts/recalc-planning.sh`
+ni `references/modele-cycles.md` — le moteur de recalcul d'état par cycles livré en Phase 44 n'est
+donc découvrable par aucun skill.
+
+**Motif du report** : P44-D-01e — `SKILL.md` reste intentionnellement intact en Phase 44 ; la
+commande n'est câblée nulle part (aucun hook, aucune gate) avant les Phases 45/48. Câbler la
+référence avant le câblage réel produirait une doc qui pointe vers une commande sans appelant.
+
+**Déclencheur de reprise :** Phase 48 (ou la phase qui câble effectivement `recalc-planning.sh` à
+un déclencheur).
+
+## Pour Samuel — faux rouge local de `test-vibeflow-update.sh` sur `~/.claude/skills/synced/` réécrit par le runtime (constaté 2026-09-28)
+
+**Capturé :** 2026-09-28, correction ciblée lot 2 de la Phase 44. Origine : manager de mission
+`vf-dev-manager-g44`, mesures du 2026-09-28. Hors périmètre de cette correction (jamais touché :
+`plugin/dev-orchestrator/**`, l'installeur, ni sa suite).
+
+**Le défaut** : le garde-fou « `~/.claude` intact » de
+`plugin/_internal/tests/test-vibeflow-update.sh` compte `~/.claude/skills/synced/`, un dossier que
+le runtime Claude Code réécrit lui-même pendant l'exécution du test (`.last-complete-round`,
+`manifest.json`) — d'où un faux rouge **local**, sans lien avec l'installeur.
+
+**Mesures du manager (2026-09-28)** : sur HEAD `72eb408`, avant=1510/après=1509 sur une exécution,
+puis avant=1509/après=1510 sur la suivante (KO les deux fois, en sens inverse) ; sur un export
+figé de la base à `424cb23`, 1509=1509 (vert). L'écart a une seule source identifiée :
+`skills/synced/`, réécrit par le runtime à 07:22:28 pendant l'exécution du test.
+
+**Propriétaire à la relecture :** Samuel (polarité fiabilité de l'installeur).
+
+**Déclencheur de reprise :** la prochaine évolution qui touche `test-vibeflow-update.sh` ou son
+garde-fou d'intégrité de `~/.claude`, ou un incident où ce faux rouge a bloqué une CI/un push.
+
+## Pour Samuel — hooks GSD introuvables dans les worktrees (constaté 2026-09-28)
+
+**Capturé :** 2026-09-28, pendant la mission de la Phase 44 (worktree `gouvernance-44`). Arbitrage
+de l'inscription : Willy, session principale, 2026-09-28 (relayé par la session principale au
+manager de mission). Hors périmètre de la Phase 44 : ni l'installeur ni `merge-hooks.sh` ne sont
+touchés ici.
+
+**Le défaut** : les hooks posés dans `settings.local.json` pointent vers
+`"$CLAUDE_PROJECT_DIR"/.claude/hooks/gsd-context-monitor.js`. Dans un worktree
+`.claude/worktrees/<nom>`, `CLAUDE_PROJECT_DIR` vaut le worktree ; or `.claude/*` est ignoré par
+git (`.gitignore:24`) et n'y est donc pas recopié. Résultat : « Stop hook error: Cannot find
+module » (non bloquant), et le moniteur de contexte GSD ne tourne pas dans les worktrees.
+
+**Portée élargie (constat du 2026-09-29, session principale)** : ce n'est pas seulement le
+moniteur de contexte. Les 22 commandes de hooks de `settings.local.json` qui visent
+`"$CLAUDE_PROJECT_DIR"/.claude/hooks/*` ou `${CLAUDE_PROJECT_DIR}/.claude/scripts/*` sont dans le
+même cas, dont des **gardes** : `gsd-secret-read-guard.js`, `gsd-write-guard.js`,
+`gsd-read-guard.js`, `gsd-prompt-guard.js`, `gsd-worktree-path-guard.js`, et
+`guard-driver-lock.sh`. Un garde qui échoue sans bloquer est un garde désactivé : dans un
+worktree, ils ne protègent rien, sans aucun signal au-delà du message d'erreur.
+
+**Contournement posé** : deux liens symboliques, `.claude/hooks` et `.claude/scripts`, vers ceux
+du checkout principal, posés à la création de chaque worktree (ignorés par git). Le lien est
+préférable à un repli dans la commande : `guard-driver-lock.sh` se situe par `BASH_SOURCE`, et
+exécuté depuis le checkout principal il viserait le mauvais dépôt ; le lien garde le chemin du
+worktree.
+
+**Piste durable** : l'installeur (ou un hook de création de worktree) pose ces deux liens, ou
+les hooks deviennent fail-closed quand leur fichier manque. **Écarté** : faire se replier la
+commande de hook sur le checkout principal (`git rev-parse --git-common-dir`) — même défaut de
+localisation que ci-dessus.
+
+**Propriétaire à la relecture :** Samuel (installeur, polarité fiabilité).
+
+**Déclencheur de reprise :** la prochaine évolution de l'installeur ou de `merge-hooks.sh`, ou la
+création d'un worktree où le contournement n'a pas été posé.
+
+## Pour Samuel — `vf_ws_enumerate` ne restitue pas fidèlement un compartiment à saut de ligne
+(constaté 2026-09-28)
+
+**Capturé :** 2026-09-28, pendant l'audit de la Phase 44 (worktree `gouvernance-44`), reproduit
+par exécution dans l'environnement maîtrisé exact du moteur. Motif du report : P44-D-01b
+(`detect-gsd-engine.sh` et `workstream-policy.sh` restent INCHANGÉS en Phase 44 — le lot 6 a fermé
+la conséquence côté appelant, dans `recalc-planning.sh` seul, jamais dans ces deux fichiers).
+
+**Le défaut** : `vf_ws_enumerate` (`workstream-policy.sh`) émet un chemin absolu par ligne
+(`printf '%s\n' "$(cd "$entry" && pwd)"`) pour chaque compartiment de `<planning>/workstreams/`.
+Un compartiment dont le nom porte un saut de ligne scinde sa propre ligne en deux à la lecture
+(`while IFS= read -r`), aucune des deux ne pointant vers un chemin qui existe : le compartiment
+devient invisible à tout consommateur de cette énumération, sans qu'aucune ligne stderr ne le
+signale — silence total, indistinguable d'un dépôt non partitionné. Mesuré : masque le marqueur
+`gsd_state_version` de ce compartiment pour `detect-gsd-engine.sh` (priorité 2bis), qui retombe
+alors sur la priorité 3 et rend le code 3 « terrain libre » sans diagnostic. Même primitive,
+même classe de trou, dans `check-planning-state.sh` (~L136-141) : compteur gonflé, diagnostic
+seul, pas un gate d'écriture — impact moindre mais même cause racine.
+
+**Piste durable** : délimiteur NUL des deux côtés (émission et lecture) plutôt que `\n`, ou
+échappement du nom de compartiment à l'émission (motif déjà en place ailleurs dans ce fichier pour
+d'autres classes de noms piégés).
+
+**Propriétaire à la relecture :** Samuel (propriétaire de `workstream-policy.sh`, Phase 41.1).
+
+**Déclencheur de reprise :** la prochaine évolution de `workstream-policy.sh` ou de
+`check-planning-state.sh`, ou un incident où ce trou a masqué un compartiment réel.
+
+## Pour Samuel — `vf_ws_enumerate` pose `found=1` même quand `cd` échoue (constaté 2026-09-28)
+
+**Capturé :** 2026-09-28, pendant l'audit de la Phase 44 (worktree `gouvernance-44`), correction de
+classe lot 7 (`recalc-planning.sh`), reproduit par exécution dans l'environnement maîtrisé exact du
+moteur. Motif du report : P44-D-01b (`detect-gsd-engine.sh` et `workstream-policy.sh` restent
+INCHANGÉS en Phase 44 — le lot 7 a fermé la conséquence côté appelant, dans `recalc-planning.sh`
+seul, jamais dans ces deux fichiers). Voisine de l'entrée précédente (même primitive, même fichier,
+même classe de trou plus large) — pas un doublon : le trou de saut de ligne casse le CONTENU d'une
+ligne déjà émise, celui-ci fait émettre une ligne alors que l'émission elle-même a ÉCHOUÉ.
+
+**Le défaut** : dans la boucle d'énumération (`workstream-policy.sh:294-307`), pour chaque entrée
+retenue (dossier réel, non-lien), la ligne `printf '%s\n' "$(cd "$entry" && pwd)"` puis
+`found=1` s'exécutent INCONDITIONNELLEMENT — même quand `cd "$entry"` a ÉCHOUÉ (compartiment sans
+bit `x`, permissions dégradées en `000`/`600`/`400`). `cd` échoue, la substitution de commande
+`$(...)` capture une chaîne VIDE (le code de retour de `cd` n'est jamais testé), `printf` imprime
+une ligne VIDE, et `found=1` est posé quand même — comme si le compartiment avait été énuméré avec
+succès. `detect-gsd-engine.sh` (priorité 2bis, `workstream-policy.sh:305-306` côté lecture — même
+zone que l'entrée précédente) saute cette ligne vide en silence (`[ -n "$_wsdir" ] || continue`) :
+aucune autre ligne ne suit, la priorité 2bis retombe sur la priorité 3/4 et rend le code 3
+« terrain libre » SANS AUCUN diagnostic qui distingue ce cas du cas nominal (aucun compartiment).
+Mesuré : un compartiment RÉELLEMENT tenu par GSD, mais dont le mode empêche `cd`, devient
+indétectable par `vf_ws_enumerate` — le lot 7 ferme la conséquence côté appelant (garde de lecture
+qui relance `vf_ws_enumerate` pour de vrai et compare son résultat à l'ensemble réel du disque),
+mais la primitive elle-même reste silencieuse sur ce cas précis.
+
+**Mesuré aussi, même lot** : un `STATE.md` (racine ou de compartiment) rendu illisible (mode `000`)
+produit le même silence côté LECTEUR — `has_frontmatter_key` (`detect-gsd-engine.sh`) échoue à
+ouvrir le fichier, ne trouve donc pas la clé cherchée, et le code de sortie qui en résulte ne se
+distingue en rien d'un fichier simplement dépourvu du marqueur. Ce n'est pas un défaut de
+`vf_ws_enumerate` elle-même (elle n'ouvre aucun `STATE.md`) mais du même MOTIF, un cran plus loin :
+aucun des deux consommateurs de cette primitive ne distingue aujourd'hui « le marqueur est absent »
+de « je n'ai pas pu vérifier s'il était présent ».
+
+**Piste durable** : tester le code de retour de `cd` avant le `printf` — `found` ne devrait se
+poser QUE si `cd` a réussi ; sur échec, un code de sortie DISTINCT (ni 0, ni le 3 nominal du dépôt
+non partitionné) rendrait le cas AUDIBLE plutôt que silencieusement confondu avec « aucun
+compartiment ». Même remède de principe pour un `STATE.md` illisible côté `has_frontmatter_key`.
+
+**Coût à volume et fenêtre TOCTOU, mesurés lot 8 (2026-09-28)** — deux limites supplémentaires de
+cette même primitive, constatées en construisant la garde de lecture du moteur (`recalc-planning.sh`,
+`_lecture_detecteur_fidele`, qui relance `vf_ws_enumerate` pour de vrai à chaque appel du moteur) :
+- **Volume** : `vf_ws_enumerate` mesurée à environ 98 secondes à 3000 compartiments — plus du double
+  du délai de 30 s que la garde de lecture s'impose (`timeout=30`), qui refuse alors fail-closed
+  (`enumeration-execution-en-echec`) plutôt que d'attendre. Un lab partitionné à ce volume de
+  compartiments ne peut donc plus jamais écrire par cette voie tant que le volume n'a pas baissé (ou
+  que le délai côté appelant n'a pas été révisé) — pas un bug du moteur, mais un plafond de
+  performance de `vf_ws_enumerate` elle-même qui devient visible dès qu'un appelant la relance à
+  chaque recalcul plutôt qu'une seule fois par exécution du détecteur.
+- **Fenêtre TOCTOU** : la garde de lecture et le détecteur lisent le disque INDÉPENDAMMENT, à deux
+  instants distincts d'une même exécution — mesuré, 1 écriture sur 15 essais avec un `mv` concurrent
+  LOCAL exécuté entre les deux lectures (gsd-security-auditor, 2026-09-28). Résolution durable
+  envisagée côté appelant : une seule lecture partagée entre la garde et le détecteur, ce qui
+  suppose que `vf_ws_enumerate` (ou `detect-gsd-engine.sh`) EXPOSE son résultat d'énumération à
+  l'appelant plutôt que de le refaire deux fois en interne à chaque appel — hors périmètre de la
+  Phase 44 (P44-D-01b), à cadrer avec la piste durable ci-dessus si `workstream-policy.sh` évolue.
+
+**Propriétaire à la relecture :** Samuel (propriétaire de `workstream-policy.sh`, Phase 41.1).
+
+**Déclencheur de reprise :** la prochaine évolution de `workstream-policy.sh` ou de
+`detect-gsd-engine.sh`, ou un incident où ce trou a masqué un compartiment réel dont les
+permissions étaient dégradées.

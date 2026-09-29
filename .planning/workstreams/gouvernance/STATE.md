@@ -3,51 +3,72 @@ gsd_state_version: 1.0
 workstream: gouvernance
 milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
-current_phase: 44
-current_phase_name: Moteur — modèle de données et recalcul d'état dérivé du disque
-status: not_started
+current_phase: 45
+current_phase_name: Moteur — hook central par rôle et gates d'écriture
+status: "Phase 44 close (PR vers main ouverte), Phase 45 à cadrer"
 created: 2026-09-23
-last_updated: "2026-09-27T00:00:00.000Z"
-last_activity: 2026-09-27
+last_updated: "2026-09-28T00:00:00.000Z"
+last_activity: 2026-09-28
 last_activity_desc: >-
-  Clôture planning des Phases 42 et 43 (mission vf-coder 2026-09-27, mandat court) : PR #108
-  (Phase 42, commit 0f3ede3) et PR #111 (Phase 43, commit 556452e) mergées sur main le
-  2026-09-27, par contournement de la revue code owner (D-02bis), arbitrage Willy, session
-  principale, 2026-09-27 — revue de Samuel sur les deux PR reste à faire après coup. Avant le
-  merge de la #111, main a été intégré deux fois dans sa branche par merge (a2517df, puis le
-  merge de la PR #112 en deba30f qui régénère l'index des capabilities pour gsd-core 1.15.0) :
-  intégration par merge plutôt que par rebase pour ne pas réécrire les SHA déjà cités, même
-  arbitrage. Phase 44 pas encore cadrée. STATE tenu à la main.
+  Clôture de la Phase 44 (mission vf-dev-manager mgr-44-reprise, reprise du 2026-09-28) : lots de
+  correction 4 à 8 commités (vrai détecteur en environnement construit de zéro, clé de journal
+  injective, garde de lecture du détecteur, lien cassé = absent, FIFO non bloquante), revue et audit
+  finaux (audit SECURED sur 345303e, A/B/PERM/LF/C/D/T2/F1 fermés), lot 8 sans nouveau tour de juges
+  (décision du head sous délégation technique de Willy, session principale, 2026-09-28), 313 OK/0 KO
+  sur test-recalc-planning.sh, detect-gsd-engine.sh/workstream-policy.sh inchangés depuis 424cb23.
+  Résidus acceptés documentés (modele-cycles.md, BACKLOG) : TOCTOU local 1/15, volume ~98 s à 3000
+  compartiments. Rapport : .planning/missions/2026-09-27-gouvernance-44.md.
 stopped_at: >-
-  Phases 42 et 43 closes dans le planning (ROADMAP cochée, PR de clôture consignées) ; revue code
-  owner de Samuel toujours en attente sur les deux PR (contournement D-02bis tracé, pas encore
-  contre-vérifié). Prochain geste : cadrage de la Phase 44 (gsd-discuss-phase --ws gouvernance),
-  non entamé.
+  Phase 44 close sur la branche gouvernance/phase-44-moteur, PR vers main ouverte (sans merge, sans
+  tag, sans release — aucune release gouvernance avant la clôture de fiabilite-v1.0). Prochain geste :
+  cadrage de la Phase 45 (--ws gouvernance), qui reprend la question d'adhésion d'un lab métier
+  contenant du code.
 progress:
   total_phases: 9
-  completed_phases: 2
-  total_plans: 13
-  completed_plans: 13
-  percent: 22
+  completed_phases: 3
+  total_plans: 18
+  completed_plans: 18
+  percent: 100
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 44 (Moteur — modèle de données et recalcul d'état dérivé du disque) — PAS ENCORE CADRÉE. Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
-**Last Activity:** 2026-09-27
-**Last Activity Description:** Clôture planning des Phases 42 et 43 (mandat court vf-coder) : ROADMAP cochée, PR de clôture consignées (PR #108 commit 0f3ede3, PR #111 commit 556452e). Merges par contournement de la revue code owner, arbitrage Willy, session principale, 2026-09-27. Deux merges amont dans la branche de la 43 avant son merge final (a2517df, deba30f/PR #112 — régénération de l'index des capabilities pour gsd-core 1.15.0), intégrés par merge plutôt que par rebase pour préserver les SHA déjà cités, même arbitrage.
+Phase: 45 (Moteur — hook central par rôle et gates d'écriture) — à cadrer. Phase 44 : exécutée (5/5 plans), vérifiée PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`), corrigée en 8 lots après revue et audit, CLOSE dans le ROADMAP le 2026-09-28 (PR vers main ouverte, non mergée). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
+**Last Activity:** 2026-09-28
+**Last Activity Description:** Clôture de la Phase 44 (mission `mgr-44-reprise`) — voir `last_activity_desc` en frontmatter. Dernier lot : correction de CLASSE lot 8 (quick 260928-vk9, CORRECTION MINIMALE, aucun nouveau tour de juges, gsd-verifier PASSED), commit `0c284e3`.
+
+Précédent : correction de CLASSE lot 5 (nœud `exec-44` rouvert, mission vf-coder `mgr-44-reprise`, quick task `260928-ol3`) : l'environnement « maîtrisé » du sous-processus détecteur (lot 4) était en réalité `dict(os.environ)` avec la seule surcharge de `GSD_HOME` — une copie intégrale du `PATH` hérité. Mesuré (attack probe direct, hors suite) : un `awk` factice en tête de PATH suffisait à faire écrire (exit 0) le moteur sur un lab GSD réel et à effacer le marqueur `gsd_state_version`. L'environnement est désormais construit DE ZÉRO (liste blanche `PATH_MAITRISE` + `GSD_HOME`, aucune autre variable héritée) ; `bash` résolu par `CANDIDATS_BASH` (deux chemins absolus fixes, validés par `lstat`), jamais `shutil.which` sur le PATH hérité. Correctifs voisins : `_jeton_journal` échappe aussi tout caractère non imprimable (NUL, contrôles C0/C1) ; un repli vide lève `ValueError` (jamais un jeton vide silencieux) ; « détecteur absent »/« détecteur non régulier » ont deux messages distincts ; `ecrire_si_different` lit par `O_NOFOLLOW`. Point explicitement NON retenu (avec preuve) : gater le code 3 sur une sortie stderr non vide — un `.planning/workstreams/` vide en produit légitimement. 233→270 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `detect-gsd-engine.sh`/`workstream-policy.sh` octet pour octet inchangés depuis `424cb23`. Le dispatch `gsd-executor` isolé n'a pas été retenté (expérience du lot 4 déjà consignée) ; un seul commit (correctifs trop imbriqués pour un découpage fix/test/docs). Vérifié PASSED 11/11 par `gsd-verifier`. Commit `9fe4a42`.
+
+Précédent : correction de CLASSE lot 4 (quick task `260928-mgu`) : `detection_gsd()` appelle le VRAI `detect-gsd-engine.sh` en sous-processus au lieu de réimplémenter ses priorités en Python, fermant les trois divergences mesurées de la copie du lot 3. `_jeton_journal` passe à un encodage pourcent injectif. 180→233 OK/0 KO, 8 suites sœurs vertes, `gsd-verifier` PASSED 7/7. Commits `b63da53`/`2fbbd65`/`3d72452`.
+
+Précédent : correction ciblée lot 3 (quick task `260928-ccz`) : dédoublonnage du journal comparé sur la valeur assainie des deux côtés (constat 1, revue — round-trip réel prouvé rouge/vert), refus « migration à examiner » de `detection_gsd()` indépendant de `GSD_HOME` sur le repli code 1 (constat 2, audit — combinaison socle+signal reproduite en Python pur, `detect-gsd-engine.sh` inchangé). 171→180 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `gsd-verifier` PASSED 7/7. Commits `dab3f62`/`89270fa`/`22381c1`.
+
+Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/F4/F5, couverture des 8 marqueurs restants de `detection_gsd()`, scindage du code 2/3 du détecteur GSD (lot 2 L1), assainissement structurel du journal (lot 2 L2), corrections de doc (DOC-44-02/03, F6, Banc F1). 171 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `gsd-verifier` PASSED 11/11. Commits `e4898a0`/`aa8420d`/`fda472a`.
 
 ## Progress
 
-**Phases Complete:** 2 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux)
-**Current Plan:** aucun — Phase 44 pas encore planifiée (0/0 plans)
+**Phases Complete:** 3 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée).
+**Current Plan:** aucun en cours — Phase 45 à cadrer
 
 ## Session Continuity
 
-**Stopped At:** Phases 42 et 43 closes dans le planning ; PR #108 et #111 mergées sur main le 2026-09-27. Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis, arbitrage Willy, session principale, 2026-09-27). Prochain geste : cadrage de la Phase 44 (`gsd-discuss-phase --ws gouvernance`), non entamé.
-**Resume File:** `.planning/missions/2026-09-26-gouvernance-43-exec.md`
+**Stopped At:** Phase 44 close (8 lots de correction, revue et audit finaux, PR vers main ouverte, sans merge). Prochain geste : cadrage de la Phase 45 (`--ws gouvernance`).
+**Resume File:** `.planning/missions/2026-09-27-gouvernance-44.md`
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Status | Directory |
+|---|-------------|------|--------|--------|-----------|
+| 260928-b4c | Correction ciblée lots 1+2, Phase 44 : gardes F3/F4/F5, couverture F2, scindage code 2/3 du détecteur GSD, assainissement du journal, corrections doc | 2026-09-28 | fda472a | passed | [260928-b4c-correction-cibl-e-lots-1-2-phase-44-gard](./quick/260928-b4c-correction-cibl-e-lots-1-2-phase-44-gard/) |
+| 260928-ccz | Correction ciblée lot 3, Phase 44 : dédoublonnage du journal sur valeur assainie (constat 1, revue), refus code 1 sur socle+signal indépendant de GSD_HOME (constat 2, audit) | 2026-09-28 | 22381c1 | passed | [260928-ccz-correction-cibl-e-lot-3-phase-44-d-doubl](./quick/260928-ccz-correction-cibl-e-lot-3-phase-44-d-doubl/) |
+| 260928-mgu | Correction de CLASSE lot 4, Phase 44 : detection_gsd() appelle le vrai détecteur sous environnement maîtrisé (plus de réimplémentation Python), encodage injectif du journal | 2026-09-28 | 3d72452 | passed | [260928-mgu-correction-de-classe-lot-4-detection-gsd](./quick/260928-mgu-correction-de-classe-lot-4-detection-gsd/) |
+| 260928-ol3 | Correction de CLASSE lot 5, Phase 44 : environnement du sous-processus détecteur construit de zéro (jamais dict(os.environ)), bash résolu par une liste fixe de chemins absolus, alphabet du journal étendu (NUL/C0/C1), messages distincts, O_NOFOLLOW | 2026-09-28 | 9fe4a42 | passed | [260928-ol3-correction-de-classe-lot-5-environnement-maitrise](./quick/260928-ol3-correction-de-classe-lot-5-environnement-maitrise/) |
+| 260928-q6h | Correction ciblée lot 6, Phase 44 (audit HIGH) : garde de fidélité d'énumération des compartiments de workstream côté appelant, AVANT tout appel au détecteur (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) ; correctifs de revue WR-02/WR-03/IN-01/IN-02 | 2026-09-28 | 770c35b | passed | [260928-q6h-ferme-le-masquage-de-compartiment-de-wor](./quick/260928-q6h-ferme-le-masquage-de-compartiment-de-wor/) |
+| 260928-s53 | Correction de CLASSE lot 7, Phase 44 : garde de lecture du détecteur — fidélité par EXÉCUTION de vf_ws_enumerate + lisibilité réelle de chaque compartiment/STATE.md, ferme la classe permissions dégradées (000/600/400) plus large que le lot 6 (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) | 2026-09-28 | 4b666e9 | passed | [260928-s53-correction-de-classe-lot-7-garde-de-lect](./quick/260928-s53-correction-de-classe-lot-7-garde-de-lect/) |
+| 260928-vk9 | Correction de CLASSE lot 8, Phase 44 (CORRECTION MINIMALE, dernier lot, aucun nouveau tour de juges) : lien symbolique cassé traité comme absent (`os.path.isfile`, mirroir de `[ -f ]`), `_ouvrable` non bloquante sur FIFO (O_NONBLOCK + fstat), correction de prose (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) | 2026-09-28 | 0c284e3 | passed | [260928-vk9-correction-de-classe-lot-8-garde-de-lect](./quick/260928-vk9-correction-de-classe-lot-8-garde-de-lect/) |
+| 260928-uu0 | Correction de portabilité GNU/BSD, Phase 44 (reprise mgr-44-reprise, nœud livraison-44) : les 3 sites `stat -f "%Lp" ... \|\| stat -c "%a" ...` (R14, MUT-CHMOD, MUT-CHMOD-JOURNAL), source du KO `R14 permissions` sur le runner CI Linux, remplacés par `mode_octal()` (lecture via `os.stat().st_mode` par `$PYBIN`, une seule sémantique GNU/BSD) ; reste de la suite balayé, aucune autre correction nécessaire (recalc-planning.sh/detect-gsd-engine.sh/workstream-policy.sh inchangés) | 2026-09-28 | ad0a0fc | passed | [260928-uu0-corrige-la-portabilit-gnu-bsd-de-test-re](./quick/260928-uu0-corrige-la-portabilit-gnu-bsd-de-test-re/) |
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
