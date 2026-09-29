@@ -260,6 +260,29 @@ adhéré (Q2).
   - le **coût de migration** d'un lab (cadrages à écrire, ou dérogations) est documenté dans la
     référence du modèle pour le jour de l'adhésion ;
   - aucune règle de gate ne change, et le goal de la ROADMAP reste tel quel.
+- **P45-D-14a (Willy, AskUserQuestion session principale, 2026-09-29) :** la **table D-05 de la
+  spec est corrigée**, pas le prédicat. Un dossier dont le `.claude/` n'a ni agent ni mémoire non
+  vide **n'est pas un lab**, même si la table le comptait comme tel. G7 garde le **prédicat
+  littéral** de P45-D-14 : au moins un agent **et** au moins une mémoire.
+  - `~/jarvis-keystone/00-doctrine` a un `.claude/` réduit à un `agent-memory/` vide (mesuré le
+    2026-09-29). Il devient un **« refus conforme au modèle »**.
+  - Lecture du manager, par la même règle : tout dossier que le prédicat littéral refuse est un
+    refus conforme au modèle. C'est le cas de `ProjetFlow-FROZEN-A1`, absent de la table (mémoire
+    sans agent, `45-RESEARCH.md` l.520).
+  - La table D-05 de `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` est
+    **amendée dans la phase**, avec la mesure et la citation. Les attendus du rejeu de G7 en
+    dérivent. G7, puis le hook par rôle, peuvent s'armer en mission.
+- **P45-D-21c (manager, 2026-09-29, après le plan-check du tour 3) :** la classification « du
+  modèle » d'une écriture rejouée est **totale**.
+  - **Quand le recalcul donne un état de phase** (`recalc-planning.sh --read-only`), c'est lui
+    qui fait référence.
+  - **Quand il n'en donne pas** (cycle sans `CYCLE.md`, qui rend `phases: []` ; courts-circuits
+    Φ0/Φ1 de `indéterminé`), l'outil de rejeu applique la **règle écrite du modèle**
+    (`modele-cycles.md` et spec §5 : un `PLAN.md` exige un `CADRAGE.md` à registre clos). Il le
+    fait **avec son propre code**, sans jamais appeler l'évaluation du hook. Ces cas sont
+    comptés dans un sous-compte distinct du relevé, « classé par la règle écrite, état dérivé
+    absent ». Une fixture et un mutant rouge tracé couvrent ce chemin. Mesure : 8 `PLAN.md` sans
+    `CADRAGE.md` sur Keystone sont dans un cycle sans `CYCLE.md`.
 - **P45-D-21b (manager, 2026-09-29, après le plan-check du tour 2) :** en scope projet,
   `$CLAUDE_PROJECT_DIR` choisit **quelle copie** de `planning-hook.sh` s'exécute, et donc quelle
   table d'armement. Une copie périmée d'un autre worktree peut s'exécuter à la place de la bonne
