@@ -1119,11 +1119,24 @@ touchés ici.
 git (`.gitignore:24`) et n'y est donc pas recopié. Résultat : « Stop hook error: Cannot find
 module » (non bloquant), et le moniteur de contexte GSD ne tourne pas dans les worktrees.
 
-**Contournement posé** : un lien symbolique `.claude/hooks` vers le `.claude/hooks` du checkout
-principal, fait à la main worktree par worktree.
+**Portée élargie (constat du 2026-09-29, session principale)** : ce n'est pas seulement le
+moniteur de contexte. Les 22 commandes de hooks de `settings.local.json` qui visent
+`"$CLAUDE_PROJECT_DIR"/.claude/hooks/*` ou `${CLAUDE_PROJECT_DIR}/.claude/scripts/*` sont dans le
+même cas, dont des **gardes** : `gsd-secret-read-guard.js`, `gsd-write-guard.js`,
+`gsd-read-guard.js`, `gsd-prompt-guard.js`, `gsd-worktree-path-guard.js`, et
+`guard-driver-lock.sh`. Un garde qui échoue sans bloquer est un garde désactivé : dans un
+worktree, ils ne protègent rien, sans aucun signal au-delà du message d'erreur.
 
-**Piste durable** : l'installeur, ou `merge-hooks.sh`, émet une commande de hook qui se replie sur
-le checkout principal (`git rev-parse --git-common-dir`) quand le fichier manque dans le worktree.
+**Contournement posé** : deux liens symboliques, `.claude/hooks` et `.claude/scripts`, vers ceux
+du checkout principal, posés à la création de chaque worktree (ignorés par git). Le lien est
+préférable à un repli dans la commande : `guard-driver-lock.sh` se situe par `BASH_SOURCE`, et
+exécuté depuis le checkout principal il viserait le mauvais dépôt ; le lien garde le chemin du
+worktree.
+
+**Piste durable** : l'installeur (ou un hook de création de worktree) pose ces deux liens, ou
+les hooks deviennent fail-closed quand leur fichier manque. **Écarté** : faire se replier la
+commande de hook sur le checkout principal (`git rev-parse --git-common-dir`) — même défaut de
+localisation que ci-dessus.
 
 **Propriétaire à la relecture :** Samuel (installeur, polarité fiabilité).
 
