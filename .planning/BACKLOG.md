@@ -1127,21 +1127,26 @@ même cas, dont des **gardes** : `gsd-secret-read-guard.js`, `gsd-write-guard.js
 `guard-driver-lock.sh`. Un garde qui échoue sans bloquer est un garde désactivé : dans un
 worktree, ils ne protègent rien, sans aucun signal au-delà du message d'erreur.
 
-**Contournement posé** : deux liens symboliques, `.claude/hooks` et `.claude/scripts`, vers ceux
-du checkout principal, posés à la création de chaque worktree (ignorés par git). Le lien est
-préférable à un repli dans la commande : `guard-driver-lock.sh` se situe par `BASH_SOURCE`, et
-exécuté depuis le checkout principal il viserait le mauvais dépôt ; le lien garde le chemin du
-worktree.
+**Mécanisme retenu** (2026-09-29, Phase 41.3, plan 02) : `.worktreeinclude` (syntaxe .gitignore,
+documentée : code.claude.com/docs/en/worktrees, /hooks#worktreecreate) recopie `.claude/hooks/` et
+`.claude/scripts/` dans tout worktree créé par Claude Code. Écartés : un hook `WorktreeCreate`
+(réimplémente la création git et désactive `.worktreeinclude`) ; les liens posés par l'installeur
+(il tourne avant les worktrees) ; le repli sur le checkout principal (même défaut de localisation).
 
-**Piste durable** : l'installeur (ou un hook de création de worktree) pose ces deux liens, ou
-les hooks deviennent fail-closed quand leur fichier manque. **Écarté** : faire se replier la
-commande de hook sur le checkout principal (`git rev-parse --git-common-dir`) — même défaut de
-localisation que ci-dessus.
+**Limites** : copie figée à la création ; `git worktree add` manuel non couvert ; `guard-driver-lock.sh`
+sous EnterWorktree vise le checkout principal (entrée suivante). Pose chez les labs : plan 41.3-03.
 
 **Propriétaire à la relecture :** Samuel (installeur, polarité fiabilité).
 
 **Déclencheur de reprise :** la prochaine évolution de l'installeur ou de `merge-hooks.sh`, ou la
 création d'un worktree où le contournement n'a pas été posé.
+
+## guard-driver-lock.sh sous EnterWorktree vise le checkout principal — DIFFÉRÉ (2026-09-29)
+
+**Constat :** sous EnterWorktree, `guard-driver-lock.sh` vise le checkout principal, non le
+worktree. `.worktreeinclude` (Phase 41.3, plan 02) y recopie `.claude/scripts/` mais ne corrige pas
+cette résolution : hors périmètre, non traité. **Déclencheur de reprise :** un verrou de driver lu
+ou posé au mauvais endroit depuis un worktree.
 
 ## Pour Samuel — `vf_ws_enumerate` ne restitue pas fidèlement un compartiment à saut de ligne
 (constaté 2026-09-28)

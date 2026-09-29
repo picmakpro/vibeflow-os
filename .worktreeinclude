@@ -14,14 +14,23 @@
 #     runtime, pas une preuve d'absence (hypothèse A5, confiance BASSE) — à inclure
 #     si un worker de documentation s'avère le lire.
 #
-# Syntaxe : la doc du harness Claude Code ne précise le format nulle part (absent de
-# gsd-core et de ce dépôt) — SUPPOSÉE de type .gitignore (motifs gitignore-style, un
-# par ligne) par analogie avec le nom et le rôle inverse du fichier (hypothèse A1,
-# confiance BASSE). Sonde qui la ferme : créer un worktree d'agent isolé, constater
-# si .claude/agent-memory/ y est bien présent.
+# Syntaxe .gitignore, documentée (code.claude.com/docs/en/worktrees § copy-gitignored-files,
+# /hooks#worktreecreate) : un motif par ligne ; seuls les fichiers qu'il désigne ET que git
+# ignore sont recopiés dans un worktree créé par Claude Code.
+# Limites : la copie est FIGÉE à la création du worktree (un hook modifié ensuite dans le
+# checkout principal ne suit pas) ; un `git worktree add` manuel n'est pas couvert ;
+# `guard-driver-lock.sh`, sous EnterWorktree, vise le checkout principal — non corrigé ici
+# (BACKLOG, entrée du 2026-09-29).
 
 # Mémoire persistante d'agent (memory: project, déclaré par tous les agents
 # écrivains) — critique : sans cette entrée, un worker isolé perd tout
 # l'apprentissage accumulé à chaque dispatch — une régression fonctionnelle directe,
 # pas une gêne cosmétique.
 .claude/agent-memory/
+
+# Hooks et gardes du projet : 22 commandes de settings.local.json visent
+# "$CLAUDE_PROJECT_DIR"/.claude/hooks/* et .claude/scripts/*, ignorés par git (.gitignore:24).
+# Dans un worktree, CLAUDE_PROJECT_DIR vaut le worktree : sans ces deux entrées, un garde
+# échoue sans bloquer, donc ne protège rien (« Cannot find module », non bloquant).
+.claude/hooks/
+.claude/scripts/
