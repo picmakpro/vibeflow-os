@@ -25,6 +25,14 @@ m'a sauvé, c'est l'`ls` du scratchpad : les fichiers s'appelaient `b.TAG_A TAG_
 3. tester l'extracteur **seul** sur un cas connu avant de le mettre en boucle — l'appel manuel
    rendait 90 lignes là où la boucle en rendait 0, et c'est ce qui a localisé la panne en un coup.
 
+**Second symptôme du même zsh, celui-là BRUYANT** : un `case "$r" in 0|1|2|64) … ;; esac` écrit
+*inline* dans un appel Bash est parsé par **zsh** et meurt sur `parse error near ')'` — alors que le
+même texte, placé dans un fichier `.sh` ou passé à `bash -c`, tourne. Mesuré le 2026-09-23 en
+prouvant un contrat de codes de sortie. Celui-ci échoue franchement, donc il ne ment pas ; mais le
+réflexe de « simplifier » la commande pour contourner l'erreur fait perdre la preuve. **Écrire la
+sonde dans le scratchpad et l'invoquer par `bash <fichier>`** dès qu'elle contient un `case`, une
+fonction, ou de la syntaxe bash non triviale.
+
 Même famille que [[check-agents-file-egal-vert-a-vide]] et [[lab-skills-plat-partage]] : la cible
 de mesure est vide, pas la propriété fausse. Voir aussi [[diff-proxifie-utiliser-comm]] pour
 l'outillage de comparaison d'ensembles sur ce poste.

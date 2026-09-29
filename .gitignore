@@ -30,6 +30,10 @@ docs/reference/
 .vibeflow-installed
 *.tmp
 
+# Cache du moteur GSD (gsd-core, workstream-inventory.cjs) : réécrit à chaque lecture d'inventaire
+# et auto-réparé s'il manque — un état machine, pas une trace de planning.
+.planning/**/.verification-ledger.json
+
 # Dépendances / environnements (au cas où un module ajoute de l'outillage)
 node_modules/
 .venv/

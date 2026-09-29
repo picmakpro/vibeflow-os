@@ -1,0 +1,134 @@
+{
+  "nodes": [
+    {
+      "id": "recon-A",
+      "step": "reconnaissance gates workstream-aware",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "recon-B",
+      "step": "reconnaissance init de lab et ergonomie",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "inscription",
+      "step": "inscription ROADMAP 41.1/41.2",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss-A",
+      "step": "cadrage chantier A",
+      "stage": "",
+      "deps": [
+        "inscription",
+        "recon-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss-B",
+      "step": "cadrage chantier B",
+      "stage": "",
+      "deps": [
+        "inscription",
+        "recon-B"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan-A",
+      "step": "plan chantier A",
+      "stage": "",
+      "deps": [
+        "discuss-A"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan-B",
+      "step": "plan chantier B",
+      "stage": "",
+      "deps": [
+        "discuss-B"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-A",
+      "step": "execution chantier A",
+      "stage": "",
+      "deps": [
+        "plan-A"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "revue-A",
+      "step": "revue chantier A",
+      "stage": "",
+      "deps": [
+        "exec-A"
+      ],
+      "scope": [],
+      "status": "blocked",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-A",
+      "step": "audit infra chantier A",
+      "stage": "",
+      "deps": [
+        "exec-A"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-B",
+      "step": "execution chantier B",
+      "stage": "",
+      "deps": [
+        "plan-B",
+        "exec-A"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-B",
+      "step": "revue chantier B",
+      "stage": "",
+      "deps": [
+        "exec-B"
+      ],
+      "scope": [],
+      "status": "blocked",
+      "review_regime": "full"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire",
+      "stage": "",
+      "deps": [
+        "exec-A",
+        "exec-B"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}

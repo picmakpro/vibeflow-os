@@ -31,10 +31,17 @@
 - [Le périmètre d'un plan se re-dérive du diff](feedback_perimetre-du-plan-se-rederive-du-diff.md) — 8 modules annoncés / 10 réels ; et ses prémisses `read_first` périment aussi (bundles « sans ligne Version » : faux).
 - [Sonder gsd-tools sans se faire mentir](project_gsd-tools-sondage-sur.md) — le `--help` omet des commandes existantes ; répéter le destructif via `--cwd` ; un gate se prouve par `render-hooks` + contre-épreuve.
 - [Jamais un verdict de sous-agent non reçu](feedback_ne-jamais-affirmer-un-resultat-de-sous-agent-non-recu.md) — `sleep` en background ne bloque pas ; extraire la dernière entrée du transcript avant d'en tirer un artefact.
-- [Deux pièges awk mesurés](project_awk-pieges-mesures.md) — `RS="\0"` ne découpe pas (1 pour 868) ; `&` en remplacement `gsub` réinjecte le match. Silencieux tous les deux.
+- [Trois pièges de commande de mesure](project_awk-pieges-mesures.md) — `RS="\0"` ne découpe pas (1 pour 868) ; `&` en `gsub` réinjecte le match ; `xargs -0 LC_ALL=C awk` ne lance pas awk.
 - [Un gate qui balaie le dépôt se balaie lui-même](feedback_gate-qui-balaie-le-depot-se-balaie-lui-meme.md) — assembler le motif à l'exécution, jamais exempter sa propre suite ; l'échappatoire se prouve par mutation.
 - [Le ship n'est jamais auto-autorisé](feedback_ship-jamais-auto-autorise.md) — question directe à chaque fois, jamais noyée dans un rapport ; l'accord vaut pour CE ship seul.
 - [/gsd-ship : la verification est le preflight #1](project_ship-preflight-verification-dabord.md) — security et broken-windows sont #6/#7 et restent inatteignables sans `*-VERIFICATION.md`.
 - [pre-push : candidat RCE non corrigé](project_pre-push-candidat-rce-non-corrige.md) — `scripts/hooks/pre-push` exécute un chemin dérivé de `show-toplevel`, même motif que dag.sh, mandat séparé requis.
 - [DAG `done` ≠ SUMMARY.md](project_dag-vs-summary-safe-resume-gate.md) — un nœud DAG clos sans SUMMARY.md bloque tout plan postérieur via `safe_resume_gate`, même hors de sa vague.
 - [Persister un fichier d'état sous TARGET_ROOT casse test-manifest.sh](project_fragment-hooks-casse-test-manifest.md) — sa liste d'exclusions D-31-03 est hardcodée en dur, PAS vf_manifest_excluded ; à vérifier ensemble.
+- [Un libellé de cas est couplé au `<verify>` du plan](project_libelle-de-cas-couple-au-verify-du-plan.md) — les plans cherchent le littéral ; plan exécuté (SUMMARY posé) = renommable, non exécuté = ARRÊT.
+- [Invariant T21b : le nom de variable est un contrat](project_invariant-t21b-nom-de-variable.md) — dans dev-orchestrator, toute redirection doit viser une variable `*TMP*` ; un nom prescrit par un plan peut rougir la suite du module.
+- [`--job tests` rougit sur une suite différente à chaque rejeu](project_flakes-concurrence-rejeu-tests.md) — 86/1 deux fois, deux suites ; la contre-épreuve est le rejeu ISOLÉ, jamais un second rejeu complet.
+- [Un plafond en division entière est toujours vrai](feedback_plafond-en-division-entiere.md) — `>= tot/4` vaut `>= 0` sous 4 lignes ; et un extracteur de table markdown avale les blocs de code.
+- [Le scratchpad est partagé entre workers](project_scratchpad-partage-entre-workers.md) — un `tests.rc` homonyme d'un lot précédent se lit comme le sien ; vérifier pgrep avant de lire.
+- [Un gate exigé garde plus que la `files_modified`](feedback_gate-qui-garde-plus-que-la-files-modified.md) — check-version-sync gate aussi les README de module ; l'écart créé par le bump se ferme.
+- [Codex hooks : schéma Claude-Code + double gate de confiance](project_codex-hooks-schema-et-trust-gate.md) — marqueur d'un hook lu dans le JSONL de session, jamais dans la réponse ; témoin différentiel exige de lever le gate pour obtenir un positif AVANT de tester l'effet du flag seul.
