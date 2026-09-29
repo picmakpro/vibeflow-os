@@ -76,9 +76,13 @@ déterministes hors contexte).
 | 52 | `dev-orchestrator` ou `conductor` (hook Stop), `check-overlaps.sh` | 45 (hook central par rôle, dans le module moteur métier) | faible |
 | 53 | `consolidator` (decay-pass, detect-promotions, hook PostToolUse) | 48 (pont mémoire) | **moyenne** — même module |
 | 54 | `infrastructure-audit` / `validator`, `consolidator` (doctrine) | 45-46 (gates) | faible |
-| 55 | `installer`, `_internal/`, `consolidator` | 42 (manifeste posé par l'installeur) | **moyenne** — même installeur |
-| 56 | nouveau module | 43 (gate des skills par nature) | faible |
+| 55 | `installer`, `_internal/`, `consolidator` | 42 (manifeste posé par l'installeur — **livrée** le 2026-09-27, PR #108) | **moyenne** — même installeur : la 55 compose avec le manifeste en place |
+| 56 | nouveau module | 43 (gate des skills par nature — **livrée** le 2026-09-27, PR #111) | faible — les skills du module naissent sous ce gate |
+
+*Mise à jour du 2026-09-29 : les Phases 42 et 43 (PR #108, #111) et 44 (PR #114) du jalon de Willy
+sont closes ; restent à venir les Phases 45 à 50. La 48 (pont mémoire) est la seule collision
+moyenne avec une phase non encore livrée.*
 
 Points de sérialisation partagés quel que soit le compartiment : `VERSION` et le tag (une seule
-release à la fois, rebase avant release), la numérotation des ADR (à la suite de 073), `BACKLOG.md`
+release à la fois, rebase avant release), la numérotation des ADR (à la suite de 075 — ADR-074 et ADR-075 existaient déjà au 2026-09-25), `BACKLOG.md`
 et `docs/ADR.md` (un seul écrivain par PR).

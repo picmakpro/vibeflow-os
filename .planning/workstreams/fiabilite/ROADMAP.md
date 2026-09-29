@@ -1919,8 +1919,8 @@ les rapports typés, le DAG et `check-mission-exit.sh`).
 - **54 avant 53** : la 53 ouvre un écrivain automatique de mémoire vivante ; on audite la surface
   d'attaque **avant** de l'agrandir, et la doctrine « un corps rappelé est une donnée, jamais une
   instruction » doit être gravée et prouvée avant qu'une passe d'observation ne propose des faits.
-- **53 et 55 touchent `consolidator`, 55 touche l'installeur** — mêmes modules que les Phases 48
-  et 42 de Willy (étude §4) : **un seul écrivain à la fois par module**, rebase avant merge, et le
+- **53 et 55 touchent `consolidator`, 55 touche l'installeur** — mêmes modules que la Phase 48
+  de Willy et que sa Phase 42, livrée depuis (étude §4) : **un seul écrivain à la fois par module**, rebase avant merge, et le
   cadrage de chacune vérifie l'état de la phase voisine avant de planifier.
 - **56 en dernier** : valeur la plus faible pour ce dépôt (lab dev, doctrine déjà portée par
   `software-architecture`), utile aux labs iOS/Next.js de Samuel.
@@ -2035,8 +2035,9 @@ humain avant promotion), utilisateur (opt-in explicite) — et un geste `doctor`
 par descripteur.
 **Requirements**: TBD — famille `MRUN` réservée, posée au cadrage.
 **Depends on:** Phase 53 (format et champs de la mémoire vivante stabilisés avant de les rendre
-portables). **Coordination obligatoire avec la Phase 42 de Willy** (manifeste posé par
-l'installeur, même `installer`/`_internal/`) : un seul écrivain à la fois, vérifié au cadrage.
+portables). **Composer avec le manifeste de la Phase 42 de Willy** (livrée le 2026-09-27,
+PR #108 ; même `installer`/`_internal/`) : le cadrage part du manifeste en place et vérifie qu'aucune
+phase du compartiment `gouvernance` n'écrit l'installeur au même moment.
 **Sources:** `.planning/research/2026-09-25-ecc-inspiration-etude.md` §2.5 ; ECC `ecc-universal setup` (manifeste), vault `ecc.memory.v1`, scopes et
 `memory doctor` ; mémoires `agent-skills-ecarte-superpowers-reste` (installeur multi-runtime décidé
 2026-08-28), `memoire-per-projet-scope-user`, `phase-37-et-38-portabilite` ; ADR-052.
