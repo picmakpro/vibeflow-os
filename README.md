@@ -11,7 +11,7 @@ pipeline (scoping → plan → execution → proof), and **machine gates** verif
 Claude Code is the reference runtime; install and usage are also measured end to end on **Codex**
 and **kimi-code**.
 
-[![Version](https://img.shields.io/badge/version-2.67.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.67.1-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#-install)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
@@ -139,7 +139,7 @@ documentation — same structure everywhere.
 ## 🔒 Trust
 
 - **Source-available**: public code and history — see [LICENSE](./LICENSE).
-- **Auditable**: bash + `jq`, every script covered by its suite (92 suites in CI — the newest
+- **Auditable**: bash + `jq`, every script covered by its suite (93 suites in CI — the newest
   ones prove the multi-runtime CLI dispatch (RUNT-01/02) and the dev-scope hooks' exec form as
   actually installed, their exit-code contract, and the shared Python resolution), **idempotent**
   install with backup before overwrite.
@@ -160,6 +160,7 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)**, the single canon — the table
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.67.1` | 2026-09-29 | **Hotfix: two v2.67.0 regressions.** `popd` bypassed the driver lock (`conductor` v1.45.1): in `pushd <other-repo> && git commit && popd && git commit`, the second commit, made in the lab, got through under another session's lock, which v2.66.0 refused; `popd` now makes the target undetermined and the lock applies. `skill-creator` v1.1.1: v1.1.0 asked for `vf-nature` (and `ecrit:`, `vf-rubrique-juge:`, the three markers) in the frontmatter while its own `quick_validate.py` rejected them, so a skill produced by that flow failed validation and packaging; the six skill-gate keys are now accepted. Each fix comes with cases that are red without it. Cut from the `v2.67.0` tag: Phase 44 (`planning-core` v2.8.0), merged on `main` unreleased, is not shipped. **92 suites.** |
 | `v2.67.0` | 2026-09-28 | **Method budgets and a driver lock scoped to the lab (minor).** New `check-method-budget.sh` (`conductor` v1.45.0) measures two budgets, read-only: `STATE.md` at most 8 KB, at most 3 active worktrees per repo, each worktree classified active, RANGEABLE (worked on, then merged) or ORPHAN. `dev-orchestrator` v2.25.0 runs it at mission close, before releasing the lock: the mission's point replaces the current position instead of piling on top, merged worktrees it created are removed without `--force`, the rest goes to the report. The driver lock no longer blocks a gesture that provably targets another repository (`cd <other-repo> && git commit`, `git -C <other-repo> push`, Write in another repo's `.planning/`); any ambiguity keeps the lock. Also ships Phases 42 and 43 (dated agents manifest, skills gate by nature, `conductor` v1.43.0 and v1.44.0) and `dev-orchestrator` v2.24.2, merged but never released. |
 | `v2.66.0` | 2026-09-25 | **Install presets, confidence on typed reports, workstream-aware planning gates (minor).** `/vibeflow-install` picks a dev lab from named presets (`dev`, `dev-mobile`, `dev-audite`) resolved from data. Typed reports gain an optional `confiance` field with a single `SEUIL_CONFIANCE`: a low-confidence judgment is never a green. The head allocates a team from three independent questions. Planning gates enumerate every workstream compartment on disk (`planning-core` v2.7.1, `conductor` v1.42.0, `dev-orchestrator` v2.24.1), `measure-server-rulesets.sh --dry-run` no longer mutates what it measures, and decision ids carry their registry (ADR-075). |
 | `v2.65.0` | 2026-09-23 | **Catch-up release: `dev-orchestrator`'s requirements ledger and mission-exit gate become workstream-aware (patch, D-02).** `check-requirements-survival.sh`, `restore-requirements-ledger.sh`, `requirements-survival-detect.sh` (LEDG-01/02) and `check-mission-exit.sh`'s E4 always resolved `.planning/REQUIREMENTS.md`/`ROADMAP.md`/`STATE.md` at the repo root, never the active workstream compartment, once a lab is partitioned. A lab with partitioned planning now sees these guards and this ledger operate on its active compartment instead of silently missing their target; a non-partitioned lab keeps the historical behavior. `dev-orchestrator` v2.23.1. Also ships `conductor` v1.40.0 (blueprints now pass the gate they target), previously merged but never released. |

@@ -400,6 +400,9 @@ def bash_targets_outside_lab(cmd, root):
                 target = resolve_dir(base, args[0]) if args else None
                 base = target if op == "&&" else None
                 continue
+            if name == "popd":
+                base = None  # la pile de pushd n est pas suivie : dossier indéterminé, le lock s applique
+                continue
             if bash_command_concerned(" ".join(shlex.quote(t) for t in seg)):
                 if name == "git":
                     target = git_target(seg, idx + 1, base)
