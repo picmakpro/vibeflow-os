@@ -142,7 +142,7 @@ avec `SCHEMA_ADHESION = "cycles-v1"` (l.71) et `SANS_SUIVI_DE_LIEN = getattr(os,
 ### Commande enregistrée (champ `command` de l'entrée PreToolUse — couche shell fail-closed)
 
 **Analogue de forme d'entrée :** `plugin/conductor/hooks/hooks.json` l.5-21 (groupe `PreToolUse` à `matcher`, entrée `type: command`).
-**Source de vérité du contenu :** `45-RESEARCH.md` § « Code Examples — La commande enregistrée » (commande testée : 39 cas × 6 shells, 936 appels E2E). **Copier telle quelle, ne pas réécrire.** Le squelette est :
+**Source de vérité du contenu :** `45-RESEARCH.md` § « Code Examples — La commande enregistrée » (commande testée par la sonde historique : 39 cas × 6 shells, 936 appels E2E ; corpus des plans : 49 cas, 17 mutants). **Copier telle quelle, ne pas réécrire.** Le squelette est :
 ```sh
 S={{VF_SCRIPTS}}/planning-hook.sh
 I=$(cat); R=1; O=

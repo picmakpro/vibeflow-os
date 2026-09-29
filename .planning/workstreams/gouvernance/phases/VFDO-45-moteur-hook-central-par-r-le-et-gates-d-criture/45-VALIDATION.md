@@ -66,7 +66,7 @@ Rempli par les plans (`45-NN-PLAN.md`) ; la correspondance exigence -> commande 
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Rejeu réel des gates sur les labs adhérents réels (comptes, faux refus) | GATE-13 | les labs réels sont machine-locaux, hors CI | lancer l'outil de rejeu lecture seule avec les chemins en argument ; joindre le rapport nominatif ; décision d'armement = Willy |
+| Rejeu réel des gates sur les labs adhérents réels (comptes, faux refus) | GATE-13 | les labs réels sont machine-locaux, hors CI | lancer l'outil de rejeu lecture seule avec les chemins en argument ; joindre le rapport nominatif ; armement mécanique (P45-D-03b) à zéro faux refus et zéro faux accept — les « refus conformes au modèle, lab non migré » sont comptés à part (P45-D-21a) ; escalade à Willy seulement sur un faux refus ou faux accept non nul |
 
 ---
 
