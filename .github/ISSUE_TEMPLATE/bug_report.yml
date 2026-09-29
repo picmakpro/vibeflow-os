@@ -1,0 +1,68 @@
+name: Bug report
+description: Something in VibeFlow does not behave as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! French or English are both fine.
+        **Security issue? Do not file it here** — use [Report a vulnerability](https://github.com/picmakpro/vibeflow-os/security/advisories/new).
+  - type: input
+    id: version
+    attributes:
+      label: VibeFlow version
+      description: Content of the `VERSION` file, or the version shown by `/vf-update`.
+      placeholder: "2.67.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      options:
+        - Claude Code
+        - Codex
+        - kimi-code
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: runtime-version
+    attributes:
+      label: Runtime version and OS
+      placeholder: "Claude Code 2.x on macOS 15 / Ubuntu 24.04 / Windows 11 (Git Bash)"
+    validations:
+      required: true
+  - type: input
+    id: modules
+    attributes:
+      label: Installed modules and scope
+      placeholder: "conductor, dev-orchestrator — user scope"
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The exact commands or prompts, in order.
+      placeholder: |
+        1. Run `/vf-dev` in a fresh lab
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Paste the output. Remove secrets and personal paths.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
