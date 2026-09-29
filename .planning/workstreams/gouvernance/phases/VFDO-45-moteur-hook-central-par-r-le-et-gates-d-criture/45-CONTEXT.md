@@ -246,6 +246,27 @@ adhéré (Q2).
   - les chemins machine-locaux restent dans les artefacts de phase, sous la forme `~/…`, jamais
     dans le code livré ni dans une suite de CI.
 
+- **P45-D-21a (Willy, AskUserQuestion session principale, 2026-09-29) :** pour le rejeu sur un lab
+  réel **non migré**, **le modèle fait référence**.
+  - **Faux refus :** une écriture que le modèle autorise et que le gate refuse.
+  - **Pas un faux refus :** une écriture que le modèle interdit. Exemple : réécrire un `PLAN.md`
+    dans une phase sans `CADRAGE.md`, comme les 197 phases de Keystone. Ces cas sont comptés à
+    part, sous le libellé **« refus conforme au modèle, lab non migré »**, et le relevé en donne le
+    nombre.
+
+  Conséquences :
+  - les gates peuvent s'armer pendant la mission, dans l'ordre de P45-D-03 et au seuil de
+    P45-D-03b, appliqué aux seuls faux refus ainsi définis ;
+  - le **coût de migration** d'un lab (cadrages à écrire, ou dérogations) est documenté dans la
+    référence du modèle pour le jour de l'adhésion ;
+  - aucune règle de gate ne change, et le goal de la ROADMAP reste tel quel.
+- **P45-D-21b (manager, 2026-09-29, après le plan-check du tour 2) :** en scope projet,
+  `$CLAUDE_PROJECT_DIR` choisit **quelle copie** de `planning-hook.sh` s'exécute, et donc quelle
+  table d'armement. Une copie périmée d'un autre worktree peut s'exécuter à la place de la bonne
+  (`45-SCOUTING.md` A.5, C.3). Cette dépendance n'est pas testable depuis le hook : elle est
+  déclarée comme **limite (i)** de P45-D-12a. C'est le canary de session (P45-D-20), en rejouant
+  la commande enregistrée telle qu'elle est posée, qui la rend visible.
+
 ### Claude's Discretion
 
 Laissés au planificateur :
