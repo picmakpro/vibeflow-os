@@ -68,6 +68,44 @@ vibeflow-head|gsd-next|vibeflow-head = front door unique du lab (agent routeur) 
 EOF
 )
 
+# Retire un BOM UTF-8 (EF BB BF) uniquement s'il ouvre le fichier ; sinon flux inchangé. Portable
+# macOS BSD / Linux : head -c, od et tail -c +N sont disponibles des deux côtés, sans dépendre
+# d'un support d'échappement hexadécimal dans awk ou sed (absent de l'awk BSD).
+strip_bom() {
+  if [ "$(LC_ALL=C head -c 3 -- "$1" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ]; then
+    tail -c +4 -- "$1"
+  else
+    cat -- "$1"
+  fi
+}
+
+# Présence d'un agent local par son name: incarné (frontmatter), EN PLUS de la résolution par nom
+# de fichier ci-dessous — jamais à sa place : les deux voies cohabitent dans present() (union), si
+# bien qu'aucun agent déjà détecté par son nom de fichier ne peut devenir invisible par cet ajout,
+# quelle que soit la forme YAML de son name: (guillemets, BOM, CRLF). Lecture confinée au premier
+# bloc frontmatter (entre les deux premières lignes ---), jamais au corps du fichier.
+agent_present_by_name() {
+  want="$1"
+  [ -d "$AGENTS_DIR" ] || return 1
+  for f in "$AGENTS_DIR"/*.md; do
+    [ -f "$f" ] || continue
+    name="$(strip_bom "$f" | awk '
+      { sub(/\r$/, "") }
+      NR==1 && $0 == "---" { fm=1; next }
+      fm && $0 == "---" { exit }
+      fm && /^name:/ { sub(/^name:[ \t]*/, ""); print; exit }
+    ')"
+    name="${name#"${name%%[![:space:]]*}"}"
+    name="${name%"${name##*[![:space:]]}"}"
+    case "$name" in
+      \"*\") name="${name#\"}"; name="${name%\"}" ;;
+      \'*\') name="${name#\'}"; name="${name%\'}" ;;
+    esac
+    [ "$name" = "$want" ] && return 0
+  done
+  return 1
+}
+
 # Présence d'une brique dans le lab, selon son préfixe.
 present() {
   ref="$1"
@@ -85,6 +123,7 @@ present() {
       [ -f "$SKILLS_DIR/$ref/SKILL.md" ] && return 0
       [ -f "$USER_SKILLS_DIR/$ref/SKILL.md" ] && return 0
       [ -f "$AGENTS_DIR/$ref.md" ] && return 0
+      agent_present_by_name "$ref" && return 0
       return 1
       ;;
   esac
