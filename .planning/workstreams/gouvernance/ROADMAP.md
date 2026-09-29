@@ -14,7 +14,7 @@
 - [x] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #108
 - [x] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #111
 - [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
-- [ ] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
+- [ ] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues), non exécutée
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -142,12 +142,55 @@ jalon : aucune release gouvernance avant la clôture de `fiabilite-v1.0`). Rappo
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5, §5.1, §5.2, D-05 (G7) ; `docs/superpowers/specs/2026-09-22-fabrique-agents-skills-design.md` §5, B-02 — **une mécanique, deux chantiers**.
 **À envisager au cadrage** : comment un lab métier qui contient du code adhère-t-il (le détecteur
 rend 2 et le moteur refuse l'écriture en 44) — origine : Phase 44, décision du head sous
-délégation technique de Willy, session principale, 2026-09-28.
-**Plans:** 0 plans
+délégation technique de Willy, session principale, 2026-09-28. **Tranché au cadrage** (P45-D-02 :
+l'adhésion explicite l'emporte sur le signal de code ; Willy, AskUserQuestion session principale,
+2026-09-29).
+**Cadrage (2026-09-29)** : `45-CONTEXT.md`, décisions P45-D-01 à P45-D-21c.
+- Arbitrages de Willy, AskUserQuestion session principale, 2026-09-29 : Q1 à Q6 et 13 décisions
+  déléguées (reconfirmées après /clear), P45-D-21a (faux refus mesuré contre le modèle sur un lab
+  non migré), P45-D-14a (table D-05 de la spec corrigée : `00-doctrine` n'est pas un lab).
+- Décisions du manager, renversables : P45-D-01a, 03a, 03b, 05a, 05b, 06a, 06b, 12a, 20, 21,
+  21b, 21c, et f5-etats.
+
+**Plans:** 10 plans en 8 vagues. Ordre d'armement imposé par P45-D-03 : G6+G5 → G1 → G7 → rôle,
+G2 en avertissement dès la vague 1. Plan-check frais PASSED au tour 6 (HEAD `4632c9b`), après
+5 révisions chirurgicales. Quatre plans portent un `checkpoint:decision` borné, à trancher à
+l'exécution : 45-02 (F10), 45-04 (F8), 45-05 (F6), 45-08 (F9).
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 45 to break down)
+- [ ] 45-01-PLAN.md — socle : commande enregistrée fail-closed (adhésion décidée sans python3), lanceur `planning-hook.sh` et cœur Python, G2 en avertissement, zéro régression dev (GATE-01, 02, 03, 08, 10, 15)
+- [ ] 45-02-PLAN.md — levée du refus de la 44 pour un lab métier à code adhérent, trois branches de régression (GATE-14, 11, 15)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 45-03-PLAN.md — preuves d'armement : canary de CI et de session, outil de rejeu et `rejeu-reel.sh` (empreinte de tout l'arbre) (GATE-12, 13, 03, 10, 15)
+- [ ] 45-04-PLAN.md — entonnoir armed/observe/dérogation, G5 et commande qui pose `VERDICT.md` (GATE-05, 11, 02, 13, 15)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 45-05-PLAN.md — étape 1 : G6, canary, faux refus dans les deux sens, armement mécanique de G6+G5 (GATE-04, 05, 11, 12, 13, 15)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 45-06-PLAN.md — étape 2 : G1, contrôle croisé avec le recalcul, classification du modèle totale, armement à zéro (GATE-06, 12, 13, 15)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 45-07-PLAN.md — étape 3 : G7 (prédicat littéral), amendement de la table D-05 de la spec, armement à zéro (GATE-07, 12, 13, 15)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 45-08-PLAN.md — hook par rôle : rôle dérivé des prédicats I5/I6, contrôle croisé avec `check-agents.sh` (GATE-09, 10, 02, 15)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 45-09-PLAN.md — étape 4 : canary Agent et Task, rejeu réel, armement du rôle à zéro (GATE-09, 12, 13, 15)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 45-10-PLAN.md — clôture : référence du modèle (limites (a) à (j)), coût de migration, `planning-core` v2.9.0 sans release, rejeu des gates (GATE-15, 03, 07, 08, 09, 11, 13)
 
 ### Phase 46: Moteur — gates de clôture et verdicts hachés
 
