@@ -1826,22 +1826,27 @@ disable_worktrees_if_root_not_git() {
 ensure_worktreeinclude_entries() {
   case "$VF_SCOPE" in project|local) ;; *) return 0 ;; esac
   [ -z "$VF_TARGET_OVERRIDE" ] || return 0
-  local f=".worktreeinclude" line verb missing=""
+  # Chemin déclaré au plan et posé : `./.worktreeinclude`, même forme que les autres chemins du plan d'install
+  # (le plan doit dire ce que l'install pose, test-manifest TD1 compare les deux ensembles).
+  local f="./.worktreeinclude" line verb missing="" eol=""
+  if [ -f "$f" ] && LC_ALL=C grep -q "$(printf '\r')" "$f"; then eol="$(printf '\r')"; fi
   for line in ".claude/hooks/" ".claude/scripts/"; do
-    if [ -f "$f" ] && grep -qxF -- "$line" "$f"; then continue; fi
+    # Comparaison modulo fin de ligne CRLF : un fichier édité sous Windows ne reçoit pas de doublon.
+    if [ -f "$f" ] && tr -d '\r' < "$f" | grep -qxF -- "$line"; then continue; fi
     missing="$missing$line
 "
   done
   [ -n "$missing" ] || return 0
   if [ -f "$f" ]; then verb="~"; else verb="+"; fi
-  vf_declare_write "$verb" "$f"
+  # `+` sans note afficherait le suffixe du module courant, déjà refermé ici : la note dit ce que c'est.
+  if [ "$verb" = "+" ]; then vf_declare_write "$verb" "$f" "(.worktreeinclude du lab, hooks et scripts recopiés dans les worktrees d'agent)"; else vf_declare_write "$verb" "$f"; fi
   vf_dry_run && return 0
   if [ -f "$f" ]; then
-    [ -z "$(tail -c 1 "$f")" ] || printf '\n' >> "$f" || return 0
+    [ -z "$(tail -c 1 "$f")" ] || printf '%s\n' "$eol" >> "$f" || return 0
   else
     printf '%s\n%s\n' "# .worktreeinclude — chemins ignorés par git recopiés dans chaque worktree d'agent (posé par VibeFlow, SOBR-03)." "# Copie figée à la création du worktree ; un git worktree add manuel n'est pas couvert." > "$f" || return 0
   fi
-  printf '%s' "$missing" >> "$f" || return 0
+  printf '%s' "$missing" | while IFS= read -r line; do printf '%s%s\n' "$line" "$eol"; done >> "$f" || return 0
   log "  [worktreeinclude] $(printf '%s' "$missing" | tr '\n' ' ')ajouté(s) à .worktreeinclude (hooks et scripts du lab recopiés dans les worktrees d'agent)"
   return 0
 }
@@ -3185,6 +3190,8 @@ update_module() {
     # de VERSION — idempotent, best-effort.
     log "$mod déjà à jour ($installed) — resync gouvernance (scripts + hooks)"
     sync_module_governance "$mod"
+    # Un lab déjà installé reçoit le .worktreeinclude à l'update même à version égale (auto-réparateur).
+    ensure_worktreeinclude_entries
     return 0
   fi
 
@@ -3210,7 +3217,9 @@ update_module() {
   # use_worktrees=false auto sur lab à racine non-git (#4734 amont) : dernier geste de la fonction,
   # symétrique du point d'appel d'install_module — cf. disable_worktrees_if_root_not_git.
   disable_worktrees_if_root_not_git
-  ensure_worktreeinclude_entries
+  # Pas d'appel à ensure_worktreeinclude_entries ici : install_module, appelée plus haut à version changée, le
+  # fait déjà en dernier geste (un second appel n'était distinguable par aucun test et doublait le plan du
+  # --dry-run). La branche « version inchangée » de cette fonction a son propre appel (T57g).
 }
 
 # ---------- Main ----------

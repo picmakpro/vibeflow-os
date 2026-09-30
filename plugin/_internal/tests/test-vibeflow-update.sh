@@ -2516,8 +2516,59 @@ if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; t
   (cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install validator --dry-run >/dev/null 2>&1)
   [ ! -e "$LAB/.worktreeinclude" ] || { ko "T57e : --dry-run a écrit .worktreeinclude"; miss=1; }
   [ "$miss" -eq 0 ] && ok "T57e (SOBR-03) : --dry-run -> aucun .worktreeinclude"
+  # T57f-T57g (correction 41.3-03, finding 4) — un lab DÉJÀ installé reçoit le .worktreeinclude à l'update, à version
+  # changée (T57f) comme à version égale (T57g : le chemin « déjà à jour » est auto-réparateur). wi_update <installeur> <bump>
+  # rend « present » ou « absent » : le fichier est retiré après l'install, puis rejoué par update.
+  wi_update() {
+    local inst="$1" bump="$2" l2
+    l2="$(mktemp -d)"; mkdir -p "$l2/home"
+    (cd "$l2" && HOME="$l2/home" VF_RUNTIME=claude VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$inst" install validator >/dev/null 2>&1)
+    rm -f "$l2/.worktreeinclude"
+    local v0; v0="$(cat "$CACHE/validator/VERSION")"
+    [ "$bump" -eq 0 ] || echo "v9.9.9" > "$CACHE/validator/VERSION"
+    (cd "$l2" && HOME="$l2/home" VF_RUNTIME=claude VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$inst" update validator >/dev/null 2>&1)
+    printf '%s\n' "$v0" > "$CACHE/validator/VERSION"
+    if [ -f "$l2/.worktreeinclude" ] && [ "$("$GREP" -cxF -- ".claude/hooks/" "$l2/.worktreeinclude")" -eq 1 ] && [ "$("$GREP" -cxF -- ".claude/scripts/" "$l2/.worktreeinclude")" -eq 1 ]; then echo present; else echo absent; fi
+    rm -rf "$l2"
+  }
+  [ "$(wi_update "$INSTALLER" 1)" = present ] && ok "T57f (SOBR-03) : update à version changée -> .worktreeinclude posé" || ko "T57f : update à version changée sans .worktreeinclude"
+  [ "$(wi_update "$INSTALLER" 0)" = present ] && ok "T57g (SOBR-03) : update à version égale -> .worktreeinclude posé (resync auto-réparateur)" || ko "T57g : update à version égale sans .worktreeinclude"
+  # T57h — CRLF : un fichier conforme (lignes finissant par \r\n) reste octet pour octet identique, sans doublon ; une ligne
+  # manquante est ajoutée au même format.
+  miss=0
+  printf '%s\r\n%s\r\n' ".claude/hooks/" ".claude/scripts/" > "$LAB/.worktreeinclude"
+  SUM_H="$(cksum < "$LAB/.worktreeinclude")"; OUT57="$(WI_INSTALL project)"
+  [ "$(cksum < "$LAB/.worktreeinclude")" = "$SUM_H" ] || { ko "T57h : fichier CRLF conforme modifié — $(od -c "$LAB/.worktreeinclude" | head -3)"; miss=1; }
+  [ "$(printf '%s\n' "$OUT57" | "$GREP" -cF '[worktreeinclude]')" -eq 0 ] || { ko "T57h : journal alors que tout était conforme (CRLF)"; miss=1; }
+  printf '%s\r\n' ".claude/hooks/" > "$LAB/.worktreeinclude"
+  WI_INSTALL project >/dev/null
+  [ "$(tr -d '\r' < "$LAB/.worktreeinclude" | "$GREP" -cxF -- ".claude/hooks/")" -eq 1 ] || { ko "T57h : .claude/hooks/ dupliquée sous CRLF"; miss=1; }
+  printf '%s\r\n%s\r\n' ".claude/hooks/" ".claude/scripts/" | cmp -s - "$LAB/.worktreeinclude" || { ko "T57h : la ligne ajoutée ne suit pas le format CRLF — $(od -c "$LAB/.worktreeinclude" | head -3)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57h (SOBR-03, CRLF) : fichier CRLF conforme intact, ligne manquante ajoutée en CRLF, aucun doublon"
+  # T57i — le plan d'install déclare ce qu'il pose, sous le chemin posé (./.worktreeinclude), sans le suffixe « ( —) »
+  miss=0
+  rm -f "$LAB/.worktreeinclude"
+  PLAN57="$(cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" --dry-run install validator 2>/dev/null)"
+  printf '%s\n' "$PLAN57" | "$GREP" -qE '^\[plan\] \+ \./\.worktreeinclude  ' || { ko "T57i : le plan ne déclare pas « + ./.worktreeinclude »"; miss=1; }
+  printf '%s\n' "$PLAN57" | "$GREP" -F '.worktreeinclude' | "$GREP" -qF '( —)' && { ko "T57i : la ligne du plan porte le suffixe « ( —) » d'un module refermé"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57i (SOBR-03) : --dry-run déclare + ./.worktreeinclude, sans suffixe de module refermé"
+  # T57j — mutants de l'installeur : chacun rougit le cas qui le vise (copie du dossier _internal, l'original n'est jamais touché)
+  MUTI="$(mktemp -d)"; cp -R "$INTERNAL_DIR" "$MUTI/_internal"; rm -rf "$MUTI/_internal/tests"
+  mut_inst() { # <mode> : neutralise l'appel d'install_module (1, chemin version changée) ou celui de la branche « version inchangée » d'update_module (2)
+    awk -v MODE="$1" '/^install_module\(\) \{/ { fn = "i" } /^update_module\(\) \{/ { fn = "u" } /^}/ { fn = "" }
+      fn == "i" && MODE == 1 && $0 == "  ensure_worktreeinclude_entries" { print "  :"; next }
+      fn == "u" && MODE == 2 && $0 == "    ensure_worktreeinclude_entries" { print "    :"; next }
+      { print }' "$INTERNAL_DIR/vibeflow-update.sh" > "$MUTI/_internal/vibeflow-update.sh"
+    cmp -s "$MUTI/_internal/vibeflow-update.sh" "$INTERNAL_DIR/vibeflow-update.sh" && return 1
+    bash -n "$MUTI/_internal/vibeflow-update.sh" || return 2
+    echo "$MUTI/_internal/vibeflow-update.sh"
+  }
+  M1="$(mut_inst 1)"; [ -n "$M1" ] && [ "$(wi_update "$M1" 1)" = absent ] && ok "T57j1 mutant tué : appel d'install_module neutralisé -> T57f rougit (aucun .worktreeinclude à version changée)" || ko "T57j1 : mutant survivant ou non opposable (appel d'install_module)"
+  M2="$(mut_inst 2)"; [ -n "$M2" ] && [ "$(wi_update "$M2" 0)" = absent ] && ok "T57j2 mutant tué : appel du chemin version inchangée neutralisé -> T57g rougit" || ko "T57j2 : mutant survivant ou non opposable (chemin version inchangée)"
+  [ "$(wi_update "$INSTALLER" 1)" = present ] && ok "T57j — témoin : l'installeur intact passe toujours T57f" || ko "T57j : témoin rouge"
+  rm -rf "$MUTI"
 else
-  skip "T57a-T57e : conductor/validator non copiables dans le cache de test"
+  skip "T57a-T57j : conductor/validator non copiables dans le cache de test"
 fi
 rm -rf "$LAB"
 
