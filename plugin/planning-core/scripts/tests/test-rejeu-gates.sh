@@ -691,6 +691,45 @@ def sec_reel(_):
     else:
         ok("R-REEL-03 un lien vers un fichier extérieur : modifier ce fichier ne change pas l'empreinte ; changer la cible du lien ou le mode d'un fichier la change")
 
+    # R-REEL-05 : --lab est un lien symbolique vers le lab (M1) — la racine est résolue, l'arbre réel
+    # est parcouru, l'écriture hors périmètre est vue.
+    reel5 = fabriquer_lab("lab-r5", {".planning/notes.md": "n", "code.txt": "c"})
+    lien5 = os.path.join(HOME, "lien-vers-lab-r5")
+    os.symlink(reel5, lien5)
+    ecrit5 = substitut("sub-lien-lab.sh", 'open(%r, "a").write("mutated")' % os.path.join(reel5, "code.txt"))
+    r = rejeu([lien5], hook=ecrit5, reel=True)
+    if r.rc == 1 and "EMPREINTE-ARBRE-DIVERGENTE ~/lab-r5" in r.rapport and "EMPREINTE-ARBRE-IDENTIQUE" not in r.rapport:
+        ok("R-REEL-05 --lab donné par un lien symbolique vers le lab, substitut qui écrit code.txt hors périmètre : EMPREINTE-ARBRE-DIVERGENTE et code 1 (racine résolue avant l'empreinte)")
+    else:
+        ko("R-REEL-05", "--lab = lien vers le lab, écriture réelle hors périmètre", "code 1, EMPREINTE-ARBRE-DIVERGENTE ~/lab-r5, jamais IDENTIQUE", "rc=%d rapport=%s err=%s" % (r.rc, court(r.rapport), court(r.err)))
+
+    # R-REEL-06 : --rapport sous un lab, ou lien vers l'intérieur d'un lab (M2) — refus avant toute
+    # empreinte, aucun fichier créé dans le lab, aucune ligne EMPREINTE-ARBRE-*.
+    lab6 = fabriquer_lab("lab-r6", {".planning/notes.md": "n"})
+    sub6 = substitut("sub-passe-rapport.sh", SUB_PASSE)
+    fautes = []
+    lien6 = os.path.join(HOME, "lien-rapport-r6")
+    os.symlink(os.path.join(lab6, "rapport-lien.txt"), lien6)
+    for nom, cible in (("sous le lab", os.path.join(lab6, "rapport-dedans.txt")), ("lien vers l'intérieur du lab", lien6)):
+        r = rejeu([lab6], hook=sub6, reel=True, rapport=False, extra=["--rapport=" + cible])
+        crees = [f for f in os.listdir(lab6) if f.startswith("rapport-")]
+        if not (r.rc == 64 and not crees and "EMPREINTE-ARBRE" not in r.out and r.err.startswith("[rejeu-reel] le rapport ne peut pas être écrit sous un lab")):
+            fautes.append("rapport %s : attendu code 64, refus de rejeu-reel.sh avant toute mesure, rien dans le lab ; obtenu rc=%d créés=%s out=%s err=%s" % (nom, r.rc, crees, court(r.out), court(r.err)))
+    if fautes:
+        for f in fautes:
+            ko("R-REEL-06", "un rapport sous un lab est refusé avant toute empreinte", "voir le cas", f)
+    else:
+        ok("R-REEL-06 --rapport sous un lab, ou lien symbolique vers l'intérieur d'un lab : code 64, refus émis par rejeu-reel.sh avant toute mesure, aucun fichier créé dans le lab, aucune ligne EMPREINTE-ARBRE-*")
+
+    # R-REEL-07 : rejeu-gates.sh refuse l'usage (code 64) : rien n'a été rejoué, donc rien à annoncer.
+    lab7 = fabriquer_lab("lab-r7", {".planning/notes.md": "n"})
+    rap7 = os.path.join(WORK, unique("rapport") + ".txt")
+    p7 = subprocess.run(["bash", REEL, "--lab=" + lab7, "--rapport=" + rap7], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env_sain(), timeout=600)
+    if p7.returncode == 64 and b"EMPREINTE-ARBRE" not in p7.stdout and not os.path.exists(rap7):
+        ok("R-REEL-07 usage refusé par rejeu-gates.sh (--etape absent) : code 64 repris, aucune ligne EMPREINTE-ARBRE-* imprimée, rapport non créé")
+    else:
+        ko("R-REEL-07", "aucune empreinte annoncée quand rien n'a été rejoué", "code 64, sortie sans EMPREINTE-ARBRE, rapport absent", "rc=%d out=%s rapport=%s" % (p7.returncode, court(p7.stdout), os.path.exists(rap7)))
+
 
 # --- Mutants ----------------------------------------------------------------------------------------
 def make_mutant(source, marqueur, ident, motif, remplacement, compagnons=()):
@@ -807,6 +846,45 @@ def sec_mutants(_):
         r = rejeu([lab], hook=sub, reel=True, script=dossier_reel)
         return {"rc": r.rc, "divergent": "EMPREINTE-ARBRE-DIVERGENTE" in r.rapport}
 
+    def sc_reel_lien_lab(dossier_reel):
+        reel = fabriquer_lab(unique("lab-mk"), {".planning/notes.md": "n", "code.txt": "c"})
+        lien = os.path.join(HOME, unique("lien-mk"))
+        os.symlink(reel, lien)
+        sub = substitut(unique("sub") + ".sh", 'open(%r, "a").write("mutated")' % os.path.join(reel, "code.txt"))
+        r = rejeu([lien], hook=sub, reel=True, script=dossier_reel)
+        return {"rc": r.rc, "divergent": "EMPREINTE-ARBRE-DIVERGENTE" in r.rapport}
+
+    def sc_reel_rapport(dossier_reel):
+        lab = fabriquer_lab(unique("lab-mq"), {".planning/notes.md": "n"})
+        sub = substitut(unique("sub") + ".sh", SUB_PASSE)
+        r = rejeu([lab], hook=sub, reel=True, rapport=False, extra=["--rapport=" + os.path.join(lab, "rapport-dedans.txt")], script=dossier_reel)
+        return {"rc": r.rc, "avant_mesure": r.err.startswith("[rejeu-reel] le rapport ne peut pas")}
+
+    def sc_reel_usage(dossier_reel):
+        lab = fabriquer_lab(unique("lab-mu"), {".planning/notes.md": "n"})
+        rap = os.path.join(WORK, unique("rapport") + ".txt")
+        p = subprocess.run(["bash", dossier_reel, "--lab=" + lab, "--rapport=" + rap],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env_sain(), timeout=600)
+        return {"rc": p.returncode, "lignes": b"EMPREINTE-ARBRE" in p.stdout, "rapport": os.path.exists(rap)}
+
+    def sc_reel_signature(dossier_reel):
+        """Trois gestes, chacun sur son lab : `touch` seul, mode seul, contenu changé à mtime restauré."""
+        gestes = {
+            "touch": 'os.utime(%r, None)',
+            "mode": 'os.chmod(%r, 0o600)',
+            "contenu": 'st = os.stat(%r)\nopen(%r, "w").write("bbbb")\nos.utime(%r, ns=(st.st_atime_ns, st.st_mtime_ns))',
+        }
+        res = {}
+        for nom, code in gestes.items():
+            lab = fabriquer_lab(unique("lab-ms"), {".planning/notes.md": "n", "src/f.txt": "aaaa"})
+            f = os.path.join(lab, "src", "f.txt")
+            os.chmod(f, 0o644)
+            os.utime(f, ns=(1000000000 * 10**9, 1000000000 * 10**9))
+            corps = code % ((f,) * code.count("%r"))
+            r = rejeu([lab], hook=substitut(unique("sub") + ".sh", corps), reel=True, script=dossier_reel)
+            res[nom] = "DIVERGENTE" if "EMPREINTE-ARBRE-DIVERGENTE" in r.rapport else "IDENTIQUE"
+        return res
+
     def duel(ident, source, marqueur, motif, remplacement, scenario, verdict, texte, compagnons=()):
         chemin = mutant(ident, source, marqueur, motif, remplacement, compagnons)
         if chemin is None:
@@ -854,6 +932,27 @@ def sec_mutants(_):
     duel("REEL-LIENS", REEL, R, "# reel-lstat", "st = os.stat(chemin)  # reel-lstat",
          sc_reel_liens, lambda o, m: (not o["divergent"]) and m["divergent"],
          "R-REEL-03 : liens suivis", compagnons=(REJEU,))
+    duel("REEL-REALPATH", REEL, R, "# reel-realpath", "reels = list(labs)  # reel-realpath",
+         sc_reel_lien_lab, lambda o, m: o["rc"] == 1 and o["divergent"] and m["rc"] == 0 and not m["divergent"],
+         "R-REEL-05 : racine du lab non résolue (un --lab lien symbolique rend IDENTIQUE alors que le lab a changé)", compagnons=(REJEU,))
+    duel("REEL-RAPPORT", REEL, R, "# reel-rapport", "if False:  # reel-rapport",
+         sc_reel_rapport, lambda o, m: o["rc"] == 64 and o["avant_mesure"] and not m["avant_mesure"],
+         "R-REEL-06 : refus du rapport sous un lab retiré (il n'est plus émis avant toute mesure)", compagnons=(REJEU,))
+    duel("REEL-REFUS64", REEL, R, "# reel-refus64", "if False:  # reel-refus64",
+         sc_reel_usage, lambda o, m: o["rc"] == 64 and not o["lignes"] and not o["rapport"] and (m["lignes"] or m["rapport"]),
+         "R-REEL-07 : lignes EMPREINTE-ARBRE-* écrites alors que rejeu-gates.sh a refusé l'usage", compagnons=(REJEU,))
+    tout = {"touch": "DIVERGENTE", "mode": "DIVERGENTE", "contenu": "DIVERGENTE"}
+    duel("REEL-MTIME", REEL, R, "# reel-signature",
+         'lignes.append((rel or ".", "%s\\t%s\\t%o\\t%d\\t%s" % (rel or ".", genre, stat.S_IMODE(mode), 0, sig)))  # reel-signature',
+         sc_reel_signature, lambda o, m: o == tout and m == dict(tout, touch="IDENTIQUE"),
+         "R-REEL-08 : mtime_ns retiré de la signature (un touch seul n'est plus vu)", compagnons=(REJEU,))
+    duel("REEL-MODE", REEL, R, "# reel-signature",
+         'lignes.append((rel or ".", "%s\\t%s\\t%o\\t%d\\t%s" % (rel or ".", genre, 0, st.st_mtime_ns, sig)))  # reel-signature',
+         sc_reel_signature, lambda o, m: o == tout and m == dict(tout, mode="IDENTIQUE"),
+         "R-REEL-08 : mode retiré de la signature (un chmod seul n'est plus vu)", compagnons=(REJEU,))
+    duel("REEL-SHA", REEL, R, "# reel-sha", 'sig = "x"  # reel-sha',
+         sc_reel_signature, lambda o, m: o == tout and m == dict(tout, contenu="IDENTIQUE"),
+         "R-REEL-08 : sha256 retiré de la signature (un contenu changé à mtime restauré n'est plus vu)", compagnons=(REJEU,))
 
 
 SECTIONS = {

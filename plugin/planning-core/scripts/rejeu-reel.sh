@@ -98,12 +98,12 @@ def empreinte(racine, fichier):
                 with open(chemin, "rb") as fh:
                     for bloc in iter(lambda: fh.read(1 << 20), b""):
                         h.update(bloc)
-                sig = h.hexdigest()
+                sig = h.hexdigest()  # reel-sha
             except OSError as exc:
                 sig = "ERR:" + type(exc).__name__
         else:
             genre, sig = "s", "-"
-        lignes.append((rel or ".", "%s\t%s\t%o\t%d\t%s" % (rel or ".", genre, stat.S_IMODE(mode), st.st_mtime_ns, sig)))
+        lignes.append((rel or ".", "%s\t%s\t%o\t%d\t%s" % (rel or ".", genre, stat.S_IMODE(mode), st.st_mtime_ns, sig)))  # reel-signature
         return genre
 
     def descendre(rel):
@@ -153,17 +153,31 @@ def main(argv):
             sys.stderr.write("[rejeu-reel] lab introuvable (pas un dossier) : " + afficher(lab) + "\n")
             return 64
 
+    # La racine d'un lab est RÉSOLUE avant toute empreinte : un --lab qui est un lien symbolique vers
+    # le lab serait sinon une entrée de type lien, jamais parcourue, et l'arbre réel resterait
+    # invisible (comme rejeu-gates.sh, qui travaille sur le lab réel).
+    reels = [os.path.realpath(lab) for lab in labs]  # reel-realpath
+    rap_reel = os.path.realpath(rapport)
+    for lab, reel in zip(labs, reels):
+        if rap_reel == reel or rap_reel.startswith(reel + os.sep):  # reel-rapport
+            sys.stderr.write("[rejeu-reel] le rapport ne peut pas être écrit sous un lab : " + afficher(lab) + "\n")
+            return 64
+
     tmp = os.path.realpath(tempfile.mkdtemp(prefix="vf-rejeu-reel-"))
     try:
-        for i, lab in enumerate(labs):
-            empreinte(lab, os.path.join(tmp, "avant-%d.txt" % i))
+        for i, reel in enumerate(reels):
+            empreinte(reel, os.path.join(tmp, "avant-%d.txt" % i))
         code = subprocess.run(["bash", rejeu_gates] + args).returncode
+        if code == 64:  # reel-refus64
+            # rejeu-gates.sh a refusé l'usage avant de rejouer quoi que ce soit : rien n'a été mesuré,
+            # aucune ligne EMPREINTE-ARBRE-* n'est écrite ni imprimée.
+            return code
         lignes = []
         divergence = False
         for i, lab in enumerate(labs):
             avant = os.path.join(tmp, "avant-%d.txt" % i)
             apres = os.path.join(tmp, "apres-%d.txt" % i)
-            empreinte(lab, apres)
+            empreinte(reels[i], apres)
             identique = subprocess.run(["cmp", "-s", avant, apres]).returncode == 0  # reel-cmp
             if identique:
                 lignes.append("EMPREINTE-ARBRE-IDENTIQUE " + afficher(lab))
