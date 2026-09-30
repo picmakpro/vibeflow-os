@@ -12,12 +12,21 @@
 #   R-G2-01..07     G2 avertit par additionalContext (jamais permissionDecision), référentiel = union
 #                   des ecrit: des plans ouverts, se tait hors d'un lab adhérent ; R-G2-PERF
 #   R-ENV-01        aucune variable d'environnement ne change l'armement ni l'adhésion (P45-D-12a)
+#   R-ENV-02        garde statique : le cœur Python ne lit aucune variable d'environnement (expanduser et
+#                   expandvars compris) ; le lanceur lit TMPDIR (ligne du mktemp), XDG_CACHE_HOME et HOME
+#                   (ligne d'appel du cœur, arguments) — amendement du 2026-09-30 (45-04)
+#   R-G5-01..06     G5 : Write, Edit, NotebookEdit de VERDICT.md sous .planning/ d'un lab adhérent, quel que
+#                   soit le rôle ; en observe une ligne de journal sans contenu, en armed un deny (45-04)
+#   R-OBS-ENV       le journal d'observation suit XDG_CACHE_HOME puis HOME et rien d'autre : les valeurs
+#                   reçues n'atteignent jamais l'armement ni l'adhésion (P45-D-12a)
+#   R-JETON         l'encodeur du journal est ast-identique à _jeton_journal du moteur de recalcul
 #   R-ACCORD        chemin relatif : avertissement G2 en mode A <=> deny en mode C (limite h)
 #   BANC            chaque `@@ ecriture` de fixtures/gates-banc.txt rend son attendu ; COUVERTURE
 #   MUT-*           chaque garde est tuée par un mutant à motif unique dont la trace est imprimée
 #
-# Tous les cas de gate tournent sur l'état livré ; les cas qui exigent l'armement FORCÉ tournent sur
-# une copie du script dont les constantes ARMEMENT_* valent `armed`, jamais sur l'état livré.
+# Les cas de gate de 45-04 (G5) tournent sur une copie dont les constantes ARMEMENT_* sont FORCÉES
+# (`observe` ou `armed`) : jamais sur l'état livré, qui change à chaque armement. Les cas de 45-01
+# (G2, table, environnement) tournent sur l'état livré. Le banc accepte l'option `armee` (copie armée).
 #
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; `cmp -s`
 # jamais `diff` ; tout le travail fin est fait par Python (PYBIN). Lançable depuis tout cwd.
@@ -62,9 +71,11 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
+import urllib.parse
 
 TOKEN = "{{VF_SCRIPTS}}"
 OUTILS_BANC = ("Write", "Edit", "NotebookEdit", "Bash")
@@ -143,6 +154,9 @@ class Ctx:
         self.recalc = os.path.join(scripts_dir, "recalc-planning.sh")
         self.home = os.path.join(work, "home")
         os.makedirs(self.home, exist_ok=True)
+        self.cache = os.path.join(work, "cache-suite")
+        os.makedirs(self.cache, exist_ok=True)
+        self._forcees = {}
         os.makedirs(os.path.join(work, "modeC"), exist_ok=True)
         self._n = 0
         self.cmd = None
@@ -165,7 +179,7 @@ class Ctx:
         return self.cmd
 
     def env(self, extra=None):
-        env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": self.home}
+        env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": self.home, "XDG_CACHE_HOME": self.cache}
         if os.environ.get("TMPDIR"):
             env["TMPDIR"] = os.environ["TMPDIR"]
         if extra:
@@ -189,6 +203,23 @@ class Ctx:
         p = subprocess.run(["/bin/sh", "-c", texte], input=entree, stdout=subprocess.PIPE,
                            stderr=subprocess.PIPE, env=env, cwd=cwd, timeout=120)
         return p.returncode, p.stdout, p.stderr
+
+    def copie_forcee(self, dossier_scripts, valeur):
+        """Copie du script du dossier donné dont les cinq constantes ARMEMENT_* valent `valeur`
+        (`observe` ou `armed`) : les cas de gate ne dépendent jamais de l'état livré."""
+        cle = (dossier_scripts, valeur)
+        if cle not in self._forcees:
+            texte = open(os.path.join(dossier_scripts, "planning-hook.sh"), encoding="utf-8").read()
+            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"' + valeur + '"', texte, flags=re.M)
+            if n != 5:
+                raise RuntimeError("cinq constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+            d = self.unique("force-" + valeur)
+            os.makedirs(d, exist_ok=True)
+            with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
+                fh.write(texte)
+            os.chmod(os.path.join(d, "planning-hook.sh"), 0o755)
+            self._forcees[cle] = d
+        return self._forcees[cle]
 
     def copie_armee(self):
         """Copie du script dont les cinq constantes ARMEMENT_* valent `armed` (armement FORCÉ)."""
@@ -296,7 +327,8 @@ def _parser_ecriture(reste):
     att = droite.split()
     if not att or att[0] not in ("doit-passer", "doit-refuser", "avertit", "silence"):
         raise ValueError("attendu inconnu : " + droite)
-    e = {"attendu": att[0], "gate": att[1] if len(att) > 1 else None, "agent": None, "cwd": None, "commande": None}
+    e = {"attendu": att[0], "gate": att[1] if len(att) > 1 else None, "agent": None, "cwd": None, "commande": None,
+         "armee": False}
     morceaux = gauche.split(" ", 2)
     e["outil"], e["chemin"] = morceaux[0], morceaux[1]
     if e["outil"] not in OUTILS_BANC:
@@ -314,8 +346,12 @@ def _parser_ecriture(reste):
         elif jeton.startswith("cwd="):
             e["cwd"] = jeton[4:]
             _valider_chemin_banc(e["cwd"])
+        elif jeton == "armee":
+            e["armee"] = True
         elif jeton:
             raise ValueError("option de banc inconnue : " + jeton)
+    if e["attendu"] in ("doit-passer", "doit-refuser") and not e["armee"]:
+        raise ValueError("un cas doit-passer / doit-refuser se rejoue sur copie armée (option `armee`) : " + reste)
     return e
 
 
@@ -543,13 +579,15 @@ def controle_accord(ctx, script):
 
 def controle_env_statique(ctx, script):
     """R-ENV-02 : garde STATIQUE — le cœur Python ne lit aucune variable d'environnement (AST : aucun
-    `environ`, `getenv`, `putenv`, ni chaîne de ce nom) et le lanceur n'en lit qu'une, TMPDIR, une
-    seule fois. Elle ne dépend d'aucun nom de variable posé par la suite : R-ENV-01, elle, ne pose
-    que les noms que ses mutants lisent."""
+    `environ`, `getenv`, `putenv`, `expanduser`, `expandvars`, ni chaîne, import ou nom de ce genre) ;
+    le lanceur lit TMPDIR une seule fois, sur la ligne du mktemp, XDG_CACHE_HOME et HOME une seule fois
+    chacune, sur la seule ligne qui appelle le cœur (arguments), rien d'autre. Amendement des décisions
+    du manager vf-dev-manager, 2026-09-30 (45-04) : les deux valeurs ne servent qu'au chemin du journal
+    d'observation. Elle ne dépend d'aucun nom de variable posé par la suite."""
     chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
     texte = open(chemin, encoding="utf-8").read()
     fautes = []
-    interdits = ("environ", "getenv", "putenv", "environb", "getenvb", "unsetenv")
+    interdits = ("environ", "getenv", "putenv", "environb", "getenvb", "unsetenv", "expanduser", "expandvars")
     arbre = ast.parse(corps_python(texte))
     for n in ast.walk(arbre):
         vu = None
@@ -571,13 +609,20 @@ def controle_env_statique(ctx, script):
             lanceur.append(l)
         if l.endswith("<<'PY_PLANNING_HOOK_EOF'"):
             dedans = True
-    noms = re.findall(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)", "\n".join(lanceur))
-    inconnus = sorted(set(noms) - {"TMPDIR", "T", "PYBIN"})
-    if inconnus:
-        fautes.append("lanceur : variable(s) lue(s) hors TMPDIR : " + ", ".join(inconnus))
-    if noms.count("TMPDIR") != 1:
-        fautes.append("lanceur : %d lecture(s) de TMPDIR (attendu 1)" % noms.count("TMPDIR"))
-    return (not fautes), ("; ".join(fautes) if fautes else "aucune lecture d'environnement dans le cœur Python, une seule lecture de TMPDIR dans le lanceur")
+    autorisees = {"TMPDIR", "T", "PYBIN", "XDG_CACHE_HOME", "HOME"}
+    ancre = {"TMPDIR": "mktemp", "XDG_CACHE_HOME": '"$PYBIN"', "HOME": '"$PYBIN"'}
+    lectures = {}
+    for l in lanceur:
+        for nom in re.findall(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)", l):
+            lectures[nom] = lectures.get(nom, 0) + 1
+            if nom not in autorisees:
+                fautes.append("lanceur : variable lue hors liste : " + nom)
+            elif nom in ancre and ancre[nom] not in l:
+                fautes.append("lanceur : %s lue hors de la ligne attendue (%s) : %s" % (nom, ancre[nom], l.strip()))
+    for nom in ancre:
+        if lectures.get(nom, 0) != 1:
+            fautes.append("lanceur : %d lecture(s) de %s (attendu 1)" % (lectures.get(nom, 0), nom))
+    return (not fautes), ("; ".join(fautes) if fautes else "aucune lecture d'environnement dans le cœur Python (expanduser et expandvars compris) ; lanceur : TMPDIR une fois (ligne du mktemp), XDG_CACHE_HOME et HOME une fois chacune (ligne d'appel du cœur)")
 
 
 def controle_env(ctx, scripts):
@@ -614,6 +659,214 @@ def controle_env(ctx, scripts):
                 if r != reference:
                     fautes.append("%s sous « %s » : %s au lieu de %s" % (etiquette, nom, classer(r[0], r[1]), attendu))
     return (not fautes), ("; ".join(fautes) if fautes else "%d rejeux sous 5 environnements : verdicts identiques octet pour octet" % n)
+
+
+
+# --- 45-04 : G5, journal d'observation, encodeur ---------------------------------------------------
+VERDICT_REL = ".planning/cycles/01-c/phases/01-p/VERDICT.md"
+SECRET = "SECRET-FACTICE-7f3a9c"
+
+
+def journal_de(cache):
+    return os.path.join(cache, "vibeflow", "gates-observation", "observation.log")
+
+
+def lignes_journal(cache):
+    chemin = journal_de(cache)
+    if not os.path.exists(chemin):
+        return []
+    return [l for l in open(chemin, encoding="utf-8").read().split("\n") if l]
+
+
+def dossier_neuf(ctx, prefixe):
+    d = ctx.unique(prefixe)
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _g5(ctx, dossier_hook, outil, rel, agent=None, lab="g5-adherent", extra_env=None, entree=None):
+    _, _, chemins = labs_banc(ctx)
+    racine = chemins[lab]
+    e = entree if entree is not None else entree_outil(outil, os.path.join(racine, rel))
+    brut = payload(outil, e, racine, agent_type=agent)
+    return ctx.lancer("A", brut, cwd=racine, dossier=dossier_hook, extra_env=extra_env)
+
+
+def controle_g5_01(ctx, script):
+    """Copie observe : Write de VERDICT.md -> silence, code 0, UNE ligne gate=G5 au journal, sans contenu."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    cache = dossier_neuf(ctx, "cache-g5-01")
+    rc, out, err = _g5(ctx, d, "Write", VERDICT_REL, extra_env={"XDG_CACHE_HOME": cache})
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err:
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    if len(lignes) != 1:
+        return False, "%d ligne(s) au journal (attendu 1)" % len(lignes)
+    ligne = lignes[0]
+    for motif in ("  gate=G5  ", "  chemin=" + VERDICT_REL + "  ", "  outil=Write  "):
+        if motif not in ligne:
+            return False, "la ligne ne porte pas %r : %s" % (motif, ligne)
+    mode_f = stat.S_IMODE(os.stat(journal_de(cache)).st_mode)
+    mode_d = stat.S_IMODE(os.stat(os.path.dirname(journal_de(cache))).st_mode)
+    if mode_f != 0o600 or mode_d != 0o700:
+        return False, "permissions fichier %o dossier %o (attendu 600 et 700)" % (mode_f, mode_d)
+    return True, "copie observe : silence, code 0, une ligne gate=G5 (chemin, outil), journal 0600 dans un dossier 0700"
+
+
+def controle_g5_02(ctx, script):
+    """Copie armed : même payload -> UN objet deny, `[planning-core] G5 :`, poser-verdict.sh, rien au journal."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    cache = dossier_neuf(ctx, "cache-g5-02")
+    rc, out, err = _g5(ctx, d, "Write", VERDICT_REL, extra_env={"XDG_CACHE_HOME": cache})
+    v = classer(rc, out)
+    if v != "deny" or err or len(out.splitlines()) != 1:
+        return False, "%s stderr=%s %s" % (v, court(err), court(out))
+    raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+    if not raison.startswith("[planning-core] G5 :") or "poser-verdict.sh" not in raison:
+        return False, "raison : " + raison
+    if lignes_journal(cache):
+        return False, "un refus a écrit au journal d'observation"
+    return True, "copie armed : un objet deny, raison « [planning-core] G5 : … poser-verdict.sh », journal vide"
+
+
+def controle_g5_03(ctx, script):
+    """Copie armed : Edit, NotebookEdit, casse, profondeur, fil principal, agent inconnu, juge -> refus."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    base = ".planning/cycles/01-c/phases/01-p/"
+    cas = (("Edit", VERDICT_REL, None), ("NotebookEdit", VERDICT_REL, None),
+           ("Write", base + "verdict.md", None), ("Write", base + "Verdict.MD", None),
+           ("Write", base + "plans/01-a/VERDICT.md", None), ("Write", ".planning/VERDICT.md", None),
+           ("Write", VERDICT_REL, None), ("Write", VERDICT_REL, "agent-inconnu"),
+           ("Write", VERDICT_REL, "vf-design-judge"), ("Write", VERDICT_REL, "general-purpose"))
+    fautes = []
+    for outil, rel, agent in cas:
+        rc, out, err = _g5(ctx, d, outil, rel, agent=agent)
+        if classer(rc, out) != "deny" or err:
+            fautes.append("%s %s agent=%s -> %s" % (outil, rel, agent, classer(rc, out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus : Edit, NotebookEdit, casse, profondeur, fil principal, agent inconnu, juge" % len(cas))
+
+
+def controle_g5_04(ctx, script):
+    """Copie armed : PLAN.md, SUMMARY.md, livrable nommé verdict hors .planning/, lab dev -> aucun refus."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+    for rel in (".planning/cycles/01-c/phases/01-p/PLAN.md", ".planning/cycles/01-c/phases/01-p/SUMMARY.md",
+                ".planning/cycles/01-c/phases/01-p/VERDICT-notes.md", "livrables/verdict-client.md",
+                "livrables/VERDICT.md"):
+        rc, out, err = _g5(ctx, d, "Write", rel)
+        if classer(rc, out) not in ("silence", "avertit") or err:
+            fautes.append("%s -> %s" % (rel, classer(rc, out)))
+    rc, out, err = _g5(ctx, d, "Write", VERDICT_REL, lab="g5-dev")
+    if classer(rc, out) != "silence" or err:
+        fautes.append("lab dev %s -> %s" % (VERDICT_REL, classer(rc, out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "aucun refus : PLAN.md, SUMMARY.md, nom voisin, livrables/VERDICT.md hors .planning/, lab dev en silence")
+
+
+def controle_g5_05(ctx, script):
+    """Erreur interne injectée dans evaluer_g5 (mutant sonde) : observe -> aucun refus + ligne d'erreur ;
+    armed -> deny."""
+    dossier, raison = make_hook_mutant(ctx, "G5-SONDE", "# g5-sonde", 'raise RuntimeError("sonde")  # g5-sonde')
+    if dossier is None:
+        return False, "mutant sonde invalide : " + raison
+    cache = dossier_neuf(ctx, "cache-g5-05")
+    rc, out, err = _g5(ctx, ctx.copie_forcee(dossier, "observe"), "Write", VERDICT_REL, extra_env={"XDG_CACHE_HOME": cache})
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err or len(lignes) != 1 or "  gate=G5  " not in lignes[0]:
+        return False, "observe : rc=%d stdout=%s stderr=%s lignes=%s" % (rc, court(out), court(err), lignes)
+    motif = [c for c in lignes[0].split("  ") if c.startswith("raison=")]
+    if not motif or "erreur interne" not in urllib.parse.unquote(motif[0]):
+        return False, "la ligne ne porte pas une raison d'erreur : " + lignes[0]
+    rc, out, err = _g5(ctx, ctx.copie_forcee(dossier, "armed"), "Write", VERDICT_REL)
+    if classer(rc, out) != "deny" or "erreur interne" not in json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]:
+        return False, "armed : " + classer(rc, out) + " " + court(out)
+    return True, "erreur interne de G5 : en observe aucun refus et une ligne d'erreur au journal, en armed un deny"
+
+
+def controle_g5_06(ctx, script):
+    """Le journal d'observation ne recopie ni le contenu ni la commande écrits (Pitfall 7)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    cache = dossier_neuf(ctx, "cache-g5-06")
+    _, _, chemins = labs_banc(ctx)
+    chemin = os.path.join(chemins["g5-adherent"], VERDICT_REL)
+    entrees = (("Write", {"file_path": chemin, "content": SECRET}),
+               ("Edit", {"file_path": chemin, "old_string": SECRET, "new_string": SECRET + "-2"}),
+               ("NotebookEdit", {"notebook_path": chemin, "new_source": SECRET}))
+    for outil, entree in entrees:
+        rc, out, err = _g5(ctx, d, outil, VERDICT_REL, extra_env={"XDG_CACHE_HOME": cache}, entree=entree)
+        if rc != 0 or out != b"" or err:
+            return False, "%s : rc=%d stdout=%s" % (outil, rc, court(out))
+    lignes = lignes_journal(cache)
+    if len(lignes) != 3:
+        return False, "%d ligne(s) au journal (attendu 3)" % len(lignes)
+    if any(SECRET in l for l in lignes):
+        return False, "le contenu écrit figure au journal : " + court("\n".join(lignes))
+    return True, "trois écritures observées (Write, Edit, NotebookEdit), aucune ligne ne porte le contenu factice"
+
+
+def _arbre_fonction(corps, nom):
+    for noeud in ast.parse(corps).body:
+        if isinstance(noeud, ast.FunctionDef) and noeud.name == nom:
+            return ast.dump(noeud)
+    return None
+
+
+def controle_jeton(ctx, script):
+    """R-JETON : l'encodeur du journal est ast-identique à `_jeton_journal` de recalc-planning.sh."""
+    chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
+    a_h = _arbre_fonction(corps_python(open(chemin, encoding="utf-8").read()), "_jeton_journal")
+    a_r = _arbre_fonction(corps_python(open(ctx.recalc, encoding="utf-8").read(), "PY_RECALC_PLANNING_EOF"), "_jeton_journal")
+    if a_h is None or a_r is None:
+        return False, "_jeton_journal absent (hook %s, moteur %s)" % (a_h is not None, a_r is not None)
+    if a_h != a_r:
+        return False, "arbres différents"
+    return True, "arbres ast identiques (docstring comprise)"
+
+
+def controle_obs_env(ctx, script):
+    """R-OBS-ENV (P45-D-12a) : le chemin du journal suit XDG_CACHE_HOME puis HOME et rien d'autre ; le
+    verdict de la commande enregistrée ne dépend d'aucune des deux valeurs ; un journal impossible à
+    écrire ne transforme jamais une observation en refus."""
+    dossier = _dossier(ctx, script)
+    d_obs = ctx.copie_forcee(dossier, "observe")
+    d_arm = ctx.copie_forcee(dossier, "armed")
+    _, _, chemins = labs_banc(ctx)
+    fautes = []
+    a, b, h1, h2 = (dossier_neuf(ctx, "obs-" + n) for n in ("a", "b", "h1", "h2"))
+    # (1) la ligne apparaît sous XDG_CACHE_HOME de la suite et sous aucun autre dossier
+    _g5(ctx, d_obs, "Write", VERDICT_REL, extra_env={"XDG_CACHE_HOME": a, "HOME": h1})
+    if len(lignes_journal(a)) != 1 or os.path.exists(os.path.join(h1, ".cache")):
+        fautes.append("XDG_CACHE_HOME=A : %d ligne(s) sous A, %s sous HOME" % (len(lignes_journal(a)), os.path.exists(os.path.join(h1, ".cache"))))
+    _g5(ctx, d_obs, "Write", VERDICT_REL, extra_env={"XDG_CACHE_HOME": b, "HOME": h2})
+    if len(lignes_journal(b)) != 1 or len(lignes_journal(a)) != 1 or os.path.exists(os.path.join(h2, ".cache")):
+        fautes.append("XDG_CACHE_HOME=B : %d ligne(s) sous B, %d sous A" % (len(lignes_journal(b)), len(lignes_journal(a))))
+    # (2) repli sur HOME/.cache quand XDG_CACHE_HOME est vide ou non absolu (jamais créé sous le lab)
+    for xdg in ("", "relatif/non/absolu"):
+        h = dossier_neuf(ctx, "obs-hrepli")
+        _g5(ctx, d_obs, "Write", VERDICT_REL, extra_env={"XDG_CACHE_HOME": xdg, "HOME": h})
+        if len(lignes_journal(os.path.join(h, ".cache"))) != 1:
+            fautes.append("XDG_CACHE_HOME=%r : pas de repli sur HOME/.cache" % xdg)
+    if os.path.exists(os.path.join(chemins["g5-adherent"], "relatif")):
+        fautes.append("un XDG_CACHE_HOME relatif a créé un dossier sous le lab")
+    # (3) verdicts identiques octet pour octet sous d'autres valeurs, y compris inexploitables
+    fichier = os.path.join(dossier_neuf(ctx, "obs-fichier"), "reguliere")
+    with open(fichier, "w", encoding="utf-8") as fh:
+        fh.write("")
+    variantes = (("A et H1", {"XDG_CACHE_HOME": a, "HOME": h1}), ("B et H2", {"XDG_CACHE_HOME": b, "HOME": h2}),
+                 ("vides", {"XDG_CACHE_HOME": "", "HOME": ""}),
+                 ("fichiers réguliers (dossier non inscriptible)", {"XDG_CACHE_HOME": fichier, "HOME": fichier}))
+    for etiquette, copie, attendu in (("observe", d_obs, "silence"), ("armed", d_arm, "deny")):
+        reference = _g5(ctx, copie, "Write", VERDICT_REL)
+        if classer(reference[0], reference[1]) != attendu:
+            fautes.append("référence %s : %s (attendu %s)" % (etiquette, classer(reference[0], reference[1]), attendu))
+            continue
+        for nom, extra in variantes:
+            r = _g5(ctx, copie, "Write", VERDICT_REL, extra_env=extra)
+            if r != reference:
+                fautes.append("copie %s sous %s : %s au lieu de %s (stderr %s)" % (etiquette, nom, classer(r[0], r[1]), attendu, court(r[2])))
+    with open(fichier, encoding="utf-8") as fh:
+        if fh.read() != "":
+            fautes.append("le fichier régulier pris pour dossier a été modifié")
+    return (not fautes), ("; ".join(fautes) if fautes else "journal sous XDG_CACHE_HOME puis HOME seulement ; verdicts identiques sous 4 jeux de valeurs (dont inexploitables), copie observe et copie armed")
 
 
 # =================================================================================================
@@ -750,7 +1003,29 @@ def sec_env(ctx):
 def sec_env_statique(ctx):
     bon, detail = controle_env_statique(ctx, ctx.hook)
     ok("R-ENV-02 garde statique : " + detail) if bon else ko(
-        "R-ENV-02", "aucun os.environ, getenv ni environ dans le cœur Python de planning-hook.sh, une seule lecture de TMPDIR dans le lanceur", "aucune faute", detail)
+        "R-ENV-02", "aucune lecture d'environnement dans le cœur Python de planning-hook.sh (expanduser et expandvars compris) ; lanceur : TMPDIR sur la ligne du mktemp, XDG_CACHE_HOME et HOME sur la ligne d'appel du cœur, une fois chacune", "aucune faute", detail)
+
+
+def sec_g5(ctx):
+    for ident, ctrl, titre in (
+            ("R-G5-01", controle_g5_01, "Write de VERDICT.md sur copie observe"),
+            ("R-G5-02", controle_g5_02, "le même Write sur copie armed"),
+            ("R-G5-03", controle_g5_03, "Edit, NotebookEdit, casse, profondeur, tout rôle : refusés sur copie armed"),
+            ("R-G5-04", controle_g5_04, "PLAN.md, nom voisin, livrable hors .planning/, lab dev : aucun refus"),
+            ("R-G5-05", controle_g5_05, "erreur interne de G5 : observe journalise, armed refuse"),
+            ("R-G5-06", controle_g5_06, "le journal ne porte jamais le contenu écrit")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+
+
+def sec_obs_env(ctx):
+    bon, detail = controle_obs_env(ctx, None)
+    ok("R-OBS-ENV " + detail) if bon else ko("R-OBS-ENV", "le journal suit XDG_CACHE_HOME puis HOME et rien d'autre ; les valeurs n'atteignent jamais l'armement ni l'adhésion", "conforme", detail)
+
+
+def sec_jeton(ctx):
+    bon, detail = controle_jeton(ctx, ctx.hook)
+    ok("R-JETON " + detail) if bon else ko("R-JETON", "l'encodeur du journal du hook est ast-identique à _jeton_journal du moteur de recalcul", "identiques", detail)
 
 
 def sec_accord(ctx):
@@ -765,9 +1040,10 @@ def sec_banc(ctx):
     for nom in ordre:
         for e in labs[nom]["ecritures"]:
             brut, cwd = entree_de_ecriture(e, chemins[nom])
-            rc, out, err = ctx.lancer("A", brut, cwd=cwd)
+            dossier = ctx.copie_forcee(ctx.scripts_dir, "armed") if e["armee"] else None
+            rc, out, err = ctx.lancer("A", brut, cwd=cwd, dossier=dossier)
             bon, obtenu = juger(e["attendu"], e["gate"], rc, out)
-            etiquette = "BANC %s %s %s%s :: %s %s" % (nom, e["outil"], e["chemin"], (" " + e["commande"]) if e["commande"] else "", e["attendu"], e["gate"] or "")
+            etiquette = "BANC %s %s %s%s%s%s :: %s %s" % (nom, e["outil"], e["chemin"], (" agent=" + e["agent"]) if e["agent"] else "", " armee" if e["armee"] else "", (" " + e["commande"]) if e["commande"] else "", e["attendu"], e["gate"] or "")
             if bon and not err:
                 ok(etiquette.strip())
             else:
@@ -782,10 +1058,19 @@ def sec_banc(ctx):
             ko("COUVERTURE " + gate, "au moins un cas `avertit` et un cas `silence` pour " + gate, ">= 1 chacun", str(c))
         else:
             ok("COUVERTURE %s : %d avertit, %d silence" % (gate, c["avertit"], c["silence"]))
+    c = compte.get("G5", {})
+    print("COUVERTURE G5 doit-refuser=%d doit-passer=%d silence=%d" % (c.get("doit-refuser", 0), c.get("doit-passer", 0), c.get("silence", 0)))
+    if c.get("doit-refuser", 0) < 1 or c.get("doit-passer", 0) < 1 or c.get("silence", 0) < 1:
+        ko("COUVERTURE G5", "au moins un cas doit-refuser, un cas doit-passer et un cas silence (jumeau dev) pour G5", ">= 1 chacun", str(c))
+    else:
+        ok("COUVERTURE G5 : %d doit-refuser, %d doit-passer, %d silence (0 faux refus, 0 faux accept : chaque cas est conforme)" % (c["doit-refuser"], c["doit-passer"], c["silence"]))
     # jumeau négatif : chaque lab jumeau a au moins un cas
     for nom in ordre:
         if labs[nom]["jumeau_de"] and not labs[nom]["ecritures"]:
             ko("COUVERTURE jumeau " + nom, "un lab jumeau porte des écritures", ">= 1", "0")
+
+
+CTRL_FICHIER = (controle_table_02, controle_parseur, controle_env_statique, controle_jeton)
 
 
 def sec_mutants(ctx):
@@ -808,6 +1093,29 @@ def sec_mutants(ctx):
          "R-ENV-02", controle_env_statique),
         ("ENV-LANCEUR", 'T="$(mktemp "${TMPDIR:-/tmp}/vf-planning-hook.XXXXXX")" || exit 70',
          'T="$(mktemp "${TMPDIR:-${HOME:-/tmp}}/vf-planning-hook.XXXXXX")" || exit 70', "R-ENV-02", controle_env_statique),
+        # 45-04 : entonnoir, G5, journal d'observation, encodeur, amendement de R-ENV-02
+        ("G5-CASSE", 'if composants[-1].casefold() != NOM_VERDICT:  # g5-casse',
+         'if composants[-1] != "VERDICT.md":  # g5-casse', "R-G5-03", controle_g5_03),
+        ("G5-PERIMETRE", 'if not composants or composants[0].casefold() != ".planning":  # g5-perimetre',
+         'if not composants:  # g5-perimetre', "R-G5-04", controle_g5_04),
+        ("DECIDER-OBSERVE", 'if etat == "armed":  # decider-armed', 'if etat in ("armed", "observe"):  # decider-armed',
+         "R-G5-01", controle_g5_01),
+        ("DECIDER-ARMED", 'if etat == "armed":  # decider-armed', 'if False:  # decider-armed', "R-G5-02", controle_g5_02),
+        ("OBS-CONTENU", '# obs-ligne',
+         r'ligne = "{}  gate={}  lab={}  chemin={}  outil={}  raison={}  contenu={}\n".format(horodatage, verdict.gate, _jeton_journal(contexte.get("racine"), "-"), _jeton_journal(verdict.chemin_rel, "-"), _jeton_journal(contexte.get("outil"), "-"), _jeton_journal(verdict.raison, "-"), _jeton_journal(str((contexte["payload"].get("tool_input") or {}).get("content", "")), "-"))  # obs-ligne',
+         "R-G5-06", controle_g5_06),
+        ("JETON", 'if caractere == "%" or caractere == "=" or caractere.isspace() or not caractere.isprintable():',
+         'if caractere == "%" or caractere.isspace() or not caractere.isprintable():', "R-JETON", controle_jeton),
+        ("OBS-CHEMIN", 'if isinstance(xdg, str) and xdg.startswith("/"):  # obs-xdg', 'if False:  # obs-xdg',
+         "R-OBS-ENV", controle_obs_env),
+        ("ENV-EXPANDUSER", 'SCHEMA_ADHESION = "cycles-v1"', 'SCHEMA_ADHESION = "cycles-v1" + os.path.expanduser("~")[:0]',
+         "R-ENV-02", controle_env_statique),
+        ("OBS-ARMEMENT", 'etat = TABLE_ARMEMENT.get(verdict.gate)',
+         'etat = "armed" if (TABLE_ARMEMENT.get(verdict.gate) == "observe" and not os.access(os.path.dirname(chemin_journal_observation(contexte.get("arg_xdg"), contexte.get("arg_home")) or "/"), os.W_OK)) else TABLE_ARMEMENT.get(verdict.gate)',
+         "R-OBS-ENV", controle_obs_env),
+        ("OBS-ADHESION", 'adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]',
+         'adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"] and sys.argv[3] != ""',
+         "R-OBS-ENV", controle_obs_env),
     ]
     for ident, motif, repl, cible, ctrl in M:
         dossier, raison = make_hook_mutant(ctx, ident, motif, repl)
@@ -815,9 +1123,9 @@ def sec_mutants(ctx):
             komut(ident, "mutant du cœur valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
             continue
         chemin_mut = os.path.join(dossier, "planning-hook.sh")
-        cible_script = chemin_mut if ctrl in (controle_table_02, controle_parseur, controle_env_statique) else dossier
+        cible_script = chemin_mut if ctrl in CTRL_FICHIER else dossier
         # l'original passe le contrôle ; le mutant le rate ; le témoin reste inchangé
-        original = ctrl(ctx, ctx.hook if ctrl in (controle_table_02, controle_parseur, controle_env_statique) else ctx.scripts_dir)
+        original = ctrl(ctx, ctx.hook if ctrl in CTRL_FICHIER else ctx.scripts_dir)
         t_orig, t_mut = controle_temoin(ctx, None), controle_temoin(ctx, dossier)
         mutant = ctrl(ctx, cible_script)
         if not original[0]:
@@ -834,8 +1142,11 @@ def sec_mutants(ctx):
 SECTIONS = {
     "table": sec_table,
     "parseur": sec_parseur,
+    "jeton": sec_jeton,
     "g2": sec_g2,
+    "g5": sec_g5,
     "env": sec_env,
+    "obs_env": sec_obs_env,
     "env_statique": sec_env_statique,
     "accord": sec_accord,
     "banc": sec_banc,
@@ -879,7 +1190,7 @@ run_sections() { # <sections séparées par des virgules>
 [ -f "$BANC" ] || ko "gates-banc.txt présent" "le banc texte existe sous fixtures/" "$BANC" "absent"
 [ -f "$RECALC" ] || ko "recalc-planning.sh présent" "le moteur de recalcul existe à côté du hook (contrôle croisé du parseur)" "$RECALC" "absent"
 
-run_sections table,parseur,g2,env,env_statique,accord,banc,mutants
+run_sections table,parseur,jeton,g2,g5,env,obs_env,env_statique,accord,banc,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

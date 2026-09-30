@@ -23,7 +23,13 @@
 # payload par un fichier de transport mktemp (0600, supprimé par un trap), jamais par argv.
 #
 # Aucune variable d'environnement ne change l'armement ni l'adhésion (P45-D-12a) : le lanceur lit
-# TMPDIR pour choisir où poser son fichier de transport (un chemin, jamais une décision).
+# TMPDIR pour choisir où poser son fichier de transport, XDG_CACHE_HOME puis HOME pour les passer en
+# arguments au cœur, qui s'en sert pour le seul chemin du journal d'observation — chacune choisit un
+# chemin, jamais une décision (décisions du manager vf-dev-manager, 2026-09-30 : amendement de R-ENV-02).
+# Le cœur Python ne lit AUCUNE variable d'environnement (ni os.environ, ni expanduser, ni expandvars).
+#
+# Arguments du cœur Python (positions fixes, sys.argv) : [1] fichier de transport du payload,
+# [2] valeur de XDG_CACHE_HOME (chaîne vide si non définie), [3] valeur de HOME (idem).
 set -u
 
 T="$(mktemp "${TMPDIR:-/tmp}/vf-planning-hook.XXXXXX")" || exit 70
@@ -42,7 +48,9 @@ case "$(command -v python3 2>/dev/null)" in
     ;;
 esac
 
-"$PYBIN" -I -S - "$T" <<'PY_PLANNING_HOOK_EOF'
+"$PYBIN" -I -S - "$T" "${XDG_CACHE_HOME:-}" "${HOME:-}" <<'PY_PLANNING_HOOK_EOF'
+import collections
+import datetime
 import json
 import os
 import re
@@ -493,16 +501,164 @@ def sortie_contexte(textes):
     }})
 
 
+# --- Entonnoir de décision, journal d'observation, G5 (45-04) ------------------------------------
+# Un gate qui refuserait rend une liste de Verdict(gate, chemin_rel, raison) ; `decider` est le SEUL
+# endroit où un verdict devient un refus (gate armed), une observation journalisée (gate observe) ou,
+# en 45-04 tâche 3, un passage cité (dérogation). `chemin_rel` vaut None pour une erreur interne.
+Verdict = collections.namedtuple("Verdict", ("gate", "chemin_rel", "raison"))
+OUTILS_ECRITURE = ("Write", "Edit", "NotebookEdit")
+NOM_VERDICT = "verdict.md"
+RAISON_G5 = ("écrire VERDICT.md par outil est refusé (P45-D-07) : posez le verdict par la commande "
+             "poser-verdict.sh")
+
+
+# Encodeur du journal : copie ast-identique de `_jeton_journal` de recalc-planning.sh (un contrôle
+# croisé de la suite des gates compare les arbres de syntaxe et rougit à la moindre divergence).
+def _jeton_journal(valeur, repli):
+    """Encode une valeur arbitraire (P44-D-09 : lue, jamais validée — aucun contrôle de SENS) en
+    UN jeton structurellement sûr pour une ligne de `cloture.log`, par un échappement pourcent
+    INJECTIF (lot 4, correction de classe — remplace l'ancien assainissement par `_`, qui
+    écrasait `"3 4"` et `"3_4"` sur le même jeton et pouvait donc faire manquer une clôture
+    réellement nouvelle au dédoublonnage, P44-D-11 ; alphabet étendu F44-05/F7 : tout caractère
+    NON IMPRIMABLE — `not str.isprintable()`, qui couvre NUL et les contrôles C0/C1, en plus des
+    séparateurs Unicode déjà couverts par `isspace()` — était encore laissé passer BRUT, ce qui
+    aurait permis d'injecter un octet de contrôle littéral dans `cloture.log`) : tout caractère
+    considéré comme un espace par Python (`str.isspace()` — couvre U+2028 LIGNE SÉPARATRICE,
+    U+0085 NEL et tout espace Unicode, pas seulement l'ASCII), tout caractère NON IMPRIMABLE
+    (`not str.isprintable()` — NUL, contrôles C0/C1, séparateurs Unicode restants), tout `=` (qui
+    ouvrirait une séquence `clé=` lisible par `LIGNE_JOURNAL_RE`), et le caractère d'échappement
+    `%` lui-même, sont réécrits en `%XX` — deux chiffres hexadécimaux majuscules par OCTET de son
+    encodage UTF-8 (un caractère multi-octets produit plusieurs `%XX` consécutifs, jamais un seul
+    jeton non réversible). Le jeton résultant ne contient donc plus jamais d'espace, de saut de
+    ligne, de `=`, ni d'octet de contrôle brut : deux valeurs distinctes produisent TOUJOURS deux
+    jetons distincts (réversible par simple décodage pourcent).
+
+    F5 (correction ciblée) : `return jeton or repli` laissait un jeton vide filer si `repli`
+    lui-même était vide (repli vide -> `jeton or repli` retombe sur `""`), produisant une ligne
+    que `LIGNE_JOURNAL_RE` (`\\S+` sur chaque champ) ne relirait plus jamais — une corruption
+    SILENCIEUSE du journal. `repli` est un contrat interne, toujours un littéral non vide chez
+    tous les appelants actuels (`"-"`, `"inconnu"`) : une erreur BRUYANTE immédiate (jamais une
+    ligne illisible produite en silence) si ce contrat est un jour rompu. Une fois `repli` garanti
+    non vide, `brute` (str) contient au moins un caractère, et chaque caractère produit au moins
+    un caractère de sortie (lui-même, ou au moins un `%XX`) : `jeton` est donc TOUJOURS non vide,
+    sans repli de dernier recours nécessaire.
+
+    IN-02 (revue, correction ciblée) : l'invariant final est vérifié par une exception EXPLICITE,
+    jamais un `assert` nu — un `assert` est désactivable en bloc par `python -O`/`PYTHONOPTIMIZE`,
+    et ce moteur ne garantit nulle part que son interpréteur tourne sans cette option. Une garde de
+    P44-D-11 (jamais de ligne illisible produite en silence dans `cloture.log`) reste active quel
+    que soit le mode d'exécution."""
+    if not repli:
+        raise ValueError("_jeton_journal : 'repli' doit toujours être non vide (contrat interne)")
+    brute = valeur if valeur not in (None, "") else repli
+    morceaux = []
+    for caractere in str(brute):
+        if caractere == "%" or caractere == "=" or caractere.isspace() or not caractere.isprintable():
+            for octet in caractere.encode("utf-8"):
+                morceaux.append("%{:02X}".format(octet))
+        else:
+            morceaux.append(caractere)
+    jeton = "".join(morceaux)
+    if not jeton:
+        raise AssertionError("_jeton_journal : jeton vide malgré un repli non vide (invariant violé)")
+    return jeton
+
+
+def chemin_journal_observation(xdg, home):
+    """Chemin du journal d'observation, dérivé des deux valeurs reçues en arguments : `<xdg>/vibeflow/
+    gates-observation/observation.log`, à défaut `<home>/.cache/...`. Une valeur vide ou non absolue
+    est ignorée ; aucune des deux exploitable : None. Ces valeurs ne servent qu'à CE chemin (P45-D-12a)."""
+    if isinstance(xdg, str) and xdg.startswith("/"):  # obs-xdg
+        base = xdg
+    elif isinstance(home, str) and home.startswith("/"):
+        base = os.path.join(home, ".cache")
+    else:
+        return None
+    return os.path.join(base, "vibeflow", "gates-observation", "observation.log")
+
+
+def observer(verdict, contexte):
+    """Écrit UNE ligne au journal d'observation (ajout seul, O_NOFOLLOW, fichier 0600, dossier 0700) :
+    gate, lab, chemin, outil, raison, horodatage — jamais le contenu écrit ni la commande (T-45-36).
+    Un journal impossible à écrire ne produit jamais un refus ni une exception : aucune ligne."""
+    try:
+        chemin = chemin_journal_observation(contexte.get("arg_xdg"), contexte.get("arg_home"))
+        if chemin is None:
+            return
+        os.makedirs(os.path.dirname(chemin), mode=0o700, exist_ok=True)
+        horodatage = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+        ligne = "{}  gate={}  lab={}  chemin={}  outil={}  raison={}\n".format(horodatage, verdict.gate, _jeton_journal(contexte.get("racine"), "-"), _jeton_journal(verdict.chemin_rel, "-"), _jeton_journal(contexte.get("outil"), "-"), _jeton_journal(verdict.raison, "-"))  # obs-ligne
+        descripteur = os.open(chemin, os.O_WRONLY | os.O_APPEND | os.O_CREAT | SANS_SUIVI_DE_LIEN, 0o600)
+        try:
+            if hasattr(os, "fchmod"):
+                os.fchmod(descripteur, 0o600)
+            os.write(descripteur, ligne.encode("utf-8"))
+        finally:
+            os.close(descripteur)
+    except Exception:
+        return
+
+
+def decider(verdicts, contexte):
+    """Entonnoir unique (P45-D-03a, P45-D-08) : (raisons de refus, citations). Un gate armed refuse ;
+    un gate en observe écrit une ligne au journal d'observation et ne dit RIEN au modèle."""
+    refus = []
+    citations = []
+    for verdict in verdicts:
+        etat = TABLE_ARMEMENT.get(verdict.gate)
+        if etat == "armed":  # decider-armed
+            refus.append("[planning-core] %s : %s" % (verdict.gate, verdict.raison))
+        else:
+            observer(verdict, contexte)
+    return refus, citations
+
+
+def evaluer_g5(contexte):
+    """G5 (P45-D-07, P45-D-11) : toute écriture par Write, Edit ou NotebookEdit d'un fichier dont le
+    nom, casse ignorée, est VERDICT.md, sous le `.planning/` d'un lab adhérent, est un verdict de G5 —
+    quel que soit le rôle (fil principal et agent inconnu compris). Le chemin est résolu physiquement.
+    Seule la commande poser-verdict.sh (lancée par Bash, jamais vue ici) pose un VERDICT.md."""
+    racine = contexte["racine"]  # g5-sonde
+    if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
+        return []
+    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
+    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    if not composants or composants[0].casefold() != ".planning":  # g5-perimetre
+        return []
+    if composants[-1].casefold() != NOM_VERDICT:  # g5-casse
+        return []
+    return [Verdict("G5", "/".join(composants), RAISON_G5)]
+
+
+# Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un
+# Verdict d'erreur : deny si le gate est armed, ligne d'observation sinon (P45-D-08, spec §5.1).
+GATES_A_VERDICT = (("G5", evaluer_g5),)
+
+
+def evaluer_protege(gate, fonction, contexte):
+    try:
+        return list(fonction(contexte))
+    except Exception as exc:
+        return [Verdict(gate, None, "erreur interne du gate : " + type(exc).__name__)]
+
+
 # --- Évaluation des gates (Phase B) ----------------------------------------------------------
 def evaluer_gates(contexte):
     """Liste de résultats (genre, texte), genre `refuse` ou `avertit`. La table d'armement est
     vérifiée d'abord : un code livré qui viole l'ordre des étapes refuse (impossible sur un code
-    sain, c'est la garde que les mutants exercent). Seul G2 est branché dans ce plan."""
+    sain, c'est la garde que les mutants exercent). G2 avertit ; les gates à verdict passent par
+    l'entonnoir `decider`."""
     if not armement_valide(TABLE_ARMEMENT):
         return [("refuse", "[planning-core] table d'armement incohérente : l'ordre des étapes "
                            "(G6 et G5, puis G1, puis G7, puis le rôle) n'est pas respecté (P45-D-03)")]
     resultats = []
     resultats.extend(evaluer_g2(contexte))
+    verdicts = []
+    for gate, fonction in GATES_A_VERDICT:
+        verdicts.extend(evaluer_protege(gate, fonction, contexte))
+    refus, citations = decider(verdicts, contexte)
+    resultats.extend(("refuse", texte) for texte in refus)
+    resultats.extend(("avertit", texte) for texte in citations)
     return resultats
 
 
@@ -522,7 +678,9 @@ def main():
     # Phase B : le lab est adhérent. Toute erreur devient un refus explicite, code 0 (P45-D-08).
     try:
         contexte = {"payload": payload, "outil": payload.get("tool_name"), "ecrit": ecrit,
-                    "cwd": cwd, "racine": racine}
+                    "cwd": cwd, "racine": racine,
+                    "arg_xdg": sys.argv[2] if len(sys.argv) > 2 else "",
+                    "arg_home": sys.argv[3] if len(sys.argv) > 3 else ""}
         resultats = evaluer_gates(contexte)  # phase-b
         refus = [texte for genre, texte in resultats if genre == "refuse"]
         avis = [texte for genre, texte in resultats if genre == "avertit"]

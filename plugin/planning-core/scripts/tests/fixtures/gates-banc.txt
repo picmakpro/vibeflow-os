@@ -108,3 +108,60 @@ ecrit: livrables/rapport.md
 @@ ecriture Edit livrables/autre.md :: silence G2
 @@ ecriture NotebookEdit livrables/nb.ipynb :: silence G2
 @@ ecriture Bash - commande=cat livrables/autre.md :: silence G2
+
+@@ # --- G5 (45-04, P45-D-07, P45-D-11) : écrire VERDICT.md par outil sous .planning/ d'un lab adhérent.
+@@ # Les cas doit-refuser / doit-passer se rejouent sur une COPIE ARMÉE du hook (option `armee`) : G5
+@@ # reste en observation dans le script livré, et un cas ne dépend jamais de l'état livré.
+@@ lab g5-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-30"
+---
+
+@@ dossier .planning/cycles/01-c/phases/01-p/plans/01-a
+
+@@ # Refus : tout outil d'écriture, toute casse, toute profondeur, tout rôle (fil principal compris).
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Edit .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: doit-refuser G5
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/verdict.md armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/plans/01-a/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Write .planning/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md agent=general-purpose armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md agent=vf-design-judge armee :: doit-refuser G5
+@@ # Passage : autres fichiers du modèle, nom voisin, livrable nommé verdict hors .planning/.
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/PLAN.md armee :: doit-passer G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/SUMMARY.md armee :: doit-passer G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT-notes.md armee :: doit-passer G5
+@@ ecriture Write livrables/verdict-client.md armee :: doit-passer G5
+@@ ecriture Write livrables/VERDICT.md armee :: doit-passer G5
+@@ ecriture Write livrables/rapport.md armee :: doit-passer G5
+
+@@ lab g5-dev jumeau-de=g5-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ # Jumeau négatif : un lab dev ne reçoit rien, même sur copie armée.
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: silence G5
+@@ ecriture Edit .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: silence G5
