@@ -1812,6 +1812,40 @@ disable_worktrees_if_root_not_git() {
   return 0
 }
 
+# ensure_worktreeinclude_entries — best-effort, appelée juste après disable_worktrees_if_root_not_git, aux
+# MÊMES deux sites (fin d'install_module ET d'update_module). SOBR-03 (Phase 41.3) : `.claude/hooks/` et
+# `.claude/scripts/` sont ignorés par git (.gitignore) et visés par des commandes de hook via
+# "$CLAUDE_PROJECT_DIR" ; dans un worktree d'agent ce dossier vaut le worktree, et un garde introuvable
+# échoue sans bloquer — il ne protège plus rien. Le fichier `.worktreeinclude` (lu dans l'ARBRE DE TRAVAIL
+# du checkout principal, mesuré le 2026-09-29) fait recopier ces chemins dans chaque worktree d'agent.
+# Scope project|local seulement (un lab en scope user n'a pas de `.claude/` de projet), à la racine du lab
+# (le cwd, comme `.planning/config.json` de sa voisine) ; sous --target, no-op (la cible n'est pas le lab).
+# AJOUT SEUL : une ligne exacte absente est ajoutée en fin de fichier, rien n'est retiré ni réordonné, la ligne
+# présente n'est jamais réécrite (idempotent) ; fichier absent → créé avec un commentaire de deux lignes.
+# Limites : la copie est FIGÉE à la création du worktree, et un `git worktree add` manuel n'est pas couvert.
+ensure_worktreeinclude_entries() {
+  case "$VF_SCOPE" in project|local) ;; *) return 0 ;; esac
+  [ -z "$VF_TARGET_OVERRIDE" ] || return 0
+  local f=".worktreeinclude" line verb missing=""
+  for line in ".claude/hooks/" ".claude/scripts/"; do
+    if [ -f "$f" ] && grep -qxF -- "$line" "$f"; then continue; fi
+    missing="$missing$line
+"
+  done
+  [ -n "$missing" ] || return 0
+  if [ -f "$f" ]; then verb="~"; else verb="+"; fi
+  vf_declare_write "$verb" "$f"
+  vf_dry_run && return 0
+  if [ -f "$f" ]; then
+    [ -z "$(tail -c 1 "$f")" ] || printf '\n' >> "$f" || return 0
+  else
+    printf '%s\n%s\n' "# .worktreeinclude — chemins ignorés par git recopiés dans chaque worktree d'agent (posé par VibeFlow, SOBR-03)." "# Copie figée à la création du worktree ; un git worktree add manuel n'est pas couvert." > "$f" || return 0
+  fi
+  printf '%s' "$missing" >> "$f" || return 0
+  log "  [worktreeinclude] $(printf '%s' "$missing" | tr '\n' ' ')ajouté(s) à .worktreeinclude (hooks et scripts du lab recopiés dans les worktrees d'agent)"
+  return 0
+}
+
 scripts_prefix_for_scope() {
   # Chemins LITTÉRAUX dans settings.json, valables pour la forme SHELL uniquement (c'est le
   # shell qui exécute la commande qui les expanse). Pour la forme exec (`args`), merge-hooks.sh
@@ -2481,6 +2515,8 @@ install_module() {
   record_codex_runtime_if_applicable "$mod" "$module_dir"
   # use_worktrees=false auto sur lab à racine non-git (#4734 amont) : cf. disable_worktrees_if_root_not_git.
   disable_worktrees_if_root_not_git
+  # .worktreeinclude du lab (SOBR-03) : hooks et scripts recopiés dans les worktrees d'agent — cf. ensure_worktreeinclude_entries.
+  ensure_worktreeinclude_entries
   # Coexistence sans hooks (MIGR-05, 38-06) : MÊME gate, AU MÊME endroit qu'au `status` (juste
   # après la bannière [fidelity]) — un opérateur qui installe voit la coexistence déclarée sans
   # second rapport séparé. Best-effort, silence si le gate/registre sont absents.
@@ -3174,6 +3210,7 @@ update_module() {
   # use_worktrees=false auto sur lab à racine non-git (#4734 amont) : dernier geste de la fonction,
   # symétrique du point d'appel d'install_module — cf. disable_worktrees_if_root_not_git.
   disable_worktrees_if_root_not_git
+  ensure_worktreeinclude_entries
 }
 
 # ---------- Main ----------

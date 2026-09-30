@@ -2464,6 +2464,64 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T57a-T57e (Phase 41.3, SOBR-03) — ensure_worktreeinclude_entries : `.claude/hooks/` et `.claude/scripts/`
+# atteignent le `.worktreeinclude` d'un lab en scope project/local. Ajout seul, idempotent, lignes existantes
+# intactes, no-op en scope user et sous --dry-run.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  WI_INSTALL() { (cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VF_SCOPE="${1:-project}" VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install validator 2>&1); }
+  # T57a — scope project, fichier absent : créé avec les deux lignes exactes (et un commentaire de deux lignes)
+  miss=0
+  OUT57="$(WI_INSTALL project)"; RC=$?
+  [ "$RC" -eq 0 ] || { ko "T57a pré-condition : install validator a échoué (rc=$RC) — $OUT57"; miss=1; }
+  [ -f "$LAB/.worktreeinclude" ] || { ko "T57a : .worktreeinclude non créé à la racine du lab"; miss=1; }
+  for l in ".claude/hooks/" ".claude/scripts/"; do
+    [ "$("$GREP" -cxF -- "$l" "$LAB/.worktreeinclude" 2>/dev/null)" -eq 1 ] || { ko "T57a : la ligne exacte « $l » n'est pas présente exactement une fois"; miss=1; }
+  done
+  [ "$(head -n 2 "$LAB/.worktreeinclude" 2>/dev/null | "$GREP" -c '^#')" -eq 2 ] || { ko "T57a : les deux premières lignes ne sont pas un commentaire"; miss=1; }
+  [ "$(printf '%s\n' "$OUT57" | "$GREP" -cF '[worktreeinclude]')" -eq 1 ] || { ko "T57a : une ligne de journal [worktreeinclude] attendue — $OUT57"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57a (SOBR-03) : scope project, fichier absent -> créé avec .claude/hooks/ et .claude/scripts/, une ligne de journal"
+  # T57b — second passage : chaque ligne une fois, fichier identique, aucune ligne de journal
+  miss=0
+  SUM_B="$(cksum < "$LAB/.worktreeinclude")"
+  OUT57="$(WI_INSTALL project)"
+  [ "$(cksum < "$LAB/.worktreeinclude")" = "$SUM_B" ] || { ko "T57b : second passage a modifié le fichier — $(cat "$LAB/.worktreeinclude")"; miss=1; }
+  for l in ".claude/hooks/" ".claude/scripts/"; do
+    [ "$("$GREP" -cxF -- "$l" "$LAB/.worktreeinclude")" -eq 1 ] || { ko "T57b : « $l » dupliquée au second passage"; miss=1; }
+  done
+  [ "$(printf '%s\n' "$OUT57" | "$GREP" -cF '[worktreeinclude]')" -eq 0 ] || { ko "T57b : ligne de journal présente alors que tout était conforme — $OUT57"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57b (SOBR-03, idempotence) : second passage -> fichier byte-pour-byte identique, chaque ligne une fois, aucun journal"
+  # T57c — lignes existantes conservées, ordre inchangé, fichier sans saut de ligne final, ligne déjà présente non dupliquée
+  miss=0
+  printf '%s\n%s\n%s' ".claude/agent-memory/" "mon/motif-utilisateur/" ".claude/hooks/" > "$LAB/.worktreeinclude"
+  WI_INSTALL project >/dev/null
+  [ "$(sed -n 1p "$LAB/.worktreeinclude")" = ".claude/agent-memory/" ] || { ko "T57c : la première ligne existante a bougé"; miss=1; }
+  [ "$(sed -n 2p "$LAB/.worktreeinclude")" = "mon/motif-utilisateur/" ] || { ko "T57c : la ligne utilisateur a bougé"; miss=1; }
+  [ "$(sed -n 3p "$LAB/.worktreeinclude")" = ".claude/hooks/" ] || { ko "T57c : la ligne déjà présente a bougé"; miss=1; }
+  [ "$(sed -n 4p "$LAB/.worktreeinclude")" = ".claude/scripts/" ] || { ko "T57c : .claude/scripts/ non ajoutée en fin, sur sa propre ligne — $(cat "$LAB/.worktreeinclude")"; miss=1; }
+  [ "$("$GREP" -cxF -- ".claude/hooks/" "$LAB/.worktreeinclude")" -eq 1 ] || { ko "T57c : .claude/hooks/ dupliquée"; miss=1; }
+  [ "$(awk 'END { print NR }' "$LAB/.worktreeinclude")" -eq 4 ] || { ko "T57c : le fichier n'a pas exactement 4 lignes — $(cat "$LAB/.worktreeinclude")"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57c (SOBR-03) : lignes existantes conservées dans l'ordre, ligne manquante ajoutée en fin, aucune duplication"
+  # T57d — scope user : aucun fichier ; T57e — --dry-run : aucun fichier non plus
+  miss=0
+  rm -f "$LAB/.worktreeinclude"
+  WI_INSTALL user >/dev/null
+  [ ! -e "$LAB/.worktreeinclude" ] || { ko "T57d : scope user a créé .worktreeinclude dans le lab"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57d (SOBR-03) : scope user -> aucun .worktreeinclude"
+  miss=0
+  (cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install validator --dry-run >/dev/null 2>&1)
+  [ ! -e "$LAB/.worktreeinclude" ] || { ko "T57e : --dry-run a écrit .worktreeinclude"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57e (SOBR-03) : --dry-run -> aucun .worktreeinclude"
+else
+  skip "T57a-T57e : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # T55 (Phase 43, FABR-10 b, plan 43-05, HOME temporaire) — serveur nommé absent de l'union
 # relayé jusqu'au journal d'installation : lab avec .mcp.json déclarant mobile-mcp (jamais
 # XcodeBuildMCP, le serveur cité par le vrai vf-reviewer.md du module), install de
