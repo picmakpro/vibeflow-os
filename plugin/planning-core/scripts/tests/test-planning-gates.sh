@@ -21,6 +21,10 @@
 #                   adhérent, quel que soit le rôle ; compartiments et plans du modèle non visés ; dérogation (45-05)
 #   R-CANG-01..03   canary de session : les cas G6 et G5 attendent une ligne d'observation tant que le gate est en
 #                   observe, un refus de gate dès qu'il est armed ; un gate neutralisé fait signaler le canary (45-05)
+#   R-G1-01..04     G1 (45-06) : PLAN.md de forme modèle dans une phase sans CADRAGE.md, observe puis armed, plan
+#                   direct et sous plans/ (la phase jugée est la phase), socle v2 et nom d'unité invalide jamais
+#                   visés ; contrôle croisé avec recalc-planning.sh --read-only sur chaque phase des bancs
+#   R-CANG-G1       le cas de canary G1-sans-cadrage (état livré, G6, G5 et G1 armed, evaluer_g1 neutralisé)
 #   R-OBS-ENV       le journal d'observation suit XDG_CACHE_HOME puis HOME et rien d'autre : les valeurs
 #                   reçues n'atteignent jamais l'armement ni l'adhésion (P45-D-12a)
 #   R-JETON         l'encodeur du journal est ast-identique à _jeton_journal du moteur de recalcul
@@ -45,6 +49,7 @@ SCRIPTS_DIR="$(cd "$TESTS_DIR/.." && pwd)"
 HOOK="$SCRIPTS_DIR/planning-hook.sh"
 RECALC="$SCRIPTS_DIR/recalc-planning.sh"
 BANC="$TESTS_DIR/fixtures/gates-banc.txt"
+BANC_RECALC="$TESTS_DIR/fixtures/recalc-planning-banc.txt"
 HOOKS_JSON="$SCRIPTS_DIR/../hooks/hooks.json"
 SETTINGS_LAB="$SCRIPTS_DIR/../settings.json"
 [ -f "$HOOKS_JSON" ] || HOOKS_JSON=""
@@ -85,6 +90,7 @@ import subprocess
 import sys
 import time
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 
 TOKEN = "{{VF_SCRIPTS}}"
 OUTILS_BANC = ("Write", "Edit", "NotebookEdit", "Bash")
@@ -1350,12 +1356,15 @@ def controle_g6_05(ctx, script):
     return True, "dérogation G6 : premier Write passe et cité, dérogation consommée, second Write refusé"
 
 
-def scripts_canary(ctx, source, valeur, hook=None):
+def scripts_canary(ctx, source, valeur, hook=None, armes=("G6", "G5"), tel_quel=False):
     """Dossier de scripts jetable : check-gates-alive.sh de `source` et planning-hook.sh (celui de `hook`, à
-    défaut de `source`) dont G6 et G5 valent `valeur`, les trois autres gates restant à observe."""
+    défaut de `source`) dont les gates de `armes` (G6 et G5 par défaut) valent `valeur`, les autres gates restant à
+    observe ; `tel_quel` : le hook n'est pas réécrit (l'état livré)."""
     texte = open(hook or os.path.join(source, "planning-hook.sh"), encoding="utf-8").read()
     for gate in ("G6", "G5", "G1", "G7", "ROLE"):
-        v = valeur if gate in ("G6", "G5") else "observe"
+        if tel_quel:
+            break
+        v = valeur if gate in armes else "observe"
         texte, n = re.subn(r'^(ARMEMENT_' + gate + r' = )"(?:observe|armed)"', r'\1"' + v + '"', texte, flags=re.M)
         if n != 1:
             raise RuntimeError("une ligne ARMEMENT_%s attendue, %d trouvée(s)" % (gate, n))
@@ -1408,7 +1417,7 @@ def controle_cang_02(ctx, script):
 
 def controle_cang_03(ctx, script):
     """evaluer_g6 neutralisé (jamais de verdict) : le canary signale, code 0, UNE ligne qui nomme G6 — observe comme armed."""
-    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5),)  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5), ("G1", evaluer_g1))  # gates-a-verdict')
     if neutre is None:
         return False, "mutant du hook invalide : " + raison
     fautes = []
@@ -1576,6 +1585,237 @@ def controle_id_05(ctx, script):
     if p.returncode != 0 or manque:
         return False, "recalc-planning.sh : rc=%d, fichiers absents %s, %s" % (p.returncode, manque, court(p.stderr))
     return True, "G6 armé : la commande Bash n'est pas refusée et recalc-planning.sh écrit l'état, l'index et le cache (le Write de l'état est refusé)"
+
+
+# --- 45-06 : G1 (pas de plan sans cadrage) ------------------------------------------------------------------
+G1_LAB = "g1-adherent"
+G1_PHASES = ".planning/cycles/01-c/phases/"
+G1_SANS = G1_PHASES + "01-sans/PLAN.md"
+G1_PLANS = G1_PHASES + "06-plans/plans/01-a/PLAN.md"
+G1_MOTIF_ABSENCE = "n'a pas de CADRAGE.md"
+G1_MOTIF_OUVERT = "porte des lignes structurantes sans statut"
+NOMS_MODELE_PHASE = ("CADRAGE.md", "PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md", "DEROGATION.md")
+PLANCHER_CROISE_G1 = 50  # plancher déclaré du nombre de phases comparées au recalcul (59 mesurées le 2026-09-30)
+
+
+def _g1(ctx, hook, outil, rel, lab=G1_LAB, agent=None, extra_env=None):
+    return _g5(ctx, hook, outil, rel, agent=agent, lab=lab, extra_env=extra_env)
+
+
+def _raison_deny(rc, out, err):
+    """(raison, None) d'un deny unique sans stderr ; (None, détail) sinon."""
+    v = classer(rc, out)
+    if v != "deny" or err or len(out.splitlines()) != 1:
+        return None, "%s %s stderr=%s" % (v, court(out), court(err))
+    return json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"], None
+
+
+def controle_g1_01(ctx, script):
+    """Copie observe : Write du PLAN.md d'une phase sans CADRAGE.md -> silence, code 0, UNE ligne gate=G1 au journal."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    cache = dossier_neuf(ctx, "cache-g1-01")
+    rc, out, err = _g1(ctx, d, "Write", G1_SANS, extra_env={"XDG_CACHE_HOME": cache})
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err:
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    if len(lignes) != 1:
+        return False, "%d ligne(s) au journal (attendu 1)" % len(lignes)
+    for motif in ("  gate=G1  ", "  chemin=" + G1_SANS + "  ", "  outil=Write  "):
+        if motif not in lignes[0]:
+            return False, "la ligne ne porte pas %r : %s" % (motif, lignes[0])
+    return True, "copie observe : silence, code 0, une ligne gate=G1 (chemin, outil) au journal d'observation"
+
+
+def controle_g1_02(ctx, script):
+    """Copie armed : Write et Edit du PLAN.md d'une phase sans CADRAGE.md, en plan direct et sous plans/ -> un deny
+    `[planning-core] G1 :` qui nomme la PHASE (jamais le plan)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    for rel, phase, plan in ((G1_SANS, "01-sans", None), (G1_PLANS, "06-plans", "01-a"),
+                             (G1_PHASES + "08-neuve/PLAN.md", "08-neuve", None)):
+        for outil in ("Write", "Edit"):
+            n += 1
+            raison, detail = _raison_deny(*_g1(ctx, d, outil, rel))
+            if raison is None:
+                fautes.append("%s %s -> %s" % (outil, rel, detail))
+            elif not raison.startswith("[planning-core] G1 :") or ("la phase %s " % phase) not in raison or G1_MOTIF_ABSENCE not in raison \
+                    or (plan is not None and ("la phase %s " % plan) in raison):
+                fautes.append("%s %s : raison %s" % (outil, rel, raison))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus G1 (Write et Edit ; plan direct, sous plans/, phase vide) qui nomment la phase" % n)
+
+
+def controle_g1_03(ctx, script):
+    """Copie armée : phase cadrée, autres fichiers du modèle, socle v2, nom d'unité invalide, hors .planning/ -> aucun
+    refus de G1 ; lab dev -> stdout d'octet vide."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+    passages = (G1_PHASES + "02-clos/PLAN.md", G1_PHASES + "03-vide/PLAN.md", G1_PHASES + "05-herite/PLAN.md",
+                G1_PHASES + "07-plans-clos/plans/01-a/PLAN.md", G1_PHASES + "01-sans/SUMMARY.md", G1_PHASES + "01-sans/PLAN.md.bak",
+                ".planning/phases/01-x/PLAN.md", G1_PHASES + "sans-numero/PLAN.md", G1_PHASES + "01-sans/plans/x/PLAN.md",
+                "livrables/PLAN.md")
+    for rel in passages:
+        rc, out, err = _g1(ctx, d, "Write", rel)
+        if classer(rc, out) not in ("silence", "avertit") or err or b"[planning-core] G1" in out:
+            fautes.append("%s -> %s %s" % (rel, classer(rc, out), court(out)))
+    rc, out, err = _g1(ctx, d, "Write", G1_SANS, lab="g1-dev")
+    if rc != 0 or out != b"" or err:
+        fautes.append("lab dev -> rc=%d stdout=%s" % (rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "aucun refus : phase cadrée (clos, inconnues: [], hérité), plan sous une phase cadrée, SUMMARY.md, PLAN.md.bak, socle v2, nom d'unité invalide, hors .planning/ ; lab dev en silence")
+
+
+# Contrôle croisé (R-G1-04, R-G1-08) : pour chaque phase des bancs de la 44 et des gates, G1 (copie armée, Write de
+# son PLAN.md) est comparé à l'état que recalc-planning.sh --read-only dérive. Les labs sont matérialisés sous un
+# dossier jetable et RENDUS adhérents (config.json réécrit) : le hook n'agit que là. Sont écartées les phases
+# dérogées (DEROGATION.md : la 44 juge alors sur la dérogation, le hook jamais) et celles qui portent un fichier du
+# modèle non régulier (Φ1 court-circuite Φ2 : l'état indéterminé n'est pas une lecture de CADRAGE.md).
+def _texte_sans_attendus(texte):
+    """Le banc de la 44 sans ses directives propres : `@@ attendu*` (la dérivation attendue), `@@ fichier-dehors` (et
+    son contenu) et les liens vers DEHORS/ (un fichier hors du lab, posé par son propre matérialiseur)."""
+    sortie, saute = [], False
+    for ligne in texte.split("\n"):
+        if ligne.startswith("@@ "):
+            saute = ligne.startswith("@@ fichier-dehors ")
+            if saute or ligne.startswith("@@ attendu") or (ligne.startswith("@@ lien ") and "DEHORS/" in ligne):
+                continue
+        elif saute:
+            continue
+        sortie.append(ligne)
+    return "\n".join(sortie)
+
+
+def _labs_croises(ctx):
+    if getattr(ctx, "_labs_croises", None) is None:
+        sources = [("gates", ctx.banc)]
+        if getattr(ctx, "banc_recalc", None):
+            sources.append(("recalc", ctx.banc_recalc))
+        labs, ignores = [], 0
+        for nom_banc, chemin in sources:
+            ordre, definitions = parser_banc(_texte_sans_attendus(open(chemin, encoding="utf-8").read()))
+            base = ctx.unique("croise-" + nom_banc)
+            for nom in ordre:
+                dest = os.path.join(base, nom)
+                try:
+                    materialiser(definitions, nom, dest)
+                    planning = os.path.join(dest, ".planning")
+                    config = os.path.join(planning, "config.json")
+                    if os.path.islink(planning) or not os.path.isdir(planning) or (os.path.isdir(config) and not os.path.islink(config)):
+                        raise OSError("planning inexploitable")
+                    if os.path.lexists(config):
+                        os.unlink(config)
+                    ecrire(config, '{"planning_version": "cycles-v1"}')
+                except (OSError, ValueError):
+                    ignores += 1
+                    continue
+                labs.append((nom_banc + "/" + nom, dest))
+        ctx._labs_croises = (labs, ignores)
+    return ctx._labs_croises
+
+
+def _derivation_lab(ctx, racine):
+    """[(chemin de phase relatif au dossier de planning, état, raison)] rendus par recalc-planning.sh --read-only."""
+    p = subprocess.run(["bash", ctx.recalc, "--planning=" + os.path.join(racine, ".planning"), "--read-only"],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ctx.env(), timeout=180)
+    if p.returncode != 0:
+        return None
+    try:
+        donnees = json.loads(p.stdout.decode("utf-8"))
+    except ValueError:
+        return None
+    return [(ph["chemin"], ph["etat"], ph.get("raison")) for c in donnees.get("cycles", []) for ph in c.get("phases", [])]
+
+
+def _phase_comparable(racine, chemin):
+    dossier = os.path.join(racine, ".planning", chemin)
+    if os.path.lexists(os.path.join(dossier, "DEROGATION.md")):
+        return False
+    for nom in NOMS_MODELE_PHASE:
+        cible = os.path.join(dossier, nom)
+        if os.path.lexists(cible) and not stat.S_ISREG(os.lstat(cible).st_mode):
+            return False
+    return True
+
+
+def _verdict_g1(ctx, dossier_hook, racine, chemin):
+    """`absence`, `ouvert`, `passe` ou `autre:...` : ce que G1 (copie armée) rend pour le Write du PLAN.md de la phase."""
+    brut = payload("Write", entree_outil("Write", os.path.join(racine, ".planning", chemin, "PLAN.md")), racine)
+    rc, out, err = ctx.lancer("A", brut, cwd=racine, dossier=dossier_hook)
+    v = classer(rc, out)
+    if v in ("silence", "avertit") and not err and b"[planning-core] G1" not in out:
+        return "passe"
+    if v == "deny" and not err:
+        raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+        if raison.startswith("[planning-core] G1 :") and G1_MOTIF_ABSENCE in raison:
+            return "absence"
+        if raison.startswith("[planning-core] G1 :") and G1_MOTIF_OUVERT in raison:
+            return "ouvert"
+    return "autre:%s %s" % (v, court(out))
+
+
+def phases_croisees(ctx, script):
+    """[(etiquette, chemin, état, raison, verdict de G1)] pour chaque phase comparable ; `script` = dossier du hook."""
+    cle = _dossier(ctx, script)
+    if getattr(ctx, "_croisees", None) is None:
+        ctx._croisees = {}
+    if cle not in ctx._croisees:
+        labs, ignores = _labs_croises(ctx)
+        armee = ctx.copie_forcee(cle, "armed")
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            derivations = list(pool.map(lambda e: _derivation_lab(ctx, e[1]), labs))
+            taches = []
+            for (etiquette, racine), derivation in zip(labs, derivations):
+                for chemin, etat, raison in derivation or []:
+                    if _phase_comparable(racine, chemin):
+                        taches.append((etiquette, racine, chemin, etat, raison))
+            verdicts = list(pool.map(lambda t: _verdict_g1(ctx, armee, t[1], t[2]), taches))
+        sans_derivation = sum(1 for d in derivations if d is None)
+        ctx._croisees[cle] = ([(t[0], t[2], t[3], t[4], v) for t, v in zip(taches, verdicts)], len(labs), ignores + sans_derivation)
+    return ctx._croisees[cle]
+
+
+def controle_croise_g1(ctx, script):
+    """R-G1-04 : « G1 refuse l'écriture du PLAN.md pour absence de CADRAGE.md » <=> recalc-planning.sh --read-only rend
+    `à cadrer` ou une raison `hors-cadrage:*`, sur chaque phase comparable des deux bancs."""
+    phases, n_labs, ignores = phases_croisees(ctx, script)
+    fautes = []
+    for etiquette, chemin, etat, raison, verdict in phases:
+        attendu = etat == "à cadrer" or (raison or "").startswith("hors-cadrage:")
+        if verdict.startswith("autre:") or (verdict == "absence") != attendu:
+            fautes.append("%s %s : recalcul %s/%s, G1 %s" % (etiquette, chemin, etat, raison, verdict))
+    n = len(phases)
+    absence = sum(1 for p in phases if p[4] == "absence")
+    print("CROISE-G1 n=%d labs=%d absence=%d hors-absence=%d ecartees=%d" % (n, n_labs, absence, n - absence, ignores))
+    if n < PLANCHER_CROISE_G1:
+        fautes.append("%d phase(s) comparée(s), sous le plancher déclaré %d" % (n, PLANCHER_CROISE_G1))
+    if absence < 1 or n - absence < 1:
+        fautes.append("comparaison à vide : %d refus d'absence, %d passages" % (absence, n - absence))
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else "%d phases comparées (%d refus pour absence de CADRAGE.md, %d passages) : G1 refuse <=> `à cadrer` ou `hors-cadrage:*`" % (n, absence, n - absence))
+
+
+# Table de canary d'un dossier de scripts jetable (R-CANG-G1) : le hook livré TEL QUEL, ou G6, G5 et G1 armés.
+def controle_cang_g1(ctx, script):
+    """R-CANG-G1 : le canary rend 3 (sain, cas G1 compris) sur l'état livré, sur une copie où G6, G5 et G1 sont armed,
+    et signale (code 0, une ligne qui nomme `G1-sans-cadrage`) quand evaluer_g1 est neutralisé."""
+    dossier = _dossier(ctx, script)
+    fautes = []
+    d = scripts_canary(ctx, dossier, "observe", tel_quel=True)
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        fautes.append("état livré : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    d = scripts_canary(ctx, dossier, "armed", armes=("G6", "G5", "G1"))
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        fautes.append("G6, G5 et G1 armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    neutre, raison = make_hook_mutant(ctx, "G1-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5))  # gates-a-verdict')
+    if neutre is None:
+        fautes.append("mutant du hook invalide : " + raison)
+    else:
+        for valeur, armes in (("observe", ()), ("armed", ("G6", "G5", "G1"))):
+            d = scripts_canary(ctx, dossier, valeur, hook=os.path.join(neutre, "planning-hook.sh"), armes=armes)
+            rc, out, err = lancer_canary_dossier(ctx, d)
+            lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+            if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G1-sans-cadrage" not in lignes[0] or "G6-principal" in lignes[0]:
+                fautes.append("evaluer_g1 neutralisé (%s) : rc=%d %s" % (valeur, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "canary sain (code 3) sur l'état livré et sur G6, G5 et G1 armed ; evaluer_g1 neutralisé : une ligne qui nomme G1-sans-cadrage, observe comme armed")
 
 
 # =================================================================================================
@@ -1753,9 +1993,23 @@ def sec_cang(ctx):
     for ident, ctrl, titre in (
             ("R-CANG-01", controle_cang_01, "canary de session, G6 et G5 en observe"),
             ("R-CANG-02", controle_cang_02, "canary de session, G6 et G5 armed"),
-            ("R-CANG-03", controle_cang_03, "canary de session, evaluer_g6 neutralisé")):
+            ("R-CANG-03", controle_cang_03, "canary de session, evaluer_g6 neutralisé"),
+            ("R-CANG-G1", controle_cang_g1, "canary de session, cas G1-sans-cadrage")):
         bon, detail = ctrl(ctx, None)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+
+
+def sec_g1(ctx):
+    for ident, ctrl, titre in (
+            ("R-G1-01", controle_g1_01, "Write du PLAN.md d'une phase sans CADRAGE.md sur copie observe"),
+            ("R-G1-02", controle_g1_02, "le même Write et Edit sur copie armed, plan direct et sous plans/"),
+            ("R-G1-03", controle_g1_03, "phase cadrée, socle v2, nom d'unité invalide, lab dev : aucun refus")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+    bon, detail = controle_croise_g1(ctx, None)
+    ok("R-G1-04 contrôle croisé avec recalc-planning.sh --read-only : " + detail) if bon else ko(
+        "R-G1-04", "G1 refuse pour absence de CADRAGE.md <=> le recalcul rend `à cadrer` ou `hors-cadrage:*`, phase par phase des deux bancs",
+        "aucune divergence", detail)
 
 
 def sec_verdict(ctx):
@@ -1828,7 +2082,7 @@ def sec_banc(ctx):
             ko("COUVERTURE " + gate, "au moins un cas `avertit` et un cas `silence` pour " + gate, ">= 1 chacun", str(c))
         else:
             ok("COUVERTURE %s : %d avertit, %d silence" % (gate, c["avertit"], c["silence"]))
-    for gate in ("G5", "G6"):
+    for gate in ("G5", "G6", "G1"):
         c = compte.get(gate, {})
         print("COUVERTURE %s doit-refuser=%d doit-passer=%d silence=%d" % (gate, c.get("doit-refuser", 0), c.get("doit-passer", 0), c.get("silence", 0)))
         if c.get("doit-refuser", 0) < 1 or c.get("doit-passer", 0) < 1 or c.get("silence", 0) < 1:
@@ -1919,6 +2173,11 @@ def sec_mutants(ctx):
          "R-ID-01", controle_id_01),
         ("F6", "# g6-adhesion", "return None  # g6-adhesion", "R-ID-03", controle_id_03),
         ("F7B", "# g6-noms", 'GENERES_PAR_RECALC = ("STATE.md", "INDEX.md", "cloture.log")  # g6-noms', "R-ID-04", controle_id_04),
+        # 45-06 : G1
+        ("G1-CADRAGE", "# g1-cadrage", "if False:  # g1-cadrage", "R-G1-02", controle_g1_02),
+        ("G1-FORME", "# g1-forme", 'dossier_phase = composants[:5] if composants and composants[-1].casefold() == "plan.md" else None  # g1-forme',
+         "R-G1-03", controle_g1_03),
+        ("G1-PHASE", "# g1-phase", "return composants[:-1]  # g1-phase", "R-G1-02", controle_g1_02),
     ]
     for entree in M:
         ident, motif, repl, cible, ctrl = entree[:5]
@@ -1955,6 +2214,7 @@ SECTIONS = {
     "g6": sec_g6,
     "id": sec_id,
     "cang": sec_cang,
+    "g1": sec_g1,
     "env": sec_env,
     "obs_env": sec_obs_env,
     "env_statique": sec_env_statique,
@@ -1968,6 +2228,7 @@ def main():
     scripts_dir, hooks_json, banc, work, settings_lab = sys.argv[2:7]
     ctx = Ctx(scripts_dir, hooks_json or None, work, settings_lab or None)
     ctx.banc = banc
+    ctx.banc_recalc = sys.argv[7] if len(sys.argv) > 7 and sys.argv[7] else None
     if ctx.charger_commande() is None:
         ko("commande enregistrée", "la commande enregistrée est lisible (une seule entrée PreToolUse portant planning-hook.sh)",
            "1 commande", "introuvable dans " + str(hooks_json or settings_lab or "aucune source"))
@@ -1982,7 +2243,7 @@ PY_AIDES_GATES_EOF
 run_sections() { # <sections séparées par des virgules>
   local out rc line
   out="$WORK/sortie-gates.txt"
-  "$PYBIN" "$AIDES" "$1" "$SCRIPTS_DIR" "$HOOKS_JSON" "$BANC" "$WORK" "$SETTINGS_LAB" > "$out" 2>&1
+  "$PYBIN" "$AIDES" "$1" "$SCRIPTS_DIR" "$HOOKS_JSON" "$BANC" "$WORK" "$SETTINGS_LAB" "$BANC_RECALC" > "$out" 2>&1
   rc=$?
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -2000,7 +2261,9 @@ run_sections() { # <sections séparées par des virgules>
 [ -f "$BANC" ] || ko "gates-banc.txt présent" "le banc texte existe sous fixtures/" "$BANC" "absent"
 [ -f "$RECALC" ] || ko "recalc-planning.sh présent" "le moteur de recalcul existe à côté du hook (contrôle croisé du parseur)" "$RECALC" "absent"
 
-run_sections table,parseur,jeton,g2,g5,g6,id,cang,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
+[ -f "$BANC_RECALC" ] || ko "recalc-planning-banc.txt présent" "le banc de la 44 existe sous fixtures/ (contrôle croisé de G1)" "$BANC_RECALC" "absent"
+
+run_sections table,parseur,jeton,g2,g5,g6,id,cang,g1,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

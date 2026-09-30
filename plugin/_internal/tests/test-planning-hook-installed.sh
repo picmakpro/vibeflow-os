@@ -394,16 +394,32 @@ def copier_lab(ctx, prefixe):
 
 
 def armer_copie(lab, gates):
-    """Réécrit en `armed` les lignes ARMEMENT_<gate> du planning-hook.sh POSÉ dans `lab` (copie)."""
+    """Réécrit en `armed` les lignes ARMEMENT_<gate> du planning-hook.sh POSÉ dans `lab` (copie) : l'armement
+    d'un gate ne dépend pas de l'état livré (une ligne déjà `armed` est conservée)."""
     chemin = os.path.join(lab, ".claude", "scripts", CITE)
     texte = open(chemin, encoding="utf-8").read()
     for g in gates:
-        motif = 'ARMEMENT_%s = "observe"' % g
-        if texte.count(motif) != 1:
-            raise RuntimeError("motif d'armement non unique dans la copie : " + motif)
-        texte = texte.replace(motif, 'ARMEMENT_%s = "armed"' % g)
+        lignes = texte.split("\n")
+        idx = [i for i, l in enumerate(lignes) if l.startswith("ARMEMENT_%s = \"" % g)]
+        if len(idx) != 1:
+            raise RuntimeError("ligne d'armement non unique dans la copie : ARMEMENT_" + g)
+        lignes[idx[0]] = lignes[idx[0]].replace('"observe"', '"armed"', 1)
+        texte = "\n".join(lignes)
     with open(chemin, "w", encoding="utf-8") as fh:
         fh.write(texte)
+
+
+def retirer_cas_canary(lab, gate):
+    """Retire de CANARIS, dans le check-gates-alive.sh POSÉ dans `lab` (copie), tous les cas du gate : le canary
+    doit alors signaler « gate armé sans canary » pour ce gate, quel que soit l'état des cas livrés (un gate qui
+    reçoit son cas de canary ne doit pas faire rougir ce contrôle)."""
+    chemin = os.path.join(lab, ".claude", "scripts", CANARY)
+    lignes = open(chemin, encoding="utf-8").read().split("\n")
+    gardees = [l for l in lignes if not (l.strip().startswith('"') and ("|" + gate + "|") in l)]
+    if len(gardees) == len(lignes):
+        raise RuntimeError("aucun cas de canary à retirer pour " + gate)
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(gardees))
 
 
 def session(cwd):
@@ -547,10 +563,11 @@ def sec_can(ctx):
     # R-CAN-05 : gate armé sans cas de canary
     lab5 = copier_lab(ctx, "lab-arme-sans-cas")
     armer_copie(lab5, ("G6", "G5", "G1"))
+    retirer_cas_canary(lab5, "G1")  # 45-06 : G1 a son cas de canary ; la copie le perd (indépendant du gate cible)
     rc, out, err = lancer_canary(ctx, lab5, ses, ())
     raison = une_ligne(out, ("gate armé sans canary : G1",))
     if rc == 0 and not raison:
-        ok("R-CAN-05 ARMEMENT_G1 armed (étapes 1 et 2) sans cas de canary G1 : code 0, UNE ligne « gate armé sans canary : G1 » (G6 et G5 ont leurs cas depuis 45-05)")
+        ok("R-CAN-05 ARMEMENT_G1 armed (étapes 1 et 2) dans une copie dont le cas de canary G1 est retiré : code 0, UNE ligne « gate armé sans canary : G1 » (G6 et G5 gardent leurs cas)")
     else:
         ko("R-CAN-05", "gate G1 armé dans la copie posée (avec G6 et G5), CANARIS sans cas G1", "code 0 et « gate armé sans canary : G1 »", "rc=%d %s err=%s" % (rc, raison or court(out), court(err)))
 
@@ -667,6 +684,7 @@ def sec_mutants(ctx):
 
     def sc_sans_cas(lab):
         armer_copie(lab, ("G6", "G5", "G1"))
+        retirer_cas_canary(lab, "G1")
         rc, out, _ = lancer_canary(ctx, lab, ses, ())
         return rc, out
 

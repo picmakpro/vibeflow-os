@@ -143,6 +143,8 @@ CANARIS = (
     "G6-principal|G6|nominal|Write:.planning/" + NOM_ETAT,
     "G6-plugin|G6|nominal|Write:.planning/" + NOM_ETAT + "@plugin-inconnu:agent-inconnu",
     "G5-verdict|G5|nominal|Write:.planning/cycles/01-c/phases/01-p/VERDICT.md@agent-inconnu",
+    # Étape 2 (45-06) : G1 (PLAN.md de forme modèle dans une phase sans CADRAGE.md, fil principal).
+    "G1-sans-cadrage|G1|nominal|Write:.planning/cycles/01-c/phases/01-p/PLAN.md",
 )
 
 

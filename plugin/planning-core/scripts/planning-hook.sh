@@ -904,9 +904,51 @@ def evaluer_g6(contexte):
     return [] if raison is None else [Verdict("G6", chemin_rel, raison)]
 
 
+# --- G1 : pas de plan sans cadrage (GATE-06, 45-06 ; spec §5) ----------------------------------------
+# Toute écriture par Write ou Edit d'un PLAN.md de forme modèle — `.planning/cycles/<cycle>/phases/<phase>/
+# PLAN.md` ou `.../phases/<phase>/plans/<plan>/PLAN.md`, chaque nom d'unité conforme à NOM_UNITE, les noms
+# fixes comparés en casefold, le chemin résolu physiquement (identité de 45-05) — est jugée sur la phase : pas
+# de CADRAGE.md dans son dossier, refus. Un PLAN.md hors de cette forme (socle v2, nom d'unité invalide) n'est
+# jamais visé. G1 lit l'état que le modèle de la 44 dérive déjà ; il ne refuse JAMAIS un état que le modèle ne
+# peut pas lire (F5 = f5-etats, P45-D-21a) : la suite compare chaque phase des bancs au recalcul.
+def unite_de_plan(composants):
+    """Composants du dossier de la PHASE jugée (cinq premiers composants, relatifs à la racine du lab) si
+    `composants` désignent un PLAN.md de forme modèle, sinon None. Sous `plans/<plan>/`, la phase jugée reste
+    la phase, jamais le plan."""
+    n = len(composants)
+    if n not in (6, 8) or composants[-1].casefold() != "plan.md":
+        return None
+    if composants[0].casefold() != ".planning" or composants[1].casefold() != "cycles" or composants[3].casefold() != "phases":
+        return None
+    if n == 8 and composants[5].casefold() != "plans":
+        return None
+    unites = [composants[2], composants[4]] + ([composants[6]] if n == 8 else [])
+    if not all(NOM_UNITE.match(u) for u in unites):
+        return None
+    return composants[:5]  # g1-phase
+
+
+def evaluer_g1(contexte):
+    """G1 (GATE-06) : écriture par Write ou Edit d'un PLAN.md de forme modèle dans une phase sans CADRAGE.md."""
+    if contexte["outil"] not in ("Write", "Edit") or not contexte["ecrit"]:
+        return []
+    racine = contexte["racine"]
+    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
+    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    dossier_phase = unite_de_plan(composants)  # g1-forme
+    if dossier_phase is None:
+        return []
+    phase = dossier_phase[-1]
+    chemin_rel = "/".join(composants)
+    cadrage = os.path.join(racine, *dossier_phase) + os.sep + "CADRAGE.md"
+    if not os.path.lexists(cadrage):  # g1-cadrage
+        return [Verdict("G1", chemin_rel, "la phase %s n'a pas de CADRAGE.md — cadrez avant de planifier (spec §5)" % phase)]
+    return []
+
+
 # Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un
 # Verdict d'erreur : deny si le gate est armed, ligne d'observation sinon (P45-D-08, spec §5.1).
-GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5))  # gates-a-verdict
+GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1))  # gates-a-verdict
 
 
 def evaluer_protege(gate, fonction, contexte):

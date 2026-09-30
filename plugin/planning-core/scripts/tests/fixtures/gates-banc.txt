@@ -195,6 +195,11 @@ etat de compartiment
 @@ fichier .planning/compartments/x/STATE.md
 etat de compartiment
 
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues: []
+---
+
 @@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
 ---
 ecrit: livrables/rapport.md
@@ -232,3 +237,125 @@ etat ecrit a la main
 @@ ecriture Write .planning/STATE.md armee :: silence G6
 @@ ecriture Edit .planning/STATE.md armee :: silence G6
 @@ ecriture Write .planning/INDEX.md armee :: silence G6
+
+@@ # --- G1 (45-06, GATE-06, spec §5) : écrire par Write ou Edit un PLAN.md de forme modèle dans une phase
+@@ # sans CADRAGE.md d'un lab adhérent. Même option `armee` : G1 reste en observation dans le script livré tant
+@@ # que le rejeu réel n'a pas armé l'étape 2. La phase jugée est la phase, jamais le plan (plans/<plan>/) ;
+@@ # un PLAN.md du socle v2 ou sous un nom d'unité invalide n'est jamais visé.
+@@ lab g1-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle G1
+rend: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-sans/PLAN.md
+---
+ecrit: livrables/a.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-clos/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Q ?"
+    structurante: oui
+    statut: ARBITRÉ
+    par: willy
+    le: "2026-09-30"
+    ou: "session principale"
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-clos/PLAN.md
+---
+ecrit: livrables/b.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/03-vide/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/03-vide/PLAN.md
+---
+ecrit: livrables/c.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/04-ouvert/CADRAGE.md
+---
+inconnues:
+  - id: I-07
+    question: "Q ouverte ?"
+    structurante: oui
+---
+
+@@ fichier .planning/cycles/01-c/phases/04-ouvert/PLAN.md
+---
+ecrit: livrables/d.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/05-herite/CADRAGE.md
+---
+titre: ancien cadrage sans registre
+---
+
+@@ fichier .planning/cycles/01-c/phases/05-herite/PLAN.md
+---
+ecrit: livrables/e.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/06-plans/plans/01-a/PLAN.md
+---
+ecrit: livrables/f.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/07-plans-clos/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/07-plans-clos/plans/01-a/PLAN.md
+---
+ecrit: livrables/g.md
+---
+
+@@ dossier .planning/cycles/01-c/phases/08-neuve
+
+@@ # Refus : phase sans CADRAGE.md, plan direct et sous plans/, phase encore vide, Write comme Edit, tout rôle.
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: doit-refuser G1
+@@ ecriture Edit .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/PLAN.md agent=general-purpose armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/06-plans/plans/01-a/PLAN.md armee :: doit-refuser G1
+@@ ecriture Edit .planning/cycles/01-c/phases/06-plans/plans/01-a/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/08-neuve/PLAN.md armee :: doit-refuser G1
+@@ # Passage : phase à CADRAGE.md clos, à `inconnues: []`, au format hérité ; plan sous une phase cadrée ; autres
+@@ # fichiers du modèle ; PLAN.md du socle v2 ou sous un nom d'unité invalide ; PLAN.md hors de .planning/.
+@@ ecriture Write .planning/cycles/01-c/phases/02-clos/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/03-vide/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/05-herite/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/07-plans-clos/plans/01-a/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/SUMMARY.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/PLAN.md.bak armee :: doit-passer G1
+@@ ecriture Write .planning/phases/01-x/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/sans-numero/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/plans/x/PLAN.md armee :: doit-passer G1
+@@ ecriture Write livrables/PLAN.md armee :: doit-passer G1
+
+@@ lab g1-dev jumeau-de=g1-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .planning/cycles/01-c/phases/01-sans/PLAN.md
+---
+ecrit: livrables/a.md
+---
+
+@@ # Jumeau négatif : un lab dev écrit ses plans à la main, même sur copie armée.
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: silence G1
+@@ ecriture Edit .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: silence G1
+@@ ecriture Write .planning/cycles/01-c/phases/08-neuve/PLAN.md armee :: silence G1
