@@ -33,6 +33,8 @@
 #                                                                                lignes rangées sous aucune étape (`-`, `?`)
 #   CLASSE-REGLE-ECRITE <gate> lab=<lab affiché> n=<j>                          gate qui classe d'après
 #                                                                                le modèle, par lab
+#   ROLE-AGENT lab=<lab affiché> agent=<nom> role=<rôle dérivé> ecriture=<attendu> dispatchs=<n>   une par agent rejoué
+#                                                                                par le constructeur ROLE (45-09) ; rien sans agent
 #   EMPREINTE-IDENTIQUE <lab affiché>   (ou EMPREINTE-DIVERGENTE + code 1)      une par lab
 # Les chemins sous HOME sont affichés `~/…` ; les chemins internes sont relatifs au lab.
 #
@@ -59,7 +61,9 @@
 # `.planning/` imbriqué réel, attendu doit-passer, et celle d'un `.planning/` dans un dossier synthétique vide
 # `rejeu-orphelin-g7/` sous chaque racine adhérente de la copie, attendu doit-refuser ; le dossier visé est mis de côté
 # sur la copie, le hook est joué, le dossier est remis en place — UN payload à la fois, après les écritures parallèles ;
-# une copie qui n'est pas identique avant et après est une erreur de l'outil) ; 45-08 et 45-09 ajoutent le leur.
+# une copie qui n'est pas identique avant et après est une erreur de l'outil) ; `ROLE` (45-09 : les définitions d'agents de la
+# racine de chaque lab adhérent, classées par `planning-hook.sh --classer` sur la copie du hook ; légitimité mesurée sur les
+# déclarations de l'agent, limite déclarée sous F9 = f9-allowlist, voir `construire_role`).
 # Une écriture de création porte la situation `creation` : sa ligne du relevé se termine par ` [création]` et elle ne se
 # fond jamais avec la réécriture en place du même chemin. `charge` (dict) remplace le tool_input d'un Edit (old_string, new_string,
 # replace_all) : l'Edit de config.json qui perd l'adhésion a une clé (outil Edit) distincte de celle de
@@ -680,7 +684,120 @@ def construire_g7(lab, ctx):
     return sortie
 
 
-CONSTRUCTEURS = {"reecriture": construire_reecriture, "G6": construire_g6, "G5": construire_g5, "G1": construire_g1, "G7": construire_g7}  # rejeu-registre
+# --- Rôle (45-09, GATE-09, P45-D-21, F9 = f9-allowlist) : le hook par rôle sur les définitions d'agents du lab ------------
+# Pour chaque définition `.claude/agents/*.md` (fichier régulier, non caché) de la RACINE d'un lab copié dont le .planning/ est
+# adhérent, `planning-hook.sh --classer` (la copie du hook rejoué) donne allowlist et disallowed. La légitimité se mesure sur les
+# DÉCLARATIONS de l'agent, jamais sur son rôle : une écriture d'un agent qui retire Write ET Edit est `doit-refuser`, toute autre
+# `doit-passer` ; un dispatch d'un nom de SA propre allowlist est `doit-passer` ; le dispatch de `hors-liste-rejeu` par un worker
+# (vf-internal: true) est `doit-refuser`, sous `Agent` et sous `Task`. LIMITE DÉCLARÉE : sous F9 = f9-allowlist (Willy,
+# AskUserQuestion session principale, 2026-09-30) ce prédicat (le dispatch appartient à l'allowlist de l'appelant) est celui de la
+# politique du hook pour la ligne worker : la mesure n'y est PAS indépendante, elle prouve la concordance de deux implémentations ;
+# la ligne juge, jugée sur disallowedTools, l'est. Ce constructeur ne pose jamais `doit-refuser-modele` : les déclarations d'un agent
+# valent pour tout lab. Deux définitions du même nom normalisé de rôles différents : l'agent est inconnu du hook (P45-D-11), son
+# écriture est `doit-passer` et aucun dispatch n'est rejoué. Un agent `.md` en lien symbolique n'est pas une définition (A1 de la 42).
+DOSSIER_ROLE = "rejeu-role"
+HORS_LISTE_ROLE = "hors-liste-rejeu"
+NOM_SUR = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def normaliser_nom(nom):
+    """Comparaison de noms d'agents (P45-D-09), écrite ICI : l'outil ne réutilise aucune fonction du hook."""
+    return nom.casefold().replace("_", "-").replace(" ", "-")
+
+
+def nom_de_definition(texte, repli):
+    """`name:` du frontmatter (dé-quoté ; le dernier l'emporte), à défaut le nom de fichier sans `.md`."""
+    lignes = texte.split("\n")
+    if not lignes or lignes[0].strip() != "---":
+        return repli
+    nom = None
+    for ligne in lignes[1:]:
+        if ligne.strip() == "---":
+            break
+        m = re.match(r"^name:(.*)$", ligne)
+        if m:
+            valeur = m.group(1).strip()
+            if len(valeur) >= 2 and valeur[0] == valeur[-1] and valeur[0] in ("'", '"'):
+                valeur = valeur[1:-1]
+            nom = valeur
+    return nom if isinstance(nom, str) and nom else repli
+
+
+def classer_definition(hook_copie, chemin):
+    """{role, allowlist, disallowed} rendus par `planning-hook.sh --classer <agent.md>` sur la COPIE du hook."""
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": os.environ.get("HOME", "")}
+    try:
+        p = subprocess.run(["bash", hook_copie, "--classer", chemin], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE, env=env, timeout=DELAI_HOOK)
+        donnees = json.loads(p.stdout.decode("utf-8"))
+    except (subprocess.TimeoutExpired, OSError, ValueError):
+        raise ErreurOutil("--classer injouable : " + os.path.basename(chemin))
+    if p.returncode != 0 or not isinstance(donnees, dict) or not isinstance(donnees.get("role"), str) \
+            or not isinstance(donnees.get("allowlist"), list) or not isinstance(donnees.get("disallowed"), list):
+        raise ErreurOutil("--classer : réponse inattendue pour " + os.path.basename(chemin))
+    return donnees
+
+
+def definitions_racine(lab):
+    """[(nom, classe)] des définitions régulières de `<copie>/.claude/agents/*.md`, triées par nom de fichier."""
+    dossier = os.path.join(lab.copie, ".claude", "agents")
+    try:
+        noms = sorted(os.listdir(dossier))
+    except OSError:
+        return []
+    res = []
+    for fichier in noms:
+        chemin = os.path.join(dossier, fichier)
+        if not fichier.endswith(".md") or fichier.startswith("."):
+            continue
+        try:
+            if not stat.S_ISREG(os.lstat(chemin).st_mode):
+                continue  # un lien symbolique n'est jamais une définition
+            with open(chemin, encoding="utf-8-sig") as fh:
+                texte = fh.read()
+        except (OSError, UnicodeDecodeError):
+            continue
+        res.append((nom_de_definition(texte, fichier[:-3]), chemin))
+    return res
+
+
+def construire_role(lab, ctx):
+    """ROLE : pour chaque agent de la racine du lab, l'écriture d'un livrable neutre `rejeu-role/<agent>.md` sous son agent_type
+    (doit-refuser s'il retire Write ET Edit, sinon doit-passer), un dispatch de chaque nom de son allowlist sous `Agent`
+    (doit-passer) et, pour un worker, le dispatch de `hors-liste-rejeu` sous `Agent` et sous `Task` (doit-refuser). Rien n'est
+    rejoué si le .planning/ de la racine n'existe pas (le lab dev reste silencieux, P45-D-04)."""
+    if ".planning" not in lab.dossiers_planning:
+        return []
+    groupes = {}
+    for nom, chemin in definitions_racine(lab):
+        groupes.setdefault(normaliser_nom(nom), []).append((nom, chemin, classer_definition(ctx["hook_copie"], chemin)))
+    sortie = []
+    for _cle, membres in sorted(groupes.items()):
+        nom, _chemin, classe = membres[0]
+        roles = set(m[2]["role"] for m in membres)
+        ecriture = DOSSIER_ROLE + "/" + NOM_SUR.sub("_", nom) + ".md"
+        if len(roles) > 1:  # rôles contradictoires : agent inconnu du hook, jamais refusé (P45-D-11)
+            sortie.append(("Write", ecriture, "doit-passer", nom))
+            ctx["notes"].append("ROLE-AGENT lab=%s agent=%s role=ambigu ecriture=doit-passer dispatchs=0" % (lab.affiche, NOM_SUR.sub("_", nom)))
+            continue
+        interdits = classe["disallowed"]
+        ecriture_refusee = "Write" in interdits and "Edit" in interdits  # la légitimité d'une écriture : les déclarations
+        sortie.append(("Write", ecriture, "doit-refuser" if ecriture_refusee else "doit-passer", nom))
+        dispatchs = []
+        for sous in classe["allowlist"]:
+            if isinstance(sous, str) and sous != "" and sous not in dispatchs:
+                dispatchs.append(sous)
+        for sous in dispatchs:
+            sortie.append(("Agent", sous, "doit-passer", nom))  # role-legitime : le dispatch appartient à l'allowlist de l'appelant
+        if classe["role"] == "worker":
+            sortie.append(("Agent", HORS_LISTE_ROLE, "doit-refuser", nom))
+            sortie.append(("Task", HORS_LISTE_ROLE, "doit-refuser", nom))
+        ctx["notes"].append("ROLE-AGENT lab=%s agent=%s role=%s ecriture=%s dispatchs=%d"
+                            % (lab.affiche, NOM_SUR.sub("_", nom), classe["role"], "doit-refuser" if ecriture_refusee else "doit-passer", len(dispatchs)))
+    return sortie
+
+
+CONSTRUCTEURS = {"reecriture": construire_reecriture, "G6": construire_g6, "G5": construire_g5, "G1": construire_g1, "G7": construire_g7, "ROLE": construire_role}  # rejeu-registre
 
 
 def normaliser(lab, gate, brut, rang):
@@ -945,7 +1062,7 @@ def executer(opts, tmp):
     entrees = []
     ordre = ["reecriture"] + [g for g in GATES if g in CONSTRUCTEURS] + \
         [g for g in sorted(CONSTRUCTEURS) if g != "reecriture" and g not in GATES]
-    contexte = {"hook_copie": hook_copie, "tmp": tmp, "etape": opts["etape"]}
+    contexte = {"hook_copie": hook_copie, "tmp": tmp, "etape": opts["etape"], "notes": []}
     for nom in ordre:
         rang = RANG_GENERIQUE if nom == "reecriture" else RANG_GATE
         for lab in labs:
@@ -1017,6 +1134,7 @@ def executer(opts, tmp):
         for lab in labs:
             n = len([e for e in gagnants if e["lab"] == lab.index and e["gate"] == gate and e["origine"] == "regle-ecrite"])
             lignes.append("CLASSE-REGLE-ECRITE %s lab=%s n=%d" % (gate, lab.affiche, n))
+    lignes.extend(contexte["notes"])  # ROLE-AGENT : une ligne par agent rejoué (rôle dérivé, nombre de dispatchs), 45-09
 
     divergence = False
     for lab in labs:

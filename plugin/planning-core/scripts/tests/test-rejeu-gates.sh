@@ -29,7 +29,12 @@
 #                 conforme au modèle, compté à part), les créations synthétiques doit-refuser ; le dossier imbriqué est mis de côté
 #                 puis remis en place sur la copie (trace d'un substitut, erreur de l'outil si la copie diffère) ; à --etape=2 la
 #                 ligne COMPTE G7 est suffixée `hors-etape` et ne compte pas
-#   R-REJEU-STATIQUE  aucun sous-processus autre que bash (hook copié, recalc-planning.sh) et cmp
+#   R-REJEU-ROLE  constructeur ROLE (45-09) : le vrai hook armé à l'étape 4 sur un lab synthétique qui porte un juge, un manager à
+#                 allowlist, un worker à allowlist et un producteur ; la légitimité se mesure sur les déclarations des agents (écriture
+#                 d'un agent qui retire Write et Edit : doit-refuser ; dispatch d'un nom de sa propre allowlist : doit-passer, F9 =
+#                 f9-allowlist, Willy, AskUserQuestion session principale, 2026-09-30 ; dispatch hors liste d'un worker sous Agent ET
+#                 Task : doit-refuser) ; un substitut qui applique la lettre compte un faux refus ; à --etape=3 les lignes ROLE sont hors-etape
+#   R-REJEU-STATIQUE  aucun sous-processus autre que bash (hook copié, `--classer`, recalc-planning.sh) et cmp
 #   R-REEL-01..04  rejeu-reel.sh : empreinte de TOUT l'arbre par un geste extérieur, liens non suivis,
 #                  aucune commande de gestionnaire de versions
 #   MUT-*  douze mutants (motif unique, texte distinct, bash -n, compilation) : chaque garde rougit
@@ -987,6 +992,122 @@ def sec_g7(_):
         ok("R-REJEU-G7 vrai hook, --etape=3, lab synthétique à deux .planning/ imbriqués (habité, nu) et un fichier d'attendus dont la ligne G7 marque zone/nu doit-refuser-modele (la colonne chemin se termine par le nom du dossier) : faux-refus=0 faux-accept=0 refus-conforme-modele=1 (les trois créations synthétiques en doit-refuser/refus, l'habité en doit-passer/passe) ; empreinte du lab identique ; le même lab à --etape=2 joue le constructeur, COMPTE G7 (0, 4, 0) hors-etape et REJEU-ETAPE-2 à 0 ; sans attendu, le nu reste doit-passer et compte un faux refus ; un substitut qui trace montre le dossier visé absent pendant son seul payload de création et présent ailleurs ; un chemin d'attendu en `..` est refusé (code 1)")
 
 
+# --- 45-09 : ROLE, constructeur du rejeu (R-REJEU-ROLE) ---------------------------------------------------------------------
+# Lab synthétique non migré (config 2.0, l'adhésion est simulée sur la copie) dont la RACINE porte un juge, un manager à allowlist,
+# un worker à allowlist (une seule entrée : cible-w), un producteur, un juge dont le name: diffère du nom de fichier, deux
+# définitions contradictoires du même nom (juge et producteur : agent inconnu du hook, P45-D-11) et un lien symbolique vers le juge
+# (jamais une définition). F9 = f9-allowlist (Willy, AskUserQuestion session principale, 2026-09-30) : le dispatch du worker dans sa
+# propre allowlist est doit-passer.
+def _agent(nom, tools, extra=""):
+    return "---\nname: %s\ndescription: agent synthétique\ntools: %s\n%s---\nCorps.\n" % (nom, tools, extra)
+
+
+ROLE_FICHIERS = {
+    ".claude/agents/juge-test.md": _agent("juge-test", "Read, Glob, Grep", "disallowedTools: Write, Edit\nomitClaudeMd: true\n"),
+    ".claude/agents/autre-fichier.md": _agent("Juge_Mixte", "Read, Glob, Grep", "disallowedTools: Write, Edit\nomitClaudeMd: true\n"),
+    ".claude/agents/manager-test.md": _agent("manager-test", "Read, Write, SendMessage, Agent(cible-m1, cible-m2)"),
+    ".claude/agents/worker-test.md": _agent("worker-test", "Read, Agent(cible-w)", "vf-internal: true\n"),
+    ".claude/agents/producteur-test.md": _agent("producteur-test", "Read, Write"),
+    ".claude/agents/ambigu-a.md": _agent("ambigu", "Read, Glob, Grep", "disallowedTools: Write, Edit\nomitClaudeMd: true\n"),
+    ".claude/agents/ambigu-b.md": _agent("ambigu", "Read, Write"),
+}
+# (chemin affiché) -> (attendu, obtenu) du relevé de l'étape 4 avec le vrai hook
+ATTENDU_ROLE = {
+    "rejeu-role/juge-test.md [Write@juge-test]": ("doit-refuser", "refus"),
+    "rejeu-role/Juge_Mixte.md [Write@Juge_Mixte]": ("doit-refuser", "refus"),
+    "rejeu-role/manager-test.md [Write@manager-test]": ("doit-passer", "passe"),
+    "cible-m1 [Agent@manager-test]": ("doit-passer", "passe"),
+    "cible-m2 [Agent@manager-test]": ("doit-passer", "passe"),
+    "rejeu-role/worker-test.md [Write@worker-test]": ("doit-passer", "passe"),
+    "cible-w [Agent@worker-test]": ("doit-passer", "passe"),
+    "hors-liste-rejeu [Agent@worker-test]": ("doit-refuser", "refus"),
+    "hors-liste-rejeu [Task@worker-test]": ("doit-refuser", "refus"),
+    "rejeu-role/producteur-test.md [Write@producteur-test]": ("doit-passer", "passe"),
+    "rejeu-role/ambigu.md [Write@ambigu]": ("doit-passer", "passe"),
+}
+ROLE_AGENTS = ["ROLE-AGENT lab=%s agent=ambigu role=ambigu ecriture=doit-passer dispatchs=0",
+               "ROLE-AGENT lab=%s agent=juge-test role=juge ecriture=doit-refuser dispatchs=0",
+               "ROLE-AGENT lab=%s agent=Juge_Mixte role=juge ecriture=doit-refuser dispatchs=0",
+               "ROLE-AGENT lab=%s agent=manager-test role=manager ecriture=doit-passer dispatchs=2",
+               "ROLE-AGENT lab=%s agent=producteur-test role=producteur ecriture=doit-passer dispatchs=0",
+               "ROLE-AGENT lab=%s agent=worker-test role=worker ecriture=doit-passer dispatchs=1"]
+# Substitut qui applique LA LETTRE de la table §5 (« Worker : tout dispatch refusé ») et refuse le juge : la légitimité du
+# constructeur ne dérive jamais du rôle, le dispatch du worker dans sa propre allowlist compte donc un faux refus.
+SUB_LETTRE = "\n".join([
+    'if ARMEMENT_ROLE == "armed" and outil in ("Agent", "Task") and p.get("agent_type") == "worker-test":',
+    '    refuser("ROLE", "worker : tout dispatch refusé (la lettre)")',
+    'if ARMEMENT_ROLE == "armed" and outil == "Write" and p.get("agent_type") in ("juge-test", "Juge_Mixte"):',
+    '    refuser("ROLE", "juge")',
+    ''])
+
+
+def substitut_classeur(nom, corps):
+    """Substitut de hook qui répond aussi à `--classer` (le constructeur ROLE l'appelle sur la copie du hook) : il délègue ce mode au
+    vrai hook ; toute autre décision est la sienne."""
+    deleg = '#!/usr/bin/env bash\nif [ "${1:-}" = "--classer" ]; then exec bash %s --classer "${2:-}"; fi\n' % HOOK
+    tete = TETE_SUBSTITUT.replace("@PY@", PYBIN).replace("#!/usr/bin/env bash\n", deleg, 1)
+    chemin = os.path.join(WORK, "substituts", nom)
+    ecrire(chemin, tete + corps + "\nPY_SUBSTITUT_EOF\n", 0o755)
+    return chemin
+
+
+def lab_role(nom, avec_planning=True):
+    lab = fabriquer_lab(nom, ROLE_FICHIERS, config='{"planning_version": "2.0"}' if avec_planning else None)
+    os.symlink(os.path.join(lab, ".claude", "agents", "juge-test.md"), os.path.join(lab, ".claude", "agents", "lien-juge.md"))
+    return lab, "~/" + os.path.basename(lab)
+
+
+def scenario_role(script, etape=4, hook=HOOK, avec_planning=True):
+    lab, aff = lab_role(unique("lab-role"), avec_planning)
+    r = rejeu([lab], hook=hook, etape=etape, script=script, scenario=("" if hook != HOOK else None))
+    return r, aff
+
+
+def lignes_role(r, aff):
+    return dict((l[2], (l[3], l[4])) for l in r.lignes if l[0] == "ROLE" and l[1] == aff)
+
+
+def sec_role(_):
+    """R-REJEU-ROLE : constructeur ROLE, le vrai hook armé à l'étape 4, légitimité mesurée sur les déclarations (F9 = f9-allowlist)."""
+    fautes = []
+    r, aff = scenario_role(REJEU, 4)
+    lignes = lignes_role(r, aff)
+    if r.rc != 0:
+        fautes.append("--etape=4 : code %d : %s" % (r.rc, court(r.err)))
+    if lignes != ATTENDU_ROLE:
+        fautes.append("--etape=4 : lignes ROLE %s (attendu %s)" % (sorted(lignes.items()), sorted(ATTENDU_ROLE.items())))
+    if r.compte.get("ROLE") != (0, 0, 0) or "ROLE" in r.hors_etape or r.etape != (0, 0, 0):
+        fautes.append("--etape=4 : COMPTE ROLE %s hors=%s REJEU-ETAPE-4 %s (attendu (0, 0, 0) compté)" % (r.compte.get("ROLE"), sorted(r.hors_etape), r.etape))
+    if any("EMPREINTE-DIVERGENTE" in e for e in r.empreintes) or not any(e.startswith("EMPREINTE-IDENTIQUE") for e in r.empreintes):
+        fautes.append("--etape=4 : empreinte du lab réel %s" % r.empreintes)
+    notes = sorted(l for l in r.out.split("\n") if l.startswith("ROLE-AGENT "))
+    if notes != sorted(m % aff for m in ROLE_AGENTS):
+        fautes.append("--etape=4 : lignes ROLE-AGENT %s (attendu %s)" % (notes, sorted(m % aff for m in ROLE_AGENTS)))
+    if any("lien-juge" in l[2] for l in r.lignes):
+        fautes.append("--etape=4 : un agent en lien symbolique est rejoué comme une définition : %s" % [l[2] for l in r.lignes if "lien-juge" in l[2]])
+    # --etape=3 : ROLE est simulé en observe ; ses lignes sont imprimées, son compte est hors-etape et n'entre pas dans REJEU-ETAPE-3
+    r3, aff3 = scenario_role(REJEU, 3)
+    l3 = lignes_role(r3, aff3)
+    if sorted(l3) != sorted(ATTENDU_ROLE) or any(obtenu != "passe" for _a, obtenu in l3.values()):
+        fautes.append("--etape=3 : lignes ROLE %s (attendu les mêmes onze clés, toutes passées : ROLE est simulé en observe)" % sorted(l3.items()))
+    if r3.compte.get("ROLE") != (0, 4, 0) or "ROLE" not in r3.hors_etape or r3.etape != (0, 0, 0):
+        fautes.append("--etape=3 : COMPTE ROLE %s hors=%s REJEU-ETAPE-3 %s (attendu (0, 4, 0) hors-etape, totaux à 0)" % (r3.compte.get("ROLE"), sorted(r3.hors_etape), r3.etape))
+    # la lettre (le substitut refuse tout dispatch d'un worker) : le dispatch de sa propre allowlist est un faux refus ; le reste reste à 0
+    rs, affs = scenario_role(REJEU, 4, hook=substitut_classeur(unique("sub-lettre") + ".sh", SUB_LETTRE))
+    ls = lignes_role(rs, affs)
+    if ls.get("cible-w [Agent@worker-test]") != ("doit-passer", "refus") or rs.compte.get("ROLE") != (1, 0, 0):
+        fautes.append("la lettre : %s COMPTE ROLE %s (attendu doit-passer/refus, (1, 0, 0) : le dispatch de la propre allowlist du worker ; les autres gates du substitut ne sont pas jugés ici)" % (ls.get("cible-w [Agent@worker-test]"), rs.compte.get("ROLE")))
+    # un lab sans .planning/ à la racine (lab dev) : le constructeur ne rejoue rien
+    rd, affd = scenario_role(REJEU, 4, avec_planning=False)
+    if rd.rc != 0 or lignes_role(rd, affd) or rd.compte.get("ROLE") != (0, 0, 0):
+        fautes.append("lab sans .planning/ : code %d lignes ROLE %s COMPTE ROLE %s (attendu aucune ligne)" % (rd.rc, sorted(lignes_role(rd, affd)), rd.compte.get("ROLE")))
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-ROLE", "constructeur ROLE : légitimité mesurée sur les déclarations des agents, le vrai hook armé à l'étape 4", "voir le cas", f)
+    else:
+        ok("R-REJEU-ROLE vrai hook, --etape=4, lab synthétique à la racine duquel vivent un juge, un juge dont le name: diffère du fichier, un manager, un worker à allowlist, un producteur, deux définitions contradictoires (agent inconnu : écriture doit-passer) et un lien symbolique (jamais une définition) : onze lignes, l'écriture d'un agent qui retire Write et Edit en doit-refuser/refus, le dispatch du worker dans sa propre allowlist en doit-passer/passe (F9 = f9-allowlist), le dispatch hors liste sous Agent ET Task en doit-refuser/refus, COMPTE ROLE (0, 0, 0), six lignes ROLE-AGENT ; à --etape=3 ROLE est en observe, COMPTE ROLE (0, 4, 0) hors-etape, REJEU-ETAPE-3 à 0 ; un substitut qui applique la lettre (tout dispatch d'un worker refusé) compte un faux refus sur le dispatch de sa propre allowlist (la légitimité ne dérive jamais du rôle) ; un lab sans .planning/ à la racine ne rejoue rien")
+
+
 ETATS_CADRAGE = ("absent", "herite", "clos", "ouvert", "vide", "invalide", "dossier", "lien")
 ORACLE_G1 = {"absent": "refus", "herite": "passe", "clos": "passe", "ouvert": "refus", "vide": "passe", "invalide": "passe", "dossier": "passe", "lien": "passe"}
 BRANCHE_ATTENDUE = {"absent": "pas-de-cadrage", "herite": "herite", "clos": "clos", "ouvert": "registre-ouvert", "vide": "clos",
@@ -1177,10 +1298,10 @@ def _appels_sous_process(script, marqueur, autorises):
 def sec_statique(_):
     """R-REJEU-STATIQUE et R-REEL-04."""
     v, n = _appels_sous_process(REJEU, "PY_REJEU_GATES_EOF", ("bash", "cmp"))
-    if not v and n == 3:
-        ok("R-REJEU-STATIQUE le texte de rejeu-gates.sh ne lance aucun sous-processus autre que bash (le hook copié, recalc-planning.sh --read-only) et cmp (3 appels, aucun git)")
+    if not v and n == 4:
+        ok("R-REJEU-STATIQUE le texte de rejeu-gates.sh ne lance aucun sous-processus autre que bash (le hook copié : le jeu d'une écriture et `--classer` du constructeur ROLE ; recalc-planning.sh --read-only) et cmp (4 appels, aucun git)")
     else:
-        ko("R-REJEU-STATIQUE", "sous-processus de rejeu-gates.sh", "bash (hook copié, recalc-planning.sh) et cmp seulement, 3 appels", "violations=%s appels=%d" % (v, n))
+        ko("R-REJEU-STATIQUE", "sous-processus de rejeu-gates.sh", "bash (hook copié, `--classer`, recalc-planning.sh) et cmp seulement, 4 appels", "violations=%s appels=%d" % (v, n))
     v, n = _appels_sous_process(REEL, "PY_REJEU_REEL_EOF", ("bash", "cmp"))
     if not v and n == 2:
         ok("R-REEL-04 le texte de rejeu-reel.sh ne lance aucun sous-processus autre que bash sur rejeu-gates.sh et cmp (2 appels, aucun git)")
@@ -1567,6 +1688,15 @@ def sec_mutants(_):
     duel("REJEU-G7-COTE", REJEU, G, "# rejeu-cote", "if False:  # rejeu-cote",
          sc_g7_trace, lambda o, m: o["rc"] == 0 and o["absents"] == ["habite/.planning/config.json", "zone/nu/.planning/config.json"] and m["absents"] == [],
          "R-REJEU-G7 : le .planning/ imbriqué n'est pas mis de côté avant le jeu (le hook voit un .planning/ existant)", compagnons=(RECALC,))
+    # --- 45-09 : constructeur ROLE ---
+    def sc_role(script):
+        r, aff = scenario_role(script, 4)
+        return {"rc": r.rc, "ROLE": r.compte.get("ROLE"), "etape": r.etape}
+
+    duel("REJEU-ROLE-LEGITIME", REJEU, G, "# role-legitime",
+         'sortie.append(("Agent", sous, "doit-refuser" if classe["role"] == "worker" else "doit-passer", nom))  # role-legitime',
+         sc_role, lambda o, m: o["rc"] == 0 and o["ROLE"] == (0, 0, 0) and o["etape"] == (0, 0, 0) and m["ROLE"] != o["ROLE"],
+         "R-REJEU-ROLE : la légitimité d'un dispatch jugée par le rôle au lieu de l'allowlist (le dispatch de la propre allowlist du worker devient doit-refuser)", compagnons=(RECALC,))
     tout = {"touch": "DIVERGENTE", "mode": "DIVERGENTE", "contenu": "DIVERGENTE"}
     duel("REEL-MTIME", REEL, R, "# reel-signature",
          'lignes.append((rel or ".", "%s\\t%s\\t%o\\t%d\\t%s" % (rel or ".", genre, stat.S_IMODE(mode), 0, sig)))  # reel-signature',
@@ -1590,6 +1720,7 @@ SECTIONS = {
     "g6g5": sec_g6g5,
     "g1": sec_g1,
     "g7": sec_g7,
+    "role": sec_role,
     "concordance": sec_concordance,
     "statique": sec_statique,
     "reel": sec_reel,
@@ -1632,7 +1763,7 @@ for f in "$REJEU" "$REEL"; do
 done
 
 if [ -f "$REJEU" ] && [ -f "$REEL" ]; then
-  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,concordance,statique,reel,mutants
+  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,role,concordance,statique,reel,mutants
 fi
 
 T_FIN="$(date +%s)"
