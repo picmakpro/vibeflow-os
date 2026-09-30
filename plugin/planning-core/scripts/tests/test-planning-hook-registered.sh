@@ -599,7 +599,7 @@ def sec_modes(ctx):
 # `none` (silence : Bash et toute lecture, limites déclarées (a) à (d), P45-D-06b).
 # =================================================================================================
 PLANCHER_MIN = 49        # plancher de la recherche : un corpus vidé rougit
-PLANCHER_CORPUS = 60     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
+PLANCHER_CORPUS = 63     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
 
 
 class Cas:
@@ -762,6 +762,12 @@ def construire_corpus(ctx):
     w("A11c", "Write", adh + "/link-bare/notes.md", dev, "none", note="lien d'un adhérent vers un dossier hors de tout lab")
     w("A11d", "Write", dev + "/link-adh/" + notes, dev, "tight", note="lien d'un dev vers un adhérent")
     w("A12", "Write", adh + "/absent/../" + notes, dev, "tight", note="`..` qui traverse un dossier inexistant")
+    # m1 : `..` après un composant INEXISTANT — le Python replie lexicalement (realpath), la couche shell
+    # doit décider pareil. Chaque cas se joue dans les trois modes (A script réel, C script absent,
+    # D python absent) et le verdict dégradé de C et D doit égaler la décision de la couche Python.
+    w("A16", "Write", dev + "/nonexist/../../adh/" + notes, dev, "tight", note="`..` après un composant inexistant, dev vers adhérent : la cible est un lab adhérent")
+    w("A17", "Write", adh + "/nonexist/../../dev/" + notes, adh, "none", note="`..` après un composant inexistant, adhérent vers dev : la cible est un lab dev")
+    w("A18", "Write", dev + "/link-adh/../adh/" + notes, dev, "tight", note="`..` après un lien vers un dossier existant : replié PHYSIQUEMENT (garde contre un repli lexical naïf)")
     w("A13", "Write", L["cfglink"] + "/" + notes, dev, "tight", note="config.json en lien symbolique (limite c : côté shell adhérent)")
     w("A14", "Write", dev + "/" + notes, adh, "none", note="session dans un adhérent qui écrit dans un dev voisin")
     w("A15", "Write", adh + "/" + notes, dev, "tight", note="session dans un dev qui écrit dans un adhérent voisin")
@@ -1064,7 +1070,7 @@ def mutant_cmd(ctx, ident, motif, remplacement, id_disc, mode, id_temoin="E01", 
 def sec_mutants(ctx):
     construire_corpus(ctx)
     M = [
-        ("EXT-1", '_p=$(cd -P -- "$_d" 2>/dev/null && pwd -P)', '_p=$(cd -- "$_d" 2>/dev/null && pwd)', "A11b", "C", {}),
+        ("EXT-1", '_y=$(cd -P -- "$_n" 2>/dev/null && pwd -P)', '_y=$(cd -- "$_n" 2>/dev/null && pwd)', "A11b", "C", {}),
         ("EXT-2", '"([^"\\\\]|\\\\.)*"\'', '"[^"]*"\'', "E03", "C", {}),
         ("EXT-3", '2>/dev/null; return $?; fi', '2>/dev/null && return 0; fi', "A09b", "C", {}),
         ("EXT-4", '\\\\\\"*) V=$V\\" ;;', '\\\\\\"*) X=0; return 0 ;;', "E03", "C", {}),
@@ -1073,6 +1079,8 @@ def sec_mutants(ctx):
         ("EXT-7", "-q -E '\"planning_version\"[[:space:]]*:[[:space:]]*\"cycles-v1\"'", "-q -F 'cycles-v1'", "A06", "C", {}),
         ("EXT-8", 'else vf_tight "$(pwd -P)" && D=0; fi', 'else :; fi', "E24b", "C", {}),
         ("EXT-9", 'then P=$V/$P; else', 'then :; else', "E30", "C", {}),
+        ("EXT-10", '..) _r=${_r%/*}; [ -n "$_r" ] || _r=/ ;;', '..) ;;', "A16", "C", {}),
+        ("EXT-11", 'if [ -d "$_n" ] && _y=$(cd', 'if false && _y=$(cd', "A18", "C", {}),
         ("CMD-1", ';; *) exit 0 ;; esac', ';; *) ;; esac', "E35", "C", {}),
         ("CMD-2", 'bash "$S"); R=$?; fi', 'bash "$S"); R=0; fi', "E01", "E", {"id_temoin": "E27"}),
         ("CMD-3", 'if [ -f "$S" ]; then O=', 'if :; then O=', "E01", "C", {"mode_temoin": "A"}),
