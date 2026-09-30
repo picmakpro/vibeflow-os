@@ -77,3 +77,5 @@
 - [Exit gate E4 suit le pointeur workstream](project_exit-gate-e4-suit-le-pointeur-workstream.md) — sans `GSD_WORKSTREAM`, E4 lit `fiabilite` : rc=0 à tort ; relayer les deux ; les vagues parallèles créent des merges
 - [Verify des plans sous zsh](project_verify-des-plans-sous-zsh.md) — `for c in $var` ne découpe pas sous zsh : faux rouge dès 2 éléments ; exiger le rejeu zsh ET bash
 - [Lire la CI de la branche dès la reprise](feedback_lire-la-ci-de-la-branche-des-la-reprise.md) — rouge Linux (`stat -f` GNU) invisible sous macOS pendant 5 lots ; rejeu `tests` toujours sous HOME=$(mktemp -d)
+- [Transcripts survivent au /clear](project_transcripts-survivent-au-clear.md) — rapports et réponses relayées retrouvables dans subagents/*.jsonl ; relire avant de rejouer, faire reconfirmer tout arbitrage relu
+- [Garde d'isolation worktree](project_garde-isolation-worktree-commandes-composees.md) — bash -c, heredoc nommant git, mktemp calculé refusés : scripts au scratchpad, chemins absolus
