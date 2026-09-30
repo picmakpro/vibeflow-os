@@ -2974,7 +2974,9 @@ l'antérieur — c'est elle, et non une réécriture d'historique, qui absorbe l
 **Date** : 2026-09-30 · **Statut** : Validée · **Décideur** : Samuel · **Voisines** : ADR-031
 (précisée ici, pas abrogée), ADR-074 (même modèle : critère par objet gardé), ADR-072 (gardes
 in-repo qui signalent sans verrouiller) · arbitrage Samuel, AskUserQuestion session principale,
-2026-09-29 (quatre principes, archivage seul) et 2026-09-30 (feu vert de la vague d'outillage).
+2026-09-29 (quatre principes, nettoyage de fin de geste gaté, archivage seul) ; feu vert de la vague
+d'outillage : Samuel, session principale, 2026-09-30 ; blocage répété de la garde de fin de geste
+(option a) : Samuel, AskUserQuestion session principale, 2026-09-30.
 
 ### Contexte
 
@@ -2988,9 +2990,14 @@ Quatre principes : (1) **un ajout, un retrait** — un gate, un ADR, une règle 
 disent ce qu'ils retirent ou pourquoi rien (`check-ajout-retrait.sh`, consultatif, trailer
 `Ajout-Retrait:`) ; (2) **budgets étendus** — BACKLOG ouvert, index de mémoire, ROADMAP, en plus de
 STATE et des worktrees (`check-method-budget.sh`) ; (3) **nettoyage en fin de geste** — clôture de
-mission (contrôle E7 de `check-mission-exit.sh`) et fin de travail direct (Stop,
-`guard-fin-de-geste.sh`, un blocage au plus par session, bascule `VF_FIN_DE_GESTE`) ; (4) **prose
-plafonnée**. La release exige en plus une relecture adverse du diff fonctionnel, une sonde exécutée.
+mission (contrôle E7 de `check-mission-exit.sh`, delta depuis un snapshot de début de mission) et fin
+de travail direct (Stop, `guard-fin-de-geste.sh`, bascule `VF_FIN_DE_GESTE`) ; (4) **prose plafonnée**.
+Le nettoyage ne juge et ne propose de ranger que ce qui est apparu **depuis le démarrage de la session
+ou de la mission** (ce qui existait avant n'est jamais imputé). La garde de fin de geste **bloque à
+chaque arrêt** tant qu'il reste du rangement ainsi attribué ; après **3 blocages de suite sans progrès**
+(progrès = l'ensemble attribué a diminué), elle laisse sortir avec un message **visible de
+l'utilisateur** (`systemMessage`). Un constat non actionnable (archivage refusé, non tenté, budget
+dépassé) est dit à l'utilisateur et ne bloque jamais ; un constat non vérifiable n'est jamais un vert. La release exige en plus une relecture adverse du diff fonctionnel, une sonde exécutée.
 
 ### Précision d'ADR-031
 
@@ -3003,8 +3010,10 @@ commiter ni supprimer. Le compartiment d'un autre mainteneur est protégé.
 
 ### Ce que cette ADR ne change pas
 
-Supprimer, corriger, juger la pertinence d'un contenu, trier un BACKLOG et toute branche distante
-(jamais celles de Willy) restent des gestes **humains** (ADR-031). Les gardes de cette ADR
+**Exception arbitrée** (2026-09-29) : la session range ce qu'**elle** a créé — worktree ou branche
+locale mergés, stash, mémoire non versionnée —, c'est le nettoyage de fin de geste. Tout le reste, et
+toute branche distante (jamais celles de Willy), reste un geste **humain** : supprimer, corriger,
+juger la pertinence d'un contenu, trier un BACKLOG (ADR-031). Les gardes de cette ADR
 signalent ou déplacent ; le blocage de fin de geste porte sur ce que la session a créé et laissé,
 fait objectif, jamais sur la qualité d'un travail. Limite de fond (ADR-072) : ces gardes vivent
 dans le dépôt, et le trailer `Ajout-Retrait:` est déclaratif — sa forme est vérifiée, jamais sa
