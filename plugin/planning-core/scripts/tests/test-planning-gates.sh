@@ -20,6 +20,8 @@
 #   R-OBS-ENV       le journal d'observation suit XDG_CACHE_HOME puis HOME et rien d'autre : les valeurs
 #                   reçues n'atteignent jamais l'armement ni l'adhésion (P45-D-12a)
 #   R-JETON         l'encodeur du journal est ast-identique à _jeton_journal du moteur de recalcul
+#   R-VERDICT-01..05 la commande poser-verdict.sh : format de la 44, sha256 du PLAN.md (A3), tentative 1 puis
+#                   +1, écriture atomique, refus hors lab adhérent, jamais vue par G5 (45-04, F8 et A3)
 #   R-ACCORD        chemin relatif : avertissement G2 en mode A <=> deny en mode C (limite h)
 #   BANC            chaque `@@ ecriture` de fixtures/gates-banc.txt rend son attendu ; COUVERTURE
 #   MUT-*           chaque garde est tuée par un mutant à motif unique dont la trace est imprimée
@@ -67,6 +69,7 @@ T_DEBUT="$(date +%s)"
 AIDES="$WORK/aides.py"
 cat > "$AIDES" <<'PY_AIDES_GATES_EOF'
 import ast
+import hashlib
 import json
 import os
 import re
@@ -386,10 +389,12 @@ def juger(attendu, gate, rc, out):
 
 
 # --- Mutants du script (make_hook_mutant) ----------------------------------------------------
-def make_hook_mutant(ctx, ident, motif, remplacement):
-    """Copie du script dont l'UNIQUE ligne portant `motif` (fixe) est remplacée par `remplacement`
-    (indentation conservée). `bash -n` et la compilation du corps Python extrait doivent passer."""
-    original = open(ctx.hook, encoding="utf-8").read()
+def make_script_mutant(ctx, nom, marqueur, ident, motif, remplacement):
+    """Copie du script `nom` (heredoc `marqueur`) dont l'UNIQUE ligne portant `motif` (fixe) est
+    remplacée par `remplacement` (indentation conservée). `bash -n` et la compilation du corps Python
+    extrait doivent passer. Un mutant d'un autre script que le hook reçoit aussi une copie du hook
+    livré (le témoin rejoue la commande enregistrée sur ce dossier)."""
+    original = open(os.path.join(ctx.scripts_dir, nom), encoding="utf-8").read()
     lignes = original.split("\n")
     idx = [i for i, l in enumerate(lignes) if motif in l]
     if len(idx) != 1 or original.count(motif) != 1:
@@ -401,18 +406,25 @@ def make_hook_mutant(ctx, ident, motif, remplacement):
         return None, "NON OPPOSABLE (identique)"
     dossier = ctx.unique("mut-" + ident.lower())
     os.makedirs(dossier, exist_ok=True)
-    chemin = os.path.join(dossier, "planning-hook.sh")
+    chemin = os.path.join(dossier, nom)
     with open(chemin, "w", encoding="utf-8") as fh:
         fh.write(muté)
     os.chmod(chemin, 0o755)
+    if nom != "planning-hook.sh":
+        shutil.copy(ctx.hook, os.path.join(dossier, "planning-hook.sh"))
+        os.chmod(os.path.join(dossier, "planning-hook.sh"), 0o755)
     p = subprocess.run(["bash", "-n", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if p.returncode != 0:
         return None, "bash -n ÉCHOUE : " + court(p.stderr)
     try:
-        compile(corps_python(muté), chemin, "exec")
+        compile(corps_python(muté, marqueur), chemin, "exec")
     except SyntaxError as e:
         return None, "SyntaxError du corps Python : " + str(e)
     return dossier, None
+
+
+def make_hook_mutant(ctx, ident, motif, remplacement):
+    return make_script_mutant(ctx, "planning-hook.sh", "PY_PLANNING_HOOK_EOF", ident, motif, remplacement)
 
 
 def corps_python(texte, marqueur="PY_PLANNING_HOOK_EOF"):
@@ -869,6 +881,188 @@ def controle_obs_env(ctx, script):
     return (not fautes), ("; ".join(fautes) if fautes else "journal sous XDG_CACHE_HOME puis HOME seulement ; verdicts identiques sous 4 jeux de valeurs (dont inexploitables), copie observe et copie armed")
 
 
+
+# --- 45-04 : poser-verdict.sh ----------------------------------------------------------------------
+UNITE = ".planning/cycles/01-c/phases/01-p"
+
+
+def lab_frais(ctx, nom="g5-adherent"):
+    """Copie jetable (le hook et les commandes y ÉCRIVENT) d'un lab du banc, avec un CYCLE.md."""
+    _, labs, _ = labs_banc(ctx)
+    dest = ctx.unique("lab-" + nom)
+    materialiser(labs, nom, dest)
+    ecrire(os.path.join(dest, ".planning", "cycles", "01-c", "CYCLE.md"), "---\ntitre: t\nrend: r\n---\n")
+    ecrire(os.path.join(dest, "livrables", "rapport.md"), "x\n")
+    return dest
+
+
+def lancer_script(ctx, dossier, nom, args, cwd=None):
+    p = subprocess.run(["bash", os.path.join(dossier, nom)] + list(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env=ctx.env(), cwd=cwd or ctx.work, timeout=120)
+    return p.returncode, p.stdout, p.stderr
+
+
+def poser(ctx, dossier, lab, tentative, juge="vf-design-judge", score="8/10", constats=("critere-a::passé",), unite=UNITE, extra=()):
+    args = ["--unite=" + os.path.join(lab, unite), "--juge=" + juge, "--tentative=" + str(tentative), "--score=" + score]
+    args += ["--constat=" + c for c in constats] + list(extra)
+    return lancer_script(ctx, dossier, "poser-verdict.sh", args)
+
+
+def octets(chemin):
+    with open(chemin, "rb") as fh:
+        return fh.read()
+
+
+def controle_verdict_01(ctx, script):
+    """Création : format de la 44 (gabarit), hash = sha256 du PLAN.md (A3), tentative 1, 0644."""
+    lab = lab_frais(ctx)
+    rc, out, err = poser(ctx, _dossier(ctx, script), lab, 1, constats=("critere-a::passé", "critere-b::échec"))
+    chemin = os.path.join(lab, UNITE, "VERDICT.md")
+    if rc != 0 or not os.path.isfile(chemin):
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    texte = octets(chemin).decode("utf-8")
+    lignes = texte.split("\n")
+    fin = lignes.index("---", 1)
+    cles = [l.split(":")[0] for l in lignes[1:fin] if l and not l.startswith(" ")]
+    empreinte = hashlib.sha256(octets(os.path.join(lab, UNITE, "PLAN.md"))).hexdigest()
+    mode = stat.S_IMODE(os.stat(chemin).st_mode)
+    fautes = []
+    if lignes[0] != "---" or cles != ["juge", "hash", "tentative", "score", "constats"]:
+        fautes.append("clés du frontmatter : %s" % cles)
+    for attendu in ('juge: "vf-design-judge"', 'hash: "%s"' % empreinte, "tentative: 1", 'score: "8/10"',
+                    '  - critere: "critere-a"', '    resultat: "passé"', '  - critere: "critere-b"', '    resultat: "échec"'):
+        if attendu not in lignes[1:fin]:
+            fautes.append("ligne absente : " + attendu)
+    if "# Verdict" not in lignes[fin + 1:]:
+        fautes.append("corps sans « # Verdict »")
+    if mode != 0o644:
+        fautes.append("permissions %o" % mode)
+    restes = [n for n in os.listdir(os.path.join(lab, UNITE)) if n.startswith(".")]
+    if restes:
+        fautes.append("fichier temporaire laissé : %s" % restes)
+    return (not fautes), ("; ".join(fautes) if fautes else "code 0, VERDICT.md au format du gabarit, hash = sha256 des octets du PLAN.md, tentative 1, 0644, aucun temporaire")
+
+
+def controle_verdict_02(ctx, script):
+    """Tentative : 1 à la création, ancienne + 1 pour remplacer (sinon 64, fichier inchangé) ; un lien n'est
+    pas un verdict existant et n'est jamais suivi (écriture atomique)."""
+    d = _dossier(ctx, script)
+    lab = lab_frais(ctx)
+    chemin = os.path.join(lab, UNITE, "VERDICT.md")
+    rc, _o, err = poser(ctx, d, lab, 1)
+    if rc != 0:
+        return False, "création refusée : rc=%d %s" % (rc, court(err))
+    avant = octets(chemin)
+    fautes = []
+    for n in (1, 3):
+        rc, _o, err = poser(ctx, d, lab, n)
+        if rc != 64 or octets(chemin) != avant:
+            fautes.append("--tentative=%d sur une tentative 1 : rc=%d, fichier %s" % (n, rc, "inchangé" if octets(chemin) == avant else "MODIFIÉ"))
+    rc, _o, err = poser(ctx, d, lab, 2)
+    if rc != 0 or b"tentative: 2" not in octets(chemin):
+        fautes.append("--tentative=2 : rc=%d %s" % (rc, court(err)))
+    # création à tentative 2 : refusée
+    lab2 = lab_frais(ctx)
+    rc, _o, err = poser(ctx, d, lab2, 2)
+    if rc != 64 or os.path.exists(os.path.join(lab2, UNITE, "VERDICT.md")):
+        fautes.append("création à --tentative=2 : rc=%d" % rc)
+    # un lien posé à la place de VERDICT.md : remplacé, jamais suivi
+    lab3 = lab_frais(ctx)
+    cible = os.path.join(lab3, "livrables", "cible-du-lien.txt")
+    ecrire(cible, "CIBLE\n")
+    os.symlink(cible, os.path.join(lab3, UNITE, "VERDICT.md"))
+    rc, _o, err = poser(ctx, d, lab3, 1)
+    lien = os.path.join(lab3, UNITE, "VERDICT.md")
+    if rc != 0 or os.path.islink(lien) or not os.path.isfile(lien) or octets(cible) != b"CIBLE\n":
+        fautes.append("lien à la place de VERDICT.md : rc=%d, lien=%s, cible %s" % (rc, os.path.islink(lien), "inchangée" if octets(cible) == b"CIBLE\n" else "MODIFIÉE"))
+    return (not fautes), ("; ".join(fautes) if fautes else "1 à la création, 1 et 3 refusés (64, cmp identique) sur une tentative 1, 2 accepté ; création à 2 refusée ; un lien est remplacé, sa cible intacte")
+
+
+def controle_verdict_03(ctx, script):
+    """recalc-planning.sh --read-only relit la tentative et le hash écrits (format de la 44)."""
+    d = _dossier(ctx, script)
+    lab = lab_frais(ctx)
+    os.rmdir(os.path.join(lab, UNITE, "plans", "01-a"))  # une phase à plan direct n'a pas de plans/ (raison plan-direct-et-plans)
+    os.rmdir(os.path.join(lab, UNITE, "plans"))
+    ecrire(os.path.join(lab, UNITE, "SUMMARY.md"), "---\nauteur: vf-coder\n---\n")
+    for n in (1, 2):
+        rc, _o, err = poser(ctx, d, lab, n)
+        if rc != 0:
+            return False, "tentative %d : rc=%d %s" % (n, rc, court(err))
+    p = subprocess.run(["bash", ctx.recalc, "--planning=" + os.path.join(lab, ".planning"), "--read-only"],
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ctx.env(), timeout=120)
+    if p.returncode != 0:
+        return False, "recalc --read-only : rc=%d %s" % (p.returncode, court(p.stderr))
+    rapport = json.loads(p.stdout.decode("utf-8"))
+    phases = [ph for c in rapport["cycles"] for ph in c.get("phases", []) if ph["chemin"].endswith("01-p")]
+    empreinte = hashlib.sha256(octets(os.path.join(lab, UNITE, "PLAN.md"))).hexdigest()
+    if len(phases) != 1:
+        return False, "phase 01-p introuvable : " + court(p.stdout)
+    ph = phases[0]
+    if str(ph.get("tentative")) != "2" or ph.get("hash_juge") != empreinte or ph.get("etat") != "close":
+        return False, "tentative=%r hash=%r état=%r raison=%r" % (ph.get("tentative"), ph.get("hash_juge"), ph.get("etat"), ph.get("raison"))
+    return True, "recalc --read-only rend tentative 2, le hash écrit et l'état close pour l'unité"
+
+
+def controle_verdict_04(ctx, script):
+    """Refus : lab non adhérent 2 ; unité hors .planning/cycles/, sans PLAN.md, constat, tentative, juge ou
+    valeur qui ne se relit pas identique 64 ; jamais un fichier écrit."""
+    d = _dossier(ctx, script)
+    fautes = []
+    dev = lab_frais(ctx, "g5-dev")
+    rc, _o, err = poser(ctx, d, dev, 1)
+    if rc != 2 or os.path.exists(os.path.join(dev, UNITE, "VERDICT.md")):
+        fautes.append("lab non adhérent : rc=%d (attendu 2)" % rc)
+    hors = dossier_neuf(ctx, "verdict-hors-lab")
+    ecrire(os.path.join(hors, "PLAN.md"), "---\necrit: a\n---\n")
+    rc, _o, err = lancer_script(ctx, d, "poser-verdict.sh", ["--unite=" + hors, "--juge=j", "--tentative=1", "--score=s", "--constat=c::passé"])
+    if rc != 2 or os.path.exists(os.path.join(hors, "VERDICT.md")):
+        fautes.append("unité hors de tout lab : rc=%d (attendu 2)" % rc)
+    lab = lab_frais(ctx)
+    ecrire(os.path.join(lab, ".planning", "notes", "PLAN.md"), "---\necrit: a\n---\n")
+    cas = (("unité hors .planning/cycles/", {"unite": ".planning/notes"}, 64),
+           ("unité sans PLAN.md", {"unite": UNITE + "/plans/01-a"}, 64),
+           ("unité inexistante", {"unite": UNITE + "/absente"}, 64),
+           ("constat au résultat hors passé/échec", {"constats": ("critere::peut-etre",)}, 64),
+           ("constat sans ::", {"constats": ("critere",)}, 64),
+           ("constat au critère vide", {"constats": ("::passé",)}, 64),
+           ("tentative non numérique", {"tentative": "x"}, 64),
+           ("tentative nulle", {"tentative": "0"}, 64),
+           ("juge vide", {"juge": ""}, 64),
+           ("score avec saut de ligne", {"score": "a\nb"}, 64),
+           ("critère avec guillemet et saut de ligne", {"constats": ('a"\nb::passé',)}, 64))
+    for nom, surcharge, attendu in cas:
+        args = dict(unite=UNITE, tentative=1, juge="j", score="s", constats=("c::passé",))
+        args.update(surcharge)
+        rc, _o, err = poser(ctx, d, lab, args["tentative"], juge=args["juge"], score=args["score"], constats=args["constats"], unite=args["unite"])
+        ecrits = [os.path.join(dp, f) for dp, _dn, fs in os.walk(os.path.join(lab, ".planning")) for f in fs if f == "VERDICT.md" or f.startswith(".VERDICT.")]
+        if rc != attendu or ecrits:
+            fautes.append("%s : rc=%d (attendu %d), écrit %s" % (nom, rc, attendu, [os.path.relpath(e, lab) for e in ecrits]))
+    return (not fautes), ("; ".join(fautes) if fautes else "lab dev 2, hors lab 2, %d refus 64 : unité hors cycles, sans PLAN.md, constat, tentative, juge, valeur non relisible ; aucun fichier écrit" % len(cas))
+
+
+def controle_verdict_05(ctx, script):
+    """La commande ne passe jamais par un outil : lancée par Bash pendant que G5 est armé, le hook n'en voit
+    rien et elle écrit (alors qu'un Write du même fichier est refusé)."""
+    d = _dossier(ctx, script)
+    armee = ctx.copie_forcee(ctx.scripts_dir, "armed")
+    lab = lab_frais(ctx)
+    commande = "bash '%s' --unite=%s --juge=vf-design-judge --tentative=1 --score=8/10 --constat=c::passé" % (
+        os.path.join(d, "poser-verdict.sh"), os.path.join(lab, UNITE))
+    brut = payload("Bash", {"command": commande}, lab)
+    rc, out, err = ctx.lancer("A", brut, cwd=lab, dossier=armee)
+    if classer(rc, out) == "deny" or err:
+        return False, "le hook armé voit la commande Bash : " + classer(rc, out) + " " + court(out)
+    brut = payload("Write", {"file_path": os.path.join(lab, UNITE, "VERDICT.md"), "content": "x"}, lab)
+    rc, out, err = ctx.lancer("A", brut, cwd=lab, dossier=armee)
+    if classer(rc, out) != "deny":
+        return False, "témoin : le Write du même fichier n'est pas refusé sur la copie armée : " + classer(rc, out)
+    rc, out, err = poser(ctx, d, lab, 1)
+    if rc != 0 or not os.path.isfile(os.path.join(lab, UNITE, "VERDICT.md")):
+        return False, "la commande n'a pas écrit : rc=%d %s" % (rc, court(err))
+    return True, "G5 armé : la commande Bash n'est pas refusée et écrit, le Write du même fichier l'est"
+
+
 # =================================================================================================
 # Sections
 # =================================================================================================
@@ -1018,6 +1212,17 @@ def sec_g5(ctx):
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
 
+def sec_verdict(ctx):
+    for ident, ctrl, titre in (
+            ("R-VERDICT-01", controle_verdict_01, "création au format du gabarit, hash sha256 du PLAN.md"),
+            ("R-VERDICT-02", controle_verdict_02, "tentative 1 puis +1, fichier inchangé sur refus, lien jamais suivi"),
+            ("R-VERDICT-03", controle_verdict_03, "le moteur de recalcul relit tentative et hash"),
+            ("R-VERDICT-04", controle_verdict_04, "refus hors lab adhérent, hors cycles, sans PLAN.md, constat invalide"),
+            ("R-VERDICT-05", controle_verdict_05, "jamais vue par G5")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+
+
 def sec_obs_env(ctx):
     bon, detail = controle_obs_env(ctx, None)
     ok("R-OBS-ENV " + detail) if bon else ko("R-OBS-ENV", "le journal suit XDG_CACHE_HOME puis HOME et rien d'autre ; les valeurs n'atteignent jamais l'armement ni l'adhésion", "conforme", detail)
@@ -1116,9 +1321,16 @@ def sec_mutants(ctx):
         ("OBS-ADHESION", 'adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]',
          'adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"] and sys.argv[3] != ""',
          "R-OBS-ENV", controle_obs_env),
+        # 45-04 : commande de verdict
+        ("VERDICT-TENTATIVE", "# verdict-tentative", 'if False:  # verdict-tentative', "R-VERDICT-02", controle_verdict_02,
+         "poser-verdict.sh", "PY_POSER_VERDICT_EOF"),
+        ("VERDICT-ATOMIQUE", "# verdict-atomique", 'open(chemin_verdict, "w", encoding="utf-8").write(texte)  # verdict-atomique',
+         "R-VERDICT-02", controle_verdict_02, "poser-verdict.sh", "PY_POSER_VERDICT_EOF"),
     ]
-    for ident, motif, repl, cible, ctrl in M:
-        dossier, raison = make_hook_mutant(ctx, ident, motif, repl)
+    for entree in M:
+        ident, motif, repl, cible, ctrl = entree[:5]
+        nom_script, marqueur = entree[5:7] if len(entree) > 5 else ("planning-hook.sh", "PY_PLANNING_HOOK_EOF")
+        dossier, raison = make_script_mutant(ctx, nom_script, marqueur, ident, motif, repl)
         if dossier is None:
             komut(ident, "mutant du cœur valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
             continue
@@ -1143,6 +1355,7 @@ SECTIONS = {
     "table": sec_table,
     "parseur": sec_parseur,
     "jeton": sec_jeton,
+    "verdict": sec_verdict,
     "g2": sec_g2,
     "g5": sec_g5,
     "env": sec_env,
@@ -1190,7 +1403,7 @@ run_sections() { # <sections séparées par des virgules>
 [ -f "$BANC" ] || ko "gates-banc.txt présent" "le banc texte existe sous fixtures/" "$BANC" "absent"
 [ -f "$RECALC" ] || ko "recalc-planning.sh présent" "le moteur de recalcul existe à côté du hook (contrôle croisé du parseur)" "$RECALC" "absent"
 
-run_sections table,parseur,jeton,g2,g5,env,obs_env,env_statique,accord,banc,mutants
+run_sections table,parseur,jeton,g2,g5,verdict,env,obs_env,env_statique,accord,banc,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"
