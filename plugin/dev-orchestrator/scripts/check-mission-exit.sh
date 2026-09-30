@@ -56,7 +56,12 @@
 #        le snapshot de DÉBUT de mission, posé par le manager juste après l'`acquire` du verrou de driver avec
 #        `check-mission-exit.sh --budget-snapshot` (mission-flow.md §Budgets de méthode) ; il vit sous le
 #        répertoire git commun (`<git-common-dir>/vf-mission-budget.snap`), jamais dans l'arbre (E2 reste
-#        propre). Sont des manques E7 les lignes RANGEABLE / ARCHIVABLE / ARCHIVAGE REFUSÉ APPARUES depuis ce
+#        propre) ; il porte la DATE de sa pose et l'IDENTITÉ de la mission (nom de la génération du verrou de
+#        driver courant) ; pris par `check-method-budget.sh --auto --dry-run` (même décision que E7, rien d'écrit :
+#        un ARCHIVAGE REFUSÉ déjà là n'est pas imputé à la mission). Génération du snapshot ≠ verrou courant :
+#        INDÉTERMINÉ ; snapshot sans identité (version antérieure) : INDÉTERMINÉ. LIMITES dites : verrou relâché
+#        (cas ordinaire à la sortie), l'identité n'est plus recontrôlable, seule la date située (dite sur stderr)
+#        la replace ; un snapshot posé TARD masque ce que la mission avait déjà créé avant lui. Sont des manques E7 les lignes RANGEABLE / ARCHIVABLE / ARCHIVAGE REFUSÉ APPARUES depuis ce
 #        snapshot (`check-method-budget.sh --auto --no-remote --strict` a d'abord archivé SANS geste humain ce
 #        qu'un budget dépassé désigne : déplacement tracé, réversible, jamais de commit ; « archivé, à
 #        commiter » tant que l'arbre porte l'archivage). Ce qui existait au démarrage (branche d'un autre
@@ -176,20 +181,30 @@ budget_snap_path() { # chemin absolu du snapshot, sous le répertoire git commun
 }
 BUDGET_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ'
 budget_lines() { { grep -E "$BUDGET_TOK" || true; } | sed 's/^\[budget\] *//' | LC_ALL=C sort -u; }
+# Identité de la mission : le NOM de la génération du verrou de driver courant (lien DRIVER.lock → DRIVER.lock.gen.<epoch>.<pid>),
+# « - » sans verrou. Même chemin que E1 (le verrou du dépôt jugé), jamais une variable d'environnement.
+cur_lock_gen() {
+  local l="$ROOT/.planning/DRIVER.lock" t
+  if [ -L "$l" ]; then t="$(readlink "$l" 2>/dev/null)"; printf '%s' "${t##*/}"
+  elif [ -e "$l" ]; then printf 'legacy'
+  else printf -- '-'; fi
+}
 
 if [ "$BUDGET_SNAPSHOT" -eq 1 ]; then
   # Geste du manager, UNE fois, au démarrage de la mission : photographie LECTURE SEULE (sans --auto) de ce
   # qui est déjà rangeable ; écrit hors de l'arbre de travail.
   SNAP_BUDGET="$(resolve_budget)" || { echo "[check-mission-exit] --budget-snapshot : check-method-budget.sh introuvable" >&2; exit 4; }
   SNAP_PATH="$(budget_snap_path)" || { echo "[check-mission-exit] --budget-snapshot : $ROOT n'est pas un dépôt git" >&2; exit 4; }
-  SNAP_OUT="$(bash "$SNAP_BUDGET" --root "$ROOT" --no-remote --quiet 2>/dev/null)"; SNAP_RC=$?
+  # --auto --dry-run : la MÊME décision que celle d'E7, rien d'écrit ; un ARCHIVAGE REFUSÉ déjà là au démarrage
+  # (source non commitée…) est donc dans la référence et n'est pas imputé à la mission.
+  SNAP_OUT="$(bash "$SNAP_BUDGET" --root "$ROOT" --no-remote --quiet --auto --dry-run 2>/dev/null)"; SNAP_RC=$?
   if [ "$SNAP_RC" -ge 2 ]; then
     echo "[check-mission-exit] --budget-snapshot : check-method-budget.sh a rendu $SNAP_RC, snapshot non posé" >&2
     exit 4
   fi
-  printf '%s\n' "$SNAP_OUT" | budget_lines > "$SNAP_PATH.tmp.$$" 2>/dev/null && mv -f "$SNAP_PATH.tmp.$$" "$SNAP_PATH" 2>/dev/null \
+  { printf '#date=%s\n#gen=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(cur_lock_gen)"; printf '%s\n' "$SNAP_OUT" | budget_lines; } > "$SNAP_PATH.tmp.$$" 2>/dev/null && mv -f "$SNAP_PATH.tmp.$$" "$SNAP_PATH" 2>/dev/null \
     || { rm -f "$SNAP_PATH.tmp.$$" 2>/dev/null; echo "[check-mission-exit] --budget-snapshot : écriture impossible ($SNAP_PATH)" >&2; exit 4; }
-  say "snapshot de début de mission posé : $SNAP_PATH"
+  say "snapshot de début de mission posé : $SNAP_PATH (génération du verrou : $(cur_lock_gen))"
   exit 0
 fi
 
@@ -537,6 +552,17 @@ elif [ -z "$E7_SNAP" ] || [ ! -f "$E7_SNAP" ]; then
   E7_STATUS="indet"
   E7_MSG="[E7] snapshot de début de mission absent : impossible de distinguer ce que la mission a créé de ce qui existait. Le manager le pose au démarrage, après l'acquire : check-mission-exit.sh --budget-snapshot"
 else
+  E7_SGEN="$(sed -n 's/^#gen=//p' "$E7_SNAP" 2>/dev/null | head -1)"
+  E7_SDATE="$(sed -n 's/^#date=//p' "$E7_SNAP" 2>/dev/null | head -1)"
+  E7_CGEN="$(cur_lock_gen)"
+  if [ -z "$E7_SGEN" ]; then
+    E7_STATUS="indet"
+    E7_MSG="[E7] snapshot de début de mission sans identité ni date (posé par une version antérieure) : impossible de savoir à quelle mission il appartient. Le reposer au démarrage : check-mission-exit.sh --budget-snapshot"
+  elif [ "$E7_CGEN" != "-" ] && [ "$E7_CGEN" != "$E7_SGEN" ]; then
+    E7_STATUS="indet"
+    E7_MSG="[E7] snapshot d'une autre mission : posé le ${E7_SDATE:-?} sous la génération « $E7_SGEN » du verrou, le verrou courant est « $E7_CGEN ». Ce qu'il masque n'est pas ce qui existait au démarrage de CETTE mission : le reposer"
+  else
+  say "[E7] snapshot posé le ${E7_SDATE:-?}, génération du verrou « $E7_SGEN » (verrou courant : $E7_CGEN ; relâché, l'identité n'est plus recontrôlable : seule la date la situe)"
   E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?
   E7_ARCHIVE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVÉ' || true; } | sed 's/^\[budget\] *//')"
   E7_NONTENTE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVAGE NON TENTÉ' || true; } | sed 's/^\[budget\] *//')"
@@ -563,6 +589,7 @@ EOF_E7
       E7_STATUS="manque"
       E7_MSG="${E7_MANQUES%$'\n'}"
     fi
+  fi
   fi
 fi
 # <<< E7

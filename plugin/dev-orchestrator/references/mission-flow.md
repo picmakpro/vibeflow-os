@@ -660,7 +660,14 @@ en Metro ou en « quelle branche ? ». La doctrine « STATE ne garde que le cour
 de ce qui existe déjà : `"$S"/check-mission-exit.sh --budget-snapshot` (lecture seule, sans `--auto` ;
 le fichier vit sous le répertoire git commun, `vf-mission-budget.snap`, jamais dans l'arbre : E2 reste
 propre). Sans lui, E7 est INDÉTERMINÉ, jamais sain : il ne saurait pas distinguer ce que la mission a
-créé de ce qui existait (branche d'un autre mainteneur, worktree d'une autre mission).
+créé de ce qui existait (branche d'un autre mainteneur, worktree d'une autre mission). Le snapshot porte
+sa **date** et l'**identité de la mission** (la génération du verrou de driver courant, d'où la consigne de
+le poser APRÈS l'`acquire`) ; il est pris sans écrire (`--auto --dry-run`), de sorte qu'un archivage
+refusé déjà présent au démarrage n'est pas imputé à la mission. E7 est INDÉTERMINÉ si la génération du
+snapshot n'est pas celle du verrou courant, ou si le snapshot n'a pas d'identité. **Limites dites** :
+à la sortie le verrou est en principe relâché, l'identité n'est alors plus recontrôlable (seule la date,
+rappelée sur stderr, situe le snapshot) ; et **un snapshot posé tard masque les objets que la mission avait
+déjà créés avant lui** : le poser dès l'`acquire`, pas plus tard.
 
 **Moment : la clôture, avant le relâchement du verrou.** Le manager lance
 `"$S"/check-method-budget.sh --auto --no-remote --quiet` : l'outil **archive seul** ce qui déborde
@@ -692,10 +699,13 @@ résolu : passer `--ws` ou exporter `GSD_WORKSTREAM`) ou si le script de budget 
 Un DÉPASSÉ seul se rapporte, il ne bloque pas. Les branches distantes ne sont pas lues ici (le
 contrôle passe `--no-remote`).
 
-**Travail direct (hors mission).** Le hook `Stop` `guard-fin-de-geste.sh` tient le même rôle pour une
-session sans manager : il archive seul, puis **bloque à chaque arrêt** tant qu'il reste du rangement
-**apparu depuis le snapshot de SA session** ; après 3 blocages de suite sans progrès (l'ensemble
-attribué n'a pas diminué), il laisse sortir avec un message visible de l'utilisateur. Les constats non
+**Travail direct.** Le hook `Stop` `guard-fin-de-geste.sh` ne sait pas si la session a conduit une mission :
+il s'applique à **tout arrêt de session** et tient le même rôle qu'E7 avec une autre référence : il archive
+seul, puis **bloque à chaque arrêt** tant qu'il reste du rangement **apparu depuis le snapshot de SA
+session** (E7 : depuis celui de la mission ; les deux se cumulent et peuvent nommer le même objet) ;
+après 3 blocages de suite sans progrès (l'ensemble attribué n'est pas plus petit que le plus bas déjà
+atteint), il laisse sortir avec un message visible de l'utilisateur. Un archivage fait par le même
+arrêt qui bloque est dit à l'utilisateur au premier exit 0 qui suit. Les constats non
 actionnables (archivage refusé ou non tenté, budget dépassé, non vérifiable) sont dits à l'utilisateur
 et ne bloquent jamais (ADR-076).
 

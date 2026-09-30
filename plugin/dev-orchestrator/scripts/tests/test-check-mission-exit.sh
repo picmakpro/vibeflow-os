@@ -483,12 +483,50 @@ D="$(mk_sane_fixture c38)"; rm -f "$D/.git/vf-mission-budget.snap"
 out="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --budget-snapshot 2>/dev/null)"; rc=$?
 if [ "$rc" -eq 0 ] && [ -z "$out" ] && [ -f "$D/.git/vf-mission-budget.snap" ] && [ -z "$(git -C "$D" status --porcelain)" ]; then ok "39 --budget-snapshot — rc 0, stdout vide, fichier sous .git, arbre propre"; else ko "39 --budget-snapshot" "rc=$rc out=[$out]"; fi
 
+# --- Identité et date du snapshot (correction 41.3, m3) ---------------------------------------------------
+# Le lien DRIVER.lock → DRIVER.lock.gen.<…> est ce que driver-lock.sh pose ; le talon de status n'en sait rien, E7 lit le lien.
+set_lock() { # <dépôt> <nom de génération> : (re)pointe le lien du verrou
+  mkdir -p "$1/.planning/$2"; ln -sfn "$2" "$1/.planning/DRIVER.lock"
+}
+snap() { PATH="$GH_OK_BIN:$PATH" run_gate --root "$1" --budget-snapshot >/dev/null 2>&1; }
+# 40 — snapshot d'une AUTRE génération du verrou : INDÉTERMINÉ, cause nommée ; 40b témoin : même génération, SAIN.
+D="$(mk_sane_fixture c40)"; set_lock "$D" DRIVER.lock.gen.1.11; snap "$D"; G7="$(mk_inst "$SCRIPT" real)"
+SN="$(cat "$D/.git/vf-mission-budget.snap")"
+case "$SN" in *"#gen=DRIVER.lock.gen.1.11"*"#date=20"*|*"#date=20"*"#gen=DRIVER.lock.gen.1.11"*) named=1 ;; *) named=0 ;; esac
+if [ "$named" -eq 1 ]; then ok "40a le snapshot porte l'identité (génération du verrou) ET la date"; else ko "40a en-tête du snapshot" "[$SN]"; fi
+gate_at "$G7" "$D"
+if [ "$E7_RC" -eq 3 ] && [ -z "$E7_OUT" ]; then ok "40b même génération que le verrou courant — code 3 (témoin)"; else ko "40b même génération" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
+set_lock "$D" DRIVER.lock.gen.2.22; gate_at "$G7" "$D"
+case "$E7_ERR" in *"[E7] snapshot d'une autre mission"*"DRIVER.lock.gen.1.11"*"DRIVER.lock.gen.2.22"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 4 ] && [ "$named" -eq 1 ]; then ok "40 génération du snapshot ≠ verrou courant — code 4 (INDÉTERMINÉ), les deux générations nommées"; else ko "40 autre génération" "rc=$E7_RC err=[$E7_ERR]"; fi
+# 41 — verrou relâché depuis (cas ordinaire à la sortie) : l'identité n'est plus recontrôlable, la date est dite, SAIN.
+rm -f "$D/.planning/DRIVER.lock"; gate_at "$G7" "$D"
+case "$E7_ERR" in *"snapshot posé le 20"*"l'identité n'est plus recontrôlable"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 3 ] && [ -z "$E7_OUT" ] && [ "$named" -eq 1 ]; then ok "41 verrou relâché — code 3, limite dite sur stderr (date du snapshot)"; else ko "41 verrou relâché" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
+# 41b — snapshot posé SANS verrou, verrou présent à la sortie : pas la même situation, INDÉTERMINÉ.
+D="$(mk_sane_fixture c41b)"; set_lock "$D" DRIVER.lock.gen.3.33; gate_at "$G7" "$D"
+if [ "$E7_RC" -eq 4 ]; then ok "41b snapshot posé sans verrou, verrou tenu à la sortie — code 4"; else ko "41b sans verrou puis verrou" "rc=$E7_RC err=[$E7_ERR]"; fi
+# 42 — snapshot sans en-tête (posé par une version antérieure) : INDÉTERMINÉ.
+D="$(mk_sane_fixture c42)"; printf 'RANGEABLE branche : x\n' > "$D/.git/vf-mission-budget.snap"; gate_at "$G7" "$D"
+case "$E7_ERR" in *"[E7] snapshot de début de mission sans identité"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 4 ] && [ "$named" -eq 1 ]; then ok "42 snapshot sans identité — code 4, cause nommée"; else ko "42 sans identité" "rc=$E7_RC err=[$E7_ERR]"; fi
+# 43 — un ARCHIVAGE REFUSÉ déjà là au démarrage (source non commitée) n'est PAS imputé à la mission ; témoin : sans lui dans le snapshot, il l'est.
+mk_dirty() { local d; d="$(mk_e7f "$1")"; echo "ajout non commité" >> "$d/.planning/BACKLOG.md"; printf '%s' "$d"; }
+D="$(mk_dirty c43)"; snap "$D"; gate_at "$G7" "$D"
+case "$E7_OUT" in *"[E7] ARCHIVAGE REFUSÉ"*) named=1 ;; *) named=0 ;; esac
+if [ "$named" -eq 0 ]; then ok "43 refus préexistant (source non commitée au démarrage) — non imputé à la mission"; else ko "43 refus préexistant" "rc=$E7_RC out=[$E7_OUT]"; fi
+grep -q 'ARCHIVAGE REFUSÉ' "$D/.git/vf-mission-budget.snap" && ok "43a … il est dans la référence (le snapshot l'a photographié sans rien écrire)" || ko "43a référence" "ARCHIVAGE REFUSÉ dans le snapshot"
+[ ! -e "$D/.planning/archives" ] && ok "43b le snapshot n'a rien archivé ni écrit sous .planning/archives" || ko "43b lecture seule" "aucun .planning/archives"
+grep -v 'ARCHIVAGE REFUSÉ' "$D/.git/vf-mission-budget.snap" > "$TMP/snap43" && cp "$TMP/snap43" "$D/.git/vf-mission-budget.snap"; gate_at "$G7" "$D"
+case "$E7_OUT" in *"[E7] ARCHIVAGE REFUSÉ"*) named=1 ;; *) named=0 ;; esac
+if [ "$named" -eq 1 ]; then ok "43c témoin : le même refus, absent de la référence, EST imputé"; else ko "43c témoin" "out=[$E7_OUT]"; fi
+
 # --- Mutants de script (rc attendu/obtenu, même forme que les autres suites du module) -------------------
 MUT_N=0
-e7_mutant() { # <id> <ancienne ligne> <nouvelle ligne> <scénario> <rc original attendu> <rc mutant attendu>
+e7_mutant() { # <id> <ancienne ligne> <nouvelle ligne> <scénario> <rc original attendu> <rc mutant attendu> [<ancienne ligne 2> <nouvelle ligne 2>]
   local id="$1" old="$2" new="$3" sc="$4" eo="$5" em="$6" f ro rm
   MUT_N=$((MUT_N+1)); f="$TMP/mut-e7-$MUT_N.sh"
-  MUT_OLD="$old" MUT_NEW="$new" awk '{ if ($0 == ENVIRON["MUT_OLD"]) print ENVIRON["MUT_NEW"]; else print }' "$SCRIPT" > "$f"
+  MUT_OLD="$old" MUT_NEW="$new" MUT_OLD2="${7:-}" MUT_NEW2="${8:-}" awk '{ if ($0 == ENVIRON["MUT_OLD"]) print ENVIRON["MUT_NEW"]; else if (ENVIRON["MUT_OLD2"] != "" && $0 == ENVIRON["MUT_OLD2"]) print ENVIRON["MUT_NEW2"]; else print }' "$SCRIPT" > "$f"
   if cmp -s "$f" "$SCRIPT" || ! bash -n "$f" 2>/dev/null; then ko "35 $id mutant NON OPPOSABLE" "mutation appliquée et syntaxe valide"; return; fi
   "$sc" "$SCRIPT" "mo$MUT_N"; ro=$?; "$sc" "$f" "mm$MUT_N"; rm=$?
   if [ "$ro" -eq "$eo" ] && [ "$rm" -eq "$em" ]; then ok "35 $id TUE : rc_mutant=$rm attendu $em, rc_original=$ro attendu $eo"
@@ -503,7 +541,15 @@ sc_i() { local d; d="$(mk_sane_fixture "$2")"; gate_at "$(mk_inst "$1" 'stub:ech
 sc_f() { local d g; d="$(mk_e7f "$2")"; g="$(mk_inst "$1" real)"; gate_at "$g" "$d"; git_f "$d" add -A; git_f "$d" commit -q -m "archivage commité"; gate_at "$g" "$d"; return "$E7_RC"; }
 e7_mutant "E7c (rc 2 lu comme sain)" '  elif [ "$E7_RC" -ge 2 ]; then' '  elif [ "$E7_RC" -ge 99 ]; then' sc_c 4 3
 e7_mutant "E7g (delta ignoré, tout le rangeable du dépôt imputé)" '  E7_LIGNES="$(LC_ALL=C comm -23 "$E7_NOW" "$E7_SNAP")"' '  E7_LIGNES="$(LC_ALL=C comm -23 "$E7_NOW" /dev/null)"' sc_g 3 0
-e7_mutant "E7h (snapshot absent non vu, lu sain)" 'elif [ -z "$E7_SNAP" ] || [ ! -f "$E7_SNAP" ]; then' 'elif false; then' sc_h 4 3
+sc_j() { local d; d="$(mk_sane_fixture "$2")"; set_lock "$d" DRIVER.lock.gen.1.11; snap "$d"; set_lock "$d" DRIVER.lock.gen.2.22; gate_at "$(mk_inst "$1" real)" "$d"; return "$E7_RC"; }
+sc_k() { local d g; d="$(mk_dirty "$2")"; g="$(mk_inst "$1" real)"; PATH="$GH_OK_BIN:$PATH" HOME="$EMPTY_HOME" bash "$g" --root "$d" --budget-snapshot >/dev/null 2>&1; gate_at "$g" "$d"
+  case "$E7_OUT" in *"[E7] ARCHIVAGE REFUSÉ"*) return 1 ;; *) return 0 ;; esac; }
+sc_l() { local d; d="$(mk_sane_fixture "$2")"; printf 'RANGEABLE branche : x\n' > "$d/.git/vf-mission-budget.snap"; gate_at "$(mk_inst "$1" real)" "$d"; return "$E7_RC"; }
+# E7h : DEUX couches (snapshot absent, puis snapshot sans identité) — le mutant retire les deux ; chacune seule laisse le même code 4 (défense en profondeur)
+e7_mutant "E7h (snapshot absent non vu, lu sain : les deux couches retirées)" 'elif [ -z "$E7_SNAP" ] || [ ! -f "$E7_SNAP" ]; then' 'elif false; then' sc_h 4 3 '  if [ -z "$E7_SGEN" ]; then' '  if false; then'
+e7_mutant "E7j (identité du snapshot non comparée au verrou courant)" '  elif [ "$E7_CGEN" != "-" ] && [ "$E7_CGEN" != "$E7_SGEN" ]; then' '  elif false; then' sc_j 4 3
+e7_mutant "E7k (snapshot pris sans --dry-run : un refus préexistant est imputé)" '  SNAP_OUT="$(bash "$SNAP_BUDGET" --root "$ROOT" --no-remote --quiet --auto --dry-run 2>/dev/null)"; SNAP_RC=$?' '  SNAP_OUT="$(bash "$SNAP_BUDGET" --root "$ROOT" --no-remote --quiet 2>/dev/null)"; SNAP_RC=$?' sc_k 0 1
+e7_mutant "E7l (snapshot sans identité accepté)" '  if [ -z "$E7_SGEN" ]; then' '  if false; then' sc_l 4 3
 e7_mutant "E7i (ARCHIVAGE NON TENTÉ redevenu silence)" '  if [ -n "$E7_NONTENTE" ]; then' '  if false; then' sc_i 4 3
 e7_mutant "E7f (--auto retiré)" '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?' '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict 2>/dev/null)"; E7_RC=$?' sc_f 3 0
 
