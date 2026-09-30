@@ -997,9 +997,68 @@ def evaluer_g1(contexte):
                                       "tranchez-les avant de planifier (spec §5)" % (phase, ", ".join(_ids_ouverts(donnees))))]
 
 
+# --- G7 : pas de planning orphelin sous un lab adhérent (GATE-07, 45-07 ; P45-D-14, spec §2 D-05) ---------------
+# Une écriture par Write ou NotebookEdit (Edit ne crée pas de fichier) qui CRÉE un dossier `.planning/` dans un dossier X
+# (le DERNIER composant `.planning` du chemin dont le dossier n'existe pas encore ; X = son parent) est jugée : le plus
+# proche ancêtre EXISTANT de X qui porte un `.planning/` est la racine du lab (le plus proche gagne, P45-D-01a) ; le
+# lab est adhérent, sinon le hook s'est tu avant d'arriver ici. Passage si X porte un marqueur de projet de code — la
+# MÊME liste que `has_code_signal` de detect-gsd-engine.sh (un contrôle croisé de la suite extrait le texte du détecteur
+# et rougit à tout écart), plus un dossier `*.xcodeproj` directement dans X — ou un `.claude/` habité.
+MARQUEURS_CODE = ("package.json", "go.mod", "Cargo.toml", "pyproject.toml", "pom.xml", "build.gradle", "build.gradle.kts", "composer.json", "Gemfile", "tsconfig.json", "Package.swift")  # g7-marqueurs
+SUFFIXE_XCODEPROJ = ".xcodeproj"
+NOM_PLANNING = ".planning"
+OUTILS_CREATION = ("Write", "NotebookEdit")
+
+
+def _creation_planning(racine, composants):
+    """Indice (dans `composants`, relatifs à la racine du lab) du DERNIER composant `.planning` — hors dernier composant,
+    qui serait un fichier — dont le dossier n'existe pas encore sur le disque, ou None. Comparaison en casefold (identité
+    de 45-05)."""
+    trouve = None
+    for i, composant in enumerate(composants[:-1]):
+        if composant.casefold() == NOM_PLANNING and not os.path.lexists(os.path.join(racine, *composants[: i + 1])):  # g7-existe
+            trouve = i
+    return trouve
+
+
+def porte_marqueur_code(dossier):
+    """Vrai si `dossier` porte un marqueur de projet de code : un fichier (test de fichier qui suit un lien, comme `[ -f ]`
+    du détecteur) de MARQUEURS_CODE, ou un dossier `*.xcodeproj` directement dedans (comme `[ -d ]`, sans fichier caché,
+    comme le glob du détecteur)."""
+    for nom in MARQUEURS_CODE:
+        if os.path.isfile(os.path.join(dossier, nom)):
+            return True
+    try:
+        noms = sorted(os.listdir(dossier))
+    except OSError:
+        return False
+    return any(n.endswith(SUFFIXE_XCODEPROJ) and not n.startswith(".") and os.path.isdir(os.path.join(dossier, n)) for n in noms)
+
+
+def evaluer_g7(contexte):
+    """G7 (GATE-07) : création d'un `.planning/` dans un dossier X sans marqueur de projet de code ni `.claude/` habité,
+    sous un lab adhérent. Le prédicat « habité » arrive à la tâche suivante : ici un X qui porte un `.claude/` passe."""
+    if contexte["outil"] not in OUTILS_CREATION or not contexte["ecrit"]:
+        return []
+    racine = contexte["racine"]
+    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
+    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    indice = _creation_planning(racine, composants)
+    if indice is None:
+        return []
+    x_rel = "/".join(composants[:indice])
+    x = os.path.join(racine, *composants[:indice])
+    if porte_marqueur_code(x):  # g7-marqueur
+        return []
+    if os.path.lexists(os.path.join(x, ".claude")):
+        return []
+    return [Verdict("G7", "/".join(composants), "créer un .planning/ dans %s exige un .claude/ habité (au moins un agent et une mémoire) ou un "
+                                                 "marqueur de projet de code — sinon ce planning serait orphelin (spec D-05)" % x_rel)]
+
+
 # Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un
 # Verdict d'erreur : deny si le gate est armed, ligne d'observation sinon (P45-D-08, spec §5.1).
-GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1))  # gates-a-verdict
+GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7))  # gates-a-verdict
 
 
 def evaluer_protege(gate, fonction, contexte):

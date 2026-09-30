@@ -29,6 +29,11 @@
 #                   COMPTE G1 du banc
 #   R-REGISTRE      lire_registre du hook est ast-identique à celle du moteur de recalcul
 #   R-CANG-G1       le cas de canary G1-sans-cadrage (état livré, G6, G5 et G1 armed, evaluer_g1 neutralisé)
+#   R-G7-01..05     G7 (45-07) : création d'un .planning/ par Write ou NotebookEdit dans un dossier nu sous un lab adhérent,
+#                   observe puis armed ; un marqueur de projet de code laisse passer (un cas par marqueur, faux marqueurs
+#                   refusés) ; .planning/ existant, Edit, lab dev, dossier sans ancêtre planifié : jamais refusés ; contrôle
+#                   croisé des marqueurs avec le TEXTE de detect-gsd-engine.sh (R-G7-05) ; COUVERTURE G7, COMPTE G7 du banc
+#   R-CANG-G7       le cas de canary G7-orphelin (état livré, étapes 1 à 3 armed, evaluer_g7 neutralisé)
 #   R-OBS-ENV       le journal d'observation suit XDG_CACHE_HOME puis HOME et rien d'autre : les valeurs
 #                   reçues n'atteignent jamais l'armement ni l'adhésion (P45-D-12a)
 #   R-JETON         l'encodeur du journal est ast-identique à _jeton_journal du moteur de recalcul
@@ -1421,7 +1426,7 @@ def controle_cang_02(ctx, script):
 
 def controle_cang_03(ctx, script):
     """evaluer_g6 neutralisé (jamais de verdict) : le canary signale, code 0, UNE ligne qui nomme G6 — observe comme armed."""
-    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5), ("G1", evaluer_g1))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7))  # gates-a-verdict')
     if neutre is None:
         return False, "mutant du hook invalide : " + raison
     fautes = []
@@ -1921,7 +1926,7 @@ def controle_cang_g1(ctx, script):
     rc, out, err = lancer_canary_dossier(ctx, d)
     if rc != 3 or out != b"":
         fautes.append("G6, G5 et G1 armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
-    neutre, raison = make_hook_mutant(ctx, "G1-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G1-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G7", evaluer_g7))  # gates-a-verdict')
     if neutre is None:
         fautes.append("mutant du hook invalide : " + raison)
     else:
@@ -1932,6 +1937,150 @@ def controle_cang_g1(ctx, script):
             if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G1-sans-cadrage" not in lignes[0] or "G6-principal" in lignes[0]:
                 fautes.append("evaluer_g1 neutralisé (%s) : rc=%d %s" % (valeur, rc, court(out)))
     return (not fautes), ("; ".join(fautes) if fautes else "canary sain (code 3) sur l'état livré et sur G6, G5 et G1 armed ; evaluer_g1 neutralisé : une ligne qui nomme G1-sans-cadrage, observe comme armed")
+
+
+# --- 45-07 : G7, pas de planning orphelin sous un lab adhérent (GATE-07, spec §2 D-05) ---------------------------------
+G7_LAB = "g7-adherent"
+G7_NU = "zone/nu/.planning/config.json"
+G7_MOTIF = "exige un .claude/ habité"
+# Les onze noms du détecteur, ÉCRITS ICI indépendamment du hook : un dossier `code-<nom>/` du banc porte le marqueur du même nom.
+G7_MARQUEURS = ("package.json", "go.mod", "Cargo.toml", "pyproject.toml", "pom.xml", "build.gradle", "build.gradle.kts",
+                "composer.json", "Gemfile", "tsconfig.json", "Package.swift")
+
+
+def _g7(ctx, hook, outil, rel, lab=G7_LAB, agent=None, extra_env=None):
+    return _g5(ctx, hook, outil, rel, agent=agent, lab=lab, extra_env=extra_env)
+
+
+def controle_g7_01(ctx, script):
+    """Copie observe : Write de `zone/nu/.planning/config.json` sous un lab adhérent -> silence, code 0, UNE ligne gate=G7 au journal."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    cache = dossier_neuf(ctx, "cache-g7-01")
+    rc, out, err = _g7(ctx, d, "Write", G7_NU, extra_env={"XDG_CACHE_HOME": cache})
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err:
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    if len(lignes) != 1:
+        return False, "%d ligne(s) au journal (attendu 1)" % len(lignes)
+    for motif in ("  gate=G7  ", "  chemin=" + G7_NU + "  ", "  outil=Write  "):
+        if motif not in lignes[0]:
+            return False, "la ligne ne porte pas %r : %s" % (motif, lignes[0])
+    return True, "copie observe : silence, code 0, une ligne gate=G7 (chemin, outil) au journal d'observation"
+
+
+def controle_g7_02(ctx, script):
+    """Copie armée : Write et NotebookEdit d'un .planning/ à créer dans un dossier nu (existant ou à créer, tout rôle) -> un deny
+    `[planning-core] G7 :` qui nomme le dossier X."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    for outil, rel, agent, x in (("Write", G7_NU, None, "zone/nu"), ("NotebookEdit", "zone/nu/.planning/x.ipynb", None, "zone/nu"),
+                                 ("Write", G7_NU, "general-purpose", "zone/nu"),
+                                 ("Write", "zone/nouveau/profond/.planning/config.json", None, "zone/nouveau/profond")):
+        n += 1
+        raison, detail = _raison_deny(*_g7(ctx, d, outil, rel, agent=agent))
+        if raison is None:
+            fautes.append("%s %s -> %s" % (outil, rel, detail))
+        elif not raison.startswith("[planning-core] G7 :") or ("dans %s exige" % x) not in raison or G7_MOTIF not in raison:
+            fautes.append("%s %s : raison %s" % (outil, rel, raison))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus G7 (Write et NotebookEdit, fil principal et agent, dossier existant ou à créer) qui nomment X" % n)
+
+
+def controle_g7_03(ctx, script):
+    """Copie armée : un .planning/ créé dans un dossier qui porte un marqueur de code -> aucun refus, un cas par marqueur (les onze
+    noms, un dossier *.xcodeproj, un lien vers un fichier) ; un FAUX marqueur (dossier nommé package.json, lien cassé, fichier
+    nommé App.xcodeproj) ne compte pas."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    for dossier in ["code-" + m for m in G7_MARQUEURS] + ["code-App.xcodeproj", "code-lien"]:
+        n += 1
+        rc, out, err = _g7(ctx, d, "Write", "zone/%s/.planning/config.json" % dossier)
+        if classer(rc, out) not in ("silence", "avertit") or err or b"[planning-core] G7" in out:
+            fautes.append("%s -> %s %s" % (dossier, classer(rc, out), court(out)))
+    for dossier in ("code-dossier", "code-casse", "code-fichier-xcode"):
+        raison, detail = _raison_deny(*_g7(ctx, d, "Write", "zone/%s/.planning/config.json" % dossier))
+        if raison is None or not raison.startswith("[planning-core] G7 :"):
+            fautes.append("faux marqueur %s -> %s" % (dossier, detail if raison is None else raison))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d marqueurs laissent passer (onze noms, *.xcodeproj, lien vers un fichier) ; dossier nommé package.json, lien cassé et fichier nommé App.xcodeproj refusés" % n)
+
+
+def controle_g7_04(ctx, script):
+    """Copie armée : écriture dans un .planning/ qui existe déjà, Edit, création sous un lab dev, création dans un dossier sans aucun
+    ancêtre planifié -> aucun refus de G7."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+    for outil, rel in (("Write", "zone/existant/.planning/notes.md"), ("Write", ".planning/notes.md"), ("Edit", G7_NU)):
+        rc, out, err = _g7(ctx, d, outil, rel)
+        if classer(rc, out) not in ("silence", "avertit") or err or b"[planning-core] G7" in out:
+            fautes.append("%s %s -> %s %s" % (outil, rel, classer(rc, out), court(out)))
+    rc, out, err = _g7(ctx, d, "Write", G7_NU, lab="g7-dev")
+    if rc != 0 or out != b"" or err:
+        fautes.append("lab dev -> rc=%d stdout=%s" % (rc, court(out)))
+    libre = dossier_neuf(ctx, "g7-libre")
+    brut = payload("Write", entree_outil("Write", os.path.join(libre, "nu", ".planning", "config.json")), libre)
+    rc, out, err = ctx.lancer("A", brut, cwd=libre, dossier=d)
+    if rc != 0 or out != b"" or err:
+        fautes.append("dossier sans ancêtre planifié -> rc=%d stdout=%s" % (rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "aucun refus : .planning/ existant (imbriqué et racine), Edit, lab dev (stdout d'octet vide), dossier sans ancêtre planifié (stdout d'octet vide)")
+
+
+def marqueurs_du_detecteur(texte):
+    """(mots de la boucle `for f in … ; do` qui teste les fichiers, glob du projet Xcode) extraits du texte de detect-gsd-engine.sh."""
+    m = re.search(r"has_code_signal\(\) \{(.*?)\n\}", texte, re.S)
+    if m is None:
+        return None, None
+    corps = m.group(1)
+    boucle = re.search(r"for f in ([^;]*?); do\n\s*\[ -f ", corps, re.S)
+    xcode = re.search(r"for f in \./(\*\.xcodeproj); do \[ -d ", corps)
+    if boucle is None or xcode is None:
+        return None, None
+    return boucle.group(1).replace("\\\n", " ").split(), xcode.group(1)
+
+
+def controle_g7_05(ctx, script):
+    """R-G7-05 : l'ensemble des marqueurs extrait du TEXTE de detect-gsd-engine.sh (mots de la boucle `for f in … ; do`, motif
+    `*.xcodeproj`) est égal à MARQUEURS_CODE ∪ {*.xcodeproj} du hook ; les onze noms écrits par la suite (G7_MARQUEURS) aussi."""
+    chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
+    ns = charger_module(chemin)
+    detecteur = os.path.join(ctx.scripts_dir, "detect-gsd-engine.sh")
+    mots, xcode = marqueurs_du_detecteur(open(detecteur, encoding="utf-8").read())
+    if mots is None:
+        return False, "extraction vide du texte du détecteur (rouge, jamais un vert à vide)"
+    hook = set(ns["MARQUEURS_CODE"]) | {"*" + ns["SUFFIXE_XCODEPROJ"]}
+    det = set(mots) | {xcode}
+    fautes = []
+    if len(mots) != len(set(mots)) or len(mots) != 11:
+        fautes.append("le détecteur porte %d mot(s) pour %d distinct(s) (attendu 11)" % (len(mots), len(set(mots))))
+    if hook != det:
+        fautes.append("écart : seulement dans le hook %s, seulement dans le détecteur %s" % (sorted(hook - det), sorted(det - hook)))
+    if set(G7_MARQUEURS) | {"*.xcodeproj"} != det:
+        fautes.append("la liste de la suite diffère du détecteur : %s" % sorted((set(G7_MARQUEURS) | {"*.xcodeproj"}) ^ det))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d marqueurs, MARQUEURS_CODE ∪ {*.xcodeproj} = l'ensemble extrait du texte de detect-gsd-engine.sh" % len(det))
+
+
+def controle_cang_g7(ctx, script):
+    """R-CANG-G7 : le canary rend 3 (sain, cas G7 compris) sur l'état livré et sur une copie où les étapes 1 à 3 sont armées, et signale
+    (code 0, une ligne qui nomme `G7-orphelin`) quand evaluer_g7 est neutralisé."""
+    dossier = _dossier(ctx, script)
+    fautes = []
+    d = scripts_canary(ctx, dossier, "observe", tel_quel=True)
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        fautes.append("état livré : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    d = scripts_canary(ctx, dossier, "armed", armes=("G6", "G5", "G1", "G7"))
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        fautes.append("étapes 1 à 3 armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    neutre, raison = make_hook_mutant(ctx, "G7-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1))  # gates-a-verdict')
+    if neutre is None:
+        fautes.append("mutant du hook invalide : " + raison)
+    else:
+        for valeur, armes in (("observe", ()), ("armed", ("G6", "G5", "G1", "G7"))):
+            d = scripts_canary(ctx, dossier, valeur, hook=os.path.join(neutre, "planning-hook.sh"), armes=armes)
+            rc, out, err = lancer_canary_dossier(ctx, d)
+            lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+            if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G7-orphelin" not in lignes[0] or "G6-principal" in lignes[0] or "G1-sans-cadrage" in lignes[0]:
+                fautes.append("evaluer_g7 neutralisé (%s) : rc=%d %s" % (valeur, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "canary sain (code 3) sur l'état livré et sur les étapes 1 à 3 armed ; evaluer_g7 neutralisé : une ligne qui nomme G7-orphelin, observe comme armed")
 
 
 # =================================================================================================
@@ -2110,7 +2259,8 @@ def sec_cang(ctx):
             ("R-CANG-01", controle_cang_01, "canary de session, G6 et G5 en observe"),
             ("R-CANG-02", controle_cang_02, "canary de session, G6 et G5 armed"),
             ("R-CANG-03", controle_cang_03, "canary de session, evaluer_g6 neutralisé"),
-            ("R-CANG-G1", controle_cang_g1, "canary de session, cas G1-sans-cadrage")):
+            ("R-CANG-G1", controle_cang_g1, "canary de session, cas G1-sans-cadrage"),
+            ("R-CANG-G7", controle_cang_g7, "canary de session, cas G7-orphelin")):
         bon, detail = ctrl(ctx, None)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
@@ -2137,6 +2287,19 @@ def sec_g1(ctx):
     ok("R-G1-08 contrôle croisé étendu : " + detail) if bon else ko(
         "R-G1-08", "G1 refuse (absence ou registre ouvert) <=> `à cadrer`, `en cadrage`, `hors-cadrage:*`, `avant-cadrage-clos:*` ; états illisibles jamais refusés",
         "aucune divergence", detail)
+
+
+def sec_g7(ctx):
+    for ident, ctrl, titre in (
+            ("R-G7-01", controle_g7_01, "Write d'un .planning/ à créer dans un dossier nu sur copie observe"),
+            ("R-G7-02", controle_g7_02, "le même Write et NotebookEdit sur copie armed, tout rôle"),
+            ("R-G7-03", controle_g7_03, "marqueur de projet de code : un cas par marqueur, faux marqueurs refusés"),
+            ("R-G7-04", controle_g7_04, ".planning/ existant, Edit, lab dev, dossier sans ancêtre planifié : aucun refus")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+    bon, detail = controle_g7_05(ctx, ctx.hook)
+    ok("R-G7-05 contrôle croisé des marqueurs avec le texte du détecteur : " + detail) if bon else ko(
+        "R-G7-05", "MARQUEURS_CODE ∪ {*.xcodeproj} du hook = l'ensemble extrait du texte de detect-gsd-engine.sh", "ensembles égaux", detail)
 
 
 def sec_registre(ctx):
@@ -2214,7 +2377,7 @@ def sec_banc(ctx):
             ko("COUVERTURE " + gate, "au moins un cas `avertit` et un cas `silence` pour " + gate, ">= 1 chacun", str(c))
         else:
             ok("COUVERTURE %s : %d avertit, %d silence" % (gate, c["avertit"], c["silence"]))
-    for gate in ("G5", "G6", "G1"):
+    for gate in ("G5", "G6", "G1", "G7"):
         c = compte.get(gate, {})
         print("COUVERTURE %s doit-refuser=%d doit-passer=%d silence=%d" % (gate, c.get("doit-refuser", 0), c.get("doit-passer", 0), c.get("silence", 0)))
         if c.get("doit-refuser", 0) < 1 or c.get("doit-passer", 0) < 1 or c.get("silence", 0) < 1:
@@ -2222,7 +2385,7 @@ def sec_banc(ctx):
         else:
             ok("COUVERTURE %s : %d doit-refuser, %d doit-passer, %d silence (0 faux refus, 0 faux accept : chaque cas est conforme)" % (gate, c["doit-refuser"], c["doit-passer"], c["silence"]))
     # comptes du banc, par gate de l'étape 1 (P45-D-03b : l'armement exige 0 et 0)
-    for gate in ("G5", "G6", "G1"):
+    for gate in ("G5", "G6", "G1", "G7"):
         fr, fa = faux.get(gate, [0, 0])
         print("COMPTE %s faux-refus=%d faux-accept=%d" % (gate, fr, fa))
     if faux.get("G1", [0, 0]) == [0, 0] and compte.get("G1"):
@@ -2239,7 +2402,7 @@ def sec_banc(ctx):
             ko("COUVERTURE jumeau " + nom, "un lab jumeau porte des écritures", ">= 1", "0")
 
 
-CTRL_FICHIER = (controle_table_02, controle_parseur, controle_env_statique, controle_jeton, controle_registre)
+CTRL_FICHIER = (controle_table_02, controle_parseur, controle_env_statique, controle_jeton, controle_registre, controle_g7_05)
 
 
 def sec_mutants(ctx):
@@ -2319,6 +2482,15 @@ def sec_mutants(ctx):
          'if structurante == "oui" and statut != "ARBITRÉ":', "R-G1-06", controle_g1_06),
         ("G1-BORD", "# g1-bord", "if registre_ok:  # g1-bord", "R-G1-07", controle_g1_07),
         ("REGISTRE", "    clos = True", "    clos = False", "R-REGISTRE", controle_registre),
+        # 45-07 : G7
+        ("G7-MARQUEUR", "# g7-marqueurs",
+         'MARQUEURS_CODE = ("package.json", "go.mod", "Cargo.toml", "pyproject.toml", "pom.xml", "build.gradle", "build.gradle.kts", "composer.json", "tsconfig.json", "Package.swift")  # g7-marqueurs',
+         "R-G7-05", controle_g7_05),
+        ("G7-MARQUEUR-GEMFILE", "# g7-marqueurs",
+         'MARQUEURS_CODE = ("package.json", "go.mod", "Cargo.toml", "pyproject.toml", "pom.xml", "build.gradle", "build.gradle.kts", "composer.json", "tsconfig.json", "Package.swift")  # g7-marqueurs',
+         "R-G7-03", controle_g7_03),
+        ("G7-EXISTE", "# g7-existe", "if composant.casefold() == NOM_PLANNING:  # g7-existe", "R-G7-04", controle_g7_04),
+        ("G7-PERIMETRE", "sys.exit(0)  # non-adherent", "pass", "R-G7-04", controle_g7_04),
     ]
     for entree in M:
         ident, motif, repl, cible, ctrl = entree[:5]
@@ -2357,6 +2529,7 @@ SECTIONS = {
     "id": sec_id,
     "cang": sec_cang,
     "g1": sec_g1,
+    "g7": sec_g7,
     "env": sec_env,
     "obs_env": sec_obs_env,
     "env_statique": sec_env_statique,
@@ -2405,7 +2578,7 @@ run_sections() { # <sections séparées par des virgules>
 
 [ -f "$BANC_RECALC" ] || ko "recalc-planning-banc.txt présent" "le banc de la 44 existe sous fixtures/ (contrôle croisé de G1)" "$BANC_RECALC" "absent"
 
-run_sections table,parseur,registre,jeton,g2,g5,g6,id,cang,g1,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
+run_sections table,parseur,registre,jeton,g2,g5,g6,id,cang,g1,g7,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

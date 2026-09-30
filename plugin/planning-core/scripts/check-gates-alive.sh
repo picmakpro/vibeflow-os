@@ -128,6 +128,10 @@ NOMINAL = "Write:.planning/notes.md"
 # Nom du fichier d'état généré : composé dans les cas ci-dessous (le recensement des consommateurs de
 # planning refuse un chemin de planning suivi de ce nom sur une même ligne).
 NOM_ETAT = "STATE.md"
+# Dossier nu du cas G7 : le lab synthétique porte un plan ouvert dont l'ecrit: le couvre, de sorte que G2 (avertit)
+# se taise et que l'observation de G7 soit le SEUL signal (un gate en observe rend stdout vide, P45-D-20).
+DOSSIER_NU = "sous-dossier-nu"
+PLAN_CANARY = ".planning/cycles/01-c/phases/01-p/PLAN.md"
 
 # --- Table des cas (une ligne par cas) : <id>|<gate>|<mode>|<payload>. L'attendu est DÉRIVÉ. ------
 CANARIS = (
@@ -145,6 +149,8 @@ CANARIS = (
     "G5-verdict|G5|nominal|Write:.planning/cycles/01-c/phases/01-p/VERDICT.md@agent-inconnu",
     # Étape 2 (45-06) : G1 (PLAN.md de forme modèle dans une phase sans CADRAGE.md, fil principal).
     "G1-sans-cadrage|G1|nominal|Write:.planning/cycles/01-c/phases/01-p/PLAN.md",
+    # Étape 3 (45-07) : G7 (création d'un .planning/ orphelin sous un lab adhérent, fil principal).
+    "G7-orphelin|G7|nominal|Write:" + DOSSIER_NU + "/.planning/config.json",
 )
 
 
@@ -270,6 +276,9 @@ class Rejeu:
         os.makedirs(os.path.join(self.lab, ".planning"))
         with open(os.path.join(self.lab, ".planning", "config.json"), "w", encoding="utf-8") as fh:
             fh.write('{"planning_version": "%s"}' % SCHEMA_ADHESION)
+        os.makedirs(os.path.dirname(os.path.join(self.lab, PLAN_CANARY)))
+        with open(os.path.join(self.lab, PLAN_CANARY), "w", encoding="utf-8") as fh:
+            fh.write("---\necrit: " + DOSSIER_NU + "\n---\n")
         self.vide = os.path.join(tmp, "vide")
         os.makedirs(os.path.join(self.vide, ".claude"))
         self.pathd = os.path.join(tmp, "path-sans-python")
