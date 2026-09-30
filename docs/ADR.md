@@ -2995,9 +2995,16 @@ de travail direct (Stop, `guard-fin-de-geste.sh`, bascule `VF_FIN_DE_GESTE`) ; (
 Le nettoyage ne juge et ne propose de ranger que ce qui est apparu **depuis le démarrage de la session
 ou de la mission** (ce qui existait avant n'est jamais imputé). La garde de fin de geste **bloque à
 chaque arrêt** tant qu'il reste du rangement ainsi attribué ; après **3 blocages de suite sans progrès**
-(progrès = l'ensemble attribué a diminué), elle laisse sortir avec un message **visible de
+(progrès = l'ensemble attribué est plus petit que le plus bas déjà atteint), elle laisse sortir avec un message **visible de
 l'utilisateur** (`systemMessage`). Un constat non actionnable (archivage refusé, non tenté, budget
-dépassé) est dit à l'utilisateur et ne bloque jamais ; un constat non vérifiable n'est jamais un vert. La release exige en plus une relecture adverse du diff fonctionnel, une sonde exécutée.
+dépassé) est dit à l'utilisateur et ne bloque jamais ; un constat non vérifiable n'est jamais un vert ; une
+écriture d'état de la garde qui échoue est dite et relâche la garde (jamais de blocage sans compteur). Un stash
+est désigné par son SHA, jamais par sa position. La garde ne sait pas si la session a conduit une mission : elle
+juge tout arrêt sur le snapshot de SA session, E7 sur celui de la mission, les deux se cumulent. Le snapshot de
+mission porte sa date et l'identité de la mission (génération du verrou) ; posé tard, il masque ce que la
+mission avait déjà créé. L'archive d'un STATE garde titres et dates, le STATE un pointeur par archivage. `.worktreeinclude`
+ne recopie que des chemins ignorés par git : en scope project `.claude/scripts/` ne l'est pas, les scripts
+arrivent par git. La release exige en plus une relecture adverse du diff fonctionnel, une sonde exécutée.
 
 ### Précision d'ADR-031
 

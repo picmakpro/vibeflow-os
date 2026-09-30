@@ -282,6 +282,8 @@ assert "B1 — branche travaillée et mergée : RANGEABLE" "$OUT" "RANGEABLE bra
 refute "B2 — branche neuve (reflog à 1 entrée) : rien" "$OUT" "RANGEABLE branche : fresh"
 assert_line "ST1 — stash sur branche supprimée : RANGEABLE" "$OUT" "« On tmp: sur-tmp »" "RANGEABLE stash"
 refute "ST1b — le stash d'une branche vivante (main) n'est pas rangeable" "$OUT" "« On main: sur-main »"
+refute "ST1c — le jeton de stash est désigné par son SHA : jamais par sa position (elle se décale)" "$OUT" "RANGEABLE stash : stash@"
+assert_rc "ST1d — chaque ligne RANGEABLE stash porte un SHA de 12 caractères" "$(printf '%s\n' "$OUT" | grep -c 'RANGEABLE stash : ')" "$(printf '%s\n' "$OUT" | grep -cE 'RANGEABLE stash : [0-9a-f]{12} « ')"
 assert_line "ST3 — stash sur une branche travaillée ET intégrée (done) : RANGEABLE" "$OUT" "« On done: sur-done »" "RANGEABLE stash"
 refute "ST4 — stash sur une branche NEUVE (fresh, tête ancêtre de main) : jamais rangeable" "$OUT" "« On fresh: sur-fresh »"
 refute "ST5 — stash sur une branche vivante NON intégrée (live) : jamais rangeable" "$OUT" "« On live: sur-live »"
@@ -560,7 +562,9 @@ OUT="$(VF_STATE_BUDGET_KB=1 krun "$K7" --no-remote --archive state --ws ws1)"
 S7="$(cat "$K7/.planning/workstreams/ws1/STATE.md")"
 assert "K7 — ARCHIVÉ" "$OUT" "ARCHIVÉ : .planning/workstreams/ws1/STATE.md → .planning/archives/state/ws1-STATE-$KD.md"
 assert_rc "K7 — le frontmatter est gardé (ligne 1 = ---, status: executing)" "$([ "$(sed -n 1p "$K7/.planning/workstreams/ws1/STATE.md")" = "---" ] && printf '%s' "$S7" | grep -q '^status: executing$'; echo $?)" 0
-for t in "## Project Reference" "## Current Position" "## Historique" "### Sous-titre" "## Session Continuity"; do assert "K7 — titre gardé : $t" "$S7" "$t"; done
+for t in "## Project Reference" "## Current Position" "## Historique" "## Session Continuity"; do assert "K7 — titre gardé : $t" "$S7" "$t"; done
+refute "K7 — le sous-titre d'historique part AVEC son corps (l'archive garde titres et dates)" "$S7" "### Sous-titre"
+assert "K7 — ... il est dans l'archive" "$(cat "$K7/.planning/archives/state/ws1-STATE-$KD.md")" "### Sous-titre"
 assert_rc "K7 — une seule ligne ^Phase:" "$(printf '%s\n' "$S7" | grep -c '^Phase:')" 1
 for t in ref-corps pos-corps session-corps; do assert "K7 — corps de section gardée : $t" "$S7" "$t"; done
 refute "K7 — l'historique a quitté le STATE" "$S7" "hist-ligne-1 "
@@ -781,6 +785,7 @@ kcommit "$KE"; TE="$(ktree "$KE" | cksum)"
 OUT="$(VF_STATE_BUDGET_KB=1 krun "$KE" --no-remote --archive state)"; RC=$?
 refute "KS2 — second passage : rien ARCHIVÉ" "$OUT" "ARCHIVÉ"
 assert_rc "KS2 — second passage : arbre identique (aucune archive -2, rien de re-déplacé)" "$([ "$(ktree "$KE" | cksum)" = "$TE" ] && echo 0 || echo 1)" 0
+refute "KS2 — second passage : aucun refus (le pointeur posé est conservé)" "$OUT" "ARCHIVAGE REFUSÉ"
 assert "KS2 — le dépassement reste dit" "$OUT" "STATE DÉPASSÉ"
 assert_rc "KS2 — un seul pointeur dans le STATE" "$(grep -c '^<!-- vf-archive: ' "$KE/.planning/STATE.md")" 1
 # KT1-KT2 — TRANCHÉ n'est pas clos ; un <details> sans ✅ ni SHIPPED reste
@@ -816,6 +821,88 @@ KV3="$WORK_DIR/kv3"; mk_part "$KV3"; echo gouvernance > "$KV3/.planning/active-w
 OUT="$(krun "$KV3" --no-remote --auto)"
 assert "KW3 — pointeur sur gouvernance : ARCHIVAGE REFUSÉ, compartiment protégé" "$OUT" "ARCHIVAGE REFUSÉ : compartiment protégé gouvernance"
 assert_rc "KW3 — rien déplacé" "$([ "$(ktree "$KV3" | cksum)" = "$TV3" ] && echo 0 || echo 1)" 0
+# KB1 (B1) — un fichier déjà archivé se ré-archive : archive, commit, nouveau sujet/entrée/jalon, archivage encore — trois sources
+KB="$WORK_DIR/kb1"; mk_repo "$KB"; mkdir -p "$KB/.planning"; bk_file "$KB/.planning/BACKLOG.md" 2 1; state_file "$KB/.planning/STATE.md"
+mk_roadmap "$KB"; kcommit "$KB"
+OUT="$(VF_STATE_BUDGET_KB=1 VF_ROADMAP_BUDGET_KB=1 krun "$KB" --no-remote --archive backlog,state,roadmap)"
+assert_rc "KB1 — premier archivage des trois sources : trois ARCHIVÉ" "$(printf '%s\n' "$OUT" | grep -c 'ARCHIVÉ :')" 3
+kcommit "$KB" "premier archivage"; B1_HEAD="$(git -C "$KB" rev-parse HEAD)"
+printf '\n## Clos 9 — CLOS (2026-02-01)\nlivré\n' >> "$KB/.planning/BACKLOG.md"
+{ printf '\n### Point du 2026-09-30\n\n'; for i in $(seq 1 40); do echo "nouvelle-ligne-$i xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done; } >> "$KB/.planning/STATE.md"
+{ printf '\n<details>\n<summary>✅ jalon B -- SHIPPED</summary>\n\n'; for i in $(seq 1 50); do echo "phase B ligne $i xxxxxxxxxxxxxxxxxxxx"; done; printf '\n</details>\n'; } >> "$KB/.planning/ROADMAP.md"
+kcommit "$KB" "nouveaux sujets"
+cp "$KB/.planning/BACKLOG.md" "$WORK_DIR/kb1.backlog.avant"; cp "$KB/.planning/STATE.md" "$WORK_DIR/kb1.state.avant"; cp "$KB/.planning/ROADMAP.md" "$WORK_DIR/kb1.roadmap.avant"
+OUT="$(VF_STATE_BUDGET_KB=1 VF_ROADMAP_BUDGET_KB=1 krun "$KB" --no-remote --archive backlog,state,roadmap)"; RC=$?
+assert_rc "KB1 — second archivage des trois sources : trois ARCHIVÉ" "$(printf '%s\n' "$OUT" | grep -c 'ARCHIVÉ :')" 3
+refute "KB1 — ... aucun refus de la preuve" "$OUT" "ARCHIVAGE REFUSÉ"
+assert_rc "KB1 — rc 0" "$RC" 0
+assert_rc "KB1 — six lignes d'INDEX (hors en-tête) : deux par source" "$(awk 'NR > 1' "$KB/.planning/archives/INDEX.tsv" | grep -c .)" 6
+assert_rc "KB1 — BACKLOG : deux pointeurs, conservés (aucun dans l'archive)" "$(grep -c '^<!-- vf-archive: ' "$KB/.planning/BACKLOG.md")" 2
+assert_rc "KB1 — aucune archive ne porte de ligne pointeur" "$(cat "$KB"/.planning/archives/*/*.md | grep -c '^<!-- vf-archive: ')" 0
+while IFS="$(printf '\t')" read -r _d _ty _src _arch _ref _mo; do
+  case "$_src" in *BACKLOG.md) A="$WORK_DIR/kb1.backlog.avant" ;; *STATE.md) A="$WORK_DIR/kb1.state.avant" ;; *ROADMAP.md) A="$WORK_DIR/kb1.roadmap.avant" ;; esac
+  git -C "$KB" cat-file blob "$_ref" > "$WORK_DIR/kb1.restored"
+  assert_rc "KB1 — second archivage de $_src : le blob de l'INDEX restitue la version commitée d'avant (cmp -s)" "$(cmp -s "$WORK_DIR/kb1.restored" "$A"; echo $?)" 0
+done <<EOF_KB1
+$(tail -n 3 "$KB/.planning/archives/INDEX.tsv")
+EOF_KB1
+# KB2 — un pointeur d'un archivage précédent enfermé dans un sujet qui se clôt ensuite RESTE dans la source (il n'est pas de l'archive)
+KB2="$WORK_DIR/kb2"; mk_repo "$KB2"; mkdir -p "$KB2/.planning"
+printf '# Backlog\n\n## Ouvert — DIFFÉRÉ\ntexte\n<!-- vf-archive: .planning/archives/backlog/ancien.md — ## Ancien — CLOS -->\n\n## Devenu clos — CLOS\ncorps\n' > "$KB2/.planning/BACKLOG.md"; kcommit "$KB2"
+OUT="$(krun "$KB2" --no-remote --archive backlog)"
+assert "KB2 — archivage accepté" "$OUT" "ARCHIVÉ : .planning/BACKLOG.md"
+assert_rc "KB2 — le pointeur ancien est encore dans la source" "$(grep -c 'archives/backlog/ancien.md' "$KB2/.planning/BACKLOG.md")" 1
+assert_rc "KB2 — et absent de l'archive" "$(grep -c 'ancien.md' "$KB2/.planning/archives/backlog/racine-BACKLOG-$KD.md")" 0
+# KD1 (D1) — STATE : l'archive garde TITRES ET DATES, le STATE un SEUL pointeur par archivage ; il repasse sous le budget
+KD1="$WORK_DIR/kd1"; mk_repo "$KD1"; mkdir -p "$KD1/.planning"
+{ printf -- '---\nstatus: executing\n---\n\n# Project State\n\nPhase: 7 of 9\n\n## Current Position\n\nEn cours : phase 7.\n\n### Pending Todos\n\n- todo ouvert A\n\n## Historique des sessions\n\n'
+  for i in $(seq 1 120); do printf '### Point du 2026-08-%02d\n\n- session %d : travail fait, ligne de remplissage pour grossir.\n\n' $((i % 28 + 1)) "$i"; done; } > "$KD1/.planning/STATE.md"; kcommit "$KD1"
+SZ0="$(wc -c < "$KD1/.planning/STATE.md" | tr -d ' ')"
+OUT="$(krun "$KD1" --no-remote --auto)"
+SZ1="$(wc -c < "$KD1/.planning/STATE.md" | tr -d ' ')"
+assert_rc "KD1 — le STATE de $SZ0 octets repasse sous le budget (8 Ko) : $SZ1" "$([ "$SZ0" -gt 8192 ] && [ "$SZ1" -le 8192 ]; echo $?)" 0
+refute "KD1 — plus de STATE DÉPASSÉ après l'archivage" "$OUT" "STATE DÉPASSÉ"
+assert_rc "KD1 — l'archive garde les 120 titres « Point du » (avec leurs dates)" "$(grep -c '^### Point du 2026-08-' "$KD1/.planning/archives/state/racine-STATE-$KD.md")" 120
+assert_rc "KD1 — le STATE n'en garde aucun" "$(grep -c '^### Point du' "$KD1/.planning/STATE.md")" 0
+assert_rc "KD1 — UN seul pointeur dans le STATE (pas un par sous-section)" "$(grep -c '^<!-- vf-archive: ' "$KD1/.planning/STATE.md")" 1
+assert "KD1 — le conteneur « Historique » et l'état ouvert restent" "$(cat "$KD1/.planning/STATE.md")" "todo ouvert A"
+assert_rc "KD1 — ligne ^Phase: gardée" "$(grep -c '^Phase:' "$KD1/.planning/STATE.md")" 1
+# KD2 — les entrées « Point du » sous un titre qui n'est PAS un conteneur d'historique partent aussi, avec leur titre ; un pointeur en tout
+KD2="$WORK_DIR/kd2"; mk_repo "$KD2"; mkdir -p "$KD2/.planning"
+{ printf '# State\n\n## Current Position\n\nposition\n\n'
+  for i in $(seq 1 30); do printf '### Point du 2026-07-%02d\n\n- fait %d xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\n' "$i" "$i"; done
+  printf '## Décisions\n\n'; for i in $(seq 1 30); do echo "decision-$i xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done; } > "$KD2/.planning/STATE.md"; kcommit "$KD2"
+OUT="$(VF_STATE_BUDGET_KB=1 krun "$KD2" --no-remote --archive state)"
+assert_rc "KD2 — les 30 entrées sous un titre non conteneur partent avec leur titre" "$(grep -c '^### Point du' "$KD2/.planning/archives/state/racine-STATE-$KD.md")" 30
+assert_rc "KD2 — le STATE n'en garde aucun" "$(grep -c '^### Point du' "$KD2/.planning/STATE.md")" 0
+assert_rc "KD2 — un seul pointeur pour l'archivage entier" "$(grep -c '^<!-- vf-archive: ' "$KD2/.planning/STATE.md")" 1
+assert "KD2 — le conteneur « Décisions » reste (titre), son corps est parti" "$(cat "$KD2/.planning/STATE.md")" "## Décisions"
+refute "KD2 — ... corps parti" "$(cat "$KD2/.planning/STATE.md")" "decision-1 "
+assert "KD2 — position courante intacte" "$(cat "$KD2/.planning/STATE.md")" "position"
+# KL1 (m2) — --auto n'attend JAMAIS le verrou : refus immédiat qui nomme le pid et dit s'il est vivant ; aucune reprise automatique
+KLK="$WORK_DIR/klk"; mk_repo "$KLK"; bk_file "$KLK/.planning/BACKLOG.md" 1 1; kcommit "$KLK"; mkdir "$KLK/.planning/.archive.lock"; echo "$$" > "$KLK/.planning/.archive.lock/pid"
+T0=$SECONDS; OUT="$(VF_ARCHIVE_LOCK_WAIT=100 krun "$KLK" --no-remote --auto)"; RC=$?; EL=$((SECONDS - T0))
+assert "KL1 — --auto, verrou tenu : refus qui nomme le processus" "$OUT" "verrou d archivage tenu par le processus $$ (vivant)"
+assert_rc "KL1 — ... immédiat (moins de 4 s alors que l'attente d'un --archive serait de 10 s) : ${EL}s" "$([ "$EL" -lt 4 ]; echo $?)" 0
+assert_rc "KL1 — rc 0 (un refus d'un --auto n'est jamais 2)" "$RC" 0
+assert_rc "KL1 — aucune reprise automatique : le verrou d'autrui est encore là" "$([ -d "$KLK/.planning/.archive.lock" ]; echo $?)" 0
+sleep 0 & DEADPID=$!; wait "$DEADPID"; echo "$DEADPID" > "$KLK/.planning/.archive.lock/pid"
+OUT="$(krun "$KLK" --no-remote --auto)"
+assert "KL1 — pid mort : dit, avec le geste (supprimer le dossier à la main)" "$OUT" "ce processus n existe plus, supprimer le dossier à la main"
+assert_rc "KL1 — ... et le verrou n'a pas été repris" "$([ -d "$KLK/.planning/.archive.lock" ]; echo $?)" 0
+assert "KL1 — le .gitignore du dépôt source couvre le dossier de verrou" "$(git -C "$(pwd)/../.." check-ignore -q .planning/.archive.lock/pid && echo couvert)" "couvert"
+# KR1 — --dry-run : la même décision, RIEN d'écrit (ni archive, ni INDEX, ni verrou) ; ne rend que les refus
+KR1="$WORK_DIR/kr1"; mk_part "$KR1"; echo "ajout non commité" >> "$KR1/.planning/workstreams/ws1/BACKLOG.md"; TR1="$(ktree "$KR1" | cksum)"
+OUT="$(GSD_WORKSTREAM=ws1 krun "$KR1" --no-remote --auto --dry-run)"; RC=$?
+assert "KR1 — --dry-run : le refus qu'un --auto rendrait est dit" "$OUT" "ARCHIVAGE REFUSÉ : .planning/workstreams/ws1/BACKLOG.md modifiée dans l'arbre de travail"
+refute "KR1 — ... et rien n'est ARCHIVÉ" "$OUT" "ARCHIVÉ :"
+assert_rc "KR1 — arbre identique (ni archive, ni INDEX)" "$([ "$(ktree "$KR1" | cksum)" = "$TR1" ]; echo $?)" 0
+assert_rc "KR1 — rc 0" "$RC" 0
+krun "$KR1" --no-remote --dry-run >/dev/null; assert_rc "KR1 — --dry-run sans --auto : rc 64" "$?" 64
+KRW="$WORK_DIR/krw"; mk_part "$KRW"; TR2="$(ktree "$KRW" | cksum)"
+OUT="$(GSD_WORKSTREAM=ws1 krun "$KRW" --no-remote --auto --dry-run)"
+refute "KR1 — témoin : sources commitées, aucun refus" "$OUT" "ARCHIVAGE REFUSÉ"
+assert_rc "KR1 — témoin : arbre identique, le verrou n'a pas été créé" "$([ "$(ktree "$KRW" | cksum)" = "$TR2" ] && [ ! -e "$KRW/.planning/.archive.lock" ]; echo $?)" 0
 # K15 — lecture seule de git/gh maintenue sous --archive/--auto (l'enveloppe n'a rien refusé) et verbes vus
 assert_rc "K15 — zéro refus de l'enveloppe git/gh sur toute la section K" "$(( $(grep -c '^VIOLATION' "$RO_LOG") - NVIOL_K0 ))" 0
 assert "K15 — témoin : l'archivage a bien appelé ls-files --error-unmatch via l'enveloppe" "$(grep -c '^OK git .*\[ls-files\] \[--error-unmatch\]' "$RO_LOG" | sed 's/^0$/jamais/; s/^[1-9][0-9]*$/vu/')" "vu"
@@ -1222,11 +1309,16 @@ assert_rc "MU32 opposable" "$RM" 0
 KX="$WORK_DIR/kx32"; mk_repo "$KX"; state_open_file "$KX/.planning/STATE.md"; kcommit "$KX"
 OUT="$(VF_STATE_BUDGET_KB=1 CHECK_UNDER="$MU32" krun "$KX" --no-remote --archive state)"; SX="$(cat "$KX/.planning/STATE.md")"
 kills_absent "MU32 toute section archivable : KS1 rougit (les todos ouverts ont quitté le STATE)" "$SX" "todo-ouvert-1 " "KS1 — les todos ouverts restent"
-MU33="$(make_mutant mu33 '  if (index($0, "<!-- vf-archive: ") == 1) { print; next }' '')"; RM=$?
-assert_rc "MU33 opposable" "$RM" 0
+MU33A="$(make_mutant mu33a '  if (ispointer($0) || $0 ~ /^Phase:/) { pr($0); next }' '  if ($0 ~ /^Phase:/) { pr($0); next }')"; RM=$?
+assert_rc "MU33a opposable" "$RM" 0
+SCRIPT="$MU33A"; MU33="$(make_mutant mu33 '  [ -z "$(LC_ALL=C comm -23 "$TMPD/p0" "$TMPD/p1")" ] || { archive_refuse "$rel : un pointeur d'"'"'un archivage précédent a disparu, rien déplacé"; return 0; }' '  :')"; RM=$?; SCRIPT="$CHECK"
+assert_rc "MU33 opposable (sur MU33a)" "$RM" 0
 KX="$WORK_DIR/kx33"; mk_repo "$KX"; state_open_file "$KX/.planning/STATE.md"; kcommit "$KX"
 OUT="$(state_two_pass "$MU33" "$KX")"
-kills "MU33 pointeur re-archivé : KS2 rougit (le second passage déplace encore le pointeur)" "$OUT" "ARCHIVÉ" "KS2 — second passage : rien ARCHIVÉ"
+kills "MU33 pointeur re-archivé ET preuve des pointeurs retirée : KS2 rougit (le second passage déplace encore le pointeur)" "$OUT" "ARCHIVÉ" "KS2 — second passage : rien ARCHIVÉ"
+KX="$WORK_DIR/kx33a"; mk_repo "$KX"; state_open_file "$KX/.planning/STATE.md"; kcommit "$KX"
+OUT="$(state_two_pass "$MU33A" "$KX")"
+kills "MU33a pointeur re-archivé, la preuve des pointeurs tient seule : le second passage est REFUSÉ, dit" "$OUT" "un pointeur d'un archivage précédent a disparu" "KS2 — second passage : aucun refus"
 MU34="$(mut mu34 '  if ! archive_lock; then' '  if false; then')"; RM=$?
 assert_rc "MU34 opposable" "$RM" 0
 KX="$WORK_DIR/kx34"; mk_repo "$KX"; bk_file "$KX/.planning/BACKLOG.md" 2 2; kcommit "$KX"
@@ -1257,6 +1349,44 @@ kills_absent "MU38 seule GSD_WORKSTREAM lue : KW1 rougit (le pointeur active-wor
 MU39="$WORK_DIR/mu39.sh"
 awk '$0 == "# <<< vf-archive-writer" { next } { print } END { print "# <<< vf-archive-writer" }' "$CHECK" > "$MU39"
 kills_absent "MU39 fermeture de la région déplacée en fin de script : X9 rougit (l'exemption s'étend)" "$(x9_etendue "$MU39")" "ok" "X9 — étendue"
+
+# MU40-MU47 — mutants de la correction 41.3 (tour 2) : chacun rougit le cas qui le vise
+MU40="$(make_mutant mu40 '  awk '"'"'index($0, "<!-- vf-archive: ") != 1'"'"' "$TMPD/snap" | LC_ALL=C sort > "$TMPD/m0"' '  LC_ALL=C sort "$TMPD/snap" > "$TMPD/m0"')"; RM=$?
+assert_rc "MU40 opposable" "$RM" 0
+KX="$WORK_DIR/kx40"; mk_repo "$KX"; mkdir -p "$KX/.planning"; printf '# Backlog\n\n## Ouvert — DIFFÉRÉ\nx\n\n## Clos 1 — CLOS\ny\n' > "$KX/.planning/BACKLOG.md"; kcommit "$KX"
+krun "$KX" --no-remote --archive backlog >/dev/null; kcommit "$KX"; printf '\n## Clos 2 — CLOS\nz\n' >> "$KX/.planning/BACKLOG.md"; kcommit "$KX"
+OUT="$(CHECK_UNDER="$MU40" krun "$KX" --no-remote --archive backlog)"
+kills "MU40 preuve sans écarter les pointeurs de l'ORIGINE : KB1 rougit (le second archivage est refusé, le défaut B1)" "$OUT" "preuve des lignes conservées en échec" "KB1 — second archivage, aucun refus de la preuve"
+MU41="$(mut mu41 '    if (hist && lev > hlev) { mv($0); next }' '    if (hist && lev > hlev) { pr($0); next }')"; RM=$?
+assert_rc "MU41 opposable" "$RM" 0
+KX="$WORK_DIR/kx41"; mk_repo "$KX"; mkdir -p "$KX/.planning"; cp "$KD1/.planning/STATE.md" "$KX/.planning/STATE.md"; git -C "$KD1" show HEAD:.planning/STATE.md > "$KX/.planning/STATE.md"; kcommit "$KX"
+CHECK_UNDER="$MU41" krun "$KX" --no-remote --auto >/dev/null
+kills "MU41 sous-titres d'historique gardés : KD1 rougit (les titres et dates restent dans le STATE, l'archive n'en a pas)" "titres=$(grep -c '^### Point du' "$KX/.planning/STATE.md")" "titres=120" "KD1 — le STATE n'en garde aucun"
+MU42="$(mut mu42 'function mv(l) {' 'function mv(l) { if (1) { pr("<!-- vf-archive: " ARCHREL " -->") } print l > ARCH; n++ }')"; RM=$?
+assert_rc "MU42 opposable" "$RM" 0
+KX="$WORK_DIR/kx42"; mk_repo "$KX"; mkdir -p "$KX/.planning"; git -C "$KD1" show HEAD:.planning/STATE.md > "$KX/.planning/STATE.md"; kcommit "$KX"
+CHECK_UNDER="$MU42" krun "$KX" --no-remote --auto >/dev/null
+kills "MU42 un pointeur par unité déplacée : KD1 rougit (plus d'un pointeur dans le STATE)" "pointeurs=$(grep -c '^<!-- vf-archive: ' "$KX/.planning/STATE.md")" "pointeurs=240" "KD1 — un seul pointeur"
+MU43="$(mut mu43 '  [ "$AUTO" -eq 0 ] || max=0' '  :')"; RM=$?
+assert_rc "MU43 opposable" "$RM" 0
+KX="$WORK_DIR/kx43"; mk_repo "$KX"; bk_file "$KX/.planning/BACKLOG.md" 1 1; kcommit "$KX"; mkdir "$KX/.planning/.archive.lock"; echo "$$" > "$KX/.planning/.archive.lock/pid"
+T0=$SECONDS; CHECK_UNDER="$MU43" VF_ARCHIVE_LOCK_WAIT=50 krun "$KX" --no-remote --auto >/dev/null; EL=$((SECONDS - T0))
+kills "MU43 --auto attend de nouveau le verrou : KL1 rougit (attente de ${EL}s, refus immédiat attendu)" "attente=$([ "$EL" -ge 4 ] && echo longue)" "attente=longue" "KL1 — refus immédiat"
+MU44="$(mut mu44 '  [ "$DRY" -eq 0 ] || return 0' '  :')"; RM=$?
+assert_rc "MU44 opposable" "$RM" 0
+KX="$WORK_DIR/kx44"; mk_part "$KX"; T44="$(ktree "$KX" | cksum)"
+GSD_WORKSTREAM=ws1 CHECK_UNDER="$MU44" krun "$KX" --no-remote --auto --dry-run >/dev/null
+kills "MU44 --dry-run écrit : KR1 rougit (l'arbre a changé)" "arbre=$([ "$(ktree "$KX" | cksum)" = "$T44" ] && echo identique || echo modifie)" "arbre=modifie" "KR1 — arbre identique"
+MU45="$(mut mu45 '  if [ "$DRY" -eq 1 ]; then archive_one_locked' '  :')"; RM=$?
+assert_rc "MU45 opposable" "$RM" 0
+KX="$WORK_DIR/kx45"; mk_part "$KX"; echo "ajout non commité" >> "$KX/.planning/workstreams/ws1/BACKLOG.md"; mkdir "$KX/.planning/.archive.lock"; echo "$$" > "$KX/.planning/.archive.lock/pid"
+OUT="$(GSD_WORKSTREAM=ws1 CHECK_UNDER="$MU45" krun "$KX" --no-remote --auto --dry-run)"
+kills_absent "MU45 --dry-run prend le verrou : un verrou tenu masque le refus de source sale (KR1 rougit : le refus attendu disparaît)" "$OUT" "modifiée dans l'arbre de travail" "KR1 — le refus de source sale est dit"
+OLD46='      OVER=1; flag "RANGEABLE stash : $sha « $msg »"'
+MU46="$(make_mutant mu46 "$OLD46" "${OLD46/\$sha/\$gd \$sha}")"; RM=$?
+assert_rc "MU46 opposable" "$RM" 0
+OUT="$(CHECK_UNDER="$MU46" FAKE_GH_PRS="$PRS" rg_run --owner sam)"
+kills "MU46 le jeton de stash porte de nouveau sa position : ST1c rougit" "$OUT" "RANGEABLE stash : stash@" "ST1c — le jeton de stash est désigné par son SHA"
 
 # MW — mutants de l'ENVELOPPE : une enveloppe affaiblie laisse passer une écriture, RO4 le voit rougir
 WMUT="$WORK_DIR/wmut"

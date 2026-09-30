@@ -64,8 +64,10 @@
 #            explicite parmi backlog, state, roadmap (séparés par des virgules ; sans liste : rc 64). backlog :
 #            les sujets clos, toujours ; state : au-delà du budget, le contenu des seules sections d'HISTORIQUE
 #            (titre contenant historique, history, décisions, journal, performance metrics ou point du, sous-sections
-#            comprises ; jamais une section d'état ouvert : todos, blocages, différés, tâches rapides) ; frontmatter,
-#            titres, ligne ^Phase: et pointeurs déjà posés restent, un second passage ne déplace rien ; roadmap :
+#            comprises ; jamais une section d'état ouvert : todos, blocages, différés, tâches rapides). L'archive garde
+#            TITRES ET DATES : les sous-sections d'historique et les entrées « Point du … » partent avec leur titre ;
+#            le STATE ne garde que les titres de conteneur (Historique, Décisions…), le frontmatter, la ligne ^Phase:,
+#            les pointeurs déjà posés et UN SEUL pointeur par archivage ; un second passage ne déplace rien ; roadmap :
 #            au-delà du budget, les blocs <details> dont le résumé porte ✅ ou SHIPPED (un jalon non livré reste). La racine `.planning/` est toujours incluse ; un compartiment
 #            de workstream n'est archivé que s'il est nommé par --ws (répétable) ; un compartiment protégé
 #            (VF_ARCHIVE_PROTECTED_WS) rend 64. Une source modifiée ou non suivie par git : refus, rien écrit,
@@ -79,15 +81,20 @@
 #            son remplacement et doit être identique à ce qui a été décidé, sinon refus bruyant, archive et ligne
 #            d'INDEX retirées, source intacte : aucune perte silencieuse d'une écriture concurrente.
 #            RESTAURER : `git cat-file blob <ref de l'INDEX>` restitue la source d'avant l'archivage.
+#   --dry-run  avec --auto seulement : la MÊME décision, rien d'écrit (ni verrou, ni archive, ni INDEX) ; ne rend que
+#            les ARCHIVAGE REFUSÉ qu'un --auto rendrait (photographie de début de mission : un refus préexistant
+#            n'est pas imputé à qui arrive après). Sans --auto : rc 64.
 #   --auto   décision ET exécution, pour le geste de fin (clôture de mission, fin de travail direct) : mêmes règles,
 #            types = ceux qui ont de l'archivable ; compartiments = --ws répétés, sinon celui de la session, résolu par
 #            vf_ws_resolve (VF_WORKSTREAM, GSD_WORKSTREAM, puis le pointeur .planning/active-workstream). Dépôt
 #            partitionné (.planning/workstreams) et aucun compartiment résolu : ARCHIVAGE NON TENTÉ, rien déplacé.
 #            Compartiment protégé ou source non commitée : ARCHIVAGE REFUSÉ, rien déplacé, rc inchangé (jamais 2).
-#            L'archivage précède les mesures : une exécution rend l'état d'après.
+#            L'archivage précède les mesures : une exécution rend l'état d'après. En --auto, JAMAIS d'attente sur le
+#            verrou (un Stop ne se bloque pas 10 s par fichier) : verrou tenu = refus immédiat qui nomme le pid et dit
+#            s'il est vivant ; aucune reprise automatique.
 #
 # JETONS de constat (CONTRAT lu par guard-fin-de-geste.sh et check-mission-exit.sh E7 ; une ligne chacun) :
-#   RANGEABLE, À VALIDER  (rangement, plan 41.3-02) · ARCHIVABLE (sujet clos encore au BACKLOG) · ARCHIVÉ (ce que
+#   RANGEABLE, À VALIDER  (rangement, plan 41.3-02 ; un stash se désigne par son SHA, jamais par sa position stash@{N} : elle se décale à chaque nouveau stash) · ARCHIVABLE (sujet clos encore au BACKLOG) · ARCHIVÉ (ce que
 #   l'archivage vient de déplacer) · ARCHIVAGE REFUSÉ · ARCHIVAGE NON TENTÉ · DÉPASSÉ / PROSE DÉPASSÉE (budget ou
 #   plafond de prose : un constat, pas un geste à faire). Aucune ligne de budget ne porte RANGEABLE.
 #
@@ -122,6 +129,7 @@ PROTECTED_WS="${VF_ARCHIVE_PROTECTED_WS:-gouvernance}"
 ARCHIVE_DATE="${VF_ARCHIVE_DATE:-$(date +%Y-%m-%d)}"
 ARCHIVE_TYPES=""
 AUTO=0
+DRY=0
 WS_NAMED=""
 
 usage() { sed -n '/^# Usage :/,/^# Sortie standard/p' "$0" >&2; exit 64; }
@@ -140,6 +148,7 @@ $2"; shift 2 ;;
       case "$2" in --*) echo "[budget] --archive exige une liste de types (backlog, state, roadmap)" >&2; exit 64 ;; esac
       ARCHIVE_TYPES="$2"; shift 2 ;;
     --auto) AUTO=1; shift ;;
+    --dry-run) DRY=1; shift ;;
     --ws) [ "$#" -ge 2 ] || usage; WS_NAMED="$WS_NAMED
 $2"; shift 2 ;;
     -h|--help) usage ;;
@@ -155,6 +164,7 @@ for _v in BACKLOG_OPEN_MAX MEMIDX_MAX ROADMAP_KB STATE_NOTE_MAX BACKLOG_ENTRY_MA
 done
 case "$ARCHIVE_DATE" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *) echo "[budget] VF_ARCHIVE_DATE invalide : $ARCHIVE_DATE" >&2; exit 64 ;; esac
 if [ "$AUTO" -eq 1 ] && [ -n "$ARCHIVE_TYPES" ]; then echo "[budget] --archive et --auto s'excluent" >&2; exit 64; fi
+if [ "$DRY" -eq 1 ] && [ "$AUTO" -eq 0 ]; then echo "[budget] --dry-run exige --auto" >&2; exit 64; fi
 if [ -n "${WS_NAMED//[$'\n ']/}" ] && [ "$AUTO" -eq 0 ] && [ -z "$ARCHIVE_TYPES" ]; then echo "[budget] --ws exige --archive ou --auto" >&2; exit 64; fi
 if [ -n "$ARCHIVE_TYPES" ]; then
   for _t in $(printf '%s' "$ARCHIVE_TYPES" | tr ',' ' '); do
@@ -223,7 +233,7 @@ AWK_BACKLOG_ARCHIVE="$AWK_COMMON"'
 function flushb(   i) {
   if (!inb) return
   if (cl) {
-    for (i = 1; i <= nb; i++) print blk[i] > ARCH
+    for (i = 1; i <= nb; i++) { if (index(blk[i], "<!-- vf-archive: ") == 1) print blk[i]; else print blk[i] > ARCH }
     n++; print "<!-- vf-archive: " ARCHREL " — ## " sanit(title) " -->"
   } else for (i = 1; i <= nb; i++) print blk[i]
   nb = 0; inb = 0
@@ -237,22 +247,27 @@ END { flushb(); print n + 0 > CNT }
 '
 AWK_STATE_ARCHIVE="$AWK_COMMON"'
 function ishist(h) { return (tolower(h) ~ /historique|history|d..?cisions|decisions|journal|performance metrics|point du/) }
-BEGIN { hist = 0; hlev = 0 }
-NR == 1 && /^---[ \t]*$/ { fm = 1; print; next }
-fm == 1 { print; if ($0 ~ /^---[ \t]*$/) fm = 2; next }
+function isentry(h) { return (tolower(h) ~ /point du/) }
+function ispointer(l) { return (index(l, "<!-- vf-archive: ") == 1) }
+function pr(l) { print l; lastblank = (l ~ /^[ \t]*$/) }
+function mv(l) { if (!ptr) { pr("<!-- vf-archive: " ARCHREL " -->"); ptr = 1 } print l > ARCH; n++ }
+BEGIN { hist = 0; hlev = 0; lastblank = 1 }
+NR == 1 && /^---[ \t]*$/ { fm = 1; pr($0); next }
+fm == 1 { pr($0); if ($0 ~ /^---[ \t]*$/) fm = 2; next }
 {
   if (isfence($0)) fence = !fence
   else if (!fence && $0 ~ /^#+ /) {
-    print
     match($0, /^#+/); lev = RLENGTH
-    if (lev == 1) hist = 0
-    else if (!(hist && lev > hlev)) { hist = ishist($0); hlev = lev }
-    ptr = 0; next
+    if (lev == 1) { hist = 0; pr($0); next }
+    if (hist && lev > hlev) { mv($0); next }
+    hist = ishist($0); hlev = lev
+    if (hist && isentry($0)) mv($0); else pr($0)
+    next
   }
-  if (!hist || $0 ~ /^[ \t]*$/ || $0 ~ /^Phase:/) { print; next }
-  if (index($0, "<!-- vf-archive: ") == 1) { print; next }
-  if (!ptr) { print "<!-- vf-archive: " ARCHREL " -->"; ptr = 1 }
-  print > ARCH; n++
+  if (ispointer($0) || $0 ~ /^Phase:/) { pr($0); next }
+  if (!hist) { pr($0); next }
+  if ($0 ~ /^[ \t]*$/) { if (lastblank) print > ARCH; else pr($0); next }
+  mv($0)
 }
 END { print n + 0 > CNT }
 '
@@ -261,7 +276,7 @@ function chk(l,   m) { if (sum == "" && match(l, /<summary>.*<\/summary>/)) sum 
 function shipped(t) { return (t ~ /✅/ || t ~ /SHIPPED/) }
 function flushd(   i) {
   if (shipped(sum)) {
-    for (i = 1; i <= nb; i++) print buf[i] > ARCH
+    for (i = 1; i <= nb; i++) { if (index(buf[i], "<!-- vf-archive: ") == 1) print buf[i]; else print buf[i] > ARCH }
     n++; print "<!-- vf-archive: " ARCHREL " — " sanit(sum) " -->"
   } else for (i = 1; i <= nb; i++) print buf[i]
   nb = 0; sum = ""
@@ -293,6 +308,7 @@ trap '[ -n "$TMPD" ] && rm -rf "$TMPD"; archive_unlock' EXIT
 archive_lock() { # rend 0 verrou pris, 1 sinon (attente bornee) ; le pid du detenteur est lu dans LOCK_HOLDER
   local d="$ROOT/.planning/.archive.lock" waited=0 max="${VF_ARCHIVE_LOCK_WAIT:-100}"
   case "$max" in ''|*[!0-9]*) max=100 ;; esac
+  [ "$AUTO" -eq 0 ] || max=0   # --auto : jamais d attente (un Stop ne se bloque pas 10 s par fichier)
   LOCK_HOLDER=""
   while ! mkdir "$d" 2>/dev/null; do
     LOCK_HOLDER=$(cat "$d/pid" 2>/dev/null)
@@ -317,11 +333,15 @@ archive_refuse() { # <message> : un refus ne perd rien ; explicite = rc 2 en fin
   flag "ARCHIVAGE REFUSÉ : $1"
 }
 archive_one() { # <type> <label> <fichier absolu> <nom du fichier> : sous verrou exclusif, un archivage à la fois
-  local src="$3" rel="${3#"$ROOT"/}" why
+  local src="$3" rel="${3#"$ROOT"/}" why live
   [ -f "$src" ] && [ -r "$src" ] || return 0
+  if [ "$DRY" -eq 1 ]; then archive_one_locked "$@"; return 0; fi   # photographie : ni verrou, ni écriture
   if ! archive_lock; then
-    why="verrou d archivage tenu (${ROOT}/.planning/.archive.lock, attente épuisée), rien déplacé"
-    [ -z "$LOCK_HOLDER" ] || why="verrou d archivage tenu par le processus $LOCK_HOLDER (${ROOT}/.planning/.archive.lock, attente épuisée), rien déplacé ; sans ce processus, supprimer le dossier"
+    why="verrou d archivage tenu (${ROOT}/.planning/.archive.lock), rien déplacé"
+    if [ -n "$LOCK_HOLDER" ]; then
+      case "$LOCK_HOLDER" in *[!0-9]*) live="pid illisible" ;; *) if kill -0 "$LOCK_HOLDER" 2>/dev/null; then live="vivant"; else live="absent : ce processus n existe plus, supprimer le dossier à la main"; fi ;; esac
+      why="verrou d archivage tenu par le processus $LOCK_HOLDER (${live}) (${ROOT}/.planning/.archive.lock), rien déplacé, aucune reprise automatique"
+    fi
     archive_refuse "${rel} : ${why}"
     return 0
   fi
@@ -357,9 +377,15 @@ archive_one_locked() { # <type> <label> <fichier absolu> <nom du fichier>
   [ "$n" -gt 0 ] || return 0
   if why=$(src_unclean "$rel"); then archive_refuse "$rel $why, rien déplacé"; return 0; fi
   # Preuve avant toute écriture : les lignes de la source = celles de la source allégée (hors pointeurs) + l'archive.
-  { awk 'index($0, "<!-- vf-archive: ") != 1' "$TMPD/new"; cat "$TMPD/arch"; } | LC_ALL=C sort > "$TMPD/m1"
-  LC_ALL=C sort "$TMPD/snap" > "$TMPD/m0"
+  # Les pointeurs sont écartés des DEUX côtés (ceux d'un archivage précédent vivent dans la source d'origine comme dans la nouvelle) ;
+  # ils ont leur propre preuve : tout pointeur d'origine est encore là.
+  { cat "$TMPD/new"; cat "$TMPD/arch"; } | awk 'index($0, "<!-- vf-archive: ") != 1' | LC_ALL=C sort > "$TMPD/m1"
+  awk 'index($0, "<!-- vf-archive: ") != 1' "$TMPD/snap" | LC_ALL=C sort > "$TMPD/m0"
   cmp -s "$TMPD/m0" "$TMPD/m1" || { archive_refuse "$rel : preuve des lignes conservées en échec, rien déplacé"; return 0; }
+  awk 'index($0, "<!-- vf-archive: ") == 1' "$TMPD/snap" | LC_ALL=C sort > "$TMPD/p0"
+  awk 'index($0, "<!-- vf-archive: ") == 1' "$TMPD/new" | LC_ALL=C sort > "$TMPD/p1"
+  [ -z "$(LC_ALL=C comm -23 "$TMPD/p0" "$TMPD/p1")" ] || { archive_refuse "$rel : un pointeur d'un archivage précédent a disparu, rien déplacé"; return 0; }
+  [ "$DRY" -eq 0 ] || return 0   # --dry-run : la décision est prise (et ses refus dits), rien n'est écrit
   ref=$(git -C "$ROOT" rev-parse "HEAD:./$rel" 2>/dev/null) || { archive_refuse "$rel : blob d'origine illisible, rien déplacé"; return 0; }
   mkdir -p "$ROOT/.planning/archives/$type" || { archive_refuse "$rel : dossier d'archive impossible"; return 0; }
   cat "$TMPD/arch" > "$ROOT/$archrel" && cmp -s "$ROOT/$archrel" "$TMPD/arch" \
@@ -651,7 +677,7 @@ rangement_stash() { # <repo> <base>
   list=$(git -C "$repo" stash list --format='%gd%x09%H%x09%gs' 2>/dev/null)
   while IFS=$'\t' read -r gd sha msg; do
     [ -n "$gd" ] || continue
-    sha="${sha:0:8}"
+    sha="${sha:0:12}"
     case "$msg" in "WIP on "*) rest="${msg#WIP on }" ;; "On "*) rest="${msg#On }" ;; *) rest="" ;; esac
     case "$rest" in *:*) own="${rest%%:*}" ;; *) own="" ;; esac
     case "$own" in *"("*|*" "*) own="" ;; esac
@@ -662,10 +688,10 @@ rangement_stash() { # <repo> <base>
     fi
     [ "$own" = "$bshort" ] && continue
     if ! git -C "$repo" rev-parse -q --verify "refs/heads/$own" >/dev/null 2>&1; then
-      OVER=1; flag "RANGEABLE stash : $gd $sha « $msg »"
+      OVER=1; flag "RANGEABLE stash : $sha « $msg »"
     elif [ -n "$base" ] && is_worked "$repo" "$own" \
          && git -C "$repo" merge-base --is-ancestor "refs/heads/$own" "$base" 2>/dev/null; then
-      OVER=1; flag "RANGEABLE stash : $gd $sha « $msg »"
+      OVER=1; flag "RANGEABLE stash : $sha « $msg »"
     fi
   done <<EOF2
 $list

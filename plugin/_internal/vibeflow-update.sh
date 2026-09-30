@@ -1814,10 +1814,13 @@ disable_worktrees_if_root_not_git() {
 
 # ensure_worktreeinclude_entries — best-effort, appelée juste après disable_worktrees_if_root_not_git, aux
 # MÊMES deux sites (fin d'install_module ET d'update_module). SOBR-03 (Phase 41.3) : `.claude/hooks/` et
-# `.claude/scripts/` sont ignorés par git (.gitignore) et visés par des commandes de hook via
-# "$CLAUDE_PROJECT_DIR" ; dans un worktree d'agent ce dossier vaut le worktree, et un garde introuvable
-# échoue sans bloquer — il ne protège plus rien. Le fichier `.worktreeinclude` (lu dans l'ARBRE DE TRAVAIL
-# du checkout principal, mesuré le 2026-09-29) fait recopier ces chemins dans chaque worktree d'agent.
+# `.claude/scripts/` sont visés par des commandes de hook via "$CLAUDE_PROJECT_DIR" ; dans un worktree
+# d'agent ce dossier vaut le worktree, et un garde introuvable échoue sans bloquer — il ne protège plus
+# rien. Le fichier `.worktreeinclude` (lu dans l'ARBRE DE TRAVAIL du checkout principal, mesuré le
+# 2026-09-29) fait recopier dans chaque worktree d'agent ceux de ces chemins QUE GIT IGNORE. Il ne sert
+# donc que là où ils le sont (scope local, ou un lab dont le .gitignore les couvre) : en scope project,
+# `.claude/scripts/` n'est PAS ignoré par git (mesuré au test d'installation isolé du 2026-09-30), les
+# scripts arrivent alors dans le worktree par git, une fois commités, et la ligne est inoffensive.
 # Scope project|local seulement (un lab en scope user n'a pas de `.claude/` de projet), à la racine du lab
 # (le cwd, comme `.planning/config.json` de sa voisine) ; sous --target, no-op (la cible n'est pas le lab).
 # AJOUT SEUL : une ligne exacte absente est ajoutée en fin de fichier, rien n'est retiré ni réordonné, la ligne
