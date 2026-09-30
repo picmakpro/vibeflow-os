@@ -541,6 +541,45 @@ def controle_accord(ctx, script):
     return (not fautes), ("; ".join(fautes) if fautes else "avertissement en mode A <=> deny en mode C sur lab adhérent ; silence des deux côtés sur lab dev")
 
 
+def controle_env_statique(ctx, script):
+    """R-ENV-02 : garde STATIQUE — le cœur Python ne lit aucune variable d'environnement (AST : aucun
+    `environ`, `getenv`, `putenv`, ni chaîne de ce nom) et le lanceur n'en lit qu'une, TMPDIR, une
+    seule fois. Elle ne dépend d'aucun nom de variable posé par la suite : R-ENV-01, elle, ne pose
+    que les noms que ses mutants lisent."""
+    chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
+    texte = open(chemin, encoding="utf-8").read()
+    fautes = []
+    interdits = ("environ", "getenv", "putenv", "environb", "getenvb", "unsetenv")
+    arbre = ast.parse(corps_python(texte))
+    for n in ast.walk(arbre):
+        vu = None
+        if isinstance(n, ast.Attribute) and n.attr in interdits:
+            vu = n.attr
+        elif isinstance(n, ast.Name) and n.id in interdits:
+            vu = n.id
+        elif isinstance(n, ast.Constant) and isinstance(n.value, str) and n.value in interdits:
+            vu = repr(n.value)
+        elif isinstance(n, ast.alias) and n.name in interdits:
+            vu = "import " + n.name
+        if vu:
+            fautes.append("cœur Python : lecture de l'environnement (%s, ligne %d)" % (vu, getattr(n, "lineno", 0)))
+    lanceur, dedans = [], False
+    for l in texte.split("\n"):
+        if l == "PY_PLANNING_HOOK_EOF":
+            dedans = False
+        if not dedans and not l.lstrip().startswith("#"):
+            lanceur.append(l)
+        if l.endswith("<<'PY_PLANNING_HOOK_EOF'"):
+            dedans = True
+    noms = re.findall(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)", "\n".join(lanceur))
+    inconnus = sorted(set(noms) - {"TMPDIR", "T", "PYBIN"})
+    if inconnus:
+        fautes.append("lanceur : variable(s) lue(s) hors TMPDIR : " + ", ".join(inconnus))
+    if noms.count("TMPDIR") != 1:
+        fautes.append("lanceur : %d lecture(s) de TMPDIR (attendu 1)" % noms.count("TMPDIR"))
+    return (not fautes), ("; ".join(fautes) if fautes else "aucune lecture d'environnement dans le cœur Python, une seule lecture de TMPDIR dans le lanceur")
+
+
 def controle_env(ctx, scripts):
     """R-ENV-01 : mêmes verdicts, octet pour octet, sous cinq environnements."""
     _, _, chemins = labs_banc(ctx)
@@ -708,6 +747,12 @@ def sec_env(ctx):
         "R-ENV-01", "cinq environnements rendent le même verdict, octet pour octet (P45-D-12a ; limite (i) : la copie exécutée n'est pas testée ici)", "verdicts identiques", detail)
 
 
+def sec_env_statique(ctx):
+    bon, detail = controle_env_statique(ctx, ctx.hook)
+    ok("R-ENV-02 garde statique : " + detail) if bon else ko(
+        "R-ENV-02", "aucun os.environ, getenv ni environ dans le cœur Python de planning-hook.sh, une seule lecture de TMPDIR dans le lanceur", "aucune faute", detail)
+
+
 def sec_accord(ctx):
     bon, detail = controle_accord(ctx, None)
     ok("R-ACCORD " + detail) if bon else ko("R-ACCORD", "chemin relatif : avertissement G2 en mode A <=> deny en mode C (limite h)", "accord des deux couches", detail)
@@ -759,6 +804,10 @@ def sec_mutants(ctx):
         ("ENV-ARMEMENT", 'G2_MODE = "avertit"', 'G2_MODE = os.environ.get("VF_ARMEMENT", "avertit")',
          "R-ENV-01", lambda c, d: controle_env(c, [d])),
         ("ACCORD-PY", 'ecrit = base + "/" + ecrit', "pass", "R-ACCORD", controle_accord),
+        ("ENV-STATIQUE", 'G2_MODE = "avertit"', 'G2_MODE = os.environ.get("VF_NOM_NON_LISTE_PAR_LE_TEST", "avertit")',
+         "R-ENV-02", controle_env_statique),
+        ("ENV-LANCEUR", 'T="$(mktemp "${TMPDIR:-/tmp}/vf-planning-hook.XXXXXX")" || exit 70',
+         'T="$(mktemp "${TMPDIR:-${HOME:-/tmp}}/vf-planning-hook.XXXXXX")" || exit 70', "R-ENV-02", controle_env_statique),
     ]
     for ident, motif, repl, cible, ctrl in M:
         dossier, raison = make_hook_mutant(ctx, ident, motif, repl)
@@ -766,9 +815,9 @@ def sec_mutants(ctx):
             komut(ident, "mutant du cœur valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
             continue
         chemin_mut = os.path.join(dossier, "planning-hook.sh")
-        cible_script = chemin_mut if ctrl in (controle_table_02, controle_parseur) else dossier
+        cible_script = chemin_mut if ctrl in (controle_table_02, controle_parseur, controle_env_statique) else dossier
         # l'original passe le contrôle ; le mutant le rate ; le témoin reste inchangé
-        original = ctrl(ctx, ctx.hook if ctrl in (controle_table_02, controle_parseur) else ctx.scripts_dir)
+        original = ctrl(ctx, ctx.hook if ctrl in (controle_table_02, controle_parseur, controle_env_statique) else ctx.scripts_dir)
         t_orig, t_mut = controle_temoin(ctx, None), controle_temoin(ctx, dossier)
         mutant = ctrl(ctx, cible_script)
         if not original[0]:
@@ -787,6 +836,7 @@ SECTIONS = {
     "parseur": sec_parseur,
     "g2": sec_g2,
     "env": sec_env,
+    "env_statique": sec_env_statique,
     "accord": sec_accord,
     "banc": sec_banc,
     "mutants": sec_mutants,
@@ -829,7 +879,7 @@ run_sections() { # <sections séparées par des virgules>
 [ -f "$BANC" ] || ko "gates-banc.txt présent" "le banc texte existe sous fixtures/" "$BANC" "absent"
 [ -f "$RECALC" ] || ko "recalc-planning.sh présent" "le moteur de recalcul existe à côté du hook (contrôle croisé du parseur)" "$RECALC" "absent"
 
-run_sections table,parseur,g2,env,accord,banc,mutants
+run_sections table,parseur,g2,env,env_statique,accord,banc,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"
