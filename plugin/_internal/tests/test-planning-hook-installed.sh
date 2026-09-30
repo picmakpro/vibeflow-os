@@ -546,13 +546,13 @@ def sec_can(ctx):
 
     # R-CAN-05 : gate armé sans cas de canary
     lab5 = copier_lab(ctx, "lab-arme-sans-cas")
-    armer_copie(lab5, ("G6", "G5"))
+    armer_copie(lab5, ("G6", "G5", "G1"))
     rc, out, err = lancer_canary(ctx, lab5, ses, ())
-    raison = une_ligne(out, ("gate armé sans canary : G5, G6",))
+    raison = une_ligne(out, ("gate armé sans canary : G1",))
     if rc == 0 and not raison:
-        ok("R-CAN-05 ARMEMENT_G6 et ARMEMENT_G5 armed sans cas de canary : code 0, UNE ligne « gate armé sans canary : G5, G6 »")
+        ok("R-CAN-05 ARMEMENT_G1 armed (étapes 1 et 2) sans cas de canary G1 : code 0, UNE ligne « gate armé sans canary : G1 » (G6 et G5 ont leurs cas depuis 45-05)")
     else:
-        ko("R-CAN-05", "gates G6 et G5 armés dans la copie posée, CANARIS sans cas G6 ni G5", "code 0 et « gate armé sans canary : G5, G6 »", "rc=%d %s err=%s" % (rc, raison or court(out), court(err)))
+        ko("R-CAN-05", "gate G1 armé dans la copie posée (avec G6 et G5), CANARIS sans cas G1", "code 0 et « gate armé sans canary : G1 »", "rc=%d %s err=%s" % (rc, raison or court(out), court(err)))
 
     # R-CAN-06 : réglages illisibles
     fautes = []
@@ -666,7 +666,7 @@ def sec_mutants(ctx):
     temoin = reglage_temoin(ctx, "reglage-temoin-mut.json", marq)
 
     def sc_sans_cas(lab):
-        armer_copie(lab, ("G6", "G5"))
+        armer_copie(lab, ("G6", "G5", "G1"))
         rc, out, _ = lancer_canary(ctx, lab, ses, ())
         return rc, out
 
@@ -690,7 +690,7 @@ def sec_mutants(ctx):
         m = sc_sans_cas(lab_m)
         signal = "gate armé sans canary".encode("utf-8")
         if o != m and signal in o[1] and signal not in m[1]:
-            okmut("CAN-SANS-CAS", "R-CAN-05 · attendu (original) : code %d, « gate armé sans canary : G5, G6 » · obtenu (mutant) : code %d, %s" % (o[0], m[0], court(m[1]) or "aucun signal"))
+            okmut("CAN-SANS-CAS", "R-CAN-05 · attendu (original) : code %d, « gate armé sans canary : G1 » · obtenu (mutant) : code %d, %s" % (o[0], m[0], court(m[1]) or "aucun signal"))
         else:
             komut("CAN-SANS-CAS", "gate armé sans cas : l'original signale, le mutant se tait", court(o[1]), court(m[1]) + " (mutant non opposable)")
 

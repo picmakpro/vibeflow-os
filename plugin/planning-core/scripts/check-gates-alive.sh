@@ -44,9 +44,12 @@
 #             nominal (le script réel)
 #   <payload> <outil>[:<chemin relatif au lab synthétique>][@<agent_type>]
 # L'ATTENDU EST DÉRIVÉ, jamais écrit dans la table : DEGRADE -> refus (Write, Agent, Task) ou silence
-# (Bash : limite déclarée P45-D-06b, exercée et non seulement écrite) ; gate `armed` -> refus ; gate
-# `observe` -> silence (observation : le gate ne refuse pas, il journalise). 45-05 à 45-09 ajoutent
-# leurs cas ; un gate armé sans cas fait signaler ce canary et rougir sa suite.
+# (Bash : limite déclarée P45-D-06b, exercée et non seulement écrite) ; gate `armed` -> refus d'un
+# gate (`deny-gate`, jamais le texte du fail-closed `deny-degrade`) ; gate `observe` -> observation
+# (P45-D-20) : stdout vide ET une nouvelle ligne `gate=<G>` au journal d'observation, dont le
+# XDG_CACHE_HOME du rejeu est un dossier jetable — un gate qui se tait sans journaliser n'est pas
+# vivant. 45-05 à 45-09 ajoutent leurs cas ; un gate armé sans cas fait signaler ce canary et rougir
+# sa suite.
 #
 # Le rejeu n'écrit rien hors de son dossier mktemp (HOME du script de hook conservé en lecture,
 # XDG_CACHE_HOME redirigé), supprimé en sortie ; il n'a lieu que dans une session adhérente.
@@ -122,6 +125,9 @@ DELAI_REJEU = 25
 # dégradé d'un refus légitime d'un gate armé sur la cible neutre.
 MARQUE_DEGRADE = "hook central indisponible"
 NOMINAL = "Write:.planning/notes.md"
+# Nom du fichier d'état généré : composé dans les cas ci-dessous (le recensement des consommateurs de
+# planning refuse un chemin de planning suivi de ce nom sur une même ligne).
+NOM_ETAT = "STATE.md"
 
 # --- Table des cas (une ligne par cas) : <id>|<gate>|<mode>|<payload>. L'attendu est DÉRIVÉ. ------
 CANARIS = (
@@ -133,6 +139,10 @@ CANARIS = (
     "D06|DEGRADE|python-absent|Agent",
     "D07|DEGRADE|python-absent|Task",
     "D08|DEGRADE|python-absent|Bash",
+    # Étape 1 (45-05) : G6 (fichier généré, fil principal puis agent de plugin) et G5 (verdict, agent inconnu).
+    "G6-principal|G6|nominal|Write:.planning/" + NOM_ETAT,
+    "G6-plugin|G6|nominal|Write:.planning/" + NOM_ETAT + "@plugin-inconnu:agent-inconnu",
+    "G5-verdict|G5|nominal|Write:.planning/cycles/01-c/phases/01-p/VERDICT.md@agent-inconnu",
 )
 
 
@@ -282,6 +292,27 @@ class Rejeu:
             raise Indetermine("mode de cas inconnu : " + mode)
         return env
 
+    def lignes_observation(self, gate):
+        """Nombre de lignes `gate=<gate>` du journal d'observation du rejeu (XDG_CACHE_HOME jetable)."""
+        chemin = os.path.join(self.xdg, "vibeflow", "gates-observation", "observation.log")
+        try:
+            with open(chemin, encoding="utf-8", errors="replace") as fh:
+                texte = fh.read()
+        except OSError:
+            return 0
+        return sum(1 for ligne in texte.split("\n") if ("  gate=" + gate + "  ") in ligne)
+
+    def jouer_observation(self, mode, spec, gate):
+        """`observation` si la commande se tait ET que le journal gagne une ligne du gate ; sinon le
+        verdict obtenu, ou `silence sans ligne d'observation`."""
+        avant = self.lignes_observation(gate)
+        obtenu = self.jouer(mode, spec)
+        if obtenu != "silence":
+            return obtenu
+        if self.lignes_observation(gate) > avant:  # canary-observation
+            return "observation"
+        return "silence sans ligne d'observation"
+
     def jouer(self, mode, spec):
         try:
             p = subprocess.run(["/bin/sh", "-c", self.commande], input=fabriquer_payload(spec, self.lab),
@@ -327,7 +358,7 @@ def attendu_de(gate, spec, table):
     """L'attendu est DÉRIVÉ de la table d'armement, jamais écrit dans CANARIS."""
     if gate == "DEGRADE":
         return "silence" if spec.split(":")[0].split("@")[0] == "Bash" else "deny-degrade"
-    return "deny-gate" if table[gate] == "armed" else "silence"
+    return "deny-gate" if table[gate] == "armed" else "observation"
 
 
 def main():
@@ -378,7 +409,7 @@ def main():
             echecs.append("nominal (attendu silence, obtenu " + nominal + ")")
         for identifiant, gate, mode, spec in cas:
             attendu = attendu_de(gate, spec, table)
-            obtenu = rejeu.jouer(mode, spec)
+            obtenu = rejeu.jouer_observation(mode, spec, gate) if attendu == "observation" else rejeu.jouer(mode, spec)
             if obtenu != attendu:
                 echecs.append(identifiant + " (attendu " + attendu + ", obtenu " + obtenu + ")")
         if echecs:

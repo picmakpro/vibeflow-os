@@ -165,3 +165,70 @@ ecrit: livrables/rapport.md
 @@ # Jumeau négatif : un lab dev ne reçoit rien, même sur copie armée.
 @@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: silence G5
 @@ ecriture Edit .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: silence G5
+
+@@ # --- G6 (45-05, GATE-04, P45-D-13) : écrire par outil un fichier généré, enfant direct du dossier de
+@@ # planning d'un lab adhérent, quel que soit le rôle. Même option `armee` que G5 : G6 reste en
+@@ # observation dans le script livré tant que le rejeu réel n'a pas armé l'étape 1.
+@@ lab g6-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/STATE.md
+etat genere
+
+@@ fichier .planning/INDEX.md
+index genere
+
+@@ fichier .planning/cloture.log
+2026-09-30T00:00:00+00:00  cloture  unite=01-c/01-p
+
+@@ fichier .planning/derogations-gates.log
+2026-09-30T00:00:00+00:00  derogation  id=1  gate=G1  chemin=livrables/autre.md  qui=willy  canal=test  date=2026-09-30  raison=cas%20du%20banc
+
+@@ fichier .planning/notes.md
+notes libres
+
+@@ fichier .planning/workstreams/x/STATE.md
+etat de compartiment
+
+@@ fichier .planning/compartments/x/STATE.md
+etat de compartiment
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ # Refus : chaque fichier généré, Write et Edit, fil principal, agent de plugin et agent inconnu.
+@@ ecriture Write .planning/STATE.md armee :: doit-refuser G6
+@@ ecriture Edit .planning/STATE.md armee :: doit-refuser G6
+@@ ecriture NotebookEdit .planning/STATE.md armee :: doit-refuser G6
+@@ ecriture Write .planning/INDEX.md armee :: doit-refuser G6
+@@ ecriture Edit .planning/INDEX.md armee :: doit-refuser G6
+@@ ecriture Write .planning/cloture.log armee :: doit-refuser G6
+@@ ecriture Edit .planning/cloture.log armee :: doit-refuser G6
+@@ ecriture Write .planning/derogations-gates.log armee :: doit-refuser G6
+@@ ecriture Edit .planning/derogations-gates.log armee :: doit-refuser G6
+@@ ecriture Write .planning/STATE.md agent=plugin-inconnu:agent-inconnu armee :: doit-refuser G6
+@@ ecriture Write .planning/STATE.md agent=general-purpose armee :: doit-refuser G6
+@@ # Passage : compartiments, plans du modèle, notes, livrables, noms voisins.
+@@ ecriture Write .planning/workstreams/x/STATE.md armee :: doit-passer G6
+@@ ecriture Write .planning/compartments/x/STATE.md armee :: doit-passer G6
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/PLAN.md armee :: doit-passer G6
+@@ ecriture Write .planning/notes.md armee :: doit-passer G6
+@@ ecriture Write .planning/STATE.md.bak armee :: doit-passer G6
+@@ ecriture Write livrables/rapport.md armee :: doit-passer G6
+
+@@ lab g6-dev jumeau-de=g6-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .planning/STATE.md
+etat ecrit a la main
+
+@@ # Jumeau négatif : un lab dev écrit sa mémoire à la main, même sur copie armée.
+@@ ecriture Write .planning/STATE.md armee :: silence G6
+@@ ecriture Edit .planning/STATE.md armee :: silence G6
+@@ ecriture Write .planning/INDEX.md armee :: silence G6

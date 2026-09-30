@@ -747,9 +747,43 @@ def evaluer_g5(contexte):
     return [Verdict("G5", "/".join(composants), RAISON_G5)]
 
 
+# --- G6 : fichiers générés, posés par le moteur de recalcul ou par la commande de dérogation (45-05) -
+# Toute écriture par Write, Edit ou NotebookEdit de l'un des noms ci-dessous, enfant DIRECT du dossier
+# de planning d'un lab adhérent, est un verdict de G6, quel que soit le rôle. Les fichiers de
+# compartiment (workstreams, compartments) et tout fichier plus profond ne sont pas visés (P45-D-13,
+# Pitfall 9). Le motif dit par quelle commande poser le fichier : le Stop de la 44 invite à mettre à
+# jour l'état, le refus ne doit pas le contredire.
+GENERES_PAR_RECALC = ("STATE.md", "INDEX.md", "cloture.log")  # g6-noms
+PROTEGES_G6 = dict([(nom.casefold(), (nom, "recalc")) for nom in GENERES_PAR_RECALC] + [(NOM_JOURNAL_DEROGATIONS.casefold(), (NOM_JOURNAL_DEROGATIONS, "derog"))])
+
+
+def raison_g6(nom, genre):
+    if genre == "derog":
+        return ("%s est un fichier inscrit par deroger-gate.sh — l'écriture par outil est refusée ; "
+                "inscrivez la dérogation par deroger-gate.sh" % nom)
+    return ("%s est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; "
+            "recalculez par recalc-planning.sh" % nom)
+
+
+def evaluer_g6(contexte):
+    """G6 (GATE-04, P45-D-13) : écriture par outil d'un fichier généré situé directement à la racine du
+    dossier de planning d'un lab adhérent. Chemin résolu physiquement, noms comparés casse ignorée."""
+    racine = contexte["racine"]
+    if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
+        return []
+    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
+    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    if len(composants) != 2 or composants[0].casefold() != ".planning":  # g6-racine
+        return []
+    trouve = PROTEGES_G6.get(composants[-1].casefold())
+    if trouve is None:
+        return []
+    return [Verdict("G6", ".planning/" + trouve[0], raison_g6(*trouve))]
+
+
 # Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un
 # Verdict d'erreur : deny si le gate est armed, ligne d'observation sinon (P45-D-08, spec §5.1).
-GATES_A_VERDICT = (("G5", evaluer_g5),)
+GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5))  # gates-a-verdict
 
 
 def evaluer_protege(gate, fonction, contexte):

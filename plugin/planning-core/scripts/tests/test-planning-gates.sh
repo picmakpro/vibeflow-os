@@ -17,6 +17,10 @@
 #                   (ligne d'appel du cœur, arguments) — amendement du 2026-09-30 (45-04)
 #   R-G5-01..06     G5 : Write, Edit, NotebookEdit de VERDICT.md sous .planning/ d'un lab adhérent, quel que
 #                   soit le rôle ; en observe une ligne de journal sans contenu, en armed un deny (45-04)
+#   R-G6-01..05     G6 : Write, Edit, NotebookEdit d'un fichier généré, enfant direct du dossier de planning d'un lab
+#                   adhérent, quel que soit le rôle ; compartiments et plans du modèle non visés ; dérogation (45-05)
+#   R-CANG-01..03   canary de session : les cas G6 et G5 attendent une ligne d'observation tant que le gate est en
+#                   observe, un refus de gate dès qu'il est armed ; un gate neutralisé fait signaler le canary (45-05)
 #   R-OBS-ENV       le journal d'observation suit XDG_CACHE_HOME puis HOME et rien d'autre : les valeurs
 #                   reçues n'atteignent jamais l'armement ni l'adhésion (P45-D-12a)
 #   R-JETON         l'encodeur du journal est ast-identique à _jeton_journal du moteur de recalcul
@@ -1258,6 +1262,166 @@ def controle_derog_08(ctx, script):
     return (not fautes), ("; ".join(fautes) if fautes else "sept options (lab, gate, chemin, qui, canal, date, raison), aucune liée à l'urgence, la vitesse ou une durée ; quatre options de ce genre refusées (64)")
 
 
+# --- 45-05 : G6 (fichiers générés) et canary des gates de l'étape 1 ---------------------------------------
+PROTEGES_BANC = (".planning/STATE.md", ".planning/INDEX.md", ".planning/cloture.log", ".planning/derogations-gates.log")
+
+
+def _g6(ctx, dossier_hook, outil, rel, agent=None, lab="g6-adherent", extra_env=None, entree=None):
+    return _g5(ctx, dossier_hook, outil, rel, agent=agent, lab=lab, extra_env=extra_env, entree=entree)
+
+
+def controle_g6_01(ctx, script):
+    """Copie observe : Write d'un fichier généré -> silence, code 0, UNE ligne gate=G6 au journal d'observation."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    cache = dossier_neuf(ctx, "cache-g6-01")
+    rc, out, err = _g6(ctx, d, "Write", ".planning/STATE.md", extra_env={"XDG_CACHE_HOME": cache})
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err:
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    if len(lignes) != 1:
+        return False, "%d ligne(s) au journal (attendu 1)" % len(lignes)
+    for motif in ("  gate=G6  ", "  chemin=.planning/STATE.md  ", "  outil=Write  "):
+        if motif not in lignes[0]:
+            return False, "la ligne ne porte pas %r : %s" % (motif, lignes[0])
+    return True, "copie observe : silence, code 0, une ligne gate=G6 (chemin, outil) au journal d'observation"
+
+
+def controle_g6_02(ctx, script):
+    """Copie armed : Write et Edit de chaque fichier généré, fil principal et agent inconnu -> un deny G6 chacun,
+    dont le motif dit par quelle commande poser le fichier (Pitfall 9)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    for rel in PROTEGES_BANC:
+        attendu_cmd = "deroger-gate.sh" if rel.endswith("derogations-gates.log") else "recalc-planning.sh"
+        for outil in ("Write", "Edit"):
+            for agent in (None, "agent-inconnu"):
+                rc, out, err = _g6(ctx, d, outil, rel, agent=agent)
+                n += 1
+                v = classer(rc, out)
+                if v != "deny" or err or len(out.splitlines()) != 1:
+                    fautes.append("%s %s agent=%s -> %s" % (outil, rel, agent, v))
+                    continue
+                raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+                if not raison.startswith("[planning-core] G6 :") or attendu_cmd not in raison:
+                    fautes.append("%s %s agent=%s : raison %s" % (outil, rel, agent, raison))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus G6 (4 fichiers, Write et Edit, fil principal et agent inconnu), le motif nomme recalc-planning.sh ou deroger-gate.sh" % n)
+
+
+def controle_g6_03(ctx, script):
+    """Copie armée : compartiments, plans du modèle, notes -> aucun refus de G6."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+    for rel in (".planning/workstreams/x/STATE.md", ".planning/compartments/x/STATE.md",
+                ".planning/cycles/01-c/phases/01-p/PLAN.md", ".planning/notes.md", ".planning/STATE.md.bak"):
+        rc, out, err = _g6(ctx, d, "Write", rel)
+        if classer(rc, out) not in ("silence", "avertit") or err or b"G6" in out:
+            fautes.append("%s -> %s %s" % (rel, classer(rc, out), court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "aucun refus : STATE.md de workstreams et de compartments, PLAN.md du modèle, notes, nom voisin")
+
+
+def controle_g6_04(ctx, script):
+    """Copie armée, lab dev : Write d'un fichier généré -> stdout d'octet vide."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    rc, out, err = _g6(ctx, d, "Write", ".planning/STATE.md", lab="g6-dev")
+    if rc != 0 or out != b"" or err:
+        return False, "rc=%d stdout=%s" % (rc, court(out))
+    return True, "lab dev, copie armée : code 0 et stdout d'octet vide"
+
+
+def controle_g6_05(ctx, script):
+    """Une dérogation G6 active sur le fichier généré : passage cité et consommé, le second Write est refusé."""
+    lab = lab_frais(ctx, "g6-adherent")
+    os.remove(journal_derog(lab))  # journal neuf : la dérogation posée ci-dessous porte l'identifiant 1
+    rc, out, err = deroger(ctx, lab, None, gate="G6", chemins=(".planning/STATE.md",))
+    if rc != 0:
+        return False, "deroger-gate.sh refuse le scénario : rc=%d %s" % (rc, court(err))
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    r1 = ecrire_dans(ctx, hook, lab, "Write", ".planning/STATE.md")
+    if classer(r1[0], r1[1]) != "avertit" or r1[2]:
+        return False, "premier Write : %s %s" % (classer(r1[0], r1[1]), court(r1[1]))
+    texte = contexte_de(r1[1])
+    manque = [m for m in ("#1", "G6", "willy", "AskUserQuestion session principale", "2026-09-30") if m not in texte]
+    lignes = [l for l in lignes_de(journal_derog(lab)) if "  consommee  id=1  gate=G6  " in l]
+    if manque or len(lignes) != 1:
+        return False, "citation sans %s ; lignes consommee : %d" % (manque, len(lignes))
+    r2 = ecrire_dans(ctx, hook, lab, "Write", ".planning/STATE.md")
+    if classer(r2[0], r2[1]) != "deny":
+        return False, "second Write : " + classer(r2[0], r2[1])
+    return True, "dérogation G6 : premier Write passe et cité, dérogation consommée, second Write refusé"
+
+
+def scripts_canary(ctx, source, valeur, hook=None):
+    """Dossier de scripts jetable : check-gates-alive.sh de `source` et planning-hook.sh (celui de `hook`, à
+    défaut de `source`) dont G6 et G5 valent `valeur`, les trois autres gates restant à observe."""
+    texte = open(hook or os.path.join(source, "planning-hook.sh"), encoding="utf-8").read()
+    for gate in ("G6", "G5", "G1", "G7", "ROLE"):
+        v = valeur if gate in ("G6", "G5") else "observe"
+        texte, n = re.subn(r'^(ARMEMENT_' + gate + r' = )"(?:observe|armed)"', r'\1"' + v + '"', texte, flags=re.M)
+        if n != 1:
+            raise RuntimeError("une ligne ARMEMENT_%s attendue, %d trouvée(s)" % (gate, n))
+    d = os.path.join(ctx.unique("projet-canary-" + valeur), ".claude", "scripts")  # forme du scope projet
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
+        fh.write(texte)
+    shutil.copy(os.path.join(source, "check-gates-alive.sh"), os.path.join(d, "check-gates-alive.sh"))
+    for nom in ("planning-hook.sh", "check-gates-alive.sh"):
+        os.chmod(os.path.join(d, nom), 0o755)
+    return d
+
+
+def lancer_canary_dossier(ctx, dossier):
+    """Lance le check-gates-alive.sh de `dossier` (= <projet>/.claude/scripts) dans une session adhérente,
+    `--settings` vers un réglage jetable dont la commande enregistrée (hooks.json, scope projet :
+    "$CLAUDE_PROJECT_DIR"/.claude/scripts) vise ce même projet."""
+    if TOKEN not in (ctx.cmd or ""):
+        raise RuntimeError("la commande enregistrée ne porte pas le jeton " + TOKEN)
+    projet = os.path.dirname(os.path.dirname(dossier))
+    lab = ctx.unique("session-canary")
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    reglage = os.path.join(ctx.unique("reglage-canary"), "settings.json")
+    ecrire(reglage, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [
+        {"type": "command", "command": ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')}]}]}}))
+    p = subprocess.run(["bash", os.path.join(dossier, "check-gates-alive.sh"), "--settings=" + reglage],
+                       input=json.dumps({"cwd": lab}).encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": ctx.home, "CLAUDE_PROJECT_DIR": projet},
+                       cwd=lab, timeout=240)
+    return p.returncode, p.stdout, p.stderr
+
+
+def controle_cang_01(ctx, script):
+    """G6 et G5 en observe : les trois cas du canary trouvent leur ligne d'observation -> code 3, stdout vide."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe")
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    return True, "G6 et G5 observe : code 3, stdout vide (G6-principal, G6-plugin et G5-verdict trouvent leur ligne d'observation)"
+
+
+def controle_cang_02(ctx, script):
+    """G6 et G5 armed : les trois cas obtiennent un deny de gate -> code 3, stdout vide."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "armed")
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    return True, "G6 et G5 armed : code 3, stdout vide (les trois cas obtiennent un refus de gate, jamais le texte du fail-closed)"
+
+
+def controle_cang_03(ctx, script):
+    """evaluer_g6 neutralisé (jamais de verdict) : le canary signale, code 0, UNE ligne qui nomme G6 — observe comme armed."""
+    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5),)  # gates-a-verdict')
+    if neutre is None:
+        return False, "mutant du hook invalide : " + raison
+    fautes = []
+    for valeur in ("observe", "armed"):
+        d = scripts_canary(ctx, _dossier(ctx, script), valeur, hook=os.path.join(neutre, "planning-hook.sh"))
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        texte = out.decode("utf-8", "replace")
+        lignes = [l for l in texte.split("\n") if l]
+        if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G6" not in lignes[0] or "G5-verdict" in lignes[0]:
+            fautes.append("%s : rc=%d %s" % (valeur, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "evaluer_g6 neutralisé, observe et armed : code 0 et une ligne qui nomme G6 (et pas G5)")
+
+
 # =================================================================================================
 # Sections
 # =================================================================================================
@@ -1407,6 +1571,26 @@ def sec_g5(ctx):
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
 
+def sec_g6(ctx):
+    for ident, ctrl, titre in (
+            ("R-G6-01", controle_g6_01, "Write d'un fichier généré sur copie observe"),
+            ("R-G6-02", controle_g6_02, "chaque fichier généré, Write et Edit, tout rôle : refusé sur copie armed"),
+            ("R-G6-03", controle_g6_03, "compartiments, plans du modèle, notes : aucun refus de G6"),
+            ("R-G6-04", controle_g6_04, "lab dev : stdout d'octet vide"),
+            ("R-G6-05", controle_g6_05, "dérogation G6 honorée, citée et consommée")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+
+
+def sec_cang(ctx):
+    for ident, ctrl, titre in (
+            ("R-CANG-01", controle_cang_01, "canary de session, G6 et G5 en observe"),
+            ("R-CANG-02", controle_cang_02, "canary de session, G6 et G5 armed"),
+            ("R-CANG-03", controle_cang_03, "canary de session, evaluer_g6 neutralisé")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+
+
 def sec_verdict(ctx):
     for ident, ctrl, titre in (
             ("R-VERDICT-01", controle_verdict_01, "création au format du gabarit, hash sha256 du PLAN.md"),
@@ -1450,6 +1634,7 @@ def sec_accord(ctx):
 def sec_banc(ctx):
     ordre, labs, chemins = labs_banc(ctx)
     compte = {}
+    faux = {}  # gate -> [faux refus, faux accept] du banc, rejoué sur copie armée
     tout_ok = True
     for nom in ordre:
         for e in labs[nom]["ecritures"]:
@@ -1465,6 +1650,10 @@ def sec_banc(ctx):
                 ko(etiquette.strip(), "écriture du banc rejouée par la commande enregistrée", e["attendu"], obtenu + " " + court(out) + " " + court(err))
             compte.setdefault(e["gate"], {}).setdefault(e["attendu"], 0)
             compte[e["gate"]][e["attendu"]] += 1
+            if e["attendu"] == "doit-passer" and obtenu == "deny":
+                faux.setdefault(e["gate"], [0, 0])[0] += 1
+            elif e["attendu"] == "doit-refuser" and obtenu != "deny":
+                faux.setdefault(e["gate"], [0, 0])[1] += 1
     for gate in ("G2",):
         c = compte.get(gate, {})
         print("COUVERTURE %s avertit=%d silence=%d" % (gate, c.get("avertit", 0), c.get("silence", 0)))
@@ -1472,12 +1661,17 @@ def sec_banc(ctx):
             ko("COUVERTURE " + gate, "au moins un cas `avertit` et un cas `silence` pour " + gate, ">= 1 chacun", str(c))
         else:
             ok("COUVERTURE %s : %d avertit, %d silence" % (gate, c["avertit"], c["silence"]))
-    c = compte.get("G5", {})
-    print("COUVERTURE G5 doit-refuser=%d doit-passer=%d silence=%d" % (c.get("doit-refuser", 0), c.get("doit-passer", 0), c.get("silence", 0)))
-    if c.get("doit-refuser", 0) < 1 or c.get("doit-passer", 0) < 1 or c.get("silence", 0) < 1:
-        ko("COUVERTURE G5", "au moins un cas doit-refuser, un cas doit-passer et un cas silence (jumeau dev) pour G5", ">= 1 chacun", str(c))
-    else:
-        ok("COUVERTURE G5 : %d doit-refuser, %d doit-passer, %d silence (0 faux refus, 0 faux accept : chaque cas est conforme)" % (c["doit-refuser"], c["doit-passer"], c["silence"]))
+    for gate in ("G5", "G6"):
+        c = compte.get(gate, {})
+        print("COUVERTURE %s doit-refuser=%d doit-passer=%d silence=%d" % (gate, c.get("doit-refuser", 0), c.get("doit-passer", 0), c.get("silence", 0)))
+        if c.get("doit-refuser", 0) < 1 or c.get("doit-passer", 0) < 1 or c.get("silence", 0) < 1:
+            ko("COUVERTURE " + gate, "au moins un cas doit-refuser, un cas doit-passer et un cas silence (jumeau dev) pour " + gate, ">= 1 chacun", str(c))
+        else:
+            ok("COUVERTURE %s : %d doit-refuser, %d doit-passer, %d silence (0 faux refus, 0 faux accept : chaque cas est conforme)" % (gate, c["doit-refuser"], c["doit-passer"], c["silence"]))
+    # comptes du banc, par gate de l'étape 1 (P45-D-03b : l'armement exige 0 et 0)
+    for gate in ("G5", "G6"):
+        fr, fa = faux.get(gate, [0, 0])
+        print("COMPTE %s faux-refus=%d faux-accept=%d" % (gate, fr, fa))
     # jumeau négatif : chaque lab jumeau a au moins un cas
     for nom in ordre:
         if labs[nom]["jumeau_de"] and not labs[nom]["ecritures"]:
@@ -1542,6 +1736,12 @@ def sec_mutants(ctx):
          "poser-verdict.sh", "PY_POSER_VERDICT_EOF"),
         ("VERDICT-ATOMIQUE", "# verdict-atomique", 'open(chemin_verdict, "w", encoding="utf-8").write(texte)  # verdict-atomique',
          "R-VERDICT-02", controle_verdict_02, "poser-verdict.sh", "PY_POSER_VERDICT_EOF"),
+        # 45-05 : G6 et canary de l'étape 1
+        ("G6-RACINE", "# g6-racine", 'if not composants or composants[0].casefold() != ".planning":  # g6-racine',
+         "R-G6-03", controle_g6_03),
+        ("G6-NOMS", "# g6-noms", 'GENERES_PAR_RECALC = ("STATE.md", "INDEX.md")  # g6-noms', "R-G6-02", controle_g6_02),
+        ("CANG-OBS", "# canary-observation", "if True:  # canary-observation", "R-CANG-03", controle_cang_03,
+         "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF"),
     ]
     for entree in M:
         ident, motif, repl, cible, ctrl = entree[:5]
@@ -1575,6 +1775,8 @@ SECTIONS = {
     "derog": sec_derog,
     "g2": sec_g2,
     "g5": sec_g5,
+    "g6": sec_g6,
+    "cang": sec_cang,
     "env": sec_env,
     "obs_env": sec_obs_env,
     "env_statique": sec_env_statique,
@@ -1620,7 +1822,7 @@ run_sections() { # <sections séparées par des virgules>
 [ -f "$BANC" ] || ko "gates-banc.txt présent" "le banc texte existe sous fixtures/" "$BANC" "absent"
 [ -f "$RECALC" ] || ko "recalc-planning.sh présent" "le moteur de recalcul existe à côté du hook (contrôle croisé du parseur)" "$RECALC" "absent"
 
-run_sections table,parseur,jeton,g2,g5,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
+run_sections table,parseur,jeton,g2,g5,g6,cang,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"
