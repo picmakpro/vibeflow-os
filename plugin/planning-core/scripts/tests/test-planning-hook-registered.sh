@@ -212,7 +212,7 @@ class Ctx:
         w = self.work
         for mode, corps in (
             ("B", "cat >/dev/null\nprintf '%s\\n' '" + DENY_B + "'\nexit 0\n"),
-            ("E", "cat >/dev/null\necho 'substitut E : plantage' >&2\nprintf '{\"hookSpecificOutput\":{'\nexit 1\n"),
+            ("E", "cat >/dev/null\necho 'substitut E : plantage' >&2\nexit 1\n"),
             ("F", "cat >/dev/null\necho 'substitut F : plantage' >&2\nprintf '{\"hookSpecificOutput\":{'\nexit 2\n"),
         ):
             d = os.path.join(w, "mode" + mode)
@@ -242,16 +242,17 @@ class Ctx:
             env.update(extra)
         return env
 
-    def preparer(self, dossier_scripts):
+    def preparer(self, dossier_scripts, cmd=None):
         """(texte de la commande, variables d'environnement additionnelles) pour un dossier de
         scripts donné. Forme du dépôt : le jeton est substitué. Forme posée dans un lab :
         `"$CLAUDE_PROJECT_DIR"/.claude/scripts`, résolu par un projet jetable."""
-        if TOKEN in self.cmd:
-            return self.cmd.replace(TOKEN, "'" + dossier_scripts + "'"), {}
+        cmd = cmd if cmd is not None else self.cmd
+        if TOKEN in cmd:
+            return cmd.replace(TOKEN, "'" + dossier_scripts + "'"), {}
         proj = self.unique("proj")
         os.makedirs(os.path.join(proj, ".claude"), exist_ok=True)
         os.symlink(dossier_scripts, os.path.join(proj, ".claude", "scripts"))
-        return self.cmd, {"CLAUDE_PROJECT_DIR": proj}
+        return cmd, {"CLAUDE_PROJECT_DIR": proj}
 
     def rejouer(self, texte, entree, env, cwd=None, shell="/bin/sh"):
         t0 = time.perf_counter()
@@ -592,10 +593,525 @@ def sec_modes(ctx):
             ok("R-CMD-08 phase B en faute : deny du Python (erreur interne, P45-D-08), code 0, lab dev en silence, aucun code 2")
 
 
+# =================================================================================================
+# Corpus adverse (Tâche 2) : arbres de labs A01-A15 et payloads E01-E36, chacun avec son attendu
+# dégradé déclaré : `tight` (deny en modes C à F pour Write, Edit, NotebookEdit, Agent, Task) ou
+# `none` (silence : Bash et toute lecture, limites déclarées (a) à (d), P45-D-06b).
+# =================================================================================================
+PLANCHER_MIN = 49        # plancher de la recherche : un corpus vidé rougit
+PLANCHER_CORPUS = 60     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
+
+
+class Cas:
+    def __init__(self, ident, outil, brut, degrade, cwd_proc, python_ok=True, note=""):
+        self.ident = ident
+        self.outil = outil
+        self.brut = brut
+        self.degrade = degrade      # "tight" | "none"
+        self.cwd_proc = cwd_proc
+        self.python_ok = python_ok  # False : le cœur Python échoue avant l'adhésion (code 3)
+        self.note = note
+
+
+def _lien(cible, chemin):
+    os.makedirs(os.path.dirname(chemin), exist_ok=True)
+    os.symlink(cible, chemin)
+
+
+def construire_arbre(t):
+    """Arbre de labs jetable sous `t`. Rend le dict nom → chemin absolu."""
+    L = {}
+
+    def lab(nom, adherent, config=None, plan=True):
+        L[nom] = fabriquer_lab(os.path.join(t, nom), adherent, config, plan)
+        return L[nom]
+
+    lab("adh", True)
+    os.makedirs(os.path.join(t, "adh", "sub"), exist_ok=True)
+    os.makedirs(os.path.join(t, "adh", ".planning", "sub"), exist_ok=True)
+    lab("dev", False)
+    lab("adh esp", True)
+    lab('qlab"x', True)
+    lab("bs\\lab", True)
+    lab("m$HOME`bt*'ap%s", True)
+    lab("uni-é", True)
+    lab("nl\nt\tlab", True)
+    lab("pretty", True, config='{\n  "planning_version": "cycles-v1"\n}\n')
+    lab("nextline", True, config='{"planning_version":\n "cycles-v1"}\n')
+    lab("escaped", True, config='{"planning_version": "cycles\\u002dv1"}\n')
+    lab("dev-note", False, config='{"note": "cycles-v1", "planning_version": "2.0"}\n')
+    lab("dev-sans-config", False, config=False)
+    lab('lab sp"q\\b', True)
+    lab("devout", False)
+    lab(os.path.join("devout", "inner"), True)
+    lab("adhout", True)
+    lab(os.path.join("adhout", "inner-dev"), False)
+    os.makedirs(os.path.join(t, "bare"), exist_ok=True)
+    _lien("adh", os.path.join(t, "alias-adh"))
+    os.makedirs(os.path.join(t, "lab-plink"), exist_ok=True)
+    _lien(os.path.join("..", "adh", ".planning"), os.path.join(t, "lab-plink", ".planning"))
+    _lien(os.path.join("..", "dev"), os.path.join(t, "adh", "link-dev"))
+    _lien(os.path.join("..", "bare"), os.path.join(t, "adh", "link-bare"))
+    _lien(os.path.join("..", "adh"), os.path.join(t, "dev", "link-adh"))
+    _lien(os.path.join("..", "adh", ".planning", "sub"), os.path.join(t, "dev", "link-sub"))
+    os.makedirs(os.path.join(t, "cfglink", ".planning"), exist_ok=True)
+    _lien(os.path.join("..", "..", "adh", ".planning", "config.json"),
+          os.path.join(t, "cfglink", ".planning", "config.json"))
+    for nom in ("adh esp", 'qlab"x', "bs\\lab", "m$HOME`bt*'ap%s", "uni-é", "nl\nt\tlab", 'lab sp"q\\b',
+                "pretty", "adhout", "devout"):
+        L.setdefault(nom, os.path.join(t, nom))
+    L["devout/inner"] = os.path.join(t, "devout", "inner")
+    L["adhout/inner-dev"] = os.path.join(t, "adhout", "inner-dev")
+    for nom in ("alias-adh", "lab-plink", "bare", "cfglink", "nextline", "escaped", "dev-note", "dev-sans-config"):
+        L.setdefault(nom, os.path.join(t, nom))
+    return L
+
+
+def construire_corpus(ctx):
+    if getattr(ctx, "corpus", None) is not None:
+        return ctx.corpus
+    t = ctx.unique("tree")
+    os.makedirs(t, exist_ok=True)
+    L = construire_arbre(t)
+    adh, dev = L["adh"], L["dev"]
+    cas = []
+
+    def w(ident, outil, chemin, cwd, degrade, cwd_proc=None, python_ok=True, note="", compact=True, ascii_=False):
+        brut = payload(outil, entree_outil(outil, chemin), cwd, compact=compact)
+        if ascii_:
+            obj = json.loads(brut.decode("utf-8"))
+            brut = json.dumps(obj, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+        cas.append(Cas(ident, outil, brut, degrade, cwd_proc or t, python_ok, note))
+
+    def brut_cas(ident, outil, brut, degrade, cwd_proc=None, python_ok=True, note=""):
+        cas.append(Cas(ident, outil, brut, degrade, cwd_proc or t, python_ok, note))
+
+    notes = ".planning/notes.md"
+    # ---- E01-E24 : extraction ----
+    w("E01", "Write", adh + "/" + notes, adh, "tight", note="chemin simple")
+    w("E02", "Write", L["adh esp"] + "/" + notes, dev, "tight", note="espace dans le lab")
+    w("E03", "Write", L['qlab"x'] + "/" + notes, dev, "tight", note="guillemet échappé dans le lab")
+    w("E04", "Write", L["bs\\lab"] + "/" + notes, dev, "tight", note="backslash dans le lab")
+    w("E05", "Write", adh + "/.planning/f\\", dev, "tight", note="chemin qui finit par un backslash")
+    w("E06", "Write", adh + '/.planning/f"', dev, "tight", note="chemin qui finit par un guillemet")
+    w("E07", "Write", L["m$HOME`bt*'ap%s"] + "/" + notes, dev, "tight", note="$HOME, backtick, glob, apostrophe, %s")
+    w("E08", "Write", L["uni-é"] + "/.planning/résumé.md", dev, "tight", note="Unicode brut")
+    w("E09", "Write", adh + "/.planning/résumé.md", dev, "tight", ascii_=True, note="Unicode échappé (préfixe dans le même lab)")
+    w("E09b", "Write", L["uni-é"] + "/" + notes, dev, "none", ascii_=True, note="Unicode échappé dans le lab lui-même (limite d)")
+    w("E10", "Write", L["nl\nt\tlab"] + "/" + notes, dev, "tight", note="\\n et \\t décodés")
+    w("E11", "Write", adh + "/.planning/a\rb.md", dev, "tight", note="\\r arrête le décodage : préfixe")
+    w("E11b", "Write", dev + "/.planning/a\rb.md", adh, "tight", note="préfixe dev, cwd adhérent : le doute tombe du côté du refus")
+    texte12 = ('{"session_id":"s","cwd":"' + dev + '","hook_event_name":"PreToolUse","tool_name":"Write",'
+               '"tool_input":{"file_path":"' + adh + '/.planning/notes.md","file_path":"' + dev
+               + '/.planning/notes.md","content":"x"}}')
+    brut_cas("E12", "Write", texte12.encode("utf-8"), "tight", note="clé en double : la première gagne")
+    piege = '"file_path":"' + adh + '/.planning/x"'
+    cas.append(Cas("E13", "Write", payload("Write", {"content": "avant " + piege, "file_path": dev + "/" + notes}, dev),
+                   "none", t, True, "contenu piégé avant la vraie clé"))
+    cas.append(Cas("E14", "Write", payload("Write", {"file_path": dev + "/" + notes, "content": piege + " après"}, dev),
+                   "none", t, True, "contenu piégé après la vraie clé"))
+    cas.append(Cas("E15", "Bash", payload("Bash", {"command": "echo '{" + piege + "}'"}, adh),
+                   "none", t, True, "Bash dont la commande cite un objet file_path"))
+    cas.append(Cas("E16", "Write", payload("Write", {"content": "a" * 200000, "file_path": adh + "/" + notes}, dev),
+                   "tight", t, True, "200 Ko avant la clé"))
+    cas.append(Cas("E17", "Write", payload("Write", {"file_path": adh + "/" + notes, "content": "b" * 1000000}, dev),
+                   "tight", t, True, "1 Mo après la clé"))
+    cas.append(Cas("E18", "Write", payload("Write", {"content": "c" * 5000000, "file_path": adh + "/" + notes}, dev),
+                   "tight", t, True, "5 Mo avant la clé"))
+    w("E19", "Write", adh + "/" + notes, adh, "none", compact=False, note="JSON espacé : tool_name espacé (limite a)")
+    tronque = payload("Write", {"file_path": adh + "/" + notes, "content": "x" * 400}, dev)
+    brut_cas("E20", "Write", tronque[: len(tronque) - 200], "tight", python_ok=False, note="JSON tronqué en pleine chaîne")
+    brut_cas("E21", "Write", b"", "none", python_ok=False, note="entrée vide")
+    inval = payload("Write", {"file_path": adh + "/" + notes, "content": "AAA_INVALIDE_BBB"}, dev)
+    brut_cas("E22", "Write", inval.replace(b"AAA_INVALIDE_BBB", b"\xff\xfe\xc3"), "tight", note="octets invalides dans le contenu")
+    w("E23", "NotebookEdit", adh + "/.planning/nb.ipynb", dev, "tight", note="notebook_path")
+    cas.append(Cas("E24", "Write", payload("Write", {"content": "x"}, adh), "tight", t, True, "sans chemin : repli sur le cwd du payload"))
+    obj24b = {"session_id": "s", "hook_event_name": "PreToolUse", "tool_name": "Write", "tool_input": {"content": "x"}}
+    brut24 = json.dumps(obj24b, separators=(",", ":")).encode("utf-8")
+    brut_cas("E24b", "Write", brut24, "tight", cwd_proc=adh, note="sans chemin ni cwd : repli pwd -P (processus dans un lab adhérent)")
+    brut_cas("E24c", "Write", brut24, "none", cwd_proc=dev, note="sans chemin ni cwd : repli pwd -P (processus dans un lab dev)")
+    # ---- E25-E36 : dispatch, chemins relatifs, lectures ----
+    w("E25", "Agent", None, adh, "tight", note="dispatch Agent sous un lab adhérent")
+    w("E26", "Task", None, adh, "tight", note="dispatch Task sous un lab adhérent")
+    w("E27", "Agent", None, dev, "none", note="dispatch Agent sous un lab dev")
+    w("E28", "Task", None, dev, "none", note="dispatch Task sous un lab dev")
+    faux = {"description": "d", "prompt": 'faux "cwd":"' + adh + '" ici', "subagent_type": "general-purpose"}
+    cas.append(Cas("E29", "Agent", payload("Agent", faux, dev), "none", t, True, "prompt d'Agent qui cite un faux cwd adhérent"))
+    w("E30", "Write", "livrable.md", adh, "tight", note="chemin relatif, cwd adhérent")
+    w("E31", "Write", "livrable.md", dev, "none", note="chemin relatif, cwd dev")
+    w("E32", "Write", "../dev/" + notes, adh, "none", note="chemin relatif ../ vers un voisin dev depuis un cwd adhérent")
+    w("E33", "NotebookEdit", ".planning/nb.ipynb", adh, "tight", note="NotebookEdit relatif, cwd adhérent")
+    w("E34", "Bash", None, adh, "none", note="Bash sous un lab adhérent (limite déclarée)")
+    w("E35", "Read", adh + "/" + notes, adh, "none", note="lecture sous un lab adhérent")
+    w("E36", "Edit", adh + "/livrable.md", dev, "tight", note="Edit d'un livrable déclaré")
+    # ---- A01-A15 : arbres ----
+    w("A01", "Write", adh + "/" + notes, dev, "tight", note="adhérent")
+    w("A02", "Write", L["pretty"] + "/" + notes, dev, "tight", note="adhérent, config espacée sur plusieurs lignes")
+    w("A03", "Write", L["nextline"] + "/" + notes, dev, "none", note="valeur sur la ligne suivante (limite b)")
+    w("A04", "Write", L["escaped"] + "/" + notes, dev, "none", note="cycles-v1 échappé (limite b)")
+    w("A05", "Write", dev + "/" + notes, adh, "none", note="dev")
+    w("A06", "Write", L["dev-note"] + "/" + notes, adh, "none", note="dev dont config.json mentionne cycles-v1 sous une autre clé")
+    w("A07", "Write", L["dev-sans-config"] + "/" + notes, adh, "none", note="dev sans config.json")
+    w("A08", "Write", L['lab sp"q\\b'] + "/" + notes, dev, "tight", note="dossier de lab avec espace, guillemet et backslash")
+    w("A09a", "Write", L["devout/inner"] + "/" + notes, dev, "tight", note="adhérent dans dev : le plus proche gagne")
+    w("A09b", "Write", L["adhout/inner-dev"] + "/" + notes, adh, "none", note="dev dans adhérent : le plus proche gagne")
+    w("A10a", "Write", L["alias-adh"] + "/" + notes, dev, "tight", note="alias de lab")
+    w("A10b", "Write", L["lab-plink"] + "/livrable.md", dev, "tight", note="alias de .planning")
+    w("A11a", "Write", adh + "/link-dev/" + notes, adh, "none", note="lien d'un adhérent vers un dev")
+    w("A11b", "Write", dev + "/link-sub/notes.md", dev, "tight", note="lien d'un dev vers un sous-dossier d'un adhérent")
+    w("A11c", "Write", adh + "/link-bare/notes.md", dev, "none", note="lien d'un adhérent vers un dossier hors de tout lab")
+    w("A11d", "Write", dev + "/link-adh/" + notes, dev, "tight", note="lien d'un dev vers un adhérent")
+    w("A12", "Write", adh + "/absent/../" + notes, dev, "tight", note="`..` qui traverse un dossier inexistant")
+    w("A13", "Write", L["cfglink"] + "/" + notes, dev, "tight", note="config.json en lien symbolique (limite c : côté shell adhérent)")
+    w("A14", "Write", dev + "/" + notes, adh, "none", note="session dans un adhérent qui écrit dans un dev voisin")
+    w("A15", "Write", adh + "/" + notes, dev, "tight", note="session dans un dev qui écrit dans un adhérent voisin")
+    ctx.corpus = cas
+    ctx.labs = L
+    return cas
+
+
+def cas_par_id(ctx, ident):
+    for c in construire_corpus(ctx):
+        if c.ident == ident:
+            return c
+    raise KeyError(ident)
+
+
+def attendu_mode(cas, mode):
+    """`silence`, `deny` ou `passe-plat` (mode B : le deny du substitut, octet pour octet)."""
+    if mode == "B":
+        return "passe-plat"
+    if mode == "A" and cas.python_ok:
+        return "silence"
+    return "deny" if cas.degrade == "tight" and cas.outil in OUTILS_FILTRES else "silence"
+
+
+def obtenu_mode(cas, mode, rc, out, err):
+    """Nom du verdict obtenu, comparable à `attendu_mode`."""
+    if mode == "B":
+        return "passe-plat" if (rc == 0 and out == (DENY_B + "\n").encode("utf-8")) else "autre:rc=%d out=%s" % (rc, court(out))
+    v = verdict(rc, out)
+    if v == "deny":
+        raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+        return "deny" if ("Reparer" in raison or "erreur interne" in raison) else "autre:deny-inattendu"
+    return v
+
+
+def sec_matrice(ctx):
+    cas = construire_corpus(ctx)
+    n = len(cas)
+    print("CORPUS n=%d plancher=%d (minimum de la recherche : %d)" % (n, PLANCHER_CORPUS, PLANCHER_MIN))
+    if n < PLANCHER_MIN or n != PLANCHER_CORPUS:
+        ko("R-CORPUS", "le compte réel des cas exercés égale le plancher déclaré en dur (≥ %d)" % PLANCHER_MIN,
+           "n=%d" % PLANCHER_CORPUS, "n=%d" % n)
+    else:
+        ok("R-CORPUS %d cas exercés = plancher déclaré (≥ %d)" % (n, PLANCHER_MIN))
+    for mode in "ABCDEF":
+        fautes = 0
+        for c in cas:
+            rc, out, err, _ = ctx.lancer(mode, c.brut, cwd=c.cwd_proc)
+            att, obt = attendu_mode(c, mode), obtenu_mode(c, mode, rc, out, err)
+            bruit = bool(err) and mode in "ABCD"
+            if att != obt or bruit:
+                fautes += 1
+                ko("R-MATRICE mode %s cas %s" % (mode, c.ident),
+                   "%s (%s) sous /bin/sh, mode %s" % (c.ident, c.note, mode),
+                   att + (" et stderr vide" if mode in "ABCD" else ""),
+                   obt + (" stderr=" + court(err) if bruit else ""))
+        if not fautes:
+            ok("R-MATRICE mode %s : %d cas sous /bin/sh, verdicts conformes (%s)" % (
+                mode, n, {"A": "script réel, silence partout", "B": "deny du substitut rejoué octet pour octet",
+                          "C": "script absent", "D": "python absent", "E": "script qui sort 1", "F": "script qui sort 2"}[mode]))
+
+
+# --- Extraction seule sous chaque shell (fonctions de la commande isolées, sans spawn du script) ---
+def sonde_extraction(cmd):
+    debut = cmd.index("NL='")
+    fin = cmd.index("\nD=1;")
+    defs = cmd[debut:fin]
+    return ("I=$(cat)\n" + defs + "\n"
+            'if vf_get file_path; then K=file_path; elif vf_get notebook_path; then K=notebook_path; else K=none; fi\n'
+            'if [ "$K" = none ]; then printf "K=none\\n"; else\n'
+            '  printf "K=%s\\nX=%s\\nV=%s\\n" "$K" "$X" "$(printf "%s" "$V" | od -An -v -tx1 | tr -d " \\n")"\n'
+            '  case $V in /*) if vf_tight "$V"; then echo D=0; else echo D=1; fi ;; *) echo D=rel ;; esac\n'
+            'fi\n')
+
+
+def extrait_reference(brut):
+    """Oracle indépendant : la lecture attendue de `file_path`, sinon `notebook_path`."""
+    texte = brut.decode("utf-8", "replace")
+    for cle in ("file_path", "notebook_path"):
+        m = re.search(r'"' + cle + r'"[ \t]*:[ \t]*"((?:[^"\\]|\\.)*)"', texte)
+        if not m:
+            continue
+        v, i, out, x = m.group(1), 0, [], 1
+        while i < len(v):
+            c = v[i]
+            if c != "\\":
+                out.append(c)
+                i += 1
+                continue
+            e = v[i + 1]
+            if e in '"\\/':
+                out.append(e)
+            elif e == "n":
+                out.append("\n")
+            elif e == "t":
+                out.append("\t")
+            else:
+                x = 0
+                break
+            i += 2
+        return cle, x, "".join(out)
+    return "none", None, None
+
+
+def tight_reference(chemin):
+    if not chemin.startswith("/"):
+        return None
+    courant = os.path.realpath(chemin)
+    while not os.path.isdir(courant):
+        parent = os.path.dirname(courant)
+        if parent == courant:
+            return False
+        courant = parent
+    while True:
+        if os.path.isdir(os.path.join(courant, ".planning")):
+            cfg = os.path.join(courant, ".planning", "config.json")
+            if not os.path.isfile(cfg):
+                return False
+            lignes = open(cfg, "rb").read().decode("utf-8", "replace").split("\n")
+            return any(re.search(r'"planning_version"[ \t]*:[ \t]*"cycles-v1"', l) for l in lignes)
+        parent = os.path.dirname(courant)
+        if parent == courant:
+            return False
+        courant = parent
+
+
+def shells_presents():
+    res = [("sh", ["/bin/sh", "-c"])]
+    d = shutil.which("dash")
+    if d:
+        res.append(("dash", [d, "-c"]))
+    b = shutil.which("bash")
+    if b:
+        res.append(("bash", [b, "-c"]))
+    z = shutil.which("zsh")
+    if z:
+        res.append(("zsh", [z, "-f", "-c"]))
+    return res
+
+
+def sec_shells(ctx):
+    cas = construire_corpus(ctx)
+    sonde = sonde_extraction(ctx.cmd)
+    exerces = []
+    fautes = 0
+    for nom, argv in shells_presents():
+        texte = ("emulate sh\n" + sonde) if nom == "zsh" else sonde
+        exerces.append(nom)
+        for c in cas:
+            env = ctx.env_mode("A")
+            p = subprocess.run(argv + [texte], input=c.brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               env=env, cwd=c.cwd_proc, timeout=120)
+            cle, x, v = extrait_reference(c.brut)
+            if cle == "none":
+                attendu = "K=none\n"
+            else:
+                d = tight_reference(v)
+                attendu = "K=%s\nX=%d\nV=%s\nD=%s\n" % (cle, x, v.encode("utf-8").hex(),
+                                                        "rel" if d is None else ("0" if d else "1"))
+            obtenu = p.stdout.decode("utf-8", "replace")
+            if obtenu != attendu:
+                fautes += 1
+                ko("R-EXTRACTION shell %s cas %s" % (nom, c.ident), "extraction de %s (%s) sous %s" % (c.ident, c.note, nom),
+                   court(attendu.replace("\n", " | ")), court(obtenu.replace("\n", " | ")) + " " + court(p.stderr))
+    print("SHELLS-EXERCES " + " ".join(exerces))
+    if "sh" not in exerces or "bash" not in exerces:
+        ko("R-EXTRACTION plancher", "sh et bash toujours exercés", "sh bash", " ".join(exerces))
+    elif not fautes:
+        ok("R-EXTRACTION mêmes verdicts sous %s : %d cas, V, X et D identiques à l'oracle" % (", ".join(exerces), len(cas)))
+
+
+# --- Performance : 5 Mo, clé en fin de charge utile ------------------------------------------
+def sec_perf(ctx):
+    adh, _dev = _labs_simples(ctx, "perf")
+    lourd = payload("Write", {"content": "z" * 5000000, "file_path": adh + "/.planning/notes.md"}, adh)
+    fautes = []
+    mesures = []
+    for mode in ("C", "A"):
+        rc, out, err, dt = ctx.lancer(mode, lourd, cwd=adh)
+        attendu = "deny" if mode == "C" else "silence"
+        v = verdict(rc, out)
+        mesures.append("mode %s %.2f s" % (mode, dt))
+        if v != attendu or dt >= 5.0:
+            fautes.append((mode, "%s en moins de 5 s" % attendu, "%s en %.2f s" % (v, dt)))
+    if fautes:
+        for mode, a, b in fautes:
+            ko("R-PERF", "5 Mo, clé en fin de charge utile, mode " + mode, a, b)
+    else:
+        ok("R-PERF 5 Mo, clé en fin : tranché en moins de 5 s (%s)" % ", ".join(mesures))
+
+
+# --- Le dépôt lui-même : lab dev, jamais un octet ---------------------------------------------
+def sec_depot(ctx):
+    racine = ctx.repo_root
+    if not racine or not os.path.isfile(os.path.join(racine, "plugin", "planning-core", "scripts", "planning-hook.sh")):
+        print("NOTE R-DEPOT hors dépôt : plugin/planning-core/scripts/planning-hook.sh absent à côté des suites — cas non rejoué (jamais un vert)")
+        return
+    cibles = (".planning/STATE.md", "README.md", "plugin/planning-core/VERSION")
+    fautes = []
+    n = 0
+    for mode in ("A", "C", "D"):
+        for outil in SIX_OUTILS:
+            for rel in cibles:
+                chemin = os.path.join(racine, rel)
+                rc, out, err, _ = ctx.lancer(mode, payload(outil, entree_outil(outil, chemin), racine), cwd=racine)
+                n += 1
+                if rc != 0 or out != b"" or err:
+                    fautes.append(("%s %s mode %s" % (outil, rel, mode), "stdout 0 octet, code 0", "rc=%d out=%s err=%s" % (rc, court(out), court(err))))
+    if fautes:
+        for a, b, c in fautes:
+            ko("R-DEPOT", a, b, c)
+    else:
+        ok("R-DEPOT ce dépôt (lab dev) : %d rejeux (six outils, trois cibles, modes A, C, D) : stdout 0 octet, code 0" % n)
+
+
+# =================================================================================================
+# Mutants (quatre conditions : (a) texte distinct et `sh -n` ; (b) témoin identique ; (c) l'obtenu
+# est un verdict et non une erreur de syntaxe ; (d) trace assertion / attendu / obtenu imprimée)
+# =================================================================================================
+MARQUEURS_SYNTAXE = ("syntax error", "unexpected", "unterminated", "bad substitution", "parse error")
+
+
+def nom_verdict(rc, out, err):
+    v = verdict(rc, out)
+    if v == "autre:rc=2" and out:
+        return "code 2 (deny imprimé)"
+    if v == "autre:rc=2":
+        return "code 2"
+    if v == "autre:document":
+        v = "document invalide (json.loads échoue)"
+    return v + ((" stderr=" + court(err, 60)) if err else "")
+
+
+def okmut(ident, trace):
+    print("  ✓ MUT-%s TUÉ — %s" % (ident, trace))
+
+
+def komut(ident, assertion, attendu, obtenu):
+    print("  ✗ MUT-%s NON TUÉ" % ident)
+    print("    assertion : " + assertion)
+    print("    attendu (original) : " + attendu)
+    print("    obtenu (mutant)     : " + obtenu)
+
+
+def make_cmd_mutant(ctx, ident, motif, remplacement):
+    """Texte muté de la commande enregistrée : motif fixe à occurrence unique, sinon komut."""
+    n = ctx.cmd.count(motif)
+    if n != 1:
+        return None, "motif ambigu ou absent (occurrences=%d)" % n
+    muté = ctx.cmd.replace(motif, remplacement)
+    if muté == ctx.cmd:
+        return None, "NON OPPOSABLE (texte identique à l'original)"
+    chemin = ctx.unique("cmd-" + ident.lower()) + ".sh"
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write(muté.replace(TOKEN, "/nonexistent") if TOKEN in muté else muté)
+    p = subprocess.run(["/bin/sh", "-n", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        return None, "sh -n ÉCHOUE : " + court(p.stderr)
+    return muté, None
+
+
+def rejouer_texte(ctx, texte, mode, brut, cwd):
+    t, extra = ctx.preparer(ctx.dossier_mode(mode), texte)
+    return ctx.rejouer(t, brut, ctx.env_mode(mode, extra), cwd)
+
+
+def mutant_cmd(ctx, ident, motif, remplacement, id_disc, mode, id_temoin="E01", mode_temoin=None, attendu_code=0):
+    muté, raison = make_cmd_mutant(ctx, ident, motif, remplacement)
+    if muté is None:
+        komut(ident, "condition (a) : texte muté distinct de l'original et sh -n réussit", "mutant valide", raison)
+        return
+    mode_temoin = mode_temoin or mode
+    disc, tem = cas_par_id(ctx, id_disc), cas_par_id(ctx, id_temoin)
+    o_t = rejouer_texte(ctx, ctx.cmd, mode_temoin, tem.brut, tem.cwd_proc)
+    m_t = rejouer_texte(ctx, muté, mode_temoin, tem.brut, tem.cwd_proc)
+    if o_t[:3] != m_t[:3]:
+        komut(ident, "condition (b) : sur le témoin %s (mode %s) le mutant sort comme l'original" % (id_temoin, mode_temoin),
+              nom_verdict(*o_t[:3]), nom_verdict(*m_t[:3]))
+        return
+    o_d = rejouer_texte(ctx, ctx.cmd, mode, disc.brut, disc.cwd_proc)
+    m_d = rejouer_texte(ctx, muté, mode, disc.brut, disc.cwd_proc)
+    att_nom = attendu_mode(disc, mode)
+    if att_nom != obtenu_mode(disc, mode, *o_d[:3]):
+        komut(ident, "l'original rend le verdict déclaré sur %s (garde du témoin de la mutation)" % id_disc,
+              att_nom, nom_verdict(*o_d[:3]))
+        return
+    syntaxe = any(mk in m_d[2].decode("utf-8", "replace") for mk in MARQUEURS_SYNTAXE)
+    if m_d[0] != attendu_code or syntaxe:
+        komut(ident, "condition (c) : le mutant rend un verdict (code %d), jamais une erreur de syntaxe" % attendu_code,
+              "code %d sans erreur de syntaxe" % attendu_code, "rc=%d stderr=%s" % (m_d[0], court(m_d[2])))
+        return
+    if o_d[:3] == m_d[:3]:
+        komut(ident, "le mutant change le verdict sur %s (mode %s)" % (id_disc, mode),
+              nom_verdict(*o_d[:3]), nom_verdict(*m_d[:3]) + " (mutant non opposable)")
+        return
+    okmut(ident, "cas %s (%s) mode %s sous /bin/sh · attendu (original) : %s · obtenu (mutant) : %s · témoin %s inchangé · (a) (b) (c) (d) vérifiées"
+          % (id_disc, disc.note, mode, nom_verdict(*o_d[:3]), nom_verdict(*m_d[:3]), id_temoin))
+
+
+def sec_mutants(ctx):
+    construire_corpus(ctx)
+    M = [
+        ("EXT-1", '_p=$(cd -P -- "$_d" 2>/dev/null && pwd -P)', '_p=$(cd -- "$_d" 2>/dev/null && pwd)', "A11b", "C", {}),
+        ("EXT-2", '"([^"\\\\]|\\\\.)*"\'', '"[^"]*"\'', "E03", "C", {}),
+        ("EXT-3", '2>/dev/null; return $?; fi', '2>/dev/null && return 0; fi', "A09b", "C", {}),
+        ("EXT-4", '\\\\\\"*) V=$V\\" ;;', '\\\\\\"*) X=0; return 0 ;;', "E03", "C", {}),
+        ("EXT-5", 'for K in file_path notebook_path; do', 'for K in zz_file zz_note; do', "A14", "C", {}),
+        ("EXT-6", '| head -n 1); [ -n "$_m" ]', '| tail -n 1); [ -n "$_m" ]', "E12", "C", {}),
+        ("EXT-7", "-q -E '\"planning_version\"[[:space:]]*:[[:space:]]*\"cycles-v1\"'", "-q -F 'cycles-v1'", "A06", "C", {}),
+        ("EXT-8", 'else vf_tight "$(pwd -P)" && D=0; fi', 'else :; fi', "E24b", "C", {}),
+        ("EXT-9", 'then P=$V/$P; else', 'then :; else', "E30", "C", {}),
+        ("CMD-1", ';; *) exit 0 ;; esac', ';; *) ;; esac', "E35", "C", {}),
+        ("CMD-2", 'bash "$S"); R=$?; fi', 'bash "$S"); R=0; fi', "E01", "E", {"id_temoin": "E27"}),
+        ("CMD-3", 'if [ -f "$S" ]; then O=', 'if :; then O=', "E01", "C", {"mode_temoin": "A"}),
+        ("CMD-4", 'la session."}}\'', 'la session."}\'', "E01", "C", {"id_temoin": "E27"}),
+        ("CMD-5", 'la session."}}\'\nexit 0', 'la session."}}\'\nexit 2', "E01", "C", {"id_temoin": "E27", "attendu_code": 2}),
+        ("CMD-6", "|*'\"tool_name\":\"Agent\"'*|*'\"tool_name\":\"Task\"'*", "", "E25", "C", {}),
+        ("CMD-7", "*'\"tool_name\":\"Task\"'*) ;;", "*'\"tool_name\":\"Task\"'*|*'\"tool_name\":\"Bash\"'*) ;;", "E34", "C", {}),
+    ]
+    for ident, motif, repl, disc, mode, kw in M:
+        mutant_cmd(ctx, ident, motif, repl, disc, mode, **kw)
+    # MUT-PY-PHASE-A : la sortie sur exception de la phase A remplacée par une sortie 0
+    dossier, raison = make_hook_mutant(ctx, "PYA", "sys.exit(3)  # phase-a-sortie", "sys.exit(0)")
+    if dossier is None:
+        komut("PY-PHASE-A", "mutant du cœur (bash -n et compilation du corps)", "mutant valide", raison)
+        return
+    disc, tem = cas_par_id(ctx, "E20"), cas_par_id(ctx, "E01")
+    o_t = ctx.lancer("A", tem.brut, cwd=tem.cwd_proc)
+    m_t = ctx.lancer("A", tem.brut, cwd=tem.cwd_proc, dossier=dossier)
+    if o_t[:3] != m_t[:3]:
+        komut("PY-PHASE-A", "condition (b) : témoin E01 identique", nom_verdict(*o_t[:3]), nom_verdict(*m_t[:3]))
+        return
+    o_d = ctx.lancer("A", disc.brut, cwd=disc.cwd_proc)
+    m_d = ctx.lancer("A", disc.brut, cwd=disc.cwd_proc, dossier=dossier)
+    if obtenu_mode(disc, "A", *o_d[:3]) != "deny" or m_d[0] != 0 or o_d[:3] == m_d[:3]:
+        komut("PY-PHASE-A", "phase A en faute (payload tronqué, lab adhérent) : l'original refuse (couche shell), le mutant se tait",
+              nom_verdict(*o_d[:3]), nom_verdict(*m_d[:3]))
+        return
+    okmut("PY-PHASE-A", "cas E20 (payload tronqué, lab adhérent) mode A · attendu (original) : %s · obtenu (mutant) : %s · témoin E01 inchangé · (a) (b) (c) (d) vérifiées"
+          % (nom_verdict(*o_d[:3]), nom_verdict(*m_d[:3])))
+
 SECTIONS = {
     "entree": sec_entree,
     "merge": sec_merge,
     "modes": sec_modes,
+    "matrice": sec_matrice,
+    "shells": sec_shells,
+    "perf": sec_perf,
+    "depot": sec_depot,
+    "mutants": sec_mutants,
 }
 
 
@@ -632,9 +1148,7 @@ run_sections() { # <sections séparées par des virgules>
 
 [ -f "$HOOK" ] || { ko "planning-hook.sh présent" "le script du hook central existe à côté des suites" "$HOOK" "absent"; }
 
-run_sections entree
-run_sections merge
-run_sections modes
+run_sections entree,merge,modes,matrice,shells,perf,depot,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"
