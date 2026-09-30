@@ -1,3 +1,5 @@
 date	type	source	archive	ref	motif
 2026-09-29	state	.planning/workstreams/fiabilite/STATE.md	.planning/archives/state/fiabilite-STATE-corps-2026-09-29.md	0d6f225a3b3cf90bc322caee91d98400526c097e	budget 8 Ko (SOBR-02)
 2026-09-29	stash	stash@{0} « On feat/phase-37-spike-portabilite-multi-runtime: wip-roadmap-phases-36-39-avant-hotfix-winpathconv »	.planning/archives/stash/stash-cb4c8ed4.patch	cb4c8ed438e9f1ba68c796f687ea498da3ab3ba3@fca17be9b3de97f3bb18ad4e83537af3dda44320	export avant drop
+2026-09-30	backlog	.planning/BACKLOG.md	.planning/archives/backlog/racine-BACKLOG-2026-09-30.md	a5144ffec327799db511edd360a065f459b44efc	sujets clos (SOBR-06)
+2026-09-30	roadmap	.planning/workstreams/fiabilite/ROADMAP.md	.planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md	1c1ca3134da8f11ff77783c906a414d3124b8309	budget 64 Ko, blocs replies (SOBR-06)
