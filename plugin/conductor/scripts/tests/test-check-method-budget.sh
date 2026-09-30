@@ -36,9 +36,17 @@
 #   K1-K16 — budgets étendus (BACKLOG ouvert, index MEMORY.md, ROADMAP), plafonds de prose (STATE, entrée de BACKLOG),
 #        ARCHIVAGE (--archive, --auto) : tracé (INDEX.tsv), relisible, jamais de commit, source commitée seule, portée
 #        bornée au(x) compartiment(s) nommé(s) ou de la session, compartiment protégé intact, retour arrière par le blob
-#   X9 — une seule région exemptée du filet statique d'écriture (la région vf-archive-writer du script)
+#   KC1-KC4 — archivage sous concurrence (correction 41.3-03) : écriture concurrente jamais écrasée (refus bruyant,
+#        archive et ligne d'INDEX retirées), trois passes simultanées = un seul déplacement et une seule ligne d'INDEX,
+#        verrou tenu = refus qui nomme le pid ; KM1-KM3 — preuve multiset, relecture de l'archive, témoin sans panne ;
+#        KS1-KS2 — STATE : jamais une section d'état ouvert, second passage = rien ; KT1-KT2 — TRANCHÉ n'est plus clos,
+#        un <details> sans ✅ ni SHIPPED reste ; KW1-KW3 — compartiment de session résolu par vf_ws_resolve
+#   X9 — une seule région exemptée du filet statique d'écriture (la région vf-archive-writer du script), BORNÉE
+#        en étendue (nombre de lignes et liste exacte des fonctions), la borne prouvée par un mutant qui l'étend
 #   MU1-MU24 — mutants (QUAL-01) : chacun rougit l'assertion qu'il vise, pour la bonne raison
 #   MU25-MU29 — mutants de l'archivage : filtre de clos, refus de source sale, filtre --ws, session de --auto, protection
+#   MU30-MU39 — mutants de la correction 41.3-03 : TRANCHÉ clos, jalon non livré, section d'état ouvert, pointeur, verrou,
+#        relecture de la source, preuve multiset, relecture de l'archive, pointeur active-workstream, étendue de X9
 #   L1 — étiquettes : aucun identifiant de cas réutilisé d'une section à l'autre
 #   Q5 — anti-vert-à-vide
 #
@@ -651,6 +659,163 @@ assert "K16 — --root . : le BACKLOG du compartiment est archivé" "$OUT" "ARCH
 assert "K16 — --root . : celui de la racine aussi" "$OUT" "ARCHIVÉ : .planning/BACKLOG.md"
 refute "K16 — --root . : aucun refus" "$OUT" "ARCHIVAGE REFUSÉ"
 assert_rc "K16 — --root . : rc 0" "$RC" 0
+# --- Correction 41.3-03 : concurrence, preuves forcées, STATE, TRANCHÉ, compartiment de session ---------------------
+unset VF_WORKSTREAM VF_ARCHIVE_LOCK_WAIT
+# Enveloppes de PANNE posées devant le PATH (elles repassent par l'enveloppe de lecture seule pour git) : git écrit dans la
+# source ou dort quand le script lit le blob de HEAD (FAKE_GIT_APPEND, FAKE_GIT_SLEEP) ; awk perd une ligne (FAKE_AWK_LOSSY=
+# new|arch) ; cmp refuse tout fichier d'archive (FAKE_CMP_FAIL). Sans variable, chacune est transparente (KM3 le prouve).
+KSHIM="$WORK_DIR/kshim"; mkdir -p "$KSHIM"
+REAL_AWK="$(command -v awk)"; REAL_CMP="$(command -v cmp)"; WRAP_GIT="$WRAPBIN/git"; export REAL_AWK REAL_CMP WRAP_GIT
+cat > "$KSHIM/git" <<'KGIT'
+#!/bin/bash
+last=""; for a in "$@"; do last="$a"; done
+case " $* " in
+  *" rev-parse "*)
+    case "$last" in
+      HEAD:./*) case " $* " in *" --verify "*) ;; *)
+        [ -z "${FAKE_GIT_APPEND:-}" ] || echo "ligne concurrente" >> "$FAKE_GIT_APPEND"
+        [ -z "${FAKE_GIT_SLEEP:-}" ] || sleep "$FAKE_GIT_SLEEP" ;; esac ;;
+    esac ;;
+esac
+exec "$WRAP_GIT" "$@"
+KGIT
+cat > "$KSHIM/awk" <<'KAWK'
+#!/bin/bash
+arch=""; for a in "$@"; do case "$a" in ARCH=*) arch="${a#ARCH=}" ;; esac; done
+if [ -n "$arch" ]; then
+  case "${FAKE_AWK_LOSSY:-}" in
+    new) "$REAL_AWK" "$@" | sed '1d'; exit 0 ;;
+    arch) "$REAL_AWK" "$@"; rc=$?; sed '1d' "$arch" > "$arch.t"; cat "$arch.t" > "$arch"; exit $rc ;;
+  esac
+fi
+exec "$REAL_AWK" "$@"
+KAWK
+cat > "$KSHIM/cmp" <<'KCMP'
+#!/bin/bash
+if [ -n "${FAKE_CMP_FAIL:-}" ]; then for a in "$@"; do case "$a" in */archives/*) exit 1 ;; esac; done; fi
+exec "$REAL_CMP" "$@"
+KCMP
+chmod +x "$KSHIM/git" "$KSHIM/awk" "$KSHIM/cmp"
+kshrun() { PATH="$KSHIM:$PATH" krun "$@"; }   # kshrun <racine> <options...> ; les FAKE_* se posent devant
+n_lines() { grep -c "$2" "$1" 2>/dev/null; true; }
+# KC1 — une écriture concurrente pendant l'archivage n'est JAMAIS écrasée : refus bruyant, archive et INDEX retirés
+KW="$WORK_DIR/kw"; mk_repo "$KW"; bk_file "$KW/.planning/BACKLOG.md" 2 2; kcommit "$KW"
+OUT="$(FAKE_GIT_APPEND="$KW/.planning/BACKLOG.md" kshrun "$KW" --no-remote --archive backlog)"; RC=$?
+assert_rc "KC1 — écriture concurrente pendant l'archivage : rc 2" "$RC" 2
+assert "KC1 — le refus dit la cause" "$OUT" "la source a changé pendant l'archivage"
+assert_rc "KC1 — la ligne concurrente est encore dans la source (aucune perte silencieuse)" "$(grep -c '^ligne concurrente$' "$KW/.planning/BACKLOG.md")" 1
+assert_rc "KC1 — les deux sujets clos sont restés au BACKLOG (rien déplacé)" "$(grep -c '^## Clos' "$KW/.planning/BACKLOG.md")" 2
+assert_rc "KC1 — ni archive, ni INDEX laissés" "$([ ! -e "$KW/.planning/archives/INDEX.tsv" ] && [ -z "$(find "$KW/.planning/archives" -type f 2>/dev/null)" ]; echo $?)" 0
+assert_rc "KC1 — le verrou est relâché" "$([ ! -e "$KW/.planning/.archive.lock" ]; echo $?)" 0
+# KC2 — trois passes SIMULTANÉES sur la même source : un seul déplacement, une seule ligne d'INDEX, aucun refus
+KL="$WORK_DIR/kl"; mk_repo "$KL"; bk_file "$KL/.planning/BACKLOG.md" 2 2; kcommit "$KL"; git -C "$KL" show HEAD:.planning/BACKLOG.md > "$WORK_DIR/kl.before"
+par3() { # <racine> <préfixe de sorties> : lance 3 passes à la fois, rend leurs sorties concaténées
+  local r="$1" pre="$2" i
+  for i in 1 2 3; do ( FAKE_GIT_SLEEP=0.6 VF_ARCHIVE_LOCK_WAIT=300 kshrun "$r" --no-remote --archive backlog > "$pre.$i.out" 2>&1; echo $? > "$pre.$i.rc" ) & done
+  wait
+  cat "$pre.1.out" "$pre.2.out" "$pre.3.out"
+}
+OUT="$(par3 "$KL" "$WORK_DIR/kl")"
+assert_rc "KC2 — trois passes simultanées : exactement un ARCHIVÉ" "$(printf '%s\n' "$OUT" | grep -c 'ARCHIVÉ :')" 1
+refute "KC2 — aucun refus" "$OUT" "ARCHIVAGE REFUSÉ"
+assert_rc "KC2 — les trois rendent 0" "$(cat "$WORK_DIR"/kl.[123].rc | sort -u | tr -d '\n' | grep -c '^0$')" 1
+assert_rc "KC2 — une seule ligne d'INDEX (hors en-tête)" "$(awk 'NR > 1' "$KL/.planning/archives/INDEX.tsv" | grep -c .)" 1
+assert_rc "KC2 — une seule archive, aucun suffixe -2" "$(find "$KL/.planning/archives/backlog" -type f | grep -c .)" 1
+{ awk 'index($0, "<!-- vf-archive: ") != 1' "$KL/.planning/BACKLOG.md"; cat "$KL/.planning/archives/backlog/"*.md; } | LC_ALL=C sort > "$WORK_DIR/kl.n"; LC_ALL=C sort "$WORK_DIR/kl.before" > "$WORK_DIR/kl.o"
+assert_rc "KC2 — lignes de la source d'avant = source sans pointeurs + archive (cmp -s)" "$(cmp -s "$WORK_DIR/kl.o" "$WORK_DIR/kl.n"; echo $?)" 0
+assert_rc "KC2 — deux pointeurs seulement (un par sujet clos, aucun doublon)" "$(grep -c '^<!-- vf-archive: ' "$KL/.planning/BACKLOG.md")" 2
+# KC3 — verrou tenu par un processus vivant, puis verrou sans pid : refus qui nomme le cas, rien déplacé
+KK="$WORK_DIR/kk"; mk_repo "$KK"; bk_file "$KK/.planning/BACKLOG.md" 1 1; kcommit "$KK"; mkdir "$KK/.planning/.archive.lock"; echo "$$" > "$KK/.planning/.archive.lock/pid"
+OUT="$(VF_ARCHIVE_LOCK_WAIT=2 krun "$KK" --no-remote --archive backlog)"; RC=$?
+assert_rc "KC3 — verrou tenu : rc 2" "$RC" 2
+assert "KC3 — le refus nomme le processus détenteur" "$OUT" "verrou d archivage tenu par le processus $$"
+assert_rc "KC3 — rien déplacé, verrou d'autrui jamais retiré" "$([ ! -e "$KK/.planning/archives" ] && [ -d "$KK/.planning/.archive.lock" ] && [ "$(git -C "$KK" status --porcelain -uno | grep -c .)" -eq 0 ]; echo $?)" 0
+rm -f "$KK/.planning/.archive.lock/pid"
+OUT="$(VF_ARCHIVE_LOCK_WAIT=2 krun "$KK" --no-remote --archive backlog)"
+assert "KC3 — verrou sans pid : refus sans processus nommé" "$OUT" "verrou d archivage tenu ("
+refute "KC3 — ... et sans « par le processus »" "$OUT" "par le processus"
+# KM1-KM3 — preuve multiset et relecture de l'archive FORCÉES : un awk qui perd une ligne, un cmp qui refuse l'archive
+KM="$WORK_DIR/km"; mk_repo "$KM"; bk_file "$KM/.planning/BACKLOG.md" 2 2; kcommit "$KM"; TKM="$(ktree "$KM" | cksum)"
+OUT="$(FAKE_AWK_LOSSY=new kshrun "$KM" --no-remote --archive backlog)"; RC=$?
+assert "KM1 — awk qui perd une ligne de la source allégée : preuve des lignes conservées en échec" "$OUT" "preuve des lignes conservées en échec, rien déplacé"
+assert_rc "KM1 — rc 2" "$RC" 2
+OUT="$(FAKE_AWK_LOSSY=arch kshrun "$KM" --no-remote --archive backlog)"
+assert "KM1 — awk qui perd une ligne de l'archive : même refus" "$OUT" "preuve des lignes conservées en échec, rien déplacé"
+OUT="$(FAKE_CMP_FAIL=1 kshrun "$KM" --no-remote --archive backlog)"; RC=$?
+assert "KM2 — archive non relisible : refus dit" "$OUT" "archive non relisible, rien déplacé"
+assert_rc "KM2 — rc 2" "$RC" 2
+assert_rc "KM1/KM2 — trois refus : arbre identique (ni archive, ni INDEX, source intacte)" "$([ "$(ktree "$KM" | cksum)" = "$TKM" ] && echo 0 || echo 1)" 0
+OUT="$(kshrun "$KM" --no-remote --archive backlog)"; RC=$?
+assert "KM3 — témoin : les enveloppes sans panne sont transparentes, l'archivage a lieu" "$OUT" "ARCHIVÉ : .planning/BACKLOG.md"
+assert_rc "KM3 — témoin : rc 0" "$RC" 0
+# KS1-KS2 — STATE : seule l'historique part ; jamais une section d'état ouvert ; un second passage ne déplace rien
+state_open_file() { # <fichier> : sections d'état ouvert et d'historique, toutes > 1 Ko cumulées
+  local f="$1" i; mkdir -p "$(dirname "$f")"
+  { printf -- '---\nstatus: executing\n---\n\n# Project State\n\n## Project Reference\nref-corps\n\n## Current Position\nPhase: 41\npos-corps\n\n## Accumulated Context\n\n### Decisions\n'
+    for i in $(seq 1 30); do echo "decision-$i xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done
+    printf '\n### Pending Todos\n'; for i in $(seq 1 30); do echo "todo-ouvert-$i xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done
+    printf '\n### Blockers/Concerns\n'; for i in $(seq 1 30); do echo "bloquant-$i xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done
+    printf '\n### Quick Tasks Completed\n'; for i in $(seq 1 20); do echo "quick-$i xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done
+    printf '\n## Deferred Items\n'; for i in $(seq 1 20); do echo "differe-$i xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"; done
+    printf '\n## Session Continuity\nsession-corps\n'; } > "$f"
+}
+state_two_pass() { # <script> <racine> : deux passes --archive state séparées par un commit ; imprime la sortie du SECOND passage
+  local scr="$1" r="$2"
+  VF_STATE_BUDGET_KB=1 CHECK_UNDER="$scr" krun "$r" --no-remote --archive state >/dev/null
+  kcommit "$r"
+  VF_STATE_BUDGET_KB=1 CHECK_UNDER="$scr" krun "$r" --no-remote --archive state
+}
+KE="$WORK_DIR/ke"; mk_repo "$KE"; state_open_file "$KE/.planning/STATE.md"; kcommit "$KE"
+OUT="$(VF_STATE_BUDGET_KB=1 krun "$KE" --no-remote --archive state)"; RC=$?
+assert "KS1 — STATE au-delà du budget : l'historique est ARCHIVÉ" "$OUT" "ARCHIVÉ : .planning/STATE.md → .planning/archives/state/racine-STATE-$KD.md"
+SE="$(cat "$KE/.planning/STATE.md")"
+assert_rc "KS1 — les 30 todos ouverts sont restés (section d'état ouvert)" "$(printf '%s\n' "$SE" | grep -c '^todo-ouvert-')" 30
+assert_rc "KS1 — les 30 blocages aussi" "$(printf '%s\n' "$SE" | grep -c '^bloquant-')" 30
+assert_rc "KS1 — les tâches rapides aussi" "$(printf '%s\n' "$SE" | grep -c '^quick-')" 20
+assert_rc "KS1 — les éléments différés aussi" "$(printf '%s\n' "$SE" | grep -c '^differe-')" 20
+refute "KS1 — les décisions (historique) ont quitté le STATE" "$SE" "decision-1 "
+assert "KS1 — ... et sont dans l'archive" "$(cat "$KE/.planning/archives/state/racine-STATE-$KD.md")" "decision-30"
+refute "KS1 — l'archive ne contient aucun sujet ouvert" "$(cat "$KE/.planning/archives/state/racine-STATE-$KD.md")" "todo-ouvert"
+assert "KS1 — toujours au-delà du budget : DÉPASSÉ dit, pas une seconde archive" "$OUT" "STATE DÉPASSÉ : $KE/.planning/STATE.md"
+kcommit "$KE"; TE="$(ktree "$KE" | cksum)"
+OUT="$(VF_STATE_BUDGET_KB=1 krun "$KE" --no-remote --archive state)"; RC=$?
+refute "KS2 — second passage : rien ARCHIVÉ" "$OUT" "ARCHIVÉ"
+assert_rc "KS2 — second passage : arbre identique (aucune archive -2, rien de re-déplacé)" "$([ "$(ktree "$KE" | cksum)" = "$TE" ] && echo 0 || echo 1)" 0
+assert "KS2 — le dépassement reste dit" "$OUT" "STATE DÉPASSÉ"
+assert_rc "KS2 — un seul pointeur dans le STATE" "$(grep -c '^<!-- vf-archive: ' "$KE/.planning/STATE.md")" 1
+# KT1-KT2 — TRANCHÉ n'est pas clos ; un <details> sans ✅ ni SHIPPED reste
+KT="$WORK_DIR/kt"; mk_repo "$KT"; mkdir -p "$KT/.planning"
+printf '# Backlog\n\n## Posture de protection — TRANCHÉ : phase dédiée à inscrire (2026-09-15)\ncorps tranché\n\n## Clos — CLOS (2026-01-02)\ncorps clos\n\n## Ouvert — DIFFÉRÉ\ncorps ouvert\n' > "$KT/.planning/BACKLOG.md"; kcommit "$KT"
+OUT="$(krun "$KT" --no-remote)"
+assert "KT1 — un seul sujet clos (TRANCHÉ n'en est pas un)" "$OUT" "ARCHIVABLE : $KT/.planning/BACKLOG.md porte 1 sujet(s) clos"
+OUT="$(krun "$KT" --no-remote --archive backlog)"
+assert "KT1 — un seul ARCHIVÉ (1 unité)" "$OUT" "(1 unité(s)"
+assert "KT1 — le sujet TRANCHÉ est resté au BACKLOG" "$(cat "$KT/.planning/BACKLOG.md")" "## Posture de protection — TRANCHÉ : phase dédiée à inscrire (2026-09-15)"
+refute "KT1 — ... et n'est pas dans l'archive" "$(cat "$KT/.planning/archives/backlog/racine-BACKLOG-$KD.md")" "Posture"
+KR2="$WORK_DIR/kr2"; mk_repo "$KR2"; mkdir -p "$KR2/.planning"
+det() { printf '<details>\n<summary>%s</summary>\n\n%s\n%s\n\n</details>\n\n' "$1" "corps de $2" "$(head -c 700 /dev/zero | tr '\0' 'x')"; }
+{ echo "# Roadmap"; echo; det "✅ jalon A -- SHIPPED" A; det "jalon B en cours" B; det "jalon C SHIPPED 2026-01-01" C; det "✅ jalon D clôturé" D; printf '<details>\nsans résumé\n</details>\n\n## Phases en cours\ncourant\n'; } > "$KR2/.planning/ROADMAP.md"; kcommit "$KR2"
+OUT="$(VF_ROADMAP_BUDGET_KB=1 krun "$KR2" --no-remote --archive roadmap)"
+assert "KT2 — les jalons portant ✅ ou SHIPPED sont archivés (3 unités)" "$OUT" "(3 unité(s)"
+SR2="$(cat "$KR2/.planning/ROADMAP.md")"; AR2="$(cat "$KR2/.planning/archives/roadmap/racine-ROADMAP-$KD.md")"
+assert "KT2 — le jalon sans ✅ ni SHIPPED reste, bloc entier" "$SR2" "corps de B"
+assert "KT2 — le bloc sans résumé reste aussi" "$SR2" "sans résumé"
+refute "KT2 — ... et aucun des deux n'est dans l'archive" "$AR2" "corps de B"
+assert "KT2 — A, C et D sont dans l'archive" "$AR2" "corps de D"
+assert_rc "KT2 — deux blocs <details> restent dans le ROADMAP" "$(printf '%s\n' "$SR2" | grep -c '^<details>')" 2
+# KW1-KW3 — compartiment de session : vf_ws_resolve (VF_WORKSTREAM, GSD_WORKSTREAM, puis le pointeur active-workstream)
+KV="$WORK_DIR/kv"; mk_part "$KV"; echo ws1 > "$KV/.planning/active-workstream"; kcommit "$KV"; T2V="$(ktree "$KV/.planning/workstreams/ws2" | cksum)"
+OUT="$(krun "$KV" --no-remote --auto)"
+assert "KW1 — sans variable, le pointeur active-workstream désigne la session : ws1 archivé" "$OUT" "ARCHIVÉ : .planning/workstreams/ws1/BACKLOG.md"
+assert_rc "KW1 — ws2 intact" "$([ "$(ktree "$KV/.planning/workstreams/ws2" | cksum)" = "$T2V" ] && echo 0 || echo 1)" 0
+KV2="$WORK_DIR/kv2"; mk_part "$KV2"; echo ws1 > "$KV2/.planning/active-workstream"; kcommit "$KV2"
+OUT="$(VF_WORKSTREAM=ws2 krun "$KV2" --no-remote --auto)"
+assert "KW2 — VF_WORKSTREAM passe avant le pointeur : ws2 archivé" "$OUT" "ARCHIVÉ : .planning/workstreams/ws2/BACKLOG.md"
+refute "KW2 — ... et ws1 non" "$OUT" "ARCHIVÉ : .planning/workstreams/ws1"
+KV3="$WORK_DIR/kv3"; mk_part "$KV3"; echo gouvernance > "$KV3/.planning/active-workstream"; kcommit "$KV3"; TV3="$(ktree "$KV3" | cksum)"
+OUT="$(krun "$KV3" --no-remote --auto)"
+assert "KW3 — pointeur sur gouvernance : ARCHIVAGE REFUSÉ, compartiment protégé" "$OUT" "ARCHIVAGE REFUSÉ : compartiment protégé gouvernance"
+assert_rc "KW3 — rien déplacé" "$([ "$(ktree "$KV3" | cksum)" = "$TV3" ] && echo 0 || echo 1)" 0
 # K15 — lecture seule de git/gh maintenue sous --archive/--auto (l'enveloppe n'a rien refusé) et verbes vus
 assert_rc "K15 — zéro refus de l'enveloppe git/gh sur toute la section K" "$(( $(grep -c '^VIOLATION' "$RO_LOG") - NVIOL_K0 ))" 0
 assert "K15 — témoin : l'archivage a bien appelé ls-files --error-unmatch via l'enveloppe" "$(grep -c '^OK git .*\[ls-files\] \[--error-unmatch\]' "$RO_LOG" | sed 's/^0$/jamais/; s/^[1-9][0-9]*$/vu/')" "vu"
@@ -663,7 +828,11 @@ tree_snap() { # <dir...> : noms, liens et octets de chaque arbre, dans un ordre 
     ( cd "$d" && { find . | LC_ALL=C sort; find . -type f | LC_ALL=C sort | while IFS= read -r f; do cksum "$f"; done; } )
   done
 }
-FIXTURES=("$LAB" "$MULTI" "$RG" "$RT" "$RD" "$RV" "$RH" "$RF" "$RL" "$RN" "$RU")
+# RA — sources ARCHIVABLES (sujets clos, STATE et ROADMAP au-delà du budget) mais sans --archive : le chemin par DÉFAUT
+# n'y touche pas (RO3 mesure l'arbre complet), à côté des fixtures qui n'ont rien à archiver.
+RA="$WORK_DIR/ra"; mk_repo "$RA"; bk_file "$RA/.planning/BACKLOG.md" 2 3; fill "$RA/.planning/STATE.md" 9
+{ echo "# Roadmap"; echo; echo "<details>"; echo "<summary>✅ jalon -- SHIPPED</summary>"; head -c 70000 /dev/zero | tr '\0' 'x'; echo; echo "</details>"; } > "$RA/.planning/ROADMAP.md"; kcommit "$RA"
+FIXTURES=("$LAB" "$MULTI" "$RG" "$RT" "$RD" "$RV" "$RH" "$RF" "$RL" "$RN" "$RU" "$RA")
 replay_all() { # rejoue TOUTES les fixtures, sous toutes les options et sous chaque comportement de gh
   local repo mode
   for repo in "${FIXTURES[@]}"; do
@@ -833,6 +1002,19 @@ NB9="$(grep -c '^# >>> vf-archive-writer$' "$CHECK")"; NE9="$(grep -c '^# <<< vf
 assert_rc "X9 — une seule ouverture de région exemptée du filet d'écriture" "$NB9" 1
 assert_rc "X9 — une seule fermeture" "$NE9" 1
 assert_rc "X9 — l'ouverture précède la fermeture" "$([ "$(grep -n '^# >>> vf-archive-writer$' "$CHECK" | cut -d: -f1)" -lt "$(grep -n '^# <<< vf-archive-writer$' "$CHECK" | cut -d: -f1)" ]; echo $?)" 0
+# ... et BORNÉE EN ÉTENDUE : au plus X9_MAX lignes et exactement les fonctions listées. Une exemption qui s'étendrait
+# (fermeture déplacée plus bas, fonction d'écriture ajoutée dans la région) doit rougir ici.
+X9_MAX=230; X9_FNS="archive_lock archive_one archive_one_locked archive_refuse archive_unlock src_unclean "
+x9_etendue() { # <script> : imprime ok, ou la raison
+  local f="$1" o c fns
+  o="$(grep -n '^# >>> vf-archive-writer$' "$f" | cut -d: -f1)"; c="$(grep -n '^# <<< vf-archive-writer$' "$f" | cut -d: -f1)"
+  [ -n "$o" ] && [ -n "$c" ] || { echo "marqueur absent"; return; }
+  [ $(( c - o - 1 )) -le "$X9_MAX" ] || { echo "région de $(( c - o - 1 )) lignes (borne $X9_MAX)"; return; }
+  fns="$(sed -n "${o},${c}p" "$f" | grep -oE '^[a-z_]+\(\) \{' | sed 's/() {//' | LC_ALL=C sort | tr '\n' ' ')"
+  [ "$fns" = "$X9_FNS" ] || { echo "fonctions de la région : $fns"; return; }
+  echo ok
+}
+assert "X9 — étendue : la région exemptée tient dans la borne et ne porte que les fonctions attendues" "$(x9_etendue "$CHECK")" "ok"
 
 
 echo ""
@@ -989,7 +1171,7 @@ assert "MU24 — la comparaison gh/origin tient seule : toujours NON VÉRIFIABLE
 # MU25-MU29 — mutants de l'archivage (K) : chacun rougit le cas K qu'il vise, pour la bonne raison
 # Un mutant vit dans $MUTD : la politique de compartiments (sourcée depuis le dossier du script) doit y être voisine.
 cp "$(pwd)/../planning-core/scripts/workstream-policy.sh" "$MUTD/workstream-policy.sh"
-K_OLD_CLOS='  return (w == "CLOS" || w == "RÉSORBÉ" || w == "TRANCHÉ" || w == "ADOPTÉ" || w == "ADOPTÉE")'
+K_OLD_CLOS='  return (w == "CLOS" || w == "RÉSORBÉ" || w == "ADOPTÉ" || w == "ADOPTÉE")'
 MU25="$(make_mutant mu25 "$K_OLD_CLOS" '  return 0')"; RM=$?
 assert_rc "MU25 opposable" "$RM" 0
 KX="$WORK_DIR/kx5"; mk_repo "$KX"; bk_file "$KX/.planning/BACKLOG.md" 3 2; kcommit "$KX"
@@ -1010,7 +1192,7 @@ assert_rc "MU27 opposable" "$RM" 0
 KX="$WORK_DIR/kx10"; mk_part "$KX"
 OUT="$(CHECK_UNDER="$MU27" krun "$KX" --no-remote --archive backlog --ws ws1)"
 kills "MU27 filtre --ws retiré : K10 rougit (ws2, non nommé, est archivé)" "$OUT" "ARCHIVÉ : .planning/workstreams/ws2/BACKLOG.md" "K10 — ws2 intact, constat seul"
-K_OLD_SES='    names="${GSD_WORKSTREAM:-}"'
+K_OLD_SES='      vf_ws_resolve "$ROOT/.planning"; names="${VF_WS_NAME:-}"'
 MU28="$(make_mutant mu28 "$K_OLD_SES" '    names="$(printf "%s\n" "$WS_DIRS" | awk "NF && !/gouvernance/ { n = \$0; sub(/.*\\//, \"\", n); print n }")"')"; RM=$?
 assert_rc "MU28 opposable" "$RM" 0
 KX="$WORK_DIR/kx12"; mk_part "$KX"
@@ -1022,6 +1204,59 @@ assert_rc "MU29 opposable" "$RM" 0
 KX="$WORK_DIR/kx13"; mk_part "$KX"
 OUT="$(GSD_WORKSTREAM=gouvernance CHECK_UNDER="$MU29" krun "$KX" --no-remote --auto)"
 kills "MU29 protection du compartiment retirée : K13 rougit (gouvernance est archivé)" "$OUT" "ARCHIVÉ : .planning/workstreams/gouvernance/BACKLOG.md" "K13 — ARCHIVAGE REFUSÉ, rien déplacé"
+
+# MU30-MU39 — mutants de la correction 41.3-03 : chacun rougit le cas qui le vise, pour la bonne raison
+MU30="$(make_mutant mu30 '  return (w == "CLOS" || w == "RÉSORBÉ" || w == "ADOPTÉ" || w == "ADOPTÉE")' '  return (w == "CLOS" || w == "RÉSORBÉ" || w == "TRANCHÉ" || w == "ADOPTÉ" || w == "ADOPTÉE")')"; RM=$?
+assert_rc "MU30 opposable" "$RM" 0
+KX="$WORK_DIR/kx30"; mk_repo "$KX"; mkdir -p "$KX/.planning"
+printf '# Backlog\n\n## Posture de protection — TRANCHÉ : phase dédiée à inscrire (2026-09-15)\ncorps tranché\n\n## Clos — CLOS (2026-01-02)\ncorps clos\n\n## Ouvert — DIFFÉRÉ\ncorps ouvert\n' > "$KX/.planning/BACKLOG.md"; kcommit "$KX"
+OUT="$(CHECK_UNDER="$MU30" krun "$KX" --no-remote)"
+kills "MU30 TRANCHÉ redevient clos : KT1 rougit (2 sujets dits clos au lieu de 1)" "$OUT" "porte 2 sujet(s) clos" "KT1 — un seul sujet clos"
+MU31="$(mut mu31 'function shipped(t) {' 'function shipped(t) { return 1 }')"; RM=$?
+assert_rc "MU31 opposable" "$RM" 0
+KX="$WORK_DIR/kx31"; mk_repo "$KX"; mkdir -p "$KX/.planning"; cp "$KR2/.planning/ROADMAP.md" "$KX/.planning/ROADMAP.md"; git -C "$KR2" show HEAD:.planning/ROADMAP.md > "$KX/.planning/ROADMAP.md"; kcommit "$KX"
+OUT="$(VF_ROADMAP_BUDGET_KB=1 CHECK_UNDER="$MU31" krun "$KX" --no-remote --archive roadmap)"
+kills "MU31 jalon non livré archivé comme les autres : KT2 rougit (5 unités au lieu de 3)" "$OUT" "(5 unité(s)" "KT2 — 3 unités"
+MU32="$(mut mu32 'function ishist(h) {' 'function ishist(h) { return 1 }')"; RM=$?
+assert_rc "MU32 opposable" "$RM" 0
+KX="$WORK_DIR/kx32"; mk_repo "$KX"; state_open_file "$KX/.planning/STATE.md"; kcommit "$KX"
+OUT="$(VF_STATE_BUDGET_KB=1 CHECK_UNDER="$MU32" krun "$KX" --no-remote --archive state)"; SX="$(cat "$KX/.planning/STATE.md")"
+kills_absent "MU32 toute section archivable : KS1 rougit (les todos ouverts ont quitté le STATE)" "$SX" "todo-ouvert-1 " "KS1 — les todos ouverts restent"
+MU33="$(make_mutant mu33 '  if (index($0, "<!-- vf-archive: ") == 1) { print; next }' '')"; RM=$?
+assert_rc "MU33 opposable" "$RM" 0
+KX="$WORK_DIR/kx33"; mk_repo "$KX"; state_open_file "$KX/.planning/STATE.md"; kcommit "$KX"
+OUT="$(state_two_pass "$MU33" "$KX")"
+kills "MU33 pointeur re-archivé : KS2 rougit (le second passage déplace encore le pointeur)" "$OUT" "ARCHIVÉ" "KS2 — second passage : rien ARCHIVÉ"
+MU34="$(mut mu34 '  if ! archive_lock; then' '  if false; then')"; RM=$?
+assert_rc "MU34 opposable" "$RM" 0
+KX="$WORK_DIR/kx34"; mk_repo "$KX"; bk_file "$KX/.planning/BACKLOG.md" 2 2; kcommit "$KX"
+SCRIPT_SAVE="$CHECK"; CHECK_UNDER="$MU34"; OUT="$(par3 "$KX" "$WORK_DIR/kx34")"; unset CHECK_UNDER
+BAD34=0; { [ "$(printf '%s\n' "$OUT" | grep -c 'ARCHIVAGE REFUSÉ')" -gt 0 ] || [ "$(printf '%s\n' "$OUT" | grep -c 'ARCHIVÉ :')" -ne 1 ] || [ "$(awk 'NR > 1' "$KX/.planning/archives/INDEX.tsv" 2>/dev/null | grep -c .)" -ne 1 ]; } && BAD34=1
+kills "MU34 verrou retiré : KC2 rougit (refus ou déplacements multiples sous trois passes simultanées)" "bad=$BAD34" "bad=1" "KC2 — exactement un ARCHIVÉ, aucun refus, une ligne d'INDEX"
+MU35="$(mut mu35 '  if ! cmp -s "$src" "$TMPD/snap"; then' '  if false; then')"; RM=$?
+assert_rc "MU35 opposable" "$RM" 0
+KX="$WORK_DIR/kx35"; mk_repo "$KX"; bk_file "$KX/.planning/BACKLOG.md" 2 2; kcommit "$KX"
+OUT="$(FAKE_GIT_APPEND="$KX/.planning/BACKLOG.md" CHECK_UNDER="$MU35" kshrun "$KX" --no-remote --archive backlog)"
+LOST35="$(grep -c '^ligne concurrente$' "$KX/.planning/BACKLOG.md")"
+kills "MU35 relecture de la source retirée : KC1 rougit (la ligne concurrente est écrasée)" "perdue=$((1 - LOST35))" "perdue=1" "KC1 — la ligne concurrente est encore dans la source"
+MU36="$(mut mu36 '  cmp -s "$TMPD/m0" "$TMPD/m1" || { archive_refuse' '  :')"; RM=$?
+assert_rc "MU36 opposable" "$RM" 0
+KX="$WORK_DIR/kx36"; mk_repo "$KX"; bk_file "$KX/.planning/BACKLOG.md" 2 2; kcommit "$KX"
+OUT="$(FAKE_AWK_LOSSY=new CHECK_UNDER="$MU36" kshrun "$KX" --no-remote --archive backlog)"
+kills "MU36 preuve multiset retirée : KM1 rougit (l'archivage avec perte de ligne est accepté)" "$OUT" "ARCHIVÉ : .planning/BACKLOG.md" "KM1 — preuve des lignes conservées en échec"
+MU37="$(mut mu37 '  cat "$TMPD/arch" > "$ROOT/$archrel" && cmp -s' '  cat "$TMPD/arch" > "$ROOT/$archrel" \')"; RM=$?
+assert_rc "MU37 opposable" "$RM" 0
+KX="$WORK_DIR/kx37"; mk_repo "$KX"; bk_file "$KX/.planning/BACKLOG.md" 2 2; kcommit "$KX"
+OUT="$(FAKE_CMP_FAIL=1 CHECK_UNDER="$MU37" kshrun "$KX" --no-remote --archive backlog)"
+kills "MU37 relecture de l'archive retirée : KM2 rougit (l'archive non relisible est acceptée)" "$OUT" "ARCHIVÉ : .planning/BACKLOG.md" "KM2 — archive non relisible"
+MU38="$(mut mu38 '      vf_ws_resolve "$ROOT/.planning"; names=' '      names="${GSD_WORKSTREAM:-}"; : ')"; RM=$?
+assert_rc "MU38 opposable" "$RM" 0
+KX="$WORK_DIR/kx38"; mk_part "$KX"; echo ws1 > "$KX/.planning/active-workstream"; kcommit "$KX"
+OUT="$(CHECK_UNDER="$MU38" krun "$KX" --no-remote --auto)"
+kills_absent "MU38 seule GSD_WORKSTREAM lue : KW1 rougit (le pointeur active-workstream est ignoré)" "$OUT" "ARCHIVÉ : .planning/workstreams/ws1/BACKLOG.md" "KW1 — ws1 archivé"
+MU39="$WORK_DIR/mu39.sh"
+awk '$0 == "# <<< vf-archive-writer" { next } { print } END { print "# <<< vf-archive-writer" }' "$CHECK" > "$MU39"
+kills_absent "MU39 fermeture de la région déplacée en fin de script : X9 rougit (l'exemption s'étend)" "$(x9_etendue "$MU39")" "ok" "X9 — étendue"
 
 # MW — mutants de l'ENVELOPPE : une enveloppe affaiblie laisse passer une écriture, RO4 le voit rougir
 WMUT="$WORK_DIR/wmut"

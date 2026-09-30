@@ -20,9 +20,10 @@
 #   VF_BUDGET_PR_LIMIT   nombre de PR mergées lues chez gh (défaut 200) ; l'atteindre = liste possiblement tronquée
 #   VF_BACKLOG_OPEN_BUDGET        sujets OUVERTS max d'un BACKLOG.md (défaut 20). Un sujet est un titre `## ` ;
 #                                 il est CLOS si le premier mot après le dernier " — " du titre est l'un de
-#                                 CLOS, RÉSORBÉ, TRANCHÉ, ADOPTÉ, ADOPTÉE (vocabulaire fermé). Un sujet clos ne
-#                                 compte pas dans le budget : il est ARCHIVABLE. 20 sujets = ce qu'un tri humain
-#                                 tient d'un regard ; au-delà le fichier n'est plus relu en entier.
+#                                 CLOS, RÉSORBÉ, ADOPTÉ, ADOPTÉE (vocabulaire fermé ; TRANCHÉ n'en fait PAS partie :
+#                                 une décision prise n'est pas un sujet livré). Un sujet clos ne compte pas dans le
+#                                 budget : il est ARCHIVABLE. 20 sujets = ce qu'un tri humain tient d'un regard ;
+#                                 au-delà le fichier n'est plus relu en entier.
 #   VF_MEMORY_INDEX_BUDGET_LINES  lignes max d'un MEMORY.md sous .claude/agent-memory/*/ et .claude/memory/
 #                                 (défaut 200) : au-delà, l'index n'est plus chargé en entier par le harnais.
 #   VF_ROADMAP_BUDGET_KB          taille max d'un ROADMAP.md (racine et compartiments), en Ko (défaut 64).
@@ -61,19 +62,26 @@
 #   --no-remote  ne consulte pas GitHub (aucun appel gh) : branches distantes non examinées.
 #   --archive <types>  ARCHIVE (déplace, ne supprime pas) ce qu'une règle décidable désigne ; types = liste
 #            explicite parmi backlog, state, roadmap (séparés par des virgules ; sans liste : rc 64). backlog :
-#            les sujets clos, toujours ; state : au-delà du budget, le contenu des sections hors Project Reference,
-#            Current Position et Session Continuity (frontmatter, titres et la ligne ^Phase: gardés) ; roadmap :
-#            au-delà du budget, les blocs <details>. La racine `.planning/` est toujours incluse ; un compartiment
+#            les sujets clos, toujours ; state : au-delà du budget, le contenu des seules sections d'HISTORIQUE
+#            (titre contenant historique, history, décisions, journal, performance metrics ou point du, sous-sections
+#            comprises ; jamais une section d'état ouvert : todos, blocages, différés, tâches rapides) ; frontmatter,
+#            titres, ligne ^Phase: et pointeurs déjà posés restent, un second passage ne déplace rien ; roadmap :
+#            au-delà du budget, les blocs <details> dont le résumé porte ✅ ou SHIPPED (un jalon non livré reste). La racine `.planning/` est toujours incluse ; un compartiment
 #            de workstream n'est archivé que s'il est nommé par --ws (répétable) ; un compartiment protégé
 #            (VF_ARCHIVE_PROTECTED_WS) rend 64. Une source modifiée ou non suivie par git : refus, rien écrit,
 #            rc 2. Destination `.planning/archives/<type>/<compartiment|racine>-<fichier>-<AAAA-MM-JJ>.md` :
 #            les blocs déplacés TELS QUELS, aucune ligne d'en-tête ni séparateur ajouté ; à leur place une ligne
 #            `<!-- vf-archive: <archive> -->` ; une ligne de `.planning/archives/INDEX.tsv` (date, type, source,
 #            archive, ref = blob d'origine, motif). JAMAIS de commit ni de `git add` : le déplacement se voit au
-#            `git status`. L'archive est écrite et relue AVANT toute modification de la source.
+#            `git status`. L'archive est écrite et relue AVANT toute modification de la source. Verrou exclusif
+#            `.planning/.archive.lock` (mkdir atomique, attente VF_ARCHIVE_LOCK_WAIT dixièmes de seconde, défaut 100 ;
+#            jamais de reprise automatique d'un verrou : refus qui nomme le pid) ; la source est relue juste avant
+#            son remplacement et doit être identique à ce qui a été décidé, sinon refus bruyant, archive et ligne
+#            d'INDEX retirées, source intacte : aucune perte silencieuse d'une écriture concurrente.
 #            RESTAURER : `git cat-file blob <ref de l'INDEX>` restitue la source d'avant l'archivage.
 #   --auto   décision ET exécution, pour le geste de fin (clôture de mission, fin de travail direct) : mêmes règles,
-#            types = ceux qui ont de l'archivable ; compartiments = --ws répétés, sinon $GSD_WORKSTREAM. Dépôt
+#            types = ceux qui ont de l'archivable ; compartiments = --ws répétés, sinon celui de la session, résolu par
+#            vf_ws_resolve (VF_WORKSTREAM, GSD_WORKSTREAM, puis le pointeur .planning/active-workstream). Dépôt
 #            partitionné (.planning/workstreams) et aucun compartiment résolu : ARCHIVAGE NON TENTÉ, rien déplacé.
 #            Compartiment protégé ou source non commitée : ARCHIVAGE REFUSÉ, rien déplacé, rc inchangé (jamais 2).
 #            L'archivage précède les mesures : une exécution rend l'état d'après.
@@ -179,7 +187,7 @@ function isclosed(t,   n, p, w) {
   n = split(t, p, " — ")
   if (n < 2) return 0
   w = p[n]; sub(/^[ \t]+/, "", w); sub(/[ \t(:,;.].*$/, "", w)
-  return (w == "CLOS" || w == "RÉSORBÉ" || w == "TRANCHÉ" || w == "ADOPTÉ" || w == "ADOPTÉE")
+  return (w == "CLOS" || w == "RÉSORBÉ" || w == "ADOPTÉ" || w == "ADOPTÉE")
 }
 function isfence(l) { return (l ~ /^(```|~~~)/) }
 function sanit(t) { gsub(/--/, "-", t); return t }
@@ -228,17 +236,21 @@ function flushb(   i) {
 END { flushb(); print n + 0 > CNT }
 '
 AWK_STATE_ARCHIVE="$AWK_COMMON"'
-BEGIN { keep = 1 }
+function ishist(h) { return (tolower(h) ~ /historique|history|d..?cisions|decisions|journal|performance metrics|point du/) }
+BEGIN { hist = 0; hlev = 0 }
 NR == 1 && /^---[ \t]*$/ { fm = 1; print; next }
 fm == 1 { print; if ($0 ~ /^---[ \t]*$/) fm = 2; next }
 {
   if (isfence($0)) fence = !fence
   else if (!fence && $0 ~ /^#+ /) {
     print
-    if ($0 ~ /^# /) keep = 1; else keep = (tolower($0) ~ /project reference|current position|session continuity/)
+    match($0, /^#+/); lev = RLENGTH
+    if (lev == 1) hist = 0
+    else if (!(hist && lev > hlev)) { hist = ishist($0); hlev = lev }
     ptr = 0; next
   }
-  if (keep || $0 ~ /^[ \t]*$/ || $0 ~ /^Phase:/) { print; next }
+  if (!hist || $0 ~ /^[ \t]*$/ || $0 ~ /^Phase:/) { print; next }
+  if (index($0, "<!-- vf-archive: ") == 1) { print; next }
   if (!ptr) { print "<!-- vf-archive: " ARCHREL " -->"; ptr = 1 }
   print > ARCH; n++
 }
@@ -246,9 +258,12 @@ END { print n + 0 > CNT }
 '
 AWK_ROADMAP_ARCHIVE="$AWK_COMMON"'
 function chk(l,   m) { if (sum == "" && match(l, /<summary>.*<\/summary>/)) sum = substr(l, RSTART + 9, RLENGTH - 19) }
+function shipped(t) { return (t ~ /✅/ || t ~ /SHIPPED/) }
 function flushd(   i) {
-  for (i = 1; i <= nb; i++) print buf[i] > ARCH
-  n++; print "<!-- vf-archive: " ARCHREL " — " sanit(sum == "" ? "bloc replie" : sum) " -->"
+  if (shipped(sum)) {
+    for (i = 1; i <= nb; i++) print buf[i] > ARCH
+    n++; print "<!-- vf-archive: " ARCHREL " — " sanit(sum) " -->"
+  } else for (i = 1; i <= nb; i++) print buf[i]
   nb = 0; sum = ""
 }
 {
@@ -272,7 +287,21 @@ END { for (i = 1; i <= nb && depth > 0; i++) print buf[i]; print n + 0 > CNT }
 # autres modes est prouvée par exécution (RO1-RO5). Verbes git employés ici : rev-parse, ls-files (lecture).
 ARCHIVE_REFUSED=0
 TMPD=""
-trap '[ -n "$TMPD" ] && rm -rf "$TMPD"' EXIT
+ARCHIVE_LOCK=""
+archive_unlock() { [ -n "$ARCHIVE_LOCK" ] && rm -rf "$ARCHIVE_LOCK"; ARCHIVE_LOCK=""; return 0; }
+trap '[ -n "$TMPD" ] && rm -rf "$TMPD"; archive_unlock' EXIT
+archive_lock() { # rend 0 verrou pris, 1 sinon (attente bornee) ; le pid du detenteur est lu dans LOCK_HOLDER
+  local d="$ROOT/.planning/.archive.lock" waited=0 max="${VF_ARCHIVE_LOCK_WAIT:-100}"
+  case "$max" in ''|*[!0-9]*) max=100 ;; esac
+  LOCK_HOLDER=""
+  while ! mkdir "$d" 2>/dev/null; do
+    LOCK_HOLDER=$(cat "$d/pid" 2>/dev/null)
+    waited=$((waited + 1)); [ "$waited" -le "$max" ] || return 1
+    sleep 0.1
+  done
+  ARCHIVE_LOCK="$d"; printf '%s\n' "$$" > "$d/pid"
+  return 0
+}
 src_unclean() { # <chemin relatif a ROOT> : imprime la raison et rend 0 si la source N est PAS archivable
   local rel="$1" h i
   git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || { echo "$ROOT n'est pas un dépôt git"; return 0; }
@@ -287,9 +316,20 @@ archive_refuse() { # <message> : un refus ne perd rien ; explicite = rc 2 en fin
   ARCHIVE_REFUSED=1
   flag "ARCHIVAGE REFUSÉ : $1"
 }
-archive_one() { # <type> <label> <fichier absolu> <nom du fichier>
-  local type="$1" label="$2" src="$3" base="$4" rel bytes n why arch archrel i ref motif
+archive_one() { # <type> <label> <fichier absolu> <nom du fichier> : sous verrou exclusif, un archivage à la fois
+  local src="$3" rel="${3#"$ROOT"/}" why
   [ -f "$src" ] && [ -r "$src" ] || return 0
+  if ! archive_lock; then
+    why="verrou d archivage tenu (${ROOT}/.planning/.archive.lock, attente épuisée), rien déplacé"
+    [ -z "$LOCK_HOLDER" ] || why="verrou d archivage tenu par le processus $LOCK_HOLDER (${ROOT}/.planning/.archive.lock, attente épuisée), rien déplacé ; sans ce processus, supprimer le dossier"
+    archive_refuse "${rel} : ${why}"
+    return 0
+  fi
+  archive_one_locked "$@"
+  archive_unlock
+}
+archive_one_locked() { # <type> <label> <fichier absolu> <nom du fichier>
+  local type="$1" label="$2" src="$3" base="$4" rel bytes n why arch archrel i ref motif idx had
   # Chemin relatif à la racine : les compartiments sont énumérés en chemins ABSOLUS, même sous --root .
   case "$src" in
     "$ROOT"/*) rel="${src#"$ROOT"/}" ;;
@@ -307,25 +347,34 @@ archive_one() { # <type> <label> <fichier absolu> <nom du fichier>
   archrel=".planning/archives/$type/${label}-${base}-${ARCHIVE_DATE}.md"
   i=1; while [ -e "$ROOT/$archrel" ]; do i=$((i + 1)); archrel=".planning/archives/$type/${label}-${base}-${ARCHIVE_DATE}-${i}.md"; done
   : > "$TMPD/cnt"; : > "$TMPD/arch"
+  # La décision porte sur un INSTANTANÉ de la source ; le remplacement n'a lieu que si la source lui est encore identique.
+  cp "$src" "$TMPD/snap" || { archive_refuse "${rel} : lecture impossible (copie de travail en échec)"; UNVERIFIABLE=1; return 0; }
   local prog
   case "$type" in backlog) prog="$AWK_BACKLOG_ARCHIVE" ;; state) prog="$AWK_STATE_ARCHIVE" ;; roadmap) prog="$AWK_ROADMAP_ARCHIVE" ;; esac
-  LC_ALL=C awk -v ARCH="$TMPD/arch" -v ARCHREL="$archrel" -v CNT="$TMPD/cnt" "$prog" "$src" > "$TMPD/new" \
+  LC_ALL=C awk -v ARCH="$TMPD/arch" -v ARCHREL="$archrel" -v CNT="$TMPD/cnt" "$prog" "$TMPD/snap" > "$TMPD/new" \
     || { archive_refuse "${rel} : lecture impossible (awk en échec)"; UNVERIFIABLE=1; return 0; }
   n=$(cat "$TMPD/cnt"); case "$n" in ''|*[!0-9]*) n=0 ;; esac
   [ "$n" -gt 0 ] || return 0
   if why=$(src_unclean "$rel"); then archive_refuse "$rel $why, rien déplacé"; return 0; fi
   # Preuve avant toute écriture : les lignes de la source = celles de la source allégée (hors pointeurs) + l'archive.
   { awk 'index($0, "<!-- vf-archive: ") != 1' "$TMPD/new"; cat "$TMPD/arch"; } | LC_ALL=C sort > "$TMPD/m1"
-  LC_ALL=C sort "$src" > "$TMPD/m0"
+  LC_ALL=C sort "$TMPD/snap" > "$TMPD/m0"
   cmp -s "$TMPD/m0" "$TMPD/m1" || { archive_refuse "$rel : preuve des lignes conservées en échec, rien déplacé"; return 0; }
   ref=$(git -C "$ROOT" rev-parse "HEAD:./$rel" 2>/dev/null) || { archive_refuse "$rel : blob d'origine illisible, rien déplacé"; return 0; }
   mkdir -p "$ROOT/.planning/archives/$type" || { archive_refuse "$rel : dossier d'archive impossible"; return 0; }
   cat "$TMPD/arch" > "$ROOT/$archrel" && cmp -s "$ROOT/$archrel" "$TMPD/arch" \
     || { rm -f "$ROOT/$archrel"; archive_refuse "$rel : archive non relisible, rien déplacé"; return 0; }
-  if [ ! -s "$ROOT/.planning/archives/INDEX.tsv" ]; then
-    printf 'date\ttype\tsource\tarchive\tref\tmotif\n' > "$ROOT/.planning/archives/INDEX.tsv"
+  idx="$ROOT/.planning/archives/INDEX.tsv"
+  if [ -s "$idx" ]; then had=1; cp "$idx" "$TMPD/idx.prev"; else had=0; printf 'date\ttype\tsource\tarchive\tref\tmotif\n' > "$idx"; fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ARCHIVE_DATE" "$type" "$rel" "$archrel" "$ref" "$motif" >> "$idx"
+  # Dernière vérification, juste avant le remplacement : une écriture concurrente sur la source n'est jamais écrasée.
+  if ! cmp -s "$src" "$TMPD/snap"; then
+    rm -f "$ROOT/$archrel"
+    if [ "$had" -eq 1 ]; then cat "$TMPD/idx.prev" > "$idx"; else rm -f "$idx"; fi
+    rmdir "$ROOT/.planning/archives/$type" "$ROOT/.planning/archives" 2>/dev/null
+    archive_refuse "$rel : la source a changé pendant l'archivage (écriture concurrente), rien déplacé, archive et ligne d'INDEX retirées"
+    return 0
   fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ARCHIVE_DATE" "$type" "$rel" "$archrel" "$ref" "$motif" >> "$ROOT/.planning/archives/INDEX.tsv"
   cat "$TMPD/new" > "$src"
   flag "ARCHIVÉ : ${rel} → ${archrel} (${n} unité(s), blob d'origine ${ref:0:8}, restaurer : git cat-file blob ${ref})"
 }
@@ -374,9 +423,13 @@ archive_pass() {
   local names nm dir found t label file base targets types line
   names="$WS_NAMED"
   if [ "$AUTO" -eq 1 ] && [ -z "${names//[$'\n ']/}" ]; then
-    names="${GSD_WORKSTREAM:-}"
+    if [ -e "$ROOT/.planning/workstreams" ] && command -v vf_ws_resolve >/dev/null 2>&1; then
+      vf_ws_resolve "$ROOT/.planning"; names="${VF_WS_NAME:-}"
+    else
+      names="${GSD_WORKSTREAM:-}"
+    fi
     if [ -z "$names" ] && [ -e "$ROOT/.planning/workstreams" ]; then
-      flag "ARCHIVAGE NON TENTÉ : compartiment de session non résolu (aucun --ws, GSD_WORKSTREAM vide) sur un dépôt partitionné, rien déplacé"
+      flag "ARCHIVAGE NON TENTÉ : compartiment de session non résolu (aucun --ws, ni VF_WORKSTREAM, GSD_WORKSTREAM ou pointeur active-workstream) sur un dépôt partitionné, rien déplacé"
       return 0
     fi
   fi
