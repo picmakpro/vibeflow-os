@@ -340,6 +340,31 @@ def lire_frontmatter_fichier(chemin):
     return lire_frontmatter(texte)
 
 
+# --- Registre de cadrage : copie ast-identique de `lire_registre` du moteur de recalcul (45-06) ------
+# G1 lit l'état que la 44 dérive déjà, avec la MÊME grammaire : un contrôle croisé de la suite des gates compare
+# les arbres de syntaxe (R-REGISTRE) et rougit à la moindre divergence.
+def lire_registre(donnees_cadrage):
+    """(registre_ok, registre_clos) depuis le frontmatter DÉJÀ analysé de CADRAGE.md. Φ3 : registre
+    absent ou mal formé (structurante hors oui/non, ligne qui n'est pas un mapping) -> registre_ok
+    faux (`registre-invalide`). Lecture littérale spec §3.1 l.213 : TOUTE valeur non vide de
+    `statut` ferme la ligne, quelle qu'elle soit — jamais une liste fermée, jamais un jugement de
+    la valeur elle-même. `inconnues: []` est clos."""
+    inconnues = donnees_cadrage.get("inconnues")
+    if not isinstance(inconnues, list):
+        return (False, False)
+    clos = True
+    for item in inconnues:
+        if not isinstance(item, dict):
+            return (False, False)
+        structurante = item.get("structurante")
+        if structurante not in ("oui", "non"):
+            return (False, False)
+        statut = item.get("statut")
+        if structurante == "oui" and not (isinstance(statut, str) and statut.strip()):
+            clos = False
+    return (True, clos)
+
+
 # --- Plans ouverts et référentiel de G2 -------------------------------------------------------
 NOM_UNITE = re.compile(r"^[0-9]{2,}-[\w.-]+$")
 
@@ -928,8 +953,20 @@ def unite_de_plan(composants):
     return composants[:5]  # g1-phase
 
 
+def _ids_ouverts(donnees):
+    """Identifiants des lignes structurantes sans statut du registre (même critère que `lire_registre`) ; `?` si la
+    ligne n'en porte pas."""
+    ids = []
+    for item in donnees.get("inconnues", []):
+        if item.get("structurante") == "oui" and not (isinstance(item.get("statut"), str) and item.get("statut").strip() != ""):
+            ids.append(item["id"] if isinstance(item.get("id"), str) and item["id"] != "" else "?")
+    return ids
+
+
 def evaluer_g1(contexte):
-    """G1 (GATE-06) : écriture par Write ou Edit d'un PLAN.md de forme modèle dans une phase sans CADRAGE.md."""
+    """G1 (GATE-06) : écriture par Write ou Edit d'un PLAN.md de forme modèle dans une phase sans CADRAGE.md ou dont
+    le registre porte au moins une ligne `structurante: oui` sans statut (toute valeur non vide ferme la ligne,
+    `inconnues: []` est clos — la valeur du statut n'est jamais jugée, spec §3.1)."""
     if contexte["outil"] not in ("Write", "Edit") or not contexte["ecrit"]:
         return []
     racine = contexte["racine"]
@@ -943,7 +980,21 @@ def evaluer_g1(contexte):
     cadrage = os.path.join(racine, *dossier_phase) + os.sep + "CADRAGE.md"
     if not os.path.lexists(cadrage):  # g1-cadrage
         return [Verdict("G1", chemin_rel, "la phase %s n'a pas de CADRAGE.md — cadrez avant de planifier (spec §5)" % phase)]
-    return []
+    # F5 = f5-etats (P45-D-21a) : un CADRAGE.md que le modèle ne peut pas lire (non régulier — dossier, lien, autre
+    # type —, frontmatter invalide, registre invalide ou format hérité sans clé `inconnues:`) est un état
+    # INDÉTERMINÉ : le modèle ne l'interdit pas, G1 ne le refuse jamais (limite T-45-55, nommée et acceptée).
+    if not est_fichier_regulier(cadrage):
+        return []
+    statut, donnees = lire_frontmatter_fichier(cadrage)
+    if statut != "ok":
+        return []
+    registre_ok, registre_clos = lire_registre(donnees)
+    if not registre_ok:  # g1-bord
+        return []
+    if registre_clos:  # g1-ouvert
+        return []
+    return [Verdict("G1", chemin_rel, "le registre de CADRAGE.md de la phase %s porte des lignes structurantes sans statut (%s) — "
+                                      "tranchez-les avant de planifier (spec §5)" % (phase, ", ".join(_ids_ouverts(donnees))))]
 
 
 # Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un

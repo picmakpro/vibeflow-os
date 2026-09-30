@@ -20,7 +20,11 @@
 #                 joué, sa ligne COMPTE porte `hors-etape` ; les gates `-` et `?` restent comptés
 #   R-REJEU-G6G5  constructeurs G6 et G5 (45-05) : le vrai hook armé à l'étape 1 sur deux labs synthétiques, une
 #                 ligne par clé, le constructeur G6 prime sur la réécriture générique, faux-refus=0 faux-accept=0
-#   R-REJEU-STATIQUE  aucun sous-processus autre que bash sur le hook copié et cmp
+#   R-REJEU-G1    constructeur G1 (45-06) : attendu du modèle, refus conformes comptés à part, classification
+#                 totale (règle écrite, CLASSE-REGLE-ECRITE), code propre de l'outil (aucun appel au hook)
+#   R-REJEU-G1-CONCORDANCE  test différentiel sur 64 cellules générées (itertools.product) : attendu du relevé
+#                 <=> deny du vrai hook <=> oracle de huit lignes ; somme des n = 26
+#   R-REJEU-STATIQUE  aucun sous-processus autre que bash (hook copié, recalc-planning.sh) et cmp
 #   R-REEL-01..04  rejeu-reel.sh : empreinte de TOUT l'arbre par un geste extérieur, liens non suivis,
 #                  aucune commande de gestionnaire de versions
 #   MUT-*  douze mutants (motif unique, texte distinct, bash -n, compilation) : chaque garde rougit
@@ -66,6 +70,7 @@ cat > "$AIDES" <<'PY_AIDES_REJEU_EOF'
 import ast
 import hashlib
 import importlib.util
+import itertools
 import json
 import os
 import re
@@ -476,10 +481,11 @@ def sec_reel_hook(_):
     """R-REJEU-06 et R-REJEU-07."""
     neutre = fabriquer_lab("lab-neutre", {".planning/notes.md": "n", "livrables/rapport.md": "r"})
     r = rejeu([neutre], hook=None, etape=1)
-    if r.rc == 0 and r.compte.get("G6") == (0, 0, 0) and r.compte.get("G5") == (0, 0, 0) and r.etape == (0, 0, 0):
-        ok("R-REJEU-06 planning-hook.sh frère, --etape=1, lab neutre (config, notes.md, livrables/) : faux-refus=0 faux-accept=0 quel que soit le contenu du hook frère")
+    if r.rc == 0 and r.compte.get("G6") == (0, 0, 0) and r.compte.get("G5") == (0, 0, 0) and r.etape == (0, 0, 0) \
+            and r.compte.get("G1") == (0, 2, 0) and "G1" in r.hors_etape:
+        ok("R-REJEU-06 planning-hook.sh frère, --etape=1, lab neutre (config, notes.md, livrables/) : faux-refus=0 faux-accept=0 pour G6 et G5 ; les deux phases synthétiques du constructeur G1 (joué, G1 en observe) passent : COMPTE G1 … faux-accept=2 hors-etape, hors du total REJEU-ETAPE-1 (0, 0, 0)")
     else:
-        ko("R-REJEU-06", "hook réel sur un lab neutre", "REJEU-ETAPE-1 (0, 0, 0), code 0", "rc=%d etape=%s compte=%s err=%s" % (r.rc, r.etape, r.compte, court(r.err)))
+        ko("R-REJEU-06", "hook réel sur un lab neutre", "REJEU-ETAPE-1 (0, 0, 0), COMPTE G1 (0, 2, 0) hors-etape, code 0", "rc=%d etape=%s compte=%s hors=%s err=%s" % (r.rc, r.etape, r.compte, sorted(r.hors_etape), court(r.err)))
 
     lab7 = fabriquer_lab("lab-d7", {".planning/notes.md": "n"})
     sub7 = substitut("sub-ecrit.sh", 'open(%r, "w").write("intrus")' % os.path.join(lab7, ".planning", "intrus.md"))
@@ -680,6 +686,8 @@ def sec_etape(_):
 
 
 FICHIERS_G6G5 = {".planning/STATE.md": "s", ".planning/INDEX.md": "i", ".planning/cloture.log": "c",
+                 ".planning/cycles/01-c/CYCLE.md": "---\ntitre: t\nrend: r\n---\n",
+                 ".planning/cycles/01-c/phases/01-p/CADRAGE.md": "---\ninconnues: []\n---\n",
                  ".planning/cycles/01-c/phases/01-p/PLAN.md": "---\necrit: livrables/a.md\n---\n"}
 ATTENDUS_G6G5 = (  # (chemin affiché, attendu, obtenu) d'un lab de FICHIERS_G6G5 ; les clés d'un lab sont DISTINCTES
     (".planning/STATE.md", "doit-refuser", "refus"), (".planning/INDEX.md", "doit-refuser", "refus"),
@@ -687,7 +695,12 @@ ATTENDUS_G6G5 = (  # (chemin affiché, attendu, obtenu) d'un lab de FICHIERS_G6G
     (".planning/.recalc-cache.json", "doit-refuser", "refus"),
     (".planning/config.json", "doit-passer", "passe"), (".planning/config.json [Edit]", "doit-refuser", "refus"),
     (".planning/cycles/01-c/phases/01-p/PLAN.md", "doit-passer", "passe"),
-    (".planning/cycles/01-c/phases/01-p/VERDICT.md", "doit-refuser", "refus"))
+    (".planning/cycles/01-c/phases/01-p/VERDICT.md", "doit-refuser", "refus"),
+    # 45-06 : la phase est cadrée selon le modèle (CYCLE.md, CADRAGE.md clos) ; le constructeur G1 est joué à --etape=1, G1 simulé
+    # en observe : ses deux phases synthétiques (doit-refuser) obtiennent un passage, compté hors-etape
+    (".planning/cycles/01-c/CYCLE.md", "doit-passer", "passe"), (".planning/cycles/01-c/phases/01-p/CADRAGE.md", "doit-passer", "passe"),
+    (".planning/cycles/01-c/phases/99-rejeu-sans-cadrage/PLAN.md", "doit-refuser", "passe"),
+    (".planning/cycles/01-c/phases/99-rejeu-registre-ouvert/PLAN.md", "doit-refuser", "passe"))
 
 
 def scenario_g6g5(script):
@@ -717,11 +730,291 @@ def sec_g6g5(_):
             fautes.append("%s : clé en double %s" % (lab, sorted(c for c in set(cles) if cles.count(c) > 1)))
     if r.compte.get("G6") != (0, 0, 0) or r.compte.get("G5") != (0, 0, 0) or r.etape != (0, 0, 0):
         fautes.append("comptes G6=%s G5=%s etape=%s (attendu 0, 0, 0)" % (r.compte.get("G6"), r.compte.get("G5"), r.etape))
+    if r.compte.get("G1") != (0, 4, 0) or "G1" not in r.hors_etape:
+        fautes.append("COMPTE G1 %s hors=%s (attendu (0, 4, 0) hors-etape : deux phases synthétiques par lab, G1 simulé en observe)" % (r.compte.get("G1"), sorted(r.hors_etape)))
     if fautes:
         for f in fautes:
             ko("R-REJEU-G6G5", "constructeurs G6 et G5 + vrai hook armé à l'étape 1, deux labs synthétiques", "une ligne par clé distincte, faux-refus=0 faux-accept=0", f)
     else:
-        ok("R-REJEU-G6G5 vrai hook, --etape=1, deux labs synthétiques : chaque fichier protégé (STATE.md, INDEX.md, cloture.log, journal de dérogation, cache) UNE fois en doit-refuser/refus (le constructeur G6 prime sur la réécriture générique), config.json et PLAN.md UNE fois en doit-passer/passe, l'Edit qui perd l'adhésion et le VERDICT.md voisin en doit-refuser/refus ; 9 lignes par lab = 9 clés distinctes ; faux-refus=0 faux-accept=0")
+        ok("R-REJEU-G6G5 vrai hook, --etape=1, deux labs synthétiques : chaque fichier protégé (STATE.md, INDEX.md, cloture.log, journal de dérogation, cache) UNE fois en doit-refuser/refus (le constructeur G6 prime sur la réécriture générique), config.json et PLAN.md UNE fois en doit-passer/passe, l'Edit qui perd l'adhésion et le VERDICT.md voisin en doit-refuser/refus ; le constructeur G1 est joué (CYCLE.md et CADRAGE.md en doit-passer, deux phases synthétiques en doit-refuser/passe, COMPTE G1 hors-etape) ; 13 lignes par lab = 13 clés distinctes ; faux-refus=0 faux-accept=0 pour G6 et G5, REJEU-ETAPE-1 à 0")
+
+
+# --- 45-06 : G1, constructeur du rejeu (R-REJEU-G1) et concordance règle écrite / prédicat (R-REJEU-G1-CONCORDANCE) ------
+CLOS_G1 = '---\ninconnues:\n  - id: I-01\n    question: "Q ?"\n    structurante: oui\n    statut: ARBITRÉ\n    par: willy\n    le: "2026-09-30"\n    ou: "session"\n---\n'
+OUVERT_G1 = '---\ninconnues:\n  - id: I-01\n    question: "Q ?"\n    structurante: oui\n---\n'
+HERITE_G1 = "---\ntitre: ancien cadrage sans registre\n---\n"
+CYCLE_G1 = "---\ntitre: t\nrend: r\n---\n"
+PLAN_G1 = "---\necrit: livrables/a.md\n---\n"
+PH = ".planning/cycles/01-c/phases/"
+
+# Substitut de hook qui joue G1 (armé sur la copie) : pas de CADRAGE.md, ou registre ouvert ; la phase d'un plan sous plans/ est la phase.
+SUB_G1_PRED = "\n".join([
+    'if ARMEMENT_G1 == "armed" and chemin.endswith("/PLAN.md"):',
+    '    d = os.path.dirname(chemin)',
+    '    if os.path.basename(os.path.dirname(d)) == "plans":',
+    '        d = os.path.dirname(os.path.dirname(d))',
+    '    cad = os.path.join(d, "CADRAGE.md")',
+    '    if not os.path.lexists(cad):',
+    '        refuser("G1", "phase sans CADRAGE.md")',
+    '    if os.path.isfile(cad) and "structurante: oui" in open(cad, encoding="utf-8").read() and "statut" not in open(cad, encoding="utf-8").read():',
+    '        refuser("G1", "registre ouvert")',
+    ''])
+
+
+def sub_g1(nom, refuse_aussi=()):
+    corps = SUB_G1_PRED
+    for morceau in refuse_aussi:
+        corps += 'if ARMEMENT_G1 == "armed" and chemin.endswith("/PLAN.md") and %r in chemin:\n    refuser("G1", "refuse aussi une phase cadrée")\n' % morceau
+    return substitut(nom, corps)
+
+
+def lab_g1_modele(nom):
+    """Lab non migré à cycle avec CYCLE.md : sans CADRAGE.md, registre ouvert, clos, hérité, plan sous plans/ sans CADRAGE.md."""
+    return fabriquer_lab(nom, {
+        PH[:-7] + "CYCLE.md": CYCLE_G1,
+        PH + "01-sans/PLAN.md": PLAN_G1,
+        PH + "02-ouvert/CADRAGE.md": OUVERT_G1, PH + "02-ouvert/PLAN.md": PLAN_G1,
+        PH + "03-clos/CADRAGE.md": CLOS_G1, PH + "03-clos/PLAN.md": PLAN_G1,
+        PH + "04-herite/CADRAGE.md": HERITE_G1, PH + "04-herite/PLAN.md": PLAN_G1,
+        PH + "05-plans/plans/01-a/PLAN.md": PLAN_G1})
+
+
+def lab_g1_classe(nom):
+    """Quatre phases classées par la règle écrite (l'état dérivé manque) : D (cycle sans CYCLE.md, sans CADRAGE.md), E (Φ1 par une
+    AUTRE entrée non régulière, sans CADRAGE.md), F (même Φ1, CADRAGE.md clos), H (CADRAGE.md est un dossier)."""
+    lab = fabriquer_lab(nom, {
+        PH[:-7] + "CYCLE.md": CYCLE_G1,
+        ".planning/cycles/02-x/phases/01-d/PLAN.md": PLAN_G1,
+        PH + "05-e/PLAN.md": PLAN_G1,
+        PH + "06-f/PLAN.md": PLAN_G1, PH + "06-f/CADRAGE.md": CLOS_G1,
+        PH + "07-h/PLAN.md": PLAN_G1})
+    for rel in (PH + "05-e/CLOTURE.md", PH + "06-f/CLOTURE.md", PH + "07-h/CADRAGE.md"):
+        os.makedirs(os.path.join(lab, rel))
+    return lab
+
+
+def par_chemin(r, aff):
+    return dict((l[2], l) for l in r.lignes if l[1] == aff)
+
+
+def sec_g1(_):
+    """R-REJEU-G1."""
+    fautes = []
+    # (a) vrai hook armé à l'étape 2, lab non migré : l'attendu du modèle, phase par phase
+    lab = lab_g1_modele(unique("lab-g1m"))
+    aff = "~/" + os.path.basename(lab)
+    r = rejeu([lab], hook=HOOK, etape=2)
+    lignes = par_chemin(r, aff)
+    attendus = {PH + "01-sans/PLAN.md": ("doit-refuser-modele", "refus"), PH + "02-ouvert/PLAN.md": ("doit-refuser-modele", "refus"),
+                PH + "03-clos/PLAN.md": ("doit-passer", "passe"), PH + "04-herite/PLAN.md": ("doit-passer", "passe"),
+                PH + "05-plans/plans/01-a/PLAN.md": ("doit-refuser-modele", "refus"),
+                PH + "99-rejeu-sans-cadrage/PLAN.md": ("doit-refuser", "refus"), PH + "99-rejeu-registre-ouvert/PLAN.md": ("doit-refuser", "refus")}
+    for chemin, (attendu, obtenu) in attendus.items():
+        l = lignes.get(chemin)
+        if l is None or (l[3], l[4]) != (attendu, obtenu):
+            fautes.append("(a) %s : attendu %s/%s, obtenu %s" % (chemin, attendu, obtenu, None if l is None else (l[3], l[4])))
+    if r.compte.get("G1") != (0, 0, 3) or r.etape != (0, 0, 3) or r.classe.get(("G1", aff)) != 0 or "G1" in r.hors_etape:
+        fautes.append("(a) G1=%s etape=%s classe=%s (attendu (0, 0, 3) : trois refus conformes au modèle, phase par phase ; n=0)" % (r.compte.get("G1"), r.etape, r.classe))
+    # (b) un substitut qui refuse AUSSI la phase à CADRAGE.md clos : faux refus, jamais un refus conforme
+    r = rejeu([lab], hook=sub_g1(unique("sub") + ".sh", ("/03-clos/",)), etape=2, scenario="")
+    if r.compte.get("G1") != (1, 0, 3):
+        fautes.append("(b) substitut qui refuse aussi la phase à CADRAGE.md clos : attendu G1 (1, 0, 3), obtenu %s" % (r.compte.get("G1"),))
+    # (c) classification totale (P45-D-21c) : D, E, F, H sont classées par la règle écrite
+    lab_c = lab_g1_classe(unique("lab-g1c"))
+    aff_c = "~/" + os.path.basename(lab_c)
+    r = rejeu([lab_c], hook=HOOK, etape=2)
+    lignes = par_chemin(r, aff_c)
+    regle = " classé par la règle écrite, état dérivé absent : "
+    cas = ((".planning/cycles/02-x/phases/01-d/PLAN.md", "doit-refuser-modele", "refus", "pas-de-cadrage"),
+           (PH + "05-e/PLAN.md", "doit-refuser-modele", "refus", "pas-de-cadrage"),
+           (PH + "06-f/PLAN.md", "doit-passer", "passe", "clos"), (PH + "07-h/PLAN.md", "doit-passer", "passe", "non-regulier"))
+    for chemin, attendu, obtenu, branche in cas:
+        l = lignes.get(chemin)
+        if l is None or (l[3], l[4]) != (attendu, obtenu) or ("état dérivé absent : " + branche) not in l[5]:
+            fautes.append("(c) %s : attendu %s/%s (%s), obtenu %s" % (chemin, attendu, obtenu, branche, None if l is None else l[3:]))
+    if r.classe.get(("G1", aff_c)) != 4 or r.compte.get("G1") != (0, 0, 2):
+        fautes.append("(c) CLASSE-REGLE-ECRITE G1 lab=%s n=4 attendu ; obtenu %s, COMPTE G1 %s (attendu (0, 0, 2))" % (aff_c, r.classe, r.compte.get("G1")))
+    for morceau in ("/06-f/", "/07-h/"):
+        r = rejeu([lab_c], hook=sub_g1(unique("sub") + ".sh", (morceau,)), etape=2, scenario="")
+        if r.compte.get("G1") != (1, 0, 2):
+            fautes.append("(c) substitut qui refuse aussi %s : attendu faux-refus=1 (1, 0, 2), obtenu %s" % (morceau, r.compte.get("G1")))
+    # (d) contrôle statique : rejeu-gates.sh ne nomme pas evaluer_g1 ; le constructeur ne lance ni n'appelle le hook ; les copies du parseur sont ast-identiques
+    corps = extraire(REJEU, "PY_REJEU_GATES_EOF", os.path.join(WORK, unique("statique-g1") + ".py"))
+    source = open(corps, encoding="utf-8").read()
+    m = re.search(r"^def construire_g1\(.*?(?=^def |^class |\Z)", source, re.S | re.M)
+    if "evaluer_g1" in open(REJEU, encoding="utf-8").read():
+        fautes.append("(d) rejeu-gates.sh contient evaluer_g1")
+    if m is None or len(m.group(0).strip()) == 0:
+        fautes.append("(d) extraction vide du corps du constructeur G1 (rouge, jamais un vert à vide)")
+    elif "hook" in m.group(0).lower() or "jouer(" in m.group(0):
+        fautes.append("(d) le constructeur G1 lance ou appelle le hook : " + court(m.group(0), 160))
+    recalc = extraire(RECALC, "PY_RECALC_PLANNING_EOF", os.path.join(WORK, unique("statique-recalc") + ".py"))
+
+    def arbres(chemin):
+        res = {}
+        for noeud in ast.parse(open(chemin, encoding="utf-8").read()).body:
+            if isinstance(noeud, ast.FunctionDef) and noeud.name in ("dequote", "lire_frontmatter", "_lire_liste_indentee", "lire_registre"):
+                res[noeud.name] = ast.dump(noeud)
+            elif isinstance(noeud, ast.Assign) and any(isinstance(c, ast.Name) and c.id == "CLE_RE" for c in noeud.targets):
+                res["CLE_RE"] = ast.dump(noeud)
+        return res
+    a_outil, a_moteur = arbres(corps), arbres(recalc)
+    for nom in ("dequote", "CLE_RE", "lire_frontmatter", "_lire_liste_indentee", "lire_registre"):
+        if nom not in a_outil or nom not in a_moteur or a_outil[nom] != a_moteur[nom]:
+            fautes.append("(d) copie du parseur : %s absente ou différente de celle de recalc-planning.sh" % nom)
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-G1", "constructeur G1 : attendu du modèle, classification totale, code propre de l'outil", "voir le cas", f)
+    else:
+        ok("R-REJEU-G1 vrai hook, --etape=2 : lab non migré (sans CADRAGE.md, registre ouvert, plan sous plans/ : refus conformes au modèle, 3, phase par phase ; clos et hérité : passage), phases synthétiques 99-rejeu-* en doit-refuser/refus, faux-refus=0 faux-accept=0 ; un substitut qui refuse aussi la phase à CADRAGE.md clos : faux-refus=1 ; classification totale : D, E, F, H classées par la règle écrite (CLASSE-REGLE-ECRITE n=4, faux-refus=0), F ou H refusées à tort : faux-refus=1 ; rejeu-gates.sh ne nomme pas evaluer_g1, le constructeur n'appelle pas le hook, copies du parseur ast-identiques")
+
+
+ETATS_CADRAGE = ("absent", "herite", "clos", "ouvert", "vide", "invalide", "dossier", "lien")
+ORACLE_G1 = {"absent": "refus", "herite": "passe", "clos": "passe", "ouvert": "refus", "vide": "passe", "invalide": "passe", "dossier": "passe", "lien": "passe"}
+BRANCHE_ATTENDUE = {"absent": "pas-de-cadrage", "herite": "herite", "clos": "clos", "ouvert": "registre-ouvert", "vide": "clos",
+                    "invalide": "illisible", "dossier": "non-regulier", "lien": "non-regulier"}
+_CELLULES = []
+
+
+def cellules_g1():
+    """Produit cartésien CALCULÉ (itertools.product), 2 x 2 x 8 x 2 = 64 : cycle {avec, sans} CYCLE.md, nom de phase {dans, hors}
+    NOM_UNITE, état de CADRAGE.md, autre entrée non régulière dans la phase {non, oui}."""
+    return list(itertools.product(("avec", "sans"), ("conforme", "hors"), ETATS_CADRAGE, ("non", "oui")))
+
+
+def fabriquer_cellules():
+    if _CELLULES:
+        return _CELLULES
+    contenus = {"herite": HERITE_G1, "clos": CLOS_G1, "ouvert": OUVERT_G1, "vide": "---\ninconnues: []\n---\n", "invalide": "---\ninconnues: []\n"}
+    for i, cell in enumerate(cellules_g1()):
+        cycle, nom, etat, autre = cell
+        phase = "01-p" if nom == "conforme" else "phase-x"
+        f = {PH + phase + "/PLAN.md": PLAN_G1}
+        if cycle == "avec":
+            f[PH[:-7] + "CYCLE.md"] = CYCLE_G1
+        if etat in contenus:
+            f[PH + phase + "/CADRAGE.md"] = contenus[etat]
+        lab = fabriquer_lab("lab-cc%02d" % i, f, config='{"planning_version": "cycles-v1"}')
+        dossier = os.path.join(lab, PH, phase)
+        if etat == "dossier":
+            os.makedirs(os.path.join(dossier, "CADRAGE.md"))
+        if etat == "lien":
+            os.symlink("cible-absente", os.path.join(dossier, "CADRAGE.md"))
+        if autre == "oui":
+            os.makedirs(os.path.join(dossier, "CLOTURE.md"))
+        _CELLULES.append((cell, lab, phase))
+    return _CELLULES
+
+
+def hook_arme():
+    chemin = os.path.join(WORK, "hook-arme-g1", "planning-hook.sh")
+    if not os.path.exists(chemin):
+        texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"armed"', open(HOOK, encoding="utf-8").read(), flags=re.M)
+        if n != 5:
+            raise RuntimeError("cinq constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+        ecrire(chemin, texte, 0o755)
+    return chemin
+
+
+def verdict_hook(lab, rel):
+    """`refus` (deny `[planning-core] G1 :`), `passe` (stdout vide) ou `autre` : le VRAI hook, copie armée, Write de `rel`."""
+    obj = {"session_id": "t", "transcript_path": "t", "cwd": lab, "hook_event_name": "PreToolUse", "tool_name": "Write",
+           "tool_input": {"file_path": os.path.join(lab, rel), "content": "x"}, "tool_use_id": "t"}
+    p = subprocess.run(["bash", hook_arme()], input=json.dumps(obj).encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env=env_sain(), cwd=lab, timeout=120)
+    if p.returncode != 0:
+        return "autre"
+    if p.stdout == b"":
+        return "passe"
+    s = json.loads(p.stdout.decode("utf-8"))["hookSpecificOutput"]
+    return "refus" if s.get("permissionDecision") == "deny" and s.get("permissionDecisionReason", "").startswith("[planning-core] G1 :") else "autre"
+
+
+def exploitable_essai(etat, raison):
+    """Partition de l'interface du plan, écrite ICI (jamais reprise de l'outil) : exploitable = tout état autre que indéterminé, et,
+    sous indéterminé, les seules raisons de Φ2 à Φ4."""
+    if etat != "indéterminé":
+        return True
+    r = raison or ""
+    return r.startswith("hors-cadrage:") or r.startswith("avant-cadrage-clos:") or r == "registre-invalide" or r == "frontmatter-invalide:CADRAGE.md"
+
+
+def etats_recalcul(lab):
+    p = subprocess.run(["bash", RECALC, "--planning=" + os.path.join(lab, ".planning"), "--read-only"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env=env_sain(), timeout=180)
+    donnees = json.loads(p.stdout.decode("utf-8"))
+    return dict((ph["chemin"], (ph["etat"], ph.get("raison"))) for c in donnees.get("cycles", []) for ph in c.get("phases", []))
+
+
+def mesurer_cellules(script, selection, hook):
+    """{cellule: (attendu, branche, n)} du relevé de `script` (vrai jeu de constructeurs) sur les cellules choisies."""
+    cibles = [c for c in fabriquer_cellules() if selection(c[0])]
+    r = rejeu([c[1] for c in cibles], hook=hook, etape=2, scenario="", script=script)
+    par_lab = {}
+    for l in r.lignes:
+        par_lab.setdefault(l[1], {})[l[2]] = l
+    res = {}
+    for cell, lab, phase in cibles:
+        aff = "~/" + os.path.basename(lab)
+        l = par_lab.get(aff, {}).get(PH + phase + "/PLAN.md")
+        branche = None
+        if l is not None and "état dérivé absent : " in l[5]:
+            branche = l[5].split("état dérivé absent : ")[-1].strip()
+        res[cell] = (None if l is None else l[3], branche, r.classe.get(("G1", aff)))
+    return res
+
+
+def divergences_relevee(mesure):
+    """Cellules dont l'attendu du relevé n'est pas l'oracle (une table de huit lignes plus la ligne hors NOM_UNITE)."""
+    res = []
+    for cell, (attendu, _branche, _n) in mesure.items():
+        oracle = "passe" if cell[1] == "hors" else ORACLE_G1[cell[2]]
+        if (attendu == "doit-refuser-modele") != (oracle == "refus"):
+            res.append(cell)
+    return res
+
+
+def sec_concordance(_):
+    """R-REJEU-G1-CONCORDANCE : test différentiel, règle écrite de l'outil contre le prédicat du hook, sur 64 cellules GÉNÉRÉES."""
+    cellules = fabriquer_cellules()
+    fautes = []
+    if len(cellules) != 64:
+        fautes.append("%d cellules générées (attendu EXACTEMENT 64)" % len(cellules))
+    mesure = mesurer_cellules(REJEU, lambda c: True, HOOK)
+    div, raisons, somme = [], {}, 0
+    for cell, lab, phase in cellules:
+        attendu, branche, n = mesure[cell]
+        hook_v = verdict_hook(lab, PH + phase + "/PLAN.md")
+        oracle = "passe" if cell[1] == "hors" else ORACLE_G1[cell[2]]
+        if attendu is None or hook_v == "autre" or not ((attendu == "doit-refuser-modele") == (hook_v == "refus") == (oracle == "refus")):
+            div.append("cellule (cycle=%s, nom=%s, cadrage=%s, autre=%s) : attendu du relevé %s, hook %s, oracle %s" % (cell + (attendu, hook_v, oracle)))
+        somme += n or 0
+        if branche is not None:
+            raisons[branche] = raisons.get(branche, 0) + 1
+            if branche != BRANCHE_ATTENDUE[cell[2]]:
+                div.append("cellule %s : raison nommée %s (attendu %s)" % (cell, branche, BRANCHE_ATTENDUE[cell[2]]))
+    # recalcul côté suite : la partition (état, raison) de l'interface, cellule par cellule
+    non_exploitables = 0
+    for cell, lab, phase in cellules:
+        if cell[1] != "conforme":
+            continue
+        etat = etats_recalcul(lab).get("cycles/01-c/phases/" + phase)
+        non = etat is None or not exploitable_essai(*etat)
+        non_exploitables += 1 if non else 0
+        if (mesure[cell][2] == 1) != non:
+            div.append("cellule %s : n=%s, état dérivé %s (n=1 <=> non exploitable)" % (cell, mesure[cell][2], etat))
+    if "defaut" in raisons:
+        div.append("raison `defaut` : la règle écrite n'a pas de branche par défaut")
+    if non_exploitables != 26 or somme != 26:
+        div.append("cellules à nom conforme non exploitables : %d, somme des n : %d (attendu 26 et 26)" % (non_exploitables, somme))
+    print("CONCORDANCE G1 cellules=%d divergences=%d" % (len(cellules), len(div)))
+    print("RAISONS-REGLE-ECRITE G1 " + " ".join("%s=%d" % kv for kv in sorted(raisons.items())) + " somme-n=%d" % somme)
+    fautes.extend(div[:8])
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-G1-CONCORDANCE", "la règle écrite de l'outil et le prédicat de G1 rendent le même verdict sur 64 cellules générées", "0 divergence", f)
+    else:
+        ok("R-REJEU-G1-CONCORDANCE 64 cellules générées (itertools.product : cycle x nom de phase x état de CADRAGE.md x autre entrée non régulière) : attendu du relevé <=> deny du vrai hook (copie armée) <=> oracle de huit lignes, 0 divergence ; raisons nommées %s, aucune raison `defaut` ; somme des n = 26 = cellules à nom conforme sans état dérivé exploitable (recalcul lancé par la suite, cellule par cellule)" % ", ".join("%s=%d" % kv for kv in sorted(raisons.items())))
 
 
 def _appels_sous_process(script, marqueur, autorises):
@@ -766,10 +1059,10 @@ def _appels_sous_process(script, marqueur, autorises):
 def sec_statique(_):
     """R-REJEU-STATIQUE et R-REEL-04."""
     v, n = _appels_sous_process(REJEU, "PY_REJEU_GATES_EOF", ("bash", "cmp"))
-    if not v and n == 2:
-        ok("R-REJEU-STATIQUE le texte de rejeu-gates.sh ne lance aucun sous-processus autre que bash sur le hook copié et cmp (2 appels, aucun git)")
+    if not v and n == 3:
+        ok("R-REJEU-STATIQUE le texte de rejeu-gates.sh ne lance aucun sous-processus autre que bash (le hook copié, recalc-planning.sh --read-only) et cmp (3 appels, aucun git)")
     else:
-        ko("R-REJEU-STATIQUE", "sous-processus de rejeu-gates.sh", "bash (hook copié) et cmp seulement, 2 appels", "violations=%s appels=%d" % (v, n))
+        ko("R-REJEU-STATIQUE", "sous-processus de rejeu-gates.sh", "bash (hook copié, recalc-planning.sh) et cmp seulement, 3 appels", "violations=%s appels=%d" % (v, n))
     v, n = _appels_sous_process(REEL, "PY_REJEU_REEL_EOF", ("bash", "cmp"))
     if not v and n == 2:
         ok("R-REEL-04 le texte de rejeu-reel.sh ne lance aucun sous-processus autre que bash sur rejeu-gates.sh et cmp (2 appels, aucun git)")
@@ -1062,30 +1355,30 @@ def sec_mutants(_):
          "R-REJEU-10 : une écriture sans attendu retombe sur doit-passer")
     duel("REEL-CMP", REEL, R, "# reel-cmp", "identique = True  # reel-cmp",
          sc_reel_cmp, lambda o, m: o["rc"] == 1 and o["divergent"] and not m["divergent"],
-         "R-REEL-02 : comparaison d'empreinte de rejeu-reel.sh toujours égale", compagnons=(REJEU,))
+         "R-REEL-02 : comparaison d'empreinte de rejeu-reel.sh toujours égale", compagnons=(REJEU, RECALC))
     duel("REEL-PERIMETRE", REEL, R, "# reel-perimetre", 'SOUS_ARBRES = [".planning", ".claude"]  # reel-perimetre',
          sc_reel_cmp, lambda o, m: o["divergent"] and not m["divergent"],
-         "R-REEL-02 : empreinte limitée à .planning/ et .claude/", compagnons=(REJEU,))
+         "R-REEL-02 : empreinte limitée à .planning/ et .claude/", compagnons=(REJEU, RECALC))
     duel("REEL-LIENS", REEL, R, "# reel-lstat", "st = os.stat(chemin)  # reel-lstat",
          sc_reel_liens, lambda o, m: (not o["divergent"]) and m["divergent"],
-         "R-REEL-03 : liens suivis", compagnons=(REJEU,))
+         "R-REEL-03 : liens suivis", compagnons=(REJEU, RECALC))
     duel("REEL-REALPATH", REEL, R, "# reel-realpath", "reels = list(labs)  # reel-realpath",
          sc_reel_lien_lab, lambda o, m: o["rc"] == 1 and o["divergent"] and m["rc"] == 0 and not m["divergent"],
-         "R-REEL-05 : racine du lab non résolue (un --lab lien symbolique rend IDENTIQUE alors que le lab a changé)", compagnons=(REJEU,))
+         "R-REEL-05 : racine du lab non résolue (un --lab lien symbolique rend IDENTIQUE alors que le lab a changé)", compagnons=(REJEU, RECALC))
     duel("REEL-RAPPORT", REEL, R, "# reel-rapport", "if False:  # reel-rapport",
          sc_reel_rapport, lambda o, m: o["rc"] == 64 and o["avant_mesure"] and not m["avant_mesure"],
-         "R-REEL-06 : refus du rapport sous un lab retiré (il n'est plus émis avant toute mesure)", compagnons=(REJEU,))
+         "R-REEL-06 : refus du rapport sous un lab retiré (il n'est plus émis avant toute mesure)", compagnons=(REJEU, RECALC))
     duel("REEL-REFUS64", REEL, R, "# reel-refus64", "if False:  # reel-refus64",
          sc_reel_usage, lambda o, m: o["rc"] == 64 and not o["lignes"] and not o["rapport"] and (m["lignes"] or m["rapport"]),
-         "R-REEL-07 : lignes EMPREINTE-ARBRE-* écrites alors que rejeu-gates.sh a refusé l'usage", compagnons=(REJEU,))
+         "R-REEL-07 : lignes EMPREINTE-ARBRE-* écrites alors que rejeu-gates.sh a refusé l'usage", compagnons=(REJEU, RECALC))
     def sc_g6g5(script):
         r, _ = scenario_g6g5(script)
         return {"G6": r.compte.get("G6"), "etape": r.etape}
 
     duel("REJEU-G6-ENREGISTRE", REJEU, G, "# rejeu-registre",
-         'CONSTRUCTEURS = {"reecriture": construire_reecriture, "G5": construire_g5}  # rejeu-registre',
+         'CONSTRUCTEURS = {"reecriture": construire_reecriture, "G5": construire_g5, "G1": construire_g1}  # rejeu-registre',
          sc_g6g5, lambda o, m: o["G6"] == (0, 0, 0) and o["etape"] == (0, 0, 0) and m["G6"] is not None and m["G6"][0] > 0,
-         "R-REJEU-G6G5 : constructeur G6 retiré du registre (STATE.md compte en doit-passer et le hook armé le refuse : faux-refus)")
+         "R-REJEU-G6G5 : constructeur G6 retiré du registre (STATE.md compte en doit-passer et le hook armé le refuse : faux-refus)", compagnons=(RECALC,))
     duel("REJEU-ETAPE", REJEU, G, "# rejeu-etape", "if False:  # rejeu-etape",
          etape_g1, lambda o, m: o["g1-etape1"] == ATTENDU_ETAPE["g1-etape1"] and m["g1-etape1"][2] == (0, 1, 0),
          "R-REJEU-ETAPE : la somme reprend tous les gates (un gate d'étape > n, simulé en observe, compte en faux accept)")
@@ -1094,18 +1387,64 @@ def sec_mutants(_):
          etape_sans_etape, lambda o, m: o["gate-tiret"] == ATTENDU_ETAPE["gate-tiret"] and o["gate-interrogation"] == ATTENDU_ETAPE["gate-interrogation"]
          and m["gate-tiret"][1] == (0, 0, 0) and m["gate-interrogation"][2] == (0, 0, 0),
          "R-REJEU-ETAPE : la somme devient une liste blanche des gates d'étapes connues (les lignes `-` et `?` ne comptent plus)")
+
+    # --- 45-06 : constructeur G1 ---
+    def sc_g1_modele(script):
+        lab = lab_g1_modele(unique("lab-mgm"))
+        r = rejeu([lab], hook=sub_g1(unique("sub") + ".sh", ("/03-clos/",)), etape=2, scenario="", script=script)
+        return {"G1": r.compte.get("G1")}
+
+    def sc_g1_classe(script):
+        lab = lab_g1_classe(unique("lab-mgc"))
+        r = rejeu([lab], hook=HOOK, etape=2, script=script)
+        return {"G1": r.compte.get("G1"), "classe": r.classe.get(("G1", "~/" + os.path.basename(lab)))}
+
+    def sc_conc(selection):
+        def scenario(script):
+            mesure = mesurer_cellules(script, selection, substitut(unique("sub") + ".sh", SUB_PASSE))
+            return {"divergences": len(divergences_relevee(mesure)), "n": sum((v[2] or 0) for v in mesure.values())}
+        return scenario
+
+    MODELE_DERIVE = ('attendu = "doit-refuser-modele" if jouer(ctx["hook_copie"], {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": os.environ.get("HOME", ""), '
+                     '"TMPDIR": ctx["tmp"], "XDG_CACHE_HOME": os.path.join(ctx["tmp"], "xdg")}, lab, "Write", rel, "")[0] == "refus" else "doit-passer"  # g1-derive')
+    duel("REJEU-G1-MODELE", REJEU, G, "# g1-derive", MODELE_DERIVE, sc_g1_modele,
+         lambda o, m: o["G1"] == (1, 0, 3) and m["G1"] == (0, 0, 4),
+         "R-REJEU-G1 : le constructeur G1 classe d'après le refus obtenu du hook (la phase à CADRAGE.md clos que le substitut refuse est rangée en conforme)", compagnons=(RECALC,))
+    duel("REJEU-G1-COMPTE", REJEU, G, "# rejeu-modele-compte", 'return "faux-refus" if obtenu == "refus" else "faux-accept"  # rejeu-modele-compte',
+         sc_g1_modele, lambda o, m: o["G1"] == (1, 0, 3) and m["G1"] == (4, 0, 0),
+         "R-REJEU-G1 : les refus conformes au modèle comptés en faux refus", compagnons=(RECALC,))
+    duel("REJEU-G1-REGLE", REJEU, G, "# g1-regle", 'sortie.append(("Write", rel, "doit-passer", ""))  # g1-regle',
+         lambda s: (sc_g1_classe(s), sc_conc(lambda c: c[0] == "sans" and c[1] == "conforme" and c[2] in ("absent", "ouvert") and c[3] == "non")(s)),
+         lambda o, m: o[0]["G1"] == (0, 0, 2) and o[0]["classe"] == 4 and o[1]["divergences"] == 0 and m[0]["G1"][0] == 2 and m[0]["classe"] == 0 and m[1]["divergences"] == 2,
+         "R-REJEU-G1 et R-REJEU-G1-CONCORDANCE : l'axe cycle — le constructeur retombe sur doit-passer quand l'état dérivé manque (D et E deviennent des faux refus, n=0, les cellules sans CYCLE.md divergent)", compagnons=(RECALC,))
+    duel("REJEU-G1-NOM", REJEU, G, "# g1-forme", "if False:  # g1-forme",
+         sc_conc(lambda c: c[1] == "hors" and c[2] in ("absent", "ouvert") and c[3] == "non"),
+         lambda o, m: o["divergences"] == 0 and m["divergences"] >= 1,
+         "R-REJEU-G1-CONCORDANCE : l'axe nom de phase — la règle écrite classe aussi les phases hors NOM_UNITE", compagnons=(RECALC,))
+    duel("REJEU-G1-HERITE", REJEU, G, "# g1-herite", 'return ("doit-refuser-modele", "registre-ouvert")  # g1-herite',
+         sc_conc(lambda c: c[1] == "conforme" and c[2] == "herite" and c[3] == "non"),
+         lambda o, m: o["divergences"] == 0 and m["divergences"] >= 1,
+         "R-REJEU-G1-CONCORDANCE : l'axe CADRAGE.md — un format hérité lu « ouvert » par la règle écrite", compagnons=(RECALC,))
+    duel("REJEU-G1-VIDE", REJEU, G, "# g1-clos", 'ouvert = not clos or donnees.get("inconnues") == []  # g1-clos',
+         sc_conc(lambda c: c[1] == "conforme" and c[2] == "vide" and c[3] == "non"),
+         lambda o, m: o["divergences"] == 0 and m["divergences"] >= 1,
+         "R-REJEU-G1-CONCORDANCE : `inconnues: []` lu « ouvert » par la règle écrite", compagnons=(RECALC,))
+    duel("REJEU-G1-NONREG", REJEU, G, "# g1-nonreg", 'return ("doit-refuser-modele", "pas-de-cadrage")  # g1-nonreg',
+         sc_conc(lambda c: c[1] == "conforme" and c[2] in ("dossier", "lien") and c[3] == "non"),
+         lambda o, m: o["divergences"] == 0 and m["divergences"] >= 1,
+         "R-REJEU-G1-CONCORDANCE : un CADRAGE.md non régulier (dossier ou lien) lu « absent » par la règle écrite", compagnons=(RECALC,))
     tout = {"touch": "DIVERGENTE", "mode": "DIVERGENTE", "contenu": "DIVERGENTE"}
     duel("REEL-MTIME", REEL, R, "# reel-signature",
          'lignes.append((rel or ".", "%s\\t%s\\t%o\\t%d\\t%s" % (rel or ".", genre, stat.S_IMODE(mode), 0, sig)))  # reel-signature',
          sc_reel_signature, lambda o, m: o == tout and m == dict(tout, touch="IDENTIQUE"),
-         "R-REEL-08 : mtime_ns retiré de la signature (un touch seul n'est plus vu)", compagnons=(REJEU,))
+         "R-REEL-08 : mtime_ns retiré de la signature (un touch seul n'est plus vu)", compagnons=(REJEU, RECALC))
     duel("REEL-MODE", REEL, R, "# reel-signature",
          'lignes.append((rel or ".", "%s\\t%s\\t%o\\t%d\\t%s" % (rel or ".", genre, 0, st.st_mtime_ns, sig)))  # reel-signature',
          sc_reel_signature, lambda o, m: o == tout and m == dict(tout, mode="IDENTIQUE"),
-         "R-REEL-08 : mode retiré de la signature (un chmod seul n'est plus vu)", compagnons=(REJEU,))
+         "R-REEL-08 : mode retiré de la signature (un chmod seul n'est plus vu)", compagnons=(REJEU, RECALC))
     duel("REEL-SHA", REEL, R, "# reel-sha", 'sig = "x"  # reel-sha',
          sc_reel_signature, lambda o, m: o == tout and m == dict(tout, contenu="IDENTIQUE"),
-         "R-REEL-08 : sha256 retiré de la signature (un contenu changé à mtime restauré n'est plus vu)", compagnons=(REJEU,))
+         "R-REEL-08 : sha256 retiré de la signature (un contenu changé à mtime restauré n'est plus vu)", compagnons=(REJEU, RECALC))
 
 
 SECTIONS = {
@@ -1115,6 +1454,8 @@ SECTIONS = {
     "modele": sec_modele,
     "etape": sec_etape,
     "g6g5": sec_g6g5,
+    "g1": sec_g1,
+    "concordance": sec_concordance,
     "statique": sec_statique,
     "reel": sec_reel,
     "mutants": sec_mutants,
@@ -1156,7 +1497,7 @@ for f in "$REJEU" "$REEL"; do
 done
 
 if [ -f "$REJEU" ] && [ -f "$REEL" ]; then
-  run_sections sens,reel_hook,priorite,modele,etape,g6g5,statique,reel,mutants
+  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,concordance,statique,reel,mutants
 fi
 
 T_FIN="$(date +%s)"

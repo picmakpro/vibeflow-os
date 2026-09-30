@@ -21,9 +21,13 @@
 #                   adhérent, quel que soit le rôle ; compartiments et plans du modèle non visés ; dérogation (45-05)
 #   R-CANG-01..03   canary de session : les cas G6 et G5 attendent une ligne d'observation tant que le gate est en
 #                   observe, un refus de gate dès qu'il est armed ; un gate neutralisé fait signaler le canary (45-05)
-#   R-G1-01..04     G1 (45-06) : PLAN.md de forme modèle dans une phase sans CADRAGE.md, observe puis armed, plan
-#                   direct et sous plans/ (la phase jugée est la phase), socle v2 et nom d'unité invalide jamais
-#                   visés ; contrôle croisé avec recalc-planning.sh --read-only sur chaque phase des bancs
+#   R-G1-01..10     G1 (45-06) : PLAN.md de forme modèle dans une phase sans CADRAGE.md ou à registre ouvert, observe puis
+#                   armed, plan direct et sous plans/ (la phase jugée est la phase), socle v2 et nom d'unité invalide
+#                   jamais visés ; la valeur d'un statut n'est jamais jugée ; bord F5 = f5-etats (un état que le modèle
+#                   ne peut pas lire n'est jamais refusé, l'absence de CADRAGE.md l'est toujours) ; dérogation ;
+#                   contrôle croisé avec recalc-planning.sh --read-only sur chaque phase des bancs (CROISE-G1) ;
+#                   COMPTE G1 du banc
+#   R-REGISTRE      lire_registre du hook est ast-identique à celle du moteur de recalcul
 #   R-CANG-G1       le cas de canary G1-sans-cadrage (état livré, G6, G5 et G1 armed, evaluer_g1 neutralisé)
 #   R-OBS-ENV       le journal d'observation suit XDG_CACHE_HOME puis HOME et rien d'autre : les valeurs
 #                   reçues n'atteignent jamais l'armement ni l'adhésion (P45-D-12a)
@@ -1595,7 +1599,7 @@ G1_PLANS = G1_PHASES + "06-plans/plans/01-a/PLAN.md"
 G1_MOTIF_ABSENCE = "n'a pas de CADRAGE.md"
 G1_MOTIF_OUVERT = "porte des lignes structurantes sans statut"
 NOMS_MODELE_PHASE = ("CADRAGE.md", "PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md", "DEROGATION.md")
-PLANCHER_CROISE_G1 = 50  # plancher déclaré du nombre de phases comparées au recalcul (59 mesurées le 2026-09-30)
+PLANCHER_CROISE_G1 = 60  # plancher déclaré du nombre de phases comparées au recalcul (65 mesurées le 2026-09-30)
 
 
 def _g1(ctx, hook, outil, rel, lab=G1_LAB, agent=None, extra_env=None):
@@ -1789,6 +1793,118 @@ def controle_croise_g1(ctx, script):
     if absence < 1 or n - absence < 1:
         fautes.append("comparaison à vide : %d refus d'absence, %d passages" % (absence, n - absence))
     return (not fautes), ("; ".join(fautes[:6]) if fautes else "%d phases comparées (%d refus pour absence de CADRAGE.md, %d passages) : G1 refuse <=> `à cadrer` ou `hors-cadrage:*`" % (n, absence, n - absence))
+
+
+def controle_g1_05(ctx, script):
+    """Copie armée : registre avec une ligne structurante: oui sans statut -> deny qui cite l'id de la ligne ; deux lignes
+    ouvertes -> les deux ids ; une ligne ouverte et une fermée -> seulement l'ouverte."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    for rel, phase, citees, tues in ((G1_PHASES + "04-ouvert/PLAN.md", "04-ouvert", ("I-07",), ()),
+                                     (G1_PHASES + "16-deux-ouverts/PLAN.md", "16-deux-ouverts", ("I-21", "I-22"), ()),
+                                     (G1_PHASES + "17-mixte/PLAN.md", "17-mixte", ("I-31",), ("I-32",))):
+        for outil in ("Write", "Edit"):
+            n += 1
+            raison, detail = _raison_deny(*_g1(ctx, d, outil, rel))
+            if raison is None:
+                fautes.append("%s %s -> %s" % (outil, rel, detail))
+            elif not raison.startswith("[planning-core] G1 :") or ("la phase %s " % phase) not in raison or G1_MOTIF_OUVERT not in raison \
+                    or any(i not in raison for i in citees) or any(i in raison for i in tues):
+                fautes.append("%s %s : raison %s" % (outil, rel, raison))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus G1 qui citent l'id de chaque ligne ouverte (une, deux, une sur deux) et nomment la phase" % n)
+
+
+def controle_g1_06(ctx, script):
+    """Copie armée : statut ARBITRÉ, statut `n'importe quoi`, structurante: non sans statut, `inconnues: []` -> passage
+    (la valeur d'un statut n'est jamais jugée)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+    for rel in (G1_PHASES + "02-clos/PLAN.md", G1_PHASES + "14-quelconque/PLAN.md", G1_PHASES + "15-non-structurante/PLAN.md",
+                G1_PHASES + "03-vide/PLAN.md"):
+        rc, out, err = _g1(ctx, d, "Write", rel)
+        if classer(rc, out) not in ("silence", "avertit") or err or b"[planning-core] G1" in out:
+            fautes.append("%s -> %s %s" % (rel, classer(rc, out), court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "passage : ARBITRÉ, n'importe quoi, structurante: non sans statut, inconnues: []")
+
+
+def controle_g1_07(ctx, script):
+    """Bord F5 (f5-etats) : CADRAGE.md au frontmatter invalide, au registre invalide, au format hérité, en lien, en dossier
+    -> passage ; phase SANS CADRAGE.md dont un AUTRE fichier est non régulier (fixture E) -> REFUS."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+    for rel in (G1_PHASES + "09-fm-invalide/PLAN.md", G1_PHASES + "10-registre-invalide/PLAN.md", G1_PHASES + "05-herite/PLAN.md",
+                G1_PHASES + "11-lien/PLAN.md", G1_PHASES + "12-dossier/PLAN.md"):
+        rc, out, err = _g1(ctx, d, "Write", rel)
+        if classer(rc, out) not in ("silence", "avertit") or err or b"[planning-core] G1" in out:
+            fautes.append("%s -> %s %s (un état indéterminé n'est jamais refusé)" % (rel, classer(rc, out), court(out)))
+    raison, detail = _raison_deny(*_g1(ctx, d, "Write", G1_PHASES + "13-autre/PLAN.md"))
+    if raison is None:
+        fautes.append("fixture E (pas de CADRAGE.md, CLOTURE.md en dossier) -> %s (jamais un passage par indétermination)" % detail)
+    elif G1_MOTIF_ABSENCE not in raison:
+        fautes.append("fixture E : raison %s" % raison)
+    return (not fautes), ("; ".join(fautes) if fautes else "passage : frontmatter invalide, registre invalide, format hérité, lien, dossier ; refus : absence de CADRAGE.md avec un autre fichier non régulier (fixture E)")
+
+
+def controle_g1_09(ctx, script):
+    """Dérogation G1 active sur le PLAN.md : passage cité et consommé ; le second Write est refusé."""
+    d = _dossier(ctx, script)
+    lab = lab_frais(ctx, G1_LAB)
+    rc, out, err = deroger(ctx, lab, None, gate="G1", chemins=(G1_SANS,))
+    if rc != 0:
+        return False, "deroger-gate.sh refuse le scénario : rc=%d %s" % (rc, court(err))
+    hook = ctx.copie_forcee(d, "armed")
+    r1 = ecrire_dans(ctx, hook, lab, "Write", G1_SANS)
+    if classer(r1[0], r1[1]) != "avertit" or r1[2]:
+        return False, "premier Write : %s %s" % (classer(r1[0], r1[1]), court(r1[1]))
+    texte = contexte_de(r1[1])
+    manque = [m for m in ("#1", "G1", "willy", "AskUserQuestion session principale", "2026-09-30") if m not in texte]
+    lignes = [l for l in lignes_de(journal_derog(lab)) if "  consommee  id=1  gate=G1  " in l]
+    if manque or len(lignes) != 1:
+        return False, "citation sans %s ; lignes consommee : %d" % (manque, len(lignes))
+    r2 = ecrire_dans(ctx, hook, lab, "Write", G1_SANS)
+    if classer(r2[0], r2[1]) != "deny":
+        return False, "second Write : " + classer(r2[0], r2[1])
+    return True, "dérogation G1 : premier Write passe et cité, dérogation consommée, second Write refusé"
+
+
+def controle_registre(ctx, script):
+    """R-REGISTRE : les arbres ast de lire_registre extraits du hook et du moteur de recalcul sont identiques."""
+    chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
+    a_h = _arbre_fonction(corps_python(open(chemin, encoding="utf-8").read()), "lire_registre")
+    a_r = _arbre_fonction(corps_python(open(ctx.recalc, encoding="utf-8").read(), "PY_RECALC_PLANNING_EOF"), "lire_registre")
+    if a_h is None or a_r is None:
+        return False, "lire_registre absent (hook %s, moteur %s)" % (a_h is not None, a_r is not None)
+    if a_h != a_r:
+        return False, "arbres différents"
+    return True, "arbres ast identiques (docstring comprise)"
+
+
+def controle_croise_g1_etendu(ctx, script):
+    """R-G1-08 : la relation de R-G1-04 étendue — « G1 refuse (absence de CADRAGE.md OU registre ouvert) » <=> le recalcul rend
+    `à cadrer`, `en cadrage`, `hors-cadrage:*` ou `avant-cadrage-clos:*` ; les états indéterminés `registre-invalide` et
+    `frontmatter-invalide:CADRAGE.md` ne sont jamais refusés (f5-etats)."""
+    phases, n_labs, ignores = phases_croisees(ctx, script)
+    fautes = []
+    illisibles = ouverts = 0
+    for etiquette, chemin, etat, raison, verdict in phases:
+        r = raison or ""
+        attendu = etat in ("à cadrer", "en cadrage") or r.startswith("hors-cadrage:") or r.startswith("avant-cadrage-clos:")
+        refuse = verdict in ("absence", "ouvert")
+        if verdict.startswith("autre:") or refuse != attendu:
+            fautes.append("%s %s : recalcul %s/%s, G1 %s" % (etiquette, chemin, etat, raison, verdict))
+        if etat == "indéterminé" and r in ("registre-invalide", "frontmatter-invalide:CADRAGE.md"):
+            illisibles += 1
+            if verdict != "passe":
+                fautes.append("%s %s : état illisible refusé (%s)" % (etiquette, chemin, verdict))
+        if verdict == "ouvert":
+            ouverts += 1
+    n = len(phases)
+    print("CROISE-G1-ETENDU n=%d absence-ou-ouvert=%d dont-ouvert=%d illisibles-jamais-refuses=%d" % (n, sum(1 for p in phases if p[4] in ("absence", "ouvert")), ouverts, illisibles))
+    if n < PLANCHER_CROISE_G1:
+        fautes.append("%d phase(s) comparée(s), sous le plancher déclaré %d" % (n, PLANCHER_CROISE_G1))
+    if ouverts < 1 or illisibles < 1:
+        fautes.append("comparaison à vide : %d refus pour registre ouvert, %d phases illisibles" % (ouverts, illisibles))
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else "%d phases comparées (dont %d refus pour registre ouvert, %d phases illisibles jamais refusées)" % (n, ouverts, illisibles))
 
 
 # Table de canary d'un dossier de scripts jetable (R-CANG-G1) : le hook livré TEL QUEL, ou G6, G5 et G1 armés.
@@ -2010,6 +2126,22 @@ def sec_g1(ctx):
     ok("R-G1-04 contrôle croisé avec recalc-planning.sh --read-only : " + detail) if bon else ko(
         "R-G1-04", "G1 refuse pour absence de CADRAGE.md <=> le recalcul rend `à cadrer` ou `hors-cadrage:*`, phase par phase des deux bancs",
         "aucune divergence", detail)
+    for ident, ctrl, titre in (
+            ("R-G1-05", controle_g1_05, "registre ouvert sur copie armed : le refus cite l'id de chaque ligne ouverte"),
+            ("R-G1-06", controle_g1_06, "la valeur d'un statut n'est jamais jugée"),
+            ("R-G1-07", controle_g1_07, "bord F5 (f5-etats) : état indéterminé jamais refusé, absence de CADRAGE.md toujours refusée"),
+            ("R-G1-09", controle_g1_09, "dérogation G1 honorée, citée et consommée")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+    bon, detail = controle_croise_g1_etendu(ctx, None)
+    ok("R-G1-08 contrôle croisé étendu : " + detail) if bon else ko(
+        "R-G1-08", "G1 refuse (absence ou registre ouvert) <=> `à cadrer`, `en cadrage`, `hors-cadrage:*`, `avant-cadrage-clos:*` ; états illisibles jamais refusés",
+        "aucune divergence", detail)
+
+
+def sec_registre(ctx):
+    bon, detail = controle_registre(ctx, ctx.hook)
+    ok("R-REGISTRE " + detail) if bon else ko("R-REGISTRE", "les arbres ast de lire_registre du hook et du moteur de recalcul sont identiques", "identiques", detail)
 
 
 def sec_verdict(ctx):
@@ -2090,9 +2222,13 @@ def sec_banc(ctx):
         else:
             ok("COUVERTURE %s : %d doit-refuser, %d doit-passer, %d silence (0 faux refus, 0 faux accept : chaque cas est conforme)" % (gate, c["doit-refuser"], c["doit-passer"], c["silence"]))
     # comptes du banc, par gate de l'étape 1 (P45-D-03b : l'armement exige 0 et 0)
-    for gate in ("G5", "G6"):
+    for gate in ("G5", "G6", "G1"):
         fr, fa = faux.get(gate, [0, 0])
         print("COMPTE %s faux-refus=%d faux-accept=%d" % (gate, fr, fa))
+    if faux.get("G1", [0, 0]) == [0, 0] and compte.get("G1"):
+        ok("R-G1-10 banc G1 sur copie armée : COMPTE G1 faux-refus=0 faux-accept=0")
+    else:
+        ko("R-G1-10", "banc G1 sur copie armée : zéro faux refus, zéro faux accept", "G1 [0, 0]", "G1=%s" % (faux.get("G1"),))
     if all(faux.get(g, [0, 0]) == [0, 0] for g in ("G5", "G6")) and all(compte.get(g) for g in ("G5", "G6")):
         ok("R-ID-06 banc complet G5 + G6 sur copie armée : COMPTE G5 faux-refus=0 faux-accept=0, COMPTE G6 faux-refus=0 faux-accept=0")
     else:
@@ -2103,7 +2239,7 @@ def sec_banc(ctx):
             ko("COUVERTURE jumeau " + nom, "un lab jumeau porte des écritures", ">= 1", "0")
 
 
-CTRL_FICHIER = (controle_table_02, controle_parseur, controle_env_statique, controle_jeton)
+CTRL_FICHIER = (controle_table_02, controle_parseur, controle_env_statique, controle_jeton, controle_registre)
 
 
 def sec_mutants(ctx):
@@ -2178,6 +2314,11 @@ def sec_mutants(ctx):
         ("G1-FORME", "# g1-forme", 'dossier_phase = composants[:5] if composants and composants[-1].casefold() == "plan.md" else None  # g1-forme',
          "R-G1-03", controle_g1_03),
         ("G1-PHASE", "# g1-phase", "return composants[:-1]  # g1-phase", "R-G1-02", controle_g1_02),
+        ("G1-OUVERT", "# g1-ouvert", "if True:  # g1-ouvert", "R-G1-05", controle_g1_05),
+        ("G1-STATUT", 'if structurante == "oui" and not (isinstance(statut, str) and statut.strip()):',
+         'if structurante == "oui" and statut != "ARBITRÉ":', "R-G1-06", controle_g1_06),
+        ("G1-BORD", "# g1-bord", "if registre_ok:  # g1-bord", "R-G1-07", controle_g1_07),
+        ("REGISTRE", "    clos = True", "    clos = False", "R-REGISTRE", controle_registre),
     ]
     for entree in M:
         ident, motif, repl, cible, ctrl = entree[:5]
@@ -2206,6 +2347,7 @@ def sec_mutants(ctx):
 SECTIONS = {
     "table": sec_table,
     "parseur": sec_parseur,
+    "registre": sec_registre,
     "jeton": sec_jeton,
     "verdict": sec_verdict,
     "derog": sec_derog,
@@ -2263,7 +2405,7 @@ run_sections() { # <sections séparées par des virgules>
 
 [ -f "$BANC_RECALC" ] || ko "recalc-planning-banc.txt présent" "le banc de la 44 existe sous fixtures/ (contrôle croisé de G1)" "$BANC_RECALC" "absent"
 
-run_sections table,parseur,jeton,g2,g5,g6,id,cang,g1,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
+run_sections table,parseur,registre,jeton,g2,g5,g6,id,cang,g1,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

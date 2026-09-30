@@ -325,6 +325,109 @@ ecrit: livrables/g.md
 
 @@ dossier .planning/cycles/01-c/phases/08-neuve
 
+@@ fichier .planning/cycles/01-c/phases/09-fm-invalide/CADRAGE.md
+---
+inconnues: []
+
+@@ fichier .planning/cycles/01-c/phases/09-fm-invalide/PLAN.md
+---
+ecrit: livrables/h.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/10-registre-invalide/CADRAGE.md
+---
+inconnues:
+  - id: I-10
+    question: "Q ?"
+    structurante: peut-etre
+---
+
+@@ fichier .planning/cycles/01-c/phases/10-registre-invalide/PLAN.md
+---
+ecrit: livrables/i.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/11-lien/PLAN.md
+---
+ecrit: livrables/j.md
+---
+
+@@ lien .planning/cycles/01-c/phases/11-lien/CADRAGE.md -> cible-absente
+
+@@ fichier .planning/cycles/01-c/phases/12-dossier/PLAN.md
+---
+ecrit: livrables/k.md
+---
+
+@@ dossier .planning/cycles/01-c/phases/12-dossier/CADRAGE.md
+
+@@ fichier .planning/cycles/01-c/phases/13-autre/PLAN.md
+---
+ecrit: livrables/l.md
+---
+
+@@ dossier .planning/cycles/01-c/phases/13-autre/CLOTURE.md
+
+@@ fichier .planning/cycles/01-c/phases/14-quelconque/CADRAGE.md
+---
+inconnues:
+  - id: I-14
+    question: "Q ?"
+    structurante: oui
+    statut: n'importe quoi
+---
+
+@@ fichier .planning/cycles/01-c/phases/14-quelconque/PLAN.md
+---
+ecrit: livrables/m.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/15-non-structurante/CADRAGE.md
+---
+inconnues:
+  - id: I-15
+    question: "Q ?"
+    structurante: non
+---
+
+@@ fichier .planning/cycles/01-c/phases/15-non-structurante/PLAN.md
+---
+ecrit: livrables/n.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/16-deux-ouverts/CADRAGE.md
+---
+inconnues:
+  - id: I-21
+    question: "Q1 ?"
+    structurante: oui
+  - id: I-22
+    question: "Q2 ?"
+    structurante: oui
+---
+
+@@ fichier .planning/cycles/01-c/phases/16-deux-ouverts/PLAN.md
+---
+ecrit: livrables/o.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/17-mixte/CADRAGE.md
+---
+inconnues:
+  - id: I-31
+    question: "Q1 ?"
+    structurante: oui
+  - id: I-32
+    question: "Q2 ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/17-mixte/PLAN.md
+---
+ecrit: livrables/p.md
+---
+
 @@ # Refus : phase sans CADRAGE.md, plan direct et sous plans/, phase encore vide, Write comme Edit, tout rôle.
 @@ ecriture Write .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: doit-refuser G1
 @@ ecriture Edit .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: doit-refuser G1
@@ -332,6 +435,21 @@ ecrit: livrables/g.md
 @@ ecriture Write .planning/cycles/01-c/phases/06-plans/plans/01-a/PLAN.md armee :: doit-refuser G1
 @@ ecriture Edit .planning/cycles/01-c/phases/06-plans/plans/01-a/PLAN.md armee :: doit-refuser G1
 @@ ecriture Write .planning/cycles/01-c/phases/08-neuve/PLAN.md armee :: doit-refuser G1
+@@ # Refus : registre ouvert (une ligne structurante: oui sans statut), Write comme Edit, plan direct ou sous plans/ ;
+@@ # l'ABSENCE de CADRAGE.md est refusée même quand un AUTRE fichier de la phase est non régulier (fixture E).
+@@ ecriture Write .planning/cycles/01-c/phases/04-ouvert/PLAN.md armee :: doit-refuser G1
+@@ ecriture Edit .planning/cycles/01-c/phases/04-ouvert/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/16-deux-ouverts/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/17-mixte/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/13-autre/PLAN.md armee :: doit-refuser G1
+@@ # Passage : la valeur d'un statut n'est jamais jugée (toute valeur non vide ferme la ligne), structurante: non sans statut ;
+@@ # états que le modèle ne peut pas lire (F5 = f5-etats : frontmatter invalide, registre invalide, CADRAGE.md en lien ou en dossier).
+@@ ecriture Write .planning/cycles/01-c/phases/14-quelconque/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/15-non-structurante/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/09-fm-invalide/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/10-registre-invalide/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/11-lien/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/12-dossier/PLAN.md armee :: doit-passer G1
 @@ # Passage : phase à CADRAGE.md clos, à `inconnues: []`, au format hérité ; plan sous une phase cadrée ; autres
 @@ # fichiers du modèle ; PLAN.md du socle v2 ou sous un nom d'unité invalide ; PLAN.md hors de .planning/.
 @@ ecriture Write .planning/cycles/01-c/phases/02-clos/PLAN.md armee :: doit-passer G1

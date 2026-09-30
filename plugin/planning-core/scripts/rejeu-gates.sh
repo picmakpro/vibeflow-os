@@ -9,7 +9,8 @@
 # lire une variable d'environnement qui change un verdict (HOME ne sert qu'à afficher `~/…` et au
 # hook lui-même, qui le lit pour résoudre les définitions d'agent, P45-D-12a). Il travaille sur une
 # COPIE sous mktemp : l'adhésion cycles-v1 y est SIMULÉE (jamais un interrupteur du script livré) et
-# l'armement des étapes ≤ --etape y est SIMULÉ sur une copie du hook. Les chemins des labs réels ne
+# l'armement des étapes ≤ --etape y est SIMULÉ sur une copie du hook. Ses seuls sous-processus : bash (le hook
+# copié ; recalc-planning.sh --read-only sur la COPIE, pour l'état dérivé du constructeur G1) et cmp. Les chemins des labs réels ne
 # vivent jamais dans ce fichier ni dans sa suite : ils sont des ARGUMENTS ; ce que les plans 45-05 à
 # 45-09 rejouent le fait par `rejeu-reel.sh`, qui prend l'empreinte de TOUT l'arbre hors de cet outil.
 #
@@ -48,8 +49,11 @@
 # Fichier d'attendus : lignes `<gate> | <lab affiché> | <chemin relatif> | <attendu> | <motif>`,
 # commentaires `#` ; une ligne dont le lab n'est pas dans cette mesure est ignorée.
 # Registre CONSTRUCTEURS (gate -> fonction(lab, ctx) qui rend des tuples (outil, chemin, attendu,
-# agent_type[, origine[, charge]])) : `reecriture` (chaque fichier régulier des .planning/ copiés, attendu
-# doit-passer) ; `G6` et `G5` (45-05 : fichiers générés, config.json, VERDICT.md) ; 45-06 à 45-09
+# agent_type[, origine[, charge[, branche]]])) : `reecriture` (chaque fichier régulier des .planning/ copiés,
+# attendu doit-passer) ; `G6` et `G5` (45-05 : fichiers générés, config.json, VERDICT.md) ; `G1` (45-06 : les
+# PLAN.md de forme modèle, classés d'après l'état que recalc-planning.sh --read-only dérive sur la copie — `recalc-
+# planning.sh` est cherché à côté de ce script — sinon d'après la règle écrite du modèle, `branche` nommant la
+# règle appliquée ; des phases synthétiques 99-rejeu-* créées sur la copie) ; 45-07 à 45-09
 # ajoutent le leur. `charge` (dict) remplace le tool_input d'un Edit (old_string, new_string,
 # replace_all) : l'Edit de config.json qui perd l'adhésion a une clé (outil Edit) distincte de celle de
 # la réécriture Write du même fichier. Un constructeur qui classe d'après le modèle porte
@@ -92,12 +96,13 @@ if [ "$HOOK_DONNE" -eq 0 ]; then
 fi
 
 # shellcheck disable=SC2086
-exec $PY_INVOKE -I -S - "$@" <<'PY_REJEU_GATES_EOF'
+exec $PY_INVOKE -I -S - "$SCRIPT_DIR_SELF" "$@" <<'PY_REJEU_GATES_EOF'
 import hashlib
 import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -342,16 +347,320 @@ def construire_g5(lab, ctx):
     return [("Write", rel, "doit-refuser", "") for rel in sorted(chemins)]
 
 
-CONSTRUCTEURS = {"reecriture": construire_reecriture, "G6": construire_g6, "G5": construire_g5}  # rejeu-registre
+# --- Règle écrite du modèle pour G1 : lecture de CADRAGE.md par le code PROPRE de l'outil (45-06) -------------
+# Copies ast-identiques de dequote, CLE_RE, lire_frontmatter, _lire_liste_indentee et lire_registre du moteur de
+# recalcul (la suite compare les arbres) : l'outil ne lit jamais le CADRAGE.md d'une autre façon que le modèle, et ne
+# s'appuie jamais sur le hook pour classer.
+def dequote(valeur):
+    """Dé-quote une valeur entre guillemets simples ou doubles, sans traitement d'échappement."""
+    v = valeur.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in ("'", '"'):
+        return v[1:-1]
+    return v
+
+
+CLE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):(.*)$")
+
+
+def lire_frontmatter(texte):
+    """Parse un frontmatter minimal (première ligne `---`, fermeture `---`) : toute forme non
+    reconnue (clé dupliquée, bloc littéral, ligne orpheline, frontmatter jamais refermé) rend un
+    statut d'échec distinct de « absent » — jamais une valeur devinée (Pitfall 3)."""
+    lignes = texte.split("\n")
+    if not lignes or lignes[0].rstrip("\r") != "---":
+        return ("absent", {})
+    fin = None
+    for i in range(1, len(lignes)):
+        if lignes[i].rstrip("\r") == "---":
+            fin = i
+            break
+    if fin is None:
+        return ("invalide:frontmatter-non-ferme", {})
+    corps = lignes[1:fin]
+    donnees = {}
+    cles_vues = set()
+    i = 0
+    n = len(corps)
+    while i < n:
+        brute = corps[i].rstrip("\r")
+        allegee = brute.strip()
+        if allegee == "" or allegee.startswith("#"):
+            i += 1
+            continue
+        if brute != brute.lstrip():
+            return ("invalide:ligne-orpheline", {})
+        m = CLE_RE.match(brute)
+        if not m:
+            return ("invalide:ligne-non-reconnue", {})
+        cle, reste = m.group(1), m.group(2).strip()
+        if cle in cles_vues:
+            return ("invalide:cle-dupliquee", {})
+        if reste == "":
+            valeur, j = _lire_liste_indentee(corps, i + 1)
+            if valeur is None:
+                return ("invalide:liste-mal-formee", {})
+            donnees[cle] = valeur
+            i = j
+        elif reste == "[]":
+            donnees[cle] = []
+            i += 1
+        elif reste.startswith("[") and reste.endswith("]"):
+            interieur = reste[1:-1].strip()
+            donnees[cle] = [] if interieur == "" else [dequote(p.strip()) for p in interieur.split(",")]
+            i += 1
+        else:
+            donnees[cle] = dequote(reste)
+            i += 1
+        cles_vues.add(cle)
+    return ("ok", donnees)
+
+
+def _lire_liste_indentee(corps, depart):
+    """Lit une liste de scalaires (`- valeur`) ou une liste de mappings plats (`- k: v` puis
+    `k2: v2` plus indentées) sous une clé vide. Renvoie (None, depart) si la forme est mixte ou
+    porte un bloc littéral (invalide, jamais devinée)."""
+    items = []
+    mode = None
+    carte_courante = None
+    j = depart
+    n = len(corps)
+    while j < n:
+        suivante = corps[j].rstrip("\r")
+        if suivante.strip() == "":
+            j += 1
+            continue
+        if suivante == suivante.lstrip():
+            break
+        interieur = suivante.strip()
+        if interieur.startswith("|") or interieur.startswith(">"):
+            return (None, j)
+        if interieur.startswith("- "):
+            corps_item = interieur[2:]
+            mkv = CLE_RE.match(corps_item)
+            if mkv:
+                if mode == "scalaires":
+                    return (None, j)
+                mode = "mappings"
+                carte_courante = {mkv.group(1): dequote(mkv.group(2))}
+                items.append(carte_courante)
+            else:
+                if mode == "mappings":
+                    return (None, j)
+                mode = "scalaires"
+                items.append(dequote(corps_item))
+                carte_courante = None
+        else:
+            mkv2 = CLE_RE.match(interieur)
+            if mode == "mappings" and mkv2 and carte_courante is not None:
+                cle2 = mkv2.group(1)
+                if cle2 in carte_courante:
+                    return (None, j)
+                carte_courante[cle2] = dequote(mkv2.group(2))
+            else:
+                return (None, j)
+        j += 1
+    return (items, j)
+
+
+def lire_registre(donnees_cadrage):
+    """(registre_ok, registre_clos) depuis le frontmatter DÉJÀ analysé de CADRAGE.md. Φ3 : registre
+    absent ou mal formé (structurante hors oui/non, ligne qui n'est pas un mapping) -> registre_ok
+    faux (`registre-invalide`). Lecture littérale spec §3.1 l.213 : TOUTE valeur non vide de
+    `statut` ferme la ligne, quelle qu'elle soit — jamais une liste fermée, jamais un jugement de
+    la valeur elle-même. `inconnues: []` est clos."""
+    inconnues = donnees_cadrage.get("inconnues")
+    if not isinstance(inconnues, list):
+        return (False, False)
+    clos = True
+    for item in inconnues:
+        if not isinstance(item, dict):
+            return (False, False)
+        structurante = item.get("structurante")
+        if structurante not in ("oui", "non"):
+            return (False, False)
+        statut = item.get("statut")
+        if structurante == "oui" and not (isinstance(statut, str) and statut.strip()):
+            clos = False
+    return (True, clos)
+
+
+# --- G1 (45-06, GATE-06, P45-D-21a, P45-D-21c) : pas de plan sans cadrage --------------------------------------
+# Le constructeur classe d'après le MODÈLE, jamais d'après le verdict du hook : l'état que `recalc-planning.sh
+# --read-only` dérive sur la copie s'il existe pour la phase, sinon — quelle qu'en soit la cause — la règle écrite du
+# modèle (`regle_ecrite`), appliquée par le code propre de l'outil. La classification est TOTALE : pour tout PLAN.md de
+# la forme que vise G1, UN attendu, `doit-passer` ou `doit-refuser-modele`, jamais aucun, jamais un doit-passer faute
+# d'état. Il ne lance jamais le hook ni une fonction du hook.
+DOSSIER_SCRIPTS = None  # posé par le lanceur shell (dossier de rejeu-gates.sh) : recalc-planning.sh vit à côté
+NOM_UNITE = re.compile(r"^[0-9]{2,}-[\w.-]+$")  # le nom d'unité du modèle (cycle, phase, plan)
+SYNTH_CYCLE = "99-rejeu"
+SYNTH_SANS = "99-rejeu-sans-cadrage"
+SYNTH_OUVERT = "99-rejeu-registre-ouvert"
+CADRAGE_OUVERT = '---\ninconnues:\n  - id: I-99\n    question: "Q ?"\n    structurante: oui\n---\n'
+
+
+def forme_g1(rel):
+    """Chemin (relatif au lab) du dossier de la PHASE si `rel` est un PLAN.md de la forme que vise G1 —
+    `<…>/.planning/cycles/<cycle>/phases/<phase>/PLAN.md` ou `…/phases/<phase>/plans/<plan>/PLAN.md`, chaque nom
+    d'unité conforme à NOM_UNITE, les noms fixes comparés en casefold — sinon None."""
+    p = rel.split("/")
+    for n in (6, 8):
+        if len(p) < n:
+            continue
+        q = p[-n:]
+        if q[0] != ".planning" or q[1].casefold() != "cycles" or q[3].casefold() != "phases" or q[-1].casefold() != "plan.md":
+            continue
+        if n == 8 and q[5].casefold() != "plans":
+            continue
+        unites = [q[2], q[4]] + ([q[6]] if n == 8 else [])
+        if not all(NOM_UNITE.match(u) for u in unites):  # g1-forme
+            continue
+        return "/".join(p[:-n] + q[:5])
+    return None
+
+
+def regle_ecrite(copie, rel):
+    """(attendu, branche) selon la RÈGLE ÉCRITE du modèle (modele-cycles.md, spec §5), sur la lecture propre de la copie
+    (lstat de CADRAGE.md). Fonction totale à branches NOMMÉES, évaluées dans cet ordre, sans branche par défaut : un
+    cas qu'aucune ne reconnaît est une erreur de l'outil, jamais un doit-passer."""
+    phase = forme_g1(rel)
+    if phase is None:
+        return ("doit-passer", "hors-forme")  # GATE-06 ne vise pas ce chemin
+    cadrage = os.path.join(copie, phase, "CADRAGE.md")
+    try:
+        mode = os.lstat(cadrage).st_mode
+    except FileNotFoundError:
+        return ("doit-refuser-modele", "pas-de-cadrage")  # même si un AUTRE fichier de la phase est non régulier
+    except OSError:
+        raise ErreurOutil("classification impossible : " + rel + " (lecture de CADRAGE.md)")
+    if not stat.S_ISREG(mode):
+        return ("doit-passer", "non-regulier")  # g1-nonreg : f5-etats, dossier, lien ou autre type, état indéterminé
+    try:
+        with open(cadrage, encoding="utf-8") as fh:
+            statut, donnees = lire_frontmatter(fh.read())
+    except (OSError, UnicodeDecodeError):
+        return ("doit-passer", "illisible")
+    if statut != "ok":
+        return ("doit-passer", "illisible")
+    if "inconnues" not in donnees:
+        return ("doit-passer", "herite")  # g1-herite : format hérité, sans clé inconnues:
+    registre_ok, clos = lire_registre(donnees)
+    if not registre_ok:
+        return ("doit-passer", "illisible")
+    ouvert = not clos  # g1-clos : toute ligne structurante: oui sans statut ; `inconnues: []` est clos
+    if ouvert:
+        return ("doit-refuser-modele", "registre-ouvert")
+    if clos:
+        return ("doit-passer", "clos")
+    raise ErreurOutil("classification impossible : " + rel)
+
+
+def exploitable(etat, raison):
+    """Un état dérivé fait référence, défini par le COUPLE (état, raison) : tout état autre que `indéterminé`, et, sous
+    `indéterminé`, les seules raisons de Φ2 à Φ4 (CADRAGE.md y a passé Φ1, son contenu est lu par le modèle)."""
+    if etat != "indéterminé":
+        return True
+    r = raison or ""
+    return r.startswith("hors-cadrage:") or r.startswith("avant-cadrage-clos:") or r == "registre-invalide" \
+        or r == "frontmatter-invalide:CADRAGE.md"
+
+
+def attendu_derive(etat, raison):
+    """Attendu d'un état dérivé exploitable : à cadrer, hors-cadrage:*, en cadrage, avant-cadrage-clos:* sont interdits
+    par le modèle (lab non migré) ; registre-invalide, frontmatter-invalide:CADRAGE.md et tout état cadré passent."""
+    r = raison or ""
+    if etat in ("à cadrer", "en cadrage") or r.startswith("hors-cadrage:") or r.startswith("avant-cadrage-clos:"):
+        return "doit-refuser-modele"
+    return "doit-passer"
+
+
+def chemin_recalc():
+    if not DOSSIER_SCRIPTS:
+        raise ErreurOutil("recalc-planning.sh introuvable : dossier des scripts inconnu")
+    chemin = os.path.join(DOSSIER_SCRIPTS, "recalc-planning.sh")
+    if not os.path.isfile(chemin):
+        raise ErreurOutil("recalc-planning.sh introuvable à côté de rejeu-gates.sh")
+    return chemin
+
+
+def etats_derives(lab, planning):
+    """{chemin de phase relatif au lab: (état, raison)} rendus par recalc-planning.sh --read-only sur la COPIE ; vide si
+    le moteur ne rend rien d'exploitable (la règle écrite prend alors le relais, quelle qu'en soit la cause)."""
+    recalc = chemin_recalc()
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": os.environ.get("HOME", "")}
+    try:
+        p = subprocess.run(["bash", recalc, "--planning=" + os.path.join(lab.copie, planning), "--read-only"],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=DELAI_HOOK)
+        donnees = json.loads(p.stdout.decode("utf-8"))
+        cycles = donnees.get("cycles", [])
+        return dict((planning + "/" + ph["chemin"], (ph["etat"], ph.get("raison"))) for c in cycles for ph in c.get("phases", []))
+    except (subprocess.TimeoutExpired, OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
+
+
+def phases_synthetiques(lab, planning):
+    """Écritures `doit-refuser` (le modèle les interdit pour tout lab) dans des phases synthétiques créées sur la COPIE :
+    une sans CADRAGE.md, une à registre ouvert, sous chaque cycle réel (ou sous le cycle synthétique 99-rejeu)."""
+    base = os.path.join(lab.copie, planning, "cycles")
+    cycles = []
+    try:
+        for nom in sorted(os.listdir(base)):
+            if NOM_UNITE.match(nom) and stat.S_ISDIR(os.lstat(os.path.join(base, nom)).st_mode):
+                cycles.append(nom)
+    except OSError:
+        cycles = []
+    if not cycles:
+        cycles = [SYNTH_CYCLE]
+    sortie = []
+    for cycle in cycles:
+        for phase, cadrage in ((SYNTH_SANS, None), (SYNTH_OUVERT, CADRAGE_OUVERT)):
+            dossier = os.path.join(base, cycle, "phases", phase)
+            try:
+                os.makedirs(dossier, exist_ok=True)
+                if cadrage is not None:
+                    with open(os.path.join(dossier, "CADRAGE.md"), "w", encoding="utf-8", newline="\n") as fh:
+                        fh.write(cadrage)
+            except OSError:
+                continue
+            sortie.append(("Write", planning + "/cycles/" + cycle + "/phases/" + phase + "/PLAN.md", "doit-refuser", ""))
+    return sortie
+
+
+def construire_g1(lab, ctx):
+    """G1 : la réécriture de chaque PLAN.md réel de forme modèle (attendu du modèle : état dérivé, sinon règle écrite) et les
+    phases synthétiques que le modèle interdit pour tout lab."""
+    sortie, vus = [], set()
+    for planning in lab.dossiers_planning:
+        derives = etats_derives(lab, planning)
+        for rel in sorted(r for r in lab.fichiers_planning if r.startswith(planning + "/") and r not in vus):
+            phase = forme_g1(rel)
+            if phase is None:
+                continue  # hors de la forme visée : la ligne du relevé vient de la réécriture générique
+            vus.add(rel)
+            etat = derives.get(phase)
+            if etat is not None and exploitable(*etat):
+                attendu = attendu_derive(*etat)  # g1-derive
+                sortie.append(("Write", rel, attendu, "", "etat-derive"))
+            else:
+                attendu, branche = regle_ecrite(lab.copie, rel)
+                sortie.append(("Write", rel, attendu, "", "regle-ecrite", None, branche))  # g1-regle
+        sortie.extend(phases_synthetiques(lab, planning))
+    return sortie
+
+
+construire_g1.classe_modele = True
+
+
+CONSTRUCTEURS = {"reecriture": construire_reecriture, "G6": construire_g6, "G5": construire_g5, "G1": construire_g1}  # rejeu-registre
 
 
 def normaliser(lab, gate, brut, rang):
     """Un tuple de constructeur -> dict d'entrée ; la classification est TOTALE (P45-D-21c)."""
-    if not isinstance(brut, (tuple, list)) or len(brut) not in (4, 5, 6):
+    if not isinstance(brut, (tuple, list)) or len(brut) not in (4, 5, 6, 7):
         raise ErreurOutil("écriture mal formée rendue par le constructeur " + gate)
     outil, chemin, attendu, agent_type = brut[:4]
     origine = brut[4] if len(brut) >= 5 else "etat-derive"
-    charge = brut[5] if len(brut) == 6 else None
+    charge = brut[5] if len(brut) >= 6 else None
+    branche = brut[6] if len(brut) == 7 else None
     if charge is not None and not isinstance(charge, dict):
         raise ErreurOutil("charge mal formée rendue par le constructeur " + gate)
     cle = clef(outil, chemin, agent_type or "")
@@ -360,7 +669,7 @@ def normaliser(lab, gate, brut, rang):
     if origine not in ORIGINES:
         raise ErreurOutil("origine inconnue : " + str(origine) + " pour " + montrer_clef(cle))
     return {"lab": lab.index, "clef": cle, "attendu": attendu, "origine": origine, "gate": gate, "rang": rang,
-            "charge": charge}
+            "charge": charge, "branche": branche}
 
 
 def lire_attendus(chemin, labs):
@@ -590,7 +899,7 @@ def executer(opts, tmp):
         if classe == "refus-conforme-modele":
             motif = RAISON_MODELE
         if gagnant["origine"] == "regle-ecrite":
-            motif = (motif + " ; " if motif and motif != "passe" else "") + RAISON_REGLE
+            motif = (motif + " ; " if motif and motif != "passe" else "") + RAISON_REGLE + (" : " + gagnant["branche"] if gagnant.get("branche") else "")
         lignes.append(" | ".join([gate, lab.affiche, colonne_chemin(gagnant["clef"]), gagnant["attendu"], obtenu, motif]))
 
     gates_comptes = [g for lot in ORDRE_ETAPES[:opts["etape"]] for g in lot]
@@ -658,5 +967,6 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    DOSSIER_SCRIPTS = sys.argv[1]  # dossier de rejeu-gates.sh, posé par le lanceur shell
+    sys.exit(main(sys.argv[2:]))
 PY_REJEU_GATES_EOF
