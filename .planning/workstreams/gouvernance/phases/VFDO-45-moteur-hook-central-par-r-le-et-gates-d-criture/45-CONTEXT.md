@@ -334,6 +334,10 @@ Chaque exigence dérive d'une décision ci-dessus et n'en pose aucune nouvelle.
   `Agent|Task` (les deux `tool_name`, `subagent_type` normalisé). Un fil principal ou un agent
   inconnu n'a que la ligne « Tous ». Un contrôle croisé prouve l'accord avec `check-agents.sh` sur
   tout le corpus (P45-D-04, P45-D-05, P45-D-05a, P45-D-05b, P45-D-09, P45-D-11).
+  *Déviation datée (2026-09-30, exécution)* : ligne worker livrée en **f9-allowlist** (un worker ne
+  dispatche que ce que sa propre allowlist autorise ; allowlist vide = tout refusé). Arbitrage F9 :
+  Willy, AskUserQuestion session principale, 2026-09-30, contre le défaut du plan 45-08. Limite
+  déclarée : l'allowlist vit dans une définition d'agent que G6 ne protège pas.
 - **GATE-10** : zéro régression sur les labs dev. Sur un lab dev fixture et sur ce dépôt, le hook
   rend un octet vide et 0 pour chaque type d'appel, et la mutation « ignorer l'adhésion » rend la
   preuve rouge (P45-D-04).
