@@ -130,7 +130,7 @@ Un script au niveau projet lit `agent_type` dans le payload du hook et applique 
 | Rôle | Refusé à l'exécution |
 |---|---|
 | Juge | toute écriture, sauf son verdict posé par commande |
-| Worker | tout dispatch d'agent |
+| Worker | tout dispatch d'agent — *déviation datée (2026-09-30, exécution de la Phase 45)* : la ligne est livrée en **f9-allowlist** — un worker ne dispatche que ce que sa propre allowlist `Agent(...)`/`Task(...)` autorise (allowlist vide = tout refusé), au lieu de « tout dispatch refusé ». Arbitrage F9 : Willy, AskUserQuestion session principale, 2026-09-30 (contre le défaut du plan 45-08). Limite déclarée : l'allowlist vit dans une définition d'agent que G6 ne protège pas. |
 | Producteur | écrire un verdict |
 | Tous | écrire `STATE.md`, `INDEX.md`, `cloture.log` |
 
