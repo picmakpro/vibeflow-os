@@ -34,6 +34,21 @@
 | MOTR-16 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
 | MOTR-17 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
 | MOTR-18 | Phase 44 | Complete — 44-VERIFICATION.md passed 18/18 (267b041) ; cochée à la main |
+| GATE-01 | Phase 45 | Pending |
+| GATE-02 | Phase 45 | Pending |
+| GATE-03 | Phase 45 | Pending |
+| GATE-04 | Phase 45 | Pending |
+| GATE-05 | Phase 45 | Pending |
+| GATE-06 | Phase 45 | Pending |
+| GATE-07 | Phase 45 | Pending |
+| GATE-08 | Phase 45 | Pending |
+| GATE-09 | Phase 45 | Pending |
+| GATE-10 | Phase 45 | Pending |
+| GATE-11 | Phase 45 | Pending |
+| GATE-12 | Phase 45 | Pending |
+| GATE-13 | Phase 45 | Pending |
+| GATE-14 | Phase 45 | Pending |
+| GATE-15 | Phase 45 | Pending |
 
 ## Milestone gouvernance-labs-v1.0 — « le planning métier tenu par une machine » (inscrit 2026-09-23)
 
@@ -132,3 +147,25 @@
 - [x] **MOTR-18**: `plugin/planning-core` reçoit un bump de version mineur (nouvelle capacité),
   CHANGELOG et README du module mis à jour ; aucune release du jalon gouvernance (pas de bump de
   la `VERSION` racine, pas de tag) avant la clôture de `fiabilite-v1.0` (P44-D-18)
+
+### Moteur — hook central par rôle et gates d'écriture (Phase 45)
+
+> Préfixe `GATE` vérifié libre le 2026-09-29 (recherche `GATE-[0-9]` sur tout le dépôt par deux commandes :
+> 0 fichier ; témoin `MOTR-[0-9]` : 25 fichiers). Chaque exigence dérive d'une décision de `45-CONTEXT.md`
+> (préfixe `P45-D-NN`, ADR-075) et ne pose aucune décision nouvelle.
+
+- [ ] **GATE-01**: un script de hook central unique dans `plugin/planning-core/` (Python embarqué dans un `.sh`), déclaré par `hooks.json`, n'agit que dans un lab adhérent `cycles-v1`, dont la racine est dérivée du chemin écrit ou du `cwd` du payload, jamais de `$CLAUDE_PROJECT_DIR`. Hors lab adhérent, il ne sort rien et rend 0 (P45-D-01, P45-D-01a, P45-D-12, P45-D-15).
+- [ ] **GATE-02**: tout refus est un `permissionDecision: "deny"` JSON avec exit 0, jamais exit 2. Toute erreur interne est piégée en deny dans le périmètre adhérent (P45-D-08).
+- [ ] **GATE-03**: la commande enregistrée émet elle-même un deny, avec un message de réparation, si le script ou `python3` manquent dans un lab adhérent. Elle décide de l'adhésion sans `python3`. Un lab non adhérent n'est jamais refusé, même sans `python3` ni script (P45-D-06, P45-D-06a).
+- [ ] **GATE-04**: G6 refuse toute écriture par outil de `STATE.md`, `INDEX.md`, `cloture.log` et du journal de dérogation d'un lab adhérent (P45-D-13, spec §5).
+- [ ] **GATE-05**: une commande pose `VERDICT.md` avec le hash sha256 de l'artefact jugé et le numéro de tentative, au format de la 44. G5 refuse toute écriture par outil de `VERDICT.md`, quel que soit le rôle (P45-D-07).
+- [ ] **GATE-06**: G1 refuse l'écriture d'un `PLAN.md` sans `CADRAGE.md`, ou avec une ligne structurante sans statut (spec §5).
+- [ ] **GATE-07**: G7 refuse la création d'un `.planning/` sous un lab adhérent quand le dossier parent n'a ni `.claude/` habité (prédicat littéral écrit dans la référence) ni marqueur de code (P45-D-14).
+- [ ] **GATE-08**: G2 avertit, sans jamais refuser, sur une écriture `Write`/`Edit`/`Bash` hors `ecrit:`. La limite « Bash non couvert par les refus » est écrite dans la référence et dans le message (P45-D-10).
+- [ ] **GATE-09**: le hook par rôle dérive le rôle du frontmatter par les prédicats I5/I6 et `vf-internal`. Il refuse au juge toute écriture par outil et au worker tout dispatch `Agent|Task` (les deux `tool_name`, `subagent_type` normalisé). Un fil principal ou un agent inconnu n'a que la ligne « Tous ». Un contrôle croisé prouve l'accord avec `check-agents.sh` sur tout le corpus (P45-D-04, P45-D-05, P45-D-05a, P45-D-05b, P45-D-09, P45-D-11).
+- [ ] **GATE-10**: zéro régression sur les labs dev. Sur un lab dev fixture et sur ce dépôt, le hook rend un octet vide et 0 pour chaque type d'appel, et la mutation « ignorer l'adhésion » rend la preuve rouge (P45-D-04).
+- [ ] **GATE-11**: une dérogation nominative (qui, canal, date, gate, chemin(s), raison qui n'est pas un placeholder) est posée par une commande dans un journal append-only protégé par G6. Elle n'est jamais conditionnée à l'urgence, et elle est citée dans la sortie de l'action qu'elle laisse passer (P45-D-01, P45-D-13).
+- [ ] **GATE-12**: un canary par gate armé rejoue la commande enregistrée telle quelle et exige un deny. Il est bloquant en CI et signale au démarrage de session d'un lab adhérent. Il couvre au minimum : script absent, `python3` absent, `Task` et `Agent`, fil principal, agent `plugin:` (P45-D-20).
+- [ ] **GATE-13**: les faux refus sont mesurés dans les deux sens pour chaque gate, sur le banc en CI puis sur le rejeu en lecture seule de deux labs réels, sans écriture prouvée par une empreinte. L'armement suit l'ordre G6+G5 → G1 → G7 → rôle, et chaque étape exige 0 faux refus et 0 faux accept (P45-D-03, P45-D-03a, P45-D-03b, P45-D-21).
+- [ ] **GATE-14**: `recalc-planning.sh` écrit sur un lab adhérent quand le détecteur rend 2. Sans adhésion, son refus est inchangé (exit 2, rien touché) ; avec le détecteur à 0, le refus reste (exit 3). Les trois branches ont leur jumeau négatif et leur mutation rouge ; `detect-gsd-engine.sh` et `workstream-policy.sh` restent inchangés (P45-D-02, P45-D-02a, P45-D-02b).
+- [ ] **GATE-15**: les suites sous `plugin/planning-core/scripts/tests/` tournent en CI Linux, sans dépendance GNU/BSD, et chaque garde est prouvée par une mutation rouge tracée. `planning-core` reçoit un bump mineur, sans release, et `guard-planning-updated.sh` n'est pas retiré (P45-D-16, P45-D-18, P45-D-19).
