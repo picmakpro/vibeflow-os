@@ -100,7 +100,7 @@ dev-orchestrator/
 │       ├── test-check-doc-drift.sh
 │       ├── test-check-requirements-survival.sh
 │       ├── test-restore-requirements-ledger.sh
-│       └── test-check-mission-exit.sh  # 48 assertions, 6 mutations de fixture + 5 mutants d'E7 (Phases 40 et 41.3, QUAL-01)
+│       └── test-check-mission-exit.sh  # 62 assertions, 6 mutations de fixture + 8 mutants d'E7 (Phases 40 et 41.3, QUAL-01)
 └── references/                    # doctrine + index chargés on-demand par les agents
     ├── intent-routing.md           # carte intention → brique (SEULE source de routage)
     ├── GSD-PIPELINE.md             # ordre canonique du cycle + model profiles
@@ -276,15 +276,15 @@ Couvre les axes de la bascule agentique (spec 2026-07-25) plus les acquis :
 bash dev-orchestrator/scripts/tests/test-check-mission-exit.sh
 ```
 
-- **`test-check-mission-exit.sh`** (HEAD-02, QUAL-01, Phase 40) — 48 assertions (re-dérivées par
+- **`test-check-mission-exit.sh`** (HEAD-02, QUAL-01, Phase 40) — 62 assertions (re-dérivées par
   exécution : `bash .../test-check-mission-exit.sh 2>&1 | tail -1`), dont les six mutations de
   fixture des contrôles E1 jusqu'à E6 (une par contrôle, chacune assertant le code de sortie ET le nom du contrôle
   dans la sortie), la discrimination machine sain/manque/indéterminé, le cas E6-tableau-de-preuves
   vide, la lecture seule du dépôt inspecté (D-10), la garde D-11 (aucune sous-commande mutante du
   verrou) prouvée par mutation du script lui-même, et les deux causes d'indétermination E1
-  départagées (cascade non résolue vs `driver-lock.sh` absent). Cas 28 à 39 (plan 41.3-04) : le contrôle E7 (rangement apparu depuis le snapshot de début de
+  départagées (cascade non résolue vs `driver-lock.sh` absent). Cas 28 à 43 (plan 41.3-04) : le contrôle E7 (rangement apparu depuis le snapshot de début de
   mission, archivage sans geste humain, snapshot absent ou archivage non tenté = indéterminé), le
-  mode `--budget-snapshot` et cinq mutants de script. Cas 23 à 27 (issue #82) : E1 lit
+  mode `--budget-snapshot` et huit mutants de script. Cas 23 à 27 (issue #82) : E1 lit
   aussi `children_running` du registre des agents dispatchés (verrou relâché mais enfant consigné
   encore `running` = manque ; valeur non numérique = indéterminé ; champ absent = kernel antérieur,
   sous-contrôle non applicable, sain).

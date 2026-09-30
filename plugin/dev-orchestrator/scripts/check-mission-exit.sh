@@ -191,8 +191,8 @@ cur_lock_gen() {
 }
 
 if [ "$BUDGET_SNAPSHOT" -eq 1 ]; then
-  # Geste du manager, UNE fois, au démarrage de la mission : photographie LECTURE SEULE (sans --auto) de ce
-  # qui est déjà rangeable ; écrit hors de l'arbre de travail.
+  # Geste du manager, UNE fois, au démarrage de la mission : photographie SANS ÉCRITURE (--auto --dry-run : la
+  # décision d'archivage est prise, rien n'est écrit) de ce qui est déjà rangeable ; écrit hors de l'arbre de travail.
   SNAP_BUDGET="$(resolve_budget)" || { echo "[check-mission-exit] --budget-snapshot : check-method-budget.sh introuvable" >&2; exit 4; }
   SNAP_PATH="$(budget_snap_path)" || { echo "[check-mission-exit] --budget-snapshot : $ROOT n'est pas un dépôt git" >&2; exit 4; }
   # --auto --dry-run : la MÊME décision que celle d'E7, rien d'écrit ; un ARCHIVAGE REFUSÉ déjà là au démarrage

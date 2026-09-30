@@ -229,6 +229,6 @@ fi
   echo "[fin-de-geste] Fin de geste : cette session laisse du rangement derrière elle (blocage $P_COUNT/$MAX_BLOCS, sans progrès le dernier laisse sortir)."
   printf '%s\n' "$BLOQUANT"
   [ -n "$CONSTATS" ] && printf '%s\n' "$CONSTATS"
-  echo "À ranger, seulement ce que CETTE session a créé : worktree (git worktree remove, sans --force), branche locale intégrée (git branch -d), stash (patch sous .planning/archives/stash/ puis drop), mémoire non indexée (git add). Jamais une branche distante : geste humain. Un objet qui n'est pas de ta main (autre session) : ne le supprime pas, cite-le dans ton rapport. Toggles : VF_FIN_DE_GESTE=warn|off."
+  echo "À ranger, seulement ce que CETTE session a créé : worktree (git worktree remove, sans --force), branche locale intégrée (git branch -d), stash (patch sous .planning/archives/stash/ puis drop), mémoire non indexée (git add PUIS une entrée dans le MEMORY.md du dossier : après git add elle passe « hors index » tant qu'elle n'y figure pas). Jamais une branche distante : geste humain. Un objet qui n'est pas de ta main (autre session) : ne le supprime pas, cite-le dans ton rapport. Toggles : VF_FIN_DE_GESTE=warn|off."
 } >&2
 exit 2

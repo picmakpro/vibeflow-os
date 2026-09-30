@@ -2,8 +2,8 @@
 # test-check-mission-exit.sh — Suite de vérification de check-mission-exit.sh (HEAD-02, QUAL-01).
 #
 # Un cas par comportement du contrat (cf. en-tête du script testé), plus les six mutations de
-# fixture (une par contrôle E1-E6) et deux mutations structurelles (D-11, cascade E1). Cas 28-36 :
-# contrôle E7 (SOBR-07, plan 41.3-04, delta depuis le snapshot de début de mission), cinq mutants de script
+# fixture (une par contrôle E1-E6) et deux mutations structurelles (D-11, cascade E1). Cas 28-43 :
+# contrôle E7 (SOBR-07, plan 41.3-04, delta depuis le snapshot de début de mission), huit mutants de script
 # tués (rc attendu/obtenu). Fixtures
 # isolées via mktemp -d + git init + dépôt nu, jamais sur le repo réel. Chaque cas capture la
 # sortie ET le code de retour dans deux variables distinctes, assertées séparément.

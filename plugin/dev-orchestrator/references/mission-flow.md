@@ -657,7 +657,7 @@ en Metro ou en « quelle branche ? ». La doctrine « STATE ne garde que le cour
 - Worktrees actifs : **3 par dépôt** au plus, arbre principal non compté.
 
 **Début de mission : le snapshot.** Juste après l'`acquire` du verrou, le manager pose la référence
-de ce qui existe déjà : `"$S"/check-mission-exit.sh --budget-snapshot` (lecture seule, sans `--auto` ;
+de ce qui existe déjà : `"$S"/check-mission-exit.sh --budget-snapshot` (pris en `--auto --dry-run`, rien n'est écrit ;
 le fichier vit sous le répertoire git commun, `vf-mission-budget.snap`, jamais dans l'arbre : E2 reste
 propre). Sans lui, E7 est INDÉTERMINÉ, jamais sain : il ne saurait pas distinguer ce que la mission a
 créé de ce qui existait (branche d'un autre mainteneur, worktree d'une autre mission). Le snapshot porte

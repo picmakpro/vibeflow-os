@@ -108,7 +108,7 @@
 #         introuvable, gh ou jq indisponible ou muet, stash illisible, branche de référence introuvable
 #         ou orpheline, git for-each-ref en échec) — jamais un 0 de complaisance sous
 #         --strict · 64 = argument invalide. Sous --strict, tout RANGEABLE et tout À VALIDER
-#         compte comme un dépassement. --archive : 2 aussi quand une source est refusée (rien écrit pour elle).
+#         compte comme un dépassement, ARCHIVABLE (sujet clos encore en ligne) aussi : rc 1. --archive : 2 aussi quand une source est refusée (rien écrit pour elle).
 set -uo pipefail
 
 ROOT="."

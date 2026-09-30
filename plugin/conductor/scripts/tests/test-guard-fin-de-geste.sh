@@ -5,7 +5,7 @@
 # VF_METHOD_BUDGET pour produire un constat). Issues QUAL-01 : PASS (silence, exit 0), FAIL (blocage exit 2
 # qui nomme ce qui reste), imparsable BRUYANT (NON VÉRIFIABLE dans `systemMessage`, exit 0). Le stdout d'un
 # exit 0 non vide est vérifié comme UN SEUL document JSON par un parseur de DOCUMENT (json.loads), jamais
-# `jq` (qui accepte un flux de documents). Sept mutants, chacun asserté au rc EXACT sur le mutant ET sur
+# `jq` (qui accepte un flux de documents). Quinze mutants, chacun asserté au rc EXACT sur le mutant ET sur
 # l'original : « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
 # Comparaisons par cmp/comm, jamais diff. LIMITE DE FOND : la garde, sa suite et hooks.json vivent dans
 # le dépôt qu'elles jugent.
