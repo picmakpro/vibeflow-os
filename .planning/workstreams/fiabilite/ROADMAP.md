@@ -112,6 +112,9 @@ Snapshots : `.planning/milestones/vfdo-v1.0-*`. Détails : `MILESTONES.md`.
 
 </details>
 
+<details>
+<summary>✅ install-ux-v1.0 — Phases 2-6 — clôturé 2026-06-05, release `v2.4.0`</summary>
+
 ### 🚧 Install UX (Phases 2-6)
 
 **Milestone Goal:** Réduire l'install de VibeFlow + modules à 2 commandes (plugin) + une UX à toggles
@@ -200,6 +203,11 @@ Plans:
 
 - [x] 06-01-PLAN.md — garde-fou first-use dans AGENT.md (détection `.planning/PROJECT.md` absent → délégation vf-init, new-project jamais seul) + axe de test T7 (FIRST-01, FIRST-02)
 
+</details>
+
+<details>
+<summary>✅ dev-doctrine — Phases 7-8 — clôturé 2026-07-07, release `v2.20.0`</summary>
+
 ### 🚧 Doctrine dev & consolidation (Phases 7-8)
 
 **Milestone Goal:** Combler les philosophies de dev manquantes (DRY absent ; Clean Architecture,
@@ -246,6 +254,11 @@ Plans:
 - [x] 08-03-PLAN.md — reference/AXIOMES-ENFORCEMENT.md source unique + renvois (CONS-03)
 - [x] 08-04-PLAN.md — dé-dup Instance C audit-architecture + fix description legacy v1.0.1 (CONS-02)
 
+</details>
+
+<details>
+<summary>✅ memory-swarm-rnd — Phase 9 — spike GO, shippé `v2.28.0`</summary>
+
 ### 🔬 R&D mémoire & swarm (Phase 9)
 
 **Milestone Goal:** Évaluer, par spike sur lab témoin, la transposition du modèle mémoire riche de jcode
@@ -282,6 +295,11 @@ Plans:
 - [x] 09-01 — spike frontmatter mémoire enrichi (3 gestes) + règle décroissance `consolidator` sur lab témoin (RND-01) → **GO** (round-trip idempotent + archivage non destructif vérifiés, `spike/`)
 - [x] 09-02 — note go/no-go mémoire (verdict + demi-vies recalibrées, `09-GO-NOGO-memoire.md`) + mini-cadrage écrit du volet swarm non implémenté (`09-CADRAGE-swarm.md`) (RND-02)
 
+</details>
+
+<details>
+<summary>✅ gsd-migration — Phases 10-11 — clos 2026-07-26, release `v2.39.0`</summary>
+
 ### 🚧 Migration package GSD (Phases 10-11)
 
 **Milestone Goal:** Basculer la dépendance GSD de `get-shit-done-cc` vers `@opengsd/gsd-core` (VOC-02)
@@ -315,6 +333,11 @@ sans toucher le code.
   3. Non-régression prouvée en **isolé** (dry-run 3 scopes + idempotence, vrai `~/.claude` jamais touché) ; CHANGELOG/README à jour ; release bumpée + **tag annoté poussé** (`scripts/check-release-tag.sh --remote` → ✓).
 
 **Plans**: à cadrer (`/gsd:discuss-phase 11` puis `plan-phase`)
+
+</details>
+
+<details>
+<summary>✅ vf-routing — Phases 12-14 — clos 2026-07-26, release `v2.37.0`</summary>
 
 ### 🚧 Routage fin & verbes VibeFlow (Phases 12-14)
 
@@ -460,6 +483,8 @@ Plans:
 - [x] 14-05-PLAN.md — commande, `domain-detection.md`, ADR-055 au registre (ALTI-04)
 - [x] 14-06-PLAN.md — release : module v2.4.0, racine v2.30.0, tag annoté poussé (ALTI-05)
 - [x] 14-07-PLAN.md — route `vf-new-lab` → moteur GSD documentée + 3 formulations alignées ADR-055 (ALTI-04 ; né du rapport d'exécution)
+
+</details>
 
 ## Progress
 
