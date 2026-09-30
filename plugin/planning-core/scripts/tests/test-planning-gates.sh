@@ -20,6 +20,8 @@
 #   R-OBS-ENV       le journal d'observation suit XDG_CACHE_HOME puis HOME et rien d'autre : les valeurs
 #                   reçues n'atteignent jamais l'armement ni l'adhésion (P45-D-12a)
 #   R-JETON         l'encodeur du journal est ast-identique à _jeton_journal du moteur de recalcul
+#   R-DEROG-01..08  la commande deroger-gate.sh (dérogation nominative, journal append-only injectif, jamais liée
+#                   à l'urgence) et sa consommation par le hook : usage unique, citée, sans effet en observe
 #   R-VERDICT-01..05 la commande poser-verdict.sh : format de la 44, sha256 du PLAN.md (A3), tentative 1 puis
 #                   +1, écriture atomique, refus hors lab adhérent, jamais vue par G5 (45-04, F8 et A3)
 #   R-ACCORD        chemin relatif : avertissement G2 en mode A <=> deny en mode C (limite h)
@@ -1063,6 +1065,199 @@ def controle_verdict_05(ctx, script):
     return True, "G5 armé : la commande Bash n'est pas refusée et écrit, le Write du même fichier l'est"
 
 
+
+# --- 45-04 : deroger-gate.sh et dérogations du hook -------------------------------------------------
+def journal_derog(lab):
+    return os.path.join(lab, ".planning", "derogations-gates.log")
+
+
+def deroger(ctx, lab, dossier=None, gate="G5", chemins=(VERDICT_REL,), qui="willy", canal="AskUserQuestion session principale",
+            date="2026-09-30", raison="cas de test de la dérogation", extra=()):
+    args = ["--lab=" + lab, "--gate=" + gate] + ["--chemin=" + c for c in chemins]
+    args += ["--qui=" + qui, "--canal=" + canal, "--date=" + date, "--raison=" + raison] + list(extra)
+    return lancer_script(ctx, dossier or ctx.scripts_dir, "deroger-gate.sh", args)
+
+
+def ecrire_dans(ctx, dossier_hook, lab, outil, rel, extra_env=None):
+    brut = payload(outil, entree_outil(outil, os.path.join(lab, rel)), lab)
+    return ctx.lancer("A", brut, cwd=lab, dossier=dossier_hook, extra_env=extra_env)
+
+
+def lignes_de(chemin):
+    if not os.path.exists(chemin):
+        return []
+    return [l for l in octets(chemin).decode("utf-8").split("\n") if l]
+
+
+def controle_derog_01(ctx, script):
+    """Dérogation valide : une ligne par chemin, ids 1 et 2, journal jamais tronqué, 0644."""
+    d = _dossier(ctx, script)
+    fautes = []
+    lab = lab_frais(ctx)
+    rc, out, err = deroger(ctx, lab, d, gate="G6", chemins=(".planning/cycles/01-c/CYCLE.md",))
+    lignes = lignes_de(journal_derog(lab))
+    attendu = "  derogation  id=1  gate=G6  chemin=.planning/cycles/01-c/CYCLE.md  qui=willy  canal=AskUserQuestion%20session%20principale  date=2026-09-30  raison=cas%20de%20test%20de%20la%20d"
+    if rc != 0 or len(lignes) != 1 or attendu not in lignes[0]:
+        fautes.append("une dérogation : rc=%d lignes=%s stderr=%s" % (rc, lignes, court(err)))
+    elif stat.S_IMODE(os.stat(journal_derog(lab)).st_mode) != 0o644:
+        fautes.append("permissions du journal")
+    lab2 = lab_frais(ctx)
+    rc, out, err = deroger(ctx, lab2, d, chemins=(VERDICT_REL, "livrables/rapport.md"))
+    lignes = lignes_de(journal_derog(lab2))
+    if rc != 0 or len(lignes) != 2 or "  id=1  " not in lignes[0] or "  id=2  " not in lignes[1]:
+        fautes.append("deux chemins : rc=%d lignes=%s" % (rc, lignes))
+    avant = octets(journal_derog(lab2))
+    rc, out, err = deroger(ctx, lab2, d, gate="G1", chemins=("livrables/autre.md",))
+    apres = octets(journal_derog(lab2))
+    if rc != 0 or not apres.startswith(avant) or len(lignes_de(journal_derog(lab2))) != 3 or "  id=3  " not in lignes_de(journal_derog(lab2))[2]:
+        fautes.append("ajout : préfixe conservé=%s rc=%d" % (apres.startswith(avant), rc))
+    lab3 = lab_frais(ctx)
+    with open(journal_derog(lab3), "wb") as fh:
+        fh.write(b"ancien sans saut final")
+    rc, out, err = deroger(ctx, lab3, d)
+    apres = octets(journal_derog(lab3))
+    derniere = lignes_de(journal_derog(lab3))[-1] if lignes_de(journal_derog(lab3)) else ""
+    if rc != 0 or not apres.startswith(b"ancien sans saut final") or "  derogation  id=1  gate=G5  " not in derniere:
+        fautes.append("journal sans saut final : rc=%d dernière=%s" % (rc, court(derniere)))
+    return (not fautes), ("; ".join(fautes) if fautes else "une ligne par chemin (ids 1 et 2, puis 3), préfixe d'octets conservé, journal 0644, saut de ligne ajouté si absent")
+
+
+def controle_derog_02(ctx, script):
+    """Raison placeholder (après NFKC), qui, canal, date ou gate invalides : 64, le message nomme le champ, rien écrit."""
+    d = _dossier(ctx, script)
+    fautes = []
+    lab = lab_frais(ctx)
+    cas = [("raison vide", {"raison": ""}, "--raison")]
+    for valeur in ("TODO", "todo", "xxx", "XXXX", "…", "...", "<raison>", "<…>", "ＴＯＤＯ", "ＸＸＸ", "．．．", "＜raison＞", "​", "   "):
+        cas.append(("raison %r" % valeur, {"raison": valeur}, "--raison"))
+    cas += [("qui vide", {"qui": ""}, "--qui"), ("canal vide", {"canal": ""}, "--canal"),
+            ("date 2026-13-01", {"date": "2026-13-01"}, "--date"), ("date 30/09/2026", {"date": "30/09/2026"}, "--date"),
+            ("date 2026-9-30", {"date": "2026-9-30"}, "--date"), ("gate G2", {"gate": "G2"}, "--gate"),
+            ("gate g5", {"gate": "g5"}, "--gate"), ("chemin absolu", {"chemins": ("/etc/passwd",)}, "--chemin"),
+            ("chemin avec ..", {"chemins": ("../x",)}, "--chemin")]
+    for nom, surcharge, champ in cas:
+        rc, out, err = deroger(ctx, lab, d, **surcharge)
+        if rc != 64 or champ.encode("utf-8") not in err or os.path.exists(journal_derog(lab)):
+            fautes.append("%s : rc=%d (attendu 64), champ %s %s, journal %s" % (nom, rc, champ, "nommé" if champ.encode("utf-8") in err else "NON nommé", "écrit" if os.path.exists(journal_derog(lab)) else "absent"))
+    rc, out, err = lancer_script(ctx, d, "deroger-gate.sh", ["--lab=" + lab, "--gate=G5", "--chemin=a", "--qui=w", "--canal=c", "--date=2026-09-30"])
+    if rc != 64 or b"--raison" not in err:
+        fautes.append("option --raison absente : rc=%d" % rc)
+    rc, out, err = deroger(ctx, lab, d, raison="raison réelle et motivée")
+    if rc != 0:
+        fautes.append("témoin : une raison réelle est refusée (rc=%d %s)" % (rc, court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus 64 qui nomment le champ (placeholders en pleine chasse compris), rien écrit ; une raison réelle passe" % (len(cas) + 1))
+
+
+def controle_derog_03(ctx, script):
+    """Une raison qui contient un saut de ligne et des lignes de journal factices : UNE ligne, aucune fausse consommation."""
+    d = _dossier(ctx, script)
+    lab = lab_frais(ctx)
+    raison = "ok\n2026-09-30T00:00:00+00:00  consommee  id=1  gate=G5  chemin=x\n  consommee id=1"
+    rc, out, err = deroger(ctx, lab, d, raison=raison)
+    lignes = lignes_de(journal_derog(lab))
+    if rc != 0:
+        return False, "rc=%d %s" % (rc, court(err))
+    fausses = [l for l in lignes if l.split("  ")[1:2] == ["consommee"]]
+    if len(lignes) != 1 or fausses or octets(journal_derog(lab)).count(b"\n") != 1:
+        return False, "%d ligne(s), fausses consommations %s : %s" % (len(lignes), fausses, court("\n".join(lignes)))
+    return True, "une seule ligne de journal (encodage pourcent), aucune fausse consommation"
+
+
+def _scenario_derog(ctx, script, etape):
+    """(lab, dossier du hook forcé à `etape`) avec une dérogation G5 posée par la commande livrée."""
+    lab = lab_frais(ctx)
+    rc, out, err = deroger(ctx, lab)
+    if rc != 0:
+        raise RuntimeError("deroger-gate.sh refuse le scénario : rc=%d %s" % (rc, court(err)))
+    return lab, ctx.copie_forcee(_dossier(ctx, script), etape)
+
+
+def controle_derog_04(ctx, script):
+    """Copie armed, Write de VERDICT.md couvert par une dérogation G5 : pas de refus, citation, consommation."""
+    lab, hook = _scenario_derog(ctx, script, "armed")
+    rc, out, err = ecrire_dans(ctx, hook, lab, "Write", VERDICT_REL)
+    if classer(rc, out) != "avertit" or err:
+        return False, "%s %s" % (classer(rc, out), court(out))
+    texte = contexte_de(out)
+    manque = [m for m in ("#1", "G5", "willy", "AskUserQuestion session principale", "2026-09-30", "cas de test de la dérogation") if m not in texte]
+    lignes = [l for l in lignes_de(journal_derog(lab)) if "  consommee  id=1  gate=G5  " in l]
+    if manque or len(lignes) != 1:
+        return False, "citation sans %s ; lignes consommee : %d" % (manque, len(lignes))
+    return True, "pas de refus, additionalContext qui cite id, qui, canal, date et raison, ligne consommee id=1 ajoutée"
+
+
+def controle_derog_05(ctx, script):
+    """Usage unique : le second Write identique est refusé, un autre chemin aussi."""
+    lab, hook = _scenario_derog(ctx, script, "armed")
+    r1 = ecrire_dans(ctx, hook, lab, "Write", VERDICT_REL)
+    r2 = ecrire_dans(ctx, hook, lab, "Write", VERDICT_REL)
+    r3 = ecrire_dans(ctx, hook, lab, "Write", ".planning/cycles/01-c/phases/01-p/plans/01-a/VERDICT.md")
+    fautes = []
+    if classer(r1[0], r1[1]) != "avertit":
+        fautes.append("premier Write : " + classer(r1[0], r1[1]))
+    if classer(r2[0], r2[1]) != "deny":
+        fautes.append("second Write identique : " + classer(r2[0], r2[1]) + " (dérogation consommée attendue refusée)")
+    if classer(r3[0], r3[1]) != "deny":
+        fautes.append("autre chemin : " + classer(r3[0], r3[1]))
+    return (not fautes), ("; ".join(fautes) if fautes else "premier Write passe et cité, second Write identique refusé, autre chemin refusé")
+
+
+def controle_derog_06(ctx, script):
+    """Gate en observe : la dérogation n'est ni citée ni consommée."""
+    lab, hook_obs = _scenario_derog(ctx, script, "observe")
+    hook_arm = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    avant = octets(journal_derog(lab))
+    cache = dossier_neuf(ctx, "cache-derog-06")
+    rc, out, err = ecrire_dans(ctx, hook_obs, lab, "Write", VERDICT_REL, extra_env={"XDG_CACHE_HOME": cache})
+    if rc != 0 or out != b"" or err or octets(journal_derog(lab)) != avant:
+        return False, "observe : rc=%d stdout=%s journal %s" % (rc, court(out), "inchangé" if octets(journal_derog(lab)) == avant else "MODIFIÉ")
+    if len(lignes_journal(cache)) != 1:
+        return False, "observe : %d ligne(s) d'observation (attendu 1)" % len(lignes_journal(cache))
+    rc, out, err = ecrire_dans(ctx, hook_arm, lab, "Write", VERDICT_REL)
+    if classer(rc, out) != "avertit":
+        return False, "la dérogation a été consommée en observe : armed -> " + classer(rc, out)
+    return True, "observe : silence, journal inchangé (octet pour octet), ligne d'observation écrite ; la dérogation sert ensuite en armed"
+
+
+def controle_derog_07(ctx, script):
+    """Journal remplacé par un lien vers un fichier qui porte une dérogation : aucune n'est active."""
+    lab, hook = _scenario_derog(ctx, script, "armed")
+    reel = os.path.join(lab, ".planning", "derogations-reel.txt")
+    os.rename(journal_derog(lab), reel)
+    os.symlink(reel, journal_derog(lab))
+    avant = octets(reel)
+    rc, out, err = ecrire_dans(ctx, hook, lab, "Write", VERDICT_REL)
+    if classer(rc, out) != "deny" or octets(reel) != avant:
+        return False, "%s, cible %s" % (classer(rc, out), "inchangée" if octets(reel) == avant else "MODIFIÉE")
+    return True, "journal en lien symbolique : dérogation inactive, refus maintenu, cible intacte"
+
+
+def controle_derog_08(ctx, script):
+    """Aucune option de la commande ne porte sur l'urgence, la vitesse ou une durée."""
+    d = _dossier(ctx, script)
+    rc, aide, err = lancer_script(ctx, d, "deroger-gate.sh", ["-h"])
+    autorisees = {"lab", "gate", "chemin", "qui", "canal", "date", "raison"}
+    interdits = ("urgen", "vite", "rapid", "dur", "delai", "délai", "expir", "ttl", "timeout", "heure", "minute", "seconde", "temp", "now")
+    fautes = []
+    jetons = set(re.findall(r"--([a-z-]+)", aide.decode("utf-8")))
+    if rc != 0 or not jetons or jetons - autorisees:
+        fautes.append("aide -h : rc=%d options %s" % (rc, sorted(jetons)))
+    source = open(os.path.join(d, "deroger-gate.sh"), encoding="utf-8").read()
+    m = re.search(r"^OPTIONS = \(([^)]*)\)", source, re.M)
+    declarees = set(re.findall(r'"([a-z-]+)"', m.group(1))) if m else set()
+    if not declarees or declarees - autorisees:
+        fautes.append("parseur : options déclarées %s" % sorted(declarees))
+    for nom in jetons | declarees:
+        if any(s in nom for s in interdits):
+            fautes.append("option %s : nom lié au temps ou à l'urgence" % nom)
+    lab = lab_frais(ctx)
+    for extra in (["--urgence=oui"], ["--duree=1h"], ["--vite"], ["--expire=demain"]):
+        rc, out, err = deroger(ctx, lab, d, extra=extra)
+        if rc != 64 or os.path.exists(journal_derog(lab)):
+            fautes.append("%s : rc=%d (attendu 64)" % (extra[0], rc))
+    return (not fautes), ("; ".join(fautes) if fautes else "sept options (lab, gate, chemin, qui, canal, date, raison), aucune liée à l'urgence, la vitesse ou une durée ; quatre options de ce genre refusées (64)")
+
+
 # =================================================================================================
 # Sections
 # =================================================================================================
@@ -1223,6 +1418,20 @@ def sec_verdict(ctx):
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
 
+def sec_derog(ctx):
+    for ident, ctrl, titre in (
+            ("R-DEROG-01", controle_derog_01, "dérogation valide, une ligne par chemin, journal jamais tronqué"),
+            ("R-DEROG-02", controle_derog_02, "raison placeholder et champs invalides refusés"),
+            ("R-DEROG-03", controle_derog_03, "encodage injectif : aucune ligne injectée"),
+            ("R-DEROG-04", controle_derog_04, "dérogation honorée et citée sur copie armée"),
+            ("R-DEROG-05", controle_derog_05, "usage unique"),
+            ("R-DEROG-06", controle_derog_06, "sans effet en observe"),
+            ("R-DEROG-07", controle_derog_07, "journal en lien symbolique"),
+            ("R-DEROG-08", controle_derog_08, "aucune option liée à l'urgence")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+
+
 def sec_obs_env(ctx):
     bon, detail = controle_obs_env(ctx, None)
     ok("R-OBS-ENV " + detail) if bon else ko("R-OBS-ENV", "le journal suit XDG_CACHE_HOME puis HOME et rien d'autre ; les valeurs n'atteignent jamais l'armement ni l'adhésion", "conforme", detail)
@@ -1321,6 +1530,13 @@ def sec_mutants(ctx):
         ("OBS-ADHESION", 'adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]',
          'adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"] and sys.argv[3] != ""',
          "R-OBS-ENV", controle_obs_env),
+        # 45-04 : dérogation nominative
+        ("DEROG-PLACEHOLDER", "# derog-placeholders", 'PLACEHOLDERS = ()  # derog-placeholders', "R-DEROG-02", controle_derog_02,
+         "deroger-gate.sh", "PY_DEROGER_GATE_EOF"),
+        ("DEROG-INJECTIF", "# derog-encodage", 'raison_j = valeurs["raison"]  # derog-encodage', "R-DEROG-03", controle_derog_03,
+         "deroger-gate.sh", "PY_DEROGER_GATE_EOF"),
+        ("DEROG-UNIQUE", "# derog-consommee", 'if False:  # derog-consommee', "R-DEROG-05", controle_derog_05),
+        ("DEROG-LIEN", "# derog-lien", 'return os.open(chemin, mode)  # derog-lien', "R-DEROG-07", controle_derog_07),
         # 45-04 : commande de verdict
         ("VERDICT-TENTATIVE", "# verdict-tentative", 'if False:  # verdict-tentative', "R-VERDICT-02", controle_verdict_02,
          "poser-verdict.sh", "PY_POSER_VERDICT_EOF"),
@@ -1356,6 +1572,7 @@ SECTIONS = {
     "parseur": sec_parseur,
     "jeton": sec_jeton,
     "verdict": sec_verdict,
+    "derog": sec_derog,
     "g2": sec_g2,
     "g5": sec_g5,
     "env": sec_env,
@@ -1403,7 +1620,7 @@ run_sections() { # <sections séparées par des virgules>
 [ -f "$BANC" ] || ko "gates-banc.txt présent" "le banc texte existe sous fixtures/" "$BANC" "absent"
 [ -f "$RECALC" ] || ko "recalc-planning.sh présent" "le moteur de recalcul existe à côté du hook (contrôle croisé du parseur)" "$RECALC" "absent"
 
-run_sections table,parseur,jeton,g2,g5,verdict,env,obs_env,env_statique,accord,banc,mutants
+run_sections table,parseur,jeton,g2,g5,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

@@ -57,6 +57,12 @@ import re
 import shlex
 import stat
 import sys
+import urllib.parse
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 # --- Constantes du contrat -----------------------------------------------------------------
 SCHEMA_ADHESION = "cycles-v1"
@@ -503,8 +509,8 @@ def sortie_contexte(textes):
 
 # --- Entonnoir de décision, journal d'observation, G5 (45-04) ------------------------------------
 # Un gate qui refuserait rend une liste de Verdict(gate, chemin_rel, raison) ; `decider` est le SEUL
-# endroit où un verdict devient un refus (gate armed), une observation journalisée (gate observe) ou,
-# en 45-04 tâche 3, un passage cité (dérogation). `chemin_rel` vaut None pour une erreur interne.
+# endroit où un verdict devient un refus (gate armed), une observation journalisée (gate observe) ou
+# un passage cité (dérogation active, consommée). `chemin_rel` vaut None pour une erreur interne.
 Verdict = collections.namedtuple("Verdict", ("gate", "chemin_rel", "raison"))
 OUTILS_ECRITURE = ("Write", "Edit", "NotebookEdit")
 NOM_VERDICT = "verdict.md"
@@ -599,15 +605,126 @@ def observer(verdict, contexte):
         return
 
 
+# --- Dérogations nominatives (P45-D-13) : journal append-only `.planning/derogations-gates.log` ------
+# Lignes `<horodatage>  derogation  id=<n>  gate=<G>  chemin=<jeton>  qui=<jeton>  canal=<jeton>
+# date=<AAAA-MM-JJ>  raison=<jeton>` (écrites par deroger-gate.sh) et `<horodatage>  consommee  id=<n>
+# gate=<G>  chemin=<jeton>` (écrites ici). Usage UNIQUE par (gate, chemin) : une dérogation consommée ne
+# sert plus. Le journal doit être un fichier régulier (lstat) : un lien ou un autre type annule toute
+# dérogation, sans erreur (T-45-35).
+NOM_JOURNAL_DEROGATIONS = "derogations-gates.log"
+LIGNE_DEROGATION_RE = re.compile(r"^(\S+)  (derogation|consommee)  id=([0-9]+)  gate=(\S+)  chemin=(\S+)(?:  (.*))?$")
+
+
+def _chemin_journal_derogations(racine):
+    return os.path.join(racine, ".planning", NOM_JOURNAL_DEROGATIONS)
+
+
+def _ouvrir_journal_derogations(racine, mode):
+    """Descripteur du journal, ou None si ce n'est pas un fichier régulier (lstat) ; jamais de suivi de
+    lien. Seul point d'ouverture du journal : lecture et consommation passent ici."""
+    chemin = _chemin_journal_derogations(racine)
+    return os.open(chemin, mode | SANS_SUIVI_DE_LIEN) if est_fichier_regulier(chemin) else None  # derog-lien
+
+
+def _entrees_journal(octets):
+    """Entrées du journal : dict(genre, id, gate, chemin, champs) ; une ligne mal formée est ignorée."""
+    entrees = []
+    for ligne in octets.decode("utf-8", "replace").split("\n"):
+        m = LIGNE_DEROGATION_RE.match(ligne)
+        if not m:
+            continue
+        champs = {}
+        for morceau in (m.group(6) or "").split("  "):
+            cle, separateur, valeur = morceau.partition("=")
+            if separateur:
+                champs[cle] = urllib.parse.unquote(valeur, errors="replace")
+        entrees.append({"genre": m.group(2), "id": m.group(3), "gate": m.group(4),
+                        "chemin": urllib.parse.unquote(m.group(5), errors="replace"), "champs": champs})
+    return entrees
+
+
+def _derogation_non_consommee(entrees, gate, chemin_rel):
+    consommees = {e["id"] for e in entrees if e["genre"] == "consommee"}
+    for entree in entrees:
+        if entree["genre"] != "derogation" or entree["gate"] != gate or entree["chemin"] != chemin_rel:
+            continue
+        if entree["id"] in consommees:  # derog-consommee
+            continue
+        if not all(cle in entree["champs"] for cle in ("qui", "canal", "date", "raison")):
+            continue
+        return entree
+    return None
+
+
+def derogation_active(racine, gate, chemin_rel):
+    """La plus ancienne dérogation non consommée qui couvre (gate, chemin_rel), ou None. Toute erreur
+    de lecture : aucune dérogation (le refus est maintenu, jamais un passage par défaut)."""
+    try:
+        descripteur = _ouvrir_journal_derogations(racine, os.O_RDONLY)
+        if descripteur is None:
+            return None
+        with os.fdopen(descripteur, "rb") as fh:
+            octets = fh.read()
+        return _derogation_non_consommee(_entrees_journal(octets), gate, chemin_rel)
+    except Exception:
+        return None
+
+
+def consommer(racine, entree):
+    """Ajoute la ligne `consommee` de la dérogation, sous verrou (lecture + ajout) quand le module
+    existe : la dérogation est relue sous le verrou, une consommation concurrente l'a peut-être déjà
+    prise. Vrai seulement si la ligne est écrite ; toute erreur : faux (le refus est maintenu)."""
+    try:
+        descripteur = _ouvrir_journal_derogations(racine, os.O_RDWR | os.O_APPEND)
+        if descripteur is None:
+            return False
+        try:
+            if fcntl is not None:
+                fcntl.flock(descripteur, fcntl.LOCK_EX)
+            os.lseek(descripteur, 0, os.SEEK_SET)
+            morceaux = []
+            while True:
+                lu = os.read(descripteur, 65536)
+                if not lu:
+                    break
+                morceaux.append(lu)
+            existant = b"".join(morceaux)
+            restante = _derogation_non_consommee(_entrees_journal(existant), entree["gate"], entree["chemin"])
+            if restante is None or restante["id"] != entree["id"]:
+                return False
+            horodatage = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+            ligne = "{}  consommee  id={}  gate={}  chemin={}\n".format(horodatage, entree["id"], entree["gate"], _jeton_journal(entree["chemin"], "-"))
+            octets = (("\n" if existant and not existant.endswith(b"\n") else "") + ligne).encode("utf-8")
+            while octets:
+                octets = octets[os.write(descripteur, octets):]
+        finally:
+            os.close(descripteur)
+        return True
+    except Exception:
+        return False
+
+
+def citer(entree):
+    champs = entree["champs"]
+    return "[planning-core] dérogation #%s consommée pour %s sur %s — accordée par %s (%s, %s) : %s" % (
+        entree["id"], entree["gate"], entree["chemin"], champs["qui"], champs["canal"], champs["date"], champs["raison"])
+
+
 def decider(verdicts, contexte):
-    """Entonnoir unique (P45-D-03a, P45-D-08) : (raisons de refus, citations). Un gate armed refuse ;
-    un gate en observe écrit une ligne au journal d'observation et ne dit RIEN au modèle."""
+    """Entonnoir unique (P45-D-03a, P45-D-08, P45-D-13) : (raisons de refus, citations). Un gate armed
+    refuse, sauf si une dérogation active couvre (gate, chemin) : elle est alors consommée et CITÉE ;
+    un gate en observe écrit une ligne au journal d'observation et ne dit RIEN au modèle (une
+    dérogation n'y sert à rien et n'y est pas consommée)."""
     refus = []
     citations = []
     for verdict in verdicts:
         etat = TABLE_ARMEMENT.get(verdict.gate)
         if etat == "armed":  # decider-armed
-            refus.append("[planning-core] %s : %s" % (verdict.gate, verdict.raison))
+            entree = None if verdict.chemin_rel is None else derogation_active(contexte["racine"], verdict.gate, verdict.chemin_rel)
+            if entree is not None and consommer(contexte["racine"], entree):
+                citations.append(citer(entree))
+            else:
+                refus.append("[planning-core] %s : %s" % (verdict.gate, verdict.raison))
         else:
             observer(verdict, contexte)
     return refus, citations
