@@ -24,6 +24,11 @@
 #                 totale (règle écrite, CLASSE-REGLE-ECRITE), code propre de l'outil (aucun appel au hook)
 #   R-REJEU-G1-CONCORDANCE  test différentiel sur 64 cellules générées (itertools.product) : attendu du relevé
 #                 <=> deny du vrai hook <=> oracle de huit lignes ; somme des n = 26
+#   R-REJEU-G7    constructeur G7 (45-07) et option --attendus sur des fixtures SYNTHÉTIQUES : le vrai hook armé à l'étape 3, un
+#                 lab à deux .planning/ imbriqués (habité, nu), le nu marqué doit-refuser-modele par le fichier d'attendus (refus
+#                 conforme au modèle, compté à part), les créations synthétiques doit-refuser ; le dossier imbriqué est mis de côté
+#                 puis remis en place sur la copie (trace d'un substitut, erreur de l'outil si la copie diffère) ; à --etape=2 la
+#                 ligne COMPTE G7 est suffixée `hors-etape` et ne compte pas
 #   R-REJEU-STATIQUE  aucun sous-processus autre que bash (hook copié, recalc-planning.sh) et cmp
 #   R-REEL-01..04  rejeu-reel.sh : empreinte de TOUT l'arbre par un geste extérieur, liens non suivis,
 #                  aucune commande de gestionnaire de versions
@@ -700,7 +705,9 @@ ATTENDUS_G6G5 = (  # (chemin affiché, attendu, obtenu) d'un lab de FICHIERS_G6G
     # en observe : ses deux phases synthétiques (doit-refuser) obtiennent un passage, compté hors-etape
     (".planning/cycles/01-c/CYCLE.md", "doit-passer", "passe"), (".planning/cycles/01-c/phases/01-p/CADRAGE.md", "doit-passer", "passe"),
     (".planning/cycles/01-c/phases/99-rejeu-sans-cadrage/PLAN.md", "doit-refuser", "passe"),
-    (".planning/cycles/01-c/phases/99-rejeu-registre-ouvert/PLAN.md", "doit-refuser", "passe"))
+    (".planning/cycles/01-c/phases/99-rejeu-registre-ouvert/PLAN.md", "doit-refuser", "passe"),
+    # 45-07 : le constructeur G7 est joué aussi, une création synthétique par racine adhérente (doit-refuser), G7 simulé en observe
+    ("rejeu-orphelin-g7/.planning/config.json [création]", "doit-refuser", "passe"))
 
 
 def scenario_g6g5(script):
@@ -732,11 +739,13 @@ def sec_g6g5(_):
         fautes.append("comptes G6=%s G5=%s etape=%s (attendu 0, 0, 0)" % (r.compte.get("G6"), r.compte.get("G5"), r.etape))
     if r.compte.get("G1") != (0, 4, 0) or "G1" not in r.hors_etape:
         fautes.append("COMPTE G1 %s hors=%s (attendu (0, 4, 0) hors-etape : deux phases synthétiques par lab, G1 simulé en observe)" % (r.compte.get("G1"), sorted(r.hors_etape)))
+    if r.compte.get("G7") != (0, 2, 0) or "G7" not in r.hors_etape:
+        fautes.append("COMPTE G7 %s hors=%s (attendu (0, 2, 0) hors-etape : une création synthétique par lab, G7 simulé en observe)" % (r.compte.get("G7"), sorted(r.hors_etape)))
     if fautes:
         for f in fautes:
             ko("R-REJEU-G6G5", "constructeurs G6 et G5 + vrai hook armé à l'étape 1, deux labs synthétiques", "une ligne par clé distincte, faux-refus=0 faux-accept=0", f)
     else:
-        ok("R-REJEU-G6G5 vrai hook, --etape=1, deux labs synthétiques : chaque fichier protégé (STATE.md, INDEX.md, cloture.log, journal de dérogation, cache) UNE fois en doit-refuser/refus (le constructeur G6 prime sur la réécriture générique), config.json et PLAN.md UNE fois en doit-passer/passe, l'Edit qui perd l'adhésion et le VERDICT.md voisin en doit-refuser/refus ; le constructeur G1 est joué (CYCLE.md et CADRAGE.md en doit-passer, deux phases synthétiques en doit-refuser/passe, COMPTE G1 hors-etape) ; 13 lignes par lab = 13 clés distinctes ; faux-refus=0 faux-accept=0 pour G6 et G5, REJEU-ETAPE-1 à 0")
+        ok("R-REJEU-G6G5 vrai hook, --etape=1, deux labs synthétiques : chaque fichier protégé (STATE.md, INDEX.md, cloture.log, journal de dérogation, cache) UNE fois en doit-refuser/refus (le constructeur G6 prime sur la réécriture générique), config.json et PLAN.md UNE fois en doit-passer/passe, l'Edit qui perd l'adhésion et le VERDICT.md voisin en doit-refuser/refus ; le constructeur G1 est joué (CYCLE.md et CADRAGE.md en doit-passer, deux phases synthétiques en doit-refuser/passe, COMPTE G1 hors-etape) ; le constructeur G7 est joué (une création synthétique par lab en doit-refuser/passe, COMPTE G7 hors-etape) ; 14 lignes par lab = 14 clés distinctes ; faux-refus=0 faux-accept=0 pour G6 et G5, REJEU-ETAPE-1 à 0")
 
 
 # --- 45-06 : G1, constructeur du rejeu (R-REJEU-G1) et concordance règle écrite / prédicat (R-REJEU-G1-CONCORDANCE) ------
@@ -867,6 +876,115 @@ def sec_g1(_):
             ko("R-REJEU-G1", "constructeur G1 : attendu du modèle, classification totale, code propre de l'outil", "voir le cas", f)
     else:
         ok("R-REJEU-G1 vrai hook, --etape=2 : lab non migré (sans CADRAGE.md, registre ouvert, plan sous plans/ : refus conformes au modèle, 3, phase par phase ; clos et hérité : passage), phases synthétiques 99-rejeu-* en doit-refuser/refus, faux-refus=0 faux-accept=0 ; un substitut qui refuse aussi la phase à CADRAGE.md clos : faux-refus=1 ; classification totale : D, E, F, H classées par la règle écrite (CLASSE-REGLE-ECRITE n=4, faux-refus=0), F ou H refusées à tort : faux-refus=1 ; rejeu-gates.sh ne nomme pas evaluer_g1, le constructeur n'appelle pas le hook, copies du parseur ast-identiques")
+
+
+# --- 45-07 : G7, constructeur du rejeu (R-REJEU-G7) et option --attendus sur des fixtures SYNTHÉTIQUES ----------------------------
+# Lab synthétique non migré (config 2.0, l'adhésion est simulée sur la copie) qui porte deux .planning/ imbriqués : `habite/`
+# (un agents/*.md ET un fichier de mémoire : habité, prédicat littéral de P45-D-14) et `zone/nu/` (aucun des deux). Le fichier
+# d'attendus marque `zone/nu` doit-refuser-modele : le modèle l'interdit (lab non migré, P45-D-21a) ; tout autre `.planning/`
+# imbriqué absent du fichier reste doit-passer.
+FICHIERS_G7 = {".planning/notes.md": "n", "habite/.planning/notes.md": "n", "habite/.claude/agents/a.md": "a",
+               "habite/.claude/memory/m.md": "m", "zone/nu/.planning/notes.md": "n", "zone/nu/.planning/sous/x.md": "x"}
+ENTETE_ATTENDUS_G7 = ["# Attendus D-05 d'essai (fixtures synthétiques) : le chemin d'une ligne G7 est le dossier X où un .planning/ est créé.",
+                      "# Tout autre .planning/ absent de D-05 reste doit-passer."]
+
+
+def lab_g7(nom, avec_attendus=True):
+    lab = fabriquer_lab(nom, FICHIERS_G7)
+    aff = "~/" + os.path.basename(lab)
+    lignes = ENTETE_ATTENDUS_G7 + (["G7 | %s | zone/nu | doit-refuser-modele | orphelin synthétique, refus conforme au modèle, lab non migré" % aff] if avec_attendus else [])
+    return lab, aff, ecrire_attendus(lignes)
+
+
+def lignes_g7(r, aff):
+    return dict((l[2], (l[3], l[4])) for l in r.lignes if l[0] == "G7" and l[1] == aff)
+
+
+# le relevé attendu à --etape=3 (vrai hook) : (attendu, obtenu) par chemin affiché
+ATTENDU_G7 = {"habite/.planning/config.json [création]": ("doit-passer", "passe"),
+              "zone/nu/.planning/config.json [création]": ("doit-refuser-modele", "refus"),
+              "rejeu-orphelin-g7/.planning/config.json [création]": ("doit-refuser", "refus"),
+              "habite/rejeu-orphelin-g7/.planning/config.json [création]": ("doit-refuser", "refus"),
+              "zone/nu/rejeu-orphelin-g7/.planning/config.json [création]": ("doit-refuser", "refus")}
+
+# Substitut qui ENREGISTRE, à chaque payload, si chacun des deux .planning/ imbriqués existe sur la copie (cwd du hook = la copie).
+def sub_trace_g7(nom, journal):
+    return substitut(nom, "\n".join([
+        'cwd = os.getcwd()',
+        'hab = os.path.isdir(os.path.join(cwd, "habite", ".planning"))',
+        'nu = os.path.isdir(os.path.join(cwd, "zone", "nu", ".planning"))',
+        'open(%r, "a").write("%%s|%%d|%%d\\n" %% (chemin[len(cwd) + 1:], hab, nu))' % journal,
+        ""]))
+
+
+def scenario_g7(script, etape=3):
+    """Relevé du rejeu de l'étape `etape` avec le VRAI hook, le constructeur G7 et un fichier d'attendus synthétique, puis le
+    même lab avec le substitut qui trace la mise de côté."""
+    lab, aff, att = lab_g7(unique("lab-g7"))
+    r = rejeu([lab], hook=HOOK, etape=etape, attendus=att, script=script)
+    return r, aff
+
+
+def trace_g7(script):
+    """Journal du substitut : pour chaque payload, (chemin, habite présent, nu présent). Le constructeur G7 joue avec un substitut."""
+    lab, aff, att = lab_g7(unique("lab-g7t"))
+    journal = os.path.join(WORK, unique("trace-g7") + ".txt")
+    r = rejeu([lab], hook=sub_trace_g7(unique("sub") + ".sh", journal), etape=3, attendus=att, script=script, scenario="")
+    lignes = [l.split("|") for l in open(journal, encoding="utf-8").read().split("\n") if l] if os.path.exists(journal) else []
+    return r, lignes
+
+
+def sec_g7(_):
+    """R-REJEU-G7 : constructeur G7, option --attendus, mise de côté et remise du .planning/ imbriqué sur la copie, comptage par étape."""
+    fautes = []
+    r, aff = scenario_g7(REJEU, 3)
+    lignes = lignes_g7(r, aff)
+    if r.rc != 0:
+        fautes.append("--etape=3 : code %d : %s" % (r.rc, court(r.err)))
+    if lignes != ATTENDU_G7:
+        fautes.append("--etape=3 : lignes G7 %s (attendu %s)" % (sorted(lignes.items()), sorted(ATTENDU_G7.items())))
+    if r.compte.get("G7") != (0, 0, 1) or "G7" in r.hors_etape or r.etape != (0, 0, 1):
+        fautes.append("--etape=3 : COMPTE G7 %s hors=%s REJEU-ETAPE-3 %s (attendu (0, 0, 1) : le nu est un refus conforme au modèle, compté à part)" % (r.compte.get("G7"), sorted(r.hors_etape), r.etape))
+    if any("EMPREINTE-DIVERGENTE" in e for e in r.empreintes) or not any(e.startswith("EMPREINTE-IDENTIQUE") for e in r.empreintes):
+        fautes.append("--etape=3 : empreinte du lab réel %s" % r.empreintes)
+    for chemin, (attendu, obtenu) in (("zone/nu/.planning/config.json [création]", ("doit-refuser-modele", "refus")),):
+        motif = [l for l in r.lignes if l[2] == chemin]
+        if not motif or "refus conforme au modèle, lab non migré" not in motif[0][5]:
+            fautes.append("--etape=3 : la ligne du nu ne porte pas « refus conforme au modèle, lab non migré » : %s" % motif)
+    # même lab à --etape=2 : le constructeur est joué (ses lignes sont au relevé), la ligne COMPTE est suffixée et ne compte pas
+    r2, aff2 = scenario_g7(REJEU, 2)
+    l2 = lignes_g7(r2, aff2)
+    if sorted(l2) != sorted(ATTENDU_G7) or any(obtenu != "passe" for _a, obtenu in l2.values()):
+        fautes.append("--etape=2 : lignes G7 %s (attendu les mêmes cinq clés, toutes passées : G7 est simulé en observe)" % sorted(l2.items()))
+    if r2.compte.get("G7") != (0, 4, 0) or "G7" not in r2.hors_etape or r2.etape != (0, 0, 0):
+        fautes.append("--etape=2 : COMPTE G7 %s hors=%s REJEU-ETAPE-2 %s (attendu (0, 4, 0) hors-etape, totaux à 0)" % (r2.compte.get("G7"), sorted(r2.hors_etape), r2.etape))
+    # un lab sans attendu : le nu reste doit-passer par défaut, le hook armé le refuse : faux refus nominatif (jamais un refus conforme)
+    lab, aff, _att = lab_g7(unique("lab-g7d"), avec_attendus=False)
+    r3 = rejeu([lab], hook=HOOK, etape=3)
+    if lignes_g7(r3, aff).get("zone/nu/.planning/config.json [création]") != ("doit-passer", "refus") or r3.compte.get("G7") != (1, 0, 0):
+        fautes.append("sans attendu : le nu doit rester doit-passer/refus et compter un faux refus : %s %s" % (lignes_g7(r3, aff).get("zone/nu/.planning/config.json [création]"), r3.compte.get("G7")))
+    # mise de côté et remise : pendant le payload de création d'un dossier, il est absent et l'autre présent ; tous les autres payloads les voient
+    rt, trace = trace_g7(REJEU)
+    if rt.rc != 0 or not trace:
+        fautes.append("trace : code %d, %d ligne(s) (rouge, jamais un vert à vide) %s" % (rt.rc, len(trace), court(rt.err)))
+    else:
+        absents_hab = [l for l in trace if l[1] == "0"]
+        absents_nu = [l for l in trace if l[2] == "0"]
+        if [l[0] for l in absents_hab] != ["habite/.planning/config.json"] or absents_hab[0][2] != "1":
+            fautes.append("trace : habite absent pendant %s (attendu son seul payload de création, nu présent)" % [l[0] for l in absents_hab])
+        if [l[0] for l in absents_nu] != ["zone/nu/.planning/config.json"] or absents_nu[0][1] != "1":
+            fautes.append("trace : nu absent pendant %s (attendu son seul payload de création, habite présent)" % [l[0] for l in absents_nu])
+    # attendu G7 à chemin invalide : erreur (code 1), jamais un passage implicite
+    lab_i = fabriquer_lab(unique("lab-g7i"), FICHIERS_G7)
+    att_i = ecrire_attendus(["G7 | ~/%s | ../dehors | doit-refuser-modele | chemin invalide" % os.path.basename(lab_i)])
+    ri = rejeu([lab_i], hook=HOOK, etape=3, attendus=att_i)
+    if ri.rc != 1 or "invalide" not in ri.err:
+        fautes.append("attendu G7 à chemin `..` : code %d %s (attendu 1 et « invalide »)" % (ri.rc, court(ri.err)))
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-G7", "constructeur G7 + --attendus (fixtures synthétiques) : le nu est un refus conforme au modèle, le .planning/ imbriqué est remis en place", "voir le cas", f)
+    else:
+        ok("R-REJEU-G7 vrai hook, --etape=3, lab synthétique à deux .planning/ imbriqués (habité, nu) et un fichier d'attendus dont la ligne G7 marque zone/nu doit-refuser-modele (la colonne chemin se termine par le nom du dossier) : faux-refus=0 faux-accept=0 refus-conforme-modele=1 (les trois créations synthétiques en doit-refuser/refus, l'habité en doit-passer/passe) ; empreinte du lab identique ; le même lab à --etape=2 joue le constructeur, COMPTE G7 (0, 4, 0) hors-etape et REJEU-ETAPE-2 à 0 ; sans attendu, le nu reste doit-passer et compte un faux refus ; un substitut qui trace montre le dossier visé absent pendant son seul payload de création et présent ailleurs ; un chemin d'attendu en `..` est refusé (code 1)")
 
 
 ETATS_CADRAGE = ("absent", "herite", "clos", "ouvert", "vide", "invalide", "dossier", "lien")
@@ -1376,7 +1494,7 @@ def sec_mutants(_):
         return {"G6": r.compte.get("G6"), "etape": r.etape}
 
     duel("REJEU-G6-ENREGISTRE", REJEU, G, "# rejeu-registre",
-         'CONSTRUCTEURS = {"reecriture": construire_reecriture, "G5": construire_g5, "G1": construire_g1}  # rejeu-registre',
+         'CONSTRUCTEURS = {"reecriture": construire_reecriture, "G5": construire_g5, "G1": construire_g1, "G7": construire_g7}  # rejeu-registre',
          sc_g6g5, lambda o, m: o["G6"] == (0, 0, 0) and o["etape"] == (0, 0, 0) and m["G6"] is not None and m["G6"][0] > 0,
          "R-REJEU-G6G5 : constructeur G6 retiré du registre (STATE.md compte en doit-passer et le hook armé le refuse : faux-refus)", compagnons=(RECALC,))
     duel("REJEU-ETAPE", REJEU, G, "# rejeu-etape", "if False:  # rejeu-etape",
@@ -1433,6 +1551,22 @@ def sec_mutants(_):
          sc_conc(lambda c: c[1] == "conforme" and c[2] in ("dossier", "lien") and c[3] == "non"),
          lambda o, m: o["divergences"] == 0 and m["divergences"] >= 1,
          "R-REJEU-G1-CONCORDANCE : un CADRAGE.md non régulier (dossier ou lien) lu « absent » par la règle écrite", compagnons=(RECALC,))
+    # --- 45-07 : constructeur G7 ---
+    def sc_g7_remise(script):
+        r, aff = scenario_g7(script, 3)
+        return {"rc": r.rc, "G7": r.compte.get("G7"), "erreur": "copie non remise en place" in r.err, "lignes": len(lignes_g7(r, aff))}
+
+    def sc_g7_trace(script):
+        rt, trace = trace_g7(script)
+        return {"rc": rt.rc, "absents": sorted(set(l[0] for l in trace if l[1] == "0" or l[2] == "0")), "payloads": len(trace)}
+
+    duel("REJEU-G7-REMISE", REJEU, G, "# rejeu-remise", "pass  # rejeu-remise",
+         lambda s: (sc_g7_remise(s), sc_g7_trace(s)),
+         lambda o, m: o[0]["rc"] == 0 and o[0]["G7"] == (0, 0, 1) and o[0]["lignes"] == 5 and m[0]["rc"] == 1 and m[0]["erreur"] and o[1]["rc"] == 0 and m[1]["rc"] == 1,
+         "R-REJEU-G7 : le .planning/ imbriqué mis de côté n'est pas remis en place sur la copie (erreur de l'outil, aucun relevé)", compagnons=(RECALC,))
+    duel("REJEU-G7-COTE", REJEU, G, "# rejeu-cote", "if False:  # rejeu-cote",
+         sc_g7_trace, lambda o, m: o["rc"] == 0 and o["absents"] == ["habite/.planning/config.json", "zone/nu/.planning/config.json"] and m["absents"] == [],
+         "R-REJEU-G7 : le .planning/ imbriqué n'est pas mis de côté avant le jeu (le hook voit un .planning/ existant)", compagnons=(RECALC,))
     tout = {"touch": "DIVERGENTE", "mode": "DIVERGENTE", "contenu": "DIVERGENTE"}
     duel("REEL-MTIME", REEL, R, "# reel-signature",
          'lignes.append((rel or ".", "%s\\t%s\\t%o\\t%d\\t%s" % (rel or ".", genre, stat.S_IMODE(mode), 0, sig)))  # reel-signature',
@@ -1455,6 +1589,7 @@ SECTIONS = {
     "etape": sec_etape,
     "g6g5": sec_g6g5,
     "g1": sec_g1,
+    "g7": sec_g7,
     "concordance": sec_concordance,
     "statique": sec_statique,
     "reel": sec_reel,
@@ -1497,7 +1632,7 @@ for f in "$REJEU" "$REEL"; do
 done
 
 if [ -f "$REJEU" ] && [ -f "$REEL" ]; then
-  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,concordance,statique,reel,mutants
+  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,concordance,statique,reel,mutants
 fi
 
 T_FIN="$(date +%s)"

@@ -33,6 +33,8 @@
 #                   observe puis armed ; un marqueur de projet de code laisse passer (un cas par marqueur, faux marqueurs
 #                   refusés) ; .planning/ existant, Edit, lab dev, dossier sans ancêtre planifié : jamais refusés ; contrôle
 #                   croisé des marqueurs avec le TEXTE de detect-gsd-engine.sh (R-G7-05) ; COUVERTURE G7, COMPTE G7 du banc
+#   R-G7-06..09     G7 (45-07) : prédicat « habité » littéral de P45-D-14 (un agents/*.md régulier ET un fichier régulier sous
+#                   memory/ ; tableau des cas imprimé `G7-HABITE`), fichiers réguliers seulement, dérogation, COMPTE G7 du banc
 #   R-CANG-G7       le cas de canary G7-orphelin (état livré, étapes 1 à 3 armed, evaluer_g7 neutralisé)
 #   R-OBS-ENV       le journal d'observation suit XDG_CACHE_HOME puis HOME et rien d'autre : les valeurs
 #                   reçues n'atteignent jamais l'armement ni l'adhésion (P45-D-12a)
@@ -2057,6 +2059,104 @@ def controle_g7_05(ctx, script):
     return (not fautes), ("; ".join(fautes) if fautes else "%d marqueurs, MARQUEURS_CODE ∪ {*.xcodeproj} = l'ensemble extrait du texte de detect-gsd-engine.sh" % len(det))
 
 
+G7_HABITE = (  # (dossier du banc, habité selon le prédicat littéral de P45-D-14, libellé) : agent ET mémoire
+    ("hab-ok", True, "agents/a.md et memory/m.md"), ("hab-profond", True, "agents/a.md et memory/ sous deux sous-dossiers"),
+    ("hab-agents", False, "agents seuls"), ("hab-memoire", False, "mémoire seule"),
+    ("hab-agent-memory", False, "agent-memory/ seul, sans fichier"), ("hab-vide", False, ".claude/ vide"))
+G7_NON_REGULIERS = (  # (dossier du banc, libellé) : fichiers NON réguliers, jamais comptés
+    ("hab-lien", "agents/x.md en lien symbolique (memory/m.md régulier)"),
+    ("hab-memoire-lien", "memory/m.md en lien symbolique (agents/a.md régulier)"),
+    ("hab-memoire-vide", "memory/ sans fichier régulier (agents/a.md régulier)"),
+    ("hab-txt", "agents/notes.txt n'est pas un agents/*.md (memory/m.md régulier)"))
+
+
+def cas_habite(ctx, script):
+    """[(dossier, libellé, attendu, obtenu)] du prédicat « habité » sur copie armée : `passage` ou `refus` (un deny de G7), sinon l'écart."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lignes = []
+    for dossier, habite, libelle in G7_HABITE:
+        lignes.append((dossier, libelle, "passage" if habite else "refus", _verdict_g7(ctx, d, dossier)))
+    return lignes
+
+
+def _verdict_g7(ctx, hook, dossier):
+    rc, out, err = _g7(ctx, hook, "Write", "zone/%s/.planning/config.json" % dossier)
+    v = classer(rc, out)
+    if err:
+        return "stderr " + court(err)
+    if v == "deny":
+        raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+        return "refus" if raison.startswith("[planning-core] G7 :") and ("dans zone/%s exige" % dossier) in raison else "deny " + raison
+    return "passage" if v in ("silence", "avertit") and b"[planning-core] G7" not in out else v + " " + court(out)
+
+
+def controle_g7_06(ctx, script):
+    """R-G7-06 : le prédicat littéral de P45-D-14 (agent ET mémoire) : agents et mémoire -> passage ; agents seuls, mémoire seule,
+    agent-memory/ seul, .claude/ vide -> refus."""
+    cas = cas_habite(ctx, script)
+    fautes = ["%s (%s) : attendu %s, obtenu %s" % (dossier, libelle, attendu, obtenu) for dossier, libelle, attendu, obtenu in cas if attendu != obtenu]
+    return (not fautes), ("; ".join(fautes) if fautes else "%d cas conformes au prédicat littéral : agents ET mémoire passent, agents seuls, mémoire seule, agent-memory/ seul et .claude/ vide sont refusés" % len(cas))
+
+
+def controle_g7_07(ctx, script):
+    """R-G7-07 : seuls les fichiers RÉGULIERS comptent — un agents/x.md ou un memory/m.md en lien symbolique, un memory/ sans fichier
+    régulier, un agents/*.txt ne comptent pas (refus)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = ["%s (%s) : attendu refus, obtenu %s" % (dossier, libelle, obtenu) for dossier, libelle in G7_NON_REGULIERS
+              for obtenu in [_verdict_g7(ctx, d, dossier)] if obtenu != "refus"]
+    return (not fautes), ("; ".join(fautes) if fautes else "%d cas refusés : lien symbolique (agent ou mémoire), memory/ sans fichier régulier, agents/*.txt" % len(G7_NON_REGULIERS))
+
+
+def controle_g7_08(ctx, script):
+    """R-G7-08 : dérogation G7 active pour `zone/nu/.planning/config.json` : passage cité et consommé ; le second Write est refusé."""
+    lab = lab_frais(ctx, G7_LAB)
+    rc, out, err = deroger(ctx, lab, None, gate="G7", chemins=(G7_NU,))
+    if rc != 0:
+        return False, "deroger-gate.sh refuse le scénario : rc=%d %s" % (rc, court(err))
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    r1 = ecrire_dans(ctx, hook, lab, "Write", G7_NU)
+    if classer(r1[0], r1[1]) != "avertit" or r1[2]:
+        return False, "premier Write : %s %s" % (classer(r1[0], r1[1]), court(r1[1]))
+    texte = contexte_de(r1[1])
+    manque = [m for m in ("#1", "G7", "willy", "AskUserQuestion session principale", "2026-09-30", G7_NU) if m not in texte]
+    lignes = [l for l in lignes_de(journal_derog(lab)) if "  consommee  id=1  gate=G7  " in l]
+    if manque or len(lignes) != 1:
+        return False, "citation sans %s ; lignes consommee : %d" % (manque, len(lignes))
+    r2 = ecrire_dans(ctx, hook, lab, "Write", G7_NU)
+    if classer(r2[0], r2[1]) != "deny":
+        return False, "second Write : " + classer(r2[0], r2[1])
+    return True, "dérogation G7 : premier Write passe et cité, dérogation consommée, second Write refusé"
+
+
+def compte_g7(ctx, script):
+    """(faux refus, faux accept, nombre d'écritures) du banc G7 (labs g7-adherent et g7-dev) rejoué sur la copie ARMÉE de `script` : un
+    doit-passer refusé est un faux refus, un doit-refuser non refusé un faux accept, un silence non silencieux un faux accept."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    _, labs, chemins = labs_banc(ctx)
+    faux_refus = faux_accept = n = 0
+    for nom in (G7_LAB, "g7-dev"):
+        for e in labs[nom]["ecritures"]:
+            brut, cwd = entree_de_ecriture(e, chemins[nom])
+            rc, out, err = ctx.lancer("A", brut, cwd=cwd, dossier=d)
+            _bon, obtenu = juger(e["attendu"], e["gate"], rc, out)
+            n += 1
+            if e["attendu"] == "doit-passer" and obtenu == "deny":
+                faux_refus += 1
+            elif e["attendu"] == "doit-refuser" and obtenu != "deny":
+                faux_accept += 1
+            elif e["attendu"] == "silence" and obtenu != "silence":
+                faux_accept += 1
+    return faux_refus, faux_accept, n
+
+
+def controle_g7_09(ctx, script):
+    """R-G7-09 : banc G7 sur copie armée -> zéro faux refus, zéro faux accept, sur un banc non vide (36 écritures au plus bas)."""
+    fr, fa, n = compte_g7(ctx, script)
+    if n < 30:
+        return False, "banc G7 trop petit : %d écriture(s) (plancher 30, jamais un vert à vide)" % n
+    return (fr == 0 and fa == 0), "COMPTE G7 faux-refus=%d faux-accept=%d sur %d écritures" % (fr, fa, n)
+
+
 def controle_cang_g7(ctx, script):
     """R-CANG-G7 : le canary rend 3 (sain, cas G7 compris) sur l'état livré et sur une copie où les étapes 1 à 3 sont armées, et signale
     (code 0, une ligne qui nomme `G7-orphelin`) quand evaluer_g7 est neutralisé."""
@@ -2300,6 +2400,14 @@ def sec_g7(ctx):
     bon, detail = controle_g7_05(ctx, ctx.hook)
     ok("R-G7-05 contrôle croisé des marqueurs avec le texte du détecteur : " + detail) if bon else ko(
         "R-G7-05", "MARQUEURS_CODE ∪ {*.xcodeproj} du hook = l'ensemble extrait du texte de detect-gsd-engine.sh", "ensembles égaux", detail)
+    for dossier, libelle, attendu, obtenu in cas_habite(ctx, None):
+        print("G7-HABITE cas=%s attendu=%s obtenu=%s (%s)" % (dossier, attendu, obtenu, libelle))
+    for ident, ctrl, titre in (
+            ("R-G7-06", controle_g7_06, "prédicat « habité » littéral de P45-D-14 (agent ET mémoire), tableau des cas imprimé (G7-HABITE)"),
+            ("R-G7-07", controle_g7_07, "fichiers réguliers seulement : lien symbolique, memory/ sans fichier, agents/*.txt ne comptent pas"),
+            ("R-G7-08", controle_g7_08, "dérogation G7 honorée, citée et consommée")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
 
 def sec_registre(ctx):
@@ -2392,6 +2500,11 @@ def sec_banc(ctx):
         ok("R-G1-10 banc G1 sur copie armée : COMPTE G1 faux-refus=0 faux-accept=0")
     else:
         ko("R-G1-10", "banc G1 sur copie armée : zéro faux refus, zéro faux accept", "G1 [0, 0]", "G1=%s" % (faux.get("G1"),))
+    bon, detail = controle_g7_09(ctx, None)
+    if bon and faux.get("G7", [0, 0]) == [0, 0] and compte.get("G7"):
+        ok("R-G7-09 banc G7 sur copie armée : COMPTE G7 faux-refus=0 faux-accept=0 (%s)" % detail)
+    else:
+        ko("R-G7-09", "banc G7 sur copie armée : zéro faux refus, zéro faux accept", "G7 [0, 0]", "G7=%s ; %s" % (faux.get("G7"), detail))
     if all(faux.get(g, [0, 0]) == [0, 0] for g in ("G5", "G6")) and all(compte.get(g) for g in ("G5", "G6")):
         ok("R-ID-06 banc complet G5 + G6 sur copie armée : COMPTE G5 faux-refus=0 faux-accept=0, COMPTE G6 faux-refus=0 faux-accept=0")
     else:
@@ -2491,6 +2604,12 @@ def sec_mutants(ctx):
          "R-G7-03", controle_g7_03),
         ("G7-EXISTE", "# g7-existe", "if composant.casefold() == NOM_PLANNING:  # g7-existe", "R-G7-04", controle_g7_04),
         ("G7-PERIMETRE", "sys.exit(0)  # non-adherent", "pass", "R-G7-04", controle_g7_04),
+        ("G7-HABITE", "# g7-habite", "if True:  # g7-habite", "R-G7-06", controle_g7_06),
+        ("G7-REGULIER", "# g7-regulier-agent", 'if nom.endswith(".md") and not nom.startswith(".") and os.path.exists(os.path.join(agents, nom)):  # g7-regulier-agent',
+         "R-G7-07", controle_g7_07),
+        ("G7-BANC-ACCEPT", "# g7-habite", "if True:  # g7-habite", "R-G7-09", controle_g7_09),
+        ("G7-BANC-REFUS", "porte_marqueur_code(x):  # g7-marqueur", "if False:  # g7-marqueur", "R-G7-09", controle_g7_09),
+        ("G7-REGULIER-MEMOIRE", "# g7-regulier-memoire", "if os.path.exists(os.path.join(dossier, nom)):  # g7-regulier-memoire", "R-G7-07", controle_g7_07),
     ]
     for entree in M:
         ident, motif, repl, cible, ctrl = entree[:5]

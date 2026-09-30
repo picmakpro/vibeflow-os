@@ -1035,9 +1035,51 @@ def porte_marqueur_code(dossier):
     return any(n.endswith(SUFFIXE_XCODEPROJ) and not n.startswith(".") and os.path.isdir(os.path.join(dossier, n)) for n in noms)
 
 
+# Prédicat « habité » (P45-D-14, F4 = f4-litteral) : LE PRÉDICAT LITTÉRAL, rien de plus — au moins un fichier RÉGULIER
+# `X/.claude/agents/*.md` ET au moins un fichier RÉGULIER sous `X/.claude/memory/` (lstat : jamais un lien, jamais un dossier).
+# Un `.claude/` qui ne porte pas les deux — un `agent-memory/` sans fichier, des agents sans mémoire, une mémoire sans agent,
+# un dossier vide — n'est pas habité. Le parcours de la mémoire est borné : au-delà de la borne le prédicat est INDÉTERMINÉ et
+# G7 ne refuse pas (jamais un refus sur ce que le hook n'a pas pu lire, comme G1 pour F5).
+BORNE_PARCOURS_HABITE = 20000
+
+
+def _a_un_agent(dossier_claude):
+    """Au moins un fichier régulier `agents/*.md` directement sous `dossier_claude` (glob : jamais un fichier caché)."""
+    agents = os.path.join(dossier_claude, "agents")
+    try:
+        noms = sorted(os.listdir(agents))
+    except OSError:
+        return False
+    for nom in noms:
+        if nom.endswith(".md") and not nom.startswith(".") and est_fichier_regulier(os.path.join(agents, nom)):  # g7-regulier-agent
+            return True
+    return False
+
+
+def _a_une_memoire(dossier_claude):
+    """Au moins un fichier régulier sous `dossier_claude/memory/` (à toute profondeur, liens de dossier non suivis) ; vrai
+    aussi quand la borne de parcours est atteinte (indéterminé : jamais un refus)."""
+    vus = 0
+    for dossier, sous_dossiers, fichiers in os.walk(os.path.join(dossier_claude, "memory"), followlinks=False):
+        sous_dossiers.sort()
+        for nom in sorted(fichiers):
+            vus += 1
+            if vus > BORNE_PARCOURS_HABITE:
+                return True
+            if est_fichier_regulier(os.path.join(dossier, nom)):  # g7-regulier-memoire
+                return True
+    return False
+
+
+def lab_habite(dossier):
+    """Le `.claude/` de `dossier` est habité : au moins un agent ET au moins une mémoire (prédicat littéral de P45-D-14)."""
+    claude = os.path.join(dossier, ".claude")
+    return _a_un_agent(claude) and _a_une_memoire(claude)
+
+
 def evaluer_g7(contexte):
     """G7 (GATE-07) : création d'un `.planning/` dans un dossier X sans marqueur de projet de code ni `.claude/` habité,
-    sous un lab adhérent. Le prédicat « habité » arrive à la tâche suivante : ici un X qui porte un `.claude/` passe."""
+    sous un lab adhérent (`.claude/` habité : prédicat littéral de P45-D-14, `lab_habite`)."""
     if contexte["outil"] not in OUTILS_CREATION or not contexte["ecrit"]:
         return []
     racine = contexte["racine"]
@@ -1050,7 +1092,7 @@ def evaluer_g7(contexte):
     x = os.path.join(racine, *composants[:indice])
     if porte_marqueur_code(x):  # g7-marqueur
         return []
-    if os.path.lexists(os.path.join(x, ".claude")):
+    if lab_habite(x):  # g7-habite
         return []
     return [Verdict("G7", "/".join(composants), "créer un .planning/ dans %s exige un .claude/ habité (au moins un agent et une mémoire) ou un "
                                                  "marqueur de projet de code — sinon ce planning serait orphelin (spec D-05)" % x_rel)]

@@ -531,8 +531,39 @@ x
 @@ fichier zone/existant/.planning/notes.md
 n
 
+@@ # Prédicat « habité » (P45-D-14, littéral) : un .claude/ habité porte au moins un agents/*.md régulier ET au moins un fichier
+@@ # régulier sous memory/. hab-ok et hab-profond sont habités ; les autres ne le sont pas : agents seuls, mémoire seule,
+@@ # agent-memory/ sans fichier, .claude/ vide, agents/x.md en lien, memory/m.md en lien, memory/ sans fichier, agents/ sans .md.
+@@ fichier zone/hab-ok/.claude/agents/a.md
+a
+@@ fichier zone/hab-ok/.claude/memory/m.md
+m
+@@ fichier zone/hab-profond/.claude/agents/a.md
+a
+@@ fichier zone/hab-profond/.claude/memory/sous/profond/m.md
+m
+@@ fichier zone/hab-agents/.claude/agents/a.md
+a
+@@ fichier zone/hab-memoire/.claude/memory/m.md
+m
+@@ dossier zone/hab-agent-memory/.claude/agent-memory
+@@ dossier zone/hab-vide/.claude
+@@ lien zone/hab-lien/.claude/agents/x.md -> ../../../cible/fichier.txt
+@@ fichier zone/hab-lien/.claude/memory/m.md
+m
+@@ fichier zone/hab-memoire-vide/.claude/agents/a.md
+a
+@@ dossier zone/hab-memoire-vide/.claude/memory/vide
+@@ fichier zone/hab-memoire-lien/.claude/agents/a.md
+a
+@@ lien zone/hab-memoire-lien/.claude/memory/m.md -> ../../../cible/fichier.txt
+@@ fichier zone/hab-txt/.claude/agents/notes.txt
+n
+@@ fichier zone/hab-txt/.claude/memory/m.md
+m
+
 @@ # Refus : la création d'un .planning/ dans un dossier nu, Write comme NotebookEdit, tout rôle, dossier existant ou à créer,
-@@ # faux marqueurs (un dossier nommé package.json, un lien cassé, un fichier nommé App.xcodeproj).
+@@ # faux marqueurs (un dossier nommé package.json, un lien cassé, un fichier nommé App.xcodeproj), .claude/ non habité.
 @@ ecriture Write zone/nu/.planning/config.json armee :: doit-refuser G7
 @@ ecriture NotebookEdit zone/nu/.planning/x.ipynb armee :: doit-refuser G7
 @@ ecriture Write zone/nu/.planning/config.json agent=general-purpose armee :: doit-refuser G7
@@ -540,7 +571,15 @@ n
 @@ ecriture Write zone/code-dossier/.planning/config.json armee :: doit-refuser G7
 @@ ecriture Write zone/code-casse/.planning/config.json armee :: doit-refuser G7
 @@ ecriture Write zone/code-fichier-xcode/.planning/config.json armee :: doit-refuser G7
-@@ # Passage : un marqueur de code (les douze, dont un lien vers un fichier), puis tout ce qui ne crée pas un .planning/ dans un
+@@ ecriture Write zone/hab-agents/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-memoire/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-agent-memory/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-vide/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-lien/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-memoire-vide/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-memoire-lien/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-txt/.planning/config.json armee :: doit-refuser G7
+@@ # Passage : un marqueur de code (les douze, dont un lien vers un fichier), un .claude/ habité (deux cas), puis tout ce qui ne crée pas un .planning/ dans un
 @@ # dossier nu : un .planning/ qui existe déjà, un Edit (ne crée pas de fichier), un dossier `planning` sans point, un
 @@ # fichier ordinaire, le dossier de planning du lab.
 @@ ecriture Write zone/code-package.json/.planning/config.json armee :: doit-passer G7
@@ -556,6 +595,8 @@ n
 @@ ecriture Write zone/code-Package.swift/.planning/config.json armee :: doit-passer G7
 @@ ecriture Write zone/code-App.xcodeproj/.planning/config.json armee :: doit-passer G7
 @@ ecriture Write zone/code-lien/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/hab-ok/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/hab-profond/.planning/config.json armee :: doit-passer G7
 @@ ecriture Write zone/existant/.planning/notes.md armee :: doit-passer G7
 @@ ecriture Edit zone/nu/.planning/config.json armee :: doit-passer G7
 @@ ecriture Write zone/nu/planning/config.json armee :: doit-passer G7

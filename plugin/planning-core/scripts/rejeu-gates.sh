@@ -47,14 +47,21 @@
 #                        « refus conforme au modèle, lab non migré » (compté à part, ni faux refus ni
 #                        faux accept) ; passage obtenu = faux accept
 # Fichier d'attendus : lignes `<gate> | <lab affiché> | <chemin relatif> | <attendu> | <motif>`,
-# commentaires `#` ; une ligne dont le lab n'est pas dans cette mesure est ignorée.
+# commentaires `#` ; une ligne dont le lab n'est pas dans cette mesure est ignorée. Pour le gate G7 (45-07) la colonne
+# chemin est le dossier X (relatif au lab) où un `.planning/` est créé, et l'écriture rejouée est la CRÉATION de
+# `X/.planning/config.json` (voir plus bas) ; la colonne se termine par le nom du dossier.
 # Registre CONSTRUCTEURS (gate -> fonction(lab, ctx) qui rend des tuples (outil, chemin, attendu,
-# agent_type[, origine[, charge[, branche]]])) : `reecriture` (chaque fichier régulier des .planning/ copiés,
+# agent_type[, origine[, charge[, branche[, situation]]]])) : `reecriture` (chaque fichier régulier des .planning/ copiés,
 # attendu doit-passer) ; `G6` et `G5` (45-05 : fichiers générés, config.json, VERDICT.md) ; `G1` (45-06 : les
 # PLAN.md de forme modèle, classés d'après l'état que recalc-planning.sh --read-only dérive sur la copie — `recalc-
 # planning.sh` est cherché à côté de ce script — sinon d'après la règle écrite du modèle, `branche` nommant la
-# règle appliquée ; des phases synthétiques 99-rejeu-* créées sur la copie) ; 45-07 à 45-09
-# ajoutent le leur. `charge` (dict) remplace le tool_input d'un Edit (old_string, new_string,
+# règle appliquée ; des phases synthétiques 99-rejeu-* créées sur la copie) ; `G7` (45-07 : la CRÉATION de chaque
+# `.planning/` imbriqué réel, attendu doit-passer, et celle d'un `.planning/` dans un dossier synthétique vide
+# `rejeu-orphelin-g7/` sous chaque racine adhérente de la copie, attendu doit-refuser ; le dossier visé est mis de côté
+# sur la copie, le hook est joué, le dossier est remis en place — UN payload à la fois, après les écritures parallèles ;
+# une copie qui n'est pas identique avant et après est une erreur de l'outil) ; 45-08 et 45-09 ajoutent le leur.
+# Une écriture de création porte la situation `creation` : sa ligne du relevé se termine par ` [création]` et elle ne se
+# fond jamais avec la réécriture en place du même chemin. `charge` (dict) remplace le tool_input d'un Edit (old_string, new_string,
 # replace_all) : l'Edit de config.json qui perd l'adhésion a une clé (outil Edit) distincte de celle de
 # la réécriture Write du même fichier. Un constructeur qui classe d'après le modèle porte
 # l'attribut `classe_modele` ; il est TOTAL (P45-D-21c) : une écriture sans attendu, ou hors des
@@ -119,6 +126,8 @@ VALEURS_ATTENDU = ("doit-passer", "doit-refuser", "doit-refuser-modele")
 ORIGINES = ("etat-derive", "regle-ecrite")
 COMPTES = ("faux-refus", "faux-accept", "refus-conforme-modele")
 RANG_ATTENDUS, RANG_GATE, RANG_GENERIQUE = 3, 2, 1
+SITUATIONS = ("", "creation")
+SYNTH_ORPHELIN_G7 = "rejeu-orphelin-g7"
 RAISON_MODELE = "refus conforme au modèle, lab non migré"
 RAISON_REGLE = "classé par la règle écrite, état dérivé absent"
 MAX_CONTENU = 1 << 20
@@ -650,17 +659,41 @@ def construire_g1(lab, ctx):
 construire_g1.classe_modele = True
 
 
-CONSTRUCTEURS = {"reecriture": construire_reecriture, "G6": construire_g6, "G5": construire_g5, "G1": construire_g1}  # rejeu-registre
+# --- G7 (45-07, GATE-07, P45-D-14) : pas de planning orphelin sous un lab adhérent ----------------------------------
+def construire_g7(lab, ctx):
+    """G7 : la CRÉATION de `config.json` dans chaque `.planning/` imbriqué réel (doit-passer par défaut : le fichier d'attendus
+    le reclasse, P45-D-21a) et la création d'un `.planning/` dans un dossier synthétique vide `rejeu-orphelin-g7/` sous
+    chaque racine adhérente de la copie (doit-refuser : le modèle l'interdit pour tout lab). Écritures de situation
+    `creation` : le dossier de planning visé est mis de côté au moment du jeu (`jouer_creation`). La racine du lab n'est pas
+    un `.planning/` imbriqué."""
+    sortie = []
+    for planning in lab.dossiers_planning:
+        parent = os.path.dirname(planning)
+        if parent:
+            sortie.append(("Write", planning + "/config.json", "doit-passer", "", "etat-derive", None, None, "creation"))
+        synth = (parent + "/" if parent else "") + SYNTH_ORPHELIN_G7
+        try:
+            os.makedirs(os.path.join(lab.copie, synth), exist_ok=True)
+        except OSError:
+            continue
+        sortie.append(("Write", synth + "/.planning/config.json", "doit-refuser", "", "etat-derive", None, None, "creation"))
+    return sortie
+
+
+CONSTRUCTEURS = {"reecriture": construire_reecriture, "G6": construire_g6, "G5": construire_g5, "G1": construire_g1, "G7": construire_g7}  # rejeu-registre
 
 
 def normaliser(lab, gate, brut, rang):
     """Un tuple de constructeur -> dict d'entrée ; la classification est TOTALE (P45-D-21c)."""
-    if not isinstance(brut, (tuple, list)) or len(brut) not in (4, 5, 6, 7):
+    if not isinstance(brut, (tuple, list)) or len(brut) not in (4, 5, 6, 7, 8):
         raise ErreurOutil("écriture mal formée rendue par le constructeur " + gate)
     outil, chemin, attendu, agent_type = brut[:4]
     origine = brut[4] if len(brut) >= 5 else "etat-derive"
     charge = brut[5] if len(brut) >= 6 else None
-    branche = brut[6] if len(brut) == 7 else None
+    branche = brut[6] if len(brut) >= 7 else None
+    situation = brut[7] if len(brut) == 8 else ""
+    if situation not in SITUATIONS:
+        raise ErreurOutil("situation inconnue : " + str(situation) + " pour " + montrer_clef(clef(outil, chemin, agent_type or "")))
     if charge is not None and not isinstance(charge, dict):
         raise ErreurOutil("charge mal formée rendue par le constructeur " + gate)
     cle = clef(outil, chemin, agent_type or "")
@@ -669,7 +702,7 @@ def normaliser(lab, gate, brut, rang):
     if origine not in ORIGINES:
         raise ErreurOutil("origine inconnue : " + str(origine) + " pour " + montrer_clef(cle))
     return {"lab": lab.index, "clef": cle, "attendu": attendu, "origine": origine, "gate": gate, "rang": rang,
-            "charge": charge, "branche": branche}
+            "charge": charge, "branche": branche, "situation": situation}
 
 
 def lire_attendus(chemin, labs):
@@ -689,8 +722,14 @@ def lire_attendus(chemin, labs):
             raise ErreurOutil("fichier d'attendus : ligne %d invalide" % n)
         gate, nom_lab, rel, attendu = champs[:4]
         cibles = [l for l in labs if nom_lab in (l.affiche, l.arg)]
+        ecriture = ("Write", rel, attendu, "")
+        if gate == "G7":  # la colonne chemin est le dossier X : l'écriture rejouée est la création de X/.planning/config.json
+            x = rel.rstrip("/")
+            if not x or x == "." or x.startswith("/") or ".." in x.split("/"):
+                raise ErreurOutil("fichier d'attendus : ligne %d invalide (G7 : un dossier relatif au lab est attendu)" % n)
+            ecriture = ("Write", x + "/.planning/config.json", attendu, "", "etat-derive", None, None, "creation")
         for lab in cibles:
-            entrees.append(normaliser(lab, gate, ("Write", rel, attendu, ""), RANG_ATTENDUS))
+            entrees.append(normaliser(lab, gate, ecriture, RANG_ATTENDUS))
     return entrees
 
 
@@ -700,7 +739,7 @@ def fusionner(entrees):
     `doit-refuser-modele` de même rang ne se contredisent pas (le plus précis l'emporte)."""
     groupes = {}
     for e in entrees:
-        groupes.setdefault((e["lab"], e["clef"]), []).append(e)
+        groupes.setdefault((e["lab"], e["clef"], e["situation"]), []).append(e)
     gagnants = []
     for cle, liste in groupes.items():
         rang = max(e["rang"] for e in liste)  # rejeu-priorite
@@ -773,6 +812,45 @@ def jouer(hook_copie, env, lab, outil, chemin, agent_type, charge=None):
     return "passe", "passe"
 
 
+def jouer_creation(hook_copie, env, lab, cle, charge, cote, numero):
+    """Rejoue une CRÉATION sur la copie : le dossier de planning visé (le parent de l'écriture) est mis de côté sous `cote`, le
+    hook est joué, le dossier est remis en place — toujours, même sur erreur. Il n'existe rien à mettre de côté pour un dossier
+    synthétique."""
+    planning = os.path.join(lab.copie, os.path.dirname(cle[1]))
+    mis = None
+    if os.path.lexists(planning):  # rejeu-cote
+        mis = os.path.join(cote, "cote-%d" % numero)
+        try:
+            os.rename(planning, mis)
+        except OSError as exc:
+            raise ErreurOutil("mise de côté impossible sur la copie : " + os.path.relpath(planning, lab.copie) + " (" + type(exc).__name__ + ")")
+    try:
+        return jouer(hook_copie, env, lab, cle[0], cle[1], cle[2], charge)
+    finally:
+        if mis is not None:
+            os.rename(mis, planning)  # rejeu-remise
+
+
+def signature_copie(racine):
+    """Signature de l'arbre d'une copie : chemin, type, mode, sha256 d'un fichier ou cible d'un lien, aucun lien suivi."""
+    h = hashlib.sha256()
+    for dossier, dossiers, fichiers in os.walk(racine, followlinks=False):
+        dossiers.sort()
+        for nom in sorted(dossiers + fichiers):
+            chemin = os.path.join(dossier, nom)
+            rel = os.path.relpath(chemin, racine)
+            st = os.lstat(chemin)
+            if stat.S_ISLNK(st.st_mode):
+                ligne = "%s\tl\t%s" % (rel, os.readlink(chemin))
+            elif stat.S_ISDIR(st.st_mode):
+                ligne = "%s\td\t%o" % (rel, stat.S_IMODE(st.st_mode))
+            else:
+                with open(chemin, "rb") as fh:
+                    ligne = "%s\tf\t%o\t%s" % (rel, stat.S_IMODE(st.st_mode), hashlib.sha256(fh.read()).hexdigest())
+            h.update(os.fsencode(ligne) + b"\n")
+    return h.hexdigest()
+
+
 def classer(attendu, obtenu):
     if attendu == "doit-passer":
         return "faux-refus" if obtenu == "refus" else "conforme"  # rejeu-modele-inverse
@@ -808,10 +886,10 @@ def assainir(texte, labs, tmp):
     return texte if len(texte) <= 240 else texte[:240] + "…"
 
 
-def colonne_chemin(cle):
+def colonne_chemin(cle, situation=""):
     outil, chemin, agent = cle
     suffixe = "" if (outil == "Write" and not agent) else " [" + outil + ("@" + agent if agent else "") + "]"
-    return chemin + suffixe
+    return chemin + suffixe + (" [création]" if situation == "creation" else "")
 
 
 def analyser(argv):
@@ -876,13 +954,30 @@ def executer(opts, tmp):
     if opts["attendus"]:
         entrees.extend(lire_attendus(opts["attendus"], labs))
     gagnants = fusionner(entrees)
-    gagnants.sort(key=lambda e: (e["lab"], e["clef"]))
+    gagnants.sort(key=lambda e: (e["lab"], e["clef"], e["situation"]))
 
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": os.environ.get("HOME", ""),
            "TMPDIR": tmp, "XDG_CACHE_HOME": os.path.join(tmp, "xdg")}
     os.makedirs(env["XDG_CACHE_HOME"], exist_ok=True)
+    verdicts = [None] * len(gagnants)
+    libres = [i for i, e in enumerate(gagnants) if e["situation"] != "creation"]
     with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 2)) as pool:
-        verdicts = list(pool.map(lambda e: jouer(hook_copie, env, labs[e["lab"]], *e["clef"], e["charge"]), gagnants))
+        rendus = list(pool.map(lambda i: jouer(hook_copie, env, labs[gagnants[i]["lab"]], *gagnants[i]["clef"], gagnants[i]["charge"]), libres))
+    for i, rendu in zip(libres, rendus):
+        verdicts[i] = rendu
+    # Les créations se jouent APRÈS les écritures parallèles, UNE à la fois : le dossier de planning visé est mis de côté le
+    # temps du payload. La copie doit être identique avant et après (sinon, erreur de l'outil : le relevé serait faux).
+    creations = [i for i, e in enumerate(gagnants) if e["situation"] == "creation"]
+    if creations:
+        cote = os.path.join(tmp, "cote")
+        os.makedirs(cote)
+        avant = [signature_copie(lab.copie) for lab in labs]
+        for numero, i in enumerate(creations):
+            e = gagnants[i]
+            verdicts[i] = jouer_creation(hook_copie, env, labs[e["lab"]], e["clef"], e["charge"], cote, numero)
+        apres = [signature_copie(lab.copie) for lab in labs]
+        if avant != apres:  # rejeu-copie-remise
+            raise ErreurOutil("copie non remise en place après les créations de G7 : le relevé n'est pas fiable")
 
     comptes = {}
     lignes = []
@@ -900,7 +995,7 @@ def executer(opts, tmp):
             motif = RAISON_MODELE
         if gagnant["origine"] == "regle-ecrite":
             motif = (motif + " ; " if motif and motif != "passe" else "") + RAISON_REGLE + (" : " + gagnant["branche"] if gagnant.get("branche") else "")
-        lignes.append(" | ".join([gate, lab.affiche, colonne_chemin(gagnant["clef"]), gagnant["attendu"], obtenu, motif]))
+        lignes.append(" | ".join([gate, lab.affiche, colonne_chemin(gagnant["clef"], gagnant["situation"]), gagnant["attendu"], obtenu, motif]))
 
     gates_comptes = [g for lot in ORDRE_ETAPES[:opts["etape"]] for g in lot]
     gates_comptes += [g for g in GATES if g in CONSTRUCTEURS and g not in gates_comptes]
