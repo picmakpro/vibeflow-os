@@ -562,7 +562,8 @@ else
     E7_STATUS="indet"
     E7_MSG="[E7] snapshot d'une autre mission : posé le ${E7_SDATE:-?} sous la génération « $E7_SGEN » du verrou, le verrou courant est « $E7_CGEN ». Ce qu'il masque n'est pas ce qui existait au démarrage de CETTE mission : le reposer"
   else
-  say "[E7] snapshot posé le ${E7_SDATE:-?}, génération du verrou « $E7_SGEN » (verrou courant : $E7_CGEN ; relâché, l'identité n'est plus recontrôlable : seule la date la situe)"
+  if [ "$E7_SGEN" = "-" ]; then say "[E7] snapshot posé le ${E7_SDATE:-?} SANS verrou de driver : aucune identité de mission, seule la date le situe"
+  else say "[E7] snapshot posé le ${E7_SDATE:-?}, génération du verrou « $E7_SGEN » (verrou courant : $E7_CGEN ; relâché, l'identité n'est plus recontrôlable : seule la date la situe)"; fi
   E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?
   E7_ARCHIVE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVÉ' || true; } | sed 's/^\[budget\] *//')"
   E7_NONTENTE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVAGE NON TENTÉ' || true; } | sed 's/^\[budget\] *//')"

@@ -503,6 +503,10 @@ if [ "$E7_RC" -eq 4 ] && [ "$named" -eq 1 ]; then ok "40 génération du snapsho
 rm -f "$D/.planning/DRIVER.lock"; gate_at "$G7" "$D"
 case "$E7_ERR" in *"snapshot posé le 20"*"l'identité n'est plus recontrôlable"*) named=1 ;; *) named=0 ;; esac
 if [ "$E7_RC" -eq 3 ] && [ -z "$E7_OUT" ] && [ "$named" -eq 1 ]; then ok "41 verrou relâché — code 3, limite dite sur stderr (date du snapshot)"; else ko "41 verrou relâché" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
+# 41a — snapshot posé sans verrou et toujours sans verrou : accepté, mais dit pour ce qu'il est (aucune identité)
+D="$(mk_sane_fixture c41a)"; gate_at "$G7" "$D"
+case "$E7_ERR" in *"SANS verrou de driver : aucune identité de mission"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 3 ] && [ "$named" -eq 1 ]; then ok "41a snapshot sans verrou — code 3, « aucune identité de mission » dit sur stderr"; else ko "41a sans verrou" "rc=$E7_RC err=[$E7_ERR]"; fi
 # 41b — snapshot posé SANS verrou, verrou présent à la sortie : pas la même situation, INDÉTERMINÉ.
 D="$(mk_sane_fixture c41b)"; set_lock "$D" DRIVER.lock.gen.3.33; gate_at "$G7" "$D"
 if [ "$E7_RC" -eq 4 ]; then ok "41b snapshot posé sans verrou, verrou tenu à la sortie — code 4"; else ko "41b sans verrou puis verrou" "rc=$E7_RC err=[$E7_ERR]"; fi
