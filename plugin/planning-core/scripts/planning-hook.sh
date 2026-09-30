@@ -1123,6 +1123,7 @@ def evaluer_g7(contexte):
 # portent le suffixe `_agent` : elles ne se confondent pas avec le parseur de frontmatter du modèle de la 44.
 # Le tokenizer est celui de check-agents.sh : découpage à PROFONDEUR DE PARENTHÈSES, jamais un split sur la virgule.
 AGENT_TOOL_NAMES = ("Agent", "Task")
+OUTILS_DISPATCH = ("Agent", "Task")  # role-dispatch
 _CLE_AGENT_RE = re.compile(r"^([A-Za-z_-]+):\s*(.*)$")
 
 
@@ -1424,30 +1425,53 @@ def resoudre_agent(agent_type, racine, home):
     return ("inconnu", None)
 
 
+def allowlist_de_definition(chemin):
+    """Noms de l'allowlist `Agent(...)` / `Task(...)` de la définition à `chemin` (liste vide si illisible)."""
+    try:
+        with open(chemin, encoding="utf-8-sig") as fh:
+            return allowlist_agent(lignes_frontmatter_agent(fh.read()))
+    except (OSError, UnicodeDecodeError):
+        return []
+
+
 RAISON_JUGE = ("%s est un juge — toute écriture par outil lui est refusée ; posez un verdict par poser-verdict.sh "
                "(spec fabrique §5)")
+RAISON_WORKER = ("%s est un worker — dispatch de %s refusé : absent de son allowlist Agent(...) / Task(...) "
+                 "(F9 = f9-allowlist, Willy, AskUserQuestion session principale, 2026-09-30)")
 
 
 def evaluer_role(contexte):
-    """Ligne juge du hook par rôle (GATE-09). Un fil principal (agent_id absent), un agent_type inconnu, ambigu,
-    illisible ou de plugin non résolu ne reçoit JAMAIS de verdict de rôle : seulement la ligne « Tous » et G1, G5,
-    G6, G7 (P45-D-11, limite déclarée). Juge : toute écriture par Write, Edit ou NotebookEdit est un verdict (le
-    verdict se pose par poser-verdict.sh). La ligne producteur est couverte par G5 (P45-D-07), aucune règle en
-    double. Manager : aucune. La ligne worker est posée par la Tâche 3 du plan 45-08, après l'arbitrage F9."""
+    """Lignes juge et worker du hook par rôle (GATE-09). Un fil principal (agent_id absent), un agent_type inconnu,
+    ambigu, illisible ou de plugin non résolu ne reçoit JAMAIS de verdict de rôle : seulement la ligne « Tous » et
+    G1, G5, G6, G7 (P45-D-11, limite déclarée). Juge : toute écriture par Write, Edit ou NotebookEdit est un verdict
+    (le verdict se pose par poser-verdict.sh). Worker : un dispatch (tool_name Agent ou Task, P45-D-09) dont le
+    subagent_type normalisé n'est égal à aucun nom de la PROPRE allowlist du worker APPELANT — l'agent_type du
+    payload, résolu en définition — est un verdict ; allowlist vide : tout dispatch refusé (F9 = f9-allowlist,
+    Willy, AskUserQuestion session principale, 2026-09-30 : contre la lettre de GATE-09 et de la table §5 de la spec
+    fabrique, « Worker : tout dispatch refusé » ; limite déclarée : l'allowlist vit dans une définition d'agent que
+    G6 ne protège pas). La ligne producteur est couverte par G5 (P45-D-07), aucune règle en double. Manager : aucune."""
     racine = contexte["racine"]  # role-sonde
     outil = contexte["outil"]
-    if outil not in OUTILS_ECRITURE:
+    if outil not in OUTILS_ECRITURE and outil not in OUTILS_DISPATCH:
         return []
     payload = contexte["payload"]
     agent_id, agent_type = payload.get("agent_id"), payload.get("agent_type")
     avec_identite = isinstance(agent_id, str) and agent_id != "" and isinstance(agent_type, str) and agent_type != ""
     role, definition = resoudre_agent(agent_type, racine, contexte.get("arg_home")) if avec_identite else ("inconnu", None)  # role-principal
-    if role == "juge":
+    if role == "juge" and outil in OUTILS_ECRITURE:
         chemin_rel = None
         if contexte["ecrit"]:
             rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
             chemin_rel = "/".join(c for c in rel.split(os.sep) if c not in ("", "."))
         return [Verdict("ROLE", chemin_rel, RAISON_JUGE % agent_type)]
+    if role == "worker" and outil in OUTILS_DISPATCH:  # role-worker
+        entree = payload.get("tool_input")
+        sous = entree.get("subagent_type") if isinstance(entree, dict) else None
+        autorises = [normaliser(nom) for nom in allowlist_de_definition(definition)]
+        if isinstance(sous, str) and normaliser(sous) in autorises:  # role-allowlist
+            return []
+        montre = sous if isinstance(sous, str) else "-"
+        return [Verdict("ROLE", "dispatch/" + montre, RAISON_WORKER % (agent_type, montre))]
     return []
 
 

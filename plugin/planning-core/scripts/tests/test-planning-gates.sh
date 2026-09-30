@@ -41,6 +41,11 @@
 #                   plugin ; name: du frontmatter, repli sur le nom de fichier ; normalisation), dérive « juge » et l'observe (copie
 #                   observe : une ligne gate=ROLE) ou le refuse (copie armed) ; fil principal, agent inconnu, ambigu, illisible ou de
 #                   plugin non résolu : jamais un refus de rôle ; lab dev : stdout d'octet vide ; --classer ; erreur interne
+#   R-ROLE-08..12   ligne worker selon F9 = f9-allowlist (Willy, AskUserQuestion session principale, 2026-09-30) : un worker ne
+#                   dispatche que ce que SA propre allowlist Agent(...) / Task(...) autorise (allowlist vide : tout refusé), sous
+#                   les deux tool_name Agent ET Task, subagent_type normalisé des deux côtés (chaîne entière, aucun préfixe retiré) ;
+#                   racine du dispatch = cwd du payload (lab dev : silence) ; manager, producteur, juge, fil principal, inconnu :
+#                   jamais un refus ; dérogation ROLE ; COMPTE ROLE du banc sur copie armée
 #   R-ROLE-13       HOME est l'entrée déclarée de la résolution des agents du compte (P45-D-12a) : il change la résolution, jamais
 #                   l'adhésion, le verdict de G5 et de G6 ni l'armement ; XDG_CACHE_HOME, CLAUDE_PROJECT_DIR et TMPDIR ne la changent pas
 #                   (le contrôle croisé du rôle avec check-agents.sh vit dans scripts/tests/test-role-hook-vs-check-agents.sh)
@@ -112,7 +117,7 @@ import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 
 TOKEN = "{{VF_SCRIPTS}}"
-OUTILS_BANC = ("Write", "Edit", "NotebookEdit", "Bash")
+OUTILS_BANC = ("Write", "Edit", "NotebookEdit", "Bash", "Agent", "Task")
 # Table d'armement ATTENDUE de l'état livré : chaque armement d'une étape (45-05 à 45-09) met à
 # jour la constante du script ET cette table dans le MÊME commit (R-TABLE-01).
 TABLE_ATTENDUE = {"G6": "observe", "G5": "observe", "G1": "observe", "G7": "observe", "ROLE": "observe"}
@@ -161,9 +166,11 @@ def payload(outil, entree, cwd, agent_type=None, agent_id="agent-test"):
     return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
-def entree_outil(outil, chemin, commande=None):
+def entree_outil(outil, chemin, commande=None, sous=None):
     if outil == "Bash":
         return {"command": commande if commande is not None else "true"}
+    if outil in ("Agent", "Task"):
+        return {"description": "d", "prompt": "p", "subagent_type": sous if sous is not None else "general-purpose"}
     if outil == "NotebookEdit":
         return {"notebook_path": chemin, "new_source": "x"}
     if outil == "Edit":
@@ -362,7 +369,7 @@ def _parser_ecriture(reste):
     if not att or att[0] not in ("doit-passer", "doit-refuser", "avertit", "silence"):
         raise ValueError("attendu inconnu : " + droite)
     e = {"attendu": att[0], "gate": att[1] if len(att) > 1 else None, "agent": None, "cwd": None, "commande": None,
-         "armee": False}
+         "armee": False, "sous": None}
     morceaux = gauche.split(" ", 2)
     e["outil"], e["chemin"] = morceaux[0], morceaux[1]
     if e["outil"] not in OUTILS_BANC:
@@ -380,6 +387,8 @@ def _parser_ecriture(reste):
         elif jeton.startswith("cwd="):
             e["cwd"] = jeton[4:]
             _valider_chemin_banc(e["cwd"])
+        elif jeton.startswith("sous="):
+            e["sous"] = jeton[5:]
         elif jeton == "armee":
             e["armee"] = True
         elif jeton:
@@ -404,7 +413,7 @@ def materialiser(labs, nom, destination):
 def entree_de_ecriture(e, racine):
     cwd = os.path.join(racine, e["cwd"]) if e["cwd"] else racine
     chemin = None if e["chemin"] == "-" else os.path.join(racine, e["chemin"])
-    return payload(e["outil"], entree_outil(e["outil"], chemin, e["commande"]), cwd, agent_type=e["agent"]), cwd
+    return payload(e["outil"], entree_outil(e["outil"], chemin, e["commande"], e.get("sous")), cwd, agent_type=e["agent"]), cwd
 
 
 def juger(attendu, gate, rc, out):
@@ -2426,6 +2435,150 @@ def controle_role_13(ctx, script):
     return (not fautes), ("; ".join(fautes) if fautes else "HOME change la résolution d'un agent du compte (A : refus, B : inconnu), jamais l'adhésion (lab dev silencieux), le verdict de G5 et de G6 ni l'armement (copie observe) ; XDG_CACHE_HOME, CLAUDE_PROJECT_DIR et TMPDIR ne la changent pas")
 
 
+# --- 45-08, Tâche 3 : la ligne worker (F9 = f9-allowlist, Willy, AskUserQuestion session principale, 2026-09-30) -------------------
+OUTILS_DISPATCH_SUITE = ("Agent", "Task")  # les deux tool_name, exercés à chaque cas de dispatch (P45-D-09)
+MOTIF_WORKER_F9 = "F9 = f9-allowlist, Willy, AskUserQuestion session principale, 2026-09-30"
+
+
+def _dispatch(ctx, hook, outil, agent, sous, lab=ROLE_LAB, extra_env=None):
+    return _role(ctx, hook, outil, "", agent=agent, lab=lab, extra_env=extra_env, entree=entree_outil(outil, None, sous=sous))
+
+
+def _cas_dispatch(ctx, hook, cas, lab=ROLE_LAB):
+    """[faute] d'une série de (agent, sous, attendu) rejouée sous Agent ET sous Task : `refus` (un deny de rôle qui cite le worker, le sous-agent
+    et F9) ou `passage`."""
+    fautes, n = [], 0
+    for agent, sous, attendu in cas:
+        for outil in OUTILS_DISPATCH_SUITE:
+            n += 1
+            rc, out, err = _dispatch(ctx, hook, outil, agent, sous, lab=lab)
+            v = verdict_role(rc, out, err)
+            if v != attendu:
+                fautes.append("%s agent=%s sous=%r : attendu %s, obtenu %s" % (outil, agent, sous, attendu, v))
+            elif attendu == "refus":
+                raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+                for morceau in ("est un worker", "dispatch de %s refusé" % sous, "allowlist Agent(...) / Task(...)", MOTIF_WORKER_F9):
+                    if morceau not in raison:
+                        fautes.append("%s agent=%s sous=%r : la raison ne porte pas %r : %s" % (outil, agent, sous, morceau, raison))
+    return fautes, n
+
+
+def controle_role_08(ctx, script):
+    """Copie armed, lab adhérent : un worker dont l'allowlist contient `vf-crafter` (écrite Agent(...) puis Task(...)) dispatche `vf-crafter` sous
+    Agent ET sous Task -> passage ; `hors-liste` -> refus ; worker à allowlist vide : tout dispatch refusé. Copie observe : le même refus est une
+    ligne gate=ROLE au journal, jamais un refus."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = _cas_dispatch(ctx, d, (
+        ("worker-liste", "vf-crafter", "passage"), ("worker-liste", "autre-agent", "passage"), ("worker-liste", "hors-liste", "refus"),
+        ("worker-task", "vf-crafter", "passage"), ("worker-task", "hors-liste", "refus"), ("worker-task", "autre-agent", "refus"),
+        ("worker-vide", "vf-crafter", "refus"), ("worker-vide", "general-purpose", "refus")))
+    o = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    for outil in OUTILS_DISPATCH_SUITE:
+        cache = dossier_neuf(ctx, "cache-role-08")
+        rc, out, err = _dispatch(ctx, o, outil, "worker-liste", "hors-liste", extra_env={"XDG_CACHE_HOME": cache})
+        lignes = lignes_journal(cache)
+        if rc != 0 or out != b"" or err or len(lignes) != 1 or "  gate=ROLE  " not in lignes[0] or ("  chemin=dispatch/hors-liste  ") not in lignes[0] or ("  outil=" + outil + "  ") not in lignes[0]:
+            fautes.append("copie observe %s : rc=%d stdout=%s lignes=%s" % (outil, rc, court(out), lignes))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d dispatchs sur copie armed (Agent et Task) : dans l'allowlist passe, hors liste refusé, allowlist vide refuse tout ; copie observe : une ligne gate=ROLE par refus évité" % n)
+
+
+def controle_role_09(ctx, script):
+    """Le subagent_type est normalisé (casse, `_`, espace, `-`) des DEUX côtés et comparé en entier : `VF_Crafter`, `vf crafter`, `VF-CRAFTER`
+    passent comme `vf-crafter` ; `autre:vf-crafter` (aucun préfixe retiré), `vf-crafter-2` et `vf-craft` (aucun préfixe de chaîne) sont refusés."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = _cas_dispatch(ctx, d, (
+        ("worker-liste", "VF_Crafter", "passage"), ("worker-liste", "vf crafter", "passage"), ("worker-liste", "VF-CRAFTER", "passage"),
+        ("worker-liste", "AUTRE_AGENT", "passage"), ("worker-liste", "Autre Agent", "passage"),
+        ("worker-liste", "autre:vf-crafter", "refus"), ("worker-liste", "vf-crafter-2", "refus"), ("worker-liste", "vf-craft", "refus"),
+        ("worker-liste", "", "refus"), ("Worker_Liste", "VF_Crafter", "passage"), ("WORKER LISTE", "hors-liste", "refus")))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d dispatchs : casse, `_`, espace et `-` unifiés des deux côtés, chaîne entière, aucun préfixe retiré" % n)
+
+
+def _payload_dispatch(racine_payload, outil, agent, sous):
+    return payload(outil, entree_outil(outil, None, sous=sous), racine_payload, agent_type=agent)
+
+
+def controle_role_10(ctx, script):
+    """La racine du dispatch est dérivée du cwd du PAYLOAD (P45-D-12) : cwd du payload dans un lab dev (process lancé depuis le lab adhérent)
+    -> stdout d'octet vide, même pour un worker ; cwd du payload dans le lab adhérent (process lancé depuis le lab dev) -> refus."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    _, _, chemins = labs_banc(ctx)
+    adherent, dev = chemins[ROLE_LAB], chemins[ROLE_DEV]
+    fautes = []
+    rc, out, err = ctx.lancer("A", _payload_dispatch(dev, "Agent", "worker-vide", "vf-crafter"), cwd=adherent, dossier=d)
+    if rc != 0 or out != b"" or err:
+        fautes.append("cwd du payload = lab dev, process dans le lab adhérent : rc=%d stdout=%s" % (rc, court(out)))
+    for outil in OUTILS_DISPATCH_SUITE:
+        rc, out, err = ctx.lancer("A", _payload_dispatch(adherent, outil, "worker-vide", "vf-crafter"), cwd=dev, dossier=d)
+        if verdict_role(rc, out, err) != "refus":
+            fautes.append("%s, cwd du payload = lab adhérent, process dans le lab dev : %s" % (outil, verdict_role(rc, out, err)))
+    return (not fautes), ("; ".join(fautes) if fautes else "la racine du dispatch vient du cwd du payload : lab dev = octet vide, lab adhérent = refus, quel que soit le cwd du processus")
+
+
+def controle_role_11(ctx, script):
+    """Manager, producteur, juge, fil principal, agent inconnu, agent de plugin non résolu, définitions ambiguë et illisible : dispatch (Agent
+    et Task) jamais un refus de rôle (P45-D-11, limite déclarée)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = _cas_dispatch(ctx, d, tuple((agent, "hors-liste", "passage") for agent in (
+        "manager-test", "producteur-test", "juge-test", "agent-inconnu", "plugin-x:agent-y", "ambigu", "abime")))
+    for outil in OUTILS_DISPATCH_SUITE:
+        n += 1
+        v = verdict_role(*_dispatch(ctx, d, outil, None, "hors-liste"))
+        if v != "passage":
+            fautes.append("%s fil principal : %s" % (outil, v))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d dispatchs (Agent et Task) sans refus de rôle : manager, producteur, juge, fil principal, agent inconnu, plugin non résolu, ambigu, illisible" % n)
+
+
+def _ecrire_agent(ctx, hook, lab, outil, rel, agent, extra_env=None):
+    brut = payload(outil, entree_outil(outil, os.path.join(lab, rel)), lab, agent_type=agent)
+    return ctx.lancer("A", brut, cwd=lab, dossier=hook, extra_env=extra_env)
+
+
+def compte_role(ctx, script):
+    """(faux refus, faux accept, nombre d'écritures) du banc ROLE (labs role-adherent et role-dev) rejoué sur la copie ARMÉE de `script`."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    _, labs, chemins = labs_banc(ctx)
+    faux_refus = faux_accept = n = 0
+    for nom in (ROLE_LAB, ROLE_DEV):
+        for e in labs[nom]["ecritures"]:
+            brut, cwd = entree_de_ecriture(e, chemins[nom])
+            rc, out, err = ctx.lancer("A", brut, cwd=cwd, dossier=d)
+            _bon, obtenu = juger(e["attendu"], e["gate"], rc, out)
+            n += 1
+            if e["attendu"] == "doit-passer" and obtenu == "deny":
+                faux_refus += 1
+            elif e["attendu"] == "doit-refuser" and obtenu != "deny":
+                faux_accept += 1
+            elif e["attendu"] == "silence" and obtenu != "silence":
+                faux_accept += 1
+    return faux_refus, faux_accept, n
+
+
+def controle_role_12(ctx, script):
+    """Dérogation ROLE active sur un chemin d'écriture de juge : passage cité et consommé, le second Write est refusé ; banc ROLE (labs
+    role-adherent et role-dev, dispatch compris) sur copie armed : `COMPTE ROLE faux-refus=0 faux-accept=0`, sur un banc non vide."""
+    lab = lab_frais(ctx, ROLE_LAB)
+    rc, out, err = deroger(ctx, lab, None, gate="ROLE", chemins=(ROLE_LIVRABLE,))
+    if rc != 0:
+        return False, "deroger-gate.sh refuse le scénario : rc=%d %s" % (rc, court(err))
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    r1 = _ecrire_agent(ctx, hook, lab, "Write", ROLE_LIVRABLE, "juge-test")
+    if classer(r1[0], r1[1]) != "avertit" or r1[2]:
+        return False, "premier Write : %s %s" % (classer(r1[0], r1[1]), court(r1[1]))
+    texte = contexte_de(r1[1])
+    manque = [m for m in ("#1", "ROLE", "willy", "AskUserQuestion session principale", "2026-09-30", ROLE_LIVRABLE) if m not in texte]
+    lignes = [l for l in lignes_de(journal_derog(lab)) if "  consommee  id=1  gate=ROLE  " in l]
+    if manque or len(lignes) != 1:
+        return False, "citation sans %s ; lignes consommee : %d" % (manque, len(lignes))
+    r2 = _ecrire_agent(ctx, hook, lab, "Write", ROLE_LIVRABLE, "juge-test")
+    if verdict_role(*r2) != "refus":
+        return False, "second Write : " + verdict_role(*r2)
+    fr, fa, n = compte_role(ctx, script)
+    if n < 50:
+        return False, "banc ROLE trop petit : %d écriture(s) (plancher 50, jamais un vert à vide)" % n
+    return (fr == 0 and fa == 0), "dérogation ROLE : premier Write passe et cité, consommée, second Write refusé ; COMPTE ROLE faux-refus=%d faux-accept=%d sur %d écritures" % (fr, fa, n)
+
+
 # =================================================================================================
 # Sections
 # =================================================================================================
@@ -2662,6 +2815,11 @@ def sec_role(ctx):
             ("R-ROLE-05", controle_role_05, "lab dev : stdout d'octet vide pour tout rôle et tout outil"),
             ("R-ROLE-06", controle_role_06, "--classer et définition illisible traitée en inconnu"),
             ("R-ROLE-07", controle_role_07, "erreur interne de evaluer_role : observe journalise, armed refuse"),
+            ("R-ROLE-08", controle_role_08, "worker : dispatch dans sa propre allowlist passe, hors liste refusé, sous Agent ET Task (F9 = f9-allowlist)"),
+            ("R-ROLE-09", controle_role_09, "subagent_type normalisé des deux côtés, chaîne entière, aucun préfixe retiré"),
+            ("R-ROLE-10", controle_role_10, "racine du dispatch dérivée du cwd du payload (lab dev : silence)"),
+            ("R-ROLE-11", controle_role_11, "manager, producteur, juge, fil principal, inconnu, ambigu, illisible : dispatch jamais refusé"),
+            ("R-ROLE-12", controle_role_12, "dérogation ROLE honorée, citée et consommée ; COMPTE ROLE du banc"),
             ("R-ROLE-13", controle_role_13, "HOME : entrée déclarée de la résolution du compte, jamais de l'adhésion ni de l'armement")):
         bon, detail = ctrl(ctx, None)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
@@ -2723,7 +2881,7 @@ def sec_banc(ctx):
             dossier = ctx.copie_forcee(ctx.scripts_dir, "armed") if e["armee"] else None
             rc, out, err = ctx.lancer("A", brut, cwd=cwd, dossier=dossier)
             bon, obtenu = juger(e["attendu"], e["gate"], rc, out)
-            etiquette = "BANC %s %s %s%s%s%s :: %s %s" % (nom, e["outil"], e["chemin"], (" agent=" + e["agent"]) if e["agent"] else "", " armee" if e["armee"] else "", (" " + e["commande"]) if e["commande"] else "", e["attendu"], e["gate"] or "")
+            etiquette = "BANC %s %s %s%s%s%s%s :: %s %s" % (nom, e["outil"], e["chemin"], (" agent=" + e["agent"]) if e["agent"] else "", (" sous=" + e["sous"]) if e.get("sous") else "", " armee" if e["armee"] else "", (" " + e["commande"]) if e["commande"] else "", e["attendu"], e["gate"] or "")
             if bon and not err:
                 ok(etiquette.strip())
             else:
@@ -2880,6 +3038,13 @@ def sec_mutants(ctx):
         ("ROLE-HOME-ARMEMENT", 'etat = TABLE_ARMEMENT.get(verdict.gate)',
          'etat = "armed" if (verdict.gate == "ROLE" and os.path.isdir(os.path.join(contexte.get("arg_home") or "/inexistant", ".claude", "agents"))) else TABLE_ARMEMENT.get(verdict.gate)',
          "R-ROLE-13", controle_role_13),
+        # 45-08 : le hook par rôle (ligne worker, F9 = f9-allowlist)
+        ("ROLE-TASK", "# role-dispatch", 'OUTILS_DISPATCH = ("Agent",)  # role-dispatch', "R-ROLE-08", controle_role_08),
+        ("ROLE-SUBAGENT", "# role-allowlist",
+         'if isinstance(sous, str) and sous in allowlist_de_definition(definition):  # role-allowlist', "R-ROLE-09", controle_role_09),
+        ("ROLE-WORKER", "# role-worker", 'if False:  # role-worker', "R-ROLE-08", controle_role_08),
+        ("ROLE-ALLOWLIST", "# role-allowlist", 'if False:  # role-allowlist', "R-ROLE-08", controle_role_08),
+        ("ROLE-CWD", "# racine-depart", 'depart = ecrit if ecrit is not None else os.getcwd()  # racine-depart', "R-ROLE-10", controle_role_10),
     ]
     filtre = [f for f in os.environ.get("VF_GATES_MUTANTS", "").split(",") if f]  # facultatif : sous-chaînes d'identifiants, développement
     for entree in M:

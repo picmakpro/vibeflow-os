@@ -759,6 +759,36 @@ Corps du worker.
 @@ ecriture Write livrables/x.md agent=ambigu armee :: doit-passer ROLE
 @@ ecriture Write livrables/x.md agent=abime armee :: doit-passer ROLE
 @@ ecriture Bash - agent=juge-test armee commande=cat livrables/x.md :: doit-passer ROLE
+@@ # Dispatch (F9 = f9-allowlist, Willy, AskUserQuestion session principale, 2026-09-30) : un worker ne dispatche que ce que SA
+@@ # propre allowlist Agent(...) / Task(...) autorise, sous les deux tool_name ; allowlist vide : tout refusé ; comparaison du
+@@ # subagent_type normalisé (casse, `_`, espace, `-`), égalité sur la chaîne entière, aucun préfixe retiré. Option `sous=` : le
+@@ # subagent_type du payload.
+@@ ecriture Agent - agent=worker-liste sous=vf-crafter armee :: doit-passer ROLE
+@@ ecriture Task - agent=worker-liste sous=vf-crafter armee :: doit-passer ROLE
+@@ ecriture Agent - agent=worker-liste sous=autre-agent armee :: doit-passer ROLE
+@@ ecriture Task - agent=worker-liste sous=AUTRE_AGENT armee :: doit-passer ROLE
+@@ ecriture Agent - agent=worker-task sous=vf-crafter armee :: doit-passer ROLE
+@@ ecriture Task - agent=worker-task sous=vf-crafter armee :: doit-passer ROLE
+@@ ecriture Agent - agent=worker-liste sous=hors-liste armee :: doit-refuser ROLE
+@@ ecriture Task - agent=worker-liste sous=hors-liste armee :: doit-refuser ROLE
+@@ ecriture Agent - agent=worker-liste sous=autre:vf-crafter armee :: doit-refuser ROLE
+@@ ecriture Task - agent=worker-liste sous=autre:vf-crafter armee :: doit-refuser ROLE
+@@ ecriture Agent - agent=worker-task sous=autre-agent armee :: doit-refuser ROLE
+@@ ecriture Task - agent=worker-task sous=autre-agent armee :: doit-refuser ROLE
+@@ ecriture Agent - agent=worker-vide sous=vf-crafter armee :: doit-refuser ROLE
+@@ ecriture Task - agent=worker-vide sous=vf-crafter armee :: doit-refuser ROLE
+@@ ecriture Agent - agent=worker-vide sous=general-purpose armee :: doit-refuser ROLE
+@@ # Dispatch : manager, producteur, juge, fil principal, agent inconnu, définitions ambiguë et illisible : jamais un refus de rôle.
+@@ ecriture Agent - agent=manager-test sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - agent=manager-test sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Agent - agent=producteur-test sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - agent=juge-test sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Agent - sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Agent - agent=agent-inconnu sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - agent=plugin-x:agent-y sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Agent - agent=ambigu sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - agent=abime sous=hors-liste armee :: doit-passer ROLE
 
 @@ lab role-dev jumeau-de=role-adherent
 
@@ -792,3 +822,6 @@ Corps du worker.
 @@ ecriture Write livrables/x.md agent=worker-vide armee :: silence ROLE
 @@ ecriture Write livrables/x.md armee :: silence ROLE
 @@ ecriture Bash - agent=juge-test armee commande=cat livrables/x.md :: silence ROLE
+@@ ecriture Agent - agent=worker-vide sous=vf-crafter armee :: silence ROLE
+@@ ecriture Task - agent=worker-vide sous=vf-crafter armee :: silence ROLE
+@@ ecriture Agent - sous=hors-liste armee :: silence ROLE
