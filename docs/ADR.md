@@ -42,6 +42,7 @@
 | ADR-072 | 2026-09-17 | Gardes in-repo sans règle côté serveur — ce qui est gardé, ce qui ne l'est pas, ce qui attend un accès admin | Validée — amendée le 2026-09-23 (volet admin : rulesets de main et des tags v*, contournement nommé Samuel et Willy) |
 | ADR-073 | 2026-09-23 | Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag | Validée (non gatée machine) |
 | ADR-074 | 2026-09-23 | Portée des gates : bloquant pour l'intégrité technique, consultatif pour le jugement métier | Validée |
+| ADR-076 | 2026-09-30 | Sobriété de méthode : ce qu'on crée, on le range — un ajout, un retrait ; archiver est un déplacement tracé, pas une correction (précision d'ADR-031) | Validée |
 
 > **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
 > `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
@@ -54,7 +55,7 @@
 |----|-----------------|
 | ADR-029 | Charte densité : agents — avertissement dès 251 lignes, bloque au-delà de 300 (amendée le 2026-09-16) ; skills ≤ 500, bootstrap ≤ 2000 tokens |
 | ADR-030 | Architecture skills (révisée) : déléguer aux skills outillés, ne jamais réimplémenter |
-| ADR-031 | Jamais de fix / suppression / matérialisation sans validation humaine |
+| ADR-031 | Jamais de fix / suppression / matérialisation sans validation humaine (précisée par ADR-076 : archiver = déplacer, tracé et réversible, n'est pas une correction) |
 | ADR-032 | Consolidation mémoire : registres indexés, 4 piliers (indexation / archivage / fusion / promotion) |
 | ADR-035 | Doctrine architecture logicielle AI-Safe : principes SOLID/SoC portés par `software-architecture`, gates de taille/structure machine-enforced |
 | ADR-036 | Doctrine d'architecture d'audit : tout process générateur a une structure d'audit multi-couches |
@@ -2967,3 +2968,44 @@ elle s'applique aux identifiants écrits à partir de son adoption, jamais en r�
 de commit existant. La borne `BASE-TRACE-ARBITRAGE` du registre de la Phase 41 continue de couvrir
 l'antérieur — c'est elle, et non une réécriture d'historique, qui absorbe le lot de commits
 `D-02` de partition déjà posés avant cette décision.
+
+## ADR-076 : Sobriété de méthode — ce qu'on crée, on le range ; archiver est un déplacement tracé, pas une correction
+
+**Date** : 2026-09-30 · **Statut** : Validée · **Décideur** : Samuel · **Voisines** : ADR-031
+(précisée ici, pas abrogée), ADR-074 (même modèle : critère par objet gardé), ADR-072 (gardes
+in-repo qui signalent sans verrouiller) · arbitrage Samuel, AskUserQuestion session principale,
+2026-09-29 (quatre principes, archivage seul) et 2026-09-30 (feu vert de la vague d'outillage).
+
+### Contexte
+
+Mesuré en Phase 41.3 : STATE à 146 Ko, BACKLOG à 88 Ko, ROADMAP à 168 Ko, worktrees et mémoires
+laissés par les missions. Chaque geste ajoute ; aucun ne retire. Un fichier qu'aucun agent ne relit
+en entier n'est plus une mémoire, c'est un coût.
+
+### Décision
+
+Quatre principes : (1) **un ajout, un retrait** — un gate, un ADR, une règle ou une mémoire ajoutés
+disent ce qu'ils retirent ou pourquoi rien (`check-ajout-retrait.sh`, consultatif, trailer
+`Ajout-Retrait:`) ; (2) **budgets étendus** — BACKLOG ouvert, index de mémoire, ROADMAP, en plus de
+STATE et des worktrees (`check-method-budget.sh`) ; (3) **nettoyage en fin de geste** — clôture de
+mission (contrôle E7 de `check-mission-exit.sh`) et fin de travail direct (Stop,
+`guard-fin-de-geste.sh`, un blocage au plus par session, bascule `VF_FIN_DE_GESTE`) ; (4) **prose
+plafonnée**. La release exige en plus une relecture adverse du diff fonctionnel, une sonde exécutée.
+
+### Précision d'ADR-031
+
+**Archiver est un déplacement, pas une correction** : le contenu est déplacé tel quel, tracé dans
+`.planning/archives/INDEX.tsv`, et réversible — la source d'avant reste un blob de l'historique
+(`git cat-file blob <ref de l'INDEX>`). L'outil archive donc seul, sans validation préalable, ce
+qu'une règle **décidable** désigne (sujets clos, blocs `<details>`, corps de STATE au-delà du
+budget), dans le ou les compartiments de la session, sur des sources commitées seules, sans jamais
+commiter ni supprimer. Le compartiment d'un autre mainteneur est protégé.
+
+### Ce que cette ADR ne change pas
+
+Supprimer, corriger, juger la pertinence d'un contenu, trier un BACKLOG et toute branche distante
+(jamais celles de Willy) restent des gestes **humains** (ADR-031). Les gardes de cette ADR
+signalent ou déplacent ; le blocage de fin de geste porte sur ce que la session a créé et laissé,
+fait objectif, jamais sur la qualité d'un travail. Limite de fond (ADR-072) : ces gardes vivent
+dans le dépôt, et le trailer `Ajout-Retrait:` est déclaratif — sa forme est vérifiée, jamais sa
+véracité.
