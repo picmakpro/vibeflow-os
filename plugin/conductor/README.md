@@ -88,8 +88,10 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   nominal.
 - **Stop** → `guard-fin-de-geste.sh` (**bloquant par le code de sortie**, Phase 41.3, ADR-076) :
   archive seul ce qu'un budget dépassé désigne, puis bloque à chaque arrêt tant qu'il reste du
-  rangement **apparu depuis le snapshot de la session** ; après 3 blocages de suite sans progrès il
-  laisse sortir avec un `systemMessage` visible de l'utilisateur. Les constats non actionnables
+  rangement **apparu depuis le snapshot de la session** ; après 3 blocages de suite sans progrès (l'ensemble
+  n'est pas plus petit que le plus bas atteint) il laisse sortir avec un `systemMessage` visible de
+  l'utilisateur ; une écriture d'état ratée relâche la garde, dite, jamais un blocage sans compteur ; un
+  archivage fait par l'arrêt qui bloque est dit au premier exit 0. État : `$TMPDIR/vibeflow-fin-de-geste-<uid>`. Les constats non actionnables
   (archivage refusé, non tenté, budget dépassé, non vérifiable) sont dits en `systemMessage` et ne
   bloquent jamais. Bascule `VF_FIN_DE_GESTE=block|warn|off`.
 
