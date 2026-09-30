@@ -450,6 +450,12 @@ def reglage_temoin(ctx, nom, marqueur, corps=None):
     return chemin
 
 
+def corps_deny(raison):
+    """Corps de commande qui refuse tout avec `raison` (sans apostrophe ni guillemet)."""
+    return ("cat >/dev/null; printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\","
+            "\"permissionDecisionReason\":\"" + raison + "\"}}' # planning-hook.sh")
+
+
 def sec_can(ctx):
     """R-CAN-01 à R-CAN-08."""
     ses = os.path.join(ctx.work, "session-adherente")
@@ -586,17 +592,21 @@ def sec_can(ctx):
     raison = une_ligne(out, ("cas en échec", "D01"))
     if rc != 0 or raison:
         fautes.append(("commande qui laisse tout passer", "code 0 et une ligne « cas en échec » qui nomme D01", "rc=%d %s" % (rc, raison or "")))
-    ferme_tout = reglage_temoin(ctx, "reglage-ferme-tout.json", os.path.join(ctx.work, "trace-08b"),
-                                corps="cat >/dev/null; printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"x\"}}' # planning-hook.sh")
-    rc, out, err = lancer_canary(ctx, ctx.lab, ses, ("--settings=" + ferme_tout,))
-    raison = une_ligne(out, ("mode dégradé",))
-    if rc != 0 or raison:
-        fautes.append(("commande qui refuse même le cas nominal", "code 0 et une ligne « mode dégradé »", "rc=%d %s" % (rc, raison or "")))
+    for nom, texte_raison, attendu in (("commande qui refuse même le cas nominal avec la raison du fail-closed", "[planning-core] hook central indisponible (script ou python3 absent)", "mode dégradé"),
+                                       ("commande dont un gate refuse la cible neutre (raison d'un gate)", "[planning-core] G6 : refus de gate arme", "cas en échec")):
+        ferme_tout = reglage_temoin(ctx, "reglage-ferme-tout.json", os.path.join(ctx.work, "trace-08b"), corps=corps_deny(texte_raison))
+        rc, out, err = lancer_canary(ctx, ctx.lab, ses, ("--settings=" + ferme_tout,))
+        raison = une_ligne(out, (attendu,))
+        texte_sortie = out.decode("utf-8", "replace")
+        if attendu == "cas en échec" and "mode dégradé" in texte_sortie:
+            raison = "un refus de gate est annoncé « mode dégradé » : " + court(out)
+        if rc != 0 or raison:
+            fautes.append((nom, "code 0 et une ligne « " + attendu + " »" + (" (jamais « mode dégradé »)" if attendu == "cas en échec" else ""), "rc=%d %s" % (rc, raison or "")))
     if fautes:
         for cas, a, b in fautes:
             ko("R-CAN-08", "table de cas pilotée par l'attendu : " + cas, a, b)
     else:
-        ok("R-CAN-08 une commande qui laisse tout passer fait signaler « cas en échec » (D01…), une qui refuse même la cible neutre fait signaler le mode dégradé")
+        ok("R-CAN-08 une commande qui laisse tout passer fait signaler « cas en échec » (D01…) ; une qui refuse la cible neutre avec la raison du fail-closed fait signaler le mode dégradé, avec la raison d'un gate elle fait signaler « cas en échec » et jamais « mode dégradé »")
 
 
 def make_canary_mutant(ctx, ident, motif, remplacement):
@@ -695,6 +705,25 @@ def sec_mutants(ctx):
             okmut("CAN-ADHESION", "R-CAN-02 · attendu (original) : code 3, aucun rejeu · obtenu (mutant) : code %d, rejeu %s" % (m[0], "lancé" if m[2] else "non lancé"))
         else:
             komut("CAN-ADHESION", "session hors lab adhérent : l'original ne rejoue rien, le mutant rejoue", "code 3, aucune trace", "original=%s mutant=%s" % (o, m))
+
+    # MUT-CAN-RAISON : la raison du refus n'est plus regardée (tout deny devient « mode dégradé »)
+    def sc_raison(lab):
+        cmd = corps_deny("[planning-core] G6 : refus d un gate arme")
+        reg = reglage_temoin(ctx, "reglage-raison-mut.json", os.path.join(ctx.work, "trace-raison-mut"), corps=cmd)
+        rc, out, _ = lancer_canary(ctx, lab, ses, ("--settings=" + reg,))
+        return rc, out
+
+    lab_m, raison = make_canary_mutant(ctx, "RAISON", "# canary-raison", 'return "deny-degrade"  # canary-raison')
+    if lab_m is None:
+        komut("CAN-RAISON", "mutant du tri des raisons de refus", "mutant valide", raison)
+    else:
+        o = sc_raison(lab_o)
+        m = sc_raison(lab_m)
+        d = "mode dégradé".encode("utf-8")
+        if o[0] == 0 and d not in o[1] and d in m[1]:
+            okmut("CAN-RAISON", "R-CAN-08 · attendu (original) : un refus de gate n'est pas « mode dégradé » · obtenu (mutant) : %s" % court(m[1]))
+        else:
+            komut("CAN-RAISON", "refus d'un gate : l'original ne dit pas « mode dégradé », le mutant le dit", court(o[1]), court(m[1]) + " (mutant non opposable)")
 
     # MUT-CAN-INDETERMINE
     lab_m, raison = make_canary_mutant(ctx, "INDETERMINE", "# canary-indetermine", "return 3  # canary-indetermine")

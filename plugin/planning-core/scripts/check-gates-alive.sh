@@ -118,6 +118,9 @@ CITE = "planning-hook.sh"
 GATES = ("G6", "G5", "G1", "G7", "ROLE")
 VALEURS_ARMEMENT = ("observe", "armed")
 DELAI_REJEU = 25
+# Texte STATIQUE de la raison du fail-closed de la commande (hooks.json) : lui seul distingue un mode
+# dégradé d'un refus légitime d'un gate armé sur la cible neutre.
+MARQUE_DEGRADE = "hook central indisponible"
 NOMINAL = "Write:.planning/notes.md"
 
 # --- Table des cas (une ligne par cas) : <id>|<gate>|<mode>|<payload>. L'attendu est DÉRIVÉ. ------
@@ -230,7 +233,8 @@ def fabriquer_payload(spec, lab):
 
 
 def verdict(rc, sortie):
-    """`silence`, `deny` (UN objet JSON deny, code 0) ou un état d'échec nommé."""
+    """`silence`, `deny-degrade` (UN objet JSON deny, code 0, dont la raison porte le texte statique du
+    fail-closed), `deny-gate` (même objet, autre raison : un gate qui refuse) ou un état d'échec nommé."""
     if rc != 0:
         return "code " + str(rc)
     if sortie == b"":
@@ -239,7 +243,7 @@ def verdict(rc, sortie):
         s = json.loads(sortie.decode("utf-8"))["hookSpecificOutput"]
         if s["hookEventName"] == "PreToolUse" and s["permissionDecision"] == "deny" \
                 and isinstance(s["permissionDecisionReason"], str):
-            return "deny"
+            return "deny-degrade" if MARQUE_DEGRADE in s["permissionDecisionReason"] else "deny-gate"  # canary-raison
     except (ValueError, KeyError, TypeError):
         pass
     return "document inattendu"
@@ -322,8 +326,8 @@ def lire_canaris():
 def attendu_de(gate, spec, table):
     """L'attendu est DÉRIVÉ de la table d'armement, jamais écrit dans CANARIS."""
     if gate == "DEGRADE":
-        return "silence" if spec.split(":")[0].split("@")[0] == "Bash" else "deny"
-    return "deny" if table[gate] == "armed" else "silence"
+        return "silence" if spec.split(":")[0].split("@")[0] == "Bash" else "deny-degrade"
+    return "deny-gate" if table[gate] == "armed" else "silence"
 
 
 def main():
@@ -356,7 +360,7 @@ def main():
     try:
         rejeu = Rejeu(commande, projet, os.path.realpath(tmp))
         nominal = rejeu.jouer("nominal", NOMINAL)
-        if nominal == "deny":
+        if nominal == "deny-degrade":
             signaler("hook central en mode dégradé : le script ou python3 manque ou plante ; dans ce lab adhérent "
                      "les écritures par outil et les dispatchs Agent et Task sont refusés, Bash reste ouvert "
                      "(limite déclarée, P45-D-06b) — réparer : /vf-update ou installer python3, puis relancer la session.")
