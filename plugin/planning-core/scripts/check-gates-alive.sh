@@ -11,6 +11,9 @@
 #   check-gates-alive.sh                       # verdict par le code de sortie, une ligne si signal
 #   check-gates-alive.sh --hook                # sous SessionStart : stdout STRICTEMENT VIDE hors signal
 #   check-gates-alive.sh --settings=<fichier>  # lit UNIQUEMENT ce réglage (défaut : voir ci-dessous)
+#   check-gates-alive.sh --couverture          # imprime les éléments de la couverture minimale (P45-D-20) que les
+#                                              # cas de CANARIS couvrent, un par ligne ; code 3 si les six sont
+#                                              # couverts, 0 avec UNE ligne de signal sinon ; ne lit ni stdin ni réglage
 # Entrée : stdin = le payload SessionStart (clé `cwd`) ou vide (repli : le cwd physique du processus).
 #
 # Réglages lus, dans l'ordre : `$CLAUDE_PROJECT_DIR/.claude/settings.json` puis
@@ -38,29 +41,39 @@
 #      ARMEMENT_<gate>) arme un gate qu'aucun cas de CANARIS ne couvre (P45-D-03a)
 #   4. cas en échec : un cas de CANARIS n'obtient pas l'attendu que la table d'armement en dérive
 #
-# Table des cas : la constante CANARIS ci-dessous, une ligne par cas `<id>|<gate>|<mode>|<payload>`.
+# Table des cas : la constante CANARIS ci-dessous, une ligne par cas `<id>|<gate>|<mode>|<payload>|<couvre>`.
 #   <gate>    DEGRADE (cas du fail-closed de la commande) ou G6, G5, G1, G7, ROLE
 #   <mode>    script-absent (CLAUDE_PROJECT_DIR vers un dossier vide) | python-absent (PATH réduit) |
 #             nominal (le script réel)
-#   <payload> <outil>[:<chemin relatif au lab synthétique>][@<agent_type>]
+#   <payload> <outil>[:<chemin relatif au lab synthétique>][@<agent_type>] ; pour Agent et Task, le
+#             « chemin » est le subagent_type du dispatch
+#   <couvre>  éléments de COUVERTURE_MINIMALE que le cas couvre, séparés par des virgules (P45-D-20) :
+#             script-absent, python-absent (mode du cas), Task, Agent (payload du gate en mode nominal),
+#             fil-principal (aucun agent_type), plugin (agent_type préfixé `<plugin>:`). Une étiquette
+#             fausse rend le canary indéterminé : elle est vérifiée contre le mode et le payload du cas.
 # L'ATTENDU EST DÉRIVÉ, jamais écrit dans la table : DEGRADE -> refus (Write, Agent, Task) ou silence
 # (Bash : limite déclarée P45-D-06b, exercée et non seulement écrite) ; gate `armed` -> refus d'un
 # gate (`deny-gate`, jamais le texte du fail-closed `deny-degrade`) ; gate `observe` -> observation
 # (P45-D-20) : stdout vide ET une nouvelle ligne `gate=<G>` au journal d'observation, dont le
 # XDG_CACHE_HOME du rejeu est un dossier jetable — un gate qui se tait sans journaliser n'est pas
 # vivant. 45-05 à 45-09 ajoutent leurs cas ; un gate armé sans cas fait signaler ce canary et rougir
-# sa suite.
+# sa suite. Le lab synthétique porte deux définitions d'agents posées par le canary lui-même
+# (`canary-juge`, `canary-worker`) : les cas ROLE (45-09) ne dépendent d'aucun agent du lab réel ni du compte.
+# Couverture minimale (P45-D-20, GATE-12) : COUVERTURE_MINIMALE, étiquetée cas par cas ; une couverture
+# incomplète fait signaler le canary (code 0, une ligne) sous `--hook` comme en direct.
 #
 # Le rejeu n'écrit rien hors de son dossier mktemp (HOME du script de hook conservé en lecture,
 # XDG_CACHE_HOME redirigé), supprimé en sortie ; il n'a lieu que dans une session adhérente.
 set -uo pipefail
 
 HOOK=0
+COUV=0
 SETTINGS=""
 SETTINGS_SET=0
 for arg in "$@"; do
   case "$arg" in
     --hook)       HOOK=1 ;;
+    --couverture) COUV=1 ;;
     --settings=*) SETTINGS="${arg#*=}"; SETTINGS_SET=1 ;;
     -h|--help)    grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-gates-alive] argument inconnu : $arg" >&2; exit 64 ;;
@@ -102,10 +115,10 @@ PY_INVOKE="$(py_resolve_local)" || { diag "INDETERMINE, rien n'a été vérifié
 SCRIPT_DIR_SELF="$(cd "$(dirname "$0")" && pwd -P)" || { diag "INDETERMINE : dossier du script illisible"; hook_exit 4; }
 
 IN=""
-if [ ! -t 0 ]; then IN="$(cat)"; fi
+if [ "$COUV" -eq 0 ] && [ ! -t 0 ]; then IN="$(cat)"; fi
 
 # shellcheck disable=SC2086
-$PY_INVOKE -I -S - "$SCRIPT_DIR_SELF" "$SETTINGS" "$IN" <<'PY_CHECK_GATES_ALIVE_EOF'
+$PY_INVOKE -I -S - "$SCRIPT_DIR_SELF" "$SETTINGS" "$IN" "$COUV" <<'PY_CHECK_GATES_ALIVE_EOF'
 import json
 import os
 import re
@@ -119,6 +132,9 @@ SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 PREFIXE = "[planning-core] canary : "
 CITE = "planning-hook.sh"
 GATES = ("G6", "G5", "G1", "G7", "ROLE")
+# Couverture minimale exigée par P45-D-20 (le script absent, python3 absent, un payload Task et un payload Agent, un fil
+# principal, un agent_type préfixé `plugin:`) ; chaque cas de CANARIS déclare ce qu'il en couvre.
+COUVERTURE_MINIMALE = ("script-absent", "python-absent", "Task", "Agent", "fil-principal", "plugin")
 VALEURS_ARMEMENT = ("observe", "armed")
 DELAI_REJEU = 25
 # Texte STATIQUE de la raison du fail-closed de la commande (hooks.json) : lui seul distingue un mode
@@ -132,25 +148,46 @@ NOM_ETAT = "STATE.md"
 # se taise et que l'observation de G7 soit le SEUL signal (un gate en observe rend stdout vide, P45-D-20).
 DOSSIER_NU = "sous-dossier-nu"
 PLAN_CANARY = ".planning/cycles/01-c/phases/01-p/PLAN.md"
+# Étape 4 : le livrable écrit par le juge (couvert par l'ecrit: du plan ouvert, pour que G2 se taise) et les définitions
+# d'agents que le canary pose lui-même dans son lab synthétique.
+LIVRABLE_CANARY = "livrables/canary.md"
+DOSSIER_LIVRABLES = "livrables"
+AGENT_JUGE = "canary-juge"
+AGENT_WORKER = "canary-worker"
+HORS_LISTE = "hors-liste"
+DEFINITIONS_CANARY = (
+    (AGENT_JUGE, "---\nname: canary-juge\ndescription: juge synthétique du canary, jamais exécuté\n"
+                 "tools: Read, Glob, Grep\ndisallowedTools: Write, Edit\nomitClaudeMd: true\n---\nCorps.\n"),
+    (AGENT_WORKER, "---\nname: canary-worker\ndescription: worker synthétique du canary, jamais exécuté\n"
+                   "vf-internal: true\ntools: Read, Agent(canary-cible)\n---\nCorps.\n"),
+)
 
 # --- Table des cas (une ligne par cas) : <id>|<gate>|<mode>|<payload>. L'attendu est DÉRIVÉ. ------
 CANARIS = (
-    "D01|DEGRADE|script-absent|Write:.planning/notes.md",
-    "D02|DEGRADE|script-absent|Agent",
-    "D03|DEGRADE|script-absent|Task",
-    "D04|DEGRADE|script-absent|Bash",
-    "D05|DEGRADE|python-absent|Write:.planning/notes.md",
-    "D06|DEGRADE|python-absent|Agent",
-    "D07|DEGRADE|python-absent|Task",
-    "D08|DEGRADE|python-absent|Bash",
+    # Les DEGRADE couvrent le mode (script-absent, python-absent) : le fail-closed refuse quel que soit l'outil, leurs
+    # payloads Agent et Task n'attestent donc PAS qu'un gate voit ces outils (éléments Task et Agent : cas nominaux).
+    "D01|DEGRADE|script-absent|Write:.planning/notes.md|script-absent",
+    "D02|DEGRADE|script-absent|Agent|script-absent",
+    "D03|DEGRADE|script-absent|Task|script-absent",
+    "D04|DEGRADE|script-absent|Bash|script-absent",
+    "D05|DEGRADE|python-absent|Write:.planning/notes.md|python-absent",
+    "D06|DEGRADE|python-absent|Agent|python-absent",
+    "D07|DEGRADE|python-absent|Task|python-absent",
+    "D08|DEGRADE|python-absent|Bash|python-absent",
     # Étape 1 (45-05) : G6 (fichier généré, fil principal puis agent de plugin) et G5 (verdict, agent inconnu).
-    "G6-principal|G6|nominal|Write:.planning/" + NOM_ETAT,
-    "G6-plugin|G6|nominal|Write:.planning/" + NOM_ETAT + "@plugin-inconnu:agent-inconnu",
-    "G5-verdict|G5|nominal|Write:.planning/cycles/01-c/phases/01-p/VERDICT.md@agent-inconnu",
+    "G6-principal|G6|nominal|Write:.planning/" + NOM_ETAT + "|fil-principal",
+    "G6-plugin|G6|nominal|Write:.planning/" + NOM_ETAT + "@plugin-inconnu:agent-inconnu|plugin",
+    "G5-verdict|G5|nominal|Write:.planning/cycles/01-c/phases/01-p/VERDICT.md@agent-inconnu|",
     # Étape 2 (45-06) : G1 (PLAN.md de forme modèle dans une phase sans CADRAGE.md, fil principal).
-    "G1-sans-cadrage|G1|nominal|Write:.planning/cycles/01-c/phases/01-p/PLAN.md",
+    "G1-sans-cadrage|G1|nominal|Write:.planning/cycles/01-c/phases/01-p/PLAN.md|fil-principal",
     # Étape 3 (45-07) : G7 (création d'un .planning/ orphelin sous un lab adhérent, fil principal).
-    "G7-orphelin|G7|nominal|Write:" + DOSSIER_NU + "/.planning/config.json",
+    "G7-orphelin|G7|nominal|Write:" + DOSSIER_NU + "/.planning/config.json|fil-principal",
+    # Étape 4 (45-09) : le rôle. Un juge qui écrit un livrable ; un worker qui dispatche un agent hors de son allowlist
+    # Agent(canary-cible), sous le nom d'outil Agent puis Task (F9 = f9-allowlist, Willy, AskUserQuestion session
+    # principale, 2026-09-30).
+    "ROLE-juge|ROLE|nominal|Write:" + LIVRABLE_CANARY + "@" + AGENT_JUGE + "|",
+    "ROLE-worker-Agent|ROLE|nominal|Agent:" + HORS_LISTE + "@" + AGENT_WORKER + "|Agent",
+    "ROLE-worker-Task|ROLE|nominal|Task:" + HORS_LISTE + "@" + AGENT_WORKER + "|Task",
 )
 
 
@@ -229,7 +266,7 @@ def fabriquer_payload(spec, lab):
     if not reste:
         outil, _, agent = spec.partition("@")
     if outil in ("Agent", "Task"):
-        entree = {"description": "d", "prompt": "p", "subagent_type": "general-purpose"}
+        entree = {"description": "d", "prompt": "p", "subagent_type": chemin or "general-purpose"}
     elif outil == "Bash":
         entree = {"command": "true"}
     elif outil == "NotebookEdit":
@@ -278,7 +315,11 @@ class Rejeu:
             fh.write('{"planning_version": "%s"}' % SCHEMA_ADHESION)
         os.makedirs(os.path.dirname(os.path.join(self.lab, PLAN_CANARY)))
         with open(os.path.join(self.lab, PLAN_CANARY), "w", encoding="utf-8") as fh:
-            fh.write("---\necrit: " + DOSSIER_NU + "\n---\n")
+            fh.write("---\necrit: [" + DOSSIER_NU + ", " + DOSSIER_LIVRABLES + "]\n---\n")
+        os.makedirs(os.path.join(self.lab, ".claude", "agents"))
+        for nom, texte in DEFINITIONS_CANARY:
+            with open(os.path.join(self.lab, ".claude", "agents", nom + ".md"), "w", encoding="utf-8") as fh:
+                fh.write(texte)
         self.vide = os.path.join(tmp, "vide")
         os.makedirs(os.path.join(self.vide, ".claude"))
         self.pathd = os.path.join(tmp, "path-sans-python")
@@ -354,15 +395,52 @@ def lire_armement(dossier_scripts):
     return table
 
 
+def etiquette_vraie(element, mode, spec):
+    """Une étiquette de couverture est VÉRIFIÉE contre le mode et le payload du cas : un cas ne déclare que ce qu'il fait."""
+    outil, _, reste = spec.partition(":")
+    agent = (reste.partition("@")[2] if reste else spec.partition("@")[2])
+    outil = outil.partition("@")[0]
+    if element in ("script-absent", "python-absent"):
+        return mode == element
+    if mode != "nominal":
+        return False
+    if element in ("Task", "Agent"):
+        return outil == element
+    if element == "fil-principal":
+        return agent == ""
+    return agent.partition(":")[2] != "" and agent.partition(":")[0] != ""  # plugin : `<plugin>:<agent>`
+
+
 def lire_canaris():
     cas = []
     for ligne in CANARIS:
         morceaux = ligne.split("|")
-        if len(morceaux) != 4 or morceaux[1] not in ("DEGRADE",) + GATES \
+        if len(morceaux) != 5 or morceaux[1] not in ("DEGRADE",) + GATES \
                 or morceaux[2] not in ("script-absent", "python-absent", "nominal"):
             raise Indetermine("ligne de CANARIS mal formée : " + ligne)
-        cas.append(tuple(morceaux))
+        etiquettes = tuple(e for e in morceaux[4].split(",") if e)
+        if any(e not in COUVERTURE_MINIMALE or not etiquette_vraie(e, morceaux[2], morceaux[3]) for e in etiquettes):
+            raise Indetermine("étiquette de couverture fausse ou inconnue : " + ligne)
+        cas.append(tuple(morceaux[:4]) + (etiquettes,))
     return cas
+
+
+def couverts_de(cas):
+    """Les éléments de COUVERTURE_MINIMALE que les cas couvrent, dans l'ordre de la constante."""
+    vus = set()
+    for c in cas:
+        vus.update(c[4])
+    return [e for e in COUVERTURE_MINIMALE if e in vus]
+
+
+def couverture_manquante(cas):
+    """Les éléments de COUVERTURE_MINIMALE qu'aucun cas ne couvre."""
+    couverts = couverts_de(cas)
+    return [e for e in COUVERTURE_MINIMALE if e not in couverts]  # couverture-manquants
+
+
+def signal_couverture(manquants):
+    return "couverture minimale incomplète : " + ", ".join(manquants) + " non couvert(s) par les cas de CANARIS (P45-D-20) — un canary qui ne couvre pas tout ce qu'il annonce ne prouve rien."
 
 
 def attendu_de(gate, spec, table):
@@ -372,8 +450,25 @@ def attendu_de(gate, spec, table):
     return "deny-gate" if table[gate] == "armed" else "observation"
 
 
+def main_couverture():
+    """`--couverture` : les éléments couverts, un par ligne ; 3 si tout est couvert, 0 avec une ligne de signal sinon."""
+    try:
+        cas = lire_canaris()
+    except Indetermine:
+        return 4
+    for element in couverts_de(cas):
+        sys.stdout.write(element + "\n")
+    manquants = couverture_manquante(cas)
+    if manquants:
+        signaler(signal_couverture(manquants))
+        return 0
+    return 3
+
+
 def main():
     dossier_scripts, arg_settings, brut = sys.argv[1], sys.argv[2], sys.argv[3]
+    if sys.argv[4] == "1":
+        return main_couverture()
     racine = racine_planning(cwd_de_session(brut))
     adherente = racine is not None and lire_adhesion(racine)  # canary-adhesion
     if not adherente:
@@ -398,6 +493,10 @@ def main():
         cas = lire_canaris()
     except Indetermine:
         return 4
+    manquants = couverture_manquante(cas)
+    if manquants:
+        signaler(signal_couverture(manquants))
+        return 0
     tmp = tempfile.mkdtemp(prefix="vf-canary-")
     try:
         rejeu = Rejeu(commande, projet, os.path.realpath(tmp))
@@ -418,7 +517,7 @@ def main():
         echecs = []
         if nominal != "silence":
             echecs.append("nominal (attendu silence, obtenu " + nominal + ")")
-        for identifiant, gate, mode, spec in cas:
+        for identifiant, gate, mode, spec, _etiquettes in cas:
             attendu = attendu_de(gate, spec, table)
             obtenu = rejeu.jouer_observation(mode, spec, gate) if attendu == "observation" else rejeu.jouer(mode, spec)
             if obtenu != attendu:

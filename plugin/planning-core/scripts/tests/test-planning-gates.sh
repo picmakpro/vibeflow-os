@@ -37,6 +37,12 @@
 #   R-G7-06..09     G7 (45-07) : prédicat « habité » littéral de P45-D-14 (un agents/*.md régulier ET un fichier régulier sous
 #                   memory/ ; tableau des cas imprimé `G7-HABITE`), fichiers réguliers seulement, dérogation, COMPTE G7 du banc
 #   R-CANG-G7       le cas de canary G7-orphelin (état livré, étapes 1 à 3 armed, evaluer_g7 neutralisé)
+#   R-CANG-ROLE     les cas de canary du rôle (45-09) : écriture d'un juge, dispatch d'un worker sous Agent ET sous Task, sur des
+#                   définitions d'agents que le canary pose dans son lab synthétique ; observe (une ligne gate=ROLE par cas) puis armed
+#   R-CANG-ROLE-MORT evaluer_role neutralisé : le canary signale, une ligne qui nomme ROLE-juge
+#   R-CANG-COUVERTURE la couverture minimale de P45-D-20 (script absent, python3 absent, Task, Agent, fil principal, plugin:), étiquetée cas
+#                   par cas et vérifiée contre le payload ; `--couverture` ; une couverture incomplète fait signaler le canary
+#                   (MUT-CANG-TASK : le cas Task retiré ; MUT-CANG-COUVERTURE : le contrôle de couverture qui rend toujours « complet »)
 #   R-ROLE-01..07   hook par rôle (45-08 ; GATE-09) : un juge défini dans le lab écrit, le hook résout sa définition (lab, compte,
 #                   plugin ; name: du frontmatter, repli sur le nom de fichier ; normalisation), dérive « juge » et l'observe (copie
 #                   observe : une ligne gate=ROLE) ou le refuse (copie armed) ; fil principal, agent inconnu, ambigu, illisible ou de
@@ -2202,6 +2208,91 @@ def controle_cang_g7(ctx, script):
     return (not fautes), ("; ".join(fautes) if fautes else "canary sain (code 3) sur l'état livré et sur les étapes 1 à 3 armed ; evaluer_g7 neutralisé : une ligne qui nomme G7-orphelin, observe comme armed")
 
 
+# --- 45-09 : le canary du rôle (GATE-12 ; P45-D-20) ----------------------------------------------------------------------
+# Couverture minimale de P45-D-20, ÉCRITE ICI indépendamment du canary : le contrôle ne se compare jamais à sa propre constante.
+COUVERTURE_ATTENDUE = ("script-absent", "python-absent", "Task", "Agent", "fil-principal", "plugin")
+MOTIF_CAS_TASK = '"ROLE-worker-Task|ROLE|'
+
+
+def controle_cang_role(ctx, script):
+    """R-CANG-ROLE : le canary rend 3 (sain, les trois cas ROLE compris : écriture d'un juge, dispatch d'un worker sous Agent puis sous
+    Task) sur l'état livré (ROLE en observe : chaque cas trouve sa ligne `gate=ROLE`) et sur une copie où les quatre étapes sont armées
+    (chaque cas obtient un refus de gate)."""
+    dossier = _dossier(ctx, script)
+    fautes = []
+    d = scripts_canary(ctx, dossier, "observe", tel_quel=True)
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        fautes.append("état livré : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    d = scripts_canary(ctx, dossier, "armed", armes=("G6", "G5", "G1", "G7", "ROLE"))
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        fautes.append("les quatre étapes armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else "canary sain (code 3) sur l'état livré (une ligne gate=ROLE par cas) et sur les quatre étapes armed (un refus de gate par cas : juge, worker sous Agent, worker sous Task)")
+
+
+def controle_cang_role_mort(ctx, script):
+    """R-CANG-ROLE-MORT : evaluer_role ne rend jamais de verdict -> le canary signale (code 0, UNE ligne qui nomme ROLE), observe comme armed."""
+    dossier = _dossier(ctx, script)
+    neutre, raison = make_hook_mutant(ctx, "ROLE-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7))  # gates-a-verdict')
+    if neutre is None:
+        return False, "mutant du hook invalide : " + raison
+    fautes = []
+    for valeur, armes in (("observe", ()), ("armed", ("G6", "G5", "G1", "G7", "ROLE"))):
+        d = scripts_canary(ctx, dossier, valeur, hook=os.path.join(neutre, "planning-hook.sh"), armes=armes)
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+        if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "ROLE-juge" not in lignes[0] or "G6-principal" in lignes[0] or "G1-sans-cadrage" in lignes[0]:
+            fautes.append("evaluer_role neutralisé (%s) : rc=%d %s" % (valeur, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "evaluer_role neutralisé : code 0 et une ligne qui nomme ROLE-juge (et ni G6 ni G1), observe comme armed")
+
+
+def dossier_sans_cas_task(ctx, dossier):
+    """Copie jetable de `dossier` (check-gates-alive.sh et planning-hook.sh) d'où la ligne du cas ROLE-worker-Task est retirée."""
+    texte = open(os.path.join(dossier, "check-gates-alive.sh"), encoding="utf-8").read()
+    lignes = [l for l in texte.split("\n") if MOTIF_CAS_TASK not in l]
+    d = ctx.unique("canary-sans-task")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "check-gates-alive.sh"), "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lignes))
+    shutil.copy(os.path.join(dossier, "planning-hook.sh"), os.path.join(d, "planning-hook.sh"))
+    for nom in ("check-gates-alive.sh", "planning-hook.sh"):
+        os.chmod(os.path.join(d, nom), 0o755)
+    return d
+
+
+def controle_cang_couverture(ctx, script):
+    """R-CANG-COUVERTURE : `--couverture` imprime les six éléments de la couverture minimale et rend 3 ; sur une copie d'où le cas
+    ROLE-worker-Task est retiré, il rend 0 avec UNE ligne de signal qui nomme Task (et n'imprime plus Task) ; la même copie, en session
+    adhérente, fait signaler le canary (code 0, UNE ligne qui nomme la couverture et Task)."""
+    dossier = _dossier(ctx, script)
+    fautes = []
+    cwd = ctx.unique("cwd-couverture")
+    os.makedirs(cwd, exist_ok=True)
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": ctx.home}
+
+    def couverture(d):
+        p = subprocess.run(["bash", os.path.join(d, "check-gates-alive.sh"), "--couverture"], stdout=subprocess.PIPE,
+                           stderr=subprocess.PIPE, env=env, cwd=cwd, timeout=60)
+        return p.returncode, [l for l in p.stdout.decode("utf-8", "replace").split("\n") if l]
+
+    rc, lignes = couverture(dossier)
+    if rc != 3 or lignes != list(COUVERTURE_ATTENDUE):
+        fautes.append("état livré : rc=%d lignes=%s" % (rc, lignes))
+    sans = dossier_sans_cas_task(ctx, dossier)
+    rc, lignes = couverture(sans)
+    signal = [l for l in lignes if l.startswith("[planning-core] canary : ")]
+    elements = [l for l in lignes if not l.startswith("[planning-core] canary : ")]
+    if rc != 0 or len(signal) != 1 or "Task" not in signal[0] or "Task" in elements or elements != [e for e in COUVERTURE_ATTENDUE if e != "Task"]:
+        fautes.append("sans le cas ROLE-worker-Task : rc=%d lignes=%s" % (rc, lignes))
+    d = scripts_canary(ctx, sans, "observe", tel_quel=True)
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+    if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "couverture" not in lignes[0] or "Task" not in lignes[0]:
+        fautes.append("session sans le cas ROLE-worker-Task : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else "six éléments imprimés (code 3) ; sans le cas ROLE-worker-Task : code 0, une ligne qui nomme Task, cinq éléments ; en session : une ligne de signal de couverture")
+
+
 # --- 45-08 : le hook par rôle (GATE-09 ; P45-D-04, P45-D-05, P45-D-05b, P45-D-11, P45-D-12a) ------------------------------
 ROLE_LAB = "role-adherent"
 ROLE_DEV = "role-dev"
@@ -2756,7 +2847,10 @@ def sec_cang(ctx):
             ("R-CANG-02", controle_cang_02, "canary de session, G6 et G5 armed"),
             ("R-CANG-03", controle_cang_03, "canary de session, evaluer_g6 neutralisé"),
             ("R-CANG-G1", controle_cang_g1, "canary de session, cas G1-sans-cadrage"),
-            ("R-CANG-G7", controle_cang_g7, "canary de session, cas G7-orphelin")):
+            ("R-CANG-G7", controle_cang_g7, "canary de session, cas G7-orphelin"),
+            ("R-CANG-ROLE", controle_cang_role, "canary de session, cas du rôle (juge, worker sous Agent, worker sous Task)"),
+            ("R-CANG-ROLE-MORT", controle_cang_role_mort, "canary de session, evaluer_role neutralisé"),
+            ("R-CANG-COUVERTURE", controle_cang_couverture, "canary de session, couverture minimale déclarée (P45-D-20)")):
         bon, detail = ctrl(ctx, None)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
@@ -3045,6 +3139,11 @@ def sec_mutants(ctx):
         ("ROLE-WORKER", "# role-worker", 'if False:  # role-worker', "R-ROLE-08", controle_role_08),
         ("ROLE-ALLOWLIST", "# role-allowlist", 'if False:  # role-allowlist', "R-ROLE-08", controle_role_08),
         ("ROLE-CWD", "# racine-depart", 'depart = ecrit if ecrit is not None else os.getcwd()  # racine-depart', "R-ROLE-10", controle_role_10),
+        # 45-09 : canary du rôle et couverture minimale (P45-D-20)
+        ("CANG-TASK", '"ROLE-worker-Task|ROLE|', "# cas ROLE-worker-Task retiré de CANARIS", "R-CANG-COUVERTURE", controle_cang_couverture,
+         "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF"),
+        ("CANG-COUVERTURE", "# couverture-manquants", "return []  # couverture-manquants", "R-CANG-COUVERTURE", controle_cang_couverture,
+         "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF"),
     ]
     filtre = [f for f in os.environ.get("VF_GATES_MUTANTS", "").split(",") if f]  # facultatif : sous-chaînes d'identifiants, développement
     for entree in M:
