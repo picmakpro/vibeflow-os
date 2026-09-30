@@ -45,12 +45,27 @@ esac
 "$PYBIN" -I -S - "$T" <<'PY_PLANNING_HOOK_EOF'
 import json
 import os
+import re
+import shlex
 import stat
 import sys
 
 # --- Constantes du contrat -----------------------------------------------------------------
 SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
+
+# --- Table d'armement (P45-D-03a) : l'état de chaque gate vit ICI, dans le code livré, jamais dans
+# un fichier du lab ni dans une variable d'environnement (P45-D-01, P45-D-12a). Une constante par
+# gate, une ligne chacune (l'outil de rejeu et les mutants réécrivent ces lignes sur une copie).
+# Valeurs admises : `observe` (le gate calcule, journalise, laisse passer) | `armed` (le gate refuse).
+ARMEMENT_G6 = "observe"  # etape-1
+ARMEMENT_G5 = "observe"  # etape-1
+ARMEMENT_G1 = "observe"  # etape-2
+ARMEMENT_G7 = "observe"  # etape-3
+ARMEMENT_ROLE = "observe"  # etape-4
+G2_MODE = "avertit"
+ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",))
+TABLE_ARMEMENT = {"G6": ARMEMENT_G6, "G5": ARMEMENT_G5, "G1": ARMEMENT_G1, "G7": ARMEMENT_G7, "ROLE": ARMEMENT_ROLE}
 
 
 # --- Lecture du payload et dérivation du lab ------------------------------------------------
@@ -164,6 +179,298 @@ def verifier_adhesion(planning):
     return resultat
 
 
+# --- Table d'armement : cohérence de l'ordre (P45-D-03) --------------------------------------
+def armement_valide(table):
+    """Vrai si chaque étape armée a toutes ses étapes antérieures armées et si G6 et G5 ont la
+    même valeur (l'étape 1 est UN seul geste). L'ordre est celui de ORDRE_ETAPES."""
+    gates = [gate for etape in ORDRE_ETAPES for gate in etape]  # armement-valide-debut
+    for gate in gates:
+        if table.get(gate) not in ("observe", "armed"):
+            return False
+    if table.get("G6") != table.get("G5"):
+        return False
+    precedente_armee = True
+    for etape in ORDRE_ETAPES:
+        armee = all(table.get(gate) == "armed" for gate in etape)
+        if armee and not precedente_armee:
+            return False
+        precedente_armee = armee
+    return True
+
+
+# --- Parseur de frontmatter : copie ast-identique de celle du moteur de recalcul ---------------
+# (dequote, CLE_RE, lire_frontmatter, _lire_liste_indentee). Un contrôle croisé de la suite des
+# gates compare les arbres de syntaxe et rougit à la moindre divergence.
+def dequote(valeur):
+    """Dé-quote une valeur entre guillemets simples ou doubles, sans traitement d'échappement."""
+    v = valeur.strip()
+    if len(v) >= 2 and v[0] == v[-1] and v[0] in ("'", '"'):
+        return v[1:-1]
+    return v
+
+
+CLE_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_-]*):(.*)$")
+
+
+def lire_frontmatter(texte):
+    """Parse un frontmatter minimal (première ligne `---`, fermeture `---`) : toute forme non
+    reconnue (clé dupliquée, bloc littéral, ligne orpheline, frontmatter jamais refermé) rend un
+    statut d'échec distinct de « absent » — jamais une valeur devinée (Pitfall 3)."""
+    lignes = texte.split("\n")
+    if not lignes or lignes[0].rstrip("\r") != "---":
+        return ("absent", {})
+    fin = None
+    for i in range(1, len(lignes)):
+        if lignes[i].rstrip("\r") == "---":
+            fin = i
+            break
+    if fin is None:
+        return ("invalide:frontmatter-non-ferme", {})
+    corps = lignes[1:fin]
+    donnees = {}
+    cles_vues = set()
+    i = 0
+    n = len(corps)
+    while i < n:
+        brute = corps[i].rstrip("\r")
+        allegee = brute.strip()
+        if allegee == "" or allegee.startswith("#"):
+            i += 1
+            continue
+        if brute != brute.lstrip():
+            return ("invalide:ligne-orpheline", {})
+        m = CLE_RE.match(brute)
+        if not m:
+            return ("invalide:ligne-non-reconnue", {})
+        cle, reste = m.group(1), m.group(2).strip()
+        if cle in cles_vues:
+            return ("invalide:cle-dupliquee", {})
+        if reste == "":
+            valeur, j = _lire_liste_indentee(corps, i + 1)
+            if valeur is None:
+                return ("invalide:liste-mal-formee", {})
+            donnees[cle] = valeur
+            i = j
+        elif reste == "[]":
+            donnees[cle] = []
+            i += 1
+        elif reste.startswith("[") and reste.endswith("]"):
+            interieur = reste[1:-1].strip()
+            donnees[cle] = [] if interieur == "" else [dequote(p.strip()) for p in interieur.split(",")]
+            i += 1
+        else:
+            donnees[cle] = dequote(reste)
+            i += 1
+        cles_vues.add(cle)
+    return ("ok", donnees)
+
+
+def _lire_liste_indentee(corps, depart):
+    """Lit une liste de scalaires (`- valeur`) ou une liste de mappings plats (`- k: v` puis
+    `k2: v2` plus indentées) sous une clé vide. Renvoie (None, depart) si la forme est mixte ou
+    porte un bloc littéral (invalide, jamais devinée)."""
+    items = []
+    mode = None
+    carte_courante = None
+    j = depart
+    n = len(corps)
+    while j < n:
+        suivante = corps[j].rstrip("\r")
+        if suivante.strip() == "":
+            j += 1
+            continue
+        if suivante == suivante.lstrip():
+            break
+        interieur = suivante.strip()
+        if interieur.startswith("|") or interieur.startswith(">"):
+            return (None, j)
+        if interieur.startswith("- "):
+            corps_item = interieur[2:]
+            mkv = CLE_RE.match(corps_item)
+            if mkv:
+                if mode == "scalaires":
+                    return (None, j)
+                mode = "mappings"
+                carte_courante = {mkv.group(1): dequote(mkv.group(2))}
+                items.append(carte_courante)
+            else:
+                if mode == "mappings":
+                    return (None, j)
+                mode = "scalaires"
+                items.append(dequote(corps_item))
+                carte_courante = None
+        else:
+            mkv2 = CLE_RE.match(interieur)
+            if mode == "mappings" and mkv2 and carte_courante is not None:
+                cle2 = mkv2.group(1)
+                if cle2 in carte_courante:
+                    return (None, j)
+                carte_courante[cle2] = dequote(mkv2.group(2))
+            else:
+                return (None, j)
+        j += 1
+    return (items, j)
+
+
+def lire_frontmatter_fichier(chemin):
+    """Frontmatter d'un fichier du modèle : fichier régulier seulement (lstat, jamais de suivi de
+    lien), ouverture O_NOFOLLOW, UTF-8 strict."""
+    if not est_fichier_regulier(chemin):
+        return ("absent", {})
+    try:
+        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        with os.fdopen(descripteur, "r", encoding="utf-8") as fh:
+            texte = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return ("invalide:illisible", {})
+    return lire_frontmatter(texte)
+
+
+# --- Plans ouverts et référentiel de G2 -------------------------------------------------------
+NOM_UNITE = re.compile(r"^[0-9]{2,}-[\w.-]+$")
+
+
+def entree_ecrit_valide(entree):
+    """Une entrée `ecrit:` valide : chemin concret relatif à la racine du lab, non vide, sans `/`
+    ni `~` initial, sans segment `..`, sans caractère de contrôle ni `\\`, sans métacaractère
+    `*?[]{}<>` — jamais un motif (même règle que le moteur de recalcul)."""
+    if not isinstance(entree, str) or entree == "":
+        return False
+    if entree.startswith("/") or entree.startswith("~"):
+        return False
+    if ".." in entree.split("/"):
+        return False
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in entree):
+        return False
+    if "\\" in entree:
+        return False
+    if any(c in entree for c in "*?[]{}<>"):
+        return False
+    return True
+
+
+def _sous_dossiers(dossier):
+    """Noms d'unité (règle NOM_UNITE) des vrais dossiers de `dossier`, triés ; jamais un lien."""
+    try:
+        noms = sorted(os.listdir(dossier))
+    except OSError:
+        return []
+    res = []
+    for nom in noms:
+        if not NOM_UNITE.match(nom):
+            continue
+        try:
+            if stat.S_ISDIR(os.lstat(os.path.join(dossier, nom)).st_mode):
+                res.append(nom)
+        except OSError:
+            continue
+    return res
+
+
+def plans_ouverts(racine):
+    """[(chemin relatif du PLAN.md, [entrées ecrit valides])] des plans OUVERTS de forme modèle :
+    `.planning/cycles/<cycle>/phases/<phase>/PLAN.md` et `.../phases/<phase>/plans/<plan>/PLAN.md`.
+    Ouvert = ni CLOTURE.md ni DEROGATION.md dans son dossier. Un PLAN.md au frontmatter illisible
+    est ignoré (G2 est fail-open, spec §5.1). Parcours trié."""
+    base = os.path.join(racine, ".planning", "cycles")
+    res = []
+    for cycle in _sous_dossiers(base):
+        phases = os.path.join(base, cycle, "phases")
+        for phase in _sous_dossiers(phases):
+            dossier_phase = os.path.join(phases, phase)
+            dossiers = [dossier_phase]
+            for plan in _sous_dossiers(os.path.join(dossier_phase, "plans")):
+                dossiers.append(os.path.join(dossier_phase, "plans", plan))
+            for dossier in dossiers:
+                if os.path.lexists(os.path.join(dossier, "CLOTURE.md")) or os.path.lexists(os.path.join(dossier, "DEROGATION.md")):  # g2-clos
+                    continue
+                statut, donnees = lire_frontmatter_fichier(os.path.join(dossier, "PLAN.md"))
+                if statut != "ok":
+                    continue
+                brut = donnees.get("ecrit")
+                valeurs = [brut] if isinstance(brut, str) else (brut if isinstance(brut, list) else [])
+                entrees = [e for e in valeurs if entree_ecrit_valide(e)]
+                res.append((os.path.relpath(os.path.join(dossier, "PLAN.md"), racine), entrees))
+    return res
+
+
+def _couvert(composants, plans):
+    """Le chemin (composants relatifs au lab) est égal à une entrée `ecrit:` d'un plan ouvert ou
+    situé dessous. Union des entrées de tous les plans ouverts."""
+    for _plan, entrees in plans:  # g2-union
+        for entree in entrees:
+            cible = [c for c in entree.split("/") if c not in ("", ".")]
+            if cible and composants[: len(cible)] == cible:
+                return True
+    return False
+
+
+def _candidats_g2(contexte):
+    """Chemins ABSOLUS que l'action vise : le chemin écrit pour Write, Edit, NotebookEdit ; pour
+    Bash, tout jeton de la commande qui ressemble à un chemin (contient `/` ou `.`, ou nomme une
+    entrée existante), résolu contre le cwd du payload (P45-D-10 : détection, jamais une promesse)."""
+    outil = contexte["outil"]
+    if outil in ("Write", "Edit", "NotebookEdit"):
+        return [contexte["ecrit"]] if contexte["ecrit"] else []
+    if outil != "Bash":
+        return []
+    entree = contexte["payload"].get("tool_input")
+    commande = entree.get("command") if isinstance(entree, dict) else None
+    if not isinstance(commande, str):
+        return []
+    try:
+        jetons = shlex.split(commande)
+    except ValueError:
+        return []
+    base = contexte["cwd"] if isinstance(contexte["cwd"], str) and contexte["cwd"].startswith("/") else os.getcwd()
+    res = []
+    for jeton in jetons:
+        jeton = re.sub(r"^[0-9]*[<>]+&?", "", jeton)
+        if jeton == "" or jeton.startswith("-") or jeton.startswith("~") or "\x00" in jeton:
+            continue
+        if any(c in jeton for c in "{}*?$`\"'|;&<>()"):
+            continue  # motif, expansion ou charge utile : pas un chemin nommé
+        absolu = jeton if jeton.startswith("/") else os.path.join(base, jeton)
+        if "/" in jeton or "." in jeton or os.path.lexists(absolu):
+            res.append(absolu)
+    return res
+
+
+def evaluer_g2(contexte):
+    """G2 : avertit, sans JAMAIS refuser (P45-D-03), quand une écriture par outil (ou une commande
+    Bash) vise un chemin du lab hors `.planning/` et hors `.claude/` non couvert par l'`ecrit:` d'un
+    plan ouvert. Toute exception est avalée : G2 est fail-open (spec §5.1)."""
+    if G2_MODE != "avertit":
+        return []
+    try:
+        racine = contexte["racine"]
+        plans = plans_ouverts(racine)
+        hors = []
+        for absolu in _candidats_g2(contexte):
+            try:
+                rel = os.path.relpath(os.path.realpath(absolu), racine)
+            except (OSError, ValueError):
+                continue
+            composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+            if not composants or composants[0] == "..":
+                continue
+            if composants[0] in (".planning", ".claude"):
+                continue
+            if _couvert(composants, plans):
+                continue
+            if "/".join(composants) not in hors:
+                hors.append("/".join(composants))
+        if not hors:
+            return []
+        montres = ", ".join(hors[:5]) + ((" (+%d autre(s))" % (len(hors) - 5)) if len(hors) > 5 else "")
+        return [("avertit", "[planning-core] G2 (avertissement, jamais un refus) : " + montres
+                 + " hors de l'ecrit: de tout plan ouvert (%d plan(s) ouvert(s)). " % len(plans)
+                 + "Les écritures par Bash ne sont pas couvertes par les refus : limite déclarée "
+                 "(P45-D-10), détection seulement.")]
+    except Exception:
+        return []
+
+
 # --- Sorties : UN objet JSON par exécution, jamais systemMessage (DIV-3) ----------------------
 def _emettre(objet):
     texte = json.dumps(objet, ensure_ascii=False) + "\n"
@@ -188,9 +495,15 @@ def sortie_contexte(textes):
 
 # --- Évaluation des gates (Phase B) ----------------------------------------------------------
 def evaluer_gates(contexte):
-    """Liste de résultats (genre, texte), genre `refuse` ou `avertit`. Aucun gate n'est encore
-    branché dans ce socle."""
-    return []
+    """Liste de résultats (genre, texte), genre `refuse` ou `avertit`. La table d'armement est
+    vérifiée d'abord : un code livré qui viole l'ordre des étapes refuse (impossible sur un code
+    sain, c'est la garde que les mutants exercent). Seul G2 est branché dans ce plan."""
+    if not armement_valide(TABLE_ARMEMENT):
+        return [("refuse", "[planning-core] table d'armement incohérente : l'ordre des étapes "
+                           "(G6 et G5, puis G1, puis G7, puis le rôle) n'est pas respecté (P45-D-03)")]
+    resultats = []
+    resultats.extend(evaluer_g2(contexte))
+    return resultats
 
 
 def main():
