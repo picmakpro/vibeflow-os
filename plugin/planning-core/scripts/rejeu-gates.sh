@@ -24,8 +24,12 @@
 #
 # Relevé (stdout, et --rapport) — lignes, dans cet ordre :
 #   <gate> | <lab affiché> | <chemin> | <attendu> | <obtenu> | <raison>       une par écriture rejouée
-#   COMPTE <gate> faux-refus=<n> faux-accept=<m> refus-conforme-modele=<k>     une par gate
-#   REJEU-ETAPE-<n> faux-refus=<N> faux-accept=<M> refus-conforme-modele=<K>
+#   COMPTE <gate> faux-refus=<n> faux-accept=<m> refus-conforme-modele=<k>     une par gate ; suivie du mot
+#                                                                                `hors-etape` si le gate est d'une
+#                                                                                étape > --etape (joué, imprimé,
+#                                                                                jamais compté dans le total)
+#   REJEU-ETAPE-<n> faux-refus=<N> faux-accept=<M> refus-conforme-modele=<K>   total des gates des étapes <= n ET des
+#                                                                                lignes rangées sous aucune étape (`-`, `?`)
 #   CLASSE-REGLE-ECRITE <gate> lab=<lab affiché> n=<j>                          gate qui classe d'après
 #                                                                                le modèle, par lab
 #   EMPREINTE-IDENTIQUE <lab affiché>   (ou EMPREINTE-DIVERGENTE + code 1)      une par lab
@@ -53,7 +57,8 @@
 # trois valeurs, est une erreur — jamais un doit-passer implicite. `origine` = `regle-ecrite` marque
 # une classification par la règle écrite du modèle faute d'état dérivé.
 # Les constructeurs de TOUS les gates sont joués quelle que soit --etape : l'étape ne décide que de
-# l'armement de la copie du hook.
+# l'armement de la copie du hook et du COMPTAGE (un gate d'étape > --etape est simulé en observe : son
+# `doit-refuser` obtient un passage, qui n'est pas un faux accept de l'étape mesurée).
 set -uo pipefail
 
 for arg in "$@"; do
@@ -100,6 +105,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 GATES = ("G6", "G5", "G1", "G7", "ROLE")
 ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",))
+ETAPE_DE = dict((g, i + 1) for i, lot in enumerate(ORDRE_ETAPES) for g in lot)
 ELAGAGE = ("node_modules", ".git", ".venv", "__pycache__")
 MARQUEURS_CODE = ("package.json", "go.mod", "Cargo.toml", "pyproject.toml", "pom.xml", "build.gradle",
                   "build.gradle.kts", "composer.json", "Gemfile", "tsconfig.json", "Package.swift")
@@ -466,6 +472,14 @@ def classer(attendu, obtenu):
     return "refus-conforme-modele" if obtenu == "refus" else "faux-accept"  # rejeu-modele-compte
 
 
+def hors_etape(gate, etape):
+    """Vrai si `gate` est d'une étape > `etape` selon ORDRE_ETAPES : ses comptes n'entrent ni dans les totaux ni
+    dans l'armement. La règle EXCLUT les gates d'étapes ultérieures ; elle ne retient pas « les seuls gates
+    connus » : un gate rangé sous aucune étape (`-`, `?`) reste compté (décisions du manager vf-dev-manager,
+    2026-09-30)."""
+    return ETAPE_DE.get(gate, 0) > etape
+
+
 def gate_de_raison(raison):
     m = PREFIXE_GATE.match(raison or "")
     return m.group(1) if m else "?"
@@ -585,9 +599,12 @@ def executer(opts, tmp):
     totaux = dict((c, 0) for c in COMPTES)
     for gate in sorted(gates_comptes, key=lambda g: (GATES.index(g) if g in GATES else len(GATES), g)):
         c = comptes.get(gate, dict((k, 0) for k in COMPTES))
-        lignes.append("COMPTE %s faux-refus=%d faux-accept=%d refus-conforme-modele=%d"
-                      % (gate, c["faux-refus"], c["faux-accept"], c["refus-conforme-modele"]))
+        lignes.append("COMPTE %s faux-refus=%d faux-accept=%d refus-conforme-modele=%d%s"
+                      % (gate, c["faux-refus"], c["faux-accept"], c["refus-conforme-modele"],
+                         " hors-etape" if hors_etape(gate, opts["etape"]) else ""))
     for gate, c in comptes.items():
+        if hors_etape(gate, opts["etape"]):  # rejeu-etape
+            continue
         for k in COMPTES:
             totaux[k] += c[k]
     lignes.append("REJEU-ETAPE-%d faux-refus=%d faux-accept=%d refus-conforme-modele=%d"

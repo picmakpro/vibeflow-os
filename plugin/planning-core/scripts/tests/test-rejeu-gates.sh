@@ -15,6 +15,9 @@
 #   R-REJEU-08  un seul attendu par écriture : priorité fichier d'attendus > gate > générique
 #   R-REJEU-09  unicité : chaque triplet apparaît une fois, la somme des comptes = les clés distinctes
 #   R-REJEU-10  attendu du modèle (P45-D-21a), classification totale (P45-D-21c), règle écrite
+#   R-REJEU-ETAPE  règle de comptage par étape (45-06, décisions du manager vf-dev-manager, 2026-09-30) :
+#                 REJEU-ETAPE-n et l'armement ne comptent que les gates des étapes <= n ; un gate d'étape > n est
+#                 joué, sa ligne COMPTE porte `hors-etape` ; les gates `-` et `?` restent comptés
 #   R-REJEU-G6G5  constructeurs G6 et G5 (45-05) : le vrai hook armé à l'étape 1 sur deux labs synthétiques, une
 #                 ligne par clé, le constructeur G6 prime sur la réécriture générique, faux-refus=0 faux-accept=0
 #   R-REJEU-STATIQUE  aucun sous-processus autre que bash sur le hook copié et cmp
@@ -293,8 +296,14 @@ def g1_total_hors(lab, ctx):
 g1_total_vide.classe_modele = True
 g1_total_hors.classe_modele = True
 
+def g1_sans_cadrage(lab, ctx):
+    """Constructeur d'essai de G1 (45-06) : doit-refuser l'écriture du PLAN.md de chaque phase (sans CADRAGE.md)."""
+    return [("Write", rel, "doit-refuser", "") for rel in plans(lab)]
+
+
 SCENARIOS = {
     "aucun": (None, None),
+    "g1-sans-cadrage": ("G1", g1_sans_cadrage),
     "g6-state": ("G6", g6_state),
     "g6-protege": ("G6", g6_protege),
     "g1-modele": ("G1", g1_modele),
@@ -338,11 +347,14 @@ class Resultat:
     def __init__(self, rc, out, err, rapport):
         self.rc, self.out, self.err, self.rapport = rc, out, err, rapport
         self.lignes, self.compte, self.etape, self.classe, self.empreintes = [], {}, None, {}, []
+        self.hors_etape = set()  # gates dont la ligne COMPTE porte le suffixe `hors-etape` (jamais comptés au total)
         for l in out.split("\n"):
             if l.startswith("COMPTE "):
-                m = re.match(r"COMPTE (\S+) faux-refus=(\d+) faux-accept=(\d+) refus-conforme-modele=(\d+)$", l)
+                m = re.match(r"COMPTE (\S+) faux-refus=(\d+) faux-accept=(\d+) refus-conforme-modele=(\d+)(?: hors-etape)?$", l)
                 if m:
                     self.compte[m.group(1)] = tuple(int(m.group(i)) for i in (2, 3, 4))
+                    if l.endswith(" hors-etape"):
+                        self.hors_etape.add(m.group(1))
             elif l.startswith("REJEU-ETAPE-"):
                 m = re.match(r"REJEU-ETAPE-(\d) faux-refus=(\d+) faux-accept=(\d+) refus-conforme-modele=(\d+)$", l)
                 if m:
@@ -553,7 +565,10 @@ def sec_modele(_):
     sub_b = substitut("sub-g1-b.sh", SUB_G1 + '\nif "/02-b/" in chemin and chemin.endswith("/PLAN.md"):\n    refuser("G1", "refuse B aussi")')
     sub_c = substitut("sub-g1-c.sh", 'if chemin.endswith("/PLAN.md") and "/03-c/" in chemin:\n    refuser("G1", "registre ouvert")')
     fautes = []
-    r = rejeu([lab], hook=sub, scenario="g1-modele")
+    r1 = rejeu([lab], hook=sub, scenario="g1-modele", etape=1)
+    if r1.compte.get("G1") != (0, 0, 2) or "G1" not in r1.hors_etape or r1.etape != (0, 0, 0) or len(r1.lignes_chemin("PLAN.md")) != 3:
+        fautes.append("(a) à --etape=1 les trois lignes G1 restent au relevé, COMPTE G1 (0, 0, 2) hors-etape, REJEU-ETAPE-1 (0, 0, 0) : G1=%s hors=%s etape=%s" % (r1.compte.get("G1"), sorted(r1.hors_etape), r1.etape))
+    r = rejeu([lab], hook=sub, scenario="g1-modele", etape=2)  # les totaux se lisent à l'étape où G1 est compté
     plans = sorted(r.lignes_chemin("PLAN.md"), key=lambda x: x[2])
     if len(plans) != 3 or [p[3] for p in plans] != ["doit-refuser-modele", "doit-passer", "doit-refuser-modele"] \
             or [p[4] for p in plans] != ["refus", "passe", "refus"] or plans[0][5] != "refus conforme au modèle, lab non migré" \
@@ -594,6 +609,74 @@ def sec_modele(_):
             ko("R-REJEU-10", "attendu du modèle (P45-D-21a), classification totale (P45-D-21c)", "voir le cas", f)
     else:
         ok("R-REJEU-10 attendu du modèle : A et C refus conformes (2), B jamais rangé en refus conforme (faux-refus si refusé), faux-accept si A passe, fichier d'attendus prioritaire, règle écrite comptée par CLASSE-REGLE-ECRITE (n=3 puis n=0), classification absente = code 1")
+
+
+SUB_G1_ARME = '''if ARMEMENT_G1 == "armed" and chemin.endswith("/PLAN.md") and not os.path.isfile(os.path.join(os.path.dirname(chemin), "CADRAGE.md")):
+    refuser("G1", "phase sans CADRAGE.md")'''
+SUB_REFUS_SANS_GATE = 'print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "refus sans nom de gate"}}))\nsys.exit(0)'
+
+
+def lab_etape(nom):
+    return fabriquer_lab(nom, {".planning/notes.md": "n", ".planning/cycles/01-c/phases/01-sans/PLAN.md": "---\necrit: livrables/a.md\n---\n"})
+
+
+def etape_g1(script):
+    """G1 d'essai (constructeur injecté) rejoué sous un hook où G1 est en observe, à --etape=1 puis 2, puis armé sur la copie."""
+    res = {}
+    lab = lab_etape(unique("lab-et"))
+    sub_obs = substitut(unique("sub") + ".sh", SUB_G1_ARME)
+    sub_passe = substitut(unique("sub") + ".sh", SUB_PASSE)
+    r = rejeu([lab], hook=sub_obs, etape=1, scenario="g1-sans-cadrage", script=script)
+    res["g1-etape1"] = (r.compte.get("G1"), "G1" in r.hors_etape, r.etape, len(r.lignes_chemin("01-sans/PLAN.md")))
+    r = rejeu([lab], hook=sub_passe, etape=2, scenario="g1-sans-cadrage", script=script)
+    res["g1-etape2"] = (r.compte.get("G1"), "G1" in r.hors_etape, r.etape)
+    r = rejeu([lab], hook=sub_obs, etape=2, scenario="g1-sans-cadrage", script=script)
+    res["g1-arme"] = (r.compte.get("G1"), "G1" in r.hors_etape, r.etape)
+    return res
+
+
+def etape_g6(script):
+    """Un substitut qui refuse à tort une écriture d'un gate de l'étape mesurée (G6 à --etape=1) : toujours un faux refus compté."""
+    lab = fabriquer_lab(unique("lab-et"), {".planning/notes.md": "n"})
+    sub = substitut(unique("sub") + ".sh", 'if ARMEMENT_G6 == "armed" and chemin.endswith("/.planning/notes.md"): refuser("G6", "notes.md refusé à tort")')
+    r = rejeu([lab], hook=sub, etape=1, script=script)
+    return {"g6-faux-refus": (r.compte.get("G6"), "G6" in r.hors_etape, r.etape)}
+
+
+def etape_sans_etape(script):
+    """Les lignes rangées sous aucune étape restent comptées : un faux accept sous le gate `-`, un faux refus sous le gate `?`."""
+    res = {}
+    lab = fabriquer_lab(unique("lab-et"), {".planning/notes.md": "n"})
+    att = ecrire_attendus(["- | ~/%s | .planning/notes.md | doit-refuser | un passage rangé sous aucun gate" % os.path.basename(lab)])
+    r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), etape=1, attendus=att, script=script)
+    res["gate-tiret"] = (r.compte.get("-"), r.etape)
+    lab3 = fabriquer_lab(unique("lab-et"), {".planning/notes.md": "n"})
+    r = rejeu([lab3], hook=substitut(unique("sub") + ".sh", SUB_REFUS_SANS_GATE), etape=1, script=script)
+    res["gate-interrogation"] = (r.compte.get("?"), "?" in r.hors_etape, r.etape)
+    return res
+
+
+def scenarios_etape(script):
+    res = {}
+    for mesure in (etape_g1, etape_g6, etape_sans_etape):
+        res.update(mesure(script))
+    return res
+
+
+ATTENDU_ETAPE = {"g1-etape1": ((0, 1, 0), True, (0, 0, 0), 1), "g1-etape2": ((0, 1, 0), False, (0, 1, 0)),
+                 "g1-arme": ((0, 0, 0), False, (0, 0, 0)), "g6-faux-refus": ((1, 0, 0), False, (1, 0, 0)),
+                 "gate-tiret": (None, (0, 1, 0)), "gate-interrogation": ((2, 0, 0), False, (2, 0, 0))}
+
+
+def sec_etape(_):
+    """R-REJEU-ETAPE : REJEU-ETAPE-<n> et l'armement ne comptent que les gates des étapes <= n ; les gates `-` et `?` restent comptés."""
+    res = scenarios_etape(REJEU)
+    fautes = ["%s : attendu %s, obtenu %s" % (cle, ATTENDU_ETAPE[cle], res.get(cle)) for cle in ATTENDU_ETAPE if res.get(cle) != ATTENDU_ETAPE[cle]]
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-ETAPE", "REJEU-ETAPE-n exclut les gates d'étape > n, garde les gates `-` et `?`", "voir le cas", f)
+    else:
+        ok("R-REJEU-ETAPE --etape=1 : le doit-refuser d'un constructeur G1 qu'un hook en observe laisse passer imprime `COMPTE G1 … faux-accept=1 … hors-etape` (la ligne du relevé reste) et REJEU-ETAPE-1 vaut 0/0/0 ; --etape=2 : G1 n'est plus hors-etape et son faux accept entre dans REJEU-ETAPE-2 ; G1 armé sur la copie : 0/0/0 ; un faux refus de G6 à --etape=1 est compté ; un faux accept rangé sous le gate `-` et un faux refus sous le gate `?` restent comptés dans REJEU-ETAPE-1")
 
 
 FICHIERS_G6G5 = {".planning/STATE.md": "s", ".planning/INDEX.md": "i", ".planning/cloture.log": "c",
@@ -1003,6 +1086,14 @@ def sec_mutants(_):
          'CONSTRUCTEURS = {"reecriture": construire_reecriture, "G5": construire_g5}  # rejeu-registre',
          sc_g6g5, lambda o, m: o["G6"] == (0, 0, 0) and o["etape"] == (0, 0, 0) and m["G6"] is not None and m["G6"][0] > 0,
          "R-REJEU-G6G5 : constructeur G6 retiré du registre (STATE.md compte en doit-passer et le hook armé le refuse : faux-refus)")
+    duel("REJEU-ETAPE", REJEU, G, "# rejeu-etape", "if False:  # rejeu-etape",
+         etape_g1, lambda o, m: o["g1-etape1"] == ATTENDU_ETAPE["g1-etape1"] and m["g1-etape1"][2] == (0, 1, 0),
+         "R-REJEU-ETAPE : la somme reprend tous les gates (un gate d'étape > n, simulé en observe, compte en faux accept)")
+    duel("REJEU-ETAPE-LISTE", REJEU, G, "# rejeu-etape",
+         'if gate not in [g for lot in ORDRE_ETAPES[:opts["etape"]] for g in lot]:  # rejeu-etape',
+         etape_sans_etape, lambda o, m: o["gate-tiret"] == ATTENDU_ETAPE["gate-tiret"] and o["gate-interrogation"] == ATTENDU_ETAPE["gate-interrogation"]
+         and m["gate-tiret"][1] == (0, 0, 0) and m["gate-interrogation"][2] == (0, 0, 0),
+         "R-REJEU-ETAPE : la somme devient une liste blanche des gates d'étapes connues (les lignes `-` et `?` ne comptent plus)")
     tout = {"touch": "DIVERGENTE", "mode": "DIVERGENTE", "contenu": "DIVERGENTE"}
     duel("REEL-MTIME", REEL, R, "# reel-signature",
          'lignes.append((rel or ".", "%s\\t%s\\t%o\\t%d\\t%s" % (rel or ".", genre, stat.S_IMODE(mode), 0, sig)))  # reel-signature',
@@ -1022,6 +1113,7 @@ SECTIONS = {
     "reel_hook": sec_reel_hook,
     "priorite": sec_priorite,
     "modele": sec_modele,
+    "etape": sec_etape,
     "g6g5": sec_g6g5,
     "statique": sec_statique,
     "reel": sec_reel,
@@ -1064,7 +1156,7 @@ for f in "$REJEU" "$REEL"; do
 done
 
 if [ -f "$REJEU" ] && [ -f "$REEL" ]; then
-  run_sections sens,reel_hook,priorite,modele,g6g5,statique,reel,mutants
+  run_sections sens,reel_hook,priorite,modele,etape,g6g5,statique,reel,mutants
 fi
 
 T_FIN="$(date +%s)"
