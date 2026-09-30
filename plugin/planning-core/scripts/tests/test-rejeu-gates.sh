@@ -15,6 +15,8 @@
 #   R-REJEU-08  un seul attendu par écriture : priorité fichier d'attendus > gate > générique
 #   R-REJEU-09  unicité : chaque triplet apparaît une fois, la somme des comptes = les clés distinctes
 #   R-REJEU-10  attendu du modèle (P45-D-21a), classification totale (P45-D-21c), règle écrite
+#   R-REJEU-G6G5  constructeurs G6 et G5 (45-05) : le vrai hook armé à l'étape 1 sur deux labs synthétiques, une
+#                 ligne par clé, le constructeur G6 prime sur la réécriture générique, faux-refus=0 faux-accept=0
 #   R-REJEU-STATIQUE  aucun sous-processus autre que bash sur le hook copié et cmp
 #   R-REEL-01..04  rejeu-reel.sh : empreinte de TOUT l'arbre par un geste extérieur, liens non suivis,
 #                  aucune commande de gestionnaire de versions
@@ -292,6 +294,7 @@ g1_total_vide.classe_modele = True
 g1_total_hors.classe_modele = True
 
 SCENARIOS = {
+    "aucun": (None, None),
     "g6-state": ("G6", g6_state),
     "g6-protege": ("G6", g6_protege),
     "g1-modele": ("G1", g1_modele),
@@ -313,7 +316,11 @@ spec.loader.exec_module(mod)
 sys.argv = [sys.argv[0], recalc, proteges]
 import constructeurs_essai as ce
 gate, fonction = ce.SCENARIOS[scenario]
-mod.CONSTRUCTEURS[gate] = fonction
+# Isolement (45-05) : les constructeurs livrés de G6 et G5 ne jouent pas dans un essai qui mesure autre chose.
+for g in [g for g in mod.CONSTRUCTEURS if g != "reecriture"]:
+    del mod.CONSTRUCTEURS[g]
+if fonction is not None:
+    mod.CONSTRUCTEURS[gate] = fonction
 sys.exit(mod.main(reste))
 '''
 
@@ -364,6 +371,8 @@ def rejeu(labs, hook=None, etape=1, attendus=None, scenario=None, script=None, r
         args.append("--rapport=" + chemin_rapport)
     args += list(extra)
     script = script or (REEL if reel else REJEU)
+    if scenario is None and hook and hook != HOOK and not reel:
+        scenario = "aucun"  # substitut de hook : les constructeurs livrés de G6 et G5 ne jouent pas
     if scenario:
         corps = extraire(script, "PY_REJEU_GATES_EOF", os.path.join(WORK, "essais", unique("module") + ".py"))
         cmd = [PYBIN, os.path.join(WORK, "essais", "lanceur_essai.py"), corps, scenario, RECALC, json.dumps(list(PROTEGES))] + args
@@ -585,6 +594,51 @@ def sec_modele(_):
             ko("R-REJEU-10", "attendu du modèle (P45-D-21a), classification totale (P45-D-21c)", "voir le cas", f)
     else:
         ok("R-REJEU-10 attendu du modèle : A et C refus conformes (2), B jamais rangé en refus conforme (faux-refus si refusé), faux-accept si A passe, fichier d'attendus prioritaire, règle écrite comptée par CLASSE-REGLE-ECRITE (n=3 puis n=0), classification absente = code 1")
+
+
+FICHIERS_G6G5 = {".planning/STATE.md": "s", ".planning/INDEX.md": "i", ".planning/cloture.log": "c",
+                 ".planning/cycles/01-c/phases/01-p/PLAN.md": "---\necrit: livrables/a.md\n---\n"}
+ATTENDUS_G6G5 = (  # (chemin affiché, attendu, obtenu) d'un lab de FICHIERS_G6G5 ; les clés d'un lab sont DISTINCTES
+    (".planning/STATE.md", "doit-refuser", "refus"), (".planning/INDEX.md", "doit-refuser", "refus"),
+    (".planning/cloture.log", "doit-refuser", "refus"), (".planning/derogations-gates.log", "doit-refuser", "refus"),
+    (".planning/.recalc-cache.json", "doit-refuser", "refus"),
+    (".planning/config.json", "doit-passer", "passe"), (".planning/config.json [Edit]", "doit-refuser", "refus"),
+    (".planning/cycles/01-c/phases/01-p/PLAN.md", "doit-passer", "passe"),
+    (".planning/cycles/01-c/phases/01-p/VERDICT.md", "doit-refuser", "refus"))
+
+
+def scenario_g6g5(script):
+    """Relevé du rejeu de l'étape 1 avec le VRAI hook (copie armée) sur deux labs synthétiques."""
+    a = fabriquer_lab(unique("lab-g6a"), FICHIERS_G6G5, config='{"planning_version": "2.0", "autre": 1}')
+    b = fabriquer_lab(unique("lab-g6b"), FICHIERS_G6G5)
+    r = rejeu([a, b], hook=HOOK, etape=1, script=script)
+    lignes = {}
+    for g, lab, chemin, attendu, obtenu, _raison in r.lignes:
+        lignes.setdefault(lab, []).append((chemin, attendu, obtenu))
+    return r, sorted(lignes.items())
+
+
+def sec_g6g5(_):
+    """R-REJEU-G6G5 : les constructeurs G6 et G5 livrés, le vrai hook armé à l'étape 1, deux labs synthétiques."""
+    r, par_lab = scenario_g6g5(REJEU)
+    fautes = []
+    if r.rc != 0:
+        fautes.append("code %d : %s" % (r.rc, court(r.err)))
+    if len(par_lab) != 2:
+        fautes.append("%d lab(s) au relevé (attendu 2)" % len(par_lab))
+    for lab, lignes in par_lab:
+        if sorted(lignes) != sorted(ATTENDUS_G6G5):
+            fautes.append("%s : lignes %s (attendu une par clé, %d)" % (lab, sorted(lignes), len(ATTENDUS_G6G5)))
+        cles = [l[0] for l in lignes]
+        if len(cles) != len(set(cles)):
+            fautes.append("%s : clé en double %s" % (lab, sorted(c for c in set(cles) if cles.count(c) > 1)))
+    if r.compte.get("G6") != (0, 0, 0) or r.compte.get("G5") != (0, 0, 0) or r.etape != (0, 0, 0):
+        fautes.append("comptes G6=%s G5=%s etape=%s (attendu 0, 0, 0)" % (r.compte.get("G6"), r.compte.get("G5"), r.etape))
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-G6G5", "constructeurs G6 et G5 + vrai hook armé à l'étape 1, deux labs synthétiques", "une ligne par clé distincte, faux-refus=0 faux-accept=0", f)
+    else:
+        ok("R-REJEU-G6G5 vrai hook, --etape=1, deux labs synthétiques : chaque fichier protégé (STATE.md, INDEX.md, cloture.log, journal de dérogation, cache) UNE fois en doit-refuser/refus (le constructeur G6 prime sur la réécriture générique), config.json et PLAN.md UNE fois en doit-passer/passe, l'Edit qui perd l'adhésion et le VERDICT.md voisin en doit-refuser/refus ; 9 lignes par lab = 9 clés distinctes ; faux-refus=0 faux-accept=0")
 
 
 def _appels_sous_process(script, marqueur, autorises):
@@ -941,6 +995,14 @@ def sec_mutants(_):
     duel("REEL-REFUS64", REEL, R, "# reel-refus64", "if False:  # reel-refus64",
          sc_reel_usage, lambda o, m: o["rc"] == 64 and not o["lignes"] and not o["rapport"] and (m["lignes"] or m["rapport"]),
          "R-REEL-07 : lignes EMPREINTE-ARBRE-* écrites alors que rejeu-gates.sh a refusé l'usage", compagnons=(REJEU,))
+    def sc_g6g5(script):
+        r, _ = scenario_g6g5(script)
+        return {"G6": r.compte.get("G6"), "etape": r.etape}
+
+    duel("REJEU-G6-ENREGISTRE", REJEU, G, "# rejeu-registre",
+         'CONSTRUCTEURS = {"reecriture": construire_reecriture, "G5": construire_g5}  # rejeu-registre',
+         sc_g6g5, lambda o, m: o["G6"] == (0, 0, 0) and o["etape"] == (0, 0, 0) and m["G6"] is not None and m["G6"][0] > 0,
+         "R-REJEU-G6G5 : constructeur G6 retiré du registre (STATE.md compte en doit-passer et le hook armé le refuse : faux-refus)")
     tout = {"touch": "DIVERGENTE", "mode": "DIVERGENTE", "contenu": "DIVERGENTE"}
     duel("REEL-MTIME", REEL, R, "# reel-signature",
          'lignes.append((rel or ".", "%s\\t%s\\t%o\\t%d\\t%s" % (rel or ".", genre, stat.S_IMODE(mode), 0, sig)))  # reel-signature',
@@ -960,6 +1022,7 @@ SECTIONS = {
     "reel_hook": sec_reel_hook,
     "priorite": sec_priorite,
     "modele": sec_modele,
+    "g6g5": sec_g6g5,
     "statique": sec_statique,
     "reel": sec_reel,
     "mutants": sec_mutants,
@@ -1001,7 +1064,7 @@ for f in "$REJEU" "$REEL"; do
 done
 
 if [ -f "$REJEU" ] && [ -f "$REEL" ]; then
-  run_sections sens,reel_hook,priorite,modele,statique,reel,mutants
+  run_sections sens,reel_hook,priorite,modele,g6g5,statique,reel,mutants
 fi
 
 T_FIN="$(date +%s)"

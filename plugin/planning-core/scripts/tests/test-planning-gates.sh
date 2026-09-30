@@ -1422,6 +1422,162 @@ def controle_cang_03(ctx, script):
     return (not fautes), ("; ".join(fautes) if fautes else "evaluer_g6 neutralisé, observe et armed : code 0 et une ligne qui nomme G6 (et pas G5)")
 
 
+# --- 45-05 : identité des fichiers protégés (Pattern 5), périmètre F6 et F7b ---------------------------------
+def lab_identite(ctx):
+    """Copie jetable du lab g6-adherent, sans INDEX.md (la création d'un nom protégé ABSENT se juge par la casse),
+    avec un lien dur vers le fichier d'état dans le dossier de planning et hors de lui, et un alias du
+    dossier de planning."""
+    lab = lab_frais(ctx, "g6-adherent")
+    os.remove(os.path.join(lab, ".planning", "INDEX.md"))
+    etat = os.path.join(lab, ".planning", "STATE.md")
+    os.link(etat, os.path.join(lab, ".planning", "hard.md"))
+    os.link(etat, os.path.join(lab, "livrables", "lien-dur.md"))
+    os.symlink(".planning", os.path.join(lab, "alias-planning"))
+    return lab
+
+
+def _refus_de(ctx, hook, lab, gate, outil, rel=None, entree=None, agent=None):
+    """(conforme, détail) : un deny dont la raison commence par `[planning-core] <gate> :`."""
+    chemin = os.path.join(lab, rel) if rel else None
+    e = entree if entree is not None else entree_outil(outil, chemin)
+    rc, out, err = ctx.lancer("A", payload(outil, e, lab, agent_type=agent), cwd=lab, dossier=hook)
+    v = classer(rc, out)
+    if v != "deny" or err or len(out.splitlines()) != 1:
+        return False, "%s %s -> %s %s" % (outil, rel, v, court(out))
+    raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+    if not raison.startswith("[planning-core] %s :" % gate):
+        return False, "%s %s : raison %s" % (outil, rel, raison)
+    return True, raison
+
+
+def _passage_de(ctx, hook, lab, outil, rel, entree=None):
+    chemin = os.path.join(lab, rel)
+    e = entree if entree is not None else entree_outil(outil, chemin)
+    rc, out, err = ctx.lancer("A", payload(outil, e, lab), cwd=lab, dossier=hook)
+    v = classer(rc, out)
+    return (v in ("silence", "avertit") and not err and b"[planning-core] G6" not in out and b"[planning-core] G5" not in out), "%s %s -> %s %s" % (outil, rel, v, court(out))
+
+
+def controle_id_01(ctx, script):
+    """Copie armée : variante de casse, lien dur (dans et hors du dossier de planning), alias du dossier de
+    planning, segment `..`, création d'un nom protégé absent en autre casse -> refus de G6 ; jumeaux sans refus."""
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lab = lab_identite(ctx)
+    fautes = []
+    cas = ((".planning/state.md", None), (".PLANNING/STATE.md", None), (".planning/Index.md", None),
+           (".planning/Cloture.Log", None), (".planning/hard.md", None), ("livrables/lien-dur.md", None),
+           ("alias-planning/STATE.md", None), (".planning/x/../STATE.md", None),
+           (".planning/hard.md", "agent-inconnu"), ("alias-planning/STATE.md", "plugin-inconnu:agent-inconnu"))
+    for rel, agent in cas:
+        bon, detail = _refus_de(ctx, hook, lab, "G6", "Write", rel, agent=agent)
+        if not bon:
+            fautes.append(detail)
+    for rel in ("livrables/STATE.md", "livrables/INDEX.md", "notes/STATE.md", ".planning/STATE.md.bak"):
+        bon, detail = _passage_de(ctx, hook, lab, "Write", rel)
+        if not bon:
+            fautes.append("jumeau : " + detail)
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus G6 (casse, lien dur dans et hors du dossier de planning, alias, segment .., création en autre casse, deux rôles), 4 jumeaux sans refus (même nom hors de la racine du dossier de planning, nom voisin)" % len(cas))
+
+
+def controle_id_02(ctx, script):
+    """Copie armée : un lien dur vers un VERDICT.md, sous un autre nom (dans et hors du dossier de planning) ->
+    refus de G5 ; VERDICT.md.bak et un lien dur vers un autre fichier -> aucun refus."""
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lab = lab_frais(ctx, "g5-adherent")
+    unite = os.path.join(lab, UNITE)
+    ecrire(os.path.join(unite, "VERDICT.md"), "v\n")
+    os.link(os.path.join(unite, "VERDICT.md"), os.path.join(unite, "lien-verdict.md"))
+    os.link(os.path.join(unite, "VERDICT.md"), os.path.join(lab, "livrables", "copie-verdict.md"))
+    os.link(os.path.join(unite, "PLAN.md"), os.path.join(unite, "plan-lien.md"))
+    ecrire(os.path.join(unite, "VERDICT.md.bak"), "b\n")
+    fautes = []
+    for rel in (UNITE + "/lien-verdict.md", "livrables/copie-verdict.md"):
+        bon, detail = _refus_de(ctx, hook, lab, "G5", "Write", rel)
+        if not bon:
+            fautes.append(detail)
+    for rel in (UNITE + "/VERDICT.md.bak", UNITE + "/plan-lien.md"):
+        bon, detail = _passage_de(ctx, hook, lab, "Write", rel)
+        if not bon:
+            fautes.append("jumeau : " + detail)
+    return (not fautes), ("; ".join(fautes) if fautes else "lien dur vers un VERDICT.md refusé (G5) sous un autre nom, dans et hors du dossier de planning ; VERDICT.md.bak et un lien dur vers un autre fichier passent")
+
+
+def controle_id_03(ctx, script):
+    """F6 = f6-oui : une écriture par outil de config.json qui change ou retire planning_version est refusée (Write,
+    Edit avec sa sémantique replace_all, NotebookEdit) ; celle qui le garde passe (autre clé changée)."""
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lab = lab_frais(ctx, "g6-adherent")
+    config = os.path.join(lab, ".planning", "config.json")
+    ecrire(config, '{"planning_version": "cycles-v1", "seuil": 1, "copie": "cycles-v1"}')
+    cible = os.path.join(lab, ".planning", "config.json")
+    rel = ".planning/config.json"
+    W = lambda contenu: ("Write", {"file_path": cible, "content": contenu})
+    E = lambda ancien, nouveau, tout=None: ("Edit", dict({"file_path": cible, "old_string": ancien, "new_string": nouveau},
+                                                        **({"replace_all": tout} if tout is not None else {})))
+    refus = (("Write planning_version 2.0",) + W('{"planning_version": "2.0"}'),
+             ("Write qui n'est pas du JSON",) + W("pas du json"),
+             ("Write sans la clé",) + W('{"seuil": 1}'),
+             ("Write où cycles-v1 est ailleurs",) + W('{"planning_version": "2.0", "copie": "cycles-v1"}'),
+             ("Edit 2.0",) + E('"planning_version": "cycles-v1"', '"planning_version": "2.0"'),
+             ("Edit qui retire la clé",) + E('"planning_version": "cycles-v1", ', ""),
+             ("Edit ambigu sans replace_all",) + E("cycles-v1", "2.0"),
+             ("Edit replace_all qui touche les deux",) + E("cycles-v1", "2.0", True),
+             ("Edit inapplicable",) + E("absent du fichier", "x"),
+             ("NotebookEdit",) + ("NotebookEdit", {"notebook_path": cible, "new_source": "x"}))
+    passages = (("Write qui garde cycles-v1",) + W('{"planning_version": "cycles-v1", "seuil": 2}'),
+                ("Edit d'une autre clé",) + E('"seuil": 1', '"seuil": 2'),
+                ("Edit de la seconde occurrence seulement",) + E('"copie": "cycles-v1"', '"copie": "autre"'))
+    fautes = []
+    for etiquette, outil, entree in refus:
+        bon, detail = _refus_de(ctx, hook, lab, "G6", outil, rel, entree=entree)
+        if not bon:
+            fautes.append(etiquette + " : " + detail)
+    for etiquette, outil, entree in passages:
+        bon, detail = _passage_de(ctx, hook, lab, outil, rel, entree=entree)
+        if not bon:
+            fautes.append(etiquette + " : " + detail)
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus (Write, Edit, replace_all, NotebookEdit) et %d passages de config.json selon planning_version" % (len(refus), len(passages)))
+
+
+def controle_id_04(ctx, script):
+    """F7b = f7b-oui : le cache du recalcul est protégé (Write et Edit refusés, motif recalc-planning.sh) ; un nom voisin passe."""
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lab = lab_frais(ctx, "g6-adherent")
+    fautes = []
+    for outil in ("Write", "Edit"):
+        bon, detail = _refus_de(ctx, hook, lab, "G6", outil, ".planning/.recalc-cache.json")
+        if not bon:
+            fautes.append(detail)
+        elif "recalc-planning.sh" not in detail:
+            fautes.append("motif sans recalc-planning.sh : " + detail)
+    bon, detail = _passage_de(ctx, hook, lab, "Write", ".planning/.recalc-cache.json.bak")
+    if not bon:
+        fautes.append("jumeau : " + detail)
+    return (not fautes), ("; ".join(fautes) if fautes else "Write et Edit du cache refusés (motif recalc-planning.sh), nom voisin sans refus")
+
+
+def controle_id_05(ctx, script):
+    """recalc-planning.sh, lancé par Bash, écrit l'état, l'index et le cache sur un lab où G6 est armé : le hook n'en voit
+    rien (alors qu'un Write de l'état par outil est refusé)."""
+    armee = ctx.copie_forcee(ctx.scripts_dir, "armed")
+    lab = lab_frais(ctx)
+    os.rmdir(os.path.join(lab, UNITE, "plans", "01-a"))
+    os.rmdir(os.path.join(lab, UNITE, "plans"))
+    commande = "bash '%s' --planning=%s" % (ctx.recalc, os.path.join(lab, ".planning"))
+    rc, out, err = ctx.lancer("A", payload("Bash", {"command": commande}, lab), cwd=lab, dossier=armee)
+    if classer(rc, out) == "deny" or err:
+        return False, "le hook armé voit la commande Bash : " + classer(rc, out) + " " + court(out)
+    rc, out, err = ctx.lancer("A", payload("Write", {"file_path": os.path.join(lab, ".planning", "STATE.md"), "content": "x"}, lab), cwd=lab, dossier=armee)
+    if classer(rc, out) != "deny":
+        return False, "témoin : un Write de l'état n'est pas refusé sur la copie armée : " + classer(rc, out)
+    p = subprocess.run(["bash", ctx.recalc, "--planning=" + os.path.join(lab, ".planning")], stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE, env=ctx.env(), timeout=240)
+    manque = [n for n in ("STATE.md", "INDEX.md", ".recalc-cache.json") if not os.path.isfile(os.path.join(lab, ".planning", n))]
+    if p.returncode != 0 or manque:
+        return False, "recalc-planning.sh : rc=%d, fichiers absents %s, %s" % (p.returncode, manque, court(p.stderr))
+    return True, "G6 armé : la commande Bash n'est pas refusée et recalc-planning.sh écrit l'état, l'index et le cache (le Write de l'état est refusé)"
+
+
 # =================================================================================================
 # Sections
 # =================================================================================================
@@ -1582,6 +1738,17 @@ def sec_g6(ctx):
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
 
+def sec_id(ctx):
+    for ident, ctrl, titre in (
+            ("R-ID-01", controle_id_01, "identité : casse, lien dur, alias, segment .., création en autre casse (G6)"),
+            ("R-ID-02", controle_id_02, "identité : lien dur vers un VERDICT.md sous un autre nom (G5)"),
+            ("R-ID-03", controle_id_03, "F6 : config.json ne perd pas l'adhésion cycles-v1 par un outil"),
+            ("R-ID-04", controle_id_04, "F7b : le cache du recalcul est protégé"),
+            ("R-ID-05", controle_id_05, "recalc-planning.sh (commande) écrit toujours, le hook n'en voit rien")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+
+
 def sec_cang(ctx):
     for ident, ctrl, titre in (
             ("R-CANG-01", controle_cang_01, "canary de session, G6 et G5 en observe"),
@@ -1672,6 +1839,10 @@ def sec_banc(ctx):
     for gate in ("G5", "G6"):
         fr, fa = faux.get(gate, [0, 0])
         print("COMPTE %s faux-refus=%d faux-accept=%d" % (gate, fr, fa))
+    if all(faux.get(g, [0, 0]) == [0, 0] for g in ("G5", "G6")) and all(compte.get(g) for g in ("G5", "G6")):
+        ok("R-ID-06 banc complet G5 + G6 sur copie armée : COMPTE G5 faux-refus=0 faux-accept=0, COMPTE G6 faux-refus=0 faux-accept=0")
+    else:
+        ko("R-ID-06", "banc complet G5 + G6 sur copie armée : zéro faux refus, zéro faux accept", "G5 [0, 0], G6 [0, 0]", "G5=%s G6=%s" % (faux.get("G5"), faux.get("G6")))
     # jumeau négatif : chaque lab jumeau a au moins un cas
     for nom in ordre:
         if labs[nom]["jumeau_de"] and not labs[nom]["ecritures"]:
@@ -1737,11 +1908,17 @@ def sec_mutants(ctx):
         ("VERDICT-ATOMIQUE", "# verdict-atomique", 'open(chemin_verdict, "w", encoding="utf-8").write(texte)  # verdict-atomique',
          "R-VERDICT-02", controle_verdict_02, "poser-verdict.sh", "PY_POSER_VERDICT_EOF"),
         # 45-05 : G6 et canary de l'étape 1
-        ("G6-RACINE", "# g6-racine", 'if not composants or composants[0].casefold() != ".planning":  # g6-racine',
-         "R-G6-03", controle_g6_03),
+        ("G6-RACINE", "# g6-racine", "a_la_racine = True  # g6-racine", "R-G6-03", controle_g6_03),
         ("G6-NOMS", "# g6-noms", 'GENERES_PAR_RECALC = ("STATE.md", "INDEX.md")  # g6-noms', "R-G6-02", controle_g6_02),
         ("CANG-OBS", "# canary-observation", "if True:  # canary-observation", "R-CANG-03", controle_cang_03,
          "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF"),
+        # 45-05 : identité, F6, F7b
+        ("ID-SAMEFILE", "# g6-samefile", "if False:  # g6-samefile", "R-ID-01", controle_id_01),
+        ("ID-SAMEFILE-G5", "# g5-samefile", "if False:  # g5-samefile", "R-ID-02", controle_id_02),
+        ("ID-CASEFOLD", "# id-casefold", "if a_la_racine and nom in [n for n, _g in PROTEGES_G6.values()]:  # id-casefold",
+         "R-ID-01", controle_id_01),
+        ("F6", "# g6-adhesion", "return None  # g6-adhesion", "R-ID-03", controle_id_03),
+        ("F7B", "# g6-noms", 'GENERES_PAR_RECALC = ("STATE.md", "INDEX.md", "cloture.log")  # g6-noms', "R-ID-04", controle_id_04),
     ]
     for entree in M:
         ident, motif, repl, cible, ctrl = entree[:5]
@@ -1776,6 +1953,7 @@ SECTIONS = {
     "g2": sec_g2,
     "g5": sec_g5,
     "g6": sec_g6,
+    "id": sec_id,
     "cang": sec_cang,
     "env": sec_env,
     "obs_env": sec_obs_env,
@@ -1822,7 +2000,7 @@ run_sections() { # <sections séparées par des virgules>
 [ -f "$BANC" ] || ko "gates-banc.txt présent" "le banc texte existe sous fixtures/" "$BANC" "absent"
 [ -f "$RECALC" ] || ko "recalc-planning.sh présent" "le moteur de recalcul existe à côté du hook (contrôle croisé du parseur)" "$RECALC" "absent"
 
-run_sections table,parseur,jeton,g2,g5,g6,cang,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
+run_sections table,parseur,jeton,g2,g5,g6,id,cang,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

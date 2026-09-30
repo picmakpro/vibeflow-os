@@ -44,8 +44,11 @@
 # Fichier d'attendus : lignes `<gate> | <lab affiché> | <chemin relatif> | <attendu> | <motif>`,
 # commentaires `#` ; une ligne dont le lab n'est pas dans cette mesure est ignorée.
 # Registre CONSTRUCTEURS (gate -> fonction(lab, ctx) qui rend des tuples (outil, chemin, attendu,
-# agent_type[, origine])) : `reecriture` (chaque fichier régulier des .planning/ copiés, attendu
-# doit-passer) ; 45-05 à 45-09 ajoutent le leur. Un constructeur qui classe d'après le modèle porte
+# agent_type[, origine[, charge]])) : `reecriture` (chaque fichier régulier des .planning/ copiés, attendu
+# doit-passer) ; `G6` et `G5` (45-05 : fichiers générés, config.json, VERDICT.md) ; 45-06 à 45-09
+# ajoutent le leur. `charge` (dict) remplace le tool_input d'un Edit (old_string, new_string,
+# replace_all) : l'Edit de config.json qui perd l'adhésion a une clé (outil Edit) distincte de celle de
+# la réécriture Write du même fichier. Un constructeur qui classe d'après le modèle porte
 # l'attribut `classe_modele` ; il est TOTAL (P45-D-21c) : une écriture sans attendu, ou hors des
 # trois valeurs, est une erreur — jamais un doit-passer implicite. `origine` = `regle-ecrite` marque
 # une classification par la règle écrite du modèle faute d'état dérivé.
@@ -300,21 +303,58 @@ def construire_reecriture(lab, ctx):
     return [("Write", rel, "doit-passer", "") for rel in lab.fichiers_planning]
 
 
-CONSTRUCTEURS = {"reecriture": construire_reecriture}
+# Noms que G6 protège à la racine du dossier de planning (le même périmètre que le hook : fichiers
+# générés, journal de dérogation, cache du recalcul) ; le contrôle de l'adhésion porte sur config.json.
+NOMS_G6 = ("STATE.md", "INDEX.md", "cloture.log", "derogations-gates.log", ".recalc-cache.json")
+CHARGE_ADHESION_PERDUE = {"old_string": '"' + SCHEMA_ADHESION + '"', "new_string": '"2.0"'}
+
+
+def construire_g6(lab, ctx):
+    """G6 (45-05) : pour chaque dossier de planning copié, doit-refuser la réécriture de chaque fichier
+    protégé présent et la création de chaque nom protégé absent (une seule clé par nom : elle prime sur
+    la réécriture générique) ; config.json réécrit à l'identique (adhésion simulée) doit passer, le même
+    fichier dont planning_version devient 2.0 (Edit) doit être refusé (F6)."""
+    sortie = []
+    for rel in lab.dossiers_planning:
+        for nom in NOMS_G6:
+            sortie.append(("Write", rel + "/" + nom, "doit-refuser", ""))
+        sortie.append(("Write", rel + "/config.json", "doit-passer", ""))
+        sortie.append(("Edit", rel + "/config.json", "doit-refuser", "", "etat-derive", CHARGE_ADHESION_PERDUE))
+    return sortie
+
+
+def construire_g5(lab, ctx):
+    """G5 (45-05) : doit-refuser l'écriture d'un VERDICT.md à côté de chaque PLAN.md copié, et la
+    réécriture de chaque VERDICT.md copié (le modèle l'interdit pour tout lab)."""
+    chemins = set()
+    for rel in lab.fichiers_planning:
+        nom = rel.split("/")[-1]
+        if nom == "PLAN.md":
+            chemins.add(os.path.dirname(rel) + "/VERDICT.md")
+        elif nom.casefold() == "verdict.md":
+            chemins.add(rel)
+    return [("Write", rel, "doit-refuser", "") for rel in sorted(chemins)]
+
+
+CONSTRUCTEURS = {"reecriture": construire_reecriture, "G6": construire_g6, "G5": construire_g5}  # rejeu-registre
 
 
 def normaliser(lab, gate, brut, rang):
     """Un tuple de constructeur -> dict d'entrée ; la classification est TOTALE (P45-D-21c)."""
-    if not isinstance(brut, (tuple, list)) or len(brut) not in (4, 5):
+    if not isinstance(brut, (tuple, list)) or len(brut) not in (4, 5, 6):
         raise ErreurOutil("écriture mal formée rendue par le constructeur " + gate)
     outil, chemin, attendu, agent_type = brut[:4]
-    origine = brut[4] if len(brut) == 5 else "etat-derive"
+    origine = brut[4] if len(brut) >= 5 else "etat-derive"
+    charge = brut[5] if len(brut) == 6 else None
+    if charge is not None and not isinstance(charge, dict):
+        raise ErreurOutil("charge mal formée rendue par le constructeur " + gate)
     cle = clef(outil, chemin, agent_type or "")
     if attendu not in VALEURS_ATTENDU:
         raise ErreurOutil("classification absente : " + montrer_clef(cle))  # rejeu-total
     if origine not in ORIGINES:
         raise ErreurOutil("origine inconnue : " + str(origine) + " pour " + montrer_clef(cle))
-    return {"lab": lab.index, "clef": cle, "attendu": attendu, "origine": origine, "gate": gate, "rang": rang}
+    return {"lab": lab.index, "clef": cle, "attendu": attendu, "origine": origine, "gate": gate, "rang": rang,
+            "charge": charge}
 
 
 def lire_attendus(chemin, labs):
@@ -363,7 +403,7 @@ def fusionner(entrees):
 
 
 # --- Rejeu d'une écriture -------------------------------------------------------------------------
-def payload(lab, outil, chemin, agent_type):
+def payload(lab, outil, chemin, agent_type, charge=None):
     absolu = os.path.join(lab.copie, chemin) if chemin else lab.copie
     contenu = "x"
     if outil in ("Write", "Edit", "NotebookEdit") and os.path.isfile(absolu):
@@ -378,6 +418,8 @@ def payload(lab, outil, chemin, agent_type):
         entree = {"command": chemin}
     elif outil == "NotebookEdit":
         entree = {"notebook_path": absolu, "new_source": contenu}
+    elif outil == "Edit" and charge is not None:
+        entree = dict(charge, file_path=absolu)
     elif outil == "Edit":
         entree = {"file_path": absolu, "old_string": "", "new_string": contenu}
     else:
@@ -394,11 +436,11 @@ def payload(lab, outil, chemin, agent_type):
     return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
-def jouer(hook_copie, env, lab, outil, chemin, agent_type):
+def jouer(hook_copie, env, lab, outil, chemin, agent_type, charge=None):
     """('passe'|'refus', raison) : un refus est un permissionDecision deny ; un code non nul ou une
     sortie illisible vaut refus (la commande enregistrée fermerait, P45-D-06)."""
     try:
-        p = subprocess.run(["bash", hook_copie], input=payload(lab, outil, chemin, agent_type),
+        p = subprocess.run(["bash", hook_copie], input=payload(lab, outil, chemin, agent_type, charge),
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=lab.copie,
                            timeout=DELAI_HOOK)
     except (subprocess.TimeoutExpired, OSError) as exc:
@@ -517,7 +559,7 @@ def executer(opts, tmp):
            "TMPDIR": tmp, "XDG_CACHE_HOME": os.path.join(tmp, "xdg")}
     os.makedirs(env["XDG_CACHE_HOME"], exist_ok=True)
     with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 2)) as pool:
-        verdicts = list(pool.map(lambda e: jouer(hook_copie, env, labs[e["lab"]], *e["clef"]), gagnants))
+        verdicts = list(pool.map(lambda e: jouer(hook_copie, env, labs[e["lab"]], *e["clef"], e["charge"]), gagnants))
 
     comptes = {}
     lignes = []

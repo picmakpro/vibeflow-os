@@ -734,17 +734,54 @@ def evaluer_g5(contexte):
     """G5 (P45-D-07, P45-D-11) : toute écriture par Write, Edit ou NotebookEdit d'un fichier dont le
     nom, casse ignorée, est VERDICT.md, sous le `.planning/` d'un lab adhérent, est un verdict de G5 —
     quel que soit le rôle (fil principal et agent inconnu compris). Le chemin est résolu physiquement.
-    Seule la commande poser-verdict.sh (lancée par Bash, jamais vue ici) pose un VERDICT.md."""
+    Seule la commande poser-verdict.sh (lancée par Bash, jamais vue ici) pose un VERDICT.md. Identité
+    (45-05, Pattern 5) : un fichier existant lié en dur à un VERDICT.md du dossier de planning, sous
+    un autre nom, est ce VERDICT.md."""
     racine = contexte["racine"]  # g5-sonde
     if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
         return []
     rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
     composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
-    if not composants or composants[0].casefold() != ".planning":  # g5-perimetre
-        return []
-    if composants[-1].casefold() != NOM_VERDICT:  # g5-casse
-        return []
+    if not _lien_dur_vers_verdict(contexte["ecrit"], racine):  # g5-identite
+        if not composants or composants[0].casefold() != ".planning":  # g5-perimetre
+            return []
+        if composants[-1].casefold() != NOM_VERDICT:  # g5-casse
+            return []
     return [Verdict("G5", "/".join(composants), RAISON_G5)]
+
+
+def _verdicts_du_planning(planning):
+    """Chemins des VERDICT.md (casse ignorée) sous `planning` : parcours trié, liens de dossier non suivis,
+    borné à BORNE_PARCOURS_VERDICTS entrées."""
+    trouves, vus = [], 0
+    for dossier, sous_dossiers, fichiers in os.walk(planning, followlinks=False):
+        sous_dossiers.sort()
+        for nom in sorted(fichiers):
+            vus += 1
+            if vus > BORNE_PARCOURS_VERDICTS:
+                return trouves
+            if nom.casefold() == NOM_VERDICT:
+                trouves.append(os.path.join(dossier, nom))
+    return trouves
+
+
+def _lien_dur_vers_verdict(ecrit, racine):
+    """Vrai si `ecrit` est un fichier régulier existant, lié en dur (st_nlink > 1), qui est le même fichier
+    qu'un VERDICT.md du dossier de planning."""
+    try:
+        cible = os.path.realpath(ecrit)
+        etat = os.stat(cible)
+    except OSError:
+        return False
+    if not stat.S_ISREG(etat.st_mode) or etat.st_nlink <= 1:
+        return False
+    for verdict in _verdicts_du_planning(os.path.realpath(os.path.join(racine, ".planning"))):
+        try:
+            if os.path.samefile(cible, verdict):  # g5-samefile
+                return True
+        except OSError:
+            continue
+    return False
 
 
 # --- G6 : fichiers générés, posés par le moteur de recalcul ou par la commande de dérogation (45-05) -
@@ -752,9 +789,21 @@ def evaluer_g5(contexte):
 # de planning d'un lab adhérent, est un verdict de G6, quel que soit le rôle. Les fichiers de
 # compartiment (workstreams, compartments) et tout fichier plus profond ne sont pas visés (P45-D-13,
 # Pitfall 9). Le motif dit par quelle commande poser le fichier : le Stop de la 44 invite à mettre à
-# jour l'état, le refus ne doit pas le contredire.
-GENERES_PAR_RECALC = ("STATE.md", "INDEX.md", "cloture.log")  # g6-noms
-PROTEGES_G6 = dict([(nom.casefold(), (nom, "recalc")) for nom in GENERES_PAR_RECALC] + [(NOM_JOURNAL_DEROGATIONS.casefold(), (NOM_JOURNAL_DEROGATIONS, "derog"))])
+# jour l'état, le refus ne doit pas le contredire. Le cache du recalcul est protégé (F7b = f7b-oui, Willy,
+# AskUserQuestion session principale, 2026-09-30) ; config.json l'est pour l'adhésion seulement (F6 =
+# f6-oui, même canal, même date) : une écriture qui change ou retire planning_version désarmerait tous
+# les gates (P45-D-01), les autres clés restent libres.
+GENERES_PAR_RECALC = ("STATE.md", "INDEX.md", "cloture.log", ".recalc-cache.json")  # g6-noms
+NOM_CONFIG = "config.json"
+PROTEGES_G6 = dict([(nom.casefold(), (nom, "recalc")) for nom in GENERES_PAR_RECALC]
+                   + [(NOM_JOURNAL_DEROGATIONS.casefold(), (NOM_JOURNAL_DEROGATIONS, "derog")),
+                      (NOM_CONFIG.casefold(), (NOM_CONFIG, "adhesion"))])
+RAISON_ADHESION = ("config.json : changer ou retirer l'adhésion cycles-v1 désarmerait les gates (P45-D-01) ; "
+                   "une écriture par outil doit garder planning_version = cycles-v1")
+RAISON_ADHESION_INVERIFIABLE = ("config.json : cette écriture par outil ne permet pas de vérifier que l'adhésion cycles-v1 "
+                                "est conservée (Edit inapplicable au contenu actuel, NotebookEdit, contenu illisible) ; "
+                                "refusée par précaution (P45-D-01)")
+BORNE_PARCOURS_VERDICTS = 20000
 
 
 def raison_g6(nom, genre):
@@ -765,20 +814,94 @@ def raison_g6(nom, genre):
             "recalculez par recalc-planning.sh" % nom)
 
 
+# Identité (Pattern 5) : G6 et G5 comparent des fichiers, pas des chaînes. Une cible EXISTANTE se compare
+# par `os.path.samefile` (lien dur, variante de casse du disque, alias du dossier de planning), une
+# création par le dossier parent résolu physiquement et le nom passé en casefold ; `..` et les liens de
+# dossier sont résolus par realpath avant toute comparaison.
+def _meme_dossier(a, b):
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return a.casefold() == b.casefold()
+
+
+def fichier_protege(ecrit, racine):
+    """(nom canonique, genre) du fichier protégé de G6 que `ecrit` désigne, ou None."""
+    planning = os.path.realpath(os.path.join(racine, ".planning"))
+    cible = os.path.realpath(ecrit)
+    parent, nom = os.path.split(cible)
+    a_la_racine = _meme_dossier(parent, planning)  # g6-racine
+    if a_la_racine and nom.casefold() in PROTEGES_G6:  # id-casefold
+        return PROTEGES_G6[nom.casefold()]
+    if os.path.lexists(cible):
+        try:
+            entrees = sorted(os.listdir(planning))
+        except OSError:
+            entrees = []
+        for entree in entrees:
+            if entree.casefold() not in PROTEGES_G6:
+                continue
+            try:
+                if os.path.samefile(cible, os.path.join(planning, entree)):  # g6-samefile
+                    return PROTEGES_G6[entree.casefold()]
+            except OSError:
+                continue
+    return None
+
+
+def _appliquer_edit(cible, entree):
+    """Contenu de `cible` après l'Edit, ou None si l'Edit ne s'applique pas au contenu actuel (old_string
+    vide, absent, ou ambigu sans replace_all) : l'effet sur l'adhésion serait invérifiable."""
+    ancien, nouveau = entree.get("old_string"), entree.get("new_string")
+    if not isinstance(ancien, str) or not isinstance(nouveau, str) or ancien == "":
+        return None
+    try:
+        descripteur = os.open(cible, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        with os.fdopen(descripteur, "r", encoding="utf-8") as fh:
+            courant = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return None
+    n = courant.count(ancien)
+    if entree.get("replace_all") is True:
+        return courant.replace(ancien, nouveau) if n > 0 else None
+    return courant.replace(ancien, nouveau, 1) if n == 1 else None
+
+
+def _texte_adherent(texte):
+    try:
+        donnees = json.loads(texte)
+    except ValueError:
+        return False
+    return isinstance(donnees, dict) and isinstance(donnees.get("planning_version"), str) \
+        and donnees["planning_version"] == SCHEMA_ADHESION
+
+
+def adhesion_conservee(contexte, cible):
+    """None si l'écriture proposée laisse planning_version = cycles-v1 ; sinon la raison du refus (F6)."""
+    entree = contexte["payload"].get("tool_input")
+    if contexte["outil"] == "NotebookEdit" or not isinstance(entree, dict):
+        return RAISON_ADHESION_INVERIFIABLE
+    texte = entree.get("content") if contexte["outil"] == "Write" else _appliquer_edit(cible, entree)
+    if not isinstance(texte, str):
+        return RAISON_ADHESION_INVERIFIABLE
+    return None if _texte_adherent(texte) else RAISON_ADHESION  # g6-adhesion
+
+
 def evaluer_g6(contexte):
-    """G6 (GATE-04, P45-D-13) : écriture par outil d'un fichier généré situé directement à la racine du
-    dossier de planning d'un lab adhérent. Chemin résolu physiquement, noms comparés casse ignorée."""
-    racine = contexte["racine"]
+    """G6 (GATE-04, P45-D-13 ; F6 et F7b) : écriture par outil d'un fichier généré situé directement à la
+    racine du dossier de planning d'un lab adhérent, ou d'un config.json qui perdrait l'adhésion. Seule
+    lecture de config.json : le contenu que l'Edit produirait (P45-D-01)."""
     if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
         return []
-    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
-    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
-    if len(composants) != 2 or composants[0].casefold() != ".planning":  # g6-racine
-        return []
-    trouve = PROTEGES_G6.get(composants[-1].casefold())
+    trouve = fichier_protege(contexte["ecrit"], contexte["racine"])
     if trouve is None:
         return []
-    return [Verdict("G6", ".planning/" + trouve[0], raison_g6(*trouve))]
+    nom, genre = trouve
+    chemin_rel = ".planning/" + nom
+    if genre != "adhesion":
+        return [Verdict("G6", chemin_rel, raison_g6(nom, genre))]
+    raison = adhesion_conservee(contexte, os.path.realpath(contexte["ecrit"]))
+    return [] if raison is None else [Verdict("G6", chemin_rel, raison)]
 
 
 # Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un
