@@ -613,3 +613,182 @@ m
 @@ # Jumeau négatif : un lab dev crée ses plannings imbriqués à la main, même sur copie armée.
 @@ ecriture Write zone/nu/.planning/config.json armee :: silence G7
 @@ ecriture NotebookEdit zone/nu/.planning/x.ipynb armee :: silence G7
+
+@@ # --- ROLE (45-08, GATE-09, P45-D-04, P45-D-05, P45-D-05b, P45-D-11) : le hook par rôle dérive le rôle de l'agent écrivain de sa
+@@ # définition sous `.claude/agents/` du lab (agent_type = name: du frontmatter, à défaut le nom de fichier ; comparaison
+@@ # normalisée : casse, `_`, espace et `-`). Même option `armee` : le rôle reste en observation dans le script livré tant que
+@@ # le rejeu réel n'a pas armé l'étape 4. Agents du lab : juge-test (juge), Juge_Mixte (juge, name: en casse mixte), sans-nom
+@@ # (juge, sans name:), double (juge, le compte en définit un producteur dans la suite), ambigu-a et ambigu-b (deux définitions
+@@ # de rôles différents sous le même name: : inconnu), abime (frontmatter jamais refermé : illisible), manager-test (manager),
+@@ # producteur-test (producteur), worker-vide (worker sans allowlist), worker-liste et worker-task (workers dont l'allowlist
+@@ # contient vf-crafter, écrite Agent(...) puis Task(...)). G2 avertit sur un livrable hors ecrit: : un doit-passer l'accepte.
+@@ lab role-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .claude/agents/juge-test.md
+---
+name: juge-test
+description: Juge du banc du rôle
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+vf-internal: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/juge-mixte.md
+---
+name: Juge_Mixte
+description: Juge du banc du rôle, name: en casse mixte
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/sans-nom.md
+---
+description: Juge du banc du rôle, sans name:
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/double.md
+---
+name: double
+description: Juge du lab, homonyme d'un producteur du compte
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/ambigu-a.md
+---
+name: ambigu
+description: Première définition contradictoire (juge)
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+Corps.
+
+@@ fichier .claude/agents/ambigu-b.md
+---
+name: ambigu
+description: Seconde définition contradictoire (producteur)
+tools: Read, Write
+---
+Corps.
+
+@@ fichier .claude/agents/abime.md
+---
+name: abime
+description: frontmatter jamais refermé
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+
+@@ fichier .claude/agents/manager-test.md
+---
+name: manager-test
+description: Manager du banc du rôle
+tools: Read, Write, SendMessage, Agent(worker-liste, vf-crafter)
+---
+Corps du manager.
+
+@@ fichier .claude/agents/producteur-test.md
+---
+name: producteur-test
+description: Producteur du banc du rôle
+tools: Read, Write
+---
+Corps du producteur.
+
+@@ fichier .claude/agents/worker-vide.md
+---
+name: worker-vide
+description: Worker interne du banc du rôle, sans allowlist
+tools: Read, Write
+vf-internal: true
+---
+Corps du worker.
+
+@@ fichier .claude/agents/worker-liste.md
+---
+name: worker-liste
+description: Worker interne du banc du rôle, allowlist Agent(...)
+tools: Read, Write, Agent(vf-crafter, autre-agent)
+vf-internal: true
+---
+Corps du worker.
+
+@@ fichier .claude/agents/worker-task.md
+---
+name: worker-task
+description: Worker interne du banc du rôle, allowlist Task(...)
+tools: Read, Write, Task(vf-crafter)
+vf-internal: true
+---
+Corps du worker.
+
+@@ # Refus : toute écriture par outil d'un juge du lab — Write, Edit, NotebookEdit, toute casse (normalisation), name: en casse mixte,
+@@ # nom de fichier en repli, le juge du lab qui masque un producteur du compte.
+@@ ecriture Write livrables/x.md agent=juge-test armee :: doit-refuser ROLE
+@@ ecriture Edit livrables/x.md agent=juge-test armee :: doit-refuser ROLE
+@@ ecriture NotebookEdit livrables/x.ipynb agent=juge-test armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=Juge_Test armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=JUGE-TEST armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=juge-mixte armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=sans-nom armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=double armee :: doit-refuser ROLE
+@@ ecriture Write .planning/notes.md agent=juge-test armee :: doit-refuser ROLE
+@@ # Passage : fil principal, agent inconnu, agent de plugin non résolu, manager, producteur, workers, définitions ambiguë et illisible
+@@ # (un agent dont la définition n'est pas trouvée n'est pas traité en juge : limite déclarée, P45-D-11).
+@@ ecriture Write livrables/x.md armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=agent-inconnu armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=plugin-x:agent-y armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=manager-test armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=producteur-test armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=worker-vide armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=worker-liste armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=worker-task armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=ambigu armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=abime armee :: doit-passer ROLE
+@@ ecriture Bash - agent=juge-test armee commande=cat livrables/x.md :: doit-passer ROLE
+
+@@ lab role-dev jumeau-de=role-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .claude/agents/juge-test.md
+---
+name: juge-test
+description: Juge du banc du rôle
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+vf-internal: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/worker-vide.md
+---
+name: worker-vide
+description: Worker interne du banc du rôle, sans allowlist
+tools: Read, Write
+vf-internal: true
+---
+Corps du worker.
+
+@@ # Jumeau négatif : un lab dev, ce dépôt compris, reste silencieux pour tout rôle, même sur copie armée (P45-D-04).
+@@ ecriture Write livrables/x.md agent=juge-test armee :: silence ROLE
+@@ ecriture Edit livrables/x.md agent=juge-test armee :: silence ROLE
+@@ ecriture NotebookEdit livrables/x.ipynb agent=juge-test armee :: silence ROLE
+@@ ecriture Write livrables/x.md agent=worker-vide armee :: silence ROLE
+@@ ecriture Write livrables/x.md armee :: silence ROLE
+@@ ecriture Bash - agent=juge-test armee commande=cat livrables/x.md :: silence ROLE

@@ -24,17 +24,30 @@
 #
 # Aucune variable d'environnement ne change l'armement ni l'adhésion (P45-D-12a) : le lanceur lit
 # TMPDIR pour choisir où poser son fichier de transport, XDG_CACHE_HOME puis HOME pour les passer en
-# arguments au cœur, qui s'en sert pour le seul chemin du journal d'observation — chacune choisit un
-# chemin, jamais une décision (décisions du manager vf-dev-manager, 2026-09-30 : amendement de R-ENV-02).
+# arguments au cœur — chacune choisit un CHEMIN, jamais une décision (décisions du manager
+# vf-dev-manager, 2026-09-30 : amendement de R-ENV-02). XDG_CACHE_HOME ne sert qu'au chemin du journal
+# d'observation ; HOME sert à DEUX chemins et à eux seuls : le repli du journal (`<HOME>/.cache/...`) et
+# la racine de résolution des agents du COMPTE (`<HOME>/.claude/agents/`, puis `<HOME>/.claude/plugins/`
+# pour un agent de plugin, P45-D-05b ; amendement du manager du 2026-09-30, plan 45-08). Un HOME différent
+# change la résolution d'un agent du compte, jamais l'adhésion ni l'état d'armement.
 # Le cœur Python ne lit AUCUNE variable d'environnement (ni os.environ, ni expanduser, ni expandvars).
 #
-# Arguments du cœur Python (positions fixes, sys.argv) : [1] fichier de transport du payload,
-# [2] valeur de XDG_CACHE_HOME (chaîne vide si non définie), [3] valeur de HOME (idem).
+# Arguments du cœur Python (positions fixes, sys.argv) : [1] fichier de transport du payload (ou, en mode
+# diagnostic, la définition d'agent à classer), [2] valeur de XDG_CACHE_HOME (chaîne vide si non définie),
+# [3] valeur de HOME (idem), [4] `--classer` en mode diagnostic, vide sinon.
+#
+# Mode de diagnostic (45-08) : `planning-hook.sh --classer <agent.md>` imprime UNE ligne JSON
+# {"role": …, "allowlist": […], "disallowed": […]} et rend 0, sans lire stdin ni rien décider. La commande
+# enregistrée ne passe jamais d'argument : le chemin de décision est inchangé.
 set -u
 
-T="$(mktemp "${TMPDIR:-/tmp}/vf-planning-hook.XXXXXX")" || exit 70
-trap 'rm -f "$T"' EXIT
-cat > "$T" || exit 71
+if [ "${1:-}" = "--classer" ]; then
+  T="${2:-}"
+else
+  T="$(mktemp "${TMPDIR:-/tmp}/vf-planning-hook.XXXXXX")" || exit 70
+  trap 'rm -f "$T"' EXIT
+  cat > "$T" || exit 71
+fi
 
 # Résolution de l'interpréteur (ADR-054) : stub Microsoft Store détecté par chemin, repli python.
 PYBIN=python3
@@ -48,7 +61,7 @@ case "$(command -v python3 2>/dev/null)" in
     ;;
 esac
 
-"$PYBIN" -I -S - "$T" "${XDG_CACHE_HOME:-}" "${HOME:-}" <<'PY_PLANNING_HOOK_EOF'
+"$PYBIN" -I -S - "$T" "${XDG_CACHE_HOME:-}" "${HOME:-}" "${1:-}" <<'PY_PLANNING_HOOK_EOF'
 import collections
 import datetime
 import json
@@ -1098,9 +1111,366 @@ def evaluer_g7(contexte):
                                                  "marqueur de projet de code — sinon ce planning serait orphelin (spec D-05)" % x_rel)]
 
 
+# --- Rôle de l'agent écrivain (GATE-09, 45-08 ; P45-D-05, P45-D-05a, P45-D-05b, P45-D-09, P45-D-11) ------------
+# Le rôle se DÉRIVE de la définition de l'agent (son frontmatter), par les prédicats de check-agents.sh :
+# juge = I5 (disallowedTools retire Write ET Edit, aucune allowlist Agent(...)/Task(...) non vide) ; manager = I6
+# (allowlist non vide, vf-internal ne vaut pas true) ; worker = vf-internal: true et pas juge ; producteur = tout
+# autre agent résolu. Aucun champ `vf-role:`, aucune table centrale.
+# Choix du planificateur (P45-D-05a) : RÉIMPLÉMENTATION, pas d'appel de check-agents.sh — planning-core ne dépend
+# d'aucun module (module.json requires []), un lab qui l'installe seul n'a pas ce script, et un appel par écriture
+# coûterait un processus de plus. Le contrôle croisé scripts/tests/test-role-hook-vs-check-agents.sh compare ce
+# code à l'oracle sur tout le corpus d'agents du dépôt et sur des fixtures adverses, et peut rougir. Les fonctions
+# portent le suffixe `_agent` : elles ne se confondent pas avec le parseur de frontmatter du modèle de la 44.
+# Le tokenizer est celui de check-agents.sh : découpage à PROFONDEUR DE PARENTHÈSES, jamais un split sur la virgule.
+AGENT_TOOL_NAMES = ("Agent", "Task")
+_CLE_AGENT_RE = re.compile(r"^([A-Za-z_-]+):\s*(.*)$")
+
+
+def frontmatter_agent(texte):
+    """Dictionnaire du frontmatter d'une définition d'agent, ou None si absent ou jamais refermé. Même
+    sémantique que `parse_frontmatter` de check-agents.sh (scalaire dé-quoté, liste en ligne, puces YAML,
+    continuation indentée) : `name:` et `vf-internal:` se lisent ici."""
+    lignes = texte.split("\n")
+    if not lignes or lignes[0].strip() != "---":
+        return None
+    fm, i, cle = {}, 1, None
+    while i < len(lignes):
+        ligne = lignes[i]
+        if ligne.strip() == "---":
+            return fm
+        m = _CLE_AGENT_RE.match(ligne)
+        if m:
+            cle = m.group(1)
+            val = m.group(2).strip()
+            if val.startswith("[") and val.endswith("]"):
+                fm[cle] = [x.strip().strip(chr(34)).strip(chr(39)) for x in val[1:-1].split(",") if x.strip()]
+            elif val == "" or val == ">" or val == "|":
+                fm[cle] = "" if val == "" else val
+            else:
+                if len(val) >= 2 and val[0] == val[-1] and val[0] in (chr(34), chr(39)):
+                    val = val[1:-1]
+                fm[cle] = val
+        elif cle is not None:
+            item = re.match(r"^\s+-\s+(.+?)(\s+#.*)?$", ligne)
+            if item and isinstance(fm.get(cle), list):
+                fm[cle].append(item.group(1).strip().strip(chr(34)).strip(chr(39)))
+            elif item and fm.get(cle) == "":
+                fm[cle] = [item.group(1).strip().strip(chr(34)).strip(chr(39))]
+            elif ligne.startswith("  ") and isinstance(fm.get(cle), str):
+                fm[cle] = (fm[cle] + " " + ligne.strip()).strip()
+        i += 1
+    return None
+
+
+def lignes_frontmatter_agent(texte):
+    """Lignes BRUTES entre les deux `---` (la re-tokenisation des allowlists repart de la ligne source), ou None."""
+    lignes = texte.split("\n")
+    if not lignes or lignes[0].strip() != "---":
+        return None
+    for idx in range(1, len(lignes)):
+        if lignes[idx].strip() == "---":
+            return lignes[1:idx]
+    return None
+
+
+def champ_brut_agent(lignes, cle):
+    """(mode, brut) d'un champ tools:/disallowedTools: : `block` (brut = liste de jetons, puces YAML), `flow` ou
+    `scalar` (brut = chaîne à re-tokeniser), (None, None) si la clé est absente. Même lecture de la continuation
+    que `extract_raw_field` de check-agents.sh (ligne indentée d'au moins deux espaces ; une ligne vide ou
+    non-puce est tolérée au milieu d'un bloc, seule une nouvelle clé le ferme)."""
+    if lignes is None:
+        return None, None
+    n = len(lignes)
+    for idx in range(n):
+        m = _CLE_AGENT_RE.match(lignes[idx])
+        if not (m and m.group(1) == cle):
+            continue
+        val = m.group(2).strip()
+        k = idx + 1
+        if val == "":
+            puces = []
+            while k < n:
+                if _CLE_AGENT_RE.match(lignes[k]):
+                    break
+                item = re.match(r"^\s+-\s+(.+?)(\s+#.*)?$", lignes[k])
+                if item:
+                    puces.append(item.group(1).strip())
+                k += 1
+            if puces:
+                return "block", puces
+            parts = []
+            while k < n and lignes[k].startswith("  ") and lignes[k].strip() and not _CLE_AGENT_RE.match(lignes[k]):
+                parts.append(lignes[k].strip())
+                k += 1
+            return "scalar", " ".join(parts)
+        parts = [val]
+        while k < n and lignes[k].startswith("  ") and lignes[k].strip() and not _CLE_AGENT_RE.match(lignes[k]):
+            parts.append(lignes[k].strip())
+            k += 1
+        brut = " ".join(parts).strip()
+        if brut.startswith("["):
+            return "flow", brut
+        return "scalar", brut
+    return None, None
+
+
+def decouper_profondeur_agent(brut):
+    """(jetons, profondeur) : découpage aux virgules de profondeur de parenthèses NULLE, jamais un split(',') naïf
+    — c'est ce qui laisse `Agent(a, b)` intact comme UN jeton. Profondeur = solde ouvertures - fermetures."""
+    jetons, profondeur, courant = [], 0, []
+    for ch in brut:
+        if ch == "(":
+            profondeur += 1
+            courant.append(ch)
+        elif ch == ")":
+            profondeur -= 1
+            courant.append(ch)
+        elif ch == "," and profondeur == 0:  # role-virgule
+            jetons.append("".join(courant))
+            courant = []
+        else:
+            courant.append(ch)
+    jetons.append("".join(courant))
+    return jetons, profondeur
+
+
+def jetons_agent(mode, brut):
+    """(jetons, profondeur) d'un champ : `block` = jetons déjà isolés (dé-quotés un à un) ; `flow` et `scalar` :
+    dé-quotage d'UNE paire englobante, crochets retirés, puis découpage à profondeur de parenthèses."""
+    def sans_guillemets(s):
+        return s[1:-1] if len(s) >= 2 and s[0] == s[-1] and s[0] in (chr(34), chr(39)) else s
+    if mode == "block":
+        return [sans_guillemets(t) for t in brut], 0
+    s = sans_guillemets(brut.strip())
+    if s.startswith("[") and s.endswith("]"):
+        s = s[1:-1]
+    return decouper_profondeur_agent(s)
+
+
+def jeton_agent(brut):
+    """(outil, noms d'agents, message) d'UN jeton d'allowlist : noms None sans parenthèses, [] pour `Agent()` ; un
+    message non None (syntaxe) interdit au jeton d'entrer dans une allowlist (`parse_token` de check-agents.sh)."""
+    tok = brut.strip()
+    if tok == "":
+        return None, None, "entrée d'allowlist vide"
+    if re.match(r"^(\S+)\s+\(", tok):
+        return None, None, "espace avant la parenthèse"
+    m = re.match(r"^([A-Za-z0-9_-]+)\((.*)$", tok, re.S)
+    if not m:
+        if not (re.fullmatch(r"[A-Za-z0-9_-]+", tok) or re.fullmatch(r"mcp__[A-Za-z0-9_-]+__[*]", tok)):
+            return None, None, "jeton hors charset"
+        return tok, None, None
+    nom, reste = m.group(1), m.group(2)
+    if not reste.endswith(")"):
+        return nom, None, "parenthèse non fermée"
+    interieur = reste[:-1]
+    if interieur.strip() == "":
+        return nom, [], "allowlist vide"
+    noms = [a.strip() for a in interieur.split(",") if a.strip() != ""]
+    if len(noms) != len(interieur.split(",")):
+        return nom, noms, "entrée vide dans l'allowlist"
+    return nom, noms, None
+
+
+def allowlist_agent(lignes):
+    """Noms d'agents des jetons `Agent(...)` et `Task(...)` de `tools:` (union), liste vide si le champ est absent
+    ou si la profondeur de parenthèses n'est pas nulle (`allowlist_agents` de check-agents.sh)."""
+    mode, brut = champ_brut_agent(lignes, "tools")
+    if mode is None:
+        return []
+    jetons, profondeur = jetons_agent(mode, brut)
+    if profondeur != 0:
+        return []
+    dispatch = []
+    for jeton in jetons:
+        nom, noms, message = jeton_agent(jeton)
+        if message is not None or nom is None:
+            continue
+        if nom in AGENT_TOOL_NAMES and noms:
+            dispatch.extend(noms)
+    return dispatch
+
+
+def jetons_nus_agent(lignes, champ):
+    """Ensemble des jetons SANS parenthèse d'un champ ; vide si le champ est absent ou l'allowlist mal formée
+    (`bare_tokens` de check-agents.sh)."""
+    mode, brut = champ_brut_agent(lignes, champ)
+    if mode is None:
+        return set()
+    jetons, profondeur = jetons_agent(mode, brut)
+    if profondeur != 0:
+        return set()
+    return {t.strip() for t in jetons if t.strip() and "(" not in t}
+
+
+def deriver_role(texte):
+    """`juge` | `manager` | `worker` | `producteur` | `illisible` (frontmatter absent ou jamais refermé). I5 d'abord
+    (juge : Write ET Edit retirés, aucune allowlist), puis I6 (manager : allowlist non vide, pas vf-internal), puis
+    vf-internal: true (worker), sinon producteur (P45-D-05)."""
+    lignes = lignes_frontmatter_agent(texte)
+    fm = frontmatter_agent(texte)
+    if lignes is None or fm is None:
+        return "illisible"
+    liste = allowlist_agent(lignes)
+    interdits = jetons_nus_agent(lignes, "disallowedTools")
+    if "Write" in interdits and "Edit" in interdits and not liste:  # role-juge
+        return "juge"
+    interne = str(fm.get("vf-internal", "")) == "true"
+    if liste and not interne:  # role-manager
+        return "manager"
+    if interne:
+        return "worker"
+    return "producteur"
+
+
+def normaliser(nom):
+    """Normalisation écrite de P45-D-09 : casefold, puis `_`, espace et `-` unifiés (en `-`), des DEUX côtés d'une
+    comparaison ; égalité sur la chaîne entière, aucun préfixe `<plugin>:` retiré."""
+    return nom.casefold().replace("_", "-").replace(" ", "-")  # role-normaliser
+
+
+BORNE_AGENTS_PAR_DOSSIER = 1000
+BORNE_PARCOURS_PLUGINS = 20000
+PROFONDEUR_PLUGINS = 8
+
+
+def lire_definition_agent(chemin):
+    """(rôle, nom d'agent) d'une définition : `name:` du frontmatter, à défaut le nom de fichier (comme
+    `agent_display_name`, Pitfall 6) ; rôle `illisible` si le fichier ne se lit pas ou si le frontmatter est abîmé."""
+    repli = os.path.basename(chemin)[:-3]
+    try:
+        with open(chemin, encoding="utf-8-sig") as fh:
+            texte = fh.read()
+    except (OSError, UnicodeDecodeError):
+        return "illisible", repli
+    fm = frontmatter_agent(texte)
+    nom = fm.get("name") if isinstance(fm, dict) else None
+    return deriver_role(texte), (nom if isinstance(nom, str) and nom else repli)
+
+
+def definitions_dossier(dossier):
+    """{nom normalisé: [(rôle, chemin)]} des `*.md` RÉGULIERS directement sous `dossier` (glob : jamais un fichier
+    caché ; jamais un lien symbolique, comme check-agents.sh qui refuse un agent .md en lien — A1), parcours trié
+    et borné."""
+    res = {}
+    try:
+        noms = sorted(os.listdir(dossier))
+    except OSError:
+        return res
+    for nom in noms[:BORNE_AGENTS_PAR_DOSSIER]:
+        chemin = os.path.join(dossier, nom)
+        if not nom.endswith(".md") or nom.startswith(".") or not est_fichier_regulier(chemin):
+            continue
+        role, nom_agent = lire_definition_agent(chemin)
+        res.setdefault(normaliser(nom_agent), []).append((role, chemin))
+    return res
+
+
+def definitions_plugin(home, plugin):
+    """Définitions des dossiers `agents/` de `<home>/.claude/plugins/` dont le chemin contient un segment égal (après
+    normalisation) à `plugin` : parcours trié, liens de dossier non suivis, dossiers cachés et node_modules ignorés,
+    borné en nombre de dossiers et en profondeur. Disposition du cache mesurée en lecture seule (45-08) :
+    `plugins/cache/<marketplace>/<plugin>/<version>/<module>/agents/*.md`."""
+    base = os.path.join(home, ".claude", "plugins")
+    res, vus = {}, 0
+    for dossier, sous, _fichiers in os.walk(base, followlinks=False):
+        sous[:] = sorted(s for s in sous if not s.startswith(".") and s != "node_modules")
+        vus += 1
+        if vus > BORNE_PARCOURS_PLUGINS:
+            break
+        segments = os.path.relpath(dossier, base).split(os.sep)
+        if len(segments) > PROFONDEUR_PLUGINS:
+            sous[:] = []
+            continue
+        if segments[-1] == "agents" and any(normaliser(s) == plugin for s in segments[:-1]):
+            for cle, candidats in definitions_dossier(dossier).items():
+                res.setdefault(cle, []).extend(candidats)
+    return res
+
+
+def _choisir_definition(candidats):
+    """None si aucune définition ; (`inconnu`, None) si les définitions se contredisent (rôles différents) ;
+    sinon la première (rôle, chemin)."""
+    if not candidats:
+        return None
+    if len({role for role, _chemin in candidats}) > 1:
+        return ("inconnu", None)
+    return candidats[0]
+
+
+def resoudre_agent(agent_type, racine, home):
+    """(rôle, chemin de la définition) de l'agent, ou (`inconnu`, None). Ordre fin de P45-D-05b, le premier niveau
+    qui trouve gagne : `.claude/agents/` du lab, puis `<home>/.claude/agents/` (le compte), puis — pour un
+    `agent_type` de forme `<plugin>:<agent>` — les dossiers `agents/` du plugin sous `<home>/.claude/plugins/`.
+    `home` est l'argument passé par le lanceur (P45-D-12a) : ce code ne lit aucune variable d'environnement.
+    Indexation par `name:` (repli : nom de fichier), comparaison normalisée ; deux définitions de rôles
+    différents au même niveau : inconnu."""
+    cible = normaliser(agent_type)
+    avec_home = isinstance(home, str) and home.startswith("/")
+    dossier_lab = os.path.join(racine, ".claude", "agents")
+    dossier_compte = os.path.join(home, ".claude", "agents") if avec_home else None  # role-home
+    niveaux = [dossier_lab, dossier_compte]  # role-niveaux
+    for dossier in niveaux:
+        if dossier is None:
+            continue
+        trouve = _choisir_definition(definitions_dossier(dossier).get(cible))
+        if trouve is not None:
+            return trouve
+    plugin, separateur, agent = agent_type.partition(":")
+    if avec_home and separateur and plugin and agent:
+        trouve = _choisir_definition(definitions_plugin(home, normaliser(plugin)).get(normaliser(agent)))
+        if trouve is not None:
+            return trouve
+    return ("inconnu", None)
+
+
+RAISON_JUGE = ("%s est un juge — toute écriture par outil lui est refusée ; posez un verdict par poser-verdict.sh "
+               "(spec fabrique §5)")
+
+
+def evaluer_role(contexte):
+    """Ligne juge du hook par rôle (GATE-09). Un fil principal (agent_id absent), un agent_type inconnu, ambigu,
+    illisible ou de plugin non résolu ne reçoit JAMAIS de verdict de rôle : seulement la ligne « Tous » et G1, G5,
+    G6, G7 (P45-D-11, limite déclarée). Juge : toute écriture par Write, Edit ou NotebookEdit est un verdict (le
+    verdict se pose par poser-verdict.sh). La ligne producteur est couverte par G5 (P45-D-07), aucune règle en
+    double. Manager : aucune. La ligne worker est posée par la Tâche 3 du plan 45-08, après l'arbitrage F9."""
+    racine = contexte["racine"]  # role-sonde
+    outil = contexte["outil"]
+    if outil not in OUTILS_ECRITURE:
+        return []
+    payload = contexte["payload"]
+    agent_id, agent_type = payload.get("agent_id"), payload.get("agent_type")
+    avec_identite = isinstance(agent_id, str) and agent_id != "" and isinstance(agent_type, str) and agent_type != ""
+    role, definition = resoudre_agent(agent_type, racine, contexte.get("arg_home")) if avec_identite else ("inconnu", None)  # role-principal
+    if role == "juge":
+        chemin_rel = None
+        if contexte["ecrit"]:
+            rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
+            chemin_rel = "/".join(c for c in rel.split(os.sep) if c not in ("", "."))
+        return [Verdict("ROLE", chemin_rel, RAISON_JUGE % agent_type)]
+    return []
+
+
+def classer_fichier(chemin):
+    """Mode de diagnostic `--classer` : UNE ligne JSON {"role", "allowlist", "disallowed"} pour la définition à
+    `chemin` (rôle `illisible` si elle ne se lit pas). Aucune décision, aucune lecture du payload."""
+    role, liste, interdits = "illisible", [], []
+    try:
+        with open(chemin, encoding="utf-8-sig") as fh:
+            texte = fh.read()
+        role = deriver_role(texte)
+        lignes = lignes_frontmatter_agent(texte)
+        if lignes is not None:
+            liste = allowlist_agent(lignes)
+            interdits = sorted(jetons_nus_agent(lignes, "disallowedTools"))
+    except (OSError, UnicodeDecodeError):
+        pass
+    sys.stdout.write(json.dumps({"role": role, "allowlist": liste, "disallowed": interdits}, ensure_ascii=False) + "\n")
+
+
 # Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un
 # Verdict d'erreur : deny si le gate est armed, ligne d'observation sinon (P45-D-08, spec §5.1).
-GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7))  # gates-a-verdict
+GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict
 
 
 def evaluer_protege(gate, fonction, contexte):
@@ -1131,12 +1501,16 @@ def evaluer_gates(contexte):
 
 
 def main():
+    # Mode de diagnostic (45-08) : `--classer <agent.md>`, quatrième argument du cœur ; aucune décision.
+    if len(sys.argv) > 4 and sys.argv[4] == "--classer":
+        classer_fichier(sys.argv[1])
+        sys.exit(0)
     # Phase A : l'adhésion n'est pas encore connue. Toute erreur sort sur un code non nul SANS rien
     # imprimer : la couche shell de la commande enregistrée tranche (P45-D-08, DIV-2).
     try:
         payload = lire_payload(sys.argv[1])  # phase-a
         ecrit, cwd = cible_de(payload)
-        depart = ecrit if ecrit is not None else (cwd if cwd is not None else os.getcwd())
+        depart = ecrit if ecrit is not None else (cwd if cwd is not None else os.getcwd())  # racine-depart
         racine = racine_lab(depart)
         adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]
     except BaseException:

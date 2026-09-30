@@ -14,7 +14,8 @@
 #   R-ENV-01        aucune variable d'environnement ne change l'armement ni l'adhésion (P45-D-12a)
 #   R-ENV-02        garde statique : le cœur Python ne lit aucune variable d'environnement (expanduser et
 #                   expandvars compris) ; le lanceur lit TMPDIR (ligne du mktemp), XDG_CACHE_HOME et HOME
-#                   (ligne d'appel du cœur, arguments) — amendement du 2026-09-30 (45-04)
+#                   (ligne d'appel du cœur, arguments) — amendement du 2026-09-30 (45-04) ; HOME sert aussi, et à cela seul,
+#                   de racine de résolution des agents du compte (45-08, même décision du manager, 2026-09-30)
 #   R-G5-01..06     G5 : Write, Edit, NotebookEdit de VERDICT.md sous .planning/ d'un lab adhérent, quel que
 #                   soit le rôle ; en observe une ligne de journal sans contenu, en armed un deny (45-04)
 #   R-G6-01..05     G6 : Write, Edit, NotebookEdit d'un fichier généré, enfant direct du dossier de planning d'un lab
@@ -36,6 +37,13 @@
 #   R-G7-06..09     G7 (45-07) : prédicat « habité » littéral de P45-D-14 (un agents/*.md régulier ET un fichier régulier sous
 #                   memory/ ; tableau des cas imprimé `G7-HABITE`), fichiers réguliers seulement, dérogation, COMPTE G7 du banc
 #   R-CANG-G7       le cas de canary G7-orphelin (état livré, étapes 1 à 3 armed, evaluer_g7 neutralisé)
+#   R-ROLE-01..07   hook par rôle (45-08 ; GATE-09) : un juge défini dans le lab écrit, le hook résout sa définition (lab, compte,
+#                   plugin ; name: du frontmatter, repli sur le nom de fichier ; normalisation), dérive « juge » et l'observe (copie
+#                   observe : une ligne gate=ROLE) ou le refuse (copie armed) ; fil principal, agent inconnu, ambigu, illisible ou de
+#                   plugin non résolu : jamais un refus de rôle ; lab dev : stdout d'octet vide ; --classer ; erreur interne
+#   R-ROLE-13       HOME est l'entrée déclarée de la résolution des agents du compte (P45-D-12a) : il change la résolution, jamais
+#                   l'adhésion, le verdict de G5 et de G6 ni l'armement ; XDG_CACHE_HOME, CLAUDE_PROJECT_DIR et TMPDIR ne la changent pas
+#                   (le contrôle croisé du rôle avec check-agents.sh vit dans scripts/tests/test-role-hook-vs-check-agents.sh)
 #   R-OBS-ENV       le journal d'observation suit XDG_CACHE_HOME puis HOME et rien d'autre : les valeurs
 #                   reçues n'atteignent jamais l'armement ni l'adhésion (P45-D-12a)
 #   R-JETON         l'encodeur du journal est ast-identique à _jeton_journal du moteur de recalcul
@@ -617,8 +625,10 @@ def controle_env_statique(ctx, script):
     `environ`, `getenv`, `putenv`, `expanduser`, `expandvars`, ni chaîne, import ou nom de ce genre) ;
     le lanceur lit TMPDIR une seule fois, sur la ligne du mktemp, XDG_CACHE_HOME et HOME une seule fois
     chacune, sur la seule ligne qui appelle le cœur (arguments), rien d'autre. Amendement des décisions
-    du manager vf-dev-manager, 2026-09-30 (45-04) : les deux valeurs ne servent qu'au chemin du journal
-    d'observation. Elle ne dépend d'aucun nom de variable posé par la suite."""
+    du manager vf-dev-manager, 2026-09-30 (45-04) : XDG_CACHE_HOME ne sert qu'au chemin du journal
+    d'observation, HOME à ce chemin (repli) et à la racine de résolution des agents du compte (45-08,
+    même décision, P45-D-12a : un chemin, jamais une décision d'armement ni d'adhésion). Elle ne dépend
+    d'aucun nom de variable posé par la suite."""
     chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
     texte = open(chemin, encoding="utf-8").read()
     fautes = []
@@ -1428,7 +1438,7 @@ def controle_cang_02(ctx, script):
 
 def controle_cang_03(ctx, script):
     """evaluer_g6 neutralisé (jamais de verdict) : le canary signale, code 0, UNE ligne qui nomme G6 — observe comme armed."""
-    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict')
     if neutre is None:
         return False, "mutant du hook invalide : " + raison
     fautes = []
@@ -1928,7 +1938,7 @@ def controle_cang_g1(ctx, script):
     rc, out, err = lancer_canary_dossier(ctx, d)
     if rc != 3 or out != b"":
         fautes.append("G6, G5 et G1 armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
-    neutre, raison = make_hook_mutant(ctx, "G1-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G7", evaluer_g7))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G1-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict')
     if neutre is None:
         fautes.append("mutant du hook invalide : " + raison)
     else:
@@ -2170,7 +2180,7 @@ def controle_cang_g7(ctx, script):
     rc, out, err = lancer_canary_dossier(ctx, d)
     if rc != 3 or out != b"":
         fautes.append("étapes 1 à 3 armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
-    neutre, raison = make_hook_mutant(ctx, "G7-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G7-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("ROLE", evaluer_role))  # gates-a-verdict')
     if neutre is None:
         fautes.append("mutant du hook invalide : " + raison)
     else:
@@ -2181,6 +2191,239 @@ def controle_cang_g7(ctx, script):
             if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G7-orphelin" not in lignes[0] or "G6-principal" in lignes[0] or "G1-sans-cadrage" in lignes[0]:
                 fautes.append("evaluer_g7 neutralisé (%s) : rc=%d %s" % (valeur, rc, court(out)))
     return (not fautes), ("; ".join(fautes) if fautes else "canary sain (code 3) sur l'état livré et sur les étapes 1 à 3 armed ; evaluer_g7 neutralisé : une ligne qui nomme G7-orphelin, observe comme armed")
+
+
+# --- 45-08 : le hook par rôle (GATE-09 ; P45-D-04, P45-D-05, P45-D-05b, P45-D-11, P45-D-12a) ------------------------------
+ROLE_LAB = "role-adherent"
+ROLE_DEV = "role-dev"
+ROLE_LIVRABLE = "livrables/x.md"
+ROLE_MOTIF = "[planning-core] ROLE :"
+TEXTE_JUGE = "---\nname: %s\ndescription: juge de la suite\ntools: Read, Glob, Grep\ndisallowedTools: Write, Edit\nomitClaudeMd: true\n---\nCorps.\n"
+TEXTE_PRODUCTEUR = "---\nname: %s\ndescription: producteur de la suite\ntools: Read, Write\n---\nCorps.\n"
+
+
+def _role(ctx, hook, outil, rel, agent=None, lab=ROLE_LAB, extra_env=None, entree=None):
+    return _g5(ctx, hook, outil, rel, agent=agent, lab=lab, extra_env=extra_env, entree=entree)
+
+
+def verdict_role(rc, out, err):
+    """`refus` (un deny dont la raison commence par `[planning-core] ROLE :`), `passage` (silence ou avertissement sans verdict de rôle),
+    sinon l'écart décrit."""
+    if err:
+        return "stderr " + court(err)
+    v = classer(rc, out)
+    if v == "deny":
+        raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+        return "refus" if raison.startswith(ROLE_MOTIF) else "deny " + raison
+    if v in ("silence", "avertit"):
+        return "passage" if b"[planning-core] ROLE" not in out else v + " " + court(out)
+    return v + " " + court(out)
+
+
+def home_de_suite(ctx, nom, agents=(), plugins=()):
+    """Dossier `HOME` jetable : `agents` = [(fichier, texte)] sous `.claude/agents/`, `plugins` = [(chemin relatif, texte)] sous
+    `.claude/plugins/`."""
+    home = dossier_neuf(ctx, "home-" + nom)
+    for fichier, texte in agents:
+        ecrire(os.path.join(home, ".claude", "agents", fichier), texte)
+    for rel, texte in plugins:
+        ecrire(os.path.join(home, ".claude", "plugins", rel), texte)
+    return home
+
+
+def controle_role_01(ctx, script):
+    """Copie observe : Write d'un livrable par un juge du lab -> code 0, stdout vide ou avertissement de G2 seulement, UNE ligne gate=ROLE
+    au journal (chemin, outil), aucun refus."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    cache = dossier_neuf(ctx, "cache-role-01")
+    rc, out, err = _role(ctx, d, "Write", ROLE_LIVRABLE, agent="juge-test", extra_env={"XDG_CACHE_HOME": cache})
+    v = classer(rc, out)
+    if rc != 0 or err or v not in ("silence", "avertit") or b"[planning-core] ROLE" in out:
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    if v == "avertit" and "G2" not in contexte_de(out):
+        return False, "avertissement qui n'est pas celui de G2 : " + court(out)
+    lignes = lignes_journal(cache)
+    if len(lignes) != 1:
+        return False, "%d ligne(s) au journal (attendu 1) : %s" % (len(lignes), lignes)
+    for motif in ("  gate=ROLE  ", "  chemin=" + ROLE_LIVRABLE + "  ", "  outil=Write  "):
+        if motif not in lignes[0]:
+            return False, "la ligne ne porte pas %r : %s" % (motif, lignes[0])
+    return True, "copie observe : code 0, aucun refus (%s), une ligne gate=ROLE (chemin, outil) au journal" % v
+
+
+def controle_role_02(ctx, script):
+    """Copie armed : Write, Edit et NotebookEdit par un juge du lab, sous `juge-test`, `Juge_Test`, `juge test`, `JUGE-TEST`, et par le juge
+    dont le name: est `Juge_Mixte` -> UN deny `[planning-core] ROLE :` (juge, poser-verdict.sh)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    for outil in ("Write", "Edit", "NotebookEdit"):
+        for agent in ("juge-test", "Juge_Test", "juge test", "JUGE-TEST", "juge-mixte", "JUGE_MIXTE", "Juge Mixte"):
+            n += 1
+            raison, detail = _raison_deny(*_role(ctx, d, outil, ROLE_LIVRABLE, agent=agent))
+            if raison is None:
+                fautes.append("%s agent=%s -> %s" % (outil, agent, detail))
+            elif not raison.startswith(ROLE_MOTIF) or "est un juge" not in raison or "poser-verdict.sh" not in raison or agent not in raison:
+                fautes.append("%s agent=%s : raison %s" % (outil, agent, raison))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus de rôle (trois outils, casse et séparateurs, name: en casse mixte), raison « juge … poser-verdict.sh »" % n)
+
+
+def _sans_agent_id(ctx, hook, outil, rel, agent_type, lab=ROLE_LAB):
+    """Payload portant agent_type mais PAS agent_id (le fil principal lancé avec --agent, par exemple)."""
+    _, _, chemins = labs_banc(ctx)
+    racine = chemins[lab]
+    obj = json.loads(payload(outil, entree_outil(outil, os.path.join(racine, rel)), racine, agent_type=agent_type).decode("utf-8"))
+    del obj["agent_id"]
+    return ctx.lancer("A", json.dumps(obj).encode("utf-8"), cwd=racine, dossier=hook)
+
+
+def controle_role_03(ctx, script):
+    """Copie armed : le même Write au fil principal (sans agent_id ni agent_type, ou avec agent_type seul), par un agent_type inconnu, par
+    `plugin-x:agent-y` non résolu -> aucun refus de rôle (la ligne « Tous » seulement)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    cas = (("fil principal", _role(ctx, d, "Write", ROLE_LIVRABLE)),
+           ("agent_type sans agent_id", _sans_agent_id(ctx, d, "Write", ROLE_LIVRABLE, "juge-test")),
+           ("agent inconnu", _role(ctx, d, "Write", ROLE_LIVRABLE, agent="agent-inconnu")),
+           ("plugin non résolu", _role(ctx, d, "Write", ROLE_LIVRABLE, agent="plugin-x:agent-y")),
+           ("juge du compte sans HOME qui le porte", _role(ctx, d, "Write", ROLE_LIVRABLE, agent="juge-compte-absent")))
+    for etiquette, r in cas:
+        n += 1
+        v = verdict_role(*r)
+        if v != "passage":
+            fautes.append("%s -> %s" % (etiquette, v))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d cas sans refus de rôle : fil principal, agent_type seul, agent inconnu, agent de plugin non résolu" % n)
+
+
+def controle_role_04(ctx, script):
+    """Résolution (P45-D-05b) sur copie armed : le lab gagne sur le compte, deux définitions de rôles différents au même niveau = inconnu,
+    deux définitions du même rôle = ce rôle, name: absent = repli sur le nom de fichier, niveau du compte, niveau du plugin (segment du
+    chemin, casse et séparateurs normalisés)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    home = home_de_suite(ctx, "role-04",
+                         agents=[("double.md", TEXTE_PRODUCTEUR % "double"), ("juge-compte.md", TEXTE_JUGE % "juge-compte"),
+                                 ("jumeau-a.md", TEXTE_JUGE % "jumeau"), ("jumeau-b.md", TEXTE_JUGE % "jumeau")],
+                         plugins=[("cache/mp/monplugin/1.0/agents/juge-plugin.md", TEXTE_JUGE % "juge-plugin"),
+                                  ("cache/mp/monplugin/1.0/agents/producteur-plugin.md", TEXTE_PRODUCTEUR % "producteur-plugin"),
+                                  ("cache/mp/autre-chose/1.0/agents/juge-ailleurs.md", TEXTE_JUGE % "juge-ailleurs")])
+    cas = (("double", "refus"), ("ambigu", "passage"), ("sans-nom", "refus"), ("juge-compte", "refus"), ("jumeau", "refus"),
+           ("monplugin:juge-plugin", "refus"), ("MonPlugin:Juge_Plugin", "refus"), ("monplugin:producteur-plugin", "passage"),
+           ("monplugin:absent", "passage"), ("autreplugin:juge-plugin", "passage"), ("juge-ailleurs", "passage"),
+           ("autre-chose:juge-plugin", "passage"), ("juge-plugin", "passage"))
+    fautes = []
+    for agent, attendu in cas:
+        v = verdict_role(*_role(ctx, d, "Write", ROLE_LIVRABLE, agent=agent, extra_env={"HOME": home}))
+        if v != attendu:
+            fautes.append("agent=%s : attendu %s, obtenu %s" % (agent, attendu, v))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d résolutions conformes : lab avant compte, ambigu = inconnu, même rôle = ce rôle, repli sur le nom de fichier, niveau du compte, niveau du plugin" % len(cas))
+
+
+def controle_role_05(ctx, script):
+    """Copie armed : dans un lab dev qui porte le même juge, Write, Edit, NotebookEdit, Bash, Agent et Task -> stdout d'octet vide, code 0
+    (P45-D-04 : zéro régression dev)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    dispatch = {"description": "d", "prompt": "p", "subagent_type": "vf-crafter"}
+    for outil, entree in (("Write", None), ("Edit", None), ("NotebookEdit", None), ("Bash", None), ("Agent", dispatch), ("Task", dispatch)):
+        for agent in ("juge-test", "worker-vide", None):
+            n += 1
+            rc, out, err = _role(ctx, d, outil, ROLE_LIVRABLE, agent=agent, lab=ROLE_DEV, entree=entree)
+            if rc != 0 or out != b"" or err:
+                fautes.append("%s agent=%s -> rc=%d stdout=%s stderr=%s" % (outil, agent, rc, court(out), court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d appels d'un lab dev (six outils, juge, worker, fil principal) : stdout d'octet vide, code 0" % n)
+
+
+def _classer(ctx, script, chemin):
+    p = subprocess.run(["bash", os.path.join(_dossier(ctx, script), "planning-hook.sh"), "--classer", chemin],
+                       stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+    return p.returncode, p.stdout, p.stderr
+
+
+def controle_role_06(ctx, script):
+    """`--classer` sur une définition au frontmatter jamais refermé -> `illisible` (une ligne JSON, code 0) ; sur un juge et un manager du lab
+    -> `juge` et `manager` ; le hook traite l'agent illisible en inconnu (copie armed : aucun refus de rôle)."""
+    _, _, chemins = labs_banc(ctx)
+    agents = os.path.join(chemins[ROLE_LAB], ".claude", "agents")
+    fautes = []
+    for nom, role in (("abime.md", "illisible"), ("juge-test.md", "juge"), ("manager-test.md", "manager"), ("producteur-test.md", "producteur"), ("worker-vide.md", "worker")):
+        rc, out, err = _classer(ctx, script, os.path.join(agents, nom))
+        try:
+            obtenu = json.loads(out.decode("utf-8").strip())
+        except ValueError:
+            fautes.append("%s : sortie non JSON : %s" % (nom, court(out)))
+            continue
+        if rc != 0 or err or len(out.splitlines()) != 1 or obtenu.get("role") != role or sorted(obtenu.keys()) != ["allowlist", "disallowed", "role"]:
+            fautes.append("%s : attendu %s, obtenu rc=%d %s stderr=%s" % (nom, role, rc, court(out), court(err)))
+    rc, out, err = _classer(ctx, script, os.path.join(agents, "absent.md"))
+    if rc != 0 or json.loads(out.decode("utf-8")).get("role") != "illisible":
+        fautes.append("fichier absent : rc=%d %s" % (rc, court(out)))
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    v = verdict_role(*_role(ctx, d, "Write", ROLE_LIVRABLE, agent="abime"))
+    if v != "passage":
+        fautes.append("agent à définition illisible : %s (attendu passage, traité en inconnu)" % v)
+    return (not fautes), ("; ".join(fautes) if fautes else "--classer : abime = illisible, juge-test = juge, manager-test = manager, producteur-test = producteur, worker-vide = worker, fichier absent = illisible ; l'agent illisible est traité en inconnu")
+
+
+def controle_role_07(ctx, script):
+    """Erreur interne injectée dans evaluer_role (mutant sonde) : observe -> aucun refus + une ligne d'erreur au journal ; armed -> deny."""
+    dossier, raison = make_hook_mutant(ctx, "ROLE-SONDE", "# role-sonde", 'raise RuntimeError("sonde")  # role-sonde')
+    if dossier is None:
+        return False, "mutant sonde invalide : " + raison
+    cache = dossier_neuf(ctx, "cache-role-07")
+    rc, out, err = _role(ctx, ctx.copie_forcee(dossier, "observe"), "Write", ".planning/notes.md", extra_env={"XDG_CACHE_HOME": cache})
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err or len(lignes) != 1 or "  gate=ROLE  " not in lignes[0]:
+        return False, "observe : rc=%d stdout=%s stderr=%s lignes=%s" % (rc, court(out), court(err), lignes)
+    motif = [c for c in lignes[0].split("  ") if c.startswith("raison=")]
+    if not motif or "erreur interne" not in urllib.parse.unquote(motif[0]):
+        return False, "la ligne ne porte pas une raison d'erreur : " + lignes[0]
+    rc, out, err = _role(ctx, ctx.copie_forcee(dossier, "armed"), "Write", ".planning/notes.md")
+    if classer(rc, out) != "deny" or "erreur interne" not in json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]:
+        return False, "armed : " + classer(rc, out) + " " + court(out)
+    return True, "erreur interne de evaluer_role : en observe aucun refus et une ligne d'erreur au journal, en armed un deny (fail-closed)"
+
+
+def controle_role_13(ctx, script):
+    """P45-D-12a : `HOME` est l'entrée déclarée de la résolution des agents du COMPTE, et d'elle seule. Un juge défini seulement sous
+    `<HOME>/.claude/agents/` : HOME A qui le porte -> refus (copie armed) ; HOME B qui ne le porte pas -> inconnu, aucun refus ; un lab dev
+    reste silencieux sous les deux ; le verdict de G5 et de G6 d'un même payload et l'état d'armement (la copie à ARMEMENT_ROLE observe
+    reste observe) ne changent pas ; XDG_CACHE_HOME, CLAUDE_PROJECT_DIR et TMPDIR ne changent pas la résolution."""
+    dossier = _dossier(ctx, script)
+    d_arm, d_obs = ctx.copie_forcee(dossier, "armed"), ctx.copie_forcee(dossier, "observe")
+    home_a = home_de_suite(ctx, "role-13-a", agents=[("juge-compte.md", TEXTE_JUGE % "juge-compte")])
+    home_b = home_de_suite(ctx, "role-13-b")
+    fautes = []
+    # (1) la résolution suit HOME
+    for etiquette, home, attendu in (("HOME A", home_a, "refus"), ("HOME B", home_b, "passage")):
+        v = verdict_role(*_role(ctx, d_arm, "Write", ROLE_LIVRABLE, agent="juge-compte", extra_env={"HOME": home}))
+        if v != attendu:
+            fautes.append("copie armed, %s : attendu %s, obtenu %s" % (etiquette, attendu, v))
+    # (2) l'adhésion ne suit pas HOME : un lab dev reste silencieux, sous les deux
+    for etiquette, home in (("HOME A", home_a), ("HOME B", home_b)):
+        rc, out, err = _role(ctx, d_arm, "Write", ROLE_LIVRABLE, agent="juge-compte", lab=ROLE_DEV, extra_env={"HOME": home})
+        if rc != 0 or out != b"" or err:
+            fautes.append("lab dev, %s : rc=%d stdout=%s" % (etiquette, rc, court(out)))
+    # (3) le verdict de G5 et de G6 (fil principal) est le même octet pour octet, sous les deux HOME
+    for outil, rel in (("Write", VERDICT_REL), ("Write", ".planning/STATE.md"), ("Edit", ".planning/STATE.md")):
+        ra = _role(ctx, d_arm, outil, rel, extra_env={"HOME": home_a})
+        rb = _role(ctx, d_arm, outil, rel, extra_env={"HOME": home_b})
+        if ra != rb or classer(ra[0], ra[1]) != "deny":
+            fautes.append("%s %s : verdict différent sous HOME A et B (%s / %s)" % (outil, rel, classer(ra[0], ra[1]), classer(rb[0], rb[1])))
+    # (4) l'armement ne suit pas HOME : la copie observe reste observe (silence) sous les deux, une ligne au journal seulement sous HOME A
+    for etiquette, home, lignes_attendues in (("HOME A", home_a, 1), ("HOME B", home_b, 0)):
+        cache = dossier_neuf(ctx, "cache-role-13")
+        rc, out, err = _role(ctx, d_obs, "Write", ".planning/notes.md", agent="juge-compte", extra_env={"HOME": home, "XDG_CACHE_HOME": cache})
+        lignes = [l for l in lignes_journal(cache) if "  gate=ROLE  " in l]
+        if rc != 0 or out != b"" or err or len(lignes) != lignes_attendues:
+            fautes.append("copie observe, %s : rc=%d stdout=%s, %d ligne(s) gate=ROLE (attendu %d)" % (etiquette, rc, court(out), len(lignes), lignes_attendues))
+    # (5) les autres variables d'environnement ne changent pas la résolution, même quand elles désignent le dossier qui porte le juge
+    for nom in ("XDG_CACHE_HOME", "CLAUDE_PROJECT_DIR", "TMPDIR"):
+        v = verdict_role(*_role(ctx, d_arm, "Write", ROLE_LIVRABLE, agent="juge-compte", extra_env={"HOME": home_b, nom: home_a}))
+        if v != "passage":
+            fautes.append("HOME B et %s=HOME A : %s (attendu passage)" % (nom, v))
+        v = verdict_role(*_role(ctx, d_arm, "Write", ROLE_LIVRABLE, agent="juge-compte", extra_env={"HOME": home_a, nom: home_b}))
+        if v != "refus":
+            fautes.append("HOME A et %s=HOME B : %s (attendu refus)" % (nom, v))
+    return (not fautes), ("; ".join(fautes) if fautes else "HOME change la résolution d'un agent du compte (A : refus, B : inconnu), jamais l'adhésion (lab dev silencieux), le verdict de G5 et de G6 ni l'armement (copie observe) ; XDG_CACHE_HOME, CLAUDE_PROJECT_DIR et TMPDIR ne la changent pas")
 
 
 # =================================================================================================
@@ -2410,6 +2653,20 @@ def sec_g7(ctx):
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
 
+def sec_role(ctx):
+    for ident, ctrl, titre in (
+            ("R-ROLE-01", controle_role_01, "Write d'un livrable par un juge du lab sur copie observe"),
+            ("R-ROLE-02", controle_role_02, "le même Write, Edit et NotebookEdit sur copie armed, casse et séparateurs normalisés"),
+            ("R-ROLE-03", controle_role_03, "fil principal, agent inconnu, agent de plugin non résolu : aucun refus de rôle"),
+            ("R-ROLE-04", controle_role_04, "résolution : lab avant compte, ambigu = inconnu, repli sur le nom de fichier, compte, plugin"),
+            ("R-ROLE-05", controle_role_05, "lab dev : stdout d'octet vide pour tout rôle et tout outil"),
+            ("R-ROLE-06", controle_role_06, "--classer et définition illisible traitée en inconnu"),
+            ("R-ROLE-07", controle_role_07, "erreur interne de evaluer_role : observe journalise, armed refuse"),
+            ("R-ROLE-13", controle_role_13, "HOME : entrée déclarée de la résolution du compte, jamais de l'adhésion ni de l'armement")):
+        bon, detail = ctrl(ctx, None)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+
+
 def sec_registre(ctx):
     bon, detail = controle_registre(ctx, ctx.hook)
     ok("R-REGISTRE " + detail) if bon else ko("R-REGISTRE", "les arbres ast de lire_registre du hook et du moteur de recalcul sont identiques", "identiques", detail)
@@ -2485,7 +2742,7 @@ def sec_banc(ctx):
             ko("COUVERTURE " + gate, "au moins un cas `avertit` et un cas `silence` pour " + gate, ">= 1 chacun", str(c))
         else:
             ok("COUVERTURE %s : %d avertit, %d silence" % (gate, c["avertit"], c["silence"]))
-    for gate in ("G5", "G6", "G1", "G7"):
+    for gate in ("G5", "G6", "G1", "G7", "ROLE"):
         c = compte.get(gate, {})
         print("COUVERTURE %s doit-refuser=%d doit-passer=%d silence=%d" % (gate, c.get("doit-refuser", 0), c.get("doit-passer", 0), c.get("silence", 0)))
         if c.get("doit-refuser", 0) < 1 or c.get("doit-passer", 0) < 1 or c.get("silence", 0) < 1:
@@ -2493,7 +2750,7 @@ def sec_banc(ctx):
         else:
             ok("COUVERTURE %s : %d doit-refuser, %d doit-passer, %d silence (0 faux refus, 0 faux accept : chaque cas est conforme)" % (gate, c["doit-refuser"], c["doit-passer"], c["silence"]))
     # comptes du banc, par gate de l'étape 1 (P45-D-03b : l'armement exige 0 et 0)
-    for gate in ("G5", "G6", "G1", "G7"):
+    for gate in ("G5", "G6", "G1", "G7", "ROLE"):
         fr, fa = faux.get(gate, [0, 0])
         print("COMPTE %s faux-refus=%d faux-accept=%d" % (gate, fr, fa))
     if faux.get("G1", [0, 0]) == [0, 0] and compte.get("G1"):
@@ -2610,9 +2867,25 @@ def sec_mutants(ctx):
         ("G7-BANC-ACCEPT", "# g7-habite", "if True:  # g7-habite", "R-G7-09", controle_g7_09),
         ("G7-BANC-REFUS", "porte_marqueur_code(x):  # g7-marqueur", "if False:  # g7-marqueur", "R-G7-09", controle_g7_09),
         ("G7-REGULIER-MEMOIRE", "# g7-regulier-memoire", "if os.path.exists(os.path.join(dossier, nom)):  # g7-regulier-memoire", "R-G7-07", controle_g7_07),
+        # 45-08 : le hook par rôle (ligne juge)
+        ("ROLE-NORMALISATION", "# role-normaliser", "return nom  # role-normaliser", "R-ROLE-02", controle_role_02),
+        ("ROLE-PRINCIPAL", "# role-principal",
+         'role, definition = ("juge", None) if not agent_id else resoudre_agent(agent_type, racine, contexte.get("arg_home"))  # role-principal',
+         "R-ROLE-03", controle_role_03),
+        ("ROLE-NIVEAU", "# role-niveaux", "niveaux = [dossier_compte, dossier_lab]  # role-niveaux", "R-ROLE-04", controle_role_04),
+        ("PY-ADHESION-ROLE", "sys.exit(0)  # non-adherent", "pass", "R-ROLE-05", controle_role_05),
+        ("ROLE-HOME", "# role-home",
+         'dossier_compte = os.path.join("/inexistant-role-home", ".claude", "agents") if avec_home else None  # role-home',
+         "R-ROLE-13", controle_role_13),
+        ("ROLE-HOME-ARMEMENT", 'etat = TABLE_ARMEMENT.get(verdict.gate)',
+         'etat = "armed" if (verdict.gate == "ROLE" and os.path.isdir(os.path.join(contexte.get("arg_home") or "/inexistant", ".claude", "agents"))) else TABLE_ARMEMENT.get(verdict.gate)',
+         "R-ROLE-13", controle_role_13),
     ]
+    filtre = [f for f in os.environ.get("VF_GATES_MUTANTS", "").split(",") if f]  # facultatif : sous-chaînes d'identifiants, développement
     for entree in M:
         ident, motif, repl, cible, ctrl = entree[:5]
+        if filtre and not any(f in ident for f in filtre):
+            continue
         nom_script, marqueur = entree[5:7] if len(entree) > 5 else ("planning-hook.sh", "PY_PLANNING_HOOK_EOF")
         dossier, raison = make_script_mutant(ctx, nom_script, marqueur, ident, motif, repl)
         if dossier is None:
@@ -2649,6 +2922,7 @@ SECTIONS = {
     "cang": sec_cang,
     "g1": sec_g1,
     "g7": sec_g7,
+    "role": sec_role,
     "env": sec_env,
     "obs_env": sec_obs_env,
     "env_statique": sec_env_statique,
@@ -2697,7 +2971,9 @@ run_sections() { # <sections séparées par des virgules>
 
 [ -f "$BANC_RECALC" ] || ko "recalc-planning-banc.txt présent" "le banc de la 44 existe sous fixtures/ (contrôle croisé de G1)" "$BANC_RECALC" "absent"
 
-run_sections table,parseur,registre,jeton,g2,g5,g6,id,cang,g1,g7,verdict,derog,env,obs_env,env_statique,accord,banc,mutants
+# VF_GATES_SECTIONS (facultatif, pour rejouer une partie de la suite pendant le développement) : liste de sections séparées
+# par des virgules ; sans elle, toutes les sections tournent, dans l'ordre ci-dessous.
+run_sections "${VF_GATES_SECTIONS:-table,parseur,registre,jeton,g2,g5,g6,id,cang,g1,g7,role,verdict,derog,env,obs_env,env_statique,accord,banc,mutants}"
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"
