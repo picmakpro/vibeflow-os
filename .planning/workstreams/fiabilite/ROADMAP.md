@@ -1579,7 +1579,7 @@ Plans:
 - [x] 41.3-01-PLAN.md — vague 1 : appliquer ici, données (STATE ≤ 8 Ko archivé, stash exporté, mémoires mesurées) — SOBR-01, SOBR-02
 - [x] 41.3-02-PLAN.md — vague 1 : appliquer ici, outillage (`check-method-budget` constate, `check-blueprints`, `.worktreeinclude`) — SOBR-01, SOBR-03
 - [ ] 41.3-03-PLAN.md — vague 2 : généraliser les budgets et l'archivage automatique, installeur — SOBR-03, SOBR-06, SOBR-08
-- [ ] 41.3-04-PLAN.md — vague 2 : ADR des quatre principes, release adverse, ajout/retrait, fin de geste — SOBR-04, SOBR-05, SOBR-07
+- [x] 41.3-04-PLAN.md — vague 2 : ADR des quatre principes, release adverse, ajout/retrait, fin de geste — SOBR-04, SOBR-05, SOBR-07
 
 ## 📋 Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (Phases 51-56)
 

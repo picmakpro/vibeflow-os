@@ -34,8 +34,8 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: **41.3** (Sobriété de méthode — ce qu'on crée, on le range) — en cours, vague 1 (plans 01-02).
-Plan: 41.3-01 (STATE sous budget, stash exporté), 41.3-02 (outillage rangement, worktrees).
+Phase: **41.3** (Sobriété de méthode — ce qu'on crée, on le range) — en cours, vagues 1-2 exécutées (plans 01-04).
+Plan: 41.3-01 (STATE, stash), 41.3-02 (rangement), 41.3-03 (budgets, archivage), 41.3-04 (ADR-076, ajout/retrait, fin de geste, E7).
 Status: executing — la Phase 41 (protection du dépôt) reste le pointeur numérique `current_phase`.
 Last activity: 2026-09-29 — exécution de la vague 1 de la Phase 41.3 ; corps historique du STATE archivé.
 
