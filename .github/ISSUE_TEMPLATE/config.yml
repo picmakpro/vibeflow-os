@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/picmakpro/vibeflow-os/security/advisories/new
+    about: Report security issues privately — never in a public issue.
+  - name: User manual
+    url: https://github.com/picmakpro/vibeflow-os/blob/main/manual/README.md
+    about: How to install, understand and run VibeFlow.

@@ -1,0 +1,177 @@
+{
+  "nodes": [
+    {
+      "id": "juge-a",
+      "step": "verification croisee des plans (angle coherence inter-plans)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "juge-b",
+      "step": "verification croisee des plans (angle falsifiabilite des preuves)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "corr-1",
+      "step": "corrections non gatees des 9 plans",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gate-doctrine",
+      "step": "3 questions doctrine remontees a l humain",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "corr-2",
+      "step": "corrections gatees par les reponses",
+      "stage": "",
+      "deps": [
+        "corr-1",
+        "gate-doctrine"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "juge-c",
+      "step": "juge frais no 3 sur plans corriges",
+      "stage": "",
+      "deps": [
+        "corr-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec",
+      "step": "execution de la phase",
+      "stage": "",
+      "deps": [
+        "juge-c"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-01",
+      "step": "executer plan 41.1-01",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-09",
+      "step": "executer plan 41.1-09",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-02",
+      "step": "executer plan 41.1-02",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-03",
+      "step": "executer plan 41.1-03",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-04",
+      "step": "executer plan 41.1-04",
+      "stage": "",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-07",
+      "step": "executer plan 41.1-07",
+      "stage": "",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-06",
+      "step": "executer plan 41.1-06",
+      "stage": "",
+      "deps": [
+        "exec-02",
+        "exec-09",
+        "exec-07"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-05",
+      "step": "executer plan 41.1-05",
+      "stage": "",
+      "deps": [
+        "exec-06"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-08",
+      "step": "executer plan 41.1-08",
+      "stage": "",
+      "deps": [
+        "exec-05"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire fin de mission",
+      "stage": "",
+      "deps": [
+        "exec-08"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "corr-f6f5",
+      "step": "ferme F6 (incoherence creee par la phase) + renomme F5",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

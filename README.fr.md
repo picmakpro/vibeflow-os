@@ -11,7 +11,7 @@ déroule le pipeline (cadrage → plan → exécution → preuve), et des **gate
 pas des promesses. Claude Code est le runtime de référence ; l'install et l'usage sont aussi
 mesurés de bout en bout sur **Codex** et **kimi-code**.
 
-[![Version](https://img.shields.io/badge/version-2.67.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.67.1-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#-installation)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
@@ -144,7 +144,7 @@ est sa documentation complète — même structure partout.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`92 suites` en CI — les
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`93 suites` en CI — les
   nouvelles prouvent le dispatch CLI multi-runtime (RUNT-01/02) et la forme exec des hooks du
   périmètre dev telle qu'installée, leur contrat de sortie, et la résolution Python partagée),
   install **idempotente** avec backup avant écrasement.
@@ -165,6 +165,7 @@ Historique complet : **[CHANGELOG.md](./CHANGELOG.md)**, canon unique — la tab
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.67.1` | 2026-09-29 | **Hotfix : deux régressions de v2.67.0.** `popd` contournait le verrou de driver (`conductor` v1.45.1) : dans `pushd <autre-dépôt> && git commit && popd && git commit`, le second commit, fait dans le lab, passait sous le verrou d'une autre session, ce que v2.66.0 refusait ; `popd` rend désormais la cible indéterminée et le verrou s'applique. `skill-creator` v1.1.1 : v1.1.0 demandait `vf-nature` (et `ecrit:`, `vf-rubrique-juge:`, les trois marqueurs) dans le frontmatter alors que son propre `quick_validate.py` les rejetait, si bien qu'un skill produit par ce flux échouait à la validation et à l'empaquetage ; les six clés du gate des skills sont acceptées. Chaque correctif vient avec des cas rouges sans lui. Coupée depuis le tag `v2.67.0` : la Phase 44 (`planning-core` v2.8.0), mergée sur `main` sans release, n'est pas embarquée. **92 suites.** |
 | `v2.67.0` | 2026-09-28 | **Budgets de méthode et verrou de driver borné au lab (minor).** Nouveau `check-method-budget.sh` (`conductor` v1.45.0), en lecture seule : `STATE.md` à 8 Ko au plus, 3 worktrees actifs au plus par dépôt, chaque worktree classé actif, RANGEABLE (travaillé puis intégré) ou ORPHELIN. `dev-orchestrator` v2.25.0 le lance à la clôture de mission, avant le relâchement du verrou : le point de la mission remplace la position courante au lieu de s'empiler, les worktrees intégrés qu'elle a créés sont retirés sans `--force`, le reste va au rapport. Le verrou ne bloque plus un geste qui vise avec certitude un autre dépôt (`cd <autre-dépôt> && git commit`, `git -C <autre-dépôt> push`, Write dans le `.planning/` d'un autre dépôt) ; toute ambiguïté garde le verrou. Embarque aussi les Phases 42 et 43 (manifeste daté des agents, gate des skills par nature, `conductor` v1.43.0 et v1.44.0) et `dev-orchestrator` v2.24.2, mergées mais jamais publiées. |
 | `v2.66.0` | 2026-09-25 | **Presets d'install, confiance des rapports typés, gates de planning workstream-aware (minor).** `/vibeflow-install` choisit un lab de dev parmi des presets nommés (`dev`, `dev-mobile`, `dev-audite`) résolus depuis les données. Les rapports typés gagnent un champ optionnel `confiance` et un `SEUIL_CONFIANCE` unique : un jugement peu sûr n'est jamais un vert. Le head alloue l'équipe à partir de trois questions indépendantes. Les gates de planning énumèrent chaque compartiment de workstream sur le disque (`planning-core` v2.7.1, `conductor` v1.42.0, `dev-orchestrator` v2.24.1), `measure-server-rulesets.sh --dry-run` ne mute plus ce qu'il mesure, et les identifiants de décision portent leur registre (ADR-075). |
 | `v2.65.0` | 2026-09-23 | **Release de rattrapage : le ledger d'exigences et le gate de sortie de mission de `dev-orchestrator` deviennent workstream-aware (patch, D-02).** `check-requirements-survival.sh`, `restore-requirements-ledger.sh`, `requirements-survival-detect.sh` (LEDG-01/02) et E4 de `check-mission-exit.sh` résolvaient toujours `.planning/REQUIREMENTS.md`/`ROADMAP.md`/`STATE.md` à la racine, jamais le compartiment de workstream actif, une fois un lab partitionné. Un lab dont le planning est partitionné voit désormais ces gardes et ce ledger fonctionner sur son compartiment actif au lieu de rater silencieusement leur cible ; un lab non partitionné garde le comportement historique. `dev-orchestrator` v2.23.1. Embarque aussi `conductor` v1.40.0 (les blueprints passent désormais le gate qu'ils visent), déjà mergé mais jamais publié. |
@@ -226,6 +227,13 @@ Lab principal (privé) : [vibeflow-lab](https://github.com/picmakpro/vibeflow-la
 
 - **[@picmakpro](https://github.com/picmakpro)** — créateur de la méthodologie VibeFlow et propriétaire du repo. A posé les fondations du projet et reste le gardien de sa doctrine : le socle de gouvernance (`conductor`, `planning-core`, `consolidator`), les hooks et guards scripturaux qui gardent chaque lab honnête. L'identité de VibeFlow — une gouvernance tenue par les outils, pas par la prose — c'est lui.
 - **Samuel Neveu — [@samuel-neveugall](https://github.com/samuel-neveugall)** — la force motrice du projet au quotidien : contributeur principal et pilote des releases. A construit tout le versant développement (`dev-orchestrator`, `design-orchestrator`, `mobile-test-team`), mené la bascule agentique et le team-kernel, et conduit l'évolution du framework — dont sa migration sur le moteur `@opengsd/gsd-core`.
+
+## 🤝 Contribuer
+
+Les contributions sont bienvenues — pas besoin d'être collaborateur : fork, branche, pull request.
+Lire [CONTRIBUTING.md](./CONTRIBUTING.md) (workflow, tests, licence des contributions), le
+[code de conduite](./CODE_OF_CONDUCT.md), et signaler les vulnérabilités en privé comme décrit
+dans [SECURITY.md](./SECURITY.md). Les issues et PR en français sont acceptées.
 
 ## 📄 Licence
 

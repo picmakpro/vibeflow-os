@@ -13,6 +13,27 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.67.1] — 2026-09-29
+
+**Patch** (deux régressions de v2.67.0, trouvées à la relecture de la release ; hotfix demandé
+par Samuel, session principale Claude Code, 2026-09-29) :
+
+- **`popd` contournait le verrou de driver** (`conductor` v1.45.0 → v1.45.1,
+  `guard-driver-lock.sh`, règle C7). Le hook suivait `cd` et `pushd`, pas `popd` : dans
+  `pushd <autre-dépôt> && git commit && popd && git commit`, le second commit, fait dans le lab,
+  passait sous le verrou d'une autre session, alors que v2.66.0 le refusait. `popd` rend
+  désormais la cible indéterminée et le verrou s'applique. 3 cas ajoutés à
+  `test-guard-driver-lock.sh` (C7r et C7s rouges sans le correctif, C7t contrôle).
+- **skill-creator refusait les clés qu'il demande d'écrire** (`skill-creator` v1.1.0 → v1.1.1).
+  v1.1.0 fait écrire `vf-nature` (et `ecrit:`, `vf-rubrique-juge:`, les trois marqueurs) dans le
+  frontmatter ; `quick_validate.py` les rejetait (« Unexpected key(s) … vf-nature »), donc un
+  skill produit par ce flux échouait à la validation et à l'empaquetage. Les six clés du gate des
+  skills sont acceptées. Suite neuve `test-quick-validate.sh` (4 cas, dont la parité avec
+  `VIBEFLOW_SKILL_FIELDS` de `check-skills.sh`) : 92 suites.
+
+Coupée depuis le tag `v2.67.0`, pas depuis `main` : la Phase 44 (`planning-core` v2.8.0), mergée
+sur `main` sans release, n'est pas embarquée.
+
 ## [v2.67.0] — 2026-09-28
 
 **Minor** (budgets de méthode, périmètre du verrou de driver ; release demandée par Samuel,

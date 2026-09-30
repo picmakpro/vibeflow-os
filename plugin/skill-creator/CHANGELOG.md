@@ -1,5 +1,19 @@
 # CHANGELOG — skill-creator
 
+## [v1.1.1] — 2026-09-29 (correctif : le validateur refusait les clés que le skill demande)
+
+**Patch** (régression de v1.1.0) :
+
+- **`skills/skill-creator/scripts/quick_validate.py`** : v1.1.0 demandait d'écrire `vf-nature`
+  (et, pour une procédure, `ecrit:`, `vf-rubrique-juge:` et les trois marqueurs) dans le
+  frontmatter, mais le validateur ne connaissait que les clés Anthropic et rendait
+  « Unexpected key(s) in SKILL.md frontmatter: vf-nature » : un skill produit par ce flux échouait
+  à la validation et à l'empaquetage (`package_skill.py`). Les six clés du gate des skills sont
+  acceptées ; leurs valeurs restent validées par `conductor/scripts/check-skills.sh`.
+- **Suite `skills/skill-creator/scripts/tests/test-quick-validate.sh`** (nouvelle, 4 cas) : clés
+  acceptées, clé inconnue toujours refusée, et parité avec `VIBEFLOW_SKILL_FIELDS` de
+  `check-skills.sh` (une clé ajoutée au gate sans l'être au validateur rougit).
+
 ## [v1.1.0] — 2026-09-26 (Phase 43 — nature des skills, FABR-08)
 
 **Minor** :

@@ -40,6 +40,10 @@ def validate_skill(skill_path):
 
     # Define allowed properties
     ALLOWED_PROPERTIES = {'name', 'description', 'license', 'allowed-tools', 'metadata', 'compatibility'}
+    # Conventions VibeFlow que SKILL.md demande d'écrire (FABR-08) : sans elles, un skill généré
+    # par ce flux échouait ici. Leurs valeurs sont validées par conductor/scripts/check-skills.sh.
+    ALLOWED_PROPERTIES |= {'vf-nature', 'ecrit', 'vf-rubrique-juge',
+                           'vf-gate-bloquant', 'vf-livrable-tiers', 'vf-couche-qualite'}
 
     # Check for unexpected properties (excluding nested keys under metadata)
     unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES

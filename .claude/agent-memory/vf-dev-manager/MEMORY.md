@@ -79,3 +79,8 @@
 - [Lire la CI de la branche dès la reprise](feedback_lire-la-ci-de-la-branche-des-la-reprise.md) — rouge Linux (`stat -f` GNU) invisible sous macOS pendant 5 lots ; rejeu `tests` toujours sous HOME=$(mktemp -d)
 - [Transcripts survivent au /clear](project_transcripts-survivent-au-clear.md) — rapports et réponses relayées retrouvables dans subagents/*.jsonl ; relire avant de rejouer, faire reconfirmer tout arbitrage relu
 - [Garde d'isolation worktree](project_garde-isolation-worktree-commandes-composees.md) — bash -c, heredoc nommant git, mktemp calculé refusés : scripts au scratchpad, chemins absolus
+- [Scratchpad partagé : vert emprunté](feedback_scratchpad-partage-vert-emprunte.md) — un `tests.rc` du worker précédent se lit comme le sien ; nommer par worker, attendre la fin du producteur
+- [Sonde inline : zsh parse le `case`](project_sonde-inline-zsh-parse-le-case.md) — `case` inline meurt en parse error ; rejeu `--job tests` > 600 s à détacher ; commiter avant de rejouer (self-check T10)
+- [Phase créée = ferme ; révélée = consigne](feedback_phase-cree-ferme-revele-consigne.md) — « ne pas élargir » ne couvre QUE le pré-existant ; une incohérence que la phase vient de créer se ferme, même hors files_modified
+- [Cas vert des deux côtés ne garde rien](feedback_cas-vert-des-deux-cotes-ne-garde-rien.md) — ne pas le rendre discriminant de force, mais le renommer : le coût est le crédit qu'on lui accorde, pas le cas inutile
+- [Escalade : attendre la vraie réponse](feedback_escalade-sendmessage-attendre-la-vraie-reponse.md) — une notification de tâche de fond n'est jamais la réponse de l'humain ; incident d'arbitrage fabriqué, Phase 18

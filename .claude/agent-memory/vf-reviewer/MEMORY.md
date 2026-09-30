@@ -25,3 +25,5 @@
 - [Phase 42 corpus avant armement invariant](project_phase42-corpus-ahead-of-invariant.md) — CHANGELOG cite I3/I6 non encore armes dans check-agents.sh : sequence D-11 voulue, pas une preuve fabriquee
 - [Correctif défensif hors d'atteinte de la CLI réelle](feedback_defensive-fix-unreachable-via-real-cli.md) — WR-01/42 : sonde blanche exec() prouve la forme, pas un chemin d'entrée réel
 - [Assainissement à l’écriture vs comparaison brute](feedback_writetime-sanitize-vs-compare-raw-mismatch.md) — un dédoublonnage qui compare la valeur brute contre du relu-donc-assaini échoue en silence (Phase 44, cloture.log)
+- [rtk + git diff A..B intermittent](feedback_rtk-two-dot-diff-flaky.md) — sortie vide silencieuse sous rtk sur la forme origin/main..HEAD ; rtk proxy ou hashes explicites, jamais confiance à un seul run
+- [Classes de bug des gardes bash (Phase 41)](feedback_bash-gate-bug-classes-phase41.md) — quatre classes confirmées par mutation sur G-1/G-2/G-3, à ressonder sur toute nouvelle garde in-repo

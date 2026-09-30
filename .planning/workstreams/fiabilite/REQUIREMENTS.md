@@ -877,6 +877,14 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | WSCH-03 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
 | WSCH-04 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
 | WSCH-05 | Phase 41.2 | Pending — inscrite 2026-09-23 (demande Samuel, session principale, 2026-09-23) |
+| SOBR-01 | Phase 41.3 | Pending — inscrite 2026-09-29 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29) |
+| SOBR-02 | Phase 41.3 | Pending — inscrite 2026-09-29 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29) |
+| SOBR-03 | Phase 41.3 | Pending — inscrite 2026-09-29 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29) |
+| SOBR-04 | Phase 41.3 | Pending — inscrite 2026-09-29 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29) |
+| SOBR-05 | Phase 41.3 | Pending — inscrite 2026-09-29 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29) |
+| SOBR-06 | Phase 41.3 | Pending — inscrite 2026-09-29 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29) |
+| SOBR-07 | Phase 41.3 | Pending — inscrite 2026-09-29 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29) |
+| SOBR-08 | Phase 41.3 | Pending — inscrite 2026-09-29 (arbitrage Samuel, AskUserQuestion session principale, 2026-09-29) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1232,6 +1240,16 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **WSCH-04**: **Preuve d'usage (critère d'échec de la phase)** — un lab neuf initialisé en mode partitionné, sur fixture jetable en CI, voit les gates de planning passer au **vert sur chaque compartiment** sans aucune réparation manuelle.
 - [ ] **WSCH-05**: Le contenu doctrinal du choix (valeur, non-choix par défaut, procédure de bascule et précondition) est **remis au manager**, qui le fait porter par WSAW-07. Cette phase **n'écrit ni `workstreams.md` ni `docs/ADR.md`** — deux écrivains sur un fichier de doctrine est le conflit que la parallélisation doit éviter.
 
+### Sobriété de méthode (Phase 41.3 — INSERTED 2026-09-29)
+- [ ] **SOBR-01**: Ce dépôt n'a plus de worktree, de branche locale ou distante déjà mergés, ni de stash sans propriétaire ; un outil les liste (extension de `check-method-budget.sh`), la suppression distante reste validée par un humain.
+- [ ] **SOBR-02**: Chaque `STATE.md` de ce dépôt est ≤ 8 Ko ; l'historique part sous `.planning/archives/state/`, rien n'est perdu, `check-state-integrity` reste vert.
+- [ ] **SOBR-03**: `check-blueprints` ne balaie plus `.claude/worktrees/` ; les hooks `$CLAUDE_PROJECT_DIR/.claude/*` fonctionnent dans un worktree (entrée BACKLOG du 2026-09-28).
+- [ ] **SOBR-04**: La procédure de release de `CLAUDE.md` exige une relecture adverse du diff fonctionnel avant le tag, avec au moins une sonde exécutée.
+- [ ] **SOBR-05**: Un ajout, un retrait — un nouveau gate, ADR, règle ou mémoire désigne ce qu'il remplace ou justifie qu'il n'en remplace aucun ; l'absence est visible par machine.
+- [ ] **SOBR-06**: Budgets étendus — plafonds mesurés sur le BACKLOG ouvert, l'index de mémoire et le ROADMAP, en plus de STATE et des worktrees ; au-delà, l'outil archive seul (déplacement tracé et réversible), écrit comme précision d'ADR-031.
+- [ ] **SOBR-07**: Nettoyage en fin de geste — la clôture d'une mission de manager **et** la fin d'un travail direct rangent worktrees, branches, stash et mémoires non versionnées ; gaté, pas facultatif.
+- [ ] **SOBR-08**: Prose plafonnée — une note de STATE ou une entrée de BACKLOG a une taille maximale ; un sujet clos quitte le fichier courant pour une archive.
+
 ### Transverse
 - [x] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée — mesuré satisfait sur la Phase 41 le 2026-09-18 (vingt mutants tués sur les trois gardes plus neuf sur les deux outils de phase, total vingt-neuf, rc=0 sur les cinq suites), **puis RÉGRESSÉ** (partition du planning, PR #94, 2026-09-23, résolution de racine cassée), **réparé le 2026-09-24** (résolution par `git rev-parse --show-toplevel`), mesure alors incomplète à **28/29** (`check-trace-arbitrage.sh` refusait PAR CONCEPTION les citations multiples distinctes et conformes). **RE-SATISFAIT le 2026-09-24** : trois défauts de conception corrigés dans `check-trace-arbitrage.sh` (citations multiples distinctes conformes acceptées, merges réels de PR et commits de release exclus du jugement, mot déclencheur insensible à la casse — arbitrage Samuel, AskUserQuestion session principale, 2026-09-24), neuf cas de test et neuf mutants ajoutés (dont MUT-2 repurposé), `BASE-TRACE-ARBITRAGE` avancée de `f1d6589` à `0b4d9a7` (7 commits antérieurs acceptés en l'état, identifiant de migration sans rapport confondu avec le registre de décisions de la phase — hors des trois défauts corrigés). **Mesuré ce jour, rc=0 sur les cinq suites : `test-check-trace-arbitrage.sh` 9 mutants tués (MUT-1 à MUT-9), `test-check-aucune-fermeture.sh` 3 mutants tués (inchangé), plus les vingt mutants inchangés des trois gardes CI (`check-baseline-arbitrage.sh` 9, `check-gate-touche.sh` 6, `check-push-sans-pr.sh` 5) — total 32 mutants tués sur cinq suites, toutes vertes.**
 
@@ -1249,9 +1267,20 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - **Blocage CI dur immédiat du budget** — accoutumance au rouge → BUDG-02 ratchet
 - **BUDG-03 étage d'alignement court (G2)** — différé : mécanique de workflow neuve, utilité non démontrée, aucun incident lié
 
+## Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (inscrit 2026-09-25)
+
+> Phases 51-56, compartiment `fiabilite`, exécution après la clôture de `fiabilite-v1.0` (arbitrage Samuel, AskUserQuestion session principale, 2026-09-25).
+> Étude source : `.planning/research/2026-09-25-ecc-inspiration-etude.md`. **Aucune exigence posée à l'inscription** : chaque phase reçoit sa
+> famille à son cadrage (`gsd-discuss-phase`), comme les Phases 43-50 du jalon de Willy. Préfixes
+> **réservés et vérifiés libres** le 2026-09-25 (`grep -rhoE '\b[A-Z]{4}-[0-9]{2}\b' .planning plugin docs`,
+> 0 occurrence pour chacun) : `SNAP` (51, snapshot PreCompact), `TELE` (52, télémétrie d'usage et
+> coût), `OBSV` (53, apprentissage par observation), `HARN` (54, audit du harness), `MRUN` (55,
+> installeur et mémoire multi-runtime), `LANG` (56, packs de règles par langage). `QUAL-01`
+> transverse s'applique de plein droit à tout gate ou hook livré.
+
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-09-23 — **HEAD-01 fermée** (correction d'un ledger périmé) :
+*Last updated: 2026-09-25 — jalon `ecc-inspiration-v1.0` inscrit (Phases 51-56, six familles réservées et vérifiées libres, exigences posées au cadrage, aucune ligne de traçabilité tant qu'aucun ID n'existe) ; précédent : 2026-09-23 — **HEAD-01 fermée** (correction d'un ledger périmé) :
 `intent-routing.md` renvoie déjà à `head-governance.md` (lignes 15 et 17, commit `5829bd0`,
 2026-09-15) et la case ci-dessus est déjà cochée avec sa preuve — seule cette note de bas de
 fichier était restée en contradiction avec le disque, corrigée sans rouvrir de travail ; précédent :

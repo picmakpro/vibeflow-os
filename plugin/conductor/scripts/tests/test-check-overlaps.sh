@@ -18,6 +18,27 @@
 #   T14 — paires intra-famille (gsd-code-review + gsd-review) → PAS un recouvrement tierce
 #   T15 — les 3 frontières mempalace/gsd-next (ADR-057) : les deux côtés présents → affichées
 #   T16 — un seul côté présent pour chaque paire mempalace/gsd-next → aucune frontière affichée
+#   T17 — un agent posé sous un nom de fichier différent de son name: incarné (un module Type 3
+#         pose son AGENT.md sous agents/<mod>.md, incarné sous un name: distinct, ex. name:
+#         vibeflow-head sous agents/dev-orchestrator.md) doit être détecté par ce name:
+#   T18 — garde-fou : un agent nommé « vibeflow-head-bis » (name: distinct, préfixe partagé) ne
+#         doit PAS satisfaire la référence « vibeflow-head » — correspondance EXACTE requise
+#   T19 — garde-fou : une ligne « name: vibeflow-head » dans le CORPS d'un agent (hors
+#         frontmatter, sous le second « --- », frontmatter lui-même SANS ligne name:) ne doit
+#         PAS compter — seule une valeur DANS le frontmatter fait foi
+#   T20 — name: entre guillemets doubles (`name: "vibeflow-head"`), sous un autre nom de fichier
+#         → détecté (le guillemet fait partie du YAML valide, pas de la valeur)
+#   T21 — name: entre guillemets simples (`name: 'vibeflow-head'`), sous un autre nom de fichier
+#         → détecté
+#   T22 — fichier ouvert par un BOM UTF-8, sous un autre nom de fichier → détecté (le BOM ne fait
+#         pas partie de la première ligne du frontmatter)
+#   T23 — fichier en fins de ligne CRLF, sous un autre nom de fichier → détecté (le \r ne fait pas
+#         partie de la valeur ni du marqueur ---)
+#   T24 — garde de non-régression : un agent posé SOUS son nom de fichier canonique
+#         (agents/vibeflow-head.md), name: entre guillemets → toujours détecté par le nom de
+#         fichier, indépendamment de la lecture du name:
+#   T25 — garde de non-régression : un agent posé SOUS son nom de fichier canonique, SANS aucune
+#         ligne name: dans son frontmatter → toujours détecté par le seul nom de fichier
 
 set -uo pipefail
 
@@ -45,6 +66,28 @@ user_skill() { # $1 = dossier du skill (sandbox user — côté GSD, gsd-* insta
 }
 agent() { # $1 = nom de l'agent (sandbox projet)
   printf -- '---\nname: %s\ndescription: sandbox\n---\ncorps\n' "$1" > "$AG/$1.md"
+}
+agent_named() { # $1 = nom de fichier · $2 = valeur de name: en frontmatter (mismatch possible
+                # avec $1 — layout d'un module Type 3, AGENT.md → agents/<mod>.md)
+  printf -- '---\nname: %s\ndescription: sandbox\n---\ncorps\n' "$2" > "$AG/$1.md"
+}
+agent_no_name_body() { # $1 = nom de fichier · $2 = valeur "name:" citée dans le CORPS (hors
+                        # frontmatter, qui n'a lui-même AUCUNE ligne name:) — ne doit jamais
+                        # compter : sans confinement, un lecteur qui continue après le
+                        # frontmatter la trouverait
+  printf -- '---\ndescription: sandbox\n---\ncorps\nname: %s\n' "$2" > "$AG/$1.md"
+}
+agent_named_quoted() { # $1 = nom de fichier · $2 = valeur de name: · $3 = caractère de guillemet
+  printf -- '---\nname: %s%s%s\ndescription: sandbox\n---\ncorps\n' "$3" "$2" "$3" > "$AG/$1.md"
+}
+agent_named_bom() { # $1 = nom de fichier · $2 = valeur de name: — BOM UTF-8 en tête de fichier
+  printf -- '\xef\xbb\xbf---\nname: %s\ndescription: sandbox\n---\ncorps\n' "$2" > "$AG/$1.md"
+}
+agent_named_crlf() { # $1 = nom de fichier · $2 = valeur de name: — fins de ligne CRLF
+  printf -- '---\r\nname: %s\r\ndescription: sandbox\r\n---\r\ncorps\r\n' "$2" > "$AG/$1.md"
+}
+agent_no_name() { # $1 = nom de fichier — frontmatter sans aucune ligne name:
+  printf -- '---\ndescription: sandbox\n---\ncorps\n' > "$AG/$1.md"
 }
 plugin_skill() { # $1 = plugin · $2 = skill
   mkdir -p "$PLUG/mkt/$1/1.0.0/skills/$2"
@@ -208,6 +251,109 @@ if [ $RC -eq 0 ] && ! echo "$OUT" | grep -q "gsd-mempalace-capture" \
   ok "T16 un seul côté présent (VibeFlow seul, GSD absent) → aucune des 3 frontières affichée"
 else
   ko "T16 (rc=$RC) : $OUT"
+fi
+
+# T17 — agent posé sous un nom de fichier différent de son name: incarné → détecté par ce name:
+reset_all
+agent_named "dev-orchestrator" "vibeflow-head"
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && echo "$OUT" | grep -q "↔ vibeflow-head ↔ gsd-next"; then
+  ok "T17 agents/dev-orchestrator.md (name: vibeflow-head) ↔ gsd-next → frontière affichée"
+else
+  ko "T17 (rc=$RC) : $OUT"
+fi
+
+# T18 — garde-fou : correspondance EXACTE du name:, pas un préfixe partagé. Un agent
+# « vibeflow-head-bis » ne doit jamais satisfaire la référence « vibeflow-head ».
+reset_all
+agent "vibeflow-head-bis"
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && ! echo "$OUT" | grep -q "vibeflow-head ↔ gsd-next"; then
+  ok "T18 vibeflow-head-bis ↔ gsd-next → pas de correspondance (name exact requis)"
+else
+  ko "T18 (rc=$RC) : $OUT"
+fi
+
+# T19 — garde-fou : une ligne "name:" dans le CORPS (hors frontmatter, qui n'a lui-même aucune
+# ligne name:) ne doit jamais compter — seule une valeur DANS le frontmatter fait foi.
+reset_all
+agent_no_name_body "readme-agent" "vibeflow-head"
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && ! echo "$OUT" | grep -q "vibeflow-head ↔ gsd-next"; then
+  ok "T19 name: dans le corps (hors frontmatter) → ignoré, pas de correspondance"
+else
+  ko "T19 (rc=$RC) : $OUT"
+fi
+
+# T20 — name: entre guillemets doubles, sous un autre nom de fichier → détecté
+reset_all
+agent_named_quoted "dev-orchestrator-dq" "vibeflow-head" '"'
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && echo "$OUT" | grep -q "vibeflow-head ↔ gsd-next"; then
+  ok "T20 name: \"vibeflow-head\" (guillemets doubles) ↔ gsd-next → frontière affichée"
+else
+  ko "T20 (rc=$RC) : $OUT"
+fi
+
+# T21 — name: entre guillemets simples, sous un autre nom de fichier → détecté
+reset_all
+agent_named_quoted "dev-orchestrator-sq" "vibeflow-head" "'"
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && echo "$OUT" | grep -q "vibeflow-head ↔ gsd-next"; then
+  ok "T21 name: 'vibeflow-head' (guillemets simples) ↔ gsd-next → frontière affichée"
+else
+  ko "T21 (rc=$RC) : $OUT"
+fi
+
+# T22 — fichier ouvert par un BOM UTF-8, sous un autre nom de fichier → détecté
+reset_all
+agent_named_bom "dev-orchestrator-bom" "vibeflow-head"
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && echo "$OUT" | grep -q "vibeflow-head ↔ gsd-next"; then
+  ok "T22 fichier ouvert par un BOM UTF-8 ↔ gsd-next → frontière affichée"
+else
+  ko "T22 (rc=$RC) : $OUT"
+fi
+
+# T23 — fichier en fins de ligne CRLF, sous un autre nom de fichier → détecté
+reset_all
+agent_named_crlf "dev-orchestrator-crlf" "vibeflow-head"
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && echo "$OUT" | grep -q "vibeflow-head ↔ gsd-next"; then
+  ok "T23 fichier en fins de ligne CRLF ↔ gsd-next → frontière affichée"
+else
+  ko "T23 (rc=$RC) : $OUT"
+fi
+
+# T24 — garde de non-régression : posé SOUS son nom de fichier canonique, name: entre guillemets
+# → toujours détecté par le nom de fichier, indépendamment de la lecture du name:
+reset_all
+agent_named_quoted "vibeflow-head" "vibeflow-head" '"'
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && echo "$OUT" | grep -q "vibeflow-head ↔ gsd-next"; then
+  ok "T24 agents/vibeflow-head.md (name: \"vibeflow-head\") ↔ gsd-next → frontière affichée"
+else
+  ko "T24 (rc=$RC) : $OUT"
+fi
+
+# T25 — garde de non-régression : posé SOUS son nom de fichier canonique, SANS aucune ligne
+# name: → toujours détecté par le seul nom de fichier
+reset_all
+agent_no_name "vibeflow-head"
+user_skill "gsd-next"
+OUT="$(run_check 2>&1)"; RC=$?
+if [ $RC -eq 0 ] && echo "$OUT" | grep -q "vibeflow-head ↔ gsd-next"; then
+  ok "T25 agents/vibeflow-head.md (sans name:) ↔ gsd-next → frontière affichée"
+else
+  ko "T25 (rc=$RC) : $OUT"
 fi
 
 echo ""

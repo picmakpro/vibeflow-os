@@ -1,5 +1,35 @@
 # Changelog — conductor
 
+## [Non publié] — 2026-09-30 (check-overlaps.sh — present() ajoute une résolution par name: incarné)
+
+**Patch** (correctif de détection) :
+
+- **`scripts/check-overlaps.sh`, `present()`, cas par défaut** — un agent local n'était détecté que
+  par son nom de fichier (`$AGENTS_DIR/$ref.md`), jamais par le `name:` de son frontmatter. Un
+  agent posé sous un nom de fichier stable indépendant de son `name:` incarné (ex.
+  `agents/dev-orchestrator.md`, `name: vibeflow-head`) échappait à cette résolution, et une
+  frontière ADR-057 comme `vibeflow-head ↔ gsd-next` restait muette sur un tel agent. Ajoute une
+  résolution par `name:` (`agent_present_by_name()`, correspondance exacte, confinée au premier
+  bloc `---`…`---`, tolérante à un BOM UTF-8 en tête de fichier, aux fins de ligne CRLF et à une
+  paire de guillemets simples ou doubles englobant la valeur), **en union** avec la résolution par
+  nom de fichier existante : les deux voies cohabitent, aucun agent déjà détecté par son nom de
+  fichier ne devient invisible par cet ajout. Suite `tests/test-check-overlaps.sh` étendue de 16 à
+  25 cas : T17 (reproduction), T18 (correspondance exacte), T19 (lecture confinée au frontmatter),
+  T20-T23 (formes YAML valides du `name:` : guillemets doubles, guillemets simples, BOM, CRLF),
+  T24-T25 (gardes de non-régression sur la résolution par nom de fichier). Numéro de version laissé
+  aux mainteneurs (pas de bump dans cette entrée : contribution externe, `CONTRIBUTING.md`).
+
+## [v1.45.1] — 2026-09-29 (correctif : `popd` contournait le verrou de driver)
+
+**Patch** (régression de v1.45.0) :
+
+- **`scripts/guard-driver-lock.sh`, règle C7** : le hook suivait `cd` et `pushd` mais pas `popd`.
+  Dans `pushd <autre-dépôt> && git commit && popd && git commit`, le second commit, fait dans le
+  lab, était jugé hors du lab et **autorisé** sous le verrou d'une autre session ; les versions
+  antérieures le refusaient. `popd` rend désormais la cible indéterminée, et le verrou s'applique au geste suivant.
+  Suite `tests/test-guard-driver-lock.sh` : 3 cas ajoutés (C7r et C7s rouges sans le correctif,
+  C7t contrôle : `pushd` sans `popd` reste autorisé).
+
 ## [v1.45.0] — 2026-09-28 (budgets de méthode, périmètre du verrou de driver)
 
 **Minor** (nouveau script, correctif du hook de verrou) :
