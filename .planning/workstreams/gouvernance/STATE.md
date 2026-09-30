@@ -5,39 +5,34 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 45
 current_phase_name: Moteur — hook central par rôle et gates d'écriture
-status: "Phase 44 close (PR vers main ouverte), Phase 45 à cadrer"
+status: "Phase 45 cadrée et planifiée (10 plans, plan-check frais PASSED), non exécutée"
 created: 2026-09-23
-last_updated: "2026-09-28T00:00:00.000Z"
-last_activity: 2026-09-28
+last_updated: "2026-09-29T00:00:00.000Z"
+last_activity: 2026-09-29
 last_activity_desc: >-
-  Clôture de la Phase 44 (mission vf-dev-manager mgr-44-reprise, reprise du 2026-09-28) : lots de
-  correction 4 à 8 commités (vrai détecteur en environnement construit de zéro, clé de journal
-  injective, garde de lecture du détecteur, lien cassé = absent, FIFO non bloquante), revue et audit
-  finaux (audit SECURED sur 345303e, A/B/PERM/LF/C/D/T2/F1 fermés), lot 8 sans nouveau tour de juges
-  (décision du head sous délégation technique de Willy, session principale, 2026-09-28), 313 OK/0 KO
-  sur test-recalc-planning.sh, detect-gsd-engine.sh/workstream-policy.sh inchangés depuis 424cb23.
-  Résidus acceptés documentés (modele-cycles.md, BACKLOG) : TOCTOU local 1/15, volume ~98 s à 3000
-  compartiments. Rapport : .planning/missions/2026-09-27-gouvernance-44.md.
+  Cadrage et planification de la Phase 45 (mission vf-dev-manager-g45-20260929, branche
+  gouvernance/phase-45-hook-central) : 45-CONTEXT.md (P45-D-01 à P45-D-21c, exigences GATE-01..15),
+  45-SCOUTING/RESEARCH/PATTERNS/VALIDATION, 10 plans en 8 vagues ; plan-check frais PASSED au tour 6
+  (4632c9b) après 5 révisions chirurgicales. Arbitrages Willy, AskUserQuestion session principale,
+  2026-09-29 : Q1-Q6 et 13 décisions déléguées (reconfirmées après /clear), P45-D-21a, P45-D-14a.
 stopped_at: >-
-  Phase 44 close sur la branche gouvernance/phase-44-moteur, PR vers main ouverte (sans merge, sans
-  tag, sans release — aucune release gouvernance avant la clôture de fiabilite-v1.0). Prochain geste :
-  cadrage de la Phase 45 (--ws gouvernance), qui reprend la question d'adhésion d'un lab métier
-  contenant du code.
+  Phase 45 planifiée, PR de planification ouverte (sans merge, sans release). Prochain geste :
+  exécution de la Phase 45 (gsd-execute-phase 45 --ws gouvernance), vague 1 (45-01 ∥ 45-02).
 progress:
   total_phases: 9
   completed_phases: 3
-  total_plans: 18
+  total_plans: 28
   completed_plans: 18
-  percent: 100
+  percent: 64
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 45 (Moteur — hook central par rôle et gates d'écriture) — à cadrer. Phase 44 : exécutée (5/5 plans), vérifiée PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`), corrigée en 8 lots après revue et audit, CLOSE dans le ROADMAP le 2026-09-28 (PR vers main ouverte, non mergée). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
-**Last Activity:** 2026-09-28
-**Last Activity Description:** Clôture de la Phase 44 (mission `mgr-44-reprise`) — voir `last_activity_desc` en frontmatter. Dernier lot : correction de CLASSE lot 8 (quick 260928-vk9, CORRECTION MINIMALE, aucun nouveau tour de juges, gsd-verifier PASSED), commit `0c284e3`.
+Phase: 45 (Moteur — hook central par rôle et gates d'écriture) — cadrée et planifiée le 2026-09-29 (10 plans, 8 vagues, plan-check frais PASSED au tour 6 sur `4632c9b`), non exécutée ; PR de planification ouverte, sans merge. Phase 44 : exécutée (5/5 plans), vérifiée PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`), corrigée en 8 lots après revue et audit, CLOSE dans le ROADMAP le 2026-09-28 (PR vers main ouverte, non mergée). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
+**Last Activity:** 2026-09-29
+**Last Activity Description:** Cadrage et planification de la Phase 45 (mission `vf-dev-manager-g45-20260929`) — voir `last_activity_desc` en frontmatter. Précédent : clôture de la Phase 44 (mission `mgr-44-reprise`). Dernier lot : correction de CLASSE lot 8 (quick 260928-vk9, CORRECTION MINIMALE, aucun nouveau tour de juges, gsd-verifier PASSED), commit `0c284e3`.
 
 Précédent : correction de CLASSE lot 5 (nœud `exec-44` rouvert, mission vf-coder `mgr-44-reprise`, quick task `260928-ol3`) : l'environnement « maîtrisé » du sous-processus détecteur (lot 4) était en réalité `dict(os.environ)` avec la seule surcharge de `GSD_HOME` — une copie intégrale du `PATH` hérité. Mesuré (attack probe direct, hors suite) : un `awk` factice en tête de PATH suffisait à faire écrire (exit 0) le moteur sur un lab GSD réel et à effacer le marqueur `gsd_state_version`. L'environnement est désormais construit DE ZÉRO (liste blanche `PATH_MAITRISE` + `GSD_HOME`, aucune autre variable héritée) ; `bash` résolu par `CANDIDATS_BASH` (deux chemins absolus fixes, validés par `lstat`), jamais `shutil.which` sur le PATH hérité. Correctifs voisins : `_jeton_journal` échappe aussi tout caractère non imprimable (NUL, contrôles C0/C1) ; un repli vide lève `ValueError` (jamais un jeton vide silencieux) ; « détecteur absent »/« détecteur non régulier » ont deux messages distincts ; `ecrire_si_different` lit par `O_NOFOLLOW`. Point explicitement NON retenu (avec preuve) : gater le code 3 sur une sortie stderr non vide — un `.planning/workstreams/` vide en produit légitimement. 233→270 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `detect-gsd-engine.sh`/`workstream-policy.sh` octet pour octet inchangés depuis `424cb23`. Le dispatch `gsd-executor` isolé n'a pas été retenté (expérience du lot 4 déjà consignée) ; un seul commit (correctifs trop imbriqués pour un découpage fix/test/docs). Vérifié PASSED 11/11 par `gsd-verifier`. Commit `9fe4a42`.
 
@@ -50,11 +45,12 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 ## Progress
 
 **Phases Complete:** 3 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée).
-**Current Plan:** aucun en cours — Phase 45 à cadrer
+**Current Plan:** aucun en cours — Phase 45 planifiée (45-01 à 45-10), exécution non commencée
 
 ## Session Continuity
 
-**Stopped At:** Phase 44 close (8 lots de correction, revue et audit finaux, PR vers main ouverte, sans merge). Prochain geste : cadrage de la Phase 45 (`--ws gouvernance`).
+**Stopped At:** Phase 45 cadrée et planifiée (plan-check frais PASSED, PR de planification ouverte, sans merge). Prochain geste : exécution de la Phase 45 (`gsd-execute-phase 45 --ws gouvernance`), vague 1.
+**Resume File (Phase 45) :** `.planning/missions/2026-09-29-gouvernance-45.md`
 **Resume File:** `.planning/missions/2026-09-27-gouvernance-44.md`
 
 ### Quick Tasks Completed
