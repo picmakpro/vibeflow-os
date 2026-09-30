@@ -759,6 +759,10 @@ NOMS_MODELE_RACINE_DOSSIERS = ("cycles", "baux", "missions")
 NOMS_MODELE_RACINE_FICHIERS = (
     "PROJECT.md", "REQUIREMENTS.md", "config.json", "INDEX.md", "STATE.md",
     "cloture.log", ".recalc-cache.json",
+    # Journal de dérogation des gates (P45-D-13, F7a — Willy, AskUserQuestion session principale,
+    # 2026-09-30) : emplacement du modèle, jamais « Hors modèle » dans INDEX.md. Même nom consommé
+    # par la commande de dérogation (45-04) et le gate G6 (45-05).
+    "derogations-gates.log",
 )
 
 
@@ -1731,6 +1735,95 @@ def ecrire_si_different(chemin, contenu):
     return True
 
 
+# --- Archivage du socle v2 à la première écriture sous migration (P45-D-02, F10) ---------------
+SEGMENTS_ARCHIVE_SOCLE_V2 = ("_archive", "socle-v2")
+NOMS_ARCHIVE_SOCLE_V2 = ("STATE.md", "INDEX.md")
+
+
+def archiver_socle_v2(planning):
+    """Sous verdict `migration` SEULEMENT (F10, f10-archive — Willy, AskUserQuestion session
+    principale, 2026-09-30), AVANT `appliquer_ecritures` : copie octet pour octet du STATE.md et de
+    l'INDEX.md du socle v2 (fichiers réguliers, lus par O_NOFOLLOW) sous
+    `.planning/_archive/socle-v2/`. `_archive` est un emplacement annexe de la 44, jamais lu par le
+    recalcul. Contenu rédigé à la main, remplacé sans sauvegarde sinon (ADR-031). Règles :
+      - une archive existante n'est JAMAIS réécrite : si une cible existe déjà (quel que soit son
+        type, lien compris), aucun des deux fichiers n'est archivé (jamais un instantané mixte) ;
+      - `_archive` ou `socle-v2` existant mais qui n'est pas un dossier réel (lien compris) :
+        sortie 1, rien écrit ;
+      - écriture atomique (mkstemp dans le dossier cible, fchmod 0o644, os.replace).
+    Rend 0 (archivé, déjà archivé ou rien à archiver) ou 1 (emplacement inutilisable)."""
+    try:
+        if stat.S_ISLNK(os.lstat(planning).st_mode):
+            return 0  # `appliquer_ecritures` refuse ce cas (sortie 1) : rien à archiver ici
+    except OSError:
+        return 0
+    sources = []
+    for nom in NOMS_ARCHIVE_SOCLE_V2:
+        chemin_source = os.path.join(planning, nom)
+        if not est_fichier_regulier(chemin_source):
+            continue
+        descripteur = os.open(chemin_source, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        with os.fdopen(descripteur, "rb") as fh:
+            sources.append((nom, fh.read()))
+    if not sources:
+        return 0
+    dossier_archive = planning
+    for segment in SEGMENTS_ARCHIVE_SOCLE_V2:
+        dossier_archive = os.path.join(dossier_archive, segment)
+        try:
+            info = os.lstat(dossier_archive)
+        except FileNotFoundError:
+            continue  # créé plus bas
+        if not stat.S_ISDIR(info.st_mode):  # lstat : un lien symbolique n'est pas un dossier réel
+            print(
+                "[recalc-planning] archivage du socle v2 impossible (P45-D-02, F10) : "
+                + dossier_archive + " existe et n'est pas un dossier réel — rien n'est écrit",
+                file=sys.stderr,
+            )
+            return 1
+    if any(os.path.lexists(os.path.join(dossier_archive, nom)) for nom in NOMS_ARCHIVE_SOCLE_V2):
+        print(
+            "[recalc-planning] archive du socle v2 déjà présente sous " + dossier_archive
+            + " — jamais réécrite (P45-D-02, F10)",
+            file=sys.stderr,
+        )
+        return 0
+    courant = planning
+    for segment in SEGMENTS_ARCHIVE_SOCLE_V2:
+        courant = os.path.join(courant, segment)
+        if not os.path.lexists(courant):
+            os.mkdir(courant)
+            os.chmod(courant, 0o755)
+    for nom, octets in sources:
+        # Noms propres à l'archive (fd_archive) : la ligne de fchmod de ecrire_si_different doit
+        # rester UNIQUE dans le fichier (motif fixe de MUT-CHMOD).
+        fd_archive, chemin_tmp = tempfile.mkstemp(dir=dossier_archive, prefix=".tmp-recalc-")
+        fd_non_adopte = True
+        try:
+            os.fchmod(fd_archive, 0o644)
+            with os.fdopen(fd_archive, "wb") as fh:
+                fd_non_adopte = False
+                fh.write(octets)
+            os.replace(chemin_tmp, os.path.join(dossier_archive, nom))
+        except Exception:
+            if fd_non_adopte:
+                try:
+                    os.close(fd_archive)
+                except OSError:
+                    pass
+            try:
+                os.remove(chemin_tmp)
+            except OSError:
+                pass
+            raise
+    print(
+        "[recalc-planning] migration (P45-D-02) : " + ", ".join(nom for nom, _ in sources)
+        + " du socle v2 archivé(s) sous " + dossier_archive + " avant remplacement",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def appliquer_ecritures(planning, racine_lab, derivation, cache_ctx, statut_cache):
     try:
         planning_est_lien = stat.S_ISLNK(os.lstat(planning).st_mode)
@@ -1878,6 +1971,16 @@ def main():
         key=lambda c: c["chemin"],  # tri, écriture
     )
     derivation = {"cycles": cycles_derives, "hors_modele": modele["hors_modele"]}
+
+    if verdict_gsd == "migration":
+        # F10 (P45-D-02) : le STATE.md/INDEX.md du socle v2 sont archivés AVANT d'être remplacés.
+        try:
+            code_archive = archiver_socle_v2(planning_abs)
+        except OSError as exc:
+            print("[recalc-planning] échec d'archivage du socle v2 : " + str(exc), file=sys.stderr)
+            sys.exit(1)
+        if code_archive != 0:
+            sys.exit(code_archive)
 
     try:
         code, rapport = appliquer_ecritures(planning_abs, racine_lab, derivation, cache_ctx, statut_cache)

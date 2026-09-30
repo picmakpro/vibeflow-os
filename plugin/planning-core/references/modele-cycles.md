@@ -52,15 +52,32 @@ Un **planning GSD détecté** (ou une détection non concluante) est refusé en 
 s'il déclare `cycles-v1`** : code de sortie **3** (P44-D-02a).
 
 **Codes du détecteur (`detect-gsd-engine.sh`) et leur traitement par `detection_gsd()`** — le
-détecteur rend 0/1/2/3/64, le recalcul les traduit en un verdict `gsd`/`non-gsd`/`non-concluante` :
+détecteur rend 0/1/2/3/64, le recalcul les traduit en un verdict `gsd`/`non-gsd`/`migration`/`non-concluante` :
 
 | Code détecteur | Sens | Verdict `detection_gsd()` | Écriture |
 |---|---|---|---|
 | 0 | moteur GSD actif | `gsd` | refusée |
 | 1 | improbable (voir ci-dessous) — fail-closed, jamais une réimplémentation de ses priorités | `non-concluante` | **refusée** |
-| **2** | **signalement de MIGRATION** (socle planning-core + signal de code, ex. `package.json`) | `non-concluante` | **refusée** — jamais assimilée au code 3 (audit B, lot 2 L1, décision du head sous délégation technique de Willy, session principale, 2026-09-28) |
+| **2** | **signalement de MIGRATION** (socle planning-core + signal de code, ex. `package.json`) | `migration` | **autorisée sous adhésion `cycles-v1` seulement** (P45-D-02, Phase 45, Willy, AskUserQuestion session principale, 2026-09-29) ; sans adhésion : sortie 2 inchangée, rien écrit. Verdict propre, jamais assimilé au code 3 (audit B, lot 2 L1, décision du head sous délégation technique de Willy, session principale, 2026-09-28) |
 | 3 | aucun moteur en place, terrain libre | `non-gsd` | autorisée |
 | tout autre code (ex. 64, détecteur défaillant) | non concluant | `non-concluante` | refusée |
+
+**Levée du code 2 sous adhésion (Phase 45, GATE-14, P45-D-02).** L'adhésion est testée **avant** la
+détection : sans `cycles-v1`, un lab au socle v2 qui contient du code reste refusé en code **2**,
+exactement comme en Phase 44 (message P44-D-02, rien écrit, cache compris). Avec l'adhésion, seule la
+combinaison « détecteur à 2 » écrit ; le détecteur à 0 (moteur GSD actif) reste un refus en code 3,
+et la garde de lecture, le code 1 et tout autre verdict non concluant aussi. `detect-gsd-engine.sh` et
+`workstream-policy.sh` ne changent pas : la levée vit dans `recalc-planning.sh` seul (P45-D-02b).
+
+**Archivage du socle v2 à la première écriture sous migration (F10, P45-D-02, Willy,
+AskUserQuestion session principale, 2026-09-30).** La première écriture remplace le `STATE.md` et
+l'`INDEX.md` du socle v2, rédigés à la main (ADR-031 : pas de perte de contenu sans validation
+humaine). Avant de les remplacer, le recalcul les copie **octet pour octet** sous
+`.planning/_archive/socle-v2/` (emplacement annexe, jamais lu par le recalcul). Une archive existante
+n'est **jamais réécrite** (si l'une des deux cibles existe déjà, quel que soit son type, rien n'est
+archivé) ; si `_archive` ou `socle-v2` existe et n'est pas un dossier réel (lien symbolique compris),
+le recalcul sort en code **1** sans rien écrire. Le `STATE.md` généré ne porte plus `planning_version` :
+le détecteur ne rend plus 2 au passage suivant, l'archivage ne se produit qu'une fois.
 
 **Source UNIQUE de vérité — le VRAI détecteur, jamais une copie (correction de CLASSE, lot 4).**
 Le code 2 a **longtemps** été traité comme le code 3 (même verdict `non-gsd`), laissant écrire sur
@@ -241,6 +258,8 @@ Phase 41.1) : la correction à la source évite qu'une future consommatrice de c
   STATE.md              (généré)
   cloture.log           (généré, ajout seul)
   .recalc-cache.json    (généré)
+  derogations-gates.log (journal de dérogation des gates, ajout seul — Phase 45, P45-D-13)
+  _archive/socle-v2/    (STATE.md et INDEX.md du socle v2, archivés à la migration — annexe)
   cycles/01-<sujet>/
     CYCLE.md
     phases/01-<nom>/
@@ -266,7 +285,9 @@ du modèle, `PLAN.md`, et spec §3).
 
 **Emplacements du modèle** à la racine de `.planning/` : dossiers `cycles`, `baux`, `missions` ;
 fichiers `PROJECT.md`, `REQUIREMENTS.md`, `config.json`, `INDEX.md`, `STATE.md`, `cloture.log`,
-`.recalc-cache.json`. `baux/` et `missions/` ne sont pas parcourus par le recalcul en Phase 44.
+`.recalc-cache.json`, `derogations-gates.log` (journal de dérogation des gates, Phase 45 : F7a, P45-D-13 —
+Willy, AskUserQuestion session principale, 2026-09-30 ; jamais « Hors modèle »). `baux/` et `missions/`
+ne sont pas parcourus par le recalcul en Phase 44.
 
 ## Emplacements annexes et hors modèle
 
