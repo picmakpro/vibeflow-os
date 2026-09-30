@@ -32,7 +32,7 @@ Une version sans tag n'est ni traçable ni installable par référence (historiq
    ```
 4. **Crée la release GitHub** sur le tag (titre court, notes = résumé du tag + commits couverts) :
    ```bash
-   gh release create vX.Y.Z --title "vX.Y.Z — <résumé court>" --notes "<résumé + liste des commits depuis le tag précédent>" --verify-tag
+   gh release create vX.Y.Z --title "vX.Y.Z — <résumé court>" --notes "<résumé + commits depuis le tag précédent + commande et sortie de la sonde, étape 2>" --verify-tag
    ```
    Un tag sans release GitHub rend la page Releases mensongère (historique : même en-tête).
 5. **Vérifie** : `bash scripts/check-release-tag.sh --remote` → doit sortir `✓` (le gate vérifie

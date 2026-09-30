@@ -14,13 +14,21 @@
 #
 # AJOUTS SURVEILLÉS (une seule lecture du diff base..HEAD, statut A seul, renommages exclus) :
 #   - fichiers  plugin/<module>/scripts/{check,guard}-*.sh  et  scripts/check-*.sh
-#   - fichiers  .claude/agent-memory/<agent>/*.md  hors MEMORY.md (l'index)
+#   - fichiers  plugin/<module>/rules/*.md                     (règles de module)
+#   - fichiers  .claude/agent-memory/**/*.md  hors MEMORY.md (l'index), sous-dossiers compris
 #   - titres    `## ADR-NNN` ajoutés dans docs/ADR.md          (clé : ADR-NNN)
-#   - titres    `## ` ajoutés dans CLAUDE.md                   (clé : CLAUDE.md)
+#   - CLAUDE.md titres `## ` ET puces de tête de ligne (`- `, `N. `) ajoutés  (clé : CLAUDE.md) ; une
+#               puce se compare SANS son marqueur (un renumérotage n'est pas un ajout)
+# REMPLACEMENT : le retrait est dans le diff. Un fichier supprimé (statut D) du même genre compense un
+# ajout de ce genre (un pour un) ; dans ADR.md et CLAUDE.md, seul l'EXCÈS d'ajouts sur les retraits (par
+# contenu) est jugé. Un remplacement ne rougit donc pas : il est listé AJOUT-COMPENSE, jamais tu.
 #
 # COUVERTURE : un trailer `Ajout-Retrait: <chemin|ADR-NNN|CLAUDE.md> — <retrait | aucun : justification>`
 # dans un commit de la BRANCHE (portée branche, comme G-2 : un commit ultérieur couvre un ajout
-# antérieur). Motif = glob `case`, jamais eval, jamais une virgule (un trailer = un motif). Le
+# antérieur). Motif = glob `case`, jamais eval, jamais une virgule (un trailer = un motif) ; un glob ne
+# couvre pas le monde : il n'est admis que dans le DERNIER segment (`plugin/*` et `*` refusés) et doit y
+# garder au moins 6 caractères littéraux (`check-*.sh` passe, `*.sh` et `*` non) — sinon MARQUEUR-MAL-FORME
+# et rien n'est couvert. Le
 # séparateur est ` — ` (ou ` - `, borne ASCII). Après le séparateur : soit un retrait nommé (10
 # caractères non blancs au moins), soit `aucun :` SUIVI d'une justification de 10 caractères au moins
 # — `aucun :` seul ne couvre rien.
@@ -96,25 +104,64 @@ awk -F'\t' '
   { p = $2; n = p; sub(/.*\//, "", n) }
   p ~ /^plugin\/[^\/]+\/scripts\/(check|guard)-[^\/]+\.sh$/ { print p "\tfichier"; next }
   p ~ /^scripts\/check-[^\/]+\.sh$/ { print p "\tfichier"; next }
-  p ~ /^\.claude\/agent-memory\/[^\/]+\/[^\/]+\.md$/ && n != "MEMORY.md" { print p "\tmemoire" }
+  p ~ /^plugin\/[^\/]+\/rules\/[^\/]+\.md$/ { print p "\trules"; next }
+  p ~ /^\.claude\/agent-memory\/.+\.md$/ && n != "MEMORY.md" { print p "\tmemoire" }
 ' "$TMPD/diff_a" >> "$AJOUTS"
 
-# --- Ajouts : titres (ajoutés moins retirés — un titre seulement modifié n'est pas un ajout) ---------
+# --- Retraits : fichiers supprimés (statut D) des mêmes genres — un retrait visible compense un ajout ---
+git diff --name-status -M --diff-filter=D "$BASE" "$HEAD_SHA" > "$TMPD/diff_d" 2>/dev/null || non_verifiable "git diff --name-status (D) illisible"
+awk -F'\t' '
+  $1 != "D" { next }
+  { p = $2; n = p; sub(/.*\//, "", n) }
+  p ~ /^plugin\/[^\/]+\/scripts\/(check|guard)-[^\/]+\.sh$/ { print "fichier"; next }
+  p ~ /^scripts\/check-[^\/]+\.sh$/ { print "fichier"; next }
+  p ~ /^plugin\/[^\/]+\/rules\/[^\/]+\.md$/ { print "rules"; next }
+  p ~ /^\.claude\/agent-memory\/.+\.md$/ && n != "MEMORY.md" { print "memoire" }
+' "$TMPD/diff_d" > "$TMPD/retraits"
+COMPENSES="$TMPD/compenses"; : > "$COMPENSES"
+awk -F'\t' -v rf="$TMPD/retraits" -v cf="$COMPENSES" '
+  BEGIN { while ((getline l < rf) > 0) r[l]++ }
+  ($2 in r) && r[$2] > 0 { r[$2]--; print $0 > cf; next }
+  { print }
+' "$AJOUTS" > "$TMPD/ajouts_nets" && cat "$TMPD/ajouts_nets" > "$AJOUTS"
+
+# --- Ajouts : titres et puces (ajoutés moins retirés, par contenu — modifier n'est pas ajouter) -------
 titres() {  # <fichier> <signe +|-> <sed> : une clé par ligne de titre ajoutée/retirée
   git diff -U0 "$BASE" "$HEAD_SHA" -- "$1" 2>/dev/null | awk -v s="$2" '
     substr($0, 1, 1) == s && substr($0, 2, 3) == "## " { print substr($0, 2) }' | sed -n "$3"
 }
-ajoute_moins_retire() {  # <fichier> <sed produisant la clé> : clés côté + absentes du côté -
-  titres "$1" "+" "$2" | LC_ALL=C sort -u > "$TMPD/plus"
-  titres "$1" "-" "$2" | LC_ALL=C sort -u > "$TMPD/moins"
-  LC_ALL=C comm -23 "$TMPD/plus" "$TMPD/moins"
+regles() {  # <signe +|-> : titres `## ` et puces de tête de ligne de CLAUDE.md, sans leur marqueur de liste
+  git diff -U0 "$BASE" "$HEAD_SHA" -- CLAUDE.md 2>/dev/null | awk -v s="$1" '
+    substr($0, 1, 1) != s { next }
+    { l = substr($0, 2) }
+    l ~ /^## / { print l; next }
+    l ~ /^- / { sub(/^- /, "", l); print l; next }
+    l ~ /^[0-9]+\. / { sub(/^[0-9]+\. /, "", l); print l }'
 }
-ajoute_moins_retire docs/ADR.md 's/^## \(ADR-[0-9][0-9]*\).*/\1/p' | awk 'NF { print $0 "\tadr" }' >> "$AJOUTS"
-ajoute_moins_retire CLAUDE.md 's/^## .*/&/p' | awk 'NF { print "CLAUDE.md\tregle (" $0 ")" }' >> "$AJOUTS"
+net_excess() {  # <plus> <moins> (triés, uniques) : les premiers (|plus\moins| - |moins\plus|) éléments de plus\moins
+  LC_ALL=C comm -23 "$1" "$2" > "$TMPD/po"; LC_ALL=C comm -13 "$1" "$2" > "$TMPD/mo"
+  local n m ex
+  n="$(awk 'END { print NR }' "$TMPD/po")"; m="$(awk 'END { print NR }' "$TMPD/mo")"; ex=$((n - m))
+  [ "$ex" -gt 0 ] && head -n "$ex" "$TMPD/po"
+  return 0
+}
+titres docs/ADR.md "+" 's/^## \(ADR-[0-9][0-9]*\).*/\1/p' | LC_ALL=C sort -u > "$TMPD/plus"
+titres docs/ADR.md "-" 's/^## \(ADR-[0-9][0-9]*\).*/\1/p' | LC_ALL=C sort -u > "$TMPD/moins"
+net_excess "$TMPD/plus" "$TMPD/moins" | awk 'NF { print $0 "\tadr" }' >> "$AJOUTS"
+regles "+" | LC_ALL=C sort -u > "$TMPD/plus"; regles "-" | LC_ALL=C sort -u > "$TMPD/moins"
+net_excess "$TMPD/plus" "$TMPD/moins" | awk 'NF { t = substr($0, 1, 60); print "CLAUDE.md\tregle (" t ")" }' >> "$AJOUTS"
 
 # --- Trailers : portée BRANCHE, forme seule ---------------------------------------------------------
 charcount() {  # codepoints UTF-8, jamais d'octets, sans dépendre d'aucune locale installée
   printf '%s' "$1" | tr -d '[:space:]' | od -An -tu1 | tr -s ' \n' '\n' | awk 'NF && ($1 < 128 || $1 >= 192) { n++ } END { print n + 0 }'
+}
+glob_admis() {  # <motif> : un glob ne couvre pas le monde (dernier segment seul, >= 6 caractères littéraux)
+  local m="$1" dirs last lit
+  case "$m" in */*) dirs="${m%/*}"; last="${m##*/}" ;; *) dirs=""; last="$m" ;; esac
+  case "$m" in *'*'*|*'?'*|*'['*) ;; *) return 0 ;; esac
+  case "$dirs" in *'*'*|*'?'*|*'['*) return 1 ;; esac
+  lit="$(printf '%s' "$last" | tr -d '*?[]')"
+  [ "${#lit}" -ge 6 ]
 }
 COMMITS_LIST="$(git rev-list "${BASE}..${HEAD_SHA}" 2>/dev/null)"
 COMMITS_COUNT="$(printf '%s\n' "$COMMITS_LIST" | awk 'NF { n++ } END { print n + 0 }')"
@@ -146,6 +193,7 @@ while IFS= read -r c; do
         *) just="$reste" ;;
       esac
       [ "$ok" -eq 1 ] && [ "$(charcount "$just")" -lt 10 ] && ok=0
+      if [ "$ok" -eq 1 ] && ! glob_admis "$motif"; then ok=0; trimmed="$trimmed  [motif glob trop large : admis seulement dans le dernier segment, 6 caractères littéraux au moins]"; fi
     fi
     if [ "$ok" -eq 1 ]; then
       MARQ_OK=$((MARQ_OK + 1))
@@ -161,7 +209,12 @@ $COMMITS_LIST
 EOF_COMMITS
 
 AJOUTS_N="$(awk 'NF { n++ } END { print n + 0 }' "$AJOUTS")"
-echo "decouverte: commits=${COMMITS_COUNT} ajouts=${AJOUTS_N} marqueurs_conformes=${MARQ_OK}"
+COMPENSES_N="$(awk 'NF { n++ } END { print n + 0 }' "$COMPENSES")"
+echo "decouverte: commits=${COMMITS_COUNT} ajouts=${AJOUTS_N} compenses=${COMPENSES_N} marqueurs_conformes=${MARQ_OK}"
+while IFS="$(printf '\t')" read -r ck cg; do
+  [ -z "$ck" ] && continue
+  echo "AJOUT-COMPENSE: ${ck} (${cg}) — un fichier du même genre est supprimé dans ce diff (le retrait est visible)"
+done < "$COMPENSES"
 while IFS= read -r m; do
   [ -z "$m" ] && continue
   echo "MARQUEUR-MAL-FORME: ${m}"
@@ -170,6 +223,10 @@ done <<EOF_MAL
 $MAL_FORMES
 EOF_MAL
 
+if [ "$AJOUTS_N" -eq 0 ] && [ "$COMPENSES_N" -gt 0 ]; then
+  echo "COUVERT"
+  exit 0
+fi
 if [ "$AJOUTS_N" -eq 0 ]; then
   echo "RIEN-A-JUGER: aucun ajout surveille entre ${BASE} et HEAD"
   exit 0

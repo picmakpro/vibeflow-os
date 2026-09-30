@@ -3,7 +3,7 @@
 # Chaque cas construit SON dépôt jetable sous mktemp -d, jamais le dépôt réel ; identité git par -c ;
 # comparaisons par cmp/comm, jamais diff. Trois issues QUAL-01 : PASS (couvert), FAIL (non couvert,
 # rc 1 sous --strict) et imparsable BRUYANT (base introuvable : stderr + rc 2 sous --strict), plus
-# cinq mutants opposables, chacun asserté avec le rc EXACT sur le mutant ET sur l'original :
+# neuf mutants opposables, chacun asserté avec le rc EXACT sur le mutant ET sur l'original :
 # « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
 # LIMITE DE FOND : la garde, sa suite et son étape CI vivent dans le dépôt qu'elles jugent.
 set -uo pipefail
@@ -47,6 +47,8 @@ expect() {  # <libellé> <rc_attendu> <rc> <sortie> [<fragment attendu dans la s
 TR='Ajout-Retrait:'
 NEW_GATE='plugin/conductor/scripts/check-new.sh'
 add_gate() { printf '#!/bin/sh\necho new\n' > "$1/$NEW_GATE"; }
+# Contenu sans rapport avec check-old.sh : git ne le lit pas comme un renommage (qui n'est pas un ajout).
+add_gate_distinct() { printf '#!/bin/sh\n# un tout autre gate\nfor f in a b c; do\n  test -e "$f" || exit 1\ndone\necho ok\n' > "$1/$NEW_GATE"; }
 
 echo "== test-check-ajout-retrait : PASS / FAIL / BRUYANT =="
 
@@ -133,13 +135,52 @@ git_c "$D" commit -q --allow-empty -m "chore: dernier commit sans trailer" >/dev
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A8 trailer d'un commit ultérieur (pas le dernier) → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT"
 
+# A9 (m1) — faux négatifs fermés : puce de CLAUDE.md, étape numérotée insérée (les suivantes renumérotées ne comptent pas),
+# règle de module, mémoire en sous-dossier.
+D="$(mk_repo a9)"; B="$(base_of "$D")"; printf -- '- Une règle neuve en puce, sans titre.\n' >> "$D/CLAUDE.md"; commit_avec "$D" "docs: puce"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A9 puce ajoutée à CLAUDE.md non couverte → rc 1, clé CLAUDE.md" 1 "$R" "$O" "AJOUT-NON-COUVERT: CLAUDE.md"
+D="$(mk_repo a9b)"; printf '1. premier\n2. deuxième\n3. troisième\n' >> "$D/CLAUDE.md"; commit_avec "$D" "docs: etapes"; B="$(git_c "$D" rev-parse HEAD)"
+printf '1. premier\n2. NOUVELLE ÉTAPE à jouer avant le tag\n3. deuxième\n4. troisième\n' > "$TMP/etapes"
+head -n 3 "$D/CLAUDE.md" > "$TMP/claude.tete"; cat "$TMP/claude.tete" "$TMP/etapes" > "$D/CLAUDE.md"; commit_avec "$D" "docs: insere une etape"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A9b étape insérée + renumérotage → UN seul ajout (la nouvelle étape), rc 1" 1 "$R" "$O" "ajouts=1 "
+D="$(mk_repo a9c)"; B="$(base_of "$D")"; mkdir -p "$D/plugin/conductor/rules"; printf 'regle\n' > "$D/plugin/conductor/rules/neuve.md"; commit_avec "$D" "docs: regle de module"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A9c règle de module plugin/*/rules/*.md ajoutée → non couverte" 1 "$R" "$O" "AJOUT-NON-COUVERT: plugin/conductor/rules/neuve.md"
+D="$(mk_repo a9d)"; B="$(base_of "$D")"; mkdir -p "$D/.claude/agent-memory/a/sous/dossier"; printf -- '---\nname: y\n---\n' > "$D/.claude/agent-memory/a/sous/dossier/project_y.md"; commit_avec "$D" "docs: memoire profonde"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A9d mémoire en sous-dossier ajoutée → non couverte" 1 "$R" "$O" "AJOUT-NON-COUVERT: .claude/agent-memory/a/sous/dossier/project_y.md"
+
+# A10 (m2) — un REMPLACEMENT ne rougit pas : le retrait est dans le diff ; un retrait d'un AUTRE genre ne compense rien.
+D="$(mk_repo a10)"; B="$(base_of "$D")"; add_gate_distinct "$D"; git_c "$D" rm -q plugin/conductor/scripts/check-old.sh; commit_avec "$D" "feat: gate qui remplace check-old"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A10 gate supprimé + gate ajouté dans le même diff → rc 0, AJOUT-COMPENSE" 0 "$R" "$O" "AJOUT-COMPENSE: $NEW_GATE"
+D="$(mk_repo a10b)"; B="$(base_of "$D")"; add_gate "$D"; printf 'x\n' > "$D/.claude/agent-memory/a/vieille.md"; commit_avec "$D" "docs: prépare"; B="$(git_c "$D" rev-parse HEAD~1)"
+git_c "$D" rm -q .claude/agent-memory/a/vieille.md; commit_avec "$D" "docs: retire une mémoire"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A10b retrait d'un autre genre (mémoire) : le gate ajouté n'est PAS compensé → rc 1" 1 "$R" "$O" "AJOUT-NON-COUVERT: $NEW_GATE"
+D="$(mk_repo a10c)"; B="$(base_of "$D")"; printf '# Titre\n## Règle remplacée\ntexte\n' > "$D/CLAUDE.md"; commit_avec "$D" "docs: remplace une règle"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A10c titre remplacé par un autre dans CLAUDE.md (net 0) → rc 0" 0 "$R" "$O"
+
+# A11 (m3) — un glob trop large ne couvre pas le monde : `*`, `plugin/*`, `*.sh` refusés, MARQUEUR-MAL-FORME dit pourquoi.
+for motif in '*' 'plugin/*' '*.sh' 'plugin/*/scripts/check-new.sh'; do
+  D="$(mk_repo "a11-$(printf '%s' "$motif" | cksum | cut -d' ' -f1)")"; B="$(base_of "$D")"; add_gate "$D"
+  commit_avec "$D" "feat: gate
+
+$TR $motif — aucun : motif volontairement trop large pour tout couvrir d'un coup"
+  run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+  expect "A11 motif « $motif » → refusé, ajout non couvert, rc 1" 1 "$R" "$O" "motif glob trop large"
+done
+
 D="$(mk_repo vide)"; B="$(base_of "$D")"; printf 'x\n' > "$D/notes.txt"; commit_avec "$D" "docs: notes"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "Rien d'ajouté dans la surface → RIEN-A-JUGER, rc 0" 0 "$R" "$O" "RIEN-A-JUGER"
 run O R "$SCRIPT" "$D" --bogus
 expect "Usage : argument inconnu → rc 64" 64 "$R" "$O"
 
-echo "== test-check-ajout-retrait : MUTANTS (MUT-1 à MUT-5) =="
+echo "== test-check-ajout-retrait : MUTANTS (MUT-1 à MUT-9) =="
 make_mutant() {  # <nom> <ancienne ligne> <nouvelle ligne> ; 0 = opposable, 1 = identique, 2 = syntaxe invalide
   local out="$MUTD/$1.sh"
   MUT_OLD_ENV="$2" MUT_NEW_ENV="$3" awk '{ if ($0 == ENVIRON["MUT_OLD_ENV"]) print ENVIRON["MUT_NEW_ENV"]; else print }' "$SCRIPT" > "$out"
@@ -163,7 +204,7 @@ $TR $NEW_GATE — aucun :"
 mutant 1 '      [ "$ok" -eq 1 ] && [ "$(charcount "$just")" -lt 10 ] && ok=0' '      :' "$D" 1 0 --strict --base-ref "$B"
 # MUT-2 (A4) : les titres ADR sont ignorés.
 D="$(mk_repo m2)"; B="$(base_of "$D")"; printf '## ADR-076 : neuf\n' >> "$D/docs/ADR.md"; commit_avec "$D" "docs: adr"
-mutant 2 "ajoute_moins_retire docs/ADR.md 's/^## \\(ADR-[0-9][0-9]*\\).*/\\1/p' | awk 'NF { print \$0 \"\\tadr\" }' >> \"\$AJOUTS\"" ':' "$D" 1 0 --strict --base-ref "$B"
+mutant 2 'net_excess "$TMPD/plus" "$TMPD/moins" | awk '"'"'NF { print $0 "\tadr" }'"'"' >> "$AJOUTS"' ':' "$D" 1 0 --strict --base-ref "$B"
 # MUT-3 (A6) : une base introuvable est lue comme un succès sous --strict.
 D="$(mk_repo m3)"; add_gate "$D"; commit_avec "$D" "feat: gate nu"
 mutant 3 '  [ "$STRICT" -eq 1 ] && exit 2' '  :' "$D" 2 0 --strict --base-ref "ref-qui-n-existe-pas"
@@ -177,6 +218,21 @@ mutant 4 'COMMITS_LIST="$(git rev-list "${BASE}..${HEAD_SHA}" 2>/dev/null)"' 'CO
 # MUT-5 : le défaut consultatif devient bloquant (rc 1 sans --strict).
 D="$(mk_repo m5)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate nu"
 mutant 5 '[ "$STRICT" -eq 1 ] && exit 1' 'exit 1' "$D" 0 1 --base-ref "$B"
+
+# MUT-6 (A10, m2) : le retrait visible ne compense plus rien.
+D="$(mk_repo m6)"; B="$(base_of "$D")"; add_gate_distinct "$D"; git_c "$D" rm -q plugin/conductor/scripts/check-old.sh; commit_avec "$D" "feat: gate qui remplace check-old"
+mutant 6 '  ($2 in r) && r[$2] > 0 { r[$2]--; print $0 > cf; next }' '  ($2 in r) && r[$2] > 99 { r[$2]--; print $0 > cf; next }' "$D" 0 1 --strict --base-ref "$B"
+# MUT-7 (A11, m3) : n'importe quel glob est admis.
+D="$(mk_repo m7)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate
+
+$TR * — aucun : motif volontairement trop large pour tout couvrir d'un coup"
+mutant 7 '  [ "${#lit}" -ge 6 ]' '  true' "$D" 1 0 --strict --base-ref "$B"
+# MUT-8 (A9, m1) : les puces de CLAUDE.md ne sont plus lues.
+D="$(mk_repo m8)"; B="$(base_of "$D")"; printf -- '- Une règle neuve en puce, sans titre.\n' >> "$D/CLAUDE.md"; commit_avec "$D" "docs: puce"
+mutant 8 '    l ~ /^- / { sub(/^- /, "", l); print l; next }' '    l ~ /^- / { next }' "$D" 1 0 --strict --base-ref "$B"
+# MUT-9 (A10c, m2) : dans CLAUDE.md, le retrait ne compense plus l'ajout (seul l'ajout est compté).
+D="$(mk_repo m9)"; B="$(base_of "$D")"; printf '# Titre\n## Règle remplacée\ntexte\n' > "$D/CLAUDE.md"; commit_avec "$D" "docs: remplace une règle"
+mutant 9 '  n="$(awk '"'"'END { print NR }'"'"' "$TMPD/po")"; m="$(awk '"'"'END { print NR }'"'"' "$TMPD/mo")"; ex=$((n - m))' '  n="$(awk '"'"'END { print NR }'"'"' "$TMPD/po")"; m="$(awk '"'"'END { print NR }'"'"' "$TMPD/mo")"; ex=$n' "$D" 0 1 --strict --base-ref "$B"
 
 echo
 echo "Résultat : $PASS vert(s), $FAIL rouge(s)"
