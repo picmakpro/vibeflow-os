@@ -1,0 +1,285 @@
+{
+  "nodes": [
+    {
+      "id": "q1-f10-f7a",
+      "step": "arbitrage Willy q1-f10-f7a",
+      "stage": "decision",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "q2-f8-a3",
+      "step": "arbitrage Willy q2-f8-a3",
+      "stage": "decision",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "q3-f6-f7b-rejeu1",
+      "step": "arbitrage Willy q3-f6-f7b-rejeu1",
+      "stage": "decision",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "q4-f9",
+      "step": "arbitrage Willy q4-f9",
+      "stage": "decision",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "q5-rejeu4",
+      "step": "arbitrage Willy q5-rejeu4",
+      "stage": "decision",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-45-01",
+      "step": "45-01 socle hook",
+      "stage": "execute",
+      "deps": [],
+      "scope": [
+        "plugin/planning-core/hooks/hooks.json",
+        "plugin/planning-core/scripts/planning-hook.sh",
+        "plugin/planning-core/scripts/tests/test-planning-hook-registered.sh",
+        "plugin/planning-core/scripts/tests/test-planning-gates.sh",
+        "plugin/planning-core/scripts/tests/fixtures/gates-banc.txt",
+        "docs/HOOKS-CONTRAT-SORTIE.md",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-45-02",
+      "step": "45-02 levee code 2",
+      "stage": "execute",
+      "deps": [
+        "q1-f10-f7a"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/recalc-planning.sh",
+        "plugin/planning-core/scripts/tests/test-recalc-planning.sh",
+        "plugin/planning-core/references/modele-cycles.md"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "exec-45-03",
+      "step": "45-03 canary et rejeu",
+      "stage": "execute",
+      "deps": [
+        "exec-45-01"
+      ],
+      "scope": [
+        "plugin/_internal/tests/test-planning-hook-installed.sh",
+        "plugin/planning-core/scripts/check-gates-alive.sh",
+        "plugin/planning-core/hooks/hooks.json",
+        "docs/HOOKS-CONTRAT-SORTIE.md",
+        "plugin/planning-core/scripts/rejeu-gates.sh",
+        "plugin/planning-core/scripts/rejeu-reel.sh",
+        "plugin/planning-core/scripts/tests/test-rejeu-gates.sh",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-45-04",
+      "step": "45-04 entonnoir G5 verdict",
+      "stage": "execute",
+      "deps": [
+        "exec-45-01",
+        "exec-45-02",
+        "q2-f8-a3"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh",
+        "plugin/planning-core/scripts/poser-verdict.sh",
+        "plugin/planning-core/scripts/deroger-gate.sh",
+        "plugin/planning-core/scripts/tests/test-planning-gates.sh",
+        "plugin/planning-core/scripts/tests/fixtures/gates-banc.txt"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-45-05",
+      "step": "45-05 etape 1 G6+G5",
+      "stage": "execute",
+      "deps": [
+        "exec-45-03",
+        "exec-45-04",
+        "q3-f6-f7b-rejeu1"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-45-06",
+      "step": "45-06 etape 2 G1",
+      "stage": "execute",
+      "deps": [
+        "exec-45-05"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-45-07",
+      "step": "45-07 etape 3 G7",
+      "stage": "execute",
+      "deps": [
+        "exec-45-06"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts",
+        "docs/superpowers/specs"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-45-08",
+      "step": "45-08 hook par role",
+      "stage": "execute",
+      "deps": [
+        "exec-45-07",
+        "q4-f9"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts",
+        "scripts/tests/test-role-hook-vs-check-agents.sh",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-45-09",
+      "step": "45-09 etape 4 role",
+      "stage": "execute",
+      "deps": [
+        "exec-45-08",
+        "q5-rejeu4"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-45-10",
+      "step": "45-10 cloture v2.9.0 sans release",
+      "stage": "execute",
+      "deps": [
+        "exec-45-02",
+        "exec-45-09"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "verif-45",
+      "step": "gsd-verifier phase 45",
+      "stage": "verify",
+      "deps": [
+        "exec-45-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-45",
+      "step": "vf-reviewer diff phase 45",
+      "stage": "review",
+      "deps": [
+        "exec-45-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-45",
+      "step": "vf-auditer hooks refus ecriture",
+      "stage": "audit",
+      "deps": [
+        "exec-45-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (audit read-only)",
+      "stage": "docs",
+      "deps": [
+        "exec-45-01",
+        "exec-45-02",
+        "exec-45-03",
+        "exec-45-04",
+        "exec-45-05",
+        "exec-45-06",
+        "exec-45-07",
+        "exec-45-08",
+        "exec-45-09",
+        "exec-45-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "livraison-45",
+      "step": "STATE/ROADMAP, gates, PR sans merge",
+      "stage": "ship",
+      "deps": [
+        "verif-45",
+        "revue-45",
+        "audit-45",
+        "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-45-socle",
+      "step": "revue anticipee 45-01+45-03 (socle)",
+      "stage": "review",
+      "deps": [
+        "exec-45-01",
+        "exec-45-03"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-socle-1",
+      "step": "correction ciblee socle M1 M2 m1 m3 m4 m5",
+      "stage": "execute",
+      "deps": [
+        "revue-45-socle"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/rejeu-reel.sh",
+        "plugin/planning-core/scripts/tests/test-rejeu-gates.sh",
+        "plugin/planning-core/scripts/check-gates-alive.sh",
+        "plugin/planning-core/scripts/tests/test-planning-gates.sh",
+        "plugin/planning-core/hooks/hooks.json",
+        "plugin/planning-core/scripts/tests/test-planning-hook-registered.sh",
+        "plugin/_internal/tests/test-planning-hook-installed.sh"
+      ],
+      "status": "done"
+    }
+  ]
+}

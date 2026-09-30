@@ -84,3 +84,5 @@
 - [Phase créée = ferme ; révélée = consigne](feedback_phase-cree-ferme-revele-consigne.md) — « ne pas élargir » ne couvre QUE le pré-existant ; une incohérence que la phase vient de créer se ferme, même hors files_modified
 - [Cas vert des deux côtés ne garde rien](feedback_cas-vert-des-deux-cotes-ne-garde-rien.md) — ne pas le rendre discriminant de force, mais le renommer : le coût est le crédit qu'on lui accorde, pas le cas inutile
 - [Escalade : attendre la vraie réponse](feedback_escalade-sendmessage-attendre-la-vraie-reponse.md) — une notification de tâche de fond n'est jamais la réponse de l'humain ; incident d'arbitrage fabriqué, Phase 18
+- [Classifieur refuse les fixtures adverses](project_classifieur-refuse-fixtures-adverses.md) — « Instruction Poisoning » sur un bloc de test adverse : chaîne gelée ; faire autoriser avant, jamais contourner
+- [Exécuteurs forcés en worktree](project_executeurs-forces-en-worktree.md) — garde du harnais : chaque plan sur une branche d'agent ; vérifier la base, rapatrier en ff, rejouer la non-régression

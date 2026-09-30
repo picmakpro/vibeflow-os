@@ -14,7 +14,7 @@
 - [x] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #108
 - [x] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #111
 - [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
-- [ ] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues), non exécutée
+- [ ] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécution en cours depuis le 2026-09-30 (45-01, 45-03 livrés ; 45-02 bloqué par un refus du classifieur de permissions, en attente de Willy)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -160,12 +160,12 @@ l'exécution : 45-02 (F10), 45-04 (F8), 45-05 (F6), 45-08 (F9).
 Plans:
 **Wave 1**
 
-- [ ] 45-01-PLAN.md — socle : commande enregistrée fail-closed (adhésion décidée sans python3), lanceur `planning-hook.sh` et cœur Python, G2 en avertissement, zéro régression dev (GATE-01, 02, 03, 08, 10, 15)
+- [x] 45-01-PLAN.md — socle : commande enregistrée fail-closed (adhésion décidée sans python3), lanceur `planning-hook.sh` et cœur Python, G2 en avertissement, zéro régression dev (GATE-01, 02, 03, 08, 10, 15)
 - [ ] 45-02-PLAN.md — levée du refus de la 44 pour un lab métier à code adhérent, trois branches de régression (GATE-14, 11, 15)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 45-03-PLAN.md — preuves d'armement : canary de CI et de session, outil de rejeu et `rejeu-reel.sh` (empreinte de tout l'arbre) (GATE-12, 13, 03, 10, 15)
+- [x] 45-03-PLAN.md — preuves d'armement : canary de CI et de session, outil de rejeu et `rejeu-reel.sh` (empreinte de tout l'arbre) (GATE-12, 13, 03, 10, 15)
 - [ ] 45-04-PLAN.md — entonnoir armed/observe/dérogation, G5 et commande qui pose `VERDICT.md` (GATE-05, 11, 02, 13, 15)
 
 **Wave 3** *(blocked on Wave 2 completion)*

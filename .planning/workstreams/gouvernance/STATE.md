@@ -5,19 +5,18 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 45
 current_phase_name: Moteur — hook central par rôle et gates d'écriture
-status: "Phase 45 cadrée et planifiée (10 plans, plan-check frais PASSED), non exécutée"
+status: "Phase 45 en exécution (45-01, 45-03 livrés ; 45-02 bloqué, décision de Willy attendue)"
 created: 2026-09-23
-last_updated: "2026-09-29T00:00:00.000Z"
-last_activity: 2026-09-29
+last_updated: "2026-09-30T00:00:00.000Z"
+last_activity: 2026-09-30
 last_activity_desc: >-
-  Cadrage et planification de la Phase 45 (mission vf-dev-manager-g45-20260929, branche
-  gouvernance/phase-45-hook-central) : 45-CONTEXT.md (P45-D-01 à P45-D-21c, exigences GATE-01..15),
-  45-SCOUTING/RESEARCH/PATTERNS/VALIDATION, 10 plans en 8 vagues ; plan-check frais PASSED au tour 6
-  (4632c9b) après 5 révisions chirurgicales. Arbitrages Willy, AskUserQuestion session principale,
-  2026-09-29 : Q1-Q6 et 13 décisions déléguées (reconfirmées après /clear), P45-D-21a, P45-D-14a.
+  Exécution de la Phase 45 (mission vf-dev-manager-p45-exec, branche gouvernance/phase-45-execution) :
+  45-01 et 45-03 livrés, correction ciblée du socle après revue anticipée (quick 260930-kc3).
+  Arbitrages Willy, AskUserQuestion session principale, 2026-09-30 : F10 f10-archive, F7a f7a-racine,
+  F8 f8-agnostique, A3 a3-plan, F6 f6-oui, F7b f7b-oui, F9 f9-allowlist, rejeux réels étapes 1 et 4.
 stopped_at: >-
-  Phase 45 planifiée, PR de planification ouverte (sans merge, sans release). Prochain geste :
-  exécution de la Phase 45 (gsd-execute-phase 45 --ws gouvernance), vague 1 (45-01 ∥ 45-02).
+  45-02 bloqué : lecture de test-recalc-planning.sh:2830-3010 refusée par le classifieur de
+  permissions (« Instruction Poisoning »), non contournée ; décision de Willy attendue. 45-04 à 45-10 gelés.
 progress:
   total_phases: 9
   completed_phases: 3
@@ -45,7 +44,7 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 ## Progress
 
 **Phases Complete:** 3 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée).
-**Current Plan:** aucun en cours — Phase 45 planifiée (45-01 à 45-10), exécution non commencée
+**Current Plan:** 45-02 (bloqué — refus du classifieur de permissions, décision de Willy attendue) ; 45-01 et 45-03 livrés le 2026-09-30
 
 ## Session Continuity
 
@@ -65,6 +64,7 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 | 260928-s53 | Correction de CLASSE lot 7, Phase 44 : garde de lecture du détecteur — fidélité par EXÉCUTION de vf_ws_enumerate + lisibilité réelle de chaque compartiment/STATE.md, ferme la classe permissions dégradées (000/600/400) plus large que le lot 6 (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) | 2026-09-28 | 4b666e9 | passed | [260928-s53-correction-de-classe-lot-7-garde-de-lect](./quick/260928-s53-correction-de-classe-lot-7-garde-de-lect/) |
 | 260928-vk9 | Correction de CLASSE lot 8, Phase 44 (CORRECTION MINIMALE, dernier lot, aucun nouveau tour de juges) : lien symbolique cassé traité comme absent (`os.path.isfile`, mirroir de `[ -f ]`), `_ouvrable` non bloquante sur FIFO (O_NONBLOCK + fstat), correction de prose (detect-gsd-engine.sh/workstream-policy.sh inchangés, P44-D-01b) | 2026-09-28 | 0c284e3 | passed | [260928-vk9-correction-de-classe-lot-8-garde-de-lect](./quick/260928-vk9-correction-de-classe-lot-8-garde-de-lect/) |
 | 260928-uu0 | Correction de portabilité GNU/BSD, Phase 44 (reprise mgr-44-reprise, nœud livraison-44) : les 3 sites `stat -f "%Lp" ... \|\| stat -c "%a" ...` (R14, MUT-CHMOD, MUT-CHMOD-JOURNAL), source du KO `R14 permissions` sur le runner CI Linux, remplacés par `mode_octal()` (lecture via `os.stat().st_mode` par `$PYBIN`, une seule sémantique GNU/BSD) ; reste de la suite balayé, aucune autre correction nécessaire (recalc-planning.sh/detect-gsd-engine.sh/workstream-policy.sh inchangés) | 2026-09-28 | ad0a0fc | passed | [260928-uu0-corrige-la-portabilit-gnu-bsd-de-test-re](./quick/260928-uu0-corrige-la-portabilit-gnu-bsd-de-test-re/) |
+| 260930-kc3 | Correction ciblée du socle, Phase 45 (revue anticipée 45-01+45-03) : rejeu-reel.sh résout la racine du lab et refuse un rapport sous un lab (M1, M2), canary deny-gate distinct du mode dégradé (m3), garde statique d'environnement (m4), mutants de signature d'empreinte (m5), couche shell alignée sur realpath pour `..` (m1) | 2026-09-30 | 696979f | passed | [260930-kc3-correction-ciblee-socle-phase-45](./quick/260930-kc3-correction-ciblee-socle-phase-45/) |
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
