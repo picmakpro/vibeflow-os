@@ -33,7 +33,7 @@
 #        (HOME, /tmp, réseau : jamais injectée avec un gh réel), un chemin du script que les fixtures
 #        n'exécutent pas, une option `-c` qui lancerait un programme. X8 (liste blanche statique) n'est
 #        gardé que comme FILET : il attrape les formes courantes, il ne prouve rien seul.
-#   K1-K15 — budgets étendus (BACKLOG ouvert, index MEMORY.md, ROADMAP), plafonds de prose (STATE, entrée de BACKLOG),
+#   K1-K16 — budgets étendus (BACKLOG ouvert, index MEMORY.md, ROADMAP), plafonds de prose (STATE, entrée de BACKLOG),
 #        ARCHIVAGE (--archive, --auto) : tracé (INDEX.tsv), relisible, jamais de commit, source commitée seule, portée
 #        bornée au(x) compartiment(s) nommé(s) ou de la session, compartiment protégé intact, retour arrière par le blob
 #   X9 — une seule région exemptée du filet statique d'écriture (la région vf-archive-writer du script)
@@ -644,6 +644,13 @@ assert_rc "K14 — rien écrit pour cette source" "$(cmp -s "$KS/.planning/works
 assert "K14 — ARCHIVABLE maintenu" "$OUT" "ARCHIVABLE : $KS/.planning/workstreams/ws1/BACKLOG.md"
 assert_rc "K14 — rc 0 sans --strict" "$RC" 0
 GSD_WORKSTREAM=ws1 krun "$KS" --no-remote --auto --strict >/dev/null; assert_rc "K14 — sous --strict : rc 1, jamais 2" "$?" 1
+# K16 — racine RELATIVE (--root .) : les compartiments, énumérés en chemins absolus, sont archivés aussi (mesuré sur le dépôt réel)
+KQ="$WORK_DIR/kq"; mk_part "$KQ"
+OUT="$(cd "$KQ" && VF_ARCHIVE_DATE="$KD" bash "$CHECK" --root . --no-remote --archive backlog --ws ws1 2>&1)"; RC=$?
+assert "K16 — --root . : le BACKLOG du compartiment est archivé" "$OUT" "ARCHIVÉ : .planning/workstreams/ws1/BACKLOG.md"
+assert "K16 — --root . : celui de la racine aussi" "$OUT" "ARCHIVÉ : .planning/BACKLOG.md"
+refute "K16 — --root . : aucun refus" "$OUT" "ARCHIVAGE REFUSÉ"
+assert_rc "K16 — --root . : rc 0" "$RC" 0
 # K15 — lecture seule de git/gh maintenue sous --archive/--auto (l'enveloppe n'a rien refusé) et verbes vus
 assert_rc "K15 — zéro refus de l'enveloppe git/gh sur toute la section K" "$(( $(grep -c '^VIOLATION' "$RO_LOG") - NVIOL_K0 ))" 0
 assert "K15 — témoin : l'archivage a bien appelé ls-files --error-unmatch via l'enveloppe" "$(grep -c '^OK git .*\[ls-files\] \[--error-unmatch\]' "$RO_LOG" | sed 's/^0$/jamais/; s/^[1-9][0-9]*$/vu/')" "vu"

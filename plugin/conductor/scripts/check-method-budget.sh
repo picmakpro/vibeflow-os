@@ -163,6 +163,7 @@ fi
 [ -d "$ROOT" ] || { echo "[budget] racine introuvable : $ROOT" >&2; exit 64; }
 case "$ROOT" in /) ;; *) ROOT="${ROOT%/}" ;; esac
 [ -n "$ROOT" ] || ROOT="/"
+ROOT_ABS="$(cd "$ROOT" && pwd)"; ROOT_PHYS="$(cd "$ROOT" && pwd -P)"
 
 OVER=0
 UNVERIFIABLE=0
@@ -289,7 +290,13 @@ archive_refuse() { # <message> : un refus ne perd rien ; explicite = rc 2 en fin
 archive_one() { # <type> <label> <fichier absolu> <nom du fichier>
   local type="$1" label="$2" src="$3" base="$4" rel bytes n why arch archrel i ref motif
   [ -f "$src" ] && [ -r "$src" ] || return 0
-  rel="${src#"$ROOT"/}"
+  # Chemin relatif à la racine : les compartiments sont énumérés en chemins ABSOLUS, même sous --root .
+  case "$src" in
+    "$ROOT"/*) rel="${src#"$ROOT"/}" ;;
+    "$ROOT_ABS"/*) rel="${src#"$ROOT_ABS"/}" ;;
+    "$ROOT_PHYS"/*) rel="${src#"$ROOT_PHYS"/}" ;;
+    *) archive_refuse "${src} est hors de la racine ${ROOT}, rien déplacé"; return 0 ;;
+  esac
   bytes=$(wc -c < "$src" | tr -d ' ')
   case "$type" in
     state) [ "$bytes" -gt $(( STATE_KB * 1024 )) ] || return 0; motif="budget ${STATE_KB} Ko (SOBR-02)" ;;
