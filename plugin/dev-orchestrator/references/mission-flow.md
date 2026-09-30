@@ -657,22 +657,27 @@ en Metro ou en « quelle branche ? ». La doctrine « STATE ne garde que le cour
 - Worktrees actifs : **3 par dépôt** au plus, arbre principal non compté.
 
 **Moment : la clôture, avant le relâchement du verrou.** Le manager lance
-`"$S"/check-method-budget.sh --quiet` (lecture seule, ne supprime rien) et agit sur ses constats :
+`"$S"/check-method-budget.sh --auto --no-remote --quiet` : l'outil **archive seul** ce qui déborde
+(compartiment de la session, sources commitées, trace dans `.planning/archives/INDEX.tsv`, retour
+arrière `git cat-file blob <ref de l'INDEX>`), ne supprime ni ne commite rien. Le manager **commite
+l'archivage** (ADR-076), puis agit sur les constats restants :
 
-1. **STATE dépassé** : le point de la mission **remplace** la position courante, il ne s'ajoute pas
-   en tête. L'ancien contenu utile part dans `.planning/archives/state/` (fichier daté), jamais
-   supprimé. Le frontmatter GSD et les sections lues par l'outillage (`Current Position`,
-   `Project Reference`) restent en place.
+1. **STATE dépassé** : le corps au-delà du budget est archivé par l'outil ; le point de la mission
+   **remplace** la position courante, il ne s'ajoute pas en tête. Le frontmatter GSD et les sections
+   lues par l'outillage (`Current Position`, `Project Reference`) restent en place.
 2. **Worktree RANGEABLE** (branche travaillée puis intégrée dans la branche de référence) créé par
    la mission : `git worktree remove <chemin>`, **sans `--force`** ; un refus signale un changement
    non vu, on s'arrête et on le rapporte. Un worktree d'une autre mission ou d'une session en cours
-   n'est jamais touché : il est cité au rapport.
-3. **ORPHELIN** (dossier disparu) : `git worktree prune`.
+   n'est jamais touché : il est cité au rapport. Même règle pour la branche locale (`git branch -d`),
+   le stash (patch sous `.planning/archives/stash/` puis `drop`) et la mémoire (`git add`).
+3. **ORPHELIN** (dossier disparu) : `git worktree prune`. **Branche distante** : geste humain, jamais
+   rangée par la mission.
 4. Les constats restants (dépassement non résorbable par la mission) vont au rapport de mission,
    section `## Budgets`, pour que le head les relaie.
 
-Non bloquant par défaut : le script rend 0 sur un dépassement. Un lab qui veut en faire un gate
-l'appelle avec `--strict` (rend 1).
+Le script seul ne bloque rien (rend 0, `--strict` rend 1) ; c'est le contrôle **E7** de
+`check-mission-exit.sh` qui bloque la sortie tant qu'un RANGEABLE, ARCHIVABLE, ARCHIVAGE REFUSÉ, À VALIDER
+ou un archivage non commité reste. Un DÉPASSÉ seul se rapporte, il ne bloque pas.
 
 ## Lignes rouges (rappel ADR-053)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check-mission-exit.sh — Gate de sortie de mission du head (HEAD-02, D-06, D-07, D-10, D-11).
 #
-# Rôle : ce script CONSTATE l'état de six contrôles (E1 à E6) sur un dépôt de mission et un
+# Rôle : ce script CONSTATE l'état de sept contrôles (E1 à E7) sur un dépôt de mission et un
 # rapport détaillé écrit sur disque — il ne corrige rien, ne rejoue aucun étage, ne juge aucun
 # contenu métier. Vérifier le témoin, jamais refaire le travail (D-03) : sur un manque ou une
 # indétermination, la conduite (mandat de correction ciblée, escalade humaine) appartient au
@@ -9,10 +9,10 @@
 #
 # Contrat de sortie — QUATRE codes, précédence explicite 64 > 4 > 0 > 3 :
 #
-#   3  = SAIN — le SEUL code qui signifie « vérifié, conforme ». Les six contrôles ont été LUS
+#   3  = SAIN — le SEUL code qui signifie « vérifié, conforme ». Les sept contrôles ont été LUS
 #        et aucun n'a rendu ni manque ni indétermination. Sortie standard vide.
 #   0  = au moins un MANQUE NOMMÉ — une ligne de signal par manque sur la sortie standard, citant
-#        le contrôle (E1..E6) et le détail. Rendu même si un AUTRE contrôle est indéterminé : les
+#        le contrôle (E1 à E7) et le détail. Rendu même si un AUTRE contrôle est indéterminé : les
 #        manques sont TOUS imprimés, rien n'est perdu — mais voir la règle de précédence ci-dessous.
 #   4  = INDÉTERMINÉ — au moins un contrôle sans source de vérité (outillage absent, racine hors
 #        d'un dépôt git, argument de contexte manquant…), un diagnostic par cause sur la sortie
@@ -35,7 +35,7 @@
 # --hook ne change que le format d'affichage (parité d'interface avec les autres gates du dépôt) ;
 # --quiet supprime les diagnostics informatifs sur la sortie d'erreur. Mutuellement exclusifs.
 #
-# Les six contrôles :
+# Les sept contrôles :
 #   E1 — le verrou de driver est relâché (lu via `driver-lock.sh status`, JAMAIS via une
 #        sous-commande qui le modifie — D-11 : ce script LIT seulement, il n'invoque jamais un
 #        verbe qui libère, reprend ou récupère quoi que ce soit). Même lecture pour le registre
@@ -51,6 +51,13 @@
 #   E5 — le rapport détaillé de mission est présent et lisible sur disque.
 #   E6 — chaque verdict du rapport porte sa preuve (contrat `references/mission-contracts.md`
 #        §Contrat de preuves E6, section `## Preuves E6` du rapport, un bloc ```json).
+#   E7 — rien de rangeable n'est laissé (SOBR-07, ADR-076) : `check-method-budget.sh --auto --strict`
+#        archive SANS geste humain ce qu'un budget dépassé désigne (déplacement tracé, réversible,
+#        jamais de commit) puis rend ce qui reste : branche ou worktree intégré (RANGEABLE), sujet
+#        archivable, branche distante à valider, archivage refusé (source non commitée) — chacun un
+#        manque E7 —, et « archivé, à commiter » si l'arbre vient d'être modifié. Un DÉPASSÉ seul
+#        (rc 1 sans aucun de ces jetons) est un constat, pas un manque du geste : SAIN. Script de
+#        budget introuvable ou rc 2 : INDÉTERMINÉ (jamais sain).
 #
 # Résolution des scripts frères ($S) : cascade de `references/mission-flow.md` (§Résolution des
 # scripts), sentinelle testée `dag.sh` — PAS `driver-lock.sh`, qui est cherché SEULEMENT une fois
@@ -60,13 +67,15 @@
 #
 # Marqueurs `# >>> Ex` / `# <<< Ex` : chaque contrôle est entouré d'une paire de lignes de
 # commentaire dédiées à l'outillage de test (suppression chirurgicale d'un bloc à la fois, sans
-# rôle fonctionnel pour ce script). Les six contrôles sont INDÉPENDANTS — la suppression du bloc
-# d'un contrôle ne fait planter ni n'altère les cinq autres ; un contrôle dont le bloc est absent
+# rôle fonctionnel pour ce script). Les sept contrôles sont INDÉPENDANTS — la suppression du bloc
+# d'un contrôle ne fait planter ni n'altère les six autres ; un contrôle dont le bloc est absent
 # contribue silencieusement « sain » à l'agrégation (chaque variable d'état est initialisée à
 # « sain » avant les six blocs, précisément pour que cette suppression reste sans danger).
 #
-# Lecture seule intégrale (D-10) : aucune écriture, aucune modification du dépôt inspecté, aucune
-# sous-commande d'écriture d'aucun outil invoqué. D-18 : shell portable, aucune dépendance externe
+# Lecture seule (D-10), à UNE exception nommée : E7 est le SEUL écrivain du gate, par le seul
+# déplacement d'archive borné de `check-method-budget.sh --auto` (sources commitées, compartiment de la
+# session, jamais de commit) ; les six autres contrôles ne modifient rien, aucune sous-commande d'écriture d'un autre
+# outil n'est invoquée. E2 tourne avant E7 : l'arbre qu'E2 a jugé propre est celui d'avant l'archivage. D-18 : shell portable, aucune dépendance externe
 # neuve — interpréteur, outil de requête JSON, git et client GitHub sont déjà des prérequis de ce
 # dépôt.
 set -uo pipefail
@@ -143,7 +152,7 @@ resolve_S() {
   return 1
 }
 
-# --- États initiaux des six contrôles, HORS des marqueurs ------------------------------------------
+# --- États initiaux des sept contrôles, HORS des marqueurs ------------------------------------------
 # Initialisés à "sain" pour que la suppression chirurgicale d'un bloc (outillage de test, tâche 2)
 # ne fasse jamais planter ce script sous `set -u` et retombe silencieusement sur "sain" — c'est la
 # propriété d'isolation exigée par l'action de la tâche 1, jamais un chemin de production.
@@ -153,6 +162,7 @@ E3_STATUS="sain"; E3_MSG=""
 E4_STATUS="sain"; E4_MSG=""
 E5_STATUS="sain"; E5_MSG=""
 E6_STATUS="sain"; E6_MSG=""
+E7_STATUS="sain"; E7_MSG=""
 
 # >>> E1
 # E1 — verrou de driver relâché. Lecture SEULE (D-11) : ce script n'invoque que le sous-verbe qui
@@ -385,7 +395,7 @@ fi
 
 # >>> E6
 # E6 — chaque verdict du rapport porte sa preuve (mission-contracts.md §Contrat de preuves E6).
-# Résolution du chemin de rapport DUPLIQUÉE (et non partagée avec E5) : les six contrôles sont
+# Résolution du chemin de rapport DUPLIQUÉE (et non partagée avec E5) : les sept contrôles sont
 # indépendants, la suppression du bloc E5 ne doit jamais priver E6 de sa propre résolution.
 if [ -z "$REPORT" ]; then
   E6_STATUS="indet"
@@ -475,10 +485,45 @@ else
 fi
 # <<< E6
 
+# >>> E7
+# E7 — rien de rangeable n'est laissé (SOBR-07). Script de budget : frère de celui-ci (lab installé, scripts
+# à plat), sinon le module conductor voisin du dépôt source. Le seul écrivain du gate : voir l'en-tête.
+E7_BUDGET="$(dirname "$0")/check-method-budget.sh"
+[ -f "$E7_BUDGET" ] || E7_BUDGET="$(dirname "$0")/../../conductor/scripts/check-method-budget.sh"
+E7_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ|À VALIDER'
+if [ ! -f "$E7_BUDGET" ]; then
+  E7_STATUS="indet"
+  E7_MSG="[E7] check-method-budget.sh introuvable (ni à côté de ce script, ni sous ../../conductor/scripts)"
+else
+  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?
+  E7_LIGNES="$({ printf '%s\n' "$E7_OUT" | grep -E "$E7_TOK" || true; } | sed 's/^\[budget\] *//')"
+  E7_ARCHIVE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVÉ' || true; } | sed 's/^\[budget\] *//')"
+  E7_NONTENTE="$(printf '%s\n' "$E7_OUT" | grep 'ARCHIVAGE NON TENTÉ' || true)"
+  [ -n "$E7_NONTENTE" ] && say "[E7] $E7_NONTENTE"
+  if [ "$E7_RC" -ge 2 ]; then
+    E7_STATUS="indet"
+    E7_MSG="[E7] check-method-budget.sh a rendu $E7_RC (non vérifiable ou usage) : rien de sûr sur ce qui reste rangeable"
+    [ -n "$E7_ARCHIVE" ] && E7_MSG="$E7_MSG"$'\n'"[E7] archivé avant l'échec, à commiter : $E7_ARCHIVE"
+  else
+    E7_MANQUES=""
+    while IFS= read -r E7_L; do
+      [ -n "$E7_L" ] && E7_MANQUES="${E7_MANQUES}[E7] $E7_L"$'\n'
+    done <<EOF_E7
+$E7_LIGNES
+EOF_E7
+    [ -n "$E7_ARCHIVE" ] && E7_MANQUES="${E7_MANQUES}[E7] archivé, à commiter : $E7_ARCHIVE"$'\n'
+    if [ -n "$E7_MANQUES" ]; then
+      E7_STATUS="manque"
+      E7_MSG="${E7_MANQUES%$'\n'}"
+    fi
+  fi
+fi
+# <<< E7
+
 # --- Agrégation finale — précédence 64 > 4 > 0 > 3 (D-06) -----------------------------------------
 HAS_INDET=0
 HAS_MANQUE=0
-for id in E1 E2 E3 E4 E5 E6; do
+for id in E1 E2 E3 E4 E5 E6 E7; do
   svar="${id}_STATUS"
   mvar="${id}_MSG"
   s="${!svar}"
@@ -504,5 +549,5 @@ if [ "$HAS_MANQUE" -eq 1 ]; then
   exit 0
 fi
 
-say "SAIN — les six contrôles E1 à E6 ont été vérifiés et sont conformes."
+say "SAIN — les sept contrôles E1 à E7 ont été vérifiés et sont conformes."
 exit 3

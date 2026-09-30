@@ -2,7 +2,8 @@
 # test-check-mission-exit.sh — Suite de vérification de check-mission-exit.sh (HEAD-02, QUAL-01).
 #
 # Un cas par comportement du contrat (cf. en-tête du script testé), plus les six mutations de
-# fixture (une par contrôle E1-E6) et deux mutations structurelles (D-11, cascade E1). Fixtures
+# fixture (une par contrôle E1-E6) et deux mutations structurelles (D-11, cascade E1). Cas 28-36 :
+# contrôle E7 (SOBR-07, plan 41.3-04), trois mutants de script tués (rc attendu/obtenu). Fixtures
 # isolées via mktemp -d + git init + dépôt nu, jamais sur le repo réel. Chaque cas capture la
 # sortie ET le code de retour dans deux variables distinctes, assertées séparément.
 # Cas 23-27 (issue #82) : E1 lit aussi `children_running` du registre des agents dispatchés
@@ -388,6 +389,90 @@ err="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --ste
 named=0; case "$err" in *"registre des agents non exposé"*) named=1 ;; esac
 if [ "$rc" -eq 3 ] && [ "$named" -eq 1 ]; then ok "27 E1 registre : champ absent (kernel antérieur), code 3, non-applicabilité dite sur stderr"
 else ko "27 E1 registre : champ absent (kernel antérieur), code 3, non-applicabilité dite sur stderr" "rc=$rc err=[$err]"; fi
+
+# === Cas 28-36 — E7 : rien de rangeable n'est laissé (SOBR-07, plan 41.3-04) ==============================
+CONDUCTOR_REAL="$(cd "$(dirname "$SCRIPT")/../../conductor" && pwd)"
+mk_inst() { # <script à installer> <real|none|stub:<corps>> -> imprime le chemin de la copie (lab « installé » jetable)
+  local d; d="$(mktemp -d "$TMP/inst.XXXXXX")"
+  mkdir -p "$d/dev-orchestrator/scripts"; cp "$1" "$d/dev-orchestrator/scripts/check-mission-exit.sh"
+  case "$2" in
+    real) ln -s "$CONDUCTOR_REAL" "$d/conductor" ;;
+    stub:*) printf '%s\n' "${2#stub:}" > "$d/dev-orchestrator/scripts/check-method-budget.sh" ;;
+  esac
+  printf '%s' "$d/dev-orchestrator/scripts/check-mission-exit.sh"
+}
+gate_at() { # <script copie> <dépôt> -> stdout ; le rc et stderr via E7_RC / E7_ERR
+  E7_OUT="$( ( HOME="$EMPTY_HOME"; export HOME; unset CLAUDE_PLUGIN_ROOT GSD_WORKSTREAM 2>/dev/null; PATH="$GH_OK_BIN:$PATH" bash "$1" --root "$2" --report "$REPORT_REL" --step "$STEP" 2>"$TMP/e7.err" ) )"; E7_RC=$?
+  E7_ERR="$(cat "$TMP/e7.err")"
+}
+git_f() { git -C "$1" -c user.email=t@t -c user.name=t "${@:2}" >/dev/null 2>&1; }
+
+# E7a — une branche intégrée laissée derrière : manque E7 nommé, code 0.
+D="$(mk_sane_fixture c28)"; G7="$(mk_inst "$SCRIPT" real)"
+git_f "$D" checkout -q main; git_f "$D" checkout -q -b old; git_f "$D" commit -q --allow-empty -m "travail old"
+git_f "$D" checkout -q main; git_f "$D" merge -q --no-ff old -m "merge old"; git_f "$D" push -q origin main; git_f "$D" checkout -q feature/mission
+gate_at "$G7" "$D"
+case "$E7_OUT" in *"[E7] RANGEABLE branche : old"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 0 ] && [ "$named" -eq 1 ]; then ok "28 E7a branche mergée laissée — code 0, manque [E7] qui la nomme"; else ko "28 E7a branche mergée laissée" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
+
+# E7b — rien à ranger : E7 contribue au SAIN.
+D="$(mk_sane_fixture c29)"; gate_at "$G7" "$D"
+case "$E7_ERR" in *"sept contrôles E1 à E7"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 3 ] && [ -z "$E7_OUT" ] && [ "$named" -eq 1 ]; then ok "29 E7b rien à ranger — code 3, stdout vide, « sept contrôles E1 à E7 »"; else ko "29 E7b rien à ranger" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
+
+# E7c — script de budget introuvable, ou rc 2 : INDÉTERMINÉ, jamais sain.
+D="$(mk_sane_fixture c30)"; gate_at "$(mk_inst "$SCRIPT" none)" "$D"
+case "$E7_ERR" in *"[E7] check-method-budget.sh introuvable"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 4 ] && [ "$named" -eq 1 ]; then ok "30 E7c script de budget introuvable — code 4, cause nommée"; else ko "30 E7c introuvable" "rc=$E7_RC err=[$E7_ERR]"; fi
+D="$(mk_sane_fixture c30b)"; gate_at "$(mk_inst "$SCRIPT" 'stub:exit 2')" "$D"
+case "$E7_ERR" in *"[E7] check-method-budget.sh a rendu 2"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 4 ] && [ "$named" -eq 1 ]; then ok "30b E7c budget rc 2 — code 4, jamais SAIN"; else ko "30b E7c rc 2" "rc=$E7_RC err=[$E7_ERR]"; fi
+
+# E7d — rc 1 dû à DÉPASSÉ seul : constat, pas un manque du geste, SAIN.
+D="$(mk_sane_fixture c31)"; gate_at "$(mk_inst "$SCRIPT" 'stub:echo "[budget] STATE DÉPASSÉ : x fait 99 Ko (budget 8 Ko)"; exit 1')" "$D"
+if [ "$E7_RC" -eq 3 ] && [ -z "$E7_OUT" ]; then ok "31 E7d rc 1 dû à DÉPASSÉ seul — code 3 (non imputé au geste)"; else ko "31 E7d DÉPASSÉ seul" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
+
+# E7e — rc 1 dû à À VALIDER ou ARCHIVAGE REFUSÉ : manque, jamais SAIN.
+D="$(mk_sane_fixture c32)"; gate_at "$(mk_inst "$SCRIPT" 'stub:echo "[budget] À VALIDER branche distante : origin/x (PR #1, samuel) — suppression = geste humain"; exit 1')" "$D"
+case "$E7_OUT" in *"[E7] À VALIDER branche distante : origin/x"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 0 ] && [ "$named" -eq 1 ]; then ok "32 E7e À VALIDER — code 0, manque [E7] nommé"; else ko "32 E7e À VALIDER" "rc=$E7_RC out=[$E7_OUT]"; fi
+D="$(mk_sane_fixture c32b)"; gate_at "$(mk_inst "$SCRIPT" 'stub:echo "[budget] ARCHIVAGE REFUSÉ : .planning/BACKLOG.md modifiée dans l arbre de travail, non commitée, rien déplacé"; exit 1')" "$D"
+case "$E7_OUT" in *"[E7] ARCHIVAGE REFUSÉ"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 0 ] && [ "$named" -eq 1 ]; then ok "32b E7e ARCHIVAGE REFUSÉ — code 0, manque [E7] nommé"; else ko "32b E7e REFUSÉ" "rc=$E7_RC out=[$E7_OUT]"; fi
+
+# E7f — dépassement réel, source commitée : E7 archive SANS geste humain, rend « archivé, à commiter » ; après commit, SAIN.
+mk_e7f() { # <nom> -> dépôt sain dont le BACKLOG porte un sujet clos, commité
+  local d; d="$(mk_sane_fixture "$1")"
+  printf '# Backlog\n\n## Ouvert — DIFFÉRÉ (2026-01-01)\ntexte\n\n## Clos — CLOS (2026-01-02)\ntexte clos\n' > "$d/.planning/BACKLOG.md"
+  git_f "$d" add -A; git_f "$d" commit -q -m "backlog avec un sujet clos"; printf '%s' "$d"
+}
+D="$(mk_e7f c33)"; cp "$D/.planning/BACKLOG.md" "$TMP/e7f.avant"; H="$(git -C "$D" rev-parse HEAD)"; G7="$(mk_inst "$SCRIPT" real)"
+gate_at "$G7" "$D"
+case "$E7_OUT" in *"[E7] archivé, à commiter : ARCHIVÉ : .planning/BACKLOG.md"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 0 ] && [ "$named" -eq 1 ]; then ok "33 E7f archivage sans geste humain — code 0, « archivé, à commiter »"; else ko "33 E7f archivage" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
+REF="$(awk -F'\t' '$3 ~ /BACKLOG.md$/ { print $5 }' "$D/.planning/archives/INDEX.tsv" 2>/dev/null | head -1)"
+if [ -n "$REF" ] && git -C "$D" cat-file blob "$REF" > "$TMP/e7f.restaure" 2>/dev/null && cmp -s "$TMP/e7f.restaure" "$TMP/e7f.avant"; then ok "33b E7f ligne INDEX écrite, git cat-file blob <ref> = la source d'avant (cmp -s)"; else ko "33b E7f restauration" "blob de l'INDEX = source d'avant" "ref=[$REF]"; fi
+if [ "$(git -C "$D" rev-parse HEAD)" = "$H" ]; then ok "33c E7f aucun commit posé par le gate"; else ko "33c E7f aucun commit" "HEAD inchangé" "HEAD déplacé"; fi
+git_f "$D" add -A; git_f "$D" commit -q -m "archivage commité"; gate_at "$G7" "$D"
+if [ "$E7_RC" -eq 3 ] && [ -z "$E7_OUT" ]; then ok "34 E7f après le commit, second passage — code 3 (SAIN)"; else ko "34 E7f second passage" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
+
+# --- Mutants de script (rc attendu/obtenu, même forme que les autres suites du module) -------------------
+MUT_N=0
+e7_mutant() { # <id> <ancienne ligne> <nouvelle ligne> <scénario> <rc original attendu> <rc mutant attendu>
+  local id="$1" old="$2" new="$3" sc="$4" eo="$5" em="$6" f ro rm
+  MUT_N=$((MUT_N+1)); f="$TMP/mut-e7-$MUT_N.sh"
+  MUT_OLD="$old" MUT_NEW="$new" awk '{ if ($0 == ENVIRON["MUT_OLD"]) print ENVIRON["MUT_NEW"]; else print }' "$SCRIPT" > "$f"
+  if cmp -s "$f" "$SCRIPT" || ! bash -n "$f" 2>/dev/null; then ko "35 $id mutant NON OPPOSABLE" "mutation appliquée et syntaxe valide"; return; fi
+  "$sc" "$SCRIPT" "mo$MUT_N"; ro=$?; "$sc" "$f" "mm$MUT_N"; rm=$?
+  if [ "$ro" -eq "$eo" ] && [ "$rm" -eq "$em" ]; then ok "35 $id TUE : rc_mutant=$rm attendu $em, rc_original=$ro attendu $eo"
+  else ko "35 $id NON TUE" "original=$eo mutant=$em obtenu original=$ro mutant=$rm"; fi
+}
+sc_c() { local d; d="$(mk_sane_fixture "$2")"; gate_at "$(mk_inst "$1" 'stub:exit 2')" "$d"; return "$E7_RC"; }
+sc_e() { local d; d="$(mk_sane_fixture "$2")"; gate_at "$(mk_inst "$1" 'stub:echo "[budget] À VALIDER branche distante : origin/x (PR #1, samuel) — suppression = geste humain"; exit 1')" "$d"; return "$E7_RC"; }
+sc_f() { local d g; d="$(mk_e7f "$2")"; g="$(mk_inst "$1" real)"; gate_at "$g" "$d"; git_f "$d" add -A; git_f "$d" commit -q -m "archivage commité"; gate_at "$g" "$d"; return "$E7_RC"; }
+e7_mutant "E7c (rc 2 lu comme sain)" '  if [ "$E7_RC" -ge 2 ]; then' '  if [ "$E7_RC" -ge 99 ]; then' sc_c 4 3
+e7_mutant "E7e (jeton À VALIDER ignoré)" "E7_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ|À VALIDER'" "E7_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ'" sc_e 0 3
+e7_mutant "E7f (--auto retiré)" '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?' '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict 2>/dev/null)"; E7_RC=$?' sc_f 3 0
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
