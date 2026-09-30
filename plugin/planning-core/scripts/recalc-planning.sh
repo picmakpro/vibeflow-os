@@ -585,11 +585,15 @@ def _lecture_detecteur_fidele(planning_abs, bash_bin, workstream_policy_sh, env_
 # écrivait (exit 0) sur un lab GSD réel et effaçait son marqueur. L'environnement est désormais
 # construit DE ZÉRO (liste blanche) : PATH fixe de dossiers système, GSD_HOME seul — rien d'autre.
 def detection_gsd(detect_sh, planning_abs, racine_lab):
-    """« gsd », « non-gsd » ou « non-concluante ». Polarité inverse d'un DAG classique :
-    l'incertitude ferme l'écriture. Fail-closed intégral (lot 4, durci F1/F44-07) : détecteur
-    absent, en lien symbolique, non régulier, illisible, aucun candidat bash valide, échec de
-    lancement, ou tout code de sortie hors de {0, 2, 3} (dont un 1 improbable, la priorité 1 étant
-    neutralisée par l'environnement maîtrisé ci-dessous) -> `non-concluante`, jamais une écriture.
+    """« gsd », « non-gsd », « migration » ou « non-concluante ». Polarité inverse d'un DAG
+    classique : l'incertitude ferme l'écriture. Fail-closed intégral (lot 4, durci F1/F44-07) :
+    détecteur absent, en lien symbolique, non régulier, illisible, aucun candidat bash valide,
+    échec de lancement, ou tout code de sortie hors de {0, 2, 3} (dont un 1 improbable, la
+    priorité 1 étant neutralisée par l'environnement maîtrisé ci-dessous) -> `non-concluante`,
+    jamais une écriture. Code 0 -> `gsd` (refus) ; code 3 -> `non-gsd` (écriture) ; code 2 ->
+    `migration` : l'écriture est autorisée SOUS ADHÉSION `cycles-v1` seulement (P45-D-02, Phase 45)
+    — l'adhésion est testée par `main()` AVANT cette fonction, sans adhésion la sortie 2 de la 44
+    est inchangée ; la garde de lecture ci-dessous précède toujours le détecteur.
     Point envisagé et NON retenu (F1) : gater le code 3 sur une sortie stderr non vide — mesuré,
     un dossier de compartiments présent mais VIDE fait légitimement écrire deux lignes sur stderr
     (`vf_ws_enumerate`) tout en rendant le code 3 racine correct ; gater dessus aurait refusé
@@ -678,10 +682,13 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
         # stderr_nominal consigné dans le rapport de mission, jamais implémenté comme gate ici.
         return "non-gsd"  # motif-code-3-terrain-libre
     if code == 2:
-        # Signalement de MIGRATION (socle planning-core + signal de code) : refus d'écriture,
-        # jamais assimilé au code 3 « terrain libre » (décision du head sous délégation technique
-        # de Willy, session principale, 2026-09-28 — lot 2, L1).
-        return "non-concluante"  # motif-code-2-migration
+        # Signalement de MIGRATION (socle planning-core + signal de code) : jamais assimilé au code
+        # 3 « terrain libre » (décision du head sous délégation technique de Willy, session
+        # principale, 2026-09-28 — lot 2, L1). Verdict propre `migration` : l'écriture est admise
+        # SOUS ADHÉSION `cycles-v1` SEULEMENT (P45-D-02, Willy, AskUserQuestion session principale,
+        # 2026-09-29). Sans adhésion, `main()` sort en 2 AVANT d'appeler cette fonction : le refus de
+        # la 44 est inchangé. Le détecteur reste, lui, octet pour octet celui de la 44 (P45-D-02b).
+        return "migration"  # motif-code-2-migration
     if code == 1:
         # Sous environnement MAÎTRISÉ, la priorité 1 du détecteur (`[ ! -d "$GSD_HOME" ]`) ne
         # devrait plus jamais matcher — GSD_HOME ci-dessus existe toujours. Un code 1 malgré tout
@@ -1849,7 +1856,9 @@ def main():
         sys.exit(2)
 
     verdict_gsd = detection_gsd(detect_sh, planning_abs, racine_lab)
-    if verdict_gsd != "non-gsd":
+    # P45-D-02 : `migration` (détecteur à 2) est admis ICI, l'adhésion ayant déjà été exigée
+    # ci-dessus ; `gsd` et `non-concluante` (garde de lecture, code 1, repli) restent des refus.
+    if verdict_gsd not in ("non-gsd", "migration"):
         print(
             "[recalc-planning] refus d'écriture (P44-D-02a) : ce planning est tenu par le moteur "
             "GSD, ou sa détection n'est pas concluante — le recalcul n'écrit jamais dans ce cas",
