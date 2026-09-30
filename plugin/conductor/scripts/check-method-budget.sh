@@ -2,7 +2,8 @@
 # check-method-budget.sh — Budgets de méthode d'un lab (v2.67.0) : taille du fichier d'état,
 # nombre de worktrees actifs, et RANGEMENT (ce qui a été créé et n'a plus de raison d'être : branches
 # locales intégrées, stash sans propriétaire, mémoires d'agents hors git ou hors index, branches
-# distantes intégrées de leur seul propriétaire). CONSTATE, ne corrige rien, ne supprime rien.
+# distantes intégrées de leur seul propriétaire). CONSTATE ; seuls --archive et --auto DÉPLACENT (archivage,
+# voir plus bas), jamais ne supprime, jamais ne commite.
 #
 # Pourquoi : la trace d'un lab ne fait que s'accumuler si rien ne la borne. Mesuré sur un lab
 # client après deux mois de missions : STATE.md à 195 Ko (1 406 lignes, un « Point du … » ajouté
@@ -17,10 +18,26 @@
 #   VF_STATE_BUDGET_KB   taille max d'un STATE.md, en Ko (défaut 8)
 #   VF_WORKTREE_BUDGET   worktrees actifs max par dépôt, hors arbre principal (défaut 3)
 #   VF_BUDGET_PR_LIMIT   nombre de PR mergées lues chez gh (défaut 200) ; l'atteindre = liste possiblement tronquée
+#   VF_BACKLOG_OPEN_BUDGET        sujets OUVERTS max d'un BACKLOG.md (défaut 20). Un sujet est un titre `## ` ;
+#                                 il est CLOS si le premier mot après le dernier " — " du titre est l'un de
+#                                 CLOS, RÉSORBÉ, TRANCHÉ, ADOPTÉ, ADOPTÉE (vocabulaire fermé). Un sujet clos ne
+#                                 compte pas dans le budget : il est ARCHIVABLE. 20 sujets = ce qu'un tri humain
+#                                 tient d'un regard ; au-delà le fichier n'est plus relu en entier.
+#   VF_MEMORY_INDEX_BUDGET_LINES  lignes max d'un MEMORY.md sous .claude/agent-memory/*/ et .claude/memory/
+#                                 (défaut 200) : au-delà, l'index n'est plus chargé en entier par le harnais.
+#   VF_ROADMAP_BUDGET_KB          taille max d'un ROADMAP.md (racine et compartiments), en Ko (défaut 64).
+#   VF_STATE_NOTE_MAX_LINES       lignes max d'un paragraphe de prose du corps d'un STATE.md (défaut 12) ;
+#                                 paragraphe = suite de lignes de prose (ni titre, ni liste, ni tableau, ni
+#                                 citation, ni bloc de code, ni frontmatter).
+#   VF_BACKLOG_ENTRY_MAX_LINES    lignes max d'une entrée de BACKLOG.md, du titre à la dernière ligne non vide (défaut 40).
+#   VF_ARCHIVE_PROTECTED_WS       compartiments jamais archivés par l'outil, séparés par des virgules (défaut
+#                                 gouvernance : compartiment d'un autre mainteneur).
+#   VF_ARCHIVE_DATE               date AAAA-MM-JJ des noms d'archive (défaut : le jour ; surcharge pour les suites).
 #
 # Usage :
 #   check-method-budget.sh [--root <dir>] [--repo <dir>]... [--strict] [--quiet]
 #                          [--owner <login>]... [--no-remote]
+#                          [--archive <types> | --auto] [--ws <nom>]...
 #   --root   racine du lab (défaut .). STATE.md lus : <root>/.planning/STATE.md et celui de
 #            chaque compartiment de workstream (énumérés par vf_ws_enumerate).
 #   --repo   dépôt git dont compter les worktrees (répétable). Défaut : <root> s'il est un dépôt
@@ -42,6 +59,29 @@
 #            aucun remote origin (ni URL, ni ref `origin/…`) alors que des refs distantes
 #            existent = branches distantes non examinées, dit.
 #   --no-remote  ne consulte pas GitHub (aucun appel gh) : branches distantes non examinées.
+#   --archive <types>  ARCHIVE (déplace, ne supprime pas) ce qu'une règle décidable désigne ; types = liste
+#            explicite parmi backlog, state, roadmap (séparés par des virgules ; sans liste : rc 64). backlog :
+#            les sujets clos, toujours ; state : au-delà du budget, le contenu des sections hors Project Reference,
+#            Current Position et Session Continuity (frontmatter, titres et la ligne ^Phase: gardés) ; roadmap :
+#            au-delà du budget, les blocs <details>. La racine `.planning/` est toujours incluse ; un compartiment
+#            de workstream n'est archivé que s'il est nommé par --ws (répétable) ; un compartiment protégé
+#            (VF_ARCHIVE_PROTECTED_WS) rend 64. Une source modifiée ou non suivie par git : refus, rien écrit,
+#            rc 2. Destination `.planning/archives/<type>/<compartiment|racine>-<fichier>-<AAAA-MM-JJ>.md` :
+#            les blocs déplacés TELS QUELS, aucune ligne d'en-tête ni séparateur ajouté ; à leur place une ligne
+#            `<!-- vf-archive: <archive> -->` ; une ligne de `.planning/archives/INDEX.tsv` (date, type, source,
+#            archive, ref = blob d'origine, motif). JAMAIS de commit ni de `git add` : le déplacement se voit au
+#            `git status`. L'archive est écrite et relue AVANT toute modification de la source.
+#            RESTAURER : `git cat-file blob <ref de l'INDEX>` restitue la source d'avant l'archivage.
+#   --auto   décision ET exécution, pour le geste de fin (clôture de mission, fin de travail direct) : mêmes règles,
+#            types = ceux qui ont de l'archivable ; compartiments = --ws répétés, sinon $GSD_WORKSTREAM. Dépôt
+#            partitionné (.planning/workstreams) et aucun compartiment résolu : ARCHIVAGE NON TENTÉ, rien déplacé.
+#            Compartiment protégé ou source non commitée : ARCHIVAGE REFUSÉ, rien déplacé, rc inchangé (jamais 2).
+#            L'archivage précède les mesures : une exécution rend l'état d'après.
+#
+# JETONS de constat (CONTRAT lu par guard-fin-de-geste.sh et check-mission-exit.sh E7 ; une ligne chacun) :
+#   RANGEABLE, À VALIDER  (rangement, plan 41.3-02) · ARCHIVABLE (sujet clos encore au BACKLOG) · ARCHIVÉ (ce que
+#   l'archivage vient de déplacer) · ARCHIVAGE REFUSÉ · ARCHIVAGE NON TENTÉ · DÉPASSÉ / PROSE DÉPASSÉE (budget ou
+#   plafond de prose : un constat, pas un geste à faire). Aucune ligne de budget ne porte RANGEABLE.
 #
 # Sortie standard : une ligne par constat, préfixe [budget]. Pour chaque worktree actif, dit s'il
 # est RANGEABLE (sa branche ou sa tête est déjà intégrée dans la branche de référence du dépôt) ou
@@ -53,7 +93,7 @@
 #         introuvable, gh ou jq indisponible ou muet, stash illisible, branche de référence introuvable
 #         ou orpheline, git for-each-ref en échec) — jamais un 0 de complaisance sous
 #         --strict · 64 = argument invalide. Sous --strict, tout RANGEABLE et tout À VALIDER
-#         compte comme un dépassement.
+#         compte comme un dépassement. --archive : 2 aussi quand une source est refusée (rien écrit pour elle).
 set -uo pipefail
 
 ROOT="."
@@ -65,6 +105,16 @@ OWNERS=""
 STATE_KB="${VF_STATE_BUDGET_KB:-8}"
 PR_LIMIT="${VF_BUDGET_PR_LIMIT:-200}"
 WT_MAX="${VF_WORKTREE_BUDGET:-3}"
+BACKLOG_OPEN_MAX="${VF_BACKLOG_OPEN_BUDGET:-20}"
+MEMIDX_MAX="${VF_MEMORY_INDEX_BUDGET_LINES:-200}"
+ROADMAP_KB="${VF_ROADMAP_BUDGET_KB:-64}"
+STATE_NOTE_MAX="${VF_STATE_NOTE_MAX_LINES:-12}"
+BACKLOG_ENTRY_MAX="${VF_BACKLOG_ENTRY_MAX_LINES:-40}"
+PROTECTED_WS="${VF_ARCHIVE_PROTECTED_WS:-gouvernance}"
+ARCHIVE_DATE="${VF_ARCHIVE_DATE:-$(date +%Y-%m-%d)}"
+ARCHIVE_TYPES=""
+AUTO=0
+WS_NAMED=""
 
 usage() { sed -n '/^# Usage :/,/^# Sortie standard/p' "$0" >&2; exit 64; }
 
@@ -77,6 +127,13 @@ while [ "$#" -gt 0 ]; do
     --owner) [ "$#" -ge 2 ] || usage; OWNERS="$OWNERS
 $2"; shift 2 ;;
     --no-remote) NO_REMOTE=1; shift ;;
+    --archive)
+      [ "$#" -ge 2 ] || { echo "[budget] --archive exige une liste de types (backlog, state, roadmap)" >&2; exit 64; }
+      case "$2" in --*) echo "[budget] --archive exige une liste de types (backlog, state, roadmap)" >&2; exit 64 ;; esac
+      ARCHIVE_TYPES="$2"; shift 2 ;;
+    --auto) AUTO=1; shift ;;
+    --ws) [ "$#" -ge 2 ] || usage; WS_NAMED="$WS_NAMED
+$2"; shift 2 ;;
     -h|--help) usage ;;
     *) echo "[budget] argument inconnu : $1" >&2; usage ;;
   esac
@@ -84,12 +141,188 @@ done
 case "$STATE_KB" in ''|*[!0-9]*) echo "[budget] VF_STATE_BUDGET_KB invalide : $STATE_KB" >&2; exit 64 ;; esac
 case "$WT_MAX" in ''|*[!0-9]*) echo "[budget] VF_WORKTREE_BUDGET invalide : $WT_MAX" >&2; exit 64 ;; esac
 case "$PR_LIMIT" in ''|*[!0-9]*|0) echo "[budget] VF_BUDGET_PR_LIMIT invalide : $PR_LIMIT" >&2; exit 64 ;; esac
+for _v in BACKLOG_OPEN_MAX MEMIDX_MAX ROADMAP_KB STATE_NOTE_MAX BACKLOG_ENTRY_MAX; do
+  eval "_val=\${$_v}"
+  case "$_val" in ''|*[!0-9]*|0) echo "[budget] budget invalide ($_v) : $_val" >&2; exit 64 ;; esac
+done
+case "$ARCHIVE_DATE" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *) echo "[budget] VF_ARCHIVE_DATE invalide : $ARCHIVE_DATE" >&2; exit 64 ;; esac
+if [ "$AUTO" -eq 1 ] && [ -n "$ARCHIVE_TYPES" ]; then echo "[budget] --archive et --auto s'excluent" >&2; exit 64; fi
+if [ -n "${WS_NAMED//[$'\n ']/}" ] && [ "$AUTO" -eq 0 ] && [ -z "$ARCHIVE_TYPES" ]; then echo "[budget] --ws exige --archive ou --auto" >&2; exit 64; fi
+if [ -n "$ARCHIVE_TYPES" ]; then
+  for _t in $(printf '%s' "$ARCHIVE_TYPES" | tr ',' ' '); do
+    case "$_t" in backlog|state|roadmap) ;; *) echo "[budget] type d'archive inconnu : $_t (attendu : backlog, state, roadmap)" >&2; exit 64 ;; esac
+  done
+  # Un compartiment protégé nommé explicitement : refus net, avant tout geste.
+  while IFS= read -r _w; do
+    [ -n "$_w" ] || continue
+    case ",$PROTECTED_WS," in *",$_w,"*) echo "[budget] compartiment protégé (VF_ARCHIVE_PROTECTED_WS) : $_w" >&2; exit 64 ;; esac
+  done <<EOF0
+$WS_NAMED
+EOF0
+fi
 [ -d "$ROOT" ] || { echo "[budget] racine introuvable : $ROOT" >&2; exit 64; }
+case "$ROOT" in /) ;; *) ROOT="${ROOT%/}" ;; esac
+[ -n "$ROOT" ] || ROOT="/"
 
 OVER=0
 UNVERIFIABLE=0
 say() { [ "$QUIET" -eq 1 ] || echo "[budget] $*"; }
 flag() { echo "[budget] $*"; }
+
+# >>> vf-archive-writer
+# --- Lecture des fichiers de planning : BACKLOG, STATE, ROADMAP (lecture seule) ---------------------
+# Programmes awk (LC_ALL=C : octets, le vocabulaire est en UTF-8). SANS apostrophe : ils vivent dans des chaînes
+# entre apostrophes. Fonctions communes à la mesure ET à l'archivage : une seule règle de « clos ».
+AWK_COMMON='
+function isclosed(t,   n, p, w) {
+  n = split(t, p, " — ")
+  if (n < 2) return 0
+  w = p[n]; sub(/^[ \t]+/, "", w); sub(/[ \t(:,;.].*$/, "", w)
+  return (w == "CLOS" || w == "RÉSORBÉ" || w == "TRANCHÉ" || w == "ADOPTÉ" || w == "ADOPTÉE")
+}
+function isfence(l) { return (l ~ /^(```|~~~)/) }
+function sanit(t) { gsub(/--/, "-", t); return t }
+'
+AWK_BACKLOG_MEASURE="$AWK_COMMON"'
+function endb() {
+  if (!inb) return
+  if (cl) nc++; else no++
+  if (last > MAX) printf "L\t%d\t%d\t%s\n", start, last, title
+  inb = 0; last = 0
+}
+{ if (isfence($0)) fence = !fence }
+!fence && /^## / { endb(); title = substr($0, 4); cl = isclosed(title); start = NR; len = 0; inb = 1 }
+inb { len++; if ($0 !~ /^[ \t]*$/) last = len }
+END { endb(); printf "C\t%d\t%d\n", no + 0, nc + 0 }
+'
+AWK_STATE_PROSE='
+NR == 1 && /^---[ \t]*$/ { fm = 1; next }
+fm == 1 { if ($0 ~ /^---[ \t]*$/) fm = 2; next }
+function endrun() { if (run > MAX) printf "%d\t%d\n", start, run; run = 0 }
+isfence($0) { fence = !fence; endrun(); next }
+fence { next }
+{
+  prose = ($0 !~ /^[ \t]*$/ && $0 !~ /^#/ && $0 !~ /^[ \t]*[-*+] / && $0 !~ /^[ \t]*[0-9]+[.)] / && $0 !~ /^[ \t]*\|/ && $0 !~ /^[ \t]*>/ && $0 !~ /^<!--/)
+  if (prose) { if (run == 0) start = NR; run++ } else endrun()
+}
+END { endrun() }
+'
+AWK_STATE_PROSE="$AWK_COMMON$AWK_STATE_PROSE"
+# Archivage : chaque programme écrit la source allégée sur la sortie standard, le contenu déplacé dans ARCH
+# (verbatim, sans en-tête), le nombre d'unités déplacées dans CNT. Pointeur : ligne « <!-- vf-archive: ... -->».
+AWK_BACKLOG_ARCHIVE="$AWK_COMMON"'
+function flushb(   i) {
+  if (!inb) return
+  if (cl) {
+    for (i = 1; i <= nb; i++) print blk[i] > ARCH
+    n++; print "<!-- vf-archive: " ARCHREL " — ## " sanit(title) " -->"
+  } else for (i = 1; i <= nb; i++) print blk[i]
+  nb = 0; inb = 0
+}
+{
+  if (isfence($0)) { fence = !fence; if (inb) blk[++nb] = $0; else print; next }
+  if (!fence && $0 ~ /^## /) { flushb(); title = substr($0, 4); cl = isclosed(title); inb = 1; blk[++nb] = $0; next }
+  if (inb) blk[++nb] = $0; else print
+}
+END { flushb(); print n + 0 > CNT }
+'
+AWK_STATE_ARCHIVE="$AWK_COMMON"'
+BEGIN { keep = 1 }
+NR == 1 && /^---[ \t]*$/ { fm = 1; print; next }
+fm == 1 { print; if ($0 ~ /^---[ \t]*$/) fm = 2; next }
+{
+  if (isfence($0)) fence = !fence
+  else if (!fence && $0 ~ /^#+ /) {
+    print
+    if ($0 ~ /^# /) keep = 1; else keep = (tolower($0) ~ /project reference|current position|session continuity/)
+    ptr = 0; next
+  }
+  if (keep || $0 ~ /^[ \t]*$/ || $0 ~ /^Phase:/) { print; next }
+  if (!ptr) { print "<!-- vf-archive: " ARCHREL " -->"; ptr = 1 }
+  print > ARCH; n++
+}
+END { print n + 0 > CNT }
+'
+AWK_ROADMAP_ARCHIVE="$AWK_COMMON"'
+function chk(l,   m) { if (sum == "" && match(l, /<summary>.*<\/summary>/)) sum = substr(l, RSTART + 9, RLENGTH - 19) }
+function flushd(   i) {
+  for (i = 1; i <= nb; i++) print buf[i] > ARCH
+  n++; print "<!-- vf-archive: " ARCHREL " — " sanit(sum == "" ? "bloc replie" : sum) " -->"
+  nb = 0; sum = ""
+}
+{
+  if (depth == 0 && isfence($0)) fence = !fence
+  if (depth == 0 && !fence && $0 ~ /^<details[ >]/) { depth = 1; nb = 0; sum = ""; buf[++nb] = $0; chk($0); next }
+  if (depth > 0) {
+    buf[++nb] = $0; chk($0)
+    if ($0 ~ /<details[ >]/) depth++
+    if ($0 ~ /<\/details>/) depth--
+    if (depth == 0) flushd()
+    next
+  }
+  print
+}
+END { for (i = 1; i <= nb && depth > 0; i++) print buf[i]; print n + 0 > CNT }
+'
+
+# Programmes awk ci-dessus (leurs `>` sont des comparaisons ou des écritures vers ARCH/CNT) et fonctions ci-dessous :
+# SEUL endroit du script qui ÉCRIT (archive, source allégée, INDEX). La suite (X8) l'exempte du filet statique
+# d'écriture, et seulement lui ; X9 vérifie qu'il n'existe qu'une paire de marqueurs. La lecture seule des
+# autres modes est prouvée par exécution (RO1-RO5). Verbes git employés ici : rev-parse, ls-files (lecture).
+ARCHIVE_REFUSED=0
+TMPD=""
+trap '[ -n "$TMPD" ] && rm -rf "$TMPD"' EXIT
+src_unclean() { # <chemin relatif a ROOT> : imprime la raison et rend 0 si la source N est PAS archivable
+  local rel="$1" h i
+  git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || { echo "$ROOT n'est pas un dépôt git"; return 0; }
+  git -C "$ROOT" ls-files --error-unmatch -- "$rel" >/dev/null 2>&1 || { echo "non suivie par git"; return 0; }
+  h=$(git -C "$ROOT" rev-parse -q --verify "HEAD:./$rel" 2>/dev/null) || { echo "absente de HEAD"; return 0; }
+  i=$(git -C "$ROOT" rev-parse -q --verify ":./$rel" 2>/dev/null) || { echo "absente de l'index"; return 0; }
+  [ "$h" = "$i" ] || { echo "modifiée dans l'index, non commitée"; return 0; }
+  [ -z "$(git -C "$ROOT" ls-files -m -- "$rel" 2>/dev/null)" ] || { echo "modifiée dans l'arbre de travail, non commitée"; return 0; }
+  return 1
+}
+archive_refuse() { # <message> : un refus ne perd rien ; explicite = rc 2 en fin, auto = constat seul
+  ARCHIVE_REFUSED=1
+  flag "ARCHIVAGE REFUSÉ : $1"
+}
+archive_one() { # <type> <label> <fichier absolu> <nom du fichier>
+  local type="$1" label="$2" src="$3" base="$4" rel bytes n why arch archrel i ref motif
+  [ -f "$src" ] && [ -r "$src" ] || return 0
+  rel="${src#"$ROOT"/}"
+  bytes=$(wc -c < "$src" | tr -d ' ')
+  case "$type" in
+    state) [ "$bytes" -gt $(( STATE_KB * 1024 )) ] || return 0; motif="budget ${STATE_KB} Ko (SOBR-02)" ;;
+    roadmap) [ "$bytes" -gt $(( ROADMAP_KB * 1024 )) ] || return 0; motif="budget ${ROADMAP_KB} Ko, blocs replies (SOBR-06)" ;;
+    backlog) motif="sujets clos (SOBR-06)" ;;
+  esac
+  [ -n "$TMPD" ] || { TMPD=$(mktemp -d) || { UNVERIFIABLE=1; flag "ARCHIVAGE NON TENTÉ : dossier temporaire impossible"; return 0; }; }
+  archrel=".planning/archives/$type/${label}-${base}-${ARCHIVE_DATE}.md"
+  i=1; while [ -e "$ROOT/$archrel" ]; do i=$((i + 1)); archrel=".planning/archives/$type/${label}-${base}-${ARCHIVE_DATE}-${i}.md"; done
+  : > "$TMPD/cnt"; : > "$TMPD/arch"
+  local prog
+  case "$type" in backlog) prog="$AWK_BACKLOG_ARCHIVE" ;; state) prog="$AWK_STATE_ARCHIVE" ;; roadmap) prog="$AWK_ROADMAP_ARCHIVE" ;; esac
+  LC_ALL=C awk -v ARCH="$TMPD/arch" -v ARCHREL="$archrel" -v CNT="$TMPD/cnt" "$prog" "$src" > "$TMPD/new" \
+    || { archive_refuse "${rel} : lecture impossible (awk en échec)"; UNVERIFIABLE=1; return 0; }
+  n=$(cat "$TMPD/cnt"); case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  [ "$n" -gt 0 ] || return 0
+  if why=$(src_unclean "$rel"); then archive_refuse "$rel $why, rien déplacé"; return 0; fi
+  # Preuve avant toute écriture : les lignes de la source = celles de la source allégée (hors pointeurs) + l'archive.
+  { awk 'index($0, "<!-- vf-archive: ") != 1' "$TMPD/new"; cat "$TMPD/arch"; } | LC_ALL=C sort > "$TMPD/m1"
+  LC_ALL=C sort "$src" > "$TMPD/m0"
+  cmp -s "$TMPD/m0" "$TMPD/m1" || { archive_refuse "$rel : preuve des lignes conservées en échec, rien déplacé"; return 0; }
+  ref=$(git -C "$ROOT" rev-parse "HEAD:./$rel" 2>/dev/null) || { archive_refuse "$rel : blob d'origine illisible, rien déplacé"; return 0; }
+  mkdir -p "$ROOT/.planning/archives/$type" || { archive_refuse "$rel : dossier d'archive impossible"; return 0; }
+  cat "$TMPD/arch" > "$ROOT/$archrel" && cmp -s "$ROOT/$archrel" "$TMPD/arch" \
+    || { rm -f "$ROOT/$archrel"; archive_refuse "$rel : archive non relisible, rien déplacé"; return 0; }
+  if [ ! -s "$ROOT/.planning/archives/INDEX.tsv" ]; then
+    printf 'date\ttype\tsource\tarchive\tref\tmotif\n' > "$ROOT/.planning/archives/INDEX.tsv"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ARCHIVE_DATE" "$type" "$rel" "$archrel" "$ref" "$motif" >> "$ROOT/.planning/archives/INDEX.tsv"
+  cat "$TMPD/new" > "$src"
+  flag "ARCHIVÉ : ${rel} → ${archrel} (${n} unité(s), blob d'origine ${ref:0:8}, restaurer : git cat-file blob ${ref})"
+}
+# <<< vf-archive-writer
 
 # --- Budget 1 : taille des fichiers d'état -------------------------------------------------
 STATE_FILES=()
@@ -99,6 +332,7 @@ STATE_FILES=()
 # workstream-planning-consumers.md), jamais par un glob maison. Politique sourcée SEULEMENT si
 # `workstreams/` existe (même posture que check-divergence.sh) ; les trois codes du contrat sont
 # traités, un compartiment non vérifiable est DIT, jamais tu.
+WS_DIRS=""
 if [ -e "$ROOT/.planning/workstreams" ]; then
   WS_POLICY=""
   for _cand in "$(dirname "$0")/workstream-policy.sh" \
@@ -114,6 +348,7 @@ if [ -e "$ROOT/.planning/workstreams" ]; then
     WS_LIST="$(vf_ws_enumerate "$ROOT/.planning")"; _ws_rc=$?
     case "$_ws_rc" in
       0)
+        WS_DIRS="$WS_LIST"
         while IFS= read -r _wsdir; do
           [ -n "$_wsdir" ] && [ -f "$_wsdir/STATE.md" ] && STATE_FILES+=("$_wsdir/STATE.md")
         done <<EOF
@@ -128,6 +363,50 @@ EOF
     esac
   fi
 fi
+archive_pass() {
+  local names nm dir found t label file base targets types line
+  names="$WS_NAMED"
+  if [ "$AUTO" -eq 1 ] && [ -z "${names//[$'\n ']/}" ]; then
+    names="${GSD_WORKSTREAM:-}"
+    if [ -z "$names" ] && [ -e "$ROOT/.planning/workstreams" ]; then
+      flag "ARCHIVAGE NON TENTÉ : compartiment de session non résolu (aucun --ws, GSD_WORKSTREAM vide) sur un dépôt partitionné, rien déplacé"
+      return 0
+    fi
+  fi
+  targets="racine|$ROOT/.planning"
+  while IFS= read -r nm; do
+    [ -n "$nm" ] || continue
+    case ",$PROTECTED_WS," in
+      *",$nm,"*) flag "ARCHIVAGE REFUSÉ : compartiment protégé ${nm} (VF_ARCHIVE_PROTECTED_WS), rien déplacé"; return 0 ;;
+    esac
+    found=""
+    while IFS= read -r dir; do
+      [ -n "$dir" ] || continue
+      [ "${dir##*/}" = "$nm" ] && { found="$dir"; break; }
+    done <<EOF4
+$WS_DIRS
+EOF4
+    if [ -z "$found" ]; then
+      if [ "$AUTO" -eq 1 ]; then flag "ARCHIVAGE NON TENTÉ : compartiment ${nm} introuvable sous .planning/workstreams, rien déplacé"; return 0; fi
+      echo "[budget] compartiment introuvable : $nm" >&2; exit 64
+    fi
+    targets="$targets
+${nm}|$found"
+  done <<EOF5
+$names
+EOF5
+  if [ "$AUTO" -eq 1 ]; then types="backlog state roadmap"; else types="$(printf '%s' "$ARCHIVE_TYPES" | tr ',' ' ')"; fi
+  while IFS='|' read -r label dir; do
+    [ -n "$label" ] || continue
+    for t in $types; do
+      case "$t" in backlog) file=BACKLOG.md; base=BACKLOG ;; state) file=STATE.md; base=STATE ;; roadmap) file=ROADMAP.md; base=ROADMAP ;; esac
+      archive_one "$t" "$label" "$dir/$file" "$base"
+    done
+  done <<EOF6
+$targets
+EOF6
+}
+if [ "$AUTO" -eq 1 ] || [ -n "$ARCHIVE_TYPES" ]; then archive_pass; fi
 if [ "${#STATE_FILES[@]}" -eq 0 ]; then
   say "STATE : aucun fichier d'état sous $ROOT/.planning, budget non applicable"
 fi
@@ -141,6 +420,77 @@ for f in "${STATE_FILES[@]+"${STATE_FILES[@]}"}"; do
     say "STATE ok : $f fait $kb Ko (budget $STATE_KB Ko)"
   fi
 done
+
+# --- Budget 1bis : BACKLOG ouvert, ROADMAP, index de mémoire, plafonds de prose ------------------------
+readable() { # <fichier> <étiquette> : 0 lisible, 1 absent, 2 présent mais illisible (NON VÉRIFIABLE dit)
+  [ -e "$1" ] || return 1
+  if [ -f "$1" ] && [ -r "$1" ]; then return 0; fi
+  UNVERIFIABLE=1; flag "$2 NON VÉRIFIABLE : $1 est illisible ou n'est pas un fichier"; return 2
+}
+PLAN_DIRS="$ROOT/.planning"
+[ -z "$WS_DIRS" ] || PLAN_DIRS="$PLAN_DIRS
+$WS_DIRS"
+while IFS= read -r d; do
+  [ -n "$d" ] || continue
+  f="$d/BACKLOG.md"
+  if readable "$f" BACKLOG; then
+    out=$(LC_ALL=C awk -v MAX="$BACKLOG_ENTRY_MAX" "$AWK_BACKLOG_MEASURE" "$f"); rc=$?
+    if [ "$rc" -ne 0 ]; then UNVERIFIABLE=1; flag "BACKLOG NON VÉRIFIABLE : $f lecture en échec (awk rc $rc)"; else
+      nopen=0; nclosed=0
+      while IFS=$'\t' read -r kind a b c; do
+        case "$kind" in
+          C) nopen="$a"; nclosed="$b" ;;
+          L) OVER=1; flag "PROSE DÉPASSÉE : ${f}:${a} (entrée « ${c} » de ${b} lignes, plafond ${BACKLOG_ENTRY_MAX})" ;;
+        esac
+      done <<EOF7
+$out
+EOF7
+      if [ "$nopen" -gt "$BACKLOG_OPEN_MAX" ]; then
+        OVER=1; flag "BACKLOG DÉPASSÉ : $f compte $nopen sujets ouverts (budget $BACKLOG_OPEN_MAX) — trier, clore ou traiter"
+      else
+        say "BACKLOG ok : $f compte $nopen sujets ouverts (budget $BACKLOG_OPEN_MAX)"
+      fi
+      if [ "$nclosed" -gt 0 ]; then
+        OVER=1; flag "ARCHIVABLE : $f porte $nclosed sujet(s) clos encore en ligne (--archive backlog)"
+      fi
+    fi
+  fi
+  f="$d/ROADMAP.md"
+  if readable "$f" ROADMAP; then
+    bytes=$(wc -c < "$f" | tr -d ' '); kb=$(( (bytes + 1023) / 1024 ))
+    if [ "$bytes" -gt $(( ROADMAP_KB * 1024 )) ]; then
+      OVER=1; flag "ROADMAP DÉPASSÉ : $f fait $kb Ko (budget $ROADMAP_KB Ko) — replier les jalons livrés (<details>) puis --archive roadmap"
+    else
+      say "ROADMAP ok : $f fait $kb Ko (budget $ROADMAP_KB Ko)"
+    fi
+  fi
+done <<EOF8
+$PLAN_DIRS
+EOF8
+for f in "${STATE_FILES[@]+"${STATE_FILES[@]}"}"; do
+  readable "$f" STATE || continue
+  out=$(LC_ALL=C awk -v MAX="$STATE_NOTE_MAX" "$AWK_STATE_PROSE" "$f"); rc=$?
+  if [ "$rc" -ne 0 ]; then UNVERIFIABLE=1; flag "STATE NON VÉRIFIABLE : $f lecture en échec (awk rc $rc)"; continue; fi
+  while IFS=$'\t' read -r a b; do
+    [ -n "$a" ] || continue
+    OVER=1; flag "PROSE DÉPASSÉE : ${f}:${a} (paragraphe de ${b} lignes, plafond ${STATE_NOTE_MAX})"
+  done <<EOF9
+$out
+EOF9
+done
+MEM_INDEXES=$( { find "$ROOT/.claude/agent-memory" -maxdepth 2 -name MEMORY.md 2>/dev/null; [ -f "$ROOT/.claude/memory/MEMORY.md" ] && echo "$ROOT/.claude/memory/MEMORY.md"; } | LC_ALL=C sort )
+while IFS= read -r f; do
+  [ -n "$f" ] || continue
+  readable "$f" MEMORY || continue
+  nl=$(awk 'END { print NR }' "$f")
+  if [ "$nl" -gt "$MEMIDX_MAX" ]; then
+    OVER=1; flag "MEMORY DÉPASSÉ : $f fait $nl lignes (budget $MEMIDX_MAX : au-delà l'index n'est plus chargé en entier)"
+  else
+    say "MEMORY ok : $f fait $nl lignes (budget $MEMIDX_MAX)"
+  fi
+done <<EOF10
+$MEM_INDEXES
+EOF10
 
 # --- Budget 2 : worktrees actifs par dépôt -------------------------------------------------
 is_repo() { git -C "$1" rev-parse --git-dir >/dev/null 2>&1; }
@@ -469,6 +819,9 @@ EOF
   rangement "$repo" "$base" "$wt_branches"
 done
 
+if [ -n "$ARCHIVE_TYPES" ] && [ "$ARCHIVE_REFUSED" -eq 1 ]; then
+  exit 2
+fi
 if [ "$STRICT" -eq 1 ] && [ "$UNVERIFIABLE" -eq 1 ]; then
   exit 2
 fi
