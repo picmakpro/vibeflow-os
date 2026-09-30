@@ -51,3 +51,36 @@ Aucune ligne non nulle à remonter (aucune mesure réelle n'a eu lieu). Motif un
 Pour lever : fermer les sessions ouvertes sur `~/BusinessFlow-Lab` (ou décider autrement, par un arbitrage explicite), puis relancer, depuis la racine du dépôt, `bash plugin/planning-core/scripts/rejeu-reel.sh --lab="$HOME/jarvis-keystone" --lab="$HOME/BusinessFlow-Lab" --etape=1 --rapport=<ce fichier>`. Si l'empreinte de l'arbre diverge, rejouer UNE fois au repos avant toute escalade ; jamais d'armement sur une divergence.
 
 ESCALADE-WILLY ETAPE-1 labs réels non au repos
+
+## Rejeu réel du 2026-09-30 (reprise)
+
+Reprise du rejeu après mise au repos des labs. Canal des décisions : mise au repos ordonnée par Willy, AskUserQuestion session principale, 2026-09-30 (« ferme les processus et go ») ; autorisation du rejeu réel, F6 = f6-oui, F7b = f7b-oui, rejeu-oui : Willy, AskUserQuestion session principale, 2026-09-30. Hook rejoué : `planning-hook.sh` au commit `8da8c6e` (G6 et G5 encore en observation dans le code). Les lignes de la section précédente (« NON EFFECTUÉ ») restent vraies pour leur date ; celle-ci les remplace pour la décision d'armement.
+
+### Contrôle de repos (lecture seule, `lsof -d cwd`, juste avant le rejeu)
+
+| Lab | Processus dont le répertoire courant est sous le lab |
+|---|---|
+| `~/jarvis-keystone` | 0 |
+| `~/BusinessFlow-Lab` | 4 : 2 `Code Helper (Plugin)` (PID 4670, 5146) et 2 `zsh` inactifs (PID 5119, 65656), seuls restants annoncés, n'écrivant pas dans le lab |
+
+### Comptes (lignes brutes du rejeu)
+
+```
+COMPTE G6 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G5 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+REJEU-ETAPE-1 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+EMPREINTE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-IDENTIQUE ~/BusinessFlow-Lab
+EMPREINTE-ARBRE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-ARBRE-IDENTIQUE ~/BusinessFlow-Lab
+```
+
+Le relevé nominatif du rejeu compte 4284 lignes : 506 en doit-refuser (refus obtenu) et 3771 en doit-passer (passage obtenu), aucun écart ; il n'est pas recopié ici, il se relance par la commande ci-dessus. Aucune commande git n'a été lancée dans les labs ; aucun chemin de machine n'apparaît dans le rapport (vérifié : aucun préfixe de dossier personnel de la machine).
+
+### Décision d'armement (P45-D-03b, mécanique)
+
+Les trois conditions tiennent : une ligne `EMPREINTE-ARBRE-IDENTIQUE` par lab, aucune divergence, `faux-refus=0 faux-accept=0`. Le banc de la suite des gates (R-ID-06) rend aussi 0/0.
+
+Non armé dans le code à ce stade, pour une raison d'outillage et non de mesure : passer `ARMEMENT_G6` et `ARMEMENT_G5` à `armed` (et `TABLE_ATTENDUE`) rend rouges deux suites qui supposent ces constantes à `observe` — `test-planning-gates.sh` (R-ENV-01 : la copie à l'armement forcé réécrit cinq constantes, n'en trouve plus que trois ; R-TABLE-03 : la table incohérente « G1 armé sans G6 ni G5 » devient cohérente) et `test-planning-hook-installed.sh` (motif `ARMEMENT_G6 = "observe"` introuvable dans la copie). Corriger ces suites est une modification de test que le classifieur du harnais a refusée ; elle est remontée à Willy plutôt que contournée. Constantes restées à `"observe"`, aucun commit d'armement.
+
+ESCALADE-WILLY ETAPE-1 suites couplées à l'état observe
