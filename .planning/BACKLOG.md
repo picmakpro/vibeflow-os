@@ -620,7 +620,43 @@ le fichier — aucune ligne d'index ne la référence. **Hors périmètre de la 
 au passage pour ne pas mêler une dérive non arbitrée au diff d'une phase dédiée à une autre
 doctrine. **Déclencheur de reprise** : prochain passage sur `docs/ADR.md`.
 
-<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15) -->
+## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15)
+
+**Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — ouvrir une **phase
+dédiée « posture de protection du dépôt »** (prochain numéro libre, 41). L'inscription au ROADMAP est
+faite par la session principale **après le merge de la PR #67**, délibérément, pour ne pas créer de
+conflit sur `ROADMAP.md` avec la branche de la Phase 25. Le présent item est la trace côté branche ;
+il cesse d'être un `human_needed` et devient le cahier des charges de cette phase.
+
+**Constat mesuré** (audit de la vague 3, Phase 25) : `gh api repos/picmakpro/vibeflow-os/rulesets`
+rend `[]`, et l'endpoint de protection classique rend 404 avec des permissions `push:true,
+admin:false` — cohérent avec « aucune protection configurée », pas avec un refus d'accès. `main`
+n'est donc protégée par rien.
+
+**Conséquence** : **tout gate in-repo de ce dépôt est neutralisable depuis la PR qu'il juge.** Une
+même PR peut modifier un gate, sa suite de tests et l'étape CI qui l'invoque. Le cas est concret pour
+la Phase 25 (`check-instruction-budget.sh` + `test-check-instruction-budget.sh` + l'étape du job
+`gates`), mais le risque est **structurel et antérieur** : il vaut identiquement pour
+`check-divergence.sh`, `check-agents.sh`, `check-version-sync.sh` et tous les autres. Aucun threat ID
+du registre STRIDE de la Phase 25 ne le nomme — il dépasse le périmètre d'une phase de gate.
+
+**Forme attendue** : un ruleset exigeant la **CI verte avant merge** sur `main`. À poser **dans une
+phase à part, jamais au passage d'une mission** : changer les règles du merge pendant qu'une PR est
+ouverte modifierait les conditions de cette PR en cours de route.
+
+**Points à instruire dans la phase 41** : interaction avec la discipline de release du `CLAUDE.md`
+(le gate `check-release-tag` est déjà `main`-only et échoue par construction au merge, rerun requis
+après le tag) ; sort du hook `pre-push` optionnel (`scripts/hooks`) ; effet sur les hotfix urgents.
+
+**Déclencheur de reprise** : inscription au ROADMAP par la session principale après le merge de
+la PR #67.
+
+**Statut partiel (2026-09-18, Phase 41) :** la phase a été ouverte et cadrée, sa prémisse s'est
+renversée (accès admin absent, cf. l'item ci-dessus), et le cahier des charges est désormais
+scindé — la partie in-repo est traitée par ADR-072 (`docs/ADR.md`), la partie côté serveur reste
+au premier item de cette page. La forme attendue décrite ici (« un ruleset exigeant la CI verte
+avant merge ») n'existe pas encore : cet item n'est pas marqué achevé.
+
 ## T-25-SC — journal de sécurité de la Phase 25 : TRANCHÉ, geste de clôture (2026-09-15)
 
 **Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — le `25-SECURITY.md`
