@@ -1054,3 +1054,8 @@ cette même primitive, constatées en construisant la garde de lecture du moteur
 **Déclencheur de reprise :** la prochaine évolution de `workstream-policy.sh` ou de
 `detect-gsd-engine.sh`, ou un incident où ce trou a masqué un compartiment réel dont les
 permissions étaient dégradées.
+
+## Résidus de la Phase 41.3 (revue finale, tour 3) — DIFFÉRÉ (2026-09-30)
+
+Tracés, non corrigés (décision du manager, 2026-09-30) : (1) snapshot de mission unique par dépôt, écrasé par une mission concurrente (`check-mission-exit.sh:184`) — E7 rend SAIN sur le snapshot d'une autre mission quand le verrou est relâché ; (2) avis d'archivage perdu si la session s'arrête après un Stop bloquant, ou si l'écriture de `.now` échoue après archivage (`guard-fin-de-geste.sh:142`) ; (3) snapshot de session pris sans `--auto --dry-run` (`:126`) : un refus préexistant est rapporté comme neuf ; (4) entrées CHANGELOG `conductor` et `dev-orchestrator` à écrire à la prochaine release fonctionnelle (aucun bump en 41.3) ; (5) tri humain : BACKLOG racine à 35 sujets ouverts pour 20, ROADMAP `fiabilite` à 143 Ko pour 64 ; (6) STATE `gouvernance` à 21 Ko (Willy).
+**Déclencheur de reprise :** la prochaine release fonctionnelle (4), la clôture du jalon `fiabilite-v1.0` (5), une reprise de la garde de fin de geste (1 à 3).

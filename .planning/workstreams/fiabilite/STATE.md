@@ -5,19 +5,18 @@ milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritée
 current_phase_name: Posture de protection du dépôt
 status: executing
 stopped_at: >-
-  Phase 41.3 vague 1 exécutée (plans 01-02, 2026-09-29) ; correction ciblée de revue appliquée.
+  Phase 41.3 exécutée (plans 01-04, 2026-09-30), PR #123 en revue.
   Ancien texte de ce champ : `git show eb7fe2b9:.planning/workstreams/fiabilite/STATE.md`.
 last_updated: "2026-09-24T08:13:16.937Z"
-last_activity: 2026-09-29
+last_activity: 2026-09-30
 last_activity_desc: >-
-  Phase 41.3 : vague 1 exécutée (STATE sous budget, outillage de rangement, worktrees) ;
-  détail : § Current Position.
+  Phase 41.3 exécutée (4 plans), PR #123 en revue ; détail : § Current Position.
 progress:
-  total_phases: 15
-  completed_phases: 11
-  total_plans: 94
-  completed_plans: 84
-  percent: 73
+  total_phases: 16
+  completed_phases: 12
+  total_plans: 98
+  completed_plans: 88
+  percent: 75
 current_phase: 41
 ---
 
@@ -34,10 +33,9 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: **41.3** (Sobriété de méthode — ce qu'on crée, on le range) — en cours, vagues 1-2 exécutées (plans 01-04).
-Plan: 41.3-01 (STATE, stash), 41.3-02 (rangement), 41.3-03 (budgets, archivage), 41.3-04 (ADR-076, ajout/retrait, fin de geste, E7).
-Status: executing — la Phase 41 (protection du dépôt) reste le pointeur numérique `current_phase`.
-Last activity: 2026-09-29 — exécution de la vague 1 de la Phase 41.3 ; corps historique du STATE archivé.
+Phase: **41.3** (Sobriété de méthode) — exécutée, plans 01-04 (2026-09-30), PR #123 en revue ; `current_phase` reste 41.
+Next: clôture du jalon `fiabilite-v1.0` après la 41.2 et les plans 41-07 à 41-09.
+Last activity: 2026-09-30 — revue finale PASS, CI verte sur 4d701558.
 
 ## Accumulated Context
 
@@ -71,4 +69,4 @@ Tableau complet dans l'archive (section `### Quick Tasks Completed`) ; les nouve
 
 **Resume file:** .planning/workstreams/fiabilite/phases/VFDO-41.3-sobri-t-de-m-thode-ce-qu-on-cr-e-on-le-range-inserted/41.3-CONTEXT.md
 
-Last session: 2026-09-29 — Phase 41.3 planifiée (4 plans), vague 1 exécutée.
+Last session: 2026-09-30 — Phase 41.3 exécutée (4 plans), clôture documentaire.

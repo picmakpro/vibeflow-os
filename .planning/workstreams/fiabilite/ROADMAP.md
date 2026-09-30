@@ -93,7 +93,7 @@
 - [x] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date — **PÉRIMÈTRE RECADRÉ SANS ADMIN LIVRÉ le 2026-09-18, mergée PR #80, SHIPPÉE v2.64.0** : trois gardes in-repo qui signalent et tracent sans jamais verrouiller (G-1 `check-baseline-arbitrage.sh`, G-2 `check-gate-touche.sh`, G-3 `check-push-sans-pr.sh`) + doctrine ADR-072 ; **critères de succès 1 à 3 du ROADMAP d'origine restent HORS D'ATTEINTE sans accès admin GitHub** (PROT-01 non coché, `REQUIREMENTS.md`) ; volet rulesets côté serveur **DIFFÉRÉ au BACKLOG** avec son déclencheur de reprise — le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce volet (WhatsApp, 2026-09-23) **avant** la clôture de `fiabilite-v1.0`, puisque PROT-01 en fait partie (correction du 2026-09-23 : la formulation précédente inversait la séquence — cf. `BACKLOG.md` § « Protection de `main` côté GitHub »))
 - [x] Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED 2026-09-23, demande Samuel session principale : « généralise le remède, ça ne doit plus se reproduire »)
 - [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage)
-- [ ] Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED 2026-09-29, arbitrage Samuel AskUserQuestion session principale ; dernière phase avant la clôture du jalon)
+- [x] Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED 2026-09-29, arbitrage Samuel AskUserQuestion session principale ; dernière phase avant la clôture du jalon) — complete 2026-09-30
 - [ ] Phase 51: Snapshot de planning avant compaction (PreCompact) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 52: Télémétrie d'usage des skills et agents, et coût de mission (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 53: Apprentissage adossé à l'observation — preuves dans la mémoire vivante (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
@@ -1572,13 +1572,13 @@ d'ADR-074.
   6. **Critère de sobriété de la phase elle-même** : elle retire plus de lignes de planning qu'elle
      n'en ajoute (mesuré sur son diff `.planning/`, hors archives).
 
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete (2026-09-30)
 
 Plans:
 
 - [x] 41.3-01-PLAN.md — vague 1 : appliquer ici, données (STATE ≤ 8 Ko archivé, stash exporté, mémoires mesurées) — SOBR-01, SOBR-02
 - [x] 41.3-02-PLAN.md — vague 1 : appliquer ici, outillage (`check-method-budget` constate, `check-blueprints`, `.worktreeinclude`) — SOBR-01, SOBR-03
-- [ ] 41.3-03-PLAN.md — vague 2 : généraliser les budgets et l'archivage automatique, installeur — SOBR-03, SOBR-06, SOBR-08
+- [x] 41.3-03-PLAN.md — vague 2 : généraliser les budgets et l'archivage automatique, installeur — SOBR-03, SOBR-06, SOBR-08
 - [x] 41.3-04-PLAN.md — vague 2 : ADR des quatre principes, release adverse, ajout/retrait, fin de geste — SOBR-04, SOBR-05, SOBR-07
 
 ## 📋 Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (Phases 51-56)
