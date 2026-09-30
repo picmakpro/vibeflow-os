@@ -75,12 +75,12 @@ bash <hook> | python3 -c 'import json,sys; json.loads(sys.stdin.read() or "{}")'
 C'est exactement ce trou de vérification qui a laissé passer le défaut de l'entrée #18 : le §3
 ci-dessus n'avait été appliqué à cette entrée que sur son *code de sortie*, jamais sur son flux.
 
-## 4. L'inventaire — 30 entrées, recompte machine
+## 4. L'inventaire — 31 entrées, recompte machine
 
 Commande de recomptage (fait foi, D-08) :
 
 ```bash
-python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==30, n"
+python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==31, n"
 ```
 
 Rendue le 2026-08-17 : `28` (27 recomptées plus tôt le même jour par le plan `32-03`, plus 1 :
@@ -101,8 +101,11 @@ d'idempotence cross-matcher que les entrées précédentes de ce module, jamais 
 `PreToolUse · Write|Edit|NotebookEdit|Bash|Agent|Task`, Phase 45 (45-01) : le hook central du
 moteur de planning, en forme shell (commande inline), **une seule entrée** au matcher combiné
 (deux entrées sous deux matchers se purgeraient, comme pour l'entrée n°27). L'entrée n°24
-(`Stop`, exit 2 voulu) reste inchangée (P45-D-19). Toute
-dérive future (une 31e entrée apparue, une entrée disparue) fait échouer cette assertion —
+(`Stop`, exit 2 voulu) reste inchangée (P45-D-19). Rendue le 2026-09-30 : `31` — l'entrée n°31,
+`check-gates-alive.sh`, `SessionStart · startup`, Phase 45 (45-03) : le canary de session du hook
+central, advisory, en forme shell `|| true`, ajouté au groupe `startup` UNIQUE de `planning-core`.
+Toute
+dérive future (une 32e entrée apparue, une entrée disparue) fait échouer cette assertion —
 bruyamment, jamais en silence — et impose de mettre à jour l'inventaire et l'assertion
 **ensemble**, jamais l'un sans l'autre.
 
@@ -169,7 +172,7 @@ humain).
 |---|---|---|---|---|---|---|---|---|
 | 18 | SessionStart · startup | `audit-infra.sh` | `--quick --if-older-than=14d --hook` | **oui** — porte à la fois la traduction du silence (3→0, `hook_exit`) **et le rendu du FLUX** (`hook_render`) | 0 (advisory systématique sans `--strict` ; le mode `--strict`, qui rendrait 1/3, n'est jamais atteint ici) | advisory (ADR-031) | shell + `\|\| true` | **stdout corrigé** — les axes écrivent un objet JSON CHACUN, donc `--quick` en émettait DEUX collés : document invalide au parsing strict du harness (`jq` l'acceptait — il lit un flux —, d'où la non-détection). Sous `--hook`, le flux est capturé et rendu en UN SEUL objet encodé (`json.dumps`), émis seulement s'il y a des findings ; stdout strictement vide sinon (§3) |
 
-### planning-core — 7 entrées
+### planning-core — 8 entrées
 
 | # | Événement · matcher | Script | Invocation | `--hook` | Codes atteignables aujourd'hui | Classement | Forme | Action (Phase 30) |
 |---|---|---|---|---|---|---|---|---|
@@ -180,6 +183,7 @@ humain).
 | 23 | UserPromptSubmit · (aucun matcher) | `planning-task-context.sh` | (aucun) | non | 0 (systématique — fail-open sur toutes les branches observées) | advisory | shell + `\|\| true` | rien |
 | 24 | Stop · (aucun matcher) | `guard-planning-updated.sh` | (aucun — **pas de `\|\| true`**) | non | 0 (fail-open, autorise l'arrêt), **2** (bloque l'arrêt — garde-fou de fin de session) | **bloquante** — bloque l'arrêt de session PAR CODE DE SORTIE (exit 2), et **c'est VOULU** : garde-fou machine-enforced « planning à jour avant de s'arrêter » (ADR-040/043/050/055) | shell, sans `\|\| true` | **rien — ne JAMAIS normaliser cette entrée** (la bloquer par exit 2 est le but du script, pas un défaut à corriger) |
 | 30 | PreToolUse · Write\|Edit\|NotebookEdit\|Bash\|Agent\|Task | `planning-hook.sh` | commande inline (commande enregistrée, `timeout: 20`) : lance `bash {{VF_SCRIPTS}}/planning-hook.sh` en fils et reprend tout code non nul | n/a (pas de flag) | 0 (toujours — la décision est portée par le JSON) | **bloquante par décision JSON** (deny + code 0), jamais par exit 2 ; **fail-closed dans un lab adhérent seulement** (P45-D-06a), sur Write, Edit, NotebookEdit, Agent et Task, Bash ouvert (P45-D-06b) — premier garde fail-closed du dépôt ; hors lab adhérent (labs dev, ce dépôt compris) : stdout vide, code 0 (P45-D-04) | **shell** (commande inline, jamais `{{VF_BASH}}` : la forme exec part dans `settings.local.json` et n'a pas de shell pour porter le test de présence) | rien (née conforme, Phase 45) |
+| 31 | SessionStart · startup | `check-gates-alive.sh` | `--hook` | oui — traduit SAIN (3) et INDÉTERMINÉ (4) vers 0 ; le signal (déjà 0) et l'usage (64) ne sont jamais traduits | 0 (signal — UNE seule ligne, préfixe `[planning-core] canary :` : hook central non enregistré, mode dégradé, gate armé sans canary, cas en échec), 3 (SAIN : session hors lab adhérent, ou canary passé), 4 (INDÉTERMINÉ : réglages illisibles, table d'armement absente, aucun interpréteur Python — jamais un vert de complaisance), 64 (usage, jamais atteint via ce fragment) | **advisory** — rejoue la commande enregistrée sur un lab adhérent synthétique et signale, ne bloque jamais (P45-D-20) ; stdout strictement vide hors signal (§3) | shell + `\|\| true` | rien (née conforme, Phase 45) |
 
 ### software-architecture — 1 entrée
 
@@ -195,9 +199,9 @@ humain).
 | consolidator | 7 | idem, `plugin/consolidator/hooks/hooks.json` |
 | dev-orchestrator | 6 | idem, `plugin/dev-orchestrator/hooks/hooks.json` |
 | infrastructure-audit | 1 | idem, `plugin/infrastructure-audit/hooks/hooks.json` |
-| planning-core | 7 | idem, `plugin/planning-core/hooks/hooks.json` |
+| planning-core | 8 | idem, `plugin/planning-core/hooks/hooks.json` |
 | software-architecture | 1 | idem, `plugin/software-architecture/hooks/hooks.json` |
-| **Total** | **30** | commande de recomptage globale, §4 ci-dessus |
+| **Total** | **31** | commande de recomptage globale, §4 ci-dessus |
 
 **Les deux entrées bloquantes mises en avant par le plan comme points de vigilance** (le
 classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.md Pitfall 4) :
@@ -212,16 +216,16 @@ classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.
 mécanisme JSON que #25 : `guard-agent-write.sh` (#1), `guard-read-registres.sh` (#7),
 `guard-bash-registres.sh` (#8) et **`guard-driver-lock.sh` (#27 PreToolUse·Bash\|Write\|Edit,
 plan `32-03`, LOCK-02/03/05)** — chacune sort toujours 0 et bloque via `permissionDecision: deny`.
-Soit **7 entrées bloquantes au total sur les 30** (6 via décision JSON + 1 via code de sortie — la 6e
+Soit **7 entrées bloquantes au total sur les 31** (6 via décision JSON + 1 via code de sortie — la 6e
 via décision JSON est l'entrée #30, `planning-hook.sh`, Phase 45, fail-closed dans un lab adhérent), et
-**23 entrées advisory** (+1 : l'entrée #28, `check-guard-health.sh`, plan `32-05`, +1 : l'entrée
-#29, `check-requirements-survival.sh`, plan `18-01` — toutes deux advisory, elles ne bloquent rien,
-ADR-031).
+**24 entrées advisory** (+1 : l'entrée #28, `check-guard-health.sh`, plan `32-05`, +1 : l'entrée
+#29, `check-requirements-survival.sh`, plan `18-01`, +1 : l'entrée #31, `check-gates-alive.sh`, plan
+`45-03` — toutes advisory, elles ne bloquent rien, ADR-031).
 
 ## 6. Ce qui reste à la polarité gouvernance
 
-Les **21 entrées gouvernance** (conductor 6, consolidator 7, infrastructure-audit 1, planning-core
-7) restent à Willy pour :
+Les **22 entrées gouvernance** (conductor 6, consolidator 7, infrastructure-audit 1, planning-core
+8) restent à Willy pour :
 
 - **La migration effective en forme exec** de leurs `hooks.json` — hors périmètre de cette phase
   (§7 du contrat PR #29).
@@ -247,4 +251,5 @@ plan VFDO-32-05 (28e entrée, `check-guard-health.sh`, le « hook doctor » gén
 QUAL-01), le 2026-08-17, puis par le plan VFDO-18-01 (29e entrée, `check-requirements-survival.sh`,
 survie du ledger d'exigences à la clôture d'un jalon, LEDG-02), le 2026-08-18, puis par le plan
 VFDO-45-01 (30e entrée, `planning-hook.sh`, hook central fail-closed du moteur de planning, GATE-01 à
-GATE-03), le 2026-09-29.*
+GATE-03), le 2026-09-29, puis par le plan VFDO-45-03 (31e entrée, `check-gates-alive.sh`, canary de
+session du hook central, GATE-12), le 2026-09-30.*

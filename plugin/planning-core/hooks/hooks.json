@@ -1,5 +1,5 @@
 {
-  "description": "Planning machine-enforced (ADR-040 + ADR-043 + ADR-050 + ADR-055) : au démarrage, fraîcheur + digest index-first injecté + 8e signal de dette + baseline de session (attribution des changements) ; à la tâche, STATE du compartiment ciblé ; en fin de session, garde-fou bloquant si le planning n'est pas à jour. ADR-055 : fraîcheur et digest se retirent quand le moteur GSD tient déjà le projet (la dette de compartiment et le garde-fou de fin de session restent : altitude lab). Phase 45 : hook central PreToolUse fail-closed dans un lab adhérent cycles-v1 (commande enregistrée qui refuse quand le script ou python3 manque), silence partout ailleurs.",
+  "description": "Planning machine-enforced (ADR-040 + ADR-043 + ADR-050 + ADR-055) : au démarrage, fraîcheur + digest index-first injecté + 8e signal de dette + baseline de session (attribution des changements) ; à la tâche, STATE du compartiment ciblé ; en fin de session, garde-fou bloquant si le planning n'est pas à jour. ADR-055 : fraîcheur et digest se retirent quand le moteur GSD tient déjà le projet (la dette de compartiment et le garde-fou de fin de session restent : altitude lab). Phase 45 : hook central PreToolUse fail-closed dans un lab adhérent cycles-v1 (commande enregistrée qui refuse quand le script ou python3 manque), silence partout ailleurs. Canary de session check-gates-alive.sh (SessionStart, startup) : rejoue la commande enregistrée sur un lab adhérent synthétique et signale, sans jamais bloquer, un hook absent, dégradé ou un gate armé sans cas.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,7 +7,8 @@
         "hooks": [
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-planning-state.sh --defer-to-gsd || true" },
           { "type": "command", "command": "bash {{VF_SCRIPTS}}/planning-context.sh --defer-to-gsd || true" },
-          { "type": "command", "command": "bash {{VF_SCRIPTS}}/detect-planning-debt.sh || true" }
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/detect-planning-debt.sh || true" },
+          { "type": "command", "command": "bash {{VF_SCRIPTS}}/check-gates-alive.sh --hook || true" }
         ]
       },
       {

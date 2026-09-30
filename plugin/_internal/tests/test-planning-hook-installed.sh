@@ -381,6 +381,334 @@ def sec_modes(ctx):
         ok("R-INST-04 lab dev (config 2.0), cinq modes, six outils : stdout d'octet vide et code 0 — %d rejeux" % n)
 
 
+# --- Canary de session check-gates-alive.sh, POSÉ dans le lab jetable (R-CAN-01 à R-CAN-08) ------
+CANARY = "check-gates-alive.sh"
+PREFIXE_SIGNAL = "[planning-core] canary : "
+
+
+def copier_lab(ctx, prefixe):
+    """Copie du lab installé (liens conservés) : les cas destructifs ne touchent jamais l'original."""
+    dest = ctx.unique(prefixe)
+    shutil.copytree(ctx.lab, dest, symlinks=True)
+    return dest
+
+
+def armer_copie(lab, gates):
+    """Réécrit en `armed` les lignes ARMEMENT_<gate> du planning-hook.sh POSÉ dans `lab` (copie)."""
+    chemin = os.path.join(lab, ".claude", "scripts", CITE)
+    texte = open(chemin, encoding="utf-8").read()
+    for g in gates:
+        motif = 'ARMEMENT_%s = "observe"' % g
+        if texte.count(motif) != 1:
+            raise RuntimeError("motif d'armement non unique dans la copie : " + motif)
+        texte = texte.replace(motif, 'ARMEMENT_%s = "armed"' % g)
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write(texte)
+
+
+def session(cwd):
+    return json.dumps({"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": cwd,
+                       "hook_event_name": "SessionStart", "source": "startup"}).encode("utf-8")
+
+
+def lancer_canary(ctx, lab, cwd, args=(), stdin="payload", tmpdir=None, env_extra=None, home=None):
+    """Lance le check-gates-alive.sh POSÉ dans `lab`, stdout et stderr séparés."""
+    script = os.path.join(lab, ".claude", "scripts", CANARY)
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": home or ctx.home,
+           "CLAUDE_PROJECT_DIR": lab}
+    if tmpdir:
+        env["TMPDIR"] = tmpdir
+    if env_extra:
+        env.update(env_extra)
+    donnees = session(cwd) if stdin == "payload" else (stdin or b"")
+    p = subprocess.run(["bash", script] + list(args), input=donnees, stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE, env=env, cwd=cwd, timeout=180)
+    return p.returncode, p.stdout, p.stderr
+
+
+def une_ligne(out, contient=()):
+    """`None` si stdout est UNE ligne au préfixe du canary qui contient chaque fragment, sinon la raison."""
+    texte = out.decode("utf-8", "replace")
+    lignes = [l for l in texte.split("\n") if l != ""]
+    if len(lignes) != 1 or not texte.endswith("\n"):
+        return "%d ligne(s) : %s" % (len(lignes), court(out))
+    if not lignes[0].startswith(PREFIXE_SIGNAL):
+        return "préfixe absent : " + court(out)
+    for f in contient:
+        if f not in lignes[0]:
+            return "fragment absent (%s) : %s" % (f, court(out))
+    return None
+
+
+def reglage_temoin(ctx, nom, marqueur, corps=None):
+    """Réglages dont la commande cite planning-hook.sh et laisse une trace `marqueur` à CHAQUE
+    exécution : la trace prouve qu'un rejeu a eu lieu (ou n'a pas eu lieu)."""
+    cmd = corps if corps is not None else (": > '" + marqueur + "'; cat >/dev/null # planning-hook.sh")
+    chemin = os.path.join(ctx.work, nom)
+    ecrire(chemin, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [
+        {"type": "command", "command": cmd}]}]}}))
+    return chemin
+
+
+def sec_can(ctx):
+    """R-CAN-01 à R-CAN-08."""
+    ses = os.path.join(ctx.work, "session-adherente")
+    ecrire(os.path.join(ses, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    dedans = os.path.join(ses, "sous", "dossier")
+    os.makedirs(dedans, exist_ok=True)
+    hors = os.path.join(ctx.work, "hors-de-tout-lab")
+    os.makedirs(hors, exist_ok=True)
+    script = os.path.join(ctx.lab, ".claude", "scripts", CANARY)
+
+    # R-CAN-01 : session adhérente, commande posée saine
+    fautes = []
+    for args, attendu in (((), 3), (("--hook",), 0)):
+        rc, out, err = lancer_canary(ctx, ctx.lab, ses, args)
+        if rc != attendu or out != b"":
+            fautes.append((" ".join(args) or "sans --hook", "code %d, stdout vide" % attendu, "rc=%d out=%s err=%s" % (rc, court(out), court(err))))
+    rc, out, err = lancer_canary(ctx, ctx.lab, dedans, ())  # cwd = sous-dossier du lab adhérent
+    if rc != 3 or out != b"":
+        fautes.append(("cwd dans un sous-dossier du lab", "code 3, stdout vide", "rc=%d out=%s" % (rc, court(out))))
+    if not os.path.isfile(script):
+        fautes.append(("canary posé", "check-gates-alive.sh présent dans le lab installé", "absent"))
+    if fautes:
+        for cas, a, b in fautes:
+            ko("R-CAN-01", "session adhérente, commande posée saine : " + cas, a, b)
+    else:
+        ok("R-CAN-01 session dans un lab adhérent, commande posée saine : code 3 et stdout vide ; sous --hook code 0 et stdout vide")
+
+    # R-CAN-02 : hors lab adhérent, aucun rejeu (le réglage-témoin laisse une trace s'il est exécuté)
+    fautes = []
+    marq = os.path.join(ctx.work, "trace-rejeu-can02")
+    temoin = reglage_temoin(ctx, "reglage-temoin-02.json", marq)
+    tmpd = ctx.unique("tmpdir-can02")
+    os.makedirs(tmpd, exist_ok=True)
+    for nom, cwd, stdin in (("lab dev", ctx.dev, "payload"), ("hors de tout .planning/", hors, "payload"),
+                            ("stdin vide, cwd du processus dans un lab dev", ctx.dev, b"")):
+        for args in ((), ("--hook",)):
+            rc, out, err = lancer_canary(ctx, ctx.lab, cwd, args + ("--settings=" + temoin,), stdin=stdin, tmpdir=tmpd)
+            attendu = 0 if args else 3
+            if rc != attendu or out != b"" or os.path.exists(marq):
+                fautes.append((nom + (" --hook" if args else ""), "code %d, stdout vide, aucun rejeu (pas de trace)" % attendu,
+                               "rc=%d out=%s trace=%s" % (rc, court(out), os.path.exists(marq))))
+                if os.path.exists(marq):
+                    os.remove(marq)
+    reste = sorted(os.listdir(tmpd))
+    if reste:
+        fautes.append(("TMPDIR", "aucun fichier créé sous TMPDIR", "présents : " + ", ".join(reste)))
+    # témoin : dans un lab adhérent le même réglage EST rejoué (la trace prouve que le test peut voir un rejeu)
+    lancer_canary(ctx, ctx.lab, ses, ("--settings=" + temoin,))
+    if not os.path.exists(marq):
+        fautes.append(("témoin", "le réglage-témoin est rejoué dans un lab adhérent", "aucune trace : la mesure ne voit pas un rejeu"))
+    else:
+        os.remove(marq)
+    if fautes:
+        for cas, a, b in fautes:
+            ko("R-CAN-02", "hors lab adhérent : " + cas, a, b)
+    else:
+        ok("R-CAN-02 session dans un lab dev, hors de tout .planning/, stdin vide : code 3 (sous --hook 0), stdout vide, aucun rejeu (trace absente), rien créé sous TMPDIR")
+
+    # R-CAN-03 : aucun réglage ne porte la commande
+    fautes = []
+    sans = os.path.join(ctx.work, "reglage-sans-hook.json")
+    ecrire(sans, '{"hooks": {}}')
+    vide_home = ctx.unique("home-vide")
+    os.makedirs(vide_home, exist_ok=True)
+    vide_proj = ctx.unique("proj-vide")
+    os.makedirs(os.path.join(vide_proj, ".claude"), exist_ok=True)
+    for nom, args, lab_proj in (("--settings sans entrée", ("--settings=" + sans,), ctx.lab),
+                                ("ni le projet ni le compte", (), vide_proj)):
+        rc, out, err = lancer_canary(ctx, ctx.lab, ses, args, home=vide_home, env_extra={"CLAUDE_PROJECT_DIR": lab_proj})
+        raison = une_ligne(out, ("hook central non enregistré",))
+        if rc != 0 or raison:
+            fautes.append((nom, "code 0 et UNE ligne « hook central non enregistré »", "rc=%d %s" % (rc, raison or "")))
+    if fautes:
+        for cas, a, b in fautes:
+            ko("R-CAN-03", "aucun réglage ne porte la commande : " + cas, a, b)
+    else:
+        ok("R-CAN-03 aucun réglage ne porte la commande (F2, worktree ou clone non préparé) : code 0, UNE ligne « hook central non enregistré »")
+
+    # R-CAN-04 : le script posé est retiré
+    lab4 = copier_lab(ctx, "lab-sans-script")
+    os.remove(os.path.join(lab4, ".claude", "scripts", CITE))
+    rc, out, err = lancer_canary(ctx, lab4, ses, ())
+    raison = une_ligne(out, ("mode dégradé", "Agent", "Task", "Bash", "P45-D-06b"))
+    if rc == 0 and not raison:
+        ok("R-CAN-04 script posé retiré : code 0, UNE ligne qui dit « mode dégradé » (écritures et dispatchs Agent et Task refusés, Bash ouvert : limite déclarée P45-D-06b)")
+    else:
+        ko("R-CAN-04", "script posé retiré : signal de mode dégradé qui nomme la limite Bash", "code 0 et une ligne « mode dégradé … Agent … Task … Bash … P45-D-06b »", "rc=%d %s err=%s" % (rc, raison or court(out), court(err)))
+
+    # R-CAN-05 : gate armé sans cas de canary
+    lab5 = copier_lab(ctx, "lab-arme-sans-cas")
+    armer_copie(lab5, ("G6", "G5"))
+    rc, out, err = lancer_canary(ctx, lab5, ses, ())
+    raison = une_ligne(out, ("gate armé sans canary : G5, G6",))
+    if rc == 0 and not raison:
+        ok("R-CAN-05 ARMEMENT_G6 et ARMEMENT_G5 armed sans cas de canary : code 0, UNE ligne « gate armé sans canary : G5, G6 »")
+    else:
+        ko("R-CAN-05", "gates G6 et G5 armés dans la copie posée, CANARIS sans cas G6 ni G5", "code 0 et « gate armé sans canary : G5, G6 »", "rc=%d %s err=%s" % (rc, raison or court(out), court(err)))
+
+    # R-CAN-06 : réglages illisibles
+    fautes = []
+    casse = os.path.join(ctx.work, "reglage-casse.json")
+    ecrire(casse, '{"hooks": {"PreToolUse": [ {oups')
+    for args, attendu in ((("--settings=" + casse,), 4), (("--settings=" + casse, "--hook"), 0)):
+        rc, out, err = lancer_canary(ctx, ctx.lab, ses, args)
+        if rc != attendu or out != b"":
+            fautes.append((" ".join(a.split("=")[0] for a in args), "code %d (jamais 3), stdout vide" % attendu, "rc=%d out=%s" % (rc, court(out))))
+    proj6 = ctx.unique("proj-illisible")
+    ecrire(os.path.join(proj6, ".claude", "settings.json"), "pas du json")
+    rc, out, err = lancer_canary(ctx, ctx.lab, ses, (), home=vide_home, env_extra={"CLAUDE_PROJECT_DIR": proj6})
+    if rc != 4 or out != b"":
+        fautes.append(("settings.json du projet illisible", "code 4, stdout vide", "rc=%d out=%s" % (rc, court(out))))
+    if fautes:
+        for cas, a, b in fautes:
+            ko("R-CAN-06", "réglages illisibles : " + cas, a, b)
+    else:
+        ok("R-CAN-06 settings.json illisible (JSON invalide) : code 4, jamais 3 ; sous --hook code 0 et stdout vide")
+
+    # R-CAN-07 : usage
+    fautes = []
+    for args in (("--inconnu",), ("--settings=",), ("--hook", "extra")):
+        rc, out, err = lancer_canary(ctx, ctx.lab, ses, args)
+        if rc != 64 or out != b"":
+            fautes.append((" ".join(args), "code 64, stdout vide", "rc=%d out=%s" % (rc, court(out))))
+    if fautes:
+        for cas, a, b in fautes:
+            ko("R-CAN-07", "usage : " + cas, a, b)
+    else:
+        ok("R-CAN-07 argument inconnu, --settings vide, argument en trop : code 64, stdout vide")
+
+    # R-CAN-08 (ajout) : la limite déclarée est EXERCÉE — une commande qui ne ferme pas fait signaler
+    fautes = []
+    ouverte = reglage_temoin(ctx, "reglage-ouvert.json", os.path.join(ctx.work, "trace-08"), corps="cat >/dev/null # planning-hook.sh")
+    rc, out, err = lancer_canary(ctx, ctx.lab, ses, ("--settings=" + ouverte,))
+    raison = une_ligne(out, ("cas en échec", "D01"))
+    if rc != 0 or raison:
+        fautes.append(("commande qui laisse tout passer", "code 0 et une ligne « cas en échec » qui nomme D01", "rc=%d %s" % (rc, raison or "")))
+    ferme_tout = reglage_temoin(ctx, "reglage-ferme-tout.json", os.path.join(ctx.work, "trace-08b"),
+                                corps="cat >/dev/null; printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"x\"}}' # planning-hook.sh")
+    rc, out, err = lancer_canary(ctx, ctx.lab, ses, ("--settings=" + ferme_tout,))
+    raison = une_ligne(out, ("mode dégradé",))
+    if rc != 0 or raison:
+        fautes.append(("commande qui refuse même le cas nominal", "code 0 et une ligne « mode dégradé »", "rc=%d %s" % (rc, raison or "")))
+    if fautes:
+        for cas, a, b in fautes:
+            ko("R-CAN-08", "table de cas pilotée par l'attendu : " + cas, a, b)
+    else:
+        ok("R-CAN-08 une commande qui laisse tout passer fait signaler « cas en échec » (D01…), une qui refuse même la cible neutre fait signaler le mode dégradé")
+
+
+def make_canary_mutant(ctx, ident, motif, remplacement):
+    """Copie du lab installé dont le check-gates-alive.sh a l'UNIQUE ligne portant `motif` remplacée
+    par `remplacement` (indentation conservée). Rend (lab_muté, None) ou (None, raison)."""
+    lab = copier_lab(ctx, "lab-mut-" + ident.lower())
+    chemin = os.path.join(lab, ".claude", "scripts", CANARY)
+    original = open(chemin, encoding="utf-8").read()
+    lignes = original.split("\n")
+    idx = [i for i, l in enumerate(lignes) if motif in l]
+    if len(idx) != 1 or original.count(motif) != 1:
+        return None, "MOTIF AMBIGU OU ABSENT (lignes=%d, occurrences=%d)" % (len(idx), original.count(motif))
+    ligne = lignes[idx[0]]
+    indent = ligne[: len(ligne) - len(ligne.lstrip())]
+    lignes[idx[0]] = indent + remplacement
+    muté = "\n".join(lignes)
+    if muté == original:
+        return None, "NON OPPOSABLE (identique)"
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write(muté)
+    p = subprocess.run(["bash", "-n", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        return None, "bash -n ÉCHOUE : " + court(p.stderr)
+    corps, dedans = [], False
+    for l in muté.split("\n"):
+        if l == "PY_CHECK_GATES_ALIVE_EOF":
+            dedans = False
+        if dedans:
+            corps.append(l)
+        if l.endswith("<<'PY_CHECK_GATES_ALIVE_EOF'"):
+            dedans = True
+    try:
+        compile("\n".join(corps) + "\n", chemin, "exec")
+    except SyntaxError as e:
+        return None, "SyntaxError du corps Python : " + str(e)
+    return lab, None
+
+
+def okmut(ident, texte):
+    print("  ✓ MUT-%s TUÉ — %s" % (ident, texte))
+
+
+def komut(ident, assertion, attendu, obtenu):
+    print("  ✗ MUT-%s NON TUÉ" % ident)
+    print("    assertion : " + str(assertion))
+    print("    attendu (original) : " + str(attendu))
+    print("    obtenu (mutant)     : " + str(obtenu))
+
+
+def sec_mutants(ctx):
+    """MUT-CAN-SANS-CAS, MUT-CAN-ADHESION, MUT-CAN-INDETERMINE : chaque contrôle du canary rougit
+    quand on le retire (motif unique, texte distinct, bash -n, compilation)."""
+    ses = os.path.join(ctx.work, "session-adherente")
+    hors = os.path.join(ctx.work, "hors-de-tout-lab")
+    casse = os.path.join(ctx.work, "reglage-casse.json")
+    marq = os.path.join(ctx.work, "trace-rejeu-mut")
+    temoin = reglage_temoin(ctx, "reglage-temoin-mut.json", marq)
+
+    def sc_sans_cas(lab):
+        armer_copie(lab, ("G6", "G5"))
+        rc, out, _ = lancer_canary(ctx, lab, ses, ())
+        return rc, out
+
+    def sc_adhesion(lab):
+        if os.path.exists(marq):
+            os.remove(marq)
+        rc, out, _ = lancer_canary(ctx, lab, hors, ("--settings=" + temoin,))
+        return rc, out, os.path.exists(marq)
+
+    def sc_indetermine(lab):
+        rc, out, _ = lancer_canary(ctx, lab, ses, ("--settings=" + casse,))
+        return rc, out
+
+    # MUT-CAN-SANS-CAS
+    lab_o = copier_lab(ctx, "lab-mut-ref")
+    lab_m, raison = make_canary_mutant(ctx, "SANS-CAS", "# canary-sans-cas", "manquants = []  # canary-sans-cas")
+    if lab_m is None:
+        komut("CAN-SANS-CAS", "mutant du contrôle « gate armé sans cas »", "mutant valide", raison)
+    else:
+        o = sc_sans_cas(lab_o)
+        m = sc_sans_cas(lab_m)
+        signal = "gate armé sans canary".encode("utf-8")
+        if o != m and signal in o[1] and signal not in m[1]:
+            okmut("CAN-SANS-CAS", "R-CAN-05 · attendu (original) : code %d, « gate armé sans canary : G5, G6 » · obtenu (mutant) : code %d, %s" % (o[0], m[0], court(m[1]) or "aucun signal"))
+        else:
+            komut("CAN-SANS-CAS", "gate armé sans cas : l'original signale, le mutant se tait", court(o[1]), court(m[1]) + " (mutant non opposable)")
+
+    # MUT-CAN-ADHESION
+    lab_m, raison = make_canary_mutant(ctx, "ADHESION", "# canary-adhesion", "adherente = True  # canary-adhesion")
+    if lab_m is None:
+        komut("CAN-ADHESION", "mutant du filtre « session adhérente »", "mutant valide", raison)
+    else:
+        o = sc_adhesion(lab_o)
+        m = sc_adhesion(lab_m)
+        if o[0] == 3 and o[1] == b"" and not o[2] and (m[0] != 3 or m[2]):
+            okmut("CAN-ADHESION", "R-CAN-02 · attendu (original) : code 3, aucun rejeu · obtenu (mutant) : code %d, rejeu %s" % (m[0], "lancé" if m[2] else "non lancé"))
+        else:
+            komut("CAN-ADHESION", "session hors lab adhérent : l'original ne rejoue rien, le mutant rejoue", "code 3, aucune trace", "original=%s mutant=%s" % (o, m))
+
+    # MUT-CAN-INDETERMINE
+    lab_m, raison = make_canary_mutant(ctx, "INDETERMINE", "# canary-indetermine", "return 3  # canary-indetermine")
+    if lab_m is None:
+        komut("CAN-INDETERMINE", "mutant du code 4", "mutant valide", raison)
+    else:
+        o = sc_indetermine(lab_o)
+        m = sc_indetermine(lab_m)
+        if o[0] == 4 and m[0] == 3:
+            okmut("CAN-INDETERMINE", "R-CAN-06 · attendu (original) : code 4 · obtenu (mutant) : code 3 (vert de complaisance)")
+        else:
+            komut("CAN-INDETERMINE", "réglages illisibles : l'original rend 4, le mutant rend 3", "code 4", "original=%s mutant=%s" % (o[0], m[0]))
+
+
 def sec_desinstall(ctx):
     """R-INST-06 : la désinstallation ne laisse aucune entrée résiduelle."""
     rc, sortie = ctx.installateur("uninstall")
@@ -421,6 +749,8 @@ def sec_isolation(ctx):
 SECTIONS = {
     "install": sec_install,
     "modes": sec_modes,
+    "can": sec_can,
+    "mutants": sec_mutants,
     "desinstall": sec_desinstall,
     "isolation": sec_isolation,
 }
@@ -462,7 +792,7 @@ run_sections() { # <sections séparées par des virgules>
 # Empreinte du VRAI ~/.claude avant la suite (sous-chemins que l'installeur écrit seulement).
 EMPREINTE_AVANT="$("$PYBIN" "$AIDES" empreinte "$REAL_HOME")"
 
-run_sections install,modes,desinstall,isolation
+run_sections install,modes,can,mutants,desinstall,isolation
 
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
