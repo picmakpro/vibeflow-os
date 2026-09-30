@@ -1,0 +1,110 @@
+@@ # Banc synthétique versionné des gates d'écriture du hook central (Phase 45, GATE-13). Format du
+@@ # banc de recalc-planning.sh (P44-D-06), étendu d'une directive d'écriture. Une ligne qui
+@@ # commence par « @@ » est une directive ; toute autre ligne appartient au fichier ouvert par le
+@@ # dernier « @@ fichier ». « @@ # <texte> » est un commentaire. « @@ lab <nom> [jumeau-de=<lab>] »
+@@ # ouvre un lab, « @@ dossier <chemin> » crée un dossier vide, « @@ fichier <chemin> » crée un
+@@ # fichier (contenu = les lignes suivantes jusqu'à la prochaine directive), « @@ lien <chemin> ->
+@@ # <cible> » crée un lien symbolique. Chemins relatifs à la racine du lab : aucun chemin absolu,
+@@ # aucun `~`, aucun `..`.
+@@ #
+@@ # Directive d'écriture (nouvelle) :
+@@ #   @@ ecriture <outil> <chemin-relatif-au-lab> [agent=<type>] [cwd=<relatif>] [commande=<texte>] :: <attendu> [<gate>]
+@@ # <outil> est Write, Edit, NotebookEdit ou Bash (pour Bash le chemin vaut `-` et `commande=` est
+@@ # la dernière option : son texte court jusqu'à ` :: `) ; `agent=` fixe agent_type du payload (absent :
+@@ # fil principal) ; `cwd=` est relatif à la racine du lab (défaut : la racine). <attendu> vaut
+@@ # `doit-passer` (aucun refus), `doit-refuser` (un deny), `avertit` (additionalContext qui nomme
+@@ # le gate, jamais une décision) ou `silence` (stdout vide, code 0). <gate> nomme le gate mesuré.
+@@ #
+@@ # Ce banc est un FICHIER TEXTE, pas une arborescence versionnée : l'installeur pose `fixtures/` à
+@@ # plat, et aucun dossier `.planning/` imbriqué n'est versionné dans ce dépôt. Le dossier de
+@@ # planning s'écrit `.planning/` dans le banc : c'est du texte.
+
+@@ lab g2-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-ouverte/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-ouverte/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-close/PLAN.md
+---
+ecrit: livrables/ancien.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-close/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/03-deroge/PLAN.md
+---
+ecrit: livrables/gele.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/03-deroge/DEROGATION.md
+---
+statut: gelé par willy
+---
+
+@@ fichier .planning/cycles/01-c/phases/04-abime/PLAN.md
+---
+ecrit: livrables/abime.md
+
+@@ fichier .planning/cycles/01-c/phases/05-suite/PLAN.md
+---
+ecrit: [livrables/suite.md, livrables/annexe]
+---
+
+@@ dossier sub
+
+@@ # Écritures par outil : couvertes par l'ecrit: d'un plan ouvert, ou sous .planning/ et .claude/ -> silence.
+@@ ecriture Write livrables/rapport.md :: silence G2
+@@ ecriture Edit livrables/rapport.md :: silence G2
+@@ ecriture Write livrables/suite.md :: silence G2
+@@ ecriture Write livrables/annexe/x.md :: silence G2
+@@ ecriture Write .planning/notes.md :: silence G2
+@@ ecriture Write .claude/agents/x.md :: silence G2
+@@ # Écritures hors de tout ecrit: ouvert -> avertissement (jamais un refus).
+@@ ecriture Write livrables/autre.md :: avertit G2
+@@ ecriture Edit livrables/autre.md :: avertit G2
+@@ ecriture NotebookEdit livrables/nb.ipynb :: avertit G2
+@@ # Un plan clos ou dérogé ne couvre rien ; un plan au frontmatter illisible est ignoré.
+@@ ecriture Write livrables/ancien.md :: avertit G2
+@@ ecriture Write livrables/gele.md :: avertit G2
+@@ ecriture Write livrables/abime.md :: avertit G2
+@@ # Fil principal et sous-agent : même comportement.
+@@ ecriture Write livrables/autre.md agent=general-purpose :: avertit G2
+@@ ecriture Write livrables/rapport.md agent=general-purpose :: silence G2
+@@ # Bash : détection seulement (P45-D-10).
+@@ ecriture Bash - commande=cat livrables/autre.md :: avertit G2
+@@ ecriture Bash - cwd=sub commande=cat ../livrables/autre.md :: avertit G2
+@@ ecriture Bash - commande=touch livrables/rapport.md :: silence G2
+@@ ecriture Bash - commande=cat .planning/notes.md :: silence G2
+@@ ecriture Bash - commande=echo 'guillemet ouvert :: silence G2
+
+@@ lab g2-dev jumeau-de=g2-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .planning/cycles/01-c/phases/01-ouverte/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ dossier sub
+
+@@ # Jumeau négatif : un lab dev ne reçoit ni avertissement ni octet.
+@@ ecriture Write livrables/autre.md :: silence G2
+@@ ecriture Edit livrables/autre.md :: silence G2
+@@ ecriture NotebookEdit livrables/nb.ipynb :: silence G2
+@@ ecriture Bash - commande=cat livrables/autre.md :: silence G2
