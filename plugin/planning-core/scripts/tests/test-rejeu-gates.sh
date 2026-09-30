@@ -872,7 +872,7 @@ def sec_mutants(_):
         gestes = {
             "touch": 'os.utime(%r, None)',
             "mode": 'os.chmod(%r, 0o600)',
-            "contenu": 'st = os.stat(%r)\nopen(%r, "w").write("bbbb")\nos.utime(%r, ns=(st.st_atime_ns, st.st_mtime_ns))',
+            "contenu": 'open(%r, "w").write("bbbb")\nos.utime(%r, ns=(10**18, 10**18))',  # mtime constant : le hook peut tourner en concurrence, la dernière opération est toujours la restauration
         }
         res = {}
         for nom, code in gestes.items():
