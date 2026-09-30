@@ -656,6 +656,12 @@ en Metro ou en « quelle branche ? ». La doctrine « STATE ne garde que le cour
 - `STATE.md` (et chaque `STATE.md` de workstream) : **8 Ko** au plus.
 - Worktrees actifs : **3 par dépôt** au plus, arbre principal non compté.
 
+**Début de mission : le snapshot.** Juste après l'`acquire` du verrou, le manager pose la référence
+de ce qui existe déjà : `"$S"/check-mission-exit.sh --budget-snapshot` (lecture seule, sans `--auto` ;
+le fichier vit sous le répertoire git commun, `vf-mission-budget.snap`, jamais dans l'arbre : E2 reste
+propre). Sans lui, E7 est INDÉTERMINÉ, jamais sain : il ne saurait pas distinguer ce que la mission a
+créé de ce qui existait (branche d'un autre mainteneur, worktree d'une autre mission).
+
 **Moment : la clôture, avant le relâchement du verrou.** Le manager lance
 `"$S"/check-method-budget.sh --auto --no-remote --quiet` : l'outil **archive seul** ce qui déborde
 (compartiment de la session, sources commitées, trace dans `.planning/archives/INDEX.tsv`, retour
@@ -665,19 +671,33 @@ l'archivage** (ADR-076), puis agit sur les constats restants :
 1. **STATE dépassé** : le corps au-delà du budget est archivé par l'outil ; le point de la mission
    **remplace** la position courante, il ne s'ajoute pas en tête. Le frontmatter GSD et les sections
    lues par l'outillage (`Current Position`, `Project Reference`) restent en place.
-2. **Worktree RANGEABLE** (branche travaillée puis intégrée dans la branche de référence) créé par
-   la mission : `git worktree remove <chemin>`, **sans `--force`** ; un refus signale un changement
-   non vu, on s'arrête et on le rapporte. Un worktree d'une autre mission ou d'une session en cours
-   n'est jamais touché : il est cité au rapport. Même règle pour la branche locale (`git branch -d`),
-   le stash (patch sous `.planning/archives/stash/` puis `drop`) et la mémoire (`git add`).
+2. **Worktree RANGEABLE** (branche travaillée puis intégrée dans la branche de référence) **apparu
+   depuis le snapshot de début de mission** : `git worktree remove <chemin>`, **sans `--force`** ; un
+   refus signale un changement non vu, on s'arrête et on le rapporte. Même règle pour la branche
+   locale (`git branch -d`), le stash (patch sous `.planning/archives/stash/` puis `drop`) et la
+   mémoire (`git add`). Ce qui existait AVANT le snapshot n'est jamais imputé ni rangé par la mission ;
+   un objet apparu depuis qui est d'une autre mission ou d'une session en cours (E7 ne sait pas le
+   distinguer) n'est **jamais supprimé** : il est cité au rapport `## Budgets` et E7 reste un manque
+   que le head tranche (`head-governance.md` §3) — c'est un constat, pas un ordre de suppression.
 3. **ORPHELIN** (dossier disparu) : `git worktree prune`. **Branche distante** : geste humain, jamais
    rangée par la mission.
 4. Les constats restants (dépassement non résorbable par la mission) vont au rapport de mission,
    section `## Budgets`, pour que le head les relaie.
 
 Le script seul ne bloque rien (rend 0, `--strict` rend 1) ; c'est le contrôle **E7** de
-`check-mission-exit.sh` qui bloque la sortie tant qu'un RANGEABLE, ARCHIVABLE, ARCHIVAGE REFUSÉ, À VALIDER
-ou un archivage non commité reste. Un DÉPASSÉ seul se rapporte, il ne bloque pas.
+`check-mission-exit.sh` qui bloque la sortie tant qu'un RANGEABLE, ARCHIVABLE ou ARCHIVAGE REFUSÉ
+**apparu depuis le snapshot**, ou un archivage non commité, reste. E7 est INDÉTERMINÉ (jamais sain)
+si le snapshot manque, si l'archivage n'a pas été tenté (dépôt partitionné, aucun compartiment
+résolu : passer `--ws` ou exporter `GSD_WORKSTREAM`) ou si le script de budget n'est pas vérifiable.
+Un DÉPASSÉ seul se rapporte, il ne bloque pas. Les branches distantes ne sont pas lues ici (le
+contrôle passe `--no-remote`).
+
+**Travail direct (hors mission).** Le hook `Stop` `guard-fin-de-geste.sh` tient le même rôle pour une
+session sans manager : il archive seul, puis **bloque à chaque arrêt** tant qu'il reste du rangement
+**apparu depuis le snapshot de SA session** ; après 3 blocages de suite sans progrès (l'ensemble
+attribué n'a pas diminué), il laisse sortir avec un message visible de l'utilisateur. Les constats non
+actionnables (archivage refusé ou non tenté, budget dépassé, non vérifiable) sont dits à l'utilisateur
+et ne bloquent jamais (ADR-076).
 
 ## Lignes rouges (rappel ADR-053)
 

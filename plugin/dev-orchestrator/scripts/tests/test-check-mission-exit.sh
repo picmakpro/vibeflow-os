@@ -3,7 +3,8 @@
 #
 # Un cas par comportement du contrat (cf. en-tête du script testé), plus les six mutations de
 # fixture (une par contrôle E1-E6) et deux mutations structurelles (D-11, cascade E1). Cas 28-36 :
-# contrôle E7 (SOBR-07, plan 41.3-04), trois mutants de script tués (rc attendu/obtenu). Fixtures
+# contrôle E7 (SOBR-07, plan 41.3-04, delta depuis le snapshot de début de mission), cinq mutants de script
+# tués (rc attendu/obtenu). Fixtures
 # isolées via mktemp -d + git init + dépôt nu, jamais sur le repo réel. Chaque cas capture la
 # sortie ET le code de retour dans deux variables distinctes, assertées séparément.
 # Cas 23-27 (issue #82) : E1 lit aussi `children_running` du registre des agents dispatchés
@@ -143,6 +144,9 @@ mk_sane_fixture() { # <name> -> imprime le chemin du dépôt
   git -C "$d" -c user.email=t@t -c user.name=t checkout -q -b feature/mission >/dev/null 2>&1
   git -C "$d" push -q -u origin feature/mission >/dev/null 2>&1
   git -C "$d" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main >/dev/null 2>&1
+
+  # Snapshot de DÉBUT de mission (E7 juge le delta depuis lui) : posé par le geste que le manager fait après l'acquire.
+  run_gate --root "$d" --budget-snapshot >/dev/null 2>&1
 
   printf '%s' "$d"
 }
@@ -432,10 +436,11 @@ if [ "$E7_RC" -eq 4 ] && [ "$named" -eq 1 ]; then ok "30b E7c budget rc 2 — co
 D="$(mk_sane_fixture c31)"; gate_at "$(mk_inst "$SCRIPT" 'stub:echo "[budget] STATE DÉPASSÉ : x fait 99 Ko (budget 8 Ko)"; exit 1')" "$D"
 if [ "$E7_RC" -eq 3 ] && [ -z "$E7_OUT" ]; then ok "31 E7d rc 1 dû à DÉPASSÉ seul — code 3 (non imputé au geste)"; else ko "31 E7d DÉPASSÉ seul" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
 
-# E7e — rc 1 dû à À VALIDER ou ARCHIVAGE REFUSÉ : manque, jamais SAIN.
-D="$(mk_sane_fixture c32)"; gate_at "$(mk_inst "$SCRIPT" 'stub:echo "[budget] À VALIDER branche distante : origin/x (PR #1, samuel) — suppression = geste humain"; exit 1')" "$D"
-case "$E7_OUT" in *"[E7] À VALIDER branche distante : origin/x"*) named=1 ;; *) named=0 ;; esac
-if [ "$E7_RC" -eq 0 ] && [ "$named" -eq 1 ]; then ok "32 E7e À VALIDER — code 0, manque [E7] nommé"; else ko "32 E7e À VALIDER" "rc=$E7_RC out=[$E7_OUT]"; fi
+# E7e — rc 1 dû à un RANGEABLE apparu ou à ARCHIVAGE REFUSÉ : manque, jamais SAIN. (À VALIDER n'est pas lu : le gate passe
+# --no-remote, le budget ne le rend jamais à cet appel.)
+D="$(mk_sane_fixture c32)"; gate_at "$(mk_inst "$SCRIPT" 'stub:echo "[budget] RANGEABLE branche : x (intégrée)"; exit 1')" "$D"
+case "$E7_OUT" in *"[E7] RANGEABLE branche : x"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 0 ] && [ "$named" -eq 1 ]; then ok "32 E7e RANGEABLE apparu — code 0, manque [E7] nommé"; else ko "32 E7e RANGEABLE" "rc=$E7_RC out=[$E7_OUT]"; fi
 D="$(mk_sane_fixture c32b)"; gate_at "$(mk_inst "$SCRIPT" 'stub:echo "[budget] ARCHIVAGE REFUSÉ : .planning/BACKLOG.md modifiée dans l arbre de travail, non commitée, rien déplacé"; exit 1')" "$D"
 case "$E7_OUT" in *"[E7] ARCHIVAGE REFUSÉ"*) named=1 ;; *) named=0 ;; esac
 if [ "$E7_RC" -eq 0 ] && [ "$named" -eq 1 ]; then ok "32b E7e ARCHIVAGE REFUSÉ — code 0, manque [E7] nommé"; else ko "32b E7e REFUSÉ" "rc=$E7_RC out=[$E7_OUT]"; fi
@@ -456,6 +461,28 @@ if [ "$(git -C "$D" rev-parse HEAD)" = "$H" ]; then ok "33c E7f aucun commit pos
 git_f "$D" add -A; git_f "$D" commit -q -m "archivage commité"; gate_at "$G7" "$D"
 if [ "$E7_RC" -eq 3 ] && [ -z "$E7_OUT" ]; then ok "34 E7f après le commit, second passage — code 3 (SAIN)"; else ko "34 E7f second passage" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
 
+# E7g — DELTA : le rangeable qui existait au démarrage (branche d'un autre mainteneur) n'est PAS imputé à la mission.
+D="$(mk_sane_fixture c35)"; G7="$(mk_inst "$SCRIPT" real)"
+git_f "$D" checkout -q main; git_f "$D" checkout -q -b avant; git_f "$D" commit -q --allow-empty -m "travail avant"
+git_f "$D" checkout -q main; git_f "$D" merge -q --no-ff avant -m "merge avant"; git_f "$D" push -q origin main; git_f "$D" checkout -q feature/mission
+run_gate --root "$D" --budget-snapshot >/dev/null 2>&1; gate_at "$G7" "$D"
+if [ "$E7_RC" -eq 3 ] && [ -z "$E7_OUT" ]; then ok "36 E7g rangeable préexistant au snapshot — code 3 (non imputé à la mission)"; else ko "36 E7g préexistant" "rc=$E7_RC out=[$E7_OUT] err=[$E7_ERR]"; fi
+
+# E7h — snapshot absent : INDÉTERMINÉ (cause nommée, geste à poser), jamais SAIN.
+D="$(mk_sane_fixture c36)"; rm -f "$D/.git/vf-mission-budget.snap"; gate_at "$G7" "$D"
+case "$E7_ERR" in *"[E7] snapshot de début de mission absent"*"--budget-snapshot"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 4 ] && [ "$named" -eq 1 ]; then ok "37 E7h snapshot absent — code 4, cause et geste nommés"; else ko "37 E7h snapshot absent" "rc=$E7_RC err=[$E7_ERR]"; fi
+
+# E7i — ARCHIVAGE NON TENTÉ (dépôt partitionné, aucun compartiment résolu) : INDÉTERMINÉ, plus de silence.
+D="$(mk_sane_fixture c37)"; gate_at "$(mk_inst "$SCRIPT" 'stub:echo "[budget] ARCHIVAGE NON TENTÉ : dépôt partitionné, aucun compartiment résolu"; exit 0')" "$D"
+case "$E7_ERR" in *"[E7] ARCHIVAGE NON TENTÉ"*) named=1 ;; *) named=0 ;; esac
+if [ "$E7_RC" -eq 4 ] && [ "$named" -eq 1 ]; then ok "38 E7i ARCHIVAGE NON TENTÉ — code 4, nommé"; else ko "38 E7i NON TENTÉ" "rc=$E7_RC err=[$E7_ERR]"; fi
+
+# --budget-snapshot : stdout vide, rc 0, fichier posé sous le répertoire git, arbre intact (E2 reste propre).
+D="$(mk_sane_fixture c38)"; rm -f "$D/.git/vf-mission-budget.snap"
+out="$(PATH="$GH_OK_BIN:$PATH" run_gate --root "$D" --budget-snapshot 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ] && [ -f "$D/.git/vf-mission-budget.snap" ] && [ -z "$(git -C "$D" status --porcelain)" ]; then ok "39 --budget-snapshot — rc 0, stdout vide, fichier sous .git, arbre propre"; else ko "39 --budget-snapshot" "rc=$rc out=[$out]"; fi
+
 # --- Mutants de script (rc attendu/obtenu, même forme que les autres suites du module) -------------------
 MUT_N=0
 e7_mutant() { # <id> <ancienne ligne> <nouvelle ligne> <scénario> <rc original attendu> <rc mutant attendu>
@@ -468,10 +495,16 @@ e7_mutant() { # <id> <ancienne ligne> <nouvelle ligne> <scénario> <rc original 
   else ko "35 $id NON TUE" "original=$eo mutant=$em obtenu original=$ro mutant=$rm"; fi
 }
 sc_c() { local d; d="$(mk_sane_fixture "$2")"; gate_at "$(mk_inst "$1" 'stub:exit 2')" "$d"; return "$E7_RC"; }
-sc_e() { local d; d="$(mk_sane_fixture "$2")"; gate_at "$(mk_inst "$1" 'stub:echo "[budget] À VALIDER branche distante : origin/x (PR #1, samuel) — suppression = geste humain"; exit 1')" "$d"; return "$E7_RC"; }
+sc_g() { local d; d="$(mk_sane_fixture "$2")"; git_f "$d" checkout -q main; git_f "$d" checkout -q -b avant; git_f "$d" commit -q --allow-empty -m "travail avant"
+  git_f "$d" checkout -q main; git_f "$d" merge -q --no-ff avant -m "merge avant"; git_f "$d" push -q origin main; git_f "$d" checkout -q feature/mission
+  run_gate --root "$d" --budget-snapshot >/dev/null 2>&1; gate_at "$(mk_inst "$1" real)" "$d"; return "$E7_RC"; }
+sc_h() { local d; d="$(mk_sane_fixture "$2")"; rm -f "$d/.git/vf-mission-budget.snap"; gate_at "$(mk_inst "$1" real)" "$d"; return "$E7_RC"; }
+sc_i() { local d; d="$(mk_sane_fixture "$2")"; gate_at "$(mk_inst "$1" 'stub:echo "[budget] ARCHIVAGE NON TENTÉ : dépôt partitionné, aucun compartiment résolu"; exit 0')" "$d"; return "$E7_RC"; }
 sc_f() { local d g; d="$(mk_e7f "$2")"; g="$(mk_inst "$1" real)"; gate_at "$g" "$d"; git_f "$d" add -A; git_f "$d" commit -q -m "archivage commité"; gate_at "$g" "$d"; return "$E7_RC"; }
-e7_mutant "E7c (rc 2 lu comme sain)" '  if [ "$E7_RC" -ge 2 ]; then' '  if [ "$E7_RC" -ge 99 ]; then' sc_c 4 3
-e7_mutant "E7e (jeton À VALIDER ignoré)" "E7_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ|À VALIDER'" "E7_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ'" sc_e 0 3
+e7_mutant "E7c (rc 2 lu comme sain)" '  elif [ "$E7_RC" -ge 2 ]; then' '  elif [ "$E7_RC" -ge 99 ]; then' sc_c 4 3
+e7_mutant "E7g (delta ignoré, tout le rangeable du dépôt imputé)" '  E7_LIGNES="$(LC_ALL=C comm -23 "$E7_NOW" "$E7_SNAP")"' '  E7_LIGNES="$(LC_ALL=C comm -23 "$E7_NOW" /dev/null)"' sc_g 3 0
+e7_mutant "E7h (snapshot absent non vu, lu sain)" 'elif [ -z "$E7_SNAP" ] || [ ! -f "$E7_SNAP" ]; then' 'elif false; then' sc_h 4 3
+e7_mutant "E7i (ARCHIVAGE NON TENTÉ redevenu silence)" '  if [ -n "$E7_NONTENTE" ]; then' '  if false; then' sc_i 4 3
 e7_mutant "E7f (--auto retiré)" '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?' '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict 2>/dev/null)"; E7_RC=$?' sc_f 3 0
 
 echo ""

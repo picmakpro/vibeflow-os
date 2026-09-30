@@ -29,6 +29,7 @@
 #
 # Usage :
 #   check-mission-exit.sh [--root <dir>] [--report <path>] [--step <phase>]... [--hook|--quiet]
+#   check-mission-exit.sh --budget-snapshot [--root <dir>]   # DÉBUT de mission, une fois (voir E7)
 # Defaults : --root .   (pas de --report ni --step par défaut : leur absence est INDÉTERMINÉE,
 #            jamais un vert — le gate n'a alors aucune source de vérité sur ce qu'il devait lire.)
 #
@@ -51,13 +52,18 @@
 #   E5 — le rapport détaillé de mission est présent et lisible sur disque.
 #   E6 — chaque verdict du rapport porte sa preuve (contrat `references/mission-contracts.md`
 #        §Contrat de preuves E6, section `## Preuves E6` du rapport, un bloc ```json).
-#   E7 — rien de rangeable n'est laissé (SOBR-07, ADR-076) : `check-method-budget.sh --auto --strict`
-#        archive SANS geste humain ce qu'un budget dépassé désigne (déplacement tracé, réversible,
-#        jamais de commit) puis rend ce qui reste : branche ou worktree intégré (RANGEABLE), sujet
-#        archivable, branche distante à valider, archivage refusé (source non commitée) — chacun un
-#        manque E7 —, et « archivé, à commiter » si l'arbre vient d'être modifié. Un DÉPASSÉ seul
-#        (rc 1 sans aucun de ces jetons) est un constat, pas un manque du geste : SAIN. Script de
-#        budget introuvable ou rc 2 : INDÉTERMINÉ (jamais sain).
+#   E7 — rien de rangeable n'est laissé PAR LA MISSION (SOBR-07, ADR-076). Sémantique DELTA : la référence est
+#        le snapshot de DÉBUT de mission, posé par le manager juste après l'`acquire` du verrou de driver avec
+#        `check-mission-exit.sh --budget-snapshot` (mission-flow.md §Budgets de méthode) ; il vit sous le
+#        répertoire git commun (`<git-common-dir>/vf-mission-budget.snap`), jamais dans l'arbre (E2 reste
+#        propre). Sont des manques E7 les lignes RANGEABLE / ARCHIVABLE / ARCHIVAGE REFUSÉ APPARUES depuis ce
+#        snapshot (`check-method-budget.sh --auto --no-remote --strict` a d'abord archivé SANS geste humain ce
+#        qu'un budget dépassé désigne : déplacement tracé, réversible, jamais de commit ; « archivé, à
+#        commiter » tant que l'arbre porte l'archivage). Ce qui existait au démarrage (branche d'un autre
+#        mainteneur, worktree d'une autre mission) n'est jamais imputé à la mission. Snapshot absent,
+#        ARCHIVAGE NON TENTÉ (dépôt partitionné, aucun compartiment résolu), script de budget introuvable
+#        ou rc 2 : INDÉTERMINÉ, jamais sain. Un DÉPASSÉ seul est un constat, pas un manque du geste. Les
+#        jetons de remote (À VALIDER) ne sont pas lus : le contrôle passe --no-remote, ils n'y arrivent pas.
 #
 # Résolution des scripts frères ($S) : cascade de `references/mission-flow.md` (§Résolution des
 # scripts), sentinelle testée `dag.sh` — PAS `driver-lock.sh`, qui est cherché SEULEMENT une fois
@@ -75,7 +81,7 @@
 # Lecture seule (D-10), à UNE exception nommée : E7 est le SEUL écrivain du gate, par le seul
 # déplacement d'archive borné de `check-method-budget.sh --auto` (sources commitées, compartiment de la
 # session, jamais de commit) ; les six autres contrôles ne modifient rien, aucune sous-commande d'écriture d'un autre
-# outil n'est invoquée. E2 tourne avant E7 : l'arbre qu'E2 a jugé propre est celui d'avant l'archivage. D-18 : shell portable, aucune dépendance externe
+# outil n'est invoquée ; le mode `--budget-snapshot` (un autre appel, en début de mission) n'écrit qu'un fichier sous le répertoire git commun. E2 tourne avant E7 : l'arbre qu'E2 a jugé propre est celui d'avant l'archivage. D-18 : shell portable, aucune dépendance externe
 # neuve — interpréteur, outil de requête JSON, git et client GitHub sont déjà des prérequis de ce
 # dépôt.
 set -uo pipefail
@@ -85,6 +91,7 @@ REPORT=""
 STEPS=""
 HOOK=0
 QUIET=0
+BUDGET_SNAPSHOT=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -108,6 +115,7 @@ while [ "$#" -gt 0 ]; do
       STEPS="${STEPS}${2}"$'\n'; shift 2 ;;
     --hook) HOOK=1; shift ;;
     --quiet) QUIET=1; shift ;;
+    --budget-snapshot) BUDGET_SNAPSHOT=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-mission-exit] argument inconnu : $1" >&2; exit 64 ;;
   esac
@@ -151,6 +159,39 @@ resolve_S() {
   done
   return 1
 }
+
+# --- Script de budget et snapshot de début de mission (E7) — HORS des marqueurs ---------------------
+# Script frère (lab installé, scripts à plat), sinon le module conductor voisin du dépôt source.
+resolve_budget() {
+  local b; b="$(dirname "$0")/check-method-budget.sh"
+  [ -f "$b" ] || b="$(dirname "$0")/../../conductor/scripts/check-method-budget.sh"
+  [ -f "$b" ] && { printf '%s' "$b"; return 0; }
+  return 1
+}
+budget_snap_path() { # chemin absolu du snapshot, sous le répertoire git commun ; échec si ROOT n'est pas un dépôt
+  local g; g="$(git_safe rev-parse --git-common-dir 2>/dev/null)" || return 1
+  [ -n "$g" ] || return 1
+  case "$g" in /*) ;; *) g="$ROOT/$g" ;; esac
+  printf '%s/vf-mission-budget.snap' "$g"
+}
+BUDGET_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ'
+budget_lines() { { grep -E "$BUDGET_TOK" || true; } | sed 's/^\[budget\] *//' | LC_ALL=C sort -u; }
+
+if [ "$BUDGET_SNAPSHOT" -eq 1 ]; then
+  # Geste du manager, UNE fois, au démarrage de la mission : photographie LECTURE SEULE (sans --auto) de ce
+  # qui est déjà rangeable ; écrit hors de l'arbre de travail.
+  SNAP_BUDGET="$(resolve_budget)" || { echo "[check-mission-exit] --budget-snapshot : check-method-budget.sh introuvable" >&2; exit 4; }
+  SNAP_PATH="$(budget_snap_path)" || { echo "[check-mission-exit] --budget-snapshot : $ROOT n'est pas un dépôt git" >&2; exit 4; }
+  SNAP_OUT="$(bash "$SNAP_BUDGET" --root "$ROOT" --no-remote --quiet 2>/dev/null)"; SNAP_RC=$?
+  if [ "$SNAP_RC" -ge 2 ]; then
+    echo "[check-mission-exit] --budget-snapshot : check-method-budget.sh a rendu $SNAP_RC, snapshot non posé" >&2
+    exit 4
+  fi
+  printf '%s\n' "$SNAP_OUT" | budget_lines > "$SNAP_PATH.tmp.$$" 2>/dev/null && mv -f "$SNAP_PATH.tmp.$$" "$SNAP_PATH" 2>/dev/null \
+    || { rm -f "$SNAP_PATH.tmp.$$" 2>/dev/null; echo "[check-mission-exit] --budget-snapshot : écriture impossible ($SNAP_PATH)" >&2; exit 4; }
+  say "snapshot de début de mission posé : $SNAP_PATH"
+  exit 0
+fi
 
 # --- États initiaux des sept contrôles, HORS des marqueurs ------------------------------------------
 # Initialisés à "sain" pour que la suppression chirurgicale d'un bloc (outillage de test, tâche 2)
@@ -486,21 +527,27 @@ fi
 # <<< E6
 
 # >>> E7
-# E7 — rien de rangeable n'est laissé (SOBR-07). Script de budget : frère de celui-ci (lab installé, scripts
-# à plat), sinon le module conductor voisin du dépôt source. Le seul écrivain du gate : voir l'en-tête.
-E7_BUDGET="$(dirname "$0")/check-method-budget.sh"
-[ -f "$E7_BUDGET" ] || E7_BUDGET="$(dirname "$0")/../../conductor/scripts/check-method-budget.sh"
-E7_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ|À VALIDER'
-if [ ! -f "$E7_BUDGET" ]; then
+# E7 — rien de rangeable n'est laissé par la mission (SOBR-07). Delta contre le snapshot de début de mission.
+E7_BUDGET="$(resolve_budget || true)"
+E7_SNAP="$(budget_snap_path || true)"
+if [ -z "$E7_BUDGET" ]; then
   E7_STATUS="indet"
   E7_MSG="[E7] check-method-budget.sh introuvable (ni à côté de ce script, ni sous ../../conductor/scripts)"
+elif [ -z "$E7_SNAP" ] || [ ! -f "$E7_SNAP" ]; then
+  E7_STATUS="indet"
+  E7_MSG="[E7] snapshot de début de mission absent : impossible de distinguer ce que la mission a créé de ce qui existait. Le manager le pose au démarrage, après l'acquire : check-mission-exit.sh --budget-snapshot"
 else
   E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?
-  E7_LIGNES="$({ printf '%s\n' "$E7_OUT" | grep -E "$E7_TOK" || true; } | sed 's/^\[budget\] *//')"
   E7_ARCHIVE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVÉ' || true; } | sed 's/^\[budget\] *//')"
-  E7_NONTENTE="$(printf '%s\n' "$E7_OUT" | grep 'ARCHIVAGE NON TENTÉ' || true)"
-  [ -n "$E7_NONTENTE" ] && say "[E7] $E7_NONTENTE"
-  if [ "$E7_RC" -ge 2 ]; then
+  E7_NONTENTE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVAGE NON TENTÉ' || true; } | sed 's/^\[budget\] *//')"
+  E7_NOW="$(mktemp "${TMPDIR:-/tmp}/vf-e7.XXXXXX")"
+  printf '%s\n' "$E7_OUT" | budget_lines > "$E7_NOW"
+  E7_LIGNES="$(LC_ALL=C comm -23 "$E7_NOW" "$E7_SNAP")"
+  rm -f "$E7_NOW"
+  if [ -n "$E7_NONTENTE" ]; then
+    E7_STATUS="indet"
+    E7_MSG="[E7] $E7_NONTENTE : rien n'a été archivé, l'état du geste de fin n'est pas vérifiable"
+  elif [ "$E7_RC" -ge 2 ]; then
     E7_STATUS="indet"
     E7_MSG="[E7] check-method-budget.sh a rendu $E7_RC (non vérifiable ou usage) : rien de sûr sur ce qui reste rangeable"
     [ -n "$E7_ARCHIVE" ] && E7_MSG="$E7_MSG"$'\n'"[E7] archivé avant l'échec, à commiter : $E7_ARCHIVE"
