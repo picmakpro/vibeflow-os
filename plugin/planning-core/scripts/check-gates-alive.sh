@@ -178,6 +178,9 @@ CANARIS = (
     "G6-principal|G6|nominal|Write:.planning/" + NOM_ETAT + "|fil-principal",
     "G6-plugin|G6|nominal|Write:.planning/" + NOM_ETAT + "@plugin-inconnu:agent-inconnu|plugin",
     "G5-verdict|G5|nominal|Write:.planning/cycles/01-c/phases/01-p/VERDICT.md@agent-inconnu|",
+    # Lot A (B1/H1, décision du manager vf-dev-manager, 2026-10-01) : le lab synthétique porte des `.planning/` IMBRIQUÉS (dans le
+    # planning, sous la phase) ; un hook qui en ferait une racine non adhérente se tairait sur ce VERDICT.md (fil principal).
+    "G5-imbrique|G5|nominal|Write:.planning/cycles/01-c/phases/01-p/VERDICT.md|fil-principal",
     # Étape 2 (45-06) : G1 (PLAN.md de forme modèle dans une phase sans CADRAGE.md, fil principal).
     "G1-sans-cadrage|G1|nominal|Write:.planning/cycles/01-c/phases/01-p/PLAN.md|fil-principal",
     # Étape 3 (45-07) : G7 (création d'un .planning/ orphelin sous un lab adhérent, fil principal).
@@ -212,10 +215,17 @@ def cwd_de_session(brut):
     return os.path.realpath(cwd)
 
 
+def sous_planning(chemin):
+    """Vrai si un composant du chemin est `.planning` (casse ignorée). Un dossier `.planning` situé dans (ou sous) un composant
+    `.planning` n'est JAMAIS une racine de lab : on remonte (amendement de P45-D-01a, décision du manager vf-dev-manager,
+    2026-10-01 — un `.planning` créé sous `<phase>/` ou sous `.planning/` ne devient pas une racine sans config.json)."""
+    return any(c.casefold() == ".planning" for c in chemin.split(os.sep))  # sous-planning-casse
+
+
 def racine_planning(depart):
     d = depart
     while True:
-        if os.path.isdir(os.path.join(d, ".planning")):
+        if os.path.isdir(os.path.join(d, ".planning")) and not sous_planning(d):  # racine-imbriquee
             return d
         parent = os.path.dirname(d)
         if parent == d:
@@ -316,6 +326,8 @@ class Rejeu:
         os.makedirs(os.path.dirname(os.path.join(self.lab, PLAN_CANARY)))
         with open(os.path.join(self.lab, PLAN_CANARY), "w", encoding="utf-8") as fh:
             fh.write("---\necrit: [" + DOSSIER_NU + ", " + DOSSIER_LIVRABLES + "]\n---\n")
+        for imbrique in (os.path.join(".planning", ".planning"), os.path.join(os.path.dirname(PLAN_CANARY), ".planning")):
+            os.makedirs(os.path.join(self.lab, imbrique))
         os.makedirs(os.path.join(self.lab, ".claude", "agents"))
         for nom, texte in DEFINITIONS_CANARY:
             with open(os.path.join(self.lab, ".claude", "agents", nom + ".md"), "w", encoding="utf-8") as fh:

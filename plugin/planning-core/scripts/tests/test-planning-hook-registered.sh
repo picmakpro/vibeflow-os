@@ -599,7 +599,7 @@ def sec_modes(ctx):
 # `none` (silence : Bash et toute lecture, limites déclarées (a) à (d), P45-D-06b).
 # =================================================================================================
 PLANCHER_MIN = 49        # plancher de la recherche : un corpus vidé rougit
-PLANCHER_CORPUS = 63     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
+PLANCHER_CORPUS = 68     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
 
 
 class Cas:
@@ -646,6 +646,13 @@ def construire_arbre(t):
     lab(os.path.join("devout", "inner"), True)
     lab("adhout", True)
     lab(os.path.join("adhout", "inner-dev"), False)
+    # Lot A (B1/H1, amendement de P45-D-01a, décision du manager vf-dev-manager, 2026-10-01) : un `.planning` situé dans
+    # (ou sous) un composant `.planning` n'est jamais une racine de lab. a = `.planning/.planning`, b = `.planning/cycles/.planning`,
+    # c = `<phase>/.planning`.
+    for nom, rel in (("imb-a", ".planning/.planning"), ("imb-b", ".planning/cycles/.planning"),
+                     ("imb-c", ".planning/cycles/01-c/phases/01-p/.planning")):
+        lab(nom, True)
+        os.makedirs(os.path.join(t, nom, rel))
     os.makedirs(os.path.join(t, "bare"), exist_ok=True)
     _lien("adh", os.path.join(t, "alias-adh"))
     os.makedirs(os.path.join(t, "lab-plink"), exist_ok=True)
@@ -662,6 +669,8 @@ def construire_arbre(t):
         L.setdefault(nom, os.path.join(t, nom))
     L["devout/inner"] = os.path.join(t, "devout", "inner")
     L["adhout/inner-dev"] = os.path.join(t, "adhout", "inner-dev")
+    for nom in ("imb-a", "imb-b", "imb-c"):
+        L.setdefault(nom, os.path.join(t, nom))
     for nom in ("alias-adh", "lab-plink", "bare", "cfglink", "nextline", "escaped", "dev-note", "dev-sans-config"):
         L.setdefault(nom, os.path.join(t, nom))
     return L
@@ -771,6 +780,13 @@ def construire_corpus(ctx):
     w("A13", "Write", L["cfglink"] + "/" + notes, dev, "tight", note="config.json en lien symbolique (limite c : côté shell adhérent)")
     w("A14", "Write", dev + "/" + notes, adh, "none", note="session dans un adhérent qui écrit dans un dev voisin")
     w("A15", "Write", adh + "/" + notes, dev, "tight", note="session dans un dev qui écrit dans un adhérent voisin")
+    # ---- A19-A23 : `.planning` imbriqué (lot A, B1/H1) — chaque cas se joue dans les six modes
+    phase_imb = ".planning/cycles/01-c/phases/01-p/"
+    w("A19", "Write", L["imb-a"] + "/.planning/notes.md", dev, "tight", note="`.planning/.planning` : le planning du lab reste la racine")
+    w("A20", "Write", L["imb-b"] + "/" + phase_imb + "VERDICT.md", dev, "tight", note="`.planning/cycles/.planning` : la racine reste le lab")
+    w("A21", "Write", L["imb-c"] + "/" + phase_imb + "VERDICT.md", dev, "tight", note="`<phase>/.planning` : la phase n'est jamais une racine")
+    w("A22", "Edit", L["imb-c"] + "/" + phase_imb + "PLAN.md", dev, "tight", note="`<phase>/.planning`, Edit du PLAN.md de la phase")
+    w("A23", "NotebookEdit", L["imb-c"] + "/" + phase_imb + "nb.ipynb", dev, "tight", note="`<phase>/.planning`, NotebookEdit")
     ctx.corpus = cas
     ctx.labs = L
     return cas
@@ -882,7 +898,7 @@ def tight_reference(chemin):
             return False
         courant = parent
     while True:
-        if os.path.isdir(os.path.join(courant, ".planning")):
+        if os.path.isdir(os.path.join(courant, ".planning")) and ".planning" not in [c.lower() for c in courant.split(os.sep)]:
             cfg = os.path.join(courant, ".planning", "config.json")
             if not os.path.isfile(cfg):
                 return False
@@ -1081,6 +1097,8 @@ def sec_mutants(ctx):
         ("EXT-9", 'then P=$V/$P; else', 'then :; else', "E30", "C", {}),
         ("EXT-10", '..) _r=${_r%/*}; [ -n "$_r" ] || _r=/ ;;', '..) ;;', "A16", "C", {}),
         ("EXT-11", 'if [ -d "$_n" ] && _y=$(cd', 'if false && _y=$(cd', "A18", "C", {}),
+        ("EXT-12", '*/[.][Pp][Ll][Aa][Nn][Nn][Ii][Nn][Gg]/*) ;;', '*/[.][Zz][Zz][Zz]/*) ;;', "A21", "C", {}),
+        ("EXT-12D", '*/[.][Pp][Ll][Aa][Nn][Nn][Ii][Nn][Gg]/*) ;;', '*/[.][Zz][Zz][Zz]/*) ;;', "A19", "D", {}),
         ("CMD-1", ';; *) exit 0 ;; esac', ';; *) ;; esac', "E35", "C", {}),
         ("CMD-2", 'bash "$S"); R=$?; fi', 'bash "$S"); R=0; fi', "E01", "E", {"id_temoin": "E27"}),
         ("CMD-3", 'if [ -f "$S" ]; then O=', 'if :; then O=', "E01", "C", {"mode_temoin": "A"}),

@@ -152,14 +152,22 @@ def _partie_existante(chemin):
     return courant
 
 
+def sous_planning(chemin):
+    """Vrai si un composant du chemin est `.planning` (casse ignorée). Un dossier `.planning` situé dans (ou sous) un composant
+    `.planning` n'est JAMAIS une racine de lab : on remonte (amendement de P45-D-01a, décision du manager vf-dev-manager,
+    2026-10-01 — un `.planning` créé sous `<phase>/` ou sous `.planning/` ne devient pas une racine sans config.json)."""
+    return any(c.casefold() == ".planning" for c in chemin.split(os.sep))  # sous-planning-casse
+
+
 def racine_lab(depart):
     """Racine physique du lab : le PLUS PROCHE ancêtre qui contient un DOSSIER `.planning` (le
-    plus proche gagne, P45-D-01a/P45-D-12), ou None. Un départ non absolu n'a pas de lab."""
+    plus proche gagne, P45-D-01a/P45-D-12) et qui n'est pas lui-même dans (ou sous) un composant `.planning`
+    (`sous_planning`), ou None. Un départ non absolu n'a pas de lab."""
     if not isinstance(depart, str) or not depart.startswith("/"):
         return None
     courant = _partie_existante(depart)
     while True:
-        if os.path.isdir(os.path.join(courant, ".planning")):
+        if os.path.isdir(os.path.join(courant, ".planning")) and not sous_planning(courant):  # racine-imbriquee
             return courant
         parent = os.path.dirname(courant)
         if parent == courant:

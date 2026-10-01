@@ -3172,6 +3172,222 @@ def sec_mutants(ctx):
                   % (cible, original[1], mutant[1]))
 
 
+# =================================================================================================
+# LOT A (correction ciblée post-45-09 : revue de phase et audit de sécurité sur e13a426 ; décisions du manager
+# vf-dev-manager, 2026-10-01, renversables) : chaque constat a son contrôle, rejoué sur le script livré ET sur un
+# mutant qui retire le seul correctif (le contrôle doit rougir sur le mutant : la trace est imprimée).
+# =================================================================================================
+LOTA_CONTROLES = []   # [(identifiant, fonction(ctx, dossier_de_scripts) -> (conforme, détail))]
+LOTA_MUTANTS = []     # [(identifiant du mutant, motif, remplacement, identifiant du contrôle, nom du script, marqueur du heredoc)]
+
+
+def lota(ident):
+    def deco(f):
+        LOTA_CONTROLES.append((ident, f))
+        return f
+    return deco
+
+
+def lota_mutant(ident, motif, remplacement, controle, nom="planning-hook.sh", marqueur="PY_PLANNING_HOOK_EOF"):
+    LOTA_MUTANTS.append((ident, motif, remplacement, controle, nom, marqueur))
+
+
+def sec_lota(ctx):
+    par_id = dict(LOTA_CONTROLES)
+    for ident, fonction in LOTA_CONTROLES:
+        conforme, detail = fonction(ctx, ctx.scripts_dir)
+        if conforme:
+            ok("%s %s" % (ident, detail))
+        else:
+            ko(ident, "contrôle du lot A sur les scripts livrés", "conforme", detail)
+    filtre = [f for f in os.environ.get("VF_GATES_MUTANTS", "").split(",") if f]
+    for ident, motif, remplacement, controle, nom, marqueur in LOTA_MUTANTS:
+        if filtre and not any(f in ident for f in filtre):
+            continue
+        dossier, raison = make_script_mutant(ctx, nom, marqueur, ident, motif, remplacement)
+        if dossier is None:
+            komut(ident, "mutant valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
+            continue
+        for autre in ("planning-hook.sh", "poser-verdict.sh", "deroger-gate.sh", "check-gates-alive.sh"):
+            if not os.path.exists(os.path.join(dossier, autre)):
+                shutil.copy(os.path.join(ctx.scripts_dir, autre), os.path.join(dossier, autre))
+                os.chmod(os.path.join(dossier, autre), 0o755)
+        ctrl = par_id[controle]
+        original = ctrl(ctx, ctx.scripts_dir)
+        temoin_o, temoin_m = controle_temoin(ctx, None), controle_temoin(ctx, dossier)
+        mutant = ctrl(ctx, dossier)
+        if not original[0]:
+            komut(ident, "l'original passe %s" % controle, "conforme", original[1])
+        elif temoin_o != temoin_m:
+            komut(ident, "témoin (Write neutre d'un lab adhérent) inchangé sous le mutant", str(temoin_o), str(temoin_m))
+        elif mutant[0]:
+            komut(ident, "%s rougit sous le mutant" % controle, "rouge", "vert : " + mutant[1] + " (mutant non opposable)")
+        else:
+            okmut(ident, "%s rougit · attendu (original) : %s · obtenu (mutant) : %s · témoin inchangé" % (controle, original[1], mutant[1]))
+
+
+def copie_de_scripts(ctx, dossier, noms, prefixe):
+    """Dossier jetable portant les `noms` copiés de `dossier` (exécutables)."""
+    d = ctx.unique(prefixe)
+    os.makedirs(d, exist_ok=True)
+    for nom in noms:
+        shutil.copy(os.path.join(dossier, nom), os.path.join(d, nom))
+        os.chmod(os.path.join(d, nom), 0o755)
+    return d
+
+
+def deny_de(rc, out, err, gate):
+    """(vrai, détail) si un deny unique de `gate` (`[planning-core] <gate> :`) sans stderr, sinon (faux, détail)."""
+    v = classer(rc, out)
+    if v != "deny" or err:
+        return False, "%s rc=%d stderr=%s stdout=%s" % (v, rc, court(err), court(out))
+    raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+    return raison.startswith("[planning-core] %s :" % gate), raison[:120]
+
+
+# --- LOT A, constat 1 (B1/H1) : un `.planning` imbriqué n'est jamais une racine de lab -----------------------------------
+# Amendement de P45-D-01a (décision du manager vf-dev-manager, 2026-10-01) : un dossier `.planning` situé dans (ou sous)
+# un composant `.planning` n'est JAMAIS une racine de lab ; on remonte. Quatre implémentations : `racine_lab` du hook,
+# `vf_tight` de hooks.json (suite test-planning-hook-registered.sh), `racine_lab` de poser-verdict.sh, `racine_planning`
+# du canary. Atteignable en deux Write (un fichier sous `<phase>/.planning/` suffit à créer le dossier), même avec G7 armé.
+IMBRIQUES = ("a", "b", "c")
+PHASE_IMB = ".planning/cycles/01-c/phases/01-p"
+
+
+def lab_imbrique(ctx, variante):
+    """Lab adhérent dont le planning porte un `.planning` imbriqué : a = `.planning/.planning`, b = `.planning/cycles/.planning`,
+    c = `<phase>/.planning`."""
+    lab = ctx.unique("lab-imbrique-" + variante)
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    phase = os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-p")
+    ecrire(os.path.join(phase, "PLAN.md"), "---\necrit: livrables\n---\n")
+    imbrique = {"a": os.path.join(lab, ".planning", ".planning"), "b": os.path.join(lab, ".planning", "cycles", ".planning"),
+                "c": os.path.join(phase, ".planning")}[variante]
+    os.makedirs(imbrique)
+    return lab
+
+
+def fonction_extraite(chemin_script, marqueur, nom):
+    """Fonction `nom` du corps Python embarqué (marqueur du heredoc), exécutée seule dans un espace de noms jetable."""
+    corps = corps_python(open(chemin_script, encoding="utf-8").read(), marqueur)
+    for noeud in ast.parse(corps).body:
+        if isinstance(noeud, ast.FunctionDef) and noeud.name == nom:
+            ns = {"os": os, "re": re}
+            exec(compile(ast.Module(body=[noeud], type_ignores=[]), chemin_script, "exec"), ns)
+            return ns[nom]
+    return None
+
+
+@lota("R-IMB-01")
+def controle_imbrique_hook(ctx, script):
+    """Copie armée : un `.planning` imbriqué (a, b, c) ne fait jamais d'un dossier de planning ou de phase une racine non
+    adhérente — Write d'un fichier généré (G6), d'un VERDICT.md (G5) et d'un PLAN.md sans cadrage (G1) : un deny du gate."""
+    armee = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    for variante in IMBRIQUES:
+        lab = lab_imbrique(ctx, variante)
+        for gate, rel in (("G6", ".planning/STATE.md"), ("G5", PHASE_IMB + "/VERDICT.md"), ("G1", PHASE_IMB + "/PLAN.md")):
+            n += 1
+            brut = payload("Write", entree_outil("Write", os.path.join(lab, rel)), lab)
+            rc, out, err = ctx.lancer("A", brut, cwd=lab, dossier=armee)
+            conforme, detail = deny_de(rc, out, err, gate)
+            if not conforme:
+                fautes.append("variante %s, %s sur %s : %s" % (variante, gate, rel, detail))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus de gate (G6, G5, G1 sur trois variantes de `.planning` imbriqué)" % n)
+
+
+@lota("R-IMB-02")
+def controle_imbrique_poser(ctx, script):
+    """poser-verdict.sh : l'unité d'un lab adhérent dont le planning porte un `.planning` imbriqué (a, b, c) est posée (code 0),
+    jamais jugée « lab non adhérent » (code 2)."""
+    d = _dossier(ctx, script)
+    fautes = []
+    for variante in IMBRIQUES:
+        lab = lab_imbrique(ctx, variante)
+        rc, out, err = poser(ctx, d, lab, 1, unite=PHASE_IMB)
+        if rc != 0 or not os.path.isfile(os.path.join(lab, PHASE_IMB, "VERDICT.md")):
+            fautes.append("variante %s : rc=%d %s" % (variante, rc, court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else "code 0 et VERDICT.md posé sur les trois variantes")
+
+
+def canary_degrade(ctx, dossier, cwd_session):
+    """Lance le check-gates-alive.sh de `dossier` (copié seul dans un projet jetable) sur un projet SANS planning-hook.sh : une
+    session reconnue adhérente signale le mode dégradé (code 0, une ligne), une session jugée hors lab adhérent rend 3 en silence."""
+    projet = ctx.unique("projet-canary-sans-hook")
+    d = os.path.join(projet, ".claude", "scripts")
+    os.makedirs(d)
+    shutil.copy(os.path.join(dossier, "check-gates-alive.sh"), os.path.join(d, "check-gates-alive.sh"))
+    reglage = os.path.join(ctx.unique("reglage-canary-imb"), "settings.json")
+    ecrire(reglage, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [
+        {"type": "command", "command": ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')}]}]}}))
+    p = subprocess.run(["bash", os.path.join(d, "check-gates-alive.sh"), "--settings=" + reglage],
+                       input=json.dumps({"cwd": cwd_session}).encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": ctx.home, "CLAUDE_PROJECT_DIR": projet},
+                       cwd=cwd_session, timeout=120)
+    return p.returncode, p.stdout, p.stderr
+
+
+@lota("R-IMB-03")
+def controle_imbrique_canary(ctx, script):
+    """Canary : une session dont le cwd est un `.planning` imbriqué (a, b, c) d'un lab adhérent est reconnue adhérente (le
+    canary rejoue la commande, ici sans script : mode dégradé, code 0), jamais « hors lab adhérent » (code 3, rien rejoué)."""
+    d = _dossier(ctx, script)
+    fautes = []
+    for variante in IMBRIQUES:
+        lab = lab_imbrique(ctx, variante)
+        cwd = {"a": os.path.join(lab, ".planning", ".planning"), "b": os.path.join(lab, ".planning", "cycles", ".planning"),
+               "c": os.path.join(lab, PHASE_IMB, ".planning")}[variante]
+        rc, out, err = canary_degrade(ctx, d, cwd)
+        if rc != 0 or b"mode d\xc3\xa9grad\xc3\xa9" not in out:
+            fautes.append("variante %s : rc=%d stdout=%s" % (variante, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "les trois variantes sont reconnues adhérentes (code 0, « mode dégradé »)")
+
+
+@lota("R-IMB-04")
+def controle_sous_planning(ctx, script):
+    """`sous_planning` (hook, poser-verdict.sh, canary) : vrai pour un chemin qui porte un composant `.planning`, casse ignorée ;
+    faux pour `planning`, `x.planning`, `.planningx` (jamais une sous-chaîne)."""
+    d = _dossier(ctx, script)
+    fautes = []
+    for nom, marqueur in (("planning-hook.sh", "PY_PLANNING_HOOK_EOF"), ("poser-verdict.sh", "PY_POSER_VERDICT_EOF"),
+                          ("check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF")):
+        f = fonction_extraite(os.path.join(d, nom), marqueur, "sous_planning")
+        if f is None:
+            fautes.append("%s : sous_planning absente" % nom)
+            continue
+        for chemin, attendu in (("/a/.planning", True), ("/a/.PLANNING/b", True), ("/a/.Planning/b/c", True),
+                                ("/a/b/.planning/cycles", True), ("/a/planning/b", False), ("/a/x.planning/b", False),
+                                ("/a/.planningx/b", False), ("/a/b", False), ("/", False)):
+            if f(chemin) is not attendu:
+                fautes.append("%s : sous_planning(%r) = %r (attendu %r)" % (nom, chemin, f(chemin), attendu))
+    return (not fautes), ("; ".join(fautes) if fautes else "composant `.planning` seul, casse ignorée, dans les trois scripts")
+
+
+lota_mutant("IMB-HOOK", "# racine-imbriquee", 'if os.path.isdir(os.path.join(courant, ".planning")):  # racine-imbriquee', "R-IMB-01")
+lota_mutant("IMB-POSER", "# racine-imbriquee", 'if os.path.isdir(os.path.join(courant, ".planning")):  # racine-imbriquee', "R-IMB-02",
+            "poser-verdict.sh", "PY_POSER_VERDICT_EOF")
+lota_mutant("IMB-CANARY", "# racine-imbriquee", 'if os.path.isdir(os.path.join(d, ".planning")):  # racine-imbriquee', "R-IMB-03",
+            "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF")
+lota_mutant("IMB-CASEFOLD", "# sous-planning-casse", 'return any(c == ".planning" for c in chemin.split(os.sep))  # sous-planning-casse', "R-IMB-04")
+
+
+@lota("R-IMB-05")
+def controle_imbrique_cas_canary(ctx, script):
+    """Canary de session (cas G5-imbrique, lab synthétique à `.planning/` imbriqués) : sain (code 3, stdout vide) sur le hook livré ;
+    un hook qui fait d'un `.planning` imbriqué une racine non adhérente fait signaler le canary (cas en échec)."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe", tel_quel=True)
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    return True, "canary sain (code 3) : le cas G5-imbrique trouve sa ligne d'observation dans un lab à `.planning/` imbriqués"
+
+
+lota_mutant("IMB-HOOK-CANARY", "# racine-imbriquee", 'if os.path.isdir(os.path.join(courant, ".planning")):  # racine-imbriquee', "R-IMB-05")
+
+
+# LOTA-ANCRE
+
+
 SECTIONS = {
     "table": sec_table,
     "parseur": sec_parseur,
@@ -3193,6 +3409,7 @@ SECTIONS = {
     "accord": sec_accord,
     "banc": sec_banc,
     "mutants": sec_mutants,
+    "lota": sec_lota,
 }
 
 
@@ -3237,7 +3454,7 @@ run_sections() { # <sections séparées par des virgules>
 
 # VF_GATES_SECTIONS (facultatif, pour rejouer une partie de la suite pendant le développement) : liste de sections séparées
 # par des virgules ; sans elle, toutes les sections tournent, dans l'ordre ci-dessous.
-run_sections "${VF_GATES_SECTIONS:-table,parseur,registre,jeton,g2,g5,g6,id,cang,g1,g7,role,verdict,derog,env,obs_env,env_statique,accord,banc,mutants}"
+run_sections "${VF_GATES_SECTIONS:-table,parseur,registre,jeton,g2,g5,g6,id,cang,g1,g7,role,verdict,derog,env,obs_env,env_statique,accord,banc,mutants,lota}"
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

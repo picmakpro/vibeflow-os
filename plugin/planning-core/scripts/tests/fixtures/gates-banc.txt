@@ -825,3 +825,42 @@ Corps du worker.
 @@ ecriture Agent - agent=worker-vide sous=vf-crafter armee :: silence ROLE
 @@ ecriture Task - agent=worker-vide sous=vf-crafter armee :: silence ROLE
 @@ ecriture Agent - sous=hors-liste armee :: silence ROLE
+
+@@ # --- Lot A (B1/H1, amendement de P45-D-01a, décision du manager vf-dev-manager, 2026-10-01) : un dossier
+@@ # `.planning` situé dans (ou sous) un composant `.planning` n'est jamais une racine de lab. Trois formes
+@@ # imbriquées dans le même lab (`.planning/.planning`, `.planning/cycles/.planning`, `<phase>/.planning`) :
+@@ # G6, G5 et G1 gardent comme sans imbrication (sur copie armée), un lab dev ne reçoit rien.
+@@ lab imbrique-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ dossier .planning/.planning
+@@ dossier .planning/cycles/.planning
+@@ dossier .planning/cycles/01-c/phases/01-p/.planning
+
+@@ ecriture Write .planning/STATE.md armee :: doit-refuser G6
+@@ ecriture Edit .planning/INDEX.md armee :: doit-refuser G6
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md agent=agent-inconnu armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/PLAN.md armee :: doit-refuser G1
+@@ ecriture Edit .planning/cycles/01-c/phases/01-p/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/SUMMARY.md armee :: doit-passer G5
+@@ ecriture Write livrables/rapport.md armee :: doit-passer G5
+
+@@ lab imbrique-dev jumeau-de=imbrique-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ dossier .planning/.planning
+@@ dossier .planning/cycles/.planning
+@@ dossier .planning/cycles/01-c/phases/01-p/.planning
+
+@@ ecriture Write .planning/STATE.md armee :: silence G6
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: silence G5
