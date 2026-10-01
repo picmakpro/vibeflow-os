@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 # guard-fin-de-geste.sh — SOBR-07 (phase 41.3), volet TRAVAIL DIRECT. Ce qu'une session crée, elle le
-# range avant de s'arrêter : à la fin de la session, ce hook archive ce qui déborde d'un budget et
+# range avant de s'arrêter : à chaque fin de tour (le Stop part à chaque fin de tour, pas seulement à la
+# fin de la session), ce hook archive ce qui déborde d'un budget et
 # BLOQUE l'arrêt tant qu'il reste du rangement attribué à la session (arbitrage Samuel, AskUserQuestion
 # session principale, 2026-09-29 : nettoyage de fin de geste, gaté ; arbitrage Samuel, AskUserQuestion
 # session principale, 2026-09-30 : blocage à chaque arrêt, coupe-circuit à 3 blocages sans progrès ;
 # feu vert de la vague 2 : Samuel, session principale, 2026-09-30 ; ADR-076).
+#
+# ACTIVATION (arbitrage Samuel, AskUserQuestion session principale, 2026-10-01 : « sentinelle armée ») : la garde
+# n'agit QUE dans un dépôt armé, c'est-à-dire dont la racine (git rev-parse --show-toplevel du cwd, à défaut $PWD)
+# porte le fichier `.planning/.fin-de-geste-armed` (même modèle que .instruction-budget-armed et
+# .requirements-survival-armed). Sans lui : exit 0, aucune sortie, aucun fichier créé, aucun archivage, en
+# --snapshot comme en Stop. Motif : le hook est câblé en scope user et s'activait sinon dans TOUS les dépôts de
+# l'utilisateur, VibeFlow ou non. Lue tout en haut, avant tout effet ; VF_FIN_DE_GESTE=off|warn garde son sens
+# dans un dépôt armé.
 #
 # Deux appels, un script, le même patron que planning-session-snapshot.sh / guard-planning-updated.sh :
 #   --snapshot   SessionStart (sans matcher, first-wins) : photographie, LECTURE SEULE, les lignes à
@@ -59,6 +68,11 @@ INPUT="$(cat 2>/dev/null || true)"
 MODE_SNAPSHOT=0
 [ "${1:-}" = "--snapshot" ] && MODE_SNAPSHOT=1
 
+# Sentinelle d'armement : tout en haut, avant tout effet (état, budget, archivage).
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
+[ -n "$ROOT" ] || ROOT="$PWD"
+[ -f "$ROOT/.planning/.fin-de-geste-armed" ] || exit 0
+
 NL=$'\n'
 VIS=""
 vis() { VIS="${VIS}${VIS:+$NL}$1"; }
@@ -95,8 +109,6 @@ MODE="${VF_FIN_DE_GESTE:-block}"
 SID=$(printf '%s' "$INPUT" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1 | tr -cd 'A-Za-z0-9._-')
 [ -n "$SID" ] || nv "session_id illisible sur stdin, garde sans objet pour cette session"
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || ROOT=""
-[ -n "$ROOT" ] || ROOT="$PWD"
 BUDGET="${VF_METHOD_BUDGET:-$(dirname "$0")/check-method-budget.sh}"
 [ -f "$BUDGET" ] || nv "script de budget introuvable : $BUDGET"
 

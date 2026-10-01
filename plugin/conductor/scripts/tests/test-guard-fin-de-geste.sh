@@ -5,7 +5,7 @@
 # VF_METHOD_BUDGET pour produire un constat). Issues QUAL-01 : PASS (silence, exit 0), FAIL (blocage exit 2
 # qui nomme ce qui reste), imparsable BRUYANT (NON VÉRIFIABLE dans `systemMessage`, exit 0). Le stdout d'un
 # exit 0 non vide est vérifié comme UN SEUL document JSON par un parseur de DOCUMENT (json.loads), jamais
-# `jq` (qui accepte un flux de documents). Quinze mutants, chacun asserté au rc EXACT sur le mutant ET sur
+# `jq` (qui accepte un flux de documents). Seize mutants, chacun asserté au rc EXACT sur le mutant ET sur
 # l'original : « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
 # Comparaisons par cmp/comm, jamais diff. LIMITE DE FOND : la garde, sa suite et hooks.json vivent dans
 # le dépôt qu'elles jugent.
@@ -35,6 +35,8 @@ mk_repo() {  # <nom> [clos] : dépôt partitionné (ws1, ws2), BACKLOG commité 
     [ "$w" = ws1 ] && [ -n "${2:-}" ] && printf '\n## Clos — CLOS (2026-01-02)\ntexte clos\n' >> "$d/.planning/workstreams/$w/BACKLOG.md"
     printf -- '---\nstatus: executing\n---\n\n# Project State\n\n## Current Position\nPhase: 1\n' > "$d/.planning/workstreams/$w/STATE.md"
   done
+  # Armement (sentinelle .planning/.fin-de-geste-armed, arbitrage Samuel 2026-10-01) : chaque fixture est armée, sauf NOARM=1.
+  [ -n "${NOARM:-}" ] || printf 'arme (fixture de test)\n' > "$d/.planning/.fin-de-geste-armed"
   G "$d" add -A >/dev/null; G "$d" commit -q -m "fixture: etat initial" >/dev/null
   printf '%s' "$d"
 }
@@ -264,7 +266,27 @@ D="$(mk_repo f18b)"; HOOK_TMP="$HT" hook "$SCRIPT" "$D" "$(J f18b)" --snapshot
 visible "F18 dossier d'état = un lien : refusé, exit 0, DIT" "dossier d'état inutilisable"
 [ -z "$(ls "$EVIL")" ] && ok "F18 … rien n'est écrit à travers le lien" || ko "F18 lien" "dossier cible vide" "$(ls "$EVIL")"
 
-echo "== test-guard-fin-de-geste : MUTANTS (MUT-1 à MUT-15) =="
+# F19 (sentinelle, arbitrage Samuel, AskUserQuestion session principale, 2026-10-01) — dépôt NON armé : exit 0 muet, aucun
+# fichier créé ni déplacé, en Stop comme en --snapshot, même avec une branche intégrée et un sujet clos à ranger.
+arbre() { (cd "$1" && find . -path ./.git -prune -o -type f -print | LC_ALL=C sort | xargs cksum | cksum); }
+NOARMT="$TMP/etat-nonarme"; mkdir -p "$NOARMT"
+D="$(NOARM=1 mk_repo f19 clos)"; T0="$(arbre "$D")"
+[ ! -e "$D/.planning/.fin-de-geste-armed" ] && ok "F19 témoin : le dépôt n'est pas armé" || ko "F19 témoin" "sentinelle absente" "présente"
+HOOK_TMP="$NOARMT" hook "$SCRIPT" "$D" "$(J f19)" --snapshot; branche_mergee "$D" feat-x; T0="$(arbre "$D")"
+check "F19 non armé, --snapshot : exit 0" 0 "$R" ""; silence "F19 non armé, --snapshot : stdout et stderr vides"
+for i in 1 2 3 4; do HOOK_TMP="$NOARMT" hook "$SCRIPT" "$D" "$(J f19)"; [ "$R" -eq 0 ] && [ -z "$O" ] && [ -z "$E" ] || break; done
+[ "$i" -eq 4 ] && [ "$R" -eq 0 ] && [ -z "$O" ] && [ -z "$E" ] && ok "F19 non armé, Stop x4 avec branche intégrée à ranger : exit 0 muet à chaque fois (jamais de blocage)" || ko "F19 Stop non armé" "exit 0 muet x4" "arrêt $i : rc=$R stdout=« $O » stderr=« $E »"
+[ "$(arbre "$D")" = "$T0" ] && [ ! -e "$D/.planning/archives" ] && ok "F19 non armé : aucun fichier créé ni déplacé (arbre identique, pas d'archive)" || ko "F19 arbre" "identique" "modifié"
+[ -z "$(ls -A "$NOARMT")" ] && ok "F19 non armé : aucun état de session écrit (dossier TMPDIR vide)" || ko "F19 état" "TMPDIR vide" "$(ls -A "$NOARMT")"
+# F19b — la sentinelle se résout à la RACINE git du cwd : lancé d'un sous-dossier d'un dépôt armé, la garde agit ; d'un sous-dossier non armé, non.
+D="$(mk_repo f19b)"; mkdir -p "$D/sous/dossier"; hook "$SCRIPT" "$D/sous/dossier" "$(J f19b)" --snapshot; branche_mergee "$D" feat-x
+hook "$SCRIPT" "$D/sous/dossier" "$(J f19b)"; check "F19b dépôt armé, lancé d'un sous-dossier → racine git résolue, exit 2" 2 "$R" "RANGEABLE branche : feat-x"
+# F19c — repo armé : off garde son sens (silence) et warn aussi (dit, exit 0).
+D="$(mk_repo f19c)"; hook "$SCRIPT" "$D" "$(J f19c)" --snapshot; branche_mergee "$D" feat-x
+VF_FIN_DE_GESTE=off hook "$SCRIPT" "$D" "$(J f19c)"; check "F19c armé + off → exit 0" 0 "$R" ""; silence "F19c armé + off : silence"
+VF_FIN_DE_GESTE=warn hook "$SCRIPT" "$D" "$(J f19c)"; visible "F19c armé + warn → exit 0, dit" "RANGEABLE branche : feat-x"
+
+echo "== test-guard-fin-de-geste : MUTANTS (MUT-1 à MUT-16) =="
 make_mutant() {  # <nom> <ancienne ligne> <nouvelle ligne> ; 0 = opposable, 1 = identique, 2 = syntaxe invalide
   local out="$MUTD/$1.sh"
   MUT_OLD_ENV="$2" MUT_NEW_ENV="$3" awk '{ if ($0 == ENVIRON["MUT_OLD_ENV"]) print ENVIRON["MUT_NEW_ENV"]; else print }' "$SCRIPT" > "$out"
@@ -350,6 +372,10 @@ else
   sc_m1 "" mo15; RO=$?; VF_METHOD_BUDGET="$MUTBUD" sc_m1 "" mm15; RM=$?
   if [ "$RO" -eq 1 ] && [ "$RM" -eq 0 ]; then okmut 15 "$RM" 0 "$RO" 1; else komut 15 "original : préexistant non imputé (1), mutant : imputé (0)" "original=1 mutant=0" "original=$RO mutant=$RM"; fi
 fi
+
+# MUT-16 (F19, sentinelle) : la lecture de la sentinelle est retirée — la garde agit dans un dépôt non armé (le témoin est le rc du Stop).
+sc_nonarme() { local d i; d="$(NOARM=1 mk_repo "$2")"; hook "$1" "$d" "$(J "$2")" --snapshot; branche_mergee "$d" feat-x; hook "$1" "$d" "$(J "$2")"; return "$R"; }
+mutp 16 '[ -f "$ROOT/.planning/.fin-de-geste-armed" ]' ':' sc_nonarme 0 2
 
 echo
 echo "Résultat : $PASS vert(s), $FAIL rouge(s)"

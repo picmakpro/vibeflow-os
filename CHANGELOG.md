@@ -22,7 +22,8 @@ session principale Claude Code, 2026-10-01) :
   v2.25.0 → v2.26.0). Ce qu'on crée, on le range : budgets de méthode étendus au BACKLOG, à l'index
   de mémoire et au ROADMAP, archivage automatique `--auto` tracé (`.planning/archives/INDEX.tsv`)
   et réversible ; nouveau hook `Stop` `guard-fin-de-geste.sh` (bloque tant qu'un rangement
-  attribué à la session reste à faire, coupe-circuit visible) ; contrôle E7 en fin de mission ;
+  attribué à la session reste à faire, coupe-circuit visible ; n'agit que dans un lab armé par
+  la sentinelle `.planning/.fin-de-geste-armed`, muet partout ailleurs) ; contrôle E7 en fin de mission ;
   `check-ajout-retrait.sh` consultatif (trailer `Ajout-Retrait:`) ; l'installeur pose
   `.worktreeinclude` dans les labs ; ADR-076 précise ADR-031. PR #123.
 - **Moteur de planning métier par cycles — Phase 44** (`planning-core` v2.7.2 → v2.8.0) :

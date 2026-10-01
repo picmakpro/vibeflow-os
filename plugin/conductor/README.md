@@ -93,7 +93,9 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   l'utilisateur ; une écriture d'état ratée relâche la garde, dite, jamais un blocage sans compteur ; un
   archivage fait par l'arrêt qui bloque est dit au premier exit 0. État : `$TMPDIR/vibeflow-fin-de-geste-<uid>`. Les constats non actionnables
   (archivage refusé, non tenté, budget dépassé, non vérifiable) sont dits en `systemMessage` et ne
-  bloquent jamais. Bascule `VF_FIN_DE_GESTE=block|warn|off`.
+  bloquent jamais. Bascule `VF_FIN_DE_GESTE=block|warn|off`. **Armement** (arbitrage Samuel, AskUserQuestion session principale,
+  2026-10-01) : les deux hooks ne font RIEN (exit 0, muets, aucun fichier créé, aucun archivage) tant que la racine git du cwd
+  ne porte pas `.planning/.fin-de-geste-armed` ; câblé en scope user, le hook agissait sinon dans tous les dépôts.
 
 ## Scripts (33) — par famille
 

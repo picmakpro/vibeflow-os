@@ -6,7 +6,10 @@
 
 - **`scripts/guard-fin-de-geste.sh`** (nouveau hook `Stop`, SOBR-07) : bloque la fin d'un geste tant
   qu'un rangement attribué à la session reste à faire ; coupe-circuit visible ; sortie JSON valide
-  même sans `jq` ni `python3`. Suite `tests/test-guard-fin-de-geste.sh`.
+  même sans `jq` ni `python3`. Suite `tests/test-guard-fin-de-geste.sh`. **N'agit que dans un lab
+  armé** : la garde (Stop et `--snapshot`) ne fait rien tant que la racine git ne porte pas
+  `.planning/.fin-de-geste-armed` ; elle s'arme par cette sentinelle (arbitrage Samuel, AskUserQuestion
+  session principale, 2026-10-01 : installée en scope user, elle bloquait sinon dans tous les dépôts).
 - **`scripts/check-method-budget.sh`** (SOBR-01/02/06/08) : budgets étendus au BACKLOG, à l'index de
   mémoire et au ROADMAP, avec plafonds de prose ; `--auto` archive seul au-delà du budget, trace le
   déplacement dans `.planning/archives/INDEX.tsv`, réversible depuis le blob ; constate branches,
