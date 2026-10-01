@@ -121,8 +121,10 @@ adhéré à `cycles-v1` et reste **fail-closed** dans ce lab seulement (la comma
 écritures par outil quand le script ou `python3` manque, `Bash` restant ouvert pour la réparation) ;
 partout ailleurs, labs de développement compris, il ne sort rien. **État livré : tous les gates en
 observation** (ils journalisent ce qu'ils refuseraient, sans refuser), G2 avertit ; aucun gate n'est
-armé — l'armement exige un nouveau rejeu réel sur des labs au repos et un arbitrage de Willy, en
-attente. Ce que le hook refuse, observe ou laisse passer, ses limites déclarées, la dérogation, la
-commande de verdict, le canary et le rejeu sont décrits dans la section « Hook central et gates
-d'écriture (Phase 45) » de `references/modele-cycles.md`, tenue identique au code par un contrôle
-croisé en CI.
+armé. L'arbitrage de Willy qu'attendait l'armement est rendu et appliqué
+(Q-ARM, AskUserQuestion session principale, 2026-09-30) ; l'armement reste conditionné au rejeu
+réel final sur des labs au repos (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`) et se
+fait par étapes, dans un ordre fixe. Ce que le hook refuse, observe ou laisse passer, ses limites
+déclarées, la dérogation, la commande de verdict, le canary et le rejeu sont décrits dans la section
+« Hook central et gates d'écriture (Phase 45) » de `references/modele-cycles.md`, tenue identique au
+code par un contrôle croisé en CI.
