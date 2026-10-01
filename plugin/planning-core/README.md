@@ -99,6 +99,7 @@ planning-core/
     recalc-planning.sh         # recalcul d'état dérivé du disque, modèle par cycles (Python embarqué)
     rejeu-gates.sh             # rejeu en lecture seule d'un lab sur copie : faux refus, faux accept (Phase 45)
     rejeu-reel.sh              # geste de rejeu sur lab réel, empreinte de tout l'arbre avant et après (Phase 45)
+    workstream-policy.sh       # politique unique de nom de workstream, à sourcer (suite test-workstream-policy.sh)
     tests/                     # 12 suites (planning-core, hooks, hardening, detect-*, recalc-planning, gates, rejeu)
 ```
 

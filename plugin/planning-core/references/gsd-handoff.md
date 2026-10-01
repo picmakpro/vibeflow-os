@@ -53,6 +53,15 @@ La **couche lab**, et rien d'autre :
 3. Surface de la dette de planning (`detect-planning-debt.sh`).
 4. Pont mémoire vers `.claude/memory/` — voir `bridge-memory.md`.
 
+**Lab adhérent `cycles-v1` : écritures réservées.** L'adhésion se lit dans `.planning/config.json`
+(`"planning_version": "cycles-v1"`), jamais dans le `planning_version` du frontmatter de `STATE.md`.
+Dans un lab adhérent, le gate G6 (armé) refuse toute écriture par outil (Write, Edit, NotebookEdit)
+de `STATE.md`, `INDEX.md`, `cloture.log` et `.recalc-cache.json` enfants directs de `.planning/`,
+ainsi que celle d'un `config.json` qui change ou retire l'adhésion. Ces fichiers s'écrivent par
+`plugin/planning-core/scripts/recalc-planning.sh`, ou sous une dérogation nominative inscrite par
+`deroger-gate.sh`. Les écritures par Bash ne sont pas couvertes. Référence complète :
+`references/modele-cycles.md`, section « Hook central et gates d'écriture (Phase 45) ».
+
 Un compartiment dev reçoit son `.planning/` **écrit par GSD** (via `gsd-new-project` depuis ce
 compartiment). `vf-planning` ne pose jamais le tronc d'un projet de code.
 

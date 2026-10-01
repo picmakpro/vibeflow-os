@@ -97,3 +97,7 @@ naturels d'un studio éditorial. Un lab de vente aurait `pipeline/`, un lab de d
 - L'**adaptation** se joue dans le vocabulaire (« campagne » au lieu de « sprint », « pièce » au lieu
   de « commit ») et dans l'**extension de domaine** (`editorial/` au lieu de `codebase/`).
 - `STATE.md` reste la clé de voûte, identique dans sa fonction : « où en est-on, là, maintenant ».
+
+> **Lab non migré.** Cet exemple décrit un lab qui n'adhère pas au modèle par cycles. Si le lab
+> adhère à `cycles-v1` (`.planning/config.json`), `STATE.md` et `INDEX.md` ne s'écrivent plus par
+> outil mais par `recalc-planning.sh` (gate G6 armé) — voir `modele-cycles.md`.

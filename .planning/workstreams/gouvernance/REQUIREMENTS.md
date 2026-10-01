@@ -42,7 +42,7 @@
 | GATE-06 | Phase 45 | Complete |
 | GATE-07 | Phase 45 | Complete |
 | GATE-08 | Phase 45 | Complete |
-| GATE-09 | Phase 45 | Complete (override F9 : allowlist, limite (l)) |
+| GATE-09 | Phase 45 | Complete (texte amendé F9 : allowlist, limite (l)) |
 | GATE-10 | Phase 45 | Complete |
 | GATE-11 | Phase 45 | Complete |
 | GATE-12 | Phase 45 | Complete |
@@ -162,8 +162,8 @@
 - [x] **GATE-06**: G1 refuse l'écriture d'un `PLAN.md` sans `CADRAGE.md`, ou avec une ligne structurante sans statut (spec §5).
 - [x] **GATE-07**: G7 refuse la création d'un `.planning/` sous un lab adhérent quand le dossier parent n'a ni `.claude/` habité (prédicat littéral écrit dans la référence) ni marqueur de code (P45-D-14).
 - [x] **GATE-08**: G2 avertit, sans jamais refuser, sur une écriture `Write`/`Edit`/`Bash` hors `ecrit:`. La limite « Bash non couvert par les refus » est écrite dans la référence et dans le message (P45-D-10).
-- [x] **GATE-09**: le hook par rôle dérive le rôle du frontmatter par les prédicats I5/I6 et `vf-internal`. Il refuse au juge toute écriture par outil et au worker tout dispatch `Agent|Task` (les deux `tool_name`, `subagent_type` normalisé). Un fil principal ou un agent inconnu n'a que la ligne « Tous ». Un contrôle croisé prouve l'accord avec `check-agents.sh` sur tout le corpus (P45-D-04, P45-D-05, P45-D-05a, P45-D-05b, P45-D-09, P45-D-11).
-  - *Déviation datée (2026-09-30)* : la ligne worker est livrée en **f9-allowlist** — un worker ne dispatche que ce que sa propre allowlist `Agent(...)`/`Task(...)` autorise (allowlist vide = tout refusé), au lieu de « tout dispatch refusé ». Arbitrage F9 : Willy, AskUserQuestion session principale, 2026-09-30 (contre le défaut du plan 45-08). Limite déclarée : l'allowlist vit dans une définition d'agent que G6 ne protège pas.
+- [x] **GATE-09**: le hook par rôle dérive le rôle du frontmatter par les prédicats I5/I6 et `vf-internal`. Il refuse au juge toute écriture par outil et au worker tout dispatch `Agent|Task` hors de sa propre allowlist `Agent(...)`/`Task(...)` (les deux `tool_name`, `subagent_type` normalisé ; allowlist vide = tout dispatch refusé). Un fil principal ou un agent inconnu n'a que la ligne « Tous ». Un contrôle croisé prouve l'accord avec `check-agents.sh` sur tout le corpus (P45-D-04, P45-D-05, P45-D-05a, P45-D-05b, P45-D-09, P45-D-11).
+  - *Déviation datée (2026-09-30)* : la ligne worker est livrée en **f9-allowlist** — un worker ne dispatche que ce que sa propre allowlist `Agent(...)`/`Task(...)` autorise (allowlist vide = tout refusé), au lieu de « tout dispatch refusé ». Arbitrage F9 : Willy, AskUserQuestion session principale, 2026-09-30 (contre le défaut du plan 45-08). Limite déclarée : l'allowlist vit dans une définition d'agent que G6 ne protège pas. *Texte de l'exigence amendé le 2026-10-01* (demande de Willy relayée par la session principale, 2026-10-01) : l'ancienne lettre « au worker tout dispatch `Agent|Task` » est remplacée par « hors de sa propre allowlist » ; la lettre d'origine reste tenue quand l'allowlist est vide.
 - [x] **GATE-10**: zéro régression sur les labs dev. Sur un lab dev fixture et sur ce dépôt, le hook rend un octet vide et 0 pour chaque type d'appel, et la mutation « ignorer l'adhésion » rend la preuve rouge (P45-D-04).
 - [x] **GATE-11**: une dérogation nominative (qui, canal, date, gate, chemin(s), raison qui n'est pas un placeholder) est posée par une commande dans un journal append-only protégé par G6. Elle n'est jamais conditionnée à l'urgence, et elle est citée dans la sortie de l'action qu'elle laisse passer (P45-D-01, P45-D-13).
 - [x] **GATE-12**: un canary par gate armé rejoue la commande enregistrée telle quelle et exige un deny. Il est bloquant en CI et signale au démarrage de session d'un lab adhérent. Il couvre au minimum : script absent, `python3` absent, `Task` et `Agent`, fil principal, agent `plugin:` (P45-D-20).
