@@ -4036,18 +4036,20 @@ def definition_piegee(lab, nom, ligne):
 
 @lota("R-DEFS-02")
 def controle_defs_piegee(ctx, script):
-    """Une définition piégée (trois puces de 30 000 espaces, plus de 20 s avec l'ancienne expression) est tranchée en moins de 2 s ; une
+    """Une définition piégée (trente puces de 32 000 espaces, soit 960 Ko sous la borne de lecture de 1 Mio : environ 40 s avec l'ancienne
+    expression quadratique, cinq fois l'échéance interne de 8 s ; trois puces de 30 000 espaces ne coûtaient que 3,5 s et un coureur
+    rapide les passait sous 2 s : le mutant survivait selon la vitesse de la machine, il est désormais coupé par l'échéance) est tranchée en moins de 2 s ; une
     définition hors des bornes (ligne de 40 000 caractères, 1,2 Mo) est INDÉTERMINÉE : jamais un refus de rôle, jamais un délai ;
     sous un lab non adhérent, stdout d'octet vide."""
     armee = ctx.copie_forcee(_dossier(ctx, script), "armed")
     lab = ctx.unique("lab-piege")
     ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
-    definition_piegee(lab, "trap", "\n".join("  - x" + " " * 30000 for _ in range(3)))
+    definition_piegee(lab, "trap", "\n".join("  - x" + " " * 32000 for _ in range(30)))
     definition_piegee(lab, "ligne-longue", "  - x" + " " * 40000)
     ecrire(os.path.join(lab, ".claude", "agents", "gros.md"), "---\nname: gros\ntools: Read\n---\n" + ("x" * 1200000) + "\n")
     dev = ctx.unique("lab-piege-dev")
     ecrire(os.path.join(dev, ".planning", "config.json"), '{"planning_version": "2.0"}')
-    definition_piegee(dev, "trap", "\n".join("  - x" + " " * 30000 for _ in range(3)))
+    definition_piegee(dev, "trap", "\n".join("  - x" + " " * 32000 for _ in range(30)))
     fautes = []
     for agent in ("trap", "ligne-longue", "gros"):
         brut = payload("Write", entree_outil("Write", os.path.join(lab, "livrables", "x.md")), lab, agent_type=agent)
