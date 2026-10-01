@@ -50,9 +50,16 @@ import re
 import stat
 import sys
 import tempfile
+import unicodedata
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
+NOM_UNITE = re.compile(r"^[0-9]{2,}-[\w.-]+$")
 RESULTATS = ("passé", "échec")
 OPTIONS_SIMPLES = ("unite", "juge", "tentative", "score")
 USAGE = ("Usage : poser-verdict.sh --unite=<dossier de l'unité> --juge=<nom> --tentative=<n> "
@@ -255,6 +262,10 @@ def analyser(args):
     valeurs = {}
     constats = []
     for arg in args:
+        try:
+            arg.encode("utf-8")
+        except UnicodeEncodeError:
+            raise Refus(64, "argument non UTF-8 (octet invalide dans la ligne de commande)")  # verdict-utf8
         if arg in ("-h", "--help"):
             return None
         if not arg.startswith("--") or "=" not in arg:
@@ -274,6 +285,44 @@ def analyser(args):
     if manquantes:
         raise Refus(64, "option obligatoire manquante : " + ", ".join(manquantes))
     return valeurs, constats
+
+
+def caractere_interdit(texte):
+    """Premier caractère de contrôle (catégorie Cc : CR, VT, FF, FS, GS, RS, NEL, tabulation…) ou séparateur de ligne ou de
+    paragraphe (Zl, Zp : U+2028, U+2029) du texte, ou None. Le moteur relit le VERDICT.md en newlines universels : un tel
+    caractère dans --juge, --score ou --constat y devenait une ligne de plus (verdict en échec lu « close », `hash` ou `tentative`
+    forgés), alors que le relecteur de cette commande, qui ne coupe que sur `\n`, ne le voyait pas (audit H4, décision du manager
+    vf-dev-manager, 2026-10-01)."""
+    for caractere in texte:
+        if unicodedata.category(caractere) in ("Cc", "Zl", "Zp"):
+            return caractere
+    return None
+
+
+def forme_unite(composants):
+    """Vrai si `composants` (relatifs à la racine du lab) désignent le dossier d'une unité du modèle : phase
+    `.planning/cycles/<cycle>/phases/<phase>` ou plan `.../phases/<phase>/plans/<plan>`, noms fixes comparés en casefold, noms d'unité
+    conformes à NOM_UNITE — la même règle que `unite_de_plan` du hook central (revue m3)."""
+    n = len(composants)
+    if n not in (5, 7):
+        return False
+    if composants[0].casefold() != ".planning" or composants[1].casefold() != "cycles" or composants[3].casefold() != "phases":
+        return False
+    if n == 7 and composants[5].casefold() != "plans":
+        return False
+    unites = [composants[2], composants[4]] + ([composants[6]] if n == 7 else [])
+    return all(NOM_UNITE.match(u) for u in unites)
+
+
+def ouvrir_verrou(chemin):
+    """Prend le verrou exclusif (`fcntl.flock`) sur le fichier régulier `chemin` — le PLAN.md voisin du VERDICT.md, ouvert sans suivre
+    de lien — et rend son descripteur, gardé ouvert jusqu'à la fin du processus ; None quand le module fcntl n'existe pas (pas de
+    verrou). Deux poses simultanées se suivent : la seconde relit la tentative écrite par la première (revue m4, audit B3)."""
+    if fcntl is None:
+        return None
+    descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+    fcntl.flock(descripteur, fcntl.LOCK_EX)
+    return descripteur
 
 
 def lire_octets(chemin):
@@ -333,6 +382,9 @@ def poser(valeurs, constats_bruts):
         raise Refus(64, "--tentative : entier supérieur ou égal à 1 attendu")
     tentative = int(valeurs["tentative"])
     juge = valeurs["juge"]
+    for nom, valeur in [("juge", juge), ("score", valeurs["score"])] + [("constat", brut) for brut in constats_bruts]:
+        fautif = caractere_interdit(valeur)
+        if fautif is not None: raise Refus(64, "--%s : caractère de contrôle ou séparateur de ligne (U+%04X) refusé" % (nom, ord(fautif)))  # verdict-controles
     if juge.strip() == "":
         raise Refus(64, "--juge : nom du juge obligatoire (non vide)")
     constats = []
@@ -349,11 +401,11 @@ def poser(valeurs, constats_bruts):
         raise Refus(2, "lab non adhérent : le config.json du dossier de planning doit déclarer "
                        "\"planning_version\": \"cycles-v1\"")
     composants = [c for c in os.path.relpath(unite, racine).split(os.sep) if c not in ("", ".")]
-    if len(composants) < 3 or composants[0] != ".planning" or composants[1] != "cycles":
-        raise Refus(64, "--unite : l'unité doit se trouver sous .planning/cycles/")
+    if not forme_unite(composants): raise Refus(64, "--unite : l'unité doit être un dossier de phase ou de plan du modèle (.planning/cycles/<cycle>/phases/<phase>[/plans/<plan>])")  # verdict-forme-unite
     plan = os.path.join(unite, "PLAN.md")
     if not est_fichier_regulier(plan):
         raise Refus(64, "--unite : pas de PLAN.md régulier dans l'unité (artefact haché, A3)")
+    verrou = ouvrir_verrou(plan)  # verdict-verrou
     empreinte = hashlib.sha256(lire_octets(plan)).hexdigest()
     chemin_verdict = os.path.join(unite, "VERDICT.md")
     ancienne = None

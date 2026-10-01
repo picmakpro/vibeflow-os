@@ -3423,6 +3423,151 @@ lota_mutant("DEROG-GLOBALE", "# decider-global",
             "if False:  # decider-global", "R-DEROG-09")
 
 
+# --- LOT A, constats 5, 6, 7 (revue m3, m4 ; audit H4, B3) : poser-verdict.sh -----------------------------------------------------
+# Décisions du manager vf-dev-manager, 2026-10-01 (renversables).
+def copie_modifiee(ctx, dossier, nom, remplacements, prefixe):
+    """Dossier jetable portant `nom` copié de `dossier` après les `remplacements` [(motif fixe, texte)] (chaque motif exactement une
+    fois) ; `bash -n` doit passer. Sert à injecter un délai dans un script, jamais à muter un garde."""
+    texte = open(os.path.join(dossier, nom), encoding="utf-8").read()
+    for motif, remplacement in remplacements:
+        if texte.count(motif) != 1:
+            raise RuntimeError("motif attendu une fois dans %s : %r (%d)" % (nom, motif, texte.count(motif)))
+        texte = texte.replace(motif, remplacement)
+    d = ctx.unique(prefixe)
+    os.makedirs(d, exist_ok=True)
+    chemin = os.path.join(d, nom)
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write(texte)
+    os.chmod(chemin, 0o755)
+    p = subprocess.run(["bash", "-n", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        raise RuntimeError("bash -n échoue sur la copie modifiée : " + court(p.stderr))
+    return d
+
+
+SEPARATEURS_VERDICT = (("\r", "CR"), ("\x0b", "VT"), ("\x0c", "FF"), ("\x1c", "FS"), ("\x1d", "GS"), ("\x1e", "RS"), ("\x85", "NEL"),
+                       ("\u2028", "LS"), ("\u2029", "PS"), ("\x01", "SOH"), ("\t", "TAB"))
+
+
+def verdicts_ecrits(lab):
+    return [os.path.join(dp, f) for dp, _dn, fs in os.walk(os.path.join(lab, ".planning")) for f in fs if f == "VERDICT.md" or f.startswith(".VERDICT.")]
+
+
+@lota("R-VERDICT-06")
+def controle_verdict_controles(ctx, script):
+    """H4 (audit) : un caractère de contrôle ou un séparateur de ligne (CR, VT, FF, FS, GS, RS, NEL, U+2028, U+2029, tout Cc) dans
+    --juge, --score ou --constat (critère) est refusé (64) et rien n'est écrit : le moteur lit en newlines universels, un CR faisait
+    lire « close » un verdict en échec ou forgeait `hash` et `tentative`. Un argument propre passe (témoin)."""
+    d = _dossier(ctx, script)
+    fautes, n = [], 0
+    for caractere, nom in SEPARATEURS_VERDICT:
+        for option in ("juge", "score", "constat"):
+            lab = lab_frais(ctx)
+            kw = {"juge": "j", "score": "8/10", "constats": ("critere-a::passé",)}
+            if option == "juge":
+                kw["juge"] = "x" + caractere + "y"
+            elif option == "score":
+                kw["score"] = "8" + caractere + "10"
+            else:
+                kw["constats"] = ("crit" + caractere + "ere::passé",)
+            n += 1
+            rc, _o, err = poser(ctx, d, lab, 1, **kw)
+            if rc != 64 or verdicts_ecrits(lab):
+                fautes.append("%s dans --%s : rc=%d, écrit %s" % (nom, option, rc, [os.path.basename(e) for e in verdicts_ecrits(lab)]))
+    # forge réelle : un CR dans --score ajoute une ligne `tentative: 9` pour un lecteur à newlines universels
+    lab = lab_frais(ctx)
+    rc, _o, err = poser(ctx, d, lab, 1, score='8/10\rtentative: 9')
+    if rc != 64 or verdicts_ecrits(lab):
+        fautes.append("forge de tentative par CR : rc=%d" % rc)
+    lab = lab_frais(ctx)
+    rc, _o, err = poser(ctx, d, lab, 1)
+    if rc != 0:
+        fautes.append("témoin propre refusé : rc=%d %s" % (rc, court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d arguments à caractère de contrôle ou séparateur refusés (64), rien d'écrit ; la forge par CR refusée ; témoin propre accepté" % n)
+
+
+@lota("R-VERDICT-07")
+def controle_verdict_forme_unite(ctx, script):
+    """m3 (revue) : --unite doit avoir la forme d'une unité de plan ou de phase du modèle (même règle que `unite_de_plan` : cinq ou sept
+    composants, `cycles`, `phases`, `plans`, noms d'unité conformes). Un dossier du cycle, de `phases/`, de `plans/` ou un nom
+    d'unité invalide, même avec un PLAN.md, est refusé (64) ; les deux formes valides passent."""
+    d = _dossier(ctx, script)
+    fautes = []
+    invalides = (".planning/cycles/01-c", ".planning/cycles/01-c/phases", ".planning/cycles/01-c/phases/01-p/plans",
+                 ".planning/cycles/01-c/phases/x-p", ".planning/cycles/01-c/phases/01-p/plans/zz",
+                 ".planning/cycles/01-c/phases/01-p/foo/01-a", ".planning/cycles/01-c/foo/01-p", ".planning/notes/01-c/phases/01-p")
+    for unite in invalides:
+        lab = lab_frais(ctx)
+        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: a\n---\n")
+        rc, _o, err = poser(ctx, d, lab, 1, unite=unite)
+        if rc != 64 or verdicts_ecrits(lab):
+            fautes.append("%s : rc=%d (attendu 64), écrit %s" % (unite, rc, [os.path.relpath(e, lab) for e in verdicts_ecrits(lab)]))
+    for unite in (".planning/cycles/01-c/phases/01-p", ".planning/cycles/01-c/phases/01-p/plans/01-a"):
+        lab = lab_frais(ctx)
+        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: a\n---\n")
+        rc, _o, err = poser(ctx, d, lab, 1, unite=unite)
+        if rc != 0 or not os.path.isfile(os.path.join(lab, unite, "VERDICT.md")):
+            fautes.append("unité valide %s : rc=%d %s" % (unite, rc, court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d unités hors forme refusées (64), les formes de phase et de plan acceptées" % len(invalides))
+
+
+@lota("R-VERDICT-08")
+def controle_verdict_verrou(ctx, script):
+    """m4 + B3 : deux poses simultanées de la tentative 1 sur la même unité (un délai est injecté entre la lecture de la tentative et
+    l'écriture, dans une COPIE du script) : sous le verrou (`fcntl.flock` sur le PLAN.md voisin, jamais suivi s'il est un lien) l'une
+    est écrite, l'autre refusée (64 : la tentative 1 n'est plus la bonne) ; le VERDICT.md final porte la tentative 1."""
+    d = copie_modifiee(ctx, _dossier(ctx, script), "poser-verdict.sh",
+                       [("    controle_tentative(tentative, ancienne)\n",
+                         "    controle_tentative(tentative, ancienne)\n    import time\n    time.sleep(0.7)\n")], "poser-avec-delai")
+    lab = lab_frais(ctx)
+    args = ["bash", os.path.join(d, "poser-verdict.sh"), "--unite=" + os.path.join(lab, UNITE), "--juge=j", "--tentative=1",
+            "--score=s", "--constat=c::passé"]
+    procs = [subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ctx.env()) for _ in range(2)]
+    codes = sorted(p.wait(timeout=60) for p in procs)
+    for p in procs:
+        p.stdout.close()
+        p.stderr.close()
+    fautes = []
+    if codes != [0, 64]:
+        fautes.append("codes %s (attendu [0, 64] : une pose, un refus de tentative)" % codes)
+    chemin = os.path.join(lab, UNITE, "VERDICT.md")
+    if not os.path.isfile(chemin) or b"tentative: 1" not in octets(chemin):
+        fautes.append("VERDICT.md final absent ou sans tentative 1")
+    restes = [n for n in os.listdir(os.path.join(lab, UNITE)) if n.startswith(".")]
+    if restes:
+        fautes.append("fichier temporaire laissé : %s" % restes)
+    # un PLAN.md en lien symbolique n'est jamais suivi : refus, rien d'écrit
+    lab2 = lab_frais(ctx)
+    plan2 = os.path.join(lab2, UNITE, "PLAN.md")
+    cible = os.path.join(lab2, "livrables", "plan-reel.md")
+    ecrire(cible, "---\necrit: a\n---\n")
+    os.remove(plan2)
+    os.symlink(cible, plan2)
+    rc, _o, err = poser(ctx, _dossier(ctx, script), lab2, 1)
+    if rc == 0 or verdicts_ecrits(lab2):
+        fautes.append("PLAN.md en lien : rc=%d, écrit %s" % (rc, verdicts_ecrits(lab2)))
+    return (not fautes), ("; ".join(fautes) if fautes else "deux poses simultanées : codes [0, 64], tentative 1, aucun temporaire ; PLAN.md en lien refusé")
+
+
+@lota("R-VERDICT-09")
+def controle_verdict_utf8(ctx, script):
+    """Un argv non UTF-8 (octet 0xFF) est refusé proprement (64, message, aucune trace Python) et rien n'est écrit."""
+    d = _dossier(ctx, script)
+    lab = lab_frais(ctx)
+    argv = [b"bash", os.path.join(d, "poser-verdict.sh").encode("utf-8"), b"--unite=" + os.path.join(lab, UNITE).encode("utf-8"),
+            b"--juge=j\xff", b"--tentative=1", b"--score=s", b"--constat=c::pass\xc3\xa9"]
+    p = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ctx.env(), timeout=60)
+    if p.returncode != 64 or b"Traceback" in p.stderr or verdicts_ecrits(lab):
+        return False, "rc=%d stderr=%s écrit=%s" % (p.returncode, court(p.stderr), verdicts_ecrits(lab))
+    return True, "argv non UTF-8 : code 64, message, aucune trace, rien d'écrit"
+
+
+lota_mutant("VERDICT-CONTROLES", "# verdict-controles", "pass  # verdict-controles", "R-VERDICT-06", "poser-verdict.sh", "PY_POSER_VERDICT_EOF")
+lota_mutant("VERDICT-FORME-UNITE", "# verdict-forme-unite", "pass  # verdict-forme-unite", "R-VERDICT-07", "poser-verdict.sh", "PY_POSER_VERDICT_EOF")
+lota_mutant("VERDICT-VERROU", "# verdict-verrou", "verrou = None  # verdict-verrou", "R-VERDICT-08", "poser-verdict.sh", "PY_POSER_VERDICT_EOF")
+lota_mutant("VERDICT-UTF8", "# verdict-utf8", "pass  # verdict-utf8", "R-VERDICT-09", "poser-verdict.sh", "PY_POSER_VERDICT_EOF")
+
+
 # LOTA-ANCRE
 
 
