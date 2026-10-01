@@ -66,7 +66,7 @@ aucun compte n'est figé.
 | Chemin | Catégorie | Statut et motif |
 |---|---|---|
 | plugin/conductor/scripts/check-divergence.sh | a1 | via-primitive — énumère les compartiments par `vf_ws_enumerate` (D-04) |
-| plugin/conductor/scripts/check-method-budget.sh | a1 | via-primitive — mesure la taille du STATE.md racine et de celui de CHAQUE compartiment, énumérés par `vf_ws_enumerate` (codes 0/2/3 traités, non vérifiable dit, rc 2 sous --strict), jamais par un glob (v2.67.0) |
+| plugin/conductor/scripts/check-method-budget.sh | a1 | via-primitive — mesure STATE.md, BACKLOG.md et ROADMAP.md de la racine et de CHAQUE compartiment, énumérés par `vf_ws_enumerate` (codes 0/2/3 traités, non vérifiable dit, rc 2 sous --strict), jamais par un glob ; `--archive` et `--auto` ne déplacent QUE la racine et les compartiments nommés (`--ws`) ou résolus par `GSD_WORKSTREAM`, jamais un compartiment protégé (`VF_ARCHIVE_PROTECTED_WS`, défaut `gouvernance`) |
 | plugin/conductor/scripts/check-planning-consumers-registered.sh | a1 | via-primitive — CE lint ; son volet ci.yml tire les noms de compartiments du disque par `vf_ws_enumerate`, jamais d'une liste en dur. Auto-recensé plutôt qu'auto-exempté par marqueur : une exemption de ligne sur ses propres motifs de recherche le rendrait invisible à lui-même |
 | plugin/conductor/scripts/check-state-integrity.sh | a2 | exempté — résout le compartiment ACTIF, correct pour un outil consommé par un agent en train de travailler ; c'est son APPELANT CI qui devient a1 par fan-out (plan 41.1-06) |
 | plugin/conductor/scripts/check-workstream-pointer.sh | a2 | exempté — résout le compartiment ACTIF, jamais un gate CI multi-compartiments |

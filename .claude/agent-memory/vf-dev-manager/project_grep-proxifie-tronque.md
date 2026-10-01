@@ -64,3 +64,8 @@ est indiscernable de « la propriété est vraie ». C'est pour ça qu'un critè
 verdict — voir [[liste-de-cas-ne-ferme-pas-une-classe]].
 
 Voir aussi [[re-deriver-les-listes-d-une-revue]] et [[artefacts-descriptifs-non-testes]].
+
+**Aggravant (2026-09-29, Phase 41.3)** : redirigé vers un FICHIER, `grep -v … > f` (et `git diff`,
+`git stash show -p`) écrit la sortie RÉSUMÉE de rtk (« 1 matches in 1F: [file] … ») à la place du
+contenu — j'ai ainsi corrompu `.worktreeinclude` en préparant une sonde, et un worker a corrompu
+son premier export de stash. Toute redirection vers un fichier passe par `rtk proxy`.

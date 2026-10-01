@@ -2464,6 +2464,115 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# T57a-T57e (Phase 41.3, SOBR-03) — ensure_worktreeinclude_entries : `.claude/hooks/` et `.claude/scripts/`
+# atteignent le `.worktreeinclude` d'un lab en scope project/local. Ajout seul, idempotent, lignes existantes
+# intactes, no-op en scope user et sous --dry-run.
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+FAKE_HOME="$LAB/home"
+mkdir -p "$FAKE_HOME"
+if prepare_module "$CACHE" "conductor" && prepare_module "$CACHE" "validator"; then
+  WI_INSTALL() { (cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VF_SCOPE="${1:-project}" VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install validator 2>&1); }
+  # T57a — scope project, fichier absent : créé avec les deux lignes exactes (et un commentaire de deux lignes)
+  miss=0
+  OUT57="$(WI_INSTALL project)"; RC=$?
+  [ "$RC" -eq 0 ] || { ko "T57a pré-condition : install validator a échoué (rc=$RC) — $OUT57"; miss=1; }
+  [ -f "$LAB/.worktreeinclude" ] || { ko "T57a : .worktreeinclude non créé à la racine du lab"; miss=1; }
+  for l in ".claude/hooks/" ".claude/scripts/"; do
+    [ "$("$GREP" -cxF -- "$l" "$LAB/.worktreeinclude" 2>/dev/null)" -eq 1 ] || { ko "T57a : la ligne exacte « $l » n'est pas présente exactement une fois"; miss=1; }
+  done
+  [ "$(head -n 2 "$LAB/.worktreeinclude" 2>/dev/null | "$GREP" -c '^#')" -eq 2 ] || { ko "T57a : les deux premières lignes ne sont pas un commentaire"; miss=1; }
+  [ "$(printf '%s\n' "$OUT57" | "$GREP" -cF '[worktreeinclude]')" -eq 1 ] || { ko "T57a : une ligne de journal [worktreeinclude] attendue — $OUT57"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57a (SOBR-03) : scope project, fichier absent -> créé avec .claude/hooks/ et .claude/scripts/, une ligne de journal"
+  # T57b — second passage : chaque ligne une fois, fichier identique, aucune ligne de journal
+  miss=0
+  SUM_B="$(cksum < "$LAB/.worktreeinclude")"
+  OUT57="$(WI_INSTALL project)"
+  [ "$(cksum < "$LAB/.worktreeinclude")" = "$SUM_B" ] || { ko "T57b : second passage a modifié le fichier — $(cat "$LAB/.worktreeinclude")"; miss=1; }
+  for l in ".claude/hooks/" ".claude/scripts/"; do
+    [ "$("$GREP" -cxF -- "$l" "$LAB/.worktreeinclude")" -eq 1 ] || { ko "T57b : « $l » dupliquée au second passage"; miss=1; }
+  done
+  [ "$(printf '%s\n' "$OUT57" | "$GREP" -cF '[worktreeinclude]')" -eq 0 ] || { ko "T57b : ligne de journal présente alors que tout était conforme — $OUT57"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57b (SOBR-03, idempotence) : second passage -> fichier byte-pour-byte identique, chaque ligne une fois, aucun journal"
+  # T57c — lignes existantes conservées, ordre inchangé, fichier sans saut de ligne final, ligne déjà présente non dupliquée
+  miss=0
+  printf '%s\n%s\n%s' ".claude/agent-memory/" "mon/motif-utilisateur/" ".claude/hooks/" > "$LAB/.worktreeinclude"
+  WI_INSTALL project >/dev/null
+  [ "$(sed -n 1p "$LAB/.worktreeinclude")" = ".claude/agent-memory/" ] || { ko "T57c : la première ligne existante a bougé"; miss=1; }
+  [ "$(sed -n 2p "$LAB/.worktreeinclude")" = "mon/motif-utilisateur/" ] || { ko "T57c : la ligne utilisateur a bougé"; miss=1; }
+  [ "$(sed -n 3p "$LAB/.worktreeinclude")" = ".claude/hooks/" ] || { ko "T57c : la ligne déjà présente a bougé"; miss=1; }
+  [ "$(sed -n 4p "$LAB/.worktreeinclude")" = ".claude/scripts/" ] || { ko "T57c : .claude/scripts/ non ajoutée en fin, sur sa propre ligne — $(cat "$LAB/.worktreeinclude")"; miss=1; }
+  [ "$("$GREP" -cxF -- ".claude/hooks/" "$LAB/.worktreeinclude")" -eq 1 ] || { ko "T57c : .claude/hooks/ dupliquée"; miss=1; }
+  [ "$(awk 'END { print NR }' "$LAB/.worktreeinclude")" -eq 4 ] || { ko "T57c : le fichier n'a pas exactement 4 lignes — $(cat "$LAB/.worktreeinclude")"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57c (SOBR-03) : lignes existantes conservées dans l'ordre, ligne manquante ajoutée en fin, aucune duplication"
+  # T57d — scope user : aucun fichier ; T57e — --dry-run : aucun fichier non plus
+  miss=0
+  rm -f "$LAB/.worktreeinclude"
+  WI_INSTALL user >/dev/null
+  [ ! -e "$LAB/.worktreeinclude" ] || { ko "T57d : scope user a créé .worktreeinclude dans le lab"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57d (SOBR-03) : scope user -> aucun .worktreeinclude"
+  miss=0
+  (cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" install validator --dry-run >/dev/null 2>&1)
+  [ ! -e "$LAB/.worktreeinclude" ] || { ko "T57e : --dry-run a écrit .worktreeinclude"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57e (SOBR-03) : --dry-run -> aucun .worktreeinclude"
+  # T57f-T57g (correction 41.3-03, finding 4) — un lab DÉJÀ installé reçoit le .worktreeinclude à l'update, à version
+  # changée (T57f) comme à version égale (T57g : le chemin « déjà à jour » est auto-réparateur). wi_update <installeur> <bump>
+  # rend « present » ou « absent » : le fichier est retiré après l'install, puis rejoué par update.
+  wi_update() {
+    local inst="$1" bump="$2" l2
+    l2="$(mktemp -d)"; mkdir -p "$l2/home"
+    (cd "$l2" && HOME="$l2/home" VF_RUNTIME=claude VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$inst" install validator >/dev/null 2>&1)
+    rm -f "$l2/.worktreeinclude"
+    local v0; v0="$(cat "$CACHE/validator/VERSION")"
+    [ "$bump" -eq 0 ] || echo "v9.9.9" > "$CACHE/validator/VERSION"
+    (cd "$l2" && HOME="$l2/home" VF_RUNTIME=claude VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$inst" update validator >/dev/null 2>&1)
+    printf '%s\n' "$v0" > "$CACHE/validator/VERSION"
+    if [ -f "$l2/.worktreeinclude" ] && [ "$("$GREP" -cxF -- ".claude/hooks/" "$l2/.worktreeinclude")" -eq 1 ] && [ "$("$GREP" -cxF -- ".claude/scripts/" "$l2/.worktreeinclude")" -eq 1 ]; then echo present; else echo absent; fi
+    rm -rf "$l2"
+  }
+  [ "$(wi_update "$INSTALLER" 1)" = present ] && ok "T57f (SOBR-03) : update à version changée -> .worktreeinclude posé" || ko "T57f : update à version changée sans .worktreeinclude"
+  [ "$(wi_update "$INSTALLER" 0)" = present ] && ok "T57g (SOBR-03) : update à version égale -> .worktreeinclude posé (resync auto-réparateur)" || ko "T57g : update à version égale sans .worktreeinclude"
+  # T57h — CRLF : un fichier conforme (lignes finissant par \r\n) reste octet pour octet identique, sans doublon ; une ligne
+  # manquante est ajoutée au même format.
+  miss=0
+  printf '%s\r\n%s\r\n' ".claude/hooks/" ".claude/scripts/" > "$LAB/.worktreeinclude"
+  SUM_H="$(cksum < "$LAB/.worktreeinclude")"; OUT57="$(WI_INSTALL project)"
+  [ "$(cksum < "$LAB/.worktreeinclude")" = "$SUM_H" ] || { ko "T57h : fichier CRLF conforme modifié — $(od -c "$LAB/.worktreeinclude" | head -3)"; miss=1; }
+  [ "$(printf '%s\n' "$OUT57" | "$GREP" -cF '[worktreeinclude]')" -eq 0 ] || { ko "T57h : journal alors que tout était conforme (CRLF)"; miss=1; }
+  printf '%s\r\n' ".claude/hooks/" > "$LAB/.worktreeinclude"
+  WI_INSTALL project >/dev/null
+  [ "$(tr -d '\r' < "$LAB/.worktreeinclude" | "$GREP" -cxF -- ".claude/hooks/")" -eq 1 ] || { ko "T57h : .claude/hooks/ dupliquée sous CRLF"; miss=1; }
+  printf '%s\r\n%s\r\n' ".claude/hooks/" ".claude/scripts/" | cmp -s - "$LAB/.worktreeinclude" || { ko "T57h : la ligne ajoutée ne suit pas le format CRLF — $(od -c "$LAB/.worktreeinclude" | head -3)"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57h (SOBR-03, CRLF) : fichier CRLF conforme intact, ligne manquante ajoutée en CRLF, aucun doublon"
+  # T57i — le plan d'install déclare ce qu'il pose, sous le chemin posé (./.worktreeinclude), sans le suffixe « ( —) »
+  miss=0
+  rm -f "$LAB/.worktreeinclude"
+  PLAN57="$(cd "$LAB" && HOME="$FAKE_HOME" VF_RUNTIME=claude VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" bash "$INSTALLER" --dry-run install validator 2>/dev/null)"
+  printf '%s\n' "$PLAN57" | "$GREP" -qE '^\[plan\] \+ \./\.worktreeinclude  ' || { ko "T57i : le plan ne déclare pas « + ./.worktreeinclude »"; miss=1; }
+  printf '%s\n' "$PLAN57" | "$GREP" -F '.worktreeinclude' | "$GREP" -qF '( —)' && { ko "T57i : la ligne du plan porte le suffixe « ( —) » d'un module refermé"; miss=1; }
+  [ "$miss" -eq 0 ] && ok "T57i (SOBR-03) : --dry-run déclare + ./.worktreeinclude, sans suffixe de module refermé"
+  # T57j — mutants de l'installeur : chacun rougit le cas qui le vise (copie du dossier _internal, l'original n'est jamais touché)
+  MUTI="$(mktemp -d)"; cp -R "$INTERNAL_DIR" "$MUTI/_internal"; rm -rf "$MUTI/_internal/tests"
+  mut_inst() { # <mode> : neutralise l'appel d'install_module (1, chemin version changée) ou celui de la branche « version inchangée » d'update_module (2)
+    awk -v MODE="$1" '/^install_module\(\) \{/ { fn = "i" } /^update_module\(\) \{/ { fn = "u" } /^}/ { fn = "" }
+      fn == "i" && MODE == 1 && $0 == "  ensure_worktreeinclude_entries" { print "  :"; next }
+      fn == "u" && MODE == 2 && $0 == "    ensure_worktreeinclude_entries" { print "    :"; next }
+      { print }' "$INTERNAL_DIR/vibeflow-update.sh" > "$MUTI/_internal/vibeflow-update.sh"
+    cmp -s "$MUTI/_internal/vibeflow-update.sh" "$INTERNAL_DIR/vibeflow-update.sh" && return 1
+    bash -n "$MUTI/_internal/vibeflow-update.sh" || return 2
+    echo "$MUTI/_internal/vibeflow-update.sh"
+  }
+  M1="$(mut_inst 1)"; [ -n "$M1" ] && [ "$(wi_update "$M1" 1)" = absent ] && ok "T57j1 mutant tué : appel d'install_module neutralisé -> T57f rougit (aucun .worktreeinclude à version changée)" || ko "T57j1 : mutant survivant ou non opposable (appel d'install_module)"
+  M2="$(mut_inst 2)"; [ -n "$M2" ] && [ "$(wi_update "$M2" 0)" = absent ] && ok "T57j2 mutant tué : appel du chemin version inchangée neutralisé -> T57g rougit" || ko "T57j2 : mutant survivant ou non opposable (chemin version inchangée)"
+  [ "$(wi_update "$INSTALLER" 1)" = present ] && ok "T57j — témoin : l'installeur intact passe toujours T57f" || ko "T57j : témoin rouge"
+  rm -rf "$MUTI"
+else
+  skip "T57a-T57j : conductor/validator non copiables dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
 # T55 (Phase 43, FABR-10 b, plan 43-05, HOME temporaire) — serveur nommé absent de l'union
 # relayé jusqu'au journal d'installation : lab avec .mcp.json déclarant mobile-mcp (jamais
 # XcodeBuildMCP, le serveur cité par le vrai vf-reviewer.md du module), install de
