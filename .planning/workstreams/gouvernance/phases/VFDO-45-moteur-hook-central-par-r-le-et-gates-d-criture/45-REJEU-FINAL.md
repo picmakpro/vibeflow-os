@@ -152,3 +152,49 @@ Aucun : mêmes totaux que le rejeu final (4404 lignes ; 3617 / 585 / 202), 0 fau
 ### Mesure des `config.json` réels pour F-02 (lecture seule)
 
 Les `config.json` racine des deux labs, et ceux des quatre compartiments de `jarvis-keystone`, portent `"planning_version": "2.0"` (non adhérents : G6 ne s'y applique pas). Leur transposition à `cycles-v1` à mise en forme identique (une clé par ligne) est admise par G6 corrigé (la clé et la valeur tiennent sur une ligne, le motif du repli la reconnaît) : aucun faux refus attendu à la migration.
+
+## Rejeu post-re-audit (2026-10-02)
+
+**Mesure seule — aucun armement, aucune constante `ARMEMENT_*` ni `TABLE_ATTENDUE` touchée.** Le code du hook a changé après le rejeu post-audit (`0f8f2946`) : la correction ciblée du re-audit (N-01 chemin inanalysable et borne longue du repli, N-03 chemin `~` développé en HOME, N-05 raison de G6 sur la mise en forme du repli, N-04 texte de `poser-verdict.sh` ; quick 261001-wtd) a modifié `hooks.json`, `planning-hook.sh`, `check-gates-alive.sh` et `poser-verdict.sh`. Ce rejeu mesure donc le code corrigé.
+
+| Champ | Valeur |
+|---|---|
+| Date | 2026-10-02 |
+| Code mesuré | HEAD `a4afbe3f` de la branche `gouvernance/phase-45-execution` |
+| Commande | celle du rejeu final ci-dessus (`rejeu-reel.sh` sur les deux labs, `--etape=4`, mêmes attendus) |
+| Autorisation | rejeu réel en lecture seule (Willy, AskUserQuestion session principale, 2026-09-30, reprise dans le mandat du 2026-10-01) |
+| Passages | un seul ; aucune occurrence de `Alarm clock` ni de « hook central indisponible » dans le relevé |
+
+### Contrôle de repos (lecture seule), forme anonymisée (sans USER ni PID)
+
+Avant (00:10) et après (00:16) :
+
+| Relevé | Avant | Après |
+|---|---|---|
+| Processus dont le répertoire courant est sous `~/jarvis-keystone` ou `~/BusinessFlow-Lab` (`lsof -d cwd`) | 0 | 0 |
+| Fichiers ouverts sous `~/jarvis-keystone/.planning` (`lsof +D`) | 0 | 0 |
+| Fichiers ouverts sous `~/BusinessFlow-Lab/.planning` (`lsof +D`) | 0 | 0 |
+| Transcripts modifiés depuis moins de 30 minutes (les deux dossiers de projet) | 0 | 0 |
+| Transcript le plus récent, BusinessFlow-Lab | 2026-10-01 20:05 (plus de 4 h) | inchangé |
+| Transcript le plus récent, jarvis-keystone | 2026-09-24 21:56 | inchangé |
+
+### Comptes (lignes brutes du rejeu)
+
+```
+COMPTE G6 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G5 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G1 faux-refus=0 faux-accept=0 refus-conforme-modele=196
+COMPTE G7 faux-refus=0 faux-accept=0 refus-conforme-modele=6
+COMPTE ROLE faux-refus=0 faux-accept=0 refus-conforme-modele=0
+REJEU-ETAPE-4 faux-refus=0 faux-accept=0 refus-conforme-modele=202
+CLASSE-REGLE-ECRITE G1 lab=~/jarvis-keystone n=200
+CLASSE-REGLE-ECRITE G1 lab=~/BusinessFlow-Lab n=0
+EMPREINTE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-IDENTIQUE ~/BusinessFlow-Lab
+EMPREINTE-ARBRE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-ARBRE-IDENTIQUE ~/BusinessFlow-Lab
+```
+
+### Écarts
+
+Aucun : mêmes totaux que le rejeu post-audit (0 faux refus, 0 faux accept, 202 refus conformes au modèle), empreintes de tout l'arbre identiques pour les deux labs. Les refus de G6 sur `config.json` portent toujours leur raison d'origine pour les écritures qui retirent réellement l'adhésion ; la nouvelle raison (mise en forme du repli) ne concerne que les contenus qui déclarent `cycles-v1` hors de la forme reconnue par le repli.
