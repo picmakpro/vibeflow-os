@@ -814,6 +814,13 @@ journalise. G2 avertit toujours et ne refuse jamais (**ouvert**). Armement par �
 fixe (P45-D-03), une étape suivante n'étant jamais armée avant la précédente ; chaque étape exige son
 canary, puis 0 faux refus et 0 faux accept sur le banc synthétique et sur le rejeu réel (P45-D-03b).
 
+**Ordre d'évaluation.** Dans un lab adhérent, le cœur vérifie d'abord la cohérence de la table
+d'armement (`armement_valide`, ordre `ORDRE_ETAPES`) : une table qui la viole (une étape armée avant
+la précédente, G6 et G5 de valeurs différentes, ou une valeur autre que `observe` et `armed`) refuse
+tout, c'est-à-dire chaque action que le hook examine, `Bash` compris, avant tout gate. Sinon G2
+avertit, puis les gates à verdict sont évalués dans l'ordre de `GATES_A_VERDICT` (G6, G5, G1, G7,
+ROLE) et leurs verdicts sont tranchés ensemble par `decider`.
+
 | Gate | Étape | État | Comportement sur défaillance | Cas de canary | Relevé |
 |---|---|---|---|---|---|
 | G6 | 1 | armed | armé : fermé (deny) ; observe : journalise | G6-principal, G6-plugin | 45-REJEU-ETAPE-1 |
@@ -866,7 +873,9 @@ l'outil, pas du disque : `Bash` et `recalc-planning.sh` écrivent ces fichiers (
 
 G5 refuse toute écriture par outil d'un fichier nommé `VERDICT.md` (casse ignorée) sous le `.planning/`
 d'un lab adhérent, quel que soit le rôle ; un lien dur vers un verdict est ce verdict ; un `VERDICT.md`
-hors de `.planning/` n'est pas visé. Le motif nomme `poser-verdict.sh`.
+hors de `.planning/` n'est pas visé. Le motif nomme `poser-verdict.sh`. La recherche d'un lien dur
+parcourt au plus 20 000 fichiers du `.planning/` (`BORNE_PARCOURS_VERDICTS`) : au-delà, un verdict
+non encore vu n'est pas reconnu par ce lien.
 
 ### G1 — pas de plan sans cadrage (GATE-06)
 
@@ -886,7 +895,8 @@ celle de `detect-gsd-engine.sh` par un contrôle qui extrait le texte du détect
 **régulier** `X/.claude/agents/*.md` ET au moins un fichier **régulier** sous `X/.claude/memory/` (lstat :
 jamais un lien, jamais un dossier). Un `.claude/` qui ne porte pas les deux — un `agent-memory/` sans
 fichier, des agents sans mémoire, une mémoire sans agent, un dossier vide — n'est pas habité. Le
-parcours de la mémoire est borné : au-delà de la borne le prédicat est indéterminé et G7 ne refuse pas.
+parcours de la mémoire est borné à 20 000 fichiers (`BORNE_PARCOURS_HABITE`) : au-delà de la borne le
+prédicat est indéterminé et G7 ne refuse pas.
 La table D-05 de la spec est corrigée en conséquence (P45-D-14a, Willy, AskUserQuestion session
 principale, 2026-09-29) : un dossier dont le `.claude/` n'a ni agent ni mémoire non vide n'est pas un
 lab. La création d'un `.planning/` par Bash n'est pas couverte (P45-D-10).
@@ -900,7 +910,8 @@ prédicats de `check-agents.sh` réimplémentés dans le hook (choix motivé : `
 d'aucun module) : **juge** = I5 (`disallowedTools` retire `Write` et `Edit`, aucune allowlist
 `Agent(...)` non vide) ; **manager** = I6 (allowlist non vide, pas `vf-internal`) ; **worker** =
 `vf-internal: true` ; **producteur** = tout autre agent résolu (P45-D-05). Un contrôle croisé
-(`scripts/tests/test-role-hook-vs-check-agents.sh`) compare la dérivation à `check-agents.sh` sur tout
+(`scripts/tests/test-role-hook-vs-check-agents.sh`, chemin pris depuis la racine du dépôt et non
+depuis le module) compare la dérivation à `check-agents.sh` sur tout
 le corpus d'agents du dépôt et sur des fixtures adverses, et peut rougir (P45-D-05a).
 
 La **résolution** `agent_type` → définition suit l'ordre écrit plus haut (P45-D-05b) : agents du lab
@@ -908,7 +919,13 @@ La **résolution** `agent_type` → définition suit l'ordre écrit plus haut (P
 la version active du plugin sous `<HOME>/.claude/plugins/` ; le premier niveau qui trouve gagne ; deux
 définitions de rôles contradictoires au même niveau valent **inconnu** ; un agent en lien symbolique
 n'est jamais une définition. Le nom est indexé par `name:` (repli : nom de fichier) et comparé après
-normalisation (casefold, `_` et espace unifiés en `-`).
+normalisation (casefold, `_` et espace unifiés en `-`). La résolution est bornée : 1 000 entrées
+lues par dossier d'agents (`BORNE_AGENTS_PAR_DOSSIER`), 8 Mio lus au total pour indexer un dossier
+(`BORNE_OCTETS_INDEX`), 4 096 octets d'en-tête pour reconnaître un candidat
+(`BORNE_ENTETE_DEFINITION`) ; une définition de plus de 1 Mio (`BORNE_LECTURE_DEFINITION`) ou portant
+une ligne de plus de 32 768 caractères (`BORNE_LIGNE_DEFINITION`) est illisible, jamais un verdict de
+rôle ; côté plugins, 64 installations au plus par plugin (`BORNE_ENTREES_PLUGINS`) et 20 000 dossiers
+parcourus au plus par version (`BORNE_PARCOURS_PLUGINS`).
 
 Lignes appliquées (la table §5 de la spec fabrique, sans règle en double dans le code) : **juge** —
 toute écriture par outil est refusée (le verdict se pose par `poser-verdict.sh`) ; **worker** — un
@@ -927,8 +944,11 @@ adhérents : la ligne « Worker : tout dispatch refusé », appliquée à un lab
 La commande `deroger-gate.sh --lab=… --gate=<G1|G5|G6|G7|ROLE> --chemin=… --qui=… --canal=…
 --date=… --raison=…` inscrit une dérogation **nominative** (qui, canal, date, gate, chemin(s), raison)
 dans le journal append-only `.planning/derogations-gates.log`, une ligne par chemin, champs en
-encodage pourcent injectif (P45-D-13). Une raison vide, `TODO`, `xxx`, une ellipse ou `<…>` est
-refusée après normalisation Unicode. Elle n'est **jamais conditionnée à l'urgence** : aucune option,
+encodage pourcent injectif (P45-D-13). Une raison vide, `TODO`, `TBD`, `FIXME`, `n/a`, `xxx` (toute
+suite de `x`), une ellipse ou `<…>` est refusée avec le code 64, après normalisation Unicode (NFKC,
+caractères de contrôle et de format retirés, blancs de bord retirés, casse repliée par `casefold`) :
+`tbd`, `Fixme` ou `N/A`, quelle que soit leur casse et même écrits en pleine chasse, sont refusés.
+Elle n'est **jamais conditionnée à l'urgence** : aucune option,
 aucune horloge ne conditionne l'acceptation (spec §5.2). Durée de vie : **usage unique** par
 (gate, chemin) ; le hook qui laisse passer une action grâce à elle ajoute une ligne `consommee` et la
 **cite** dans la sortie de l'action (numéro, gate, chemin, auteur, canal, date, raison) ; sans effet
@@ -943,7 +963,8 @@ qui la lance (T-45-34).
 (sha256 des octets du `PLAN.md` de l'unité, A3 = a3-plan) est calculé **par la commande**, jamais
 fourni par l'agent ; `--tentative` est une option **obligatoire que la commande vérifie** (1 à la
 création, ancienne tentative + 1 pour remplacer ; toute autre valeur : code 64, fichier inchangé) ;
-l'écriture est atomique et ne traverse jamais un lien. Elle est agnostique de l'appelant (F8 =
+l'écriture est atomique et ne traverse jamais un lien. Codes de sortie : 0 verdict écrit, 1 erreur de
+lecture ou d'écriture, 2 lab non adhérent, 64 usage ou valeur refusée. Elle est agnostique de l'appelant (F8 =
 f8-agnostique, Willy, AskUserQuestion session principale, 2026-09-30) : un juge qui a `Bash` la lance
 lui-même, les autres livrent leur rapport au manager qui la lance. Artefact haché : le plan, pas le
 livrable ; la vérification du hash à la clôture est la Phase 46 (limite : `--juge` est déclaratif).
