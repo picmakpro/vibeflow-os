@@ -599,7 +599,7 @@ def sec_modes(ctx):
 # `none` (silence : Bash et toute lecture, limites déclarées (a) à (d), P45-D-06b).
 # =================================================================================================
 PLANCHER_MIN = 49        # plancher de la recherche : un corpus vidé rougit
-PLANCHER_CORPUS = 68     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
+PLANCHER_CORPUS = 72     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
 
 
 class Cas:
@@ -632,6 +632,7 @@ def construire_arbre(t):
     lab("dev", False)
     lab("adh esp", True)
     lab('qlab"x', True)
+    lab('dq"x', False)
     lab("bs\\lab", True)
     lab("m$HOME`bt*'ap%s", True)
     lab("uni-é", True)
@@ -706,7 +707,7 @@ def construire_corpus(ctx):
     w("E07", "Write", L["m$HOME`bt*'ap%s"] + "/" + notes, dev, "tight", note="$HOME, backtick, glob, apostrophe, %s")
     w("E08", "Write", L["uni-é"] + "/.planning/résumé.md", dev, "tight", note="Unicode brut")
     w("E09", "Write", adh + "/.planning/résumé.md", dev, "tight", ascii_=True, note="Unicode échappé (préfixe dans le même lab)")
-    w("E09b", "Write", L["uni-é"] + "/" + notes, dev, "none", ascii_=True, note="Unicode échappé dans le lab lui-même (limite d)")
+    w("E09b", "Write", L["uni-é"] + "/" + notes, dev, "tight", ascii_=True, note="Unicode échappé dans le lab lui-même (limite d fermée par le lot A : le doute d'adhésion ferme en panne)")
     w("E10", "Write", L["nl\nt\tlab"] + "/" + notes, dev, "tight", note="\\n et \\t décodés")
     w("E11", "Write", adh + "/.planning/a\rb.md", dev, "tight", note="\\r arrête le décodage : préfixe")
     w("E11b", "Write", dev + "/.planning/a\rb.md", adh, "tight", note="préfixe dev, cwd adhérent : le doute tombe du côté du refus")
@@ -787,6 +788,16 @@ def construire_corpus(ctx):
     w("A21", "Write", L["imb-c"] + "/" + phase_imb + "VERDICT.md", dev, "tight", note="`<phase>/.planning` : la phase n'est jamais une racine")
     w("A22", "Edit", L["imb-c"] + "/" + phase_imb + "PLAN.md", dev, "tight", note="`<phase>/.planning`, Edit du PLAN.md de la phase")
     w("A23", "NotebookEdit", L["imb-c"] + "/" + phase_imb + "nb.ipynb", dev, "tight", note="`<phase>/.planning`, NotebookEdit")
+    # ---- E37-E39 : échappement JSON non géré (b, f, u0001) dans le chemin écrit, lot A (audit B1, basse). La couche shell
+    # ne peut pas décoder la valeur (X=0 : préfixe seulement) ; en panne, un préfixe hors de tout lab adhérent avec un cwd
+    # hors du lab ne doit JAMAIS ouvrir : le doute d'adhésion ferme (P45-D-06a), comme E11b.
+    w("E37", "Write", dev + "/a\x08b/../../adh/" + notes, dev, "tight", note="échappement JSON b (non géré) : le préfixe est un dossier dev, la cible réelle un lab adhérent, cwd hors du lab")
+    w("E38", "Write", dev + "/x\x0cy.md", dev, "tight", note="échappement JSON f (non géré) dans un chemin dev, cwd dev : le doute ferme en panne")
+    w("E39", "Edit", dev + "/x\x01y.md", dev, "tight", note="échappement JSON u0001 (non géré) : le doute ferme en panne")
+    # E40 : l'extraction DOIT décoder un guillemet échappé — sinon, le doute d'adhésion fermant en panne (E37-E39), un lab dev
+    # serait refusé à tort ; seul un lab dev, un cwd hors de tout lab et un nom à guillemet distinguent l'extraction fidèle d'une
+    # extraction tronquée (les mutants EXT-2 et EXT-4 y sont opposables).
+    w("E40", "Write", L['dq"x'] + "/" + notes, L["bare"], "none", note="guillemet échappé dans un lab dev, cwd hors de tout lab : décodé, donc silence")
     ctx.corpus = cas
     ctx.labs = L
     return cas
@@ -1087,9 +1098,9 @@ def sec_mutants(ctx):
     construire_corpus(ctx)
     M = [
         ("EXT-1", '_y=$(cd -P -- "$_n" 2>/dev/null && pwd -P)', '_y=$(cd -- "$_n" 2>/dev/null && pwd)', "A11b", "C", {}),
-        ("EXT-2", '"([^"\\\\]|\\\\.)*"\'', '"[^"]*"\'', "E03", "C", {}),
+        ("EXT-2", '"([^"\\\\]|\\\\.)*"\'', '"[^"]*"\'', "E40", "C", {}),
         ("EXT-3", '2>/dev/null; return $?; fi', '2>/dev/null && return 0; fi', "A09b", "C", {}),
-        ("EXT-4", '\\\\\\"*) V=$V\\" ;;', '\\\\\\"*) X=0; return 0 ;;', "E03", "C", {}),
+        ("EXT-4", '\\\\\\"*) V=$V\\" ;;', '\\\\\\"*) X=0; return 0 ;;', "E40", "C", {}),
         ("EXT-5", 'for K in file_path notebook_path; do', 'for K in zz_file zz_note; do', "A14", "C", {}),
         ("EXT-6", '| head -n 1); [ -n "$_m" ]', '| tail -n 1); [ -n "$_m" ]', "E12", "C", {}),
         ("EXT-7", "-q -E '\"planning_version\"[[:space:]]*:[[:space:]]*\"cycles-v1\"'", "-q -F 'cycles-v1'", "A06", "C", {}),
@@ -1099,6 +1110,8 @@ def sec_mutants(ctx):
         ("EXT-11", 'if [ -d "$_n" ] && _y=$(cd', 'if false && _y=$(cd', "A18", "C", {}),
         ("EXT-12", '*/[.][Pp][Ll][Aa][Nn][Nn][Ii][Nn][Gg]/*) ;;', '*/[.][Zz][Zz][Zz]/*) ;;', "A21", "C", {}),
         ("EXT-12D", '*/[.][Pp][Ll][Aa][Nn][Nn][Ii][Nn][Gg]/*) ;;', '*/[.][Zz][Zz][Zz]/*) ;;', "A19", "D", {}),
+        ("PX-1", 'elif [ "$PX" = 0 ]; then D=0; fi', 'elif [ "$PX" = 0 ] && { vf_get cwd && vf_tight "$V"; }; then D=0; fi', "E37", "C", {}),
+        ("PX-1D", 'elif [ "$PX" = 0 ]; then D=0; fi', 'elif [ "$PX" = 0 ] && { vf_get cwd && vf_tight "$V"; }; then D=0; fi', "E38", "D", {}),
         ("CMD-1", ';; *) exit 0 ;; esac', ';; *) ;; esac', "E35", "C", {}),
         ("CMD-2", 'bash "$S"); R=$?; fi', 'bash "$S"); R=0; fi', "E01", "E", {"id_temoin": "E27"}),
         ("CMD-3", 'if [ -f "$S" ]; then O=', 'if :; then O=', "E01", "C", {"mode_temoin": "A"}),
