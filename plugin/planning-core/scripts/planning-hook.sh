@@ -1464,6 +1464,7 @@ PROFONDEUR_VERSION = 4
 BORNE_LECTURE_DEFINITION = 1048576
 BORNE_LIGNE_DEFINITION = 32768
 BORNE_OCTETS_INDEX = 8388608
+BORNE_ENTETE_DEFINITION = 4096
 BORNE_ENTREES_PLUGINS = 64
 
 
@@ -1501,11 +1502,34 @@ def lire_definition_agent(chemin, budget=None):
     return None, (nom if isinstance(nom, str) and nom else repli), texte
 
 
-def definitions_dossier(dossier, cible=None):
+def candidat_definition(chemin, nom_fichier, cible):
+    """Vrai si la définition à `chemin` PEUT porter le nom `cible` (nom normalisé) : son nom de fichier le porte, ou l'en-tête borné
+    (BORNE_ENTETE_DEFINITION octets) le contient une fois normalisé, ou le frontmatter y reste ouvert (`name:` peut se trouver plus loin :
+    incertain, donc candidat). Un sur-ensemble : un faux candidat est écarté par la comparaison du `name:` lu en entier ; un vrai candidat
+    n'est jamais manqué (lot C, N1)."""
+    if normaliser(nom_fichier[:-3]) == cible:
+        return True
+    try:
+        with open(chemin, "rb") as fh:
+            octets = fh.read(BORNE_ENTETE_DEFINITION)
+    except OSError:
+        return False
+    texte = octets.decode("utf-8-sig", "replace").replace("\r\n", "\n").replace("\r", "\n")
+    if cible in normaliser(texte):
+        return True
+    lignes = texte.split("\n")
+    if len(octets) >= BORNE_ENTETE_DEFINITION and lignes and lignes[0].strip() == "---":
+        return not any(ligne.strip() == "---" for ligne in lignes[1:])
+    return False
+
+
+def definitions_dossier(dossier, cible=None, signaux=None):
     """{nom normalisé: [(rôle, chemin)]} des `*.md` RÉGULIERS directement sous `dossier` (glob : jamais un fichier
     caché ; jamais un lien symbolique, comme check-agents.sh qui refuse un agent .md en lien — A1), parcours trié
-    et borné. `cible` (nom normalisé de l'agent appelant) borne l'indexation à ce qui est nécessaire : le rôle n'est dérivé que
-    pour les définitions de ce nom (lot A, H2)."""
+    et borné. `cible` (nom normalisé de l'agent appelant) borne l'indexation à ce qui est nécessaire : seuls les fichiers CANDIDATS
+    (`candidat_definition`) sont lus en entier et décomptés du budget d'octets, le rôle n'est dérivé que pour les définitions de ce nom
+    (lot A, H2 ; lot C, N1 : des fichiers frères triés avant l'agent visé n'épuisent plus le budget). Un budget épuisé sur un candidat rend
+    la définition INDÉTERMINÉE (rôle `illisible`) et le signale (`signaux` reçoit `budget-indexation`)."""
     res = {}
     budget = [BORNE_OCTETS_INDEX]
     try:
@@ -1515,6 +1539,13 @@ def definitions_dossier(dossier, cible=None):
     for nom in noms[:BORNE_AGENTS_PAR_DOSSIER]:
         chemin = os.path.join(dossier, nom)
         if not nom.endswith(".md") or nom.startswith(".") or not est_fichier_regulier(chemin):
+            continue
+        if cible is not None and not candidat_definition(chemin, nom, cible):  # indexation-candidats
+            continue
+        if cible is not None and budget[0] <= 0:
+            res.setdefault(cible, []).append(("illisible", chemin))
+            if signaux is not None and "budget-indexation" not in signaux:
+                signaux.append("budget-indexation")
             continue
         role, nom_agent, texte = lire_definition_agent(chemin, budget)
         cle = normaliser(nom_agent)
@@ -1632,14 +1663,14 @@ def dossiers_agents_version(dossier_version):
     return res
 
 
-def definitions_plugin(home, plugin, cible=None):
+def definitions_plugin(home, plugin, cible=None, signaux=None):
     """Définitions des dossiers `agents/` de la version ACTIVE du plugin `plugin` (nom normalisé) sous `<home>/.claude/plugins/`
     (`versions_actives`), les dossiers de cette seule version étant lus."""
     base = os.path.join(home, ".claude", "plugins")
     res = {}
     for version in versions_actives(base, plugin):
         for dossier in dossiers_agents_version(version):
-            for cle, candidats in definitions_dossier(dossier, cible).items():
+            for cle, candidats in definitions_dossier(dossier, cible, signaux).items():
                 res.setdefault(cle, []).extend(candidats)
     return res
 
@@ -1654,7 +1685,7 @@ def _choisir_definition(candidats):
     return candidats[0]
 
 
-def resoudre_agent(agent_type, racine, home):
+def resoudre_agent(agent_type, racine, home, signaux=None):
     """(rôle, chemin de la définition) de l'agent, ou (`inconnu`, None). Ordre fin de P45-D-05b, le premier niveau
     qui trouve gagne : `.claude/agents/` du lab, puis `<home>/.claude/agents/` (le compte), puis — pour un
     `agent_type` de forme `<plugin>:<agent>` — les dossiers `agents/` de la version ACTIVE du plugin sous
@@ -1669,13 +1700,13 @@ def resoudre_agent(agent_type, racine, home):
     for dossier in niveaux:
         if dossier is None:
             continue
-        trouve = _choisir_definition(definitions_dossier(dossier, cible).get(cible))
+        trouve = _choisir_definition(definitions_dossier(dossier, cible, signaux).get(cible))
         if trouve is not None:
             return trouve
     plugin, separateur, agent = agent_type.partition(":")
     if avec_home and separateur and plugin and agent:
         cible_plugin = normaliser(agent)
-        trouve = _choisir_definition(definitions_plugin(home, normaliser(plugin), cible_plugin).get(cible_plugin))
+        trouve = _choisir_definition(definitions_plugin(home, normaliser(plugin), cible_plugin, signaux).get(cible_plugin))
         if trouve is not None:
             return trouve
     return ("inconnu", None)
@@ -1710,7 +1741,10 @@ def evaluer_role(contexte):
     payload = contexte["payload"]
     agent_id, agent_type = payload.get("agent_id"), payload.get("agent_type")
     avec_identite = isinstance(agent_id, str) and agent_id != "" and isinstance(agent_type, str) and agent_type != ""
-    role, definition = resoudre_agent(agent_type, racine, contexte.get("arg_home")) if avec_identite else ("inconnu", None)  # role-principal
+    signaux = []
+    role, definition = resoudre_agent(agent_type, racine, contexte.get("arg_home"), signaux) if avec_identite else ("inconnu", None)  # role-principal
+    for signal in signaux:  # role-signal : un budget d'indexation épuisé ne se tait jamais (lot C, N1)
+        observer(Verdict("ROLE", None, signal), contexte)
     if role == "juge" and outil in OUTILS_ECRITURE:
         chemin_rel = None
         if contexte["ecrit"]:

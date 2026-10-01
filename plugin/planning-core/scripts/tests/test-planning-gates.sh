@@ -4093,6 +4093,59 @@ lota_mutant("CANG-RECONNUE", "# canary-reconnue", "if True:  # canary-reconnue",
 lota_mutant("CANG-ARMEMENT-SIGNAL", "# canary-armement", "return 4  # canary-armement", "R-CAN-10", "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF")
 
 
+# --- LOT C, constat 1 (re-audit N1) : le budget d'indexation ne décompte que les fichiers CANDIDATS --------------------------------
+# Décision du manager vf-dev-manager, 2026-10-01 (renversable) : des fichiers frères triés avant l'agent visé épuisaient les 8 Mio
+# d'indexation, l'agent devenait `illisible` et le hook ROLE se taisait (un juge `zz-judge` seul : refus ; avec dix `aaa-*.md` de 1 Mo :
+# plus aucun refus). Un épuisement qui survient malgré tout est VISIBLE : une ligne `raison=budget-indexation` au journal d'observation.
+def frere_lourd(lab, nom, agent, octets=1000000):
+    """`<lab>/.claude/agents/<nom>.md` : une définition valide de `agent`, remplie jusqu'à `octets` octets (lignes courtes)."""
+    entete = "---\nname: %s\ndescription: frère lourd\ntools: Read\n---\n" % agent
+    corps = ("x" * 99 + "\n") * ((octets - len(entete)) // 100)
+    ecrire(os.path.join(lab, ".claude", "agents", nom + ".md"), entete + corps)
+
+
+@lota("R-N1-01")
+def controle_n1_budget_candidats(ctx, script):
+    """Dix frères `aaa-*.md` de 1 Mo triés avant `zz-judge` : le juge reste refusé (ROLE) en moins de 3 s ; aucune ligne `budget-indexation`
+    (les frères ne sont pas candidats) ; puis dix définitions de `zz-judge` de 1 Mo (candidates : le budget s'épuise) : jamais un refus
+    (indéterminé, P45-D-11), et UNE ligne `raison=budget-indexation` au journal d'observation."""
+    armee = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+    lab = ctx.unique("lab-n1")
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    ecrire(os.path.join(lab, ".claude", "agents", "zz-judge.md"), TEXTE_JUGE % "zz-judge")
+    for i in range(10):
+        frere_lourd(lab, "aaa-%02d" % i, "aaa-%02d" % i)
+    cache = dossier_neuf(ctx, "cache-n1-a")
+    brut = payload("Write", entree_outil("Write", os.path.join(lab, "livrables", "x.md")), lab, agent_type="zz-judge")
+    debut = time.perf_counter()
+    rc, out, err = ctx.lancer("A", brut, cwd=lab, dossier=armee, extra_env={"XDG_CACHE_HOME": cache})
+    duree = time.perf_counter() - debut
+    v = verdict_role(rc, out, err)
+    if v != "refus" or duree >= 3.0:
+        fautes.append("dix frères de 1 Mo : %s en %.2f s (attendu refus en moins de 3 s)" % (v, duree))
+    if [l for l in lignes_journal(cache) if "raison=budget-indexation" in l]:
+        fautes.append("ligne budget-indexation écrite alors qu'aucun candidat n'a épuisé le budget")
+    lab2 = ctx.unique("lab-n1-candidats")
+    ecrire(os.path.join(lab2, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    for i in range(10):
+        frere_lourd(lab2, "zz-judge-%02d" % i, "zz-judge")
+    cache2 = dossier_neuf(ctx, "cache-n1-b")
+    brut = payload("Write", entree_outil("Write", os.path.join(lab2, "livrables", "x.md")), lab2, agent_type="zz-judge")
+    rc, out, err = ctx.lancer("A", brut, cwd=lab2, dossier=armee, extra_env={"XDG_CACHE_HOME": cache2})
+    v = verdict_role(rc, out, err)
+    visibles = [l for l in lignes_journal(cache2) if "raison=budget-indexation" in l and "gate=ROLE" in l]
+    if v != "passage":
+        fautes.append("budget épuisé sur des candidats : %s (attendu passage : indéterminé)" % v)
+    if len(visibles) != 1:
+        fautes.append("budget épuisé : %d ligne(s) budget-indexation au journal (attendu 1)" % len(visibles))
+    return (not fautes), ("; ".join(fautes) if fautes else "dix frères de 1 Mo : refus du juge en moins de 3 s, aucun signal ; dix candidats de 1 Mo : indéterminé (passage) et une ligne raison=budget-indexation")
+
+
+lota_mutant("INDEXATION-CANDIDATS", "# indexation-candidats", "if False:  # indexation-candidats", "R-N1-01")
+lota_mutant("BUDGET-SIGNAL", "# role-signal", "for signal in []:  # role-signal", "R-N1-01")
+
+
 # LOTA-ANCRE
 
 
