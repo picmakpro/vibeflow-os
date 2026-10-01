@@ -79,7 +79,7 @@
 #                   (Phase 45) ») est identique au code livré : table d'armement (état, étape, cas de canary, relevé), noms protégés par
 #                   G6, journal de dérogation, marqueurs de code, ordre de résolution des agents, outils refusés et laissé ouvert en mode
 #                   dégradé (commande de hooks.json), limites déclarées (a) à (z) chacune sur sa ligne ; MUT-REFERENCE-* : une valeur de
-#                   gate inversée, `Agent` retiré des outils refusés, une limite retirée (chacune des 25, puis (l) à part), un nom de
+#                   gate inversée, `Agent` retiré des outils refusés, une limite retirée (chacune des 26, puis (l) à part), un nom de
 #                   journal, un marqueur, l'ordre de résolution, un cas de canary, une constante du hook changée sans la référence
 #   MUT-*           chaque garde est tuée par un mutant à motif unique dont la trace est imprimée
 #
