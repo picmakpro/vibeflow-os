@@ -79,7 +79,15 @@
       refuse toute valeur trop longue qui contient `.planning` ou `.claude` (casse ignorée), quel que soit le `cwd` ;
       (b) le cœur ne sort plus en code non nul sur un chemin non analysable (surrogate, NUL, `~utilisateur`, erreur de
       `realpath`) : refus s'il nomme `.planning` ou `.claude`, sinon décision sur le `cwd` ; (c) l'échéance de 8 s
-      provoquée par un chemin géant revient à (a). Limite (aa). Suite : R-DOUTE-01 et R-DOUTE-02, dix mutants.
+      provoquée par un chemin géant revenait à (a), ce qui était FAUX pour une valeur échappée : voir N2-01. Limite (aa).
+      Suite : R-DOUTE-01 et R-DOUTE-02, dix mutants.
+    - **N2-01 (moyenne, re-audit 2, classe)** — le repli cherchait `.planning` et `.claude` dans l'extrait brut, avant le
+      décodage JSON : `\u002eplanning` y échappait ; le cœur tombait alors en échéance (8 s) sur un chemin géant qui
+      descend puis remonte et le repli se taisait sur le `cwd`. Désormais : (a) le repli refuse toute valeur de plus de 4096
+      caractères qui nomme `.planning` ou `.claude` OU porte un antislash ; (b) le cœur juge une telle valeur d'emblée sur
+      son nom décodé, sans `realpath` ni `racine_lab`, ce qui supprime aussi la lenteur quadratique. Écart volontaire à
+      GATE-03 borné à ce cas (N2-03) ; N2-02 et N2-04 déclarés. Limites (aa) et (ab). Suite : R-DOUTE-03 (2 000 valeurs
+      générées, graine 20261002) et R-DOUTE-04 (sonde N=130000), trois mutants de plus.
     - **N-03 (haute)** — un chemin `~/x` était joint au `cwd` comme un chemin relatif, alors que le `Read` du harnais le
       développe : une poche `<cwd>/~/lab/` faisait taire les gates sur `~/lab/.planning/…`. `~` et `~/…` sont développés
       en HOME dans les deux couches (HOME, déjà passé en argument au cœur, R-ENV-02) ; `~utilisateur/…` est tranché dans

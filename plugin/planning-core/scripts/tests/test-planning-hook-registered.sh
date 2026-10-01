@@ -65,8 +65,10 @@ T_DEBUT="$(date +%s)"
 # ================================================================================================
 AIDES="$WORK/aides.py"
 cat > "$AIDES" <<'PY_AIDES_REG_EOF'
+import concurrent.futures
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -1386,6 +1388,135 @@ def verdict_direct(ctx, brut, cwd):
     return verdict(p.returncode, p.stdout), p.returncode, p.stdout, p.stderr
 
 
+# --- N2-01 (re-audit 2 du 2026-10-02) : la CLASSE « valeur longue que la couche de repli ne sait pas analyser » ------------------------
+# Un nom d'actif gardé peut s'écrire de bien des façons dans le JSON (`.planning`, `.planning`, `.PLANNING`) : la couche
+# de repli ne le décode pas, elle refuse donc toute valeur longue qui porte `.planning`, `.claude` OU un antislash. Le cœur, lui, a décodé
+# le JSON : une valeur longue y est jugée d'emblée sur son nom décodé, sans realpath ni racine_lab (quadratiques en profondeur).
+PLAFOND_DECISION_S = 2.0
+GRAINE_GENERATIVE = 20261002
+N_GENERATIF = int(os.environ.get("VF_GEN_N", "2000"))
+
+
+def payload_brut(outil, chemin_json, cwd, cle="file_path"):
+    """Payload dont la clé de chemin vaut le littéral JSON `chemin_json` (déjà échappé, sans guillemets) : permet d'écrire un nom sous une
+    forme que json.dumps ne produit jamais (`\\u002eplanning`)."""
+    obj = {"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": cwd, "prompt_id": "prompt-test",
+           "permission_mode": "default", "hook_event_name": "PreToolUse", "tool_name": outil,
+           "tool_input": {cle: "@@F@@", "content": "x"}, "tool_use_id": "toolu_test"}
+    texte = json.dumps(obj, separators=(",", ":"), ensure_ascii=True)
+    return texte.replace('"@@F@@"', '"' + chemin_json + '"', 1).encode("ascii")
+
+
+def json_litteral(texte):
+    """Contenu d'une chaîne JSON (sans les guillemets) pour `texte`."""
+    return json.dumps(texte, ensure_ascii=True)[1:-1]
+
+
+def nom_sous_forme(rng, nom):
+    """`nom` dont chaque caractère est pris au hasard sous sa forme littérale, littérale de casse inversée, `\\uXXXX` en minuscules ou
+    `\\uXXXX` en majuscules (échappement JSON)."""
+    sortie = []
+    for c in nom:
+        forme = rng.randrange(4)
+        if forme == 0:
+            sortie.append(c)
+        elif forme == 1:
+            sortie.append(c.swapcase())
+        elif forme == 2:
+            sortie.append("\\u%04x" % ord(c))
+        else:
+            sortie.append("\\u%04X" % ord(c))
+    return "".join(sortie)
+
+
+def rembourrage(rng):
+    """Rembourrage (> 4096 caractères) de forme variée : `./`, `a/../`, descente puis remontée, composants longs."""
+    forme = rng.randrange(4)
+    if forme == 0:
+        return "./" * rng.randrange(2100, 3000)
+    if forme == 1:
+        return "a/../" * rng.randrange(900, 1200)
+    if forme == 2:
+        n = rng.randrange(1100, 1500)
+        return "a/" * n + "../" * n
+    return ("x" * rng.randrange(200, 400) + "/") * rng.randrange(25, 35)  # au moins 25 × 201 = 5025 caractères
+
+
+def valeur_generative(rng, avec_nom, bases):
+    """Littéral JSON d'une valeur longue : base, rembourrage, puis (avec_nom) le nom sous une forme tirée au hasard, en milieu (suivi
+    d'un reste) ou en fin de valeur. Sans nom : aucun `.planning`, aucun `.claude`, aucun antislash."""
+    base = rng.choice(bases)
+    pad = rembourrage(rng)
+    reste = rng.choice(("/STATE.md", "/scripts/x.sh", "/cycles/01-c/notes.md", ""))
+    if avec_nom:
+        nom = nom_sous_forme(rng, rng.choice((".planning", ".claude")))
+        return json_litteral(base + "/" + pad) + nom + json_litteral(reste)
+    return json_litteral(base + "/" + pad + "n" + reste + "/f.md")
+
+
+def controle_generatif(ctx, texte, adh, hors, n=None, graine=GRAINE_GENERATIVE):
+    """Preuve générative de la classe : `n` valeurs longues qui nomment `.planning` ou `.claude` sous une forme tirée au hasard doivent
+    être REFUSÉES par la commande complète (cœur livré présent) ET par la couche de repli seule (script absent), cwd non adhérent ou
+    adhérent ; des valeurs longues qui ne nomment rien, sans antislash, en cwd non adhérent, restent silencieuses (GATE-03). Rend
+    (conforme, détail, stats)."""
+    n = N_GENERATIF if n is None else n
+    rng = random.Random(graine)
+    bases = [adh, hors, "/tmp/zz", ""]
+    cas = []
+    for _ in range(n):
+        cas.append(("nom", valeur_generative(rng, True, bases), rng.choice((hors, adh)), rng.choice(("Write", "Edit", "NotebookEdit"))))
+    for _ in range(max(1, n // 4)):
+        cas.append(("temoin", valeur_generative(rng, False, [hors]), hors, rng.choice(("Write", "Edit", "NotebookEdit"))))
+    stats = {"graine": graine, "n": n, "deny_complet": 0, "deny_repli": 0, "temoins": 0, "temoins_pass": 0, "t_max": 0.0}
+    fautes = []
+
+    def jouer(c):
+        genre, v, cwd, outil = c
+        brut = payload_brut(outil, v, cwd, "notebook_path" if outil == "NotebookEdit" else "file_path")
+        t_c, extra_c = ctx.preparer(ctx.scripts_dir_livre, texte)
+        rc1, out1, err1, dt1 = ctx.rejouer(t_c, brut, ctx.env_mode("A", extra_c), cwd)
+        rc2, out2, err2, dt2 = rejouer_texte_t(ctx, texte, "C", brut, cwd)
+        return (c, verdict(rc1, out1), err1, dt1, verdict(rc2, out2), err2, dt2)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        for c, v1, e1, d1, v2, e2, d2 in ex.map(jouer, cas):
+            stats["t_max"] = max(stats["t_max"], d1, d2)
+            if c[0] == "nom":
+                stats["deny_complet"] += int(v1 == "deny" and not e1)
+                stats["deny_repli"] += int(v2 == "deny" and not e2)
+                if v1 != "deny" or e1 or v2 != "deny" or e2:
+                    fautes.append("valeur …%s cwd=%s : complet=%s repli=%s" % (c[1][-60:], "adh" if c[2] == adh else "hors", v1, v2))
+            else:
+                stats["temoins"] += 1
+                stats["temoins_pass"] += int(v1 == "silence" and v2 == "silence" and not e1 and not e2)
+                if v1 != "silence" or v2 != "silence" or e1 or e2:
+                    fautes.append("témoin …%s : complet=%s repli=%s (attendu silence)" % (c[1][-40:], v1, v2))
+    if stats["t_max"] >= PLAFOND_DECISION_S:
+        fautes.append("temps maximal %.2f s (plafond %.0f s)" % (stats["t_max"], PLAFOND_DECISION_S))
+    detail = ("%d valeurs (graine %d) : deny complet %d/%d, deny repli %d/%d, témoins PASS %d/%d, t_max %.2f s"
+              % (n, graine, stats["deny_complet"], n, stats["deny_repli"], n, stats["temoins_pass"], stats["temoins"], stats["t_max"]))
+    return (not fautes), ("; ".join(fautes[:3]) + " | " + detail if fautes else detail), stats
+
+
+def chemin_aller_retour(base, n, nom):
+    """`base/` + `a/` × n + `../` × n + nom : descend puis remonte (la sonde N=130000 du ré-auditeur à n = 130000)."""
+    return base + "/" + "a/" * n + "../" * n + nom
+
+
+def controle_sonde_n(ctx, texte, adh, hors, n=130000):
+    """La sonde du ré-auditeur (~520 Ko) : `.planning/STATE.md` puis `.claude/scripts/planning-hook.sh`, cwd non adhérent."""
+    fautes = []
+    pire = 0.0
+    for nom in (".planning/STATE.md", ".claude/scripts/planning-hook.sh"):
+        brut = payload("Write", {"file_path": chemin_aller_retour(adh, n, nom), "content": "x"}, hors)
+        t_c, extra_c = ctx.preparer(ctx.scripts_dir_livre, texte)
+        rc, out, err, dt = ctx.rejouer(t_c, brut, ctx.env_mode("A", extra_c), hors)
+        pire = max(pire, dt)
+        if verdict(rc, out) != "deny" or err or dt >= PLAFOND_DECISION_S:
+            fautes.append("%s : %s en %.2f s stderr=%s (attendu deny, < %.0f s)" % (nom, verdict(rc, out), dt, court(err), PLAFOND_DECISION_S))
+    return (not fautes), ("; ".join(fautes) if fautes else "sonde N=%d (nom en fin, cwd non adhérent) : deny des deux noms, pire temps %.2f s" % (n, pire))
+
+
 def controle_doute_shell(ctx, texte, adh, hors, lab_home):
     """Rend (conforme, détail) : la couche shell seule (mode C, script absent)."""
     fautes = []
@@ -1414,6 +1545,23 @@ def controle_doute_shell(ctx, texte, adh, hors, lab_home):
     jouer("N-01 chemin trop long avec échappement `\\ud800` et `..` (sonde r3 de l'audit), cwd non adhérent",
           payload_ascii("Write", {"file_path": adh + "/\ud800/../" + LONG_BORNE + ".planning/STATE.md", "content": "x"}, hors), hors, "deny", nomme)
     jouer("N-01 chemin trop long qui ne nomme ni l'un ni l'autre : silence hors lab adhérent (GATE-03)", ecrit(hors + "/" + LONG_BORNE + "x.md", hors), hors, "silence")
+    # N2-01 : le nom écrit sous une forme échappée (la couche de repli ne décode pas le JSON) ; descente puis remontée ; tout cwd
+    nomme_esc = "il nomme .planning ou .claude, ou porte un echappement JSON"
+    long_p = json_litteral(adh + "/" + LONG_BORNE)
+    jouer("N2-01 `\\u002eplanning` dans une valeur trop longue, cwd non adhérent",
+          payload_brut("Write", long_p + "\\u002eplanning/STATE.md", hors), hors, "deny", nomme_esc)
+    jouer("N2-01 `.pl\\u0061nning` (une seule lettre échappée), cwd non adhérent",
+          payload_brut("Write", long_p + ".pl\\u0061nning/STATE.md", hors), hors, "deny", nomme_esc)
+    jouer("N2-01 `\\u002eclaude` en fin de valeur, cwd non adhérent",
+          payload_brut("Edit", long_p + "\\u002eclaude", hors), hors, "deny", nomme_esc)
+    jouer("N2-01 `\\u002E` PLANNING majuscules échappées, cwd ADHÉRENT",
+          payload_brut("Write", long_p + "\\u002E\\u0050LANNING/x.md", adh), adh, "deny", nomme_esc)
+    jouer("N2-01 un antislash seul (`\\/`) dans une valeur trop longue sans nom, cwd non adhérent : refusé",
+          payload_brut("Write", json_litteral(hors + "/" + LONG_BORNE) + "\\/x.md", hors), hors, "deny", nomme_esc)
+    jouer("N2-01 descente puis remontée (130 000 composantes) vers un lab adhérent, nom échappé, cwd non adhérent",
+          payload_brut("Write", json_litteral(adh + "/" + "a/" * 130000 + "../" * 130000) + "\\u002eplanning/STATE.md", hors), hors, "deny", nomme_esc)
+    jouer("N2-01 GATE-03 : valeur trop longue sans nom ni antislash, cwd non adhérent : silence",
+          payload_brut("Write", json_litteral(hors + "/" + LONG_BORNE + "x.md"), hors), hors, "silence")
     # N-03 : `~` développé en HOME, jamais joint au cwd
     jouer("N-03 `~/<lab>/.planning/STATE.md`, cwd non adhérent : lu sous HOME, adhérent", ecrit("~/" + lab_home + "/.planning/STATE.md", hors), hors, "deny",
           "dans un lab adherent cycles-v1")
@@ -1454,6 +1602,19 @@ def controle_doute_coeur(ctx, adh, hors, lab_home):
     jouer("`~/x.md` sous HOME hors lab, cwd non adhérent : silence", e("~/x.md", hors), hors, "silence")
     jouer("`~/x.md` sous HOME hors lab, cwd ADHÉRENT : silence (jamais joint au cwd)", e("~/x.md", adh), adh, "silence")
     jouer("cwd inanalysable (surrogate), chemin qui ne nomme rien : refusé dans le doute", e(hors + "/\ud800/x.md", hors + "/\ud800"), hors, "deny")
+    # N2-01 : une valeur longue est jugée d'emblée sur son nom DÉCODÉ (aiguillage), jamais par realpath ni racine_lab. Le chemin descend
+    # puis remonte vers un lab NON adhérent : résolu, il serait silencieux ; le nom (échappé dans le JSON) seul le fait refuser.
+    aller_retour = hors + "/" + "a/" * 2500 + "../" * 2500
+    jouer("N2-01 valeur longue qui descend puis remonte, nom `\\u002eplanning` échappé, cwd non adhérent",
+          payload_brut("Write", json_litteral(aller_retour) + "\\u002eplanning/STATE.md", hors), hors, "deny")
+    jouer("N2-01 même chemin, nom `.claude` littéral, cwd non adhérent", e(aller_retour + ".claude/scripts/x.sh", hors), hors, "deny")
+    jouer("N2-01 valeur longue RELATIVE qui nomme `.planning`, cwd non adhérent", e("a/" * 2500 + "../" * 2500 + ".planning/x.md", hors), hors, "deny")
+    jouer("N2-01 valeur longue en `notebook_path`, nom échappé, cwd non adhérent",
+          payload_brut("NotebookEdit", json_litteral(aller_retour) + "\\u002eclaude/x.ipynb", hors, "notebook_path"), hors, "deny")
+    jouer("N2-01 valeur longue sans nom, cwd non adhérent : silence (GATE-03)", e(aller_retour + "x.md", hors), hors, "silence")
+    jouer("N2-01 valeur longue sans nom, cwd adhérent : refusé dans le doute", e(aller_retour + "x.md", adh), adh, "deny")
+    jouer("N2-01 cwd du payload plus long que la borne, chemin court, processus hors lab : silence (GATE-03)",
+          payload("Write", {"file_path": "x.md", "content": "x"}, hors + "/" + "a/" * 2500 + "../" * 2500), hors, "silence")
     return (not fautes), ("; ".join(fautes) if fautes else
                           "%d rejeux du cœur seul, toujours rc 0 : chemin inanalysable refusé s'il nomme .planning ou .claude, sinon décision sur le cwd ; `~` développé en HOME" % n[0])
 
@@ -1470,10 +1631,23 @@ def sec_doute(ctx):
         ok("R-DOUTE-02 " + c[1])
     else:
         ko("R-DOUTE-02", "cœur : chemin inanalysable décidé dans le doute, jamais le code 3, `~` développé en HOME", "conforme", c[1])
+    g = controle_generatif(ctx, ctx.cmd, adh, hors)
+    if g[0]:
+        ok("R-DOUTE-03 " + g[1])
+    else:
+        ko("R-DOUTE-03", "preuve générative : toute valeur longue qui nomme .planning ou .claude, sous n'importe quelle orthographe, est refusée (commande complète ET repli seul, moins de %.0f s), les témoins restent silencieux" % PLAFOND_DECISION_S,
+           "conforme", g[1])
+    sonde = controle_sonde_n(ctx, ctx.cmd, adh, hors)
+    if sonde[0]:
+        ok("R-DOUTE-04 " + sonde[1])
+    else:
+        ko("R-DOUTE-04", "sonde du ré-auditeur (N=130000) : deny en moins de %.0f s" % PLAFOND_DECISION_S, "conforme", sonde[1])
     for ident, motif, remplacement in (
-            ("DOUTE-GUARD-RETIRE", "grep -a -q -i -E '[.](planning|claude)' && G=1;", ":;"),
-            ("DOUTE-GUARD-CLAUDE", "[.](planning|claude)'", "[.](planning)'"),
-            ("DOUTE-GUARD-CASSE", "grep -a -q -i -E '[.](planning|claude)'", "grep -a -q -E '[.](planning|claude)'"),
+            ("DOUTE-GUARD-RETIRE", "grep -a -q -i -E '[.](planning|claude)|[\\\\]' && G=1;", ":;"),
+            ("DOUTE-GUARD-CLAUDE", "[.](planning|claude)|", "[.](planning)|"),
+            ("DOUTE-GUARD-CASSE", "grep -a -q -i -E '[.](planning|claude)|", "grep -a -q -E '[.](planning|claude)|"),
+            ("DOUTE-GUARD-ANTISLASH", "(planning|claude)|[\\\\]'", "(planning|claude)'"),
+            ("DOUTE-GUARD-NOM", "'[.](planning|claude)|[\\\\]'", "'[\\\\]'"),
             ("DOUTE-TILDE-SHELL", "'~'|'~/'*) _h=${HOME%/}; case $_h in /*) P=$_h${P#'~'} ;; *) PX=0 ;; esac ;; '~'*) PX=0 ;; *) if vf_get cwd", "*) if vf_get cwd"),
             ("DOUTE-TILDE-USER", " '~'*) PX=0 ;; *) if vf_get cwd", " *) if vf_get cwd")):
         muté, raison = make_cmd_mutant(ctx, ident, motif, remplacement)
@@ -1489,6 +1663,7 @@ def sec_doute(ctx):
             okmut(ident, "R-DOUTE-01 rougit · attendu (original) : %s · obtenu (mutant) : %s" % (o[1], m[1][:300]))
     for ident, motif, remplacement in (
             ("DOUTE-COEUR-REVERT", "decide = decider_dans_le_doute(payload)", "decide = None"),
+            ("DOUTE-COEUR-AIGUILLAGE", "if valeur_trop_longue(payload):  # aiguillage-longue", "if False:  # aiguillage-longue"),
             ("DOUTE-COEUR-NOMME", "if nomme_un_actif_garde(brut):  # doute-nomme", "if False:  # doute-nomme"),
             ("DOUTE-COEUR-CLAUDE", 'return ".planning" in bas or ".claude" in bas  # nomme-actif-garde', 'return ".planning" in bas  # nomme-actif-garde'),
             ("DOUTE-COEUR-ADHESION", "# doute-adhesion", "adherent = False  # doute-adhesion"),

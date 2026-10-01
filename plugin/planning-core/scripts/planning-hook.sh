@@ -233,6 +233,23 @@ def chemin_brut(payload):
     return None
 
 
+BORNE_VALEUR = 4096  # même borne que la couche shell de hooks.json (PATH_MAX de Linux)
+
+
+def valeur_trop_longue(payload):
+    """Vrai si `file_path`/`notebook_path` (le premier présent, comme `chemin_brut`) dépasse BORNE_VALEUR caractères. Un `cwd` plus
+    long que la borne n'est jamais parcouru non plus : il est remplacé par le cwd physique du processus, comme le fait la couche shell
+    (le cwd vient du harnais, l'attaquant ne le contrôle pas)."""
+    cwd = payload.get("cwd")
+    if isinstance(cwd, str) and len(cwd) > BORNE_VALEUR:  # cwd-long
+        try:
+            payload["cwd"] = os.getcwd()
+        except OSError:
+            del payload["cwd"]
+    brut = chemin_brut(payload)
+    return brut is not None and len(brut) > BORNE_VALEUR
+
+
 def nomme_un_actif_garde(texte):
     """Vrai si le texte contient `.planning` ou `.claude`, casse ignorée : seul un chemin qui les nomme peut viser un actif gardé."""
     bas = texte.casefold()
@@ -1969,6 +1986,11 @@ def main():
     except BaseException:
         sys.exit(3)  # phase-a-sortie
     try:
+        # N2-01 (re-audit 2 du 2026-10-02) : une valeur de plus de BORNE_VALEUR caractères ne passe JAMAIS par realpath ni racine_lab
+        # (quadratiques en profondeur : l'échéance de 8 s tombait sur un chemin qui descend puis remonte et la couche shell, aveugle à
+        # une forme échappée, se taisait). Le cœur a décodé le JSON : il juge le nom décodé, par la décision dans le doute.
+        if valeur_trop_longue(payload):  # aiguillage-longue
+            raise ValueError("valeur trop longue")
         ecrit, cwd = cible_de(payload, sys.argv[3] if len(sys.argv) > 3 else "")
         depart = ecrit if ecrit is not None else (cwd if cwd is not None else os.getcwd())  # racine-depart
         racine = racine_lab(depart)
