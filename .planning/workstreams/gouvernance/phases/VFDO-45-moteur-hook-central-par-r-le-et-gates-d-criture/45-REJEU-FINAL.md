@@ -101,3 +101,54 @@ Aucun. Faux refus = 0, faux accept = 0 pour G6, G5, G1, G7 et le rôle ; emprein
 ## Verdict de seuil — non armé par ce nœud
 
 La condition de l'armement en cascade est tenue sur cette mesure (0 faux refus, 0 faux accept, `EMPREINTE-ARBRE-IDENTIQUE` pour les deux labs). Ce nœud n'arme rien : aucune constante `ARMEMENT_*` ni `TABLE_ATTENDUE` n'a été touchée, la décision d'armement et son ordre (G6 et G5, G1, G7, puis le rôle) reviennent au manager.
+
+## Rejeu post-audit (2026-10-01)
+
+**Mesure seule — aucun armement, aucune constante `ARMEMENT_*` ni `TABLE_ATTENDUE` touchée.** Le code du hook a changé après le rejeu réel final (`708debcb`) : la correction ciblée de l'audit de sécurité final (F-01 borne de la couche shell de repli, F-02 motif d'adhésion partagé entre G6 et le repli, F-03 minuteur désarmé après la décision ; quick 261001-urj) a modifié `hooks.json`, `planning-hook.sh` et la copie de référence du canary. Ce rejeu mesure donc le code corrigé.
+
+| Champ | Valeur |
+|---|---|
+| Date | 2026-10-01 |
+| Code mesuré | HEAD `0f8f2946` de la branche `gouvernance/phase-45-execution` |
+| Commande | celle du rejeu final ci-dessus (`rejeu-reel.sh` sur les deux labs, `--etape=4`, mêmes attendus) |
+| Autorisation | rejeu réel en lecture seule (Willy, AskUserQuestion session principale, 2026-09-30, reprise dans le mandat du 2026-10-01) |
+| Passages | un seul, code de sortie 0 ; charge machine élevée (suites de la correction rejouées juste avant), sans effet sur la mesure |
+
+### Contrôle de repos (lecture seule), forme anonymisée (sans USER ni PID)
+
+Avant (22:42) et après (22:47) :
+
+| Relevé | Avant | Après |
+|---|---|---|
+| Processus dont le répertoire courant est sous `~/jarvis-keystone` ou `~/BusinessFlow-Lab` (`lsof -d cwd`) | 0 | 0 |
+| Fichiers ouverts sous `~/jarvis-keystone/.planning` (`lsof +D`) | 0 | 0 |
+| Fichiers ouverts sous `~/BusinessFlow-Lab/.planning` (`lsof +D`) | 0 | 0 |
+| Transcript le plus récent, BusinessFlow-Lab | 2026-10-01 20:05 (plus de 2 h 30) | inchangé |
+| Transcript le plus récent, jarvis-keystone | 2026-09-24 21:56 | inchangé |
+
+### Comptes (lignes brutes du rejeu)
+
+```
+COMPTE G6 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G5 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G1 faux-refus=0 faux-accept=0 refus-conforme-modele=196
+COMPTE G7 faux-refus=0 faux-accept=0 refus-conforme-modele=6
+COMPTE ROLE faux-refus=0 faux-accept=0 refus-conforme-modele=0
+REJEU-ETAPE-4 faux-refus=0 faux-accept=0 refus-conforme-modele=202
+CLASSE-REGLE-ECRITE G1 lab=~/jarvis-keystone n=200
+CLASSE-REGLE-ECRITE G1 lab=~/BusinessFlow-Lab n=0
+EMPREINTE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-IDENTIQUE ~/BusinessFlow-Lab
+EMPREINTE-ARBRE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-ARBRE-IDENTIQUE ~/BusinessFlow-Lab
+```
+
+Le relevé nominatif compte 4404 lignes : 3617 en doit-passer (passage obtenu), 585 en doit-refuser (refus obtenu), 202 en doit-refuser-modele (refus obtenu), aucun écart dans aucun sens. Les 24 lignes `ROLE-AGENT` sont identiques à celles du rejeu final. Aucune occurrence de `Alarm clock` ni de « hook central indisponible » dans la sortie ni dans le relevé.
+
+### Écarts
+
+Aucun : mêmes totaux que le rejeu final (4404 lignes ; 3617 / 585 / 202), 0 faux refus, 0 faux accept, empreintes de tout l'arbre identiques pour les deux labs.
+
+### Mesure des `config.json` réels pour F-02 (lecture seule)
+
+Les `config.json` racine des deux labs, et ceux des quatre compartiments de `jarvis-keystone`, portent `"planning_version": "2.0"` (non adhérents : G6 ne s'y applique pas). Leur transposition à `cycles-v1` à mise en forme identique (une clé par ligne) est admise par G6 corrigé (la clé et la valeur tiennent sur une ligne, le motif du repli la reconnaît) : aucun faux refus attendu à la migration.
