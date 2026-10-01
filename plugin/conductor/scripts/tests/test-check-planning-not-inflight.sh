@@ -42,6 +42,7 @@ emit() { # <ID> <0 = ok | 1 = ko> <description> <détail>
     [ "$QUIET" -eq 1 ] || { echo "  ✓ $1 — $3"; PASS=$((PASS+1)); }
   else
     echo "$1 KO" >> "$RES"
+    printf '%s\t%s\n' "$1" "$4" >> "$RES.det"
     [ "$QUIET" -eq 1 ] || { echo "  ✗ $1 — $3 [$4]"; FAIL=$((FAIL+1)); }
   fi
 }
@@ -129,7 +130,7 @@ addplan() { # <lab> <phase dir> <fichier>
 # La MATRICE : jouée une fois sur le gate réel, puis une fois par mutant (QUIET=1).
 # =================================================================================================
 matrix() {
-  MXN=$((MXN+1)); : > "$RES"
+  MXN=$((MXN+1)); : > "$RES"; : > "$RES.det"
   local D D2 pre post
 
   D="$(mkflat f1)"
@@ -170,7 +171,7 @@ matrix() {
   expect F5 "lab partitionné : accepté, stdout « partitionne »" 0 "partitionne" "-"
 
   D="$(mkflat f6)"
-  g "$TMP" "PATH=$TMP/bin-jq" "HOME=$EMPTYHOME" -u CLAUDE_CONFIG_DIR -u GSD_TOOLS -- --path "$D"
+  g "$TMP" -u CLAUDE_CONFIG_DIR -u GSD_TOOLS "PATH=$TMP/bin-jq" "HOME=$EMPTYHOME" -- --path "$D"
   expect F6 "moteur introuvable (HOME vide, ni GSD_TOOLS ni gsd-tools) : NON VÉRIFIABLE" 2 "" "NON VÉRIFIABLE"
 
   D="$(mkflat f7)"
@@ -224,7 +225,7 @@ matrix() {
   mkdir -p "$D/gsd-core/bin" "$D/.claude/gsd-core/bin"
   printf "require('fs').writeFileSync(%s,'x');\n" "'$D/TEMOIN-1'" > "$D/gsd-core/bin/gsd-tools.cjs"
   printf "require('fs').writeFileSync(%s,'x');\n" "'$D/TEMOIN-2'" > "$D/.claude/gsd-core/bin/gsd-tools.cjs"
-  g "$D" "PATH=$TMP/bin-jq" "HOME=$EMPTYHOME" -u CLAUDE_CONFIG_DIR -u GSD_TOOLS -- --path "$D"
+  g "$D" -u CLAUDE_CONFIG_DIR -u GSD_TOOLS "PATH=$TMP/bin-jq" "HOME=$EMPTYHOME" -- --path "$D"
   if [ -e "$D/TEMOIN-1" ] || [ -e "$D/TEMOIN-2" ]; then
     [ "$QUIET" -eq 1 ] || echo "$RC" >> "$RCSEEN"
     emit F17 1 "moteur relatif au cwd NON exécuté" "un fichier-témoin existe : le candidat cwd a été exécuté"
@@ -304,7 +305,10 @@ mutant() { # <nom> <ancre BRE> <sed s///> <ensemble attendu : IDs séparés par 
   printf '%s\n' $expected | LC_ALL=C sort -u > "$TMP/m.attendu"
   awk '$2=="KO"{print $1}' "$RES" | LC_ALL=C sort -u > "$TMP/m.obtenu"
   if cmp -s "$TMP/m.attendu" "$TMP/m.obtenu"; then
-    QUIET=0; emit "M-$name" 0 "mutant tué : bascule exactement {$(printf '%s' "$expected" | tr -s ' ' ' ')}" ""; QUIET=1
+    QUIET=0; emit "M-$name" 0 "mutant tué : bascule exactement {$(printf '%s' "$expected" | tr -s ' ' ' ')}" ""
+    # Trace du rouge : pour chaque cas basculé, l'assertion violée (attendu / obtenu).
+    while IFS="$(printf '\t')" read -r _id _det; do echo "      rouge $_id : $_det"; done < "$RES.det"
+    QUIET=1
     KILLED=$((KILLED+1))
   else
     why="obtenu {$got} attendu {$expected} ; en trop/en moins : $(comm -3 "$TMP/m.attendu" "$TMP/m.obtenu" | tr -s '\t\n' '  ')"
@@ -328,7 +332,7 @@ mutant a         'status_lc" = "executing"'                    's/"executing"/"z
 mutant b         'select(.plan_count > .summary_count)'        's/select(.plan_count > .summary_count)/select(false)/'          'F2b F9'
 mutant bprime    '^bp_min=1$'                                  's/1/999999/'                                                    'F10'
 mutant cmp       'select(.plan_count > .summary_count)'        's/plan_count > /plan_count >= /'                                'F1 F3'
-mutant env       'query roadmap.analyze'                       's/env -u GSD_WORKSTREAM //'                                     'F9'
+mutant env       'cwd "$ROOT" query'                       's/env -u GSD_WORKSTREAM //'                                     'F9'
 mutant forme     'jq -e "$VALID_JQ"'                           's/jq -e "$VALID_JQ"/jq -e true/'                                'F8 F16'
 mutant partition 'echo "partitionne"; exit 0'                  's/echo "partitionne"; exit 0/:/'                                'F5'
 mutant cwd       '^GT=""$'                                     's|^GT=""$|GT=""; for _c in gsd-core/bin/gsd-tools.cjs .claude/gsd-core/bin/gsd-tools.cjs; do test -f "$_c" \&\& { GT="$_c"; break; }; done|' 'F17'
