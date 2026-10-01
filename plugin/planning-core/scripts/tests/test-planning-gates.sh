@@ -3192,10 +3192,18 @@ def lota_mutant(ident, motif, remplacement, controle, nom="planning-hook.sh", ma
     LOTA_MUTANTS.append((ident, motif, remplacement, controle, nom, marqueur))
 
 
+def lota_executer(fonction, ctx, dossier):
+    """(conforme, détail) d'un contrôle ; une exception du contrôle est un KO décrit, jamais une section qui s'arrête."""
+    try:
+        return fonction(ctx, dossier)
+    except Exception as exc:
+        return False, "exception du contrôle : %s : %s" % (type(exc).__name__, str(exc)[:300])
+
+
 def sec_lota(ctx):
     par_id = dict(LOTA_CONTROLES)
     for ident, fonction in LOTA_CONTROLES:
-        conforme, detail = fonction(ctx, ctx.scripts_dir)
+        conforme, detail = lota_executer(fonction, ctx, ctx.scripts_dir)
         if conforme:
             ok("%s %s" % (ident, detail))
         else:
@@ -3213,9 +3221,9 @@ def sec_lota(ctx):
                 shutil.copy(os.path.join(ctx.scripts_dir, autre), os.path.join(dossier, autre))
                 os.chmod(os.path.join(dossier, autre), 0o755)
         ctrl = par_id[controle]
-        original = ctrl(ctx, ctx.scripts_dir)
+        original = lota_executer(ctrl, ctx, ctx.scripts_dir)
         temoin_o, temoin_m = controle_temoin(ctx, None), controle_temoin(ctx, dossier)
-        mutant = ctrl(ctx, dossier)
+        mutant = lota_executer(ctrl, ctx, dossier)
         if not original[0]:
             komut(ident, "l'original passe %s" % controle, "conforme", original[1])
         elif temoin_o != temoin_m:
@@ -3610,6 +3618,366 @@ def controle_derog_droits_utf8(ctx, script):
 
 lota_mutant("DEROG-FCHMOD", "# derog-fchmod", 'if hasattr(os, "fchmod"):  # derog-fchmod', "R-DEROG-10", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
 lota_mutant("DEROG-UTF8", "# derog-utf8", "pass  # derog-utf8", "R-DEROG-10", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
+
+
+# --- LOT A, constat 2 (H2) : le parseur de définitions d'agent est linéaire, borné, et le cœur se borne lui-même ---------------------
+# Décisions du manager vf-dev-manager, 2026-10-01 (renversables). L'expression `^\s+-\s+(.+?)(\s+#.*)?$` était quadratique : 60 Ko
+# d'espaces dans une définition donnaient plus de 20 s, un fail-open ; le Python orphelin survivait au kill et le fichier de
+# transport gardait le payload sous SIGKILL.
+ANCIENNE_PUCE = re.compile(r"^\s+-\s+(.+?)(\s+#.*)?$")
+ANCIEN_FRONTMATTER = '''
+def ancien_frontmatter_agent(texte):
+    lignes = texte.split("\\n")
+    if not lignes or lignes[0].strip() != "---":
+        return None
+    fm, i, cle = {}, 1, None
+    while i < len(lignes):
+        ligne = lignes[i]
+        if ligne.strip() == "---":
+            return fm
+        m = _CLE_AGENT_RE.match(ligne)
+        if m:
+            cle = m.group(1)
+            val = m.group(2).strip()
+            if val.startswith("[") and val.endswith("]"):
+                fm[cle] = [x.strip().strip(chr(34)).strip(chr(39)) for x in val[1:-1].split(",") if x.strip()]
+            elif val == "" or val == ">" or val == "|":
+                fm[cle] = "" if val == "" else val
+            else:
+                if len(val) >= 2 and val[0] == val[-1] and val[0] in (chr(34), chr(39)):
+                    val = val[1:-1]
+                fm[cle] = val
+        elif cle is not None:
+            item = re.match(r"^\\s+-\\s+(.+?)(\\s+#.*)?$", ligne)
+            if item and isinstance(fm.get(cle), list):
+                fm[cle].append(item.group(1).strip().strip(chr(34)).strip(chr(39)))
+            elif item and fm.get(cle) == "":
+                fm[cle] = [item.group(1).strip().strip(chr(34)).strip(chr(39))]
+            elif ligne.startswith("  ") and isinstance(fm.get(cle), str):
+                fm[cle] = (fm[cle] + " " + ligne.strip()).strip()
+        i += 1
+    return None
+'''
+
+
+def alphabet_complet(alphabet, longueur_max):
+    chaines = [""]
+    courant = [""]
+    for _ in range(longueur_max):
+        courant = [c + a for c in courant for a in alphabet]
+        chaines.extend(courant)
+    return chaines
+
+
+@lota("R-DEFS-01")
+def controle_defs_equivalence(ctx, script):
+    """`puce_agent` et `frontmatter_agent` du hook rendent EXACTEMENT ce que rendaient l'ancienne expression et l'ancien parseur
+    quadratique : exhaustif sur de petits alphabets (blancs Unicode compris), puis aléatoire sur des frontmatters entiers."""
+    import random
+    ns = charger_module(os.path.join(_dossier(ctx, script), "planning-hook.sh"))
+    puce, front = ns.get("puce_agent"), ns.get("frontmatter_agent")
+    if puce is None:
+        return False, "puce_agent absente du hook"
+    ancien = {"re": re, "_CLE_AGENT_RE": ns["_CLE_AGENT_RE"]}
+    exec(ANCIEN_FRONTMATTER, ancien)
+    fautes, n = [], 0
+    for ligne in alphabet_complet((" ", "-", "#", "x", " ", "\t"), 6):
+        m, p = ANCIENNE_PUCE.match(ligne), puce(ligne)
+        n += 1
+        if (m is None) != (p is None) or (m is not None and m.group(1) != p.group(1)):
+            fautes.append("puce %r : ancien %r, nouveau %r" % (ligne, m.group(1) if m else None, p.group(1) if p else None))
+            if len(fautes) > 5:
+                break
+    hasard = random.Random(4501)
+    morceaux = ("---", "name: x", "tools:", "tools: a, b", "tools: [a, b]", "description: >", "  - a", "  -  b  # c", "  - ", "  -", "  suite", "   ",
+                "  ", "x: ' y '", "  - '  q  '", "  # note", "\tzz", "- n", "disallowedTools:", "  - Write", "key: ", "  text  ")
+    for _ in range(2500):
+        corps = [hasard.choice(morceaux) for _ in range(hasard.randint(1, 9))]
+        texte = "\n".join(["---"] + corps + hasard.choice((["---", "tail"], ["---"], [])))
+        n += 1
+        a, b = ancien["ancien_frontmatter_agent"](texte), front(texte)
+        if a != b:
+            fautes.append("frontmatter %r : ancien %r, nouveau %r" % (texte, a, b))
+            if len(fautes) > 5:
+                break
+    return (not fautes), ("; ".join(fautes) if fautes else "%d lignes et frontmatters identiques à l'ancien parseur (alphabets de six symboles jusqu'à six caractères, blancs Unicode, 2500 frontmatters aléatoires)" % n)
+
+
+def definition_piegee(lab, nom, ligne):
+    """Écrit `<lab>/.claude/agents/<nom>.md` : un frontmatter dont `tools:` porte la puce `ligne`."""
+    ecrire(os.path.join(lab, ".claude", "agents", nom + ".md"),
+           "---\nname: %s\ndescription: définition piégée\ntools:\n%s\ndisallowedTools: Write\n---\nCorps.\n" % (nom, ligne))
+
+
+@lota("R-DEFS-02")
+def controle_defs_piegee(ctx, script):
+    """Une définition piégée (trois puces de 30 000 espaces, plus de 20 s avec l'ancienne expression) est tranchée en moins de 2 s ; une
+    définition hors des bornes (ligne de 40 000 caractères, 1,2 Mo) est INDÉTERMINÉE : jamais un refus de rôle, jamais un délai ;
+    sous un lab non adhérent, stdout d'octet vide."""
+    armee = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lab = ctx.unique("lab-piege")
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    definition_piegee(lab, "trap", "\n".join("  - x" + " " * 30000 for _ in range(3)))
+    definition_piegee(lab, "ligne-longue", "  - x" + " " * 40000)
+    ecrire(os.path.join(lab, ".claude", "agents", "gros.md"), "---\nname: gros\ntools: Read\n---\n" + ("x" * 1200000) + "\n")
+    dev = ctx.unique("lab-piege-dev")
+    ecrire(os.path.join(dev, ".planning", "config.json"), '{"planning_version": "2.0"}')
+    definition_piegee(dev, "trap", "\n".join("  - x" + " " * 30000 for _ in range(3)))
+    fautes = []
+    for agent in ("trap", "ligne-longue", "gros"):
+        brut = payload("Write", entree_outil("Write", os.path.join(lab, "livrables", "x.md")), lab, agent_type=agent)
+        debut = time.perf_counter()
+        rc, out, err = ctx.lancer("A", brut, cwd=lab, dossier=armee)
+        duree = time.perf_counter() - debut
+        v = verdict_role(rc, out, err)
+        if v != "passage" or duree >= 2.0:
+            fautes.append("%s : %s en %.2f s (attendu passage en moins de 2 s)" % (agent, v, duree))
+    brut = payload("Write", entree_outil("Write", os.path.join(dev, "livrables", "x.md")), dev, agent_type="trap")
+    debut = time.perf_counter()
+    rc, out, err = ctx.lancer("A", brut, cwd=dev, dossier=armee)
+    if rc != 0 or out != b"" or err or time.perf_counter() - debut >= 2.0:
+        fautes.append("lab dev : rc=%d stdout=%s" % (rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "définition piégée tranchée en moins de 2 s, définitions hors bornes indéterminées (passage), lab dev silencieux")
+
+
+def echeance_copie(ctx, script, delai, injection, prefixe, avant_lecture=False):
+    """Copie du hook dont ECHEANCE_COEUR_S vaut `delai` et qui exécute `injection` (une instruction Python sur UNE ligne) soit avant la
+    lecture du payload, soit juste avant l'évaluation des gates."""
+    remplacements = [("ECHEANCE_COEUR_S = 8.0", "ECHEANCE_COEUR_S = %s" % delai)]
+    if avant_lecture:
+        remplacements.append(("payload = lire_payload(sys.argv[1])  # phase-a", injection + "; payload = lire_payload(sys.argv[1])  # phase-a"))
+    else:
+        remplacements.append(("resultats = evaluer_gates(contexte)  # phase-b", injection + "; resultats = evaluer_gates(contexte)  # phase-b"))
+    return copie_modifiee(ctx, _dossier(ctx, script), "planning-hook.sh", remplacements, prefixe)
+
+
+def lab_adherent_simple(ctx, prefixe):
+    lab = ctx.unique(prefixe)
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    return lab
+
+
+@lota("R-DEFS-03")
+def controle_defs_echeance(ctx, script):
+    """Le dépassement SIMULÉ de l'échéance interne (délai ramené à 0,8 s, un sommeil de 6 s injecté avant les gates) FERME : le cœur sort
+    sur 73 sans rien imprimer, la commande enregistrée refuse l'écriture dans un lab adhérent (raison du fail-closed) et se tait dans
+    un lab dev, en moins de 4 s."""
+    copie = echeance_copie(ctx, script, "0.8", "import time; time.sleep(6)", "hook-echeance")
+    fautes = []
+    adh, dev = lab_adherent_simple(ctx, "lab-echeance"), ctx.unique("lab-echeance-dev")
+    ecrire(os.path.join(dev, ".planning", "config.json"), '{"planning_version": "2.0"}')
+    for etiquette, lab, attendu in (("lab adhérent", adh, "deny"), ("lab dev", dev, "silence")):
+        brut = payload("Write", entree_outil("Write", os.path.join(lab, ".planning", "notes.md")), lab)
+        debut = time.perf_counter()
+        rc, out, err = ctx.lancer("A", brut, cwd=lab, dossier=copie)
+        duree = time.perf_counter() - debut
+        v = classer(rc, out)
+        if v != attendu or duree >= 4.0 or (attendu == "deny" and b"hook central indisponible" not in out):
+            fautes.append("%s : %s en %.2f s (attendu %s en moins de 4 s)" % (etiquette, v, duree, attendu))
+    brut = payload("Write", entree_outil("Write", os.path.join(adh, ".planning", "notes.md")), adh)
+    p = subprocess.run(["bash", os.path.join(copie, "planning-hook.sh")], input=brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env=ctx.env(), cwd=adh, timeout=30)
+    if p.returncode != 73 or p.stdout != b"":
+        fautes.append("lanceur seul : rc=%d stdout=%s (attendu 73 et rien)" % (p.returncode, court(p.stdout)))
+    return (not fautes), ("; ".join(fautes) if fautes else "échéance dépassée : code 73 sans sortie, deny du fail-closed dans un lab adhérent, silence dans un lab dev")
+
+
+def vivant(pid):
+    """Vrai si le processus `pid` existe et n'est pas un zombie."""
+    p = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    etat = p.stdout.decode("utf-8", "replace").strip()
+    return etat != "" and not etat.startswith("Z")
+
+
+def lancer_endormi(ctx, copie, lab, tmpdir, fichier_pid):
+    """Lance le hook `copie` (qui écrit son pid dans `fichier_pid` puis dort) sur un payload de lab adhérent ; rend (Popen, pid du Python
+    ou None)."""
+    brut = payload("Write", entree_outil("Write", os.path.join(lab, ".planning", "notes.md")), lab)
+    env = ctx.env({"TMPDIR": tmpdir})
+    proc = subprocess.Popen(["bash", os.path.join(copie, "planning-hook.sh")], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, env=env, cwd=lab)
+    proc.stdin.write(brut)
+    proc.stdin.close()
+    pid = None
+    for _ in range(100):
+        if os.path.exists(fichier_pid) and open(fichier_pid, encoding="utf-8").read().strip():
+            pid = int(open(fichier_pid, encoding="utf-8").read().strip())
+            break
+        time.sleep(0.1)
+    return proc, pid
+
+
+def tuer(proc, pid):
+    for cible in (pid, proc.pid):
+        if cible:
+            try:
+                os.kill(cible, 9)
+            except OSError:
+                pass
+    proc.wait(timeout=10)
+    proc.stdout.close()
+    proc.stderr.close()
+
+
+@lota("R-DEFS-04")
+def controle_defs_orphelin(ctx, script):
+    """Le Python ne survit pas à son lanceur : le lanceur est tué (SIGKILL) pendant que le cœur dort (délai interne de 60 s) ; le cœur
+    disparaît en moins de 4 s."""
+    fichier_pid = os.path.join(ctx.unique("pid-orphelin"), "pid")
+    os.makedirs(os.path.dirname(fichier_pid))
+    copie = echeance_copie(ctx, script, "60.0", "open(%r, 'w').write(str(os.getpid())); import time; time.sleep(30)" % fichier_pid, "hook-orphelin")
+    lab = lab_adherent_simple(ctx, "lab-orphelin")
+    tmp = ctx.unique("tmp-orphelin")
+    os.makedirs(tmp)
+    proc, pid = lancer_endormi(ctx, copie, lab, tmp, fichier_pid)
+    try:
+        if pid is None:
+            return False, "le cœur n'a pas démarré (pas de pid)"
+        os.kill(proc.pid, 9)
+        proc.wait(timeout=10)
+        mort = False
+        for _ in range(40):
+            if not vivant(pid):
+                mort = True
+                break
+            time.sleep(0.1)
+    finally:
+        tuer(proc, pid)
+    return mort, ("le cœur a disparu moins de 4 s après son lanceur" if mort else "le cœur Python (pid %d) vit encore 4 s après la mort de son lanceur" % pid)
+
+
+@lota("R-DEFS-05")
+def controle_defs_transport(ctx, script):
+    """Fichier de transport : créé en 0600 (vu avant la lecture), EFFACÉ dès que le cœur a lu le payload — un SIGKILL du lanceur et du cœur
+    pendant le calcul ne laisse rien sous TMPDIR."""
+    fautes = []
+    lab = lab_adherent_simple(ctx, "lab-transport")
+    # a) avant la lecture : le fichier existe, 0600
+    fichier_pid = os.path.join(ctx.unique("pid-transport-a"), "pid")
+    os.makedirs(os.path.dirname(fichier_pid))
+    copie = echeance_copie(ctx, script, "60.0", "open(%r, 'w').write(str(os.getpid())); import time; time.sleep(3)" % fichier_pid,
+                           "hook-transport-a", avant_lecture=True)
+    tmp = ctx.unique("tmp-transport-a")
+    os.makedirs(tmp)
+    proc, pid = lancer_endormi(ctx, copie, lab, tmp, fichier_pid)
+    try:
+        presents = [n for n in os.listdir(tmp) if n.startswith("vf-planning-hook.")]
+        if len(presents) != 1:
+            fautes.append("avant la lecture : %d fichier(s) de transport (attendu 1)" % len(presents))
+        else:
+            mode = stat.S_IMODE(os.stat(os.path.join(tmp, presents[0])).st_mode)
+            if mode != 0o600:
+                fautes.append("fichier de transport en %o (attendu 600)" % mode)
+    finally:
+        tuer(proc, pid)
+    # b) après la lecture : effacé, même sous SIGKILL
+    fichier_pid = os.path.join(ctx.unique("pid-transport-b"), "pid")
+    os.makedirs(os.path.dirname(fichier_pid))
+    copie = echeance_copie(ctx, script, "60.0", "open(%r, 'w').write(str(os.getpid())); import time; time.sleep(30)" % fichier_pid, "hook-transport-b")
+    tmp = ctx.unique("tmp-transport-b")
+    os.makedirs(tmp)
+    proc, pid = lancer_endormi(ctx, copie, lab, tmp, fichier_pid)
+    try:
+        if pid is None:
+            fautes.append("le cœur n'a pas démarré (pas de pid)")
+        else:
+            restes = os.listdir(tmp)
+            if restes:
+                fautes.append("pendant le calcul : %s sous TMPDIR" % restes)
+    finally:
+        tuer(proc, pid)
+    restes = os.listdir(tmp)
+    if restes:
+        fautes.append("après SIGKILL : %s sous TMPDIR" % restes)
+    return (not fautes), ("; ".join(fautes) if fautes else "transport 0600 avant la lecture, effacé dès la lecture : rien sous TMPDIR pendant le calcul ni après SIGKILL")
+
+
+lota_mutant("PUCE-REGEX-FM", "# puce-agent-fm", 'item = re.match(r"^\\s+-\\s+(.+?)(\\s+#.*)?$", ligne)  # puce-agent-fm', "R-DEFS-02")
+lota_mutant("PUCE-REGEX-CHAMP", "# puce-agent-champ", 'item = re.match(r"^\\s+-\\s+(.+?)(\\s+#.*)?$", lignes[k])  # puce-agent-champ', "R-DEFS-02")
+lota_mutant("PUCE-EQUIVALENCE", "# puce-lineaire", "if True:  # puce-lineaire", "R-DEFS-01")
+lota_mutant("ECHEANCE-ARMEE", "# echeance-armee", "pass  # echeance-armee", "R-DEFS-03")
+lota_mutant("ECHEANCE-DELAI", "# echeance-delai", "if False:  # echeance-delai", "R-DEFS-03")
+lota_mutant("ECHEANCE-PARENT", "# echeance-parent", "if False:  # echeance-parent", "R-DEFS-04")
+lota_mutant("TRANSPORT-EFFACE", "# transport-efface", "pass  # transport-efface", "R-DEFS-05")
+
+
+# --- LOT A, constat 3 (revue M1 et m5) : un plugin en plusieurs versions ne retient que sa version ACTIVE ---------------------------------
+# Avant : `definitions_plugin` donnait `inconnu` quand deux versions en cache portaient des rôles différents (le rôle disparaissait), la
+# plus ancienne sinon, et marchait tout `~/.claude/plugins` à chaque appel (environ 1 s). Décision du manager vf-dev-manager, 2026-10-01 :
+# la version de `installed_plugins.json` (installPath, fichier régulier et lisible) ; à défaut la plus HAUTE du cache (tri de version, pas
+# lexical) ; seul le dossier de cette version est lu. `HOME` reste un argument du lanceur (R-ENV-02).
+VERSION_AGENT = "agentx"
+
+
+def agent_version(version, texte, module=None):
+    """(chemin relatif sous `.claude/plugins/`, texte) de l'agent `agentx` dans la version `version` du plugin `monplugin`."""
+    base = "cache/mp/monplugin/%s/" % version + ((module + "/") if module else "")
+    return (base + "agents/agentx.md", texte % VERSION_AGENT)
+
+
+def installed_plugins(home, versions, ecrire_comme="regulier", cle="monplugin@mp"):
+    """Pose `installed_plugins.json` : une entrée par (version, installPath) de `versions`. `ecrire_comme` : `regulier`, `illisible`
+    (JSON cassé), `lien` (lien symbolique vers un fichier valide)."""
+    chemin = os.path.join(home, ".claude", "plugins", "installed_plugins.json")
+    entrees = [{"scope": "user", "installPath": chemin_install, "version": version} for version, chemin_install in versions]
+    texte = json.dumps({"version": 2, "plugins": {cle: entrees}})
+    if ecrire_comme == "illisible":
+        texte = '{"version": 2, "plugins": {oups'
+    if ecrire_comme == "lien":
+        reel = os.path.join(home, "ailleurs", "installed.json")
+        ecrire(reel, texte)
+        os.makedirs(os.path.dirname(chemin), exist_ok=True)
+        os.symlink(reel, chemin)
+    else:
+        ecrire(chemin, texte)
+
+
+def verdict_version(ctx, hook, home):
+    return verdict_role(*_role(ctx, hook, "Write", ROLE_LIVRABLE, agent="monplugin:" + VERSION_AGENT, extra_env={"HOME": home}))
+
+
+@lota("R-VERSION-01")
+def controle_version_active(ctx, script):
+    """Copie armée, deux versions en cache (`1.9.0` producteur, `1.10.0` juge) : sans installed_plugins.json la plus HAUTE (tri de
+    version : 1.10.0 après 1.9.0) fait foi, refus ; installed_plugins.json qui désigne 1.9.0 : passage ; qui désigne 1.10.0 : refus ;
+    deux versions de même rôle : ce rôle ; pré-version (`2.0.0-beta` juge, `2.0.0` producteur) : la version finale ; dispositions
+    `<version>/<module>/agents` et `<version>/<module>/content/agents`."""
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+
+    def cas(etiquette, attendu, agents, install=None, comme="regulier", cle="monplugin@mp"):
+        home = home_de_suite(ctx, "version", plugins=agents)
+        if install is not None:
+            installed_plugins(home, [(v, os.path.join(home, ".claude", "plugins", "cache", "mp", "monplugin", v) if sous is None else sous) for v, sous in install],
+                              comme, cle)
+        v = verdict_version(ctx, hook, home)
+        if v != attendu:
+            fautes.append("%s : attendu %s, obtenu %s" % (etiquette, attendu, v))
+
+    mixte = [agent_version("1.9.0", TEXTE_PRODUCTEUR), agent_version("1.10.0", TEXTE_JUGE)]
+    cas("la plus haute (1.10.0 juge) sans installed_plugins.json", "refus", mixte)
+    cas("installed_plugins.json désigne 1.10.0 (juge)", "refus", mixte, install=[("1.10.0", None)])
+    inverse = [agent_version("1.9.0", TEXTE_JUGE), agent_version("1.10.0", TEXTE_PRODUCTEUR)]
+    cas("la plus haute (1.10.0 producteur) sans installed_plugins.json", "passage", inverse)
+    cas("installed_plugins.json désigne 1.9.0 (juge) : la version active gagne sur la plus haute", "refus", inverse, install=[("1.9.0", None)])
+    cas("installed_plugins.json illisible : repli sur la plus haute (producteur)", "passage", inverse, install=[("1.9.0", None)], comme="illisible")
+    cas("installed_plugins.json en lien symbolique : ignoré, repli sur la plus haute (producteur)", "passage", inverse, install=[("1.9.0", None)], comme="lien")
+    ecrire(os.path.join(ctx.work, "hors-plugins", "agents", "agentx.md"), TEXTE_JUGE % VERSION_AGENT)
+    cas("installPath hors de ~/.claude/plugins : ignoré, repli sur la plus haute (producteur)", "passage", inverse,
+        install=[("1.9.0", os.path.join(ctx.work, "hors-plugins"))])
+    cas("entrée d'un autre plugin seulement : repli sur la plus haute (producteur)", "passage", inverse, install=[("1.9.0", None)], cle="autre@mp")
+    memes = [agent_version("1.0.0", TEXTE_JUGE), agent_version("1.1.0", TEXTE_JUGE)]
+    cas("deux versions de même rôle (juge)", "refus", memes)
+    cas("pré-version juge et version finale producteur : la finale", "passage", [agent_version("2.0.0-beta", TEXTE_JUGE), agent_version("2.0.0", TEXTE_PRODUCTEUR)])
+    cas("disposition <version>/<module>/agents", "refus", [agent_version("2.0.0", TEXTE_JUGE, "mod")])
+    cas("disposition <version>/<module>/content/agents", "refus", [agent_version("2.0.0", TEXTE_JUGE, "mod/content")])
+    cas("version ancienne seule contradictoire : jamais lue", "passage", [agent_version("1.0.0", TEXTE_JUGE), agent_version("3.0.0", TEXTE_PRODUCTEUR)])
+    return (not fautes), ("; ".join(fautes) if fautes else "13 résolutions conformes : version active, plus haute (tri de version), repli sur un installed_plugins.json absent, illisible, en lien ou hors plugins")
+
+
+lota_mutant("PLUGIN-INSTALLED", "# plugin-installed", "versions = []  # plugin-installed", "R-VERSION-01")
+lota_mutant("PLUGIN-HAUTE", "# plugin-haute", "haute = min(cle for cle, _chemin in versions)  # plugin-haute", "R-VERSION-01")
+lota_mutant("PLUGIN-TRI", "# plugin-tri", "return (nom,)  # plugin-tri", "R-VERSION-01")
 
 
 # LOTA-ANCRE

@@ -17,6 +17,7 @@
 #   70  mktemp impossible
 #   71  lecture de stdin impossible
 #   72  aucun interpréteur Python (python3 puis python, ADR-054)
+#   73  échéance interne du cœur dépassée (ECHEANCE_COEUR_S) ou lanceur disparu : stdout vide (lot A, H2)
 #
 # Livraison — voie (a) de P44-D-14 : le cœur Python est embarqué en heredoc quoté (patron
 # recalc-planning.sh) ; l'installeur ne pose pas de fichier .py. Le programme passe par stdin, le
@@ -44,6 +45,7 @@ set -u
 if [ "${1:-}" = "--classer" ]; then
   T="${2:-}"
 else
+  umask 077
   T="$(mktemp "${TMPDIR:-/tmp}/vf-planning-hook.XXXXXX")" || exit 70
   trap 'rm -f "$T"' EXIT
   cat > "$T" || exit 71
@@ -70,6 +72,7 @@ import re
 import shlex
 import stat
 import sys
+import time
 import urllib.parse
 
 try:
@@ -80,6 +83,12 @@ except ImportError:
 # --- Constantes du contrat -----------------------------------------------------------------
 SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
+# Lot A (H2 ; décisions du manager vf-dev-manager, 2026-10-01) : le cœur se borne lui-même. Passé l'échéance, ou si le lanceur
+# meurt, il sort sur CODE_ECHEANCE sans rien imprimer : la couche shell de la commande enregistrée ferme alors sous adhésion
+# (P45-D-06a) et reste silencieuse ailleurs. Le délai du harnais (20 s) ne tue que le shell, jamais le Python orphelin.
+ECHEANCE_COEUR_S = 8.0
+PAS_SURVEILLANCE_S = 0.5
+CODE_ECHEANCE = 73
 
 # --- Table d'armement (P45-D-03a) : l'état de chaque gate vit ICI, dans le code livré, jamais dans
 # un fichier du lab ni dans une variable d'environnement (P45-D-01, P45-D-12a). Une constante par
@@ -95,6 +104,41 @@ ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",))
 TABLE_ARMEMENT = {"G6": ARMEMENT_G6, "G5": ARMEMENT_G5, "G1": ARMEMENT_G1, "G7": ARMEMENT_G7, "ROLE": ARMEMENT_ROLE}
 
 
+# --- Échéance interne et surveillance du lanceur (lot A, H2) ------------------------------------------------------
+def armer_echeance():
+    """Arme la surveillance du cœur : toutes les PAS_SURVEILLANCE_S secondes, sortie immédiate sur CODE_ECHEANCE (aucune sortie)
+    si ECHEANCE_COEUR_S est dépassée ou si le processus parent n'est plus le lanceur (il est mort : un Python orphelin ne survit
+    pas à son kill). Minuterie du système (SIGALRM) : un gestionnaire de signal passe aussi pendant une expression régulière, là où
+    un fil ne passerait pas (le GIL) ; sans SIGALRM (Windows), repli sur un fil démon."""
+    debut = time.monotonic()
+    parent = os.getppid()
+
+    def surveiller(*_ignores):
+        if time.monotonic() - debut >= ECHEANCE_COEUR_S:  # echeance-delai
+            os._exit(CODE_ECHEANCE)
+        if os.getppid() != parent:  # echeance-parent
+            os._exit(CODE_ECHEANCE)
+
+    try:
+        import signal
+        if hasattr(signal, "setitimer") and hasattr(signal, "SIGALRM"):
+            signal.signal(signal.SIGALRM, surveiller)
+            signal.setitimer(signal.ITIMER_REAL, PAS_SURVEILLANCE_S, PAS_SURVEILLANCE_S)
+            return
+    except (ImportError, ValueError, OSError):
+        pass
+    import threading
+
+    def boucle():
+        while True:
+            time.sleep(PAS_SURVEILLANCE_S)
+            surveiller()
+
+    fil = threading.Thread(target=boucle)
+    fil.daemon = True
+    fil.start()
+
+
 # --- Lecture du payload et dérivation du lab ------------------------------------------------
 def _premier_gagne(paires):
     """Clé en double : la PREMIÈRE occurrence gagne, comme la couche shell de la commande
@@ -107,10 +151,15 @@ def _premier_gagne(paires):
 
 
 def lire_payload(chemin):
-    """Lit le payload du fichier de transport. Octets invalides : remplacés (jamais une exception
-    pour un contenu que le harnais a déjà accepté)."""
+    """Lit le payload du fichier de transport, puis EFFACE ce fichier (lot A, H2 : le trap du lanceur ne tourne pas sous SIGKILL, le
+    contenu du payload ne reste pas sur disque le temps du calcul). Octets invalides : remplacés (jamais une exception pour un
+    contenu que le harnais a déjà accepté)."""
     with open(chemin, "rb") as fh:
         octets = fh.read()
+    try:
+        os.unlink(chemin)  # transport-efface
+    except OSError:
+        pass
     texte = octets.decode("utf-8", "replace")
     payload = json.loads(texte, object_pairs_hook=_premier_gagne)
     if not isinstance(payload, dict):
@@ -1145,21 +1194,62 @@ OUTILS_DISPATCH = ("Agent", "Task")  # role-dispatch
 _CLE_AGENT_RE = re.compile(r"^([A-Za-z_-]+):\s*(.*)$")
 
 
+class _Puce(object):
+    """Résultat de `puce_agent` : l'interface du `re.Match` de l'ancienne expression, `group(1)` seul."""
+    __slots__ = ("_texte",)
+
+    def __init__(self, texte):
+        self._texte = texte
+
+    def group(self, rang=0):
+        return self._texte
+
+
+def puce_agent(ligne):
+    """Équivalent LINÉAIRE de `re.match(r"^\\s+-\\s+(.+?)(\\s+#.*)?$", ligne)` pour une ligne sans saut de ligne : un objet à `group(1)` (le
+    texte de la puce, commentaire ` #…` final exclu) ou None. Lot A, H2 : l'expression était quadratique (60 Ko d'espaces dans une
+    ligne de définition : plus de 20 s, un fail-open) ; la suite compare les deux sur un corpus de petits alphabets. Cas limites de
+    l'ancienne expression conservés : un texte réduit à des blancs rend le dernier blanc (le premier groupe de blancs en rend un au
+    texte), le commentaire ne s'ouvre que sur un `#` précédé d'un blanc, et il emporte tout le blanc qui le précède."""
+    reste = ligne.lstrip()
+    if len(reste) == len(ligne) or not reste.startswith("-"):
+        return None
+    apres = reste[1:]
+    corps = apres.lstrip()
+    blancs = len(apres) - len(corps)
+    if blancs == 0:
+        return None
+    if corps == "":
+        return _Puce(apres[-1]) if blancs >= 2 else None
+    diese = corps.find("#", 2)
+    while diese != -1:
+        if corps[diese - 1].isspace():  # puce-lineaire
+            debut = diese - 1
+            while debut > 0 and corps[debut - 1].isspace():
+                debut -= 1
+            return _Puce(corps[:debut])
+        diese = corps.find("#", diese + 1)
+    return _Puce(corps)
+
+
 def frontmatter_agent(texte):
     """Dictionnaire du frontmatter d'une définition d'agent, ou None si absent ou jamais refermé. Même
     sémantique que `parse_frontmatter` de check-agents.sh (scalaire dé-quoté, liste en ligne, puces YAML,
-    continuation indentée) : `name:` et `vf-internal:` se lisent ici."""
+    continuation indentée) : `name:` et `vf-internal:` se lisent ici. Les lignes de continuation d'un scalaire
+    s'accumulent dans une liste jointe une seule fois (lot A, H2 : la concaténation répétée était quadratique)."""
     lignes = texte.split("\n")
     if not lignes or lignes[0].strip() != "---":
         return None
     fm, i, cle = {}, 1, None
+    suite = {}
     while i < len(lignes):
         ligne = lignes[i]
         if ligne.strip() == "---":
-            return fm
+            return _finaliser_continuations(fm, suite)
         m = _CLE_AGENT_RE.match(ligne)
         if m:
             cle = m.group(1)
+            suite.pop(cle, None)
             val = m.group(2).strip()
             if val.startswith("[") and val.endswith("]"):
                 fm[cle] = [x.strip().strip(chr(34)).strip(chr(39)) for x in val[1:-1].split(",") if x.strip()]
@@ -1170,15 +1260,32 @@ def frontmatter_agent(texte):
                     val = val[1:-1]
                 fm[cle] = val
         elif cle is not None:
-            item = re.match(r"^\s+-\s+(.+?)(\s+#.*)?$", ligne)
+            item = puce_agent(ligne)  # puce-agent-fm
             if item and isinstance(fm.get(cle), list):
                 fm[cle].append(item.group(1).strip().strip(chr(34)).strip(chr(39)))
-            elif item and fm.get(cle) == "":
+            elif item and fm.get(cle) == "" and cle not in suite:
                 fm[cle] = [item.group(1).strip().strip(chr(34)).strip(chr(39))]
             elif ligne.startswith("  ") and isinstance(fm.get(cle), str):
-                fm[cle] = (fm[cle] + " " + ligne.strip()).strip()
+                morceau = ligne.strip()
+                if cle in suite:
+                    if morceau != "":
+                        suite[cle].append(morceau)
+                elif morceau == "":
+                    fm[cle] = fm[cle].strip()
+                elif fm[cle].strip() == "":
+                    suite[cle] = [morceau]
+                else:
+                    suite[cle] = [fm[cle].lstrip(), morceau]
         i += 1
     return None
+
+
+def _finaliser_continuations(fm, suite):
+    """Joint, en une fois, les continuations accumulées : l'ancien `(valeur + " " + ligne).strip()` répété. Après la première
+    continuation non vide la valeur n'a plus de blanc en bordure : seules les pièces restent à joindre par une espace."""
+    for cle, morceaux in suite.items():
+        fm[cle] = " ".join(morceaux)
+    return fm
 
 
 def lignes_frontmatter_agent(texte):
@@ -1211,7 +1318,7 @@ def champ_brut_agent(lignes, cle):
             while k < n:
                 if _CLE_AGENT_RE.match(lignes[k]):
                     break
-                item = re.match(r"^\s+-\s+(.+?)(\s+#.*)?$", lignes[k])
+                item = puce_agent(lignes[k])  # puce-agent-champ
                 if item:
                     puces.append(item.group(1).strip())
                 k += 1
@@ -1350,28 +1457,57 @@ def normaliser(nom):
 
 BORNE_AGENTS_PAR_DOSSIER = 1000
 BORNE_PARCOURS_PLUGINS = 20000
-PROFONDEUR_PLUGINS = 8
+PROFONDEUR_VERSION = 4
+# Lot A (H2) : une définition d'agent plus grande que BORNE_LECTURE_DEFINITION, ou portant une ligne plus longue que
+# BORNE_LIGNE_DEFINITION, est INDÉTERMINÉE (rôle `illisible` : jamais un verdict de rôle) ; l'indexation d'un dossier d'agents lit au
+# plus BORNE_OCTETS_INDEX octets au total.
+BORNE_LECTURE_DEFINITION = 1048576
+BORNE_LIGNE_DEFINITION = 32768
+BORNE_OCTETS_INDEX = 8388608
+BORNE_ENTREES_PLUGINS = 64
 
 
-def lire_definition_agent(chemin):
-    """(rôle, nom d'agent) d'une définition : `name:` du frontmatter, à défaut le nom de fichier (comme
-    `agent_display_name`, Pitfall 6) ; rôle `illisible` si le fichier ne se lit pas ou si le frontmatter est abîmé."""
-    repli = os.path.basename(chemin)[:-3]
+def lire_definition_bornee(chemin, budget=None):
+    """Texte d'une définition (utf-8-sig, fins de ligne universelles comme la lecture texte d'origine), ou None — indéterminé : illisible,
+    plus grande que BORNE_LECTURE_DEFINITION, ou portant une ligne plus longue que BORNE_LIGNE_DEFINITION. `budget` ([octets restants])
+    décompte la lecture ; épuisé, rend None sans lire."""
     try:
-        with open(chemin, encoding="utf-8-sig") as fh:
-            texte = fh.read()
+        if budget is not None and budget[0] <= 0:
+            return None
+        with open(chemin, "rb") as fh:
+            octets = fh.read(BORNE_LECTURE_DEFINITION + 1)
+        if budget is not None:
+            budget[0] -= len(octets)
+        if len(octets) > BORNE_LECTURE_DEFINITION:
+            return None
+        texte = octets.decode("utf-8-sig").replace("\r\n", "\n").replace("\r", "\n")
     except (OSError, UnicodeDecodeError):
-        return "illisible", repli
+        return None
+    if any(len(ligne) > BORNE_LIGNE_DEFINITION for ligne in texte.split("\n")):
+        return None
+    return texte
+
+
+def lire_definition_agent(chemin, budget=None):
+    """(rôle, nom d'agent, texte lu ou None) d'une définition : `name:` du frontmatter, à défaut le nom de fichier (comme
+    `agent_display_name`, Pitfall 6) ; rôle `illisible` si le fichier ne se lit pas, dépasse les bornes ou si le frontmatter est abîmé.
+    Le rôle n'est dérivé que sur demande (`deriver_role` de `texte`)."""
+    repli = os.path.basename(chemin)[:-3]
+    texte = lire_definition_bornee(chemin, budget)
+    if texte is None:
+        return "illisible", repli, None
     fm = frontmatter_agent(texte)
     nom = fm.get("name") if isinstance(fm, dict) else None
-    return deriver_role(texte), (nom if isinstance(nom, str) and nom else repli)
+    return None, (nom if isinstance(nom, str) and nom else repli), texte
 
 
-def definitions_dossier(dossier):
+def definitions_dossier(dossier, cible=None):
     """{nom normalisé: [(rôle, chemin)]} des `*.md` RÉGULIERS directement sous `dossier` (glob : jamais un fichier
     caché ; jamais un lien symbolique, comme check-agents.sh qui refuse un agent .md en lien — A1), parcours trié
-    et borné."""
+    et borné. `cible` (nom normalisé de l'agent appelant) borne l'indexation à ce qui est nécessaire : le rôle n'est dérivé que
+    pour les définitions de ce nom (lot A, H2)."""
     res = {}
+    budget = [BORNE_OCTETS_INDEX]
     try:
         noms = sorted(os.listdir(dossier))
     except OSError:
@@ -1380,29 +1516,130 @@ def definitions_dossier(dossier):
         chemin = os.path.join(dossier, nom)
         if not nom.endswith(".md") or nom.startswith(".") or not est_fichier_regulier(chemin):
             continue
-        role, nom_agent = lire_definition_agent(chemin)
-        res.setdefault(normaliser(nom_agent), []).append((role, chemin))
+        role, nom_agent, texte = lire_definition_agent(chemin, budget)
+        cle = normaliser(nom_agent)
+        if cible is not None and cle != cible:
+            continue
+        if role is None:
+            role = deriver_role(texte)
+        res.setdefault(cle, []).append((role, chemin))
     return res
 
 
-def definitions_plugin(home, plugin):
-    """Définitions des dossiers `agents/` de `<home>/.claude/plugins/` dont le chemin contient un segment égal (après
-    normalisation) à `plugin` : parcours trié, liens de dossier non suivis, dossiers cachés et node_modules ignorés,
-    borné en nombre de dossiers et en profondeur. Disposition du cache mesurée en lecture seule (45-08) :
-    `plugins/cache/<marketplace>/<plugin>/<version>/<module>/agents/*.md`."""
-    base = os.path.join(home, ".claude", "plugins")
-    res, vus = {}, 0
-    for dossier, sous, _fichiers in os.walk(base, followlinks=False):
+def _cle_version(nom):
+    """Clé de tri d'un nom de dossier de version : suites de chiffres comparées comme des ENTIERS (1.10.0 après 1.9.0, jamais l'ordre
+    lexical), une version à suffixe de pré-version (`-beta`) avant la même version sans suffixe."""
+    coeur, tiret, pre = nom.partition("-")
+    nombres = tuple(int(x) for x in re.findall(r"[0-9]+", coeur))
+    return (nombres, 0 if tiret else 1, pre)  # plugin-tri
+
+
+def _versions_installees(base, plugin):
+    """[(clé de version, dossier)] des `installPath` de `<base>/installed_plugins.json` pour `plugin` (clé `<plugin>@<marketplace>`) :
+    fichier régulier (lstat, ouvert sans suivre de lien), de taille bornée, JSON ; un `installPath` n'est retenu que s'il est un
+    dossier situé sous `base`. Fichier absent, irrégulier, illisible ou sans entrée utilisable : liste vide (le repli est le cache)."""
+    chemin = os.path.join(base, "installed_plugins.json")
+    if not est_fichier_regulier(chemin):
+        return []
+    try:
+        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        with os.fdopen(descripteur, "rb") as fh:
+            octets = fh.read(BORNE_LECTURE_DEFINITION + 1)
+        if len(octets) > BORNE_LECTURE_DEFINITION:
+            return []
+        donnees = json.loads(octets.decode("utf-8"))
+    except (OSError, ValueError, RecursionError):
+        return []
+    plugins = donnees.get("plugins") if isinstance(donnees, dict) else None
+    if not isinstance(plugins, dict):
+        return []
+    racine_plugins = os.path.realpath(base)
+    res = []
+    for cle, entrees in plugins.items():
+        if not isinstance(cle, str) or normaliser(cle.partition("@")[0]) != plugin or not isinstance(entrees, list):
+            continue
+        for entree in entrees[:BORNE_ENTREES_PLUGINS]:
+            installe = entree.get("installPath") if isinstance(entree, dict) else None
+            if not isinstance(installe, str) or not installe.startswith("/"):
+                continue
+            reel = os.path.realpath(installe)
+            if reel.startswith(racine_plugins + os.sep) and os.path.isdir(reel):
+                res.append((_cle_version(os.path.basename(reel)), reel))
+    return res
+
+
+def _sous_dossiers_reels(dossier):
+    """Chemins des vrais sous-dossiers (jamais un lien, jamais un nom caché) de `dossier`, triés et bornés."""
+    res = []
+    try:
+        noms = sorted(os.listdir(dossier))
+    except OSError:
+        return res
+    for nom in noms[:BORNE_AGENTS_PAR_DOSSIER]:
+        chemin = os.path.join(dossier, nom)
+        try:
+            if not nom.startswith(".") and stat.S_ISDIR(os.lstat(chemin).st_mode):
+                res.append(chemin)
+        except OSError:
+            continue
+    return res
+
+
+def _versions_du_cache(base, plugin):
+    """[(clé de version, dossier)] de `<base>/cache/<marketplace>/<plugin>/<version>` : repli quand installed_plugins.json ne dit rien."""
+    res = []
+    for marketplace in _sous_dossiers_reels(os.path.join(base, "cache")):
+        for dossier_plugin in _sous_dossiers_reels(marketplace):
+            if normaliser(os.path.basename(dossier_plugin)) != plugin:
+                continue
+            for version in _sous_dossiers_reels(dossier_plugin):
+                res.append((_cle_version(os.path.basename(version)), version))
+    return res
+
+
+def versions_actives(base, plugin):
+    """Dossiers de la version ACTIVE de `plugin` : celle de installed_plugins.json (la plus haute s'il en porte plusieurs), à défaut la plus
+    haute du cache (tri de version, pas lexical). Lot A, revue M1 et m5 (décision du manager vf-dev-manager, 2026-10-01) : une version
+    ancienne restée en cache ne contredit plus la version active, et seul le dossier de cette version est lu."""
+    versions = _versions_installees(base, plugin)  # plugin-installed
+    if not versions:
+        versions = _versions_du_cache(base, plugin)
+    if not versions:
+        return []
+    haute = max(cle for cle, _chemin in versions)  # plugin-haute
+    retenues = []
+    for cle, chemin in versions:
+        if cle == haute and chemin not in retenues:
+            retenues.append(chemin)
+    return retenues
+
+
+def dossiers_agents_version(dossier_version):
+    """Dossiers `agents` sous `dossier_version` (jusqu'à PROFONDEUR_VERSION niveaux : `<version>/agents`, `<version>/<module>/agents`,
+    `<version>/<module>/content/agents`, disposition mesurée au 45-08), liens de dossier non suivis, dossiers cachés et node_modules
+    ignorés, parcours trié et borné."""
+    res, vus = [], 0
+    for dossier, sous, _fichiers in os.walk(dossier_version, followlinks=False):
         sous[:] = sorted(s for s in sous if not s.startswith(".") and s != "node_modules")
         vus += 1
         if vus > BORNE_PARCOURS_PLUGINS:
             break
-        segments = os.path.relpath(dossier, base).split(os.sep)
-        if len(segments) > PROFONDEUR_PLUGINS:
+        profondeur = 0 if dossier == dossier_version else len(os.path.relpath(dossier, dossier_version).split(os.sep))
+        if profondeur >= PROFONDEUR_VERSION:
             sous[:] = []
-            continue
-        if segments[-1] == "agents" and any(normaliser(s) == plugin for s in segments[:-1]):
-            for cle, candidats in definitions_dossier(dossier).items():
+        if profondeur >= 1 and os.path.basename(dossier) == "agents":
+            res.append(dossier)
+    return res
+
+
+def definitions_plugin(home, plugin, cible=None):
+    """Définitions des dossiers `agents/` de la version ACTIVE du plugin `plugin` (nom normalisé) sous `<home>/.claude/plugins/`
+    (`versions_actives`), les dossiers de cette seule version étant lus."""
+    base = os.path.join(home, ".claude", "plugins")
+    res = {}
+    for version in versions_actives(base, plugin):
+        for dossier in dossiers_agents_version(version):
+            for cle, candidats in definitions_dossier(dossier, cible).items():
                 res.setdefault(cle, []).extend(candidats)
     return res
 
@@ -1420,10 +1657,10 @@ def _choisir_definition(candidats):
 def resoudre_agent(agent_type, racine, home):
     """(rôle, chemin de la définition) de l'agent, ou (`inconnu`, None). Ordre fin de P45-D-05b, le premier niveau
     qui trouve gagne : `.claude/agents/` du lab, puis `<home>/.claude/agents/` (le compte), puis — pour un
-    `agent_type` de forme `<plugin>:<agent>` — les dossiers `agents/` du plugin sous `<home>/.claude/plugins/`.
-    `home` est l'argument passé par le lanceur (P45-D-12a) : ce code ne lit aucune variable d'environnement.
-    Indexation par `name:` (repli : nom de fichier), comparaison normalisée ; deux définitions de rôles
-    différents au même niveau : inconnu."""
+    `agent_type` de forme `<plugin>:<agent>` — les dossiers `agents/` de la version ACTIVE du plugin sous
+    `<home>/.claude/plugins/`. `home` est l'argument passé par le lanceur (P45-D-12a) : ce code ne lit aucune variable
+    d'environnement. Indexation par `name:` (repli : nom de fichier), comparaison normalisée, bornée à l'agent appelant ; deux
+    définitions de rôles différents au même niveau : inconnu."""
     cible = normaliser(agent_type)
     avec_home = isinstance(home, str) and home.startswith("/")
     dossier_lab = os.path.join(racine, ".claude", "agents")
@@ -1432,24 +1669,22 @@ def resoudre_agent(agent_type, racine, home):
     for dossier in niveaux:
         if dossier is None:
             continue
-        trouve = _choisir_definition(definitions_dossier(dossier).get(cible))
+        trouve = _choisir_definition(definitions_dossier(dossier, cible).get(cible))
         if trouve is not None:
             return trouve
     plugin, separateur, agent = agent_type.partition(":")
     if avec_home and separateur and plugin and agent:
-        trouve = _choisir_definition(definitions_plugin(home, normaliser(plugin)).get(normaliser(agent)))
+        cible_plugin = normaliser(agent)
+        trouve = _choisir_definition(definitions_plugin(home, normaliser(plugin), cible_plugin).get(cible_plugin))
         if trouve is not None:
             return trouve
     return ("inconnu", None)
 
 
 def allowlist_de_definition(chemin):
-    """Noms de l'allowlist `Agent(...)` / `Task(...)` de la définition à `chemin` (liste vide si illisible)."""
-    try:
-        with open(chemin, encoding="utf-8-sig") as fh:
-            return allowlist_agent(lignes_frontmatter_agent(fh.read()))
-    except (OSError, UnicodeDecodeError):
-        return []
+    """Noms de l'allowlist `Agent(...)` / `Task(...)` de la définition à `chemin` (liste vide si illisible ou hors des bornes de lecture)."""
+    texte = lire_definition_bornee(chemin)
+    return [] if texte is None else allowlist_agent(lignes_frontmatter_agent(texte))
 
 
 RAISON_JUGE = ("%s est un juge — toute écriture par outil lui est refusée ; posez un verdict par poser-verdict.sh "
@@ -1497,16 +1732,13 @@ def classer_fichier(chemin):
     """Mode de diagnostic `--classer` : UNE ligne JSON {"role", "allowlist", "disallowed"} pour la définition à
     `chemin` (rôle `illisible` si elle ne se lit pas). Aucune décision, aucune lecture du payload."""
     role, liste, interdits = "illisible", [], []
-    try:
-        with open(chemin, encoding="utf-8-sig") as fh:
-            texte = fh.read()
+    texte = lire_definition_bornee(chemin)
+    if texte is not None:
         role = deriver_role(texte)
         lignes = lignes_frontmatter_agent(texte)
         if lignes is not None:
             liste = allowlist_agent(lignes)
             interdits = sorted(jetons_nus_agent(lignes, "disallowedTools"))
-    except (OSError, UnicodeDecodeError):
-        pass
     sys.stdout.write(json.dumps({"role": role, "allowlist": liste, "disallowed": interdits}, ensure_ascii=False) + "\n")
 
 
@@ -1543,6 +1775,7 @@ def evaluer_gates(contexte):
 
 
 def main():
+    armer_echeance()  # echeance-armee
     # Mode de diagnostic (45-08) : `--classer <agent.md>`, quatrième argument du cœur ; aucune décision.
     if len(sys.argv) > 4 and sys.argv[4] == "--classer":
         classer_fichier(sys.argv[1])
