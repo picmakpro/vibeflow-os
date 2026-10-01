@@ -1,714 +1,306 @@
 # Codebase Concerns
 
-**Analysis Date:** 2026-07-26
+**Analysis Date:** 2026-10-02
 
-> Réécriture complète — la version du 2026-06-04 est périmée. Sa dette majeure a été traitée par
-> l'enforcement CI v2.32.0+ : **37 suites de tests** découvertes dynamiquement par
-> `.github/workflows/ci.yml:32`, `check-agents.sh --strict` sur chaque `plugin/*/agents`
-> (`ci.yml:66-76`), gate `scripts/check-version-sync.sh` (9 points de contrôle, ADR-054).
-> `infrastructure-audit` a désormais sa suite (`plugin/infrastructure-audit/scripts/tests/test-audit-infra.sh`),
-> le résolveur de dépendances existe et est testé (`plugin/_internal/resolve-deps.sh` +
-> `plugin/_internal/tests/test-resolve-deps.sh`). Ne pas reporter l'ancienne liste.
+> Rafraîchissement du 2026-10-02 (HEAD `8fb37832`, branche `gouvernance/phase-45-execution`, VERSION
+> racine `v2.67.1`, 17 modules, 98 suites découvertes par `.github/workflows/ci.yml:218`,
+> `planning-core` `v2.9.0` non publié). Chaque entrée de l'analyse précédente a été revérifiée dans le
+> code : ce qui a changé est regroupé dans « Résolu ou périmé » ; ce qui reste vrai est condensé ; la
+> Phase 45 (hook central et gates d'écriture) ouvre une famille de limites déclarées, citées **par
+> lettre et par thème** — la source de vérité est la section « Hook central et gates d'écriture
+> (Phase 45) » de `plugin/planning-core/references/modele-cycles.md`, qui peut encore évoluer : y relire
+> la lettre avant d'en tirer une conséquence.
+
+## Résolu ou périmé (ne plus reporter)
+
+| Ancienne entrée | État vérifié le 2026-10-02 |
+|---|---|
+| `update` ne converge pas (pas de manifeste des chemins posés) | **RÉSOLU** : `vf_manifest_path`/`vf_converge_apply` dans `plugin/_internal/vibeflow-update.sh` (manifeste `scripts/.vibeflow-manifest-<mod>`, convergence MANI-03), suite `plugin/_internal/tests/test-manifest.sh` |
+| `merge-hooks.sh` : purge cross-matcher silencieuse | **PÉRIMÉ comme formulé** : la purge cross-matcher est désormais voulue et testée (T7, T21a/b/c dans `plugin/_internal/tests/test-merge-hooks.sh`). Un cas strictement « même run, deux entrées neuves, même script et même événement » n'a pas de test nommé : le contournement `Bash|Write|Edit` de `plugin/conductor/hooks/hooks.json` reste la forme à utiliser |
+| Divergence `lexique.md` vs `VIBEFLOW_CORE.md` (P3-P8) | **RÉSOLU** : `plugin/reference/content/methodology/vocabulary/lexique.md:18-27` reprend les intitulés du Core v4.2 (P1-P9) |
+| `docs/reference/` doublon divergent | **RÉSOLU** : le dossier n'existe plus |
+| `validator/AGENT.md` à 249/250 lignes | **RÉSOLU** (Phase 40.1) : 250 lignes, avertissement dès 251, blocage au-delà de 300 |
+| Gate ADR-044 faux vert en invocation nue | **RÉSOLU** : `bash plugin/conductor/scripts/check-agents.sh` rend « INDETERMINE … CIBLE-ABSENTE » (D-20), plus un vert à vide |
+| Verrou de driver déclaratif | **RÉSOLU** (Phase 32) ; résiduel inchangé : guard anti-accident, pas anti-adversaire (session non armée, terminal humain, client git tiers, `bash -c`) — `plugin/conductor/scripts/guard-driver-lock.sh` |
+| Fuite hors-lab par répertoire de compartiment en lien symbolique (T-24-14-C1) | **FERMÉE** (`workstream-policy.sh`, `test-workstream-symlink-escape.sh`) ; il reste le motif (voir Tech Debt) |
+| T-24-02-01 mitigation falsifiée | **TRANCHÉE** (réécriture, 2026-08-05) |
+| `24-03-SUMMARY.md` contredit `config.json` | **RÉSOLU** : le SUMMARY (archivé sous `.planning/milestones/agentique-v1.0-phases/`) nomme maintenant `windows_enforce` et `workflow_guard` comme posés |
+| Bug amont #2893 (`WINDOWS.md` réécrit en entier) | **RÉSOLU en amont** : le correctif de préservation de prose est présent dans `~/.claude/gsd-core/bin/lib/broken-windows.cjs` (gsd-core 1.15.0 installé au compte). Ne plus écrire « générée tant que ≤ 1.9.1 » ; garder le réflexe de committer `.planning/WINDOWS.md` avant toute commande `windows` |
+| `check-version-sync.sh` / `check-release-tag.sh` sans suite | **PARTIEL** : `scripts/tests/` existe (11 suites dont `test-check-release-tag.sh`, `test-check-baseline-arbitrage.sh`, `test-check-gate-touche.sh`) ; `scripts/check-version-sync.sh` et `scripts/bump.sh` n'ont toujours **aucune** suite dédiée |
+| Phase 13 « en suspens » | **RÉSOLU** : livrée le 2026-07-26 (`.planning/MILESTONES.md:67`) |
+| Milestone `gsd-migration` « EN ATTENTE » | **RÉSOLU** : clos le 2026-07-26 (`.planning/MILESTONES.md:71`) |
+| Backlog « Skill-installer global » à déclencheur consommé | **RÉSOLU** : clos NO-GO le 2026-09-15 (`.planning/BACKLOG.md:385`) |
+| Compteur « 37 suites » | **PÉRIMÉ** : 98 suites ; `scripts/check-version-sync.sh` gate ce compteur (README.md et README.fr.md, point « suites ») |
+| CI qui ne vérifie que le compartiment `fiabilite` | **PÉRIMÉ sur cette branche** : `.github/workflows/ci.yml:351-545` énumère les compartiments présents sur disque (`vf_ws_enumerate`) et traite `gouvernance` non initialisé sans le compter en écart |
 
 ## Tech Debt
 
-**`update` ne converge pas le contenu — pas de manifeste des chemins posés** — Sévérité : **HIGH**
-- Issue: `vibeflow-update.sh update` re-matérialise le contenu du module mais **ne supprime jamais**
-  les fichiers que la nouvelle version ne livre plus. Vécu terrain (update machine 2.23.0 → 2.36.0) :
-  les 12 verbes-façades de dev-orchestrator v1.x ont survécu dans `~/.claude/skills/` et ressuscité
-  le double catalogue tué par la bascule agentique v2.33.0 — nettoyage manuel.
-- Files: `plugin/_internal/vibeflow-update.sh` (fonction `install_module`, aucune écriture de
-  manifeste) ; capturé dans `.planning/BACKLOG.md:3-12`
-- Impact: chaque lab mis à jour peut garder des skills/scripts fantômes qui contredisent la version
-  courante (régression de doctrine silencieuse).
-- Fix approach: manifeste des chemins posés par module à l'install
-  (`.claude/scripts/.vibeflow-manifest-<module>`) ; `update` supprime les chemins de l'ancien
-  manifeste absents du nouveau (avec backup). Test : update d'un module dont une skill a disparu.
-
-**`merge-hooks.sh` — défaut d'idempotence cross-matcher, purge silencieuse** — Sévérité : **HIGH**
-- Issue: deux entrées `hooks.json` référençant le **même script** sous le **même événement**, même
-  avec des matchers différents, se purgent l'une l'autre à l'installation — seule la **dernière
-  traitée survit, sans erreur ni avertissement**. Découvert empiriquement pendant le plan 32-03
-  (D-32-05 amendé) : la forme prescrite à deux entrées (`Bash` puis `Write|Edit`) pour
-  `guard-driver-lock.sh` faisait disparaître l'entrée `Bash` du fragment installé, désarmant
-  silencieusement une moitié de la couverture d'un garde de sécurité.
-- Files: `plugin/_internal/merge-hooks.sh` (fonction de fusion des fragments) ;
-  `plugin/_internal/tests/test-merge-hooks.sh` (couverture existante insuffisante)
-- Impact: le script distribue les hooks de **tout le parc de modules** — un défaut ici désarme
-  silencieusement n'importe quel garde posé en deux entrées combinées sur un même script/événement,
-  pas seulement `guard-driver-lock.sh`. Aujourd'hui aucun autre module n'est exposé (les 6
-  `hooks.json` du dépôt ont été scannés au bilan de la Phase 32) — mais rien n'empêche un futur
-  garde de retomber dans le même piège sans le savoir, puisque le comportement est silencieux.
-- Contournement retenu en Phase 32, **pas une correction** : une seule entrée `PreToolUse` à
-  matcher combiné `"Bash|Write|Edit"` (fonctionnellement équivalente, le script dispatchant déjà sur
-  `tool_name` du payload). `merge-hooks.sh` lui-même n'a pas été touché — hors périmètre de fichiers
-  du plan 32-03.
-- Trou de couverture : `test-merge-hooks.sh` ne couvre que le scénario d'**upgrade en deux appels
-  séparés** (une version du fragment puis une autre) — jamais le **même-run** (deux entrées neuves
-  posées dans le même appel de merge, sous le même événement, pour le même script), qui est le
-  scénario qui a réellement mordu.
-- Fix approach: ajouter un cas de test même-run reproduisant le scénario mordant (deux entrées, même
-  script + même événement, un seul appel de merge) ; corriger la fusion pour additionner les
-  matchers d'un même script/événement au lieu de faire gagner le dernier traité. Non corrigé à ce
-  jour — arbitrage humain en cours.
-
-**Divergence de doctrine distribuée — lexique vs VIBEFLOW_CORE** — Sévérité : **HIGH**
-- Issue: les intitulés des principes P3–P8 divergent entre les deux documents canoniques livrés aux
-  labs. `lexique.md` : P3 Specialiser, P4 Orchestrer, P5 Verifier, P6 Iterer, P7 Transposer,
-  P8 Evaluer. `VIBEFLOW_CORE.md` v4.2 : P3 Orchestrer et executer, P4 Clarifier avant d'executer,
-  P5 Verifier en boucle, P6 Iterer par cycles courts, P7 Transposer pas copier, P8 Evaluer la
-  qualite cognitive. Toute référence « P4 » pointe donc sur deux principes différents selon la source.
-- Files: `plugin/reference/content/methodology/vocabulary/lexique.md:18-26` vs
-  `plugin/reference/content/methodology/VIBEFLOW_CORE.md:90-144`
-- Impact: agents et blueprints citent P-numéros (ex. `business-pilot-bundle` trace « EVAL-XXX (P8) ») —
-  le sens dépend du document lu. Signalée le 2026-07-26, **non arbitrée**.
-- Fix approach: arbitrer la numérotation canonique (CORE v4.2 probable), aligner `lexique.md`,
-  puis greper tous les `P[1-9]` du repo pour vérifier la cohérence.
-
-**`docs/reference/` doublon divergent de `plugin/reference/content/`** — Sévérité : **MEDIUM**
-- Issue: 4 fichiers diffèrent entre les deux arborescences : `README-CLIENT.md`, `VERSION.md`,
-  `methodology/patterns/README.md`, `methodology/vocabulary/lexique.md` (vérifié `diff -rq` le
-  2026-07-26).
-- Files: `docs/reference/` vs `plugin/reference/content/` ; flagué « poids mort » dans
-  `reports/audit/2026-07-25-audit-complet.md:73` et `:143` (item 7) — toujours non traité.
-- Impact: deux vérités pour la même doc méthodologique ; le module `reference` installe
-  `plugin/reference/content/`, `docs/` est la copie qui dérive.
-- Fix approach: supprimer `docs/reference/` ou le réduire à un pointeur vers le module ; sinon gate
-  d'identité dans la CI.
-
-**`validator/AGENT.md` à 249/250 lignes (plafond ADR-029)** — **RÉSOLU (Phase 40.1, PR #76)**
-- Issue d'origine: l'agent était à 1 ligne de l'ancien plafond ADR-029 (250 lignes, seuil unique et
-  bloquant). Tout ajout (nouveau contrôle Phase 4, nouvelle escalade) exigeait d'abord un
-  délestage vers `references/` ou une skill.
-- Ce qui a changé: la Phase 40.1 (arbitrages Samuel D-01/D-05, AskUserQuestion session principale,
-  2026-09-16) a révisé le plafond ADR-029 — avertissement non bloquant dès 251 lignes, blocage
-  seulement au-delà de 300 lignes (`plugin/conductor/scripts/check-instruction-budget.sh`, gate
-  machine-enforced). `plugin/validator/AGENT.md` fait aujourd'hui **250 lignes** (`wc -l` vérifié le
-  2026-09-17) : sous le seuil d'avertissement, avec 50 lignes de marge avant celui-ci et 50 de plus
-  avant le plafond bloquant. Le risque de refactoring forcé par le seul comptage de lignes est levé.
-- Fix approach résiduel: aucun impératif immédiat. Si le fichier approche à nouveau 251 lignes,
-  même remède qu'avant (délestage vers `plugin/validator/references/`) — le ratchet d'instructions
-  du même gate reste, lui, comparatif et peut se déclencher indépendamment du seuil de lignes.
-  Famille voisine, non couverte par cette révision (budget skills, pas agents) :
-  `plugin/skill-creator/skills/skill-creator/SKILL.md` à 485/500 lignes.
+**Aucune primitive partagée de confinement de chemin — le motif se répète à chaque site** — Sévérité : **HIGH**
+- Issue: le défaut « chemin dérivé d'une entrée non maîtrisée qui sort de son arbre » a été fermé site
+  par site : liens symboliques (Phase 23, `check-workstream-pointer.sh`, `build-gsd-capabilities-index.sh`,
+  répertoire de compartiment), résolution CWD non ancrée de `plugin/conductor/scripts/dag.sh` (ADR-070,
+  fermé), traversée par `name:` de frontmatter dans `plugin/_internal/runtime-adapter/register-codex-agent.sh`
+  (fermé, 16 cas verts dans `.../tests/test-register-codex-agent-path-traversal.sh`). Six implémentations
+  coexistent en trois langages : `[ -L ]` (`plugin/planning-core/scripts/workstream-policy.sh`), `vf_realpath`
+  node, `os.path.realpath` python (`plugin/conductor/scripts/guard-agent-write.sh`), `pwd -P`
+  (`plugin/conductor/scripts/check-branch-claim.sh`), `os.path.normpath`
+  (`plugin/consolidator/scripts/guard-read-registres.sh`), `O_NOFOLLOW` (`plugin/planning-core/scripts/planning-hook.sh`).
+  Les fonctions `vf_path_refuse_link` / `vf_path_confine` recommandées **n'existent toujours pas** (grep vide
+  dans `plugin/`, `scripts/`, `docs/`).
+- Impact: le prochain script qui lit un chemin dérivé d'une entrée le réinventera ou l'oubliera ; le contrôle
+  anti-duplication de `plugin/planning-core/scripts/tests/test-workstream-policy.sh` (C1/C2/C3) itère sur un roster
+  figé, aveugle aux nouveaux entrants.
+- Fix approach: deux fonctions partagées dans `plugin/planning-core/scripts/`, C1/C2 généralisés à
+  l'énumération de `plugin/*/scripts/*.sh` avec liste d'exemptions nommée, mutant obligatoire (modèle C3).
+  Surface voisine non couverte : le segment racine `.planning` en lien symbolique (théorique ici, `.planning`
+  est un vrai répertoire) — à fermer avec la primitive, pas avant.
 
 **Résolution des `requires[]` opt-in seulement** — Sévérité : **MEDIUM**
-- Issue: la fermeture transitive existe (`plugin/_internal/resolve-deps.sh`, câblée et testée) mais
-  uniquement via `install --with-deps <module>` (`vibeflow-update.sh:759-768`). Un
-  `install <module>` nu n'installe **ni ne signale** les `requires[]` manquants (0 occurrence de
-  `requires` dans l'engine). `uninstall` ne vérifie pas non plus les dépendances inverses : on peut
-  désinstaller `consolidator` alors que `validator` installé le requiert.
-- Files: `plugin/_internal/vibeflow-update.sh:755-771` (dispatch install), `:611` (`uninstall_module`) ;
-  `requires[]` déclarés dans `plugin/*/module.json` (ex. `plugin/validator/module.json`)
-- Impact: install partiel silencieux → module qui échoue au runtime ; désinstallation qui casse un
-  module resté en place.
-- Fix approach: au minimum un warning listant les `requires[]` non installés sur `install` nu ;
-  refus (ou `--force`) sur `uninstall` d'un module requis par un module installé.
+- Issue: la fermeture transitive n'existe que via `install --with-deps <module>`
+  (`plugin/_internal/vibeflow-update.sh:3193`). `install <module>` nu ne signale pas les `requires[]`
+  manquants (0 occurrence de `requires` dans l'engine), et `uninstall_module` (`:2858`) ne contrôle pas les
+  dépendances inverses.
+- Fix approach: avertissement sur `install` nu ; refus (ou `--force`) sur `uninstall` d'un module requis.
 
-**Backlog avec déclencheur consommé, non ré-arbitré** — Sévérité : **LOW**
-- Issue: l'item « Skill-installer global » avait pour déclencheur la clôture du milestone Install UX —
-  atteinte le 2026-06-05 ; l'item a dormi 7 semaines déclencheur consommé.
-- Files: `.planning/BACKLOG.md:36-38`
-- Impact: le backlog perd sa valeur de radar si les déclencheurs ne sont pas honorés.
-- Fix approach: ré-arbitrage explicite (reprendre / re-différer avec nouveau déclencheur / abandonner).
+**`.planning/WINDOWS.md` : `open_count: 3` — `/gsd-ship` est bloqué** — Sévérité : **MEDIUM**
+- Issue: le ledger (`.planning/WINDOWS.md`, `windows_enforce: true`) porte trois fenêtres ouvertes : #6
+  (`T4 [majuscules]` de `test-register-codex-agent-path-traversal.sh`, **déjà corrigé dans le code**, 0 ko
+  mesuré le 2026-10-02 : la ligne est à passer en `fixed`), #7 (`test-check-description-fidelity.sh` : PyYAML
+  absent de `python3` sur ce poste, problème d'environnement), #9 (écart CO-VERDICT de la Phase 41, accepté
+  et documenté, jamais soldé). La #3 (recette XcodeBuildMCP) reste `waived` : jamais jouée, à rejouer sur un
+  lab iOS équipé.
+- Fix approach: solder #6 par `gsd-tools windows fixed 6` (committer le fichier avant), trancher #7 (installer
+  PyYAML ou déroger nommément) et #9 (waive motivé) — sinon le ship du jalon est bloqué.
 
-**`.planning/WINDOWS.md` est un fichier purement généré tant que gsd-core ≤ 1.9.1** — Sévérité : **MEDIUM**
-- Issue: bug amont **#2893** — `gsd-tools windows append|waive|fixed` passent tous les trois par le
-  même `writeLedgerAtomic` → `renderLedger`, qui **réécrit le fichier intégralement** (frontmatter +
-  en-tête figé + table + miroir JSON, et rien d'autre) et rapporte `ok: true`. Toute prose libre
-  ajoutée sous le ledger serait détruite **sans avertissement**. La PR corrective **#2975** est
-  mergée mais **non publiée** : `dist-tags.latest` = `1.9.1` (2026-07-31), aucune version au-delà.
-- Files: `~/.claude/gsd-core/bin/lib/broken-windows.cjs` (version installée 1.9.1) ;
-  `.planning/WINDOWS.md` (87 lignes, aucune prose libre sous le ledger au 2026-08-04)
-- Impact: **nul en l'état** — c'est précisément ce qui a permis d'activer la zone 2 (ADR-066) : le
-  bug n'a rien à détruire sur ce fichier. Le risque n'apparaîtrait que si quelqu'un ajoutait de la
-  prose sous le ledger, ou éditait le fichier à la main.
-- Fix approach: **ne pas écrire à la main dans `.planning/WINDOWS.md`** et ne pas y ajouter de prose
-  sous le ledger ; **le committer avant toute commande `windows`** pour que tout dégât reste
-  récupérable (répéter d'abord sur une copie jetable via `--cwd` est bon marché et concluant).
-  Résolution définitive : monter `@opengsd/gsd-core` dès qu'une version strictement supérieure à
-  1.9.1 portant le correctif #2893 est publiée. **Cette montée ne gate aucun travail** — la zone 2
-  est activée, elle n'attend rien (ADR-066, § Note de veille).
+**Protection côté serveur : documents et mesure versionnée en retard sur la pose** — Sévérité : **LOW**
+- Issue: la section « Protection côté serveur … PAS ENCORE POSÉE » de `CLAUDE.md` et
+  `.planning/server-rulesets-measurement.json` (`ruleset_count: 0`, mesuré le 2026-09-23T14:26Z) décrivent
+  l'état d'avant la pose ; `.github/rulesets/main.json`, `.github/rulesets/tags-v.json` et `.github/CODEOWNERS`
+  sont la source versionnée.
+- Fix approach: re-mesurer par `scripts/measure-server-rulesets.sh` avant toute affirmation sur l'état réel,
+  puis réaligner `CLAUDE.md` (Doc, sans release : ADR-073).
 
-**Fenêtre #3 du ledger dérogée, pas résolue — la recette XcodeBuildMCP reste à faire ailleurs** — Sévérité : **LOW**
-- Issue: valider `test_sim`/`build_sim`/`clean` (tokens `vf-mcp-tools`) contre un serveur
-  XcodeBuildMCP **vivant** est impossible dans ce dépôt : aucun `.mcp.json`, aucun projet iOS, aucun
-  simulateur. La fenêtre a donc été **dérogée** (`waived`) le 2026-08-04, pas fermée.
-- Files: `.planning/WINDOWS.md` (entrée id 3, `status: waived`) ;
-  `plugin/dev-orchestrator/agents/vf-reviewer.md`
-- Impact: `open_count` = 0, donc `/gsd-ship` ne bloque plus — mais la recette humaine n'a **jamais
-  été jouée**. Ne pas lire cette dérogation comme une validation.
-- Fix approach: rejouer la recette sur un **lab iOS équipé** (projet Xcode + `.mcp.json` + simulateur),
-  puis reporter le constat ici. La dérogation se réexamine si `vibeflow-os` acquiert un projet iOS.
-
-**Aucune primitive partagée de confinement de chemin — le motif symlink en est à son 4ᵉ passage** — Sévérité : **HIGH**
-- Issue: le même défaut (un chemin dérivé d'une entrée non maîtrisée qui sort de son arbre par
-  lien symbolique) a été fermé **quatre fois, à quatre endroits, sans jamais l'être une fois pour
-  toutes** : deux scripts en Phase 23 ; `check-workstream-pointer.sh` (vague 1, refus `[ -L ]`) ;
-  `build-gsd-capabilities-index.sh` (vague 2, `vf_realpath` node + comparaison de préfixe) ; et
-  le répertoire de compartiment (découvert le 2026-08-04, **fermé le soir même** par `960055d` —
-  voir T-24-14-C1 ; le motif, lui, reste ouvert : il s'est fermé **là**, une 4ᵉ fois, sans primitive
-  partagée, et le segment RACINE reste non couvert — voir Security Considerations). Le
-  commentaire du 3ᵉ passage écrit lui-même « *C'est le troisième passage de ce motif dans ce
-  dépôt ; il se ferme ici* » (`build-gsd-capabilities-index.sh:166`) — il s'est fermé **là**, et
-  le motif est réapparu ailleurs. Trois causes mesurées :
-  **(1)** six implémentations du même besoin coexistent dans **trois langages** — `[ -L ]`
-  (`workstream-policy.sh:153`), `vf_realpath` node (`build-gsd-capabilities-index.sh:174-176`),
-  `os.path.realpath` python (`guard-agent-write.sh:78`), `pwd -P`
-  (`check-branch-claim.sh:128`), `os.path.normpath` (`guard-read-registres.sh:25`) ;
-  **(2)** la primitive existe déjà mais **déguisée en règle métier** — `vf_ws_read_pointer()`
-  (`workstream-policy.sh:149-171`) est une lecture sûre générique (ses 3 refus — lien
-  symbolique, fichier non régulier, taille — n'ont rien de spécifique au workstream) mais son
-  nommage (`VF_WS_RAW`, `VF_WS_REASON`) la rend invisible à qui résout un autre genre de chemin ;
-  **(3)** le contrôle anti-duplication existe déjà mais **sur un roster figé** —
-  `test-workstream-policy.sh` C1 (`:301-313`) / C2 (`:316-322`) / C3 (mutation, `:324+`) est
-  exactement la bonne forme, mais C1 itère sur **quatre chemins écrits en dur**. Un script neuf
-  n'appartient à aucun roster : il peut ré-inventer le confinement sans que rien ne s'en
-  aperçoive. **Le contrôle est aveugle aux nouveaux entrants, qui sont précisément la population
-  qui reproduit le motif.**
-- Files: `plugin/planning-core/scripts/workstream-policy.sh:149-171`,
-  `plugin/planning-core/scripts/tests/test-workstream-policy.sh:301-322`,
-  `plugin/dev-orchestrator/scripts/build-gsd-capabilities-index.sh:160-192`,
-  `plugin/conductor/scripts/guard-agent-write.sh:78`,
-  `plugin/conductor/scripts/check-branch-claim.sh:128`,
-  `plugin/consolidator/scripts/guard-read-registres.sh:25`
-- Impact: sur les 52 scripts hors tests de `plugin/*/scripts/`, **37** lisent un fichier à un
-  chemin porté par une variable et **29** ne portent aucun marqueur de confinement. Ce chiffre
-  est un **majorant de candidats à trier, pas un décompte de vulnérabilités** (beaucoup de ces
-  chemins dérivent de la racine du dépôt et ne sont pas pilotables). Il donne l'ordre de
-  grandeur de la surface. Tant que le contrôle reste par-script, un 5ᵉ passage est attendu.
-- Fix approach: **(a)** primitive partagée dans `plugin/planning-core/scripts/` (le précédent est
-  là : la politique de workstream y vit et est sourcée par 4 scripts de 3 modules, et sa
-  fermeture de dépendances est réduite à elle-même) — **deux** fonctions, car le motif a deux
-  moitiés que les quatre passages confondent : `vf_path_refuse_link` (refuser de suivre — cas
-  pointeur) et `vf_path_confine <candidat> <ancre>` (chemin réel sous ancre réelle — cas registre
-  et cas compartiment) ; **(b)** généraliser C1/C2 du roster figé à l'**énumération** de
-  `plugin/*/scripts/*.sh`, chaque script lisant un chemin dérivé d'une entrée devant soit sourcer
-  la primitive, soit figurer dans une liste d'exemptions **nommée et motivée** ; **(c)** cas de
-  **mutation obligatoire** sur le modèle de C3 — un script neuf non confiné ajouté au corpus doit
-  faire rougir la suite, sans quoi la garde n'est qu'une assertion d'*existence* (« la primitive
-  existe quelque part ») qui reste verte pendant que la *relation* se rompt.
-- Update 2026-08-06 — **prédiction vérifiée, sur un site neuf, hors du sous-motif symlink** : le 5ᵉ
-  passage annoncé ci-dessus s'est produit dans `plugin/conductor/scripts/dag.sh:124`
-  (`resolve_gsd_tools_cmd()`), trouvé par l'audit de la Phase 27 — RCE reproduite par PoC (candidat
-  de résolution **relatif au CWD**, exécuté via `node` sans ancrage, sans symlink ni `PATH`
-  compromis). C'est un **mécanisme distinct** du sous-motif « suivi de lien symbolique » que
-  comptent les quatre passages ci-dessus : même famille (chemin dérivé d'une entrée non maîtrisée,
-  jamais confiné avant usage), vecteur différent (résolution CWD non ancrée, pas traversée de
-  lien) — les deux comptages ne se fusionnent pas. Le registre de menaces du plan (`T-27-01-04`)
-  couvrait le spoofing de résolution **uniquement via `PATH`**, jamais via CWD : la règle de méthode
-  que l'audit en tire (bornage explicite du vecteur qu'une disposition `accept` couvre) vit dans
-  `docs/ADR.md` §ADR-070. Correctif du site (retirer ou ancrer le candidat CWD) : **arbitrage humain
-  gelé**, `.planning/REQUIREMENTS.md` PAEX-11 — non traité ici.
-- Clôture 2026-08-06 : l'arbitrage ci-dessus est **tranché (retrait) et exécuté** — `dag.sh`
-  (`4a532ec`) et `mission-contracts.md` (`08ad030`). La prédiction de cette entrée s'est vérifiée
-  et le site est fermé ; voir `docs/ADR.md` §ADR-070 pour le détail.
-
-**`hooks.workflow_guard` se déclenche sur des fichiers HORS du dépôt** — Sévérité : **LOW**
-- Issue: la capacité a été activée par la Phase 24 (ADR-066) et se comporte comme annoncé sur le
-  dépôt — mais son périmètre ne s'arrête pas à l'arbre du projet. Constaté **de première main le
-  2026-08-05**, pendant le mandat de correction ciblée : l'écriture d'un script de travail dans le
-  scratchpad de session (`/private/tmp/claude-501/…/scratchpad/`, **hors du dépôt**) a déclenché
-  l'avis « cette édition ne sera pas tracée dans STATE.md ». Même signalement rapporté sur une
-  écriture dans `~/.claude/projects/…`, sans rapport avec le projet. L'avis est donc **juste sur sa
-  lettre** (aucun `/gsd-*` n'était en cours) et **hors sujet sur son objet** : ces fichiers n'ont
-  aucune vocation à être tracés dans le `STATE.md` d'un projet.
-- Files: capacité amont `workflow_guard` du moteur GSD (`~/.claude/gsd-core/hooks/gsd-workflow-guard.sh`
-  dans l'installation de référence) ; activée par `.planning/config.json` (`hooks.workflow_guard: true`)
-- Impact: **non bloquant** — le hook est advisory (ADR-031 tenu), il n'a jamais empêché une écriture.
-  Le coût est du **bruit** : sur un mandat qui écrit hors du dépôt (scratchpad, fixtures jetables), un
-  avis identique se répète à chaque écriture et devient un signal qu'on apprend à ignorer. C'est le
-  chemin classique par lequel une garde advisory se désarme sans que personne ne la débranche.
-  **La prochaine phase doit savoir d'où vient ce bruit** avant de conclure à un défaut du projet.
-- Fix approach: (a) mesurer d'abord la règle de périmètre réelle du hook amont sur l'installation
-  courante (est-il censé se borner à la racine du projet ?) ; (b) si le comportement est conforme
-  à l'amont, c'est une **remontée upstream**, pas un correctif local — ce dépôt câble la capacité,
-  il ne la fourche (Iron Law 2 révisée, ADR-069) ; (c) ne PAS désactiver le toggle pour faire taire
-  le bruit : ce serait perdre la garde sur le dépôt, qui, elle, fonctionne.
+**`hooks.workflow_guard` se déclenche hors du dépôt** — Sévérité : **LOW**
+- Issue: l'avis « édition non tracée dans STATE.md » du hook amont `gsd-workflow-guard.sh` s'émet aussi pour
+  des écritures hors du dépôt (scratchpad de session, dossier de projets du compte). Advisory, jamais bloquant.
+- Fix approach: remonter en amont (ADR-069, Iron Law 2 révisée) ; ne pas désactiver `hooks.workflow_guard`
+  dans `.planning/config.json`.
 
 ## Known Bugs
 
-Aucun bug ouvert confirmé sur disque au 2026-07-26. Les comportements gênants connus (survie de
-fichiers à l'update, faux positifs check-agents hors baseline) sont des limites de conception
-capturées au backlog — voir Tech Debt.
+Aucun bug ouvert confirmé sur disque au 2026-10-02. Les comportements gênants connus sont des limites de
+conception : voir « Limites déclarées de la Phase 45 » et Tech Debt.
 
 ## Security Considerations
 
-**Codex importe de lui-même une 5e racine de skills, non choisie par l'utilisateur** — Sévérité : **MEDIUM**
-- Risk: Codex télécharge de lui-même un cache de skills distant
-  (`plugins/cache/openai-curated-remote`) qui apparaît comme une **5e racine de skills** au fil des
-  sessions. Un lab sous Codex hérite donc de skills que l'utilisateur n'a ni posées ni choisies —
-  VibeFlow ne les liste ni ne les contrôle. Mesuré pendant la Phase 38 (multi-runtime) ; l'audit de
-  clôture a constaté que le fait n'était consigné dans **aucun document livré**, seulement dans les
-  notes internes de la phase.
-- Files: comportement du binaire `codex` (hors dépôt) ; déclaré côté gate en constante
-  `REMOTE_SKILLS_CACHE` dans `plugin/conductor/scripts/check-artifact-fidelity.sh`
-  (`compute_fidelity_recette`/`print_fidelity_recette`, champ `remote_skills_cache` de la ligne
-  `[fidelity-recette]`, aux deux points d'observation — install `--target codex` et status
-  `--coexistence-report`).
-- Current mitigation: déclaration seule (pas d'enforcement) — même doctrine que
-  `role_confinement`/`multi_agent_v2`/`trust_level` sur la même ligne : un opérateur qui lit la
-  recette voit le fait, VibeFlow ne le désarme pas.
-- Recommendations: si un contrôle de contenu de skills devient nécessaire un jour (allowlist,
-  revue), le cache distant est un site à couvrir explicitement — hors périmètre de cette phase.
+**Candidat RCE par `git worktree` hostile — RÉDUIT, PAS FERMÉ (`pre-push` et `post-merge`)** — Sévérité : **MEDIUM**
+- Risk: sous `core.hooksPath scripts/hooks` en chemin **relatif** (convention documentée), git charge le hook
+  lui-même depuis le worktree courant : un worktree hostile fournit son propre `pre-push`/`post-merge` et le
+  gate est contourné, quel que soit le contenu du hook légitime.
+- Files: `scripts/hooks/pre-push`, `scripts/hooks/post-merge` (le script **appelé** est résolu par
+  `git rev-parse --git-common-dir`, ligne 21 et ligne 29 : fermé ; le hook lui-même : ouvert).
+- Current mitigation: ancrage `--git-common-dir` du script appelé, prouvé par exécution réelle.
+- Recommendations: **ne pas basculer `core.hooksPath` en absolu** — mesuré : l'absolu ferme le vecteur worktree
+  mais le geste d'armement est piégé (épingle le dépôt entier sur un worktree hostile), il meurt en silence au
+  déplacement du dépôt, et ne couvre pas un dépôt principal basculé sur la branche hostile. Le relatif échoue
+  bruyamment ; entre les deux, préférer l'échec qui se voit. Tout futur hook qui résout un script tiers :
+  `--git-common-dir`, jamais `--show-toplevel` ni `dirname "$0"`.
+
+**Codex importe de lui-même une 5ᵉ racine de skills** — Sévérité : **MEDIUM**
+- Risk: `plugins/cache/openai-curated-remote` est téléchargé par le binaire `codex`, hors contrôle VibeFlow.
+- Files: constante `REMOTE_SKILLS_CACHE` de `plugin/conductor/scripts/check-artifact-fidelity.sh:97`
+  (ligne `[fidelity-recette]`).
+- Current mitigation: déclaration seule, pas d'enforcement. Recommendations : allowlist/revue de contenu si un
+  jour nécessaire.
 
 **Nom de module non assaini dans l'engine** — Sévérité : **LOW**
-- Risk: `install_module` valide seulement `[ -d "$CACHE_DIR/$mod" ]` — un nom contenant `../`
-  résoudrait hors cache. Exposition faible : l'appelant prod est le skill `/vibeflow-install` qui
-  passe des noms issus du catalogue, et le cache est local.
-- Files: `plugin/_internal/vibeflow-update.sh` (`install_module`, garde `-d` uniquement)
-- Current mitigation: `err` si le dossier n'existe pas ; noms fournis par le catalogue en prod.
-- Recommendations: rejeter tout nom contenant `/`, `..` ou espace au parsing des positionnels.
+- Risk: `install_module` (`plugin/_internal/vibeflow-update.sh:2216`) ne valide que `[ -d "$CACHE_DIR/$mod" ]`
+  (`:2221`) ; un nom en `../` résoudrait hors cache. Appelant prod : `/vibeflow-install`, noms issus du catalogue.
+- Recommendations: rejeter `/`, `..` et espace au parsing des positionnels.
 
 **Pas de filtrage de secrets dans la copie d'install** — Sévérité : **LOW**
-- Risk: l'engine copie des arborescences de modules vers `.claude/` sans filtre de motifs
-  (`.env*`, clés). Exposition faible car la source est le cache du plugin packagé, pas le lab.
-- Files: `plugin/_internal/vibeflow-update.sh` (copies `cp` dans `install_module`)
-- Current mitigation: source contrôlée (cache = contenu du repo publié).
-- Recommendations: garde ceinture-bretelles excluant `*.env*` / `*secret*` des copies.
+- Risk: copies `cp` de `install_module` sans filtre `*.env*`/`*secret*` ; source = cache du plugin publié.
 
-**Candidat RCE par `git worktree` hostile — RÉDUIT, PAS FERMÉ (`pre-push` ET `post-merge`)** — Sévérité : **MEDIUM** — **RÉDUIT le 2026-09-10, résiduel OUVERT constaté le 2026-09-14**
-- Risk: un hook git qui résout le script qu'il exécute via `git rev-parse --show-toplevel` fait
-  résoudre ce chemin sur l'arbre du **worktree courant** — un `git worktree add` sur une branche
-  hostile peut donc faire exécuter au hook une copie du script entièrement contrôlée par
-  l'attaquant. Une dette de sécurité qui n'existe que dans la mémoire d'un agent n'est pas une
-  dette suivie, c'est une dette oubliée avec un délai : ce constat était noté côté mémoire d'agent
-  seulement (`.claude/agent-memory/vf-coder/project_pre-push-candidat-rce-non-corrige.md`), jamais
-  ici.
-- **Ce qui EST fermé** — le script APPELÉ par le hook ne peut plus venir d'un arbre hostile,
-  prouvé par exécution réelle sur les deux hooks :
-  - `scripts/hooks/post-merge` : résout `plugin/conductor/scripts/check-divergence.sh` via
-    `git rev-parse --git-common-dir` (ancré sur le dépôt principal, stable à travers
-    `git worktree add`), plus jamais via `--show-toplevel`. Prouvé : une copie malveillante de
-    `check-divergence.sh` posée dans un worktree hostile ne s'exécute plus au merge — seule la
-    copie du dépôt principal s'exécute.
-  - `scripts/hooks/pre-push` : résout `scripts/check-release-tag.sh` via `main_root="$(cd "$(git
-    rev-parse --git-common-dir)/.." && pwd)"`, plus jamais via `root="$(git rev-parse
-    --show-toplevel)"`. Prouvé (dépôt jetable + remote bare local) : avant correctif, une copie
-    malveillante de `check-release-tag.sh` posée dans le worktree hostile crée un fichier témoin
-    au `git push` ; après correctif, seule la copie du dépôt principal s'exécute (aucun témoin).
-  - Le raisonnement retenu pour ce périmètre : hériter une dette cataloguée et l'écrire
-    volontairement dans du code neuf ne sont pas le même geste — le vecteur est connu au moment où
-    la ligne s'écrit.
-- **Ce qui reste OUVERT — le hook lui-même, sous `core.hooksPath` relatif** : la mitigation
-  ci-dessus protège le script que le hook *appelle*, pas le hook. Or sous `core.hooksPath
-  scripts/hooks` — la convention **documentée de ce dépôt**, en chemin **relatif** — git résout
-  aussi le **hook lui-même** depuis le worktree courant, pas depuis le dépôt principal. Dériver
-  l'exécutable depuis l'emplacement du hook (`dirname "$0"`) ne suffit donc pas non plus : le
-  chemin du hook est déjà celui du worktree hostile avant même que son contenu ne s'exécute.
-  **Scénario résiduel démontré par un juge** (vrai `push` et vrai `merge`, pas une lecture de
-  code) : un worktree hostile fournit son propre `pre-push` ou `post-merge` — n'importe quel
-  contenu, y compris un hook qui ne fait rien — et c'est **ce hook-là** qui s'exécute au lieu de
-  celui du dépôt principal. Le gate est donc **entièrement contourné**, quel que soit le contenu
-  du hook légitime : push accepté sans tag de release, témoin créé confirmant l'exécution du hook
-  hostile plutôt que celui du dépôt. Seul `--git-common-dir` (déjà utilisé pour résoudre le script
-  appelé) échappe à ce biais, mais il ne protège que la résolution *interne au corps du hook* — il
-  n'a aucune prise sur *quel fichier hook* git choisit d'exécuter en premier lieu.
-  **Motif de la décision, à retenir tel quel : une entrée de sécurité qui surpromet est pire
-  qu'une entrée qui manque — elle éteint la vigilance.**
-- Files: `scripts/hooks/pre-push` (script appelé fermé, hook lui-même ouvert),
-  `scripts/hooks/post-merge` (idem) ;
-  `.planning/phases/VFDO-39-workstreams-partition-du-planning-et-collaboration-concurren/39-01-PLAN.md`
-  (registre STRIDE, T-39-01)
-- Current mitigation: les deux hooks résolvent l'exécutable **qu'ils appellent** via
-  `--git-common-dir` — voir le détail par hook ci-dessus. Aucune mitigation ne couvre encore la
-  résolution du **hook lui-même** sous `core.hooksPath` relatif.
-- Recommendations: si un futur hook de ce dépôt résout un script tiers à exécuter, appliquer le
-  même patron dès l'écriture (`--git-common-dir`, jamais `--show-toplevel` ni `dirname "$0"`) — le
-  vecteur est désormais documenté, pas seulement connu. Le résiduel (résolution du hook lui-même)
-  n'est PAS traité ici : un chemin **absolu** pour `core.hooksPath` fermerait potentiellement ce
-  vecteur, mais changer la convention d'armement documentée de ce dépôt est une décision humaine,
-  pas un correctif de routine — hors périmètre de cette entrée.
+**`vf-internal` perdu sur kimi, `kimi doctor` vert à vide** — voir Fragile Areas.
 
-**Le verrou de driver est déclaratif, pas contraignant** — Sévérité : **HIGH** — **RÉSOLU le 2026-08-17 (Phase 32)**
-- Risk (état au constat, 2026-07-27) : `driver-lock.sh` n'empêchait techniquement rien : aucun hook ni
-  garde en écriture ne refusait un commit à une session sans verrou. Constaté le 2026-07-27 : le lock
-  de `mission-phase16` a été élagué par TTL, `mission-phase17` l'a acquis, et la Phase 16 a **continué
-  à commiter** pendant que la Phase 17 tenait le verrou — horodatages entrelacés 22:37 P16 · 22:38 P17 ·
-  22:42 P16 · 22:46 P16 · 22:48 P17 · 22:50 P16. Conséquence concrète : collision de version, la
-  Phase 17 ayant planifié le `v2.5.0` que la Phase 16 venait de prendre (résolu en `v2.6.0`, commit
-  `5a8b6a8`). Deux drivers concurrents sur le même `.planning/` pouvaient écraser silencieusement les
-  arbitrages l'un de l'autre.
-- Files: `plugin/conductor/scripts/driver-lock.sh`, `plugin/conductor/scripts/guard-driver-lock.sh`,
-  `plugin/conductor/scripts/check-guard-health.sh`
-- Fermeture (Phase 32, `.planning/phases/VFDO-32-durcissement-du-driver-lock/32-RELIQUATS.md`) :
-  `acquire` refuse désormais un lock périmé (`stale-requires-takeover`, jamais de récupération
-  implicite) ; guard `PreToolUse(Bash|Write|Edit)` distribué via `merge-hooks`, qui refuse un commit
-  ou une écriture `.planning/` sous le lock d'autrui, armé et vérifié en lab jetable ; le
-  contournement réel de 2026-07-27 a été rejoué comme cas de test et rougit sans le guard. 64 suites
-  / 0 échec, `conductor` v1.26.0.
-- **Ce qui reste vrai — le guard est anti-accident, pas anti-adversaire** (`32-RELIQUATS.md` §6.2) :
-  restent structurellement hors de sa portée une session **non armée**, un **terminal humain** direct
-  hors Claude Code, un **IDE ou client git tiers**, un **processus en arrière-plan**, un appel **MCP**,
-  une **autre machine**, et `bash -c`/`eval` (passoires du matching par sous-chaîne de commande, nommées
-  explicitement). Une entrée qui se déclarerait entièrement close mentirait — catégorie C non traitée,
-  hors du périmètre livré.
-- Recommendations (résiduel) : si la catégorie C devient un risque mesuré (pas seulement théorique),
-  ré-ouvrir sur un mécanisme distinct (ex. hook git natif côté dépôt, hors du seul chemin Claude Code).
+## Limites déclarées de la Phase 45 (hook central et gates d'écriture)
 
-**Le gate ADR-044 est un faux vert dans son invocation nue** — Sévérité : **MEDIUM**
-- Risk: `bash plugin/conductor/scripts/check-agents.sh` **sans argument** sort **exit 0** avec
-  « aucun agent dans .claude/agents — rien a verifier », car `.claude/agents` est absent de ce repo.
-  Or c'est cette invocation que prescrivent les critères d'acceptation (spec Phase 17 §7.6) — elle ne
-  prouve RIEN. De plus, `plugin/dev-orchestrator/AGENT.md` (`name: vibeflow-dev`) est à la racine du
-  module, donc hors de la boucle CI sur `plugin/*/agents` : il n'est atteint que par
-  `check-agents.sh --file`. Invocation réelle qui prouve quelque chose :
-  `bash plugin/conductor/scripts/check-agents.sh --file plugin/dev-orchestrator/AGENT.md` (exit 0,
-  3 warnings préexistants : name ≠ nom de fichier, aucun skill câblé, `tools:` absent). Tout critère
-  d'acceptation futur rédigé sur l'invocation nue est satisfait à la lettre et vide sur le fond.
-- Files: `plugin/conductor/scripts/check-agents.sh`, `.github/workflows/ci.yml`
-- Current mitigation: aucune — constaté le 2026-07-27, non corrigé (hors mandat de clôture Phase 17).
-- Recommendations: toute future spec/critère d'acceptation qui cite `check-agents.sh` sans argument
-  sur ce repo doit être remplacée par l'invocation `--file` explicite du (des) `AGENT.md` racine de
-  module ; ou faire pointer l'invocation nue sur les emplacements réels des `AGENT.md` du repo plutôt
-  que sur `.claude/agents` (répertoire d'un lab qui a *installé* le plugin, pas de ce repo lui-même).
+Source : `plugin/planning-core/references/modele-cycles.md`, section « Hook central et gates d'écriture
+(Phase 45) » (lettres (a) à (ae), tenues alignées avec le code par R-REFERENCE dans
+`plugin/planning-core/scripts/tests/test-planning-gates.sh`). Code : `plugin/planning-core/scripts/planning-hook.sh`
+(lanceur bash, cœur Python), commande enregistrée dans `plugin/planning-core/hooks/hooks.json`.
+**Gates : G1, G5, G6, G7 et ROLE sont `armed` (constantes `ARMEMENT_*` de `planning-hook.sh:102-106`) ; G2 est
+`avertit` (`G2_MODE`), il ne refuse jamais.** Le hook n'agit que dans un lab dont `.planning/config.json`
+déclare `planning_version: cycles-v1` : ce dépôt (lab dev) n'est jamais refusé.
 
-**Fuite hors-lab par répertoire de compartiment en lien symbolique (T-24-14-C1)** — Sévérité : **HIGH** — **FERMÉE le 2026-08-04**
-- Risk: le nom de workstream est validé et le pointeur-*fichier* refuse les liens symboliques
-  (`plugin/planning-core/scripts/workstream-policy.sh:153-156`), mais **rien ne contraint le
-  répertoire de compartiment lui-même**. Avec `.planning/workstreams/<nom>` posé en lien
-  symbolique vers un répertoire hors du lab, `[ -d ]` le suit et
-  `plugin/planning-core/scripts/planning-context.sh:168` injecte le `STATE.md` de la cible
-  **verbatim dans le contexte de session**. **Reproduit** le 2026-08-04 sur fixture jetable : à
-  exit 0, une ligne sentinelle lue hors de l'arbre du lab apparaît dans la sortie du hook.
-  Préconditions identiques à celles du trou pointeur que la Phase 24 a jugé réel et fermé : une
-  entrée mode 120000 committée sous `.planning/`, puis n'importe quelle ouverture de session.
-- Files: `plugin/planning-core/scripts/planning-context.sh:168`,
-  `plugin/dev-orchestrator/scripts/check-dev-bootstrap.sh:286` (portée réduite à 3 valeurs
-  ≤ 80 caractères par la liste blanche), `plugin/conductor/scripts/check-state-integrity.sh:145`
-- Current mitigation: **fermée le 2026-08-04** (correctif `960055d`, preuve `a64df96`). Les deux
-  segments du compartiment et les fichiers qu'on y lit passent par `vf_ws_dir_resolve` /
-  `vf_ws_file_in_ws` (`plugin/planning-core/scripts/workstream-policy.sh`), qui **refusent de
-  traverser** au lieu de tenter de décider si la cible est « dans le lab » — un tel test se réécrit
-  avec `..`, dépend d'un `readlink -f` absent de macOS et ne survit pas à un remontage. La cible
-  n'est jamais lue ni nommée ; seule la raison sort, d'une énumération fermée. Gradation par rôle :
-  vérification → exit 2, injecteurs → repli sur la racine **plus** une ligne qui nomme le refus.
-  Fermeture prouvée **par mutation sur les quatre gates à la fois**
-  (`plugin/planning-core/scripts/tests/test-workstream-symlink-escape.sh`). Registre C de
-  `.planning/phases/VFDO-24-*/24-SECURITY.md` : statut `closed`.
-- Recommendations: **rien de plus sur ce vecteur.** Ce qui reste ouvert n'est pas cette menace mais
-  le **motif** : c'est son 4ᵉ passage, refermé une 4ᵉ fois localement — voir Tech Debt (primitive
-  partagée de confinement) — et le **segment racine** reste hors couverture, voir l'entrée
-  « `.planning` lui-même en lien symbolique » plus bas.
+Les lettres ci-dessous sont des renvois, pas des citations : relire la lettre dans la référence avant d'agir.
 
-**T-24-02-01 — mitigation falsifiée, en attente d'un arbitrage humain** — Sévérité : **HIGH** — **TRANCHÉE le 2026-08-05**
-- Risk: le modèle de menaces du plan 24-02 mitigeait le risque `gsd-tools windows *` par
-  **abstinence** (« aucune tâche ne les invoque ») plus une interdiction écrite. Les deux moitiés
-  sont tombées : ADR-066 ne porte aucune formulation d'interdiction et **acte** l'exécution
-  (`docs/ADR.md:1597`), et la commande **a été invoquée** (commit `7b96e34`,
-  `.planning/WINDOWS.md:3-4`, entrée id 3 `"status": "waived"`). Le dégel était une décision
-  humaine légitime — mais le registre de menaces n'a jamais été révisé en conséquence, et aucune
-  entrée n'existe au journal des risques acceptés.
-- Files: `docs/ADR.md:1565-1651` (ADR-066), `.planning/WINDOWS.md`,
-  `.planning/phases/VFDO-24-*/24-SECURITY.md` (registre A)
-- Current mitigation: contrôles compensatoires réels mais non déclarés comme la mitigation —
-  répétition préalable sur copie jetable via `--cwd` (`docs/ADR.md:1609-1611`), post-conditions
-  vérifiées (`:1611-1615`), risque résiduel acté (`:1633-1639`), et **aucun script du dépôt
-  n'invoque ces commandes** (balayage `.sh`/`.md`/`.json`/`.yml` : prose uniquement).
-- Recommendations: **soldé le 2026-08-05 — Samuel a tranché pour la RÉÉCRITURE de la mitigation ;
-  la re-disposition en `accept` avec entrée nominative est écartée.** La mitigation n'avait pas été
-  violée : elle a été **rendue caduque par ADR-066**, décision d'un niveau supérieur et postérieure
-  à sa rédaction. Elle décrit désormais les quatre contrôles qui ont réellement protégé l'opération
-  (répétition sur copie jetable via `--cwd` ; `WINDOWS.md` commité et propre à `d89a60e`, `waive`
-  borné à 1 fichier / 7+ / 7− en `7b96e34` ; intégrité constatée après — 87 lignes avant/après, 1
-  fence JSON, 4 entrées `fixed` intactes, `fixed_count` et `total_count` inchangés ; résiduel nommé
-  et opposable). Formulation d'origine **conservée en trace** dans `24-02-PLAN.md`, à la forme de la
-  trace de révision de l'Iron Law 2. **Le journal des risques acceptés n'a reçu aucune entrée** :
-  la menace est mitigée, pas acceptée, et aucune signature humaine n'est empruntée. `threats_open`
-  passe de 1 à **0** — recalculé par extracteur `awk`, contre-épreuve jouée.
+| Lettre | Thème | Nature du risque |
+|---|---|---|
+| (y) | Réglages `.claude/settings*.json` non protégés ; scripts du hook protégés par G6 en scope projet seulement ; deux silences par lien préexistant et par dossier de session ≠ parent de `.planning` | **Désarmement par outil** : un `Write` qui retire le hook des réglages éteint tous les gates. Scope compte (`~/.claude/scripts/`) non gardé |
+| (o) | Définition d'une racine de lab : `.planning` sous un composant `.planning` ou `.claude` n'est pas une racine ; seule exception `.claude/worktrees/<nom>` ; divergence Unicode entre cœur Python (`casefold`, `planning-hook.sh:288-302`) et motif de la commande shell (`[Ww][Oo]…` dans `hooks.json`) | **Divergence cœur/shell** : en panne du cœur seulement, faux refus ou faux silence dans des poches au nom replié |
+| (z) | Faux refus fail-closed sous forte charge machine (échéance interne du cœur) | **Disponibilité** : écriture légitime refusée, à rejouer ; jamais un faux accept |
+| (s) | Échéance interne de 8 s du cœur (`ECHEANCE_COEUR_S = 8.0`, `CODE_ECHEANCE = 73`, `planning-hook.sh:94-96`) | Déni de service sur machine lente ; ferme sous adhésion |
+| (aa) | Couche shell : borne de 4096 caractères par valeur du payload ; cœur qui ne sort plus en code non nul sur chemin inanalysable | Silence résiduel conditionné à une panne du cœur ET à un lien préexistant |
+| (ab) | Chemin commençant par `~` : développement identique dans les deux couches, `~utilisateur` tranché dans le doute | Écart non mesuré de première main pour `Write` |
+| (ac) | Racine d'un dispatch `Agent`/`Task` dérivée de clés de chemin facultatives du payload | Précondition (le harnais transmet des clés inconnues) non établie |
+| (ad) | Poche `.claude/worktrees/<nom>` non adhérente créable par `Write` seul | Script d'un futur worktree lancé dedans non gardé |
+| (ae) | Seuls les outils du matcher sont vus : `MultiEdit`, outils d'écriture de serveurs MCP et tout outil hors matcher échappent | **Trou de couverture structurel** |
+| (g), (n) | `Bash` reste ouvert (P45-D-06b, P45-D-10) : désarmement de l'adhésion ou écriture d'un fichier gardé par `sed`/redirection | Contournement assumé, jamais promesse |
+| (a), (b), (c), (k), (m) | Écarts de lecture shell/Python de `config.json` (JSON non compact, ligne multiple, lien symbolique, virgule finale, échappements) | Silence en panne du cœur seulement ; (m) partiellement fermée par `MOTIF_ADHESION_REPLI` |
+| (d), (u), (e), (f), (h) | Échappements JSON non gérés, charge non JSON, `bash` absent, chemins relatifs joints au `cwd` | Fail-closed dans le doute ; (u) refuse parfois hors lab adhérent |
+| (i) | Scope projet : `$CLAUDE_PROJECT_DIR` choisit la copie du script exécutée | Copie périmée d'un autre worktree ; seul le canary la rend visible |
+| (j) | G1 laisse passer un `PLAN.md` quand `CADRAGE.md` est non régulier, invalide ou hérité | Contournement connu, T-45-55, renversable |
+| (l) | Allowlist d'un worker dans une définition d'agent que G6 ne protège pas | Un agent étend ce qu'il peut dispatcher |
+| (p), (q), (t), (v), (w) | Poche `.planning/` sans `config.json` ; dispatch sans `subagent_type` ; version de plugin déduite du nom de dossier ; `STATE.md` marqué généré puis édité ; `name:` YAML masqué | Bords d'index et de classification |
+| (r), (x) | Journal d'observation sans borne ni rotation ; rejeu non optimisé (25 000 fichiers > 300 s), lien `.planning` non suivi → MESURE-VIDE | Croissance disque ; volume |
 
-**`.planning` lui-même en lien symbolique — surface NON COUVERTE, pas exposition vivante** — Sévérité : **LOW**
-- Risk: le correctif `T-24-14-C1` contraint les **deux segments du compartiment**
-  (`<planning>/workstreams` puis `<planning>/workstreams/<nom>`) et les fichiers qu'on y lit. Il ne
-  contraint **pas le segment racine** : `<planning>` est fourni par `--path` ou par l'environnement, et
-  arrive dans `vf_ws_dir_resolve` **déjà résolu par l'appelant**. Un `.planning` versionné en mode
-  `120000`, ou une racine passée par `--path` qui en traverse un, rejouerait le **même vecteur un cran
-  plus haut** : `[ -d ]`/`[ -f ]` suivent le lien exactement de la même façon. Ce serait, en toutes
-  lettres, le **5ᵉ passage** du motif inventorié en Tech Debt.
-- Files: `plugin/planning-core/scripts/workstream-policy.sh` (`vf_ws_dir_resolve` : le paramètre
-  `<planning_dir>` n'est pas contrôlé, par construction), et les quatre appelants qui le lui
-  fournissent — `planning-context.sh`, `check-dev-bootstrap.sh`, `check-state-integrity.sh`,
-  `check-workstream-pointer.sh`
-- Impact: **THÉORIQUE DANS CE DÉPÔT, et la nuance est le fond de l'entrée.** Vérifié de première main
-  le 2026-08-05 : `.planning` est un **vrai répertoire** (`[ -L ]` faux, `[ -d ]` vrai), et
-  `.planning/workstreams` **n'existe pas** — ce dépôt n'est pas partitionné. Il n'y a donc **rien à
-  exploiter ici aujourd'hui** : c'est une **surface non couverte**, pas une fuite ouverte. L'inscrire
-  comme exposition vivante serait aussi faux que de la taire — et brouillerait la lecture du registre
-  de menaces, où une entrée `high` engage un blocage de ship.
-- Recommendations: ne PAS refermer cette surface en durcissant `vf_ws_dir_resolve` sur son propre
-  paramètre — la primitive ne peut pas savoir ce que son appelant a le droit de désigner, et un refus
-  y casserait les usages légitimes (`--path` vers une fixture, worktree). La fermeture appartient à la
-  **primitive partagée de confinement de chemin** déjà recommandée en Tech Debt (`vf_path_refuse_link`
-  / `vf_path_confine`), appliquée **au point où la racine est résolue**. À traiter avec elle, pas
-  avant : deux correctifs séparés sur le même motif, c'est ce qui a produit les quatre passages.
-
-
-#### Mesure du 2026-09-14 — pourquoi la convention reste en chemin RELATIF
-
-Le résiduel ci-dessus vient du fait que `core.hooksPath scripts/hooks` est **relatif** : git charge le
-hook lui-même depuis le worktree courant. La question « un chemin **absolu** fermerait-il le
-résiduel ? » a été **mesurée**, par exécution, quatre fois (deux hooks × deux formes de chemin), avec
-vrais `git push` et `git merge`. **Elle est tranchée : on reste en relatif.** Voici pourquoi, en
-détail — c'est le détail qui fait le garde-fou.
-
-1. **L'absolu FERME bien le vecteur worktree.** Sous relatif, le hook hostile s'exécute et le gate est
-   contourné (payload poussé sur `main` sans tag) ; sous absolu, le hook légitime s'exécute et bloque,
-   le hostile ne tire pas. Les témoins hostiles ont été **vérifiés capables de tirer** (déclenchés à la
-   main après coup) : leur silence était une attaque déjouée, pas un témoin cassé.
-2. **Mais le geste d'armement est PIÉGÉ.** Un chemin absolu n'étant pas écrivable littéralement dans
-   une instruction générique, la seule forme portable le dérive du dépôt courant. Or `core.hooksPath`
-   est **partagé par tous les worktrees** : lancée depuis un worktree hostile, la commande épingle le
-   **dépôt entier** sur cet arbre — le hook hostile s'exécute alors **même pour un push fait depuis le
-   dépôt principal**. Le vecteur est rouvert **en pire**.
-3. **Et il MEURT EN SILENCE.** Dépôt renommé ou déplacé, worktree supprimé : le chemin devient faux et
-   git ne dit **rien**. Mesuré : push vers `main` sans tag → accepté, exit 0, sortie vide, aucune
-   mention de « hook », tous les témoins muets. **Une garde qu'on croit active et qui ne l'est plus.**
-4. **Il ne ferme pas tout.** L'absolu vise l'arbre de travail principal : si le dépôt **principal** est
-   lui-même basculé sur la branche hostile, le hook hostile s'exécute quand même.
-
-> **Le relatif échoue bruyamment et sous deux préconditions délibérées (worktree hostile ET hook armé
-> volontairement) ; l'absolu échoue silencieusement et tout seul. Entre les deux, on préfère l'échec
-> qui se voit.**
-
-**Ne « répare » pas ce résiduel en basculant sur un chemin absolu** : ce serait installer un
-désarmement silencieux **en croyant durcir la sécurité** — le motif même que la Phase 39 a combattu
-(un mécanisme qui a l'air correct et ne peut pas rendre rouge), déplacé d'un cran, dans le correctif
-censé le fermer.
+Autres résidus déclarés, hors lettre : G7 « habité » borné à 20 000 fichiers (`BORNE_PARCOURS_HABITE`) et faux
+agent + mémoire qui passe G7 (T-45-61) ; recherche de lien dur de G5 bornée à 20 000 fichiers
+(`BORNE_PARCOURS_VERDICTS`) ; `--juge` de `poser-verdict.sh` et `--qui` de `deroger-gate.sh` purement
+déclaratifs (T-45-34) ; recalcul : TOCTOU garde/détecteur, `vf_ws_enumerate` ≈ 98 s à 3000 compartiments contre
+`timeout=30` de `plugin/planning-core/scripts/recalc-planning.sh:446,666` (refus fail-closed), `CANDIDATS_BASH`
+(`/bin/bash`, `/usr/bin/bash`, `recalc-planning.sh:88`) qui interdit toute écriture sur un système sans bash à
+ces chemins.
 
 ## Performance Bottlenecks
 
-Rien de bloquant identifié à l'échelle actuelle (registres de labs de quelques centaines
-d'entrées ; scripts bash + python3 stdlib). Les anciens points (O(n²) de
-`plugin/consolidator/scripts/detect-duplicates.sh`, chargement mémoire de `reindex.sh`) restent
-vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas prioriser.
+Rien de bloquant à l'échelle actuelle. Deux points à surveiller : le cœur du hook (`planning-hook.sh`, 2012
+lignes) sous charge — voir limites (s), (z) — et `vf_ws_enumerate` à très grand nombre de compartiments. Les
+O(n²) de `plugin/consolidator/scripts/detect-duplicates.sh` restent sans impact observé (LOW).
 
 ## Fragile Areas
 
-**`kimi doctor` est un VERT À VIDE sur les agents — il ne les regarde pas** — Sévérité : **HIGH**
-- Files: toute recette d'install/vérification ciblant kimi-code ; constat en
-  `.planning/phases/VFDO-38-*/38-MESURE-KIMI.md` (artefact `71-doctor-populated.txt`)
-- Why fragile: mesuré le 2026-08-30 — sur un banc peuplé de **11 agents cassés sur 31**, `kimi
-  doctor` rend **« All checked config files are valid »**. Il valide les fichiers de configuration
-  et **jamais les agents**. Le seul signal est un WARN dans `<KIMI_CODE_HOME>/logs/kimi-code.log`,
-  lui-même **tronqué nativement à 233 octets** (vérifié à l'`od -c` : la raison du rejet est coupée)
-  et **plafonné à 5 lignes** (« Suppressed 6 further agent-discovery skip warnings »). Une recette
-  qui conclurait « install saine » sur `doctor` déclarerait vert un lab dont un tiers des rôles ne
-  charge pas — et les managers, eux, chargeraient et **dispatcheraient dans le vide**.
-- Safe modification: **toute recette d'install kimi vérifie par `kimi --agent-file <chemin>`, fichier
-  par fichier — jamais par `doctor`, jamais par le log.** `--agent-file` rend le message d'erreur
-  **complet** et échoue **avant** tout appel de modèle (donc à coût nul). L'écrire dans la recette
-  elle-même, pas seulement ici : une consigne qui ne vit que dans CONCERNS ne protège personne.
-- Test coverage: le gate double-parseur posé en Phase 38 couvre la **forme** du frontmatter ; il ne
-  remplace pas la vérification `--agent-file` sur cible kimi réelle.
+**Borne d'horloge de 3 s de R-N1-01 : test sensible à la charge** — Sévérité : **MEDIUM**
+- Files: `plugin/planning-core/scripts/tests/test-planning-gates.sh:4538-4556` (`duree >= 3.0` sur dix frères de
+  1 Mo) ; mêmes familles d'assertions murales à `:2828` (R-G2-PERF, `dt < 3.0`), `:4060` (`duree >= 2.0`),
+  `:4102` (`duree >= 4.0`).
+- Why fragile: une suite de 4929 lignes asserte des durées murales de 2 à 4 s alors que le cœur lui-même
+  accepte jusqu'à 8 s (limite (z) observée « en suites à charge 20 à 35, jamais en rejeu réel ») : un rouge sous
+  charge n'est pas une régression du hook.
+- Safe modification: relancer sur machine au repos avant de conclure à une régression ; si ces bornes sont
+  touchées, les mesurer par rapport à `ECHEANCE_COEUR_S` plutôt que par seuil absolu, sans jamais retirer
+  l'assertion (le mutant `INDEXATION-CANDIDATS` doit continuer à la faire rougir).
 
-**`vf-internal` est perdu en silence sur kimi — le Pattern 12 ne tient plus** — Sévérité : **MEDIUM**
-- Files: 19 agents portant `vf-internal: true` ; `plugin/conductor/scripts/check-artifact-fidelity.sh`
-- Why fragile: mesuré le 2026-08-30 — kimi **tolère et ignore** `vf-internal`, comme `model`,
-  `effort`, `memory`, `skills`, `vf-requires`, `vf-mcp-*`. Aucun de ces champs n'empêche le
-  chargement (bonne nouvelle pour l'adaptateur), mais `vf-internal: true` perdu signifie qu'un
-  **worker interne devient publiquement invocable** (`kimi --agent vf-coder`). Le cloisonnement du
-  Pattern 12 est une garantie **de frontmatter**, pas de runtime : elle ne survit pas à la
-  conversion.
-- Safe modification: la perte doit être **déclarée par le gate de fidélité** à l'install ET au
-  `status` sur cible kimi, avec un texte vrai — jamais un texte qui promet un confinement inexistant.
-- Test coverage: à câbler avec la déclaration du gate.
+**Sensibilité des suites à la charge machine** — Sévérité : **MEDIUM**
+- Files: `plugin/planning-core/scripts/tests/test-planning-gates.sh` (timeouts `subprocess` de 10 à 240 s ,
+  mutants qui réécrivent des copies du hook), `plugin/_internal/tests/test-planning-hook-installed.sh`,
+  `scripts/tests/test-role-hook-vs-check-agents.sh`.
+- Why fragile: le cœur Python se borne à 8 s et ferme en refus au-delà ; une suite lancée en parallèle d'autres
+  (CI partagée, plusieurs sessions) peut obtenir des faux refus attribuables à la charge. Ne pas lancer deux
+  suites lourdes ensemble ; ne jamais « réparer » en élargissant `ECHEANCE_COEUR_S` sans arbitrage (limite (s)).
 
-**Modules `mobile-test` / `mobile-test-team` expérimentaux — « run réel vert » jamais tracé** — Sévérité : **HIGH**
-- Files: `plugin/mobile-test/module.json:5` et `plugin/mobile-test-team/module.json:5` (« Statut
-  expérimental jusqu'au premier run réel vert ») ; `plugin/mobile-test/README.md:10`,
-  `plugin/mobile-test-team/README.md:11` (bandeaux ⚠️)
-- Why fragile: le pipeline (`plugin/mobile-test/scripts/mobile-test-run.mjs`, 409 lignes, Node) et
-  l'orchestration de sous-agents imbriqués (Pattern 12, `plugin/mobile-test-team/agents/`) n'ont
-  jamais été prouvés par un run réel documenté depuis leur import. Aucun rapport horodaté dans
-  `reports/`.
-- Safe modification: ne pas étendre ces modules avant un run réel vert tracé (rapport commis) ;
-  toute release qui les touche doit le mentionner comme non-validé.
-- Test coverage: **zéro** — voir Test Coverage Gaps.
+**Bash non couvert par le hook (P45-D-10)** — Sévérité : **HIGH (par construction, assumé)**
+- Files: `plugin/planning-core/scripts/planning-hook.sh` (G2 sur Bash = détection seulement),
+  `plugin/planning-core/hooks/hooks.json` (matcher `Write|Edit|NotebookEdit|Bash|Agent|Task`).
+- Why fragile: G1, G5, G6, G7 et ROLE refusent des **outils**, jamais le disque : une redirection ou un `sed` écrit
+  `STATE.md`, un `VERDICT.md`, retire l'adhésion ou le hook des réglages (limites (g), (n), (y)). En panne du cœur,
+  `Bash` reste aussi ouvert pour permettre la réparation. Ne jamais présenter un gate comme une garantie
+  d'intégrité du disque ; les seuls chemins légitimes sont `recalc-planning.sh`, `poser-verdict.sh`, `deroger-gate.sh`.
 
-**Chiffres en prose non gatés — la famille de dérive n'est pas éteinte** — Sévérité : **MEDIUM**
-- Files: `README.md:169-182` et `README.fr.md:171-187` (tableau des modules, colonne version) —
-  actuellement alignés (vérifié 2026-07-26) mais **hors périmètre** de
-  `scripts/check-version-sync.sh` (ses 9 points couvrent badges, phrase « N modules », triade
-  VERSION↔module.json, en-têtes Version des README de modules, historique en tête, compte de
-  suites — pas la colonne version du tableau racine).
-- Why fragile: c'est exactement la dérive F1 (13 modules mensongers) qui a motivé le gate ; l'audit
-  du 2026-07-26 a encore trouvé 14/14 en-têtes Version faux avant que le point 8 du gate ne les
-  couvre. Tout compteur en prose hors gate finit par mentir.
-- Safe modification: à chaque nouveau chiffre en prose dans un README, soit le gater dans
-  `check-version-sync.sh`, soit le remplacer par un renvoi vers la source machine.
-- Test coverage: le gate lui-même n'a pas de suite (voir Test Coverage Gaps).
+**G6 sur les scripts du hook : prouvé seulement en suites** — Sévérité : **MEDIUM**
+- Files: `SCRIPTS_HOOK_G6` (`plugin/planning-core/scripts/planning-hook.sh:1062`), preuve dans
+  `plugin/_internal/tests/test-planning-hook-installed.sh` et `test-planning-gates.sh`.
+- Why fragile: la protection de `<lab>/.claude/scripts/planning-hook.sh` et de `check-gates-alive.sh` n'a jamais
+  été rejouée sur un lab réel armé (les rejeux `45-REJEU-*` mesurent faux refus et faux accept sur copie des deux
+  labs réels, non migrés : ces scripts n'y existent pas, le corpus G6 n'a donc aucune cible pour eux) ; le dépôt lui-même n'adhère pas. Limite (y) : seul le scope projet est
+  couvert. Le canary de session (`plugin/planning-core/scripts/check-gates-alive.sh`) signale, n'empêche rien.
+- Test coverage: suites seulement ; prévoir un rejeu sur un lab adhérent réel au prochain palier.
 
-**Sonde cross-module `conductor` → `dev-orchestrator` aveugle en silence si le layout d'install change** — Sévérité : **MEDIUM**
-- Files: `plugin/conductor/skills/vf-update/SKILL.md` (étape 1, sonde de `check-gsd-engine.sh` en
-  cascade `$HOME/.claude/scripts/` → `./.claude/scripts/` → `${CLAUDE_PLUGIN_ROOT}/conductor/scripts/`) ;
-  `docs/ADR.md` §ADR-058 (Conséquences négatives, où le risque est auto-documenté).
-- Why fragile: `vf-update` (module `conductor`, mandatory) appelle un script de `dev-orchestrator`
-  (non mandatory) par **sonde de présence de fichier**, jamais par un `requires` — inverser la
-  dépendance casserait la baseline d'un lab non-dev. Le silence sur script absent est **voulu** (un
-  lab content/growth ne doit rien voir), mais il rend le mode dégradé indiscernable du mode nominal :
-  si l'engine cessait un jour de matérialiser les scripts de tous les modules à plat dans le même
-  `.claude/scripts/`, la détection du moteur GSD s'éteindrait **sans aucun signal**, exactement le
-  trou que la Phase 19 vient de fermer.
-- Safe modification: toute évolution de `copy_module_scripts()` / du layout d'install
-  (`plugin/_internal/vibeflow-update.sh`) doit être accompagnée d'une vérification que la sonde
-  résout toujours ; ne jamais convertir ce silence en dépendance déclarée.
-- Test coverage: les 3 états du gate sont couverts (`test-check-gsd-engine.sh`, 15 cas) ; la
-  **résolution de la sonde depuis le skill** ne l'est pas — c'est du markdown, non exécutable.
+**Phase 45 vérifiée `human_needed` 14/15** — Sévérité : **MEDIUM**
+- Files: `.planning/workstreams/gouvernance/phases/VFDO-45-moteur-hook-central-par-r-le-et-gates-d-criture/45-VERIFICATION.md`,
+  `.planning/workstreams/gouvernance/STATE.md`.
+- Why fragile: GATE-15 attend la CI Linux de l'état armé sur la PR vers `main` ; les rejeux réels
+  (`45-REJEU-*`) ont été faits sur copie des labs au repos. Aucun merge, tag ni release avant clôture de `fiabilite-v1.0` (garde-fou du jalon).
 
-**Greps du gate sensibles aux reformulations README** — Sévérité : **LOW**
-- Files: `scripts/check-version-sync.sh:60-71` (phrases « N modules, each versioned » /
-  « N modules, chacun versionné » cherchées littéralement)
-- Why fragile: une refonte éditoriale des README casse le grep ; le gate signale désormais la cible
-  introuvable (ko explicite, leçon du contrôle sauté en silence) mais chaque refonte impose de
-  réaligner les motifs.
-- Safe modification: après toute refonte README, lancer `bash scripts/check-version-sync.sh` en local.
+**`kimi doctor` est un vert à vide sur les agents** — Sévérité : **HIGH**
+- Files: recette d'install kimi ; mesure `38-MESURE-KIMI.md` (Phase 38).
+- Why fragile: `kimi doctor` valide les fichiers de configuration, jamais les agents (11 cassés sur 31 passaient) ;
+  le log est tronqué à 233 octets et plafonné à 5 lignes. Toute recette kimi vérifie par `kimi --agent-file
+  <chemin>` fichier par fichier, jamais par `doctor` ni par le log. Le gate double-parseur ne couvre que la forme.
+
+**`vf-internal` perdu en silence sur kimi** — Sévérité : **MEDIUM**
+- Files: 19 agents `vf-internal: true` ; `plugin/conductor/scripts/check-artifact-fidelity.sh`
+  (`KIMI_VF_INTERNAL_NOTE`, ligne `[fidelity-vf-internal]`).
+- Why fragile: le cloisonnement du Pattern 12 est une garantie de frontmatter, pas de runtime ; la perte est
+  désormais **déclarée** par le gate à l'install et au `status`. Le texte ne doit jamais promettre un confinement.
+
+**Modules `mobile-test` / `mobile-test-team` expérimentaux** — Sévérité : **HIGH**
+- Files: `plugin/mobile-test/module.json:5`, `plugin/mobile-test-team/module.json:5` (« expérimental jusqu'au
+  premier run réel vert »), `plugin/mobile-test/scripts/mobile-test-run.mjs` (409 lignes Node, aucun `tests/`).
+- Why fragile: aucun run réel tracé dans `reports/` (sous-dossiers `audit`, `research`, `uat`, `validator`) ;
+  pipeline et orchestration Pattern 12 jamais prouvés. Ne pas étendre avant un run réel vert commis.
+
+**Chiffres en prose non gatés** — Sévérité : **MEDIUM**
+- Files: tableau des modules de `README.md` et `README.fr.md` (colonne version) hors périmètre de
+  `scripts/check-version-sync.sh` (qui gate badges, phrase « N modules », triade VERSION, en-têtes de modules,
+  historique, compteur de suites 98). Tout compteur en prose hors gate finit par mentir ; le gater ou renvoyer
+  à la source machine. Les greps littéraux de `check-version-sync.sh` cassent à toute refonte éditoriale :
+  relancer `bash scripts/check-version-sync.sh` après.
+
+**Sonde cross-module `conductor` → `dev-orchestrator`** — Sévérité : **MEDIUM**
+- Files: `plugin/conductor/skills/vf-update/SKILL.md` (sonde de `check-gsd-engine.sh`), `docs/ADR.md` §ADR-058.
+- Why fragile: sonde de présence de fichier, silence voulu sur script absent ; un changement du layout posé par
+  `copy_module_scripts()` éteindrait la détection du moteur sans signal. Ne jamais la convertir en `requires`.
 
 ## Scaling Limits
 
-**Découverte de suites CI limitée au motif `*/tests/test-*.sh`** — Sévérité : **MEDIUM**
-- Current capacity: 37 suites bash découvertes (`.github/workflows/ci.yml:32`).
-- Limit: tout test non-bash est invisible — `plugin/mobile-test/scripts/mobile-test-run.mjs` (Node)
-  ne peut structurellement pas être couvert par ce pipeline.
-- Scaling path: soit un wrapper bash `tests/test-mobile-test-run.sh` qui invoque le `.mjs` en mode
-  dry-run, soit élargir la découverte CI.
+**Découverte de suites CI limitée à `*/tests/test-*.sh`** — Sévérité : **MEDIUM**
+- Current capacity: 98 suites (`.github/workflows/ci.yml:218`, `find plugin scripts -type f -path '*/tests/test-*.sh'`).
+- Limit: tout test non-bash est invisible (`plugin/mobile-test/scripts/mobile-test-run.mjs`).
+- Scaling path: wrapper bash dry-run ou découverte élargie.
 
 ## Dependencies at Risk
 
-**`python3` et `jq` supposés présents, non vérifiés à l'install** — Sévérité : **LOW**
-- Risk: plusieurs scripts consomment `python3` (consolidator, check-agents) et `jq`
-  (resolve-deps a un fallback sed, mais pas tous les consommateurs) sans check de présence à
-  l'install d'un module.
-- Impact: échec runtime tardif sur machine minimale. Atténué : la CI « fresh lab » (`ci.yml:116+`)
-  valide le parcours complet sur runner standard, et `check-version-sync.sh` évite volontairement jq.
-- Migration plan: `verify_dependencies()` dans l'engine ou dans `plugin/installer/scripts/preflight.sh`
-  (qui existe déjà — vérifier son périmètre et le câbler systématiquement).
+**`python3`, `jq` et PyYAML supposés présents** — Sévérité : **LOW**
+- Risk: scripts consolidator, `check-agents.sh` et le cœur de `planning-hook.sh` consomment `python3` ; PyYAML
+  manque sur le `python3` de ce poste (fenêtre #7 de `.planning/WINDOWS.md`). Hors lab adhérent, un `python3`
+  absent ne refuse jamais (P45-D-06a) ; dans un lab adhérent, la commande enregistrée refuse `Write`, `Edit`,
+  `NotebookEdit`, `Agent`, `Task`.
+- Migration plan: câbler `plugin/installer/scripts/preflight.sh` systématiquement.
+
+**Moteur `@opengsd/gsd-core` : version locale périmée, CI en `^1`** — Sévérité : **LOW**
+- Risk: l'install locale au dépôt (`.claude/gsd-core`, gitignorée) et celle du compte (`~/.claude/gsd-core`,
+  1.15.0) peuvent différer ; `ci.yml` installe `@opengsd/gsd-core@^1` sous Node 24 (sous Node 22 l'install
+  rétrograderait en silence en 1.10.0). Appeler `gsd-tools.cjs` du compte explicitement.
 
 ## Missing Critical Features
 
-**Phase 13 en suspens — plan écrit, rien d'exécuté** — Sévérité : **MEDIUM** (dette de process, pas de code)
-- Problem: le plan 13-01 (`discover-unintegrated-docs.sh`, BRDG-02) est écrit et committé mais
-  **non exécuté** (0 SUMMARY) ; le plan 13-02 (câblage de l'ingestion dans l'agent `vibeflow-dev`)
-  reste à planifier.
-- Files: `.planning/phases/13-pont-spec-feuille-de-route/13-01-PLAN.md` ; `.planning/STATE.md:6-8`
-  et `:30-36` (stopped_at + Current Position)
-- Blocks: la promesse « pont spec → feuille de route » du milestone vf-routing (dernière phase du
-  milestone, 2/3 complétées). Prochaine action documentée : `/gsd:execute-phase 13`.
-
-**Milestone `gsd-migration` — Phase 11 livrée et vérifiée** — Sévérité : **LOW**
-- Problem: Phase 11 (intégration migration GSD, `get-shit-done-cc` → `@opengsd/gsd-core`) a été
-  exécutée et vérifiée (6 vagues, PASS sur les 3 critères, suites vertes) le 2026-07-26. Le
-  milestone `MILESTONES.md:42` porte encore le statut « EN ATTENTE — non planifié » hérité de sa
-  création — désynchronisé de l'avancement réel.
-- Files: `.planning/MILESTONES.md:42` ; `.planning/phases/10-etude-migration-gsd/`,
-  `.planning/phases/11-integration-migration-gsd/`
-- Blocks: rien de bloquant — mais le statut du milestone (`MILESTONES.md`) mérite une mise à jour
-  pour ne pas laisser croire à un chantier non démarré alors qu'il est en grande partie livré.
+**Phases 46-50 du jalon `gouvernance-labs-v1.0` non commencées** — Sévérité : **MEDIUM**
+- Problem: gates de clôture et vérification du hash de `VERDICT.md` (46), baux (47), injection de l'index et
+  pont mémoire (48), grille d'initialisation (49-50) ; G2′, G3, G4, G4′, D1 absents ; le hook managed (seul à
+  résister à `disableAllHooks`) est hors périmètre. Un gate peut donc être désarmé par `disableAllHooks`.
+- Files: `.planning/workstreams/gouvernance/ROADMAP.md`.
 
 ## Test Coverage Gaps
 
-**Les gates de release eux-mêmes n'ont aucune suite** — Priority: **HIGH**
-- What's not tested: `scripts/check-version-sync.sh` (9 points, parsing grep/sed volontairement
-  sans jq), `scripts/check-release-tag.sh`, `scripts/bump.sh`. Le dossier `scripts/` n'a pas de
-  `tests/` — la découverte CI (`find plugin scripts -path '*/tests/test-*.sh'`) n'y trouve donc rien.
-- Files: `scripts/bump.sh`, `scripts/check-version-sync.sh`, `scripts/check-release-tag.sh`
-- Risk: une régression dans un gate (grep qui ne matche plus, faux vert) neutralise silencieusement
-  la protection anti-dérive — la classe de bug la plus coûteuse de l'historique du repo (divergence
-  main juillet 2026). Ironique : tout le reste est gaté par eux.
-- Priority: **HIGH** — suite `scripts/tests/test-check-version-sync.sh` sur fixtures (README/VERSION
-  synthétiques désalignés → le gate doit ko).
+**`scripts/check-version-sync.sh` et `scripts/bump.sh` sans suite** — Priority: **HIGH**
+- What's not tested: les 9 points de parsing grep/sed du gate de version et le bump ; un grep qui ne matche plus
+  est un faux vert silencieux.
+- Files: `scripts/check-version-sync.sh`, `scripts/bump.sh`
+- Fix: `scripts/tests/test-check-version-sync.sh` sur fixtures désalignées (le gate doit ko).
 
-**`mobile-test-run.mjs` — 409 lignes Node, zéro test** — Priority: **HIGH**
-- What's not tested: détection de cible, build-if-absent, rapport horodaté, diagnostic sur échec.
-- Files: `plugin/mobile-test/scripts/mobile-test-run.mjs` (aucun `tests/` dans le module)
-- Risk: module déjà expérimental + script central non testé = régression invisible garantie ; hors
-  motif de découverte CI (voir Scaling Limits).
-- Priority: **HIGH** — préalable au « premier run réel vert » qui lèverait le statut expérimental.
+**`mobile-test-run.mjs` : 409 lignes Node, zéro test** — Priority: **HIGH**
+- Files: `plugin/mobile-test/scripts/mobile-test-run.mjs` ; hors motif de découverte CI.
 
 **`plugin/installer/scripts/preflight.sh` non couvert** — Priority: **MEDIUM**
-- What's not tested: le preflight d'install (la suite du module, `test-build-module-catalog.sh`, ne
-  le référence pas ; aucune mention dans `plugin/_internal/tests/`).
-- Files: `plugin/installer/scripts/preflight.sh`
-- Risk: un preflight cassé laisse passer des installs sur environnement non conforme.
+- Files: `plugin/installer/scripts/preflight.sh` ; la suite du module (`test-build-module-catalog.sh`) ne le référence pas.
 
-**`mobile-test-team` — orchestration Pattern 12 jamais éprouvée** — Priority: **MEDIUM**
-- What's not tested: la boucle test → corrige → re-test (vf-test-orchestrator + workers
-  vf-test-runner / vf-app-fixer). Les agents passent `check-agents.sh --strict` (conformité de
-  forme) mais aucun run d'orchestration n'est tracé.
-- Files: `plugin/mobile-test-team/agents/`, `plugin/mobile-test-team/README.md:11`
-- Risk: le module vend une capacité autonome non démontrée.
+**`mobile-test-team` : boucle test → corrige → re-test jamais éprouvée** — Priority: **MEDIUM**
+- Files: `plugin/mobile-test-team/agents/`.
 
-**Gestes documentés de la Phase 24 sans aucune garde machine** — Priority: **HIGH**
-- What's not tested: trois mitigations **présentes aujourd'hui, gardées par rien demain**,
-  relevées par l'audit sécurité du 2026-08-04 (fermées au registre parce qu'elles livrent ce
-  qu'elles promettaient, mais sans non-régression) :
-  **(1)** `hooks.json` — le `|| true` sur les 5 commandes `SessionStart` de conductor (T-24-05-02).
-  Le filtre `jq` qui devait le vérifier ne vit que dans le bloc `<verify>` du plan, un one-shot
-  d'exécution. Aucune suite ni étape CI ne l'asserte. Le précédent existe pourtant :
-  `plugin/consolidator/scripts/tests/test-consolidator.sh:295-296` (T-CSL11) fait exactement cela
-  pour le `PostToolUse` de consolidator.
-  **(2)** `workstreams.md` — le geste de vérification avant PR (T-24-08-03) et l'ordonnancement
-  « résous le compartiment **AVANT** toute lecture » (T-24-08-01). Le seul exécutable qui
-  mentionne `workstreams.md` est `test-dev-orchestrator.sh:6139-6158` (T35), et il ne vérifie que
-  le **renvoi** depuis les deux agents, jamais le **contenu**. Concrètement : supprimer le geste
-  PR, les quatre gestes, ou le mot « AVANT » laisse **toute la CI verte**.
-  **(3)** plafond ADR-029 sur les deux modules injectés en `agent_skills` (T-24-03-03) :
-  `test-dev-orchestrator.sh:1052` borne T5 à `"$MOD"/skills/vf-*/SKILL.md`, or
-  `plugin/software-architecture/SKILL.md` et `plugin/audit-architecture/SKILL.md` sont à la racine
-  de modules autonomes, sans préfixe `vf-`. Le volume injecté dans le prompt de `gsd-planner`
-  (269 lignes aujourd'hui) peut croître au-delà de 500 sans qu'aucun gate ne rougisse.
-- Files: `plugin/conductor/hooks/hooks.json:16-20`,
-  `plugin/dev-orchestrator/references/workstreams.md:138-145`,
-  `plugin/dev-orchestrator/agents/vf-dev-manager.md:33-34`,
-  `plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh:1052`
-- Risk: une régression sur l'une de ces trois rouvre une menace **fermée** de la Phase 24 sans
-  qu'aucun signal ne se déclenche — le mode d'échec exact que le registre de menaces existe pour
-  empêcher.
+**Gestes documentés de la Phase 24 sans garde machine (non re-mesuré en entier)** — Priority: **MEDIUM**
+- Files: `plugin/conductor/hooks/hooks.json` (`|| true` des commandes `SessionStart`),
+  `plugin/dev-orchestrator/references/workstreams.md`, `plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh`
+  (T35 : renvoi et plafond 300 des agents vérifiés, contenu du geste PR non vérifié),
+  `plugin/software-architecture/SKILL.md`, `plugin/audit-architecture/SKILL.md` (volume injecté dans
+  `gsd-planner` non borné par un gate).
 
-**`24-03-SUMMARY.md` affirme le contraire de l'arbre courant** — Priority: **MEDIUM**
-- What's not tested: rien ne vérifie qu'un SUMMARY reste vrai après coup. `24-03-SUMMARY.md:74-78`
-  affirme que « les **9** clés refusées ou différées sont **TOUTES absentes**, chacune vérifiée
-  individuellement ». Or `.planning/config.json:27` porte `"windows_enforce": true` et `:45`
-  porte `"workflow_guard": true` — posées par le plan **24-02** sous ADR-066. Le PLAN a été
-  corrigé et daté (`24-03-PLAN.md:88-93`, `:104`), le SUMMARY ne l'a pas été. Un relecteur du
-  SUMMARY conclurait que la zone 2 est désarmée alors qu'elle est **armée et bloquante** à
-  `ship:pre`.
-- Files: `.planning/phases/VFDO-24-*/24-03-SUMMARY.md:74-78`, `.planning/config.json:27,45`
-- Risk: c'est la classe de fait la plus dangereuse du dépôt — un artefact de traçabilité qui dit
-  le contraire du réel et que personne ne re-mesure. Non corrigé ici : le mandat d'audit
-  autorisait à *enregistrer un verdict* dans les SUMMARY, pas à les réécrire.
-
-**Aucune primitive partagée de confinement de chemin — l'engine porte sa propre validation, à
-chaque site, ou aucune** — Priority: **HIGH**
-- What's not tested: `check-agents.sh:510-511` valide bien `name` contre `[a-z0-9-]+`
-  (`re.fullmatch`), mais ce gate ne protège que les agents **de ce dépôt**, en **CI**.
-  `vibeflow-update.sh` ne l'invoque JAMAIS — zéro occurrence dans le fichier. Un module tiers du
-  marketplace, ou un module de lab modifié après coup, échappe donc entièrement à cette règle :
-  rien côté engine ne revalide un `name:` de frontmatter avant de s'en servir pour construire un
-  chemin. C'est le 5ᵉ passage mesuré sur ce sous-motif (« aucune primitive partagée de
-  confinement de chemin », déjà 4 occurrences côté symlink) — chaque site qui a besoin de la
-  garde la réimplémente localement (ou l'oublie), il n'existe aucune fonction unique
-  `sanitize_component()`/`assert_safe_name()` à laquelle un nouveau site pourrait simplement
-  faire appel.
-  Corrigé au point d'usage pour le seul site trouvé porteur du défaut (`register-codex-agent.sh`,
-  pose ET `--remove` d'un rôle Codex depuis le `name:` du frontmatter d'un agent) — recherche
-  élargie à tout le dépôt (`grep -rnE "jq (-r )?'\.name'|sed -n .s/\^name:|frontmatter\.get\(.name.\)|fm\.get\(.name.\)" plugin --include="*.sh" --include="*.mjs" --include="*.js" --include="*.py"`,
-  hors `tests/`) : **aucun autre site** ne dérive un nom de chemin depuis un contenu de fichier
-  (frontmatter/JSON/TOML) dans `plugin/`. Les autres candidats inspectés (`_vf_uninstall_from_cache`
-  dans `vibeflow-update.sh`, `plugin/conductor/scripts/runtime-registry.sh`,
-  `plugin/_internal/merge-hooks.sh`) dérivent tous leurs noms via `basename` d'un listing
-  filesystem ou d'une correspondance sur un basename déjà référencé — jamais depuis un contenu
-  de fichier — donc hors de la classe de vulnérabilité visée.
-- Files: `plugin/_internal/runtime-adapter/register-codex-agent.sh` (corrigé),
-  `plugin/conductor/scripts/check-agents.sh:510-511` (gate CI, non porté par l'engine)
-- Risk: le prochain site qui dérive un nom depuis un contenu de fichier (nouveau runtime tier-1,
-  nouveau format de registre) reproduira le même défaut par défaut, faute d'une primitive
-  partagée à appeler — dette de conception, pas seulement le bug ponctuel déjà fermé.
+**Limites de la Phase 45 sans preuve sur lab réel** — Priority: **MEDIUM**
+- What's not tested: protection des scripts du hook (limite (y)), poches `.claude/worktrees` (limites (o), (ad)),
+  faux refus sous charge (limite (z)) : mesurés en suites ou sur copie, jamais en rejeu réel armé.
+- Files: `plugin/planning-core/scripts/rejeu-reel.sh`, `plugin/planning-core/scripts/rejeu-gates.sh`.
 
 ---
 
-*Concerns audit: 2026-07-26 — v2.36.1, 17 modules, 37 suites CI*
-*Complété 2026-08-04 par `/gsd-secure-phase 24` : 4 entrées (1 dette d'architecture HIGH,
-2 sécurité HIGH, 2 lacunes de couverture) issues de l'audit des 34 menaces ouvertes.*
-*Complété 2026-08-29 — correction ciblée Phase 38 (register-codex-agent.sh, traversée de
-chemin sur `name:`) : 1 entrée dette de conception (primitive de confinement de chemin absente
-côté engine).*
+*Concerns audit: 2026-10-02 — v2.67.1, 17 modules, 98 suites CI, planning-core v2.9.0 (Phase 45 armée)*
