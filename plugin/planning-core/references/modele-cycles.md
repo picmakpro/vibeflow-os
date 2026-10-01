@@ -74,10 +74,15 @@ AskUserQuestion session principale, 2026-09-30).** La première écriture rempla
 l'`INDEX.md` du socle v2, rédigés à la main (ADR-031 : pas de perte de contenu sans validation
 humaine). Avant de les remplacer, le recalcul les copie **octet pour octet** sous
 `.planning/_archive/socle-v2/` (emplacement annexe, jamais lu par le recalcul). Une archive existante
-n'est **jamais réécrite** (si l'une des deux cibles existe déjà, quel que soit son type, rien n'est
-archivé) ; si `_archive` ou `socle-v2` existe et n'est pas un dossier réel (lien symbolique compris),
-le recalcul sort en code **1** sans rien écrire. Le `STATE.md` généré ne porte plus `planning_version` :
-le détecteur ne rend plus 2 au passage suivant, l'archivage ne se produit qu'une fois.
+n'est **jamais réécrite** : si elle porte déjà tous les fichiers à archiver aux mêmes octets, il n'y a
+rien à faire ; sinon une nouvelle archive est posée sous un nom libre (`socle-v2`, puis `socle-v2.2`,
+`socle-v2.3`…), en tout ou rien (dossier provisoire puis renommage d'un bloc : en cas d'échec le recalcul
+ne remplace ni le `STATE.md` ni l'`INDEX.md`, sortie 1) — correction ciblée du lot B (décisions du manager
+vf-dev-manager, 2026-10-01). Si `_archive` ou une archive nommée existe et n'est pas un dossier réel
+(lien symbolique compris), le recalcul sort en code **1** sans rien écrire. Un `STATE.md` ou un `INDEX.md`
+qui porte la marque de génération du recalcul se reproduit : il n'est pas archivé (limite déclarée, voir
+(v) dans la section « Hook central et gates d'écriture (Phase 45) »). Le `STATE.md` généré ne porte plus
+`planning_version` : le détecteur ne rend plus 2 au passage suivant, l'archivage ne se produit qu'une fois.
 
 **Source UNIQUE de vérité — le VRAI détecteur, jamais une copie (correction de CLASSE, lot 4).**
 Le code 2 a **longtemps** été traité comme le code 3 (même verdict `non-gsd`), laissant écrire sur
@@ -222,8 +227,8 @@ corrections indépendantes de la garde de lecture du lot 7, mesurées à l'audit
 ### Résidus acceptés (lot 8)
 
 - **TOCTOU entre la garde et le détecteur** : deux lectures indépendantes du disque (la garde de
-  lecture, puis le sous-processus détecteur relancé juste après) — mesuré à 1 écriture sur 15
-  essais avec un `mv` concurrent LOCAL pendant la fenêtre entre les deux lectures
+  lecture, puis le sous-processus détecteur relancé juste après) — mesuré : une écriture indue sur
+  15 essais avec un `mv` concurrent LOCAL pendant la fenêtre entre les deux lectures
   (gsd-security-auditor, 2026-09-28). Exige un processus concurrent disposant du droit d'écriture
   sur l'arbre — aucun contenu versionné (un fichier du modèle, un nom de compartiment) ne peut
   produire cette fenêtre à lui seul. Résolution durable envisagée : une seule lecture partagée entre
@@ -705,21 +710,297 @@ Huit gabarits sous `plugin/planning-core/references/templates/cycles/`, un par f
 | `CYCLE.md` seul | cycle `à cadrer` |
 | `config.json` | adhérent (`cycles-v1`) |
 
+## Hook central et gates d'écriture (Phase 45)
+
+Cette section décrit ce que la Phase 45 **livre**, tel que le code livré le fait. Elle est tenue
+identique au code par un contrôle croisé (R-REFERENCE, `scripts/tests/test-planning-gates.sh`) qui
+compare la table d'armement, les noms protégés par G6, le nom du journal de dérogation, la liste des
+marqueurs de code, l'ordre de résolution des agents, les outils refusés en mode dégradé et la présence
+des limites déclarées aux constantes du hook et à la commande de `hooks.json` : un écart rougit la
+suite (MUT-REFERENCE le prouve). Chaque décision citée porte le préfixe `P45-D-NN` (`45-CONTEXT.md`) ;
+chaque arbitrage humain nomme son canal et sa date.
+
+### Principe
+
+- **Une mécanique, deux chantiers.** Un seul script, `scripts/planning-hook.sh` (lanceur bash et cœur
+  Python embarqué, P45-D-15), porte les gates d'écriture du moteur (G1, G2, G5, G6, G7) et le
+  cloisonnement par rôle de la fabrique d'agents (ROLE). Il est déclaré par une seule entrée
+  `PreToolUse` de `hooks.json`.
+- **Adhérents seuls** (P45-D-01, P45-D-01a, P45-D-04). Il n'agit que dans un lab dont
+  `.planning/config.json` déclare `"planning_version": "cycles-v1"` (même lecture que l'adhésion du
+  recalcul). Hors d'un lab adhérent — labs dev, ce dépôt compris — il ne sort rien (octet vide) et
+  rend 0 : un lab dev n'est jamais refusé, et la mutation « ignorer l'adhésion » rend la preuve rouge.
+  Les drapeaux `phases_trace` et `options.gates` de `config.json` restent **sans effet** : les gates
+  s'arment avec l'adhésion, et un gate ne se désarme que par une dérogation nominative, jamais par un
+  drapeau qu'un agent peut écrire (P45-D-01).
+- **Racine dérivée du chemin écrit** (P45-D-12), jamais de `$CLAUDE_PROJECT_DIR`, qui ne suit pas
+  `EnterWorktree` : la racine du lab est le plus proche ancêtre du chemin écrit (à défaut, du `cwd` du
+  payload pour un dispatch) qui contient un dossier `.planning` ; le plus proche gagne.
+- **Un refus est un JSON `permissionDecision: "deny"` rendu avec le code 0** (P45-D-08), jamais un
+  exit 2 ; toute erreur interne du script, dans le périmètre adhérent, est piégée et rendue en `deny`.
+- **Périmètre d'environnement** (P45-D-12a ; amendement de R-ENV-02, décisions du manager
+  vf-dev-manager, 2026-09-30). Aucune variable d'environnement ne change l'armement ni l'adhésion.
+  Le lanceur lit `TMPDIR` (où poser le fichier de transport du payload), `XDG_CACHE_HOME` puis `HOME`
+  (le seul chemin du journal d'observation) ; `HOME` est aussi l'entrée déclarée de la seule résolution
+  des définitions d'agent du compte et des plugins (P45-D-05b). Ces lectures sont celles du
+  **lanceur**, qui les passe en arguments au cœur Python : le cœur ne lit aucune variable
+  d'environnement, `os.path.expanduser` compris. Un `HOME` différent change la résolution d'un agent
+  du compte, jamais l'adhésion ni l'état d'armement.
+
+### La commande enregistrée (fail-closed dans un lab adhérent)
+
+L'entrée `PreToolUse` de `hooks.json` (matcher `Write|Edit|NotebookEdit|Bash|Agent|Task`, `timeout`
+de 20 s) est une commande **de forme shell**, jamais la forme exec `{{VF_BASH}}` (qui part dans
+`settings.local.json` et n'a pas de shell pour porter le test de présence) : l'installeur la pose
+dans `settings.json`. Elle lance le script en fils et **reprend tout code non nul** (script absent,
+`python3` absent, plantage, échéance interne : code 73). Dans ce cas elle décide elle-même, **sans
+`python3`**, si le lab est adhérent — extraction shell du chemin écrit ou du `cwd`, remontée jusqu'au
+plus proche `.planning`, lecture de `config.json` — et :
+
+- dans un lab adhérent (ou dans le doute, voir (u)), elle émet un refus JSON statique avec un message
+  de réparation (mettre à jour VibeFlow, ou installer `python3`, puis relancer la session) ;
+- hors d'un lab adhérent, elle se tait : un lab dev sans `python3` n'est jamais refusé (P45-D-06a) ;
+- le **timeout** du harnais reste un fail-open sans réglage possible : le canary est obligatoire de
+  toute façon (P45-D-06, P45-D-20).
+
+- **Outils refusés en mode dégradé** : `Write`, `Edit`, `NotebookEdit`, `Agent`, `Task`.
+- **Outil laissé ouvert en mode dégradé** : `Bash` (P45-D-06b).
+
+Limites déclarées de la couche shell, puis des gates, chacune sur sa propre ligne (la lettre, puis la
+source). Les lettres (a) à (l) sont celles du plan ; (m) et suivantes sont les limites que les
+corrections ciblées et les relectures de la phase ont ajoutées (décisions du manager vf-dev-manager,
+2026-10-01, renversables par Willy).
+
+- **limite (a)** — la commande ne reconnaît le filtre d'outil qu'en JSON **compact** : un `"tool_name" : "Write"` espacé échappe au filtre dégradé (les clés de chemin tolèrent les blancs). Source : recherche du plan 45-01, vérifié sur le harnais 2.1.284.
+- **limite (b)** — la couche shell ne reconnaît `cycles-v1` qu'en forme littérale sur **une ligne** : une valeur échappée, ou une clé et une valeur sur deux lignes, ne sont pas reconnues ; le script Python, lui, décide exactement quand il tourne (la conséquence de l'écart est la limite (m)).
+- **limite (c)** — un `config.json` en lien symbolique est adhérent côté shell et non adhérent côté Python (`O_NOFOLLOW`, comme le recalcul).
+- **limite (d)** — fermée : un chemin à échappement JSON non géré (`\b`, `\f`, `\r`, `\uXXXX`) ferme sans condition quand le cœur est tombé (lot A, décision du manager vf-dev-manager, 2026-10-01) ; le coût de cette fermeture est la limite (u).
+- **limite (e)** — une charge utile qui n'est pas du JSON n'est jamais refusée en mode dégradé (outil inconnu).
+- **limite (f)** — `bash` absent (une image sans `bash`) : code 127, donc chemin dégradé (refus dans un lab adhérent), même politique fail-closed que le recalcul sans `bash`.
+- **limite (g)** — **Bash reste ouvert en mode dégradé** (P45-D-06b) : quand le script ou `python3` manque dans un lab adhérent, `Write`, `Edit`, `NotebookEdit`, `Agent` et `Task` sont refusés mais `Bash` passe, pour que la réparation (poser le script, installer `python3`) reste possible ; cohérent avec P45-D-10 (Bash n'est jamais couvert par les refus).
+- **limite (h)** — un chemin écrit relatif est joint au `cwd` du payload par les deux couches (le harnais l'émet toujours absolu, P45-D-12) ; `..` n'est résolu que par la résolution physique du plus proche ancêtre existant.
+- **limite (i)** — en scope projet, `$CLAUDE_PROJECT_DIR` choisit QUELLE copie de `planning-hook.sh` s'exécute, donc quelle table d'armement (une copie périmée d'un autre worktree peut s'exécuter à la place de la bonne) : le hook ne peut pas le tester de l'intérieur, le canary de session le rend visible en rejouant la commande telle qu'elle est posée (P45-D-21b, P45-D-12a).
+- **limite (j)** — G1 laisse passer l'écriture d'un `PLAN.md` quand `CADRAGE.md` est non régulier (dossier ou lien), a un frontmatter invalide ou est au format hérité, parce que le modèle de la 44 rend alors `indéterminé`, qui n'est pas « interdit » ; contournement connu (transformer `CADRAGE.md` en dossier ou en lien pour passer G1), limite acceptée ; F5 = f5-etats (choix du plan 45-06, rattaché à P45-D-21a ; renversable par Willy ; l'alternative stricte élargirait GATE-06) ; menace T-45-55.
+- **limite (k)** — m2 (décisions du manager vf-dev-manager, 2026-09-30) : en mode panne (script ou `python3` absent), la couche shell tient pour adhérent un `config.json` à virgule finale, clé dupliquée, valeur imbriquée ou BOM UTF-8 que le cœur Python tient pour non adhérent : le lab est refusé en panne, cohérent avec P45-D-06a.
+- **limite (l)** — F9 (Willy, AskUserQuestion session principale, 2026-09-30) : l'allowlist que le hook applique à un worker vit dans une définition d'agent que G6 ne protège pas — un agent qui édite sa propre allowlist étend ce qu'il peut dispatcher ; écart déclaré avec la ligne « Worker : tout dispatch refusé » de la table §5 de la spec fabrique.
+- **limite (m)** — F2 (re-audit, inverse de (k)) : un `config.json` adhérent pour Python mais à clé ou valeur échappée (`_`, `-`) ou réparti sur plusieurs lignes est lu comme non adhérent par le repli shell, donc silence si le cœur tombe ; exploitation conditionnée à une panne du cœur.
+- **limite (n)** — T-45-42 reformulée : F6 (`config.json` protégé par G6 contre un changement ou un retrait de l'adhésion, Willy, AskUserQuestion session principale, 2026-09-30) ferme le désarmement « par outil » ; Bash reste ouvert (P45-D-10) : un `sed` ou une redirection qui retire l'adhésion désarme les gates.
+- **limite (o)** — amendement de P45-D-01a (décision du manager vf-dev-manager, 2026-10-01) : un `.planning` situé dans (ou sous) un composant `.planning` n'est jamais une racine de lab ; limite : un lab situé sous un ancêtre nommé `.planning` n'est plus une racine gardée.
+- **limite (p)** — R1 (re-audit) : un `.planning/` sans `config.json` sous un sous-dossier ordinaire rend ce sous-dossier non adhérent (« le plus proche gagne ») ; G7 n'interdit que sa création par outil, pas son existence.
+- **limite (q)** — m1 (revue) : un worker qui dispatche sans `subagent_type`, ou avec `fork`, est refusé (le hook ne traite pas `fork` à part : absent de l'allowlist) ; la sémantique du harnais pour ces dispatchs n'est pas mesurée.
+- **limite (r)** — m6 (revue) : le journal d'observation (`~/.cache/vibeflow/gates-observation/`) n'a ni borne ni rotation.
+- **limite (s)** — coût et échéance : la résolution d'un agent de plugin a été mesurée à environ 0,05 s à vide (0,11 s au plus avec mille fichiers dans le dossier d'agents, huit définitions candidates de 1 Mio comprises ; 0,12 à 0,40 s avant la correction du lot A) ; la borne n'est pas ce coût mais l'échéance interne de 8 s du cœur (code 73), qui ferme sous adhésion : sur une machine lente ou chargée, un dépassement refuse des écritures légitimes (risque de déni de service).
+- **limite (t)** — F3 (re-revue) : sans `installed_plugins.json` exploitable, la « plus haute version » d'un plugin est extraite des chiffres du nom de dossier (un SHA ou `unknown` peut la fausser), tous scopes confondus.
+- **limite (u)** — F4 (re-revue ; décision du manager vf-dev-manager, 2026-10-01) : cœur tombé, un chemin portant un échappement JSON non géré (`\b`, `\f`, `\r`, `\uXXXX`) est refusé même hors de tout lab adhérent, le doute tombant du côté du refus ; le message dit « doute d'adhésion du lab » et non qu'un lab adhérent est en cause.
+- **limite (v)** — F5 (lot B) : un `STATE.md` qui porte la marque de génération en tête, puis édité à la main, est remplacé sans archive (la marque seule le fait tenir pour généré).
+- **limite (w)** — N1 résiduelle : un `name:` masqué par un échappement YAML dans l'en-tête de la définition n'est pas candidat à l'indexation des agents.
+- **limite (x)** — rejeu : le volume n'est pas optimisé (25 000 fichiers en plus de 300 s) ; un `.planning` qui est un lien vers un dossier du lab n'est pas suivi par la copie et rend désormais MESURE-VIDE (code 1), jamais un vert.
+- **limite (y)** — OUVERTE, arbitrage de Willy en attente (audit M1) : le script du hook (`.claude/scripts/planning-hook.sh`, et celui du canary) et `.claude/settings*.json` ne sont protégés par aucun gate ; un `Write` qui remplace le script par un script qui ne refuse rien désarme les gates. Le canary de session signale un script sans constantes d'armement ; il n'empêche rien.
+
+### Table d'armement livrée
+
+L'état de chaque gate vit **dans le code livré** (une constante `ARMEMENT_<gate>` par gate dans
+`planning-hook.sh`), jamais dans un fichier du lab ni dans une variable d'environnement (P45-D-03a).
+`observe` : le gate calcule, **journalise** ce qu'il aurait refusé, laisse passer ; `armed` : le gate
+refuse (`deny`, **fermé**) ; sur erreur interne, un gate `armed` refuse et un gate `observe`
+journalise. G2 avertit toujours et ne refuse jamais (**ouvert**). Armement par étapes dans un ordre
+fixe (P45-D-03), une étape suivante n'étant jamais armée avant la précédente ; chaque étape exige son
+canary, puis 0 faux refus et 0 faux accept sur le banc synthétique et sur le rejeu réel (P45-D-03b).
+
+| Gate | Étape | État | Comportement sur défaillance | Cas de canary | Relevé |
+|---|---|---|---|---|---|
+| G6 | 1 | observe | armé : fermé (deny) ; observe : journalise | G6-principal, G6-plugin | 45-REJEU-ETAPE-1 |
+| G5 | 1 | observe | armé : fermé (deny) ; observe : journalise | G5-verdict, G5-imbrique | 45-REJEU-ETAPE-1 |
+| G1 | 2 | observe | armé : fermé (deny) ; observe : journalise | G1-sans-cadrage | 45-REJEU-ETAPE-2 |
+| G7 | 3 | observe | armé : fermé (deny) ; observe : journalise | G7-orphelin | 45-REJEU-ETAPE-3 |
+| ROLE | 4 | observe | armé : fermé (deny) ; observe : journalise | ROLE-juge, ROLE-worker-Agent, ROLE-worker-Task | 45-REJEU-ETAPE-4 |
+| G2 | - | avertit | ouvert : n'avertit pas, ne refuse jamais | aucun | aucun |
+
+**État d'armement livré, tel que mesuré (v2.9.0).**
+
+- Les cinq constantes `ARMEMENT_*` valent `observe` ; `G2_MODE` vaut `avertit`.
+- Les rejeux réels des étapes 1 à 4 ont tous rendu 0 faux refus et 0 faux accept, avec des empreintes d'arbre identiques (relevés de phase `45-REJEU-ETAPE-1` à `45-REJEU-ETAPE-4`). Mais ils ont été mesurés sur le hook **avant** les lots de correction A, B et C.
+- L'armement exige donc un NOUVEAU rejeu réel, sur des labs au repos, **et** un arbitrage de Willy, en attente, pour adapter deux suites couplées à « tout en observe » (modification refusée par le classifieur « Security Test Removal »).
+- La phase se ferme **en observation**, mesurée à zéro. Aucun gate n'est armé : ce document ne dit jamais qu'un gate est armé tant qu'une constante vaut `observe`.
+
+Quatre listes que R-REFERENCE compare au code, chacune sur une seule ligne :
+
+- **Noms protégés par G6** : `STATE.md`, `INDEX.md`, `cloture.log`, `.recalc-cache.json`, `derogations-gates.log`, `config.json`.
+- **Journal de dérogation** : `derogations-gates.log`.
+- **Marqueurs de projet de code (G7)** : `package.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `composer.json`, `Gemfile`, `tsconfig.json`, `Package.swift`, `*.xcodeproj`.
+- **Ordre de résolution des agents (P45-D-05b)** : lab, compte, plugin
+
+### G2 — avertit, ne refuse jamais (GATE-08)
+
+Sur une écriture (`Write`, `Edit`, `NotebookEdit`) ou une commande `Bash` qui vise un chemin du lab
+adhérent hors de `.planning/` et de `.claude/` et hors du `ecrit:` de tout plan ouvert, G2 ajoute un
+`additionalContext` (jamais un `permissionDecision`) ; il est fail-open (spec §5.1). Le
+référentiel est l'**union** des `ecrit:` des plans ouverts, pour tout écrivain, fil principal compris ;
+un plan clos ou dérogé ne couvre rien ; un frontmatter illisible fait ignorer le plan. Pour Bash, un
+jeton de la commande n'est retenu que s'il ressemble à un chemin du lab. **Bash n'est pas couvert par
+les refus** : G2 sur Bash est une **détection**, jamais une promesse (P45-D-10), et le message le dit.
+
+### G6 — les fichiers générés (GATE-04)
+
+G6 refuse toute écriture par outil (`Write`, `Edit`, `NotebookEdit`), quel que soit le rôle, d'un nom
+protégé (ci-dessus) enfant direct du dossier de planning d'un lab adhérent ; les `STATE.md` de
+`workstreams/` et `compartments/` ne sont pas visés. L'**identité** prime sur la chaîne : une cible
+existante est comparée par identité de fichier (lien dur, casse du disque, alias du dossier), une
+création par le dossier parent résolu et le nom en casefold. `config.json` n'est protégé que pour
+l'**adhésion** (F6 = f6-oui, Willy, AskUserQuestion session principale, 2026-09-30) : une écriture qui
+change ou retire `planning_version` est refusée, les autres clés restent libres ; le cache du recalcul
+l'est aussi (F7b = f7b-oui, même canal, même date), et le journal de dérogation (F7a = f7a-racine,
+même canal, même date). Le motif d'un refus nomme `recalc-planning.sh` (ou `deroger-gate.sh`) : le
+`Stop` de la 44 invite à mettre à jour l'état, le refus ne le contredit pas. G6 est un refus de
+l'outil, pas du disque : `Bash` et `recalc-planning.sh` écrivent ces fichiers (P45-D-10).
+
+### G5 — le verdict par commande (GATE-05)
+
+G5 refuse toute écriture par outil d'un fichier nommé `VERDICT.md` (casse ignorée) sous le `.planning/`
+d'un lab adhérent, quel que soit le rôle ; un lien dur vers un verdict est ce verdict ; un `VERDICT.md`
+hors de `.planning/` n'est pas visé. Le motif nomme `poser-verdict.sh`.
+
+### G1 — pas de plan sans cadrage (GATE-06)
+
+G1 refuse l'écriture (`Write`, `Edit`) d'un `PLAN.md` de forme modèle — direct sous la phase, ou
+`plans/<plan>/PLAN.md` — dans une phase sans `CADRAGE.md`, ou dont le registre porte une ligne
+structurante sans statut (le refus cite les identifiants ouverts). Il lit l'état que le modèle dérive
+par des copies ast-identiques du parseur de frontmatter et du registre, contrôlées phase par phase
+contre le vrai `recalc-planning.sh --read-only` (CROISE-G1). La valeur d'un statut n'est jamais jugée.
+Un `PLAN.md` du socle v2 ou sous un nom d'unité invalide n'est jamais visé. Bord : limite (j).
+
+### G7 — pas de planning orphelin (GATE-07)
+
+G7 refuse la **création**, par `Write` ou `NotebookEdit`, d'un dossier `.planning/` dans un dossier X
+sous un lab adhérent, sauf si X porte un marqueur de projet de code (la liste ci-dessus, tenue égale à
+celle de `detect-gsd-engine.sh` par un contrôle qui extrait le texte du détecteur) ou un `.claude/`
+**habité**. Prédicat littéral de « habité » (P45-D-14, F4 = f4-litteral) : au moins un fichier
+**régulier** `X/.claude/agents/*.md` ET au moins un fichier **régulier** sous `X/.claude/memory/` (lstat :
+jamais un lien, jamais un dossier). Un `.claude/` qui ne porte pas les deux — un `agent-memory/` sans
+fichier, des agents sans mémoire, une mémoire sans agent, un dossier vide — n'est pas habité. Le
+parcours de la mémoire est borné : au-delà de la borne le prédicat est indéterminé et G7 ne refuse pas.
+La table D-05 de la spec est corrigée en conséquence (P45-D-14a, Willy, AskUserQuestion session
+principale, 2026-09-29) : un dossier dont le `.claude/` n'a ni agent ni mémoire non vide n'est pas un
+lab. La création d'un `.planning/` par Bash n'est pas couverte (P45-D-10).
+
+### Le hook par rôle (GATE-09)
+
+Le rôle se **dérive** de la définition de l'agent écrivain (`agent_type` du payload), par les
+prédicats de `check-agents.sh` réimplémentés dans le hook (choix motivé : `planning-core` ne dépend
+d'aucun module) : **juge** = I5 (`disallowedTools` retire `Write` et `Edit`, aucune allowlist
+`Agent(...)` non vide) ; **manager** = I6 (allowlist non vide, pas `vf-internal`) ; **worker** =
+`vf-internal: true` ; **producteur** = tout autre agent résolu (P45-D-05). Un contrôle croisé
+(`scripts/tests/test-role-hook-vs-check-agents.sh`) compare la dérivation à `check-agents.sh` sur tout
+le corpus d'agents du dépôt et sur des fixtures adverses, et peut rougir (P45-D-05a).
+
+La **résolution** `agent_type` → définition suit l'ordre écrit plus haut (P45-D-05b) : agents du lab
+(`.claude/agents/`), puis du compte (`<HOME>/.claude/agents/`), puis, pour `<plugin>:<agent>`, ceux de
+la version active du plugin sous `<HOME>/.claude/plugins/` ; le premier niveau qui trouve gagne ; deux
+définitions de rôles contradictoires au même niveau valent **inconnu** ; un agent en lien symbolique
+n'est jamais une définition. Le nom est indexé par `name:` (repli : nom de fichier) et comparé après
+normalisation (casefold, `_` et espace unifiés en `-`).
+
+Lignes appliquées (la table §5 de la spec fabrique, sans règle en double dans le code) : **juge** —
+toute écriture par outil est refusée (le verdict se pose par `poser-verdict.sh`) ; **worker** — un
+dispatch (`tool_name` `Agent` **ou** `Task`, P45-D-09) dont le `subagent_type` normalisé n'égale aucun
+nom de **sa propre** allowlist `Agent(...)` / `Task(...)` est refusé, allowlist vide : tout refusé
+(F9 = f9-allowlist, Willy, AskUserQuestion session principale, 2026-09-30 ; limite (l)) ; **producteur
+et manager** — aucune ligne propre, G5 couvre l'écriture d'un verdict (P45-D-07). **Fil principal**
+(`agent_id` absent) et **agent inconnu, ambigu, illisible ou de plugin non résolu** ne reçoivent que la
+ligne « Tous » et les gates G1, G5, G6 et G7 : un juge dont la définition n'est pas trouvée n'est pas
+traité en juge (limite déclarée, P45-D-11 ; le canary la compte). Le rôle ne s'applique qu'aux labs
+adhérents : la ligne « Worker : tout dispatch refusé », appliquée à un lab dev, casserait la chaîne
+`vf-coder` vers les briques de développement (P45-D-04).
+
+### La dérogation (GATE-11)
+
+La commande `deroger-gate.sh --lab=… --gate=<G1|G5|G6|G7|ROLE> --chemin=… --qui=… --canal=…
+--date=… --raison=…` inscrit une dérogation **nominative** (qui, canal, date, gate, chemin(s), raison)
+dans le journal append-only `.planning/derogations-gates.log`, une ligne par chemin, champs en
+encodage pourcent injectif (P45-D-13). Une raison vide, `TODO`, `xxx`, une ellipse ou `<…>` est
+refusée après normalisation Unicode. Elle n'est **jamais conditionnée à l'urgence** : aucune option,
+aucune horloge ne conditionne l'acceptation (spec §5.2). Durée de vie : **usage unique** par
+(gate, chemin) ; le hook qui laisse passer une action grâce à elle ajoute une ligne `consommee` et la
+**cite** dans la sortie de l'action (numéro, gate, chemin, auteur, canal, date, raison) ; sans effet
+sur un gate en observation. Le journal doit être un fichier régulier : un lien annule toute
+dérogation. Limite : l'identité déclarée (`--qui`) n'est pas vérifiée, la commande ne peut pas savoir
+qui la lance (T-45-34).
+
+### La commande de verdict (GATE-05)
+
+`poser-verdict.sh --unite=… --juge=… --tentative=… --score=… --constat=<critère>::<passé|échec>` est le
+**seul** chemin légitime vers `VERDICT.md` (lancée par Bash, elle n'est jamais vue par G5). Le hash
+(sha256 des octets du `PLAN.md` de l'unité, A3 = a3-plan) et la tentative (1 à la création, ancienne
+tentative + 1 pour remplacer) sont calculés **par la commande**, jamais fournis par l'agent ;
+l'écriture est atomique et ne traverse jamais un lien. Elle est agnostique de l'appelant (F8 =
+f8-agnostique, Willy, AskUserQuestion session principale, 2026-09-30) : un juge qui a `Bash` la lance
+lui-même, les autres livrent leur rapport au manager qui la lance. Artefact haché : le plan, pas le
+livrable ; la vérification du hash à la clôture est la Phase 46 (limite : `--juge` est déclaratif).
+
+### Le journal d'observation
+
+Un gate en observation écrit une ligne par refus évité dans
+`${XDG_CACHE_HOME}/vibeflow/gates-observation/observation.log` (à défaut `${HOME}/.cache/…`), ajout
+seul, fichier 0600 : horodatage, gate, lab, chemin, outil, raison — **jamais** le contenu écrit ni la
+commande. Un journal impossible à écrire ne devient jamais un refus. Limite (r).
+
+### Le canary (GATE-12)
+
+Un canary rejoue la **commande enregistrée telle quelle** (celle des réglages, jamais un appel direct
+au script) sur des payloads qui doivent être refusés. En **CI**, il est bloquant : la suite
+`plugin/_internal/tests/test-planning-hook-installed.sh` installe `planning-core` par l'installeur
+inchangé et rejoue la commande posée (script absent, `python3` absent, script qui sort 1 puis 2).
+Au **démarrage de session** d'un lab adhérent (`check-gates-alive.sh`, `SessionStart` `startup`), il
+signale sans jamais bloquer, par une seule ligne : hook central non enregistré, commande enregistrée
+non reconnue (le canary n'exécute que la commande de référence), mode dégradé, constantes
+d'armement absentes ou illisibles, gate armé sans cas de canary, cas en échec. L'attendu de chaque cas
+est **dérivé** de la table d'armement du script frère : observation (stdout vide et une ligne au
+journal jetable) tant que le gate est `observe`, refus de gate dès qu'il est `armed`. Couverture
+minimale déclarée et vérifiée cas par cas (P45-D-20) : script absent, `python3` absent, `Task` et
+`Agent`, fil principal, agent `plugin:`. Il rend visible la limite (i).
+
+### Le rejeu (GATE-13)
+
+`rejeu-gates.sh` mesure ce qu'un gate armé refuserait, sur une **copie** du lab (adhésion et armement
+simulés, aucune commande git) : un attendu par écriture, un relevé `gate | lab | chemin | attendu |
+obtenu | raison`, des comptes par gate (faux refus, faux accept, refus conformes au modèle).
+`rejeu-reel.sh` est le geste de rejeu sur un lab réel : il prend l'empreinte de **tout** l'arbre
+avant et après, par un geste extérieur à l'outil mesuré, comparée octet pour octet. Règles
+(P45-D-21) : hors CI, en lecture seule, chemins affichés sous la forme `~/…`, aucun chemin de machine
+dans le code livré. Pour un lab réel **non migré**, **le modèle fait référence** (P45-D-21a) : une
+écriture que le modèle interdit — le `PLAN.md` d'une phase sans `CADRAGE.md`, un `.planning/` orphelin
+de la table D-05 — est un **refus conforme au modèle, lab non migré** ; il est compté à part, jamais en
+faux refus ni en faux accept ; le seuil d'armement porte sur les faux refus et les faux accepts. La
+classification est **totale** (P45-D-21c) : l'état dérivé par `recalc-planning.sh --read-only` fait
+référence quand il existe, sinon la règle écrite du modèle s'applique avec le code propre de l'outil,
+dans un sous-compte distinct. Limite (x).
+
+### Coût de migration d'un lab
+
+Un lab non migré qui adhère à `cycles-v1` découvre, au premier jour des gates armés, ce que le modèle
+lui interdit. Ce qu'il faut écrire : **un `CADRAGE.md` par phase de forme modèle qui n'en a pas**, ou
+une **dérogation nominative** (`deroger-gate.sh`) par écriture à laisser passer. Comment le mesurer :
+`rejeu-reel.sh --lab=<chemin> --etape=2` rend, par motif, le nombre de refus conformes au modèle de G1
+(phases sans cadrage), et `--etape=3` ajoute ceux de G7 (planning orphelin, avec un fichier d'attendus
+`--attendus=<fichier>`). Les nombres relevés sur les labs réels du poste vivent dans l'artefact de phase
+`45-COUT-MIGRATION.md`, jamais dans le code livré ni dans cette référence (P45-D-21, P45-D-21a).
+
 ## Hors de cette phase
 
-Ce que la Phase 44 **ne fait pas** :
+Ce que les Phases 44 et 45 **ne font pas** :
 
-- **Aucun hook ni gate câblé** : le recalcul est une commande, pas un mécanisme de refus. Où il
-  tournera (`SessionStart`, clôture, écriture) se décide en Phases 45/48 (P44-D-15).
-- **Fichiers générés non protégés contre l'écriture à la main** : `G6` (protection de `STATE.md`,
-  `INDEX.md`, `cloture.log`) arrive en Phase 45 (P44-D-15).
-- Le drapeau `"phases_trace": false` du `config.json` d'un lab **n'est pas lu** par cette phase ;
-  l'arbitrage d'usage (que doit rendre le traçage pour valoir son prix, à quelle frontière on le
-  limite) est renvoyé au cadrage de la Phase 45 (P44-D-05).
+- **G2′, G3, G4, G4′ et D1** (`TaskCompleted`, `SubagentStop`, `FileChanged`) : Phases 46 et 47. La
+  **vérification du hash** de `VERDICT.md` à la clôture : Phase 46.
+- **Le hook managed** (seul à résister à `disableAllHooks`) : hors périmètre ; le gate détecte et
+  trace, il ne verrouille pas.
+- **`guard-planning-updated.sh` n'est pas retiré** et reste en exit 2 (entrée `Stop` de `hooks.json`
+  inchangée, P45-D-19, ADR-031 : suppression de code sous validation humaine).
+- Les drapeaux `"phases_trace"` et `options.gates` du `config.json` d'un lab **ne sont lus par aucune
+  phase** et restent sans effet : les gates s'arment avec l'adhésion (P45-D-01).
 - **Le socle métier v2 existant n'est pas retiré** : le remplacement est **additif** — les labs qui
   adhèrent à `cycles-v1` passent au moteur, les autres restent sur l'existant. Tout retrait de
-  code existant (`guard-planning-updated.sh`, prose « scaffoldeur » du `SKILL.md`) arrive **avec
-  les gates**, sous validation humaine (ADR-031 : suppression de code) (P44-D-01e).
+  code existant (prose « scaffoldeur » du `SKILL.md`) se fait sous validation humaine (ADR-031 :
+  suppression de code) (P44-D-01e).
 - Les **baux** (`.planning/baux/`) : Phase 47.
 - L'**injection de l'index** et le **pont mémoire** : Phase 48.
 - Les **cycles récurrents** (`recurrent: true`, cadence, `bloqué par un tiers`) : spec §8, hors
