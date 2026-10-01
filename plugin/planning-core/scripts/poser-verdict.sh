@@ -131,6 +131,20 @@ def sous_planning(chemin):
     return any(c.casefold() == ".planning" for c in chemin.split(os.sep))  # sous-planning-casse
 
 
+def sous_claude(chemin):
+    """Vrai si `chemin` est (ou est sous) un composant `.claude` (casse ignorée) autre que `.claude/worktrees/<nom>` : un dossier
+    `.planning` qui y est créé n'est JAMAIS une racine de lab — sinon un Write de `<lab>/.claude/scripts/.planning/x` ferait de
+    `.claude/scripts` une racine non adhérente et désarmerait la protection de ses scripts (amendement de P45-D-01a, décision du manager
+    vf-dev-manager, 2026-10-01). Seul le DERNIER composant `.claude` compte, et `.claude/worktrees/<nom>` (là où Claude Code pose les
+    worktrees d'un lab, dont celui où l'on travaille) reste une racine possible."""
+    composants = chemin.split(os.sep)
+    places = [i for i, c in enumerate(composants) if c.casefold() == ".claude"]  # sous-claude-casse
+    if not places:
+        return False
+    reste = [c for c in composants[places[-1] + 1:] if c]  # sous-claude-dernier
+    return not (len(reste) >= 2 and reste[0].casefold() == "worktrees")  # sous-claude-worktrees
+
+
 def racine_lab(depart):
     """Racine physique du lab : le PLUS PROCHE ancêtre qui contient un DOSSIER `.planning` (le
     plus proche gagne, P45-D-01a/P45-D-12) et qui n'est pas lui-même dans (ou sous) un composant `.planning`
@@ -139,7 +153,7 @@ def racine_lab(depart):
         return None
     courant = _partie_existante(depart)
     while True:
-        if os.path.isdir(os.path.join(courant, ".planning")) and not sous_planning(courant):  # racine-imbriquee
+        if os.path.isdir(os.path.join(courant, ".planning")) and not sous_planning(courant) and not sous_claude(courant):  # racine-imbriquee racine-claude
             return courant
         parent = os.path.dirname(courant)
         if parent == courant:

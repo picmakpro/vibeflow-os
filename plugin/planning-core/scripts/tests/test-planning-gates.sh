@@ -2935,7 +2935,11 @@ def controle_g6_08(ctx, script):
            (".claude/scripts/dur.sh", None), ("lien-hook.sh", None), ("alias-scripts/planning-hook.sh", None),
            (".claude/scripts/x/../planning-hook.sh", None), (".claude/../.claude/scripts/planning-hook.sh", None),
            (".claude/scripts/check-gates-alive.sh", None), (".claude/scripts/Check-Gates-Alive.SH", None),
-           (".claude/scripts/planning-hook.sh", "plugin-inconnu:agent-inconnu"), ("livrables/dur-hook.sh", "agent-inconnu"))
+           (".claude/scripts/planning-hook.sh", "plugin-inconnu:agent-inconnu"), ("livrables/dur-hook.sh", "agent-inconnu"),
+           # lot E, F3 : création d'un script ABSENT par un dossier aliasé ou de casse différente (le dossier se juge par samefile, jamais
+           # par comparaison de chaînes : sous le mutant G6-SCRIPT-DOSSIER-CHAINES, une autre casse du dossier échappe à G6)
+           ("alias-scripts/check-gates-alive.sh", None), (".CLAUDE/scripts/check-gates-alive.sh", None),
+           (".claude/Scripts/check-gates-alive.sh", None), (".CLAUDE/SCRIPTS/Check-Gates-Alive.SH", "agent-inconnu"))
     for rel, agent in cas:
         bon, detail = _refus_de(ctx, hook, lab, "G6", "Write", rel, agent=agent)
         if not bon:
@@ -3243,6 +3247,7 @@ def sec_mutants(ctx):
         # Q-G6 = (b) : scripts du hook
         ("G6-SCRIPTS", "# g6-scripts", "SCRIPTS_HOOK_G6 = ()  # g6-scripts", "R-G6-06", controle_g6_06),
         ("G6-SCRIPT-RACINE", "# g6-script-racine", "if False:  # g6-script-racine", "R-G6-08", controle_g6_08),
+        ("G6-SCRIPT-DOSSIER-CHAINES", "# g6-script-racine", "if parent == dossier:  # g6-script-racine", "R-G6-08", controle_g6_08),
         ("G6-SCRIPT-CASEFOLD", "# g6-script-casefold", "if canonique == nom:  # g6-script-casefold", "R-G6-08", controle_g6_08),
         ("G6-SCRIPT-SAMEFILE", "# g6-script-samefile", "if False:  # g6-script-samefile", "R-G6-08", controle_g6_08),
         ("G6-SCRIPT-ADHESION", "sys.exit(0)  # non-adherent", "pass", "R-G6-07", controle_g6_07),
@@ -3554,6 +3559,124 @@ def controle_imbrique_cas_canary(ctx, script):
 
 
 lota_mutant("IMB-HOOK-CANARY", "# racine-imbriquee", 'if os.path.isdir(os.path.join(courant, ".planning")):  # racine-imbriquee', "R-IMB-05")
+
+
+# --- LOT E, constat F1 (revue du lot D) : un `.planning` sous un composant `.claude` n'est jamais une racine de lab -----------
+# Amendement de P45-D-01a (décision du manager vf-dev-manager, 2026-10-01, renversable) : sans lui, la chaîne Write de
+# `.claude/scripts/package.json`, Write de `.claude/scripts/.planning/x.md`, Write de `.claude/scripts/planning-hook.sh` faisait de
+# `.claude/scripts` une racine non adhérente : silence, tous gates armés. Exception mesurée : `.claude/worktrees/<nom>` (là où Claude Code
+# pose les worktrees d'un lab) reste une racine possible, sans quoi tout lab travaillé dans un worktree serait jugé par son voisin.
+# Quatre implémentations de la règle : `racine_lab` du hook, de poser-verdict.sh, `racine_planning` du canary, `vf_tight` de hooks.json.
+VARIANTES_CLAUDE = ("a", "b", "c")
+
+
+def lab_claude(ctx, variante):
+    """Lab adhérent dont `.claude` porte un `.planning` : a = `.claude/.planning`, b = `.claude/scripts/.planning`, c = lab posé sous
+    `<x>/.claude/worktrees/wt` avec `.claude/scripts/.planning`. Rend (lab, dossier du `.planning` créé)."""
+    base = ctx.unique("lab-claude-" + variante)
+    lab = os.path.join(base, ".claude", "worktrees", "wt") if variante == "c" else base
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    rel = {"a": (".claude", ".planning"), "b": (".claude", "scripts", ".planning"), "c": (".claude", "scripts", ".planning")}[variante]
+    imbrique = os.path.join(lab, *rel)
+    os.makedirs(imbrique)
+    return lab, imbrique
+
+
+def racines_extraites(chemin_script, marqueur, noms):
+    """Fonctions `noms` du corps Python embarqué, exécutées ensemble dans un espace de noms jetable (rend l'espace de noms)."""
+    corps = corps_python(open(chemin_script, encoding="utf-8").read(), marqueur)
+    choisies = [n for n in ast.parse(corps).body if isinstance(n, ast.FunctionDef) and n.name in noms]
+    ns = {"os": os, "re": re}
+    exec(compile(ast.Module(body=choisies, type_ignores=[]), chemin_script, "exec"), ns)
+    return ns
+
+
+@lota("R-CLAUDE-01")
+def controle_claude_hook(ctx, script):
+    """Copie armée : un `.planning` sous `.claude` (a, b) ou sous `.claude/scripts` d'un lab posé sous `.claude/worktrees/<nom>` (c) ne
+    fait jamais de ce dossier une racine non adhérente — Write du script du hook (chemin absolu, puis relatif depuis un cwd dans
+    `.claude/scripts`) et d'un fichier généré : un deny G6 chacun."""
+    armee = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    for variante in VARIANTES_CLAUDE:
+        lab, imbrique = lab_claude(ctx, variante)
+        scripts = os.path.join(lab, ".claude", "scripts")
+        os.makedirs(scripts, exist_ok=True)
+        for nom, cible, cwd in (("script absolu", os.path.join(scripts, "planning-hook.sh"), lab),
+                                ("script relatif", "planning-hook.sh", scripts),
+                                ("fichier généré", os.path.join(lab, ".planning", "STATE.md"), lab)):
+            n += 1
+            brut = payload("Write", entree_outil("Write", cible), cwd)
+            rc, out, err = ctx.lancer("A", brut, cwd=cwd, dossier=armee)
+            conforme, detail = deny_de(rc, out, err, "G6")
+            if not conforme:
+                fautes.append("variante %s, %s : %s" % (variante, nom, detail))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus G6 (script du hook absolu et relatif, fichier généré, trois variantes de `.planning` sous `.claude`)" % n)
+
+
+@lota("R-CLAUDE-02")
+def controle_claude_poser(ctx, script):
+    """poser-verdict.sh : `racine_lab` d'un chemin sous `.claude/scripts` (a, b) ou sous le `.claude/scripts` d'un worktree (c) rend le lab,
+    jamais le dossier qui porte le `.planning` créé sous `.claude`."""
+    ns = racines_extraites(os.path.join(_dossier(ctx, script), "poser-verdict.sh"), "PY_POSER_VERDICT_EOF",
+                           ("_partie_existante", "sous_planning", "sous_claude", "racine_lab"))
+    fautes = []
+    for variante in VARIANTES_CLAUDE:
+        lab, imbrique = lab_claude(ctx, variante)
+        obtenu = ns["racine_lab"](os.path.realpath(os.path.dirname(imbrique)) + "/x")
+        if obtenu != os.path.realpath(lab):
+            fautes.append("variante %s : racine %r (attendu %r)" % (variante, obtenu, os.path.realpath(lab)))
+    return (not fautes), ("; ".join(fautes) if fautes else "la racine reste le lab sur les trois variantes")
+
+
+@lota("R-CLAUDE-03")
+def controle_claude_canary(ctx, script):
+    """Canary : une session dont le cwd est `.claude/scripts` (a : `.claude`) d'un lab adhérent portant un `.planning` à cet endroit est
+    reconnue adhérente (code 0, « mode dégradé »), jamais « hors lab adhérent » (code 3)."""
+    d = _dossier(ctx, script)
+    fautes = []
+    for variante in VARIANTES_CLAUDE:
+        lab, imbrique = lab_claude(ctx, variante)
+        rc, out, err = canary_degrade(ctx, d, os.path.dirname(imbrique))
+        if rc != 0 or b"mode d\xc3\xa9grad\xc3\xa9" not in out:
+            fautes.append("variante %s : rc=%d stdout=%s" % (variante, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "les trois variantes sont reconnues adhérentes (code 0, « mode dégradé »)")
+
+
+@lota("R-CLAUDE-04")
+def controle_sous_claude(ctx, script):
+    """`sous_claude` (hook, poser-verdict.sh, canary) : vrai pour un chemin dont le dernier composant `.claude` (casse ignorée) n'est pas
+    suivi de `worktrees/<nom>` ; faux pour `.claudex`, `x.claude`, un chemin sans `.claude`, `.claude/worktrees/<nom>[/...]`."""
+    d = _dossier(ctx, script)
+    fautes = []
+    for nom, marqueur in (("planning-hook.sh", "PY_PLANNING_HOOK_EOF"), ("poser-verdict.sh", "PY_POSER_VERDICT_EOF"),
+                          ("check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF")):
+        f = fonction_extraite(os.path.join(d, nom), marqueur, "sous_claude")
+        if f is None:
+            fautes.append("%s : sous_claude absente" % nom)
+            continue
+        for chemin, attendu in (("/a/.claude", True), ("/a/.CLAUDE", True), ("/a/.claude/scripts", True), ("/a/.Claude/Scripts/b", True),
+                                ("/a/.claude/worktrees", True), ("/a/.claude/worktrees/", True),
+                                ("/a/.claude/worktrees/wt/.claude/scripts", True), ("/a/.claude/worktrees/wt/.claude", True),
+                                ("/a/.claude/worktrees/wt", False), ("/a/.CLAUDE/Worktrees/wt/b", False),
+                                ("/a/.claudex/b", False), ("/a/x.claude/b", False), ("/a/b", False), ("/", False)):
+            if f(chemin) is not attendu:
+                fautes.append("%s : sous_claude(%r) = %r (attendu %r)" % (nom, chemin, f(chemin), attendu))
+    return (not fautes), ("; ".join(fautes) if fautes else "dernier composant `.claude`, casse ignorée, exception `worktrees/<nom>`, dans les trois scripts")
+
+
+_ANCIEN_HOOK = 'if os.path.isdir(os.path.join(courant, ".planning")) and not sous_planning(courant):  # racine-imbriquee racine-claude'
+lota_mutant("CLAUDE-HOOK", " racine-claude", _ANCIEN_HOOK, "R-CLAUDE-01")
+lota_mutant("CLAUDE-POSER", " racine-claude", _ANCIEN_HOOK, "R-CLAUDE-02", "poser-verdict.sh", "PY_POSER_VERDICT_EOF")
+lota_mutant("CLAUDE-CANARY", " racine-claude", 'if os.path.isdir(os.path.join(d, ".planning")) and not sous_planning(d):  # racine-imbriquee racine-claude',
+            "R-CLAUDE-03", "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF")
+lota_mutant("CLAUDE-WORKTREES", "# sous-claude-worktrees", 'return True  # sous-claude-worktrees', "R-CLAUDE-01")
+lota_mutant("CLAUDE-DERNIER", "# sous-claude-dernier", 'reste = [c for c in composants[places[0] + 1:] if c]  # sous-claude-dernier', "R-CLAUDE-01")
+lota_mutant("CLAUDE-CASSE", "# sous-claude-casse", 'places = [i for i, c in enumerate(composants) if c == ".claude"]  # sous-claude-casse', "R-CLAUDE-04")
+lota_mutant("CLAUDE-CASSE-POSER", "# sous-claude-casse", 'places = [i for i, c in enumerate(composants) if c == ".claude"]  # sous-claude-casse', "R-CLAUDE-04",
+            "poser-verdict.sh", "PY_POSER_VERDICT_EOF")
+lota_mutant("CLAUDE-CASSE-CANARY", "# sous-claude-casse", 'places = [i for i, c in enumerate(composants) if c == ".claude"]  # sous-claude-casse', "R-CLAUDE-04",
+            "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF")
 
 
 # --- LOT A, constat 4 (revue m2) : une dérogation n'est consommée que si la décision FINALE est un passage grâce à elle ---------
@@ -4439,6 +4562,7 @@ def ecarts_reference(texte, ns, texte_hook, canaris, commande, matcher):
             ecarts.append("ECART %s : référence %s, code %s" % (etiquette, sorted(lus), sorted(attendu)))
 
     jetons_de("- **Noms protégés par G6**", {nom for nom, _genre in ns["PROTEGES_G6"].values()}, "noms protégés par G6")
+    jetons_de("- **Scripts du hook protégés par G6**", set(ns["SCRIPTS_HOOK_G6"]), "scripts du hook protégés par G6")
     jetons_de("- **Journal de dérogation**", {ns["NOM_JOURNAL_DEROGATIONS"]}, "nom du journal de dérogation")
     jetons_de("- **Marqueurs de projet de code (G7)**", set(ns["MARQUEURS_CODE"]) | {"*" + ns["SUFFIXE_XCODEPROJ"]}, "marqueurs de code")
     refuses, ouverts = outils_commande(commande, matcher)
@@ -4522,6 +4646,8 @@ def sec_reference(ctx):
     mutant_texte("OUTIL", lambda t: remplacer_ligne_reference(t, "- **Outils refusés en mode dégradé**", lambda l: l.replace("`Agent`, ", "", 1)),
                  "`Agent` retiré de la liste des outils refusés en mode dégradé")
     mutant_texte("LIMITE-L", lambda t: remplacer_ligne_reference(t, "- **limite (l)**", None), "la ligne de la limite (l) retirée")
+    mutant_texte("SCRIPTS", lambda t: remplacer_ligne_reference(t, "- **Scripts du hook protégés par G6**", lambda l: l.replace("`check-gates-alive.sh`", "`check-gates-alive.shx`", 1)),
+                 "`check-gates-alive.sh` renommé dans la liste des scripts du hook protégés")
     mutant_texte("JOURNAL", lambda t: remplacer_ligne_reference(t, "- **Journal de dérogation**", lambda l: l.replace("derogations-gates.log", "derogations.log")),
                  "nom du journal de dérogation changé")
     mutant_texte("MARQUEURS", lambda t: remplacer_ligne_reference(t, "- **Marqueurs de projet de code (G7)**", lambda l: l.replace("`Gemfile`, ", "", 1)),
@@ -4551,6 +4677,13 @@ def sec_reference(ctx):
     # fixe : le mutant reste opposable quel que soit l'état d'armement courant.
     inverse = "observe" if ns["TABLE_ARMEMENT"]["G1"] == "armed" else "armed"
     ns_mut["TABLE_ARMEMENT"] = dict(ns["TABLE_ARMEMENT"], G1=inverse)
+    ns_scripts = dict(ns)
+    ns_scripts["SCRIPTS_HOOK_G6"] = tuple(ns["SCRIPTS_HOOK_G6"]) + ("autre-script.sh",)
+    ecarts_s = controler(chemin, ns_scripts)
+    if ecarts_s:
+        okmut("REFERENCE-CODE-SCRIPTS", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant, un script ajouté à SCRIPTS_HOOK_G6 dans le code, référence intacte) : %d écart(s), premier : %s" % (len(ecarts_s), ecarts_s[0].replace("ECART ", "écart : ", 1)))
+    else:
+        komut("REFERENCE-CODE-SCRIPTS", "R-REFERENCE rougit quand un script protégé est ajouté dans le code sans la référence", "au moins un écart", "aucun écart")
     ecarts_c = controler(chemin, ns_mut)
     if ecarts_c:
         okmut("REFERENCE-CODE", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant, ARMEMENT_G1 inversé en %s dans le code, référence intacte) : %d écart(s), premier : %s" % (inverse, len(ecarts_c), ecarts_c[0].replace("ECART ", "écart : ", 1)))

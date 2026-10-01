@@ -158,7 +158,8 @@ NL='
 '; TB=$(printf '\t')
 vf_get() { _m=$(printf '%s' "$I" | LC_ALL=C grep -a -o -E '"'"$1"'"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -n 1); [ -n "$_m" ] || return 1; _m=${_m#*:}; while :; do case $_m in ' '*|"$TB"*) _m=${_m#?} ;; *) break ;; esac; done; _m=${_m#\"}; V=""; X=1; while :; do _s=${_m%%[\"\\]*}; V=$V$_s; _m=${_m#"$_s"}; case $_m in '') X=0; return 0 ;; \"*) return 0 ;; \\\"*) V=$V\" ;; \\\\*) V=$V\\ ;; \\/*) V=$V/ ;; \\n*) V=$V$NL ;; \\t*) V=$V$TB ;; *) X=0; return 0 ;; esac; _m=${_m#??}; done; }
 vf_norm() { _r=/; _z=${1#/}; while [ -n "$_z" ]; do case $_z in */*) _c=${_z%%/*}; _z=${_z#*/} ;; *) _c=$_z; _z= ;; esac; case $_c in ""|.) ;; ..) _r=${_r%/*}; [ -n "$_r" ] || _r=/ ;; *) if [ "$_r" = / ]; then _n=/$_c; else _n=$_r/$_c; fi; if [ -d "$_n" ] && _y=$(cd -P -- "$_n" 2>/dev/null && pwd -P) && [ -n "$_y" ]; then _r=$_y; else _r=$_n; fi ;; esac; done; }
-vf_tight() { _d=$1; case $_d in /*) ;; *) return 1 ;; esac; vf_norm "$_d"; _d=$_r; while :; do if [ -d "$_d" ]; then break; fi; [ "$_d" = / ] && return 1; _q=${_d%/*}; [ -z "$_q" ] && _q=/; [ "$_q" = "$_d" ] && return 1; _d=$_q; done; while :; do case $_d/ in */[.][Pp][Ll][Aa][Nn][Nn][Ii][Nn][Gg]/*) ;; *) if [ -d "$_d/.planning" ]; then [ -f "$_d/.planning/config.json" ] && LC_ALL=C grep -a -q -E '"planning_version"[[:space:]]*:[[:space:]]*"cycles-v1"' "$_d/.planning/config.json" 2>/dev/null; return $?; fi ;; esac; [ "$_d" = / ] && return 1; _q=${_d%/*}; [ -z "$_q" ] && _q=/; [ "$_q" = "$_d" ] && return 1; _d=$_q; done; }
+vf_cl() { _w=$1/; case $_w in */[.][Cc][Ll][Aa][Uu][Dd][Ee]/*) _w=${_w##*/[.][Cc][Ll][Aa][Uu][Dd][Ee]/}; case $_w in [Ww][Oo][Rr][Kk][Tt][Rr][Ee][Ee][Ss]/?*/) return 1 ;; esac; return 0 ;; esac; return 1; }
+vf_tight() { _d=$1; case $_d in /*) ;; *) return 1 ;; esac; vf_norm "$_d"; _d=$_r; while :; do if [ -d "$_d" ]; then break; fi; [ "$_d" = / ] && return 1; _q=${_d%/*}; [ -z "$_q" ] && _q=/; [ "$_q" = "$_d" ] && return 1; _d=$_q; done; while :; do case $_d/ in */[.][Pp][Ll][Aa][Nn][Nn][Ii][Nn][Gg]/*) ;; *) if ! vf_cl "$_d" && [ -d "$_d/.planning" ]; then [ -f "$_d/.planning/config.json" ] && LC_ALL=C grep -a -q -E '"planning_version"[[:space:]]*:[[:space:]]*"cycles-v1"' "$_d/.planning/config.json" 2>/dev/null; return $?; fi ;; esac; [ "$_d" = / ] && return 1; _q=${_d%/*}; [ -z "$_q" ] && _q=/; [ "$_q" = "$_d" ] && return 1; _d=$_q; done; }
 D=1; for K in file_path notebook_path; do if vf_get "$K"; then P=$V; PX=$X; case $P in /*) ;; *) if vf_get cwd; then P=$V/$P; else P=$(pwd -P)/$P; fi ;; esac; if vf_tight "$P"; then D=0; elif [ "$PX" = 0 ]; then D=0; fi; K=done; break; fi; done
 if [ "$K" != done ]; then if vf_get cwd; then vf_tight "$V" && D=0; else vf_tight "$(pwd -P)" && D=0; fi; fi
 [ "$D" -eq 0 ] || exit 0
@@ -257,10 +258,24 @@ def sous_planning(chemin):
     return any(c.casefold() == ".planning" for c in chemin.split(os.sep))  # sous-planning-casse
 
 
+def sous_claude(chemin):
+    """Vrai si `chemin` est (ou est sous) un composant `.claude` (casse ignorée) autre que `.claude/worktrees/<nom>` : un dossier
+    `.planning` qui y est créé n'est JAMAIS une racine de lab — sinon un Write de `<lab>/.claude/scripts/.planning/x` ferait de
+    `.claude/scripts` une racine non adhérente et désarmerait la protection de ses scripts (amendement de P45-D-01a, décision du manager
+    vf-dev-manager, 2026-10-01). Seul le DERNIER composant `.claude` compte, et `.claude/worktrees/<nom>` (là où Claude Code pose les
+    worktrees d'un lab, dont celui où l'on travaille) reste une racine possible."""
+    composants = chemin.split(os.sep)
+    places = [i for i, c in enumerate(composants) if c.casefold() == ".claude"]  # sous-claude-casse
+    if not places:
+        return False
+    reste = [c for c in composants[places[-1] + 1:] if c]  # sous-claude-dernier
+    return not (len(reste) >= 2 and reste[0].casefold() == "worktrees")  # sous-claude-worktrees
+
+
 def racine_planning(depart):
     d = depart
     while True:
-        if os.path.isdir(os.path.join(d, ".planning")) and not sous_planning(d):  # racine-imbriquee
+        if os.path.isdir(os.path.join(d, ".planning")) and not sous_planning(d) and not sous_claude(d):  # racine-imbriquee racine-claude
             return d
         parent = os.path.dirname(d)
         if parent == d:

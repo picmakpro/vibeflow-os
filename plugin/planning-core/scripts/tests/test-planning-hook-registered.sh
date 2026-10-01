@@ -650,7 +650,7 @@ def sec_modes(ctx):
 # `none` (silence : Bash et toute lecture, limites déclarées (a) à (d), P45-D-06b).
 # =================================================================================================
 PLANCHER_MIN = 49        # plancher de la recherche : un corpus vidé rougit
-PLANCHER_CORPUS = 72     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
+PLANCHER_CORPUS = 76     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
 
 
 class Cas:
@@ -705,6 +705,13 @@ def construire_arbre(t):
                      ("imb-c", ".planning/cycles/01-c/phases/01-p/.planning")):
         lab(nom, True)
         os.makedirs(os.path.join(t, nom, rel))
+    # Lot E (F1, amendement de P45-D-01a, décision du manager vf-dev-manager, 2026-10-01) : un `.planning` situé sous un composant
+    # `.claude` n'est jamais une racine de lab (sauf `.claude/worktrees/<nom>`, où Claude Code pose les worktrees d'un lab).
+    for nom, rel in (("claude-a", ".claude/.planning"), ("claude-b", ".claude/scripts/.planning")):
+        lab(nom, True)
+        os.makedirs(os.path.join(t, nom, rel))
+    lab(".claude/worktrees/wt", True)
+    os.makedirs(os.path.join(t, ".claude", "worktrees", "wt", ".claude", "scripts", ".planning"))
     os.makedirs(os.path.join(t, "bare"), exist_ok=True)
     _lien("adh", os.path.join(t, "alias-adh"))
     os.makedirs(os.path.join(t, "lab-plink"), exist_ok=True)
@@ -721,8 +728,9 @@ def construire_arbre(t):
         L.setdefault(nom, os.path.join(t, nom))
     L["devout/inner"] = os.path.join(t, "devout", "inner")
     L["adhout/inner-dev"] = os.path.join(t, "adhout", "inner-dev")
-    for nom in ("imb-a", "imb-b", "imb-c"):
+    for nom in ("imb-a", "imb-b", "imb-c", "claude-a", "claude-b"):
         L.setdefault(nom, os.path.join(t, nom))
+    L["wt"] = os.path.join(t, ".claude", "worktrees", "wt")
     for nom in ("alias-adh", "lab-plink", "bare", "cfglink", "nextline", "escaped", "dev-note", "dev-sans-config"):
         L.setdefault(nom, os.path.join(t, nom))
     return L
@@ -839,6 +847,11 @@ def construire_corpus(ctx):
     w("A21", "Write", L["imb-c"] + "/" + phase_imb + "VERDICT.md", dev, "tight", note="`<phase>/.planning` : la phase n'est jamais une racine")
     w("A22", "Edit", L["imb-c"] + "/" + phase_imb + "PLAN.md", dev, "tight", note="`<phase>/.planning`, Edit du PLAN.md de la phase")
     w("A23", "NotebookEdit", L["imb-c"] + "/" + phase_imb + "nb.ipynb", dev, "tight", note="`<phase>/.planning`, NotebookEdit")
+    # ---- A24-A27 : `.planning` sous `.claude` (lot E, F1) — chaque cas se joue dans les six modes
+    w("A24", "Write", L["claude-b"] + "/.claude/scripts/planning-hook.sh", dev, "tight", note="`.claude/scripts/.planning` : la racine reste le lab, le script du hook reste gardé")
+    w("A25", "Write", L["claude-a"] + "/.claude/notes.md", dev, "tight", note="`.claude/.planning` : la racine reste le lab")
+    w("A26", "Write", L["wt"] + "/.planning/notes.md", dev, "tight", note="lab adhérent posé sous `.claude/worktrees/<nom>` : reste une racine")
+    w("A27", "Write", L["wt"] + "/.claude/scripts/planning-hook.sh", dev, "tight", note="`.claude/scripts/.planning` d'un lab sous `.claude/worktrees/<nom>` : la racine reste ce lab")
     # ---- E37-E39 : échappement JSON non géré (b, f, u0001) dans le chemin écrit, lot A (audit B1, basse). La couche shell
     # ne peut pas décoder la valeur (X=0 : préfixe seulement) ; en panne, un préfixe hors de tout lab adhérent avec un cwd
     # hors du lab ne doit JAMAIS ouvrir : le doute d'adhésion ferme (P45-D-06a), comme E11b.
@@ -950,6 +963,15 @@ def extrait_reference(brut):
     return "none", None, None
 
 
+def _sous_claude_reference(chemin):
+    """Oracle (lot E, F1) : le DERNIER composant `.claude` n'est pas suivi de `worktrees/<nom>`."""
+    comps = chemin.lower().split(os.sep)
+    if ".claude" not in comps:
+        return False
+    reste = [c for c in comps[len(comps) - 1 - comps[::-1].index(".claude") + 1:] if c]
+    return not (len(reste) >= 2 and reste[0] == "worktrees")
+
+
 def tight_reference(chemin):
     if not chemin.startswith("/"):
         return None
@@ -960,7 +982,8 @@ def tight_reference(chemin):
             return False
         courant = parent
     while True:
-        if os.path.isdir(os.path.join(courant, ".planning")) and ".planning" not in [c.lower() for c in courant.split(os.sep)]:
+        if os.path.isdir(os.path.join(courant, ".planning")) and ".planning" not in [c.lower() for c in courant.split(os.sep)] \
+                and not _sous_claude_reference(courant):
             cfg = os.path.join(courant, ".planning", "config.json")
             if not os.path.isfile(cfg):
                 return False
@@ -1161,6 +1184,10 @@ def sec_mutants(ctx):
         ("EXT-11", 'if [ -d "$_n" ] && _y=$(cd', 'if false && _y=$(cd', "A18", "C", {}),
         ("EXT-12", '*/[.][Pp][Ll][Aa][Nn][Nn][Ii][Nn][Gg]/*) ;;', '*/[.][Zz][Zz][Zz]/*) ;;', "A21", "C", {}),
         ("EXT-12D", '*/[.][Pp][Ll][Aa][Nn][Nn][Ii][Nn][Gg]/*) ;;', '*/[.][Zz][Zz][Zz]/*) ;;', "A19", "D", {}),
+        ("EXT-13", 'if ! vf_cl "$_d" && [ -d "$_d/.planning" ]; then', 'if [ -d "$_d/.planning" ]; then', "A24", "C", {}),
+        ("EXT-13D", 'if ! vf_cl "$_d" && [ -d "$_d/.planning" ]; then', 'if [ -d "$_d/.planning" ]; then', "A25", "D", {}),
+        ("EXT-14", 'case $_w in [Ww][Oo][Rr][Kk][Tt][Rr][Ee][Ee][Ss]/?*/) return 1 ;; esac; ', '', "A26", "C", {}),
+        ("EXT-15", '_w=${_w##*/[.][Cc][Ll][Aa][Uu][Dd][Ee]/}', '_w=${_w#*/[.][Cc][Ll][Aa][Uu][Dd][Ee]/}', "A27", "C", {}),
         ("PX-1", 'elif [ "$PX" = 0 ]; then D=0; fi', 'elif [ "$PX" = 0 ] && { vf_get cwd && vf_tight "$V"; }; then D=0; fi', "E37", "C", {}),
         ("PX-1D", 'elif [ "$PX" = 0 ]; then D=0; fi', 'elif [ "$PX" = 0 ] && { vf_get cwd && vf_tight "$V"; }; then D=0; fi', "E38", "D", {}),
         ("CMD-1", ';; *) exit 0 ;; esac', ';; *) ;; esac', "E35", "C", {}),
