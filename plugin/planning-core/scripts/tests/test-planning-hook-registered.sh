@@ -478,6 +478,32 @@ def _labs_simples(ctx, nom):
     return adh, dev
 
 
+def raison_deny(rc, out, err):
+    """Raison d'un deny unique (code 0, stderr vide), sinon None."""
+    if verdict(rc, out) != "deny" or err:
+        return None
+    return json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+def controle_libelle_f4(ctx, texte, adh, dev):
+    """Lot C, F4 (re-audit, décision du manager vf-dev-manager, 2026-10-01, renversable) : le refus de la couche shell dit ce qu'il sait.
+    Un chemin à échappement JSON non géré hors de tout lab adhérent : « doute d adhesion du lab (chemin non analysable) », jamais « dans
+    un lab adherent » ; un chemin sous un lab réellement adhérent (même échappement) : « dans un lab adherent cycles-v1 », jamais
+    « doute ». Script absent (mode C) : seule la couche shell parle. Rend (conforme, détail)."""
+    fautes = []
+    cas = (("hors de tout lab adhérent (échappement \\f)", dev + "/x\x0cy.md", dev, "doute d adhesion du lab", "dans un lab adherent"),
+           ("sous un lab adhérent (échappement \\b)", adh + "/a\x08b.md", adh, "dans un lab adherent cycles-v1", "doute d adhesion"))
+    for etiquette, chemin, cwd, attendu, interdit in cas:
+        brut = payload("Write", {"file_path": chemin, "content": "x"}, cwd)
+        rc, out, err, _ = rejouer_texte(ctx, texte, "C", brut, cwd)
+        raison = raison_deny(rc, out, err)
+        if raison is None:
+            fautes.append("%s : pas de deny unique (rc=%d out=%s)" % (etiquette, rc, court(out)))
+        elif attendu not in raison or interdit in raison or "hook central indisponible" not in raison or "Reparer" not in raison:
+            fautes.append("%s : libellé %r (attendu %r, sans %r, avec « hook central indisponible » et « Reparer »)" % (etiquette, raison[:200], attendu, interdit))
+    return (not fautes), ("; ".join(fautes) if fautes else "doute d'adhésion nommé hors lab, « dans un lab adherent cycles-v1 » sous un lab adhérent")
+
+
 def sec_modes(ctx):
     """R-CMD-03 à R-CMD-08."""
     adh, dev = _labs_simples(ctx, "modes")
@@ -526,6 +552,13 @@ def sec_modes(ctx):
             ko("R-CMD-05", "lab adhérent, script absent : " + outil, a, b)
     else:
         ok("R-CMD-05 lab adhérent, script absent : deny statique pour Write, Edit, NotebookEdit, Agent, Task (message de réparation), Bash et lab dev en silence, chemin relatif rattaché au lab")
+
+    # R-CMD-05b (lot C, F4) : le libellé du refus de la couche shell dit exactement ce qu'elle sait
+    conforme, detail = controle_libelle_f4(ctx, ctx.cmd, adh, dev)
+    if conforme:
+        ok("R-CMD-05b " + detail)
+    else:
+        ko("R-CMD-05b", "libellé exact du refus de la couche shell (doute d'adhésion / lab adhérent)", "libellés distincts", detail)
 
     # R-CMD-06 : python absent (mode D)
     fautes = []
@@ -1122,6 +1155,23 @@ def sec_mutants(ctx):
     ]
     for ident, motif, repl, disc, mode, kw in M:
         mutant_cmd(ctx, ident, motif, repl, disc, mode, **kw)
+    # MUT-LIBELLE-* (lot C, F4) : le libellé de doute retiré, ou appliqué à un lab réellement adhérent
+    adh_l, dev_l = _labs_simples(ctx, "libelle-mut")
+    for ident, motif, remplacement in (
+            ("LIBELLE-DOUTE", 'if [ "$K" = done ] && [ "$PX" = 0 ] && ! vf_tight "$P"; then', "if false; then"),
+            ("LIBELLE-ADHERENT", 'if [ "$K" = done ] && [ "$PX" = 0 ] && ! vf_tight "$P"; then', 'if [ "$K" = done ] && [ "$PX" = 0 ]; then')):
+        muté, raison = make_cmd_mutant(ctx, ident, motif, remplacement)
+        if muté is None:
+            komut(ident, "texte muté distinct de l'original et sh -n réussit", "mutant valide", raison)
+            continue
+        original = controle_libelle_f4(ctx, ctx.cmd, adh_l, dev_l)
+        mutant = controle_libelle_f4(ctx, muté, adh_l, dev_l)
+        if not original[0]:
+            komut(ident, "l'original passe R-CMD-05b", "conforme", original[1])
+        elif mutant[0]:
+            komut(ident, "R-CMD-05b rougit sous le mutant", "rouge", "vert : " + mutant[1] + " (mutant non opposable)")
+        else:
+            okmut(ident, "R-CMD-05b rougit · attendu (original) : %s · obtenu (mutant) : %s" % (original[1], mutant[1]))
     # MUT-PY-PHASE-A : la sortie sur exception de la phase A remplacée par une sortie 0
     dossier, raison = make_hook_mutant(ctx, "PYA", "sys.exit(3)  # phase-a-sortie", "sys.exit(0)")
     if dossier is None:

@@ -162,7 +162,9 @@ vf_tight() { _d=$1; case $_d in /*) ;; *) return 1 ;; esac; vf_norm "$_d"; _d=$_
 D=1; for K in file_path notebook_path; do if vf_get "$K"; then P=$V; PX=$X; case $P in /*) ;; *) if vf_get cwd; then P=$V/$P; else P=$(pwd -P)/$P; fi ;; esac; if vf_tight "$P"; then D=0; elif [ "$PX" = 0 ]; then D=0; fi; K=done; break; fi; done
 if [ "$K" != done ]; then if vf_get cwd; then vf_tight "$V" && D=0; else vf_tight "$(pwd -P)" && D=0; fi; fi
 [ "$D" -eq 0 ] || exit 0
-printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[planning-core] hook central indisponible (script ou python3 absent, ou en erreur) dans un lab adherent cycles-v1 : ecritures par outil refusees. Reparer : mettre a jour VibeFlow (/vf-update) ou installer python3, puis relancer la session."}}'
+W='dans un lab adherent cycles-v1 : ecritures par outil refusees'
+if [ "$K" = done ] && [ "$PX" = 0 ] && ! vf_tight "$P"; then W='doute d adhesion du lab (chemin non analysable) : ecritures par outil refusees par precaution'; fi
+printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[planning-core] hook central indisponible (script ou python3 absent, ou en erreur) '"$W"'. Reparer : mettre a jour VibeFlow (/vf-update) ou installer python3, puis relancer la session."}}'
 exit 0'''
 GATES = ("G6", "G5", "G1", "G7", "ROLE")
 # Couverture minimale exigée par P45-D-20 (le script absent, python3 absent, un payload Task et un payload Agent, un fil
