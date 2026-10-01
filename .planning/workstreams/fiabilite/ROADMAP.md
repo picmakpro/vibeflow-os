@@ -1523,11 +1523,16 @@ sur chaque compartiment sans réparation manuelle**.
 
   6. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa mutation rouge prouvée.
 
-**Plans:** TBD (run /gsd-plan-phase 41.2 to break down)
+**Plans:** 6 plans en 4 vagues (planifiés le 2026-10-02, vérifiés par le plan-checker)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 41.2 to break down)
+- [ ] 41.2-01 — mesure du verbe d'état du moteur sur fixture jetable + `check-planning-not-inflight.sh` (précondition ADR-069 par machine, QUAL-01) — vague 1
+- [ ] 41.2-02 — balayage par sujet extrait en `fanout-state-integrity.sh` sourcé (deux copies de `ci.yml` retirées) + outil de rejeu CI — vague 1
+- [ ] 41.2-03 — le geste `split-planning.sh` (précondition → `workstream create` → séquence d'état moteur) + cas S1-S12 — vague 2
+- [ ] 41.2-04 — preuve d'usage WSCH-04 de bout en bout (lab neuf partitionné vert sur chaque sujet) + mutations — vague 3
+- [ ] 41.2-05 — skill `vf-split-planning` + commande + renvois `vf-new-lab` / `intent-routing.md` + sonde WSCH-01 (checkpoint F1 : budget d'instructions) — vague 3
+- [ ] 41.2-06 — remise WSAW-07 (`41.2-WSAW07-HANDOFF.md`) + clôture rejouée — vague 4
 
 
 ### Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED)
