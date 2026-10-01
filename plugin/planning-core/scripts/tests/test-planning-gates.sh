@@ -3567,16 +3567,21 @@ lota_mutant("IMB-HOOK-CANARY", "# racine-imbriquee", 'if os.path.isdir(os.path.j
 # `.claude/scripts` une racine non adhérente : silence, tous gates armés. Exception mesurée : `.claude/worktrees/<nom>` (là où Claude Code
 # pose les worktrees d'un lab) reste une racine possible, sans quoi tout lab travaillé dans un worktree serait jugé par son voisin.
 # Quatre implémentations de la règle : `racine_lab` du hook, de poser-verdict.sh, `racine_planning` du canary, `vf_tight` de hooks.json.
+# Lot F (M5) : la variante d (poche `.claude/worktrees/<nom>/.planning` créée DANS le lab) n'est jouée que par R-CLAUDE-01, hors de
+# VARIANTES_CLAUDE : sous la limite (o), la poche est sa propre racine (non adhérente) ; R-CLAUDE-02 attendrait le lab, R-CLAUDE-03 une
+# session adhérente, deux attendus qui ne valent pas pour une poche.
 VARIANTES_CLAUDE = ("a", "b", "c")
 
 
 def lab_claude(ctx, variante):
     """Lab adhérent dont `.claude` porte un `.planning` : a = `.claude/.planning`, b = `.claude/scripts/.planning`, c = lab posé sous
-    `<x>/.claude/worktrees/wt` avec `.claude/scripts/.planning`. Rend (lab, dossier du `.planning` créé)."""
+    `<x>/.claude/worktrees/wt` avec `.claude/scripts/.planning`, d = poche `.claude/worktrees/wt/.planning` créée dans un lab adhérent.
+    Rend (lab, dossier du `.planning` créé)."""
     base = ctx.unique("lab-claude-" + variante)
     lab = os.path.join(base, ".claude", "worktrees", "wt") if variante == "c" else base
     ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
-    rel = {"a": (".claude", ".planning"), "b": (".claude", "scripts", ".planning"), "c": (".claude", "scripts", ".planning")}[variante]
+    rel = {"a": (".claude", ".planning"), "b": (".claude", "scripts", ".planning"), "c": (".claude", "scripts", ".planning"),
+           "d": (".claude", "worktrees", "wt", ".planning")}[variante]
     imbrique = os.path.join(lab, *rel)
     os.makedirs(imbrique)
     return lab, imbrique
@@ -3595,7 +3600,9 @@ def racines_extraites(chemin_script, marqueur, noms):
 def controle_claude_hook(ctx, script):
     """Copie armée : un `.planning` sous `.claude` (a, b) ou sous `.claude/scripts` d'un lab posé sous `.claude/worktrees/<nom>` (c) ne
     fait jamais de ce dossier une racine non adhérente — Write du script du hook (chemin absolu, puis relatif depuis un cwd dans
-    `.claude/scripts`) et d'un fichier généré : un deny G6 chacun."""
+    `.claude/scripts`) et d'un fichier généré : un deny G6 chacun. Variante d (lot F, M5) : poche `.claude/worktrees/wt/.planning` créée DANS
+    le lab, sans `config.json` — trois deny G6 sur le script du hook du lab (chemin absolu ; absolu et relatif depuis une session ouverte dans
+    la poche), deux silences sous la poche (script du hook du worktree, création d'un `.planning`)."""
     armee = ctx.copie_forcee(_dossier(ctx, script), "armed")
     fautes, n = [], 0
     for variante in VARIANTES_CLAUDE:
@@ -3611,7 +3618,36 @@ def controle_claude_hook(ctx, script):
             conforme, detail = deny_de(rc, out, err, "G6")
             if not conforme:
                 fautes.append("variante %s, %s : %s" % (variante, nom, detail))
-    return (not fautes), ("; ".join(fautes) if fautes else "%d refus G6 (script du hook absolu et relatif, fichier généré, trois variantes de `.planning` sous `.claude`)" % n)
+    # Variante d (lot F, M5) : poche `<lab>/.claude/worktrees/wt/.planning` créée DANS le lab (sans config.json). Une session ouverte dans la
+    # poche écrit le script du hook du LAB : la racine se dérive du chemin écrit, jamais du cwd de la session (mutant CLAUDE-POCHE).
+    lab, imbrique = lab_claude(ctx, "d")
+    poche = os.path.dirname(imbrique)
+    scripts = os.path.join(lab, ".claude", "scripts")
+    os.makedirs(scripts, exist_ok=True)
+    os.makedirs(os.path.join(poche, "sub"), exist_ok=True)
+    os.makedirs(os.path.join(poche, ".claude", "scripts"), exist_ok=True)
+    script_lab = os.path.join(scripts, "planning-hook.sh")
+    refus_d = (("script du lab, absolu", script_lab, lab),
+               ("script du lab, absolu depuis la poche", script_lab, poche),
+               ("script du lab, relatif depuis la poche", os.path.join("..", "..", "scripts", "planning-hook.sh"), poche))
+    silences_d = (("script du worktree", os.path.join(poche, ".claude", "scripts", "planning-hook.sh"), poche),
+                  ("création d'un .planning sous la poche", os.path.join(poche, "sub", ".planning", "x.md"), poche))
+    for nom, cible, cwd in refus_d:
+        brut = payload("Write", entree_outil("Write", cible), cwd)
+        rc, out, err = ctx.lancer("A", brut, cwd=cwd, dossier=armee)
+        conforme, detail = deny_de(rc, out, err, "G6")
+        if not conforme:
+            fautes.append("variante d, %s : %s" % (nom, detail))
+    for nom, cible, cwd in silences_d:
+        brut = payload("Write", entree_outil("Write", cible), cwd)
+        rc, out, err = ctx.lancer("A", brut, cwd=cwd, dossier=armee)
+        if classer(rc, out) != "silence" or err:
+            fautes.append("variante d, %s : %s rc=%d stderr=%s stdout=%s" % (nom, classer(rc, out), rc, court(err), court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else (
+        "%d refus G6 (script du hook absolu et relatif, fichier généré, trois variantes de `.planning` sous `.claude`)" % n
+        + " ; variante d (poche `.claude/worktrees/<nom>/.planning` créée dans le lab) : %d refus G6 sur le script du hook du lab (chemin absolu ; "
+        "absolu et relatif depuis une session ouverte dans la poche), %d silences sous la poche (script du hook du worktree, "
+        "création d'un `.planning`)" % (len(refus_d), len(silences_d))))
 
 
 @lota("R-CLAUDE-02")
@@ -3672,6 +3708,9 @@ lota_mutant("CLAUDE-CANARY", " racine-claude", 'if os.path.isdir(os.path.join(d,
             "R-CLAUDE-03", "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF")
 lota_mutant("CLAUDE-WORKTREES", "# sous-claude-worktrees", 'return True  # sous-claude-worktrees', "R-CLAUDE-01")
 lota_mutant("CLAUDE-DERNIER", "# sous-claude-dernier", 'reste = [c for c in composants[places[0] + 1:] if c]  # sous-claude-dernier', "R-CLAUDE-01")
+# Lot F (M5) : la racine se dérive du chemin écrit, jamais du cwd de la session (une session ouverte dans la poche jugerait sinon le script du lab par la poche).
+lota_mutant("CLAUDE-POCHE", "# racine-depart",
+            'depart = cwd if cwd is not None else (ecrit if ecrit is not None else os.getcwd())  # racine-depart', "R-CLAUDE-01")
 lota_mutant("CLAUDE-CASSE", "# sous-claude-casse", 'places = [i for i, c in enumerate(composants) if c == ".claude"]  # sous-claude-casse', "R-CLAUDE-04")
 lota_mutant("CLAUDE-CASSE-POSER", "# sous-claude-casse", 'places = [i for i, c in enumerate(composants) if c == ".claude"]  # sous-claude-casse', "R-CLAUDE-04",
             "poser-verdict.sh", "PY_POSER_VERDICT_EOF")
