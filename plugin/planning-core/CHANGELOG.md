@@ -1,5 +1,73 @@
 # Changelog — planning-core
 
+## [v2.9.0] — 2026-10-01 (moteur de planning métier — hook central par rôle et gates d'écriture, Phase 45)
+
+**Minor** (nouvelle capacité) :
+
+- **État d'armement livré, tel que mesuré** : les cinq constantes `ARMEMENT_*` de `planning-hook.sh` valent
+  `observe` ; `G2_MODE` vaut `avertit`. Les rejeux réels des étapes 1 à 4 ont tous rendu 0 faux refus et 0 faux
+  accept, avec des empreintes d'arbre identiques (relevés de phase `45-REJEU-ETAPE-1` à `45-REJEU-ETAPE-4`). Mais
+  ils ont été mesurés sur le hook AVANT les lots de correction A, B et C du 2026-10-01. L'armement exige donc un
+  NOUVEAU rejeu réel, sur des labs au repos, ET un arbitrage de Willy, en attente, pour adapter deux suites
+  couplées à « tout en observe » (modification refusée par le classifieur « Security Test Removal »). La phase se
+  ferme EN OBSERVATION, mesurée à zéro : **aucun gate n'est armé**.
+- **`scripts/planning-hook.sh` et sa commande enregistrée fail-closed** — une seule entrée `PreToolUse` de
+  `hooks.json` (forme shell, matcher `Write|Edit|NotebookEdit|Bash|Agent|Task`) : lanceur bash et cœur Python
+  embarqué (aucun `.py` posé par l'installeur). Dans un lab adhérent `cycles-v1` seulement, quand le script ou
+  `python3` manque ou plante, la commande refuse `Write`, `Edit`, `NotebookEdit`, `Agent` et `Task` avec un
+  message de réparation ; partout ailleurs (labs de développement, ce dépôt compris) il ne sort rien. Un refus est
+  un `deny` JSON en code 0, jamais un exit 2. Échéance interne du cœur de 8 s (code 73, lot A).
+- **G2 en avertissement** : avertit (`additionalContext`) sur une écriture hors du `ecrit:` des plans ouverts,
+  Bash compris (détection, jamais une promesse, P45-D-10) ; il ne refuse jamais.
+- **G6, G5, G1, G7 et le hook par rôle, chacun en OBSERVATION** (ils journalisent ce qu'ils refuseraient, sans
+  refuser) : G6 (fichiers générés, cache, journal de dérogation, adhésion de `config.json`) et G5 (`VERDICT.md`
+  par outil) — étape 1, relevé `45-REJEU-ETAPE-1` ; G1 (pas de plan sans cadrage) — étape 2, relevé
+  `45-REJEU-ETAPE-2` ; G7 (pas de planning orphelin, prédicat « habité » littéral) — étape 3, relevé
+  `45-REJEU-ETAPE-3` ; ROLE (juge : aucune écriture par outil ; worker : dispatch limité à sa propre allowlist,
+  F9) — étape 4, relevé `45-REJEU-ETAPE-4`. Chacun à 0 faux refus et 0 faux accept sur le banc et sur le rejeu
+  réel ; les refus conformes au modèle (lab non migré) sont comptés à part (P45-D-21a).
+- **Canary de CI et de session** : `plugin/_internal/tests/test-planning-hook-installed.sh` rejoue la commande
+  telle que l'installeur la pose (bloquant en CI) ; `scripts/check-gates-alive.sh` (`SessionStart`, advisory)
+  la rejoue sur un lab synthétique et signale, sans bloquer, un hook non enregistré, une commande non reconnue,
+  un mode dégradé, des constantes d'armement absentes, un gate armé sans cas, une couverture incomplète, un cas
+  en échec.
+- **Outil de rejeu et geste de rejeu réel** : `scripts/rejeu-gates.sh` (copie du lab, un attendu par écriture,
+  faux refus, faux accepts, refus conformes au modèle) et `scripts/rejeu-reel.sh` (empreinte de TOUT l'arbre
+  avant et après, extérieure à l'outil mesuré ; `MESURE-VIDE` si rien n'a été mesuré).
+- **Limite déclarée « Bash reste ouvert quand le hook ne peut pas tourner »** (P45-D-06b) : un lab adhérent dont
+  le script ou `python3` manque refuse les écritures et les dispatchs mais laisse passer `Bash`, pour que la
+  réparation reste possible.
+- **Limites déclarées (k) et (l)** : (k) m2 — en mode panne, la couche shell tient pour adhérent un `config.json`
+  que le cœur Python tient pour non adhérent (virgule finale, clé dupliquée, valeur imbriquée, BOM) : refus en
+  panne ; (l) F9 — l'allowlist d'un worker vit dans une définition d'agent que G6 ne protège pas. Les limites
+  (a) à (y), dont l'OUVERTE (y) — le script du hook et les réglages ne sont protégés par aucun gate, arbitrage de
+  Willy en attente — sont écrites, chacune sur sa ligne, dans `references/modele-cycles.md` et tenues identiques
+  au code par un contrôle croisé de la CI (R-REFERENCE).
+- **`scripts/poser-verdict.sh` et `scripts/deroger-gate.sh`** : le premier pose `VERDICT.md` (hash sha256 du
+  `PLAN.md` et tentative calculés par la commande, seul chemin légitime une fois G5 armé) ; le second inscrit
+  une dérogation nominative (qui, canal, date, gate, chemin, raison non placeholder, jamais liée à l'urgence)
+  dans `.planning/derogations-gates.log`, append-only, à usage unique et citée par le hook.
+- **Levée du code 2 de `recalc-planning.sh` sous adhésion (GATE-14)** : un lab adhérent qui contient du code
+  (détecteur à 2, signalement de migration) est désormais écrit ; sans adhésion le refus est inchangé. Sort du
+  socle v2 (F10 = f10-archive, Willy, AskUserQuestion session principale, 2026-09-30) : `STATE.md` et `INDEX.md`
+  rédigés à la main sont archivés octet pour octet sous `.planning/_archive/socle-v2/` avant d'être remplacés.
+- **Corrections ciblées du 2026-10-01** (revue de phase, audit de sécurité, re-revue et re-audit ; décisions du
+  manager vf-dev-manager) : lot A (hook central : un `.planning` imbriqué n'est jamais une racine de lab, parseur
+  d'agents linéaire et borné, échéance interne, version active d'un plugin, commandes de verdict et de dérogation
+  durcies), lot B (rejeu : garde de lien, relevés anonymisés ; archivage du socle v2 en tout ou rien), lot C
+  (budget d'indexation des agents, libellé du doute d'adhésion, `.planning` en lien refusé au rejeu).
+- **`guard-planning-updated.sh` est conservé** (P45-D-19) : son entrée `Stop` de `hooks.json` est inchangée et il
+  reste en exit 2.
+- **Escalades vers Willy, en attente** : (1) l'armement de l'étape 1 et, en cascade, des étapes suivantes —
+  nouveau rejeu réel sur des labs au repos et adaptation de deux suites couplées à « tout en observe »
+  (ESCALADE-WILLY ETAPE-1) ; (2) la protection du script du hook et des réglages par un gate (audit M1,
+  limite (y)) ; (3) G1 face à une phase dérogée sans cadrage (constat de 45-06 : zéro occurrence sur les deux
+  labs réels mesurés, la règle de gate reste inchangée).
+- **Ce qui n'est PAS livré** : G2′, G3, G4, G4′ et D1 (Phases 46 et 47), la vérification du hash à la clôture
+  (Phase 46), le hook managed (hors périmètre) ; les drapeaux `phases_trace` et `options.gates` restent sans
+  effet (P45-D-01). Bump de module seul (P45-D-18) : la version racine, `plugin.json` et le marketplace ne
+  bougent pas, aucun tag, avant la clôture de `fiabilite-v1.0` (ADR-073).
+
 ## [v2.8.0] — 2026-09-28 (moteur de planning métier — modèle par cycles et recalcul d'état dérivé du disque, Phase 44)
 
 **Minor** (nouvelle capacité) :
