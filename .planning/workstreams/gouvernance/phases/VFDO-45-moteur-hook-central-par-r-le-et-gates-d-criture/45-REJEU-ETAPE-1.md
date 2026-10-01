@@ -61,7 +61,7 @@ Reprise du rejeu après mise au repos des labs. Canal des décisions : mise au r
 | Lab | Processus dont le répertoire courant est sous le lab |
 |---|---|
 | `~/jarvis-keystone` | 0 |
-| `~/BusinessFlow-Lab` | 4 : 2 `Code Helper (Plugin)` (PID 4670, 5146) et 2 `zsh` inactifs (PID 5119, 65656), seuls restants annoncés, n'écrivant pas dans le lab |
+| `~/BusinessFlow-Lab` | 4 : 2 `Code Helper (Plugin)` et 2 `zsh` inactifs, seuls restants annoncés, n'écrivant pas dans le lab |
 
 ### Comptes (lignes brutes du rejeu)
 
@@ -84,3 +84,5 @@ Les trois conditions tiennent : une ligne `EMPREINTE-ARBRE-IDENTIQUE` par lab, a
 Non armé dans le code à ce stade, pour une raison d'outillage et non de mesure : passer `ARMEMENT_G6` et `ARMEMENT_G5` à `armed` (et `TABLE_ATTENDUE`) rend rouges deux suites qui supposent ces constantes à `observe` — `test-planning-gates.sh` (R-ENV-01 : la copie à l'armement forcé réécrit cinq constantes, n'en trouve plus que trois ; R-TABLE-03 : la table incohérente « G1 armé sans G6 ni G5 » devient cohérente) et `test-planning-hook-installed.sh` (motif `ARMEMENT_G6 = "observe"` introuvable dans la copie). Corriger ces suites est une modification de test que le classifieur du harnais a refusée ; elle est remontée à Willy plutôt que contournée. Constantes restées à `"observe"`, aucun commit d'armement.
 
 ESCALADE-WILLY ETAPE-1 suites couplées à l'état observe
+
+> Note du 2026-10-01 (quick 45-B, B2 ; décisions du manager vf-dev-manager, 2026-10-01) : les identifiants de processus et le nom du compte local qui figuraient dans les sorties `lsof` de ce relevé ont été retirés (forme anonymisée : COMMAND et NAME en `~/…`, sans USER ni PID) ; le décompte des processus et les conclusions sont inchangés.

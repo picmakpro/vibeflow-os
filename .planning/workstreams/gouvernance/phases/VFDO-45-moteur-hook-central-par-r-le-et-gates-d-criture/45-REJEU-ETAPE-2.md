@@ -18,7 +18,7 @@
 | Lab | Processus dont le répertoire courant est sous le lab |
 |---|---|
 | `~/jarvis-keystone` | 0 |
-| `~/BusinessFlow-Lab` | 4 : 2 `Code Helper (Plugin)` (PID 4670, 5146) et 2 `zsh` inactifs (PID 5119, 65656), seuls restants annoncés |
+| `~/BusinessFlow-Lab` | 4 : 2 `Code Helper (Plugin)` et 2 `zsh` inactifs, seuls restants annoncés |
 
 ## Comptes (lignes brutes du rejeu)
 
@@ -86,3 +86,5 @@ Les 42 refus de G1 doit-refuser sur `~/jarvis-keystone` et les 20 sur `~/Busines
 ## Décision d'armement
 
 Non décidée ici : mesure seule. La condition P45-D-03b de l'étape 2 tient sur la mesure (0/0, empreintes de tout l'arbre identiques, `refus-conforme-modele=196` compté à part), mais l'ordre P45-D-03 interdit d'armer l'étape 2 tant que l'étape 1 n'est pas armée. Le manager armera les étapes en cascade sur ces mesures.
+
+> Note du 2026-10-01 (quick 45-B, B2 ; décisions du manager vf-dev-manager, 2026-10-01) : les identifiants de processus et le nom du compte local qui figuraient dans les sorties `lsof` de ce relevé ont été retirés (forme anonymisée : COMMAND et NAME en `~/…`, sans USER ni PID) ; le décompte des processus et les conclusions sont inchangés.

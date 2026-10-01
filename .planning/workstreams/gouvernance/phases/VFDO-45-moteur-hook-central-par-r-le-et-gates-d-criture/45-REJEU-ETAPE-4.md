@@ -21,20 +21,20 @@ Un seul passage du rejeu réel : l'empreinte de tout l'arbre est identique pour 
 
 ### Contrôle de repos (lecture seule, `lsof -d cwd`, avant et après le rejeu)
 
-Sortie brute (chemins affichés `~/…`), identique avant et après :
+Sortie (chemins affichés `~/…`, anonymisée : sans USER ni PID), identique avant et après :
 
 ```
-COMMAND     PID      USER   FD   TYPE DEVICE SIZE/OFF      NODE NAME
-Code\x20H  4670 makwilmak  cwd    DIR   1,13      864   1114365 ~/BusinessFlow-Lab
-zsh        5119 makwilmak  cwd    DIR   1,13      864   1114365 ~/BusinessFlow-Lab
-Code\x20H  5146 makwilmak  cwd    DIR   1,13      864   1114365 ~/BusinessFlow-Lab
-zsh       65656 makwilmak  cwd    DIR   1,13      864   1114365 ~/BusinessFlow-Lab
+COMMAND               NAME
+Code Helper (Plugin)  ~/BusinessFlow-Lab
+zsh                   ~/BusinessFlow-Lab
+Code Helper (Plugin)  ~/BusinessFlow-Lab
+zsh                   ~/BusinessFlow-Lab
 ```
 
 | Lab | Processus dont le répertoire courant est sous le lab |
 |---|---|
 | `~/jarvis-keystone` | 0 |
-| `~/BusinessFlow-Lab` | 4 : 2 `Code Helper (Plugin)` (PID 4670, 5146) et 2 `zsh` inactifs (PID 5119, 65656), seuls restants annoncés (mêmes processus avant et après) |
+| `~/BusinessFlow-Lab` | 4 : 2 `Code Helper (Plugin)` et 2 `zsh` inactifs, seuls restants annoncés (mêmes processus avant et après) |
 
 ## Comptes (lignes brutes du rejeu)
 
@@ -138,3 +138,5 @@ Le rôle reste en `observe` : `ARMEMENT_ROLE = "observe"`, `TABLE_ATTENDUE` inch
 
 - **Motif : armement différé, G7 non armé, P45-D-03.** L'ordre d'armement est fixe (G6 et G5, puis G1, puis G7, puis le rôle) et le rôle ne s'arme jamais avant G7 (`armement_valide`) ; G7 n'est pas armé dans l'état livré, pas plus que les étapes 1 et 2. Ce relevé est une mesure seule (amendement A1, manager vf-dev-manager, 2026-09-30).
 - **Condition P45-D-03b de l'étape 4 : tenue sur la mesure** — 0 faux refus, 0 faux accept (`COMPTE ROLE faux-refus=0 faux-accept=0 refus-conforme-modele=0`), banc de la suite des gates à zéro (`COMPTE ROLE faux-refus=0 faux-accept=0`), canary du rôle sain sous `Agent` et sous `Task` (45-09, Tâche 1), empreinte de tout l'arbre identique pour les deux labs, une ligne `EMPREINTE-ARBRE-IDENTIQUE` par lab. Aucune ligne non nulle à remonter ni `ESCALADE-WILLY` à émettre : le manager armera les étapes en cascade (G6 et G5, G1, G7, puis le rôle) sur ces mesures, avec un commit d'armement dans l'ordre.
+
+> Note du 2026-10-01 (quick 45-B, B2 ; décisions du manager vf-dev-manager, 2026-10-01) : les identifiants de processus et le nom du compte local qui figuraient dans les sorties `lsof` de ce relevé ont été retirés (forme anonymisée : COMMAND et NAME en `~/…`, sans USER ni PID) ; le décompte des processus et les conclusions sont inchangés.

@@ -23,7 +23,7 @@ Un premier passage sans `--attendus` a servi à lister les `.planning/` imbriqu�
 | Lab | Processus dont le répertoire courant est sous le lab |
 |---|---|
 | `~/jarvis-keystone` | 0 |
-| `~/BusinessFlow-Lab` | 4 : 2 `Code Helper (Plugin)` (PID 4670, 5146) et 2 `zsh` inactifs (PID 5119, 65656), seuls restants annoncés (mêmes processus avant et après) |
+| `~/BusinessFlow-Lab` | 4 : 2 `Code Helper (Plugin)` et 2 `zsh` inactifs, seuls restants annoncés (mêmes processus avant et après) |
 
 ## Comptes (lignes brutes du rejeu)
 
@@ -91,3 +91,5 @@ Aucun `.planning/` imbriqué réel absent de la table D-05 amendée, hors les qu
 ## Décision d'armement
 
 Non décidée ici : mesure seule. La condition P45-D-03b de l'étape 3 tient sur la mesure (0/0, empreintes de tout l'arbre identiques, `refus-conforme-modele=202` compté à part), mais l'ordre P45-D-03 interdit d'armer l'étape 3 tant que l'étape 1 n'est pas armée. Le manager armera les étapes en cascade sur ces mesures.
+
+> Note du 2026-10-01 (quick 45-B, B2 ; décisions du manager vf-dev-manager, 2026-10-01) : les identifiants de processus et le nom du compte local qui figuraient dans les sorties `lsof` de ce relevé ont été retirés (forme anonymisée : COMMAND et NAME en `~/…`, sans USER ni PID) ; le décompte des processus et les conclusions sont inchangés.
