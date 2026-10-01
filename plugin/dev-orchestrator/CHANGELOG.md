@@ -1,5 +1,15 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.26.0] — 2026-10-01 (contrôle E7 de fin de mission, Phase 41.3)
+
+**Minor** (nouveau contrôle de sortie) :
+
+- **`scripts/check-mission-exit.sh` E7** (SOBR-07) : contrôle en delta du rangement de la mission
+  (budgets de méthode, archivage `--auto`) ; issues MANQUE / SAIN / INDÉTERMINÉ. Suite
+  `tests/test-check-mission-exit.sh` étendue.
+- **`references/mission-flow.md`** : la clôture de mission déclenche l'archivage automatique et le
+  contrôle E7 ; `agents/vf-dev-manager.md` aligné.
+
 ## [v2.25.0] — 2026-09-28 (budgets de méthode à la clôture de mission)
 
 **Minor** (nouvelle étape de clôture) :
