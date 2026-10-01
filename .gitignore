@@ -34,9 +34,6 @@ docs/reference/
 # et auto-réparé s'il manque — un état machine, pas une trace de planning.
 .planning/**/.verification-ledger.json
 
-# Verrou d'archivage de check-method-budget.sh (mkdir atomique, retiré à la sortie) : état machine éphémère.
-.planning/.archive.lock/
-
 # Dépendances / environnements (au cas où un module ajoute de l'outillage)
 node_modules/
 .venv/

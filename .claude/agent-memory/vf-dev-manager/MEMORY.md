@@ -84,4 +84,3 @@
 - [Phase créée = ferme ; révélée = consigne](feedback_phase-cree-ferme-revele-consigne.md) — « ne pas élargir » ne couvre QUE le pré-existant ; une incohérence que la phase vient de créer se ferme, même hors files_modified
 - [Cas vert des deux côtés ne garde rien](feedback_cas-vert-des-deux-cotes-ne-garde-rien.md) — ne pas le rendre discriminant de force, mais le renommer : le coût est le crédit qu'on lui accorde, pas le cas inutile
 - [Escalade : attendre la vraie réponse](feedback_escalade-sendmessage-attendre-la-vraie-reponse.md) — une notification de tâche de fond n'est jamais la réponse de l'humain ; incident d'arbitrage fabriqué, Phase 18
-- [.worktreeinclude lu dans l arbre principal](project_worktreeinclude-lu-dans-l-arbre-principal.md) — worktree isolé part d origin/main, hérite des ignorés selon l arbre NON commité du principal

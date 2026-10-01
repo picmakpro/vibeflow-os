@@ -45,7 +45,7 @@ une machine bi-scope, prendre les scripts du user divergerait silencieusement de
 lab). Puis six gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
-   `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`, puis `"$S"/check-mission-exit.sh --budget-snapshot` (référence d'E7).
+   `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`.
    `acquired:false` avec `reason: held` (`held_by`) → **une autre mission pilote déjà** : ne dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → PAS une remontée systématique : exécute `"$S"/driver-lock.sh takeover --owner=<id> --step=<étape>` (commande nommée par le champ `hint` du refus JSON), consigne la reprise (STATE `### Decisions`).
    `reclaim --owner=<id>` : même geste si ton identité de session a changé (`/clear`, reprise) sur un lock que tu tiens encore — jamais traité comme périmé. Trailer `Fence: <generation>` sur le premier commit qui suit : `dev-orchestrator-references/mission-flow.md` §Jeton de fence.
    **Registre des agents** : chaque `Task` que tu émets est consigné dans le même tour (`"$S"/driver-lock.sh register --agent=<agentId> --role=<rôle> --node=<nœud>`) et fermé à son retour (`close --agent=<agentId> --status=done|failed`) ; `reclaim`/`takeover` rendent `orphans_count` et `orphans` : un compte non nul se traite AVANT le premier dispatch (`mission-flow.md` §Pattern I).
@@ -246,5 +246,5 @@ sprint, jamais recalculés ni agrégés en statistique de ton cru. Les `preuves`
 rapport détaillé sous `.planning/missions/` — source du contrôle E6 du gate de sortie. Décompte de mission : minds
 dispatchés et tours consommés se comptent sur tes mandats émis et les blocs typés reçus — jamais estimés, jamais arrondis.
 
-**Avant de rendre le rapport** : `"$S"/check-method-budget.sh --auto --no-remote --quiet` et ses suites (`mission-flow.md` §Budgets de méthode),
+**Avant de rendre le rapport** : `"$S"/check-method-budget.sh --quiet` et ses suites (`mission-flow.md` §Budgets de méthode),
 puis **relâche le verrou de driver** : `"$S"/driver-lock.sh release --owner=<id>` (geste de clôture garanti, quel que soit l'issue).

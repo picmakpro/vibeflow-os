@@ -1788,24 +1788,6 @@ jobs:
               ;;
           esac
 
-      - name: check-ajout-retrait (SOBR-05, consultatif — un ajout à la méthode dit ce qu'il retire)
-        # Ajouts surveillés : gates et gardes, mémoires d'agents, titres ADR et règles de CLAUDE.md. Sans
-        # trailer `Ajout-Retrait:` (forme vérifiée, jamais la véracité) dans un commit de la branche :
-        # `::warning::`, jamais un échec (ADR-074 amendé, ADR-076). Les cas et cinq mutants vivent dans
-        # plugin/conductor/scripts/tests/test-check-ajout-retrait.sh. LIMITE DE FOND (ADR-072) : la PR qu'il
-        # juge peut modifier ce script, sa suite et cette étape.
-        run: |
-          set -eu
-          REF=""
-          for r in refs/remotes/origin/main origin/main refs/heads/main main; do
-            if git rev-parse --verify -q "${r}^{commit}" >/dev/null 2>&1; then REF="$r"; break; fi
-          done
-          if [ -z "$REF" ]; then
-            echo "::warning::check-ajout-retrait CI : aucune ref main résoluble localement, git fetch origin main"
-            git fetch origin main:refs/remotes/origin/main
-          fi
-          bash plugin/conductor/scripts/check-ajout-retrait.sh --ci
-
       - name: check-affirmation-non-mesuree (G-4 — affirmation de prose non mesurée)
         # POURQUOI CETTE ÉTAPE EXISTE. La PR #90 a écrit dans `CLAUDE.md` que « le serveur refuse
         # le push direct » et que « toute mise à jour de `main` passe par une PR », au présent de

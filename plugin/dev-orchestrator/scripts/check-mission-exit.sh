@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # check-mission-exit.sh — Gate de sortie de mission du head (HEAD-02, D-06, D-07, D-10, D-11).
 #
-# Rôle : ce script CONSTATE l'état de sept contrôles (E1 à E7) sur un dépôt de mission et un
+# Rôle : ce script CONSTATE l'état de six contrôles (E1 à E6) sur un dépôt de mission et un
 # rapport détaillé écrit sur disque — il ne corrige rien, ne rejoue aucun étage, ne juge aucun
 # contenu métier. Vérifier le témoin, jamais refaire le travail (D-03) : sur un manque ou une
 # indétermination, la conduite (mandat de correction ciblée, escalade humaine) appartient au
@@ -9,10 +9,10 @@
 #
 # Contrat de sortie — QUATRE codes, précédence explicite 64 > 4 > 0 > 3 :
 #
-#   3  = SAIN — le SEUL code qui signifie « vérifié, conforme ». Les sept contrôles ont été LUS
+#   3  = SAIN — le SEUL code qui signifie « vérifié, conforme ». Les six contrôles ont été LUS
 #        et aucun n'a rendu ni manque ni indétermination. Sortie standard vide.
 #   0  = au moins un MANQUE NOMMÉ — une ligne de signal par manque sur la sortie standard, citant
-#        le contrôle (E1 à E7) et le détail. Rendu même si un AUTRE contrôle est indéterminé : les
+#        le contrôle (E1..E6) et le détail. Rendu même si un AUTRE contrôle est indéterminé : les
 #        manques sont TOUS imprimés, rien n'est perdu — mais voir la règle de précédence ci-dessous.
 #   4  = INDÉTERMINÉ — au moins un contrôle sans source de vérité (outillage absent, racine hors
 #        d'un dépôt git, argument de contexte manquant…), un diagnostic par cause sur la sortie
@@ -29,14 +29,13 @@
 #
 # Usage :
 #   check-mission-exit.sh [--root <dir>] [--report <path>] [--step <phase>]... [--hook|--quiet]
-#   check-mission-exit.sh --budget-snapshot [--root <dir>]   # DÉBUT de mission, une fois (voir E7)
 # Defaults : --root .   (pas de --report ni --step par défaut : leur absence est INDÉTERMINÉE,
 #            jamais un vert — le gate n'a alors aucune source de vérité sur ce qu'il devait lire.)
 #
 # --hook ne change que le format d'affichage (parité d'interface avec les autres gates du dépôt) ;
 # --quiet supprime les diagnostics informatifs sur la sortie d'erreur. Mutuellement exclusifs.
 #
-# Les sept contrôles :
+# Les six contrôles :
 #   E1 — le verrou de driver est relâché (lu via `driver-lock.sh status`, JAMAIS via une
 #        sous-commande qui le modifie — D-11 : ce script LIT seulement, il n'invoque jamais un
 #        verbe qui libère, reprend ou récupère quoi que ce soit). Même lecture pour le registre
@@ -52,23 +51,6 @@
 #   E5 — le rapport détaillé de mission est présent et lisible sur disque.
 #   E6 — chaque verdict du rapport porte sa preuve (contrat `references/mission-contracts.md`
 #        §Contrat de preuves E6, section `## Preuves E6` du rapport, un bloc ```json).
-#   E7 — rien de rangeable n'est laissé PAR LA MISSION (SOBR-07, ADR-076). Sémantique DELTA : la référence est
-#        le snapshot de DÉBUT de mission, posé par le manager juste après l'`acquire` du verrou de driver avec
-#        `check-mission-exit.sh --budget-snapshot` (mission-flow.md §Budgets de méthode) ; il vit sous le
-#        répertoire git commun (`<git-common-dir>/vf-mission-budget.snap`), jamais dans l'arbre (E2 reste
-#        propre) ; il porte la DATE de sa pose et l'IDENTITÉ de la mission (nom de la génération du verrou de
-#        driver courant) ; pris par `check-method-budget.sh --auto --dry-run` (même décision que E7, rien d'écrit :
-#        un ARCHIVAGE REFUSÉ déjà là n'est pas imputé à la mission). Génération du snapshot ≠ verrou courant :
-#        INDÉTERMINÉ ; snapshot sans identité (version antérieure) : INDÉTERMINÉ. LIMITES dites : verrou relâché
-#        (cas ordinaire à la sortie), l'identité n'est plus recontrôlable, seule la date située (dite sur stderr)
-#        la replace ; un snapshot posé TARD masque ce que la mission avait déjà créé avant lui. Sont des manques E7 les lignes RANGEABLE / ARCHIVABLE / ARCHIVAGE REFUSÉ APPARUES depuis ce
-#        snapshot (`check-method-budget.sh --auto --no-remote --strict` a d'abord archivé SANS geste humain ce
-#        qu'un budget dépassé désigne : déplacement tracé, réversible, jamais de commit ; « archivé, à
-#        commiter » tant que l'arbre porte l'archivage). Ce qui existait au démarrage (branche d'un autre
-#        mainteneur, worktree d'une autre mission) n'est jamais imputé à la mission. Snapshot absent,
-#        ARCHIVAGE NON TENTÉ (dépôt partitionné, aucun compartiment résolu), script de budget introuvable
-#        ou rc 2 : INDÉTERMINÉ, jamais sain. Un DÉPASSÉ seul est un constat, pas un manque du geste. Les
-#        jetons de remote (À VALIDER) ne sont pas lus : le contrôle passe --no-remote, ils n'y arrivent pas.
 #
 # Résolution des scripts frères ($S) : cascade de `references/mission-flow.md` (§Résolution des
 # scripts), sentinelle testée `dag.sh` — PAS `driver-lock.sh`, qui est cherché SEULEMENT une fois
@@ -78,15 +60,13 @@
 #
 # Marqueurs `# >>> Ex` / `# <<< Ex` : chaque contrôle est entouré d'une paire de lignes de
 # commentaire dédiées à l'outillage de test (suppression chirurgicale d'un bloc à la fois, sans
-# rôle fonctionnel pour ce script). Les sept contrôles sont INDÉPENDANTS — la suppression du bloc
-# d'un contrôle ne fait planter ni n'altère les six autres ; un contrôle dont le bloc est absent
+# rôle fonctionnel pour ce script). Les six contrôles sont INDÉPENDANTS — la suppression du bloc
+# d'un contrôle ne fait planter ni n'altère les cinq autres ; un contrôle dont le bloc est absent
 # contribue silencieusement « sain » à l'agrégation (chaque variable d'état est initialisée à
 # « sain » avant les six blocs, précisément pour que cette suppression reste sans danger).
 #
-# Lecture seule (D-10), à UNE exception nommée : E7 est le SEUL écrivain du gate, par le seul
-# déplacement d'archive borné de `check-method-budget.sh --auto` (sources commitées, compartiment de la
-# session, jamais de commit) ; les six autres contrôles ne modifient rien, aucune sous-commande d'écriture d'un autre
-# outil n'est invoquée ; le mode `--budget-snapshot` (un autre appel, en début de mission) n'écrit qu'un fichier sous le répertoire git commun. E2 tourne avant E7 : l'arbre qu'E2 a jugé propre est celui d'avant l'archivage. D-18 : shell portable, aucune dépendance externe
+# Lecture seule intégrale (D-10) : aucune écriture, aucune modification du dépôt inspecté, aucune
+# sous-commande d'écriture d'aucun outil invoqué. D-18 : shell portable, aucune dépendance externe
 # neuve — interpréteur, outil de requête JSON, git et client GitHub sont déjà des prérequis de ce
 # dépôt.
 set -uo pipefail
@@ -96,7 +76,6 @@ REPORT=""
 STEPS=""
 HOOK=0
 QUIET=0
-BUDGET_SNAPSHOT=0
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -120,7 +99,6 @@ while [ "$#" -gt 0 ]; do
       STEPS="${STEPS}${2}"$'\n'; shift 2 ;;
     --hook) HOOK=1; shift ;;
     --quiet) QUIET=1; shift ;;
-    --budget-snapshot) BUDGET_SNAPSHOT=1; shift ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-mission-exit] argument inconnu : $1" >&2; exit 64 ;;
   esac
@@ -165,50 +143,7 @@ resolve_S() {
   return 1
 }
 
-# --- Script de budget et snapshot de début de mission (E7) — HORS des marqueurs ---------------------
-# Script frère (lab installé, scripts à plat), sinon le module conductor voisin du dépôt source.
-resolve_budget() {
-  local b; b="$(dirname "$0")/check-method-budget.sh"
-  [ -f "$b" ] || b="$(dirname "$0")/../../conductor/scripts/check-method-budget.sh"
-  [ -f "$b" ] && { printf '%s' "$b"; return 0; }
-  return 1
-}
-budget_snap_path() { # chemin absolu du snapshot, sous le répertoire git commun ; échec si ROOT n'est pas un dépôt
-  local g; g="$(git_safe rev-parse --git-common-dir 2>/dev/null)" || return 1
-  [ -n "$g" ] || return 1
-  case "$g" in /*) ;; *) g="$ROOT/$g" ;; esac
-  printf '%s/vf-mission-budget.snap' "$g"
-}
-BUDGET_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ'
-budget_lines() { { grep -E "$BUDGET_TOK" || true; } | sed 's/^\[budget\] *//' | LC_ALL=C sort -u; }
-# Identité de la mission : le NOM de la génération du verrou de driver courant (lien DRIVER.lock → DRIVER.lock.gen.<epoch>.<pid>),
-# « - » sans verrou. Même chemin que E1 (le verrou du dépôt jugé), jamais une variable d'environnement.
-cur_lock_gen() {
-  local l="$ROOT/.planning/DRIVER.lock" t
-  if [ -L "$l" ]; then t="$(readlink "$l" 2>/dev/null)"; printf '%s' "${t##*/}"
-  elif [ -e "$l" ]; then printf 'legacy'
-  else printf -- '-'; fi
-}
-
-if [ "$BUDGET_SNAPSHOT" -eq 1 ]; then
-  # Geste du manager, UNE fois, au démarrage de la mission : photographie SANS ÉCRITURE (--auto --dry-run : la
-  # décision d'archivage est prise, rien n'est écrit) de ce qui est déjà rangeable ; écrit hors de l'arbre de travail.
-  SNAP_BUDGET="$(resolve_budget)" || { echo "[check-mission-exit] --budget-snapshot : check-method-budget.sh introuvable" >&2; exit 4; }
-  SNAP_PATH="$(budget_snap_path)" || { echo "[check-mission-exit] --budget-snapshot : $ROOT n'est pas un dépôt git" >&2; exit 4; }
-  # --auto --dry-run : la MÊME décision que celle d'E7, rien d'écrit ; un ARCHIVAGE REFUSÉ déjà là au démarrage
-  # (source non commitée…) est donc dans la référence et n'est pas imputé à la mission.
-  SNAP_OUT="$(bash "$SNAP_BUDGET" --root "$ROOT" --no-remote --quiet --auto --dry-run 2>/dev/null)"; SNAP_RC=$?
-  if [ "$SNAP_RC" -ge 2 ]; then
-    echo "[check-mission-exit] --budget-snapshot : check-method-budget.sh a rendu $SNAP_RC, snapshot non posé" >&2
-    exit 4
-  fi
-  { printf '#date=%s\n#gen=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(cur_lock_gen)"; printf '%s\n' "$SNAP_OUT" | budget_lines; } > "$SNAP_PATH.tmp.$$" 2>/dev/null && mv -f "$SNAP_PATH.tmp.$$" "$SNAP_PATH" 2>/dev/null \
-    || { rm -f "$SNAP_PATH.tmp.$$" 2>/dev/null; echo "[check-mission-exit] --budget-snapshot : écriture impossible ($SNAP_PATH)" >&2; exit 4; }
-  say "snapshot de début de mission posé : $SNAP_PATH (génération du verrou : $(cur_lock_gen))"
-  exit 0
-fi
-
-# --- États initiaux des sept contrôles, HORS des marqueurs ------------------------------------------
+# --- États initiaux des six contrôles, HORS des marqueurs ------------------------------------------
 # Initialisés à "sain" pour que la suppression chirurgicale d'un bloc (outillage de test, tâche 2)
 # ne fasse jamais planter ce script sous `set -u` et retombe silencieusement sur "sain" — c'est la
 # propriété d'isolation exigée par l'action de la tâche 1, jamais un chemin de production.
@@ -218,7 +153,6 @@ E3_STATUS="sain"; E3_MSG=""
 E4_STATUS="sain"; E4_MSG=""
 E5_STATUS="sain"; E5_MSG=""
 E6_STATUS="sain"; E6_MSG=""
-E7_STATUS="sain"; E7_MSG=""
 
 # >>> E1
 # E1 — verrou de driver relâché. Lecture SEULE (D-11) : ce script n'invoque que le sous-verbe qui
@@ -451,7 +385,7 @@ fi
 
 # >>> E6
 # E6 — chaque verdict du rapport porte sa preuve (mission-contracts.md §Contrat de preuves E6).
-# Résolution du chemin de rapport DUPLIQUÉE (et non partagée avec E5) : les sept contrôles sont
+# Résolution du chemin de rapport DUPLIQUÉE (et non partagée avec E5) : les six contrôles sont
 # indépendants, la suppression du bloc E5 ne doit jamais priver E6 de sa propre résolution.
 if [ -z "$REPORT" ]; then
   E6_STATUS="indet"
@@ -541,64 +475,10 @@ else
 fi
 # <<< E6
 
-# >>> E7
-# E7 — rien de rangeable n'est laissé par la mission (SOBR-07). Delta contre le snapshot de début de mission.
-E7_BUDGET="$(resolve_budget || true)"
-E7_SNAP="$(budget_snap_path || true)"
-if [ -z "$E7_BUDGET" ]; then
-  E7_STATUS="indet"
-  E7_MSG="[E7] check-method-budget.sh introuvable (ni à côté de ce script, ni sous ../../conductor/scripts)"
-elif [ -z "$E7_SNAP" ] || [ ! -f "$E7_SNAP" ]; then
-  E7_STATUS="indet"
-  E7_MSG="[E7] snapshot de début de mission absent : impossible de distinguer ce que la mission a créé de ce qui existait. Le manager le pose au démarrage, après l'acquire : check-mission-exit.sh --budget-snapshot"
-else
-  E7_SGEN="$(sed -n 's/^#gen=//p' "$E7_SNAP" 2>/dev/null | head -1)"
-  E7_SDATE="$(sed -n 's/^#date=//p' "$E7_SNAP" 2>/dev/null | head -1)"
-  E7_CGEN="$(cur_lock_gen)"
-  if [ -z "$E7_SGEN" ]; then
-    E7_STATUS="indet"
-    E7_MSG="[E7] snapshot de début de mission sans identité ni date (posé par une version antérieure) : impossible de savoir à quelle mission il appartient. Le reposer au démarrage : check-mission-exit.sh --budget-snapshot"
-  elif [ "$E7_CGEN" != "-" ] && [ "$E7_CGEN" != "$E7_SGEN" ]; then
-    E7_STATUS="indet"
-    E7_MSG="[E7] snapshot d'une autre mission : posé le ${E7_SDATE:-?} sous la génération « $E7_SGEN » du verrou, le verrou courant est « $E7_CGEN ». Ce qu'il masque n'est pas ce qui existait au démarrage de CETTE mission : le reposer"
-  else
-  if [ "$E7_SGEN" = "-" ]; then say "[E7] snapshot posé le ${E7_SDATE:-?} SANS verrou de driver : aucune identité de mission, seule la date le situe"
-  else say "[E7] snapshot posé le ${E7_SDATE:-?}, génération du verrou « $E7_SGEN » (verrou courant : $E7_CGEN ; relâché, l'identité n'est plus recontrôlable : seule la date la situe)"; fi
-  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?
-  E7_ARCHIVE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVÉ' || true; } | sed 's/^\[budget\] *//')"
-  E7_NONTENTE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVAGE NON TENTÉ' || true; } | sed 's/^\[budget\] *//')"
-  E7_NOW="$(mktemp "${TMPDIR:-/tmp}/vf-e7.XXXXXX")"
-  printf '%s\n' "$E7_OUT" | budget_lines > "$E7_NOW"
-  E7_LIGNES="$(LC_ALL=C comm -23 "$E7_NOW" "$E7_SNAP")"
-  rm -f "$E7_NOW"
-  if [ -n "$E7_NONTENTE" ]; then
-    E7_STATUS="indet"
-    E7_MSG="[E7] $E7_NONTENTE : rien n'a été archivé, l'état du geste de fin n'est pas vérifiable"
-  elif [ "$E7_RC" -ge 2 ]; then
-    E7_STATUS="indet"
-    E7_MSG="[E7] check-method-budget.sh a rendu $E7_RC (non vérifiable ou usage) : rien de sûr sur ce qui reste rangeable"
-    [ -n "$E7_ARCHIVE" ] && E7_MSG="$E7_MSG"$'\n'"[E7] archivé avant l'échec, à commiter : $E7_ARCHIVE"
-  else
-    E7_MANQUES=""
-    while IFS= read -r E7_L; do
-      [ -n "$E7_L" ] && E7_MANQUES="${E7_MANQUES}[E7] $E7_L"$'\n'
-    done <<EOF_E7
-$E7_LIGNES
-EOF_E7
-    [ -n "$E7_ARCHIVE" ] && E7_MANQUES="${E7_MANQUES}[E7] archivé, à commiter : $E7_ARCHIVE"$'\n'
-    if [ -n "$E7_MANQUES" ]; then
-      E7_STATUS="manque"
-      E7_MSG="${E7_MANQUES%$'\n'}"
-    fi
-  fi
-  fi
-fi
-# <<< E7
-
 # --- Agrégation finale — précédence 64 > 4 > 0 > 3 (D-06) -----------------------------------------
 HAS_INDET=0
 HAS_MANQUE=0
-for id in E1 E2 E3 E4 E5 E6 E7; do
+for id in E1 E2 E3 E4 E5 E6; do
   svar="${id}_STATUS"
   mvar="${id}_MSG"
   s="${!svar}"
@@ -624,5 +504,5 @@ if [ "$HAS_MANQUE" -eq 1 ]; then
   exit 0
 fi
 
-say "SAIN — les sept contrôles E1 à E7 ont été vérifiés et sont conformes."
+say "SAIN — les six contrôles E1 à E6 ont été vérifiés et sont conformes."
 exit 3

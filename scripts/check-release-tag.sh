@@ -12,7 +12,7 @@
 #   check-release-tag.sh --help
 #
 # Fenêtre de grâce (ADR-073) : le tag et la release GitHub sont posés quelques minutes APRÈS
-# le merge (CLAUDE.md § Règle non négociable, étape 3), alors que ce gate tourne au push sur
+# le merge (CLAUDE.md § Règle non négociable, étape 2), alors que ce gate tourne au push sur
 # main, c'est-à-dire au moment du merge. Si le tag est absent ET que le commit HEAD est récent
 # (< VF_RELEASE_TAG_GRACE_SECONDS, défaut 900s = 15 min), le gate rend un verdict d'ATTENTE non
 # bloquant (exit 3) plutôt qu'un échec — au-delà de la fenêtre, il échoue comme avant (exit 1).
