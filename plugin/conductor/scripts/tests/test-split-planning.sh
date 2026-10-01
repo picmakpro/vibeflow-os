@@ -47,7 +47,7 @@ eng() { # <cwd> <args…> : appel moteur de la suite, environnement neutralisé
 # --- Outils : PATH réduit de liens (avec jq), pour S6 -------------------------------------------
 mkdir -p "$TMP/bin-jq"
 for t in awk sed tr grep cat ls find sort head tail cut uniq wc mktemp date basename dirname env \
-         readlink rm mkdir cmp expr tee xargs uname id cksum; do
+         node readlink rm mkdir cmp expr tee xargs uname id cksum; do
   p="$(command -v "$t" 2>/dev/null || true)"; [ -n "$p" ] && ln -s "$p" "$TMP/bin-jq/$t"
 done
 JQ_REAL="$(command -v jq 2>/dev/null || true)"; [ -n "$JQ_REAL" ] && ln -s "$JQ_REAL" "$TMP/bin-jq/jq"
