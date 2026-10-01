@@ -34,6 +34,10 @@
 #                 d'un agent qui retire Write et Edit : doit-refuser ; dispatch d'un nom de sa propre allowlist : doit-passer, F9 =
 #                 f9-allowlist, Willy, AskUserQuestion session principale, 2026-09-30 ; dispatch hors liste d'un worker sous Agent ET
 #                 Task : doit-refuser) ; un substitut qui applique la lettre compte un faux refus ; à --etape=3 les lignes ROLE sont hors-etape
+#   R-REJEU-10   Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : les scripts du hook présents sous `.claude/scripts/` de la
+#                racine d'un lab adhérent entrent dans le relevé de G6 (doit-refuser), settings.json n'y entre pas ; un hook qui ne les
+#                garde pas compte un faux accept par script ; MUT-REJEU-SCRIPTS-G6. Q-ARM (2026-09-30) : le hook « frère » des cas est
+#                une copie à observe (HOOK), les cas ne dépendent pas de l'état d'armement courant
 #   R-REJEU-STATIQUE  aucun sous-processus autre que bash (hook copié, `--classer`, recalc-planning.sh) et cmp
 #   R-REJEU-LIENS / R-REEL-LIENS  (quick 45-B, H3 ; décisions du manager vf-dev-manager, 2026-10-01) : un lien du lab dont la cible
 #                 résolue sort du lab, sur un chemin que le rejeu écrit ou lit (cycles/, phases/, STATE.md, .claude/agents), est une
@@ -141,6 +145,21 @@ def ecrire(chemin, contenu, mode=None):
         fh.write(contenu)
     if mode is not None:
         os.chmod(chemin, mode)
+
+
+def hook_observe(source):
+    """Copie du hook dont les cinq constantes ARMEMENT_* valent `observe` (Q-ARM, Willy, AskUserQuestion session principale,
+    2026-09-30) : les cas du rejeu ne dépendent pas de l'état d'armement courant du hook livré. L'outil arme lui-même, sur sa
+    propre copie, les gates des étapes <= --etape ; ceux des étapes suivantes restent à observe (« simulés en observe »)."""
+    texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"observe"', open(source, encoding="utf-8").read(), flags=re.M)
+    if n != 5:
+        raise RuntimeError("cinq constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+    chemin = os.path.join(WORK, "hook-observe", "planning-hook.sh")
+    ecrire(chemin, texte, 0o755)
+    return chemin
+
+
+HOOK = hook_observe(HOOK)  # le hook « frère » des cas du rejeu : le script livré, tous gates à observe
 
 
 def fabriquer_lab(nom, fichiers, config='{"planning_version": "2.0"}'):
@@ -493,15 +512,42 @@ def sec_sens(_):
         ko("R-REJEU-05", "élagage node_modules, .git", "aucune ligne sous node_modules ni .git", "rc=%d lignes=%s" % (r5.rc, [l[2] for l in r5.lignes]))
 
 
+def scenario_scripts_g6(script=None, hook=None, scenario=None):
+    """Rejeu --etape=1 d'un lab dont la racine porte `.planning/` et, sous `.claude/`, les deux scripts du hook et un settings.json."""
+    lab = fabriquer_lab(unique("lab-g6s"), {".planning/notes.md": "n", ".claude/scripts/planning-hook.sh": "#!/bin/bash\n",
+                                            ".claude/scripts/check-gates-alive.sh": "#!/bin/bash\n", ".claude/settings.json": "{}\n"})
+    return rejeu([lab], hook=hook or HOOK, etape=1, script=script, scenario=scenario)
+
+
 def sec_reel_hook(_):
     """R-REJEU-06 et R-REJEU-07."""
     neutre = fabriquer_lab("lab-neutre", {".planning/notes.md": "n", "livrables/rapport.md": "r"})
-    r = rejeu([neutre], hook=None, etape=1)
+    r = rejeu([neutre], hook=HOOK, etape=1)
     if r.rc == 0 and r.compte.get("G6") == (0, 0, 0) and r.compte.get("G5") == (0, 0, 0) and r.etape == (0, 0, 0) \
             and r.compte.get("G1") == (0, 2, 0) and "G1" in r.hors_etape:
-        ok("R-REJEU-06 planning-hook.sh frère, --etape=1, lab neutre (config, notes.md, livrables/) : faux-refus=0 faux-accept=0 pour G6 et G5 ; les deux phases synthétiques du constructeur G1 (joué, G1 en observe) passent : COMPTE G1 … faux-accept=2 hors-etape, hors du total REJEU-ETAPE-1 (0, 0, 0)")
+        ok("R-REJEU-06 planning-hook.sh frère (copie à observe : Q-ARM), --etape=1, lab neutre (config, notes.md, livrables/) : faux-refus=0 faux-accept=0 pour G6 et G5 ; les deux phases synthétiques du constructeur G1 (joué, G1 en observe) passent : COMPTE G1 … faux-accept=2 hors-etape, hors du total REJEU-ETAPE-1 (0, 0, 0)")
     else:
         ko("R-REJEU-06", "hook réel sur un lab neutre", "REJEU-ETAPE-1 (0, 0, 0), COMPTE G1 (0, 2, 0) hors-etape, code 0", "rc=%d etape=%s compte=%s hors=%s err=%s" % (r.rc, r.etape, r.compte, sorted(r.hors_etape), court(r.err)))
+
+    # R-REJEU-10 (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01) : les scripts du hook posés sous `.claude/scripts/` de la
+    # racine d'un lab adhérent entrent dans le relevé de G6 (doit-refuser) quand le lab copié les porte ; `.claude/settings.json` n'y entre pas
+    # (limite (y)) ; un hook qui ne les garde pas compte un faux accept par script.
+    attendu_s = [(".claude/scripts/check-gates-alive.sh", "doit-refuser", "refus"), (".claude/scripts/planning-hook.sh", "doit-refuser", "refus")]
+    r10 = scenario_scripts_g6()
+    ls10 = sorted((l[2], l[3], l[4]) for l in r10.lignes if l[2].startswith(".claude/"))
+    sans_scripts = os.path.join(WORK, "hook-sans-scripts", "planning-hook.sh")
+    texte_sans, n_sans = re.subn(r'^SCRIPTS_HOOK_G6 = \(.*\)  # g6-scripts$', "SCRIPTS_HOOK_G6 = ()  # g6-scripts",
+                                 open(HOOK, encoding="utf-8").read(), count=1, flags=re.M)
+    ecrire(sans_scripts, texte_sans, 0o755)
+    r10m = scenario_scripts_g6(hook=sans_scripts, scenario="")
+    sans = [l[2] for l in r10m.lignes if l[2].startswith(".claude/")]
+    if r10.rc == 0 and ls10 == attendu_s and r10.compte.get("G6") == (0, 0, 0) and r10.etape == (0, 0, 0) and n_sans == 1 \
+            and r10m.compte.get("G6") == (0, 2, 0) and len(sans) == 2:
+        ok("R-REJEU-10 lab adhérent dont .claude/scripts/ porte les deux scripts du hook (et un settings.json) : deux lignes G6 doit-refuser/refus (hook frère, --etape=1), COMPTE G6 (0, 0, 0), settings.json absent du relevé (limite (y)) ; un hook dont SCRIPTS_HOOK_G6 est vide : COMPTE G6 faux-accept=2 sur ces deux scripts")
+    else:
+        ko("R-REJEU-10", "les scripts du hook entrent dans le relevé de G6 et un hook qui ne les garde pas est compté en faux accept",
+           "2 lignes doit-refuser/refus, COMPTE G6 (0, 0, 0) ; hook sans scripts : (0, 2, 0)",
+           "rc=%d lignes=%s compte=%s ; sans scripts : compte=%s lignes=%s err=%s" % (r10.rc, ls10, r10.compte.get("G6"), r10m.compte.get("G6"), sans, court(r10.err)))
 
     lab7 = fabriquer_lab("lab-d7", {".planning/notes.md": "n"})
     sub7 = substitut("sub-ecrit.sh", 'open(%r, "w").write("intrus")' % os.path.join(lab7, ".planning", "intrus.md"))
@@ -1895,6 +1941,13 @@ def sec_mutants(_):
     duel("REJEU-ECRIT", REJEU, G, "# rejeu-adhesion-copie", 'cible = os.path.join(lab.reel, rel, "config.json")  # rejeu-adhesion-copie',
          sc_ecrit, lambda o, m: o["rc"] == 0 and o["arbre"] and o["config"] and not (m["arbre"] and m["config"] and m["rc"] == 0),
          "R-REJEU-02 : l'adhésion simulée écrite dans le lab réel")
+    def sc_scripts(script):
+        r = scenario_scripts_g6(script=script)
+        return {"lignes": sorted(l[2] for l in r.lignes if l[2].startswith(".claude/")), "G6": r.compte.get("G6")}
+
+    duel("REJEU-SCRIPTS-G6", REJEU, G, "# rejeu-scripts-g6", 'if False:  # rejeu-scripts-g6',
+         sc_scripts, lambda o, m: len(o["lignes"]) == 2 and o["G6"] == (0, 0, 0) and m["lignes"] == [],
+         "R-REJEU-10 : le constructeur G6 ne joue plus les scripts du hook")
     duel("REJEU-EMPREINTE", REJEU, G, "# rejeu-empreinte", "identique = True  # rejeu-empreinte",
          sc_empreinte, lambda o, m: o["rc"] == 1 and o["divergent"] and not m["divergent"],
          "R-REJEU-07 : comparaison d'empreinte toujours égale")

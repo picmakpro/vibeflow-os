@@ -57,7 +57,8 @@
 # `X/.planning/config.json` (voir plus bas) ; la colonne se termine par le nom du dossier.
 # Registre CONSTRUCTEURS (gate -> fonction(lab, ctx) qui rend des tuples (outil, chemin, attendu,
 # agent_type[, origine[, charge[, branche[, situation]]]])) : `reecriture` (chaque fichier régulier des .planning/ copiés,
-# attendu doit-passer) ; `G6` et `G5` (45-05 : fichiers générés, config.json, VERDICT.md) ; `G1` (45-06 : les
+# attendu doit-passer) ; `G6` et `G5` (45-05 : fichiers générés, config.json, VERDICT.md ; G6 : aussi, Q-G6 = b, les scripts du hook
+# présents sous `.claude/scripts/` de la racine adhérente) ; `G1` (45-06 : les
 # PLAN.md de forme modèle, classés d'après l'état que recalc-planning.sh --read-only dérive sur la copie — `recalc-
 # planning.sh` est cherché à côté de ce script — sinon d'après la règle écrite du modèle, `branche` nommant la
 # règle appliquée ; des phases synthétiques 99-rejeu-* créées sur la copie) ; `G7` (45-07 : la CRÉATION de chaque
@@ -385,6 +386,10 @@ def construire_reecriture(lab, ctx):
 # Noms que G6 protège à la racine du dossier de planning (le même périmètre que le hook : fichiers
 # générés, journal de dérogation, cache du recalcul) ; le contrôle de l'adhésion porte sur config.json.
 NOMS_G6 = ("STATE.md", "INDEX.md", "cloture.log", "derogations-gates.log", ".recalc-cache.json")
+# Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : les scripts du hook posés par l'installeur sous `.claude/scripts/`
+# de la RACINE d'un lab adhérent sont protégés par G6 ; le relevé les joue quand le lab copié les porte (fichier régulier) — un lab
+# qui n'a pas installé le hook en scope projet n'en a aucun à garder. Les réglages `.claude/settings*.json` ne le sont pas (limite (y)).
+SCRIPTS_G6 = ("planning-hook.sh", "check-gates-alive.sh")
 CHARGE_ADHESION_PERDUE = {"old_string": '"' + SCHEMA_ADHESION + '"', "new_string": '"2.0"'}
 
 
@@ -399,6 +404,11 @@ def construire_g6(lab, ctx):
             sortie.append(("Write", rel + "/" + nom, "doit-refuser", ""))
         sortie.append(("Write", rel + "/config.json", "doit-passer", ""))
         sortie.append(("Edit", rel + "/config.json", "doit-refuser", "", "etat-derive", CHARGE_ADHESION_PERDUE))
+    if ".planning" in lab.dossiers_planning:  # rejeu-scripts-g6
+        for nom in SCRIPTS_G6:
+            rel = ".claude/scripts/" + nom
+            if (rel, "f") in lab.entrees:
+                sortie.append(("Write", rel, "doit-refuser", ""))
     return sortie
 
 

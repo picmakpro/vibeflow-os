@@ -954,6 +954,36 @@ def fichier_protege(ecrit, racine):
     return None
 
 
+# Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : G6 protège aussi les SCRIPTS du hook, là où
+# l'installeur les pose dans un lab en scope projet (`<lab>/.claude/scripts/`) : le script du hook central et son canary.
+# Même identité que les fichiers générés (existant par samefile : lien dur, lien symbolique, variante de casse ; création
+# par le dossier parent résolu physiquement et le nom en casefold ; `..` et chemins relatifs par realpath). Les réglages
+# `.claude/settings*.json` NE SONT PAS protégés (limite (y) déclarée) ; le scope compte (`~/.claude/scripts/`) n'est sous
+# aucun lab adhérent (sauf si le HOME est lui-même un lab adhérent) : limite déclarée, jamais présentée comme protégée.
+# Bash n'est pas couvert (P45-D-10). Une dérogation nominative couvre le chemin `.claude/scripts/<nom>` comme celui d'un fichier généré.
+SCRIPTS_HOOK_G6 = ("planning-hook.sh", "check-gates-alive.sh")  # g6-scripts
+DOSSIER_SCRIPTS_REL = (".claude", "scripts")
+
+
+def script_protege(ecrit, racine):
+    """Nom canonique du script du hook que `ecrit` désigne sous `<racine>/.claude/scripts/`, ou None."""
+    dossier = os.path.join(racine, *DOSSIER_SCRIPTS_REL)
+    cible = os.path.realpath(ecrit)
+    parent, nom = os.path.split(cible)
+    if _meme_dossier(parent, os.path.realpath(dossier)):  # g6-script-racine
+        for canonique in SCRIPTS_HOOK_G6:
+            if canonique.casefold() == nom.casefold():  # g6-script-casefold
+                return canonique
+    if os.path.lexists(cible):
+        for canonique in SCRIPTS_HOOK_G6:
+            try:
+                if os.path.samefile(cible, os.path.join(dossier, canonique)):  # g6-script-samefile
+                    return canonique
+            except OSError:
+                continue
+    return None
+
+
 def _appliquer_edit(cible, entree):
     """Contenu de `cible` après l'Edit, ou None si l'Edit ne s'applique pas au contenu actuel (old_string
     vide, absent, ou ambigu sans replace_all) : l'effet sur l'adhésion serait invérifiable."""
@@ -994,13 +1024,20 @@ def adhesion_conservee(contexte, cible):
 
 def evaluer_g6(contexte):
     """G6 (GATE-04, P45-D-13 ; F6 et F7b) : écriture par outil d'un fichier généré situé directement à la
-    racine du dossier de planning d'un lab adhérent, ou d'un config.json qui perdrait l'adhésion. Seule
-    lecture de config.json : le contenu que l'Edit produirait (P45-D-01)."""
+    racine du dossier de planning d'un lab adhérent, ou d'un config.json qui perdrait l'adhésion, ou (Q-G6 = b, Willy,
+    AskUserQuestion session principale, 2026-10-01) d'un script du hook posé sous `<lab>/.claude/scripts/` d'un lab adhérent.
+    Seule lecture de config.json : le contenu que l'Edit produirait (P45-D-01)."""
     if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
         return []
     trouve = fichier_protege(contexte["ecrit"], contexte["racine"])
     if trouve is None:
-        return []
+        script = script_protege(contexte["ecrit"], contexte["racine"])
+        if script is None:
+            return []
+        chemin_script = "/".join(DOSSIER_SCRIPTS_REL) + "/" + script
+        return [Verdict("G6", chemin_script, ("%s est un script du hook central posé par l'installeur — l'écriture par outil est "
+                                              "refusée ; mettez à jour VibeFlow (/vf-update), ou inscrivez une dérogation par "
+                                              "deroger-gate.sh" % chemin_script))]
     nom, genre = trouve
     chemin_rel = ".planning/" + nom
     if genre != "adhesion":

@@ -205,6 +205,18 @@ inconnues: []
 ecrit: livrables/rapport.md
 ---
 
+@@ fichier .claude/scripts/planning-hook.sh
+#!/bin/bash
+# script du hook central, tel que l'installeur le pose en scope projet (banc)
+
+@@ fichier .claude/scripts/check-gates-alive.sh
+#!/bin/bash
+# canary de session, tel que l'installeur le pose en scope projet (banc)
+
+@@ fichier scripts/planning-hook.sh
+#!/bin/bash
+# un script de même nom hors de .claude/scripts : jumeau négatif
+
 @@ # Refus : chaque fichier généré, Write et Edit, fil principal, agent de plugin et agent inconnu.
 @@ ecriture Write .planning/STATE.md armee :: doit-refuser G6
 @@ ecriture Edit .planning/STATE.md armee :: doit-refuser G6
@@ -224,6 +236,20 @@ ecrit: livrables/rapport.md
 @@ ecriture Write .planning/notes.md armee :: doit-passer G6
 @@ ecriture Write .planning/STATE.md.bak armee :: doit-passer G6
 @@ ecriture Write livrables/rapport.md armee :: doit-passer G6
+@@ # Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : les scripts du hook, posés par l'installeur sous
+@@ # `.claude/scripts/` du lab (scope projet), sont protégés comme les fichiers générés ; Bash n'est pas couvert (P45-D-10).
+@@ ecriture Write .claude/scripts/planning-hook.sh armee :: doit-refuser G6
+@@ ecriture Edit .claude/scripts/planning-hook.sh armee :: doit-refuser G6
+@@ ecriture NotebookEdit .claude/scripts/planning-hook.sh armee :: doit-refuser G6
+@@ ecriture Write .claude/scripts/check-gates-alive.sh armee :: doit-refuser G6
+@@ ecriture Edit .claude/scripts/check-gates-alive.sh armee :: doit-refuser G6
+@@ ecriture NotebookEdit .claude/scripts/check-gates-alive.sh armee :: doit-refuser G6
+@@ ecriture Write .claude/scripts/planning-hook.sh agent=plugin-inconnu:agent-inconnu armee :: doit-refuser G6
+@@ ecriture Write .claude/scripts/Planning-Hook.sh armee :: doit-refuser G6
+@@ # Passage : un autre script du dossier, un nom voisin, le même nom hors de `.claude/scripts/`.
+@@ ecriture Write .claude/scripts/autre.sh armee :: doit-passer G6
+@@ ecriture Write .claude/scripts/planning-hook.sh.bak armee :: doit-passer G6
+@@ ecriture Write scripts/planning-hook.sh armee :: doit-passer G6
 
 @@ lab g6-dev jumeau-de=g6-adherent
 
@@ -233,7 +259,14 @@ ecrit: livrables/rapport.md
 @@ fichier .planning/STATE.md
 etat ecrit a la main
 
+@@ fichier .claude/scripts/planning-hook.sh
+#!/bin/bash
+# script du hook d'un lab dev (hors adhésion : aucun gate ne le garde)
+
 @@ # Jumeau négatif : un lab dev écrit sa mémoire à la main, même sur copie armée.
+@@ ecriture Write .claude/scripts/planning-hook.sh armee :: doit-passer G6
+@@ ecriture Write .claude/scripts/planning-hook.sh armee :: silence G6
+@@ ecriture Edit .claude/scripts/planning-hook.sh armee :: silence G6
 @@ ecriture Write .planning/STATE.md armee :: silence G6
 @@ ecriture Edit .planning/STATE.md armee :: silence G6
 @@ ecriture Write .planning/INDEX.md armee :: silence G6

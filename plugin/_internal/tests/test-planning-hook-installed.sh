@@ -18,6 +18,11 @@
 #   R-INST-04  lab dev dans les mêmes modes et pour les six outils : stdout d'octet vide, code 0
 #   R-INST-05  contrôle négatif anti-vert-à-vide : un settings.json vidé de l'entrée fait rougir
 #              l'assertion R-INST-01 (verdict inversé attendu)
+#   R-INST-07  Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01), scope projet : sur une copie ARMÉE du lab installé, G6 refuse
+#              Write, Edit et NotebookEdit des deux scripts posés sous `.claude/scripts/` ; les réglages settings*.json passent (limite (y)) ;
+#              un lab dev reste silencieux
+#   R-INST-08  scope compte (installation réelle dans un HOME jetable) : `~/.claude/scripts/` n'est sous aucun lab adhérent, donc NON protégé
+#              (sauf un HOME qui est lui-même un lab adhérent) ; un témoin prouve que la commande armée tourne
 #   R-INST-06  la désinstallation ne laisse aucune entrée résiduelle, fichiers JSON valides
 #   R-INST-ISOL  le vrai ~/.claude n'a pas bougé (sous-chemins que l'installeur écrit)
 #
@@ -379,6 +384,95 @@ def sec_modes(ctx):
             ko("R-INST-04", "lab dev : " + cas, a, b)
     else:
         ok("R-INST-04 lab dev (config 2.0), cinq modes, six outils : stdout d'octet vide et code 0 — %d rejeux" % n)
+
+
+# --- Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : G6 protège les scripts du hook posés ------
+# R-INST-07 (scope projet : les scripts posés par l'installeur sous `<lab>/.claude/scripts/` sont refusés par G6 armé, les réglages
+# `.claude/settings*.json` passent : limite (y)) et R-INST-08 (scope compte : `~/.claude/scripts/` n'est sous aucun lab adhérent, donc non
+# protégé — sauf un HOME qui serait lui-même un lab adhérent). L'armement est FORCÉ sur la copie (armer_copie) : l'état livré ne compte pas.
+def rejouer_dans(commande, entree, cwd, env_extra):
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    if os.environ.get("TMPDIR"):
+        env["TMPDIR"] = os.environ["TMPDIR"]
+    env.update(env_extra)
+    p = subprocess.run(["/bin/sh", "-c", commande], input=entree, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env=env, cwd=cwd, timeout=120)
+    return p.returncode, p.stdout, p.stderr
+
+
+def raison_de(out):
+    try:
+        return json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+    except (ValueError, KeyError, TypeError):
+        return ""
+
+
+def sec_g6_scripts(ctx):
+    """R-INST-07 et R-INST-08."""
+    lab = copier_lab(ctx, "lab-g6-scripts")
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    armer_copie(lab, ("G6", "G5"))
+    fautes, n = [], 0
+    for outil in ("Write", "Edit", "NotebookEdit"):
+        for nom in (CITE, CANARY):
+            rel = ".claude/scripts/" + nom
+            rc, out, err = rejouer_dans(ctx.cmd, payload(outil, entree_outil(outil, lab + "/" + rel), lab), lab, {"HOME": ctx.home, "CLAUDE_PROJECT_DIR": lab})
+            n += 1
+            raison = raison_de(out)
+            if verdict(rc, out) != "deny" or err or "[planning-core] G6 :" not in raison or rel not in raison:
+                fautes.append("%s %s : %s %s" % (outil, rel, verdict(rc, out), court(out)))
+    for rel in (".claude/settings.json", ".claude/settings.local.json"):
+        rc, out, err = rejouer_dans(ctx.cmd, payload("Write", entree_outil("Write", lab + "/" + rel), lab), lab, {"HOME": ctx.home, "CLAUDE_PROJECT_DIR": lab})
+        if rc != 0 or out != b"" or err:
+            fautes.append("réglage %s (limite (y), attendu : silence) : rc=%d %s" % (rel, rc, court(out)))
+    dev = copier_lab(ctx, "lab-g6-scripts-dev")
+    ecrire(os.path.join(dev, ".planning", "config.json"), '{"planning_version": "2.0"}')
+    armer_copie(dev, ("G6", "G5"))
+    for nom in (CITE, CANARY):
+        rc, out, err = rejouer_dans(ctx.cmd, payload("Write", entree_outil("Write", dev + "/.claude/scripts/" + nom), dev), dev, {"HOME": ctx.home, "CLAUDE_PROJECT_DIR": dev})
+        if rc != 0 or out != b"" or err:
+            fautes.append("lab dev %s : rc=%d %s (attendu : stdout vide, GATE-10)" % (nom, rc, court(out)))
+    if fautes:
+        ko("R-INST-07", "scope projet, scripts posés par l'installeur : Write, Edit et NotebookEdit refusés par G6 armé ; settings*.json et lab dev silencieux", "6 refus G6, 2 silences, 2 silences", "; ".join(fautes))
+    else:
+        ok("R-INST-07 scope projet, copie armée du lab installé : %d refus G6 (Write, Edit, NotebookEdit des deux scripts posés), settings.json et settings.local.json passent (limite (y)), lab dev silencieux" % n)
+
+    # R-INST-08 : scope compte, installé pour de vrai dans un HOME jetable
+    home = os.path.join(ctx.work, "home-compte")
+    os.makedirs(home, exist_ok=True)
+    env = dict(os.environ)
+    env.update({"VF_SCOPE": "user", "VIBEFLOW_CACHE": ctx.cache, "HOME": home})
+    p = subprocess.run(["bash", ctx.installer, "install", "planning-core"], cwd=home, env=env,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=300)
+    if p.returncode != 0:
+        ko("R-INST-08", "l'installeur inchangé pose planning-core en scope compte (HOME jetable)", "code 0", "code %d : %s" % (p.returncode, court(p.stdout)))
+        return
+    cmds = entrees_du_hook(os.path.join(home, ".claude", "settings.json"))
+    if len(cmds) != 1 or not os.path.isfile(os.path.join(home, ".claude", "scripts", CITE)):
+        ko("R-INST-08", "scope compte : UNE entrée posée et le script sous ~/.claude/scripts/", "1 entrée, script présent", "%d entrée(s)" % len(cmds))
+        return
+    armer_copie(home, ("G6", "G5"))
+    env_c = {"HOME": home}
+    cible = os.path.join(home, ".claude", "scripts", CITE)
+    fautes = []
+    adh = ctx.adh
+    rc, out, err = rejouer_dans(cmds[0], payload("Write", entree_outil("Write", adh + "/.planning/STATE.md"), adh), adh, env_c)
+    if verdict(rc, out) != "deny" or "[planning-core] G6 :" not in raison_de(out) or err:
+        fautes.append("témoin (la commande du compte, armée, refuse .planning/STATE.md d'un lab adhérent) : %s %s" % (verdict(rc, out), court(out)))
+    for outil in ("Write", "Edit", "NotebookEdit"):
+        for nom in (CITE, CANARY):
+            rc, out, err = rejouer_dans(cmds[0], payload(outil, entree_outil(outil, os.path.join(home, ".claude", "scripts", nom)), adh), adh, env_c)
+            if rc != 0 or out != b"" or err:
+                fautes.append("scope compte %s %s : rc=%d %s (attendu : silence, non protégé)" % (outil, nom, rc, court(out)))
+    # un HOME qui serait lui-même un lab adhérent : la racine dérivée du chemin écrit est le HOME, les scripts y sont gardés
+    ecrire(os.path.join(home, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    rc, out, err = rejouer_dans(cmds[0], payload("Write", entree_outil("Write", cible), home), home, env_c)
+    if verdict(rc, out) != "deny" or "[planning-core] G6 :" not in raison_de(out):
+        fautes.append("HOME adhérent : %s %s (attendu : deny G6)" % (verdict(rc, out), court(out)))
+    if fautes:
+        ko("R-INST-08", "scope compte : ~/.claude/scripts/ non protégé (aucun lab adhérent au-dessus), sauf HOME adhérent ; témoin armé", "témoin deny, 6 silences, HOME adhérent deny", "; ".join(fautes))
+    else:
+        ok("R-INST-08 scope compte (installation réelle dans un HOME jetable) : la commande armée refuse .planning/STATE.md d'un lab adhérent (témoin), mais Write, Edit et NotebookEdit de ~/.claude/scripts/ passent (6 silences : limite (y), non protégé) ; un HOME qui est lui-même un lab adhérent les garde (deny G6)")
 
 
 # --- Canary de session check-gates-alive.sh, POSÉ dans le lab jetable (R-CAN-01 à R-CAN-08) ------
@@ -855,6 +949,7 @@ def sec_isolation(ctx):
 SECTIONS = {
     "install": sec_install,
     "modes": sec_modes,
+    "g6_scripts": sec_g6_scripts,
     "can": sec_can,
     "can_m2": sec_can_m2,
     "mutants": sec_mutants,
@@ -899,7 +994,7 @@ run_sections() { # <sections séparées par des virgules>
 # Empreinte du VRAI ~/.claude avant la suite (sous-chemins que l'installeur écrit seulement).
 EMPREINTE_AVANT="$("$PYBIN" "$AIDES" empreinte "$REAL_HOME")"
 
-run_sections install,modes,can,can_m2,mutants,desinstall,isolation
+run_sections install,modes,g6_scripts,can,can_m2,mutants,desinstall,isolation
 
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]

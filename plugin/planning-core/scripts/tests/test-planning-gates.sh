@@ -6,7 +6,7 @@
 # (test-planning-hook-registered.sh).
 #
 # Familles :
-#   R-TABLE-01..03  la table d'armement vit dans le code livré (constantes ARMEMENT_*, tout à observe),
+#   R-TABLE-01..03  la table d'armement vit dans le code livré (constantes ARMEMENT_* = TABLE_ATTENDUE, l'état courant),
 #                   armement_valide refuse un ordre violé, une table incohérente refuse (deny)
 #   R-PARSEUR       lire_frontmatter du hook est ast-identique à celle du moteur de recalcul
 #   R-G2-01..07     G2 avertit par additionalContext (jamais permissionDecision), référentiel = union
@@ -20,6 +20,10 @@
 #                   soit le rôle ; en observe une ligne de journal sans contenu, en armed un deny (45-04)
 #   R-G6-01..05     G6 : Write, Edit, NotebookEdit d'un fichier généré, enfant direct du dossier de planning d'un lab
 #                   adhérent, quel que soit le rôle ; compartiments et plans du modèle non visés ; dérogation (45-05)
+#   R-G6-06..09     Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : G6 protège aussi les scripts du hook posés sous
+#                   `<lab>/.claude/scripts/` d'un lab adhérent (planning-hook.sh et check-gates-alive.sh : Write, Edit, NotebookEdit, casse,
+#                   liens dur et symbolique, alias, `..`, relatif, création) ; les réglages `.claude/settings*.json` ne le sont pas (limite (y)) ;
+#                   observe journalise, lab dev silencieux (GATE-10), dérogation nominative ; MUT-G6-SCRIPT* et MUT-G6-SCRIPTS
 #   R-CANG-01..03   canary de session : les cas G6 et G5 attendent une ligne d'observation tant que le gate est en
 #                   observe, un refus de gate dès qu'il est armed ; un gate neutralisé fait signaler le canary (45-05)
 #   R-G1-01..10     G1 (45-06) : PLAN.md de forme modèle dans une phase sans CADRAGE.md ou à registre ouvert, observe puis
@@ -285,7 +289,7 @@ class Ctx:
         """Copie du script dont les cinq constantes ARMEMENT_* valent `armed` (armement FORCÉ)."""
         if self._armee is None:
             texte = open(self.hook, encoding="utf-8").read()
-            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"observe"', r'\1"armed"', texte, flags=re.M)
+            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"armed"', texte, flags=re.M)
             d = self.unique("armee")
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
@@ -448,12 +452,19 @@ def juger(attendu, gate, rc, out):
 
 
 # --- Mutants du script (make_hook_mutant) ----------------------------------------------------
+def observe_partout(texte):
+    """Le texte du script dont les cinq constantes ARMEMENT_* valent `observe` (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30) : la
+    base d'un mutant ne dépend pas de l'état d'armement courant (les contrôles forcent eux-mêmes l'état qu'ils mesurent, par copie_forcee ; le
+    témoin « Write neutre » ne doit pas voir un gate armé refuser à la place du mutant). Sans ligne ARMEMENT_* (le canary), le texte est rendu tel quel."""
+    return re.sub(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"observe"', texte, flags=re.M)
+
+
 def make_script_mutant(ctx, nom, marqueur, ident, motif, remplacement):
     """Copie du script `nom` (heredoc `marqueur`) dont l'UNIQUE ligne portant `motif` (fixe) est
     remplacée par `remplacement` (indentation conservée). `bash -n` et la compilation du corps Python
     extrait doivent passer. Un mutant d'un autre script que le hook reçoit aussi une copie du hook
     livré (le témoin rejoue la commande enregistrée sur ce dossier)."""
-    original = open(os.path.join(ctx.scripts_dir, nom), encoding="utf-8").read()
+    original = observe_partout(open(os.path.join(ctx.scripts_dir, nom), encoding="utf-8").read())
     lignes = original.split("\n")
     idx = [i for i, l in enumerate(lignes) if motif in l]
     if len(idx) != 1 or original.count(motif) != 1:
@@ -470,7 +481,8 @@ def make_script_mutant(ctx, nom, marqueur, ident, motif, remplacement):
         fh.write(muté)
     os.chmod(chemin, 0o755)
     if nom != "planning-hook.sh":
-        shutil.copy(ctx.hook, os.path.join(dossier, "planning-hook.sh"))
+        with open(os.path.join(dossier, "planning-hook.sh"), "w", encoding="utf-8") as fh:
+            fh.write(observe_partout(open(ctx.hook, encoding="utf-8").read()))
         os.chmod(os.path.join(dossier, "planning-hook.sh"), 0o755)
     p = subprocess.run(["bash", "-n", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if p.returncode != 0:
@@ -2714,16 +2726,32 @@ def sec_table(ctx):
             ko("R-TABLE-01", "les cinq constantes ARMEMENT_* (une ligne chacune) valent TABLE_ATTENDUE, G2_MODE vaut avertit, ordre de l'interface",
                "table livrée = table attendue", f)
     else:
-        ok("R-TABLE-01 cinq constantes ARMEMENT_* sur une ligne chacune = TABLE_ATTENDUE (tout à observe), G2_MODE avertit, ORDRE_ETAPES conforme, armement_valide vrai")
+        ok("R-TABLE-01 cinq constantes ARMEMENT_* sur une ligne chacune = TABLE_ATTENDUE (l'état courant), G2_MODE avertit, ORDRE_ETAPES conforme, armement_valide vrai")
     bon, detail = controle_table_02(ctx, ctx.hook)
     if bon:
         ok("R-TABLE-02 " + detail)
     else:
         ko("R-TABLE-02", "armement_valide rejette un ordre violé et accepte les préfixes", "6 rejets, 5 acceptations", detail)
     # Table livrée incohérente (G1 armé sans G6 ni G5) : le hook refuse dans un lab adhérent
+    bon, detail = controle_table_03(ctx, ctx.scripts_dir)
+    if bon:
+        ok("R-TABLE-03 " + detail)
+    else:
+        ko("R-TABLE-03", "une table livrée qui viole l'ordre des étapes refuse", "deny « table d'armement incohérente »", detail)
+
+
+def controle_table_03(ctx, script):
+    """R-TABLE-03 : une table incohérente (G1 armé, G6 et G5 en observe : vraie QUEL QUE SOIT l'état courant d'armement, Q-ARM, Willy,
+    AskUserQuestion session principale, 2026-09-30) construite en réécrivant les cinq constantes du script livré -> deny « table
+    d'armement incohérente », code 0, dans un lab adhérent."""
+    texte = open(os.path.join(_dossier(ctx, script), "planning-hook.sh"), encoding="utf-8").read()
     d = ctx.unique("incoherente")
     os.makedirs(d, exist_ok=True)
-    incoh = re.sub(r'^(ARMEMENT_G1 = )"observe"', r'\1"armed"', texte, count=1, flags=re.M)
+    incoh = texte
+    for gate, valeur in (("G6", "observe"), ("G5", "observe"), ("G1", "armed"), ("G7", "observe"), ("ROLE", "observe")):
+        incoh, n = re.subn(r'^(ARMEMENT_%s = )"(?:observe|armed)"' % gate, r'\1"%s"' % valeur, incoh, count=1, flags=re.M)
+        if n != 1:
+            return False, "ARMEMENT_%s : %d ligne(s) réécrite(s) (attendu 1)" % (gate, n)
     with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
         fh.write(incoh)
     _, _, chemins = labs_banc(ctx)
@@ -2734,9 +2762,8 @@ def sec_table(ctx):
     if classer(rc, out) == "deny":
         raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
     if classer(rc, out) == "deny" and "table d'armement incohérente" in raison and not err:
-        ok("R-TABLE-03 table livrée incohérente (G1 armé sans G6 ni G5) : deny « table d'armement incohérente », code 0")
-    else:
-        ko("R-TABLE-03", "une table livrée qui viole l'ordre des étapes refuse", "deny « table d'armement incohérente »", classer(rc, out) + " " + court(out))
+        return True, "table incohérente (G1 armé sans G6 ni G5, quel que soit l'état courant) : deny « table d'armement incohérente », code 0"
+    return False, classer(rc, out) + " " + court(out)
 
 
 def sec_parseur(ctx):
@@ -2832,13 +2859,127 @@ def sec_g5(ctx):
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
 
+# --- Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : G6 protège les scripts du hook --------------
+# `.claude/scripts/planning-hook.sh` et son canary `check-gates-alive.sh`, là où l'installeur les pose dans un lab en scope projet.
+# Les réglages `.claude/settings*.json` ne le sont PAS (limite (y)) ; Bash n'est pas couvert (P45-D-10).
+SCRIPTS_HOOK_BANC = (".claude/scripts/planning-hook.sh", ".claude/scripts/check-gates-alive.sh")
+
+
+def controle_g6_06(ctx, script):
+    """Copie armed : Write, Edit et NotebookEdit de chaque script du hook sous `.claude/scripts/` d'un lab adhérent, fil principal
+    et agent inconnu -> un deny G6 chacun dont le motif nomme le script et la mise à jour (/vf-update)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes, n = [], 0
+    for rel in SCRIPTS_HOOK_BANC:
+        for outil in ("Write", "Edit", "NotebookEdit"):
+            for agent in (None, "agent-inconnu"):
+                rc, out, err = _g6(ctx, d, outil, rel, agent=agent)
+                n += 1
+                v = classer(rc, out)
+                if v != "deny" or err or len(out.splitlines()) != 1:
+                    fautes.append("%s %s agent=%s -> %s" % (outil, rel, agent, v))
+                    continue
+                raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+                if not raison.startswith("[planning-core] G6 :") or rel not in raison or "/vf-update" not in raison:
+                    fautes.append("%s %s agent=%s : raison %s" % (outil, rel, agent, raison))
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus G6 (2 scripts, Write, Edit et NotebookEdit, fil principal et agent inconnu), le motif nomme le script et /vf-update" % n)
+
+
+def controle_g6_07(ctx, script):
+    """Copie observe : Write d'un script du hook -> silence, code 0, UNE ligne gate=G6 chemin=.claude/scripts/... ; copie armed : les noms
+    voisins, le même nom hors de `.claude/scripts/`, les réglages `.claude/settings*.json` (limite (y)) passent, un lab dev (hors
+    adhésion) reste silencieux (GATE-10), stdout d'octet vide."""
+    fautes = []
+    o = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    cache = dossier_neuf(ctx, "cache-g6-07")
+    rel = ".claude/scripts/planning-hook.sh"
+    rc, out, err = _g6(ctx, o, "Write", rel, extra_env={"XDG_CACHE_HOME": cache})
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err or len(lignes) != 1 or "  gate=G6  " not in lignes[0] or ("  chemin=" + rel + "  ") not in lignes[0]:
+        fautes.append("observe : rc=%d stdout=%s lignes=%s" % (rc, court(out), lignes))
+    a = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    for voisin in (".claude/scripts/autre.sh", ".claude/scripts/planning-hook.sh.bak", ".claude/scripts/sous/planning-hook.sh",
+                   ".claude/planning-hook.sh", "scripts/planning-hook.sh", "livrables/planning-hook.sh",
+                   ".claude/settings.json", ".claude/settings.local.json"):
+        rc, out, err = _g6(ctx, a, "Write", voisin)
+        if classer(rc, out) not in ("silence", "avertit") or err or b"G6" in out:
+            fautes.append("voisin %s -> %s %s" % (voisin, classer(rc, out), court(out)))
+    for outil in ("Write", "Edit", "NotebookEdit"):
+        for script_rel in SCRIPTS_HOOK_BANC:
+            rc, out, err = _g6(ctx, a, outil, script_rel, lab="g6-dev")
+            if rc != 0 or out != b"" or err:
+                fautes.append("lab dev %s %s : rc=%d stdout=%s" % (outil, script_rel, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "observe : silence et une ligne gate=G6 ; armed : 8 voisins sans refus (dont settings*.json, limite (y)), lab dev silencieux (6 écritures, stdout vide)")
+
+
+def lab_scripts(ctx):
+    """Copie jetable du lab g6-adherent, avec liens dur et symbolique vers les scripts du hook, un alias du dossier
+    `.claude/scripts` et un lien dur dans le dossier ; check-gates-alive.sh est ABSENT (la création d'un nom protégé se juge par la casse)."""
+    lab = lab_frais(ctx, "g6-adherent")
+    scripts = os.path.join(lab, ".claude", "scripts")
+    os.link(os.path.join(scripts, "planning-hook.sh"), os.path.join(lab, "livrables", "dur-hook.sh"))
+    os.link(os.path.join(scripts, "planning-hook.sh"), os.path.join(scripts, "dur.sh"))
+    os.symlink(".claude/scripts/planning-hook.sh", os.path.join(lab, "lien-hook.sh"))
+    os.symlink(".claude/scripts", os.path.join(lab, "alias-scripts"))
+    os.remove(os.path.join(scripts, "check-gates-alive.sh"))
+    return lab
+
+
+def controle_g6_08(ctx, script):
+    """Copie armée : variante de casse, lien dur (dans et hors du dossier), lien symbolique, alias du dossier, segment `..`, chemin relatif,
+    création d'un script protégé absent (autre casse comprise) -> refus de G6 ; jumeaux sans refus."""
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lab = lab_scripts(ctx)
+    fautes = []
+    cas = ((".claude/scripts/Planning-Hook.sh", None), (".CLAUDE/scripts/planning-hook.sh", None), ("livrables/dur-hook.sh", None),
+           (".claude/scripts/dur.sh", None), ("lien-hook.sh", None), ("alias-scripts/planning-hook.sh", None),
+           (".claude/scripts/x/../planning-hook.sh", None), (".claude/../.claude/scripts/planning-hook.sh", None),
+           (".claude/scripts/check-gates-alive.sh", None), (".claude/scripts/Check-Gates-Alive.SH", None),
+           (".claude/scripts/planning-hook.sh", "plugin-inconnu:agent-inconnu"), ("livrables/dur-hook.sh", "agent-inconnu"))
+    for rel, agent in cas:
+        bon, detail = _refus_de(ctx, hook, lab, "G6", "Write", rel, agent=agent)
+        if not bon:
+            fautes.append(detail)
+    bon, detail = _refus_de(ctx, hook, lab, "G6", "Write", entree=entree_outil("Write", ".claude/scripts/planning-hook.sh"))
+    if not bon:
+        fautes.append("chemin relatif : " + detail)
+    for rel in ("livrables/planning-hook.sh", "scripts/planning-hook.sh", ".claude/scripts/planning-hook.sh.bak", ".claude/agents/planning-hook.sh",
+                ".claude/settings.json"):
+        bon, detail = _passage_de(ctx, hook, lab, "Write", rel)
+        if not bon:
+            fautes.append("jumeau : " + detail)
+    return (not fautes), ("; ".join(fautes) if fautes else "%d refus G6 (casse, lien dur dans et hors du dossier, lien symbolique, alias, segment .., chemin relatif, création en autre casse, deux rôles), 5 jumeaux sans refus" % (len(cas) + 1))
+
+
+def controle_g6_09(ctx, script):
+    """Une dérogation G6 nominative sur `.claude/scripts/planning-hook.sh` : premier Write cité et consommé, second refusé ; l'autre script reste refusé."""
+    lab = lab_frais(ctx, "g6-adherent")
+    os.remove(journal_derog(lab))
+    rc, out, err = deroger(ctx, lab, None, gate="G6", chemins=(".claude/scripts/planning-hook.sh",))
+    if rc != 0:
+        return False, "deroger-gate.sh refuse le scénario : rc=%d %s" % (rc, court(err))
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    r1 = ecrire_dans(ctx, hook, lab, "Write", ".claude/scripts/planning-hook.sh")
+    if classer(r1[0], r1[1]) != "avertit" or r1[2] or "#1" not in contexte_de(r1[1]):
+        return False, "premier Write : %s %s" % (classer(r1[0], r1[1]), court(r1[1]))
+    r2 = ecrire_dans(ctx, hook, lab, "Write", ".claude/scripts/planning-hook.sh")
+    r3 = ecrire_dans(ctx, hook, lab, "Write", ".claude/scripts/check-gates-alive.sh")
+    if classer(r2[0], r2[1]) != "deny" or classer(r3[0], r3[1]) != "deny":
+        return False, "second Write : %s ; autre script : %s" % (classer(r2[0], r2[1]), classer(r3[0], r3[1]))
+    return True, "dérogation G6 sur un script du hook : premier Write passe et cité, consommée, second refusé, l'autre script reste refusé"
+
+
 def sec_g6(ctx):
     for ident, ctrl, titre in (
             ("R-G6-01", controle_g6_01, "Write d'un fichier généré sur copie observe"),
             ("R-G6-02", controle_g6_02, "chaque fichier généré, Write et Edit, tout rôle : refusé sur copie armed"),
             ("R-G6-03", controle_g6_03, "compartiments, plans du modèle, notes : aucun refus de G6"),
             ("R-G6-04", controle_g6_04, "lab dev : stdout d'octet vide"),
-            ("R-G6-05", controle_g6_05, "dérogation G6 honorée, citée et consommée")):
+            ("R-G6-05", controle_g6_05, "dérogation G6 honorée, citée et consommée"),
+            ("R-G6-06", controle_g6_06, "Q-G6 = b : scripts du hook (scope projet), Write, Edit, NotebookEdit : refusés sur copie armed"),
+            ("R-G6-07", controle_g6_07, "scripts du hook : observe journalise, voisins et settings*.json passent, lab dev silencieux"),
+            ("R-G6-08", controle_g6_08, "scripts du hook : identité (casse, liens, alias, .., relatif, création)"),
+            ("R-G6-09", controle_g6_09, "scripts du hook : dérogation nominative honorée et consommée")):
         bon, detail = ctrl(ctx, None)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
@@ -3049,6 +3190,8 @@ def sec_mutants(ctx):
         ("PY-ADHESION", "sys.exit(0)  # non-adherent", "pass", "R-G2-07", controle_g2_07),
         ("TABLE-ORDRE", "gates = [gate for etape in ORDRE_ETAPES for gate in etape]  # armement-valide-debut", "return True",
          "R-TABLE-02", controle_table_02),
+        ("TABLE-ORDRE-REFUS", "gates = [gate for etape in ORDRE_ETAPES for gate in etape]  # armement-valide-debut", "return True",
+         "R-TABLE-03", controle_table_03),
         ("PARSEUR", 'return ("invalide:frontmatter-non-ferme", {})', 'return ("invalide:frontmatter-non-ferme-mute", {})',
          "R-PARSEUR", controle_parseur),
         ("ENV-ADHESION", 'SCHEMA_ADHESION = "cycles-v1"', 'SCHEMA_ADHESION = os.environ.get("VF_SCHEMA_ADHESION", "cycles-v1")',
@@ -3097,6 +3240,13 @@ def sec_mutants(ctx):
          "R-VERDICT-02", controle_verdict_02, "poser-verdict.sh", "PY_POSER_VERDICT_EOF"),
         # 45-05 : G6 et canary de l'étape 1
         ("G6-RACINE", "# g6-racine", "a_la_racine = True  # g6-racine", "R-G6-03", controle_g6_03),
+        # Q-G6 = (b) : scripts du hook
+        ("G6-SCRIPTS", "# g6-scripts", "SCRIPTS_HOOK_G6 = ()  # g6-scripts", "R-G6-06", controle_g6_06),
+        ("G6-SCRIPT-RACINE", "# g6-script-racine", "if False:  # g6-script-racine", "R-G6-08", controle_g6_08),
+        ("G6-SCRIPT-CASEFOLD", "# g6-script-casefold", "if canonique == nom:  # g6-script-casefold", "R-G6-08", controle_g6_08),
+        ("G6-SCRIPT-SAMEFILE", "# g6-script-samefile", "if False:  # g6-script-samefile", "R-G6-08", controle_g6_08),
+        ("G6-SCRIPT-ADHESION", "sys.exit(0)  # non-adherent", "pass", "R-G6-07", controle_g6_07),
+        ("G6-SCRIPT-DEROG", "# g6-scripts", "SCRIPTS_HOOK_G6 = ()  # g6-scripts", "R-G6-09", controle_g6_09),
         ("G6-NOMS", "# g6-noms", 'GENERES_PAR_RECALC = ("STATE.md", "INDEX.md")  # g6-noms', "R-G6-02", controle_g6_02),
         ("CANG-OBS", "# canary-observation", "if True:  # canary-observation", "R-CANG-03", controle_cang_03,
          "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF"),
@@ -4192,7 +4342,7 @@ LIMITES_REFERENCE = (
     ("v", ("F5", "marque de génération", "sans archive")),
     ("w", ("N1", "name:", "échappement YAML")),
     ("x", ("MESURE-VIDE", "volume")),
-    ("y", ("OUVERTE", "arbitrage de Willy en attente", "planning-hook.sh")),
+    ("y", ("settings", "Q-G6 = b", "scope compte", "planning-hook.sh")),
 )
 
 
@@ -4367,7 +4517,8 @@ def sec_reference(ctx):
         else:
             komut("REFERENCE-" + ident, "R-REFERENCE rougit sur la référence mutée (%s)" % motif, "au moins un écart", "aucun écart (le contrôle passe à vide)")
 
-    mutant_texte("G6", lambda t: re.sub(r"^(\| G6 \| 1 \| )observe", r"\1armed", t, count=1, flags=re.M), "valeur de G6 inversée dans la table d'armement")
+    mutant_texte("G6", lambda t: re.sub(r"^(\| G6 \| 1 \| )(observe|armed)", lambda m: m.group(1) + ("armed" if m.group(2) == "observe" else "observe"), t, count=1, flags=re.M),
+                 "valeur de G6 inversée dans la table d'armement")
     mutant_texte("OUTIL", lambda t: remplacer_ligne_reference(t, "- **Outils refusés en mode dégradé**", lambda l: l.replace("`Agent`, ", "", 1)),
                  "`Agent` retiré de la liste des outils refusés en mode dégradé")
     mutant_texte("LIMITE-L", lambda t: remplacer_ligne_reference(t, "- **limite (l)**", None), "la ligne de la limite (l) retirée")
@@ -4376,7 +4527,7 @@ def sec_reference(ctx):
     mutant_texte("MARQUEURS", lambda t: remplacer_ligne_reference(t, "- **Marqueurs de projet de code (G7)**", lambda l: l.replace("`Gemfile`, ", "", 1)),
                  "`Gemfile` retiré des marqueurs de code")
     mutant_texte("ORDRE", lambda t: t.replace("lab, compte, plugin", "compte, lab, plugin", 1), "ordre de résolution lab/compte inversé")
-    mutant_texte("CANARY", lambda t: re.sub(r"(\| G1 \| 2 \| observe \| [^|]*\| )G1-sans-cadrage", r"\1G1-autre", t, count=1), "cas de canary de G1 renommé")
+    mutant_texte("CANARY", lambda t: re.sub(r"(\| G1 \| 2 \| (?:observe|armed) \| [^|]*\| )G1-sans-cadrage", r"\1G1-autre", t, count=1), "cas de canary de G1 renommé")
     # Chaque limite, retirée une à une : le contrôle doit nommer cette limite.
     non_tuees = []
     for lettre, _mots in LIMITES_REFERENCE:
@@ -4396,10 +4547,13 @@ def sec_reference(ctx):
         okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))
     # Côté code : une constante du hook change, la référence reste intacte.
     ns_mut = dict(ns)
-    ns_mut["TABLE_ARMEMENT"] = dict(ns["TABLE_ARMEMENT"], G1="armed")
+    # Q-ARM (Willy, AskUserQuestion session principale, 2026-09-30) : la constante est INVERSÉE (observe <-> armed), jamais posée à une valeur
+    # fixe : le mutant reste opposable quel que soit l'état d'armement courant.
+    inverse = "observe" if ns["TABLE_ARMEMENT"]["G1"] == "armed" else "armed"
+    ns_mut["TABLE_ARMEMENT"] = dict(ns["TABLE_ARMEMENT"], G1=inverse)
     ecarts_c = controler(chemin, ns_mut)
     if ecarts_c:
-        okmut("REFERENCE-CODE", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant, ARMEMENT_G1 armed dans le code, référence intacte) : %d écart(s), premier : %s" % (len(ecarts_c), ecarts_c[0].replace("ECART ", "écart : ", 1)))
+        okmut("REFERENCE-CODE", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant, ARMEMENT_G1 inversé en %s dans le code, référence intacte) : %d écart(s), premier : %s" % (inverse, len(ecarts_c), ecarts_c[0].replace("ECART ", "écart : ", 1)))
     else:
         komut("REFERENCE-CODE", "R-REFERENCE rougit quand une constante du hook change sans la référence", "au moins un écart", "aucun écart")
 
