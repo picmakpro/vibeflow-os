@@ -4465,7 +4465,7 @@ LIMITES_REFERENCE = (
     ("v", ("F5", "marque de génération", "sans archive")),
     ("w", ("N1", "name:", "échappement YAML")),
     ("x", ("MESURE-VIDE", "volume")),
-    ("y", ("settings", "Q-G6 = b", "scope compte", "planning-hook.sh")),
+    ("y", ("settings", "Q-G6 = b", "scope compte", "planning-hook.sh", "lien préexistant")),
 )
 
 
