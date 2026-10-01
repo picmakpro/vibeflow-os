@@ -4254,6 +4254,14 @@ def controle_adhesion_repli(ctx, script):
             fautes.append("%s : G6 refuse une forme courante (attendu admise) : %s" % (etiquette, court(out)))
         if not admis and v != "deny":
             fautes.append("%s : G6 admet une forme que le repli ne reconnaît pas (attendu refus)" % etiquette)
+        if not admis and v == "deny":
+            # N-05 : le refus d'un contenu que le JSON dit adhérent nomme la contrainte de mise en forme ; un contenu réellement non adhérent garde la raison d'origine
+            raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+            attendu_forme = etiquette != "clé imbriquée seulement"
+            if attendu_forme and ("UNE même ligne" not in raison or "changer ou retirer" in raison):
+                fautes.append("%s : raison %r (attendu : la contrainte de mise en forme, « UNE même ligne », jamais « changer ou retirer »)" % (etiquette, raison[:200]))
+            if not attendu_forme and "changer ou retirer l'adhésion" not in raison:
+                fautes.append("%s : raison %r (attendu : « changer ou retirer l'adhésion »)" % (etiquette, raison[:200]))
         if v == "silence":
             lab2 = lab_adherent_simple(ctx, "lab-adh-repli")
             ecrire(os.path.join(lab2, ".planning", "config.json"), contenu)
@@ -4320,6 +4328,7 @@ lota_mutant("ECHEANCE-ARMEE", "# echeance-armee", "pass  # echeance-armee", "R-D
 lota_mutant("ECHEANCE-DELAI", "# echeance-delai", "if False:  # echeance-delai", "R-DEFS-03")
 lota_mutant("ECHEANCE-PARENT", "# echeance-parent", "if False:  # echeance-parent", "R-DEFS-04")
 lota_mutant("ADH-REPLI-CONJONCTION", "# g6-adhesion", "return None if _texte_adherent(texte) else RAISON_ADHESION  # g6-adhesion", "R-ADH-REPLI")
+lota_mutant("ADH-REPLI-RAISON", "# raison-forme", "return RAISON_ADHESION  # raison-forme", "R-ADH-REPLI")
 lota_mutant("ADH-REPLI-ESPACES", "# repli-espaces", 'motif = re.compile(MOTIF_ADHESION_REPLI.replace("[[:space:]]", r"[ \\t\\r\\n\\v\\f]"))  # repli-espaces',
             "R-ADH-REPLI")
 lota_mutant("ADH-REPLI-MOTIF", "# motif-adhesion-repli", 'MOTIF_ADHESION_REPLI = \'"planning_version"[[:space:]]*:[[:space:]]*"cycles-v[0-9]"\'  # motif-adhesion-repli',
@@ -4584,7 +4593,7 @@ lota_mutant("BUDGET-SIGNAL", "# role-signal", "for signal in []:  # role-signal"
 TITRE_REFERENCE = re.compile(r"^## Hook central et gates d.écriture \(Phase 45\)")
 GATES_REFERENCE = ("G6", "G5", "G1", "G7", "ROLE", "G2")
 LIMITES_REFERENCE = (
-    ("a", ("compact", "tool_name")),
+    ("a", ("compact", "tool_name", "N-06")),
     ("b", ("cycles-v1", "une ligne")),
     ("c", ("lien symbolique", "O_NOFOLLOW")),
     ("d", ("fermée", "échappement JSON")),
@@ -4610,8 +4619,8 @@ LIMITES_REFERENCE = (
     ("x", ("MESURE-VIDE", "volume")),
     ("y", ("settings", "Q-G6 = b", "scope compte", "planning-hook.sh", "lien préexistant")),
     ("z", ("SIGALRM", "Alarm clock", "faux refus")),
-    ("aa", ("F-01", "4096", "cwd", "GATE-03")),
-    ("ab", ("F-04", "~", "cwd", "Write")),
+    ("aa", ("F-01", "4096", "cwd", "GATE-03", "N-01", "surrogate")),
+    ("ab", ("F-04", "~", "cwd", "Write", "N-03", "HOME")),
     ("ac", ("F-05", "notebook_path", "Agent", "Task")),
     ("ad", ("F-06", ".claude/worktrees", "Write")),
     ("ae", ("F-07", "MultiEdit", "MCP", "matcher")),

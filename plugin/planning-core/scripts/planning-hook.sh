@@ -192,11 +192,14 @@ def lire_payload(chemin):
     return payload
 
 
-def cible_de(payload):
+def cible_de(payload, home=""):
     """(chemin écrit absolu ou None, cwd du payload ou None). Clé `file_path`, sinon
     `notebook_path`, dans `tool_input`. Un chemin relatif est JOINT au cwd du payload (à défaut au
     cwd physique du processus), comme la couche shell (limite h) : les deux couches rattachent
-    le chemin au même lab."""
+    le chemin au même lab. Un chemin qui commence par `~` n'est JAMAIS lu comme relatif au cwd (N-03, re-audit
+    du 2026-10-01) : `~` et `~/…` sont développés en HOME, argument du lanceur (le cœur ne lit pas l'environnement, R-ENV-02), de façon
+    identique à la couche shell ; `~utilisateur/…`, ou un HOME absent ou non absolu, lève ValueError : la décision dans le doute
+    (`decider_dans_le_doute`) prend la main."""
     cwd = payload.get("cwd")
     if not isinstance(cwd, str):
         cwd = None
@@ -208,10 +211,62 @@ def cible_de(payload):
             if isinstance(valeur, str):
                 ecrit = valeur
                 break
+    if ecrit is not None and ecrit.startswith("~"):  # tilde-developpe
+        if (ecrit == "~" or ecrit.startswith("~/")) and isinstance(home, str) and home.startswith("/"):
+            ecrit = home.rstrip("/") + ecrit[1:]
+        else:
+            raise ValueError("tilde non résolu")
     if ecrit is not None and not ecrit.startswith("/"):
         base = cwd if cwd is not None else os.path.realpath(os.getcwd())
         ecrit = base + "/" + ecrit
     return (ecrit, cwd)
+
+
+def chemin_brut(payload):
+    """Valeur brute (chaîne) de `file_path`, sinon `notebook_path`, ou None : sans aucune analyse du chemin, donc qui ne peut pas lever."""
+    entree = payload.get("tool_input")
+    if isinstance(entree, dict):
+        for cle in ("file_path", "notebook_path"):
+            valeur = entree.get(cle)
+            if isinstance(valeur, str):
+                return valeur
+    return None
+
+
+def nomme_un_actif_garde(texte):
+    """Vrai si le texte contient `.planning` ou `.claude`, casse ignorée : seul un chemin qui les nomme peut viser un actif gardé."""
+    bas = texte.casefold()
+    return ".planning" in bas or ".claude" in bas  # nomme-actif-garde
+
+
+def decider_dans_le_doute(payload):
+    """Décision pour un chemin écrit que le cœur ne sait pas analyser (surrogate isolé, NUL, `~utilisateur`, HOME inutilisable, erreur
+    de realpath ou d'encodage ; N-01 et N-03, re-audit du 2026-10-01 ; décision du manager vf-dev-manager, renversable, même classe que
+    GATE-03). Propriété : aucun chemin que le hook ne sait pas analyser ne peut taire les gates sur un actif sous `.planning/` ou
+    `.claude/` d'un lab adhérent, quel que soit le cwd. (a) Le chemin nomme `.planning` ou `.claude` : REFUS, sans regarder le cwd.
+    (b) Sinon : décision sur le cwd du payload — dans (ou sous) un lab adhérent, refus ; hors lab adhérent, silence (GATE-03) ; un
+    cwd lui-même inanalysable (ou absent) : refus. Le texte du refus ne reprend jamais le chemin (un surrogate fait échouer l'encodage
+    de la sortie). Rend True quand la décision est un refus (déjà émis)."""
+    brut = chemin_brut(payload)
+    if brut is None:
+        return None  # aucun chemin écrit : rien à décider ici, le code 3 reste celui du repli shell
+    if nomme_un_actif_garde(brut):  # doute-nomme
+        sortie_refus(["[planning-core] chemin que le hook central ne sait pas analyser (caractère invalide ou forme `~`) et qui nomme "
+                      ".planning ou .claude : écriture par outil refusée dans le doute"])
+        return True
+    cwd = payload.get("cwd")
+    try:
+        if not isinstance(cwd, str):
+            raise ValueError("cwd absent")
+        racine = racine_lab(cwd)
+        adherent = bool(racine) and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]  # doute-adhesion
+    except BaseException:
+        adherent = True  # doute-cwd : un cwd inanalysable ne tait rien
+    if adherent:
+        sortie_refus(["[planning-core] chemin que le hook central ne sait pas analyser (caractère invalide ou forme `~`) dans un lab "
+                      "adhérent cycles-v1 : écriture par outil refusée dans le doute"])
+        return True
+    return False
 
 
 def _partie_existante(chemin):
@@ -945,6 +1000,9 @@ PROTEGES_G6 = dict([(nom.casefold(), (nom, "recalc")) for nom in GENERES_PAR_REC
                       (NOM_CONFIG.casefold(), (NOM_CONFIG, "adhesion"))])
 RAISON_ADHESION = ("config.json : changer ou retirer l'adhésion cycles-v1 désarmerait les gates (P45-D-01) ; "
                    "une écriture par outil doit garder planning_version = cycles-v1")
+RAISON_ADHESION_FORME = ("config.json : ce contenu déclare bien planning_version = cycles-v1, mais pas sous la forme que reconnaît la couche shell de repli "
+                         "de la commande enregistrée (clé et valeur sur UNE même ligne, `\"planning_version\": \"cycles-v1\"` écrit tel quel, sans échappement "
+                         "de la clé ni de la valeur) ; une panne du cœur ne reconnaîtrait plus le lab adhérent et tairait les gates (F-02, N-05) — réécrire sur cette forme")
 RAISON_ADHESION_INVERIFIABLE = ("config.json : cette écriture par outil ne permet pas de vérifier que l'adhésion cycles-v1 "
                                 "est conservée (Edit inapplicable au contenu actuel, NotebookEdit, contenu illisible) ; "
                                 "refusée par précaution (P45-D-01)")
@@ -1058,6 +1116,12 @@ def _reconnu_par_le_repli(texte):
     return motif.search(texte) is not None
 
 
+def raison_adhesion_refusee(texte):
+    """Raison du refus d'un config.json : le contenu déclare l'adhésion mais la couche shell de repli ne la reconnaît pas (N-05, re-audit du
+    2026-10-01 : la contrainte de MISE EN FORME est nommée, pas « changer ou retirer l'adhésion »), sinon l'adhésion est réellement perdue."""
+    return RAISON_ADHESION_FORME if _texte_adherent(texte) else RAISON_ADHESION  # raison-forme
+
+
 def adhesion_conservee(contexte, cible):
     """None si l'écriture proposée laisse planning_version = cycles-v1 ; sinon la raison du refus (F6)."""
     entree = contexte["payload"].get("tool_input")
@@ -1066,7 +1130,7 @@ def adhesion_conservee(contexte, cible):
     texte = entree.get("content") if contexte["outil"] == "Write" else _appliquer_edit(cible, entree)
     if not isinstance(texte, str):
         return RAISON_ADHESION_INVERIFIABLE
-    return None if (_texte_adherent(texte) and _reconnu_par_le_repli(texte)) else RAISON_ADHESION  # g6-adhesion
+    return None if (_texte_adherent(texte) and _reconnu_par_le_repli(texte)) else raison_adhesion_refusee(texte)  # g6-adhesion
 
 
 def evaluer_g6(contexte):
@@ -1902,12 +1966,23 @@ def main():
     # imprimer : la couche shell de la commande enregistrée tranche (P45-D-08, DIV-2).
     try:
         payload = lire_payload(sys.argv[1])  # phase-a
-        ecrit, cwd = cible_de(payload)
+    except BaseException:
+        sys.exit(3)  # phase-a-sortie
+    try:
+        ecrit, cwd = cible_de(payload, sys.argv[3] if len(sys.argv) > 3 else "")
         depart = ecrit if ecrit is not None else (cwd if cwd is not None else os.getcwd())  # racine-depart
         racine = racine_lab(depart)
         adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]
-    except BaseException:
-        sys.exit(3)  # phase-a-sortie
+    except BaseException:  # phase-a-doute
+        # N-01 : un chemin que l'analyse fait lever (surrogate, NUL, realpath) ne sort plus en code non nul — le payload aurait provoqué
+        # lui-même la panne du cœur et fait taire les gates ; il est décidé dans le doute. Sans chemin écrit : code 3, comme avant.
+        try:
+            decide = decider_dans_le_doute(payload)
+        except BaseException:
+            sys.exit(3)
+        if decide is None:
+            sys.exit(3)
+        sys.exit(0)
     if not adherent:
         sys.exit(0)  # non-adherent
     # Phase B : le lab est adhérent. Toute erreur devient un refus explicite, code 0 (P45-D-08).

@@ -11,7 +11,8 @@
 # la commande est agnostique de l'appelant et `--juge` est obligatoire. Le juge la lance lui-même
 # quand il a Bash (vf-design-judge) ; sinon le manager la lance sur le rapport du juge (trois juges
 # livrés sur quatre n'ont pas Bash : quality-gate-client, content-clarity-judge, growth-quality-judge).
-# Le hash et la tentative viennent TOUJOURS de la commande, jamais de l'agent.
+# Le hash vient TOUJOURS de la commande, jamais de l'agent. La tentative est fournie par l'appelant (`--tentative`) et VÉRIFIÉE par la
+# commande : 1 à la création, ancienne tentative + 1 pour un remplacement, tout autre entier est refusé (code 64) ; jamais prise sur parole.
 #
 # Artefact haché (décision A3 = a3-plan, même arbitrage, même canal) : le sha256 des octets du
 # PLAN.md de l'unité, calculé ici par hashlib (jamais un outil externe). Il ne prouve pas que le
@@ -361,7 +362,8 @@ def lignes_verdict(juge, empreinte, tentative, score, constats):
         lignes.append('    resultat: "%s"' % resultat)
     lignes.extend(["---", "", "# Verdict", "",
                    "Posé par `poser-verdict.sh` (P45-D-07) : le hash (sha256 des octets du PLAN.md de "
-                   "l'unité, A3) et la tentative sont calculés par la commande, jamais par l'agent. "
+                   "l'unité, A3) est calculé par la commande, jamais par l'agent ; la tentative est fournie par l'appelant "
+                   "et vérifiée par la commande (1 à la création, ancienne + 1 pour un remplacement). "
                    "Le `score` est affiché et non bloquant ; seuls les `constats` en échec bloquent.", ""])
     return "\n".join(lignes)
 

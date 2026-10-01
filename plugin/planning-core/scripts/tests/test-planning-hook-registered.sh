@@ -1350,8 +1350,171 @@ def sec_borne(ctx):
             okmut(ident, "R-BORNE-01 rougit · attendu (original) : %s · obtenu (mutant) : %s" % (original[1], mutant[1]))
 
 
+# =================================================================================================
+# R-DOUTE (N-01 et N-03, re-audit de sécurité du 2026-10-01 ; décisions du manager vf-dev-manager, renversables, même classe que
+# GATE-03). Propriété : aucun chemin que le hook ne sait pas analyser ne peut taire les gates sur un actif sous `.planning/` ou
+# `.claude/` d'un lab adhérent, quel que soit le cwd. (a) COUCHE SHELL : une valeur trop longue pour être parcourue est REFUSÉE dès
+# qu'elle contient `.planning` ou `.claude` (casse ignorée), quel que soit le cwd ; sinon la décision sur le cwd de R-BORNE tient.
+# (b) CŒUR : un chemin qui fait lever l'analyse (surrogate isolé, NUL, `~utilisateur`) ne sort plus en code non nul : refus s'il nomme
+# `.planning` ou `.claude`, sinon décision sur le cwd. (c) `~` et `~/…` sont développés en HOME dans les deux couches, jamais lus
+# comme relatifs au cwd. La preuve est le VERDICT et le LIBELLÉ ; chaque mutant reproduit l'ancien comportement.
+# =================================================================================================
+def payload_ascii(outil, entree, cwd):
+    """Comme payload(), en JSON ASCII : un surrogate isolé y est écrit `\\ud800` (ce que sérialise le harnais)."""
+    obj = {"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": cwd, "prompt_id": "prompt-test",
+           "permission_mode": "default", "hook_event_name": "PreToolUse", "tool_name": outil, "tool_input": entree,
+           "tool_use_id": "toolu_test"}
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+
+
+def labs_doute(ctx, nom):
+    """(lab adhérent, hors lab, nom du lab du HOME). Le HOME de la suite porte un lab adhérent ; le hors-lab porte un dossier LITTÉRAL
+    nommé `~` qui contient un faux lab non adhérent de même nom : lu comme relatif au cwd, `~/<nom>/.planning/STATE.md` y tombe."""
+    base = ctx.unique(nom)
+    adh = fabriquer_lab(os.path.join(base, "adh"), True)
+    hors = fabriquer_lab(os.path.join(base, "hors"), False)
+    lab_home = "labdir-" + os.path.basename(base)
+    fabriquer_lab(os.path.join(ctx.home, lab_home), True)
+    fabriquer_lab(os.path.join(hors, "~", lab_home), False)
+    return adh, hors, lab_home
+
+
+def verdict_direct(ctx, brut, cwd):
+    """Verdict du CŒUR LIVRÉ (armé), lancé directement : jamais la couche shell. Rend (verdict, rc, stdout, stderr)."""
+    p = subprocess.run(["bash", os.path.join(ctx.scripts_dir_livre, "planning-hook.sh")], input=brut, stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE, env=ctx.env_mode("A"), cwd=cwd, timeout=120)
+    return verdict(p.returncode, p.stdout), p.returncode, p.stdout, p.stderr
+
+
+def controle_doute_shell(ctx, texte, adh, hors, lab_home):
+    """Rend (conforme, détail) : la couche shell seule (mode C, script absent)."""
+    fautes = []
+    n = [0]
+
+    def jouer(etiquette, brut, cwd, attendu, libelle=None):
+        n[0] += 1
+        rc, out, err, dt = rejouer_texte_t(ctx, texte, "C", brut, cwd)
+        v = verdict(rc, out)
+        if v != attendu or err:
+            fautes.append("%s : %s stderr=%s (attendu %s)" % (etiquette, v, court(err), attendu))
+            return
+        if attendu == "deny":
+            raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+            if libelle is not None and libelle not in raison:
+                fautes.append("%s : libellé %r (attendu %r)" % (etiquette, raison[:220], libelle))
+
+    nomme = "il nomme .planning ou .claude"
+
+    def ecrit(chemin, cwd, outil="Write"):
+        return payload(outil, entree_outil(outil, chemin), cwd)
+
+    jouer("N-01 chemin trop long qui nomme .planning, cwd non adhérent", ecrit(hors + "/" + LONG_BORNE + ".planning/STATE.md", hors), hors, "deny", nomme)
+    jouer("N-01 chemin trop long qui nomme .CLAUDE (casse), cwd non adhérent", ecrit(hors + "/" + LONG_BORNE + ".CLAUDE/scripts/x.sh", hors), hors, "deny", nomme)
+    jouer("N-01 chemin relatif trop long qui nomme .claude, cwd non adhérent", ecrit(LONG_BORNE + ".claude/x.sh", hors, "Edit"), hors, "deny", nomme)
+    jouer("N-01 chemin trop long avec échappement `\\ud800` et `..` (sonde r3 de l'audit), cwd non adhérent",
+          payload_ascii("Write", {"file_path": adh + "/\ud800/../" + LONG_BORNE + ".planning/STATE.md", "content": "x"}, hors), hors, "deny", nomme)
+    jouer("N-01 chemin trop long qui ne nomme ni l'un ni l'autre : silence hors lab adhérent (GATE-03)", ecrit(hors + "/" + LONG_BORNE + "x.md", hors), hors, "silence")
+    # N-03 : `~` développé en HOME, jamais joint au cwd
+    jouer("N-03 `~/<lab>/.planning/STATE.md`, cwd non adhérent : lu sous HOME, adhérent", ecrit("~/" + lab_home + "/.planning/STATE.md", hors), hors, "deny",
+          "dans un lab adherent cycles-v1")
+    jouer("N-03 `~/<lab>/.planning/STATE.md`, cwd adhérent", ecrit("~/" + lab_home + "/.planning/STATE.md", adh, "Edit"), adh, "deny",
+          "dans un lab adherent cycles-v1")
+    jouer("N-03 `~/x.md` sous HOME, hors de tout lab adhérent : silence (GATE-03)", ecrit("~/x.md", hors), hors, "silence")
+    jouer("N-03 `~/x.md` sous HOME hors lab, cwd ADHÉRENT : silence (jamais joint au cwd)", ecrit("~/x.md", adh), adh, "silence")
+    jouer("N-03 `~utilisateur/…` : non analysable, refusé dans le doute", ecrit("~bob/x.md", hors), hors, "deny", "chemin non analysable")
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "%d rejeux : valeur trop longue refusée si elle nomme .planning ou .claude (casse ignorée, échappement, tout cwd), silence sinon ; `~` développé en HOME, `~utilisateur` refusé"
+                          % n[0])
+
+
+def controle_doute_coeur(ctx, adh, hors, lab_home):
+    """Rend (conforme, détail) : le cœur LIVRÉ lancé directement, rc 0 attendu partout (jamais le code 3)."""
+    fautes = []
+    n = [0]
+
+    def jouer(etiquette, brut, cwd, attendu):
+        n[0] += 1
+        v, rc, out, err = verdict_direct(ctx, brut, cwd)
+        if v != attendu or rc != 0 or err:
+            fautes.append("%s : %s rc=%d stderr=%s (attendu %s, rc 0)" % (etiquette, v, rc, court(err), attendu))
+
+    def e(chemin, cwd, outil="Write"):
+        return payload_ascii(outil, entree_outil(outil, chemin), cwd)
+
+    jouer("surrogate isolé, nomme .planning, cwd non adhérent", e(adh + "/\ud800/.planning/STATE.md", hors), hors, "deny")
+    jouer("NUL, nomme .claude, cwd non adhérent", e(adh + "/\x00/.claude/scripts/x.sh", hors), hors, "deny")
+    jouer("NUL, nomme .PLANNING (casse), cwd non adhérent", e(adh + "/\x00/.PLANNING/x.md", hors, "Edit"), hors, "deny")
+    jouer("surrogate isolé, ne nomme rien, cwd non adhérent : silence (GATE-03)", e(hors + "/\ud800/x.md", hors), hors, "silence")
+    jouer("NUL, ne nomme rien, cwd non adhérent : silence (GATE-03)", e(hors + "/\x00/x.md", hors), hors, "silence")
+    jouer("NUL, ne nomme rien, cwd adhérent : refusé dans le doute", e(adh + "/\x00/x.md", adh), adh, "deny")
+    jouer("surrogate isolé dans un chemin RELATIF qui nomme .planning, cwd non adhérent", e("\ud800/.planning/STATE.md", hors), hors, "deny")
+    jouer("`~utilisateur/…` qui nomme .planning, cwd non adhérent", e("~bob/.planning/STATE.md", hors), hors, "deny")
+    jouer("`~utilisateur/…` qui ne nomme rien, cwd non adhérent : silence", e("~bob/x.md", hors), hors, "silence")
+    jouer("`~/<lab>/.planning/STATE.md`, cwd non adhérent portant un dossier littéral `~` : lu sous HOME", e("~/" + lab_home + "/.planning/STATE.md", hors), hors, "deny")
+    jouer("`~/x.md` sous HOME hors lab, cwd non adhérent : silence", e("~/x.md", hors), hors, "silence")
+    jouer("`~/x.md` sous HOME hors lab, cwd ADHÉRENT : silence (jamais joint au cwd)", e("~/x.md", adh), adh, "silence")
+    jouer("cwd inanalysable (surrogate), chemin qui ne nomme rien : refusé dans le doute", e(hors + "/\ud800/x.md", hors + "/\ud800"), hors, "deny")
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "%d rejeux du cœur seul, toujours rc 0 : chemin inanalysable refusé s'il nomme .planning ou .claude, sinon décision sur le cwd ; `~` développé en HOME" % n[0])
+
+
+def sec_doute(ctx):
+    adh, hors, lab_home = labs_doute(ctx, "doute")
+    o = controle_doute_shell(ctx, ctx.cmd, adh, hors, lab_home)
+    if o[0]:
+        ok("R-DOUTE-01 " + o[1])
+    else:
+        ko("R-DOUTE-01", "couche shell : valeur trop longue qui nomme un actif gardé refusée, `~` développé en HOME", "conforme", o[1])
+    c = controle_doute_coeur(ctx, adh, hors, lab_home)
+    if c[0]:
+        ok("R-DOUTE-02 " + c[1])
+    else:
+        ko("R-DOUTE-02", "cœur : chemin inanalysable décidé dans le doute, jamais le code 3, `~` développé en HOME", "conforme", c[1])
+    for ident, motif, remplacement in (
+            ("DOUTE-GUARD-RETIRE", "grep -a -q -i -E '[.](planning|claude)' && G=1;", ":;"),
+            ("DOUTE-GUARD-CLAUDE", "[.](planning|claude)'", "[.](planning)'"),
+            ("DOUTE-GUARD-CASSE", "grep -a -q -i -E '[.](planning|claude)'", "grep -a -q -E '[.](planning|claude)'"),
+            ("DOUTE-TILDE-SHELL", "'~'|'~/'*) _h=${HOME%/}; case $_h in /*) P=$_h${P#'~'} ;; *) PX=0 ;; esac ;; '~'*) PX=0 ;; *) if vf_get cwd", "*) if vf_get cwd"),
+            ("DOUTE-TILDE-USER", " '~'*) PX=0 ;; *) if vf_get cwd", " *) if vf_get cwd")):
+        muté, raison = make_cmd_mutant(ctx, ident, motif, remplacement)
+        if muté is None:
+            komut(ident, "texte muté distinct de l'original et sh -n réussit", "mutant valide", raison)
+            continue
+        m = controle_doute_shell(ctx, muté, adh, hors, lab_home)
+        if not o[0]:
+            komut(ident, "l'original passe R-DOUTE-01", "conforme", o[1])
+        elif m[0]:
+            komut(ident, "R-DOUTE-01 rougit sous le mutant", "rouge", "vert : " + m[1] + " (mutant non opposable)")
+        else:
+            okmut(ident, "R-DOUTE-01 rougit · attendu (original) : %s · obtenu (mutant) : %s" % (o[1], m[1][:300]))
+    for ident, motif, remplacement in (
+            ("DOUTE-COEUR-REVERT", "decide = decider_dans_le_doute(payload)", "decide = None"),
+            ("DOUTE-COEUR-NOMME", "if nomme_un_actif_garde(brut):  # doute-nomme", "if False:  # doute-nomme"),
+            ("DOUTE-COEUR-CLAUDE", 'return ".planning" in bas or ".claude" in bas  # nomme-actif-garde', 'return ".planning" in bas  # nomme-actif-garde'),
+            ("DOUTE-COEUR-ADHESION", "# doute-adhesion", "adherent = False  # doute-adhesion"),
+            ("DOUTE-COEUR-CWD", "adherent = True  # doute-cwd", "adherent = False  # doute-cwd"),
+            ("DOUTE-COEUR-TILDE", 'if (ecrit == "~" or ecrit.startswith("~/")) and isinstance(home, str) and home.startswith("/"):', "if False:")):
+        dossier, raison = make_hook_mutant(ctx, ident, motif, remplacement)
+        if dossier is None:
+            komut(ident, "mutant du cœur (bash -n et compilation du corps)", "mutant valide", raison)
+            continue
+        sauve = ctx.scripts_dir_livre
+        ctx.scripts_dir_livre = dossier
+        try:
+            m = controle_doute_coeur(ctx, adh, hors, lab_home)
+        finally:
+            ctx.scripts_dir_livre = sauve
+        if not c[0]:
+            komut(ident, "l'original passe R-DOUTE-02", "conforme", c[1])
+        elif m[0]:
+            komut(ident, "R-DOUTE-02 rougit sous le mutant", "rouge", "vert : " + m[1] + " (mutant non opposable)")
+        else:
+            okmut(ident, "R-DOUTE-02 rougit · attendu (original) : %s · obtenu (mutant) : %s" % (c[1], m[1][:300]))
+
+
 SECTIONS = {
     "borne": sec_borne,
+    "doute": sec_doute,
     "entree": sec_entree,
     "merge": sec_merge,
     "modes": sec_modes,
@@ -1396,7 +1559,7 @@ run_sections() { # <sections séparées par des virgules>
 
 [ -f "$HOOK" ] || { ko "planning-hook.sh présent" "le script du hook central existe à côté des suites" "$HOOK" "absent"; }
 
-run_sections entree,merge,modes,matrice,shells,perf,depot,borne,mutants
+run_sections entree,merge,modes,matrice,shells,perf,depot,borne,doute,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

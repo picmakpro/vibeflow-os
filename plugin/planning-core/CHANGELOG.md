@@ -58,7 +58,9 @@
     (23,27 s pour 40 165 octets, au-delà du `timeout` de 20 s du harnais, qui laisse alors passer). Une valeur du
     payload de plus de 4096 caractères n'est plus parcourue : le doute se tranche sur le `cwd` (adhérent : refus,
     « chemin trop long pour etre analyse » ; non adhérent : silence, GATE-03). Même chemin : 0,02 s ; 5 Mo : moins
-    d'une seconde. Limite (aa). Suite : R-BORNE-01 et cinq mutants (`test-planning-hook-registered.sh`).
+    d'une seconde. Limite (aa) ; état final après le re-audit (N-01, ci-dessous) : une valeur trop longue qui nomme
+    `.planning` ou `.claude` est refusée quel que soit le `cwd`, les autres sont tranchées sur le `cwd`. Suite :
+    R-BORNE-01 et cinq mutants (`test-planning-hook-registered.sh`).
   - **F-02 (moyenne)** — G6 admettait par `Write` un `config.json` multiligne, à clé ou valeur en `\uXXXX`, que le
     `grep` du repli ne reconnaît pas comme adhérent : après une panne du cœur, tout passait. G6 exige désormais que le
     nouveau contenu satisfasse AUSSI le motif du repli, constante partagée `MOTIF_ADHESION_REPLI` comparée par une suite
@@ -69,6 +71,28 @@
     l'impression de sa décision (code 142) et la commande enregistrée la jetait. L'échéance est désarmée à l'émission
     et à la sortie ; l'échéance de 8 s (code 73) reste intacte avant l'émission. Suite : R-DEFS-06 (banc déterministe,
     sans horloge) et trois mutants.
+  - **Re-audit à regard frais (2026-10-01, quick 261001-wtd ; décisions du manager vf-dev-manager, renversables, même
+    classe que GATE-03)** :
+    - **N-01 (haute)** — la branche « valeur de plus de 4096 caractères : décision sur le `cwd` » rouvrait un
+      contournement par `Write` seul : un chemin géant portant un surrogate isolé (`\ud800`) ou un NUL faisait lever
+      `realpath`, le cœur sortait en 3 et, le `cwd` étant non adhérent, le repli se taisait. Désormais : (a) le repli
+      refuse toute valeur trop longue qui contient `.planning` ou `.claude` (casse ignorée), quel que soit le `cwd` ;
+      (b) le cœur ne sort plus en code non nul sur un chemin non analysable (surrogate, NUL, `~utilisateur`, erreur de
+      `realpath`) : refus s'il nomme `.planning` ou `.claude`, sinon décision sur le `cwd` ; (c) l'échéance de 8 s
+      provoquée par un chemin géant revient à (a). Limite (aa). Suite : R-DOUTE-01 et R-DOUTE-02, dix mutants.
+    - **N-03 (haute)** — un chemin `~/x` était joint au `cwd` comme un chemin relatif, alors que le `Read` du harnais le
+      développe : une poche `<cwd>/~/lab/` faisait taire les gates sur `~/lab/.planning/…`. `~` et `~/…` sont développés
+      en HOME dans les deux couches (HOME, déjà passé en argument au cœur, R-ENV-02) ; `~utilisateur/…` est tranché dans
+      le doute. Limite (ab) réécrite : elle ne repose plus sur « `Write` exige un chemin absolu ».
+    - **N-05 (basse)** — le refus G6 d'un `config.json` multiligne ou à clé échappée nomme désormais la contrainte de
+      mise en forme du repli (clé et valeur sur UNE même ligne, sans échappement), pas « changer ou retirer
+      l'adhésion ». Suite : R-ADH-REPLI et un mutant de plus.
+    - **N-04 (basse)** — `poser-verdict.sh` : « le hash et la tentative viennent TOUJOURS de la commande » était faux
+      pour la tentative, fournie par l'appelant et vérifiée par la commande ; le commentaire de tête et le texte écrit
+      dans chaque `VERDICT.md` sont corrigés.
+    - **N-02, N-06 (texte)** — limite (aa) écrite à l'état après correction ; limite (a) étendue à la forme
+      `"tool_name": "Write"` (antérieure au lot, dépend de la sérialisation du harnais, non exploitable par `Write`
+      seul).
   - **Limites ajoutées** : (aa) F-01 ; (ab) F-04 `~` résolu par le hook contre le `cwd` ; (ac) F-05 racine d'un dispatch
     dérivée de `file_path` ou `notebook_path` ; (ad) F-06 poche `.claude/worktrees/<nom>` non adhérente créable par
     `Write` ; (ae) F-07 `MultiEdit`, outils MCP et tout outil hors matcher ; F-08 : (z) réécrite, limite T-45-61 ajoutée
