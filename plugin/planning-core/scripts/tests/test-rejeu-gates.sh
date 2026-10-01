@@ -1697,6 +1697,71 @@ def make_mutant(source, marqueur, ident, motif, remplacement, compagnons=()):
     return chemin, None
 
 
+# --- Lot C, F1 (re-revue) : un `.planning` du lab qui est LUI-MÊME un lien sortant est refusé ; une mesure à zéro ligne n'est jamais un vert ---
+# Décisions du manager (vf-dev-manager, 2026-10-01), renversables. Avant : `.planning` en lien vers l'extérieur n'était pas dans les chemins
+# à risque, la copie du rejeu n'y voyait rien, le geste rendait 0 ligne mesurée et EMPREINTE-ARBRE-IDENTIQUE (un vert vide).
+def lab_planning_lien(nom, imbrique=False):
+    """Lab synthétique dont `.planning` (racine, ou `sous/.planning` si `imbrique`) est un lien vers un dossier EXTÉRIEUR qui porte un vrai
+    `.planning` (config.json, notes.md). Rend (lab, dossier extérieur)."""
+    lab = fabriquer_lab(nom, {"src/a.txt": "a"}, config=None)
+    ext = os.path.join(HOME, "ext-" + nom)
+    ecrire(os.path.join(ext, "config.json"), '{"planning_version": "2.0"}')
+    ecrire(os.path.join(ext, "notes.md"), "n")
+    chemin = os.path.join(lab, "sous", ".planning") if imbrique else os.path.join(lab, ".planning")
+    os.makedirs(os.path.dirname(chemin), exist_ok=True)
+    os.symlink(ext, chemin)
+    return lab, ext
+
+
+def sc_planning_lien(script, imbrique=False):
+    lab, ext = lab_planning_lien(unique("lab-pl"), imbrique)
+    avant = empreinte_arbre(ext)
+    r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), reel=True, script=script)
+    return {"rc": r.rc, "refus": "lien symbolique dont la cible sort du lab" in r.err, "rien_joue": r.rapport == "", "ext_intact": empreinte_arbre(ext) == avant,
+            "vert": "EMPREINTE-ARBRE-IDENTIQUE" in r.rapport and "MESURE-VIDE" not in r.rapport and r.rc == 0}
+
+
+def sc_mesure_vide(script):
+    lab = fabriquer_lab(unique("lab-mv"), {"src/a.txt": "a"}, config=None)
+    r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), reel=True, script=script)
+    return {"rc": r.rc, "signal": "MESURE-VIDE" in r.rapport and "MESURE-VIDE" in r.out and "ce n'est pas un vert" in r.err,
+            "vert": "EMPREINTE-ARBRE-IDENTIQUE" in r.rapport and r.rc == 0}
+
+
+def sec_lotc(_):
+    """R-REEL-PLANNING-LIEN, R-REEL-MESURE-VIDE (lot C, F1)."""
+    fautes = []
+    for nom, imbrique in (("racine", False), ("imbriqué", True)):
+        o = sc_planning_lien(REEL, imbrique)
+        if not (o["rc"] == 1 and o["refus"] and o["rien_joue"] and o["ext_intact"] and not o["vert"]):
+            fautes.append("`.planning` %s en lien sortant : attendu code 1, refus nominatif, rapport non créé, extérieur intact, aucun vert ; obtenu %s" % (nom, o))
+    if fautes:
+        for f in fautes:
+            ko("R-REEL-PLANNING-LIEN", "un `.planning` du lab qui est un lien vers l'extérieur est refusé avant tout rejeu", "code 1, rien joué", f)
+    else:
+        ok("R-REEL-PLANNING-LIEN `.planning` du lab (racine ou imbriqué) en lien vers l'extérieur : code 1, message nominatif, rapport non créé, dossier extérieur intact, jamais un vert vide")
+    # témoin : un `.planning` en lien vers un dossier DU lab n'est pas refusé
+    lab = fabriquer_lab(unique("lab-pli"), {"vrai/config.json": '{"planning_version": "2.0"}', "vrai/notes.md": "n"}, config=None)
+    os.symlink("vrai", os.path.join(lab, ".planning"))
+    r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), reel=True)
+    # la copie ne suit pas un `.planning` en lien : rien n'est mesuré, et c'est dit (MESURE-VIDE, code 1), jamais un vert
+    if "lien symbolique dont la cible sort du lab" not in r.err and r.rc == 1 and "MESURE-VIDE" in r.rapport:
+        ok("R-REEL-PLANNING-LIEN témoin : `.planning` lien vers un dossier DU lab : pas de refus de lien sortant ; rien de mesuré, signalé MESURE-VIDE (code 1)")
+    else:
+        ko("R-REEL-PLANNING-LIEN témoin", "pas de sur-refus d'un lien interne, et rien de mesuré est dit", "pas de refus sortant, MESURE-VIDE, code 1", "rc=%d err=%s" % (r.rc, court(r.err)))
+    o = sc_mesure_vide(REEL)
+    if o["rc"] == 1 and o["signal"] and not o["vert"]:
+        ok("R-REEL-MESURE-VIDE un lab sans aucune ligne mesurée : MESURE-VIDE au rapport et à la sortie, message « ce n'est pas un vert », code 1")
+    else:
+        ko("R-REEL-MESURE-VIDE", "zéro ligne mesurée signalée, jamais lue comme un vert", "code 1, MESURE-VIDE", str(o))
+    lab = fabriquer_lab(unique("lab-mvt"), {".planning/notes.md": "n"})
+    r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), reel=True)
+    if r.rc == 0 and "MESURE-VIDE" not in r.rapport and "MESURE-VIDE" not in r.out:
+        ok("R-REEL-MESURE-VIDE témoin : un lab qui porte des lignes mesurées : code 0, aucune MESURE-VIDE")
+    else:
+        ko("R-REEL-MESURE-VIDE témoin", "pas de signal sur un lab mesuré", "code 0", "rc=%d rapport=%s" % (r.rc, court(r.rapport)))
+
+
 def sec_mutants(_):
     G = "PY_REJEU_GATES_EOF"
     R = "PY_REJEU_REEL_EOF"
@@ -1872,6 +1937,15 @@ def sec_mutants(_):
     duel("REEL-REFUS64", REEL, R, "# reel-refus64", "if False:  # reel-refus64",
          sc_reel_usage, lambda o, m: o["rc"] == 64 and not o["lignes"] and not o["rapport"] and (m["lignes"] or m["rapport"]),
          "R-REEL-07 : lignes EMPREINTE-ARBRE-* écrites alors que rejeu-gates.sh a refusé l'usage", compagnons=(REJEU, RECALC))
+    duel("REEL-PLANNING-LIEN", REEL, R, "# reel-planning-lien", "if False:  # reel-planning-lien",
+         sc_planning_lien, lambda o, m: o["refus"] and not m["refus"],
+         "F1 : un `.planning` en lien vers l'extérieur n'est plus refusé", compagnons=(REJEU, RECALC))
+    duel("REEL-PLANNING-LIEN-IMBRIQUE", REEL, R, "# reel-planning-lien", "if parts == [\".planning\"]:  # reel-planning-lien",
+         lambda script: sc_planning_lien(script, True), lambda o, m: o["refus"] and not m["refus"],
+         "F1 : seul le `.planning` de la racine est refusé, un `.planning` imbriqué en lien sortant passe", compagnons=(REJEU, RECALC))
+    duel("REEL-MESURE-VIDE", REEL, R, "# reel-mesure-vide", "for lab in []:  # reel-mesure-vide",
+         sc_mesure_vide, lambda o, m: o["rc"] == 1 and o["signal"] and m["vert"],
+         "F1 : une mesure à zéro ligne est lue comme un vert", compagnons=(REJEU, RECALC))
     def sc_g6g5(script):
         r, _ = scenario_g6g5(script)
         return {"G6": r.compte.get("G6"), "etape": r.etape}
@@ -2074,6 +2148,7 @@ SECTIONS = {
     "statique": sec_statique,
     "reel": sec_reel,
     "liens": sec_liens,
+    "lotc": sec_lotc,
     "releve": sec_releve,
     "mutants": sec_mutants,
 }
@@ -2114,7 +2189,7 @@ for f in "$REJEU" "$REEL"; do
 done
 
 if [ -f "$REJEU" ] && [ -f "$REEL" ]; then
-  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,role,concordance,statique,reel,liens,releve,mutants
+  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,role,concordance,statique,reel,liens,lotc,releve,mutants
 fi
 
 T_FIN="$(date +%s)"

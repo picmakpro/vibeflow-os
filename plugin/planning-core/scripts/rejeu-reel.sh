@@ -21,7 +21,11 @@
 #   (4) `cmp -s` avant/après, lab par lab.
 # Après ce que rejeu-gates.sh a écrit dans --rapport, il ajoute une ligne
 # `EMPREINTE-ARBRE-IDENTIQUE <lab affiché>` ou `EMPREINTE-ARBRE-DIVERGENTE <lab affiché>` par lab
-# (`~/…` sous HOME). Codes : 0 toutes identiques, 1 au moins une divergence (ou code non nul de
+# (`~/…` sous HOME ; `<lab-N>` hors de HOME, N = rang parmi les `--lab=` hors de HOME, donc dépendant de l'ORDRE des `--lab=` de l'appel :
+# la même liste dans le même ordre redonne les mêmes noms, un autre ordre les permute — lot C, F2). Un lab dont le relevé ne porte
+# AUCUNE ligne mesurée reçoit en plus `MESURE-VIDE <lab affiché>` (rapport et sortie) et un message : jamais lu comme un vert (code 1).
+# Un `.planning` du lab, racine ou imbriqué, qui est un lien dont la cible sort du lab est refusé avant tout rejeu (code 1, rien joué).
+# Codes : 0 toutes identiques, 1 au moins une divergence ou une mesure vide (ou code non nul de
 # rejeu-gates.sh, repris), 64 usage. Un lab très gros peut dépasser le délai d'un appel d'outil :
 # lancer alors en arrière-plan et attendre la fin.
 #
@@ -113,6 +117,10 @@ NOMS_ECRITS_LUS = ("STATE.md", "INDEX.md", "cloture.log", "derogations-gates.log
 
 def lien_a_risque(rel):
     parts = rel.split("/")
+    if parts[-1] == ".planning":  # reel-planning-lien
+        # lot C, F1 : un `.planning` du lab (racine ou imbriqué) qui est LUI-MÊME un lien : rien de ce qui est dessous n'est vu par la
+        # copie du rejeu, et ce qui y serait écrit ou lu l'est hors du lab (décision du manager vf-dev-manager, 2026-10-01, renversable).
+        return True
     if parts[0] == ".claude":
         return len(parts) == 1 or (parts[1] == "agents" and len(parts) <= 3)
     if ".planning" not in parts[:-1]:
@@ -247,6 +255,17 @@ def main(argv):
             return code
         lignes = []
         divergence = False
+        vides = []
+        try:
+            with open(rapport, encoding="utf-8") as fh:
+                releve = fh.read().split("\n")
+        except OSError:
+            releve = []
+        for lab in labs:  # reel-mesure-vide
+            # lot C, F1 : un lab dont le relevé ne porte AUCUNE ligne mesurée (`<gate> | <lab affiché> | …`) n'a rien mesuré : jamais un vert.
+            affiche = afficher(lab)
+            if not any(len(ch) >= 5 and ch[1] == affiche for ch in (l.split(" | ") for l in releve)):
+                vides.append(lab)
         for i, lab in enumerate(labs):
             avant = os.path.join(tmp, "avant-%d.txt" % i)
             apres = os.path.join(tmp, "apres-%d.txt" % i)
@@ -257,6 +276,9 @@ def main(argv):
             else:
                 divergence = True
                 lignes.append("EMPREINTE-ARBRE-DIVERGENTE " + afficher(lab))
+        for lab in vides:
+            lignes.append("MESURE-VIDE " + afficher(lab))
+            sys.stderr.write("[rejeu-reel] aucune ligne mesurée pour " + afficher(lab) + " : ce n'est pas un vert (rien n'a été rejoué sur ce lab)\n")
         texte = "".join(l + "\n" for l in lignes)
         with open(rapport, "a", encoding="utf-8", newline="\n") as fh:
             fh.write(texte)
@@ -264,7 +286,7 @@ def main(argv):
         sys.stdout.flush()
         if code != 0:
             return code
-        return 1 if divergence else 0
+        return 1 if (divergence or vides) else 0
     except (RecursionError, MemoryError):
         sys.stderr.write("[rejeu-reel] arborescence trop profonde ou trop grosse pour être empreinte : rien n'a été mesuré\n")
         return 1

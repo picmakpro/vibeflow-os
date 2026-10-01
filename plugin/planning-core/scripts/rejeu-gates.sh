@@ -36,7 +36,10 @@
 #   ROLE-AGENT lab=<lab affiché> agent=<nom> role=<rôle dérivé> ecriture=<attendu> dispatchs=<n>   une par agent rejoué
 #                                                                                par le constructeur ROLE (45-09) ; rien sans agent
 #   EMPREINTE-IDENTIQUE <lab affiché>   (ou EMPREINTE-DIVERGENTE + code 1)      une par lab
-# Les chemins sous HOME sont affichés `~/…` ; les chemins internes sont relatifs au lab.
+# Les chemins sous HOME sont affichés `~/…` ; les chemins internes sont relatifs au lab. Un lab HORS de HOME est affiché `<lab-N>`
+# (jamais son chemin absolu), N étant son rang parmi les `--lab=` hors de HOME : il dépend de l'ORDRE des `--lab=` de l'appel — la même
+# liste, dans le même ordre, redonne les mêmes noms ; un autre ordre les permute (lot C, F2). Pour les fichiers d'attendus, la colonne lab
+# porte ce nom : l'écrire dans l'ordre des `--lab=` de la mesure.
 #
 # Contrat de rejeu : chaque écriture est identifiée par son triplet (outil, chemin relatif au lab
 # après normpath, agent_type — vide pour le fil principal) et reçoit UN SEUL attendu, donc une seule
