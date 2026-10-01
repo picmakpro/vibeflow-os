@@ -2,7 +2,7 @@
 phase: 45-moteur-hook-central-par-r-le-et-gates-d-criture
 plan: 10
 subsystem: planning-core (référence du hook central, contrôle croisé référence <-> code, bump v2.9.0 sans release, contrat de sortie des hooks)
-tags: [reference, r-reference, mut-reference, limites-declarees, observation, bump-module, sans-release, hooks-contrat-sortie, cout-migration]
+tags: [reference, r-reference, mut-reference, limites-declarees, armement-en-cascade, bump-module, sans-release, hooks-contrat-sortie, cout-migration]
 
 requires:
   - phase: 45-02
@@ -10,7 +10,7 @@ requires:
   - phase: 45-09
     provides: canary du rôle, constructeur ROLE du rejeu, relevé de l'étape 4
 provides:
-  - "modele-cycles.md : section « Hook central et gates d'écriture (Phase 45) » (principe, commande enregistrée, 25 limites déclarées (a) à (y), table d'armement livrée, G1, G2, G5, G6, G7, hook par rôle, dérogation, verdict, journal d'observation, canary, rejeu, coût de migration) ; section « Hors de cette phase » réécrite"
+  - "modele-cycles.md : section « Hook central et gates d'écriture (Phase 45) » (principe, commande enregistrée, 25 limites déclarées (a) à (y) à la livraison de 1897aa44, 26 (a) à (z) depuis le 2026-10-01, table d'armement livrée, G1, G2, G5, G6, G7, hook par rôle, dérogation, verdict, journal d'observation, canary, rejeu, coût de migration) ; section « Hors de cette phase » réécrite"
   - "test-planning-gates.sh : R-REFERENCE et neuf MUT-REFERENCE (section `reference`), 395 -> 405 OK"
   - "45-COUT-MIGRATION.md : nombres de refus conformes au modèle repris de 45-REJEU-ETAPE-2 et 45-REJEU-ETAPE-3, aucun nouveau rejeu réel"
   - "planning-core v2.9.0 (VERSION, module.json, README, CHANGELOG), sans release"
@@ -49,20 +49,20 @@ key-files:
     - plugin/planning-core/README.md
 
 key-decisions:
-  - "A2 (vf-dev-manager, 2026-10-01) appliqué tel que mesuré : les cinq ARMEMENT_* valent observe, G2_MODE vaut avertit (lu dans planning-hook.sh l.97-102, aucun écart avec le mandat) ; la phase se ferme EN OBSERVATION ; rien n'est dit armé"
+  - "A2 (vf-dev-manager, 2026-10-01) appliqué tel que mesuré À LA LIVRAISON DE 1897aa44 : les cinq ARMEMENT_* valaient observe, G2_MODE valait avertit (lu dans planning-hook.sh l.97-102, aucun écart avec le mandat) ; rien n'était dit armé. Cet état est daté : l'armement en cascade du 2026-10-01 (section « Armement en cascade ») l'a depuis remplacé par cinq gates armés"
   - "A1 : les limites (m) à (y) suivent l'ordre du mandat ; la limite (y) (audit M1) est écrite comme OUVERTE, arbitrage de Willy en attente, jamais comme une décision"
   - "A5 : aucun rejeu sur ~/jarvis-keystone ni ~/BusinessFlow-Lab ; 45-COUT-MIGRATION.md reprend les nombres des relevés existants et le dit"
   - "Chaque limite tient sur UNE ligne physique (la vérification du plan lit ligne à ligne : « limite (k) » et `config.json` sur la même ligne)"
 
 requirements-completed: []
-requirements-note: "à cocher par l'orchestrateur (ADR-063), jamais par cet exécuteur : GATE-15, GATE-03, GATE-07, GATE-08, GATE-09, GATE-11, GATE-13 pour leurs parties « écrites dans la référence » ; l'armement (GATE-13, GATE-04 à GATE-09) reste ouvert"
+requirements-note: "à cocher par l'orchestrateur (ADR-063), jamais par cet exécuteur : GATE-15, GATE-03, GATE-07, GATE-08, GATE-09, GATE-11, GATE-13 pour leurs parties « écrites dans la référence » ; l'armement n'est plus ouvert : il s'est fait en cascade le 2026-10-01 (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30 ; commits 3d06e503, bf6cfa87, b6609fa6, 239df76d)"
 
 status: complete
 ---
 
-# Phase 45 Plan 10 : référence du hook central prouvée identique au code, planning-core v2.9.0 sans release, phase fermée en observation
+# Phase 45 Plan 10 : référence du hook central prouvée identique au code, planning-core v2.9.0 sans release, cinq gates armés en cascade
 
-**La référence du modèle dit ce que le hook livré fait (table d'armement, limites (a) à (y), prédicats, dérogation, canary, rejeu), un contrôle croisé mutant la compare au code, à hooks.json et au canary ; planning-core passe en v2.9.0 sans aucune release ; la phase se ferme EN OBSERVATION, mesurée à zéro : aucun gate n'est armé.**
+**La référence du modèle dit ce que le hook livré fait (table d'armement, limites (a) à (y), prédicats, dérogation, canary, rejeu), un contrôle croisé mutant la compare au code, à hooks.json et au canary ; planning-core passe en v2.9.0 sans aucune release . À la livraison de ce plan (1897aa44) la phase se fermait en observation, mesurée à zéro ; depuis le 2026-10-01 (voir « Armement en cascade ») les cinq gates sont armés, G2 avertit, et planning-core reste en v2.9.0 sans release.**
 
 ## Base et état de départ
 
@@ -70,12 +70,25 @@ status: complete
 - HEAD de départ : `893071a6b077c5d5bc8a28fb90ce0d94ee28328b` ; `git merge-base --is-ancestor 893071a HEAD` : code 0.
 - Base de VERSION relue à l'exécution : `v2.8.0` (aucune PR de fiabilite n'a bumpé planning-core) -> `v2.9.0`.
 
-## État d'armement livré (A2, constaté, jamais supposé)
+## État d'armement à la livraison de 1897aa44 (A2, constaté, jamais supposé ; état daté, remplacé le 2026-10-01)
 
 - Les cinq constantes `ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7`, `ARMEMENT_ROLE` valent `observe` ; `G2_MODE` vaut `avertit` (lecture de `planning-hook.sh`, lignes 97 à 102). **Le code est d'accord avec le mandat : aucun écart à signaler.**
 - Les relevés `45-REJEU-ETAPE-1` à `45-REJEU-ETAPE-4` donnent tous `faux-refus=0 faux-accept=0` et des lignes `EMPREINTE-ARBRE-IDENTIQUE` pour les deux labs, mais ils ont été mesurés sur le hook AVANT les lots de correction A, B et C.
-- L'armement exige donc un NOUVEAU rejeu réel sur des labs au repos ET un arbitrage de Willy, en attente, pour adapter deux suites couplées à « tout en observe » (refusé par le classifieur « Security Test Removal »). Écrit tel quel dans la référence, dans l'entrée CHANGELOG v2.9.0 et ici.
+- À cette date, l'armement exigeait donc un NOUVEAU rejeu réel sur des labs au repos ET un arbitrage de Willy, alors en attente, pour adapter deux suites couplées à « tout en observe » (refusé par le classifieur « Security Test Removal »). Écrit tel quel dans la référence, dans l'entrée CHANGELOG v2.9.0 et ici. Le rejeu est fait (`45-REJEU-FINAL.md`, `708debcb`) et l'arbitrage est rendu (Q-ARM) : voir la section suivante.
 - Constat de lecture : les SUMMARY 45-05, 45-06 et 45-07 disent « rejeu réel non effectué » ; ils datent d'avant les reprises du 2026-09-30 et du 2026-10-01 consignées dans les relevés. Les relevés font foi (aucun écart avec le code).
+
+## Armement en cascade (2026-10-01)
+
+Ajout daté : les sections ci-dessus décrivent 1897aa44 et sont conservées telles quelles.
+
+- **Autorisation** : Q-ARM — Willy, AskUserQuestion session principale, 2026-09-30, relayé par la session principale : « oui pour les quatre étapes d'armement ; découplage des suites autorisé, sans supprimer aucun cas ni aucun mutant ». Relevé qui l'autorise : `45-REJEU-FINAL.md` (`708debcb`), rejeu réel final sur le hook livré, 0 faux refus, 0 faux accept, empreintes de tout l'arbre identiques pour les deux labs. Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : les scripts du hook sont protégés par G6, limite (y).
+- **Quatre commits, un par étape, dans l'ordre fixe (P45-D-03)** : `3d06e503` étape 1 (G6 et G5) ; `bf6cfa87` étape 2 (G1) ; `b6609fa6` étape 3 (G7) ; `239df76d` étape 4 et dernière (cloisonnement par rôle).
+- **Suites rejouées à chaque étape (identiques aux quatre commits)** : gates 446 OK / 0 KO ; hook enregistré 50 OK / 0 KO ; rejeu 91 OK / 0 KO ; hook installé 23 OK / 0 KO ; role-vs-check-agents 6 OK / 0 KO. Aucun cas ni mutant supprimé ou affaibli.
+- **Zéro régression dev** (relevé du manager, commande enregistrée rejouée hors lab adhérent, ce dépôt, repris du digest du mandat et non rejoué ici) : 12/12 cas, `rc=0`, stdout et stderr à 0 octet.
+- **Canary synthétique** : `check-gates-alive.sh` rejoue la commande sur un lab synthétique et rend `rc=3` (relevé du manager, repris du digest du mandat) ; il signale, sans bloquer.
+- **Relevé final** : 0 faux refus, 0 faux accept, 202 refus conformes au modèle (G1 196, G7 6), `EMPREINTE-ARBRE-IDENTIQUE` pour `~/jarvis-keystone` et `~/BusinessFlow-Lab` (`45-REJEU-FINAL.md`).
+- **État final** : `ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7` et `ARMEMENT_ROLE` valent `armed` ; `G2_MODE` vaut `avertit`. planning-core reste en v2.9.0, SANS release (ADR-073) : aucun bump.
+- **Limite (z)** (quick 261001-owx) : faux refus sous forte charge machine (SIGALRM, « Alarm clock », échéance de 8 s), observé en suites à charge 20 à 35, jamais en rejeu réel ; point de surveillance après l'armement, non traité dans la Phase 45.
 
 ## Accomplishments
 
@@ -91,7 +104,7 @@ status: complete
 
 ### Tâche 2 : bump v2.9.0 sans release et rejeu des gates
 
-- **`plugin/planning-core/{VERSION,module.json,CHANGELOG.md,README.md}` -> v2.9.0** (commit `1897aa44`) : entrée de tête du CHANGELOG qui dit l'état d'armement livré (tout en observation, aucun gate armé), chaque gate avec son relevé, les limites (k) et (l), la levée du code 2 avec F10 = f10-archive (Willy, AskUserQuestion session principale, 2026-09-30), `guard-planning-updated.sh` conservé (P45-D-19) et les trois escalades vers Willy ; README : paragraphe « Hook central (Phase 45) » et liste des scripts complétée (planning-hook.sh, check-gates-alive.sh, rejeu-gates.sh, rejeu-reel.sh, poser-verdict.sh, deroger-gate.sh).
+- **`plugin/planning-core/{VERSION,module.json,CHANGELOG.md,README.md}` -> v2.9.0** (commit `1897aa44`) : entrée de tête du CHANGELOG qui disait, à 1897aa44, l'état d'armement livré (tout en observation, aucun gate armé ; réécrite depuis à l'état armé), chaque gate avec son relevé, les limites (k) et (l), la levée du code 2 avec F10 = f10-archive (Willy, AskUserQuestion session principale, 2026-09-30), `guard-planning-updated.sh` conservé (P45-D-19) et les trois escalades vers Willy ; README : paragraphe « Hook central (Phase 45) » et liste des scripts complétée (planning-hook.sh, check-gates-alive.sh, rejeu-gates.sh, rejeu-reel.sh, poser-verdict.sh, deroger-gate.sh).
 - **Version et release** : voir « Version ». Aucune release, aucun tag, aucune écriture de la `VERSION` racine, de `plugin.json`, de `marketplace.json` ni des README racine.
 
 ## Limites déclarées (lettre -> source)
@@ -122,7 +135,8 @@ status: complete
 | (v) | F5 (lot B) : `STATE.md` portant la marque de génération puis édité à la main, remplacé sans archive | A1 ; lot B (261001-lb4) ; vérifié `_est_genere` |
 | (w) | N1 résiduelle : `name:` masqué par un échappement YAML non candidat | A1 ; lot C ; vérifié `candidat_definition` |
 | (x) | rejeu : volume (25 000 fichiers sur plus de 300 s) ; `.planning` lien vers un dossier du lab -> MESURE-VIDE (code 1) | A1 ; lots B et C |
-| (y) | OUVERTE : script du hook, canary et `.claude/settings*.json` protégés par aucun gate ; arbitrage de Willy en attente | A1 ; audit M1 ; lot A (« hors périmètre ») |
+| (y) | à la livraison : OUVERTE (arbitrage en attente) ; depuis le 2026-10-01 : scripts du hook protégés par G6 (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01), `.claude/settings*.json` non protégés | A1 ; audit M1 ; lot A (« hors périmètre ») ; lot D |
+| (z) | ajoutée le 2026-10-01 : faux refus sous forte charge (SIGALRM, « Alarm clock »), point de surveillance | quick 261001-owx |
 
 ## Task Commits
 
@@ -218,10 +232,10 @@ Aucun.
 
 Aucune surface nouvelle. T-45-90 (référence qui annonce un gate armé qui ne l'est pas) : mitigé par R-REFERENCE (exige « Aucun gate n'est armé » si et seulement si les cinq constantes valent `observe`) et MUT-REFERENCE-CODE. T-45-91 (release prématurée) : aucun bump racine, aucun tag, vérifié. T-45-92 (retrait de `guard-planning-updated.sh`) : fichier présent, entrée `Stop` comparée.
 
-## Escalades vers Willy (en attente, rien tranché ici)
+## Escalades vers Willy (état à la livraison de 1897aa44 ; mises à jour ci-dessous)
 
-1. **Armement** : nouveau rejeu réel sur des labs au repos après les lots A, B et C, puis adaptation de deux suites couplées à « tout en observe » (ESCALADE-WILLY ETAPE-1, refus du classifieur « Security Test Removal »). Aucun armement dans ce plan.
-2. **Limite (y), audit M1** : protection du script du hook, du canary et de `.claude/settings*.json` par un gate ; décision non prise.
+1. **Armement** : nouveau rejeu réel sur des labs au repos après les lots A, B et C, puis adaptation de deux suites couplées à « tout en observe » (ESCALADE-WILLY ETAPE-1, refus du classifieur « Security Test Removal »). Aucun armement dans ce plan. **Résolu le 2026-10-01** : rejeu fait (`45-REJEU-FINAL.md`), Q-ARM rendu, armement fait en cascade.
+2. **Limite (y), audit M1** : protection du script du hook, du canary et de `.claude/settings*.json` par un gate ; décision non prise à la livraison. **Tranchée le 2026-10-01** : Q-G6 = b (Willy, AskUserQuestion session principale, 2026-10-01), scripts du hook protégés, réglages non protégés.
 3. **G1 et phase dérogée sans cadrage** (constat de 45-06 : zéro occurrence sur les deux labs réels mesurés) : règle de gate inchangée.
 
 ## Refus de la garde du poste (rapportés, jamais contournés)
@@ -230,4 +244,4 @@ Commandes composées refusées par la garde d'isolation du worktree (« too comp
 
 ## Self-Check: PASSED
 
-Vérifié par commandes : les huit fichiers créés ou modifiés existent (`ls`) ; les cinq commits de tâche (`6d391897`, `0c240fb8`, `1e7a8d5c`, `1897aa44`, `7db13bee`) existent (`git cat-file -t` : `commit`) et descendent de `893071a` ; les cinq constantes `ARMEMENT_*` valent toujours `"observe"` (`grep -c` : 5) ; `planning-hook.sh`, `STATE.md`, `ROADMAP.md` et `REQUIREMENTS.md` du compartiment sont inchangés depuis `893071a` (`git diff --stat` vide) ; aucun `gsd-tools state`, `roadmap update-plan-progress` ni `requirements mark-complete` lancé ; aucun push, merge, tag ; aucune commande lancée sur `~/jarvis-keystone` ni `~/BusinessFlow-Lab` ; aucun processus ne reste actif ; ce SUMMARY ne porte aucun chemin absolu de machine (`check-machine-paths.sh` rejoué après son écriture, voir ci-dessous).
+Vérifié par commandes : les huit fichiers créés ou modifiés existent (`ls`) ; les cinq commits de tâche (`6d391897`, `0c240fb8`, `1e7a8d5c`, `1897aa44`, `7db13bee`) existent (`git cat-file -t` : `commit`) et descendent de `893071a` ; à la date de ce SUMMARY, les cinq constantes `ARMEMENT_*` valaient toujours `"observe"` (`grep -c` : 5) ; `planning-hook.sh`, `STATE.md`, `ROADMAP.md` et `REQUIREMENTS.md` du compartiment sont inchangés depuis `893071a` (`git diff --stat` vide) ; aucun `gsd-tools state`, `roadmap update-plan-progress` ni `requirements mark-complete` lancé ; aucun push, merge, tag ; aucune commande lancée sur `~/jarvis-keystone` ni `~/BusinessFlow-Lab` ; aucun processus ne reste actif ; ce SUMMARY ne porte aucun chemin absolu de machine (`check-machine-paths.sh` rejoué après son écriture, voir ci-dessous).

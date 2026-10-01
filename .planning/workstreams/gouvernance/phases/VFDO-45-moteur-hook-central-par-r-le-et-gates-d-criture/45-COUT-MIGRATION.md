@@ -4,11 +4,11 @@ Artefact de phase : il porte les nombres que la référence du modèle (`plugin/
 « Coût de migration d'un lab ») s'interdit d'écrire (P45-D-21, P45-D-21a). Aucun nombre de ce fichier ne vit dans le code livré ni dans
 la référence ; les chemins sont affichés sous la forme `~/…`.
 
-## Provenance : aucun nouveau rejeu réel
+## Provenance : aucun rejeu réel pour ce fichier (état à sa rédaction), recoupé ensuite par le rejeu final
 
-**Aucun rejeu réel n'a été fait pour ce fichier** (amendement A5 du manager vf-dev-manager, 2026-10-01 : les rejeux sur labs réels sont
-REPORTÉS avec l'armement ; seuls les rejeux sur fixtures et sur banc sont joués dans ce plan). Tous les nombres ci-dessous sont repris,
-tels quels, des relevés existants, sans nouvelle mesure :
+**Aucun rejeu réel n'a été fait pour ce fichier à sa rédaction** (amendement A5 du manager vf-dev-manager, 2026-10-01 : les rejeux sur
+labs réels étaient alors REPORTÉS avec l'armement ; seuls les rejeux sur fixtures et sur banc étaient joués dans ce plan). Tous les
+nombres ci-dessous sont repris, tels quels, des relevés existants, sans nouvelle mesure :
 
 | Nombre | Relevé source | Où |
 |---|---|---|
@@ -19,8 +19,10 @@ tels quels, des relevés existants, sans nouvelle mesure :
 
 Réserve de provenance : ces relevés ont été mesurés sur le hook **avant** les lots de correction A, B et C du 2026-10-01 (relevés de
 l'étape 2 au commit `630478c`, de l'étape 3 et de l'étape 4 sur les commits de leurs plans). Le **nouveau rejeu réel**, sur des labs au
-repos, qui précède tout armement (voir la section « État d'armement livré » de la référence), remesurera ces nombres : il remplace ce
-fichier par ses propres lignes `COMPTE`. Un écart entre les deux mesures serait lui-même un constat.
+repos, qui précédait tout armement, devait remesurer ces nombres. **Il est fait** (`45-REJEU-FINAL.md`, commit `708debcb`, 2026-10-01) :
+ses lignes `COMPTE` rendent 196 refus conformes pour G1, 6 pour G7 et 202 au total, soit les mêmes nombres que ceux repris ici, avec 0 faux
+refus et 0 faux accept ; aucun écart entre les deux mesures. Les nombres du tableau ci-dessous restent ceux des relevés d'étape ; le relevé
+final les recoupe.
 
 Reproduction (lecture seule, depuis ce dossier) : `grep -E '^(COMPTE G1|COMPTE G7|REJEU-ETAPE-[234]) ' 45-REJEU-ETAPE-2.md
 45-REJEU-ETAPE-3.md 45-REJEU-ETAPE-4.md`.
@@ -63,6 +65,6 @@ passent : G1 ne les refuse pas (limite (j) de la référence). Alternative à un
 
 ## Ce que ce fichier ne dit pas
 
-- Aucune mesure postérieure aux lots A, B et C : voir « Provenance ».
+- Aucune mesure propre à ce fichier : les nombres viennent des relevés d'étape, recoupés par le rejeu réel final postérieur aux lots A, B et C (`45-REJEU-FINAL.md`) : voir « Provenance ».
 - Aucun nombre de faux refus ou de faux accepts autre que 0 et 0 (ceux des quatre relevés, empreintes d'arbre identiques).
-- Aucun armement : les cinq constantes `ARMEMENT_*` valent `observe` (référence, « État d'armement livré »).
+- Aucun état d'armement à la rédaction de ce fichier (les constantes valaient alors `observe`) ; depuis le 2026-10-01 les cinq gates sont armés et G2 avertit (référence, « État d'armement livré » ; SUMMARY 45-10, « Armement en cascade »).
