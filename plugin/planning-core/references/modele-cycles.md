@@ -811,17 +811,17 @@ canary, puis 0 faux refus et 0 faux accept sur le banc synthétique et sur le re
 |---|---|---|---|---|---|
 | G6 | 1 | armed | armé : fermé (deny) ; observe : journalise | G6-principal, G6-plugin | 45-REJEU-ETAPE-1 |
 | G5 | 1 | armed | armé : fermé (deny) ; observe : journalise | G5-verdict, G5-imbrique | 45-REJEU-ETAPE-1 |
-| G1 | 2 | observe | armé : fermé (deny) ; observe : journalise | G1-sans-cadrage | 45-REJEU-ETAPE-2 |
+| G1 | 2 | armed | armé : fermé (deny) ; observe : journalise | G1-sans-cadrage | 45-REJEU-ETAPE-2 |
 | G7 | 3 | observe | armé : fermé (deny) ; observe : journalise | G7-orphelin | 45-REJEU-ETAPE-3 |
 | ROLE | 4 | observe | armé : fermé (deny) ; observe : journalise | ROLE-juge, ROLE-worker-Agent, ROLE-worker-Task | 45-REJEU-ETAPE-4 |
 | G2 | - | avertit | ouvert : n'avertit pas, ne refuse jamais | aucun | aucun |
 
 **État d'armement livré, tel que mesuré (v2.9.0).**
 
-- Armés à ce commit : étape 1 (`ARMEMENT_G6` et `ARMEMENT_G5` valent `armed`). Restent en observation : `ARMEMENT_G1`, `ARMEMENT_G7` et `ARMEMENT_ROLE` valent `observe` ; `G2_MODE` vaut `avertit`.
+- Armés à ce commit : étapes 1 et 2 (`ARMEMENT_G6`, `ARMEMENT_G5` et `ARMEMENT_G1` valent `armed`). Restent en observation : `ARMEMENT_G7` et `ARMEMENT_ROLE` valent `observe` ; `G2_MODE` vaut `avertit`.
 - Les rejeux réels des étapes 1 à 4 ont tous rendu 0 faux refus et 0 faux accept, avec des empreintes d'arbre identiques (relevés de phase `45-REJEU-ETAPE-1` à `45-REJEU-ETAPE-4`). Mais ils ont été mesurés sur le hook **avant** les lots de correction A, B et C.
 - L'armement exigeait un NOUVEAU rejeu réel, sur des labs au repos, du hook livré après les lots de correction : il est fait (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`), avec 0 faux refus, 0 faux accept et des empreintes d'arbre identiques pour les deux labs. L'arbitrage qui attendait pour adapter deux suites couplées à « tout en observe » est rendu et appliqué (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30, oui pour les quatre étapes d'armement) : les suites ne dépendent plus de l'état d'armement, seuls la table de cette référence et `TABLE_ATTENDUE` le suivent. La protection des scripts du hook par G6 est elle aussi tranchée et appliquée (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01, limite (y)).
-- L'armement se fait par étapes dans l'ordre fixe (P45-D-03), un commit par étape : cet état est celui de l'étape 1. Les gates des étapes suivantes restent en observation ; ce document ne dit jamais qu'un gate est armé tant que sa constante vaut `observe`.
+- L'armement se fait par étapes dans l'ordre fixe (P45-D-03), un commit par étape : cet état est celui de l'étape 2. Les gates des étapes suivantes restent en observation ; ce document ne dit jamais qu'un gate est armé tant que sa constante vaut `observe`.
 
 Cinq listes que R-REFERENCE compare au code, chacune sur une seule ligne :
 

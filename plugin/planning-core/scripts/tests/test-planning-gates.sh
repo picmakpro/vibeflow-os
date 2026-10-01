@@ -143,7 +143,7 @@ TOKEN = "{{VF_SCRIPTS}}"
 OUTILS_BANC = ("Write", "Edit", "NotebookEdit", "Bash", "Agent", "Task")
 # Table d'armement ATTENDUE de l'état livré : chaque armement d'une étape (45-05 à 45-09) met à
 # jour la constante du script ET cette table dans le MÊME commit (R-TABLE-01).
-TABLE_ATTENDUE = {"G6": "armed", "G5": "armed", "G1": "observe", "G7": "observe", "ROLE": "observe"}
+TABLE_ATTENDUE = {"G6": "armed", "G5": "armed", "G1": "armed", "G7": "observe", "ROLE": "observe"}
 ORDRE_ATTENDU = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",))
 
 

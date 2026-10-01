@@ -96,7 +96,7 @@ CODE_ECHEANCE = 73
 # Valeurs admises : `observe` (le gate calcule, journalise, laisse passer) | `armed` (le gate refuse).
 ARMEMENT_G6 = "armed"  # etape-1
 ARMEMENT_G5 = "armed"  # etape-1
-ARMEMENT_G1 = "observe"  # etape-2
+ARMEMENT_G1 = "armed"  # etape-2
 ARMEMENT_G7 = "observe"  # etape-3
 ARMEMENT_ROLE = "observe"  # etape-4
 G2_MODE = "avertit"
