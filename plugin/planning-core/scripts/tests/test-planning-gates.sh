@@ -3385,6 +3385,44 @@ def controle_imbrique_cas_canary(ctx, script):
 lota_mutant("IMB-HOOK-CANARY", "# racine-imbriquee", 'if os.path.isdir(os.path.join(courant, ".planning")):  # racine-imbriquee', "R-IMB-05")
 
 
+# --- LOT A, constat 4 (revue m2) : une dérogation n'est consommée que si la décision FINALE est un passage grâce à elle ---------
+# Avant : `decider` consommait la dérogation de G6 verdict par verdict, alors que ROLE refusait la même écriture : la dérogation était
+# brûlée pour rien. Décision du manager vf-dev-manager, 2026-10-01 : on consomme seulement quand aucun verdict armé ne reste refusé.
+@lota("R-DEROG-09")
+def controle_derog_non_brulee(ctx, script):
+    """Copie armée, juge-test écrit `.planning/STATE.md` (G6 couvert par une dérogation, ROLE non couvert) : un deny ROLE, la
+    dérogation G6 n'est PAS consommée ; le même Write au fil principal (G6 seul) passe, cité, et la consomme alors."""
+    lab = lab_frais(ctx, "role-adherent")
+    journal = journal_derog(lab)
+    if os.path.exists(journal):
+        os.remove(journal)
+    rc, _o, err = deroger(ctx, lab, None, gate="G6", chemins=(".planning/STATE.md",))
+    if rc != 0:
+        return False, "deroger-gate.sh refuse le scénario : rc=%d %s" % (rc, court(err))
+    hook = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    cible = os.path.join(lab, ".planning", "STATE.md")
+    brut = payload("Write", entree_outil("Write", cible), lab, agent_type="juge-test")
+    rc, out, err = ctx.lancer("A", brut, cwd=lab, dossier=hook)
+    conforme, detail = deny_de(rc, out, err, "ROLE")
+    brulees = [l for l in lignes_de(journal) if "  consommee  " in l]
+    fautes = []
+    if not conforme:
+        fautes.append("Write du juge : " + detail)
+    if brulees:
+        fautes.append("dérogation G6 consommée alors que ROLE refuse : %s" % brulees)
+    if "G6" in (json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"] if classer(rc, out) == "deny" else ""):
+        fautes.append("la raison cite G6, couvert par la dérogation")
+    rc, out, err = ctx.lancer("A", payload("Write", entree_outil("Write", cible), lab), cwd=lab, dossier=hook)
+    consommees = [l for l in lignes_de(journal) if "  consommee  id=1  gate=G6  " in l]
+    if classer(rc, out) != "avertit" or err or "#1" not in contexte_de(out) or len(consommees) != 1:
+        fautes.append("Write au fil principal : %s, %d consommation(s) de #1 (attendu avertit cité + 1)" % (classer(rc, out), len(consommees)))
+    return (not fautes), ("; ".join(fautes) if fautes else "juge : deny ROLE seul, dérogation G6 intacte ; fil principal : passage cité, dérogation consommée")
+
+
+lota_mutant("DEROG-GLOBALE", "# decider-global",
+            "if False:  # decider-global", "R-DEROG-09")
+
+
 # LOTA-ANCRE
 
 

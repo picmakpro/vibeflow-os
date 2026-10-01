@@ -758,21 +758,31 @@ def citer(entree):
 
 def decider(verdicts, contexte):
     """Entonnoir unique (P45-D-03a, P45-D-08, P45-D-13) : (raisons de refus, citations). Un gate armed
-    refuse, sauf si une dérogation active couvre (gate, chemin) : elle est alors consommée et CITÉE ;
-    un gate en observe écrit une ligne au journal d'observation et ne dit RIEN au modèle (une
-    dérogation n'y sert à rien et n'y est pas consommée)."""
+    refuse, sauf si une dérogation active couvre (gate, chemin) ; un gate en observe écrit une ligne au
+    journal d'observation et ne dit RIEN au modèle (une dérogation n'y sert à rien et n'y est pas consommée).
+    Lot A (revue m2 ; décision du manager vf-dev-manager, 2026-10-01) : une dérogation n'est consommée et citée
+    que si la décision FINALE est un passage grâce à elle — tant qu'un verdict armé reste refusé (un autre gate
+    sans dérogation, le rôle par exemple), aucune dérogation n'est consommée : elle ne se brûle pas pour rien."""
     refus = []
     citations = []
+    couverts = []
     for verdict in verdicts:
         etat = TABLE_ARMEMENT.get(verdict.gate)
         if etat == "armed":  # decider-armed
             entree = None if verdict.chemin_rel is None else derogation_active(contexte["racine"], verdict.gate, verdict.chemin_rel)
-            if entree is not None and consommer(contexte["racine"], entree):
-                citations.append(citer(entree))
-            else:
+            if entree is None:
                 refus.append("[planning-core] %s : %s" % (verdict.gate, verdict.raison))
+            else:
+                couverts.append((verdict, entree))
         else:
             observer(verdict, contexte)
+    if refus:  # decider-global
+        return refus, citations
+    for verdict, entree in couverts:
+        if consommer(contexte["racine"], entree):
+            citations.append(citer(entree))
+        else:
+            refus.append("[planning-core] %s : %s" % (verdict.gate, verdict.raison))
     return refus, citations
 
 
