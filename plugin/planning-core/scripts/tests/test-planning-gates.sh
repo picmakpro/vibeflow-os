@@ -3568,6 +3568,50 @@ lota_mutant("VERDICT-VERROU", "# verdict-verrou", "verrou = None  # verdict-verr
 lota_mutant("VERDICT-UTF8", "# verdict-utf8", "pass  # verdict-utf8", "R-VERDICT-09", "poser-verdict.sh", "PY_POSER_VERDICT_EOF")
 
 
+# --- LOT A, constat 8 (audit B3) : deroger-gate.sh n'élargit jamais les droits d'un journal et refuse un argv non UTF-8 ------------
+# Décision du manager vf-dev-manager, 2026-10-01, renversable : `fchmod 0644` élargissait un journal 0600 existant.
+@lota("R-DEROG-10")
+def controle_derog_droits_utf8(ctx, script):
+    """Un journal existant 0600 reste 0600 après une dérogation (jamais élargi) ; un journal créé par la commande est 0644 ; un argv non
+    UTF-8 (octet 0xFF dans --raison) est refusé proprement (64, message, aucune trace Python) et le journal reste intact."""
+    d = _dossier(ctx, script)
+    fautes = []
+    lab = lab_frais(ctx)
+    journal = journal_derog(lab)
+    if os.path.exists(journal):
+        os.remove(journal)
+    fd = os.open(journal, os.O_WRONLY | os.O_CREAT, 0o600)
+    os.close(fd)
+    os.chmod(journal, 0o600)
+    rc, _o, err = deroger(ctx, lab, d, gate="G6", chemins=(".planning/STATE.md",))
+    mode = stat.S_IMODE(os.stat(journal).st_mode)
+    if rc != 0 or mode != 0o600:
+        fautes.append("journal 0600 existant : rc=%d, droits %o (attendu 600)" % (rc, mode))
+    lab2 = lab_frais(ctx)
+    journal2 = journal_derog(lab2)
+    if os.path.exists(journal2):
+        os.remove(journal2)
+    rc, _o, err = deroger(ctx, lab2, d, gate="G6", chemins=(".planning/STATE.md",))
+    mode2 = stat.S_IMODE(os.stat(journal2).st_mode) if os.path.exists(journal2) else None
+    if rc != 0 or mode2 != 0o644:
+        fautes.append("journal créé : rc=%d, droits %s (attendu 644)" % (rc, oct(mode2) if mode2 is not None else None))
+    lab3 = lab_frais(ctx)
+    journal3 = journal_derog(lab3)
+    if os.path.exists(journal3):
+        os.remove(journal3)
+    argv = [b"bash", os.path.join(d, "deroger-gate.sh").encode("utf-8"), b"--lab=" + lab3.encode("utf-8"), b"--gate=G6",
+            b"--chemin=.planning/STATE.md", b"--qui=willy", b"--canal=AskUserQuestion session principale", b"--date=2026-09-30",
+            b"--raison=cas de test \xff"]
+    p = subprocess.run(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ctx.env(), timeout=60)
+    if p.returncode != 64 or b"Traceback" in p.stderr or os.path.exists(journal3):
+        fautes.append("argv non UTF-8 : rc=%d stderr=%s journal créé=%s" % (p.returncode, court(p.stderr), os.path.exists(journal3)))
+    return (not fautes), ("; ".join(fautes) if fautes else "journal 0600 conservé, journal créé 0644, argv non UTF-8 refusé (64, aucune trace, aucun journal)")
+
+
+lota_mutant("DEROG-FCHMOD", "# derog-fchmod", 'if hasattr(os, "fchmod"):  # derog-fchmod', "R-DEROG-10", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
+lota_mutant("DEROG-UTF8", "# derog-utf8", "pass  # derog-utf8", "R-DEROG-10", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
+
+
 # LOTA-ANCRE
 
 

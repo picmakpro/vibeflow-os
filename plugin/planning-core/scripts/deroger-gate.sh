@@ -181,6 +181,10 @@ def analyser(args):
     valeurs = {}
     chemins = []
     for arg in args:
+        try:
+            arg.encode("utf-8")
+        except UnicodeEncodeError:
+            raise Refus(64, "argument non UTF-8 (octet invalide dans la ligne de commande)")  # derog-utf8
         if arg in ("-h", "--help"):
             return None
         if not arg.startswith("--") or "=" not in arg:
@@ -259,9 +263,12 @@ def inscrire(lab, valeurs, chemins):
     journal = os.path.join(lab, ".planning", "derogations-gates.log")
     if os.path.lexists(journal) and not est_fichier_regulier(journal):
         raise Refus(1, "le journal des dérogations n'est pas un fichier régulier : aucune écriture")
+    existait = os.path.lexists(journal)
     descripteur = os.open(journal, os.O_RDWR | os.O_APPEND | os.O_CREAT | SANS_SUIVI_DE_LIEN, 0o644)
     try:
-        if hasattr(os, "fchmod"):
+        # Jamais élargir les droits d'un journal existant (un journal 0600 reste 0600, audit B3 ; décision du manager
+        # vf-dev-manager, 2026-10-01) : 0644 seulement pour le journal que cette commande crée.
+        if hasattr(os, "fchmod") and not existait:  # derog-fchmod
             os.fchmod(descripteur, 0o644)
         if fcntl is not None:
             fcntl.flock(descripteur, fcntl.LOCK_EX)
