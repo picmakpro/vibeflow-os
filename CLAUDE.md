@@ -15,27 +15,27 @@ dans `plugin/reference/`. Le socle de gouvernance est le module `conductor`.
 > **Toute release (bump de la `VERSION` racine) DOIT créer et pousser un tag git annoté `vX.Y.Z`
 > pointant sur le commit de release.**
 
-Une version sans tag n'est ni traçable ni installable par référence. C'est précisément ce qui a
-fait diverger `main` en juillet 2026 : v2.10.0 → v2.16.0 publiées sans jamais être taggées, états
-intermédiaires irretrouvables.
+Une version sans tag n'est ni traçable ni installable par référence (historique : en-tête de
+`scripts/check-release-tag.sh`).
 
 **À chaque release :**
 
 1. **Bump cohérent** du même numéro dans les trois fichiers : `VERSION`,
    `plugin/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` — plus l'historique des
    deux README (`README.md` **et** `README.fr.md`, badges inclus).
-2. **Après le merge sur `main`**, crée et pousse le tag annoté :
+2. **Relecture adverse avant le tag** (SOBR-04) : `git diff <tag précédent>..<commit de release> -- plugin/`
+   relu par qui ne l'a pas écrit, ≥ 1 sonde exécutée, commande et sortie dans les notes de release.
+3. **Après le merge sur `main`**, crée et pousse le tag annoté :
    ```bash
    git tag -a vX.Y.Z -m "vX.Y.Z — <résumé>" <commit-de-release>
    git push origin vX.Y.Z
    ```
-3. **Crée la release GitHub** sur le tag (titre court, notes = résumé du tag + commits couverts) :
+4. **Crée la release GitHub** sur le tag (titre court, notes = résumé du tag + commits couverts) :
    ```bash
-   gh release create vX.Y.Z --title "vX.Y.Z — <résumé court>" --notes "<résumé + liste des commits depuis le tag précédent>" --verify-tag
+   gh release create vX.Y.Z --title "vX.Y.Z — <résumé court>" --notes "<résumé + commits depuis le tag précédent + commande et sortie de la sonde, étape 2>" --verify-tag
    ```
-   Un tag sans release GitHub rend la page Releases mensongère — c'est ce qui s'est produit de
-   v2.29.0 à v2.39.0 (14 versions taggées, page bloquée sur v2.28.0, rattrapage le 2026-07-26).
-4. **Vérifie** : `bash scripts/check-release-tag.sh --remote` → doit sortir `✓` (le gate vérifie
+   Un tag sans release GitHub rend la page Releases mensongère (historique : même en-tête).
+5. **Vérifie** : `bash scripts/check-release-tag.sh --remote` → doit sortir `✓` (le gate vérifie
    le tag local, le tag poussé **et** la release GitHub).
 
 **Garde-fou machine** : `scripts/check-release-tag.sh` échoue (exit 1) si la `VERSION` courante n'a

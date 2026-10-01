@@ -38,3 +38,11 @@ qu'elles n'exerçaient que le cas « **glob non satisfait** », **jamais un éch
 Voir [[liste-de-cas-ne-ferme-pas-une-classe]] (quatre point-fixes ne ferment pas une classe),
 [[mutation-qui-echoue-pour-la-mauvaise-raison]] et
 [[revalider-les-plans-ecrits-avant-les-faits]] (le vert interne d'un pipeline ne compte pas).
+
+**Récidive (2026-09-30, Phase 41.3) — l'état stable, pas le premier passage** : un archivage
+automatique a passé trois revues et 373 assertions, puis le test d'installation isolé a montré
+qu'il ne pouvait archiver qu'UNE fois par fichier. Les suites ne jouaient que le premier passage
+et un « second passage = rien » qui sortait avant la preuve. Pour tout outil qui transforme un
+fichier vivant, exiger le cycle « transformer, commiter, ajouter du neuf, retransformer ». Le test
+isolé as-installed en fin de vague trouve ce que les juges ne voient pas : le commander AVANT la
+revue finale, pas après.

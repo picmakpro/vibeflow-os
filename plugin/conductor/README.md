@@ -83,11 +83,24 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   « mise à jour disponible X → Y, lance /vf-update » + nudge de méthode legacy), `check-guard-health.sh
   --hook` (**advisory**, Phase 32 : lecteur générique des marqueurs de santé du parc, silence
   nominal à 0 octet, une ligne si un garde s'est dégradé récemment).
+- **SessionStart (sans matcher)** → `guard-fin-de-geste.sh --snapshot` (**advisory**, Phase 41.3,
+  SOBR-07) : photographie en lecture seule ce qui est déjà rangeable ; stdout vide sur le chemin
+  nominal.
+- **Stop** → `guard-fin-de-geste.sh` (**bloquant par le code de sortie**, Phase 41.3, ADR-076) :
+  archive seul ce qu'un budget dépassé désigne, puis bloque à chaque arrêt tant qu'il reste du
+  rangement **apparu depuis le snapshot de la session** ; après 3 blocages de suite sans progrès (l'ensemble
+  n'est pas plus petit que le plus bas atteint) il laisse sortir avec un `systemMessage` visible de
+  l'utilisateur ; une écriture d'état ratée relâche la garde, dite, jamais un blocage sans compteur ; un
+  archivage fait par l'arrêt qui bloque est dit au premier exit 0. État : `$TMPDIR/vibeflow-fin-de-geste-<uid>`. Les constats non actionnables
+  (archivage refusé, non tenté, budget dépassé, non vérifiable) sont dits en `systemMessage` et ne
+  bloquent jamais. Bascule `VF_FIN_DE_GESTE=block|warn|off`.
 
-## Scripts (30) — par famille
+## Scripts (33) — par famille
 
-*(Compte re-dérivé au 2026-09-26 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
-'*.sh' | awk 'END{print NR}'` → 30, croisé par `git ls-files`. Il gagne `check-skills.sh` (+1,
+*(Compte re-dérivé au 2026-09-30 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
+'*.sh' | awk 'END{print NR}'` → 33 ; il gagne `check-ajout-retrait.sh` et `guard-fin-de-geste.sh`
+(+2, Phase 41.3) au-dessus du compte 31 de `origin/main` (dont `check-method-budget.sh`, v2.67.0).
+Le compte du 2026-09-26 était 30, croisé par `git ls-files`. Il gagne `check-skills.sh` (+1,
 gate des skills par nature, FABR-06, Phase 43) au-dessus du compte 29 du 2026-09-22 (lui-même
 issu de `check-planning-consumers-registered.sh`, déjà présent à cette date mais non catalogué
 ci-dessous — hors périmètre de cette correction) et `check-blueprints.sh` (+1, correctif de
@@ -147,6 +160,16 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   au sein d'un même jalon, et le corps ne porte jamais plus d'une ligne `^Phase:` (ADR-063).
 - `check-branch-claim.sh` — santé de la revendication de branche par mission (portabilité, PORT-03).
 - `check-workstream-pointer.sh` — santé du pointeur de workstream (portabilité, PORT-03).
+- `check-method-budget.sh` — budgets de méthode d'un lab (STATE, worktrees, BACKLOG ouvert, index
+  de mémoire, ROADMAP, prose) et rangement (branches, stash, mémoires) ; `--auto` archive seul, par
+  déplacement tracé et réversible, ce qu'une règle décidable désigne (ADR-076). Jetons lus par
+  `guard-fin-de-geste.sh` et le contrôle E7 de `check-mission-exit.sh`.
+- `check-ajout-retrait.sh` — garde consultative « un ajout, un retrait » (Phase 41.3, SOBR-05) :
+  un gate, un ADR, une règle (titre ou puce de `CLAUDE.md`, `plugin/*/rules/*.md`) ou une mémoire
+  ajoutés sans trailer `Ajout-Retrait:` sont listés ; un remplacement (retrait dans le diff) ne
+  rougit pas, un glob trop large ne couvre rien.
+- `guard-fin-de-geste.sh` — hooks `SessionStart --snapshot` et `Stop` du nettoyage de fin de geste
+  (voir § Hooks ci-dessus).
 - `check-map-drift.sh` — gate anti-drift carte↔disque (contrat de routage par dossier).
 - `check-guard-health.sh` — lecteur générique `SessionStart` des marqueurs de santé écrits par
   `vf_guard_unavailable` (tout le parc de gardes, pas seulement le lock) : fail-open bruyant plutôt
@@ -196,7 +219,7 @@ SessionStart), `vf-update-run.sh` (re-matérialise les modules depuis le cache p
 ADR-042) et `generate-agent-commands.sh` (une commande slash d'incarnation par agent posé — saute
 les workers `vf-internal: true`, Pattern 12).
 
-**Tests** : 31 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
+**Tests** : 34 suites sous `scripts/tests/` (une par script critique + `test-conductor.sh`,
 `test-vf-new-lab.sh`, `test-vf-update.sh`, `test-doc-and-commands.sh`, `test-check-divergence.sh`
 neuve en Phase 39, 17 cas dont 3 mutants — 10 cas à la livraison du plan 39-01, +7 le
 2026-09-14 pour couvrir la sortie `2` et la normalisation base 10, tuant 5 mutations survivantes). *(Compte re-dérivé au 2026-09-26 :
