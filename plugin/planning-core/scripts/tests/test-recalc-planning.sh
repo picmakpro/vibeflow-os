@@ -3142,23 +3142,40 @@ if ! grep -qF '_archive' "$R_G14R_DIR/.planning/INDEX.md" 2>/dev/null; then
 else
   ko "R-GATE14-ARCHIVE hors modèle" "_archive absent de INDEX.md" "présent" "$(grep -F '_archive' "$R_G14R_DIR/.planning/INDEX.md")"
 fi
-# Second passage sous migration (le STATE.md v2 est recréé à la main, contenu DIFFÉRENT) : l'archive
-# du premier passage n'est jamais réécrite.
+# Second passage sous migration (le STATE.md v2 est recréé à la main, contenu DIFFÉRENT) : l'archive du premier passage n'est
+# jamais réécrite ET le nouveau contenu manuscrit est archivé sous `socle-v2.2` (quick 45-B, M3, décisions du manager
+# vf-dev-manager, 2026-10-01 : l'attendu précédent — `_archive` strictement identique — documentait la perte du contenu recréé).
 printf -- '---\nplanning_version: "2.0"\n---\n\n# STATE v2 recréé, contenu différent\n' > "$R_G14R_DIR/.planning/STATE.md"
-empreinte "$R_G14R_DIR/.planning/_archive" > "$WORK/r-gate14-archive-avant2.txt"
+cp "$R_G14R_DIR/.planning/STATE.md" "$WORK/r-gate14-archive-state-recree.md"
 ( cd "$R_G14R_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-gate14-archive-out2.txt" 2>"$WORK/r-gate14-archive-err2.txt" )
 R_G14R_RC2=$?
-empreinte "$R_G14R_DIR/.planning/_archive" > "$WORK/r-gate14-archive-apres2.txt"
-if [ "$R_G14R_RC2" -eq 0 ] && cmp -s "$WORK/r-gate14-archive-avant2.txt" "$WORK/r-gate14-archive-apres2.txt" \
-   && cmp -s "$WORK/r-gate14-archive-state-v2.md" "$R_G14R_DIR/.planning/_archive/socle-v2/STATE.md"; then
-  ok "R-GATE14-ARCHIVE second passage sous migration : code 0, archive existante jamais réécrite (empreinte de _archive identique)"
+if [ "$R_G14R_RC2" -eq 0 ] \
+   && cmp -s "$WORK/r-gate14-archive-state-v2.md" "$R_G14R_DIR/.planning/_archive/socle-v2/STATE.md" \
+   && cmp -s "$WORK/r-gate14-archive-index-v2.md" "$R_G14R_DIR/.planning/_archive/socle-v2/INDEX.md" \
+   && cmp -s "$WORK/r-gate14-archive-state-recree.md" "$R_G14R_DIR/.planning/_archive/socle-v2.2/STATE.md" 2>/dev/null \
+   && [ ! -e "$R_G14R_DIR/.planning/_archive/socle-v2.2/INDEX.md" ]; then
+  ok "R-GATE14-ARCHIVE second passage sous migration : code 0, archive existante jamais réécrite, le STATE.md manuscrit recréé est archivé sous socle-v2.2 (l'INDEX.md généré ne l'est pas)"
 else
-  ko "R-GATE14-ARCHIVE second passage" "code 0, _archive identique" "code=$R_G14R_RC2, archive modifiée" "$(cat "$WORK/r-gate14-archive-err2.txt")"
+  ko "R-GATE14-ARCHIVE second passage" "code 0, socle-v2 intact, socle-v2.2/STATE.md = le contenu recréé" "code=$R_G14R_RC2" "$(cat "$WORK/r-gate14-archive-err2.txt"; ls -R "$R_G14R_DIR/.planning/_archive" 2>&1 | tr '\n' ' ')"
+fi
+# Troisième passage, plus aucun contenu manuscrit (STATE.md et INDEX.md générés) : rien n'est archivé de plus.
+empreinte "$R_G14R_DIR/.planning/_archive" > "$WORK/r-gate14-archive-avant3.txt"
+( cd "$R_G14R_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-gate14-archive-out3.txt" 2>"$WORK/r-gate14-archive-err3.txt" )
+R_G14R_RC3=$?
+empreinte "$R_G14R_DIR/.planning/_archive" > "$WORK/r-gate14-archive-apres3.txt"
+if [ "$R_G14R_RC3" -eq 0 ] && cmp -s "$WORK/r-gate14-archive-avant3.txt" "$WORK/r-gate14-archive-apres3.txt"; then
+  ok "R-GATE14-ARCHIVE troisième passage (fichiers générés seulement) : code 0, aucune archive de plus (un fichier généré se reproduit)"
+else
+  ko "R-GATE14-ARCHIVE troisième passage" "code 0, _archive identique" "code=$R_G14R_RC3, archive modifiée" "$(cat "$WORK/r-gate14-archive-err3.txt")"
 fi
 
-# Cible d'archive préexistante (fichier ET lien) : jamais écrasée, aucune archive écrite en plus.
+# Archive préexistante de contenu DIFFÉRENT (un fichier et un lien) : jamais écrasée, et le contenu manuscrit est archivé sous
+# `socle-v2.2` (quick 45-B, M3, décisions du manager vf-dev-manager, 2026-10-01 : l'attendu précédent — « aucune archive écrite
+# en plus » — documentait la perte du STATE.md et de l'INDEX.md manuscrits, remplacés sans copie).
 R_G14P_DIR="$WORK/r-gate14-archive-preexistante"
 gate14_lab_socle_v2_riche "$R_G14P_DIR"
+cp "$R_G14P_DIR/.planning/STATE.md" "$WORK/r-gate14-archive-p-state.md"
+cp "$R_G14P_DIR/.planning/INDEX.md" "$WORK/r-gate14-archive-p-index.md"
 mkdir -p "$R_G14P_DIR/.planning/_archive/socle-v2" "$WORK/r-gate14-archive-preexistante-dehors"
 printf 'SENTINELLE archive préexistante\n' > "$R_G14P_DIR/.planning/_archive/socle-v2/STATE.md"
 printf 'SENTINELLE hors archive\n' > "$WORK/r-gate14-archive-preexistante-dehors/cible.md"
@@ -3168,10 +3185,87 @@ R_G14P_RC=$?
 if [ "$R_G14P_RC" -eq 0 ] \
    && [ "$(cat "$R_G14P_DIR/.planning/_archive/socle-v2/STATE.md")" = "SENTINELLE archive préexistante" ] \
    && [ -L "$R_G14P_DIR/.planning/_archive/socle-v2/INDEX.md" ] \
-   && [ "$(cat "$WORK/r-gate14-archive-preexistante-dehors/cible.md")" = "SENTINELLE hors archive" ]; then
-  ok "R-GATE14-ARCHIVE cible préexistante (fichier et lien) : jamais écrasée, rien écrit à travers le lien"
+   && [ "$(cat "$WORK/r-gate14-archive-preexistante-dehors/cible.md")" = "SENTINELLE hors archive" ] \
+   && cmp -s "$WORK/r-gate14-archive-p-state.md" "$R_G14P_DIR/.planning/_archive/socle-v2.2/STATE.md" 2>/dev/null \
+   && cmp -s "$WORK/r-gate14-archive-p-index.md" "$R_G14P_DIR/.planning/_archive/socle-v2.2/INDEX.md" 2>/dev/null; then
+  ok "R-GATE14-ARCHIVE archive préexistante différente (fichier et lien) : jamais écrasée, rien écrit à travers le lien, STATE.md et INDEX.md manuscrits archivés sous socle-v2.2"
 else
-  ko "R-GATE14-ARCHIVE cible préexistante" "code 0, fichier et lien intacts, cible du lien intacte" "code=$R_G14P_RC" "$(cat "$R_G14P_DIR/.planning/_archive/socle-v2/STATE.md" 2>/dev/null)"
+  ko "R-GATE14-ARCHIVE archive préexistante" "code 0, socle-v2 intact, socle-v2.2 = les deux manuscrits (cmp)" "code=$R_G14P_RC" "$(cat "$WORK/r-gate14-archive-p-err.txt"; ls -R "$R_G14P_DIR/.planning/_archive" 2>&1 | tr '\n' ' ')"
+fi
+
+# Demi-archive (INDEX.md seul, identique au manuscrit) : elle ne fait plus sauter l'archivage du STATE.md courant (M3).
+R_G14H_DIR="$WORK/r-gate14-archive-demi"
+gate14_lab_socle_v2_riche "$R_G14H_DIR"
+cp "$R_G14H_DIR/.planning/STATE.md" "$WORK/r-gate14-archive-h-state.md"
+cp "$R_G14H_DIR/.planning/INDEX.md" "$WORK/r-gate14-archive-h-index.md"
+mkdir -p "$R_G14H_DIR/.planning/_archive/socle-v2"
+cp "$R_G14H_DIR/.planning/INDEX.md" "$R_G14H_DIR/.planning/_archive/socle-v2/INDEX.md"
+( cd "$R_G14H_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-gate14-archive-h-out.txt" 2>"$WORK/r-gate14-archive-h-err.txt" )
+R_G14H_RC=$?
+if [ "$R_G14H_RC" -eq 0 ] \
+   && [ ! -e "$R_G14H_DIR/.planning/_archive/socle-v2/STATE.md" ] \
+   && cmp -s "$WORK/r-gate14-archive-h-index.md" "$R_G14H_DIR/.planning/_archive/socle-v2/INDEX.md" \
+   && cmp -s "$WORK/r-gate14-archive-h-state.md" "$R_G14H_DIR/.planning/_archive/socle-v2.2/STATE.md" 2>/dev/null \
+   && cmp -s "$WORK/r-gate14-archive-h-index.md" "$R_G14H_DIR/.planning/_archive/socle-v2.2/INDEX.md" 2>/dev/null; then
+  ok "R-GATE14-ARCHIVE demi-archive : intacte, et le STATE.md manuscrit est archivé sous socle-v2.2 (avec l'INDEX.md, archive complète)"
+else
+  ko "R-GATE14-ARCHIVE demi-archive" "code 0, socle-v2 inchangé, socle-v2.2 = STATE.md et INDEX.md manuscrits" "code=$R_G14H_RC" "$(cat "$WORK/r-gate14-archive-h-err.txt"; ls -R "$R_G14H_DIR/.planning/_archive" 2>&1 | tr '\n' ' ')"
+fi
+
+# Contenu manuscrit déjà archivé à l'identique : aucune nouvelle archive, aucun résidu provisoire, rien d'autre que socle-v2.
+R_G14I_DIR="$WORK/r-gate14-archive-idem"
+gate14_lab_socle_v2_riche "$R_G14I_DIR"
+cp "$R_G14I_DIR/.planning/STATE.md" "$WORK/r-gate14-archive-i-state.md"
+( cd "$R_G14I_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-gate14-archive-i-out.txt" 2>"$WORK/r-gate14-archive-i-err.txt" )
+R_G14I_RC=$?
+cp "$WORK/r-gate14-archive-i-state.md" "$R_G14I_DIR/.planning/STATE.md"
+( cd "$R_G14I_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-gate14-archive-i-out2.txt" 2>"$WORK/r-gate14-archive-i-err2.txt" )
+R_G14I_RC2=$?
+if [ "$R_G14I_RC" -eq 0 ] && [ "$R_G14I_RC2" -eq 0 ] && [ "$(ls -A "$R_G14I_DIR/.planning/_archive" | tr '\n' ' ')" = "socle-v2 " ] \
+   && ! cmp -s "$WORK/r-gate14-archive-i-state.md" "$R_G14I_DIR/.planning/STATE.md"; then
+  ok "R-GATE14-ARCHIVE même contenu manuscrit recréé : déjà archivé, pas de nouvelle archive ni de résidu provisoire, STATE.md remplacé"
+else
+  ko "R-GATE14-ARCHIVE idempotence" "_archive = {socle-v2} seul, STATE.md remplacé" "rc=$R_G14I_RC/$R_G14I_RC2" "$(ls -A "$R_G14I_DIR/.planning/_archive" | tr '\n' ' ')"
+fi
+
+# Refus d'écriture tardif : les gardes précèdent l'archivage, un refus ne laisse ni archive orpheline ni fichier remplacé (M3).
+for cas in cloture-lien cache-dossier index-lien; do
+  R_G14T_DIR="$WORK/r-gate14-archive-tardif-$cas"
+  gate14_lab_socle_v2_riche "$R_G14T_DIR"
+  case "$cas" in
+    cloture-lien) printf 'x\n' > "$WORK/r-gate14-tardif-cible.log"; ln -s "$WORK/r-gate14-tardif-cible.log" "$R_G14T_DIR/.planning/cloture.log" ;;
+    cache-dossier) mkdir "$R_G14T_DIR/.planning/.recalc-cache.json" ;;
+    index-lien) rm "$R_G14T_DIR/.planning/INDEX.md"; printf 'cible\n' > "$WORK/r-gate14-tardif-index.md"; ln -s "$WORK/r-gate14-tardif-index.md" "$R_G14T_DIR/.planning/INDEX.md" ;;
+  esac
+  empreinte "$R_G14T_DIR" > "$WORK/r-gate14-tardif-avant-$cas.txt"
+  ( cd "$R_G14T_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-gate14-tardif-out-$cas.txt" 2>"$WORK/r-gate14-tardif-err-$cas.txt" )
+  R_G14T_RC=$?
+  empreinte "$R_G14T_DIR" > "$WORK/r-gate14-tardif-apres-$cas.txt"
+  if [ "$R_G14T_RC" -eq 1 ] && cmp -s "$WORK/r-gate14-tardif-avant-$cas.txt" "$WORK/r-gate14-tardif-apres-$cas.txt" && [ ! -e "$R_G14T_DIR/.planning/_archive" ]; then
+    ok "R-GATE14-ARCHIVE refus d'écriture ($cas) : code 1, empreinte du lab identique, aucune archive orpheline"
+  else
+    ko "R-GATE14-ARCHIVE refus d'écriture ($cas)" "code 1, rien écrit, pas de _archive" "code=$R_G14T_RC" "$(cat "$WORK/r-gate14-tardif-err-$cas.txt"; ls -A "$R_G14T_DIR/.planning" | tr '\n' ' ')"
+  fi
+done
+
+# Archivage impossible (`_archive` en lecture seule) : code 1, le STATE.md et l'INDEX.md manuscrits ne sont PAS remplacés.
+if [ "$(id -u)" -eq 0 ]; then
+  echo "  ⊘ R-GATE14-ARCHIVE lecture seule SKIP (UID 0 — les permissions ne s'appliquent pas à root)"
+else
+  R_G14X_DIR="$WORK/r-gate14-archive-lecture-seule"
+  gate14_lab_socle_v2_riche "$R_G14X_DIR"
+  mkdir "$R_G14X_DIR/.planning/_archive"
+  chmod 555 "$R_G14X_DIR/.planning/_archive"
+  empreinte "$R_G14X_DIR" > "$WORK/r-gate14-x-avant.txt"
+  ( cd "$R_G14X_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-gate14-x-out.txt" 2>"$WORK/r-gate14-x-err.txt" )
+  R_G14X_RC=$?
+  empreinte "$R_G14X_DIR" > "$WORK/r-gate14-x-apres.txt"
+  chmod 755 "$R_G14X_DIR/.planning/_archive"
+  if [ "$R_G14X_RC" -eq 1 ] && cmp -s "$WORK/r-gate14-x-avant.txt" "$WORK/r-gate14-x-apres.txt"; then
+    ok "R-GATE14-ARCHIVE archivage impossible (_archive en lecture seule) : code 1, STATE.md et INDEX.md manuscrits non remplacés, rien d'écrit"
+  else
+    ko "R-GATE14-ARCHIVE archivage impossible" "code 1, empreinte identique" "code=$R_G14X_RC" "$(cat "$WORK/r-gate14-x-err.txt")"
+  fi
 fi
 
 # `_archive` en lien symbolique : code 1, rien écrit (ni archive, ni INDEX/STATE générés).
@@ -3300,10 +3394,13 @@ then
   fi
 fi
 
-# ---------- MUT-GATE14-ECRASE — contrôle d'existence de la cible retiré : l'archive est écrasée ----
+# ---------- MUT-GATE14-ECRASE — le choix du nom d'archive ignore les archives existantes -----------
+# Adapté (quick 45-B, M3, décisions du manager vf-dev-manager, 2026-10-01) : l'ancien motif (contrôle d'existence de la cible,
+# aujourd'hui sans objet puisqu'une archive existante n'est plus jamais ciblée) est remplacé par la ligne qui choisit le nom de
+# la nouvelle archive ; l'attendu « SENTINELLE intacte » est conservé, et complété : le manuscrit est archivé sous socle-v2.2.
 if make_recalc_mutant GATE14-ECRASE \
-  'if any(os.path.lexists(os.path.join(dossier_archive, nom)) for nom in NOMS_ARCHIVE_SOCLE_V2):' \
-  'if False:  # MUT-GATE14-ECRASE'
+  'destination = os.path.join(parent, _nom_archive_libre(existants))  # archive-destination' \
+  'destination = os.path.join(parent, "socle-v2")  # MUT-GATE14-ECRASE'
 then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-gate14-ecrase-cas"
@@ -3311,11 +3408,88 @@ then
   mkdir -p "$DIR_CAS/.planning/_archive/socle-v2"
   printf 'SENTINELLE archive préexistante\n' > "$DIR_CAS/.planning/_archive/socle-v2/STATE.md"
   ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-gate14-ecrase-out.txt" 2>"$WORK/mut-gate14-ecrase-err.txt" ); RC_M=$?
-  if ! _verifier_plantage GATE14-ECRASE "archive préexistante (cas « cible préexistante » de R-GATE14-ARCHIVE)" "$WORK/mut-gate14-ecrase-out.txt" "$WORK/mut-gate14-ecrase-err.txt" "$RC_M"; then
-    if [ "$(cat "$DIR_CAS/.planning/_archive/socle-v2/STATE.md" 2>/dev/null)" != "SENTINELLE archive préexistante" ]; then
-      okmut GATE14-ECRASE "archive préexistante · attendu (original) : SENTINELLE intacte · obtenu (mutant, contrôle retiré) : écrasée par le STATE.md du socle v2"
+  if ! _verifier_plantage GATE14-ECRASE "archive préexistante (cas « archive préexistante différente » de R-GATE14-ARCHIVE)" "$WORK/mut-gate14-ecrase-out.txt" "$WORK/mut-gate14-ecrase-err.txt" "$RC_M"; then
+    if [ ! -e "$DIR_CAS/.planning/_archive/socle-v2.2/STATE.md" ]; then
+      okmut GATE14-ECRASE "archive préexistante · attendu (original) : SENTINELLE intacte et manuscrit archivé sous socle-v2.2 · obtenu (mutant, nom fixe socle-v2) : pas de socle-v2.2 (rc=$RC_M, contenu à la main perdu ou archive en collision)"
     else
-      komut GATE14-ECRASE "archive préexistante" "SENTINELLE intacte (original)" "SENTINELLE intacte (mutant non opposable)"
+      komut GATE14-ECRASE "archive préexistante" "socle-v2.2/STATE.md absent chez le mutant" "socle-v2.2/STATE.md présent (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-GATE14-DEJA — toute archive existante vaut « déjà archivé » (comportement d'avant la M3) ------
+if make_recalc_mutant GATE14-DEJA \
+  'if _archive_contient(os.path.join(parent, nom), sources):  # archive-deja' \
+  'if True:  # MUT-GATE14-DEJA'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-gate14-deja-cas"
+  gate14_lab_socle_v2_riche "$DIR_CAS"
+  mkdir -p "$DIR_CAS/.planning/_archive/socle-v2"
+  cp "$DIR_CAS/.planning/INDEX.md" "$DIR_CAS/.planning/_archive/socle-v2/INDEX.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-gate14-deja-out.txt" 2>"$WORK/mut-gate14-deja-err.txt" ); RC_M=$?
+  if ! _verifier_plantage GATE14-DEJA "demi-archive de R-GATE14-ARCHIVE" "$WORK/mut-gate14-deja-out.txt" "$WORK/mut-gate14-deja-err.txt" "$RC_M"; then
+    if [ ! -e "$DIR_CAS/.planning/_archive/socle-v2.2/STATE.md" ] && [ ! -e "$DIR_CAS/.planning/_archive/socle-v2/STATE.md" ]; then
+      okmut GATE14-DEJA "demi-archive · attendu (original) : STATE.md manuscrit archivé sous socle-v2.2 · obtenu (mutant, toute archive vaut « déjà archivé ») : STATE.md archivé nulle part (rc=$RC_M), puis remplacé"
+    else
+      komut GATE14-DEJA "demi-archive" "STATE.md archivé nulle part chez le mutant" "STATE.md archivé (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-GATE14-PREALABLES — les gardes d'écriture ne précèdent plus l'archivage -----------
+if make_recalc_mutant GATE14-PREALABLES \
+  'code_prealable = gardes_ecriture_prealables(planning_abs)  # archive-prealables' \
+  'code_prealable = 0  # MUT-GATE14-PREALABLES'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-gate14-prealables-cas"
+  gate14_lab_socle_v2_riche "$DIR_CAS"
+  mkdir "$DIR_CAS/.planning/.recalc-cache.json"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-gate14-prealables-out.txt" 2>"$WORK/mut-gate14-prealables-err.txt" ); RC_M=$?
+  if ! _verifier_plantage GATE14-PREALABLES "refus d'écriture (cache en dossier) de R-GATE14-ARCHIVE" "$WORK/mut-gate14-prealables-out.txt" "$WORK/mut-gate14-prealables-err.txt" "$RC_M"; then
+    if [ -d "$DIR_CAS/.planning/_archive/socle-v2" ]; then
+      okmut GATE14-PREALABLES "refus d'écriture · attendu (original) : code 1 sans _archive · obtenu (mutant, gardes après l'archivage) : archive orpheline sous _archive/socle-v2 (rc=$RC_M)"
+    else
+      komut GATE14-PREALABLES "refus d'écriture" "archive orpheline chez le mutant" "pas d'archive (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-GATE14-GENERE — un fichier généré est archivé comme du contenu manuscrit ------------
+if make_recalc_mutant GATE14-GENERE \
+  'if _est_genere(nom, octets_source):  # archive-genere' \
+  'if False:  # MUT-GATE14-GENERE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-gate14-genere-cas"
+  gate14_lab_socle_v2_riche "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+  printf -- '---\nplanning_version: "2.0"\n---\n\n# STATE v2 recréé, contenu différent\n' > "$DIR_CAS/.planning/STATE.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-gate14-genere-out.txt" 2>"$WORK/mut-gate14-genere-err.txt" ); RC_M=$?
+  if ! _verifier_plantage GATE14-GENERE "second passage de R-GATE14-ARCHIVE (STATE.md manuscrit recréé, INDEX.md généré)" "$WORK/mut-gate14-genere-out.txt" "$WORK/mut-gate14-genere-err.txt" "$RC_M"; then
+    if [ -e "$DIR_CAS/.planning/_archive/socle-v2.2/INDEX.md" ]; then
+      okmut GATE14-GENERE "INDEX.md généré · attendu (original) : absent de socle-v2.2 (seul le STATE.md manuscrit est archivé) · obtenu (mutant, génération non reconnue) : un instantané de l'INDEX.md généré est archivé"
+    else
+      komut GATE14-GENERE "INDEX.md généré" "socle-v2.2/INDEX.md présent chez le mutant" "socle-v2.2/INDEX.md absent (mutant non opposable)"
+    fi
+  fi
+fi
+
+# ---------- MUT-GATE14-RENAME — le dossier provisoire n'est jamais publié (tout ou rien) ---------------
+if make_recalc_mutant GATE14-RENAME \
+  'os.rename(provisoire, destination)  # archive-rename' \
+  'pass  # MUT-GATE14-RENAME'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-gate14-rename-cas"
+  gate14_lab_socle_v2_riche "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-gate14-rename-out.txt" 2>"$WORK/mut-gate14-rename-err.txt" ); RC_M=$?
+  if ! _verifier_plantage GATE14-RENAME "archive de R-GATE14-ARCHIVE publiée par renommage" "$WORK/mut-gate14-rename-out.txt" "$WORK/mut-gate14-rename-err.txt" "$RC_M"; then
+    if [ ! -e "$DIR_CAS/.planning/_archive/socle-v2/STATE.md" ]; then
+      okmut GATE14-RENAME "archive publiée par renommage · attendu (original) : _archive/socle-v2/STATE.md présent · obtenu (mutant, renommage retiré) : absent (rc=$RC_M)"
+    else
+      komut GATE14-RENAME "archive publiée par renommage" "STATE.md absent chez le mutant" "STATE.md présent (mutant non opposable)"
     fi
   fi
 fi
