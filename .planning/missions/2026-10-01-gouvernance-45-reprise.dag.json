@@ -125,7 +125,7 @@
         "maj-45-10"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -146,7 +146,7 @@
         "docs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "fix-45-E",
