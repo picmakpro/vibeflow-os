@@ -71,14 +71,14 @@
 #   LOT A           (section `lota` ; correction ciblée post-45-09, décisions du manager vf-dev-manager, 2026-10-01) : R-IMB-01..05 un `.planning`
 #                   imbriqué n'est jamais une racine de lab ; R-DEROG-09 une dérogation n'est consommée que si la décision finale est un
 #                   passage ; R-DEROG-10 droits du journal jamais élargis, argv UTF-8 ; R-VERDICT-06..09 poser-verdict.sh (contrôles, forme
-#                   d'unité, verrou, UTF-8) ; R-DEFS-01..05 parseur de définitions linéaire et borné, échéance interne, orphelin, transport ;
+#                   d'unité, verrou, UTF-8) ; R-DEFS-01..05 parseur de définitions linéaire et borné, échéance interne, orphelin, transport ; R-DEFS-06 minuteur désarmé après la décision (F-03) ; R-ADH-REPLI constante partagée entre G6 et le grep de repli (F-02) ;
 #                   R-VERSION-01 version active d'un plugin ; R-CAN-09..11 le canary n'exécute que la commande de référence, constantes
 #                   d'armement absentes = signal ; chaque contrôle a son mutant (MUT-IMB-*, DEROG-GLOBALE, DEROG-FCHMOD, DEROG-UTF8, VERDICT-*,
-#                   PUCE-*, ECHEANCE-*, TRANSPORT-EFFACE, PLUGIN-*, CANG-RECONNUE, CANG-ARMEMENT-SIGNAL)
+#                   PUCE-*, ECHEANCE-* (dont FIGEE-EMISSION, FIGEE-SORTIE, FIGE-GARDE), ADH-REPLI-*, TRANSPORT-EFFACE, PLUGIN-*, CANG-RECONNUE, CANG-ARMEMENT-SIGNAL)
 #   R-REFERENCE     (section `reference`, 45-10 ; GATE-15, T-45-90) la référence du modèle (section « Hook central et gates d'écriture
 #                   (Phase 45) ») est identique au code livré : table d'armement (état, étape, cas de canary, relevé), noms protégés par
 #                   G6, journal de dérogation, marqueurs de code, ordre de résolution des agents, outils refusés et laissé ouvert en mode
-#                   dégradé (commande de hooks.json), limites déclarées (a) à (z) chacune sur sa ligne ; MUT-REFERENCE-* : une valeur de
+#                   dégradé (commande de hooks.json), limites déclarées (a) à (ae) chacune sur sa ligne ; MUT-REFERENCE-* : une valeur de
 #                   gate inversée, `Agent` retiré des outils refusés, une limite retirée (chacune des 26, puis (l) à part), un nom de
 #                   journal, un marqueur, l'ordre de résolution, un cas de canary, une constante du hook changée sans la référence
 #   MUT-*           chaque garde est tuée par un mutant à motif unique dont la trace est imprimée
@@ -4173,6 +4173,100 @@ def controle_defs_orphelin(ctx, script):
     return mort, ("le cœur a disparu moins de 4 s après son lanceur" if mort else "le cœur Python (pid %d) vit encore 4 s après la mort de son lanceur" % pid)
 
 
+INJECTION_APRES_EMISSION = ('import os as _o, signal as _s, time as _t; globals().__setitem__("ECHEANCE_COEUR_S", 0.0); '
+                            '_o.kill(_o.getpid(), _s.SIGALRM); _t.sleep(0.3)')
+INJECTION_A_LA_SORTIE = ("import atexit, os as _o, signal as _s, time as _t; "
+                         "atexit.register(lambda: (globals().__setitem__('ECHEANCE_COEUR_S', 0.0), _o.kill(_o.getpid(), _s.SIGALRM), _t.sleep(0.3)))")
+
+
+@lota("R-DEFS-06")
+def controle_defs_minuteur(ctx, script):
+    """F-03 (audit de sécurité final du 2026-10-01) : le minuteur de l'échéance n'est jamais armé APRÈS la décision. Banc déterministe, sans
+    horloge : l'échéance est ramenée à 0 et un SIGALRM est envoyé au cœur par lui-même, soit juste après l'impression d'un refus de G6, soit
+    à la sortie du processus (décision silencieuse). Une décision imprimée avec le code 0 est livrée telle quelle : le lanceur rend 0 et la
+    commande enregistrée rend la raison du cœur (G6), jamais le refus générique du fail-closed ni un code 73 ou 142."""
+    armee = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+    lab = lab_adherent_simple(ctx, "lab-minuteur")
+    sorties = (
+        ("après l'impression d'un refus", [("sortie_refus(refus)\n", "sortie_refus(refus); " + INJECTION_APRES_EMISSION + "\n")],
+         os.path.join(lab, ".planning", "STATE.md"), "deny"),
+        ("à la sortie, décision silencieuse", [("def main():\n    armer_echeance()  # echeance-armee\n",
+                                                "def main():\n    armer_echeance()  # echeance-armee\n    " + INJECTION_A_LA_SORTIE + "\n")],
+         os.path.join(lab, ".planning", "notes.md"), "silence"))
+    for etiquette, remplacements, cible, attendu in sorties:
+        copie = copie_modifiee(ctx, armee, "planning-hook.sh", remplacements, "hook-minuteur")
+        brut = payload("Write", entree_outil("Write", cible), lab)
+        p = subprocess.run(["bash", os.path.join(copie, "planning-hook.sh")], input=brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           env=ctx.env(), cwd=lab, timeout=60)
+        if p.returncode != 0 or classer(p.returncode, p.stdout) != attendu or p.stderr:
+            fautes.append("%s, lanceur seul : rc=%d %s stderr=%s (attendu 0 et %s)" % (etiquette, p.returncode, classer(p.returncode, p.stdout),
+                                                                                   court(p.stderr), attendu))
+        rc, out, err = ctx.lancer("A", brut, cwd=lab, dossier=copie)
+        v = classer(rc, out)
+        if v != attendu or err or (attendu == "deny" and (b"G6" not in out or b"hook central indisponible" in out)):
+            fautes.append("%s, commande enregistrée : %s %s (attendu %s portant la raison du cœur, sans « hook central indisponible »)"
+                          % (etiquette, v, court(out), attendu))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "SIGALRM tardif sans effet : refus de G6 et silence livrés tels quels (lanceur 0, commande enregistrée = raison du cœur)")
+
+
+CONTENUS_ADHESION = (
+    # (étiquette, contenu, G6 doit l'admettre ?)  : l'admission est exigée pour les formes courantes (jamais un faux refus), le refus pour
+    # les formes que le JSON admet mais que la couche shell de repli (grep ligne à ligne, sans décodage) ne reconnaît pas.
+    ("compact", '{"planning_version":"cycles-v1"}', True),
+    ("deux espaces, ligne par ligne", '{\n  "planning_version": "cycles-v1"\n}\n', True),
+    ("séparateurs en tabulation", '{"planning_version"\t:\t"cycles-v1"}', True),
+    ("fins de ligne CRLF", '{\r\n"planning_version": "cycles-v1"\r\n}\r\n', True),
+    ("autres clés", '{"planning_version": "cycles-v1", "seuil": 3, "copie": {"x": 1}}', True),
+    ("clé en double, la seconde gagne", '{"planning_version":"x","planning_version":"cycles-v1"}', True),
+    ("deux-points sur la ligne suivante", '{"planning_version"\n:"cycles-v1"}', False),
+    ("valeur sur la ligne suivante", '{\n"planning_version":\n"cycles-v1"\n}\n', False),
+    ("clé échappée \\u005f", '{"planning\\u005fversion":"cycles-v1"}', False),
+    ("valeur échappée \\u002d", '{"planning_version":"cycles\\u002dv1"}', False),
+    ("clé imbriquée seulement", '{"a":{"planning_version":"cycles-v1"}}', False),
+)
+
+
+@lota("R-ADH-REPLI")
+def controle_adhesion_repli(ctx, script):
+    """F-02 (audit de sécurité final du 2026-10-01) : tout contenu de config.json que G6 admet pour un lab adhérent est AUSSI reconnu adhérent
+    par la couche shell de repli de la commande enregistrée. (a) le motif du repli est UNE constante partagée (MOTIF_ADHESION_REPLI du
+    cœur), comparée ici au motif du `grep` de hooks.json, jamais une seconde copie libre ; (b) pour chaque contenu de la batterie : G6 le
+    refuse, ou le lab qui le porte est refusé par le repli (script absent) sur une écriture neutre ; les formes courantes restent admises."""
+    fautes = []
+    dossier = _dossier(ctx, script)
+    noyau = charger_module(os.path.join(dossier, "planning-hook.sh"))
+    motif_noyau = noyau.get("MOTIF_ADHESION_REPLI")
+    trouves = re.findall(r"-q -E '(\"planning_version\"[^']*)'", ctx.cmd or "")
+    if len(trouves) != 1 or trouves[0] != motif_noyau:
+        fautes.append("motif du repli : hooks.json %r, cœur %r (attendus identiques, une seule occurrence)" % (trouves, motif_noyau))
+    hook = ctx.copie_forcee(dossier, "armed")
+    for etiquette, contenu, admis in CONTENUS_ADHESION:
+        lab = lab_adherent_simple(ctx, "lab-adh-g6")
+        brut = payload("Write", {"file_path": os.path.join(lab, ".planning", "config.json"), "content": contenu}, lab)
+        rc, out, err = ctx.lancer("A", brut, cwd=lab, dossier=hook)
+        v = classer(rc, out)
+        if err or v not in ("silence", "deny"):
+            fautes.append("%s : G6 %s %s" % (etiquette, v, court(out)))
+            continue
+        if admis and v != "silence":
+            fautes.append("%s : G6 refuse une forme courante (attendu admise) : %s" % (etiquette, court(out)))
+        if not admis and v != "deny":
+            fautes.append("%s : G6 admet une forme que le repli ne reconnaît pas (attendu refus)" % etiquette)
+        if v == "silence":
+            lab2 = lab_adherent_simple(ctx, "lab-adh-repli")
+            ecrire(os.path.join(lab2, ".planning", "config.json"), contenu)
+            neutre = payload("Write", entree_outil("Write", os.path.join(lab2, ".planning", "notes.md")), lab2)
+            rc2, out2, err2 = ctx.lancer("C", neutre, cwd=lab2)
+            if classer(rc2, out2) != "deny" or b"hook central indisponible" not in out2:
+                fautes.append("%s : admis par G6 mais NON reconnu adhérent par le repli (script absent : %s) — la porte du Write de config.json"
+                              % (etiquette, classer(rc2, out2)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "motif du repli partagé (constante du cœur = grep de hooks.json) ; %d contenus : admis par G6 ⇒ reconnu par le repli, formes que le grep manque refusées"
+                          % len(CONTENUS_ADHESION))
+
+
 @lota("R-DEFS-05")
 def controle_defs_transport(ctx, script):
     """Fichier de transport : créé en 0600 (vu avant la lecture), EFFACÉ dès que le cœur a lu le payload — un SIGKILL du lanceur et du cœur
@@ -4225,6 +4319,14 @@ lota_mutant("PUCE-EQUIVALENCE", "# puce-lineaire", "if True:  # puce-lineaire", 
 lota_mutant("ECHEANCE-ARMEE", "# echeance-armee", "pass  # echeance-armee", "R-DEFS-03")
 lota_mutant("ECHEANCE-DELAI", "# echeance-delai", "if False:  # echeance-delai", "R-DEFS-03")
 lota_mutant("ECHEANCE-PARENT", "# echeance-parent", "if False:  # echeance-parent", "R-DEFS-04")
+lota_mutant("ADH-REPLI-CONJONCTION", "# g6-adhesion", "return None if _texte_adherent(texte) else RAISON_ADHESION  # g6-adhesion", "R-ADH-REPLI")
+lota_mutant("ADH-REPLI-ESPACES", "# repli-espaces", 'motif = re.compile(MOTIF_ADHESION_REPLI.replace("[[:space:]]", r"[ \\t\\r\\n\\v\\f]"))  # repli-espaces',
+            "R-ADH-REPLI")
+lota_mutant("ADH-REPLI-MOTIF", "# motif-adhesion-repli", 'MOTIF_ADHESION_REPLI = \'"planning_version"[[:space:]]*:[[:space:]]*"cycles-v[0-9]"\'  # motif-adhesion-repli',
+            "R-ADH-REPLI")
+lota_mutant("ECHEANCE-FIGEE-EMISSION", "# echeance-figee-emission", "pass  # echeance-figee-emission", "R-DEFS-06")
+lota_mutant("ECHEANCE-FIGEE-SORTIE", "# echeance-figee-sortie", "pass  # echeance-figee-sortie", "R-DEFS-06")
+lota_mutant("ECHEANCE-FIGE-GARDE", "# echeance-fige-garde", "if False:  # echeance-fige-garde", "R-DEFS-06")
 lota_mutant("TRANSPORT-EFFACE", "# transport-efface", "pass  # transport-efface", "R-DEFS-05")
 
 
@@ -4474,7 +4576,7 @@ lota_mutant("BUDGET-SIGNAL", "# role-signal", "for signal in []:  # role-signal"
 # contrôle la compare, mécaniquement, aux constantes du hook (table d'armement, noms protégés par G6, nom du journal de dérogation,
 # marqueurs de code, ordre de résolution des agents), à la commande enregistrée de hooks.json (outils refusés en mode dégradé, outil
 # laissé ouvert) et à la table CANARIS du canary (cas par gate) : tout écart rougit — une référence qui annoncerait un gate armé qui ne
-# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (z) sont chacune sur sa propre ligne canonique
+# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (ae) sont chacune sur sa propre ligne canonique
 # `- **limite (X)**` avec ses mots-clés. Chaque mutant retire ou fausse UNE chose, sur une copie de la référence écrite sous le dossier
 # de travail (ou, pour MUT-REFERENCE-CODE, sur les constantes du hook, la référence restant intacte) ; le contrôle doit alors rendre un
 # écart. Les lignes d'écart du contrôle commencent par `ECART` ; la suite ne les imprime que si la VRAIE référence est en écart (un
@@ -4508,6 +4610,11 @@ LIMITES_REFERENCE = (
     ("x", ("MESURE-VIDE", "volume")),
     ("y", ("settings", "Q-G6 = b", "scope compte", "planning-hook.sh", "lien préexistant")),
     ("z", ("SIGALRM", "Alarm clock", "faux refus")),
+    ("aa", ("F-01", "4096", "cwd", "GATE-03")),
+    ("ab", ("F-04", "~", "cwd", "Write")),
+    ("ac", ("F-05", "notebook_path", "Agent", "Task")),
+    ("ad", ("F-06", ".claude/worktrees", "Write")),
+    ("ae", ("F-07", "MultiEdit", "MCP", "matcher")),
 )
 
 
@@ -4666,7 +4773,7 @@ def sec_reference(ctx):
             print(e)
         ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
         return
-    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (z) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
+    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (ae) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
     original = open(chemin, encoding="utf-8").read()
 
     def mutant_texte(ident, fonction, motif):
@@ -4688,6 +4795,11 @@ def sec_reference(ctx):
     mutant_texte("OUTIL", lambda t: remplacer_ligne_reference(t, "- **Outils refusés en mode dégradé**", lambda l: l.replace("`Agent`, ", "", 1)),
                  "`Agent` retiré de la liste des outils refusés en mode dégradé")
     mutant_texte("LIMITE-L", lambda t: remplacer_ligne_reference(t, "- **limite (l)**", None), "la ligne de la limite (l) retirée")
+    # F-01 à F-08 (audit de sécurité final, 2026-10-01) : un mot-clé retiré de la ligne d'une limite ajoutée, sur une copie privée de la référence
+    mutant_texte("LIMITE-AE-MOTCLE", lambda t: remplacer_ligne_reference(t, "- **limite (ae)**", lambda l: l.replace("MultiEdit", "MultiEd1t", 1)),
+                 "le mot-clé MultiEdit retiré de la ligne de la limite (ae)")
+    mutant_texte("LIMITE-AA-MOTCLE", lambda t: remplacer_ligne_reference(t, "- **limite (aa)**", lambda l: l.replace("GATE-03", "GATE-0x", 1)),
+                 "le mot-clé GATE-03 retiré de la ligne de la limite (aa)")
     mutant_texte("SCRIPTS", lambda t: remplacer_ligne_reference(t, "- **Scripts du hook protégés par G6**", lambda l: l.replace("`check-gates-alive.sh`", "`check-gates-alive.shx`", 1)),
                  "`check-gates-alive.sh` renommé dans la liste des scripts du hook protégés")
     mutant_texte("JOURNAL", lambda t: remplacer_ligne_reference(t, "- **Journal de dérogation**", lambda l: l.replace("derogations-gates.log", "derogations.log")),
@@ -4709,7 +4821,7 @@ def sec_reference(ctx):
         if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
             non_tuees.append(lettre)
     if non_tuees:
-        komut("REFERENCE-LIMITES", "chaque limite (a) à (z) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+        komut("REFERENCE-LIMITES", "chaque limite (a) à (ae) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
               "non tuées : " + ", ".join(non_tuees))
     else:
         okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))

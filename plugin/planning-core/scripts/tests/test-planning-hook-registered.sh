@@ -1194,7 +1194,7 @@ def sec_mutants(ctx):
         ("EXT-5", 'for K in file_path notebook_path; do', 'for K in zz_file zz_note; do', "A14", "C", {}),
         ("EXT-6", '| head -n 1); [ -n "$_m" ]', '| tail -n 1); [ -n "$_m" ]', "E12", "C", {}),
         ("EXT-7", "-q -E '\"planning_version\"[[:space:]]*:[[:space:]]*\"cycles-v1\"'", "-q -F 'cycles-v1'", "A06", "C", {}),
-        ("EXT-8", 'else vf_tight "$(pwd -P)" && D=0; fi', 'else :; fi', "E24b", "C", {}),
+        ("EXT-8", 'else vf_tight "$(pwd -P)" && D=0; fi; fi\n[ "$D" -eq 0 ]', 'else :; fi; fi\n[ "$D" -eq 0 ]', "E24b", "C", {}),
         ("EXT-9", 'then P=$V/$P; else', 'then :; else', "E30", "C", {}),
         ("EXT-10", '..) _r=${_r%/*}; [ -n "$_r" ] || _r=/ ;;', '..) ;;', "A16", "C", {}),
         ("EXT-11", 'if [ -d "$_n" ] && _y=$(cd', 'if false && _y=$(cd', "A18", "C", {}),
@@ -1257,7 +1257,101 @@ def sec_mutants(ctx):
     okmut("PY-PHASE-A", "cas E20 (payload tronqué, lab adhérent) mode A · attendu (original) : %s · obtenu (mutant) : %s · témoin E01 inchangé · (a) (b) (c) (d) vérifiées"
           % (nom_verdict(*o_d[:3]), nom_verdict(*m_d[:3])))
 
+# =================================================================================================
+# R-BORNE (F-01, audit de sécurité final du 2026-10-01 ; décisions du manager vf-dev-manager) : la couche shell de repli n'est
+# plus quadratique en la longueur d'une valeur du payload. Au-delà de 4096 caractères la valeur n'est PAS parcourue (le coût
+# mesuré avant : 23,27 s pour un chemin de 40 165 octets, au-delà du timeout de 20 s du harnais, qui laisse alors passer) ; le
+# doute se tranche sur le cwd : un cwd adhérent refuse (« chemin trop long pour etre analyse »), un cwd non adhérent se tait
+# (GATE-03). La preuve est le LIBELLÉ et le verdict, jamais l'horloge seule : le mutant qui retire la borne perd le libellé
+# quelle que soit la vitesse de la machine ; le plafond de 10 s n'est qu'une marge de 10x et plus sur le temps mesuré.
+# =================================================================================================
+LONG_BORNE = "./" * 6000          # 12 000 caractères, trois fois la borne
+PLAFOND_BORNE_S = 10.0
+
+
+def controle_borne_f01(ctx, texte, adh, dev):
+    """Rend (conforme, détail) : sept rejeux de la couche shell seule (mode C, script absent)."""
+    fautes = []
+    mesures = []
+
+    def jouer(etiquette, outil, entree, cwd_payload, cwd_proc, attendu, libelle=None, interdit=None):
+        brut = payload(outil, entree, cwd_payload)
+        rc, out, err, dt = rejouer_texte_t(ctx, texte, "C", brut, cwd_proc)
+        mesures.append(dt)
+        v = verdict(rc, out)
+        if v != attendu or err or dt >= PLAFOND_BORNE_S:
+            fautes.append("%s : %s en %.2f s stderr=%s (attendu %s en moins de %.0f s)" % (etiquette, v, dt, court(err), attendu, PLAFOND_BORNE_S))
+            return
+        if attendu == "deny":
+            raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+            if "hook central indisponible" not in raison or "Reparer" not in raison:
+                fautes.append("%s : raison %r sans « hook central indisponible » et « Reparer »" % (etiquette, raison[:160]))
+            if libelle is not None and libelle not in raison:
+                fautes.append("%s : libellé %r (attendu %r)" % (etiquette, raison[:200], libelle))
+            if interdit is not None and interdit in raison:
+                fautes.append("%s : libellé %r (jamais %r)" % (etiquette, raison[:200], interdit))
+
+    trop = "chemin trop long pour etre analyse"
+    jouer("chemin absolu trop long, cwd adhérent", "Write", {"file_path": adh + "/" + LONG_BORNE + ".planning/notes.md", "content": "x"},
+          adh, adh, "deny", libelle=trop)
+    jouer("chemin relatif trop long, cwd adhérent", "Write", {"file_path": LONG_BORNE + "x.md", "content": "x"}, adh, adh, "deny", libelle=trop)
+    jouer("chemin absolu trop long, cwd non adhérent (GATE-03)", "Write", {"file_path": dev + "/" + LONG_BORNE + "x.md", "content": "x"},
+          dev, dev, "silence")
+    jouer("chemin relatif trop long, cwd non adhérent (GATE-03)", "Edit",
+          {"file_path": LONG_BORNE + "x.md", "old_string": "a", "new_string": "b"}, dev, dev, "silence")
+    jouer("cwd trop long, chemin court, processus dans un lab adhérent", "Write", {"file_path": "x.md", "content": "x"},
+          adh + "/" + LONG_BORNE, adh, "deny", interdit=trop)
+    jouer("cwd trop long, chemin court, processus dans un lab non adhérent (GATE-03)", "Write", {"file_path": "x.md", "content": "x"},
+          dev + "/" + LONG_BORNE, dev, "silence")
+    jouer("cwd trop long, aucun chemin (Agent), processus dans un lab adhérent", "Agent",
+          {"description": "d", "prompt": "p", "subagent_type": "general-purpose"}, adh + "/" + LONG_BORNE, adh, "deny", interdit=trop)
+    jouer("sous la borne (3 000 caractères) : analysé, jamais « trop long »", "Write",
+          {"file_path": adh + "/" + "./" * 1500 + ".planning/notes.md", "content": "x"}, adh, adh, "deny",
+          libelle="dans un lab adherent cycles-v1", interdit=trop)
+    # Pire cas SOUS la borne : des composantes qui existent (chaque `cd -P` est un sous-shell). Marge de 10x sur le temps mesuré.
+    base = os.path.basename(adh)
+    remonte = ("../" + base + "/") * (3500 // (len(base) + 4))
+    jouer("sous la borne, composantes existantes (pire cas des sous-shells)", "Write",
+          {"file_path": adh + "/" + remonte + ".planning/notes.md", "content": "x"}, adh, adh, "deny", interdit=trop)
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "%d rejeux : valeur trop longue tranchée sur le cwd (adhérent refuse, non adhérent se tait), sous la borne analysée, pire temps %.2f s (plafond %.0f s)"
+                          % (len(mesures), max(mesures), PLAFOND_BORNE_S))
+
+
+def rejouer_texte_t(ctx, texte, mode, brut, cwd):
+    t, extra = ctx.preparer(ctx.dossier_mode(mode), texte)
+    return ctx.rejouer(t, brut, ctx.env_mode(mode, extra), cwd)
+
+
+def sec_borne(ctx):
+    adh, dev = _labs_simples(ctx, "borne")
+    original = controle_borne_f01(ctx, ctx.cmd, adh, dev)
+    if original[0]:
+        ok("R-BORNE-01 " + original[1])
+    else:
+        ko("R-BORNE-01", "valeur du payload au-delà de 4096 caractères : jamais parcourue, tranchée sur le cwd, GATE-03 tenu", "conforme", original[1])
+    for ident, motif, remplacement in (
+            ("BORNE-RETIREE", 'if [ "${#_m}" -gt 4096 ]; then B=1;', 'if false; then B=1;'),
+            ("BORNE-LAB-DEV", 'if [ "$K" = long ]; then if vf_get cwd && [ "$B" = 0 ]; then vf_tight "$V" && D=0; else vf_tight "$(pwd -P)" && D=0; fi; elif',
+             'if [ "$K" = long ]; then D=0; elif'),
+            ("BORNE-LIBELLE", 'if [ "$K" = long ]; then W=', 'if false; then W='),
+            ("BORNE-CWD-REL", 'if vf_get cwd && [ "$B" = 0 ]; then P=$V/$P;', 'if vf_get cwd; then P=$V/$P;'),
+            ("BORNE-CWD-AGENT", 'elif [ "$K" != done ]; then if vf_get cwd && [ "$B" = 0 ]; then', 'elif [ "$K" != done ]; then if vf_get cwd; then')):
+        muté, raison = make_cmd_mutant(ctx, ident, motif, remplacement)
+        if muté is None:
+            komut(ident, "texte muté distinct de l'original et sh -n réussit", "mutant valide", raison)
+            continue
+        mutant = controle_borne_f01(ctx, muté, adh, dev)
+        if not original[0]:
+            komut(ident, "l'original passe R-BORNE-01", "conforme", original[1])
+        elif mutant[0]:
+            komut(ident, "R-BORNE-01 rougit sous le mutant", "rouge", "vert : " + mutant[1] + " (mutant non opposable)")
+        else:
+            okmut(ident, "R-BORNE-01 rougit · attendu (original) : %s · obtenu (mutant) : %s" % (original[1], mutant[1]))
+
+
 SECTIONS = {
+    "borne": sec_borne,
     "entree": sec_entree,
     "merge": sec_merge,
     "modes": sec_modes,
@@ -1302,7 +1396,7 @@ run_sections() { # <sections séparées par des virgules>
 
 [ -f "$HOOK" ] || { ko "planning-hook.sh présent" "le script du hook central existe à côté des suites" "$HOOK" "absent"; }
 
-run_sections entree,merge,modes,matrice,shells,perf,depot,mutants
+run_sections entree,merge,modes,matrice,shells,perf,depot,borne,mutants
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

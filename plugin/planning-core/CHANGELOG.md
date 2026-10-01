@@ -47,9 +47,32 @@
   `references/modele-cycles.md` et tenues identiques au code par un contrôle croisé de la CI (R-REFERENCE, dont la
   liste des scripts du hook protégés).
 - **Limite déclarée (z) — faux refus sous forte charge machine** : sous forte charge (observé en suites à charge 20 à
-  35, jamais en rejeu réel), le cœur Python dépasse son échéance interne de 8 s (SIGALRM, « Alarm clock », code 73,
-  limite (s)) ; la commande enregistrée ferme alors en `deny`, faux refus fail-closed d'une écriture légitime, jamais
-  un faux accept. Point de surveillance après l'armement, non traité dans la Phase 45.
+  35, jamais en rejeu réel), le cœur Python peut dépasser son échéance interne de 8 s (SIGALRM, code 73, limite (s))
+  avant d'avoir imprimé sa décision ; la commande enregistrée ferme alors en `deny`, faux refus fail-closed d'une
+  écriture légitime. Depuis F-03 (ci-dessous) il n'y a plus de message « Alarm clock » (c'était le code 142) ; la
+  limite ne promet pas « jamais un faux accept » (angles morts du repli shell : (b), (k), (m), (aa)). Point de
+  surveillance après l'armement.
+- **Correction ciblée de l'audit de sécurité final (2026-10-01, demandé par Willy en session principale ; décisions du
+  manager vf-dev-manager, renversables ; quick 261001-urj)** :
+  - **F-01 (haute)** — la couche shell de repli de la commande enregistrée était quadratique en la longueur du chemin
+    (23,27 s pour 40 165 octets, au-delà du `timeout` de 20 s du harnais, qui laisse alors passer). Une valeur du
+    payload de plus de 4096 caractères n'est plus parcourue : le doute se tranche sur le `cwd` (adhérent : refus,
+    « chemin trop long pour etre analyse » ; non adhérent : silence, GATE-03). Même chemin : 0,02 s ; 5 Mo : moins
+    d'une seconde. Limite (aa). Suite : R-BORNE-01 et cinq mutants (`test-planning-hook-registered.sh`).
+  - **F-02 (moyenne)** — G6 admettait par `Write` un `config.json` multiligne, à clé ou valeur en `\uXXXX`, que le
+    `grep` du repli ne reconnaît pas comme adhérent : après une panne du cœur, tout passait. G6 exige désormais que le
+    nouveau contenu satisfasse AUSSI le motif du repli, constante partagée `MOTIF_ADHESION_REPLI` comparée par une suite
+    au motif de `hooks.json`. Mesure en lecture seule des `config.json` de `jarvis-keystone` et `BusinessFlow-Lab` : les
+    deux sont en `planning_version: "2.0"` (non adhérents, G6 ne s'y applique pas) et leur transposition `cycles-v1` à
+    mise en forme identique est admise. Suite : R-ADH-REPLI et trois mutants.
+  - **F-03 (moyenne)** — le minuteur `setitimer` n'était jamais désarmé : un SIGALRM tardif tuait le cœur après
+    l'impression de sa décision (code 142) et la commande enregistrée la jetait. L'échéance est désarmée à l'émission
+    et à la sortie ; l'échéance de 8 s (code 73) reste intacte avant l'émission. Suite : R-DEFS-06 (banc déterministe,
+    sans horloge) et trois mutants.
+  - **Limites ajoutées** : (aa) F-01 ; (ab) F-04 `~` résolu par le hook contre le `cwd` ; (ac) F-05 racine d'un dispatch
+    dérivée de `file_path` ou `notebook_path` ; (ad) F-06 poche `.claude/worktrees/<nom>` non adhérente créable par
+    `Write` ; (ae) F-07 `MultiEdit`, outils MCP et tout outil hors matcher ; F-08 : (z) réécrite, limite T-45-61 ajoutée
+    à la section G7, formulation de `--tentative` corrigée (option obligatoire vérifiée par la commande).
 - **G6 protège les scripts du hook** (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01) : `Write`,
   `Edit` et `NotebookEdit` de `<lab>/.claude/scripts/planning-hook.sh` et `check-gates-alive.sh` (scope projet d'un
   lab adhérent) sont refusés par G6 (armé) ; dérogation nominative possible ;

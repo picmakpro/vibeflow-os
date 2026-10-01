@@ -82,6 +82,11 @@ except ImportError:
 
 # --- Constantes du contrat -----------------------------------------------------------------
 SCHEMA_ADHESION = "cycles-v1"
+# Motif de la couche shell de repli (F-02, audit de sécurité final du 2026-10-01) : la commande enregistrée de hooks.json reconnaît un lab
+# adhérent par `grep -a -q -E '<ce motif>' config.json` (ligne à ligne, sans décodage JSON). Constante PARTAGÉE : G6 n'admet l'écriture
+# par outil d'un config.json que si le nouveau contenu satisfait AUSSI ce motif, sinon une panne du cœur taisait tous les gates d'un lab que
+# le JSON dit adhérent et que le grep ne reconnaît pas. Une suite compare cette constante au motif de hooks.json : jamais une seconde copie libre.
+MOTIF_ADHESION_REPLI = '"planning_version"[[:space:]]*:[[:space:]]*"cycles-v1"'  # motif-adhesion-repli
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 # Lot A (H2 ; décisions du manager vf-dev-manager, 2026-10-01) : le cœur se borne lui-même. Passé l'échéance, ou si le lanceur
 # meurt, il sort sur CODE_ECHEANCE sans rien imprimer : la couche shell de la commande enregistrée ferme alors sous adhésion
@@ -105,6 +110,24 @@ TABLE_ARMEMENT = {"G6": ARMEMENT_G6, "G5": ARMEMENT_G5, "G1": ARMEMENT_G1, "G7":
 
 
 # --- Échéance interne et surveillance du lanceur (lot A, H2) ------------------------------------------------------
+_ECHEANCE = {"figee": False}
+
+
+def figer_echeance():
+    """Désarme l'échéance (F-03, audit de sécurité final du 2026-10-01) : à partir d'ici le code de sortie du cœur ne dépend plus du
+    minuteur. L'échéance de ECHEANCE_COEUR_S ne vaut qu'AVANT l'émission de la décision (code 73, refus du fail-closed) ; une décision
+    imprimée avec le code 0 est livrée telle quelle. Sans cela, un SIGALRM arrivé après l'impression tuait le cœur (73, ou 142 une fois
+    l'interpréteur en fin de vie) et la commande enregistrée jetait la décision. Le drapeau est posé AVANT le désarmement : un signal
+    déjà parti trouve le drapeau et ne fait rien."""
+    _ECHEANCE["figee"] = True
+    try:
+        import signal
+        if hasattr(signal, "setitimer") and hasattr(signal, "ITIMER_REAL"):
+            signal.setitimer(signal.ITIMER_REAL, 0, 0)
+    except (ImportError, ValueError, OSError):
+        pass
+
+
 def armer_echeance():
     """Arme la surveillance du cœur : toutes les PAS_SURVEILLANCE_S secondes, sortie immédiate sur CODE_ECHEANCE (aucune sortie)
     si ECHEANCE_COEUR_S est dépassée ou si le processus parent n'est plus le lanceur (il est mort : un Python orphelin ne survit
@@ -114,6 +137,8 @@ def armer_echeance():
     parent = os.getppid()
 
     def surveiller(*_ignores):
+        if _ECHEANCE["figee"]:  # echeance-fige-garde
+            return
         if time.monotonic() - debut >= ECHEANCE_COEUR_S:  # echeance-delai
             os._exit(CODE_ECHEANCE)
         if os.getppid() != parent:  # echeance-parent
@@ -597,6 +622,7 @@ def evaluer_g2(contexte):
 # --- Sorties : UN objet JSON par exécution, jamais systemMessage (DIV-3) ----------------------
 def _emettre(objet):
     texte = json.dumps(objet, ensure_ascii=False) + "\n"
+    figer_echeance()  # echeance-figee-emission
     sys.stdout.buffer.write(texte.encode("utf-8"))
     sys.stdout.buffer.flush()
 
@@ -1025,6 +1051,13 @@ def _texte_adherent(texte):
         and donnees["planning_version"] == SCHEMA_ADHESION
 
 
+def _reconnu_par_le_repli(texte):
+    """Vrai si `grep -a -q -E MOTIF_ADHESION_REPLI` reconnaîtrait ce contenu. `[[:space:]]` du motif est traduit en espace, tabulation, CR, VT, FF
+    (jamais le saut de ligne : grep travaille ligne à ligne, et le motif n'a aucun joker qui franchirait une ligne)."""
+    motif = re.compile(MOTIF_ADHESION_REPLI.replace("[[:space:]]", r"[ \t\r\v\f]"))  # repli-espaces
+    return motif.search(texte) is not None
+
+
 def adhesion_conservee(contexte, cible):
     """None si l'écriture proposée laisse planning_version = cycles-v1 ; sinon la raison du refus (F6)."""
     entree = contexte["payload"].get("tool_input")
@@ -1033,7 +1066,7 @@ def adhesion_conservee(contexte, cible):
     texte = entree.get("content") if contexte["outil"] == "Write" else _appliquer_edit(cible, entree)
     if not isinstance(texte, str):
         return RAISON_ADHESION_INVERIFIABLE
-    return None if _texte_adherent(texte) else RAISON_ADHESION  # g6-adhesion
+    return None if (_texte_adherent(texte) and _reconnu_par_le_repli(texte)) else RAISON_ADHESION  # g6-adhesion
 
 
 def evaluer_g6(contexte):
@@ -1897,5 +1930,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        figer_echeance()  # echeance-figee-sortie
 PY_PLANNING_HOOK_EOF
