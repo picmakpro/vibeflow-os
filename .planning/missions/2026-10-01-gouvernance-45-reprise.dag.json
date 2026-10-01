@@ -1,0 +1,218 @@
+{
+  "nodes": [
+    {
+      "id": "fix-45-D",
+      "step": "lot D commite (fd8aeee3, 04ac70aa)",
+      "stage": "execute",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-D",
+      "step": "lot D : suites, mutants, traces, SUMMARY quick 261001-dzl",
+      "stage": "verify",
+      "deps": [
+        "fix-45-D"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/quick/261001-dzl-lot-d-phase-45-g6-prot-ge-scripts-du-hoo"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-D",
+      "step": "revue du diff lot D",
+      "stage": "review",
+      "deps": [
+        "fix-45-D"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "nonreg-D",
+      "step": "non-regression complete (manager, comm contre base)",
+      "stage": "verify",
+      "deps": [
+        "verif-D",
+        "revue-D"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rejeu-final-4",
+      "step": "rejeu reel final etape 4 Keystone + BusinessFlow",
+      "stage": "verify",
+      "deps": [
+        "nonreg-D",
+        "nonreg-E"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arm-1",
+      "step": "armement G6+G5",
+      "stage": "execute",
+      "deps": [
+        "rejeu-final-4",
+        "fix-45-F"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arm-2",
+      "step": "armement G1",
+      "stage": "execute",
+      "deps": [
+        "arm-1"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arm-3",
+      "step": "armement G7",
+      "stage": "execute",
+      "deps": [
+        "arm-2"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arm-4",
+      "step": "armement role",
+      "stage": "execute",
+      "deps": [
+        "arm-3"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "maj-45-10",
+      "step": "reference, CHANGELOG, SUMMARY 45-10 a l'etat arme",
+      "stage": "execute",
+      "deps": [
+        "arm-4",
+        "revue-arm",
+        "nonreg-arm"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verif-45",
+      "step": "gsd-verifier phase 45 --ws gouvernance",
+      "stage": "verify",
+      "deps": [
+        "maj-45-10"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (audit read-only)",
+      "stage": "docs",
+      "deps": [
+        "maj-45-10"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "livraison-45",
+      "step": "ROADMAP/STATE, gates planning, push, PR sans merge, CI",
+      "stage": "ship",
+      "deps": [
+        "verif-45",
+        "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "fix-45-E",
+      "step": "lot E : F1 racine sous .claude, F2 limites, F3 test creation alias, F4 textes perimes + liste scripts comparee",
+      "stage": "execute",
+      "deps": [
+        "revue-D"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        "plugin/_internal/tests"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-E",
+      "step": "re-revue lot E",
+      "stage": "review",
+      "deps": [
+        "fix-45-E"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "nonreg-E",
+      "step": "non-regression complete apres lot E",
+      "stage": "verify",
+      "deps": [
+        "revue-E",
+        "nonreg-D"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-45-F",
+      "step": "lot F : M1 limite lien dans le lab, M2 README, M3 phrase (o), M4 casse vf_cl EXT-16, M5 variante d",
+      "stage": "execute",
+      "deps": [
+        "rejeu-final-4"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "nonreg-arm",
+      "step": "non-regression complete apres armement",
+      "stage": "",
+      "deps": [
+        "arm-4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-arm",
+      "step": "revue du diff d armement",
+      "stage": "",
+      "deps": [
+        "arm-4"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

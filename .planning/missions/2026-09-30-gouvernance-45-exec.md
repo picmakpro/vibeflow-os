@@ -6,8 +6,9 @@
 - Worktree : `.claude/worktrees/gouvernance-45`, branche `gouvernance/phase-45-execution` (poussée,
   sans PR à ce stade). Base de phase : `0c5e631` (= origin/main, CI verte run 36701943812).
 - Plan de bataille : `.planning/missions/2026-09-30-gouvernance-45-exec.dag.json`.
-- Statut à la remise : **partiel — bloqué sur une décision humaine** (45-02, refus du classifieur
-  de permissions). 45-04 à 45-10, vérification, revue et audit finaux, PR : non commencés.
+- Statut final (2026-10-01) : **10/10 plans livrés, cinq gates armés, vérification human_needed 14/15**
+  (GATE-15 : CI Linux de l'état armé, lue sur la PR). Statut à la première remise (2026-09-30) : bloqué
+  sur 45-02 (refus du classifieur), levé par Willy.
 
 ## Démarrage
 
@@ -106,3 +107,86 @@ Faux refus mesurés : aucun rejeu réel encore lancé (45-03 a livré l'outil, t
 
 Le `exit_code: 1` de la non-régression complète est celui des 11 échecs d'environnement de la base,
 identiques en ensemble (`comm` vide dans les deux sens) : aucun échec introduit.
+
+## Suite et clôture de l'exécution (2026-09-30 → 2026-10-01)
+
+Le détail du 2026-09-30 (45-02 à 45-10, revue et audit en deux tours, lots A, B, C) est tracé dans les
+SUMMARY des plans et des quick. Ce qui suit couvre la reprise du 2026-10-01.
+
+### Pilotage
+- **Verrou :** repris par takeover (lock périmé, l'orphelin a5e063ef était le worker du lot D, mort
+  avec la session), puis réacquis à chaque relance du head. DAG de reprise :
+  `.planning/missions/2026-10-01-gouvernance-45-reprise.dag.json`. L'ancien DAG n'était plus tenu
+  depuis le 2026-09-30.
+- **Gate d'invariants :** 3 (SAIN). Flags d'enchaînement : déjà à false (lu dans `.planning/config.json`).
+- **Remises forcées :** trois remises intérimaires ont été imposées par le harnais pendant l'attente
+  d'un worker. Leçon consignée en mémoire d'agent (`project_attente-au-premier-plan.md`).
+
+### Provenance des arbitrages (constat F2 de la revue de l'armement)
+- **Q-ARM :**
+  - Question posée par le manager, relayée à Willy par la session principale le 2026-09-30 :
+    « autoriser l'adaptation des deux suites couplées à « tout en observe ». C'était le refus du
+    classifieur « Security Test Removal ». Sans cette autorisation, aucun armement n'est possible. »
+  - Réponse rapportée par la session principale dans le mandat de reprise du 2026-10-01, texte exact :
+    « Q-ARM, 2026-09-30 : oui pour les quatre étapes d'armement. Découplage des suites autorisé, sans
+    supprimer aucun cas ni aucun mutant, chaque cas modifié prouvé rouge sur son mutant. »
+  - Canal déclaré : AskUserQuestion session principale. Le manager n'a pas vu la réponse de Willy
+    elle-même, seulement ce relais.
+- **Q-G6 = (b) :** même canal, 2026-10-01. G6 protège `planning-hook.sh` et `check-gates-alive.sh` ;
+  `.claude/settings*.json` reste une limite déclarée.
+
+### Déroulé
+
+| Nœud | Résultat | Commits |
+|---|---|---|
+| verif-D | lot D vérifié : gates 430/0, rejeu 91/0, registered 44/0, installed 23/0, rôle 6/0, recalc 358/0 ; indépendance à l'armement sur 5 états | `731abf55` |
+| revue-D | gaps_found : F1 majeur (un `.planning` créé sous `.claude` désarmait G6-scripts par Write seul), F2-F4 mineurs | — |
+| fix-45-E | quick 261001-kp5 : un `.planning` sous `.claude` n'est jamais racine, sauf `.claude/worktrees/<nom>` (décision du manager, renversable) ; F2-F4 fermés | `8a86ed25`, `a2a2a9ff` |
+| revue-E | PASSED : l'exception worktrees ne rouvre rien ; 4 implémentations d'accord (126 chemins, 0 écart) ; 5 mineurs | — |
+| rejeu-final-4 | 0 faux refus, 0 faux accept, REJEU-ETAPE-4 0/0/202, empreintes de tout l'arbre identiques sur les deux labs ; labs au repos avant et après | `708debcb` |
+| fix-45-F | quick 261001-m8c : M1-M5 ; M3 déclaré avec l'effet mesuré (décision du manager) | `b9071496`..`07edca9e` |
+| arm-1..4 | G6+G5, G1, G7, rôle ; après chaque commit : gates 446/0, registered 50/0, rejeu 91/0, installed 23/0, rôle 6/0 ; zéro régression dev 12/12 ; canary rc=3 ; marqueurs sans-marqueur=0 | `3d06e503`, `bf6cfa87`, `b6609fa6`, `239df76d` |
+| revue-arm | gaps_found : F1 README (« journalisent sans refuser » sur des gates armés), F2 provenance Q-ARM (voir ci-dessus), mineurs | — |
+| maj-45-10 | quick 261001-owx : README, CHANGELOG, 45-10-SUMMARY, 45-COUT-MIGRATION et 45-VALIDATION à l'état armé ; limite (z) ; chemins de machine du lot F | `3a2495fb`..`4cc09106` |
+| verif-45 | `human_needed` 14/15 : seul GATE-15 (CI Linux de l'état armé) reste à lire ; GATE-09 tenu sous l'override F9 | `74868a60` |
+
+### Non-régression complète (job tests de la CI, HOME jetable, `comm` contre la base)
+
+| HEAD | Suites | Nouveaux échecs |
+|---|---|---|
+| `731abf55` | 98 | 0 (flake SIGPIPE de `test-restore-requirements-ledger.sh`, 3/3 vert rejoué seul) |
+| `a2a2a9ff` | 98 | 0 |
+| `239df76d` | 98 | 1 : `test-check-machine-paths.sh`, régression réelle du lot F (`/Users/<compte>` dans 261001-m8c-PLAN.md), corrigée en `3a2495fb` ; gate rc=0 sur 1806 fichiers |
+
+### État d'armement livré
+- Gates armés : G6, G5, G1, G7 et rôle. G2 avertit.
+- Faux refus mesurés en réel : 0 dans les deux sens.
+- Points de surveillance :
+  - **Limite (z) :** faux refus fail-closed sous forte charge (échéance de 8 s du cœur, « Alarm clock »),
+    vu en suites sous une charge de 20 à 35, jamais en réel.
+  - L'extension de G6 aux scripts du hook n'est prouvée qu'en suites : aucun lab réel ne porte ces scripts.
+
+### Décompte
+- **Minds dispatchés pendant la reprise :** 9 mandats. Sur ce compte : 2 réveils de workers existants,
+  3 vf-coder neufs (lot E, rejeu final, documentation), 3 vf-reviewer et 1 gsd-verifier.
+- **Sous-agents lancés par les workers :** planner, plan-checker, executor, verifier, non inscrits au registre.
+- **Tours de revue :** 3. **Lots de correction :** 3 (E, F, owx).
+
+## Preuves E6
+
+```json
+{
+  "preuves": [
+    {"verdict": "recette", "preuve": "amont"},
+    {"verdict": "gate:suites-planning-core", "commande": "bash plugin/planning-core/scripts/tests/test-planning-gates.sh (et registered, rejeu, installed, rôle) après chaque commit d'armement", "exit_code": 0, "sha": "239df76d"},
+    {"verdict": "gate:zero-regression-dev", "commande": "rejeu de la commande enregistrée de hooks.json hors lab adhérent, 6 outils x 2 shells", "exit_code": 0, "sha": "239df76d"},
+    {"verdict": "gate:rejeu-reel-final", "commande": "rejeu-reel.sh --lab=~/jarvis-keystone --lab=~/BusinessFlow-Lab --etape=4", "exit_code": 0, "sha": "a2a2a9ff"},
+    {"verdict": "gate:non-regression-complete", "commande": "HOME=<jetable> replay-ci-jobs.sh --job tests, comparé par comm", "exit_code": 1, "sha": "239df76d"},
+    {"verdict": "gate:machine-paths", "commande": "scripts/check-machine-paths.sh", "exit_code": 0, "sha": "4cc09106"},
+    {"verdict": "verification", "commande": "gsd-verifier --ws gouvernance", "exit_code": 0, "sha": "74868a60"}
+  ]
+}
+```
+
+Le `exit_code: 1` de la non-régression à `239df76d` vient d'échecs d'environnement de la base,
+plus la régression de chemin de machine corrigée ensuite en `3a2495fb`.
