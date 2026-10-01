@@ -4,13 +4,15 @@
 
 **Minor** (nouvelle capacité) :
 
-- **État d'armement livré, tel que mesuré** : les cinq constantes `ARMEMENT_*` de `planning-hook.sh` valent
-  `observe` ; `G2_MODE` vaut `avertit`. Les rejeux réels des étapes 1 à 4 ont tous rendu 0 faux refus et 0 faux
-  accept, avec des empreintes d'arbre identiques (relevés de phase `45-REJEU-ETAPE-1` à `45-REJEU-ETAPE-4`). Mais
-  ils ont été mesurés sur le hook AVANT les lots de correction A, B et C du 2026-10-01. L'armement exige donc un
-  NOUVEAU rejeu réel, sur des labs au repos. L'arbitrage qui attendait pour adapter deux suites couplées à « tout
-  en observe » est rendu et appliqué (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30) : les suites ne
-  dépendent plus de l'état d'armement. La phase se ferme EN OBSERVATION, mesurée à zéro : **aucun gate n'est armé**.
+- **État d'armement livré** : les cinq gates sont ARMÉS (`ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`,
+  `ARMEMENT_G7` et `ARMEMENT_ROLE` valent `armed`) et refusent, fermés sur défaillance ; `G2_MODE` vaut `avertit`
+  (G2 avertit, ne refuse jamais). Les rejeux réels des étapes 1 à 4 avaient été mesurés sur le hook AVANT les lots de
+  correction A, B et C du 2026-10-01 ; l'armement a donc attendu un NOUVEAU rejeu réel, sur des labs au repos, du hook
+  livré : il est fait (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`, 0 faux refus, 0 faux accept,
+  empreintes d'arbre identiques). L'arbitrage de Willy est rendu et appliqué (Q-ARM, AskUserQuestion session
+  principale, 2026-09-30 : oui pour les quatre étapes d'armement, découplage des suites autorisé sans supprimer aucun
+  cas ni aucun mutant) ; l'armement s'est fait en cascade le 2026-10-01, un commit par étape (`3d06e503` G6 et G5,
+  `bf6cfa87` G1, `b6609fa6` G7, `239df76d` ROLE). Aucune release : le module reste en v2.9.0 (ADR-073).
 - **`scripts/planning-hook.sh` et sa commande enregistrée fail-closed** — une seule entrée `PreToolUse` de
   `hooks.json` (forme shell, matcher `Write|Edit|NotebookEdit|Bash|Agent|Task`) : lanceur bash et cœur Python
   embarqué (aucun `.py` posé par l'installeur). Dans un lab adhérent `cycles-v1` seulement, quand le script ou
@@ -19,8 +21,8 @@
   un `deny` JSON en code 0, jamais un exit 2. Échéance interne du cœur de 8 s (code 73, lot A).
 - **G2 en avertissement** : avertit (`additionalContext`) sur une écriture hors du `ecrit:` des plans ouverts,
   Bash compris (détection, jamais une promesse, P45-D-10) ; il ne refuse jamais.
-- **G6, G5, G1, G7 et le hook par rôle, chacun en OBSERVATION** (ils journalisent ce qu'ils refuseraient, sans
-  refuser) : G6 (fichiers générés, cache, journal de dérogation, adhésion de `config.json`) et G5 (`VERDICT.md`
+- **G6, G5, G1, G7 et le hook par rôle, chacun ARMÉ à sa propre étape** (ils refusent ; un gate armé qui rencontre
+  une erreur interne refuse aussi) : G6 (fichiers générés, cache, journal de dérogation, adhésion de `config.json`) et G5 (`VERDICT.md`
   par outil) — étape 1, relevé `45-REJEU-ETAPE-1` ; G1 (pas de plan sans cadrage) — étape 2, relevé
   `45-REJEU-ETAPE-2` ; G7 (pas de planning orphelin, prédicat « habité » littéral) — étape 3, relevé
   `45-REJEU-ETAPE-3` ; ROLE (juge : aucune écriture par outil ; worker : dispatch limité à sa propre allowlist,
@@ -40,13 +42,17 @@
 - **Limites déclarées (k) et (l)** : (k) m2 — en mode panne, la couche shell tient pour adhérent un `config.json`
   que le cœur Python tient pour non adhérent (virgule finale, clé dupliquée, valeur imbriquée, BOM) : refus en
   panne ; (l) F9 — l'allowlist d'un worker vit dans une définition d'agent que G6 ne protège pas. Les limites
-  (a) à (y), dont (y) — les réglages `.claude/settings*.json` ne sont pas protégés, les scripts du hook le sont
+  (a) à (z), dont (y) — les réglages `.claude/settings*.json` ne sont pas protégés, les scripts du hook le sont
   (Q-G6 = b, ci-dessous), deux silences mesurés y sont écrits — sont écrites, chacune sur sa ligne, dans
   `references/modele-cycles.md` et tenues identiques au code par un contrôle croisé de la CI (R-REFERENCE, dont la
   liste des scripts du hook protégés).
+- **Limite déclarée (z) — faux refus sous forte charge machine** : sous forte charge (observé en suites à charge 20 à
+  35, jamais en rejeu réel), le cœur Python dépasse son échéance interne de 8 s (SIGALRM, « Alarm clock », code 73,
+  limite (s)) ; la commande enregistrée ferme alors en `deny`, faux refus fail-closed d'une écriture légitime, jamais
+  un faux accept. Point de surveillance après l'armement, non traité dans la Phase 45.
 - **G6 protège les scripts du hook** (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01) : `Write`,
   `Edit` et `NotebookEdit` de `<lab>/.claude/scripts/planning-hook.sh` et `check-gates-alive.sh` (scope projet d'un
-  lab adhérent) sont refusés par G6 une fois armé, journalisés en observation ; dérogation nominative possible ;
+  lab adhérent) sont refusés par G6 (armé) ; dérogation nominative possible ;
   scope compte non protégé, Bash ouvert (P45-D-10). Un `.planning` situé sous un composant `.claude` n'est jamais
   une racine de lab (amendement de P45-D-01a, décision du manager vf-dev-manager, 2026-10-01 ; exception
   `.claude/worktrees/<nom>`), pour que cette protection ne se désarme pas par la création d'un tel dossier.
@@ -65,11 +71,13 @@
   (budget d'indexation des agents, libellé du doute d'adhésion, `.planning` en lien refusé au rejeu).
 - **`guard-planning-updated.sh` est conservé** (P45-D-19) : son entrée `Stop` de `hooks.json` est inchangée et il
   reste en exit 2.
-- **Escalades vers Willy** : (1) l'armement de l'étape 1 et, en cascade, des étapes suivantes — il reste à faire
-  un nouveau rejeu réel sur des labs au repos (ESCALADE-WILLY ETAPE-1) ; l'adaptation des deux suites couplées à
-  « tout en observe » est appliquée (Q-ARM) ; (2) la protection du script du hook est tranchée et appliquée
-  (Q-G6 = b, limite (y)) ; les réglages `.claude/settings*.json` restent non protégés (limite (y)) ; (3) G1 face à une phase dérogée sans cadrage (constat de 45-06 : zéro occurrence sur les deux
-  labs réels mesurés, la règle de gate reste inchangée).
+- **Escalades vers Willy** : (1) l'armement — le nouveau rejeu réel sur des labs au repos est fait (relevé
+  `45-REJEU-FINAL.md`, `708debcb`) et l'armement s'est fait en cascade (Q-ARM, Willy, AskUserQuestion session
+  principale, 2026-09-30), la dernière étape étant ROLE (`239df76d`) : plus rien n'est ouvert ; (2) la protection du
+  script du hook est tranchée et appliquée (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01, limite
+  (y)) ; les réglages `.claude/settings*.json` restent non protégés (limite (y)) ; (3) G1 face à une phase dérogée
+  sans cadrage (constat de 45-06 : zéro occurrence sur les deux labs réels mesurés, la règle de gate reste
+  inchangée).
 - **Ce qui n'est PAS livré** : G2′, G3, G4, G4′ et D1 (Phases 46 et 47), la vérification du hash à la clôture
   (Phase 46), le hook managed (hors périmètre) ; les drapeaux `phases_trace` et `options.gates` restent sans
   effet (P45-D-01). Bump de module seul (P45-D-18) : la version racine, `plugin.json` et le marketplace ne
