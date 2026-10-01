@@ -11,6 +11,7 @@
 #   check-gates-alive.sh                       # verdict par le code de sortie, une ligne si signal
 #   check-gates-alive.sh --hook                # sous SessionStart : stdout STRICTEMENT VIDE hors signal
 #   check-gates-alive.sh --settings=<fichier>  # lit UNIQUEMENT ce réglage (défaut : voir ci-dessous)
+#   check-gates-alive.sh --reference=<fichier> # RÉSERVÉ AUX SUITES : remplace la commande de référence (voir ci-dessous) ; jamais lue des réglages
 #   check-gates-alive.sh --couverture          # imprime les éléments de la couverture minimale (P45-D-20) que les
 #                                              # cas de CANARIS couvrent, un par ligne ; code 3 si les six sont
 #                                              # couverts, 0 avec UNE ligne de signal sinon ; ne lit ni stdin ni réglage
@@ -18,27 +19,34 @@
 #
 # Réglages lus, dans l'ordre : `$CLAUDE_PROJECT_DIR/.claude/settings.json` puis
 # `$HOME/.claude/settings.json` (ou le seul --settings). L'entrée retenue est la première entrée
-# PreToolUse dont la commande cite planning-hook.sh. CLAUDE_PROJECT_DIR et HOME sont les DEUX
-# entrées déclarées de ce script (où chercher les réglages, quelle copie du hook rejouer) : aucune
-# variable d'environnement ne change ce qu'il exige d'un gate (P45-D-12a). Aucun contenu de payload
-# n'est journalisé.
+# PreToolUse dont la commande cite planning-hook.sh ET est STRICTEMENT égale à la commande de référence. CLAUDE_PROJECT_DIR et HOME
+# sont les DEUX entrées déclarées de ce script (où chercher les réglages, quelle copie du hook rejouer) : aucune variable
+# d'environnement ne change ce qu'il exige d'un gate (P45-D-12a). Aucun contenu de payload n'est journalisé.
+#
+# Commande de référence (lot A, audit M2 ; décision du manager vf-dev-manager, 2026-10-01) : COMMANDE_REFERENCE, la commande de
+# hooks/hooks.json, embarquée ici (l'installeur ne pose pas hooks.json dans le lab ; la suite compare les deux octet pour octet),
+# résolue comme l'installeur la pose — `"$CLAUDE_PROJECT_DIR"/.claude/scripts` (scope projet) ou `"$HOME"/.claude/scripts` (scope compte). Le
+# canary n'exécute JAMAIS une autre commande, même si elle cite planning-hook.sh : sans commande reconnue mais avec une qui cite
+# le script, il signale « commande enregistrée non reconnue » sans rien exécuter.
 #
 # Contrat de sortie (patron à 4 codes de check-guard-health.sh : SAIN et INDÉTERMINÉ ne se
 # confondent JAMAIS) :
 #   0  = signal — UNE seule ligne sur stdout, préfixe `[planning-core] canary : `
 #   3  = SAIN — vérifié : session hors lab adhérent (rien n'a été rejoué), ou canary passé
-#   4  = INDÉTERMINÉ — rien n'a pu être vérifié (réglages illisibles, table d'armement absente,
-#        aucun interpréteur Python) : jamais un vert de complaisance
+#   4  = INDÉTERMINÉ — rien n'a pu être vérifié (réglages illisibles, aucun interpréteur Python) :
+#        jamais un vert de complaisance
 #  64  = erreur d'usage
 # Sous --hook, 3 et 4 sont traduits en 0 avec stdout vide (docs/HOOKS-CONTRAT-SORTIE.md §2-§3).
 #
 # Signaux, dans l'ordre où le canary les cherche (UN seul par exécution) :
-#   1. hook central non enregistré (F2) : aucun réglage ne porte la commande
+#   1. hook central non enregistré (F2) : aucun réglage ne porte la commande ; ou commande enregistrée non reconnue : un réglage cite
+#      planning-hook.sh avec une commande qui n'est pas celle de la référence (rien n'est exécuté)
 #   2. mode dégradé : la commande, rejouée sur le cas nominal, refuse — le script ou python3 manque
 #      ou plante ; écritures par outil et dispatchs Agent et Task refusés, Bash reste ouvert (limite
 #      déclarée, P45-D-06b)
 #   3. gate armé sans canary : la table d'armement du planning-hook.sh frère (constantes
-#      ARMEMENT_<gate>) arme un gate qu'aucun cas de CANARIS ne couvre (P45-D-03a)
+#      ARMEMENT_<gate>) arme un gate qu'aucun cas de CANARIS ne couvre (P45-D-03a) ; ou constantes d'armement absentes ou illisibles
+#      (lot A, audit M1 : sous adhésion c'est un signal, plus un code 4 traduit en silence sous --hook)
 #   4. cas en échec : un cas de CANARIS n'obtient pas l'attendu que la table d'armement en dérive
 #
 # Table des cas : la constante CANARIS ci-dessous, une ligne par cas `<id>|<gate>|<mode>|<payload>|<couvre>`.
@@ -70,17 +78,24 @@ HOOK=0
 COUV=0
 SETTINGS=""
 SETTINGS_SET=0
+REFERENCE=""
+REFERENCE_SET=0
 for arg in "$@"; do
   case "$arg" in
     --hook)       HOOK=1 ;;
     --couverture) COUV=1 ;;
     --settings=*) SETTINGS="${arg#*=}"; SETTINGS_SET=1 ;;
+    --reference=*) REFERENCE="${arg#*=}"; REFERENCE_SET=1 ;;
     -h|--help)    grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-gates-alive] argument inconnu : $arg" >&2; exit 64 ;;
   esac
 done
 if [ "$SETTINGS_SET" -eq 1 ] && [ -z "$SETTINGS" ]; then
   echo "[check-gates-alive] --settings vide" >&2
+  exit 64
+fi
+if [ "$REFERENCE_SET" -eq 1 ] && [ -z "$REFERENCE" ]; then
+  echo "[check-gates-alive] --reference vide" >&2
   exit 64
 fi
 
@@ -118,7 +133,7 @@ IN=""
 if [ "$COUV" -eq 0 ] && [ ! -t 0 ]; then IN="$(cat)"; fi
 
 # shellcheck disable=SC2086
-$PY_INVOKE -I -S - "$SCRIPT_DIR_SELF" "$SETTINGS" "$IN" "$COUV" <<'PY_CHECK_GATES_ALIVE_EOF'
+$PY_INVOKE -I -S - "$SCRIPT_DIR_SELF" "$SETTINGS" "$IN" "$COUV" "$REFERENCE" <<'PY_CHECK_GATES_ALIVE_EOF'
 import json
 import os
 import re
@@ -131,6 +146,24 @@ SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 PREFIXE = "[planning-core] canary : "
 CITE = "planning-hook.sh"
+# Commande de référence : celle de hooks/hooks.json (jeton {{VF_SCRIPTS}} non résolu), embarquée ; la suite la compare à hooks.json.
+JETON_SCRIPTS = "{{VF_SCRIPTS}}"
+PREFIXES_INSTALLEUR = ('"$CLAUDE_PROJECT_DIR"/.claude/scripts', '"$HOME"/.claude/scripts')
+COMMANDE_REFERENCE = r'''S={{VF_SCRIPTS}}/planning-hook.sh
+I=$(cat); R=1; O=
+if [ -f "$S" ]; then O=$(printf '%s' "$I" | bash "$S"); R=$?; fi
+if [ "$R" -eq 0 ]; then [ -z "$O" ] || printf '%s\n' "$O"; exit 0; fi
+case $I in *'"tool_name":"Write"'*|*'"tool_name":"Edit"'*|*'"tool_name":"NotebookEdit"'*|*'"tool_name":"Agent"'*|*'"tool_name":"Task"'*) ;; *) exit 0 ;; esac
+NL='
+'; TB=$(printf '\t')
+vf_get() { _m=$(printf '%s' "$I" | LC_ALL=C grep -a -o -E '"'"$1"'"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -n 1); [ -n "$_m" ] || return 1; _m=${_m#*:}; while :; do case $_m in ' '*|"$TB"*) _m=${_m#?} ;; *) break ;; esac; done; _m=${_m#\"}; V=""; X=1; while :; do _s=${_m%%[\"\\]*}; V=$V$_s; _m=${_m#"$_s"}; case $_m in '') X=0; return 0 ;; \"*) return 0 ;; \\\"*) V=$V\" ;; \\\\*) V=$V\\ ;; \\/*) V=$V/ ;; \\n*) V=$V$NL ;; \\t*) V=$V$TB ;; *) X=0; return 0 ;; esac; _m=${_m#??}; done; }
+vf_norm() { _r=/; _z=${1#/}; while [ -n "$_z" ]; do case $_z in */*) _c=${_z%%/*}; _z=${_z#*/} ;; *) _c=$_z; _z= ;; esac; case $_c in ""|.) ;; ..) _r=${_r%/*}; [ -n "$_r" ] || _r=/ ;; *) if [ "$_r" = / ]; then _n=/$_c; else _n=$_r/$_c; fi; if [ -d "$_n" ] && _y=$(cd -P -- "$_n" 2>/dev/null && pwd -P) && [ -n "$_y" ]; then _r=$_y; else _r=$_n; fi ;; esac; done; }
+vf_tight() { _d=$1; case $_d in /*) ;; *) return 1 ;; esac; vf_norm "$_d"; _d=$_r; while :; do if [ -d "$_d" ]; then break; fi; [ "$_d" = / ] && return 1; _q=${_d%/*}; [ -z "$_q" ] && _q=/; [ "$_q" = "$_d" ] && return 1; _d=$_q; done; while :; do case $_d/ in */[.][Pp][Ll][Aa][Nn][Nn][Ii][Nn][Gg]/*) ;; *) if [ -d "$_d/.planning" ]; then [ -f "$_d/.planning/config.json" ] && LC_ALL=C grep -a -q -E '"planning_version"[[:space:]]*:[[:space:]]*"cycles-v1"' "$_d/.planning/config.json" 2>/dev/null; return $?; fi ;; esac; [ "$_d" = / ] && return 1; _q=${_d%/*}; [ -z "$_q" ] && _q=/; [ "$_q" = "$_d" ] && return 1; _d=$_q; done; }
+D=1; for K in file_path notebook_path; do if vf_get "$K"; then P=$V; PX=$X; case $P in /*) ;; *) if vf_get cwd; then P=$V/$P; else P=$(pwd -P)/$P; fi ;; esac; if vf_tight "$P"; then D=0; elif [ "$PX" = 0 ]; then D=0; fi; K=done; break; fi; done
+if [ "$K" != done ]; then if vf_get cwd; then vf_tight "$V" && D=0; else vf_tight "$(pwd -P)" && D=0; fi; fi
+[ "$D" -eq 0 ] || exit 0
+printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[planning-core] hook central indisponible (script ou python3 absent, ou en erreur) dans un lab adherent cycles-v1 : ecritures par outil refusees. Reparer : mettre a jour VibeFlow (/vf-update) ou installer python3, puis relancer la session."}}'
+exit 0'''
 GATES = ("G6", "G5", "G1", "G7", "ROLE")
 # Couverture minimale exigée par P45-D-20 (le script absent, python3 absent, un payload Task et un payload Agent, un fil
 # principal, un agent_type préfixé `plugin:`) ; chaque cas de CANARIS déclare ce qu'il en couvre.
@@ -246,10 +279,19 @@ def lire_adhesion(racine):
 
 
 # --- Réglages : la commande enregistrée ---------------------------------------------------------
-def trouver_commande(candidats):
-    """(commande, chemin du réglage, illisible). Un réglage présent mais illisible n'est jamais lu
-    comme « sans entrée » : `illisible` le retient, l'appelant tranche."""
+def commandes_reconnues(reference):
+    """Les seules commandes que le canary rejoue : la référence (embarquée, ou celle de --reference pour les suites) résolue comme
+    l'installeur la pose, scope projet puis scope compte."""
+    texte = COMMANDE_REFERENCE if reference == "" else open(reference, encoding="utf-8").read()
+    return [texte.replace(JETON_SCRIPTS, prefixe) for prefixe in PREFIXES_INSTALLEUR]
+
+
+def trouver_commande(candidats, reconnues):
+    """(commande, chemin du réglage, illisible, citée non reconnue). Seule une commande STRICTEMENT égale à une commande reconnue est
+    retenue ; une commande qui cite planning-hook.sh sans l'être est comptée (`citee`), jamais retenue ni exécutée. Un réglage présent
+    mais illisible n'est jamais lu comme « sans entrée » : `illisible` le retient, l'appelant tranche."""
     illisible = False
+    citee = False
     for chemin in candidats:
         if not os.path.isfile(chemin):
             continue
@@ -263,10 +305,12 @@ def trouver_commande(candidats):
                 for h in groupe.get("hooks", []) or []:
                     commande = h.get("command") if isinstance(h, dict) else None
                     if isinstance(commande, str) and CITE in commande:
-                        return commande, chemin, illisible
+                        if commande in reconnues:  # canary-reconnue
+                            return commande, chemin, illisible, citee
+                        citee = True
         except (OSError, ValueError, AttributeError, TypeError):
             illisible = True
-    return None, None, illisible
+    return None, None, illisible, citee
 
 
 # --- Rejeu ---------------------------------------------------------------------------------------
@@ -477,8 +521,16 @@ def main_couverture():
     return 3
 
 
+def signal_armement(erreur):
+    """Constantes d'armement du planning-hook.sh frère absentes, en double ou illisibles, sous adhésion : un SIGNAL (code 0), jamais le
+    silence d'un code 4 traduit sous --hook (lot A, audit M1, décision du manager vf-dev-manager, 2026-10-01)."""
+    signaler("constantes d'armement absentes ou illisibles (" + str(erreur) + ") : le canary ne peut pas dire quels gates sont armés ni "
+             "s'ils sont tous couverts — réparer : /vf-update, puis relancer la session.")
+    return 0
+
+
 def main():
-    dossier_scripts, arg_settings, brut = sys.argv[1], sys.argv[2], sys.argv[3]
+    dossier_scripts, arg_settings, brut, reference = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[5]
     if sys.argv[4] == "1":
         return main_couverture()
     racine = racine_planning(cwd_de_session(brut))
@@ -492,8 +544,13 @@ def main():
     else:
         home = os.environ.get("HOME") or os.path.expanduser("~")
         candidats = [os.path.join(projet, ".claude", "settings.json"), os.path.join(home, ".claude", "settings.json")]
-    commande, _, illisible = trouver_commande(candidats)
+    commande, _, illisible, citee = trouver_commande(candidats, commandes_reconnues(reference))
     if commande is None:
+        if citee:
+            signaler("commande enregistrée non reconnue : un réglage cite planning-hook.sh avec une commande qui n'est pas, octet pour octet, "
+                     "celle que l'installeur pose (hooks.json, scope projet ou compte) — rien n'a été exécuté, les gates ne sont pas vérifiés "
+                     "dans cette session ; réparer : /vf-update.")
+            return 0
         if illisible:
             return 4  # canary-indetermine
         signaler("hook central non enregistré : aucun réglage du projet ni du compte ne porte la commande de "
@@ -520,8 +577,8 @@ def main():
             return 0
         try:
             table = lire_armement(dossier_scripts)
-        except Indetermine:
-            return 4
+        except Indetermine as erreur:
+            return signal_armement(erreur)  # canary-armement
         manquants = sorted(g for g in GATES if table[g] == "armed" and not any(c[1] == g for c in cas))  # canary-sans-cas
         if manquants:
             signaler("gate armé sans canary : " + ", ".join(manquants))

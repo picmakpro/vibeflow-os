@@ -64,6 +64,13 @@
 #                   +1, écriture atomique, refus hors lab adhérent, jamais vue par G5 (45-04, F8 et A3)
 #   R-ACCORD        chemin relatif : avertissement G2 en mode A <=> deny en mode C (limite h)
 #   BANC            chaque `@@ ecriture` de fixtures/gates-banc.txt rend son attendu ; COUVERTURE
+#   LOT A           (section `lota` ; correction ciblée post-45-09, décisions du manager vf-dev-manager, 2026-10-01) : R-IMB-01..05 un `.planning`
+#                   imbriqué n'est jamais une racine de lab ; R-DEROG-09 une dérogation n'est consommée que si la décision finale est un
+#                   passage ; R-DEROG-10 droits du journal jamais élargis, argv UTF-8 ; R-VERDICT-06..09 poser-verdict.sh (contrôles, forme
+#                   d'unité, verrou, UTF-8) ; R-DEFS-01..05 parseur de définitions linéaire et borné, échéance interne, orphelin, transport ;
+#                   R-VERSION-01 version active d'un plugin ; R-CAN-09..11 le canary n'exécute que la commande de référence, constantes
+#                   d'armement absentes = signal ; chaque contrôle a son mutant (MUT-IMB-*, DEROG-GLOBALE, DEROG-FCHMOD, DEROG-UTF8, VERDICT-*,
+#                   PUCE-*, ECHEANCE-*, TRANSPORT-EFFACE, PLUGIN-*, CANG-RECONNUE, CANG-ARMEMENT-SIGNAL)
 #   MUT-*           chaque garde est tuée par un mutant à motif unique dont la trace est imprimée
 #
 # Les cas de gate de 45-04 (G5) tournent sur une copie dont les constantes ARMEMENT_* sont FORCÉES
@@ -3978,6 +3985,112 @@ def controle_version_active(ctx, script):
 lota_mutant("PLUGIN-INSTALLED", "# plugin-installed", "versions = []  # plugin-installed", "R-VERSION-01")
 lota_mutant("PLUGIN-HAUTE", "# plugin-haute", "haute = min(cle for cle, _chemin in versions)  # plugin-haute", "R-VERSION-01")
 lota_mutant("PLUGIN-TRI", "# plugin-tri", "return (nom,)  # plugin-tri", "R-VERSION-01")
+
+
+# --- LOT A, constats 9 et 10 (audit M2 ; audit M1, part canary) : le canary n'exécute que la commande que l'installeur pose ------------
+# Décisions du manager vf-dev-manager, 2026-10-01 (renversables). M2 : le canary exécutait par `/bin/sh -c` la première commande PreToolUse
+# du `settings.json` du lab qui contenait « planning-hook.sh » — n'importe quelle commande forgée. Il n'exécute plus qu'une commande
+# STRICTEMENT égale à celle de hooks.json, résolue comme l'installeur la pose (scope projet : "$CLAUDE_PROJECT_DIR"/.claude/scripts, scope
+# compte : "$HOME"/.claude/scripts) ; sinon il signale « commande enregistrée non reconnue » sans rien exécuter. M1 (canary) : des
+# constantes d'armement absentes ou illisibles, sous adhésion, sont un SIGNAL, plus un silence sous --hook. L'option `--reference=<fichier>`
+# (réservée aux suites) remplace la commande de référence : elle n'est jamais lue des réglages.
+def canary_direct(ctx, dossier_scripts, reglage, args=(), session=None, home=None, projet=None):
+    """Lance le check-gates-alive.sh de `dossier_scripts` dans une session adhérente, sur le réglage `reglage` ; rend (code, stdout, stderr)."""
+    session = session or lab_adherent_simple(ctx, "session-canary-direct")
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": home or ctx.home, "CLAUDE_PROJECT_DIR": projet or session}
+    p = subprocess.run(["bash", os.path.join(dossier_scripts, "check-gates-alive.sh"), "--settings=" + reglage] + list(args),
+                       input=json.dumps({"cwd": session}).encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+                       cwd=session, timeout=240)
+    return p.returncode, p.stdout, p.stderr
+
+
+def reglage_de(ctx, commandes, prefixe="reglage-m2"):
+    chemin = os.path.join(ctx.unique(prefixe), "settings.json")
+    ecrire(chemin, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [{"type": "command", "command": c}]} for c in commandes]}}))
+    return chemin
+
+
+def une_ligne_canary(out, fragments):
+    """None si stdout est UNE ligne au préfixe du canary qui contient chaque fragment, sinon la raison."""
+    lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+    if len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : "):
+        return "%d ligne(s) : %s" % (len(lignes), court(out))
+    manque = [f for f in fragments if f not in lignes[0]]
+    return ("fragment(s) absent(s) %s : %s" % (manque, lignes[0])) if manque else None
+
+
+@lota("R-CAN-09")
+def controle_canary_commande_reconnue(ctx, script):
+    """M2 : une commande forgée `touch <marqueur> # planning-hook.sh` n'est JAMAIS exécutée (marqueur jamais créé) : seule, elle fait signaler
+    « commande enregistrée non reconnue » (code 0, UNE ligne, sous --hook comme en direct) ; devant la vraie commande, la vraie est rejouée
+    (code 3) ; la forme du scope compte ("$HOME"/.claude/scripts) est reconnue comme celle du scope projet."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe", tel_quel=True)
+    reelle = ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')
+    marqueur = os.path.join(ctx.unique("marqueur-m2"), "cree")
+    os.makedirs(os.path.dirname(marqueur))
+    forgee = "touch '%s' # planning-hook.sh" % marqueur
+    fautes = []
+    for args in ((), ("--hook",)):
+        rc, out, err = canary_direct(ctx, d, reglage_de(ctx, [forgee]), args, projet=os.path.dirname(os.path.dirname(d)))
+        raison = une_ligne_canary(out, ("commande enregistrée non reconnue",))
+        if rc != 0 or raison or os.path.exists(marqueur):
+            fautes.append("commande forgée seule %s : rc=%d %s marqueur=%s" % (" ".join(args) or "sans --hook", rc, raison or "", os.path.exists(marqueur)))
+    rc, out, err = canary_direct(ctx, d, reglage_de(ctx, [forgee, reelle]), (), projet=os.path.dirname(os.path.dirname(d)))
+    if rc != 3 or out != b"" or os.path.exists(marqueur):
+        fautes.append("forgée puis réelle : rc=%d stdout=%s marqueur=%s (attendu 3, rien, aucun marqueur)" % (rc, court(out), os.path.exists(marqueur)))
+    # forme du scope compte : HOME porte `.claude/scripts` (canary et hook réels), le réglage pose "$HOME"/.claude/scripts
+    home = ctx.unique("home-compte-m2")
+    dh = os.path.join(home, ".claude", "scripts")
+    os.makedirs(dh)
+    for nom in ("check-gates-alive.sh", "planning-hook.sh"):
+        shutil.copy(os.path.join(d, nom), os.path.join(dh, nom))
+    compte = ctx.cmd.replace(TOKEN, '"$HOME"/.claude/scripts')
+    vide = ctx.unique("projet-vide-m2")
+    os.makedirs(vide)
+    rc, out, err = canary_direct(ctx, dh, reglage_de(ctx, [compte]), (), home=home, projet=vide)
+    if rc != 3 or out != b"":
+        fautes.append("scope compte : rc=%d stdout=%s stderr=%s (attendu 3 et rien)" % (rc, court(out), court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else "commande forgée : jamais exécutée, signalée « non reconnue » ; forgée puis réelle : la réelle est rejouée ; forme du scope compte reconnue")
+
+
+@lota("R-CAN-10")
+def controle_canary_armement_signal(ctx, script):
+    """M1 (canary) : un planning-hook.sh sans constantes ARMEMENT_* posé à côté du canary, dans une session adhérente, fait SIGNALER « constantes
+    d'armement absentes ou illisibles » (code 0, UNE ligne), sous --hook comme en direct — plus un code 4 qui se traduit en silence."""
+    projet = ctx.unique("projet-sans-constantes")
+    d = os.path.join(projet, ".claude", "scripts")
+    os.makedirs(d)
+    shutil.copy(os.path.join(_dossier(ctx, script), "check-gates-alive.sh"), os.path.join(d, "check-gates-alive.sh"))
+    with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
+        fh.write("#!/usr/bin/env bash\ncat >/dev/null\nexit 0\n")
+    reglage = reglage_de(ctx, [ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')])
+    fautes = []
+    for args in ((), ("--hook",)):
+        rc, out, err = canary_direct(ctx, d, reglage, args, projet=projet)
+        raison = une_ligne_canary(out, ("constantes d'armement absentes ou illisibles",))
+        if rc != 0 or raison:
+            fautes.append("%s : rc=%d %s" % (" ".join(args) or "sans --hook", rc, raison or ""))
+    return (not fautes), ("; ".join(fautes) if fautes else "constantes absentes : code 0 et UNE ligne de signal, sous --hook comme en direct")
+
+
+@lota("R-CAN-11")
+def controle_canary_reference_dans_hooks_json(ctx, script):
+    """La commande de référence EMBARQUÉE dans le canary est, octet pour octet, celle de hooks.json : la dérive de l'une ou de l'autre rougit ici
+    (le canary ne lit pas hooks.json au démarrage : l'installeur ne le pose pas dans le lab)."""
+    texte = open(os.path.join(_dossier(ctx, script), "check-gates-alive.sh"), encoding="utf-8").read()
+    debut = texte.find("COMMANDE_REFERENCE = r'''")
+    if debut < 0:
+        return False, "COMMANDE_REFERENCE absente du canary"
+    corps = texte[debut + len("COMMANDE_REFERENCE = r'''"):]
+    fin = corps.find("'''")
+    embarquee = corps[:fin]
+    if embarquee != ctx.cmd:
+        return False, "commande embarquée différente de hooks.json (%d caractères contre %d)" % (len(embarquee), len(ctx.cmd))
+    return True, "commande embarquée identique à celle de hooks.json (%d caractères)" % len(embarquee)
+
+
+lota_mutant("CANG-RECONNUE", "# canary-reconnue", "if True:  # canary-reconnue", "R-CAN-09", "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF")
+lota_mutant("CANG-ARMEMENT-SIGNAL", "# canary-armement", "return 4  # canary-armement", "R-CAN-10", "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF")
 
 
 # LOTA-ANCRE

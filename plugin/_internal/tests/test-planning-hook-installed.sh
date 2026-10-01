@@ -463,7 +463,13 @@ def reglage_temoin(ctx, nom, marqueur, corps=None):
     chemin = os.path.join(ctx.work, nom)
     ecrire(chemin, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [
         {"type": "command", "command": cmd}]}]}}))
+    ecrire(chemin + ".ref", cmd)  # lot A (audit M2) : le canary ne rejoue qu'une commande égale à sa référence ; ces commandes-témoins sont la leur
     return chemin
+
+
+def args_temoin(chemin):
+    """Arguments du canary pour un réglage-témoin : le réglage et la référence (lot A, audit M2 ; décision du manager vf-dev-manager, 2026-10-01)."""
+    return ("--settings=" + chemin, "--reference=" + chemin + ".ref")
 
 
 def corps_deny(raison):
@@ -508,7 +514,7 @@ def sec_can(ctx):
     for nom, cwd, stdin in (("lab dev", ctx.dev, "payload"), ("hors de tout .planning/", hors, "payload"),
                             ("stdin vide, cwd du processus dans un lab dev", ctx.dev, b"")):
         for args in ((), ("--hook",)):
-            rc, out, err = lancer_canary(ctx, ctx.lab, cwd, args + ("--settings=" + temoin,), stdin=stdin, tmpdir=tmpd)
+            rc, out, err = lancer_canary(ctx, ctx.lab, cwd, args + args_temoin(temoin), stdin=stdin, tmpdir=tmpd)
             attendu = 0 if args else 3
             if rc != attendu or out != b"" or os.path.exists(marq):
                 fautes.append((nom + (" --hook" if args else ""), "code %d, stdout vide, aucun rejeu (pas de trace)" % attendu,
@@ -519,7 +525,7 @@ def sec_can(ctx):
     if reste:
         fautes.append(("TMPDIR", "aucun fichier créé sous TMPDIR", "présents : " + ", ".join(reste)))
     # témoin : dans un lab adhérent le même réglage EST rejoué (la trace prouve que le test peut voir un rejeu)
-    lancer_canary(ctx, ctx.lab, ses, ("--settings=" + temoin,))
+    lancer_canary(ctx, ctx.lab, ses, args_temoin(temoin))
     if not os.path.exists(marq):
         fautes.append(("témoin", "le réglage-témoin est rejoué dans un lab adhérent", "aucune trace : la mesure ne voit pas un rejeu"))
     else:
@@ -605,14 +611,14 @@ def sec_can(ctx):
     # R-CAN-08 (ajout) : la limite déclarée est EXERCÉE — une commande qui ne ferme pas fait signaler
     fautes = []
     ouverte = reglage_temoin(ctx, "reglage-ouvert.json", os.path.join(ctx.work, "trace-08"), corps="cat >/dev/null # planning-hook.sh")
-    rc, out, err = lancer_canary(ctx, ctx.lab, ses, ("--settings=" + ouverte,))
+    rc, out, err = lancer_canary(ctx, ctx.lab, ses, args_temoin(ouverte))
     raison = une_ligne(out, ("cas en échec", "D01"))
     if rc != 0 or raison:
         fautes.append(("commande qui laisse tout passer", "code 0 et une ligne « cas en échec » qui nomme D01", "rc=%d %s" % (rc, raison or "")))
     for nom, texte_raison, attendu in (("commande qui refuse même le cas nominal avec la raison du fail-closed", "[planning-core] hook central indisponible (script ou python3 absent)", "mode dégradé"),
                                        ("commande dont un gate refuse la cible neutre (raison d'un gate)", "[planning-core] G6 : refus de gate arme", "cas en échec")):
         ferme_tout = reglage_temoin(ctx, "reglage-ferme-tout.json", os.path.join(ctx.work, "trace-08b"), corps=corps_deny(texte_raison))
-        rc, out, err = lancer_canary(ctx, ctx.lab, ses, ("--settings=" + ferme_tout,))
+        rc, out, err = lancer_canary(ctx, ctx.lab, ses, args_temoin(ferme_tout))
         raison = une_ligne(out, (attendu,))
         texte_sortie = out.decode("utf-8", "replace")
         if attendu == "cas en échec" and "mode dégradé" in texte_sortie:
@@ -691,7 +697,7 @@ def sec_mutants(ctx):
     def sc_adhesion(lab):
         if os.path.exists(marq):
             os.remove(marq)
-        rc, out, _ = lancer_canary(ctx, lab, hors, ("--settings=" + temoin,))
+        rc, out, _ = lancer_canary(ctx, lab, hors, args_temoin(temoin))
         return rc, out, os.path.exists(marq)
 
     def sc_indetermine(lab):
@@ -728,7 +734,7 @@ def sec_mutants(ctx):
     def sc_raison(lab):
         cmd = corps_deny("[planning-core] G6 : refus d un gate arme")
         reg = reglage_temoin(ctx, "reglage-raison-mut.json", os.path.join(ctx.work, "trace-raison-mut"), corps=cmd)
-        rc, out, _ = lancer_canary(ctx, lab, ses, ("--settings=" + reg,))
+        rc, out, _ = lancer_canary(ctx, lab, ses, args_temoin(reg))
         return rc, out
 
     lab_m, raison = make_canary_mutant(ctx, "RAISON", "# canary-raison", 'return "deny-degrade"  # canary-raison')
@@ -754,6 +760,59 @@ def sec_mutants(ctx):
             okmut("CAN-INDETERMINE", "R-CAN-06 · attendu (original) : code 4 · obtenu (mutant) : code 3 (vert de complaisance)")
         else:
             komut("CAN-INDETERMINE", "réglages illisibles : l'original rend 4, le mutant rend 3", "code 4", "original=%s mutant=%s" % (o[0], m[0]))
+
+
+def sec_can_m2(ctx):
+    """R-CAN-12 (lot A, audit M2 ; décision du manager vf-dev-manager, 2026-10-01) : dans le lab INSTALLÉ, une commande forgée posée dans le
+    settings.json qui cite planning-hook.sh n'est jamais exécutée par le canary (marqueur jamais créé) ; devant la commande posée par
+    l'installeur elle ne gêne pas (code 3), seule elle fait signaler « commande enregistrée non reconnue » ; MUT-CAN-RECONNUE : sans le
+    contrôle d'égalité, la commande forgée est rejouée."""
+    ses = os.path.join(ctx.work, "session-adherente")
+    marq = os.path.join(ctx.work, "trace-m2-installe")
+
+    def avec_forgee(lab, garder_reelle):
+        chemin = os.path.join(lab, ".claude", "settings.json")
+        d = lire_json(chemin)
+        groupes = d["hooks"]["PreToolUse"]
+        forge = {"matcher": "Write", "hooks": [{"type": "command", "command": ": > '" + marq + "'; cat >/dev/null # planning-hook.sh"}]}
+        if garder_reelle:
+            d["hooks"]["PreToolUse"] = [forge] + groupes
+        else:
+            d["hooks"]["PreToolUse"] = [forge] + [g for g in groupes if not any(CITE in h.get("command", "") for h in g.get("hooks", []))]
+        with open(chemin, "w", encoding="utf-8") as fh:
+            json.dump(d, fh)
+
+    def scenario(lab, garder_reelle):
+        if os.path.exists(marq):
+            os.remove(marq)
+        avec_forgee(lab, garder_reelle)
+        rc, out, err = lancer_canary(ctx, lab, ses, ())
+        return rc, out, os.path.exists(marq)
+
+    fautes = []
+    lab_a = copier_lab(ctx, "lab-m2-devant")
+    rc, out, cree = scenario(lab_a, True)
+    if rc != 3 or out != b"" or cree:
+        fautes.append(("forgée devant la commande posée", "code 3, stdout vide, marqueur jamais créé", "rc=%d out=%s marqueur=%s" % (rc, court(out), cree)))
+    lab_b = copier_lab(ctx, "lab-m2-seule")
+    rc, out, cree = scenario(lab_b, False)
+    raison = une_ligne(out, ("commande enregistrée non reconnue",))
+    if rc != 0 or raison or cree:
+        fautes.append(("forgée seule", "code 0, UNE ligne « commande enregistrée non reconnue », marqueur jamais créé", "rc=%d %s marqueur=%s" % (rc, raison or "", cree)))
+    if fautes:
+        for cas, a, b in fautes:
+            ko("R-CAN-12", "commande forgée dans settings.json : " + cas, a, b)
+    else:
+        ok("R-CAN-12 commande forgée dans le settings.json du lab installé : jamais exécutée (marqueur jamais créé), sans effet devant la commande posée (code 3), signalée « non reconnue » quand elle est seule")
+    lab_m, raison = make_canary_mutant(ctx, "RECONNUE", "# canary-reconnue", "if True:  # canary-reconnue")
+    if lab_m is None:
+        komut("CAN-RECONNUE", "mutant du contrôle d'égalité de la commande", "mutant valide", raison)
+    else:
+        rc, out, cree = scenario(lab_m, False)
+        if cree and "non reconnue".encode("utf-8") not in out:
+            okmut("CAN-RECONNUE", "R-CAN-12 · attendu (original) : marqueur jamais créé, « non reconnue » · obtenu (mutant) : la commande forgée est rejouée (marqueur créé), rc=%d" % rc)
+        else:
+            komut("CAN-RECONNUE", "commande forgée seule : l'original ne l'exécute pas, le mutant la rejoue", "marqueur créé sous le mutant", "marqueur=%s out=%s" % (cree, court(out)))
 
 
 def sec_desinstall(ctx):
@@ -797,6 +856,7 @@ SECTIONS = {
     "install": sec_install,
     "modes": sec_modes,
     "can": sec_can,
+    "can_m2": sec_can_m2,
     "mutants": sec_mutants,
     "desinstall": sec_desinstall,
     "isolation": sec_isolation,
@@ -839,7 +899,7 @@ run_sections() { # <sections séparées par des virgules>
 # Empreinte du VRAI ~/.claude avant la suite (sous-chemins que l'installeur écrit seulement).
 EMPREINTE_AVANT="$("$PYBIN" "$AIDES" empreinte "$REAL_HOME")"
 
-run_sections install,modes,can,mutants,desinstall,isolation
+run_sections install,modes,can,can_m2,mutants,desinstall,isolation
 
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
