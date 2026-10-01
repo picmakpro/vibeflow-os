@@ -71,6 +71,12 @@
 #                   R-VERSION-01 version active d'un plugin ; R-CAN-09..11 le canary n'exécute que la commande de référence, constantes
 #                   d'armement absentes = signal ; chaque contrôle a son mutant (MUT-IMB-*, DEROG-GLOBALE, DEROG-FCHMOD, DEROG-UTF8, VERDICT-*,
 #                   PUCE-*, ECHEANCE-*, TRANSPORT-EFFACE, PLUGIN-*, CANG-RECONNUE, CANG-ARMEMENT-SIGNAL)
+#   R-REFERENCE     (section `reference`, 45-10 ; GATE-15, T-45-90) la référence du modèle (section « Hook central et gates d'écriture
+#                   (Phase 45) ») est identique au code livré : table d'armement (état, étape, cas de canary, relevé), noms protégés par
+#                   G6, journal de dérogation, marqueurs de code, ordre de résolution des agents, outils refusés et laissé ouvert en mode
+#                   dégradé (commande de hooks.json), limites déclarées (a) à (y) chacune sur sa ligne ; MUT-REFERENCE-* : une valeur de
+#                   gate inversée, `Agent` retiré des outils refusés, une limite retirée (chacune des 25, puis (l) à part), un nom de
+#                   journal, un marqueur, l'ordre de résolution, un cas de canary, une constante du hook changée sans la référence
 #   MUT-*           chaque garde est tuée par un mutant à motif unique dont la trace est imprimée
 #
 # Les cas de gate de 45-04 (G5) tournent sur une copie dont les constantes ARMEMENT_* sont FORCÉES
@@ -4149,6 +4155,255 @@ lota_mutant("BUDGET-SIGNAL", "# role-signal", "for signal in []:  # role-signal"
 # LOTA-ANCRE
 
 
+# --- R-REFERENCE et MUT-REFERENCE (45-10 ; GATE-15, T-45-90) ----------------------------------------------------------------------------
+# La référence du modèle (modele-cycles.md, section « Hook central et gates d'écriture (Phase 45) ») dit ce que le hook livré fait. Ce
+# contrôle la compare, mécaniquement, aux constantes du hook (table d'armement, noms protégés par G6, nom du journal de dérogation,
+# marqueurs de code, ordre de résolution des agents), à la commande enregistrée de hooks.json (outils refusés en mode dégradé, outil
+# laissé ouvert) et à la table CANARIS du canary (cas par gate) : tout écart rougit — une référence qui annoncerait un gate armé qui ne
+# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (y) sont chacune sur sa propre ligne canonique
+# `- **limite (X)**` avec ses mots-clés. Chaque mutant retire ou fausse UNE chose, sur une copie de la référence écrite sous le dossier
+# de travail (ou, pour MUT-REFERENCE-CODE, sur les constantes du hook, la référence restant intacte) ; le contrôle doit alors rendre un
+# écart. Les lignes d'écart du contrôle commencent par `ECART` ; la suite ne les imprime que si la VRAIE référence est en écart (un
+# mutant tué n'imprime que sa trace, sans ce mot : une exécution verte n'a aucune ligne ECART).
+TITRE_REFERENCE = re.compile(r"^## Hook central et gates d.écriture \(Phase 45\)")
+GATES_REFERENCE = ("G6", "G5", "G1", "G7", "ROLE", "G2")
+LIMITES_REFERENCE = (
+    ("a", ("compact", "tool_name")),
+    ("b", ("cycles-v1", "une ligne")),
+    ("c", ("lien symbolique", "O_NOFOLLOW")),
+    ("d", ("fermée", "échappement JSON")),
+    ("e", ("JSON", "outil inconnu")),
+    ("f", ("bash", "127")),
+    ("g", ("Bash", "P45-D-06b")),
+    ("h", ("relatif", "cwd")),
+    ("i", ("CLAUDE_PROJECT_DIR", "P45-D-21b")),
+    ("j", ("CADRAGE.md", "G1", "f5-etats")),
+    ("k", ("config.json", "virgule finale", "BOM")),
+    ("l", ("allowlist", "G6", "F9")),
+    ("m", ("F2", "config.json", "plusieurs lignes", "silence")),
+    ("n", ("T-45-42", "F6", "Bash")),
+    ("o", ("P45-D-01a", "ancêtre")),
+    ("p", ("R1", "sans `config.json`", "plus proche")),
+    ("q", ("m1", "subagent_type", "fork")),
+    ("r", ("m6", "journal d'observation", "rotation")),
+    ("s", ("échéance", "73", "déni de service")),
+    ("t", ("F3", "installed_plugins.json", "chiffres")),
+    ("u", ("F4", "échappement JSON", "hors de tout lab adhérent")),
+    ("v", ("F5", "marque de génération", "sans archive")),
+    ("w", ("N1", "name:", "échappement YAML")),
+    ("x", ("MESURE-VIDE", "volume")),
+    ("y", ("OUVERTE", "arbitrage de Willy en attente", "planning-hook.sh")),
+)
+
+
+def section_reference(texte):
+    lignes = texte.split("\n")
+    debut = next((i for i, l in enumerate(lignes) if TITRE_REFERENCE.match(l)), None)
+    if debut is None:
+        return None
+    fin = next((j for j in range(debut + 1, len(lignes)) if lignes[j].startswith("## ")), len(lignes))
+    return lignes[debut:fin]
+
+
+def jetons_reference(ligne):
+    return re.findall(r"`([^`]+)`", ligne)
+
+
+def canaris_par_gate(texte_canary):
+    res = {}
+    for ident, gate in re.findall(r'"([A-Za-z0-9_-]+)\|(G6|G5|G1|G7|ROLE)\|nominal\|', texte_canary):
+        res.setdefault(gate, set()).add(ident)
+    return res
+
+
+def ordre_resolution_hook(texte_hook):
+    """Ordre (lab, compte, plugin) de `resoudre_agent`, lu dans le TEXTE du hook : l'ordre des deux premiers niveaux est celui de la liste
+    `niveaux`, le plugin vient après la boucle (premier appel de `definitions_plugin`)."""
+    try:
+        corps = texte_hook[texte_hook.index("def resoudre_agent("):]
+        fin = corps.find("\ndef ", 10)
+        corps = corps[: fin if fin != -1 else len(corps)]
+        ligne = next(l for l in corps.split("\n") if "niveaux = [" in l)
+        base = corps.index(ligne)
+        positions = [("lab", base + ligne.index("dossier_lab")), ("compte", base + ligne.index("dossier_compte")),
+                     ("plugin", corps.index("definitions_plugin("))]
+    except (ValueError, StopIteration):
+        return None
+    return [nom for nom, _ in sorted(positions, key=lambda p: p[1])]
+
+
+def outils_commande(commande, matcher):
+    """(outils refusés en mode dégradé, outils laissés ouverts) de la commande enregistrée : les noms du `case` glob de la commande, et ceux
+    du matcher de l'entrée que ce glob ne refuse pas."""
+    refuses = set(re.findall(r"""\*'"tool_name":"([A-Za-z]+)"'\*""", commande))
+    return refuses, set(matcher.split("|")) - refuses
+
+
+def ecarts_reference(texte, ns, texte_hook, canaris, commande, matcher):
+    """Lignes `ECART …` de la comparaison référence ↔ code (liste vide : conforme)."""
+    ecarts = []
+    section = section_reference(texte)
+    if section is None:
+        return ["ECART section « Hook central et gates d'écriture (Phase 45) » absente de la référence"]
+    table, ordre = ns["TABLE_ARMEMENT"], ns["ORDRE_ETAPES"]
+    etape = {g: str(i + 1) for i, groupe in enumerate(ordre) for g in groupe}
+    for gate in table:
+        if gate not in GATES_REFERENCE:
+            ecarts.append("ECART gate %s du hook inconnu du contrôle (la référence ne peut pas le décrire)" % gate)
+    for gate in GATES_REFERENCE:
+        lignes = [l for l in section if re.match(r"^\|\s*%s\s*\|" % gate, l)]
+        if len(lignes) != 1:
+            ecarts.append("ECART table d'armement : %d ligne(s) `| %s |` (attendu 1)" % (len(lignes), gate))
+            continue
+        cases = [c.strip().strip("`") for c in lignes[0].strip().strip("|").split("|")]
+        if len(cases) != 6:
+            ecarts.append("ECART table d'armement : la ligne %s a %d colonne(s) (attendu 6)" % (gate, len(cases)))
+            continue
+        etat = ns["G2_MODE"] if gate == "G2" else table.get(gate)
+        if cases[2] != etat:
+            ecarts.append("ECART %s : état « %s » dans la référence, « %s » dans le code livré" % (gate, cases[2], etat))
+        attendue = "-" if gate == "G2" else etape.get(gate)
+        if cases[1] != attendue:
+            ecarts.append("ECART %s : étape « %s » dans la référence, « %s » dans ORDRE_ETAPES" % (gate, cases[1], attendue))
+        ids = {x.strip() for x in cases[4].split(",")}
+        ids_code = {"aucun"} if gate == "G2" else canaris.get(gate, set())
+        if ids != ids_code:
+            ecarts.append("ECART %s : cas de canary %s dans la référence, %s dans CANARIS" % (gate, sorted(ids), sorted(ids_code)))
+        releve = "aucun" if gate == "G2" else "45-REJEU-ETAPE-" + (etape.get(gate) or "?")
+        if cases[5] != releve:
+            ecarts.append("ECART %s : relevé « %s » dans la référence, « %s » attendu" % (gate, cases[5], releve))
+    toutes_observe = all(v == "observe" for v in table.values())
+    dit_aucun = any("Aucun gate n'est armé" in l for l in section)
+    if toutes_observe and not dit_aucun:
+        ecarts.append("ECART le code livré a toutes ses constantes à observe : la référence doit dire « Aucun gate n'est armé »")
+    if not toutes_observe and dit_aucun:
+        ecarts.append("ECART la référence dit « Aucun gate n'est armé » alors qu'une constante du code livré vaut armed")
+
+    def jetons_de(marque, attendu, etiquette):
+        lignes = [l for l in section if l.startswith(marque)]
+        if len(lignes) != 1:
+            ecarts.append("ECART %s : %d ligne(s) `%s` (attendu 1)" % (etiquette, len(lignes), marque))
+            return
+        lus = set(jetons_reference(lignes[0]))
+        if lus != attendu:
+            ecarts.append("ECART %s : référence %s, code %s" % (etiquette, sorted(lus), sorted(attendu)))
+
+    jetons_de("- **Noms protégés par G6**", {nom for nom, _genre in ns["PROTEGES_G6"].values()}, "noms protégés par G6")
+    jetons_de("- **Journal de dérogation**", {ns["NOM_JOURNAL_DEROGATIONS"]}, "nom du journal de dérogation")
+    jetons_de("- **Marqueurs de projet de code (G7)**", set(ns["MARQUEURS_CODE"]) | {"*" + ns["SUFFIXE_XCODEPROJ"]}, "marqueurs de code")
+    refuses, ouverts = outils_commande(commande, matcher)
+    jetons_de("- **Outils refusés en mode dégradé**", refuses, "outils refusés en mode dégradé")
+    jetons_de("- **Outil laissé ouvert en mode dégradé**", ouverts, "outil laissé ouvert en mode dégradé")
+    lignes = [l for l in section if l.startswith("- **Ordre de résolution des agents (P45-D-05b)**")]
+    ordre_code = ordre_resolution_hook(texte_hook)
+    if len(lignes) != 1:
+        ecarts.append("ECART ordre de résolution : %d ligne(s) (attendu 1)" % len(lignes))
+    elif [x.strip() for x in lignes[0].split(" : ", 1)[-1].split(",")] != ordre_code:
+        ecarts.append("ECART ordre de résolution : référence %r, code %r" % (lignes[0].split(" : ", 1)[-1], ordre_code))
+    for lettre, mots in LIMITES_REFERENCE:
+        marque = "- **limite (%s)**" % lettre
+        lignes = [l for l in section if l.startswith(marque)]
+        if len(lignes) != 1:
+            ecarts.append("ECART limite (%s) : %d ligne(s) `%s` (attendu 1, chacune sur sa propre ligne)" % (lettre, len(lignes), marque))
+            continue
+        manque = [m for m in mots if m not in lignes[0]]
+        if manque:
+            ecarts.append("ECART limite (%s) : mots-clés absents de sa ligne : %s" % (lettre, manque))
+    return ecarts
+
+
+def remplacer_ligne_reference(texte, marque, fonction):
+    lignes = texte.split("\n")
+    idx = [i for i, l in enumerate(lignes) if l.startswith(marque)]
+    if len(idx) != 1:
+        return texte
+    if fonction is None:
+        del lignes[idx[0]]
+    else:
+        lignes[idx[0]] = fonction(lignes[idx[0]])
+    return "\n".join(lignes)
+
+
+def sec_reference(ctx):
+    chemin = os.path.normpath(os.path.join(ctx.scripts_dir, "..", "references", "modele-cycles.md"))
+    if not os.path.isfile(chemin):
+        ko("R-REFERENCE", "la référence du modèle est lisible à côté du module", chemin, "absente")
+        return
+    ns = charger_module(ctx.hook)
+    texte_hook = open(ctx.hook, encoding="utf-8").read()
+    canaris = canaris_par_gate(open(os.path.join(ctx.scripts_dir, "check-gates-alive.sh"), encoding="utf-8").read())
+    if not ctx.hooks_json:
+        ko("R-REFERENCE", "hooks.json est lisible (matcher et commande enregistrée)", "hooks.json", "absent")
+        return
+    donnees = json.load(open(ctx.hooks_json, encoding="utf-8"))
+    matchers = [g["matcher"] for g in donnees["hooks"]["PreToolUse"] if any("planning-hook.sh" in h.get("command", "") for h in g["hooks"])]
+    if len(matchers) != 1 or not ctx.cmd:
+        ko("R-REFERENCE", "une seule entrée PreToolUse porte planning-hook.sh", "1", str(len(matchers)))
+        return
+
+    def controler(fichier, ns_=ns):
+        return ecarts_reference(open(fichier, encoding="utf-8").read(), ns_, texte_hook, canaris, ctx.cmd, matchers[0])
+
+    ecarts = controler(chemin)
+    if ecarts:
+        for e in ecarts:
+            print(e)
+        ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
+        return
+    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (y) sont ceux du code livré ; « Aucun gate n'est armé » dit vrai" % len(LIMITES_REFERENCE))
+    original = open(chemin, encoding="utf-8").read()
+
+    def mutant_texte(ident, fonction, motif):
+        copie = ctx.unique("reference-" + ident.lower()) + ".md"
+        texte = fonction(original)
+        if texte == original:
+            komut("REFERENCE-" + ident, "mutant de la référence (texte distinct)", "texte distinct", "NON OPPOSABLE (identique) : " + motif)
+            return
+        with open(copie, "w", encoding="utf-8") as fh:
+            fh.write(texte)
+        ecarts_m = controler(copie)
+        if ecarts_m:
+            okmut("REFERENCE-" + ident, "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant, %s) : %d écart(s), premier : %s" % (motif, len(ecarts_m), ecarts_m[0].replace("ECART ", "écart : ", 1)))
+        else:
+            komut("REFERENCE-" + ident, "R-REFERENCE rougit sur la référence mutée (%s)" % motif, "au moins un écart", "aucun écart (le contrôle passe à vide)")
+
+    mutant_texte("G6", lambda t: re.sub(r"^(\| G6 \| 1 \| )observe", r"\1armed", t, count=1, flags=re.M), "valeur de G6 inversée dans la table d'armement")
+    mutant_texte("OUTIL", lambda t: remplacer_ligne_reference(t, "- **Outils refusés en mode dégradé**", lambda l: l.replace("`Agent`, ", "", 1)),
+                 "`Agent` retiré de la liste des outils refusés en mode dégradé")
+    mutant_texte("LIMITE-L", lambda t: remplacer_ligne_reference(t, "- **limite (l)**", None), "la ligne de la limite (l) retirée")
+    mutant_texte("JOURNAL", lambda t: remplacer_ligne_reference(t, "- **Journal de dérogation**", lambda l: l.replace("derogations-gates.log", "derogations.log")),
+                 "nom du journal de dérogation changé")
+    mutant_texte("MARQUEURS", lambda t: remplacer_ligne_reference(t, "- **Marqueurs de projet de code (G7)**", lambda l: l.replace("`Gemfile`, ", "", 1)),
+                 "`Gemfile` retiré des marqueurs de code")
+    mutant_texte("ORDRE", lambda t: t.replace("lab, compte, plugin", "compte, lab, plugin", 1), "ordre de résolution lab/compte inversé")
+    mutant_texte("CANARY", lambda t: re.sub(r"(\| G1 \| 2 \| observe \| [^|]*\| )G1-sans-cadrage", r"\1G1-autre", t, count=1), "cas de canary de G1 renommé")
+    # Chaque limite, retirée une à une : le contrôle doit nommer cette limite.
+    non_tuees = []
+    for lettre, _mots in LIMITES_REFERENCE:
+        copie = ctx.unique("reference-limite-" + lettre) + ".md"
+        texte = remplacer_ligne_reference(original, "- **limite (%s)**" % lettre, None)
+        if texte == original:
+            non_tuees.append(lettre + " (opposable : non)")
+            continue
+        with open(copie, "w", encoding="utf-8") as fh:
+            fh.write(texte)
+        if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
+            non_tuees.append(lettre)
+    if non_tuees:
+        komut("REFERENCE-LIMITES", "chaque limite (a) à (y) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+              "non tuées : " + ", ".join(non_tuees))
+    else:
+        okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))
+    # Côté code : une constante du hook change, la référence reste intacte.
+    ns_mut = dict(ns)
+    ns_mut["TABLE_ARMEMENT"] = dict(ns["TABLE_ARMEMENT"], G1="armed")
+    ecarts_c = controler(chemin, ns_mut)
+    if ecarts_c:
+        okmut("REFERENCE-CODE", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant, ARMEMENT_G1 armed dans le code, référence intacte) : %d écart(s), premier : %s" % (len(ecarts_c), ecarts_c[0].replace("ECART ", "écart : ", 1)))
+    else:
+        komut("REFERENCE-CODE", "R-REFERENCE rougit quand une constante du hook change sans la référence", "au moins un écart", "aucun écart")
+
+
 SECTIONS = {
     "table": sec_table,
     "parseur": sec_parseur,
@@ -4171,6 +4426,7 @@ SECTIONS = {
     "banc": sec_banc,
     "mutants": sec_mutants,
     "lota": sec_lota,
+    "reference": sec_reference,
 }
 
 
@@ -4215,7 +4471,7 @@ run_sections() { # <sections séparées par des virgules>
 
 # VF_GATES_SECTIONS (facultatif, pour rejouer une partie de la suite pendant le développement) : liste de sections séparées
 # par des virgules ; sans elle, toutes les sections tournent, dans l'ordre ci-dessous.
-run_sections "${VF_GATES_SECTIONS:-table,parseur,registre,jeton,g2,g5,g6,id,cang,g1,g7,role,verdict,derog,env,obs_env,env_statique,accord,banc,mutants,lota}"
+run_sections "${VF_GATES_SECTIONS:-table,parseur,registre,jeton,g2,g5,g6,id,cang,g1,g7,role,verdict,derog,env,obs_env,env_statique,accord,banc,mutants,lota,reference}"
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"
