@@ -198,3 +198,47 @@ EMPREINTE-ARBRE-IDENTIQUE ~/BusinessFlow-Lab
 ### Écarts
 
 Aucun : mêmes totaux que le rejeu post-audit (0 faux refus, 0 faux accept, 202 refus conformes au modèle), empreintes de tout l'arbre identiques pour les deux labs. Les refus de G6 sur `config.json` portent toujours leur raison d'origine pour les écritures qui retirent réellement l'adhésion ; la nouvelle raison (mise en forme du repli) ne concerne que les contenus qui déclarent `cycles-v1` hors de la forme reconnue par le repli.
+
+## Rejeu post-re-audit 2 (2026-10-02)
+
+**Mesure seule — aucun armement, aucune constante `ARMEMENT_*` ni `TABLE_ATTENDUE` touchée.** Le code du hook a changé après le rejeu post-re-audit (`a4afbe3f`) : la correction de classe du re-audit 2 (N2-01 : valeur longue que le hook ne sait pas analyser, repli et cœur ; quick 261002-1dv) a modifié `hooks.json`, `planning-hook.sh` et `check-gates-alive.sh`. Ce rejeu mesure donc le code corrigé.
+
+| Champ | Valeur |
+|---|---|
+| Date | 2026-10-02 |
+| Code mesuré | commit `19d9c32d` de la branche `gouvernance/phase-45-execution` |
+| Commande | celle du rejeu final ci-dessus (`rejeu-reel.sh` sur les deux labs, `--etape=4`, mêmes attendus) |
+| Autorisation | rejeu réel en lecture seule (Willy, AskUserQuestion session principale, 2026-09-30, reprise dans le mandat du 2026-10-02) |
+| Passages | un seul ; aucune occurrence de `Alarm clock` ni de « hook central indisponible » dans le relevé |
+
+### Contrôle de repos (lecture seule), forme anonymisée (sans USER ni PID)
+
+Avant (juste avant le rejeu) et après (01:37) :
+
+| Relevé | Avant | Après |
+|---|---|---|
+| Processus dont le répertoire courant est sous `~/jarvis-keystone` ou `~/BusinessFlow-Lab` (`lsof -d cwd`) | 0 | 0 |
+| Fichiers ouverts sous `~/jarvis-keystone/.planning` (`lsof +D`) | 0 | 0 |
+| Fichiers ouverts sous `~/BusinessFlow-Lab/.planning` (`lsof +D`) | 0 | 0 |
+| Transcripts modifiés depuis moins de 30 minutes (les deux dossiers de projet) | 0 | 0 |
+
+### Comptes (lignes brutes du rejeu)
+
+```
+COMPTE G6 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G5 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G1 faux-refus=0 faux-accept=0 refus-conforme-modele=196
+COMPTE G7 faux-refus=0 faux-accept=0 refus-conforme-modele=6
+COMPTE ROLE faux-refus=0 faux-accept=0 refus-conforme-modele=0
+REJEU-ETAPE-4 faux-refus=0 faux-accept=0 refus-conforme-modele=202
+CLASSE-REGLE-ECRITE G1 lab=~/jarvis-keystone n=200
+CLASSE-REGLE-ECRITE G1 lab=~/BusinessFlow-Lab n=0
+EMPREINTE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-IDENTIQUE ~/BusinessFlow-Lab
+EMPREINTE-ARBRE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-ARBRE-IDENTIQUE ~/BusinessFlow-Lab
+```
+
+### Écarts
+
+Aucun : mêmes totaux que le rejeu post-re-audit (0 faux refus, 0 faux accept, 202 refus conformes au modèle), empreintes de tout l'arbre identiques pour les deux labs.
