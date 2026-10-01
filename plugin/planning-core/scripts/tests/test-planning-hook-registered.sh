@@ -650,7 +650,7 @@ def sec_modes(ctx):
 # `none` (silence : Bash et toute lecture, limites déclarées (a) à (d), P45-D-06b).
 # =================================================================================================
 PLANCHER_MIN = 49        # plancher de la recherche : un corpus vidé rougit
-PLANCHER_CORPUS = 76     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
+PLANCHER_CORPUS = 78     # compte déclaré en dur du corpus livré : un corpus amaigri rougit aussi
 
 
 class Cas:
@@ -712,6 +712,18 @@ def construire_arbre(t):
         os.makedirs(os.path.join(t, nom, rel))
     lab(".claude/worktrees/wt", True)
     os.makedirs(os.path.join(t, ".claude", "worktrees", "wt", ".claude", "scripts", ".planning"))
+    # Lot F (M4, re-revue du lot E) : la casse de `.claude` et de `worktrees` dans la commande enregistrée (motifs `[Cc][Ll]…`,
+    # `[Ww][Oo]…`). Trois mesures qui fixent la forme : (1) la casse doit être PHYSIQUE (sur le disque, pas seulement dans le chemin
+    # écrit) : avec `.claude` sur le disque et `.CLAUDE` dans le chemin, le mutant n'est pas opposable sous zsh (son `pwd -P` rend la
+    # casse du disque) ni sous Linux (dossier inexistant en casse sensible) ; (2) l'exclusion `.claude` de G2 compare la casse
+    # (`composants[0] in (".planning", ".claude")`) : en mode A le cœur avertirait sur `.CLAUDE/scripts/…`, ce qui casserait l'attendu
+    # « silence » : le plan ouvert du lab `claude-casse` déclare donc `ecrit: .CLAUDE/scripts` (G2 n'avertit jamais qu'un
+    # avertissement, jamais un refus) ; (3) sous `cw`, sous-arbre neuf : réutiliser le `.claude/worktrees` ci-dessus ramènerait la casse
+    # du disque sur un disque insensible à la casse.
+    lab("claude-casse", True)
+    ecrire(os.path.join(t, "claude-casse", ".planning", "cycles", "01-c", "phases", "01-p", "PLAN.md"), "---\necrit: .CLAUDE/scripts\n---\n")
+    os.makedirs(os.path.join(t, "claude-casse", ".CLAUDE", "scripts", ".planning"))
+    lab(os.path.join("cw", ".claude", "WORKTREES", "wt"), True)
     os.makedirs(os.path.join(t, "bare"), exist_ok=True)
     _lien("adh", os.path.join(t, "alias-adh"))
     os.makedirs(os.path.join(t, "lab-plink"), exist_ok=True)
@@ -731,6 +743,7 @@ def construire_arbre(t):
     for nom in ("imb-a", "imb-b", "imb-c", "claude-a", "claude-b"):
         L.setdefault(nom, os.path.join(t, nom))
     L["wt"] = os.path.join(t, ".claude", "worktrees", "wt")
+    L["wt-casse"] = os.path.join(t, "cw", ".claude", "WORKTREES", "wt")
     for nom in ("alias-adh", "lab-plink", "bare", "cfglink", "nextline", "escaped", "dev-note", "dev-sans-config"):
         L.setdefault(nom, os.path.join(t, nom))
     return L
@@ -852,6 +865,9 @@ def construire_corpus(ctx):
     w("A25", "Write", L["claude-a"] + "/.claude/notes.md", dev, "tight", note="`.claude/.planning` : la racine reste le lab")
     w("A26", "Write", L["wt"] + "/.planning/notes.md", dev, "tight", note="lab adhérent posé sous `.claude/worktrees/<nom>` : reste une racine")
     w("A27", "Write", L["wt"] + "/.claude/scripts/planning-hook.sh", dev, "tight", note="`.claude/scripts/.planning` d'un lab sous `.claude/worktrees/<nom>` : la racine reste ce lab")
+    # ---- A28-A29 : casse de `.claude` et de `worktrees` dans la commande enregistrée (lot F, M4) — chaque cas se joue dans les six modes
+    w("A28", "Write", L["claude-casse"] + "/.CLAUDE/scripts/planning-hook.sh", dev, "tight", note="`.CLAUDE/scripts/.planning` (casse physique) : la racine reste le lab, le script du hook reste gardé")
+    w("A29", "Write", L["wt-casse"] + "/.planning/notes.md", dev, "tight", note="lab adhérent posé sous `.claude/WORKTREES/<nom>` (casse physique) : reste une racine")
     # ---- E37-E39 : échappement JSON non géré (b, f, u0001) dans le chemin écrit, lot A (audit B1, basse). La couche shell
     # ne peut pas décoder la valeur (X=0 : préfixe seulement) ; en panne, un préfixe hors de tout lab adhérent avec un cwd
     # hors du lab ne doit JAMAIS ouvrir : le doute d'adhésion ferme (P45-D-06a), comme E11b.
@@ -1188,6 +1204,10 @@ def sec_mutants(ctx):
         ("EXT-13D", 'if ! vf_cl "$_d" && [ -d "$_d/.planning" ]; then', 'if [ -d "$_d/.planning" ]; then', "A25", "D", {}),
         ("EXT-14", 'case $_w in [Ww][Oo][Rr][Kk][Tt][Rr][Ee][Ee][Ss]/?*/) return 1 ;; esac; ', '', "A26", "C", {}),
         ("EXT-15", '_w=${_w##*/[.][Cc][Ll][Aa][Uu][Dd][Ee]/}', '_w=${_w#*/[.][Cc][Ll][Aa][Uu][Dd][Ee]/}', "A27", "C", {}),
+        ("EXT-16", 'case $_w in */[.][Cc][Ll][Aa][Uu][Dd][Ee]/*) _w=${_w##*/[.][Cc][Ll][Aa][Uu][Dd][Ee]/};',
+         'case $_w in */[.]claude/*) _w=${_w##*/[.]claude/};', "A28", "C", {}),
+        ("EXT-17", 'case $_w in [Ww][Oo][Rr][Kk][Tt][Rr][Ee][Ee][Ss]/?*/) return 1 ;; esac;',
+         'case $_w in worktrees/?*/) return 1 ;; esac;', "A29", "C", {}),
         ("PX-1", 'elif [ "$PX" = 0 ]; then D=0; fi', 'elif [ "$PX" = 0 ] && { vf_get cwd && vf_tight "$V"; }; then D=0; fi', "E37", "C", {}),
         ("PX-1D", 'elif [ "$PX" = 0 ]; then D=0; fi', 'elif [ "$PX" = 0 ] && { vf_get cwd && vf_tight "$V"; }; then D=0; fi', "E38", "D", {}),
         ("CMD-1", ';; *) exit 0 ;; esac', ';; *) ;; esac', "E35", "C", {}),
