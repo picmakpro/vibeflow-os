@@ -119,12 +119,12 @@ Un hook `PreToolUse` unique (`scripts/planning-hook.sh`) porte les gates d'écri
 G5, G6, G7) et le cloisonnement par rôle de la fabrique d'agents. Il n'agit que dans un lab qui a
 adhéré à `cycles-v1` et reste **fail-closed** dans ce lab seulement (la commande enregistrée refuse les
 écritures par outil quand le script ou `python3` manque, `Bash` restant ouvert pour la réparation) ;
-partout ailleurs, labs de développement compris, il ne sort rien. **État livré : tous les gates en
-observation** (ils journalisent ce qu'ils refuseraient, sans refuser), G2 avertit ; aucun gate n'est
-armé. L'arbitrage de Willy qu'attendait l'armement est rendu et appliqué
-(Q-ARM, AskUserQuestion session principale, 2026-09-30) ; l'armement reste conditionné au rejeu
-réel final sur des labs au repos (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`) et se
-fait par étapes, dans un ordre fixe. Ce que le hook refuse, observe ou laisse passer, ses limites
+partout ailleurs, labs de développement compris, il ne sort rien. **État livré : G6 et G5 armés (étape 1),
+les autres gates en observation** (ils journalisent ce qu'ils refuseraient, sans refuser), G2
+avertit. L'arbitrage de Willy qu'attendait l'armement est rendu et appliqué
+(Q-ARM, AskUserQuestion session principale, 2026-09-30) ; le rejeu réel final sur des labs au repos
+est fait (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`) et l'armement se fait par
+étapes, dans un ordre fixe, un commit par étape. Ce que le hook refuse, observe ou laisse passer, ses limites
 déclarées, la dérogation, la commande de verdict, le canary et le rejeu sont décrits dans la section
 « Hook central et gates d'écriture (Phase 45) » de `references/modele-cycles.md`, tenue identique au
 code par un contrôle croisé en CI.

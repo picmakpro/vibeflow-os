@@ -94,8 +94,8 @@ CODE_ECHEANCE = 73
 # un fichier du lab ni dans une variable d'environnement (P45-D-01, P45-D-12a). Une constante par
 # gate, une ligne chacune (l'outil de rejeu et les mutants réécrivent ces lignes sur une copie).
 # Valeurs admises : `observe` (le gate calcule, journalise, laisse passer) | `armed` (le gate refuse).
-ARMEMENT_G6 = "observe"  # etape-1
-ARMEMENT_G5 = "observe"  # etape-1
+ARMEMENT_G6 = "armed"  # etape-1
+ARMEMENT_G5 = "armed"  # etape-1
 ARMEMENT_G1 = "observe"  # etape-2
 ARMEMENT_G7 = "observe"  # etape-3
 ARMEMENT_ROLE = "observe"  # etape-4
