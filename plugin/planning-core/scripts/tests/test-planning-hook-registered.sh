@@ -168,7 +168,12 @@ def fabriquer_lab(racine, adherent, config=None, plan=True):
 # --- Contexte : la commande enregistrée et ses six modes de défaillance ----------------------
 class Ctx:
     def __init__(self, scripts_dir, hooks_json, repo_root, work, settings_lab):
-        self.scripts_dir = scripts_dir
+        # Q-ARM (Willy, AskUserQuestion session principale, 2026-09-30) : les verdicts de cette suite (extraction, adhésion, mode dégradé,
+        # matrice A et E) sont ceux de l'enveloppe du hook, pas ceux d'un gate : le script rejoué est une COPIE du livré dont les cinq
+        # constantes ARMEMENT_* valent `observe`, quel que soit l'état d'armement courant (un gate armé refuse à juste titre un VERDICT.md
+        # ou un PLAN.md que la matrice attend silencieux). Les gates armés sont mesurés par test-planning-gates.sh.
+        self.scripts_dir_livre = scripts_dir
+        self.scripts_dir = self._dossier_observe(scripts_dir, work)
         self.hooks_json = hooks_json
         self.repo_root = repo_root
         self.work = work
@@ -184,6 +189,19 @@ class Ctx:
     def unique(self, prefixe):
         self._n += 1
         return os.path.join(self.work, prefixe + "-" + str(self._n))
+
+    @staticmethod
+    def _dossier_observe(source, work):
+        """Dossier jetable portant planning-hook.sh du `source`, les cinq constantes ARMEMENT_* réécrites à `observe` (observe|armed → observe)."""
+        texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"observe"',
+                           open(os.path.join(source, "planning-hook.sh"), encoding="utf-8").read(), flags=re.M)
+        if n != 5:
+            raise RuntimeError("cinq constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+        d = os.path.join(work, "scripts-observe")
+        os.makedirs(d, exist_ok=True)
+        ecrire(os.path.join(d, "planning-hook.sh"), texte)
+        os.chmod(os.path.join(d, "planning-hook.sh"), 0o755)
+        return d
 
     # -- la commande, lue là où le harnais la lit
     def charger_commande(self):
