@@ -148,7 +148,16 @@ class ErreurOutil(Exception):
 
 
 # --- Affichage : jamais un chemin de machine dans un relevé --------------------------------------
+GENERIQUES = {}
+
+
+def neutraliser(texte):
+    """Aucun caractère de contrôle (LF, CR, ESC…) dans une ligne imprimée : `\\xNN`. Un nom de fichier ne forge pas de ligne du relevé."""
+    return "".join(c if (c >= " " and c != "\x7f") else "\\x%02x" % ord(c) for c in texte)  # rejeu-neutraliser
+
+
 def afficher(chemin):
+    """Jamais un chemin absolu de machine : `~/…` sous HOME, sinon un nom générique `<lab-N>` dans l'ordre des labs (quick 45-B, B2)."""
     p = os.path.realpath(chemin)
     home = os.environ.get("HOME") or ""
     if home:
@@ -156,8 +165,27 @@ def afficher(chemin):
         if p == h:
             return "~"
         if p.startswith(h + os.sep):
-            return "~/" + p[len(h) + 1:]  # rejeu-affichage
-    return p
+            return neutraliser("~/" + p[len(h) + 1:])  # rejeu-affichage
+    return GENERIQUES.setdefault(p, "<lab-%d>" % (len(GENERIQUES) + 1))  # rejeu-generique
+
+
+def sous_un_lab(chemin, reel):
+    """Vrai si `chemin` est le lab `reel` ou se trouve dessous : chaînes ET identité de fichier de chaque ancêtre existant
+    (système de fichiers insensible à la casse : `/x/LAB` et `/x/lab` sont le même dossier sans que les chaînes le disent)."""
+    p = os.path.abspath(chemin)
+    r = os.path.realpath(chemin)
+    if r == reel or r.startswith(reel + os.sep):
+        return True
+    while True:
+        try:
+            if os.path.exists(p) and os.path.samefile(p, reel):
+                return True
+        except OSError:
+            pass
+        parent = os.path.dirname(p)
+        if parent == p:
+            return False
+        p = parent
 
 
 def clef(outil, chemin, agent_type):
@@ -257,6 +285,29 @@ def empreinte_perimetre(lab, entrees, fichier):
         fh.write("\n".join(lignes) + ("\n" if lignes else ""))
 
 
+def sous_copie(lab, chemin):
+    """Garde H3 (quick 45-B, décisions du manager vf-dev-manager, 2026-10-01) : `chemin` doit se RÉSOUDRE sous la copie du lab.
+    La copie recrée chaque lien avec sa cible d'origine : un lien à cible absolue (ou remontant) ferait écrire ou lire HORS de
+    la copie, donc dans le lab réel ou ailleurs. Appelée avant tout makedirs, open en écriture, rename ou lecture d'un chemin
+    qui peut traverser un lien ; erreur de l'outil (code 1), jamais un repli silencieux."""
+    base = os.path.realpath(lab.copie)
+    r = os.path.realpath(chemin)
+    if not (r == base or r.startswith(base + os.sep)):  # rejeu-garde-lien
+        raise ErreurOutil("lien symbolique dont la cible sort du lab : " + os.path.relpath(os.path.abspath(chemin), os.path.abspath(lab.copie)) + " (rien n'a été écrit hors de la copie)")
+
+
+def lire_regulier(lab, chemin, limite):
+    """Contenu texte d'un fichier RÉGULIER de la copie (lstat, aucun suivi de lien, cible résolue sous la copie) ; None sinon."""
+    try:
+        if not stat.S_ISREG(os.lstat(chemin).st_mode):  # rejeu-lecture-regulier
+            return None
+        sous_copie(lab, chemin)
+        with open(chemin, encoding="utf-8", errors="replace") as fh:
+            return fh.read(limite)
+    except (OSError, ErreurOutil):
+        return None
+
+
 def copier(lab, dest):
     lab.copie = dest
     os.makedirs(dest)
@@ -287,6 +338,7 @@ def simuler_adhesion(lab):
     cycles-v1 (autres clés conservées, fichier créé s'il manque). Jamais dans le lab réel."""
     for rel in lab.dossiers_planning:
         cible = os.path.join(lab.copie, rel, "config.json")  # rejeu-adhesion-copie
+        sous_copie(lab, os.path.dirname(cible))
         donnees = {}
         try:
             with open(cible, encoding="utf-8") as fh:
@@ -614,6 +666,7 @@ def phases_synthetiques(lab, planning):
     """Écritures `doit-refuser` (le modèle les interdit pour tout lab) dans des phases synthétiques créées sur la COPIE :
     une sans CADRAGE.md, une à registre ouvert, sous chaque cycle réel (ou sous le cycle synthétique 99-rejeu)."""
     base = os.path.join(lab.copie, planning, "cycles")
+    sous_copie(lab, base)
     cycles = []
     try:
         for nom in sorted(os.listdir(base)):
@@ -627,9 +680,11 @@ def phases_synthetiques(lab, planning):
     for cycle in cycles:
         for phase, cadrage in ((SYNTH_SANS, None), (SYNTH_OUVERT, CADRAGE_OUVERT)):
             dossier = os.path.join(base, cycle, "phases", phase)
+            sous_copie(lab, dossier)
             try:
                 os.makedirs(dossier, exist_ok=True)
                 if cadrage is not None:
+                    sous_copie(lab, os.path.join(dossier, "CADRAGE.md"))
                     with open(os.path.join(dossier, "CADRAGE.md"), "w", encoding="utf-8", newline="\n") as fh:
                         fh.write(cadrage)
             except OSError:
@@ -676,6 +731,7 @@ def construire_g7(lab, ctx):
         if parent:
             sortie.append(("Write", planning + "/config.json", "doit-passer", "", "etat-derive", None, None, "creation"))
         synth = (parent + "/" if parent else "") + SYNTH_ORPHELIN_G7
+        sous_copie(lab, os.path.join(lab.copie, synth))
         try:
             os.makedirs(os.path.join(lab.copie, synth), exist_ok=True)
         except OSError:
@@ -741,6 +797,8 @@ def classer_definition(hook_copie, chemin):
 def definitions_racine(lab):
     """[(nom, classe)] des définitions régulières de `<copie>/.claude/agents/*.md`, triées par nom de fichier."""
     dossier = os.path.join(lab.copie, ".claude", "agents")
+    if os.path.lexists(dossier):
+        sous_copie(lab, dossier)  # rejeu-agents-lien : .claude ou agents en lien vers l'extérieur, jamais lu (quick 45-B, H3)
     try:
         noms = sorted(os.listdir(dossier))
     except OSError:
@@ -877,12 +935,10 @@ def fusionner(entrees):
 def payload(lab, outil, chemin, agent_type, charge=None):
     absolu = os.path.join(lab.copie, chemin) if chemin else lab.copie
     contenu = "x"
-    if outil in ("Write", "Edit", "NotebookEdit") and os.path.isfile(absolu):
-        try:
-            with open(absolu, encoding="utf-8", errors="replace") as fh:
-                contenu = fh.read(MAX_CONTENU)
-        except OSError:
-            contenu = "x"
+    if outil in ("Write", "Edit", "NotebookEdit"):
+        lu = lire_regulier(lab, absolu, MAX_CONTENU)  # lstat + fichier régulier, aucun suivi de lien (quick 45-B, H3)
+        if lu is not None:
+            contenu = lu
     if outil in ("Agent", "Task"):
         entree = {"description": "d", "prompt": "p", "subagent_type": chemin}
     elif outil == "Bash":
@@ -934,6 +990,7 @@ def jouer_creation(hook_copie, env, lab, cle, charge, cote, numero):
     hook est joué, le dossier est remis en place — toujours, même sur erreur. Il n'existe rien à mettre de côté pour un dossier
     synthétique."""
     planning = os.path.join(lab.copie, os.path.dirname(cle[1]))
+    sous_copie(lab, os.path.dirname(planning))
     mis = None
     if os.path.lexists(planning):  # rejeu-cote
         mis = os.path.join(cote, "cote-%d" % numero)
@@ -999,14 +1056,14 @@ def assainir(texte, labs, tmp):
         for h in {home, os.path.realpath(home)}:
             if h and h != "/":
                 texte = texte.replace(h, "~")
-    texte = texte.replace("\n", " ⏎ ").replace(" | ", " / ")
+    texte = neutraliser(texte.replace("\n", " ⏎ ").replace(" | ", " / "))
     return texte if len(texte) <= 240 else texte[:240] + "…"
 
 
 def colonne_chemin(cle, situation=""):
     outil, chemin, agent = cle
     suffixe = "" if (outil == "Write" and not agent) else " [" + outil + ("@" + agent if agent else "") + "]"
-    return chemin + suffixe + (" [création]" if situation == "creation" else "")
+    return neutraliser(chemin + suffixe).replace(" | ", " / ") + (" [création]" if situation == "creation" else "")
 
 
 def analyser(argv):
@@ -1044,9 +1101,8 @@ def analyser(argv):
 def executer(opts, tmp):
     labs = [Lab(i, a) for i, a in enumerate(opts["labs"])]
     if opts["rapport"]:
-        rap = os.path.realpath(opts["rapport"])
         for lab in labs:
-            if rap == lab.reel or rap.startswith(lab.reel + os.sep):
+            if sous_un_lab(opts["rapport"], lab.reel):
                 raise Usage("le rapport ne peut pas être écrit sous un lab : " + lab.affiche)
     hook_copie = os.path.join(tmp, "hook", "planning-hook.sh")
     os.makedirs(os.path.dirname(hook_copie))
@@ -1174,6 +1230,10 @@ def main(argv):
         return 64
     except ErreurOutil as exc:
         sys.stderr.write("[rejeu-gates] " + str(exc) + "\n")
+        return 1
+    except RecursionError:  # rejeu-recursion
+        # quick 45-B (B3) : un arbre de plus d'un millier de niveaux dépasse la pile de l'interpréteur ; message, jamais une trace.
+        sys.stderr.write("[rejeu-gates] arborescence trop profonde pour être parcourue : rien n'a été mesuré\n")
         return 1
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

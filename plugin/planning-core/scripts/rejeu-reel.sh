@@ -65,7 +65,16 @@ import tempfile
 SOUS_ARBRES = [""]  # reel-perimetre
 
 
+GENERIQUES = {}
+
+
+def neutraliser(texte):
+    """Aucun caractère de contrôle (LF, CR, ESC…) dans une ligne imprimée : `\\xNN`. Un nom de dossier ne forge pas de ligne."""
+    return "".join(c if (c >= " " and c != "\x7f") else "\\x%02x" % ord(c) for c in texte)  # reel-neutraliser
+
+
 def afficher(chemin):
+    """Jamais un chemin absolu de machine : `~/…` sous HOME, sinon un nom générique `<lab-N>` (quick 45-B, B2)."""
     p = os.path.realpath(chemin)
     home = os.environ.get("HOME") or ""
     if home:
@@ -73,8 +82,54 @@ def afficher(chemin):
         if p == h:
             return "~"
         if p.startswith(h + os.sep):
-            return "~/" + p[len(h) + 1:]
-    return p
+            return neutraliser("~/" + p[len(h) + 1:])
+    return GENERIQUES.setdefault(p, "<lab-%d>" % (len(GENERIQUES) + 1))  # reel-generique
+
+
+def sous_un_lab(chemin, reel):
+    """Vrai si `chemin` est le lab `reel` ou se trouve dessous : comparaison de chaînes ET identité de fichier de chaque ancêtre existant
+    (un système de fichiers insensible à la casse rend `/x/LAB` et `/x/lab` identiques sans que les chaînes le disent)."""
+    p = os.path.abspath(chemin)
+    r = os.path.realpath(chemin)
+    if r == reel or r.startswith(reel + os.sep):
+        return True
+    while True:
+        try:
+            if os.path.exists(p) and os.path.samefile(p, reel):  # reel-samefile
+                return True
+        except OSError:
+            pass
+        parent = os.path.dirname(p)
+        if parent == p:
+            return False
+        p = parent
+
+
+# Chemins que le rejeu ÉCRIT ou LIT à l'intérieur d'un `.planning/` ou du `.claude/` de la racine (quick 45-B, H3) : un lien
+# dont la cible résolue sort du lab, à ces endroits, ferait écrire ou lire hors du lab.
+NOMS_ECRITS_LUS = ("STATE.md", "INDEX.md", "cloture.log", "derogations-gates.log", ".recalc-cache.json", "config.json",
+                   "cycles", "phases", "CADRAGE.md", "PLAN.md")
+
+
+def lien_a_risque(rel):
+    parts = rel.split("/")
+    if parts[0] == ".claude":
+        return len(parts) == 1 or (parts[1] == "agents" and len(parts) <= 3)
+    if ".planning" not in parts[:-1]:
+        return False
+    sous = parts[parts.index(".planning") + 1:]
+    return sous[-1] in NOMS_ECRITS_LUS or sous[-1].casefold() == "verdict.md" or "cycles" in sous[:-1]
+
+
+def liens_sortants(reel, liens):
+    sortants = []
+    for rel in liens:
+        if not lien_a_risque(rel):
+            continue
+        cible = os.path.realpath(os.path.join(reel, rel))
+        if not (cible == reel or cible.startswith(reel + os.sep)):  # reel-lien-sortant
+            sortants.append(rel)
+    return sortants
 
 
 def empreinte(racine, fichier):
@@ -82,6 +137,7 @@ def empreinte(racine, fichier):
     ou cible du lien), triées par octets. os.lstat et os.scandir(follow_symlinks=False) : un lien
     symbolique est une entrée, jamais un chemin à parcourir ni un fichier à lire."""
     lignes = []
+    liens = []
 
     def entree(rel):
         chemin = os.path.join(racine, rel) if rel else racine
@@ -89,6 +145,7 @@ def empreinte(racine, fichier):
         mode = st.st_mode
         if stat.S_ISLNK(mode):
             genre, sig = "l", os.readlink(chemin)
+            liens.append(rel)
         elif stat.S_ISDIR(mode):
             genre, sig = "d", "-"
         elif stat.S_ISREG(mode):
@@ -106,25 +163,29 @@ def empreinte(racine, fichier):
         lignes.append((rel or ".", "%s\t%s\t%o\t%d\t%s" % (rel or ".", genre, stat.S_IMODE(mode), st.st_mtime_ns, sig)))  # reel-signature
         return genre
 
-    def descendre(rel):
+    # Parcours ITÉRATIF (quick 45-B, B3) : aucune récursion, donc aucune profondeur qui fasse planter l'interpréteur.
+    pile = []
+    for sous in SOUS_ARBRES:
+        if sous == "" or os.path.lexists(os.path.join(racine, sous)):
+            pile.append(sous)
+    while pile:
+        rel = pile.pop()
         if entree(rel) != "d":
-            return
+            continue
         chemin = os.path.join(racine, rel) if rel else racine
         try:
             with os.scandir(chemin) as it:
                 enfants = sorted(e.name for e in it)
         except OSError as exc:
             lignes.append((rel + "/?", "%s/?\tERR\t%s" % (rel, type(exc).__name__)))
-            return
+            continue
         for nom in enfants:
-            descendre(rel + "/" + nom if rel else nom)
+            pile.append(rel + "/" + nom if rel else nom)
 
-    for sous in SOUS_ARBRES:
-        if sous == "" or os.path.lexists(os.path.join(racine, sous)):
-            descendre(sous)
     lignes.sort(key=lambda t: os.fsencode(t[0]))
     with open(fichier, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("".join(l[1] + "\n" for l in lignes))
+    return liens
 
 
 def main(argv):
@@ -157,16 +218,28 @@ def main(argv):
     # le lab serait sinon une entrée de type lien, jamais parcourue, et l'arbre réel resterait
     # invisible (comme rejeu-gates.sh, qui travaille sur le lab réel).
     reels = [os.path.realpath(lab) for lab in labs]  # reel-realpath
-    rap_reel = os.path.realpath(rapport)
+    for lab in labs:
+        afficher(lab)  # nomme les labs hors HOME dans l'ordre des arguments, comme rejeu-gates.sh
     for lab, reel in zip(labs, reels):
-        if rap_reel == reel or rap_reel.startswith(reel + os.sep):  # reel-rapport
+        if sous_un_lab(rapport, reel):  # reel-rapport
             sys.stderr.write("[rejeu-reel] le rapport ne peut pas être écrit sous un lab : " + afficher(lab) + "\n")
             return 64
 
     tmp = os.path.realpath(tempfile.mkdtemp(prefix="vf-rejeu-reel-"))
     try:
+        liens = []
         for i, reel in enumerate(reels):
-            empreinte(reel, os.path.join(tmp, "avant-%d.txt" % i))
+            liens.append(empreinte(reel, os.path.join(tmp, "avant-%d.txt" % i)))
+        # H3 (quick 45-B, décisions du manager vf-dev-manager, 2026-10-01) : AVANT tout rejeu, un lien dont la cible résolue sort du
+        # lab, sur un chemin que le rejeu écrit ou lit, est une erreur (code 1) : rien n'est joué, rien n'est écrit.
+        refus = False
+        for lab, reel, ls in zip(labs, reels, liens):
+            for rel in liens_sortants(reel, ls):
+                refus = True
+                sys.stderr.write("[rejeu-reel] lien symbolique dont la cible sort du lab : " + afficher(lab) + "/" + neutraliser(rel)
+                                 + " (le rejeu écrit ou lit à cet endroit) ; rien n'a été joué\n")
+        if refus:
+            return 1
         code = subprocess.run(["bash", rejeu_gates] + args).returncode
         if code == 64:  # reel-refus64
             # rejeu-gates.sh a refusé l'usage avant de rejouer quoi que ce soit : rien n'a été mesuré,
@@ -177,7 +250,7 @@ def main(argv):
         for i, lab in enumerate(labs):
             avant = os.path.join(tmp, "avant-%d.txt" % i)
             apres = os.path.join(tmp, "apres-%d.txt" % i)
-            empreinte(reels[i], apres)
+            empreinte(reels[i], apres)  # le retour (liens) ne sert qu'avant le rejeu
             identique = subprocess.run(["cmp", "-s", avant, apres]).returncode == 0  # reel-cmp
             if identique:
                 lignes.append("EMPREINTE-ARBRE-IDENTIQUE " + afficher(lab))
@@ -192,6 +265,13 @@ def main(argv):
         if code != 0:
             return code
         return 1 if divergence else 0
+    except (RecursionError, MemoryError):
+        sys.stderr.write("[rejeu-reel] arborescence trop profonde ou trop grosse pour être empreinte : rien n'a été mesuré\n")
+        return 1
+    except OSError as exc:  # reel-profondeur
+        # un chemin plus long que la limite du système (arbre très profond) ou une entrée disparue : message, jamais une trace.
+        sys.stderr.write("[rejeu-reel] arborescence illisible ou trop profonde, ou rapport non écrit (" + type(exc).__name__ + ")\n")
+        return 1
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

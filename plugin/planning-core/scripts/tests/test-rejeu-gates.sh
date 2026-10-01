@@ -35,6 +35,12 @@
 #                 f9-allowlist, Willy, AskUserQuestion session principale, 2026-09-30 ; dispatch hors liste d'un worker sous Agent ET
 #                 Task : doit-refuser) ; un substitut qui applique la lettre compte un faux refus ; à --etape=3 les lignes ROLE sont hors-etape
 #   R-REJEU-STATIQUE  aucun sous-processus autre que bash (hook copié, `--classer`, recalc-planning.sh) et cmp
+#   R-REJEU-LIENS / R-REEL-LIENS  (quick 45-B, H3 ; décisions du manager vf-dev-manager, 2026-10-01) : un lien du lab dont la cible
+#                 résolue sort du lab, sur un chemin que le rejeu écrit ou lit (cycles/, phases/, STATE.md, .claude/agents), est une
+#                 erreur (code 1) AVANT toute écriture sur la copie ; dossier extérieur intact ; payload sans suivi de lien ; rejeu-reel.sh
+#                 refuse avant de rien jouer ; témoins positifs (lien interne au lab, lien sortant hors des chemins du rejeu)
+#   R-REJEU-RELEVE / R-REEL-CASSE / R-REJEU-PROFOND  (quick 45-B, B2 et B3) : aucun chemin absolu ni ligne forgée par un nom dans le
+#                 relevé, garde « rapport sous un lab » par identité de fichier, arbre profond sans trace Python
 #   R-REEL-01..04  rejeu-reel.sh : empreinte de TOUT l'arbre par un geste extérieur, liens non suivis,
 #                  aucune commande de gestionnaire de versions
 #   MUT-*  douze mutants (motif unique, texte distinct, bash -n, compilation) : chaque garde rougit
@@ -1400,6 +1406,262 @@ def sec_reel(_):
         ko("R-REEL-07", "aucune empreinte annoncée quand rien n'a été rejoué", "code 64, sortie sans EMPREINTE-ARBRE, rapport absent", "rc=%d out=%s rapport=%s" % (p7.returncode, court(p7.stdout), os.path.exists(rap7)))
 
 
+# --- Quick 45-B (H3, B3) : aucun lien symbolique du lab ne fait écrire ou lire hors de la copie ; arbre très profond -------------
+# Décisions du manager (vf-dev-manager, 2026-10-01), renversables. Un lien dont la cible résolue sort du lab est une ERREUR
+# (code 1, dossier extérieur intact) avant toute écriture sur la copie ; un lien dont la cible reste dans le lab est suivi
+# normalement (témoin positif). Le geste réel (rejeu-reel.sh) le refuse AVANT de rien jouer.
+def lab_ext(nom, lien, relatif=False, avec_cycle=False):
+    """Lab synthétique dont `lien` (chemin relatif au lab) est un lien symbolique vers un dossier EXTÉRIEUR `ext-<nom>`."""
+    lab = fabriquer_lab(nom, {".planning/notes.md": "n"})
+    ext = os.path.join(HOME, "ext-" + nom)
+    ecrire(os.path.join(ext, "x.txt"), "extérieur")
+    if avec_cycle:
+        ecrire(os.path.join(lab, ".planning", "cycles", "01-c", "CYCLE.md"), "c")
+    chemin = os.path.join(lab, lien)
+    os.makedirs(os.path.dirname(chemin), exist_ok=True)
+    os.symlink(os.path.relpath(ext, os.path.dirname(chemin)) if relatif else ext, chemin)
+    return lab, ext
+
+
+def sec_liens(_):
+    """R-REJEU-LIENS (H3) : écriture et lecture à travers un lien sortant ; R-REEL-LIENS ; R-REEL-PROF (B3)."""
+    cas = (("cycles absolu", ".planning/cycles", False, False), ("cycles relatif", ".planning/cycles", True, False),
+           ("phases d'un cycle réel", ".planning/cycles/01-c/phases", False, True))
+    fautes = []
+    for nom, lien, relatif, avec_cycle in cas:
+        lab, ext = lab_ext(unique("lab-l"), lien, relatif, avec_cycle)
+        avant = empreinte_arbre(ext)
+        r = rejeu([lab], hook=HOOK, etape=2)
+        if not (r.rc == 1 and r.err.startswith("[rejeu-gates] ") and "Traceback" not in r.err and empreinte_arbre(ext) == avant):
+            fautes.append("%s : attendu code 1 et dossier extérieur intact ; obtenu rc=%d ext_intact=%s err=%s" % (nom, r.rc, empreinte_arbre(ext) == avant, court(r.err)))
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-LIENS", "un lien qui sort du lab ne laisse rien écrire hors de la copie", "code 1, dossier extérieur intact", f)
+    else:
+        ok("R-REJEU-LIENS .planning/cycles (absolu, relatif) ou phases/ d'un cycle réel en lien vers un dossier extérieur : code 1, message de rejeu-gates.sh, dossier extérieur INTACT (empreinte comparée)")
+
+    # témoin positif : un lien qui reste DANS le lab est suivi, aucun refus
+    lab = fabriquer_lab(unique("lab-l"), {".planning/notes.md": "n", ".planning/vrais-cycles/01-c/CYCLE.md": "c"})
+    os.symlink("vrais-cycles", os.path.join(lab, ".planning", "cycles"))
+    r = rejeu([lab], hook=HOOK, etape=2)
+    reel_intact = not os.path.exists(os.path.join(lab, ".planning", "vrais-cycles", "01-c", "phases"))
+    if r.rc == 0 and reel_intact:
+        ok("R-REJEU-LIENS témoin : .planning/cycles lien vers un dossier DU lab : suivi sur la copie, code 0, lab réel intact")
+    else:
+        ko("R-REJEU-LIENS témoin", "un lien interne au lab n'est pas refusé", "code 0, lab intact", "rc=%d intact=%s err=%s" % (r.rc, reel_intact, court(r.err)))
+
+    # lecture : STATE.md en lien (vers l'extérieur, ou vers un fichier DU lab) : jamais suivi, la charge du hook porte le contenu neutre
+    for nom, cible in (("extérieur", None), ("interne", "notes.md")):
+        lab = fabriquer_lab(unique("lab-l"), {".planning/notes.md": "NOTE-INTERNE"})
+        ext = os.path.join(HOME, unique("ext-secret"))
+        ecrire(os.path.join(ext, "secret.md"), "SECRET-EXTERIEUR")
+        os.symlink(cible or os.path.join(ext, "secret.md"), os.path.join(lab, ".planning", "STATE.md"))
+        trace = os.path.join(WORK, unique("trace") + ".txt")
+        sub = substitut(unique("sub-trace") + ".sh", 'if chemin.endswith("/.planning/STATE.md"): open(%r, "a").write(str(ti.get("content")) + "\\n")' % trace)
+        r = rejeu([lab], hook=sub, scenario="g6-state")
+        vu = open(trace, encoding="utf-8").read() if os.path.exists(trace) else ""
+        if vu == "x\n":
+            ok("R-REJEU-LIENS STATE.md en lien (%s) : son contenu n'est jamais lu, la charge du hook porte le contenu neutre" % nom)
+        else:
+            ko("R-REJEU-LIENS lecture (%s)" % nom, "payload sans suivi de lien (lstat + fichier régulier)", "charge neutre x", "rc=%d vu=%s" % (r.rc, court(vu)))
+
+    # lecture : .claude/agents en lien vers un dossier extérieur portant une définition
+    lab, ext = lab_ext(unique("lab-l"), ".claude/agents", False, False)
+    ecrire(os.path.join(ext, "w.md"), _agent("w-ext", "Read, Agent(cible-w)", "vf-internal: true\n"))
+    r = rejeu([lab], hook=HOOK, etape=4)
+    if r.rc == 1 and "ROLE-AGENT" not in r.out and r.err.startswith("[rejeu-gates] "):
+        ok("R-REJEU-LIENS .claude/agents en lien vers un dossier extérieur : code 1, aucune définition extérieure lue")
+    else:
+        ko("R-REJEU-LIENS agents", "definitions_racine sans suivi de lien", "code 1, aucune ligne ROLE-AGENT", "rc=%d out=%s err=%s" % (r.rc, court(r.out), court(r.err)))
+
+    # geste réel : refus AVANT tout rejeu, rien d'écrit, rapport non créé
+    cas_reel = (("cycles absolu", ".planning/cycles", False, False), ("cycles relatif", ".planning/cycles", True, False),
+                ("phases d'un cycle réel", ".planning/cycles/01-c/phases", False, True), ("STATE.md", ".planning/STATE.md", False, False),
+                ("agents", ".claude/agents", False, False))
+    fautes = []
+    for nom, lien, relatif, avec_cycle in cas_reel:
+        lab, ext = lab_ext(unique("lab-lr"), lien, relatif, avec_cycle)
+        avant, marque = empreinte_arbre(ext), os.path.join(WORK, unique("marque") + ".txt")
+        sub = substitut(unique("sub-marque") + ".sh", 'open(%r, "w").write("joue")' % marque)
+        r = rejeu([lab], hook=sub, reel=True)
+        if not (r.rc == 1 and r.err.startswith("[rejeu-reel] ") and not os.path.exists(marque) and r.rapport == "" and "EMPREINTE-ARBRE" not in r.out
+                and "Traceback" not in r.err and empreinte_arbre(ext) == avant):
+            fautes.append("%s : attendu code 1, rien joué, rapport absent ; obtenu rc=%d joué=%s rapport=%s err=%s" % (nom, r.rc, os.path.exists(marque), court(r.rapport), court(r.err)))
+    if fautes:
+        for f in fautes:
+            ko("R-REEL-LIENS", "rejeu-reel.sh refuse un lien sortant avant tout rejeu", "code 1, aucun hook joué", f)
+    else:
+        ok("R-REEL-LIENS rejeu-reel.sh : lien sortant sur cycles/, phases/, STATE.md ou .claude/agents : code 1 avec message, AUCUN hook joué, rapport non créé, dossier extérieur intact")
+    # témoin : un lien sortant hors des chemins que le rejeu écrit ou lit n'est pas refusé
+    lab, ext = lab_ext(unique("lab-lr"), "docs-externes", False, False)
+    r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), reel=True)
+    if r.rc == 0:
+        ok("R-REEL-LIENS témoin : un lien sortant à la racine du lab, hors des chemins écrits ou lus, ne bloque pas le rejeu (code 0)")
+    else:
+        ko("R-REEL-LIENS témoin", "pas de sur-refus", "code 0", "rc=%d err=%s" % (r.rc, court(r.err)))
+
+    # B3 : arbre de plus de 1 500 niveaux : erreur propre (code 1, message), jamais une trace Python
+    lab = fabriquer_lab(unique("lab-prof"), {".planning/notes.md": "n"})
+    base = os.path.join(lab, "src")
+    os.makedirs(base)
+    cwd = os.getcwd()
+    try:
+        os.chdir(base)
+        for _ in range(1600):
+            os.mkdir("d")
+            os.chdir("d")
+    finally:
+        os.chdir(cwd)
+    try:
+        r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), reel=True)
+        if r.rc == 1 and "Traceback" not in r.err and r.err.startswith("[rejeu-"):
+            ok("R-REEL-PROF arbre de 1 600 niveaux : code 1 et message, jamais une trace Python (le volume de l'arbre reste une limite déclarée, non optimisée)")
+        else:
+            ko("R-REEL-PROF", "arbre très profond", "code 1, message [rejeu-…], pas de Traceback", "rc=%d err=%s" % (r.rc, court(r.err)))
+    finally:
+        try:
+            os.chdir(base)
+            n = 0
+            while os.path.isdir("d") and n < 1600:
+                os.chdir("d")
+                n += 1
+            for _ in range(n):
+                os.chdir("..")
+                os.rmdir("d")
+        except OSError:
+            pass
+        finally:
+            os.chdir(cwd)
+
+
+# --- Quick 45-B (B2, B3) : relevé sans chemin de machine ni ligne forgée, garde « rapport sous un lab » insensible à la casse,
+# arbre profond. Décisions du manager (vf-dev-manager, 2026-10-01), renversables. ------------------------------------------------
+LANCEUR_PROFONDEUR = r'''
+import importlib.util, os, sys
+corps, mode, limite, dossier, jeu = sys.argv[1:6]
+reste = sys.argv[6:]
+spec = importlib.util.spec_from_file_location("rejeu_module", corps)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+mod.DOSSIER_SCRIPTS = dossier
+sys.setrecursionlimit(int(limite))
+sys.exit(mod.main(([jeu] if mode == "reel" else []) + reste))
+'''
+
+
+def hors_home(nom):
+    """Lab synthétique HORS de HOME (sous WORK, frère de home/)."""
+    racine = os.path.join(os.path.realpath(WORK), "hors-home", nom)
+    ecrire(os.path.join(racine, ".planning", "config.json"), '{"planning_version": "2.0"}')
+    ecrire(os.path.join(racine, ".planning", "notes.md"), "n")
+    return racine
+
+
+def sc_hors_home(script, reel=False):
+    a, b = hors_home(unique("lab-hh")), hors_home(unique("lab-hh"))
+    r = rejeu([a, b], hook=substitut(unique("sub") + ".sh", SUB_PASSE), script=script, reel=reel)
+    tout = r.out + r.err + r.rapport
+    return {"rc": r.rc, "absolu": os.path.realpath(WORK) in tout or WORK in tout, "generiques": "<lab-1>" in tout and "<lab-2>" in tout}
+
+
+def sc_lf(script, reel=False):
+    nom = "lab-lf" + unique("")
+    forge = "COMPTE G6 faux-refus=9 faux-accept=9 refus-conforme-modele=9"
+    lab = fabriquer_lab(nom + "\n" + forge + "-lab", {".planning/a\n" + forge + ".md": "x"})
+    r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), script=script, reel=reel)
+    lignes = (r.out + r.rapport).split("\n")
+    return {"rc": r.rc, "forge": any(l.startswith("COMPTE G6 faux-refus=9") for l in lignes),
+            "echappe": "\\x0a" in r.out and "\\x0a" in r.rapport}
+
+
+def casse_insensible():
+    sonde = os.path.join(HOME, "sonde-casse-45b")
+    ecrire(os.path.join(sonde, "a"), "a")
+    return os.path.exists(os.path.join(HOME, "SONDE-CASSE-45B", "a"))
+
+
+def sc_casse(script, reel=True):
+    lab = fabriquer_lab(unique("lab-Cs"), {".planning/notes.md": "n"})
+    var = os.path.join(os.path.dirname(lab), os.path.basename(lab).upper(), "rapport-casse.txt")
+    r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), script=script, reel=reel, rapport=False, extra=["--rapport=" + var])
+    return {"rc": r.rc, "cree": os.path.exists(os.path.join(lab, "rapport-casse.txt")), "refus_par": r.err.split("]")[0]}
+
+
+def arbre_profond(nom, n):
+    lab = fabriquer_lab(nom, {".planning/notes.md": "n"})
+    base = os.path.join(lab, "src")
+    os.makedirs(base)
+    cwd = os.getcwd()
+    try:
+        os.chdir(base)
+        for _ in range(n):
+            os.mkdir("d")
+            os.chdir("d")
+    finally:
+        os.chdir(cwd)
+    return lab
+
+
+def lancer_profondeur(script, mode, limite, lab):
+    corps = extraire(script, "PY_REJEU_GATES_EOF" if mode == "gates" else "PY_REJEU_REEL_EOF", os.path.join(WORK, "essais", unique("module-prof") + ".py"))
+    ecrire(os.path.join(WORK, "essais", "lanceur_profondeur.py"), LANCEUR_PROFONDEUR)
+    sub = substitut(unique("sub") + ".sh", SUB_PASSE)
+    rap = os.path.join(WORK, unique("rapport") + ".txt")
+    jeu = os.path.join(SCRIPTS, "rejeu-gates.sh")
+    cmd = [PYBIN, os.path.join(WORK, "essais", "lanceur_profondeur.py"), corps, mode, str(limite), SCRIPTS, jeu,
+           "--lab=" + lab, "--etape=1", "--hook=" + sub, "--rapport=" + rap]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env_sain(), timeout=600)
+    return p.returncode, p.stdout.decode("utf-8", "replace"), p.stderr.decode("utf-8", "replace"), (open(rap, encoding="utf-8").read() if os.path.exists(rap) else "")
+
+
+def sc_prof_gates(script):
+    lab = arbre_profond(unique("lab-pg"), 150)
+    rc, out, err, _ = lancer_profondeur(script, "gates", 120, lab)
+    return {"rc": rc, "message": err.startswith("[rejeu-gates] arborescence trop profonde"), "trace": "Traceback" in err}
+
+
+def sc_prof_reel(script):
+    lab = arbre_profond(unique("lab-pr"), 150)
+    rc, out, err, rap = lancer_profondeur(script, "reel", 120, lab)
+    return {"rc": rc, "trace": "Traceback" in err, "identique": "EMPREINTE-ARBRE-IDENTIQUE" in rap}
+
+
+def sec_releve(_):
+    """R-REJEU-RELEVE (B2) : jamais un chemin absolu, aucune ligne forgée par un nom ; R-REEL-CASSE ; R-REJEU-PROFOND (B3)."""
+    for nom, script, reel in (("rejeu-gates.sh", REJEU, False), ("rejeu-reel.sh", REEL, True)):
+        o = sc_hors_home(script, reel)
+        if o["rc"] == 0 and not o["absolu"] and o["generiques"]:
+            ok("R-REJEU-RELEVE %s : deux labs hors de HOME sont nommés <lab-1> et <lab-2>, aucun chemin absolu dans la sortie, le rapport ni les messages" % nom)
+        else:
+            ko("R-REJEU-RELEVE %s" % nom, "aucun chemin absolu de machine imprimé", "rc 0, <lab-1> et <lab-2>, aucun chemin absolu", o)
+        o = sc_lf(script, reel)
+        if o["rc"] == 0 and not o["forge"] and o["echappe"]:
+            ok("R-REJEU-RELEVE %s : un LF dans un nom de dossier ou de fichier est échappé (\\x0a), aucune ligne du relevé n'est forgée" % nom)
+        else:
+            ko("R-REJEU-RELEVE %s LF" % nom, "un nom de fichier ne forge pas de ligne", "rc 0, aucune ligne COMPTE forgée, \\x0a visible", o)
+    if casse_insensible():
+        for nom, script, reel in (("rejeu-reel.sh", REEL, True), ("rejeu-gates.sh", REJEU, False)):
+            o = sc_casse(script, reel)
+            if o["rc"] == 64 and not o["cree"] and o["refus_par"] == "[" + nom[:-3]:
+                ok("R-REEL-CASSE %s : --rapport sous le lab écrit avec une autre casse (même dossier sur ce système de fichiers) : code 64, aucun fichier créé dans le lab" % nom)
+            else:
+                ko("R-REEL-CASSE %s" % nom, "le garde « rapport sous un lab » compare l'identité des dossiers", "code 64, rien créé", o)
+    else:
+        ok("R-REEL-CASSE non applicable ici : ce système de fichiers distingue la casse, `/x/LAB` et `/x/lab` y sont deux dossiers (le cas se joue sous APFS/NTFS par défaut)")
+    # B3 : le parcours de rejeu-reel.sh est ITÉRATIF (limite de récursion abaissée à 120 sur un arbre de 150 niveaux : il passe) ;
+    # celui de rejeu-gates.sh est récursif : message et code 1, jamais une trace.
+    o = sc_prof_reel(REEL)
+    if o["rc"] == 0 and o["identique"] and not o["trace"]:
+        ok("R-REJEU-PROFOND rejeu-reel.sh : parcours itératif, un arbre de 150 niveaux sous une limite de récursion de 120 est empreint sans erreur (EMPREINTE-ARBRE-IDENTIQUE)")
+    else:
+        ko("R-REJEU-PROFOND rejeu-reel.sh", "parcours sans récursion", "rc 0, EMPREINTE-ARBRE-IDENTIQUE, pas de trace", o)
+    o = sc_prof_gates(REJEU)
+    if o["rc"] == 1 and o["message"] and not o["trace"]:
+        ok("R-REJEU-PROFOND rejeu-gates.sh : un arbre plus profond que la pile de l'interpréteur rend le code 1 et un message, jamais une trace Python")
+    else:
+        ko("R-REJEU-PROFOND rejeu-gates.sh", "erreur propre sur un arbre trop profond", "rc 1, message, pas de trace", o)
+
+
 # --- Mutants ----------------------------------------------------------------------------------------
 def make_mutant(source, marqueur, ident, motif, remplacement, compagnons=()):
     """Copie de `source` dont l'UNIQUE ligne portant `motif` est remplacée (indentation conservée) ;
@@ -1709,6 +1971,93 @@ def sec_mutants(_):
     duel("REEL-SHA", REEL, R, "# reel-sha", 'sig = "x"  # reel-sha',
          sc_reel_signature, lambda o, m: o == tout and m == dict(tout, contenu="IDENTIQUE"),
          "R-REEL-08 : sha256 retiré de la signature (un contenu changé à mtime restauré n'est plus vu)", compagnons=(REJEU, RECALC))
+    # --- Quick 45-B : H3 (liens), B2 (relevé), B3 (profondeur) ---
+    def sc_lien_ecriture(script):
+        lab, ext = lab_ext(unique("lab-ml"), ".planning/cycles", False, False)
+        avant = empreinte_arbre(ext)
+        r = rejeu([lab], hook=HOOK, etape=2, script=script)
+        return {"rc": r.rc, "ext_intact": empreinte_arbre(ext) == avant}
+
+    def sc_lien_agents(script):
+        lab, ext = lab_ext(unique("lab-ma"), ".claude/agents", False, False)
+        os.makedirs(ext, exist_ok=True)
+        r = rejeu([lab], hook=HOOK, etape=4, script=script)
+        return {"rc": r.rc}
+
+    def sc_lien_lecture(script):
+        lab = fabriquer_lab(unique("lab-mr"), {".planning/notes.md": "NOTE-INTERNE"})
+        os.symlink("notes.md", os.path.join(lab, ".planning", "STATE.md"))
+        trace = os.path.join(WORK, unique("trace") + ".txt")
+        sub = substitut(unique("sub-trace") + ".sh", 'if chemin.endswith("/.planning/STATE.md"): open(%r, "a").write(str(ti.get("content")) + "\\n")' % trace)
+        rejeu([lab], hook=sub, scenario="g6-state", script=script)
+        return {"lu": open(trace, encoding="utf-8").read() if os.path.exists(trace) else None}
+
+    def sc_lien_reel(script):
+        lab, ext = lab_ext(unique("lab-mlr"), ".planning/STATE.md", False, False)
+        marque = os.path.join(WORK, unique("marque") + ".txt")
+        sub = substitut(unique("sub-marque") + ".sh", 'open(%r, "w").write("joue")' % marque)
+        r = rejeu([lab], hook=sub, reel=True, script=script)
+        return {"rc": r.rc, "joue": os.path.exists(marque)}
+
+    duel("REJEU-GARDE-LIEN", REJEU, G, "# rejeu-garde-lien", "if False:  # rejeu-garde-lien",
+         sc_lien_ecriture, lambda o, m: o == {"rc": 1, "ext_intact": True} and m["ext_intact"] is False,
+         "H3 : la garde « la cible résolue reste sous la copie » retirée (le rejeu écrit dans le dossier extérieur par un lien)", compagnons=(RECALC,))
+    duel("REJEU-LECTURE-REGULIER", REJEU, G, "# rejeu-lecture-regulier", "if False:  # rejeu-lecture-regulier",
+         sc_lien_lecture, lambda o, m: o == {"lu": "x\n"} and m["lu"] != "x\n",
+         "H3 : le payload ne vérifie plus que le fichier lu est régulier (STATE.md en lien interne : son contenu est lu)", compagnons=(RECALC,))
+    duel("REJEU-AGENTS-LIEN", REJEU, G, "# rejeu-agents-lien", "pass  # rejeu-agents-lien",
+         sc_lien_agents, lambda o, m: o["rc"] == 1 and m["rc"] == 0,
+         "H3 : .claude/agents en lien vers l'extérieur n'est plus refusé (le dossier extérieur est lu)", compagnons=(RECALC,))
+    duel("REEL-LIEN-SORTANT", REEL, R, "# reel-lien-sortant", "if False:  # reel-lien-sortant",
+         sc_lien_reel, lambda o, m: o == {"rc": 1, "joue": False} and m["joue"] is True,
+         "H3 : rejeu-reel.sh ne refuse plus un lien sortant avant le rejeu (le hook est joué)", compagnons=(REJEU, RECALC))
+    duel("REJEU-GENERIQUE", REJEU, G, "# rejeu-generique", "return p  # rejeu-generique",
+         lambda s: sc_hors_home(s, False), lambda o, m: o["rc"] == 0 and not o["absolu"] and m["absolu"],
+         "B2 : un lab hors de HOME est de nouveau affiché par son chemin absolu", compagnons=(RECALC,))
+    duel("REEL-GENERIQUE", REEL, R, "# reel-generique", "return p  # reel-generique",
+         lambda s: sc_hors_home(s, True), lambda o, m: o["rc"] == 0 and not o["absolu"] and m["absolu"],
+         "B2 : rejeu-reel.sh affiche de nouveau le chemin absolu d'un lab hors de HOME", compagnons=(REJEU, RECALC))
+    duel("REJEU-NEUTRALISER", REJEU, G, "# rejeu-neutraliser", "return texte  # rejeu-neutraliser",
+         lambda s: sc_lf(s, False), lambda o, m: o["rc"] == 0 and not o["forge"] and o["echappe"] and m["forge"],
+         "B2 : les caractères de contrôle d'un nom ne sont plus échappés (une ligne COMPTE est forgée par un nom de fichier)", compagnons=(RECALC,))
+    duel("REEL-NEUTRALISER", REEL, R, "# reel-neutraliser", "return texte  # reel-neutraliser",
+         lambda s: sc_lf(s, True), lambda o, m: o["rc"] == 0 and not o["forge"] and o["echappe"] and m["forge"],
+         "B2 : rejeu-reel.sh n'échappe plus les caractères de contrôle d'un nom de lab", compagnons=(REJEU, RECALC))
+    duel("REJEU-RECURSION", REJEU, G, "# rejeu-recursion", "except ZeroDivisionError:  # rejeu-recursion",
+         sc_prof_gates, lambda o, m: o == {"rc": 1, "message": True, "trace": False} and m["trace"] and not m["message"],
+         "B3 : la RecursionError de rejeu-gates.sh n'est plus rattrapée (trace Python au lieu du message)", compagnons=(RECALC,))
+    if casse_insensible():
+        duel("REEL-SAMEFILE", REEL, R, "# reel-samefile", "if False:  # reel-samefile",
+             lambda s: sc_casse(s, True), lambda o, m: o["rc"] == 64 and not o["cree"] and o["refus_par"] == "[rejeu-reel" and m["refus_par"] == "[rejeu-gates",
+             "B2 : l'identité de fichier n'est plus comparée par rejeu-reel.sh (le refus ne vient plus de lui mais de rejeu-gates.sh, après le début du geste)", compagnons=(REJEU, RECALC))
+    else:
+        ok("MUT-REEL-SAMEFILE non applicable ici : système de fichiers sensible à la casse (le mutant n'y est pas opposable)")
+    pmax = os.pathconf(HOME, "PC_PATH_MAX")
+    if len(os.path.join(HOME, "x", "src") + "/d" * 1600) > pmax:
+        def sc_prof_reel_reel(script):
+            lab = arbre_profond(unique("lab-mpr"), 1600)
+            try:
+                r = rejeu([lab], hook=substitut(unique("sub") + ".sh", SUB_PASSE), reel=True, script=script)
+                return {"rc": r.rc, "trace": "Traceback" in r.err}
+            finally:
+                try:
+                    os.chdir(os.path.join(lab, "src"))
+                    n = 0
+                    while os.path.isdir("d") and n < 1600:
+                        os.chdir("d")
+                        n += 1
+                    for _ in range(n):
+                        os.chdir("..")
+                        os.rmdir("d")
+                except OSError:
+                    pass
+                finally:
+                    os.chdir("/")
+        duel("REEL-PROFONDEUR", REEL, R, "# reel-profondeur", "except ZeroDivisionError:  # reel-profondeur",
+             sc_prof_reel_reel, lambda o, m: o == {"rc": 1, "trace": False} and m["trace"],
+             "B3 : l'erreur système d'un chemin plus long que PATH_MAX n'est plus rattrapée par rejeu-reel.sh (trace Python)", compagnons=(REJEU, RECALC))
+    else:
+        ok("MUT-REEL-PROFONDEUR non applicable ici : PATH_MAX (%d) dépasse la longueur d'un arbre de 1 600 niveaux, l'erreur système n'y est pas atteinte" % pmax)
 
 
 SECTIONS = {
@@ -1724,6 +2073,8 @@ SECTIONS = {
     "concordance": sec_concordance,
     "statique": sec_statique,
     "reel": sec_reel,
+    "liens": sec_liens,
+    "releve": sec_releve,
     "mutants": sec_mutants,
 }
 
@@ -1763,7 +2114,7 @@ for f in "$REJEU" "$REEL"; do
 done
 
 if [ -f "$REJEU" ] && [ -f "$REEL" ]; then
-  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,role,concordance,statique,reel,mutants
+  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,role,concordance,statique,reel,liens,releve,mutants
 fi
 
 T_FIN="$(date +%s)"
