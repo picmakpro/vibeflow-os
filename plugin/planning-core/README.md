@@ -119,8 +119,8 @@ Un hook `PreToolUse` unique (`scripts/planning-hook.sh`) porte les gates d'écri
 G5, G6, G7) et le cloisonnement par rôle de la fabrique d'agents. Il n'agit que dans un lab qui a
 adhéré à `cycles-v1` et reste **fail-closed** dans ce lab seulement (la commande enregistrée refuse les
 écritures par outil quand le script ou `python3` manque, `Bash` restant ouvert pour la réparation) ;
-partout ailleurs, labs de développement compris, il ne sort rien. **État livré : G6, G5 et G1 armés (étapes 1 et 2),
-les autres gates en observation** (ils journalisent ce qu'ils refuseraient, sans refuser), G2
+partout ailleurs, labs de développement compris, il ne sort rien. **État livré : G6, G5, G1 et G7 armés (étapes 1 à 3),
+le gate de rôle en observation** (ils journalisent ce qu'ils refuseraient, sans refuser), G2
 avertit. L'arbitrage de Willy qu'attendait l'armement est rendu et appliqué
 (Q-ARM, AskUserQuestion session principale, 2026-09-30) ; le rejeu réel final sur des labs au repos
 est fait (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`) et l'armement se fait par
