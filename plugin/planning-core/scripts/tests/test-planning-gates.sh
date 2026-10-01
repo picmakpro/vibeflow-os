@@ -4455,7 +4455,7 @@ LIMITES_REFERENCE = (
     ("l", ("allowlist", "G6", "F9")),
     ("m", ("F2", "config.json", "plusieurs lignes", "silence")),
     ("n", ("T-45-42", "F6", "Bash")),
-    ("o", ("P45-D-01a", "ancêtre")),
+    ("o", ("P45-D-01a", "ancêtre", "U+212A")),
     ("p", ("R1", "sans `config.json`", "plus proche")),
     ("q", ("m1", "subagent_type", "fork")),
     ("r", ("m6", "journal d'observation", "rotation")),
