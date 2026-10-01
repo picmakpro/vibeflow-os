@@ -78,7 +78,7 @@
 #   R-REFERENCE     (section `reference`, 45-10 ; GATE-15, T-45-90) la référence du modèle (section « Hook central et gates d'écriture
 #                   (Phase 45) ») est identique au code livré : table d'armement (état, étape, cas de canary, relevé), noms protégés par
 #                   G6, journal de dérogation, marqueurs de code, ordre de résolution des agents, outils refusés et laissé ouvert en mode
-#                   dégradé (commande de hooks.json), limites déclarées (a) à (y) chacune sur sa ligne ; MUT-REFERENCE-* : une valeur de
+#                   dégradé (commande de hooks.json), limites déclarées (a) à (z) chacune sur sa ligne ; MUT-REFERENCE-* : une valeur de
 #                   gate inversée, `Agent` retiré des outils refusés, une limite retirée (chacune des 25, puis (l) à part), un nom de
 #                   journal, un marqueur, l'ordre de résolution, un cas de canary, une constante du hook changée sans la référence
 #   MUT-*           chaque garde est tuée par un mutant à motif unique dont la trace est imprimée
@@ -4472,7 +4472,7 @@ lota_mutant("BUDGET-SIGNAL", "# role-signal", "for signal in []:  # role-signal"
 # contrôle la compare, mécaniquement, aux constantes du hook (table d'armement, noms protégés par G6, nom du journal de dérogation,
 # marqueurs de code, ordre de résolution des agents), à la commande enregistrée de hooks.json (outils refusés en mode dégradé, outil
 # laissé ouvert) et à la table CANARIS du canary (cas par gate) : tout écart rougit — une référence qui annoncerait un gate armé qui ne
-# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (y) sont chacune sur sa propre ligne canonique
+# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (z) sont chacune sur sa propre ligne canonique
 # `- **limite (X)**` avec ses mots-clés. Chaque mutant retire ou fausse UNE chose, sur une copie de la référence écrite sous le dossier
 # de travail (ou, pour MUT-REFERENCE-CODE, sur les constantes du hook, la référence restant intacte) ; le contrôle doit alors rendre un
 # écart. Les lignes d'écart du contrôle commencent par `ECART` ; la suite ne les imprime que si la VRAIE référence est en écart (un
@@ -4505,6 +4505,7 @@ LIMITES_REFERENCE = (
     ("w", ("N1", "name:", "échappement YAML")),
     ("x", ("MESURE-VIDE", "volume")),
     ("y", ("settings", "Q-G6 = b", "scope compte", "planning-hook.sh", "lien préexistant")),
+    ("z", ("SIGALRM", "Alarm clock", "faux refus")),
 )
 
 
@@ -4663,7 +4664,7 @@ def sec_reference(ctx):
             print(e)
         ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
         return
-    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (y) sont ceux du code livré ; « Aucun gate n'est armé » dit vrai" % len(LIMITES_REFERENCE))
+    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (z) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
     original = open(chemin, encoding="utf-8").read()
 
     def mutant_texte(ident, fonction, motif):
@@ -4706,7 +4707,7 @@ def sec_reference(ctx):
         if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
             non_tuees.append(lettre)
     if non_tuees:
-        komut("REFERENCE-LIMITES", "chaque limite (a) à (y) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+        komut("REFERENCE-LIMITES", "chaque limite (a) à (z) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
               "non tuées : " + ", ".join(non_tuees))
     else:
         okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))
