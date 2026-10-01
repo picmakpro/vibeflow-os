@@ -1,5 +1,0 @@
-# Marqueur d'armement de guard-fin-de-geste.sh (hook Stop / SessionStart --snapshot).
-#
-# Présence de ce fichier = la garde de fin de geste agit dans ce dépôt ; absence = elle ne fait rien (exit 0, muette, sans archivage).
-# Motif : le hook est câblé en scope user et s'activait dans tous les dépôts de l'utilisateur.
-# Armé le 2026-10-01 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-01 : « Sentinelle armée »).
