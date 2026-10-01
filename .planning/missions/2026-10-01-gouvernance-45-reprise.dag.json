@@ -213,6 +213,16 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "fix-ci-puce",
+      "step": "mutant MUT-PUCE-REGEX-CHAMP deterministe",
+      "stage": "",
+      "deps": [
+        "livraison-45"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
