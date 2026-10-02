@@ -15,10 +15,11 @@
 #                    => aucune séquence (état « deja-complet ») ; NI l'un NI l'autre (produit brut de
 #                    gsd-new-project) => pré-capture `state get Phase --raw` (doit commencer par un chiffre,
 #                    sinon NON VÉRIFIABLE, aucune écriture) et jalon lu du ROADMAP par `init progress` ;
-#                    UNE SEULE des deux clés => NON VÉRIFIABLE « état à moitié renseigné », AVANT tout
-#                    `workstream create` (disque intact) : la séquence, destructive sur un lab démarré,
-#                    n'est jamais jouée là, et aucune voie moteur ne pose `milestone` seul sans effet de
-#                    bord (41.2-CORRECTION-01-SUMMARY.md, C1) ;
+#                    UNE SEULE des deux clés (P412-D-07) : le jalon manque, la phase courante est posée, ET le
+#                    ROADMAP déclare un jalon => le MOTEUR l'écrit par un `state patch` anodin (voie mesurée sûre,
+#                    41.2-CORRECTION-01-SUMMARY.md C1), puis post-conditions et empreinte (jalon posé, corps et
+#                    lignes d'origine du frontmatter intacts, reste du planning intact) ; sinon NON VÉRIFIABLE
+#                    « état à moitié renseigné » AVANT tout `workstream create` (disque intact) ;
 #   4. create        `workstream create <nom> --migrate-name <nom>` (plat, MÊME nom) ou
 #                    `workstream create <nom>` (partitionné) ; `already_exists` => REFUSÉ, aucune écriture ;
 #   5. nom retenu    le champ `.workstream` rendu par le moteur (normalisé), jamais la saisie, validé par
@@ -138,7 +139,19 @@ fm_get() { # <STATE.md> <clé> : valeur de la clé dans le frontmatter (lecture 
 # --- 3. Lab plat : séquence d'état nécessaire ? ------------------------------------------------------------
 # Trois états du STATE racine, jamais deux manières de le lire : complet (les deux clés), brut (aucune des
 # deux : produit de gsd-new-project), partiel (une seule : lab démarré, séquence destructive => refus).
-NEED_SEQ=0; PRECAP=""
+NEED_SEQ=0; PRECAP=""; REPAIRED=0
+roadmap_milestone() { # jalon courant du ROADMAP du lab (lecture seule, mesurée) ; vide si rien de lisible ou forme refusée
+  local ms; ms="$(engine init progress 2>/dev/null | jq -r '.milestone_version // empty' 2>/dev/null)"
+  if [ -n "$ms" ] && [ "${#ms}" -le 32 ]; then case "$ms" in *[!$ALNUM._-]*) : ;; *) printf '%s' "$ms" ;; esac; fi
+}
+tree_sum() { # empreinte du planning HORS STATE.md racine (contenu), pour prouver que seul l'état a bougé
+  find "$PLANNING" -type f -not -path "$PLANNING/STATE.md" -exec cksum {} + 2>/dev/null | LC_ALL=C sort
+}
+state_split() { # <STATE.md> <fm|body> : frontmatter (sans les barres, guillemets de valeur retirés : le moteur
+  # réécrit '1.0' en "1.0", même valeur) ou corps
+  awk -v w="$2" '/^---[[:space:]]*$/{n++; next} (w=="fm" && n==1) || (w=="body" && n>=2){print}' "$1" \
+    | if [ "$2" = "fm" ]; then sed -e "s/^\([^:]*:\)[[:space:]]*[\"']\(.*\)[\"']\$/\1 \2/"; else cat; fi
+}
 if [ "$MODE" = "plat" ]; then
   ROOT_STATE="$PLANNING/STATE.md"
   HAS_M="$(fm_get "$ROOT_STATE" milestone)"; HAS_C="$(fm_get "$ROOT_STATE" current_phase)"
@@ -152,14 +165,31 @@ if [ "$MODE" = "plat" ]; then
       *) nv "ligne Phase: non numérique [$PRECAP] — aucune écriture" ;;
     esac
     if [ "$MILESTONE_SET" -eq 0 ]; then
-      # Jalon courant du ROADMAP du lab (lecture seule, mesurée) ; rien de lisible ou forme refusée => v1.0.
-      _ms="$(engine init progress 2>/dev/null | jq -r '.milestone_version // empty' 2>/dev/null)"
-      if [ -n "$_ms" ] && [ "${#_ms}" -le 32 ]; then
-        case "$_ms" in *[!$ALNUM._-]*) : ;; *) MILESTONE="$_ms" ;; esac
-      fi
+      _ms="$(roadmap_milestone)"; [ -z "$_ms" ] || MILESTONE="$_ms"   # rien de lisible => v1.0
     fi
+  elif [ -z "$HAS_M" ]; then
+    # Lab démarré (la phase courante est posée, le jalon manque) : P412-D-07. Le jalon est DÉRIVÉ du plan de route
+    # par le moteur ; un `state patch` anodin le fait écrire, sans autre effet de bord (mesuré, correction 01 C1).
+    # Sans jalon déclaré au plan de route, aucune voie sûre : refus, disque intact.
+    _ms="$(roadmap_milestone)"
+    [ -n "$_ms" ] || nv "l'état d'avancement du planning est à moitié renseigné (le jalon manque) et le plan de route ne déclare aucun jalon : je ne sépare pas ce planning, pour ne pas remettre l'avancement à zéro — aucune écriture. Déclarez d'abord un jalon dans le plan de route (commande /gsd-new-milestone), puis relancez la séparation"
+    if [ "$MILESTONE_SET" -eq 1 ] && [ "$MILESTONE" != "$_ms" ]; then
+      nv "le jalon demandé ($MILESTONE) diffère de celui du plan de route ($_ms) : l'état d'avancement du planning, à moitié renseigné, prend celui du plan de route — aucune écriture"
+    fi
+    _fm0="$(state_split "$ROOT_STATE" fm | LC_ALL=C sort)"; _body0="$(state_split "$ROOT_STATE" body | cksum)"; _tree0="$(tree_sum)"
+    _la="$(engine state get "Last activity" --raw 2>/dev/null)" || _la=""
+    la_json="$(jq -cn --arg v "$_la" '{"Last activity":$v}')"
+    engine state patch "$la_json" >/dev/null 2>&1 || nv "le moteur n'a pas pu compléter l'état d'avancement du planning — état à vérifier, aucune séparation faite"
+    # Post-conditions et empreinte : le jalon est posé, le corps est identique octet pour octet, aucune ligne du
+    # frontmatter d'origine n'a changé ou disparu, rien d'autre dans le planning n'a bougé.
+    _fm1="$(state_split "$ROOT_STATE" fm | LC_ALL=C sort)"
+    [ -n "$(fm_get "$ROOT_STATE" milestone)" ] || nv "le moteur n'a pas posé le jalon dans l'état d'avancement — état à vérifier, aucune séparation faite"
+    [ "$_body0" = "$(state_split "$ROOT_STATE" body | cksum)" ] || nv "le moteur a modifié le corps de l'état d'avancement — état à vérifier, aucune séparation faite"
+    [ -z "$(comm -23 <(cat <<<"$_fm0") <(cat <<<"$_fm1"))" ] || nv "le moteur a modifié l'avancement déjà renseigné — état à vérifier, aucune séparation faite"
+    [ "$_tree0" = "$(tree_sum)" ] || nv "le moteur a modifié d'autres fichiers du planning — état à vérifier, aucune séparation faite"
+    REPAIRED=1
   else
-    nv "l'état d'avancement du planning est à moitié renseigné (le jalon ou la phase courante manque) : je ne sépare pas ce planning, pour ne pas remettre l'avancement à zéro — aucune écriture ; à trancher avec l'équipe"
+    nv "l'état d'avancement du planning est à moitié renseigné (la phase courante manque) : je ne sépare pas ce planning, pour ne pas remettre l'avancement à zéro — aucune écriture ; à trancher avec l'équipe"
   fi
 fi
 
@@ -189,7 +219,7 @@ fi
 # --- 6. Séquence d'état (lab plat à état vierge seulement) ---------------------------------------------------------
 STATE_OUT="non-initialise"
 if [ "$MODE" = "plat" ] && [ "$NEED_SEQ" -eq 0 ]; then
-  STATE_OUT="deja-complet"
+  STATE_OUT="deja-complet"; [ "$REPAIRED" -eq 1 ] && STATE_OUT="complete"
 elif [ "$MODE" = "plat" ]; then
   SUBJ_PHASE="$(engine state get Phase --raw --ws "$SUBJECT" 2>/dev/null)" \
     || nv "relecture de Phase: par le moteur en échec — sujet créé, état à compléter"

@@ -297,6 +297,8 @@ esac
 node "$REAL_ENG" "$@"; rc=$?
 case "${FAKE_MODE:-}:$*" in
   dup-phase:*"state patch"*) for f in "$cwd"/.planning/workstreams/*/STATE.md; do printf 'Phase: doublon\n' >> "$f"; done ;;
+  patch-body:*"state patch"*) printf 'Ligne hors périmètre\n' >> "$cwd/.planning/STATE.md" ;;
+  patch-fm:*"state patch"*) sed -i.bak 's/^status: planning$/status: verifying/' "$cwd/.planning/STATE.md"; rm -f "$cwd/.planning/STATE.md.bak" ;;
 esac
 exit $rc
 FE
@@ -586,6 +588,50 @@ else
   else emit M4 1 "(iv) status: executing : refus rc 1, rien écrit" "rc=$RC stderr=[$ERR]"; fi
 fi
 
+# --- C1c-C1e (P412-D-07) : lab démarré (current_phase SANS milestone) --------------------------------------------------------
+# Le ROADMAP déclare un jalon => le MOTEUR pose le jalon (`state patch` anodin), l'empreinte prouve que seuls les champs
+# voulus bougent ; sans jalon au ROADMAP => refus (C1a, plus haut). Fixture commitée : le balayage de la CI est joué.
+sbody() { awk '/^---[[:space:]]*$/{n++; next} n>=2{print}' "$1"; }
+sfm()   { awk '/^---[[:space:]]*$/{n++; next} n==1{print}' "$1" | sed -e "s/^\([^:]*:\)[[:space:]]*[\"']\(.*\)[\"']\$/\1 \2/"; }   # guillemets de valeur retirés (le moteur réécrit '1.0' en "1.0")
+mk_started() { # <id> -> lab démarré, ROADMAP au jalon v2.3, commité
+  local d; d="$(mk_new_project "$1" "Phase: 2 of 3 (Coeur)" "current_phase: 2")"
+  sed -i.bak 's/^## Phases$/## Milestones\n\n- 🚧 **v2.3 Lancement** - Phases 1-3 (in progress)\n\n## Phases/' "$d/.planning/ROADMAP.md"; rm -f "$d/.planning/ROADMAP.md.bak"
+  gcommit "$d" "docs: lab démarré, jalon au plan de route"
+  printf '%s' "$d"
+}
+c1c_run() { # <script> <id> -> C1C_BAD (vide = conforme), D, RC, OUT, ERR ; accepté, sujet conforme, empreinte intacte
+  D="$(mk_started "$2")"; cp "$D/.planning/STATE.md" "$TMP/$2.avant"
+  sp_on "$1" "$TMP" -- --path "$D" --name demarre
+  C1C_BAD=""
+  [ "$RC" = "0" ] || C1C_BAD="rc=$RC attendu 0 (stderr=[$ERR])"
+  [ "$OUT" = '{"mode":"plat","subject":"demarre","state":"complete"}' ] || C1C_BAD="$C1C_BAD stdout=[$OUT]"
+  local ss="$D/.planning/workstreams/demarre/STATE.md"
+  [ "$(fm "$ss" milestone)" = "v2.3" ] || C1C_BAD="$C1C_BAD milestone=[$(fm "$ss" milestone)] attendu v2.3"
+  [ "$(fm "$ss" current_phase)" = "2" ] || C1C_BAD="$C1C_BAD current_phase=[$(fm "$ss" current_phase)] attendu 2"
+  [ "$(sbody "$ss" | cksum)" = "$(sbody "$TMP/$2.avant" | cksum)" ] || C1C_BAD="$C1C_BAD corps de l'état modifié"
+  [ -z "$(comm -23 <(sfm "$TMP/$2.avant" | LC_ALL=C sort) <(sfm "$ss" | LC_ALL=C sort))" ] || C1C_BAD="$C1C_BAD ligne du frontmatter d'origine modifiée ou perdue"
+}
+c1c_run "$SCRIPT" c1c
+gcommit "$D" "docs: planning séparé"; sweep "$D"
+vert_sans_reserve 1 "conforme (compteurs non régressés, 1 ligne '^Phase:')" || C1C_BAD="$C1C_BAD balayage de la CI non vert : $WHY"
+emit C1c "$([ -z "$C1C_BAD" ] && echo 0 || echo 1)" "current_phase SANS milestone + ROADMAP au jalon v2.3 : accepté (complete), jalon écrit par le moteur, corps et lignes d'origine intacts, balayage de la CI vert" "$C1C_BAD"
+D="$(mk_started c1c2)"; sp "$TMP" -- --path "$D" --name demarre --milestone v9.9; E1="$(empreinte "$D")"
+expect C1c2 "jalon explicite v9.9 ≠ jalon du plan de route v2.3 sur un état à moitié renseigné : NON VÉRIFIABLE, aucune écriture" 2 "diffère de celui du plan de route" "-"
+[ ! -d "$D/.planning/workstreams" ] || emit C1c2 1 "aucun sujet créé" "sujet présent"
+fakec1() { # <script> <id> <mode> -> RC, ERR, C1D_BAD (disque non touché par le geste, refus par le moteur détecté)
+  local d; d="$(mk_started "$2")"
+  sp_on "$1" "$TMP" "GSD_TOOLS=$FAKE" "REAL_ENG=$REAL_ENGINE" "FAKE_MODE=$3" -- --path "$d" --name demarre
+  C1D_BAD=""
+  [ "$RC" = "2" ] || C1D_BAD="rc=$RC attendu 2 (stdout=[$OUT])"
+  [ ! -d "$d/.planning/workstreams" ] || C1D_BAD="$C1D_BAD sujet créé malgré l'empreinte rompue"
+}
+fakec1 "$SCRIPT" c1d patch-body
+printf '%s' "$ERR" | grep -qF "modifié le corps de l'état" || C1D_BAD="$C1D_BAD stderr sans [modifié le corps de l'état] : [$ERR]"
+emit C1d "$([ -z "$C1D_BAD" ] && echo 0 || echo 1)" "le moteur (faux) écrit dans le CORPS de l'état pendant le patch : NON VÉRIFIABLE, aucun sujet créé" "$C1D_BAD"
+fakec1 "$SCRIPT" c1e patch-fm
+printf '%s' "$ERR" | grep -qF "modifié l'avancement déjà renseigné" || C1D_BAD="$C1D_BAD stderr sans [modifié l'avancement déjà renseigné] : [$ERR]"
+emit C1e "$([ -z "$C1D_BAD" ] && echo 0 || echo 1)" "le moteur (faux) change une ligne du frontmatter d'origine (status) : NON VÉRIFIABLE, aucun sujet créé" "$C1D_BAD"
+
 # --- (v) condition « état complet » du STATE racine : && -> || (correction C1) : un lab démarré à UNE clé rejoue la
 #         séquence destructive ou saute l'état à tort au lieu d'être refusé -----------------------------------------------
 mut_c1() { # <nom> <ancre> <remplacement> <id> <libellé>
@@ -615,7 +661,22 @@ if mutate "$MS" "$ANCH6" "$(printf '%s' "$ANCH6" | sed 's/ || nv / || true || nv
   else emit M6 1 "(vi) post-condition neutralisée : C3 doit rougir" "DP_BAD=[$DP_BAD] RC=$RC"; fi
 else emit M6 1 "(vi) construction du mutant" "ancre introuvable [$ANCH6]"; fi
 
-echo "== mutations : $MD/7 détectées =="
+# --- (vii) empreinte du corps neutralisée (C1d) / lignes d'origine neutralisées (C1e) : le moteur fautif passe pour sain ---
+mut_fp() { # <nom> <ancre> <remplacement> <id> <mode faux> <cas> <libellé>
+  local mname="$1" manchor="$2" mrepl="$3" mid="$4" fmode="$5" fcase="$6" mlabel="$7"
+  mk_mut_tree "$mname"; MS="$MT/conductor/scripts/split-planning.sh"
+  if mutate "$MS" "$manchor" "$mrepl"; then
+    fakec1 "$MS" "${mname}x" "$fmode"; local mrc="$RC" mout="$OUT"
+    if [ -n "$C1D_BAD" ] && [ "$mrc" = "0" ]; then
+      MD=$((MD+1)); emit "$mid" 0 "$mlabel : $fcase rougit" ""
+      echo "      trace $mid : assertion=$fcase « moteur fautif ($fmode) : NON VÉRIFIABLE, aucun sujet créé » ; attendu=rc 2 ; obtenu=rc $mrc stdout=[$mout]"
+    else emit "$mid" 1 "$mlabel : $fcase doit rougir" "C1D_BAD=[$C1D_BAD] RC=$mrc"; fi
+  else emit "$mid" 1 "$mlabel : construction du mutant" "ancre introuvable [$manchor]"; fi
+}
+mut_fp v7 '    [ "$_body0" = "$(state_split "$ROOT_STATE" body | cksum)" ] || nv "le moteur a modifié le corps de l'"'"'état d'"'"'avancement — état à vérifier, aucune séparation faite"' '    true' M7 patch-body C1d "(vii) empreinte du corps neutralisée"
+mut_fp v8 '    [ -z "$(comm -23 <(cat <<<"$_fm0") <(cat <<<"$_fm1"))" ] || nv "le moteur a modifié l'"'"'avancement déjà renseigné — état à vérifier, aucune séparation faite"' '    true' M8 patch-fm C1e "(viii) lignes d'origine du frontmatter neutralisées"
+
+echo "== mutations : $MD/9 détectées =="
 
 else
   emit ENGINE 1 "moteur gsd-core introuvable (GSD_TOOLS, PATH, ~/.claude/gsd-core) : S1-S5, S7-S10, W1-W12 et mutations (i)-(iv) NON jouables — ko, jamais skip" "installer @opengsd/gsd-core@^1"
