@@ -38,7 +38,7 @@ Phase: **41.2** (Choisir la partition du planning au démarrage d'un lab) — ex
 ciblées 01-02 (2026-10-02), PR ouverte en revue (revue `@picmakpro` requise : `ci.yml` et baseline du budget) ;
 `current_phase` reste 41. Phase 41.3 mergée (PR #123). Vérification de phase : human_needed (E1 + parcours réel).
 Next: arbitrage E1 (sujet actif par défaut après partition), merge de la 41.2, puis clôture du jalon `fiabilite-v1.0`
-(reste les plans 41-07 à 41-09).
+(les plans 41-07 à 41-13 sont confiés à Willy, hors clôture).
 Last activity: 2026-10-02 — mission `.planning/missions/2026-10-01-phase-41-2-partition-au-demarrage.md`.
 
 ## Accumulated Context
@@ -50,6 +50,8 @@ Historique complet (jalons, décisions, arbitrages 2026-07 à 2026-09) : voir l'
 - 2026-10-01/02 — Phase 41.2 : P412-D-01 à D-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-01),
   P412-D-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02) ; P412-D-04, D-06, D-07, D-08 =
   décisions du manager. Registre : `41.2-CONTEXT.md` du dossier de phase.
+
+- 2026-10-02 — Plans 41-07 à 41-13 (chaîne des mesures de la protection serveur) confiés à Willy, hors clôture de `fiabilite-v1.0` (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy » pour 41-07 à 41-09, puis « Toute la chaîne à Willy » pour 41-10 à 41-13) ; PROT-01 cochée le 2026-09-24 sur la pose des rulesets, complément attendu : mesure du refus réel d'un push direct (41-09, complément en 41-13) confiée à Willy ; 41-07 partiellement entamé (`PR-R-*`, 2026-09-24).
 
 ### Pending Todos
 
