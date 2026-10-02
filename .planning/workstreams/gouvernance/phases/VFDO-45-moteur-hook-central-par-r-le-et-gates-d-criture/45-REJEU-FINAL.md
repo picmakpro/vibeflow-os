@@ -288,3 +288,52 @@ Le relevé nominatif (rapport écrit hors des labs) compte 4440 lignes, dont 442
 ### Écarts
 
 Aucun : mêmes lignes `COMPTE` que le rejeu post-re-audit 2 (0 faux refus, 0 faux accept, 202 refus conformes au modèle), empreintes de tout l'arbre identiques pour les deux labs. Les chemins du rejeu sont courts (aucune valeur de plus de 4096 caractères) : ce rejeu confirme l'absence de régression sur les valeurs courtes, que le différentiel à trois versions de la quick 261002-3rx établit aussi (2 128 cas courts sans écart, `court-different=0` sur 552 cas courts supplémentaires).
+
+## Rejeu post-pré-filtre (2026-10-02)
+
+**Mesure seule — aucun armement, aucune constante `ARMEMENT_*` ni `TABLE_ATTENDUE` touchée.** Le code a changé après le rejeu post-re-audit 3 : le pré-filtre hors adhésion a été corrigé (parcours borné, coût cubique et bande 4083-4096 ; quick 261002-uhn, re-audit du pré-filtre). Ce rejeu mesure le code à ce commit.
+
+**Portée de la preuve.** Le rejeu juge le cœur sur copie de labs non migrés : le pré-filtre de la commande enregistrée est prouvé par `test-planning-prefilter.sh`, pas par ce rejeu.
+
+| Champ | Valeur |
+|---|---|
+| Date | 2026-10-02 |
+| Code mesuré | commit `5d6ba02c` de la branche `gouvernance/phase-45-execution` |
+| Commande | celle du rejeu final ci-dessus (`rejeu-reel.sh` sur les deux labs, `--etape=4`, mêmes attendus, rapport hors des labs) |
+| Autorisation | rejeu réel en lecture seule (Willy, AskUserQuestion session principale, 2026-09-30, reprise dans le mandat du 2026-10-02) |
+| Passages | deux, sans échéance : le premier n'a pas écrit son rapport (dossier de destination absent, code de sortie 1, aucun relevé exploitable) ; le second est complet et fait foi. Aucune occurrence de `Alarm clock` ni de « hook central indisponible ». Charge machine au lancement du second : 7,64 sur 1 minute, 7,01 sur 5 |
+
+### Contrôle de repos (lecture seule), forme anonymisée (sans USER ni PID)
+
+Avant (23:46) et après (23:54) :
+
+| Relevé | Avant | Après |
+|---|---|---|
+| Processus `claude` ou `node` dont le répertoire courant est sous `~/jarvis-keystone` ou `~/BusinessFlow-Lab` (`lsof -d cwd`) | 0 | 0 |
+| Autres processus dont le répertoire courant est sous un lab | 1 (shell `zsh` inactif, ne bloque pas) | non relevé |
+| Fichiers ouverts sous `~/jarvis-keystone/.planning` (`lsof +D`) | 0 | 0 |
+| Fichiers ouverts sous `~/BusinessFlow-Lab/.planning` (`lsof +D`) | 0 | 0 |
+| Transcripts de lab modifiés depuis moins de 30 minutes | 0 (le plus récent date de plus de 3 heures) | 0 |
+
+### Comptes (lignes brutes du rejeu)
+
+```
+COMPTE G6 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G5 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G1 faux-refus=0 faux-accept=0 refus-conforme-modele=196
+COMPTE G7 faux-refus=0 faux-accept=0 refus-conforme-modele=6
+COMPTE ROLE faux-refus=0 faux-accept=0 refus-conforme-modele=0
+REJEU-ETAPE-4 faux-refus=0 faux-accept=0 refus-conforme-modele=202
+CLASSE-REGLE-ECRITE G1 lab=~/jarvis-keystone n=200
+CLASSE-REGLE-ECRITE G1 lab=~/BusinessFlow-Lab n=0
+EMPREINTE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-IDENTIQUE ~/BusinessFlow-Lab
+EMPREINTE-ARBRE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-ARBRE-IDENTIQUE ~/BusinessFlow-Lab
+```
+
+Le relevé nominatif (rapport écrit hors des labs) compte 4440 lignes, comme celui du rejeu post-re-audit 3.
+
+### Écarts
+
+Aucun : mêmes lignes `COMPTE` que le rejeu post-re-audit 3 (0 faux refus, 0 faux accept, 202 refus conformes au modèle), empreintes de tout l'arbre identiques pour les deux labs.
