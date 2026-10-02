@@ -190,3 +190,33 @@ SUMMARY des plans et des quick. Ce qui suit couvre la reprise du 2026-10-01.
 
 Le `exit_code: 1` de la non-régression à `239df76d` vient d'échecs d'environnement de la base,
 plus la régression de chemin de machine corrigée ensuite en `3a2495fb`.
+
+## Clôture (2026-10-01 → 2026-10-02) — audit final, doc, re-mapping, fermeture
+
+Mandat de Willy, relayé par la session principale (messages en session principale, 2026-10-01) :
+« clore mais avant fait les audit de securité et apres une mise a jour doc », puis « re mapping ».
+
+| Étape | Résultat | Commits |
+|---|---|---|
+| Flake CI MUT-PUCE-REGEX-CHAMP | mise à mort par borne d'horloge, non déterministe → par l'échéance du cœur (quick qq9) ; limite (z) non en cause (mesuré) | `d87f881c` |
+| Audit final (eb8165e4) | OPEN_THREATS : F-01 HIGH (repli quadratique, fail-open harnais), F-02/F-03/F-04 MEDIUM, F-05..F-08 LOW | — |
+| Correction urj | F-01, F-02, F-03 corrigés ; F-04..F-08 déclarés (aa)..(ae) | `0f8f2946`, `699ee250` |
+| Re-audit 1 | N-01 HIGH (panne du cœur induite par surrogate/NUL + borne longue), N-03 HIGH probable (`~`) | — |
+| Correction wtd | N-01, N-03, N-04, N-05 corrigés ; N-06 déclaré | `a4afbe3f`, `6d2e5a73` |
+| Re-audit 2 | plus de HIGH ; N2-01 MEDIUM (nom échappé + échéance) | — |
+| Correction 1dv | classe fermée (antislash, aiguillage du cœur), preuve générative 2 000/2 000 | `19d9c32d`, `079e905f` |
+| Re-audit 3 | N3-01 MEDIUM = régression de l'aiguillage | — |
+| Correction 3rx | analyse exacte sous deux formes (réduite, physique) ; différentiel 3 versions, 7 765 cas, 0 régression | `1d9425f7`, `cdf96c42` |
+| Re-audit 4 | **SECURED** (recoupé gsd-security-auditor) ; résidus N4-01..N4-06 déclarés | lot des limites |
+| Doc | `--verify-only` (3 gsd-doc-verifier), puis gsd-doc-writer : guides, README, contrat de sortie, référence ; texte de GATE-09 amendé | `ad8ff6a1`, `8fb37832` |
+| Re-mapping | `.planning/codebase/` (7 documents) rafraîchi | `24b58748` |
+| Merge de main | v2.68.0 intégrée par merge (jamais rebase) ; HOOKS-CONTRAT renuméroté (planning-core n°32/33, total 33) | `d19835c5` |
+| Rejeux réels | après chaque tour de code : 0 faux refus, 0 faux accept, empreintes identiques | 45-REJEU-FINAL.md |
+
+Décisions du manager (renversables) : valeur longue ou non analysable refusée si elle nomme
+`.planning`/`.claude` ou porte un antislash ; `~` développé en HOME ; analyse exacte sous forme réduite
+et forme physique ; cinq attendus de R-DOUTE-02 et le critère de R-DOUTE-03 passés à « verdict
+exact » (levée d'un faux refus de 079e905f, chaque cas doublé d'un irréductible et d'un adhérent).
+
+Clôture : 45-VERIFICATION passée à `passed` 15/15 sur la validation de Willy (« clore », message en
+session principale, 2026-10-01) et la CI Linux de la PR #124 ; GATE-15 Complete ; Phase 45 cochée.

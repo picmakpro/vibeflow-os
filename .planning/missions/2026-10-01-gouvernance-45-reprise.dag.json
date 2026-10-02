@@ -223,6 +223,156 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "audit-final",
+      "step": "audit securite final 0c5e631..eb8165e4",
+      "stage": "",
+      "deps": [
+        "fix-ci-puce"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-audit-final",
+      "step": "F-01 F-02 F-03 corriges, F-04..F-08 limites, rejeu post-audit",
+      "stage": "",
+      "deps": [
+        "audit-final"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs-verify",
+      "step": "gsd-docs-update --verify-only (perimetre phase 45)",
+      "stage": "",
+      "deps": [
+        "fix-audit-final"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-audit",
+      "step": "re-audit 1 : OPEN_THREATS N-01 N-03",
+      "stage": "",
+      "deps": [
+        "fix-audit-final"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-reaudit",
+      "step": "N-01 N-03 corriges, N-02 N-04 N-05 N-06",
+      "stage": "",
+      "deps": [
+        "re-audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-audit-2",
+      "step": "re-audit tour 2 (699ee250..6d2e5a73)",
+      "stage": "",
+      "deps": [
+        "fix-reaudit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs-write",
+      "step": "mise a jour doc produit (ad8ff6a1, 8fb37832)",
+      "stage": "",
+      "deps": [
+        "docs-verify"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "remap",
+      "step": "gsd-map-codebase, .planning/codebase",
+      "stage": "",
+      "deps": [
+        "docs-write"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-reaudit-2",
+      "step": "N2-01 classe chemin inanalysable, preuve generative",
+      "stage": "",
+      "deps": [
+        "re-audit-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-audit-3",
+      "step": "re-audit tour 3 cible N2-01 (24b58748..079e905f)",
+      "stage": "",
+      "deps": [
+        "fix-reaudit-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-reaudit-3",
+      "step": "N3-01 reduction lexicale, N3-02, F2-F6 declares, differentiel 3 versions",
+      "stage": "",
+      "deps": [
+        "re-audit-3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-audit-4",
+      "step": "re-audit final tour 4 (d19835c5..cdf96c42)",
+      "stage": "",
+      "deps": [
+        "fix-reaudit-3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "limites-finales",
+      "step": "N4-01..N4-06 declares, aucune modif de comportement",
+      "stage": "",
+      "deps": [
+        "re-audit-4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "cloture-45",
+      "step": "cloture : VERIFICATION 15/15, GATE-15, ROADMAP, STATE, CONCERNS",
+      "stage": "",
+      "deps": [
+        "limites-finales"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "livraison-finale",
+      "step": "gates planning, push, CI PR deux runs",
+      "stage": "",
+      "deps": [
+        "cloture-45"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
