@@ -43,7 +43,19 @@ que de réinventer sa propre coordination d'équipe.
 **Driver lock (verrou de driver)** — Le mécanisme qui garantit qu'une seule mission pilote une
 étape à la fois. Il porte une durée de vie et un battement de cœur (heartbeat) : si le pilote
 disparaît sans le relâcher, le verrou est récupéré proprement plutôt que de rester bloqué pour
-toujours.
+toujours. Le verrou est appliqué : une session qui n'y est pas enregistrée voit ses commits et ses
+écritures dans `.planning/` refusés.
+
+**Sujet (workstream)** — Un chantier de planning qui avance en parallèle d'un autre, avec ses
+propres phases et son propre état. Un lab n'en a qu'un seul par défaut. Développé dans
+[sujets-en-parallele.md](../05-equipe-agents/sujets-en-parallele.md).
+
+**Budget de méthode** — Un seuil mesurable sur la trace qu'un lab accumule (taille de `STATE.md`,
+nombre de worktrees actifs…). Dépassé, il se constate et se range ; il ne supprime rien. Développé
+dans [ranger-ce-qu-on-cree.md](../05-equipe-agents/ranger-ce-qu-on-cree.md).
+
+**Fin de geste** — Le moment où une session s'arrête : dans un dépôt armé, un hook range ce qu'elle
+a créé ou la retient d'arrêter tant que ce rangement n'est pas fait.
 
 **DAG** — Le plan de bataille d'une mission longue, représenté comme un graphe de tâches avec
 leurs dépendances plutôt qu'une liste linéaire. Le manager ne dispatche que les tâches dont toutes
