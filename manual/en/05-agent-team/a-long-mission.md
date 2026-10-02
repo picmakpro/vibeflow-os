@@ -52,13 +52,17 @@ working (a heartbeat), and releases it at the end — success, failure, or aband
 
 It hasn't always been binding. It used to be **declarative**: one mission kept committing while
 another held the lock on the same resource, because nothing enforced it. That is no longer true:
-the lock is now **enforced**. A session that isn't registered under someone else's lock has its
-commit, branch switch, publishing operations (`git push`, `gh pr`) or write to `.planning/`
-**refused before it runs**. The refusal names the holder, its step, its branch and its age, then
+the lock is now **enforced**. A session that isn't registered under someone else's lock has its mutating gestures **refused before
+they run**: commit, branch switch, publishing (`git push`, `gh pr`) or a write to `.planning/`, but
+the list is wider and not exhaustive. It also includes `git reset`, `git restore`, `git clean`,
+`git tag`, `git branch`, `git merge`, `git rebase`, `git cherry-pick`, `git revert`, `git stash`
+(except their exit options `--abort`, `--continue`, `--skip`, `--quit`), `git worktree remove` and
+`gh release`. The refusal names the holder, its step, its branch and its age, then
 offers three ways out: re-attach to the lock if it's your own mission that got a new session
 identifier, work in a separate tree (`git worktree add`, never refused), or put an explicit
-override marker on that one gesture — the override is then recorded in a journal next to the lock,
-never silent.
+override marker on that one gesture — the override is then recorded, as far as possible, in a
+journal next to the lock; writing it never blocks the gesture, a write failure is ignored and the
+command is truncated to 200 characters there. Don't rely on that journal as proof.
 
 It's worth being honest about what this guard does *not* do. It's an **accident guard**, not an
 adversary guard: it stops the path of least resistance, not a determined workaround. It can't see a

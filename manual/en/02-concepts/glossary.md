@@ -54,8 +54,9 @@ phases and its own state. A lab has just one by default. Covered in
 number of active worktrees…). When exceeded it is reported and tidied; it deletes nothing. Covered
 in [tidying-up-after-yourself.md](../05-agent-team/tidying-up-after-yourself.md).
 
-**End of gesture** — The moment a session stops: in an armed repository, a hook tidies what it
-created, or holds it back from stopping until that tidying is done.
+**End of gesture** — The moment a session stops: in an armed repository, a hook archives
+planning files (whatever an exceeded budget points at, closed `BACKLOG.md` topics included) and
+holds the stop until the session has tidied up what it created itself.
 
 **DAG** — A long mission's battle plan, represented as a graph of tasks with their dependencies
 instead of a linear list. The manager only dispatches tasks whose dependencies are all

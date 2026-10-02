@@ -139,7 +139,8 @@ vérifier : tu **es** le détenteur, mais ta session a changé d'identifiant (ap
 session au verrou avec `driver-lock.sh reclaim --owner=<détenteur>`, puis réessaie. Sinon : attends la
 fin du mandat, ou travaille dans un arbre séparé (`git worktree add`), qui n'est pas soumis au
 verrou. En dernier recours, pour un geste précis que tu assumes, le message décrit un marqueur de
-dérogation explicite ; elle est consignée, et ne se pose jamais « au cas où ».
+dérogation explicite ; elle est consignée dans la mesure du possible (une écriture qui échoue est
+ignorée), et ne se pose jamais « au cas où ».
 
 **Vérification.** Le même geste passe, ou une nouvelle tentative nomme le même détenteur tant que
 sa mission n'est pas terminée. Le garde-fou ne voit ni un terminal hors Claude Code ni une commande
@@ -173,10 +174,14 @@ exécutants, plusieurs fois par jour.
 **Cause.** L'isolation par worktree suppose un dépôt git à la racine ; sans lui, un repère
 d'isolation périme au bout de dix minutes et le moteur refuse alors tout exécutant.
 
-**Geste.** Lance `/vf-update` : l'installation pose elle-même `workflow.use_worktrees` à `false`
-dans `.planning/config.json` quand la racine n'est pas un dépôt git et que la clé n'est pas déjà
-fixée. Tu peux aussi poser cette clé à la main ; une valeur que tu as fixée n'est jamais réécrite.
-Conséquence : les exécutants tournent à la suite, sans isolation par worktree.
+**Geste.** Pose la clé toi-même, c'est le chemin fiable : dans `.planning/config.json`, ajoute
+`"workflow": { "use_worktrees": false }` (si un bloc `workflow` existe déjà, ajoute seulement
+`"use_worktrees": false` dedans). L'installation sait aussi la poser, mais seulement quand elle
+installe un module ou qu'elle met à jour un module dont la version change, que `.planning/config.json`
+existe, que `node` est disponible, que git répond que la racine n'est pas un dépôt, et que la clé
+n'est pas déjà fixée. Un `/vf-update` sur un module déjà à jour ne la pose pas. Une valeur que tu as
+fixée n'est jamais réécrite. Conséquence : les exécutants tournent à la suite, sans isolation par
+worktree.
 
 **Vérification.** La clé figure dans `.planning/config.json` et les exécutants ne sont plus refusés.
 

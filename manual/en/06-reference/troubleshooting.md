@@ -132,7 +132,7 @@ the holder, but your session's identifier changed (after a `/clear`, or an ambig
 `driver-lock.sh reclaim --owner=<holder>`, then retry. Otherwise: wait for the mandate to end, or
 work in a separate tree (`git worktree add`), which isn't subject to the lock. As a last resort, for
 one specific action you take responsibility for, the message describes an explicit override marker;
-it is recorded, and never set "just in case".
+it is recorded as far as possible (a failed write is ignored), and never set "just in case".
 
 **Check.** The same action goes through, or a new attempt names the same holder for as long as its
 mission isn't over. The safeguard sees neither a terminal outside Claude Code nor a disguised
@@ -166,10 +166,13 @@ times a day.
 **Cause.** Worktree isolation assumes a git repository at the root; without one, an isolation marker
 goes stale after ten minutes and the engine then refuses every executor.
 
-**Move.** Run `/vf-update`: the install itself sets `workflow.use_worktrees` to `false` in
-`.planning/config.json` when the root isn't a git repository and the key isn't already set. You can
-also set that key by hand; a value you set yourself is never rewritten. Consequence: executors run
-one after another, without worktree isolation.
+**Move.** Set the key yourself, it's the reliable path: in `.planning/config.json`, add
+`"workflow": { "use_worktrees": false }` (if a `workflow` block already exists, add only
+`"use_worktrees": false` inside it). The install can also set it, but only when it installs a module
+or updates a module whose version changes, `.planning/config.json` exists, `node` is available, git
+answers that the root isn't a repository, and the key isn't already set. A `/vf-update` on a module
+that is already up to date doesn't set it. A value you set yourself is never rewritten. Consequence:
+executors run one after another, without worktree isolation.
 
 **Check.** The key is in `.planning/config.json` and executors are no longer refused.
 

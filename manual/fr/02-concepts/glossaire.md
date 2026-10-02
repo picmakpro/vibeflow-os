@@ -54,8 +54,9 @@ propres phases et son propre état. Un lab n'en a qu'un seul par défaut. Dével
 nombre de worktrees actifs…). Dépassé, il se constate et se range ; il ne supprime rien. Développé
 dans [ranger-ce-qu-on-cree.md](../05-equipe-agents/ranger-ce-qu-on-cree.md).
 
-**Fin de geste** — Le moment où une session s'arrête : dans un dépôt armé, un hook range ce qu'elle
-a créé ou la retient d'arrêter tant que ce rangement n'est pas fait.
+**Fin de geste** — Le moment où une session s'arrête : dans un dépôt armé, un hook archive des
+fichiers de planning (ce qu'un budget dépassé désigne, y compris les sujets clos du `BACKLOG.md`) et
+retient l'arrêt tant que la session n'a pas rangé elle-même ce qu'elle a créé.
 
 **DAG** — Le plan de bataille d'une mission longue, représenté comme un graphe de tâches avec
 leurs dépendances plutôt qu'une liste linéaire. Le manager ne dispatche que les tâches dont toutes

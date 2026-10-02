@@ -82,6 +82,9 @@ Aucun hook ne le lance dans ton lab : tu l'appelles à la main, depuis les scrip
 bash .claude/scripts/check-divergence.sh --path .
 ```
 
+Ce chemin vaut pour une installation en scope projet ou local ; en scope user, le script est sous
+`~/.claude/scripts/check-divergence.sh`.
+
 Il répond `0` (conforme), `1` (divergence constatée, avec le ou les numéros en cause), `2` (non
 vérifiable — jamais un vert de complaisance) ou `3` (le dépôt n'est pas partitionné, rien à
 vérifier).

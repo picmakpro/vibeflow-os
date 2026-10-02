@@ -80,6 +80,9 @@ merge branches that touch the planning.
 bash .claude/scripts/check-divergence.sh --path .
 ```
 
+That path applies to a project or local scope install; in user scope, the script is under
+`~/.claude/scripts/check-divergence.sh`.
+
 It answers `0` (consistent), `1` (divergence found, naming the number or numbers involved), `2`
 (cannot be verified — never a courtesy green) or `3` (the repository isn't partitioned, nothing to
 check).

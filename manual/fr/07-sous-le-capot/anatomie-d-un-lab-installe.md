@@ -93,11 +93,13 @@ Aussi utile que l'inventaire ci-dessus : ce que l'installation **ne touche jamai
   qu'elle a posés restent locaux. Elle ne touche à rien d'autre côté git — aucun commit, aucune
   branche, aucun remote. Hors git, deux réglages de configuration sont aussi écrits dans le projet, et seulement
   dans les cas qui les justifient : un `.worktreeinclude` à la racine (scope projet ou local,
-  lignes ajoutées sans jamais en retirer) qui recopie `.claude/hooks/` et `.claude/scripts/` dans
-  chaque worktree d'agent — copie figée à la création, un `git worktree add` manuel n'est pas
-  couvert ; et la clé `workflow.use_worktrees = false` dans `.planning/config.json` d'un lab dont la
-  racine n'est pas un dépôt git, sauf si tu l'as déjà fixée toi-même (voir
-  [depannage.md](../06-reference/depannage.md)).
+  lignes ajoutées sans jamais en retirer) qui ne fait recopier dans un worktree d'agent que ceux de
+  `.claude/hooks/` et `.claude/scripts/` que git ignore (suivis par git, ils arrivent par git) — copie
+  figée à la création, un `git worktree add` manuel n'est pas couvert ; et la clé
+  `workflow.use_worktrees = false` dans `.planning/config.json` d'un lab dont la racine n'est pas un
+  dépôt git, posée seulement quand l'installation d'un module, ou la mise à jour d'un module dont la
+  version change, a lieu, sauf si la clé est déjà fixée (voir
+  [depannage.md](../06-reference/depannage.md), qui donne aussi la pose à la main).
 - **Aucun appel réseau silencieux.** Rien n'est envoyé vers l'extérieur pendant l'installation —
   pas de télémétrie, pas de rapport d'usage.
 - **Aucun lancement automatique.** L'installation ne s'exécute jamais toute seule au démarrage d'une

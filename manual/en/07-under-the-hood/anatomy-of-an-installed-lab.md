@@ -88,11 +88,13 @@ Just as useful as the inventory above: what the install **never touches**.
   scope, the install adds lines to your `.gitignore` so the paths it placed stay local. It touches
   nothing else on the git side — no commit, no branch, no remote. Outside git, two configuration
   settings are also written into the project, and only where they are warranted: a `.worktreeinclude` at the root
-  (project or local scope, lines added and never removed) that copies `.claude/hooks/` and
-  `.claude/scripts/` into every agent worktree — a copy frozen at creation time, a manual
-  `git worktree add` isn't covered; and the key `workflow.use_worktrees = false` in the
-  `.planning/config.json` of a lab whose root isn't a git repository, unless you already set it
-  yourself (see [troubleshooting.md](../06-reference/troubleshooting.md)).
+  (project or local scope, lines added and never removed) which only makes an agent worktree
+  receive those of `.claude/hooks/` and `.claude/scripts/` that git ignores (tracked by git, they
+  arrive through git) — a copy frozen at creation time, a manual `git worktree add` isn't covered;
+  and the key `workflow.use_worktrees = false` in the `.planning/config.json` of a lab whose root
+  isn't a git repository, set only when a module is installed or a module whose version changes is
+  updated, unless the key is already set (see
+  [troubleshooting.md](../06-reference/troubleshooting.md), which also gives the manual setting).
 - **No silent network call.** Nothing is sent outward during install — no telemetry, no usage report.
 - **No automatic launch.** The install never runs on its own at session startup: you invoke it
   (`/vibeflow-install`), it acts, it stops. This point is developed in

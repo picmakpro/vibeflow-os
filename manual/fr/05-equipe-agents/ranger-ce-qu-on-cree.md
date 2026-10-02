@@ -33,9 +33,10 @@ branches distantes ne sont jamais rangées par la machine : c'est un geste humai
 ## Le rangement en fin de mission et en fin de geste
 
 **À la clôture d'une mission,** avant de relâcher le verrou de driver, le manager lance le script
-en mode `--auto`. Il archive ce qui déborde, commite cet archivage, remplace la position courante
-du `STATE.md` plutôt que d'y empiler un point de plus, retire sans `--force` les worktrees et les
-branches intégrés que **la mission** a créés, et élague les orphelins. Ce qu'il n'a pas pu ranger
+en mode `--auto`. Le script archive ce qui déborde, sans jamais rien commiter ni supprimer ; c'est le
+manager qui commite ensuite cet archivage, remplace la position courante du `STATE.md` plutôt que d'y
+empiler un point de plus, retire sans `--force` les worktrees et les branches intégrés que **la
+mission** a créés, et élague les orphelins. Ce qu'il n'a pas pu ranger
 va dans la section `## Budgets` de son rapport. Un contrôle de sortie compare l'état de fin à un
 instantané pris au début de la mission : ce qui existait avant n'est jamais imputé ni rangé par
 elle, et un manque bloque la sortie jusqu'à ce que le head le tranche.
@@ -71,15 +72,17 @@ ses sections d'état ouvert), les jalons livrés d'un `ROADMAP.md` au-delà du s
 - Le bloc déplacé atterrit tel quel sous `.planning/archives/<type>/`, une ligne
   `<!-- vf-archive: … -->` reste à sa place, et une ligne s'ajoute à `.planning/archives/INDEX.tsv`
   (date, type, source, archive, version d'origine, motif).
-- **Jamais de commit** : le déplacement se voit au `git status`, et tu le relis comme n'importe quel
-  changement. Un fichier modifié mais non commité est refusé, rien n'est écrit. Sur un dépôt
+- **L'outil ne commite jamais** : le déplacement se voit au `git status`, et tu le relis comme
+  n'importe quel changement. À la clôture d'une mission, c'est le manager qui le commite ; le hook de
+  fin de geste, lui, laisse l'archivage non commité. Un fichier modifié mais non commité est refusé, rien n'est écrit. Sur un dépôt
   partitionné, seul le sujet de la session est archivé ; sans sujet résolu, rien n'est tenté.
 - **Retour arrière** : la colonne « version d'origine » de l'`INDEX.tsv` est une référence git, et
   `git cat-file blob <référence>` restitue le fichier d'avant l'archivage.
 
 Dernier détail, côté création : l'installation pose un fichier `.worktreeinclude` à la racine d'un
-lab installé pour un projet, qui recopie `.claude/hooks/` et `.claude/scripts/` dans chaque
-worktree d'agent — sans lui, un worktree neuf n'aurait pas les garde-fous du lab.
+lab installé pour un projet. Il ne fait recopier dans un worktree d'agent que ceux de
+`.claude/hooks/` et `.claude/scripts/` que git ignore ; s'ils sont suivis par git, ils arrivent dans
+le worktree par git, et il ne sert à rien.
 
 <!-- vf-manual:nav -->
 [← Précédent](../05-equipe-agents/sujets-en-parallele.md) · [↑ Sommaire](../README.md) · [Suivant →](../05-equipe-agents/equipes-specialisees.md)

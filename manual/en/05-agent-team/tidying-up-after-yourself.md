@@ -33,9 +33,10 @@ machine: that's a human action.
 ## Tidying at the end of a mission and at the end of a gesture
 
 **When a mission closes,** before releasing the driver lock, the manager runs the script in `--auto`
-mode. It archives what overflows, commits that archiving, replaces the current position in
-`STATE.md` instead of stacking one more entry, removes without `--force` the merged worktrees and
-branches that **the mission** created, and prunes the orphans. What it couldn't tidy goes into the
+mode. The script archives what overflows, never committing or deleting anything; the manager then
+commits that archiving, replaces the current position in `STATE.md` instead of stacking one more
+entry, removes without `--force` the merged worktrees and branches that **the mission** created, and
+prunes the orphans. What it couldn't tidy goes into the
 `## Budgets` section of its report. An exit check compares the final state to a snapshot taken at
 the start of the mission: what existed before is never blamed on it nor tidied by it, and a gap
 blocks the exit until the head settles it.
@@ -71,15 +72,18 @@ open-state sections), and the shipped milestones of a `ROADMAP.md` beyond its ow
 - The moved block lands as-is under `.planning/archives/<type>/`, a `<!-- vf-archive: … -->` line
   stays in its place, and a line is added to `.planning/archives/INDEX.tsv` (date, type, source,
   archive, original version, reason).
-- **Never a commit**: the move shows in `git status`, and you review it like any other change. A
+- **The tool never commits**: the move shows in `git status`, and you review it like any other
+  change. When a mission closes, the manager commits it; the end-of-turn hook leaves the archiving
+  uncommitted. A
   modified but uncommitted file is refused, nothing is written. On a partitioned repository, only
   the session's topic is archived; with no topic resolved, nothing is attempted.
 - **Undo**: the "original version" column of `INDEX.tsv` is a git reference, and
   `git cat-file blob <reference>` returns the file as it was before archiving.
 
 One last detail, on the creation side: installation puts a `.worktreeinclude` file at the root of a
-lab installed for a project, which copies `.claude/hooks/` and `.claude/scripts/` into each agent
-worktree — without it, a fresh worktree would lack the lab's safeguards.
+lab installed for a project. It only makes an agent worktree receive those of `.claude/hooks/` and
+`.claude/scripts/` that git ignores; if git tracks them, they reach the worktree through git, and the
+file does nothing.
 
 <!-- vf-manual:nav -->
 [← Previous](../05-agent-team/parallel-topics.md) · [↑ Contents](../README.md) · [Next →](../05-agent-team/specialized-teams.md)

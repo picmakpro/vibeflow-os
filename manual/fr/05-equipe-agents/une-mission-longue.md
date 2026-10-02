@@ -55,13 +55,18 @@ ou abandon confondus.
 Il n'a pas toujours été contraignant. Il fut un temps où il restait **déclaratif** : une mission
 a pu continuer à committer pendant qu'une autre tenait le verrou sur la même ressource, parce que
 rien ne le faisait respecter. Ce n'est plus le cas : le verrou est désormais **appliqué**. Une
-session qui n'est pas enregistrée sous le verrou d'un autre voit son commit, son changement de
-branche, ses opérations de publication (`git push`, `gh pr`) ou son écriture dans `.planning/`
-**refusés avant exécution**. Le message de refus nomme le détenteur, son étape, sa branche et son
+session qui n'est pas enregistrée sous le verrou d'un autre voit ses gestes mutants **refusés avant
+exécution** : le commit, le changement de branche, la publication (`git push`, `gh pr`) ou l'écriture
+dans `.planning/`, mais la liste est plus large et non exhaustive. Elle contient aussi `git reset`,
+`git restore`, `git clean`, `git tag`, `git branch`, `git merge`, `git rebase`, `git cherry-pick`,
+`git revert`, `git stash` (sauf leurs options de sortie `--abort`, `--continue`, `--skip`, `--quit`),
+`git worktree remove` et `gh release`. Le message de refus nomme le détenteur, son étape, sa branche et son
 âge, puis propose trois issues : se ré-attacher au verrou si c'est sa propre mission qui a changé
 d'identifiant de session, travailler dans un arbre séparé (`git worktree add`, jamais refusé), ou
-poser un marqueur de dérogation explicite sur ce geste précis — la dérogation est alors tracée dans
-un journal à côté du verrou, jamais silencieuse.
+poser un marqueur de dérogation explicite sur ce geste précis — la dérogation est alors consignée,
+dans la mesure du possible, dans un journal à côté du verrou ; cette écriture ne bloque jamais le
+geste, un échec d'écriture est ignoré et la commande y est tronquée à 200 caractères. Ne compte donc
+pas sur ce journal comme preuve.
 
 Il faut être honnête sur ce que cette garde *ne* fait *pas*. C'est un garde-fou **anti-accident**,
 pas anti-adversaire : il arrête le chemin de moindre résistance, pas une volonté de contourner. Il
