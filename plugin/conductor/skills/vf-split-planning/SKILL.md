@@ -37,7 +37,11 @@ bash .claude/scripts/check-planning-not-inflight.sh --path .
   planning maintenant. Terminez-la d'abord, puis relancez /vf-split-planning. » Arrêt, aucune question.
 - rc 2 → dire « Je n'ai pas pu vérifier qu'aucune phase n'est en cours : je ne change rien. »
   avec le motif lu sur la sortie d'erreur. Arrêt.
+- tout autre code (script absent, erreur d'usage, etc.) → dire « Je n'ai pas pu vérifier qu'aucune
+  phase n'est en cours : je ne change rien. » avec le code lu. Arrêt, aucune question, aucun appel
+  au geste.
 - rc 0 → la sortie vaut `plat` (planning unique actuel) ou `partitionne` (sujets déjà présents).
+  Toute autre sortie se traite comme le « tout autre code » ci-dessus.
 
 ### 2. Session non interactive
 
@@ -57,15 +61,33 @@ Mode `plat` : **AskUserQuestion**, header « Parallèle », avec exactement :
 Réponse négative ou question sautée : planning unique, aucun appel au geste ; dire « Planning
 unique conservé ; /vf-split-planning reste possible plus tard. » Fin.
 
-Mode `partitionne` : le nom du nouveau sujet vient de l'argument de la commande, sinon il est
-demandé en clair ; confirmation par **AskUserQuestion** (header « Parallèle ») avant tout appel.
+Mode `partitionne` : le nom du nouveau sujet suit l'étape 4 ; confirmation par **AskUserQuestion**
+(header « Parallèle ») avant tout appel.
 
-### 4. Nom du premier sujet
+### 4. Nom du sujet, puis confirmation si le lab est déjà démarré
 
-Par défaut : le titre `# ` de `.planning/PROJECT.md`, sinon le nom du dossier du lab. Si ce nom
-ne respecte pas la forme acceptée par le geste (premier caractère alphanumérique, puis lettres,
-chiffres, espace, point, tiret ou souligné, 64 au plus, sans deux points consécutifs), demander
-un nom en clair.
+Le nom, dans les deux modes : l'argument de la commande s'il est donné, qui l'emporte toujours ;
+sinon, en mode `plat`, le titre `# ` de `.planning/PROJECT.md`, à défaut le nom du dossier du lab ;
+en mode `partitionne` sans argument, le demander en clair. Si ce nom ne respecte pas la forme
+acceptée par le geste (premier caractère alphanumérique, puis lettres, chiffres, espace, point,
+tiret ou souligné, 64 au plus, sans deux points consécutifs), demander un nom en clair.
+
+Mode `plat` seulement : lire sur le disque si le lab est neuf ou déjà démarré — même critère que le
+geste, jamais deviné en prose :
+
+```sh
+awk '/^---[ \t]*$/{n++; next} n==1 && /^(milestone|current_phase):/{f=1} END{print f ? "demarre" : "neuf"}' .planning/STATE.md
+```
+
+- `neuf` (produit brut de l'initialisation : aucune des deux clés) → la seule question de l'étape 3
+  suffit : pas de seconde question. Le message de l'étape 6 affiche le nom retenu.
+- tout autre résultat, `demarre` ou lecture impossible → lab déjà démarré : AVANT tout appel au geste,
+  dire « Le planning actuel sera rangé dans le sujet « <nom> ». » et demander confirmation par
+  **AskUserQuestion** (header « Parallèle ») avec trois options : « Oui, ranger le planning actuel
+  dans le sujet « <nom> » », « Choisir un autre nom » (nom demandé en clair, vérifié comme ci-dessus,
+  puis la confirmation est reposée) et « Non, garder un seul planning ». Refus, « Non » ou
+  **AskUserQuestion** indisponible : RIEN n'est fait, aucun appel au geste ; dire « Planning unique
+  conservé ; /vf-split-planning reste possible plus tard. »
 
 ### 5. Le geste
 
@@ -87,6 +109,8 @@ réimplémente rien du moteur.
   est créé et l'état à compléter : « Le sujet est créé mais son état reste à compléter — je ne
   répare pas sans votre accord. »
 - rc 64 → « Ce nom de sujet n'est pas accepté » + la règle de l'étape 4 ; redemander un nom.
+- tout autre code, ou une ligne de résultat illisible → « Je n'ai pas pu terminer proprement. » + le
+  code lu ; ne rien deviner, ne rien réparer sans l'accord de l'humain.
 
 ### 7. Proposer le commit
 

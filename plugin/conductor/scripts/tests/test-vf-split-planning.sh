@@ -16,7 +16,8 @@
 #   VF_TEST_SKILL_PATH    chemin du SKILL.md jugé (absent => « introuvable », rc 1)
 #   VF_TEST_COMMAND_PATH  chemin de la commande jugée
 #
-# Cas : T1-T12 (skill + commande), D1-D5 (la sonde discrimine), R1-R4 (renvois), M1-M2 (manuel).
+# Cas : T1-T12 (skill + commande), D1-D5 (la sonde discrimine), R1-R4 (renvois), M1-M2 (manuel),
+#       P1-P5 (ordre des étapes, refus relayés, confirmation de bascule, nom) et D6-D9 (leurs mutants).
 # Aucun `diff` (proxifié, menteur sur ce poste) : `cmp -s`.
 set -uo pipefail
 
@@ -213,6 +214,82 @@ grep -qx '### `/vf-split-planning`' "$MAN_EN" || m2=false
 [ -n "$(section "$MAN_EN")" ] && section "$MAN_EN" | mots_interdits || m2=false
 ok M2 "manuel EN : « The eight commands », section /vf-split-planning sans mot interdit" "$m2"
 
+# --- P1-P5 : la STRUCTURE du skill (WSCH-03 côté skill, P412-D-08), D6-D9 : elle rougit sur ses mutants --------
+# Propriété : la précondition est appelée AVANT toute création, chacun de ses refus (et de ceux du geste) est relayé en
+# langage d'usage par une puce dédiée, la bascule d'un lab démarré se confirme AVANT l'appel au geste, le nom suit
+# la même règle dans les deux modes. Une fonction, jouée sur le vrai skill puis sur des copies mutées.
+echo "  -- structure du skill (étapes, refus relayés, confirmation) --"
+sec() { # <fichier> <préfixe de titre « ### N. »> : le corps de l'étape, jusqu'au titre suivant
+  awk -v p="$2" 'index($0,p)==1{on=1; next} on && /^### /{exit} on{print}' "$1"
+}
+lnum() { grep -nF -- "$1" "$2" 2>/dev/null | head -1 | cut -d: -f1; }
+structure() { # <fichier> -> rc 0 conforme ; STRUCT_BAD = les écarts
+  local f="$1" bad="" n prev=0 s1 s4 s6 l_pre l_geste l_conf
+  for n in 1 2 3 4 5 6 7 8; do
+    l="$(grep -n "^### $n\. " "$f" | head -1 | cut -d: -f1)"
+    if [ -z "$l" ]; then bad="$bad étape-$n-absente"; elif [ "$l" -le "$prev" ]; then bad="$bad étape-$n-hors-ordre"; else prev="$l"; fi
+  done
+  s1="$(sec "$f" "### 1. ")"; s4="$(sec "$f" "### 4. ")"; s6="$(sec "$f" "### 6. ")"
+  l_pre="$(lnum "bash .claude/scripts/check-planning-not-inflight.sh" "$f")"; l_geste="$(lnum "bash .claude/scripts/split-planning.sh" "$f")"
+  { [ -n "$l_pre" ] && [ -n "$l_geste" ] && [ "$l_pre" -lt "$l_geste" ]; } || bad="$bad précondition-pas-avant-le-geste"
+  # étape 1 : une puce par code, chacune avec son message dit
+  printf '%s\n' "$s1" | grep -F -- "- rc 1" | grep -qF "Une phase est en cours dans ce lab" || bad="$bad précondition:rc1-non-relayé"
+  printf '%s\n' "$s1" | grep -F -- "- rc 2" | grep -qF "Je n'ai pas pu vérifier qu'aucune phase n'est en cours" || bad="$bad précondition:rc2-non-relayé"
+  printf '%s\n' "$s1" | grep -F -- "- tout autre code" | grep -qF "Je n'ai pas pu vérifier" || bad="$bad précondition:autre-code-non-relayé"
+  # étape 6 : les refus du geste, un message dit par code, y compris un code non prévu
+  printf '%s\n' "$s6" | grep -F -- "- rc 1" | grep -qF "Je n'ai rien changé" || bad="$bad geste:rc1-non-relayé"
+  printf '%s\n' "$s6" | grep -F -- "- rc 2" | grep -qF "Je n'ai pas pu terminer proprement" || bad="$bad geste:rc2-non-relayé"
+  printf '%s\n' "$s6" | grep -F -- "- rc 64" | grep -qF "Ce nom de sujet n'est pas accepté" || bad="$bad geste:rc64-non-relayé"
+  printf '%s\n' "$s6" | grep -F -- "- tout autre code" | grep -qF "Je n'ai pas pu terminer proprement" || bad="$bad geste:autre-code-non-relayé"
+  # étape 4 : confirmation de bascule d'un lab démarré, AVANT le geste ; le nom, même règle dans les deux modes
+  l_conf="$(lnum "sera rangé dans le sujet" "$f")"
+  { [ -n "$l_conf" ] && [ -n "$l_geste" ] && [ "$l_conf" -lt "$l_geste" ]; } || bad="$bad confirmation-absente-ou-après-le-geste"
+  printf '%s\n' "$s4" | grep -qF "AVANT tout appel au geste" || bad="$bad confirmation:pas-avant-tout-appel"
+  printf '%s\n' "$s4" | grep -qF "RIEN n'est fait" || bad="$bad confirmation:refus-non-traité"
+  printf '%s\n' "$s4" | grep -qF "pas de seconde question" || bad="$bad confirmation:lab-neuf-non-distingué"
+  printf '%s\n' "$s4" | grep -qF "dans les deux modes" || bad="$bad nom:règle-non-unique"
+  printf '%s\n' "$s4" | grep -qF "l'emporte toujours" || bad="$bad nom:argument-non-prioritaire"
+  STRUCT_BAD="$bad"; [ -z "$bad" ]
+}
+clean() { local p; for p in "$@"; do case "$STRUCT_BAD" in *"$p"*) echo false; return ;; esac; done; echo true; }
+structure "$SKILL"; sr=$?
+ok P1 "étapes 1 à 8 présentes dans l'ordre ; précondition appelée avant le geste" \
+  "$(clean étape- précondition-pas)" "$STRUCT_BAD"
+ok P2 "étape 1 : une puce dédiée, avec son message dit, pour rc 1, rc 2 et tout autre code" \
+  "$(clean précondition:)" "$STRUCT_BAD"
+ok P3 "étape 6 : une puce dédiée, avec son message dit, pour rc 1, rc 2, rc 64 et tout autre code" \
+  "$(clean geste:)" "$STRUCT_BAD"
+ok P4 "étape 4 : confirmation « sera rangé dans le sujet » avant le geste, refus = rien fait, lab neuf sans seconde question" \
+  "$(clean confirmation)" "$STRUCT_BAD"
+ok P5 "étape 4 : le nom passé en argument l'emporte, même règle dans les deux modes (aligné sur le manuel)" \
+  "$(clean nom:)" "$STRUCT_BAD"
+[ $sr -eq 0 ] || echo "      (structure du vrai skill : $STRUCT_BAD)"
+
+# Mutants du skill (copies jetables) : chacun doit faire rougir `structure`.
+strip_bullet() { # <fichier> <début de puce> <sortie> : retire la puce et ses lignes de suite (indentées)
+  awk -v b="$2" 'index($0,b)==1{skip=1; next} skip && /^  [^ ]/{next} {skip=0; print}' "$1" > "$3"
+}
+dmut() { # <ID> <description> <fichier muté> <fragment attendu dans STRUCT_BAD>
+  if cmp -s "$3" "$SKILL"; then ok "$1" "$2" false "mutant NON OPPOSABLE (identique au skill)"; return; fi
+  structure "$3"; local r=$?
+  if [ $r -ne 0 ] && printf '%s' "$STRUCT_BAD" | grep -qF -- "$4"; then DOK=$((DOK+1)); ok "$1" "$2" true
+  else ok "$1" "$2" false "attendu un rouge contenant [$4], obtenu rc $r [$STRUCT_BAD]"; fi
+  echo "      trace $1 : assertion=${4} ; attendu=rouge ; obtenu=$([ $r -ne 0 ] && echo "rouge [$STRUCT_BAD]" || echo vert)"
+}
+# D6 : la ligne « rc 2 » de la précondition supprimée
+awk '/^### 1\. /{on=1} /^### 2\. /{on=0} on && index($0,"- rc 2")==1{skip=1; next} skip && /^  [^ ]/{next} {skip=0; print}' "$SKILL" > "$TMP/d6.md"
+dmut D6 "ligne « rc 2 » de la précondition supprimée => rouge" "$TMP/d6.md" "précondition:rc2-non-relayé"
+# D7 : « 5. Le geste » placée AVANT « 1. Précondition »
+awk '/^### /{cur=$2+0} {b[cur]=b[cur] $0 "\n"} END{printf "%s%s", b[0], b[5]; for(i=1;i<=8;i++) if(i!=5) printf "%s", b[i]}' "$SKILL" > "$TMP/d7.md"
+dmut D7 "étape « Le geste » placée avant « Précondition » => rouge" "$TMP/d7.md" "précondition-pas-avant-le-geste"
+# D8 : toutes les puces « rc 1 » et « rc 2 » supprimées (précondition ET geste)
+strip_bullet "$SKILL" "- rc 1" "$TMP/d8a.md"; strip_bullet "$TMP/d8a.md" "- rc 2" "$TMP/d8.md"
+dmut D8 "puces « rc 1 » et « rc 2 » supprimées => rouge" "$TMP/d8.md" "rc1-non-relayé"
+# D9 : confirmation de bascule (P412-D-08) supprimée
+awk 'index($0,"sera rangé dans le sujet")>0{next} {print}' "$SKILL" > "$TMP/d9.md"
+dmut D9 "confirmation « sera rangé dans le sujet » supprimée => rouge" "$TMP/d9.md" "confirmation-absente-ou-après-le-geste"
+echo "== structure : $DOK/8 mutants de la sonde et du skill prouvés =="
+
 # __BILAN__
 echo "== bilan : $((PASS+FAIL)) cas, $FAIL échec(s) =="
-[ "$FAIL" -eq 0 ] && [ "$DOK" -eq 4 ]
+[ "$FAIL" -eq 0 ] && [ "$DOK" -eq 8 ]
