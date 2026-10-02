@@ -64,6 +64,136 @@ L'ancienne branche et son worktree sont supprimés par la session principale (va
 
 Le relais verbatim des blocs `preuves` des vf-coder est dans les SUMMARY du dossier de phase. Les worker n'ont pas recueilli d'`actuals:`.
 
+Bloc machine lu par le gate de sortie (contrat `mission-contracts.md` §Contrat de preuves E6). Les éléments `revue` et `recette` sont relayés tels quels depuis les blocs typés des workers. Les éléments `gate:*` au SHA 547a4659 ont été rejoués par le manager à la clôture. Ce commit de rapport change le HEAD sans toucher au code : ces verdicts valent pour l'arbre de code de 547a4659.
+
+```json
+{
+ "preuves": [
+  {
+   "verdict": "gate:check-mission-invariants",
+   "commande": "bash plugin/conductor/scripts/check-mission-invariants.sh",
+   "exit_code": 3,
+   "sha": "4523114bd9e4516f90b6f4b8af253339464964cd"
+  },
+  {
+   "verdict": "recette",
+   "preuve": "amont"
+  },
+  {
+   "verdict": "revue",
+   "commande": "rejouer-ci.sh --job gates --step 'check-state-integrity' --compare 4523114b 05a5c504 (puis --step 'Gates workstream-aware') ; test-split-planning.sh (38 ok) et test-check-planning-not-inflight.sh (32 ok) sous /bin/bash 3.2.57 avec le vrai moteur",
+   "exit_code": 0,
+   "sha": "05a5c504"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/conductor/scripts/tests/test-vf-split-planning.sh (HOME jetable, worktree détaché 45a694b2)",
+   "exit_code": 0,
+   "sha": "45a694b2"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/conductor/scripts/check-instruction-budget.sh --path .",
+   "exit_code": 0,
+   "sha": "45a694b2",
+   "note": "exit code déduit par le juge du verdict affiché (code=0), $? brut non capturé"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash scripts/check-baseline-arbitrage.sh --base-ref origin/main",
+   "exit_code": 0,
+   "sha": "45a694b2",
+   "note": "exit code déduit par le juge du verdict affiché (CONFORME)"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash scripts/check-gate-touche.sh --base-ref origin/main",
+   "exit_code": 0,
+   "sha": "45a694b2",
+   "note": "exit code déduit par le juge du verdict affiché (DECLARE)"
+  },
+  {
+   "verdict": "revue",
+   "commande": "HOME=$(mktemp -d) GSD_TOOLS=~/.claude/gsd-core/bin/gsd-tools.cjs /bin/bash plugin/conductor/scripts/tests/{test-split-planning,test-check-planning-not-inflight,test-vf-split-planning}.sh (worktree 96067480, bash 3.2) ; idem dans node:24-slim bash 5.2 + en_US.UTF-8 : test-split-planning.sh 57 ok / 2 ko (C2, C4a)",
+   "exit_code": 1,
+   "sha": "96067480b20656c1e9c6a6398aecd5961ce3ae68",
+   "note": "rouge de jointure, fermé par la correction 03 (dd6e3316, 418a7419)"
+  },
+  {
+   "verdict": "revue",
+   "commande": "env -u GSD_WORKSTREAM bash plugin/conductor/scripts/tests/test-split-planning.sh",
+   "exit_code": 0,
+   "sha": "607c57d2"
+  },
+  {
+   "verdict": "revue",
+   "commande": "env -u GSD_WORKSTREAM bash plugin/conductor/scripts/tests/test-vf-split-planning.sh",
+   "exit_code": 0,
+   "sha": "607c57d2"
+  },
+  {
+   "verdict": "revue",
+   "commande": "env -u GSD_WORKSTREAM bash plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh",
+   "exit_code": 0,
+   "sha": "607c57d2"
+  },
+  {
+   "verdict": "gate:test-split-planning",
+   "commande": "env -u GSD_WORKSTREAM HOME=$(mktemp -d) GSD_TOOLS=~/.claude/gsd-core/bin/gsd-tools.cjs bash plugin/conductor/scripts/tests/test-split-planning.sh",
+   "exit_code": 0,
+   "sha": "547a46590af6ab22a233382bfffdb23ade3181cc",
+   "note": "rejoué par le manager, bilan 69 ok, 0 ko"
+  },
+  {
+   "verdict": "gate:test-vf-split-planning",
+   "commande": "env -u GSD_WORKSTREAM HOME=$(mktemp -d) GSD_TOOLS=~/.claude/gsd-core/bin/gsd-tools.cjs bash plugin/conductor/scripts/tests/test-vf-split-planning.sh",
+   "exit_code": 0,
+   "sha": "547a46590af6ab22a233382bfffdb23ade3181cc",
+   "note": "rejoué par le manager, bilan 40 cas, 0 échec"
+  },
+  {
+   "verdict": "gate:test-check-planning-not-inflight",
+   "commande": "env -u GSD_WORKSTREAM HOME=$(mktemp -d) GSD_TOOLS=~/.claude/gsd-core/bin/gsd-tools.cjs bash plugin/conductor/scripts/tests/test-check-planning-not-inflight.sh",
+   "exit_code": 0,
+   "sha": "547a46590af6ab22a233382bfffdb23ade3181cc",
+   "note": "rejoué par le manager, 34 ok, 0 ko"
+  },
+  {
+   "verdict": "gate:check-instruction-budget",
+   "commande": "bash plugin/conductor/scripts/check-instruction-budget.sh",
+   "exit_code": 0,
+   "sha": "547a46590af6ab22a233382bfffdb23ade3181cc",
+   "note": "BOOTSTRAP 2610 = ligne 2610"
+  },
+  {
+   "verdict": "gate:check-ajout-retrait",
+   "commande": "bash plugin/conductor/scripts/check-ajout-retrait.sh --strict",
+   "exit_code": 0,
+   "sha": "547a46590af6ab22a233382bfffdb23ade3181cc",
+   "note": "COUVERT"
+  },
+  {
+   "verdict": "gate:check-gate-touche",
+   "commande": "bash scripts/check-gate-touche.sh",
+   "exit_code": 0,
+   "sha": "547a46590af6ab22a233382bfffdb23ade3181cc",
+   "note": "DECLARE"
+  },
+  {
+   "verdict": "gate:check-baseline-arbitrage",
+   "commande": "bash scripts/check-baseline-arbitrage.sh",
+   "exit_code": 0,
+   "sha": "547a46590af6ab22a233382bfffdb23ade3181cc",
+   "note": "CONFORME"
+  }
+ ]
+}
+```
+
+### E7 — non vérifiable pour cette mission
+
+Le snapshot de budget de début de mission sur disque a été posé par une version antérieure à v2.68.0 de `check-mission-exit.sh --budget-snapshot`. Il ne porte ni identité de mission ni date, et rien ne permet de le rattacher à cette mission. Le poser maintenant fabriquerait une référence postérieure aux faits, qui masquerait ce que la mission a laissé : il n'est donc pas reposé. E7 reste **INDÉTERMINÉ** pour la mission 41.2, jamais conforme. Seule source disponible : `check-method-budget.sh --quiet` (consultatif, rc 0) a été joué en clôture, et ses dépassements (STATE de `gouvernance`, BACKLOG, ROADMAP de `fiabilite`) sont antérieurs à la mission. Ce n'est pas un delta mesuré.
+
 ## Écarts et limites
 
 - **E1 tranché** (P412-D-10), puis livré par la correction 04 (`a6f715f7`, `3629152e`, `bf9d4986`, `607c57d2`) et revu (PASS, 4 mineurs). Il reste deux mineurs ouverts. D'une part, `intent-routing.md` : « on reprend le sujet X » recoupe la ligne « on reprend » → `gsd-resume-work` ; c'est la spécificité qui départage, il faudrait préciser « (sans nom de sujet) ». D'autre part, `workstreams.md` §3 affirme que le pointeur in-repo « n'est jamais lu » sous Claude Code, ce que la cascade de gsd-core 1.15.0 dément : c'est à corriger par WSAW-07.
