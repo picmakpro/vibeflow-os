@@ -30,7 +30,7 @@ L'ancienne branche et son worktree sont supprimés par la session principale (va
 | P412-D-07 | décision du manager | Lab démarré avec une seule des deux clés : le moteur pose le jalon (`state patch`) si le plan de route en déclare un, sinon refus, disque intact. |
 | P412-D-08 | décision du manager (ADR-031) | Bascule d'un lab démarré : confirmation explicite avant de ranger le planning existant. Lab neuf : une seule question. |
 | P412-D-09 | décision du manager | Le pivot `Last activity` est gardé avant toute écriture (ligne absente, vide ou non conforme : refus, disque intact). |
-| **E1** | **EN ATTENTE — question posée à Samuel le 2026-10-02 via la session principale, sans réponse à la clôture** | Quel sujet est actif par défaut après une partition ? Recommandation : (a) le premier sujet, via le pointeur partagé `.planning/active-workstream` écrit par le moteur, plus une ligne de routage « reprendre le sujet X ». |
+| P412-D-10 (E1) | arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 | Le premier sujet devient le sujet par défaut via `.planning/active-workstream`, écrit par le moteur (`create` sous clés de session neutralisées, mesuré). Ajouter un sujet ne change pas ce défaut. Une ligne de la carte d'intention porte « reprends / travaille sur le sujet X ». La fixture CI ne pose plus la variable. |
 
 ## Livré (PR)
 
@@ -48,7 +48,7 @@ L'ancienne branche et son worktree sont supprimés par la session principale (va
 - **Lot 1** (plans 01-04) : 1 majeur, la séquence destructive était jouée sur un lab à une seule clé. 4 mineurs : locale, post-condition non gardée, vocabulaire, mode de fichier.
 - **Lot 2** (plans 05-06) : 2 majeurs. La suite ne mordait pas sur l'ordre précondition → geste, et la migration d'un lab démarré n'était pas confirmée. 4 mineurs.
 - **Jointure** : 1 bloquant (cas C2 rouge sur la CI Linux, noms de locale glibc), 1 majeur (signal neuf/démarré non éprouvé et divergent sur CRLF), 3 mineurs. Tous fermés par la correction 03 (`dd6e3316`, `418a7419`).
-- Vérification de phase (`41.2-VERIFICATION.md`) : 5/6, aucun critère en échec, statut `human_needed` pour deux raisons. E1 attend l'arbitrage. Le parcours réel du skill doit être joué en session interactive, car aucune suite ne peut exécuter un agent.
+- Vérification de phase (`41.2-VERIFICATION.md`) : 5/6, aucun critère en échec. E1 est re-vérifié le 2026-10-02 (section datée). Seul reste humain le parcours réel du skill en session interactive, car aucune suite ne peut exécuter un agent.
 
 ## Preuves E6
 
@@ -57,6 +57,7 @@ L'ancienne branche et son worktree sont supprimés par la session principale (va
 | `bash plugin/conductor/scripts/check-mission-invariants.sh` (au démarrage) | 3 (SAIN) | 4523114b |
 | CI GitHub, run 36981206488 (4 jobs) | success | 45a694b2 |
 | CI GitHub, run 37009753104 (job tests : C2 locale glibc) | failure | 96067480 |
+| CI GitHub, run 37021334036 (PR, 4 jobs, après P412-D-10 ; W6 sans variable d'environnement) | success | 607c57d2 |
 | CI GitHub, run 37012362820 (4 jobs ; 98 suites, 0 échec ; C2 joué sous `C C.utf8 en_US.utf8` ; W1-W12 sur le vrai moteur) | success | e4569aec |
 | `bash plugin/conductor/scripts/check-state-integrity.sh --path . --file .planning/workstreams/fiabilite/STATE.md` | 0 | db99c891 (arbre avant commit) |
 | `bash plugin/conductor/scripts/check-method-budget.sh --quiet` (consultatif ; dépassements tous antérieurs à la mission) | 0 | e4569aec |
@@ -65,14 +66,14 @@ Le relais verbatim des blocs `preuves` des vf-coder est dans les SUMMARY du doss
 
 ## Écarts et limites
 
-- **E1 non tranché.** Sur un lab fraîchement partitionné, `check-workstream-pointer.sh` émet un avertissement à chaque début de session tant qu'aucun canal composable n'est posé. W6 n'est vert que parce que la fixture exporte la variable.
+- **E1 tranché** (P412-D-10), puis livré par la correction 04 (`a6f715f7`, `3629152e`, `bf9d4986`, `607c57d2`) et revu (PASS, 4 mineurs). Il reste deux mineurs ouverts. D'une part, `intent-routing.md` : « on reprend le sujet X » recoupe la ligne « on reprend » → `gsd-resume-work` ; c'est la spécificité qui départage, il faudrait préciser « (sans nom de sujet) ». D'autre part, `workstreams.md` §3 affirme que le pointeur in-repo « n'est jamais lu » sous Claude Code, ce que la cascade de gsd-core 1.15.0 dément : c'est à corriger par WSAW-07.
 - Le parcours réel de `/vf-split-planning` n'a pas été exercé en session interactive.
 - `plugin/conductor/README.md` et `CHANGELOG.md` ne mentionnent pas encore le skill (P412-D-03). C'est à faire à la prochaine release fonctionnelle.
 - La PR touche `.github/workflows/ci.yml` et la baseline (CODEOWNERS) : elle exige la revue `@picmakpro`.
 - `.planning/BACKLOG.md` porte encore l'entrée d'origine « Choisir la partition du planning AU DÉMARRAGE » (52 lignes, au-dessus du plafond de prose). Il faut la clore au merge.
-- Incidents de pilotage : deux workers figés par le chien de garde. Le premier a été réveillé et a fini. Pour le second, le manager a commité les docs déjà rédigées, contenu inchangé (commit 96067480 qui le dit). Il n'y a eu aucun redispatch.
+- Incidents de pilotage : deux workers figés par le chien de garde. Le premier a été réveillé et a fini. Pour le second, le manager a commité les docs déjà rédigées, contenu inchangé (commit 96067480 qui le dit). Il n'y a eu aucun redispatch. Réveillé plus tard, ce second worker a ajouté un commit de 2 lignes à son SUMMARY (`7c0d4090`), sans effet sur le code.
 
 ## Décompte
 
-- Mandats émis : 7 vf-coder (cadrage, plan, exécution 01-04, exécution 05-06, corrections 01, 02 et 03) et 3 vf-reviewer.
-- Escalades humaines : 3 (Q1-Q3 groupées, F1, E1). E1 reste ouverte.
+- Mandats émis : 8 vf-coder (cadrage, plan, exécution 01-04, exécution 05-06, corrections 01 à 04) et 4 vf-reviewer.
+- Escalades humaines : 3 (Q1-Q3 groupées, F1, E1), toutes tranchées par Samuel.
