@@ -92,7 +92,7 @@
 - [x] Phase 40.1: Révision ADR-029 et du gate du budget d'instructions (INSERTED 2026-09-16 — plafond 300 lignes, ratchet sur les instructions seules ; arbitrages Samuel AskUserQuestion session principale ; avant la 41)
 - [x] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date — **PÉRIMÈTRE RECADRÉ SANS ADMIN LIVRÉ le 2026-09-18, mergée PR #80, SHIPPÉE v2.64.0** : trois gardes in-repo qui signalent et tracent sans jamais verrouiller (G-1 `check-baseline-arbitrage.sh`, G-2 `check-gate-touche.sh`, G-3 `check-push-sans-pr.sh`) + doctrine ADR-072 ; **critères de succès 1 à 3 du ROADMAP d'origine restent HORS D'ATTEINTE sans accès admin GitHub** (PROT-01 non coché, `REQUIREMENTS.md`) ; volet rulesets côté serveur **DIFFÉRÉ au BACKLOG** avec son déclencheur de reprise — le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce volet (WhatsApp, 2026-09-23) **avant** la clôture de `fiabilite-v1.0`, puisque PROT-01 en fait partie (correction du 2026-09-23 : la formulation précédente inversait la séquence — cf. `BACKLOG.md` § « Protection de `main` côté GitHub »))
 - [x] Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED 2026-09-23, demande Samuel session principale : « généralise le remède, ça ne doit plus se reproduire »)
-- [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage)
+- [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage) — exécutée 2026-10-02, PR en revue (non mergée)
 - [x] Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED 2026-09-29, arbitrage Samuel AskUserQuestion session principale ; dernière phase avant la clôture du jalon) — complete 2026-09-30
 - [ ] Phase 51: Snapshot de planning avant compaction (PreCompact) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 52: Télémétrie d'usage des skills et agents, et coût de mission (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
@@ -1523,16 +1523,16 @@ sur chaque compartiment sans réparation manuelle**.
 
   6. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa mutation rouge prouvée.
 
-**Plans:** 6 plans en 4 vagues (planifiés le 2026-10-02, vérifiés par le plan-checker)
+**Plans:** 6 plans en 4 vagues (planifiés le 2026-10-02, vérifiés par le plan-checker ; tous exécutés le 2026-10-02, plus 2 corrections ciblées de revue, un `*-SUMMARY.md` par plan)
 
 Plans:
 
-- [ ] 41.2-01 — mesure du verbe d'état du moteur sur fixture jetable + `check-planning-not-inflight.sh` (précondition ADR-069 par machine, QUAL-01) — vague 1
-- [ ] 41.2-02 — balayage par sujet extrait en `fanout-state-integrity.sh` sourcé (deux copies de `ci.yml` retirées) + outil de rejeu CI — vague 1
-- [ ] 41.2-03 — le geste `split-planning.sh` (précondition → `workstream create` → séquence d'état moteur) + cas S1-S12 — vague 2
-- [ ] 41.2-04 — preuve d'usage WSCH-04 de bout en bout (lab neuf partitionné vert sur chaque sujet) + mutations — vague 3
-- [ ] 41.2-05 — skill `vf-split-planning` + commande + renvois `vf-new-lab` / `intent-routing.md` + sonde WSCH-01 (checkpoint F1 : budget d'instructions) — vague 3
-- [ ] 41.2-06 — remise WSAW-07 (`41.2-WSAW07-HANDOFF.md`) + clôture rejouée — vague 4
+- [x] 41.2-01 — mesure du verbe d'état du moteur sur fixture jetable + `check-planning-not-inflight.sh` (précondition ADR-069 par machine, QUAL-01) — vague 1
+- [x] 41.2-02 — balayage par sujet extrait en `fanout-state-integrity.sh` sourcé (deux copies de `ci.yml` retirées) + outil de rejeu CI — vague 1
+- [x] 41.2-03 — le geste `split-planning.sh` (précondition → `workstream create` → séquence d'état moteur) + cas S1-S12 — vague 2
+- [x] 41.2-04 — preuve d'usage WSCH-04 de bout en bout (lab neuf partitionné vert sur chaque sujet) + mutations — vague 3
+- [x] 41.2-05 — skill `vf-split-planning` + commande + renvois `vf-new-lab` / `intent-routing.md` + sonde WSCH-01 (checkpoint F1 : budget d'instructions) — vague 3
+- [x] 41.2-06 — remise WSAW-07 (`41.2-WSAW07-HANDOFF.md`) + clôture rejouée — vague 4
 
 
 ### Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED)
