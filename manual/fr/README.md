@@ -88,6 +88,8 @@ flowchart LR
 - [Une mission longue, la mécanique](./05-equipe-agents/une-mission-longue.md)
 - [Ce qu'on vous demande](./05-equipe-agents/ce-qu-on-vous-demande.md)
 - [Branches et worktrees](./05-equipe-agents/branches-et-worktrees.md)
+- [Plusieurs sujets en parallèle](./05-equipe-agents/sujets-en-parallele.md)
+- [Ce qu'on crée, on le range](./05-equipe-agents/ranger-ce-qu-on-cree.md)
 - [Équipes spécialisées](./05-equipe-agents/equipes-specialisees.md)
 ### Référence
 - [Commandes](./06-reference/commandes.md)

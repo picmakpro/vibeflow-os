@@ -43,7 +43,19 @@ coordination.
 
 **Driver lock** — The mechanism that guarantees only one mission drives a step at a time. It
 carries a TTL and a heartbeat: if the driver disappears without releasing it, the lock gets
-recovered cleanly instead of staying stuck forever.
+recovered cleanly instead of staying stuck forever. The lock is enforced: a session that isn't
+registered under it has its commits and its writes to `.planning/` refused.
+
+**Topic (workstream)** — A planning line of work that moves in parallel with another, with its own
+phases and its own state. A lab has just one by default. Covered in
+[parallel-topics.md](../05-agent-team/parallel-topics.md).
+
+**Method budget** — A measurable threshold on the trace a lab accumulates (size of `STATE.md`,
+number of active worktrees…). When exceeded it is reported and tidied; it deletes nothing. Covered
+in [tidying-up-after-yourself.md](../05-agent-team/tidying-up-after-yourself.md).
+
+**End of gesture** — The moment a session stops: in an armed repository, a hook tidies what it
+created, or holds it back from stopping until that tidying is done.
 
 **DAG** — A long mission's battle plan, represented as a graph of tasks with their dependencies
 instead of a linear list. The manager only dispatches tasks whose dependencies are all

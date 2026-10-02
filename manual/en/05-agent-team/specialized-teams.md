@@ -104,5 +104,5 @@ design, but how well they do it still depends on what you've told the lab about 
 asking it to run.
 
 <!-- vf-manual:nav -->
-[← Previous](../05-agent-team/branches-and-worktrees.md) · [↑ Contents](../README.md) · [Next →](../06-reference/commands.md)
+[← Previous](../05-agent-team/tidying-up-after-yourself.md) · [↑ Contents](../README.md) · [Next →](../06-reference/commands.md)
 <!-- /vf-manual:nav -->

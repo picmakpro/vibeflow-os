@@ -227,6 +227,16 @@ pages:
     path_en: 05-agent-team/branches-and-worktrees.md
     fr: Branches et worktrees
     en: Branches and worktrees
+  - id: parallel-topics
+    path_fr: 05-equipe-agents/sujets-en-parallele.md
+    path_en: 05-agent-team/parallel-topics.md
+    fr: Plusieurs sujets en parallèle
+    en: Several topics in parallel
+  - id: tidying-up
+    path_fr: 05-equipe-agents/ranger-ce-qu-on-cree.md
+    path_en: 05-agent-team/tidying-up-after-yourself.md
+    fr: Ce qu'on crée, on le range
+    en: Tidying up after yourself
   - id: specialized-teams
     path_fr: 05-equipe-agents/equipes-specialisees.md
     path_en: 05-agent-team/specialized-teams.md

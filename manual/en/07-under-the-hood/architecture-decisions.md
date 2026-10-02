@@ -24,7 +24,10 @@ obvious a fix might seem.
 - **Human validation before any irreversible action (ADR-031).** A fix, a deletion, the
   materialization of a structural file never happens without your explicit consent — the central
   commitment already detailed in
-  [gates-and-human-validation.md](../02-concepts/gates-and-human-validation.md).
+  [gates-and-human-validation.md](../02-concepts/gates-and-human-validation.md). A neighboring
+  decision (ADR-076) clarifies its scope: automatic archiving of a lab's trace is a traced,
+  reversible move, never a correction, and it deletes and commits nothing (see
+  [tidying-up-after-yourself.md](../05-agent-team/tidying-up-after-yourself.md)).
 - **MCP access kept to the minimum needed (ADR-051).** An agent that compiles or tests your code
   automatically receives access only to the MCP servers **your own project** declares — never
   broader access, never a guessed or hardcoded server name (already covered on
