@@ -183,6 +183,8 @@ class Ctx:
         self.settings_lab = settings_lab
         self.hook = os.path.join(scripts_dir, "planning-hook.sh")
         self.cmd = None
+        self.cmd_np = None   # la même commande SANS l'appel du pré-filtre (revue Samuel, PR #124) : base des mutants de la couche shell
+        self.cmd_pre = None  # la commande tronquée à l'appel du pré-filtre : rend SHORT ou DEFER, ne lance rien d'autre
         self.source_cmd = None
         self.home = os.path.join(work, "home")
         os.makedirs(self.home, exist_ok=True)
@@ -226,6 +228,15 @@ class Ctx:
         if len(candidats) != 1:
             return None
         self.cmd = candidats[0]
+        # Pré-filtre hors adhésion (revue Samuel, PR #124 ; arbitrage Willy, AskUserQuestion session principale, 2026-10-02) : UN appel, une ligne.
+        if self.cmd.count(APPEL_PREFILTRE) != 1:
+            return None
+        debut = self.cmd.find(DEBUT_PREFILTRE)
+        if debut < 0 or debut > self.cmd.index(APPEL_PREFILTRE):
+            return None
+        # le bloc entier (définitions et appel) : ce qui reste est la couche shell d'avant le pré-filtre, octet pour octet
+        self.cmd_np = self.cmd[:debut] + self.cmd[self.cmd.index(APPEL_PREFILTRE) + len(APPEL_PREFILTRE):]
+        self.cmd_pre = self.cmd.replace(APPEL_PREFILTRE, "if vf_pre; then printf SHORT; else printf DEFER; fi\nexit 0\n")
         return self.cmd
 
     # -- modes A à F
@@ -281,12 +292,16 @@ class Ctx:
                            stderr=subprocess.PIPE, env=env, cwd=cwd, timeout=120)
         return p.returncode, p.stdout, p.stderr, time.perf_counter() - t0
 
-    def lancer(self, mode, entree, cwd=None, shell="/bin/sh", dossier=None, extra_env=None):
-        texte, extra = self.preparer(dossier if dossier else self.dossier_mode(mode))
+    def lancer(self, mode, entree, cwd=None, shell="/bin/sh", dossier=None, extra_env=None, np=False):
+        texte, extra = self.preparer(dossier if dossier else self.dossier_mode(mode), self.cmd_np if np else None)
         if extra_env:
             extra = dict(extra)
             extra.update(extra_env)
         return self.rejouer(texte, entree, self.env_mode(mode, extra), cwd, shell)
+
+
+APPEL_PREFILTRE = "vf_pre && exit 0\n"
+DEBUT_PREFILTRE = "_pn='\n'\nvf_pp()"
 
 
 def verdict(rc, out):
@@ -925,7 +940,7 @@ def sec_matrice(ctx):
     for mode in "ABCDEF":
         fautes = 0
         for c in cas:
-            rc, out, err, _ = ctx.lancer(mode, c.brut, cwd=c.cwd_proc)
+            rc, out, err, _ = ctx.lancer(mode, c.brut, cwd=c.cwd_proc, np=True)
             att, obt = attendu_mode(c, mode), obtenu_mode(c, mode, rc, out, err)
             bruit = bool(err) and mode in "ABCD"
             if att != obt or bruit:
@@ -937,7 +952,24 @@ def sec_matrice(ctx):
         if not fautes:
             ok("R-MATRICE mode %s : %d cas sous /bin/sh, verdicts conformes (%s)" % (
                 mode, n, {"A": "script réel, silence partout", "B": "deny du substitut rejoué octet pour octet",
-                          "C": "script absent", "D": "python absent", "E": "script qui sort 1", "F": "script qui sort 2"}[mode]))
+                          "C": "script absent", "D": "python absent", "E": "script qui sort 1", "F": "script qui sort 2"}[mode]) + " · commande SANS pré-filtre")
+    # La commande COMPLÈTE : même sortie que sans pré-filtre, SAUF quand le pré-filtre court-circuite (silence : le script n'est pas lancé).
+    for mode in "ABCDEF":
+        fautes, courts = 0, 0
+        for c in cas:
+            rc, out, err, _ = ctx.lancer(mode, c.brut, cwd=c.cwd_proc)
+            rcn, outn, errn, _ = ctx.lancer(mode, c.brut, cwd=c.cwd_proc, np=True)
+            t, extra = ctx.preparer(ctx.dossier_mode(mode), ctx.cmd_pre)
+            _, sortie, _, _ = ctx.rejouer(t, c.brut, ctx.env_mode(mode, extra), c.cwd_proc)
+            court_circuit = sortie == b"SHORT"
+            courts += int(court_circuit)
+            attendu = (0, b"", b"") if court_circuit else (rcn, outn, errn)
+            if (rc, out, err) != attendu or sortie not in (b"SHORT", b"DEFER"):
+                fautes += 1
+                ko("R-MATRICE-PRE mode %s cas %s" % (mode, c.ident), "commande complète = commande sans pré-filtre, ou silence si SHORT (%s)" % c.note,
+                   "rc=%d out=%s" % (attendu[0], court(attendu[1])), "rc=%d out=%s err=%s sortie du pré-filtre=%s" % (rc, court(out), court(err), court(sortie)))
+        if not fautes:
+            ok("R-MATRICE-PRE mode %s : %d cas, commande complète identique à la commande sans pré-filtre (%d court-circuits, tous silencieux)" % (mode, n, courts))
 
 
 # --- Extraction seule sous chaque shell (fonctions de la commande isolées, sans spawn du script) ---
@@ -1134,11 +1166,11 @@ def komut(ident, assertion, attendu, obtenu):
 
 def make_cmd_mutant(ctx, ident, motif, remplacement):
     """Texte muté de la commande enregistrée : motif fixe à occurrence unique, sinon komut."""
-    n = ctx.cmd.count(motif)
+    n = ctx.cmd_np.count(motif)
     if n != 1:
         return None, "motif ambigu ou absent (occurrences=%d)" % n
-    muté = ctx.cmd.replace(motif, remplacement)
-    if muté == ctx.cmd:
+    muté = ctx.cmd_np.replace(motif, remplacement)
+    if muté == ctx.cmd_np:
         return None, "NON OPPOSABLE (texte identique à l'original)"
     chemin = ctx.unique("cmd-" + ident.lower()) + ".sh"
     with open(chemin, "w", encoding="utf-8") as fh:
@@ -1161,13 +1193,13 @@ def mutant_cmd(ctx, ident, motif, remplacement, id_disc, mode, id_temoin="E01", 
         return
     mode_temoin = mode_temoin or mode
     disc, tem = cas_par_id(ctx, id_disc), cas_par_id(ctx, id_temoin)
-    o_t = rejouer_texte(ctx, ctx.cmd, mode_temoin, tem.brut, tem.cwd_proc)
+    o_t = rejouer_texte(ctx, ctx.cmd_np, mode_temoin, tem.brut, tem.cwd_proc)
     m_t = rejouer_texte(ctx, muté, mode_temoin, tem.brut, tem.cwd_proc)
     if o_t[:3] != m_t[:3]:
         komut(ident, "condition (b) : sur le témoin %s (mode %s) le mutant sort comme l'original" % (id_temoin, mode_temoin),
               nom_verdict(*o_t[:3]), nom_verdict(*m_t[:3]))
         return
-    o_d = rejouer_texte(ctx, ctx.cmd, mode, disc.brut, disc.cwd_proc)
+    o_d = rejouer_texte(ctx, ctx.cmd_np, mode, disc.brut, disc.cwd_proc)
     m_d = rejouer_texte(ctx, muté, mode, disc.brut, disc.cwd_proc)
     att_nom = attendu_mode(disc, mode)
     if att_nom != obtenu_mode(disc, mode, *o_d[:3]):
@@ -1232,7 +1264,7 @@ def sec_mutants(ctx):
         if muté is None:
             komut(ident, "texte muté distinct de l'original et sh -n réussit", "mutant valide", raison)
             continue
-        original = controle_libelle_f4(ctx, ctx.cmd, adh_l, dev_l)
+        original = controle_libelle_f4(ctx, ctx.cmd_np, adh_l, dev_l)
         mutant = controle_libelle_f4(ctx, muté, adh_l, dev_l)
         if not original[0]:
             komut(ident, "l'original passe R-CMD-05b", "conforme", original[1])
@@ -1328,11 +1360,16 @@ def rejouer_texte_t(ctx, texte, mode, brut, cwd):
 
 def sec_borne(ctx):
     adh, dev = _labs_simples(ctx, "borne")
-    original = controle_borne_f01(ctx, ctx.cmd, adh, dev)
+    original = controle_borne_f01(ctx, ctx.cmd_np, adh, dev)
     if original[0]:
-        ok("R-BORNE-01 " + original[1])
+        ok("R-BORNE-01 " + original[1] + " · commande SANS pré-filtre")
     else:
         ko("R-BORNE-01", "valeur du payload au-delà de 4096 caractères : jamais parcourue, tranchée sur le cwd, GATE-03 tenu", "conforme", original[1])
+    complet = controle_borne_f01(ctx, ctx.cmd, adh, dev)
+    if complet[0]:
+        ok("R-BORNE-02 " + complet[1] + " · commande COMPLÈTE (pré-filtre)")
+    else:
+        ko("R-BORNE-02", "mêmes verdicts avec le pré-filtre : une valeur trop longue le fait différer, jamais court-circuiter", "conforme", complet[1])
     for ident, motif, remplacement in (
             ("BORNE-RETIREE", 'if [ "${#_m}" -gt 4096 ]; then B=1;', 'if false; then B=1;'),
             ("BORNE-LAB-DEV", 'if [ "$K" = long ]; then if vf_get cwd && [ "$B" = 0 ]; then vf_tight "$V" && D=0; else vf_tight "$(pwd -P)" && D=0; fi; elif',
@@ -1759,11 +1796,16 @@ def controle_reduction(ctx, adh, hors):
 
 def sec_doute(ctx):
     adh, hors, lab_home = labs_doute(ctx, "doute")
-    o = controle_doute_shell(ctx, ctx.cmd, adh, hors, lab_home)
+    o = controle_doute_shell(ctx, ctx.cmd_np, adh, hors, lab_home)
     if o[0]:
-        ok("R-DOUTE-01 " + o[1])
+        ok("R-DOUTE-01 " + o[1] + " · commande SANS pré-filtre")
     else:
         ko("R-DOUTE-01", "couche shell : valeur trop longue qui nomme un actif gardé refusée, `~` développé en HOME", "conforme", o[1])
+    o_c = controle_doute_shell(ctx, ctx.cmd, adh, hors, lab_home)
+    if o_c[0]:
+        ok("R-DOUTE-05 " + o_c[1] + " · commande COMPLÈTE (pré-filtre)")
+    else:
+        ko("R-DOUTE-05", "mêmes verdicts avec le pré-filtre : valeur longue, `~`, échappement, jamais court-circuités", "conforme", o_c[1])
     c = controle_doute_coeur(ctx, adh, hors, lab_home)
     if c[0]:
         ok("R-DOUTE-02 " + c[1])

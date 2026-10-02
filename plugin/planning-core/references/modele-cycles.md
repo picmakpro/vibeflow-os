@@ -764,6 +764,25 @@ plus proche `.planning`, lecture de `config.json` — et :
   toute façon (P45-D-06, P45-D-20). La couche shell ne s'y expose plus par la longueur d'une valeur du
   payload : au-delà de 4096 caractères elle ne parcourt pas la valeur, la refuse si elle nomme `.planning` ou `.claude` ou porte un antislash et la tranche sinon sur le cwd ; le cœur la lit sous deux formes en temps linéaire (réduite lexicalement, physique) et n'en décide dans le doute que si elle reste trop longue (F-01, N-01, N2-01, N3-01, limite (aa)).
 
+Un **pré-filtre hors adhésion** ouvre la commande (revue de Samuel sur la PR #124, 2026-10-01 : « un hook ne paie son coût que
+là où il a un effet » ; arbitrage de Willy, AskUserQuestion session principale, 2026-10-02 : le pré-filtre seul, `Bash` reste dans
+le matcher). Avant tout lancement du script, de `mktemp` ou de `python3`, la fonction `vf_pre` rend « court-circuit » (`exit 0`
+immédiat) UNIQUEMENT quand le lab est CERTAINEMENT non adhérent ; dans tous les autres cas rien ne change dans le chemin d'avant,
+octet pour octet (adhérent, doute, valeur non analysable). Règle : elle lit TOUTES les occurrences des valeurs `file_path`,
+`notebook_path` et `cwd` du payload, plus `$PWD` et le cwd physique du processus ; chacune doit être absolue, de 4096 caractères au
+plus, propre (ni `//`, ni `.` ou `..`, ni `/` final, ni `/.vol`) et sans antislash, le payload tenant sur une seule ligne et ne portant
+aucun échappement `\u00xx` ASCII (une clé écrite `\u0066ile_path` n'est pas lue : le payload est alors différé) ; puis, pour CHAQUE
+ancêtre de chacune (forme lexicale ET forme physique, `cd -P` et `pwd -P` de la partie existante dès qu'un lien intervient), un
+dossier `.planning` doit avoir un `config.json` absent ou régulier, lisible, sans `cycles-v1` (casse ignorée, `grep -F`) ni antislash ;
+un lien pendant ou en boucle, une config illisible ou non régulière, un `.planning` imbriqué ou sous `.claude` qui porterait
+`cycles-v1` renvoient au chemin complet. Le pré-filtre est volontairement PLUS conservateur que le cœur : il ne réimplémente ni « le
+plus proche gagne », ni `.claude/worktrees`, ni `.planning/.planning`, il renvoie au chemin complet dès qu'un ancêtre, quel qu'il
+soit, peut être adhérent. Sens fail-closed : il ne peut que court-circuiter un « non adhérent », jamais créer un passage dans un lab
+adhérent ; toute erreur (grep, `cd`, valeur inattendue) renvoie au chemin complet. Il tourne sous sh, dash, bash et zsh et n'ajoute
+aucune dépendance. Garde : `test-planning-prefilter.sh` (équivalence sur le banc, les arbres adverses, le générateur de valeurs
+longues et un générateur d'arbres de labs ; mutants).
+
+- **Pré-filtre hors adhésion** : `vf_pre`, appelé par `vf_pre && exit 0` avant le lancement du script ; hors lab adhérent il sort aussitôt, sans script, sans mktemp, sans python3 ; dans le doute il ne change rien (fail-closed).
 - **Outils refusés en mode dégradé** : `Write`, `Edit`, `NotebookEdit`, `Agent`, `Task`.
 - **Outil laissé ouvert en mode dégradé** : `Bash` (P45-D-06b).
 

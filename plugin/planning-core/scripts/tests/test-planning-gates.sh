@@ -224,6 +224,7 @@ class Ctx:
         os.makedirs(os.path.join(work, "modeC"), exist_ok=True)
         self._n = 0
         self.cmd = None
+        self.cmd_np = None
         self._armee = None
 
     def unique(self, prefixe):
@@ -240,6 +241,14 @@ class Ctx:
         if len(cands) != 1:
             return None
         self.cmd = cands[0]
+        # Pré-filtre hors adhésion (revue Samuel, PR #124 ; arbitrage Willy, AskUserQuestion session principale, 2026-10-02) : les cas de cette suite
+        # mesurent le CŒUR et les gates, rejoués par la couche shell d'avant le pré-filtre (le bloc retiré, octet pour octet) : un lab non
+        # adhérent n'y lance plus le cœur, un mutant du cœur y serait invisible. La commande COMPLÈTE est gardée par test-planning-prefilter.sh
+        # (équivalence : court-circuit seulement hors adhésion) et, ici, par R-REFERENCE et le canary.
+        appel, debut = "vf_pre && exit 0\n", "_pn='\n'\nvf_pp()"
+        if self.cmd.count(appel) != 1 or self.cmd.count(debut) != 1 or self.cmd.index(debut) > self.cmd.index(appel):
+            return None
+        self.cmd_np = self.cmd[:self.cmd.index(debut)] + self.cmd[self.cmd.index(appel) + len(appel):]
         return self.cmd
 
     def env(self, extra=None):
@@ -254,13 +263,13 @@ class Ctx:
         """Rejoue la commande enregistrée TELLE QUELLE sous /bin/sh -c. Mode A : script du dossier
         donné (défaut : le script réel) ; mode C : dossier de scripts vide."""
         d = os.path.join(self.work, "modeC") if mode == "C" else (dossier or self.scripts_dir)
-        if TOKEN in self.cmd:
-            texte, extra = self.cmd.replace(TOKEN, "'" + d + "'"), {}
+        if TOKEN in self.cmd_np:
+            texte, extra = self.cmd_np.replace(TOKEN, "'" + d + "'"), {}
         else:
             proj = self.unique("proj")
             os.makedirs(os.path.join(proj, ".claude"), exist_ok=True)
             os.symlink(d, os.path.join(proj, ".claude", "scripts"))
-            texte, extra = self.cmd, {"CLAUDE_PROJECT_DIR": proj}
+            texte, extra = self.cmd_np, {"CLAUDE_PROJECT_DIR": proj}
         env = self.env(extra)
         if extra_env:
             env.update(extra_env)
@@ -4734,6 +4743,9 @@ def ecarts_reference(texte, ns, texte_hook, canaris, commande, matcher):
     jetons_de("- **Journal de dérogation**", {ns["NOM_JOURNAL_DEROGATIONS"]}, "nom du journal de dérogation")
     jetons_de("- **Marqueurs de projet de code (G7)**", set(ns["MARQUEURS_CODE"]) | {"*" + ns["SUFFIXE_XCODEPROJ"]}, "marqueurs de code")
     refuses, ouverts = outils_commande(commande, matcher)
+    # Revue Samuel, PR #124 (arbitrage Willy, AskUserQuestion session principale, 2026-10-02) : le pré-filtre hors adhésion de la commande
+    pre_ok = "vf_pre() {" in commande and commande.count("vf_pre && exit 0\n") == 1 and commande.index("vf_pre && exit 0\n") < commande.index('bash "$S"')
+    jetons_de("- **Pré-filtre hors adhésion**", {"vf_pre", "vf_pre && exit 0"} if pre_ok else set(), "pré-filtre hors adhésion (défini et appelé avant le lancement du script)")
     jetons_de("- **Outils refusés en mode dégradé**", refuses, "outils refusés en mode dégradé")
     jetons_de("- **Outil laissé ouvert en mode dégradé**", ouverts, "outil laissé ouvert en mode dégradé")
     lignes = [l for l in section if l.startswith("- **Ordre de résolution des agents (P45-D-05b)**")]
@@ -4826,6 +4838,8 @@ def sec_reference(ctx):
                  "le mot-clé fail-closed retiré de la ligne de la limite (am)")
     mutant_texte("LIMITE-AN-MOTCLE", lambda t: remplacer_ligne_reference(t, "- **limite (an)**", lambda l: l.replace("readlink", "readl1nk", 1)),
                  "le mot-clé readlink retiré de la ligne de la limite (an)")
+    mutant_texte("PREFILTRE", lambda t: remplacer_ligne_reference(t, "- **Pré-filtre hors adhésion**", None),
+                 "la ligne du pré-filtre hors adhésion retirée")
     mutant_texte("SCRIPTS", lambda t: remplacer_ligne_reference(t, "- **Scripts du hook protégés par G6**", lambda l: l.replace("`check-gates-alive.sh`", "`check-gates-alive.shx`", 1)),
                  "`check-gates-alive.sh` renommé dans la liste des scripts du hook protégés")
     mutant_texte("JOURNAL", lambda t: remplacer_ligne_reference(t, "- **Journal de dérogation**", lambda l: l.replace("derogations-gates.log", "derogations.log")),
