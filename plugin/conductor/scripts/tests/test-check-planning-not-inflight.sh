@@ -75,7 +75,7 @@ g() {
 # expect <ID> <description> <rc attendu> <stdout attendu | -> <fragment de stderr | ->
 expect() {
   local ok=0 why=""
-  [ "$QUIET" -eq 1 ] || echo "$RC" >> "$RCSEEN"
+  [ "$QUIET" -eq 1 ] || { echo "$RC" >> "$RCSEEN"; printf '%s\n%s\n' "$OUT" "$ERR" >> "$TMP/emis.txt"; }
   [ "$RC" = "$3" ] || { ok=1; why="rc=$RC attendu $3"; }
   if [ "$4" != "-" ] && [ "$OUT" != "$4" ]; then ok=1; why="$why stdout=[$OUT] attendu [$4]"; fi
   if [ "$5" != "-" ] && ! printf '%s' "$ERR" | grep -qF -- "$5"; then
@@ -273,6 +273,17 @@ if [ -z "$manquants" ] && [ -z "$hors" ]; then
 else
   emit COUV 1 "couverture des codes de sortie" "manquants=[$manquants] hors_contrat=[$hors]"
 fi
+
+# --- F19 + VOCAB : vocabulaire des messages (correction C4) --------------------------------------------------
+# F19 : règles des sujets introuvables (gate seul, aucun voisin ni planning-core). Puis sonde sur TOUTES les
+# sorties réelles de la passe normale (stdout + stderr de chaque `expect`) : ni « workstream » ni « compartiment ».
+ISO="$TMP/iso/conductor/scripts"; mkdir -p "$ISO"; cp "$SCRIPT" "$ISO/check-planning-not-inflight.sh"
+D="$(mkflat f19)"
+TARGET="$ISO/check-planning-not-inflight.sh"; g "$TMP" -- --path "$D"; TARGET="$SCRIPT"
+expect F19 "règles des sujets introuvables (gate isolé) : NON VÉRIFIABLE, message en vocabulaire d'usage" 2 "" "règles des sujets"
+vocab_hits="$(grep -i -n -E 'workstream|compartiment' "$TMP/emis.txt" | head -5 | tr '\n' '|')"
+if [ -z "$vocab_hits" ]; then emit VOCAB 0 "aucun message émis ($(grep -c '' "$TMP/emis.txt") lignes, passe normale) ne contient workstream/compartiment" ""
+else emit VOCAB 1 "aucun message émis ne contient workstream/compartiment" "occurrences : $vocab_hits"; fi
 
 # =================================================================================================
 # Mutants

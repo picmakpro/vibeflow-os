@@ -78,14 +78,14 @@ for _cand in "$(dirname "$0")/workstream-policy.sh" \
              "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
   [ -f "$_cand" ] && { _POLICY="$_cand"; break; }
 done
-[ -n "$_POLICY" ] || nv "workstream-policy.sh introuvable — politique de workstream non chargeable"
+[ -n "$_POLICY" ] || nv "script des règles des sujets introuvable — règles non chargeables"
 # shellcheck source=/dev/null
 . "$_POLICY"
 vf_ws_enumerate "$PLANNING" >/dev/null 2>&1; _enum_rc=$?
 case "$_enum_rc" in
   0) echo "partitionne"; exit 0 ;;
   3) : ;;
-  *) nv "workstreams/ présent mais illisible (vf_ws_enumerate rc=$_enum_rc)" ;;
+  *) nv "le dossier des sujets est présent mais illisible (vf_ws_enumerate rc=$_enum_rc)" ;;
 esac
 
 command -v jq >/dev/null 2>&1 || nv "jq introuvable"
