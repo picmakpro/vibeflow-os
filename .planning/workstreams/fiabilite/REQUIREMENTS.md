@@ -1021,6 +1021,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
   `.github/workflows/ci.yml`, a été vue `BLOCKED` par la revue code owner exigée malgré le
   contournement disponible — c'est le refus réel observé. Son merge se fait par contournement
   tracé (`gh pr merge --admin`, arbitrage Samuel, AskUserQuestion session principale, 2026-09-25).
+  - **Traçabilité (2026-10-02)** : ouverte, mesure du refus réel confiée à Willy (41-09/41-13), arbitrage Samuel, AskUserQuestion session principale, 2026-10-02. Les rulesets sont posés (preuves ci-dessus) ; le refus réel d'un push direct n'est pas mesuré, 41-09 n'étant pas faite.
 - [x] **PROT-02**: Compatibilité avec la discipline de release du `CLAUDE.md`. **COCHÉ** —
   clôture citant les clés `REJEU-GATES` et `G3-FIXTURE` (registre `41-PREUVES.md` § 41-19) et les
   trois preuves du plan 41-17 : ordre des étapes avant `check-release-tag`, absence d'entrée
