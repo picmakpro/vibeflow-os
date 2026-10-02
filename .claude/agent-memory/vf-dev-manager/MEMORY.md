@@ -89,3 +89,4 @@
 - [Attendre au premier plan](project_attente-au-premier-plan.md) — un tour fini en attente = remise forcée ; un worker aux suites en arrière-plan s'endort : sonder en Python, suites au premier plan
 - [Exécuteurs forcés en worktree](project_executeurs-forces-en-worktree.md) — garde du harnais : chaque plan sur une branche d'agent ; vérifier la base, rapatrier en ff, rejouer la non-régression
 - [.worktreeinclude lu dans l arbre principal](project_worktreeinclude-lu-dans-l-arbre-principal.md) — worktree isolé part d origin/main, hérite des ignorés selon l arbre NON commité du principal
+- [Commiter avant de rendre](feedback_commiter-avant-de-rendre.md) — 2 workers figés après rédaction, avant commit : exiger le commit avant le rapport, aucun rejeu long en fin de mandat
