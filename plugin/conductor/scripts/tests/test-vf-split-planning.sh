@@ -157,6 +157,62 @@ ok D5 "mot interdit en prose, hors « » => rc 1" "$([ "$ok_d5" = 1 ] && echo tr
 
 echo "== sonde : $DOK/4 discriminations prouvées =="
 
+# --- R1-R4 : les renvois (un seul exécutant, deux points d'entrée y renvoient sans poser la question) ---
+echo "  -- renvois et manuel --"
+W3="compart""ment"
+lignes_ws() { # <fichier> : les SEULES lignes portant vf-split-planning (vf-new-lab emploie légitimement l'autre sens du mot)
+  grep -F "vf-split-planning" "$1" 2>/dev/null
+}
+mots_interdits() { # lit stdin ; rc 0 si AUCUN mot interdit (français et anglais)
+  ! LC_ALL=C awk -v a="$W1" -v b="$W2" -v c="$W3" '{ l=tolower($0); if (index(l,a)||index(l,b)||index(l,c)) f=1 } END{ exit f?0:1 }'
+}
+ln_of() { grep -nF -- "$1" "$2" 2>/dev/null | head -1 | cut -d: -f1; }
+
+l3=$(ln_of "3. **Socle planning**" "$NEWLAB"); lr=$(ln_of "vf-split-planning" "$NEWLAB"); ll=$(ln_of "**Lab à compartiments**" "$NEWLAB")
+r1=false
+[ -n "$l3" ] && [ -n "$lr" ] && [ -n "$ll" ] && [ "$l3" -lt "$lr" ] && [ "$lr" -lt "$ll" ] && r1=true
+ok R1 "vf-new-lab : renvoi entre « 3. Socle planning » (l.${l3:-?}) et « Lab à compartiments » (l.${ll:-?}), trouvé l.${lr:-?}" "$r1" \
+  "attendu $l3 < renvoi < $ll, obtenu ${lr:-absent}"
+
+nl=$(lignes_ws "$NEWLAB" | wc -l | tr -d ' ')
+bloc=$(grep -B1 -F "vf-split-planning" "$NEWLAB")  # le renvoi tient sur deux lignes : la précédente et celle qui nomme le skill
+r2=true
+[ "$nl" -ge 1 ] || r2=false
+printf '%s\n' "$bloc" | grep -qF "BOOT-04" || r2=false
+printf '%s\n' "$bloc" | grep -qF "terminé" || r2=false
+printf '%s\n' "$bloc" | grep -qF "ne la pose pas" || r2=false
+printf '%s\n' "$bloc" | mots_interdits || r2=false
+ok R2 "vf-new-lab : $nl ligne(s) de renvoi — après gsd-new-project terminé (BOOT-04), la question n'est pas posée ici, aucun mot interdit" "$r2"
+
+r3=true
+grep -F "démarrer un projet" "$ROUTING" | grep -qF "vf-split-planning" || r3=false
+grep -F "onboarde ce codebase" "$ROUTING" | grep -qF "vf-split-planning" || r3=false
+grep -F "on sera plusieurs" "$ROUTING" | grep -qF "vf-split-planning" || r3=false
+ok R3 "intent-routing : lignes « démarrer un projet », « onboarde ce codebase » et « on sera plusieurs » renvoient au skill" "$r3"
+
+nr=$(lignes_ws "$ROUTING" | wc -l | tr -d ' ')
+r4=true
+[ "$nr" -ge 3 ] || r4=false
+lignes_ws "$ROUTING" | mots_interdits || r4=false
+ok R4 "intent-routing : $nr ligne(s) de renvoi (>= 3), aucun mot interdit" "$r4" "attendu >= 3 lignes sans mot interdit, obtenu $nr"
+
+# --- M1/M2 : le manuel cesse d'affirmer une liste close fausse -------------------------------------
+section() { # <fichier> : la section « ### `/vf-split-planning` » jusqu'au titre suivant
+  awk '/^### `\/vf-split-planning`/{on=1; print; next} on && /^##/{exit} on{print}' "$1" 2>/dev/null
+}
+m1=true
+grep -qx '## Les huit commandes' "$MAN_FR" || m1=false
+grep -q '^## Les sept commandes' "$MAN_FR" && m1=false
+grep -qx '### `/vf-split-planning`' "$MAN_FR" || m1=false
+[ -n "$(section "$MAN_FR")" ] && section "$MAN_FR" | mots_interdits || m1=false
+ok M1 "manuel FR : « Les huit commandes », section /vf-split-planning sans mot interdit" "$m1"
+m2=true
+grep -qx '## The eight commands' "$MAN_EN" || m2=false
+grep -q '^## The seven commands' "$MAN_EN" && m2=false
+grep -qx '### `/vf-split-planning`' "$MAN_EN" || m2=false
+[ -n "$(section "$MAN_EN")" ] && section "$MAN_EN" | mots_interdits || m2=false
+ok M2 "manuel EN : « The eight commands », section /vf-split-planning sans mot interdit" "$m2"
+
 # __BILAN__
 echo "== bilan : $((PASS+FAIL)) cas, $FAIL échec(s) =="
 [ "$FAIL" -eq 0 ] && [ "$DOK" -eq 4 ]
