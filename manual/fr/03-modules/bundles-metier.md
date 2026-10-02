@@ -71,6 +71,19 @@ Chaque bundle expose une entrée unique et simple, un skill au nom du métier �
 du bundle, et le manager fait le reste : il planifie, distribue aux workers, fait passer le juge,
 et s'arrête pour te demander ton avis aux endroits prévus.
 
+### Le planning par cycles (opt-in)
+
+Les trois bundles s'appuient sur le module `planning-core`, qui sait aussi tenir un planning
+métier **par cycles** : l'état d'un cycle, d'une phase ou d'un plan n'y est jamais déclaré, il est
+recalculé depuis les fichiers présents sur le disque. C'est une **commande**, pas un automatisme :
+`recalc-planning.sh`, que tu lances toi-même, régénère `INDEX.md`, `STATE.md` et un journal de
+clôture (`cloture.log`, en ajout seul). Aucun hook ni skill ne l'appelle à ta place.
+
+Elle n'écrit que si ton lab y a adhéré en posant `"planning_version": "cycles-v1"` dans
+`.planning/config.json`, et refuse net un planning tenu par le moteur de développement. Avec
+`--read-only`, elle affiche l'état calculé en JSON sans rien écrire — le moyen sûr de voir ce
+qu'elle dirait.
+
 ### Ce qu'un bundle ne fait pas
 
 Trois limites méritent d'être dites franchement, parce qu'elles évitent une déception.

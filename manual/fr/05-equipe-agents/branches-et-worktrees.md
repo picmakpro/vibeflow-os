@@ -43,7 +43,11 @@ savoir.** Le 2026-07-31, une mission pilotée par un manager et une session conv
 ordinaire ont écrit sur la même branche en parallèle — trois commits hors périmètre se sont
 retrouvés dans la PR d'une mission qui ne les avait pas produits. Le verrou de driver existait déjà,
 mais il ne protégeait qu'une étape, et surtout il n'était consulté que par les managers ; une
-session ordinaire passe par-dessus sans même le savoir.
+session ordinaire passait par-dessus sans même le savoir. Depuis, il est appliqué : une session qui
+n'est pas enregistrée sous un verrou vivant voit son commit, son changement de branche ou son
+écriture dans `.planning/` refusés avant exécution, avec le nom du détenteur. Ce refus ne remplace
+pas la règle ci-dessous — il ne voit ni un terminal hors Claude Code, ni deux acteurs d'une même
+session — et un arbre séparé reste la seule barrière qui ne dépend de rien.
 
 La règle qui en découle (ADR-064) : **dès que deux acteurs travaillent en parallèle sur le même
 dépôt — deux missions, une mission et une session conversationnelle, deux vagues d'une même
@@ -94,9 +98,9 @@ la seconde mission ne démarre pas en silence à côté de la première, elle re
 Dans ce cas, ce que tu vois dépend de la fraîcheur du verrou. S'il est actif et récent, la mission
 qui a été refusée te le dit et attend ton arbitrage — relancer plus tard, ou confirmer que la
 première mission est bien celle qui doit continuer. S'il est périmé (le porteur a disparu sans le
-relâcher), le mécanisme de récupération décrit dans
-[une-mission-longue.md](./une-mission-longue.md) prend le relais tout seul, et la reprise est tracée
-dans le rapport — tu n'as rien à débloquer à la main dans ce cas précis.
+relâcher), le manager suivant le reprend par un geste explicite et tracé, comme décrit dans
+[une-mission-longue.md](./une-mission-longue.md), et la reprise figure dans le rapport — tu n'as rien
+à débloquer à la main dans ce cas précis.
 
 Une fois la mission terminée et sa PR fusionnée, le geste de nettoyage est court : retire le
 worktree qui lui était dédié (`git worktree remove`), et supprime la branche mergée si tu ne comptes
@@ -111,5 +115,5 @@ transforme un mécanisme d'isolation physique en pratique dont tu profites réel
 filet de sécurité que tu ne découvres qu'après l'avoir déclenché.
 
 <!-- vf-manual:nav -->
-[← Précédent](../05-equipe-agents/ce-qu-on-vous-demande.md) · [↑ Sommaire](../README.md) · [Suivant →](../05-equipe-agents/equipes-specialisees.md)
+[← Précédent](../05-equipe-agents/ce-qu-on-vous-demande.md) · [↑ Sommaire](../README.md) · [Suivant →](../05-equipe-agents/sujets-en-parallele.md)
 <!-- /vf-manual:nav -->

@@ -13,7 +13,7 @@ Each issue below follows the same pattern: the exact symptom as you see it, the 
 the move to make, and how to check it's actually fixed. No move proposed here is destructive
 without this page explicitly saying what it destroys.
 
-## The six known issues
+## The nine known issues
 
 ### The agent didn't trigger
 
@@ -118,7 +118,65 @@ the branch.
 **Check.** The PR turns merged or closed only after your explicit action; nothing automates it for
 you.
 
-## If your problem doesn't match any of these six
+### An action is refused: a driver lock belongs to another session
+
+**Symptom.** Your commit, branch switch or write under `.planning/` is refused before it runs, with
+a message starting "Lock de driver ACTIF, tenu par …" ("active driver lock, held by …") that names
+the holder, its step, its branch and the lock's age.
+
+**Most common cause.** A mission holds a live lock on this repository and your session isn't
+registered under it: the safeguard doing its job, not a failure. A common case to check: you **are**
+the holder, but your session's identifier changed (after a `/clear`, or an ambiguous `--continue`).
+
+**Move.** Three ways out, in order of caution. If you're the holder: reattach with
+`driver-lock.sh reclaim --owner=<holder>`, then retry. Otherwise: wait for the mandate to end, or
+work in a separate tree (`git worktree add`), which isn't subject to the lock. As a last resort, for
+one specific action you take responsibility for, the message describes an explicit override marker;
+it is recorded as far as possible (a failed write is ignored), and never set "just in case".
+
+**Check.** The same action goes through, or a new attempt names the same holder for as long as its
+mission isn't over. The safeguard sees neither a terminal outside Claude Code nor a disguised
+command: don't take it for an absolute guarantee.
+
+### The session won't stop
+
+**Symptom.** At the end of a turn, the session doesn't stop and shows "Fin de geste: this session is
+leaving clean-up behind" (in French), with a block counter ("1/3") and the list of what it created:
+a worktree, a merged branch, a stash, an unindexed memory.
+
+**Cause.** Your repository is armed for end-of-gesture tidying (it contains
+`.planning/.fin-de-geste-armed`), and the session created something since it started that it hasn't
+tidied. Nothing is broken: the message says what to do.
+
+**Move.** Tidy, with the message's exact commands, what **this session** created — never an object
+that isn't yours, which you cite in your write-up instead. If you'd rather not be stopped,
+`VF_FIN_DE_GESTE=warn` flags without blocking, `off` switches the guard off, and deleting the
+sentinel file disarms the repository. Doing nothing, the guard lets you out by itself after three
+blocks without progress.
+
+**Check.** On the next turn, the session stops with no message; the detail is in
+[tidying-up-after-yourself.md](../05-agent-team/tidying-up-after-yourself.md).
+
+### Executors are refused on a lab with a non-git root
+
+**Symptom.** On a lab whose root isn't a git repository (a `.planning/` at the root, code
+repositories below it), the planning engine ends up refusing to launch executor agents, several
+times a day.
+
+**Cause.** Worktree isolation assumes a git repository at the root; without one, an isolation marker
+goes stale after ten minutes and the engine then refuses every executor.
+
+**Move.** Set the key yourself, it's the reliable path: in `.planning/config.json`, add
+`"workflow": { "use_worktrees": false }` (if a `workflow` block already exists, add only
+`"use_worktrees": false` inside it). The install can also set it, but only when it installs a module
+or updates a module whose version changes, `.planning/config.json` exists, `node` is available, git
+answers that the root isn't a repository, and the key isn't already set. A `/vf-update` on a module
+that is already up to date doesn't set it. A value you set yourself is never rewritten. Consequence:
+executors run one after another, without worktree isolation.
+
+**Check.** The key is in `.planning/config.json` and executors are no longer refused.
+
+## If your problem doesn't match any of these nine
 
 Describe exactly what you see — the full message, the sentence you typed — rather than guessing at
 a cause: that's what lets you find which of the mechanisms above is actually at play, fastest. If

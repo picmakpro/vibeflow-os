@@ -5,19 +5,19 @@
 <!-- /vf-manual:lang -->
 
 You don't type a skill — it fires on its own when your plain-language sentence matches what it
-knows how to do. This is VibeFlow's real front door, far more than the six [commands](./commands.md):
+knows how to do. This is VibeFlow's real front door, far more than the eight [commands](./commands.md):
 you never need to know a skill's name to invoke it, only to say what you want. What you actually
 need, then, isn't the technical names below but **the phrasings that trigger them** — that's what
 this page foregrounds for each one.
 
-This list comes from enumerating every `SKILL.md` file in the repo on 2026-08-01, module by
-module — explicitly excluding the skill templates under
+This list comes from enumerating every `SKILL.md` file in the repo, rechecked on 2026-10-02,
+module by module — explicitly excluding the skill templates under
 `plugin/reference/content/methodology/templates/skills/`, which aren't shipped skills but
-blueprints for building new ones. The disk holds twenty, grouped here by their originating module:
+blueprints for building new ones. The disk holds twenty-two, grouped here by their originating module:
 you only have the ones whose module is installed — the [module catalog](../03-modules/catalog.md)
 says which one brings what.
 
-## The twenty skills, by module
+## The twenty-two skills, by module
 
 ### `installer`
 **`vibeflow-install`** — the very first thing you do after installing the plugin. Triggers on
@@ -32,6 +32,12 @@ for [domain]." Full bootstrap of a new lab, whatever the domain.
 Detects the gap between the lab and the methodology, proposes a migration.
 **`vf-update`** — "update vibeflow," typically in reaction to the update-available banner shown at
 session start. Updates the plugin, then the installed modules, under confirmation.
+**`vf-notify`** — "turn on notifications," "turn off notifs," "are notifications on?". Turns the
+system notifications at mission milestones on or off. Off by default: nothing shows up until you
+ask for it.
+**`vf-split-planning`** — "there will be several of us on this lab," "two workstreams in
+parallel," "split the planning into topics." Has you choose between a single planning and several
+parallel topics, and sets up the structure with your agreement.
 
 ### `dev-orchestrator`
 **`vf-dev`** — "help me move forward," "drive this for me," "handle this project." The default
@@ -116,9 +122,9 @@ entirely to that.
 
 ## Where this list comes from
 
-Every skill above corresponds to a real `SKILL.md` file, enumerated on 2026-08-01 rather than
+Every skill above corresponds to a real `SKILL.md` file, enumerated (then rechecked on 2026-10-02) rather than
 copied from an existing doc. To check for yourself: from the repo root,
-`find plugin -iname 'SKILL.md' | grep -v reference/content` — the count should stay at twenty
+`find plugin -iname 'SKILL.md' | grep -v reference/content` — the count should stay at twenty-two
 unless a skill has been added, removed, or a template has drifted out of its templates folder.
 
 <!-- vf-manual:nav -->

@@ -58,15 +58,18 @@ requested pause makes it readable for whoever picks it up.
 truth for every VibeFlow mission. A fresh session that restarts the same manager needs no context
 repeated to it: it reads the project's state itself (`.planning/ROADMAP.md`, `.planning/STATE.md`)
 and the mission's graph, rebuilds its position, and resumes dispatching right where it stopped —
-including reclaiming a stale driver lock if the cut was long enough for that (see
-[a-long-mission.md](./a-long-mission.md)). You have nothing to reconstruct yourself; that's
+including taking over a stale driver lock if the cut was long enough for that (see
+[a-long-mission.md](./a-long-mission.md)). Before any new dispatch, it also checks the register of
+agents the previous driver had launched and stops the ones still running: an agent left behind
+doesn't keep writing to the repository while the new manager redistributes the work. You have nothing to reconstruct yourself; that's
 exactly what the previous session's report and the state on disk make possible.
 
 One nuance worth knowing: a clean cut (closing the tab, killing the process) doesn't necessarily
 release the driver lock cleanly — that's the limit already stated in
 [a-long-mission.md](./a-long-mission.md). That's fine: the stale-lock recovery mechanism
-exists precisely for this case, and a following session that relaunches the same mission reclaims
-it automatically, with the reclaim recorded. You have nothing to clean up by hand.
+exists precisely for this case, and a following session that relaunches the same mission takes it
+over without asking you, with the takeover recorded and the agents left behind stopped. You have
+nothing to clean up by hand.
 
 ## Where artifacts land, and what to read before accepting
 
@@ -87,7 +90,9 @@ What you read before accepting picks up, without repeating it in full, the list 
 success criteria. A team mission adds one piece of its own: the **mission report** handed back at
 the end, which summarizes the overall verdict, the per-step detail (done / verdicts / commits),
 the decisions made under autonomy and by which mechanism, and the points explicitly waiting on
-your call. Always start with that last point — it's what blocks the rest, exactly as in plain
+your call. A `## Budgets` section lists what the mission leaves behind and couldn't tidy on its own
+(a budget overrun, a worktree it didn't create) — what it does tidy, and how, is in
+[tidying-up-after-yourself.md](./tidying-up-after-yourself.md). Always start with that last point — it's what blocks the rest, exactly as in plain
 autonomous mode.
 
 One last thing to check, specific to the longest missions: if the plan carried a cost estimate,

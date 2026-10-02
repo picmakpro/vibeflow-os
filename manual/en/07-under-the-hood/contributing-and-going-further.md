@@ -38,6 +38,25 @@ too, and a change follows the same cycle described in the
 shipping. A good starting point, if you want to propose a change, is to start small: a doc fix, an
 isolated skill, before a larger architectural change.
 
+A few commit conventions are, however, checked by the VibeFlow repository's CI:
+
+- **`Gate-Touche: <path> — <reason>`**: any commit that touches a gate, its test suite, the CI
+  workflow or a hook carries this trailer. Its form and presence are checked, never the truthfulness
+  of the reason.
+- **An arbitration citation with its channel and date** ("Samuel's arbitration, AskUserQuestion
+  main session, 2026-09-09"), required when a commit raises a value of the instruction-budget
+  baseline.
+- **`Ajout-Retrait: <path|ADR-NNN|CLAUDE.md> — <removal | none: justification>`**: when a branch
+  adds a gate, a module rule, an agent memory, an ADR or a `CLAUDE.md` rule, it says what it removes
+  in exchange, or why nothing needs removing. This check is advisory: it flags, it doesn't block.
+
+Two **opt-in** git hooks in the repository are enabled once per clone with
+`git config core.hooksPath scripts/hooks`: `pre-push` checks that the root version has its tag,
+only for a push to `main`; `post-merge` runs the topic divergence check
+([parallel-topics.md](../05-agent-team/parallel-topics.md)) after a merge, loud but unable to undo
+anything. These safeguards make things visible, they lock nothing: a safeguard that lives in the
+repository can be modified by the contribution it judges.
+
 ## What `docs/` and `.planning/` are
 
 To be precise about what these two folders actually contain, without ever asking you to open them:

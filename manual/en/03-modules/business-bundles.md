@@ -71,6 +71,19 @@ Each bundle exposes a single simple entry point, a skill named after the line of
 routes to the bundle's manager, and the manager does the rest: it plans, distributes to the
 workers, runs the judge, and stops to ask for your opinion at the points designed for it.
 
+### Cycle-based planning (opt-in)
+
+All three bundles rely on the `planning-core` module, which can also keep a business planning
+**by cycles**: the state of a cycle, a phase or a plan is never declared, it's recomputed from the
+files present on disk. It's a **command**, not an automatism: `recalc-planning.sh`, which you run
+yourself, regenerates `INDEX.md`, `STATE.md` and a closing log (`cloture.log`, append-only). No hook
+or skill calls it for you.
+
+It only writes if your lab opted in by setting `"planning_version": "cycles-v1"` in
+`.planning/config.json`, and it flatly refuses a planning held by the development engine. With
+`--read-only`, it prints the computed state as JSON and writes nothing — the safe way to see what
+it would say.
+
 ### What a bundle does not do
 
 Three limits deserve to be stated plainly, because they save you a disappointment.

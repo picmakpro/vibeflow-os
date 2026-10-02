@@ -38,6 +38,26 @@ aussi celui du dépôt lui-même, et une modification suit le même cycle que ce
 livrer. Un bon point de départ, si tu veux proposer un changement, est de commencer petit : une
 correction de doc, un skill isolé, avant un changement d'architecture plus large.
 
+Quelques conventions de commit sont en revanche contrôlées par la CI du dépôt VibeFlow :
+
+- **`Gate-Touche: <chemin> — <raison>`** : tout commit qui touche un gate, sa suite, le workflow de
+  CI ou un hook en porte le trailer. Sa forme et sa présence sont vérifiées, jamais la véracité de
+  la raison.
+- **Une citation d'arbitrage avec son canal et sa date** (« arbitrage Samuel, AskUserQuestion
+  session principale, 2026-09-09 »), exigée quand un commit relève une valeur de la baseline du
+  budget d'instructions.
+- **`Ajout-Retrait: <chemin|ADR-NNN|CLAUDE.md> — <retrait | aucun : justification>`** : quand une
+  branche ajoute un gate, une règle de module, une mémoire d'agent, un ADR ou une règle de
+  `CLAUDE.md`, elle dit ce qu'elle retire en contrepartie, ou pourquoi rien n'est à retirer. Ce
+  contrôle est consultatif : il signale, il ne bloque pas.
+
+Deux hooks git du dépôt, **opt-in**, s'activent une seule fois par clone avec
+`git config core.hooksPath scripts/hooks` : `pre-push` vérifie que la version de la racine a son
+tag, uniquement pour un push vers `main` ; `post-merge` lance le filet de divergence de sujets
+([sujets-en-parallele.md](../05-equipe-agents/sujets-en-parallele.md)) après une fusion, bruyant
+mais incapable d'annuler quoi que ce soit. Ces gardes rendent visible, elles ne verrouillent rien :
+une garde qui vit dans le dépôt peut être modifiée par la contribution qu'elle juge.
+
 ## Ce que sont `docs/` et `.planning/`
 
 Pour être précis sur ce que ces deux dossiers contiennent, sans jamais te demander de les ouvrir :

@@ -48,29 +48,52 @@ review catches.
 
 The **driver lock** exists for one precise reason: to stop two managers from driving the same step
 at once without knowing it. The manager who starts a mission acquires the lock, refreshes it while
-working (a heartbeat), and releases it at the end — success, failure, or abandonment alike. A lock
-whose heartbeat stalls too long is considered stale and reclaimed automatically, with the recovery
-recorded in the report.
+working (a heartbeat), and releases it at the end — success, failure, or abandonment alike.
 
-It's worth being honest about what this mechanism does *not* do, because it's a real limit,
-observed on this repository and not just a theoretical one: **the driver lock is declarative, not
-enforced**. It coordinates the actors who consult it before acting — the team managers. It stops
-nothing, technically, for an actor who ignores it. The case happened here: one mission kept
-committing while another held the lock on the same resource, because nothing enforces the lock by
-force — it documents an intention, it doesn't impose it.
+It hasn't always been binding. It used to be **declarative**: one mission kept committing while
+another held the lock on the same resource, because nothing enforced it. That is no longer true:
+the lock is now **enforced**. A session that isn't registered under someone else's lock has its mutating gestures **refused before
+they run**: commit, branch switch, publishing (`git push`, `gh pr`) or a write to `.planning/`, but
+the list is wider and not exhaustive. It also includes `git reset`, `git restore`, `git clean`,
+`git tag`, `git branch`, `git merge`, `git rebase`, `git cherry-pick`, `git revert`, `git stash`
+(except their exit options `--abort`, `--continue`, `--skip`, `--quit`), `git worktree remove` and
+`gh release`. The refusal names the holder, its step, its branch and its age, then
+offers three ways out: re-attach to the lock if it's your own mission that got a new session
+identifier, work in a separate tree (`git worktree add`, never refused), or put an explicit
+override marker on that one gesture — the override is then recorded, as far as possible, in a
+journal next to the lock; writing it never blocks the gesture, a write failure is ignored and the
+command is truncated to 200 characters there. Don't rely on that journal as proof.
 
-Since then, the mechanism has been widened: a branch claim is now also recorded (working tree,
-branch), and an ordinary session — not just a manager — is told about it at startup if it lands on
-a branch already driven from another tree. That's what
-[branches-and-worktrees.md](./branches-and-worktrees.md) covers in detail: the real barrier against
-two simultaneous writers isn't this lock, it's working in separate trees.
+It's worth being honest about what this guard does *not* do. It's an **accident guard**, not an
+adversary guard: it stops the path of least resistance, not a determined workaround. It can't see a
+disguised command (an inline interpreter, a repository script that commits internally), nor a write
+to `.planning/` made by a tool other than Write or Edit. It is **blind outside a Claude Code
+session where it's armed**: a terminal, an IDE, a third-party git client or another machine all get
+through. And it guarantees that no *other session* commits under the lock, not that no other actor
+within the *same* session does. Its real promise: one mission driven by this harness at a time.
 
-A word on recovery, because it's what makes the lock usable despite its assumed fragility: nothing
-guarantees that an agent that dies mid-run releases cleanly what it held — an LLM agent can stop
-without executing its last instruction. The safety net is therefore lifespan plus heartbeat, not a
-promise of clean release under every circumstance. A stale lock never blocks a following mission
-forever; it gets reclaimed, and the reclaim is written down in plain sight in the report you read,
-never quietly skipped.
+It only covers the **lab**. A gesture whose target resolves with certainty to somewhere outside the
+lab — for instance a `cd` into another repository followed by `&&` and a commit — goes through,
+because this lock doesn't protect neighboring repositories. Conversely, as soon as the target is
+ambiguous (a variable, a glob, a subshell, a pipe, a background job), the gesture stays under the
+lock: when in doubt, it refuses.
+
+The mechanism has also been widened: a branch claim is recorded (working tree, branch), and an
+ordinary session — not just a manager — is told about it at startup if it lands on a branch
+already driven from another tree. That's what [branches-and-worktrees.md](./branches-and-worktrees.md)
+covers in detail: the safest barrier against two simultaneous writers is still working in separate
+trees.
+
+A word on recovery. Nothing guarantees that an agent that dies mid-run releases cleanly what it
+held — an LLM agent can stop without executing its last instruction. The safety net is therefore
+lifespan plus heartbeat. A lock whose heartbeat stalls too long is considered stale, but it is
+never taken over silently: an ordinary acquisition **refuses** it, and the next manager takes it
+over through an explicit gesture, recorded in the report you read. That recovery doesn't stop at
+the lock: every agent a manager dispatches is entered in an **agent registry**, kept next to the
+lock and closed when the agent hands back its report. When a driver dies, its children still
+"running" become orphans: the successor takes the lock over, receives the inventory, **stops the
+orphans before any new dispatch**, and only then redispatches from the state of the repository —
+never from what the old graph believed was in progress.
 
 ## The typed report, and a second limit worth knowing
 
@@ -88,6 +111,13 @@ severity, and the list of nodes its work unblocks. The manager runs a determinis
 check on it — nothing to guess at. That contract is what makes the graph trustworthy: a
 `human_needed` status always escalates to you, never an invented answer standing in for you.
 
+A judgment (a review, an audit, a scored critique) can also carry an optional `confiance` field (a French name, as in the report itself), a
+number between 0 and 1: the margin the judge grants itself. It never goes with machine proof — a
+test or a gate is green or red, whatever is written next to it. Below the 0.6 threshold, a
+judgment's `passed` is **not** a green: it is requalified as a finding to settle, and so reaches
+you. When absent, the field means nothing (not an implicit 1.0). The manager copies the values it
+receives as-is into its mission report, and never averages them.
+
 That contract rests on a second mechanism that also deserves an unflattering presentation: **tool
 fencing**. On a VibeFlow team, whoever fixes the code can't touch the tests, and whoever writes the
 tests can't touch the application code — the separation is carried by the list of tools each agent
@@ -98,6 +128,9 @@ list — it's a compliance gate checked when the module is installed, not a barr
 engine enforces live while the agent runs. The discipline holds because agents are written to
 respect it and because the gate rejects a module that violates it, not because a technical wall
 enforces it in real time.
+
+What gets tidied at the end of a mission (merged worktrees and branches, unindexed memory) has its
+own page: [tidying-up-after-yourself.md](./tidying-up-after-yourself.md).
 
 What you find at the end of a mission, and where, is the subject of the next page — the one that
 says what's asked of you, specifically, while all of this runs.
