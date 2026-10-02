@@ -1,8 +1,26 @@
 # Changelog — conductor
 
-## [Non publié] — 2026-09-30 (check-overlaps.sh — present() ajoute une résolution par name: incarné)
+## [v1.46.0] — 2026-10-01 (sobriété de méthode, Phase 41.3)
 
-**Patch** (correctif de détection) :
+**Minor** (nouveaux gates et hook) :
+
+- **`scripts/guard-fin-de-geste.sh`** (nouveau hook `Stop`, SOBR-07) : bloque la fin d'un geste tant
+  qu'un rangement attribué à la session reste à faire ; coupe-circuit visible ; sortie JSON valide
+  même sans `jq` ni `python3`. Suite `tests/test-guard-fin-de-geste.sh`. **N'agit que dans un lab
+  armé** : la garde (Stop et `--snapshot`) ne fait rien tant que la racine git ne porte pas
+  `.planning/.fin-de-geste-armed` ; elle s'arme par cette sentinelle (arbitrage Samuel, AskUserQuestion
+  session principale, 2026-10-01 : installée en scope user, elle bloquait sinon dans tous les dépôts).
+- **`scripts/check-method-budget.sh`** (SOBR-01/02/06/08) : budgets étendus au BACKLOG, à l'index de
+  mémoire et au ROADMAP, avec plafonds de prose ; `--auto` archive seul au-delà du budget, trace le
+  déplacement dans `.planning/archives/INDEX.tsv`, réversible depuis le blob ; constate branches,
+  stash et branches distantes de l'auteur seulement. Suite étendue (24 mutants MU + 3 MW tués).
+- **`scripts/check-ajout-retrait.sh`** (nouveau, SOBR-05, consultatif) : un ajout à la méthode
+  (gate, garde, mémoire d'agent, ADR, règle de `CLAUDE.md`) sans trailer `Ajout-Retrait:` lève un
+  `::warning::`, jamais un échec. Suite `tests/test-check-ajout-retrait.sh` (cinq mutants).
+- **`scripts/check-blueprints.sh`** (SOBR-03) : ne balaie plus `.claude/worktrees/`.
+- **`hooks/hooks.json`** : câble le hook `Stop` de fin de geste et son instantané de référence (`--snapshot`) au démarrage de session.
+
+**Patch** (contribution externe #119) :
 
 - **`scripts/check-overlaps.sh`, `present()`, cas par défaut** — un agent local n'était détecté que
   par son nom de fichier (`$AGENTS_DIR/$ref.md`), jamais par le `name:` de son frontmatter. Un
@@ -16,8 +34,7 @@
   fichier ne devient invisible par cet ajout. Suite `tests/test-check-overlaps.sh` étendue de 16 à
   25 cas : T17 (reproduction), T18 (correspondance exacte), T19 (lecture confinée au frontmatter),
   T20-T23 (formes YAML valides du `name:` : guillemets doubles, guillemets simples, BOM, CRLF),
-  T24-T25 (gardes de non-régression sur la résolution par nom de fichier). Numéro de version laissé
-  aux mainteneurs (pas de bump dans cette entrée : contribution externe, `CONTRIBUTING.md`).
+  T24-T25 (gardes de non-régression sur la résolution par nom de fichier).
 
 ## [v1.45.1] — 2026-09-29 (correctif : `popd` contournait le verrou de driver)
 

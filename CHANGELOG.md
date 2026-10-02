@@ -13,6 +13,25 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.68.0] — 2026-10-01
+
+**Minor** (sobriété de méthode, moteur de planning métier par cycles ; release demandée par Samuel,
+session principale Claude Code, 2026-10-01) :
+
+- **Sobriété de méthode — Phase 41.3** (`conductor` v1.45.1 → v1.46.0, `dev-orchestrator`
+  v2.25.0 → v2.26.0). Ce qu'on crée, on le range : budgets de méthode étendus au BACKLOG, à l'index
+  de mémoire et au ROADMAP, archivage automatique `--auto` tracé (`.planning/archives/INDEX.tsv`)
+  et réversible ; nouveau hook `Stop` `guard-fin-de-geste.sh` (bloque tant qu'un rangement
+  attribué à la session reste à faire, coupe-circuit visible ; n'agit que dans un lab armé par
+  la sentinelle `.planning/.fin-de-geste-armed`, muet partout ailleurs) ; contrôle E7 en fin de mission ;
+  `check-ajout-retrait.sh` consultatif (trailer `Ajout-Retrait:`) ; l'installeur pose
+  `.worktreeinclude` dans les labs ; ADR-076 précise ADR-031. PR #123.
+- **Moteur de planning métier par cycles — Phase 44** (`planning-core` v2.7.2 → v2.8.0) :
+  `recalc-planning.sh` dérive du disque l'état des cycles, phases et plans d'un lab métier ;
+  modèle `modele-cycles.md` et gabarits de cycle. PR #114.
+- **`check-overlaps.sh` résout un agent par son `name:`** (contribution externe, PR #119), en union
+  avec la résolution par nom de fichier.
+
 ## [v2.67.1] — 2026-09-29
 
 **Patch** (deux régressions de v2.67.0, trouvées à la relecture de la release ; hotfix demandé
