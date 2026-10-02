@@ -95,7 +95,7 @@
       l'écriture d'un juge derrière `./` × 2 100, que l'analyse exacte précédente refusait (24b58748). Désormais le cœur
       lit une valeur longue sous DEUX formes obtenues en temps linéaire : la forme réduite lexicalement
       (`posixpath.normpath`) et la forme physique (une résolution qui suit les liens et ne teste sur le disque qu'un
-      composant dont tous les ancêtres existent, égale à `realpath` sur 20 000 chemins tirés au hasard) ; chacune qui tient
+      composant dont tous les ancêtres existent, égale à `realpath`, hors boucles de liens, sur 20 000 chemins tirés au hasard) ; chacune qui tient
       sous 4096 caractères est analysée comme une valeur courte, la valeur est refusée dès que l'une des deux l'est (ce qui
       ferme aussi, pour les valeurs longues, le constat F2 : un `..` après un lien symbolique, dans les deux sens) ; seule
       une valeur qui reste trop longue est décidée dans le doute, sur son nom, puis sur son `cwd` et sur l'ancêtre existant
@@ -120,6 +120,11 @@
     - **N-02, N-06 (texte)** — limite (aa) écrite à l'état après correction ; limite (a) étendue à la forme
       `"tool_name": "Write"` (antérieure au lot, dépend de la sérialisation du harnais, non exploitable par `Write`
       seul).
+    - **Re-audit final tour 4 : SECURED** (2026-10-02, aucun CRITICAL ni HIGH, recoupé par `gsd-security-auditor`) — les
+      constats MEDIUM et LOW restants sont déclarés, sans changement de code (mandat de Willy relayé par la session
+      principale, 2026-10-01) : limite (al) N4-02 (`/.vol/<dev>/<inode>/…` sous macOS), limite (am) N4-03 (dérogation
+      brûlée, fail-closed), limite (an) N4-05 (course `lstat`/`readlink`) ; N4-01 et N4-04 précisent (aa) et (af) ;
+      N4-06 corrige des textes (docstring de `resoudre_lineaire`, « hors boucles de liens », (ai), (ak), (aa)).
   - **Limites ajoutées** : (aa) F-01 ; (ab) F-04 `~` résolu par le hook contre le `cwd` ; (ac) F-05 racine d'un dispatch
     dérivée de `file_path` ou `notebook_path` ; (ad) F-06 poche `.claude/worktrees/<nom>` non adhérente créable par
     `Write` ; (ae) F-07 `MultiEdit`, outils MCP et tout outil hors matcher ; F-08 : (z) réécrite, limite T-45-61 ajoutée

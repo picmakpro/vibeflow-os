@@ -4620,17 +4620,20 @@ LIMITES_REFERENCE = (
     ("y", ("settings", "Q-G6 = b", "scope compte", "planning-hook.sh", "lien préexistant")),
     ("z", ("SIGALRM", "Alarm clock", "faux refus")),
     ("aa", ("F-01", "4096", "cwd", "GATE-03", "N-01", "surrogate", "N2-01", "antislash", "N2-03", "N2-04", "R-DOUTE-04", "N3-01", "N3-02", "forme physique",
-            "réduite lexicalement", "lien dur", "lien symbolique", "R-REDUC-01")),
+            "réduite lexicalement", "lien dur", "lien symbolique", "R-REDUC-01", "N4-01", "N4-04", "ROLE-juge")),
     ("ab", ("F-04", "~", "cwd", "Write", "N-03", "HOME", "N2-02", "plus stricte")),
     ("ac", ("F-05", "notebook_path", "Agent", "Task")),
     ("ad", ("F-06", ".claude/worktrees", "Write")),
     ("ae", ("F-07", "MultiEdit", "MCP", "matcher")),
-    ("af", ("F2", "..", "lien symbolique", "PHYSIQUEMENT", "LEXICALEMENT", "R-REDUC-01")),
+    ("af", ("F2", "..", "lien symbolique", "PHYSIQUEMENT", "LEXICALEMENT", "R-REDUC-01", "N4-04")),
     ("ag", ("F3", "lien symbolique", "FICHIER", "couche de repli")),
     ("ah", ("F4", "config.json", "saut de ligne", "grep")),
-    ("ai", ("F5", "leurre", "5 000 chiffres", "imbrication")),
+    ("ai", ("F5", "leurre", "5 000 chiffres", "imbrication", "_premier_gagne")),
     ("aj", ("F6", "NotebookEdit", "file_path", "notebook_path")),
-    ("ak", ("Windows", "8.3", "Python", "3.14")),
+    ("ak", ("Windows", "8.3", "Python", "3.14", "3.9.6")),
+    ("al", ("N4-02", "/.vol", "inode", "macOS")),
+    ("am", ("N4-03", "dérogation", "fail-closed")),
+    ("an", ("N4-05", "lstat", "readlink", "OSError")),
 )
 
 
@@ -4789,7 +4792,7 @@ def sec_reference(ctx):
             print(e)
         ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
         return
-    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (ak) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
+    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (an) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
     original = open(chemin, encoding="utf-8").read()
 
     def mutant_texte(ident, fonction, motif):
@@ -4816,6 +4819,13 @@ def sec_reference(ctx):
                  "le mot-clé MultiEdit retiré de la ligne de la limite (ae)")
     mutant_texte("LIMITE-AA-MOTCLE", lambda t: remplacer_ligne_reference(t, "- **limite (aa)**", lambda l: l.replace("GATE-03", "GATE-0x", 1)),
                  "le mot-clé GATE-03 retiré de la ligne de la limite (aa)")
+    # Re-audit final tour 4 (2026-10-02) : un mot-clé retiré de la ligne de chacune des limites (al), (am), (an), sur une copie privée
+    mutant_texte("LIMITE-AL-MOTCLE", lambda t: remplacer_ligne_reference(t, "- **limite (al)**", lambda l: l.replace("/.vol", "/.v0l")),
+                 "le mot-clé /.vol retiré de la ligne de la limite (al)")
+    mutant_texte("LIMITE-AM-MOTCLE", lambda t: remplacer_ligne_reference(t, "- **limite (am)**", lambda l: l.replace("fail-closed", "fail-open", 1)),
+                 "le mot-clé fail-closed retiré de la ligne de la limite (am)")
+    mutant_texte("LIMITE-AN-MOTCLE", lambda t: remplacer_ligne_reference(t, "- **limite (an)**", lambda l: l.replace("readlink", "readl1nk", 1)),
+                 "le mot-clé readlink retiré de la ligne de la limite (an)")
     mutant_texte("SCRIPTS", lambda t: remplacer_ligne_reference(t, "- **Scripts du hook protégés par G6**", lambda l: l.replace("`check-gates-alive.sh`", "`check-gates-alive.shx`", 1)),
                  "`check-gates-alive.sh` renommé dans la liste des scripts du hook protégés")
     mutant_texte("JOURNAL", lambda t: remplacer_ligne_reference(t, "- **Journal de dérogation**", lambda l: l.replace("derogations-gates.log", "derogations.log")),
@@ -4837,7 +4847,7 @@ def sec_reference(ctx):
         if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
             non_tuees.append(lettre)
     if non_tuees:
-        komut("REFERENCE-LIMITES", "chaque limite (a) à (ak) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+        komut("REFERENCE-LIMITES", "chaque limite (a) à (an) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
               "non tuées : " + ", ".join(non_tuees))
     else:
         okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))
