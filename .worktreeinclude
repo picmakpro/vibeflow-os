@@ -14,14 +14,30 @@
 #     runtime, pas une preuve d'absence (hypothèse A5, confiance BASSE) — à inclure
 #     si un worker de documentation s'avère le lire.
 #
-# Syntaxe : la doc du harness Claude Code ne précise le format nulle part (absent de
-# gsd-core et de ce dépôt) — SUPPOSÉE de type .gitignore (motifs gitignore-style, un
-# par ligne) par analogie avec le nom et le rôle inverse du fichier (hypothèse A1,
-# confiance BASSE). Sonde qui la ferme : créer un worktree d'agent isolé, constater
-# si .claude/agent-memory/ y est bien présent.
+# Syntaxe .gitignore, documentée (code.claude.com/docs/en/worktrees § copy-gitignored-files,
+# /hooks#worktreecreate) : un motif par ligne ; seuls les fichiers qu'il désigne ET que git
+# ignore sont recopiés dans un worktree créé par Claude Code.
+# Limites : la copie est FIGÉE à la création du worktree (un hook modifié ensuite dans le
+# checkout principal ne suit pas) ; un `git worktree add` manuel n'est pas couvert ;
+# `guard-driver-lock.sh`, sous EnterWorktree, vise le checkout principal — non corrigé ici
+# (BACKLOG, entrée du 2026-09-29).
 
 # Mémoire persistante d'agent (memory: project, déclaré par tous les agents
 # écrivains) — critique : sans cette entrée, un worker isolé perd tout
 # l'apprentissage accumulé à chaque dispatch — une régression fonctionnelle directe,
 # pas une gêne cosmétique.
 .claude/agent-memory/
+
+# Hooks et gardes du projet : .claude/hooks/* et .claude/scripts/* sont ignorés par git (.gitignore:24)
+# et visés par des commandes de hook via "$CLAUDE_PROJECT_DIR". Constat daté et situé : poste de Willy,
+# Phase 44, 2026-09-28, consigné au BACKLOG — dans un worktree, CLAUDE_PROJECT_DIR vaut le worktree,
+# et un garde introuvable échoue sans bloquer (« Cannot find module »), donc ne protège rien. Le nombre
+# de commandes concernées n'est pas chiffré ici : le settings.local.json de ce checkout n'en porte aucune.
+#
+# Où ce fichier est lu (mesuré le 2026-09-29, deux sondes, worktree parti de 6e7c40d7 qui n'a PAS
+# ces lignes) : dans l'ARBRE DE TRAVAIL du checkout principal, pas dans le commit de base du worktree.
+# Ligne présente dans l'arbre principal : témoin sous .claude/hooks/ recopié ; ligne retirée : absent ;
+# témoin positif .claude/agent-memory/ présent les deux fois ; témoin négatif .claude/logs/ (non listé)
+# absent les deux fois.
+.claude/hooks/
+.claude/scripts/

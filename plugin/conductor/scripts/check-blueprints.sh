@@ -72,14 +72,17 @@ if [ -z "$ROOT" ]; then
   ROOT="$(cd -- "$SCRIPT_DIR/../../.." && pwd)"
 fi
 
-# Collecte des blueprints
+# Collecte des blueprints. `.claude/worktrees` est élagué (SOBR-03 a) : chaque worktree porte une
+# copie complète du dépôt, et ses blueprints — d'une autre branche, parfois périmés — étaient jugés
+# comme s'ils étaient ceux de l'arbre courant (faux rouge local : 45 comptés pour 9 suivis par git).
 BPS=()
 if [ -n "$ONE_FILE" ]; then
   [ -f "$ONE_FILE" ] || { echo "✗ blueprint introuvable : $ONE_FILE" >&2; hook_exit 1; }
   BPS+=("$ONE_FILE")
 else
   while IFS= read -r f; do [ -n "$f" ] && BPS+=("$f"); done < <(
-    find "$ROOT" -type f -name '*.blueprint.md' -not -path '*/node_modules/*' 2>/dev/null | sort
+    find "$ROOT" \( -path '*/node_modules' -o -path '*/.claude/worktrees' \) -prune -o \
+      -type f -name '*.blueprint.md' -print 2>/dev/null | sort
   )
 fi
 

@@ -8,7 +8,7 @@
 > d'intention unique**. Plus de façade de verbes : GSD est l'interface directe des équipes,
 > l'agent est l'entrée conversationnelle optionnelle.
 
-**Version** : v2.25.0
+**Version** : v2.26.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -94,13 +94,13 @@ dev-orchestrator/
 │   ├── requirements-survival-detect.sh # primitive sourcée : vf_ledger_state + vf_ledger_classify (Phase 18)
 │   ├── check-requirements-survival.sh  # signal survie du ledger, LEDG-02 (Phase 18)
 │   ├── restore-requirements-ledger.sh  # rattrapage roll-forward, LEDG-01 (Phase 18)
-│   ├── check-mission-exit.sh      # gate de sortie de mission, E1-E6, 3/0/4/64 (Phase 40)
+│   ├── check-mission-exit.sh      # gate de sortie de mission, E1-E7, 3/0/4/64 (Phase 40, E7 41.3)
 │   └── tests/                     # suites de vérification
 │       ├── test-check-dev-bootstrap.sh
 │       ├── test-check-doc-drift.sh
 │       ├── test-check-requirements-survival.sh
 │       ├── test-restore-requirements-ledger.sh
-│       └── test-check-mission-exit.sh  # 22+ cas, 6 mutations rouges (Phase 40, QUAL-01)
+│       └── test-check-mission-exit.sh  # 62 assertions, 6 mutations de fixture + 8 mutants d'E7 (Phases 40 et 41.3, QUAL-01)
 └── references/                    # doctrine + index chargés on-demand par les agents
     ├── intent-routing.md           # carte intention → brique (SEULE source de routage)
     ├── GSD-PIPELINE.md             # ordre canonique du cycle + model profiles
@@ -276,14 +276,15 @@ Couvre les axes de la bascule agentique (spec 2026-07-25) plus les acquis :
 bash dev-orchestrator/scripts/tests/test-check-mission-exit.sh
 ```
 
-- **`test-check-mission-exit.sh`** (HEAD-02, QUAL-01, Phase 40) — 23 cas (re-dérivés par
+- **`test-check-mission-exit.sh`** (HEAD-02, QUAL-01, Phase 40) — 62 assertions (re-dérivées par
   exécution : `bash .../test-check-mission-exit.sh 2>&1 | tail -1`), dont les six mutations de
-  fixture E1 à E6 (une par contrôle, chacune assertant le code de sortie ET le nom du contrôle
+  fixture des contrôles E1 jusqu'à E6 (une par contrôle, chacune assertant le code de sortie ET le nom du contrôle
   dans la sortie), la discrimination machine sain/manque/indéterminé, le cas E6-tableau-de-preuves
   vide, la lecture seule du dépôt inspecté (D-10), la garde D-11 (aucune sous-commande mutante du
   verrou) prouvée par mutation du script lui-même, et les deux causes d'indétermination E1
-  départagées (cascade non résolue vs `driver-lock.sh` absent). Cas 23 à 27 (issue #82, 28 cas au
-  total) : E1 lit
+  départagées (cascade non résolue vs `driver-lock.sh` absent). Cas 28 à 43 (plan 41.3-04) : le contrôle E7 (rangement apparu depuis le snapshot de début de
+  mission, archivage sans geste humain, snapshot absent ou archivage non tenté = indéterminé), le
+  mode `--budget-snapshot` et huit mutants de script. Cas 23 à 27 (issue #82) : E1 lit
   aussi `children_running` du registre des agents dispatchés (verrou relâché mais enfant consigné
   encore `running` = manque ; valeur non numérique = indéterminé ; champ absent = kernel antérieur,
   sous-contrôle non applicable, sain).
