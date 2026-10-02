@@ -25,6 +25,13 @@
 #   formes de chemin (`//`, `.`, `..`, relatif, `~`, échappements JSON, valeur longue, surrogate, NUL, clés dupliquées ou échappées,
 #   JSON non compact) ; (3) le générateur de valeurs longues de controle_generatif ; (4) un générateur d'arbres de labs aléatoires.
 #
+# Propriété (F) : bornes et coût (re-audit du pré-filtre, 2026-10-02, F-P1 et F-P2). Le pré-filtre DIFFÈRE dès qu'une valeur dépasse 1024
+#   caractères ou 64 composants, qu'une correspondance brute dépasse 2048 caractères ou que le payload porte plus de 16 valeurs (PF-BORNE-01,
+#   autour de chaque borne, lab non adhérent et adhérent, script présent et absent, sortie identique à la commande sans pré-filtre) ; son
+#   coût est borné (PF-COUT-01 : sous 5 s sur des valeurs propres de 1 000 à 4 096 caractères, et nombre d'appels à `vf_pc` exact, tueur
+#   structurel indépendant de l'horloge). Les sections se lancent une à une : VF_PF_SECTIONS=table,bornes | corpus | mutants, et
+#   VF_PF_MUT=<préfixes de mutants séparés par des virgules> (la suite entière dépasse dix minutes sur une machine chargée).
+#
 # Mutants (chacun doit rougir la garde, trace nom · assertion · attendu · obtenu) : (i) sortie trop tôt — sans vérifier cycles-v1, sans le
 # cwd du payload, sans le cwd du processus, sans les ancêtres ; (ii) sans résolution physique, sans le lien pendant ; (iii) valeur longue,
 # antislash, clé échappée, JSON non compact, `/.vol` acceptés.
@@ -191,12 +198,15 @@ class Ctx:
             return cmd.replace(TOKEN, "'" + dossier + "'"), {}
         raise SystemExit("jeton {{VF_SCRIPTS}} attendu dans hooks.json")
 
-    def lancer(self, cmd, brut, cwd, dossier=None, shell=None):
+    def lancer(self, cmd, brut, cwd, dossier=None, shell=None, tmo=120):
         t, _ = self.texte(cmd, dossier or self.scripts_dir)
         argv = shell or ["/bin/sh", "-c"]
         if argv[0].endswith("zsh"):
             t = "emulate sh\n" + t
-        p = subprocess.run(argv + [t], input=brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.env(), cwd=cwd, timeout=120)
+        try:
+            p = subprocess.run(argv + [t], input=brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.env(), cwd=cwd, timeout=tmo)
+        except subprocess.TimeoutExpired:
+            return -9, b"", b"TIMEOUT"
         return p.returncode, p.stdout, p.stderr
 
     def pre(self, cmd_pre, cas, shell=None):
@@ -301,6 +311,9 @@ def foret(ctx):
     os.symlink(L["plain"], R + "/lnk-plain")
     # HOME : un lab adhérent sous le home de la suite
     L["hl"] = lab(ctx.home + "/hl")
+    # préfixe de nom : `pfx` (adhérent) et `pfx-dev` (non adhérent) ; la mémoire du préfixe vérifié ne doit jamais tenir `pfx` pour un ancêtre de `pfx-dev/…`
+    L["pfx"] = lab(R + "/pfx")
+    L["pfxdev"] = lab(R + "/pfx-dev", DEV)
     L["racine"] = R
     return L
 
@@ -818,6 +831,146 @@ def table_courts(ctx, cmd, L):
     return viol, n
 
 
+# --- bornes du pré-filtre (F-P1, F-P2 du re-audit du 2026-10-02) --------------------------------------------
+def comps(chemin):
+    return chemin.count("/")
+
+
+def chemin_long(base, n, comp=120):
+    """Chemin propre de EXACTEMENT n caractères sous `base` (composants de `comp` caractères au plus)."""
+    s = base
+    while len(s) < n:
+        r = n - len(s)
+        morceau = min(r, 1 + comp)
+        if r - morceau == 1:
+            morceau -= 1
+        s += "/" + "y" * (morceau - 1)
+    return s
+
+
+def chemin_comps(base, total):
+    """Chemin propre de `total` composants sous `base` (composants d'un caractère)."""
+    return base + "/a" * (total - comps(base))
+
+
+def cas_bornes(ctx, L):
+    """(étiquette, octets, cwd processus, verdict attendu du pré-filtre). Le pré-filtre DIFFÈRE dès qu'une valeur examinée dépasse
+    1024 caractères ou 64 composants, qu'une correspondance brute dépasse 2048 caractères ou que le payload en compte plus de 16 ; il
+    court-circuite sinon, dans un lab non adhérent. Dans tous les cas la commande complète rend la sortie de la commande sans pré-filtre."""
+    dev, adh, plain = L["dev"], L["adh"], L["plain"]
+    w = lambda chemin, c: compact(payload_obj("Write", entree_outil("Write", chemin), c))
+    b = lambda c: compact(payload_obj("Bash", {"command": "true"}, c))
+    cas = []
+    # (nom, base du chemin, cwd du payload d'écriture, le lab est-il non adhérent). `.claude` : le repli de l'ancienne commande refuse
+    # une valeur trop longue qui nomme `.claude` ou `.planning` (F-P2).
+    for nom, base, cwd_b, court_ok in (("dev", dev, dev, True), ("claude", plain + "/.claude/q", plain, True), ("adh", adh, adh, False)):
+        for lg in (1023, 1024, 1025, 4083, 4090, 4096, 4097):
+            v = chemin_long(base, lg)
+            att = "SHORT" if court_ok and lg <= 1024 else "DEFER"
+            cas.append(("%s, Write, valeur de %d caractères" % (nom, lg), w(v, cwd_b), cwd_b, att))
+            cas.append(("%s, Bash, cwd de %d caractères" % (nom, lg), b(v), cwd_b, att))
+        for tot in (63, 64, 65, 66):
+            v = chemin_comps(base + "/s", tot)
+            att = "SHORT" if court_ok and tot <= 64 else "DEFER"
+            cas.append(("%s, Write, valeur de %d composants" % (nom, tot), w(v, cwd_b), cwd_b, att))
+            cas.append(("%s, Bash, cwd de %d composants" % (nom, tot), b(v), cwd_b, att))
+    cas.append(("préfixe de nom : cwd dans pfx-dev (non adhérent), écriture dans pfx (adhérent)", w(L["pfx"] + "/x.md", L["pfxdev"]), L["pfxdev"], "DEFER"))
+    cas.append(("préfixe de nom : cwd dans pfx (adhérent), écriture dans pfx-dev (non adhérent)", w(L["pfxdev"] + "/x.md", L["pfx"]), L["pfxdev"], "DEFER"))
+    cas.append(("préfixe de nom : cwd et écriture dans pfx-dev (non adhérent)", w(L["pfxdev"] + "/x.md", L["pfxdev"]), L["pfxdev"], "SHORT"))
+    txt = b(dev).decode("utf-8")
+    cle = '"cwd":"%s"' % dev
+    for n, att in ((1, "SHORT"), (16, "SHORT"), (17, "DEFER"), (40, "DEFER")):
+        cas.append(("dev, Bash, %d clés cwd répétées" % n, txt.replace(cle, ",".join([cle] * n), 1).encode("utf-8"), dev, att))
+    txt = b(plain + "/.claude/q").decode("utf-8")
+    for k, att in ((100, "SHORT"), (4100, "DEFER")):
+        cas.append(("claude, Bash, %d espaces entre la clé cwd et sa valeur" % k, txt.replace('"cwd":', '"cwd":' + " " * k, 1).encode("utf-8"), plain, att))
+    return cas
+
+
+def table_bornes(ctx, cmd, L, mutant=False):
+    np, pre = ctx.derive(cmd)
+    viol = []
+
+    def jouer(e):
+        etiq, brut, cwd, att = e
+        c = Cas("bornes", etiq, brut, cwd, etiq)
+        v = ctx.pre(pre, c)
+        r = []
+        if v != att:
+            r.append(("(F) borne du pré-filtre : verdict (SHORT sous les bornes dans un lab non adhérent, DEFER au-delà ou en lab adhérent)", att, v, c))
+        for dossier, nom in ((ctx.scripts_dir, "script présent"), (ctx.vide, "script absent")):
+            a, z = ctx.lancer(np, brut, cwd, dossier), ctx.lancer(cmd, brut, cwd, dossier)
+            if a != z:
+                r.append(("(A)(E) la commande complète rend la sortie de la commande sans pré-filtre, octet pour octet (%s)" % nom,
+                          "rc=%d out=%s err=%s" % (a[0], court(a[1]), court(a[2])), "rc=%d out=%s err=%s" % (z[0], court(z[1]), court(z[2])), c))
+        return r
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        for r in ex.map(jouer, cas_bornes(ctx, L)):
+            viol += r
+            if mutant and viol:
+                break
+    return viol
+
+
+def table_cout(ctx, cmd, L, mutant=False):
+    """Coût borné : pour des valeurs propres de 1 000 à 4 096 caractères (cwd et chemin), lab adhérent et non adhérent, le pré-filtre seul
+    comme la commande complète tiennent sous 5 s (attendu : moins d'une demi-seconde, soit une marge de 10 fois) ; et un tueur structurel
+    qui ne dépend pas de l'horloge : le nombre d'appels à `vf_pc` est EXACT sur trois branches d'un même arbre (mémoire d'UN préfixe vérifié, ni
+    sans mémoire ni chaîne cumulée) et nul sur une valeur de 200 composants (refusée avant tout parcours)."""
+    np, pre = ctx.derive(cmd)
+    dev, adh = L["dev"], L["adh"]
+    viol = []
+    cas = []
+    for nom, base in (("dev", dev), ("adh", adh)):
+        for lg in (1000, 1548, 2748, 4096):
+            v = base + "/a" * ((lg - len(base)) // 2)
+            for forme, chemin in (("composants d'un caractère", v), ("composants de 120 caractères", chemin_long(base, lg))):
+                cas.append(("%s, Bash, cwd de %d caractères (%s)" % (nom, len(chemin), forme), compact(payload_obj("Bash", {"command": "true"}, chemin)), base))
+                cas.append(("%s, Write, valeur de %d caractères (%s)" % (nom, len(chemin), forme),
+                            compact(payload_obj("Write", entree_outil("Write", chemin + "/f.md"), chemin)), base))
+
+    def chrono(e):
+        etiq, brut, base = e
+        r = []
+        for quoi, c_ in (("pré-filtre seul", pre), ("commande complète", cmd)):
+            t0 = time.time()
+            rc, out, err = ctx.lancer(c_, brut, base, tmo=5)
+            dt = time.time() - t0
+            if err == b"TIMEOUT" or dt >= 5:
+                r.append(("coût borné (%s) : moins de 5 s, jamais un TIMEOUT que le harnais tuerait en laissant passer" % quoi, "< 5 s (attendu < 0.5 s)",
+                          "TIMEOUT à 5 s" if err == b"TIMEOUT" else "%.2f s" % dt, Cas("cout", etiq, brut, base, etiq)))
+        return r
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        for r in ex.map(chrono, cas):
+            viol += r
+            if mutant and viol:
+                return viol
+    inst = pre.replace("vf_pc() { ", "vf_pc() { printf C >&2; ", 1)
+    if inst == pre:
+        return viol + [("fonction vf_pc instrumentable", "présente", "absente", None)]
+    # Trois branches d'un même arbre, dans l'ordre du harnais (cwd, puis file_path, puis $PWD et le cwd physique) : P/s1/s2/s3 (cwd), P/s1/t1/t2/f.md
+    # (écriture), P/s1/s2/s3 (processus). La mémoire d'UN préfixe vérifié (la dernière valeur parcourue) donne EXACTEMENT : cwd, toute la chaîne
+    # (P + 4 répertoires) ; écriture, 3 appels jusqu'à P/s1, déjà vérifié ; $PWD, 2 appels jusqu'à P/s1 ; cwd physique, 0. Ni sans mémoire (chaque
+    # valeur reparcourt toute sa chaîne), ni avec la chaîne cumulée `_pk` (la valeur parcourue en dernier ne coûterait rien).
+    P = L["plain"]
+    os.makedirs(P + "/s1/s2/s3", exist_ok=True)
+    sous = P + "/s1/s2/s3"
+    fich = P + "/s1/t1/t2/f.md"
+    attendu = (comps(sous) + 1) + 3 + 2
+    rc, out, err = ctx.lancer(inst, compact(payload_obj("Write", entree_outil("Write", fich), sous)), sous)
+    obtenu = err.count(b"C")
+    if out != b"SHORT" or obtenu != attendu:
+        viol.append(("mémoire d'un seul préfixe vérifié : appels à vf_pc EXACTS sur trois branches d'un même arbre (ni sans mémoire, ni chaîne cumulée)",
+                     "SHORT, %d appels" % attendu, "%s, %d appels" % (court(out), obtenu), Cas("cout", "appels vf_pc sur trois branches", b"", sous)))
+    profond = chemin_comps(dev + "/s", 200)
+    rc, out, err = ctx.lancer(inst, compact(payload_obj("Bash", {"command": "true"}, profond)), dev)
+    obtenu = err.count(b"C")
+    if out != b"DEFER" or obtenu != 0:
+        viol.append(("valeur de 200 composants : refusée avant tout parcours (64 composants au plus, comptés sur la valeur, jamais sur la distance au préfixe déjà vérifié)", "DEFER, 0 appel", "%s, %d appels" % (court(out), obtenu),
+                     Cas("cout", "appels vf_pc sur une valeur de 200 composants", b"", dev)))
+    return viol
+
+
 # --- sections ----------------------------------------------------------------------------------------------
 def montrer(libelle, viol, ok_detail):
     if viol:
@@ -855,6 +1008,16 @@ def sec_table(ctx, L):
     montrer("PF-D-02", v2, "plancher : %d cas (lab dev, lab sans config, hors lab ; six outils) court-circuités" % n)
 
 
+def sec_bornes(ctx, L):
+    n = len(cas_bornes(ctx, L))
+    montrer("PF-BORNE-01", table_bornes(ctx, ctx.cmd, L),
+            "%d cas autour des bornes (1023, 1024, 1025 caractères ; 4083 à 4097 ; 63, 64, 65, 66 composants ; 1, 16, 17, 40 clés répétées ; 100 et 4 100 espaces) en lab non adhérent "
+            "et adhérent : verdict attendu, et la commande complète rend, script présent comme script absent, la sortie de la commande sans pré-filtre" % n)
+    montrer("PF-COUT-01", table_cout(ctx, ctx.cmd, L),
+            "valeurs propres de 1 000 à 4 096 caractères (cwd et chemin, composants d'un caractère ou de 120), lab adhérent et non adhérent : pré-filtre seul et "
+            "commande complète sous 5 s ; appels à vf_pc exacts sur trois branches d'un même arbre (mémoire d'un seul préfixe) et nuls sur 200 composants")
+
+
 def sec_corpus(ctx, L):
     cats = (("banc", corpus_banc(ctx)), ("adverse", corpus_adverse(ctx, L)), ("generatif", corpus_generatif(ctx, L)), ("arbres", corpus_arbres(ctx)))
     total, ident_cas = [], set()
@@ -878,13 +1041,20 @@ def sec_corpus(ctx, L):
 
 
 MUTANTS = [
+    ("IV-PK-REMIS", 'case $_pa/ in "$_pd"/*) _pa=$_pt; return 0 ;; esac; vf_pc "$_pd" || return 1; if [ "$_pd" = / ]; then _pa=$_pt; return 0; fi;',
+     'case $_pk in *"$_pn$_pd$_pn"*) ;; *) _pk=$_pk$_pd$_pn; vf_pc "$_pd" || return 1 ;; esac; [ "$_pd" = / ] && return 0;',
+     "iv : remet la chaîne de dédoublonnage `_pk` (le coût d'avant), les bornes restant en place : seul le compte exact des appels à vf_pc la distingue"),
+    ("IV-MEMO-SANS-FRONTIERE", 'case $_pa/ in "$_pd"/*)', 'case $_pa/ in "$_pd"*)', "iv : la mémoire du préfixe vérifié tient `pfx` pour un ancêtre de `pfx-dev/…` (frontière de composant retirée)"),
+    ("IV-SANS-BORNE-COMPOSANTS", '_pj=$((_pj+1)); [ "$_pj" -le 64 ] || return 1; ', "", "iv : retire la borne de 64 composants"),
+    ("IV-SANS-BORNE-BRUTE", '[ "${#_pv}" -le 2048 ] || return 1; ', "", "iv : retire la borne de 2048 caractères sur la correspondance brute"),
+    ("IV-SANS-PLAFOND-VALEURS", '_pz=$((_pz+1)); [ "$_pz" -le 16 ] || return 1; ', "", "iv : retire le plafond de 16 valeurs examinées"),
     ("I-SANS-CYCLES-V1", "[ $? -eq 1 ]; }", ":; }", "i : sort trop tôt, sans vérifier cycles-v1 dans la config"),
     ("I-SANS-CWD-PAYLOAD", "(file_path|notebook_path|cwd)", "(file_path|notebook_path)", "i : sort trop tôt, sans regarder le cwd du payload"),
     ("I-SANS-CWD-PROCESSUS", 'case $PWD in /*) vf_px "$PWD" || return 1 ;; esac; vf_pp . || return 1; vf_pw "$_pr"; }', "return 0; }", "i : sort trop tôt, sans regarder le cwd du processus"),
-    ("I-SANS-ANCETRES", '[ "$_pd" = / ] && return 0; _pd=${_pd%/*}; [ -n "$_pd" ] || _pd=/; done; }', "return 0; done; }", "i : sort trop tôt, sans remonter les ancêtres"),
+    ("I-SANS-ANCETRES", 'if [ "$_pd" = / ]; then _pa=$_pt; return 0; fi; _pd=${_pd%/*}; [ -n "$_pd" ] || _pd=/; done; }', "return 0; done; }", "i : sort trop tôt, sans remonter les ancêtres"),
     ("II-SANS-PHYSIQUE", '[ "$_ps" = 0 ] && return 0;', "return 0;", "ii : sans résolution physique (pwd -P) de la partie existante"),
     ("II-SANS-LIEN-PENDANT", '[ -d "$_pd" ] || return 1; fi;', ":; fi;", "ii : un lien pendant ou en boucle n'est pas un doute"),
-    ("III-SANS-BORNE", '[ "${#1}" -le 4096 ] || return 1;', ":;", "iii : accepte une valeur longue"),
+    ("III-SANS-BORNE", '[ "${#1}" -le 1024 ] || return 1; _pd=$1;', "_pd=$1;", "iii : accepte une valeur longue (borne de 1024 caractères retirée)"),
     ("III-SANS-ANTISLASH", "*'\\'*|*//*", "*//*", "iii : accepte une valeur échappée (antislash)"),
     ("III-SANS-CLE-ECHAPPEE", "|*'\\u00'[2-7]*) return 1 ;; esac; _pm=", ") return 1 ;; esac; _pm=", "iii : accepte une clé écrite sous forme échappée"),
     ("III-SANS-NON-COMPACT", "case $I in *\"$_pn\"*|", "case $I in ", "iii : accepte un JSON non compact"),
@@ -895,7 +1065,10 @@ MUTANTS = [
 
 def sec_mutants(ctx, L, familles):
     cas_tous = [c for _, liste, _ in familles for c in liste]
+    filtre = os.environ.get("VF_PF_MUT", "")
     for nom, motif, remplacement, role in MUTANTS:
+        if filtre and not any(nom.startswith(p) for p in filtre.split(",")):
+            continue
         n = ctx.cmd.count(motif)
         if n != 1:
             print("  ✗ MUT-%s NON TUÉ" % nom)
@@ -913,8 +1086,9 @@ def sec_mutants(ctx, L, familles):
             continue
         # ordre : tableau D d'abord (rapide), puis le plancher, puis le corpus (sh seul, arrêt à la première violation)
         viol_t = table_d(ctx, muté, L, mutant=True)
+        viol_b = table_bornes(ctx, muté, L, mutant=True) + table_cout(ctx, muté, L, mutant=True)
         viol_c, _ = garde(ctx, muté, cas_tous, mutant=True, avec_a=False)
-        viol = viol_t + viol_c
+        viol = viol_t + viol_b + viol_c
         if not viol:
             print("  ✗ MUT-%s NON TUÉ" % nom)
             print("    assertion : la garde d'équivalence rougit sous le mutant (%s)" % role)
@@ -922,7 +1096,7 @@ def sec_mutants(ctx, L, familles):
             print("    obtenu (mutant)     : vert (mutant non opposable)")
             continue
         traces = []
-        for src, lst in (("tableau D", viol_t), ("corpus", viol_c)):
+        for src, lst in (("tableau D", viol_t), ("bornes et coût", viol_b), ("corpus", viol_c)):
             if lst:
                 a, b, c, cas = lst[0]
                 traces.append("%s : cas %s (%s) · assertion : %s · attendu (original) : %s · obtenu (mutant) : %s"
@@ -939,6 +1113,11 @@ def main():
     for nom in sys.argv[1].split(","):
         if nom == "table":
             sec_table(ctx, L)
+        elif nom == "bornes":
+            sec_bornes(ctx, L)
+        elif nom == "mutants":
+            familles = [(n, liste, None) for n, liste in (("banc", corpus_banc(ctx)), ("adverse", corpus_adverse(ctx, L)), ("generatif", corpus_generatif(ctx, L)), ("arbres", corpus_arbres(ctx)))]
+            sec_mutants(ctx, L, familles)
         elif nom == "corpus":
             familles = sec_corpus(ctx, L)
             if "mutants" in sys.argv[1].split(","):
@@ -967,7 +1146,7 @@ run_sections() { # <sections séparées par des virgules>
   fi
 }
 
-run_sections table,corpus,mutants
+run_sections "${VF_PF_SECTIONS:-table,bornes,corpus,mutants}"
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

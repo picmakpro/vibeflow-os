@@ -769,13 +769,24 @@ là où il a un effet » ; arbitrage de Willy, AskUserQuestion session principal
 le matcher). Avant tout lancement du script, de `mktemp` ou de `python3`, la fonction `vf_pre` rend « court-circuit » (`exit 0`
 immédiat) UNIQUEMENT quand le lab est CERTAINEMENT non adhérent ; dans tous les autres cas rien ne change dans le chemin d'avant,
 octet pour octet (adhérent, doute, valeur non analysable). Règle : elle lit TOUTES les occurrences des valeurs `file_path`,
-`notebook_path` et `cwd` du payload, plus `$PWD` et le cwd physique du processus ; chacune doit être absolue, de 4096 caractères au
-plus, propre (ni `//`, ni `.` ou `..`, ni `/` final, ni `/.vol`) et sans antislash, le payload tenant sur une seule ligne et ne portant
+`notebook_path` et `cwd` du payload, plus `$PWD` et le cwd physique du processus ; chacune doit être absolue, de 1024 caractères
+(PATH_MAX sous macOS) et 64 composants au plus, propre (ni `//`, ni `.` ou `..`, ni `/` final, ni `/.vol`) et sans antislash, le payload tenant sur une seule ligne et ne portant
 aucun échappement `\u00xx` ASCII (une clé écrite `\u0066ile_path` n'est pas lue : le payload est alors différé) ; puis, pour CHAQUE
 ancêtre de chacune (forme lexicale ET forme physique, `cd -P` et `pwd -P` de la partie existante dès qu'un lien intervient), un
 dossier `.planning` doit avoir un `config.json` absent ou régulier, lisible, sans `cycles-v1` (casse ignorée, `grep -F`) ni antislash ;
 un lien pendant ou en boucle, une config illisible ou non régulière, un `.planning` imbriqué ou sous `.claude` qui porterait
-`cycles-v1` renvoient au chemin complet. Le pré-filtre est volontairement PLUS conservateur que le cœur : il ne réimplémente ni « le
+`cycles-v1` renvoient au chemin complet. Le parcours est **borné par construction** (re-audit du pré-filtre, 2026-10-02, F-P1 et F-P2 ; arbitrage de Willy, AskUserQuestion
+session principale, 2026-10-02 : le pré-filtre seul, `Bash` reste dans le matcher) : une valeur de plus de 1024 caractères ou de plus
+de 64 composants, une correspondance brute (clé, blancs et valeur) de plus de 2048 caractères, ou plus de 16 valeurs dans le payload
+renvoient au chemin complet, qui paie alors le coût d'avant et jamais davantage. Les composants sont comptés sur la valeur elle-même,
+avant tout parcours. Le parcours des ancêtres ne retient qu'UN seul préfixe déjà vérifié (la dernière valeur parcourue : un ancêtre
+lexical de ce préfixe, à la frontière d'un composant, est vérifié d'avance) : la chaîne de dédoublonnage de la première version,
+accumulée puis balayée à chaque ancêtre, rendait le coût cubique en la profondeur (un `cwd` propre de 1 548 caractères dépassait le
+`timeout` de 20 s, que le harnais traite en laissant passer : un fail-open, le `cwd` précédant `tool_input` dans le payload). Sans
+aucune mémoire le coût serait borné mais doublerait dans un dépôt qui porte deux `.planning` sur sa chaîne (un `grep` par config et par
+valeur, mesuré le 2026-10-02 : 40 ms contre 24 ms par appel de Write) ; la mémoire d'un seul préfixe garde le gain d'origine. La même borne règle F-P2 : sous 2048 caractères de correspondance le repli
+de l'ancienne commande ne bascule pas dans son régime « valeur de plus de 4096 caractères » et refuse comme le pré-filtre se tait, soit
+exactement la même sortie. Le pré-filtre est volontairement PLUS conservateur que le cœur : il ne réimplémente ni « le
 plus proche gagne », ni `.claude/worktrees`, ni `.planning/.planning`, il renvoie au chemin complet dès qu'un ancêtre, quel qu'il
 soit, peut être adhérent. Sens fail-closed : il ne peut que court-circuiter un « non adhérent », jamais créer un passage dans un lab
 adhérent ; toute erreur (grep, `cd`, valeur inattendue) renvoie au chemin complet. Il tourne sous sh, dash, bash et zsh et n'ajoute

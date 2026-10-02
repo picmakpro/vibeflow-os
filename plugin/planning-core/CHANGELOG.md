@@ -20,6 +20,19 @@
   message de réparation ; partout ailleurs (labs de développement, ce dépôt compris) il ne sort rien. Un refus est
   un `deny` JSON en code 0, jamais un exit 2. Échéance interne du cœur de 8 s (code 73, lot A).
 - **Pré-filtre hors adhésion** (revue Samuel, PR #124 ; arbitrage Willy, AskUserQuestion session principale, 2026-10-02 : le pré-filtre seul, `Bash` reste dans le matcher) : la commande enregistrée commence par `vf_pre && exit 0` et sort aussitôt (stdout vide, code 0), sans lancer le script, `mktemp` ni `python3`, quand le lab est certainement non adhérent. Dans tous les autres cas (lab adhérent, doute, valeur longue, échappée, `~`, relative, lien non résolu, config illisible, JSON non compact) le chemin d'avant est inchangé, octet pour octet : le pré-filtre est plus conservateur que le cœur et ne peut que taire un « non adhérent » (fail-closed). Garde d'équivalence `test-planning-prefilter.sh` (corpus : banc, arbres adverses des audits, générateur de valeurs longues, générateur d'arbres de labs ; mutants). Aucun cas ni mutant supprimé ou affaibli (Q-ARM) ; les mutants de la couche shell rejouent la commande sans le bloc du pré-filtre. Coût mesuré (2026-10-02, 40 rejeux entrelacés par outil, `/bin/sh`) : médiane de 45 ms à 12 ms par appel de Write, de Bash et d'Agent dans ce dépôt, de 45 ms à 49 ms dans un lab adhérent. Aucune release : le module reste en v2.9.0 (ADR-073).
+  **Parcours borné par construction** (re-audit du pré-filtre, 2026-10-02 ; quick 261002-uhn) : la chaîne de dédoublonnage `_pk` de la
+  première version, balayée à chaque ancêtre, rendait le coût cubique en la profondeur (F-P1, haute : un `cwd` propre de 1 548 ou
+  2 748 caractères dépassait le `timeout` de 20 s, que le harnais traite en laissant passer, le `cwd` précédant `tool_input` dans le
+  payload). Elle est retirée au profit de la mémoire d'UN seul préfixe vérifié (un ancêtre lexical de la dernière valeur parcourue,
+  à la frontière d'un composant, n'est pas revérifié : sans elle le coût doublait dans un dépôt à deux `.planning`, 40 ms contre 24 ms) ;
+  le pré-filtre DIFFÈRE (chemin d'avant, jamais pire) dès qu'une valeur examinée (`file_path`,
+  `notebook_path`, `cwd`, `$PWD`, cwd physique) dépasse 1024 caractères ou 64 composants, qu'une correspondance brute dépasse 2048
+  caractères ou que le payload porte plus de 16 valeurs. La même borne règle F-P2 (basse : dans la bande de 4083 à 4096 caractères,
+  script absent, lab non adhérent, l'ancienne commande refusait par son repli quand le pré-filtre se taisait). Gardes :
+  `PF-BORNE-01`, `PF-COUT-01` et six mutants dans `test-planning-prefilter.sh` ; aucun cas ni mutant supprimé ou affaibli (Q-ARM).
+  Coût après correction (2026-10-02, 40 rejeux entrelacés par outil, `/bin/sh`, charge de 15 à 18 : machine non au repos), médiane
+  / p90 de la commande sans pré-filtre puis corrigée : Write 88,5 / 123,9 → 24,2 / 33,2 ms ; Bash 75,8 / 109,1 → 20,4 / 36,5 ms ;
+  Agent 67,1 / 98,1 → 16,3 / 24,0 ms (la version d'avant la correction, dans la même série : 22,7, 18,5 et 16,3 ms).
 - **G2 en avertissement** : avertit (`additionalContext`) sur une écriture hors du `ecrit:` des plans ouverts,
   Bash compris (détection, jamais une promesse, P45-D-10) ; il ne refuse jamais.
 - **G6, G5, G1, G7 et le hook par rôle, chacun ARMÉ à sa propre étape** (ils refusent ; un gate armé qui rencontre
