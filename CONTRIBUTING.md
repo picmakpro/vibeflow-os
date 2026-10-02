@@ -33,10 +33,10 @@ terms. By submitting a pull request, you agree that:
 1. **You have the right to submit it.** The contribution is your original work, or you have
    the right to submit it under these terms, as described by the
    [Developer Certificate of Origin 1.1](https://developercertificate.org/).
-2. **You grant a license to the repository owner.** You grant picmakpro (the repository owner) a
-   perpetual, worldwide, non-exclusive, royalty-free, irrevocable license to use, reproduce,
-   modify, sublicense and distribute your contribution as part of VibeFlow, under the project's
-   license or any future license.
+2. **You grant a license to the copyright holders.** You grant picmakpro and Samuel Neveu (the
+   copyright holders named in [LICENSE](./LICENSE)) a perpetual, worldwide, non-exclusive,
+   royalty-free, irrevocable license to use, reproduce, modify, sublicense and distribute your
+   contribution as part of VibeFlow, under the project's license or any future license.
 3. **You keep your copyright.** This is a license grant, not a transfer of ownership.
 
 Certify point 1 by signing off each commit (`git commit -s`), which adds a trailer:
@@ -128,5 +128,5 @@ rather than any summary.
 
 ## Maintainers
 
-- [@picmakpro](https://github.com/picmakpro) — creator and repository owner
+- [@picmakpro](https://github.com/picmakpro) — creator of the VibeFlow methodology
 - [@samuel-neveugall](https://github.com/samuel-neveugall) — main contributor and release driver

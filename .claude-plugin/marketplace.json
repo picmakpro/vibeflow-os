@@ -2,7 +2,7 @@
   "name": "vibeflow-os",
   "description": "Marketplace officiel de VibeFlow : orchestrateur de développement Claude Code à modules toggables.",
   "owner": {
-    "name": "picmakpro"
+    "name": "VFOS"
   },
   "plugins": [
     {
@@ -13,7 +13,7 @@
       "category": "development",
       "homepage": "https://github.com/vf-os/vibeflow-os",
       "author": {
-        "name": "picmakpro"
+        "name": "VFOS"
       }
     }
   ]

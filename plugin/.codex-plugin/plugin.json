@@ -4,7 +4,7 @@
   "version": "2.68.0",
   "description": "Orchestrateur agentique spec-driven pour agents de code : détection d'intention en langage naturel → pipeline cadrage → plan → exécution → preuve, vérifié par des gates machine. Dev + design, 3 bundles métier (contenu, growth, business), Lab Factory pour tout autre métier.",
   "author": {
-    "name": "picmakpro"
+    "name": "VFOS"
   },
   "homepage": "https://github.com/vf-os/vibeflow-os",
   "repository": "https://github.com/vf-os/vibeflow-os",
@@ -21,7 +21,7 @@
   "skills": "./installer",
   "interface": {
     "displayName": "VibeFlow",
-    "developerName": "picmakpro",
+    "developerName": "VFOS",
     "category": "Developer Tools",
     "brandColor": "#2563eb",
     "brandColorDark": "#3b82f6",
