@@ -4619,11 +4619,18 @@ LIMITES_REFERENCE = (
     ("x", ("MESURE-VIDE", "volume")),
     ("y", ("settings", "Q-G6 = b", "scope compte", "planning-hook.sh", "lien préexistant")),
     ("z", ("SIGALRM", "Alarm clock", "faux refus")),
-    ("aa", ("F-01", "4096", "cwd", "GATE-03", "N-01", "surrogate", "N2-01", "antislash", "N2-03", "N2-04", "R-DOUTE-04")),
+    ("aa", ("F-01", "4096", "cwd", "GATE-03", "N-01", "surrogate", "N2-01", "antislash", "N2-03", "N2-04", "R-DOUTE-04", "N3-01", "N3-02", "forme physique",
+            "réduite lexicalement", "lien dur", "lien symbolique", "R-REDUC-01")),
     ("ab", ("F-04", "~", "cwd", "Write", "N-03", "HOME", "N2-02", "plus stricte")),
     ("ac", ("F-05", "notebook_path", "Agent", "Task")),
     ("ad", ("F-06", ".claude/worktrees", "Write")),
     ("ae", ("F-07", "MultiEdit", "MCP", "matcher")),
+    ("af", ("F2", "..", "lien symbolique", "PHYSIQUEMENT", "LEXICALEMENT", "R-REDUC-01")),
+    ("ag", ("F3", "lien symbolique", "FICHIER", "couche de repli")),
+    ("ah", ("F4", "config.json", "saut de ligne", "grep")),
+    ("ai", ("F5", "leurre", "5 000 chiffres", "imbrication")),
+    ("aj", ("F6", "NotebookEdit", "file_path", "notebook_path")),
+    ("ak", ("Windows", "8.3", "Python", "3.14")),
 )
 
 
@@ -4782,7 +4789,7 @@ def sec_reference(ctx):
             print(e)
         ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
         return
-    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (ae) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
+    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (ak) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
     original = open(chemin, encoding="utf-8").read()
 
     def mutant_texte(ident, fonction, motif):
@@ -4830,7 +4837,7 @@ def sec_reference(ctx):
         if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
             non_tuees.append(lettre)
     if non_tuees:
-        komut("REFERENCE-LIMITES", "chaque limite (a) à (ae) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+        komut("REFERENCE-LIMITES", "chaque limite (a) à (ak) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
               "non tuées : " + ", ".join(non_tuees))
     else:
         okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))

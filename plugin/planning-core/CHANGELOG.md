@@ -85,9 +85,28 @@
       décodage JSON : `\u002eplanning` y échappait ; le cœur tombait alors en échéance (8 s) sur un chemin géant qui
       descend puis remonte et le repli se taisait sur le `cwd`. Désormais : (a) le repli refuse toute valeur de plus de 4096
       caractères qui nomme `.planning` ou `.claude` OU porte un antislash ; (b) le cœur juge une telle valeur d'emblée sur
-      son nom décodé, sans `realpath` ni `racine_lab`, ce qui supprime aussi la lenteur quadratique. Écart volontaire à
-      GATE-03 borné à ce cas (N2-03) ; N2-02 et N2-04 déclarés. Limites (aa) et (ab). Suite : R-DOUTE-03 (2 000 valeurs
-      générées, graine 20261002) et R-DOUTE-04 (sonde N=130000), trois mutants de plus.
+      son nom décodé, sans `realpath` ni `racine_lab`, ce qui supprime aussi la lenteur quadratique — rédaction
+      CORRIGÉE par N3-01 ci-dessous (elle laissait passer un lien dur, un lien symbolique ou une écriture de juge derrière
+      un rembourrage). Écart volontaire à GATE-03 borné à ce cas (N2-03) ; N2-02 et N2-04 déclarés. Limites (aa) et (ab).
+      Suite : R-DOUTE-03 (2 000 valeurs générées, graine 20261002) et R-DOUTE-04 (sonde N=130000), trois mutants de plus.
+    - **N3-01 (moyenne, re-audit 3, régression de N2-01)** — l'aiguillage « valeur de plus de 4096 caractères : décision dans
+      le doute sur son nom » laissait passer un actif gardé quand la valeur ne nommait rien : un lien dur (`<lab>/src` puis
+      4 200 barres obliques puis `hl.md`), un lien symbolique (`a/` × 2 100 puis `../` × 2 100 puis `pl/STATE.md`) ou
+      l'écriture d'un juge derrière `./` × 2 100, que l'analyse exacte précédente refusait (24b58748). Désormais le cœur
+      lit une valeur longue sous DEUX formes obtenues en temps linéaire : la forme réduite lexicalement
+      (`posixpath.normpath`) et la forme physique (une résolution qui suit les liens et ne teste sur le disque qu'un
+      composant dont tous les ancêtres existent, égale à `realpath` sur 20 000 chemins tirés au hasard) ; chacune qui tient
+      sous 4096 caractères est analysée comme une valeur courte, la valeur est refusée dès que l'une des deux l'est (ce qui
+      ferme aussi, pour les valeurs longues, le constat F2 : un `..` après un lien symbolique, dans les deux sens) ; seule
+      une valeur qui reste trop longue est décidée dans le doute, sur son nom, puis sur son `cwd` et sur l'ancêtre existant
+      de ses formes. Faux refus levé, assumé : une valeur longue qui se réduit vers un lab non adhérent, même en nommant
+      `.planning`, est silencieuse. La couche de repli ne réduit pas (écart déclaré : plus stricte, nom ou antislash).
+      Sonde N=130000 : 0,09 s. Suite : R-REDUC-01 (lien dur, lien symbolique, juge, F2 dans les deux sens, boucle de
+      liens, sonde de 130 000 composantes), R-DOUTE-02 et R-DOUTE-03 reformulés (jumeau court), sept mutants de plus.
+      Limites (aa) réécrite, (af) à (ak) ajoutées : constats F2 à F6 du recoupement et plateformes non évaluées.
+    - **N3-02 (basse, re-audit 3)** — un chemin relatif sous un `cwd` de plus de 4096 caractères était résolu contre le
+      `cwd` du processus : il passe désormais par la décision dans le doute (le `cwd` long y est lu réduit
+      lexicalement). Mutant sur le marqueur `cwd-long`.
     - **N-03 (haute)** — un chemin `~/x` était joint au `cwd` comme un chemin relatif, alors que le `Read` du harnais le
       développe : une poche `<cwd>/~/lab/` faisait taire les gates sur `~/lab/.planning/…`. `~` et `~/…` sont développés
       en HOME dans les deux couches (HOME, déjà passé en argument au cœur, R-ENV-02) ; `~utilisateur/…` est tranché dans

@@ -68,6 +68,7 @@ cat > "$AIDES" <<'PY_AIDES_REG_EOF'
 import concurrent.futures
 import json
 import os
+import posixpath
 import random
 import re
 import shutil
@@ -1374,6 +1375,7 @@ def labs_doute(ctx, nom):
     nommé `~` qui contient un faux lab non adhérent de même nom : lu comme relatif au cwd, `~/<nom>/.planning/STATE.md` y tombe."""
     base = ctx.unique(nom)
     adh = fabriquer_lab(os.path.join(base, "adh"), True)
+    ecrire(os.path.join(adh, ".claude", "scripts", "planning-hook.sh"), "x\n")  # actif gardé sous `.claude/` (N3-01)
     hors = fabriquer_lab(os.path.join(base, "hors"), False)
     lab_home = "labdir-" + os.path.basename(base)
     fabriquer_lab(os.path.join(ctx.home, lab_home), True)
@@ -1442,50 +1444,70 @@ def rembourrage(rng):
     return ("x" * rng.randrange(200, 400) + "/") * rng.randrange(25, 35)  # au moins 25 × 201 = 5025 caractères
 
 
-def valeur_generative(rng, avec_nom, bases):
+def valeur_generative(rng, avec_nom, bases, noms=(".planning", ".claude"), restes=("/STATE.md", "/scripts/x.sh", "/cycles/01-c/notes.md", "")):
     """Littéral JSON d'une valeur longue : base, rembourrage, puis (avec_nom) le nom sous une forme tirée au hasard, en milieu (suivi
     d'un reste) ou en fin de valeur. Sans nom : aucun `.planning`, aucun `.claude`, aucun antislash."""
     base = rng.choice(bases)
     pad = rembourrage(rng)
-    reste = rng.choice(("/STATE.md", "/scripts/x.sh", "/cycles/01-c/notes.md", ""))
+    reste = rng.choice(restes)
     if avec_nom:
-        nom = nom_sous_forme(rng, rng.choice((".planning", ".claude")))
+        nom = nom_sous_forme(rng, rng.choice(noms))
         return json_litteral(base + "/" + pad) + nom + json_litteral(reste)
     return json_litteral(base + "/" + pad + "n" + reste + "/f.md")
 
 
 def controle_generatif(ctx, texte, adh, hors, n=None, graine=GRAINE_GENERATIVE):
-    """Preuve générative de la classe : `n` valeurs longues qui nomment `.planning` ou `.claude` sous une forme tirée au hasard doivent
-    être REFUSÉES par la commande complète (cœur livré présent) ET par la couche de repli seule (script absent), cwd non adhérent ou
-    adhérent ; des valeurs longues qui ne nomment rien, sans antislash, en cwd non adhérent, restent silencieuses (GATE-03). Rend
-    (conforme, détail, stats)."""
+    """Preuve générative de la classe : `n` valeurs longues qui nomment `.planning` ou `.claude` sous une forme tirée au hasard.
+    La couche de repli seule (script absent) les REFUSE toutes, cwd non adhérent ou adhérent. La commande complète (cœur livré présent)
+    les lit sous deux formes (N3-01) : une valeur qui reste plus longue que la borne une fois réduite lexicalement est REFUSÉE sur son
+    nom ; une valeur qui se réduit sous la borne reçoit EXACTEMENT le verdict de son JUMEAU COURT (la valeur réduite, rejouée telle quelle)
+    — refusée si le jumeau l'est, silencieuse sinon (le faux refus de 079e905f sur un lab non adhérent est levé, c'est le but). Des valeurs
+    longues qui ne nomment rien, sans antislash, en cwd non adhérent, restent silencieuses (GATE-03). Rend (conforme, détail, stats)."""
     n = N_GENERATIF if n is None else n
     rng = random.Random(graine)
     bases = [adh, hors, "/tmp/zz", ""]
     cas = []
     for _ in range(n):
         cas.append(("nom", valeur_generative(rng, True, bases), rng.choice((hors, adh)), rng.choice(("Write", "Edit", "NotebookEdit"))))
+    for _ in range(max(1, n // 4)):  # N3-01 : valeurs qui visent `.planning/STATE.md` d'un lab ADHÉRENT sous une orthographe tirée au hasard
+        cas.append(("nom", valeur_generative(rng, True, [adh], noms=(".planning",), restes=("/STATE.md",)), rng.choice((hors, adh)),
+                    rng.choice(("Write", "Edit", "NotebookEdit"))))
     for _ in range(max(1, n // 4)):
         cas.append(("temoin", valeur_generative(rng, False, [hors]), hors, rng.choice(("Write", "Edit", "NotebookEdit"))))
-    stats = {"graine": graine, "n": n, "deny_complet": 0, "deny_repli": 0, "temoins": 0, "temoins_pass": 0, "t_max": 0.0}
+    stats = {"graine": graine, "n": n, "deny_complet": 0, "deny_repli": 0, "temoins": 0, "temoins_pass": 0, "t_max": 0.0,
+             "irreductibles": 0, "reductibles": 0, "jumeaux_egaux": 0, "jumeaux_refuses": 0}
     fautes = []
 
     def jouer(c):
         genre, v, cwd, outil = c
-        brut = payload_brut(outil, v, cwd, "notebook_path" if outil == "NotebookEdit" else "file_path")
+        cle = "notebook_path" if outil == "NotebookEdit" else "file_path"
+        brut = payload_brut(outil, v, cwd, cle)
         t_c, extra_c = ctx.preparer(ctx.scripts_dir_livre, texte)
         rc1, out1, err1, dt1 = ctx.rejouer(t_c, brut, ctx.env_mode("A", extra_c), cwd)
         rc2, out2, err2, dt2 = rejouer_texte_t(ctx, texte, "C", brut, cwd)
-        return (c, verdict(rc1, out1), err1, dt1, verdict(rc2, out2), err2, dt2)
+        jumeau = None  # (verdict du jumeau court, stderr) ; None si la valeur reste trop longue une fois réduite
+        reduit = posixpath.normpath(json.loads('"' + v + '"'))
+        if genre == "nom" and len(reduit) <= 4096:
+            rc3, out3, err3, dt3 = ctx.rejouer(t_c, payload_brut(outil, json_litteral(reduit), cwd, cle), ctx.env_mode("A", extra_c), cwd)
+            jumeau = (verdict(rc3, out3), err3)
+        return (c, verdict(rc1, out1), err1, dt1, verdict(rc2, out2), err2, dt2, jumeau)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
-        for c, v1, e1, d1, v2, e2, d2 in ex.map(jouer, cas):
+        for c, v1, e1, d1, v2, e2, d2, jumeau in ex.map(jouer, cas):
             stats["t_max"] = max(stats["t_max"], d1, d2)
             if c[0] == "nom":
                 stats["deny_complet"] += int(v1 == "deny" and not e1)
                 stats["deny_repli"] += int(v2 == "deny" and not e2)
-                if v1 != "deny" or e1 or v2 != "deny" or e2:
-                    fautes.append("valeur …%s cwd=%s : complet=%s repli=%s" % (c[1][-60:], "adh" if c[2] == adh else "hors", v1, v2))
+                attendu = "deny"
+                if jumeau is None:
+                    stats["irreductibles"] += 1
+                else:
+                    stats["reductibles"] += 1
+                    attendu = jumeau[0]
+                    stats["jumeaux_refuses"] += int(attendu == "deny")
+                    stats["jumeaux_egaux"] += int(v1 == attendu and not jumeau[1])
+                if v1 != attendu or e1 or v2 != "deny" or e2:
+                    fautes.append("valeur …%s cwd=%s : complet=%s (attendu %s) repli=%s" % (c[1][-60:], "adh" if c[2] == adh else "hors", v1, attendu, v2))
             else:
                 stats["temoins"] += 1
                 stats["temoins_pass"] += int(v1 == "silence" and v2 == "silence" and not e1 and not e2)
@@ -1493,8 +1515,12 @@ def controle_generatif(ctx, texte, adh, hors, n=None, graine=GRAINE_GENERATIVE):
                     fautes.append("témoin …%s : complet=%s repli=%s (attendu silence)" % (c[1][-40:], v1, v2))
     if stats["t_max"] >= PLAFOND_DECISION_S:
         fautes.append("temps maximal %.2f s (plafond %.0f s)" % (stats["t_max"], PLAFOND_DECISION_S))
-    detail = ("%d valeurs (graine %d) : deny complet %d/%d, deny repli %d/%d, témoins PASS %d/%d, t_max %.2f s"
-              % (n, graine, stats["deny_complet"], n, stats["deny_repli"], n, stats["temoins_pass"], stats["temoins"], stats["t_max"]))
+    if stats["irreductibles"] == 0 or stats["jumeaux_refuses"] < n // 10:  # garde contre un vert à vide : les deux familles doivent être exercées
+        fautes.append("preuve creuse : %d irréductibles, %d jumeaux refusés (attendu au moins 1 et %d)" % (stats["irreductibles"], stats["jumeaux_refuses"], n // 10))
+    detail = ("%d valeurs (graine %d) : repli %d/%d refusées ; complet : %d irréductibles refusées sur leur nom, %d réductibles dont %d refusées, "
+              "verdict égal à celui du jumeau court %d/%d ; témoins PASS %d/%d, t_max %.2f s"
+              % (n + max(1, n // 4), graine, stats["deny_repli"], n + max(1, n // 4), stats["irreductibles"], stats["reductibles"], stats["jumeaux_refuses"],
+                 stats["jumeaux_egaux"], stats["reductibles"], stats["temoins_pass"], stats["temoins"], stats["t_max"]))
     return (not fautes), ("; ".join(fautes[:3]) + " | " + detail if fautes else detail), stats
 
 
@@ -1602,21 +1628,133 @@ def controle_doute_coeur(ctx, adh, hors, lab_home):
     jouer("`~/x.md` sous HOME hors lab, cwd non adhérent : silence", e("~/x.md", hors), hors, "silence")
     jouer("`~/x.md` sous HOME hors lab, cwd ADHÉRENT : silence (jamais joint au cwd)", e("~/x.md", adh), adh, "silence")
     jouer("cwd inanalysable (surrogate), chemin qui ne nomme rien : refusé dans le doute", e(hors + "/\ud800/x.md", hors + "/\ud800"), hors, "deny")
-    # N2-01 : une valeur longue est jugée d'emblée sur son nom DÉCODÉ (aiguillage), jamais par realpath ni racine_lab. Le chemin descend
-    # puis remonte vers un lab NON adhérent : résolu, il serait silencieux ; le nom (échappé dans le JSON) seul le fait refuser.
+    # N2-01 puis N3-01 (re-audit 3 du 2026-10-02) : une valeur longue est LUE SOUS DEUX FORMES en temps linéaire (réduite lexicalement,
+    # physique). Chacune qui tient sous la borne est analysée comme une valeur courte (exacte) ; seule une valeur qui RESTE trop longue est
+    # jugée dans le doute (son nom décodé, puis le lab de son cwd et de ses ancêtres existants). Le chemin qui descend puis remonte vers un
+    # lab NON adhérent se réduit à `hors/.planning/…` : analysé, il est silencieux (GATE-03) ; 079e905f le refusait sur son seul nom (faux
+    # refus levé, déclaré). La propriété du doute (« un nom d'actif gardé que le hook ne sait pas analyser refuse ») reste prouvée sur les
+    # valeurs IRRÉDUCTIBLES (composantes qui ne se réduisent pas), cwd non adhérent.
     aller_retour = hors + "/" + "a/" * 2500 + "../" * 2500
-    jouer("N2-01 valeur longue qui descend puis remonte, nom `\\u002eplanning` échappé, cwd non adhérent",
-          payload_brut("Write", json_litteral(aller_retour) + "\\u002eplanning/STATE.md", hors), hors, "deny")
-    jouer("N2-01 même chemin, nom `.claude` littéral, cwd non adhérent", e(aller_retour + ".claude/scripts/x.sh", hors), hors, "deny")
-    jouer("N2-01 valeur longue RELATIVE qui nomme `.planning`, cwd non adhérent", e("a/" * 2500 + "../" * 2500 + ".planning/x.md", hors), hors, "deny")
-    jouer("N2-01 valeur longue en `notebook_path`, nom échappé, cwd non adhérent",
-          payload_brut("NotebookEdit", json_litteral(aller_retour) + "\\u002eclaude/x.ipynb", hors, "notebook_path"), hors, "deny")
-    jouer("N2-01 valeur longue sans nom, cwd non adhérent : silence (GATE-03)", e(aller_retour + "x.md", hors), hors, "silence")
-    jouer("N2-01 valeur longue sans nom, cwd adhérent : refusé dans le doute", e(aller_retour + "x.md", adh), adh, "deny")
+    aller_retour_adh = adh + "/" + "a/" * 2500 + "../" * 2500
+    irreductible = hors + "/" + ("x" * 300 + "/") * 20
+    irreductible_adh = adh + "/" + ("x" * 300 + "/") * 20
+    jouer("N2-01 valeur longue qui descend puis remonte vers un lab NON adhérent, nom `\\u002eplanning` échappé, cwd non adhérent : réduite, analysée, silence",
+          payload_brut("Write", json_litteral(aller_retour) + "\\u002eplanning/STATE.md", hors), hors, "silence")
+    jouer("N2-01 même chemin, nom `.claude` littéral, cwd non adhérent : réduite, analysée, silence", e(aller_retour + ".claude/scripts/x.sh", hors), hors, "silence")
+    jouer("N2-01 valeur longue RELATIVE qui nomme `.planning`, cwd non adhérent : réduite contre le cwd, analysée, silence",
+          e("a/" * 2500 + "../" * 2500 + ".planning/x.md", hors), hors, "silence")
+    jouer("N2-01 valeur longue en `notebook_path`, nom échappé, cwd non adhérent : réduite, analysée, silence",
+          payload_brut("NotebookEdit", json_litteral(aller_retour) + "\\u002eclaude/x.ipynb", hors, "notebook_path"), hors, "silence")
+    jouer("N2-01 valeur longue sans nom vers un lab non adhérent, cwd adhérent : réduite, analysée sur son lab réel, silence",
+          e(aller_retour + "x.md", adh), adh, "silence")
+    # La même descente puis remontée vers un lab ADHÉRENT : la forme réduite est analysée et refusée (le nom n'y est pour rien)
+    jouer("N3-01 valeur longue qui descend puis remonte vers un lab adhérent, nom `\\u002eplanning` échappé, cwd non adhérent : refusée",
+          payload_brut("Write", json_litteral(aller_retour_adh) + "\\u002eplanning/STATE.md", hors), hors, "deny")
+    jouer("N3-01 même chemin, nom `.claude` littéral (script gardé), cwd non adhérent : refusée", e(aller_retour_adh + ".claude/scripts/planning-hook.sh", hors), hors, "deny")
+    # Les valeurs IRRÉDUCTIBLES (plus longues que la borne après réduction) : décision dans le doute, comme avant
+    jouer("N2-01 valeur IRRÉDUCTIBLE, nom `\\u002eplanning` échappé, cwd non adhérent : refusée sur son nom décodé",
+          payload_brut("Write", json_litteral(irreductible) + "\\u002eplanning/STATE.md", hors), hors, "deny")
+    jouer("N2-01 valeur IRRÉDUCTIBLE, nom `.claude` littéral, cwd non adhérent : refusée sur son nom", e(irreductible + ".claude/scripts/x.sh", hors), hors, "deny")
+    jouer("N2-01 valeur IRRÉDUCTIBLE RELATIVE qui nomme `.planning`, cwd non adhérent : refusée sur son nom",
+          e(("x" * 300 + "/") * 20 + ".planning/x.md", hors), hors, "deny")
+    jouer("N2-01 valeur IRRÉDUCTIBLE en `notebook_path`, nom échappé, cwd non adhérent : refusée sur son nom",
+          payload_brut("NotebookEdit", json_litteral(irreductible) + "\\u002eclaude/x.ipynb", hors, "notebook_path"), hors, "deny")
+    jouer("N2-01 valeur IRRÉDUCTIBLE sans nom, cwd non adhérent, ancêtres hors lab adhérent : silence (GATE-03)", e(irreductible + "x.md", hors), hors, "silence")
+    jouer("N2-01 valeur IRRÉDUCTIBLE sans nom, cwd adhérent : refusée dans le doute", e(irreductible + "x.md", adh), adh, "deny")
+    jouer("N3-01 valeur IRRÉDUCTIBLE sans nom sous un lab ADHÉRENT (son ancêtre existant), cwd non adhérent : refusée dans le doute",
+          e(irreductible_adh + "x.md", hors), hors, "deny")
     jouer("N2-01 cwd du payload plus long que la borne, chemin court, processus hors lab : silence (GATE-03)",
           payload("Write", {"file_path": "x.md", "content": "x"}, hors + "/" + "a/" * 2500 + "../" * 2500), hors, "silence")
+    # N3-02 : un chemin RELATIF sous un cwd de plus de 4096 caractères n'est jamais résolu contre le cwd du processus
+    cwd_long_hors = hors + "/" + "a/../" * 1100
+    cwd_long_adh = adh + "/" + "a/../" * 1100
+    jouer("N3-02 chemin relatif qui nomme `.planning`, cwd trop long (se réduit à un lab non adhérent) : refusé dans le doute, sur son nom",
+          e(".planning/x.md", cwd_long_hors), hors, "deny")
+    jouer("N3-02 chemin relatif sans nom, cwd trop long qui se réduit à un lab ADHÉRENT, processus hors lab : refusé (cwd lu réduit)",
+          e("x.md", cwd_long_adh), hors, "deny")
+    jouer("N3-02 chemin relatif sans nom, cwd trop long qui se réduit à un lab non adhérent : silence (GATE-03)", e("x.md", cwd_long_hors), hors, "silence")
+    jouer("N3-02 chemin relatif sans nom, cwd IRRÉDUCTIBLE (reste trop long) : refusé dans le doute",
+          e("x.md", hors + "/" + ("c" * 300 + "/") * 20), hors, "deny")
     return (not fautes), ("; ".join(fautes) if fautes else
                           "%d rejeux du cœur seul, toujours rc 0 : chemin inanalysable refusé s'il nomme .planning ou .claude, sinon décision sur le cwd ; `~` développé en HOME" % n[0])
+
+
+def labs_reduction(ctx, nom):
+    """(lab adhérent, lab non adhérent) avec un lien dur vers STATE.md, un lien symbolique vers `.planning`, un lien vers un sous-dossier
+    gardé (`cyc`), un lien vers un dossier hors lab (`ext`), une boucle de liens (`loop`) et la définition d'un juge."""
+    base = ctx.unique(nom)
+    adh = fabriquer_lab(os.path.join(base, "adh"), True)
+    hors = fabriquer_lab(os.path.join(base, "hors"), False)
+    dehors = os.path.join(base, "dehors", "deep")
+    os.makedirs(dehors, exist_ok=True)
+    ecrire(os.path.join(adh, ".planning", "STATE.md"), "x\n")
+    ecrire(os.path.join(adh, "src", "a.py"), "x\n")
+    ecrire(os.path.join(adh, ".claude", "agents", "vf-judge.md"), "---\nname: vf-judge\ndescription: juge\ndisallowedTools: Write, Edit\n---\ncorps\n")
+    os.link(os.path.join(adh, ".planning", "STATE.md"), os.path.join(adh, "src", "hl.md"))
+    os.symlink(".planning", os.path.join(adh, "pl"))
+    os.symlink("../.planning/cycles", os.path.join(adh, "src", "cyc"))
+    os.symlink("../.planning", os.path.join(adh, "src", "plink"))
+    os.symlink(dehors, os.path.join(adh, "src", "ext"))
+    os.symlink("loop", os.path.join(adh, "src", "loop"))
+    return adh, hors
+
+
+def controle_reduction(ctx, adh, hors):
+    """N3-01 (re-audit 3 du 2026-10-02) : cœur LIVRÉ lancé directement. Une valeur de plus de 4096 caractères qui se réduit (lexicalement ou
+    physiquement) vers un actif gardé d'un lab adhérent est REFUSÉE par l'analyse exacte, quel que soit le cwd : lien dur, lien
+    symbolique, écriture d'un juge, `..` après un lien symbolique dans les DEUX sens (F2 : le sens lexical, que seule la forme réduite
+    voit, et le sens physique, que seule la forme physique voit) ; la même valeur vers un lab non adhérent reste silencieuse (GATE-03)
+    ; une boucle de liens a le verdict de son jumeau court ; la sonde de 130 000 composantes est tranchée en moins de 2 s. Rend
+    (conforme, détail)."""
+    fautes = []
+    n = [0]
+    pire = [0.0]
+    src = adh + "/src/"
+
+    def lancer(brut, cwd):
+        t0 = time.monotonic()
+        v, rc, out, err = verdict_direct(ctx, brut, cwd)
+        dt = time.monotonic() - t0
+        pire[0] = max(pire[0], dt)
+        return v, rc, err, dt
+
+    def jouer(etiquette, brut, cwd, attendu):
+        n[0] += 1
+        v, rc, err, dt = lancer(brut, cwd)
+        if v != attendu or rc != 0 or err or dt >= PLAFOND_DECISION_S:
+            fautes.append("%s : %s rc=%d stderr=%s en %.2f s (attendu %s, rc 0, moins de %.0f s)" % (etiquette, v, rc, court(err), dt, attendu, PLAFOND_DECISION_S))
+
+    def jumeau(etiquette, long_brut, court_brut, cwd):
+        n[0] += 1
+        v, rc, err, dt = lancer(long_brut, cwd)
+        vc, rcc, errc, _dt = lancer(court_brut, cwd)
+        if v != vc or rc != 0 or err or dt >= PLAFOND_DECISION_S:
+            fautes.append("%s : long=%s rc=%d stderr=%s en %.2f s, jumeau court=%s (attendu le même verdict, rc 0)" % (etiquette, v, rc, court(err), dt, vc))
+
+    def e(chemin, cwd, outil="Write", **kw):
+        return payload(outil, entree_outil(outil, chemin), cwd, **kw)
+
+    pad = "./" * 2100                    # 4 200 caractères
+    jouer("N3-01 lien dur vers STATE.md derrière 4 200 barres obliques, cwd non adhérent", e(adh + "/src" + "/" * 4200 + "hl.md", hors), hors, "deny")
+    jouer("N3-01 lien symbolique `pl` -> .planning derrière une descente puis remontée de 4 200 composantes, cwd non adhérent",
+          e(adh + "/" + "a/" * 2100 + "../" * 2100 + "pl/STATE.md", hors), hors, "deny")
+    jouer("N3-01 lien symbolique `plink` -> ../.planning sous src/, cwd adhérent", e(src + pad + "plink/STATE.md", adh), adh, "deny")
+    jouer("N3-01 écriture d'un juge vers src/a.py derrière 2 100 `./`, cwd non adhérent", e(src + pad + "a.py", hors, agent_type="vf-judge"), hors, "deny")
+    jouer("N3-01 F2 sens physique : `cyc/..` (lien vers un sous-dossier gardé) remonte dans `.planning`, cwd non adhérent",
+          e(src + pad + "cyc/../STATE.md", hors), hors, "deny")
+    jouer("N3-01 F2 sens lexical : `ext/../..` (lien vers un dossier hors lab) se réduit à `.planning/STATE.md`, cwd non adhérent",
+          e(src + pad + "ext/../../.planning/STATE.md", hors), hors, "deny")
+    jouer("N3-01 valeur longue réductible vers un livrable que le plan déclare, lab ADHÉRENT : analysée (exacte), silence ; jamais le doute",
+          e(adh + "/" + "a/../" * 1100 + "livrable.md", hors), hors, "silence")
+    jouer("N3-01 la même valeur vers un lab NON adhérent : silence (GATE-03)", e(hors + "/" + "a/../" * 1100 + "x.md", hors), hors, "silence")
+    jouer("N3-01 `.planning/STATE.md` d'un lab non adhérent derrière 4 200 `./` : silence (faux refus de 079e905f levé)",
+          e(hors + "/" + pad + ".planning/STATE.md", hors), hors, "silence")
+    jumeau("N3-01 boucle de liens symboliques derrière 4 200 `./` : le verdict de son jumeau court", e(src + pad + "loop/x.md", hors), e(src + "loop/x.md", hors), hors)
+    jouer("N3-01 sonde de 130 000 composantes vers un lien dur, cwd non adhérent", e(src + "a/" * 130000 + "../" * 130000 + "hl.md", hors), hors, "deny")
+    jouer("N3-01 sonde de 130 000 composantes vers un lien symbolique, cwd adhérent", e(adh + "/" + "a/" * 130000 + "../" * 130000 + "pl/STATE.md", adh), adh, "deny")
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "%d rejeux du cœur seul : lien dur, lien symbolique, juge et `..` sous un lien (deux sens) refusés derrière un rembourrage long, lab non adhérent silencieux, boucle de liens égale à son jumeau, sonde de 130 000 composantes, pire temps %.2f s (plafond %.0f s)"
+                          % (n[0], pire[0], PLAFOND_DECISION_S))
 
 
 def sec_doute(ctx):
@@ -1642,6 +1780,12 @@ def sec_doute(ctx):
         ok("R-DOUTE-04 " + sonde[1])
     else:
         ko("R-DOUTE-04", "sonde du ré-auditeur (N=130000) : deny en moins de %.0f s" % PLAFOND_DECISION_S, "conforme", sonde[1])
+    adh_r, hors_r = labs_reduction(ctx, "reduction")
+    r = controle_reduction(ctx, adh_r, hors_r)
+    if r[0]:
+        ok("R-REDUC-01 " + r[1])
+    else:
+        ko("R-REDUC-01", "valeur longue réductible vers un actif gardé : refusée par l'analyse exacte (lien dur, lien symbolique, juge, `..` sous un lien dans les deux sens), lab non adhérent silencieux, sonde de 130 000 composantes", "conforme", r[1])
     for ident, motif, remplacement in (
             ("DOUTE-GUARD-RETIRE", "grep -a -q -i -E '[.](planning|claude)|[\\\\]' && G=1;", ":;"),
             ("DOUTE-GUARD-CLAUDE", "[.](planning|claude)|", "[.](planning)|"),
@@ -1662,13 +1806,16 @@ def sec_doute(ctx):
         else:
             okmut(ident, "R-DOUTE-01 rougit · attendu (original) : %s · obtenu (mutant) : %s" % (o[1], m[1][:300]))
     for ident, motif, remplacement in (
-            ("DOUTE-COEUR-REVERT", "decide = decider_dans_le_doute(payload)", "decide = None"),
-            ("DOUTE-COEUR-AIGUILLAGE", "if valeur_trop_longue(payload):  # aiguillage-longue", "if False:  # aiguillage-longue"),
+            ("DOUTE-COEUR-REVERT", 'decide = decider_dans_le_doute(payload, getattr(exc_doute, "ancetres", ()))', "decide = None"),
+            ("DOUTE-COEUR-AIGUILLAGE", "if len(ecrit) > BORNE_VALEUR or len(physique) > BORNE_VALEUR:  # aiguillage-longue", "if False:  # aiguillage-longue"),
             ("DOUTE-COEUR-NOMME", "if nomme_un_actif_garde(brut):  # doute-nomme", "if False:  # doute-nomme"),
             ("DOUTE-COEUR-CLAUDE", 'return ".planning" in bas or ".claude" in bas  # nomme-actif-garde', 'return ".planning" in bas  # nomme-actif-garde'),
             ("DOUTE-COEUR-ADHESION", "# doute-adhesion", "adherent = False  # doute-adhesion"),
             ("DOUTE-COEUR-CWD", "adherent = True  # doute-cwd", "adherent = False  # doute-cwd"),
-            ("DOUTE-COEUR-TILDE", 'if (ecrit == "~" or ecrit.startswith("~/")) and isinstance(home, str) and home.startswith("/"):', "if False:")):
+            ("DOUTE-COEUR-TILDE", 'if (ecrit == "~" or ecrit.startswith("~/")) and isinstance(home, str) and home.startswith("/"):', "if False:"),
+            ("DOUTE-COEUR-CWD-LONG", "if cwd_long:  # cwd-long", "if False:  # cwd-long"),
+            ("DOUTE-COEUR-CWD-REDUIT", "cwd = reduire_lexicalement(cwd)  # doute-cwd-reduit", "pass  # doute-cwd-reduit"),
+            ("DOUTE-COEUR-ANCETRES", "for lieu in [cwd] + list(ancetres):  # doute-ancetres", "for lieu in [cwd]:  # doute-ancetres")):
         dossier, raison = make_hook_mutant(ctx, ident, motif, remplacement)
         if dossier is None:
             komut(ident, "mutant du cœur (bash -n et compilation du corps)", "mutant valide", raison)
@@ -1685,6 +1832,27 @@ def sec_doute(ctx):
             komut(ident, "R-DOUTE-02 rougit sous le mutant", "rouge", "vert : " + m[1] + " (mutant non opposable)")
         else:
             okmut(ident, "R-DOUTE-02 rougit · attendu (original) : %s · obtenu (mutant) : %s" % (c[1], m[1][:300]))
+    for ident, motif, remplacement in (
+            ("REDUC-LEXICALE", "ecrit = reduire_lexicalement(joint)  # reduction-lexicale", "ecrit = joint  # reduction-lexicale"),
+            ("REDUC-PHYSIQUE", "variantes.append(physique)  # variante-physique", "pass  # variante-physique"),
+            ("REDUC-LIEN", "if not est_lien or liens > BORNE_LIENS:  # lien-suivi", "if True:  # lien-suivi"),
+            ("REDUC-BORNE-LIENS", "if not est_lien or liens > BORNE_LIENS:  # lien-suivi", "if not est_lien:  # lien-suivi")):
+        dossier, raison = make_hook_mutant(ctx, ident, motif, remplacement)
+        if dossier is None:
+            komut(ident, "mutant du cœur (bash -n et compilation du corps)", "mutant valide", raison)
+            continue
+        sauve = ctx.scripts_dir_livre
+        ctx.scripts_dir_livre = dossier
+        try:
+            m = controle_reduction(ctx, adh_r, hors_r)
+        finally:
+            ctx.scripts_dir_livre = sauve
+        if not r[0]:
+            komut(ident, "l'original passe R-REDUC-01", "conforme", r[1])
+        elif m[0]:
+            komut(ident, "R-REDUC-01 rougit sous le mutant", "rouge", "vert : " + m[1] + " (mutant non opposable)")
+        else:
+            okmut(ident, "R-REDUC-01 rougit · attendu (original) : %s · obtenu (mutant) : %s" % (r[1], m[1][:300]))
 
 
 SECTIONS = {

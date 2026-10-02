@@ -68,6 +68,7 @@ import collections
 import datetime
 import json
 import os
+import posixpath
 import re
 import shlex
 import stat
@@ -193,13 +194,16 @@ def lire_payload(chemin):
 
 
 def cible_de(payload, home=""):
-    """(chemin écrit absolu ou None, cwd du payload ou None). Clé `file_path`, sinon
+    """(chemin écrit absolu ou None, cwd du payload ou None, formes physiques supplémentaires à juger). Clé `file_path`, sinon
     `notebook_path`, dans `tool_input`. Un chemin relatif est JOINT au cwd du payload (à défaut au
     cwd physique du processus), comme la couche shell (limite h) : les deux couches rattachent
     le chemin au même lab. Un chemin qui commence par `~` n'est JAMAIS lu comme relatif au cwd (N-03, re-audit
     du 2026-10-01) : `~` et `~/…` sont développés en HOME, argument du lanceur (le cœur ne lit pas l'environnement, R-ENV-02), de façon
     identique à la couche shell ; `~utilisateur/…`, ou un HOME absent ou non absolu, lève ValueError : la décision dans le doute
-    (`decider_dans_le_doute`) prend la main."""
+    (`decider_dans_le_doute`) prend la main. Une valeur de plus de BORNE_VALEUR caractères est lue sous deux formes (réduite
+    lexicalement, physique) rendues en temps linéaire ; si l'une reste trop longue, ValeurTropLongue (décision dans le doute). Un chemin
+    RELATIF sous un cwd de plus de BORNE_VALEUR caractères n'est jamais résolu contre le cwd du processus : ValueError (N3-02) ; un cwd
+    long, sinon, est remplacé par sa forme réduite (`cwd_borne`)."""
     cwd = payload.get("cwd")
     if not isinstance(cwd, str):
         cwd = None
@@ -211,15 +215,37 @@ def cible_de(payload, home=""):
             if isinstance(valeur, str):
                 ecrit = valeur
                 break
+    longue = ecrit is not None and len(ecrit) > BORNE_VALEUR  # valeur-longue
     if ecrit is not None and ecrit.startswith("~"):  # tilde-developpe
         if (ecrit == "~" or ecrit.startswith("~/")) and isinstance(home, str) and home.startswith("/"):
             ecrit = home.rstrip("/") + ecrit[1:]
         else:
             raise ValueError("tilde non résolu")
+    cwd_long = cwd is not None and len(cwd) > BORNE_VALEUR
     if ecrit is not None and not ecrit.startswith("/"):
+        if cwd_long:  # cwd-long
+            raise ValueError("chemin relatif sous un cwd trop long")  # N3-02 : jamais résolu contre le cwd du processus
         base = cwd if cwd is not None else os.path.realpath(os.getcwd())
         ecrit = base + "/" + ecrit
-    return (ecrit, cwd)
+    variantes = []
+    if longue:
+        # N3-01 (re-audit 3 du 2026-10-02) : une valeur de plus de BORNE_VALEUR caractères n'est jamais analysée telle quelle (realpath et
+        # racine_lab sont quadratiques en profondeur). Elle est lue sous DEUX formes, en temps linéaire, et refusée si l'UNE des deux
+        # l'est : la forme RÉDUITE lexicalement (`posixpath.normpath`, ce que fait un harnais qui normalise avant l'appel système) et la
+        # forme PHYSIQUE (`resoudre_lineaire`, ce que fait l'ancienne analyse exacte, un `..` après un lien symbolique remontant le lien).
+        # Chacune qui tient sous la borne est analysée comme une valeur courte ; si l'une reste trop longue, décision dans le doute.
+        joint = ecrit
+        ecrit = reduire_lexicalement(joint)  # reduction-lexicale
+        # Un chemin qui reste RELATIF (cwd du payload lui-même relatif) n'a pas de lab : `racine_lab` le rend None, comme avant.
+        physique, existant = resoudre_lineaire(joint) if joint.startswith("/") else (ecrit, "")  # forme-physique
+        if len(ecrit) > BORNE_VALEUR or len(physique) > BORNE_VALEUR:  # aiguillage-longue
+            raise ValeurTropLongue([existant, resoudre_lineaire(ecrit)[1] if ecrit.startswith("/") else ""])
+        if physique != ecrit:
+            variantes.append(physique)  # variante-physique
+    if cwd_long:
+        cwd = cwd_borne(cwd)
+        payload["cwd"] = cwd
+    return (ecrit, cwd, variantes)
 
 
 def chemin_brut(payload):
@@ -236,18 +262,82 @@ def chemin_brut(payload):
 BORNE_VALEUR = 4096  # même borne que la couche shell de hooks.json (PATH_MAX de Linux)
 
 
-def valeur_trop_longue(payload):
-    """Vrai si `file_path`/`notebook_path` (le premier présent, comme `chemin_brut`) dépasse BORNE_VALEUR caractères. Un `cwd` plus
-    long que la borne n'est jamais parcouru non plus : il est remplacé par le cwd physique du processus, comme le fait la couche shell
-    (le cwd vient du harnais, l'attaquant ne le contrôle pas)."""
-    cwd = payload.get("cwd")
-    if isinstance(cwd, str) and len(cwd) > BORNE_VALEUR:  # cwd-long
+class ValeurTropLongue(ValueError):
+    """Une valeur qui reste plus longue que BORNE_VALEUR une fois réduite : elle porte l'ANCÊTRE EXISTANT de chacune de ses deux formes
+    (réduite lexicalement, physique), le seul morceau qui dit dans quel lab elle tombe sans parcourir la valeur entière."""
+
+    def __init__(self, ancetres):
+        ValueError.__init__(self, "valeur trop longue après réduction")
+        self.ancetres = ancetres
+
+
+def reduire_lexicalement(chemin):
+    """Forme réduite lexicalement (`.`, `..`, `//` retirés, sans toucher au disque) en temps LINÉAIRE : `posixpath.normpath` (N3-01,
+    re-audit 3 du 2026-10-02). C'est ce que fait le harnais d'un chemin avant l'appel système ; elle diffère de la résolution physique
+    (realpath) quand un `..` suit un lien symbolique (limite F2, déclarée)."""
+    return posixpath.normpath(chemin)
+
+
+def cwd_borne(cwd):
+    """`cwd` de plus de BORNE_VALEUR caractères, jamais parcouru tel quel : sa forme réduite lexicalement si elle est absolue et tient
+    sous la borne (un lab nommé par un cwd qui descend puis remonte reste un lab) ; sinon le cwd physique du processus, comme la couche
+    shell (None s'il est illisible)."""
+    if cwd.startswith("/"):
+        reduit = reduire_lexicalement(cwd)
+        if len(reduit) <= BORNE_VALEUR:
+            return reduit
+    try:
+        return os.getcwd()
+    except OSError:
+        return None
+
+
+BORNE_LIENS = 40  # comme le noyau (ELOOP) : au-delà, un lien n'est plus suivi (comme `os.path.realpath`, qui laisse alors le lien en place)
+
+
+def resoudre_lineaire(chemin):
+    """Résolution PHYSIQUE d'un chemin absolu (liens suivis sur la partie existante, `..` après un lien remontant le lien), comme
+    `os.path.realpath` non strict, mais en temps quasi LINÉAIRE : le chemin se consomme composant par composant sur une pile, et un
+    composant n'est testé sur le disque (`lstat`) que si TOUS ses ancêtres existent. Un descendant d'un composant absent n'existe pas :
+    il n'est jamais testé, donc une descente de 130 000 composants absents ne coûte pas 130 000 appels sur des chemins qui grossissent
+    (le coût quadratique de realpath). Le nombre d'appels est borné par la profondeur RÉELLE du disque (PATH_MAX). Au-delà de BORNE_LIENS
+    liens suivis (boucle), le lien n'est plus suivi ; une erreur d'`lstat` (absent, trop long) vaut « n'existe pas » ; un NUL lève
+    ValueError (décision dans le doute). Rend (chemin physique, plus long préfixe qui existe) : le second est l'ancêtre existant, dont
+    `racine_lab` tire le lab sans parcourir le reste."""
+    restant = collections.deque(chemin.split("/"))
+    pile = []
+    existe = 0  # longueur du plus long préfixe de `pile` qui existe
+    liens = 0
+    while restant:
+        c = restant.popleft()
+        if c == "" or c == ".":
+            continue
+        if c == "..":
+            if pile:
+                pile.pop()
+            if existe > len(pile):
+                existe = len(pile)
+            continue
+        pile.append(c)
+        if existe != len(pile) - 1:
+            continue  # un ancêtre est absent : ce composant n'existe pas, inutile de le tester
+        courant = "/" + "/".join(pile)
         try:
-            payload["cwd"] = os.getcwd()
+            st = os.lstat(courant)
         except OSError:
-            del payload["cwd"]
-    brut = chemin_brut(payload)
-    return brut is not None and len(brut) > BORNE_VALEUR
+            continue
+        est_lien = stat.S_ISLNK(st.st_mode)
+        liens += 1 if est_lien else 0
+        if not est_lien or liens > BORNE_LIENS:  # lien-suivi
+            existe = len(pile)
+            continue
+        cible = os.readlink(courant)
+        pile.pop()  # le lien est remplacé par sa cible, lue depuis le dossier qui le contient
+        if cible.startswith("/"):
+            pile = []
+            existe = 0
+        restant.extendleft(reversed(cible.split("/")))
+    return ("/" + "/".join(pile), "/" + "/".join(pile[:existe]))
 
 
 def nomme_un_actif_garde(texte):
@@ -256,14 +346,15 @@ def nomme_un_actif_garde(texte):
     return ".planning" in bas or ".claude" in bas  # nomme-actif-garde
 
 
-def decider_dans_le_doute(payload):
+def decider_dans_le_doute(payload, ancetres=()):
     """Décision pour un chemin écrit que le cœur ne sait pas analyser (surrogate isolé, NUL, `~utilisateur`, HOME inutilisable, erreur
     de realpath ou d'encodage ; N-01 et N-03, re-audit du 2026-10-01 ; décision du manager vf-dev-manager, renversable, même classe que
     GATE-03). Propriété : aucun chemin que le hook ne sait pas analyser ne peut taire les gates sur un actif sous `.planning/` ou
     `.claude/` d'un lab adhérent, quel que soit le cwd. (a) Le chemin nomme `.planning` ou `.claude` : REFUS, sans regarder le cwd.
-    (b) Sinon : décision sur le cwd du payload — dans (ou sous) un lab adhérent, refus ; hors lab adhérent, silence (GATE-03) ; un
-    cwd lui-même inanalysable (ou absent) : refus. Le texte du refus ne reprend jamais le chemin (un surrogate fait échouer l'encodage
-    de la sortie). Rend True quand la décision est un refus (déjà émis)."""
+    (b) Sinon : décision sur le cwd du payload ET sur les ANCÊTRES EXISTANTS de la valeur (`ancetres`, quand elle est trop longue : N3-01)
+    — dans (ou sous) un lab adhérent, refus ; hors lab adhérent, silence (GATE-03) ; un cwd lui-même inanalysable (ou absent) : refus.
+    Un cwd de plus de BORNE_VALEUR caractères y est lu sous sa forme réduite lexicalement (refus s'il reste trop long). Le texte du refus
+    ne reprend jamais le chemin (un surrogate fait échouer l'encodage de la sortie). Rend True quand la décision est un refus (déjà émis)."""
     brut = chemin_brut(payload)
     if brut is None:
         return None  # aucun chemin écrit : rien à décider ici, le code 3 reste celui du repli shell
@@ -275,8 +366,14 @@ def decider_dans_le_doute(payload):
     try:
         if not isinstance(cwd, str):
             raise ValueError("cwd absent")
-        racine = racine_lab(cwd)
-        adherent = bool(racine) and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]  # doute-adhesion
+        if len(cwd) > BORNE_VALEUR:  # doute-cwd-long : jamais parcouru tel quel ; réduit lexicalement, refus s'il reste trop long
+            cwd = reduire_lexicalement(cwd)  # doute-cwd-reduit
+            if len(cwd) > BORNE_VALEUR:
+                raise ValueError("cwd trop long")
+        adherent = False
+        for lieu in [cwd] + list(ancetres):  # doute-ancetres
+            racine = racine_lab(lieu)
+            adherent = adherent or (bool(racine) and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"])  # doute-adhesion
     except BaseException:
         adherent = True  # doute-cwd : un cwd inanalysable ne tait rien
     if adherent:
@@ -1988,34 +2085,42 @@ def main():
     try:
         # N2-01 (re-audit 2 du 2026-10-02) : une valeur de plus de BORNE_VALEUR caractères ne passe JAMAIS par realpath ni racine_lab
         # (quadratiques en profondeur : l'échéance de 8 s tombait sur un chemin qui descend puis remonte et la couche shell, aveugle à
-        # une forme échappée, se taisait). Le cœur a décodé le JSON : il juge le nom décodé, par la décision dans le doute.
-        if valeur_trop_longue(payload):  # aiguillage-longue
-            raise ValueError("valeur trop longue")
-        ecrit, cwd = cible_de(payload, sys.argv[3] if len(sys.argv) > 3 else "")
+        # une forme échappée, se taisait). N3-01 (re-audit 3) : `cible_de` la lit sous deux formes en temps linéaire (réduite
+        # lexicalement, physique) ; chacune qui tient sous la borne est analysée comme une valeur courte ; seule une valeur qui reste trop
+        # longue lève ici et part dans la décision dans le doute sur son nom décodé. Un lab est adhérent dès que l'UNE des formes y tombe.
+        ecrit, cwd, variantes = cible_de(payload, sys.argv[3] if len(sys.argv) > 3 else "")
         depart = ecrit if ecrit is not None else (cwd if cwd is not None else os.getcwd())  # racine-depart
         racine = racine_lab(depart)
         adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]
-    except BaseException:  # phase-a-doute
+        autres = []  # formes supplémentaires (N3-01) qui tombent, elles, dans un lab adhérent : (chemin écrit, racine du lab)
+        for forme in variantes:
+            racine_forme = racine_lab(forme)
+            if racine_forme is not None and verifier_adhesion(os.path.join(racine_forme, ".planning"))["adherente"]:
+                autres.append((forme, racine_forme))
+    except BaseException as exc_doute:  # phase-a-doute
         # N-01 : un chemin que l'analyse fait lever (surrogate, NUL, realpath) ne sort plus en code non nul — le payload aurait provoqué
         # lui-même la panne du cœur et fait taire les gates ; il est décidé dans le doute. Sans chemin écrit : code 3, comme avant.
         try:
-            decide = decider_dans_le_doute(payload)
+            decide = decider_dans_le_doute(payload, getattr(exc_doute, "ancetres", ()))
         except BaseException:
             sys.exit(3)
         if decide is None:
             sys.exit(3)
         sys.exit(0)
-    if not adherent:
+    if not adherent and not autres:
         sys.exit(0)  # non-adherent
     # Phase B : le lab est adhérent. Toute erreur devient un refus explicite, code 0 (P45-D-08).
     try:
-        contexte = {"payload": payload, "outil": payload.get("tool_name"), "ecrit": ecrit,
-                    "cwd": cwd, "racine": racine,
-                    "arg_xdg": sys.argv[2] if len(sys.argv) > 2 else "",
-                    "arg_home": sys.argv[3] if len(sys.argv) > 3 else ""}
-        resultats = evaluer_gates(contexte)  # phase-b
-        refus = [texte for genre, texte in resultats if genre == "refuse"]
-        avis = [texte for genre, texte in resultats if genre == "avertit"]
+        refus, avis = [], []
+        cibles = ([(ecrit, racine)] if adherent else []) + autres
+        for forme, racine_cible in (cibles or [(ecrit, racine)]):  # `or` : jamais vide sur un code sain, la sortie ci-dessus l'a écarté
+            contexte = {"payload": payload, "outil": payload.get("tool_name"), "ecrit": forme,
+                        "cwd": cwd, "racine": racine_cible,
+                        "arg_xdg": sys.argv[2] if len(sys.argv) > 2 else "",
+                        "arg_home": sys.argv[3] if len(sys.argv) > 3 else ""}
+            resultats = evaluer_gates(contexte)  # phase-b
+            refus.extend(texte for genre, texte in resultats if genre == "refuse" and texte not in refus)
+            avis.extend(texte for genre, texte in resultats if genre == "avertit" and texte not in avis)
         if refus:
             sortie_refus(refus)
         elif avis:
