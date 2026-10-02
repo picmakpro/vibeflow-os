@@ -5,22 +5,22 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 45
 current_phase_name: Moteur — hook central par rôle et gates d'écriture
-status: "Phase 45 exécutée et armée (10/10 plans, cinq gates armés) ; vérification human_needed 14/15, CI Linux à lire sur la PR"
+status: "Phase 45 close (10/10 plans, cinq gates armés, audit SECURED, vérifiée 15/15) ; PR #124 ouverte, non mergée"
 created: 2026-09-23
-last_updated: "2026-10-01T00:00:00.000Z"
-last_activity: 2026-10-01
+last_updated: "2026-10-02T00:00:00.000Z"
+last_activity: 2026-10-02
 last_activity_desc: >-
-  Exécution de la Phase 45 (mission vf-dev-manager-p45-exec, branche gouvernance/phase-45-execution) :
-  10/10 plans, 8 quick de correction (kc3, lb4, fxa, 5xc, dzl, kp5, m8c, owx), rejeu réel final 0/0
-  (708debcb), armement en cascade G6+G5, G1, G7, rôle (3d06e503..239df76d), planning-core v2.9.0
-  sans release. Arbitrages Willy, AskUserQuestion session principale : Q-ARM (2026-09-30), Q-G6 = b
-  (2026-10-01).
+  Clôture de la Phase 45 (mission vf-dev-manager-p45-exec) à la demande de Willy (message en session
+  principale, 2026-10-01) : audit de sécurité final en 4 tours, SECURED ; documentation produit mise à
+  jour ; cartographie .planning/codebase/ rafraîchie ; merge de main (v2.68.0) ; GATE-15 validé sur la
+  CI Linux de la PR #124. Armement en cascade du 2026-10-01 (3d06e503..239df76d), planning-core v2.9.0
+  sans release.
 stopped_at: >-
-  Phase 45 vérifiée human_needed 14/15 (45-VERIFICATION.md) : seul GATE-15 attend la CI Linux de
-  l'état armé, sur la PR vers main (sans merge, tag ni release).
+  Phase 45 close le 2026-10-02 (15/15, audit SECURED). PR #124 sans merge, tag ni release ; revue de
+  Samuel attendue. Prochain : cadrage de la Phase 46.
 progress:
   total_phases: 9
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 28
   completed_plans: 28
   percent: 100
@@ -30,9 +30,9 @@ progress:
 
 ## Current Position
 
-Phase: 45 (Moteur — hook central par rôle et gates d'écriture) — exécutée du 2026-09-30 au 2026-10-01 (10/10 plans), cinq gates ARMÉS en cascade le 2026-10-01 (G6+G5 `3d06e503`, G1 `bf6cfa87`, G7 `b6609fa6`, rôle `239df76d` ; G2 avertit), rejeu réel final 0 faux refus / 0 faux accept (`45-REJEU-FINAL.md`, `708debcb`), `planning-core` v2.9.0 sans release ; vérification `human_needed` 14/15 (GATE-15 : CI Linux de l'état armé, à lire sur la PR vers main, sans merge). Phase 44 : exécutée (5/5 plans), vérifiée PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`), corrigée en 8 lots après revue et audit, CLOSE dans le ROADMAP le 2026-09-28 (PR vers main ouverte, non mergée). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
-**Last Activity:** 2026-10-01
-**Last Activity Description:** Cadrage et planification de la Phase 45 (mission `vf-dev-manager-g45-20260929`) — voir `last_activity_desc` en frontmatter. Précédent : clôture de la Phase 44 (mission `mgr-44-reprise`). Dernier lot : correction de CLASSE lot 8 (quick 260928-vk9, CORRECTION MINIMALE, aucun nouveau tour de juges, gsd-verifier PASSED), commit `0c284e3`.
+Phase: 45 (Moteur — hook central par rôle et gates d'écriture) — exécutée du 2026-09-30 au 2026-10-01 (10/10 plans), cinq gates ARMÉS en cascade le 2026-10-01 (G6+G5 `3d06e503`, G1 `bf6cfa87`, G7 `b6609fa6`, rôle `239df76d` ; G2 avertit), rejeu réel final 0 faux refus / 0 faux accept (`45-REJEU-FINAL.md`, `708debcb`), `planning-core` v2.9.0 sans release ; audit de sécurité final SECURED (4 tours, limites (z) à (al)) ; vérifiée 15/15 (GATE-15 validé par Willy sur la CI Linux de la PR #124) ; CLOSE le 2026-10-02, PR #124 ouverte, non mergée. Phase 44 : exécutée (5/5 plans), vérifiée PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`), corrigée en 8 lots après revue et audit, CLOSE dans le ROADMAP le 2026-09-28 (PR vers main ouverte, non mergée). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
+**Last Activity:** 2026-10-02
+**Last Activity Description:** Exécution, armement, audit final et clôture de la Phase 45 (mission `vf-dev-manager-p45-exec`). Plus tôt : cadrage et planification de la Phase 45 (mission `vf-dev-manager-g45-20260929`) — voir `last_activity_desc` en frontmatter. Précédent : clôture de la Phase 44 (mission `mgr-44-reprise`). Dernier lot : correction de CLASSE lot 8 (quick 260928-vk9, CORRECTION MINIMALE, aucun nouveau tour de juges, gsd-verifier PASSED), commit `0c284e3`.
 
 Précédent : correction de CLASSE lot 5 (nœud `exec-44` rouvert, mission vf-coder `mgr-44-reprise`, quick task `260928-ol3`) : l'environnement « maîtrisé » du sous-processus détecteur (lot 4) était en réalité `dict(os.environ)` avec la seule surcharge de `GSD_HOME` — une copie intégrale du `PATH` hérité. Mesuré (attack probe direct, hors suite) : un `awk` factice en tête de PATH suffisait à faire écrire (exit 0) le moteur sur un lab GSD réel et à effacer le marqueur `gsd_state_version`. L'environnement est désormais construit DE ZÉRO (liste blanche `PATH_MAITRISE` + `GSD_HOME`, aucune autre variable héritée) ; `bash` résolu par `CANDIDATS_BASH` (deux chemins absolus fixes, validés par `lstat`), jamais `shutil.which` sur le PATH hérité. Correctifs voisins : `_jeton_journal` échappe aussi tout caractère non imprimable (NUL, contrôles C0/C1) ; un repli vide lève `ValueError` (jamais un jeton vide silencieux) ; « détecteur absent »/« détecteur non régulier » ont deux messages distincts ; `ecrire_si_different` lit par `O_NOFOLLOW`. Point explicitement NON retenu (avec preuve) : gater le code 3 sur une sortie stderr non vide — un `.planning/workstreams/` vide en produit légitimement. 233→270 OK/0 KO sur test-recalc-planning.sh, 8 suites sœurs vertes et non modifiées, `detect-gsd-engine.sh`/`workstream-policy.sh` octet pour octet inchangés depuis `424cb23`. Le dispatch `gsd-executor` isolé n'a pas été retenté (expérience du lot 4 déjà consignée) ; un seul commit (correctifs trop imbriqués pour un découpage fix/test/docs). Vérifié PASSED 11/11 par `gsd-verifier`. Commit `9fe4a42`.
 
@@ -44,12 +44,12 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 
 ## Progress
 
-**Phases Complete:** 3 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée).
-**Current Plan:** aucun — Phase 45 : 10/10 plans livrés, armement fait ; reste la lecture de la CI Linux de la PR (GATE-15) puis la clôture
+**Phases Complete:** 4 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée ; Phase 45 : close le 2026-10-02, PR #124 ouverte, non mergée).
+**Current Plan:** aucun — Phase 45 close ; prochaine étape : cadrage de la Phase 46
 
 ## Session Continuity
 
-**Stopped At:** Phase 45 exécutée et armée, vérifiée `human_needed` 14/15. Prochain geste : lire la CI Linux de la PR (GATE-15), puis clore la Phase 45 et cadrer la Phase 46 (`gsd-discuss-phase 46 --ws gouvernance`).
+**Stopped At:** Phase 45 close (vérifiée 15/15, audit SECURED, PR #124 ouverte, non mergée, revue de Samuel attendue). Prochain geste : cadrer la Phase 46 (`gsd-discuss-phase 46 --ws gouvernance`).
 **Resume File (Phase 45) :** `.planning/missions/2026-09-30-gouvernance-45-exec.md`
 **Resume File:** `.planning/missions/2026-09-27-gouvernance-44.md`
 
@@ -73,6 +73,12 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 | 261001-kp5 | Lot E, Phase 45 : un .planning sous .claude n'est jamais racine (exception .claude/worktrees/<nom>), liste des scripts comparée par R-REFERENCE | 2026-10-01 | a2a2a9f | passed | [261001-kp5-lot-e-correction-ciblee-phase-45](./quick/261001-kp5-lot-e-correction-ciblee-phase-45/) |
 | 261001-m8c | Lot F, Phase 45 : mineurs M1-M5 de la re-revue (limites (y)(a) et (o), README, casse de la commande enregistrée, poche worktrees) | 2026-10-01 | 07edca9 | passed | [261001-m8c-lot-f-45-f-mineurs-m1-m5-re-revue-lot-e](./quick/261001-m8c-lot-f-45-f-mineurs-m1-m5-re-revue-lot-e/) |
 | 261001-owx | Correction documentaire après l'armement, Phase 45 : README, CHANGELOG, 45-10-SUMMARY à l'état armé, limite (z) du faux refus sous charge, chemins de machine du lot F | 2026-10-01 | 4cc0910 | passed | [261001-owx-correction-cibl-e-de-documentation-apr-s](./quick/261001-owx-correction-cibl-e-de-documentation-apr-s/) |
+| 261001-qq9 | Phase 45 : le mutant MUT-PUCE-REGEX-CHAMP est tué par l'échéance du cœur et non plus par une borne d'horloge (CI non déterministe) | 2026-10-01 | d87f881 | passed | [261001-qq9-mise-mort-d-terministe-du-mutant-mut-puc](./quick/261001-qq9-mise-mort-d-terministe-du-mutant-mut-puc/) |
+| 261001-urj | Audit de sécurité final, Phase 45 : F-01 (repli quadratique), F-02 (adhésion reconnue par le repli), F-03 (rc 142) corrigés, F-04..F-08 déclarés | 2026-10-01 | 699ee25 | passed | [261001-urj-fix-audit-final-securite-phase-45](./quick/261001-urj-fix-audit-final-securite-phase-45/) |
+| 261001-wtd | Re-audit tour 1, Phase 45 : N-01 (chemin inanalysable), N-03 (tilde), N-04, N-05 corrigés, N-06 déclaré | 2026-10-02 | 6d2e5a7 | passed | [261001-wtd-correction-re-audit-phase-45](./quick/261001-wtd-correction-re-audit-phase-45/) |
+| 261002-1dv | Re-audit tour 2, Phase 45 : classe N2-01 (nom échappé, valeur longue) fermée, preuve générative, N2-02..04 déclarés | 2026-10-02 | 079e905 | passed | [261002-1dv-correction-de-classe-n2-01-repli-et-coeu](./quick/261002-1dv-correction-de-classe-n2-01-repli-et-coeu/) |
+| 261002-3rx | Re-audit tour 3, Phase 45 : N3-01 (valeur longue lue sous ses deux formes en temps linéaire), N3-02, F2..F6 déclarés ; audit final SECURED au tour 4 | 2026-10-02 | cdf96c4 | passed | [261002-3rx-correction-ciblee-tour-4-phase-45-n3-01-](./quick/261002-3rx-correction-ciblee-tour-4-phase-45-n3-01-/) |
+| 261002-6x7 | Limites finales du re-audit tour 4 (SECURED), Phase 45 : (al) /.vol, (am) dérogation brûlée, (an) course lstat/readlink, N4-01/N4-04 dans (aa)/(af) ; aucun changement de comportement | 2026-10-02 | 5e58ebe | passed | [261002-6x7-limites-finales-tour-4-phase-45](./quick/261002-6x7-limites-finales-tour-4-phase-45/) |
 
 ## Note pour Willy (2026-09-23, partition D-02)
 

@@ -14,7 +14,7 @@
 - [x] Phase 42: Fabrique — manifeste daté et invariants de doctrine du gate des agents (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #108
 - [x] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #111
 - [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
-- [ ] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécutée 2026-09-30 → 2026-10-01 (10/10 plans, 8 quick de correction), cinq gates ARMÉS en cascade le 2026-10-01 ; vérification `human_needed` 14/15 (GATE-15 : CI Linux de l'état armé à lire sur la PR)
+- [x] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécutée 2026-09-30 → 2026-10-02 (10/10 plans, 15 quick de correction), cinq gates ARMÉS en cascade le 2026-10-01 ; audit de sécurité final SECURED (4 tours) ; vérifiée 15/15 — clôturée 2026-10-02 (clôture validée par Willy, message en session principale, 2026-10-01), PR #124 ouverte (non mergée)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -165,10 +165,18 @@ AskUserQuestion session principale : F10, F7a, F8, A3, F6, F7b, F9 = f9-allowlis
 Q-G6 = (b), G6 protège les scripts du hook (2026-10-01). Rejeu réel final de l'étape 4
 (`45-REJEU-FINAL.md`, 708debcb) : 0 faux refus, 0 faux accept, empreintes identiques. Armement en
 cascade : G6+G5 (3d06e503), G1 (bf6cfa87), G7 (b6609fa6), rôle (239df76d) ; G2 avertit.
-`planning-core` v2.9.0 sans release. Vérification (`45-VERIFICATION.md`) : `human_needed` 14/15,
-seul GATE-15 (suites en CI Linux sur l'état armé) reste à lire sur la PR ; GATE-09 tenu sous
-l'override F9 (allowlist). Limite (z) : faux refus fail-closed sous forte charge (échéance de 8 s du
-cœur, « Alarm clock »), point de surveillance.
+`planning-core` v2.9.0 sans release. Vérification (`45-VERIFICATION.md`) : 15/15 — GATE-15 (suites
+en CI Linux sur l'état armé) prouvé par la CI de la PR #124 et validé par Willy (message en session
+principale, 2026-10-01 : « clore ») ; GATE-09 au texte amendé F9 (allowlist).
+
+**Clôture (2026-10-01 → 2026-10-02)**, à la demande de Willy (message en session principale,
+2026-10-01 : « clore mais avant fait les audit de securité et apres une mise a jour doc », puis
+« re mapping ») : audit de sécurité final en 4 tours, verdict SECURED (corrections F-01..F-03,
+N-01..N-05, N2-01, N3-01..N3-02 dans les quick urj, wtd, 1dv, 3rx ; résidus déclarés en limites (z) à
+(al) de `modele-cycles.md`) ; flake d'horloge MUT-PUCE-REGEX-CHAMP rendu déterministe (quick qq9) ;
+documentation produit mise à jour après `--verify-only` ; cartographie `.planning/codebase/`
+rafraîchie ; `main` (v2.68.0) intégrée par merge (d19835c5). Rejeux réels répétés après chaque tour
+de code : 0 faux refus, 0 faux accept, empreintes identiques.
 
 Plans:
 **Wave 1**

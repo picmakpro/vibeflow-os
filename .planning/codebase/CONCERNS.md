@@ -207,11 +207,13 @@ O(n²) de `plugin/consolidator/scripts/detect-duplicates.sh` restent sans impact
   couvert. Le canary de session (`plugin/planning-core/scripts/check-gates-alive.sh`) signale, n'empêche rien.
 - Test coverage: suites seulement ; prévoir un rejeu sur un lab adhérent réel au prochain palier.
 
-**Phase 45 vérifiée `human_needed` 14/15** — Sévérité : **MEDIUM**
+**Phase 45 close, vérifiée 15/15, non mergée** — Sévérité : **LOW** (résolu le 2026-10-02)
 - Files: `.planning/workstreams/gouvernance/phases/VFDO-45-moteur-hook-central-par-r-le-et-gates-d-criture/45-VERIFICATION.md`,
   `.planning/workstreams/gouvernance/STATE.md`.
-- Why fragile: GATE-15 attend la CI Linux de l'état armé sur la PR vers `main` ; les rejeux réels
-  (`45-REJEU-*`) ont été faits sur copie des labs au repos. Aucun merge, tag ni release avant clôture de `fiabilite-v1.0` (garde-fou du jalon).
+- État : GATE-15 prouvé par la CI Linux de la PR #124 et validé par Willy (message en session
+  principale, 2026-10-01) ; audit de sécurité final SECURED (4 tours). Les rejeux réels
+  (`45-REJEU-*`) ont été faits sur copie des labs au repos. Reste : aucun merge, tag ni release avant
+  clôture de `fiabilite-v1.0` (garde-fou du jalon).
 
 **`kimi doctor` est un vert à vide sur les agents** — Sévérité : **HIGH**
 - Files: recette d'install kimi ; mesure `38-MESURE-KIMI.md` (Phase 38).

@@ -1,8 +1,9 @@
 ---
 phase: VFDO-45-moteur-hook-central-par-r-le-et-gates-d-criture
 verified: 2026-10-01T16:14:00Z
-status: human_needed
-score: 14/15 exigences vérifiées (1 présente, comportement non prouvé sur Linux)
+status: passed
+score: 15/15 exigences vérifiées (GATE-15 prouvé après coup par la CI Linux de la PR #124, item humain validé par Willy)
+human_verification_resolved: "2026-10-02 — item humain GATE-15 validé par Willy (message en session principale, 2026-10-01 : « clore »), relayé par la session principale, sur la base de la CI Linux de la PR #124 verte sur les deux runs de eb8165e4 (push 36899232164, pull_request 36899237824 : 4/4 jobs, 98 suites, 0 échec) ; confirmé depuis sur les deux runs de cdf96c42 (push 36954736874, pull_request 36954739960). Statut posé par le manager vf-dev-manager-p45-exec sur cette validation, pas par le vérificateur."
 covered_files:
   - .planning/workstreams/gouvernance/REQUIREMENTS.md
   - .planning/workstreams/gouvernance/phases/VFDO-45-moteur-hook-central-par-r-le-et-gates-d-criture/45-01-PLAN.md

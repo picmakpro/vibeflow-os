@@ -48,7 +48,7 @@
 | GATE-12 | Phase 45 | Complete |
 | GATE-13 | Phase 45 | Complete |
 | GATE-14 | Phase 45 | Complete |
-| GATE-15 | Phase 45 | Pending (CI Linux de l'état armé à lire) |
+| GATE-15 | Phase 45 | Complete (CI Linux de la PR #124, validé par Willy 2026-10-01) |
 
 ## Milestone gouvernance-labs-v1.0 — « le planning métier tenu par une machine » (inscrit 2026-09-23)
 
@@ -169,4 +169,4 @@
 - [x] **GATE-12**: un canary par gate armé rejoue la commande enregistrée telle quelle et exige un deny. Il est bloquant en CI et signale au démarrage de session d'un lab adhérent. Il couvre au minimum : script absent, `python3` absent, `Task` et `Agent`, fil principal, agent `plugin:` (P45-D-20).
 - [x] **GATE-13**: les faux refus sont mesurés dans les deux sens pour chaque gate, sur le banc en CI puis sur le rejeu en lecture seule de deux labs réels, sans écriture prouvée par une empreinte. L'armement suit l'ordre G6+G5 → G1 → G7 → rôle, et chaque étape exige 0 faux refus et 0 faux accept (P45-D-03, P45-D-03a, P45-D-03b, P45-D-21).
 - [x] **GATE-14**: `recalc-planning.sh` écrit sur un lab adhérent quand le détecteur rend 2. Sans adhésion, son refus est inchangé (exit 2, rien touché) ; avec le détecteur à 0, le refus reste (exit 3). Les trois branches ont leur jumeau négatif et leur mutation rouge ; `detect-gsd-engine.sh` et `workstream-policy.sh` restent inchangés (P45-D-02, P45-D-02a, P45-D-02b).
-- [ ] **GATE-15**: les suites sous `plugin/planning-core/scripts/tests/` tournent en CI Linux, sans dépendance GNU/BSD, et chaque garde est prouvée par une mutation rouge tracée. `planning-core` reçoit un bump mineur, sans release, et `guard-planning-updated.sh` n'est pas retiré (P45-D-16, P45-D-18, P45-D-19).
+- [x] **GATE-15**: les suites sous `plugin/planning-core/scripts/tests/` tournent en CI Linux, sans dépendance GNU/BSD, et chaque garde est prouvée par une mutation rouge tracée. `planning-core` reçoit un bump mineur, sans release, et `guard-planning-updated.sh` n'est pas retiré (P45-D-16, P45-D-18, P45-D-19).
