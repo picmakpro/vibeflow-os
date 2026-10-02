@@ -18,7 +18,7 @@ DAG (`dag.sh`, fichier hors arbre) :
 | `exec-ajouts` | lot B : 29 fichiers dont `toc.yml` et 4 pages neuves | inv | vf-coder (worktree `manuel-b`) | done |
 | `exec-ci` | jointure `--no-ff`, liens croisés, étape CI, en-têtes | exec-corr, exec-ajouts | vf-coder | done |
 | `revue-1` | exactitude contre le code, régime plein | exec-ci | vf-reviewer | done (correctifs requis) |
-| `verif-gates` | rejeu des jobs `gates` et `tests` | exec-ci | general-purpose | done côté disque, worker resté muet |
+| `verif-gates` | rejeu des jobs `gates` et `tests` | exec-ci | general-purpose | done (rapport rendu tardivement, après la livraison) |
 | `fix-revue-1` | correction ciblée M1, M3, m1-m5 | revue-1 | vf-coder | done |
 | `revue-2` | re-revue du comblement, régime plein | fix-revue-1 | vf-reviewer | done (PASS) |
 | `livraison` | rejeu `gates` au HEAD, attribution d'un rouge, push, PR, suivi CI | revue-2, verif-gates | vf-coder | done |
@@ -60,7 +60,11 @@ Le manuel passe de 45 à 47 pages par langue. 40 fichiers sont touchés : 39 sou
 
   Tranché par le manager sans panel (coût faible, réversible avant le merge). Samuel ou le head peuvent le renverser dans la PR.
 - **Partition en deux lots parallèles dans deux worktrees** plutôt qu'en séquence. Les ensembles de fichiers étaient disjoints et vérifiés, et la jointure s'est faite sans conflit.
-- **Nœud de vérification resté muet** : le juge `verif-gates` a écrit ses journaux et ses codes de sortie sur disque, puis n'a plus répondu à deux réveils, et aucun processus ne tournait. Je ne l'ai pas remplacé par un juge concurrent : l'attribution du rouge restant et le rejeu final ont été confiés au nœud `livraison`, dans un ordre séquentiel. Son worktree jetable `base-wt` a été retiré par le manager.
+- **Nœud de vérification resté muet** : le juge `verif-gates` a écrit ses journaux et ses codes de sortie sur disque, puis n'a plus répondu à deux réveils, et aucun processus ne tournait. Je ne l'ai pas remplacé par un juge concurrent : l'attribution du rouge restant et le rejeu final ont été confiés au nœud `livraison`, dans un ordre séquentiel. Son worktree jetable `base-wt` a été retiré par le manager. Il a fini par rendre son rapport après la livraison. Ses conclusions recoupent celles du nœud `livraison` : les 6 rouges macOS viennent du HOME jetable (PyYAML et gsd-core introuvables), identiques sur la base. La 7ᵉ suite est une course SIGPIPE entre `pipefail` et `echo | grep -q`, verte 10 fois sur 10 quand on la rejoue seule.
+
+## Incident de clôture
+
+Le premier commit de ce rapport (`e5578b76`) portait un chemin absolu de machine dans le bloc E6. `check-machine-paths` l'a refusé, et les jobs `gates` et `tests` de la CI ont rougi (runs 37057490906 et 37057495144). Le chemin est remplacé par `<worktree de la branche>` dans le commit suivant. Leçon : un rapport de mission est un fichier versionné, il passe les mêmes gates que le code. Il faut lancer `check-machine-paths` avant de le pousser.
 
 ## Points ouverts pour l'humain
 
@@ -112,7 +116,7 @@ Ce bloc est lu par le gate de sortie (contrat `mission-contracts.md`, § Contrat
  "preuves": [
   {"verdict": "gate:check-mission-invariants", "commande": "bash plugin/conductor/scripts/check-mission-invariants.sh", "exit_code": 3, "sha": "0c14757b8dcc6ba5e4b1d97e4bb12ca7c8eb1d4a"},
   {"verdict": "gate:check-manual", "commande": "bash manual/.tools/check-manual.sh", "exit_code": 0, "sha": "deef907a23e81f60ba38bc036968b8179baeefc6"},
-  {"verdict": "gate:replay-gates", "commande": "replay-ci-jobs.sh --job gates --root /Users/samuel/Documents/dev/vibeflow-os/.claude/worktrees/manuel", "exit_code": 0, "sha": "deef907a23e81f60ba38bc036968b8179baeefc6"},
+  {"verdict": "gate:replay-gates", "commande": "replay-ci-jobs.sh --job gates --root <worktree de la branche>", "exit_code": 0, "sha": "deef907a23e81f60ba38bc036968b8179baeefc6"},
   {"verdict": "gate:inject-mcp-tools-isole", "commande": "HOME=$(mktemp -d) bash plugin/dev-orchestrator/scripts/tests/test-inject-mcp-tools.sh (x3)", "exit_code": 0, "sha": "deef907a23e81f60ba38bc036968b8179baeefc6"},
   {"verdict": "gate:ci-github", "commande": "gh pr checks 132", "exit_code": 0, "sha": "deef907a23e81f60ba38bc036968b8179baeefc6"},
   {"verdict": "gate:mutation-C5", "commande": "bash manual/.tools/check-manual.sh <copie jetable avec v9.9.9 en dur>", "exit_code": 1, "sha": "ed58f1c2"},
