@@ -175,6 +175,8 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    socle adapté au métier ; *lab de code* → le socle du **projet** appartient au moteur de développement,
    router la brique **`gsd-new-project`** (`vf-planning` n'y pose plus le tronc, il tient l'altitude lab
    et redirige — carte : `dev-orchestrator/references/intent-routing.md`).
+   Une fois `gsd-new-project` **terminé** (jamais avant, jamais en autonomie — BOOT-04), router le skill
+   **`vf-split-planning`**, qui pose la question du planning en parallèle ; `vf-new-lab` ne la pose pas.
    **Lab à compartiments** (quel que soit le métier) : `.planning/` du lab en *steering +
    `INDEX.md`* (jamais de ROADMAP global) ; un socle par compartiment **qualifié** (seuil d'autonomie),
    typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →

@@ -59,8 +59,10 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 | quelle option / compare ces approches / A ou B / aide-moi à choisir | `gsd-discuss-phase` (mode advisor — panel de décision) |
 | planifie / découpe / cadre / prépare le sprint / structure le boulot | `gsd-discuss-phase` puis `gsd-plan-phase` |
 | la plus petite version qui marche / une tranche verticale / le MVP de cette étape | `gsd-mvp-phase` |
-| démarrer un projet / repartir de zéro / nouveau repo (confirmation explicite, FIRST-02) | `gsd-new-project` |
-| onboarde ce codebase / reprends ce repo légué / c'est un projet existant, pas from scratch (FIRST-02) | `gsd-onboard` (fallback : `gsd-map-codebase` puis `gsd-new-project` si le skill est absent de l'index) |
+| démarrer un projet / repartir de zéro / nouveau repo (confirmation explicite, FIRST-02) | `gsd-new-project`, puis `vf-split-planning` à la fin de l'initialisation (choix du planning) |
+| onboarde ce codebase / reprends ce repo légué / c'est un projet existant, pas from scratch (FIRST-02) | `gsd-onboard` (fallback : `gsd-map-codebase` puis `gsd-new-project` si le skill est absent de l'index), puis `vf-split-planning` à la fin de l'initialisation (choix du planning) |
+| on sera plusieurs sur ce lab / deux chantiers en parallèle / sépare le planning en sujets | skill `vf-split-planning` |
+| reprends le sujet X / travaille sur le sujet X / on reprend le sujet X (lab partitionné) | l'équipe dispatchée reçoit le sujet X explicitement dans son mandat : `--ws X` sur chaque appel du moteur, et la variable d'environnement de sujet exportée dans le worktree (règle du §3 de la référence sur les sujets) ; si X n'existe pas, le dire et proposer `/vf-split-planning` |
 | intègre cette spec à la feuille de route / importe ce plan (doctrine : `ingestion-flow.md`) | `gsd-ingest-docs`, `gsd-import` |
 
 ## Construction

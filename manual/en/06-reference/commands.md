@@ -6,16 +6,16 @@
 
 A command typed with a `/` isn't the product's front door. VibeFlow is built end-to-end so you can
 just talk to it in plain language — "make this look better," "create a content lab," "check my
-lab" — and whichever agent is listening routes itself to the right piece. The seven commands on this
+lab" — and whichever agent is listening routes itself to the right piece. The eight commands on this
 page are **shortcuts**: they skip the step of phrasing a sentence when you already know exactly
 which action you want to trigger. You can ignore this page entirely and never type a `/` — nothing
 works worse for it.
 
 This list was built by enumerating `plugin/commands/*.md` on disk (2026-08-01, re-checked on
-2026-08-17 when `/vf-notify` was added): seven files, none anywhere else in the repo. That's the
-complete list by construction — there can't be an eighth one missing from here.
+2026-10-02 when `/vf-split-planning` was added): eight files, none anywhere else in the repo. That's the
+complete list by construction — there can't be a ninth one missing from here.
 
-## The seven commands
+## The eight commands
 
 ### `/vibeflow`
 
@@ -96,6 +96,18 @@ the setting stands, `/vf-notify test` to send a verification notification withou
 One thing it never mutes: the stalled-mission alert. If an agent freezes, the signal shows up in
 your session whatever this setting says — the toggle turns off the comfort, never the alarm.
 
+### `/vf-split-planning`
+
+Chooses whether your lab's planning stays single or splits into several topics that move forward in
+parallel. VibeFlow asks you one question, at the end of a code lab's initialization — and you can
+ask it again later with this command. By default a single planning is enough: if you answer no, or
+don't answer, nothing changes. If you answer yes, VibeFlow splits the planning, offers the files to
+commit, then tells you how to start the first milestone of a following topic. It refuses to split
+the planning while a phase is in progress: finish it first.
+
+*Example*: `/vf-split-planning mobile-redesign` — the name passed as an argument is the new topic's;
+with no argument, VibeFlow suggests your project's title.
+
 ## The boundary with skills
 
 A command and a skill are not the same thing, even though nearly every command on this page does
@@ -109,10 +121,10 @@ command — `/vf-design` and `/vf-sketch`, in particular, are skills and have no
 ## Where this list comes from
 
 Every command above corresponds to a real file under `plugin/commands/`, enumerated at the time
-this page was written (2026-08-01, re-checked on 2026-08-17) rather than copied from an existing
+this page was written (2026-08-01, re-checked on 2026-10-02) rather than copied from an existing
 document — that's the rule that applies across this whole reference theme. If you want to check for
 yourself, the command is `ls plugin/commands/*.md` from the repo root: the count should stay at
-seven unless one has been added or removed since.
+eight unless one has been added or removed since.
 
 <!-- vf-manual:nav -->
 [← Previous](../05-agent-team/specialized-teams.md) · [↑ Contents](../README.md) · [Next →](../06-reference/skills.md)
