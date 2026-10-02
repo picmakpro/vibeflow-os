@@ -22,7 +22,7 @@ la liste complète, par construction — il ne peut pas en exister une neuvième
 Le point d'entrée générique. Tape `/vibeflow` suivi de ta demande en langage naturel — « crée un
 lab d'acquisition », « vérifie le lab », « mets à jour » — et elle est transmise telle quelle à
 l'agent `vibeflow-conductor`, qui route vers la bonne action. Utile quand tu ne sais pas encore
-laquelle des cinq commandes suivantes correspond à ton besoin, ou quand ta demande touche plusieurs
+laquelle des huit commandes suivantes correspond à ton besoin, ou quand ta demande touche plusieurs
 d'entre elles à la fois (par exemple installer un module puis vérifier la conformité). Elle ne fait
 jamais elle-même le travail métier — uniquement la configuration du lab.
 
