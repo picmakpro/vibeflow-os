@@ -68,6 +68,7 @@ sp() {
   shift
   OUT="$( cd "$cwd" && env -u GSD_WORKSTREAM ${envs[@]+"${envs[@]}"} "$BASH_BIN" "$SCRIPT" "$@" 2>"$TMP/err" )"; RC=$?
   ERR="$(cat "$TMP/err" 2>/dev/null)"
+  printf '%s\n%s\n' "$OUT" "$ERR" >> "$TMP/emis.txt"   # tout ce que le geste a émis (sonde de vocabulaire VOCAB)
 }
 
 empreinte() { # contenu ET arbre
@@ -267,6 +268,121 @@ nrun="$(printf '%s\n' "$code" | grep -c 'RUN\[@\]')"
 [ "$nrun" = "1" ] || bad="$bad appels-moteur-hors-fonction-unique($nrun)"
 printf '%s\n' "$code" | grep 'RUN\[@\]' | grep -q 'env -u GSD_WORKSTREAM' || bad="$bad fonction-sans-env-u"
 emit S12 "$([ -z "$bad" ] && echo 0 || echo 1)" "assertions statiques : aucune écriture directe de planning, aucun eval, JSON par jq -cn --arg, fonction moteur unique sous env -u" "$bad"
+
+
+# =================================================================================================
+# Correction ciblée 41.2-CORRECTION-01 (C1-C6) : état de départ partiel, locale, post-condition,
+# vocabulaire, jalon du ROADMAP. VRAI moteur ; un faux moteur (enveloppe) ne sert qu'à provoquer les
+# sorties que le vrai moteur ne rend pas.
+# =================================================================================================
+echo
+echo "== correction ciblée (cas C1-C6) =="
+
+if [ "$HAVE_ENG" = 1 ]; then
+
+# Faux moteur : délègue au vrai (REAL_ENG) sauf en mode FAKE_MODE — create-fail (rc 1), create-garbage
+# (JSON sans « created »), dup-phase (ajoute une 2e ligne ^Phase: au STATE du sujet APRÈS `state patch`).
+FAKE="$TMP/fake-engine.sh"
+cat > "$FAKE" <<'FE'
+#!/usr/bin/env bash
+cwd="."; prev=""
+for a in "$@"; do [ "$prev" = "--cwd" ] && cwd="$a"; prev="$a"; done
+case " $* " in
+  *" workstream create "*)
+    case "${FAKE_MODE:-}" in
+      create-fail) exit 1 ;;
+      create-garbage) echo '{"foo":1}'; exit 0 ;;
+    esac ;;
+esac
+node "$REAL_ENG" "$@"; rc=$?
+case "${FAKE_MODE:-}:$*" in
+  dup-phase:*"state patch"*) for f in "$cwd"/.planning/workstreams/*/STATE.md; do printf 'Phase: doublon\n' >> "$f"; done ;;
+esac
+exit $rc
+FE
+chmod +x "$FAKE"
+REAL_ENGINE="$GT"
+
+# sp_on <script> <args du sp…> : exécute le geste donné (SCRIPT temporairement remplacé)
+sp_on() { local save="$SCRIPT"; SCRIPT="$1"; shift; sp "$@"; SCRIPT="$save"; }
+
+# --- C1 : état de départ PARTIEL (une seule des deux clés) : refusé AVANT toute écriture ----------------------------
+onekey() { # <script> <id> <ligne Phase:> <frontmatter additionnel> -> C1_BAD (vide = conforme), RC, ERR
+  local d; d="$(mk_new_project "$2" "$3" "$4")"; local e0; e0="$(empreinte "$d")"
+  sp_on "$1" "$TMP" -- --path "$d" --name partiel
+  C1_BAD=""
+  [ "$RC" = "2" ] || C1_BAD="rc=$RC attendu 2 (stdout=[$OUT])"
+  printf '%s' "$ERR" | grep -qF "à moitié renseigné" || C1_BAD="$C1_BAD stderr sans [à moitié renseigné] : [$ERR]"
+  [ "$e0" = "$(empreinte "$d")" ] || C1_BAD="$C1_BAD empreinte modifiée"
+  [ ! -d "$d/.planning/workstreams" ] || C1_BAD="$C1_BAD sujet créé"
+}
+onekey "$SCRIPT" c1a "Phase: 2 of 3 (Coeur)" "current_phase: 2"
+emit C1a "$([ -z "$C1_BAD" ] && echo 0 || echo 1)" "current_phase SANS milestone (lab démarré) : NON VÉRIFIABLE « à moitié renseigné », disque intact, aucun sujet créé" "$C1_BAD"
+onekey "$SCRIPT" c1b "Phase: 2 of 3 (Coeur)" "milestone: v1.0"
+emit C1b "$([ -z "$C1_BAD" ] && echo 0 || echo 1)" "milestone SANS current_phase : NON VÉRIFIABLE « à moitié renseigné », disque intact, aucun sujet créé" "$C1_BAD"
+
+# --- C2 : --name déterministe sous toute locale -------------------------------------------------------------------------
+D="$(mk_new_project c2)"; E0="$(empreinte "$D")"; bad=""; played=""
+LOCS="$(locale -a 2>/dev/null)"   # capturé : un `locale -a | grep -q` sous pipefail ment (SIGPIPE)
+for loc in C en_US.UTF-8 fr_FR.UTF-8; do
+  if [ "$loc" != "C" ] && ! grep -qix "$loc" <<<"$LOCS"; then continue; fi
+  played="$played $loc"
+  for nm in "é" "aé" "ñ" "añb"; do
+    sp "$TMP" "LC_ALL=$loc" -- --path "$D" --name "$nm"
+    [ "$RC" = "64" ] || bad="$bad [$loc name=<$nm> rc=$RC]"
+  done
+  sp "$TMP" "LC_ALL=$loc" -- --path "$D" --name ok --milestone "vé1"
+  [ "$RC" = "64" ] || bad="$bad [$loc milestone=<vé1> rc=$RC]"
+done
+[ "$E0" = "$(empreinte "$D")" ] || bad="$bad empreinte modifiée"
+case "$played" in *UTF-8*) : ;; *) bad="$bad aucune locale UTF-8 installée (en_US/fr_FR) : cas non opposable" ;; esac
+emit C2 "$([ -z "$bad" ] && echo 0 || echo 1)" "--name é / aé / ñ / añb et --milestone vé1 : 64 sans écriture sous les locales{$played }" "$bad"
+
+# --- C3 : post-condition « une seule ligne ^Phase: » ---------------------------------------------------------------------
+dupphase() { # <script> <id> -> RC, ERR, DP_BAD
+  local d; d="$(mk_new_project "$2")"
+  sp_on "$1" "$TMP" "GSD_TOOLS=$FAKE" "REAL_ENG=$REAL_ENGINE" FAKE_MODE=dup-phase -- --path "$d" --name dup
+  DP_BAD=""
+  [ "$RC" = "2" ] || DP_BAD="rc=$RC attendu 2 (stdout=[$OUT])"
+  printf '%s' "$ERR" | grep -qF "ligne ^Phase: absente ou en double" || DP_BAD="$DP_BAD stderr sans [ligne ^Phase: absente ou en double] : [$ERR]"
+}
+dupphase "$SCRIPT" c3
+emit C3 "$([ -z "$DP_BAD" ] && echo 0 || echo 1)" "STATE du sujet à DEUX lignes ^Phase: après la séquence : NON VÉRIFIABLE « absente ou en double »" "$DP_BAD"
+
+# --- C4 : vocabulaire — messages de sortie du geste et du gate, par des sorties réelles ----------------------------
+D="$(mk_new_project c4a)"
+sp "$TMP" "GSD_TOOLS=$FAKE" "REAL_ENG=$REAL_ENGINE" FAKE_MODE=create-fail -- --path "$D" --name x
+expect C4a "création du sujet en échec : NON VÉRIFIABLE, message en vocabulaire d'usage" 2 "création du sujet en échec" "-"
+D="$(mk_new_project c4b)"
+sp "$TMP" "GSD_TOOLS=$FAKE" "REAL_ENG=$REAL_ENGINE" FAKE_MODE=create-garbage -- --path "$D" --name x
+expect C4b "création du sujet : sortie inattendue : NON VÉRIFIABLE" 2 "création du sujet : sortie inattendue" "-"
+# règles des sujets introuvables : arbre isolé (geste + faux gate « plat », aucune politique voisine)
+ISO="$TMP/iso/conductor/scripts"; mkdir -p "$ISO"
+cp "$SCRIPT" "$ISO/split-planning.sh"
+printf '#!/usr/bin/env bash\necho plat\nexit 0\n' > "$ISO/check-planning-not-inflight.sh"
+D="$(mk_new_project c4c)"
+sp_on "$ISO/split-planning.sh" "$TMP" -- --path "$D" --name x
+expect C4c "règles des sujets introuvables (arbre isolé) : NON VÉRIFIABLE, aucune écriture" 2 "règles des sujets" "-"
+
+# --- C6 : jalon lu du ROADMAP du lab -------------------------------------------------------------------------------------
+D="$(mk_new_project c6)"
+sed -i.bak 's/^## Phases$/## Milestones\n\n- 🚧 **v2.3 Lancement** - Phases 1-3 (in progress)\n\n## Phases/' "$D/.planning/ROADMAP.md"; rm -f "$D/.planning/ROADMAP.md.bak"
+grep -qF 'v2.3 Lancement' "$D/.planning/ROADMAP.md" || emit C6 1 "fixture de jalon prouvée" "ROADMAP non modifié"
+D6="$D"
+sp "$TMP" -- --path "$D6" --name jalon
+expect C6a "ROADMAP du lab au jalon v2.3, --milestone absent : le sujet reçoit v2.3 (lu du moteur)" 0 "-" '{"mode":"plat","subject":"jalon","state":"complete"}'
+[ "$(fm "$D6/.planning/workstreams/jalon/STATE.md" milestone)" = "v2.3" ] \
+  && emit C6a 0 "C6a milestone: v2.3 dans le STATE du sujet" "" \
+  || emit C6a 1 "C6a milestone: v2.3 dans le STATE du sujet" "milestone=[$(fm "$D6/.planning/workstreams/jalon/STATE.md" milestone)]"
+D="$(mk_new_project c6b)"
+sed -i.bak 's/^## Phases$/## Milestones\n\n- 🚧 **v2.3 Lancement** - Phases 1-3 (in progress)\n\n## Phases/' "$D/.planning/ROADMAP.md"; rm -f "$D/.planning/ROADMAP.md.bak"
+sp "$TMP" -- --path "$D" --name jalon --milestone v9.9
+expect C6b "--milestone v9.9 explicite sur un ROADMAP au jalon v2.3 : l'explicite l'emporte" 0 "-" '{"mode":"plat","subject":"jalon","state":"complete"}'
+[ "$(fm "$D/.planning/workstreams/jalon/STATE.md" milestone)" = "v9.9" ] \
+  && emit C6b 0 "C6b milestone: v9.9 dans le STATE du sujet" "" \
+  || emit C6b 1 "C6b milestone: v9.9 dans le STATE du sujet" "milestone=[$(fm "$D/.planning/workstreams/jalon/STATE.md" milestone)]"
+
+fi # HAVE_ENG (C1-C6)
 
 # =================================================================================================
 # Preuve d'usage WSCH-04 de bout en bout (plan 41.2-04) : cas W1-W12 + mutations (i)-(iv), VRAI moteur.
@@ -470,11 +586,47 @@ else
   else emit M4 1 "(iv) status: executing : refus rc 1, rien écrit" "rc=$RC stderr=[$ERR]"; fi
 fi
 
-echo "== mutations : $MD/4 détectées =="
+# --- (v) condition « état complet » du STATE racine : && -> || (correction C1) : un lab démarré à UNE clé rejoue la
+#         séquence destructive ou saute l'état à tort au lieu d'être refusé -----------------------------------------------
+mut_c1() { # <nom> <ancre> <remplacement> <id> <libellé>
+  local mname="$1" manchor="$2" mrepl="$3" mid="$4" mlabel="$5" ba bb ra rb oa
+  mk_mut_tree "$mname"; MS="$MT/conductor/scripts/split-planning.sh"
+  if mutate "$MS" "$manchor" "$mrepl"; then
+    onekey "$MS" "${mname}a" "Phase: 2 of 3 (Coeur)" "current_phase: 2"; ba="$C1_BAD"; ra="$RC"; oa="$OUT"
+    onekey "$MS" "${mname}b" "Phase: 2 of 3 (Coeur)" "milestone: v1.0"; bb="$C1_BAD"; rb="$RC"
+    if [ -n "$ba" ] && [ -n "$bb" ]; then
+      MD=$((MD+1)); emit "$mid" 0 "$mlabel : C1a ET C1b rougissent (le refus disparaît)" ""
+      echo "      trace $mid : assertion=C1a « current_phase seul : NON VÉRIFIABLE, disque intact » ; attendu=rc 2 ; obtenu=rc $ra stdout=[$oa]"
+      echo "      trace $mid : assertion=C1b « milestone seul : NON VÉRIFIABLE, disque intact » ; attendu=rc 2 ; obtenu=rc $rb"
+    else emit "$mid" 1 "$mlabel : C1a et C1b doivent rougir tous deux" "C1a=[$ba] C1b=[$bb]"; fi
+  else emit "$mid" 1 "$mlabel : construction du mutant" "ancre introuvable [$manchor]"; fi
+}
+mut_c1 v5 '  if [ -n "$HAS_M" ] && [ -n "$HAS_C" ]; then' '  if [ -n "$HAS_M" ] || [ -n "$HAS_C" ]; then' M5 "(v) condition « complet » && -> ||"
+mut_c1 v5b '  elif [ -z "$HAS_M" ] && [ -z "$HAS_C" ]; then' '  elif [ -z "$HAS_M" ] || [ -z "$HAS_C" ]; then' M5b "(v-bis) condition « brut » && -> ||"
+
+# --- (vi) post-condition « une seule ligne ^Phase: » neutralisée (|| true) : le doublon passe pour complete (correction C3) ---
+mk_mut_tree v6; MS="$MT/conductor/scripts/split-planning.sh"
+ANCH6="$(grep -F 'grep -c' "$MS" | grep -F '^Phase:' | head -1)"
+if mutate "$MS" "$ANCH6" "$(printf '%s' "$ANCH6" | sed 's/ || nv / || true || nv /')"; then
+  dupphase "$MS" m6; m6_out="$OUT"
+  if [ -n "$DP_BAD" ] && [ "$RC" = "0" ]; then
+    MD=$((MD+1)); emit M6 0 "(vi) post-condition ^Phase: neutralisée (|| true || nv) : C3 rougit" ""
+    echo "      trace (vi) : assertion=C3 « 2 lignes ^Phase: : NON VÉRIFIABLE absente ou en double » ; attendu=rc 2 ; obtenu=rc $RC stdout=[$m6_out]"
+  else emit M6 1 "(vi) post-condition neutralisée : C3 doit rougir" "DP_BAD=[$DP_BAD] RC=$RC"; fi
+else emit M6 1 "(vi) construction du mutant" "ancre introuvable [$ANCH6]"; fi
+
+echo "== mutations : $MD/7 détectées =="
 
 else
   emit ENGINE 1 "moteur gsd-core introuvable (GSD_TOOLS, PATH, ~/.claude/gsd-core) : S1-S5, S7-S10, W1-W12 et mutations (i)-(iv) NON jouables — ko, jamais skip" "installer @opengsd/gsd-core@^1"
 fi # HAVE_ENG (W1-W12, mutations)
+
+# --- VOCAB : aucun message émis par le geste (ni par le gate qu'il appelle) ne contient le jargon du moteur ------------
+# Sonde sur les sorties RÉELLES de tous les cas ci-dessus (stdout + stderr de chaque appel à `sp`).
+if [ -s "$TMP/emis.txt" ]; then
+  vocab_hits="$(grep -i -n -E 'workstream|compartiment' "$TMP/emis.txt" | head -5 | tr '\n' '|')"
+  emit VOCAB "$([ -z "$vocab_hits" ] && echo 0 || echo 1)" "aucun message émis ($(grep -c '' "$TMP/emis.txt") lignes, tous les cas) ne contient workstream/compartiment" "occurrences : $vocab_hits"
+else emit VOCAB 1 "sonde de vocabulaire" "aucune sortie collectée"; fi
 
 echo
 echo "== bilan : $PASS ok, $FAIL ko =="

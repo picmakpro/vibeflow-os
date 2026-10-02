@@ -12,8 +12,13 @@
 #                    gsd-core/bin/gsd-tools.cjs ; AUCUN candidat relatif au cwd ni au dépôt. Chaque appel
 #                    moteur passe par la fonction unique `engine`, sous `env -u GSD_WORKSTREAM` ;
 #   3. lab plat      lecture seule du frontmatter du STATE racine : `milestone` ET `current_phase` présents
-#                    => aucune séquence (état « deja-complet ») ; sinon pré-capture `state get Phase --raw`
-#                    (doit commencer par un chiffre, sinon NON VÉRIFIABLE, aucune écriture) ;
+#                    => aucune séquence (état « deja-complet ») ; NI l'un NI l'autre (produit brut de
+#                    gsd-new-project) => pré-capture `state get Phase --raw` (doit commencer par un chiffre,
+#                    sinon NON VÉRIFIABLE, aucune écriture) et jalon lu du ROADMAP par `init progress` ;
+#                    UNE SEULE des deux clés => NON VÉRIFIABLE « état à moitié renseigné », AVANT tout
+#                    `workstream create` (disque intact) : la séquence, destructive sur un lab démarré,
+#                    n'est jamais jouée là, et aucune voie moteur ne pose `milestone` seul sans effet de
+#                    bord (41.2-CORRECTION-01-SUMMARY.md, C1) ;
 #   4. create        `workstream create <nom> --migrate-name <nom>` (plat, MÊME nom) ou
 #                    `workstream create <nom>` (partitionné) ; `already_exists` => REFUSÉ, aucune écriture ;
 #   5. nom retenu    le champ `.workstream` rendu par le moteur (normalisé), jamais la saisie, validé par
@@ -24,15 +29,18 @@
 #                    (milestone, current_phase numérique, UNE seule ligne ^Phase:).
 # Aucun rollback automatique (ADR-031) : si le sujet est créé et l'état incomplet, le message dit « sujet
 # créé, état à compléter » et rend NON VÉRIFIABLE. La séquence d'état est destructive sur un lab démarré
-# (mesuré, 41.2-MESURE-VERBE-ETAT.md) : d'où sa condition « STATE migré sans milestone ni current_phase ».
+# (mesuré, 41.2-MESURE-VERBE-ETAT.md) : d'où sa condition « STATE migré sans milestone NI current_phase ».
 #
 # Usage:
 #   split-planning.sh --name <nom> [--path <dir>] [--milestone <v>]
 #   split-planning.sh --help
 #
-# Defaults: --path .   --milestone v1.0 (le gabarit de roadmap du moteur nomme le greenfield v1.0)
+# Defaults: --path .   --milestone = le jalon courant du ROADMAP du lab (moteur : `init progress`,
+# milestone_version), à défaut de jalon lisible v1.0 (le gabarit de roadmap du moteur nomme le greenfield
+# v1.0). Un --milestone explicite l'emporte toujours.
 # Validation : nom = premier caractère [A-Za-z0-9] puis [A-Za-z0-9 ._-], 64 au plus, sans « .. » ;
-# jalon = [A-Za-z0-9._-], 32 au plus. Tout écart ou argument inconnu => 64.
+# jalon = [A-Za-z0-9._-], 32 au plus. Tout écart ou argument inconnu => 64. Les classes sont listées
+# caractère par caractère : un intervalle [A-Za-z] dépend de la locale (bash 3.2 y laisse passer é, ñ).
 #
 # Sortie : une seule ligne JSON sur stdout pour le code 0 : {"mode":"plat|partitionne","subject":"<nom>",
 # "state":"complete|deja-complet|non-initialise"} ; diagnostics sur stderr (préfixe [split-planning]).
@@ -45,7 +53,8 @@
 #   64 = erreur d'usage (option inconnue, valeur manquante, nom ou jalon invalide).
 set -uo pipefail
 
-ROOT="."; NAME=""; MILESTONE="v1.0"; HAVE_NAME=0
+ROOT="."; NAME=""; MILESTONE="v1.0"; MILESTONE_SET=0; HAVE_NAME=0
+ALNUM="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 usage_err() { echo "[split-planning] $*" >&2; exit 64; }
 nv() { echo "[split-planning] NON VÉRIFIABLE : $*" >&2; exit 2; }
@@ -56,8 +65,8 @@ while [ "$#" -gt 0 ]; do
     --path=*)    ROOT="${1#--path=}"; shift ;;
     --name)      [ "$#" -ge 2 ] || usage_err "--name nécessite une valeur"; NAME="$2"; HAVE_NAME=1; shift 2 ;;
     --name=*)    NAME="${1#--name=}"; HAVE_NAME=1; shift ;;
-    --milestone) [ "$#" -ge 2 ] || usage_err "--milestone nécessite une valeur"; MILESTONE="$2"; shift 2 ;;
-    --milestone=*) MILESTONE="${1#--milestone=}"; shift ;;
+    --milestone) [ "$#" -ge 2 ] || usage_err "--milestone nécessite une valeur"; MILESTONE="$2"; MILESTONE_SET=1; shift 2 ;;
+    --milestone=*) MILESTONE="${1#--milestone=}"; MILESTONE_SET=1; shift ;;
     -h|--help)   grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *)           usage_err "argument inconnu : $1" ;;
   esac
@@ -69,15 +78,15 @@ done
 [ "${#NAME}" -le 64 ] || usage_err "--name : 64 caractères au plus"
 case "$NAME" in
   *..*) usage_err "--name ne doit pas contenir « .. »" ;;
-  [A-Za-z0-9]*) ;;
-  *) usage_err "--name doit commencer par [A-Za-z0-9]" ;;
+  [$ALNUM]*) ;;
+  *) usage_err "--name doit commencer par une lettre ASCII ou un chiffre" ;;
 esac
 case "$NAME" in
-  *[!A-Za-z0-9\ ._-]*) usage_err "--name : caractères autorisés [A-Za-z0-9 ._-]" ;;
+  *[!$ALNUM\ ._-]*) usage_err "--name : caractères autorisés : lettres ASCII, chiffres, espace, point, tiret, souligné" ;;
 esac
 [ -n "$MILESTONE" ] && [ "${#MILESTONE}" -le 32 ] || usage_err "--milestone : 1 à 32 caractères"
 case "$MILESTONE" in
-  *[!A-Za-z0-9._-]*) usage_err "--milestone : caractères autorisés [A-Za-z0-9._-]" ;;
+  *[!$ALNUM._-]*) usage_err "--milestone : caractères autorisés : lettres ASCII, chiffres, point, tiret, souligné" ;;
 esac
 
 [ -d "$ROOT" ] || nv "--path introuvable : $ROOT — aucune écriture"
@@ -104,7 +113,7 @@ _POLICY=""
 for _cand in "$HERE/workstream-policy.sh" "$HERE/../../planning-core/scripts/workstream-policy.sh"; do
   [ -f "$_cand" ] && { _POLICY="$_cand"; break; }
 done
-[ -n "$_POLICY" ] || nv "workstream-policy.sh introuvable — aucune écriture"
+[ -n "$_POLICY" ] || nv "script des règles des sujets introuvable — aucune écriture"
 # shellcheck source=/dev/null
 . "$_POLICY"
 
@@ -127,18 +136,30 @@ fm_get() { # <STATE.md> <clé> : valeur de la clé dans le frontmatter (lecture 
 }
 
 # --- 3. Lab plat : séquence d'état nécessaire ? ------------------------------------------------------------
+# Trois états du STATE racine, jamais deux manières de le lire : complet (les deux clés), brut (aucune des
+# deux : produit de gsd-new-project), partiel (une seule : lab démarré, séquence destructive => refus).
 NEED_SEQ=0; PRECAP=""
 if [ "$MODE" = "plat" ]; then
   ROOT_STATE="$PLANNING/STATE.md"
-  if [ -n "$(fm_get "$ROOT_STATE" milestone)" ] && [ -n "$(fm_get "$ROOT_STATE" current_phase)" ]; then
+  HAS_M="$(fm_get "$ROOT_STATE" milestone)"; HAS_C="$(fm_get "$ROOT_STATE" current_phase)"
+  if [ -n "$HAS_M" ] && [ -n "$HAS_C" ]; then
     NEED_SEQ=0
-  else
+  elif [ -z "$HAS_M" ] && [ -z "$HAS_C" ]; then
     NEED_SEQ=1
     PRECAP="$(engine state get Phase --raw 2>/dev/null)" || nv "lecture de la ligne Phase: par le moteur en échec — aucune écriture"
     case "$PRECAP" in
       [0-9]*) : ;;
       *) nv "ligne Phase: non numérique [$PRECAP] — aucune écriture" ;;
     esac
+    if [ "$MILESTONE_SET" -eq 0 ]; then
+      # Jalon courant du ROADMAP du lab (lecture seule, mesurée) ; rien de lisible ou forme refusée => v1.0.
+      _ms="$(engine init progress 2>/dev/null | jq -r '.milestone_version // empty' 2>/dev/null)"
+      if [ -n "$_ms" ] && [ "${#_ms}" -le 32 ]; then
+        case "$_ms" in *[!$ALNUM._-]*) : ;; *) MILESTONE="$_ms" ;; esac
+      fi
+    fi
+  else
+    nv "l'état d'avancement du planning est à moitié renseigné (le jalon ou la phase courante manque) : je ne sépare pas ce planning, pour ne pas remettre l'avancement à zéro — aucune écriture ; à trancher avec l'équipe"
   fi
 fi
 
@@ -151,9 +172,9 @@ fi
 if printf '%s' "$CREATED" | jq -e '.error == "already_exists"' >/dev/null 2>&1; then
   echo "[split-planning] REFUSÉ : le sujet existe déjà (already_exists) — aucune écriture." >&2; exit 1
 fi
-[ "$c_rc" -eq 0 ] || nv "workstream create en échec (rc=$c_rc) — état du lab à vérifier"
+[ "$c_rc" -eq 0 ] || nv "création du sujet en échec (rc=$c_rc) — état du lab à vérifier"
 printf '%s' "$CREATED" | jq -e '.created == true and (.workstream | type == "string")' >/dev/null 2>&1 \
-  || nv "workstream create : sortie inattendue — état du lab à vérifier"
+  || nv "création du sujet : sortie inattendue — état du lab à vérifier"
 
 # --- 5. Nom retenu = nom canonique du moteur --------------------------------------------------------------------
 SUBJECT="$(printf '%s' "$CREATED" | jq -r '.workstream')"
