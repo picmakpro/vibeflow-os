@@ -54,11 +54,10 @@ ok "l'utilisateur peut travailler pendant la fabrication" "$(has "travailler pen
 ok "récap dette d'express obligatoire"        "$(has "dette d'express")"
 ok "affinage ultérieur via /vf-calibrate"     "$(has "/vf-calibrate")"
 
-# --- effort aligné sur check-agents.sh (ADR-044) : le gate est bloquant même si CLAUDE.md:63 et
-# docs/ADR.md:63 (doctrine interne, mainteneurs, hors périmètre de cette PR — voir Reste ouvert
-# du dossier de soumission) ne citent encore que description/model/memory. Assertions bornées au
-# bloc YAML du squelette (Phase 5) et au point 2 du Gate C : pas de grep sur tout le fichier, pour
-# ne pas être trompé par une occurrence hors de ces deux blocs. ---
+# --- effort aligné sur check-agents.sh (source citée verbatim : « zone 6, Phase 24 — ADR-044
+# etendu ») : vérifie que le squelette d'agent de la Phase 5 ne présente jamais `effort` comme
+# optionnel, porte la forme attendue par check-agents.sh, et que l'énumération du Gate C (point 2)
+# cite `effort`. Bornée à ces deux blocs, pas un grep sur tout le fichier. ---
 EFFORT_LIGNE="$(squelette | grep -E '^\s*effort:' | head -1)"
 
 if printf '%s' "$EFFORT_LIGNE" | grep -qiE 'optionnel|facultatif|optional'; then
@@ -66,6 +65,7 @@ if printf '%s' "$EFFORT_LIGNE" | grep -qiE 'optionnel|facultatif|optional'; then
 else
   ok "squelette agent : effort jamais présenté comme optionnel" "true"
 fi
+# Liste low|medium|high|xhigh|max en dur : reflète niveaux_effort du manifeste lu par check-agents.sh (pas une dérivation).
 ok "squelette agent : effort au format check-agents (low|medium|high|xhigh|max)" \
   "$(printf '%s' "$EFFORT_LIGNE" | grep -qE 'effort: <?low\|medium\|high\|xhigh\|max' && echo true || echo false)"
 ok "Gate C (point 2) : effort cité dans l'énumération des champs exigés" \
