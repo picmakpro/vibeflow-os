@@ -122,8 +122,12 @@ dépôt. », puis laisser l'humain décider.
 
 ### 8. Proposer le geste suivant
 
-Le geste a déjà activé le sujet pour la session en cours. Dire « Pour reprendre ce sujet dans une
-autre session, demandez à VibeFlow de reprendre le sujet <subject>. » Pour un sujet suivant, dire
+Le sujet par défaut du lab est celui qui reçoit le contenu migré, le premier : le geste le désigne
+lui-même, et VibeFlow le reprend d'une session à l'autre sans rien demander. Sur `mode` = `plat`, dire
+« Le sujet <subject> est le sujet par défaut ; pour travailler sur un autre sujet, nommez-le à
+VibeFlow : « reprends le sujet <nom> ». » Sur `mode` = `partitionne`, le sujet par défaut ne change
+pas : dire « Le sujet par défaut ne change pas ; pour travailler sur <subject>, dites à VibeFlow :
+« travaille sur le sujet <subject> ». » Pour un sujet suivant, dire
 « Pour lancer le premier jalon d'un sujet suivant, tapez : » puis la commande, en un seul span :
 
 « /gsd-new-milestone --ws <sujet> »

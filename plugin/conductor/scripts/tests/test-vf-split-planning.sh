@@ -294,6 +294,26 @@ dmut D8 "puces « rc 1 » et « rc 2 » supprimées => rouge" "$TMP/d8.md" "rc1-
 awk 'index($0,"sera rangé dans le sujet")>0{next} {print}' "$SKILL" > "$TMP/d9.md"
 dmut D9 "confirmation « sera rangé dans le sujet » supprimée => rouge" "$TMP/d9.md" "confirmation-absente-ou-après-le-geste"
 
+# --- P9 / D10 (P412-D-10) : le message de fin dit quel est le sujet par défaut et comment en nommer un autre --------------------
+# Le geste désigne le premier sujet comme sujet par défaut (pointeur partagé posé par le moteur) : si le skill cesse de le dire,
+# l'humain ne sait plus que « reprends le sujet X » existe. Les deux modes sont couverts (plat : le sujet devient le défaut ;
+# partitionné : le défaut ne change pas).
+defaut_sujet() { # <fichier> -> rc 0 si l'étape 8 porte les trois mentions
+  local s8; s8="$(sec "$1" "### 8. ")"
+  printf '%s\n' "$s8" | grep -qF "sujet par défaut" || return 1
+  printf '%s\n' "$s8" | grep -qF "« reprends le sujet <nom> »" || return 1
+  printf '%s\n' "$s8" | grep -qF "« travaille sur le sujet <subject> »" || return 1
+  printf '%s\n' "$s8" | grep -qF "le sujet par défaut ne change" || printf '%s\n' "$s8" | grep -qF "Le sujet par défaut ne change" || return 1
+}
+defaut_sujet "$SKILL"; p6=$?
+ok P9 "étape 8 : le sujet par défaut est dit (mode plat : le sujet l'est ; partitionné : inchangé) et « reprends / travaille sur le sujet » proposé" "$([ $p6 -eq 0 ] && echo true || echo false)"
+awk '/^### 8\. /{on=1; print; next} /^### /{on=0} on{gsub(/sujet par défaut/,"sujet"); gsub(/Sujet par défaut/,"Sujet")} {print}' "$SKILL" > "$TMP/d10.md"
+if cmp -s "$TMP/d10.md" "$SKILL"; then ok D10 "mention du sujet par défaut retirée de l'étape 8 => rouge" false "mutant NON OPPOSABLE"
+else defaut_sujet "$TMP/d10.md"; d10=$?
+  ok D10 "mention du sujet par défaut retirée de l'étape 8 => rouge" "$([ $d10 -ne 0 ] && echo true || echo false)" "le mutant est resté vert"
+  echo "      trace D10 : assertion=P9 « étape 8 dit le sujet par défaut » ; attendu=rouge ; obtenu=$([ $d10 -ne 0 ] && echo rouge || echo vert)"
+fi
+
 # --- J2 (correction 03) : le signal neuf / démarré de P412-D-08 est EXÉCUTÉ, jamais seulement lu -----------------------
 # Le skill appelle le geste en lecture seule (`--lab-state`) : le test extrait le bloc de commande de l'étape 4 du SKILL.md,
 # le joue sur des fixtures, et applique la règle du skill à son résultat (« neuf » => lab neuf, tout autre résultat => démarré).
