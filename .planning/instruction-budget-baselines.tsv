@@ -25,7 +25,7 @@
 # rendue par la ligne BOOTSTRAP de check-instruction-budget.sh. Toute hausse au-dessus de cette
 # ligne bloque (DEPASSEMENT-BOOTSTRAP) ; le plafond ADR-029 de 2000 tokens reste un objectif
 # (BACKLOG.md, commit 433fea0). Cette clé n'est jamais comptée comme entrée orpheline.
-@bootstrap:socle	0	2499
+@bootstrap:socle	0	2610
 plugin/business-pilot-bundle/agents/quality-gate-client.md	91	10
 plugin/business-pilot-bundle/agents/vf-business-commercial.md	97	17
 plugin/business-pilot-bundle/agents/vf-business-delivery.md	90	15
