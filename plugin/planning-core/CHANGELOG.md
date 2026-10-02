@@ -33,6 +33,19 @@
   Coût après correction (2026-10-02, 40 rejeux entrelacés par outil, `/bin/sh`, charge de 15 à 18 : machine non au repos), médiane
   / p90 de la commande sans pré-filtre puis corrigée : Write 88,5 / 123,9 → 24,2 / 33,2 ms ; Bash 75,8 / 109,1 → 20,4 / 36,5 ms ;
   Agent 67,1 / 98,1 → 16,3 / 24,0 ms (la version d'avant la correction, dans la même série : 22,7, 18,5 et 16,3 ms).
+  **Coût indépendant du système de fichiers** (re-audit du pré-filtre, tour 2, 2026-10-02 ; quick 261003-1le ; arbitrage de Willy, AskUserQuestion
+  session principale, 2026-10-02 : le pré-filtre seul, `Bash` reste dans le matcher) : F-P3 (haute) : une `config.json` creuse de 2 Gio
+  sur la chaîne du `cwd`, lue sans borne par `grep`, dépassait le `timeout` de 20 s (fail-open de tous les gates ; 16 valeurs sur 16 arbres
+  de configs : 18 s sous charge). Une config de plus de 64 Kio (mesurée par `find -L … -size +128`, sans lecture, lien suivi) fait
+  maintenant différer AVANT toute lecture, et un budget de 64 lectures de config par exécution fait différer au-delà : le pré-filtre ne
+  lit jamais plus de 64 fois 64 Kio, quel que soit le contenu que l'agent contrôle ; tout dépassement renvoie au chemin complet. F-P4
+  (basse) : `_pa` et le compteur sont initialisés à chaque exécution (un `_pa` hérité de l'environnement tenait un ancêtre adhérent
+  pour vérifié). Gardes : `PF-CREUX-01` (config creuse de 2 Gio, de 1 Mio, lien, ancêtre ; 65 536 et 65 537 octets ; budget de 64 et de 65
+  lectures ; 16 valeurs sur 16 arbres ; `_pa` et compteur hérités ; nombre de lectures compté dans une copie instrumentée, jamais déduit
+  de l'horloge) et six mutants (`V-*`) dans `test-planning-prefilter.sh` ; aucun cas ni mutant supprimé ou affaibli (Q-ARM). Coût mesuré
+  (2026-10-02, 40 rejeux entrelacés par outil, `/bin/sh`, dans ce dépôt, deux `.planning` sur la chaîne), médiane / p90 : Write 43,4 / 45,8 →
+  15,1 / 16,1 ms, Bash 43,2 / 45,8 → 14,8 / 15,8 ms, Agent 43,2 / 48,5 → 14,8 / 16,5 ms (le tour 1 : 12,1, 11,5 et 11,5 ms ; le `find`
+  par config coûte 3 ms dans ce dépôt).
 - **G2 en avertissement** : avertit (`additionalContext`) sur une écriture hors du `ecrit:` des plans ouverts,
   Bash compris (détection, jamais une promesse, P45-D-10) ; il ne refuse jamais.
 - **G6, G5, G1, G7 et le hook par rôle, chacun ARMÉ à sa propre étape** (ils refusent ; un gate armé qui rencontre

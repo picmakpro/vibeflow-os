@@ -29,12 +29,16 @@
 #   caractères ou 64 composants, qu'une correspondance brute dépasse 2048 caractères ou que le payload porte plus de 16 valeurs (PF-BORNE-01,
 #   autour de chaque borne, lab non adhérent et adhérent, script présent et absent, sortie identique à la commande sans pré-filtre) ; son
 #   coût est borné (PF-COUT-01 : sous 5 s sur des valeurs propres de 1 000 à 4 096 caractères, et nombre d'appels à `vf_pc` exact, tueur
-#   structurel indépendant de l'horloge). Les sections se lancent une à une : VF_PF_SECTIONS=table,bornes | corpus | mutants, et
+#   structurel indépendant de l'horloge). Propriété (G) : le coût d'une exécution ne dépend d'AUCUN contenu du système de fichiers que l'agent
+#   contrôle (re-audit, tour 2, F-P3 et F-P4 ; PF-CREUX-01) : une config de plus de 64 Kio (creuse de 2 Gio, lien vers elle, de 1 Mio, sur un
+#   ancêtre) fait DIFFÉRER avant toute lecture, 64 lectures de config au plus par exécution (copie instrumentée : le nombre de `grep` d'une
+#   `config.json` est compté, jamais déduit de l'horloge), `_pa` et le compteur hérités de l'environnement sans effet. Les sections se lancent une à une : VF_PF_SECTIONS=table,bornes | corpus | mutants, et
 #   VF_PF_MUT=<préfixes de mutants séparés par des virgules> (la suite entière dépasse dix minutes sur une machine chargée).
 #
 # Mutants (chacun doit rougir la garde, trace nom · assertion · attendu · obtenu) : (i) sortie trop tôt — sans vérifier cycles-v1, sans le
 # cwd du payload, sans le cwd du processus, sans les ancêtres ; (ii) sans résolution physique, sans le lien pendant ; (iii) valeur longue,
-# antislash, clé échappée, JSON non compact, `/.vol` acceptés.
+# antislash, clé échappée, JSON non compact, `/.vol` acceptés ; (v) sans borne de taille de config, sans budget de lectures, `_pa` ou compteur non
+# initialisés, mesure de taille sans suivre le lien, borne de taille déplacée.
 #
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; `cmp -s` jamais `diff`. Lançable depuis tout cwd.
 set -uo pipefail
@@ -187,8 +191,10 @@ class Ctx:
         self.n += 1
         return os.path.join(self.work, "%s-%d" % (p, self.n))
 
-    def env(self):
+    def env(self, extra=None):
         e = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": self.home}
+        if extra:
+            e.update(extra)
         if os.environ.get("TMPDIR"):
             e["TMPDIR"] = os.environ["TMPDIR"]
         return e
@@ -198,13 +204,13 @@ class Ctx:
             return cmd.replace(TOKEN, "'" + dossier + "'"), {}
         raise SystemExit("jeton {{VF_SCRIPTS}} attendu dans hooks.json")
 
-    def lancer(self, cmd, brut, cwd, dossier=None, shell=None, tmo=120):
+    def lancer(self, cmd, brut, cwd, dossier=None, shell=None, tmo=120, env_extra=None):
         t, _ = self.texte(cmd, dossier or self.scripts_dir)
         argv = shell or ["/bin/sh", "-c"]
         if argv[0].endswith("zsh"):
             t = "emulate sh\n" + t
         try:
-            p = subprocess.run(argv + [t], input=brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.env(), cwd=cwd, timeout=tmo)
+            p = subprocess.run(argv + [t], input=brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.env(env_extra), cwd=cwd, timeout=tmo)
         except subprocess.TimeoutExpired:
             return -9, b"", b"TIMEOUT"
         return p.returncode, p.stdout, p.stderr
@@ -971,6 +977,120 @@ def table_cout(ctx, cmd, L, mutant=False):
     return viol
 
 
+# --- coût indépendant du système de fichiers (re-audit du pré-filtre, tour 2, 2026-10-02, F-P3 et F-P4) -------------
+SONDE_GREP = "grep() { for _a; do :; done; printf 'G:%s\\n' \"$_a\" >> \"$VF_SONDE\"; command grep \"$@\"; }\n"
+
+
+def fixtures_creux(ctx):
+    """Fixtures de PF-CREUX-01, créées UNE fois dans le dossier temporaire de la suite : configs creuses (2 Gio, 1 Mio), config d'un lien, configs
+    de 65 536 et 65 537 octets, arbres de configs non adhérentes. Le dossier est supprimé à la fin de la suite (trap de la suite)."""
+    if getattr(ctx, "creux", None):
+        return ctx.creux
+    R = os.path.realpath(ctx.unique("creux"))
+    os.makedirs(R)
+    F = {"R": R}
+
+    def creux(chemin, taille, debut=b""):
+        os.makedirs(os.path.dirname(chemin), exist_ok=True)
+        with open(chemin, "wb") as fh:
+            fh.write(debut)
+            fh.truncate(taille)
+    F["gio2"] = R + "/s1/.planning/config.json"
+    creux(F["gio2"], 2 * 1024 ** 3)
+    creux(R + "/s2/.planning/config.json", 1024 * 1024, ADH.encode())
+    os.makedirs(R + "/s3/.planning")
+    os.symlink(F["gio2"], R + "/s3/.planning/config.json")
+    creux(R + "/s4/.planning/config.json", 1024 * 1024)
+    os.makedirs(R + "/s4/a/b/c")
+    os.makedirs(R + "/s1/a")
+    for nom, taille in (("s5", 65536), ("s6", 65537)):
+        corps = DEV.encode()
+        os.makedirs(R + "/" + nom + "/.planning")
+        with open(R + "/" + nom + "/.planning/config.json", "wb") as fh:
+            fh.write(corps + b" " * (taille - len(corps)))
+    # arbres : un `.planning/config.json` non adhérent à CHAQUE niveau ; niveaux au plus 30, et assez peu pour que la valeur reste sous 64 composants
+    F["max"] = 62 - comps(R)
+
+    def arbre(nom, niveaux):
+        feuille = R + "/arbres/" + nom
+        for k in range(niveaux):
+            lab(feuille + "/c" * k if k else feuille, DEV)
+        return feuille + "/c" * (niveaux - 1) if niveaux > 1 else feuille
+    F["arbre"] = arbre
+    ctx.creux = F
+    return F
+
+
+def table_creux(ctx, cmd, L, mutant=False):
+    """Le coût d'une exécution du pré-filtre ne dépend d'AUCUN contenu du système de fichiers que l'agent contrôle (F-P3) : une config de plus de
+    64 Kio (creuse de 2 Gio, ou d'un lien) fait DIFFÉRER avant toute lecture ; le budget est de 64 lectures de config par exécution ; `_pa` et le
+    compteur sont initialisés à chaque exécution (F-P4). Tueurs STRUCTURELS : le nombre de lectures (`grep` d'une `config.json`) est compté dans
+    une copie instrumentée, jamais déduit de l'horloge ; l'horloge ne sert qu'à borner (5 s, attendu moins d'une demi-seconde)."""
+    np, pre = ctx.derive(cmd)
+    F = fixtures_creux(ctx)
+    R = F["R"]
+    inst = SONDE_GREP + pre
+    plain = L["plain"]
+    w = lambda chemin, cwd: compact(payload_obj("Write", entree_outil("Write", chemin), cwd))
+    cas = []
+    # (étiquette, payload, cwd du processus, verdict, lectures de config attendues, environnement ajouté, rejouer la commande complète)
+    cas.append(("config creuse de 2 Gio, Write sous le lab", w(R + "/s1/a/f.md", R + "/s1/a"), plain, "DEFER", 0, None, True))
+    cas.append(("config de 1 Mio qui débute par cycles-v1, Write dans le lab", w(R + "/s2/f.md", R + "/s2"), plain, "DEFER", 0, None, True))
+    cas.append(("config = lien vers la config creuse de 2 Gio", w(R + "/s3/f.md", R + "/s3"), plain, "DEFER", 0, None, True))
+    cas.append(("config creuse de 1 Mio sur un ANCÊTRE du cwd", w(R + "/s4/a/b/c/f.md", R + "/s4/a/b/c"), plain, "DEFER", 0, None, True))
+    cas.append(("config de 65 536 octets (limite incluse)", w(R + "/s5/f.md", R + "/s5"), plain, "SHORT", 1, None, True))
+    cas.append(("config de 65 537 octets (limite dépassée)", w(R + "/s6/f.md", R + "/s6"), plain, "DEFER", 0, None, True))
+    if F["max"] < 33:
+        return [("fixtures de PF-CREUX-01 : au moins 33 niveaux sous 64 composants", ">= 33", "%d (dossier temporaire trop profond)" % F["max"], None)]
+    n = 32
+    ar = F["arbre"]
+    a1, a2 = ar("p1", n), ar("p2", n)
+    cas.append(("budget : %d + %d = 64 lectures de config (non adhérentes)" % (n, 64 - n), w(ar("q1", 64 - n) + "/f.md", a1), plain, "SHORT", 64, None, True))
+    cas.append(("budget : %d + %d = 65 lectures de config" % (n, 65 - n), w(ar("q2", 65 - n) + "/f.md", a2), plain, "DEFER", 64, None, True))
+    vals = [ar("r%d" % i, n) for i in range(16)]
+    ti = {"file_path": vals[0] + "/f.md", "content": "x"}
+    for i in range(1, 15):
+        ti["n%d" % i] = {"cwd": vals[i]}
+    cas.append(("budget : 16 valeurs sur 16 arbres de %d niveaux portant chacun une config" % n, compact(payload_obj("Write", ti, vals[15])), plain, "DEFER", 64, None, True))
+    cas.append(("F-P4 : `_pa` hérité de l'environnement, égal à un ancêtre adhérent", w(L["adh"] + "/f.md", L["adh"]), plain, "DEFER", None, {"_pa": L["adh"]}, False))
+    cas.append(("F-P4 : compteur `_pb` hérité de l'environnement (1000)", w(L["dev"] + "/f.md", L["dev"]), plain, "SHORT", None, {"_pb": "1000"}, False))
+
+    def jouer(e):
+        etiq, brut, cwd, att, g_att, env_extra, avec_complete = e
+        c = Cas("creux", etiq, brut, cwd, etiq)
+        r = []
+        sonde = ctx.unique("sonde")
+        t0 = time.time()
+        rc, out, err = ctx.lancer(inst, brut, cwd, tmo=5, env_extra=dict(env_extra or {}, VF_SONDE=sonde))
+        dt = time.time() - t0
+        # le tueur STRUCTUREL d'abord : le nombre de lectures de config, lu même si l'horloge a tué le processus
+        if g_att is not None:
+            lu = len([l for l in (open(sonde, "rb").read().split(b"\n") if os.path.exists(sonde) else []) if l.endswith(b"/config.json")])
+            if lu != g_att:
+                r.append(("(F-P3) nombre de lectures de config (compté dans une copie instrumentée : budget de 64, aucune lecture d'un fichier de plus de 64 Kio)",
+                          "%d lecture(s)" % g_att, "%d lecture(s)" % lu, c))
+        if err == b"TIMEOUT" or dt >= 5:
+            return r + [("coût borné : pré-filtre sous 5 s (attendu moins d'une demi-seconde), jamais un TIMEOUT que le harnais tuerait en laissant passer",
+                         "< 5 s", "TIMEOUT à 5 s" if err == b"TIMEOUT" else "%.2f s" % dt, c)]
+        verdict = out.decode("utf-8", "replace") if rc == 0 else "ERR rc=%d" % rc
+        if verdict != att:
+            r.append(("(F-P3)(F-P4) verdict du pré-filtre (DEFER dès qu'un contenu du système de fichiers le demande, SHORT sinon)", att, verdict, c))
+        if avec_complete and not r:
+            # le coût du CŒUR (planning-hook.sh lit une config de 2 Gio en 1,5 à 2,5 s) n'est pas celui du pré-filtre : pas d'horloge ici, l'égalité seule
+            a = ctx.lancer(np, brut, cwd, tmo=90)
+            z = ctx.lancer(cmd, brut, cwd, tmo=90)
+            if a != z or a[2] == b"TIMEOUT":
+                r.append(("(E) la commande complète rend la sortie de la commande sans pré-filtre, octet pour octet",
+                          "rc=%d out=%s err=%s" % (a[0], court(a[1]), court(a[2])), "rc=%d out=%s err=%s" % (z[0], court(z[1]), court(z[2])), c))
+        return r
+    viol = []
+    for e in cas:
+        viol += jouer(e)
+        if mutant and viol:
+            break
+    return viol
+
+
 # --- sections ----------------------------------------------------------------------------------------------
 def montrer(libelle, viol, ok_detail):
     if viol:
@@ -1013,6 +1133,10 @@ def sec_bornes(ctx, L):
     montrer("PF-BORNE-01", table_bornes(ctx, ctx.cmd, L),
             "%d cas autour des bornes (1023, 1024, 1025 caractères ; 4083 à 4097 ; 63, 64, 65, 66 composants ; 1, 16, 17, 40 clés répétées ; 100 et 4 100 espaces) en lab non adhérent "
             "et adhérent : verdict attendu, et la commande complète rend, script présent comme script absent, la sortie de la commande sans pré-filtre" % n)
+    montrer("PF-CREUX-01", table_creux(ctx, ctx.cmd, L),
+            "coût indépendant du système de fichiers : config creuse de 2 Gio (et lien vers elle, et config de 1 Mio qui débute par cycles-v1, et sur un ancêtre) : DEFER en moins de 5 s, "
+            "aucune lecture ; limite de 65 536 octets ; budget de 64 lectures de config (64 → SHORT, 65 et 16 valeurs sur 16 arbres → DEFER) ; `_pa` et le compteur hérités de l'environnement sans effet ; "
+            "commande complète identique à la commande sans pré-filtre")
     montrer("PF-COUT-01", table_cout(ctx, ctx.cmd, L),
             "valeurs propres de 1 000 à 4 096 caractères (cwd et chemin, composants d'un caractère ou de 120), lab adhérent et non adhérent : pré-filtre seul et "
             "commande complète sous 5 s ; appels à vf_pc exacts sur trois branches d'un même arbre (mémoire d'un seul préfixe) et nuls sur 200 composants")
@@ -1048,6 +1172,12 @@ MUTANTS = [
     ("IV-SANS-BORNE-COMPOSANTS", '_pj=$((_pj+1)); [ "$_pj" -le 64 ] || return 1; ', "", "iv : retire la borne de 64 composants"),
     ("IV-SANS-BORNE-BRUTE", '[ "${#_pv}" -le 2048 ] || return 1; ', "", "iv : retire la borne de 2048 caractères sur la correspondance brute"),
     ("IV-SANS-PLAFOND-VALEURS", '_pz=$((_pz+1)); [ "$_pz" -le 16 ] || return 1; ', "", "iv : retire le plafond de 16 valeurs examinées"),
+    ("V-SANS-BORNE-TAILLE", '[ -z "$(find -L "$_pq" -size +128 2>/dev/null)" ] || return 1; ', "", "v : retire la borne de 64 Kio sur la config (lecture d'un fichier creux de 2 Gio)"),
+    ("V-SANS-BUDGET", '_pb=$((_pb+1)); [ "$_pb" -le 64 ] || return 1; ', "", "v : retire le budget de 64 lectures de config par exécution"),
+    ("V-PA-NON-INITIALISE", '_pa=; _pb=0; ', '_pb=0; ', "v : `_pa` n'est plus initialisé (F-P4 : un `_pa` hérité de l'environnement tient un ancêtre adhérent pour vérifié)"),
+    ("V-PB-NON-INITIALISE", '_pa=; _pb=0; ', '_pa=; ', "v : le compteur n'est plus initialisé (un `_pb` hérité de l'environnement consomme le budget)"),
+    ("V-FIND-SANS-L", 'find -L "$_pq"', 'find "$_pq"', "v : la mesure de taille ne suit plus le lien (une config lien vers un fichier creux est lue)"),
+    ("V-BORNE-TAILLE-DEPLACEE", '-size +128 ', '-size +256 ', "v : borne de taille déplacée (128 kio : une config de 65 537 octets est lue)"),
     ("I-SANS-CYCLES-V1", "[ $? -eq 1 ]; }", ":; }", "i : sort trop tôt, sans vérifier cycles-v1 dans la config"),
     ("I-SANS-CWD-PAYLOAD", "(file_path|notebook_path|cwd)", "(file_path|notebook_path)", "i : sort trop tôt, sans regarder le cwd du payload"),
     ("I-SANS-CWD-PROCESSUS", 'case $PWD in /*) vf_px "$PWD" || return 1 ;; esac; vf_pp . || return 1; vf_pw "$_pr"; }', "return 0; }", "i : sort trop tôt, sans regarder le cwd du processus"),
@@ -1086,7 +1216,7 @@ def sec_mutants(ctx, L, familles):
             continue
         # ordre : tableau D d'abord (rapide), puis le plancher, puis le corpus (sh seul, arrêt à la première violation)
         viol_t = table_d(ctx, muté, L, mutant=True)
-        viol_b = table_bornes(ctx, muté, L, mutant=True) + table_cout(ctx, muté, L, mutant=True)
+        viol_b = table_bornes(ctx, muté, L, mutant=True) + table_cout(ctx, muté, L, mutant=True) + table_creux(ctx, muté, L, mutant=True)
         viol_c, _ = garde(ctx, muté, cas_tous, mutant=True, avec_a=False)
         viol = viol_t + viol_b + viol_c
         if not viol:
