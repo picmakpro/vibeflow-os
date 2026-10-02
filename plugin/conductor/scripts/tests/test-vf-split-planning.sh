@@ -17,7 +17,7 @@
 #   VF_TEST_COMMAND_PATH  chemin de la commande jugée
 #
 # Cas : T1-T12 (skill + commande), D1-D5 (la sonde discrimine), R1-R4 (renvois), M1-M2 (manuel),
-#       P1-P5 (ordre des étapes, refus relayés, confirmation de bascule, nom) et D6-D9 (leurs mutants).
+#       P1-P7 (ordre des étapes, refus relayés, confirmation de bascule, nom, signal neuf/démarré exécuté) et D6-D9, X1-X4 (leurs mutants).
 # Aucun `diff` (proxifié, menteur sur ce poste) : `cmp -s`.
 set -uo pipefail
 
@@ -223,6 +223,9 @@ sec() { # <fichier> <préfixe de titre « ### N. »> : le corps de l'étape, jus
   awk -v p="$2" 'index($0,p)==1{on=1; next} on && /^### /{exit} on{print}' "$1"
 }
 lnum() { grep -nF -- "$1" "$2" 2>/dev/null | head -1 | cut -d: -f1; }
+bullet_of() { # <texte> <début de puce> : la puce ET ses lignes de suite (indentées)
+  printf '%s\n' "$1" | awk -v b="$2" 'index($0,b)==1{on=1; print; next} on && /^  [^ ]/{print; next} {on=0}'
+}
 structure() { # <fichier> -> rc 0 conforme ; STRUCT_BAD = les écarts
   local f="$1" bad="" n prev=0 s1 s4 s6 l_pre l_geste l_conf
   for n in 1 2 3 4 5 6 7 8; do
@@ -230,7 +233,7 @@ structure() { # <fichier> -> rc 0 conforme ; STRUCT_BAD = les écarts
     if [ -z "$l" ]; then bad="$bad étape-$n-absente"; elif [ "$l" -le "$prev" ]; then bad="$bad étape-$n-hors-ordre"; else prev="$l"; fi
   done
   s1="$(sec "$f" "### 1. ")"; s4="$(sec "$f" "### 4. ")"; s6="$(sec "$f" "### 6. ")"
-  l_pre="$(lnum "bash .claude/scripts/check-planning-not-inflight.sh" "$f")"; l_geste="$(lnum "bash .claude/scripts/split-planning.sh" "$f")"
+  l_pre="$(lnum "bash .claude/scripts/check-planning-not-inflight.sh" "$f")"; l_geste="$(lnum "bash .claude/scripts/split-planning.sh --path . --name" "$f")"
   { [ -n "$l_pre" ] && [ -n "$l_geste" ] && [ "$l_pre" -lt "$l_geste" ]; } || bad="$bad précondition-pas-avant-le-geste"
   # étape 1 : une puce par code, chacune avec son message dit
   printf '%s\n' "$s1" | grep -F -- "- rc 1" | grep -qF "Une phase est en cours dans ce lab" || bad="$bad précondition:rc1-non-relayé"
@@ -247,6 +250,8 @@ structure() { # <fichier> -> rc 0 conforme ; STRUCT_BAD = les écarts
   printf '%s\n' "$s4" | grep -qF "AVANT tout appel au geste" || bad="$bad confirmation:pas-avant-tout-appel"
   printf '%s\n' "$s4" | grep -qF "RIEN n'est fait" || bad="$bad confirmation:refus-non-traité"
   printf '%s\n' "$s4" | grep -qF "pas de seconde question" || bad="$bad confirmation:lab-neuf-non-distingué"
+  bullet_of "$s4" '- `neuf`' | grep -qF "pas de seconde question" || bad="$bad signal:neuf-mal-relayé"
+  bullet_of "$s4" '- tout autre résultat' | grep -qF '`demarre` ou lecture impossible → lab déjà démarré' || bad="$bad signal:démarré-ou-illisible-non-relayé"
   printf '%s\n' "$s4" | grep -qF "dans les deux modes" || bad="$bad nom:règle-non-unique"
   printf '%s\n' "$s4" | grep -qF "l'emporte toujours" || bad="$bad nom:argument-non-prioritaire"
   STRUCT_BAD="$bad"; [ -z "$bad" ]
@@ -288,8 +293,77 @@ dmut D8 "puces « rc 1 » et « rc 2 » supprimées => rouge" "$TMP/d8.md" "rc1-
 # D9 : confirmation de bascule (P412-D-08) supprimée
 awk 'index($0,"sera rangé dans le sujet")>0{next} {print}' "$SKILL" > "$TMP/d9.md"
 dmut D9 "confirmation « sera rangé dans le sujet » supprimée => rouge" "$TMP/d9.md" "confirmation-absente-ou-après-le-geste"
-echo "== structure : $DOK/8 mutants de la sonde et du skill prouvés =="
+
+# --- J2 (correction 03) : le signal neuf / démarré de P412-D-08 est EXÉCUTÉ, jamais seulement lu -----------------------
+# Le skill appelle le geste en lecture seule (`--lab-state`) : le test extrait le bloc de commande de l'étape 4 du SKILL.md,
+# le joue sur des fixtures, et applique la règle du skill à son résultat (« neuf » => lab neuf, tout autre résultat => démarré).
+echo "  -- signal neuf / démarré exécuté (étape 4) --"
+labcmd() { # <SKILL.md> : le bloc ```sh de l'étape 4 (hors précondition), sans ses barrières
+  sec "$1" "### 4. " | awk '/^```sh/{on=1; next} /^```/{on=0} on{print}'
+}
+mk_lab() { # <id> <contenu du STATE.md, via printf> -> dossier du lab
+  local d="$TMP/lab-$1"; mkdir -p "$d/.planning"; printf -- "$2" > "$d/.planning/STATE.md"; printf '%s' "$d"
+}
+LB="$(printf '\357\273\277')"
+FM_NEUF='---\ngsd_state_version: 1.0\nstatus: planning\n---\n\n# Project State\nPhase: 1 of 3\n'
+LAB_NEUF="$(mk_lab neuf "$FM_NEUF")"
+LAB_DEM="$(mk_lab dem '---\ngsd_state_version: 1.0\ncurrent_phase: 2\nstatus: planning\n---\n\nPhase: 2 of 3\n')"
+LAB_JAL="$(mk_lab jal '---\nmilestone: v1.0\nstatus: planning\n---\n\nPhase: 1 of 3\n')"
+LAB_COMPLET="$(mk_lab complet '---\nmilestone: v1.0\ncurrent_phase: 2\n---\n\nPhase: 2 of 3\n')"
+LAB_CRLF="$(mk_lab crlf '---\r\ngsd_state_version: 1.0\r\ncurrent_phase: 2\r\nstatus: planning\r\n---\r\n\r\nPhase: 2 of 3\r\n')"
+LAB_CRLF_NEUF="$(mk_lab crlfneuf '---\r\ngsd_state_version: 1.0\r\nstatus: planning\r\n---\r\n\r\nPhase: 1 of 3\r\n')"
+LAB_BOM="$(mk_lab bom "${LB}"'---\ncurrent_phase: 2\nstatus: planning\n---\n\nPhase: 2 of 3\n')"
+LAB_VIDE="$(mk_lab vide '---\nmilestone:\ncurrent_phase:\nstatus: planning\n---\n\nPhase: 1 of 3\n')"
+LAB_ABSENT="$TMP/lab-absent"; mkdir -p "$LAB_ABSENT/.planning"
+labstate_exec() { # <SKILL.md> -> LS_BAD (vide = conforme), LS_REACH_NEUF / LS_REACH_DEM = verdicts atteints
+  local f="$1" cmd verdict lab want out rc c0 c1 spec; LS_BAD=""; LS_REACH_NEUF=0; LS_REACH_DEM=0
+  cmd="$(labcmd "$f")"
+  [ -n "$cmd" ] || { LS_BAD="aucun bloc de commande à l'étape 4"; return 1; }
+  cmd="$(printf '%s' "$cmd" | sed "s#\.claude/scripts/#$CONDUCTOR/scripts/#g")"
+  for spec in "$LAB_NEUF:neuf" "$LAB_DEM:demarre" "$LAB_JAL:demarre" "$LAB_COMPLET:demarre" "$LAB_CRLF:demarre" \
+              "$LAB_CRLF_NEUF:neuf" "$LAB_BOM:demarre" "$LAB_VIDE:neuf" "$LAB_ABSENT:demarre"; do
+    lab="${spec%%:*}"; want="${spec##*:}"
+    c0="$(cd "$lab" && find . -type f -exec cksum {} + | LC_ALL=C sort)"
+    out="$(cd "$lab" && "$BASH" -c "$cmd" 2>/dev/null)"; rc=$?
+    c1="$(cd "$lab" && find . -type f -exec cksum {} + | LC_ALL=C sort)"
+    # la règle du skill : « neuf » (rc 0) => lab neuf ; tout autre résultat, y compris une lecture impossible => démarré
+    if [ "$rc" = "0" ] && [ "$out" = "neuf" ]; then verdict=neuf; LS_REACH_NEUF=$((LS_REACH_NEUF+1)); else verdict=demarre; LS_REACH_DEM=$((LS_REACH_DEM+1)); fi
+    [ "$verdict" = "$want" ] || LS_BAD="$LS_BAD $(basename "$lab"):attendu-$want-obtenu-$verdict(rc=$rc,out=$out)"
+    [ "$c0" = "$c1" ] || LS_BAD="$LS_BAD $(basename "$lab"):écriture-détectée"
+  done
+  [ "$LS_REACH_NEUF" -ge 1 ] && [ "$LS_REACH_DEM" -ge 1 ] || LS_BAD="$LS_BAD verdict-non-atteint(neuf=$LS_REACH_NEUF,demarre=$LS_REACH_DEM)"
+  [ -z "$LS_BAD" ]
+}
+labstate_exec "$SKILL"; lsr=$?
+ok P6 "étape 4 : le bloc de commande du skill, exécuté sur 9 fixtures (neuf, démarré, jalon seul, complet, CRLF, BOM, valeurs vides, CRLF neuf, STATE absent), rend le bon verdict sans rien écrire" \
+  "$([ $lsr -eq 0 ] && echo true || echo false)" "$LS_BAD"
+structure "$SKILL"
+ok P7 "étape 4 : puces du signal — « neuf » ne pose pas de seconde question ; démarré ET lecture impossible déclenchent la confirmation" \
+  "$(clean signal:)" "$STRUCT_BAD"
+
+xmut() { # <ID> <description> <fichier muté> <exécution|prose>
+  if cmp -s "$3" "$SKILL"; then ok "$1" "$2" false "mutant NON OPPOSABLE (identique au skill)"; return; fi
+  local r
+  if [ "$4" = "exécution" ]; then labstate_exec "$3"; r=$?; else structure "$3"; r=$?; fi
+  local bad="${LS_BAD}"; [ "$4" = "prose" ] && bad="$STRUCT_BAD"
+  if [ $r -ne 0 ]; then DOK=$((DOK+1)); ok "$1" "$2" true
+  else ok "$1" "$2" false "attendu un rouge, obtenu vert"; fi
+  echo "      trace $1 : assertion=$4 ; attendu=rouge ; obtenu=$([ $r -ne 0 ] && echo "rouge [$bad]" || echo vert)"
+}
+# X1 : signal inversé (les deux puces échangent leurs mots-clés)
+awk '{ if (index($0,"- `neuf` (produit brut")==1) sub(/`neuf`/, "`demarre`"); else if (index($0,"- tout autre résultat, `demarre`")==1) sub(/`demarre`/, "`neuf`"); print }' "$SKILL" > "$TMP/x1.md"
+xmut X1 "signal inversé (puces « neuf » / « démarré » échangées) => rouge" "$TMP/x1.md" prose
+# X2 : « lecture impossible => démarré » remplacé par « lecture impossible => neuf »
+awk '{ if (index($0,"- tout autre résultat")==1) { sub(/, `demarre` ou lecture impossible/, ", `demarre` seul") } print }' "$SKILL" > "$TMP/x2.md"
+xmut X2 "« lecture impossible » ne relève plus du lab démarré => rouge" "$TMP/x2.md" prose
+# X3 : critère réduit à `current_phase` seul (l'ancien awk du skill, jalon ignoré)
+awk -v q="'" '/^bash .claude\/scripts\/split-planning.sh --path . --lab-state$/{ print "awk " q "/^---[ \\t]*$/{n++; next} n==1 && /^current_phase:/{f=1} END{print f ? \"demarre\" : \"neuf\"}" q " .planning/STATE.md"; next } {print}' "$SKILL" > "$TMP/x3.md"
+xmut X3 "critère réduit à current_phase seul (jalon ignoré), joué sur les fixtures => rouge" "$TMP/x3.md" exécution
+# X4 : le geste est remplacé par un motif awk qui ne tolère ni CRLF ni BOM (l'ancien one-liner du skill)
+awk -v q="'" '/^bash .claude\/scripts\/split-planning.sh --path . --lab-state$/{ print "awk " q "/^---[ \\t]*$/{n++; next} n==1 && /^(milestone|current_phase):/{f=1} END{print f ? \"demarre\" : \"neuf\"}" q " .planning/STATE.md"; next } {print}' "$SKILL" > "$TMP/x4.md"
+xmut X4 "ancien one-liner awk (motif sans [[:space:]], sans BOM) joué sur les fixtures CRLF/BOM => rouge" "$TMP/x4.md" exécution
+echo "== structure : $DOK/12 mutants de la sonde et du skill prouvés =="
 
 # __BILAN__
 echo "== bilan : $((PASS+FAIL)) cas, $FAIL échec(s) =="
-[ "$FAIL" -eq 0 ] && [ "$DOK" -eq 8 ]
+[ "$FAIL" -eq 0 ] && [ "$DOK" -eq 12 ]

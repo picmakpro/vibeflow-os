@@ -72,11 +72,11 @@ en mode `partitionne` sans argument, le demander en clair. Si ce nom ne respecte
 acceptée par le geste (premier caractère alphanumérique, puis lettres, chiffres, espace, point,
 tiret ou souligné, 64 au plus, sans deux points consécutifs), demander un nom en clair.
 
-Mode `plat` seulement : lire sur le disque si le lab est neuf ou déjà démarré — même critère que le
-geste, jamais deviné en prose :
+Mode `plat` seulement : lire sur le disque si le lab est neuf ou déjà démarré — par le geste lui-même
+en lecture seule (aucune écriture), le même critère que lui, jamais deviné en prose ni dupliqué ici :
 
 ```sh
-awk '/^---[ \t]*$/{n++; next} n==1 && /^(milestone|current_phase):/{f=1} END{print f ? "demarre" : "neuf"}' .planning/STATE.md
+bash .claude/scripts/split-planning.sh --path . --lab-state
 ```
 
 - `neuf` (produit brut de l'initialisation : aucune des deux clés) → la seule question de l'étape 3
