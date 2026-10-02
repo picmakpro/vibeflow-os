@@ -66,7 +66,11 @@ sp() {
   local envs=()
   while [ "$1" != "--" ]; do envs+=("$1"); shift; done
   shift
-  OUT="$( cd "$cwd" && env -u GSD_WORKSTREAM ${envs[@]+"${envs[@]}"} "$BASH_BIN" "$SCRIPT" "$@" 2>"$TMP/err" )"; RC=$?
+  # Une session Claude Code est SIMULÉE (clé de session + TMPDIR jetable) : le moteur écrirait alors son pointeur
+  # de session sous os.tmpdir(), non composable. Seul le geste, en neutralisant ces clés (P412-D-10), obtient le
+  # pointeur partagé du dépôt : la preuve ne tient pas à l'environnement nu de la CI.
+  mkdir -p "$TMP/sess"
+  OUT="$( cd "$cwd" && env -u GSD_WORKSTREAM ${envs[@]+"${envs[@]}"} GSD_SESSION_KEY=vf-split-test "TMPDIR=$TMP/sess" "$BASH_BIN" "$SCRIPT" "$@" 2>"$TMP/err" )"; RC=$?
   ERR="$(cat "$TMP/err" 2>/dev/null)"
   printf '%s\n%s\n' "$OUT" "$ERR" >> "$TMP/emis.txt"   # tout ce que le geste a émis (sonde de vocabulaire VOCAB)
 }
@@ -522,14 +526,25 @@ O5="$( cd "$DW" && env -u GSD_WORKSTREAM "$BASH_BIN" "$CHKDIV" --path "$DW" 2>&1
 if [ "$R5" = "0" ] && printf '%s' "$O5" | grep -qF 'conforme'; then emit W5 0 "check-divergence.sh --path : rc 0, conforme" ""
 else emit W5 1 "check-divergence.sh --path : rc 0, conforme" "rc=$R5 sortie=[$O5]"; fi
 
-# --- W6 : check-workstream-pointer avec GSD_WORKSTREAM -------------------------------------------------------
-O6="$( cd "$DW" && env GSD_WORKSTREAM=mon-projet "$BASH_BIN" "$CHKPTR" --path "$DW" 2>&1 )"; R6=$?
-if [ "$R6" = "0" ] && printf '%s' "$O6" | grep -q 'env'; then emit W6 0 "check-workstream-pointer.sh, GSD_WORKSTREAM=mon-projet : rc 0, canal env nommé" ""
-else emit W6 1 "check-workstream-pointer.sh, GSD_WORKSTREAM=mon-projet : rc 0, canal env nommé" "rc=$R6 sortie=[$O6]"; fi
+# --- W6 : check-workstream-pointer SANS GSD_WORKSTREAM (P412-D-10) --------------------------------------------------
+# Le lab fraîchement partitionné résout son sujet par le pointeur PARTAGÉ, posé par le moteur au moment du geste :
+# aucune variable d'environnement n'est posée ici, ni par la fixture ni par la suite.
+w6_run() { # <dossier> -> W6_RC, W6_OUT
+  W6_OUT="$( cd "$1" && env -u GSD_WORKSTREAM "$BASH_BIN" "$CHKPTR" --path "$1" 2>&1 )"; W6_RC=$?
+}
+w6_run "$DW"
+W6_DESC="check-workstream-pointer.sh sans GSD_WORKSTREAM : rc 0, canal du pointeur partagé nommé"
+if [ "$W6_RC" = "0" ] && printf '%s' "$W6_OUT" | grep -qF 'store-partage' && [ "$(cat "$DW/.planning/active-workstream" 2>/dev/null)" = "mon-projet" ] && [ -f "$DW/.planning/active-workstream" ] && [ ! -L "$DW/.planning/active-workstream" ]; then emit W6 0 "$W6_DESC" ""
+else emit W6 1 "$W6_DESC" "rc=$W6_RC sortie=[$W6_OUT]"; fi
 
 # --- W7 : second sujet ----------------------------------------------------------------------------------------
 sp "$TMP" -- --path "$DW" --name second
 expect W7 "second sujet : partitionné, non-initialise" 0 "-" '{"mode":"partitionne","subject":"second","state":"non-initialise"}'
+# W7b (P412-D-10) : le sujet ajouté ne change PAS le sujet par défaut — pointeur partagé inchangé, canal toujours résolu
+PTRB_BAD=""
+[ -f "$DW/.planning/active-workstream" ] && [ ! -L "$DW/.planning/active-workstream" ] && [ "$(cat "$DW/.planning/active-workstream")" = "mon-projet" ] || PTRB_BAD="pointeur=[$(cat "$DW/.planning/active-workstream" 2>/dev/null)] attendu mon-projet"
+w6_run "$DW"; [ "$W6_RC" = "0" ] || PTRB_BAD="$PTRB_BAD check-workstream-pointer rc=$W6_RC"
+emit W7b "$([ -z "$PTRB_BAD" ] && echo 0 || echo 1)" "sujet ajouté à un lab partitionné : sujet par défaut inchangé (pointeur partagé = mon-projet), check-workstream-pointer rc 0" "$PTRB_BAD"
 gcommit "$DW" "docs: second sujet"
 
 # --- W8 : balayage à deux sujets ---------------------------------------------------------------------------------
@@ -766,7 +781,34 @@ if mutate "$MS" "$ANCH10" "$(printf '%s' "$ANCH10" | sed 's/if \[ -n "\$CREATED"
   else emit M10 1 "(x) garde de sortie vide retirée : J5 doit rougir" "J5_BAD=[$J5_BAD] RC=$m10_rc"; fi
 else emit M10 1 "(x) construction du mutant" "ancre introuvable [$ANCH10]"; fi
 
-echo "== mutations : $MD/11 détectées =="
+# --- (xi) écriture du pointeur retirée (P412-D-10) : le geste n'ose plus neutraliser les clés de session, ET la
+#          post-condition est neutralisée pour que W6 soit mis à l'épreuve SEUL : un lab fraîchement partitionné ne résout plus ------
+mk_mut_tree v11; MS="$MT/conductor/scripts/split-planning.sh"; ML="$MT/conductor/scripts/fanout-state-integrity.sh"
+ANCH11a='  PTR_ENV=("${PTR_NOKEY[@]}")'
+ANCH11b="$(grep -F '|| nv "le sujet par défaut n' "$MS" | head -1)"
+if mutate "$MS" "$ANCH11a" '  PTR_ENV=()' && mutate "$MS" "$ANCH11b" '    || true'; then
+  chain34 "$MS" "$ML"; w6_run "$D"
+  if [ "$C_RC" = "0" ] && [ "$W6_RC" = "1" ]; then
+    MD=$((MD+1)); emit M11 0 "(xi) écriture du pointeur retirée : le geste rend complete, W6 rougit (check-workstream-pointer rc 1)" ""
+    echo "      trace (xi) : assertion=W6 « sans GSD_WORKSTREAM : rc 0, canal du pointeur partagé » ; attendu=rc 0 ; obtenu=rc $W6_RC ($(printf '%s' "$W6_OUT" | cut -c1-90)…)"
+  else emit M11 1 "(xi) écriture du pointeur retirée : W6 doit rougir" "C_RC=$C_RC W6_RC=$W6_RC"; fi
+else emit M11 1 "(xi) construction du mutant" "ancre introuvable [$ANCH11a] [$ANCH11b]"; fi
+
+# --- (xii) sujet ajouté qui ÉCRASE le sujet par défaut (create sans clé forcée) + post-condition neutralisée : W7b rougit -------
+mk_mut_tree v12; MS="$MT/conductor/scripts/split-planning.sh"; ML="$MT/conductor/scripts/fanout-state-integrity.sh"
+ANCH12a="$(grep -F 'PTR_ENV=("GSD_SESSION_KEY=' "$MS" | head -1)"
+ANCH12b="$(grep -F '[ "$(ptr_snapshot)" = "$PTR_BEFORE" ]' "$MS" | head -1)"
+if mutate "$MS" "$ANCH12a" '  PTR_ENV=("${PTR_NOKEY[@]}")' && mutate "$MS" "$ANCH12b" '  true'; then
+  chain34 "$MS" "$ML"; gcommit "$D" "docs: partition"
+  sp_on "$MS" "$TMP" -- --path "$D" --name second; m12_rc="$RC"
+  m12_ptr="$(cat "$D/.planning/active-workstream" 2>/dev/null)"
+  if [ "$m12_rc" = "0" ] && [ "$m12_ptr" = "second" ]; then
+    MD=$((MD+1)); emit M12 0 "(xii) sujet ajouté qui écrase le sujet par défaut : le pointeur devient second — W7b (pointeur = mon-projet) rougit" ""
+    echo "      trace (xii) : assertion=W7b « sujet ajouté : pointeur partagé inchangé » ; attendu=mon-projet ; obtenu=$m12_ptr"
+  else emit M12 1 "(xii) écrasement du sujet par défaut : le pointeur doit devenir second" "rc=$m12_rc pointeur=[$m12_ptr]"; fi
+else emit M12 1 "(xii) construction du mutant" "ancre introuvable [$ANCH12a] [$ANCH12b]"; fi
+
+echo "== mutations : $MD/13 détectées =="
 
 else
   emit ENGINE 1 "moteur gsd-core introuvable (GSD_TOOLS, PATH, ~/.claude/gsd-core) : S1-S5, S7-S10, W1-W12 et mutations (i)-(iv) NON jouables — ko, jamais skip" "installer @opengsd/gsd-core@^1"

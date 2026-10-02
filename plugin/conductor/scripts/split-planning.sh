@@ -28,6 +28,15 @@
 #                    pré-capture, puis `state milestone-switch --milestone <v> --name <sujet>`, puis
 #                    `state patch` du JSON fabriqué par `jq -cn --arg` ; post-condition lue sur le disque
 #                    (milestone, current_phase numérique, UNE seule ligne ^Phase:).
+#   7. sujet par défaut (P412-D-10, arbitrage Samuel, AskUserQuestion session principale, 2026-10-02,
+#                    « Le premier sujet (Recommandé) ») : la migration d'un lab plat fait écrire PAR LE MOTEUR le
+#                    pointeur partagé `.planning/active-workstream` = le premier sujet (mesuré : `workstream create`
+#                    l'écrit lui-même quand AUCUNE clé de session ne résout ; sinon il écrit sous `os.tmpdir()`,
+#                    non composable). L'appel `create` d'un lab plat passe donc sous `env -u <clés de session>` et
+#                    stdin fermé. Un sujet AJOUTÉ à un lab déjà partitionné ne change JAMAIS le sujet par défaut :
+#                    son `create` est détourné vers un pointeur de session jetable (clé forcée, TMPDIR jetable).
+#                    Post-condition : fichier régulier (pas un lien), contenu = nom canonique ; ou, pour un sujet
+#                    ajouté, pointeur strictement inchangé.
 # Aucun rollback automatique (ADR-031) : si le sujet est créé et l'état incomplet, le message dit « sujet
 # créé, état à compléter » et rend NON VÉRIFIABLE. La séquence d'état est destructive sur un lab démarré
 # (mesuré, 41.2-MESURE-VERBE-ETAT.md) : d'où sa condition « STATE migré sans milestone NI current_phase ».
@@ -147,7 +156,21 @@ case "$GT" in
   *) RUN=("$GT") ;;
 esac
 
-engine() { env -u GSD_WORKSTREAM "${RUN[@]}" --cwd "$ROOT" "$@"; }
+# PTR_ENV : réglages d'environnement SUPPLÉMENTAIRES du seul appel `create` (vide partout ailleurs), cf. étape 4.
+PTR_ENV=()
+# Clés de session que le moteur consulte pour choisir son pointeur (active-workstream-store, mesuré 2026-10-02) :
+# aucune ne résout => le pointeur écrit est le pointeur PARTAGÉ du dépôt.
+PTR_NOKEY=(-u GSD_SESSION_KEY -u CODEX_THREAD_ID -u CLAUDE_SESSION_ID -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_SSE_PORT
+  -u OPENCODE_SESSION_ID -u GEMINI_SESSION_ID -u CURSOR_SESSION_ID -u WINDSURF_SESSION_ID -u TERM_SESSION_ID
+  -u WT_SESSION -u TMUX_PANE -u ZELLIJ_SESSION_NAME -u TTY -u SSH_TTY)
+engine() { env -u GSD_WORKSTREAM ${PTR_ENV[@]+"${PTR_ENV[@]}"} "${RUN[@]}" --cwd "$ROOT" "$@"; }
+PTR_FILE="$PLANNING/active-workstream"
+ptr_snapshot() { # empreinte du pointeur partagé : « absent » ou cksum du contenu (lien ou non régulier => « atypique »)
+  if [ -L "$PTR_FILE" ]; then echo atypique
+  elif [ -f "$PTR_FILE" ]; then cksum < "$PTR_FILE"
+  elif [ -e "$PTR_FILE" ]; then echo atypique
+  else echo absent; fi
+}
 
 # --- 3. Lab plat : séquence d'état nécessaire ? ------------------------------------------------------------
 # Trois états du STATE racine, jamais deux manières de le lire : complet (les deux clés), brut (aucune des
@@ -211,10 +234,20 @@ if [ "$MODE" = "plat" ]; then
 fi
 
 # --- 4. Création par le moteur ------------------------------------------------------------------------------
+PTR_BEFORE="$(ptr_snapshot)"; SCRATCH=""
 if [ "$MODE" = "plat" ]; then
-  CREATED="$(engine workstream create "$NAME" --migrate-name "$NAME" 2>/dev/null)"; c_rc=$?
+  # P412-D-10 : aucune clé de session => le moteur écrit lui-même le pointeur PARTAGÉ = le premier sujet.
+  PTR_ENV=("${PTR_NOKEY[@]}")
+  CREATED="$(engine workstream create "$NAME" --migrate-name "$NAME" 2>/dev/null </dev/null)"; c_rc=$?
+  PTR_ENV=()
 else
-  CREATED="$(engine workstream create "$NAME" 2>/dev/null)"; c_rc=$?
+  # Sujet ajouté : le sujet par défaut ne bouge pas. Le moteur écrit son pointeur de SESSION (clé forcée) sous un
+  # TMPDIR jetable, jamais le pointeur partagé.
+  SCRATCH="$(mktemp -d 2>/dev/null)" || nv "dossier temporaire indisponible — aucune écriture"
+  PTR_ENV=("GSD_SESSION_KEY=vf-split-$$" "TMPDIR=$SCRATCH")
+  CREATED="$(engine workstream create "$NAME" 2>/dev/null </dev/null)"; c_rc=$?
+  PTR_ENV=()
+  rm -rf "$SCRATCH"
 fi
 if [ -n "$CREATED" ] && printf '%s' "$CREATED" | jq -e '.error == "already_exists"' >/dev/null 2>&1; then
   echo "[split-planning] REFUSÉ : le sujet existe déjà (already_exists) — aucune écriture." >&2; exit 1
@@ -256,6 +289,14 @@ elif [ "$MODE" = "plat" ]; then
   STATE_OUT="complete"
 fi
 
-# --- 7. Sortie -------------------------------------------------------------------------------------------------------
+# --- 7. Sujet par défaut (P412-D-10) ------------------------------------------------------------------------------
+if [ "$MODE" = "plat" ]; then
+  { [ -f "$PTR_FILE" ] && [ ! -L "$PTR_FILE" ] && [ "$(cat "$PTR_FILE" 2>/dev/null)" = "$SUBJECT" ]; } \
+    || nv "le sujet par défaut n'a pas été posé par le moteur (fichier absent, lien, ou autre contenu que « $SUBJECT ») — sujet créé, sujet par défaut à poser"
+else
+  [ "$(ptr_snapshot)" = "$PTR_BEFORE" ] || nv "le sujet par défaut a changé pendant l'ajout du sujet — sujet créé, sujet par défaut à vérifier"
+fi
+
+# --- 8. Sortie -------------------------------------------------------------------------------------------------------
 jq -cn --arg mode "$MODE" --arg subject "$SUBJECT" --arg state "$STATE_OUT" '{mode:$mode,subject:$subject,state:$state}'
 exit 0
