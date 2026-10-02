@@ -25,7 +25,7 @@ désinstallation, dépannage — vit désormais dans le manuel utilisateur, à j
 Pour aller vite, les deux commandes qui posent le plugin (avant de lancer `/vibeflow-install`) :
 
 ```bash
-claude plugin marketplace add picmakpro/vibeflow-os
+claude plugin marketplace add vf-os/vibeflow-os
 claude plugin install vibeflow
 ```
 
@@ -33,7 +33,7 @@ Sous **Codex**, le canal natif prend le relais — noter le verbe `add`, `codex 
 n'existe pas :
 
 ```bash
-codex plugin marketplace add picmakpro/vibeflow-os
+codex plugin marketplace add vf-os/vibeflow-os
 codex plugin add vibeflow@vibeflow-os
 ```
 

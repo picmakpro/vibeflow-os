@@ -13,7 +13,7 @@
 #   check-plugin-update.sh --print    # met à jour le cache ET imprime le JSON sur stdout
 set -uo pipefail
 
-REPO_URL="${VF_REPO_URL:-https://github.com/picmakpro/vibeflow-os}"
+REPO_URL="${VF_REPO_URL:-https://github.com/vf-os/vibeflow-os}"
 PLUGIN_ID="${VF_PLUGIN_ID:-vibeflow@vibeflow-os}"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow"
 CACHE_FILE="$CACHE_DIR/update-check.json"

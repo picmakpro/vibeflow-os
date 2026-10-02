@@ -101,7 +101,7 @@ gates sans intervention.
 Deux commandes, zéro clone, zéro édition de config :
 
 ```bash
-claude plugin marketplace add picmakpro/vibeflow-os
+claude plugin marketplace add vf-os/vibeflow-os
 claude plugin install vibeflow
 ```
 
@@ -113,7 +113,7 @@ choix des modules, dépendances résolues et récapitulées avant toute pose. Mi
 (canal natif, plus un manifeste `.codex-plugin/`) et sur **kimi-code** :
 
 ```bash
-codex plugin marketplace add picmakpro/vibeflow-os
+codex plugin marketplace add vf-os/vibeflow-os
 codex plugin add vibeflow@vibeflow-os
 ```
 

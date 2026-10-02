@@ -175,4 +175,4 @@ Voir `CHANGELOG.md` section "Limites connues".
 
 ## Support
 
-Issues : tracker du repo `picmakpro/vibeflow-os`.
+Issues : tracker du repo `vf-os/vibeflow-os`.

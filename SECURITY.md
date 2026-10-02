@@ -16,7 +16,7 @@ Only the **latest published release** of VibeFlow OS receives security fixes. Up
 discussions.**
 
 Report them privately through GitHub:
-**[Report a vulnerability](https://github.com/picmakpro/vibeflow-os/security/advisories/new)**
+**[Report a vulnerability](https://github.com/vf-os/vibeflow-os/security/advisories/new)**
 (repository → *Security* tab → *Report a vulnerability*).
 
 Please include:

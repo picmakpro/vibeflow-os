@@ -9,7 +9,7 @@
 # suivre. Poser le secret suffit à activer le snapshot — aucun autre changement à faire ici.
 #
 # GESTE HUMAIN REQUIS — le seul que ce workflow ne peut pas faire lui-même :
-#   1. Créer un PAT *fine-grained* limité au seul dépôt picmakpro/vibeflow-os, avec les permissions
+#   1. Créer un PAT *fine-grained* limité au seul dépôt vf-os/vibeflow-os, avec les permissions
 #      "Administration: read" et "Metadata: read" (rien de plus — pas de "Contents", pas de token
 #      classic).
 #   2. Le poser en secret de DÉPÔT (pas d'organisation) nommé TRAFFIC_PAT :
@@ -51,7 +51,7 @@ jobs:
           if [ -n "${{ secrets.TRAFFIC_PAT }}" ]; then
             echo "actif=true" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "::error::Secret TRAFFIC_PAT manquant — voir l'en-tête de ce fichier (.github/workflows/traffic-snapshot.yml) pour la marche à suivre (PAT fine-grained, permission Administration: read, dépôt picmakpro/vibeflow-os seul)."
+            echo "::error::Secret TRAFFIC_PAT manquant — voir l'en-tête de ce fichier (.github/workflows/traffic-snapshot.yml) pour la marche à suivre (PAT fine-grained, permission Administration: read, dépôt vf-os/vibeflow-os seul)."
             exit 1
           else
             echo "::warning::Snapshot NON ACTIVÉ — secret TRAFFIC_PAT absent. Run planifié ignoré sans erreur ; poser le secret (voir l'en-tête du fichier) pour activer le snapshot hebdomadaire."

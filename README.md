@@ -97,7 +97,7 @@ baseline installs into a blank lab and must pass its own gates with zero interve
 Two commands, no clone, no config editing:
 
 ```bash
-claude plugin marketplace add picmakpro/vibeflow-os
+claude plugin marketplace add vf-os/vibeflow-os
 claude plugin install vibeflow
 ```
 
@@ -109,7 +109,7 @@ module picker, dependencies resolved and recapped before anything is written. Up
 channel, plus a `.codex-plugin/` manifest) and on **kimi-code**:
 
 ```bash
-codex plugin marketplace add picmakpro/vibeflow-os
+codex plugin marketplace add vf-os/vibeflow-os
 codex plugin add vibeflow@vibeflow-os
 ```
 

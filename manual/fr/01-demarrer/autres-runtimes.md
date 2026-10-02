@@ -44,7 +44,7 @@ Deux commandes, la même logique que sous Claude Code (nom du verbe près : c'es
 `install`) :
 
 ```bash
-codex plugin marketplace add picmakpro/vibeflow-os
+codex plugin marketplace add vf-os/vibeflow-os
 codex plugin add vibeflow@vibeflow-os
 ```
 

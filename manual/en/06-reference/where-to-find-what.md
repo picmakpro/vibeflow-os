@@ -87,7 +87,7 @@ faster to just ask your lab in plain language than to go read the raw file yours
 
 ## Reporting a problem or suggesting an improvement
 
-This repo is public on GitHub, at `picmakpro/vibeflow-os`. A behavior anomaly, a manual page that's
+This repo is public on GitHub, at `vf-os/vibeflow-os`. A behavior anomaly, a manual page that's
 aged badly, or an improvement idea — the normal path is a GitHub issue on this repo.
 
 Describe what you observe rather than what you assume the cause is: that's what gets it fixed

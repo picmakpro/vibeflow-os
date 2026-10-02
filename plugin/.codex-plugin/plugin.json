@@ -6,8 +6,8 @@
   "author": {
     "name": "picmakpro"
   },
-  "homepage": "https://github.com/picmakpro/vibeflow-os",
-  "repository": "https://github.com/picmakpro/vibeflow-os",
+  "homepage": "https://github.com/vf-os/vibeflow-os",
+  "repository": "https://github.com/vf-os/vibeflow-os",
   "license": "UNLICENSED",
   "keywords": [
     "vibeflow",
@@ -38,6 +38,6 @@
       "On est où sur le projet ?",
       "Cadre et code la prochaine étape depuis la feuille de route."
     ],
-    "websiteURL": "https://github.com/picmakpro/vibeflow-os"
+    "websiteURL": "https://github.com/vf-os/vibeflow-os"
   }
 }

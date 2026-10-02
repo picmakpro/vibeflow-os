@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for the report! French or English are both fine.
-        **Security issue? Do not file it here** — use [Report a vulnerability](https://github.com/picmakpro/vibeflow-os/security/advisories/new).
+        **Security issue? Do not file it here** — use [Report a vulnerability](https://github.com/vf-os/vibeflow-os/security/advisories/new).
   - type: input
     id: version
     attributes:

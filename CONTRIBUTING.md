@@ -50,7 +50,7 @@ redistribution — say so explicitly in the pull request.
 
 ## Reporting bugs and proposing features
 
-Use the [issue templates](https://github.com/picmakpro/vibeflow-os/issues/new/choose). A good
+Use the [issue templates](https://github.com/vf-os/vibeflow-os/issues/new/choose). A good
 bug report includes:
 
 - the VibeFlow version (`VERSION` file, or the version shown by `/vf-update`);

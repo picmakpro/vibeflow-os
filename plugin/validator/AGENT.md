@@ -247,4 +247,4 @@ Si je détecte que le lab est désaligné avec la méthodologie de référence (
 - ADR-045 — Recherche documentaire avant debug (gate `check-debug-research.sh`, Phase 2)
 - LRN-105 — 4 piliers complémentaires
 - LRN-106 — Audit avant fix
-- Repo : `picmakpro/vibeflow-os` v1.1.0+
+- Repo : `vf-os/vibeflow-os` v1.1.0+

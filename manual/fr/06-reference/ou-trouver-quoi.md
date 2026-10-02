@@ -88,7 +88,7 @@ naturel que d'aller lire le fichier brut toi-même.
 
 ## Signaler un problème ou proposer une amélioration
 
-Ce dépôt est public sur GitHub, à l'adresse `picmakpro/vibeflow-os`. Une anomalie de comportement,
+Ce dépôt est public sur GitHub, à l'adresse `vf-os/vibeflow-os`. Une anomalie de comportement,
 une page de ce manuel qui a mal vieilli, ou une idée d'amélioration — la voie normale est une issue
 GitHub sur ce dépôt.
 

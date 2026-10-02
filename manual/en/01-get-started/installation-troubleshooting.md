@@ -50,11 +50,11 @@ or the local catalog cache is stale.
 **Fix.** Re-run the marketplace add, then check it actually appears in the list:
 
 ```bash
-claude plugin marketplace add picmakpro/vibeflow-os
+claude plugin marketplace add vf-os/vibeflow-os
 claude plugin marketplace list
 ```
 
-The `picmakpro/vibeflow-os` repository should show up in the second command's output.
+The `vf-os/vibeflow-os` repository should show up in the second command's output.
 
 ### Reinstalling everything from scratch
 

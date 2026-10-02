@@ -152,4 +152,4 @@ bash .claude/scripts/audit-infra.sh --snapshot   # → .claude/INFRASTRUCTURE_SN
 
 - ADR-056 — vigilance support runtime · ADR-043 — hooks posés à l'install · ADR-032 — consolidation mémoire
 - Doc hooks Anthropic : https://docs.claude.com/en/docs/claude-code/hooks
-- Issues : tracker du repo `picmakpro/vibeflow-os`
+- Issues : tracker du repo `vf-os/vibeflow-os`

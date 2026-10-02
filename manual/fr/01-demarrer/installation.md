@@ -18,12 +18,12 @@ scopes, modules — y est identique.
 Ouvre un terminal (ou la fenêtre de commande de Claude Code) et tape, dans l'ordre :
 
 ```bash
-claude plugin marketplace add picmakpro/vibeflow-os
+claude plugin marketplace add vf-os/vibeflow-os
 claude plugin install vibeflow
 ```
 
 - La **première commande** ajoute le marketplace VibeFlow à Claude Code. Le dépôt GitHub
-  `picmakpro/vibeflow-os` héberge son propre catalogue de plugins (`marketplace.json`) — cette
+  `vf-os/vibeflow-os` héberge son propre catalogue de plugins (`marketplace.json`) — cette
   commande dit simplement à Claude Code « regarde aussi là ».
 - La **seconde commande** installe le plugin `vibeflow` lui-même : Claude Code copie le contenu du
   plugin (les modules, le skill `installer/`, et le moteur interne) dans son cache local.

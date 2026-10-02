@@ -43,7 +43,7 @@ believe the protections are running. Everything else — agents, skills, on-disk
 Two commands, the same logic as under Claude Code (mind the verb: it's `add`, not `install`):
 
 ```bash
-codex plugin marketplace add picmakpro/vibeflow-os
+codex plugin marketplace add vf-os/vibeflow-os
 codex plugin add vibeflow@vibeflow-os
 ```
 

@@ -10,7 +10,7 @@
 # Usage :
 #   traffic-snapshot.sh [--repo OWNER/NAME] [--out CHEMIN] [--dry-run] [--help]
 #
-#   --repo OWNER/NAME   Dépôt ciblé (défaut : picmakpro/vibeflow-os).
+#   --repo OWNER/NAME   Dépôt ciblé (défaut : vf-os/vibeflow-os).
 #   --out CHEMIN        Fichier JSON à lire/fusionner/écrire (défaut : traffic.json).
 #   --dry-run           Émet le JSON fusionné sur stdout, n'écrit jamais le fichier.
 #   -h, --help          Cette aide.
@@ -48,7 +48,7 @@
 # Codes de sortie : 0 = conforme · 1 = échec d'appel ou de fusion · 2 = usage/prérequis manquant
 set -euo pipefail
 
-REPO="picmakpro/vibeflow-os"
+REPO="vf-os/vibeflow-os"
 OUT="traffic.json"
 DRY_RUN=false
 

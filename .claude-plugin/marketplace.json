@@ -11,7 +11,7 @@
       "version": "2.68.0",
       "source": "./plugin",
       "category": "development",
-      "homepage": "https://github.com/picmakpro/vibeflow-os",
+      "homepage": "https://github.com/vf-os/vibeflow-os",
       "author": {
         "name": "picmakpro"
       }

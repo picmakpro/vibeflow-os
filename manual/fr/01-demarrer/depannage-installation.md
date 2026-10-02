@@ -51,11 +51,11 @@ que le marketplace n'est pas enregistré.
 **Geste.** Réexécute l'ajout du marketplace, puis vérifie qu'il apparaît bien dans la liste :
 
 ```bash
-claude plugin marketplace add picmakpro/vibeflow-os
+claude plugin marketplace add vf-os/vibeflow-os
 claude plugin marketplace list
 ```
 
-Le dépôt `picmakpro/vibeflow-os` doit figurer dans le résultat de la deuxième commande.
+Le dépôt `vf-os/vibeflow-os` doit figurer dans le résultat de la deuxième commande.
 
 ### Tout réinstaller depuis zéro
 
