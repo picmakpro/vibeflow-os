@@ -26,6 +26,10 @@ tools. Add `software-architecture` as soon as your project outgrows a handful of
 module that stops you from letting a god class grow for six weeks. What you don't take: the
 business bundles, which would lay down agent teams you'll never call.
 
+The installer offers these development compositions as presets: `dev` (the complete cycle),
+`dev-mobile` (`dev` plus the mobile test loop) and `dev-audite` (`dev` plus software architecture
+and the validator). The detail is in [installation.md](../01-get-started/installation.md).
+
 **There are several of you on a shared repository.** Same base as above, with two differences in
 posture. First the scope: install at project level so the configuration is versioned with the code
 and identical for everyone — that's the only way to avoid each person running their own slightly

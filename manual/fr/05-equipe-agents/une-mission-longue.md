@@ -130,6 +130,9 @@ fait respecter lui-même pendant que l'agent tourne. La discipline tient parce q
 écrits pour la respecter et parce que le gate refuse un module qui la viole, pas parce qu'un mur
 technique l'impose en direct.
 
+Ce qui se range en fin de mission (worktrees et branches intégrés, mémoire non indexée) a sa propre
+page : [ranger-ce-qu-on-cree.md](./ranger-ce-qu-on-cree.md).
+
 Ce que tu retrouves à la fin d'une mission, et où, c'est le sujet de la page suivante — celle qui
 dit ce qu'on te demande, à toi, pendant que tout ça tourne.
 

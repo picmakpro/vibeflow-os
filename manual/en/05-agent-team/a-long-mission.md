@@ -125,6 +125,9 @@ engine enforces live while the agent runs. The discipline holds because agents a
 respect it and because the gate rejects a module that violates it, not because a technical wall
 enforces it in real time.
 
+What gets tidied at the end of a mission (merged worktrees and branches, unindexed memory) has its
+own page: [tidying-up-after-yourself.md](./tidying-up-after-yourself.md).
+
 What you find at the end of a mission, and where, is the subject of the next page — the one that
 says what's asked of you, specifically, while all of this runs.
 
