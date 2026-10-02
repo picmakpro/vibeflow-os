@@ -34,7 +34,13 @@
 #
 # Usage:
 #   split-planning.sh --name <nom> [--path <dir>] [--milestone <v>]
+#   split-planning.sh --lab-state [--path <dir>]
 #   split-planning.sh --help
+#
+# --lab-state (P412-D-08, lecture seule) : rend « neuf » (ni jalon ni phase courante renseignés : produit brut de
+# l'initialisation) ou « demarre » (au moins l'un des deux) sur stdout, rc 0 ; état illisible => rc 2. Aucune
+# écriture, aucun appel moteur, aucun nom requis : c'est le MÊME critère que le geste (fm_get ci-dessous), le skill
+# l'appelle au lieu de dupliquer le critère. Tolère fins de ligne CRLF et BOM UTF-8.
 #
 # Defaults: --path .   --milestone = le jalon courant du ROADMAP du lab (moteur : `init progress`,
 # milestone_version), à défaut de jalon lisible v1.0 (le gabarit de roadmap du moteur nomme le greenfield
@@ -54,7 +60,7 @@
 #   64 = erreur d'usage (option inconnue, valeur manquante, nom ou jalon invalide).
 set -uo pipefail
 
-ROOT="."; NAME=""; MILESTONE="v1.0"; MILESTONE_SET=0; HAVE_NAME=0
+ROOT="."; NAME=""; MILESTONE="v1.0"; MILESTONE_SET=0; HAVE_NAME=0; LABSTATE=0
 ALNUM="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 usage_err() { echo "[split-planning] $*" >&2; exit 64; }
@@ -68,10 +74,21 @@ while [ "$#" -gt 0 ]; do
     --name=*)    NAME="${1#--name=}"; HAVE_NAME=1; shift ;;
     --milestone) [ "$#" -ge 2 ] || usage_err "--milestone nécessite une valeur"; MILESTONE="$2"; MILESTONE_SET=1; shift 2 ;;
     --milestone=*) MILESTONE="${1#--milestone=}"; MILESTONE_SET=1; shift ;;
+    --lab-state) LABSTATE=1; shift ;;
     -h|--help)   grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *)           usage_err "argument inconnu : $1" ;;
   esac
 done
+
+fm_get() { # <STATE.md> <clé> : valeur de la clé dans le frontmatter (lecture seule ; BOM UTF-8 et CR final tolérés)
+  LC_ALL=C awk -v k="$2" 'NR==1 && index($0,"\357\273\277")==1{$0=substr($0,4)} {sub(/\r$/,"")} /^---[[:space:]]*$/{n++; if(n==1) next; if(n==2) exit} n==1 && $0 ~ "^"k":"{sub("^"k":[[:space:]]*",""); gsub(/^["'\'']|["'\'']$/,""); print; exit}' "$1"
+}
+
+if [ "$LABSTATE" -eq 1 ]; then
+  [ -d "$ROOT" ] && [ -r "$ROOT/.planning/STATE.md" ] || { echo "[split-planning] NON VÉRIFIABLE : l'état d'avancement du planning est illisible — aucune écriture" >&2; exit 2; }
+  if [ -n "$(fm_get "$ROOT/.planning/STATE.md" milestone)" ] || [ -n "$(fm_get "$ROOT/.planning/STATE.md" current_phase)" ]; then echo demarre; else echo neuf; fi
+  exit 0
+fi
 
 [ "$HAVE_NAME" -eq 1 ] || usage_err "--name est obligatoire"
 [ -n "$ROOT" ] || usage_err "--path nécessite une valeur"
@@ -132,10 +149,6 @@ esac
 
 engine() { env -u GSD_WORKSTREAM "${RUN[@]}" --cwd "$ROOT" "$@"; }
 
-fm_get() { # <STATE.md> <clé> : valeur de la clé dans le frontmatter (lecture seule)
-  awk -v k="$2" '/^---[[:space:]]*$/{n++; if(n==1) next; if(n==2) exit} n==1 && $0 ~ "^"k":"{sub("^"k":[[:space:]]*",""); gsub(/^["'\'']|["'\'']$/,""); print; exit}' "$1"
-}
-
 # --- 3. Lab plat : séquence d'état nécessaire ? ------------------------------------------------------------
 # Trois états du STATE racine, jamais deux manières de le lire : complet (les deux clés), brut (aucune des
 # deux : produit de gsd-new-project), partiel (une seule : lab démarré, séquence destructive => refus).
@@ -149,7 +162,7 @@ tree_sum() { # empreinte du planning HORS STATE.md racine (contenu), pour prouve
 }
 state_split() { # <STATE.md> <fm|body> : frontmatter (sans les barres, guillemets de valeur retirés : le moteur
   # réécrit '1.0' en "1.0", même valeur) ou corps
-  awk -v w="$2" '/^---[[:space:]]*$/{n++; next} (w=="fm" && n==1) || (w=="body" && n>=2){print}' "$1" \
+  LC_ALL=C awk -v w="$2" 'NR==1 && index($0,"\357\273\277")==1{$0=substr($0,4)} /^---[[:space:]]*$/{n++; next} (w=="fm" && n==1) || (w=="body" && n>=2){print}' "$1" \
     | if [ "$2" = "fm" ]; then sed -e "s/^\([^:]*:\)[[:space:]]*[\"']\(.*\)[\"']\$/\1 \2/"; else cat; fi
 }
 if [ "$MODE" = "plat" ]; then
@@ -178,6 +191,10 @@ if [ "$MODE" = "plat" ]; then
     fi
     _fm0="$(state_split "$ROOT_STATE" fm | LC_ALL=C sort)"; _body0="$(state_split "$ROOT_STATE" body | cksum)"; _tree0="$(tree_sum)"
     _la="$(engine state get "Last activity" --raw 2>/dev/null)" || _la=""
+    # P412-D-09 : le moteur n'écrit que la ligne « Last activity » : elle doit exister, être renseignée et se relire à
+    # l'identique (sinon le moteur lirait une autre ligne ou une valeur rognée, et l'empreinte ne refuserait qu'APRÈS l'écriture)
+    _la_raw="$(grep -m1 '^Last activity:' "$ROOT_STATE" 2>/dev/null | sed 's/^Last activity:[[:space:]]*//')"
+    { [ -n "$_la_raw" ] && [ "$_la_raw" = "$_la" ]; } || nv "la ligne « Last activity » de l'état d'avancement est absente, vide ou ne se relit pas à l'identique (espaces en fin de ligne, par exemple) : je ne sépare pas ce planning — aucune écriture. Corrigez cette ligne, puis relancez la séparation"
     la_json="$(jq -cn --arg v "$_la" '{"Last activity":$v}')"
     engine state patch "$la_json" >/dev/null 2>&1 || nv "le moteur n'a pas pu compléter l'état d'avancement du planning — état à vérifier, aucune séparation faite"
     # Post-conditions et empreinte : le jalon est posé, le corps est identique octet pour octet, aucune ligne du
@@ -185,7 +202,7 @@ if [ "$MODE" = "plat" ]; then
     _fm1="$(state_split "$ROOT_STATE" fm | LC_ALL=C sort)"
     [ -n "$(fm_get "$ROOT_STATE" milestone)" ] || nv "le moteur n'a pas posé le jalon dans l'état d'avancement — état à vérifier, aucune séparation faite"
     [ "$_body0" = "$(state_split "$ROOT_STATE" body | cksum)" ] || nv "le moteur a modifié le corps de l'état d'avancement — état à vérifier, aucune séparation faite"
-    [ -z "$(comm -23 <(cat <<<"$_fm0") <(cat <<<"$_fm1"))" ] || nv "le moteur a modifié l'avancement déjà renseigné — état à vérifier, aucune séparation faite"
+    [ -z "$(LC_ALL=C comm -23 <(cat <<<"$_fm0") <(cat <<<"$_fm1"))" ] || nv "le moteur a modifié l'avancement déjà renseigné — état à vérifier, aucune séparation faite"
     [ "$_tree0" = "$(tree_sum)" ] || nv "le moteur a modifié d'autres fichiers du planning — état à vérifier, aucune séparation faite"
     REPAIRED=1
   else
@@ -199,10 +216,11 @@ if [ "$MODE" = "plat" ]; then
 else
   CREATED="$(engine workstream create "$NAME" 2>/dev/null)"; c_rc=$?
 fi
-if printf '%s' "$CREATED" | jq -e '.error == "already_exists"' >/dev/null 2>&1; then
+if [ -n "$CREATED" ] && printf '%s' "$CREATED" | jq -e '.error == "already_exists"' >/dev/null 2>&1; then
   echo "[split-planning] REFUSÉ : le sujet existe déjà (already_exists) — aucune écriture." >&2; exit 1
 fi
 [ "$c_rc" -eq 0 ] || nv "création du sujet en échec (rc=$c_rc) — état du lab à vérifier"
+[ -n "$CREATED" ] || nv "création du sujet : le moteur n'a rien répondu — état du lab à vérifier"
 printf '%s' "$CREATED" | jq -e '.created == true and (.workstream | type == "string")' >/dev/null 2>&1 \
   || nv "création du sujet : sortie inattendue — état du lab à vérifier"
 

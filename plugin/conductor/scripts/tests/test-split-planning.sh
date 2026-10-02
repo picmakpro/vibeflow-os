@@ -281,7 +281,7 @@ echo "== correction ciblée (cas C1-C6) =="
 if [ "$HAVE_ENG" = 1 ]; then
 
 # Faux moteur : délègue au vrai (REAL_ENG) sauf en mode FAKE_MODE — create-fail (rc 1), create-garbage
-# (JSON sans « created »), dup-phase (ajoute une 2e ligne ^Phase: au STATE du sujet APRÈS `state patch`).
+# (JSON sans « created »), create-empty (rc 0, aucune sortie), dup-phase (ajoute une 2e ligne ^Phase: au STATE du sujet APRÈS `state patch`).
 FAKE="$TMP/fake-engine.sh"
 cat > "$FAKE" <<'FE'
 #!/usr/bin/env bash
@@ -292,6 +292,7 @@ case " $* " in
     case "${FAKE_MODE:-}" in
       create-fail) exit 1 ;;
       create-garbage) echo '{"foo":1}'; exit 0 ;;
+      create-empty) exit 0 ;;
     esac ;;
 esac
 node "$REAL_ENG" "$@"; rc=$?
@@ -324,10 +325,35 @@ onekey "$SCRIPT" c1b "Phase: 2 of 3 (Coeur)" "milestone: v1.0"
 emit C1b "$([ -z "$C1_BAD" ] && echo 0 || echo 1)" "milestone SANS current_phase : NON VÉRIFIABLE « à moitié renseigné », disque intact, aucun sujet créé" "$C1_BAD"
 
 # --- C2 : --name déterministe sous toute locale -------------------------------------------------------------------------
+# Sélection des locales UTF-8 jouées : noms NORMALISÉS (casse, « utf-8 » = « utf8 ») des deux côtés, car glibc rend
+# `en_US.utf8` / `C.utf8` là où macOS rend `en_US.UTF-8` ; le nom EXACT listé est celui passé à LC_ALL (J1, correction 03).
+utf8_locales() { # stdin : sortie de `locale -a` -> les noms UTF-8 candidats (en_US, fr_FR, C), tels que listés
+  local l n
+  while IFS= read -r l; do
+    n="$(printf '%s' "$l" | tr 'A-Z' 'a-z' | sed 's/utf-8/utf8/')"
+    case "$n" in en_us.utf8|fr_fr.utf8|c.utf8) printf '%s\n' "$l" ;; esac
+  done
+}
+LIST_GLIBC="$(printf 'C\nC.utf8\nen_US.utf8\nfr_FR.utf8\nPOSIX\n')"
+LIST_MACOS="$(printf 'C\nPOSIX\nen_US\nen_US.ISO8859-1\nen_US.UTF-8\nfr_FR.UTF-8\n')"
+LIST_NONE="$(printf 'C\nPOSIX\nen_US.ISO8859-1\n')"
+sel_glibc="$(utf8_locales <<<"$LIST_GLIBC" | tr '\n' ' ')"; sel_macos="$(utf8_locales <<<"$LIST_MACOS" | tr '\n' ' ')"; sel_none="$(utf8_locales <<<"$LIST_NONE" | tr '\n' ' ')"
+old_filter() { # le filtre d'origine (mutant J1) : grep -qix « en_US.UTF-8 » sur la liste brute
+  local loc out=""; for loc in en_US.UTF-8 fr_FR.UTF-8; do grep -qix "$loc" <<<"$1" && out="$out$loc "; done; printf '%s' "$out"
+}
+bad=""
+[ "$sel_glibc" = "C.utf8 en_US.utf8 fr_FR.utf8 " ] || bad="$bad glibc=[$sel_glibc]"
+[ "$sel_macos" = "en_US.UTF-8 fr_FR.UTF-8 " ] || bad="$bad macos=[$sel_macos]"
+[ -z "$sel_none" ] || bad="$bad sans-utf8=[$sel_none]"
+[ -z "$(old_filter "$LIST_GLIBC")" ] || bad="$bad témoin-mutant-J1-non-aveugle-sur-glibc"
+emit C2s "$([ -z "$bad" ] && echo 0 || echo 1)" "sélection des locales UTF-8 : liste glibc (utf8 minuscule, C.utf8) et liste macOS reconnues, liste sans UTF-8 vide ; le filtre d'origine restait aveugle sur glibc" "$bad"
+echo "      trace C2s : mutant=filtre d'origine grep -qix en_US.UTF-8 ; assertion=liste glibc non vide ; attendu=rouge ; obtenu=[$(old_filter "$LIST_GLIBC")] (vide = aveugle, donc rouge)"
+
 D="$(mk_new_project c2)"; E0="$(empreinte "$D")"; bad=""; played=""
-LOCS="$(locale -a 2>/dev/null)"   # capturé : un `locale -a | grep -q` sous pipefail ment (SIGPIPE)
-for loc in C en_US.UTF-8 fr_FR.UTF-8; do
-  if [ "$loc" != "C" ] && ! grep -qix "$loc" <<<"$LOCS"; then continue; fi
+SEL="$(utf8_locales <<<"$(locale -a 2>/dev/null)")"   # capturé : un `locale -a | grep -q` sous pipefail ment (SIGPIPE)
+nsel=0
+for loc in C $SEL; do
+  [ "$loc" = "C" ] || nsel=$((nsel+1))
   played="$played $loc"
   for nm in "é" "aé" "ñ" "añb"; do
     sp "$TMP" "LC_ALL=$loc" -- --path "$D" --name "$nm"
@@ -337,8 +363,8 @@ for loc in C en_US.UTF-8 fr_FR.UTF-8; do
   [ "$RC" = "64" ] || bad="$bad [$loc milestone=<vé1> rc=$RC]"
 done
 [ "$E0" = "$(empreinte "$D")" ] || bad="$bad empreinte modifiée"
-case "$played" in *UTF-8*) : ;; *) bad="$bad aucune locale UTF-8 installée (en_US/fr_FR) : cas non opposable" ;; esac
-emit C2 "$([ -z "$bad" ] && echo 0 || echo 1)" "--name é / aé / ñ / añb et --milestone vé1 : 64 sans écriture sous les locales{$played }" "$bad"
+[ "$nsel" -ge 1 ] || bad="$bad aucune locale UTF-8 jouée (en_US/fr_FR/C.UTF-8 absentes de locale -a) : cas non opposable"
+emit C2 "$([ -z "$bad" ] && echo 0 || echo 1)" "--name é / aé / ñ / añb et --milestone vé1 : 64 sans écriture sous les locales{$played } (dont $nsel UTF-8)" "$bad"
 
 # --- C3 : post-condition « une seule ligne ^Phase: » ---------------------------------------------------------------------
 dupphase() { # <script> <id> -> RC, ERR, DP_BAD
@@ -609,7 +635,7 @@ c1c_run() { # <script> <id> -> C1C_BAD (vide = conforme), D, RC, OUT, ERR ; acce
   [ "$(fm "$ss" milestone)" = "v2.3" ] || C1C_BAD="$C1C_BAD milestone=[$(fm "$ss" milestone)] attendu v2.3"
   [ "$(fm "$ss" current_phase)" = "2" ] || C1C_BAD="$C1C_BAD current_phase=[$(fm "$ss" current_phase)] attendu 2"
   [ "$(sbody "$ss" | cksum)" = "$(sbody "$TMP/$2.avant" | cksum)" ] || C1C_BAD="$C1C_BAD corps de l'état modifié"
-  [ -z "$(comm -23 <(sfm "$TMP/$2.avant" | LC_ALL=C sort) <(sfm "$ss" | LC_ALL=C sort))" ] || C1C_BAD="$C1C_BAD ligne du frontmatter d'origine modifiée ou perdue"
+  [ -z "$(LC_ALL=C comm -23 <(sfm "$TMP/$2.avant" | LC_ALL=C sort) <(sfm "$ss" | LC_ALL=C sort))" ] || C1C_BAD="$C1C_BAD ligne du frontmatter d'origine modifiée ou perdue"
 }
 c1c_run "$SCRIPT" c1c
 gcommit "$D" "docs: planning séparé"; sweep "$D"
@@ -631,6 +657,45 @@ emit C1d "$([ -z "$C1D_BAD" ] && echo 0 || echo 1)" "le moteur (faux) écrit dan
 fakec1 "$SCRIPT" c1e patch-fm
 printf '%s' "$ERR" | grep -qF "modifié l'avancement déjà renseigné" || C1D_BAD="$C1D_BAD stderr sans [modifié l'avancement déjà renseigné] : [$ERR]"
 emit C1e "$([ -z "$C1D_BAD" ] && echo 0 || echo 1)" "le moteur (faux) change une ligne du frontmatter d'origine (status) : NON VÉRIFIABLE, aucun sujet créé" "$C1D_BAD"
+
+# --- J3 (P412-D-09) : la ligne « Last activity » est le pivot du `state patch` : absente, vide ou rognée => refus AVANT toute écriture ----
+la_case() { # <id> <script sed> <geste> -> LA_BAD (vide = conforme) : rc 2, ligne nommée, disque ET git intacts
+  local d e0 g0; d="$(mk_started "$1")"
+  sed -i.bak "$2" "$d/.planning/STATE.md"; rm -f "$d/.planning/STATE.md.bak"
+  gcommit "$d" "docs: ligne Last activity altérée"
+  e0="$(empreinte "$d")"; g0="$(cd "$d" && git status --porcelain)"
+  sp_on "$3" "$TMP" -- --path "$d" --name demarre
+  LA_BAD=""
+  [ "$RC" = "2" ] || LA_BAD="rc=$RC attendu 2 (stdout=[$OUT])"
+  printf '%s' "$ERR" | grep -qF "Last activity" || LA_BAD="$LA_BAD stderr sans [Last activity] : [$ERR]"
+  [ "$e0" = "$(empreinte "$d")" ] || LA_BAD="$LA_BAD empreinte modifiée"
+  [ "$g0" = "$(cd "$d" && git status --porcelain)" ] || LA_BAD="$LA_BAD git status modifié"
+  [ ! -d "$d/.planning/workstreams" ] || LA_BAD="$LA_BAD sujet créé"
+}
+SED_LA_VIDE='s/^Last activity:.*/Last activity:/'; SED_LA_ESP='s/^\(Last activity:.*\)$/\1   /'; SED_LA_ABS='/^Last activity:/d'
+la_case j3a "$SED_LA_VIDE" "$SCRIPT"; emit J3a "$([ -z "$LA_BAD" ] && echo 0 || echo 1)" "ligne « Last activity » VIDE : NON VÉRIFIABLE, la ligne est nommée, disque et git intacts, aucun sujet" "$LA_BAD"
+la_case j3b "$SED_LA_ESP" "$SCRIPT"; emit J3b "$([ -z "$LA_BAD" ] && echo 0 || echo 1)" "ligne « Last activity » avec espaces en fin de ligne : NON VÉRIFIABLE, disque et git intacts" "$LA_BAD"
+la_case j3c "$SED_LA_ABS" "$SCRIPT"; emit J3c "$([ -z "$LA_BAD" ] && echo 0 || echo 1)" "ligne « Last activity » ABSENTE : NON VÉRIFIABLE, disque et git intacts" "$LA_BAD"
+
+# --- J5 : un `workstream create` sans aucune sortie n'est pas « already_exists » (jq 1.6 rend 0 sur entrée vide) -----------------
+JQ_SHIM="$TMP/jq16"; mkdir -p "$JQ_SHIM"
+cat > "$JQ_SHIM/jq" <<SH
+#!/usr/bin/env bash
+# jq 1.6 simulé : \`jq -e\` sur une entrée VIDE rend 0 (jq 1.7 rend 4)
+case " \$* " in *" -e "*) inp="\$(cat)"; [ -z "\$inp" ] && exit 0; printf '%s' "\$inp" | "$JQ_REAL" "\$@"; exit \$? ;; esac
+exec "$JQ_REAL" "\$@"
+SH
+chmod +x "$JQ_SHIM/jq"
+empty_create() { # <geste> <id> -> RC, ERR, J5_BAD
+  local d e0; d="$(mk_new_project "$2")"; e0="$(empreinte "$d")"
+  sp_on "$1" "$TMP" "GSD_TOOLS=$FAKE" "REAL_ENG=$REAL_ENGINE" FAKE_MODE=create-empty "PATH=$JQ_SHIM:$PATH" -- --path "$d" --name x
+  J5_BAD=""
+  [ "$RC" = "2" ] || J5_BAD="rc=$RC attendu 2 (stdout=[$OUT])"
+  printf '%s' "$ERR" | grep -qF "n'a rien répondu" || J5_BAD="$J5_BAD stderr sans [n'a rien répondu] : [$ERR]"
+  printf '%s' "$ERR" | grep -qF "existe déjà" && J5_BAD="$J5_BAD pris pour already_exists"
+}
+empty_create "$SCRIPT" j5
+emit J5 "$([ -z "$J5_BAD" ] && echo 0 || echo 1)" "création du sujet sans aucune sortie (jq 1.6 simulé) : NON VÉRIFIABLE rc 2, pas « existe déjà » rc 1" "$J5_BAD"
 
 # --- (v) condition « état complet » du STATE racine : && -> || (correction C1) : un lab démarré à UNE clé rejoue la
 #         séquence destructive ou saute l'état à tort au lieu d'être refusé -----------------------------------------------
@@ -674,9 +739,34 @@ mut_fp() { # <nom> <ancre> <remplacement> <id> <mode faux> <cas> <libellé>
   else emit "$mid" 1 "$mlabel : construction du mutant" "ancre introuvable [$manchor]"; fi
 }
 mut_fp v7 '    [ "$_body0" = "$(state_split "$ROOT_STATE" body | cksum)" ] || nv "le moteur a modifié le corps de l'"'"'état d'"'"'avancement — état à vérifier, aucune séparation faite"' '    true' M7 patch-body C1d "(vii) empreinte du corps neutralisée"
-mut_fp v8 '    [ -z "$(comm -23 <(cat <<<"$_fm0") <(cat <<<"$_fm1"))" ] || nv "le moteur a modifié l'"'"'avancement déjà renseigné — état à vérifier, aucune séparation faite"' '    true' M8 patch-fm C1e "(viii) lignes d'origine du frontmatter neutralisées"
+mut_fp v8 '    [ -z "$(LC_ALL=C comm -23 <(cat <<<"$_fm0") <(cat <<<"$_fm1"))" ] || nv "le moteur a modifié l'"'"'avancement déjà renseigné — état à vérifier, aucune séparation faite"' '    true' M8 patch-fm C1e "(viii) lignes d'origine du frontmatter neutralisées"
 
-echo "== mutations : $MD/9 détectées =="
+# --- (ix) garde « Last activity » retirée (J3) : un pivot vide/rogné/absent passe jusqu'à l'écriture ------------------------------
+mk_mut_tree v9; MS="$MT/conductor/scripts/split-planning.sh"
+ANCH9="$(grep -F '{ [ -n "$_la_raw" ]' "$MS")"
+if mutate "$MS" "$ANCH9" '    true'; then
+  mred=0
+  for v in "j3am:$SED_LA_VIDE" "j3bm:$SED_LA_ESP" "j3cm:$SED_LA_ABS"; do
+    la_case "${v%%:*}" "${v#*:}" "$MS"
+    if [ -n "$LA_BAD" ]; then mred=$((mred+1)); echo "      trace (ix) ${v%%:*} : assertion=J3 « pivot altéré : rc 2, disque intact » ; attendu=rouge ; obtenu=rouge [$LA_BAD]"
+    else echo "      trace (ix) ${v%%:*} : assertion=J3 ; attendu=rouge ; obtenu=vert (le mutant n'est pas détecté par ce variant)"; fi
+  done
+  if [ "$mred" -ge 1 ]; then MD=$((MD+1)); emit M9 0 "(ix) garde « Last activity » retirée : J3 rougit sur $mred variant(s) sur 3" ""
+  else emit M9 1 "(ix) garde « Last activity » retirée : J3 doit rougir" "aucun variant rouge"; fi
+else emit M9 1 "(ix) construction du mutant" "ancre introuvable [$ANCH9]"; fi
+
+# --- (x) garde « sortie non vide » retirée devant already_exists (J5) : une création muette devient rc 1 ----------------------------
+mk_mut_tree v10; MS="$MT/conductor/scripts/split-planning.sh"
+ANCH10="$(grep -F 'if [ -n "$CREATED" ] && printf' "$MS")"
+if mutate "$MS" "$ANCH10" "$(printf '%s' "$ANCH10" | sed 's/if \[ -n "\$CREATED" \] && printf/if printf/')"; then
+  empty_create "$MS" m10; m10_rc="$RC"
+  if [ -n "$J5_BAD" ] && [ "$m10_rc" = "1" ]; then
+    MD=$((MD+1)); emit M10 0 "(x) garde de sortie vide retirée : J5 rougit (la création muette redevient « existe déjà », rc 1)" ""
+    echo "      trace (x) : assertion=J5 « création muette : NON VÉRIFIABLE rc 2 » ; attendu=rc 2 ; obtenu=rc $m10_rc"
+  else emit M10 1 "(x) garde de sortie vide retirée : J5 doit rougir" "J5_BAD=[$J5_BAD] RC=$m10_rc"; fi
+else emit M10 1 "(x) construction du mutant" "ancre introuvable [$ANCH10]"; fi
+
+echo "== mutations : $MD/11 détectées =="
 
 else
   emit ENGINE 1 "moteur gsd-core introuvable (GSD_TOOLS, PATH, ~/.claude/gsd-core) : S1-S5, S7-S10, W1-W12 et mutations (i)-(iv) NON jouables — ko, jamais skip" "installer @opengsd/gsd-core@^1"
