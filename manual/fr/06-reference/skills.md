@@ -5,20 +5,21 @@
 <!-- /vf-manual:lang -->
 
 Un skill ne se tape pas — il se déclenche tout seul quand ta phrase, dite en langage naturel,
-correspond à ce qu'il sait faire. C'est la vraie porte d'entrée de VibeFlow, bien plus que les six
+correspond à ce qu'il sait faire. C'est la vraie porte d'entrée de VibeFlow, bien plus que les huit
 [commandes](./commandes.md) : tu n'as jamais besoin de connaître le nom d'un skill pour
 l'invoquer, seulement de dire ce que tu veux. Ce dont tu as réellement besoin, ce ne sont donc pas
 les noms techniques ci-dessous, mais **les formulations qui les activent** — c'est ce que cette
 page met en avant pour chacun.
 
-Cette liste vient de l'énumération de tous les fichiers `SKILL.md` du dépôt le 2026-08-01, module
+Cette liste vient de l'énumération de tous les fichiers `SKILL.md` du dépôt, revérifiée le
+2026-10-02, module
 par module — en excluant explicitement les modèles de skills sous
 `plugin/reference/content/methodology/templates/skills/`, qui ne sont pas des skills livrés mais
-des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt, groupés ici par module
+des gabarits pour en fabriquer de nouveaux. Le disque en porte vingt-deux, groupés ici par module
 d'origine : tu n'as que ceux dont le module correspondant est installé — le
 [catalogue des modules](../03-modules/catalogue.md) dit lequel apporte quoi.
 
-## Les vingt skills, par module
+## Les vingt-deux skills, par module
 
 ### `installer`
 **`vibeflow-install`** — le tout premier geste après avoir installé le plugin. Se déclenche sur
@@ -33,6 +34,12 @@ VibeFlow pour [métier] ». Bootstrap complet d'un nouveau lab, quel que soit le
 à jour ? ». Détecte l'écart entre le lab et la méthodologie, propose une migration.
 **`vf-update`** — « mets à jour vibeflow » en réaction au bandeau de mise à jour disponible en
 début de session. Met à jour le plugin puis les modules installés, sous confirmation.
+**`vf-notify`** — « active les notifications », « désactive les notifs », « est-ce que les
+notifications sont activées ? ». Active ou coupe les notifications du système aux jalons d'une
+mission. Désactivées par défaut : rien ne s'affiche tant que tu ne l'as pas demandé.
+**`vf-split-planning`** — « on sera plusieurs sur ce lab », « deux chantiers en parallèle »,
+« sépare le planning en sujets ». Te fait choisir entre un planning unique et plusieurs sujets
+parallèles, et en pose la structure sous ton accord.
 
 ### `dev-orchestrator`
 **`vf-dev`** — « aide-moi à avancer », « pilote-moi ça », « occupe-toi de ce projet ». Le point
@@ -116,9 +123,9 @@ page séparée de ce même thème, consacrée uniquement à ça.
 
 ## D'où vient cette liste
 
-Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré le 2026-08-01 plutôt que
+Chaque skill ci-dessus correspond à un fichier `SKILL.md` réel, énuméré (puis revérifié le 2026-10-02) plutôt que
 recopié d'une doc existante. Pour revérifier : depuis la racine du dépôt,
-`find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit rester à vingt tant
+`find plugin -iname 'SKILL.md' | grep -v reference/content` — le compte doit rester à vingt-deux tant
 qu'aucun skill n'a été ajouté, retiré, ou qu'aucun modèle n'a glissé hors de son dossier de
 templates.
 

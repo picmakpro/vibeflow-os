@@ -50,28 +50,49 @@ quand même mal s'assembler, et c'est précisément ce que cette revue de jointu
 Le **verrou de driver** existe pour une raison précise : empêcher que deux managers pilotent la
 même étape en même temps sans le savoir. Le manager qui démarre une mission acquiert le verrou, le
 rafraîchit pendant qu'il travaille (un battement de cœur), et le relâche à la fin — succès, échec
-ou abandon confondus. Un verrou dont le battement de cœur s'arrête trop longtemps est considéré
-périmé et récupéré automatiquement, avec la reprise consignée dans le rapport.
+ou abandon confondus.
 
-Il faut être honnête sur ce que ce mécanisme *ne* fait *pas*, parce que c'est une limite réelle,
-constatée sur ce dépôt et pas seulement théorique : **le verrou de driver est déclaratif, pas
-contraignant**. Il coordonne les acteurs qui le consultent avant d'agir — les managers d'équipe.
-Il n'arrête techniquement rien chez un acteur qui l'ignore. Le cas s'est produit ici : une mission
-a continué à committer pendant qu'une autre tenait le verrou sur la même ressource, parce que rien
-ne fait respecter le verrou par la force — il documente une intention, il ne l'impose pas.
+Il n'a pas toujours été contraignant. Il fut un temps où il restait **déclaratif** : une mission
+a pu continuer à committer pendant qu'une autre tenait le verrou sur la même ressource, parce que
+rien ne le faisait respecter. Ce n'est plus le cas : le verrou est désormais **appliqué**. Une
+session qui n'est pas enregistrée sous le verrou d'un autre voit son commit, son changement de
+branche, ses opérations de publication (`git push`, `gh pr`) ou son écriture dans `.planning/`
+**refusés avant exécution**. Le message de refus nomme le détenteur, son étape, sa branche et son
+âge, puis propose trois issues : se ré-attacher au verrou si c'est sa propre mission qui a changé
+d'identifiant de session, travailler dans un arbre séparé (`git worktree add`, jamais refusé), ou
+poser un marqueur de dérogation explicite sur ce geste précis — la dérogation est alors tracée dans
+un journal à côté du verrou, jamais silencieuse.
 
-Depuis, le mécanisme a été élargi : un claim de branche est désormais également consigné (arbre de
-travail, branche), et une session ordinaire — pas seulement un manager — en est informée au
-démarrage si elle arrive sur une branche déjà pilotée depuis un autre arbre. C'est ce que
-[branches-et-worktrees.md](./branches-et-worktrees.md) détaille : la vraie barrière contre deux
-écrivains simultanés n'est pas ce verrou, c'est le fait de travailler dans des arbres séparés.
+Il faut être honnête sur ce que cette garde *ne* fait *pas*. C'est un garde-fou **anti-accident**,
+pas anti-adversaire : il arrête le chemin de moindre résistance, pas une volonté de contourner. Il
+ne voit pas une commande déguisée (interpréteur inline, script du dépôt qui committe en interne),
+ni une écriture dans `.planning/` faite par un autre outil que Write ou Edit. Il est **aveugle hors
+d'une session Claude Code où il est armé** : un terminal, un IDE, un client git tiers ou une autre
+machine passent. Et il garantit qu'aucune *autre session* ne committe sous le verrou, pas qu'aucun
+autre acteur de la *même* session ne le fait. Sa promesse réelle : une seule mission pilotée par ce
+harness à la fois.
 
-Un mot sur la récupération, parce que c'est ce qui rend le verrou utilisable malgré sa fragilité
-assumée : rien ne garantit qu'un agent qui meurt en cours de route relâche proprement ce qu'il tenait
-— un agent LLM peut s'arrêter sans exécuter sa dernière instruction. Le filet est donc la durée de
-vie plus le battement de cœur, pas une promesse de libération propre en toutes circonstances. Un
-verrou périmé ne bloque jamais une mission suivante indéfiniment ; il est repris, et la reprise est
-tracée noir sur blanc dans le rapport que tu lis, pas passée sous silence.
+Il ne vise que le **lab**. Un geste dont la cible se résout avec certitude hors du lab — par
+exemple un `cd` vers un autre dépôt suivi de `&&` et d'un commit — passe, parce que ce verrou ne
+protège pas les dépôts voisins. À l'inverse, dès que la cible est ambiguë (variable, joker,
+sous-shell, tube, arrière-plan), le geste reste sous le verrou : dans le doute, on refuse.
+
+Le mécanisme a aussi été élargi : un claim de branche est consigné (arbre de travail, branche), et
+une session ordinaire — pas seulement un manager — en est informée au démarrage si elle arrive sur
+une branche déjà pilotée depuis un autre arbre. C'est ce que
+[branches-et-worktrees.md](./branches-et-worktrees.md) détaille : la barrière la plus sûre contre
+deux écrivains simultanés reste de travailler dans des arbres séparés.
+
+Un mot sur la récupération. Rien ne garantit qu'un agent qui meurt en cours de route relâche
+proprement ce qu'il tenait — un agent LLM peut s'arrêter sans exécuter sa dernière instruction. Le
+filet est donc la durée de vie plus le battement de cœur. Un verrou dont le battement s'arrête trop
+longtemps est considéré périmé, mais il ne se vole jamais en silence : l'acquisition ordinaire le
+**refuse**, et le manager suivant le reprend par un geste explicite, tracé dans le rapport que tu
+lis. Cette reprise ne s'arrête pas au verrou : chaque agent qu'un manager dispatche est inscrit dans
+un **registre des agents**, rangé à côté du verrou et fermé quand l'agent rend son rapport. Quand
+un pilote meurt, ses enfants encore « en cours » deviennent des orphelins : le successeur reprend le
+verrou, reçoit l'inventaire, **arrête les orphelins avant tout nouveau dispatch**, puis seulement
+redispatche à partir de l'état du dépôt — jamais de ce que l'ancien graphe croyait en cours.
 
 ## Le rapport typé, et une deuxième limite à connaître
 
@@ -89,6 +110,13 @@ interpréter. Il rend un **rapport typé** : un statut fermé, une liste de cons
 gravité, et la liste des nœuds que son travail débloque. Le manager fait un contrôle de flux
 déterministe dessus — il n'a rien à deviner. C'est ce contrat qui rend le graphe fiable : un
 statut `human_needed` remonte toujours jusqu'à toi, jamais une réponse inventée à ta place.
+
+Un jugement (une revue, un audit, une critique scorée) peut aussi porter un champ optionnel
+`confiance`, un nombre entre 0 et 1 : la marge que celui qui juge s'accorde. Il n'accompagne jamais
+une preuve machine — un test ou un gate est vert ou rouge, quoi qu'on écrive à côté. Sous le seuil
+de 0,6, un `passed` de jugement n'est **pas** un vert : il est requalifié en constat à trancher, et
+remonte donc à toi. Absent, le champ ne veut rien dire (pas un 1,0 implicite). Le manager recopie
+les valeurs reçues telles quelles dans son rapport de mission, sans jamais en faire une moyenne.
 
 Ce contrat s'appuie sur un second mécanisme qui mérite lui aussi d'être présenté sans le flatter :
 le **cloisonnement par outils**. Dans une équipe VibeFlow, celui qui corrige le code ne peut pas
