@@ -1,0 +1,94 @@
+{
+  "nodes": [
+    {
+      "id": "discuss",
+      "step": "cadrage 41.2 rafraichi",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "arbitrage",
+      "step": "arbitrages Samuel",
+      "stage": "",
+      "deps": [
+        "discuss"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plan",
+      "step": "plan 41.2 + plancheck",
+      "stage": "",
+      "deps": [
+        "arbitrage"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec",
+      "step": "execution 41.2",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "revue code",
+      "stage": "",
+      "deps": [
+        "exec"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "nonreg",
+      "step": "non-regression complete (rejeu CI)",
+      "stage": "",
+      "deps": [
+        "exec"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire",
+      "stage": "",
+      "deps": [
+        "exec"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "pr",
+      "step": "PR ouverte et CI verte",
+      "stage": "",
+      "deps": [
+        "revue",
+        "nonreg",
+        "docs"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "f1-arbitrage",
+      "step": "arbitrage F1 budget socle",
+      "stage": "",
+      "deps": [
+        "plan"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}
