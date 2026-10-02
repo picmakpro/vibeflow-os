@@ -292,7 +292,7 @@ def cwd_borne(cwd):
         return None
 
 
-BORNE_LIENS = 40  # comme le noyau (ELOOP) : au-delà, un lien n'est plus suivi (comme `os.path.realpath`, qui laisse alors le lien en place)
+BORNE_LIENS = 40  # comme le noyau (ELOOP) : au-delà, un lien n'est plus suivi (realpath, lui, détecte la boucle à la première répétition ; l'écart ne porte que sur des boucles denses, que le noyau rejette en ELOOP)
 
 
 def resoudre_lineaire(chemin):
