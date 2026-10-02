@@ -242,3 +242,49 @@ EMPREINTE-ARBRE-IDENTIQUE ~/BusinessFlow-Lab
 ### Écarts
 
 Aucun : mêmes totaux que le rejeu post-re-audit (0 faux refus, 0 faux accept, 202 refus conformes au modèle), empreintes de tout l'arbre identiques pour les deux labs.
+
+## Rejeu post-re-audit 3 (2026-10-02)
+
+**Mesure seule — aucun armement, aucune constante `ARMEMENT_*` ni `TABLE_ATTENDUE` touchée.** Le code du hook a changé après le rejeu post-re-audit 2 : la correction du re-audit 3 (N3-01 : une valeur de plus de 4096 caractères est lue sous deux formes en temps linéaire et analysée comme une valeur courte ; N3-02 : un chemin relatif sous un `cwd` long passe par la décision dans le doute ; quick 261002-3rx) a modifié `planning-hook.sh`. Ce rejeu mesure donc le code corrigé.
+
+| Champ | Valeur |
+|---|---|
+| Date | 2026-10-02 |
+| Code mesuré | commit `1d9425f7` de la branche `gouvernance/phase-45-execution` |
+| Commande | celle du rejeu final ci-dessus (`rejeu-reel.sh` sur les deux labs, `--etape=4`, mêmes attendus, rapport hors des labs) |
+| Autorisation | rejeu réel en lecture seule (Willy, AskUserQuestion session principale, 2026-09-30, reprise dans le mandat du 2026-10-02) |
+| Passages | un seul (code de sortie 0) ; aucune occurrence de `Alarm clock` ni de « hook central indisponible » dans la sortie ni dans le relevé nominatif ; charge machine élevée au lancement (`uptime` : 4,40 sur 1 minute, 10,08 sur 5), sans effet sur le résultat |
+
+### Contrôle de repos (lecture seule), forme anonymisée (sans USER ni PID)
+
+Avant (04:06) et après (04:09) :
+
+| Relevé | Avant | Après |
+|---|---|---|
+| Processus dont le répertoire courant est sous `~/jarvis-keystone` ou `~/BusinessFlow-Lab` (`lsof -d cwd`) | 0 | 0 |
+| Fichiers ouverts sous `~/jarvis-keystone/.planning` (`lsof +D`) | 0 | 0 |
+| Fichiers ouverts sous `~/BusinessFlow-Lab/.planning` (`lsof +D`) | 0 | 0 |
+| Transcripts modifiés depuis moins de 30 minutes (les deux dossiers de projet) | 0 | 0 |
+
+### Comptes (lignes brutes du rejeu)
+
+```
+COMPTE G6 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G5 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G1 faux-refus=0 faux-accept=0 refus-conforme-modele=196
+COMPTE G7 faux-refus=0 faux-accept=0 refus-conforme-modele=6
+COMPTE ROLE faux-refus=0 faux-accept=0 refus-conforme-modele=0
+REJEU-ETAPE-4 faux-refus=0 faux-accept=0 refus-conforme-modele=202
+CLASSE-REGLE-ECRITE G1 lab=~/jarvis-keystone n=200
+CLASSE-REGLE-ECRITE G1 lab=~/BusinessFlow-Lab n=0
+EMPREINTE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-IDENTIQUE ~/BusinessFlow-Lab
+EMPREINTE-ARBRE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-ARBRE-IDENTIQUE ~/BusinessFlow-Lab
+```
+
+Le relevé nominatif (rapport écrit hors des labs) compte 4440 lignes, dont 4428 lignes de verdict : 3640 en doit-passer, 586 en doit-refuser et 202 en doit-refuser-modele, toutes obtenues conformes à l'attendu (faux refus 0, faux accept 0). Il est plus long que celui du 2026-10-01 (4404 lignes : 3617, 585, 202) parce que les labs réels ont évolué depuis, pas parce que le hook rend autre chose : les lignes `COMPTE` sont identiques.
+
+### Écarts
+
+Aucun : mêmes lignes `COMPTE` que le rejeu post-re-audit 2 (0 faux refus, 0 faux accept, 202 refus conformes au modèle), empreintes de tout l'arbre identiques pour les deux labs. Les chemins du rejeu sont courts (aucune valeur de plus de 4096 caractères) : ce rejeu confirme l'absence de régression sur les valeurs courtes, que le différentiel à trois versions de la quick 261002-3rx établit aussi (2 128 cas courts sans écart, `court-different=0` sur 552 cas courts supplémentaires).
