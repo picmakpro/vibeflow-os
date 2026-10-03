@@ -55,7 +55,7 @@
         "plan-46"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "suivi-46",
@@ -68,7 +68,7 @@
         ".planning/workstreams/gouvernance/ROADMAP.md",
         ".planning/workstreams/gouvernance/STATE.md"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "pr-46",
@@ -78,7 +78,7 @@
         "suivi-46"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     }
   ]
 }

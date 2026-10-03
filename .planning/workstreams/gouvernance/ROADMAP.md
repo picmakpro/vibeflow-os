@@ -15,7 +15,7 @@
 - [x] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #111
 - [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
 - [x] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécutée 2026-09-30 → 2026-10-02 (10/10 plans, 15 quick de correction), cinq gates ARMÉS en cascade le 2026-10-01 ; audit de sécurité final SECURED (4 tours) ; vérifiée 15/15 — clôturée 2026-10-02 (clôture validée par Willy, message en session principale, 2026-10-01), PR #124 ouverte (non mergée)
-- [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
+- [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-03 (12 plans, 9 vagues, plan-check frais PASSED), PR de planification empilée sur la PR #124
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 49: Initialisation — script des trois gates de la grille (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -216,24 +216,77 @@ Plans:
 ### Phase 46: Moteur — gates de clôture et verdicts hachés
 
 **Goal:** La clôture d'une tâche est refusée quand un livrable déclaré manque (G3) ou qu'un constat du verdict échoue (G4) ; un rapport de sous-agent sans sortie brute est refusé (G4′) ; `VERDICT.md` porte le hash de l'artefact jugé et un numéro de tentative ; `FileChanged` trace toute écriture surveillée (D1) ; au premier cycle, le canary joue la **sortie piégée** que l'initialisation a préparée pour chaque juge, et signale le juge qui ne la refuse pas (C-16).
-**Requirements**: TBD (posés au cadrage)
+**Requirements**: CLOT-01..CLOT-12 (posées au cadrage, `46-CONTEXT.md`, 2026-10-03)
 **Depends on:** Phase 45.
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §5 (G3, G4, G4′, D1), §10, D-02 (le juge ne bloque que sur ses constats) ; `docs/superpowers/specs/2026-09-23-initialisation-lab-design.md` C-16, §10 (préparer la preuve sans l'exécuter, B-01).
 **À envisager au cadrage** : un état de transition « à clore » pour le cas « verdict passé,
 SUMMARY absent » (le §3.1 ne le nomme pas, la Phase 44 le rend `indéterminé` par défaut,
 P44-D-08) — origine Phase 44, décision (a), head sous délégation technique de Willy, session
-principale, 2026-09-28.
-**Plans:** 0 plans
+principale, 2026-09-28. **Tranché au cadrage** (P46-D-04 : neuvième état `à clore`, non terminal ;
+Willy, AskUserQuestion session principale, 2026-10-03).
+**Cadrage (2026-10-03)** : `46-CONTEXT.md`, décisions P46-D-01 à P46-D-19 (plus 02a, 02b, 03a, 03b,
+06a, 07a, 10a), mission `vf-dev-manager-p46-cadrage`. Faits : `46-RECHERCHE-HOOKS.md` (Claude Code
+2.1.288) et `46-SCOUTING.md`.
+- Arbitrages de Willy, AskUserQuestion session principale, 2026-10-03 : Q1 à Q8 (recommandation
+  suivie, Q7 = b) puis Q9 (G4′ limité aux workers et producteurs qui ont Bash, P46-D-02b). Fait
+  structurant : `TaskCompleted` n'existe pas par défaut sur les modèles récents ; G3/G4 passent en
+  `PreToolUse` sur l'écriture de `CLOTURE.md`/`SUMMARY.md` (P46-D-01), la spec §5 est amendée.
+- Décisions du manager, renversables : P46-D-02a, 03a, 03b, 06a, 07a, 09 à 19, 10a.
+- Le rejeu réel des étapes 5 et 6 sur `~/jarvis-keystone` et `~/BusinessFlow-Lab` **n'est pas
+  autorisé par le planning** : le checkpoint de 46-11 le demande à Willy au moment de l'exécution.
+**Plans:** 12 plans en 9 vagues. Ordre d'armement P46-D-11 : (G3 + G4, empreintes comprises) →
+G4′ ; D1 n'est jamais armé. Plan-check frais : tour 1 (deux checkers, objectif et exécutabilité)
+0 bloquant ; révision 1 (Q9, mode dégradé, codes de sortie des vérifications, replis sûrs) ; tour 2
+PASSED ; révision 2 (formulation du checkpoint de rejeu, consigne d'exécution des vérifications en
+session isolée). Deux plans `autonomous: false` portent un checkpoint humain borné : 46-11 (rejeu
+réel, étape 5) et 46-12 (porte de G4′, étape 6).
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 46 to break down)
+- [ ] 46-01-PLAN.md — modèle côté pose : prédicat « livrable présent », deux empreintes (plan A3 + livrables), plafond de 3 tentatives (CLOT-01, 03, 05)
+- [ ] 46-02-PLAN.md — amendements de la spec moteur (§3.1, §5, §5.1-1, §10) et texte de la note ROADMAP de la 47 (CLOT-12)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 46-03-PLAN.md — recalcul : R4 « absent ou vide », vérification des deux empreintes, état `à clore` (CLOT-01, 03, 04)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 46-04-PLAN.md — câblage : une commande, un mode par événement, `SubagentHandback` au matcher, canary, inventaire des hooks (CLOT-09, 11, 12)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 46-05-PLAN.md — G3 et G4 en observation, fail-closed, banc de clôture et mutation d'armement (CLOT-01, 02, 03, 09, 10)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 46-06-PLAN.md — G4′ en observation : `PreToolUse(SubagentHandback)` + repli `SubagentStop`, agents qui ont Bash (CLOT-06, 09, 12)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 46-07-PLAN.md — D1 : `FileChanged`/`watchPaths`, journal protégé par G6, réconciliation par hash au `SessionStart` (CLOT-07, 09, 11)
+- [ ] 46-08-PLAN.md — outil de rejeu étendu aux étapes 5 et 6, constructeurs G3/G4/G4′ (CLOT-10)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 46-09-PLAN.md — canary de juge C-16 : contrat de la sortie piégée, vérificateur déterministe, « juge sans preuve » (CLOT-08)
+- [ ] 46-10-PLAN.md — zéro régression lab dev par événement, coût hors adhésion mesuré (CLOT-11)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 46-11-PLAN.md — étape 5 : autorisation du rejeu réel demandée à Willy, banc, canary, rejeu en lecture seule, armement de G3 + G4 (CLOT-10)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 46-12-PLAN.md — étape 6 : porte de G4′, rejeu, armement, référence et limites, `planning-core` v2.10.0 sans release (CLOT-10, 12)
 
 ### Phase 47: Moteur — baux générationnels et jeton monotone
 
 **Goal:** Un bail générationnel porte les fichiers d'état réécrits en place, au fichier près ; son numéro de génération est un jeton monotone vérifié par le hook **et** par l'écrivain, qui rejette l'écriture périmée d'une session revenue, d'un cron ou d'un sous-agent en fan-out ; à la clôture, G2′ refuse ce qui a bougé hors du bail sans amendement.
 **Requirements**: TBD (posés au cadrage)
 **Depends on:** Phase 46 (G2′ se branche sur le même événement `TaskCompleted` que G3/G4 ; il vit ici parce qu'il consomme le bail).
+**Note du cadrage de la 46 (P46-D-19, 2026-10-03)** : la prémisse « même `TaskCompleted` que G3/G4 » ne tient plus. La 46 a porté G3/G4 en `PreToolUse` sur l'écriture de `CLOTURE.md`/`SUMMARY.md` (P46-D-01, Willy, AskUserQuestion session principale, 2026-10-03), parce que `TaskCompleted` n'existe pas par défaut sur les modèles récents (`46-RECHERCHE-HOOKS.md` §0). Le point d'accroche de G2′ se re-décide au cadrage de la 47.
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §6 (6.1 à 6.4), §5 (G2′), D-04.
 **À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : `save()` de `dag.sh` sans verrou ni écriture atomique, lost update silencieux — `.planning/BACKLOG.md:74`. C'est la même classe d'écriture concurrente que les baux : le jeton monotone doit la couvrir, ou la phase dit pourquoi non.
 **Plans:** 0 plans
