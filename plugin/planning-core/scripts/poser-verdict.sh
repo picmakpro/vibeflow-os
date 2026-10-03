@@ -390,15 +390,22 @@ def _valeurs_ecrit(donnees):
     return None
 
 
-# --- Prédicat « livrable présent » et empreinte des livrables : bloc partagé (Phase 46, 46-01 ; P46-D-03a, P46-D-12) ----------
+# --- Entrées `ecrit:`, prédicat « livrable présent » et empreinte des livrables : bloc partagé (Phase 46, 46-01 ; P46-D-03a, P46-D-12) ----------
 # MÊME texte dans poser-verdict.sh, planning-hook.sh et recalc-planning.sh (l'installeur ne pose que des `*.sh` : pas de module
-# partagé, des copies ast-identiques que la suite test-cloture-empreintes.sh compare, R-EMP-04). Le parcours est borné et les
-# bornes comptent les ENTRÉES parcourues (fichiers, sous-dossiers, liens) : un dépassement est un refus explicite, jamais une
-# empreinte partielle. Les noms de NOMS_EXCLUS_LIVRABLES sont ignorés partout (prédicat « vide » ET empreinte) : ouvrir un
+# partagé, des copies ast-identiques que la suite test-cloture-empreintes.sh compare, R-EMP-04). Le bloc porte l'ENCHAÎNEMENT
+# complet « PLAN.md -> entrées `ecrit:` -> validation -> présence -> empreinte » (`entrees_du_plan`, `livrables_presents`,
+# `empreinte_livrables`) : G3, G4, la règle R4 du recalcul et la commande de pose l'appellent, aucun ne le réécrit ; ses ENTRÉES
+# (parseur de frontmatter, `entree_ecrit_valide`, `_valeurs_ecrit`, `SANS_SUIVI_DE_LIEN`) sont comparées avec lui. Le parcours est
+# borné PAR PLAN.md : les bornes comptent les ENTRÉES parcourues (fichiers, sous-dossiers, liens) et les octets, avec UN budget
+# commun à toutes les entrées d'un même PLAN.md ; un dépassement est un refus explicite, jamais une empreinte partielle ni un
+# livrable « présent ». Les noms de NOMS_EXCLUS_LIVRABLES sont ignorés partout (prédicat « vide » ET empreinte) : ouvrir un
 # dossier livrable dans le Finder ou l'Explorateur ne doit pas périmer un verdict.
 BORNE_FICHIERS_LIVRABLES = 2000
 BORNE_OCTETS_LIVRABLES = 134217728
 NOMS_EXCLUS_LIVRABLES = (".DS_Store", "Thumbs.db", "desktop.ini")
+SANS_BLOCAGE = getattr(os, "O_NONBLOCK", 0)
+DRAPEAUX_LIVRABLE = os.O_RDONLY | SANS_SUIVI_DE_LIEN | SANS_BLOCAGE  # livrable-ouverture
+AVEC_DESCRIPTEURS = os.open in os.supports_dir_fd and hasattr(os, "O_DIRECTORY")  # livrable-dirfd
 
 
 def _normaliser_livrable(entree):
@@ -417,23 +424,24 @@ def _nom_sain(nom):
     try:
         nom.encode("utf-8")
     except UnicodeEncodeError:
-        return False
-    return not any(ord(c) < 0x20 or ord(c) == 0x7F for c in nom)
+        return False  # livrable-nom-utf8
+    return not any(ord(c) < 0x20 or ord(c) == 0x7F for c in nom)  # livrable-nom-controle
 
 
 def _borne_depassee(budget):
     """Libellé de la borne franchie par `budget` = [entrées parcourues, octets annoncés par lstat, octets lus], ou None."""
     if budget[0] > BORNE_FICHIERS_LIVRABLES:  # livrable-borne
         return "borne de %d fichiers dépassée (BORNE_FICHIERS_LIVRABLES)" % BORNE_FICHIERS_LIVRABLES
-    if budget[1] > BORNE_OCTETS_LIVRABLES or budget[2] > BORNE_OCTETS_LIVRABLES:
+    if budget[1] > BORNE_OCTETS_LIVRABLES or budget[2] > BORNE_OCTETS_LIVRABLES:  # livrable-octets
         return "borne de %d octets dépassée (BORNE_OCTETS_LIVRABLES)" % BORNE_OCTETS_LIVRABLES
     return None
 
 
 def _parcourir_livrable(dossier, relatif, budget):
     """(statut, detail, fichiers) : les fichiers réguliers du sous-arbre de `dossier` (`relatif` : son chemin relatif au lab),
-    triés par chemin relatif, sous forme (relatif, chemin absolu, taille). Lstat sur chaque entrée : un lien et un fichier
-    spécial interne ne sont ni suivis ni retenus. Statut `ok`, `borne` (detail = libellé de la borne) ou `illisible`."""
+    triés par chemin relatif, sous forme (relatif, taille). Lstat sur chaque entrée : un lien et un fichier spécial interne ne sont
+    ni suivis ni retenus. Le tri final rend l'empreinte indépendante de l'ordre d'énumération du système de fichiers. Statut `ok`,
+    `borne` (detail = libellé de la borne) ou `illisible`."""
     fichiers = []
     pile = [(dossier, relatif)]
     while pile:
@@ -456,10 +464,10 @@ def _parcourir_livrable(dossier, relatif, budget):
                     if stat.S_ISDIR(info.st_mode):
                         pile.append((entree.path, rel + "/" + nom))
                     elif stat.S_ISREG(info.st_mode):
-                        fichiers.append((rel + "/" + nom, entree.path, info.st_size))
+                        fichiers.append((rel + "/" + nom, info.st_size))
         except OSError:
             return ("illisible", rel, [])
-    fichiers.sort()
+    fichiers.sort()  # livrable-tri
     return ("ok", relatif, fichiers)
 
 
@@ -468,7 +476,7 @@ def _examiner_livrable(racine, entree, budget):
     lien, terminal ou intermédiaire, rend le livrable `lien` (jamais suivi). Un fichier régulier de 0 octet est `vide` ; un dossier
     sans aucun fichier régulier non vide est `vide` ; une entrée absente, un composant intermédiaire qui n'est pas un dossier ou un
     fichier spécial (FIFO, socket, périphérique) est `absent` ; une erreur de lecture est `illisible` ; un dépassement de borne est
-    `borne`. `genre` vaut `fichier` ou `dossier` pour un livrable `present`."""
+    `borne`. `genre` vaut `fichier` ou `dossier` pour un livrable `present`. `fichiers` : (chemin relatif au lab, taille)."""
     normale = _normaliser_livrable(entree)
     composants = normale.split("/") if normale != "" else []
     if not composants:
@@ -495,30 +503,69 @@ def _examiner_livrable(racine, entree, budget):
             return ("borne", depasse, "", [])
         if not _fichier_non_vide(info.st_size):
             return ("vide", normale, "", [])
-        return ("present", normale, "fichier", [(normale, courant, info.st_size)])
+        return ("present", normale, "fichier", [(normale, info.st_size)])
     if stat.S_ISDIR(info.st_mode):
         statut, detail, fichiers = _parcourir_livrable(courant, normale, budget)
         if statut != "ok":
             return (statut, detail, "", [])
-        if not any(_fichier_non_vide(f[2]) for f in fichiers):
+        if not any(_fichier_non_vide(f[1]) for f in fichiers):
             return ("vide", normale, "", [])
         return ("present", normale, "dossier", fichiers)
     return ("absent", normale, "", [])
 
 
-def livrable_present(racine, entree):
-    """(statut, detail) du livrable `entree` d'un `ecrit:` du lab de racine `racine` : statut `present`, `absent`, `lien`, `vide`,
-    `borne` ou `illisible` (voir `_examiner_livrable`). Le prédicat unique de G3 et de la règle R4 du recalcul (P46-D-12)."""
-    statut, detail, _genre, _fichiers = _examiner_livrable(racine, entree, [0, 0, 0])
-    return (statut, detail)
+def livrables_presents(racine, entrees):
+    """[(entrée, statut, détail)], une par entrée de `entrees` et dans leur ordre : le prédicat « livrable présent » d'un PLAN.md
+    entier (P46-D-12), statut `present`, `absent`, `lien`, `vide`, `borne` ou `illisible` (voir `_examiner_livrable`). UN budget
+    commun à toutes les entrées : le coût d'un PLAN.md est borné comme l'empreinte, jamais proportionnel au nombre d'entrées qui se
+    recouvrent. Dès qu'une borne est franchie, cette entrée et toutes les suivantes valent `borne` (jamais `present`). Le prédicat
+    unique de G3 et de la règle R4 du recalcul : aucun appelant n'examine une entrée isolément."""
+    budget = [0, 0, 0]
+    resultats = []
+    for entree in entrees:
+        depasse = _borne_depassee(budget)
+        if depasse is not None:
+            resultats.append((entree, "borne", depasse))
+            continue
+        statut, detail, _genre, _fichiers = _examiner_livrable(racine, entree, budget)  # livrables-budget-commun
+        resultats.append((entree, statut, detail))
+    return resultats
 
 
-def _hacher_livrable(chemin, budget):
-    """(statut, valeur) : `ok` et le sha256 hexadécimal du fichier régulier `chemin` (ouvert O_NOFOLLOW puis fstat régulier, lu par
-    blocs, octets lus ajoutés au budget partagé), `borne` et le libellé de la borne, ou `illisible`. Jamais un hash partiel."""
+def _ouvrir_dossier_livrable(racine, composants):
+    """Poignée du dossier `racine`/`composants`, ouvert sans suivre de lien à AUCUN composant : sous POSIX un descripteur obtenu par
+    ouvertures chaînées relatives à un descripteur de dossier (openat), O_NOFOLLOW à chaque pas (DRAPEAUX_LIVRABLE) ; sans descripteurs
+    de dossier (Windows), le chemin : limite déclarée. La racine du lab est celle de l'appelant, déjà résolue. Lève OSError."""
+    if not AVEC_DESCRIPTEURS:
+        return os.path.join(racine, *composants)
+    dossier = os.open(racine, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for composant in composants:
+            suivant = os.open(composant, DRAPEAUX_LIVRABLE | os.O_DIRECTORY, dir_fd=dossier)
+            os.close(dossier)
+            dossier = suivant
+    except BaseException:
+        os.close(dossier)
+        raise
+    return dossier
+
+
+def _fermer_dossier_livrable(poignee):
+    if AVEC_DESCRIPTEURS:
+        os.close(poignee)
+
+
+def _hacher_dans(poignee, nom, budget):
+    """(statut, valeur) : `ok` et le sha256 hexadécimal du fichier `nom` du dossier `poignee`, ouvert sans suivre de lien et sans
+    bloquer (O_NOFOLLOW, O_NONBLOCK : un FIFO substitué à un fichier après le parcours ne bloque pas l'ouverture), puis fstat
+    régulier, lu par blocs, octets lus ajoutés au budget partagé ; `borne` et le libellé de la borne ; ou `illisible`. Jamais un
+    hash partiel."""
     import hashlib
     try:
-        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        if AVEC_DESCRIPTEURS:
+            descripteur = os.open(nom, DRAPEAUX_LIVRABLE, dir_fd=poignee)
+        else:
+            descripteur = os.open(os.path.join(poignee, nom), DRAPEAUX_LIVRABLE)
     except OSError:
         return ("illisible", "")
     hacheur = hashlib.sha256()
@@ -540,6 +587,33 @@ def _hacher_livrable(chemin, budget):
     return ("ok", hacheur.hexdigest())
 
 
+def _hacher_livrables(racine, fichiers, budget):
+    """("ok", {chemin relatif: sha256}) ou (statut d'échec, chemin relatif ou libellé de borne) pour `fichiers` = [(chemin relatif au
+    lab, taille)]. Chaque dossier est ouvert UNE fois (le coût d'une lecture ne dépend pas de la profondeur du fichier), sans suivre de
+    lien à aucun composant : un lien substitué à un composant après le parcours rend le fichier `illisible`, jamais lu."""
+    par_dossier = {}
+    for rel, _taille in fichiers:
+        dossier_rel, _, nom = rel.rpartition("/")
+        par_dossier.setdefault(dossier_rel, []).append(nom)
+    valeurs = {}
+    for dossier_rel in sorted(par_dossier):
+        noms = sorted(par_dossier[dossier_rel])
+        try:
+            poignee = _ouvrir_dossier_livrable(racine, [c for c in dossier_rel.split("/") if c != ""])
+        except OSError:
+            return ("illisible", dossier_rel + "/" + noms[0] if dossier_rel != "" else noms[0])
+        try:
+            for nom in noms:
+                rel = dossier_rel + "/" + nom if dossier_rel != "" else nom
+                statut, valeur = _hacher_dans(poignee, nom, budget)
+                if statut != "ok":
+                    return (statut, valeur if valeur != "" else rel)
+                valeurs[rel] = valeur
+        finally:
+            _fermer_dossier_livrable(poignee)
+    return ("ok", valeurs)
+
+
 def empreinte_livrables(racine, entrees):
     """("ok", sha256 hexadécimal) ou (statut d'échec, entrée ou libellé de borne) pour les entrées `ecrit:` `entrees`. Texte
     canonique : entrées normalisées, dédoublonnées et triées ; une ligne `fichier<TAB><chemin relatif au lab><TAB><sha256>` par
@@ -555,13 +629,47 @@ def empreinte_livrables(racine, entrees):
             return (statut, detail)
         if genre == "dossier":
             lignes.append("dossier\t" + detail)
-        for rel, chemin, _taille in fichiers:
-            statut_hache, valeur = _hacher_livrable(chemin, budget)
-            if statut_hache != "ok":
-                return (statut_hache, valeur if valeur != "" else rel)
-            lignes.append("fichier\t" + rel + "\t" + valeur)
+        statut_hache, valeurs = _hacher_livrables(racine, fichiers, budget)
+        if statut_hache != "ok":
+            return (statut_hache, valeurs)
+        for rel, _taille in fichiers:
+            lignes.append("fichier\t" + rel + "\t" + valeurs[rel])
     texte = "\n".join(lignes) + "\n"
     return ("ok", hashlib.sha256(texte.encode("utf-8")).hexdigest())
+
+
+def _couvre_unite(entree, unite_rel):
+    """Vrai si l'entrée `ecrit:` EST le dossier de l'unité (`unite_rel`, relatif au lab) ou l'un de ses ancêtres, comparé par
+    composants et sans égard à la casse (sur un système de fichiers insensible à la casse, `.PLANNING` désigne le même dossier).
+    Une entrée qui se normalise en rien (`.`) n'est pas un livrable : le prédicat la rend `absente`, elle n'est pas traitée ici."""
+    cible = [c.casefold() for c in _normaliser_livrable(entree).split("/") if c != ""]
+    unite = [c.casefold() for c in unite_rel.split("/") if c not in ("", ".")]
+    return len(cible) > 0 and len(cible) <= len(unite) and unite[:len(cible)] == cible
+
+
+def entrees_du_plan(octets_plan, unite_rel):
+    """(motif, détail) : `("ok", [entrées déclarées, dans l'ordre])` ou le premier échec de la chaîne PLAN.md -> entrées -> validation :
+    `non-utf8` ; `frontmatter` (détail : statut du parseur) ; `absent` (`ecrit:` absent ou vide) ; `invalide` (détail : la valeur
+    fautive telle que lue) ; `unite` (détail : l'entrée normalisée) quand une entrée EST ou CONTIENT le dossier de l'unité
+    `unite_rel` — le verdict s'écrit dans ce dossier, donc `hash_livrables` serait périmé dès la pose (décision du manager,
+    renversable). Le chemin unique de G3, G4, de R4 du recalcul et de la commande de pose : `octets_plan` est lu par l'appelant."""
+    try:
+        texte = octets_plan.decode("utf-8")
+    except UnicodeDecodeError:
+        return ("non-utf8", "")
+    statut, donnees = lire_frontmatter(texte)
+    if statut != "ok":
+        return ("frontmatter", statut)
+    valeurs = _valeurs_ecrit(donnees)
+    if not valeurs:
+        return ("absent", "")
+    for valeur in valeurs:
+        if not entree_ecrit_valide(valeur):
+            return ("invalide", valeur)
+    for valeur in valeurs:
+        if _couvre_unite(valeur, unite_rel):  # entrees-unite
+            return ("unite", _normaliser_livrable(valeur))
+    return ("ok", list(valeurs))
 
 
 # --- Dérogation nominative PLAFOND (P46-D-05) : copies ast-identiques des fonctions du journal du hook central ----------
@@ -749,25 +857,26 @@ def controle_tentative(nouvelle, ancienne):
             attendue, "création" if ancienne is None else "ancienne tentative %d + 1" % ancienne, nouvelle))
 
 
-def empreinte_des_livrables(racine, octets_plan):
-    """Empreinte composée des livrables `ecrit:` du PLAN.md (octets déjà lus sous le verrou), ou refus 64 : `ecrit:` absent, vide ou
-    invalide, livrable absent, vide ou lien, borne dépassée, livrable illisible (P46-D-03, P46-D-03a). Les messages ne nomment que
-    l'entrée déclarée (relative au lab) ou la borne : jamais un chemin absolu, jamais le texte d'une OSError (P46-D-10)."""
-    try:
-        statut_plan, donnees_plan = lire_frontmatter(octets_plan.decode("utf-8"))
-    except UnicodeDecodeError:
+def empreinte_des_livrables(racine, octets_plan, unite_rel):
+    """Empreinte composée des livrables `ecrit:` du PLAN.md (octets déjà lus sous le verrou), ou refus 64. Mince adaptateur de la
+    chaîne unique du bloc partagé : `entrees_du_plan` (PLAN.md -> entrées -> validation, refus d'une entrée qui est ou contient le
+    dossier de l'unité `unite_rel`) puis `empreinte_livrables` (livrable absent, vide ou lien, borne dépassée, livrable illisible)
+    (P46-D-03, P46-D-03a, P46-D-12). Les messages ne nomment que l'entrée déclarée (relative au lab) ou la borne : jamais un chemin
+    absolu, jamais le texte d'une OSError (P46-D-10)."""
+    motif, entrees = entrees_du_plan(octets_plan, unite_rel)
+    if motif == "non-utf8":
         raise Refus(64, "PLAN.md : texte non UTF-8, ecrit: illisible : aucun livrable à empreinter")
-    if statut_plan != "ok":
-        raise Refus(64, "PLAN.md : frontmatter illisible (%s), ecrit: invalide : aucun livrable à empreinter" % statut_plan)
-    valeurs = _valeurs_ecrit(donnees_plan)
-    if not valeurs:
+    if motif == "frontmatter":
+        raise Refus(64, "PLAN.md : frontmatter illisible (%s), ecrit: invalide : aucun livrable à empreinter" % entrees)
+    if motif == "absent":
         raise Refus(64, "PLAN.md : ecrit: absent ou vide : aucun livrable à empreinter")
-    invalides = [v for v in valeurs if not entree_ecrit_valide(v)]
-    if invalides:
-        fautive = invalides[0]
+    if motif == "invalide":
+        fautive = entrees
         nom_fautif = "chemin absolu ou ~ refusé" if isinstance(fautive, str) and fautive.startswith(("/", "~")) else repr(fautive)
         raise Refus(64, "PLAN.md : ecrit: invalide (entrée %s) : chemin concret relatif au lab attendu" % nom_fautif)
-    statut, detail = empreinte_livrables(racine, valeurs)
+    if motif == "unite":
+        raise Refus(64, "PLAN.md : ecrit: l'entrée %s est ou contient le dossier de l'unité : le verdict s'y écrit, hash_livrables serait périmé dès la pose — verdict non posé (déclarez les livrables eux-mêmes)" % entrees)
+    statut, detail = empreinte_livrables(racine, entrees)
     if statut != "ok":
         raison = {"absent": "est absent", "vide": "est vide", "lien": "est un lien (jamais suivi)",
                   "illisible": "est illisible"}.get(statut)
@@ -854,7 +963,8 @@ def poser(valeurs, constats_bruts):
     verrou = ouvrir_verrou(plan)  # verdict-verrou
     octets_plan = lire_octets(plan)
     empreinte = hashlib.sha256(octets_plan).hexdigest()
-    empreinte_livr = None if juge_forme else empreinte_des_livrables(racine, octets_plan)
+    unite_rel = "/".join(composants)
+    empreinte_livr = None if juge_forme else empreinte_des_livrables(racine, octets_plan, unite_rel)
     chemin_verdict = os.path.join(unite, "VERDICT.md")
     ancienne = None
     if est_fichier_regulier(chemin_verdict):
@@ -870,7 +980,6 @@ def poser(valeurs, constats_bruts):
     texte = lignes_verdict(juge, empreinte, empreinte_livr, tentative, valeurs["score"], constats)
     verifier_relecture(texte, juge, empreinte, empreinte_livr, tentative, valeurs["score"], constats)
     if tentative > PLAFOND_TENTATIVES:  # verdict-plafond
-        unite_rel = "/".join(composants)
         derogation = derogation_active(racine, "PLAFOND", unite_rel)
         if derogation is None:
             raise Refus(65, "plafond de %d tentatives atteint pour %s : arbitrage humain requis (deroger-gate.sh --gate=PLAFOND, ou DEROGATION.md)" % (PLAFOND_TENTATIVES, unite_rel))

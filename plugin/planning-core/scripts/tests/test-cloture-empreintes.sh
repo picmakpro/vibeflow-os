@@ -270,7 +270,7 @@ def controle_emp_01(ctx, dossier):
     for script, marqueur in TROIS_COPIES:
         ns = charger_bloc(os.path.join(dossier, script), marqueur)
         for nom, entree, attendu in cas:
-            statut, detail = ns["livrable_present"](lab, entree)
+            statut, detail = ns["livrables_presents"](lab, [entree])[0][1:]
             if statut != attendu:
                 fautes.append("%s, cas « %s » (%s) : obtenu %s, attendu %s" % (script, nom, entree, statut, attendu))
     return (not fautes), ("; ".join(fautes) if fautes else
@@ -392,9 +392,9 @@ def controle_emp_03(ctx, dossier):
             if statut != "borne" or mot not in (detail or "") or re.fullmatch(r"[0-9a-f]{64}", detail or ""):
                 fautes.append("%s : obtenu (%s, %s), attendu un refus (borne) qui nomme « %s » et aucune empreinte" % (nom, statut, court(detail), mot))
     # le prédicat seul applique la même borne
-    statut, detail = ns["livrable_present"](lab, "d11")
+    statut, detail = ns["livrables_presents"](lab, ["d11"])[0][1:]
     if statut != "borne":
-        fautes.append("livrable_present sur 11 fichiers : %s, attendu borne" % statut)
+        fautes.append("livrables_presents sur 11 fichiers : %s, attendu borne" % statut)
     return (not fautes), ("; ".join(fautes) if fautes else
                           "valeurs livrées 2000 et 134217728 ; bornes abaissées à 10 et 4096 : la borne passe, une unité de plus est un "
                           "refus explicite qui la nomme, budget commun à toutes les entrées, aucune empreinte partielle")
@@ -565,9 +565,10 @@ def controle_emp_07(ctx, dossier):
 
 
 # --- R-EMP-04 : trois copies ast-identiques ---------------------------------------------------------------------------
-NOMS_BLOC = ("BORNE_FICHIERS_LIVRABLES", "BORNE_OCTETS_LIVRABLES", "NOMS_EXCLUS_LIVRABLES", "_normaliser_livrable", "_fichier_non_vide",
-             "_nom_sain", "_borne_depassee", "_parcourir_livrable", "_examiner_livrable", "livrable_present", "_hacher_livrable",
-             "empreinte_livrables", "entree_ecrit_valide")
+NOMS_BLOC = ("BORNE_FICHIERS_LIVRABLES", "BORNE_OCTETS_LIVRABLES", "NOMS_EXCLUS_LIVRABLES", "SANS_BLOCAGE", "DRAPEAUX_LIVRABLE",
+             "AVEC_DESCRIPTEURS", "_normaliser_livrable", "_fichier_non_vide", "_nom_sain", "_borne_depassee", "_parcourir_livrable",
+             "_examiner_livrable", "livrables_presents", "_ouvrir_dossier_livrable", "_fermer_dossier_livrable", "_hacher_dans",
+             "_hacher_livrables", "empreinte_livrables", "_couvre_unite", "entrees_du_plan", "entree_ecrit_valide")
 NOMS_JOURNAL = ("NOM_JOURNAL_DEROGATIONS", "LIGNE_DEROGATION_RE", "_jeton_journal", "_chemin_journal_derogations",
                 "_ouvrir_journal_derogations", "_entrees_journal", "_derogation_non_consommee", "derogation_active", "consommer", "citer")
 
@@ -614,7 +615,7 @@ def controle_emp_04(ctx, dossier):
     rendus = {}
     for script, marqueur in TROIS_COPIES:
         ns = charger_bloc(os.path.join(dossier, script), marqueur)
-        rendus[script] = ([ns["livrable_present"](lab, entree) for _n, entree, _a in cas], ns["empreinte_livrables"](lab, ENTREES_EMP))
+        rendus[script] = ([ns["livrables_presents"](lab, [entree])[0] for _n, entree, _a in cas], ns["empreinte_livrables"](lab, ENTREES_EMP))
     base = rendus["poser-verdict.sh"]
     for script, rendu in rendus.items():
         if rendu != base:

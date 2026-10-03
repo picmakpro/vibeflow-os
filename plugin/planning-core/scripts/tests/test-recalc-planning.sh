@@ -2307,8 +2307,8 @@ fi
 
 # ---------- MUT-LIVRABLES — contrôle R4 (livrable présent) neutralisé ---------------------------
 if make_recalc_mutant LIVRABLES \
-  'statut_livrable, _detail_livrable = livrable_present(racine_lab, v)  # r4-predicat' \
-  'statut_livrable = "present"  # MUT-LIVRABLES'
+  'presents = livrables_presents(racine_lab, valeurs)  # r4-predicat' \
+  'presents = [(v, "present", "") for v in valeurs]  # MUT-LIVRABLES'
 then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-livrables-cas"
@@ -2326,8 +2326,8 @@ fi
 
 # ---------- MUT-R4-VIDE — le prédicat partagé « livrable présent » remplacé par l'ancienne existence nue (46-03, P46-D-12) ----
 if make_recalc_mutant R4-VIDE \
-  'statut_livrable, _detail_livrable = livrable_present(racine_lab, v)  # r4-predicat' \
-  'statut_livrable = "present" if os.path.lexists(os.path.join(racine_lab, v)) else "absent"  # MUT-R4-VIDE'
+  'presents = livrables_presents(racine_lab, valeurs)  # r4-predicat' \
+  'presents = [(v, "present" if os.path.lexists(os.path.join(racine_lab, v)) else "absent", "") for v in valeurs]  # MUT-R4-VIDE'
 then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-r4-vide-cas"
