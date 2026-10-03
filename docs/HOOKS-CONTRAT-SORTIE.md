@@ -77,12 +77,12 @@ bash <hook> | python3 -c 'import json,sys; json.loads(sys.stdin.read() or "{}")'
 C'est exactement ce trou de vérification qui a laissé passer le défaut de l'entrée #18 : le §3
 ci-dessus n'avait été appliqué à cette entrée que sur son *code de sortie*, jamais sur son flux.
 
-## 4. L'inventaire — 33 entrées, recompte machine
+## 4. L'inventaire — 37 entrées, recompte machine
 
 Commande de recomptage (fait foi, D-08) :
 
 ```bash
-python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==33, n"
+python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==37, n"
 ```
 
 Rendue le 2026-08-17 : `28` (27 recomptées plus tôt le même jour par le plan `32-03`, plus 1 :
@@ -112,7 +112,15 @@ moteur de planning, en forme shell (commande inline), **une seule entrée** au m
 (`Stop`, exit 2 voulu) reste inchangée (P45-D-19). L'entrée n°33, `check-gates-alive.sh`,
 `SessionStart · startup`, Phase 45 (45-03) : le canary de session du hook central, advisory, en
 forme shell `|| true`, ajouté au groupe `startup` UNIQUE de `planning-core`.
-Toute dérive future (une 34e entrée apparue, une entrée disparue) fait échouer cette assertion —
+Rendue le 2026-10-03 : `37` — les entrées n°34 à n°37 de `planning-core`, nées sur la Phase 46 (46-04, P46-D-09,
+P46-D-10) : le hook central reçoit désormais **cinq événements par UNE commande enregistrée, au texte identique
+sous chacun** ; l'entrée n°32 reste celle de `PreToolUse`, dont le matcher unique est élargi à `SubagentHandback`
+(jamais un second groupe : la purge de `merge-hooks.sh` l'écraserait), et la même commande est posée sous
+`SessionStart` (n°34, dans le groupe sans matcher existant, à côté du cliché de session), `SubagentStop` (n°35),
+`CwdChanged` (n°36) et `FileChanged` (n°37), chacune dans son propre groupe sans matcher. Seule la n°35 peut bloquer
+(décision JSON `decision: "block"`, code 0, jamais le code 2) ; les n°34, n°36 et n°37 ne refusent jamais.
+L'événement de mise à jour de tâche n'est pas câblé (P46-D-01).
+Toute dérive future (une 38e entrée apparue, une entrée disparue) fait échouer cette assertion —
 bruyamment, jamais en silence — et impose de mettre à jour l'inventaire et l'assertion
 **ensemble**, jamais l'un sans l'autre.
 
@@ -181,7 +189,7 @@ humain).
 |---|---|---|---|---|---|---|---|---|
 | 18 | SessionStart · startup | `audit-infra.sh` | `--quick --if-older-than=14d --hook` | **oui** — porte à la fois la traduction du silence (3→0, `hook_exit`) **et le rendu du FLUX** (`hook_render`) | 0 (advisory systématique sans `--strict` ; le mode `--strict`, qui rendrait 1/3, n'est jamais atteint ici) | advisory (ADR-031) | shell + `\|\| true` | **stdout corrigé** — les axes écrivent un objet JSON CHACUN, donc `--quick` en émettait DEUX collés : document invalide au parsing strict du harness (`jq` l'acceptait — il lit un flux —, d'où la non-détection). Sous `--hook`, le flux est capturé et rendu en UN SEUL objet encodé (`json.dumps`), émis seulement s'il y a des findings ; stdout strictement vide sinon (§3) |
 
-### planning-core — 8 entrées
+### planning-core — 12 entrées
 
 | # | Événement · matcher | Script | Invocation | `--hook` | Codes atteignables aujourd'hui | Classement | Forme | Action (Phase 30) |
 |---|---|---|---|---|---|---|---|---|
@@ -191,8 +199,12 @@ humain).
 | 22 | SessionStart · (aucun matcher, second bloc) | `planning-session-snapshot.sh` | (aucun) | non | 0 (systématique — toutes les branches observées sortent 0) | advisory (baseline d'attribution de session, ne bloque rien) | shell + `\|\| true` | rien |
 | 23 | UserPromptSubmit · (aucun matcher) | `planning-task-context.sh` | (aucun) | non | 0 (systématique — fail-open sur toutes les branches observées) | advisory | shell + `\|\| true` | rien |
 | 24 | Stop · (aucun matcher) | `guard-planning-updated.sh` | (aucun — **pas de `\|\| true`**) | non | 0 (fail-open, autorise l'arrêt), **2** (bloque l'arrêt — garde-fou de fin de session) | **bloquante** — bloque l'arrêt de session PAR CODE DE SORTIE (exit 2), et **c'est VOULU** : garde-fou machine-enforced « planning à jour avant de s'arrêter » (ADR-040/043/050/055) | shell, sans `\|\| true` | **rien — ne JAMAIS normaliser cette entrée** (la bloquer par exit 2 est le but du script, pas un défaut à corriger) |
-| 32 | PreToolUse · Write\|Edit\|NotebookEdit\|Bash\|Agent\|Task | `planning-hook.sh` | commande inline (commande enregistrée, `timeout: 20`) : lance `bash {{VF_SCRIPTS}}/planning-hook.sh` en fils et reprend tout code non nul | n/a (pas de flag) | 0 (toujours côté commande enregistrée — la décision est portée par le JSON) ; le lanceur interne `planning-hook.sh` rend, lui, 0, 3 (erreur Python avant l'adhésion), 70 à 72 et **73** (échéance interne de 8 s du cœur dépassée, ou lanceur disparu : stdout vide), que la commande reprend comme tout code non nul — fail-closed sous adhésion, silence ailleurs | **bloquante par décision JSON** (deny + code 0), jamais par exit 2 ; **fail-closed dans un lab adhérent seulement** (P45-D-06a), sur Write, Edit, NotebookEdit, Agent et Task, Bash ouvert (P45-D-06b) — premier garde fail-closed du dépôt ; hors lab adhérent (labs dev, ce dépôt compris) : stdout vide, code 0 (P45-D-04) — **sauf cœur tombé** : un chemin portant un échappement JSON non géré (`\b`, `\f`, `\r`, `\uXXXX`) est refusé même hors de tout lab adhérent, le doute tombant du côté du refus (limite F4 de la référence du modèle, `PX=0` ferme sans condition ; décision du manager vf-dev-manager, 2026-10-01) ; de même, toujours cœur tombé et quel que soit le cwd, un champ `file_path`, `notebook_path` ou `cwd` dont l'extrait brut dépasse 4096 caractères et nomme `.planning` ou `.claude` (casse ignorée) est refusé avec le motif « chemin trop long pour etre analyse, il nomme .planning ou .claude » (`vf_get`, variable `G`) ; un chemin `~` ou `~/…` est développé en `$HOME`, par le cœur comme par la couche de repli, jamais lu comme relatif au cwd (si `HOME` n'est pas absolu, ou pour `~utilisateur/…`, le chemin est tenu pour non analysable) ; **court-circuit hors adhésion** (revue de Samuel sur la PR #124, arbitrage de Willy, AskUserQuestion session principale, 2026-10-02 : le pré-filtre seul, `Bash` reste dans le matcher) : la commande commence par `vf_pre && exit 0` — stdout vide, code 0, sans lancer ni le script, ni `mktemp`, ni `python3` — quand le lab est certainement non adhérent (aucun ancêtre du chemin écrit, du `cwd` du payload, de `$PWD` ni du cwd physique, sous forme lexicale ET physique, ne porte un `.planning` dont le `config.json` contient `cycles-v1` ou un antislash, est illisible ou n'est pas régulier) ; valeur longue (plus de 1024 caractères ou de 64 composants, correspondance brute de plus de 2048, plus de 16 valeurs ; config de plus de 64 Kio, ou plus de 64 lectures de config par exécution : coût borné par construction et indépendant du contenu du système de fichiers, re-audit du 2026-10-02, F-P1 à F-P4), antislash, `~`, relatif, `//`, `.`, `..`, `/.vol`, JSON non compact, clé échappée, lien pendant ou en boucle : jamais de court-circuit, le chemin d'avant reste identique octet pour octet ; ne peut que taire un « non adhérent », jamais créer un passage dans un lab adhérent (garde : `test-planning-prefilter.sh`) | **shell** (commande inline, jamais `{{VF_BASH}}` : la forme exec part dans `settings.local.json` et n'a pas de shell pour porter le test de présence) | rien (née conforme, Phase 45) |
+| 32 | PreToolUse · Write\|Edit\|NotebookEdit\|Bash\|Agent\|Task\|SubagentHandback | `planning-hook.sh` | commande inline (commande enregistrée, `timeout: 20`) : lance `bash {{VF_SCRIPTS}}/planning-hook.sh` en fils et reprend tout code non nul | n/a (pas de flag) | 0 (toujours côté commande enregistrée — la décision est portée par le JSON) ; le lanceur interne `planning-hook.sh` rend, lui, 0, 3 (erreur Python avant l'adhésion), 70 à 72 et **73** (échéance interne de 8 s du cœur dépassée, ou lanceur disparu : stdout vide), que la commande reprend comme tout code non nul — fail-closed sous adhésion, silence ailleurs | **bloquante par décision JSON** (deny + code 0), jamais par exit 2 ; **fail-closed dans un lab adhérent seulement** (P45-D-06a), sur Write, Edit, NotebookEdit, Agent et Task, et depuis la Phase 46 sur SubagentHandback (le rapport d'un sous-agent, refusé sans dériver le rôle), Bash ouvert (P45-D-06b) — premier garde fail-closed du dépôt ; hors lab adhérent (labs dev, ce dépôt compris) : stdout vide, code 0 (P45-D-04) — **sauf cœur tombé** : un chemin portant un échappement JSON non géré (`\b`, `\f`, `\r`, `\uXXXX`) est refusé même hors de tout lab adhérent, le doute tombant du côté du refus (limite F4 de la référence du modèle, `PX=0` ferme sans condition ; décision du manager vf-dev-manager, 2026-10-01) ; de même, toujours cœur tombé et quel que soit le cwd, un champ `file_path`, `notebook_path` ou `cwd` dont l'extrait brut dépasse 4096 caractères et nomme `.planning` ou `.claude` (casse ignorée) est refusé avec le motif « chemin trop long pour etre analyse, il nomme .planning ou .claude » (`vf_get`, variable `G`) ; un chemin `~` ou `~/…` est développé en `$HOME`, par le cœur comme par la couche de repli, jamais lu comme relatif au cwd (si `HOME` n'est pas absolu, ou pour `~utilisateur/…`, le chemin est tenu pour non analysable) ; **court-circuit hors adhésion** (revue de Samuel sur la PR #124, arbitrage de Willy, AskUserQuestion session principale, 2026-10-02 : le pré-filtre seul, `Bash` reste dans le matcher) : la commande commence par `vf_pre && exit 0` — stdout vide, code 0, sans lancer ni le script, ni `mktemp`, ni `python3` — quand le lab est certainement non adhérent (aucun ancêtre du chemin écrit, du `cwd` du payload, de `$PWD` ni du cwd physique, sous forme lexicale ET physique, ne porte un `.planning` dont le `config.json` contient `cycles-v1` ou un antislash, est illisible ou n'est pas régulier) ; valeur longue (plus de 1024 caractères ou de 64 composants, correspondance brute de plus de 2048, plus de 16 valeurs ; config de plus de 64 Kio, ou plus de 64 lectures de config par exécution : coût borné par construction et indépendant du contenu du système de fichiers, re-audit du 2026-10-02, F-P1 à F-P4), antislash, `~`, relatif, `//`, `.`, `..`, `/.vol`, JSON non compact, clé échappée, lien pendant ou en boucle : jamais de court-circuit, le chemin d'avant reste identique octet pour octet ; ne peut que taire un « non adhérent », jamais créer un passage dans un lab adhérent (garde : `test-planning-prefilter.sh`) | **shell** (commande inline, jamais `{{VF_BASH}}` : la forme exec part dans `settings.local.json` et n'a pas de shell pour porter le test de présence) | rien (née conforme, Phase 45) |
 | 33 | SessionStart · startup | `check-gates-alive.sh` | `--hook` | oui — traduit SAIN (3) et INDÉTERMINÉ (4) vers 0 ; le signal (déjà 0) et l'usage (64) ne sont jamais traduits | 0 (signal — UNE seule ligne, préfixe `[planning-core] canary :` : hook central non enregistré, **commande enregistrée non reconnue** (un réglage cite `planning-hook.sh` avec une commande qui n'est pas celle de référence : rien n'est exécuté), mode dégradé, **constantes d'armement absentes ou illisibles** (une table d'armement absente est désormais un SIGNAL en code 0, plus un code 4 traduit en silence sous `--hook`), gate armé sans canary, couverture minimale incomplète, cas en échec), 3 (SAIN : session hors lab adhérent, ou canary passé), 4 (INDÉTERMINÉ : réglages illisibles, aucun interpréteur Python — jamais un vert de complaisance), 64 (usage, jamais atteint via ce fragment) | **advisory** — rejoue la commande enregistrée sur un lab adhérent synthétique et signale, ne bloque jamais (P45-D-20) ; stdout strictement vide hors signal (§3) | shell + `\|\| true` | rien (née conforme, Phase 45) |
+| 34 | SessionStart · (aucun matcher, second bloc) | `planning-hook.sh` | commande inline (la MÊME commande enregistrée que la n°32, `timeout: 20`) : lance `bash {{VF_SCRIPTS}}/planning-hook.sh` en fils et reprend tout code non nul | n/a (pas de flag) | 0 (toujours côté commande enregistrée) ; le lanceur interne rend, lui, 0, 3, 70 à 72 et 73, que la commande reprend : hors adhésion, stdout vide, code 0 par le pré-filtre `vf_pre` AVANT le script et AVANT tout `python3` (P46-D-16) ; mode dégradé (script ou `python3` absent) : stdout vide, code 0 (fail-open, limite (ap)) | **advisory** — ne refuse JAMAIS (`watchPaths` et réconciliation de D1, à venir) ; toute erreur : silence, code 0 (fail-open déclaré, P46-D-10) | shell (commande inline, jamais `{{VF_BASH}}`) | rien (née conforme, Phase 46, 46-04) |
+| 35 | SubagentStop · (aucun matcher) | `planning-hook.sh` | commande inline (la MÊME commande enregistrée que la n°32, `timeout: 20`) : lance `bash {{VF_SCRIPTS}}/planning-hook.sh` en fils et reprend tout code non nul | n/a (pas de flag) | 0 (toujours côté commande enregistrée) ; le lanceur interne rend, lui, 0, 3, 70 à 72 et 73, que la commande reprend : hors adhésion, stdout vide, code 0 par le pré-filtre `vf_pre` AVANT le script et AVANT tout `python3` (P46-D-16) ; mode dégradé (script ou `python3` absent) : stdout vide, code 0 (fail-open, limite (ap)) | **bloquante par décision JSON** (`decision: "block"` avec `reason`, code 0, JAMAIS le code 2 — #60490) quand G4′ sera armé (repli de G4′ hors mode auto, sans évaluation dans la 46-04) ; toute erreur : silence, code 0 (fail-open) | shell (commande inline) | rien (née conforme, Phase 46, 46-04) |
+| 36 | CwdChanged · (aucun matcher) | `planning-hook.sh` | commande inline (la MÊME commande enregistrée que la n°32, `timeout: 20`) : lance `bash {{VF_SCRIPTS}}/planning-hook.sh` en fils et reprend tout code non nul | n/a (pas de flag) | 0 (toujours côté commande enregistrée) ; le lanceur interne rend, lui, 0, 3, 70 à 72 et 73, que la commande reprend : hors adhésion, stdout vide, code 0 par le pré-filtre `vf_pre` AVANT le script et AVANT tout `python3` (P46-D-16) ; mode dégradé (script ou `python3` absent) : stdout vide, code 0 (fail-open, limite (ap)) | **advisory** — ne refuse JAMAIS (`watchPaths` de D1, à venir) ; racine lue dans `cwd` (limite (ao)) ; toute erreur : silence, code 0 | shell (commande inline) | rien (née conforme, Phase 46, 46-04) |
+| 37 | FileChanged · (aucun matcher) | `planning-hook.sh` | commande inline (la MÊME commande enregistrée que la n°32, `timeout: 20`) : lance `bash {{VF_SCRIPTS}}/planning-hook.sh` en fils et reprend tout code non nul | n/a (pas de flag) | 0 (toujours côté commande enregistrée) ; le lanceur interne rend, lui, 0, 3, 70 à 72 et 73, que la commande reprend : hors adhésion, stdout vide, code 0 par le pré-filtre `vf_pre` AVANT le script et AVANT tout `python3` (P46-D-16) ; mode dégradé (script ou `python3` absent) : stdout vide, code 0 (fail-open, limite (ap)) | **advisory** — ne refuse JAMAIS (trace de D1, à venir) ; racine lue dans le `file_path` de premier niveau ; toute erreur : silence, code 0 | shell (commande inline) | rien (née conforme, Phase 46, 46-04) |
 
 ### software-architecture — 1 entrée
 
@@ -208,9 +220,9 @@ humain).
 | consolidator | 7 | idem, `plugin/consolidator/hooks/hooks.json` |
 | dev-orchestrator | 6 | idem, `plugin/dev-orchestrator/hooks/hooks.json` |
 | infrastructure-audit | 1 | idem, `plugin/infrastructure-audit/hooks/hooks.json` |
-| planning-core | 8 | idem, `plugin/planning-core/hooks/hooks.json` |
+| planning-core | 12 | idem, `plugin/planning-core/hooks/hooks.json` |
 | software-architecture | 1 | idem, `plugin/software-architecture/hooks/hooks.json` |
-| **Total** | **33** | commande de recomptage globale, §4 ci-dessus |
+| **Total** | **37** | commande de recomptage globale, §4 ci-dessus |
 
 **Les deux entrées bloquantes mises en avant par le plan comme points de vigilance** (le
 classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.md Pitfall 4) :
@@ -225,22 +237,24 @@ classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.
 mécanisme JSON que #25 : `guard-agent-write.sh` (#1), `guard-read-registres.sh` (#7),
 `guard-bash-registres.sh` (#8) et **`guard-driver-lock.sh` (#27 PreToolUse·Bash\|Write\|Edit,
 plan `32-03`, LOCK-02/03/05)** — chacune sort toujours 0 et bloque via `permissionDecision: deny`.
-Soit **8 entrées bloquantes au total sur les 33** (6 via décision JSON + 2 via code de sortie : #24 et
+Soit **9 entrées bloquantes au total sur les 37** (7 via décision JSON + 2 via code de sortie : #24 et
 #31, `guard-fin-de-geste.sh` au Stop, plan `41.3-04` ; la 6e via décision JSON est l'entrée #32,
-`planning-hook.sh`, Phase 45, fail-closed dans un lab adhérent), et **25 entrées advisory** (dont #30,
+`planning-hook.sh`, Phase 45, fail-closed dans un lab adhérent, et la 7e l'entrée #35, `planning-hook.sh`
+sous `SubagentStop`, Phase 46 : blocage par `decision: "block"` en code 0), et **28 entrées advisory** (dont #30,
 le snapshot de début de session ; +1 : l'entrée #28, `check-guard-health.sh`, plan `32-05`, +1 :
 l'entrée #29, `check-requirements-survival.sh`, plan `18-01`, +1 : l'entrée #33,
-`check-gates-alive.sh`, plan `45-03` — toutes advisory, elles ne bloquent rien, ADR-031).
+`check-gates-alive.sh`, plan `45-03`, +3 : les entrées #34, #36 et #37, `planning-hook.sh` sous `SessionStart`,
+`CwdChanged` et `FileChanged`, Phase 46 — toutes advisory, elles ne bloquent rien ou ne refusent jamais, ADR-031).
 
 ## 6. Ce qui reste à la polarité gouvernance
 
-Les **22 entrées gouvernance** (conductor 6 — les entrées n°1 à n°6 —, consolidator 7,
-infrastructure-audit 1, planning-core 8) restent à Willy. Le module `conductor` compte bien 10
+Les **26 entrées gouvernance** (conductor 6 — les entrées n°1 à n°6 —, consolidator 7,
+infrastructure-audit 1, planning-core 12) restent à Willy. Le module `conductor` compte bien 10
 entrées (§5), mais quatre d'entre elles relèvent de la polarité dev : `guard-driver-lock.sh` (#27,
 plan `32-03`), `check-guard-health.sh` (#28, plan `32-05`) et les deux entrées de
 `guard-fin-de-geste.sh` (#30 et #31, plan `41.3-04`), nées en forme exec. Les 11 entrées de
-la polarité dev sont donc conductor 4, dev-orchestrator 6 et software-architecture 1 ; 22 + 11 = 33,
-le total de la commande du §4. Les 22 entrées gouvernance restent à Willy pour :
+la polarité dev sont donc conductor 4, dev-orchestrator 6 et software-architecture 1 ; 26 + 11 = 37,
+le total de la commande du §4. Les 26 entrées gouvernance restent à Willy pour :
 
 - **La migration effective en forme exec** de leurs `hooks.json` — hors périmètre de cette phase
   (§7 du contrat PR #29).
@@ -251,7 +265,7 @@ le total de la commande du §4. Les 22 entrées gouvernance restent à Willy pou
   `guard-agent-write.sh`) — c'est cette migration-là, pas cette phase, qui leur donne un point
   d'ancrage pour la traduction.
 
-`planning-hook.sh` (#32) est hors de ces deux listes. Sa forme est une commande shell inline,
+`planning-hook.sh` (#32, et ses entrées sœurs #34 à #37 sous quatre autres événements) est hors de ces deux listes. Sa forme est une commande shell inline,
 sans drapeau, et elle le reste : la forme exec part dans `settings.local.json` et n'a pas de shell
 pour porter le test de présence du script (ligne n°32 du §4). Elle n'a pas non plus besoin de
 `--hook` : la commande enregistrée sort déjà toujours en 0 et porte sa décision dans le JSON.
@@ -278,4 +292,6 @@ de session du hook central, GATE-12, née n°31), le 2026-09-30, puis par le pla
 signaux du canary, code 73 du lanceur, refus `PX=0` hors lab), le 2026-10-01, puis à l'intégration de
 `main` dans la branche de la Phase 45 (renumérotation des deux entrées de `planning-core` en n°32 et
 n°33, les numéros 30 et 31 étant déjà pris sur `main` ; décompte recompté à 33 par la commande machine
-du §4), le 2026-10-02.*
+du §4), le 2026-10-02, puis par le plan VFDO-46-04 (entrées n°34 à n°37 : la commande enregistrée de
+`planning-hook.sh` sous `SessionStart`, `SubagentStop`, `CwdChanged` et `FileChanged`, matcher de l'entrée
+n°32 élargi à `SubagentHandback` ; décompte recompté à 37 par la commande machine du §4), le 2026-10-03.*

@@ -25,11 +25,12 @@
 # vidé, la suite doit échouer sur son propre compteur (mutation m3, prouvée plus bas), jamais
 # passer au vert silencieusement.
 #
-# ENTRÉES BLOQUANTES DU PARC (5 au total, docs/HOOKS-CONTRAT-SORTIE.md §5) — EXCLUES nommément du
-# contrôle --hook (elles ne portent pas de silence à traduire, leur blocage est le comportement
+# ENTRÉES BLOQUANTES DU PARC NOMMÉES ICI (6, sur les 9 bloquantes de docs/HOOKS-CONTRAT-SORTIE.md §5) — EXCLUES
+# nommément du contrôle --hook (elles ne portent pas de silence à traduire, leur blocage est le comportement
 # voulu) : guard-agent-write.sh, guard-read-registres.sh, guard-bash-registres.sh (décision JSON,
-# sortent toujours 0) et guard-planning-updated.sh (bloque PAR son code de sortie, exit 2 — jamais
-# à normaliser). guard-file-size.sh (software-architecture) est hors périmètre de ce plan (déjà
+# sortent toujours 0), guard-planning-updated.sh (bloque PAR son code de sortie, exit 2 — jamais
+# à normaliser) et planning-hook.sh (hook central, Phase 46 : decision JSON — deny en PreToolUse, block en
+# SubagentStop —, sort toujours 0). guard-file-size.sh (software-architecture) est hors périmètre de ce plan (déjà
 # migré en forme exec, PR #29).
 #
 # MUTATIONS (QUAL-01, trois issues : PASS / FAIL / IMPARSABLE BRUYANT — jamais un skip silencieux) :
@@ -373,8 +374,8 @@ if assert_mutant_differs "$SCRIPT" "$MUT2" "audit-infra.sh m2"; then
 fi
 
 # ==================================================================================================
-# Exclusions NOMMÉES — 5 entrées bloquantes du parc (docs/HOOKS-CONTRAT-SORTIE.md §5), jamais
-# une absence silencieuse.
+# Exclusions NOMMÉES — 6 entrées bloquantes du parc nommées ici, sur les 9 de docs/HOOKS-CONTRAT-SORTIE.md §5
+# (Phase 46 : planning-hook.sh ajouté), jamais une absence silencieuse.
 # ==================================================================================================
 echo "== Exclusions nommées (bloquantes — hors contrôle --hook, docs/HOOKS-CONTRAT-SORTIE.md §5) =="
 echo "  ⊘ guard-agent-write.sh (conductor)        — bloque par décision JSON, sort toujours 0"
@@ -382,6 +383,7 @@ echo "  ⊘ guard-read-registres.sh (consolidator)  — bloque par décision JSO
 echo "  ⊘ guard-bash-registres.sh (consolidator)  — bloque par décision JSON, sort toujours 0"
 echo "  ⊘ guard-planning-updated.sh (planning-core) — bloque PAR son code de sortie (exit 2) — JAMAIS à normaliser"
 echo "  ⊘ guard-file-size.sh (software-architecture) — hors périmètre (déjà migré en forme exec, PR #29)"
+echo "  ⊘ planning-hook.sh (planning-core) — bloque par décision JSON (deny en PreToolUse, block en SubagentStop), sort toujours 0"
 
 # ==================================================================================================
 # m3 — anti-vert-à-vide : la garde de plancher elle-même, testée directement (jamais en
