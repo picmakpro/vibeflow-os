@@ -90,3 +90,5 @@
 - [Exécuteurs forcés en worktree](project_executeurs-forces-en-worktree.md) — garde du harnais : chaque plan sur une branche d'agent ; vérifier la base, rapatrier en ff, rejouer la non-régression
 - [.worktreeinclude lu dans l arbre principal](project_worktreeinclude-lu-dans-l-arbre-principal.md) — worktree isolé part d origin/main, hérite des ignorés selon l arbre NON commité du principal
 - [Commiter avant de rendre](feedback_commiter-avant-de-rendre.md) — 2 workers figés après rédaction, avant commit : exiger le commit avant le rapport, aucun rejeu long en fin de mandat
+- [Autorisation relayée jamais gravée](feedback_autorisation-relayee-jamais-gravee-dans-un-plan.md) — agir hors worktree s'autorise au moment d'agir ; l'inscrire dans un plan = commit refusé (Instruction Poisoning)
+- [TaskCompleted absent par défaut](project_taskcompleted-absent-modeles-recents.md) — outils Task retirés des modèles récents (2.1.268) : gate posé dessus = absent ; G2′ de la 47 à ré-accrocher

@@ -24,6 +24,13 @@ Formes acceptées :
 
 Les plan-checkers subissent la même garde : `mktemp -d` calculé est refusé (le scratchpad de session est accepté), commits scriptés dans une fixture git refusés.
 
+Phase 46 (2026-10-03) : la garde refuse aussi les commandes `verify` de plan à forme composée
+(`out=$(bash …); rc=$?; …` en ligne, `zsh -c '…'`, `rtk proxy git …`), et la sonde `claude -p`
+d'un chercheur. Le plan-checker du tour 2 n'a pu jouer aucune commande sous les deux shells.
+Correctif retenu dans les plans : une consigne d'exécution par plan (la commande `<automated>` est
+écrite telle quelle dans un fichier du scratchpad, puis lancée par `bash <fichier>` ; c'est le code
+de sortie qui fait le verdict).
+
 **Why:** une dizaine d'appels refusés en une mission avant d'adopter la forme simple ; les juges
 ont jugé « sur lecture » faute de pouvoir monter une fixture git.
 
