@@ -373,6 +373,56 @@
       ],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "prefiltre",
+      "step": "pre-filtre shell hors adhesion (revue Samuel PR 124)",
+      "stage": "",
+      "deps": [
+        "livraison-finale"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-prefiltre",
+      "step": "re-audit securite cible du pre-filtre",
+      "stage": "",
+      "deps": [
+        "prefiltre"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-prefiltre",
+      "step": "F-P1 cout cubique _pk + borne 1024/64, F-P2 bande 4083-4096",
+      "stage": "",
+      "deps": [
+        "audit-prefiltre"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-prefiltre-2",
+      "step": "F-P3 borne de taille config + budget grep, F-P4 _pa initialise",
+      "stage": "",
+      "deps": [
+        "fix-prefiltre"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "reponse-samuel",
+      "step": "STATE, commentaire PR, CI",
+      "stage": "",
+      "deps": [
+        "fix-prefiltre-2"
+      ],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
