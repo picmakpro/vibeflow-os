@@ -362,14 +362,22 @@ caractère de contrôle ni `\`, sans métacaractère `*?[]{}<>`. Le champ s'appe
 `scope:` (spec D-10 — `scope` est déjà pris ailleurs dans le corpus).
 
 `PLAN.md` n'est **jamais** modifié pour marquer une clôture : son hash reste **stable**, ce que
-consommeront les verdicts hachés de la Phase 46 (P44-D-03).
+vérifient les verdicts hachés (P44-D-03, Phase 46 : champ `hash` de `VERDICT.md`, règle E).
 
-**Limite connue et acceptée** (aucun contrôle supplémentaire en Phase 44) : un segment
-**intermédiaire** en lien symbolique sous la racine du lab (par exemple `cycles` lui-même
-remplacé par un lien) peut faire constater par `os.path.lexists` une existence qui pointe, via ce
-segment, hors de la racine du lab. Le contrôle porte sur la **forme** de l'entrée (pas de `..`,
-pas de `~`/`/` initial), jamais sur une résolution des segments intermédiaires du disque —
-documentée ici plutôt que corrigée, jusqu'à la protection des fichiers générés (G6, Phase 45).
+**Un livrable déclaré est « absent ou vide »** (R4, P46-D-12). Le recalcul ne se contente plus de
+constater qu'un chemin existe : il appelle le prédicat unique « livrable présent » (voir § `VERDICT.md`),
+le même que G3 et que la commande de pose. Chaque entrée `ecrit:` est parcourue composant par
+composant par `lstat`, **jamais en suivant un lien** : un lien, **terminal ou intermédiaire** (par
+exemple `cycles` lui-même remplacé par un lien), rend le livrable **absent** (`livrable-absent:<entrée>`).
+Cette règle **remplace** la limite connue de la Phase 44, qui acceptait qu'`os.path.lexists` constate,
+par un segment intermédiaire en lien, une existence pointant hors de la racine du lab. Un fichier
+régulier de 0 octet, ou un dossier sans aucun fichier régulier non vide, est **vide**
+(`livrable-vide:<entrée>`) ; les noms `.DS_Store`, `Thumbs.db` et `desktop.ini` sont **exclus** partout
+(motif : ouvrir un dossier livrable dans le Finder ou l'Explorateur ne doit ni le rendre non vide ni
+périmer un verdict) ; un parcours qui dépasse la borne (2000 entrées, 128 Mio) rend le livrable **hors
+borne** (`livrable-hors-borne:<entrée>`), jamais un livrable accepté sur un parcours partiel. Un livrable
+illisible n'est pas établi présent : il rend `livrable-absent:<entrée>`. Les raisons nomment l'entrée
+telle que déclarée dans `ecrit:`.
 
 ### `CLOTURE.md`
 
@@ -395,9 +403,10 @@ attributs : **dimension** = un constat par critère éliminatoire objectivement 
 **Deux empreintes** (Phase 46, P46-D-03 : Willy, AskUserQuestion session principale, 2026-10-03,
 Q3 = a). Les deux sont calculées par la commande `poser-verdict.sh`, **jamais par l'agent**, sous le
 verrou du `PLAN.md`, et relues identiques par le parseur avant l'écriture. Un verdict dont l'une des
-deux ne correspond plus est **périmé** : il se refait (les gates et le recalcul qui le vérifient sont
-livrés par les plans suivants de la Phase 46 ; en Phase 44, `hash` et `tentative` étaient lus et
-restitués, jamais vérifiés, P44-D-09).
+deux ne correspond plus est **périmé** : il se refait. Le recalcul le vérifie (règle E, § Règles de
+feuille, P46-D-03b) ; G4 le vérifiera à l'écriture de `SUMMARY.md` (plan 46-05). En Phase 44, `hash` et
+`tentative` étaient lus et restitués sans être vérifiés (P44-D-09) ; ce n'est plus vrai de `hash` ni de
+`hash_livrables`.
 
 - `hash` : sha256 des octets du `PLAN.md` de l'unité (A3, conservé).
 - `hash_livrables` (P46-D-03a, P46-D-12) : empreinte des entrées `ecrit:` du `PLAN.md`. **Texte
@@ -417,7 +426,7 @@ restitués, jamais vérifiés, P44-D-09).
   vide (hors noms exclus). Un seul prédicat « livrable présent » (`absent`, `lien`, `vide`, `present`,
   plus `borne` et `illisible`) existe, en **trois copies ast-identiques** (`poser-verdict.sh`,
   `planning-hook.sh`, `recalc-planning.sh`) prouvées identiques par comparaison d'arbres de syntaxe
-  (suite `test-cloture-empreintes.sh`, R-EMP-04) ; R4 du recalcul et G3 le liront (plans 46-03 et 46-05).
+  (suite `test-cloture-empreintes.sh`, R-EMP-04) ; R4 du recalcul le lit (plan 46-03), G3 le lira (plan 46-05).
 - **Refus de pose** : la commande refuse (code 64) de poser un verdict quand un livrable déclaré est
   absent, vide ou un lien, quand `ecrit:` est absent, vide ou invalide, ou quand une borne est dépassée
   (R4 précède R5 : un tel verdict serait de toute façon `indéterminé`). Les messages ne nomment que
@@ -469,7 +478,7 @@ frontmatter non fermé → lecture en échec → la raison `frontmatter-invalide
 conditionne l'état. Pas de commentaire en fin de ligne (`#` fait partie de la valeur, qui devient
 alors invalide pour un champ fermé).
 
-## Les huit états et les dérogations
+## Les neuf états et les dérogations
 
 | État | Ce que la machine constate |
 |---|---|
@@ -477,13 +486,14 @@ alors invalide pour un champ fermé).
 | `en cadrage` | registre avec au moins une ligne structurante sans statut |
 | `à planifier` | registre clos, pas de `PLAN.md` |
 | `à exécuter` | `PLAN.md` présent, marqueur de clôture (`CLOTURE.md`) absent |
-| `à juger` | marqueur présent, livrables présents, pas de `VERDICT.md` |
-| `à corriger` | constats du verdict en échec |
-| `close` | constats passés **et** `SUMMARY.md` présent |
+| `à juger` | marqueur présent, livrables présents (ni absents ni vides), pas de `VERDICT.md` — **ou** un verdict périmé sans `SUMMARY.md` (règle E, motif `verdict-perime`) |
+| `à corriger` | constats du verdict en échec, les deux empreintes conformes |
+| `à clore` | constats tous `passé`, les deux empreintes conformes, `SUMMARY.md` absent — **non terminal** (P46-D-04) |
+| `close` | constats passés, les deux empreintes conformes **et** `SUMMARY.md` présent |
 | `indéterminé` | les signaux se contredisent |
 
 Plus trois **dérogations non dérivables** : `abandonné`, `remplacé`, `gelé` — posées par
-dérogation nominative, lues dans un champ `statut:` qui **doit nommer son auteur**. Ces huit états
+dérogation nominative, lues dans un champ `statut:` qui **doit nommer son auteur**. Ces neuf états
 plus les trois dérogations s'appliquent **aux phases et aux plans** (P44-D-07).
 
 ## Règles de dérivation
@@ -513,7 +523,7 @@ Appliquées **dans cet ordre** — la première règle qui s'applique gagne.
 
 ### Règles de feuille (phase à plan direct, ou plan)
 
-Un plan applique Φ0 et Φ1 puis R1 à R8.
+Un plan applique Φ0 et Φ1 puis R1 à R8, dont la règle E entre R6 et R7.
 
 - **R1** — pas de `PLAN.md` : SUMMARY présent → `SUMMARY.md-sans-PLAN.md` ; CLOTURE présent →
   `CLOTURE.md-sans-PLAN.md` ; VERDICT présent → `VERDICT.md-sans-PLAN.md` ; sinon `à planifier`.
@@ -521,26 +531,45 @@ Un plan applique Φ0 et Φ1 puis R1 à R8.
   vide ou avec une entrée invalide → `ecrit-invalide`.
 - **R3** — pas de `CLOTURE.md` : VERDICT présent → `VERDICT.md-sans-CLOTURE.md` ; SUMMARY présent
   → `SUMMARY.md-sans-CLOTURE.md` ; sinon `à exécuter`.
-- **R4** — un livrable d'`ecrit:` absent sous la racine du lab → `livrable-absent:<entrée>`.
+- **R4** — un livrable d'`ecrit:` **absent ou vide** (prédicat partagé, voir § `PLAN.md`) →
+  `livrable-absent:<entrée>` (absent, lien ou illisible), `livrable-vide:<entrée>` ou
+  `livrable-hors-borne:<entrée>` ; la première entrée fautive dans l'ordre déclaré donne la raison.
 - **R5** — pas de `VERDICT.md` : SUMMARY présent → `SUMMARY.md-sans-VERDICT.md` ; sinon `à juger`.
 - **R6** — frontmatter de `VERDICT.md` illisible → `frontmatter-invalide:VERDICT.md` ; `constats`
   absent, vide ou avec un `resultat` hors `passé`/`échec` → `verdict-invalide`.
+- **E** (empreintes, P46-D-03b) — après un `VERDICT.md` lisible aux constats valides, le recalcul
+  compare les **deux empreintes** : `hash` au sha256 des octets du `PLAN.md`, `hash_livrables` à
+  l'empreinte des entrées `ecrit:` calculée par la copie partagée du bloc de `poser-verdict.sh`. Un
+  écart, ou un `hash_livrables` **absent** (un verdict sans cette clé est traité comme périmé), rend
+  `à juger` (`verdict-perime`) quand `SUMMARY.md` est absent, `indéterminé`
+  (`livrable-modifie-apres-cloture`) quand il est présent — y compris pour un `PLAN.md` modifié, un
+  troisième motif propre au plan n'étant pas requis. Un dépassement de borne pendant le calcul rend
+  `indéterminé` (`empreinte-hors-borne`). **R7 et R8 ne s'appliquent qu'à un verdict conforme.**
 - **R7** — un constat `échec` : SUMMARY présent → `SUMMARY.md-avec-verdict-en-echec` ; sinon
   `à corriger`.
-- **R8** — constats tous `passé` : SUMMARY présent → `close` ; sinon `indéterminé`
-  (`verdict-passe-sans-SUMMARY.md`).
+- **R8** — constats tous `passé` : SUMMARY présent → `close` ; sinon `à clore`.
 - **Défaut défensif** : `combinaison-non-prevue` — clause de garde-fou pour une évolution
   future des règles R1-R8/Φ0-Φ5 ; R1-R8 tel que codé aujourd'hui épuise déjà toute combinaison
   possible de plan/cloture/verdict/summary/constats, ce libellé n'est donc produit par AUCUN
   chemin du code actuel (F6, 2026-09-28).
 
-### Le cas « verdict passé sans SUMMARY.md »
+### L'état `à clore`
 
-R8 rend `indéterminé` (`verdict-passe-sans-SUMMARY.md`) — la table du §3.1 de la spec **ne nomme
-pas** cet état de transition, et P44-D-08 interdit au moteur de le **supposer**. C'est un état de
-transition **normal**, pas une anomalie : entre un verdict aux constats tous `passé` et l'écriture
-de `SUMMARY.md`, le disque ne permet pas de trancher seul entre « close » et « en cours de
-clôture », donc le moteur avoue plutôt que de deviner.
+Entre un verdict aux constats tous `passé`, dont les deux empreintes sont conformes, et l'écriture de
+`SUMMARY.md`, l'unité est **`à clore`** (P46-D-04 : Willy, AskUserQuestion session principale,
+2026-10-03, Q4 = a). Ce cas rendait jusque-là `indéterminé` (`verdict-passe-sans-SUMMARY.md`), parce que
+la table du §3.1 de la spec ne nommait pas cet état de transition et que P44-D-08 interdisait au moteur
+de le supposer ; **P44-D-08 est levée sur ce point** et ce code disparaît. `à clore` est un état
+**normal et non terminal** : il n'entre pas dans `TERMINAUX`, l'agrégat d'un cycle le rend tel quel (et
+non plus `indéterminé`), l'index le liste, et aucune ligne de `cloture.log` n'est écrite tant que
+l'unité n'est pas `close`.
+
+**Conséquence voulue de la règle E** : le verdict couvre un artefact, plus un état. Un verdict en
+`échec` suivi d'une **correction du livrable** (ou du plan) repasse en `à juger` (`verdict-perime`) dès
+la première modification : l'état ne reste pas `à corriger` pendant la correction, il redemande un
+jugement (tentative suivante, plafond de trois). De même un livrable réécrit après un verdict `passé`
+sans `SUMMARY.md` renvoie de `à clore` à `à juger`, et après `SUMMARY.md` de `close` à `indéterminé`
+(`livrable-modifie-apres-cloture`) : jamais un `close` qui survit au contenu qu'il ne couvre plus.
 
 ### Les quatre contradictions de P44-D-08
 
@@ -571,11 +600,15 @@ clôture », donc le moteur avoue plutôt que de deviner.
 | `ecrit-invalide` | R2 | `ecrit:` absent, vide, ou entrée invalide |
 | `VERDICT.md-sans-CLOTURE.md` | R3 | contradiction P44-D-08 |
 | `SUMMARY.md-sans-CLOTURE.md` | R3 | résumé avant l'exécution marquée close |
-| `livrable-absent:<entrée>` | R4 | un chemin d'`ecrit:` n'existe pas sur le disque |
+| `livrable-absent:<entrée>` | R4 | un chemin d'`ecrit:` est absent, est un lien (jamais suivi) ou est illisible |
+| `livrable-vide:<entrée>` | R4 | un chemin d'`ecrit:` est un fichier de 0 octet ou un dossier sans fichier non vide |
+| `livrable-hors-borne:<entrée>` | R4 | le parcours d'un livrable dépasse la borne (2000 entrées, 128 Mio) |
 | `SUMMARY.md-sans-VERDICT.md` | R5 | résumé avant jugement |
 | `verdict-invalide` | R6 | `constats` absent, vide, ou `resultat` hors `passé`/`échec` |
+| `verdict-perime` | E | `hash` ou `hash_livrables` ne correspond plus (ou est absent), `SUMMARY.md` absent : état `à juger`, pas `indéterminé` |
+| `livrable-modifie-apres-cloture` | E | même écart avec `SUMMARY.md` présent |
+| `empreinte-hors-borne` | E | la borne est dépassée pendant le calcul de l'empreinte des livrables d'un verdict |
 | `SUMMARY.md-avec-verdict-en-echec` | R7 | contradiction P44-D-08 |
-| `verdict-passe-sans-SUMMARY.md` | R8 | état de transition non nommé par le §3.1 |
 | `combinaison-non-prevue` | défaut | aucune règle ne s'applique |
 | `plan-indetermine:<plan>` | Agrégation phase | un plan de `plans/` est `indéterminé` |
 | `phase-indeterminee:<phase>` | Agrégation cycle | une phase du cycle est `indéterminé` |
@@ -643,8 +676,18 @@ assainie reste lue telle quelle, jamais validée. Un jeton ne peut **jamais** re
 interne vérifié par une erreur bruyante (`ValueError`) plutôt qu'une ligne de journal illisible
 produite en silence.
 
-**`.recalc-cache.json`** : JSON, `cache_schema_version` = `1`, `moteur` = `"recalc-planning"`,
-signature sha256 du contenu des fichiers lus par unité. Absent, illisible, lien, ou d'un autre
+**`.recalc-cache.json`** : JSON, `cache_schema_version` = `2`, `moteur` = `"recalc-planning"`,
+signature sha256 du contenu des fichiers lus par unité, et par unité l'**état des livrables** `ecrit:`
+(`empreinte_livrables`, P46-D-03b) : `["ok", <empreinte>]` quand tous sont présents, `["statuts", {…}]`
+quand l'un d'eux est absent, vide ou lien (la dérivation ne dépend alors que de ces statuts). Une entrée
+n'est reprise que si la signature **et** cet état, **recalculé à chaque passage** par la copie partagée
+(bornée), sont égaux ; un livrable réécrit, même à taille égale, fait donc recalculer l'unité — un `close`
+en cache ne survit jamais à la réécriture d'un livrable (les schémas 1, qui ne retenaient que l'existence
+des livrables, sont relus comme `autre-format`). Une empreinte non calculable alors que tous les
+livrables sont présents (borne, lecture impossible) n'est jamais reprise. **Coût déclaré** : chaque
+passage hache le contenu des livrables de chaque unité qui déclare un `ecrit:` valide, dans la borne de
+2000 entrées et 128 Mio par unité — la spec §10 impose le hachage du contenu, jamais une signature par
+date. Absent, illisible, lien, ou d'un autre
 `cache_schema_version` → recalcul complet, **jamais** une confiance aveugle. Le cache est
 **incrémental par hash du contenu**, **jamais par `mtime`** (P44-D-13) — un `touch` sans
 changement de contenu ne change rien, un changement de contenu à `mtime` restauré est vu. Le
@@ -694,7 +737,9 @@ ici :
 | Code | Libellé |
 |---|---|
 | `combinaison-non-prevue` | combinaison de signaux non prévue |
-| `verdict-passe-sans-SUMMARY.md` | verdict passé, SUMMARY absent |
+| `verdict-perime` | verdict périmé : re-juger (tentative n+1) |
+| `livrable-modifie-apres-cloture` | livrable ou plan modifié après la clôture |
+| `empreinte-hors-borne` | empreinte des livrables hors borne |
 | `SUMMARY.md-sans-PLAN.md` | SUMMARY.md sans PLAN.md |
 | `CLOTURE.md-sans-PLAN.md` | CLOTURE.md sans PLAN.md |
 | `VERDICT.md-sans-CLOTURE.md` | VERDICT.md sans CLOTURE.md (marqueur) |
@@ -702,12 +747,16 @@ ici :
 | `derogation-sans-auteur` | dérogation sans auteur nommé |
 | `derogation-invalide` | dérogation invalide |
 | `CYCLE.md-absent` | CYCLE.md absent |
+| `livrable-absent:<entrée>` | livrable absent : `<entrée>` |
+| `livrable-vide:<entrée>` | livrable vide : `<entrée>` |
+| `livrable-hors-borne:<entrée>` | livrable hors borne : `<entrée>` |
 
 Un code **suffixé** `:<x>` (ex. `phase-indeterminee:<phase>`, `plan-indetermine:<plan>`,
 `livrable-absent:<entrée>`) se sépare sur le **premier** `:` : le libellé de la partie fixe
 s'applique et `<x>` s'y insère littéralement — `phase-indeterminee:<phase>` → «`` phase `<phase>`
 indéterminée ``» ; `plan-indetermine:<plan>` → «`` plan `<plan>` indéterminé ``» ;
-`livrable-absent:<entrée>` → « livrable absent : `<entrée>` ».
+`livrable-absent:<entrée>` → « livrable absent : `<entrée>` » ; `livrable-vide:<entrée>` → « livrable vide :
+`<entrée>` » ; `livrable-hors-borne:<entrée>` → « livrable hors borne : `<entrée>` ».
 
 Tout code **absent** de la table (`fichier-non-regulier:<nom>`, `erreur-de-lecture:<nom>`,
 `frontmatter-invalide:<nom>`, `hors-cadrage:<nom>`, `registre-invalide`,
@@ -715,6 +764,11 @@ Tout code **absent** de la table (`fichier-non-regulier:<nom>`, `erreur-de-lectu
 `ecrit-invalide`, `verdict-invalide`, `SUMMARY.md-sans-CLOTURE.md`, `SUMMARY.md-sans-VERDICT.md`,
 `VERDICT.md-sans-PLAN.md` compris) retombe sur **lui-même** avec `-` et `:` remplacés par des
 espaces — jamais un `KeyError`.
+
+**La raison d'un `à juger` périmé** (P46-D-03b) se lit aussi : une unité `à juger` dont la raison vaut
+`verdict-perime` rend, dans `INDEX.md` (ligne du cycle) et dans `STATE.md` (`etat`),
+`à juger — verdict périmé : re-juger (tentative n+1)` ; un `à juger` ordinaire (sans verdict) reste `à juger`
+tout court. Le cycle et la phase à plans remontent la raison de leur unité courante.
 
 Le JSON, lui, garde **toujours** le code brut dans `raison` : la forme lisible n'habille que
 `INDEX.md` et `STATE.md`.
