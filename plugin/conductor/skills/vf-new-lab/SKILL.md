@@ -205,7 +205,7 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    model: <sonnet|opus|haiku|fable|inherit — choix JUSTIFIÉ par la mission>
    memory: project        # souveraineté mémoire — cross-session, versionnable
    skills: [<skills EXISTANTS — fabriqués Phases 5-6 ou créés via skill-creator, JAMAIS une promesse>]
-   effort: <optionnel : low|medium|high|xhigh|max>
+   effort: <low|medium|high|xhigh|max — barème par rôle, champ requis>
    tools: <optionnel : restreindre si l'agent est en lecture/analyse>
    ---
    ```
@@ -257,7 +257,7 @@ Dériver puis poser (déléguer, ne pas réinventer) :
       un `EVALS.md` absent est un **avertissement** (créé à la première éval réelle), pas un échec ;
       en standard/complet les 5 registres restent exigés ;
    2. `bash .claude/scripts/check-agents.sh --strict` → **exit 0** (chaque agent : frontmatter natif
-      complet name/description/model/memory, enums valides, skills déclarés EXISTANTS, budget de
+      complet name/description/model/memory/effort, enums valides, skills déclarés EXISTANTS, budget de
       préchargement respecté) ;
    3. hooks de gouvernance câblés : `grep -q guard-read-registres .claude/settings.json` (posés
       automatiquement par `vibeflow-install` via `hooks/hooks.json` + `merge-hooks.sh` — s'ils

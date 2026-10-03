@@ -1,5 +1,22 @@
 # Changelog — conductor
 
+## [Non publié] — 2026-10-02 (vf-new-lab — effort aligné sur check-agents.sh)
+
+**Patch** (correctif de documentation) :
+
+- **`skills/vf-new-lab/SKILL.md`, squelette d'agent (Phase 5) et énumération du Gate C** —
+  le squelette présentait `effort: <optionnel : low|medium|high|xhigh|max>`, alors que
+  `check-agents.sh --strict` refuse tout agent sans `effort` (`✗ … effort absent — bareme par
+  role requis`). Un agent posé en suivant le squelette tel quel échouait donc le Gate C que le
+  même skill décrit comme bloquant. Corrigé en deux points : le squelette porte désormais
+  `effort: <low|medium|high|xhigh|max — barème par rôle, champ requis>` (chevrons, même forme
+  que la ligne `model:` voisine du squelette — un paramètre à remplacer, pas une valeur à copier
+  telle quelle comme `memory: project`), et l'énumération des champs exigés par `check-agents.sh`
+  (Gate C, point 2) cite `effort` aux côtés de `name/description/model/memory`.
+  `test-vf-new-lab.sh` gagne 3 assertions bornées au bloc YAML du squelette et au point 2 du
+  Gate C (aucune formulation « optionnel »/« facultatif » sur la ligne `effort`, forme attendue,
+  `effort` cité dans l'énumération).
+
 ## [v1.46.0] — 2026-10-01 (sobriété de méthode, Phase 41.3)
 
 **Minor** (nouveaux gates et hook) :

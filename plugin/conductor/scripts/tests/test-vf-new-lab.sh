@@ -10,6 +10,10 @@ PASS=0; FAIL=0
 
 ok()  { if [ "$2" = "true" ]; then echo "  ✓ $1"; PASS=$((PASS+1)); else echo "  ✗ $1"; FAIL=$((FAIL+1)); fi; }
 has() { grep -qF "$1" "$SKILL" 2>/dev/null && echo true || echo false; }
+# Bloc borné : le squelette YAML de frontmatter posé à la Phase 5 (entre ```yaml et la ``` fermante).
+squelette() { sed -n '/```yaml/,/^   ```$/p' "$SKILL" 2>/dev/null; }
+# Bloc borné : le point 2 du Gate C (énumération des champs exigés par check-agents.sh --strict).
+gate_c_point2() { sed -n '/`bash .claude\/scripts\/check-agents.sh --strict`/,/^   3\. /p' "$SKILL" 2>/dev/null | sed '$d'; }
 
 echo "== test-vf-new-lab (mode express) =="
 
@@ -49,6 +53,23 @@ ok "fan-out skill-creator en tâche de fond"   "$(has "en arrière-plan")"
 ok "l'utilisateur peut travailler pendant la fabrication" "$(has "travailler pendant la fabrication")"
 ok "récap dette d'express obligatoire"        "$(has "dette d'express")"
 ok "affinage ultérieur via /vf-calibrate"     "$(has "/vf-calibrate")"
+
+# --- effort aligné sur check-agents.sh (source citée verbatim : « zone 6, Phase 24 — ADR-044
+# etendu ») : vérifie que le squelette d'agent de la Phase 5 ne présente jamais `effort` comme
+# optionnel, porte la forme attendue par check-agents.sh, et que l'énumération du Gate C (point 2)
+# cite `effort`. Bornée à ces deux blocs, pas un grep sur tout le fichier. ---
+EFFORT_LIGNE="$(squelette | grep -E '^\s*effort:' | head -1)"
+
+if printf '%s' "$EFFORT_LIGNE" | grep -qiE 'optionnel|facultatif|optional'; then
+  ok "squelette agent : effort jamais présenté comme optionnel" "false"
+else
+  ok "squelette agent : effort jamais présenté comme optionnel" "true"
+fi
+# Liste low|medium|high|xhigh|max en dur : reflète niveaux_effort du manifeste lu par check-agents.sh (pas une dérivation).
+ok "squelette agent : effort au format check-agents (low|medium|high|xhigh|max)" \
+  "$(printf '%s' "$EFFORT_LIGNE" | grep -qE 'effort: <?low\|medium\|high\|xhigh\|max' && echo true || echo false)"
+ok "Gate C (point 2) : effort cité dans l'énumération des champs exigés" \
+  "$(gate_c_point2 | grep -qF "name/description/model/memory/effort" && echo true || echo false)"
 
 # --- Densité (ADR-029 : skill ≤ 500 lignes) ---
 LINES=$(wc -l < "$SKILL" | tr -d ' ')
