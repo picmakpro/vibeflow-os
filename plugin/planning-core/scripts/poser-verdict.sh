@@ -25,8 +25,15 @@
 #                    texte canonique est décrit à `empreinte_livrables` et dans modele-cycles.md).
 # La commande REFUSE de poser un verdict (code 64) quand un livrable déclaré est absent, vide ou un lien
 # (jamais suivi), quand `ecrit:` est absent ou invalide, ou quand une borne est dépassée : jamais une
-# empreinte partielle. Le prédicat « livrable présent » et l'empreinte sont le bloc partagé avec le hook
-# central et le recalcul (copies ast-identiques, R-EMP-04).
+# empreinte partielle. Elle refuse aussi (64, message distinct) une entrée `ecrit:` qui est ou contient le
+# dossier de l'unité (l'unité, `.planning` ou un autre ancêtre, sans égard à la casse) : le verdict s'y écrit,
+# `hash_livrables` serait périmé dès la pose (point fixe ; décision du manager, vf-dev-manager, mandat de
+# correction ciblée du 2026-10-03, revue anticipée du socle, renversable) ; ce refus précède la lecture de
+# VERDICT.md, tout temporaire et toute consommation de dérogation. Le bloc partagé avec le hook central et
+# le recalcul (copies ast-identiques, entrées comprises, R-EMP-04) porte la chaîne unique `entrees_du_plan`
+# (PLAN.md -> entrées -> validation) -> `livrables_presents` (prédicat, budget COMMUN à toutes les entrées
+# d'un PLAN.md) -> `empreinte_livrables` ; la lecture ne suit aucun lien à aucun composant (ouvertures
+# chaînées par descripteur de dossier, O_NOFOLLOW, O_NONBLOCK).
 #
 # Règles : la tentative vaut 1 à la création, ancienne tentative + 1 pour remplacer un VERDICT.md
 # existant (sinon code 64, fichier inchangé) ; l'écriture est atomique (fichier temporaire du même
@@ -46,11 +53,15 @@
 # relative au lab : `deroger-gate.sh --gate=PLAFOND`). La dérogation est à usage UNIQUE : elle est consommée (ligne
 # `consommee`, sous le verrou exclusif du journal, MÊME code que le hook central) après le verrou du PLAN.md et AVANT
 # l'écriture ; si l'écriture échoue après la consommation, la dérogation est perdue — fail-closed, visible au journal.
-# Limite déclarée (g) : supprimer VERDICT.md par Bash remet le compteur à 1 ; D1 (46-07) en trace la disparition.
+# Limite déclarée (g) (libellé mesuré par sonde, quick 261003-ps1) : supprimer VERDICT.md, ou le remplacer par un lien ou
+# un FIFO, remet le compteur à 1 (tentative 1 acceptée, code 0 ; le lien est remplacé, jamais suivi) ; le remplacer par un
+# dossier remet le contrôle à 1 mais l'écriture échoue (code 1, aucun verdict tant que le dossier reste) ; y éditer
+# `tentative:` à une valeur plus basse remet le compteur à cette valeur + 1 (à 0, la tentative 1 est acceptée). Les
+# écritures par Bash restent ouvertes ; D1 (plan 46-07) en trace la disparition.
 #
 # Codes : 0 écrit · 1 erreur de lecture ou d'écriture · 2 lab non adhérent · 64 usage, tentative
 # incohérente, constat invalide, unité hors forme (ni .planning/cycles/…, ni .planning/juges/<juge>) ou sans PLAN.md
-# (sans SORTIE-PIEGEE.md pour un juge), ecrit: invalide,
+# (sans SORTIE-PIEGEE.md pour un juge), ecrit: invalide, entrée ecrit: qui est ou contient le dossier de l'unité,
 # livrable absent, vide ou lien, borne dépassée · 65 plafond de tentatives atteint sans dérogation.
 #
 # Limite déclarée : la commande ne peut pas savoir qui la lance (trace déclarative : `--juge`).

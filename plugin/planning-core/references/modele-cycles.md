@@ -365,8 +365,14 @@ caractère de contrôle ni `\`, sans métacaractère `*?[]{}<>`. Le champ s'appe
 vérifient les verdicts hachés (P44-D-03, Phase 46 : champ `hash` de `VERDICT.md`, règle E).
 
 **Un livrable déclaré est « absent ou vide »** (R4, P46-D-12). Le recalcul ne se contente plus de
-constater qu'un chemin existe : il appelle le prédicat unique « livrable présent » (voir § `VERDICT.md`),
-le même que G3 et que la commande de pose. Chaque entrée `ecrit:` est parcourue composant par
+constater qu'un chemin existe : il appelle le prédicat unique « livrable présent » d'un `PLAN.md` entier,
+`livrables_presents` (voir § `VERDICT.md`), le même que G3 et que la commande de pose, sur les entrées
+lues par la même chaîne `entrees_du_plan`. Le prédicat est **borné PAR `PLAN.md`** : un **budget commun**
+à toutes ses entrées (2000 entrées, 128 Mio) ; dès qu'une borne est franchie, cette entrée et toutes les
+suivantes valent `borne`, jamais `present` — le coût d'un `PLAN.md` ne croît pas avec le nombre d'entrées
+qui se recouvrent (`a`, `a/a`, … : une seule traversée de l'arbre, puis la borne). Avant le prédicat, une
+entrée qui est ou contient le dossier de l'unité rend `ecrit-contient-unite:<entrée>` (§ `VERDICT.md`,
+point fixe). Chaque entrée `ecrit:` est parcourue composant par
 composant par `lstat`, **jamais en suivant un lien** : un lien, **terminal ou intermédiaire** (par
 exemple `cycles` lui-même remplacé par un lien), rend le livrable **absent** (`livrable-absent:<entrée>`).
 Cette règle **remplace** la limite connue de la Phase 44, qui acceptait qu'`os.path.lexists` constate,
@@ -376,8 +382,19 @@ régulier de 0 octet, ou un dossier sans aucun fichier régulier non vide, est *
 (motif : ouvrir un dossier livrable dans le Finder ou l'Explorateur ne doit ni le rendre non vide ni
 périmer un verdict) ; un parcours qui dépasse la borne (2000 entrées, 128 Mio) rend le livrable **hors
 borne** (`livrable-hors-borne:<entrée>`), jamais un livrable accepté sur un parcours partiel. Un livrable
-illisible n'est pas établi présent : il rend `livrable-absent:<entrée>`. Les raisons nomment l'entrée
-telle que déclarée dans `ecrit:`.
+illisible n'est pas établi présent : il rend `livrable-absent:<entrée>` ; un nom d'entrée de dossier non
+UTF-8 ou porteur d'un caractère de contrôle (tabulation, saut de ligne, DEL) rend le livrable **illisible**,
+jamais une empreinte (le texte canonique serait ambigu). Les raisons nomment l'entrée telle que déclarée
+dans `ecrit:`.
+
+**La lecture ne suit aucun lien, à aucun composant.** Le contenu d'un livrable est lu par des ouvertures
+**chaînées par descripteur de dossier** (`openat` : chaque composant ouvert relativement au précédent),
+`O_NOFOLLOW` à chaque pas et `O_NONBLOCK` (un FIFO substitué à un fichier n'en bloque pas l'ouverture),
+puis `fstat` régulier avant la lecture ; un dossier est ouvert une fois pour tous ses fichiers. **Limite
+déclarée Windows** : sans descripteur de dossier, l'ouverture se fait par chemin (`O_NOFOLLOW` y protège
+le seul dernier composant) ; le repli rend la même empreinte (R-EMP-12). **Fenêtre résiduelle** : le
+parcours (`lstat` par chemin) précède la lecture ; un lien ou un fichier spécial substitué entre les deux
+n'est jamais lu (la lecture le refuse : `illisible`), mais le parcours a pu compter l'objet d'origine.
 
 ### `CLOTURE.md`
 
@@ -414,23 +431,45 @@ feuille, P46-D-03b) ; G4 le vérifiera à l'écriture de `SUMMARY.md` (plan 46-0
   une entrée fichier, une ligne `fichier<TAB><chemin relatif au lab><TAB><sha256>` ; pour une entrée
   dossier, une ligne `dossier<TAB><entrée>` puis une ligne `fichier…` par fichier régulier du
   sous-arbre, triées par chemin relatif ; lignes jointes par `\n` avec un saut final, hachées en UTF-8.
+  L'ordre du texte **ne dépend pas de l'ordre d'énumération** du système de fichiers (tri final par chemin
+  relatif, prouvé sous trois ordres provoqués, R-EMP-11).
   **Aucun lien n'est suivi** : le chemin est parcouru composant par composant par `lstat`, et un lien,
   terminal ou intermédiaire, rend le livrable **absent** ; un lien ou un fichier spécial **interne** à un
   dossier n'est ni suivi ni haché. Les noms `.DS_Store`, `Thumbs.db` et `desktop.ini` sont ignorés
   partout, dans le prédicat « vide » comme dans l'empreinte (écart de précision assumé par rapport à
   « tous les fichiers réguliers » de P46-D-03a : sans cette exclusion, ouvrir un dossier livrable dans le
   Finder ou l'Explorateur périmerait le verdict). Le parcours est **borné** à 2000 entrées (fichiers et
-  sous-dossiers) et 128 Mio, budget commun à toutes les entrées d'un même calcul : un dépassement est un
-  **refus explicite** qui nomme la borne, jamais une empreinte partielle.
+  sous-dossiers) et 128 Mio (octets annoncés par `lstat` comme octets **lus** : chacun seul déclenche la
+  borne), budget commun à toutes les entrées d'un même `PLAN.md` : un dépassement est un **refus
+  explicite** qui nomme la borne, jamais une empreinte partielle. La lecture ne suit aucun lien à aucun
+  composant (ouvertures chaînées par descripteur de dossier, `O_NOFOLLOW`, `O_NONBLOCK`, § `PLAN.md`).
 - **« Vide »** (P46-D-12) : un fichier régulier de 0 octet, ou un dossier sans aucun fichier régulier non
-  vide (hors noms exclus). Un seul prédicat « livrable présent » (`absent`, `lien`, `vide`, `present`,
-  plus `borne` et `illisible`) existe, en **trois copies ast-identiques** (`poser-verdict.sh`,
-  `planning-hook.sh`, `recalc-planning.sh`) prouvées identiques par comparaison d'arbres de syntaxe
-  (suite `test-cloture-empreintes.sh`, R-EMP-04) ; R4 du recalcul le lit (plan 46-03), G3 le lira (plan 46-05).
+  vide (hors noms exclus).
+- **Chaîne unique** (P46-D-12) : `entrees_du_plan` (octets du `PLAN.md` → entrées `ecrit:` → validation,
+  refus du point fixe), puis `livrables_presents` (le prédicat « livrable présent » d'un `PLAN.md` entier :
+  `absent`, `lien`, `vide`, `present`, plus `borne` et `illisible`, budget commun) et `empreinte_livrables`.
+  Cette chaîne existe en **trois copies ast-identiques** (`poser-verdict.sh`, `planning-hook.sh`,
+  `recalc-planning.sh`), avec ses entrées — le parseur de frontmatter, `entree_ecrit_valide`,
+  `_valeurs_ecrit` et `SANS_SUIVI_DE_LIEN` — prouvées identiques par comparaison d'arbres de syntaxe et
+  par les mêmes verdicts de `entrees_du_plan` (suite `test-cloture-empreintes.sh`, R-EMP-04). La commande
+  de pose, R4 du recalcul et son cache l'appellent ; G3 et G4 l'appelleront (plan 46-05) ; aucun ne la
+  réécrit.
+- **Point fixe** : une entrée `ecrit:` qui **est ou contient le dossier de l'unité** (l'unité elle-même,
+  `.planning` ou un autre ancêtre, comparés par composants et sans égard à la casse) est **refusée à la
+  pose** (code 64, message distinct « … est ou contient le dossier de l'unité … »), jamais posée : le
+  verdict s'écrit dans ce dossier, `hash_livrables` y serait périmé dès la pose. Le refus précède toute
+  lecture de `VERDICT.md`, tout temporaire et toute consommation de dérogation. Étiquette :
+  décision du manager (vf-dev-manager, mandat de correction ciblée du 2026-10-03, revue anticipée du socle), renversable.
+  G3/G4 (plan 46-05) l'appliqueront par `entrees_du_plan` (même chaîne) ; R4 du recalcul rend
+  `ecrit-contient-unite:<entrée>` pour une unité à `CLOTURE.md`. Une entrée **dans** l'unité (un fichier
+  qu'elle contient) ou une unité voisine reste posable. **Limite déclarée (h)** : une entrée qui nomme un
+  fichier que le moteur réécrit lui-même (le journal `.planning/derogations-gates.log`,
+  `.planning/INDEX.md`, `STATE.md`, le cache) n'est pas protégée par cette règle.
 - **Refus de pose** : la commande refuse (code 64) de poser un verdict quand un livrable déclaré est
-  absent, vide ou un lien, quand `ecrit:` est absent, vide ou invalide, ou quand une borne est dépassée
-  (R4 précède R5 : un tel verdict serait de toute façon `indéterminé`). Les messages ne nomment que
-  l'entrée déclarée ou la borne, jamais un chemin absolu ni le texte d'une `OSError` (P46-D-10).
+  absent, vide ou un lien, quand `ecrit:` est absent, vide ou invalide, quand une entrée est ou contient
+  le dossier de l'unité, ou quand une borne est dépassée (R4 précède R5 : un tel verdict serait de toute
+  façon `indéterminé`). Les messages ne nomment que l'entrée déclarée ou la borne, jamais un chemin
+  absolu ni le texte d'une `OSError` (P46-D-10).
 
 **Plafond de tentatives** (P46-D-05, Q5 = a, même canal) : `PLAFOND_TENTATIVES = 3` est une constante de
 la commande, jamais lue dans un fichier du lab ni dans l'environnement. La quatrième tentative est
@@ -439,8 +478,12 @@ requis`), `VERDICT.md` inchangé, sauf **dérogation nominative** `deroger-gate.
 chemin est le dossier de l'unité relatif au lab : elle est à **usage unique**, consommée par la commande
 (même code que le hook, verrou exclusif du journal) sous le verrou du `PLAN.md` et **avant** l'écriture ;
 si l'écriture échoue après la consommation, la dérogation est perdue (fail-closed, visible au journal).
-Limite déclarée (g) : supprimer `VERDICT.md` par Bash remet le compteur à 1 (les écritures par Bash restent
-ouvertes) ; D1 (plan 46-07) en trace la disparition.
+Limite déclarée (g) (libellé mesuré par sonde, quick 261003-ps1) : supprimer `VERDICT.md`, ou le remplacer
+par un lien ou un FIFO, remet le compteur à 1 (la tentative 1 est acceptée, code 0 ; le lien est remplacé,
+jamais suivi) ; le remplacer par un dossier remet le contrôle à 1 mais l'écriture échoue (code 1, aucun
+verdict posé tant que le dossier reste) ; y éditer `tentative:` à une valeur plus basse remet le compteur à
+cette valeur + 1 (à `0`, la tentative 1 est acceptée). Les écritures par Bash restent ouvertes ; D1
+(plan 46-07) en trace la disparition.
 
 **Verdict d'un juge** (P46-D-06a, Q6 = a, même canal) : la commande admet une seconde forme d'unité,
 `.planning/juges/<juge>` (nom en minuscules, chiffres et tirets, 64 caractères au plus), dont
@@ -531,9 +574,12 @@ Un plan applique Φ0 et Φ1 puis R1 à R8, dont la règle E entre R6 et R7.
   vide ou avec une entrée invalide → `ecrit-invalide`.
 - **R3** — pas de `CLOTURE.md` : VERDICT présent → `VERDICT.md-sans-CLOTURE.md` ; SUMMARY présent
   → `SUMMARY.md-sans-CLOTURE.md` ; sinon `à exécuter`.
-- **R4** — un livrable d'`ecrit:` **absent ou vide** (prédicat partagé, voir § `PLAN.md`) →
+- **R4** — avant le prédicat, une entrée d'`ecrit:` qui est ou contient le dossier de l'unité (point fixe,
+  § `VERDICT.md`) → `ecrit-contient-unite:<entrée>` ; sinon un livrable d'`ecrit:` **absent ou vide**
+  (prédicat partagé `livrables_presents`, budget commun au `PLAN.md`, voir § `PLAN.md`) →
   `livrable-absent:<entrée>` (absent, lien ou illisible), `livrable-vide:<entrée>` ou
-  `livrable-hors-borne:<entrée>` ; la première entrée fautive dans l'ordre déclaré donne la raison.
+  `livrable-hors-borne:<entrée>` (borne franchie par cette entrée ou par le cumul des précédentes) ; la
+  première entrée fautive dans l'ordre déclaré donne la raison.
 - **R5** — pas de `VERDICT.md` : SUMMARY présent → `SUMMARY.md-sans-VERDICT.md` ; sinon `à juger`.
 - **R6** — frontmatter de `VERDICT.md` illisible → `frontmatter-invalide:VERDICT.md` ; `constats`
   absent, vide ou avec un `resultat` hors `passé`/`échec` → `verdict-invalide`.
@@ -600,9 +646,10 @@ sans `SUMMARY.md` renvoie de `à clore` à `à juger`, et après `SUMMARY.md` de
 | `ecrit-invalide` | R2 | `ecrit:` absent, vide, ou entrée invalide |
 | `VERDICT.md-sans-CLOTURE.md` | R3 | contradiction P44-D-08 |
 | `SUMMARY.md-sans-CLOTURE.md` | R3 | résumé avant l'exécution marquée close |
+| `ecrit-contient-unite:<entrée>` | R4 | une entrée d'`ecrit:` est ou contient le dossier de l'unité (unité à `CLOTURE.md`) : la pose d'un verdict y est refusée |
 | `livrable-absent:<entrée>` | R4 | un chemin d'`ecrit:` est absent, est un lien (jamais suivi) ou est illisible |
 | `livrable-vide:<entrée>` | R4 | un chemin d'`ecrit:` est un fichier de 0 octet ou un dossier sans fichier non vide |
-| `livrable-hors-borne:<entrée>` | R4 | le parcours d'un livrable dépasse la borne (2000 entrées, 128 Mio) |
+| `livrable-hors-borne:<entrée>` | R4 | le parcours d'un livrable dépasse la borne (2000 entrées, 128 Mio), seul ou cumulé aux entrées précédentes du même `PLAN.md` |
 | `SUMMARY.md-sans-VERDICT.md` | R5 | résumé avant jugement |
 | `verdict-invalide` | R6 | `constats` absent, vide, ou `resultat` hors `passé`/`échec` |
 | `verdict-perime` | E | `hash` ou `hash_livrables` ne correspond plus (ou est absent), `SUMMARY.md` absent : état `à juger`, pas `indéterminé` |
@@ -679,7 +726,9 @@ produite en silence.
 **`.recalc-cache.json`** : JSON, `cache_schema_version` = `2`, `moteur` = `"recalc-planning"`,
 signature sha256 du contenu des fichiers lus par unité, et par unité l'**état des livrables** `ecrit:`
 (`empreinte_livrables`, P46-D-03b) : `["ok", <empreinte>]` quand tous sont présents, `["statuts", {…}]`
-quand l'un d'eux est absent, vide ou lien (la dérivation ne dépend alors que de ces statuts). Une entrée
+quand l'un d'eux est absent, vide, lien ou hors borne (statuts rendus par `livrables_presents`, budget
+commun ; la dérivation ne dépend alors que de ces statuts). Les entrées surveillées sont lues par la même
+chaîne `entrees_du_plan` que R2 (aucune quand une entrée couvre le dossier de l'unité). Une entrée
 n'est reprise que si la signature **et** cet état, **recalculé à chaque passage** par la copie partagée
 (bornée), sont égaux ; un livrable réécrit, même à taille égale, fait donc recalculer l'unité — un `close`
 en cache ne survit jamais à la réécriture d'un livrable (les schémas 1, qui ne retenaient que l'existence
@@ -750,13 +799,15 @@ ici :
 | `livrable-absent:<entrée>` | livrable absent : `<entrée>` |
 | `livrable-vide:<entrée>` | livrable vide : `<entrée>` |
 | `livrable-hors-borne:<entrée>` | livrable hors borne : `<entrée>` |
+| `ecrit-contient-unite:<entrée>` | ecrit: couvre le dossier de l'unité : `<entrée>` |
 
 Un code **suffixé** `:<x>` (ex. `phase-indeterminee:<phase>`, `plan-indetermine:<plan>`,
 `livrable-absent:<entrée>`) se sépare sur le **premier** `:` : le libellé de la partie fixe
 s'applique et `<x>` s'y insère littéralement — `phase-indeterminee:<phase>` → «`` phase `<phase>`
 indéterminée ``» ; `plan-indetermine:<plan>` → «`` plan `<plan>` indéterminé ``» ;
 `livrable-absent:<entrée>` → « livrable absent : `<entrée>` » ; `livrable-vide:<entrée>` → « livrable vide :
-`<entrée>` » ; `livrable-hors-borne:<entrée>` → « livrable hors borne : `<entrée>` ».
+`<entrée>` » ; `livrable-hors-borne:<entrée>` → « livrable hors borne : `<entrée>` » ;
+`ecrit-contient-unite:<entrée>` → « ecrit: couvre le dossier de l'unité : `<entrée>` ».
 
 Tout code **absent** de la table (`fichier-non-regulier:<nom>`, `erreur-de-lecture:<nom>`,
 `frontmatter-invalide:<nom>`, `hors-cadrage:<nom>`, `registre-invalide`,
@@ -1113,8 +1164,9 @@ empreintes** : `hash` (le plan) et `hash_livrables` (les entrées `ecrit:`, voir
 poser un verdict quand un livrable déclaré est absent, vide ou un lien, applique le **plafond de 3
 tentatives** (code 65, dérogation `PLAFOND` à usage unique) et admet la forme d'unité
 `.planning/juges/<juge>`. Codes de sortie complets : 0 verdict écrit, 1 erreur de lecture ou d'écriture,
-2 lab non adhérent, 64 usage ou valeur refusée (dont `ecrit:` invalide, livrable absent, vide ou lien,
-borne dépassée), 65 plafond de tentatives atteint sans dérogation.
+2 lab non adhérent, 64 usage ou valeur refusée (dont `ecrit:` invalide, entrée `ecrit:` qui est ou contient
+le dossier de l'unité — point fixe, § `VERDICT.md` —, livrable absent, vide ou lien, borne dépassée), 65
+plafond de tentatives atteint sans dérogation.
 
 ### Le journal d'observation
 
