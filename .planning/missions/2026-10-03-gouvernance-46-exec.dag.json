@@ -1,0 +1,311 @@
+{
+  "nodes": [
+    {
+      "id": "exec-46-01",
+      "step": "46-01 socle empreintes, plafond, R4",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/planning-core/scripts/poser-verdict.sh",
+        "plugin/planning-core/scripts/planning-hook.sh",
+        "plugin/planning-core/scripts/recalc-planning.sh",
+        "plugin/planning-core/scripts/deroger-gate.sh",
+        "plugin/planning-core/references",
+        "plugin/planning-core/scripts/tests/test-cloture-empreintes.sh",
+        "plugin/planning-core/scripts/tests/test-planning-gates.sh",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-46-02",
+      "step": "46-02 amendements de spec, note ROADMAP 47",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md",
+        ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-NOTE-ROADMAP-47.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-46-03",
+      "step": "46-03 recalcul: empreintes, a clore",
+      "stage": "",
+      "deps": [
+        "exec-46-01"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "exec-46-04",
+      "step": "46-04 hook par evenement, hooks.json",
+      "stage": "",
+      "deps": [
+        "exec-46-01",
+        "exec-46-03"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        "plugin/_internal/tests/test-planning-hook-installed.sh",
+        "docs/HOOKS-CONTRAT-SORTIE.md",
+        "scripts/tests/test-hook-exit-parc.sh"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-46-05",
+      "step": "46-05 G3 et G4 en observation, table a huit gates",
+      "stage": "",
+      "deps": [
+        "exec-46-03",
+        "exec-46-04"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-46-06",
+      "step": "46-06 G4prime en observation",
+      "stage": "",
+      "deps": [
+        "exec-46-02",
+        "exec-46-05"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        "docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-46-07",
+      "step": "46-07 D1 detection",
+      "stage": "",
+      "deps": [
+        "exec-46-06"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh",
+        "plugin/planning-core/scripts/recalc-planning.sh",
+        "plugin/planning-core/scripts/poser-verdict.sh",
+        "plugin/planning-core/scripts/deroger-gate.sh",
+        "plugin/planning-core/scripts/check-gates-alive.sh",
+        "plugin/planning-core/scripts/tests/test-d1-surveillance.sh",
+        "plugin/planning-core/scripts/tests/test-planning-gates.sh",
+        "plugin/planning-core/references/modele-cycles.md",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-46-08",
+      "step": "46-08 rejeu etapes 5 et 6",
+      "stage": "",
+      "deps": [
+        "exec-46-06"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/rejeu-gates.sh",
+        "plugin/planning-core/scripts/rejeu-reel.sh",
+        "plugin/planning-core/scripts/tests/test-rejeu-gates.sh",
+        ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-REJEU-ATTENDUS.txt"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-46-09",
+      "step": "46-09 canary de juge",
+      "stage": "",
+      "deps": [
+        "exec-46-07"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh",
+        "plugin/planning-core/scripts/recalc-planning.sh",
+        "plugin/planning-core/scripts/tests/test-juges-canary.sh",
+        "plugin/planning-core/scripts/tests/test-planning-gates.sh",
+        "plugin/planning-core/references",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-46-10",
+      "step": "46-10 cout du pre-filtre (mesure, machine au calme)",
+      "stage": "",
+      "deps": [
+        "exec-46-07",
+        "exec-46-09"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/tests/test-planning-prefilter.sh",
+        "plugin/_internal/tests/test-planning-hook-installed.sh",
+        ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-COUT-PREFILTRE.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-46-a",
+      "step": "revue du diff 46-01..46-10 (avant armement)",
+      "stage": "",
+      "deps": [
+        "exec-46-08",
+        "exec-46-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-46-a",
+      "step": "audit securite 46-01..46-10 (fail-open, timeouts)",
+      "stage": "",
+      "deps": [
+        "exec-46-08",
+        "exec-46-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "nonreg-a",
+      "step": "non-regression complete avant armement",
+      "stage": "",
+      "deps": [
+        "exec-46-08",
+        "exec-46-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ckpt-46-11",
+      "step": "checkpoint Willy: rejeu reel etapes 5/6 + armement 5",
+      "stage": "",
+      "deps": [
+        "exec-46-08",
+        "exec-46-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "fix-46-a",
+      "step": "corrections ciblees revue+audit",
+      "stage": "",
+      "deps": [
+        "revue-46-a",
+        "audit-46-a",
+        "nonreg-a"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-46-11",
+      "step": "46-11 armement etape 5 (G3+G4)",
+      "stage": "",
+      "deps": [
+        "ckpt-46-11",
+        "fix-46-a"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "ckpt-46-12",
+      "step": "checkpoint Willy: porte G4prime",
+      "stage": "",
+      "deps": [
+        "exec-46-11"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-46-12",
+      "step": "46-12 armement etape 6, v2.10.0 sans release",
+      "stage": "",
+      "deps": [
+        "ckpt-46-12"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "verif-46",
+      "step": "gsd-verifier --ws gouvernance",
+      "stage": "",
+      "deps": [
+        "exec-46-12"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-46-b",
+      "step": "revue finale (armement + corrections)",
+      "stage": "",
+      "deps": [
+        "exec-46-12"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-46-b",
+      "step": "audit final",
+      "stage": "",
+      "deps": [
+        "exec-46-12"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "nonreg-b",
+      "step": "non-regression complete finale",
+      "stage": "",
+      "deps": [
+        "exec-46-12"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (ROADMAP, STATE, gates planning)",
+      "stage": "",
+      "deps": [
+        "verif-46",
+        "revue-46-b",
+        "audit-46-b",
+        "nonreg-b"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr",
+      "step": "push, PR empilee, CI lue",
+      "stage": "",
+      "deps": [
+        "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
