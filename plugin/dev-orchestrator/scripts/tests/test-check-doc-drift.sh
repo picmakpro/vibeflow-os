@@ -73,6 +73,17 @@ mk_git_root() { # <name> -> imprime le chemin
   if ! git -C "$d" init -q -b main >/dev/null 2>&1; then
     git_must "git init (repli sans -b, git < 2.28)" -C "$d" init -q
   fi
+  # Maintenance git automatique COUPÉE (cas 19 flaky, runs CI 37049918814 et 37083451812 — git 2.55) :
+  # chaque `git commit` de fixture peut lancer `git maintenance run --auto` / `gc --auto`, DÉTACHÉ
+  # en arrière-plan. Il survit au dernier commit et écrit sous .git (objects/maintenance.lock,
+  # pack/.tmp-*, pack/tmp_pack_*, multi-pack-index, packs, loose objects supprimés) pendant que le
+  # cas 19 prend son empreinte `find` : « before » et « after » diffèrent alors sans que le sujet
+  # ait écrit quoi que ce soit — l'écrivain est git, pas check-doc-drift.sh. Un dépôt de fixture
+  # sans maintenance de fond rend l'empreinte déterministe ; elle couvre toujours .git en entier,
+  # donc toute vraie écriture du sujet reste détectée (voir le cas 19).
+  git_must "config gc.auto=0 ($1)" -C "$d" config gc.auto 0
+  git_must "config maintenance.auto=false ($1)" -C "$d" config maintenance.auto false
+  git_must "config gc.autoDetach=false ($1)" -C "$d" config gc.autoDetach false
   printf '%s' "$d"
 }
 
