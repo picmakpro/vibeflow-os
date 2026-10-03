@@ -1,0 +1,84 @@
+{
+  "nodes": [
+    {
+      "id": "recherche-hooks-46",
+      "step": "recherche doc TaskCompleted/FileChanged/SubagentStop (ADR-045)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-RECHERCHE-HOOKS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "scouting-46",
+      "step": "état des lieux des acquis 44/45 pour la 46",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-SCOUTING.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "cadrage-46",
+      "step": "cadrage 46 (manager) + escalade Willy",
+      "stage": "",
+      "deps": [
+        "recherche-hooks-46",
+        "scouting-46"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-CONTEXT.md",
+        ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-DISCUSSION-LOG.md",
+        ".planning/workstreams/gouvernance/REQUIREMENTS.md"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "plan-46",
+      "step": "gsd-plan-phase 46 --ws gouvernance (vf-coder)",
+      "stage": "",
+      "deps": [
+        "cadrage-46"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "plancheck-46",
+      "step": "plan-checkers frais jusqu'au vert",
+      "stage": "",
+      "deps": [
+        "plan-46"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "suivi-46",
+      "step": "ROADMAP/STATE à la main + gates de planning",
+      "stage": "",
+      "deps": [
+        "plancheck-46"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/ROADMAP.md",
+        ".planning/workstreams/gouvernance/STATE.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-46",
+      "step": "push + PR empilée sur phase-45-execution",
+      "stage": "",
+      "deps": [
+        "suivi-46"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
