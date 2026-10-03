@@ -34,9 +34,18 @@
 # fichier régulier (lien, par exemple) n'est pas un verdict existant : il est remplacé, jamais suivi.
 # Les valeurs qui ne se relisent pas identiques par le parseur de frontmatter sont refusées (64).
 #
+# Plafond de tentatives (Phase 46, 46-01 ; P46-D-05 ; Willy, AskUserQuestion session principale, 2026-10-03,
+# Q5 = a) : PLAFOND_TENTATIVES = 3 est une CONSTANTE de ce script, jamais lue dans un fichier du lab ni dans
+# l'environnement. Une tentative au-delà (la quatrième) est refusée avec le code 65 et un message distinct, VERDICT.md
+# inchangé, SAUF dérogation nominative du journal `.planning/derogations-gates.log` (jeton PLAFOND, chemin = l'unité
+# relative au lab : `deroger-gate.sh --gate=PLAFOND`). La dérogation est à usage UNIQUE : elle est consommée (ligne
+# `consommee`, sous le verrou exclusif du journal, MÊME code que le hook central) après le verrou du PLAN.md et AVANT
+# l'écriture ; si l'écriture échoue après la consommation, la dérogation est perdue — fail-closed, visible au journal.
+# Limite déclarée (g) : supprimer VERDICT.md par Bash remet le compteur à 1 ; D1 (46-07) en trace la disparition.
+#
 # Codes : 0 écrit · 1 erreur de lecture ou d'écriture · 2 lab non adhérent · 64 usage, tentative
 # incohérente, constat invalide, unité hors .planning/cycles/ ou sans PLAN.md, ecrit: invalide,
-# livrable absent, vide ou lien, borne dépassée.
+# livrable absent, vide ou lien, borne dépassée · 65 plafond de tentatives atteint sans dérogation.
 #
 # Limite déclarée : la commande ne peut pas savoir qui la lance (trace déclarative : `--juge`).
 set -u
@@ -75,6 +84,7 @@ SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 NOM_UNITE = re.compile(r"^[0-9]{2,}-[\w.-]+$")
 RESULTATS = ("passé", "échec")
 OPTIONS_SIMPLES = ("unite", "juge", "tentative", "score")
+PLAFOND_TENTATIVES = 3  # verdict-plafond-constante
 USAGE = ("Usage : poser-verdict.sh --unite=<dossier de l'unité> --juge=<nom> --tentative=<n> "
          "--score=<texte> --constat=<critère>::<passé|échec> [--constat=...] [-h]")
 
@@ -546,6 +556,159 @@ def empreinte_livrables(racine, entrees):
     return ("ok", hashlib.sha256(texte.encode("utf-8")).hexdigest())
 
 
+# --- Dérogation nominative PLAFOND (P46-D-05) : copies ast-identiques des fonctions du journal du hook central ----------
+# Le plafond de tentatives se lève par une dérogation nominative du journal `.planning/derogations-gates.log` (jeton PLAFOND, chemin
+# = l'unité relative au lab), à usage unique : `consommer` est le MÊME code que celui du hook (verrou exclusif du journal, relecture
+# sous le verrou, ajout d'une ligne `consommee`).
+def _jeton_journal(valeur, repli):
+    """Encode une valeur arbitraire (P44-D-09 : lue, jamais validée — aucun contrôle de SENS) en
+    UN jeton structurellement sûr pour une ligne de `cloture.log`, par un échappement pourcent
+    INJECTIF (lot 4, correction de classe — remplace l'ancien assainissement par `_`, qui
+    écrasait `"3 4"` et `"3_4"` sur le même jeton et pouvait donc faire manquer une clôture
+    réellement nouvelle au dédoublonnage, P44-D-11 ; alphabet étendu F44-05/F7 : tout caractère
+    NON IMPRIMABLE — `not str.isprintable()`, qui couvre NUL et les contrôles C0/C1, en plus des
+    séparateurs Unicode déjà couverts par `isspace()` — était encore laissé passer BRUT, ce qui
+    aurait permis d'injecter un octet de contrôle littéral dans `cloture.log`) : tout caractère
+    considéré comme un espace par Python (`str.isspace()` — couvre U+2028 LIGNE SÉPARATRICE,
+    U+0085 NEL et tout espace Unicode, pas seulement l'ASCII), tout caractère NON IMPRIMABLE
+    (`not str.isprintable()` — NUL, contrôles C0/C1, séparateurs Unicode restants), tout `=` (qui
+    ouvrirait une séquence `clé=` lisible par `LIGNE_JOURNAL_RE`), et le caractère d'échappement
+    `%` lui-même, sont réécrits en `%XX` — deux chiffres hexadécimaux majuscules par OCTET de son
+    encodage UTF-8 (un caractère multi-octets produit plusieurs `%XX` consécutifs, jamais un seul
+    jeton non réversible). Le jeton résultant ne contient donc plus jamais d'espace, de saut de
+    ligne, de `=`, ni d'octet de contrôle brut : deux valeurs distinctes produisent TOUJOURS deux
+    jetons distincts (réversible par simple décodage pourcent).
+
+    F5 (correction ciblée) : `return jeton or repli` laissait un jeton vide filer si `repli`
+    lui-même était vide (repli vide -> `jeton or repli` retombe sur `""`), produisant une ligne
+    que `LIGNE_JOURNAL_RE` (`\\S+` sur chaque champ) ne relirait plus jamais — une corruption
+    SILENCIEUSE du journal. `repli` est un contrat interne, toujours un littéral non vide chez
+    tous les appelants actuels (`"-"`, `"inconnu"`) : une erreur BRUYANTE immédiate (jamais une
+    ligne illisible produite en silence) si ce contrat est un jour rompu. Une fois `repli` garanti
+    non vide, `brute` (str) contient au moins un caractère, et chaque caractère produit au moins
+    un caractère de sortie (lui-même, ou au moins un `%XX`) : `jeton` est donc TOUJOURS non vide,
+    sans repli de dernier recours nécessaire.
+
+    IN-02 (revue, correction ciblée) : l'invariant final est vérifié par une exception EXPLICITE,
+    jamais un `assert` nu — un `assert` est désactivable en bloc par `python -O`/`PYTHONOPTIMIZE`,
+    et ce moteur ne garantit nulle part que son interpréteur tourne sans cette option. Une garde de
+    P44-D-11 (jamais de ligne illisible produite en silence dans `cloture.log`) reste active quel
+    que soit le mode d'exécution."""
+    if not repli:
+        raise ValueError("_jeton_journal : 'repli' doit toujours être non vide (contrat interne)")
+    brute = valeur if valeur not in (None, "") else repli
+    morceaux = []
+    for caractere in str(brute):
+        if caractere == "%" or caractere == "=" or caractere.isspace() or not caractere.isprintable():
+            for octet in caractere.encode("utf-8"):
+                morceaux.append("%{:02X}".format(octet))
+        else:
+            morceaux.append(caractere)
+    jeton = "".join(morceaux)
+    if not jeton:
+        raise AssertionError("_jeton_journal : jeton vide malgré un repli non vide (invariant violé)")
+    return jeton
+
+
+NOM_JOURNAL_DEROGATIONS = "derogations-gates.log"
+LIGNE_DEROGATION_RE = re.compile(r"^(\S+)  (derogation|consommee)  id=([0-9]+)  gate=(\S+)  chemin=(\S+)(?:  (.*))?$")
+
+
+def _chemin_journal_derogations(racine):
+    return os.path.join(racine, ".planning", NOM_JOURNAL_DEROGATIONS)
+
+
+def _ouvrir_journal_derogations(racine, mode):
+    """Descripteur du journal, ou None si ce n'est pas un fichier régulier (lstat) ; jamais de suivi de
+    lien. Seul point d'ouverture du journal : lecture et consommation passent ici."""
+    chemin = _chemin_journal_derogations(racine)
+    return os.open(chemin, mode | SANS_SUIVI_DE_LIEN) if est_fichier_regulier(chemin) else None  # derog-lien
+
+
+def _entrees_journal(octets):
+    """Entrées du journal : dict(genre, id, gate, chemin, champs) ; une ligne mal formée est ignorée."""
+    entrees = []
+    for ligne in octets.decode("utf-8", "replace").split("\n"):
+        m = LIGNE_DEROGATION_RE.match(ligne)
+        if not m:
+            continue
+        champs = {}
+        for morceau in (m.group(6) or "").split("  "):
+            cle, separateur, valeur = morceau.partition("=")
+            if separateur:
+                champs[cle] = urllib.parse.unquote(valeur, errors="replace")
+        entrees.append({"genre": m.group(2), "id": m.group(3), "gate": m.group(4),
+                        "chemin": urllib.parse.unquote(m.group(5), errors="replace"), "champs": champs})
+    return entrees
+
+
+def _derogation_non_consommee(entrees, gate, chemin_rel):
+    consommees = {e["id"] for e in entrees if e["genre"] == "consommee"}
+    for entree in entrees:
+        if entree["genre"] != "derogation" or entree["gate"] != gate or entree["chemin"] != chemin_rel:
+            continue
+        if entree["id"] in consommees:  # derog-consommee
+            continue
+        if not all(cle in entree["champs"] for cle in ("qui", "canal", "date", "raison")):
+            continue
+        return entree
+    return None
+
+
+def derogation_active(racine, gate, chemin_rel):
+    """La plus ancienne dérogation non consommée qui couvre (gate, chemin_rel), ou None. Toute erreur
+    de lecture : aucune dérogation (le refus est maintenu, jamais un passage par défaut)."""
+    try:
+        descripteur = _ouvrir_journal_derogations(racine, os.O_RDONLY)
+        if descripteur is None:
+            return None
+        with os.fdopen(descripteur, "rb") as fh:
+            octets = fh.read()
+        return _derogation_non_consommee(_entrees_journal(octets), gate, chemin_rel)
+    except Exception:
+        return None
+
+
+def consommer(racine, entree):
+    """Ajoute la ligne `consommee` de la dérogation, sous verrou (lecture + ajout) quand le module
+    existe : la dérogation est relue sous le verrou, une consommation concurrente l'a peut-être déjà
+    prise. Vrai seulement si la ligne est écrite ; toute erreur : faux (le refus est maintenu)."""
+    try:
+        descripteur = _ouvrir_journal_derogations(racine, os.O_RDWR | os.O_APPEND)
+        if descripteur is None:
+            return False
+        try:
+            if fcntl is not None:
+                fcntl.flock(descripteur, fcntl.LOCK_EX)
+            os.lseek(descripteur, 0, os.SEEK_SET)
+            morceaux = []
+            while True:
+                lu = os.read(descripteur, 65536)
+                if not lu:
+                    break
+                morceaux.append(lu)
+            existant = b"".join(morceaux)
+            restante = _derogation_non_consommee(_entrees_journal(existant), entree["gate"], entree["chemin"])
+            if restante is None or restante["id"] != entree["id"]:
+                return False
+            horodatage = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+            ligne = "{}  consommee  id={}  gate={}  chemin={}\n".format(horodatage, entree["id"], entree["gate"], _jeton_journal(entree["chemin"], "-"))
+            octets = (("\n" if existant and not existant.endswith(b"\n") else "") + ligne).encode("utf-8")
+            while octets:
+                octets = octets[os.write(descripteur, octets):]
+        finally:
+            os.close(descripteur)
+        return True
+    except Exception:
+        return False
+
+
+def citer(entree):
+    champs = entree["champs"]
+    return "[planning-core] dérogation #%s consommée pour %s sur %s — accordée par %s (%s, %s) : %s" % (
+        entree["id"], entree["gate"], entree["chemin"], champs["qui"], champs["canal"], champs["date"], champs["raison"])
+
+
 def ouvrir_verrou(chemin):
     """Prend le verrou exclusif (`fcntl.flock`) sur le fichier régulier `chemin` — le PLAN.md voisin du VERDICT.md, ouvert sans suivre
     de lien — et rend son descripteur, gardé ouvert jusqu'à la fin du processus ; None quand le module fcntl n'existe pas (pas de
@@ -689,6 +852,13 @@ def poser(valeurs, constats_bruts):
     controle_tentative(tentative, ancienne)
     texte = lignes_verdict(juge, empreinte, empreinte_livr, tentative, valeurs["score"], constats)
     verifier_relecture(texte, juge, empreinte, empreinte_livr, tentative, valeurs["score"], constats)
+    if tentative > PLAFOND_TENTATIVES:  # verdict-plafond
+        unite_rel = "/".join(composants)
+        derogation = derogation_active(racine, "PLAFOND", unite_rel)
+        if derogation is None:
+            raise Refus(65, "plafond de %d tentatives atteint pour %s : arbitrage humain requis (deroger-gate.sh --gate=PLAFOND, ou DEROGATION.md)" % (PLAFOND_TENTATIVES, unite_rel))
+        if not consommer(racine, derogation): raise Refus(65, "plafond de %d tentatives atteint pour %s : la dérogation PLAFOND n'a pas pu être consommée, verdict non posé" % (PLAFOND_TENTATIVES, unite_rel))  # verdict-consommation
+        print(citer(derogation))
     ecrire_atomique(unite, "VERDICT.md", texte)
     print("[poser-verdict] VERDICT.md écrit : %s (juge %s, tentative %d, hash %s, hash_livrables %s)" % (
         os.path.join(os.path.relpath(unite, racine), "VERDICT.md"), juge, tentative, empreinte, empreinte_livr))

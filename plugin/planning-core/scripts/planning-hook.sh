@@ -666,6 +666,180 @@ def entree_ecrit_valide(entree):
     return True
 
 
+# --- Prédicat « livrable présent » et empreinte des livrables : bloc partagé (Phase 46, 46-01 ; P46-D-03a, P46-D-12) ----------
+# MÊME texte dans poser-verdict.sh, planning-hook.sh et recalc-planning.sh (l'installeur ne pose que des `*.sh` : pas de module
+# partagé, des copies ast-identiques que la suite test-cloture-empreintes.sh compare, R-EMP-04). Le parcours est borné et les
+# bornes comptent les ENTRÉES parcourues (fichiers, sous-dossiers, liens) : un dépassement est un refus explicite, jamais une
+# empreinte partielle. Les noms de NOMS_EXCLUS_LIVRABLES sont ignorés partout (prédicat « vide » ET empreinte) : ouvrir un
+# dossier livrable dans le Finder ou l'Explorateur ne doit pas périmer un verdict.
+BORNE_FICHIERS_LIVRABLES = 2000
+BORNE_OCTETS_LIVRABLES = 134217728
+NOMS_EXCLUS_LIVRABLES = (".DS_Store", "Thumbs.db", "desktop.ini")
+
+
+def _normaliser_livrable(entree):
+    """Entrée `ecrit:` normalisée : composants non vides et différents de `.`, rejoints par `/` (barre finale retirée)."""
+    return "/".join(c for c in entree.split("/") if c not in ("", "."))
+
+
+def _fichier_non_vide(taille):
+    """Vrai si un fichier régulier de `taille` octets (lstat) n'est pas vide."""
+    return taille > 0  # livrable-vide
+
+
+def _nom_sain(nom):
+    """Vrai si le nom d'une entrée de dossier se décode en UTF-8 et ne porte aucun caractère de contrôle : sans cela le texte
+    canonique de l'empreinte serait ambigu (tabulation, saut de ligne) ou non encodable."""
+    try:
+        nom.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return not any(ord(c) < 0x20 or ord(c) == 0x7F for c in nom)
+
+
+def _borne_depassee(budget):
+    """Libellé de la borne franchie par `budget` = [entrées parcourues, octets annoncés par lstat, octets lus], ou None."""
+    if budget[0] > BORNE_FICHIERS_LIVRABLES:  # livrable-borne
+        return "borne de %d fichiers dépassée (BORNE_FICHIERS_LIVRABLES)" % BORNE_FICHIERS_LIVRABLES
+    if budget[1] > BORNE_OCTETS_LIVRABLES or budget[2] > BORNE_OCTETS_LIVRABLES:
+        return "borne de %d octets dépassée (BORNE_OCTETS_LIVRABLES)" % BORNE_OCTETS_LIVRABLES
+    return None
+
+
+def _parcourir_livrable(dossier, relatif, budget):
+    """(statut, detail, fichiers) : les fichiers réguliers du sous-arbre de `dossier` (`relatif` : son chemin relatif au lab),
+    triés par chemin relatif, sous forme (relatif, chemin absolu, taille). Lstat sur chaque entrée : un lien et un fichier
+    spécial interne ne sont ni suivis ni retenus. Statut `ok`, `borne` (detail = libellé de la borne) ou `illisible`."""
+    fichiers = []
+    pile = [(dossier, relatif)]
+    while pile:
+        courant, rel = pile.pop()
+        try:
+            with os.scandir(courant) as entrees:
+                for entree in entrees:
+                    nom = entree.name
+                    if nom in NOMS_EXCLUS_LIVRABLES:  # livrable-exclus
+                        continue
+                    if not _nom_sain(nom):
+                        return ("illisible", rel, [])
+                    info = entree.stat(follow_symlinks=False)
+                    budget[0] += 1
+                    if stat.S_ISREG(info.st_mode):
+                        budget[1] += info.st_size
+                    depasse = _borne_depassee(budget)
+                    if depasse is not None:
+                        return ("borne", depasse, [])
+                    if stat.S_ISDIR(info.st_mode):
+                        pile.append((entree.path, rel + "/" + nom))
+                    elif stat.S_ISREG(info.st_mode):
+                        fichiers.append((rel + "/" + nom, entree.path, info.st_size))
+        except OSError:
+            return ("illisible", rel, [])
+    fichiers.sort()
+    return ("ok", relatif, fichiers)
+
+
+def _examiner_livrable(racine, entree, budget):
+    """(statut, detail, genre, fichiers) d'une entrée `ecrit:`. Le chemin est parcouru composant par composant par lstat : un
+    lien, terminal ou intermédiaire, rend le livrable `lien` (jamais suivi). Un fichier régulier de 0 octet est `vide` ; un dossier
+    sans aucun fichier régulier non vide est `vide` ; une entrée absente, un composant intermédiaire qui n'est pas un dossier ou un
+    fichier spécial (FIFO, socket, périphérique) est `absent` ; une erreur de lecture est `illisible` ; un dépassement de borne est
+    `borne`. `genre` vaut `fichier` ou `dossier` pour un livrable `present`."""
+    normale = _normaliser_livrable(entree)
+    composants = normale.split("/") if normale != "" else []
+    if not composants:
+        return ("absent", entree if entree != "" else ".", "", [])
+    courant = racine
+    info = None
+    for rang, composant in enumerate(composants):
+        courant = os.path.join(courant, composant)
+        try:
+            info = os.lstat(courant)  # livrable-lien
+        except (FileNotFoundError, NotADirectoryError):
+            return ("absent", normale, "", [])
+        except OSError:
+            return ("illisible", normale, "", [])
+        if stat.S_ISLNK(info.st_mode):
+            return ("lien", normale, "", [])
+        if rang < len(composants) - 1 and not stat.S_ISDIR(info.st_mode):
+            return ("absent", normale, "", [])
+    if stat.S_ISREG(info.st_mode):
+        budget[0] += 1
+        budget[1] += info.st_size
+        depasse = _borne_depassee(budget)
+        if depasse is not None:
+            return ("borne", depasse, "", [])
+        if not _fichier_non_vide(info.st_size):
+            return ("vide", normale, "", [])
+        return ("present", normale, "fichier", [(normale, courant, info.st_size)])
+    if stat.S_ISDIR(info.st_mode):
+        statut, detail, fichiers = _parcourir_livrable(courant, normale, budget)
+        if statut != "ok":
+            return (statut, detail, "", [])
+        if not any(_fichier_non_vide(f[2]) for f in fichiers):
+            return ("vide", normale, "", [])
+        return ("present", normale, "dossier", fichiers)
+    return ("absent", normale, "", [])
+
+
+def livrable_present(racine, entree):
+    """(statut, detail) du livrable `entree` d'un `ecrit:` du lab de racine `racine` : statut `present`, `absent`, `lien`, `vide`,
+    `borne` ou `illisible` (voir `_examiner_livrable`). Le prédicat unique de G3 et de la règle R4 du recalcul (P46-D-12)."""
+    statut, detail, _genre, _fichiers = _examiner_livrable(racine, entree, [0, 0, 0])
+    return (statut, detail)
+
+
+def _hacher_livrable(chemin, budget):
+    """(statut, valeur) : `ok` et le sha256 hexadécimal du fichier régulier `chemin` (ouvert O_NOFOLLOW puis fstat régulier, lu par
+    blocs, octets lus ajoutés au budget partagé), `borne` et le libellé de la borne, ou `illisible`. Jamais un hash partiel."""
+    import hashlib
+    try:
+        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+    except OSError:
+        return ("illisible", "")
+    hacheur = hashlib.sha256()
+    try:
+        with os.fdopen(descripteur, "rb") as fh:
+            if not stat.S_ISREG(os.fstat(fh.fileno()).st_mode):
+                return ("illisible", "")
+            while True:
+                bloc = fh.read(65536)
+                if not bloc:
+                    break
+                budget[2] += len(bloc)
+                depasse = _borne_depassee(budget)
+                if depasse is not None:
+                    return ("borne", depasse)
+                hacheur.update(bloc)
+    except OSError:
+        return ("illisible", "")
+    return ("ok", hacheur.hexdigest())
+
+
+def empreinte_livrables(racine, entrees):
+    """("ok", sha256 hexadécimal) ou (statut d'échec, entrée ou libellé de borne) pour les entrées `ecrit:` `entrees`. Texte
+    canonique : entrées normalisées, dédoublonnées et triées ; une ligne `fichier<TAB><chemin relatif au lab><TAB><sha256>` par
+    entrée fichier ; pour une entrée dossier, une ligne `dossier<TAB><entrée>` puis une ligne `fichier…` par fichier régulier du
+    sous-arbre, triées par chemin relatif ; lignes jointes par `\\n`, saut final, haché en UTF-8. Le budget (entrées et octets) est
+    commun à toutes les entrées. Une entrée qui n'est pas `present` (absente, vide, lien, borne, illisible) fait échouer le calcul."""
+    import hashlib
+    budget = [0, 0, 0]
+    lignes = []
+    for entree in sorted(set(_normaliser_livrable(e) for e in entrees)):  # empreinte-tri
+        statut, detail, genre, fichiers = _examiner_livrable(racine, entree, budget)
+        if statut != "present":
+            return (statut, detail)
+        if genre == "dossier":
+            lignes.append("dossier\t" + detail)
+        for rel, chemin, _taille in fichiers:
+            statut_hache, valeur = _hacher_livrable(chemin, budget)
+            if statut_hache != "ok":
+                return (statut_hache, valeur if valeur != "" else rel)
+            lignes.append("fichier\t" + rel + "\t" + valeur)
+    texte = "\n".join(lignes) + "\n"
+    return ("ok", hashlib.sha256(texte.encode("utf-8")).hexdigest())
+
+
 def _sous_dossiers(dossier):
     """Noms d'unité (règle NOM_UNITE) des vrais dossiers de `dossier`, triés ; jamais un lien."""
     try:

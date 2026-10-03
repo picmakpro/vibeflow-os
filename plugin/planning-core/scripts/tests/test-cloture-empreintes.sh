@@ -7,13 +7,16 @@
 #   R-EMP-01  le prédicat « livrable présent » (lstat par composant, vide, lien, FIFO, dossier, exclusions)
 #   R-EMP-02  l'empreinte des livrables (stable, indépendante de l'ordre, sensible au contenu, insensible aux exclus et aux liens)
 #   R-EMP-03  les bornes (2000 entrées, 128 Mio) : refus explicite, jamais une empreinte partielle
+#   R-EMP-04  trois copies ast-identiques du bloc partagé (poser-verdict.sh, planning-hook.sh, recalc-planning.sh), mêmes verdicts
 #   R-EMP-05  la commande pose `hash` et `hash_livrables`, relus identiques par le parseur, six clés dans l'ordre
 #   R-EMP-06  la commande refuse (64) un livrable absent, vide ou lien, un ecrit: invalide, une borne dépassée
 #   R-EMP-07  aucun refus ne porte le chemin absolu du lab, « no such file » ni « can't open » (P46-D-10)
+#   R-PLAF-01 à 04  plafond de trois tentatives (code 65, VERDICT.md inchangé), dérogation PLAFOND à usage unique consommée sous
+#             verrou avant l'écriture, constante du code (jamais un fichier du lab ni l'environnement), ordre prouvé par l'ast
 #   MUT-*     chaque garde est tuée par un mutant à motif unique : la trace du rouge (assertion, attendu, obtenu) est imprimée ;
 #             un mutant tué par la durée est interdit, il meurt par structure ou par verdict
 #
-# Sections (VF_CLOT_SECTIONS, facultatif) : emp, mut. Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`,
+# Sections (VF_CLOT_SECTIONS, facultatif) : emp, ast, plaf, mut. Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`,
 # ni `readlink -f`, ni `date -d` ; `cmp -s` jamais `diff` ; tout le travail fin est fait par Python (PYBIN). Lançable depuis tout
 # cwd, par `bash <suite>` (jamais sourcée). Piège CI (`bash -e {0}`) : jamais `commande && { … }` nu.
 set -uo pipefail
@@ -57,6 +60,8 @@ import sys
 MARQUEUR_POSER = "PY_POSER_VERDICT_EOF"
 UNITE = ".planning/cycles/01-c/phases/01-p"
 SCRIPTS_COPIES = ("poser-verdict.sh", "planning-hook.sh", "recalc-planning.sh", "deroger-gate.sh")
+TROIS_COPIES = (("planning-hook.sh", "PY_PLANNING_HOOK_EOF"), ("poser-verdict.sh", MARQUEUR_POSER),
+                ("recalc-planning.sh", "PY_RECALC_PLANNING_EOF"))
 
 
 def ok(libelle):
@@ -142,9 +147,12 @@ def charger_bloc(chemin_script, marqueur=MARQUEUR_POSER):
     return ns
 
 
-def lancer(ctx, dossier, nom, args):
+def lancer(ctx, dossier, nom, args, env_extra=None):
+    env = ctx.env()
+    if env_extra:
+        env.update(env_extra)
     p = subprocess.run(["bash", os.path.join(dossier, nom)] + list(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                       env=ctx.env(), cwd=ctx.work, timeout=120)
+                       env=env, cwd=ctx.work, timeout=120)
     return p.returncode, p.stdout, p.stderr
 
 
@@ -169,10 +177,23 @@ def lab_neuf(ctx, nom="lab", entrees=("livrables/rapport.md", "donnees"), unite=
     return lab
 
 
-def poser_cmd(ctx, dossier, lab, tentative, unite=UNITE, juge="vf-design-judge", extra=()):
+def poser_cmd(ctx, dossier, lab, tentative, unite=UNITE, juge="vf-design-judge", extra=(), env_extra=None):
     args = ["--unite=" + os.path.join(lab, unite), "--juge=" + juge, "--tentative=" + str(tentative), "--score=8/10",
             "--constat=critere-a::passé"] + list(extra)
-    return lancer(ctx, dossier, "poser-verdict.sh", args)
+    return lancer(ctx, dossier, "poser-verdict.sh", args, env_extra)
+
+
+def deroger_cmd(ctx, dossier, lab, gate, chemin, raison="cas de test du plafond de tentatives"):
+    args = ["--lab=" + lab, "--gate=" + gate, "--chemin=" + chemin, "--qui=willy", "--canal=AskUserQuestion session principale",
+            "--date=2026-10-03", "--raison=" + raison]
+    return lancer(ctx, dossier, "deroger-gate.sh", args)
+
+
+def journal_derogations(lab):
+    chemin = os.path.join(lab, ".planning", "derogations-gates.log")
+    if not os.path.exists(chemin):
+        return []
+    return [l for l in octets(chemin).decode("utf-8").split("\n") if l]
 
 
 def verdicts_ecrits(lab):
@@ -241,17 +262,18 @@ def cas_predicat(lab):
 
 
 def controle_emp_01(ctx, dossier):
-    ns = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
     lab = lab_neuf(ctx, "emp01")
     cas = cas_predicat(lab)
     fautes = []
-    for nom, entree, attendu in cas:
-        statut, detail = ns["livrable_present"](lab, entree)
-        if statut != attendu:
-            fautes.append("cas « %s » (%s) : obtenu %s, attendu %s" % (nom, entree, statut, attendu))
+    for script, marqueur in TROIS_COPIES:
+        ns = charger_bloc(os.path.join(dossier, script), marqueur)
+        for nom, entree, attendu in cas:
+            statut, detail = ns["livrable_present"](lab, entree)
+            if statut != attendu:
+                fautes.append("%s, cas « %s » (%s) : obtenu %s, attendu %s" % (script, nom, entree, statut, attendu))
     return (not fautes), ("; ".join(fautes) if fautes else
-                          "%d cas du prédicat conformes (fichier plein, vide, lien terminal et intermédiaire, pendant, dossier "
-                          "vide, de zéros, d'exclus, de lien interne, imbriqué, absent, FIFO) avec leurs jumeaux non vides" % len(cas))
+                          "%d cas du prédicat conformes dans les trois copies (fichier plein, vide, lien terminal et intermédiaire, "
+                          "pendant, dossier vide, de zéros, d'exclus, de lien interne, imbriqué, absent, FIFO) avec leurs jumeaux non vides" % len(cas))
 
 
 # --- R-EMP-02 : l'empreinte des livrables ----------------------------------------------------------------------------
@@ -540,6 +562,207 @@ def controle_emp_07(ctx, dossier):
                           "ni trace Python" % n)
 
 
+# --- R-EMP-04 : trois copies ast-identiques ---------------------------------------------------------------------------
+NOMS_BLOC = ("BORNE_FICHIERS_LIVRABLES", "BORNE_OCTETS_LIVRABLES", "NOMS_EXCLUS_LIVRABLES", "_normaliser_livrable", "_fichier_non_vide",
+             "_nom_sain", "_borne_depassee", "_parcourir_livrable", "_examiner_livrable", "livrable_present", "_hacher_livrable",
+             "empreinte_livrables", "entree_ecrit_valide")
+NOMS_JOURNAL = ("NOM_JOURNAL_DEROGATIONS", "LIGNE_DEROGATION_RE", "_jeton_journal", "_chemin_journal_derogations",
+                "_ouvrir_journal_derogations", "_entrees_journal", "_derogation_non_consommee", "derogation_active", "consommer", "citer")
+
+
+def corps_ast(dossier, script, marqueur):
+    return ast.parse(corps_python(open(os.path.join(dossier, script), encoding="utf-8").read(), marqueur))
+
+
+def arbre_de(arbre, nom):
+    """ast.dump de la fonction ou de la constante `nom` du corps (docstring comprise), ou None."""
+    for noeud in arbre.body:
+        if isinstance(noeud, ast.FunctionDef) and noeud.name == nom:
+            return ast.dump(noeud)
+        if isinstance(noeud, ast.Assign) and isinstance(noeud.targets[0], ast.Name) and noeud.targets[0].id == nom:
+            return ast.dump(noeud)
+    return None
+
+
+def comparer_arbres(arbres, noms, fautes):
+    """`arbres` = [(script, arbre)] : chaque nom de `noms` a le même arbre dans tous les scripts ; un écart nomme le script et le nom."""
+    for nom in noms:
+        refs = [(s, arbre_de(a, nom)) for s, a in arbres]
+        for s, r in refs:
+            if r is None:
+                fautes.append("%s absent de %s" % (nom, s))
+        presentes = [(s, r) for s, r in refs if r is not None]
+        for s, r in presentes[1:]:
+            if r != presentes[0][1]:
+                fautes.append("%s : arbre ast différent entre %s et %s" % (nom, presentes[0][0], s))
+
+
+def controle_emp_04(ctx, dossier):
+    arbres = {s: corps_ast(dossier, s, m) for s, m in TROIS_COPIES + (("deroger-gate.sh", "PY_DEROGER_GATE_EOF"),)}
+    fautes = []
+    trois = [(s, arbres[s]) for s, _m in TROIS_COPIES]
+    comparer_arbres(trois, NOMS_BLOC, fautes)
+    comparer_arbres([(s, arbres[s]) for s in ("poser-verdict.sh", "recalc-planning.sh")], ("_valeurs_ecrit",), fautes)
+    comparer_arbres([(s, arbres[s]) for s in ("planning-hook.sh", "poser-verdict.sh")], NOMS_JOURNAL, fautes)
+    comparer_arbres([(s, arbres[s]) for s in ("planning-hook.sh", "poser-verdict.sh", "recalc-planning.sh", "deroger-gate.sh")],
+                    ("_jeton_journal", "entree_ecrit_valide"), fautes)
+    # mêmes verdicts : le prédicat et l'empreinte rendent la même chose dans les trois copies sur le même lab
+    lab = lab_neuf(ctx, "emp04")
+    cas = cas_predicat(lab)
+    rendus = {}
+    for script, marqueur in TROIS_COPIES:
+        ns = charger_bloc(os.path.join(dossier, script), marqueur)
+        rendus[script] = ([ns["livrable_present"](lab, entree) for _n, entree, _a in cas], ns["empreinte_livrables"](lab, ENTREES_EMP))
+    base = rendus["poser-verdict.sh"]
+    for script, rendu in rendus.items():
+        if rendu != base:
+            fautes.append("%s rend un verdict de présence ou une empreinte différents de poser-verdict.sh sur le même lab" % script)
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "%d noms du bloc partagé et %d du journal de dérogation à arbres ast identiques (docstring comprise) dans les copies "
+                          "attendues ; mêmes statuts de présence (%d cas) et même empreinte dans les trois copies"
+                          % (len(NOMS_BLOC), len(NOMS_JOURNAL), len(cas)))
+
+
+# --- R-PLAF-01 à 04 : le plafond de tentatives -------------------------------------------------------------------------
+def controle_plaf_01(ctx, dossier):
+    lab = lab_neuf(ctx, "plaf01")
+    for n in (1, 2, 3):
+        rc, out, err = poser_cmd(ctx, dossier, lab, n)
+        if rc != 0:
+            return False, "tentative %d : rc=%d (attendu 0) %s" % (n, rc, court(err))
+    chemin = os.path.join(lab, UNITE, "VERDICT.md")
+    avant = octets(chemin)
+    fautes = []
+    rc, out, err = poser_cmd(ctx, dossier, lab, 4)
+    texte = err.decode("utf-8", "replace")
+    if rc != 65:
+        fautes.append("4e tentative : rc=%d (attendu 65) %s" % (rc, court(err)))
+    else:
+        if "plafond de 3 tentatives" not in texte or "arbitrage humain" not in texte:
+            fautes.append("le message de la 4e tentative ne nomme pas le plafond de 3 et l'arbitrage humain : " + court(err))
+        if "Usage" in texte:
+            fautes.append("le refus du plafond imprime l'usage des erreurs de saisie (64) : le message doit être distinct")
+    if octets(chemin) != avant:
+        fautes.append("VERDICT.md modifié par la 4e tentative refusée")
+    if [n for n in os.listdir(os.path.join(lab, UNITE)) if n.startswith(".")]:
+        fautes.append("fichier temporaire laissé par la 4e tentative refusée")
+    # jumeau : une tentative incohérente (5 sur une tentative 3) reste une erreur de saisie (64), jamais le plafond
+    rc, out, err = poser_cmd(ctx, dossier, lab, 5)
+    if rc != 64:
+        fautes.append("tentative incohérente 5 sur une tentative 3 : rc=%d (attendu 64, distinct du plafond)" % rc)
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "tentatives 1, 2, 3 acceptées ; la 4e : code 65, message qui nomme le plafond de 3 et l'arbitrage humain, VERDICT.md "
+                          "octet pour octet inchangé, aucun temporaire ; une tentative incohérente reste 64")
+
+
+def controle_plaf_02(ctx, dossier):
+    lab = lab_neuf(ctx, "plaf02")
+    for n in (1, 2, 3):
+        rc, out, err = poser_cmd(ctx, dossier, lab, n)
+        if rc != 0:
+            return False, "tentative %d : rc=%d (attendu 0) %s" % (n, rc, court(err))
+    chemin = os.path.join(lab, UNITE, "VERDICT.md")
+    fautes = []
+    # jumeaux négatifs : une dérogation d'un autre gate sur l'unité, ou PLAFOND sur une autre unité, ne lève rien
+    for gate, cible in (("G5", UNITE), ("PLAFOND", ".planning/cycles/01-c/phases/02-autre")):
+        rc, out, err = deroger_cmd(ctx, dossier, lab, gate, cible)
+        if rc != 0:
+            return False, "deroger-gate.sh refuse la dérogation %s sur %s : rc=%d %s" % (gate, cible, rc, court(err))
+    rc, out, err = poser_cmd(ctx, dossier, lab, 4)
+    if rc != 65:
+        fautes.append("4e tentative sous une dérogation d'un autre gate ou d'une autre unité : rc=%d (attendu 65)" % rc)
+    if [l for l in journal_derogations(lab) if "  consommee  " in l]:
+        fautes.append("une dérogation étrangère à l'unité a été consommée")
+    # la vraie dérogation : PLAFOND sur l'unité
+    rc, out, err = deroger_cmd(ctx, dossier, lab, "PLAFOND", UNITE)
+    if rc != 0:
+        return False, "deroger-gate.sh refuse la dérogation PLAFOND sur l'unité : rc=%d %s" % (rc, court(err))
+    rc, out, err = poser_cmd(ctx, dossier, lab, 4)
+    if rc != 0:
+        fautes.append("4e tentative sous la dérogation PLAFOND de l'unité : rc=%d (attendu 0) %s" % (rc, court(err)))
+    elif b"tentative: 4" not in octets(chemin):
+        fautes.append("VERDICT.md sans tentative 4 après la dérogation")
+    consommees = [l for l in journal_derogations(lab) if "  consommee  " in l and "gate=PLAFOND" in l]
+    if len(consommees) != 1 or ("chemin=" + UNITE) not in consommees[0]:
+        fautes.append("journal : %d ligne(s) consommee PLAFOND sur l'unité (attendu 1) : %s" % (len(consommees), court(" | ".join(consommees))))
+    if b"consomm" not in out:
+        fautes.append("la dérogation consommée n'est pas citée sur la sortie : " + court(out))
+    avant = octets(chemin)
+    rc, out, err = poser_cmd(ctx, dossier, lab, 5)
+    if rc != 65:
+        fautes.append("5e tentative : rc=%d (attendu 65 : usage unique de la dérogation) %s" % (rc, court(err)))
+    if octets(chemin) != avant:
+        fautes.append("VERDICT.md modifié par la 5e tentative refusée")
+    if len([l for l in journal_derogations(lab) if "  consommee  " in l]) != len(consommees):
+        fautes.append("la 5e tentative refusée a consommé une dérogation")
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "4e tentative refusée (65) sous une dérogation d'un autre gate ou d'une autre unité ; acceptée sous la dérogation PLAFOND de "
+                          "l'unité, qui est citée et inscrite `consommee` ; la 5e est refusée (65), usage unique")
+
+
+def controle_plaf_03(ctx, dossier):
+    lab = lab_neuf(ctx, "plaf03")
+    ecrire(os.path.join(lab, ".planning", "config.json"), json.dumps({
+        "planning_version": "cycles-v1", "plafond_tentatives": 10, "PLAFOND_TENTATIVES": 10, "plafond": 10,
+        "options": {"plafond_tentatives": 10, "plafond": 10}}))
+    env_extra = {"PLAFOND_TENTATIVES": "10", "VF_PLAFOND_TENTATIVES": "10", "PLAFOND": "10", "VF_PLAFOND": "10",
+                 "PLAFOND_TENTATIVES_VERDICT": "10"}
+    fautes = []
+    for n in (1, 2, 3):
+        rc, out, err = poser_cmd(ctx, dossier, lab, n, env_extra=env_extra)
+        if rc != 0:
+            return False, "tentative %d : rc=%d (attendu 0) %s" % (n, rc, court(err))
+    rc, out, err = poser_cmd(ctx, dossier, lab, 4, env_extra=env_extra)
+    if rc != 65:
+        fautes.append("4e tentative sous une clé de config et des variables d'environnement à 10 : rc=%d (attendu 65, constante du code)" % rc)
+    texte = open(os.path.join(dossier, "poser-verdict.sh"), encoding="utf-8").read()
+    corps = corps_python(texte, MARQUEUR_POSER)
+    if re.search(r"os\.environ|getenv", corps):
+        fautes.append("le corps du script lit l'environnement")
+    valeur = None
+    for noeud in ast.parse(corps).body:
+        if isinstance(noeud, ast.Assign) and isinstance(noeud.targets[0], ast.Name) and noeud.targets[0].id == "PLAFOND_TENTATIVES":
+            valeur = ast.literal_eval(noeud.value)
+    if valeur != 3:
+        fautes.append("PLAFOND_TENTATIVES est %r dans le code livré (attendu la constante 3)" % (valeur,))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "une clé de plafond à 10 dans config.json et des variables d'environnement à 10 ne changent rien : la 4e tentative reste "
+                          "refusée (65) ; PLAFOND_TENTATIVES = 3 est une constante littérale, le script ne lit pas l'environnement")
+
+
+def controle_plaf_04(ctx, dossier):
+    arbre = corps_ast(dossier, "poser-verdict.sh", MARQUEUR_POSER)
+    fonction = next((n for n in arbre.body if isinstance(n, ast.FunctionDef) and n.name == "poser"), None)
+    if fonction is None:
+        return False, "fonction poser absente de poser-verdict.sh"
+    ordre = ("ouvrir_verrou", "derogation_active", "consommer", "ecrire_atomique")
+    positions = {}
+    for noeud in ast.walk(fonction):
+        if isinstance(noeud, ast.Call) and isinstance(noeud.func, ast.Name) and noeud.func.id in ordre:
+            pos = (noeud.lineno, noeud.col_offset)
+            positions[noeud.func.id] = min(pos, positions.get(noeud.func.id, pos))
+    fautes = []
+    manquants = [n for n in ordre if n not in positions]
+    if manquants:
+        fautes.append("appel(s) absent(s) de poser : %s" % ", ".join(manquants))
+    else:
+        for avant, apres in zip(ordre, ordre[1:]):
+            if not positions[avant] < positions[apres]:
+                fautes.append("%s (ligne %d) ne précède pas %s (ligne %d) dans poser" % (avant, positions[avant][0], apres, positions[apres][0]))
+    # `consommer` est le code du hook central (verrou exclusif du journal, relecture sous le verrou)
+    arbre_hook = corps_ast(dossier, "planning-hook.sh", "PY_PLANNING_HOOK_EOF")
+    a_poser, a_hook = arbre_de(arbre, "consommer"), arbre_de(arbre_hook, "consommer")
+    if a_poser is None or a_poser != a_hook:
+        fautes.append("consommer de poser-verdict.sh n'est pas ast-identique à celui de planning-hook.sh")
+    noeud_hook = next((n for n in arbre_hook.body if isinstance(n, ast.FunctionDef) and n.name == "consommer"), None)
+    verrouille = noeud_hook is not None and any(isinstance(n, ast.Attribute) and n.attr == "flock" for n in ast.walk(noeud_hook))
+    if not verrouille:
+        fautes.append("consommer du hook ne prend pas le verrou du journal (fcntl.flock)")
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "dans poser : ouvrir_verrou, puis derogation_active, puis consommer, puis ecrire_atomique ; consommer est ast-identique à "
+                          "celui du hook, qui prend le verrou exclusif du journal")
+
+
 # --- Mutants ------------------------------------------------------------------------------------------------------------
 def make_mutant(ctx, nom, marqueur, ident, motif, remplacement):
     """Dossier jetable portant les scripts livrés, dont `nom` a son UNIQUE ligne portant `motif` (fixe) remplacée par
@@ -623,6 +846,18 @@ def rendre(ident, titre, ctrl, ctx, dossier):
     ok("%s %s : %s" % (ident, titre, detail)) if bon else ko(ident, titre, "conforme", detail)
 
 
+def sec_ast(ctx):
+    rendre("R-EMP-04", "trois copies ast-identiques du bloc partagé", controle_emp_04, ctx, ctx.scripts_dir)
+
+
+def sec_plaf(ctx):
+    d = ctx.scripts_dir
+    rendre("R-PLAF-01", "quatrième tentative refusée, code 65, fichier inchangé", controle_plaf_01, ctx, d)
+    rendre("R-PLAF-02", "dérogation PLAFOND nominative, à usage unique", controle_plaf_02, ctx, d)
+    rendre("R-PLAF-03", "le plafond est une constante du code", controle_plaf_03, ctx, d)
+    rendre("R-PLAF-04", "ordre verrou, dérogation, consommation, écriture (structurel)", controle_plaf_04, ctx, d)
+
+
 def sec_emp(ctx):
     d = ctx.scripts_dir
     rendre("R-EMP-01", "prédicat « livrable présent »", controle_emp_01, ctx, d)
@@ -645,6 +880,15 @@ MUTANTS = [
      "R-EMP-02", controle_emp_02, "nom exclu", True),
     ("VERDICT-HASH-LIVRABLES", "poser-verdict.sh", MARQUEUR_POSER, "# verdict-hash-livrables", "pass  # verdict-hash-livrables",
      "R-EMP-05", controle_emp_05, "ne se relisent pas identiques", False),
+    ("PLAF", "poser-verdict.sh", MARQUEUR_POSER, "if tentative > PLAFOND_TENTATIVES:  # verdict-plafond",
+     "if False:  # verdict-plafond", "R-PLAF-01", controle_plaf_01, "attendu 65", True),
+    ("PLAF-CONSO", "poser-verdict.sh", MARQUEUR_POSER, "# verdict-consommation", "pass  # verdict-consommation",
+     "R-PLAF-02", controle_plaf_02, "consommee", True),
+    ("PLAF-ORDRE", "poser-verdict.sh", MARQUEUR_POSER, "# verdict-consommation",
+     'ecrire_atomique(unite, "VERDICT.md", texte); consommer(racine, derogation)  # verdict-consommation',
+     "R-PLAF-04", controle_plaf_04, "ecrire_atomique", True),
+    ("EMP-AST", "recalc-planning.sh", "PY_RECALC_PLANNING_EOF", "# livrable-vide", "return taille >= 1  # livrable-vide",
+     "R-EMP-04", controle_emp_04, "recalc-planning.sh", True),
 ]
 
 
@@ -656,7 +900,7 @@ def sec_mut(ctx):
         executer_mutant(ctx, ident, nom, marqueur, motif, remplacement, cid, ctrl, mot, temoin)
 
 
-SECTIONS = {"emp": sec_emp, "mut": sec_mut}
+SECTIONS = {"emp": sec_emp, "ast": sec_ast, "plaf": sec_plaf, "mut": sec_mut}
 
 
 def main():
@@ -690,7 +934,7 @@ run_sections() { # <sections séparées par des virgules>
 
 # VF_CLOT_SECTIONS (facultatif, pour rejouer une partie de la suite pendant le développement) ; VF_CLOT_MUTANTS filtre les mutants
 # par fragment d'identifiant. Sans elles, toutes les sections tournent.
-run_sections "${VF_CLOT_SECTIONS:-emp,mut}"
+run_sections "${VF_CLOT_SECTIONS:-emp,ast,plaf,mut}"
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

@@ -4,7 +4,7 @@
 # `.planning/derogations-gates.log` (F7a = f7a-racine, Willy, AskUserQuestion session principale,
 # 2026-09-30), enfant direct du dossier de planning, déclaré au modèle par 45-02.
 #
-# Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G5|G6|G7|ROLE> --chemin=<relatif> [--chemin=...]
+# Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G5|G6|G7|ROLE|PLAFOND> --chemin=<relatif> [--chemin=...]
 #                         --qui=<nom> --canal=<canal> --date=<AAAA-MM-JJ> --raison=<texte> [-h]
 #
 # Trois règles de l'échappatoire (spec §5.2) : nominative (qui, canal, date, gate, chemins, raison) ;
@@ -22,6 +22,10 @@
 #
 # Codes : 0 inscrit · 1 erreur de lecture ou d'écriture · 2 lab non adhérent · 64 usage ou champ refusé
 # (le message nomme le champ).
+#
+# Le jeton PLAFOND (Phase 46, 46-01 ; P46-D-05) lève le plafond de trois tentatives de poser-verdict.sh : son `--chemin` est le
+# dossier de l'unité, relatif au lab (`.planning/cycles/<cycle>/phases/<phase>[/plans/<plan>]` ou `.planning/juges/<juge>`) ;
+# c'est poser-verdict.sh, non le hook, qui la consomme (usage unique, sous verrou, avant l'écriture du verdict).
 #
 # Limite déclarée (T-45-34) : la commande ne peut pas savoir qui la lance ; `--qui` est déclaratif.
 set -u
@@ -54,11 +58,11 @@ except ImportError:
 
 SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
-GATES = ("G1", "G5", "G6", "G7", "ROLE")
+GATES = ("G1", "G5", "G6", "G7", "ROLE", "PLAFOND")
 OPTIONS = ("lab", "gate", "chemin", "qui", "canal", "date", "raison")
 PLACEHOLDERS = ("todo", "tbd", "fixme", "xxx", "n/a", "...")  # derog-placeholders
 IDENTIFIANT_RE = re.compile(r"^\S+  (?:derogation|consommee)  id=([0-9]+)  ", re.M)
-USAGE = ("Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G5|G6|G7|ROLE> --chemin=<relatif> "
+USAGE = ("Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G5|G6|G7|ROLE|PLAFOND> --chemin=<relatif> "
          "[--chemin=...] --qui=<nom> --canal=<canal> --date=<AAAA-MM-JJ> --raison=<texte> [-h]")
 
 
@@ -223,7 +227,7 @@ def raison_placeholder(raison):
 
 def valider(valeurs, chemins_bruts):
     if valeurs["gate"] not in GATES:
-        raise Refus(64, "--gate : G1, G5, G6, G7 ou ROLE attendu, reçu : " + valeurs["gate"])
+        raise Refus(64, "--gate : G1, G5, G6, G7, ROLE ou PLAFOND attendu, reçu : " + valeurs["gate"])
     chemins = []
     for brut in chemins_bruts:
         if not entree_ecrit_valide(brut):
