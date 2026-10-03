@@ -39,7 +39,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-46-04",
@@ -47,7 +47,8 @@
       "stage": "",
       "deps": [
         "exec-46-01",
-        "exec-46-03"
+        "exec-46-03",
+        "fix-46-socle"
       ],
       "scope": [
         "plugin/planning-core",
@@ -306,6 +307,30 @@
       ],
       "scope": [],
       "status": "blocked"
+    },
+    {
+      "id": "revue-46-socle",
+      "step": "revue anticipée du socle 46-01/46-02 (164d7537..74de2f0a)",
+      "stage": "",
+      "deps": [
+        "exec-46-01",
+        "exec-46-02"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-46-socle",
+      "step": "correction ciblée du socle (revue anticipée F1-F6, F9 doc)",
+      "stage": "",
+      "deps": [
+        "revue-46-socle",
+        "exec-46-03"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "running"
     }
   ]
 }
