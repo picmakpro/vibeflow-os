@@ -82,6 +82,7 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 | 261002-brz | Revue Samuel (PR #124) : pré-filtre hors adhésion en tête de la commande enregistrée (Bash conservé, arbitrage Willy, AskUserQuestion session principale, 2026-10-02), garde d'équivalence test-planning-prefilter.sh | 2026-10-02 | aac3b83 | passed | [261002-brz-pr-filtre-hors-adh-sion-hook-central-pre](./quick/261002-brz-pr-filtre-hors-adh-sion-hook-central-pre/) |
 | 261002-uhn | Re-audit du pré-filtre : F-P1 (coût cubique, fail-open par timeout) et F-P2 corrigés, bornes 1024 caractères / 64 composants | 2026-10-02 | 5d6ba02 | passed | [261002-uhn-correction-f-p1-f-p2-prefiltre](./quick/261002-uhn-correction-f-p1-f-p2-prefiltre/) |
 | 261003-1le | Re-audit du pré-filtre tour 2 : F-P3 (config lue sans borne) et F-P4 corrigés ; vérification SECURED, F-P5 déclaré | 2026-10-03 | fed5492 | passed | [261003-1le-correction-f-p3-f-p4-pre-filtre](./quick/261003-1le-correction-f-p3-f-p4-pre-filtre/) |
+| 261003-4gk | CI de la PR #124 : cas 19 de test-check-doc-drift.sh rendu déterministe (maintenance git de fond désactivée dans la fixture ; cas non affaibli, mutant tué) | 2026-10-03 | 90af51c | passed | [261003-4gk-flake-cas-19-doc-drift-gc-auto](./quick/261003-4gk-flake-cas-19-doc-drift-gc-auto/) |
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
