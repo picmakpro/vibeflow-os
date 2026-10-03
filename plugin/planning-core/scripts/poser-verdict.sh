@@ -4,7 +4,7 @@
 # G5 refuse toute écriture de ce fichier par Write, Edit ou NotebookEdit ; cette commande, lancée par
 # Bash, n'est jamais vue par G5.
 #
-# Usage : poser-verdict.sh --unite=<dossier de l'unité> --juge=<nom> --tentative=<n> --score=<texte>
+# Usage : poser-verdict.sh --unite=<dossier de l'unité : phase, plan ou juge> --juge=<nom> --tentative=<n> --score=<texte>
 #                          --constat=<critère>::<passé|échec> [--constat=...] [-h]
 #
 # Qui la lance (décision F8 = f8-agnostique, Willy, AskUserQuestion session principale, 2026-09-30) :
@@ -34,6 +34,11 @@
 # fichier régulier (lien, par exemple) n'est pas un verdict existant : il est remplacé, jamais suivi.
 # Les valeurs qui ne se relisent pas identiques par le parseur de frontmatter sont refusées (64).
 #
+# Seconde forme d'unité (Phase 46, 46-01 ; P46-D-06a ; Willy, AskUserQuestion session principale, 2026-10-03, Q6 = a) : le
+# verdict du canary d'un juge se pose sur `.planning/juges/<juge>` (3 composants après la racine du lab, `juges` en casse exacte,
+# nom `^[a-z0-9][a-z0-9-]{0,63}$`). L'artefact haché est SORTIE-PIEGEE.md (fichier régulier, jamais un lien) au lieu du PLAN.md ; le
+# verdict n'a pas de `hash_livrables` ; le plafond de tentatives s'y applique comme à toute unité. Toute autre forme reste refusée.
+#
 # Plafond de tentatives (Phase 46, 46-01 ; P46-D-05 ; Willy, AskUserQuestion session principale, 2026-10-03,
 # Q5 = a) : PLAFOND_TENTATIVES = 3 est une CONSTANTE de ce script, jamais lue dans un fichier du lab ni dans
 # l'environnement. Une tentative au-delà (la quatrième) est refusée avec le code 65 et un message distinct, VERDICT.md
@@ -44,7 +49,8 @@
 # Limite déclarée (g) : supprimer VERDICT.md par Bash remet le compteur à 1 ; D1 (46-07) en trace la disparition.
 #
 # Codes : 0 écrit · 1 erreur de lecture ou d'écriture · 2 lab non adhérent · 64 usage, tentative
-# incohérente, constat invalide, unité hors .planning/cycles/ ou sans PLAN.md, ecrit: invalide,
+# incohérente, constat invalide, unité hors forme (ni .planning/cycles/…, ni .planning/juges/<juge>) ou sans PLAN.md
+# (sans SORTIE-PIEGEE.md pour un juge), ecrit: invalide,
 # livrable absent, vide ou lien, borne dépassée · 65 plafond de tentatives atteint sans dérogation.
 #
 # Limite déclarée : la commande ne peut pas savoir qui la lance (trace déclarative : `--juge`).
@@ -85,7 +91,9 @@ NOM_UNITE = re.compile(r"^[0-9]{2,}-[\w.-]+$")
 RESULTATS = ("passé", "échec")
 OPTIONS_SIMPLES = ("unite", "juge", "tentative", "score")
 PLAFOND_TENTATIVES = 3  # verdict-plafond-constante
-USAGE = ("Usage : poser-verdict.sh --unite=<dossier de l'unité> --juge=<nom> --tentative=<n> "
+NOM_SORTIE_PIEGEE = "SORTIE-PIEGEE.md"
+JUGE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}\Z")
+USAGE = ("Usage : poser-verdict.sh --unite=<dossier de l'unité : phase, plan ou juge> --juge=<nom> --tentative=<n> "
          "--score=<texte> --constat=<critère>::<passé|échec> [--constat=...] [-h]")
 
 
@@ -709,6 +717,13 @@ def citer(entree):
         entree["id"], entree["gate"], entree["chemin"], champs["qui"], champs["canal"], champs["date"], champs["raison"])
 
 
+def forme_juge(composants):
+    """Vrai si `composants` (relatifs à la racine du lab) désignent le dossier d'un juge : `.planning/juges/<juge>`, `juges` en casse
+    exacte, nom de juge en minuscules, chiffres et tirets (JUGE_RE). L'artefact haché de cette unité est SORTIE-PIEGEE.md, jamais
+    PLAN.md, et son verdict ne porte pas d'empreinte de livrables (P46-D-06a)."""
+    return len(composants) == 3 and composants[0].casefold() == ".planning" and composants[1] == "juges" and JUGE_RE.match(composants[2]) is not None  # verdict-forme-juge
+
+
 def ouvrir_verrou(chemin):
     """Prend le verrou exclusif (`fcntl.flock`) sur le fichier régulier `chemin` — le PLAN.md voisin du VERDICT.md, ouvert sans suivre
     de lien — et rend son descripteur, gardé ouvert jusqu'à la fin du processus ; None quand le module fcntl n'existe pas (pas de
@@ -830,14 +845,16 @@ def poser(valeurs, constats_bruts):
         raise Refus(2, "lab non adhérent : le config.json du dossier de planning doit déclarer "
                        "\"planning_version\": \"cycles-v1\"")
     composants = [c for c in os.path.relpath(unite, racine).split(os.sep) if c not in ("", ".")]
-    if not forme_unite(composants): raise Refus(64, "--unite : l'unité doit être un dossier de phase ou de plan du modèle (.planning/cycles/<cycle>/phases/<phase>[/plans/<plan>])")  # verdict-forme-unite
-    plan = os.path.join(unite, "PLAN.md")
+    juge_forme = forme_juge(composants)
+    if not (forme_unite(composants) or juge_forme): raise Refus(64, "--unite : l'unité doit être un dossier de phase ou de plan du modèle (.planning/cycles/<cycle>/phases/<phase>[/plans/<plan>]) ou le dossier d'un juge (.planning/juges/<juge>)")  # verdict-forme-unite
+    nom_artefact = NOM_SORTIE_PIEGEE if juge_forme else "PLAN.md"
+    plan = os.path.join(unite, nom_artefact)
     if not est_fichier_regulier(plan):
-        raise Refus(64, "--unite : pas de PLAN.md régulier dans l'unité (artefact haché, A3)")
+        raise Refus(64, "--unite : pas de %s régulier dans l'unité (artefact haché%s)" % (nom_artefact, "" if juge_forme else ", A3"))
     verrou = ouvrir_verrou(plan)  # verdict-verrou
     octets_plan = lire_octets(plan)
     empreinte = hashlib.sha256(octets_plan).hexdigest()
-    empreinte_livr = empreinte_des_livrables(racine, octets_plan)
+    empreinte_livr = None if juge_forme else empreinte_des_livrables(racine, octets_plan)
     chemin_verdict = os.path.join(unite, "VERDICT.md")
     ancienne = None
     if est_fichier_regulier(chemin_verdict):

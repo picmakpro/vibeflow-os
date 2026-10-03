@@ -13,10 +13,12 @@
 #   R-EMP-07  aucun refus ne porte le chemin absolu du lab, « no such file » ni « can't open » (P46-D-10)
 #   R-PLAF-01 à 04  plafond de trois tentatives (code 65, VERDICT.md inchangé), dérogation PLAFOND à usage unique consommée sous
 #             verrou avant l'écriture, constante du code (jamais un fichier du lab ni l'environnement), ordre prouvé par l'ast
+#   R-JUGE-FORME-01, 02  la forme d'unité `.planning/juges/<juge>` (artefact haché SORTIE-PIEGEE.md, pas de hash_livrables, plafond
+#             appliqué) et ses jumeaux négatifs (toute autre forme reste refusée, une unité de cycle garde sa règle)
 #   MUT-*     chaque garde est tuée par un mutant à motif unique : la trace du rouge (assertion, attendu, obtenu) est imprimée ;
 #             un mutant tué par la durée est interdit, il meurt par structure ou par verdict
 #
-# Sections (VF_CLOT_SECTIONS, facultatif) : emp, ast, plaf, mut. Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`,
+# Sections (VF_CLOT_SECTIONS, facultatif) : emp, ast, plaf, juge, mut. Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`,
 # ni `readlink -f`, ni `date -d` ; `cmp -s` jamais `diff` ; tout le travail fin est fait par Python (PYBIN). Lançable depuis tout
 # cwd, par `bash <suite>` (jamais sourcée). Piège CI (`bash -e {0}`) : jamais `commande && { … }` nu.
 set -uo pipefail
@@ -763,6 +765,114 @@ def controle_plaf_04(ctx, dossier):
                           "celui du hook, qui prend le verrou exclusif du journal")
 
 
+# --- R-JUGE-FORME-01 et 02 : la forme d'unité d'un juge ------------------------------------------------------------------
+UNITE_JUGE = ".planning/juges/vf-design-judge"
+
+
+def lab_juge(ctx, nom):
+    lab = lab_neuf(ctx, nom)
+    ecrire(os.path.join(lab, UNITE_JUGE, "SORTIE-PIEGEE.md"), "sortie piégée : le critère visé est violé\n")
+    return lab
+
+
+def controle_juge_01(ctx, dossier):
+    lab = lab_juge(ctx, "juge01")
+    fautes = []
+    rc, out, err = poser_cmd(ctx, dossier, lab, 1, unite=UNITE_JUGE)
+    chemin = os.path.join(lab, UNITE_JUGE, "VERDICT.md")
+    if rc != 0 or not os.path.isfile(chemin):
+        return False, "forme de juge refusée : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    ns = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
+    statut, donnees = ns["lire_frontmatter"](octets(chemin).decode("utf-8"))
+    lignes = octets(chemin).decode("utf-8").split("\n")
+    fin = lignes.index("---", 1)
+    cles = [l.split(":")[0] for l in lignes[1:fin] if l and not l.startswith(" ")]
+    attendu = hashlib.sha256(octets(os.path.join(lab, UNITE_JUGE, "SORTIE-PIEGEE.md"))).hexdigest()
+    if statut != "ok" or donnees.get("hash") != attendu:
+        fautes.append("hash relu %r, attendu le sha256 de SORTIE-PIEGEE.md %s" % (donnees.get("hash"), attendu))
+    if cles != ["juge", "hash", "tentative", "score", "constats"]:
+        fautes.append("clés du frontmatter : %s (attendu juge, hash, tentative, score, constats, sans hash_livrables)" % cles)
+    # le plafond s'applique comme à toute unité
+    for n in (2, 3):
+        rc, out, err = poser_cmd(ctx, dossier, lab, n, unite=UNITE_JUGE)
+        if rc != 0:
+            fautes.append("tentative %d de l'unité de juge : rc=%d %s" % (n, rc, court(err)))
+    avant = octets(chemin)
+    rc, out, err = poser_cmd(ctx, dossier, lab, 4, unite=UNITE_JUGE)
+    if rc != 65 or octets(chemin) != avant:
+        fautes.append("4e tentative de l'unité de juge : rc=%d (attendu 65), fichier %s" % (rc, "inchangé" if octets(chemin) == avant else "MODIFIÉ"))
+    rc, out, err = deroger_cmd(ctx, dossier, lab, "PLAFOND", UNITE_JUGE)
+    if rc != 0:
+        fautes.append("deroger-gate.sh refuse la dérogation PLAFOND de l'unité de juge : rc=%d %s" % (rc, court(err)))
+    else:
+        rc, out, err = poser_cmd(ctx, dossier, lab, 4, unite=UNITE_JUGE)
+        if rc != 0:
+            fautes.append("4e tentative de l'unité de juge sous la dérogation PLAFOND : rc=%d (attendu 0) %s" % (rc, court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "unité .planning/juges/vf-design-judge posée (code 0) : hash = sha256 de SORTIE-PIEGEE.md, aucune clé hash_livrables ; plafond "
+                          "appliqué (4e refusée en 65, acceptée sous la dérogation PLAFOND de l'unité)")
+
+
+def controle_juge_02(ctx, dossier):
+    fautes = []
+    cas = []
+
+    def neuf(nom):
+        lab = lab_neuf(ctx, "juge02-" + nom)
+        return lab
+
+    def sortie(lab, rel):
+        ecrire(os.path.join(lab, rel, "SORTIE-PIEGEE.md"), "sortie piégée\n")
+
+    lab = neuf("dotdot")
+    os.makedirs(os.path.join(lab, ".planning", "juges", "vf-design-judge"))
+    sortie(lab, ".planning/autre")
+    cas.append(("unité .planning/juges/../autre", lab, ".planning/juges/../autre"))
+    lab = neuf("autre")
+    sortie(lab, ".planning/autre/x")
+    cas.append(("unité .planning/autre/x", lab, ".planning/autre/x"))
+    lab = neuf("profond")
+    sortie(lab, ".planning/juges/a/b")
+    cas.append(("unité .planning/juges/a/b", lab, ".planning/juges/a/b"))
+    lab = neuf("majuscule")
+    sortie(lab, ".planning/juges/Majuscule")
+    cas.append(("unité .planning/juges/Majuscule", lab, ".planning/juges/Majuscule"))
+    lab = neuf("souligne")
+    sortie(lab, ".planning/juges/x_y")
+    cas.append(("unité .planning/juges/x_y (souligné)", lab, ".planning/juges/x_y"))
+    lab = neuf("casse-juges")
+    sortie(lab, ".planning/Juges/x")
+    cas.append(("unité .planning/Juges/x (casse de juges)", lab, ".planning/Juges/x"))
+    lab = neuf("long")
+    sortie(lab, ".planning/juges/" + "a" * 65)
+    cas.append(("nom de juge de 65 caractères", lab, ".planning/juges/" + "a" * 65))
+    lab = neuf("sans-sortie")
+    ecrire(os.path.join(lab, ".planning", "juges", "x", "PLAN.md"), "---\necrit: livrables/rapport.md\n---\n")
+    cas.append(("unité .planning/juges/x sans SORTIE-PIEGEE.md (même avec un PLAN.md)", lab, ".planning/juges/x"))
+    lab = neuf("lien")
+    ecrire(os.path.join(lab, "livrables", "reel.md"), "sortie piégée\n")
+    os.makedirs(os.path.join(lab, ".planning", "juges", "x"))
+    os.symlink("../../../livrables/reel.md", os.path.join(lab, ".planning", "juges", "x", "SORTIE-PIEGEE.md"))
+    cas.append(("SORTIE-PIEGEE.md est un lien", lab, ".planning/juges/x"))
+    lab = neuf("cycle-sans-plan")
+    os.remove(os.path.join(lab, UNITE, "PLAN.md"))
+    sortie(lab, UNITE)
+    cas.append(("unité de cycle sans PLAN.md (SORTIE-PIEGEE.md ne le remplace pas)", lab, UNITE))
+    for nom, lab, unite in cas:
+        rc, out, err = poser_cmd(ctx, dossier, lab, 1, unite=unite)
+        if rc != 64 or verdicts_ecrits(lab):
+            fautes.append("%s : rc=%d (attendu 64), écrit %s" % (nom, rc, [os.path.relpath(e, lab) for e in verdicts_ecrits(lab)]))
+    # jumeau valide : la même sortie piégée, sous un nom de juge conforme
+    lab = neuf("valide")
+    sortie(lab, ".planning/juges/x")
+    rc, out, err = poser_cmd(ctx, dossier, lab, 1, unite=".planning/juges/x")
+    if rc != 0:
+        fautes.append("jumeau valide .planning/juges/x refusé : rc=%d %s" % (rc, court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "%d unités hors forme refusées (64), aucun VERDICT.md écrit (autre dossier, profondeur, majuscule, souligné, casse de juges, nom "
+                          "trop long, sans SORTIE-PIEGEE.md, lien, unité de cycle sans PLAN.md) ; le jumeau conforme est posé" % len(cas))
+
+
 # --- Mutants ------------------------------------------------------------------------------------------------------------
 def make_mutant(ctx, nom, marqueur, ident, motif, remplacement):
     """Dossier jetable portant les scripts livrés, dont `nom` a son UNIQUE ligne portant `motif` (fixe) remplacée par
@@ -858,6 +968,12 @@ def sec_plaf(ctx):
     rendre("R-PLAF-04", "ordre verrou, dérogation, consommation, écriture (structurel)", controle_plaf_04, ctx, d)
 
 
+def sec_juge(ctx):
+    d = ctx.scripts_dir
+    rendre("R-JUGE-FORME-01", "unité de juge posée sur SORTIE-PIEGEE.md, sans hash_livrables", controle_juge_01, ctx, d)
+    rendre("R-JUGE-FORME-02", "jumeaux négatifs : toute autre forme d'unité reste refusée", controle_juge_02, ctx, d)
+
+
 def sec_emp(ctx):
     d = ctx.scripts_dir
     rendre("R-EMP-01", "prédicat « livrable présent »", controle_emp_01, ctx, d)
@@ -887,6 +1003,9 @@ MUTANTS = [
     ("PLAF-ORDRE", "poser-verdict.sh", MARQUEUR_POSER, "# verdict-consommation",
      'ecrire_atomique(unite, "VERDICT.md", texte); consommer(racine, derogation)  # verdict-consommation',
      "R-PLAF-04", controle_plaf_04, "ecrire_atomique", True),
+    ("JUGE-FORME", "poser-verdict.sh", MARQUEUR_POSER, "# verdict-forme-juge",
+     'return len(composants) == 3 and composants[0].casefold() == ".planning" and composants[1] == "juges"  # verdict-forme-juge',
+     "R-JUGE-FORME-02", controle_juge_02, "Majuscule", True),
     ("EMP-AST", "recalc-planning.sh", "PY_RECALC_PLANNING_EOF", "# livrable-vide", "return taille >= 1  # livrable-vide",
      "R-EMP-04", controle_emp_04, "recalc-planning.sh", True),
 ]
@@ -900,7 +1019,7 @@ def sec_mut(ctx):
         executer_mutant(ctx, ident, nom, marqueur, motif, remplacement, cid, ctrl, mot, temoin)
 
 
-SECTIONS = {"emp": sec_emp, "ast": sec_ast, "plaf": sec_plaf, "mut": sec_mut}
+SECTIONS = {"emp": sec_emp, "ast": sec_ast, "plaf": sec_plaf, "juge": sec_juge, "mut": sec_mut}
 
 
 def main():
@@ -934,7 +1053,7 @@ run_sections() { # <sections séparées par des virgules>
 
 # VF_CLOT_SECTIONS (facultatif, pour rejouer une partie de la suite pendant le développement) ; VF_CLOT_MUTANTS filtre les mutants
 # par fragment d'identifiant. Sans elles, toutes les sections tournent.
-run_sections "${VF_CLOT_SECTIONS:-emp,ast,plaf,mut}"
+run_sections "${VF_CLOT_SECTIONS:-emp,ast,plaf,juge,mut}"
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

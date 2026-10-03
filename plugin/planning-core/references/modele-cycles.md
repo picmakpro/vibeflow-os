@@ -379,10 +379,12 @@ Frontmatter : `cloture_par`, `cloture_le`. Le recalcul ne lit que **sa présence
 
 ### `VERDICT.md`
 
-Frontmatter : `juge` (auditeur indépendant, **jamais** l'auteur du livrable), `hash` (sha256 de
-l'artefact jugé), `tentative` (entier, compteur anti-boucle), `score` (jugement non bloquant,
-spec D-02 amendée), `constats` = liste **non vide** de mappings {`critere`, `resultat`
-(`passé`|`échec`)}.
+Frontmatter, dans cet ordre : `juge` (auditeur indépendant, **jamais** l'auteur du livrable), `hash`
+(sha256 de l'artefact jugé : les octets du `PLAN.md` de l'unité), `hash_livrables` (empreinte composée
+des livrables que le `PLAN.md` déclare par `ecrit:`, voir ci-dessous), `tentative` (entier, compteur
+anti-boucle), `score` (jugement non bloquant, spec D-02 amendée), `constats` = liste **non vide** de
+mappings {`critere`, `resultat` (`passé`|`échec`)}. Le verdict d'un juge de canary (unité
+`.planning/juges/<juge>`, ci-dessous) n'a pas `hash_livrables`.
 
 `VERDICT.md` incarne, au sens de la couche d'audit générique (`audit-architecture`), ses cinq
 attributs : **dimension** = un constat par critère éliminatoire objectivement vérifiable ;
@@ -390,8 +392,52 @@ attributs : **dimension** = un constat par critère éliminatoire objectivement 
 **verdict bloquant** = un `échec` empêche `close` (§ Règles de dérivation, R7) ; **anti-boucle** =
 `tentative`, qui compte les allers-retours.
 
-En Phase 44, `hash` et `tentative` sont **lus et restitués, jamais vérifiés** — leur vérification
-(hash contre l'artefact effectivement produit) relève de la Phase 46 (P44-D-09).
+**Deux empreintes** (Phase 46, P46-D-03 : Willy, AskUserQuestion session principale, 2026-10-03,
+Q3 = a). Les deux sont calculées par la commande `poser-verdict.sh`, **jamais par l'agent**, sous le
+verrou du `PLAN.md`, et relues identiques par le parseur avant l'écriture. Un verdict dont l'une des
+deux ne correspond plus est **périmé** : il se refait (les gates et le recalcul qui le vérifient sont
+livrés par les plans suivants de la Phase 46 ; en Phase 44, `hash` et `tentative` étaient lus et
+restitués, jamais vérifiés, P44-D-09).
+
+- `hash` : sha256 des octets du `PLAN.md` de l'unité (A3, conservé).
+- `hash_livrables` (P46-D-03a, P46-D-12) : empreinte des entrées `ecrit:` du `PLAN.md`. **Texte
+  canonique** : entrées normalisées (barre finale retirée, `.` retiré), dédoublonnées et triées ; pour
+  une entrée fichier, une ligne `fichier<TAB><chemin relatif au lab><TAB><sha256>` ; pour une entrée
+  dossier, une ligne `dossier<TAB><entrée>` puis une ligne `fichier…` par fichier régulier du
+  sous-arbre, triées par chemin relatif ; lignes jointes par `\n` avec un saut final, hachées en UTF-8.
+  **Aucun lien n'est suivi** : le chemin est parcouru composant par composant par `lstat`, et un lien,
+  terminal ou intermédiaire, rend le livrable **absent** ; un lien ou un fichier spécial **interne** à un
+  dossier n'est ni suivi ni haché. Les noms `.DS_Store`, `Thumbs.db` et `desktop.ini` sont ignorés
+  partout, dans le prédicat « vide » comme dans l'empreinte (écart de précision assumé par rapport à
+  « tous les fichiers réguliers » de P46-D-03a : sans cette exclusion, ouvrir un dossier livrable dans le
+  Finder ou l'Explorateur périmerait le verdict). Le parcours est **borné** à 2000 entrées (fichiers et
+  sous-dossiers) et 128 Mio, budget commun à toutes les entrées d'un même calcul : un dépassement est un
+  **refus explicite** qui nomme la borne, jamais une empreinte partielle.
+- **« Vide »** (P46-D-12) : un fichier régulier de 0 octet, ou un dossier sans aucun fichier régulier non
+  vide (hors noms exclus). Un seul prédicat « livrable présent » (`absent`, `lien`, `vide`, `present`,
+  plus `borne` et `illisible`) existe, en **trois copies ast-identiques** (`poser-verdict.sh`,
+  `planning-hook.sh`, `recalc-planning.sh`) prouvées identiques par comparaison d'arbres de syntaxe
+  (suite `test-cloture-empreintes.sh`, R-EMP-04) ; R4 du recalcul et G3 le liront (plans 46-03 et 46-05).
+- **Refus de pose** : la commande refuse (code 64) de poser un verdict quand un livrable déclaré est
+  absent, vide ou un lien, quand `ecrit:` est absent, vide ou invalide, ou quand une borne est dépassée
+  (R4 précède R5 : un tel verdict serait de toute façon `indéterminé`). Les messages ne nomment que
+  l'entrée déclarée ou la borne, jamais un chemin absolu ni le texte d'une `OSError` (P46-D-10).
+
+**Plafond de tentatives** (P46-D-05, Q5 = a, même canal) : `PLAFOND_TENTATIVES = 3` est une constante de
+la commande, jamais lue dans un fichier du lab ni dans l'environnement. La quatrième tentative est
+refusée avec le code **65** et un message distinct (`plafond de 3 tentatives atteint … arbitrage humain
+requis`), `VERDICT.md` inchangé, sauf **dérogation nominative** `deroger-gate.sh --gate=PLAFOND` dont le
+chemin est le dossier de l'unité relatif au lab : elle est à **usage unique**, consommée par la commande
+(même code que le hook, verrou exclusif du journal) sous le verrou du `PLAN.md` et **avant** l'écriture ;
+si l'écriture échoue après la consommation, la dérogation est perdue (fail-closed, visible au journal).
+Limite déclarée (g) : supprimer `VERDICT.md` par Bash remet le compteur à 1 (les écritures par Bash restent
+ouvertes) ; D1 (plan 46-07) en trace la disparition.
+
+**Verdict d'un juge** (P46-D-06a, Q6 = a, même canal) : la commande admet une seconde forme d'unité,
+`.planning/juges/<juge>` (nom en minuscules, chiffres et tirets, 64 caractères au plus), dont
+l'artefact haché est `SORTIE-PIEGEE.md` (fichier régulier, jamais un lien) au lieu du `PLAN.md` ; ce
+verdict ne porte pas `hash_livrables`, et le plafond s'y applique comme à toute unité. Toute autre
+forme d'unité reste refusée. Le contrat détaillé de la sortie piégée est livré par le plan 46-09.
 
 ### `SUMMARY.md`
 
@@ -980,7 +1026,7 @@ adhérents : la ligne « Worker : tout dispatch refusé », appliquée à un lab
 
 ### La dérogation (GATE-11)
 
-La commande `deroger-gate.sh --lab=… --gate=<G1|G5|G6|G7|ROLE> --chemin=… --qui=… --canal=…
+La commande `deroger-gate.sh --lab=… --gate=<G1|G5|G6|G7|ROLE|PLAFOND> --chemin=… --qui=… --canal=…
 --date=… --raison=…` inscrit une dérogation **nominative** (qui, canal, date, gate, chemin(s), raison)
 dans le journal append-only `.planning/derogations-gates.log`, une ligne par chemin, champs en
 encodage pourcent injectif (P45-D-13). Une raison vide, `TODO`, `TBD`, `FIXME`, `n/a`, `xxx` (toute
@@ -993,7 +1039,8 @@ aucune horloge ne conditionne l'acceptation (spec §5.2). Durée de vie : **usag
 **cite** dans la sortie de l'action (numéro, gate, chemin, auteur, canal, date, raison) ; sans effet
 sur un gate en observation. Le journal doit être un fichier régulier : un lien annule toute
 dérogation. Limite : l'identité déclarée (`--qui`) n'est pas vérifiée, la commande ne peut pas savoir
-qui la lance (T-45-34).
+qui la lance (T-45-34). Le jeton `PLAFOND` (P46-D-05) lève le plafond de trois tentatives de la commande de
+verdict : son chemin est le dossier de l'unité, et c'est `poser-verdict.sh`, non le hook, qui la consomme.
 
 ### La commande de verdict (GATE-05)
 
@@ -1005,8 +1052,15 @@ création, ancienne tentative + 1 pour remplacer ; toute autre valeur : code 64,
 l'écriture est atomique et ne traverse jamais un lien. Codes de sortie : 0 verdict écrit, 1 erreur de
 lecture ou d'écriture, 2 lab non adhérent, 64 usage ou valeur refusée. Elle est agnostique de l'appelant (F8 =
 f8-agnostique, Willy, AskUserQuestion session principale, 2026-09-30) : un juge qui a `Bash` la lance
-lui-même, les autres livrent leur rapport au manager qui la lance. Artefact haché : le plan, pas le
-livrable ; la vérification du hash à la clôture est la Phase 46 (limite : `--juge` est déclaratif).
+lui-même, les autres livrent leur rapport au manager qui la lance. Limite : `--juge` est déclaratif.
+
+Depuis la Phase 46 (P46-D-03, P46-D-03a, P46-D-05, P46-D-06a, P46-D-12) la commande pose **deux
+empreintes** : `hash` (le plan) et `hash_livrables` (les entrées `ecrit:`, voir § `VERDICT.md`), refuse de
+poser un verdict quand un livrable déclaré est absent, vide ou un lien, applique le **plafond de 3
+tentatives** (code 65, dérogation `PLAFOND` à usage unique) et admet la forme d'unité
+`.planning/juges/<juge>`. Codes de sortie complets : 0 verdict écrit, 1 erreur de lecture ou d'écriture,
+2 lab non adhérent, 64 usage ou valeur refusée (dont `ecrit:` invalide, livrable absent, vide ou lien,
+borne dépassée), 65 plafond de tentatives atteint sans dérogation.
 
 ### Le journal d'observation
 
