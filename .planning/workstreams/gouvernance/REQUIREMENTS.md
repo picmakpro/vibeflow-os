@@ -203,10 +203,11 @@
   empreintes conformes, `SUMMARY.md` absent), à la place d'`indéterminé` pour ce cas (P46-D-04).
 - [ ] **CLOT-05**: `poser-verdict.sh` refuse une quatrième tentative, avec un message distinct, sauf
   dérogation nominative couvrant l'unité ; le plafond est une constante du code (P46-D-05).
-- [ ] **CLOT-06**: G4′ refuse le rapport d'un worker ou d'un producteur d'un lab adhérent sans sortie
-  de commande brute, par deny sur `PreToolUse(SubagentHandback)` et par `decision: "block"` sur
-  `SubagentStop` en repli ; juges, fil principal, agent inconnu et `agent_type` vide exclus
-  (P46-D-02, P46-D-02a).
+- [ ] **CLOT-06**: G4′ refuse le rapport d'un worker ou d'un producteur **qui a Bash**, dans un lab
+  adhérent, sans sortie de commande brute, par deny sur `PreToolUse(SubagentHandback)` et par
+  `decision: "block"` sur `SubagentStop` en repli ; agents sans Bash, juges, fil principal, agent
+  inconnu et `agent_type` vide exclus ; le trou « hors mode auto, mode dégradé » est déclaré
+  (P46-D-02, P46-D-02a, P46-D-02b, P46-D-10a).
 - [ ] **CLOT-07**: D1 trace toute écriture non expliquée d'un fichier surveillé d'un lab adhérent, en
   séance (`FileChanged`, `watchPaths` fichier par fichier depuis `SessionStart`/`CwdChanged`) et
   entre les séances (réconciliation par hash au `SessionStart`) ; il ne refuse jamais ; hors

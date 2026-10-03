@@ -33,7 +33,7 @@
         ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-DISCUSSION-LOG.md",
         ".planning/workstreams/gouvernance/REQUIREMENTS.md"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plan-46",
@@ -45,7 +45,7 @@
       "scope": [
         ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "plancheck-46",
@@ -55,7 +55,7 @@
         "plan-46"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "suivi-46",

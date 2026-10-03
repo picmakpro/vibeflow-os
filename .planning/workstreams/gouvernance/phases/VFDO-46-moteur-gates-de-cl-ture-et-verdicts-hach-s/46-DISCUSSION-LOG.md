@@ -34,6 +34,7 @@ cadrage de 46 en parallèle »), pendant la relecture de la PR #124 par Samuel.
 | Q6 | Canary de juge C-16 | (a) contrat + vérificateur déterministe, « juge sans preuve » jamais vert, premier passage par le manager jusqu'à la 48 · (b) `claude -p` scripté · (c) reporter | **(a)** |
 | Q7 | D1 | (a) `FileChanged` seul · (b) `FileChanged` + réconciliation par hash au `SessionStart` · (c) reporter | **(b)** |
 | Q8 | Sonde refusée | (a) documentation + canaries, limites déclarées · (b) sonde jouée hors worktree | **(a)** |
+| Q9 | Périmètre de G4′ (posée après le plan-check du tour 1 : le planificateur avait restreint G4′ aux agents capables de Bash) | (a) workers et producteurs qui ont Bash · (b) lettre de Q2, tous, refus à chaque rapport sans Bash · (c) tous, avertissement sans Bash | **(a)** — arbitrage de Willy, pas décision du manager (P46-D-02b) |
 
 ## Décisions du manager signalées à Willy
 

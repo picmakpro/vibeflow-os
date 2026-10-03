@@ -4,10 +4,11 @@
 **Status:** Ready for planning
 **Compartiment :** `gouvernance` — toute commande GSD de cette phase passe `--ws gouvernance` ;
 `gsd-tools` s'appelle par `node ~/.claude/gsd-core/bin/gsd-tools.cjs` (1.14.0).
-**Décisions humaines :** Q1 à Q8 tranchées par Willy, AskUserQuestion session principale,
+**Décisions humaines :** Q1 à Q9 tranchées par Willy, AskUserQuestion session principale,
 2026-10-03, relayées par la session principale au manager de mission (repli D-09, pas d'outil de
 question en sous-agent). Willy a suivi la recommandation du manager sur les huit questions (Q7 :
-option (b)). Elles deviennent P46-D-01 à P46-D-08.
+option (b)). Elles deviennent P46-D-01 à P46-D-08 ; Q9, posée après le premier tour de
+plan-check (périmètre de G4′), devient P46-D-02b.
 **Décisions du manager :** marquées « manager », annoncées à Willy avant l'écriture de ce fichier
 (liste relayée par la session principale le 2026-10-03, « renversables »), et dérivées ici en
 P46-D-09 à P46-D-19. Les sous-décisions `a`/`b` des décisions humaines sont aussi du manager.
@@ -81,6 +82,13 @@ refus dans les deux sens, et s'arme dans l'ordre (P46-D-11), comme en 45.
   Il « bloque le silence, pas la falsification » (spec §5) : une sortie inventée passe, limite
   déclarée. La grammaire exacte est écrite dans `modele-cycles.md` et prouvée par jumeaux négatifs
   ; le planificateur peut l'affiner sans la rendre plus permissive.
+- **P46-D-02b :** **périmètre resserré** : G4′ ne vise que les workers et producteurs **qui ont
+  Bash** (leur `tools:` le déclare), dans un lab adhérent. Pour un agent sans Bash, c'est le
+  verdict du juge (G4) qui tient la preuve. Le motif est celui qui exclut déjà les juges : sans
+  Bash, aucune sortie de commande brute n'est possible, le rapport serait refusé à chaque fois.
+  Né de la planification (hypothèse A8), soumis à Willy après le premier tour de plan-check. —
+  Willy, AskUserQuestion session principale, 2026-10-03 (Q9 = a). **Ce n'est pas une décision du
+  manager** : l'amendement de la spec §5 et le plan 46-02 la citent comme arbitrage de Willy.
 
 ### Empreintes du verdict (Q3)
 
@@ -174,6 +182,11 @@ refus dans les deux sens, et s'arme dans l'ordre (P46-D-11), comme en 45.
   adhérent pour G3, G4 (empreintes comprises) et G4′ (erreur interne → refus) ; en mode dégradé
   (script ou `python3` absent), le repli refuse aussi `SubagentHandback`, sans dériver le rôle.
   **Fail-open** déclaré pour D1 : une trace perdue en séance est rattrapée par la réconciliation.
+- **P46-D-10a (manager, après le plan-check du 2026-10-03) :** en mode dégradé, le repli
+  `SubagentStop` est **fail-open** : sans rôle dérivable, un blocage statique arrêterait chaque
+  sous-agent (juges et agents internes compris) huit fois de suite. Conséquence **nommée** :
+  **hors mode auto et en mode dégradé, G4′ est ouvert**. Cette limite est écrite dans
+  `modele-cycles.md` et listée au checkpoint d'armement de l'étape 6 (46-12).
 - **P46-D-11 :** **ordre d'armement prolongé** après la 45 : (G3 + G4, empreintes comprises) →
   G4′. Chaque étape exige le canary vert et **0 faux refus / 0 faux accept**, sur le banc en CI
   puis sur le rejeu en lecture seule (protocole P45-D-03, P45-D-03b, P45-D-21). Constantes
@@ -240,10 +253,11 @@ Chaque exigence dérive d'une décision ci-dessus et n'en pose aucune nouvelle.
   empreintes conformes, `SUMMARY.md` absent), à la place d'`indéterminé` pour ce cas (P46-D-04).
 - **CLOT-05** : `poser-verdict.sh` refuse une quatrième tentative, avec un message distinct, sauf
   dérogation nominative couvrant l'unité ; le plafond est une constante du code (P46-D-05).
-- **CLOT-06** : G4′ refuse le rapport d'un worker ou d'un producteur d'un lab adhérent sans sortie
-  de commande brute, par deny sur `PreToolUse(SubagentHandback)` et par `decision: "block"` sur
-  `SubagentStop` en repli ; juges, fil principal, agent inconnu et `agent_type` vide exclus
-  (P46-D-02, P46-D-02a).
+- **CLOT-06** : G4′ refuse le rapport d'un worker ou d'un producteur **qui a Bash**, dans un lab
+  adhérent, sans sortie de commande brute, par deny sur `PreToolUse(SubagentHandback)` et par
+  `decision: "block"` sur `SubagentStop` en repli ; agents sans Bash, juges, fil principal, agent
+  inconnu et `agent_type` vide exclus ; le trou « hors mode auto, mode dégradé » est déclaré
+  (P46-D-02, P46-D-02a, P46-D-02b, P46-D-10a).
 - **CLOT-07** : D1 trace toute écriture non expliquée d'un fichier surveillé d'un lab adhérent, en
   séance (`FileChanged`, `watchPaths` fichier par fichier depuis `SessionStart`/`CwdChanged`) et
   entre les séances (réconciliation par hash au `SessionStart`) ; il ne refuse jamais ; hors
