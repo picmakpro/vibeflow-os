@@ -17,6 +17,22 @@
 #   R-CMD-07  faute injectée en phase A du script : repris par la couche shell
 #   R-CMD-08  faute injectée en phase B : deny émis par le Python, code 0, jamais code 2 (P45-D-08)
 #
+# Phase 46, plan 46-04 (P46-D-09, P46-D-10, P46-D-16) : la MÊME commande est câblée sous cinq événements (PreToolUse élargi à
+# SubagentHandback, SubagentStop, SessionStart, CwdChanged, FileChanged). R-CMD-01 et R-CMD-02 portent sur les cinq entrées ;
+# R-EVT-01 à R-EVT-07 prouvent le contrat de chaque événement (VF_REG_SECTIONS=evenements pour les rejouer seuls) :
+#   R-EVT-01  hors adhésion (lab dev fixture ET ce dépôt), chaque événement et le nouvel outil rendent un octet vide et 0 sous
+#             quatre shells, SANS lancer le script ni python3 (marqueurs) ; R-EVT-01b : la copie sonde du cœur, rejouée sans
+#             pré-filtre, n'écrit AUCUNE ligne au journal hors adhésion et une ligne dans un lab adhérent (témoin)
+#   R-EVT-02  lab adhérent, script présent : silence, code 0, pour les cinq événements
+#   R-EVT-03  lab adhérent, script absent puis python absent : SubagentHandback refusé (un deny), les quatre autres événements
+#             muets ; aucun chemin absolu ni « no such file » / « can't open » dans un message
+#   R-EVT-04  faute injectée dans un mode non outil : silence, code 0 (fail-open déclaré) ; en PreToolUse : deny
+#   R-EVT-05  `hook_event_name` absent = PreToolUse ; inconnu ou non chaîne = silence
+#   R-EVT-06  FileChanged : la racine se lit dans `file_path` de premier niveau, jamais dans `cwd`
+#   R-EVT-07  contrat de sortie : SubagentStop `decision: block` code 0, jamais le code 2 ; les trois autres ne refusent jamais
+#   Mutants : MUT-EVT-REPLI-HANDBACK, MUT-EVT-FAILOPEN, MUT-EVT-ADHESION, MUT-EVT-PREFILTRE, MUT-EVT-FILEPATH, MUT-EVT-EXIT2,
+#   MUT-EVT-EXIT2-STATIQUE, MUT-CMD01-* (hooks.json mutés), chacun avec sa trace assertion / attendu / obtenu.
+#
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ;
 # comparaisons par `cmp -s` (jamais `diff`) ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Posée sous `.claude/scripts/tests/` d'un lab, la suite lit la commande
@@ -66,6 +82,7 @@ T_DEBUT="$(date +%s)"
 AIDES="$WORK/aides.py"
 cat > "$AIDES" <<'PY_AIDES_REG_EOF'
 import concurrent.futures
+import copy
 import json
 import os
 import posixpath
@@ -305,27 +322,34 @@ DEBUT_PREFILTRE = "_pn='\n'\nvf_pp()"
 
 
 def verdict(rc, out):
-    """`silence` (rien, code 0), `deny` (UN objet JSON deny, code 0), sinon `autre`."""
+    """`silence` (rien, code 0), `deny` (UN objet JSON deny, code 0), `block` (SubagentStop), `watchPaths`, sinon `autre`."""
     if rc != 0:
         return "autre:rc=" + str(rc)
     if out == b"":
         return "silence"
     try:
         obj = json.loads(out.decode("utf-8"))
+        if isinstance(obj, dict) and obj.get("decision") == "block" and isinstance(obj.get("reason"), str) and "hookSpecificOutput" not in obj:
+            return "block"   # SubagentStop : décision JSON, code 0 (P46-D-10)
+        if isinstance(obj, dict) and isinstance(obj.get("watchPaths"), list):
+            return "watchPaths"
         s = obj["hookSpecificOutput"]
+        if isinstance(s.get("watchPaths"), list):
+            return "watchPaths"
         if s["hookEventName"] == "PreToolUse" and s["permissionDecision"] == "deny" and isinstance(s["permissionDecisionReason"], str):
             return "deny"
-    except (ValueError, KeyError, TypeError):
+    except (ValueError, KeyError, TypeError, AttributeError):
         pass
     return "autre:document"
 
 
 # --- Mutants du script (make_hook_mutant) ----------------------------------------------------
-def make_hook_mutant(ctx, ident, motif, remplacement):
+def make_hook_mutant(ctx, ident, motif, remplacement, source=None):
     """Copie du script dont l'UNIQUE ligne portant `motif` (fixe) est remplacée par `remplacement`
     (indentation conservée). Rend (dossier, None) ou (None, raison) : texte distinct de l'original,
-    `bash -n` et compilation du corps Python extrait doivent passer, sinon le mutant ne prouve rien."""
-    original = open(ctx.hook, encoding="utf-8").read()
+    `bash -n` et compilation du corps Python extrait doivent passer, sinon le mutant ne prouve rien.
+    `source` : chemin d'un script déjà muté à muter encore (chaîne de mutations de la 46) ; à défaut, le script livré."""
+    original = open(source or ctx.hook, encoding="utf-8").read()
     lignes = original.split("\n")
     idx = [i for i, l in enumerate(lignes) if motif in l]
     if len(idx) != 1 or original.count(motif) != 1:
@@ -363,34 +387,65 @@ def make_hook_mutant(ctx, ident, motif, remplacement):
 # =================================================================================================
 # Sections
 # =================================================================================================
-def sec_entree(ctx):
-    """R-CMD-01 : la forme de l'entrée enregistrée."""
-    if not ctx.hooks_json:
-        ok("R-CMD-01 (hors dépôt : commande lue dans le settings.json du lab, forme non rejouable ici)")
-        return
-    brut = open(ctx.hooks_json, encoding="utf-8").read()
-    d = json.loads(brut)
+# =================================================================================================
+# Phase 46, plan 46-04 (P46-D-09, P46-D-10, P46-D-16) : la MÊME commande sous cinq événements.
+# R-CMD-01 (forme des cinq entrées), puis R-EVT-01 à R-EVT-07 (contrat de chaque événement, silence hors adhésion, repli, fail-open).
+# =================================================================================================
+EVENEMENTS_CABLES = ("PreToolUse", "SubagentStop", "CwdChanged", "FileChanged", "SessionStart")
+MATCHER_PRETOOLUSE = "Write|Edit|NotebookEdit|Bash|Agent|Task|SubagentHandback"
+EVT_NON_OUTIL = ("SubagentStop", "SessionStart", "CwdChanged", "FileChanged")
+CINQ_ENTREES = ("SubagentHandback",) + EVT_NON_OUTIL   # le nouvel outil du matcher, puis les quatre événements nouveaux
+MODES_NON_OUTIL = (("SubagentStop", "evt-mode-subagentstop"), ("SessionStart", "evt-mode-sessionstart"),
+                   ("CwdChanged", "evt-mode-cwdchanged"), ("FileChanged", "evt-mode-filechanged"))
+FRAGMENTS_INTERDITS = ("no such file", "can't open")
+# Chemin absolu de plus d'un composant (`/a/b`) : `/vf-update` seul n'en est pas un.
+RE_CHEMIN_ABSOLU = re.compile(r"(?<![A-Za-z0-9_.\-])/(?:[A-Za-z0-9_.~\-]+/)+[A-Za-z0-9_.~\-]*")
+
+
+def chemin_absolu_dans(texte):
+    m = RE_CHEMIN_ABSOLU.search(texte)
+    return m.group(0) if m else None
+
+
+def fautes_entree(d):
+    """R-CMD-01 sur le document hooks.json `d` : liste de (assertion, attendu, obtenu). Une seule entrée citant planning-hook.sh par
+    événement, sous exactement les cinq événements ; matcher PreToolUse exact (UN seul groupe, jamais un second que la purge de
+    merge-hooks écraserait) ; SubagentStop, CwdChanged, FileChanged sans `matcher` ; SessionStart dans un groupe sans matcher ; même texte
+    de commande partout ; timeout 20 ; forme shell ; événements préexistants inchangés."""
     evts = d.get("hooks", {})
-    pre = evts.get("PreToolUse", [])
-    entrees = [(g, h) for g in pre for h in g.get("hooks", []) if "planning-hook.sh" in h.get("command", "")]
     fautes = []
-    if len(pre) != 1 or len(entrees) != 1:
-        fautes.append(("une seule entrée PreToolUse portant planning-hook.sh",
-                       "1 groupe, 1 commande", "%d groupe(s), %d commande(s)" % (len(pre), len(entrees))))
-    else:
-        g, h = entrees[0]
-        if g.get("matcher") != "Write|Edit|NotebookEdit|Bash|Agent|Task":
-            fautes.append(("matcher exact", "Write|Edit|NotebookEdit|Bash|Agent|Task", g.get("matcher")))
-        if h.get("timeout") != 20:
-            fautes.append(("clé timeout", 20, h.get("timeout")))
-        if h.get("type") != "command" or "args" in h:
-            fautes.append(("forme shell (type command, sans args)", "command sans args", str(sorted(h.keys()))))
-        cmd = h.get("command", "")
-        if "{{VF_BASH}}" in cmd:
-            fautes.append(("aucune occurrence de {{VF_BASH}}", "0", "présent"))
-        noms = sorted(set(re.findall(r"([A-Za-z0-9._-]+\.(?:sh|py))", cmd)))
-        if noms != ["planning-hook.sh"]:
-            fautes.append(("seul basename *.sh/*.py cité", "['planning-hook.sh']", str(noms)))
+    citent = {}
+    for evt, groupes in evts.items():
+        for g in groupes:
+            for h in g.get("hooks", []):
+                if "planning-hook.sh" in h.get("command", ""):
+                    citent.setdefault(evt, []).append((g, h))
+    if sorted(citent) != sorted(EVENEMENTS_CABLES):
+        fautes.append(("planning-hook.sh cité sous exactement les cinq événements, aucun ailleurs", str(sorted(EVENEMENTS_CABLES)), str(sorted(citent))))
+    for evt, liste in sorted(citent.items()):
+        if len(liste) != 1:
+            fautes.append(("une seule entrée portant planning-hook.sh sous " + evt, "1", str(len(liste))))
+    pre = evts.get("PreToolUse", [])
+    if len(pre) != 1:
+        fautes.append(("un seul groupe PreToolUse (un second groupe citant planning-hook.sh serait écrasé par la purge de merge-hooks)", "1 groupe", "%d groupe(s)" % len(pre)))
+    commandes = {h.get("command") for liste in citent.values() for _g, h in liste}
+    if len(commandes) != 1:
+        fautes.append(("le même texte de commande sous les cinq événements", "1 texte", "%d textes" % len(commandes)))
+    for evt, liste in sorted(citent.items()):
+        for g, h in liste:
+            attendu_matcher = MATCHER_PRETOOLUSE if evt == "PreToolUse" else None
+            if g.get("matcher") != attendu_matcher:
+                fautes.append(("matcher de l'entrée " + evt + (" (exact, sept outils)" if evt == "PreToolUse" else " (omis)"), str(attendu_matcher), str(g.get("matcher"))))
+            if h.get("timeout") != 20:
+                fautes.append(("clé timeout sous " + evt, "20", str(h.get("timeout"))))
+            if h.get("type") != "command" or "args" in h:
+                fautes.append(("forme shell (type command, sans args) sous " + evt, "command sans args", str(sorted(h.keys()))))
+            cmd = h.get("command", "")
+            if "{{VF_BASH}}" in cmd:
+                fautes.append(("aucune occurrence de {{VF_BASH}} sous " + evt, "0", "présent"))
+            noms = sorted(set(re.findall(r"([A-Za-z0-9._-]+\.(?:sh|py))", cmd)))
+            if noms != ["planning-hook.sh"]:
+                fautes.append(("seul basename *.sh/*.py cité sous " + evt, "['planning-hook.sh']", str(noms)))
     # entrées préexistantes : chacune retrouvée, dans l'ordre, sans altération (sous-suite)
     for evt, base in BASE_EVENEMENTS.items():
         courant = evts.get(evt, [])
@@ -400,11 +455,67 @@ def sec_entree(ctx):
                 i += 1
         if i != len(base):
             fautes.append(("entrées préexistantes de " + evt + " conservées", "structure de base", "altérée ou absente"))
+    return fautes
+
+
+def sec_entree(ctx):
+    """R-CMD-01 : la forme des cinq entrées enregistrées ; puis les mutants de hooks.json (MUT-CMD01-*)."""
+    if not ctx.hooks_json:
+        ok("R-CMD-01 (hors dépôt : commande lue dans le settings.json du lab, forme non rejouable ici)")
+        return
+    d = json.load(open(ctx.hooks_json, encoding="utf-8"))
+    fautes = fautes_entree(d)
     if fautes:
         for a, b, c in fautes:
             ko("R-CMD-01", a, b, c)
-    else:
-        ok("R-CMD-01 entrée unique, forme shell, matcher combiné, timeout 20, seul planning-hook.sh cité, événements préexistants inchangés")
+        return
+    ok("R-CMD-01 une entrée par événement sous les cinq (PreToolUse au matcher élargi à SubagentHandback, SubagentStop, CwdChanged, FileChanged sans matcher, SessionStart dans un groupe sans matcher), même commande, timeout 20, forme shell, seul planning-hook.sh cité, événements préexistants inchangés")
+
+    def muter(ident, fonction, motif):
+        copie = copy.deepcopy(d)
+        fonction(copie)
+        if copie == d:
+            komut(ident, "hooks.json muté distinct de l'original", "document distinct", "NON OPPOSABLE (identique) : " + motif)
+            return
+        f = fautes_entree(copie)
+        if f:
+            okmut(ident, "R-CMD-01 rougit · attendu (original) : aucune faute · obtenu (mutant, %s) : %d faute(s), première : %s — attendu %s, obtenu %s"
+                  % (motif, len(f), f[0][0], f[0][1], f[0][2]))
+        else:
+            komut(ident, "R-CMD-01 rougit sur hooks.json muté (%s)" % motif, "au moins une faute", "aucune faute (le contrôle passe à vide)")
+
+    def sans_handback(c):
+        c["hooks"]["PreToolUse"][0]["matcher"] = "Write|Edit|NotebookEdit|Bash|Agent|Task"
+
+    def second_groupe(c):
+        g = copy.deepcopy(c["hooks"]["PreToolUse"][0])
+        g["matcher"] = "Bash"
+        c["hooks"]["PreToolUse"].append(g)
+
+    def sans_filechanged(c):
+        del c["hooks"]["FileChanged"]
+
+    def autre_commande(c):
+        c["hooks"]["SubagentStop"][0]["hooks"][0]["command"] += "\n:"
+
+    def session_matcher(c):
+        for g in c["hooks"]["SessionStart"]:
+            if any("planning-hook.sh" in h.get("command", "") for h in g["hooks"]):
+                g["matcher"] = "startup"
+
+    def timeout_long(c):
+        c["hooks"]["FileChanged"][0]["hooks"][0]["timeout"] = 30
+
+    def matcher_filechanged(c):
+        c["hooks"]["FileChanged"][0]["matcher"] = "*"
+
+    muter("CMD01-MATCHER", sans_handback, "SubagentHandback retiré du matcher PreToolUse")
+    muter("CMD01-SECOND-GROUPE", second_groupe, "second groupe PreToolUse citant planning-hook.sh")
+    muter("CMD01-FILECHANGED-ABSENT", sans_filechanged, "entrée FileChanged retirée")
+    muter("CMD01-COMMANDE-DIFFERENTE", autre_commande, "texte de commande de SubagentStop différent")
+    muter("CMD01-SESSIONSTART-MATCHER", session_matcher, "matcher `startup` posé sur le groupe SessionStart qui porte la commande")
+    muter("CMD01-TIMEOUT", timeout_long, "timeout de FileChanged à 30")
+    muter("CMD01-FILECHANGED-MATCHER", matcher_filechanged, "matcher `*` posé sur FileChanged (un fichier nommé `*`, jamais un joker)")
 
 
 def _groupe_contient(groupe, base):
@@ -444,11 +555,11 @@ def sec_merge(ctx):
             return []
         d = json.load(open(chemin, encoding="utf-8"))
         res = []
-        for groupes in d.get("hooks", {}).values():
+        for evt, groupes in d.get("hooks", {}).items():
             for g in groupes:
                 for h in g.get("hooks", []):
                     if "planning-hook.sh" in json.dumps(h):
-                        res.append((g.get("matcher"), h))
+                        res.append((evt, g.get("matcher"), h))
         return res
 
     rc, err = mh("merge")
@@ -457,16 +568,18 @@ def sec_merge(ctx):
         return
     dans_s, dans_sl = entrees_posees(s), entrees_posees(sl)
     fautes = []
-    if len(dans_s) != 1:
-        fautes.append(("l'entrée est posée UNE fois dans settings.json", "1", str(len(dans_s))))
+    if sorted(e for e, _m, _h in dans_s) != sorted(EVENEMENTS_CABLES):
+        fautes.append(("l'entrée est posée UNE fois par événement dans settings.json (cinq événements)", str(sorted(EVENEMENTS_CABLES)), str(sorted(e for e, _m, _h in dans_s))))
     if dans_sl:
         fautes.append(("rien dans settings.local.json (forme shell)", "0 entrée", str(len(dans_sl))))
-    if dans_s:
-        matcher, h = dans_s[0]
-        if matcher != "Write|Edit|NotebookEdit|Bash|Agent|Task" or h.get("timeout") != 20:
-            fautes.append(("matcher et timeout préservés", "Write|Edit|NotebookEdit|Bash|Agent|Task, 20", "%s, %s" % (matcher, h.get("timeout"))))
+    for evt, matcher, h in dans_s:
+        attendu_matcher = MATCHER_PRETOOLUSE if evt == "PreToolUse" else None
+        if matcher != attendu_matcher or h.get("timeout") != 20:
+            fautes.append(("matcher et timeout préservés sous " + evt, "%s, 20" % attendu_matcher, "%s, %s" % (matcher, h.get("timeout"))))
         if TOKEN in h["command"] or prefixe not in h["command"]:
-            fautes.append(("jeton {{VF_SCRIPTS}} substitué par le préfixe", prefixe, court(h["command"], 80)))
+            fautes.append(("jeton {{VF_SCRIPTS}} substitué par le préfixe sous " + evt, prefixe, court(h["command"], 80)))
+    if len({h["command"] for _e, _m, h in dans_s}) > 1:
+        fautes.append(("même texte de commande posé sous les cinq événements", "1 texte", "%d textes" % len({h["command"] for _e, _m, h in dans_s})))
     octets1 = (open(s, "rb").read(), open(sl, "rb").read() if os.path.exists(sl) else None)
     rc2, err2 = mh("merge")
     octets2 = (open(s, "rb").read(), open(sl, "rb").read() if os.path.exists(sl) else None)
@@ -474,7 +587,7 @@ def sec_merge(ctx):
         fautes.append(("second merge idempotent (cmp)", "fichiers identiques, rc 0", "rc=%d, identiques=%s" % (rc2, octets1 == octets2)))
     # la commande POSÉE rejouée : script présent → silence ; script absent → deny
     if dans_s:
-        cmd_posee = dans_s[0][1]["command"]
+        cmd_posee = dans_s[0][2]["command"]
         lab = fabriquer_lab(os.path.join(w, "lab"), True)
         proj_ok = os.path.join(w, "proj-ok")
         os.makedirs(os.path.join(proj_ok, ".claude"), exist_ok=True)
@@ -496,7 +609,7 @@ def sec_merge(ctx):
         for a, b, c in fautes:
             ko("R-CMD-02", a, b, c)
     else:
-        ok("R-CMD-02 merge pose dans settings.json (rien dans settings.local.json), idempotent (cmp), commande posée rejouée, remove sans résidu")
+        ok("R-CMD-02 merge pose dans settings.json une entrée par événement sous les cinq (rien dans settings.local.json), idempotent (cmp), commande posée rejouée, remove sans résidu")
 
 
 def _deny_ok(rc, out, err):
@@ -1897,6 +2010,411 @@ def sec_doute(ctx):
             okmut(ident, "R-REDUC-01 rougit · attendu (original) : %s · obtenu (mutant) : %s" % (r[1], m[1][:300]))
 
 
+# -------------------------------------------------------------------------------------------------
+# Payloads des cinq entrées, labs, sondes
+# -------------------------------------------------------------------------------------------------
+def payload_evt(evt, cwd, fichier=None, agent_type="agent-test", texte_fin="fin"):
+    """Payload du harnais pour l'entrée `evt` (champs documentés, 46-RECHERCHE-HOOKS §2 et §3). SubagentHandback est un outil de
+    PreToolUse (`tool_input.message`) ; SubagentStop porte `agent_id`, `agent_type`, `last_assistant_message`, `stop_hook_active` ;
+    CwdChanged `old_cwd` et `new_cwd` ; FileChanged `file_path` et `event` de PREMIER niveau."""
+    if evt == "SubagentHandback":
+        return payload("SubagentHandback", {"message": "rapport du sous-agent"}, cwd, agent_type=agent_type)
+    obj = {"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": cwd}
+    if evt == "SubagentStop":
+        obj.update({"permission_mode": "default", "hook_event_name": "SubagentStop", "stop_hook_active": False, "agent_id": "agent-test",
+                    "agent_type": agent_type, "agent_transcript_path": "sub.jsonl", "last_assistant_message": texte_fin})
+    elif evt == "SessionStart":
+        obj.update({"hook_event_name": "SessionStart", "source": "startup", "model": "modele-test"})
+    elif evt == "CwdChanged":
+        obj.update({"hook_event_name": "CwdChanged", "old_cwd": cwd, "new_cwd": cwd})
+    elif evt == "FileChanged":
+        obj.update({"hook_event_name": "FileChanged", "file_path": fichier, "event": "change"})
+    else:
+        raise KeyError(evt)
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def lire_lignes_sonde(xdg):
+    """Nombre de lignes `gate=EVT` du journal d'observation du rejeu (XDG_CACHE_HOME jetable) : la sonde de la phase B."""
+    chemin = os.path.join(xdg, "vibeflow", "gates-observation", "observation.log")
+    try:
+        with open(chemin, encoding="utf-8", errors="replace") as fh:
+            texte = fh.read()
+    except OSError:
+        return 0
+    return sum(1 for ligne in texte.split("\n") if "  gate=EVT  " in ligne)
+
+
+def dossier_sonde_lancement(ctx):
+    """Dossier dont planning-hook.sh ne fait QUE créer le fichier `$VF_SONDE_LANCE` : s'il existe, la commande a lancé le script."""
+    d = ctx.unique("sonde-lancement")
+    os.makedirs(d, exist_ok=True)
+    chemin = os.path.join(d, "planning-hook.sh")
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write("#!/usr/bin/env bash\ncat >/dev/null\n: > \"$VF_SONDE_LANCE\"\nexit 0\n")
+    os.chmod(chemin, 0o755)
+    return d
+
+
+def bin_python_factice(ctx):
+    """Dossier dont `python3` ne fait que créer le fichier `$VF_SONDE_PY` : s'il existe, python3 a été lancé."""
+    d = ctx.unique("bin-python-factice")
+    os.makedirs(d, exist_ok=True)
+    chemin = os.path.join(d, "python3")
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write("#!/bin/sh\n: > \"$VF_SONDE_PY\"\nexit 72\n")
+    os.chmod(chemin, 0o755)
+    return d
+
+
+def sous_shell(ctx, nom, argv, texte, dossier_scripts, brut, cwd, extra_env=None):
+    """La commande `texte` rejouée telle quelle sous le shell `nom` (zsh : `emulate sh`, comme les autres suites). Rend (code, stdout, stderr)."""
+    t, extra = ctx.preparer(dossier_scripts, texte)
+    extra = dict(extra)
+    if extra_env:
+        extra.update(extra_env)
+    if nom == "zsh":
+        t = "emulate sh\n" + t
+    p = subprocess.run(argv + [t], input=brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ctx.env_mode("A", extra), cwd=cwd, timeout=120)
+    return p.returncode, p.stdout, p.stderr
+
+
+def fabriquer_sonde_coeur(ctx, ident, source=None, extras=()):
+    """Copie SONDE du cœur : une ligne `gate=EVT` est écrite au journal d'observation (XDG_CACHE_HOME du rejeu) à l'entrée de la phase B,
+    avant les gates en PreToolUse et avant le mode de l'événement sinon ; `extras` : remplacements supplémentaires (motif, remplacement),
+    les mutants. Rend (dossier, None) ou (None, raison)."""
+    paires = (("resultats = evaluer_gates(contexte)  # phase-b",
+               'observer(Verdict("EVT", None, "sonde-" + str(contexte["outil"])), contexte); resultats = evaluer_gates(contexte)  # phase-b'),
+              ("raisons = MODES_EVENEMENT[evenement](contexte)  # evt-phase-b",
+               'observer(Verdict("EVT", None, "sonde-" + evenement), contexte); raisons = MODES_EVENEMENT[evenement](contexte)  # evt-phase-b')) + tuple(extras)
+    courant = source
+    dossier = None
+    for i, (motif, remplacement) in enumerate(paires):
+        dossier, raison = make_hook_mutant(ctx, "%s-%d" % (ident, i), motif, remplacement, source=courant)
+        if dossier is None:
+            return None, raison
+        courant = os.path.join(dossier, "planning-hook.sh")
+    return dossier, None
+
+
+def verdict_conforme(rc, out, err, attendu="silence"):
+    return rc == 0 and err == b"" and verdict(rc, out) == attendu
+
+
+def mutant_controle(ident, original, mutant, nom_controle):
+    """MUT-<ident> : le contrôle doit rougir sous le mutant ; la trace (assertion, attendu, obtenu) est la sortie du contrôle."""
+    if not original[0]:
+        komut(ident, "l'original passe " + nom_controle, "conforme", original[1])
+    elif mutant[0]:
+        komut(ident, nom_controle + " rougit sous le mutant", "rouge", "vert : " + mutant[1] + " (mutant non opposable)")
+    else:
+        okmut(ident, "%s rougit · attendu (original) : %s · obtenu (mutant) : %s" % (nom_controle, original[1], mutant[1][:400]))
+
+
+# -------------------------------------------------------------------------------------------------
+# R-EVT-01 : hors adhésion, octet vide et code 0 — AVANT le script, AVANT python3
+# -------------------------------------------------------------------------------------------------
+def controle_evt_01(ctx, texte, labs):
+    """Pour chaque lab hors adhésion (lab dev fixture, ce dépôt) et chacune des cinq entrées (SubagentHandback, SubagentStop,
+    SessionStart, CwdChanged, FileChanged) : sous chaque shell présent, stdout d'octet vide, stderr vide, code 0 ET le script du hook jamais
+    lancé (sonde de lancement) ; avec le script réel et un python3 factice en tête du PATH, python3 jamais lancé ; en mode dégradé (script
+    absent, python absent), le même silence. La commande est le seul objet que le contrôle fait varier (mutant : la même commande SANS pré-filtre)."""
+    fautes = []
+    n = [0]
+    sonde = dossier_sonde_lancement(ctx)
+    factice = bin_python_factice(ctx)
+    chemin_path = factice + os.pathsep + os.environ.get("PATH", "/usr/bin:/bin")
+    nb_shells = len(shells_presents())
+    for lab_nom, racine, fichier in labs:
+        for evt in CINQ_ENTREES:
+            brut = payload_evt(evt, racine, fichier)
+            etiquette = "%s, %s" % (evt, lab_nom)
+            for nom, argv in shells_presents():
+                marque = ctx.unique("marque-lancement")
+                rc, out, err = sous_shell(ctx, nom, argv, texte, sonde, brut, racine, {"VF_SONDE_LANCE": marque})
+                n[0] += 1
+                if rc != 0 or out != b"" or err:
+                    fautes.append("%s, shell %s : stdout 0 octet, stderr vide, code 0 (attendu) — obtenu rc=%d out=%s err=%s" % (etiquette, nom, rc, court(out), court(err)))
+                if os.path.exists(marque):
+                    fautes.append("%s, shell %s : le script du hook n'est PAS lancé hors adhésion (attendu : aucun lancement) — obtenu : le script a été lancé" % (etiquette, nom))
+            marque = ctx.unique("marque-python")
+            rc, out, err = sous_shell(ctx, "sh", ["/bin/sh", "-c"], texte, ctx.scripts_dir, brut, racine, {"PATH": chemin_path, "VF_SONDE_PY": marque})
+            n[0] += 1
+            if rc != 0 or out != b"" or err:
+                fautes.append("%s, script réel : stdout 0 octet, code 0 (attendu) — obtenu rc=%d out=%s" % (etiquette, rc, court(out)))
+            if os.path.exists(marque):
+                fautes.append("%s : python3 n'est PAS lancé hors adhésion (attendu : aucun lancement) — obtenu : python3 a été lancé" % etiquette)
+            for mode in ("C", "D"):
+                rc, out, err, _ = rejouer_texte(ctx, texte, mode, brut, racine)
+                n[0] += 1
+                if rc != 0 or out != b"" or err:
+                    fautes.append("%s, mode dégradé %s : silence, code 0 (attendu) — obtenu rc=%d out=%s" % (etiquette, mode, rc, court(out)))
+    detail = ("%d rejeux (%d entrées × %d labs hors adhésion : %s) : stdout 0 octet, code 0 sous %d shells, script du hook jamais lancé, python3 jamais lancé "
+              "(python3 factice), même silence en mode dégradé (script absent, python absent)"
+              % (n[0], len(CINQ_ENTREES), len(labs), ", ".join(l[0] for l in labs), nb_shells))
+    return (not fautes), ("; ".join(fautes[:3]) + (" (+%d autre(s))" % (len(fautes) - 3) if len(fautes) > 3 else "") if fautes else detail)
+
+
+def controle_evt_01b(ctx, dossier_coeur, labs, adh):
+    """La copie sonde du cœur, rejouée par la commande SANS pré-filtre : hors adhésion aucune ligne au journal (la phase B n'est jamais
+    atteinte), stdout vide, code 0 ; dans un lab adhérent (témoin : une sonde morte ne prouve rien) exactement une ligne par entrée."""
+    fautes = []
+    n = [0]
+    for lab_nom, racine, fichier in labs:
+        for evt in CINQ_ENTREES:
+            xdg = ctx.unique("xdg-sonde")
+            os.makedirs(xdg)
+            rc, out, err, _ = ctx.lancer("A", payload_evt(evt, racine, fichier), cwd=racine, dossier=dossier_coeur, extra_env={"XDG_CACHE_HOME": xdg}, np=True)
+            lignes = lire_lignes_sonde(xdg)
+            n[0] += 1
+            if rc != 0 or out != b"" or err or lignes != 0:
+                fautes.append("%s, %s : 0 ligne au journal, stdout vide, code 0 (attendu) — obtenu %d ligne(s), rc=%d out=%s" % (evt, lab_nom, lignes, rc, court(out)))
+    for evt in CINQ_ENTREES:
+        xdg = ctx.unique("xdg-temoin")
+        os.makedirs(xdg)
+        rc, out, err, _ = ctx.lancer("A", payload_evt(evt, adh, adh + "/.planning/STATE.md"), cwd=adh, dossier=dossier_coeur, extra_env={"XDG_CACHE_HOME": xdg}, np=True)
+        lignes = lire_lignes_sonde(xdg)
+        n[0] += 1
+        if rc != 0 or out != b"" or err or lignes != 1:
+            fautes.append("témoin %s, lab adhérent : 1 ligne au journal, stdout vide, code 0 (attendu) — obtenu %d ligne(s), rc=%d out=%s" % (evt, lignes, rc, court(out)))
+    detail = "%d rejeux de la copie sonde sans pré-filtre : aucune ligne hors adhésion (%s), une ligne par entrée dans un lab adhérent (témoin)" % (n[0], ", ".join(l[0] for l in labs))
+    return (not fautes), ("; ".join(fautes[:3]) + (" (+%d autre(s))" % (len(fautes) - 3) if len(fautes) > 3 else "") if fautes else detail)
+
+
+# -------------------------------------------------------------------------------------------------
+# R-EVT-02 à R-EVT-07
+# -------------------------------------------------------------------------------------------------
+def controle_evt_02(ctx, adh):
+    """Lab adhérent, script présent : silence, code 0, pour les cinq entrées — sur la copie observe (commande complète) et sur le cœur
+    LIVRÉ (armé) lancé seul : aucun gate existant ne s'applique à ces entrées dans ce plan."""
+    fautes = []
+    for evt in CINQ_ENTREES:
+        brut = payload_evt(evt, adh, adh + "/.planning/notes.md")
+        rc, out, err, _ = ctx.lancer("A", brut, cwd=adh)
+        if not verdict_conforme(rc, out, err):
+            fautes.append("%s (commande complète) : silence, code 0 (attendu) — obtenu rc=%d out=%s err=%s" % (evt, rc, court(out), court(err)))
+        v, rc2, out2, err2 = verdict_direct(ctx, brut, adh)
+        if v != "silence" or rc2 != 0 or err2:
+            fautes.append("%s (cœur livré seul) : silence, code 0 (attendu) — obtenu %s rc=%d err=%s" % (evt, v, rc2, court(err2)))
+    return (not fautes), ("; ".join(fautes) if fautes else "SubagentHandback, SubagentStop, SessionStart, CwdChanged, FileChanged dans un lab adhérent : silence, code 0 (commande complète et cœur livré)")
+
+
+def controle_evt_03(ctx, texte, adh, dev):
+    """Lab adhérent, script absent (mode C) puis python absent (mode D) : SubagentHandback d'un sous-agent quelconque (juge compris, sans
+    dériver le rôle) → UN deny dont la raison dit « hook central indisponible », nomme le rapport du sous-agent et la réparation ; les
+    quatre autres événements → stdout vide, code 0 ; lab dev → silence. Aucun message ne porte de chemin absolu, ni « no such file » /
+    « can't open »."""
+    fautes = []
+    for mode in ("C", "D"):
+        for agent in ("agent-test", "vf-judge"):
+            rc, out, err, _ = rejouer_texte(ctx, texte, mode, payload_evt("SubagentHandback", adh, agent_type=agent), adh)
+            raison = raison_deny(rc, out, err)
+            etiquette = "mode %s, SubagentHandback de %s" % (mode, agent)
+            if raison is None:
+                fautes.append("%s : UN deny, code 0 (attendu) — obtenu %s rc=%d out=%s" % (etiquette, verdict(rc, out), rc, court(out)))
+                continue
+            manque = [m for m in ("hook central indisponible", "SubagentHandback", "rapport", "/vf-update") if m not in raison]
+            if manque:
+                fautes.append("%s : raison qui contient %s (attendu) — obtenu %r" % (etiquette, manque, raison[:200]))
+            interdit = [f for f in FRAGMENTS_INTERDITS if f in raison.casefold()]
+            absolu = chemin_absolu_dans(raison)
+            if interdit or absolu or adh in raison:
+                fautes.append("%s : ni chemin absolu ni %s (attendu) — obtenu %r" % (etiquette, FRAGMENTS_INTERDITS, absolu or interdit or raison[:120]))
+        rc, out, err, _ = rejouer_texte(ctx, texte, mode, payload_evt("SubagentHandback", dev), dev)
+        if not verdict_conforme(rc, out, err):
+            fautes.append("mode %s, SubagentHandback sous un lab dev : silence (attendu) — obtenu rc=%d out=%s" % (mode, rc, court(out)))
+        for evt in EVT_NON_OUTIL:
+            rc, out, err, _ = rejouer_texte(ctx, texte, mode, payload_evt(evt, adh, adh + "/.planning/STATE.md"), adh)
+            if not verdict_conforme(rc, out, err):
+                fautes.append("mode %s, %s : stdout 0 octet, code 0 (fail-open, attendu) — obtenu rc=%d out=%s err=%s" % (mode, evt, rc, court(out), court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "scripts absent puis python absent : SubagentHandback refusé par UN deny (« hook central indisponible », rapport du sous-agent, /vf-update ; juge compris, rôle non dérivé), "
+                          "SubagentStop, SessionStart, CwdChanged, FileChanged muets, lab dev en silence, aucun chemin absolu ni « no such file » / « can't open »")
+
+
+def controle_evt_04(ctx, adh, source=None):
+    """Faute injectée dans le mode d'un événement non outil (SubagentStop, SessionStart, CwdChanged, FileChanged) : stdout vide, code 0
+    (fail-open déclaré) ; la même injection en PreToolUse (SubagentHandback) : un deny `erreur interne` (inchangé, P45-D-08)."""
+    fautes = []
+    for evt, marque in MODES_NON_OUTIL:
+        dossier, raison = make_hook_mutant(ctx, "EVT4-" + evt, "return None  # " + marque, 'raise RuntimeError("faute injectee")', source=source)
+        if dossier is None:
+            return False, "mutant d'injection invalide (%s) : %s" % (evt, raison)
+        rc, out, err, _ = ctx.lancer("A", payload_evt(evt, adh, adh + "/.planning/STATE.md"), cwd=adh, dossier=dossier)
+        if not verdict_conforme(rc, out, err):
+            fautes.append("faute dans le mode %s : stdout vide, code 0 (fail-open, attendu) — obtenu %s rc=%d out=%s" % (evt, verdict(rc, out), rc, court(out)))
+    dossier, raison = make_hook_mutant(ctx, "EVT4-PRE", "resultats = evaluer_gates(contexte)  # phase-b", 'raise RuntimeError("faute injectee")', source=source)
+    if dossier is None:
+        return False, "mutant d'injection invalide (PreToolUse) : " + raison
+    rc, out, err, _ = ctx.lancer("A", payload_evt("SubagentHandback", adh), cwd=adh, dossier=dossier)
+    texte = raison_deny(rc, out, err)
+    if texte is None or "erreur interne" not in texte:
+        fautes.append("faute en PreToolUse (SubagentHandback) : un deny `erreur interne` (attendu) — obtenu %s rc=%d out=%s" % (verdict(rc, out), rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "faute injectée dans le mode SubagentStop, SessionStart, CwdChanged, puis FileChanged : stdout vide, code 0 (fail-open déclaré) ; en PreToolUse : deny `erreur interne`")
+
+
+def controle_evt_05(ctx, dossier_coeur, adh):
+    """`hook_event_name` absent = PreToolUse (la phase B est atteinte) ; `PreToolUse` écrit = même chose ; inconnu, d'une autre casse, vide
+    ou non chaîne = silence, la phase B n'est PAS atteinte (limite (aq)). La sonde du cœur (une ligne par phase B atteinte) départage."""
+    fautes = []
+    base = {"session_id": "sess-test", "cwd": adh, "tool_name": "Write", "tool_input": {"file_path": adh + "/.planning/notes.md", "content": "x"}}
+    absent = object()
+    for etiquette, valeur, lignes_attendues in (("absent", absent, 1), ("PreToolUse", "PreToolUse", 1), ("inconnu", "Bogus", 0),
+                                                 ("casse différente", "pretooluse", 0), ("vide", "", 0), ("non chaîne", 123, 0)):
+        obj = dict(base)
+        if valeur is not absent:
+            obj["hook_event_name"] = valeur
+        xdg = ctx.unique("xdg-evt05")
+        os.makedirs(xdg)
+        rc, out, err, _ = ctx.lancer("A", json.dumps(obj, separators=(",", ":")).encode("utf-8"), cwd=adh, dossier=dossier_coeur, extra_env={"XDG_CACHE_HOME": xdg}, np=True)
+        lignes = lire_lignes_sonde(xdg)
+        if rc != 0 or out != b"" or err or lignes != lignes_attendues:
+            fautes.append("hook_event_name %s : %d ligne(s) de sonde, stdout vide, code 0 (attendu) — obtenu %d ligne(s), rc=%d out=%s" % (etiquette, lignes_attendues, lignes, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "hook_event_name absent ou PreToolUse : phase B atteinte ; inconnu, autre casse, vide, non chaîne : silence sans phase B")
+
+
+def controle_evt_06(ctx, dossier_coeur, adh, dev):
+    """FileChanged : la racine se dérive du `file_path` de PREMIER niveau, jamais du cwd. Un fichier d'un lab adhérent avec un cwd dev atteint
+    la phase B (une ligne de sonde) ; l'inverse (cwd adhérent, fichier d'un lab dev) se tait ; un `file_path` relatif ou plus long que la borne
+    du cœur se tait même avec un cwd adhérent."""
+    fautes = []
+    cas = (("fichier d'un lab adhérent, cwd dev", dev, adh + "/.planning/STATE.md", 1),
+           ("fichier d'un lab dev, cwd adhérent", adh, dev + "/.planning/STATE.md", 0),
+           ("file_path relatif, cwd adhérent", adh, ".planning/STATE.md", 0),
+           ("file_path plus long que la borne, cwd adhérent", adh, adh + "/" + "a" * 5000, 0))
+    for etiquette, cwd, fichier, lignes_attendues in cas:
+        xdg = ctx.unique("xdg-evt06")
+        os.makedirs(xdg)
+        rc, out, err, _ = ctx.lancer("A", payload_evt("FileChanged", cwd, fichier), cwd=cwd, dossier=dossier_coeur, extra_env={"XDG_CACHE_HOME": xdg}, np=True)
+        lignes = lire_lignes_sonde(xdg)
+        if rc != 0 or out != b"" or err or lignes != lignes_attendues:
+            fautes.append("%s : %d ligne(s) de sonde, stdout vide, code 0 (attendu) — obtenu %d ligne(s), rc=%d out=%s" % (etiquette, lignes_attendues, lignes, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "FileChanged : racine lue dans file_path (lab adhérent atteint avec un cwd dev, lab dev ignoré avec un cwd adhérent), chemin relatif ou trop long : silence")
+
+
+def controle_evt_07(ctx, adh, source=None):
+    """Contrat de sortie (P46-D-10) : un blocage de SubagentStop est la décision JSON `decision: block` + `reason`, code 0, JAMAIS le code 2 ;
+    un message qui porterait « no such file » ou « can't open » est neutralisé ; SessionStart, CwdChanged, FileChanged ne refusent jamais
+    (un mode qui voudrait bloquer reste muet) ; aucune sortie par `exit 2` dans le script ni dans la commande."""
+    fautes = []
+    brut = payload_evt("SubagentStop", adh)
+    for raison_test, doit_porter in (("raison de test", "raison de test"), ("Erreur : No such file or directory", None), ("bash: can't open fichier", None)):
+        dossier, raison = make_hook_mutant(ctx, "EVT7-S", "return None  # evt-mode-subagentstop", "return [%r]" % raison_test, source=source)
+        if dossier is None:
+            return False, "mutant d'émission invalide : " + raison
+        direct = subprocess.run(["bash", os.path.join(dossier, "planning-hook.sh")], input=brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=adh, timeout=120)
+        rc, out, err, _ = ctx.lancer("A", brut, cwd=adh, dossier=dossier)
+        for etiquette, code, sortie, erreur in (("cœur seul", direct.returncode, direct.stdout, direct.stderr), ("commande complète", rc, out, err)):
+            try:
+                obj = json.loads(sortie.decode("utf-8"))
+            except ValueError:
+                obj = None
+            ok_forme = isinstance(obj, dict) and obj.get("decision") == "block" and isinstance(obj.get("reason"), str) and set(obj) == {"decision", "reason"}
+            if code != 0 or erreur or not ok_forme:
+                fautes.append("%s, raison %r : `decision: block` + `reason`, code 0, stderr vide (attendu) — obtenu rc=%d out=%s err=%s" % (etiquette, raison_test, code, court(sortie), court(erreur)))
+                continue
+            if doit_porter is not None and obj["reason"] != doit_porter:
+                fautes.append("%s : reason %r (attendu) — obtenu %r" % (etiquette, doit_porter, obj["reason"]))
+            if any(f in obj["reason"].casefold() for f in FRAGMENTS_INTERDITS):
+                fautes.append("%s, raison %r : aucun fragment %s dans le message (attendu) — obtenu %r" % (etiquette, raison_test, FRAGMENTS_INTERDITS, obj["reason"]))
+    for evt, marque in MODES_NON_OUTIL[1:]:
+        dossier, raison = make_hook_mutant(ctx, "EVT7-N", "return None  # " + marque, 'return ["refus voulu"]', source=source)
+        if dossier is None:
+            return False, "mutant d'émission invalide (%s) : %s" % (evt, raison)
+        rc, out, err, _ = ctx.lancer("A", payload_evt(evt, adh, adh + "/.planning/STATE.md"), cwd=adh, dossier=dossier)
+        if not verdict_conforme(rc, out, err):
+            fautes.append("%s : ne refuse JAMAIS, stdout vide, code 0 (attendu) — obtenu %s rc=%d out=%s" % (evt, verdict(rc, out), rc, court(out)))
+    texte_script = open(source or ctx.hook, encoding="utf-8").read()
+    for numero, ligne in enumerate(texte_script.split("\n"), 1):
+        code = ligne.split("#", 1)[0]
+        if re.search(r"\bsys\.exit\(2\)|^\s*exit 2\b", code):
+            fautes.append("script, ligne %d : aucune sortie par le code 2 (attendu) — obtenu %r" % (numero, ligne.strip()[:100]))
+    if re.search(r"\bexit 2\b", ctx.cmd):
+        fautes.append("commande enregistrée : aucune sortie par le code 2 (attendu) — obtenu `exit 2`")
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "SubagentStop : `decision: block` + `reason`, code 0 (cœur seul et commande), fragments « no such file » / « can't open » neutralisés ; SessionStart, CwdChanged, FileChanged ne refusent jamais ; aucun `exit 2`")
+
+
+def sec_evenements(ctx):
+    adh, dev = _labs_simples(ctx, "evt")
+    labs = [("lab dev fixture", dev, dev + "/.planning/STATE.md")]
+    if ctx.repo_root and os.path.isfile(os.path.join(ctx.repo_root, "plugin", "planning-core", "scripts", "planning-hook.sh")):
+        labs.append(("ce dépôt", ctx.repo_root, os.path.join(ctx.repo_root, ".planning", "STATE.md")))
+    else:
+        print("NOTE R-EVT-01 hors dépôt : plugin/planning-core/scripts/planning-hook.sh absent à côté des suites — le cas « ce dépôt » n'est pas rejoué (jamais un vert)")
+    # --- R-EVT-01 : hors adhésion
+    o1 = controle_evt_01(ctx, ctx.cmd, labs)
+    if o1[0]:
+        ok("R-EVT-01 " + o1[1])
+    else:
+        ko("R-EVT-01", "hors adhésion, chaque entrée (SubagentHandback, SubagentStop, SessionStart, CwdChanged, FileChanged) rend un octet vide et 0, sans lancer le script ni python3", "conforme", o1[1])
+    sonde, raison = fabriquer_sonde_coeur(ctx, "SONDE")
+    if sonde is None:
+        ko("R-EVT-01b", "la copie sonde du cœur est valide", "sonde valide", raison)
+        return
+    o1b = controle_evt_01b(ctx, sonde, labs, adh)
+    if o1b[0]:
+        ok("R-EVT-01b " + o1b[1])
+    else:
+        ko("R-EVT-01b", "la copie sonde du cœur n'atteint jamais la phase B hors adhésion et l'atteint dans un lab adhérent (témoin)", "conforme", o1b[1])
+    # MUT-EVT-PREFILTRE : la commande SANS pré-filtre lance le script hors adhésion
+    mutant_controle("EVT-PREFILTRE", o1, controle_evt_01(ctx, ctx.cmd_np, labs), "R-EVT-01 (pré-filtre ignoré : la commande sans l'appel de vf_pre)")
+    # MUT-EVT-ADHESION : adhésion forcée vraie dans le cœur (sur la copie sonde) : la phase B est atteinte hors adhésion
+    forcee, raison = fabriquer_sonde_coeur(ctx, "SONDE-ADH", extras=(('adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]', "adherent = True"),))
+    if forcee is None:
+        komut("EVT-ADHESION", "mutant du cœur valide (adhésion forcée vraie)", "mutant valide", raison)
+    else:
+        mutant_controle("EVT-ADHESION", o1b, controle_evt_01b(ctx, forcee, labs, adh), "R-EVT-01b (adhésion ignorée dans le cœur)")
+    # --- R-EVT-02
+    o2 = controle_evt_02(ctx, adh)
+    ok("R-EVT-02 " + o2[1]) if o2[0] else ko("R-EVT-02", "lab adhérent, script présent : silence pour les cinq entrées", "conforme", o2[1])
+    # --- R-EVT-03 (+ repli retiré)
+    o3 = controle_evt_03(ctx, ctx.cmd, adh, dev)
+    ok("R-EVT-03 " + o3[1]) if o3[0] else ko("R-EVT-03", "mode dégradé : SubagentHandback refusé, les quatre autres événements muets", "conforme", o3[1])
+    o3_np = controle_evt_03(ctx, ctx.cmd_np, adh, dev)
+    muté, raison = make_cmd_mutant(ctx, "EVT-REPLI", "|*'\"tool_name\":\"SubagentHandback\"'*|*'\"tool_name\":\"Agent\"'*", "|*'\"tool_name\":\"Agent\"'*")
+    if muté is None:
+        komut("EVT-REPLI-HANDBACK", "texte muté distinct de l'original et sh -n réussit", "mutant valide", raison)
+    else:
+        mutant_controle("EVT-REPLI-HANDBACK", o3_np, controle_evt_03(ctx, muté, adh, dev), "R-EVT-03 (alternative SubagentHandback retirée du `case` de repli)")
+    # --- R-EVT-04 (+ fail-open transformé en deny)
+    o4 = controle_evt_04(ctx, adh)
+    ok("R-EVT-04 " + o4[1]) if o4[0] else ko("R-EVT-04", "faute dans un mode non outil : silence, code 0 ; en PreToolUse : deny", "conforme", o4[1])
+    ouvert, raison = make_hook_mutant(ctx, "FAILOPEN", "if evenement == EVT_PRETOOLUSE:  # evt-refus-pretooluse", "if True:  # evt-refus-pretooluse")
+    if ouvert is None:
+        komut("EVT-FAILOPEN", "mutant du cœur valide (exception d'un mode non outil refusée)", "mutant valide", raison)
+    else:
+        mutant_controle("EVT-FAILOPEN", o4, controle_evt_04(ctx, adh, source=os.path.join(ouvert, "planning-hook.sh")), "R-EVT-04 (l'exception d'un mode non outil devient un deny)")
+    # --- R-EVT-05
+    o5 = controle_evt_05(ctx, sonde, adh)
+    ok("R-EVT-05 " + o5[1]) if o5[0] else ko("R-EVT-05", "hook_event_name absent = PreToolUse, inconnu = silence", "conforme", o5[1])
+    # --- R-EVT-06 (+ racine de FileChanged lue dans cwd)
+    o6 = controle_evt_06(ctx, sonde, adh, dev)
+    ok("R-EVT-06 " + o6[1]) if o6[0] else ko("R-EVT-06", "FileChanged : racine lue dans file_path de premier niveau", "conforme", o6[1])
+    cwd_lu, raison = fabriquer_sonde_coeur(ctx, "SONDE-CWD", extras=(("if evenement == EVT_FILE_CHANGED:  # evt-filechanged-depart", "if False:  # evt-filechanged-depart"),))
+    if cwd_lu is None:
+        komut("EVT-FILEPATH", "mutant du cœur valide (racine de FileChanged lue dans cwd)", "mutant valide", raison)
+    else:
+        mutant_controle("EVT-FILEPATH", o6, controle_evt_06(ctx, cwd_lu, adh, dev), "R-EVT-06 (racine de FileChanged lue dans cwd)")
+    # --- R-EVT-07 (+ sortie de SubagentStop par le code 2)
+    o7 = controle_evt_07(ctx, adh)
+    ok("R-EVT-07 " + o7[1]) if o7[0] else ko("R-EVT-07", "contrat de sortie : SubagentStop block en code 0, jamais le code 2 ; les trois autres ne refusent jamais", "conforme", o7[1])
+    # MUT-EVT-EXIT2 : le blocage de SubagentStop sort par le code 2 (os._exit : le fail-open du mode, qui attrape SystemExit, ne le masque pas)
+    deux, raison = make_hook_mutant(ctx, "EXIT2", "                sortie_blocage_subagent(raisons)", "sortie_blocage_subagent(raisons); os._exit(2)")
+    if deux is None:
+        komut("EVT-EXIT2", "mutant du cœur valide (blocage de SubagentStop par le code 2)", "mutant valide", raison)
+    else:
+        mutant_controle("EVT-EXIT2", o7, controle_evt_07(ctx, adh, source=os.path.join(deux, "planning-hook.sh")), "R-EVT-07 (SubagentStop sort par le code 2)")
+    # MUT-EVT-EXIT2-STATIQUE : un `sys.exit(2)` écrit dans le script (attrapé par le fail-open du mode, donc invisible du comportement : seul le contrôle statique le voit)
+    deux_s, raison = make_hook_mutant(ctx, "EXIT2S", "_emettre({\"decision\": \"block\", \"reason\": _message_sur(\"\\n\".join(raisons))})  # sortie-subagentstop",
+                                      "_emettre({\"decision\": \"block\", \"reason\": _message_sur(\"\\n\".join(raisons))}); sys.exit(2)  # sortie-subagentstop")
+    if deux_s is None:
+        komut("EVT-EXIT2-STATIQUE", "mutant du cœur valide (`sys.exit(2)` écrit dans le script)", "mutant valide", raison)
+    else:
+        mutant_controle("EVT-EXIT2-STATIQUE", o7, controle_evt_07(ctx, adh, source=os.path.join(deux_s, "planning-hook.sh")), "R-EVT-07 (contrôle statique : `sys.exit(2)` dans le script)")
+
+
 SECTIONS = {
     "borne": sec_borne,
     "doute": sec_doute,
@@ -1908,6 +2426,7 @@ SECTIONS = {
     "perf": sec_perf,
     "depot": sec_depot,
     "mutants": sec_mutants,
+    "evenements": sec_evenements,
 }
 
 
@@ -1944,7 +2463,8 @@ run_sections() { # <sections séparées par des virgules>
 
 [ -f "$HOOK" ] || { ko "planning-hook.sh présent" "le script du hook central existe à côté des suites" "$HOOK" "absent"; }
 
-run_sections entree,merge,modes,matrice,shells,perf,depot,borne,doute,mutants
+# VF_REG_SECTIONS (facultatif, pour rejouer une partie de la suite pendant le développement) : sections séparées par des virgules.
+run_sections "${VF_REG_SECTIONS:-entree,merge,modes,matrice,shells,perf,depot,borne,doute,mutants,evenements}"
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

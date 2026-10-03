@@ -1,13 +1,24 @@
 #!/usr/bin/env bash
-# planning-hook.sh — hook central PreToolUse de planning-core (Phase 45, P45-D-15 : UN SEUL script
-# pour les gates d'écriture et le cloisonnement par rôle). Il n'agit que dans un lab adhérent
-# `cycles-v1` (P45-D-01a) ; ailleurs — labs dev, ce dépôt compris — il ne sort RIEN et rend 0
-# (P45-D-04). La racine du lab est dérivée du chemin écrit (à défaut du cwd du payload, à défaut du
-# cwd physique du processus), jamais de $CLAUDE_PROJECT_DIR (P45-D-12).
+# planning-hook.sh — hook central de planning-core (Phase 45, P45-D-15 : UN SEUL script pour les gates
+# d'écriture et le cloisonnement par rôle ; Phase 46, P46-D-09 : un MODE par événement). Il n'agit que
+# dans un lab adhérent `cycles-v1` (P45-D-01a) ; ailleurs — labs dev, ce dépôt compris — il ne sort
+# RIEN et rend 0 (P45-D-04, P46-D-16). La racine du lab est dérivée du chemin écrit (à défaut du cwd du
+# payload, à défaut du cwd physique du processus), jamais de $CLAUDE_PROJECT_DIR (P45-D-12) ; pour un
+# FileChanged, du `file_path` de premier niveau du payload.
 #
-# Entrée : le payload JSON du harnais sur stdin. Sortie : rien, ou UN objet JSON hookSpecificOutput
-# (refus : permissionDecision deny ; avertissement : additionalContext), toujours code 0 — jamais
-# exit 2 (P45-D-08, DIV-2).
+# Cinq événements, UNE commande enregistrée (hooks.json), le champ `hook_event_name` du payload
+# aiguillant (absent : PreToolUse, compatibilité des payloads existants ; inconnu : silence, limite (aq)) :
+#   PreToolUse    G1…G7, rôle (les gates à venir de la 46 : G3, G4, G4′ sur SubagentHandback) — refus : deny JSON, code 0
+#   SubagentStop  repli de G4′ — refus : `decision: "block"` JSON, code 0, JAMAIS le code 2 (P46-D-10, #60490)
+#   SessionStart, CwdChanged, FileChanged   ne refusent JAMAIS ; toute erreur sort en silence, code 0 (fail-open déclaré :
+#                 une trace perdue est rattrapée par la réconciliation de D1, P46-D-10)
+# La décision dans le doute (N-01, `decider_dans_le_doute`) ne vaut que pour PreToolUse : tout autre événement en doute
+# sort en silence.
+#
+# Entrée : le payload JSON du harnais sur stdin. Sortie : rien, ou UN objet JSON (PreToolUse : hookSpecificOutput,
+# refus permissionDecision deny, avertissement additionalContext ; SubagentStop : decision block), toujours code 0 —
+# jamais exit 2 (P45-D-08, DIV-2, P46-D-10). Aucun message ne porte de chemin absolu hors du lab, ni « no such file »,
+# ni « can't open » (#60490).
 #
 # Contrat des codes du LANCEUR (bash) — il ne décide de RIEN : tout code non nul est repris par la
 # commande enregistrée dans hooks.json, qui tranche elle-même (fail-closed dans un lab adhérent,
@@ -95,6 +106,15 @@ SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 ECHEANCE_COEUR_S = 8.0
 PAS_SURVEILLANCE_S = 0.5
 CODE_ECHEANCE = 73
+# --- Événements (Phase 46, P46-D-09) : un mode par `hook_event_name` ; la table des modes est plus bas (`MODES_EVENEMENT`).
+EVT_PRETOOLUSE = "PreToolUse"
+EVT_SUBAGENT_STOP = "SubagentStop"
+EVT_SESSION_START = "SessionStart"
+EVT_CWD_CHANGED = "CwdChanged"
+EVT_FILE_CHANGED = "FileChanged"
+EVENEMENTS_CONNUS = (EVT_PRETOOLUSE, EVT_SUBAGENT_STOP, EVT_SESSION_START, EVT_CWD_CHANGED, EVT_FILE_CHANGED)
+# Un message de sortie ne contient jamais ces fragments (P46-D-10, #60490 : un refus qui les porte est lu comme « script absent »).
+FRAGMENTS_INTERDITS_SORTIE = ("no such file", "can't open")
 
 # --- Table d'armement (P45-D-03a) : l'état de chaque gate vit ICI, dans le code livré, jamais dans
 # un fichier du lab ni dans une variable d'environnement (P45-D-01, P45-D-12a). Une constante par
@@ -1099,6 +1119,21 @@ def sortie_contexte(textes):
         "hookEventName": "PreToolUse",
         "additionalContext": "\n".join(textes),
     }})
+
+
+def _message_sur(texte):
+    """Message de sortie d'un événement non outil (P46-D-10, #60490) : un texte qui porterait « no such file » ou « can't open » (message
+    d'erreur système remonté tel quel) est remplacé par un texte neutre — le harnais lit un refus qui les porte comme « script absent »."""
+    bas = texte.casefold()
+    if any(fragment in bas for fragment in FRAGMENTS_INTERDITS_SORTIE):  # message-sur
+        return "[planning-core] refus : le motif détaillé n'est pas reproduit (message d'erreur système écarté, P46-D-10)"
+    return texte
+
+
+def sortie_blocage_subagent(raisons):
+    """SubagentStop : le blocage est la décision JSON `decision: "block"` avec sa `reason`, code 0 — JAMAIS le code 2 (P46-D-10 ; le
+    sous-agent continue et la raison devient sa prochaine instruction, plafond natif de huit continuations). Passe par `_emettre`."""
+    _emettre({"decision": "block", "reason": _message_sur("\n".join(raisons))})  # sortie-subagentstop
 
 
 # --- Entonnoir de décision, journal d'observation, G5 (45-04) ------------------------------------
@@ -2360,6 +2395,59 @@ def evaluer_gates(contexte):
     return resultats
 
 
+# --- Modes par événement (Phase 46, P46-D-09, P46-D-10) ----------------------------------------------------------------
+# Chaque mode reçoit le contexte du lab adhérent et rend une liste de raisons de blocage ou None. Seul SubagentStop émet (décision
+# `block`, code 0) ; SessionStart, CwdChanged et FileChanged ne refusent JAMAIS : ce qu'un de leurs modes rendrait est ignoré. Aucun
+# gate ne lit encore ces événements dans ce plan (G3 et G4 en 46-05, G4′ en 46-06, D1 en 46-07) : les modes sont des points d'accroche.
+def mode_subagent_stop(contexte):
+    """Repli de G4′ (hors mode auto, où `SubagentHandback` n'existe pas) : aucune évaluation encore."""
+    return None  # evt-mode-subagentstop
+
+
+def mode_session_start(contexte):
+    """`watchPaths` et réconciliation de D1 : aucune évaluation encore."""
+    return None  # evt-mode-sessionstart
+
+
+def mode_cwd_changed(contexte):
+    """Racine lue dans `cwd` (`new_cwd` non lu, limite (ao)) ; `watchPaths` de D1 : aucune évaluation encore."""
+    return None  # evt-mode-cwdchanged
+
+
+def mode_file_changed(contexte):
+    """Trace de D1 : aucune évaluation encore."""
+    return None  # evt-mode-filechanged
+
+
+MODES_EVENEMENT = {
+    EVT_SUBAGENT_STOP: mode_subagent_stop,
+    EVT_SESSION_START: mode_session_start,
+    EVT_CWD_CHANGED: mode_cwd_changed,
+    EVT_FILE_CHANGED: mode_file_changed,
+}
+
+
+def evenement_de(payload):
+    """Nom de l'événement du payload (`hook_event_name`). Clé absente : `PreToolUse` (les payloads d'avant la 46 ne la portaient pas
+    toujours) ; valeur qui n'est pas une chaîne : chaîne vide, donc événement inconnu (silence, limite (aq))."""
+    nom = payload.get("hook_event_name")
+    if nom is None:  # evt-absent
+        return EVT_PRETOOLUSE
+    return nom if isinstance(nom, str) else ""
+
+
+def depart_evenement(payload, evenement, cwd, ecrit):
+    """Chemin d'où se dérive la racine du lab. FileChanged : le `file_path` de PREMIER NIVEAU (chaîne absolue sous la borne de longueur
+    du cœur, sinon None : silence). Tout autre événement : le chemin écrit, sinon le cwd du payload, sinon le cwd du processus
+    (logique d'avant la 46, inchangée)."""
+    if evenement == EVT_FILE_CHANGED:  # evt-filechanged-depart
+        chemin = payload.get("file_path")
+        if isinstance(chemin, str) and chemin.startswith("/") and len(chemin) <= BORNE_VALEUR:  # evt-filechanged-chemin
+            return chemin
+        return None
+    return ecrit if ecrit is not None else (cwd if cwd is not None else os.getcwd())
+
+
 def main():
     armer_echeance()  # echeance-armee
     # Mode de diagnostic (45-08) : `--classer <agent.md>`, quatrième argument du cœur ; aucune décision.
@@ -2372,6 +2460,9 @@ def main():
         payload = lire_payload(sys.argv[1])  # phase-a
     except BaseException:
         sys.exit(3)  # phase-a-sortie
+    evenement = evenement_de(payload)  # evt-lecture
+    if evenement not in EVENEMENTS_CONNUS:
+        sys.exit(0)  # evt-inconnu : un événement que le hook ne connaît pas sort en silence (limite (aq))
     try:
         # N2-01 (re-audit 2 du 2026-10-02) : une valeur de plus de BORNE_VALEUR caractères ne passe JAMAIS par realpath ni racine_lab
         # (quadratiques en profondeur : l'échéance de 8 s tombait sur un chemin qui descend puis remonte et la couche shell, aveugle à
@@ -2379,7 +2470,7 @@ def main():
         # lexicalement, physique) ; chacune qui tient sous la borne est analysée comme une valeur courte ; seule une valeur qui reste trop
         # longue lève ici et part dans la décision dans le doute sur son nom décodé. Un lab est adhérent dès que l'UNE des formes y tombe.
         ecrit, cwd, variantes = cible_de(payload, sys.argv[3] if len(sys.argv) > 3 else "")
-        depart = ecrit if ecrit is not None else (cwd if cwd is not None else os.getcwd())  # racine-depart
+        depart = depart_evenement(payload, evenement, cwd, ecrit)  # racine-depart evt-depart
         racine = racine_lab(depart)
         adherent = racine is not None and verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]
         autres = []  # formes supplémentaires (N3-01) qui tombent, elles, dans un lab adhérent : (chemin écrit, racine du lab)
@@ -2388,6 +2479,8 @@ def main():
             if racine_forme is not None and verifier_adhesion(os.path.join(racine_forme, ".planning"))["adherente"]:
                 autres.append((forme, racine_forme))
     except BaseException as exc_doute:  # phase-a-doute
+        if evenement != EVT_PRETOOLUSE:  # evt-doute-pretooluse : la décision dans le doute ne vaut que pour PreToolUse
+            sys.exit(0)
         # N-01 : un chemin que l'analyse fait lever (surrogate, NUL, realpath) ne sort plus en code non nul — le payload aurait provoqué
         # lui-même la panne du cœur et fait taire les gates ; il est décidé dans le doute. Sans chemin écrit : code 3, comme avant.
         try:
@@ -2401,23 +2494,34 @@ def main():
         sys.exit(0)  # non-adherent
     # Phase B : le lab est adhérent. Toute erreur devient un refus explicite, code 0 (P45-D-08).
     try:
-        refus, avis = [], []
-        cibles = ([(ecrit, racine)] if adherent else []) + autres
-        for forme, racine_cible in (cibles or [(ecrit, racine)]):  # `or` : jamais vide sur un code sain, la sortie ci-dessus l'a écarté
-            contexte = {"payload": payload, "outil": payload.get("tool_name"), "ecrit": forme,
-                        "cwd": cwd, "racine": racine_cible,
+        if evenement == EVT_PRETOOLUSE:
+            refus, avis = [], []
+            cibles = ([(ecrit, racine)] if adherent else []) + autres
+            for forme, racine_cible in (cibles or [(ecrit, racine)]):  # `or` : jamais vide sur un code sain, la sortie ci-dessus l'a écarté
+                contexte = {"payload": payload, "outil": payload.get("tool_name"), "ecrit": forme,
+                            "cwd": cwd, "racine": racine_cible,
+                            "arg_xdg": sys.argv[2] if len(sys.argv) > 2 else "",
+                            "arg_home": sys.argv[3] if len(sys.argv) > 3 else ""}
+                resultats = evaluer_gates(contexte)  # phase-b
+                refus.extend(texte for genre, texte in resultats if genre == "refuse" and texte not in refus)
+                avis.extend(texte for genre, texte in resultats if genre == "avertit" and texte not in avis)
+            if refus:
+                sortie_refus(refus)
+            elif avis:
+                sortie_contexte(avis)
+        else:
+            contexte = {"payload": payload, "evenement": evenement, "outil": None,
+                        "ecrit": depart if evenement == EVT_FILE_CHANGED else None,
+                        "cwd": cwd, "racine": racine,
                         "arg_xdg": sys.argv[2] if len(sys.argv) > 2 else "",
                         "arg_home": sys.argv[3] if len(sys.argv) > 3 else ""}
-            resultats = evaluer_gates(contexte)  # phase-b
-            refus.extend(texte for genre, texte in resultats if genre == "refuse" and texte not in refus)
-            avis.extend(texte for genre, texte in resultats if genre == "avertit" and texte not in avis)
-        if refus:
-            sortie_refus(refus)
-        elif avis:
-            sortie_contexte(avis)
+            raisons = MODES_EVENEMENT[evenement](contexte)  # evt-phase-b
+            if raisons and evenement == EVT_SUBAGENT_STOP:  # seul SubagentStop émet ; les trois autres ne refusent jamais
+                sortie_blocage_subagent(raisons)
     except BaseException as exc:
-        sortie_refus(["[planning-core] erreur interne du hook central dans un lab adhérent "
-                      "cycles-v1 : action refusée (P45-D-08) — " + type(exc).__name__])
+        if evenement == EVT_PRETOOLUSE:  # evt-refus-pretooluse : fail-closed de PreToolUse (P45-D-08) ; les autres événements : silence (fail-open déclaré)
+            sortie_refus(["[planning-core] erreur interne du hook central dans un lab adhérent "
+                          "cycles-v1 : action refusée (P45-D-08) — " + type(exc).__name__])
     sys.exit(0)
 
 
