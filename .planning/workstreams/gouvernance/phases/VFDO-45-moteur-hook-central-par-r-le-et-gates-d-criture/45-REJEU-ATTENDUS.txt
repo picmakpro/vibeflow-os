@@ -1,0 +1,26 @@
+# Attendus du rejeu réel de l'étape 3 (G7) — Phase 45, plan 45-07
+# Date : 2026-10-01
+# Source : docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md §2 D-05, table TELLE QU'AMENDÉE par P45-D-14a
+#   (Willy, AskUserQuestion session principale, 2026-09-29 : table D-05 corrigée ; 00-doctrine n'est pas un lab ; G7 garde le prédicat
+#   littéral de P45-D-14). Rejeu réel autorisé, modèle de référence : P45-D-21 et P45-D-21a (même canal, même date).
+# Format : G7 | <lab affiché> | <dossier X relatif au lab> | <attendu> | <motif> ; l'écriture rejouée est la création de X/.planning/config.json.
+#
+# Tout autre .planning/ absent de D-05 reste doit-passer (par défaut) : les autres ProjetFlow-* habités
+#   (ProjetFlow-A2-POLLUE, ProjetFlow-A2-PROPRE, ProjetFlow-FROZEN-A3, ProjetFlow-LAB-GENERE-A3) n'ont pas de ligne.
+# Les racines des deux labs (~/jarvis-keystone, ~/BusinessFlow-Lab) sont doit-passer : la racine n'est pas un .planning/ imbriqué, donc
+#   le format G7 (dossier relatif non vide) ne peut pas la porter ; elle est attendue passer par construction et n'a pas de ligne.
+#
+# Keystone : cinq labs, cinq plannings (racine, 10-pilotage, 20-ateliers/01-marche-offre, 30-captation, 20-ateliers/_gabarit) — doit-passer.
+G7 | ~/jarvis-keystone | 10-pilotage | doit-passer | lab D-05 (pilotage), .claude/ habité
+G7 | ~/jarvis-keystone | 20-ateliers/01-marche-offre | doit-passer | lab D-05 (atelier), .claude/ habité
+G7 | ~/jarvis-keystone | 30-captation | doit-passer | lab D-05 (captation), .claude/ habité
+G7 | ~/jarvis-keystone | 20-ateliers/_gabarit | doit-passer | lab D-05 (gabarit), .claude/ habité
+# Keystone : 00-doctrine n'est pas un lab (P45-D-14a).
+G7 | ~/jarvis-keystone | 00-doctrine | doit-refuser-modele | non-lab, table D-05 amendée (P45-D-14a) — refus conforme au modèle, lab non migré
+# BusinessFlow : quatre orphelins D-05.
+G7 | ~/BusinessFlow-Lab | projects/avma | doit-refuser-modele | orphelin D-05 — refus conforme au modèle, lab non migré
+G7 | ~/BusinessFlow-Lab | projects/dmflow | doit-refuser-modele | orphelin D-05 — refus conforme au modèle, lab non migré
+G7 | ~/BusinessFlow-Lab | projects/lead-recovery | doit-refuser-modele | orphelin D-05 — refus conforme au modèle, lab non migré
+G7 | ~/BusinessFlow-Lab | projects/formation | doit-refuser-modele | orphelin D-05 — refus conforme au modèle, lab non migré
+# BusinessFlow : ProjetFlow-FROZEN-A1 (mémoire sans agent) — refus par le prédicat littéral, lecture du manager (distincte de la citation de Willy).
+G7 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1 | doit-refuser-modele | mémoire sans agent (P45-D-14) — lecture du manager, 2026-09-29 (P45-D-14a) — refus conforme au modèle, lab non migré

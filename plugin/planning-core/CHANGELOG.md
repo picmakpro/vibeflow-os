@@ -1,5 +1,194 @@
 # Changelog — planning-core
 
+## [v2.9.0] — 2026-10-01 (moteur de planning métier — hook central par rôle et gates d'écriture, Phase 45)
+
+**Minor** (nouvelle capacité) :
+
+- **État d'armement livré** : les cinq gates sont ARMÉS (`ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`,
+  `ARMEMENT_G7` et `ARMEMENT_ROLE` valent `armed`) et refusent, fermés sur défaillance ; `G2_MODE` vaut `avertit`
+  (G2 avertit, ne refuse jamais). Les rejeux réels des étapes 1 à 4 avaient été mesurés sur le hook AVANT les lots de
+  correction A, B et C du 2026-10-01 ; l'armement a donc attendu un NOUVEAU rejeu réel, sur des labs au repos, du hook
+  livré : il est fait (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`, 0 faux refus, 0 faux accept,
+  empreintes d'arbre identiques). L'arbitrage de Willy est rendu et appliqué (Q-ARM, AskUserQuestion session
+  principale, 2026-09-30 : oui pour les quatre étapes d'armement, découplage des suites autorisé sans supprimer aucun
+  cas ni aucun mutant) ; l'armement s'est fait en cascade le 2026-10-01, un commit par étape (`3d06e503` G6 et G5,
+  `bf6cfa87` G1, `b6609fa6` G7, `239df76d` ROLE). Aucune release : le module reste en v2.9.0 (ADR-073).
+- **`scripts/planning-hook.sh` et sa commande enregistrée fail-closed** — une seule entrée `PreToolUse` de
+  `hooks.json` (forme shell, matcher `Write|Edit|NotebookEdit|Bash|Agent|Task`) : lanceur bash et cœur Python
+  embarqué (aucun `.py` posé par l'installeur). Dans un lab adhérent `cycles-v1` seulement, quand le script ou
+  `python3` manque ou plante, la commande refuse `Write`, `Edit`, `NotebookEdit`, `Agent` et `Task` avec un
+  message de réparation ; partout ailleurs (labs de développement, ce dépôt compris) il ne sort rien. Un refus est
+  un `deny` JSON en code 0, jamais un exit 2. Échéance interne du cœur de 8 s (code 73, lot A).
+- **Pré-filtre hors adhésion** (revue Samuel, PR #124 ; arbitrage Willy, AskUserQuestion session principale, 2026-10-02 : le pré-filtre seul, `Bash` reste dans le matcher) : la commande enregistrée commence par `vf_pre && exit 0` et sort aussitôt (stdout vide, code 0), sans lancer le script, `mktemp` ni `python3`, quand le lab est certainement non adhérent. Dans tous les autres cas (lab adhérent, doute, valeur longue, échappée, `~`, relative, lien non résolu, config illisible, JSON non compact) le chemin d'avant est inchangé, octet pour octet : le pré-filtre est plus conservateur que le cœur et ne peut que taire un « non adhérent » (fail-closed). Garde d'équivalence `test-planning-prefilter.sh` (corpus : banc, arbres adverses des audits, générateur de valeurs longues, générateur d'arbres de labs ; mutants). Aucun cas ni mutant supprimé ou affaibli (Q-ARM) ; les mutants de la couche shell rejouent la commande sans le bloc du pré-filtre. Coût mesuré (2026-10-02, 40 rejeux entrelacés par outil, `/bin/sh`) : médiane de 45 ms à 12 ms par appel de Write, de Bash et d'Agent dans ce dépôt, de 45 ms à 49 ms dans un lab adhérent. Aucune release : le module reste en v2.9.0 (ADR-073).
+  **Parcours borné par construction** (re-audit du pré-filtre, 2026-10-02 ; quick 261002-uhn) : la chaîne de dédoublonnage `_pk` de la
+  première version, balayée à chaque ancêtre, rendait le coût cubique en la profondeur (F-P1, haute : un `cwd` propre de 1 548 ou
+  2 748 caractères dépassait le `timeout` de 20 s, que le harnais traite en laissant passer, le `cwd` précédant `tool_input` dans le
+  payload). Elle est retirée au profit de la mémoire d'UN seul préfixe vérifié (un ancêtre lexical de la dernière valeur parcourue,
+  à la frontière d'un composant, n'est pas revérifié : sans elle le coût doublait dans un dépôt à deux `.planning`, 40 ms contre 24 ms) ;
+  le pré-filtre DIFFÈRE (chemin d'avant, jamais pire) dès qu'une valeur examinée (`file_path`,
+  `notebook_path`, `cwd`, `$PWD`, cwd physique) dépasse 1024 caractères ou 64 composants, qu'une correspondance brute dépasse 2048
+  caractères ou que le payload porte plus de 16 valeurs. La même borne règle F-P2 (basse : dans la bande de 4083 à 4096 caractères,
+  script absent, lab non adhérent, l'ancienne commande refusait par son repli quand le pré-filtre se taisait). Gardes :
+  `PF-BORNE-01`, `PF-COUT-01` et six mutants dans `test-planning-prefilter.sh` ; aucun cas ni mutant supprimé ou affaibli (Q-ARM).
+  Coût après correction (2026-10-02, 40 rejeux entrelacés par outil, `/bin/sh`, charge de 15 à 18 : machine non au repos), médiane
+  / p90 de la commande sans pré-filtre puis corrigée : Write 88,5 / 123,9 → 24,2 / 33,2 ms ; Bash 75,8 / 109,1 → 20,4 / 36,5 ms ;
+  Agent 67,1 / 98,1 → 16,3 / 24,0 ms (la version d'avant la correction, dans la même série : 22,7, 18,5 et 16,3 ms).
+  **Coût indépendant du système de fichiers** (re-audit du pré-filtre, tour 2, 2026-10-02 ; quick 261003-1le ; arbitrage de Willy, AskUserQuestion
+  session principale, 2026-10-02 : le pré-filtre seul, `Bash` reste dans le matcher) : F-P3 (haute) : une `config.json` creuse de 2 Gio
+  sur la chaîne du `cwd`, lue sans borne par `grep`, dépassait le `timeout` de 20 s (fail-open de tous les gates ; 16 valeurs sur 16 arbres
+  de configs : 18 s sous charge). Une config de plus de 64 Kio (mesurée par `find -L … -size +128`, sans lecture, lien suivi) fait
+  maintenant différer AVANT toute lecture, et un budget de 64 lectures de config par exécution fait différer au-delà : le pré-filtre ne
+  lit jamais plus de 64 fois 64 Kio, quel que soit le contenu que l'agent contrôle ; tout dépassement renvoie au chemin complet. F-P4
+  (basse) : `_pa` et le compteur sont initialisés à chaque exécution (un `_pa` hérité de l'environnement tenait un ancêtre adhérent
+  pour vérifié). Gardes : `PF-CREUX-01` (config creuse de 2 Gio, de 1 Mio, lien, ancêtre ; 65 536 et 65 537 octets ; budget de 64 et de 65
+  lectures ; 16 valeurs sur 16 arbres ; `_pa` et compteur hérités ; nombre de lectures compté dans une copie instrumentée, jamais déduit
+  de l'horloge) et six mutants (`V-*`) dans `test-planning-prefilter.sh` ; aucun cas ni mutant supprimé ou affaibli (Q-ARM). Coût mesuré
+  (2026-10-02, 40 rejeux entrelacés par outil, `/bin/sh`, dans ce dépôt, deux `.planning` sur la chaîne), médiane / p90 : Write 43,4 / 45,8 →
+  15,1 / 16,1 ms, Bash 43,2 / 45,8 → 14,8 / 15,8 ms, Agent 43,2 / 48,5 → 14,8 / 16,5 ms (le tour 1 : 12,1, 11,5 et 11,5 ms ; le `find`
+  par config coûte 3 ms dans ce dépôt).
+- **G2 en avertissement** : avertit (`additionalContext`) sur une écriture hors du `ecrit:` des plans ouverts,
+  Bash compris (détection, jamais une promesse, P45-D-10) ; il ne refuse jamais.
+- **G6, G5, G1, G7 et le hook par rôle, chacun ARMÉ à sa propre étape** (ils refusent ; un gate armé qui rencontre
+  une erreur interne refuse aussi) : G6 (fichiers générés, cache, journal de dérogation, adhésion de `config.json`) et G5 (`VERDICT.md`
+  par outil) — étape 1, relevé `45-REJEU-ETAPE-1` ; G1 (pas de plan sans cadrage) — étape 2, relevé
+  `45-REJEU-ETAPE-2` ; G7 (pas de planning orphelin, prédicat « habité » littéral) — étape 3, relevé
+  `45-REJEU-ETAPE-3` ; ROLE (juge : aucune écriture par outil ; worker : dispatch limité à sa propre allowlist,
+  F9) — étape 4, relevé `45-REJEU-ETAPE-4`. Chacun à 0 faux refus et 0 faux accept sur le banc et sur le rejeu
+  réel ; les refus conformes au modèle (lab non migré) sont comptés à part (P45-D-21a).
+- **Canary de CI et de session** : `plugin/_internal/tests/test-planning-hook-installed.sh` rejoue la commande
+  telle que l'installeur la pose (bloquant en CI) ; `scripts/check-gates-alive.sh` (`SessionStart`, advisory)
+  la rejoue sur un lab synthétique et signale, sans bloquer, un hook non enregistré, une commande non reconnue,
+  un mode dégradé, des constantes d'armement absentes, un gate armé sans cas, une couverture incomplète, un cas
+  en échec.
+- **Outil de rejeu et geste de rejeu réel** : `scripts/rejeu-gates.sh` (copie du lab, un attendu par écriture,
+  faux refus, faux accepts, refus conformes au modèle) et `scripts/rejeu-reel.sh` (empreinte de TOUT l'arbre
+  avant et après, extérieure à l'outil mesuré ; `MESURE-VIDE` si rien n'a été mesuré).
+- **Limite déclarée « Bash reste ouvert quand le hook ne peut pas tourner »** (P45-D-06b) : un lab adhérent dont
+  le script ou `python3` manque refuse les écritures et les dispatchs mais laisse passer `Bash`, pour que la
+  réparation reste possible.
+- **Limites déclarées (k) et (l)** : (k) m2 — en mode panne, la couche shell tient pour adhérent un `config.json`
+  que le cœur Python tient pour non adhérent (virgule finale, clé dupliquée, valeur imbriquée, BOM) : refus en
+  panne ; (l) F9 — l'allowlist d'un worker vit dans une définition d'agent que G6 ne protège pas. Les limites
+  (a) à (z), dont (y) — les réglages `.claude/settings*.json` ne sont pas protégés, les scripts du hook le sont
+  (Q-G6 = b, ci-dessous), deux silences mesurés y sont écrits — sont écrites, chacune sur sa ligne, dans
+  `references/modele-cycles.md` et tenues identiques au code par un contrôle croisé de la CI (R-REFERENCE, dont la
+  liste des scripts du hook protégés).
+- **Limite déclarée (z) — faux refus sous forte charge machine** : sous forte charge (observé en suites à charge 20 à
+  35, jamais en rejeu réel), le cœur Python peut dépasser son échéance interne de 8 s (SIGALRM, code 73, limite (s))
+  avant d'avoir imprimé sa décision ; la commande enregistrée ferme alors en `deny`, faux refus fail-closed d'une
+  écriture légitime. Depuis F-03 (ci-dessous) il n'y a plus de message « Alarm clock » (c'était le code 142) ; la
+  limite ne promet pas « jamais un faux accept » (angles morts du repli shell : (b), (k), (m), (aa)). Point de
+  surveillance après l'armement.
+- **Correction ciblée de l'audit de sécurité final (2026-10-01, demandé par Willy en session principale ; décisions du
+  manager vf-dev-manager, renversables ; quick 261001-urj)** :
+  - **F-01 (haute)** — la couche shell de repli de la commande enregistrée était quadratique en la longueur du chemin
+    (23,27 s pour 40 165 octets, au-delà du `timeout` de 20 s du harnais, qui laisse alors passer). Une valeur du
+    payload de plus de 4096 caractères n'est plus parcourue : le doute se tranche sur le `cwd` (adhérent : refus,
+    « chemin trop long pour etre analyse » ; non adhérent : silence, GATE-03). Même chemin : 0,02 s ; 5 Mo : moins
+    d'une seconde. Limite (aa) ; état final après le re-audit (N-01, ci-dessous) : une valeur trop longue qui nomme
+    `.planning` ou `.claude` est refusée quel que soit le `cwd`, les autres sont tranchées sur le `cwd`. Suite :
+    R-BORNE-01 et cinq mutants (`test-planning-hook-registered.sh`).
+  - **F-02 (moyenne)** — G6 admettait par `Write` un `config.json` multiligne, à clé ou valeur en `\uXXXX`, que le
+    `grep` du repli ne reconnaît pas comme adhérent : après une panne du cœur, tout passait. G6 exige désormais que le
+    nouveau contenu satisfasse AUSSI le motif du repli, constante partagée `MOTIF_ADHESION_REPLI` comparée par une suite
+    au motif de `hooks.json`. Mesure en lecture seule des `config.json` de `jarvis-keystone` et `BusinessFlow-Lab` : les
+    deux sont en `planning_version: "2.0"` (non adhérents, G6 ne s'y applique pas) et leur transposition `cycles-v1` à
+    mise en forme identique est admise. Suite : R-ADH-REPLI et trois mutants.
+  - **F-03 (moyenne)** — le minuteur `setitimer` n'était jamais désarmé : un SIGALRM tardif tuait le cœur après
+    l'impression de sa décision (code 142) et la commande enregistrée la jetait. L'échéance est désarmée à l'émission
+    et à la sortie ; l'échéance de 8 s (code 73) reste intacte avant l'émission. Suite : R-DEFS-06 (banc déterministe,
+    sans horloge) et trois mutants.
+  - **Re-audit à regard frais (2026-10-01, quick 261001-wtd ; décisions du manager vf-dev-manager, renversables, même
+    classe que GATE-03)** :
+    - **N-01 (haute)** — la branche « valeur de plus de 4096 caractères : décision sur le `cwd` » rouvrait un
+      contournement par `Write` seul : un chemin géant portant un surrogate isolé (`\ud800`) ou un NUL faisait lever
+      `realpath`, le cœur sortait en 3 et, le `cwd` étant non adhérent, le repli se taisait. Désormais : (a) le repli
+      refuse toute valeur trop longue qui contient `.planning` ou `.claude` (casse ignorée), quel que soit le `cwd` ;
+      (b) le cœur ne sort plus en code non nul sur un chemin non analysable (surrogate, NUL, `~utilisateur`, erreur de
+      `realpath`) : refus s'il nomme `.planning` ou `.claude`, sinon décision sur le `cwd` ; (c) l'échéance de 8 s
+      provoquée par un chemin géant revenait à (a), ce qui était FAUX pour une valeur échappée : voir N2-01. Limite (aa).
+      Suite : R-DOUTE-01 et R-DOUTE-02, dix mutants.
+    - **N2-01 (moyenne, re-audit 2, classe)** — le repli cherchait `.planning` et `.claude` dans l'extrait brut, avant le
+      décodage JSON : `\u002eplanning` y échappait ; le cœur tombait alors en échéance (8 s) sur un chemin géant qui
+      descend puis remonte et le repli se taisait sur le `cwd`. Désormais : (a) le repli refuse toute valeur de plus de 4096
+      caractères qui nomme `.planning` ou `.claude` OU porte un antislash ; (b) le cœur juge une telle valeur d'emblée sur
+      son nom décodé, sans `realpath` ni `racine_lab`, ce qui supprime aussi la lenteur quadratique — rédaction
+      CORRIGÉE par N3-01 ci-dessous (elle laissait passer un lien dur, un lien symbolique ou une écriture de juge derrière
+      un rembourrage). Écart volontaire à GATE-03 borné à ce cas (N2-03) ; N2-02 et N2-04 déclarés. Limites (aa) et (ab).
+      Suite : R-DOUTE-03 (2 000 valeurs générées, graine 20261002) et R-DOUTE-04 (sonde N=130000), trois mutants de plus.
+    - **N3-01 (moyenne, re-audit 3, régression de N2-01)** — l'aiguillage « valeur de plus de 4096 caractères : décision dans
+      le doute sur son nom » laissait passer un actif gardé quand la valeur ne nommait rien : un lien dur (`<lab>/src` puis
+      4 200 barres obliques puis `hl.md`), un lien symbolique (`a/` × 2 100 puis `../` × 2 100 puis `pl/STATE.md`) ou
+      l'écriture d'un juge derrière `./` × 2 100, que l'analyse exacte précédente refusait (24b58748). Désormais le cœur
+      lit une valeur longue sous DEUX formes obtenues en temps linéaire : la forme réduite lexicalement
+      (`posixpath.normpath`) et la forme physique (une résolution qui suit les liens et ne teste sur le disque qu'un
+      composant dont tous les ancêtres existent, égale à `realpath`, hors boucles de liens, sur 20 000 chemins tirés au hasard) ; chacune qui tient
+      sous 4096 caractères est analysée comme une valeur courte, la valeur est refusée dès que l'une des deux l'est (ce qui
+      ferme aussi, pour les valeurs longues, le constat F2 : un `..` après un lien symbolique, dans les deux sens) ; seule
+      une valeur qui reste trop longue est décidée dans le doute, sur son nom, puis sur son `cwd` et sur l'ancêtre existant
+      de ses formes. Faux refus levé, assumé : une valeur longue qui se réduit vers un lab non adhérent, même en nommant
+      `.planning`, est silencieuse. La couche de repli ne réduit pas (écart déclaré : plus stricte, nom ou antislash).
+      Sonde N=130000 : 0,09 s. Suite : R-REDUC-01 (lien dur, lien symbolique, juge, F2 dans les deux sens, boucle de
+      liens, sonde de 130 000 composantes), R-DOUTE-02 et R-DOUTE-03 reformulés (jumeau court), sept mutants de plus.
+      Limites (aa) réécrite, (af) à (ak) ajoutées : constats F2 à F6 du recoupement et plateformes non évaluées.
+    - **N3-02 (basse, re-audit 3)** — un chemin relatif sous un `cwd` de plus de 4096 caractères était résolu contre le
+      `cwd` du processus : il passe désormais par la décision dans le doute (le `cwd` long y est lu réduit
+      lexicalement). Mutant sur le marqueur `cwd-long`.
+    - **N-03 (haute)** — un chemin `~/x` était joint au `cwd` comme un chemin relatif, alors que le `Read` du harnais le
+      développe : une poche `<cwd>/~/lab/` faisait taire les gates sur `~/lab/.planning/…`. `~` et `~/…` sont développés
+      en HOME dans les deux couches (HOME, déjà passé en argument au cœur, R-ENV-02) ; `~utilisateur/…` est tranché dans
+      le doute. Limite (ab) réécrite : elle ne repose plus sur « `Write` exige un chemin absolu ».
+    - **N-05 (basse)** — le refus G6 d'un `config.json` multiligne ou à clé échappée nomme désormais la contrainte de
+      mise en forme du repli (clé et valeur sur UNE même ligne, sans échappement), pas « changer ou retirer
+      l'adhésion ». Suite : R-ADH-REPLI et un mutant de plus.
+    - **N-04 (basse)** — `poser-verdict.sh` : « le hash et la tentative viennent TOUJOURS de la commande » était faux
+      pour la tentative, fournie par l'appelant et vérifiée par la commande ; le commentaire de tête et le texte écrit
+      dans chaque `VERDICT.md` sont corrigés.
+    - **N-02, N-06 (texte)** — limite (aa) écrite à l'état après correction ; limite (a) étendue à la forme
+      `"tool_name": "Write"` (antérieure au lot, dépend de la sérialisation du harnais, non exploitable par `Write`
+      seul).
+    - **Re-audit final tour 4 : SECURED** (2026-10-02, aucun CRITICAL ni HIGH, recoupé par `gsd-security-auditor`) — les
+      constats MEDIUM et LOW restants sont déclarés, sans changement de code (mandat de Willy relayé par la session
+      principale, 2026-10-01) : limite (al) N4-02 (`/.vol/<dev>/<inode>/…` sous macOS), limite (am) N4-03 (dérogation
+      brûlée, fail-closed), limite (an) N4-05 (course `lstat`/`readlink`) ; N4-01 et N4-04 précisent (aa) et (af) ;
+      N4-06 corrige des textes (docstring de `resoudre_lineaire`, « hors boucles de liens », (ai), (ak), (aa)).
+  - **Limites ajoutées** : (aa) F-01 ; (ab) F-04 `~` résolu par le hook contre le `cwd` ; (ac) F-05 racine d'un dispatch
+    dérivée de `file_path` ou `notebook_path` ; (ad) F-06 poche `.claude/worktrees/<nom>` non adhérente créable par
+    `Write` ; (ae) F-07 `MultiEdit`, outils MCP et tout outil hors matcher ; F-08 : (z) réécrite, limite T-45-61 ajoutée
+    à la section G7, formulation de `--tentative` corrigée (option obligatoire vérifiée par la commande).
+- **G6 protège les scripts du hook** (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01) : `Write`,
+  `Edit` et `NotebookEdit` de `<lab>/.claude/scripts/planning-hook.sh` et `check-gates-alive.sh` (scope projet d'un
+  lab adhérent) sont refusés par G6 (armé) ; dérogation nominative possible ;
+  scope compte non protégé, Bash ouvert (P45-D-10). Un `.planning` situé sous un composant `.claude` n'est jamais
+  une racine de lab (amendement de P45-D-01a, décision du manager vf-dev-manager, 2026-10-01 ; exception
+  `.claude/worktrees/<nom>`), pour que cette protection ne se désarme pas par la création d'un tel dossier.
+- **`scripts/poser-verdict.sh` et `scripts/deroger-gate.sh`** : le premier pose `VERDICT.md` (hash sha256 du
+  `PLAN.md` et tentative calculés par la commande, seul chemin légitime une fois G5 armé) ; le second inscrit
+  une dérogation nominative (qui, canal, date, gate, chemin, raison non placeholder, jamais liée à l'urgence)
+  dans `.planning/derogations-gates.log`, append-only, à usage unique et citée par le hook.
+- **Levée du code 2 de `recalc-planning.sh` sous adhésion (GATE-14)** : un lab adhérent qui contient du code
+  (détecteur à 2, signalement de migration) est désormais écrit ; sans adhésion le refus est inchangé. Sort du
+  socle v2 (F10 = f10-archive, Willy, AskUserQuestion session principale, 2026-09-30) : `STATE.md` et `INDEX.md`
+  rédigés à la main sont archivés octet pour octet sous `.planning/_archive/socle-v2/` avant d'être remplacés.
+- **Corrections ciblées du 2026-10-01** (revue de phase, audit de sécurité, re-revue et re-audit ; décisions du
+  manager vf-dev-manager) : lot A (hook central : un `.planning` imbriqué n'est jamais une racine de lab, parseur
+  d'agents linéaire et borné, échéance interne, version active d'un plugin, commandes de verdict et de dérogation
+  durcies), lot B (rejeu : garde de lien, relevés anonymisés ; archivage du socle v2 en tout ou rien), lot C
+  (budget d'indexation des agents, libellé du doute d'adhésion, `.planning` en lien refusé au rejeu).
+- **`guard-planning-updated.sh` est conservé** (P45-D-19) : son entrée `Stop` de `hooks.json` est inchangée et il
+  reste en exit 2.
+- **Escalades vers Willy** : (1) l'armement — le nouveau rejeu réel sur des labs au repos est fait (relevé
+  `45-REJEU-FINAL.md`, `708debcb`) et l'armement s'est fait en cascade (Q-ARM, Willy, AskUserQuestion session
+  principale, 2026-09-30), la dernière étape étant ROLE (`239df76d`) : plus rien n'est ouvert ; (2) la protection du
+  script du hook est tranchée et appliquée (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01, limite
+  (y)) ; les réglages `.claude/settings*.json` restent non protégés (limite (y)) ; (3) G1 face à une phase dérogée
+  sans cadrage (constat de 45-06 : zéro occurrence sur les deux labs réels mesurés, la règle de gate reste
+  inchangée).
+- **Ce qui n'est PAS livré** : G2′, G3, G4, G4′ et D1 (Phases 46 et 47), la vérification du hash à la clôture
+  (Phase 46), le hook managed (hors périmètre) ; les drapeaux `phases_trace` et `options.gates` restent sans
+  effet (P45-D-01). Bump de module seul (P45-D-18) : la version racine, `plugin.json` et le marketplace ne
+  bougent pas, aucun tag, avant la clôture de `fiabilite-v1.0` (ADR-073).
+
 ## [v2.8.0] — 2026-09-28 (moteur de planning métier — modèle par cycles et recalcul d'état dérivé du disque, Phase 44)
 
 **Minor** (nouvelle capacité) :

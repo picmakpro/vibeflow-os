@@ -1,0 +1,899 @@
+@@ # Banc synthétique versionné des gates d'écriture du hook central (Phase 45, GATE-13). Format du
+@@ # banc de recalc-planning.sh (P44-D-06), étendu d'une directive d'écriture. Une ligne qui
+@@ # commence par « @@ » est une directive ; toute autre ligne appartient au fichier ouvert par le
+@@ # dernier « @@ fichier ». « @@ # <texte> » est un commentaire. « @@ lab <nom> [jumeau-de=<lab>] »
+@@ # ouvre un lab, « @@ dossier <chemin> » crée un dossier vide, « @@ fichier <chemin> » crée un
+@@ # fichier (contenu = les lignes suivantes jusqu'à la prochaine directive), « @@ lien <chemin> ->
+@@ # <cible> » crée un lien symbolique. Chemins relatifs à la racine du lab : aucun chemin absolu,
+@@ # aucun `~`, aucun `..`.
+@@ #
+@@ # Directive d'écriture (nouvelle) :
+@@ #   @@ ecriture <outil> <chemin-relatif-au-lab> [agent=<type>] [cwd=<relatif>] [commande=<texte>] :: <attendu> [<gate>]
+@@ # <outil> est Write, Edit, NotebookEdit ou Bash (pour Bash le chemin vaut `-` et `commande=` est
+@@ # la dernière option : son texte court jusqu'à ` :: `) ; `agent=` fixe agent_type du payload (absent :
+@@ # fil principal) ; `cwd=` est relatif à la racine du lab (défaut : la racine). <attendu> vaut
+@@ # `doit-passer` (aucun refus), `doit-refuser` (un deny), `avertit` (additionalContext qui nomme
+@@ # le gate, jamais une décision) ou `silence` (stdout vide, code 0). <gate> nomme le gate mesuré.
+@@ #
+@@ # Ce banc est un FICHIER TEXTE, pas une arborescence versionnée : l'installeur pose `fixtures/` à
+@@ # plat, et aucun dossier `.planning/` imbriqué n'est versionné dans ce dépôt. Le dossier de
+@@ # planning s'écrit `.planning/` dans le banc : c'est du texte.
+
+@@ lab g2-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-ouverte/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-ouverte/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-close/PLAN.md
+---
+ecrit: livrables/ancien.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-close/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/03-deroge/PLAN.md
+---
+ecrit: livrables/gele.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/03-deroge/DEROGATION.md
+---
+statut: gelé par willy
+---
+
+@@ fichier .planning/cycles/01-c/phases/04-abime/PLAN.md
+---
+ecrit: livrables/abime.md
+
+@@ fichier .planning/cycles/01-c/phases/05-suite/PLAN.md
+---
+ecrit: [livrables/suite.md, livrables/annexe]
+---
+
+@@ dossier sub
+
+@@ # Écritures par outil : couvertes par l'ecrit: d'un plan ouvert, ou sous .planning/ et .claude/ -> silence.
+@@ ecriture Write livrables/rapport.md :: silence G2
+@@ ecriture Edit livrables/rapport.md :: silence G2
+@@ ecriture Write livrables/suite.md :: silence G2
+@@ ecriture Write livrables/annexe/x.md :: silence G2
+@@ ecriture Write .planning/notes.md :: silence G2
+@@ ecriture Write .claude/agents/x.md :: silence G2
+@@ # Écritures hors de tout ecrit: ouvert -> avertissement (jamais un refus).
+@@ ecriture Write livrables/autre.md :: avertit G2
+@@ ecriture Edit livrables/autre.md :: avertit G2
+@@ ecriture NotebookEdit livrables/nb.ipynb :: avertit G2
+@@ # Un plan clos ou dérogé ne couvre rien ; un plan au frontmatter illisible est ignoré.
+@@ ecriture Write livrables/ancien.md :: avertit G2
+@@ ecriture Write livrables/gele.md :: avertit G2
+@@ ecriture Write livrables/abime.md :: avertit G2
+@@ # Fil principal et sous-agent : même comportement.
+@@ ecriture Write livrables/autre.md agent=general-purpose :: avertit G2
+@@ ecriture Write livrables/rapport.md agent=general-purpose :: silence G2
+@@ # Bash : détection seulement (P45-D-10).
+@@ ecriture Bash - commande=cat livrables/autre.md :: avertit G2
+@@ ecriture Bash - cwd=sub commande=cat ../livrables/autre.md :: avertit G2
+@@ ecriture Bash - commande=touch livrables/rapport.md :: silence G2
+@@ ecriture Bash - commande=cat .planning/notes.md :: silence G2
+@@ ecriture Bash - commande=echo 'guillemet ouvert :: silence G2
+
+@@ lab g2-dev jumeau-de=g2-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .planning/cycles/01-c/phases/01-ouverte/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ dossier sub
+
+@@ # Jumeau négatif : un lab dev ne reçoit ni avertissement ni octet.
+@@ ecriture Write livrables/autre.md :: silence G2
+@@ ecriture Edit livrables/autre.md :: silence G2
+@@ ecriture NotebookEdit livrables/nb.ipynb :: silence G2
+@@ ecriture Bash - commande=cat livrables/autre.md :: silence G2
+
+@@ # --- G5 (45-04, P45-D-07, P45-D-11) : écrire VERDICT.md par outil sous .planning/ d'un lab adhérent.
+@@ # Les cas doit-refuser / doit-passer se rejouent sur une COPIE ARMÉE du hook (option `armee`) : G5
+@@ # reste en observation dans le script livré, et un cas ne dépend jamais de l'état livré.
+@@ lab g5-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-30"
+---
+
+@@ dossier .planning/cycles/01-c/phases/01-p/plans/01-a
+
+@@ # Refus : tout outil d'écriture, toute casse, toute profondeur, tout rôle (fil principal compris).
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Edit .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: doit-refuser G5
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/verdict.md armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/plans/01-a/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Write .planning/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md agent=general-purpose armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md agent=vf-design-judge armee :: doit-refuser G5
+@@ # Passage : autres fichiers du modèle, nom voisin, livrable nommé verdict hors .planning/.
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/PLAN.md armee :: doit-passer G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/SUMMARY.md armee :: doit-passer G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT-notes.md armee :: doit-passer G5
+@@ ecriture Write livrables/verdict-client.md armee :: doit-passer G5
+@@ ecriture Write livrables/VERDICT.md armee :: doit-passer G5
+@@ ecriture Write livrables/rapport.md armee :: doit-passer G5
+
+@@ lab g5-dev jumeau-de=g5-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ # Jumeau négatif : un lab dev ne reçoit rien, même sur copie armée.
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: silence G5
+@@ ecriture Edit .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: silence G5
+
+@@ # --- G6 (45-05, GATE-04, P45-D-13) : écrire par outil un fichier généré, enfant direct du dossier de
+@@ # planning d'un lab adhérent, quel que soit le rôle. Même option `armee` que G5 : G6 reste en
+@@ # observation dans le script livré tant que le rejeu réel n'a pas armé l'étape 1.
+@@ lab g6-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/STATE.md
+etat genere
+
+@@ fichier .planning/INDEX.md
+index genere
+
+@@ fichier .planning/cloture.log
+2026-09-30T00:00:00+00:00  cloture  unite=01-c/01-p
+
+@@ fichier .planning/derogations-gates.log
+2026-09-30T00:00:00+00:00  derogation  id=1  gate=G1  chemin=livrables/autre.md  qui=willy  canal=test  date=2026-09-30  raison=cas%20du%20banc
+
+@@ fichier .planning/notes.md
+notes libres
+
+@@ fichier .planning/workstreams/x/STATE.md
+etat de compartiment
+
+@@ fichier .planning/compartments/x/STATE.md
+etat de compartiment
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .claude/scripts/planning-hook.sh
+#!/bin/bash
+# script du hook central, tel que l'installeur le pose en scope projet (banc)
+
+@@ fichier .claude/scripts/check-gates-alive.sh
+#!/bin/bash
+# canary de session, tel que l'installeur le pose en scope projet (banc)
+
+@@ fichier scripts/planning-hook.sh
+#!/bin/bash
+# un script de même nom hors de .claude/scripts : jumeau négatif
+
+@@ # Refus : chaque fichier généré, Write et Edit, fil principal, agent de plugin et agent inconnu.
+@@ ecriture Write .planning/STATE.md armee :: doit-refuser G6
+@@ ecriture Edit .planning/STATE.md armee :: doit-refuser G6
+@@ ecriture NotebookEdit .planning/STATE.md armee :: doit-refuser G6
+@@ ecriture Write .planning/INDEX.md armee :: doit-refuser G6
+@@ ecriture Edit .planning/INDEX.md armee :: doit-refuser G6
+@@ ecriture Write .planning/cloture.log armee :: doit-refuser G6
+@@ ecriture Edit .planning/cloture.log armee :: doit-refuser G6
+@@ ecriture Write .planning/derogations-gates.log armee :: doit-refuser G6
+@@ ecriture Edit .planning/derogations-gates.log armee :: doit-refuser G6
+@@ ecriture Write .planning/STATE.md agent=plugin-inconnu:agent-inconnu armee :: doit-refuser G6
+@@ ecriture Write .planning/STATE.md agent=general-purpose armee :: doit-refuser G6
+@@ # Passage : compartiments, plans du modèle, notes, livrables, noms voisins.
+@@ ecriture Write .planning/workstreams/x/STATE.md armee :: doit-passer G6
+@@ ecriture Write .planning/compartments/x/STATE.md armee :: doit-passer G6
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/PLAN.md armee :: doit-passer G6
+@@ ecriture Write .planning/notes.md armee :: doit-passer G6
+@@ ecriture Write .planning/STATE.md.bak armee :: doit-passer G6
+@@ ecriture Write livrables/rapport.md armee :: doit-passer G6
+@@ # Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : les scripts du hook, posés par l'installeur sous
+@@ # `.claude/scripts/` du lab (scope projet), sont protégés comme les fichiers générés ; Bash n'est pas couvert (P45-D-10).
+@@ ecriture Write .claude/scripts/planning-hook.sh armee :: doit-refuser G6
+@@ ecriture Edit .claude/scripts/planning-hook.sh armee :: doit-refuser G6
+@@ ecriture NotebookEdit .claude/scripts/planning-hook.sh armee :: doit-refuser G6
+@@ ecriture Write .claude/scripts/check-gates-alive.sh armee :: doit-refuser G6
+@@ ecriture Edit .claude/scripts/check-gates-alive.sh armee :: doit-refuser G6
+@@ ecriture NotebookEdit .claude/scripts/check-gates-alive.sh armee :: doit-refuser G6
+@@ ecriture Write .claude/scripts/planning-hook.sh agent=plugin-inconnu:agent-inconnu armee :: doit-refuser G6
+@@ ecriture Write .claude/scripts/Planning-Hook.sh armee :: doit-refuser G6
+@@ # Passage : un autre script du dossier, un nom voisin, le même nom hors de `.claude/scripts/`.
+@@ ecriture Write .claude/scripts/autre.sh armee :: doit-passer G6
+@@ ecriture Write .claude/scripts/planning-hook.sh.bak armee :: doit-passer G6
+@@ ecriture Write scripts/planning-hook.sh armee :: doit-passer G6
+
+@@ lab g6-dev jumeau-de=g6-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .planning/STATE.md
+etat ecrit a la main
+
+@@ fichier .claude/scripts/planning-hook.sh
+#!/bin/bash
+# script du hook d'un lab dev (hors adhésion : aucun gate ne le garde)
+
+@@ # Jumeau négatif : un lab dev écrit sa mémoire à la main, même sur copie armée.
+@@ ecriture Write .claude/scripts/planning-hook.sh armee :: doit-passer G6
+@@ ecriture Write .claude/scripts/planning-hook.sh armee :: silence G6
+@@ ecriture Edit .claude/scripts/planning-hook.sh armee :: silence G6
+@@ ecriture Write .planning/STATE.md armee :: silence G6
+@@ ecriture Edit .planning/STATE.md armee :: silence G6
+@@ ecriture Write .planning/INDEX.md armee :: silence G6
+
+@@ # --- G1 (45-06, GATE-06, spec §5) : écrire par Write ou Edit un PLAN.md de forme modèle dans une phase
+@@ # sans CADRAGE.md d'un lab adhérent. Même option `armee` : G1 reste en observation dans le script livré tant
+@@ # que le rejeu réel n'a pas armé l'étape 2. La phase jugée est la phase, jamais le plan (plans/<plan>/) ;
+@@ # un PLAN.md du socle v2 ou sous un nom d'unité invalide n'est jamais visé.
+@@ lab g1-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle G1
+rend: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-sans/PLAN.md
+---
+ecrit: livrables/a.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-clos/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Q ?"
+    structurante: oui
+    statut: ARBITRÉ
+    par: willy
+    le: "2026-09-30"
+    ou: "session principale"
+---
+
+@@ fichier .planning/cycles/01-c/phases/02-clos/PLAN.md
+---
+ecrit: livrables/b.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/03-vide/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/03-vide/PLAN.md
+---
+ecrit: livrables/c.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/04-ouvert/CADRAGE.md
+---
+inconnues:
+  - id: I-07
+    question: "Q ouverte ?"
+    structurante: oui
+---
+
+@@ fichier .planning/cycles/01-c/phases/04-ouvert/PLAN.md
+---
+ecrit: livrables/d.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/05-herite/CADRAGE.md
+---
+titre: ancien cadrage sans registre
+---
+
+@@ fichier .planning/cycles/01-c/phases/05-herite/PLAN.md
+---
+ecrit: livrables/e.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/06-plans/plans/01-a/PLAN.md
+---
+ecrit: livrables/f.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/07-plans-clos/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/07-plans-clos/plans/01-a/PLAN.md
+---
+ecrit: livrables/g.md
+---
+
+@@ dossier .planning/cycles/01-c/phases/08-neuve
+
+@@ fichier .planning/cycles/01-c/phases/09-fm-invalide/CADRAGE.md
+---
+inconnues: []
+
+@@ fichier .planning/cycles/01-c/phases/09-fm-invalide/PLAN.md
+---
+ecrit: livrables/h.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/10-registre-invalide/CADRAGE.md
+---
+inconnues:
+  - id: I-10
+    question: "Q ?"
+    structurante: peut-etre
+---
+
+@@ fichier .planning/cycles/01-c/phases/10-registre-invalide/PLAN.md
+---
+ecrit: livrables/i.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/11-lien/PLAN.md
+---
+ecrit: livrables/j.md
+---
+
+@@ lien .planning/cycles/01-c/phases/11-lien/CADRAGE.md -> cible-absente
+
+@@ fichier .planning/cycles/01-c/phases/12-dossier/PLAN.md
+---
+ecrit: livrables/k.md
+---
+
+@@ dossier .planning/cycles/01-c/phases/12-dossier/CADRAGE.md
+
+@@ fichier .planning/cycles/01-c/phases/13-autre/PLAN.md
+---
+ecrit: livrables/l.md
+---
+
+@@ dossier .planning/cycles/01-c/phases/13-autre/CLOTURE.md
+
+@@ fichier .planning/cycles/01-c/phases/14-quelconque/CADRAGE.md
+---
+inconnues:
+  - id: I-14
+    question: "Q ?"
+    structurante: oui
+    statut: n'importe quoi
+---
+
+@@ fichier .planning/cycles/01-c/phases/14-quelconque/PLAN.md
+---
+ecrit: livrables/m.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/15-non-structurante/CADRAGE.md
+---
+inconnues:
+  - id: I-15
+    question: "Q ?"
+    structurante: non
+---
+
+@@ fichier .planning/cycles/01-c/phases/15-non-structurante/PLAN.md
+---
+ecrit: livrables/n.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/16-deux-ouverts/CADRAGE.md
+---
+inconnues:
+  - id: I-21
+    question: "Q1 ?"
+    structurante: oui
+  - id: I-22
+    question: "Q2 ?"
+    structurante: oui
+---
+
+@@ fichier .planning/cycles/01-c/phases/16-deux-ouverts/PLAN.md
+---
+ecrit: livrables/o.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/17-mixte/CADRAGE.md
+---
+inconnues:
+  - id: I-31
+    question: "Q1 ?"
+    structurante: oui
+  - id: I-32
+    question: "Q2 ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/17-mixte/PLAN.md
+---
+ecrit: livrables/p.md
+---
+
+@@ # Refus : phase sans CADRAGE.md, plan direct et sous plans/, phase encore vide, Write comme Edit, tout rôle.
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: doit-refuser G1
+@@ ecriture Edit .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/PLAN.md agent=general-purpose armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/06-plans/plans/01-a/PLAN.md armee :: doit-refuser G1
+@@ ecriture Edit .planning/cycles/01-c/phases/06-plans/plans/01-a/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/08-neuve/PLAN.md armee :: doit-refuser G1
+@@ # Refus : registre ouvert (une ligne structurante: oui sans statut), Write comme Edit, plan direct ou sous plans/ ;
+@@ # l'ABSENCE de CADRAGE.md est refusée même quand un AUTRE fichier de la phase est non régulier (fixture E).
+@@ ecriture Write .planning/cycles/01-c/phases/04-ouvert/PLAN.md armee :: doit-refuser G1
+@@ ecriture Edit .planning/cycles/01-c/phases/04-ouvert/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/16-deux-ouverts/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/17-mixte/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/13-autre/PLAN.md armee :: doit-refuser G1
+@@ # Passage : la valeur d'un statut n'est jamais jugée (toute valeur non vide ferme la ligne), structurante: non sans statut ;
+@@ # états que le modèle ne peut pas lire (F5 = f5-etats : frontmatter invalide, registre invalide, CADRAGE.md en lien ou en dossier).
+@@ ecriture Write .planning/cycles/01-c/phases/14-quelconque/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/15-non-structurante/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/09-fm-invalide/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/10-registre-invalide/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/11-lien/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/12-dossier/PLAN.md armee :: doit-passer G1
+@@ # Passage : phase à CADRAGE.md clos, à `inconnues: []`, au format hérité ; plan sous une phase cadrée ; autres
+@@ # fichiers du modèle ; PLAN.md du socle v2 ou sous un nom d'unité invalide ; PLAN.md hors de .planning/.
+@@ ecriture Write .planning/cycles/01-c/phases/02-clos/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/03-vide/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/05-herite/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/07-plans-clos/plans/01-a/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/SUMMARY.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/PLAN.md.bak armee :: doit-passer G1
+@@ ecriture Write .planning/phases/01-x/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/sans-numero/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/plans/x/PLAN.md armee :: doit-passer G1
+@@ ecriture Write livrables/PLAN.md armee :: doit-passer G1
+
+@@ lab g1-dev jumeau-de=g1-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .planning/cycles/01-c/phases/01-sans/PLAN.md
+---
+ecrit: livrables/a.md
+---
+
+@@ # Jumeau négatif : un lab dev écrit ses plans à la main, même sur copie armée.
+@@ ecriture Write .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: silence G1
+@@ ecriture Edit .planning/cycles/01-c/phases/01-sans/PLAN.md armee :: silence G1
+@@ ecriture Write .planning/cycles/01-c/phases/08-neuve/PLAN.md armee :: silence G1
+
+@@ # --- G7 (45-07, GATE-07, spec §2 D-05) : créer par Write ou NotebookEdit un .planning/ dans un dossier X sans marqueur de
+@@ # projet de code ni .claude/ habité, sous un lab adhérent. Même option `armee` : G7 reste en observation dans le script
+@@ # livré tant que le rejeu réel n'a pas armé l'étape 3. Le dossier zone/ est couvert par l'ecrit: d'un plan ouvert : G2
+@@ # (avertit) se tait, l'observation de G7 est le seul signal. Un dossier `code-<marqueur>/` porte le marqueur de code du
+@@ # même nom (les onze noms du détecteur et un dossier *.xcodeproj) ; les dossiers code-dossier, code-casse et
+@@ # code-fichier-xcode portent un FAUX marqueur (dossier nommé package.json, lien cassé, fichier nommé App.xcodeproj).
+@@ lab g7-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle G7
+rend: zone/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: zone
+---
+
+@@ dossier zone/nu
+@@ fichier zone/code-package.json/package.json
+@@ fichier zone/code-go.mod/go.mod
+@@ fichier zone/code-Cargo.toml/Cargo.toml
+@@ fichier zone/code-pyproject.toml/pyproject.toml
+@@ fichier zone/code-pom.xml/pom.xml
+@@ fichier zone/code-build.gradle/build.gradle
+@@ fichier zone/code-build.gradle.kts/build.gradle.kts
+@@ fichier zone/code-composer.json/composer.json
+@@ fichier zone/code-Gemfile/Gemfile
+@@ fichier zone/code-tsconfig.json/tsconfig.json
+@@ fichier zone/code-Package.swift/Package.swift
+@@ dossier zone/code-App.xcodeproj/App.xcodeproj
+@@ fichier zone/cible/fichier.txt
+x
+@@ lien zone/code-lien/go.mod -> ../cible/fichier.txt
+@@ lien zone/code-casse/go.mod -> ../n-existe-pas
+@@ dossier zone/code-dossier/package.json
+@@ fichier zone/code-fichier-xcode/App.xcodeproj
+x
+@@ fichier zone/existant/.planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier zone/existant/.planning/notes.md
+n
+
+@@ # Prédicat « habité » (P45-D-14, littéral) : un .claude/ habité porte au moins un agents/*.md régulier ET au moins un fichier
+@@ # régulier sous memory/. hab-ok et hab-profond sont habités ; les autres ne le sont pas : agents seuls, mémoire seule,
+@@ # agent-memory/ sans fichier, .claude/ vide, agents/x.md en lien, memory/m.md en lien, memory/ sans fichier, agents/ sans .md.
+@@ fichier zone/hab-ok/.claude/agents/a.md
+a
+@@ fichier zone/hab-ok/.claude/memory/m.md
+m
+@@ fichier zone/hab-profond/.claude/agents/a.md
+a
+@@ fichier zone/hab-profond/.claude/memory/sous/profond/m.md
+m
+@@ fichier zone/hab-agents/.claude/agents/a.md
+a
+@@ fichier zone/hab-memoire/.claude/memory/m.md
+m
+@@ dossier zone/hab-agent-memory/.claude/agent-memory
+@@ dossier zone/hab-vide/.claude
+@@ lien zone/hab-lien/.claude/agents/x.md -> ../../../cible/fichier.txt
+@@ fichier zone/hab-lien/.claude/memory/m.md
+m
+@@ fichier zone/hab-memoire-vide/.claude/agents/a.md
+a
+@@ dossier zone/hab-memoire-vide/.claude/memory/vide
+@@ fichier zone/hab-memoire-lien/.claude/agents/a.md
+a
+@@ lien zone/hab-memoire-lien/.claude/memory/m.md -> ../../../cible/fichier.txt
+@@ fichier zone/hab-txt/.claude/agents/notes.txt
+n
+@@ fichier zone/hab-txt/.claude/memory/m.md
+m
+
+@@ # Refus : la création d'un .planning/ dans un dossier nu, Write comme NotebookEdit, tout rôle, dossier existant ou à créer,
+@@ # faux marqueurs (un dossier nommé package.json, un lien cassé, un fichier nommé App.xcodeproj), .claude/ non habité.
+@@ ecriture Write zone/nu/.planning/config.json armee :: doit-refuser G7
+@@ ecriture NotebookEdit zone/nu/.planning/x.ipynb armee :: doit-refuser G7
+@@ ecriture Write zone/nu/.planning/config.json agent=general-purpose armee :: doit-refuser G7
+@@ ecriture Write zone/nouveau/profond/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/code-dossier/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/code-casse/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/code-fichier-xcode/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-agents/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-memoire/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-agent-memory/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-vide/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-lien/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-memoire-vide/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-memoire-lien/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write zone/hab-txt/.planning/config.json armee :: doit-refuser G7
+@@ # Passage : un marqueur de code (les douze, dont un lien vers un fichier), un .claude/ habité (deux cas), puis tout ce qui ne crée pas un .planning/ dans un
+@@ # dossier nu : un .planning/ qui existe déjà, un Edit (ne crée pas de fichier), un dossier `planning` sans point, un
+@@ # fichier ordinaire, le dossier de planning du lab.
+@@ ecriture Write zone/code-package.json/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-go.mod/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-Cargo.toml/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-pyproject.toml/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-pom.xml/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-build.gradle/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-build.gradle.kts/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-composer.json/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-Gemfile/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-tsconfig.json/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-Package.swift/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-App.xcodeproj/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/code-lien/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/hab-ok/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/hab-profond/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/existant/.planning/notes.md armee :: doit-passer G7
+@@ ecriture Edit zone/nu/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/nu/planning/config.json armee :: doit-passer G7
+@@ ecriture Write zone/nu/notes.md armee :: doit-passer G7
+@@ ecriture Write .planning/notes.md armee :: doit-passer G7
+
+@@ lab g7-dev jumeau-de=g7-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ dossier zone/nu
+
+@@ # Jumeau négatif : un lab dev crée ses plannings imbriqués à la main, même sur copie armée.
+@@ ecriture Write zone/nu/.planning/config.json armee :: silence G7
+@@ ecriture NotebookEdit zone/nu/.planning/x.ipynb armee :: silence G7
+
+@@ # --- ROLE (45-08, GATE-09, P45-D-04, P45-D-05, P45-D-05b, P45-D-11) : le hook par rôle dérive le rôle de l'agent écrivain de sa
+@@ # définition sous `.claude/agents/` du lab (agent_type = name: du frontmatter, à défaut le nom de fichier ; comparaison
+@@ # normalisée : casse, `_`, espace et `-`). Même option `armee` : le rôle reste en observation dans le script livré tant que
+@@ # le rejeu réel n'a pas armé l'étape 4. Agents du lab : juge-test (juge), Juge_Mixte (juge, name: en casse mixte), sans-nom
+@@ # (juge, sans name:), double (juge, le compte en définit un producteur dans la suite), ambigu-a et ambigu-b (deux définitions
+@@ # de rôles différents sous le même name: : inconnu), abime (frontmatter jamais refermé : illisible), manager-test (manager),
+@@ # producteur-test (producteur), worker-vide (worker sans allowlist), worker-liste et worker-task (workers dont l'allowlist
+@@ # contient vf-crafter, écrite Agent(...) puis Task(...)). G2 avertit sur un livrable hors ecrit: : un doit-passer l'accepte.
+@@ lab role-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .claude/agents/juge-test.md
+---
+name: juge-test
+description: Juge du banc du rôle
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+vf-internal: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/juge-mixte.md
+---
+name: Juge_Mixte
+description: Juge du banc du rôle, name: en casse mixte
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/sans-nom.md
+---
+description: Juge du banc du rôle, sans name:
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/double.md
+---
+name: double
+description: Juge du lab, homonyme d'un producteur du compte
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/ambigu-a.md
+---
+name: ambigu
+description: Première définition contradictoire (juge)
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+---
+Corps.
+
+@@ fichier .claude/agents/ambigu-b.md
+---
+name: ambigu
+description: Seconde définition contradictoire (producteur)
+tools: Read, Write
+---
+Corps.
+
+@@ fichier .claude/agents/abime.md
+---
+name: abime
+description: frontmatter jamais refermé
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+
+@@ fichier .claude/agents/manager-test.md
+---
+name: manager-test
+description: Manager du banc du rôle
+tools: Read, Write, SendMessage, Agent(worker-liste, vf-crafter)
+---
+Corps du manager.
+
+@@ fichier .claude/agents/producteur-test.md
+---
+name: producteur-test
+description: Producteur du banc du rôle
+tools: Read, Write
+---
+Corps du producteur.
+
+@@ fichier .claude/agents/worker-vide.md
+---
+name: worker-vide
+description: Worker interne du banc du rôle, sans allowlist
+tools: Read, Write
+vf-internal: true
+---
+Corps du worker.
+
+@@ fichier .claude/agents/worker-liste.md
+---
+name: worker-liste
+description: Worker interne du banc du rôle, allowlist Agent(...)
+tools: Read, Write, Agent(vf-crafter, autre-agent)
+vf-internal: true
+---
+Corps du worker.
+
+@@ fichier .claude/agents/worker-task.md
+---
+name: worker-task
+description: Worker interne du banc du rôle, allowlist Task(...)
+tools: Read, Write, Task(vf-crafter)
+vf-internal: true
+---
+Corps du worker.
+
+@@ # Refus : toute écriture par outil d'un juge du lab — Write, Edit, NotebookEdit, toute casse (normalisation), name: en casse mixte,
+@@ # nom de fichier en repli, le juge du lab qui masque un producteur du compte.
+@@ ecriture Write livrables/x.md agent=juge-test armee :: doit-refuser ROLE
+@@ ecriture Edit livrables/x.md agent=juge-test armee :: doit-refuser ROLE
+@@ ecriture NotebookEdit livrables/x.ipynb agent=juge-test armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=Juge_Test armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=JUGE-TEST armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=juge-mixte armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=sans-nom armee :: doit-refuser ROLE
+@@ ecriture Write livrables/x.md agent=double armee :: doit-refuser ROLE
+@@ ecriture Write .planning/notes.md agent=juge-test armee :: doit-refuser ROLE
+@@ # Passage : fil principal, agent inconnu, agent de plugin non résolu, manager, producteur, workers, définitions ambiguë et illisible
+@@ # (un agent dont la définition n'est pas trouvée n'est pas traité en juge : limite déclarée, P45-D-11).
+@@ ecriture Write livrables/x.md armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=agent-inconnu armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=plugin-x:agent-y armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=manager-test armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=producteur-test armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=worker-vide armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=worker-liste armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=worker-task armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=ambigu armee :: doit-passer ROLE
+@@ ecriture Write livrables/x.md agent=abime armee :: doit-passer ROLE
+@@ ecriture Bash - agent=juge-test armee commande=cat livrables/x.md :: doit-passer ROLE
+@@ # Dispatch (F9 = f9-allowlist, Willy, AskUserQuestion session principale, 2026-09-30) : un worker ne dispatche que ce que SA
+@@ # propre allowlist Agent(...) / Task(...) autorise, sous les deux tool_name ; allowlist vide : tout refusé ; comparaison du
+@@ # subagent_type normalisé (casse, `_`, espace, `-`), égalité sur la chaîne entière, aucun préfixe retiré. Option `sous=` : le
+@@ # subagent_type du payload.
+@@ ecriture Agent - agent=worker-liste sous=vf-crafter armee :: doit-passer ROLE
+@@ ecriture Task - agent=worker-liste sous=vf-crafter armee :: doit-passer ROLE
+@@ ecriture Agent - agent=worker-liste sous=autre-agent armee :: doit-passer ROLE
+@@ ecriture Task - agent=worker-liste sous=AUTRE_AGENT armee :: doit-passer ROLE
+@@ ecriture Agent - agent=worker-task sous=vf-crafter armee :: doit-passer ROLE
+@@ ecriture Task - agent=worker-task sous=vf-crafter armee :: doit-passer ROLE
+@@ ecriture Agent - agent=worker-liste sous=hors-liste armee :: doit-refuser ROLE
+@@ ecriture Task - agent=worker-liste sous=hors-liste armee :: doit-refuser ROLE
+@@ ecriture Agent - agent=worker-liste sous=autre:vf-crafter armee :: doit-refuser ROLE
+@@ ecriture Task - agent=worker-liste sous=autre:vf-crafter armee :: doit-refuser ROLE
+@@ ecriture Agent - agent=worker-task sous=autre-agent armee :: doit-refuser ROLE
+@@ ecriture Task - agent=worker-task sous=autre-agent armee :: doit-refuser ROLE
+@@ ecriture Agent - agent=worker-vide sous=vf-crafter armee :: doit-refuser ROLE
+@@ ecriture Task - agent=worker-vide sous=vf-crafter armee :: doit-refuser ROLE
+@@ ecriture Agent - agent=worker-vide sous=general-purpose armee :: doit-refuser ROLE
+@@ # Dispatch : manager, producteur, juge, fil principal, agent inconnu, définitions ambiguë et illisible : jamais un refus de rôle.
+@@ ecriture Agent - agent=manager-test sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - agent=manager-test sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Agent - agent=producteur-test sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - agent=juge-test sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Agent - sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Agent - agent=agent-inconnu sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - agent=plugin-x:agent-y sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Agent - agent=ambigu sous=hors-liste armee :: doit-passer ROLE
+@@ ecriture Task - agent=abime sous=hors-liste armee :: doit-passer ROLE
+
+@@ lab role-dev jumeau-de=role-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .claude/agents/juge-test.md
+---
+name: juge-test
+description: Juge du banc du rôle
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+vf-internal: true
+---
+Corps du juge.
+
+@@ fichier .claude/agents/worker-vide.md
+---
+name: worker-vide
+description: Worker interne du banc du rôle, sans allowlist
+tools: Read, Write
+vf-internal: true
+---
+Corps du worker.
+
+@@ # Jumeau négatif : un lab dev, ce dépôt compris, reste silencieux pour tout rôle, même sur copie armée (P45-D-04).
+@@ ecriture Write livrables/x.md agent=juge-test armee :: silence ROLE
+@@ ecriture Edit livrables/x.md agent=juge-test armee :: silence ROLE
+@@ ecriture NotebookEdit livrables/x.ipynb agent=juge-test armee :: silence ROLE
+@@ ecriture Write livrables/x.md agent=worker-vide armee :: silence ROLE
+@@ ecriture Write livrables/x.md armee :: silence ROLE
+@@ ecriture Bash - agent=juge-test armee commande=cat livrables/x.md :: silence ROLE
+@@ ecriture Agent - agent=worker-vide sous=vf-crafter armee :: silence ROLE
+@@ ecriture Task - agent=worker-vide sous=vf-crafter armee :: silence ROLE
+@@ ecriture Agent - sous=hors-liste armee :: silence ROLE
+
+@@ # --- Lot A (B1/H1, amendement de P45-D-01a, décision du manager vf-dev-manager, 2026-10-01) : un dossier
+@@ # `.planning` situé dans (ou sous) un composant `.planning` n'est jamais une racine de lab. Trois formes
+@@ # imbriquées dans le même lab (`.planning/.planning`, `.planning/cycles/.planning`, `<phase>/.planning`) :
+@@ # G6, G5 et G1 gardent comme sans imbrication (sur copie armée), un lab dev ne reçoit rien.
+@@ lab imbrique-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ dossier .planning/.planning
+@@ dossier .planning/cycles/.planning
+@@ dossier .planning/cycles/01-c/phases/01-p/.planning
+
+@@ ecriture Write .planning/STATE.md armee :: doit-refuser G6
+@@ ecriture Edit .planning/INDEX.md armee :: doit-refuser G6
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md agent=agent-inconnu armee :: doit-refuser G5
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/PLAN.md armee :: doit-refuser G1
+@@ ecriture Edit .planning/cycles/01-c/phases/01-p/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/SUMMARY.md armee :: doit-passer G5
+@@ ecriture Write livrables/rapport.md armee :: doit-passer G5
+
+@@ lab imbrique-dev jumeau-de=imbrique-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ dossier .planning/.planning
+@@ dossier .planning/cycles/.planning
+@@ dossier .planning/cycles/01-c/phases/01-p/.planning
+
+@@ ecriture Write .planning/STATE.md armee :: silence G6
+@@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: silence G5

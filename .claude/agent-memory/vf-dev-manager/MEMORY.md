@@ -84,5 +84,9 @@
 - [Phase créée = ferme ; révélée = consigne](feedback_phase-cree-ferme-revele-consigne.md) — « ne pas élargir » ne couvre QUE le pré-existant ; une incohérence que la phase vient de créer se ferme, même hors files_modified
 - [Cas vert des deux côtés ne garde rien](feedback_cas-vert-des-deux-cotes-ne-garde-rien.md) — ne pas le rendre discriminant de force, mais le renommer : le coût est le crédit qu'on lui accorde, pas le cas inutile
 - [Escalade : attendre la vraie réponse](feedback_escalade-sendmessage-attendre-la-vraie-reponse.md) — une notification de tâche de fond n'est jamais la réponse de l'humain ; incident d'arbitrage fabriqué, Phase 18
+- [Classifieur refuse les fixtures adverses](project_classifieur-refuse-fixtures-adverses.md) — « Instruction Poisoning » sur un bloc de test adverse : chaîne gelée ; faire autoriser avant, jamais contourner
+- [Correctif de sécurité : différentiel à N versions](feedback_correctif-de-securite-differentiel-a-n-versions.md) — 4 tours sur une même classe de chemin ; seul le différentiel contre la version d'avant le 1er correctif a convergé
+- [Attendre au premier plan](project_attente-au-premier-plan.md) — un tour fini en attente = remise forcée ; un worker aux suites en arrière-plan s'endort : sonder en Python, suites au premier plan
+- [Exécuteurs forcés en worktree](project_executeurs-forces-en-worktree.md) — garde du harnais : chaque plan sur une branche d'agent ; vérifier la base, rapatrier en ff, rejouer la non-régression
 - [.worktreeinclude lu dans l arbre principal](project_worktreeinclude-lu-dans-l-arbre-principal.md) — worktree isolé part d origin/main, hérite des ignorés selon l arbre NON commité du principal
 - [Commiter avant de rendre](feedback_commiter-avant-de-rendre.md) — 2 workers figés après rédaction, avant commit : exiger le commit avant le rapport, aucun rejeu long en fin de mandat

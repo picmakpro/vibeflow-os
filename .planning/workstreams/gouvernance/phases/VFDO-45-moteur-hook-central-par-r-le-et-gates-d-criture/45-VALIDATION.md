@@ -66,7 +66,7 @@ Rempli par les plans (`45-NN-PLAN.md`) ; la correspondance exigence -> commande 
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Rejeu réel des gates sur les labs adhérents réels (comptes, faux refus) | GATE-13 | les labs réels sont machine-locaux, hors CI | lancer l'outil de rejeu lecture seule avec les chemins en argument ; joindre le rapport nominatif ; armement mécanique (P45-D-03b) à zéro faux refus et zéro faux accept — les « refus conformes au modèle, lab non migré » sont comptés à part (P45-D-21a) ; escalade à Willy seulement sur un faux refus ou faux accept non nul |
+| Rejeu réel des gates sur les labs adhérents réels (comptes, faux refus) | GATE-13 | les labs réels sont machine-locaux, hors CI | lancer l'outil de rejeu lecture seule avec les chemins en argument ; joindre le rapport nominatif ; armement mécanique (P45-D-03b) à zéro faux refus et zéro faux accept — les « refus conformes au modèle, lab non migré » sont comptés à part (P45-D-21a) ; escalade à Willy seulement sur un faux refus ou faux accept non nul**Fait le 2026-10-01** : rejeu réel final sur le hook livré, 0 faux refus, 0 faux accept, empreintes d'arbre identiques pour les deux labs (voir `45-REJEU-FINAL.md`, commit `708debcb`) ; armement en cascade ensuite (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30). |
 
 ---
 

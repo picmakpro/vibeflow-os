@@ -1,0 +1,438 @@
+{
+  "nodes": [
+    {
+      "id": "fix-45-D",
+      "step": "lot D commite (fd8aeee3, 04ac70aa)",
+      "stage": "execute",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "verif-D",
+      "step": "lot D : suites, mutants, traces, SUMMARY quick 261001-dzl",
+      "stage": "verify",
+      "deps": [
+        "fix-45-D"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/quick/261001-dzl-lot-d-phase-45-g6-prot-ge-scripts-du-hoo"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-D",
+      "step": "revue du diff lot D",
+      "stage": "review",
+      "deps": [
+        "fix-45-D"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "nonreg-D",
+      "step": "non-regression complete (manager, comm contre base)",
+      "stage": "verify",
+      "deps": [
+        "verif-D",
+        "revue-D"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "rejeu-final-4",
+      "step": "rejeu reel final etape 4 Keystone + BusinessFlow",
+      "stage": "verify",
+      "deps": [
+        "nonreg-D",
+        "nonreg-E"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arm-1",
+      "step": "armement G6+G5",
+      "stage": "execute",
+      "deps": [
+        "rejeu-final-4",
+        "fix-45-F"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arm-2",
+      "step": "armement G1",
+      "stage": "execute",
+      "deps": [
+        "arm-1"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arm-3",
+      "step": "armement G7",
+      "stage": "execute",
+      "deps": [
+        "arm-2"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "arm-4",
+      "step": "armement role",
+      "stage": "execute",
+      "deps": [
+        "arm-3"
+      ],
+      "scope": [
+        "plugin/planning-core/scripts/planning-hook.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "maj-45-10",
+      "step": "reference, CHANGELOG, SUMMARY 45-10 a l'etat arme",
+      "stage": "execute",
+      "deps": [
+        "arm-4",
+        "revue-arm",
+        "nonreg-arm"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verif-45",
+      "step": "gsd-verifier phase 45 --ws gouvernance",
+      "stage": "verify",
+      "deps": [
+        "maj-45-10"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire (audit read-only)",
+      "stage": "docs",
+      "deps": [
+        "maj-45-10"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "livraison-45",
+      "step": "ROADMAP/STATE, gates planning, push, PR sans merge, CI",
+      "stage": "ship",
+      "deps": [
+        "verif-45",
+        "docs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-45-E",
+      "step": "lot E : F1 racine sous .claude, F2 limites, F3 test creation alias, F4 textes perimes + liste scripts comparee",
+      "stage": "execute",
+      "deps": [
+        "revue-D"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        "plugin/_internal/tests"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-E",
+      "step": "re-revue lot E",
+      "stage": "review",
+      "deps": [
+        "fix-45-E"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "nonreg-E",
+      "step": "non-regression complete apres lot E",
+      "stage": "verify",
+      "deps": [
+        "revue-E",
+        "nonreg-D"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-45-F",
+      "step": "lot F : M1 limite lien dans le lab, M2 README, M3 phrase (o), M4 casse vf_cl EXT-16, M5 variante d",
+      "stage": "execute",
+      "deps": [
+        "rejeu-final-4"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "nonreg-arm",
+      "step": "non-regression complete apres armement",
+      "stage": "",
+      "deps": [
+        "arm-4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-arm",
+      "step": "revue du diff d armement",
+      "stage": "",
+      "deps": [
+        "arm-4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-ci-puce",
+      "step": "mutant MUT-PUCE-REGEX-CHAMP deterministe",
+      "stage": "",
+      "deps": [
+        "livraison-45"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-final",
+      "step": "audit securite final 0c5e631..eb8165e4",
+      "stage": "",
+      "deps": [
+        "fix-ci-puce"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-audit-final",
+      "step": "F-01 F-02 F-03 corriges, F-04..F-08 limites, rejeu post-audit",
+      "stage": "",
+      "deps": [
+        "audit-final"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs-verify",
+      "step": "gsd-docs-update --verify-only (perimetre phase 45)",
+      "stage": "",
+      "deps": [
+        "fix-audit-final"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-audit",
+      "step": "re-audit 1 : OPEN_THREATS N-01 N-03",
+      "stage": "",
+      "deps": [
+        "fix-audit-final"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-reaudit",
+      "step": "N-01 N-03 corriges, N-02 N-04 N-05 N-06",
+      "stage": "",
+      "deps": [
+        "re-audit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-audit-2",
+      "step": "re-audit tour 2 (699ee250..6d2e5a73)",
+      "stage": "",
+      "deps": [
+        "fix-reaudit"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "docs-write",
+      "step": "mise a jour doc produit (ad8ff6a1, 8fb37832)",
+      "stage": "",
+      "deps": [
+        "docs-verify"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "remap",
+      "step": "gsd-map-codebase, .planning/codebase",
+      "stage": "",
+      "deps": [
+        "docs-write"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-reaudit-2",
+      "step": "N2-01 classe chemin inanalysable, preuve generative",
+      "stage": "",
+      "deps": [
+        "re-audit-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-audit-3",
+      "step": "re-audit tour 3 cible N2-01 (24b58748..079e905f)",
+      "stage": "",
+      "deps": [
+        "fix-reaudit-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-reaudit-3",
+      "step": "N3-01 reduction lexicale, N3-02, F2-F6 declares, differentiel 3 versions",
+      "stage": "",
+      "deps": [
+        "re-audit-3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "re-audit-4",
+      "step": "re-audit final tour 4 (d19835c5..cdf96c42)",
+      "stage": "",
+      "deps": [
+        "fix-reaudit-3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "limites-finales",
+      "step": "N4-01..N4-06 declares, aucune modif de comportement",
+      "stage": "",
+      "deps": [
+        "re-audit-4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "cloture-45",
+      "step": "cloture : VERIFICATION 15/15, GATE-15, ROADMAP, STATE, CONCERNS",
+      "stage": "",
+      "deps": [
+        "limites-finales"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "livraison-finale",
+      "step": "gates planning, push, CI PR deux runs",
+      "stage": "",
+      "deps": [
+        "cloture-45"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "prefiltre",
+      "step": "pre-filtre shell hors adhesion (revue Samuel PR 124)",
+      "stage": "",
+      "deps": [
+        "livraison-finale"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "audit-prefiltre",
+      "step": "re-audit securite cible du pre-filtre",
+      "stage": "",
+      "deps": [
+        "prefiltre"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-prefiltre",
+      "step": "F-P1 cout cubique _pk + borne 1024/64, F-P2 bande 4083-4096",
+      "stage": "",
+      "deps": [
+        "audit-prefiltre"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-prefiltre-2",
+      "step": "F-P3 borne de taille config + budget grep, F-P4 _pa initialise",
+      "stage": "",
+      "deps": [
+        "fix-prefiltre"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "reponse-samuel",
+      "step": "STATE, commentaire PR, CI",
+      "stage": "",
+      "deps": [
+        "fix-prefiltre-2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "flake-doc-drift",
+      "step": "test-check-doc-drift cas 19 intermittent en CI",
+      "stage": "",
+      "deps": [
+        "reponse-samuel"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}

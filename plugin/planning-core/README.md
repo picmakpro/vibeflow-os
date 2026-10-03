@@ -7,7 +7,7 @@
 > Sur un lab de code, le planning du **projet** appartient au moteur de développement : ce module
 > redirige vers le verbe adéquat au lieu de produire un format concurrent (ADR-055).
 
-**Type** : `skill + references + scripts` · **Version** : v2.8.0 · **Dépend de** : rien.
+**Type** : `skill + references + scripts` · **Version** : v2.9.0 · **Dépend de** : rien.
 
 ---
 
@@ -85,15 +85,22 @@ planning-core/
     templates/                 # 10 gabarits universels neutres-métier
     templates/cycles/          # 8 gabarits du modèle par cycles
   scripts/
+    check-gates-alive.sh       # canary de session du hook central (SessionStart, advisory, Phase 45)
     check-planning-state.sh    # garde-fou fraîcheur de STATE.md (advisory)
+    deroger-gate.sh            # dérogation nominative à un gate d'écriture, journal append-only (Phase 45)
     detect-gsd-engine.sh       # fait « un moteur GSD est-il en place ? » (4 exits)
     detect-planning-debt.sh    # 8e signal de dette : dette de planning (ADR-040)
     guard-planning-updated.sh  # gate bloquant : planning à jour avant clôture (exception motivée)
     planning-context.sh        # contexte planning injecté en session
+    planning-hook.sh           # hook central PreToolUse : gates d'écriture et cloisonnement par rôle (Phase 45)
     planning-session-snapshot.sh  # snapshot de fin de session
     planning-task-context.sh   # contexte par tâche
+    poser-verdict.sh           # seul chemin légitime vers VERDICT.md : hash et tentative calculés (Phase 45)
     recalc-planning.sh         # recalcul d'état dérivé du disque, modèle par cycles (Python embarqué)
-    tests/                     # 9 suites (planning-core, hooks, hardening, detect-*, recalc-planning)
+    rejeu-gates.sh             # rejeu en lecture seule d'un lab sur copie : faux refus, faux accept (Phase 45)
+    rejeu-reel.sh              # geste de rejeu sur lab réel, empreinte de tout l'arbre avant et après (Phase 45)
+    workstream-policy.sh       # politique unique de nom de workstream, à sourcer (suite test-workstream-policy.sh)
+    tests/                     # 12 suites (planning-core, hooks, hardening, detect-*, recalc-planning, gates, rejeu)
 ```
 
 ## Moteur par cycles (recalc-planning.sh)
@@ -104,6 +111,21 @@ modèle (`"planning_version": "cycles-v1"` dans `.planning/config.json`) obtient
 (append-only) régénérés, avec un cache incrémental par hash du contenu. Sans cette adhésion, ou
 sur un planning détecté comme tenu par GSD, le recalcul **refuse d'écrire** — mode `--read-only`
 disponible sur n'importe quel planning, adhérent ou non, sortie JSON sur la sortie standard
-uniquement. Aucun hook n'est câblé dans cette phase (arrivera avec les gates, 45+) ; le socle
-existant décrit ci-dessus reste inchangé et toujours actif pour tout lab qui n'a pas adhéré.
-Détail complet : `references/modele-cycles.md`.
+uniquement. Le socle existant décrit ci-dessus reste inchangé et toujours actif pour tout lab qui
+n'a pas adhéré. Détail complet : `references/modele-cycles.md`.
+
+## Hook central (Phase 45)
+
+Un hook `PreToolUse` unique (`scripts/planning-hook.sh`) porte les gates d'écriture du moteur (G1, G2,
+G5, G6, G7) et le cloisonnement par rôle de la fabrique d'agents. Il n'agit que dans un lab qui a
+adhéré à `cycles-v1` et reste **fail-closed** dans ce lab seulement (la commande enregistrée refuse les
+écritures par outil quand le script ou `python3` manque, `Bash` restant ouvert pour la réparation) ;
+partout ailleurs, labs de développement compris, il ne sort rien. **État livré : G6, G5, G1, G7 et le
+cloisonnement par rôle sont armés (étapes 1 à 4) : ils refusent, fermés sur défaillance** ; seul G2
+avertit. L'arbitrage de Willy qu'attendait l'armement est rendu et appliqué
+(Q-ARM, AskUserQuestion session principale, 2026-09-30) ; le rejeu réel final sur des labs au repos
+est fait (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`) et l'armement s'est fait par
+étapes, dans un ordre fixe, un commit par étape. Ce que le hook refuse, observe ou laisse passer, ses limites
+déclarées, la dérogation, la commande de verdict, le canary et le rejeu sont décrits dans la section
+« Hook central et gates d'écriture (Phase 45) » de `references/modele-cycles.md`, tenue identique au
+code par un contrôle croisé en CI.

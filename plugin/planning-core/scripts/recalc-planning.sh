@@ -585,11 +585,15 @@ def _lecture_detecteur_fidele(planning_abs, bash_bin, workstream_policy_sh, env_
 # écrivait (exit 0) sur un lab GSD réel et effaçait son marqueur. L'environnement est désormais
 # construit DE ZÉRO (liste blanche) : PATH fixe de dossiers système, GSD_HOME seul — rien d'autre.
 def detection_gsd(detect_sh, planning_abs, racine_lab):
-    """« gsd », « non-gsd » ou « non-concluante ». Polarité inverse d'un DAG classique :
-    l'incertitude ferme l'écriture. Fail-closed intégral (lot 4, durci F1/F44-07) : détecteur
-    absent, en lien symbolique, non régulier, illisible, aucun candidat bash valide, échec de
-    lancement, ou tout code de sortie hors de {0, 2, 3} (dont un 1 improbable, la priorité 1 étant
-    neutralisée par l'environnement maîtrisé ci-dessous) -> `non-concluante`, jamais une écriture.
+    """« gsd », « non-gsd », « migration » ou « non-concluante ». Polarité inverse d'un DAG
+    classique : l'incertitude ferme l'écriture. Fail-closed intégral (lot 4, durci F1/F44-07) :
+    détecteur absent, en lien symbolique, non régulier, illisible, aucun candidat bash valide,
+    échec de lancement, ou tout code de sortie hors de {0, 2, 3} (dont un 1 improbable, la
+    priorité 1 étant neutralisée par l'environnement maîtrisé ci-dessous) -> `non-concluante`,
+    jamais une écriture. Code 0 -> `gsd` (refus) ; code 3 -> `non-gsd` (écriture) ; code 2 ->
+    `migration` : l'écriture est autorisée SOUS ADHÉSION `cycles-v1` seulement (P45-D-02, Phase 45)
+    — l'adhésion est testée par `main()` AVANT cette fonction, sans adhésion la sortie 2 de la 44
+    est inchangée ; la garde de lecture ci-dessous précède toujours le détecteur.
     Point envisagé et NON retenu (F1) : gater le code 3 sur une sortie stderr non vide — mesuré,
     un dossier de compartiments présent mais VIDE fait légitimement écrire deux lignes sur stderr
     (`vf_ws_enumerate`) tout en rendant le code 3 racine correct ; gater dessus aurait refusé
@@ -678,10 +682,13 @@ def detection_gsd(detect_sh, planning_abs, racine_lab):
         # stderr_nominal consigné dans le rapport de mission, jamais implémenté comme gate ici.
         return "non-gsd"  # motif-code-3-terrain-libre
     if code == 2:
-        # Signalement de MIGRATION (socle planning-core + signal de code) : refus d'écriture,
-        # jamais assimilé au code 3 « terrain libre » (décision du head sous délégation technique
-        # de Willy, session principale, 2026-09-28 — lot 2, L1).
-        return "non-concluante"  # motif-code-2-migration
+        # Signalement de MIGRATION (socle planning-core + signal de code) : jamais assimilé au code
+        # 3 « terrain libre » (décision du head sous délégation technique de Willy, session
+        # principale, 2026-09-28 — lot 2, L1). Verdict propre `migration` : l'écriture est admise
+        # SOUS ADHÉSION `cycles-v1` SEULEMENT (P45-D-02, Willy, AskUserQuestion session principale,
+        # 2026-09-29). Sans adhésion, `main()` sort en 2 AVANT d'appeler cette fonction : le refus de
+        # la 44 est inchangé. Le détecteur reste, lui, octet pour octet celui de la 44 (P45-D-02b).
+        return "migration"  # motif-code-2-migration
     if code == 1:
         # Sous environnement MAÎTRISÉ, la priorité 1 du détecteur (`[ ! -d "$GSD_HOME" ]`) ne
         # devrait plus jamais matcher — GSD_HOME ci-dessus existe toujours. Un code 1 malgré tout
@@ -752,6 +759,10 @@ NOMS_MODELE_RACINE_DOSSIERS = ("cycles", "baux", "missions")
 NOMS_MODELE_RACINE_FICHIERS = (
     "PROJECT.md", "REQUIREMENTS.md", "config.json", "INDEX.md", "STATE.md",
     "cloture.log", ".recalc-cache.json",
+    # Journal de dérogation des gates (P45-D-13, F7a — Willy, AskUserQuestion session principale,
+    # 2026-09-30) : emplacement du modèle, jamais « Hors modèle » dans INDEX.md. Même nom consommé
+    # par la commande de dérogation (45-04) et le gate G6 (45-05).
+    "derogations-gates.log",
 )
 
 
@@ -1724,6 +1735,176 @@ def ecrire_si_different(chemin, contenu):
     return True
 
 
+# --- Archivage du socle v2 à la première écriture sous migration (P45-D-02, F10) ---------------
+SEGMENTS_ARCHIVE_SOCLE_V2 = ("_archive", "socle-v2")
+NOMS_ARCHIVE_SOCLE_V2 = ("STATE.md", "INDEX.md")
+NOM_ARCHIVE_SOCLE_V2 = re.compile(r"^socle-v2(?:\.([0-9]+))?$")
+MARQUEUR_INDEX_GENERE = "Généré par recalc-planning.sh, ne se rédige pas (P44-D-10).".encode("utf-8")
+
+
+def gardes_ecriture_prealables(planning):
+    """Gardes d'écriture de `appliquer_ecritures` (planning en lien, journal inaccessible, emplacement du modèle occupé par
+    autre chose qu'un fichier régulier), jouées AVANT l'archivage du socle v2 (quick 45-B, M3, décisions du manager
+    vf-dev-manager, 2026-10-01) : un refus d'écriture ne laisse plus d'archive orpheline. Mêmes messages que
+    `appliquer_ecritures`, qui rejoue ces gardes après l'archivage. Rend 0 (admis) ou 1 (refus, rien écrit)."""
+    try:
+        planning_est_lien = stat.S_ISLNK(os.lstat(planning).st_mode)
+    except OSError:
+        planning_est_lien = False
+    if planning_est_lien:
+        print("[recalc-planning] dossier de planning en lien symbolique : " + planning, file=sys.stderr)
+        return 1
+    _lignes, statut_journal = lire_journal(planning)
+    if statut_journal in ("lien", "illisible"):
+        print("[recalc-planning] journal des clôtures inaccessible en écriture (statut=" + statut_journal + ")", file=sys.stderr)
+        return 1
+    for nom_cible in ("INDEX.md", "STATE.md", "cloture.log", ".recalc-cache.json"):
+        chemin_cible = os.path.join(planning, nom_cible)
+        if not os.path.lexists(chemin_cible):
+            continue
+        if not est_fichier_regulier(chemin_cible):
+            print("[recalc-planning] emplacement occupé par autre chose qu'un fichier régulier : " + chemin_cible, file=sys.stderr)
+            return 1
+    return 0
+
+
+def _est_genere(nom, octets):
+    """Vrai si `octets` porte la marque de génération de recalc-planning (STATE.md : `genere_par: recalc-planning` en tête du
+    frontmatter ; INDEX.md : la ligne « Généré par recalc-planning.sh… » en troisième ligne). Un fichier généré se reproduit,
+    il n'est pas du contenu rédigé à la main : le ré-archiver à chaque passage empilerait des instantanés."""
+    lignes = octets.split(b"\n")
+    if nom == "STATE.md":
+        return len(lignes) > 1 and lignes[0].rstrip(b"\r") == b"---" and lignes[1].rstrip(b"\r") == b"genere_par: recalc-planning"
+    return len(lignes) > 2 and lignes[2].rstrip(b"\r") == MARQUEUR_INDEX_GENERE
+
+
+def _archive_contient(dossier, sources):
+    """Vrai si `dossier` porte, pour CHAQUE source, un fichier régulier (lu sans suivre de lien) aux mêmes octets."""
+    for nom, octets in sources:
+        chemin = os.path.join(dossier, nom)
+        if not est_fichier_regulier(chemin):
+            return False
+        try:
+            descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+            with os.fdopen(descripteur, "rb") as fh:
+                if fh.read() != octets:
+                    return False
+        except OSError:
+            return False
+    return True
+
+
+def _nom_archive_libre(existants):
+    """`socle-v2` s'il est libre, sinon `socle-v2.N` avec N = plus grand suffixe existant + 1 (au moins 2)."""
+    if SEGMENTS_ARCHIVE_SOCLE_V2[1] not in existants:
+        return SEGMENTS_ARCHIVE_SOCLE_V2[1]
+    plus_grand = 1
+    for nom in existants:
+        m = NOM_ARCHIVE_SOCLE_V2.match(nom)
+        if m and m.group(1):
+            plus_grand = max(plus_grand, int(m.group(1)))
+    return SEGMENTS_ARCHIVE_SOCLE_V2[1] + "." + str(plus_grand + 1)
+
+
+def archiver_socle_v2(planning):
+    """Sous verdict `migration` SEULEMENT (F10, f10-archive — Willy, AskUserQuestion session
+    principale, 2026-09-30 : « aucun contenu perdu »), APRÈS les gardes d'écriture et AVANT
+    `appliquer_ecritures` : copie octet pour octet du STATE.md et de l'INDEX.md du socle v2 (fichiers
+    réguliers, lus par O_NOFOLLOW, de contenu RÉDIGÉ À LA MAIN : un fichier qui porte la marque de
+    génération de recalc-planning se reproduit et n'est pas archivé) sous `.planning/_archive/`.
+    `_archive` est un emplacement annexe de la 44, jamais lu par le recalcul. Contenu rédigé à la
+    main, remplacé sans sauvegarde sinon (ADR-031). Règles (quick 45-B, M3, décisions du manager
+    vf-dev-manager, 2026-10-01, renversables) :
+      - une archive existante n'est JAMAIS réécrite ; si une archive existante porte déjà tous les
+        fichiers à archiver aux mêmes octets, il n'y a rien à faire (code 0) ; sinon une NOUVELLE
+        archive est posée sous un nom libre (`socle-v2`, puis `socle-v2.2`, `socle-v2.3`, …) — une
+        archive incomplète (demi-archive) ou de contenu différent ne fait jamais sauter l'archivage ;
+      - tout ou rien : les fichiers sont écrits dans un dossier provisoire `_archive/.tmp-socle-v2-*`,
+        puis le dossier est renommé en une fois ; en cas d'échec rien ne reste, et l'appelant ne
+        remplace ni STATE.md ni INDEX.md (sortie 1) ;
+      - `_archive` ou une archive nommée existant mais qui n'est pas un dossier réel (lien compris) :
+        sortie 1, rien écrit.
+    Rend 0 (archivé, déjà archivé ou rien à archiver) ou 1 (emplacement inutilisable)."""
+    try:
+        if stat.S_ISLNK(os.lstat(planning).st_mode):
+            return 0  # `appliquer_ecritures` refuse ce cas (sortie 1) : rien à archiver ici
+    except OSError:
+        return 0
+    sources = []
+    for nom in NOMS_ARCHIVE_SOCLE_V2:
+        chemin_source = os.path.join(planning, nom)
+        if not est_fichier_regulier(chemin_source):
+            continue
+        descripteur = os.open(chemin_source, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        with os.fdopen(descripteur, "rb") as fh:
+            octets_source = fh.read()
+        if _est_genere(nom, octets_source):  # archive-genere
+            continue
+        sources.append((nom, octets_source))
+    if not sources:
+        return 0
+    parent = os.path.join(planning, SEGMENTS_ARCHIVE_SOCLE_V2[0])
+    existants = []
+    try:
+        info = os.lstat(parent)
+    except FileNotFoundError:
+        info = None
+    if info is not None:
+        if not stat.S_ISDIR(info.st_mode):  # lstat : un lien symbolique n'est pas un dossier réel
+            print(
+                "[recalc-planning] archivage du socle v2 impossible (P45-D-02, F10) : "
+                + parent + " existe et n'est pas un dossier réel — rien n'est écrit",
+                file=sys.stderr,
+            )
+            return 1
+        for nom in sorted(os.listdir(parent)):
+            if not NOM_ARCHIVE_SOCLE_V2.match(nom):
+                continue
+            if not stat.S_ISDIR(os.lstat(os.path.join(parent, nom)).st_mode):
+                print(
+                    "[recalc-planning] archivage du socle v2 impossible (P45-D-02, F10) : "
+                    + os.path.join(parent, nom) + " existe et n'est pas un dossier réel — rien n'est écrit",
+                    file=sys.stderr,
+                )
+                return 1
+            existants.append(nom)
+    for nom in existants:
+        if _archive_contient(os.path.join(parent, nom), sources):  # archive-deja
+            print(
+                "[recalc-planning] socle v2 déjà archivé sous " + os.path.join(parent, nom)
+                + " — jamais réécrit (P45-D-02, F10)",
+                file=sys.stderr,
+            )
+            return 0
+    if info is None:
+        os.mkdir(parent)
+        os.chmod(parent, 0o755)
+    destination = os.path.join(parent, _nom_archive_libre(existants))  # archive-destination
+    provisoire = tempfile.mkdtemp(dir=parent, prefix=".tmp-socle-v2-")
+    try:
+        for nom, octets in sources:
+            chemin_archive = os.path.join(provisoire, nom)
+            with open(chemin_archive, "xb") as fh:
+                fh.write(octets)
+            os.chmod(chemin_archive, 0o644)
+        os.chmod(provisoire, 0o755)
+        os.rename(provisoire, destination)  # archive-rename
+    except BaseException:
+        try:
+            for nom_residuel in os.listdir(provisoire):
+                os.remove(os.path.join(provisoire, nom_residuel))
+            os.rmdir(provisoire)
+        except OSError:
+            pass
+        raise
+    print(
+        "[recalc-planning] migration (P45-D-02) : " + ", ".join(nom for nom, _ in sources)
+        + " du socle v2 archivé(s) sous " + destination + " avant remplacement",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def appliquer_ecritures(planning, racine_lab, derivation, cache_ctx, statut_cache):
     try:
         planning_est_lien = stat.S_ISLNK(os.lstat(planning).st_mode)
@@ -1849,7 +2030,9 @@ def main():
         sys.exit(2)
 
     verdict_gsd = detection_gsd(detect_sh, planning_abs, racine_lab)
-    if verdict_gsd != "non-gsd":
+    # P45-D-02 : `migration` (détecteur à 2) est admis ICI, l'adhésion ayant déjà été exigée
+    # ci-dessus ; `gsd` et `non-concluante` (garde de lecture, code 1, repli) restent des refus.
+    if verdict_gsd not in ("non-gsd", "migration"):
         print(
             "[recalc-planning] refus d'écriture (P44-D-02a) : ce planning est tenu par le moteur "
             "GSD, ou sa détection n'est pas concluante — le recalcul n'écrit jamais dans ce cas",
@@ -1869,6 +2052,20 @@ def main():
         key=lambda c: c["chemin"],  # tri, écriture
     )
     derivation = {"cycles": cycles_derives, "hors_modele": modele["hors_modele"]}
+
+    if verdict_gsd == "migration":
+        # F10 (P45-D-02) : le STATE.md/INDEX.md du socle v2 sont archivés AVANT d'être remplacés, et APRÈS les gardes
+        # d'écriture (quick 45-B, M3) : un refus d'écriture ne laisse pas d'archive orpheline.
+        code_prealable = gardes_ecriture_prealables(planning_abs)  # archive-prealables
+        if code_prealable != 0:
+            sys.exit(code_prealable)
+        try:
+            code_archive = archiver_socle_v2(planning_abs)
+        except OSError as exc:
+            print("[recalc-planning] échec d'archivage du socle v2 : " + str(exc), file=sys.stderr)
+            sys.exit(1)
+        if code_archive != 0:
+            sys.exit(code_archive)
 
     try:
         code, rapport = appliquer_ecritures(planning_abs, racine_lab, derivation, cache_ctx, statut_cache)

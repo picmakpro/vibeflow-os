@@ -153,15 +153,22 @@ Keystone — **il est postérieur de 16 jours**, n'est pas bloquant, et n'est pa
   peuvent donc être **emboîtés**, et chacun a droit à son planning.
 
   La v1 confondait « un dépôt » et « un lab », et la passe adversariale a hérité de l'erreur : elle
-  a chiffré à 5 665 références la fusion des six plannings de Keystone — **une migration qui ne doit
-  pas avoir lieu.** Vérification :
+  a chiffré à 5 665 références la fusion des plannings de Keystone (six `.planning/`, dont cinq portent
+  un lab, voir le tableau amendé) — **une migration qui ne doit pas avoir lieu.** Vérification, tableau
+  amendé le 2026-09-29 (P45-D-14a) :
 
   | | `.claude/` | `.planning/` | agents | verdict |
   |---|:--:|:--:|--:|---|
-  | Keystone — racine, doctrine, pilotage, atelier, captation, gabarit | ✓ ×6 | ✓ ×6 | 7 · 0 · 4 · 17 · 1 · 1 | **six labs, six plannings, zéro orphelin** |
+  | Keystone — racine, pilotage, atelier, captation, gabarit | ✓ ×5 | ✓ ×5 | 7 · 4 · 17 · 1 · 1 | **cinq labs, cinq plannings vivants** |
+  | Keystone — `00-doctrine` | ✓ (`agent-memory/` sans fichier) | ✓ | **0** | **pas un lab** : ni agent ni mémoire non vide (mesuré le 2026-09-29) ; son `.planning/` est refusé par G7, refus conforme au modèle |
   | BusinessFlow — racine | ✓ | ✓ | 17 | lab, planning vivant |
   | BusinessFlow — `avma`, `dmflow`, `lead-recovery` | **·** | ✓ | 0 | **orphelins** |
   | BusinessFlow — `formation` | ✓ | ✓ | **0** | **orphelin** |
+  | BusinessFlow — `ProjetFlow-FROZEN-A1` | ✓ (mémoire, sans agent) | ✓ | **0** | **pas un lab** : lecture du manager, 2026-09-29 (P45-D-14a) |
+
+  **Amendement du 2026-09-29 (P45-D-14a).** Un dossier dont le `.claude/` ne porte pas à la fois au moins un agent et au moins une mémoire non vide n'est pas un lab : c'est le prédicat de G7 (P45-D-14), littéral, dont cette phrase est la lecture. Le `.claude/` de `00-doctrine` est réduit à un `agent-memory/` sans fichier (mesuré le 2026-09-29).
+  Décision (Willy, AskUserQuestion session principale, 2026-09-29) : la table D-05 est corrigée ; `00-doctrine`, sans agent ni mémoire non vide, n'est pas un lab ; G7 garde le prédicat littéral de P45-D-14 (au moins un agent ET au moins une mémoire).
+  La ligne `ProjetFlow-FROZEN-A1` découle du même prédicat, sans escalade : lecture du manager, 2026-09-29 (P45-D-14a), distincte de la décision ci-dessus. Tout dossier que le prédicat littéral refuse est un « refus conforme au modèle, lab non migré », compté à part, jamais un faux refus (P45-D-21a).
 
   **Les quatre plannings orphelins de BusinessFlow sont exactement les quatre plannings morts** —
   tous à `last_updated: 2026-06-23`, 91 jours. Un planning qu'aucun agent n'habite ne peut pas
@@ -676,9 +683,11 @@ tentative d'en produire.
 ### 11.1 D-05 — refermée
 
 Elle a été rouverte à tort pendant la révision, sur une migration chiffrée à 5 665 références. La
-prémisse était fausse : Keystone n'est pas un lab à six plannings, **c'est six labs emboîtés**. Voir
-§2, D-05. Aucune migration n'est due. Ce qui reste, c'est d'écrire G7 avec le bon critère — la
-présence d'un `.claude/` habité — et de traiter les quatre orphelins de BusinessFlow.
+prémisse était fausse : Keystone n'est pas un lab à plusieurs plannings à fusionner, **ce sont cinq labs
+emboîtés** (plus `00-doctrine`, dont le `.claude/` n'est pas habité et qui n'en est pas un, table amendée
+par P45-D-14a). Voir §2, D-05. Aucune migration n'est due. Ce qui reste, c'est d'écrire G7 avec le bon
+critère — la présence d'un `.claude/` habité, prédicat littéral de P45-D-14 (au moins un agent ET au moins
+une mémoire) — et de traiter les quatre orphelins de BusinessFlow.
 
 ### 11.2 L'arbitrage d'usage
 
