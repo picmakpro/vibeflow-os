@@ -309,15 +309,22 @@ class Ctx:
 
 
 def classer(rc, out):
-    """`silence`, `avertit` (additionalContext sans décision), `deny`, ou `autre:...`."""
+    """`silence`, `avertit` (additionalContext sans décision), `deny`, `block` (SubagentStop : décision JSON, Phase 46), `watchPaths`, ou
+    `autre:...`."""
     if rc != 0:
         return "autre:rc=%d" % rc
     if out == b"":
         return "silence"
     try:
         obj = json.loads(out.decode("utf-8"))
+        if isinstance(obj, dict) and obj.get("decision") == "block" and isinstance(obj.get("reason"), str) and "hookSpecificOutput" not in obj:
+            return "block"
+        if isinstance(obj, dict) and isinstance(obj.get("watchPaths"), list):
+            return "watchPaths"
         s = obj["hookSpecificOutput"]
-    except (ValueError, KeyError, TypeError):
+        if isinstance(s.get("watchPaths"), list):
+            return "watchPaths"
+    except (ValueError, KeyError, TypeError, AttributeError):
         return "autre:document"
     if s.get("hookEventName") != "PreToolUse":
         return "autre:enveloppe"
@@ -1512,18 +1519,34 @@ def scripts_canary(ctx, source, valeur, hook=None, armes=("G6", "G5"), tel_quel=
     return d
 
 
+EVENEMENTS_CABLES = ("PreToolUse", "SubagentStop", "CwdChanged", "FileChanged", "SessionStart")
+
+
+def reglage_cinq_evenements(chemin, commande, sans=(), autre=None):
+    """Réglage jetable : `commande` sous les cinq événements (PreToolUse au matcher Write, les quatre autres sans matcher, Phase 46) ;
+    `sans` : événements omis ; `autre` : (événement, commande) remplace la commande de cet événement."""
+    hooks = {}
+    for evt in EVENEMENTS_CABLES:
+        if evt in sans:
+            continue
+        groupe = {"hooks": [{"type": "command", "command": autre[1] if autre and autre[0] == evt else commande}]}
+        if evt == "PreToolUse":
+            groupe["matcher"] = "Write"
+        hooks[evt] = [groupe]
+    ecrire(chemin, json.dumps({"hooks": hooks}))
+
+
 def lancer_canary_dossier(ctx, dossier):
     """Lance le check-gates-alive.sh de `dossier` (= <projet>/.claude/scripts) dans une session adhérente,
     `--settings` vers un réglage jetable dont la commande enregistrée (hooks.json, scope projet :
-    "$CLAUDE_PROJECT_DIR"/.claude/scripts) vise ce même projet."""
+    "$CLAUDE_PROJECT_DIR"/.claude/scripts) vise ce même projet, posée sous les cinq événements (Phase 46)."""
     if TOKEN not in (ctx.cmd or ""):
         raise RuntimeError("la commande enregistrée ne porte pas le jeton " + TOKEN)
     projet = os.path.dirname(os.path.dirname(dossier))
     lab = ctx.unique("session-canary")
     ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
     reglage = os.path.join(ctx.unique("reglage-canary"), "settings.json")
-    ecrire(reglage, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [
-        {"type": "command", "command": ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')}]}]}}))
+    reglage_cinq_evenements(reglage, ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts'))
     p = subprocess.run(["bash", os.path.join(dossier, "check-gates-alive.sh"), "--settings=" + reglage],
                        input=json.dumps({"cwd": lab}).encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                        env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": ctx.home, "CLAUDE_PROJECT_DIR": projet},
@@ -1563,6 +1586,78 @@ def controle_cang_03(ctx, script):
         if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G6" not in lignes[0] or "G5-verdict" in lignes[0]:
             fautes.append("%s : rc=%d %s" % (valeur, rc, court(out)))
     return (not fautes), ("; ".join(fautes) if fautes else "evaluer_g6 neutralisé, observe et armed : code 0 et une ligne qui nomme G6 (et pas G5)")
+
+
+# --- Phase 46, 46-04 : le canary retrouve la commande sous les cinq événements ; deux cas DEGRADE pour SubagentHandback ---------
+def controle_cang_evt_01(ctx, script):
+    """R-CANG-EVT-01 : un réglage jetable portant la commande de référence sous les cinq événements : code 3 (sain), stdout vide ; privé de
+    l'entrée FileChanged (puis SubagentStop, CwdChanged, SessionStart) : code 0 et UNE ligne de signal qui nomme l'événement manquant,
+    sous --hook comme en direct ; deux événements manquants : les deux nommés ; une AUTRE commande sous SubagentStop : signal « non reconnue »
+    qui nomme l'événement, la commande n'étant jamais exécutée."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe", tel_quel=True)
+    projet = os.path.dirname(os.path.dirname(d))
+    reelle = ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')
+    fautes = []
+
+    def lancer(args=(), **kw):
+        reglage = os.path.join(ctx.unique("reglage-evt"), "settings.json")
+        reglage_cinq_evenements(reglage, reelle, **kw)
+        return canary_direct(ctx, d, reglage, args, projet=projet)
+
+    rc, out, err = lancer()
+    if rc != 3 or out != b"":
+        fautes.append("cinq événements : code 3 et stdout vide (attendu) — obtenu rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    for args in ((), ("--hook",)):
+        rc, out, err = lancer(args, sans=("FileChanged",))
+        raison = une_ligne_canary(out, ("FileChanged", "non câblé"))
+        if rc != 0 or raison:
+            fautes.append("sans FileChanged %s : code 0 et UNE ligne qui nomme FileChanged (attendu) — obtenu rc=%d %s" % (" ".join(args) or "sans --hook", rc, raison or ""))
+    for evt in ("SubagentStop", "CwdChanged", "SessionStart"):
+        rc, out, err = lancer(sans=(evt,))
+        raison = une_ligne_canary(out, (evt, "non câblé"))
+        if rc != 0 or raison:
+            fautes.append("sans %s : code 0 et UNE ligne qui nomme %s (attendu) — obtenu rc=%d %s" % (evt, evt, rc, raison or ""))
+    rc, out, err = lancer(sans=("CwdChanged", "FileChanged"))
+    raison = une_ligne_canary(out, ("CwdChanged", "FileChanged"))
+    if rc != 0 or raison:
+        fautes.append("sans CwdChanged ni FileChanged : code 0 et UNE ligne qui nomme les deux (attendu) — obtenu rc=%d %s" % (rc, raison or ""))
+    marqueur = os.path.join(ctx.unique("marqueur-evt"), "cree")
+    os.makedirs(os.path.dirname(marqueur))
+    rc, out, err = lancer(autre=("SubagentStop", "touch '%s' # planning-hook.sh" % marqueur))
+    raison = une_ligne_canary(out, ("non reconnue", "SubagentStop"))
+    if rc != 0 or raison or os.path.exists(marqueur):
+        fautes.append("autre commande sous SubagentStop : code 0, UNE ligne « non reconnue » qui nomme SubagentStop, commande jamais exécutée (attendu) — obtenu rc=%d %s marqueur=%s"
+                      % (rc, raison or "", os.path.exists(marqueur)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "cinq événements : code 3 ; privé de FileChanged (--hook compris), SubagentStop, CwdChanged ou SessionStart : une ligne qui nomme l'événement ; deux manquants : les deux nommés ; autre commande sous SubagentStop : « non reconnue », jamais exécutée")
+
+
+def controle_cang_evt_02(ctx, script):
+    """R-CANG-EVT-02 : les cas DEGRADE `D09` (script absent) et `D10` (python absent), payload SubagentHandback, sont dans CANARIS ; ils sont
+    COUVERTS : sur une commande de référence dont la couche de repli a perdu l'alternative SubagentHandback, le canary signale (code 0, UNE
+    ligne « cas en échec ») exactement ces deux cas ; sur la commande livrée il est sain (R-CANG-EVT-01)."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe", tel_quel=True)
+    projet = os.path.dirname(os.path.dirname(d))
+    texte = open(os.path.join(d, "check-gates-alive.sh"), encoding="utf-8").read()
+    fautes = []
+    for ident, mode in (("D09", "script-absent"), ("D10", "python-absent")):
+        motif = '"%s|DEGRADE|%s|SubagentHandback|%s",' % (ident, mode, mode)
+        if texte.count(motif) != 1:
+            fautes.append("cas %s dans CANARIS (attendu : une ligne `%s`) — obtenu %d occurrence(s)" % (ident, motif, texte.count(motif)))
+    alternative = "|*'\"tool_name\":\"SubagentHandback\"'*|*'\"tool_name\":\"Agent\"'*"
+    if ctx.cmd.count(alternative) != 1:
+        return False, "la commande enregistrée porte l'alternative SubagentHandback entre NotebookEdit et Agent (attendu 1) — obtenu %d" % ctx.cmd.count(alternative)
+    sans_repli = ctx.cmd.replace(alternative, "|*'\"tool_name\":\"Agent\"'*")
+    reference = os.path.join(ctx.unique("reference-evt"), "reference.txt")
+    ecrire(reference, sans_repli)
+    reglage = os.path.join(ctx.unique("reglage-evt02"), "settings.json")
+    reglage_cinq_evenements(reglage, sans_repli.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts'))
+    rc, out, err = canary_direct(ctx, d, reglage, ("--reference=" + reference,), projet=projet)
+    raison = une_ligne_canary(out, ("2 cas en échec", "D09", "D10"))
+    if rc != 0 or raison:
+        fautes.append("repli sans SubagentHandback : code 0 et UNE ligne « 2 cas en échec » qui nomme D09 et D10 (attendu) — obtenu rc=%d %s stderr=%s" % (rc, raison or "", court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "D09 et D10 présents dans CANARIS ; couverts : sans l'alternative SubagentHandback du repli, le canary signale exactement ces deux cas (« 2 cas en échec »)")
 
 
 # --- 45-05 : identité des fichiers protégés (Pattern 5), périmètre F6 et F7b ---------------------------------
@@ -3081,9 +3176,28 @@ def sec_cang(ctx):
             ("R-CANG-G7", controle_cang_g7, "canary de session, cas G7-orphelin"),
             ("R-CANG-ROLE", controle_cang_role, "canary de session, cas du rôle (juge, worker sous Agent, worker sous Task)"),
             ("R-CANG-ROLE-MORT", controle_cang_role_mort, "canary de session, evaluer_role neutralisé"),
-            ("R-CANG-COUVERTURE", controle_cang_couverture, "canary de session, couverture minimale déclarée (P45-D-20)")):
+            ("R-CANG-COUVERTURE", controle_cang_couverture, "canary de session, couverture minimale déclarée (P45-D-20)"),
+            ("R-CANG-EVT-01", controle_cang_evt_01, "canary de session, la commande sous les cinq événements (Phase 46)"),
+            ("R-CANG-EVT-02", controle_cang_evt_02, "canary de session, cas DEGRADE D09 et D10 (SubagentHandback en mode dégradé)")):
         bon, detail = ctrl(ctx, None)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+    # Mutants du canary (Phase 46) : l'événement non câblé n'est plus vu, une autre commande est reconnue, le cas D09 est retiré
+    for ident, motif, remplacement, ctrl, nom_ctrl in (
+            ("CANG-EVT-MANQUANT", "# canary-evenements", "sans, non_reconnus = [], []  # canary-evenements", controle_cang_evt_01, "R-CANG-EVT-01"),
+            ("CANG-EVT-RECONNUE", "# canary-evenement-reconnue", "if True:  # canary-evenement-reconnue", controle_cang_evt_01, "R-CANG-EVT-01"),
+            ("CANG-EVT-CAS-D09", '"D09|DEGRADE|script-absent|SubagentHandback|script-absent",', "", controle_cang_evt_02, "R-CANG-EVT-02")):
+        dossier, raison = make_script_mutant(ctx, "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF", ident, motif, remplacement)
+        if dossier is None:
+            komut(ident, "mutant du canary valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
+            continue
+        original = ctrl(ctx, None)
+        mutant = ctrl(ctx, dossier)
+        if not original[0]:
+            komut(ident, "l'original passe " + nom_ctrl, "conforme", original[1])
+        elif mutant[0]:
+            komut(ident, nom_ctrl + " rougit sous le mutant", "rouge", "vert : " + mutant[1] + " (mutant non opposable)")
+        else:
+            okmut(ident, "%s rougit · attendu (original) : %s · obtenu (mutant) : %s" % (nom_ctrl, original[1], mutant[1][:400]))
 
 
 def sec_g1(ctx):
@@ -3568,8 +3682,7 @@ def canary_degrade(ctx, dossier, cwd_session):
     os.makedirs(d)
     shutil.copy(os.path.join(dossier, "check-gates-alive.sh"), os.path.join(d, "check-gates-alive.sh"))
     reglage = os.path.join(ctx.unique("reglage-canary-imb"), "settings.json")
-    ecrire(reglage, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [
-        {"type": "command", "command": ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')}]}]}}))
+    reglage_cinq_evenements(reglage, ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts'))
     p = subprocess.run(["bash", os.path.join(d, "check-gates-alive.sh"), "--settings=" + reglage],
                        input=json.dumps({"cwd": cwd_session}).encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                        env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": ctx.home, "CLAUDE_PROJECT_DIR": projet},
@@ -4510,8 +4623,13 @@ def canary_direct(ctx, dossier_scripts, reglage, args=(), session=None, home=Non
 
 
 def reglage_de(ctx, commandes, prefixe="reglage-m2"):
+    """Réglage jetable : `commandes` sous PreToolUse (chacune dans son groupe) ; la commande réelle sous les quatre autres événements (Phase 46 :
+    le canary signale un événement non câblé, ce que ces cas ne veulent pas mesurer)."""
     chemin = os.path.join(ctx.unique(prefixe), "settings.json")
-    ecrire(chemin, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [{"type": "command", "command": c}]} for c in commandes]}}))
+    hooks = {"PreToolUse": [{"matcher": "Write", "hooks": [{"type": "command", "command": c}]} for c in commandes]}
+    for evt in EVENEMENTS_CABLES[1:]:
+        hooks[evt] = [{"hooks": [{"type": "command", "command": ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')}]}]
+    ecrire(chemin, json.dumps({"hooks": hooks}))
     return chemin
 
 
@@ -4708,6 +4826,9 @@ LIMITES_REFERENCE = (
     ("al", ("N4-02", "/.vol", "inode", "macOS")),
     ("am", ("N4-03", "dérogation", "fail-closed")),
     ("an", ("N4-05", "lstat", "readlink", "OSError")),
+    ("ao", ("cwd", "new_cwd")),
+    ("ap", ("SubagentHandback", "juges", "G4′ est ouvert")),
+    ("aq", ("inconnu",)),
 )
 
 
@@ -4869,7 +4990,7 @@ def sec_reference(ctx):
             print(e)
         ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
         return
-    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (an) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
+    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (aq) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
     original = open(chemin, encoding="utf-8").read()
 
     def mutant_texte(ident, fonction, motif):
@@ -4926,7 +5047,7 @@ def sec_reference(ctx):
         if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
             non_tuees.append(lettre)
     if non_tuees:
-        komut("REFERENCE-LIMITES", "chaque limite (a) à (an) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+        komut("REFERENCE-LIMITES", "chaque limite (a) à (aq) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
               "non tuées : " + ", ".join(non_tuees))
     else:
         okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))

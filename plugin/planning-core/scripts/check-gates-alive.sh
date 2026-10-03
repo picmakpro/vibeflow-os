@@ -19,7 +19,10 @@
 #
 # Réglages lus, dans l'ordre : `$CLAUDE_PROJECT_DIR/.claude/settings.json` puis
 # `$HOME/.claude/settings.json` (ou le seul --settings). L'entrée retenue est la première entrée
-# PreToolUse dont la commande cite planning-hook.sh ET est STRICTEMENT égale à la commande de référence. CLAUDE_PROJECT_DIR et HOME
+# PreToolUse dont la commande cite planning-hook.sh ET est STRICTEMENT égale à la commande de référence.
+# Phase 46 (46-04, P46-D-10, P46-D-11) : la MÊME commande est câblée sous cinq événements (PreToolUse, SubagentStop, CwdChanged,
+# FileChanged, SessionStart) ; le canary retrouve la commande de référence sous chacun (dans l'ensemble des réglages lus : le harnais
+# les fusionne) et SIGNALE — code 0, une ligne, jamais un blocage — un événement non câblé, ou câblé avec une autre commande. CLAUDE_PROJECT_DIR et HOME
 # sont les DEUX entrées déclarées de ce script (où chercher les réglages, quelle copie du hook rejouer) : aucune variable
 # d'environnement ne change ce qu'il exige d'un gate (P45-D-12a). Aucun contenu de payload n'est journalisé.
 #
@@ -40,7 +43,9 @@
 #
 # Signaux, dans l'ordre où le canary les cherche (UN seul par exécution) :
 #   1. hook central non enregistré (F2) : aucun réglage ne porte la commande ; ou commande enregistrée non reconnue : un réglage cite
-#      planning-hook.sh avec une commande qui n'est pas celle de la référence (rien n'est exécuté)
+#      planning-hook.sh avec une commande qui n'est pas celle de la référence (rien n'est exécuté) ; ou événement non câblé (Phase 46) :
+#      la commande de référence manque sous SubagentStop, CwdChanged, FileChanged ou SessionStart (la citer avec une autre commande est
+#      « non reconnue »)
 #   2. mode dégradé : la commande, rejouée sur le cas nominal, refuse — le script ou python3 manque
 #      ou plante ; écritures par outil et dispatchs Agent et Task refusés, Bash reste ouvert (limite
 #      déclarée, P45-D-06b)
@@ -146,6 +151,9 @@ SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 PREFIXE = "[planning-core] canary : "
 CITE = "planning-hook.sh"
+# Les cinq événements sous lesquels la commande de référence est câblée (Phase 46, P46-D-09) : PreToolUse d'abord (matcher élargi à
+# SubagentHandback), puis les quatre événements nouveaux. L'événement de mise à jour de tâche n'est pas câblé (P46-D-01).
+EVENEMENTS_CABLES = ("PreToolUse", "SubagentStop", "CwdChanged", "FileChanged", "SessionStart")
 # Commande de référence : celle de hooks/hooks.json (jeton {{VF_SCRIPTS}} non résolu), embarquée ; la suite la compare à hooks.json.
 JETON_SCRIPTS = "{{VF_SCRIPTS}}"
 PREFIXES_INSTALLEUR = ('"$CLAUDE_PROJECT_DIR"/.claude/scripts', '"$HOME"/.claude/scripts')
@@ -162,7 +170,7 @@ vf_pre() { _pa=; _pb=0; case $I in *"$_pn"*|*'\u00'[2-7]*) return 1 ;; esac; _pm
 vf_pre && exit 0
 if [ -f "$S" ]; then O=$(printf '%s' "$I" | bash "$S"); R=$?; fi
 if [ "$R" -eq 0 ]; then [ -z "$O" ] || printf '%s\n' "$O"; exit 0; fi
-case $I in *'"tool_name":"Write"'*|*'"tool_name":"Edit"'*|*'"tool_name":"NotebookEdit"'*|*'"tool_name":"Agent"'*|*'"tool_name":"Task"'*) ;; *) exit 0 ;; esac
+case $I in *'"tool_name":"Write"'*|*'"tool_name":"Edit"'*|*'"tool_name":"NotebookEdit"'*|*'"tool_name":"SubagentHandback"'*|*'"tool_name":"Agent"'*|*'"tool_name":"Task"'*) ;; *) exit 0 ;; esac
 NL='
 '; TB=$(printf '\t')
 vf_get() { B=0; _m=$(printf '%s' "$I" | LC_ALL=C grep -a -o -E '"'"$1"'"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -n 1); [ -n "$_m" ] || return 1; if [ "${#_m}" -gt 4096 ]; then B=1; V=; X=0; printf '%s' "$_m" | LC_ALL=C grep -a -q -i -E '[.](planning|claude)|[\\]' && G=1; return 0; fi; _m=${_m#*:}; while :; do case $_m in ' '*|"$TB"*) _m=${_m#?} ;; *) break ;; esac; done; _m=${_m#\"}; V=""; X=1; while :; do _s=${_m%%[\"\\]*}; V=$V$_s; _m=${_m#"$_s"}; case $_m in '') X=0; return 0 ;; \"*) return 0 ;; \\\"*) V=$V\" ;; \\\\*) V=$V\\ ;; \\/*) V=$V/ ;; \\n*) V=$V$NL ;; \\t*) V=$V$TB ;; *) X=0; return 0 ;; esac; _m=${_m#??}; done; }
@@ -173,6 +181,7 @@ D=1; B=0; G=0; for K in file_path notebook_path; do if vf_get "$K"; then if [ "$
 if [ "$K" = long ]; then if vf_get cwd && [ "$B" = 0 ]; then vf_tight "$V" && D=0; else vf_tight "$(pwd -P)" && D=0; fi; elif [ "$K" != done ]; then if vf_get cwd && [ "$B" = 0 ]; then vf_tight "$V" && D=0; else vf_tight "$(pwd -P)" && D=0; fi; fi
 [ "$D" -eq 0 ] || [ "$G" = 1 ] || exit 0
 W='dans un lab adherent cycles-v1 : ecritures par outil refusees'
+case $I in *'"tool_name":"SubagentHandback"'*) W='dans un lab adherent cycles-v1 : le rapport du sous-agent (SubagentHandback) est refuse tant que le hook central est indisponible' ;; esac
 if [ "$K" = long ]; then W='doute d adhesion du lab (chemin trop long pour etre analyse) : ecritures par outil refusees par precaution'; fi
 if [ "$G" = 1 ]; then W='doute d adhesion du lab (chemin trop long pour etre analyse, il nomme .planning ou .claude, ou porte un echappement JSON) : ecritures par outil refusees par precaution'; fi
 if [ "$K" = done ] && [ "$PX" = 0 ] && ! vf_tight "$P"; then W='doute d adhesion du lab (chemin non analysable) : ecritures par outil refusees par precaution'; fi
@@ -221,6 +230,9 @@ CANARIS = (
     "D06|DEGRADE|python-absent|Agent|python-absent",
     "D07|DEGRADE|python-absent|Task|python-absent",
     "D08|DEGRADE|python-absent|Bash|python-absent",
+    # Phase 46 (46-04, P46-D-10) : en mode dégradé la couche shell refuse aussi `SubagentHandback` (rapport d'un sous-agent), sans dériver le rôle.
+    "D09|DEGRADE|script-absent|SubagentHandback|script-absent",
+    "D10|DEGRADE|python-absent|SubagentHandback|python-absent",
     # Étape 1 (45-05) : G6 (fichier généré, fil principal puis agent de plugin) et G5 (verdict, agent inconnu).
     "G6-principal|G6|nominal|Write:.planning/" + NOM_ETAT + "|fil-principal",
     "G6-plugin|G6|nominal|Write:.planning/" + NOM_ETAT + "@plugin-inconnu:agent-inconnu|plugin",
@@ -341,6 +353,39 @@ def trouver_commande(candidats, reconnues):
     return None, None, illisible, citee
 
 
+def evenements_non_cables(candidats, reconnues):
+    """(manquants, non reconnus) : parmi les quatre événements NOUVEAUX de EVENEMENTS_CABLES (PreToolUse est tranché par `trouver_commande`),
+    ceux sous lesquels AUCUN réglage lu ne porte la commande de référence (`manquants`, dans l'ordre de la constante), et ceux qui citent
+    planning-hook.sh sans l'avoir (`non reconnus`). Les réglages sont lus ENSEMBLE (le harnais les fusionne : scope projet et scope
+    compte) ; un réglage illisible ou absent n'apporte rien."""
+    evenements = [e for e in EVENEMENTS_CABLES if e != "PreToolUse"]
+    trouvees = {e: False for e in evenements}
+    citees = {e: False for e in evenements}
+    for chemin in candidats:
+        if not os.path.isfile(chemin):
+            continue
+        try:
+            with open(chemin, encoding="utf-8") as fh:
+                donnees = json.load(fh)
+            reglage = donnees.get("hooks", {}) if isinstance(donnees, dict) else None
+            if not isinstance(reglage, dict):
+                continue
+            for evt in evenements:
+                for groupe in reglage.get(evt, []) or []:
+                    for h in groupe.get("hooks", []) or []:
+                        commande = h.get("command") if isinstance(h, dict) else None
+                        if isinstance(commande, str) and CITE in commande:
+                            if commande in reconnues:  # canary-evenement-reconnue
+                                trouvees[evt] = True
+                            else:
+                                citees[evt] = True
+        except (OSError, ValueError, AttributeError, TypeError):
+            continue
+    manquants = [e for e in evenements if not trouvees[e] and not citees[e]]
+    non_reconnus = [e for e in evenements if not trouvees[e] and citees[e]]
+    return manquants, non_reconnus
+
+
 # --- Rejeu ---------------------------------------------------------------------------------------
 def fabriquer_payload(spec, lab):
     outil, _, reste = spec.partition(":")
@@ -351,6 +396,8 @@ def fabriquer_payload(spec, lab):
         entree = {"description": "d", "prompt": "p", "subagent_type": chemin or "general-purpose"}
     elif outil == "Bash":
         entree = {"command": "true"}
+    elif outil == "SubagentHandback":
+        entree = {"message": chemin or "rapport du canary"}
     elif outil == "NotebookEdit":
         entree = {"notebook_path": os.path.join(lab, chemin), "new_source": "x"}
     elif outil == "Edit":
@@ -586,6 +633,17 @@ def main():
                  "session ; préparer le projet (/vf-update).")
         return 0
 
+    sans, non_reconnus = evenements_non_cables(candidats, commandes_reconnues(reference))  # canary-evenements
+    if non_reconnus:
+        signaler("commande enregistrée non reconnue sous " + ", ".join(non_reconnus) + " : un réglage cite planning-hook.sh avec une commande qui n'est pas, octet "
+                 "pour octet, celle que l'installeur pose (hooks.json) — rien n'a été exécuté, les gates de cet événement ne sont pas vérifiés "
+                 "dans cette session ; réparer : /vf-update.")
+        return 0
+    if sans:
+        signaler("hook central non câblé sous " + ", ".join(sans) + " : la commande de planning-hook.sh manque sous cet événement dans les réglages du "
+                 "projet et du compte (installation périmée ?) — les gates de cet événement ne gardent rien dans cette session ; "
+                 "réparer : /vf-update, puis relancer la session.")
+        return 0
     try:
         cas = lire_canaris()
     except Indetermine:
@@ -600,7 +658,7 @@ def main():
         nominal = rejeu.jouer("nominal", NOMINAL)
         if nominal == "deny-degrade":
             signaler("hook central en mode dégradé : le script ou python3 manque ou plante ; dans ce lab adhérent "
-                     "les écritures par outil et les dispatchs Agent et Task sont refusés, Bash reste ouvert "
+                     "les écritures par outil, les dispatchs Agent et Task et les rapports de sous-agent (SubagentHandback) sont refusés, Bash reste ouvert "
                      "(limite déclarée, P45-D-06b) — réparer : /vf-update ou installer python3, puis relancer la session.")
             return 0
         try:

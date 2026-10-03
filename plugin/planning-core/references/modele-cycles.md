@@ -900,8 +900,8 @@ chaque arbitrage humain nomme son canal et sa date.
 
 ### La commande enregistrée (fail-closed dans un lab adhérent)
 
-L'entrée `PreToolUse` de `hooks.json` (matcher `Write|Edit|NotebookEdit|Bash|Agent|Task`, `timeout`
-de 20 s) est une commande **de forme shell**, jamais la forme exec `{{VF_BASH}}` (qui part dans
+L'entrée `PreToolUse` de `hooks.json` (matcher `Write|Edit|NotebookEdit|Bash|Agent|Task|SubagentHandback`,
+élargi par la Phase 46 ; `timeout` de 20 s) est une commande **de forme shell**, jamais la forme exec `{{VF_BASH}}` (qui part dans
 `settings.local.json` et n'a pas de shell pour porter le test de présence) : l'installeur la pose
 dans `settings.json`. Elle lance le script en fils et **reprend tout code non nul** (script absent,
 `python3` absent, plantage, échéance interne : code 73). Dans ce cas elle décide elle-même, **sans
@@ -945,7 +945,7 @@ aucune dépendance. Garde : `test-planning-prefilter.sh` (équivalence sur le ba
 longues et un générateur d'arbres de labs ; mutants).
 
 - **Pré-filtre hors adhésion** : `vf_pre`, appelé par `vf_pre && exit 0` avant le lancement du script ; hors lab adhérent il sort aussitôt, sans script, sans mktemp, sans python3 ; dans le doute il ne change rien (fail-closed).
-- **Outils refusés en mode dégradé** : `Write`, `Edit`, `NotebookEdit`, `Agent`, `Task`.
+- **Outils refusés en mode dégradé** : `Write`, `Edit`, `NotebookEdit`, `SubagentHandback`, `Agent`, `Task`.
 - **Outil laissé ouvert en mode dégradé** : `Bash` (P45-D-06b).
 
 Limites déclarées de la couche shell, puis des gates, chacune sur sa propre ligne (la lettre, puis la
@@ -983,7 +983,7 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (ab)** — F-04, N-03 puis N2-02 (re-audits du 2026-10-01 et du 2026-10-02) : un chemin qui commence par `~` n'est JAMAIS lu comme relatif au `cwd`. `~` et `~/…` sont développés en HOME par les deux couches (le lanceur passe HOME au cœur en argument, le cœur ne lit pas l'environnement, R-ENV-02 ; la couche shell lit `$HOME`), avec une différence : avec HOME=`/`, la couche shell tombe dans le doute et refuse, elle est plus stricte que le cœur, qui développe `~/x` en `/x`. `~utilisateur/…`, ou un HOME absent ou non absolu, sont non analysables et tranchés dans le doute (cœur : refus s'il nomme `.planning` ou `.claude`, sinon décision sur le `cwd` ; couche shell : refus). N2-02 : un chemin RELATIF `~xxx` (nom de fichier qui commence par `~`) dans un lab adhérent est donc refusé, là où il était laissé passer avec un avertissement ; c'est un faux refus rare, le harnais donne des chemins absolus. Un chemin relatif sans `~` reste joint au `cwd` (limite (h)). La limite ne repose plus sur « l'outil `Write` exige un chemin absolu », que le `Read` du harnais contredit ; elle porte sur le développement de `~` par le harnais lui-même : mesuré pour `Read`, non mesuré de première main pour `Write`. Si `Write` traitait `~/x` comme un littéral relatif au `cwd`, le hook lirait HOME alors que l'écriture tomberait dans la poche `<cwd>/~/…`, qui n'est pas un actif du lab (écart non protégé, jamais un actif gardé).
 - **limite (ac)** — F-05 : la racine d'un dispatch `Agent` ou `Task` est dérivée de `tool_input.file_path` ou `notebook_path` s'ils sont présents. Précondition : que le harnais transmette des clés inconnues à ces outils (non établi).
 - **limite (ad)** — F-06 : une poche `.claude/worktrees/<nom>` non adhérente est créable par `Write` seul ; le script d'un futur worktree lancé dedans n'est pas gardé. Les actifs du lab englobant restent gardés.
-- **limite (ae)** — F-07 : seuls les outils du matcher (`Write`, `Edit`, `NotebookEdit`, `Agent`, `Task` ; `Bash` est ouvert) sont vus. `MultiEdit`, les outils d'écriture fournis par des serveurs MCP et tout outil hors matcher échappent aux gates.
+- **limite (ae)** — F-07 : seuls les outils du matcher (`Write`, `Edit`, `NotebookEdit`, `Agent`, `Task`, et depuis la Phase 46 `SubagentHandback` ; `Bash` est ouvert) sont vus. `MultiEdit`, les outils d'écriture fournis par des serveurs MCP et tout outil hors matcher échappent aux gates.
 - **limite (af)** — constat F2 du recoupement du re-audit 3 (2026-10-02), préexistant, non corrigé dans cette phase : un `..` qui suit un lien symbolique est résolu PHYSIQUEMENT par le hook (le lien est remonté), alors que le harnais (Node) le réduit probablement LEXICALEMENT avant l'appel système ; les deux lectures divergent et le hook n'en juge qu'une pour une valeur d'au plus 4096 caractères. Exemple : `<lab>/src/ext/../../.planning/STATE.md` avec `ext` vers un dossier hors lab rend silence (lecture physique : hors lab), alors que la lecture lexicale vise `<lab>/.planning/STATE.md`. Pour les valeurs de plus de 4096 caractères (N3-01), les DEUX formes sont jugées et le cas est fermé dans les deux sens (R-REDUC-01). Non corrigé pour les valeurs courtes (dernier tour de correction de code de la phase) : le comportement du harnais n'est pas mesuré, et la correction consisterait à juger les deux formes de toute valeur, ce que la phase ne fait pas ; précondition : un lien préexistant (`Write` seul n'en crée pas, `Bash` reste ouvert, P45-D-10). Précision N4-04 (re-audit final, tour 4) : le seuil de 4096 caractères porte sur la valeur BRUTE ; un chemin relatif court sous un `cwd` de 4096 caractères au plus, dont la forme jointe dépasse 4096, reste jugé sous une seule forme.
 - **limite (ag)** — constat F3 du recoupement du re-audit 3, préexistant, non corrigé : cœur absent ou en panne, la couche de repli ne suit pas un lien symbolique vers un FICHIER (elle normalise les composants qui sont des dossiers, par `cd -P`, jamais un lien terminal) : une écriture par un lien vers un actif gardé, hors de tout lab adhérent par son chemin, y passe. Le cœur le suit (`realpath`). Précondition : le lien préexiste.
 - **limite (ah)** — constat F4 du recoupement du re-audit 3, préexistant, non corrigé : l'adhésion n'est pas lue de la même façon par le cœur (JSON analysé) et par la couche de repli (`grep` d'une ligne `"planning_version": "cycles-v1"`) : un `config.json` DÉJÀ en place dont la clé est suivie d'un saut de ligne, ou écrite avec un échappement, est adhérent pour le cœur et non adhérent pour le repli, qui se tait après une panne du cœur. G6 interdit d'écrire un tel contenu depuis F-02 (R-ADH-REPLI) ; un fichier antérieur à G6 n'est pas relu.
@@ -993,6 +993,39 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (al)** — N4-02 (moyenne, re-audit final tour 4, 2026-10-02), préexistant, non corrigé dans cette phase : sous macOS, `/.vol/<dev>/<inode>/…` atteint un actif gardé (`STATE.md`, `config.json`, `cycles/…`, ou un fichier gardé par ROLE-juge) sans nommer `.planning` ni `.claude` ; `racine_lab` remonte à `/.vol`, ne trouve aucun lab et le hook se tait, dans le cœur comme dans la couche de repli. Préconditions : connaître l'inode (`Bash`, qui reste ouvert, P45-D-10, par `stat` ou `ls -i`) et que le harnais accepte un chemin `/.vol` en `Write` (non mesuré). Correctif possible, non fait dans la phase : traiter `/.vol/` comme non analysable.
 - **limite (am)** — N4-03 (basse, re-audit final tour 4) : quand les deux formes d'une valeur longue (réduite et physique) diffèrent et tombent dans le même lab adhérent, la première évaluation consomme la dérogation et la seconde refuse. La dérogation est brûlée et l'écriture refusée : le comportement est fail-closed, jamais un contournement.
 - **limite (an)** — N4-05 (basse, re-audit final tour 4) : une course entre `lstat` et `readlink` dans `resoudre_lineaire` lève `OSError`, et la décision dans le doute ne reçoit alors pas les ancêtres. Silence seulement si la valeur ne nomme rien, que le `cwd` n'est pas adhérent et qu'une exécution concurrente gagne la course (lien préexistant, `Bash` ouvert).
+- **limite (ao)** — P46-D-08 (Phase 46, 46-04) : la racine d'un `CwdChanged` est lue dans `cwd` ; `new_cwd`, que le harnais devrait porter égal à `cwd`, n'est pas lu (non mesuré : aucune sonde en direct de la version 2.1.288 n'a été permise, P46-D-08) ; si les deux divergeaient, la racine jugée serait celle de `cwd`, comme pour le pré-filtre qui lit le même champ.
+- **limite (ap)** — P46-D-10, P46-D-10a (Phase 46, 46-04) : en mode dégradé (script ou `python3` absent) dans un lab adhérent, `SubagentHandback` est refusé pour tout sous-agent, juges compris (fail-closed voulu : la couche shell ne dérive aucun rôle), et les quatre autres événements restent muets, `SubagentStop` compris (fail-open : sans rôle dérivable, un blocage statique arrêterait chaque sous-agent huit fois de suite). **Conséquence : hors mode auto et en mode dégradé, G4′ est ouvert** (hors mode auto, `SubagentHandback` n'est pas l'événement porteur : seul le repli `SubagentStop` porte G4′, et il sort sans refus) ; décision du manager P46-D-10a, renversable, listée au checkpoint d'armement de l'étape 6 (46-12).
+- **limite (aq)** — Phase 46, 46-04 : un événement que le hook ne connaît pas (`hook_event_name` inconnu, d'une autre casse, vide ou qui n'est pas une chaîne) sort en silence, code 0, sans rien évaluer ni journaliser ; seule une clé absente est lue comme `PreToolUse` (compatibilité des payloads d'avant la 46).
+
+### Contrat de sortie par événement (Phase 46)
+
+Depuis la Phase 46 (P46-D-09, P46-D-10) la MÊME commande enregistrée, au texte identique octet pour octet, est câblée sous **cinq
+événements** ; le champ `hook_event_name` du payload aiguille le cœur, qui traite chaque événement par son mode. L'événement de
+mise à jour de tâche n'est pas câblé (P46-D-01). Chaque décision citée porte le préfixe `P46-D-NN` (`46-CONTEXT.md`).
+
+- **`PreToolUse`** — un seul groupe, matcher `Write|Edit|NotebookEdit|Bash|Agent|Task|SubagentHandback` (jamais un second groupe
+  qui citerait `planning-hook.sh` : la purge de `merge-hooks.sh` retire toute entrée citant le même script dans les groupes du même
+  événement). Mode : les gates G1 à G7 et le rôle, inchangés ; `SubagentHandback` (le rapport d'un sous-agent, `tool_input.message`,
+  fourni en mode auto seulement) n'a encore aucun gate. Refus : JSON `permissionDecision: "deny"`, code 0. Erreur interne dans le
+  périmètre adhérent : `deny` (fail-closed, P45-D-08).
+- **`SubagentStop`** — aucun matcher. Mode : repli de G4′ (hors mode auto), sans évaluation encore. Blocage : JSON
+  `decision: "block"` avec `reason`, code 0, **jamais le code 2** (#60490). Erreur interne : silence, code 0.
+- **`SessionStart`** — l'entrée vit dans le groupe SANS matcher (à côté du cliché de session), donc sur `startup`, `resume`, `clear`
+  et `compact`. Mode : `watchPaths` et réconciliation de D1 (à venir). Ne refuse jamais ; toute erreur : silence, code 0.
+- **`CwdChanged`** — aucun matcher ; racine lue dans `cwd` (limite (ao)). Ne refuse jamais ; toute erreur : silence, code 0.
+- **`FileChanged`** — aucun matcher (un `*` y serait un nom de fichier littéral, jamais un joker). Racine lue dans le `file_path` de
+  PREMIER niveau du payload (chaîne absolue sous la borne de longueur du cœur, sinon silence). Ne refuse jamais ; toute erreur :
+  silence, code 0.
+
+**Fail-open déclaré** des trois événements qui ne refusent jamais : une trace perdue en séance est rattrapée par la réconciliation de
+D1 (P46-D-10) ; la décision dans le doute (N-01) ne vaut que pour `PreToolUse`, tout autre événement en doute sort en silence.
+**Hors adhésion** (lab dev, ce dépôt compris), chaque événement et le nouvel outil du matcher traversent le pré-filtre : octet vide,
+code 0, avant le lancement du script et avant tout `python3` (P46-D-16 ; R-EVT-01 et R-EVT-01b, mutants MUT-EVT-PREFILTRE et
+MUT-EVT-ADHESION). **Repli shell** (script ou `python3` absent, lab adhérent) : `SubagentHandback` est refusé par un `deny` statique
+dont la raison dit que le rapport du sous-agent est refusé tant que le hook central est indisponible et comment réparer ; tout autre
+événement sort en code 0 sans sortie (limite (ap)). Aucun message ne porte de chemin absolu hors du lab, ni « no such file », ni
+« can't open ». Le canary de session retrouve la commande de référence sous les cinq événements et signale, sans jamais bloquer, un
+événement non câblé ; ses cas DEGRADE `D09` et `D10` prouvent le refus de `SubagentHandback` en mode dégradé.
 
 ### Table d'armement livrée
 
