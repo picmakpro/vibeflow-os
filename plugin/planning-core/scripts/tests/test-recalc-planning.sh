@@ -1746,6 +1746,103 @@ else
   ko "R58 INDEX.md" "$R58_LIGNE_ATTENDUE" "rc=$R58_RC $(cat "$R58_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
 fi
 
+# ---------- R-CACHE2-01 — livrable RÉÉCRIT (taille égale) après un passage à cache valide : jamais `close` (46-03, P46-D-03b) --
+# Jumeau de R58 (livrable supprimé) pour une réécriture : la signature de l'unité (fichiers du modèle) est stable, seule l'empreinte du
+# contenu des livrables, recalculée à chaque passage, voit l'écart.
+RC2_DIR="$WORK/r-cache2-01"
+materialiser traceur "$RC2_DIR"
+( cd "$RC2_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc2-premier.json" 2>/dev/null )
+RC2_CACHE_SCHEMA="$("$PYBIN" -c '
+import json, re, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+e = d["unites"]["cycles/01-traceur/phases/01-livree"]
+v = e.get("empreinte_livrables")
+print("%s %s %s" % (d["cache_schema_version"], v[0], bool(re.fullmatch("[0-9a-f]{64}", v[1] or ""))))
+' "$RC2_DIR/.planning/.recalc-cache.json" 2>/dev/null || echo ERREUR)"
+if [ "$RC2_CACHE_SCHEMA" = "2 ok True" ]; then
+  ok "R-CACHE2-01 le cache écrit est de schéma 2 et porte l'empreinte des livrables de la phase close (64 hexadécimaux)"
+else
+  ko "R-CACHE2-01 schéma et empreinte du cache" "2 ok True" "$RC2_CACHE_SCHEMA" "-"
+fi
+RC2_TAILLE_AVANT="$("$PYBIN" -c 'import os,sys; print(os.path.getsize(sys.argv[1]))' "$RC2_DIR/livrables/rapport.md")"
+"$PYBIN" -c '
+import sys
+chemin = sys.argv[1]
+octets = bytearray(open(chemin, "rb").read())
+octets[0] = ord("M") if octets[0] != ord("M") else ord("L")
+open(chemin, "wb").write(bytes(octets))
+' "$RC2_DIR/livrables/rapport.md"
+RC2_TAILLE_APRES="$("$PYBIN" -c 'import os,sys; print(os.path.getsize(sys.argv[1]))' "$RC2_DIR/livrables/rapport.md")"
+( cd "$RC2_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc2-second.json" 2>"$WORK/rc2-second.err" )
+RC2_RC=$?
+RC2_LIGNE='indéterminé — phase `01-livree` indéterminée : livrable ou plan modifié après la clôture (cycles/01-traceur)'
+RC2_RECALCULEES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/rc2-second.json" 2>/dev/null || echo '?')"
+if [ "$RC2_RC" -eq 0 ] && [ "$RC2_TAILLE_AVANT" = "$RC2_TAILLE_APRES" ] && grep -qF "$RC2_LIGNE" "$RC2_DIR/.planning/INDEX.md" 2>/dev/null \
+   && [ "$RC2_RECALCULEES" = "1" ]; then
+  ok "R-CACHE2-01 un octet d'un livrable réécrit à taille égale : le second recalcul, par le cache, rend indéterminé (livrable-modifie-apres-cloture), jamais close ; une seule unité recalculée"
+else
+  ko "R-CACHE2-01 réécriture du livrable" "indéterminé (livrable ou plan modifié après la clôture), 1 unité recalculée, tailles égales" "rc=$RC2_RC taille=$RC2_TAILLE_AVANT/$RC2_TAILLE_APRES recalculees=$RC2_RECALCULEES $(cat "$RC2_DIR/.planning/INDEX.md" 2>/dev/null)" "$(cat "$WORK/rc2-second.err" 2>/dev/null)"
+fi
+# Jumeau négatif : réécrire un fichier que aucun `ecrit:` ne déclare laisse l'unité close et reprise du cache.
+RC2J_DIR="$WORK/r-cache2-01-jumeau"
+materialiser traceur "$RC2J_DIR"
+printf 'Hors ecrit: A.\n' > "$RC2J_DIR/autre-fichier.md"
+( cd "$RC2J_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+printf 'Hors ecrit: B.\n' > "$RC2J_DIR/autre-fichier.md"
+( cd "$RC2J_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc2j-second.json" 2>/dev/null )
+RC2J_FAITS="$("$PYBIN" -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("reprises=%s recalculees=%s" % (d["unites_reprises"], d["unites_recalculees"]))
+' "$WORK/rc2j-second.json" 2>/dev/null || echo ERREUR)"
+if [ "$RC2J_FAITS" = "reprises=2 recalculees=0" ] && ! grep -qF 'modifié après la clôture' "$RC2J_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R-CACHE2-01 jumeau : un fichier hors ecrit: réécrit laisse les deux unités reprises du cache (close conservé)"
+else
+  ko "R-CACHE2-01 jumeau fichier hors ecrit:" "reprises=2 recalculees=0, aucune péremption" "$RC2J_FAITS $(cat "$RC2J_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+
+# ---------- R-CACHE2-02 — un cache de schéma 1 est relu comme `autre-format` : recalcul complet, résultat identique (46-03) ----
+RC2B_DIR="$WORK/r-cache2-02"
+materialiser traceur "$RC2B_DIR"
+( cd "$RC2B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+cp "$RC2B_DIR/.planning/INDEX.md" "$WORK/rc2b-index-ref.md"
+cp "$RC2B_DIR/.planning/STATE.md" "$WORK/rc2b-state-ref.md"
+"$PYBIN" -c "
+import json
+p = '$RC2B_DIR/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+d['cache_schema_version'] = 1
+for e in d['unites'].values():
+    e.pop('empreinte_livrables', None)
+    e['livrables'] = {v: True for v in e.get('ecrit', [])}
+json.dump(d, open(p, 'w', encoding='utf-8'))
+"
+( cd "$RC2B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc2b-out.json" 2>"$WORK/rc2b-err.txt" )
+RC2B_RC=$?
+RC2B_FAITS="$("$PYBIN" -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("cache=%s reprises=%s recalculees=%s unites=%s" % (d["cache"], d["unites_reprises"], d["unites_recalculees"], d["unites"]))
+' "$WORK/rc2b-out.json" 2>/dev/null || echo ERREUR)"
+if [ "$RC2B_RC" -eq 0 ] && [ "$RC2B_FAITS" = "cache=autre-format reprises=0 recalculees=2 unites=2" ]; then
+  ok "R-CACHE2-02 cache de schéma 1 : autre-format, aucune reprise, recalcul complet ($RC2B_FAITS)"
+else
+  ko "R-CACHE2-02 cache de schéma 1" "cache=autre-format reprises=0 recalculees=2 unites=2" "rc=$RC2B_RC $RC2B_FAITS" "$(cat "$WORK/rc2b-err.txt" 2>/dev/null)"
+fi
+rm -f "$RC2B_DIR/.planning/.recalc-cache.json"
+( cd "$RC2B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+if cmp -s "$WORK/rc2b-index-ref.md" "$RC2B_DIR/.planning/INDEX.md" && cmp -s "$WORK/rc2b-state-ref.md" "$RC2B_DIR/.planning/STATE.md"; then
+  ok "R-CACHE2-02 INDEX.md et STATE.md identiques au recalcul sans cache (cache de schéma 1, cache absent, cache valide)"
+else
+  ko "R-CACHE2-02 identité avec le recalcul sans cache" "INDEX.md et STATE.md identiques" "diffèrent" "-"
+fi
+RC2B_SCHEMA_FINAL="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache_schema_version"])' "$RC2B_DIR/.planning/.recalc-cache.json" 2>/dev/null || echo '?')"
+if [ "$RC2B_SCHEMA_FINAL" = "2" ]; then
+  ok "R-CACHE2-02 le cache réécrit après le schéma 1 est de schéma 2"
+else
+  ko "R-CACHE2-02 schéma réécrit" "2" "$RC2B_SCHEMA_FINAL" "-"
+fi
+
 # ================================================================================================
 # make_recalc_mutant — mute UNE ligne à motif fixe unique de recalc-planning.sh dans une copie
 # fraîche (moteur + detect-gsd-engine.sh + workstream-policy.sh), patron test-check-skills.sh
@@ -2627,7 +2724,7 @@ fi
 
 # ---------- MUT-LIVRABLES-CACHE — existence des livrables non revue à la reprise -----------------
 if make_recalc_mutant LIVRABLES-CACHE \
-  'if livrables_actuels == livrables_cache:' \
+  'if livrables_actuels is not None and livrables_actuels == entree_cache.get("empreinte_livrables"):  # cache-empreinte' \
   'if True:  # MUT-LIVRABLES-CACHE'
 then
   MR="$MUT_DIR/recalc-planning.sh"
@@ -2637,10 +2734,27 @@ then
   rm -f "$DIR_CAS/livrables/rapport.md"
   ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-livrables-cache-out.json" 2>"$WORK/mut-livrables-cache-err.txt" ); RC_M=$?
   if ! _verifier_plantage LIVRABLES-CACHE "état de la phase de R58 après suppression du livrable" "$WORK/mut-livrables-cache-out.json" "$WORK/mut-livrables-cache-err.txt" "$RC_M"; then
-    if grep -qF 'livrable absent : livrables/rapport.md' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null; then
-      komut LIVRABLES-CACHE "état de la phase de R58 après suppression du livrable" "indéterminé, livrable-absent (original)" "indéterminé, livrable-absent (mutant non opposable)"
-    else
-      okmut LIVRABLES-CACHE "état de la phase de R58 après suppression du livrable · attendu (original) : indéterminé (livrable-absent:livrables/rapport.md) · obtenu (mutant) : $(grep 'cycles/01-traceur' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null) (l'état repris du cache reste close malgré le livrable manquant)"
+    # Second scénario (R-CACHE2-01) : un octet du livrable réécrit à taille égale, sur un lab neuf.
+    DIR_CAS2="$WORK/mut-livrables-cache-cas2"
+    materialiser traceur "$DIR_CAS2"
+    ( cd "$DIR_CAS2" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+    "$PYBIN" -c '
+import sys
+chemin = sys.argv[1]
+octets = bytearray(open(chemin, "rb").read())
+octets[0] = ord("M") if octets[0] != ord("M") else ord("L")
+open(chemin, "wb").write(bytes(octets))
+' "$DIR_CAS2/livrables/rapport.md"
+    ( cd "$DIR_CAS2" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-livrables-cache-out2.json" 2>"$WORK/mut-livrables-cache-err2.txt" ); RC_M2=$?
+    if ! _verifier_plantage LIVRABLES-CACHE "état de la phase de R-CACHE2-01 après réécriture du livrable" "$WORK/mut-livrables-cache-out2.json" "$WORK/mut-livrables-cache-err2.txt" "$RC_M2"; then
+      LIVR_R58_TUE=0; LIVR_RC2_TUE=0
+      grep -qF 'livrable absent : livrables/rapport.md' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null || LIVR_R58_TUE=1
+      grep -qF 'modifié après la clôture' "$DIR_CAS2/.planning/INDEX.md" 2>/dev/null || LIVR_RC2_TUE=1
+      if [ "$LIVR_R58_TUE" -eq 1 ] && [ "$LIVR_RC2_TUE" -eq 1 ]; then
+        okmut LIVRABLES-CACHE "tué par R58 ET par R-CACHE2-01 · R58 : attendu (original) : indéterminé (livrable-absent:livrables/rapport.md) · obtenu (mutant) : $(grep 'cycles/01-traceur' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null) · R-CACHE2-01 : attendu (original) : indéterminé (livrable ou plan modifié après la clôture) · obtenu (mutant) : $(grep 'cycles/01-traceur' "$DIR_CAS2/.planning/INDEX.md" 2>/dev/null) (l'état repris du cache reste en place malgré le livrable manquant ou réécrit)"
+      else
+        komut LIVRABLES-CACHE "état après suppression (R58) puis après réécriture (R-CACHE2-01) du livrable" "indéterminé dans les deux scénarios (original)" "mutant non opposable : R58 tué=$LIVR_R58_TUE, R-CACHE2-01 tué=$LIVR_RC2_TUE"
+      fi
     fi
   fi
 fi

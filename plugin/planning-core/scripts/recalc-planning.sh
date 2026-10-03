@@ -79,7 +79,7 @@ from datetime import datetime
 
 # --- Constantes du contrat -----------------------------------------------------------------
 SCHEMA_ADHESION = "cycles-v1"
-CACHE_SCHEMA_VERSION = 1
+CACHE_SCHEMA_VERSION = 2
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 # Candidats bash FIXES pour lancer le détecteur (F1/F44-07, correction de classe) : jamais
 # `shutil.which("bash")` sur le PATH hérité — un PATH détourné (un faux `bash` en tête) rendrait
@@ -1442,30 +1442,45 @@ def charger_cache(planning):
     return ("valide", donnees)
 
 
+def _livrables_pour_cache(racine_lab, entrees):
+    """Valeur JSON, comparable d'un passage à l'autre, de l'état des livrables `ecrit:` `entrees` d'une unité : `["ok", empreinte]`
+    quand tous sont présents et hachables (copie partagée, bornée) — `["ok", None]` quand il n'y a aucune entrée, la dérivation ne
+    dépend alors d'aucun livrable —, `["statuts", {entrée: statut}]` quand au moins un livrable n'est pas présent (la dérivation ne
+    dépend alors que de ces statuts, pas du contenu) ; None quand le calcul de l'empreinte échoue alors que tous les livrables sont
+    présents (borne dépassée, lecture impossible) : une telle entrée n'est jamais reprise."""
+    if not entrees:
+        return ["ok", None]
+    statut, valeur = empreinte_livrables(racine_lab, entrees)
+    if statut == "ok":
+        return ["ok", valeur]
+    statuts = {e: livrable_present(racine_lab, e)[0] for e in entrees}
+    if all(s == "present" for s in statuts.values()):
+        return None
+    return ["statuts", statuts]
+
+
 def _deriver_feuille_cache(unite, racine_lab, cache_ctx, chemin_cadrage_supplementaire=None):
     """Enveloppe de `deriver_feuille` consciente du cache (44-04, P44-D-13) : `cache_ctx` None ->
     jamais consulté ni écrit (mode lecture seule, T-44-21) — délègue alors directement à
-    `deriver_feuille`. Sinon, reprend l'entrée du cache existant SI la signature ET l'existence
-    des livrables re-vérifiée à cet instant concordent toutes deux ; sinon recalcule et enregistre
-    la nouvelle entrée."""
+    `deriver_feuille`. Sinon, reprend l'entrée du cache existant SI la signature ET l'état des
+    livrables (empreinte de leur contenu, recalculée à cet instant par la copie partagée, bornée),
+    concordent toutes deux ; sinon recalcule et enregistre la nouvelle entrée. Aucune signature par
+    date : le contenu seul (spec §10, incrémentalité par hash, jamais par mtime)."""
     if cache_ctx is None:
         return deriver_feuille(unite, racine_lab)
     chemin_rel = unite["chemin_rel"]
     signature = signature_unite(unite, NOMS_MODELE_PLAN, chemin_cadrage_supplementaire)
     entree_cache = (cache_ctx["existant"] or {}).get(chemin_rel)
     if isinstance(entree_cache, dict) and entree_cache.get("signature") == signature:
-        ecrit_cache = entree_cache.get("ecrit") or []
-        livrables_cache = entree_cache.get("livrables") or {}
-        livrables_actuels = {v: os.path.lexists(os.path.join(racine_lab, v)) for v in ecrit_cache}
-        if livrables_actuels == livrables_cache:
+        livrables_actuels = _livrables_pour_cache(racine_lab, entree_cache.get("ecrit") or [])
+        if livrables_actuels is not None and livrables_actuels == entree_cache.get("empreinte_livrables"):  # cache-empreinte
             cache_ctx["nouveau"][chemin_rel] = entree_cache
             cache_ctx["reprises"] += 1
             return (entree_cache.get("etat"), entree_cache.get("raison"), dict(entree_cache.get("meta") or {}))
     etat, raison, meta = deriver_feuille(unite, racine_lab)
     ecrit_reel = _lire_ecrit_reel(unite["chemin_abs"])
-    livrables_reel = {v: os.path.lexists(os.path.join(racine_lab, v)) for v in ecrit_reel}
     cache_ctx["nouveau"][chemin_rel] = {
-        "signature": signature, "ecrit": ecrit_reel, "livrables": livrables_reel,
+        "signature": signature, "ecrit": ecrit_reel, "empreinte_livrables": _livrables_pour_cache(racine_lab, ecrit_reel),
         "etat": etat, "raison": raison, "meta": meta,
     }
     cache_ctx["recalculees"] += 1
