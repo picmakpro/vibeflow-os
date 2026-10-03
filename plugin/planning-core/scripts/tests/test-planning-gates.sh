@@ -1009,7 +1009,7 @@ def controle_verdict_01(ctx, script):
     empreinte = hashlib.sha256(octets(os.path.join(lab, UNITE, "PLAN.md"))).hexdigest()
     mode = stat.S_IMODE(os.stat(chemin).st_mode)
     fautes = []
-    if lignes[0] != "---" or cles != ["juge", "hash", "tentative", "score", "constats"]:
+    if lignes[0] != "---" or cles != ["juge", "hash", "hash_livrables", "tentative", "score", "constats"]:
         fautes.append("clés du frontmatter : %s" % cles)
     for attendu in ('juge: "vf-design-judge"', 'hash: "%s"' % empreinte, "tentative: 1", 'score: "8/10"',
                     '  - critere: "critere-a"', '    resultat: "passé"', '  - critere: "critere-b"', '    resultat: "échec"'):
@@ -1017,12 +1017,14 @@ def controle_verdict_01(ctx, script):
             fautes.append("ligne absente : " + attendu)
     if "# Verdict" not in lignes[fin + 1:]:
         fautes.append("corps sans « # Verdict »")
+    if not any(re.fullmatch(r'hash_livrables: "[0-9a-f]{64}"', l) for l in lignes[1:fin]):
+        fautes.append("hash_livrables absent ou mal formé (empreinte de 64 hexadécimaux attendue)")
     if mode != 0o644:
         fautes.append("permissions %o" % mode)
     restes = [n for n in os.listdir(os.path.join(lab, UNITE)) if n.startswith(".")]
     if restes:
         fautes.append("fichier temporaire laissé : %s" % restes)
-    return (not fautes), ("; ".join(fautes) if fautes else "code 0, VERDICT.md au format du gabarit, hash = sha256 des octets du PLAN.md, tentative 1, 0644, aucun temporaire")
+    return (not fautes), ("; ".join(fautes) if fautes else "code 0, VERDICT.md au format du gabarit (deux empreintes, 46-01), hash = sha256 des octets du PLAN.md, tentative 1, 0644, aucun temporaire")
 
 
 def controle_verdict_02(ctx, script):
@@ -3446,6 +3448,7 @@ def lab_imbrique(ctx, variante):
     ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
     phase = os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-p")
     ecrire(os.path.join(phase, "PLAN.md"), "---\necrit: livrables\n---\n")
+    ecrire(os.path.join(lab, "livrables", "rapport.md"), "x\n")  # 46-01 : poser-verdict.sh refuse un livrable absent ou vide
     imbrique = {"a": os.path.join(lab, ".planning", ".planning"), "b": os.path.join(lab, ".planning", "cycles", ".planning"),
                 "c": os.path.join(phase, ".planning")}[variante]
     os.makedirs(imbrique)
@@ -3840,13 +3843,13 @@ def controle_verdict_forme_unite(ctx, script):
                  ".planning/cycles/01-c/phases/01-p/foo/01-a", ".planning/cycles/01-c/foo/01-p", ".planning/notes/01-c/phases/01-p")
     for unite in invalides:
         lab = lab_frais(ctx)
-        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: a\n---\n")
+        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: livrables/rapport.md\n---\n")
         rc, _o, err = poser(ctx, d, lab, 1, unite=unite)
         if rc != 64 or verdicts_ecrits(lab):
             fautes.append("%s : rc=%d (attendu 64), écrit %s" % (unite, rc, [os.path.relpath(e, lab) for e in verdicts_ecrits(lab)]))
     for unite in (".planning/cycles/01-c/phases/01-p", ".planning/cycles/01-c/phases/01-p/plans/01-a"):
         lab = lab_frais(ctx)
-        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: a\n---\n")
+        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: livrables/rapport.md\n---\n")
         rc, _o, err = poser(ctx, d, lab, 1, unite=unite)
         if rc != 0 or not os.path.isfile(os.path.join(lab, unite, "VERDICT.md")):
             fautes.append("unité valide %s : rc=%d %s" % (unite, rc, court(err)))
