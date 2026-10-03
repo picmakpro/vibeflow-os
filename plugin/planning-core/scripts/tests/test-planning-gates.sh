@@ -430,6 +430,67 @@ def _parser_ecriture(reste):
     return e
 
 
+JETON_PLAN = "{{sha256-plan}}"
+JETON_LIVRABLES = "{{empreinte-livrables}}"
+POSER_VERDICT_SH = None  # chemin de poser-verdict.sh, posé par main() : la source du bloc partagé qui résout les jetons du banc
+
+
+class JetonNonResolu(RuntimeError):
+    """Un jeton du banc ne se résout pas : ni un OSError ni un ValueError, pour que `_labs_croises` ne l'écarte jamais en silence."""
+
+
+def _bloc_poser_verdict():
+    """Espace de noms du corps Python de poser-verdict.sh, sans l'appel final à main() : les jetons du banc sont résolus par la copie du
+    bloc partagé que lit la vraie commande de pose, jamais par celle du recalcul (preuve croisée, 46-03)."""
+    if not POSER_VERDICT_SH or not os.path.isfile(POSER_VERDICT_SH):
+        raise JetonNonResolu("jeton du banc non résolu : poser-verdict.sh introuvable")
+    arbre = ast.parse(corps_python(open(POSER_VERDICT_SH, encoding="utf-8").read(), "PY_POSER_VERDICT_EOF"))
+    arbre.body = [n for n in arbre.body
+                  if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Call) and getattr(n.value.func, "id", "") == "main")]
+    ns = {"__name__": "bloc_charge_banc"}
+    exec(compile(arbre, POSER_VERDICT_SH, "exec"), ns)
+    return ns
+
+
+def resoudre_jetons(destination):
+    """Résout, APRÈS l'écriture de tous les fichiers du lab, `{{sha256-plan}}` (sha256 des octets du PLAN.md voisin du VERDICT.md) et
+    `{{empreinte-livrables}}` (empreinte des entrées `ecrit:` de ce PLAN.md, par la copie du bloc lue dans poser-verdict.sh), comme le
+    matérialiseur de test-recalc-planning.sh : sans quoi un verdict valide du banc de recalcul deviendrait périmé ici. Un jeton qui ne se
+    résout pas lève JetonNonResolu avec un message nommé, jamais une substitution vide."""
+    ns = None
+    for racine, _dossiers, fichiers in os.walk(destination, followlinks=False):
+        if "VERDICT.md" not in fichiers:
+            continue
+        chemin = os.path.join(racine, "VERDICT.md")
+        rel = os.path.relpath(chemin, destination)
+        if not stat.S_ISREG(os.lstat(chemin).st_mode):
+            continue
+        texte = open(chemin, encoding="utf-8").read()
+        if JETON_PLAN not in texte and JETON_LIVRABLES not in texte:
+            continue
+        plan = os.path.join(racine, "PLAN.md")
+        if not os.path.isfile(plan) or os.path.islink(plan):
+            raise JetonNonResolu("jeton du banc non résolu : PLAN.md voisin absent de " + rel)
+        octets_plan = open(plan, "rb").read()
+        if JETON_PLAN in texte:
+            texte = texte.replace(JETON_PLAN, hashlib.sha256(octets_plan).hexdigest())
+        if JETON_LIVRABLES in texte:
+            if ns is None:
+                ns = _bloc_poser_verdict()
+            statut_fm, donnees = ns["lire_frontmatter"](octets_plan.decode("utf-8"))
+            if statut_fm != "ok":
+                raise JetonNonResolu("jeton du banc non résolu : frontmatter du PLAN.md voisin illisible (" + rel + ")")
+            valeurs = ns["_valeurs_ecrit"](donnees)
+            if not valeurs:
+                raise JetonNonResolu("jeton du banc non résolu : ecrit: absent du PLAN.md voisin (" + rel + ")")
+            statut, detail = ns["empreinte_livrables"](destination, valeurs)
+            if statut != "ok":
+                raise JetonNonResolu("jeton du banc non résolu : empreinte des livrables " + statut + " (" + str(detail) + ") pour " + rel)
+            texte = texte.replace(JETON_LIVRABLES, detail)
+        with open(chemin, "w", encoding="utf-8") as fh:
+            fh.write(texte)
+
+
 def materialiser(labs, nom, destination):
     lab = labs[nom]
     os.makedirs(destination, exist_ok=True)
@@ -440,6 +501,7 @@ def materialiser(labs, nom, destination):
     for chemin, cible in lab["liens"]:
         os.makedirs(os.path.dirname(os.path.join(destination, chemin)), exist_ok=True)
         os.symlink(cible, os.path.join(destination, chemin))
+    resoudre_jetons(destination)
 
 
 def entree_de_ecriture(e, racine):
@@ -4915,7 +4977,9 @@ SECTIONS = {
 
 
 def main():
+    global POSER_VERDICT_SH
     scripts_dir, hooks_json, banc, work, settings_lab = sys.argv[2:7]
+    POSER_VERDICT_SH = os.path.join(scripts_dir, "poser-verdict.sh")
     ctx = Ctx(scripts_dir, hooks_json or None, work, settings_lab or None)
     ctx.banc = banc
     ctx.banc_recalc = sys.argv[7] if len(sys.argv) > 7 and sys.argv[7] else None

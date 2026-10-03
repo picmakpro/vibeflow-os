@@ -116,6 +116,8 @@ BASH_BIN="$(command -v bash)"
 # CET instantané, jamais contre le fichier lui-même (qui serait trivialement identique à soi).
 RECALC_SNAPSHOT="$WORK/recalc-planning-snapshot.sh"
 cp "$RECALC" "$RECALC_SNAPSHOT"
+# Les jetons du banc ({{sha256-plan}}, {{empreinte-livrables}}) sont résolus par la copie du bloc partagé lue dans poser-verdict.sh.
+export AIDES_POSER_VERDICT="$SCRIPTS_DIR/poser-verdict.sh"
 
 # ================================================================================================
 # Aides Python (materialiser / empreinte / coureur du banc) — un seul fichier, invoqué par sous-
@@ -227,6 +229,76 @@ def parser_banc(texte):
     return ordre_labs, labs
 
 
+JETON_PLAN = "{{sha256-plan}}"
+JETON_LIVRABLES = "{{empreinte-livrables}}"
+
+
+def _corps_python(texte, marqueur):
+    corps, dedans = [], False
+    for ligne in texte.split("\n"):
+        if ligne == marqueur:
+            dedans = False
+        if dedans:
+            corps.append(ligne)
+        if ligne.endswith("<<'" + marqueur + "'"):
+            dedans = True
+    return "\n".join(corps) + "\n"
+
+
+def _bloc_poser_verdict():
+    """Espace de noms du corps Python de poser-verdict.sh (chemin dans AIDES_POSER_VERDICT), sans l'appel final à main() : les jetons
+    du banc sont résolus par la copie du bloc partagé que lit la vraie commande de pose, jamais par celle du recalcul (preuve croisée)."""
+    import ast
+    chemin = os.environ.get("AIDES_POSER_VERDICT")
+    if not chemin or not os.path.isfile(chemin):
+        raise ValueError("jeton du banc non résolu : poser-verdict.sh introuvable (AIDES_POSER_VERDICT)")
+    arbre = ast.parse(_corps_python(open(chemin, encoding="utf-8").read(), "PY_POSER_VERDICT_EOF"))
+    arbre.body = [n for n in arbre.body
+                  if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Call) and getattr(n.value.func, "id", "") == "main")]
+    ns = {"__name__": "bloc_charge_banc"}
+    exec(compile(arbre, chemin, "exec"), ns)
+    return ns
+
+
+def resoudre_jetons(destination):
+    """Résout, APRÈS l'écriture de tous les fichiers du lab, les jetons `{{sha256-plan}}` (sha256 des octets du PLAN.md voisin du
+    VERDICT.md) et `{{empreinte-livrables}}` (empreinte des entrées `ecrit:` de ce PLAN.md, copie du bloc de poser-verdict.sh). Un
+    jeton qui ne se résout pas (PLAN.md voisin absent, `ecrit:` illisible, livrable absent, vide ou lien) lève ValueError avec un message
+    nommé : jamais une substitution vide."""
+    ns = None
+    for racine, _dossiers, fichiers in os.walk(destination, followlinks=False):
+        if "VERDICT.md" not in fichiers:
+            continue
+        chemin = os.path.join(racine, "VERDICT.md")
+        rel = os.path.relpath(chemin, destination)
+        if not stat.S_ISREG(os.lstat(chemin).st_mode):
+            continue
+        texte = open(chemin, encoding="utf-8").read()
+        if JETON_PLAN not in texte and JETON_LIVRABLES not in texte:
+            continue
+        plan = os.path.join(racine, "PLAN.md")
+        if not os.path.isfile(plan) or os.path.islink(plan):
+            raise ValueError("jeton du banc non résolu : PLAN.md voisin absent de " + rel)
+        octets_plan = open(plan, "rb").read()
+        if JETON_PLAN in texte:
+            texte = texte.replace(JETON_PLAN, hashlib.sha256(octets_plan).hexdigest())
+        if JETON_LIVRABLES in texte:
+            if ns is None:
+                ns = _bloc_poser_verdict()
+            statut_fm, donnees = ns["lire_frontmatter"](octets_plan.decode("utf-8"))
+            if statut_fm != "ok":
+                raise ValueError("jeton du banc non résolu : frontmatter du PLAN.md voisin illisible (" + rel + ")")
+            valeurs = ns["_valeurs_ecrit"](donnees)
+            if not valeurs:
+                raise ValueError("jeton du banc non résolu : ecrit: absent du PLAN.md voisin (" + rel + ")")
+            statut, detail = ns["empreinte_livrables"](destination, valeurs)
+            if statut != "ok":
+                raise ValueError("jeton du banc non résolu : empreinte des livrables " + statut + " (" + str(detail) + ") pour " + rel)
+            texte = texte.replace(JETON_LIVRABLES, detail)
+        with open(chemin, "w", encoding="utf-8") as fh:
+            fh.write(texte)
+
+
 def materialiser(banc_path, nom_lab, destination):
     texte = open(banc_path, encoding="utf-8").read()
     ordre, labs = parser_banc(texte)
@@ -260,6 +332,7 @@ def materialiser(banc_path, nom_lab, destination):
         else:
             cible_resolue = os.path.join(destination, cible)
         os.symlink(cible_resolue, chemin_lien)
+    resoudre_jetons(destination)
     return lab["attendus"]
 
 
@@ -307,7 +380,12 @@ def coureur(banc_path, work_dir, recalc_sh):
     tout_ok = True
     for nom in ordre:
         dest = os.path.join(work_dir, "bancs", nom)
-        attendus = materialiser(banc_path, nom, dest)
+        try:
+            attendus = materialiser(banc_path, nom, dest)
+        except ValueError as e:
+            print("✗ BANC " + nom + " : " + str(e))
+            tout_ok = False
+            continue
         proc = subprocess.run(
             ["bash", recalc_sh, "--planning=" + os.path.join(dest, ".planning"), "--read-only"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
@@ -353,20 +431,20 @@ def coureur(banc_path, work_dir, recalc_sh):
     sys.exit(0 if tout_ok else 1)
 
 
-ETATS_ONZE = (
-    "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger",
+ETATS_DOUZE = (
+    "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger", "à clore",
     "close", "indéterminé", "abandonné", "remplacé", "gelé",
 )
 
 
 def couverture(banc_path):
-    """R20 : pour chacun des onze états, un lab non jumeau porte un `@@ attendu` à cet état sur
+    """R20 : pour chacun des douze états (onze plus `à clore`), un lab non jumeau porte un `@@ attendu` à cet état sur
     une unité U ET un lab `jumeau-de=` ce lab porte un `@@ attendu` sur la MÊME unité U à un état
     différent."""
     texte = open(banc_path, encoding="utf-8").read()
     ordre, labs = parser_banc(texte)
     tout_ok = True
-    for etat in ETATS_ONZE:
+    for etat in ETATS_DOUZE:
         trouve = None
         for nom in ordre:
             lab = labs[nom]
@@ -417,6 +495,13 @@ def main():
     if action == "materialiser":
         materialiser(sys.argv[2], sys.argv[3], sys.argv[4])
         return
+    if action == "jetons":
+        try:
+            resoudre_jetons(sys.argv[2])
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(1)
+        return
     if action == "empreinte":
         for type_, rel, valeur in empreinte(sys.argv[2]):
             print(type_ + "\t" + rel + "\t" + valeur)
@@ -439,6 +524,8 @@ PY_AIDES_EOF
 
 materialiser() { "$PYBIN" "$AIDES_PY" materialiser "$BANC" "$1" "$2"; }
 empreinte() { "$PYBIN" "$AIDES_PY" empreinte "$1"; }
+# jetons — résout les jetons de verdict d'un lab déjà matérialisé (un VERDICT.md réécrit à la main par un cas inline).
+jetons() { "$PYBIN" "$AIDES_PY" jetons "$1"; }
 
 echo "== test-recalc-planning =="
 echo ""
@@ -772,15 +859,15 @@ else
   ko "R14 permissions" "644 chacun" "$R14_MODES" "-"
 fi
 
-# ---------- R20 — contrôle de couverture (onze états, positif + jumeau, P44-D-06/D-17) ----------
+# ---------- R20 — contrôle de couverture (douze états : onze plus `à clore`, positif + jumeau, P44-D-06/D-17, P46-D-04) ----------
 R20_OUT="$WORK/r20-out.txt"
 "$PYBIN" "$AIDES_PY" couverture "$BANC" > "$R20_OUT" 2>&1
 R20_RC=$?
 cat "$R20_OUT"
-if [ "$R20_RC" -eq 0 ] && [ "$(grep -c '^COUVERTURE ' "$R20_OUT")" -eq 11 ]; then
-  ok "R20 couverture : onze états couverts, chacun par un positif et un jumeau"
+if [ "$R20_RC" -eq 0 ] && [ "$(grep -c '^COUVERTURE ' "$R20_OUT")" -eq 12 ]; then
+  ok "R20 couverture : douze états couverts, chacun par un positif et un jumeau"
 else
-  ko "R20 couverture" "code 0, onze lignes COUVERTURE" "code=$R20_RC, $(grep -c '^COUVERTURE ' "$R20_OUT") ligne(s)" "$(grep '✗' "$R20_OUT" | head -1)"
+  ko "R20 couverture" "code 0, douze lignes COUVERTURE" "code=$R20_RC, $(grep -c '^COUVERTURE ' "$R20_OUT") ligne(s)" "$(grep '✗' "$R20_OUT" | head -1)"
 fi
 BANC_LABS_N="$(grep -oE 'BANC-LABS n=[0-9]+' "$R20_OUT" | grep -oE '[0-9]+')"
 if [ -n "$BANC_LABS_N" ] && [ "$BANC_LABS_N" -ge 18 ]; then
@@ -997,31 +1084,254 @@ fi
 
 # ---------- R27 — libellés lisibles distincts (INDEX.md et STATE.md, décision (a) 2026-09-28) ----
 R27A_DIR="$WORK/r27a"
-materialiser etat-a-corriger-jumeau "$R27A_DIR"
+materialiser etat-a-clore "$R27A_DIR"
 ( cd "$R27A_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27a-err.txt" )
 R27B_DIR="$WORK/r27b"
 materialiser d08-summary-sans-plan "$R27B_DIR"
 ( cd "$R27B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27b-err.txt" )
-if grep -qF 'verdict passé, SUMMARY absent' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null; then
-  ok "R27 INDEX.md (etat-a-corriger-jumeau) contient « verdict passé, SUMMARY absent »"
+R27C_DIR="$WORK/r27c"
+materialiser verdict-perime "$R27C_DIR"
+( cd "$R27C_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27c-err.txt" )
+# 46-03 (P46-D-04) : « verdict passé, SUMMARY absent » est un état à part entière, `à clore` ; son ancien libellé n'existe plus.
+if grep -qF '| cycles/01-c | à clore | 01-p |' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 INDEX.md (etat-a-clore) porte l'état « à clore » (phase courante 01-p)"
 else
-  ko "R27 INDEX.md libellé A" "verdict passé, SUMMARY absent" "$(cat "$R27A_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+  ko "R27 INDEX.md libellé A" "| cycles/01-c | à clore | 01-p |" "$(cat "$R27A_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
 fi
 if grep -qF 'SUMMARY.md sans PLAN.md' "$R27B_DIR/.planning/INDEX.md" 2>/dev/null; then
   ok "R27 INDEX.md (d08-summary-sans-plan) contient « SUMMARY.md sans PLAN.md »"
 else
   ko "R27 INDEX.md libellé B" "SUMMARY.md sans PLAN.md" "$(cat "$R27B_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
 fi
-if ! grep -qF 'verdict passé, SUMMARY absent' "$R27B_DIR/.planning/INDEX.md" 2>/dev/null \
-   && ! grep -qF 'SUMMARY.md sans PLAN.md' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null; then
-  ok "R27 les deux libellés sont distincts (jamais le même générique)"
+if ! grep -qF 'SUMMARY.md sans PLAN.md' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null \
+   && ! grep -qF 'à clore' "$R27B_DIR/.planning/INDEX.md" 2>/dev/null \
+   && ! grep -qF 'verdict périmé' "$R27A_DIR/.planning/INDEX.md" "$R27B_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 les libellés sont distincts (jamais le même générique)"
 else
-  ko "R27 distinction des libellés" "les deux libellés diffèrent" "chevauchement détecté" "-"
+  ko "R27 distinction des libellés" "les libellés diffèrent d'un lab à l'autre" "chevauchement détecté" "-"
 fi
-if grep -qF 'verdict passé, SUMMARY absent' "$R27A_DIR/.planning/STATE.md" 2>/dev/null; then
-  ok "R27 STATE.md (etat-a-corriger-jumeau) porte le libellé lisible de phase-indeterminee:01-p"
+if grep -qF 'etat: à clore' "$R27A_DIR/.planning/STATE.md" 2>/dev/null; then
+  ok "R27 STATE.md (etat-a-clore) porte l'état « à clore »"
 else
-  ko "R27 STATE.md libellé" "verdict passé, SUMMARY absent" "$(cat "$R27A_DIR/.planning/STATE.md" 2>/dev/null)" "-"
+  ko "R27 STATE.md libellé" "etat: à clore" "$(cat "$R27A_DIR/.planning/STATE.md" 2>/dev/null)" "-"
+fi
+if ! grep -qF 'verdict passé, SUMMARY absent' "$R27A_DIR/.planning/INDEX.md" "$R27A_DIR/.planning/STATE.md" 2>/dev/null \
+   && ! grep -qF 'verdict-passe-sans-SUMMARY' "$R27A_DIR/.planning/INDEX.md" "$R27A_DIR/.planning/STATE.md" 2>/dev/null; then
+  ok "R27 le libellé « verdict passé, SUMMARY absent » n'apparaît plus (INDEX.md, STATE.md)"
+else
+  ko "R27 ancien libellé" "absent de INDEX.md et STATE.md" "présent" "$(cat "$R27A_DIR/.planning/INDEX.md" 2>/dev/null)"
+fi
+# 46-03 (P46-D-03b) : la raison d'un `à juger` périmé se lit dans l'index et dans l'état.
+if grep -qF '| cycles/01-c | à juger — verdict périmé : re-juger (tentative n+1) | 01-p |' "$R27C_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 INDEX.md (verdict-perime) porte « verdict périmé : re-juger (tentative n+1) »"
+else
+  ko "R27 INDEX.md verdict périmé" "à juger — verdict périmé : re-juger (tentative n+1)" "$(cat "$R27C_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+if grep -qF 'etat: à juger — verdict périmé : re-juger (tentative n+1)' "$R27C_DIR/.planning/STATE.md" 2>/dev/null; then
+  ok "R27 STATE.md (verdict-perime) porte « verdict périmé : re-juger (tentative n+1) »"
+else
+  ko "R27 STATE.md verdict périmé" "etat: à juger — verdict périmé : re-juger (tentative n+1)" "$(cat "$R27C_DIR/.planning/STATE.md" 2>/dev/null)" "-"
+fi
+# Jumeau négatif : un `à juger` ordinaire (sans verdict) ne porte aucune raison dans l'index.
+R27D_DIR="$WORK/r27d"
+materialiser livrable-vide-jumeau "$R27D_DIR"
+( cd "$R27D_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27d-err.txt" )
+if grep -qF '| cycles/01-c | à juger | 01-p |' "$R27D_DIR/.planning/INDEX.md" 2>/dev/null \
+   && ! grep -qF 'verdict périmé' "$R27D_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 INDEX.md (jumeau, à juger sans verdict) ne porte aucune raison de péremption"
+else
+  ko "R27 jumeau à juger" "| cycles/01-c | à juger | 01-p | sans « verdict périmé »" "$(cat "$R27D_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+
+# ---------- 46-03 — état « à clore », empreintes du verdict, R4 « absent ou vide » (P46-D-04, P46-D-03b, P46-D-12) -----
+phase_etat_raison() { # <recalc.sh> <dossier du lab> -> « état|raison » de la phase 01-p ; ERREUR si le recalcul échoue
+  local recalc="$1" dir="$2" sortie
+  sortie="$WORK/per-courant.json"
+  bash "$recalc" --planning="$dir/.planning" --read-only > "$sortie" 2>"$WORK/per-courant.err" || { echo "ERREUR"; return 0; }
+  "$PYBIN" -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    p = [ph for c in d["cycles"] for ph in c["phases"] if ph["nom"] == "01-p"][0]
+    print(p["etat"] + "|" + str(p.get("raison") or ""))
+except Exception:
+    print("ERREUR")
+' "$sortie"
+}
+cycle_etat_raison() { # <recalc.sh> <dossier du lab> -> « état|raison » du cycle 01-c
+  local recalc="$1" dir="$2" sortie
+  sortie="$WORK/per-courant.json"
+  bash "$recalc" --planning="$dir/.planning" --read-only > "$sortie" 2>"$WORK/per-courant.err" || { echo "ERREUR"; return 0; }
+  "$PYBIN" -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    c = [c for c in d["cycles"] if c["nom"] == "01-c"][0]
+    print(c["etat"] + "|" + str(c.get("raison") or ""))
+except Exception:
+    print("ERREUR")
+' "$sortie"
+}
+verifier_etat() { # <id> <libellé> <recalc.sh> <lab du banc> <attendu « état|raison »>
+  local id="$1" libelle="$2" recalc="$3" lab="$4" attendu="$5" dir obtenu
+  dir="$WORK/per-lab-$lab"
+  [ -d "$dir" ] || materialiser "$lab" "$dir"
+  obtenu="$(phase_etat_raison "$recalc" "$dir")"
+  if [ "$obtenu" = "$attendu" ]; then ok "$id $libelle ($lab : $attendu)"; else ko "$id $libelle" "état|raison de $lab" "$attendu" "$obtenu $(cat "$WORK/per-courant.err" 2>/dev/null)"; fi
+}
+
+# R-CLORE-01 — constats tous passé, deux empreintes conformes, SUMMARY.md absent : `à clore`, sans raison, non terminal.
+verifier_etat R-CLORE-01 "état à clore" "$RECALC" etat-a-clore 'à clore|'
+verifier_etat R-CLORE-01 "jumeau : le même verdict avec SUMMARY.md" "$RECALC" etat-a-clore-jumeau 'close|'
+R_CLORE_CYCLE="$(cycle_etat_raison "$RECALC" "$WORK/per-lab-etat-a-clore")"
+if [ "$R_CLORE_CYCLE" = 'à clore|' ]; then
+  ok "R-CLORE-01 l'agrégat du cycle suit l'état non terminal (à clore, jamais indéterminé)"
+else
+  ko "R-CLORE-01 agrégat du cycle" "à clore|" "$R_CLORE_CYCLE" "-"
+fi
+R_CLORE_JSON="$WORK/per-lab-etat-a-clore-rapport.json"
+bash "$RECALC" --planning="$WORK/per-lab-etat-a-clore/.planning" --read-only > "$R_CLORE_JSON" 2>/dev/null
+R_CLORE_FAITS="$("$PYBIN" -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("compte=%s journal=%d" % (d["compte_par_etat"].get("à clore"), len(d["cloture_a_ajouter"])))
+' "$R_CLORE_JSON" 2>/dev/null || echo ERREUR)"
+if [ "$R_CLORE_FAITS" = "compte=1 journal=0" ]; then
+  ok "R-CLORE-01 compte_par_etat compte l'état et rien n'est journalisé (non terminal : aucune ligne de cloture.log)"
+else
+  ko "R-CLORE-01 compte et journal" "compte=1 journal=0" "$R_CLORE_FAITS" "-"
+fi
+
+# R-PERIME-01 — un écart d'empreinte, ou un hash_livrables absent, avant SUMMARY.md : `à juger` (verdict-perime).
+verifier_etat R-PERIME-01 "hash_livrables littéral faux" "$RECALC" verdict-perime 'à juger|verdict-perime'
+verifier_etat R-PERIME-01 "jumeau : empreintes conformes" "$RECALC" verdict-perime-jumeau 'à clore|'
+verifier_etat R-PERIME-01 "hash_livrables absent" "$RECALC" verdict-sans-empreinte-livrables 'à juger|verdict-perime'
+verifier_etat R-PERIME-01 "jumeau : hash_livrables présent" "$RECALC" verdict-sans-empreinte-livrables-jumeau 'à clore|'
+verifier_etat R-PERIME-01 "hash du PLAN.md faux" "$RECALC" plan-modifie 'à juger|verdict-perime'
+verifier_etat R-PERIME-01 "jumeau : hash du PLAN.md conforme" "$RECALC" plan-modifie-jumeau 'à clore|'
+R_PERIME_CYCLE="$(cycle_etat_raison "$RECALC" "$WORK/per-lab-verdict-perime")"
+if [ "$R_PERIME_CYCLE" = 'à juger|verdict-perime' ]; then
+  ok "R-PERIME-01 le cycle remonte la raison verdict-perime de sa phase courante"
+else
+  ko "R-PERIME-01 raison du cycle" "à juger|verdict-perime" "$R_PERIME_CYCLE" "-"
+fi
+# Réécriture réelle : un livrable (ou le PLAN.md) change APRÈS la résolution du verdict ; un fichier non déclaré, jamais.
+R_PERIME_VIVANT="$WORK/per-vivant-a-clore"
+materialiser etat-a-clore "$R_PERIME_VIVANT"
+printf 'Hors ecrit: du plan.\n' > "$R_PERIME_VIVANT/autre-fichier.md"
+R_AVANT="$(phase_etat_raison "$RECALC" "$R_PERIME_VIVANT")"
+printf 'Livrable non vide!\n' > "$R_PERIME_VIVANT/livrables/rapport.md"   # même taille que « Livrable non vide. » (+0 octet)
+R_APRES_LIVRABLE="$(phase_etat_raison "$RECALC" "$R_PERIME_VIVANT")"
+if [ "$R_AVANT" = 'à clore|' ] && [ "$R_APRES_LIVRABLE" = 'à juger|verdict-perime' ]; then
+  ok "R-PERIME-01 un octet d'un livrable réécrit après la résolution : à clore -> à juger (verdict-perime)"
+else
+  ko "R-PERIME-01 réécriture du livrable" "à clore| puis à juger|verdict-perime" "$R_AVANT puis $R_APRES_LIVRABLE" "-"
+fi
+R_PERIME_JUMEAU="$WORK/per-vivant-jumeau"
+materialiser etat-a-clore "$R_PERIME_JUMEAU"
+printf 'Hors ecrit: du plan.\n' > "$R_PERIME_JUMEAU/autre-fichier.md"
+printf 'Autre contenu hors plan.\n' > "$R_PERIME_JUMEAU/autre-fichier.md"   # réécrit : aucun `ecrit:` ne le couvre
+R_APRES_AUTRE="$(phase_etat_raison "$RECALC" "$R_PERIME_JUMEAU")"
+if [ "$R_APRES_AUTRE" = 'à clore|' ]; then
+  ok "R-PERIME-01 jumeau : un fichier hors ecrit: réécrit ne périme pas le verdict (à clore)"
+else
+  ko "R-PERIME-01 jumeau fichier hors ecrit:" "à clore|" "$R_APRES_AUTRE" "-"
+fi
+R_PERIME_PLAN="$WORK/per-vivant-plan"
+materialiser etat-a-clore "$R_PERIME_PLAN"
+printf '\nPrécision ajoutée au plan après le verdict.\n' >> "$R_PERIME_PLAN/.planning/cycles/01-c/phases/01-p/PLAN.md"
+R_APRES_PLAN="$(phase_etat_raison "$RECALC" "$R_PERIME_PLAN")"
+if [ "$R_APRES_PLAN" = 'à juger|verdict-perime' ]; then
+  ok "R-PERIME-01 le PLAN.md modifié après le verdict le périme (à juger, verdict-perime)"
+else
+  ko "R-PERIME-01 PLAN.md modifié" "à juger|verdict-perime" "$R_APRES_PLAN" "-"
+fi
+# Conséquence voulue (modele-cycles.md) : un verdict en échec suivi d'une correction du livrable repasse en `à juger`.
+R_ECHEC_CORRIGE="$WORK/per-echec-corrige"
+materialiser etat-a-corriger "$R_ECHEC_CORRIGE"
+R_ECHEC_AVANT="$(phase_etat_raison "$RECALC" "$R_ECHEC_CORRIGE")"
+printf 'Livrable corrigé.\n' > "$R_ECHEC_CORRIGE/livrables/rapport.md"
+R_ECHEC_APRES="$(phase_etat_raison "$RECALC" "$R_ECHEC_CORRIGE")"
+if [ "$R_ECHEC_AVANT" = 'à corriger|' ] && [ "$R_ECHEC_APRES" = 'à juger|verdict-perime' ]; then
+  ok "R-PERIME-01 un verdict en échec suivi d'une correction du livrable : à corriger -> à juger (verdict-perime)"
+else
+  ko "R-PERIME-01 correction après échec" "à corriger| puis à juger|verdict-perime" "$R_ECHEC_AVANT puis $R_ECHEC_APRES" "-"
+fi
+
+# R-PERIME-02 — un écart d'empreinte avec SUMMARY.md présent : `indéterminé` (livrable-modifie-apres-cloture).
+verifier_etat R-PERIME-02 "hash_livrables littéral faux, SUMMARY.md présent" "$RECALC" livrable-modifie-apres-cloture 'indéterminé|livrable-modifie-apres-cloture'
+verifier_etat R-PERIME-02 "jumeau : empreintes conformes, SUMMARY.md présent" "$RECALC" livrable-modifie-apres-cloture-jumeau 'close|'
+R_CLOS_VIVANT="$WORK/per-vivant-close"
+materialiser etat-close "$R_CLOS_VIVANT"
+R_CLOS_AVANT="$(phase_etat_raison "$RECALC" "$R_CLOS_VIVANT")"
+printf 'Livrable de etat-close!\n' > "$R_CLOS_VIVANT/livrables/rapport.md"   # même taille que « Livrable de etat-close. »
+R_CLOS_APRES="$(phase_etat_raison "$RECALC" "$R_CLOS_VIVANT")"
+if [ "$R_CLOS_AVANT" = 'close|' ] && [ "$R_CLOS_APRES" = 'indéterminé|livrable-modifie-apres-cloture' ]; then
+  ok "R-PERIME-02 un livrable réécrit après la clôture : close -> indéterminé (livrable-modifie-apres-cloture)"
+else
+  ko "R-PERIME-02 réécriture après clôture" "close| puis indéterminé|livrable-modifie-apres-cloture" "$R_CLOS_AVANT puis $R_CLOS_APRES" "-"
+fi
+
+# R-R4VIDE-01 — R4 par le prédicat partagé : absent ou vide ; un lien (jamais suivi) compte comme absent.
+verifier_etat R-R4VIDE-01 "livrable de 0 octet" "$RECALC" livrable-vide 'indéterminé|livrable-vide:livrables/rapport.md'
+verifier_etat R-R4VIDE-01 "jumeau : livrable non vide" "$RECALC" livrable-vide-jumeau 'à juger|'
+verifier_etat R-R4VIDE-01 "livrable lien vers un fichier non vide" "$RECALC" livrable-lien 'indéterminé|livrable-absent:livrables/lien.md'
+verifier_etat R-R4VIDE-01 "jumeau : fichier réel au même chemin" "$RECALC" livrable-lien-jumeau 'à juger|'
+verifier_etat R-R4VIDE-01 "dossier sans aucun fichier" "$RECALC" livrable-dossier-vide 'indéterminé|livrable-vide:livrables/dossier'
+verifier_etat R-R4VIDE-01 "jumeau : dossier avec un fichier non vide" "$RECALC" livrable-dossier-vide-jumeau 'à juger|'
+verifier_etat R-R4VIDE-01 "dossier avec le seul .DS_Store (exclusion fixe)" "$RECALC" livrable-dossier-ds-store 'indéterminé|livrable-vide:livrables/dossier'
+verifier_etat R-R4VIDE-01 "jumeau : un fichier ordinaire à côté du .DS_Store" "$RECALC" livrable-dossier-ds-store-jumeau 'à juger|'
+
+# R-JETON-01 — un jeton du banc qui ne se résout pas fait échouer le lab avec un message nommé (jamais une substitution vide).
+R_JETON_BANC="$WORK/banc-jeton.txt"
+cat > "$R_JETON_BANC" <<'JETON_BANC_EOF'
+@@ lab jeton-sans-plan
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ attendu cycles/01-c :: à cadrer
+@@ lab jeton-livrable-absent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/inexistant.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ attendu cycles/01-c :: à cadrer
+JETON_BANC_EOF
+R_JETON_OUT="$WORK/banc-jeton-out.txt"
+"$PYBIN" "$AIDES_PY" coureur "$R_JETON_BANC" "$WORK/r-jeton" "$RECALC" > "$R_JETON_OUT" 2>&1
+R_JETON_RC=$?
+if [ "$R_JETON_RC" -eq 1 ] \
+   && grep -qF '✗ BANC jeton-sans-plan : jeton du banc non résolu : PLAN.md voisin absent de .planning/cycles/01-c/phases/01-p/VERDICT.md' "$R_JETON_OUT" \
+   && grep -qF '✗ BANC jeton-livrable-absent : jeton du banc non résolu : empreinte des livrables absent (livrables/inexistant.md)' "$R_JETON_OUT"; then
+  ok "R-JETON-01 un jeton non résolu (PLAN.md voisin absent, livrable absent) fait échouer le lab avec un message nommé"
+else
+  ko "R-JETON-01 jeton non résolu" "code 1 et deux lignes ✗ BANC nommées" "code=$R_JETON_RC $(tr '\n' ' ' < "$R_JETON_OUT")" "-"
 fi
 
 # ================================================================================================
@@ -1900,8 +2210,8 @@ fi
 
 # ---------- MUT-LIVRABLES — contrôle R4 (livrable présent) neutralisé ---------------------------
 if make_recalc_mutant LIVRABLES \
-  'manquant = next((v for v in valeurs if not os.path.lexists(os.path.join(racine_lab, v))), None)' \
-  'manquant = None  # MUT-LIVRABLES'
+  'statut_livrable, _detail_livrable = livrable_present(racine_lab, v)  # r4-predicat' \
+  'statut_livrable = "present"  # MUT-LIVRABLES'
 then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-livrables-cas"
@@ -1914,6 +2224,62 @@ then
     else
       okmut LIVRABLES "état de etat-a-juger-jumeau · attendu (original) : indéterminé (livrable-absent) · obtenu (mutant) : $ETAT_M"
     fi
+  fi
+fi
+
+# ---------- MUT-R4-VIDE — le prédicat partagé « livrable présent » remplacé par l'ancienne existence nue (46-03, P46-D-12) ----
+if make_recalc_mutant R4-VIDE \
+  'statut_livrable, _detail_livrable = livrable_present(racine_lab, v)  # r4-predicat' \
+  'statut_livrable = "present" if os.path.lexists(os.path.join(racine_lab, v)) else "absent"  # MUT-R4-VIDE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-r4-vide-cas"
+  materialiser livrable-vide "$DIR_CAS"
+  ETAT_M="$(phase_etat_raison "$MR" "$DIR_CAS")"
+  if ! _verifier_plantage R4-VIDE "état/raison de livrable-vide" "$WORK/per-courant.json" "$WORK/per-courant.err" "0"; then
+    if [ "$ETAT_M" = 'indéterminé|livrable-vide:livrables/rapport.md' ]; then
+      komut R4-VIDE "état/raison de livrable-vide" "indéterminé|livrable-vide:livrables/rapport.md (original)" "$ETAT_M (mutant non opposable)"
+    elif [ "$ETAT_M" = "ERREUR" ]; then
+      komut R4-VIDE "état/raison de livrable-vide" "indéterminé|livrable-vide:livrables/rapport.md (original)" "ERREUR : le mutant plante, il n'est pas tué par la bonne raison"
+    else
+      okmut R4-VIDE "état/raison de livrable-vide · attendu (original) : indéterminé|livrable-vide:livrables/rapport.md · obtenu (mutant, existence nue) : $ETAT_M"
+    fi
+  fi
+fi
+
+# ---------- MUT-EMPREINTES-RECALC — règle E neutralisée : un verdict périmé reste cru (46-03, P46-D-03b) ------------------
+if make_recalc_mutant EMPREINTES-RECALC \
+  'if perime:' \
+  'if False:  # MUT-EMPREINTES-RECALC'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-empreintes-recalc-cas"
+  materialiser verdict-perime "$DIR_CAS"
+  ETAT_M="$(phase_etat_raison "$MR" "$DIR_CAS")"
+  if [ "$ETAT_M" = 'à juger|verdict-perime' ]; then
+    komut EMPREINTES-RECALC "état/raison de verdict-perime" "à juger|verdict-perime (original)" "$ETAT_M (mutant non opposable)"
+  elif [ "$ETAT_M" = "ERREUR" ]; then
+    komut EMPREINTES-RECALC "état/raison de verdict-perime" "à juger|verdict-perime (original)" "ERREUR : le mutant plante, il n'est pas tué par la bonne raison"
+  else
+    okmut EMPREINTES-RECALC "état/raison de verdict-perime · attendu (original) : à juger|verdict-perime · obtenu (mutant, règle E neutralisée) : $ETAT_M"
+  fi
+fi
+
+# ---------- MUT-A-CLORE — R8 rend l'ancien `indéterminé` au lieu de `à clore` (46-03, P46-D-04) --------------------------
+if make_recalc_mutant A-CLORE \
+  'return ("à clore", None, meta)  # r8-a-clore' \
+  'return ("indéterminé", "verdict-passe-sans-SUMMARY.md", meta)  # MUT-A-CLORE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-a-clore-cas"
+  materialiser etat-a-clore "$DIR_CAS"
+  ETAT_M="$(phase_etat_raison "$MR" "$DIR_CAS")"
+  if [ "$ETAT_M" = 'à clore|' ]; then
+    komut A-CLORE "état/raison de etat-a-clore" "à clore| (original)" "$ETAT_M (mutant non opposable)"
+  elif [ "$ETAT_M" = "ERREUR" ]; then
+    komut A-CLORE "état/raison de etat-a-clore" "à clore| (original)" "ERREUR : le mutant plante, il n'est pas tué par la bonne raison"
+  else
+    okmut A-CLORE "état/raison de etat-a-clore · attendu (original) : à clore| · obtenu (mutant, R8 rend l'ancien indéterminé) : $ETAT_M"
   fi
 fi
 
@@ -4331,10 +4697,12 @@ fi
 R_INJ_DIR="$WORK/r-injectif-roundtrip"
 materialiser traceur "$R_INJ_DIR"
 VERDICT_CIBLE="$R_INJ_DIR/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
-printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "3 4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+printf -- '---\njuge: relecteur-banc\nhash: {{sha256-plan}}\nhash_livrables: {{empreinte-livrables}}\ntentative: "3 4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+jetons "$R_INJ_DIR"
 ( cd "$R_INJ_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r-injectif-err1.txt" )
 R_INJ_RC1=$?
-printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "3_4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+printf -- '---\njuge: relecteur-banc\nhash: {{sha256-plan}}\nhash_livrables: {{empreinte-livrables}}\ntentative: "3_4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+jetons "$R_INJ_DIR"
 ( cd "$R_INJ_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-injectif-out2.json" 2>"$WORK/r-injectif-err2.txt" )
 R_INJ_RC2=$?
 NB_LIGNES_CLOTURE="$(grep -c "01-livree" "$R_INJ_DIR/.planning/cloture.log")"
@@ -4368,8 +4736,9 @@ fi
 # relu dans le fichier de l'autre.
 R_DEDASSAINI_DIR="$WORK/r-dedoublonnage-assaini"
 materialiser traceur "$R_DEDASSAINI_DIR"
-printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
+printf -- '---\njuge: relecteur-banc\nhash: {{sha256-plan}}\nhash_livrables: {{empreinte-livrables}}\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
   > "$R_DEDASSAINI_DIR/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+jetons "$R_DEDASSAINI_DIR"
 ( cd "$R_DEDASSAINI_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r-dedassaini-err1.txt" )
 R_DEDASSAINI_RC1=$?
 LIGNES_APRES_1="$(wc -l < "$R_DEDASSAINI_DIR/.planning/cloture.log" | tr -d ' ')"
@@ -4401,8 +4770,9 @@ then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-dedoublonnage-brut-cas"
   materialiser traceur "$DIR_CAS"
-  printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
+  printf -- '---\njuge: relecteur-banc\nhash: {{sha256-plan}}\nhash_livrables: {{empreinte-livrables}}\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
     > "$DIR_CAS/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+  jetons "$DIR_CAS"
   ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>"$WORK/mut-dedoublonnage-brut-err1.txt" )
   ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-dedoublonnage-brut-out2.txt" 2>"$WORK/mut-dedoublonnage-brut-err2.txt" ); RC_M=$?
   if ! _verifier_plantage DEDOUBLONNAGE-BRUT "cloture_ajouts du second recalcul (valeur piégée espaces+=)" "$WORK/mut-dedoublonnage-brut-out2.txt" "$WORK/mut-dedoublonnage-brut-err2.txt" "$RC_M"; then

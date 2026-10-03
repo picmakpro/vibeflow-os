@@ -7,6 +7,14 @@
 @@ # dérivation attendue en lecture seule (unité = chemin relatif à .planning/, cycle, phase ou
 @@ # plan). Chemins relatifs à la racine du lab, sans segment `..` ni `/` ou `~` initial.
 @@ #
+@@ # Jetons d'un VERDICT.md valide (46-03, P46-D-03) : `{{sha256-plan}}` = sha256 des octets du PLAN.md
+@@ # voisin, `{{empreinte-livrables}}` = empreinte composée des entrées `ecrit:` de ce PLAN.md. Les
+@@ # matérialiseurs les résolvent APRÈS l'écriture de tous les fichiers du lab, par la copie du bloc
+@@ # partagé lue dans poser-verdict.sh (jamais par celle du recalcul : la preuve est croisée) ; un jeton
+@@ # qui ne se résout pas fait échouer le lab, jamais une substitution vide. Un verdict volontairement
+@@ # périmé garde une valeur littérale. Un fichier de 0 octet s'écrit en faisant suivre sa directive
+@@ # `@@ fichier` d'une autre directive, sans aucune ligne.
+@@ #
 @@ # Ce banc est un FICHIER TEXTE, pas une arborescence versionnée : le site de pose n°4 de
 @@ # l'installeur installe les fixtures à plat (glob non récursif), et aucun dossier `.planning/`
 @@ # imbriqué n'est versionné dans ce dépôt (guard-planning-updated.sh, planning-session-
@@ -53,7 +61,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-traceur/phases/01-livree/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -122,7 +131,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-traceur/phases/01-livree/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -191,7 +201,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-traceur/phases/01-livree/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -520,7 +531,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: échec
@@ -565,7 +577,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -574,8 +587,8 @@ constats:
 @@ fichier livrables/rapport.md
 Livrable de etat-a-corriger-jumeau.
 
-@@ attendu cycles/01-c/phases/01-p :: indéterminé :: verdict-passe-sans-SUMMARY.md
-@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+@@ attendu cycles/01-c/phases/01-p :: à clore
+@@ attendu cycles/01-c :: à clore
 
 @@ lab etat-close
 
@@ -610,7 +623,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -660,7 +674,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: échec
@@ -937,7 +952,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: échec
@@ -1210,7 +1226,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -1267,7 +1284,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/plans/01-a/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -1295,7 +1313,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/plans/02-b/VERDICT.md
 ---
 juge: relecteur-banc
-hash: fedcba9876543210fedcba9876543210fedcba9876543210fedcba98765432
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -1501,7 +1520,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -1590,7 +1610,8 @@ cloture_le: "2026-09-27"
 @@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
 ---
 juge: relecteur-banc
-hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
 tentative: 1
 constats:
   - resultat: passé
@@ -1829,3 +1850,802 @@ JETON-DEHORS-44
 
 @@ attendu cycles/01-c/phases/01-p :: indéterminé :: fichier-non-regulier:PLAN.md
 @@ attendu-hors-modele-aucun
+
+@@ # 46-03, R-CLORE-01 : verdict valide aux deux empreintes résolues, sans SUMMARY.md -> `à clore` (non terminal, aucune raison).
+@@ lab etat-a-clore
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à clore
+@@ attendu cycles/01-c :: à clore
+
+
+@@ # 46-03, jumeau : le même verdict, SUMMARY.md présent -> `close`.
+@@ lab etat-a-clore-jumeau jumeau-de=etat-a-clore
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: close
+@@ attendu cycles/01-c :: close
+
+
+@@ # 46-03, R-PERIME-01 : `hash_livrables` littéral faux, sans SUMMARY.md -> `à juger` (verdict-perime).
+@@ lab verdict-perime
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: 0000000000000000000000000000000000000000000000000000000000000000
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à juger :: verdict-perime
+@@ attendu cycles/01-c :: à juger :: verdict-perime
+
+
+@@ # 46-03, jumeau : les deux empreintes conformes -> `à clore`.
+@@ lab verdict-perime-jumeau jumeau-de=verdict-perime
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à clore
+@@ attendu cycles/01-c :: à clore
+
+
+@@ # 46-03, R-PERIME-01 : un verdict sans `hash_livrables` est périmé (P46-D-03b) -> `à juger` (verdict-perime).
+@@ lab verdict-sans-empreinte-livrables
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à juger :: verdict-perime
+@@ attendu cycles/01-c :: à juger :: verdict-perime
+
+
+@@ # 46-03, jumeau : la clé `hash_livrables` présente et conforme -> `à clore`.
+@@ lab verdict-sans-empreinte-livrables-jumeau jumeau-de=verdict-sans-empreinte-livrables
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à clore
+@@ attendu cycles/01-c :: à clore
+
+
+@@ # 46-03, R-PERIME-01 : `hash` du PLAN.md faux, sans SUMMARY.md -> `à juger` (verdict-perime).
+@@ lab plan-modifie
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à juger :: verdict-perime
+@@ attendu cycles/01-c :: à juger :: verdict-perime
+
+
+@@ # 46-03, jumeau : `hash` conforme -> `à clore`.
+@@ lab plan-modifie-jumeau jumeau-de=plan-modifie
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à clore
+@@ attendu cycles/01-c :: à clore
+
+
+@@ # 46-03, R-PERIME-02 : `hash_livrables` ne couvre plus le livrable, SUMMARY.md présent -> `indéterminé` (livrable-modifie-apres-cloture).
+@@ lab livrable-modifie-apres-cloture
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: 0000000000000000000000000000000000000000000000000000000000000000
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: livrable-modifie-apres-cloture
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+
+@@ # 46-03, jumeau : les deux empreintes conformes, SUMMARY.md présent -> `close`.
+@@ lab livrable-modifie-apres-cloture-jumeau jumeau-de=livrable-modifie-apres-cloture
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/SUMMARY.md
+---
+auteur: willy
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: close
+@@ attendu cycles/01-c :: close
+
+
+@@ # 46-03, R-R4VIDE-01 : livrable de 0 octet -> `indéterminé` (livrable-vide).
+@@ lab livrable-vide
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier livrables/rapport.md
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: livrable-vide:livrables/rapport.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+
+@@ # 46-03, jumeau : livrable non vide -> `à juger`.
+@@ lab livrable-vide-jumeau jumeau-de=livrable-vide
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier livrables/rapport.md
+Livrable non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à juger
+@@ attendu cycles/01-c :: à juger
+
+
+@@ # 46-03, R-R4VIDE-01 : un lien n'est jamais suivi, il compte comme absent -> `indéterminé` (livrable-absent).
+@@ lab livrable-lien
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/lien.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier livrables/reel.md
+Fichier réel non vide.
+
+@@ lien livrables/lien.md -> livrables/reel.md
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: livrable-absent:livrables/lien.md
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+
+@@ # 46-03, jumeau : le même chemin, fichier réel -> `à juger`.
+@@ lab livrable-lien-jumeau jumeau-de=livrable-lien
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/lien.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier livrables/lien.md
+Fichier réel non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à juger
+@@ attendu cycles/01-c :: à juger
+
+
+@@ # 46-03, R-R4VIDE-01 : dossier sans aucun fichier -> `indéterminé` (livrable-vide).
+@@ lab livrable-dossier-vide
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/dossier
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ dossier livrables/dossier
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: livrable-vide:livrables/dossier
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+
+@@ # 46-03, jumeau : le dossier porte un fichier non vide -> `à juger`.
+@@ lab livrable-dossier-vide-jumeau jumeau-de=livrable-dossier-vide
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/dossier
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier livrables/dossier/a.md
+Fichier non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à juger
+@@ attendu cycles/01-c :: à juger
+
+
+@@ # 46-03, R-R4VIDE-01 : seul un `.DS_Store` (exclusion fixe) -> `indéterminé` (livrable-vide).
+@@ lab livrable-dossier-ds-store
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/dossier
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier livrables/dossier/.DS_Store
+Métadonnée de système, exclue.
+
+@@ attendu cycles/01-c/phases/01-p :: indéterminé :: livrable-vide:livrables/dossier
+@@ attendu cycles/01-c :: indéterminé :: phase-indeterminee:01-p
+
+
+@@ # 46-03, jumeau : un fichier ordinaire dans le même dossier -> `à juger`.
+@@ lab livrable-dossier-ds-store-jumeau jumeau-de=livrable-dossier-ds-store
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle banc
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CADRAGE.md
+---
+inconnues:
+  - id: I-01
+    question: "Question ouverte ?"
+    structurante: oui
+    statut: ARBITRÉ
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/dossier
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/CLOTURE.md
+---
+cloture_par: willy
+cloture_le: "2026-09-27"
+---
+
+@@ fichier livrables/dossier/.DS_Store
+Métadonnée de système, exclue.
+
+@@ fichier livrables/dossier/a.md
+Fichier non vide.
+
+@@ attendu cycles/01-c/phases/01-p :: à juger
+@@ attendu cycles/01-c :: à juger
+

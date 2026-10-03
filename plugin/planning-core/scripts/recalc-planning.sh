@@ -102,7 +102,7 @@ NOMS_MODELE_PLAN = ("PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md", "DEROGA
 TERMINAUX = frozenset({"close", "abandonné", "remplacé"})
 JOURNALISABLES = frozenset({"close", "abandonné", "remplacé", "gelé"})
 ETATS_TOUS = (
-    "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger",
+    "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger", "à clore",
     "close", "indéterminé", "abandonné", "remplacé", "gelé",
 )
 # Table LIBELLES (code -> gabarit de phrase), reproduite depuis references/modele-cycles.md
@@ -116,7 +116,9 @@ LIBELLES = {
     # ce libellé (F6, 2026-09-28) ; il reste dans la table pour le jour où une règle nouvelle
     # laisserait un trou.
     "combinaison-non-prevue": "combinaison de signaux non prévue",
-    "verdict-passe-sans-SUMMARY.md": "verdict passé, SUMMARY absent",
+    "verdict-perime": "verdict périmé : re-juger (tentative n+1)",
+    "livrable-modifie-apres-cloture": "livrable ou plan modifié après la clôture",
+    "empreinte-hors-borne": "empreinte des livrables hors borne",
     "SUMMARY.md-sans-PLAN.md": "SUMMARY.md sans PLAN.md",
     "CLOTURE.md-sans-PLAN.md": "CLOTURE.md sans PLAN.md",
     "VERDICT.md-sans-CLOTURE.md": "VERDICT.md sans CLOTURE.md (marqueur)",
@@ -127,6 +129,8 @@ LIBELLES = {
     "phase-indeterminee": "phase `{}` indéterminée",
     "plan-indetermine": "plan `{}` indéterminé",
     "livrable-absent": "livrable absent : {}",
+    "livrable-vide": "livrable vide : {}",
+    "livrable-hors-borne": "livrable hors borne : {}",
 }
 
 
@@ -1199,12 +1203,15 @@ def _meta_unite(chemin_abs, entrees):
             auteur = donnees.get("auteur")
     tentative = None
     hash_juge = None
+    hash_livrables = None
     if "VERDICT.md" in entrees:
         statut, donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "VERDICT.md"))
         if statut == "ok":
             tentative = donnees.get("tentative")
             hash_juge = donnees.get("hash")
-    return {"auteur": auteur or "inconnu", "tentative": tentative, "hash_juge": hash_juge, "type_derivation": None}
+            hash_livrables = donnees.get("hash_livrables")
+    return {"auteur": auteur or "inconnu", "tentative": tentative, "hash_juge": hash_juge,
+            "hash_livrables": hash_livrables, "type_derivation": None}
 
 
 # --- Φ1 : régularité et lisibilité des fichiers du modèle présents ------------------------------
@@ -1271,10 +1278,15 @@ def _r1_a_r8(chemin_abs, entrees, racine_lab, meta):
         if summary_present:
             return ("indéterminé", "SUMMARY.md-sans-CLOTURE.md", meta)
         return ("à exécuter", None, meta)
-    # R4
-    manquant = next((v for v in valeurs if not os.path.lexists(os.path.join(racine_lab, v))), None)
-    if manquant is not None:
-        return ("indéterminé", "livrable-absent:" + manquant, meta)
+    # R4 : « absent ou vide » par le prédicat partagé (P46-D-12) ; un lien, terminal ou intermédiaire, est absent
+    for v in valeurs:
+        statut_livrable, _detail_livrable = livrable_present(racine_lab, v)  # r4-predicat
+        if statut_livrable == "vide":
+            return ("indéterminé", "livrable-vide:" + v, meta)
+        if statut_livrable == "borne":
+            return ("indéterminé", "livrable-hors-borne:" + v, meta)
+        if statut_livrable != "present":
+            return ("indéterminé", "livrable-absent:" + v, meta)
     # R5
     if not verdict_present:
         if summary_present:
@@ -1289,6 +1301,20 @@ def _r1_a_r8(chemin_abs, entrees, racine_lab, meta):
         not isinstance(c, dict) or c.get("resultat") not in ("passé", "échec") for c in constats
     ):
         return ("indéterminé", "verdict-invalide", meta)
+    # E : les deux empreintes du verdict (P46-D-03b) — `hash` (sha256 des octets du PLAN.md) et `hash_livrables` (empreinte composée
+    # des entrées `ecrit:`, copie partagée de 46-01). Un écart, ou un `hash_livrables` absent, périme le verdict : R7 et R8 ne
+    # s'appliquent qu'à un verdict conforme.
+    empreinte_plan = hash_contenu(os.path.join(chemin_abs, "PLAN.md"))  # r-empreintes
+    perime = empreinte_plan is None or meta["hash_juge"] != empreinte_plan
+    if not perime:
+        statut_emp, valeur_emp = empreinte_livrables(racine_lab, valeurs)  # r-empreintes-livrables
+        if statut_emp == "borne":
+            return ("indéterminé", "empreinte-hors-borne", meta)
+        perime = statut_emp != "ok" or meta["hash_livrables"] != valeur_emp
+    if perime:
+        if summary_present:
+            return ("indéterminé", "livrable-modifie-apres-cloture", meta)
+        return ("à juger", "verdict-perime", meta)
     # R7
     if any(c.get("resultat") == "échec" for c in constats):
         if summary_present:
@@ -1299,7 +1325,7 @@ def _r1_a_r8(chemin_abs, entrees, racine_lab, meta):
         meta2 = dict(meta)
         meta2["type_derivation"] = "feuille"
         return ("close", None, meta2)
-    return ("indéterminé", "verdict-passe-sans-SUMMARY.md", meta)
+    return ("à clore", None, meta)  # r8-a-clore
 
 
 def deriver_feuille(unite, racine_lab):
@@ -1447,6 +1473,12 @@ def _deriver_feuille_cache(unite, racine_lab, cache_ctx, chemin_cadrage_suppleme
 
 
 # --- Agrégation ----------------------------------------------------------------------------------
+def _raison_a_juger(unite):
+    """La raison d'une unité `à juger` (le seul état non terminal et non indéterminé qui en porte une : `verdict-perime`), None
+    pour tout autre état — la remonte du plan à la phase et au cycle pour que INDEX.md et STATE.md la rendent."""
+    return unite.get("raison") if unite["etat"] == "à juger" else None
+
+
 def agreger(etats):
     """Première unité (déjà triée par nom) dont l'état n'est ni close ni abandonné ni remplacé ;
     si toutes sont terminales, close prime dès qu'au moins une l'est, sinon abandonné."""
@@ -1496,7 +1528,7 @@ def _agreger_plans(phase, racine_lab, cache_ctx=None):
         return ("indéterminé", "plan-indetermine:" + premier["nom"], meta_phase, plans_derives)
     courant = agreger(plans_derives)
     if courant["etat"] not in TERMINAUX:
-        return (courant["etat"], None, meta_phase, plans_derives)
+        return (courant["etat"], _raison_a_juger(courant), meta_phase, plans_derives)
     if any(p["etat"] == "close" for p in plans_derives):
         return ("close", None, meta_phase, plans_derives)
     return ("abandonné", None, meta_phase, plans_derives)
@@ -1576,7 +1608,7 @@ def deriver_cycle(cycle, racine_lab, cache_ctx=None):
                 "phase_courante": premiere["nom"], "phases": phases_derivees}
     courante = agreger(phases_derivees)
     if courante["etat"] not in TERMINAUX:
-        return {"nom": cycle["nom"], "chemin": chemin, "etat": courante["etat"], "raison": None,
+        return {"nom": cycle["nom"], "chemin": chemin, "etat": courante["etat"], "raison": _raison_a_juger(courante),
                 "phase_courante": courante["nom"], "phases": phases_derivees}
     if any(p["etat"] == "close" for p in phases_derivees):
         return {"nom": cycle["nom"], "chemin": chemin, "etat": "close", "raison": None,
@@ -1788,6 +1820,8 @@ def ajouter_au_journal(chemin, lignes):
 def _texte_etat_cycle(cycle):
     if cycle["etat"] == "indéterminé":
         return "indéterminé — " + libelle_cycle_indetermine(cycle["raison"], cycle["phases"]) + " (" + cycle["chemin"] + ")"
+    if cycle["etat"] == "à juger" and cycle["raison"] == "verdict-perime":
+        return "à juger — " + libelle_raison(cycle["raison"])
     return cycle["etat"]
 
 
