@@ -6,17 +6,28 @@
 # Familles :
 #   R-EMP-01  le prédicat « livrable présent » (lstat par composant, vide, lien, FIFO, dossier, exclusions)
 #   R-EMP-02  l'empreinte des livrables (stable, indépendante de l'ordre, sensible au contenu, insensible aux exclus et aux liens)
-#   R-EMP-03  les bornes (2000 entrées, 128 Mio) : refus explicite, jamais une empreinte partielle
-#   R-EMP-04  trois copies ast-identiques du bloc partagé (poser-verdict.sh, planning-hook.sh, recalc-planning.sh), mêmes verdicts
+#   R-EMP-03  les bornes (2000 entrées, 128 Mio) : refus explicite, jamais une empreinte partielle ; les octets LUS seuls la déclenchent
+#   R-EMP-04  trois copies ast-identiques du bloc partagé ET de ses entrées (parseur de frontmatter, entree_ecrit_valide,
+#             _valeurs_ecrit, SANS_SUIVI_DE_LIEN) : 27 noms ; mêmes verdicts du prédicat, de l'empreinte et de `entrees_du_plan`
 #   R-EMP-05  la commande pose `hash` et `hash_livrables`, relus identiques par le parseur, six clés dans l'ordre
 #   R-EMP-06  la commande refuse (64) un livrable absent, vide ou lien, un ecrit: invalide, une borne dépassée
 #   R-EMP-07  aucun refus ne porte le chemin absolu du lab, « no such file » ni « can't open » (P46-D-10)
+#   R-EMP-08  point fixe : une entrée `ecrit:` qui est ou contient le dossier de l'unité est refusée (64, « dossier de l'unité »),
+#             sans verdict, temporaire, tentative ni dérogation consommée ; une entrée dans l'unité ou voisine est posée (point fixe)
+#   R-EMP-09  budget commun à toutes les entrées d'un PLAN.md (`livrables_presents`) : aucune entrée après une borne n'est présente
+#   R-EMP-10  nom d'entrée non UTF-8 ou porteur d'un caractère de contrôle : livrable `illisible`, jamais une empreinte
+#   R-EMP-11  l'empreinte ne dépend pas de l'ordre d'énumération (trois ordres provoqués, texte canonique recalculé par la suite)
+#   R-EMP-12  lecture sans lien à aucun composant (ouvertures chaînées, O_NOFOLLOW), sans blocage sur un FIFO (O_NONBLOCK) ; le
+#             repli sans descripteur de dossier rend la même empreinte
 #   R-PLAF-01 à 04  plafond de trois tentatives (code 65, VERDICT.md inchangé), dérogation PLAFOND à usage unique consommée sous
 #             verrou avant l'écriture, constante du code (jamais un fichier du lab ni l'environnement), ordre prouvé par l'ast
 #   R-JUGE-FORME-01, 02  la forme d'unité `.planning/juges/<juge>` (artefact haché SORTIE-PIEGEE.md, pas de hash_livrables, plafond
 #             appliqué) et ses jumeaux négatifs (toute autre forme reste refusée, une unité de cycle garde sa règle)
 #   MUT-*     chaque garde est tuée par un mutant à motif unique : la trace du rouge (assertion, attendu, obtenu) est imprimée ;
-#             un mutant tué par la durée est interdit, il meurt par structure ou par verdict
+#             un mutant tué par la durée est interdit, il meurt par structure ou par verdict (EMP-*, VERDICT-*, PLAF-*, JUGE-*,
+#             EMP-ENTREES-DEQUOTE, EMP-NOFOLLOW-AST, EMP-CHAINE-AST, UNITE-REFUS, BUDGET-COMMUN, NOM-SAIN-*, OCTETS-LUS, TRI,
+#             LIEN-INTERMEDIAIRE, NONBLOCK, DIRFD) ; le résultat de l'original est mémoïsé par contrôle
+#   « ~ »     une ligne qui commence par « ~ » signale un cas non exerçable sur le système courant : ni vert, ni rouge
 #
 # Sections (VF_CLOT_SECTIONS, facultatif) : emp, ast, plaf, juge, mut. Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`,
 # ni `readlink -f`, ni `date -d` ; `cmp -s` jamais `diff` ; tout le travail fin est fait par Python (PYBIN). Lançable depuis tout
@@ -55,9 +66,11 @@ import json
 import os
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
+import time
 
 MARQUEUR_POSER = "PY_POSER_VERDICT_EOF"
 UNITE = ".planning/cycles/01-c/phases/01-p"
@@ -114,6 +127,7 @@ class Ctx:
         os.makedirs(self.home, exist_ok=True)
         self._n = 0
         self.memo = {}
+        self.notes = []
 
     def unique(self, prefixe):
         self._n += 1
@@ -395,9 +409,19 @@ def controle_emp_03(ctx, dossier):
     statut, detail = ns["livrables_presents"](lab, ["d11"])[0][1:]
     if statut != "borne":
         fautes.append("livrables_presents sur 11 fichiers : %s, attendu borne" % statut)
+    # les octets LUS seuls déclenchent la borne : budget [entrées, octets annoncés, octets lus] = [0, 0, 4090], 10 octets lus de plus
+    ecrire(os.path.join(lab, "f.bin"), b"x" * 10)
+    rendu = ns["_hacher_livrables"](lab, [("f.bin", 0)], [0, 0, 4090])
+    if rendu[0] != "borne" or "4096 octets" not in str(rendu[1]):
+        fautes.append("octets lus : 10 octets lus au-delà de 4090 déjà lus (borne 4096, octets annoncés 0) : obtenu %s, attendu borne "
+                      "« 4096 octets »" % (rendu,))
+    rendu = ns["_hacher_livrables"](lab, [("f.bin", 0)], [0, 0, 4000])
+    if rendu[0] != "ok":
+        fautes.append("octets lus : jumeau sous la borne (4000 + 10 octets lus) : obtenu %s, attendu ok" % (rendu,))
     return (not fautes), ("; ".join(fautes) if fautes else
                           "valeurs livrées 2000 et 134217728 ; bornes abaissées à 10 et 4096 : la borne passe, une unité de plus est un "
-                          "refus explicite qui la nomme, budget commun à toutes les entrées, aucune empreinte partielle")
+                          "refus explicite qui la nomme, budget commun à toutes les entrées, aucune empreinte partielle ; les octets lus "
+                          "seuls (4090 + 10) franchissent la borne, leur jumeau (4000 + 10) passe")
 
 
 # --- R-EMP-05 : la commande pose les deux empreintes -------------------------------------------------------------
@@ -564,11 +588,386 @@ def controle_emp_07(ctx, dossier):
                           "ni trace Python" % n)
 
 
+# --- Mandataires de `os` injectés dans l'espace de noms d'un bloc chargé (ordre provoqué, compteur, espion) -----------------
+class OsMandataire:
+    """Module `os` dont quelques attributs sont remplacés ; tout le reste est délégué au vrai module. Injecté dans l'espace de noms
+    d'un bloc chargé par `charger_bloc` (`ns["os"] = …`) : le bloc livré n'est jamais réécrit."""
+
+    def __init__(self, **surcharges):
+        object.__setattr__(self, "_surcharges", surcharges)
+
+    def __getattr__(self, nom):
+        surcharges = object.__getattribute__(self, "_surcharges")
+        if nom in surcharges:
+            return surcharges[nom]
+        return getattr(os, nom)
+
+
+class _Enumeration:
+    """Résultat d'un `scandir` réécrit : itérable et gestionnaire de contexte, comme l'itérateur du vrai `os.scandir`."""
+
+    def __init__(self, entrees):
+        self.entrees = list(entrees)
+
+    def __enter__(self):
+        return iter(self.entrees)
+
+    def __exit__(self, *_exc):
+        return False
+
+    def __iter__(self):
+        return iter(self.entrees)
+
+
+def scandir_ordonne(ordre):
+    """`scandir` qui rend les entrées dans un ordre PROVOQUÉ (naturel = trié par nom, inverse, rotation d'un cran) : jamais
+    l'ordre natif du système de fichiers."""
+    def scandir(chemin):
+        with os.scandir(chemin) as it:
+            entrees = sorted(it, key=lambda e: e.name)
+        if ordre == "inverse":
+            entrees.reverse()
+        elif ordre == "rotation" and entrees:
+            entrees = entrees[1:] + entrees[:1]
+        return _Enumeration(entrees)
+    return scandir
+
+
+class TropDEntrees(Exception):
+    """Levée par le compteur au-delà du plafond d'entrées de dossier énumérées : borne le coût d'un mutant (jamais une OSError,
+    que le bloc rattraperait en `illisible`)."""
+
+
+def scandir_compteur(compteur, plafond):
+    def scandir(chemin):
+        with os.scandir(chemin) as it:
+            entrees = list(it)
+        compteur[0] += len(entrees)
+        if compteur[0] > plafond:
+            raise TropDEntrees("%d entrées de dossier énumérées (plafond %d)" % (compteur[0], plafond))
+        return _Enumeration(entrees)
+    return scandir
+
+
+class OuvertureBloquee(Exception):
+    """Levée par l'alarme quand une ouverture de FIFO bloque (jamais une OSError)."""
+
+
+# --- R-EMP-08 : point fixe — une entrée qui est ou contient le dossier de l'unité est refusée à la pose -----------------------
+MOT_UNITE = "dossier de l'unité"
+ENTREES_UNITE = (UNITE, ".planning", ".planning/cycles", ".planning/cycles/01-c/phases", ".PLANNING", "./.planning/")
+VOISINE = ".planning/cycles/01-c/phases/01-p-bis"
+
+
+def fuites_message(ctx, lab, texte):
+    """Ce qu'un message de refus ne doit jamais porter (mêmes contrôles que R-EMP-07)."""
+    fuites = []
+    for chemin in {lab, os.path.realpath(lab), os.path.dirname(os.path.realpath(lab)), ctx.work}:
+        if chemin and chemin in texte:
+            fuites.append("le chemin absolu " + chemin)
+    bas = texte.lower()
+    for interdit in ("no such file", "can't open", "cannot open", "traceback"):
+        if interdit in bas:
+            fuites.append("« %s »" % interdit)
+    if re.search(r"(^|[\s'\"(])/(Users|home|private|var|tmp|etc)/", texte):
+        fuites.append("un chemin absolu")
+    return fuites
+
+
+def hash_livrables_pose(lab, unite=UNITE):
+    m = re.search(r'^hash_livrables: "([0-9a-f]{64})"$', octets(os.path.join(lab, unite, "VERDICT.md")).decode("utf-8"), re.M)
+    return m.group(1) if m else None
+
+
+def controle_emp_08(ctx, dossier):
+    fautes = []
+    ns = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
+    for entree in ENTREES_UNITE:
+        lab = lab_neuf(ctx, "emp08", (entree,))
+        rc, out, err = poser_cmd(ctx, dossier, lab, 1)
+        texte = (out + err).decode("utf-8", "replace")
+        if rc != 64:
+            fautes.append("ecrit: %s : code %d, attendu 64 (refus « %s »)" % (entree, rc, MOT_UNITE))
+        if MOT_UNITE not in texte or "est absent" in texte:
+            fautes.append("ecrit: %s : le message ne nomme pas « %s » ou dit « est absent » : %s" % (entree, MOT_UNITE, court(err)))
+        if verdicts_ecrits(lab):
+            fautes.append("ecrit: %s : un VERDICT.md ou son temporaire écrit malgré le refus « %s »" % (entree, MOT_UNITE))
+        for fuite in fuites_message(ctx, lab, texte):
+            fautes.append("ecrit: %s : le refus « %s » porte %s" % (entree, MOT_UNITE, fuite))
+    # jumeaux posés, et point fixe : l'empreinte recalculée après la pose égale celle posée
+    lab_dans = lab_neuf(ctx, "emp08-dans", (UNITE + "/notes.md",))
+    ecrire(os.path.join(lab_dans, UNITE, "notes.md"), "notes de l'unité\n")
+    lab_voisine = lab_neuf(ctx, "emp08-voisine", (VOISINE,))
+    ecrire(os.path.join(lab_voisine, VOISINE, "a.md"), "unité voisine\n")
+    for nom, lab, entree in (("entrée dans l'unité", lab_dans, UNITE + "/notes.md"), ("unité voisine", lab_voisine, VOISINE)):
+        rc, out, err = poser_cmd(ctx, dossier, lab, 1)
+        if rc != 0:
+            fautes.append("jumeau %s (%s) refusé hors du « %s » : rc=%d %s" % (nom, entree, MOT_UNITE, rc, court(err)))
+            continue
+        pose, recalcule = hash_livrables_pose(lab), ns["empreinte_livrables"](lab, [entree])
+        if recalcule != ("ok", pose):
+            fautes.append("point fixe rompu (jumeau %s) : hash_livrables posé %s, recalculé après la pose %s" % (nom, pose, recalcule))
+    # non-consommation de la tentative : refus sur une tentative 2, PLAN.md rétabli, la tentative 2 passe
+    lab = lab_neuf(ctx, "emp08-tentative")
+    rc, out, err = poser_cmd(ctx, dossier, lab, 1)
+    if rc != 0:
+        return False, "tentative 1 du lab de non-consommation refusée : rc=%d %s" % (rc, court(err))
+    chemin_plan, chemin_verdict = os.path.join(lab, UNITE, "PLAN.md"), os.path.join(lab, UNITE, "VERDICT.md")
+    plan_avant, verdict_avant = octets(chemin_plan), octets(chemin_verdict)
+    ecrire(chemin_plan, plan_md((".planning",)))
+    rc, out, err = poser_cmd(ctx, dossier, lab, 2)
+    if rc != 64 or MOT_UNITE not in err.decode("utf-8", "replace"):
+        fautes.append("tentative 2 sous ecrit: .planning : rc=%d, attendu 64 « %s » : %s" % (rc, MOT_UNITE, court(err)))
+    if octets(chemin_verdict) != verdict_avant:
+        fautes.append("VERDICT.md modifié par un refus « %s »" % MOT_UNITE)
+    if [n for n in os.listdir(os.path.join(lab, UNITE)) if n.startswith(".VERDICT.")]:
+        fautes.append("temporaire laissé par un refus « %s »" % MOT_UNITE)
+    ecrire(chemin_plan, plan_avant)
+    rc, out, err = poser_cmd(ctx, dossier, lab, 2)
+    if rc != 0:
+        fautes.append("tentative 2 après rétablissement du PLAN.md : rc=%d (attendu 0 : le refus « %s » ne consomme aucune tentative) %s"
+                      % (rc, MOT_UNITE, court(err)))
+    # non-consommation de la dérogation PLAFOND : le refus précède le plafond (64, jamais 65)
+    lab = lab_neuf(ctx, "emp08-derog")
+    for n in (1, 2, 3):
+        rc, out, err = poser_cmd(ctx, dossier, lab, n)
+        if rc != 0:
+            return False, "tentative %d du lab de dérogation refusée : rc=%d %s" % (n, rc, court(err))
+    ecrire(os.path.join(lab, UNITE, "PLAN.md"), plan_md((UNITE,)))
+    rc, out, err = deroger_cmd(ctx, dossier, lab, "PLAFOND", UNITE)
+    if rc != 0:
+        return False, "deroger-gate.sh refuse la dérogation PLAFOND sur l'unité : rc=%d %s" % (rc, court(err))
+    rc, out, err = poser_cmd(ctx, dossier, lab, 4)
+    if rc != 64 or MOT_UNITE not in err.decode("utf-8", "replace"):
+        fautes.append("tentative 4 sous dérogation PLAFOND et ecrit: = l'unité : rc=%d, attendu 64 « %s » (jamais 65 ni 0) : %s"
+                      % (rc, MOT_UNITE, court(err)))
+    if [l for l in journal_derogations(lab) if "  consommee  " in l]:
+        fautes.append("la dérogation PLAFOND a été consommée par une pose refusée (« %s »)" % MOT_UNITE)
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "%d entrées qui sont ou contiennent le dossier de l'unité (l'unité, .planning, deux ancêtres, .PLANNING, ./.planning/) "
+                          "refusées en 64, message « %s », jamais « est absent », aucun VERDICT.md ni temporaire, aucun chemin absolu ; jumeaux "
+                          "posés (entrée dans l'unité, unité voisine) au point fixe ; refus sans tentative consommée (la tentative 2 passe "
+                          "ensuite) ni dérogation PLAFOND consommée (64, jamais 65)" % (len(ENTREES_UNITE), MOT_UNITE))
+
+
+# --- R-EMP-09 : budget commun à toutes les entrées d'un PLAN.md -----------------------------------------------------------
+def controle_emp_09(ctx, dossier):
+    fautes = []
+    ns = charger_bloc(os.path.join(copie_bornes(ctx, dossier), "poser-verdict.sh"))
+    lab = lab_neuf(ctx, "emp09")
+
+    def dossier_de(nom, n):
+        for i in range(n):
+            ecrire(os.path.join(lab, nom, "f%02d.txt" % i), "xx")
+        return nom
+
+    rendu = ns["livrables_presents"](lab, [dossier_de("da", 6), dossier_de("db", 6)])
+    if [s for _e, s, _d in rendu] != ["present", "borne"] or "10 fichiers" not in rendu[1][2]:
+        fautes.append("budget commun : 6+6 fichiers sous une borne de 10 : obtenu %s, attendu present puis borne « 10 fichiers »" % (rendu,))
+    rendu = ns["livrables_presents"](lab, [dossier_de("dc", 5), dossier_de("dd", 5)])
+    if [s for _e, s, _d in rendu] != ["present", "present"]:
+        fautes.append("budget commun : 5+5 fichiers sous une borne de 10 : obtenu %s, attendu deux present" % (rendu,))
+    rendu = ns["livrables_presents"](lab, ["da", "db", dossier_de("de", 1)])
+    if [s for _e, s, _d in rendu] != ["present", "borne", "borne"]:
+        fautes.append("budget commun : 6+6+1 fichiers : obtenu %s, attendu present, borne, borne (toute entrée après une borne)" % (rendu,))
+    # cas p4, bornes réelles : 250 entrées imbriquées sur 250 dossiers et 1600 fichiers non vides au fond
+    lab4 = ctx.unique("emp09-p4")
+    entrees, rel = [], ""
+    for _i in range(250):
+        rel = rel + "/a" if rel else "a"
+        entrees.append(rel)
+    os.makedirs(os.path.join(lab4, rel))
+    for i in range(1600):
+        with open(os.path.join(lab4, rel, "f%04d" % i), "w") as fh:
+            fh.write("x")
+    ns_reel = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
+    compteur = [0]
+    ns_reel["os"] = OsMandataire(scandir=scandir_compteur(compteur, 2500))
+    debut = time.time()
+    try:
+        rendu = ns_reel["livrables_presents"](lab4, entrees)
+    except TropDEntrees as exc:
+        rendu = None
+        fautes.append("budget commun : cas p4 (250 entrées imbriquées, 1600 fichiers) : %s, attendu au plus 2500" % exc)
+    duree = time.time() - debut
+    if rendu is not None:
+        statuts = [s for _e, s, _d in rendu]
+        if "borne" not in statuts:
+            fautes.append("budget commun : cas p4 : aucune entrée borne (%d present)" % statuts.count("present"))
+        elif "present" in statuts[statuts.index("borne"):]:
+            fautes.append("budget commun : cas p4 : une entrée present après la première borne")
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "bornes abaissées à 10 : 6+6 → present puis borne « 10 fichiers », 5+5 → deux present, 6+6+1 → la troisième borne ; "
+                          "cas p4 (bornes réelles, 250 entrées imbriquées, 1600 fichiers) : %d present puis %d borne, aucune present après la "
+                          "première borne, %d entrées de dossier énumérées (au plus 2500), durée indicative %.2f s"
+                          % (statuts.count("present"), statuts.count("borne"), compteur[0], duree))
+
+
+# --- R-EMP-10 : un nom non UTF-8 ou porteur d'un caractère de contrôle rend le livrable illisible ----------------------------
+def controle_emp_10(ctx, dossier):
+    fautes, exerces = [], []
+    ns = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
+    for nom, attendu in (("a.txt", True), ("é", True), ("a\tb", False), ("a\nb", False), ("a\x7fb", False), ("a\udcffb", False)):
+        obtenu = ns["_nom_sain"](nom)
+        if obtenu is not attendu:
+            fautes.append("nom sain : _nom_sain(%r) rend %r, attendu %r" % (nom, obtenu, attendu))
+    for etiquette, nom_fichier in (("une tabulation", "a\tb.txt"), ("un saut de ligne", "a\nb.txt")):
+        lab = lab_neuf(ctx, "emp10")
+        ecrire(os.path.join(lab, "nt", "ok.txt"), "y\n")
+        try:
+            ecrire(os.path.join(lab, "nt", nom_fichier), "x\n")
+        except OSError as exc:
+            ctx.notes.append("  ~ R-EMP-10 nom à %s non exercé (création refusée : %s)" % (etiquette, type(exc).__name__))
+            continue
+        rendu = ns["empreinte_livrables"](lab, ["nt"])
+        if rendu[0] != "illisible":
+            fautes.append("nom sain : livrable dont un fichier porte %s dans son nom : %s, attendu illisible (jamais ok)" % (etiquette, rendu))
+        exerces.append(etiquette)
+    lab = lab_neuf(ctx, "emp10b")
+    ecrire(os.path.join(lab, "nu", "ok.txt"), "y\n")
+    try:
+        descripteur = os.open(os.fsencode(os.path.join(lab, "nu")) + b"/\xff.txt", os.O_WRONLY | os.O_CREAT, 0o644)
+    except OSError:
+        ctx.notes.append("  ~ R-EMP-10b non exercé (système de fichiers qui refuse les noms non UTF-8)")
+    else:
+        os.write(descripteur, b"x\n")
+        os.close(descripteur)
+        rendu = ns["empreinte_livrables"](lab, ["nu"])
+        if rendu[0] != "illisible":
+            fautes.append("nom sain : livrable dont un fichier porte un nom non UTF-8 réel : %s, attendu illisible (jamais ok)" % (rendu,))
+        exerces.append("non UTF-8 réel")
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "_nom_sain vrai pour a.txt et é, faux pour tabulation, saut de ligne, DEL et substitut (octet non UTF-8) ; noms réels "
+                          "exercés (%s) : livrable illisible, jamais une empreinte" % (", ".join(exerces) if exerces else "aucun"))
+
+
+# --- R-EMP-11 : l'empreinte ne dépend pas de l'ordre d'énumération --------------------------------------------------------
+def controle_emp_11(ctx, dossier):
+    fautes = []
+    lab = lab_neuf(ctx, "emp11")
+    ecrire(os.path.join(lab, "d", "b.txt"), "B\n")
+    ecrire(os.path.join(lab, "d", "a", "x.txt"), "X\n")
+    for nom in ("a", "b", "c"):
+        ecrire(os.path.join(lab, "m", nom + ".txt"), nom.upper() + "\n")
+    entrees = ["d", "m"]
+    attendu = empreinte_independante(lab, entrees)
+    rendus = {}
+    for ordre in ("naturel", "inverse", "rotation"):
+        ns = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
+        ns["os"] = OsMandataire(scandir=scandir_ordonne(ordre))
+        rendus[ordre] = ns["empreinte_livrables"](lab, entrees)
+        if rendus[ordre] != ("ok", attendu):
+            fautes.append("ordre %s : empreinte %s, attendu le texte canonique recalculé par la suite (%s)" % (ordre, rendus[ordre], attendu))
+    if len(set(rendus.values())) != 1:
+        fautes.append("ordre : l'empreinte change avec l'ordre d'énumération : %s" % rendus)
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "empreinte identique sous trois ordres d'énumération provoqués (naturel, inverse, rotation) et égale au texte "
+                          "canonique recalculé par la suite (sous-dossier d/a/x.txt avant d/b.txt, trois fichiers au même niveau)")
+
+
+# --- R-EMP-12 : lecture sans lien à aucun composant, sans blocage sur un FIFO, repli sans descripteur ------------------------
+def controle_emp_12(ctx, dossier):
+    fautes = []
+    ns = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
+    lab = lab_neuf(ctx, "emp12")
+    ecrire(os.path.join(lab, "dehors", "f"), "HORS\n")
+    os.symlink("dehors", os.path.join(lab, "lnk"))
+    rendu = ns["_hacher_livrables"](lab, [("lnk/f", 0)], [0, 0, 0])
+    if rendu[0] != "illisible":
+        fautes.append("lien : composant intermédiaire lien (lnk/f) : obtenu %s, attendu illisible (jamais lu)" % (rendu,))
+    rendu = ns["_hacher_livrables"](lab, [("dehors/f", 0)], [0, 0, 0])
+    if rendu[0] != "ok":
+        fautes.append("lien : jumeau réel dehors/f : obtenu %s, attendu ok" % (rendu,))
+    fifo = "non exercé"
+    if hasattr(os, "mkfifo") and hasattr(signal, "alarm"):
+        os.mkfifo(os.path.join(lab, "fifo"))
+
+        def sonner(_signum, _cadre):
+            raise OuvertureBloquee()
+
+        ancien = signal.signal(signal.SIGALRM, sonner)
+        try:
+            signal.alarm(5)
+            rendu = ns["_hacher_livrables"](lab, [("fifo", 0)], [0, 0, 0])
+        except OuvertureBloquee:
+            rendu = None
+            fautes.append("FIFO : ouverture bloquée (O_NONBLOCK) au-delà de 5 s")
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, ancien)
+        if rendu is not None and rendu[0] != "illisible":
+            fautes.append("FIFO : obtenu %s, attendu illisible sans blocage (O_NONBLOCK, fstat non régulier)" % (rendu,))
+        fifo = "illisible sans blocage"
+    else:
+        ctx.notes.append("  ~ R-EMP-12b non exercé (os.mkfifo ou signal.alarm indisponible)")
+    # espion : toute ouverture du chemin de lecture (hors la racine du lab, résolue par l'appelant) porte O_NOFOLLOW, O_NONBLOCK et,
+    # là où le système l'offre, un descripteur de dossier
+    journal = []
+
+    def ouvrir(chemin, drapeaux, mode=0o777, *, dir_fd=None):
+        journal.append((chemin, drapeaux, dir_fd))
+        return os.open(chemin, drapeaux, mode, dir_fd=dir_fd)
+
+    ns_espion = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
+    ns_espion["os"] = OsMandataire(open=ouvrir)
+    lab_e = lab_neuf(ctx, "emp12-espion")
+    rendu = ns_espion["empreinte_livrables"](lab_e, ENTREES_EMP)
+    if rendu[0] != "ok":
+        fautes.append("espion : empreinte %s, attendu ok" % (rendu,))
+    lecture = [(c, d, f) for c, d, f in journal if not (c == lab_e and f is None)]
+    if not lecture:
+        fautes.append("espion : aucune ouverture du chemin de lecture consignée (contrôle à vide)")
+    sans_suivi, sans_blocage = getattr(os, "O_NOFOLLOW", 0), getattr(os, "O_NONBLOCK", 0)
+    avec_dirfd = os.open in os.supports_dir_fd and hasattr(os, "O_DIRECTORY")
+    ecarts = {}
+    for chemin, drapeaux, dir_fd in lecture:
+        nom = os.path.basename(str(chemin))
+        if sans_suivi and not drapeaux & sans_suivi:
+            ecarts.setdefault("lien suivi possible : ouverture sans O_NOFOLLOW", []).append(nom)
+        if sans_blocage and not drapeaux & sans_blocage:
+            ecarts.setdefault("O_NONBLOCK absent d'une ouverture", []).append(nom)
+        if avec_dirfd and dir_fd is None:
+            ecarts.setdefault("lien intermédiaire suivi : ouverture par chemin, sans descripteur de dossier", []).append(nom)
+    for libelle, noms in sorted(ecarts.items()):
+        fautes.append("%s (%d ouverture(s) : %s)" % (libelle, len(noms), ", ".join(sorted(set(noms))[:6])))
+    # repli sans descripteur de dossier : même empreinte que le chemin normal
+    lab_r = lab_neuf(ctx, "emp12-repli")
+    normal = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))["empreinte_livrables"](lab_r, ENTREES_EMP)
+    ns_repli = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
+    ns_repli["AVEC_DESCRIPTEURS"] = False
+    repli = ns_repli["empreinte_livrables"](lab_r, ENTREES_EMP)
+    if normal[0] != "ok" or repli != normal:
+        fautes.append("repli sans descripteur de dossier : empreinte %s, chemin normal %s : attendu la même" % (repli, normal))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "composant lien (lnk/f) illisible, jumeau réel ok ; FIFO %s ; %d ouvertures du chemin de lecture, toutes avec "
+                          "O_NOFOLLOW et O_NONBLOCK%s ; repli sans descripteur : même empreinte"
+                          % (fifo, len(lecture), " et un descripteur de dossier" if avec_dirfd else ""))
+
+
 # --- R-EMP-04 : trois copies ast-identiques ---------------------------------------------------------------------------
 NOMS_BLOC = ("BORNE_FICHIERS_LIVRABLES", "BORNE_OCTETS_LIVRABLES", "NOMS_EXCLUS_LIVRABLES", "SANS_BLOCAGE", "DRAPEAUX_LIVRABLE",
              "AVEC_DESCRIPTEURS", "_normaliser_livrable", "_fichier_non_vide", "_nom_sain", "_borne_depassee", "_parcourir_livrable",
              "_examiner_livrable", "livrables_presents", "_ouvrir_dossier_livrable", "_fermer_dossier_livrable", "_hacher_dans",
              "_hacher_livrables", "empreinte_livrables", "_couvre_unite", "entrees_du_plan", "entree_ecrit_valide")
+NOMS_ENTREES = ("SANS_SUIVI_DE_LIEN", "dequote", "CLE_RE", "lire_frontmatter", "_lire_liste_indentee", "_valeurs_ecrit")
+JEUX_PLAN = (
+    ("ecrit scalaire", b"---\necrit: livrables/rapport.md\n---\n"),
+    ("ecrit scalaire quoté", b"---\necrit: 'livrables/rapport.md'\n---\n"),
+    ("liste en ligne", b"---\necrit: [livrables/rapport.md, donnees]\n---\n"),
+    ("liste indentée", b"---\necrit:\n  - livrables/rapport.md\n  - donnees\n---\n"),
+    ("entrées quotées 'x' et \"x\"", b"---\necrit:\n  - 'livrables/rapport.md'\n  - \"donnees\"\n---\n"),
+    ("liste vide", b"---\necrit: []\n---\n"),
+    ("ecrit absent", b"---\nauteur: x\n---\n"),
+    ("ecrit: ../x", b"---\necrit: ../x\n---\n"),
+    ("ecrit: /abs", b"---\necrit: /abs\n---\n"),
+    ("liste de mappings", b"---\necrit:\n  - chemin: livrables/rapport.md\n---\n"),
+    ("frontmatter non fermé", b"---\necrit: livrables/rapport.md\n"),
+    ("non UTF-8", b"---\necrit: livrables/\xff.md\n---\n"),
+    ("entrée = l'unité", ("---\necrit: %s\n---\n" % UNITE).encode("utf-8")),
+    ("ancêtre .planning", b"---\necrit:\n  - livrables/rapport.md\n  - .planning\n---\n"),
+    ("casse .PLANNING", b"---\necrit: .PLANNING/cycles\n---\n"),
+    ("entrée voisine hors de l'unité", ("---\necrit: %s\n---\n" % VOISINE).encode("utf-8")),
+)
 NOMS_JOURNAL = ("NOM_JOURNAL_DEROGATIONS", "LIGNE_DEROGATION_RE", "_jeton_journal", "_chemin_journal_derogations",
                 "_ouvrir_journal_derogations", "_entrees_journal", "_derogation_non_consommee", "derogation_active", "consommer", "citer")
 
@@ -604,26 +1003,31 @@ def controle_emp_04(ctx, dossier):
     arbres = {s: corps_ast(dossier, s, m) for s, m in TROIS_COPIES + (("deroger-gate.sh", "PY_DEROGER_GATE_EOF"),)}
     fautes = []
     trois = [(s, arbres[s]) for s, _m in TROIS_COPIES]
-    comparer_arbres(trois, NOMS_BLOC, fautes)
-    comparer_arbres([(s, arbres[s]) for s in ("poser-verdict.sh", "recalc-planning.sh")], ("_valeurs_ecrit",), fautes)
+    comparer_arbres(trois, NOMS_BLOC + NOMS_ENTREES, fautes)
     comparer_arbres([(s, arbres[s]) for s in ("planning-hook.sh", "poser-verdict.sh")], NOMS_JOURNAL, fautes)
     comparer_arbres([(s, arbres[s]) for s in ("planning-hook.sh", "poser-verdict.sh", "recalc-planning.sh", "deroger-gate.sh")],
                     ("_jeton_journal", "entree_ecrit_valide"), fautes)
     # mêmes verdicts : le prédicat et l'empreinte rendent la même chose dans les trois copies sur le même lab
     lab = lab_neuf(ctx, "emp04")
     cas = cas_predicat(lab)
-    rendus = {}
+    rendus, chaines = {}, {}
     for script, marqueur in TROIS_COPIES:
         ns = charger_bloc(os.path.join(dossier, script), marqueur)
         rendus[script] = ([ns["livrables_presents"](lab, [entree])[0] for _n, entree, _a in cas], ns["empreinte_livrables"](lab, ENTREES_EMP))
+        chaines[script] = [ns["entrees_du_plan"](jeu, UNITE) for _n, jeu in JEUX_PLAN]
     base = rendus["poser-verdict.sh"]
     for script, rendu in rendus.items():
         if rendu != base:
             fautes.append("%s rend un verdict de présence ou une empreinte différents de poser-verdict.sh sur le même lab" % script)
+    for script, rendu in chaines.items():
+        for (nom, _jeu), obtenu, attendu in zip(JEUX_PLAN, rendu, chaines["poser-verdict.sh"]):
+            if obtenu != attendu:
+                fautes.append("entrees_du_plan : jeu « %s » : %s rend %r, poser-verdict.sh rend %r" % (nom, script, obtenu, attendu))
     return (not fautes), ("; ".join(fautes) if fautes else
-                          "%d noms du bloc partagé et %d du journal de dérogation à arbres ast identiques (docstring comprise) dans les copies "
-                          "attendues ; mêmes statuts de présence (%d cas) et même empreinte dans les trois copies"
-                          % (len(NOMS_BLOC), len(NOMS_JOURNAL), len(cas)))
+                          "%d noms du bloc partagé et de ses entrées et %d du journal de dérogation à arbres ast identiques (docstring comprise) "
+                          "dans les copies attendues ; mêmes statuts de présence (%d cas), même empreinte et mêmes verdicts de entrees_du_plan "
+                          "(%d jeux d'octets) dans les trois copies"
+                          % (len(NOMS_BLOC) + len(NOMS_ENTREES), len(NOMS_JOURNAL), len(cas), len(JEUX_PLAN)))
 
 
 # --- R-PLAF-01 à 04 : le plafond de tentatives -------------------------------------------------------------------------
@@ -929,13 +1333,19 @@ def executer_mutant(ctx, ident, nom, marqueur, motif, remplacement, cid, ctrl, m
     if d is None:
         komut(ident, "mutant valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
         return
-    original = sur(ctrl, ctx, ctx.scripts_dir)
+    # le résultat de l'ORIGINAL est mémoïsé par contrôle (et le témoin de pose de l'original une fois) : il ne dépend pas du mutant
+    if ("original", cid) not in ctx.memo:
+        ctx.memo[("original", cid)] = sur(ctrl, ctx, ctx.scripts_dir)
+    original = ctx.memo[("original", cid)]
     mutant = sur(ctrl, ctx, d)
+    ctx.notes = []
     if not original[0]:
         komut(ident, "l'original passe %s" % cid, "conforme", original[1])
         return
     if avec_temoin:
-        t_orig, t_mut = temoin_pose(ctx, ctx.scripts_dir), temoin_pose(ctx, d)
+        if ("temoin-original",) not in ctx.memo:
+            ctx.memo[("temoin-original",)] = temoin_pose(ctx, ctx.scripts_dir)
+        t_orig, t_mut = ctx.memo[("temoin-original",)], temoin_pose(ctx, d)
         if t_orig[0] != 0 or t_mut[0] != 0:
             komut(ident, "témoin (pose neutre) accepté sous l'original et sous le mutant", str(t_orig), str(t_mut))
             return
@@ -950,11 +1360,15 @@ def executer_mutant(ctx, ident, nom, marqueur, motif, remplacement, cid, ctrl, m
 
 # --- Sections --------------------------------------------------------------------------------------------------------------
 def rendre(ident, titre, ctrl, ctx, dossier):
+    ctx.notes = []
     try:
         bon, detail = ctrl(ctx, dossier)
     except Exception as exc:
         bon, detail = False, "exception du contrôle : %s : %s" % (type(exc).__name__, str(exc)[:300])
     ok("%s %s : %s" % (ident, titre, detail)) if bon else ko(ident, titre, "conforme", detail)
+    for note in ctx.notes:  # cas non exerçables sur ce système : ligne « ~ », ni verte ni rouge
+        print(note)
+    ctx.notes = []
 
 
 def sec_ast(ctx):
@@ -983,6 +1397,11 @@ def sec_emp(ctx):
     rendre("R-EMP-05", "la commande pose hash et hash_livrables", controle_emp_05, ctx, d)
     rendre("R-EMP-06", "la commande refuse un livrable absent, vide, lien, un ecrit: invalide, une borne dépassée", controle_emp_06, ctx, d)
     rendre("R-EMP-07", "aucun refus ne fuit un chemin absolu ni « no such file »", controle_emp_07, ctx, d)
+    rendre("R-EMP-08", "point fixe : une entrée qui est ou contient le dossier de l'unité est refusée à la pose", controle_emp_08, ctx, d)
+    rendre("R-EMP-09", "budget commun à toutes les entrées d'un PLAN.md", controle_emp_09, ctx, d)
+    rendre("R-EMP-10", "nom non UTF-8 ou à caractère de contrôle : livrable illisible", controle_emp_10, ctx, d)
+    rendre("R-EMP-11", "empreinte indépendante de l'ordre d'énumération", controle_emp_11, ctx, d)
+    rendre("R-EMP-12", "lecture sans lien, sans blocage, repli sans descripteur", controle_emp_12, ctx, d)
 
 
 MUTANTS = [
@@ -1009,6 +1428,31 @@ MUTANTS = [
      "R-JUGE-FORME-02", controle_juge_02, "Majuscule", True),
     ("EMP-AST", "recalc-planning.sh", "PY_RECALC_PLANNING_EOF", "# livrable-vide", "return taille >= 1  # livrable-vide",
      "R-EMP-04", controle_emp_04, "recalc-planning.sh", True),
+    # quick 261003-ps1 (F1 à F6) : les entrées du bloc, la chaîne unique, le point fixe, le budget commun, les noms, l'ordre, la lecture
+    ("EMP-ENTREES-DEQUOTE", "recalc-planning.sh", "PY_RECALC_PLANNING_EOF",
+     "    if len(v) >= 2 and v[0] == v[-1] and v[0] in (\"'\", '\"'):", "if False:", "R-EMP-04", controle_emp_04, "dequote", True),
+    ("EMP-NOFOLLOW-AST", "planning-hook.sh", "PY_PLANNING_HOOK_EOF", 'SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)',
+     "SANS_SUIVI_DE_LIEN = 0", "R-EMP-04", controle_emp_04, "SANS_SUIVI_DE_LIEN", True),
+    ("EMP-CHAINE-AST", "recalc-planning.sh", "PY_RECALC_PLANNING_EOF", "# entrees-unite", "if False:  # entrees-unite",
+     "R-EMP-04", controle_emp_04, "entrees_du_plan", True),
+    ("UNITE-REFUS", "poser-verdict.sh", MARQUEUR_POSER, "# entrees-unite", "if False:  # entrees-unite",
+     "R-EMP-08", controle_emp_08, "dossier de l'unité", True),
+    ("BUDGET-COMMUN", "poser-verdict.sh", MARQUEUR_POSER, "# livrables-budget-commun",
+     "statut, detail, _genre, _fichiers = _examiner_livrable(racine, entree, [0, 0, 0])  # livrables-budget-commun",
+     "R-EMP-09", controle_emp_09, "budget commun", True),
+    ("NOM-SAIN-CONTROLE", "poser-verdict.sh", MARQUEUR_POSER, "# livrable-nom-controle", "return True  # livrable-nom-controle",
+     "R-EMP-10", controle_emp_10, "nom sain", True),
+    ("NOM-SAIN-UTF8", "poser-verdict.sh", MARQUEUR_POSER, "# livrable-nom-utf8", "return True  # livrable-nom-utf8",
+     "R-EMP-10", controle_emp_10, "nom sain", True),
+    ("OCTETS-LUS", "poser-verdict.sh", MARQUEUR_POSER, "# livrable-octets",
+     "if budget[1] > BORNE_OCTETS_LIVRABLES:  # livrable-octets", "R-EMP-03", controle_emp_03, "octets lus", True),
+    ("TRI", "poser-verdict.sh", MARQUEUR_POSER, "# livrable-tri", "pass  # livrable-tri", "R-EMP-11", controle_emp_11, "ordre", True),
+    ("LIEN-INTERMEDIAIRE", "poser-verdict.sh", MARQUEUR_POSER, "# livrable-ouverture",
+     "DRAPEAUX_LIVRABLE = os.O_RDONLY | SANS_BLOCAGE  # livrable-ouverture", "R-EMP-12", controle_emp_12, "lien", True),
+    ("NONBLOCK", "poser-verdict.sh", MARQUEUR_POSER, "# livrable-ouverture",
+     "DRAPEAUX_LIVRABLE = os.O_RDONLY | SANS_SUIVI_DE_LIEN  # livrable-ouverture", "R-EMP-12", controle_emp_12, "O_NONBLOCK", True),
+    ("DIRFD", "poser-verdict.sh", MARQUEUR_POSER, "# livrable-dirfd", "AVEC_DESCRIPTEURS = False  # livrable-dirfd",
+     "R-EMP-12", controle_emp_12, "lien", True),
 ]
 
 

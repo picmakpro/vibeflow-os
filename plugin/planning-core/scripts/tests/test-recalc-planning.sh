@@ -1282,6 +1282,89 @@ verifier_etat R-R4VIDE-01 "jumeau : dossier avec un fichier non vide" "$RECALC" 
 verifier_etat R-R4VIDE-01 "dossier avec le seul .DS_Store (exclusion fixe)" "$RECALC" livrable-dossier-ds-store 'indéterminé|livrable-vide:livrables/dossier'
 verifier_etat R-R4VIDE-01 "jumeau : un fichier ordinaire à côté du .DS_Store" "$RECALC" livrable-dossier-ds-store-jumeau 'à juger|'
 
+# ---------- quick 261003-ps1 — R4 par la chaîne unique du bloc partagé (`entrees_du_plan`, `livrables_presents`) ----------------
+# Copies matérialisées du lab de banc `livrable-vide-jumeau` (état `à juger`, unité de phase 01-p, CLOTURE.md présent), PLAN.md
+# réécrit dans la suite : le banc de fixtures n'est pas touché.
+UNITE_01P=".planning/cycles/01-c/phases/01-p"
+ecrire_plan_ecrit() { # <dossier du lab> <entrée> : réécrit le PLAN.md de l'unité 01-p avec une seule entrée `ecrit:`
+  printf '%s\n' '---' "ecrit: $2" '---' > "$1/$UNITE_01P/PLAN.md"
+}
+ecrire_fichiers() { # <dossier> <nombre> : <nombre> fichiers non vides dans <dossier>
+  "$PYBIN" -c '
+import os, sys
+base, n = sys.argv[1], int(sys.argv[2])
+os.makedirs(base, exist_ok=True)
+for i in range(n):
+    with open(os.path.join(base, "f%04d.txt" % i), "w") as fh:
+        fh.write("x")
+' "$1" "$2"
+}
+verifier_copie() { # <id> <libellé> <dossier du lab> <attendu « état|raison »>
+  local obtenu
+  obtenu="$(phase_etat_raison "$RECALC" "$3")"
+  if [ "$obtenu" = "$4" ]; then ok "$1 $2 ($4)"; else ko "$1 $2" "état|raison de la phase 01-p" "$4" "$obtenu $(cat "$WORK/per-courant.err" 2>/dev/null)"; fi
+}
+
+# R-UNITE-01 — une entrée `ecrit:` qui est ou contient le dossier de l'unité (unité à CLOTURE.md) : R4 rend
+# `ecrit-contient-unite:<entrée>` (la pose la refuse : décision du manager, renversable) ; sans CLOTURE.md, R3 décide.
+R_UNITE_A="$WORK/r-unite-a"
+materialiser livrable-vide-jumeau "$R_UNITE_A"
+ecrire_plan_ecrit "$R_UNITE_A" "$UNITE_01P"
+verifier_copie R-UNITE-01 "ecrit: = le dossier de l'unité, CLOTURE.md présent" "$R_UNITE_A" "indéterminé|ecrit-contient-unite:$UNITE_01P"
+R_UNITE_B="$WORK/r-unite-b"
+materialiser livrable-vide-jumeau "$R_UNITE_B"
+ecrire_plan_ecrit "$R_UNITE_B" ".planning"
+verifier_copie R-UNITE-01 "ecrit: .planning (ancêtre de l'unité), CLOTURE.md présent" "$R_UNITE_B" 'indéterminé|ecrit-contient-unite:.planning'
+R_UNITE_C="$WORK/r-unite-c"
+materialiser livrable-vide-jumeau "$R_UNITE_C"
+ecrire_plan_ecrit "$R_UNITE_C" "$UNITE_01P"
+rm -f "$R_UNITE_C/$UNITE_01P/CLOTURE.md"
+verifier_copie R-UNITE-01 "jumeau : même entrée, CLOTURE.md retiré (R3 décide)" "$R_UNITE_C" 'à exécuter|'
+R_UNITE_D="$WORK/r-unite-d"
+materialiser livrable-vide-jumeau "$R_UNITE_D"
+ecrire_plan_ecrit "$R_UNITE_D" "$UNITE_01P/notes.md"
+printf '%s\n' 'Notes de l unité.' > "$R_UNITE_D/$UNITE_01P/notes.md"
+verifier_copie R-UNITE-01 "jumeau : entrée DANS l'unité (fichier non vide)" "$R_UNITE_D" 'à juger|'
+
+# R-R4BORNE-01 — budget COMMUN à toutes les entrées d'un PLAN.md : deux entrées chacune sous la borne réelle (2000 entrées) dont la
+# somme la dépasse rendent `livrable-hors-borne:<seconde entrée>` ; 250 entrées imbriquées ne coûtent pas 250 parcours.
+R_BORNE_A="$WORK/r-r4borne-a"
+materialiser livrable-vide-jumeau "$R_BORNE_A"
+printf '%s\n' '---' 'ecrit:' '  - livrables/a' '  - livrables/b' '---' > "$R_BORNE_A/$UNITE_01P/PLAN.md"
+ecrire_fichiers "$R_BORNE_A/livrables/a" 1000
+ecrire_fichiers "$R_BORNE_A/livrables/b" 1001
+verifier_copie R-R4BORNE-01 "1000 + 1001 fichiers sur deux entrées (borne 2000)" "$R_BORNE_A" 'indéterminé|livrable-hors-borne:livrables/b'
+R_BORNE_B="$WORK/r-r4borne-b"
+materialiser livrable-vide-jumeau "$R_BORNE_B"
+printf '%s\n' '---' 'ecrit:' '  - livrables/a' '  - livrables/b' '---' > "$R_BORNE_B/$UNITE_01P/PLAN.md"
+ecrire_fichiers "$R_BORNE_B/livrables/a" 1000
+ecrire_fichiers "$R_BORNE_B/livrables/b" 1000
+verifier_copie R-R4BORNE-01 "jumeau : 1000 + 1000 fichiers (à la borne)" "$R_BORNE_B" 'à juger|'
+R_BORNE_C="$WORK/r-r4borne-c"
+materialiser livrable-vide-jumeau "$R_BORNE_C"
+"$PYBIN" -c '
+import os, sys
+lab, plan = sys.argv[1], sys.argv[2]
+rel, entrees = "", []
+for _i in range(250):
+    rel = rel + "/a" if rel else "a"
+    entrees.append(rel)
+os.makedirs(os.path.join(lab, rel))
+for i in range(1600):
+    with open(os.path.join(lab, rel, "f%04d" % i), "w") as fh:
+        fh.write("x")
+with open(plan, "w") as fh:
+    fh.write("---\necrit:\n" + "".join("  - %s\n" % e for e in entrees) + "---\n")
+' "$R_BORNE_C" "$R_BORNE_C/$UNITE_01P/PLAN.md"
+R_BORNE_T0="$(date +%s)"
+R_BORNE_P4="$(phase_etat_raison "$RECALC" "$R_BORNE_C")"
+R_BORNE_DUREE=$(( $(date +%s) - R_BORNE_T0 ))
+if [ "$R_BORNE_P4" = 'indéterminé|livrable-hors-borne:a/a' ]; then
+  ok "R-R4BORNE-01 cas p4 : 250 entrées imbriquées et 1600 fichiers -> indéterminé|livrable-hors-borne:a/a (durée indicative ${R_BORNE_DUREE} s)"
+else
+  ko "R-R4BORNE-01 cas p4" "état|raison de la phase 01-p" 'indéterminé|livrable-hors-borne:a/a' "$R_BORNE_P4 $(cat "$WORK/per-courant.err" 2>/dev/null)"
+fi
+
 # R-JETON-01 — un jeton du banc qui ne se résout pas fait échouer le lab avec un message nommé (jamais une substitution vide).
 R_JETON_BANC="$WORK/banc-jeton.txt"
 cat > "$R_JETON_BANC" <<'JETON_BANC_EOF'
