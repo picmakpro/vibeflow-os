@@ -996,6 +996,9 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (ao)** — P46-D-08 (Phase 46, 46-04) : la racine d'un `CwdChanged` est lue dans `cwd` ; `new_cwd`, que le harnais devrait porter égal à `cwd`, n'est pas lu (non mesuré : aucune sonde en direct de la version 2.1.288 n'a été permise, P46-D-08) ; si les deux divergeaient, la racine jugée serait celle de `cwd`, comme pour le pré-filtre qui lit le même champ.
 - **limite (ap)** — P46-D-10, P46-D-10a (Phase 46, 46-04) : en mode dégradé (script ou `python3` absent) dans un lab adhérent, `SubagentHandback` est refusé pour tout sous-agent, juges compris (fail-closed voulu : la couche shell ne dérive aucun rôle), et les quatre autres événements restent muets, `SubagentStop` compris (fail-open : sans rôle dérivable, un blocage statique arrêterait chaque sous-agent huit fois de suite). **Conséquence : hors mode auto et en mode dégradé, G4′ est ouvert** (hors mode auto, `SubagentHandback` n'est pas l'événement porteur : seul le repli `SubagentStop` porte G4′, et il sort sans refus) ; décision du manager P46-D-10a, renversable, listée au checkpoint d'armement de l'étape 6 (46-12).
 - **limite (aq)** — Phase 46, 46-04 : un événement que le hook ne connaît pas (`hook_event_name` inconnu, d'une autre casse, vide ou qui n'est pas une chaîne) sort en silence, code 0, sans rien évaluer ni journaliser ; seule une clé absente est lue comme `PreToolUse` (compatibilité des payloads d'avant la 46).
+- **limite (ar)** — P46-D-01 (Phase 46, 46-05) : `CLOTURE.md` et `SUMMARY.md` restent écrivables par `Bash` (limite (g) : le hook ne voit pas les écritures par `Bash`) ; le recalcul les voit (R4, règle E) et D1 les trace.
+- **limite (as)** — P46-D-12 (Phase 46, 46-05) : G3 refuse sur un `PLAN.md` absent ou illisible (refus conforme au modèle : l'unité est `indéterminé`, R1 et R2) ; c'est un écart assumé avec G1, qui se tait sur un état illisible (F5) ; le rejeu le mesure comme « refus conforme au modèle ».
+- **limite (at)** — P46-D-03a (Phase 46, 46-01) : les noms `.DS_Store`, `Thumbs.db` et `desktop.ini` sont exclus du prédicat « livrable présent » et de l'empreinte des livrables (métadonnées de système fixes : un dossier rouvert dans le Finder ne périme pas un verdict).
 
 ### Contrat de sortie par événement (Phase 46)
 
@@ -1005,8 +1008,8 @@ mise à jour de tâche n'est pas câblé (P46-D-01). Chaque décision citée por
 
 - **`PreToolUse`** — un seul groupe, matcher `Write|Edit|NotebookEdit|Bash|Agent|Task|SubagentHandback` (jamais un second groupe
   qui citerait `planning-hook.sh` : la purge de `merge-hooks.sh` retire toute entrée citant le même script dans les groupes du même
-  événement). Mode : les gates G1 à G7 et le rôle, inchangés ; `SubagentHandback` (le rapport d'un sous-agent, `tool_input.message`,
-  fourni en mode auto seulement) n'a encore aucun gate. Refus : JSON `permissionDecision: "deny"`, code 0. Erreur interne dans le
+  événement). Mode : les gates G1 à G7 et le rôle, inchangés, plus G3 (`CLOTURE.md` d'une unité, Phase 46, 46-05) ; `SubagentHandback`
+  (le rapport d'un sous-agent, `tool_input.message`, fourni en mode auto seulement) n'a encore aucun gate. Refus : JSON `permissionDecision: "deny"`, code 0. Erreur interne dans le
   périmètre adhérent : `deny` (fail-closed, P45-D-08).
 - **`SubagentStop`** — aucun matcher. Mode : repli de G4′ (hors mode auto), sans évaluation encore. Blocage : JSON
   `decision: "block"` avec `reason`, code 0, **jamais le code 2** (#60490). Erreur interne : silence, code 0.
@@ -1039,10 +1042,13 @@ canary, puis 0 faux refus et 0 faux accept sur le banc synthétique et sur le re
 
 **Ordre d'évaluation.** Dans un lab adhérent, le cœur vérifie d'abord la cohérence de la table
 d'armement (`armement_valide`, ordre `ORDRE_ETAPES`) : une table qui la viole (une étape armée avant
-la précédente, G6 et G5 de valeurs différentes, ou une valeur autre que `observe` et `armed`) refuse
-tout, c'est-à-dire chaque action que le hook examine, `Bash` compris, avant tout gate. Sinon G2
-avertit, puis les gates à verdict sont évalués dans l'ordre de `GATES_A_VERDICT` (G6, G5, G1, G7,
-ROLE) et leurs verdicts sont tranchés ensemble par `decider`.
+la précédente, G6 et G5 de valeurs différentes, G3 et G4 de valeurs différentes, ou une valeur autre que
+`observe` et `armed`) refuse tout, c'est-à-dire chaque action que le hook examine, `Bash` compris, avant tout
+gate. Sinon G2 avertit, puis les gates à verdict sont évalués dans l'ordre de `GATES_A_VERDICT` (G6, G5, G1,
+G7, ROLE, G3) et leurs verdicts sont tranchés ensemble par `decider`. L'ordre des étapes de `ORDRE_ETAPES`
+(Phase 46, P46-D-11) est : G6 et G5, puis G1, puis G7, puis le rôle, puis G3 et G4 (étape 5, un seul geste), puis
+G4′ (étape 6) ; G4 et G4′ n'ont pas encore de fonction d'évaluation dans `GATES_A_VERDICT` : leurs constantes
+existent et valent `observe`.
 
 | Gate | Étape | État | Comportement sur défaillance | Cas de canary | Relevé |
 |---|---|---|---|---|---|
@@ -1051,6 +1057,9 @@ ROLE) et leurs verdicts sont tranchés ensemble par `decider`.
 | G1 | 2 | armed | armé : fermé (deny) ; observe : journalise | G1-sans-cadrage | 45-REJEU-ETAPE-2 |
 | G7 | 3 | armed | armé : fermé (deny) ; observe : journalise | G7-orphelin | 45-REJEU-ETAPE-3 |
 | ROLE | 4 | armed | armé : fermé (deny) ; observe : journalise | ROLE-juge, ROLE-worker-Agent, ROLE-worker-Task | 45-REJEU-ETAPE-4 |
+| G3 | 5 | observe | armé : fermé (deny) ; observe : journalise | G3-livrable-absent | 46-REJEU-ETAPE-5 |
+| G4 | 5 | observe | armé : fermé (deny) ; observe : journalise | aucun | 46-REJEU-ETAPE-5 |
+| G4P | 6 | observe | armé : fermé (deny) ; observe : journalise | aucun | 46-REJEU-ETAPE-6 |
 | G2 | - | avertit | ouvert : n'avertit pas, ne refuse jamais | aucun | aucun |
 
 **État d'armement livré, tel que mesuré (v2.9.0).**
@@ -1058,7 +1067,8 @@ ROLE) et leurs verdicts sont tranchés ensemble par `decider`.
 - Armés à la livraison v2.9.0 : les quatre étapes (`ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7` et `ARMEMENT_ROLE` valent `armed`). `G2_MODE` vaut `avertit` : G2 avertit toujours et ne refuse jamais.
 - Les rejeux réels des étapes 1 à 4 ont tous rendu 0 faux refus et 0 faux accept, avec des empreintes d'arbre identiques (relevés de phase `45-REJEU-ETAPE-1` à `45-REJEU-ETAPE-4`). Mais ils ont été mesurés sur le hook **avant** les lots de correction A, B et C.
 - L'armement exigeait un NOUVEAU rejeu réel, sur des labs au repos, du hook livré après les lots de correction : il est fait (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`), avec 0 faux refus, 0 faux accept et des empreintes d'arbre identiques pour les deux labs. L'arbitrage qui attendait pour adapter deux suites couplées à « tout en observe » est rendu et appliqué (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30, oui pour les quatre étapes d'armement) : les suites ne dépendent plus de l'état d'armement, seuls la table de cette référence et `TABLE_ATTENDUE` le suivent. La protection des scripts du hook par G6 est elle aussi tranchée et appliquée (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01, limite (y)).
-- L'armement se fait par étapes dans l'ordre fixe (P45-D-03), un commit par étape : cet état est celui de l'étape 4, la dernière : plus aucun gate n'est en observation. Ce document ne dit jamais qu'un gate est armé tant que sa constante vaut `observe`.
+- L'armement se fait par étapes dans l'ordre fixe (P45-D-03), un commit par étape : cet état est celui de l'étape 4, la dernière de la Phase 45. Ce document ne dit jamais qu'un gate est armé tant que sa constante vaut `observe`.
+- Phase 46 (46-05) : G3 et G4 (étape 5) et G4′ (étape 6) sont livrés en `observe` (`ARMEMENT_G3`, `ARMEMENT_G4` et `ARMEMENT_G4P` valent `observe`) ; l'armement réel de l'étape 5 puis de l'étape 6 est un commit de constantes distinct, après canary vert et 0 faux refus, 0 faux accept (P46-D-11). Les relevés attendus sont `46-REJEU-ETAPE-5` et `46-REJEU-ETAPE-6` (ceux des étapes 1 à 4 restent `45-REJEU-ETAPE-<n>`). Dans la colonne des cas de canary, `aucun` n'est admis que pour G2 et pour un gate en `observe` qui n'a pas encore de cas dans `CANARIS` ; un gate armé sans cas reste un écart.
 
 Cinq listes que R-REFERENCE compare au code, chacune sur une seule ligne :
 
@@ -1126,6 +1136,21 @@ lab. La création d'un `.planning/` par Bash n'est pas couverte (P45-D-10).
 
 Limite T-45-61 (acceptée, sévérité basse) : un `.claude/` garni d'un faux agent et d'un fichier de mémoire passe G7 ; G7 rend visible un planning nu, il ne certifie pas un lab.
 
+### G3 — pas de clôture sans livrable (Phase 46)
+
+G3 refuse, en `PreToolUse`, l'écriture par `Write`, `Edit` ou `NotebookEdit` d'un `CLOTURE.md` d'**unité de forme modèle**
+(`.planning/cycles/<cycle>/phases/<phase>[/plans/<plan>]/CLOTURE.md`, noms d'unité conformes à `NOM_UNITE`, noms fixes comparés
+sans égard à la casse, chemin résolu physiquement) quand un livrable déclaré par `ecrit:` du `PLAN.md` voisin est absent, vide,
+lien ou hors borne, ou quand ce `PLAN.md` est absent, illisible ou sans `ecrit:` valide (P46-D-01, P46-D-12). Il appelle la MÊME
+chaîne que la règle R4 du recalcul (`entrees_du_plan`, puis `livrables_presents`, budget commun par `PLAN.md`) : G3 refuse
+exactement quand R4 rend `indéterminé` pour la même unité (preuve croisée R-CROISE-01, 46-05). Un `CLOTURE.md` de toute autre
+forme (planning de style GSD sous `.planning/phases/`, niveau cycle, `CLOTURE.md.bak`, un livrable nommé `CLOTURE.md` hors de
+`.planning/`) n'est jamais jugé. Le verdict porte le chemin relatif du `CLOTURE.md` écrit : c'est le chemin d'une dérogation
+nominative (`deroger-gate.sh --gate=G3`, usage unique). Messages, relatifs au lab : `livrable déclaré <statut> : <entrée> —
+produisez-le (non vide, sans lien) avant de clore (spec §5)` ; `PLAN.md de l'unité absent, illisible ou sans ecrit: valide —
+l'unité est indéterminée au modèle, la clôture est refusée`. Entré en `PreToolUse` par l'entonnoir existant : en `observe` il
+journalise, armé il refuse (deny), une erreur interne refuse quand il est armé.
+
 ### Le hook par rôle (GATE-09)
 
 Le rôle se **dérive** de la définition de l'agent écrivain (`agent_type` du payload), par les
@@ -1164,7 +1189,7 @@ adhérents : la ligne « Worker : tout dispatch refusé », appliquée à un lab
 
 ### La dérogation (GATE-11)
 
-La commande `deroger-gate.sh --lab=… --gate=<G1|G5|G6|G7|ROLE|PLAFOND> --chemin=… --qui=… --canal=…
+La commande `deroger-gate.sh --lab=… --gate=<G1|G3|G4|G4P|G5|G6|G7|ROLE|PLAFOND> --chemin=… --qui=… --canal=…
 --date=… --raison=…` inscrit une dérogation **nominative** (qui, canal, date, gate, chemin(s), raison)
 dans le journal append-only `.planning/derogations-gates.log`, une ligne par chemin, champs en
 encodage pourcent injectif (P45-D-13). Une raison vide, `TODO`, `TBD`, `FIXME`, `n/a`, `xxx` (toute

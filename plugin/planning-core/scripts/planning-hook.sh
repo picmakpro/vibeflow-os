@@ -125,9 +125,13 @@ ARMEMENT_G5 = "armed"  # etape-1
 ARMEMENT_G1 = "armed"  # etape-2
 ARMEMENT_G7 = "armed"  # etape-3
 ARMEMENT_ROLE = "armed"  # etape-4
+ARMEMENT_G3 = "observe"  # etape-5
+ARMEMENT_G4 = "observe"  # etape-5
+ARMEMENT_G4P = "observe"  # etape-6
 G2_MODE = "avertit"
-ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",))
-TABLE_ARMEMENT = {"G6": ARMEMENT_G6, "G5": ARMEMENT_G5, "G1": ARMEMENT_G1, "G7": ARMEMENT_G7, "ROLE": ARMEMENT_ROLE}
+ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",), ("G3", "G4"), ("G4P",))
+TABLE_ARMEMENT = {"G6": ARMEMENT_G6, "G5": ARMEMENT_G5, "G1": ARMEMENT_G1, "G7": ARMEMENT_G7, "ROLE": ARMEMENT_ROLE,
+                  "G3": ARMEMENT_G3, "G4": ARMEMENT_G4, "G4P": ARMEMENT_G4P}
 
 
 # --- Échéance interne et surveillance du lanceur (lot A, H2) ------------------------------------------------------
@@ -494,12 +498,15 @@ def verifier_adhesion(planning):
 # --- Table d'armement : cohérence de l'ordre (P45-D-03) --------------------------------------
 def armement_valide(table):
     """Vrai si chaque étape armée a toutes ses étapes antérieures armées et si G6 et G5 ont la
-    même valeur (l'étape 1 est UN seul geste). L'ordre est celui de ORDRE_ETAPES."""
+    même valeur (l'étape 1 est UN seul geste), de même G3 et G4 (l'étape 5 est UN seul geste, Phase 46,
+    P46-D-11). L'ordre est celui de ORDRE_ETAPES."""
     gates = [gate for etape in ORDRE_ETAPES for gate in etape]  # armement-valide-debut
     for gate in gates:
         if table.get(gate) not in ("observe", "armed"):
             return False
     if table.get("G6") != table.get("G5"):
+        return False
+    if table.get("G3") != table.get("G4"):  # armement-g3-g4
         return False
     precedente_armee = True
     for etape in ORDRE_ETAPES:
@@ -1664,6 +1671,72 @@ def evaluer_g1(contexte):
                                       "tranchez-les avant de planifier (spec §5)" % (phase, ", ".join(_ids_ouverts(donnees))))]
 
 
+# --- G3 : pas de clôture sans livrable (CLOT-01, 46-05 ; P46-D-01, P46-D-12) ----------------------------------------------
+# Toute écriture par Write, Edit ou NotebookEdit d'un CLOTURE.md d'unité de forme modèle — `.planning/cycles/<cycle>/phases/<phase>`
+# ou `.../phases/<phase>/plans/<plan>/CLOTURE.md`, noms d'unité conformes à NOM_UNITE, noms fixes en casefold, chemin résolu
+# physiquement — est jugée sur le `PLAN.md` voisin : un livrable déclaré par `ecrit:` absent, vide, lien ou hors borne (le prédicat
+# partagé `livrables_presents`, MÊME chaîne que la règle R4 du recalcul, R-CROISE-01) refuse ; un PLAN.md absent, illisible ou sans
+# `ecrit:` valide refuse aussi (l'unité est indéterminée au modèle, R1 et R2 : écart assumé avec G1, qui se tait sur un état illisible,
+# F5). Un CLOTURE.md de toute autre forme (planning de style GSD, niveau cycle, nom voisin) n'est jamais jugé.
+def unite_de_fichier(composants, nom):
+    """Composants du DOSSIER de l'unité (cinq ou sept, relatifs à la racine du lab) si `composants` désignent le fichier `nom`
+    (casefold) d'une unité de forme modèle, sinon None. Généralise `unite_de_plan` sans la toucher ; même forme que `forme_unite` de
+    poser-verdict.sh (contrôle croisé R-FORME-01). Sous `plans/<plan>/`, l'unité jugée est le plan, jamais la phase."""
+    n = len(composants)
+    if n not in (6, 8) or composants[-1].casefold() != nom.casefold():
+        return None
+    if composants[0].casefold() != ".planning" or composants[1].casefold() != "cycles" or composants[3].casefold() != "phases":
+        return None
+    if n == 8 and composants[5].casefold() != "plans":
+        return None
+    unites = [composants[2], composants[4]] + ([composants[6]] if n == 8 else [])
+    if not all(NOM_UNITE.match(u) for u in unites):
+        return None
+    return composants[:-1]
+
+
+def octets_plan_du_dossier(dossier):
+    """Octets du PLAN.md de l'unité `dossier` : fichier régulier requis (lstat, jamais de suivi de lien), ouverture O_NOFOLLOW ; None
+    si non régulier ou illisible (jamais un contenu partiel)."""
+    chemin = os.path.join(dossier, "PLAN.md")
+    if not est_fichier_regulier(chemin):
+        return None
+    try:
+        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        with os.fdopen(descripteur, "rb") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+RAISON_G3_PLAN = "PLAN.md de l'unité absent, illisible ou sans ecrit: valide — l'unité est indéterminée au modèle, la clôture est refusée"
+LIBELLES_LIVRABLE_G3 = {"absent": "absent", "vide": "vide", "lien": "lien", "borne": "hors borne", "illisible": "illisible"}
+
+
+def evaluer_g3(contexte):
+    """G3 : voir l'en-tête de section. Verdict `G3` sur le chemin relatif du CLOTURE.md écrit (dérogation nominative sur ce chemin)."""
+    racine = contexte["racine"]  # g3-sonde
+    if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
+        return []
+    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
+    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    unite = unite_de_fichier(composants, "CLOTURE.md")  # g3-forme
+    if unite is None:
+        return []
+    chemin_rel = "/".join(composants)
+    octets = octets_plan_du_dossier(os.path.join(racine, *unite))
+    motif, detail = ("frontmatter", "illisible") if octets is None else entrees_du_plan(octets, "/".join(unite))  # g3-plan
+    if motif == "unite":
+        return [Verdict("G3", chemin_rel, "ecrit: contient le dossier de l'unité (%s) — l'unité est indéterminée au modèle, la clôture est refusée" % detail)]
+    if motif != "ok":
+        return [Verdict("G3", chemin_rel, RAISON_G3_PLAN)]
+    for entree, statut, _detail in livrables_presents(racine, detail):
+        if statut != "present":  # g3-livrable
+            return [Verdict("G3", chemin_rel, "livrable déclaré %s : %s — produisez-le (non vide, sans lien) avant de clore (spec §5)"
+                            % (LIBELLES_LIVRABLE_G3.get(statut, statut), entree))]
+    return []
+
+
 # --- G7 : pas de planning orphelin sous un lab adhérent (GATE-07, 45-07 ; P45-D-14, spec §2 D-05) ---------------
 # Une écriture par Write ou NotebookEdit (Edit ne crée pas de fichier) qui CRÉE un dossier `.planning/` dans un dossier X
 # (le DERNIER composant `.planning` du chemin dont le dossier n'existe pas encore ; X = son parent) est jugée : le plus
@@ -2365,7 +2438,7 @@ def classer_fichier(chemin):
 
 # Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un
 # Verdict d'erreur : deny si le gate est armed, ligne d'observation sinon (P45-D-08, spec §5.1).
-GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict
+GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role), ("G3", evaluer_g3))  # gates-a-verdict
 
 
 def evaluer_protege(gate, fonction, contexte):
@@ -2383,7 +2456,7 @@ def evaluer_gates(contexte):
     l'entonnoir `decider`."""
     if not armement_valide(TABLE_ARMEMENT):
         return [("refuse", "[planning-core] table d'armement incohérente : l'ordre des étapes "
-                           "(G6 et G5, puis G1, puis G7, puis le rôle) n'est pas respecté (P45-D-03)")]
+                           "(G6 et G5, puis G1, puis G7, puis le rôle, puis G3 et G4, puis G4′) n'est pas respecté (P45-D-03, P46-D-11)")]
     resultats = []
     resultats.extend(evaluer_g2(contexte))
     verdicts = []

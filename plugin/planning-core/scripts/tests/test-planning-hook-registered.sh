@@ -189,7 +189,7 @@ def fabriquer_lab(racine, adherent, config=None, plan=True):
 class Ctx:
     def __init__(self, scripts_dir, hooks_json, repo_root, work, settings_lab):
         # Q-ARM (Willy, AskUserQuestion session principale, 2026-09-30) : les verdicts de cette suite (extraction, adhésion, mode dégradé,
-        # matrice A et E) sont ceux de l'enveloppe du hook, pas ceux d'un gate : le script rejoué est une COPIE du livré dont les cinq
+        # matrice A et E) sont ceux de l'enveloppe du hook, pas ceux d'un gate : le script rejoué est une COPIE du livré dont les huit
         # constantes ARMEMENT_* valent `observe`, quel que soit l'état d'armement courant (un gate armé refuse à juste titre un VERDICT.md
         # ou un PLAN.md que la matrice attend silencieux). Les gates armés sont mesurés par test-planning-gates.sh.
         self.scripts_dir_livre = scripts_dir
@@ -214,11 +214,11 @@ class Ctx:
 
     @staticmethod
     def _dossier_observe(source, work):
-        """Dossier jetable portant planning-hook.sh du `source`, les cinq constantes ARMEMENT_* réécrites à `observe` (observe|armed → observe)."""
-        texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"observe"',
+        """Dossier jetable portant planning-hook.sh du `source`, les huit constantes ARMEMENT_* réécrites à `observe` (observe|armed → observe)."""
+        texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', r'\1"observe"',
                            open(os.path.join(source, "planning-hook.sh"), encoding="utf-8").read(), flags=re.M)
-        if n != 5:
-            raise RuntimeError("cinq constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+        if n != 8:
+            raise RuntimeError("huit constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
         d = os.path.join(work, "scripts-observe")
         os.makedirs(d, exist_ok=True)
         ecrire(os.path.join(d, "planning-hook.sh"), texte)
