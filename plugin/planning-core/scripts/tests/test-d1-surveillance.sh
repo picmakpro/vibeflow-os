@@ -20,12 +20,22 @@
 #   R-D1-08  Write laissé passer (copie observe) : une ligne `intention`, FileChanged expliqué ; un second changement sans nouvelle intention : contournement ;
 #            un Write refusé (copie G6), un Write hors liste : aucune intention
 #   R-D1-09  `inscrire_surveillance` et `_jeton_journal` ast-identiques dans les quatre scripts ; un chemin à saut de ligne reste UNE ligne encodée
+#   R-D1-10  SessionStart (références posées), CLOTURE.md créé hors séance, SessionStart -> un contournement (source=reconciliation) et le signal D1 avec le chemin,
+#            une ligne `signal` posée ; un troisième SessionStart sans changement : aucun signal
+#   R-D1-11  une écriture du moteur entre deux séances : aucun contournement à la réconciliation
+#   R-D1-12  CwdChanged : `watchPaths` au premier niveau ET sous `hookSpecificOutput` ; FileChanged : jamais de `watchPaths`
+#   R-D1-13  erreur injectée dans chaque mode de D1 : stdout vide, code 0, aucun refus ; aucune sortie de D1 ne contient `deny` ni `block`
+#   R-D1-14  journal de plus de 5 Mio dont la dernière référence est hors de la fenêtre des 4 Mio de fin : première observation (jumeau : dans la fenêtre,
+#            contournement) ; un SessionStart sur 128 chemins lit chaque fichier une fois (mesure structurelle)
+#   Le cas de canary R-CANG-D1 vit dans la section `cang` de test-planning-gates.sh.
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-D1-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-D1-03), MUT-D1-DOSSIER (le dossier de l'unité dans la liste -> R-D1-01),
 #   MUT-D1-BORNE (borne retirée -> R-D1-02), MUT-D1-TRACE (aucune ligne de contournement -> R-D1-04), MUT-D1-MOTEUR (ligne moteur du recalcul retirée ->
 #   R-D1-06), MUT-D1-INTENTION (ligne d'intention retirée -> R-D1-08), MUT-D1-INTENTION-REUTILISEE (une intention explique plusieurs changements ->
-#   R-D1-08), MUT-D1-AST (une copie divergente -> R-D1-09).
-# Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, moteur, mutants_moteur).
+#   R-D1-08), MUT-D1-AST (une copie divergente -> R-D1-09), MUT-D1-RECONCILIATION (réconciliation retirée -> R-D1-10), MUT-D1-SIGNAL-REPETE (ligne `signal`
+#   non posée -> R-D1-10), MUT-D1-REFUS (une erreur de D1 transformée en deny -> R-D1-13), MUT-D1-WATCH-FILECHANGED (FileChanged renvoie la liste -> R-D1-12),
+#   MUT-D1-FENETRE (fenêtre de lecture retirée -> R-D1-14).
+# Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, moteur, mutants_moteur, reconciliation, mutants_reconciliation).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
 set -uo pipefail
@@ -857,6 +867,217 @@ def controle_d1_09(ctx, script):
                           "aucune ligne ni exception pour un journal en lien ou en dossier, ni pour une racine absente")
 
 
+# =================================================================================================
+# R-D1-10 à R-D1-14 : réconciliation au SessionStart, signal, CwdChanged, fail-open, fenêtre de lecture
+# =================================================================================================
+def contexte_de(out):
+    """`additionalContext` du SessionStart de la sortie, ou None."""
+    doc = lire_objet(out)
+    if not isinstance(doc, dict):
+        return None
+    corps = doc.get("hookSpecificOutput")
+    return corps.get("additionalContext") if isinstance(corps, dict) else None
+
+
+def controle_d1_10(ctx, script):
+    """Références posées au SessionStart ; CLOTURE.md d'une unité ouverte créé « hors séance » par un script de test ; SessionStart -> UNE ligne
+    `contournement` (source=reconciliation, sha256 du contenu créé), un `additionalContext` qui porte le signal D1 et le chemin, une ligne `signal` posée ;
+    un troisième SessionStart sans changement : aucun signal, aucune ligne de plus."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    lab = fabriquer_lab(ctx, "d1-10", ouvertes=("01-u",), closes=())
+    rel = ".planning/cycles/01-c/phases/01-u/CLOTURE.md"
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err or contexte_de(out) is not None:
+        return False, "premier SessionStart : références posées, aucun signal attendus — obtenu rc=%d %s" % (rc, court(out))
+    contenu = "clôture écrite hors séance\n"
+    ecrire(os.path.join(lab, *rel.split("/")), contenu)
+    rc, out, err = session(ctx, d, lab)
+    fautes = []
+    if rc != 0 or err:
+        fautes.append("SessionStart de réconciliation : code 0 attendu — obtenu rc=%d %s" % (rc, court(err)))
+    ligne = contournements(lab, rel)
+    if len(ligne) != 1 or ligne[0]["source"] != "reconciliation" or ligne[0]["sha"] != sha(contenu.encode("utf-8")):
+        fautes.append("UNE ligne contournement (source=reconciliation, sha256 du contenu créé) attendue — obtenu %s" % [(l["source"], l["sha"][:12]) for l in ligne])
+    signal = contexte_de(out)
+    if not isinstance(signal, str) or not signal.startswith("[planning-core] D1 : 1 écriture(s) non expliquée(s)") or rel not in signal or "surveillance.log" not in signal:
+        fautes.append("additionalContext : le signal D1 qui nomme le chemin attendu — obtenu %r" % (signal,))
+    if len(lignes_de(lab, "signal")) != 1:
+        fautes.append("UNE ligne signal attendue — obtenu %d" % len(lignes_de(lab, "signal")))
+    avant = len(lignes_journal(lab))
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or contexte_de(out) is not None or len(lignes_journal(lab)) != avant or len(lignes_de(lab, "signal")) != 1:
+        fautes.append("troisième SessionStart sans changement : aucun signal, aucune ligne de plus attendus — obtenu %r, %d ligne(s) de plus, %d signal(aux)"
+                      % (contexte_de(out), len(lignes_journal(lab)) - avant, len(lignes_de(lab, "signal"))))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "CLOTURE.md créé hors séance : au SessionStart, un contournement (source=reconciliation) et le signal D1 avec le chemin, une ligne signal posée ; "
+                          "troisième SessionStart sans changement : aucun signal")
+
+
+def controle_d1_11(ctx, script):
+    """Une écriture du moteur entre deux séances (recalc-planning.sh réécrit STATE.md et INDEX.md) : aucun contournement à la réconciliation, aucun signal."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    lab = fabriquer_lab(ctx, "d1-11", ouvertes=(), closes=())
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err:
+        return False, "premier SessionStart : code 0 attendu — obtenu rc=%d %s" % (rc, court(err))
+    rc, out, err = lancer_recalc(ctx, script, lab)
+    if rc != 0:
+        return False, "recalc-planning.sh : code 0 attendu — obtenu %d %s" % (rc, court(err))
+    if not lignes_de(lab, "moteur", ".planning/STATE.md"):
+        return False, "recalc-planning.sh : une ligne moteur pour STATE.md attendue"
+    rc, out, err = session(ctx, d, lab)
+    fautes = []
+    if rc != 0 or err or lignes_de(lab, "contournement") or lignes_de(lab, "signal") or contexte_de(out) is not None:
+        fautes.append("SessionStart après une écriture du moteur : aucun contournement ni signal attendus — obtenu %d contournement(s), %d signal(aux), contexte %r"
+                      % (len(lignes_de(lab, "contournement")), len(lignes_de(lab, "signal")), contexte_de(out)))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else "écriture du moteur entre deux séances : aucun contournement à la réconciliation, aucun signal")
+
+
+def controle_d1_12(ctx, script):
+    """CwdChanged d'un lab adhérent : `watchPaths` au PREMIER niveau ET sous `hookSpecificOutput` (`hookEventName: "CwdChanged"`), la même liste que le
+    SessionStart ; FileChanged (fichier changé ou non) : stdout vide, jamais de `watchPaths`."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    lab = fabriquer_lab(ctx, "d1-12")
+    rc, out, err = session(ctx, d, lab)
+    liste_session, doc = watch_paths(out)
+    if liste_session is None:
+        return False, doc
+    rc, out, err = ctx.lancer(payload_cwd(lab), cwd=lab, dossier=d)
+    fautes = []
+    doc = lire_objet(out)
+    if rc != 0 or err or not isinstance(doc, dict):
+        return False, "CwdChanged : un objet JSON, code 0 attendus — obtenu rc=%d %s" % (rc, court(out))
+    corps = doc.get("hookSpecificOutput")
+    if sorted(doc) != ["hookSpecificOutput", "watchPaths"]:
+        fautes.append("CwdChanged : clés de premier niveau hookSpecificOutput et watchPaths seulement attendues — obtenu %s" % sorted(doc))
+    if sorted(doc.get("watchPaths") or []) != sorted(liste_session):
+        fautes.append("CwdChanged : watchPaths de premier niveau = la liste du SessionStart attendu")
+    if not isinstance(corps, dict) or corps.get("hookEventName") != "CwdChanged" or sorted(corps.get("watchPaths") or []) != sorted(liste_session) or sorted(corps) != ["hookEventName", "watchPaths"]:
+        fautes.append("CwdChanged : hookSpecificOutput {hookEventName: CwdChanged, watchPaths: la liste} attendu — obtenu %s" % court(json.dumps(corps)))
+    state = os.path.join(lab, ".planning", "STATE.md")
+    for etat in ("sans changement", "changé hors moteur"):
+        if etat != "sans changement":
+            ecrire(state, "réécrit hors moteur\n")
+        rc, out, err = ctx.lancer(payload_fichier(lab, state), cwd=lab, dossier=d)
+        if rc != 0 or out != b"" or err:
+            fautes.append("FileChanged (%s) : stdout vide, jamais de watchPaths attendus — obtenu rc=%d %s" % (etat, rc, court(out)))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "CwdChanged : watchPaths au premier niveau ET sous hookSpecificOutput (hookEventName CwdChanged), la liste du SessionStart ; FileChanged : stdout vide")
+
+
+MODES_D1 = (("SessionStart", "evt-mode-sessionstart"), ("CwdChanged", "evt-mode-cwdchanged"), ("FileChanged", "evt-mode-filechanged"))
+INTERDITS_D1 = ('"deny"', '"block"', "permissionDecision", '"decision"')
+
+
+def controle_d1_13(ctx, script):
+    """Erreur injectée dans chaque mode de D1 (SessionStart, CwdChanged, FileChanged) : stdout vide, stderr vide, code 0, aucun refus ; aucune sortie
+    de D1 (SessionStart avec signal, CwdChanged) ne contient `deny`, `block` ni `decision`."""
+    base = script
+    fautes = []
+    for evt, marque in MODES_D1:
+        dossier, raison = make_hook_mutant(ctx, "D1-INJ-" + evt, "return None  # " + marque, 'raise RuntimeError("faute injectee")', base=base)
+        if dossier is None:
+            return False, "mutant d'injection invalide (%s) : %s" % (evt, raison)
+        lab = fabriquer_lab(ctx, "d1-13-" + evt.lower())
+        etat = os.path.join(lab, ".planning", "STATE.md")
+        brut = {"SessionStart": payload_session(lab), "CwdChanged": payload_cwd(lab), "FileChanged": payload_fichier(lab, etat)}[evt]
+        rc, out, err = ctx.lancer(brut, cwd=lab, dossier=dossier)
+        if rc != 0 or out != b"" or err:
+            fautes.append("faute dans le mode %s : stdout vide, stderr vide, code 0 (fail-open, aucun refus) attendus — obtenu rc=%d %s %s" % (evt, rc, court(out), court(err)))
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    lab = fabriquer_lab(ctx, "d1-13-sorties", ouvertes=("01-u",), closes=())
+    session(ctx, d, lab)
+    ecrire(os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-u", "CLOTURE.md"), "hors séance\n")
+    rc, out_s, err = session(ctx, d, lab)
+    rc2, out_c, err2 = ctx.lancer(payload_cwd(lab), cwd=lab, dossier=d)
+    if not (contexte_de(out_s) or "").startswith("[planning-core] D1 :") or not out_c:
+        fautes.append("témoin : un SessionStart avec signal et un CwdChanged non vides attendus")
+    for nom, out in (("SessionStart", out_s), ("CwdChanged", out_c)):
+        trouve = [m for m in INTERDITS_D1 if m in out.decode("utf-8", "replace")]
+        if trouve:
+            fautes.append("la sortie de %s contient %s (D1 ne refuse jamais)" % (nom, trouve))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "faute injectée dans le mode SessionStart, CwdChanged, puis FileChanged : stdout vide, code 0, aucun refus ; les sorties de D1 ne contiennent ni deny, ni block, ni decision")
+
+
+LIGNE_REMPLISSAGE = "2026-10-05T00:00:00Z  genre=reference  chemin=.planning/remplissage-%07d.md  sha256=" + "0" * 64 + "  par=planning-hook.sh  source=seance\n"
+
+
+def journal_de_5_mio(lab, ref_au_debut):
+    """Journal de plus de 5 Mio : une référence ANCIENNE de STATE.md, au début (hors de la fenêtre de lecture des 4 Mio de fin) ou à la fin (dans la fenêtre),
+    et des lignes de remplissage valides pour des chemins hors liste."""
+    ref = "2026-10-05T00:00:00Z  genre=reference  chemin=.planning/STATE.md  sha256=" + sha(b"ancien contenu de STATE.md") + "  par=planning-hook.sh  source=seance\n"
+    corps = "".join(LIGNE_REMPLISSAGE % i for i in range(29000))
+    texte = (ref + corps) if ref_au_debut else (corps + ref)
+    ecrire(chemin_journal(lab), texte)
+    return os.path.getsize(chemin_journal(lab))
+
+
+def controle_d1_14(ctx, script):
+    """Journal de plus de 5 Mio dont la dernière référence de STATE.md est HORS de la fenêtre de lecture (4 Mio de fin) : première observation (une référence
+    de plus, aucun contournement, limite (ba)) ; jumeau : la même référence DANS la fenêtre -> un contournement. Coût : un SessionStart sur 128 chemins lit
+    chaque fichier une seule fois (mesure structurelle : nombre de lectures égal au nombre de chemins, jamais une borne d'horloge)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    fautes = []
+    lab_a = fabriquer_lab(ctx, "d1-14-hors", ouvertes=(), closes=())
+    lab_b = fabriquer_lab(ctx, "d1-14-dans", ouvertes=(), closes=())
+    taille_a, taille_b = journal_de_5_mio(lab_a, True), journal_de_5_mio(lab_b, False)
+    if min(taille_a, taille_b) < 5 * 1024 * 1024:
+        return False, "journal de 5 Mio au moins attendu — obtenu %d et %d octets" % (taille_a, taille_b)
+    rc, out, err = session(ctx, d, lab_a)
+    ref_a = [e for e in entrees_journal_de_fin(lab_a) if e["chemin"] == ".planning/STATE.md" and e["source"] == "reconciliation"]
+    if rc != 0 or err or watch_paths(out)[0] is None:
+        fautes.append("SessionStart (référence hors fenêtre) : code 0 et watchPaths attendus — obtenu rc=%d %s" % (rc, court(out)))
+    if [e for e in ref_a if e["genre"] == "contournement"] or len([e for e in ref_a if e["genre"] == "reference"]) != 1 or contexte_de(out) is not None:
+        fautes.append("référence hors de la fenêtre : première observation (UNE référence, aucun contournement, aucun signal) attendue — obtenu %s" % [(e["genre"]) for e in ref_a])
+    rc, out, err = session(ctx, d, lab_b)
+    ref_b = [e for e in entrees_journal_de_fin(lab_b) if e["chemin"] == ".planning/STATE.md" and e["source"] == "reconciliation"]
+    if [e["genre"] for e in ref_b] != ["contournement", "reference"]:
+        fautes.append("jumeau : la même référence dans la fenêtre : contournement puis référence attendus — obtenu %s" % [e["genre"] for e in ref_b])
+    # Coût structurel : une lecture par fichier de la liste
+    hook = os.path.join(_dossier(ctx, script), "planning-hook.sh")
+    espace = {"__name__": "d1_mesure"}
+    exec(compile(corps_python(open(hook, encoding="utf-8").read()), hook, "exec"), espace)
+    lab_c = fabriquer_lab(ctx, "d1-14-cout", ouvertes=tuple("%02d-unite" % i for i in range(1, 41)), closes=())
+    liste, tronquee = espace["chemins_surveilles"](lab_c)
+    for chemin in liste:
+        if not os.path.exists(chemin):
+            ecrire(chemin, "contenu de " + os.path.basename(chemin) + "\n")
+    compteur = {}
+    reel = os.open
+
+    def compte(chemin, *args, **kwargs):
+        compteur[str(chemin)] = compteur.get(str(chemin), 0) + 1
+        return reel(chemin, *args, **kwargs)
+
+    os.open = compte
+    try:
+        espace["reconcilier"](lab_c, liste, tronquee)
+    finally:
+        os.open = reel
+    lectures = [compteur.get(c, 0) for c in liste]
+    if len(liste) != 128 or not tronquee or lectures != [1] * 128:
+        fautes.append("128 chemins lus UNE fois chacun attendus — obtenu %d chemin(s), %d lecture(s), maximum %d par chemin" % (len(liste), sum(lectures), max(lectures or [0])))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "journal de %.1f Mio : référence hors fenêtre = première observation (aucun contournement), la même dans la fenêtre = contournement ; SessionStart sur 128 "
+                          "chemins : 128 lectures, une par chemin" % (taille_a / 1048576.0))
+
+
+def entrees_journal_de_fin(lab):
+    """Les entrées du journal lues sur les derniers 200 Kio (les lignes écrites par la réconciliation)."""
+    chemin = chemin_journal(lab)
+    taille = os.path.getsize(chemin)
+    with open(chemin, "rb") as fh:
+        fh.seek(max(0, taille - 200000))
+        brut = fh.read().decode("utf-8", "replace").split("\n")
+    res = []
+    for ligne in brut:
+        m = LIGNE_RE.match(ligne)
+        if m:
+            res.append({"genre": m.group(2), "chemin": urllib.parse.unquote(m.group(3)), "sha": m.group(4), "par": m.group(5), "source": m.group(6)})
+    return res
+
+
 # --- Mutants --------------------------------------------------------------------------------------------------------
 def original_de(ctx, ident, controle):
     """Résultat d'un contrôle sur le script réel, calculé une seule fois (les sections et les mutants lisent la même exécution)."""
@@ -924,11 +1145,32 @@ def sec_mutants_moteur(ctx):
     tuer(ctx, "D1-AST", "if os.path.islink(planning) or (", "if os.path.islink(planning):", "R-D1-09", controle_d1_09, script="poser-verdict.sh")
 
 
+def sec_reconciliation(ctx):
+    rendre("R-D1-10", "réconciliation par hash au SessionStart et signal", controle_d1_10, ctx)
+    rendre("R-D1-11", "une écriture du moteur entre deux séances n'est pas un contournement", controle_d1_11, ctx)
+    rendre("R-D1-12", "CwdChanged : deux formes de watchPaths ; FileChanged : jamais de watchPaths", controle_d1_12, ctx)
+    rendre("R-D1-13", "fail-open : une erreur de D1 sort en silence, aucun refus", controle_d1_13, ctx)
+    rendre("R-D1-14", "fenêtre de lecture du journal et coût du SessionStart", controle_d1_14, ctx)
+
+
+def sec_mutants_reconciliation(ctx):
+    tuer(ctx, "D1-RECONCILIATION", "# d1-reconciliation", "genres = []  # d1-reconciliation", "R-D1-10", controle_d1_10)
+    tuer(ctx, "D1-SIGNAL-REPETE", "# d1-signal", "pass  # d1-signal", "R-D1-10", controle_d1_10)
+    # Une erreur de D1 transformée en refus : la branche d'erreur des trois événements émet un deny (la commande rejouée n'a pas son pré-filtre)
+    tuer(ctx, "D1-REFUS", "# evt-erreur-d1", 'sortie_refus(["[planning-core] erreur de D1"])  # evt-erreur-d1', "R-D1-13", controle_d1_13)
+    # FileChanged renvoie la liste : le mode émet lui-même l'objet de SessionStart
+    tuer(ctx, "D1-WATCH-FILECHANGED", "return None  # evt-mode-filechanged",
+         'sortie_d1(sortie_surveillance(EVT_SESSION_START, chemins_surveilles(racine)[0], None)); return None  # evt-mode-filechanged', "R-D1-12", controle_d1_12)
+    tuer(ctx, "D1-FENETRE", "# d1-fenetre", "debut = 0  # d1-fenetre", "R-D1-14", controle_d1_14)
+
+
 SECTIONS = {
     "base": sec_base,
     "mutants_base": sec_mutants_base,
     "moteur": sec_moteur,
     "mutants_moteur": sec_mutants_moteur,
+    "reconciliation": sec_reconciliation,
+    "mutants_reconciliation": sec_mutants_reconciliation,
 }
 
 
@@ -968,7 +1210,7 @@ run_sections() { # <sections séparées par des virgules>
 if [ -z "$HOOKS_JSON" ] && [ -z "$SETTINGS_LAB" ]; then
   echo "NOTE : ni hooks.json ni settings.json à côté des scripts (suite lancée hors dépôt) : la commande enregistrée n'est pas lisible, rien n'est rejoué."
 else
-  run_sections "${VF_D1_SECTIONS:-base,mutants_base,moteur,mutants_moteur}"
+  run_sections "${VF_D1_SECTIONS:-base,mutants_base,moteur,mutants_moteur,reconciliation,mutants_reconciliation}"
 fi
 
 T_FIN="$(date +%s)"

@@ -2814,30 +2814,42 @@ def lire_surveillance(racine):
     return entrees
 
 
-def decider_trace(entrees, rel, sha):
-    """Lignes que le fichier `rel`, de sha256 courant `sha` (`absent` s'il n'existe pas), appelle au journal. Règle d'explication, déterministe :
-    sans référence antérieure, la première observation pose la référence sans contournement (limite (ba)) ; un sha égal à celui de la dernière
-    référence n'est pas un changement (rien à inscrire : un événement répété ne se compte pas deux fois) ; un changement est EXPLIQUÉ s'il existe,
-    APRÈS la dernière référence du chemin, une ligne `moteur` du chemin de sha `sha` (une écriture du moteur, journalisée par son écrivain) ou une
-    ligne `intention` du chemin (une écriture par outil que le hook a laissée passer) — une intention n'explique qu'UN changement, puisque la
-    référence qui suit la dépasse. Expliqué : `reference` seule ; sinon `contournement` puis `reference`."""
+def entrees_par_chemin(entrees):
+    """Les entrées du journal groupées par chemin, chaque groupe dans l'ordre du journal : une seule passe sur le journal, quel que soit le nombre de
+    chemins de la liste (le coût d'une réconciliation ne dépend pas du nombre de chemins surveillés multiplié par la taille du journal)."""
+    groupes = {}
+    for entree in entrees:
+        groupes.setdefault(entree["chemin"], []).append(entree)
+    return groupes
+
+
+def decider_trace(entrees, sha):
+    """Lignes que le fichier dont `entrees` sont les lignes du journal (dans l'ordre), de sha256 courant `sha` (`absent` s'il n'existe pas),
+    appelle au journal. Règle d'explication, déterministe : sans référence antérieure, la première observation pose la référence sans
+    contournement (limite (ba)) ; un sha égal à celui de la dernière référence n'est pas un changement (rien à inscrire : un événement répété ne se
+    compte pas deux fois) ; un changement est EXPLIQUÉ s'il existe, APRÈS la dernière référence du chemin, une ligne `moteur` de sha `sha` (une
+    écriture du moteur, journalisée par son écrivain) ou une ligne `intention` (une écriture par outil que le hook a laissée passer) — une intention
+    n'explique qu'UN changement, puisque la référence qui suit la dépasse. Expliqué : `reference` seule ; sinon `contournement` puis `reference`."""
     derniere = None
     for rang, entree in enumerate(entrees):
-        if entree["genre"] == "reference" and entree["chemin"] == rel:
+        if entree["genre"] == "reference":
             derniere = rang
     if derniere is None:
         return ["reference"]
     if entrees[derniere]["sha"] == sha:
         return []
     apres = entrees[derniere + 1:]  # d1-apres
-    expliquee = any(e["chemin"] == rel and ((e["genre"] == "moteur" and e["sha"] == sha) or e["genre"] == "intention") for e in apres)  # d1-explique
+    expliquee = any((e["genre"] == "moteur" and e["sha"] == sha) or e["genre"] == "intention" for e in apres)  # d1-explique
     return ["reference"] if expliquee else ["contournement", "reference"]  # d1-contournement
 
 
 def tracer_changement(racine, rel, sha, entrees, source):
-    """Inscrit les lignes que `decider_trace` demande ; un contournement n'a pas d'auteur (`par` vide : aucun auteur dans le payload, limite (ay))."""
-    for genre in decider_trace(entrees, rel, sha):
+    """Inscrit les lignes que `decider_trace` demande pour le fichier `rel` (`entrees` : ses lignes du journal) et rend les genres inscrits ; un
+    contournement n'a pas d'auteur (`par` vide : aucun auteur dans le payload, limite (ay))."""
+    genres = decider_trace(entrees, sha)
+    for genre in genres:
         inscrire_surveillance(racine, genre, rel, sha, None if genre == "contournement" else PAR_HOOK, source)
+    return genres
 
 
 def inscrire_ecriture_moteur(racine, chemin_rel, par):
@@ -2868,24 +2880,47 @@ def inscrire_intentions(payload, cibles):
         return
 
 
-def poser_references(racine, liste, tronquee):
-    """Première observation au SessionStart : une ligne `reference` (chemin, sha256 courant) pour chaque chemin de la liste qui n'en a pas
-    encore, sans jamais juger ; une troncature à la borne est tracée (une ligne `borne`)."""
-    connus = {entree["chemin"] for entree in lire_surveillance(racine) if entree["genre"] == "reference"}
+def reconcilier(racine, liste, tronquee):
+    """Réconciliation par hash au SessionStart (P46-D-07) : les empreintes des fichiers surveillés sont comparées au dernier état connu du journal (une
+    lecture bornée du journal, une lecture de chaque fichier de la liste). Une première observation pose la référence ; un changement que rien n'explique
+    est tracé comme contournement (`source=reconciliation`) ; une troncature à la borne est tracée. Rend le signal à porter au contexte — les
+    contournements tracés depuis la séance précédente, c'est-à-dire depuis la dernière ligne `signal` — ou None ; la ligne `signal` est posée, de sorte
+    qu'un SessionStart sans nouveau contournement ne le répète pas."""
+    entrees = lire_surveillance(racine)
+    par_chemin = entrees_par_chemin(entrees)
+    contournements = []
+    for entree in entrees:
+        if entree["genre"] == "signal":
+            contournements = []
+        elif entree["genre"] == "contournement":
+            contournements.append(entree["chemin"])
     for chemin in liste:
         rel = os.path.relpath(chemin, racine).replace(os.sep, "/")
-        if rel in connus:
-            continue
         sha = empreinte_fichier(chemin)
-        if sha is not None:
-            inscrire_surveillance(racine, "reference", rel, sha, PAR_HOOK, "reconciliation")  # d1-references
+        if sha is None:
+            continue
+        genres = tracer_changement(racine, rel, sha, par_chemin.get(rel, []), "reconciliation")  # d1-reconciliation
+        if "contournement" in genres:
+            contournements.append(rel)
     if tronquee:
         inscrire_surveillance(racine, "borne", None, None, PAR_HOOK, "reconciliation")  # d1-troncature
+    if not contournements:
+        return None
+    distincts = []
+    for chemin in contournements:
+        if chemin not in distincts:
+            distincts.append(chemin)
+    inscrire_surveillance(racine, "signal", None, None, PAR_HOOK, "reconciliation")  # d1-signal
+    return ("[planning-core] D1 : %d écriture(s) non expliquée(s) de fichiers surveillés depuis la séance précédente (%s%s) — tracées dans .planning/surveillance.log"
+            % (len(contournements), ", ".join(distincts[:3]), "…" if len(distincts) > 3 else ""))
 
 
 def sortie_surveillance(evenement, liste, texte):
-    """Objet de sortie de SessionStart (`hookSpecificOutput` : `watchPaths` et `additionalContext`, chaque clé présente seulement si non
-    vide) ou None. Jamais une décision (`deny`, `block`) : D1 ne refuse jamais."""
+    """Objet de sortie de SessionStart (`hookSpecificOutput` : `watchPaths` et `additionalContext`, chaque clé présente seulement si non vide) ou de
+    CwdChanged (`watchPaths` au PREMIER niveau ET sous `hookSpecificOutput` : la forme n'est pas mesurée, P46-D-08, les deux sont émises) ; None si rien à
+    dire. Jamais une décision (`deny`, `block`) : D1 ne refuse jamais."""
+    if evenement == EVT_CWD_CHANGED:
+        return {"watchPaths": list(liste), "hookSpecificOutput": {"hookEventName": EVT_CWD_CHANGED, "watchPaths": list(liste)}} if liste else None
     corps = {"hookEventName": evenement}
     if liste:
         corps["watchPaths"] = list(liste)
@@ -2924,30 +2959,36 @@ def mode_subagent_stop(contexte):
 
 
 def mode_session_start(contexte):
-    """D1 au SessionStart (46-07) : la liste surveillée du lab adhérent, fichier par fichier (`watchPaths`) ; les références des fichiers jamais
-    observés sont posées au journal. L'objet de sortie est déposé dans `contexte["sortie_d1"]`, que `main` émet."""
+    """D1 au SessionStart (46-07) : la liste surveillée du lab adhérent, fichier par fichier (`watchPaths`), et la réconciliation par hash des fichiers
+    de cette liste avec le dernier état connu (les changements que rien n'explique sont tracés ; le signal tient en une ligne de `additionalContext`).
+    L'objet de sortie est déposé dans `contexte["sortie_d1"]`, que `main` émet. Ne bloque jamais."""
     racine = contexte["racine"]
     liste, tronquee = chemins_surveilles(racine)  # d1-liste
-    poser_references(racine, liste, tronquee)
-    contexte["sortie_d1"] = sortie_surveillance(EVT_SESSION_START, liste, None)
+    signal = reconcilier(racine, liste, tronquee)
+    contexte["sortie_d1"] = sortie_surveillance(EVT_SESSION_START, liste, signal)
     return None  # evt-mode-sessionstart
 
 
 def mode_cwd_changed(contexte):
-    """Racine lue dans `cwd` (`new_cwd` non lu, limite (ao)) ; `watchPaths` de D1 : aucune évaluation encore."""
+    """Racine lue dans `cwd` (`new_cwd` non lu, limite (ao)) ; D1 renvoie la même liste surveillée, sous les deux formes de `watchPaths`
+    (`sortie_surveillance`). Pas de réconciliation : elle est faite au SessionStart. La limite (ax) (#95440 : FileChanged sourd après un `cd`) est
+    rattrapée par cette réconciliation."""
+    liste, _tronquee = chemins_surveilles(contexte["racine"])  # d1-cwd-liste
+    contexte["sortie_d1"] = sortie_surveillance(EVT_CWD_CHANGED, liste, None)
     return None  # evt-mode-cwdchanged
 
 
 def mode_file_changed(contexte):
     """D1 en séance (46-07) : un fichier surveillé d'un lab adhérent a changé (`file_path` de premier niveau, `event` change, add ou unlink).
     Son sha256 courant (`absent` s'il a disparu) est comparé à la dernière référence du journal ; un changement que rien n'explique est tracé comme
-    contournement, puis la référence est mise à jour. Un fichier qui n'est pas surveillé : rien. Ne refuse jamais."""
+    contournement, puis la référence est mise à jour. Un fichier qui n'est pas surveillé : rien. Ne refuse jamais et ne renvoie JAMAIS de
+    `watchPaths` (P46-D-07)."""
     racine, chemin = contexte["racine"], contexte["ecrit"]
     rel = chemin_relatif_surveille(racine, chemin)
     if rel is not None:
         sha = empreinte_fichier(chemin)
         if sha is not None:
-            tracer_changement(racine, rel, sha, lire_surveillance(racine), "seance")  # d1-trace
+            tracer_changement(racine, rel, sha, entrees_par_chemin(lire_surveillance(racine)).get(rel, []), "seance")  # d1-trace
     return None  # evt-mode-filechanged
 
 
