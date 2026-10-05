@@ -71,7 +71,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "exec-46-06",
@@ -362,6 +362,16 @@
       ],
       "scope": [
         ".planning/workstreams/gouvernance/phases"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-ci-emp",
+      "step": "correction ciblée CI Linux : MUT-NOM-SAIN-UTF8 (test-cloture-empreintes.sh)",
+      "stage": "fix",
+      "deps": [],
+      "scope": [
+        "plugin/planning-core/scripts/tests/test-cloture-empreintes.sh"
       ],
       "status": "done"
     }
