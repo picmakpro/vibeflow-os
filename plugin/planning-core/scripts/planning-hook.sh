@@ -1737,6 +1737,67 @@ def evaluer_g3(contexte):
     return []
 
 
+# --- G4 : pas de SUMMARY.md sans verdict qui tienne (CLOT-02, CLOT-03, 46-05 ; P46-D-01, P46-D-03) ----------------------------
+# Toute écriture par Write, Edit ou NotebookEdit d'un SUMMARY.md d'unité de forme modèle (même forme que G3, `unite_de_fichier`) est jugée
+# sur le `VERDICT.md` voisin : absent, invalide (règle R6 du recalcul : constats vides ou hors passé/échec), périmé (`hash` différent du
+# sha256 du PLAN.md, `hash_livrables` absent ou différent de l'empreinte des livrables), ou portant un constat `échec` -> refus. Même
+# ordre que le recalcul (R6, puis E, puis R7) : un verdict périmé se re-juge avant qu'on lise ses constats. Le prédicat est réévalué à
+# CHAQUE écriture : retoucher le SUMMARY.md d'une unité close reste permis tant que le verdict tient. Les empreintes viennent de la copie
+# partagée du bloc (jamais d'une réécriture) ; un SUMMARY.md de toute autre forme n'est jamais jugé.
+RAISON_G4_PLAN = "PLAN.md de l'unité absent, illisible ou sans ecrit: valide — l'unité est indéterminée au modèle, le verdict ne peut pas être vérifié"
+
+
+def _tentative_suivante(donnees):
+    """Entier `tentative` + 1 lu dans le frontmatter du verdict, ou None si la valeur n'est pas un entier décimal."""
+    brute = donnees.get("tentative")
+    if isinstance(brute, str) and re.fullmatch(r"[0-9]{1,6}", brute.strip()):
+        return int(brute.strip()) + 1
+    return None
+
+
+def evaluer_g4(contexte):
+    """G4 : voir l'en-tête de section. Verdict `G4` sur le chemin relatif du SUMMARY.md écrit (dérogation nominative sur ce chemin)."""
+    racine = contexte["racine"]  # g4-sonde
+    if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
+        return []
+    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
+    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    unite = unite_de_fichier(composants, "SUMMARY.md")  # g4-forme
+    if unite is None:
+        return []
+    import hashlib
+    chemin_rel = "/".join(composants)
+    dossier = os.path.join(racine, *unite)
+    verdict = os.path.join(dossier, "VERDICT.md")
+    if not os.path.lexists(verdict):  # g4-verdict-absent
+        return [Verdict("G4", chemin_rel, "aucun VERDICT.md : faites juger l'unité (poser-verdict.sh)")]
+    statut, donnees = lire_frontmatter_fichier(verdict)
+    constats = donnees.get("constats") if statut == "ok" else None
+    if not isinstance(constats, list) or len(constats) == 0 or any(  # g4-invalide
+            not isinstance(c, dict) or c.get("resultat") not in ("passé", "échec") for c in constats):
+        return [Verdict("G4", chemin_rel, "VERDICT.md invalide (règle R6)")]
+    suivante = _tentative_suivante(donnees)
+    reessai = "" if suivante is None else " (tentative %d)" % suivante
+    octets = octets_plan_du_dossier(dossier)
+    motif, detail = ("frontmatter", "illisible") if octets is None else entrees_du_plan(octets, "/".join(unite))
+    if motif == "unite":
+        return [Verdict("G4", chemin_rel, "ecrit: contient le dossier de l'unité (%s) — l'unité est indéterminée au modèle, le verdict ne peut pas être vérifié" % detail)]
+    if motif != "ok":
+        return [Verdict("G4", chemin_rel, RAISON_G4_PLAN)]
+    perime = Verdict("G4", chemin_rel, "verdict périmé : re-juger" + reessai)
+    if donnees.get("hash") != hashlib.sha256(octets).hexdigest():  # g4-hash-plan
+        return [perime]
+    statut_emp, valeur_emp = empreinte_livrables(racine, detail)
+    if statut_emp == "borne":
+        return [Verdict("G4", chemin_rel, "livrables hors borne : %s" % valeur_emp)]
+    if statut_emp != "ok" or donnees.get("hash_livrables") != valeur_emp:  # g4-hash-livrables
+        return [perime]
+    for constat in constats:
+        if constat.get("resultat") == "échec":  # g4-echec
+            return [Verdict("G4", chemin_rel, "constat en échec : %s — corrigez puis re-jugez%s" % (constat.get("critere") or "?", reessai))]
+    return []
+
+
 # --- G7 : pas de planning orphelin sous un lab adhérent (GATE-07, 45-07 ; P45-D-14, spec §2 D-05) ---------------
 # Une écriture par Write ou NotebookEdit (Edit ne crée pas de fichier) qui CRÉE un dossier `.planning/` dans un dossier X
 # (le DERNIER composant `.planning` du chemin dont le dossier n'existe pas encore ; X = son parent) est jugée : le plus
@@ -2438,14 +2499,14 @@ def classer_fichier(chemin):
 
 # Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un
 # Verdict d'erreur : deny si le gate est armed, ligne d'observation sinon (P45-D-08, spec §5.1).
-GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role), ("G3", evaluer_g3))  # gates-a-verdict
+GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role), ("G3", evaluer_g3), ("G4", evaluer_g4))  # gates-a-verdict
 
 
 def evaluer_protege(gate, fonction, contexte):
     try:
         return list(fonction(contexte))
     except Exception as exc:
-        return [Verdict(gate, None, "erreur interne du gate : " + type(exc).__name__)]
+        return [Verdict(gate, None, "erreur interne du gate : " + type(exc).__name__)]  # protege-erreur
 
 
 # --- Évaluation des gates (Phase B) ----------------------------------------------------------

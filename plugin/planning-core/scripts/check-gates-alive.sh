@@ -251,8 +251,9 @@ CANARIS = (
     "ROLE-worker-Agent|ROLE|nominal|Agent:" + HORS_LISTE + "@" + AGENT_WORKER + "|Agent",
     "ROLE-worker-Task|ROLE|nominal|Task:" + HORS_LISTE + "@" + AGENT_WORKER + "|Task",
     # Étape 5 (46-05, P46-D-11) : G3 (CLOTURE.md d'une unité de forme modèle dont le PLAN.md voisin déclare des livrables qui n'existent pas
-    # dans le lab synthétique, fil principal) ; le cas de G4 arrive avec G4.
+    # dans le lab synthétique, fil principal) ; G4 (SUMMARY.md de la même unité, sans VERDICT.md voisin, fil principal) ; le cas de G4′ arrive avec G4′.
     "G3-livrable-absent|G3|nominal|Write:.planning/cycles/01-c/phases/01-p/CLOTURE.md|fil-principal",
+    "G4-sans-verdict|G4|nominal|Write:.planning/cycles/01-c/phases/01-p/SUMMARY.md|fil-principal",
 )
 
 

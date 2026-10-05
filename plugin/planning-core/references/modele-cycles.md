@@ -421,7 +421,7 @@ attributs : **dimension** = un constat par critère éliminatoire objectivement 
 Q3 = a). Les deux sont calculées par la commande `poser-verdict.sh`, **jamais par l'agent**, sous le
 verrou du `PLAN.md`, et relues identiques par le parseur avant l'écriture. Un verdict dont l'une des
 deux ne correspond plus est **périmé** : il se refait. Le recalcul le vérifie (règle E, § Règles de
-feuille, P46-D-03b) ; G4 le vérifiera à l'écriture de `SUMMARY.md` (plan 46-05). En Phase 44, `hash` et
+feuille, P46-D-03b) ; G4 le vérifie à l'écriture de `SUMMARY.md` (plan 46-05). En Phase 44, `hash` et
 `tentative` étaient lus et restitués sans être vérifiés (P44-D-09) ; ce n'est plus vrai de `hash` ni de
 `hash_livrables`.
 
@@ -452,7 +452,7 @@ feuille, P46-D-03b) ; G4 le vérifiera à l'écriture de `SUMMARY.md` (plan 46-0
   `recalc-planning.sh`), avec ses entrées — le parseur de frontmatter, `entree_ecrit_valide`,
   `_valeurs_ecrit` et `SANS_SUIVI_DE_LIEN` — prouvées identiques par comparaison d'arbres de syntaxe et
   par les mêmes verdicts de `entrees_du_plan` (suite `test-cloture-empreintes.sh`, R-EMP-04). La commande
-  de pose, R4 du recalcul et son cache l'appellent ; G3 et G4 l'appelleront (plan 46-05) ; aucun ne la
+  de pose, R4 du recalcul et son cache l'appellent ; G3 et G4 l'appellent (plan 46-05) ; aucun ne la
   réécrit.
 - **Point fixe** : une entrée `ecrit:` qui **est ou contient le dossier de l'unité** (l'unité elle-même,
   `.planning` ou un autre ancêtre, comparés par composants et sans égard à la casse) est **refusée à la
@@ -460,7 +460,7 @@ feuille, P46-D-03b) ; G4 le vérifiera à l'écriture de `SUMMARY.md` (plan 46-0
   verdict s'écrit dans ce dossier, `hash_livrables` y serait périmé dès la pose. Le refus précède toute
   lecture de `VERDICT.md`, tout temporaire et toute consommation de dérogation. Étiquette :
   décision du manager (vf-dev-manager, mandat de correction ciblée du 2026-10-03, revue anticipée du socle), renversable.
-  G3/G4 (plan 46-05) l'appliqueront par `entrees_du_plan` (même chaîne) ; R4 du recalcul rend
+  G3 et G4 (plan 46-05) l'appliquent par `entrees_du_plan` (même chaîne) ; R4 du recalcul rend
   `ecrit-contient-unite:<entrée>` pour une unité à `CLOTURE.md`. Une entrée **dans** l'unité (un fichier
   qu'elle contient) ou une unité voisine reste posable. **Limite déclarée (h)** : une entrée qui nomme un
   fichier que le moteur réécrit lui-même (le journal `.planning/derogations-gates.log`,
@@ -1008,7 +1008,7 @@ mise à jour de tâche n'est pas câblé (P46-D-01). Chaque décision citée por
 
 - **`PreToolUse`** — un seul groupe, matcher `Write|Edit|NotebookEdit|Bash|Agent|Task|SubagentHandback` (jamais un second groupe
   qui citerait `planning-hook.sh` : la purge de `merge-hooks.sh` retire toute entrée citant le même script dans les groupes du même
-  événement). Mode : les gates G1 à G7 et le rôle, inchangés, plus G3 (`CLOTURE.md` d'une unité, Phase 46, 46-05) ; `SubagentHandback`
+  événement). Mode : les gates G1 à G7 et le rôle, inchangés, plus G3 (`CLOTURE.md` d'une unité) et G4 (`SUMMARY.md` d'une unité), Phase 46, 46-05 ; `SubagentHandback`
   (le rapport d'un sous-agent, `tool_input.message`, fourni en mode auto seulement) n'a encore aucun gate. Refus : JSON `permissionDecision: "deny"`, code 0. Erreur interne dans le
   périmètre adhérent : `deny` (fail-closed, P45-D-08).
 - **`SubagentStop`** — aucun matcher. Mode : repli de G4′ (hors mode auto), sans évaluation encore. Blocage : JSON
@@ -1045,10 +1045,10 @@ d'armement (`armement_valide`, ordre `ORDRE_ETAPES`) : une table qui la viole (u
 la précédente, G6 et G5 de valeurs différentes, G3 et G4 de valeurs différentes, ou une valeur autre que
 `observe` et `armed`) refuse tout, c'est-à-dire chaque action que le hook examine, `Bash` compris, avant tout
 gate. Sinon G2 avertit, puis les gates à verdict sont évalués dans l'ordre de `GATES_A_VERDICT` (G6, G5, G1,
-G7, ROLE, G3) et leurs verdicts sont tranchés ensemble par `decider`. L'ordre des étapes de `ORDRE_ETAPES`
+G7, ROLE, G3, G4) et leurs verdicts sont tranchés ensemble par `decider`. L'ordre des étapes de `ORDRE_ETAPES`
 (Phase 46, P46-D-11) est : G6 et G5, puis G1, puis G7, puis le rôle, puis G3 et G4 (étape 5, un seul geste), puis
-G4′ (étape 6) ; G4 et G4′ n'ont pas encore de fonction d'évaluation dans `GATES_A_VERDICT` : leurs constantes
-existent et valent `observe`.
+G4′ (étape 6) ; G4′ n'a pas encore de fonction d'évaluation dans `GATES_A_VERDICT` : sa constante
+existe et vaut `observe`.
 
 | Gate | Étape | État | Comportement sur défaillance | Cas de canary | Relevé |
 |---|---|---|---|---|---|
@@ -1058,7 +1058,7 @@ existent et valent `observe`.
 | G7 | 3 | armed | armé : fermé (deny) ; observe : journalise | G7-orphelin | 45-REJEU-ETAPE-3 |
 | ROLE | 4 | armed | armé : fermé (deny) ; observe : journalise | ROLE-juge, ROLE-worker-Agent, ROLE-worker-Task | 45-REJEU-ETAPE-4 |
 | G3 | 5 | observe | armé : fermé (deny) ; observe : journalise | G3-livrable-absent | 46-REJEU-ETAPE-5 |
-| G4 | 5 | observe | armé : fermé (deny) ; observe : journalise | aucun | 46-REJEU-ETAPE-5 |
+| G4 | 5 | observe | armé : fermé (deny) ; observe : journalise | G4-sans-verdict | 46-REJEU-ETAPE-5 |
 | G4P | 6 | observe | armé : fermé (deny) ; observe : journalise | aucun | 46-REJEU-ETAPE-6 |
 | G2 | - | avertit | ouvert : n'avertit pas, ne refuse jamais | aucun | aucun |
 
@@ -1150,6 +1150,22 @@ nominative (`deroger-gate.sh --gate=G3`, usage unique). Messages, relatifs au la
 produisez-le (non vide, sans lien) avant de clore (spec §5)` ; `PLAN.md de l'unité absent, illisible ou sans ecrit: valide —
 l'unité est indéterminée au modèle, la clôture est refusée`. Entré en `PreToolUse` par l'entonnoir existant : en `observe` il
 journalise, armé il refuse (deny), une erreur interne refuse quand il est armé.
+
+### G4 — pas de SUMMARY.md sans verdict qui tienne (Phase 46)
+
+G4 refuse, en `PreToolUse`, l'écriture par `Write`, `Edit` ou `NotebookEdit` d'un `SUMMARY.md` d'**unité de forme modèle** (même
+forme que G3, même résolution du chemin) quand le `VERDICT.md` voisin est **absent**, **invalide** (règle R6 : constats vides ou
+hors `passé`/`échec`, frontmatter illisible), **périmé** — `hash` différent du sha256 du `PLAN.md`, ou `hash_livrables` absent ou
+différent de l'empreinte des livrables, relue par la copie partagée du bloc — ou **portant un constat `échec`** (P46-D-01,
+P46-D-03). Ordre du recalcul : R6, puis E (empreintes), puis R7 (échec) : un verdict périmé se re-juge avant qu'on lise ses
+constats. Le prédicat est réévalué à **chaque** écriture : retoucher le `SUMMARY.md` d'une unité close reste permis tant que le
+verdict tient. Un `PLAN.md` absent, illisible, sans `ecrit:` valide ou dont `ecrit:` contient l'unité rend l'unité indéterminée au
+modèle : refus. Un `SUMMARY.md` de toute autre forme n'est jamais jugé. Le verdict porte le chemin relatif du `SUMMARY.md` écrit
+(dérogation nominative : `deroger-gate.sh --gate=G4`, usage unique). Messages, relatifs au lab : `aucun VERDICT.md : faites juger
+l'unité (poser-verdict.sh)` ; `VERDICT.md invalide (règle R6)` ; `constat en échec : <critère> — corrigez puis re-jugez
+(tentative n+1)` ; `verdict périmé : re-juger (tentative n+1)` (n lu dans `tentative` du verdict, sans numéro si elle est
+illisible) ; `livrables hors borne : <libellé>`. Entonnoir existant : en `observe` il journalise, armé il refuse (deny), une erreur
+interne refuse quand il est armé.
 
 ### Le hook par rôle (GATE-09)
 
