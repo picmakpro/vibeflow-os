@@ -167,7 +167,7 @@
         "exec-46-10"
       ],
       "scope": [],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -179,7 +179,7 @@
         "exec-46-10"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "nonreg-a",
@@ -190,7 +190,7 @@
         "exec-46-10"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "ckpt-46-11",
@@ -201,7 +201,7 @@
         "exec-46-10"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "fix-46-a",
@@ -213,7 +213,7 @@
         "nonreg-a"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "exec-46-11",
@@ -386,6 +386,14 @@
         "plugin/planning-core/scripts/tests/test-planning-hook-registered.sh"
       ],
       "status": "done"
+    },
+    {
+      "id": "arb-46-d1",
+      "step": "arbitrage Willy : lot B de l'audit (D1 A5-A8, canary de juge A10) — corriger avant clôture ou nommer en limites",
+      "stage": "checkpoint",
+      "deps": [],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
