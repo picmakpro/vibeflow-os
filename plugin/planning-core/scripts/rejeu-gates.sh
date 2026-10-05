@@ -15,9 +15,10 @@
 # 45-09 rejouent le fait par `rejeu-reel.sh`, qui prend l'empreinte de TOUT l'arbre hors de cet outil.
 #
 # Usage :
-#   rejeu-gates.sh --lab=<chemin> [--lab=<chemin>…] --etape=<1|2|3|4>
+#   rejeu-gates.sh --lab=<chemin> [--lab=<chemin>…] --etape=<1|2|3|4|5|6>
 #                  [--attendus=<fichier>] [--rapport=<fichier>] [--hook=<script>]
-#   --etape    étape d'armement simulée (P45-D-03) : 1 = G6 et G5 ; 2 = + G1 ; 3 = + G7 ; 4 = + rôle
+#   --etape    étape d'armement simulée (P45-D-03, P46-D-11) : 1 = G6 et G5 ; 2 = + G1 ; 3 = + G7 ; 4 = + rôle ; 5 = + G3 et G4 ;
+#              6 = + G4′ (G4P) ; l'armement simulé suit ORDRE_ETAPES (le hook copié) ; tout autre numéro est un usage refusé (64)
 #   --hook     le hook à rejouer (défaut : planning-hook.sh à côté de ce script) ; toujours COPIÉ
 #   --rapport  écrit aussi le relevé dans ce fichier (refusé s'il est sous un lab)
 # Codes : 0 mesure faite (quels que soient les comptes), 1 erreur (lecture, empreinte divergente,
@@ -31,10 +32,20 @@
 #                                                                                jamais compté dans le total)
 #   REJEU-ETAPE-<n> faux-refus=<N> faux-accept=<M> refus-conforme-modele=<K>   total des gates des étapes <= n ET des
 #                                                                                lignes rangées sous aucune étape (`-`, `?`)
+#   COUVERTURE-REJEU <G3|G4> n=<k> plancher=<p>                                (46-08) écritures réellement jouées par le
+#                                                                                constructeur du gate et plancher exigé ; un
+#                                                                                compte sous le plancher rend le code 1 : jamais
+#                                                                                0 faux refus / 0 faux accept sans rien jouer
 #   CLASSE-REGLE-ECRITE <gate> lab=<lab affiché> n=<j>                          gate qui classe d'après
 #                                                                                le modèle, par lab
 #   ROLE-AGENT lab=<lab affiché> agent=<nom> role=<rôle dérivé> ecriture=<attendu> dispatchs=<n>   une par agent rejoué
 #                                                                                par le constructeur ROLE (45-09) ; rien sans agent
+#   BORNE-LIVRABLES lab=<lab affiché> entree=<entrée> fichiers=<n> octets=<m>    (46-08) entrée réelle de premier niveau dont le
+#                                                                                parcours dépasse 2000 entrées ou 128 Mio (mesure de
+#                                                                                l'hypothèse A7, P46-D-03a) ; nommée, jamais agrégée
+#   ENTREE-IGNOREE lab=<lab affiché> entree=<entrée> motif=<motif>               (46-08) entrée réelle que G3 et G4 ne rejouent pas
+#                                                                                (nom non déclarable dans `ecrit:`, réservé, ou
+#                                                                                squelette / verdict impossible) : dite, jamais tue
 #   EMPREINTE-IDENTIQUE <lab affiché>   (ou EMPREINTE-DIVERGENTE + code 1)      une par lab
 # Les chemins sous HOME sont affichés `~/…` ; les chemins internes sont relatifs au lab. Un lab HORS de HOME est affiché `<lab-N>`
 # (jamais son chemin absolu), N étant son rang parmi les `--lab=` hors de HOME : il dépend de l'ORDRE des `--lab=` de l'appel — la même
@@ -77,7 +88,14 @@
 # une classification par la règle écrite du modèle faute d'état dérivé.
 # Les constructeurs de TOUS les gates sont joués quelle que soit --etape : l'étape ne décide que de
 # l'armement de la copie du hook et du COMPTAGE (un gate d'étape > --etape est simulé en observe : son
-# `doit-refuser` obtient un passage, qui n'est pas un faux accept de l'étape mesurée).
+# `doit-refuser` obtient un passage, qui n'est pas un faux accept de l'étape mesurée). EXCEPTION (46-08) : les constructeurs
+# `G3` et `G4` (étape 5) sont coûteux (unités synthétiques, une pose de verdict par `poser-verdict.sh`)
+# et ne se jouent qu'à partir de l'étape de leur gate : un rejeu --etape=n d'une étape antérieure ne les construit pas, et leur couverture
+# minimale (COUVERTURE-REJEU) n'est exigée qu'à partir de cette étape. `G3` (46-08 ; P46-D-01, P46-D-12) : sur la COPIE, des unités synthétiques de
+# forme modèle sous `.planning/cycles/99-rejeu-cloture/phases/` dont `ecrit:` désigne des entrées RÉELLES de premier niveau du lab (squelette
+# reflété sur la copie, le contenu réel n'est jamais lu) et des cas synthétiques à attendu nominatif ; l'attendu d'une entrée réelle vient
+# d'un oracle de présence PROPRE au rejeu (lstat, aucun lien suivi), jamais du prédicat du hook. `G4` : mêmes unités, `SUMMARY.md`, verdicts posés par
+# la vraie `poser-verdict.sh`.
 set -uo pipefail
 
 for arg in "$@"; do
@@ -140,6 +158,7 @@ RAISON_MODELE = "refus conforme au modèle, lab non migré"
 RAISON_REGLE = "classé par la règle écrite, état dérivé absent"
 MAX_CONTENU = 1 << 20
 DELAI_HOOK = 120
+ETAPE_G3G4 = 5  # étape à partir de laquelle les constructeurs G3 et G4 se jouent (constantes du rejeu : elles ne dérivent pas de ORDRE_ETAPES)
 PREFIXE_GATE = re.compile(r"^\[planning-core\] ([A-Z0-9]+) : ")
 
 
@@ -868,7 +887,342 @@ def construire_role(lab, ctx):
     return sortie
 
 
+# --- G3 et G4 (46-08, CLOT-10 ; P46-D-01, P46-D-03, P46-D-03a, P46-D-11, P46-D-12) : clôture sans livrable, SUMMARY.md sans verdict ---------------------
+# Un constructeur qui ne parcourt que le réel rendrait « 0 faux refus / 0 faux accept » sans rien jouer : les labs réels n'ont ni VERDICT.md ni unité
+# `cycles/` au format modèle (46-RESEARCH, Pitfall « rejeu à vide »). Ce constructeur FABRIQUE donc, sur la COPIE seulement (`sous_copie` avant toute
+# écriture), des unités de forme modèle sous `.planning/cycles/99-rejeu-cloture/phases/<NN>-<slug>/` (PLAN.md à `ecrit:`, CADRAGE.md clos pour que G1
+# ne s'en mêle pas) : (a) des cas synthétiques à attendu NOMINATIF (livrable présent, absent, vide, lien, dossier réduit à un `.DS_Store` ; pour G4 :
+# verdict conforme posé par la VRAIE `poser-verdict.sh`, absent, en échec, périmé par le plan, périmé par le livrable, invalide) ; (b) une unité par
+# entrée RÉELLE de premier niveau du lab (non cachée, au plus MAX_ENTREES_REELLES, triées) dont `ecrit:` la désigne : un SQUELETTE de l'entrée est
+# reflété sur la copie (même arborescence, un octet par fichier non vide, jamais le contenu réel ; un substitut de dimension pour une entrée hors
+# borne). L'attendu d'une entrée réelle vient d'un ORACLE de présence propre au rejeu (`oracle_presence` : lstat par composant, un lien vaut absent,
+# aucun lien suivi), jamais du prédicat du hook (T-46-082). Les CLOTURE.md et SUMMARY.md réels de style GSD sont rejoués en doit-passer par la
+# réécriture générique : seule la forme `.planning/cycles/<c>/phases/<p>[/plans/<pl>]/` est visée par G3 et G4.
+CYCLE_G34 = "99-rejeu-cloture"
+DOSSIER_LIVRABLES_G34 = "rejeu-livrables-g34"
+BORNE_FICHIERS_G34, BORNE_OCTETS_G34 = 2000, 134217728  # P46-D-03a : valeurs PROPRES du rejeu, comparées à celles du hook par la mesure (hypothèse A7)
+MESURE_PLAFOND_G34 = 200000  # au-delà, le comptage d'une entrée réelle s'arrête et le relevé le dit (mesure tronquée)
+EXCLUS_LIVRABLES_G34 = (".DS_Store", "Thumbs.db", "desktop.ini")
+MAX_ENTREES_REELLES = 50
+PLANCHER_G34 = 6  # écritures minimales jouées : par lab adhérent pour G3 et G4
+CADRAGE_CLOS_G34 = "---\ninconnues: []\n---\n"
+
+
+def nom_lisible(nom):
+    """Vrai si un nom d'entrée se décode en UTF-8 et ne porte aucun caractère de contrôle (sinon le texte d'une empreinte serait ambigu)."""
+    try:
+        nom.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return not any(ord(c) < 0x20 or ord(c) == 0x7f for c in nom)
+
+
+def oracle_presence(chemin):
+    """ORACLE de présence d'un livrable réel, PROPRE au rejeu (T-46-082) : (statut, entrées, octets, tronqué), statut `present`, `absent`, `vide`,
+    `lien`, `borne` ou `illisible`. lstat sur l'entrée, un lien (terminal) vaut `lien` et n'est jamais suivi ; un fichier régulier de taille non
+    nulle est `present` ; un dossier est `present` s'il porte au moins un fichier régulier non vide hors `.DS_Store`, `Thumbs.db`, `desktop.ini`,
+    parcours itératif sans suivi de lien. Les entrées comptent fichiers, sous-dossiers et liens (le budget que le hook borne) ; au-delà de
+    BORNE_FICHIERS_G34 entrées ou BORNE_OCTETS_G34 octets : `borne`. Aucun contenu n'est lu."""
+    try:
+        st = os.lstat(chemin)  # rejeu-oracle-presence
+    except FileNotFoundError:
+        return ("absent", 0, 0, False)
+    except OSError:
+        return ("illisible", 0, 0, False)
+    if stat.S_ISLNK(st.st_mode):
+        return ("lien", 0, 0, False)
+    if stat.S_ISREG(st.st_mode):
+        statut = "borne" if st.st_size > BORNE_OCTETS_G34 else ("present" if st.st_size > 0 else "vide")
+        return (statut, 1, st.st_size, False)
+    if not stat.S_ISDIR(st.st_mode):
+        return ("absent", 0, 0, False)
+    entrees = octets = 0
+    non_vide = illisible = tronque = False
+    pile = [chemin]
+    while pile:
+        courant = pile.pop()
+        try:
+            with os.scandir(courant) as it:
+                for e in it:
+                    if e.name in EXCLUS_LIVRABLES_G34:
+                        continue
+                    if not nom_lisible(e.name):
+                        illisible = True
+                        continue
+                    entrees += 1
+                    try:
+                        info = e.stat(follow_symlinks=False)
+                    except OSError:
+                        illisible = True
+                        continue
+                    if stat.S_ISREG(info.st_mode):
+                        octets += info.st_size
+                        non_vide = non_vide or info.st_size > 0
+                    elif stat.S_ISDIR(info.st_mode):
+                        pile.append(e.path)
+                    if entrees >= MESURE_PLAFOND_G34:
+                        tronque = True
+                        pile = []
+                        break
+        except OSError:
+            illisible = True
+    if entrees > BORNE_FICHIERS_G34 or octets > BORNE_OCTETS_G34:
+        statut = "borne"
+    elif illisible:
+        statut = "illisible"
+    else:
+        statut = "present" if non_vide else "vide"
+    return (statut, entrees, octets, tronque)
+
+
+def entree_declarable(nom):
+    """Vrai si le nom d'une entrée peut figurer dans `ecrit:` (même contrainte que le modèle : un chemin concret relatif, sans `~` initial, sans
+    caractère de contrôle ni `\\`, sans métacaractère `*?[]{}<>`) ET se citer entre guillemets simples ou doubles dans un frontmatter."""
+    if nom == "" or nom.startswith("~") or nom in (".", ".."):
+        return False
+    if any(ord(c) < 0x20 or ord(c) == 0x7f for c in nom) or "\\" in nom or any(c in nom for c in "*?[]{}<>"):
+        return False
+    return not ('"' in nom and "'" in nom) and nom_lisible(nom)
+
+
+def citer(nom):
+    return "'" + nom + "'" if '"' in nom else '"' + nom + '"'
+
+
+def ecrire_copie(lab, chemin, contenu):
+    """Écrit `contenu` (texte) dans `chemin`, sous la copie (`sous_copie` avant l'écriture) ; erreur de l'outil si l'écriture échoue."""
+    sous_copie(lab, os.path.dirname(chemin))
+    try:
+        os.makedirs(os.path.dirname(chemin), exist_ok=True)
+        with open(chemin, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(contenu)
+    except OSError as exc:
+        raise ErreurOutil("écriture impossible sur la copie : " + os.path.relpath(chemin, lab.copie) + " (" + type(exc).__name__ + ")")
+
+
+def creer_unite_g34(lab, nom_unite, entree):
+    """Unité de forme modèle `99-rejeu-cloture/phases/<nom_unite>` sur la copie : CADRAGE.md clos et PLAN.md dont `ecrit:` désigne `entree`.
+    Rend (chemin relatif de l'unité, chemin absolu)."""
+    rel = ".planning/cycles/" + CYCLE_G34 + "/phases/" + nom_unite
+    dossier = os.path.join(lab.copie, rel)
+    sous_copie(lab, dossier)
+    if os.path.lexists(dossier):
+        raise ErreurOutil("unité de rejeu déjà présente sur la copie : " + rel)
+    ecrire_copie(lab, os.path.join(dossier, "CADRAGE.md"), CADRAGE_CLOS_G34)
+    ecrire_copie(lab, os.path.join(dossier, "PLAN.md"), "---\necrit:\n  - " + citer(entree) + "\n---\n\n# Plan de rejeu\n")
+    return rel, dossier
+
+
+def poser_verdict_copie(lab, ctx, unite, constat, obligatoire=True):
+    """Pose un VERDICT.md sur l'unité `unite` (chemin absolu, copie) par la VRAIE `poser-verdict.sh` (le SEUL chemin légitime, G5). Rend None si
+    posé ; sinon la sortie d'erreur (une erreur de l'outil quand `obligatoire`)."""
+    poser = os.path.join(DOSSIER_SCRIPTS or "", "poser-verdict.sh")
+    if not os.path.isfile(poser):
+        raise ErreurOutil("poser-verdict.sh introuvable à côté de rejeu-gates.sh")
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": os.environ.get("HOME", ""), "TMPDIR": ctx["tmp"]}
+    try:
+        p = subprocess.run(["bash", poser, "--unite=" + unite, "--juge=rejeu", "--tentative=1", "--score=rejeu", "--constat=rejeu::" + constat],
+                           stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, timeout=DELAI_HOOK)
+    except (subprocess.TimeoutExpired, OSError):
+        if obligatoire:
+            raise ErreurOutil("poser-verdict.sh injouable sur la copie : " + os.path.relpath(unite, lab.copie))
+        return "injouable"
+    if p.returncode != 0:
+        if obligatoire:
+            raise ErreurOutil("poser-verdict.sh a refusé la pose d'un verdict synthétique (code %d) : %s" % (p.returncode, os.path.relpath(unite, lab.copie)))
+        return "code %d" % p.returncode
+    return None
+
+
+def reflechir_squelette(lab, src, dst, statut, entrees):  # rejeu-miroir
+    """Reflète sur la copie l'entrée réelle `src` : un LIEN reste un lien (cible inerte), un fichier garde sa vacuité (0 ou 1 octet), un dossier garde son
+    arborescence et ses noms (un octet par fichier non vide ; liens et noms exclus compris) ; une entrée `borne` reçoit un substitut de même verdict
+    (plus de BORNE_FICHIERS_G34 entrées, ou un fichier creux de plus de BORNE_OCTETS_G34 octets). Ce qui existe déjà sur la copie (marqueur de code
+    copié, dossier `.xcodeproj` vide) n'est jamais écrasé, seulement complété. Aucun contenu réel n'est lu. Rend False si le reflet est impossible."""
+    sous_copie(lab, os.path.dirname(dst))
+    try:
+        info = os.lstat(src)  # le genre de l'entrée se lit sur le disque, jamais sur le statut de l'oracle
+        if stat.S_ISLNK(info.st_mode):
+            if not os.path.lexists(dst):
+                os.symlink("cible-rejeu-inerte", dst)
+            return True
+        if stat.S_ISREG(info.st_mode):
+            if not os.path.lexists(dst):
+                with open(dst, "wb") as fh:
+                    if statut == "borne":
+                        fh.truncate(BORNE_OCTETS_G34 + 1)
+                    elif info.st_size > 0:
+                        fh.write(b"x")
+            return True
+        if os.path.islink(dst) or (os.path.lexists(dst) and not os.path.isdir(dst)):
+            return True  # déjà présent sur la copie (lien ou fichier copié) : jamais écrit à travers
+        os.makedirs(dst, exist_ok=True)
+        if statut == "borne":
+            if entrees > BORNE_FICHIERS_G34:
+                for i in range(BORNE_FICHIERS_G34 + 1):
+                    with open(os.path.join(dst, "e%05d" % i), "wb"):
+                        pass
+            else:
+                with open(os.path.join(dst, "creux"), "wb") as fh:
+                    fh.truncate(BORNE_OCTETS_G34 + 1)
+            return True
+        pile = [(src, dst)]
+        while pile:
+            courant_src, courant_dst = pile.pop()
+            with os.scandir(courant_src) as it:
+                enfants = sorted(it, key=lambda x: os.fsencode(x.name))
+            for e in enfants:
+                cible = os.path.join(courant_dst, e.name)
+                if os.path.lexists(cible):
+                    continue
+                if e.is_symlink():
+                    os.symlink("cible-rejeu-inerte", cible)
+                elif e.is_dir(follow_symlinks=False):
+                    os.mkdir(cible)
+                    pile.append((e.path, cible))
+                elif e.is_file(follow_symlinks=False):
+                    with open(cible, "wb") as fh:
+                        if e.stat(follow_symlinks=False).st_size > 0:
+                            fh.write(b"x")
+        return True
+    except (OSError, ErreurOutil):
+        return False
+
+
+def entrees_reelles(lab):
+    """Entrées de premier niveau NON CACHÉES du lab réel, triées par octets, au plus MAX_ENTREES_REELLES (lecture des NOMS seulement)."""
+    try:
+        with os.scandir(lab.reel) as it:
+            noms = [e.name for e in it if not e.name.startswith(".")]
+    except OSError as exc:
+        raise ErreurOutil("lecture impossible : premier niveau du lab (" + type(exc).__name__ + ")")
+    return sorted(noms, key=os.fsencode)[:MAX_ENTREES_REELLES]
+
+
+def preparer_g34(lab, ctx):  # rejeu-g3g4-synthetique
+    """Unités G3 et G4 d'un lab, fabriquées UNE fois sur sa copie (les constructeurs G3 et G4 se partagent le résultat) : {"G3": [écritures], "G4": [...]}.
+    Rien n'est fabriqué si le `.planning/` de la racine n'existe pas (un lab dev reste silencieux, P45-D-04)."""
+    cache = ctx.setdefault("g34", {})
+    if lab.index in cache:
+        return cache[lab.index]
+    res = {"G3": [], "G4": []}
+    cache[lab.index] = res
+    if ".planning" not in lab.dossiers_planning:
+        return res
+    liv = os.path.join(lab.copie, DOSSIER_LIVRABLES_G34)
+    sous_copie(lab, liv)
+    if os.path.lexists(liv):
+        raise ErreurOutil("nom réservé du rejeu déjà présent sur la copie : " + DOSSIER_LIVRABLES_G34)
+
+    def livrable(nom, contenu=None, dossier=None, lien=None):
+        """Livrable synthétique `rejeu-livrables-g34/<nom>` : un fichier de `contenu`, un dossier de fichiers `dossier` ({nom: contenu}), ou un lien."""
+        chemin = os.path.join(liv, nom)
+        if lien is not None:
+            sous_copie(lab, os.path.dirname(chemin))
+            os.makedirs(os.path.dirname(chemin), exist_ok=True)
+            os.symlink(lien, chemin)
+        elif dossier is not None:
+            for sous, texte in dossier.items():
+                ecrire_copie(lab, os.path.join(chemin, sous), texte)
+        elif contenu is not None:
+            ecrire_copie(lab, chemin, contenu)
+        return DOSSIER_LIVRABLES_G34 + "/" + nom
+
+    # --- G3 : le CLOTURE.md d'une unité dont le livrable déclaré est présent, absent, vide, lien, dossier réduit à un `.DS_Store` ---
+    plein = livrable("g3-present-fichier.txt", "livrable\n")
+    cas_g3 = [("61-g3-present-fichier", plein, "doit-passer"),
+              ("62-g3-present-dossier", livrable("g3-present-dossier", dossier={"a.txt": "a\n", "sous/b.txt": "b\n"}), "doit-passer"),
+              ("63-g3-absent", DOSSIER_LIVRABLES_G34 + "/g3-absent.txt", "doit-refuser"),
+              ("64-g3-vide", livrable("g3-vide.txt", ""), "doit-refuser"),
+              ("65-g3-lien", livrable("g3-lien.txt", lien="g3-present-fichier.txt"), "doit-refuser"),
+              ("66-g3-dossier-ds-store", livrable("g3-dossier-ds-store", dossier={".DS_Store": "x"}), "doit-refuser"),
+              ("67-g3-lien-dossier", livrable("g3-lien-dossier", lien="g3-present-dossier"), "doit-refuser")]
+    for nom_unite, entree, attendu in cas_g3:
+        rel, _absolu = creer_unite_g34(lab, nom_unite, entree)
+        res["G3"].append(("Write", rel + "/CLOTURE.md", attendu, ""))
+
+    # --- G4 : le SUMMARY.md d'une unité selon son verdict (posé par la vraie poser-verdict.sh) ---
+    def g4(nom_unite, nom_livrable, attendu, constat="passé", pose=True, dossier=None, apres=None):
+        entree = livrable(nom_livrable, "livrable\n") if dossier is None else livrable(nom_livrable, dossier=dossier)
+        rel, absolu = creer_unite_g34(lab, nom_unite, entree)
+        if pose:
+            poser_verdict_copie(lab, ctx, absolu, constat)
+        if apres is not None:
+            apres(absolu, os.path.join(lab.copie, entree))
+        res["G4"].append(("Write", rel + "/SUMMARY.md", attendu, ""))
+        return rel, absolu
+
+    def perime_plan(absolu, _livrable):
+        with open(os.path.join(absolu, "PLAN.md"), encoding="utf-8") as fh:
+            ancien = fh.read()
+        ecrire_copie(lab, os.path.join(absolu, "PLAN.md"), ancien + "\nPlan retouché après le verdict.\n")
+
+    def perime_livrable(_absolu, chemin_livrable):
+        ecrire_copie(lab, chemin_livrable, "livrable retouché après le verdict\n")
+
+    def verdict_invalide(absolu, _livrable):
+        ecrire_copie(lab, os.path.join(absolu, "VERDICT.md"), '---\njuge: "rejeu"\nhash: "0"\nhash_livrables: "0"\ntentative: 1\nscore: "rejeu"\nconstats: []\n---\n')
+
+    g4("71-g4-conforme-fichier", "g4-conforme-fichier.txt", "doit-passer")
+    g4("72-g4-conforme-dossier", "g4-conforme-dossier", "doit-passer", dossier={"a.txt": "a\n", "sous/b.txt": "b\n"})
+    g4("73-g4-verdict-absent", "g4-verdict-absent.txt", "doit-refuser", pose=False)
+    g4("74-g4-echec", "g4-echec.txt", "doit-refuser", constat="échec")
+    g4("75-g4-perime-plan", "g4-perime-plan.txt", "doit-refuser", apres=perime_plan)
+    g4("76-g4-perime-livrable", "g4-perime-livrable.txt", "doit-refuser", apres=perime_livrable)
+    g4("77-g4-verdict-invalide", "g4-verdict-invalide.txt", "doit-refuser", pose=False, apres=verdict_invalide)
+
+    # --- Entrées RÉELLES de premier niveau : l'attendu vient de l'oracle de présence, jamais du hook ---
+    for rang, nom in enumerate(entrees_reelles(lab), 1):
+        affiche = neutraliser(nom)
+        if nom == DOSSIER_LIVRABLES_G34:
+            ctx["notes"].append("ENTREE-IGNOREE lab=%s entree=%s motif=nom-reserve" % (lab.affiche, affiche))
+            continue
+        if not entree_declarable(nom):
+            ctx["notes"].append("ENTREE-IGNOREE lab=%s entree=%s motif=non-declarable-dans-ecrit" % (lab.affiche, affiche))
+            continue
+        statut, entrees, octets, tronque = oracle_presence(os.path.join(lab.reel, nom))
+        if statut == "borne":  # rejeu-borne : la mesure de l'hypothèse A7, nommée
+            ctx["notes"].append("BORNE-LIVRABLES lab=%s entree=%s fichiers=%d octets=%d%s" % (lab.affiche, affiche, entrees, octets, " mesure-tronquee" if tronque else ""))
+        if not reflechir_squelette(lab, os.path.join(lab.reel, nom), os.path.join(lab.copie, nom), statut, entrees):
+            ctx["notes"].append("ENTREE-IGNOREE lab=%s entree=%s motif=squelette-impossible" % (lab.affiche, affiche))
+            continue
+        slug = re.sub(r"[^\w.-]", "_", nom)[:48]
+        rel, absolu = creer_unite_g34(lab, "69-reel-%02d-%s" % (rang, slug), nom)
+        res["G3"].append(("Write", rel + "/CLOTURE.md", "doit-passer" if statut == "present" else "doit-refuser", ""))
+        if statut != "present":
+            continue
+        rel4, absolu4 = creer_unite_g34(lab, "79-reel-%02d-%s" % (rang, slug), nom)
+        if poser_verdict_copie(lab, ctx, absolu4, "passé", obligatoire=False) is not None:
+            ctx["notes"].append("ENTREE-IGNOREE lab=%s entree=%s motif=verdict-non-pose-pour-g4" % (lab.affiche, affiche))
+            continue
+        res["G4"].append(("Write", rel4 + "/SUMMARY.md", "doit-passer", ""))
+    return res
+
+
+def construire_g3(lab, ctx):
+    """G3 : voir `preparer_g34`. Rien avant l'étape 5 (exception documentée en tête de fichier)."""
+    return preparer_g34(lab, ctx)["G3"] if ctx["etape"] >= ETAPE_G3G4 else []
+
+
+def construire_g4(lab, ctx):
+    """G4 : voir `preparer_g34`. Rien avant l'étape 5."""
+    return preparer_g34(lab, ctx)["G4"] if ctx["etape"] >= ETAPE_G3G4 else []
+
+
+def couverture_g34(labs, gagnants, etape):  # rejeu-couverture
+    """[(gate, n, plancher)] des gates G3 et G4 dont l'étape est atteinte : n = écritures réellement jouées sous le gate (constructeur ET fichier
+    d'attendus), plancher = PLANCHER_G34 par lab adhérent, au moins un lab. Le plancher
+    ne dépend pas des constructeurs : un constructeur retiré du registre laisse n à 0 sous un plancher qui reste exigé."""
+    adherents = [l for l in labs if ".planning" in l.dossiers_planning]
+    res = []
+    if etape >= ETAPE_G3G4:
+        for gate in ("G3", "G4"):
+            res.append((gate, len([e for e in gagnants if e["gate"] == gate]), PLANCHER_G34 * max(1, len(adherents))))
+    return res
+
+
 CONSTRUCTEURS = {"reecriture": construire_reecriture, "G6": construire_g6, "G5": construire_g5, "G1": construire_g1, "G7": construire_g7, "ROLE": construire_role}  # rejeu-registre
+CONSTRUCTEURS.update({"G3": construire_g3, "G4": construire_g4})  # rejeu-g3g4-registre
 
 
 def normaliser(lab, gate, brut, rang):
@@ -1087,8 +1441,8 @@ def analyser(argv):
                 raise Usage("--lab vide")
             opts["labs"].append(arg[6:])
         elif arg.startswith("--etape="):
-            if arg[8:] not in ("1", "2", "3", "4"):
-                raise Usage("--etape invalide : " + arg[8:] + " (attendu 1, 2, 3 ou 4)")
+            if arg[8:] not in ("1", "2", "3", "4", "5", "6"):
+                raise Usage("--etape invalide : " + arg[8:] + " (attendu 1, 2, 3, 4, 5 ou 6)")
             opts["etape"] = int(arg[8:])
         elif arg.startswith("--attendus="):
             opts["attendus"] = arg[11:]
@@ -1101,7 +1455,7 @@ def analyser(argv):
     if not opts["labs"]:
         raise Usage("au moins un --lab=<chemin> est requis")
     if opts["etape"] is None:
-        raise Usage("--etape=<1|2|3|4> est requis")
+        raise Usage("--etape=<1|2|3|4|5|6> est requis")
     for champ in ("attendus", "rapport", "hook"):
         if opts[champ] == "":
             raise Usage("--" + champ + " vide")
@@ -1199,6 +1553,10 @@ def executer(opts, tmp):
             totaux[k] += c[k]
     lignes.append("REJEU-ETAPE-%d faux-refus=%d faux-accept=%d refus-conforme-modele=%d"
                   % (opts["etape"], totaux["faux-refus"], totaux["faux-accept"], totaux["refus-conforme-modele"]))
+    couvertures = couverture_g34(labs, gagnants, opts["etape"])
+    insuffisantes = [c for c in couvertures if c[1] < c[2]]  # rejeu-couverture
+    for gate, n, plancher in couvertures:
+        lignes.append("COUVERTURE-REJEU %s n=%d plancher=%d" % (gate, n, plancher))
     for gate in [g for g in GATES if g in CONSTRUCTEURS and getattr(CONSTRUCTEURS[g], "classe_modele", False)]:
         for lab in labs:
             n = len([e for e in gagnants if e["lab"] == lab.index and e["gate"] == gate and e["origine"] == "regle-ecrite"])
@@ -1226,7 +1584,9 @@ def executer(opts, tmp):
                 fh.write(texte)
         except OSError as exc:
             raise ErreurOutil("rapport non écrit (" + type(exc).__name__ + ")")
-    return 1 if divergence else 0
+    for gate, n, plancher in insuffisantes:
+        sys.stderr.write("[rejeu-gates] couverture insuffisante : %s n=%d plancher=%d — un zéro mesuré sans rien jouer n'est pas une mesure\n" % (gate, n, plancher))
+    return 1 if (divergence or insuffisantes) else 0
 
 
 def main(argv):

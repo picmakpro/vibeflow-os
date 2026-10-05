@@ -38,7 +38,12 @@
 #                racine d'un lab adhérent entrent dans le relevé de G6 (doit-refuser), settings.json n'y entre pas ; un hook qui ne les
 #                garde pas compte un faux accept par script ; MUT-REJEU-SCRIPTS-G6. Q-ARM (2026-09-30) : le hook « frère » des cas est
 #                une copie à observe (HOOK), les cas ne dépendent pas de l'état d'armement courant
-#   R-REJEU-STATIQUE  aucun sous-processus autre que bash (hook copié, `--classer`, recalc-planning.sh) et cmp
+#   R-REJEU-STATIQUE  aucun sous-processus autre que bash (hook copié, `--classer`, recalc-planning.sh, poser-verdict.sh) et cmp
+#   R-REJEU-ETAPES  (46-08) --etape=5 (+ G3 et G4) et --etape=6 (+ G4P) acceptés, armement simulé selon ORDRE_ETAPES ; tout autre numéro : code 64
+#   R-REJEU-G3G4    (46-08) le vrai hook armé à l'étape 5 sur un lab synthétique complet : unités synthétiques à attendu nominatif, entrées réelles
+#                   jugées par l'oracle de présence du rejeu, verdicts posés par la vraie poser-verdict.sh, plancher de couverture, deux sens comptés
+#   R-REJEU-BORNE   (46-08) BORNE-LIVRABLES nomme toute entrée réelle hors borne (2001 entrées, 128 Mio + 1) : mesure de l'hypothèse A7
+#   (VF_REJEU_SECTIONS=<sections séparées par des virgules> restreint la suite pour la mise au point ; la preuve est la suite entière)
 #   R-REJEU-LIENS / R-REEL-LIENS  (quick 45-B, H3 ; décisions du manager vf-dev-manager, 2026-10-01) : un lien du lab dont la cible
 #                 résolue sort du lab, sur un chemin que le rejeu écrit ou lit (cycles/, phases/, STATE.md, .claude/agents), est une
 #                 erreur (code 1) AVANT toute écriture sur la copie ; dossier extérieur intact ; payload sans suivi de lien ; rejeu-reel.sh
@@ -99,6 +104,7 @@ import subprocess
 import sys
 
 SCRIPTS, REJEU, REEL, HOOK, RECALC, WORK, PYBIN = sys.argv[2:9]
+POSER = os.path.join(SCRIPTS, "poser-verdict.sh")
 HOME = os.environ["HOME"]
 PROTEGES = (".planning/STATE.md", ".planning/INDEX.md", ".planning/cloture.log",
             ".planning/cycles/01-c/STATE.md", ".planning/x/INDEX.md")
@@ -1163,6 +1169,211 @@ def sec_role(_):
         ok("R-REJEU-ROLE vrai hook, --etape=4, lab synthétique à la racine duquel vivent un juge, un juge dont le name: diffère du fichier, un manager, un worker à allowlist, un producteur, deux définitions contradictoires (agent inconnu : écriture doit-passer) et un lien symbolique (jamais une définition) : onze lignes, l'écriture d'un agent qui retire Write et Edit en doit-refuser/refus, le dispatch du worker dans sa propre allowlist en doit-passer/passe (F9 = f9-allowlist), le dispatch hors liste sous Agent ET Task en doit-refuser/refus, COMPTE ROLE (0, 0, 0), six lignes ROLE-AGENT ; à --etape=3 ROLE est en observe, COMPTE ROLE (0, 4, 0) hors-etape, REJEU-ETAPE-3 à 0 ; un substitut qui applique la lettre (tout dispatch d'un worker refusé) compte un faux refus sur le dispatch de sa propre allowlist (la légitimité ne dérive jamais du rôle) ; un lab sans .planning/ à la racine ne rejoue rien")
 
 
+# --- 46-08 : étapes 5 et 6, constructeurs G3, G4 et G4P (R-REJEU-ETAPES, R-REJEU-G3G4, R-REJEU-BORNE, R-REJEU-G4P) -----------------------------------
+# Vrai hook (copie armée à l'étape 5 ou 6) sur des labs SYNTHÉTIQUES : aucun lab réel, aucune sonde `claude -p`. Les attendus de ces cas sont ÉCRITS ICI, à la
+# main, d'après le modèle (P46-D-12 : « vide », un lien n'est jamais suivi ; P46-D-03 : verdict absent, en échec, périmé) : ils ne dérivent ni du hook ni de
+# l'oracle de présence de l'outil.
+SYNTH_G3 = {"61-g3-present-fichier": ("doit-passer", "passe"), "62-g3-present-dossier": ("doit-passer", "passe"),
+            "63-g3-absent": ("doit-refuser", "refus"), "64-g3-vide": ("doit-refuser", "refus"), "65-g3-lien": ("doit-refuser", "refus"),
+            "66-g3-dossier-ds-store": ("doit-refuser", "refus"), "67-g3-lien-dossier": ("doit-refuser", "refus")}
+SYNTH_G4 = {"71-g4-conforme-fichier": ("doit-passer", "passe"), "72-g4-conforme-dossier": ("doit-passer", "passe"),
+            "73-g4-verdict-absent": ("doit-refuser", "refus"), "74-g4-echec": ("doit-refuser", "refus"),
+            "75-g4-perime-plan": ("doit-refuser", "refus"), "76-g4-perime-livrable": ("doit-refuser", "refus"),
+            "77-g4-verdict-invalide": ("doit-refuser", "refus")}
+UNITES_G34 = ".planning/cycles/99-rejeu-cloture/phases/"
+# Entrées réelles de premier niveau du lab complet, avec le statut que le MODÈLE leur donne (écrit à la main).
+REELLES_PRESENTES = ("rapport.md", "dossier-plein", "dossier avec espace", 'guillemet "x".txt', "Notes: v2.txt")
+REELLES_ABSENTES = ("vide.txt", "dossier-vide", "dossier-ds", "lien", "lien-dossier")  # vide, dossier vide, dossier réduit à un .DS_Store, deux liens
+
+
+def slug_g34(nom):
+    return re.sub(r"[^\w.-]", "_", nom)[:48]
+
+
+def lab_g34(nom, complet=True):
+    """Lab synthétique à la racine adhérente (config 2.0 : l'adhésion est simulée sur la copie) et à entrées de premier niveau de toute nature."""
+    f = {".planning/notes.md": "n", "rapport.md": "rapport\n", "dossier-plein/a.txt": "a\n", "dossier-plein/sous/b.txt": "b\n", "vide.txt": ""}
+    if complet:
+        f.update({".planning/phases/01-x/01-01-SUMMARY.md": "---\nplan: 01\n---\n# SUMMARY de style GSD\n", ".planning/phases/01-x/CLOTURE.md": "clôture de style GSD\n",
+                  "dossier-ds/.DS_Store": "x", "dossier avec espace/c.txt": "c\n", 'guillemet "x".txt': "q\n", "Notes: v2.txt": "n\n", "~tmp.txt": "t\n"})
+    lab = fabriquer_lab(nom, f)
+    os.symlink("rapport.md", os.path.join(lab, "lien"))
+    if complet:
+        os.symlink("dossier-plein", os.path.join(lab, "lien-dossier"))
+        os.makedirs(os.path.join(lab, "dossier-vide"))
+    return lab, "~/" + os.path.basename(lab)
+
+
+def releve_g34(r, aff):
+    """{gate: {chemin: [(attendu, obtenu, raison)]}} du relevé pour le lab `aff`."""
+    res = {}
+    for g, lab, chemin, attendu, obtenu, raison in r.lignes:
+        if lab == aff:
+            res.setdefault(g, {}).setdefault(chemin, []).append((attendu, obtenu, raison))
+    return res
+
+
+def notes(r, prefixe):
+    return sorted(l for l in r.out.split("\n") if l.startswith(prefixe + " "))
+
+
+def couverture(r):
+    """{gate: (n, plancher)} des lignes COUVERTURE-REJEU."""
+    res = {}
+    for l in r.out.split("\n"):
+        m = re.match(r"COUVERTURE-REJEU (\S+) n=(\d+) plancher=(\d+)$", l)
+        if m:
+            res[m.group(1)] = (int(m.group(2)), int(m.group(3)))
+    return res
+
+
+def attendus_g34(releve, gate, synth, fautes, etiquette, complet=True):
+    """Compare le relevé d'un gate (G3 : CLOTURE.md, G4 : SUMMARY.md) à l'attendu écrit à la main : cas synthétiques et entrées réelles."""
+    fichier = "CLOTURE.md" if gate == "G3" else "SUMMARY.md"
+    prefixe = "69" if gate == "G3" else "79"
+    lignes = releve.get(gate, {})
+    for chemin, vues in lignes.items():
+        if len(vues) != 1:
+            fautes.append("%s : %s apparaît %d fois (attendu une)" % (etiquette, chemin, len(vues)))
+    obtenu_synth = dict((c[len(UNITES_G34):].split("/")[0], (v[0][0], v[0][1])) for c, v in lignes.items() if not c[len(UNITES_G34):].startswith(prefixe + "-reel-"))
+    if obtenu_synth != synth:
+        fautes.append("%s : cas synthétiques %s (attendu %s)" % (etiquette, sorted(obtenu_synth.items()), sorted(synth.items())))
+    reelles = {}
+    for c, v in lignes.items():
+        m = re.match(re.escape(UNITES_G34) + prefixe + r"-reel-\d\d-(.*)/" + re.escape(fichier) + "$", c)
+        if m:
+            reelles[m.group(1)] = (v[0][0], v[0][1])
+    attendu = {}
+    if complet:
+        for nom in REELLES_PRESENTES:
+            attendu[slug_g34(nom)] = ("doit-passer", "passe")
+        if gate == "G3":
+            for nom in REELLES_ABSENTES:
+                attendu[slug_g34(nom)] = ("doit-refuser", "refus")
+    if reelles != attendu:
+        fautes.append("%s : entrées réelles %s (attendu %s)" % (etiquette, sorted(reelles.items()), sorted(attendu.items())))
+
+
+def scenario_g34(script, hook=HOOK, etape=5, complet=True, scenario=None, nom=None):
+    lab, aff = lab_g34(nom or unique("lab-g34"), complet)
+    avant = empreinte_arbre(lab)
+    r = rejeu([lab], hook=hook, etape=etape, script=script, scenario=scenario)
+    return r, aff, lab, avant
+
+
+def sec_etapes(_):
+    """R-REJEU-ETAPES : --etape=5 et --etape=6 acceptés, tout autre numéro est un usage refusé ; l'armement simulé suit ORDRE_ETAPES."""
+    fautes = []
+    lab = fabriquer_lab(unique("lab-et56"), {".planning/notes.md": "n"})
+    sub = substitut("sub-armes56.sh", SUB_TOUT)
+    # le substitut ne porte aucun constructeur G3, G4 ni G4P (le lanceur d'essai les retire) : la couverture minimale fait échouer la mesure, nommément
+    for etape, attendu, sans_couverture in ((5, "armes=G6,G5,G1,G7,ROLE,G3,G4", ("G3 n=0 plancher=6", "G4 n=0 plancher=6")),
+                                            (6, "armes=G6,G5,G1,G7,ROLE,G3,G4,G4P", ("G3 n=0 plancher=6", "G4 n=0 plancher=6"))):
+        r = rejeu([lab], hook=sub, etape=etape)
+        vus = set(l[5] for l in r.lignes)
+        if vus != {"[planning-core] G6 : " + attendu} or r.rc != 1 or any("couverture insuffisante : " + c not in r.err for c in sans_couverture) \
+                or (etape == 5 and "G4P" in r.err):
+            fautes.append("étape %d : attendu %s, code 1 et la couverture insuffisante de %s, obtenu rc=%d %s err=%s" % (etape, attendu, sans_couverture, r.rc, sorted(vus), court(r.err)))
+    r4 = rejeu([lab], hook=sub, etape=4)
+    if r4.rc != 0 or set(l[5] for l in r4.lignes) != {"[planning-core] G6 : armes=G6,G5,G1,G7,ROLE"}:
+        fautes.append("étape 4 : G3, G4 et G4P restent en observe (armes=G6,G5,G1,G7,ROLE), obtenu %s" % sorted(set(l[5] for l in r4.lignes)))
+    for refuse in ("7", "0", "5x", "", "-1"):
+        for nom, reel in (("rejeu-gates.sh", False), ("rejeu-reel.sh", True)):
+            r = rejeu([lab], hook=sub, etape=refuse, reel=reel)
+            if r.rc != 64 or r.out != "" or (reel and r.rapport != ""):
+                fautes.append("%s --etape=%r : attendu code 64, aucune sortie, aucun rapport ; obtenu rc=%d out=%s rapport=%s" % (nom, refuse, r.rc, court(r.out), court(r.rapport)))
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-ETAPES", "--etape accepte 1 à 6 (armement simulé selon ORDRE_ETAPES), refuse tout autre numéro (code 64)", "voir le cas", f)
+    else:
+        ok("R-REJEU-ETAPES --etape=5 arme G6, G5, G1, G7, ROLE, G3 et G4 sur la copie (G4P reste observe), --etape=6 arme aussi G4P, --etape=4 laisse G3, G4 et G4P en observe ; un hook substitut sans constructeur G3, G4 ni G4P (rien de rejoué sous ces gates) : code 1 et COUVERTURE-REJEU insuffisante nommée (G3 et G4), jamais un 0/0 à vide ; --etape=7, 0, 5x, vide et -1 : code 64 sans sortie, pour rejeu-gates.sh ET rejeu-reel.sh (aucun rapport écrit)")
+
+
+def sec_g3g4(_):
+    """R-REJEU-G3G4 : le vrai hook armé à l'étape 5, un lab synthétique complet : chaque unité UNE fois, entrées réelles par l'oracle, deux sens comptés."""
+    fautes = []
+    r, aff, lab, avant = scenario_g34(REJEU)
+    releve = releve_g34(r, aff)
+    if r.rc != 0:
+        fautes.append("code %d : %s" % (r.rc, court(r.err)))
+    attendus_g34(releve, "G3", SYNTH_G3, fautes, "G3")
+    attendus_g34(releve, "G4", SYNTH_G4, fautes, "G4")
+    if r.compte.get("G3") != (0, 0, 0) or r.compte.get("G4") != (0, 0, 0) or r.etape != (0, 0, 0) or "G3" in r.hors_etape or "G4" in r.hors_etape:
+        fautes.append("comptes G3=%s G4=%s REJEU-ETAPE-5=%s hors-etape=%s (attendu (0, 0, 0) compté, aucun gate hors-etape pour G3 et G4)" % (r.compte.get("G3"), r.compte.get("G4"), r.etape, sorted(r.hors_etape)))
+    cov = couverture(r)
+    if not (cov.get("G3", (0, 99))[0] >= cov.get("G3", (0, 99))[1] and cov.get("G4", (0, 99))[0] >= cov.get("G4", (0, 99))[1]) or "G4P" in cov:
+        fautes.append("COUVERTURE-REJEU %s (attendu G3 et G4 au-dessus de leur plancher, aucune ligne G4P à l'étape 5)" % cov)
+    if notes(r, "ENTREE-IGNOREE") != ["ENTREE-IGNOREE lab=%s entree=~tmp.txt motif=non-declarable-dans-ecrit" % aff]:
+        fautes.append("ENTREE-IGNOREE %s (attendu ~tmp.txt non déclarable dans ecrit:)" % notes(r, "ENTREE-IGNOREE"))
+    gsd = [(l[0], l[3], l[4]) for l in r.lignes if l[1] == aff and l[2] in (".planning/phases/01-x/CLOTURE.md", ".planning/phases/01-x/01-01-SUMMARY.md")]
+    if sorted(gsd) != [("-", "doit-passer", "passe"), ("-", "doit-passer", "passe")]:
+        fautes.append("CLOTURE.md et SUMMARY.md réels de style GSD (réécriture générique) : %s (attendu deux doit-passer/passe)" % gsd)
+    if not r.empreintes or any("DIVERGENTE" in e for e in r.empreintes) or empreinte_arbre(lab) != avant:
+        fautes.append("le lab réel a changé : %s" % r.empreintes)
+    # étape 4 : les constructeurs G3 et G4 ne se jouent pas (exception documentée : coût), et aucun plancher n'est exigé
+    r4, aff4, _lab4, _a4 = scenario_g34(REJEU, etape=4, complet=False)
+    if r4.rc != 0 or releve_g34(r4, aff4).get("G3") or releve_g34(r4, aff4).get("G4") or couverture(r4):
+        fautes.append("--etape=4 : rc=%d lignes G3 %s couverture %s (attendu aucune ligne G3 ni G4, aucune couverture)" % (r4.rc, sorted(releve_g34(r4, aff4).get("G3", {})), couverture(r4)))
+    # un hook qui laisse tout passer : chaque doit-refuser est un faux accept compté ; un hook qui refuse tout : chaque doit-passer est un faux refus compté
+    rp, _a, _l, _v = scenario_g34(REJEU, hook=substitut_classeur(unique("sub-passe34") + ".sh", SUB_PASSE), scenario="", complet=False)
+    rt, _a2, _l2, _v2 = scenario_g34(REJEU, hook=substitut_classeur(unique("sub-tout34") + ".sh", 'if ARMEMENT_G3 == "armed" and chemin.endswith(("/CLOTURE.md", "/SUMMARY.md")): refuser("G3", "tout")'),
+                                     scenario="", complet=False)
+    if rp.compte.get("G3", (0, 0, 0))[1] < 4 or rp.compte.get("G4", (0, 0, 0))[1] < 4 or rp.compte.get("G3", (9, 0, 0))[0] != 0:
+        fautes.append("hook qui laisse tout passer : COMPTE G3=%s G4=%s (attendu faux-accept >= 4 pour chacun, faux-refus=0)" % (rp.compte.get("G3"), rp.compte.get("G4")))
+    if rt.compte.get("G3", (0, 0, 0))[0] < 2 or rt.compte.get("G3", (0, 9, 0))[1] != 0:
+        fautes.append("hook qui refuse tout : COMPTE G3=%s (attendu faux-refus >= 2, faux-accept=0)" % (rt.compte.get("G3"),))
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-G3G4", "vrai hook armé à l'étape 5 : G3 et G4 sur unités synthétiques et entrées réelles, jamais à vide", "voir le cas", f)
+    else:
+        ok("R-REJEU-G3G4 vrai hook, --etape=5, lab synthétique complet (fichiers, dossiers, dossier vide, fichier vide, deux liens, un .DS_Store seul, noms à espace, guillemet et deux-points) : %d unités G3 et %d unités G4 UNE fois chacune ; entrées présentes en doit-passer/passe, absentes, vides ou liées en doit-refuser/refus, attendu écrit à la main ; verdicts posés par la vraie poser-verdict.sh (conforme passe ; absent, échec, périmé par le plan, périmé par le livrable, invalide refusent) ; CLOTURE.md et SUMMARY.md de style GSD en doit-passer ; ~tmp.txt dite non déclarable ; REJEU-ETAPE-5 (0, 0, 0), COUVERTURE-REJEU au-dessus du plancher ; --etape=4 ne joue ni G3 ni G4 ; un hook qui laisse tout passer compte des faux accept, un hook qui refuse tout des faux refus ; lab réel intact"
+           % (len(releve.get("G3", {})), len(releve.get("G4", {}))))
+
+
+def lab_borne(nom):
+    """Lab dont un dossier porte 2001 fichiers (hors borne), un autre 2000 (à la borne, accepté) et un fichier creux d'un octet de plus que la borne d'octets."""
+    lab = fabriquer_lab(nom, {".planning/notes.md": "n"})
+    for dossier, n in (("limite-borne", 2001), ("limite-ok", 2000)):
+        os.makedirs(os.path.join(lab, dossier))
+        for i in range(n):
+            with open(os.path.join(lab, dossier, "f%04d.txt" % i), "w") as fh:
+                fh.write("x")
+    with open(os.path.join(lab, "octets-borne.bin"), "wb") as fh:
+        fh.truncate(134217729)
+    return lab, "~/" + os.path.basename(lab)
+
+
+def sec_borne(_):
+    """R-REJEU-BORNE : toute entrée réelle dont le parcours dépasse 2000 entrées ou 128 Mio est imprimée nommément (mesure de A7, P46-D-03a)."""
+    fautes = []
+    lab, aff = lab_borne(unique("lab-bo"))
+    r = rejeu([lab], hook=HOOK, etape=5)
+    releve = releve_g34(r, aff)
+    if r.rc != 0:
+        fautes.append("code %d : %s" % (r.rc, court(r.err)))
+    attendu = ["BORNE-LIVRABLES lab=%s entree=limite-borne fichiers=2001 octets=2001" % aff,
+               "BORNE-LIVRABLES lab=%s entree=octets-borne.bin fichiers=1 octets=134217729" % aff]
+    if notes(r, "BORNE-LIVRABLES") != attendu:
+        fautes.append("lignes BORNE-LIVRABLES %s (attendu %s : le dossier de 2000 entrées, à la borne, n'y figure pas)" % (notes(r, "BORNE-LIVRABLES"), attendu))
+    g3 = dict((c.split("/")[-2], v[0][:2]) for c, v in releve.get("G3", {}).items() if "69-reel-" in c)
+    attendu_g3 = {"69-reel-01-limite-borne": ("doit-refuser", "refus"), "69-reel-02-limite-ok": ("doit-passer", "passe"), "69-reel-03-octets-borne.bin": ("doit-refuser", "refus")}
+    if g3 != attendu_g3:
+        fautes.append("G3 des entrées réelles %s (attendu %s)" % (sorted(g3.items()), sorted(attendu_g3.items())))
+    motifs = [v[0][2] for c, v in releve.get("G3", {}).items() if c.endswith(("69-reel-01-limite-borne/CLOTURE.md", "69-reel-03-octets-borne.bin/CLOTURE.md"))]
+    if not (len(motifs) == 2 and all("hors borne" in m for m in motifs)):
+        fautes.append("raison des deux refus : %s (attendu « hors borne »)" % motifs)
+    g4 = sorted(c.split("/")[-2] for c in releve.get("G4", {}) if "79-reel-" in c)
+    if g4 != ["79-reel-02-limite-ok"]:
+        fautes.append("G4 des entrées réelles %s (attendu seule l'entrée à la borne, présente)" % g4)
+    if r.etape != (0, 0, 0) or r.compte.get("G3") != (0, 0, 0) or r.compte.get("G4") != (0, 0, 0):
+        fautes.append("comptes G3=%s G4=%s REJEU-ETAPE-5=%s (attendu 0, 0, 0 : le hook et l'oracle bornent à la même valeur)" % (r.compte.get("G3"), r.compte.get("G4"), r.etape))
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-BORNE", "BORNE-LIVRABLES nomme toute entrée réelle hors borne, avec ses comptes", "voir le cas", f)
+    else:
+        ok("R-REJEU-BORNE un dossier de 2001 fichiers et un fichier creux d'un octet au-delà de 128 Mio : une ligne BORNE-LIVRABLES chacun, avec ses comptes (fichiers=2001 octets=2001 ; fichiers=1 octets=134217729), refusés hors borne par G3 ; le dossier de 2000 fichiers, à la borne, n'y figure pas et passe G3 et G4 ; le hook et l'oracle bornent à la même valeur (REJEU-ETAPE-5 à 0)")
+
+
 ETATS_CADRAGE = ("absent", "herite", "clos", "ouvert", "vide", "invalide", "dossier", "lien")
 ORACLE_G1 = {"absent": "refus", "herite": "passe", "clos": "passe", "ouvert": "refus", "vide": "passe", "invalide": "passe", "dossier": "passe", "lien": "passe"}
 BRANCHE_ATTENDUE = {"absent": "pas-de-cadrage", "herite": "herite", "clos": "clos", "ouvert": "registre-ouvert", "vide": "clos",
@@ -1353,10 +1564,10 @@ def _appels_sous_process(script, marqueur, autorises):
 def sec_statique(_):
     """R-REJEU-STATIQUE et R-REEL-04."""
     v, n = _appels_sous_process(REJEU, "PY_REJEU_GATES_EOF", ("bash", "cmp"))
-    if not v and n == 4:
-        ok("R-REJEU-STATIQUE le texte de rejeu-gates.sh ne lance aucun sous-processus autre que bash (le hook copié : le jeu d'une écriture et `--classer` du constructeur ROLE ; recalc-planning.sh --read-only) et cmp (4 appels, aucun git)")
+    if not v and n == 5:
+        ok("R-REJEU-STATIQUE le texte de rejeu-gates.sh ne lance aucun sous-processus autre que bash (le hook copié : le jeu d'une écriture et `--classer` du constructeur ROLE ; recalc-planning.sh --read-only ; poser-verdict.sh, 46-08) et cmp (5 appels, aucun git)")
     else:
-        ko("R-REJEU-STATIQUE", "sous-processus de rejeu-gates.sh", "bash (hook copié, `--classer`, recalc-planning.sh) et cmp seulement, 4 appels", "violations=%s appels=%d" % (v, n))
+        ko("R-REJEU-STATIQUE", "sous-processus de rejeu-gates.sh", "bash (hook copié, `--classer`, recalc-planning.sh, poser-verdict.sh) et cmp seulement, 5 appels", "violations=%s appels=%d" % (v, n))
     v, n = _appels_sous_process(REEL, "PY_REJEU_REEL_EOF", ("bash", "cmp"))
     if not v and n == 2:
         ok("R-REEL-04 le texte de rejeu-reel.sh ne lance aucun sous-processus autre que bash sur rejeu-gates.sh et cmp (2 appels, aucun git)")
@@ -2101,6 +2312,30 @@ def sec_mutants(_):
     duel("REEL-SHA", REEL, R, "# reel-sha", 'sig = "x"  # reel-sha',
          sc_reel_signature, lambda o, m: o == tout and m == dict(tout, contenu="IDENTIQUE"),
          "R-REEL-08 : sha256 retiré de la signature (un contenu changé à mtime restauré n'est plus vu)", compagnons=(REJEU, RECALC))
+    # --- 46-08 : étapes 5 et 6, constructeurs G3, G4 et G4P (T-46-081, T-46-082) ---
+    memo_g34 = {}
+
+    def sc_g34(script):
+        """Rejeu --etape=5 d'un lab synthétique léger (fichier, dossier, fichier vide, lien) ; résumé comparable."""
+        if script not in memo_g34:
+            r, _aff, _lab, _avant = scenario_g34(script, complet=False)
+            lien = [(l[3], l[4]) for l in r.lignes if l[0] == "G3" and l[2].endswith("-lien/CLOTURE.md") and "69-reel-" in l[2]]
+            memo_g34[script] = {"rc": r.rc, "sans_plancher": "couverture insuffisante : G3" in r.err, "G3": r.compte.get("G3"), "G4": r.compte.get("G4"),
+                                "etape": r.etape, "lien": lien}
+        return memo_g34[script]
+
+    duel("REJEU-G3G4-ENREGISTRE", REJEU, G, "# rejeu-g3g4-registre", "pass  # rejeu-g3g4-registre",
+         sc_g34, lambda o, m: o["rc"] == 0 and not o["sans_plancher"] and o["G3"] == (0, 0, 0) and m["rc"] == 1 and m["sans_plancher"],
+         "R-REJEU-G3G4 : les constructeurs G3 et G4 retirés du registre (rien n'est joué sous ces gates : le plancher de couverture fait échouer la mesure, jamais un 0/0 à vide)",
+         compagnons=(RECALC, POSER))
+    duel("REJEU-ORACLE", REJEU, G, "# rejeu-oracle-presence", "st = os.stat(chemin)  # rejeu-oracle-presence",
+         sc_g34, lambda o, m: o["rc"] == 0 and o["G3"] == (0, 0, 0) and o["lien"] == [("doit-refuser", "refus")] and m["G3"] is not None and m["G3"][0] >= 1 and m["lien"] == [("doit-passer", "refus")],
+         "R-REJEU-G3G4 : l'oracle de présence suit les liens (une entrée réelle liée devient un doit-passer que le hook refuse : un faux refus compté, T-46-082)",
+         compagnons=(RECALC, POSER))
+    duel("REJEU-ETAPE5", REJEU, G, "ORDRE_ETAPES = (", 'ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",), (), ("G4P",))',
+         sc_g34, lambda o, m: o["rc"] == 0 and o["etape"] == (0, 0, 0) and m["etape"] is not None and m["etape"][1] >= 1 and m["G3"][1] >= 1,
+         "R-REJEU-G3G4 : l'étape 5 n'arme ni G3 ni G4 sur la copie (leurs doit-refuser passent : faux accept comptés dans REJEU-ETAPE-5)",
+         compagnons=(RECALC, POSER))
     # --- Quick 45-B : H3 (liens), B2 (relevé), B3 (profondeur) ---
     def sc_lien_ecriture(script):
         lab, ext = lab_ext(unique("lab-ml"), ".planning/cycles", False, False)
@@ -2200,6 +2435,9 @@ SECTIONS = {
     "g1": sec_g1,
     "g7": sec_g7,
     "role": sec_role,
+    "etapes": sec_etapes,
+    "g3g4": sec_g3g4,
+    "borne": sec_borne,
     "concordance": sec_concordance,
     "statique": sec_statique,
     "reel": sec_reel,
@@ -2245,7 +2483,7 @@ for f in "$REJEU" "$REEL"; do
 done
 
 if [ -f "$REJEU" ] && [ -f "$REEL" ]; then
-  run_sections sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,role,concordance,statique,reel,liens,lotc,releve,mutants
+  run_sections "${VF_REJEU_SECTIONS:-sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,role,etapes,g3g4,borne,concordance,statique,reel,liens,lotc,releve,mutants}"
 fi
 
 T_FIN="$(date +%s)"

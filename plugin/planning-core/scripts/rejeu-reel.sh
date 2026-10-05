@@ -8,8 +8,9 @@
 # seul, que 45-05 à 45-09 lancent sur les labs réels. Les chemins des labs sont des ARGUMENTS.
 #
 # Usage :
-#   rejeu-reel.sh --lab=<chemin> [--lab=<chemin>…] --etape=<1|2|3|4> [--attendus=<fichier>]
+#   rejeu-reel.sh --lab=<chemin> [--lab=<chemin>…] --etape=<1|2|3|4|5|6> [--attendus=<fichier>]
 #                 --rapport=<fichier> [--hook=<script>]
+#   (--etape : 5 = + G3 et G4, 6 = + G4′ ; tout autre numéro est un usage refusé, code 64, avant toute empreinte — 46-08, P46-D-11)
 # Mêmes arguments que rejeu-gates.sh (transmis tels quels), --rapport obligatoire. Pour chaque lab,
 # dans cet ordre :
 #   (1) empreinte de TOUT l'arbre — aucun élagage : `.git`, `node_modules` et dossiers de build
@@ -209,7 +210,11 @@ def main(argv):
             labs.append(arg[6:])
         elif arg.startswith("--rapport="):
             rapport = arg[10:]
-        elif arg.startswith(("--etape=", "--attendus=", "--hook=")):
+        elif arg.startswith("--etape="):
+            if arg[8:] not in ("1", "2", "3", "4", "5", "6"):  # reel-etape : usage refusé avant toute empreinte, comme rejeu-gates.sh
+                sys.stderr.write("[rejeu-reel] --etape invalide : " + arg[8:] + " (attendu 1, 2, 3, 4, 5 ou 6)\n")
+                return 64
+        elif arg.startswith(("--attendus=", "--hook=")):
             pass
         else:
             sys.stderr.write("[rejeu-reel] argument inconnu : " + arg + "\n")
