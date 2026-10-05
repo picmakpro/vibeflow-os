@@ -141,7 +141,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-46-10",
@@ -156,7 +156,7 @@
         "plugin/_internal/tests/test-planning-hook-installed.sh",
         ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-COUT-PREFILTRE.md"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-46-a",
@@ -376,6 +376,16 @@
         "plugin/planning-core/scripts/tests/test-cloture-empreintes.sh"
       ],
       "status": "done"
+    },
+    {
+      "id": "fix-fuite-d1",
+      "step": "suite d'enregistrement : MUT-EVT-ADHESION ne doit plus écrire .planning/surveillance.log dans le dépôt",
+      "stage": "fix",
+      "deps": [],
+      "scope": [
+        "plugin/planning-core/scripts/tests/test-planning-hook-registered.sh"
+      ],
+      "status": "running"
     }
   ]
 }
