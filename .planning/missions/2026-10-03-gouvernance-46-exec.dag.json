@@ -56,7 +56,7 @@
         "docs/HOOKS-CONTRAT-SORTIE.md",
         "scripts/tests/test-hook-exit-parc.sh"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "exec-46-05",
@@ -330,7 +330,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "running"
+      "status": "done"
     }
   ]
 }
