@@ -13,10 +13,22 @@
 #                 chaîne) ; de bout en bout : un rapport non conforme est refusé sur copie armée
 #   R-G4P-01      copie observe, lab adhérent, producteur doté de Bash, SubagentHandback sans sortie brute : silence, UNE ligne gate=G4P ; avec : aucune
 #   R-G4P-02      copie armée, même cas : UN deny `[planning-core] G4P :` qui nomme l'agent et la marche à suivre ; avec sortie brute : passage
+#   R-G4P-03      périmètre (copie armée, rapport sans sortie brute) : juge et manager qui ont Bash, worker et producteur sans Bash, allowlist ou définition
+#                 illisible, agent inconnu, fil principal, agent_type vide, agent_id absent ou vide -> aucun refus ; worker doté de Bash, producteur sans champ
+#                 `tools:`, formes `Bash(…)`, liste en ligne et en puces -> refus, aux deux événements
+#   R-G4P-04      SubagentStop hors mode auto : UN objet `decision: block` + `reason`, code 0, stderr vide, jamais le code 2 ; avec sortie brute : silence
+#   R-G4P-05      SubagentStop en mode auto : silence, aucune ligne de journal (le rapport a déjà passé le PreToolUse)
+#   R-G4P-06      dérogation nominative `G4P` sur `agents/<agent_type>` : usage unique, aux deux événements
+#   R-G4P-07      erreur interne injectée (dans evaluer_g4p, dans le mode SubagentStop) : armée deny / block, observe une ligne d'observation
+#   R-G4P-08      lab dev : stdout d'octet vide aux deux événements
+#   R-CANG-G4P    check-gates-alive.sh : cas G4P-handback et G4P-stop (producteur synthétique `canary-producteur` doté de Bash) ; état livré : observation, code 3 ;
+#                 copie armée : deny puis block, code 3 ; evaluer_g4p neutralisé : signal qui nomme G4P
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-G4P-GRAMMAIRE (la ligne qui suit la commande n'est plus jugée -> R-G4P-GRAM-02), MUT-G4P-FERMETURE (un bloc non fermé compte -> R-G4P-GRAM-02),
-#   MUT-G4P-VERDICT (evaluer_g4p ne rend jamais de verdict -> R-G4P-01).
-# Variables : VF_G4P_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : gram, base, mutants_gram, mutants_base).
+#   MUT-G4P-VERDICT (evaluer_g4p ne rend jamais de verdict -> R-G4P-01), MUT-G4P-AUTO (garde du mode auto retirée -> R-G4P-05), MUT-G4P-ROLE (juges et
+#   managers inclus -> R-G4P-03), MUT-G4P-CAPACITE (contrôle de Bash retiré -> R-G4P-03), MUT-G4P-CODE2 (sortie SubagentStop en code 2 -> R-G4P-04),
+#   MUT-G4P-ADHESION (adhésion forcée, commande sans pré-filtre -> R-G4P-08).
+# Variables : VF_G4P_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : gram, base, stop, canary, mutants_gram, mutants_base, mutants_stop).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
 set -uo pipefail
@@ -56,8 +68,10 @@ import ast
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import urllib.parse
 
 TOKEN = "{{VF_SCRIPTS}}"
 ABSENT = object()   # message absent du tool_input (jamais une chaîne)
@@ -103,6 +117,23 @@ def payload_handback(cwd, agent_type, message, agent_id="agent-test", mode="defa
     obj["tool_name"] = "SubagentHandback"
     obj["tool_input"] = {} if message is ABSENT else {"message": message}
     obj["tool_use_id"] = "toolu_test"
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def payload_stop(cwd, agent_type, message, agent_id="agent-test", mode="default"):
+    """SubagentStop (46-RECHERCHE-HOOKS §2) : `last_assistant_message` est le rapport ; `mode` None : `permission_mode` absent ; `message` ABSENT : la
+    clé est omise. `agent_type` None : ni agent_id ni agent_type (fil principal)."""
+    obj = {"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": cwd}
+    if mode is not None:
+        obj["permission_mode"] = mode
+    obj.update({"hook_event_name": "SubagentStop", "stop_hook_active": False})
+    if agent_type is not None:
+        if agent_id is not None:
+            obj["agent_id"] = agent_id
+        obj["agent_type"] = agent_type
+    obj["agent_transcript_path"] = "sub.jsonl"
+    if message is not ABSENT:
+        obj["last_assistant_message"] = message
     return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
@@ -315,9 +346,26 @@ def def_agent(nom, tools=None, disallowed=None, interne=False):
 
 
 AGENTS = {
+    # Dans le périmètre de G4′ (worker ou producteur, Bash disponible)
     "producteur-bash": def_agent("producteur-bash", tools="Read, Bash"),
     "worker-bash": def_agent("worker-bash", tools="Read, Bash", interne=True),
+    "producteur-sans-champ": def_agent("producteur-sans-champ"),
+    "producteur-bash-forme": def_agent("producteur-bash-forme", tools="Read, Bash(git status)"),
+    "producteur-flux": def_agent("producteur-flux", tools="[Read, Bash]"),
+    "producteur-puces": "---\nname: producteur-puces\ndescription: agent synthétique d'un cas de test, jamais exécuté\ntools:\n  - Read\n  - Bash\n---\nCorps.\n",
+    # Hors périmètre : un juge ou un manager qui a Bash, un agent sans Bash, une définition illisible
+    "juge-bash": def_agent("juge-bash", tools="Read, Bash", disallowed="Write, Edit"),
+    "manager-bash": def_agent("manager-bash", tools="Read, Bash, Agent(worker-bash)"),
+    "worker-sans-bash": def_agent("worker-sans-bash", tools="Read, Grep", interne=True),
+    "producteur-sans-bash": def_agent("producteur-sans-bash", tools="Read, Write"),
+    "producteur-interdit-bash": def_agent("producteur-interdit-bash", tools="Read, Bash", disallowed="Bash"),
+    "producteur-sans-champ-interdit": def_agent("producteur-sans-champ-interdit", disallowed="Bash"),
+    "producteur-allowlist-illisible": def_agent("producteur-allowlist-illisible", tools="Read, Bash("),
+    "illisible": "---\nname: illisible\ndescription: frontmatter jamais refermé\ntools: Read, Bash\n",
 }
+HORS_PERIMETRE = ("juge-bash", "manager-bash", "worker-sans-bash", "producteur-sans-bash", "producteur-interdit-bash", "producteur-sans-champ-interdit",
+                  "producteur-allowlist-illisible", "illisible", "agent-inconnu")
+DANS_PERIMETRE = ("producteur-bash", "worker-bash", "producteur-sans-champ", "producteur-bash-forme", "producteur-flux", "producteur-puces")
 
 
 def fabriquer_lab(ctx, nom, adherent=True, agents=None):
@@ -352,9 +400,9 @@ def controle_temoin(ctx, script):
     return classer(rc, out) == "silence" and not err, classer(rc, out)
 
 
-def jouer_handback(ctx, dossier_hook, lab, agent_type, message, cache=None, agent_id="agent-test"):
+def jouer_handback(ctx, dossier_hook, lab, agent_type, message, cache=None, agent_id="agent-test", mode="default"):
     extra = {"XDG_CACHE_HOME": cache} if cache else None
-    return ctx.lancer(payload_handback(lab, agent_type, message, agent_id=agent_id), cwd=lab, dossier=dossier_hook, extra_env=extra)
+    return ctx.lancer(payload_handback(lab, agent_type, message, agent_id=agent_id, mode=mode), cwd=lab, dossier=dossier_hook, extra_env=extra)
 
 
 # =================================================================================================
@@ -518,6 +566,303 @@ def controle_g4p_02(ctx, script):
                           "nominative (agents/<agent>) ; aucun chemin absolu ; avec sortie brute : silence")
 
 
+# =================================================================================================
+# Périmètre, repli SubagentStop, dérogation, erreur interne, lab dev
+# =================================================================================================
+def jouer_stop(ctx, dossier_hook, lab, agent_type, message, cache=None, agent_id="agent-test", mode="default"):
+    extra = {"XDG_CACHE_HOME": cache} if cache else None
+    return ctx.lancer(payload_stop(lab, agent_type, message, agent_id=agent_id, mode=mode), cwd=lab, dossier=dossier_hook, extra_env=extra)
+
+
+def raison_block(out):
+    return json.loads(out.decode("utf-8"))["reason"]
+
+
+def controle_g4p_03(ctx, script):
+    """Périmètre (copie armée, rapport sans sortie brute) : juge et manager qui ont Bash, worker et producteur sans Bash (champ `tools:` sans Bash, ou
+    Bash dans `disallowedTools`), allowlist illisible, définition illisible, agent inconnu, fil principal, `agent_type` vide, `agent_id` absent ou vide ->
+    aucun refus de G4P (PreToolUse et SubagentStop) ; worker doté de Bash, producteur sans champ `tools:`, formes `Bash(…)`, liste en ligne et en puces
+    -> refus."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lab = fabriquer_lab(ctx, "g4p-03")
+    fautes = []
+    for agent in HORS_PERIMETRE:
+        for nom, jouer in (("SubagentHandback", jouer_handback), ("SubagentStop", jouer_stop)):
+            rc, out, err = jouer(ctx, d, lab, agent, RAPPORT_SANS_PREUVE)
+            if classer(rc, out) != "silence" or err:
+                fautes.append("hors périmètre %s %s : silence attendu — obtenu %s %s" % (agent, nom, classer(rc, out), court(out)))
+    anonymes = (("fil principal (ni agent_id ni agent_type)", None, "agent-test"), ("agent_type vide", "", "agent-test"),
+                ("agent_id absent", "producteur-bash", None), ("agent_id vide", "producteur-bash", ""))
+    for libelle, agent, ident in anonymes:
+        for nom, jouer in (("SubagentHandback", jouer_handback), ("SubagentStop", jouer_stop)):
+            rc, out, err = jouer(ctx, d, lab, agent, RAPPORT_SANS_PREUVE, agent_id=ident)
+            if classer(rc, out) != "silence" or err:
+                fautes.append("%s %s : silence attendu — obtenu %s %s" % (libelle, nom, classer(rc, out), court(out)))
+    for agent in DANS_PERIMETRE:
+        rc, out, err = jouer_handback(ctx, d, lab, agent, RAPPORT_SANS_PREUVE)
+        if classer(rc, out) != "deny" or err or not raison_de(out).startswith("[planning-core] G4P :") or agent not in raison_de(out):
+            fautes.append("dans le périmètre %s SubagentHandback : deny G4P attendu — obtenu %s %s" % (agent, classer(rc, out), court(out)))
+        rc, out, err = jouer_stop(ctx, d, lab, agent, RAPPORT_SANS_PREUVE)
+        if classer(rc, out) != "block" or err or not raison_block(out).startswith("[planning-core] G4P :"):
+            fautes.append("dans le périmètre %s SubagentStop : block G4P attendu — obtenu %s %s" % (agent, classer(rc, out), court(out)))
+    return (not fautes), ("; ".join(fautes[:4]) if fautes else
+                          "hors périmètre, aucun refus aux deux événements : %s ; fil principal, agent_type vide, agent_id absent ou vide ; dans le périmètre, refus aux deux "
+                          "événements : %s" % (", ".join(HORS_PERIMETRE), ", ".join(DANS_PERIMETRE)))
+
+
+def controle_g4p_04(ctx, script):
+    """SubagentStop hors mode auto (`default`, `acceptEdits`, `plan`, `permission_mode` absent), producteur doté de Bash, rapport sans sortie brute
+    (ou `last_assistant_message` absent, ou non chaîne), copie armée : UN objet `{"decision":"block","reason":…}` sur stdout, code 0, stderr vide,
+    jamais le code 2 ; avec sortie brute : silence ; copie observe : silence et UNE ligne gate=G4P (outil SubagentStop)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lab = fabriquer_lab(ctx, "g4p-04")
+    fautes = []
+    for mode in ("default", "acceptEdits", "plan", None):
+        rc, out, err = jouer_stop(ctx, d, lab, "producteur-bash", RAPPORT_SANS_PREUVE, mode=mode)
+        if rc != 0 or classer(rc, out) != "block" or err or len(out.splitlines()) != 1:
+            fautes.append("mode %s : block en code 0 attendu — obtenu rc=%d %s %s" % (mode, rc, classer(rc, out), court(out)))
+            continue
+        raison = raison_block(out)
+        manque = [m for m in ("[planning-core] G4P :", "producteur-bash", "sortie de commande brute", "$ <commande>",
+                              "deroger-gate.sh --gate=G4P --chemin=agents/producteur-bash") if m not in raison]
+        if manque:
+            fautes.append("mode %s : la raison ne porte pas %s : %s" % (mode, manque, raison))
+        fautes.extend("mode %s : %s" % (mode, f) for f in fautes_de_message(raison, lab))
+    # le cœur seul (sans la couche shell de la commande, qui masquerait un code 2 en silence) : decision block, code 0
+    direct = subprocess.run(["bash", os.path.join(d, "planning-hook.sh")], input=payload_stop(lab, "producteur-bash", RAPPORT_SANS_PREUVE),
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=lab, env=ctx.env(), timeout=120)
+    if direct.returncode != 0 or direct.stderr or classer(direct.returncode, direct.stdout) != "block":
+        fautes.append("cœur seul : decision block, code 0 (jamais 2) attendus — obtenu rc=%d %s %s" % (direct.returncode, classer(direct.returncode, direct.stdout), court(direct.stdout)))
+    for libelle, message in (("last_assistant_message absent", ABSENT), ("last_assistant_message liste", [RAPPORT_AVEC_PREUVE]), ("last_assistant_message null", None)):
+        rc, out, err = jouer_stop(ctx, d, lab, "producteur-bash", message)
+        if rc != 0 or classer(rc, out) != "block" or err:
+            fautes.append("%s : block attendu (aucune preuve) — obtenu rc=%d %s %s" % (libelle, rc, classer(rc, out), court(out)))
+    rc, out, err = jouer_stop(ctx, d, lab, "producteur-bash", RAPPORT_AVEC_PREUVE)
+    if classer(rc, out) != "silence" or err:
+        fautes.append("avec sortie brute : silence attendu — obtenu %s %s" % (classer(rc, out), court(out)))
+    o = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    cache = dossier_neuf(ctx, "cache-g4p-04")
+    rc, out, err = jouer_stop(ctx, o, lab, "producteur-bash", RAPPORT_SANS_PREUVE, cache=cache)
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err or len(lignes) != 1 or "  gate=G4P  " not in lignes[0] or "  outil=SubagentStop  " not in lignes[0]:
+        fautes.append("copie observe : silence et une ligne gate=G4P (outil SubagentStop) attendus — obtenu rc=%d %s lignes=%s" % (rc, court(out), lignes))
+    return (not fautes), ("; ".join(fautes[:4]) if fautes else
+                          "SubagentStop hors mode auto (default, acceptEdits, plan, absent) : un seul objet decision block + reason, code 0, stderr vide, jamais le code 2 ; "
+                          "message absent, liste ou null : block ; avec sortie brute : silence ; copie observe : silence et une ligne gate=G4P")
+
+
+def controle_g4p_05(ctx, script):
+    """Mode auto : SubagentStop avec `permission_mode: "auto"`, même rapport sans preuve -> silence et AUCUNE ligne de journal, copie armée comme copie
+    observe (le rapport a déjà passé le PreToolUse de SubagentHandback) ; le PreToolUse de SubagentHandback, lui, juge en mode auto (deny armé)."""
+    lab = fabriquer_lab(ctx, "g4p-05")
+    fautes = []
+    for valeur in ("armed", "observe"):
+        d = ctx.copie_forcee(_dossier(ctx, script), valeur)
+        cache = dossier_neuf(ctx, "cache-g4p-05")
+        rc, out, err = jouer_stop(ctx, d, lab, "producteur-bash", RAPPORT_SANS_PREUVE, cache=cache, mode="auto")
+        if rc != 0 or out != b"" or err or lignes_journal(cache):
+            fautes.append("copie %s, mode auto : silence et aucune ligne attendus — obtenu rc=%d %s lignes=%s" % (valeur, rc, court(out), lignes_journal(cache)))
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    rc, out, err = jouer_handback(ctx, d, lab, "producteur-bash", RAPPORT_SANS_PREUVE, mode="auto")
+    if classer(rc, out) != "deny" or not raison_de(out).startswith("[planning-core] G4P :"):
+        fautes.append("SubagentHandback en mode auto, copie armée : deny G4P attendu — obtenu %s %s" % (classer(rc, out), court(out)))
+    return (not fautes), ("; ".join(fautes[:4]) if fautes else
+                          "mode auto : SubagentStop muet, aucune ligne de journal (copie armée et copie observe) ; SubagentHandback en mode auto : deny G4P")
+
+
+def _consommees(lab, gate, ident):
+    journal = os.path.join(lab, ".planning", "derogations-gates.log")
+    if not os.path.exists(journal):
+        return 0
+    return len([l for l in open(journal, encoding="utf-8").read().split("\n") if "  consommee  id=%d  gate=%s  " % (ident, gate) in l])
+
+
+def deroger(ctx, lab, gate, chemins):
+    args = ["--lab=" + lab, "--gate=" + gate] + ["--chemin=" + c for c in chemins]
+    args += ["--qui=willy", "--canal=AskUserQuestion session principale", "--date=2026-10-05", "--raison=cas de test de la dérogation"]
+    p = subprocess.run(["bash", os.path.join(ctx.scripts_dir, "deroger-gate.sh")] + args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env=ctx.env(), cwd=ctx.work, timeout=120)
+    return p.returncode, p.stdout, p.stderr
+
+
+def controle_g4p_06(ctx, script):
+    """Dérogation nominative `--gate=G4P --chemin=agents/<agent_type>` : le premier rapport sans preuve passe (cité au PreToolUse, consommée au journal),
+    le rapport suivant est refusé (usage unique) ; même cycle au repli SubagentStop (passage, dérogation consommée, second rapport bloqué)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+    lab = fabriquer_lab(ctx, "g4p-06")
+    rc, out, err = deroger(ctx, lab, "G4P", ("agents/producteur-bash",))
+    if rc != 0:
+        return False, "deroger-gate.sh refuse le scénario : rc=%d %s" % (rc, court(err))
+    r1 = jouer_handback(ctx, d, lab, "producteur-bash", RAPPORT_SANS_PREUVE)
+    if classer(r1[0], r1[1]) != "avertit" or r1[2]:
+        fautes.append("SubagentHandback, premier rapport : citation attendue — obtenu %s %s" % (classer(r1[0], r1[1]), court(r1[1])))
+    else:
+        texte = json.loads(r1[1].decode("utf-8"))["hookSpecificOutput"]["additionalContext"]
+        manque = [m for m in ("#1", "G4P", "willy", "AskUserQuestion session principale", "2026-10-05", "agents/producteur-bash") if m not in texte]
+        if manque or _consommees(lab, "G4P", 1) != 1:
+            fautes.append("citation sans %s ; lignes consommee : %d" % (manque, _consommees(lab, "G4P", 1)))
+    r2 = jouer_handback(ctx, d, lab, "producteur-bash", RAPPORT_SANS_PREUVE)
+    if classer(r2[0], r2[1]) != "deny":
+        fautes.append("SubagentHandback, second rapport : deny attendu (usage unique) — obtenu %s" % classer(r2[0], r2[1]))
+    lab2 = fabriquer_lab(ctx, "g4p-06-stop")
+    rc, out, err = deroger(ctx, lab2, "G4P", ("agents/producteur-bash",))
+    if rc != 0:
+        return False, "deroger-gate.sh refuse le scénario (SubagentStop) : rc=%d %s" % (rc, court(err))
+    s1 = jouer_stop(ctx, d, lab2, "producteur-bash", RAPPORT_SANS_PREUVE)
+    if classer(s1[0], s1[1]) != "silence" or s1[2] or _consommees(lab2, "G4P", 1) != 1:
+        fautes.append("SubagentStop, premier rapport : passage et dérogation consommée attendus — obtenu %s consommées=%d" % (classer(s1[0], s1[1]), _consommees(lab2, "G4P", 1)))
+    s2 = jouer_stop(ctx, d, lab2, "producteur-bash", RAPPORT_SANS_PREUVE)
+    if classer(s2[0], s2[1]) != "block":
+        fautes.append("SubagentStop, second rapport : block attendu (usage unique) — obtenu %s" % classer(s2[0], s2[1]))
+    return (not fautes), ("; ".join(fautes[:4]) if fautes else
+                          "dérogation G4P sur agents/producteur-bash : premier rapport cité et dérogation consommée, second refusé (PreToolUse) ; au repli SubagentStop : "
+                          "passage, consommée, second bloqué")
+
+
+def controle_g4p_07(ctx, script):
+    """Erreur interne injectée : (a) dans evaluer_g4p (sonde sur la ligne du verdict), (b) dans le mode SubagentStop lui-même (faute au retour sans
+    verdict) ; copie armée : deny « erreur interne du gate » en PreToolUse (a), block en SubagentStop (a et b) ; copie observe : aucune sortie et une
+    ligne d'observation qui porte l'erreur."""
+    fautes = []
+    sonde, raison = make_hook_mutant(ctx, "G4P-SONDE", "# g4p-verdict", 'raise RuntimeError("sonde")  # g4p-verdict')
+    if sonde is None:
+        return False, "mutant sonde invalide : " + raison
+    mode, raison = make_hook_mutant(ctx, "G4P-MODE", "return None  # evt-mode-subagentstop", 'raise RuntimeError("faute injectee")')
+    if mode is None:
+        return False, "mutant du mode invalide : " + raison
+    lab = fabriquer_lab(ctx, "g4p-07")
+    # (a) sonde dans evaluer_g4p : le rapport est sans preuve, donc le verdict est atteint
+    arme, observe = ctx.copie_forcee(sonde, "armed"), ctx.copie_forcee(sonde, "observe")
+    rc, out, err = jouer_handback(ctx, arme, lab, "producteur-bash", RAPPORT_SANS_PREUVE)
+    if classer(rc, out) != "deny" or "erreur interne du gate" not in raison_de(out) or not raison_de(out).startswith("[planning-core] G4P :"):
+        fautes.append("sonde, armée, SubagentHandback : deny « erreur interne du gate » attendu — obtenu %s %s" % (classer(rc, out), court(out)))
+    rc, out, err = jouer_stop(ctx, arme, lab, "producteur-bash", RAPPORT_SANS_PREUVE)
+    if classer(rc, out) != "block" or "erreur interne du gate" not in raison_block(out):
+        fautes.append("sonde, armée, SubagentStop : block « erreur interne du gate » attendu — obtenu %s %s" % (classer(rc, out), court(out)))
+    for nom, jouer in (("SubagentHandback", jouer_handback), ("SubagentStop", jouer_stop)):
+        cache = dossier_neuf(ctx, "cache-g4p-07")
+        rc, out, err = jouer(ctx, observe, lab, "producteur-bash", RAPPORT_SANS_PREUVE, cache=cache)
+        lignes = lignes_journal(cache)
+        motif = [c for c in lignes[0].split("  ") if c.startswith("raison=")] if lignes else []
+        if rc != 0 or out != b"" or err or len(lignes) != 1 or "  gate=G4P  " not in lignes[0] or not motif \
+                or "erreur interne" not in urllib.parse.unquote(motif[0]):
+            fautes.append("sonde, observe, %s : aucune sortie et une ligne d'erreur attendues — obtenu rc=%d %s lignes=%s" % (nom, rc, court(out), lignes))
+    # (b) faute dans le mode SubagentStop : rapport AVEC preuve, le retour sans verdict est atteint
+    arme, observe = ctx.copie_forcee(mode, "armed"), ctx.copie_forcee(mode, "observe")
+    rc, out, err = jouer_stop(ctx, arme, lab, "producteur-bash", RAPPORT_AVEC_PREUVE)
+    if rc != 0 or classer(rc, out) != "block" or "erreur interne du gate" not in raison_block(out):
+        fautes.append("faute du mode, armée : block « erreur interne du gate », code 0 attendu — obtenu rc=%d %s %s" % (rc, classer(rc, out), court(out)))
+    cache = dossier_neuf(ctx, "cache-g4p-07b")
+    rc, out, err = jouer_stop(ctx, observe, lab, "producteur-bash", RAPPORT_AVEC_PREUVE, cache=cache)
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err or len(lignes) != 1 or "  gate=G4P  " not in lignes[0]:
+        fautes.append("faute du mode, observe : aucune sortie et une ligne gate=G4P attendues — obtenu rc=%d %s lignes=%s" % (rc, court(out), lignes))
+    return (not fautes), ("; ".join(fautes[:4]) if fautes else
+                          "erreur interne de G4′ : armée, deny en PreToolUse et block en SubagentStop (sonde du gate, faute du mode) ; observe, aucune sortie et une ligne "
+                          "d'observation qui porte l'erreur")
+
+
+def controle_g4p_08(ctx, script):
+    """Lab dev (planning_version hors cycles-v1) : le rapport sans sortie d'un producteur doté de Bash, au PreToolUse de SubagentHandback et au repli
+    SubagentStop, copie armée -> stdout d'octet vide, code 0, stderr vide."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    lab = fabriquer_lab(ctx, "g4p-08-dev", adherent=False)
+    fautes = []
+    for nom, jouer in (("SubagentHandback", jouer_handback), ("SubagentStop", jouer_stop)):
+        for agent in ("producteur-bash", "worker-bash"):
+            rc, out, err = jouer(ctx, d, lab, agent, RAPPORT_SANS_PREUVE)
+            if rc != 0 or out != b"" or err:
+                fautes.append("lab dev, %s de %s : stdout vide, code 0 attendus — obtenu rc=%d %s %s" % (nom, agent, rc, court(out), court(err)))
+    return (not fautes), ("; ".join(fautes[:4]) if fautes else
+                          "lab dev : SubagentHandback et SubagentStop d'un producteur et d'un worker dotés de Bash, sans sortie brute -> stdout d'octet vide, code 0, copie armée")
+
+
+# =================================================================================================
+# Canary de session : cas G4P-handback et G4P-stop (R-CANG-G4P)
+# =================================================================================================
+EVENEMENTS_CABLES = ("PreToolUse", "SubagentStop", "CwdChanged", "FileChanged", "SessionStart")
+
+
+def dossier_canary(ctx, valeur, hook=None):
+    """`<projet>/.claude/scripts` jetable (forme du scope projet) : check-gates-alive.sh du dépôt et planning-hook.sh (celui de `hook`, à défaut le réel)
+    dont les huit constantes ARMEMENT_* valent `valeur` (`observe` ou `armed`) ; `valeur` None : le hook n'est pas réécrit (l'état livré)."""
+    texte = open(os.path.join(hook or ctx.scripts_dir, "planning-hook.sh"), encoding="utf-8").read()
+    if valeur is not None:
+        texte, n = re.subn(REGEX_ARMEMENT, r'\1"' + valeur + '"', texte, flags=re.M)
+        if n != 8:
+            raise RuntimeError("huit constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+    d = os.path.join(ctx.unique("projet-canary-" + str(valeur)), ".claude", "scripts")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
+        fh.write(texte)
+    shutil.copy(os.path.join(ctx.scripts_dir, "check-gates-alive.sh"), os.path.join(d, "check-gates-alive.sh"))
+    for nom in ("planning-hook.sh", "check-gates-alive.sh"):
+        os.chmod(os.path.join(d, nom), 0o755)
+    return d
+
+
+def lancer_canary(ctx, d):
+    """Lance le check-gates-alive.sh de `d` dans une session adhérente, `--settings` vers un réglage jetable qui porte la commande de référence
+    (hooks.json, scope projet) sous les cinq événements."""
+    if TOKEN not in (ctx.cmd or ""):
+        raise RuntimeError("la commande enregistrée ne porte pas le jeton " + TOKEN)
+    projet = os.path.dirname(os.path.dirname(d))
+    lab = ctx.unique("session-canary")
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    commande = ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')
+    hooks = {}
+    for evt in EVENEMENTS_CABLES:
+        groupe = {"hooks": [{"type": "command", "command": commande}]}
+        if evt == "PreToolUse":
+            groupe["matcher"] = "Write"
+        hooks[evt] = [groupe]
+    reglage = os.path.join(ctx.unique("reglage-canary"), "settings.json")
+    ecrire(reglage, json.dumps({"hooks": hooks}))
+    p = subprocess.run(["bash", os.path.join(d, "check-gates-alive.sh"), "--settings=" + reglage], input=json.dumps({"cwd": lab}).encode("utf-8"),
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": ctx.home, "CLAUDE_PROJECT_DIR": projet},
+                       cwd=lab, timeout=240)
+    return p.returncode, p.stdout, p.stderr
+
+
+def controle_cang_g4p(ctx, script):
+    """R-CANG-G4P : le check-gates-alive.sh du dépôt porte `G4P-handback` et `G4P-stop` (producteur synthétique `canary-producteur`, doté de Bash) ;
+    état livré (G4P en observe) : cas en observation, code 3, stdout vide ; copie armée (toutes les étapes) : deny pour le premier, block pour le
+    second, code 3 ; copie où evaluer_g4p ne rend jamais de verdict : signal (code 0, UNE ligne) qui nomme G4P-handback et G4P-stop, observe comme armée."""
+    chemin = os.path.join(ctx.scripts_dir, "check-gates-alive.sh")
+    texte = open(chemin, encoding="utf-8").read()
+    fautes = []
+    for cas in ('"G4P-handback|G4P|nominal|SubagentHandback:sans-sortie@" + AGENT_PRODUCTEUR + "|"', '"G4P-stop|G4P|nominal|SubagentStop:sans-sortie@" + AGENT_PRODUCTEUR + "|"'):
+        if texte.count(cas) != 1:
+            fautes.append("le cas %s n'est pas (une seule fois) dans CANARIS" % cas)
+    if "canary-producteur" not in texte or "tools: Read, Bash" not in texte:
+        fautes.append("la définition du producteur synthétique doté de Bash (canary-producteur) n'est pas dans DEFINITIONS_CANARY")
+    if fautes:
+        return False, "; ".join(fautes)
+    dossier = _dossier(ctx, script)
+    rc, out, err = lancer_canary(ctx, dossier_canary(ctx, None, hook=dossier))
+    if rc != 3 or out != b"":
+        fautes.append("état livré : code 3 et stdout vide attendus — obtenu rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    rc, out, err = lancer_canary(ctx, dossier_canary(ctx, "observe", hook=dossier))
+    if rc != 3 or out != b"":
+        fautes.append("copie observe : code 3 et stdout vide attendus (les deux cas trouvent leur ligne d'observation) — obtenu rc=%d stdout=%s" % (rc, court(out)))
+    rc, out, err = lancer_canary(ctx, dossier_canary(ctx, "armed", hook=dossier))
+    if rc != 3 or out != b"":
+        fautes.append("copie armée : code 3 et stdout vide attendus (deny pour G4P-handback, block pour G4P-stop) — obtenu rc=%d stdout=%s" % (rc, court(out)))
+    neutre, raison = make_hook_mutant(ctx, "G4P-NEUTRE", "# g4p-verdict", "return []  # g4p-verdict")
+    if neutre is None:
+        return False, "mutant du hook invalide : " + raison
+    for valeur in ("observe", "armed"):
+        rc, out, err = lancer_canary(ctx, dossier_canary(ctx, valeur, hook=neutre))
+        lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+        if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G4P-handback" not in lignes[0] \
+                or "G4P-stop" not in lignes[0] or "G6-principal" in lignes[0] or "G1-sans-cadrage" in lignes[0]:
+            fautes.append("evaluer_g4p neutralisé (%s) : code 0 et une ligne qui nomme G4P-handback et G4P-stop attendus — obtenu rc=%d %s" % (valeur, rc, court(out)))
+    return (not fautes), ("; ".join(fautes[:4]) if fautes else
+                          "canary : état livré et copie observe, code 3 (les cas G4P-handback et G4P-stop trouvent leur ligne d'observation) ; copie armée, code 3 (deny puis "
+                          "block) ; evaluer_g4p neutralisé : code 0 et une ligne qui nomme G4P-handback et G4P-stop, observe comme armée")
+
+
 # --- Mutants --------------------------------------------------------------------------------------------------------
 def original_de(ctx, ident, controle):
     """Résultat d'un contrôle sur le script réel, calculé une seule fois (les sections et les mutants lisent la même exécution)."""
@@ -561,6 +906,32 @@ def sec_base(ctx):
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
 
+def sec_stop(ctx):
+    for ident, ctrl, titre in (
+            ("R-G4P-03", controle_g4p_03, "périmètre : juges, managers, agents sans Bash, fil principal, agent inconnu ou illisible exclus"),
+            ("R-G4P-04", controle_g4p_04, "SubagentStop hors mode auto : decision block, code 0, jamais le code 2"),
+            ("R-G4P-05", controle_g4p_05, "mode auto : SubagentStop n'évalue rien"),
+            ("R-G4P-06", controle_g4p_06, "dérogation nominative à usage unique"),
+            ("R-G4P-07", controle_g4p_07, "erreur interne : armée refuse, observe observe"),
+            ("R-G4P-08", controle_g4p_08, "lab dev : octet vide")):
+        bon, detail = original_de(ctx, ident, ctrl)
+        ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+
+
+def sec_canary(ctx):
+    bon, detail = original_de(ctx, "R-CANG-G4P", controle_cang_g4p)
+    ok("R-CANG-G4P " + detail) if bon else ko("R-CANG-G4P", "le canary porte G4P-handback et G4P-stop et les rejoue comme la table le dérive", "conforme", detail)
+
+
+def sec_mutants_stop(ctx):
+    tuer(ctx, "G4P-AUTO", "# g4p-auto", "if False:  # g4p-auto", "R-G4P-05", controle_g4p_05)
+    tuer(ctx, "G4P-ROLE", "# g4p-perimetre", "if definition is None:  # g4p-perimetre", "R-G4P-03", controle_g4p_03)
+    tuer(ctx, "G4P-CAPACITE", "# g4p-capacite", "if False:  # g4p-capacite", "R-G4P-03", controle_g4p_03)
+    tuer(ctx, "G4P-CODE2", "                sortie_blocage_subagent(raisons)", "sortie_blocage_subagent(raisons); os._exit(2)", "R-G4P-04", controle_g4p_04)
+    # Adhésion forcée vraie : la sortie silencieuse d'un lab non adhérent retirée (la commande rejouée n'a pas son pré-filtre, `cmd_np`)
+    tuer(ctx, "G4P-ADHESION", "sys.exit(0)  # non-adherent", "pass", "R-G4P-08", controle_g4p_08)
+
+
 def sec_mutants_gram(ctx):
     tuer(ctx, "G4P-GRAMMAIRE", "# g4p-sortie", "etape = 3  # g4p-sortie", "R-G4P-GRAM-02", controle_gram_02)
     tuer(ctx, "G4P-FERMETURE", "# g4p-fermeture", "return etape == 3  # g4p-fermeture", "R-G4P-GRAM-02", controle_gram_02)
@@ -573,8 +944,11 @@ def sec_mutants_base(ctx):
 SECTIONS = {
     "gram": sec_gram,
     "base": sec_base,
+    "stop": sec_stop,
+    "canary": sec_canary,
     "mutants_gram": sec_mutants_gram,
     "mutants_base": sec_mutants_base,
+    "mutants_stop": sec_mutants_stop,
 }
 
 
@@ -614,7 +988,7 @@ run_sections() { # <sections séparées par des virgules>
 if [ -z "$HOOKS_JSON" ] && [ -z "$SETTINGS_LAB" ]; then
   echo "NOTE : ni hooks.json ni settings.json à côté des scripts (suite lancée hors dépôt) : la commande enregistrée n'est pas lisible, rien n'est rejoué."
 else
-  run_sections "${VF_G4P_SECTIONS:-gram,base,mutants_gram,mutants_base}"
+  run_sections "${VF_G4P_SECTIONS:-gram,base,stop,canary,mutants_gram,mutants_base,mutants_stop}"
 fi
 
 T_FIN="$(date +%s)"

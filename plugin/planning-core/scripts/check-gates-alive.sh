@@ -59,14 +59,17 @@
 #   <mode>    script-absent (CLAUDE_PROJECT_DIR vers un dossier vide) | python-absent (PATH réduit) |
 #             nominal (le script réel)
 #   <payload> <outil>[:<chemin relatif au lab synthétique>][@<agent_type>] ; pour Agent et Task, le
-#             « chemin » est le subagent_type du dispatch
+#             « chemin » est le subagent_type du dispatch ; pour SubagentHandback (PreToolUse, `tool_input.message`) et SubagentStop
+#             (événement non outil, `last_assistant_message`, `permission_mode: "default"`, Phase 46), le « chemin » nomme le rapport :
+#             `sans-sortie` ou `avec-sortie` (RAPPORTS_G4P), les cas de G4′ (agent canary-producteur, doté de Bash)
 #   <couvre>  éléments de COUVERTURE_MINIMALE que le cas couvre, séparés par des virgules (P45-D-20) :
 #             script-absent, python-absent (mode du cas), Task, Agent (payload du gate en mode nominal),
 #             fil-principal (aucun agent_type), plugin (agent_type préfixé `<plugin>:`). Une étiquette
 #             fausse rend le canary indéterminé : elle est vérifiée contre le mode et le payload du cas.
 # L'ATTENDU EST DÉRIVÉ, jamais écrit dans la table : DEGRADE -> refus (Write, Agent, Task) ou silence
 # (Bash : limite déclarée P45-D-06b, exercée et non seulement écrite) ; gate `armed` -> refus d'un
-# gate (`deny-gate`, jamais le texte du fail-closed `deny-degrade`) ; gate `observe` -> observation
+# gate (`deny-gate`, jamais le texte du fail-closed `deny-degrade` ; `block-gate`, l'objet `decision: "block"`, pour un cas SubagentStop) ;
+# gate `observe` -> observation
 # (P45-D-20) : stdout vide ET une nouvelle ligne `gate=<G>` au journal d'observation, dont le
 # XDG_CACHE_HOME du rejeu est un dossier jetable — un gate qui se tait sans journaliser n'est pas
 # vivant. 45-05 à 45-09 ajoutent leurs cas ; un gate armé sans cas fait signaler ce canary et rougir
@@ -210,12 +213,20 @@ LIVRABLE_CANARY = "livrables/canary.md"
 DOSSIER_LIVRABLES = "livrables"
 AGENT_JUGE = "canary-juge"
 AGENT_WORKER = "canary-worker"
+AGENT_PRODUCTEUR = "canary-producteur"
 HORS_LISTE = "hors-liste"
+# Étape 6 (46-06) : les rapports des cas de G4′. `sans-sortie` : aucune sortie de commande brute (le gate refuse) ; `avec-sortie` : un bloc délimité
+# dont la première ligne est `$ <commande>`, suivie d'une ligne de sortie (le gate laisse passer). Un payload qui nomme autre chose porte ce texte tel quel.
+RAPPORTS_G4P = {"sans-sortie": "rapport du canary : travail terminé, tout fonctionne",
+                "avec-sortie": "rapport du canary\n```\n$ true\nok\n```\n"}
 DEFINITIONS_CANARY = (
     (AGENT_JUGE, "---\nname: canary-juge\ndescription: juge synthétique du canary, jamais exécuté\n"
                  "tools: Read, Glob, Grep\ndisallowedTools: Write, Edit\nomitClaudeMd: true\n---\nCorps.\n"),
     (AGENT_WORKER, "---\nname: canary-worker\ndescription: worker synthétique du canary, jamais exécuté\n"
                    "vf-internal: true\ntools: Read, Agent(canary-cible)\n---\nCorps.\n"),
+    # Producteur synthétique doté de Bash (ni vf-internal, ni allowlist Agent, Write et Edit permis) : dans le périmètre de G4′ (P46-D-02b).
+    (AGENT_PRODUCTEUR, "---\nname: canary-producteur\ndescription: producteur synthétique du canary, jamais exécuté\n"
+                       "tools: Read, Bash\n---\nCorps.\n"),
 )
 
 # --- Table des cas (une ligne par cas) : <id>|<gate>|<mode>|<payload>. L'attendu est DÉRIVÉ. ------
@@ -254,6 +265,10 @@ CANARIS = (
     # dans le lab synthétique, fil principal) ; G4 (SUMMARY.md de la même unité, sans VERDICT.md voisin, fil principal) ; le cas de G4′ arrive avec G4′.
     "G3-livrable-absent|G3|nominal|Write:.planning/cycles/01-c/phases/01-p/CLOTURE.md|fil-principal",
     "G4-sans-verdict|G4|nominal|Write:.planning/cycles/01-c/phases/01-p/SUMMARY.md|fil-principal",
+    # Étape 6 (46-06, P46-D-02, P46-D-11) : G4′ — le rapport sans sortie de commande brute d'un producteur doté de Bash, au PreToolUse de SubagentHandback
+    # (`tool_input.message`) puis au repli SubagentStop hors mode auto (`last_assistant_message`, `permission_mode: "default"`).
+    "G4P-handback|G4P|nominal|SubagentHandback:sans-sortie@" + AGENT_PRODUCTEUR + "|",
+    "G4P-stop|G4P|nominal|SubagentStop:sans-sortie@" + AGENT_PRODUCTEUR + "|",
 )
 
 
@@ -401,7 +416,16 @@ def fabriquer_payload(spec, lab):
     elif outil == "Bash":
         entree = {"command": "true"}
     elif outil == "SubagentHandback":
-        entree = {"message": chemin or "rapport du canary"}
+        entree = {"message": RAPPORTS_G4P.get(chemin, chemin or "rapport du canary")}
+    elif outil == "SubagentStop":
+        # Repli de G4′ (Phase 46) : l'événement n'est pas un outil, le rapport est `last_assistant_message` ; hors mode auto.
+        stop = {"session_id": "canary", "transcript_path": "transcript.jsonl", "cwd": lab, "permission_mode": "default",
+                "hook_event_name": "SubagentStop", "stop_hook_active": False}
+        if agent:
+            stop["agent_id"] = "canary-agent"
+            stop["agent_type"] = agent
+        stop["last_assistant_message"] = RAPPORTS_G4P.get(chemin, chemin or "rapport du canary")
+        return json.dumps(stop, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     elif outil == "NotebookEdit":
         entree = {"notebook_path": os.path.join(lab, chemin), "new_source": "x"}
     elif outil == "Edit":
@@ -422,11 +446,19 @@ def fabriquer_payload(spec, lab):
 
 def verdict(rc, sortie):
     """`silence`, `deny-degrade` (UN objet JSON deny, code 0, dont la raison porte le texte statique du
-    fail-closed), `deny-gate` (même objet, autre raison : un gate qui refuse) ou un état d'échec nommé."""
+    fail-closed), `deny-gate` (même objet, autre raison : un gate qui refuse), `block-gate` (SubagentStop : UN objet `decision: "block"` et sa
+    `reason`, rien d'autre, code 0 — le refus d'un gate au repli de G4′) ou un état d'échec nommé."""
     if rc != 0:
         return "code " + str(rc)
     if sortie == b"":
         return "silence"
+    try:
+        document = json.loads(sortie.decode("utf-8"))
+        if isinstance(document, dict) and document.get("decision") == "block" and isinstance(document.get("reason"), str) \
+                and set(document) == {"decision", "reason"}:
+            return "block-gate"  # canary-block
+    except ValueError:
+        return "document inattendu"
     try:
         s = json.loads(sortie.decode("utf-8"))["hookSpecificOutput"]
         if s["hookEventName"] == "PreToolUse" and s["permissionDecision"] == "deny" \
@@ -582,7 +614,9 @@ def attendu_de(gate, spec, table):
     """L'attendu est DÉRIVÉ de la table d'armement, jamais écrit dans CANARIS."""
     if gate == "DEGRADE":
         return "silence" if spec.split(":")[0].split("@")[0] == "Bash" else "deny-degrade"
-    return "deny-gate" if table[gate] == "armed" else "observation"
+    if table[gate] != "armed":
+        return "observation"
+    return "block-gate" if spec.partition(":")[0].partition("@")[0] == "SubagentStop" else "deny-gate"  # canary-attendu-stop
 
 
 def main_couverture():

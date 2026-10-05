@@ -8,8 +8,8 @@
 #
 # Cinq événements, UNE commande enregistrée (hooks.json), le champ `hook_event_name` du payload
 # aiguillant (absent : PreToolUse, compatibilité des payloads existants ; inconnu : silence, limite (aq)) :
-#   PreToolUse    G1…G7, rôle (les gates à venir de la 46 : G3, G4, G4′ sur SubagentHandback) — refus : deny JSON, code 0
-#   SubagentStop  repli de G4′ — refus : `decision: "block"` JSON, code 0, JAMAIS le code 2 (P46-D-10, #60490)
+#   PreToolUse    G1…G7, rôle, G3, G4, G4′ (sur SubagentHandback) — refus : deny JSON, code 0
+#   SubagentStop  repli de G4′ hors mode auto — refus : `decision: "block"` JSON, code 0, JAMAIS le code 2 (P46-D-10, #60490)
 #   SessionStart, CwdChanged, FileChanged   ne refusent JAMAIS ; toute erreur sort en silence, code 0 (fail-open déclaré :
 #                 une trace perdue est rattrapée par la réconciliation de D1, P46-D-10)
 # La décision dans le doute (N-01, `decider_dans_le_doute`) ne vaut que pour PreToolUse : tout autre événement en doute
@@ -2642,10 +2642,19 @@ def evaluer_gates(contexte):
 
 # --- Modes par événement (Phase 46, P46-D-09, P46-D-10) ----------------------------------------------------------------
 # Chaque mode reçoit le contexte du lab adhérent et rend une liste de raisons de blocage ou None. Seul SubagentStop émet (décision
-# `block`, code 0) ; SessionStart, CwdChanged et FileChanged ne refusent JAMAIS : ce qu'un de leurs modes rendrait est ignoré. Aucun
-# gate ne lit encore ces événements dans ce plan (G3 et G4 en 46-05, G4′ en 46-06, D1 en 46-07) : les modes sont des points d'accroche.
+# `block`, code 0) ; SessionStart, CwdChanged et FileChanged ne refusent JAMAIS : ce qu'un de leurs modes rendrait est ignoré. SubagentStop
+# porte le repli de G4′ (46-06) ; SessionStart, CwdChanged et FileChanged restent des points d'accroche (D1 en 46-07).
 def mode_subagent_stop(contexte):
-    """Repli de G4′ (hors mode auto, où `SubagentHandback` n'existe pas) : aucune évaluation encore."""
+    """Repli de G4′ hors mode auto (P46-D-02, P46-D-10) : le rapport est `last_assistant_message`, jugé par le MÊME prédicat que le PreToolUse de
+    SubagentHandback (`evaluer_g4p`) et passé par le même entonnoir (observe journalise, armé refuse, dérogation nominative à usage unique).
+    En mode auto, SubagentStop n'évalue RIEN : le rapport a déjà passé le PreToolUse de SubagentHandback, et un second jugement refuserait deux
+    fois le même rapport. Le refus est rendu à `main`, qui émet `decision: block` en code 0, jamais le code 2."""
+    if contexte["payload"].get("permission_mode") == "auto":  # g4p-auto
+        return None
+    suivi = dict(contexte, outil=EVT_SUBAGENT_STOP)
+    refus, _citations = decider(evaluer_protege("G4P", evaluer_g4p, suivi), suivi)
+    if refus:
+        return refus
     return None  # evt-mode-subagentstop
 
 
@@ -2670,6 +2679,19 @@ MODES_EVENEMENT = {
     EVT_CWD_CHANGED: mode_cwd_changed,
     EVT_FILE_CHANGED: mode_file_changed,
 }
+
+
+def erreur_subagent_stop(exc, racine):
+    """Erreur interne en phase B de SubagentStop (P46-D-10) : fail-closed pour G4′, par le même entonnoir que les autres gates — `decision: block`
+    si ARMEMENT_G4P vaut `armed`, ligne d'observation sinon. Ne lève jamais, ne sort jamais par le code 2."""
+    try:
+        contexte = {"racine": racine, "outil": EVT_SUBAGENT_STOP,
+                    "arg_xdg": sys.argv[2] if len(sys.argv) > 2 else "", "arg_home": sys.argv[3] if len(sys.argv) > 3 else ""}
+        refus, _citations = decider([Verdict("G4P", None, "erreur interne du gate : " + type(exc).__name__)], contexte)
+        if refus:
+            sortie_blocage_subagent(refus)
+    except BaseException:
+        return
 
 
 def evenement_de(payload):
@@ -2764,9 +2786,11 @@ def main():
             if raisons and evenement == EVT_SUBAGENT_STOP:  # seul SubagentStop émet ; les trois autres ne refusent jamais
                 sortie_blocage_subagent(raisons)
     except BaseException as exc:
-        if evenement == EVT_PRETOOLUSE:  # evt-refus-pretooluse : fail-closed de PreToolUse (P45-D-08) ; les autres événements : silence (fail-open déclaré)
+        if evenement == EVT_PRETOOLUSE:  # evt-refus-pretooluse : fail-closed de PreToolUse (P45-D-08)
             sortie_refus(["[planning-core] erreur interne du hook central dans un lab adhérent "
                           "cycles-v1 : action refusée (P45-D-08) — " + type(exc).__name__])
+        elif evenement == EVT_SUBAGENT_STOP:  # evt-erreur-subagentstop : fail-closed de G4′ (block si armé, observation sinon) ; SessionStart, CwdChanged, FileChanged : silence (fail-open déclaré)
+            erreur_subagent_stop(exc, racine)
     sys.exit(0)
 
 
