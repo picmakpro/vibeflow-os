@@ -108,7 +108,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-46-08",
@@ -123,7 +123,7 @@
         "plugin/planning-core/scripts/tests/test-rejeu-gates.sh",
         ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-REJEU-ATTENDUS.txt"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-46-09",
@@ -141,7 +141,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-46-10",
