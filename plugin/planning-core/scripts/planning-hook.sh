@@ -12,7 +12,8 @@
 #   SubagentStop  repli de G4′ hors mode auto — refus : `decision: "block"` JSON, code 0, JAMAIS le code 2 (P46-D-10, #60490)
 #   SessionStart, CwdChanged, FileChanged   D1 (46-07) : ne refusent JAMAIS ; toute erreur sort en silence, code 0 (fail-open déclaré :
 #                 une trace perdue est rattrapée par la réconciliation de D1, P46-D-10). SessionStart et CwdChanged renvoient la liste
-#                 surveillée (`watchPaths`, fichier par fichier) ; FileChanged ne sort rien et trace ce qu'il voit au journal de D1
+#                 surveillée (`watchPaths`, fichier par fichier) ; FileChanged ne sort rien et trace ce qu'il voit au journal de D1 ; SessionStart
+#                 (source `startup`) ajoute UNE ligne agrégée du canary de juge à son `additionalContext` (46-09, P46-D-06)
 # La décision dans le doute (N-01, `decider_dans_le_doute`) ne vaut que pour PreToolUse : tout autre événement en doute
 # sort en silence.
 #
@@ -2939,6 +2940,125 @@ def sortie_d1(objet):
     _emettre(objet)
 
 
+# --- Canary de juge (Phase 46, 46-09 ; CLOT-08 ; P46-D-06, P46-D-06a, P46-D-13, P46-D-16) ---------------------------------------------------------
+# Un juge qui laisse tout passer est le mode d'échec le plus coûteux d'un système multi-agents (spec d'initialisation §10, C-16). La 46 livre le
+# CONTRAT et le VÉRIFICATEUR, jamais le dispatch (Phase 48) ni la fabrication des sorties piégées (Phase 50). Chaque juge du lab — les définitions de
+# `.claude/agents/` du lab dont le rôle dérivé est `juge`, jamais celles du compte ni d'un plugin — a un dossier `.planning/juges/<juge>` : la sortie
+# piégée `SORTIE-PIEGEE.md` (frontmatter `juge`, `critere_vise`, `provenance` ; corps : l'exemple raté qui viole le critère visé) et le verdict de canary
+# `VERDICT.md`, posé par poser-verdict.sh (forme de juge de 46-01 : `hash` = sha256 des octets de la sortie piégée, pas de `hash_livrables`) et protégé par
+# G5 comme tout verdict. Trois classes, déterministes : PROUVÉ (verdict valide, `hash` égal au sha256 de la sortie piégée, le critère visé porté en `échec`
+# et seulement en `échec`), LAXISTE (verdict valide et à jour dont le critère visé n'est pas en `échec` : absent des constats, ou porté en `passé` ne
+# serait-ce qu'une fois), SANS PREUVE (tout le reste : nom hors forme, pas de dossier, pas de sortie piégée ou sans `critere_vise`, pas de verdict, verdict invalide ou
+# périmé, toute erreur de lecture) — « juge sans preuve » n'est JAMAIS vert. Aucun seuil de juge n'est lu (P46-D-13) ; config.json n'est lu que pour l'adhésion.
+NOM_SORTIE_PIEGEE = "SORTIE-PIEGEE.md"
+NOM_VERDICT_JUGE = "VERDICT.md"
+NOM_DOSSIER_JUGES = "juges"
+JUGE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}\Z")  # même forme de nom que poser-verdict.sh
+BORNE_SORTIE_PIEGEE = 1048576
+BORNE_NOMS_SIGNAL = 3
+
+
+def _dossier_reel(chemin):
+    """Vrai si `chemin` est un dossier réel (lstat : un lien vers un dossier n'en est pas un)."""
+    try:
+        return stat.S_ISDIR(os.lstat(chemin).st_mode)
+    except OSError:
+        return False
+
+
+def _verifier_un_juge(racine, juge):
+    """(classe, motif) du juge `juge` (nom normalisé) : classe `prouve`, `laxiste` ou `sans-preuve` ; motif en kebab-case pour `sans-preuve`, None sinon.
+    Ordre : dossier, sortie piégée (octets, `critere_vise`), verdict (règle R6 des constats, comme G4), `hash`, critère visé. Lève sur une erreur
+    imprévue : l'appelant range le juge sans preuve (jamais vert)."""
+    import hashlib
+    if JUGE_RE.match(juge) is None:
+        return "sans-preuve", "nom-hors-forme"
+    dossier = os.path.join(racine, NOM_PLANNING, NOM_DOSSIER_JUGES, juge)
+    if not (_dossier_reel(os.path.join(racine, NOM_PLANNING, NOM_DOSSIER_JUGES)) and _dossier_reel(dossier)):
+        return "sans-preuve", "dossier-absent"  # juge-sans-preuve
+    sortie = os.path.join(dossier, NOM_SORTIE_PIEGEE)
+    try:
+        etat = os.lstat(sortie)
+    except FileNotFoundError:
+        return "sans-preuve", "sortie-piegee-absente"
+    if not stat.S_ISREG(etat.st_mode):
+        return "sans-preuve", "sortie-piegee-invalide"
+    if etat.st_size > BORNE_SORTIE_PIEGEE:
+        return "sans-preuve", "sortie-piegee-hors-borne"
+    with os.fdopen(os.open(sortie, DRAPEAUX_LIVRABLE), "rb") as fh:
+        octets = fh.read(BORNE_SORTIE_PIEGEE + 1)
+    if len(octets) > BORNE_SORTIE_PIEGEE:
+        return "sans-preuve", "sortie-piegee-hors-borne"
+    try:
+        texte = octets.decode("utf-8")
+    except UnicodeDecodeError:
+        return "sans-preuve", "sortie-piegee-illisible"
+    statut_s, donnees_s = lire_frontmatter(texte)
+    critere = donnees_s.get("critere_vise") if statut_s == "ok" else None
+    if not isinstance(critere, str) or critere.strip() == "":
+        return "sans-preuve", "critere-vise-absent"
+    statut_v, donnees_v = lire_frontmatter_fichier(os.path.join(dossier, NOM_VERDICT_JUGE))
+    if statut_v == "absent":
+        return "sans-preuve", "verdict-absent"
+    constats = donnees_v.get("constats") if statut_v == "ok" else None
+    if not isinstance(constats, list) or len(constats) == 0 or any(
+            not isinstance(c, dict) or c.get("resultat") not in ("passé", "échec") for c in constats):
+        return "sans-preuve", "verdict-invalide"
+    if donnees_v.get("hash") != hashlib.sha256(octets).hexdigest():  # juge-hash
+        return "sans-preuve", "verdict-perime"
+    visees = [c.get("resultat") for c in constats if c.get("critere") == critere]
+    if visees and all(resultat == "échec" for resultat in visees):  # juge-critere
+        return "prouve", None
+    return "laxiste", None
+
+
+def verifier_juges(racine):
+    """Vérificateur de juges du lab de racine `racine` : {"prouves": [noms], "laxistes": [noms], "sans_preuve": [{"juge": nom, "motif": motif}]}, noms
+    triés. Les juges sont les définitions de `<racine>/.claude/agents/` dont le rôle dérivé est `juge` (`definitions_dossier`, `deriver_role`) ; une
+    erreur sur un juge le range SANS PREUVE avec le motif `erreur-<type>`, jamais prouvé. Ne lit ni config.json ni aucun seuil (P46-D-13)."""
+    prouves, laxistes, sans_preuve = [], [], []
+    try:
+        definitions = definitions_dossier(os.path.join(racine, ".claude", "agents"))
+    except Exception:
+        definitions = {}
+    for nom in sorted(definitions):
+        if not any(role == "juge" for role, _chemin in definitions[nom]):
+            continue
+        try:
+            classe, motif = _verifier_un_juge(racine, nom)
+        except Exception as exc:
+            classe, motif = "sans-preuve", "erreur-" + type(exc).__name__
+        if classe == "prouve":
+            prouves.append(nom)
+        elif classe == "laxiste":
+            laxistes.append(nom)
+        else:
+            sans_preuve.append({"juge": nom, "motif": motif})
+    return {"prouves": prouves, "laxistes": laxistes, "sans_preuve": sans_preuve}
+
+
+def _noms_du_signal(noms):
+    """Au plus BORNE_NOMS_SIGNAL noms, suivis du reste compté."""
+    texte = ", ".join(noms[:BORNE_NOMS_SIGNAL])
+    return texte + (" et %d autre(s)" % (len(noms) - BORNE_NOMS_SIGNAL) if len(noms) > BORNE_NOMS_SIGNAL else "")
+
+
+def signal_juges(classes):
+    """UNE ligne agrégée pour le contexte du SessionStart, ou None quand le lab n'a aucun juge : les prouvés comptés, les laxistes et les premiers sans
+    preuve nommés (au plus BORNE_NOMS_SIGNAL, le reste compté) ; la marche à suivre n'est ajoutée que s'il reste un juge à prouver."""
+    prouves, laxistes = classes["prouves"], classes["laxistes"]
+    sans = [entree["juge"] for entree in classes["sans_preuve"]]
+    if not (prouves or laxistes or sans):
+        return None
+    texte = "[planning-core] juges (C-16) : %d prouvé(s) ; %d laxiste(s)%s ; %d sans preuve%s" % (
+        len(prouves), len(laxistes), " : " + _noms_du_signal(laxistes) if laxistes else "",
+        len(sans), " : " + _noms_du_signal(sans) if sans else "")
+    if laxistes or sans:
+        texte += (" — faire passer chaque juge sur .planning/juges/<juge>/SORTIE-PIEGEE.md et poser son verdict par "
+                  "poser-verdict.sh --unite=.planning/juges/<juge>")
+    return texte
+
+
 # --- Modes par événement (Phase 46, P46-D-09, P46-D-10) ----------------------------------------------------------------
 # Chaque mode reçoit le contexte du lab adhérent. Seul SubagentStop REFUSE (il rend ses raisons de blocage à `main`, qui émet la décision
 # `block`, code 0) ; SessionStart, CwdChanged et FileChanged ne refusent JAMAIS. Les modes de D1 (46-07) ne rendent rien : SessionStart et
@@ -2961,10 +3081,18 @@ def mode_subagent_stop(contexte):
 def mode_session_start(contexte):
     """D1 au SessionStart (46-07) : la liste surveillée du lab adhérent, fichier par fichier (`watchPaths`), et la réconciliation par hash des fichiers
     de cette liste avec le dernier état connu (les changements que rien n'explique sont tracés ; le signal tient en une ligne de `additionalContext`).
-    L'objet de sortie est déposé dans `contexte["sortie_d1"]`, que `main` émet. Ne bloque jamais."""
+    L'objet de sortie est déposé dans `contexte["sortie_d1"]`, que `main` émet. Ne bloque jamais. Canary de juge (46-09, P46-D-06) : à la source `startup`
+    seulement, UNE ligne agrégée de plus dans le même `additionalContext` (les juges du lab, voir `signal_juges`) ; une erreur du vérificateur la tait,
+    elle ne change ni la liste ni le signal de D1."""
     racine = contexte["racine"]
     liste, tronquee = chemins_surveilles(racine)  # d1-liste
     signal = reconcilier(racine, liste, tronquee)
+    if contexte["payload"].get("source") == "startup":  # juge-source
+        try:
+            ligne_juges = signal_juges(verifier_juges(racine))
+        except Exception:
+            ligne_juges = None
+        signal = "\n".join(texte for texte in (signal, ligne_juges) if texte) or None
     contexte["sortie_d1"] = sortie_surveillance(EVT_SESSION_START, liste, signal)
     return None  # evt-mode-sessionstart
 
