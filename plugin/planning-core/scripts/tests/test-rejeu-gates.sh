@@ -148,12 +148,12 @@ def ecrire(chemin, contenu, mode=None):
 
 
 def hook_observe(source):
-    """Copie du hook dont les cinq constantes ARMEMENT_* valent `observe` (Q-ARM, Willy, AskUserQuestion session principale,
+    """Copie du hook dont les huit constantes ARMEMENT_* valent `observe` (Q-ARM, Willy, AskUserQuestion session principale,
     2026-09-30) : les cas du rejeu ne dépendent pas de l'état d'armement courant du hook livré. L'outil arme lui-même, sur sa
     propre copie, les gates des étapes <= --etape ; ceux des étapes suivantes restent à observe (« simulés en observe »)."""
-    texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"observe"', open(source, encoding="utf-8").read(), flags=re.M)
-    if n != 5:
-        raise RuntimeError("cinq constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+    texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', r'\1"observe"', open(source, encoding="utf-8").read(), flags=re.M)
+    if n != 8:
+        raise RuntimeError("huit constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
     chemin = os.path.join(WORK, "hook-observe", "planning-hook.sh")
     ecrire(chemin, texte, 0o755)
     return chemin
@@ -204,11 +204,14 @@ ARMEMENT_G5 = "observe"  # etape-1
 ARMEMENT_G1 = "observe"  # etape-2
 ARMEMENT_G7 = "observe"  # etape-3
 ARMEMENT_ROLE = "observe"  # etape-4
+ARMEMENT_G3 = "observe"  # etape-5
+ARMEMENT_G4 = "observe"  # etape-5
+ARMEMENT_G4P = "observe"  # etape-6
 p = json.load(open(sys.argv[1], encoding="utf-8"))
 outil = p.get("tool_name")
 ti = p.get("tool_input") or {}
 chemin = ti.get("file_path") or ti.get("notebook_path") or ""
-ARMES = [g for g in ("G6", "G5", "G1", "G7", "ROLE") if globals()["ARMEMENT_" + g] == "armed"]
+ARMES = [g for g in ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P") if globals()["ARMEMENT_" + g] == "armed"]
 
 
 def refuser(gate, texte):
@@ -1200,9 +1203,9 @@ def fabriquer_cellules():
 def hook_arme():
     chemin = os.path.join(WORK, "hook-arme-g1", "planning-hook.sh")
     if not os.path.exists(chemin):
-        texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"armed"', open(HOOK, encoding="utf-8").read(), flags=re.M)
-        if n != 5:
-            raise RuntimeError("cinq constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+        texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', r'\1"armed"', open(HOOK, encoding="utf-8").read(), flags=re.M)
+        if n != 8:
+            raise RuntimeError("huit constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
         ecrire(chemin, texte, 0o755)
     return chemin
 

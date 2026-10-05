@@ -143,8 +143,8 @@ TOKEN = "{{VF_SCRIPTS}}"
 OUTILS_BANC = ("Write", "Edit", "NotebookEdit", "Bash", "Agent", "Task")
 # Table d'armement ATTENDUE de l'état livré : chaque armement d'une étape (45-05 à 45-09) met à
 # jour la constante du script ET cette table dans le MÊME commit (R-TABLE-01).
-TABLE_ATTENDUE = {"G6": "armed", "G5": "armed", "G1": "armed", "G7": "armed", "ROLE": "armed"}
-ORDRE_ATTENDU = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",))
+TABLE_ATTENDUE = {"G6": "armed", "G5": "armed", "G1": "armed", "G7": "armed", "ROLE": "armed", "G3": "observe", "G4": "observe", "G4P": "observe"}
+ORDRE_ATTENDU = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",), ("G3", "G4"), ("G4P",))
 
 
 def ok(libelle):
@@ -278,14 +278,14 @@ class Ctx:
         return p.returncode, p.stdout, p.stderr
 
     def copie_forcee(self, dossier_scripts, valeur):
-        """Copie du script du dossier donné dont les cinq constantes ARMEMENT_* valent `valeur`
+        """Copie du script du dossier donné dont les huit constantes ARMEMENT_* valent `valeur`
         (`observe` ou `armed`) : les cas de gate ne dépendent jamais de l'état livré."""
         cle = (dossier_scripts, valeur)
         if cle not in self._forcees:
             texte = open(os.path.join(dossier_scripts, "planning-hook.sh"), encoding="utf-8").read()
-            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"' + valeur + '"', texte, flags=re.M)
-            if n != 5:
-                raise RuntimeError("cinq constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', r'\1"' + valeur + '"', texte, flags=re.M)
+            if n != 8:
+                raise RuntimeError("huit constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
             d = self.unique("force-" + valeur)
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
@@ -295,10 +295,10 @@ class Ctx:
         return self._forcees[cle]
 
     def copie_armee(self):
-        """Copie du script dont les cinq constantes ARMEMENT_* valent `armed` (armement FORCÉ)."""
+        """Copie du script dont les huit constantes ARMEMENT_* valent `armed` (armement FORCÉ)."""
         if self._armee is None:
             texte = open(self.hook, encoding="utf-8").read()
-            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"armed"', texte, flags=re.M)
+            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', r'\1"armed"', texte, flags=re.M)
             d = self.unique("armee")
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
@@ -531,10 +531,10 @@ def juger(attendu, gate, rc, out):
 
 # --- Mutants du script (make_hook_mutant) ----------------------------------------------------
 def observe_partout(texte):
-    """Le texte du script dont les cinq constantes ARMEMENT_* valent `observe` (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30) : la
+    """Le texte du script dont les huit constantes ARMEMENT_* valent `observe` (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30) : la
     base d'un mutant ne dépend pas de l'état d'armement courant (les contrôles forcent eux-mêmes l'état qu'ils mesurent, par copie_forcee ; le
     témoin « Write neutre » ne doit pas voir un gate armé refuser à la place du mutant). Sans ligne ARMEMENT_* (le canary), le texte est rendu tel quel."""
-    return re.sub(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"observe"', texte, flags=re.M)
+    return re.sub(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', r'\1"observe"', texte, flags=re.M)
 
 
 def make_script_mutant(ctx, nom, marqueur, ident, motif, remplacement):
@@ -678,14 +678,18 @@ def controle_table_02(ctx, script):
     av = ns["armement_valide"]
     o, a = "observe", "armed"
 
-    def T(g6, g5, g1, g7, role):
-        return {"G6": g6, "G5": g5, "G1": g1, "G7": g7, "ROLE": role}
+    def T(g6, g5, g1, g7, role, g3=o, g4=o, g4p=o):
+        return {"G6": g6, "G5": g5, "G1": g1, "G7": g7, "ROLE": role, "G3": g3, "G4": g4, "G4P": g4p}
 
     refusees = {"G1 armé sans G6 ni G5": T(o, o, a, o, o), "G6 armé sans G5": T(a, o, o, o, o),
                 "G5 armé sans G6": T(o, a, o, o, o), "ROLE armé sans G7": T(a, a, a, o, a),
-                "G7 armé sans G1": T(a, a, o, a, o), "valeur inconnue": T("arme", "arme", o, o, o)}
+                "G7 armé sans G1": T(a, a, o, a, o), "valeur inconnue": T("arme", "arme", o, o, o),
+                "G3 et G4 armés sans ROLE": T(a, a, a, a, o, a, a, o), "G3 armé, G4 en observe": T(a, a, a, a, a, a, o, o),
+                "G4 armé, G3 en observe": T(a, a, a, a, a, o, a, o), "G4P armé sans G3 ni G4": T(a, a, a, a, a, o, o, a),
+                "G4P armé, G3 et G4 en observe": T(a, a, a, a, a, o, o, a), "G3 et G4 armés, G4P armé sans ROLE": T(a, a, a, a, o, a, a, a)}
     acceptees = {"tout à observe": T(o, o, o, o, o), "étape 1": T(a, a, o, o, o), "étapes 1-2": T(a, a, a, o, o),
-                 "étapes 1-3": T(a, a, a, a, o), "étapes 1-4": T(a, a, a, a, a)}
+                 "étapes 1-3": T(a, a, a, a, o), "étapes 1-4": T(a, a, a, a, a), "étapes 1-5": T(a, a, a, a, a, a, a, o),
+                 "étapes 1-6": T(a, a, a, a, a, a, a, a)}
     fautes = []
     for nom, t in refusees.items():
         if av(t):
@@ -693,7 +697,25 @@ def controle_table_02(ctx, script):
     for nom, t in acceptees.items():
         if not av(t):
             fautes.append("refusée à tort : " + nom)
-    return (not fautes), ("; ".join(fautes) if fautes else "6 tables rejetées, 5 préfixes de l'ordre acceptés")
+    return (not fautes), ("; ".join(fautes) if fautes else "%d tables rejetées, %d préfixes de l'ordre acceptés (huit gates, six étapes)" % (len(refusees), len(acceptees)))
+
+
+def controle_table_04(ctx, script):
+    """R-TABLE-04 (Phase 46, 46-05 ; P46-D-11) : G3 et G4 sont UN seul geste (l'étape 5) : une table qui les arme à des valeurs différentes est
+    refusée, comme G4P armé avant G3 et G4 ; G3 et G4 armés ensemble, G4P en observe, est acceptée. Trace : table refusée ou table acceptée."""
+    ns = charger_module(script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh"))
+    av = ns["armement_valide"]
+    o, a = "observe", "armed"
+    base = {"G6": a, "G5": a, "G1": a, "G7": a, "ROLE": a}
+    cas = (("G3 armé, G4 en observe", dict(base, G3=a, G4=o, G4P=o), False),
+           ("G4 armé, G3 en observe", dict(base, G3=o, G4=a, G4P=o), False),
+           ("G4P armé sans G3 ni G4", dict(base, G3=o, G4=o, G4P=a), False),
+           ("G3 et G4 armés, G4P en observe", dict(base, G3=a, G4=a, G4P=o), True))
+    fautes = []
+    for nom, table, attendue in cas:
+        if av(table) != attendue:
+            fautes.append("table %s : %s" % ("acceptée" if av(table) else "refusée", nom))
+    return (not fautes), ("; ".join(fautes) if fautes else "table refusée : G3 armé avec G4 en observe, G4 armé avec G3 en observe, G4P armé sans G3 ni G4 ; table acceptée : G3 et G4 armés ensemble")
 
 
 def controle_parseur(ctx, script):
@@ -1502,7 +1524,7 @@ def scripts_canary(ctx, source, valeur, hook=None, armes=("G6", "G5"), tel_quel=
     défaut de `source`) dont les gates de `armes` (G6 et G5 par défaut) valent `valeur`, les autres gates restant à
     observe ; `tel_quel` : le hook n'est pas réécrit (l'état livré)."""
     texte = open(hook or os.path.join(source, "planning-hook.sh"), encoding="utf-8").read()
-    for gate in ("G6", "G5", "G1", "G7", "ROLE"):
+    for gate in ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P"):
         if tel_quel:
             break
         v = valeur if gate in armes else "observe"
@@ -1554,6 +1576,76 @@ def lancer_canary_dossier(ctx, dossier):
     return p.returncode, p.stdout, p.stderr
 
 
+def scripts_canary_g3(ctx, source, valeur, hook=None, armes=("G6", "G5")):
+    """`scripts_canary`, pour les cas de G3 armé : G3 et G4 sont UN seul geste (armement_valide), donc un G3 armé arme G4, et tant que G4 n'a pas
+    son cas dans CANARIS le canary signale « gate armé sans canary : G4 » avant de rejouer quoi que ce soit. Dans ce cas seulement (aucun cas G4 dans
+    le check-gates-alive.sh posé), la copie du canary ne regarde ni G4 ni G4′ (GATES réduit à G3) : le cas G3 est rejoué pour de bon. Dès que G4 a
+    son cas, la copie est celle du canary livré, sans réduction."""
+    d = scripts_canary(ctx, source, valeur, hook=hook, armes=armes)
+    chemin = os.path.join(d, "check-gates-alive.sh")
+    texte = open(chemin, encoding="utf-8").read()
+    if re.search(r'"[A-Za-z0-9_-]+\|G4\|nominal\|', texte):
+        return d
+    complet = 'GATES = ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P")'
+    if texte.count(complet) != 1:
+        raise RuntimeError("une ligne GATES de huit gates attendue dans le canary, %d trouvée(s)" % texte.count(complet))
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write(texte.replace(complet, 'GATES = ("G6", "G5", "G1", "G7", "ROLE", "G3")', 1))
+    return d
+
+
+def controle_cang_g3_01(ctx, script):
+    """R-CANG-G3-01 (46-05 ; P46-D-11) : état livré (G3 en observe), `--settings` vers un réglage jetable portant la commande de référence : le
+    canary rend 3, stdout vide — le cas `G3-livrable-absent` trouve sa ligne `gate=G3` au journal d'observation du rejeu (jamais « silence
+    sans ligne d'observation »)."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe", tel_quel=True)
+    texte = open(os.path.join(d, "check-gates-alive.sh"), encoding="utf-8").read()
+    if texte.count('"G3-livrable-absent|G3|nominal|Write:.planning/cycles/01-c/phases/01-p/CLOTURE.md|fil-principal"') != 1:
+        return False, "le cas G3-livrable-absent (Write d'un CLOTURE.md, fil principal) n'est pas dans CANARIS"
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    return True, "état livré (G3 en observe) : code 3, stdout vide (G3-livrable-absent trouve sa ligne gate=G3 au journal d'observation du rejeu)"
+
+
+def controle_cang_g3_02(ctx, script):
+    """R-CANG-G3-02 : copie où G3 et G4 sont armés (et toutes les étapes avant) : le canary rend 3, le cas obtient un deny `[planning-core] G3 :`
+    (rejoué aussi directement sur la copie : la raison porte le préfixe du gate)."""
+    dossier = _dossier(ctx, script)
+    d = scripts_canary_g3(ctx, dossier, "armed", armes=("G6", "G5", "G1", "G7", "ROLE", "G3", "G4"))
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        return False, "canary : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    lab = ctx.unique("cang-g3-lab")
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    ecrire(os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-p", "PLAN.md"), "---\necrit: livrables/absent.md\n---\n")
+    rc2, out2, err2 = ctx.lancer("A", payload("Write", entree_outil("Write", lab + "/.planning/cycles/01-c/phases/01-p/CLOTURE.md"), lab), cwd=lab,
+                                 dossier=os.path.join(d))
+    if classer(rc2, out2) != "deny":
+        return False, "rejeu direct : %s %s" % (classer(rc2, out2), court(out2))
+    raison = json.loads(out2.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+    if not raison.startswith("[planning-core] G3 :"):
+        return False, "raison : " + raison
+    return True, "G3 et G4 armed : canary code 3 (le cas obtient un refus de gate) et le deny porte « [planning-core] G3 : »"
+
+
+def controle_cang_g3_03(ctx, script):
+    """R-CANG-G3-03 : evaluer_g3 ne rend jamais de verdict (G3 retiré de GATES_A_VERDICT) -> le canary signale, code 0, UNE ligne qui nomme G3,
+    observe comme armed."""
+    dossier = _dossier(ctx, script)
+    neutre, raison = make_hook_mutant(ctx, "G3-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict')
+    if neutre is None:
+        return False, "mutant du hook invalide : " + raison
+    fautes = []
+    for valeur, armes in (("observe", ()), ("armed", ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4"))):
+        d = scripts_canary_g3(ctx, dossier, valeur, hook=os.path.join(neutre, "planning-hook.sh"), armes=armes)
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+        if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G3-livrable-absent" not in lignes[0] or "G6-principal" in lignes[0] or "G1-sans-cadrage" in lignes[0]:
+            fautes.append("evaluer_g3 neutralisé (%s) : rc=%d %s" % (valeur, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "evaluer_g3 neutralisé : code 0 et une ligne qui nomme G3-livrable-absent (et ni G6 ni G1), observe comme armed")
+
+
 def controle_cang_01(ctx, script):
     """G6 et G5 en observe : les trois cas du canary trouvent leur ligne d'observation -> code 3, stdout vide."""
     d = scripts_canary(ctx, _dossier(ctx, script), "observe")
@@ -1574,7 +1666,7 @@ def controle_cang_02(ctx, script):
 
 def controle_cang_03(ctx, script):
     """evaluer_g6 neutralisé (jamais de verdict) : le canary signale, code 0, UNE ligne qui nomme G6 — observe comme armed."""
-    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role), ("G3", evaluer_g3))  # gates-a-verdict')
     if neutre is None:
         return False, "mutant du hook invalide : " + raison
     fautes = []
@@ -2146,7 +2238,7 @@ def controle_cang_g1(ctx, script):
     rc, out, err = lancer_canary_dossier(ctx, d)
     if rc != 3 or out != b"":
         fautes.append("G6, G5 et G1 armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
-    neutre, raison = make_hook_mutant(ctx, "G1-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G1-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G7", evaluer_g7), ("ROLE", evaluer_role), ("G3", evaluer_g3))  # gates-a-verdict')
     if neutre is None:
         fautes.append("mutant du hook invalide : " + raison)
     else:
@@ -2388,7 +2480,7 @@ def controle_cang_g7(ctx, script):
     rc, out, err = lancer_canary_dossier(ctx, d)
     if rc != 3 or out != b"":
         fautes.append("étapes 1 à 3 armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
-    neutre, raison = make_hook_mutant(ctx, "G7-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("ROLE", evaluer_role))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G7-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("ROLE", evaluer_role), ("G3", evaluer_g3))  # gates-a-verdict')
     if neutre is None:
         fautes.append("mutant du hook invalide : " + raison)
     else:
@@ -2427,7 +2519,7 @@ def controle_cang_role(ctx, script):
 def controle_cang_role_mort(ctx, script):
     """R-CANG-ROLE-MORT : evaluer_role ne rend jamais de verdict -> le canary signale (code 0, UNE ligne qui nomme ROLE), observe comme armed."""
     dossier = _dossier(ctx, script)
-    neutre, raison = make_hook_mutant(ctx, "ROLE-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "ROLE-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("G3", evaluer_g3))  # gates-a-verdict')
     if neutre is None:
         return False, "mutant du hook invalide : " + raison
     fautes = []
@@ -2871,7 +2963,7 @@ def sec_table(ctx):
     corps = corps_python(texte)
     fautes = []
     for gate, valeur in TABLE_ATTENDUE.items():
-        motif = re.compile(r'^ARMEMENT_%s = "(observe|armed)"  # etape-[1-4]$' % gate, re.M)
+        motif = re.compile(r'^ARMEMENT_%s = "(observe|armed)"  # etape-[1-6]$' % gate, re.M)
         trouves = motif.findall(corps)
         if len(trouves) != 1:
             fautes.append("ARMEMENT_%s : %d ligne(s)" % (gate, len(trouves)))
@@ -2891,15 +2983,20 @@ def sec_table(ctx):
         fautes.append("TABLE_ARMEMENT %r != TABLE_ATTENDUE" % (ns["TABLE_ARMEMENT"],))
     if fautes:
         for f in fautes:
-            ko("R-TABLE-01", "les cinq constantes ARMEMENT_* (une ligne chacune) valent TABLE_ATTENDUE, G2_MODE vaut avertit, ordre de l'interface",
+            ko("R-TABLE-01", "les huit constantes ARMEMENT_* (une ligne chacune) valent TABLE_ATTENDUE, G2_MODE vaut avertit, ordre de l'interface",
                "table livrée = table attendue", f)
     else:
-        ok("R-TABLE-01 cinq constantes ARMEMENT_* sur une ligne chacune = TABLE_ATTENDUE (l'état courant), G2_MODE avertit, ORDRE_ETAPES conforme, armement_valide vrai")
+        ok("R-TABLE-01 huit constantes ARMEMENT_* sur une ligne chacune = TABLE_ATTENDUE (l'état courant), G2_MODE avertit, ORDRE_ETAPES conforme, armement_valide vrai")
     bon, detail = controle_table_02(ctx, ctx.hook)
     if bon:
         ok("R-TABLE-02 " + detail)
     else:
-        ko("R-TABLE-02", "armement_valide rejette un ordre violé et accepte les préfixes", "6 rejets, 5 acceptations", detail)
+        ko("R-TABLE-02", "armement_valide rejette un ordre violé et accepte les préfixes", "12 rejets, 7 acceptations", detail)
+    bon, detail = controle_table_04(ctx, ctx.hook)
+    if bon:
+        ok("R-TABLE-04 " + detail)
+    else:
+        ko("R-TABLE-04", "G3 et G4 tenus égaux, G4P après eux (armement_valide)", "table refusée / table acceptée selon le cas", detail)
     # Table livrée incohérente (G1 armé sans G6 ni G5) : le hook refuse dans un lab adhérent
     bon, detail = controle_table_03(ctx, ctx.scripts_dir)
     if bon:
@@ -2910,13 +3007,14 @@ def sec_table(ctx):
 
 def controle_table_03(ctx, script):
     """R-TABLE-03 : une table incohérente (G1 armé, G6 et G5 en observe : vraie QUEL QUE SOIT l'état courant d'armement, Q-ARM, Willy,
-    AskUserQuestion session principale, 2026-09-30) construite en réécrivant les cinq constantes du script livré -> deny « table
+    AskUserQuestion session principale, 2026-09-30) construite en réécrivant les huit constantes du script livré -> deny « table
     d'armement incohérente », code 0, dans un lab adhérent."""
     texte = open(os.path.join(_dossier(ctx, script), "planning-hook.sh"), encoding="utf-8").read()
     d = ctx.unique("incoherente")
     os.makedirs(d, exist_ok=True)
     incoh = texte
-    for gate, valeur in (("G6", "observe"), ("G5", "observe"), ("G1", "armed"), ("G7", "observe"), ("ROLE", "observe")):
+    for gate, valeur in (("G6", "observe"), ("G5", "observe"), ("G1", "armed"), ("G7", "observe"), ("ROLE", "observe"),
+                         ("G3", "observe"), ("G4", "observe"), ("G4P", "observe")):
         incoh, n = re.subn(r'^(ARMEMENT_%s = )"(?:observe|armed)"' % gate, r'\1"%s"' % valeur, incoh, count=1, flags=re.M)
         if n != 1:
             return False, "ARMEMENT_%s : %d ligne(s) réécrite(s) (attendu 1)" % (gate, n)
@@ -3001,8 +3099,8 @@ def sec_g2(ctx):
 
 def sec_env(ctx):
     armee, n = ctx.copie_armee()
-    if n != 5:
-        ko("R-ENV-01", "la copie à l'armement forcé réécrit cinq constantes", "5", str(n))
+    if n != 8:
+        ko("R-ENV-01", "la copie à l'armement forcé réécrit huit constantes", "8", str(n))
         return
     bon, detail = controle_env(ctx, [ctx.scripts_dir, armee])
     ok("R-ENV-01 adhésion et armement indépendants de l'environnement (état livré et copie armée) : " + detail) if bon else ko(
@@ -3178,7 +3276,10 @@ def sec_cang(ctx):
             ("R-CANG-ROLE-MORT", controle_cang_role_mort, "canary de session, evaluer_role neutralisé"),
             ("R-CANG-COUVERTURE", controle_cang_couverture, "canary de session, couverture minimale déclarée (P45-D-20)"),
             ("R-CANG-EVT-01", controle_cang_evt_01, "canary de session, la commande sous les cinq événements (Phase 46)"),
-            ("R-CANG-EVT-02", controle_cang_evt_02, "canary de session, cas DEGRADE D09 et D10 (SubagentHandback en mode dégradé)")):
+            ("R-CANG-EVT-02", controle_cang_evt_02, "canary de session, cas DEGRADE D09 et D10 (SubagentHandback en mode dégradé)"),
+            ("R-CANG-G3-01", controle_cang_g3_01, "canary de session, cas G3-livrable-absent, état livré (G3 en observe)"),
+            ("R-CANG-G3-02", controle_cang_g3_02, "canary de session, cas G3-livrable-absent, G3 et G4 armed"),
+            ("R-CANG-G3-03", controle_cang_g3_03, "canary de session, evaluer_g3 neutralisé")):
         bon, detail = ctrl(ctx, None)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
     # Mutants du canary (Phase 46) : l'événement non câblé n'est plus vu, une autre commande est reconnue, le cas D09 est retiré
@@ -3369,7 +3470,7 @@ def sec_banc(ctx):
             ko("COUVERTURE jumeau " + nom, "un lab jumeau porte des écritures", ">= 1", "0")
 
 
-CTRL_FICHIER = (controle_table_02, controle_parseur, controle_env_statique, controle_jeton, controle_registre, controle_g7_05)
+CTRL_FICHIER = (controle_table_02, controle_table_04, controle_parseur, controle_env_statique, controle_jeton, controle_registre, controle_g7_05)
 
 
 def sec_mutants(ctx):
@@ -3383,6 +3484,8 @@ def sec_mutants(ctx):
          "R-TABLE-02", controle_table_02),
         ("TABLE-ORDRE-REFUS", "gates = [gate for etape in ORDRE_ETAPES for gate in etape]  # armement-valide-debut", "return True",
          "R-TABLE-03", controle_table_03),
+        # 46-05 : G3 et G4 sont UN seul geste (P46-D-11) : la garde d'égalité neutralisée, une table à G3 armé et G4 en observe est acceptée
+        ("ARMEMENT-G3-G4", "# armement-g3-g4", "if False:  # armement-g3-g4", "R-TABLE-04", controle_table_04),
         ("PARSEUR", 'return ("invalide:frontmatter-non-ferme", {})', 'return ("invalide:frontmatter-non-ferme-mute", {})',
          "R-PARSEUR", controle_parseur),
         ("ENV-ADHESION", 'SCHEMA_ADHESION = "cycles-v1"', 'SCHEMA_ADHESION = os.environ.get("VF_SCHEMA_ADHESION", "cycles-v1")',
@@ -4783,7 +4886,7 @@ lota_mutant("BUDGET-SIGNAL", "# role-signal", "for signal in []:  # role-signal"
 # écart. Les lignes d'écart du contrôle commencent par `ECART` ; la suite ne les imprime que si la VRAIE référence est en écart (un
 # mutant tué n'imprime que sa trace, sans ce mot : une exécution verte n'a aucune ligne ECART).
 TITRE_REFERENCE = re.compile(r"^## Hook central et gates d.écriture \(Phase 45\)")
-GATES_REFERENCE = ("G6", "G5", "G1", "G7", "ROLE", "G2")
+GATES_REFERENCE = ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P", "G2")
 LIMITES_REFERENCE = (
     ("a", ("compact", "tool_name", "N-06")),
     ("b", ("cycles-v1", "une ligne")),
@@ -4829,6 +4932,9 @@ LIMITES_REFERENCE = (
     ("ao", ("cwd", "new_cwd")),
     ("ap", ("SubagentHandback", "juges", "G4′ est ouvert")),
     ("aq", ("inconnu",)),
+    ("ar", ("CLOTURE.md", "SUMMARY.md", "Bash", "limite (g)")),
+    ("as", ("G3", "PLAN.md", "illisible", "G1")),
+    ("at", (".DS_Store", "Thumbs.db", "empreinte")),
 )
 
 
@@ -4847,7 +4953,7 @@ def jetons_reference(ligne):
 
 def canaris_par_gate(texte_canary):
     res = {}
-    for ident, gate in re.findall(r'"([A-Za-z0-9_-]+)\|(G6|G5|G1|G7|ROLE)\|nominal\|', texte_canary):
+    for ident, gate in re.findall(r'"([A-Za-z0-9_-]+)\|(G6|G5|G1|G7|ROLE|G3|G4P|G4)\|nominal\|', texte_canary):
         res.setdefault(gate, set()).add(ident)
     return res
 
@@ -4902,10 +5008,12 @@ def ecarts_reference(texte, ns, texte_hook, canaris, commande, matcher):
         if cases[1] != attendue:
             ecarts.append("ECART %s : étape « %s » dans la référence, « %s » dans ORDRE_ETAPES" % (gate, cases[1], attendue))
         ids = {x.strip() for x in cases[4].split(",")}
-        ids_code = {"aucun"} if gate == "G2" else canaris.get(gate, set())
+        # `aucun` : G2 (jamais de refus) ou un gate en observe sans cas dans CANARIS (G4 et G4′ avant leur canary) ; un gate armé sans cas reste un écart
+        ids_code = {"aucun"} if (gate == "G2" or (etat == "observe" and not canaris.get(gate))) else canaris.get(gate, set())
         if ids != ids_code:
             ecarts.append("ECART %s : cas de canary %s dans la référence, %s dans CANARIS" % (gate, sorted(ids), sorted(ids_code)))
-        releve = "aucun" if gate == "G2" else "45-REJEU-ETAPE-" + (etape.get(gate) or "?")
+        # relevé : « 45-REJEU-ETAPE-<n> » pour les étapes 1 à 4 (Phase 45), « 46-REJEU-ETAPE-<n> » pour les étapes 5 et 6 (Phase 46)
+        releve = "aucun" if gate == "G2" else ("46" if etape.get(gate) in ("5", "6") else "45") + "-REJEU-ETAPE-" + (etape.get(gate) or "?")
         if cases[5] != releve:
             ecarts.append("ECART %s : relevé « %s » dans la référence, « %s » attendu" % (gate, cases[5], releve))
     toutes_observe = all(v == "observe" for v in table.values())
@@ -4990,7 +5098,7 @@ def sec_reference(ctx):
             print(e)
         ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
         return
-    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (aq) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
+    ok("R-REFERENCE la table d'armement (huit gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (at) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
     original = open(chemin, encoding="utf-8").read()
 
     def mutant_texte(ident, fonction, motif):
@@ -5047,7 +5155,7 @@ def sec_reference(ctx):
         if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
             non_tuees.append(lettre)
     if non_tuees:
-        komut("REFERENCE-LIMITES", "chaque limite (a) à (aq) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+        komut("REFERENCE-LIMITES", "chaque limite (a) à (at) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
               "non tuées : " + ", ".join(non_tuees))
     else:
         okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))

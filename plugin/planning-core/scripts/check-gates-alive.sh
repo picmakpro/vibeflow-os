@@ -55,7 +55,7 @@
 #   4. cas en échec : un cas de CANARIS n'obtient pas l'attendu que la table d'armement en dérive
 #
 # Table des cas : la constante CANARIS ci-dessous, une ligne par cas `<id>|<gate>|<mode>|<payload>|<couvre>`.
-#   <gate>    DEGRADE (cas du fail-closed de la commande) ou G6, G5, G1, G7, ROLE
+#   <gate>    DEGRADE (cas du fail-closed de la commande) ou G6, G5, G1, G7, ROLE, G3, G4, G4P
 #   <mode>    script-absent (CLAUDE_PROJECT_DIR vers un dossier vide) | python-absent (PATH réduit) |
 #             nominal (le script réel)
 #   <payload> <outil>[:<chemin relatif au lab synthétique>][@<agent_type>] ; pour Agent et Task, le
@@ -187,7 +187,7 @@ if [ "$G" = 1 ]; then W='doute d adhesion du lab (chemin trop long pour etre ana
 if [ "$K" = done ] && [ "$PX" = 0 ] && ! vf_tight "$P"; then W='doute d adhesion du lab (chemin non analysable) : ecritures par outil refusees par precaution'; fi
 printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[planning-core] hook central indisponible (script ou python3 absent, ou en erreur) '"$W"'. Reparer : mettre a jour VibeFlow (/vf-update) ou installer python3, puis relancer la session."}}'
 exit 0'''
-GATES = ("G6", "G5", "G1", "G7", "ROLE")
+GATES = ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P")
 # Couverture minimale exigée par P45-D-20 (le script absent, python3 absent, un payload Task et un payload Agent, un fil
 # principal, un agent_type préfixé `plugin:`) ; chaque cas de CANARIS déclare ce qu'il en couvre.
 COUVERTURE_MINIMALE = ("script-absent", "python-absent", "Task", "Agent", "fil-principal", "plugin")
@@ -250,6 +250,9 @@ CANARIS = (
     "ROLE-juge|ROLE|nominal|Write:" + LIVRABLE_CANARY + "@" + AGENT_JUGE + "|",
     "ROLE-worker-Agent|ROLE|nominal|Agent:" + HORS_LISTE + "@" + AGENT_WORKER + "|Agent",
     "ROLE-worker-Task|ROLE|nominal|Task:" + HORS_LISTE + "@" + AGENT_WORKER + "|Task",
+    # Étape 5 (46-05, P46-D-11) : G3 (CLOTURE.md d'une unité de forme modèle dont le PLAN.md voisin déclare des livrables qui n'existent pas
+    # dans le lab synthétique, fil principal) ; le cas de G4 arrive avec G4.
+    "G3-livrable-absent|G3|nominal|Write:.planning/cycles/01-c/phases/01-p/CLOTURE.md|fil-principal",
 )
 
 

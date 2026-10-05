@@ -4,7 +4,7 @@
 # `.planning/derogations-gates.log` (F7a = f7a-racine, Willy, AskUserQuestion session principale,
 # 2026-09-30), enfant direct du dossier de planning, déclaré au modèle par 45-02.
 #
-# Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G5|G6|G7|ROLE|PLAFOND> --chemin=<relatif> [--chemin=...]
+# Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G3|G4|G4P|G5|G6|G7|ROLE|PLAFOND> --chemin=<relatif> [--chemin=...]
 #                         --qui=<nom> --canal=<canal> --date=<AAAA-MM-JJ> --raison=<texte> [-h]
 #
 # Trois règles de l'échappatoire (spec §5.2) : nominative (qui, canal, date, gate, chemins, raison) ;
@@ -58,11 +58,11 @@ except ImportError:
 
 SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
-GATES = ("G1", "G5", "G6", "G7", "ROLE", "PLAFOND")
+GATES = ("G1", "G3", "G4", "G4P", "G5", "G6", "G7", "ROLE", "PLAFOND")
 OPTIONS = ("lab", "gate", "chemin", "qui", "canal", "date", "raison")
 PLACEHOLDERS = ("todo", "tbd", "fixme", "xxx", "n/a", "...")  # derog-placeholders
 IDENTIFIANT_RE = re.compile(r"^\S+  (?:derogation|consommee)  id=([0-9]+)  ", re.M)
-USAGE = ("Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G5|G6|G7|ROLE|PLAFOND> --chemin=<relatif> "
+USAGE = ("Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G3|G4|G4P|G5|G6|G7|ROLE|PLAFOND> --chemin=<relatif> "
          "[--chemin=...] --qui=<nom> --canal=<canal> --date=<AAAA-MM-JJ> --raison=<texte> [-h]")
 
 
@@ -227,7 +227,7 @@ def raison_placeholder(raison):
 
 def valider(valeurs, chemins_bruts):
     if valeurs["gate"] not in GATES:
-        raise Refus(64, "--gate : G1, G5, G6, G7, ROLE ou PLAFOND attendu, reçu : " + valeurs["gate"])
+        raise Refus(64, "--gate : G1, G3, G4, G4P, G5, G6, G7, ROLE ou PLAFOND attendu, reçu : " + valeurs["gate"])
     chemins = []
     for brut in chemins_bruts:
         if not entree_ecrit_valide(brut):

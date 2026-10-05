@@ -123,8 +123,8 @@ import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
-GATES = ("G6", "G5", "G1", "G7", "ROLE")
-ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",))
+GATES = ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P")
+ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",), ("G3", "G4"), ("G4P",))
 ETAPE_DE = dict((g, i + 1) for i, lot in enumerate(ORDRE_ETAPES) for g in lot)
 ELAGAGE = ("node_modules", ".git", ".venv", "__pycache__")
 MARQUEURS_CODE = ("package.json", "go.mod", "Cargo.toml", "pyproject.toml", "pom.xml", "build.gradle",
