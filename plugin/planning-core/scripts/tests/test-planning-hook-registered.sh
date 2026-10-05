@@ -2431,7 +2431,9 @@ def sec_evenements(ctx):
     if forcee is None:
         komut("EVT-ADHESION", "mutant du cœur valide (adhésion forcée vraie)", "mutant valide", raison)
     else:
-        mutant_controle("EVT-ADHESION", o1b, controle_evt_01b(ctx, forcee, labs, adh), "R-EVT-01b (adhésion ignorée dans le cœur)")
+        # Le mutant force l'adhésion : il écrit au journal de D1 de chaque racine rejouée. Il ne rejoue donc QUE le lab fixture
+        # temporaire (labs[:1]) — jamais ce dépôt, que la suite ne doit pas polluer (46-04, correction ciblée).
+        mutant_controle("EVT-ADHESION", o1b, controle_evt_01b(ctx, forcee, labs[:1], adh), "R-EVT-01b (adhésion ignorée dans le cœur)")
     # --- R-EVT-02
     o2 = controle_evt_02(ctx, adh)
     ok("R-EVT-02 " + o2[1]) if o2[0] else ko("R-EVT-02", "lab adhérent, script présent : silence pour les cinq entrées", "conforme", o2[1])
@@ -2510,11 +2512,28 @@ def main():
 main()
 PY_AIDES_REG_EOF
 
+journaux_depot() { # <fichier de sortie> : liste triée des journaux de D1 sous .planning/ de la racine du dépôt (vide hors dépôt)
+  if [ -n "$REPO_ROOT" ] && [ -d "$REPO_ROOT/.planning" ]; then
+    find "$REPO_ROOT/.planning" -maxdepth 4 -name surveillance.log -not -type d 2>/dev/null | LC_ALL=C sort > "$1"
+  else
+    : > "$1"
+  fi
+}
+
 run_sections() { # <sections séparées par des virgules>
   local out rc line
   out="$WORK/sortie-$1.txt"
+  journaux_depot "$WORK/journaux-avant-$1.txt"
   "$PYBIN" "$AIDES" "$1" "$SCRIPTS_DIR" "$HOOKS_JSON" "$REPO_ROOT" "$WORK" "$SETTINGS_LAB" > "$out" 2>&1
   rc=$?
+  journaux_depot "$WORK/journaux-apres-$1.txt"
+  if [ -n "$REPO_ROOT" ]; then
+    local apparus
+    apparus="$(comm -13 "$WORK/journaux-avant-$1.txt" "$WORK/journaux-apres-$1.txt" | head -n 3 | tr '\n' ' ')"
+    if [ -n "$apparus" ]; then
+      ko "R-DEPOT-INTACT ($1)" "aucune section n'écrit dans le dépôt : aucun journal de D1 (surveillance.log) n'apparaît sous .planning/" "aucun fichier nouveau" "apparu : $apparus"
+    fi
+  fi
   while IFS= read -r line; do
     printf '%s\n' "$line"
     case "$line" in
