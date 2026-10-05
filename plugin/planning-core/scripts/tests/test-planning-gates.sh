@@ -208,6 +208,19 @@ def ecrire(chemin, contenu):
 
 
 # --- Contexte : la commande enregistrée, modes A (script réel) et C (script absent) ------------
+ETAPES_FORCEES = ("G6", "G5", "G1", "G7", "ROLE")  # étapes 1 à 4 de la Phase 45 : les seules que cette suite arme
+
+
+def forcer_armement(texte, valeur):
+    """(texte réécrit, nombre de constantes réécrites). Les cinq gates de la Phase 45 (étapes 1 à 4) valent `valeur` ; G3, G4 et G4′ (étapes 5 et 6,
+    Phase 46) valent TOUJOURS `observe` : cette suite mesure G5, G1, G7, le rôle et les bancs d'écriture, qui rejouent des écritures de `SUMMARY.md`
+    sans `VERDICT.md` — un G4 armé les refuserait à bon droit (46-05). G3, G4 et G4′ sont prouvés armés par test-cloture-gates.sh et
+    test-g4p-sortie-brute.sh, qui arment leurs propres copies."""
+    def remplacement(m):
+        return m.group(1) + '"' + (valeur if m.group(2) in ETAPES_FORCEES else "observe") + '"'
+    return re.subn(r'^(ARMEMENT_(G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', remplacement, texte, flags=re.M)
+
+
 class Ctx:
     def __init__(self, scripts_dir, hooks_json, work, settings_lab):
         self.scripts_dir = scripts_dir
@@ -283,7 +296,7 @@ class Ctx:
         cle = (dossier_scripts, valeur)
         if cle not in self._forcees:
             texte = open(os.path.join(dossier_scripts, "planning-hook.sh"), encoding="utf-8").read()
-            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', r'\1"' + valeur + '"', texte, flags=re.M)
+            texte, n = forcer_armement(texte, valeur)
             if n != 8:
                 raise RuntimeError("huit constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
             d = self.unique("force-" + valeur)
@@ -298,7 +311,7 @@ class Ctx:
         """Copie du script dont les huit constantes ARMEMENT_* valent `armed` (armement FORCÉ)."""
         if self._armee is None:
             texte = open(self.hook, encoding="utf-8").read()
-            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', r'\1"armed"', texte, flags=re.M)
+            texte, n = forcer_armement(texte, "armed")
             d = self.unique("armee")
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
