@@ -2483,6 +2483,117 @@ def evaluer_role(contexte):
     return []
 
 
+# --- G4′ : pas de rapport de sous-agent sans sortie de commande brute (CLOT-06, 46-06 ; P46-D-02, P46-D-02a, P46-D-02b, P46-D-10) ---------
+# Le rapport d'un sous-agent de rôle worker ou producteur d'un lab adhérent, qui a Bash, est jugé là où il est rendu : `tool_input.message` au
+# PreToolUse de SubagentHandback, `last_assistant_message` au repli SubagentStop hors mode auto. Il doit porter au moins un bloc de code délimité
+# dont la première ligne non vide est une commande (`$ <commande>`) suivie d'au moins une ligne de sortie. Le gate « bloque le silence, pas la
+# falsification » (spec §5) : une sortie inventée passe (limite (au)). Juges, managers, fil principal (agent_id ou agent_type absent ou vide),
+# agent inconnu, ambigu ou illisible, et agent sans Bash sont hors périmètre : sans Bash le refus ne pourrait pas être levé (P46-D-02b, Willy,
+# AskUserQuestion session principale, 2026-10-03, Q9 = a) ; un agent sans champ `tools:` hérite des outils de la session, Bash compris, et reste dans
+# le périmètre (limite (av)).
+RAISON_G4P = ("rapport de %s sans sortie de commande brute — rejouez la commande qui prouve le travail et collez-la avec sa sortie dans un bloc "
+              "(première ligne « $ <commande> », puis la sortie) ; dérogation nominative : deroger-gate.sh --gate=G4P --chemin=agents/%s")
+OUTIL_HANDBACK = "SubagentHandback"
+
+
+def _delimiteur_ouvrant(texte):
+    """(caractère, longueur) de l'ouverture d'un bloc délimité si `texte` (blancs de tête déjà retirés) commence par trois ``` ou ~~~ ou plus (une
+    étiquette de langage est admise après ; pour ```, elle ne porte pas d'accent grave) ; None sinon. Parcours linéaire, aucune expression."""
+    if texte[:3] not in ("```", "~~~"):
+        return None
+    car = texte[0]
+    longueur = len(texte) - len(texte.lstrip(car))
+    if car == "`" and "`" in texte[longueur:]:
+        return None
+    return car, longueur
+
+
+def sortie_brute_presente(message):
+    """Vrai si `message` (une chaîne : tout autre type n'est aucune preuve) contient au moins un bloc de code délimité par une ligne de trois ``` ou
+    ~~~ (ou plus) et FERMÉ par une ligne du même caractère au moins aussi longue, dont la première ligne non vide commence par `$ ` suivi d'un
+    caractère non blanc et dont la ligne non vide suivante, dans le bloc, n'est ni une fermeture ni une ligne `$ ` (P46-D-02a). Un bloc non fermé
+    ne compte pas. Parcours linéaire ligne à ligne, aucune expression à retour arrière. États : 0 hors bloc, 1 bloc ouvert (commande attendue),
+    2 commande vue (sortie attendue), 3 bloc conforme, 4 bloc non conforme (ignoré jusqu'à sa fermeture)."""
+    if not isinstance(message, str):
+        return False
+    etape, car, longueur = 0, "", 0
+    for ligne in message.split("\n"):
+        texte = ligne.strip()
+        if etape == 0:
+            ouvert = _delimiteur_ouvrant(ligne.lstrip())  # g4p-ouverture
+            if ouvert is not None:
+                car, longueur = ouvert
+                etape = 1
+            continue
+        if texte != "" and not texte.strip(car) and len(texte) >= longueur:
+            if etape == 3:
+                return True
+            etape = 0
+            continue
+        if texte == "":
+            continue
+        if etape == 1:
+            etape = 2 if texte.startswith("$ ") and texte[2:3].strip() != "" else 4  # g4p-commande
+        elif etape == 2:
+            etape = 3 if not texte.startswith("$ ") else 4  # g4p-sortie
+    return False  # g4p-fermeture
+
+
+def agent_a_bash(texte):
+    """Capacité Bash d'une définition d'agent (P46-D-02b) : True si `tools:` est absent (l'agent hérite des outils de la session, Bash compris) ou
+    nomme `Bash` ou une forme `Bash(…)`, et que `disallowedTools` ne nomme pas `Bash` ; False sinon ; None si le frontmatter ou une allowlist est
+    illisible (parenthèses déséquilibrées) : l'appelant exclut alors l'agent du périmètre."""
+    lignes = lignes_frontmatter_agent(texte)
+    if lignes is None:
+        return None
+    mode, brut = champ_brut_agent(lignes, "tools")
+    if mode is not None:
+        jetons, profondeur = jetons_agent(mode, brut)
+        if profondeur != 0:
+            return None
+        if not any(jeton.strip().strip(chr(34)).strip(chr(39)).partition("(")[0].strip() == "Bash" for jeton in jetons):
+            return False
+    mode_interdit, brut_interdit = champ_brut_agent(lignes, "disallowedTools")
+    if mode_interdit is not None:
+        interdits, profondeur_interdit = jetons_agent(mode_interdit, brut_interdit)
+        if profondeur_interdit != 0:
+            return None
+        if any(jeton.strip().strip(chr(34)).strip(chr(39)) == "Bash" for jeton in interdits):
+            return False
+    return True
+
+
+def evaluer_g4p(contexte):
+    """G4′ : voir l'en-tête de section. Verdict `G4P` sur le chemin `agents/<agent_type>` (dérogation nominative sur ce chemin). Deux entrées :
+    outil `SubagentHandback` (PreToolUse, `tool_input.message`) et outil `SubagentStop` (repli, `last_assistant_message`, posé par
+    `mode_subagent_stop`) ; tout autre outil : aucun verdict. Identité et rôle comme `evaluer_role` (même `resoudre_agent`)."""
+    outil = contexte["outil"]
+    payload = contexte["payload"]
+    if outil == OUTIL_HANDBACK:
+        entree = payload.get("tool_input")
+        message = entree.get("message") if isinstance(entree, dict) else None
+    elif outil == EVT_SUBAGENT_STOP:
+        message = payload.get("last_assistant_message")
+    else:
+        return []
+    agent_id, agent_type = payload.get("agent_id"), payload.get("agent_type")
+    if not (isinstance(agent_id, str) and agent_id != "" and isinstance(agent_type, str) and agent_type != ""):
+        return []
+    signaux = []
+    role, definition = resoudre_agent(agent_type, contexte["racine"], contexte.get("arg_home"), signaux)
+    for signal in signaux:
+        observer(Verdict("G4P", None, signal), contexte)
+    if role not in ("worker", "producteur") or definition is None:  # g4p-perimetre
+        return []
+    texte = lire_definition_bornee(definition)
+    a_bash = None if texte is None else agent_a_bash(texte)
+    if not a_bash:  # g4p-capacite
+        return []
+    if sortie_brute_presente(message):
+        return []
+    return [Verdict("G4P", "agents/" + agent_type, RAISON_G4P % (agent_type, agent_type))]  # g4p-verdict
+
+
 def classer_fichier(chemin):
     """Mode de diagnostic `--classer` : UNE ligne JSON {"role", "allowlist", "disallowed"} pour la définition à
     `chemin` (rôle `illisible` si elle ne se lit pas). Aucune décision, aucune lecture du payload."""
@@ -2499,7 +2610,7 @@ def classer_fichier(chemin):
 
 # Gates qui refusent (armed) ou observent : (nom, fonction). Une erreur interne d'un gate est un
 # Verdict d'erreur : deny si le gate est armed, ligne d'observation sinon (P45-D-08, spec §5.1).
-GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role), ("G3", evaluer_g3), ("G4", evaluer_g4))  # gates-a-verdict
+GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role), ("G3", evaluer_g3), ("G4", evaluer_g4), ("G4P", evaluer_g4p))  # gates-a-verdict
 
 
 def evaluer_protege(gate, fonction, contexte):
