@@ -398,6 +398,7 @@ CINQ_ENTREES = ("SubagentHandback",) + EVT_NON_OUTIL   # le nouvel outil du matc
 MODES_NON_OUTIL = (("SubagentStop", "evt-mode-subagentstop"), ("SessionStart", "evt-mode-sessionstart"),
                    ("CwdChanged", "evt-mode-cwdchanged"), ("FileChanged", "evt-mode-filechanged"))
 FRAGMENTS_INTERDITS = ("no such file", "can't open")
+PLAFOND_EVT_S = 10.0   # marge large sur le temps mesuré : la preuve est le verdict, le plafond n'écarte qu'un traitement non borné
 # Chemin absolu de plus d'un composant (`/a/b`) : `/vf-update` seul n'en est pas un.
 RE_CHEMIN_ABSOLU = re.compile(r"(?<![A-Za-z0-9_.\-])/(?:[A-Za-z0-9_.~\-]+/)+[A-Za-z0-9_.~\-]*")
 
@@ -2282,15 +2283,22 @@ def controle_evt_06(ctx, dossier_coeur, adh, dev):
     cas = (("fichier d'un lab adhérent, cwd dev", dev, adh + "/.planning/STATE.md", 1),
            ("fichier d'un lab dev, cwd adhérent", adh, dev + "/.planning/STATE.md", 0),
            ("file_path relatif, cwd adhérent", adh, ".planning/STATE.md", 0),
-           ("file_path plus long que la borne, cwd adhérent", adh, adh + "/" + "a" * 5000, 0))
+           ("file_path plus long que la borne, cwd adhérent", adh, adh + "/" + "a" * 5000, 0),
+           # pire cas BORNÉ sous la borne (le traitement ajouté par la 46 ne rallonge aucun chemin coûteux) : près de 4000 caractères, un millier de composantes
+           ("file_path de près de 4000 caractères sous un lab adhérent (pire cas sous la borne), cwd dev", dev, adh + "/" + "a/" * ((3900 - len(adh)) // 2) + "f", 1))
+    pire = 0.0
     for etiquette, cwd, fichier, lignes_attendues in cas:
         xdg = ctx.unique("xdg-evt06")
         os.makedirs(xdg)
+        debut = time.monotonic()
         rc, out, err, _ = ctx.lancer("A", payload_evt("FileChanged", cwd, fichier), cwd=cwd, dossier=dossier_coeur, extra_env={"XDG_CACHE_HOME": xdg}, np=True)
+        pire = max(pire, time.monotonic() - debut)
         lignes = lire_lignes_sonde(xdg)
         if rc != 0 or out != b"" or err or lignes != lignes_attendues:
             fautes.append("%s : %d ligne(s) de sonde, stdout vide, code 0 (attendu) — obtenu %d ligne(s), rc=%d out=%s" % (etiquette, lignes_attendues, lignes, rc, court(out)))
-    return (not fautes), ("; ".join(fautes) if fautes else "FileChanged : racine lue dans file_path (lab adhérent atteint avec un cwd dev, lab dev ignoré avec un cwd adhérent), chemin relatif ou trop long : silence")
+    if pire >= PLAFOND_EVT_S:
+        fautes.append("traitement de FileChanged borné : moins de %.0f s (attendu) — obtenu %.2f s" % (PLAFOND_EVT_S, pire))
+    return (not fautes), ("; ".join(fautes) if fautes else "FileChanged : racine lue dans file_path (lab adhérent atteint avec un cwd dev, lab dev ignoré avec un cwd adhérent), chemin relatif ou trop long : silence, pire cas sous la borne en %.2f s (plafond %.0f s)" % (pire, PLAFOND_EVT_S))
 
 
 def controle_evt_07(ctx, adh, source=None):
