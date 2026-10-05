@@ -120,6 +120,14 @@ explicitement ; n'attends rien de la CI sur ce point.
 
 ### Decisions
 
+- **2026-10-05 — reprise de l'exécution de la Phase 46 (vf-dev-manager-p46-exec)** : feu vert
+  de Willy, message en session principale, 2026-10-05. Verrou périmé (heartbeat figé au 2026-10-03
+  23:23, session 0737ff15 morte) repris par `takeover`, même owner, génération
+  `DRIVER.lock.gen.1791200572.62796` ; deux orphelins du registre fermés `stopped` (aucune écriture
+  dans leur worktree depuis le 2026-10-03 22:03). Les trois commits de 46-04 rapatriés en
+  fast-forward, worktree d'agent supprimé après intégration. Re-validation fraîche des plans
+  46-05..46-12 contre le code livré : 2 bloquants (46-06) et 4 avertissements corrigés en `9bba35b2`.
+
 - **2026-09-26 — mission d'exécution de la Phase 43 (vf-dev-manager)** : trois décisions du
   head sous délégation technique de Willy, session principale, 2026-09-26. (1) Le témoin
   `MERGES-DANS-LA-PLAGE` (43-01, 43-06) ne compte plus que les merges dont un parent n'a pas B43
