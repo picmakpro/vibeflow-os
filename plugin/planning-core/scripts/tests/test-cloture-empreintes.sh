@@ -832,9 +832,16 @@ def controle_emp_10(ctx, dossier):
     else:
         os.write(descripteur, b"x\n")
         os.close(descripteur)
-        rendu = ns["empreinte_livrables"](lab, ["nu"])
-        if rendu[0] != "illisible":
-            fautes.append("nom sain : livrable dont un fichier porte un nom non UTF-8 réel : %s, attendu illisible (jamais ok)" % (rendu,))
+        try:
+            rendu = ns["empreinte_livrables"](lab, ["nu"])
+        except UnicodeEncodeError as exc:
+            # sans le garde « nom sain », le nom (substitut) atteint l'encodage UTF-8 strict du texte canonique : c'est la
+            # conséquence directe du garde manquant (Linux, nom non UTF-8 réel), rapportée comme l'échec « nom sain » visé
+            fautes.append("nom sain : livrable dont un fichier porte un nom non UTF-8 réel : nom accepté sans garde, encodage du texte "
+                          "canonique en échec (%s), attendu illisible (jamais ok)" % type(exc).__name__)
+        else:
+            if rendu[0] != "illisible":
+                fautes.append("nom sain : livrable dont un fichier porte un nom non UTF-8 réel : %s, attendu illisible (jamais ok)" % (rendu,))
         exerces.append("non UTF-8 réel")
     return (not fautes), ("; ".join(fautes) if fautes else
                           "_nom_sain vrai pour a.txt et é, faux pour tabulation, saut de ligne, DEL et substitut (octet non UTF-8) ; noms réels "
