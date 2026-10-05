@@ -277,6 +277,9 @@ Phase 41.1) : la correction à la source évite qu'une future consommatrice de c
       DEROGATION.md      (optionnel — phase ou plan)
   baux/<phase>/gen-<n>/  (Phase 47)
   missions/
+  juges/<juge>/          (canary de juge, C-16 — Phase 46, P46-D-06a)
+    SORTIE-PIEGEE.md     (la sortie piégée du juge)
+    VERDICT.md           (le verdict de canary, posé par poser-verdict.sh)
 ```
 
 Une phase porte `CADRAGE.md`, et **soit** un plan direct (`PLAN.md`, `CLOTURE.md`, `VERDICT.md`,
@@ -289,7 +292,8 @@ espace ni caractère de contrôle.
 **Le livrable vit à sa place métier**, hors de `.planning/`, déclaré par `ecrit:` (voir § Fichiers
 du modèle, `PLAN.md`, et spec §3).
 
-**Emplacements du modèle** à la racine de `.planning/` : dossiers `cycles`, `baux`, `missions` ;
+**Emplacements du modèle** à la racine de `.planning/` : dossiers `cycles`, `baux`, `missions`, `juges` (le canary de juge, Phase 46 :
+P46-D-06a ; jamais « Hors modèle », jamais dérivé comme une unité de cycle : seul `cycles/` porte des unités) ;
 fichiers `PROJECT.md`, `REQUIREMENTS.md`, `config.json`, `INDEX.md`, `STATE.md`, `cloture.log`,
 `.recalc-cache.json`, `derogations-gates.log` (journal de dérogation des gates, Phase 45 : F7a, P45-D-13 —
 Willy, AskUserQuestion session principale, 2026-09-30 ; jamais « Hors modèle »), `surveillance.log` (journal de D1,
@@ -838,7 +842,7 @@ standard seule.
 
 ## Gabarits
 
-Huit gabarits sous `plugin/planning-core/references/templates/cycles/`, un par fichier du modèle,
+Neuf gabarits sous `plugin/planning-core/references/templates/cycles/`, un par fichier du modèle (plus la sortie piégée d'un juge, Phase 46),
 **à côté** des gabarits v2 (inchangés) :
 
 | Gabarit | Fichier du modèle |
@@ -850,6 +854,7 @@ Huit gabarits sous `plugin/planning-core/references/templates/cycles/`, un par f
 | `VERDICT.template.md` | `VERDICT.md` |
 | `SUMMARY.template.md` | `SUMMARY.md` |
 | `DEROGATION.template.md` | `DEROGATION.md` |
+| `SORTIE-PIEGEE.template.md` | `SORTIE-PIEGEE.md` d'un juge (`.planning/juges/<juge>/`, voir « Canary de juge ») |
 | `config.template.json` | déclaration d'adhésion (`cycles-v1`) |
 
 **Un gabarit recopié tel quel (sans être rempli) ne fait jamais passer une unité en `close`** :
@@ -861,6 +866,7 @@ Huit gabarits sous `plugin/planning-core/references/templates/cycles/`, un par f
 | `VERDICT.md` (résultat à crochets) | `indéterminé` (`verdict-invalide`) |
 | `DEROGATION.md` (statut à crochets) | `indéterminé` (`derogation-invalide`) |
 | `CYCLE.md` seul | cycle `à cadrer` |
+| `SORTIE-PIEGEE.md` (sans verdict de canary) | aucun état dérivé ; le juge est signalé « sans preuve », jamais vert |
 | `config.json` | adhérent (`cycles-v1`) |
 
 ## Hook central et gates d'écriture (Phase 45)
@@ -1008,6 +1014,7 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (ay)** — P46-D-07a (Phase 46, 46-07) : le payload de `FileChanged` ne porte aucun auteur (ni pid, ni outil) : D1 ne sait pas qui a écrit. Une ligne `intention` (écriture par outil que le hook a laissée passer) explique UN changement du chemin, jamais deux ; une écriture par `Bash` qui tombe dans le même intervalle qu'une intention d'outil sur le même chemin est donc masquée par elle (au plus une écriture masquée par intention). D1 trace, il n'attribue pas.
 - **limite (az)** — P46-D-07a, P46-D-08 (Phase 46, 46-07) : `watchPaths` **remplace** la liste dynamique du harnais : un autre hook qui en renvoie la remplace, et la liste de D1 disparaît pour la session ; la forme de `watchPaths` hors `SessionStart` (A2 : `CwdChanged` renvoie les deux formes, premier niveau et sous `hookSpecificOutput`, sans mesure) et la surveillance d'un chemin encore inexistant (A3 : `SUMMARY.md` absent, créé plus tard) ne sont pas mesurées ; la réconciliation du `SessionStart` rattrape ce que le watcher ne voit pas.
 - **limite (ba)** — P46-D-07, P46-D-10 (Phase 46, 46-07) : la première observation d'un fichier surveillé pose sa référence sans contournement (un fichier déjà modifié avant le premier `SessionStart` d'un lab n'est pas tracé) ; le journal est lu sur ses 4 Mio de fin (`BORNE_LECTURE_SURVEILLANCE`) : une référence plus ancienne est inconnue et se repose en première observation ; D1 est fail-open (toute erreur sort en silence, code 0) : une trace perdue en séance est rattrapée au `SessionStart` suivant.
+- **limite (bb)** — P46-D-06, P46-D-13 (Phase 46, 46-09) : aucun dispatch de juge en Phase 46 — le premier passage d'un juge sur sa sortie piégée est une étape écrite du premier cycle, portée par le manager jusqu'à l'orchestrateur générique de la Phase 48 ; les sorties piégées sont fabriquées par l'initialisation en Phase 50 (à la main sinon) : « juge sans preuve » est donc attendu sur tout lab existant, et ce n'est jamais vert ; la qualité d'une sortie piégée (trop facile à refuser) relève de la Phase 50 ; le seuil de juge n'est ni lu ni posé dans `config.json` (P46-D-13, Phase 50).
 
 ### Contrat de sortie par événement (Phase 46)
 
@@ -1026,7 +1033,8 @@ mise à jour de tâche n'est pas câblé (P46-D-01). Chaque décision citée por
   (P46-D-10) ; en mode dégradé, silence, code 0 (limite (ap)).
 - **`SessionStart`** — l'entrée vit dans le groupe SANS matcher (à côté du cliché de session), donc sur `startup`, `resume`, `clear`
   et `compact`. Mode : D1 (46-07) — la liste surveillée en `watchPaths` et la réconciliation par hash ; sortie
-  `{"hookSpecificOutput":{"hookEventName":"SessionStart","watchPaths":[…],"additionalContext":"…"}}` (chaque clé seulement si non vide).
+  `{"hookSpecificOutput":{"hookEventName":"SessionStart","watchPaths":[…],"additionalContext":"…"}}` (chaque clé seulement si non vide) ;
+  à la source `startup` seulement, une ligne agrégée de plus dans `additionalContext` : le canary de juge (46-09, « Canary de juge » ci-dessous).
   Ne refuse jamais ; toute erreur : silence, code 0.
 - **`CwdChanged`** — aucun matcher ; racine lue dans `cwd` (limite (ao)). Mode : D1 — la même liste, `watchPaths` au PREMIER niveau ET sous
   `hookSpecificOutput` (`hookEventName: "CwdChanged"` ; la forme n'est pas mesurée, limite (az)). Ne refuse jamais ; toute erreur : silence, code 0.
@@ -1269,6 +1277,45 @@ ensuite empêche qu'un `SessionStart` sans nouveau contournement le répète. La
 **Canary.** D1 n'a pas de constante d'armement mais a son canary : le cas `D1-trace` (catégorie `D1` de `CANARIS`) rejoue un `FileChanged` synthétique
 sur un fichier surveillé du lab synthétique, d'abord sur son état initial (la référence), puis modifié hors du moteur : la commande doit se taire ET
 ajouter une ligne `contournement` au journal du lab synthétique ; l'attendu est `trace`, jamais dérivé de la table d'armement. Limites : (ax) à (ba).
+
+### Canary de juge (C-16, Phase 46)
+
+Un juge qui laisse tout passer est le mode d'échec le plus coûteux d'un système multi-agents (spec d'initialisation §10, C-16). La Phase 46 livre
+le **contrat** et le **vérificateur** du canary de juge — jamais le dispatch (Phase 48) ni la fabrication des sorties piégées (Phase 50) — et
+signale, sans jamais bloquer, chaque juge qui n'a pas prouvé qu'il sait refuser (P46-D-06 ; Willy, AskUserQuestion session principale, 2026-10-03,
+Q6 = a ; P46-D-06a).
+
+**Contrat.** Un dossier par juge du lab, `.planning/juges/<juge>/` (`<juge>` : `^[a-z0-9][a-z0-9-]{0,63}$`, le nom normalisé de la définition) :
+`SORTIE-PIEGEE.md` (frontmatter `juge`, `critere_vise`, `provenance` ; corps : l'**exemple raté** qui viole le critère visé, un mauvais output connu,
+notion voisine du test de discrimination de `rubric-design.md`) et `VERDICT.md`, le **verdict de canary**, posé par `poser-verdict.sh
+--unite=.planning/juges/<juge>` (forme de juge de 46-01 : l'artefact haché est `SORTIE-PIEGEE.md`, `hash` en est le sha256, pas de `hash_livrables`) et
+protégé par **G5** comme tout verdict (l'écriture par outil d'un `VERDICT.md` est refusée, R-JUGE-08). Gabarit : `SORTIE-PIEGEE.template.md`.
+`juges` est un **emplacement du modèle** à la racine de `.planning/` (jamais « Hors modèle », jamais dérivé comme une unité de cycle).
+
+**Vérificateur** (`verifier_juges`, dans `planning-hook.sh` : une copie de moins du parseur et de l'indexation des agents). Les **juges du lab** sont les
+définitions de `.claude/agents/` du lab dont le rôle dérivé est `juge` (jamais celles du compte ni d'un plugin). Trois classes, déterministes :
+
+| Classe | Condition |
+|---|---|
+| **prouvé** | verdict valide (règle R6 : constats non vides, chaque résultat `passé` ou `échec`), `hash` égal au sha256 de `SORTIE-PIEGEE.md`, le critère visé porté en `échec` et seulement en `échec` |
+| **laxiste** | verdict valide et à jour dont le critère visé n'est pas en `échec` : absent des constats, ou porté en `passé` ne serait-ce qu'une fois |
+| **sans preuve** | tout le reste, avec un motif : `nom-hors-forme`, `dossier-absent` (ou lien), `sortie-piegee-absente`, `sortie-piegee-invalide` (lien, non régulière), `sortie-piegee-hors-borne` (plus de 1 Mio), `sortie-piegee-illisible`, `critere-vise-absent`, `verdict-absent`, `verdict-invalide`, `verdict-perime` (la sortie piégée a changé depuis le verdict), `erreur-<type>` |
+
+**« Juge sans preuve » n'est jamais vert** : toute erreur de lecture range le juge sans preuve, jamais prouvé. Aucun seuil de juge n'est lu ni posé dans
+`config.json` (P46-D-13) ; `config.json` n'est lu que pour l'adhésion.
+
+**Signal.** Au `SessionStart` de source `startup` d'un lab adhérent, UNE ligne agrégée dans l'`additionalContext` (le même objet que la liste surveillée de
+D1), sans jamais bloquer : `[planning-core] juges (C-16) : <p> prouvé(s) ; <l> laxiste(s) : <noms> ; <s> sans preuve : <noms> — faire passer chaque juge sur
+.planning/juges/<juge>/SORTIE-PIEGEE.md et poser son verdict par poser-verdict.sh --unite=.planning/juges/<juge>` — au plus trois noms par classe, suivis
+du reste compté ; la marche à suivre n'est ajoutée que s'il reste un juge à prouver. Aucun juge : aucune ligne ; `resume`, `clear`, `compact` : aucune ligne ;
+hors adhésion : rien (pré-filtre, octet vide). Fail-open : une erreur du vérificateur la tait.
+
+**Diagnostic.** `planning-hook.sh --juges <racine du lab>` (patron de `--classer` : premier argument du lanceur, racine en second, sans lire stdin) imprime UNE
+ligne JSON `{"prouves": […], "laxistes": […], "sans_preuve": [{"juge": …, "motif": …}]}` et rend 0 ; il ne vérifie pas l'adhésion.
+
+**Étape du premier cycle.** Le premier passage de chaque juge sur sa sortie piégée est une étape **écrite** du premier cycle (`CYCLE.template.md`, « Premier
+cycle — canary de juge ») : le manager dispatche le juge sur `.planning/juges/<juge>/SORTIE-PIEGEE.md`, puis pose le verdict par `poser-verdict.sh`. Tant que ce
+n'est pas fait, le `SessionStart` signale « juge sans preuve ». Limite : (bb).
 
 ### Le hook par rôle (GATE-09)
 
