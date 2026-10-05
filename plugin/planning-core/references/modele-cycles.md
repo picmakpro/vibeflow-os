@@ -999,6 +999,9 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (ar)** — P46-D-01 (Phase 46, 46-05) : `CLOTURE.md` et `SUMMARY.md` restent écrivables par `Bash` (limite (g) : le hook ne voit pas les écritures par `Bash`) ; le recalcul les voit (R4, règle E) et D1 les trace.
 - **limite (as)** — P46-D-12 (Phase 46, 46-05) : G3 refuse sur un `PLAN.md` absent ou illisible (refus conforme au modèle : l'unité est `indéterminé`, R1 et R2) ; c'est un écart assumé avec G1, qui se tait sur un état illisible (F5) ; le rejeu le mesure comme « refus conforme au modèle ».
 - **limite (at)** — P46-D-03a (Phase 46, 46-01) : les noms `.DS_Store`, `Thumbs.db` et `desktop.ini` sont exclus du prédicat « livrable présent » et de l'empreinte des livrables (métadonnées de système fixes : un dossier rouvert dans le Finder ne périme pas un verdict).
+- **limite (au)** — P46-D-02a (Phase 46, 46-06) : G4′ « bloque le silence, pas la falsification » (spec §5) : une sortie de commande inventée, collée dans un bloc conforme, passe ; le prédicat est structurel, il ne rejoue ni ne vérifie la commande. La preuve de fond reste celle du juge (G4) et du recalcul.
+- **limite (av)** — P46-D-02b (Phase 46, 46-06 ; Willy, AskUserQuestion session principale, 2026-10-03, Q9 = a) : G4′ ne vise que les workers et producteurs qui ont `Bash` ; un agent dont `tools:` ne nomme pas `Bash` (ou dont `disallowedTools` le retire), un juge, un manager, un agent inconnu, ambigu ou illisible n'est pas jugé : pour un agent sans `Bash`, le verdict du juge (G4) tient la preuve. Un agent sans champ `tools:` hérite des outils de la session, `Bash` compris, et reste dans le périmètre (c'est la lecture du champ, non une hypothèse).
+- **limite (aw)** — P46-D-02, P46-D-08, P46-D-10 (Phase 46, 46-06) : un fork en mode auto n'est vu ni par `SubagentHandback` ni par `SubagentStop` ; le `permission_mode` de `SubagentStop` est supposé valoir `auto` quand `SubagentHandback` était fourni (A4, non mesuré : aucune sonde en direct n'a été permise, P46-D-08) ; aucun plafond natif n'est documenté pour un refus `PreToolUse` répété (A6) : la boucle d'un agent qui ne pourrait pas produire de sortie est évitée par le périmètre aux agents dotés de `Bash` et par la dérogation nominative.
 
 ### Contrat de sortie par événement (Phase 46)
 
@@ -1009,10 +1012,12 @@ mise à jour de tâche n'est pas câblé (P46-D-01). Chaque décision citée por
 - **`PreToolUse`** — un seul groupe, matcher `Write|Edit|NotebookEdit|Bash|Agent|Task|SubagentHandback` (jamais un second groupe
   qui citerait `planning-hook.sh` : la purge de `merge-hooks.sh` retire toute entrée citant le même script dans les groupes du même
   événement). Mode : les gates G1 à G7 et le rôle, inchangés, plus G3 (`CLOTURE.md` d'une unité) et G4 (`SUMMARY.md` d'une unité), Phase 46, 46-05 ; `SubagentHandback`
-  (le rapport d'un sous-agent, `tool_input.message`, fourni en mode auto seulement) n'a encore aucun gate. Refus : JSON `permissionDecision: "deny"`, code 0. Erreur interne dans le
+  (le rapport d'un sous-agent, `tool_input.message`, fourni en mode auto seulement) est jugé par G4′ (Phase 46, 46-06). Refus : JSON `permissionDecision: "deny"`, code 0. Erreur interne dans le
   périmètre adhérent : `deny` (fail-closed, P45-D-08).
-- **`SubagentStop`** — aucun matcher. Mode : repli de G4′ (hors mode auto), sans évaluation encore. Blocage : JSON
-  `decision: "block"` avec `reason`, code 0, **jamais le code 2** (#60490). Erreur interne : silence, code 0.
+- **`SubagentStop`** — aucun matcher. Mode : repli de G4′ hors mode auto (`permission_mode` différent de `auto` ; en mode auto, aucune
+  évaluation : le rapport a déjà passé le `PreToolUse` de `SubagentHandback`), qui juge `last_assistant_message` par le même prédicat. Blocage : JSON
+  `decision: "block"` avec `reason`, code 0, **jamais le code 2** (#60490). Erreur interne : `block` si `ARMEMENT_G4P` vaut `armed`, ligne d'observation sinon
+  (P46-D-10) ; en mode dégradé, silence, code 0 (limite (ap)).
 - **`SessionStart`** — l'entrée vit dans le groupe SANS matcher (à côté du cliché de session), donc sur `startup`, `resume`, `clear`
   et `compact`. Mode : `watchPaths` et réconciliation de D1 (à venir). Ne refuse jamais ; toute erreur : silence, code 0.
 - **`CwdChanged`** — aucun matcher ; racine lue dans `cwd` (limite (ao)). Ne refuse jamais ; toute erreur : silence, code 0.
@@ -1045,10 +1050,10 @@ d'armement (`armement_valide`, ordre `ORDRE_ETAPES`) : une table qui la viole (u
 la précédente, G6 et G5 de valeurs différentes, G3 et G4 de valeurs différentes, ou une valeur autre que
 `observe` et `armed`) refuse tout, c'est-à-dire chaque action que le hook examine, `Bash` compris, avant tout
 gate. Sinon G2 avertit, puis les gates à verdict sont évalués dans l'ordre de `GATES_A_VERDICT` (G6, G5, G1,
-G7, ROLE, G3, G4) et leurs verdicts sont tranchés ensemble par `decider`. L'ordre des étapes de `ORDRE_ETAPES`
+G7, ROLE, G3, G4, G4P) et leurs verdicts sont tranchés ensemble par `decider`. L'ordre des étapes de `ORDRE_ETAPES`
 (Phase 46, P46-D-11) est : G6 et G5, puis G1, puis G7, puis le rôle, puis G3 et G4 (étape 5, un seul geste), puis
-G4′ (étape 6) ; G4′ n'a pas encore de fonction d'évaluation dans `GATES_A_VERDICT` : sa constante
-existe et vaut `observe`.
+G4′ (étape 6) ; G4′ a sa fonction d'évaluation (`evaluer_g4p`, Phase 46, 46-06) dans `GATES_A_VERDICT` et son repli
+au mode `SubagentStop` : sa constante vaut `observe`.
 
 | Gate | Étape | État | Comportement sur défaillance | Cas de canary | Relevé |
 |---|---|---|---|---|---|
@@ -1059,7 +1064,7 @@ existe et vaut `observe`.
 | ROLE | 4 | armed | armé : fermé (deny) ; observe : journalise | ROLE-juge, ROLE-worker-Agent, ROLE-worker-Task | 45-REJEU-ETAPE-4 |
 | G3 | 5 | observe | armé : fermé (deny) ; observe : journalise | G3-livrable-absent | 46-REJEU-ETAPE-5 |
 | G4 | 5 | observe | armé : fermé (deny) ; observe : journalise | G4-sans-verdict | 46-REJEU-ETAPE-5 |
-| G4P | 6 | observe | armé : fermé (deny) ; observe : journalise | aucun | 46-REJEU-ETAPE-6 |
+| G4P | 6 | observe | armé : fermé (deny en PreToolUse, block en SubagentStop) ; observe : journalise | G4P-handback, G4P-stop | 46-REJEU-ETAPE-6 |
 | G2 | - | avertit | ouvert : n'avertit pas, ne refuse jamais | aucun | aucun |
 
 **État d'armement livré, tel que mesuré (v2.9.0).**
@@ -1167,6 +1172,41 @@ l'unité (poser-verdict.sh)` ; `VERDICT.md invalide (règle R6)` ; `constat en �
 illisible) ; `livrables hors borne : <libellé>`. Entonnoir existant : en `observe` il journalise, armé il refuse (deny), une erreur
 interne refuse quand il est armé.
 
+### G4′ — pas de rapport sans sortie brute (Phase 46)
+
+G4′ juge le **rapport** d'un sous-agent là où il est rendu : au `PreToolUse` de `SubagentHandback` (le rapport est
+`tool_input.message`, une chaîne seulement ; tout autre type, ou son absence, n'est aucune preuve), et, **hors mode auto**
+(`permission_mode` différent de `auto`), au repli `SubagentStop` (`last_assistant_message`, même prédicat). En mode auto,
+`SubagentStop` n'évalue rien : le rapport a déjà passé le `PreToolUse`, et un second jugement refuserait deux fois le même
+rapport. Un rapport sans sortie de commande brute reçoit le verdict `G4P` (P46-D-02).
+
+**Grammaire de la sortie de commande brute** (fonction `sortie_brute_presente`, P46-D-02a, jamais plus permissive que celle-ci).
+Le rapport contient au moins UN bloc de code délimité qui remplit toutes ces conditions : (1) **ouverture** : une ligne dont le
+texte, blancs de tête retirés, commence par trois caractères ``` ou ~~~ (ou plus), une étiquette de langage étant admise
+après (pour ```, l'étiquette ne porte pas d'accent grave) ; (2) **fermeture** : une ligne faite du même caractère, au moins aussi
+longue que l'ouverture, blancs autour admis — un bloc non fermé ne compte pas, et une ligne d'un autre caractère ou plus courte
+n'est pas une fermeture ; (3) la **première ligne non vide** du bloc commence par `$ ` suivi d'un caractère non blanc ; (4) la
+**ligne non vide suivante**, dans le bloc, existe et n'est ni une fermeture ni une ligne `$ ` (c'est la sortie). Les lignes vides
+sont ignorées ; un seul bloc conforme suffit. Le parcours est linéaire, ligne à ligne, sans aucune expression à retour arrière : la
+taille du rapport n'est bornée que par l'échéance du cœur.
+
+**Périmètre.** Un sous-agent de rôle **worker** ou **producteur** d'un lab adhérent, rôle dérivé comme pour le hook par rôle
+(même `resoudre_agent`), **qui a `Bash`**. Exclus : les juges, les managers, le fil principal (`agent_id` ou `agent_type` absent ou
+vide), l'agent inconnu, ambigu ou illisible, et un agent sans `Bash`. La **capacité** se lit dans la définition : `tools:` absent
+(l'agent hérite des outils de la session, `Bash` compris : il reste dans le périmètre), ou `tools:` qui nomme `Bash` ou une forme
+`Bash(…)`, et `Bash` absent de `disallowedTools` ; une allowlist illisible exclut l'agent. Motif (P46-D-02b ; Willy,
+AskUserQuestion session principale, 2026-10-03, Q9 = a) : sans `Bash`, aucune sortie de commande brute n'est possible, le refus ne
+pourrait pas être levé ; le verdict du juge (G4) tient alors la preuve (limite (av)).
+
+**Entonnoir et message.** Par `decider`, comme les autres gates : en `observe` il journalise (une ligne `gate=G4P`, chemin
+`agents/<agent_type>`), armé il refuse (`deny` en `PreToolUse`, `decision: "block"` en code 0 en `SubagentStop`, jamais le code 2),
+une erreur interne refuse quand il est armé (`block` en `SubagentStop` aussi, P46-D-10) et se journalise en `observe`. Dérogation
+nominative `G4P` sur le chemin `agents/<agent_type>`, à usage unique (`deroger-gate.sh --gate=G4P --chemin=agents/<agent_type>`).
+Message : `[planning-core] G4P : rapport de <agent_type> sans sortie de commande brute — rejouez la commande qui prouve le travail
+et collez-la avec sa sortie dans un bloc (première ligne « $ <commande> », puis la sortie) ; dérogation nominative : deroger-gate.sh
+--gate=G4P --chemin=agents/<agent_type>`. Le gate « bloque le silence, pas la falsification » (limite (au)). Cas de canary :
+`G4P-handback` et `G4P-stop`, rejoués sur un producteur synthétique doté de `Bash` (`canary-producteur`). Limites : (au), (av), (aw).
+
 ### Le hook par rôle (GATE-09)
 
 Le rôle se **dérive** de la définition de l'agent écrivain (`agent_type` du payload), par les
@@ -1262,7 +1302,9 @@ d'armement absentes ou illisibles, gate armé sans cas de canary, cas en échec.
 est **dérivé** de la table d'armement du script frère : observation (stdout vide et une ligne au
 journal jetable) tant que le gate est `observe`, refus de gate dès qu'il est `armed`. Couverture
 minimale déclarée et vérifiée cas par cas (P45-D-20) : script absent, `python3` absent, `Task` et
-`Agent`, fil principal, agent `plugin:`. Il rend visible la limite (i).
+`Agent`, fil principal, agent `plugin:`. Il rend visible la limite (i). Les cas de G4′ (`G4P-handback`, `G4P-stop`, Phase 46)
+rejouent le rapport sans sortie brute d'un producteur synthétique doté de `Bash` ; l'attendu armé d'un cas `SubagentStop` est
+l'objet `decision: "block"` en code 0, celui d'un cas `SubagentHandback` un `deny`.
 
 ### Le rejeu (GATE-13)
 
