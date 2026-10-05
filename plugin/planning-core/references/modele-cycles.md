@@ -264,6 +264,7 @@ Phase 41.1) : la correction à la source évite qu'une future consommatrice de c
   cloture.log           (généré, ajout seul)
   .recalc-cache.json    (généré)
   derogations-gates.log (journal de dérogation des gates, ajout seul — Phase 45, P45-D-13)
+  surveillance.log      (journal de D1, ajout seul, jamais surveillé — Phase 46, P46-D-07a)
   _archive/socle-v2/    (STATE.md et INDEX.md du socle v2, archivés à la migration — annexe)
   cycles/01-<sujet>/
     CYCLE.md
@@ -291,7 +292,8 @@ du modèle, `PLAN.md`, et spec §3).
 **Emplacements du modèle** à la racine de `.planning/` : dossiers `cycles`, `baux`, `missions` ;
 fichiers `PROJECT.md`, `REQUIREMENTS.md`, `config.json`, `INDEX.md`, `STATE.md`, `cloture.log`,
 `.recalc-cache.json`, `derogations-gates.log` (journal de dérogation des gates, Phase 45 : F7a, P45-D-13 —
-Willy, AskUserQuestion session principale, 2026-09-30 ; jamais « Hors modèle »). `baux/` et `missions/`
+Willy, AskUserQuestion session principale, 2026-09-30 ; jamais « Hors modèle »), `surveillance.log` (journal de D1,
+Phase 46, P46-D-07a ; jamais « Hors modèle »). `baux/` et `missions/`
 ne sont pas parcourus par le recalcul en Phase 44.
 
 ## Emplacements annexes et hors modèle
@@ -1077,7 +1079,7 @@ au mode `SubagentStop` : sa constante vaut `observe`.
 
 Cinq listes que R-REFERENCE compare au code, chacune sur une seule ligne :
 
-- **Noms protégés par G6** : `STATE.md`, `INDEX.md`, `cloture.log`, `.recalc-cache.json`, `derogations-gates.log`, `config.json`.
+- **Noms protégés par G6** : `STATE.md`, `INDEX.md`, `cloture.log`, `.recalc-cache.json`, `derogations-gates.log`, `surveillance.log`, `config.json`.
 - **Scripts du hook protégés par G6** : `planning-hook.sh`, `check-gates-alive.sh`.
 - **Journal de dérogation** : `derogations-gates.log`.
 - **Marqueurs de projet de code (G7)** : `package.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `composer.json`, `Gemfile`, `tsconfig.json`, `Package.swift`, `*.xcodeproj`.
@@ -1103,7 +1105,8 @@ création par le dossier parent résolu et le nom en casefold. `config.json` n'e
 l'**adhésion** (F6 = f6-oui, Willy, AskUserQuestion session principale, 2026-09-30) : une écriture qui
 change ou retire `planning_version` est refusée, les autres clés restent libres ; le cache du recalcul
 l'est aussi (F7b = f7b-oui, même canal, même date), et le journal de dérogation (F7a = f7a-racine,
-même canal, même date). Le motif d'un refus nomme `recalc-planning.sh` (ou `deroger-gate.sh`) : le
+même canal, même date) ; le journal de D1, `surveillance.log` (Phase 46, 46-07, P46-D-07a), l'est aussi : il est inscrit par le
+moteur et le hook, jamais rédigé. Le motif d'un refus nomme `recalc-planning.sh` (ou `deroger-gate.sh`) : le
 `Stop` de la 44 invite à mettre à jour l'état, le refus ne le contredit pas. G6 est un refus de
 l'outil, pas du disque : `Bash` et `recalc-planning.sh` écrivent ces fichiers (P45-D-10).
 
@@ -1206,6 +1209,33 @@ Message : `[planning-core] G4P : rapport de <agent_type> sans sortie de commande
 et collez-la avec sa sortie dans un bloc (première ligne « $ <commande> », puis la sortie) ; dérogation nominative : deroger-gate.sh
 --gate=G4P --chemin=agents/<agent_type>`. Le gate « bloque le silence, pas la falsification » (limite (au)). Cas de canary :
 `G4P-handback` et `G4P-stop`, rejoués sur un producteur synthétique doté de `Bash` (`canary-producteur`). Limites : (au), (av), (aw).
+
+### D1 — écritures surveillées (Phase 46)
+
+D1 est la **détection** des écritures sur les fichiers que le moteur tient pour siens : toute écriture sur un fichier surveillé d'un lab
+adhérent est **expliquée** par le moteur, ou **tracée comme contournement**. Elle ne refuse jamais (P46-D-07 ; Willy, AskUserQuestion
+session principale, 2026-10-03, Q7 = b) et n'a pas de constante d'armement : une détection ne s'arme pas (P46-D-11).
+
+**Liste surveillée** (P46-D-07a). Fichier par fichier, jamais un dossier (#91634 : un `watchPaths` pointé sur un dossier est enregistré
+récursivement et a bloqué le fil principal de 20 à 45 s sur 137 000 fichiers), chemins absolus, **au plus 128** (`BORNE_WATCHPATHS`) :
+`STATE.md`, `INDEX.md`, `cloture.log`, le journal de dérogation et `config.json` à la racine du dossier de planning, puis `PLAN.md`,
+`CLOTURE.md`, `VERDICT.md` et `SUMMARY.md` de chaque **unité de forme modèle dont `SUMMARY.md` est absent** (approximation déterministe
+d'« unité non close », sans recalcul : une unité close voit ses écarts par la règle E du recalcul ; `SUMMARY.md` encore absent est dans la
+liste, pour voir sa création). Les unités sont parcourues dans l'ordre trié, la phase puis ses plans. Une troncature à la borne est tracée
+(une ligne `genre=borne`). Le journal de D1 n'en fait jamais partie : un watcher sur le fichier que sa propre trace réécrit bouclerait.
+
+**Sorties par événement.** `SessionStart` : `{"hookSpecificOutput":{"hookEventName":"SessionStart","watchPaths":[…]}}` (les clés
+`watchPaths` et `additionalContext` ne sont présentes que si elles sont non vides) ; hors adhésion, rien n'est renvoyé et le watcher ne
+démarre pas. `FileChanged` ne renvoie jamais de `watchPaths` (P46-D-07) : il trace.
+
+**Journal.** `.planning/surveillance.log`, un seul fichier, ajout seul (`O_APPEND`, `O_NOFOLLOW`, 0600, verrou exclusif), protégé par G6 (l'écriture
+par outil est refusée) et connu du recalcul (jamais « Hors modèle »). Une ligne par fait, `<horodatage ISO UTC>  genre=<g>  chemin=<jeton>
+sha256=<hex|absent|->  par=<jeton>  source=<seance|reconciliation|->` (deux espaces entre champs), chaque valeur par l'encodeur injectif du journal
+(un nom de fichier qui porte un saut de ligne reste UNE ligne). Genres : `reference` (dernier état connu d'un chemin), `moteur` (écriture d'un
+écrivain du moteur, sha256 du fichier après écriture), `intention` (écriture par outil laissée passer par le hook), `contournement` (changement
+que rien n'explique), `borne` (liste tronquée), `signal` (contournements signalés au SessionStart). La fonction qui inscrit,
+`inscrire_surveillance`, est copiée ast-identique dans `planning-hook.sh`, `recalc-planning.sh`, `poser-verdict.sh` et `deroger-gate.sh` ;
+toute erreur d'inscription est silencieuse (D1 est fail-open).
 
 ### Le hook par rôle (GATE-09)
 

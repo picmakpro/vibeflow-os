@@ -768,6 +768,9 @@ NOMS_MODELE_RACINE_FICHIERS = (
     # 2026-09-30) : emplacement du modèle, jamais « Hors modèle » dans INDEX.md. Même nom consommé
     # par la commande de dérogation (45-04) et le gate G6 (45-05).
     "derogations-gates.log",
+    # Journal de D1, la détection des écritures sur les fichiers surveillés (Phase 46, 46-07, P46-D-07a) : emplacement du modèle, jamais
+    # « Hors modèle » ; inscrit par les écrivains du moteur et par le hook central, protégé par G6, jamais surveillé.
+    "surveillance.log",
 )
 
 
