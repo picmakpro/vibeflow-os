@@ -55,13 +55,15 @@
 #   4. cas en échec : un cas de CANARIS n'obtient pas l'attendu que la table d'armement en dérive
 #
 # Table des cas : la constante CANARIS ci-dessous, une ligne par cas `<id>|<gate>|<mode>|<payload>|<couvre>`.
-#   <gate>    DEGRADE (cas du fail-closed de la commande) ou G6, G5, G1, G7, ROLE, G3, G4, G4P
+#   <gate>    DEGRADE (cas du fail-closed de la commande), D1 (Phase 46, 46-07 : la détection des écritures, jamais armée, P46-D-11) ou G6, G5,
+#             G1, G7, ROLE, G3, G4, G4P
 #   <mode>    script-absent (CLAUDE_PROJECT_DIR vers un dossier vide) | python-absent (PATH réduit) |
 #             nominal (le script réel)
 #   <payload> <outil>[:<chemin relatif au lab synthétique>][@<agent_type>] ; pour Agent et Task, le
 #             « chemin » est le subagent_type du dispatch ; pour SubagentHandback (PreToolUse, `tool_input.message`) et SubagentStop
 #             (événement non outil, `last_assistant_message`, `permission_mode: "default"`, Phase 46), le « chemin » nomme le rapport :
-#             `sans-sortie` ou `avec-sortie` (RAPPORTS_G4P), les cas de G4′ (agent canary-producteur, doté de Bash)
+#             `sans-sortie` ou `avec-sortie` (RAPPORTS_G4P), les cas de G4′ (agent canary-producteur, doté de Bash) ; pour FileChanged
+#             (événement non outil, `file_path` et `event` de premier niveau, Phase 46), le « chemin » est le fichier surveillé du lab synthétique
 #   <couvre>  éléments de COUVERTURE_MINIMALE que le cas couvre, séparés par des virgules (P45-D-20) :
 #             script-absent, python-absent (mode du cas), Task, Agent (payload du gate en mode nominal),
 #             fil-principal (aucun agent_type), plugin (agent_type préfixé `<plugin>:`). Une étiquette
@@ -69,7 +71,7 @@
 # L'ATTENDU EST DÉRIVÉ, jamais écrit dans la table : DEGRADE -> refus (Write, Agent, Task) ou silence
 # (Bash : limite déclarée P45-D-06b, exercée et non seulement écrite) ; gate `armed` -> refus d'un
 # gate (`deny-gate`, jamais le texte du fail-closed `deny-degrade` ; `block-gate`, l'objet `decision: "block"`, pour un cas SubagentStop) ;
-# gate `observe` -> observation
+# gate `observe` -> observation ; D1 -> `trace` (jamais dérivé d'un armement : D1 n'en a pas)
 # (P45-D-20) : stdout vide ET une nouvelle ligne `gate=<G>` au journal d'observation, dont le
 # XDG_CACHE_HOME du rejeu est un dossier jetable — un gate qui se tait sans journaliser n'est pas
 # vivant. 45-05 à 45-09 ajoutent leurs cas ; un gate armé sans cas fait signaler ce canary et rougir
@@ -269,6 +271,9 @@ CANARIS = (
     # (`tool_input.message`) puis au repli SubagentStop hors mode auto (`last_assistant_message`, `permission_mode: "default"`).
     "G4P-handback|G4P|nominal|SubagentHandback:sans-sortie@" + AGENT_PRODUCTEUR + "|",
     "G4P-stop|G4P|nominal|SubagentStop:sans-sortie@" + AGENT_PRODUCTEUR + "|",
+    # D1 (46-07, P46-D-11) : pas de constante d'armement, mais un canary — le rejeu d'un FileChanged synthétique sur un fichier surveillé modifié hors du moteur
+    # exige UNE ligne de contournement de plus au journal du lab synthétique (la trace, jamais un refus : la sortie reste vide).
+    "D1-trace|D1|nominal|FileChanged:.planning/" + NOM_ETAT + "|",
 )
 
 
@@ -426,6 +431,11 @@ def fabriquer_payload(spec, lab):
             stop["agent_type"] = agent
         stop["last_assistant_message"] = RAPPORTS_G4P.get(chemin, chemin or "rapport du canary")
         return json.dumps(stop, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    elif outil == "FileChanged":
+        # D1 (Phase 46) : l'événement n'est pas un outil, `file_path` et `event` sont de PREMIER niveau.
+        change = {"session_id": "canary", "transcript_path": "transcript.jsonl", "cwd": lab, "hook_event_name": "FileChanged",
+                  "file_path": os.path.join(lab, chemin), "event": "change"}
+        return json.dumps(change, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     elif outil == "NotebookEdit":
         entree = {"notebook_path": os.path.join(lab, chemin), "new_source": "x"}
     elif outil == "Edit":
@@ -532,6 +542,37 @@ class Rejeu:
             return "observation"
         return "silence sans ligne d'observation"
 
+    def lignes_contournement(self):
+        """Nombre de lignes `genre=contournement` du journal de D1 du lab synthétique."""
+        chemin = os.path.join(self.lab, ".planning", "surveillance.log")
+        try:
+            with open(chemin, encoding="utf-8", errors="replace") as fh:
+                texte = fh.read()
+        except OSError:
+            return 0
+        return sum(1 for ligne in texte.split("\n") if "  genre=contournement  " in ligne)
+
+    def jouer_trace(self, mode, spec):
+        """Cas de D1 : `trace` si le rejeu d'un FileChanged synthétique, le fichier surveillé modifié hors du moteur, se tait (stdout vide : D1 ne refuse jamais)
+        ET ajoute UNE ligne de contournement au journal du lab synthétique ; sinon le verdict obtenu, ou `silence sans ligne de contournement`. Un premier
+        FileChanged, sur l'état initial, pose la référence (première observation : aucune ligne de contournement)."""
+        fichier = os.path.join(self.lab, spec.partition(":")[2].partition("@")[0])
+        os.makedirs(os.path.dirname(fichier), exist_ok=True)
+        with open(fichier, "w", encoding="utf-8") as fh:
+            fh.write("état de référence du canary\n")
+        premier = self.jouer(mode, spec)
+        if premier != "silence":
+            return premier
+        with open(fichier, "w", encoding="utf-8") as fh:
+            fh.write("écrit hors du moteur\n")
+        avant = self.lignes_contournement()
+        obtenu = self.jouer(mode, spec)
+        if obtenu != "silence":
+            return obtenu
+        if self.lignes_contournement() == avant + 1:  # canary-trace
+            return "trace"
+        return "silence sans ligne de contournement"
+
     def jouer(self, mode, spec):
         try:
             p = subprocess.run(["/bin/sh", "-c", self.commande], input=fabriquer_payload(spec, self.lab),
@@ -582,7 +623,7 @@ def lire_canaris():
     cas = []
     for ligne in CANARIS:
         morceaux = ligne.split("|")
-        if len(morceaux) != 5 or morceaux[1] not in ("DEGRADE",) + GATES \
+        if len(morceaux) != 5 or morceaux[1] not in ("DEGRADE", "D1") + GATES \
                 or morceaux[2] not in ("script-absent", "python-absent", "nominal"):
             raise Indetermine("ligne de CANARIS mal formée : " + ligne)
         etiquettes = tuple(e for e in morceaux[4].split(",") if e)
@@ -614,6 +655,8 @@ def attendu_de(gate, spec, table):
     """L'attendu est DÉRIVÉ de la table d'armement, jamais écrit dans CANARIS."""
     if gate == "DEGRADE":
         return "silence" if spec.split(":")[0].split("@")[0] == "Bash" else "deny-degrade"
+    if gate == "D1":
+        return "trace"  # canary-d1 : une détection ne s'arme pas (P46-D-11), son attendu ne dépend d'aucune constante
     if table[gate] != "armed":
         return "observation"
     return "block-gate" if spec.partition(":")[0].partition("@")[0] == "SubagentStop" else "deny-gate"  # canary-attendu-stop
@@ -712,7 +755,12 @@ def main():
             echecs.append("nominal (attendu silence, obtenu " + nominal + ")")
         for identifiant, gate, mode, spec, _etiquettes in cas:
             attendu = attendu_de(gate, spec, table)
-            obtenu = rejeu.jouer_observation(mode, spec, gate) if attendu == "observation" else rejeu.jouer(mode, spec)
+            if attendu == "observation":
+                obtenu = rejeu.jouer_observation(mode, spec, gate)
+            elif attendu == "trace":
+                obtenu = rejeu.jouer_trace(mode, spec)
+            else:
+                obtenu = rejeu.jouer(mode, spec)
             if obtenu != attendu:
                 echecs.append(identifiant + " (attendu " + attendu + ", obtenu " + obtenu + ")")
         if echecs:

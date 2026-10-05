@@ -264,6 +264,7 @@ Phase 41.1) : la correction à la source évite qu'une future consommatrice de c
   cloture.log           (généré, ajout seul)
   .recalc-cache.json    (généré)
   derogations-gates.log (journal de dérogation des gates, ajout seul — Phase 45, P45-D-13)
+  surveillance.log      (journal de D1, ajout seul, jamais surveillé — Phase 46, P46-D-07a)
   _archive/socle-v2/    (STATE.md et INDEX.md du socle v2, archivés à la migration — annexe)
   cycles/01-<sujet>/
     CYCLE.md
@@ -291,7 +292,8 @@ du modèle, `PLAN.md`, et spec §3).
 **Emplacements du modèle** à la racine de `.planning/` : dossiers `cycles`, `baux`, `missions` ;
 fichiers `PROJECT.md`, `REQUIREMENTS.md`, `config.json`, `INDEX.md`, `STATE.md`, `cloture.log`,
 `.recalc-cache.json`, `derogations-gates.log` (journal de dérogation des gates, Phase 45 : F7a, P45-D-13 —
-Willy, AskUserQuestion session principale, 2026-09-30 ; jamais « Hors modèle »). `baux/` et `missions/`
+Willy, AskUserQuestion session principale, 2026-09-30 ; jamais « Hors modèle »), `surveillance.log` (journal de D1,
+Phase 46, P46-D-07a ; jamais « Hors modèle »). `baux/` et `missions/`
 ne sont pas parcourus par le recalcul en Phase 44.
 
 ## Emplacements annexes et hors modèle
@@ -1002,6 +1004,10 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (au)** — P46-D-02a (Phase 46, 46-06) : G4′ « bloque le silence, pas la falsification » (spec §5) : une sortie de commande inventée, collée dans un bloc conforme, passe ; le prédicat est structurel, il ne rejoue ni ne vérifie la commande. La preuve de fond reste celle du juge (G4) et du recalcul.
 - **limite (av)** — P46-D-02b (Phase 46, 46-06 ; Willy, AskUserQuestion session principale, 2026-10-03, Q9 = a) : G4′ ne vise que les workers et producteurs qui ont `Bash` ; un agent dont `tools:` ne nomme pas `Bash` (ou dont `disallowedTools` le retire), un juge, un manager, un agent inconnu, ambigu ou illisible n'est pas jugé : pour un agent sans `Bash`, le verdict du juge (G4) tient la preuve. Un agent sans champ `tools:` hérite des outils de la session, `Bash` compris, et reste dans le périmètre (c'est la lecture du champ, non une hypothèse).
 - **limite (aw)** — P46-D-02, P46-D-08, P46-D-10 (Phase 46, 46-06) : un fork en mode auto n'est vu ni par `SubagentHandback` ni par `SubagentStop` ; le `permission_mode` de `SubagentStop` est supposé valoir `auto` quand `SubagentHandback` était fourni (A4, non mesuré : aucune sonde en direct n'a été permise, P46-D-08) ; aucun plafond natif n'est documenté pour un refus `PreToolUse` répété (A6) : la boucle d'un agent qui ne pourrait pas produire de sortie est évitée par le périmètre aux agents dotés de `Bash` et par la dérogation nominative.
+- **limite (ax)** — P46-D-07a, P46-D-08 (Phase 46, 46-07) : #95440 — après n'importe quel `cd` dans la session, le harnais ne déclenche plus `FileChanged`, ni pour un `matcher` ni pour un `watchPaths` renvoyé par `CwdChanged`, et rien ne l'annonce (issue ouverte, non mesurée sur la version 2.1.288 : aucune sonde en direct n'a été permise, P46-D-08) ; D1 est alors sourd en séance, et la réconciliation par hash du `SessionStart` suivant le rattrape.
+- **limite (ay)** — P46-D-07a (Phase 46, 46-07) : le payload de `FileChanged` ne porte aucun auteur (ni pid, ni outil) : D1 ne sait pas qui a écrit. Une ligne `intention` (écriture par outil que le hook a laissée passer) explique UN changement du chemin, jamais deux ; une écriture par `Bash` qui tombe dans le même intervalle qu'une intention d'outil sur le même chemin est donc masquée par elle (au plus une écriture masquée par intention). D1 trace, il n'attribue pas.
+- **limite (az)** — P46-D-07a, P46-D-08 (Phase 46, 46-07) : `watchPaths` **remplace** la liste dynamique du harnais : un autre hook qui en renvoie la remplace, et la liste de D1 disparaît pour la session ; la forme de `watchPaths` hors `SessionStart` (A2 : `CwdChanged` renvoie les deux formes, premier niveau et sous `hookSpecificOutput`, sans mesure) et la surveillance d'un chemin encore inexistant (A3 : `SUMMARY.md` absent, créé plus tard) ne sont pas mesurées ; la réconciliation du `SessionStart` rattrape ce que le watcher ne voit pas.
+- **limite (ba)** — P46-D-07, P46-D-10 (Phase 46, 46-07) : la première observation d'un fichier surveillé pose sa référence sans contournement (un fichier déjà modifié avant le premier `SessionStart` d'un lab n'est pas tracé) ; le journal est lu sur ses 4 Mio de fin (`BORNE_LECTURE_SURVEILLANCE`) : une référence plus ancienne est inconnue et se repose en première observation ; D1 est fail-open (toute erreur sort en silence, code 0) : une trace perdue en séance est rattrapée au `SessionStart` suivant.
 
 ### Contrat de sortie par événement (Phase 46)
 
@@ -1019,11 +1025,14 @@ mise à jour de tâche n'est pas câblé (P46-D-01). Chaque décision citée por
   `decision: "block"` avec `reason`, code 0, **jamais le code 2** (#60490). Erreur interne : `block` si `ARMEMENT_G4P` vaut `armed`, ligne d'observation sinon
   (P46-D-10) ; en mode dégradé, silence, code 0 (limite (ap)).
 - **`SessionStart`** — l'entrée vit dans le groupe SANS matcher (à côté du cliché de session), donc sur `startup`, `resume`, `clear`
-  et `compact`. Mode : `watchPaths` et réconciliation de D1 (à venir). Ne refuse jamais ; toute erreur : silence, code 0.
-- **`CwdChanged`** — aucun matcher ; racine lue dans `cwd` (limite (ao)). Ne refuse jamais ; toute erreur : silence, code 0.
+  et `compact`. Mode : D1 (46-07) — la liste surveillée en `watchPaths` et la réconciliation par hash ; sortie
+  `{"hookSpecificOutput":{"hookEventName":"SessionStart","watchPaths":[…],"additionalContext":"…"}}` (chaque clé seulement si non vide).
+  Ne refuse jamais ; toute erreur : silence, code 0.
+- **`CwdChanged`** — aucun matcher ; racine lue dans `cwd` (limite (ao)). Mode : D1 — la même liste, `watchPaths` au PREMIER niveau ET sous
+  `hookSpecificOutput` (`hookEventName: "CwdChanged"` ; la forme n'est pas mesurée, limite (az)). Ne refuse jamais ; toute erreur : silence, code 0.
 - **`FileChanged`** — aucun matcher (un `*` y serait un nom de fichier littéral, jamais un joker). Racine lue dans le `file_path` de
-  PREMIER niveau du payload (chaîne absolue sous la borne de longueur du cœur, sinon silence). Ne refuse jamais ; toute erreur :
-  silence, code 0.
+  PREMIER niveau du payload (chaîne absolue sous la borne de longueur du cœur, sinon silence). Mode : D1 — la trace ; il ne sort JAMAIS de
+  `watchPaths`. Ne refuse jamais ; toute erreur : silence, code 0.
 
 **Fail-open déclaré** des trois événements qui ne refusent jamais : une trace perdue en séance est rattrapée par la réconciliation de
 D1 (P46-D-10) ; la décision dans le doute (N-01) ne vaut que pour `PreToolUse`, tout autre événement en doute sort en silence.
@@ -1077,7 +1086,7 @@ au mode `SubagentStop` : sa constante vaut `observe`.
 
 Cinq listes que R-REFERENCE compare au code, chacune sur une seule ligne :
 
-- **Noms protégés par G6** : `STATE.md`, `INDEX.md`, `cloture.log`, `.recalc-cache.json`, `derogations-gates.log`, `config.json`.
+- **Noms protégés par G6** : `STATE.md`, `INDEX.md`, `cloture.log`, `.recalc-cache.json`, `derogations-gates.log`, `surveillance.log`, `config.json`.
 - **Scripts du hook protégés par G6** : `planning-hook.sh`, `check-gates-alive.sh`.
 - **Journal de dérogation** : `derogations-gates.log`.
 - **Marqueurs de projet de code (G7)** : `package.json`, `go.mod`, `Cargo.toml`, `pyproject.toml`, `pom.xml`, `build.gradle`, `build.gradle.kts`, `composer.json`, `Gemfile`, `tsconfig.json`, `Package.swift`, `*.xcodeproj`.
@@ -1103,7 +1112,8 @@ création par le dossier parent résolu et le nom en casefold. `config.json` n'e
 l'**adhésion** (F6 = f6-oui, Willy, AskUserQuestion session principale, 2026-09-30) : une écriture qui
 change ou retire `planning_version` est refusée, les autres clés restent libres ; le cache du recalcul
 l'est aussi (F7b = f7b-oui, même canal, même date), et le journal de dérogation (F7a = f7a-racine,
-même canal, même date). Le motif d'un refus nomme `recalc-planning.sh` (ou `deroger-gate.sh`) : le
+même canal, même date) ; le journal de D1, `surveillance.log` (Phase 46, 46-07, P46-D-07a), l'est aussi : il est inscrit par le
+moteur et le hook, jamais rédigé. Le motif d'un refus nomme `recalc-planning.sh` (ou `deroger-gate.sh`) : le
 `Stop` de la 44 invite à mettre à jour l'état, le refus ne le contredit pas. G6 est un refus de
 l'outil, pas du disque : `Bash` et `recalc-planning.sh` écrivent ces fichiers (P45-D-10).
 
@@ -1207,6 +1217,59 @@ et collez-la avec sa sortie dans un bloc (première ligne « $ <commande> », pu
 --gate=G4P --chemin=agents/<agent_type>`. Le gate « bloque le silence, pas la falsification » (limite (au)). Cas de canary :
 `G4P-handback` et `G4P-stop`, rejoués sur un producteur synthétique doté de `Bash` (`canary-producteur`). Limites : (au), (av), (aw).
 
+### D1 — écritures surveillées (Phase 46)
+
+D1 est la **détection** des écritures sur les fichiers que le moteur tient pour siens : toute écriture sur un fichier surveillé d'un lab
+adhérent est **expliquée** par le moteur, ou **tracée comme contournement**. Elle ne refuse jamais (P46-D-07 ; Willy, AskUserQuestion
+session principale, 2026-10-03, Q7 = b) et n'a pas de constante d'armement : une détection ne s'arme pas (P46-D-11).
+
+**Liste surveillée** (P46-D-07a). Fichier par fichier, jamais un dossier (#91634 : un `watchPaths` pointé sur un dossier est enregistré
+récursivement et a bloqué le fil principal de 20 à 45 s sur 137 000 fichiers), chemins absolus, **au plus 128** (`BORNE_WATCHPATHS`) :
+`STATE.md`, `INDEX.md`, `cloture.log`, le journal de dérogation et `config.json` à la racine du dossier de planning, puis `PLAN.md`,
+`CLOTURE.md`, `VERDICT.md` et `SUMMARY.md` de chaque **unité de forme modèle dont `SUMMARY.md` est absent** (approximation déterministe
+d'« unité non close », sans recalcul : une unité close voit ses écarts par la règle E du recalcul ; `SUMMARY.md` encore absent est dans la
+liste, pour voir sa création). Les unités sont parcourues dans l'ordre trié, la phase puis ses plans. Une troncature à la borne est tracée
+(une ligne `genre=borne`). Le journal de D1 n'en fait jamais partie : un watcher sur le fichier que sa propre trace réécrit bouclerait.
+
+**Sorties par événement.** `SessionStart` : `{"hookSpecificOutput":{"hookEventName":"SessionStart","watchPaths":[…],"additionalContext":"…"}}`
+(les clés `watchPaths` et `additionalContext` ne sont présentes que si elles sont non vides) ; `CwdChanged` : la même liste, `watchPaths` au premier
+niveau ET sous `{"hookSpecificOutput":{"hookEventName":"CwdChanged","watchPaths":[…]}}` (forme non mesurée, P46-D-08) ; `FileChanged` ne renvoie
+jamais de `watchPaths` (P46-D-07) : il trace, stdout vide. **Hors adhésion**, rien n'est renvoyé et le watcher ne démarre pas : le coût de D1 est
+**nul par construction** (aucune liste, aucun fichier lu, aucune ligne au journal), prouvé par R-D1-03 et par la mutation « adhésion ignorée ».
+**Fail-open** (P46-D-10) : toute erreur d'un mode de D1 sort en silence, code 0, jamais un `deny` ni un `block` ; aucune sortie de D1 n'en contient.
+
+**Journal.** `.planning/surveillance.log`, un seul fichier, ajout seul (`O_APPEND`, `O_NOFOLLOW`, 0600, verrou exclusif), protégé par G6 (l'écriture
+par outil est refusée) et connu du recalcul (jamais « Hors modèle »). Une ligne par fait, `<horodatage ISO UTC>  genre=<g>  chemin=<jeton>
+sha256=<hex|absent|->  par=<jeton>  source=<seance|reconciliation|->` (deux espaces entre champs), chaque valeur par l'encodeur injectif du journal
+(un nom de fichier qui porte un saut de ligne reste UNE ligne). Genres : `reference` (dernier état connu d'un chemin), `moteur` (écriture d'un
+écrivain du moteur, sha256 du fichier après écriture), `intention` (écriture par outil laissée passer par le hook), `contournement` (changement
+que rien n'explique), `borne` (liste tronquée), `signal` (contournements signalés au SessionStart). La fonction qui inscrit,
+`inscrire_surveillance`, est copiée ast-identique dans `planning-hook.sh`, `recalc-planning.sh`, `poser-verdict.sh` et `deroger-gate.sh` ;
+toute erreur d'inscription est silencieuse (D1 est fail-open).
+
+**Règle d'explication** (déterministe). Pour un chemin P de sha256 courant S (`absent` s'il n'existe pas, ou s'il n'est pas un fichier régulier — un lien
+n'est jamais suivi) : sans ligne `reference` antérieure, la **première observation** pose la référence (P, S) sans contournement (limite (ba)) ; un S égal
+à celui de la dernière référence n'est pas un changement, rien n'est inscrit ; sinon le changement est **expliqué** s'il existe, **après** la dernière
+`reference` de P, une ligne `moteur` de P de sha256 S, ou une ligne `intention` de P ; expliqué, D1 ajoute une `reference` (P, S) ; non expliqué, il
+ajoute une ligne `contournement` puis cette `reference`. Une intention n'explique donc qu'**un** changement (la référence qui suit la dépasse ; limite (ay)).
+
+**Écrivains.** `recalc-planning.sh` après chaque écriture effective de `STATE.md`, `INDEX.md` et `cloture.log` (jamais en lecture seule) ;
+`poser-verdict.sh` après l'écriture atomique d'un `VERDICT.md` d'unité et après la consommation d'une dérogation `PLAFOND` ; `deroger-gate.sh` après
+l'ajout au journal de dérogation ; le hook central après une ligne `consommee` et, en `PreToolUse`, quand la décision **finale** laisse passer une
+écriture par `Write`, `Edit` ou `NotebookEdit` sur un chemin de la liste (ligne `intention`, outil nommé, sans sha256 : le contenu n'est pas encore
+écrit). Une écriture refusée n'est jamais une intention. Une erreur d'inscription ne change jamais le code de sortie de l'écrivain.
+
+**Réconciliation au `SessionStart`.** Les empreintes des fichiers de la liste sont comparées au dernier état connu du journal (lu sur les 4 Mio de fin,
+`BORNE_LECTURE_SURVEILLANCE` ; un fichier de la liste est lu une seule fois) : un changement que rien n'explique est tracé (`contournement`,
+`source=reconciliation`), puis la référence est mise à jour. Les contournements tracés depuis la séance précédente — depuis la dernière ligne `signal` —
+sont signalés en **une ligne** de `additionalContext`, sans jamais bloquer : `[planning-core] D1 : <n> écriture(s) non expliquée(s) de fichiers
+surveillés depuis la séance précédente (<trois premiers chemins relatifs>…) — tracées dans .planning/surveillance.log` ; la ligne `signal` posée
+ensuite empêche qu'un `SessionStart` sans nouveau contournement le répète. La réconciliation rattrape aussi ce que le watcher ne voit pas (limite (ax)).
+
+**Canary.** D1 n'a pas de constante d'armement mais a son canary : le cas `D1-trace` (catégorie `D1` de `CANARIS`) rejoue un `FileChanged` synthétique
+sur un fichier surveillé du lab synthétique, d'abord sur son état initial (la référence), puis modifié hors du moteur : la commande doit se taire ET
+ajouter une ligne `contournement` au journal du lab synthétique ; l'attendu est `trace`, jamais dérivé de la table d'armement. Limites : (ax) à (ba).
+
 ### Le hook par rôle (GATE-09)
 
 Le rôle se **dérive** de la définition de l'agent écrivain (`agent_type` du payload), par les
@@ -1304,7 +1367,8 @@ journal jetable) tant que le gate est `observe`, refus de gate dès qu'il est `a
 minimale déclarée et vérifiée cas par cas (P45-D-20) : script absent, `python3` absent, `Task` et
 `Agent`, fil principal, agent `plugin:`. Il rend visible la limite (i). Les cas de G4′ (`G4P-handback`, `G4P-stop`, Phase 46)
 rejouent le rapport sans sortie brute d'un producteur synthétique doté de `Bash` ; l'attendu armé d'un cas `SubagentStop` est
-l'objet `decision: "block"` en code 0, celui d'un cas `SubagentHandback` un `deny`.
+l'objet `decision: "block"` en code 0, celui d'un cas `SubagentHandback` un `deny`. Le cas `D1-trace` (Phase 46, 46-07) est d'une autre catégorie : D1 ne
+s'arme pas, son attendu est une trace (une ligne `contournement` de plus au journal du lab synthétique, stdout vide), et sa défaillance est signalée comme celle d'un gate.
 
 ### Le rejeu (GATE-13)
 

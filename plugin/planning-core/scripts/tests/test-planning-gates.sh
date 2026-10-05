@@ -44,6 +44,10 @@
 #   R-CANG-ROLE     les cas de canary du rôle (45-09) : écriture d'un juge, dispatch d'un worker sous Agent ET sous Task, sur des
 #                   définitions d'agents que le canary pose dans son lab synthétique ; observe (une ligne gate=ROLE par cas) puis armed
 #   R-CANG-ROLE-MORT evaluer_role neutralisé : le canary signale, une ligne qui nomme ROLE-juge
+#   R-CANG-D1      le cas de canary `D1-trace` (46-07, P46-D-11 : D1 n'est jamais armé mais a son canary) : un FileChanged synthétique sur un
+#                   fichier surveillé modifié hors du moteur exige une ligne de contournement au journal du lab synthétique (état livré et
+#                   copie armée : code 3) ; une copie du hook où la trace est neutralisée fait signaler le canary, une ligne qui nomme D1-trace
+#                   (MUT-CANG-D1-CAS : le cas retiré de CANARIS)
 #   R-CANG-COUVERTURE la couverture minimale de P45-D-20 (script absent, python3 absent, Task, Agent, fil principal, plugin:), étiquetée cas
 #                   par cas et vérifiée contre le payload ; `--couverture` ; une couverture incomplète fait signaler le canary
 #                   (MUT-CANG-TASK : le cas Task retiré ; MUT-CANG-COUVERTURE : le contrôle de couverture qui rend toujours « complet »)
@@ -1657,6 +1661,35 @@ def controle_cang_g3_03(ctx, script):
         if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G3-livrable-absent" not in lignes[0] or "G6-principal" in lignes[0] or "G1-sans-cadrage" in lignes[0]:
             fautes.append("evaluer_g3 neutralisé (%s) : rc=%d %s" % (valeur, rc, court(out)))
     return (not fautes), ("; ".join(fautes) if fautes else "evaluer_g3 neutralisé : code 0 et une ligne qui nomme G3-livrable-absent (et ni G6 ni G1), observe comme armed")
+
+
+def controle_cang_d1(ctx, script):
+    """R-CANG-D1 (46-07 ; P46-D-11) : le canary porte le cas `D1-trace` (FileChanged synthétique sur un fichier surveillé) ; état livré et copie armée
+    (les étapes 1 : D1 n'a pas de constante d'armement) : code 3, stdout vide (la trace attendue est trouvée au journal du lab synthétique) ; copie du hook
+    où la trace est neutralisée (plus aucune ligne de contournement) : code 0, UNE ligne de signal qui nomme D1-trace et aucun gate."""
+    dossier = _dossier(ctx, script)
+    texte = open(os.path.join(dossier, "check-gates-alive.sh"), encoding="utf-8").read()
+    cas = '"D1-trace|D1|nominal|FileChanged:.planning/" + NOM_ETAT + "|",'
+    if texte.count(cas) != 1:
+        return False, "le cas %s n'est pas (une seule fois) dans CANARIS" % cas
+    fautes = []
+    for valeur, tel_quel in (("observe", True), ("armed", False)):
+        d = scripts_canary(ctx, dossier, valeur, tel_quel=tel_quel)
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        if rc != 3 or out != b"":
+            fautes.append("%s : code 3 et stdout vide attendus — obtenu rc=%d stdout=%s stderr=%s" % ("état livré" if tel_quel else "copie armée", rc, court(out), court(err)))
+    neutre, raison = make_hook_mutant(ctx, "D1-TRACE-NEUTRE", "# d1-contournement", 'return ["reference"]  # d1-contournement')
+    if neutre is None:
+        return False, "mutant du hook invalide : " + raison
+    for valeur in ("observe", "armed"):
+        d = scripts_canary(ctx, dossier, valeur, hook=os.path.join(neutre, "planning-hook.sh"))
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+        if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "D1-trace" not in lignes[0] or "G6-principal" in lignes[0]:
+            fautes.append("trace neutralisée (%s) : code 0 et une ligne qui nomme D1-trace attendus — obtenu rc=%d %s" % (valeur, rc, court(out)))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "cas D1-trace : état livré et copie armée, code 3 (la ligne de contournement est trouvée) ; trace neutralisée : code 0 et une ligne qui nomme D1-trace, "
+                          "observe comme armed")
 
 
 def controle_cang_01(ctx, script):
@@ -3292,14 +3325,16 @@ def sec_cang(ctx):
             ("R-CANG-EVT-02", controle_cang_evt_02, "canary de session, cas DEGRADE D09 et D10 (SubagentHandback en mode dégradé)"),
             ("R-CANG-G3-01", controle_cang_g3_01, "canary de session, cas G3-livrable-absent, état livré (G3 en observe)"),
             ("R-CANG-G3-02", controle_cang_g3_02, "canary de session, cas G3-livrable-absent, G3 et G4 armed"),
-            ("R-CANG-G3-03", controle_cang_g3_03, "canary de session, evaluer_g3 neutralisé")):
+            ("R-CANG-G3-03", controle_cang_g3_03, "canary de session, evaluer_g3 neutralisé"),
+            ("R-CANG-D1", controle_cang_d1, "canary de session, cas D1-trace (FileChanged synthétique, trace exigée)")):
         bon, detail = ctrl(ctx, None)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
     # Mutants du canary (Phase 46) : l'événement non câblé n'est plus vu, une autre commande est reconnue, le cas D09 est retiré
     for ident, motif, remplacement, ctrl, nom_ctrl in (
             ("CANG-EVT-MANQUANT", "# canary-evenements", "sans, non_reconnus = [], []  # canary-evenements", controle_cang_evt_01, "R-CANG-EVT-01"),
             ("CANG-EVT-RECONNUE", "# canary-evenement-reconnue", "if True:  # canary-evenement-reconnue", controle_cang_evt_01, "R-CANG-EVT-01"),
-            ("CANG-EVT-CAS-D09", '"D09|DEGRADE|script-absent|SubagentHandback|script-absent",', "", controle_cang_evt_02, "R-CANG-EVT-02")):
+            ("CANG-EVT-CAS-D09", '"D09|DEGRADE|script-absent|SubagentHandback|script-absent",', "", controle_cang_evt_02, "R-CANG-EVT-02"),
+            ("CANG-D1-CAS", '"D1-trace|D1|nominal|FileChanged:.planning/" + NOM_ETAT + "|",', "", controle_cang_d1, "R-CANG-D1")):
         dossier, raison = make_script_mutant(ctx, "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF", ident, motif, remplacement)
         if dossier is None:
             komut(ident, "mutant du canary valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
@@ -4951,6 +4986,10 @@ LIMITES_REFERENCE = (
     ("au", ("falsification",)),
     ("av", ("Bash", "P46-D-02b")),
     ("aw", ("fork", "A4", "A6")),
+    ("ax", ("#95440",)),
+    ("ay", ("auteur", "intention")),
+    ("az", ("watchPaths", "A2", "A3")),
+    ("ba", ("référence", "fail-open")),
 )
 
 
@@ -5114,7 +5153,7 @@ def sec_reference(ctx):
             print(e)
         ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
         return
-    ok("R-REFERENCE la table d'armement (huit gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (aw) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
+    ok("R-REFERENCE la table d'armement (huit gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (ba) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
     original = open(chemin, encoding="utf-8").read()
 
     def mutant_texte(ident, fonction, motif):
@@ -5171,7 +5210,7 @@ def sec_reference(ctx):
         if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
             non_tuees.append(lettre)
     if non_tuees:
-        komut("REFERENCE-LIMITES", "chaque limite (a) à (aw) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+        komut("REFERENCE-LIMITES", "chaque limite (a) à (ba) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
               "non tuées : " + ", ".join(non_tuees))
     else:
         okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))

@@ -10,13 +10,15 @@
 # aiguillant (absent : PreToolUse, compatibilité des payloads existants ; inconnu : silence, limite (aq)) :
 #   PreToolUse    G1…G7, rôle, G3, G4, G4′ (sur SubagentHandback) — refus : deny JSON, code 0
 #   SubagentStop  repli de G4′ hors mode auto — refus : `decision: "block"` JSON, code 0, JAMAIS le code 2 (P46-D-10, #60490)
-#   SessionStart, CwdChanged, FileChanged   ne refusent JAMAIS ; toute erreur sort en silence, code 0 (fail-open déclaré :
-#                 une trace perdue est rattrapée par la réconciliation de D1, P46-D-10)
+#   SessionStart, CwdChanged, FileChanged   D1 (46-07) : ne refusent JAMAIS ; toute erreur sort en silence, code 0 (fail-open déclaré :
+#                 une trace perdue est rattrapée par la réconciliation de D1, P46-D-10). SessionStart et CwdChanged renvoient la liste
+#                 surveillée (`watchPaths`, fichier par fichier) ; FileChanged ne sort rien et trace ce qu'il voit au journal de D1
 # La décision dans le doute (N-01, `decider_dans_le_doute`) ne vaut que pour PreToolUse : tout autre événement en doute
 # sort en silence.
 #
 # Entrée : le payload JSON du harnais sur stdin. Sortie : rien, ou UN objet JSON (PreToolUse : hookSpecificOutput,
-# refus permissionDecision deny, avertissement additionalContext ; SubagentStop : decision block), toujours code 0 —
+# refus permissionDecision deny, avertissement additionalContext ; SubagentStop : decision block ; SessionStart, CwdChanged :
+# watchPaths et additionalContext, jamais une décision), toujours code 0 —
 # jamais exit 2 (P45-D-08, DIV-2, P46-D-10). Aucun message ne porte de chemin absolu hors du lab, ni « no such file »,
 # ni « can't open » (#60490).
 #
@@ -1206,6 +1208,45 @@ def _jeton_journal(valeur, repli):
     return jeton
 
 
+# Journal de D1 (Phase 46, 46-07 ; P46-D-07a) : copie ast-identique de `inscrire_surveillance` dans planning-hook.sh, recalc-planning.sh,
+# poser-verdict.sh et deroger-gate.sh (un contrôle de test-d1-surveillance.sh compare les arbres de syntaxe, R-D1-09) : les écrivains
+# du moteur y inscrivent ce qu'ils écrivent, le hook y trace ce qu'il observe.
+def inscrire_surveillance(racine, genre, chemin_rel, empreinte, par, source):
+    """Ajoute UNE ligne au journal de D1, `<racine>/.planning/surveillance.log` : `<horodatage ISO UTC>  genre=<g>  chemin=<jeton>  sha256=<hex|absent|->
+    par=<jeton>  source=<seance|reconciliation|->` (deux espaces entre champs), chaque valeur par `_jeton_journal` (injectif : un nom de fichier
+    qui porte un saut de ligne reste UNE ligne). Ajout seul (O_APPEND, O_NOFOLLOW, 0600), sous verrou exclusif quand `fcntl` existe. Un
+    journal qui n'est pas un fichier régulier (lien compris), un dossier de planning en lien, toute erreur : AUCUNE ligne, jamais une
+    exception qui remonte (D1 est fail-open, P46-D-10). Jamais appelée en lecture seule."""
+    try:
+        import time as _temps
+        try:
+            import fcntl as _verrou
+        except ImportError:
+            _verrou = None
+        planning = os.path.join(racine, ".planning")
+        chemin = os.path.join(planning, "surveillance.log")
+        if os.path.islink(planning) or (os.path.lexists(chemin) and not stat.S_ISREG(os.lstat(chemin).st_mode)):
+            return
+        ligne = "{}  genre={}  chemin={}  sha256={}  par={}  source={}\n".format(
+            _temps.strftime("%Y-%m-%dT%H:%M:%SZ", _temps.gmtime()), _jeton_journal(genre, "-"), _jeton_journal(chemin_rel, "-"),
+            _jeton_journal(empreinte, "-"), _jeton_journal(par, "-"), _jeton_journal(source, "-"))
+        descripteur = os.open(chemin, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0), 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(descripteur).st_mode):
+                return
+            if hasattr(os, "fchmod"):
+                os.fchmod(descripteur, 0o600)
+            if _verrou is not None:
+                _verrou.flock(descripteur, _verrou.LOCK_EX)
+            octets = ligne.encode("utf-8")
+            while octets:
+                octets = octets[os.write(descripteur, octets):]
+        finally:
+            os.close(descripteur)
+    except Exception:
+        return
+
+
 def chemin_journal_observation(xdg, home):
     """Chemin du journal d'observation, dérivé des deux valeurs reçues en arguments : `<xdg>/vibeflow/
     gates-observation/observation.log`, à défaut `<home>/.cache/...`. Une valeur vide ou non absolue
@@ -1248,6 +1289,7 @@ def observer(verdict, contexte):
 # sert plus. Le journal doit être un fichier régulier (lstat) : un lien ou un autre type annule toute
 # dérogation, sans erreur (T-45-35).
 NOM_JOURNAL_DEROGATIONS = "derogations-gates.log"
+NOM_SURVEILLANCE = "surveillance.log"  # journal de D1 (46-07, P46-D-07a) : inscrit par le moteur, protégé par G6, jamais surveillé
 LIGNE_DEROGATION_RE = re.compile(r"^(\S+)  (derogation|consommee)  id=([0-9]+)  gate=(\S+)  chemin=(\S+)(?:  (.*))?$")
 
 
@@ -1370,6 +1412,7 @@ def decider(verdicts, contexte):
         return refus, citations
     for verdict, entree in couverts:
         if consommer(contexte["racine"], entree):
+            inscrire_ecriture_moteur(contexte["racine"], ".planning/" + NOM_JOURNAL_DEROGATIONS, PAR_HOOK)  # d1-moteur-consommation : une écriture du moteur, expliquée au journal de D1
             citations.append(citer(entree))
         else:
             refus.append("[planning-core] %s : %s" % (verdict.gate, verdict.raison))
@@ -1438,11 +1481,14 @@ def _lien_dur_vers_verdict(ecrit, racine):
 # jour l'état, le refus ne doit pas le contredire. Le cache du recalcul est protégé (F7b = f7b-oui, Willy,
 # AskUserQuestion session principale, 2026-09-30) ; config.json l'est pour l'adhésion seulement (F6 =
 # f6-oui, même canal, même date) : une écriture qui change ou retire planning_version désarmerait tous
-# les gates (P45-D-01), les autres clés restent libres.
+# les gates (P45-D-01), les autres clés restent libres. Phase 46 (46-07, P46-D-07a) : le journal de D1 est protégé comme celui des
+# dérogations (écriture par outil refusée, genre `d1`) ; il n'est JAMAIS surveillé (un watcher sur le fichier que sa propre trace
+# réécrit bouclerait).
 GENERES_PAR_RECALC = ("STATE.md", "INDEX.md", "cloture.log", ".recalc-cache.json")  # g6-noms
 NOM_CONFIG = "config.json"
 PROTEGES_G6 = dict([(nom.casefold(), (nom, "recalc")) for nom in GENERES_PAR_RECALC]
                    + [(NOM_JOURNAL_DEROGATIONS.casefold(), (NOM_JOURNAL_DEROGATIONS, "derog")),
+                      (NOM_SURVEILLANCE.casefold(), (NOM_SURVEILLANCE, "d1")),
                       (NOM_CONFIG.casefold(), (NOM_CONFIG, "adhesion"))])
 RAISON_ADHESION = ("config.json : changer ou retirer l'adhésion cycles-v1 désarmerait les gates (P45-D-01) ; "
                    "une écriture par outil doit garder planning_version = cycles-v1")
@@ -1459,6 +1505,8 @@ def raison_g6(nom, genre):
     if genre == "derog":
         return ("%s est un fichier inscrit par deroger-gate.sh — l'écriture par outil est refusée ; "
                 "inscrivez la dérogation par deroger-gate.sh" % nom)
+    if genre == "d1":
+        return "%s est inscrit par le moteur (D1) : l'écriture par outil est refusée ; ce journal ne se rédige pas" % nom
     return ("%s est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; "
             "recalculez par recalc-planning.sh" % nom)
 
@@ -2640,10 +2688,262 @@ def evaluer_gates(contexte):
     return resultats
 
 
+# --- D1 : écritures surveillées (Phase 46, 46-07 ; P46-D-07, P46-D-07a, P46-D-10) ---------------------------------------------------------
+# Toute écriture sur un fichier surveillé d'un lab adhérent est EXPLIQUÉE par le moteur ou TRACÉE comme contournement : en séance par
+# FileChanged, entre les séances par une réconciliation par hash au SessionStart. D1 DÉTECTE, ne refuse JAMAIS (fail-open déclaré : toute
+# erreur sort en silence, code 0) et ne coûte rien hors adhésion (aucune liste n'est renvoyée, le watcher ne démarre pas). Fichiers surveillés,
+# un par un (jamais un dossier, #91634) : cinq à la racine du dossier de planning, quatre par unité de forme modèle dont SUMMARY.md est absent
+# (approximation déterministe d'« unité non close », sans recalcul). Le journal de D1 n'en fait jamais partie. Limites : (ax) à (ba) de la
+# référence.
+BORNE_WATCHPATHS = 128
+BORNE_LECTURE_SURVEILLANCE = 4194304
+PAR_HOOK = "planning-hook.sh"
+FICHIERS_RACINE_SURVEILLES = ("STATE.md", "INDEX.md", "cloture.log", NOM_JOURNAL_DEROGATIONS, NOM_CONFIG)
+FICHIERS_UNITE_SURVEILLES = ("PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md")
+LIGNE_SURVEILLANCE_RE = re.compile(r"^(\S+)  genre=(\S+)  chemin=(\S+)  sha256=(\S+)  par=(\S+)  source=(\S+)$")
+
+
+def _unites_non_closes(racine):
+    """Dossiers des unités de forme modèle dont SUMMARY.md est absent, en parcours trié : pour chaque phase de chaque cycle, le dossier de la
+    phase puis ceux de ses plans (comme `plans_ouverts`, sans lire ni PLAN.md ni CLOTURE.md : aucune dérivation d'état). Un générateur : le
+    consommateur s'arrête dès que la borne est atteinte."""
+    base = os.path.join(racine, NOM_PLANNING, "cycles")
+    for cycle in _sous_dossiers(base):
+        phases = os.path.join(base, cycle, "phases")
+        for phase in _sous_dossiers(phases):
+            dossier_phase = os.path.join(phases, phase)
+            dossiers = [dossier_phase] + [os.path.join(dossier_phase, "plans", plan) for plan in _sous_dossiers(os.path.join(dossier_phase, "plans"))]
+            for dossier in dossiers:
+                if not os.path.lexists(os.path.join(dossier, "SUMMARY.md")):
+                    yield dossier
+
+
+def chemins_surveilles(racine):
+    """(liste de chemins ABSOLUS, tronquée) : les cinq fichiers racine du dossier de planning puis, par unité non close, ses quatre fichiers
+    (SUMMARY.md encore absent compris), FICHIER PAR FICHIER — jamais un dossier, un watcher récursif sur un dossier géant bloquant le fil
+    principal (#91634). Au plus BORNE_WATCHPATHS chemins ; la troncature est signalée à l'appelant, qui la trace. Ni le journal de D1 ni le
+    cache du recalcul n'en font partie."""
+    planning = os.path.join(racine, NOM_PLANNING)
+    liste = [os.path.join(planning, nom) for nom in FICHIERS_RACINE_SURVEILLES]
+    for dossier in _unites_non_closes(racine):
+        for nom in FICHIERS_UNITE_SURVEILLES:
+            liste.append(os.path.join(dossier, nom))  # d1-fichier-par-fichier
+        if len(liste) > BORNE_WATCHPATHS:
+            break
+    if len(liste) > BORNE_WATCHPATHS:  # d1-borne
+        return liste[:BORNE_WATCHPATHS], True
+    return liste, False
+
+
+def chemin_relatif_surveille(racine, chemin):
+    """Chemin relatif au lab (séparateur `/`) si `chemin` a la FORME d'un fichier surveillé — un des cinq fichiers racine du dossier de
+    planning, ou un des quatre fichiers d'une unité de forme modèle, SUMMARY.md compris (sa création est précisément ce qu'un contournement
+    ferait) —, sinon None : un fichier hors du dossier de planning, un livrable, le journal de D1 ne sont jamais surveillés. Le dossier parent
+    est résolu physiquement (l'alias d'un dossier ne change pas le lab) ; le fichier lui-même n'est jamais suivi."""
+    try:
+        parent, nom = os.path.split(chemin)
+        composants = os.path.relpath(os.path.join(os.path.realpath(parent), nom), racine).split(os.sep)
+    except (OSError, ValueError):
+        return None
+    reste = composants[1:]
+    if composants[0] != NOM_PLANNING:
+        return None
+    if len(reste) == 1:
+        conforme = reste[0] in FICHIERS_RACINE_SURVEILLES
+    elif len(reste) in (5, 7):
+        conforme = (reste[0] == "cycles" and reste[2] == "phases" and NOM_UNITE.match(reste[1]) is not None and NOM_UNITE.match(reste[3]) is not None
+                    and reste[-1] in FICHIERS_UNITE_SURVEILLES
+                    and (len(reste) == 5 or (reste[4] == "plans" and NOM_UNITE.match(reste[5]) is not None)))
+    else:
+        conforme = False
+    return "/".join(composants) if conforme else None
+
+
+def empreinte_fichier(chemin):
+    """sha256 hexadécimal du fichier régulier `chemin`, lu sans suivre de lien ; `absent` s'il n'existe pas ou n'est pas un fichier régulier (un
+    lien, un dossier, un tube comptent comme absents) ; None si la lecture échoue ou si le fichier dépasse BORNE_OCTETS_LIVRABLES (aucune ligne :
+    D1 est fail-open)."""
+    import hashlib
+    try:
+        etat = os.lstat(chemin)
+    except (FileNotFoundError, NotADirectoryError):
+        return "absent"
+    except OSError:
+        return None
+    if not stat.S_ISREG(etat.st_mode):
+        return "absent"
+    if etat.st_size > BORNE_OCTETS_LIVRABLES:
+        return None
+    try:
+        hacheur = hashlib.sha256()
+        with os.fdopen(os.open(chemin, DRAPEAUX_LIVRABLE), "rb") as fh:
+            while True:
+                bloc = fh.read(1048576)
+                if not bloc:
+                    break
+                hacheur.update(bloc)
+    except OSError:
+        return None
+    return hacheur.hexdigest()
+
+
+def lire_surveillance(racine):
+    """Entrées du journal de D1, dans l'ordre : dict(genre, chemin, sha, par, source), `chemin` décodé. Lecture bornée aux
+    BORNE_LECTURE_SURVEILLANCE octets de FIN (la ligne que la fenêtre coupe est écartée : une référence plus ancienne est inconnue, la première
+    observation la repose, limite (ba)). [] si le journal est absent, n'est pas un fichier régulier (un lien n'est jamais suivi) ou ne se lit
+    pas ; une ligne mal formée est ignorée."""
+    chemin = os.path.join(racine, NOM_PLANNING, NOM_SURVEILLANCE)
+    try:
+        if not est_fichier_regulier(chemin):
+            return []
+        with os.fdopen(os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN | SANS_BLOCAGE), "rb") as fh:
+            debut = max(0, os.fstat(fh.fileno()).st_size - BORNE_LECTURE_SURVEILLANCE)  # d1-fenetre
+            fh.seek(debut)
+            octets = fh.read(BORNE_LECTURE_SURVEILLANCE)
+    except OSError:
+        return []
+    if debut > 0:
+        coupe = octets.find(b"\n")
+        octets = octets[coupe + 1:] if coupe >= 0 else b""
+    entrees = []
+    for ligne in octets.decode("utf-8", "replace").split("\n"):
+        m = LIGNE_SURVEILLANCE_RE.match(ligne)
+        if m:
+            entrees.append({"genre": m.group(2), "chemin": urllib.parse.unquote(m.group(3), errors="replace"), "sha": m.group(4),
+                            "par": m.group(5), "source": m.group(6)})
+    return entrees
+
+
+def entrees_par_chemin(entrees):
+    """Les entrées du journal groupées par chemin, chaque groupe dans l'ordre du journal : une seule passe sur le journal, quel que soit le nombre de
+    chemins de la liste (le coût d'une réconciliation ne dépend pas du nombre de chemins surveillés multiplié par la taille du journal)."""
+    groupes = {}
+    for entree in entrees:
+        groupes.setdefault(entree["chemin"], []).append(entree)
+    return groupes
+
+
+def decider_trace(entrees, sha):
+    """Lignes que le fichier dont `entrees` sont les lignes du journal (dans l'ordre), de sha256 courant `sha` (`absent` s'il n'existe pas),
+    appelle au journal. Règle d'explication, déterministe : sans référence antérieure, la première observation pose la référence sans
+    contournement (limite (ba)) ; un sha égal à celui de la dernière référence n'est pas un changement (rien à inscrire : un événement répété ne se
+    compte pas deux fois) ; un changement est EXPLIQUÉ s'il existe, APRÈS la dernière référence du chemin, une ligne `moteur` de sha `sha` (une
+    écriture du moteur, journalisée par son écrivain) ou une ligne `intention` (une écriture par outil que le hook a laissée passer) — une intention
+    n'explique qu'UN changement, puisque la référence qui suit la dépasse. Expliqué : `reference` seule ; sinon `contournement` puis `reference`."""
+    derniere = None
+    for rang, entree in enumerate(entrees):
+        if entree["genre"] == "reference":
+            derniere = rang
+    if derniere is None:
+        return ["reference"]
+    if entrees[derniere]["sha"] == sha:
+        return []
+    apres = entrees[derniere + 1:]  # d1-apres
+    expliquee = any((e["genre"] == "moteur" and e["sha"] == sha) or e["genre"] == "intention" for e in apres)  # d1-explique
+    return ["reference"] if expliquee else ["contournement", "reference"]  # d1-contournement
+
+
+def tracer_changement(racine, rel, sha, entrees, source):
+    """Inscrit les lignes que `decider_trace` demande pour le fichier `rel` (`entrees` : ses lignes du journal) et rend les genres inscrits ; un
+    contournement n'a pas d'auteur (`par` vide : aucun auteur dans le payload, limite (ay))."""
+    genres = decider_trace(entrees, sha)
+    for genre in genres:
+        inscrire_surveillance(racine, genre, rel, sha, None if genre == "contournement" else PAR_HOOK, source)
+    return genres
+
+
+def inscrire_ecriture_moteur(racine, chemin_rel, par):
+    """Après une écriture du MOTEUR sur `chemin_rel` (relatif au lab, séparateur `/`), inscrit la ligne `moteur` avec le sha256 du fichier APRÈS
+    écriture : c'est elle qui explique le FileChanged qui suit. Aucune ligne si le fichier ne se lit pas ; jamais une exception : l'inscription ne
+    change JAMAIS le résultat de l'écrivain (D1 est fail-open)."""
+    try:
+        empreinte = empreinte_fichier(os.path.join(racine, *chemin_rel.split("/")))
+        if empreinte is not None:
+            inscrire_surveillance(racine, "moteur", chemin_rel, empreinte, par, None)
+    except Exception:
+        return
+
+
+def inscrire_intentions(payload, cibles):
+    """Écriture par Write, Edit ou NotebookEdit que la décision FINALE du PreToolUse laisse passer sur un fichier surveillé d'un lab adhérent : une
+    ligne `intention` (outil, chemin, sans sha256 — le contenu n'est pas encore écrit). Elle explique le changement que le FileChanged verra, un seul
+    (limite (ay)). Jamais une exception ni un refus : un échec ne change pas la décision du hook."""
+    try:
+        outil = payload.get("tool_name")
+        if outil not in OUTILS_ECRITURE:
+            return
+        for forme, racine_cible in cibles:
+            rel = chemin_relatif_surveille(racine_cible, forme) if forme else None
+            if rel is not None:
+                inscrire_surveillance(racine_cible, "intention", rel, None, outil, None)
+    except Exception:
+        return
+
+
+def reconcilier(racine, liste, tronquee):
+    """Réconciliation par hash au SessionStart (P46-D-07) : les empreintes des fichiers surveillés sont comparées au dernier état connu du journal (une
+    lecture bornée du journal, une lecture de chaque fichier de la liste). Une première observation pose la référence ; un changement que rien n'explique
+    est tracé comme contournement (`source=reconciliation`) ; une troncature à la borne est tracée. Rend le signal à porter au contexte — les
+    contournements tracés depuis la séance précédente, c'est-à-dire depuis la dernière ligne `signal` — ou None ; la ligne `signal` est posée, de sorte
+    qu'un SessionStart sans nouveau contournement ne le répète pas."""
+    entrees = lire_surveillance(racine)
+    par_chemin = entrees_par_chemin(entrees)
+    contournements = []
+    for entree in entrees:
+        if entree["genre"] == "signal":
+            contournements = []
+        elif entree["genre"] == "contournement":
+            contournements.append(entree["chemin"])
+    for chemin in liste:
+        rel = os.path.relpath(chemin, racine).replace(os.sep, "/")
+        sha = empreinte_fichier(chemin)
+        if sha is None:
+            continue
+        genres = tracer_changement(racine, rel, sha, par_chemin.get(rel, []), "reconciliation")  # d1-reconciliation
+        if "contournement" in genres:
+            contournements.append(rel)
+    if tronquee:
+        inscrire_surveillance(racine, "borne", None, None, PAR_HOOK, "reconciliation")  # d1-troncature
+    if not contournements:
+        return None
+    distincts = []
+    for chemin in contournements:
+        if chemin not in distincts:
+            distincts.append(chemin)
+    inscrire_surveillance(racine, "signal", None, None, PAR_HOOK, "reconciliation")  # d1-signal
+    return ("[planning-core] D1 : %d écriture(s) non expliquée(s) de fichiers surveillés depuis la séance précédente (%s%s) — tracées dans .planning/surveillance.log"
+            % (len(contournements), ", ".join(distincts[:3]), "…" if len(distincts) > 3 else ""))
+
+
+def sortie_surveillance(evenement, liste, texte):
+    """Objet de sortie de SessionStart (`hookSpecificOutput` : `watchPaths` et `additionalContext`, chaque clé présente seulement si non vide) ou de
+    CwdChanged (`watchPaths` au PREMIER niveau ET sous `hookSpecificOutput` : la forme n'est pas mesurée, P46-D-08, les deux sont émises) ; None si rien à
+    dire. Jamais une décision (`deny`, `block`) : D1 ne refuse jamais."""
+    if evenement == EVT_CWD_CHANGED:
+        return {"watchPaths": list(liste), "hookSpecificOutput": {"hookEventName": EVT_CWD_CHANGED, "watchPaths": list(liste)}} if liste else None
+    corps = {"hookEventName": evenement}
+    if liste:
+        corps["watchPaths"] = list(liste)
+    if texte:
+        corps["additionalContext"] = _message_sur(texte)
+    return {"hookSpecificOutput": corps} if len(corps) > 1 else None
+
+
+def sortie_d1(objet):
+    """Émet l'objet de sortie de SessionStart ou de CwdChanged (rien si vide). Un objet qui porterait une décision n'est jamais émis."""
+    if not isinstance(objet, dict) or not objet:
+        return
+    corps = objet.get("hookSpecificOutput")
+    if "decision" in objet or (isinstance(corps, dict) and ("permissionDecision" in corps or "decision" in corps)):  # d1-sans-refus
+        return
+    _emettre(objet)
+
+
 # --- Modes par événement (Phase 46, P46-D-09, P46-D-10) ----------------------------------------------------------------
-# Chaque mode reçoit le contexte du lab adhérent et rend une liste de raisons de blocage ou None. Seul SubagentStop émet (décision
-# `block`, code 0) ; SessionStart, CwdChanged et FileChanged ne refusent JAMAIS : ce qu'un de leurs modes rendrait est ignoré. SubagentStop
-# porte le repli de G4′ (46-06) ; SessionStart, CwdChanged et FileChanged restent des points d'accroche (D1 en 46-07).
+# Chaque mode reçoit le contexte du lab adhérent. Seul SubagentStop REFUSE (il rend ses raisons de blocage à `main`, qui émet la décision
+# `block`, code 0) ; SessionStart, CwdChanged et FileChanged ne refusent JAMAIS. Les modes de D1 (46-07) ne rendent rien : SessionStart et
+# CwdChanged déposent leur objet de sortie dans `contexte["sortie_d1"]`, que `main` émet (`watchPaths` et `additionalContext`, jamais `deny` ni
+# `block`) ; FileChanged ne sort rien. Une exception d'un mode D1 sort en silence, code 0.
 def mode_subagent_stop(contexte):
     """Repli de G4′ hors mode auto (P46-D-02, P46-D-10) : le rapport est `last_assistant_message`, jugé par le MÊME prédicat que le PreToolUse de
     SubagentHandback (`evaluer_g4p`) et passé par le même entonnoir (observe journalise, armé refuse, dérogation nominative à usage unique).
@@ -2659,17 +2959,36 @@ def mode_subagent_stop(contexte):
 
 
 def mode_session_start(contexte):
-    """`watchPaths` et réconciliation de D1 : aucune évaluation encore."""
+    """D1 au SessionStart (46-07) : la liste surveillée du lab adhérent, fichier par fichier (`watchPaths`), et la réconciliation par hash des fichiers
+    de cette liste avec le dernier état connu (les changements que rien n'explique sont tracés ; le signal tient en une ligne de `additionalContext`).
+    L'objet de sortie est déposé dans `contexte["sortie_d1"]`, que `main` émet. Ne bloque jamais."""
+    racine = contexte["racine"]
+    liste, tronquee = chemins_surveilles(racine)  # d1-liste
+    signal = reconcilier(racine, liste, tronquee)
+    contexte["sortie_d1"] = sortie_surveillance(EVT_SESSION_START, liste, signal)
     return None  # evt-mode-sessionstart
 
 
 def mode_cwd_changed(contexte):
-    """Racine lue dans `cwd` (`new_cwd` non lu, limite (ao)) ; `watchPaths` de D1 : aucune évaluation encore."""
+    """Racine lue dans `cwd` (`new_cwd` non lu, limite (ao)) ; D1 renvoie la même liste surveillée, sous les deux formes de `watchPaths`
+    (`sortie_surveillance`). Pas de réconciliation : elle est faite au SessionStart. La limite (ax) (#95440 : FileChanged sourd après un `cd`) est
+    rattrapée par cette réconciliation."""
+    liste, _tronquee = chemins_surveilles(contexte["racine"])  # d1-cwd-liste
+    contexte["sortie_d1"] = sortie_surveillance(EVT_CWD_CHANGED, liste, None)
     return None  # evt-mode-cwdchanged
 
 
 def mode_file_changed(contexte):
-    """Trace de D1 : aucune évaluation encore."""
+    """D1 en séance (46-07) : un fichier surveillé d'un lab adhérent a changé (`file_path` de premier niveau, `event` change, add ou unlink).
+    Son sha256 courant (`absent` s'il a disparu) est comparé à la dernière référence du journal ; un changement que rien n'explique est tracé comme
+    contournement, puis la référence est mise à jour. Un fichier qui n'est pas surveillé : rien. Ne refuse jamais et ne renvoie JAMAIS de
+    `watchPaths` (P46-D-07)."""
+    racine, chemin = contexte["racine"], contexte["ecrit"]
+    rel = chemin_relatif_surveille(racine, chemin)
+    if rel is not None:
+        sha = empreinte_fichier(chemin)
+        if sha is not None:
+            tracer_changement(racine, rel, sha, entrees_par_chemin(lire_surveillance(racine)).get(rel, []), "seance")  # d1-trace
     return None  # evt-mode-filechanged
 
 
@@ -2774,8 +3093,10 @@ def main():
                 avis.extend(texte for genre, texte in resultats if genre == "avertit" and texte not in avis)
             if refus:
                 sortie_refus(refus)
-            elif avis:
-                sortie_contexte(avis)
+            else:
+                inscrire_intentions(payload, cibles or [(ecrit, racine)])  # d1-intention : la décision finale est un passage, l'écriture par outil est tracée (D1)
+                if avis:
+                    sortie_contexte(avis)
         else:
             contexte = {"payload": payload, "evenement": evenement, "outil": None,
                         "ecrit": depart if evenement == EVT_FILE_CHANGED else None,
@@ -2783,14 +3104,18 @@ def main():
                         "arg_xdg": sys.argv[2] if len(sys.argv) > 2 else "",
                         "arg_home": sys.argv[3] if len(sys.argv) > 3 else ""}
             raisons = MODES_EVENEMENT[evenement](contexte)  # evt-phase-b
-            if raisons and evenement == EVT_SUBAGENT_STOP:  # seul SubagentStop émet ; les trois autres ne refusent jamais
+            if raisons and evenement == EVT_SUBAGENT_STOP:  # seul SubagentStop REFUSE (`decision: block`) ; SessionStart, CwdChanged et FileChanged ne refusent jamais
                 sortie_blocage_subagent(raisons)
+            elif evenement in (EVT_SESSION_START, EVT_CWD_CHANGED):  # evt-sortie-d1 : D1 émet `watchPaths` (jamais deny ni block) ; FileChanged ne sort rien
+                sortie_d1(contexte.get("sortie_d1"))
     except BaseException as exc:
         if evenement == EVT_PRETOOLUSE:  # evt-refus-pretooluse : fail-closed de PreToolUse (P45-D-08)
             sortie_refus(["[planning-core] erreur interne du hook central dans un lab adhérent "
                           "cycles-v1 : action refusée (P45-D-08) — " + type(exc).__name__])
         elif evenement == EVT_SUBAGENT_STOP:  # evt-erreur-subagentstop : fail-closed de G4′ (block si armé, observation sinon) ; SessionStart, CwdChanged, FileChanged : silence (fail-open déclaré)
             erreur_subagent_stop(exc, racine)
+        else:  # SessionStart, CwdChanged, FileChanged : silence, jamais un refus (fail-open déclaré de D1, P46-D-10)
+            pass  # evt-erreur-d1
     sys.exit(0)
 
 
