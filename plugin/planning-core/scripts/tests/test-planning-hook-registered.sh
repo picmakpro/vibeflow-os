@@ -23,7 +23,8 @@
 #   R-EVT-01  hors adhésion (lab dev fixture ET ce dépôt), chaque événement et le nouvel outil rendent un octet vide et 0 sous
 #             quatre shells, SANS lancer le script ni python3 (marqueurs) ; R-EVT-01b : la copie sonde du cœur, rejouée sans
 #             pré-filtre, n'écrit AUCUNE ligne au journal hors adhésion et une ligne dans un lab adhérent (témoin)
-#   R-EVT-02  lab adhérent, script présent : silence, code 0, pour les cinq événements
+#   R-EVT-02  lab adhérent, script présent : code 0 ; silence pour SubagentHandback, SubagentStop, FileChanged ; silence ou émission de D1
+#             sans refus (hookSpecificOutput, watchPaths) pour SessionStart et CwdChanged (46-07, P46-D-07)
 #   R-EVT-03  lab adhérent, script absent puis python absent : SubagentHandback refusé (un deny), les quatre autres événements
 #             muets ; aucun chemin absolu ni « no such file » / « can't open » dans un message
 #   R-EVT-04  faute injectée dans un mode non outil : silence, code 0 (fail-open déclaré) ; en PreToolUse : deny
@@ -2102,6 +2103,50 @@ def verdict_conforme(rc, out, err, attendu="silence"):
     return rc == 0 and err == b"" and verdict(rc, out) == attendu
 
 
+def emission_sans_refus(evt, rc, out, err, racine):
+    """P46-D-07/D-10 : SessionStart et CwdChanged d'un lab adhérent émettent la liste surveillée de D1 mais ne refusent JAMAIS. Conforme :
+    code 0, stderr vide, et stdout vide OU UN objet JSON sans `decision`/`permissionDecision`/`deny`/`block` (en clé, à aucun niveau),
+    dont la clé `hookSpecificOutput` (seule clé de premier niveau, avec `watchPaths` pour CwdChanged, forme non mesurée P46-D-08) porte
+    `hookEventName` = l'événement et des clés dans {hookEventName, watchPaths, additionalContext} ; aucun chemin absolu hors du lab ; ni
+    « no such file » ni « can't open ». Rend (conforme, détail)."""
+    if rc != 0 or err != b"":
+        return False, "code 0 et stderr vide (attendu) — obtenu rc=%d err=%s" % (rc, court(err))
+    if out == b"":
+        return True, "silence"
+    try:
+        obj = json.loads(out.decode("utf-8"))
+    except ValueError:
+        return False, "stdout vide ou un objet JSON (attendu) — obtenu %s" % court(out)
+    if not isinstance(obj, dict):
+        return False, "un objet JSON (attendu) — obtenu %s" % court(out)
+    interdites = {"decision", "permissionDecision", "permissionDecisionReason", "deny", "block"}
+    pile, trouvees = [obj], set()
+    while pile:
+        cur = pile.pop()
+        if isinstance(cur, dict):
+            trouvees |= (set(cur) & interdites)
+            pile.extend(cur.values())
+        elif isinstance(cur, list):
+            pile.extend(cur)
+    if trouvees:
+        return False, "aucune clé de refus (attendu) — obtenu %s dans %s" % (sorted(trouvees), court(out))
+    haut_permis = {"hookSpecificOutput", "watchPaths"} if evt == "CwdChanged" else {"hookSpecificOutput"}
+    if not set(obj) <= haut_permis:
+        return False, "clés de premier niveau dans %s (attendu) — obtenu %s" % (sorted(haut_permis), sorted(obj))
+    spec = obj.get("hookSpecificOutput")
+    if not isinstance(spec, dict) or spec.get("hookEventName") != evt or not set(spec) <= {"hookEventName", "watchPaths", "additionalContext"}:
+        return False, "hookSpecificOutput de %s, clés dans {hookEventName, watchPaths, additionalContext} (attendu) — obtenu %s" % (evt, court(out))
+    texte = out.decode("utf-8")
+    interdit = [f for f in FRAGMENTS_INTERDITS if f in texte.casefold()]
+    if interdit:
+        return False, "ni %s (attendu) — obtenu %s" % (FRAGMENTS_INTERDITS, interdit)
+    racines = tuple(sorted({racine.rstrip("/") + "/", os.path.realpath(racine).rstrip("/") + "/"}))
+    for chemin in (spec.get("watchPaths") or []) + (obj.get("watchPaths") or []):
+        if not isinstance(chemin, str) or not chemin.startswith(racines):
+            return False, "chemins sous le lab (attendu) — obtenu %r" % (chemin,)
+    return True, "emission"
+
+
 def mutant_controle(ident, original, mutant, nom_controle):
     """MUT-<ident> : le contrôle doit rougir sous le mutant ; la trace (assertion, attendu, obtenu) est la sortie du contrôle."""
     if not original[0]:
@@ -2176,8 +2221,14 @@ def controle_evt_01b(ctx, dossier_coeur, labs, adh):
         rc, out, err, _ = ctx.lancer("A", payload_evt(evt, adh, adh + "/.planning/STATE.md"), cwd=adh, dossier=dossier_coeur, extra_env={"XDG_CACHE_HOME": xdg}, np=True)
         lignes = lire_lignes_sonde(xdg)
         n[0] += 1
-        if rc != 0 or out != b"" or err or lignes != 1:
-            fautes.append("témoin %s, lab adhérent : 1 ligne au journal, stdout vide, code 0 (attendu) — obtenu %d ligne(s), rc=%d out=%s" % (evt, lignes, rc, court(out)))
+        if evt in ("SessionStart", "CwdChanged"):
+            conforme, detail_e = emission_sans_refus(evt, rc, out, err, adh)   # D1 émet la liste surveillée (46-07) : jamais un refus
+            conforme = conforme and lignes == 1
+        else:
+            conforme, detail_e = (rc == 0 and out == b"" and not err), ""
+            conforme = conforme and lignes == 1
+        if not conforme:
+            fautes.append("témoin %s, lab adhérent : 1 ligne au journal, stdout vide%s, code 0 (attendu) — obtenu %d ligne(s), rc=%d out=%s %s" % (evt, " ou émission sans refus" if evt in ("SessionStart", "CwdChanged") else "", lignes, rc, court(out), detail_e))
     detail = "%d rejeux de la copie sonde sans pré-filtre : aucune ligne hors adhésion (%s), une ligne par entrée dans un lab adhérent (témoin)" % (n[0], ", ".join(l[0] for l in labs))
     return (not fautes), ("; ".join(fautes[:3]) + (" (+%d autre(s))" % (len(fautes) - 3) if len(fautes) > 3 else "") if fautes else detail)
 
@@ -2192,12 +2243,15 @@ def controle_evt_02(ctx, adh):
     for evt in CINQ_ENTREES:
         brut = payload_evt(evt, adh, adh + "/.planning/notes.md")
         rc, out, err, _ = ctx.lancer("A", brut, cwd=adh)
-        if not verdict_conforme(rc, out, err):
-            fautes.append("%s (commande complète) : silence, code 0 (attendu) — obtenu rc=%d out=%s err=%s" % (evt, rc, court(out), court(err)))
+        emet = evt in ("SessionStart", "CwdChanged")   # D1 (46-07) : la liste surveillée, jamais un refus ; les trois autres : silence
+        conforme = emission_sans_refus(evt, rc, out, err, adh)[0] if emet else verdict_conforme(rc, out, err)
+        if not conforme:
+            fautes.append("%s (commande complète) : %s, code 0 (attendu) — obtenu rc=%d out=%s err=%s" % (evt, "silence ou émission sans refus" if emet else "silence", rc, court(out), court(err)))
         v, rc2, out2, err2 = verdict_direct(ctx, brut, adh)
-        if v != "silence" or rc2 != 0 or err2:
-            fautes.append("%s (cœur livré seul) : silence, code 0 (attendu) — obtenu %s rc=%d err=%s" % (evt, v, rc2, court(err2)))
-    return (not fautes), ("; ".join(fautes) if fautes else "SubagentHandback, SubagentStop, SessionStart, CwdChanged, FileChanged dans un lab adhérent : silence, code 0 (commande complète et cœur livré)")
+        conforme2 = emission_sans_refus(evt, rc2, out2, err2, adh)[0] if emet else (v == "silence" and rc2 == 0 and not err2)
+        if not conforme2:
+            fautes.append("%s (cœur livré seul) : %s, code 0 (attendu) — obtenu %s rc=%d err=%s" % (evt, "silence ou émission sans refus" if emet else "silence", v, rc2, court(err2)))
+    return (not fautes), ("; ".join(fautes) if fautes else "SubagentHandback, SubagentStop, FileChanged : silence ; SessionStart, CwdChanged : silence ou émission de D1 sans refus, code 0, dans un lab adhérent (commande complète et cœur livré)")
 
 
 def controle_evt_03(ctx, texte, adh, dev):
@@ -2331,8 +2385,12 @@ def controle_evt_07(ctx, adh, source=None):
         if dossier is None:
             return False, "mutant d'émission invalide (%s) : %s" % (evt, raison)
         rc, out, err, _ = ctx.lancer("A", payload_evt(evt, adh, adh + "/.planning/STATE.md"), cwd=adh, dossier=dossier)
-        if not verdict_conforme(rc, out, err):
-            fautes.append("%s : ne refuse JAMAIS, stdout vide, code 0 (attendu) — obtenu %s rc=%d out=%s" % (evt, verdict(rc, out), rc, court(out)))
+        if evt in ("SessionStart", "CwdChanged"):
+            conforme = emission_sans_refus(evt, rc, out, err, adh)[0]   # D1 émet la liste surveillée (46-07) : un mode qui voudrait refuser n'y parvient pas
+        else:
+            conforme = verdict_conforme(rc, out, err)
+        if not conforme:
+            fautes.append("%s : ne refuse JAMAIS, %s, code 0 (attendu) — obtenu %s rc=%d out=%s" % (evt, "stdout vide ou émission sans refus" if evt in ("SessionStart", "CwdChanged") else "stdout vide", verdict(rc, out), rc, court(out)))
     texte_script = open(source or ctx.hook, encoding="utf-8").read()
     for numero, ligne in enumerate(texte_script.split("\n"), 1):
         code = ligne.split("#", 1)[0]
