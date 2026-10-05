@@ -156,7 +156,7 @@
         "plugin/_internal/tests/test-planning-hook-installed.sh",
         ".planning/workstreams/gouvernance/phases/VFDO-46-moteur-gates-de-cl-ture-et-verdicts-hach-s/46-COUT-PREFILTRE.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-46-a",
@@ -167,7 +167,7 @@
         "exec-46-10"
       ],
       "scope": [],
-      "status": "blocked",
+      "status": "ready",
       "review_regime": "full"
     },
     {
@@ -179,7 +179,7 @@
         "exec-46-10"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "nonreg-a",
@@ -190,7 +190,7 @@
         "exec-46-10"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "ckpt-46-11",
@@ -201,7 +201,7 @@
         "exec-46-10"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "fix-46-a",
@@ -385,7 +385,7 @@
       "scope": [
         "plugin/planning-core/scripts/tests/test-planning-hook-registered.sh"
       ],
-      "status": "running"
+      "status": "done"
     }
   ]
 }
