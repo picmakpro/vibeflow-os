@@ -13,10 +13,19 @@
 #   R-JUGE-02  aucun juge (agents d'autres rôles seulement, pas de `.claude/agents/`, juge du COMPTE seulement) -> aucune ligne ; lab dev avec juges et sans
 #              dossier -> stdout d'octet vide, arbre identique (commande complète ET cœur seul) ; jumeau adhérent : la ligne est là
 #   R-JUGE-03  SessionStart de source `resume`, `compact`, `clear` ou sans source : aucune ligne de juge, la liste surveillée de D1 reste émise (jumeau : startup)
+#   R-JUGE-04  verdict de canary posé par la vraie commande avec `critere-x::passé` -> juge LAXISTE, nommé au signal ; critère visé absent des constats, ou en
+#              échec ET en passé -> laxiste ; jumeau : en échec seul -> prouvé
+#   R-JUGE-05  sans preuve, avec le motif nommé : sortie piégée modifiée après le verdict (périmé), verdict invalide, sortie piégée lien, absente ou sans
+#              `critere_vise`, verdict absent, dossier absent ou lien, nom de juge hors forme ; jumeau : le juge intact est prouvé
+#   R-JUGE-06  `planning-hook.sh --juges <lab>` : UNE ligne JSON des trois classes, code 0, stdin non lu, arbre du lab identique ; racine inexistante : trois listes vides
+#   R-JUGE-07  recalc-planning.sh --read-only : `juges` absent de `hors_modele`, aucune unité dérivée sous `juges` ; jumeaux : `juges-autre` hors modèle, `juges` fichier
+#              hors modèle
+#   R-JUGE-08  copie armée : Write et Edit de `.planning/juges/<juge>/VERDICT.md` -> deny de G5 ; jumeaux : SORTIE-PIEGEE.md du même dossier et cible neutre -> silence
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-JUGE-SANS-PREUVE-VERT (un juge sans dossier compté prouvé -> R-JUGE-01), MUT-JUGE-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-JUGE-02),
-#   MUT-JUGE-SOURCE (la source du SessionStart n'est plus filtrée -> R-JUGE-03).
-# Variables : VF_JUGES_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base).
+#   MUT-JUGE-SOURCE (la source du SessionStart n'est plus filtrée -> R-JUGE-03), MUT-JUGE-LAXISTE (un critère visé en `passé` compté prouvé -> R-JUGE-04),
+#   MUT-JUGE-HASH (contrôle du hash de la sortie piégée retiré -> R-JUGE-05), MUT-JUGE-NOMS-MODELE (`juges` retiré des noms du modèle du recalcul -> R-JUGE-07).
+# Variables : VF_JUGES_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, etats, mutants_etats).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
 set -uo pipefail
@@ -502,6 +511,266 @@ def controle_juge_03(ctx, script):
                           "source resume, compact, clear et absente : aucune ligne de juge, watchPaths conservés ; jumeau startup : la ligne nomme juge-a")
 
 
+# =================================================================================================
+# R-JUGE-04 à R-JUGE-08 : les trois classes, le diagnostic, `juges` dans le modèle, G5 sur le verdict de canary
+# =================================================================================================
+SCRIPTS_MOTEUR = ("planning-hook.sh", "recalc-planning.sh", "poser-verdict.sh", "deroger-gate.sh", "detect-gsd-engine.sh")
+MARQUEURS = {"planning-hook.sh": "PY_PLANNING_HOOK_EOF", "recalc-planning.sh": "PY_RECALC_PLANNING_EOF", "poser-verdict.sh": "PY_POSER_VERDICT_EOF",
+             "deroger-gate.sh": "PY_DEROGER_GATE_EOF"}
+
+
+def make_scripts_mutant(ctx, ident, script, motif, remplacement):
+    """Dossier qui porte les copies des scripts du moteur dont `script` a son UNIQUE ligne portant `motif` remplacée par `remplacement` (indentation
+    conservée) ; `bash -n` et la compilation du corps Python doivent passer. Motif ambigu ou absent, ou mutant identique : un KO nommé."""
+    source = os.path.join(ctx.scripts_dir, script)
+    original = open(source, encoding="utf-8").read()
+    lignes = original.split("\n")
+    idx = [i for i, l in enumerate(lignes) if motif in l]
+    if len(idx) != 1 or original.count(motif) != 1:
+        return None, "MOTIF AMBIGU OU ABSENT (lignes=%d, occurrences=%d)" % (len(idx), original.count(motif))
+    ligne = lignes[idx[0]]
+    lignes[idx[0]] = ligne[: len(ligne) - len(ligne.lstrip())] + remplacement
+    mute = "\n".join(lignes)
+    if mute == original:
+        return None, "NON OPPOSABLE (identique)"
+    dossier = ctx.unique("mut-scripts-" + ident.lower())
+    os.makedirs(dossier, exist_ok=True)
+    for nom in SCRIPTS_MOTEUR:
+        with open(os.path.join(dossier, nom), "w", encoding="utf-8") as fh:
+            fh.write(mute if nom == script else open(os.path.join(ctx.scripts_dir, nom), encoding="utf-8").read())
+        os.chmod(os.path.join(dossier, nom), 0o755)
+    chemin = os.path.join(dossier, script)
+    p = subprocess.run(["bash", "-n", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        return None, "bash -n ÉCHOUE : " + court(p.stderr)
+    if script in MARQUEURS:
+        try:
+            compile(corps_python(open(chemin, encoding="utf-8").read(), MARQUEURS[script]), chemin, "exec")
+        except SyntaxError as e:
+            return None, "SyntaxError du corps Python : " + str(e)
+    return dossier, None
+
+
+def script_de(ctx, dossier, nom):
+    """Le script `nom` du dossier jugé (une copie mutante) s'il y est, sinon celui du dépôt."""
+    if dossier and os.path.exists(os.path.join(dossier, nom)):
+        return os.path.join(dossier, nom)
+    return os.path.join(ctx.scripts_dir, nom)
+
+
+def lancer_diagnostic(ctx, racine, dossier=None):
+    """`planning-hook.sh --juges <racine>` (le script du dossier donné, défaut le script réel), stdin laissé OUVERT et jamais fermé : un diagnostic qui le
+    lirait ne rendrait jamais la main. Rend (code, stdout, stderr) ; le code vaut None si le processus n'a pas fini en 60 s (stdin lu)."""
+    hook = script_de(ctx, dossier, "planning-hook.sh")
+    chemin_out, chemin_err = ctx.unique("diag-out"), ctx.unique("diag-err")
+    with open(chemin_out, "wb") as fo, open(chemin_err, "wb") as fe:
+        p = subprocess.Popen(["bash", hook, "--juges", racine], stdin=subprocess.PIPE, stdout=fo, stderr=fe, env=ctx.env(), cwd=ctx.work)
+        try:
+            try:
+                rc = p.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.wait()
+                rc = None
+        finally:
+            p.stdin.close()
+    return rc, open(chemin_out, "rb").read(), open(chemin_err, "rb").read()
+
+
+def classes_de(ctx, lab, dossier=None):
+    """(classes décodées, faute) : l'objet JSON du diagnostic `--juges` du lab, ou (None, message)."""
+    rc, out, err = lancer_diagnostic(ctx, lab, dossier)
+    if rc != 0 or err:
+        return None, "--juges : code 0 et stderr vide attendus — obtenu rc=%s out=%s err=%s" % (rc, court(out), court(err))
+    try:
+        return json.loads(out.decode("utf-8")), None
+    except ValueError:
+        return None, "--juges : une ligne JSON attendue — obtenu %s" % court(out)
+
+
+def sans_preuve_attendus(motifs):
+    """La liste `sans_preuve` attendue pour {juge: motif}, triée par nom de juge."""
+    return [{"juge": nom, "motif": motifs[nom]} for nom in sorted(motifs)]
+
+
+def controle_juge_04(ctx, script):
+    """Verdict de canary posé par la vraie commande avec `critere-x::passé` -> juge LAXISTE, nommé dans le signal ; le critère visé absent des constats ->
+    laxiste ; porté en `échec` ET en `passé` -> laxiste ; jumeau : `critere-x::échec` seul -> prouvé (le diagnostic et le signal du SessionStart disent
+    la même chose)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    fautes = []
+    cas = {"juge-lax": ["critere-x::passé", "critere-y::échec"], "juge-absent": ["critere-y::échec"],
+           "juge-mixte": ["critere-x::échec", "critere-x::passé"], "juge-ok": ["critere-x::échec"]}
+    lab = fabriquer_lab(ctx, "juge-04", agents={nom: def_juge(nom) for nom in cas})
+    for nom, constats in cas.items():
+        ecrire_sortie_piegee(lab, nom, "critere-x")
+        rc, out, err = poser(ctx, lab, nom, constats)
+        if rc != 0:
+            return False, "fixture : poser-verdict.sh (%s) : code 0 attendu — obtenu rc=%d %s" % (nom, rc, court(err))
+    classes, faute = classes_de(ctx, lab, script)
+    if faute:
+        fautes.append(faute)
+    elif classes != {"prouves": ["juge-ok"], "laxistes": ["juge-absent", "juge-lax", "juge-mixte"], "sans_preuve": []}:
+        fautes.append("diagnostic : prouvé juge-ok, laxistes juge-absent, juge-lax, juge-mixte, aucun sans preuve attendus — obtenu %s" % json.dumps(classes, ensure_ascii=False))
+    rc, out, err = session(ctx, d, lab)
+    ligne, anomalies = ligne_de_juges(out)
+    fautes += anomalies
+    attendu = "1 prouvé(s) ; 3 laxiste(s) : juge-absent, juge-lax, juge-mixte ; 0 sans preuve"
+    if rc != 0 or err or ligne is None or attendu not in ligne or "poser-verdict.sh --unite=.planning/juges/<juge>" not in ligne:
+        fautes.append("signal : « %s » suivi de la marche à suivre attendu — obtenu rc=%d %s" % (attendu, rc, court(ligne or out)))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "critère visé en passé, absent des constats ou en échec ET passé : laxiste, nommé au signal ; jumeau en échec seul : prouvé ; diagnostic et signal concordent")
+
+
+def controle_juge_05(ctx, script):
+    """Verdict périmé ou invalide, sortie piégée absente, lien ou sans critère visé, dossier absent ou lien, nom hors forme -> SANS PREUVE avec le motif
+    nommé (jamais vert) ; jumeau négatif : le juge dont rien n'a bougé est prouvé. Le verdict valide vient de la vraie commande."""
+    fautes = []
+    juges = ("j-ok", "j-perime", "j-invalide", "j-lien", "j-sans-verdict", "j-sans-sortie", "j-sans-critere", "j-dossier-lien", "j-sans-dossier")
+    agents = {nom: def_juge(nom) for nom in juges}
+    agents["juge.x"] = def_juge("juge.x")
+    lab = fabriquer_lab(ctx, "juge-05", agents=agents)
+    juges_dir = os.path.join(lab, ".planning", "juges")
+    for nom in ("j-ok", "j-perime", "j-lien", "j-dossier-lien"):
+        echec = juge_prouve(ctx, lab, nom)
+        if echec:
+            return False, "fixture (%s) : %s" % (nom, echec)
+    # Sortie piégée modifiée APRÈS le verdict
+    with open(os.path.join(juges_dir, "j-perime", "SORTIE-PIEGEE.md"), "a", encoding="utf-8") as fh:
+        fh.write("\nAffaiblie après le verdict.\n")
+    # Verdict hors forme (constat qui n'est ni passé ni échec) : fabriqué à la main, c'est le jumeau négatif
+    ecrire_sortie_piegee(lab, "j-invalide", "critere-x")
+    brut = open(os.path.join(juges_dir, "j-invalide", "SORTIE-PIEGEE.md"), "rb").read()
+    ecrire(os.path.join(juges_dir, "j-invalide", "VERDICT.md"),
+           '---\njuge: "j-invalide"\nhash: "%s"\ntentative: 1\nscore: "8/10"\nconstats:\n  - critere: "critere-x"\n    resultat: "peut-être"\n---\n' % sha(brut))
+    # Sortie piégée remplacée par un lien (même contenu)
+    sortie = os.path.join(juges_dir, "j-lien", "SORTIE-PIEGEE.md")
+    os.rename(sortie, os.path.join(juges_dir, "j-lien", "reelle.md"))
+    os.symlink("reelle.md", sortie)
+    # Pas de verdict ; pas de sortie piégée ; sortie piégée sans critere_vise
+    ecrire_sortie_piegee(lab, "j-sans-verdict", "critere-x")
+    os.makedirs(os.path.join(juges_dir, "j-sans-sortie"))
+    ecrire_sortie_piegee(lab, "j-sans-critere", "critere-x", texte="---\njuge: j-sans-critere\nprovenance: sans critère visé\n---\n\nCorps.\n")
+    # Dossier de juge remplacé par un lien vers un dossier réel qui porte une preuve valide
+    os.rename(os.path.join(juges_dir, "j-dossier-lien"), os.path.join(lab, ".planning", "reel-j-dossier-lien"))
+    os.symlink(os.path.join("..", "reel-j-dossier-lien"), os.path.join(juges_dir, "j-dossier-lien"))
+    # Nom hors forme : un dossier à ce nom, avec une sortie piégée et un verdict qui, eux, seraient valides
+    ecrire_sortie_piegee(lab, "juge.x", "critere-x")
+    brut = open(os.path.join(juges_dir, "juge.x", "SORTIE-PIEGEE.md"), "rb").read()
+    ecrire(os.path.join(juges_dir, "juge.x", "VERDICT.md"),
+           '---\njuge: "juge.x"\nhash: "%s"\ntentative: 1\nscore: "8/10"\nconstats:\n  - critere: "critere-x"\n    resultat: "échec"\n---\n' % sha(brut))
+    classes, faute = classes_de(ctx, lab, script)
+    if faute:
+        return False, faute
+    attendus = {"j-perime": "verdict-perime", "j-invalide": "verdict-invalide", "j-lien": "sortie-piegee-invalide", "j-sans-verdict": "verdict-absent",
+                "j-sans-sortie": "sortie-piegee-absente", "j-sans-critere": "critere-vise-absent", "j-dossier-lien": "dossier-absent",
+                "j-sans-dossier": "dossier-absent", "juge.x": "nom-hors-forme"}
+    if classes.get("prouves") != ["j-ok"] or classes.get("laxistes") != []:
+        fautes.append("seul j-ok prouvé et aucun laxiste attendus — obtenu prouvés %s, laxistes %s" % (classes.get("prouves"), classes.get("laxistes")))
+    if classes.get("sans_preuve") != sans_preuve_attendus(attendus):
+        fautes.append("sans preuve attendu %s — obtenu %s" % (json.dumps(sans_preuve_attendus(attendus), ensure_ascii=False), json.dumps(classes.get("sans_preuve"), ensure_ascii=False)))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "périmé (sortie piégée modifiée après le verdict), verdict invalide, sortie piégée lien, absente ou sans critère visé, verdict absent, dossier absent ou lien, nom hors forme : "
+                          "sans preuve avec leur motif ; jumeau j-ok : prouvé")
+
+
+def controle_juge_06(ctx, script):
+    """`planning-hook.sh --juges <lab>` : UNE ligne JSON des trois classes (clés prouves, laxistes, sans_preuve ; chaque sans preuve porte juge et motif), code 0,
+    stderr vide, stdin non lu (laissé ouvert), aucun fichier créé dans le lab ; une racine inexistante : trois listes vides, code 0."""
+    fautes = []
+    lab = fabriquer_lab(ctx, "juge-06", agents={"juge-a": def_juge("juge-a"), "juge-b": def_juge("juge-b"), "juge-c": def_juge("juge-c")})
+    echec = juge_prouve(ctx, lab, "juge-b")
+    if echec:
+        return False, "fixture : " + echec
+    avant = empreinte_arbre(lab)
+    rc, out, err = lancer_diagnostic(ctx, lab, script)
+    if rc != 0 or err:
+        fautes.append("code 0, stderr vide et stdin non lu attendus — obtenu rc=%s err=%s" % (rc, court(err)))
+    if not out.endswith(b"\n") or out.count(b"\n") != 1:
+        fautes.append("UNE ligne attendue — obtenu %s" % court(out))
+    else:
+        try:
+            classes = json.loads(out.decode("utf-8"))
+        except ValueError:
+            classes = None
+        attendu = {"prouves": ["juge-b"], "laxistes": [], "sans_preuve": [{"juge": "juge-a", "motif": "dossier-absent"}, {"juge": "juge-c", "motif": "dossier-absent"}]}
+        if classes != attendu or list(classes) != ["prouves", "laxistes", "sans_preuve"]:
+            fautes.append("classes attendues %s (clés dans cet ordre) — obtenu %s" % (json.dumps(attendu, ensure_ascii=False), court(out)))
+    if empreinte_arbre(lab) != avant:
+        fautes.append("le diagnostic ne crée ni ne modifie aucun fichier du lab (empreinte de l'arbre identique)")
+    rc, out, err = lancer_diagnostic(ctx, os.path.join(ctx.work, "racine-inexistante"), script)
+    if rc != 0 or err or out != b'{"prouves": [], "laxistes": [], "sans_preuve": []}\n':
+        fautes.append("racine inexistante : trois listes vides, code 0 attendus — obtenu rc=%s out=%s err=%s" % (rc, court(out), court(err)))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "--juges : UNE ligne JSON (prouves, laxistes, sans_preuve avec juge et motif), code 0, stderr vide, stdin non lu, arbre identique ; racine inexistante : trois listes vides")
+
+
+def controle_juge_07(ctx, script):
+    """`recalc-planning.sh --read-only` sur un lab adhérent qui porte `.planning/juges/…` (un juge prouvé) : `juges` absent de `hors_modele` (et rien sous
+    lui), aucune unité dérivée sous `juges` (la seule unité est celle de `cycles/`), le jumeau `juges-autre` y figure ; jumeau négatif : `juges` FICHIER
+    est hors modèle."""
+    fautes = []
+    recalc = script_de(ctx, script, "recalc-planning.sh")
+
+    def rapport(lab):
+        p = subprocess.run(["bash", recalc, "--planning=" + os.path.join(lab, ".planning"), "--read-only"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           env=ctx.env({"GSD_HOME": ctx.gsd}), cwd=lab, timeout=240)
+        if p.returncode != 0:
+            return None, "recalc-planning.sh --read-only : code 0 attendu — obtenu %d %s" % (p.returncode, court(p.stderr))
+        return json.loads(p.stdout.decode("utf-8")), None
+    lab = fabriquer_lab(ctx, "juge-07", agents={"juge-b": def_juge("juge-b")})
+    echec = juge_prouve(ctx, lab, "juge-b")
+    if echec:
+        return False, "fixture : " + echec
+    ecrire(os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-p", "PLAN.md"), "---\necrit: []\n---\nplan\n")
+    ecrire(os.path.join(lab, ".planning", "juges-autre", "note.md"), "jumeau voisin\n")
+    rap, faute = rapport(lab)
+    if faute:
+        return False, faute
+    chemins = [e["chemin"] for e in rap.get("hors_modele", [])]
+    if any(c == "juges" or c.startswith("juges/") for c in chemins) or "juges-autre" not in chemins:
+        fautes.append("hors_modele : `juges` absent (rien sous lui), jumeau `juges-autre` présent attendus — obtenu %s" % chemins)
+    unites = [c.get("chemin") for c in rap.get("cycles", [])]
+    if unites != ["cycles/01-c"] or "juges" in json.dumps(rap.get("cycles", []), ensure_ascii=False):
+        fautes.append("aucune unité dérivée sous `juges` : le seul cycle est cycles/01-c attendu — obtenu %s" % unites)
+    fichier = fabriquer_lab(ctx, "juge-07-fichier")
+    ecrire(os.path.join(fichier, ".planning", "juges"), "un fichier, pas un dossier\n")
+    rap, faute = rapport(fichier)
+    if faute:
+        fautes.append(faute)
+    elif {"chemin": "juges", "type": "fichier"} not in rap.get("hors_modele", []):
+        fautes.append("jumeau : `juges` FICHIER hors modèle attendu — obtenu %s" % rap.get("hors_modele"))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "juges/ (et son contenu) absent de hors_modele, juges-autre présent, aucune unité dérivée sous juges ; jumeau : un fichier `juges` est hors modèle")
+
+
+def controle_juge_08(ctx, script):
+    """Copie armée (G6 et G5) : Write et Edit de `.planning/juges/juge-b/VERDICT.md` -> UN deny `[planning-core] G5 :` (le verdict de canary ne s'écrit que par la
+    commande) ; jumeaux : Write de `SORTIE-PIEGEE.md` du même dossier et d'une cible neutre -> silence."""
+    fautes = []
+    g6 = ctx.copie_forcee(_dossier(ctx, script), "g6")
+    lab = fabriquer_lab(ctx, "juge-08", agents={"juge-b": def_juge("juge-b")})
+    echec = juge_prouve(ctx, lab, "juge-b")
+    if echec:
+        return False, "fixture : " + echec
+    dossier = os.path.join(lab, ".planning", "juges", "juge-b")
+    for outil in ("Write", "Edit"):
+        rc, out, err = ctx.lancer(payload_ecriture(lab, os.path.join(dossier, "VERDICT.md"), outil), cwd=lab, dossier=g6)
+        v = verdict_de(rc, out)
+        if v != "deny" or err:
+            fautes.append("%s de VERDICT.md d'un juge (copie G5 armée) : UN deny attendu — obtenu %s %s" % (outil, v, court(out)))
+        else:
+            raison = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+            if not raison.startswith("[planning-core] G5 :"):
+                fautes.append("%s : raison `[planning-core] G5 :` attendue — obtenu %r" % (outil, raison[:200]))
+    for nom, cible in (("SORTIE-PIEGEE.md du même dossier", os.path.join(dossier, "SORTIE-PIEGEE.md")), ("cible neutre", os.path.join(lab, ".planning", "notes.md"))):
+        rc, out, err = ctx.lancer(payload_ecriture(lab, cible), cwd=lab, dossier=g6)
+        if verdict_de(rc, out) != "silence" or err:
+            fautes.append("jumeau (%s, copie armée) : silence attendu — obtenu %s %s" % (nom, verdict_de(rc, out), court(out)))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "copie armée : Write et Edit du VERDICT.md d'un juge -> deny G5 ; jumeaux (SORTIE-PIEGEE.md du même dossier, cible neutre) : silence")
+
+
 # --- Mutants --------------------------------------------------------------------------------------------------------
 def original_de(ctx, ident, controle):
     """Résultat d'un contrôle sur le script réel, calculé une seule fois (les sections et les mutants lisent la même exécution)."""
@@ -510,9 +779,13 @@ def original_de(ctx, ident, controle):
     return ctx.originaux[ident]
 
 
-def tuer(ctx, ident, motif, remplacement, id_controle, controle):
-    """Preuve d'opposabilité : le contrôle passe sur l'original, le témoin est inchangé sous le mutant, le contrôle rougit sous le mutant."""
-    dossier, raison = make_hook_mutant(ctx, ident, motif, remplacement)
+def tuer(ctx, ident, motif, remplacement, id_controle, controle, script="planning-hook.sh"):
+    """Preuve d'opposabilité : le contrôle passe sur l'original, le témoin est inchangé sous le mutant, le contrôle rougit sous le mutant. `script` : le
+    script du moteur que le mutant réécrit (le hook par défaut)."""
+    if script == "planning-hook.sh":
+        dossier, raison = make_hook_mutant(ctx, ident, motif, remplacement)
+    else:
+        dossier, raison = make_scripts_mutant(ctx, ident, script, motif, remplacement)
     if dossier is None:
         komut(ident, "mutant du cœur valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
         return
@@ -547,9 +820,29 @@ def sec_mutants_base(ctx):
     tuer(ctx, "JUGE-SOURCE", "# juge-source", "if True:  # juge-source", "R-JUGE-03", controle_juge_03)
 
 
+def sec_etats(ctx):
+    rendre("R-JUGE-04", "juge laxiste : critère visé non en échec", controle_juge_04, ctx)
+    rendre("R-JUGE-05", "verdict périmé ou invalide, sortie piégée altérée, dossier ou nom hors forme : sans preuve", controle_juge_05, ctx)
+    rendre("R-JUGE-06", "diagnostic --juges : une ligne JSON des trois classes", controle_juge_06, ctx)
+    rendre("R-JUGE-07", "juges est un dossier du modèle, jamais dérivé", controle_juge_07, ctx)
+    rendre("R-JUGE-08", "G5 protège le verdict de canary", controle_juge_08, ctx)
+
+
+def sec_mutants_etats(ctx):
+    # Un critère visé en `passé` compté prouvé : la condition de la preuve ne regarde plus le résultat des constats
+    tuer(ctx, "JUGE-LAXISTE", "# juge-critere", "if visees:  # juge-critere", "R-JUGE-04", controle_juge_04)
+    # Le contrôle du hash de la sortie piégée retiré : une sortie piégée affaiblie après le verdict reste prouvée
+    tuer(ctx, "JUGE-HASH", "# juge-hash", "if False:  # juge-hash", "R-JUGE-05", controle_juge_05)
+    # `juges` retiré des noms du modèle : le dossier redevient « Hors modèle »
+    tuer(ctx, "JUGE-NOMS-MODELE", "NOMS_MODELE_RACINE_DOSSIERS = (", 'NOMS_MODELE_RACINE_DOSSIERS = ("cycles", "baux", "missions")', "R-JUGE-07", controle_juge_07,
+         script="recalc-planning.sh")
+
+
 SECTIONS = {
     "base": sec_base,
     "mutants_base": sec_mutants_base,
+    "etats": sec_etats,
+    "mutants_etats": sec_mutants_etats,
 }
 
 
@@ -589,7 +882,7 @@ run_sections() { # <sections séparées par des virgules>
 if [ -z "$HOOKS_JSON" ] && [ -z "$SETTINGS_LAB" ]; then
   echo "NOTE : ni hooks.json ni settings.json à côté des scripts (suite lancée hors dépôt) : la commande enregistrée n'est pas lisible, rien n'est rejoué."
 else
-  run_sections "${VF_JUGES_SECTIONS:-base,mutants_base}"
+  run_sections "${VF_JUGES_SECTIONS:-base,mutants_base,etats,mutants_etats}"
 fi
 
 T_FIN="$(date +%s)"

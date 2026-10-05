@@ -49,14 +49,17 @@
 #
 # Arguments du cœur Python (positions fixes, sys.argv) : [1] fichier de transport du payload (ou, en mode
 # diagnostic, la définition d'agent à classer), [2] valeur de XDG_CACHE_HOME (chaîne vide si non définie),
-# [3] valeur de HOME (idem), [4] `--classer` en mode diagnostic, vide sinon.
+# [3] valeur de HOME (idem), [4] `--classer` ou `--juges` en mode diagnostic, vide sinon.
 #
 # Mode de diagnostic (45-08) : `planning-hook.sh --classer <agent.md>` imprime UNE ligne JSON
 # {"role": …, "allowlist": […], "disallowed": […]} et rend 0, sans lire stdin ni rien décider. La commande
 # enregistrée ne passe jamais d'argument : le chemin de décision est inchangé.
+# Mode de diagnostic du canary de juge (46-09, C-16) : `planning-hook.sh --juges <racine du lab>` imprime UNE ligne JSON
+# {"prouves": […], "laxistes": […], "sans_preuve": [{"juge": …, "motif": …}]} et rend 0, sans lire stdin ni rien décider
+# (patron de `--classer` ; il ne vérifie pas l'adhésion : la racine est celle que l'appelant désigne).
 set -u
 
-if [ "${1:-}" = "--classer" ]; then
+if [ "${1:-}" = "--classer" ] || [ "${1:-}" = "--juges" ]; then
   T="${2:-}"
 else
   umask 077
@@ -3059,6 +3062,11 @@ def signal_juges(classes):
     return texte
 
 
+def juges_diagnostic(racine):
+    """Mode de diagnostic `--juges` : UNE ligne JSON des trois classes pour le lab de racine `racine`. Aucune décision, aucune lecture du payload."""
+    sys.stdout.write(json.dumps(verifier_juges(racine), ensure_ascii=False) + "\n")
+
+
 # --- Modes par événement (Phase 46, P46-D-09, P46-D-10) ----------------------------------------------------------------
 # Chaque mode reçoit le contexte du lab adhérent. Seul SubagentStop REFUSE (il rend ses raisons de blocage à `main`, qui émet la décision
 # `block`, code 0) ; SessionStart, CwdChanged et FileChanged ne refusent JAMAIS. Les modes de D1 (46-07) ne rendent rien : SessionStart et
@@ -3167,6 +3175,10 @@ def main():
     # Mode de diagnostic (45-08) : `--classer <agent.md>`, quatrième argument du cœur ; aucune décision.
     if len(sys.argv) > 4 and sys.argv[4] == "--classer":
         classer_fichier(sys.argv[1])
+        sys.exit(0)
+    # Mode de diagnostic du canary de juge (46-09) : `--juges <racine du lab>`, même patron ; aucune décision.
+    if len(sys.argv) > 4 and sys.argv[4] == "--juges":
+        juges_diagnostic(sys.argv[1])
         sys.exit(0)
     # Phase A : l'adhésion n'est pas encore connue. Toute erreur sort sur un code non nul SANS rien
     # imprimer : la couche shell de la commande enregistrée tranche (P45-D-08, DIV-2).

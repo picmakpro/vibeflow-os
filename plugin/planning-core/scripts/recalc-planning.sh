@@ -760,7 +760,9 @@ def scanner(planning):
 
 
 # --- Hors modèle et garde-fous de chemin (44-04, P44-D-04) ----------------------------------
-NOMS_MODELE_RACINE_DOSSIERS = ("cycles", "baux", "missions")
+# `juges` (Phase 46, 46-09, P46-D-06a) : le dossier du canary de juge (`.planning/juges/<juge>/{SORTIE-PIEGEE.md, VERDICT.md}`) est un emplacement du
+# modèle à la racine, jamais « Hors modèle » ; il n'est ni descendu ni dérivé (seul `cycles/` porte des unités de cycle).
+NOMS_MODELE_RACINE_DOSSIERS = ("cycles", "baux", "missions", "juges")
 NOMS_MODELE_RACINE_FICHIERS = (
     "PROJECT.md", "REQUIREMENTS.md", "config.json", "INDEX.md", "STATE.md",
     "cloture.log", ".recalc-cache.json",
