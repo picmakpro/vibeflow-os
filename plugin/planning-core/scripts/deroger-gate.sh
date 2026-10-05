@@ -44,6 +44,7 @@ esac
 
 "$PYBIN" -I -S - "$@" <<'PY_DEROGER_GATE_EOF'
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -181,6 +182,65 @@ def _jeton_journal(valeur, repli):
     return jeton
 
 
+# Journal de D1 (Phase 46, 46-07 ; P46-D-07a) : copie ast-identique de `inscrire_surveillance` dans planning-hook.sh, recalc-planning.sh,
+# poser-verdict.sh et deroger-gate.sh (un contrôle de test-d1-surveillance.sh compare les arbres de syntaxe, R-D1-09) : les écrivains
+# du moteur y inscrivent ce qu'ils écrivent, le hook y trace ce qu'il observe.
+def inscrire_surveillance(racine, genre, chemin_rel, empreinte, par, source):
+    """Ajoute UNE ligne au journal de D1, `<racine>/.planning/surveillance.log` : `<horodatage ISO UTC>  genre=<g>  chemin=<jeton>  sha256=<hex|absent|->
+    par=<jeton>  source=<seance|reconciliation|->` (deux espaces entre champs), chaque valeur par `_jeton_journal` (injectif : un nom de fichier
+    qui porte un saut de ligne reste UNE ligne). Ajout seul (O_APPEND, O_NOFOLLOW, 0600), sous verrou exclusif quand `fcntl` existe. Un
+    journal qui n'est pas un fichier régulier (lien compris), un dossier de planning en lien, toute erreur : AUCUNE ligne, jamais une
+    exception qui remonte (D1 est fail-open, P46-D-10). Jamais appelée en lecture seule."""
+    try:
+        import time as _temps
+        try:
+            import fcntl as _verrou
+        except ImportError:
+            _verrou = None
+        planning = os.path.join(racine, ".planning")
+        chemin = os.path.join(planning, "surveillance.log")
+        if os.path.islink(planning) or (os.path.lexists(chemin) and not stat.S_ISREG(os.lstat(chemin).st_mode)):
+            return
+        ligne = "{}  genre={}  chemin={}  sha256={}  par={}  source={}\n".format(
+            _temps.strftime("%Y-%m-%dT%H:%M:%SZ", _temps.gmtime()), _jeton_journal(genre, "-"), _jeton_journal(chemin_rel, "-"),
+            _jeton_journal(empreinte, "-"), _jeton_journal(par, "-"), _jeton_journal(source, "-"))
+        descripteur = os.open(chemin, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0), 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(descripteur).st_mode):
+                return
+            if hasattr(os, "fchmod"):
+                os.fchmod(descripteur, 0o600)
+            if _verrou is not None:
+                _verrou.flock(descripteur, _verrou.LOCK_EX)
+            octets = ligne.encode("utf-8")
+            while octets:
+                octets = octets[os.write(descripteur, octets):]
+        finally:
+            os.close(descripteur)
+    except Exception:
+        return
+
+
+def inscrire_ecriture_moteur(racine, chemin_rel, par):
+    """D1 (Phase 46, 46-07 ; P46-D-07a) : après une écriture EFFECTIVE du moteur sur `chemin_rel` (relatif au lab, séparateur `/`), inscrit la ligne
+    `moteur` au journal de D1 avec le sha256 du fichier APRÈS écriture : elle explique le changement que le watcher verra. Une erreur n'a AUCUN effet sur
+    le code de sortie (aucune ligne)."""
+    try:
+        chemin = os.path.join(racine, *chemin_rel.split("/"))
+        if not stat.S_ISREG(os.lstat(chemin).st_mode):
+            return
+        hacheur = hashlib.sha256()
+        with os.fdopen(os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN), "rb") as fh:
+            while True:
+                bloc = fh.read(65536)
+                if not bloc:
+                    break
+                hacheur.update(bloc)
+        inscrire_surveillance(racine, "moteur", chemin_rel, hacheur.hexdigest(), par, None)
+    except Exception:
+        return
+
+
 def analyser(args):
     valeurs = {}
     chemins = []
@@ -303,6 +363,7 @@ def deroger(valeurs, chemins_bruts):
         raise Refus(2, "lab non adhérent : le config.json du dossier de planning doit déclarer "
                        "\"planning_version\": \"cycles-v1\"")
     premier = inscrire(lab, valeurs, chemins)
+    inscrire_ecriture_moteur(lab, ".planning/derogations-gates.log", "deroger-gate.sh")  # d1-moteur-derogation
     for rang, chemin in enumerate(chemins):
         print("[deroger-gate] dérogation #%d inscrite : %s sur %s (%s, %s, %s)" % (
             premier + rang, valeurs["gate"], chemin, valeurs["qui"], valeurs["canal"], valeurs["date"]))

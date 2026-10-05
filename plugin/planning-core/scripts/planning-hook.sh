@@ -1412,6 +1412,7 @@ def decider(verdicts, contexte):
         return refus, citations
     for verdict, entree in couverts:
         if consommer(contexte["racine"], entree):
+            inscrire_ecriture_moteur(contexte["racine"], ".planning/" + NOM_JOURNAL_DEROGATIONS, PAR_HOOK)  # d1-moteur-consommation : une écriture du moteur, expliquée au journal de D1
             citations.append(citer(entree))
         else:
             refus.append("[planning-core] %s : %s" % (verdict.gate, verdict.raison))
@@ -2814,9 +2815,12 @@ def lire_surveillance(racine):
 
 
 def decider_trace(entrees, rel, sha):
-    """Lignes que le fichier `rel`, de sha256 courant `sha` (`absent` s'il n'existe pas), appelle au journal : `reference` seule (première
-    observation : elle pose la référence sans contournement, limite (ba)), rien (aucun changement depuis la dernière référence), ou
-    `contournement` puis `reference` (un changement que rien n'explique). Déterministe."""
+    """Lignes que le fichier `rel`, de sha256 courant `sha` (`absent` s'il n'existe pas), appelle au journal. Règle d'explication, déterministe :
+    sans référence antérieure, la première observation pose la référence sans contournement (limite (ba)) ; un sha égal à celui de la dernière
+    référence n'est pas un changement (rien à inscrire : un événement répété ne se compte pas deux fois) ; un changement est EXPLIQUÉ s'il existe,
+    APRÈS la dernière référence du chemin, une ligne `moteur` du chemin de sha `sha` (une écriture du moteur, journalisée par son écrivain) ou une
+    ligne `intention` du chemin (une écriture par outil que le hook a laissée passer) — une intention n'explique qu'UN changement, puisque la
+    référence qui suit la dépasse. Expliqué : `reference` seule ; sinon `contournement` puis `reference`."""
     derniere = None
     for rang, entree in enumerate(entrees):
         if entree["genre"] == "reference" and entree["chemin"] == rel:
@@ -2825,13 +2829,43 @@ def decider_trace(entrees, rel, sha):
         return ["reference"]
     if entrees[derniere]["sha"] == sha:
         return []
-    return ["contournement", "reference"]  # d1-contournement
+    apres = entrees[derniere + 1:]  # d1-apres
+    expliquee = any(e["chemin"] == rel and ((e["genre"] == "moteur" and e["sha"] == sha) or e["genre"] == "intention") for e in apres)  # d1-explique
+    return ["reference"] if expliquee else ["contournement", "reference"]  # d1-contournement
 
 
 def tracer_changement(racine, rel, sha, entrees, source):
     """Inscrit les lignes que `decider_trace` demande ; un contournement n'a pas d'auteur (`par` vide : aucun auteur dans le payload, limite (ay))."""
     for genre in decider_trace(entrees, rel, sha):
         inscrire_surveillance(racine, genre, rel, sha, None if genre == "contournement" else PAR_HOOK, source)
+
+
+def inscrire_ecriture_moteur(racine, chemin_rel, par):
+    """Après une écriture du MOTEUR sur `chemin_rel` (relatif au lab, séparateur `/`), inscrit la ligne `moteur` avec le sha256 du fichier APRÈS
+    écriture : c'est elle qui explique le FileChanged qui suit. Aucune ligne si le fichier ne se lit pas ; jamais une exception : l'inscription ne
+    change JAMAIS le résultat de l'écrivain (D1 est fail-open)."""
+    try:
+        empreinte = empreinte_fichier(os.path.join(racine, *chemin_rel.split("/")))
+        if empreinte is not None:
+            inscrire_surveillance(racine, "moteur", chemin_rel, empreinte, par, None)
+    except Exception:
+        return
+
+
+def inscrire_intentions(payload, cibles):
+    """Écriture par Write, Edit ou NotebookEdit que la décision FINALE du PreToolUse laisse passer sur un fichier surveillé d'un lab adhérent : une
+    ligne `intention` (outil, chemin, sans sha256 — le contenu n'est pas encore écrit). Elle explique le changement que le FileChanged verra, un seul
+    (limite (ay)). Jamais une exception ni un refus : un échec ne change pas la décision du hook."""
+    try:
+        outil = payload.get("tool_name")
+        if outil not in OUTILS_ECRITURE:
+            return
+        for forme, racine_cible in cibles:
+            rel = chemin_relatif_surveille(racine_cible, forme) if forme else None
+            if rel is not None:
+                inscrire_surveillance(racine_cible, "intention", rel, None, outil, None)
+    except Exception:
+        return
 
 
 def poser_references(racine, liste, tronquee):
@@ -3018,8 +3052,10 @@ def main():
                 avis.extend(texte for genre, texte in resultats if genre == "avertit" and texte not in avis)
             if refus:
                 sortie_refus(refus)
-            elif avis:
-                sortie_contexte(avis)
+            else:
+                inscrire_intentions(payload, cibles or [(ecrit, racine)])  # d1-intention : la décision finale est un passage, l'écriture par outil est tracée (D1)
+                if avis:
+                    sortie_contexte(avis)
         else:
             contexte = {"payload": payload, "evenement": evenement, "outil": None,
                         "ecrit": depart if evenement == EVT_FILE_CHANGED else None,

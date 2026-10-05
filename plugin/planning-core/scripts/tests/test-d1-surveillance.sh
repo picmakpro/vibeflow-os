@@ -14,10 +14,18 @@
 #            un FileChanged sans changement de contenu et une première observation : aucun contournement
 #   R-D1-05  copie G6 : Write et Edit de `surveillance.log` -> deny de G6 ; le recalcul ne range pas le journal « Hors modèle » (jumeau négatif : un nom
 #            voisin y figure) ; FileChanged sur un fichier non surveillé (config.json hors du dossier de planning, un livrable, le journal) -> aucune ligne
+#   R-D1-06  recalc-planning.sh (écriture) : une ligne `moteur` (par=recalc-planning.sh, sha256 du fichier écrit) pour STATE.md et INDEX.md, FileChanged expliqué ;
+#            `--read-only` : aucune ligne ; jumeau : STATE.md réécrit à la main ensuite -> contournement
+#   R-D1-07  poser-verdict.sh, deroger-gate.sh et la consommation d'une dérogation par le hook : une ligne `moteur` chacun, FileChanged expliqué
+#   R-D1-08  Write laissé passer (copie observe) : une ligne `intention`, FileChanged expliqué ; un second changement sans nouvelle intention : contournement ;
+#            un Write refusé (copie G6), un Write hors liste : aucune intention
+#   R-D1-09  `inscrire_surveillance` et `_jeton_journal` ast-identiques dans les quatre scripts ; un chemin à saut de ligne reste UNE ligne encodée
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-D1-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-D1-03), MUT-D1-DOSSIER (le dossier de l'unité dans la liste -> R-D1-01),
-#   MUT-D1-BORNE (borne retirée -> R-D1-02), MUT-D1-TRACE (aucune ligne de contournement -> R-D1-04).
-# Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base).
+#   MUT-D1-BORNE (borne retirée -> R-D1-02), MUT-D1-TRACE (aucune ligne de contournement -> R-D1-04), MUT-D1-MOTEUR (ligne moteur du recalcul retirée ->
+#   R-D1-06), MUT-D1-INTENTION (ligne d'intention retirée -> R-D1-08), MUT-D1-INTENTION-REUTILISEE (une intention explique plusieurs changements ->
+#   R-D1-08), MUT-D1-AST (une copie divergente -> R-D1-09).
+# Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, moteur, mutants_moteur).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
 set -uo pipefail
@@ -476,7 +484,9 @@ def controle_d1_03(ctx, script):
     labs = [("lab dev", dev, os.path.join(dev, ".planning", "STATE.md"), dev)]
     fautes = _etat_hors_adhesion(ctx, d, True, labs)
     depot_labs = [("ce dépôt", depot, os.path.join(depot, ".planning", "STATE.md"), os.path.join(depot, ".planning"))]
-    if os.path.isdir(os.path.join(depot, ".planning")) and os.path.isdir(os.path.join(depot, "plugin", "planning-core")):
+    # Ce dépôt n'est rejoué QUE par le script réel : un mutant « adhésion ignorée » y laisserait un journal de D1 (le pré-filtre ne prouve pas la non-adhésion
+    # d'un config.json de plus de 128 octets : c'est le cœur qui la garde) — la preuve de la mutation se fait sur le lab dev fixture, jamais sur le dépôt.
+    if script is None and os.path.isdir(os.path.join(depot, ".planning")) and os.path.isdir(os.path.join(depot, "plugin", "planning-core")):
         fautes += _etat_hors_adhesion(ctx, d, False, labs + depot_labs)
     return (not fautes), ("; ".join(fautes[:3]) if fautes else
                           "lab dev (commande complète et cœur seul) et ce dépôt (commande complète) : SessionStart, CwdChanged, FileChanged -> stdout 0 octet, code 0, "
@@ -575,6 +585,278 @@ def controle_d1_05(ctx, script):
                           "FileChanged sur config.json hors planning, livrable, fichier hors liste et journal : aucune ligne")
 
 
+# =================================================================================================
+# R-D1-06 à R-D1-09 : les écritures du moteur et les écritures par outil laissées passer sont EXPLIQUÉES
+# =================================================================================================
+SCRIPTS_MOTEUR = ("planning-hook.sh", "recalc-planning.sh", "poser-verdict.sh", "deroger-gate.sh", "detect-gsd-engine.sh")
+MARQUEURS = {"planning-hook.sh": "PY_PLANNING_HOOK_EOF", "recalc-planning.sh": "PY_RECALC_PLANNING_EOF", "poser-verdict.sh": "PY_POSER_VERDICT_EOF",
+             "deroger-gate.sh": "PY_DEROGER_GATE_EOF"}
+
+
+def script_de(ctx, dossier, nom):
+    """Le script `nom` du dossier jugé (une copie mutante) s'il y est, sinon celui du dépôt."""
+    if dossier and os.path.exists(os.path.join(dossier, nom)):
+        return os.path.join(dossier, nom)
+    return os.path.join(ctx.scripts_dir, nom)
+
+
+def make_scripts_mutant(ctx, ident, script, motif, remplacement):
+    """Dossier qui porte les copies des scripts du moteur (hook, recalcul, pose de verdict, dérogation, détecteur du moteur de développement) dont
+    `script` a son UNIQUE ligne portant `motif` remplacée par `remplacement` (indentation conservée) ; `bash -n` et la compilation du corps Python
+    doivent passer. Motif ambigu ou absent, ou mutant identique : un KO nommé."""
+    source = os.path.join(ctx.scripts_dir, script)
+    original = open(source, encoding="utf-8").read()
+    lignes = original.split("\n")
+    idx = [i for i, l in enumerate(lignes) if motif in l]
+    if len(idx) != 1 or original.count(motif) != 1:
+        return None, "MOTIF AMBIGU OU ABSENT (lignes=%d, occurrences=%d)" % (len(idx), original.count(motif))
+    ligne = lignes[idx[0]]
+    lignes[idx[0]] = ligne[: len(ligne) - len(ligne.lstrip())] + remplacement
+    mute = "\n".join(lignes)
+    if mute == original:
+        return None, "NON OPPOSABLE (identique)"
+    dossier = ctx.unique("mut-scripts-" + ident.lower())
+    os.makedirs(dossier, exist_ok=True)
+    for nom in SCRIPTS_MOTEUR:
+        with open(os.path.join(dossier, nom), "w", encoding="utf-8") as fh:
+            fh.write(mute if nom == script else open(os.path.join(ctx.scripts_dir, nom), encoding="utf-8").read())
+        os.chmod(os.path.join(dossier, nom), 0o755)
+    chemin = os.path.join(dossier, script)
+    p = subprocess.run(["bash", "-n", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        return None, "bash -n ÉCHOUE : " + court(p.stderr)
+    if script in MARQUEURS:
+        try:
+            compile(corps_python(mute, MARQUEURS[script]), chemin, "exec")
+        except SyntaxError as e:
+            return None, "SyntaxError du corps Python : " + str(e)
+    return dossier, None
+
+
+def lancer_script(ctx, argv, lab):
+    p = subprocess.run(["bash"] + argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ctx.env({"GSD_HOME": ctx.gsd}), cwd=lab, timeout=240)
+    return p.returncode, p.stdout, p.stderr
+
+
+def lancer_recalc(ctx, dossier, lab, *options):
+    return lancer_script(ctx, [script_de(ctx, dossier, "recalc-planning.sh"), "--planning=" + os.path.join(lab, ".planning")] + list(options), lab)
+
+
+def lignes_de(lab, genre, chemin=None):
+    return [e for e in entrees_journal(lab) if e["genre"] == genre and (chemin is None or e["chemin"] == chemin)]
+
+
+def sha_du_fichier(chemin):
+    return sha(open(chemin, "rb").read())
+
+
+def session(ctx, hook_dir, lab):
+    """SessionStart sur la copie `observe` du hook : les références sont posées. Rend (rc, out, err)."""
+    return ctx.lancer(payload_session(lab), cwd=lab, dossier=hook_dir)
+
+
+def changement(ctx, hook_dir, lab, rel):
+    """FileChanged sur le fichier `rel` (relatif au lab) ; rend (rc, out, err)."""
+    return ctx.lancer(payload_fichier(lab, os.path.join(lab, *rel.split("/"))), cwd=lab, dossier=hook_dir)
+
+
+def contournements(lab, rel):
+    return lignes_de(lab, "contournement", rel)
+
+
+def controle_d1_06(ctx, script):
+    """`recalc-planning.sh` (écriture) réécrit STATE.md et INDEX.md : une ligne `moteur` (par=recalc-planning.sh) avec le sha256 du fichier écrit ; le FileChanged
+    qui suit n'est pas un contournement (référence seule). Jumeau négatif : STATE.md réécrit ensuite à la main (sha différent de celui du moteur) -> contournement.
+    `--read-only` : aucune ligne au journal."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    lab = fabriquer_lab(ctx, "d1-06", ouvertes=(), closes=())
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err:
+        return False, "SessionStart : code 0 attendu — obtenu rc=%d %s" % (rc, court(err))
+    avant = len(lignes_journal(lab))
+    rc, out, err = lancer_recalc(ctx, script, lab, "--read-only")
+    if rc != 0 or len(lignes_journal(lab)) != avant:
+        return False, "recalc --read-only : code 0 et aucune ligne au journal attendus — obtenu rc=%d, %d ligne(s) de plus" % (rc, len(lignes_journal(lab)) - avant)
+    rc, out, err = lancer_recalc(ctx, script, lab)
+    if rc != 0:
+        return False, "recalc-planning.sh : code 0 attendu — obtenu %d %s" % (rc, court(err))
+    fautes = []
+    for nom in ("STATE.md", "INDEX.md"):
+        rel = ".planning/" + nom
+        moteur = lignes_de(lab, "moteur", rel)
+        reel = sha_du_fichier(os.path.join(lab, ".planning", nom))
+        if len(moteur) != 1 or moteur[0]["sha"] != reel or moteur[0]["par"] != "recalc-planning.sh":
+            fautes.append("%s : UNE ligne moteur (par=recalc-planning.sh, sha256 du fichier écrit %s…) attendue — obtenu %s" % (nom, reel[:12], [(m["sha"][:12], m["par"]) for m in moteur]))
+        rc, out, err = changement(ctx, d, lab, rel)
+        if rc != 0 or out != b"" or err or contournements(lab, rel):
+            fautes.append("FileChanged sur %s après l'écriture du moteur : aucun contournement, stdout vide attendus — obtenu rc=%d %s %d contournement(s)" % (nom, rc, court(out), len(contournements(lab, rel))))
+    ecrire(os.path.join(lab, ".planning", "STATE.md"), "réécrit à la main, hors moteur\n")
+    changement(ctx, d, lab, ".planning/STATE.md")
+    if len(contournements(lab, ".planning/STATE.md")) != 1:
+        fautes.append("jumeau : STATE.md réécrit à la main après le moteur -> UN contournement attendu — obtenu %d" % len(contournements(lab, ".planning/STATE.md")))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "recalc-planning.sh : une ligne moteur (sha256 du fichier écrit) par fichier écrit, FileChanged expliqué ; réécriture à la main ensuite : contournement ; "
+                          "--read-only : aucune ligne")
+
+
+def controle_d1_07(ctx, script):
+    """`poser-verdict.sh` pose un VERDICT.md, `deroger-gate.sh` ajoute une dérogation, le hook (copie G6) en consomme une : une ligne `moteur` chacun (par= le script,
+    sha256 du fichier écrit) ; le FileChanged qui suit n'est pas un contournement."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    g6 = ctx.copie_forcee(_dossier(ctx, script), "g6")
+    lab = fabriquer_lab(ctx, "d1-07", ouvertes=("01-u",), closes=())
+    unite = os.path.join(".planning", "cycles", "01-c", "phases", "01-u")
+    ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: [livrables/rapport.md]\n---\nplan\n")
+    ecrire(os.path.join(lab, "livrables", "rapport.md"), "livrable\n")
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err:
+        return False, "SessionStart : code 0 attendu — obtenu rc=%d %s" % (rc, court(err))
+    fautes = []
+    # 1. poser-verdict.sh
+    rc, out, err = lancer_script(ctx, [script_de(ctx, script, "poser-verdict.sh"), "--unite=" + os.path.join(lab, unite), "--juge=juge-test", "--tentative=1", "--score=ok",
+                                       "--constat=critere::passé"], lab)
+    rel = ".planning/cycles/01-c/phases/01-u/VERDICT.md"
+    if rc != 0:
+        return False, "poser-verdict.sh : code 0 attendu — obtenu %d %s" % (rc, court(err))
+    moteur = lignes_de(lab, "moteur", rel)
+    if len(moteur) != 1 or moteur[0]["par"] != "poser-verdict.sh" or moteur[0]["sha"] != sha_du_fichier(os.path.join(lab, rel)):
+        fautes.append("poser-verdict.sh : UNE ligne moteur (par=poser-verdict.sh, sha256 du VERDICT.md) attendue — obtenu %s" % [(m["par"], m["sha"][:12]) for m in moteur])
+    changement(ctx, d, lab, rel)
+    if contournements(lab, rel):
+        fautes.append("FileChanged sur VERDICT.md après poser-verdict.sh : aucun contournement attendu")
+    # 2. deroger-gate.sh
+    journal_derog = ".planning/derogations-gates.log"
+    rc, out, err = lancer_script(ctx, [script_de(ctx, script, "deroger-gate.sh"), "--lab=" + lab, "--gate=G6", "--chemin=.planning/STATE.md", "--qui=suite-d1", "--canal=suite de test",
+                                       "--date=2026-10-05", "--raison=preuve de D1 : la derogation est une ecriture du moteur"], lab)
+    if rc != 0:
+        return False, "deroger-gate.sh : code 0 attendu — obtenu %d %s" % (rc, court(err))
+    moteur = lignes_de(lab, "moteur", journal_derog)
+    reel = sha_du_fichier(os.path.join(lab, journal_derog))
+    if len(moteur) != 1 or moteur[0]["par"] != "deroger-gate.sh" or moteur[0]["sha"] != reel:
+        fautes.append("deroger-gate.sh : UNE ligne moteur (par=deroger-gate.sh, sha256 du journal) attendue — obtenu %s" % [(m["par"], m["sha"][:12]) for m in moteur])
+    changement(ctx, d, lab, journal_derog)
+    if contournements(lab, journal_derog):
+        fautes.append("FileChanged sur le journal de dérogation après deroger-gate.sh : aucun contournement attendu")
+    # 3. le hook consomme la dérogation : le Write de STATE.md (G6 armé) passe, cité
+    rc, out, err = ctx.lancer(payload_ecriture(lab, os.path.join(lab, ".planning", "STATE.md")), cwd=lab, dossier=g6)
+    if rc != 0 or verdict_de(rc, out) != "sortie" or "dérogation #1 consommée" not in out.decode("utf-8", "replace"):
+        return False, "Write de STATE.md avec dérogation active (copie G6) : passage cité attendu — obtenu %s %s" % (verdict_de(rc, out), court(out))
+    moteur = [m for m in lignes_de(lab, "moteur", journal_derog) if m["par"] == "planning-hook.sh"]
+    reel = sha_du_fichier(os.path.join(lab, journal_derog))
+    if len(moteur) != 1 or moteur[0]["sha"] != reel:
+        fautes.append("consommation par le hook : UNE ligne moteur (par=planning-hook.sh, sha256 du journal) attendue — obtenu %s" % [(m["par"], m["sha"][:12]) for m in moteur])
+    changement(ctx, d, lab, journal_derog)
+    if contournements(lab, journal_derog):
+        fautes.append("FileChanged sur le journal de dérogation après la consommation par le hook : aucun contournement attendu")
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "poser-verdict.sh, deroger-gate.sh et la consommation d'une dérogation par le hook : une ligne moteur chacun (sha256 du fichier écrit), FileChanged expliqué")
+
+
+def controle_d1_08(ctx, script):
+    """Write de PLAN.md laissé passer par le hook (copie observe) -> UNE ligne `intention` ; le FileChanged qui suit n'est pas un contournement ; un second
+    FileChanged après une nouvelle écriture SANS nouvelle intention -> contournement (une intention n'explique qu'un changement) ; un Write refusé (copie G6)
+    -> aucune intention ; un Write hors liste ou un Bash -> aucune intention."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    g6 = ctx.copie_forcee(_dossier(ctx, script), "g6")
+    lab = fabriquer_lab(ctx, "d1-08", ouvertes=("01-u",), closes=())
+    plan_rel = ".planning/cycles/01-c/phases/01-u/PLAN.md"
+    plan = os.path.join(lab, *plan_rel.split("/"))
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err:
+        return False, "SessionStart : code 0 attendu — obtenu rc=%d %s" % (rc, court(err))
+    fautes = []
+    rc, out, err = ctx.lancer(payload_ecriture(lab, plan), cwd=lab, dossier=d)
+    intentions = lignes_de(lab, "intention", plan_rel)
+    if rc != 0 or verdict_de(rc, out) == "deny" or len(intentions) != 1 or intentions[0]["par"] != "Write" or intentions[0]["sha"] != "-":
+        return False, "Write de PLAN.md laissé passer : UNE ligne intention (par=Write, sans sha256) attendue — obtenu rc=%d %s %s" % (rc, verdict_de(rc, out), [(i["par"], i["sha"]) for i in intentions])
+    ecrire(plan, "---\necrit: []\n---\nplan réécrit par l'outil\n")
+    rc, out, err = changement(ctx, d, lab, plan_rel)
+    if rc != 0 or out != b"" or contournements(lab, plan_rel) or len(lignes_de(lab, "reference", plan_rel)) != 2:
+        fautes.append("FileChanged après l'écriture par outil : aucun contournement, une référence de plus attendus — obtenu %d contournement(s), %d référence(s)" % (len(contournements(lab, plan_rel)), len(lignes_de(lab, "reference", plan_rel))))
+    ecrire(plan, "---\necrit: []\n---\nplan réécrit une seconde fois, hors outil\n")
+    changement(ctx, d, lab, plan_rel)
+    if len(contournements(lab, plan_rel)) != 1:
+        fautes.append("second changement sans nouvelle intention : UN contournement attendu (une intention n'explique qu'un changement) — obtenu %d" % len(contournements(lab, plan_rel)))
+    # Write refusé : copie G6, STATE.md -> aucune intention
+    avant = len(lignes_journal(lab))
+    rc, out, err = ctx.lancer(payload_ecriture(lab, os.path.join(lab, ".planning", "STATE.md")), cwd=lab, dossier=g6)
+    if verdict_de(rc, out) != "deny" or lignes_de(lab, "intention", ".planning/STATE.md") or len(lignes_journal(lab)) != avant:
+        fautes.append("Write refusé (copie G6) : un deny et aucune intention attendus — obtenu %s, %d intention(s)" % (verdict_de(rc, out), len(lignes_de(lab, "intention", ".planning/STATE.md"))))
+    # Write hors liste : aucune intention
+    rc, out, err = ctx.lancer(payload_ecriture(lab, os.path.join(lab, ".planning", "notes.md")), cwd=lab, dossier=d)
+    if len(lignes_journal(lab)) != avant:
+        fautes.append("Write hors liste : aucune ligne attendue")
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "Write de PLAN.md laissé passer : une ligne intention, FileChanged expliqué ; second changement sans intention : contournement ; Write refusé ou hors liste : "
+                          "aucune intention")
+
+
+def _fonctions(chemin, marqueur, noms):
+    """{nom: ast.dump} des fonctions `noms` du corps Python du script (docstring comprise) et leur nombre de définitions."""
+    arbre = ast.parse(corps_python(open(chemin, encoding="utf-8").read(), marqueur))
+    res, compte = {}, {}
+    for noeud in arbre.body:
+        if isinstance(noeud, ast.FunctionDef) and noeud.name in noms:
+            res[noeud.name] = ast.dump(noeud)
+            compte[noeud.name] = compte.get(noeud.name, 0) + 1
+    return res, compte
+
+
+def _charger(chemin, marqueur):
+    """`inscrire_surveillance` du script, chargée dans un espace de noms où elle n'a que `os`, `stat` et `_jeton_journal` (comme dans le script)."""
+    arbre = ast.parse(corps_python(open(chemin, encoding="utf-8").read(), marqueur))
+    noeuds = [n for n in arbre.body if isinstance(n, ast.FunctionDef) and n.name in ("_jeton_journal", "inscrire_surveillance")]
+    espace = {"os": os, "stat": __import__("stat")}
+    exec(compile(ast.Module(body=noeuds, type_ignores=[]), chemin, "exec"), espace)
+    return espace["inscrire_surveillance"]
+
+
+def controle_d1_09(ctx, script):
+    """`inscrire_surveillance` et `_jeton_journal` sont ast-identiques dans planning-hook.sh, recalc-planning.sh, poser-verdict.sh et deroger-gate.sh (UNE définition
+    chacune) ; chaque copie, exécutée, inscrit UNE ligne encodée pour un chemin qui porte un saut de ligne, mode 0600, et n'inscrit RIEN (sans exception) quand le
+    journal est un lien, un dossier ou que le dossier de planning est absent."""
+    dumps = {}
+    fautes = []
+    for nom in ("planning-hook.sh", "recalc-planning.sh", "poser-verdict.sh", "deroger-gate.sh"):
+        fonctions, compte = _fonctions(script_de(ctx, script, nom), MARQUEURS[nom], ("inscrire_surveillance", "_jeton_journal"))
+        for fn in ("inscrire_surveillance", "_jeton_journal"):
+            if compte.get(fn) != 1:
+                fautes.append("%s : %d définition(s) de %s (attendu 1)" % (nom, compte.get(fn, 0), fn))
+            dumps.setdefault(fn, {})[nom] = fonctions.get(fn)
+    for fn, par_script in dumps.items():
+        if len(set(par_script.values())) != 1:
+            divergents = [nom for nom, v in par_script.items() if v != par_script["planning-hook.sh"]]
+            fautes.append("%s n'est pas ast-identique à celle de planning-hook.sh dans %s" % (fn, divergents))
+    if fautes:
+        return False, "; ".join(fautes[:3])
+    for nom in ("planning-hook.sh", "recalc-planning.sh", "poser-verdict.sh", "deroger-gate.sh"):
+        f = _charger(script_de(ctx, script, nom), MARQUEURS[nom])
+        lab = os.path.realpath(ctx.unique("lab-d1-09"))
+        os.makedirs(os.path.join(lab, ".planning"))
+        f(lab, "contournement", "a\nb c.md", "abc", "outil=x", "seance")
+        lignes = lignes_journal(lab)
+        mode = os.stat(chemin_journal(lab)).st_mode & 0o777
+        if len(lignes) != 1 or not LIGNE_RE.match(lignes[0]) or "chemin=a%0Ab%20c.md" not in lignes[0] or "par=outil%3Dx" not in lignes[0] or mode != 0o600:
+            fautes.append("%s : UNE ligne encodée (chemin=a%%0Ab%%20c.md, par=outil%%3Dx, mode 0600) attendue — obtenu %s mode=%o" % (nom, lignes, mode))
+        ailleurs = os.path.join(lab, "ailleurs.log")
+        ecrire(ailleurs, "")
+        os.unlink(chemin_journal(lab))
+        os.symlink(ailleurs, chemin_journal(lab))
+        f(lab, "reference", ".planning/STATE.md", "abc", "p", "seance")
+        if os.path.getsize(ailleurs) != 0:
+            fautes.append("%s : journal en lien symbolique : aucune ligne écrite à travers le lien attendue" % nom)
+        os.unlink(chemin_journal(lab))
+        os.makedirs(chemin_journal(lab))
+        f(lab, "reference", ".planning/STATE.md", "abc", "p", "seance")
+        os.rmdir(chemin_journal(lab))
+        f(os.path.join(lab, "inexistant"), "reference", ".planning/STATE.md", "abc", "p", "seance")
+        if os.path.exists(os.path.join(lab, "inexistant")):
+            fautes.append("%s : racine inexistante : rien créé attendu" % nom)
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "inscrire_surveillance et _jeton_journal ast-identiques dans les quatre scripts ; chaque copie : une ligne encodée pour un chemin à saut de ligne (0600), "
+                          "aucune ligne ni exception pour un journal en lien ou en dossier, ni pour une racine absente")
+
+
 # --- Mutants --------------------------------------------------------------------------------------------------------
 def original_de(ctx, ident, controle):
     """Résultat d'un contrôle sur le script réel, calculé une seule fois (les sections et les mutants lisent la même exécution)."""
@@ -583,9 +865,13 @@ def original_de(ctx, ident, controle):
     return ctx.originaux[ident]
 
 
-def tuer(ctx, ident, motif, remplacement, id_controle, controle):
-    """Preuve d'opposabilité : le contrôle passe sur l'original, le témoin est inchangé sous le mutant, le contrôle rougit sous le mutant."""
-    dossier, raison = make_hook_mutant(ctx, ident, motif, remplacement)
+def tuer(ctx, ident, motif, remplacement, id_controle, controle, script="planning-hook.sh"):
+    """Preuve d'opposabilité : le contrôle passe sur l'original, le témoin est inchangé sous le mutant, le contrôle rougit sous le mutant. `script` : le script
+    du moteur que le mutant réécrit (le hook par défaut)."""
+    if script == "planning-hook.sh":
+        dossier, raison = make_hook_mutant(ctx, ident, motif, remplacement)
+    else:
+        dossier, raison = make_scripts_mutant(ctx, ident, script, motif, remplacement)
     if dossier is None:
         komut(ident, "mutant du cœur valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
         return
@@ -623,9 +909,26 @@ def sec_mutants_base(ctx):
     tuer(ctx, "D1-TRACE", "# d1-contournement", 'return ["reference"]  # d1-contournement', "R-D1-04", controle_d1_04)
 
 
+def sec_moteur(ctx):
+    rendre("R-D1-06", "le recalcul inscrit ce qu'il écrit", controle_d1_06, ctx)
+    rendre("R-D1-07", "pose de verdict, dérogation et consommation inscrites", controle_d1_07, ctx)
+    rendre("R-D1-08", "une écriture par outil laissée passer est une intention, une seule fois", controle_d1_08, ctx)
+    rendre("R-D1-09", "la fonction qui inscrit est ast-identique dans les quatre scripts", controle_d1_09, ctx)
+
+
+def sec_mutants_moteur(ctx):
+    tuer(ctx, "D1-MOTEUR", "# d1-moteur-state", "pass  # d1-moteur-state", "R-D1-06", controle_d1_06, script="recalc-planning.sh")
+    tuer(ctx, "D1-INTENTION", "# d1-intention", "pass  # d1-intention", "R-D1-08", controle_d1_08)
+    tuer(ctx, "D1-INTENTION-REUTILISEE", "# d1-apres", "apres = entrees  # d1-apres", "R-D1-08", controle_d1_08)
+    # Une copie divergente : la fonction de poser-verdict.sh perd la garde du lien (le contrôle des arbres rougit)
+    tuer(ctx, "D1-AST", "if os.path.islink(planning) or (", "if os.path.islink(planning):", "R-D1-09", controle_d1_09, script="poser-verdict.sh")
+
+
 SECTIONS = {
     "base": sec_base,
     "mutants_base": sec_mutants_base,
+    "moteur": sec_moteur,
+    "mutants_moteur": sec_mutants_moteur,
 }
 
 
@@ -665,7 +968,7 @@ run_sections() { # <sections séparées par des virgules>
 if [ -z "$HOOKS_JSON" ] && [ -z "$SETTINGS_LAB" ]; then
   echo "NOTE : ni hooks.json ni settings.json à côté des scripts (suite lancée hors dépôt) : la commande enregistrée n'est pas lisible, rien n'est rejoué."
 else
-  run_sections "${VF_D1_SECTIONS:-base,mutants_base}"
+  run_sections "${VF_D1_SECTIONS:-base,mutants_base,moteur,mutants_moteur}"
 fi
 
 T_FIN="$(date +%s)"

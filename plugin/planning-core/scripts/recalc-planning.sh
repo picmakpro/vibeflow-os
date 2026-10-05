@@ -1945,6 +1945,45 @@ def _jeton_journal(valeur, repli):
     return jeton
 
 
+# Journal de D1 (Phase 46, 46-07 ; P46-D-07a) : copie ast-identique de `inscrire_surveillance` dans planning-hook.sh, recalc-planning.sh,
+# poser-verdict.sh et deroger-gate.sh (un contrôle de test-d1-surveillance.sh compare les arbres de syntaxe, R-D1-09) : les écrivains
+# du moteur y inscrivent ce qu'ils écrivent, le hook y trace ce qu'il observe.
+def inscrire_surveillance(racine, genre, chemin_rel, empreinte, par, source):
+    """Ajoute UNE ligne au journal de D1, `<racine>/.planning/surveillance.log` : `<horodatage ISO UTC>  genre=<g>  chemin=<jeton>  sha256=<hex|absent|->
+    par=<jeton>  source=<seance|reconciliation|->` (deux espaces entre champs), chaque valeur par `_jeton_journal` (injectif : un nom de fichier
+    qui porte un saut de ligne reste UNE ligne). Ajout seul (O_APPEND, O_NOFOLLOW, 0600), sous verrou exclusif quand `fcntl` existe. Un
+    journal qui n'est pas un fichier régulier (lien compris), un dossier de planning en lien, toute erreur : AUCUNE ligne, jamais une
+    exception qui remonte (D1 est fail-open, P46-D-10). Jamais appelée en lecture seule."""
+    try:
+        import time as _temps
+        try:
+            import fcntl as _verrou
+        except ImportError:
+            _verrou = None
+        planning = os.path.join(racine, ".planning")
+        chemin = os.path.join(planning, "surveillance.log")
+        if os.path.islink(planning) or (os.path.lexists(chemin) and not stat.S_ISREG(os.lstat(chemin).st_mode)):
+            return
+        ligne = "{}  genre={}  chemin={}  sha256={}  par={}  source={}\n".format(
+            _temps.strftime("%Y-%m-%dT%H:%M:%SZ", _temps.gmtime()), _jeton_journal(genre, "-"), _jeton_journal(chemin_rel, "-"),
+            _jeton_journal(empreinte, "-"), _jeton_journal(par, "-"), _jeton_journal(source, "-"))
+        descripteur = os.open(chemin, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0), 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(descripteur).st_mode):
+                return
+            if hasattr(os, "fchmod"):
+                os.fchmod(descripteur, 0o600)
+            if _verrou is not None:
+                _verrou.flock(descripteur, _verrou.LOCK_EX)
+            octets = ligne.encode("utf-8")
+            while octets:
+                octets = octets[os.write(descripteur, octets):]
+        finally:
+            os.close(descripteur)
+    except Exception:
+        return
+
+
 def _formater_ligne_journal(horodatage, unite):
     chemin = _jeton_journal(unite["chemin"], "-")
     auteur = _jeton_journal(unite["auteur"], "inconnu")
@@ -2265,6 +2304,20 @@ def archiver_socle_v2(planning):
     return 0
 
 
+def inscrire_ecriture_moteur(racine, planning, nom):
+    """D1 (Phase 46, 46-07 ; P46-D-07a) : après une écriture EFFECTIVE de `nom` dans le dossier de planning du lab, inscrit la ligne `moteur` au journal de
+    D1 avec le sha256 du fichier APRÈS écriture : elle explique le changement que le watcher verra. Rien pour un dossier de planning qui n'est pas celui
+    de la racine du lab (un compartiment n'est pas surveillé) ; jamais appelée en lecture seule ; une erreur n'a AUCUN effet sur le code de sortie."""
+    try:
+        if os.path.realpath(planning) != os.path.realpath(os.path.join(racine, ".planning")):
+            return
+        empreinte = hash_contenu(os.path.join(planning, nom))
+        if empreinte is not None:
+            inscrire_surveillance(racine, "moteur", ".planning/" + nom, empreinte, "recalc-planning.sh", None)
+    except Exception:
+        return
+
+
 def appliquer_ecritures(planning, racine_lab, derivation, cache_ctx, statut_cache):
     try:
         planning_est_lien = stat.S_ISLNK(os.lstat(planning).st_mode)
@@ -2289,12 +2342,16 @@ def appliquer_ecritures(planning, racine_lab, derivation, cache_ctx, statut_cach
     horodatage = datetime.now().astimezone().isoformat(timespec="seconds")
     nouvelles_lignes = [_formater_ligne_journal(horodatage, u) for u in a_ajouter]
     ajouter_au_journal(os.path.join(planning, "cloture.log"), nouvelles_lignes)
+    if nouvelles_lignes:
+        inscrire_ecriture_moteur(racine_lab, planning, "cloture.log")  # d1-moteur-cloture
     lignes_completes, _ = lire_journal(planning)
     ecrits = []
     if ecrire_si_different(os.path.join(planning, "INDEX.md"), rendre_index(derivation, lignes_completes)):
         ecrits.append("INDEX.md")
+        inscrire_ecriture_moteur(racine_lab, planning, "INDEX.md")  # d1-moteur-index
     if ecrire_si_different(os.path.join(planning, "STATE.md"), rendre_state(derivation)):
         ecrits.append("STATE.md")
+        inscrire_ecriture_moteur(racine_lab, planning, "STATE.md")  # d1-moteur-state
     nouveau_cache_texte = json.dumps(
         {
             "cache_schema_version": CACHE_SCHEMA_VERSION,
