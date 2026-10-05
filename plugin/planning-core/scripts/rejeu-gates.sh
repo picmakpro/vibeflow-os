@@ -32,7 +32,7 @@
 #                                                                                jamais compté dans le total)
 #   REJEU-ETAPE-<n> faux-refus=<N> faux-accept=<M> refus-conforme-modele=<K>   total des gates des étapes <= n ET des
 #                                                                                lignes rangées sous aucune étape (`-`, `?`)
-#   COUVERTURE-REJEU <G3|G4> n=<k> plancher=<p>                                (46-08) écritures réellement jouées par le
+#   COUVERTURE-REJEU <G3|G4|G4P> n=<k> plancher=<p>                             (46-08) écritures réellement jouées par le
 #                                                                                constructeur du gate et plancher exigé ; un
 #                                                                                compte sous le plancher rend le code 1 : jamais
 #                                                                                0 faux refus / 0 faux accept sans rien jouer
@@ -46,6 +46,9 @@
 #   ENTREE-IGNOREE lab=<lab affiché> entree=<entrée> motif=<motif>               (46-08) entrée réelle que G3 et G4 ne rejouent pas
 #                                                                                (nom non déclarable dans `ecrit:`, réservé, ou
 #                                                                                squelette / verdict impossible) : dite, jamais tue
+#   G4P-AGENT lab=<lab affiché> agent=<nom> role=<rôle> bash=<oui|non|indetermine> attendu=<attendu>   (46-08) une par agent rejoué
+#                                                                                par le constructeur G4P ; `attendu` vaut pour le rapport
+#                                                                                SANS sortie brute (avec sortie : toujours doit-passer)
 #   EMPREINTE-IDENTIQUE <lab affiché>   (ou EMPREINTE-DIVERGENTE + code 1)      une par lab
 # Les chemins sous HOME sont affichés `~/…` ; les chemins internes sont relatifs au lab. Un lab HORS de HOME est affiché `<lab-N>`
 # (jamais son chemin absolu), N étant son rang parmi les `--lab=` hors de HOME : il dépend de l'ORDRE des `--lab=` de l'appel — la même
@@ -89,13 +92,13 @@
 # Les constructeurs de TOUS les gates sont joués quelle que soit --etape : l'étape ne décide que de
 # l'armement de la copie du hook et du COMPTAGE (un gate d'étape > --etape est simulé en observe : son
 # `doit-refuser` obtient un passage, qui n'est pas un faux accept de l'étape mesurée). EXCEPTION (46-08) : les constructeurs
-# `G3` et `G4` (étape 5) sont coûteux (unités synthétiques, une pose de verdict par `poser-verdict.sh`)
+# `G3`, `G4` (étape 5) et `G4P` (étape 6) sont coûteux (unités synthétiques, une pose de verdict par `poser-verdict.sh`, quatre jeux par agent)
 # et ne se jouent qu'à partir de l'étape de leur gate : un rejeu --etape=n d'une étape antérieure ne les construit pas, et leur couverture
 # minimale (COUVERTURE-REJEU) n'est exigée qu'à partir de cette étape. `G3` (46-08 ; P46-D-01, P46-D-12) : sur la COPIE, des unités synthétiques de
 # forme modèle sous `.planning/cycles/99-rejeu-cloture/phases/` dont `ecrit:` désigne des entrées RÉELLES de premier niveau du lab (squelette
 # reflété sur la copie, le contenu réel n'est jamais lu) et des cas synthétiques à attendu nominatif ; l'attendu d'une entrée réelle vient
 # d'un oracle de présence PROPRE au rejeu (lstat, aucun lien suivi), jamais du prédicat du hook. `G4` : mêmes unités, `SUMMARY.md`, verdicts posés par
-# la vraie `poser-verdict.sh`.
+# la vraie `poser-verdict.sh`. `G4P` (P46-D-02) : par agent du lab copié, un `SubagentHandback` et un `SubagentStop` sans, puis avec, sortie brute.
 set -uo pipefail
 
 for arg in "$@"; do
@@ -158,7 +161,7 @@ RAISON_MODELE = "refus conforme au modèle, lab non migré"
 RAISON_REGLE = "classé par la règle écrite, état dérivé absent"
 MAX_CONTENU = 1 << 20
 DELAI_HOOK = 120
-ETAPE_G3G4 = 5  # étape à partir de laquelle les constructeurs G3 et G4 se jouent (constantes du rejeu : elles ne dérivent pas de ORDRE_ETAPES)
+ETAPE_G3G4, ETAPE_G4P = 5, 6  # étapes à partir desquelles les constructeurs G3 et G4, puis G4P, se jouent (constantes du rejeu : elles ne dérivent pas de ORDRE_ETAPES)
 PREFIXE_GATE = re.compile(r"^\[planning-core\] ([A-Z0-9]+) : ")
 
 
@@ -904,8 +907,10 @@ BORNE_FICHIERS_G34, BORNE_OCTETS_G34 = 2000, 134217728  # P46-D-03a : valeurs PR
 MESURE_PLAFOND_G34 = 200000  # au-delà, le comptage d'une entrée réelle s'arrête et le relevé le dit (mesure tronquée)
 EXCLUS_LIVRABLES_G34 = (".DS_Store", "Thumbs.db", "desktop.ini")
 MAX_ENTREES_REELLES = 50
-PLANCHER_G34 = 6  # écritures minimales jouées : par lab adhérent pour G3 et G4
+PLANCHER_G34, PLANCHER_G4P = 6, 4  # écritures minimales jouées : par lab adhérent pour G3 et G4, par lab doté d'agents pour G4P (un agent = quatre jeux)
 CADRAGE_CLOS_G34 = "---\ninconnues: []\n---\n"
+RAPPORTS_G4P = {"sans-sortie": "rapport du rejeu : travail terminé, tout fonctionne",
+                "avec-sortie": "rapport du rejeu\n```\n$ ls\nfichier.txt\n```\n"}  # le rapport de référence : un bloc dont la première ligne est `$ ls`, puis une ligne de sortie
 
 
 def nom_lisible(nom):
@@ -1209,20 +1214,133 @@ def construire_g4(lab, ctx):
     return preparer_g34(lab, ctx)["G4"] if ctx["etape"] >= ETAPE_G3G4 else []
 
 
+# --- G4′ (46-08, CLOT-10 ; P46-D-02, P46-D-02b, P46-D-11) : pas de rapport de sous-agent sans sortie de commande brute ----------------------------
+# Pour chaque agent de la RACINE d'un lab copié adhérent (mêmes définitions que le constructeur ROLE), un `SubagentHandback` (PreToolUse, `tool_input.message`)
+# et un `SubagentStop` (repli hors mode auto, `last_assistant_message`), SANS puis AVEC sortie brute. L'attendu du rapport SANS sortie dérive du RÔLE (le
+# diagnostic `--classer` du hook copié : worker ou producteur) et d'une lecture PROPRE au rejeu de `tools:` et `disallowedTools:` (la capacité Bash) ; celui
+# du rapport AVEC sortie est toujours doit-passer. Une ligne `G4P-AGENT` par agent. Un fichier d'attendus nominatif (`G4P | <lab> | agents/<agent> | …`)
+# l'emporte sur le rapport sans sortie de l'agent.
+def jetons_nus(valeur):
+    """Jetons d'une valeur `a, b(c, d), e` coupés aux virgules de profondeur 0 ; None si les parenthèses ne s'équilibrent pas."""
+    jetons, courant, profondeur = [], "", 0
+    for c in valeur:
+        if c == "(":
+            profondeur += 1
+        elif c == ")":
+            profondeur -= 1
+            if profondeur < 0:
+                return None
+        if c == "," and profondeur == 0:
+            jetons.append(courant)
+            courant = ""
+        else:
+            courant += c
+    if profondeur != 0:
+        return None
+    jetons.append(courant)
+    return [j.strip() for j in jetons if j.strip() != ""]
+
+
+def champ_agent(texte, cle):
+    """(présent, jetons) du champ `cle:` du frontmatter d'une définition d'agent : (False, []) s'il est absent ; (True, jetons) sinon (valeur en ligne,
+    entre crochets, ou liste `- x`) ; (True, None) si illisible (parenthèses déséquilibrées, frontmatter jamais refermé)."""
+    lignes = texte.replace("\r\n", "\n").split("\n")
+    if not lignes or lignes[0].strip() != "---":
+        return (False, [])
+    fin = None
+    for i in range(1, len(lignes)):
+        if lignes[i].strip() == "---":
+            fin = i
+            break
+    if fin is None:
+        return (True, None)
+    corps = lignes[1:fin]
+    trouve, jetons = False, []
+    for i, ligne in enumerate(corps):
+        if not ligne.startswith(cle + ":"):
+            continue
+        trouve = True
+        valeur = ligne[len(cle) + 1:].strip()
+        if valeur == "":
+            brut = []
+            for suite in corps[i + 1:]:
+                if suite.strip() == "":
+                    continue
+                if suite == suite.lstrip() or not suite.strip().startswith("- "):
+                    break
+                brut.append(suite.strip()[2:])
+            valeur = ", ".join(brut)
+        elif valeur.startswith("[") and valeur.endswith("]"):
+            valeur = valeur[1:-1]
+        coupes = jetons_nus(valeur)
+        if coupes is None:
+            return (True, None)
+        jetons = coupes
+    return (trouve, jetons)
+
+
+def capacite_bash(texte):
+    """`oui`, `non` ou `indetermine`, d'après `tools:` (absent : l'agent hérite des outils de la session, Bash compris ; sinon il doit nommer `Bash` ou
+    `Bash(…)`) et `disallowedTools:` (ne doit pas nommer `Bash`) — P46-D-02b."""
+    present, jetons = champ_agent(texte, "tools")
+    if present and jetons is None:
+        return "indetermine"
+    if present and not any(j.strip("\"'").partition("(")[0].strip() == "Bash" for j in jetons):
+        return "non"
+    interdit_present, interdits = champ_agent(texte, "disallowedTools")
+    if interdit_present and interdits is None:
+        return "indetermine"
+    if interdit_present and any(j.strip("\"'") == "Bash" for j in interdits):
+        return "non"
+    return "oui"
+
+
+def construire_g4p(lab, ctx):  # rejeu-g4p
+    """G4P : voir l'en-tête de section. Rien avant l'étape 6 ; rien sans `.planning/` à la racine (lab dev silencieux, P45-D-04)."""
+    if ctx["etape"] < ETAPE_G4P or ".planning" not in lab.dossiers_planning:
+        return []
+    groupes = {}
+    for nom, chemin in definitions_racine(lab):
+        groupes.setdefault(normaliser_nom(nom), []).append((nom, chemin, classer_definition(ctx["hook_copie"], chemin)))
+    sortie = []
+    for _cle, membres in sorted(groupes.items()):
+        nom, chemin, classe = membres[0]
+        sur = NOM_SUR.sub("_", nom)
+        if len(set(m[2]["role"] for m in membres)) > 1:  # rôles contradictoires : agent inconnu du hook, jamais refusé (P45-D-11)
+            role, bash, sans = "ambigu", "non", "doit-passer"
+        else:
+            role = classe["role"]
+            try:
+                with open(chemin, encoding="utf-8-sig") as fh:
+                    bash = capacite_bash(fh.read())
+            except (OSError, UnicodeDecodeError):
+                bash = "indetermine"
+            sans = "doit-refuser" if role in ("worker", "producteur") and bash == "oui" else "doit-passer"  # rejeu-g4p-bash
+        for outil in ("SubagentHandback", "SubagentStop"):
+            sortie.append((outil, "rapport/sans-sortie", sans, nom))
+            sortie.append((outil, "rapport/avec-sortie", "doit-passer", nom))
+        ctx["notes"].append("G4P-AGENT lab=%s agent=%s role=%s bash=%s attendu=%s" % (lab.affiche, sur, role, bash, sans))
+    return sortie
+
+
 def couverture_g34(labs, gagnants, etape):  # rejeu-couverture
-    """[(gate, n, plancher)] des gates G3 et G4 dont l'étape est atteinte : n = écritures réellement jouées sous le gate (constructeur ET fichier
-    d'attendus), plancher = PLANCHER_G34 par lab adhérent, au moins un lab. Le plancher
+    """[(gate, n, plancher)] des gates G3, G4 et G4P dont l'étape est atteinte : n = écritures réellement jouées sous le gate (constructeur ET fichier
+    d'attendus), plancher = PLANCHER_G34 par lab adhérent (G3, G4) ou PLANCHER_G4P par lab adhérent doté d'agents (G4P), au moins un lab. Le plancher
     ne dépend pas des constructeurs : un constructeur retiré du registre laisse n à 0 sous un plancher qui reste exigé."""
     adherents = [l for l in labs if ".planning" in l.dossiers_planning]
     res = []
     if etape >= ETAPE_G3G4:
         for gate in ("G3", "G4"):
             res.append((gate, len([e for e in gagnants if e["gate"] == gate]), PLANCHER_G34 * max(1, len(adherents))))
+    if etape >= ETAPE_G4P:
+        dotes = [l for l in adherents if definitions_racine(l)]
+        res.append(("G4P", len([e for e in gagnants if e["gate"] == "G4P"]), PLANCHER_G4P * max(1, len(dotes))))
     return res
 
 
 CONSTRUCTEURS = {"reecriture": construire_reecriture, "G6": construire_g6, "G5": construire_g5, "G1": construire_g1, "G7": construire_g7, "ROLE": construire_role}  # rejeu-registre
 CONSTRUCTEURS.update({"G3": construire_g3, "G4": construire_g4})  # rejeu-g3g4-registre
+CONSTRUCTEURS["G4P"] = construire_g4p  # rejeu-g4p-registre
 
 
 def normaliser(lab, gate, brut, rang):
@@ -1265,13 +1383,20 @@ def lire_attendus(chemin, labs):
         gate, nom_lab, rel, attendu = champs[:4]
         cibles = [l for l in labs if nom_lab in (l.affiche, l.arg)]
         ecriture = ("Write", rel, attendu, "")
+        ecritures = None
+        if gate == "G4P":  # la colonne chemin est `agents/<agent>` : les deux rapports SANS sortie brute de l'agent (SubagentHandback et SubagentStop)
+            agent = rel[len("agents/"):] if rel.startswith("agents/") else ""
+            if agent == "" or "/" in agent:
+                raise ErreurOutil("fichier d'attendus : ligne %d invalide (G4P : agents/<agent> est attendu)" % n)
+            ecritures = [(outil, "rapport/sans-sortie", attendu, agent) for outil in ("SubagentHandback", "SubagentStop")]
         if gate == "G7":  # la colonne chemin est le dossier X : l'écriture rejouée est la création de X/.planning/config.json
             x = rel.rstrip("/")
             if not x or x == "." or x.startswith("/") or ".." in x.split("/"):
                 raise ErreurOutil("fichier d'attendus : ligne %d invalide (G7 : un dossier relatif au lab est attendu)" % n)
             ecriture = ("Write", x + "/.planning/config.json", attendu, "", "etat-derive", None, None, "creation")
         for lab in cibles:
-            entrees.append(normaliser(lab, gate, ecriture, RANG_ATTENDUS))
+            for une in (ecritures or [ecriture]):
+                entrees.append(normaliser(lab, gate, une, RANG_ATTENDUS))
     return entrees
 
 
@@ -1300,6 +1425,14 @@ def fusionner(entrees):
 
 # --- Rejeu d'une écriture -------------------------------------------------------------------------
 def payload(lab, outil, chemin, agent_type, charge=None):
+    if outil == "SubagentStop":  # repli de G4′ : l'événement n'est pas un outil, le rapport est `last_assistant_message`, hors mode auto
+        arret = {"session_id": "rejeu", "transcript_path": "transcript.jsonl", "cwd": lab.copie, "permission_mode": "default",
+                 "hook_event_name": "SubagentStop", "stop_hook_active": False}
+        if agent_type:
+            arret["agent_id"] = "rejeu-agent"
+            arret["agent_type"] = agent_type
+        arret["last_assistant_message"] = RAPPORTS_G4P.get(os.path.basename(chemin), chemin)
+        return json.dumps(arret, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     absolu = os.path.join(lab.copie, chemin) if chemin else lab.copie
     contenu = "x"
     if outil in ("Write", "Edit", "NotebookEdit"):
@@ -1308,6 +1441,8 @@ def payload(lab, outil, chemin, agent_type, charge=None):
             contenu = lu
     if outil in ("Agent", "Task"):
         entree = {"description": "d", "prompt": "p", "subagent_type": chemin}
+    elif outil == "SubagentHandback":
+        entree = {"message": RAPPORTS_G4P.get(os.path.basename(chemin), chemin)}
     elif outil == "Bash":
         entree = {"command": chemin}
     elif outil == "NotebookEdit":
@@ -1344,7 +1479,10 @@ def jouer(hook_copie, env, lab, outil, chemin, agent_type, charge=None):
     if p.stdout == b"":
         return "passe", "passe"
     try:
-        s = json.loads(p.stdout.decode("utf-8"))["hookSpecificOutput"]
+        objet = json.loads(p.stdout.decode("utf-8"))
+        if isinstance(objet, dict) and objet.get("decision") == "block":  # SubagentStop : le blocage est `decision: block`, code 0 (P46-D-10)
+            return "refus", str(objet.get("reason", ""))
+        s = objet["hookSpecificOutput"]
     except (ValueError, KeyError, TypeError):
         return "refus", "sortie du hook illisible"
     if isinstance(s, dict) and s.get("permissionDecision") == "deny":

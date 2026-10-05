@@ -1,0 +1,37 @@
+# Attendus nominatifs du rejeu réel des étapes 5 (G3, G4) et 6 (G4′) — Phase 46, plan 46-08
+# Date : 2026-10-05
+# Sources : P46-D-11 (ordre d'armement prolongé : G3 + G4, empreintes comprises, puis G4′ ; 0 faux refus / 0 faux accept sur le banc en CI puis sur le
+#   rejeu en lecture seule), P46-D-02 et P46-D-02b (G4′ : workers et producteurs qui ont Bash), P46-D-12 (« vide », un lien n'est jamais suivi),
+#   protocole P45-D-21 et P45-D-21a (attendu à trois valeurs, nominatif, jamais une moyenne). Le rejeu réel de ces étapes est un geste de 46-11 et
+#   de 46-12, après autorisation humaine : ce fichier pose le FORMAT et les règles par défaut ; il ne porte AUCUNE ligne de lab réel (elles s'écrivent
+#   en 46-11 et 46-12, une fois le rejeu autorisé).
+#
+# Rôle des lignes : un fichier d'attendus prime sur le constructeur d'un gate, qui prime sur la réécriture générique (rejeu-gates.sh, `fusionner`) ;
+#   deux lignes de même clé qui se contredisent sont une erreur de l'outil (code 1). Une ligne dont le lab n'est pas dans la mesure est ignorée.
+#
+# Format : <gate> | <lab affiché> | <chemin relatif ou agents/<agent>> | <attendu> | <motif>
+#   <gate>          G3, G4 ou G4P (les gates des étapes 1 à 4 gardent leurs lignes de 45-REJEU-ATTENDUS.txt)
+#   <lab affiché>   `~/…` sous HOME, `<lab-N>` hors de HOME (N = rang du `--lab=` hors de HOME dans l'appel : écrire les lignes dans l'ordre des `--lab=`)
+#   <attendu>       doit-passer | doit-refuser | doit-refuser-modele (refus conforme au modèle, lab non migré : compté à part)
+#   <motif>         une phrase : pourquoi l'attendu diffère de la règle par défaut ci-dessous
+#   G3, G4          le chemin est celui du CLOTURE.md (G3) ou du SUMMARY.md (G4) de l'unité de rejeu, relatif au lab, tel que le relevé l'imprime :
+#                   `.planning/cycles/99-rejeu-cloture/phases/<NN>-<slug>/CLOTURE.md` ; pour une entrée réelle, le <slug> porte le nom de l'entrée
+#                   (`69-reel-<rang>-<nom>` pour G3, `79-reel-<rang>-<nom>` pour G4)
+#   G4P             le chemin est `agents/<agent>` (le `name:` de la définition, tel que `G4P-AGENT` l'imprime) ; la ligne vise les DEUX rapports
+#                   SANS sortie brute de l'agent (SubagentHandback et SubagentStop) ; les rapports AVEC sortie brute restent doit-passer
+#
+# Règles par défaut (sans ligne ici) :
+#   - unités synthétiques (cas `61` à `67`, `71` à `77`) : l'attendu du constructeur, écrit d'après le modèle (livrable présent, absent, vide, lien,
+#     dossier réduit à un .DS_Store ; verdict conforme, absent, en échec, périmé par le plan, périmé par le livrable, invalide) ;
+#   - entrées réelles de premier niveau (non cachées, au plus 50 par lab, triées) : l'attendu vient de l'ORACLE de présence propre au rejeu
+#     (lstat par composant, aucun lien suivi) : fichier régulier non vide ou dossier portant au moins un fichier régulier non vide hors `.DS_Store`,
+#     `Thumbs.db`, `desktop.ini` -> doit-passer ; absent, vide, lien, hors borne (2000 entrées ou 128 Mio) ou illisible -> doit-refuser ;
+#   - CLOTURE.md et SUMMARY.md réels de style GSD : doit-passer (réécriture générique : seule la forme `.planning/cycles/<c>/phases/<p>[/plans/<pl>]/`
+#     est visée par G3 et G4) ;
+#   - agents (G4P) : doit-refuser pour le rapport sans sortie brute d'un worker ou d'un producteur qui a Bash (rôle dérivé par `--classer` du hook,
+#     lecture propre au rejeu de `tools:` et `disallowedTools:`), doit-passer pour tout autre agent (juge, manager, agent sans Bash, rôle ambigu).
+#
+# Tout nom d'entrée réelle non déclarable dans `ecrit:` (caractère de contrôle, `~` initial, métacaractère) est dit au relevé (ENTREE-IGNOREE), jamais tu ;
+#   toute entrée hors borne est nommée (BORNE-LIVRABLES) : c'est la mesure de l'hypothèse A7 sur les labs réels (P46-D-03a).
+#
+# Aucune ligne de lab réel ici.

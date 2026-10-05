@@ -43,6 +43,8 @@
 #   R-REJEU-G3G4    (46-08) le vrai hook armé à l'étape 5 sur un lab synthétique complet : unités synthétiques à attendu nominatif, entrées réelles
 #                   jugées par l'oracle de présence du rejeu, verdicts posés par la vraie poser-verdict.sh, plancher de couverture, deux sens comptés
 #   R-REJEU-BORNE   (46-08) BORNE-LIVRABLES nomme toute entrée réelle hors borne (2001 entrées, 128 Mio + 1) : mesure de l'hypothèse A7
+#   R-REJEU-G4P     (46-08) le vrai hook armé à l'étape 6 sur six agents : quatre jeux par agent, attendu dérivé du rôle et de la capacité Bash,
+#                   fichier d'attendus nominatif prioritaire
 #   (VF_REJEU_SECTIONS=<sections séparées par des virgules> restreint la suite pour la mise au point ; la preuve est la suite entière)
 #   R-REJEU-LIENS / R-REEL-LIENS  (quick 45-B, H3 ; décisions du manager vf-dev-manager, 2026-10-01) : un lien du lab dont la cible
 #                 résolue sort du lab, sur un chemin que le rejeu écrit ou lit (cycles/, phases/, STATE.md, .claude/agents), est une
@@ -1268,7 +1270,7 @@ def sec_etapes(_):
     sub = substitut("sub-armes56.sh", SUB_TOUT)
     # le substitut ne porte aucun constructeur G3, G4 ni G4P (le lanceur d'essai les retire) : la couverture minimale fait échouer la mesure, nommément
     for etape, attendu, sans_couverture in ((5, "armes=G6,G5,G1,G7,ROLE,G3,G4", ("G3 n=0 plancher=6", "G4 n=0 plancher=6")),
-                                            (6, "armes=G6,G5,G1,G7,ROLE,G3,G4,G4P", ("G3 n=0 plancher=6", "G4 n=0 plancher=6"))):
+                                            (6, "armes=G6,G5,G1,G7,ROLE,G3,G4,G4P", ("G3 n=0 plancher=6", "G4 n=0 plancher=6", "G4P n=0 plancher=4"))):
         r = rejeu([lab], hook=sub, etape=etape)
         vus = set(l[5] for l in r.lignes)
         if vus != {"[planning-core] G6 : " + attendu} or r.rc != 1 or any("couverture insuffisante : " + c not in r.err for c in sans_couverture) \
@@ -1286,7 +1288,7 @@ def sec_etapes(_):
         for f in fautes:
             ko("R-REJEU-ETAPES", "--etape accepte 1 à 6 (armement simulé selon ORDRE_ETAPES), refuse tout autre numéro (code 64)", "voir le cas", f)
     else:
-        ok("R-REJEU-ETAPES --etape=5 arme G6, G5, G1, G7, ROLE, G3 et G4 sur la copie (G4P reste observe), --etape=6 arme aussi G4P, --etape=4 laisse G3, G4 et G4P en observe ; un hook substitut sans constructeur G3, G4 ni G4P (rien de rejoué sous ces gates) : code 1 et COUVERTURE-REJEU insuffisante nommée (G3 et G4), jamais un 0/0 à vide ; --etape=7, 0, 5x, vide et -1 : code 64 sans sortie, pour rejeu-gates.sh ET rejeu-reel.sh (aucun rapport écrit)")
+        ok("R-REJEU-ETAPES --etape=5 arme G6, G5, G1, G7, ROLE, G3 et G4 sur la copie (G4P reste observe), --etape=6 arme aussi G4P, --etape=4 laisse G3, G4 et G4P en observe ; un hook substitut sans constructeur G3, G4 ni G4P (rien de rejoué sous ces gates) : code 1 et COUVERTURE-REJEU insuffisante nommée (G3, G4, puis G4P à l'étape 6), jamais un 0/0 à vide ; --etape=7, 0, 5x, vide et -1 : code 64 sans sortie, pour rejeu-gates.sh ET rejeu-reel.sh (aucun rapport écrit)")
 
 
 def sec_g3g4(_):
@@ -1372,6 +1374,88 @@ def sec_borne(_):
             ko("R-REJEU-BORNE", "BORNE-LIVRABLES nomme toute entrée réelle hors borne, avec ses comptes", "voir le cas", f)
     else:
         ok("R-REJEU-BORNE un dossier de 2001 fichiers et un fichier creux d'un octet au-delà de 128 Mio : une ligne BORNE-LIVRABLES chacun, avec ses comptes (fichiers=2001 octets=2001 ; fichiers=1 octets=134217729), refusés hors borne par G3 ; le dossier de 2000 fichiers, à la borne, n'y figure pas et passe G3 et G4 ; le hook et l'oracle bornent à la même valeur (REJEU-ETAPE-5 à 0)")
+
+
+AGENTS_G4P = {
+    ".claude/agents/juge.md": _agent("juge", "Read, Glob, Grep", "disallowedTools: Write, Edit\nomitClaudeMd: true\n"),
+    ".claude/agents/manager.md": _agent("manager", "Read, Write, SendMessage, Agent(cible-m1, cible-m2)"),
+    ".claude/agents/worker-bash.md": _agent("worker-bash", "Read, Bash", "vf-internal: true\n"),
+    ".claude/agents/worker-nobash.md": _agent("worker-nobash", "Read", "vf-internal: true\n"),
+    ".claude/agents/prod-sanstools.md": "---\nname: prod-sanstools\ndescription: agent synthétique\n---\nCorps.\n",
+    ".claude/agents/prod-bashinterdit.md": _agent("prod-bashinterdit", "Read, Write, Bash", "disallowedTools: Bash\n"),
+}
+# (rôle, Bash, attendu du rapport SANS sortie) : écrit à la main d'après P46-D-02 et P46-D-02b
+ATTENDU_G4P = {"juge": ("juge", "non", "doit-passer"), "manager": ("manager", "non", "doit-passer"), "worker-bash": ("worker", "oui", "doit-refuser"),
+               "worker-nobash": ("worker", "non", "doit-passer"), "prod-sanstools": ("producteur", "oui", "doit-refuser"),
+               "prod-bashinterdit": ("producteur", "non", "doit-passer")}
+
+
+def scenario_g4p(script, hook=HOOK, etape=6, attendus=None, scenario=None):
+    lab = fabriquer_lab(unique("lab-g4p"), dict(AGENTS_G4P, **{".planning/notes.md": "n"}))
+    r = rejeu([lab], hook=hook, etape=etape, script=script, attendus=attendus, scenario=scenario)
+    return r, "~/" + os.path.basename(lab)
+
+
+def sec_g4p(_):
+    """R-REJEU-G4P : le vrai hook armé à l'étape 6, un lab de six agents (juge, manager, worker avec Bash, worker sans Bash, producteur sans tools:, producteur à Bash interdit)."""
+    fautes = []
+    r, aff = scenario_g4p(REJEU)
+    if r.rc != 0:
+        fautes.append("code %d : %s" % (r.rc, court(r.err)))
+    agents = sorted(notes(r, "G4P-AGENT"))
+    attendu_agents = sorted("G4P-AGENT lab=%s agent=%s role=%s bash=%s attendu=%s" % ((aff, nom) + ATTENDU_G4P[nom]) for nom in ATTENDU_G4P)
+    if agents != attendu_agents:
+        fautes.append("lignes G4P-AGENT %s (attendu %s)" % (agents, attendu_agents))
+    obtenu = {}
+    for g, lab, chemin, attendu, vu, _raison in r.lignes:
+        if g == "G4P" and lab == aff:
+            obtenu.setdefault(chemin, []).append((attendu, vu))
+    attendu_lignes = {}
+    for nom, (_role, _bash, sans) in ATTENDU_G4P.items():
+        for evt in ("SubagentHandback", "SubagentStop"):
+            attendu_lignes["rapport/sans-sortie [%s@%s]" % (evt, nom)] = [(sans, "refus" if sans == "doit-refuser" else "passe")]
+            attendu_lignes["rapport/avec-sortie [%s@%s]" % (evt, nom)] = [("doit-passer", "passe")]
+    if obtenu != attendu_lignes:
+        fautes.append("lignes G4P : écart %s" % sorted(set(map(str, obtenu.items())) ^ set(map(str, attendu_lignes.items())))[:6])
+    if r.compte.get("G4P") != (0, 0, 0) or "G4P" in r.hors_etape or r.etape != (0, 0, 0):
+        fautes.append("comptes G4P=%s hors-etape=%s REJEU-ETAPE-6=%s (attendu (0, 0, 0) compté)" % (r.compte.get("G4P"), sorted(r.hors_etape), r.etape))
+    cov = couverture(r)
+    if cov.get("G4P", (0, 99))[0] < cov.get("G4P", (0, 99))[1] or cov.get("G4P", (0, 0))[0] != 24:
+        fautes.append("COUVERTURE-REJEU G4P %s (attendu n=24, quatre jeux par agent, au-dessus du plancher)" % (cov.get("G4P"),))
+    if not r.empreintes or any("DIVERGENTE" in e for e in r.empreintes):
+        fautes.append("empreinte du lab réel : %s" % r.empreintes)
+    # à l'étape 5, G4P est en observe : aucune ligne rejouée, aucun plancher
+    r5, aff5 = scenario_g4p(REJEU, etape=5)
+    if r5.rc != 0 or "G4P" in couverture(r5) or any(l[0] == "G4P" for l in r5.lignes) or notes(r5, "G4P-AGENT"):
+        fautes.append("--etape=5 : G4P ne se joue pas (rc=%d, couverture %s)" % (r5.rc, couverture(r5)))
+    # un fichier d'attendus nominatif l'emporte sur le constructeur : worker-bash exempté, le hook le refuse encore : deux faux refus
+    lab = fabriquer_lab(unique("lab-g4pa"), dict(AGENTS_G4P, **{".planning/notes.md": "n"}))
+    att = ecrire_attendus(["G4P | ~/%s | agents/worker-bash | doit-passer | agent exempté par arbitrage d'essai" % os.path.basename(lab)])
+    ra = rejeu([lab], hook=HOOK, etape=6, attendus=att)
+    refuses = [(l[2], l[3], l[4]) for l in ra.lignes if l[0] == "G4P" and "worker-bash" in l[2] and "sans-sortie" in l[2]]
+    if ra.rc != 0 or ra.compte.get("G4P") != (2, 0, 0) or sorted(refuses) != [("rapport/sans-sortie [SubagentHandback@worker-bash]", "doit-passer", "refus"),
+                                                                               ("rapport/sans-sortie [SubagentStop@worker-bash]", "doit-passer", "refus")]:
+        fautes.append("attendu nominatif : rc=%d COMPTE G4P=%s lignes %s (attendu faux-refus=2 sur les deux rapports sans sortie de worker-bash)" % (ra.rc, ra.compte.get("G4P"), refuses))
+    contra = ecrire_attendus(["G4P | ~/%s | agents/worker-bash | doit-passer | a" % os.path.basename(lab), "G4P | ~/%s | agents/worker-bash | doit-refuser | b" % os.path.basename(lab)])
+    rc = rejeu([lab], hook=HOOK, etape=6, attendus=contra)
+    if rc.rc != 1 or "attendus contradictoires" not in rc.err:
+        fautes.append("attendus contradictoires de même rang : attendu code 1 et « attendus contradictoires », obtenu rc=%d err=%s" % (rc.rc, court(rc.err)))
+    for ligne in ("G4P | ~/%s | agents/ | doit-passer | x" % os.path.basename(lab), "G4P | ~/%s | rapport/x | doit-passer | x" % os.path.basename(lab)):
+        ri = rejeu([lab], hook=HOOK, etape=6, attendus=ecrire_attendus([ligne]))
+        if ri.rc != 1 or "G4P : agents/<agent> est attendu" not in ri.err:
+            fautes.append("ligne G4P mal formée %r : attendu code 1 et « agents/<agent> est attendu », obtenu rc=%d err=%s" % (ligne, ri.rc, court(ri.err)))
+    # un hook qui ne distingue pas la capacité Bash (applique la lettre : tout worker ou producteur sans sortie est refusé) : faux refus sur ceux qui n'ont pas Bash
+    lettre = substitut_classeur(unique("sub-lettre-g4p") + ".sh", "\n".join([
+        'if ARMEMENT_G4P == "armed" and outil == "SubagentHandback" and "$ ls" not in str(ti.get("message", "")):',
+        '    refuser("G4P", "rapport sans sortie")', '']))
+    rl, _affl = scenario_g4p(REJEU, hook=lettre, scenario="")
+    if rl.compte.get("G4P", (0, 0, 0))[0] < 4:
+        fautes.append("hook qui refuse tout rapport sans sortie : COMPTE G4P=%s (attendu faux-refus >= 4 : juge, manager, worker sans Bash, producteur à Bash interdit, au PreToolUse de SubagentHandback)" % (rl.compte.get("G4P"),))
+    if fautes:
+        for f in fautes:
+            ko("R-REJEU-G4P", "vrai hook armé à l'étape 6 : G4′ rejoué agent par agent, deux événements, avec et sans sortie brute", "voir le cas", f)
+    else:
+        ok("R-REJEU-G4P vrai hook, --etape=6, six agents : six lignes G4P-AGENT (rôle, Bash, attendu), quatre jeux par agent (SubagentHandback et SubagentStop, sans puis avec sortie brute) : sans sortie refusé pour le worker avec Bash et le producteur sans tools:, accepté pour le juge, le manager, le worker sans Bash et le producteur à Bash interdit ; avec sortie accepté pour tous ; COMPTE G4P (0, 0, 0), COUVERTURE-REJEU G4P n=24 ; --etape=5 ne le joue pas ; un fichier d'attendus nominatif l'emporte (deux faux refus), deux attendus contradictoires ou une ligne mal formée = code 1 ; un hook qui refuse tout rapport sans sortie compte des faux refus")
 
 
 ETATS_CADRAGE = ("absent", "herite", "clos", "ouvert", "vide", "invalide", "dossier", "lien")
@@ -2324,6 +2408,15 @@ def sec_mutants(_):
                                 "etape": r.etape, "lien": lien}
         return memo_g34[script]
 
+    memo_g4p = {}
+
+    def sc_g4p(script):
+        """Rejeu --etape=6 du lab de six agents ; résumé comparable."""
+        if script not in memo_g4p:
+            r, _aff = scenario_g4p(script)
+            memo_g4p[script] = {"rc": r.rc, "sans_plancher": "couverture insuffisante : G4P" in r.err, "G4P": r.compte.get("G4P"), "etape": r.etape}
+        return memo_g4p[script]
+
     duel("REJEU-G3G4-ENREGISTRE", REJEU, G, "# rejeu-g3g4-registre", "pass  # rejeu-g3g4-registre",
          sc_g34, lambda o, m: o["rc"] == 0 and not o["sans_plancher"] and o["G3"] == (0, 0, 0) and m["rc"] == 1 and m["sans_plancher"],
          "R-REJEU-G3G4 : les constructeurs G3 et G4 retirés du registre (rien n'est joué sous ces gates : le plancher de couverture fait échouer la mesure, jamais un 0/0 à vide)",
@@ -2335,6 +2428,14 @@ def sec_mutants(_):
     duel("REJEU-ETAPE5", REJEU, G, "ORDRE_ETAPES = (", 'ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",), (), ("G4P",))',
          sc_g34, lambda o, m: o["rc"] == 0 and o["etape"] == (0, 0, 0) and m["etape"] is not None and m["etape"][1] >= 1 and m["G3"][1] >= 1,
          "R-REJEU-G3G4 : l'étape 5 n'arme ni G3 ni G4 sur la copie (leurs doit-refuser passent : faux accept comptés dans REJEU-ETAPE-5)",
+         compagnons=(RECALC, POSER))
+    duel("REJEU-G4P-ENREGISTRE", REJEU, G, "# rejeu-g4p-registre", "pass  # rejeu-g4p-registre",
+         sc_g4p, lambda o, m: o["rc"] == 0 and not o["sans_plancher"] and o["G4P"] == (0, 0, 0) and m["rc"] == 1 and m["sans_plancher"],
+         "R-REJEU-G4P : le constructeur G4P retiré du registre (aucun rapport rejoué : le plancher de couverture fait échouer la mesure)",
+         compagnons=(RECALC, POSER))
+    duel("REJEU-G4P-BASH", REJEU, G, "# rejeu-g4p-bash", 'sans = "doit-refuser" if role in ("worker", "producteur") else "doit-passer"  # rejeu-g4p-bash',
+         sc_g4p, lambda o, m: o["rc"] == 0 and o["G4P"] == (0, 0, 0) and m["G4P"] == (0, 4, 0),
+         "R-REJEU-G4P : la capacité Bash ignorée dans l'attendu (le worker sans Bash et le producteur à Bash interdit deviennent des doit-refuser que le hook laisse passer : quatre faux accept)",
          compagnons=(RECALC, POSER))
     # --- Quick 45-B : H3 (liens), B2 (relevé), B3 (profondeur) ---
     def sc_lien_ecriture(script):
@@ -2438,6 +2539,7 @@ SECTIONS = {
     "etapes": sec_etapes,
     "g3g4": sec_g3g4,
     "borne": sec_borne,
+    "g4p": sec_g4p,
     "concordance": sec_concordance,
     "statique": sec_statique,
     "reel": sec_reel,
@@ -2483,7 +2585,7 @@ for f in "$REJEU" "$REEL"; do
 done
 
 if [ -f "$REJEU" ] && [ -f "$REEL" ]; then
-  run_sections "${VF_REJEU_SECTIONS:-sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,role,etapes,g3g4,borne,concordance,statique,reel,liens,lotc,releve,mutants}"
+  run_sections "${VF_REJEU_SECTIONS:-sens,reel_hook,priorite,modele,etape,g6g5,g1,g7,role,etapes,g3g4,borne,g4p,concordance,statique,reel,liens,lotc,releve,mutants}"
 fi
 
 T_FIN="$(date +%s)"
