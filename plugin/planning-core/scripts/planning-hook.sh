@@ -2827,16 +2827,30 @@ def _unites_non_closes(racine):
                     yield dossier
 
 
+def _chemin_surveillable(chemin):
+    """Vrai si `chemin` est ABSENT (la création d'un fichier surveillé est précisément ce qu'on observe) ou un fichier RÉGULIER (`lstat`, jamais suivi) ;
+    faux pour un dossier, un lien, un tube, ou quand l'état ne se lit pas : un watcher sur un dossier géant bloquerait le fil principal (#91634, T-46-074)."""
+    try:
+        etat = os.lstat(chemin)
+    except (FileNotFoundError, NotADirectoryError):
+        return True
+    except OSError:
+        return False
+    return stat.S_ISREG(etat.st_mode)  # d1-jamais-un-dossier
+
+
 def chemins_surveilles(racine):
     """(liste de chemins ABSOLUS, tronquée) : les cinq fichiers racine du dossier de planning puis, par unité non close, la plus RÉCENTE d'abord, ses quatre fichiers
-    (SUMMARY.md encore absent compris), FICHIER PAR FICHIER — jamais un dossier, un watcher récursif sur un dossier géant bloquant le fil
-    principal (#91634). Au plus BORNE_WATCHPATHS chemins ; la troncature est signalée à l'appelant, qui la trace. Ni le journal de D1 ni le
-    cache du recalcul n'en font partie."""
+    (SUMMARY.md encore absent compris), FICHIER PAR FICHIER — jamais un dossier ni un lien (un chemin n'est gardé que s'il est absent ou fichier
+    régulier, `_chemin_surveillable`), un watcher récursif sur un dossier géant bloquant le fil principal (#91634). Au plus BORNE_WATCHPATHS
+    chemins ; la troncature est signalée à l'appelant, qui la trace. Ni le journal de D1 ni le cache du recalcul n'en font partie."""
     planning = os.path.join(racine, NOM_PLANNING)
-    liste = [os.path.join(planning, nom) for nom in FICHIERS_RACINE_SURVEILLES]
+    liste = [c for c in (os.path.join(planning, nom) for nom in FICHIERS_RACINE_SURVEILLES) if _chemin_surveillable(c)]
     for dossier in _unites_non_closes(racine):
         for nom in FICHIERS_UNITE_SURVEILLES:
-            liste.append(os.path.join(dossier, nom))  # d1-fichier-par-fichier
+            chemin = os.path.join(dossier, nom)
+            if _chemin_surveillable(chemin):
+                liste.append(chemin)  # d1-fichier-par-fichier
         if len(liste) > BORNE_WATCHPATHS:
             break
     if len(liste) > BORNE_WATCHPATHS:  # d1-borne

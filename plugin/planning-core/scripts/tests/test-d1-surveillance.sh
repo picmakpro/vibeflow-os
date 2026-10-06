@@ -7,7 +7,8 @@
 #
 # Familles :
 #   R-D1-01  SessionStart d'un lab adhérent (deux unités ouvertes, une close) : `watchPaths` en chemins absolus, fichier par fichier — les cinq fichiers racine
-#            et les quatre fichiers de chaque unité ouverte (SUMMARY.md encore absent compris), aucun dossier, aucun fichier de l'unité close, jamais le journal
+#            et les quatre fichiers de chaque unité ouverte (SUMMARY.md encore absent compris), aucun dossier, aucun fichier de l'unité close, jamais le journal ;
+#            (N-1, audit-46-b) un dossier ou un lien posé à la place d'un fichier surveillé n'entre jamais dans la liste
 #   R-D1-02  lab de 40 unités ouvertes : exactement 128 chemins et une ligne `genre=borne` au journal (sha256 = empreinte de la liste), signal de borne dans additionalContext
 #   R-D1-03  lab dev et ce dépôt : SessionStart, CwdChanged, FileChanged -> stdout d'octet vide, code 0, aucun fichier créé (empreinte de l'arbre identique)
 #   R-D1-04  références posées au SessionStart, STATE.md réécrit hors moteur, FileChanged -> une ligne `contournement` (source=seance) puis une `reference` ;
@@ -39,7 +40,7 @@
 #            recalcul) : signal D1 au SessionStart, rien d'écrit ; jumeaux : première séance sans journal, journal sain, séance suivante (pas de répétition)
 #   Le cas de canary R-CANG-D1 vit dans la section `cang` de test-planning-gates.sh.
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
-#   MUT-D1-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-D1-03), MUT-D1-DOSSIER (le dossier de l'unité dans la liste -> R-D1-01),
+#   MUT-D1-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-D1-03), MUT-D1-DOSSIER (le dossier de l'unité dans la liste -> R-D1-01), MUT-D1-JAMAIS-UN-DOSSIER (filtre « absent ou fichier régulier » retiré -> R-D1-01, N-1),
 #   MUT-D1-BORNE (borne retirée -> R-D1-02), MUT-D1-TRACE (aucune ligne de contournement -> R-D1-04), MUT-D1-MOTEUR (ligne moteur du recalcul retirée ->
 #   R-D1-06), MUT-D1-INTENTION (ligne d'intention retirée -> R-D1-08), MUT-D1-INTENTION-REUTILISEE (une intention explique plusieurs changements ->
 #   R-D1-08), MUT-D1-AST (une copie divergente -> R-D1-09), MUT-D1-RECONCILIATION (réconciliation retirée -> R-D1-10), MUT-D1-SIGNAL-REPETE (ligne `signal`
@@ -462,9 +463,35 @@ def controle_d1_01(ctx, script):
         fautes.append("le journal de D1 ou le cache du recalcul est surveillé")
     if "additionalContext" in doc["hookSpecificOutput"]:
         fautes.append("additionalContext présent sans contournement à signaler")
+    # (audit-46-b N-1, T-46-074) un chemin surveillé n'est gardé que s'il est ABSENT ou FICHIER RÉGULIER : un dossier ou un lien (même vers un dossier) posé à la
+    # place d'un fichier surveillé n'entre jamais dans `watchPaths` ; le jumeau (fichier régulier, absent) y reste
+    hostile = fabriquer_lab(ctx, "d1-01-hostile", ouvertes=("01-ouverte-a",), closes=())
+    plan = os.path.join(hostile, ".planning")
+    cible = os.path.join(os.path.dirname(hostile), "d1-01-hostile-hors")
+    os.makedirs(cible, exist_ok=True)
+    os.remove(os.path.join(plan, "STATE.md"))
+    os.makedirs(os.path.join(plan, "STATE.md"))  # un DOSSIER à la place d'un fichier racine
+    os.remove(os.path.join(plan, "INDEX.md"))
+    os.symlink(cible, os.path.join(plan, "INDEX.md"))  # un LIEN vers un dossier
+    unite = os.path.join(plan, "cycles", "01-c", "phases", "01-ouverte-a")
+    os.remove(os.path.join(unite, "PLAN.md"))
+    os.symlink(cible, os.path.join(unite, "PLAN.md"))  # un LIEN à la place du PLAN.md de l'unité
+    os.makedirs(os.path.join(unite, "CLOTURE.md"))  # un dossier à la place d'un fichier d'unité
+    rc2, out2, err2 = ctx.lancer(payload_session(hostile), cwd=hostile, dossier=d)
+    chemins2, doc2 = watch_paths(out2)
+    if rc2 != 0 or chemins2 is None:
+        fautes.append("lab hostile : code 0 et UN objet SessionStart attendus — obtenu rc=%d %s" % (rc2, court(err2) if chemins2 is not None else doc2))
+    else:
+        interdits = [os.path.relpath(c, hostile) for c in chemins2 if os.path.islink(c) or (os.path.lexists(c) and not os.path.isfile(c))]
+        if interdits:
+            fautes.append("un dossier ou un lien est dans la liste (T-46-074) : %s" % interdits[:3])
+        attendus2 = [c for c in attendus_surveilles(hostile, ("01-ouverte-a",)) if not any(c.endswith(s) for s in (
+            "/STATE.md", "/INDEX.md", "/01-ouverte-a/PLAN.md", "/01-ouverte-a/CLOTURE.md"))]
+        if sorted(chemins2) != sorted(attendus2):
+            fautes.append("lab hostile : liste différente — en trop %s, manquants %s" % (sorted(set(chemins2) - set(attendus2))[:3], sorted(set(attendus2) - set(chemins2))[:3]))
     return (not fautes), ("; ".join(fautes[:3]) if fautes else
                           "SessionStart : %d chemins absolus, fichier par fichier (cinq racine + quatre par unité ouverte, SUMMARY.md absent compris), aucun dossier, "
-                          "rien de l'unité close, ni le journal ni le cache" % len(chemins))
+                          "rien de l'unité close, ni le journal ni le cache ; lab hostile (dossier, lien) : ni dossier ni lien, le reste surveillé" % len(chemins))
 
 
 def controle_d1_02(ctx, script):
@@ -1469,6 +1496,8 @@ def sec_mutants_base(ctx):
     # Adhésion ignorée : la sortie silencieuse d'un lab non adhérent retirée (la commande rejouée n'a pas son pré-filtre, `np`)
     tuer(ctx, "D1-ADHESION", "sys.exit(0)  # non-adherent", "pass", "R-D1-03", controle_d1_03)
     tuer(ctx, "D1-DOSSIER", "# d1-fichier-par-fichier", "liste.append(dossier)  # d1-fichier-par-fichier", "R-D1-01", controle_d1_01)
+    # N-1 (audit-46-b) : le filtre « absent ou fichier régulier » retiré -> un dossier ou un lien entre dans la liste
+    tuer(ctx, "D1-JAMAIS-UN-DOSSIER", "# d1-jamais-un-dossier", "return True  # d1-jamais-un-dossier", "R-D1-01", controle_d1_01)
     tuer(ctx, "D1-BORNE", "# d1-borne", "if False:  # d1-borne", "R-D1-02", controle_d1_02)
     tuer(ctx, "D1-TRACE", "# d1-contournement", 'return ["reference"]  # d1-contournement', "R-D1-04", controle_d1_04)
 
