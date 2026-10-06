@@ -46,3 +46,4 @@
 - [Un gate exigé garde plus que la `files_modified`](feedback_gate-qui-garde-plus-que-la-files-modified.md) — check-version-sync gate aussi les README de module ; l'écart créé par le bump se ferme.
 - [Codex hooks : schéma Claude-Code + double gate de confiance](project_codex-hooks-schema-et-trust-gate.md) — marqueur d'un hook lu dans le JSONL de session, jamais dans la réponse ; témoin différentiel exige de lever le gate pour obtenir un positif AVANT de tester l'effet du flag seul.
 - [Borne longue : deux formes, pas une](project_borne-longue-reduction-deux-formes.md) — normpath seul régresse (`..` sous lien) ; résolveur physique linéaire + différentiel 3 versions.
+- [Gate-Touche : un chemin par trailer](project_gate-touche-un-chemin-par-trailer.md) — motif à virgule = sans-marqueur au contrôle par commit ; lecture neuve = ligne de RECENSEMENT_LECTURE.
