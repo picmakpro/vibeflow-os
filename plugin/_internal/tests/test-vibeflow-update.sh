@@ -11,6 +11,9 @@
 #   T3c (local)  — Phase 30 tâche 4 : .claude/settings.json (écrit par merge_module_hooks sur un
 #                  module à hooks) est gitignoré exactement une fois, idempotent ; en scope
 #                  project le même module ne crée/ne touche PAS .gitignore (SCOPE-04 borné).
+#   T3d (local)  — P5 (46-12) : .planning/surveillance.log (journal de D1) gitignoré par planning-core,
+#                  exactement une fois, idempotent ; négatifs module sans hook central et scope project ;
+#                  mutant (engine privé de la ligne) tué.
 #   T4 (no clone)— aucun `git clone`/`git pull` dans le source de l'engine (assert statique).
 #   T5 (résolveur RÉELLEMENT exercé) — resolve-deps.sh copié dans $CACHE/_internal/, puis
 #                  install --with-deps validator → fermeture {consolidator, infrastructure-audit,
@@ -225,6 +228,83 @@ if prepare_module "$CACHE" "dev-orchestrator"; then
   fi
 else
   skip "T3c (négatif) project : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# ---------------------------------------------------------------------------
+# T3d (P5, 46-12 ; arbitrage Willy, AskUserQuestion session principale, 2026-10-06, « L'ignorer ») —
+# `.planning/surveillance.log`, le journal de D1 écrit à l'exécution par le hook central, est gitignoré
+# par l'installation d'un module qui PORTE le hook central (planning-core), en scope local : exactement
+# une fois, idempotent, à la racine du lab (jamais préfixé par la cible).
+#   - négatif (module sans hook central) : dev-orchestrator en scope local ne le pose pas ;
+#   - négatif (scope) : planning-core en scope project ne crée pas .gitignore (SCOPE-04 inchangé) ;
+#   - mutant : l'engine privé de sa ligne ne le pose plus, le contrôle rougit (contre-épreuve : le même
+#     montage avec l'engine entier le pose).
+# ---------------------------------------------------------------------------
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "planning-core"; then
+  (cd "$LAB" && git init -q && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install planning-core >/dev/null 2>&1)
+  (cd "$LAB" && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install planning-core >/dev/null 2>&1)
+  n=$("$GREP" -cxF ".planning/surveillance.log" "$LAB/.gitignore" 2>/dev/null || true)
+  [ "${n:-0}" -eq 1 ] \
+    && ok "T3d local : .planning/surveillance.log gitignoré exactement une fois par planning-core, idempotent après 2 runs" \
+    || ko "T3d local : .planning/surveillance.log apparaît ${n:-0} fois dans .gitignore (attendu 1)"
+  # Mutant : l'engine sans la ligne du journal de D1 (copie de _internal hors tests, ligne retirée).
+  MLAB="$(mktemp -d)"
+  mkdir -p "$MLAB/_internal" "$MLAB/work"
+  cp -r "$INTERNAL_DIR/." "$MLAB/_internal/" 2>/dev/null
+  rm -rf "$MLAB/_internal/tests"
+  "$GREP" -vF 'gitignore_add_one ".planning/surveillance.log"' "$INSTALLER" > "$MLAB/_internal/vibeflow-update.sh"
+  if [ "$("$GREP" -cF 'surveillance.log' "$MLAB/_internal/vibeflow-update.sh")" -lt "$("$GREP" -cF 'surveillance.log' "$INSTALLER")" ]; then
+    mkdir -p "$MLAB/work/cache"
+    cp -r "$CACHE/planning-core" "$MLAB/work/cache/planning-core"
+    (cd "$MLAB/work" && git init -q && VF_SCOPE=local VIBEFLOW_CACHE="$MLAB/work/cache" \
+       bash "$MLAB/_internal/vibeflow-update.sh" install planning-core >/dev/null 2>&1)
+    nm=$("$GREP" -cxF ".planning/surveillance.log" "$MLAB/work/.gitignore" 2>/dev/null || true)
+    if [ "${nm:-0}" -eq 0 ] && [ -s "$MLAB/work/.gitignore" ]; then
+      ok "T3d mutant tué : l'engine privé de sa ligne ne gitignore plus .planning/surveillance.log (le contrôle rougit)"
+    else
+      ko "T3d mutant survivant : sans la ligne, .planning/surveillance.log apparaît ${nm:-0} fois (.gitignore non vide : $([ -s "$MLAB/work/.gitignore" ] && echo oui || echo non))"
+    fi
+  else
+    ko "T3d mutant : la ligne visée n'a pas été retirée de la copie de l'engine (fixture morte)"
+  fi
+  rm -rf "$MLAB"
+else
+  skip "T3d local : planning-core non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "dev-orchestrator"; then
+  (cd "$LAB" && git init -q && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install dev-orchestrator >/dev/null 2>&1)
+  if [ -s "$LAB/.gitignore" ] && ! "$GREP" -qF ".planning/surveillance.log" "$LAB/.gitignore"; then
+    ok "T3d (négatif) local : dev-orchestrator (sans hook central) ne gitignore pas .planning/surveillance.log"
+  else
+    ko "T3d (négatif) local : .gitignore vide ou porte .planning/surveillance.log pour un module sans hook central"
+  fi
+else
+  skip "T3d (négatif) local : dev-orchestrator non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "planning-core"; then
+  (cd "$LAB" && VF_SCOPE=project VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" install planning-core >/dev/null 2>&1)
+  if [ -f "$LAB/.gitignore" ]; then
+    ko "T3d (négatif) project : .gitignore créé par planning-core en scope project (SCOPE-04 violé)"
+  else
+    ok "T3d (négatif) project : planning-core en scope project ne touche pas .gitignore (SCOPE-04 inchangé)"
+  fi
+else
+  skip "T3d (négatif) project : planning-core non copiable dans le cache de test"
 fi
 rm -rf "$LAB"
 

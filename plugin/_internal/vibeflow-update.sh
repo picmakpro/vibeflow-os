@@ -1221,6 +1221,12 @@ gitignore_add_paths() {
   # écrit réellement dans ces fichiers à cette install) déclenche l'ajout.
   [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one "${gi_prefix}/settings.json"
   [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one "${gi_prefix}/settings.local.json"
+  # Journal de D1 du moteur de planning (46-12, P5 ; arbitrage Willy, AskUserQuestion session principale,
+  # 2026-10-06, « L'ignorer ») : `.planning/surveillance.log` est écrit à l'exécution par le hook central
+  # (une ligne par écriture surveillée) et ne doit jamais être committé. Il vit à la racine du lab (le cwd
+  # de l'installation, comme ./.gitignore), pas sous la cible : jamais préfixé par `$gi_prefix`. Sélecteur
+  # data-driven : seul un module qui PORTE le hook central (scripts/planning-hook.sh) déclenche l'ajout.
+  [ -f "$module_dir/scripts/planning-hook.sh" ] && gitignore_add_one ".planning/surveillance.log"
   # Lib partagée de portabilité (Phase 30 tâche 2, copy_engine_lib()) : posée par l'ENGINE, pas
   # par un module — donc jamais vue par la boucle scripts/ plus haut (elle vient du cache
   # _internal, jamais de $module_dir/scripts). Gap constaté en tâche 4 lors de la vérification
