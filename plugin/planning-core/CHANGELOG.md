@@ -1,5 +1,42 @@
 # Changelog — planning-core
 
+## [v2.10.0] — 2026-10-06 (moteur de planning métier — gates de clôture et verdicts hachés, Phase 46)
+
+**Minor** (nouvelle capacité) :
+
+- **État d'armement livré** : `ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7`, `ARMEMENT_ROLE` et `ARMEMENT_G3` valent
+  `armed` ; `ARMEMENT_G4` et `ARMEMENT_G4P` valent `observe` ; `G2_MODE` vaut `avertit` ; D1 n'a pas de constante d'armement.
+  L'étape 5 est scindée (P46-D-11) : **5a, G3, est armé** (commit `b703d73d`, rejeu réel à 0 faux refus et 0 faux accept sur
+  52 cas réels, relevé de phase `46-REJEU-ETAPE-5`) sur la décision « (c) Armer G3 seul » (arbitrage Willy, AskUserQuestion
+  session principale, 2026-10-06) ; **5b, G4, reste en observation** : 343 unités closes avant G4 seraient refusées à la
+  réécriture de leur `SUMMARY.md`, reportées à une phase ultérieure (limite (bp)). **G4′ (étape 6) reste en observation** :
+  « etape-6-mesure » (arbitrage Willy, AskUserQuestion session principale, 2026-10-06) ; quatre points d'audit (A2, A3, A4, P1)
+  sont reportés à une phase ultérieure, préalables à tout armement de G4′ (limite (bs)). Mesure de l'étape 6 : relevé à venir.
+- **G3 — pas de clôture sans livrable** (CLOT-01) : refuse par `deny` l'écriture par outil d'un `CLOTURE.md` d'unité d'un lab
+  adhérent sans livrable présent. **G4 — pas de `SUMMARY.md` sans verdict qui tienne** (CLOT-02), **G4′ — pas de rapport sans
+  sortie brute** (CLOT-06, workers et producteurs dotés de `Bash`, `SubagentHandback` en mode auto, repli `SubagentStop`) :
+  livrés, en observation.
+- **Verdicts hachés** : `poser-verdict.sh` pose **deux empreintes** (plan, livrables composés ; CLOT-03) et un **plafond de
+  trois tentatives** (CLOT-05) ; le recalcul dérive un neuvième état, **`à clore`** (CLOT-04), et vérifie les deux empreintes.
+- **D1 — écritures surveillées** (CLOT-07) : `FileChanged`, `CwdChanged` et `SessionStart` (réconciliation par hash), journal
+  `.planning/surveillance.log`. **Canary de juge** (CLOT-08) : un vérificateur déterministe signale au `SessionStart` chaque
+  juge laxiste (verdict de canary sans `échec` sur le critère visé) et chaque « juge sans preuve » ; le dispatch du juge
+  relève de la Phase 48.
+- **Contrat de sortie par événement** : la même commande enregistrée est câblée sous cinq événements (inventaire des hooks :
+  n==37 entrées), jamais de code 2 (P46-D-10) ; **coût du pré-filtre par événement** mesuré (CLOT-11, `46-COUT-PREFILTRE.md`).
+- **`.planning/surveillance.log` ignoré à l'installation** (P5 ; arbitrage Willy, AskUserQuestion session principale,
+  2026-10-06, « L'ignorer ») : l'engine l'ajoute au `.gitignore` du lab en scope local (`scripts/planning-hook.sh` présent dans le
+  module) ; en scope project l'installation ne touche jamais au `.gitignore` (SCOPE-04), le journal n'y est pas ignoré.
+- **Lot B** (arbitrage Willy, AskUserQuestion session principale, 2026-10-06, « b3 mixte ») : A6 et A8 corrigés (résidus en
+  limites (bn), (bo)) ; A5, A7 et A10 déclarés en limites (bk), (bl), (bm).
+- **Référence** (`references/modele-cycles.md`) alignée sur l'état livré : table d'armement à huit gates, limites (a) à (bs)
+  contrôlées par R-REFERENCE, dont les limites non mesurées : déclenchement de `FileChanged` sous `settings.json` en 2.1.288 et
+  #63148 sans objet (bq), #60490 sans objet (br).
+- **Exigences** : CLOT-01 à CLOT-12 (famille CLOT, P46-D-15).
+
+Aucune release : le module reste en v2.10.0 (ADR-073). Ni la `VERSION` racine, ni `plugin.json`, ni `marketplace.json`, ni
+tag.
+
 ## [v2.9.0] — 2026-10-01 (moteur de planning métier — hook central par rôle et gates d'écriture, Phase 45)
 
 **Minor** (nouvelle capacité) :

@@ -5308,7 +5308,7 @@ lota_mutant("BUDGET-SIGNAL", "# role-signal", "for signal in []:  # role-signal"
 # contrôle la compare, mécaniquement, aux constantes du hook (table d'armement, noms protégés par G6, nom du journal de dérogation,
 # marqueurs de code, ordre de résolution des agents), à la commande enregistrée de hooks.json (outils refusés en mode dégradé, outil
 # laissé ouvert) et à la table CANARIS du canary (cas par gate) : tout écart rougit — une référence qui annoncerait un gate armé qui ne
-# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (ae) sont chacune sur sa propre ligne canonique
+# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (bs) sont chacune sur sa propre ligne canonique
 # `- **limite (X)**` avec ses mots-clés. Chaque mutant retire ou fausse UNE chose, sur une copie de la référence écrite sous le dossier
 # de travail (ou, pour MUT-REFERENCE-CODE, sur les constantes du hook, la référence restant intacte) ; le contrôle doit alors rendre un
 # écart. Les lignes d'écart du contrôle commencent par `ECART` ; la suite ne les imprime que si la VRAIE référence est en écart (un
@@ -5383,6 +5383,9 @@ LIMITES_REFERENCE = (
     ("bn", ("A6", "surveillance.log", "D1-f", "D1-c3", "empreinte")),
     ("bo", ("A8", ".recalc-cache.json", "ecrit:", "PLAN.md")),
     ("bp", ("SUMMARY.md", "VERDICT.md", "G4", "343")),
+    ("bq", ("2.1.288", "settings.json", "#63148")),
+    ("br", ("#60490", "code 2", "P46-D-10")),
+    ("bs", ("G4′", "A2", "A3", "A4", "P1", "préalables à tout armement")),
 )
 PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 

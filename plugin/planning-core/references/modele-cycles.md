@@ -1052,6 +1052,9 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (bn)** — A6, journal de D1 (Phase 46, audit d'avant armement, lot B ; correction b3 livrée, résidu nommé ; arbitrage Willy, AskUserQuestion session principale, 2026-10-06 (« b3 mixte » : corriger A6 et A8, nommer A5, A7 et A10 en limites)) : le `SessionStart` signale un journal `.planning/surveillance.log` absent, non régulier (lien compris), sans droits de lecture ou d'écriture pour son propriétaire, ou refusé à l'ouverture (`chflags uchg`) ; ce qu'il ne signale PAS : (1) la FORGE d'une ligne — une ligne `moteur` portant le sha256 courant d'un fichier falsifié l'explique, et rien ne distingue cette ligne de celle du recalcul (mesuré, sonde `p5` cas D1-f : aucun signal) ; aucune empreinte du journal n'est conservée ailleurs (hors de la correction b3) ; (2) un journal supprimé sans AUTRE trace d'état précédent : un journal absent n'est signalé qu'à une séance de reprise (`resume`, `clear`, `compact`) ou si `.planning/.recalc-cache.json` existe — une première séance `startup` d'un lab neuf est indiscernable d'un journal supprimé (mesuré, sonde `p5` cas D1-c3 : silence) ; (3) un journal sous un dossier `.planning` en lien. Un journal inutilisable est signalé à CHAQUE séance tant que l'état dure (il ne peut plus recevoir la ligne `signal` de l'anti-répétition).
 - **limite (bo)** — A8, cache du recalcul (Phase 46, audit d'avant armement, lot B ; correction b3 livrée, résidu nommé ; arbitrage Willy, AskUserQuestion session principale, 2026-10-06 (« b3 mixte » : corriger A6 et A8, nommer A5, A7 et A10 en limites)) : une entrée de `.planning/.recalc-cache.json` n'est reprise que si ses `ecrit:` sont ceux du `PLAN.md` réel (relu à chaque reprise, même chaîne que R2) et si l'empreinte des livrables, recalculée sur ces entrées réelles, est celle qu'elle porte ; un écart : recalcul complet, jamais `close` sur la foi du cache. Résidu : un cache forgé de bout en bout — `etat` et `meta` inclus, avec l'empreinte recalculée à la main sur le livrable déjà modifié — reste cru ; le cache n'est ni signé ni lié au `VERDICT.md`, et D1 ne le surveille pas (G6 le refuse aux outils d'écriture, pas à `Bash`).
 - **limite (bp)** — unités closes avant G4 (Phase 46, scission de l'étape 5 ; arbitrage Willy, AskUserQuestion session principale, 2026-10-06, « (c) Armer G3 seul ») : unités closes avant G4 — `SUMMARY.md` existant sans `VERDICT.md` refusé à la réécriture une fois G4 armé ; 343 cas mesurés sur un lab réel (`~/jarvis-keystone`, relevé `46-REJEU-ETAPE-5`) ; reporté, phase ultérieure. G4 reste donc en observation (`ARMEMENT_G4` vaut `observe`) tant que ce cas n'est pas traité.
+- **limite (bq)** — P46-D-08 (Phase 46, 46-12) : le déclenchement de `FileChanged` pour un hook déclaré dans `settings.json` n'est pas mesuré en 2.1.288 (la sonde en direct a été refusée par la garde d'isolation du poste, P46-D-08) ; la défaillance éventuelle est rattrapée par la réconciliation par hash du `SessionStart` suivant (limite (ax)). L'issue #63148 est sans objet ici : les hooks du module sont fusionnés dans `settings.json` par l'installation, jamais déclarés par le plugin.
+- **limite (br)** — P46-D-10 (Phase 46, 46-12) : #60490 est rendu sans objet — aucun événement du hook ne sort en code 2 (refus : JSON `permissionDecision: "deny"` ou `decision: "block"`, code 0), donc le comportement du harnais sur un code 2 n'est jamais exercé.
+- **limite (bs)** — G4′ en observation, A2, A3, A4 et P1 (Phase 46, 46-12 ; arbitrage Willy, AskUserQuestion session principale, 2026-10-06, « etape-6-mesure ») : G4′ reste en observation (`ARMEMENT_G4P` vaut `observe`) ; quatre points de l'audit d'avant armement sont reportés à une phase ultérieure, préalables à tout armement de G4′ : le leurre de définition d'agent (A2), le lab dérivé du `cwd` (A3), le repli `SubagentStop` qui relance sans verrou et se tait sur une panne du cœur (A4), et `stop_hook_active` non lu (P1). Le relevé réel de l'étape 6 n'est pas encore posé (mesure à rejouer, relevé à venir).
 
 ### Contrat de sortie par événement (Phase 46)
 
@@ -1089,6 +1092,15 @@ dont la raison dit que le rapport du sous-agent est refusé tant que le hook cen
 « can't open ». Le canary de session retrouve la commande de référence sous les cinq événements et signale, sans jamais bloquer, un
 événement non câblé ; ses cas DEGRADE `D09` et `D10` prouvent le refus de `SubagentHandback` en mode dégradé.
 
+**Coût du pré-filtre par événement** (relevé de phase `46-COUT-PREFILTRE.md`, P46-D-16, commit mesuré `322a6869`, informatif : aucun
+seuil n'en est tiré). Protocole : rejeu par `/bin/sh -c`, 40 rejeux entrelacés par série (commande complète, puis la même commande sans
+`vf_pre`), médiane et p90 en ms, deux passes de huit séries (quatre événements × deux lieux), **machine partagée, jamais au repos**
+(charge à 1 minute de 8 à 39) : seules les comparaisons au sein d'une série sont fiables, les valeurs absolues varient d'un facteur trois
+avec la charge. Plancher de lancement de `/bin/sh -c ':'` : médiane 13,1 ms. Dans ce dépôt (non adhérent), la commande complète est
+plus rapide que sans pré-filtre sur les huit séries : médiane de 36,1 à 48,2 ms contre 102,3 à 144,1 ms. Dans un lab adhérent
+synthétique, elle est plus lente sur les huit séries (le pré-filtre diffère puis le cœur travaille) : écart de médiane de 5,5 à 29,1 ms.
+`FileChanged` hors adhésion n'est pas mesuré : le watcher ne démarre pas (aucun `watchPaths` rendu), preuve par R-INST-DEV-03.
+
 ### Table d'armement livrée
 
 L'état de chaque gate vit **dans le code livré** (une constante `ARMEMENT_<gate>` par gate dans
@@ -1121,13 +1133,14 @@ au mode `SubagentStop` : sa constante vaut `observe`.
 | G4P | 6 | observe | armé : fermé (deny en PreToolUse, block en SubagentStop) ; observe : journalise | G4P-handback, G4P-stop | 46-REJEU-ETAPE-6 |
 | G2 | - | avertit | ouvert : n'avertit pas, ne refuse jamais | aucun | aucun |
 
-**État d'armement livré, tel que mesuré (v2.9.0).**
+**État d'armement livré, tel que mesuré (v2.10.0).**
 
 - Armés à la livraison v2.9.0 : les quatre étapes (`ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7` et `ARMEMENT_ROLE` valent `armed`). `G2_MODE` vaut `avertit` : G2 avertit toujours et ne refuse jamais.
 - Les rejeux réels des étapes 1 à 4 ont tous rendu 0 faux refus et 0 faux accept, avec des empreintes d'arbre identiques (relevés de phase `45-REJEU-ETAPE-1` à `45-REJEU-ETAPE-4`). Mais ils ont été mesurés sur le hook **avant** les lots de correction A, B et C.
 - L'armement exigeait un NOUVEAU rejeu réel, sur des labs au repos, du hook livré après les lots de correction : il est fait (relevé de phase `45-REJEU-FINAL.md`, commit `708debcb`), avec 0 faux refus, 0 faux accept et des empreintes d'arbre identiques pour les deux labs. L'arbitrage qui attendait pour adapter deux suites couplées à « tout en observe » est rendu et appliqué (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30, oui pour les quatre étapes d'armement) : les suites ne dépendent plus de l'état d'armement, seuls la table de cette référence et `TABLE_ATTENDUE` le suivent. La protection des scripts du hook par G6 est elle aussi tranchée et appliquée (Q-G6 = b, Willy, AskUserQuestion session principale, 2026-10-01, limite (y)).
 - L'armement se fait par étapes dans l'ordre fixe (P45-D-03), un commit par étape : cet état est celui de l'étape 4, la dernière de la Phase 45. Ce document ne dit jamais qu'un gate est armé tant que sa constante vaut `observe`.
 - Phase 46 (46-05 puis 46-11) : G3, G4 et G4′ ont été livrés en `observe` (46-05). L'étape 5 est **scindée** (P46-D-11, décision humaine : étape 5 → « (c) Armer G3 seul », arbitrage Willy, AskUserQuestion session principale, 2026-10-06) : **5a, G3, est armé** (`ARMEMENT_G3` vaut `armed` ; rejeu réel à 0 faux refus et 0 faux accept sur 52 cas réels, relevé de phase `46-REJEU-ETAPE-5`, commit `69961c23`) ; **5b, G4, reste en observation** (`ARMEMENT_G4` vaut `observe`), son armement attend la limite (bp) ci-dessus. G4′ (étape 6) reste en `observe` et exige G3 ET G4 armés (`armement_valide`). Le relevé de l'étape 6 attendu est `46-REJEU-ETAPE-6` (ceux des étapes 1 à 4 restent `45-REJEU-ETAPE-<n>`). Dans la colonne des cas de canary, `aucun` n'est admis que pour G2 et pour un gate en `observe` qui n'a pas encore de cas dans `CANARIS` ; un gate armé sans cas reste un écart.
+- Phase 46 (46-12) : état livré à la clôture — `ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7`, `ARMEMENT_ROLE` et `ARMEMENT_G3` valent `armed` ; `ARMEMENT_G4` et `ARMEMENT_G4P` valent `observe`. G4′ reste en observation : décision « etape-6-mesure » (arbitrage Willy, AskUserQuestion session principale, 2026-10-06), qui reporte A2, A3, A4 et P1 à une phase ultérieure, avant tout armement de G4′ (limite (bs)). Mesure de l'étape 6 : relevé à venir (`46-REJEU-ETAPE-6`, non encore posé). D1 n'a pas de constante d'armement (P46-D-11).
 
 Cinq listes que R-REFERENCE compare au code, chacune sur une seule ligne :
 
@@ -1510,10 +1523,13 @@ une **dérogation nominative** (`deroger-gate.sh`) par écriture à laisser pass
 
 ## Hors de cette phase
 
-Ce que les Phases 44 et 45 **ne font pas** :
+Ce que les Phases 44 à 46 **ne font pas** :
 
-- **G2′, G3, G4, G4′ et D1** (`TaskCompleted`, `SubagentStop`, `FileChanged`) : Phases 46 et 47. La
-  **vérification du hash** de `VERDICT.md` à la clôture : Phase 46.
+- **G2′ et les baux** (`.planning/baux/`) : Phase 47 ; le point d'accroche de G2′ est à re-décider (P46-D-19). G3, G4, G4′, D1 et la
+  vérification du hash de `VERDICT.md` à la clôture sont livrés par la Phase 46, à l'état d'armement décrit dans la table ci-dessus
+  (G3 armé ; G4 et G4′ en observation, limites (bp) et (bs)).
+- **Le dispatch du juge** : Phase 48 ; la fabrication des sorties piégées et le seuil de juge : Phase 50 (P46-D-13, limite (bb)).
+- **L'événement de mise à jour de tâche** n'est pas câblé (P46-D-01).
 - **Le hook managed** (seul à résister à `disableAllHooks`) : hors périmètre ; le gate détecte et
   trace, il ne verrouille pas.
 - **`guard-planning-updated.sh` n'est pas retiré** et reste en exit 2 (entrée `Stop` de `hooks.json`
@@ -1524,7 +1540,6 @@ Ce que les Phases 44 et 45 **ne font pas** :
   adhèrent à `cycles-v1` passent au moteur, les autres restent sur l'existant. Tout retrait de
   code existant (prose « scaffoldeur » du `SKILL.md`) se fait sous validation humaine (ADR-031 :
   suppression de code) (P44-D-01e).
-- Les **baux** (`.planning/baux/`) : Phase 47.
 - L'**injection de l'index** et le **pont mémoire** : Phase 48.
 - Les **cycles récurrents** (`recurrent: true`, cadence, `bloqué par un tiers`) : spec §8, hors
   Phase 44.

@@ -1,7 +1,7 @@
 {
   "name": "planning-core",
-  "version": "v2.9.0",
+  "version": "v2.10.0",
   "type": "skill + references + scripts",
-  "description": "Socle de planning & gestion documentaire universel : tronc commun .planning/ (PROJECT/REQUIREMENTS/ROADMAP/STATE/MILESTONES/phases) + topologie à compartiments (steering lab + INDEX + plan conditionnel typé deliverable/continuous + détection de dette), adapté à la logique métier de chaque lab — jamais imposé. Inclut un moteur de recalcul d'état dérivé du disque par cycles (recalc-planning.sh) et un hook central PreToolUse par rôle et gates d'écriture (planning-hook.sh), fail-closed dans un lab adhérent cycles-v1 seulement.",
+  "description": "Socle de planning & gestion documentaire universel : tronc commun .planning/ (PROJECT/REQUIREMENTS/ROADMAP/STATE/MILESTONES/phases) + topologie à compartiments (steering lab + INDEX + plan conditionnel typé deliverable/continuous + détection de dette), adapté à la logique métier de chaque lab — jamais imposé. Inclut un moteur de recalcul d'état dérivé du disque par cycles (recalc-planning.sh) et un hook central PreToolUse par rôle et gates d'écriture (planning-hook.sh), fail-closed dans un lab adhérent cycles-v1 seulement. Phase 46 : gates de clôture (G3 : pas de CLOTURE.md sans livrable, armé ; G4 : pas de SUMMARY.md sans verdict qui tienne ; G4′ : pas de rapport sans sortie brute, en observation), verdicts hachés à deux empreintes avec plafond de tentatives, état dérivé « à clore », journal des écritures surveillées (D1) et canary de juge.",
   "requires": []
 }
