@@ -3,7 +3,7 @@
 # Sources : P46-D-11 (ordre d'armement prolongé : G3 + G4, empreintes comprises, puis G4′ ; 0 faux refus / 0 faux accept sur le banc en CI puis sur le
 #   rejeu en lecture seule), P46-D-02 et P46-D-02b (G4′ : workers et producteurs qui ont Bash), P46-D-12 (« vide », un lien n'est jamais suivi),
 #   protocole P45-D-21 et P45-D-21a (attendu à trois valeurs, nominatif, jamais une moyenne). Le rejeu réel de ces étapes est un geste de 46-11 et
-#   de 46-12, après autorisation humaine : ce fichier pose le FORMAT et les règles par défaut ; il ne porte AUCUNE ligne de lab réel (elles s'écrivent
+#   de 46-12, après autorisation humaine : ce fichier pose le FORMAT et les règles par défaut ; il ne porte AUCUNE ligne de lab réel, hors les 10 lignes G7 recopiées en fin de fichier (les autres s'écrivent
 #   en 46-11 et 46-12, une fois le rejeu autorisé).
 #
 # Rôle des lignes : un fichier d'attendus prime sur le constructeur d'un gate, qui prime sur la réécriture générique (rejeu-gates.sh, `fusionner`) ;
@@ -34,4 +34,22 @@
 # Tout nom d'entrée réelle non déclarable dans `ecrit:` (caractère de contrôle, `~` initial, métacaractère) est dit au relevé (ENTREE-IGNOREE), jamais tu ;
 #   toute entrée hors borne est nommée (BORNE-LIVRABLES) : c'est la mesure de l'hypothèse A7 sur les labs réels (P46-D-03a).
 #
-# Aucune ligne de lab réel ici.
+#
+# Lignes G7 recopiées de 45-REJEU-ATTENDUS.txt (arbitrage Willy, AskUserQuestion session principale, 2026-10-06, Q-G7 « (a) Recopier les 10 lignes » ;
+#   origine : les 10 lignes arbitrées en Phase 45 par Willy, AskUserQuestion session principale, 2026-09-29, commit ed117c7e). Recopie TELLE QUELLE, format G7 = dossier
+#   (l'écriture rejouée est la création de X/.planning/config.json). Le prédicat de G7 n'est pas touché ; ces lignes disent seulement ce que la mesure doit attendre.
+# Pour un lab hors de HOME, la colonne lab s'écrit <lab-N> (rang du --lab= dans l'appel) : les lignes ci-dessous valent pour les deux labs réels sous HOME.
+# Keystone : cinq labs, cinq plannings (racine, 10-pilotage, 20-ateliers/01-marche-offre, 30-captation, 20-ateliers/_gabarit) — doit-passer.
+G7 | ~/jarvis-keystone | 10-pilotage | doit-passer | lab D-05 (pilotage), .claude/ habité
+G7 | ~/jarvis-keystone | 20-ateliers/01-marche-offre | doit-passer | lab D-05 (atelier), .claude/ habité
+G7 | ~/jarvis-keystone | 30-captation | doit-passer | lab D-05 (captation), .claude/ habité
+G7 | ~/jarvis-keystone | 20-ateliers/_gabarit | doit-passer | lab D-05 (gabarit), .claude/ habité
+# Keystone : 00-doctrine n'est pas un lab (P45-D-14a).
+G7 | ~/jarvis-keystone | 00-doctrine | doit-refuser-modele | non-lab, table D-05 amendée (P45-D-14a) — refus conforme au modèle, lab non migré
+# BusinessFlow : quatre orphelins D-05.
+G7 | ~/BusinessFlow-Lab | projects/avma | doit-refuser-modele | orphelin D-05 — refus conforme au modèle, lab non migré
+G7 | ~/BusinessFlow-Lab | projects/dmflow | doit-refuser-modele | orphelin D-05 — refus conforme au modèle, lab non migré
+G7 | ~/BusinessFlow-Lab | projects/lead-recovery | doit-refuser-modele | orphelin D-05 — refus conforme au modèle, lab non migré
+G7 | ~/BusinessFlow-Lab | projects/formation | doit-refuser-modele | orphelin D-05 — refus conforme au modèle, lab non migré
+# BusinessFlow : ProjetFlow-FROZEN-A1 (mémoire sans agent) — refus par le prédicat littéral, lecture du manager (distincte de la citation de Willy).
+G7 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1 | doit-refuser-modele | mémoire sans agent (P45-D-14) — lecture du manager, 2026-09-29 (P45-D-14a) — refus conforme au modèle, lab non migré
