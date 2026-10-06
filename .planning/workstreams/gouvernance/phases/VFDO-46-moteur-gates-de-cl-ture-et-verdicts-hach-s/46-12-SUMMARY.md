@@ -38,9 +38,15 @@ key-files:
 
 Réponse : `etape-6-mesure` — arbitrage Willy, AskUserQuestion session principale, 2026-10-06. G4′ reste en observation ; A2, A3, A4 et P1 sont reportés à une phase ultérieure, avant tout armement de G4′ (limite (bs)).
 
-## Tâche 2 — rejeu réel de l'étape 6 : mesure à rejouer
+## Tâche 2 — rejeu réel de l'étape 6 : mesure faite (mesure seule)
 
-Non jouée à ce stade : la mesure a été invalidée par une session active dans `~/BusinessFlow-Lab` (précondition de repos non tenue). `46-REJEU-ETAPE-6.md` n'existe pas ; le relevé n'est pas commité et sera posé par le manager avant la clôture. Aucune constante ne change (`ARMEMENT_G4P` vaut `observe`). Le CHANGELOG et la référence disent « mesure de l'étape 6 : relevé à venir », sans chiffre.
+Mesure jouée le 2026-10-06 après arrêt de la session active du lab BusinessFlow (arbitrage Willy, AskUserQuestion session principale, 2026-10-06 : « tu peux la fermer »), sous garde dure de repos : 0 processus dont le cwd est sous les deux labs, avant (19:01:58) et après (19:08:15). Relevé : `46-REJEU-ETAPE-6.md`, commit `f5280888`, sur HEAD `0f9db46e`.
+
+Chiffres G4P : 96 cas (28 dans `~/jarvis-keystone`, 68 dans `~/BusinessFlow-Lab`), 24 agents, `COMPTE G4P faux-refus=0 faux-accept=0 refus-conforme-modele=0`, `COUVERTURE-REJEU G4P n=96 plancher=8`. Les 15 agents « producteur » avec Bash sont refusés sans sortie de commande brute et acceptés avec ; les autres passent dans les quatre cas. Empreintes des deux labs identiques avant/après.
+
+Lecture par gate : le total `REJEU-ETAPE-6 faux-refus=349` mêle G4 (343, unités closes avant G4, limite (bp)) et G7 (6, attendus de la 45 non chargés, constat rendu, décision de Willy en cours) ; aucun faux refus ne vient de G4P. G1 compte 196 refus conformes au modèle.
+
+Aucun armement : `ARMEMENT_G4P` vaut toujours `observe` (etape-6-mesure, arbitrage Willy, AskUserQuestion session principale, 2026-10-06 ; G4′ reste en observation). Le CHANGELOG et la référence disent encore « mesure de l'étape 6 : relevé à venir » : leur mise à jour avec les chiffres est hors de ce mandat et revient au manager.
 
 ## Tâche 3 — référence, limites, version, suites
 
