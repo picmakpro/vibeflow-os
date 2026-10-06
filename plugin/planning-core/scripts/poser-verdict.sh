@@ -57,7 +57,13 @@
 # un FIFO, remet le compteur à 1 (tentative 1 acceptée, code 0 ; le lien est remplacé, jamais suivi) ; le remplacer par un
 # dossier remet le contrôle à 1 mais l'écriture échoue (code 1, aucun verdict tant que le dossier reste) ; y éditer
 # `tentative:` à une valeur plus basse remet le compteur à cette valeur + 1 (à 0, la tentative 1 est acceptée). Les
-# écritures par Bash restent ouvertes ; D1 (plan 46-07) en trace la disparition.
+# écritures par Bash restent ouvertes. Précisions (libellé mesuré par sonde, quick 261006-23m) : un agent qui a Bash peut
+# s'accorder lui-même la dérogation PLAFOND (deroger-gate.sh --gate=PLAFOND, --qui déclaratif, T-45-34 ; mesuré : la
+# quatrième pose rend 65 sans elle, 0 avec) — dérogation journalisée et citée à la pose, et, pour D1, deux écritures du
+# moteur (lignes `moteur`), jamais un contournement ; la disparition de VERDICT.md n'est tracée que si FileChanged la voit
+# en séance (ligne `contournement` à sha256=absent, quand une référence du fichier existe) : supprimé puis reposé avant le
+# SessionStart suivant, le verdict reposé est une écriture du moteur et la réconciliation ne trace rien (mesuré : aucun
+# contournement, `tentative: 1`).
 #
 # Codes : 0 écrit · 1 erreur de lecture ou d'écriture · 2 lab non adhérent · 64 usage, tentative
 # incohérente, constat invalide, unité hors forme (ni .planning/cycles/…, ni .planning/juges/<juge>) ou sans PLAN.md

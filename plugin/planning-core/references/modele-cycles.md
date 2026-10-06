@@ -488,8 +488,14 @@ Limite déclarée (g) (libellé mesuré par sonde, quick 261003-ps1) : supprimer
 par un lien ou un FIFO, remet le compteur à 1 (la tentative 1 est acceptée, code 0 ; le lien est remplacé,
 jamais suivi) ; le remplacer par un dossier remet le contrôle à 1 mais l'écriture échoue (code 1, aucun
 verdict posé tant que le dossier reste) ; y éditer `tentative:` à une valeur plus basse remet le compteur à
-cette valeur + 1 (à `0`, la tentative 1 est acceptée). Les écritures par Bash restent ouvertes ; D1
-(plan 46-07) en trace la disparition.
+cette valeur + 1 (à `0`, la tentative 1 est acceptée). Les écritures par Bash restent ouvertes. Précisions
+(libellé mesuré par sonde, quick 261006-23m) : un agent qui a `Bash` peut s'accorder lui-même la dérogation
+`PLAFOND` (`deroger-gate.sh --gate=PLAFOND`, `--qui` déclaratif, T-45-34 ; mesuré : la quatrième pose rend 65
+sans elle, 0 avec) — dérogation journalisée et citée à la pose, et, pour D1, deux écritures du moteur (lignes
+`moteur`), jamais un contournement ; la disparition de `VERDICT.md` n'est tracée que si `FileChanged` la voit en
+séance (ligne `contournement` à `sha256=absent`, quand une référence du fichier existe) : supprimé puis reposé
+avant le `SessionStart` suivant, le verdict reposé est une écriture du moteur et la réconciliation ne trace
+rien (mesuré : aucun contournement, `tentative: 1`).
 
 **Verdict d'un juge** (P46-D-06a, Q6 = a, même canal) : la commande admet une seconde forme d'unité,
 `.planning/juges/<juge>` (nom en minuscules, chiffres et tirets, 64 caractères au plus), dont
@@ -1030,6 +1036,8 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (be)** — A11 (Phase 46, fix-46-a) : G3, G4 et G2 ne lisent pas plus de 1 Mio d'un `PLAN.md` (`BORNE_LECTURE_PLAN`, 1 048 576 octets LUS, jamais la taille annoncée) : au-delà, le `PLAN.md` est tenu pour illisible, la clôture et le `SUMMARY.md` sont refusés par un message qui nomme la borne, et G2 (fail-open, spec §5.1) ignore ce plan comme tout `PLAN.md` au frontmatter illisible (`lire_frontmatter_fichier(chemin, borne)` : `invalide:hors-borne`) ; le recalcul et `poser-verdict.sh` le lisent sans cette borne (le recalcul peut rendre un état, la commande poser un verdict, là où le hook refuse : un refus de plus, jamais un passage).
 - **limite (bf)** — A1 (Phase 46, fix-46-a) : la normalisation NFC porte sur les composants SOUS la racine du lab, jamais sur la racine (préfixe tel que la résolution physique le rend) ; sur APFS et HFS+, insensibles à la normalisation, les formes NFC et NFD d'un nom désignent le même dossier ; sur un système sensible à la normalisation (ext4), le hook lit l'unité sous sa forme NFC : une unité dont le nom de disque n'est pas en NFC (le recalcul la range « Hors modèle », sauf un nom qui reste conforme à `NOM_UNITE` une fois décomposé — jamo hangûl, idéogrammes de compatibilité CJK) y est lue absente, d'où un refus de G1, G3 ou G4, jamais un passage ; une jumelle NFC posée à côté serait lue à sa place, le recalcul gardant la vue du disque.
 - **limite (bg)** — D1 (Phase 46, fix-46-a ; critère et plafond : choix du planificateur du quick 261006-23m, renversables) : la liste surveillée garde les unités non closes les plus récentes d'abord — ordre DÉCLARÉ par le nom (préfixe numérique décroissant comparé comme un entier, puis le nom), jamais par une date du disque — et se tronque à `BORNE_WATCHPATHS` chemins ; la réconciliation ne hache pas au-delà de `BORNE_OCTETS_RECONCILIATION` octets cumulés (256 Mio) ni un fichier de plus de 128 Mio : un fichier écarté n'est ni surveillé en séance (s'il est hors liste) ni réconcilié ; la borne est tracée (`genre=borne`, `sha256` = empreinte de la liste) et le signal ne la répète pas tant que la liste tronquée ne change pas.
+- **limite (bh)** — P46-D-06a (Phase 46, fix-46-a, revue P4) : le `VERDICT.md` d'un juge n'est protégé par G5 que contre l'écriture par OUTIL : un agent qui a `Bash` peut écrire sous `.planning/juges/<juge>/` un verdict qui porte le `hash` de la sortie piégée et le critère visé en `échec`, et le vérificateur range alors le juge « prouvé » ; D1 ne surveille pas `.planning/juges/` (hors de la liste surveillée) : cette écriture n'est ni tracée ni signalée (mesuré par sonde, quick 261006-23m : juge compté prouvé, aucune ligne du journal de D1, aucun chemin de `.planning/juges/` dans `watchPaths`).
+- **limite (bi)** — P46-D-11 (Phase 46, fix-46-a, audit A15) : le canary de session (`CANARIS`) rejoue `PreToolUse` (dont `SubagentHandback`), `SubagentStop` et `FileChanged` ; il ne rejoue ni `SessionStart` (liste surveillée et réconciliation de D1), ni `CwdChanged`, ni le vérificateur de juges (`verifier_juges`) — il vérifie seulement que la commande de référence est câblée sous les cinq événements : leur panne n'est pas signalée au démarrage de session ; seules les suites (`test-d1-surveillance.sh`, `test-juges-canary.sh`) la voient.
 
 ### Contrat de sortie par événement (Phase 46)
 
@@ -1352,7 +1360,7 @@ ligne JSON `{"prouves": […], "laxistes": […], "sans_preuve": [{"juge": …, 
 
 **Étape du premier cycle.** Le premier passage de chaque juge sur sa sortie piégée est une étape **écrite** du premier cycle (`CYCLE.template.md`, « Premier
 cycle — canary de juge ») : le manager dispatche le juge sur `.planning/juges/<juge>/SORTIE-PIEGEE.md`, puis pose le verdict par `poser-verdict.sh`. Tant que ce
-n'est pas fait, le `SessionStart` signale « juge sans preuve ». Limite : (bb).
+n'est pas fait, le `SessionStart` signale « juge sans preuve ». Limites : (bb), (bh).
 
 ### Le hook par rôle (GATE-09)
 
@@ -1452,7 +1460,7 @@ minimale déclarée et vérifiée cas par cas (P45-D-20) : script absent, `pytho
 `Agent`, fil principal, agent `plugin:`. Il rend visible la limite (i). Les cas de G4′ (`G4P-handback`, `G4P-stop`, Phase 46)
 rejouent le rapport sans sortie brute d'un producteur synthétique doté de `Bash` ; l'attendu armé d'un cas `SubagentStop` est
 l'objet `decision: "block"` en code 0, celui d'un cas `SubagentHandback` un `deny`. Le cas `D1-trace` (Phase 46, 46-07) est d'une autre catégorie : D1 ne
-s'arme pas, son attendu est une trace (une ligne `contournement` de plus au journal du lab synthétique, stdout vide), et sa défaillance est signalée comme celle d'un gate.
+s'arme pas, son attendu est une trace (une ligne `contournement` de plus au journal du lab synthétique, stdout vide), et sa défaillance est signalée comme celle d'un gate. Limite : (bi).
 
 ### Le rejeu (GATE-13)
 
