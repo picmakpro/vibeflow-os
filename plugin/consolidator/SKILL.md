@@ -172,7 +172,7 @@ Voir `references/fusion.md`.
    - Non encore encode : champ `Encode dans:` = `Non encode`
 2. **Draft auto** : brouillon sous `.claude/rules/_draft/` selon la `nature` de la candidate (check si mecanique, regle si jugement) — grille : `references/promotion.md` §Grille de tri.
 3. **Validation humaine** : le user revoit chaque draft, valide ou rejette.
-4. **Promotion finale** : draft valide -> `.claude/rules/[slug].md`, learnings sources marques `Encode dans: .claude/rules/[slug].md`, learnings archives si redondants.
+4. **Promotion finale** : draft de rule valide -> `.claude/rules/[slug].md`, learnings sources marques `Encode dans: .claude/rules/[slug].md`, learnings archives si redondants. Brouillon de check valide -> proposition de controle executable a l'emplacement nomme (lint, hook ou job CI), pose par un geste humain ou un mandat de dev ; une fois pose, learnings sources marques `Encode dans: [chemin du controle]` (jamais `.claude/rules/`) — `references/promotion.md` Phases C et D.
 
 ### Quand declencher
 
