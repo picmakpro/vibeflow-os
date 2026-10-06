@@ -773,6 +773,9 @@ NOMS_MODELE_RACINE_FICHIERS = (
     # Journal de D1, la détection des écritures sur les fichiers surveillés (Phase 46, 46-07, P46-D-07a) : emplacement du modèle, jamais
     # « Hors modèle » ; inscrit par les écrivains du moteur et par le hook central, protégé par G6, jamais surveillé.
     "surveillance.log",
+    # `.planning/.gitignore` (fix-46-c, Q-B ; arbitrage Willy, AskUserQuestion session principale, 2026-10-06) : posé par le hook central au SessionStart d'un
+    # lab adhérent, une seule ligne `surveillance.log` ; emplacement du modèle, jamais « Hors modèle ». Ni généré par le recalcul, ni protégé par G6.
+    ".gitignore",
 )
 
 

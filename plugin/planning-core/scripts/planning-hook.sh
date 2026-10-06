@@ -3327,6 +3327,53 @@ def mode_subagent_stop(contexte):
     return None  # evt-mode-subagentstop
 
 
+BORNE_GITIGNORE_PLANNING = 65536  # lecture bornée du .planning/.gitignore existant
+LIGNE_GITIGNORE_PLANNING = "surveillance.log"
+FORMES_GITIGNORE_PLANNING = ("surveillance.log", "/surveillance.log")  # d'autres écritures de la même ligne : déjà ignoré
+
+
+def poser_gitignore_planning(racine):
+    """Q-B (fix-46-c ; arbitrage Willy, AskUserQuestion session principale, 2026-10-06, « (1) .planning/.gitignore ») : pose `<racine>/.planning/.gitignore`
+    avec UNE ligne, `surveillance.log` (le journal de D1 ne doit jamais être committé), au SessionStart d'un lab ADHÉRENT (le seul appelant, `mode_session_start`,
+    n'est atteint qu'après adhésion, jamais en refus). Idempotent : un `.gitignore` qui porte déjà la ligne n'est pas touché ; un `.gitignore` existant sans
+    la ligne la reçoit en dernier, son contenu reste tel quel (jamais écrasé) ; écriture ATOMIQUE (fichier temporaire du même dossier, `O_EXCL`, `os.replace`).
+    Un `.planning` en lien, un `.gitignore` qui n'est pas un fichier régulier (lien, dossier), de plus de BORNE_GITIGNORE_PLANNING octets ou illisible :
+    rien (la lecture est bornée, jamais suivie). Fail-silencieux : aucune exception ne remonte."""
+    temporaire = None
+    try:
+        planning = os.path.join(racine, NOM_PLANNING)
+        if os.path.islink(planning) or not os.path.isdir(planning):
+            return
+        chemin = os.path.join(planning, ".gitignore")
+        existant, droits = b"", 0o644
+        if os.path.lexists(chemin):
+            etat = os.lstat(chemin)
+            if not stat.S_ISREG(etat.st_mode):
+                return
+            droits = stat.S_IMODE(etat.st_mode)
+            with os.fdopen(os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN | SANS_BLOCAGE), "rb") as fh:
+                existant = fh.read(BORNE_GITIGNORE_PLANNING + 1)
+            if len(existant) > BORNE_GITIGNORE_PLANNING:
+                return
+            if any(ligne.strip() in FORMES_GITIGNORE_PLANNING for ligne in existant.decode("utf-8", "replace").splitlines()):  # gitignore-idempotent
+                return
+        contenu = existant + (b"\n" if existant and not existant.endswith(b"\n") else b"") + (LIGNE_GITIGNORE_PLANNING + "\n").encode("utf-8")
+        temporaire = os.path.join(planning, ".gitignore.%d.tmp" % os.getpid())
+        descripteur = os.open(temporaire, os.O_WRONLY | os.O_CREAT | os.O_EXCL | SANS_SUIVI_DE_LIEN, droits)
+        with os.fdopen(descripteur, "wb") as fh:
+            fh.write(contenu)
+        os.replace(temporaire, chemin)  # gitignore-atomique
+        temporaire = None
+    except Exception:
+        return
+    finally:
+        if temporaire is not None:
+            try:
+                os.unlink(temporaire)
+            except OSError:
+                pass
+
+
 def mode_session_start(contexte):
     """D1 au SessionStart (46-07) : la liste surveillée du lab adhérent, fichier par fichier (`watchPaths`), et la réconciliation par hash des fichiers
     de cette liste avec le dernier état connu (les changements que rien n'explique sont tracés ; le signal tient en une ligne de `additionalContext`).
@@ -3334,6 +3381,7 @@ def mode_session_start(contexte):
     seulement, UNE ligne agrégée de plus dans le même `additionalContext` (les juges du lab, voir `signal_juges`) ; une erreur du vérificateur la tait,
     elle ne change ni la liste ni le signal de D1."""
     racine = contexte["racine"]
+    poser_gitignore_planning(racine)  # gitignore-appel : avant toute ligne du journal (Q-B)
     liste, tronquee = chemins_surveilles(racine)  # d1-liste
     signal = reconcilier(racine, liste, tronquee, contexte["payload"].get("source"))
     if contexte["payload"].get("source") == "startup":  # juge-source

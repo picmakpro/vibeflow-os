@@ -38,9 +38,11 @@
 #            contournement) ; un SessionStart sur 128 chemins lit chaque fichier une fois (mesure structurelle)
 #   R-D1-19  (A6, P46 lot B, b3) journal réduit au silence par Bash (lien vers /dev/null, chmod 000, `chflags uchg`, absent alors que l'état précédent existe : reprise ou cache du
 #            recalcul) : signal D1 au SessionStart, rien d'écrit ; jumeaux : première séance sans journal, journal sain, séance suivante (pas de répétition)
+#   R-D1-20  (Q-B, fix-46-c) `.planning/.gitignore` (une ligne `surveillance.log`) posé au SessionStart d'un lab adhérent : idempotent, existant préservé, hors adhésion rien,
+#            lien et dossier jamais suivis, aucun temporaire
 #   Le cas de canary R-CANG-D1 vit dans la section `cang` de test-planning-gates.sh.
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
-#   MUT-D1-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-D1-03), MUT-D1-DOSSIER (le dossier de l'unité dans la liste -> R-D1-01), MUT-D1-JAMAIS-UN-DOSSIER (filtre « absent ou fichier régulier » retiré -> R-D1-01, N-1),
+#   MUT-D1-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-D1-03), MUT-D1-DOSSIER (le dossier de l'unité dans la liste -> R-D1-01), MUT-D1-GITIGNORE-APPEL / -IDEMPOTENT / -ATOMIQUE (Q-B -> R-D1-20), MUT-D1-GITIGNORE-MODELE (`.gitignore` retiré des noms du modèle du recalcul -> R-D1-05), MUT-D1-JAMAIS-UN-DOSSIER (filtre « absent ou fichier régulier » retiré -> R-D1-01, N-1),
 #   MUT-D1-BORNE (borne retirée -> R-D1-02), MUT-D1-TRACE (aucune ligne de contournement -> R-D1-04), MUT-D1-MOTEUR (ligne moteur du recalcul retirée ->
 #   R-D1-06), MUT-D1-INTENTION (ligne d'intention retirée -> R-D1-08), MUT-D1-INTENTION-REUTILISEE (une intention explique plusieurs changements ->
 #   R-D1-08), MUT-D1-AST (une copie divergente -> R-D1-09), MUT-D1-RECONCILIATION (réconciliation retirée -> R-D1-10), MUT-D1-SIGNAL-REPETE (ligne `signal`
@@ -407,6 +409,73 @@ def attendus_surveilles(lab, unites_ouvertes):
     return res
 
 
+def controle_d1_20(ctx, script):
+    """(Q-B, fix-46-c) `.planning/.gitignore` posé au SessionStart d'un lab ADHÉRENT : une seule ligne `surveillance.log`, avant toute ligne du journal ; un second
+    SessionStart ne le touche pas (même octets, même inode) ; un `.gitignore` existant sans la ligne la reçoit en dernier, ses lignes restent (avec ou sans
+    saut de ligne final) ; un `.gitignore` qui porte déjà la ligne est laissé tel quel (octets identiques) ; un lab non adhérent n'en reçoit pas ; un `.gitignore`
+    en lien ou en dossier n'est jamais suivi ni modifié ; aucun fichier temporaire ne reste."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    fautes = []
+
+    def session(lab):
+        return ctx.lancer(payload_session(lab), cwd=lab, dossier=d)
+
+    def gi(lab):
+        return os.path.join(lab, ".planning", ".gitignore")
+
+    def lu(chemin):
+        with open(chemin, "rb") as fh:
+            return fh.read()
+
+    def restes(lab):
+        return [n for n in os.listdir(os.path.join(lab, ".planning")) if n.startswith(".gitignore.")]
+
+    lab = fabriquer_lab(ctx, "d1-20-neuf")
+    rc, out, err = session(lab)
+    if rc != 0 or err or not os.path.isfile(gi(lab)) or lu(gi(lab)) != b"surveillance.log\n":
+        fautes.append("lab adhérent sans .gitignore : UNE ligne `surveillance.log` attendue — obtenu rc=%d %r" % (rc, lu(gi(lab))[:80] if os.path.isfile(gi(lab)) else None))
+    ino = os.stat(gi(lab)).st_ino if os.path.isfile(gi(lab)) else None
+    session(lab)
+    if not os.path.isfile(gi(lab)) or lu(gi(lab)) != b"surveillance.log\n" or os.stat(gi(lab)).st_ino != ino:
+        fautes.append("second SessionStart : le .gitignore doit rester le même fichier, une seule ligne")
+    if restes(lab):
+        fautes.append("fichier temporaire laissé : %s" % restes(lab))
+    # existant sans la ligne, sans saut de ligne final
+    lab = fabriquer_lab(ctx, "d1-20-existant")
+    ecrire(gi(lab), "node_modules\n*.tmp")
+    session(lab)
+    if lu(gi(lab)) != b"node_modules\n*.tmp\nsurveillance.log\n":
+        fautes.append(".gitignore existant : lignes conservées et `surveillance.log` ajoutée en dernier attendues — obtenu %r" % lu(gi(lab))[:120])
+    # déjà présent (forme `/surveillance.log` comprise) : octets inchangés
+    for nom, contenu in (("present", "a\nsurveillance.log\nb\n"), ("present-racine", "/surveillance.log")):
+        lab = fabriquer_lab(ctx, "d1-20-" + nom)
+        ecrire(gi(lab), contenu)
+        session(lab)
+        if lu(gi(lab)) != contenu.encode("utf-8"):
+            fautes.append(".gitignore qui porte déjà la ligne (%s) : laissé tel quel attendu — obtenu %r" % (nom, lu(gi(lab))[:80]))
+    # lab non adhérent : aucun fichier
+    lab = fabriquer_lab(ctx, "d1-20-dev", adherent=False)
+    session(lab)
+    if os.path.lexists(gi(lab)):
+        fautes.append("lab non adhérent : aucun .gitignore attendu")
+    # lien et dossier : jamais suivis
+    lab = fabriquer_lab(ctx, "d1-20-lien")
+    cible = os.path.join(os.path.dirname(lab), "d1-20-lien-hors.txt")
+    ecrire(cible, "hors du lab\n")
+    os.symlink(cible, gi(lab))
+    session(lab)
+    if lu(cible) != b"hors du lab\n" or not os.path.islink(gi(lab)):
+        fautes.append(".gitignore en lien : jamais suivi, cible et lien inchangés attendus")
+    lab = fabriquer_lab(ctx, "d1-20-dossier")
+    os.makedirs(gi(lab))
+    session(lab)
+    if not os.path.isdir(gi(lab)) or os.listdir(gi(lab)):
+        fautes.append(".gitignore en dossier : inchangé attendu")
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          ".planning/.gitignore : posé une fois (`surveillance.log`), idempotent, existant préservé (ligne ajoutée en dernier), déjà présent laissé tel quel, "
+                          "hors adhésion rien, lien et dossier jamais suivis, aucun temporaire")
+
+
 def temoin(ctx, dossier):
     """Témoin : Write d'une cible neutre d'un lab adhérent -> silence (aucun mutant de D1 ne l'affecte)."""
     lab = fabriquer_lab(ctx, "temoin")
@@ -622,10 +691,12 @@ def controle_d1_05(ctx, script):
     if verdict_de(rc, out) != "silence":
         fautes.append("témoin (cible neutre, copie G6) : silence attendu — obtenu %s" % verdict_de(rc, out))
     # Le recalcul : le journal est un emplacement du modèle
-    recalc = os.path.join(ctx.scripts_dir, "recalc-planning.sh")
+    recalc = os.path.join(_dossier(ctx, script), "recalc-planning.sh")
     lab_r = fabriquer_lab(ctx, "d1-05-recalc", ouvertes=(), closes=(), racine_complete=False)
     ecrire(chemin_journal(lab_r), "")
     ecrire(os.path.join(lab_r, ".planning", "surveillance.log.autre"), "autre\n")
+    ecrire(os.path.join(lab_r, ".planning", ".gitignore"), "surveillance.log\n")  # Q-B : posé par le hook, emplacement du modèle
+    ecrire(os.path.join(lab_r, ".planning", ".gitignore.bak"), "jumeau\n")
     p = subprocess.run(["bash", recalc, "--planning=" + os.path.join(lab_r, ".planning")], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                        env=ctx.env({"GSD_HOME": ctx.gsd}), cwd=lab_r, timeout=240)
     index = os.path.join(lab_r, ".planning", "INDEX.md")
@@ -634,6 +705,8 @@ def controle_d1_05(ctx, script):
         fautes.append("recalc-planning.sh : code 0 attendu — obtenu %d %s" % (p.returncode, court(p.stderr)))
     elif "`surveillance.log`" in texte or "`surveillance.log.autre`" not in texte:
         fautes.append("INDEX.md : surveillance.log absent de « Hors modèle » et son jumeau surveillance.log.autre présent attendus — obtenu %s" % court(texte, 400))
+    elif "`.gitignore`" in texte or "`.gitignore.bak`" not in texte:
+        fautes.append("INDEX.md : .gitignore absent de « Hors modèle » et son jumeau .gitignore.bak présent attendus — obtenu %s" % court(texte, 400))
     # FileChanged hors liste : aucune ligne
     d = ctx.copie_forcee(_dossier(ctx, script), "observe")
     lab_f = fabriquer_lab(ctx, "d1-05-hors-liste")
@@ -1492,6 +1565,7 @@ def sec_base(ctx):
     rendre("R-D1-03", "hors adhésion : octet vide, aucun fichier créé", controle_d1_03, ctx)
     rendre("R-D1-04", "une écriture que rien n'explique, vue par FileChanged, est tracée", controle_d1_04, ctx)
     rendre("R-D1-05", "journal protégé par G6, connu du recalcul, jamais surveillé", controle_d1_05, ctx)
+    rendre("R-D1-20", "Q-B : .planning/.gitignore posé au SessionStart d'un lab adhérent, idempotent", controle_d1_20, ctx)
 
 
 def sec_mutants_base(ctx):
@@ -1502,6 +1576,10 @@ def sec_mutants_base(ctx):
     tuer(ctx, "D1-JAMAIS-UN-DOSSIER", "# d1-jamais-un-dossier", "return True  # d1-jamais-un-dossier", "R-D1-01", controle_d1_01)
     tuer(ctx, "D1-BORNE", "# d1-borne", "if False:  # d1-borne", "R-D1-02", controle_d1_02)
     tuer(ctx, "D1-TRACE", "# d1-contournement", 'return ["reference"]  # d1-contournement', "R-D1-04", controle_d1_04)
+    # Q-B : l'appel retiré, l'idempotence retirée (la ligne s'ajoute à chaque séance), l'écriture atomique remplacée par une écriture en place (le temporaire reste)
+    tuer(ctx, "D1-GITIGNORE-APPEL", "# gitignore-appel", "pass  # gitignore-appel", "R-D1-20", controle_d1_20)
+    tuer(ctx, "D1-GITIGNORE-IDEMPOTENT", "# gitignore-idempotent", "if False:  # gitignore-idempotent", "R-D1-20", controle_d1_20)
+    tuer(ctx, "D1-GITIGNORE-ATOMIQUE", "# gitignore-atomique", "open(chemin, \"wb\").write(contenu)  # gitignore-atomique", "R-D1-20", controle_d1_20)
 
 
 def sec_moteur(ctx):
@@ -1515,6 +1593,7 @@ def sec_moteur(ctx):
 
 def sec_mutants_moteur(ctx):
     tuer(ctx, "D1-MOTEUR", "# d1-moteur-state", "pass  # d1-moteur-state", "R-D1-06", controle_d1_06, script="recalc-planning.sh")
+    tuer(ctx, "D1-GITIGNORE-MODELE", '".gitignore",', '"gitignore-neutre",', "R-D1-05", controle_d1_05, script="recalc-planning.sh")
     tuer(ctx, "D1-INTENTION", "# d1-intention", "pass  # d1-intention", "R-D1-08", controle_d1_08)
     tuer(ctx, "D1-INTENTION-REUTILISEE", "# d1-apres", "apres = entrees  # d1-apres", "R-D1-08", controle_d1_08)
     tuer(ctx, "D1-NFC", "# nfc-d1", "composants = os.path.relpath(os.path.join(os.path.realpath(parent), nom), racine).split(os.sep)  # nfc-d1", "R-D1-15", controle_d1_15)

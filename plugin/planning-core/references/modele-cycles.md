@@ -265,6 +265,7 @@ Phase 41.1) : la correction à la source évite qu'une future consommatrice de c
   .recalc-cache.json    (généré)
   derogations-gates.log (journal de dérogation des gates, ajout seul — Phase 45, P45-D-13)
   surveillance.log      (journal de D1, ajout seul, jamais surveillé — Phase 46, P46-D-07a)
+  .gitignore            (une ligne, `surveillance.log` : posé par le hook central au SessionStart d'un lab adhérent, jamais écrasé — fix-46-c, Q-B)
   _archive/socle-v2/    (STATE.md et INDEX.md du socle v2, archivés à la migration — annexe)
   cycles/01-<sujet>/
     CYCLE.md
@@ -297,7 +298,8 @@ P46-D-06a ; jamais « Hors modèle », jamais dérivé comme une unité de cycle
 fichiers `PROJECT.md`, `REQUIREMENTS.md`, `config.json`, `INDEX.md`, `STATE.md`, `cloture.log`,
 `.recalc-cache.json`, `derogations-gates.log` (journal de dérogation des gates, Phase 45 : F7a, P45-D-13 —
 Willy, AskUserQuestion session principale, 2026-09-30 ; jamais « Hors modèle »), `surveillance.log` (journal de D1,
-Phase 46, P46-D-07a ; jamais « Hors modèle »). `baux/` et `missions/`
+Phase 46, P46-D-07a ; jamais « Hors modèle »), `.gitignore` (une seule ligne, `surveillance.log`, posé par le hook central au `SessionStart`
+d'un lab adhérent — fix-46-c, Q-B ; arbitrage Willy, AskUserQuestion session principale, 2026-10-06 ; jamais « Hors modèle », ni protégé par G6). `baux/` et `missions/`
 ne sont pas parcourus par le recalcul en Phase 44.
 
 ## Emplacements annexes et hors modèle
