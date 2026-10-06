@@ -107,6 +107,72 @@ Relayées verbatim des blocs typés, par sprint :
 - 46-10 : `[{"verdict":"recette","preuve":"amont"}]`
 - fix-46-a (tours 1, 2 et 3) : `[{"verdict":"recette","preuve":"amont"}]`
 
+```json
+{
+ "preuves": [
+  {
+   "verdict": "recette",
+   "preuve": "amont",
+   "sprint": "46-04"
+  },
+  {
+   "verdict": "gate:code_review",
+   "preuve": "absent",
+   "sprint": "46-04"
+  },
+  {
+   "verdict": "recette",
+   "preuve": "amont",
+   "sprint": "46-05"
+  },
+  {
+   "verdict": "recette",
+   "preuve": "amont",
+   "sprint": "46-06"
+  },
+  {
+   "verdict": "gate:marqueur",
+   "commande": "45-CONTROLE-MARQUEUR.sh --base=247194c7 -- plugin/planning-core/scripts plugin/planning-core/hooks",
+   "exit_code": 0,
+   "sha": "7873a8b5",
+   "sprint": "46-06"
+  },
+  {
+   "verdict": "recette",
+   "preuve": "amont",
+   "sprint": "46-07"
+  },
+  {
+   "verdict": "recette",
+   "preuve": "amont",
+   "sprint": "46-08"
+  },
+  {
+   "verdict": "recette",
+   "preuve": "amont",
+   "sprint": "46-09"
+  },
+  {
+   "verdict": "test-juges-canary",
+   "commande": "bash plugin/planning-core/scripts/tests/test-juges-canary.sh",
+   "exit_code": 0,
+   "sha": "e70217f2",
+   "sprint": "46-09"
+  },
+  {
+   "verdict": "recette",
+   "preuve": "amont",
+   "sprint": "46-10"
+  },
+  {
+   "verdict": "recette",
+   "preuve": "amont",
+   "sprint": "fix-46-a"
+  }
+ ]
+}
+```
+
 ## Next step
 
 Relancer la mission avec les réponses de Willy à ckpt-46-11 et au lot B : exec-46-11 (rejeu réel et
