@@ -1631,8 +1631,11 @@ clôture de `fiabilite-v1.0`. Touche `dev-orchestrator` (références du head, `
      l'équivalent Codex ; un gate rougit sur un skill non classé ou sur un user-invoked qui en
      appelle un autre (POCK-07). *Reformulé le 2026-10-06, P414-D-18 (arbitrage Samuel,
      AskUserQuestion session principale, 2026-10-06).*
-  8. Un ajout de skill, gate ou règle cite une **défaillance observée** (session, geste, écart)
-     ou est refusé ; `check-ajout-retrait` l'exige en plus de SOBR-05 (POCK-08).
+  8. Un ajout de skill, gate ou règle cite une **défaillance observée** (session, geste, commit
+     daté) ; `check-ajout-retrait` l'exige en plus de SOBR-05 et signale tout ajout qui ne la cite
+     pas — consultatif en CI (P414-D-04), le refus reste un geste de relecture (POCK-08).
+     *Reformulé le 2026-10-06, P414-D-19 (arbitrage Samuel, AskUserQuestion session principale,
+     2026-10-06).*
   9. **Sobriété** (SOBR-05) : chaque ajout de doctrine désigne ce qu'il remplace ou resserre ;
      aucun skill neuf, aucun agent neuf.
 
