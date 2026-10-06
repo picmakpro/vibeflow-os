@@ -11,6 +11,7 @@
 #   T3c (local)  — Phase 30 tâche 4 : .claude/settings.json (écrit par merge_module_hooks sur un
 #                  module à hooks) est gitignoré exactement une fois, idempotent ; en scope
 #                  project le même module ne crée/ne touche PAS .gitignore (SCOPE-04 borné).
+#   T3d (--target) — fix-46-c : la ligne du journal préfixée par le lab sous --target <lab>/.claude, rien hors .claude
 #   T3d (local)  — P5 (46-12) : .planning/surveillance.log (journal de D1) gitignoré par planning-core,
 #                  exactement une fois, idempotent ; négatifs module sans hook central et scope project ;
 #                  mutant (engine privé de la ligne) tué.
@@ -257,8 +258,8 @@ if prepare_module "$CACHE" "planning-core"; then
   mkdir -p "$MLAB/_internal" "$MLAB/work"
   cp -r "$INTERNAL_DIR/." "$MLAB/_internal/" 2>/dev/null
   rm -rf "$MLAB/_internal/tests"
-  "$GREP" -vF 'gitignore_add_one ".planning/surveillance.log"' "$INSTALLER" > "$MLAB/_internal/vibeflow-update.sh"
-  if [ "$("$GREP" -cF 'surveillance.log' "$MLAB/_internal/vibeflow-update.sh")" -lt "$("$GREP" -cF 'surveillance.log' "$INSTALLER")" ]; then
+  "$GREP" -vF 'gitignore_add_one "$gi_journal"' "$INSTALLER" > "$MLAB/_internal/vibeflow-update.sh"
+  if [ "$("$GREP" -cF 'gitignore_add_one "$gi_journal"' "$MLAB/_internal/vibeflow-update.sh")" -lt "$("$GREP" -cF 'gitignore_add_one "$gi_journal"' "$INSTALLER")" ]; then
     mkdir -p "$MLAB/work/cache"
     cp -r "$CACHE/planning-core" "$MLAB/work/cache/planning-core"
     (cd "$MLAB/work" && git init -q && VF_SCOPE=local VIBEFLOW_CACHE="$MLAB/work/cache" \
@@ -275,6 +276,36 @@ if prepare_module "$CACHE" "planning-core"; then
   rm -rf "$MLAB"
 else
   skip "T3d local : planning-core non copiable dans le cache de test"
+fi
+rm -rf "$LAB"
+
+# T3d (--target, fix-46-c, revue de P5) : sous `--target <lab>/.claude` le lab n'est plus le cwd, la ligne du journal est préfixée par le chemin du lab relatif
+# au cwd (jamais la ligne nue `.planning/surveillance.log`, qui viserait le mauvais dossier) ; une cible qui n'est pas un `.claude` n'en pose aucune.
+LAB="$(mktemp -d)"
+CACHE="$LAB/cache"
+if prepare_module "$CACHE" "planning-core"; then
+  mkdir -p "$LAB/sub" "$LAB/autre"
+  (cd "$LAB" && git init -q && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$LAB/sub/.claude" install planning-core >/dev/null 2>&1)
+  (cd "$LAB" && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$LAB/sub/.claude" install planning-core >/dev/null 2>&1)
+  n=$("$GREP" -cxF "sub/.planning/surveillance.log" "$LAB/.gitignore" 2>/dev/null || true)
+  nn=$("$GREP" -cxF ".planning/surveillance.log" "$LAB/.gitignore" 2>/dev/null || true)
+  if [ "${n:-0}" -eq 1 ] && [ "${nn:-0}" -eq 0 ]; then
+    ok "T3d --target : sub/.planning/surveillance.log gitignoré une fois (préfixé par le lab), jamais la ligne nue .planning/surveillance.log"
+  else
+    ko "T3d --target : sub/.planning/surveillance.log ×${n:-0} (attendu 1), .planning/surveillance.log nue ×${nn:-0} (attendu 0)"
+  fi
+  rm -f "$LAB/.gitignore"
+  (cd "$LAB" && VF_SCOPE=local VIBEFLOW_CACHE="$CACHE" \
+     bash "$INSTALLER" --target "$LAB/autre" install planning-core >/dev/null 2>&1)
+  if ! "$GREP" -qF "surveillance.log" "$LAB/.gitignore" 2>/dev/null; then
+    ok "T3d --target hors .claude : aucune ligne de journal posée (le lab n'est pas déterminable)"
+  else
+    ko "T3d --target hors .claude : une ligne de journal a été posée alors que le lab n'est pas déterminable"
+  fi
+else
+  skip "T3d --target : planning-core non copiable dans le cache de test"
 fi
 rm -rf "$LAB"
 
