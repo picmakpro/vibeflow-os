@@ -1,3 +1,10 @@
+## Équivalent Codex des skills de modules Type 1 — consigné 2026-10-06
+
+**Statut : dette consignée par la Phase 41.4 (P414-D-03), non traitée : exige une modification de l'installeur.**
+**Constat.** Le Type 1 copie le SKILL.md seul : un `plugin/{mod}/agents/` serait installé et linté comme agent ; seuls les skills nichés Type 2 transportent `agents/openai.yaml`. Un skill Type 1 passé user n'aurait donc aucun équivalent Codex (`plugin/_internal/vibeflow-update.sh` l.2290-2322).
+**Modules concernés.** installer, planning-core, consolidator, infrastructure-audit, audit-architecture, kpi-analyst, mobile-test, software-architecture.
+**Issue de Q1 (plan 41.4-08).** Option (a), P414-D-17 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-06 ; 0 skill user aujourd'hui (26 classés `vf-invocation: model`), donc aucune dette Codex active ; elle le devient au premier skill Type 1 passé user.
+
 ## Routage « crée une PR / ship » vers gsd-ship contre « ouvrir une PR = geste VibeFlow » — consigné 2026-10-06
 
 **Statut : consigné par la Phase 41.4 (P414-D-16, décision du manager), non cadré — changer une route est hors périmètre de la phase.**
