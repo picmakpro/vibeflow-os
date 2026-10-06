@@ -9,6 +9,9 @@
 # Tri de chaque candidate (POCK-05, P414-D-10) :
 #   nature      mecanique | jugement  (heuristique lexicale, defaut jugement ; tri final humain)
 #   proposition check | brouillon-regle  (mecanique -> check ; jugement -> brouillon de regle)
+# Findings (tableau "findings", POCK-05) : depot_sans_garde_fou — aucun workflow CI
+#   (.github/workflows/*.yml|*.yaml), aucun check-*.sh (.claude/scripts/, scripts/), aucun hook
+#   declare (.claude/settings.json) dans le repertoire courant.
 # Output : JSON sur stdout
 #
 # Usage:
@@ -135,5 +138,24 @@ while IFS='|' read -r cat ids nature; do
 done <<< "$clusters_section"
 
 echo ""
+echo "  ],"
+
+# ---------- Findings (POCK-05, Q7 : MESURE) ----------
+# Depot sans garde-fou : aucune des trois familles n'est presente dans le repertoire courant
+# (racine du lab, comme MEMORY_DIR) — workflow CI, script check-*.sh, hook declare.
+# Globs non apparies laisses litteraux puis ecartes par [ -e ] : sans danger sous set -e.
+# L'instruction sans effet (no-op) est du JUGEMENT : doctrine de references/promotion.md, jamais calculee ici.
+has_guard=false
+for f in .github/workflows/*.yml .github/workflows/*.yaml .claude/scripts/check-*.sh scripts/check-*.sh; do
+  if [ -e "$f" ]; then has_guard=true; break; fi
+done
+if ! $has_guard && [ -f .claude/settings.json ] && grep -q '"hooks"' .claude/settings.json 2>/dev/null; then
+  has_guard=true
+fi
+
+echo "  \"findings\": ["
+if ! $has_guard; then
+  echo '    {"type": "depot_sans_garde_fou", "detail": "aucun workflow CI, aucun script check-*.sh, aucun hook declare"}'
+fi
 echo "  ]"
 echo "}"

@@ -214,6 +214,25 @@ assert "T6g.1 — cluster de 3 membres mécaniques : mecanique|check" "$(cluster
 mk_cluster "$WORK_DIR/t6g2" "Clarté du découpage entre modules"
 assert "T6g.2 — cluster dont un membre est jugement : jugement|brouillon-regle" "$(cluster_of "$WORK_DIR/t6g2")" "jugement|brouillon-regle"
 
+# T6e — finding « dépôt sans garde-fou » (Q7 : MESURÉ). Dossier NEUF, jamais la racine $WORK_DIR dont
+# .claude/scripts est un lien vers les scripts du module ; script invoqué par chemin absolu.
+findings_of() { # <dossier> -> "types des findings séparés par une virgule", ou "(vide)"
+  (cd "$1" && MEMORY_DIR=".claude/memory" "$DP" 2>/dev/null) | python3 -c '
+import json, sys
+f = json.load(sys.stdin)["findings"]
+print(",".join(x["type"] for x in f) if f else "(vide)")
+' 2>&1
+}
+T6E="$WORK_DIR/t6e"; mk_lrn "$T6E"
+assert "T6e-a — aucun workflow, check-*.sh ni hook : finding depot_sans_garde_fou" "$(findings_of "$T6E")" "depot_sans_garde_fou"
+mkdir -p "$T6E/.github/workflows"; printf 'name: ci\n' > "$T6E/.github/workflows/ci.yml"
+assert "T6e-b — avec .github/workflows/ci.yml : findings vide" "$(findings_of "$T6E")" "(vide)"
+# Les deux autres familles lèvent aussi le finding (check-*.sh ; hooks déclarés dans settings.json).
+T6E2="$WORK_DIR/t6e2"; mk_lrn "$T6E2"; mkdir -p "$T6E2/scripts"; printf '#!/bin/sh\n' > "$T6E2/scripts/check-x.sh"
+assert "T6e-c — avec scripts/check-x.sh : findings vide" "$(findings_of "$T6E2")" "(vide)"
+T6E3="$WORK_DIR/t6e3"; mk_lrn "$T6E3"; printf '{"hooks": {}}\n' > "$T6E3/.claude/settings.json"
+assert "T6e-d — avec .claude/settings.json portant hooks : findings vide" "$(findings_of "$T6E3")" "(vide)"
+
 echo ""
 echo "=== T7 — reindex.sh --apply : backups isolés + rotation + gitignore (ADR-049) ==="
 # 4 applies successifs → doit garder 3 backups max, dans .backups/, jamais à la racine memory/.

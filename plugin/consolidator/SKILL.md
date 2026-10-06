@@ -169,7 +169,7 @@ Voir `references/fusion.md`.
    - Frequence : meme tag/theme present dans ≥ 3 learnings
    - Operationnel : presence de mots-cles d'instruction (`toujours`, `jamais`, `eviter`, `forcer`)
    - Non encore encode : champ `Encode dans:` = `Non encode`
-2. **Draft auto** : pour chaque candidat, l'agent (Claude) genere un draft rule dans `.claude/rules/_draft/[slug].md` avec frontmatter `paths:` propose.
+2. **Draft auto** : brouillon sous `.claude/rules/_draft/` selon la `nature` de la candidate (check si mecanique, regle si jugement) — grille : `references/promotion.md` §Grille de tri.
 3. **Validation humaine** : le user revoit chaque draft, valide ou rejette.
 4. **Promotion finale** : draft valide -> `.claude/rules/[slug].md`, learnings sources marques `Encode dans: .claude/rules/[slug].md`, learnings archives si redondants.
 

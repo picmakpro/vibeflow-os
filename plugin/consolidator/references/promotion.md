@@ -32,6 +32,17 @@ Le pipeline `learning -> rule` est dormant alors que c'est le mecanisme qui tran
 
 Un candidat satisfait `(Frequence OR Operationnel) AND Non-encode`.
 
+#### Grille de tri (POCK-05)
+
+Chaque candidat est trie par sa **nature** (champ `nature`), qui decide de la **proposition** :
+
+| Nature | Reconnaissable a | Proposition (Phase B) |
+|--------|------------------|-----------------------|
+| `mecanique` | motif syntaxique, API ou commande bannie, emplacement ou nom de fichier, format | `check` : un controle deterministe (lint, hook ou job CI), jamais une prose de regle |
+| `jugement` | coherence entre fichiers, choix de conception, arbitrage de contexte | `brouillon-regle` : un draft de rule, comme avant |
+
+Une erreur mecanique devient un controle execute, pas une ligne de regle de plus. Le script pose `nature` par une **heuristique lexicale** (indices dans le titre et les 500 premiers caracteres : lint, hook, regex, grep, commit, chemin, fichier, import, console.log, frontmatter, job ci, extension de fichier) ; **le defaut est `jugement`** — on ne propose jamais un check a tort. Un cluster n'est `mecanique` que si tous ses membres le sont. L'heuristique est un tri, pas un verdict : le tri final reste humain (Phase C).
+
 Output JSON :
 
 ```json
@@ -42,23 +53,31 @@ Output JSON :
       "lrn_id": "LRN-032",
       "title": "Console.log en production = bloque",
       "rule_slug": "no-console-in-prod",
-      "rule_path_proposed": "src/**/*.{ts,tsx,js,jsx}",
-      "confidence": 0.9
+      "nature": "mecanique",
+      "proposition": "check",
+      "confidence": 0.85
     },
     {
       "type": "frequency_cluster",
-      "lrn_ids": ["LRN-099", "LRN-100"],
-      "common_theme": "agent density",
-      "rule_slug": "agent-density-ceiling",
-      "confidence": 0.85
+      "category": "Architecture",
+      "lrn_ids": "LRN-099,LRN-100,LRN-101",
+      "rule_slug": "cluster-architecture",
+      "nature": "jugement",
+      "proposition": "brouillon-regle",
+      "confidence": 0.7
     }
+  ],
+  "findings": [
+    {"type": "depot_sans_garde_fou", "detail": "aucun workflow CI, aucun script check-*.sh, aucun hook declare"}
   ]
 }
 ```
 
+`findings` est un tableau (vide quand le depot porte au moins un garde-fou). `depot_sans_garde_fou` est **mesure** par le script dans le repertoire courant : aucun `.github/workflows/*.yml|*.yaml`, aucun `check-*.sh` sous `.claude/scripts/` ou `scripts/`, aucun `.claude/settings.json` declarant `"hooks"`.
+
 ### Phase B — Draft auto (LLM)
 
-Pour chaque candidat, l'agent (Claude) genere un draft `.claude/rules/_draft/[slug].md` avec :
+Pour chaque candidat de nature `jugement`, l'agent (Claude) genere un draft `.claude/rules/_draft/[slug].md`. Pour un candidat `mecanique`, il genere un **brouillon de check** (type lint, hook ou job CI ; motif exact detecte ; commande qui le verifie) dans le meme dossier `_draft/`, sous `check-[slug].md`, soumis a la meme validation (Phase C) — jamais une prose de regle. Le draft de rule porte :
 
 - **Frontmatter** : `paths:` (scope where the rule applies)
 - **Contenu** : reformulation imperative du learning (instructions courtes, claires)
@@ -138,17 +157,28 @@ Avant d'accepter un draft, verifier :
 ## Pilier 4 — Promotion
 
 ### Candidats detectes (3)
-- LRN-032 (operational) -> draft .claude/rules/_draft/no-console-in-prod.md
-- LRN-099 + LRN-100 (cluster density) -> draft .claude/rules/_draft/agent-density-ceiling.md
+- LRN-032 (operational, mecanique) -> brouillon de check .claude/rules/_draft/check-no-console-in-prod.md
+- LRN-099 + LRN-100 (cluster density, jugement) -> draft .claude/rules/_draft/agent-density-ceiling.md
 - LRN-019 (operational mais deja partiellement encode dans ADR-009) -> skip
 
+### Findings
+- depot_sans_garde_fou : aucun workflow CI, aucun check-*.sh, aucun hook declare
+- no-op : la regle X (LRN-0NN) n'a change aucune session observee
+
 ### Status drafts
-- [ ] no-console-in-prod.md (en attente validation user)
+- [ ] check-no-console-in-prod.md (en attente validation user)
 - [ ] agent-density-ceiling.md (en attente validation user)
 
 ### Action user requise
 Revoir .claude/rules/_draft/, valider/rejeter, deplacer vers .claude/rules/
 ```
+
+#### Findings
+
+Deux constats vont au rapport, sous « Findings », en plus des candidats :
+
+- **Depot sans garde-fou** (`depot_sans_garde_fou`) — **mesure** : champ `findings` du JSON de `detect-promotions.sh`. Sans garde-fou mesurable, aucun check promu n'a de cible a laquelle s'ajouter : le rapport le dit.
+- **Instruction sans effet (no-op)** — **jugement de l'agent**, jamais calcule par le script : une regle ou une consigne dont aucune session ne montre l'effet (jamais citee, jamais respectee ni enfreinte, aucun comportement qui differe). Elle est **signalee au rapport**, jamais retiree sans validation humaine (ADR-031).
 
 ## Workflow recommande
 
