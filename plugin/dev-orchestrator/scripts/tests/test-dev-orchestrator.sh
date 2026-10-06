@@ -85,6 +85,10 @@
 #   T40 — POCK-03 (P414-D-09) : frontière de phase de head-governance.md (cinq branches dans l'ordre,
 #         « Moins cher la prochaine fois »), contrôle E7 et décompte des contrôles ; mutations.
 #   T42 — POCK-02 (P414-D-08) : glossaire du lab dans docs-flow.md §Famille savoir ; mutations.
+#   T41 — POCK-04 (P414-D-07) : contrat à deux axes de revue présent dans vf-reviewer.md ET dans
+#         mission-contracts.md, et dit au pilotage (§Pattern E) ; test statique, mutations.
+#   T43 — POCK-06 (P414-D-11) : forme du merge-danger call dans mission-contracts.md §Isolation de
+#         branche (côté contrat ; le gate E3 qui la lit a sa propre suite) ; mutations.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -7225,6 +7229,87 @@ for t42_a in "${T42_ANCRES[@]}"; do
   t42_k=$((t42_k+1))
   t414_ablate "$T42_DF" "$T414_TMP/t42-$t42_k.md" "$t42_a" "$T42_ZS" "$T42_ZE"
   t414_mutant "T42 mutant copie de docs-flow.md privée de « $t42_a » dans sa section" t42_check "$T42_DF" "$T414_TMP/t42-$t42_k.md"
+done
+
+# ---- T41 : contrat à deux axes de revue, dans l'agent ET dans le contrat (POCK-04, P414-D-07) ----
+# TEST STATIQUE de P414-D-07 : les champs du contrat (axes.standards, axes.spec, review_path,
+# conjonction, brief:plan-absent) existent dans la définition de vf-reviewer ET dans mission-contracts.md,
+# et la table de pilotage de mission-flow.md §Pattern E le dit. Il ne prouve PAS qu'un revieweur rend
+# deux axes : la preuve de comportement est la sonde réelle jouée par le manager (dossier de phase,
+# sonde-pock04/SONDE.md). Aucun item numéroté portant les trois libellés d'axes (T30-F) n'est écrit
+# dans references/ : les copies mutées vivent sous mktemp -d, hors du balayage de T30.
+T41_MC="$REFS_DIR/mission-contracts.md"
+T41_MC_ZS='^### Deux axes de revue : Standards et Spec [(]POCK-04[)]'
+T41_MC_ZE='^## '
+T41_MC_ANCRES=('axes.standards' 'axes.spec' 'conjonction' 'review_path' 'brief:plan-absent')
+T41_RV_ANCRES=('axes.standards' 'axes.spec' 'review_path')
+T41_MF="$REFS_DIR/mission-flow.md"
+T41_MF_ZS='^## Pattern E'
+T41_MF_ZE='^## Briques dormantes'
+
+t41_contracts() { # <mission-contracts.md>
+  local z out; z="$(t414_zone "$1" "$T41_MC_ZS" "$T41_MC_ZE")"
+  [ -n "$z" ] || { printf 'sous-section « Deux axes de revue » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T41_MC_ANCRES[@]}")" || { printf 'ancres absentes du contrat : %s' "$out"; return 1; }
+}
+t41_reviewer() { # <vf-reviewer.md>
+  local z out; z="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf 'vf-reviewer.md absent ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T41_RV_ANCRES[@]}")" || { printf 'champs absents de l'"'"'agent : %s' "$out"; return 1; }
+}
+t41_flow() { # <mission-flow.md>
+  local z out; z="$(t414_zone "$1" "$T41_MF_ZS" "$T41_MF_ZE")"
+  [ -n "$z" ] || { printf 'section « Pattern E » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'les deux axes sont')" || { printf 'pilotage absent de §Pattern E : %s' "$out"; return 1; }
+}
+
+t41_out="$(t41_contracts "$T41_MC")" && ok "T41 (a) mission-contracts.md : contrat à deux axes (${#T41_MC_ANCRES[@]} ancres, bornées à la sous-section)" \
+  || ko "T41 (a) mission-contracts.md : attendu — ${#T41_MC_ANCRES[@]} ancres du contrat à deux axes ; obtenu — $t41_out"
+t41_out="$(t41_reviewer "$REVIEWER_FILE")" && ok "T41 (b) vf-reviewer.md porte le même contrat (${#T41_RV_ANCRES[@]} champs)" \
+  || ko "T41 (b) vf-reviewer.md : attendu — ${#T41_RV_ANCRES[@]} champs du contrat ; obtenu — $t41_out"
+t41_out="$(t41_flow "$T41_MF")" && ok "T41 (c) mission-flow.md §Pattern E : « les deux axes sont » dans le pilotage" \
+  || ko "T41 (c) mission-flow.md §Pattern E : attendu — « les deux axes sont » ; obtenu — $t41_out"
+
+t41_k=0
+for t41_a in "${T41_MC_ANCRES[@]}"; do
+  t41_k=$((t41_k+1))
+  t414_ablate "$T41_MC" "$T414_TMP/t41-mc-$t41_k.md" "$t41_a" "$T41_MC_ZS" "$T41_MC_ZE"
+  t414_mutant "T41 mutant (a) copie de mission-contracts.md privée de « $t41_a » dans sa sous-section" t41_contracts "$T41_MC" "$T414_TMP/t41-mc-$t41_k.md"
+done
+t41_k=0
+for t41_a in "${T41_RV_ANCRES[@]}"; do
+  t41_k=$((t41_k+1))
+  t414_ablate "$REVIEWER_FILE" "$T414_TMP/t41-rv-$t41_k.md" "$t41_a"
+  t414_mutant "T41 mutant (b) copie de vf-reviewer.md privée de « $t41_a »" t41_reviewer "$REVIEWER_FILE" "$T414_TMP/t41-rv-$t41_k.md"
+done
+t414_ablate "$T41_MF" "$T414_TMP/t41-mf.md" 'les deux axes sont' "$T41_MF_ZS" "$T41_MF_ZE"
+t414_mutant "T41 mutant (c) copie de mission-flow.md privée de « les deux axes sont » dans §Pattern E" t41_flow "$T41_MF" "$T414_TMP/t41-mf.md"
+
+# ---- T43 : forme du merge-danger call, côté contrat (POCK-06, P414-D-11) ------------------------
+# Garde la PRÉSENCE de la forme exacte dans mission-contracts.md §Isolation de branche. Le gate qui la
+# LIT (E3 de check-mission-exit.sh) a sa propre suite avec mutants ; ce test garde que le contrat qui
+# la définit ne dérive pas sans que le gate le sache.
+T43_MC="$REFS_DIR/mission-contracts.md"
+T43_ZS='^## Isolation de branche'
+T43_ZE='^## Contrat'
+T43_ANCRES=('Merge-danger call (POCK-06)' '## Merge-danger call' 'Porte : sens unique' 'Porte : double sens' 'Rayon d' 'explosion')
+
+t43_check() { # <mission-contracts.md>
+  local z out; z="$(t414_zone "$1" "$T43_ZS" "$T43_ZE")"
+  [ -n "$z" ] || { printf 'section « Isolation de branche » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'Merge-danger call (POCK-06)' '## Merge-danger call' 'Porte : sens unique' 'Porte : double sens')" \
+    || { printf 'absent de §Isolation de branche : %s' "$out"; return 1; }
+  # Rayon d'explosion : « Rayon d » puis « explosion », l'apostrophe n'étant pas épinglée (droite ou typographique).
+  out="$(t414_order "$z" 'Rayon d' 'explosion')" || { printf 'ligne Rayon d'"'"'explosion : %s' "$out"; return 1; }
+}
+
+t43_out="$(t43_check "$T43_MC")" && ok "T43 mission-contracts.md §Isolation de branche : forme du merge-danger call (sens unique, double sens, Rayon d'explosion)" \
+  || ko "T43 mission-contracts.md : attendu — forme exacte du merge-danger call ; obtenu — $t43_out"
+t43_k=0
+for t43_a in "${T43_ANCRES[@]}"; do
+  t43_k=$((t43_k+1))
+  t414_ablate "$T43_MC" "$T414_TMP/t43-$t43_k.md" "$t43_a" "$T43_ZS" "$T43_ZE"
+  t414_mutant "T43 mutant copie de mission-contracts.md privée de « $t43_a » dans §Isolation de branche" t43_check "$T43_MC" "$T414_TMP/t43-$t43_k.md"
 done
 
 # ---------------------------------------------------------------------------
