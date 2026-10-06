@@ -4663,6 +4663,46 @@ lota_mutant("DEROG-FCHMOD", "# derog-fchmod", 'if hasattr(os, "fchmod"):  # dero
 lota_mutant("DEROG-UTF8", "# derog-utf8", "pass  # derog-utf8", "R-DEROG-10", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
 
 
+# --- fix-46-c (revue m1) : deroger-gate.sh n'écrit jamais dans un journal que le hook ne lirait plus ----------------------------------
+@lota("R-DEROG-11")
+def controle_derog_borne_journal(ctx, script):
+    """Le hook ne lit pas un journal des dérogations de plus de BORNE_LECTURE_FICHIER (1 048 576) octets : aucune dérogation n'y serait honorée. La commande
+    refuse donc d'y écrire (code 1, message qui nomme BORNE_LECTURE_FICHIER, journal inchangé) — journal déjà au-delà de la borne, ou écriture qui le
+    ferait dépasser ; jumeau : un journal sous la borne (de quoi accueillir la ligne) reçoit la dérogation."""
+    d = _dossier(ctx, script)
+    fautes = []
+    BORNE = 1048576
+
+    def journal_de_taille(taille):
+        lab = lab_frais(ctx)
+        journal = journal_derog(lab)
+        if os.path.exists(journal):
+            os.remove(journal)
+        ligne = b"2026-10-06T00:00:00+00:00  derogation  id=1  gate=G6  chemin=.planning/STATE.md  qui=w  canal=c  date=2026-10-06  raison=r\n"
+        contenu = (ligne * (taille // len(ligne) + 1))[:taille - 1] + b"\n"
+        with open(journal, "wb") as fh:
+            fh.write(contenu)
+        return lab, journal
+
+    for taille, motif in ((BORNE + 4096, "déjà au-delà"), (BORNE - 10, "ferait dépasser")):
+        lab, journal = journal_de_taille(taille)
+        avant = octets(journal)
+        rc, _o, err = deroger(ctx, lab, d, gate="G6", chemins=(".planning/STATE.md",))
+        texte = err.decode("utf-8", "replace") if isinstance(err, bytes) else str(err)
+        if rc != 1 or "BORNE_LECTURE_FICHIER" not in texte or motif not in texte or octets(journal) != avant:
+            fautes.append("journal de %d octets : code 1, message nommant BORNE_LECTURE_FICHIER (%s) et journal inchangé attendus — obtenu rc=%d %s" % (taille, motif, rc, court(err)))
+    lab, journal = journal_de_taille(BORNE - 4096)
+    rc, _o, err = deroger(ctx, lab, d, gate="G6", chemins=(".planning/STATE.md",))
+    if rc != 0 or os.path.getsize(journal) > BORNE:
+        fautes.append("jumeau (journal sous la borne) : dérogation inscrite, journal <= %d octets attendus — obtenu rc=%d taille=%d %s" % (BORNE, rc, os.path.getsize(journal), court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "journal au-delà de la borne : refus (1, BORNE_LECTURE_FICHIER, journal intact) ; écriture qui le ferait dépasser : refus ; jumeau sous la borne : inscrit")
+
+
+lota_mutant("DEROG-BORNE-JOURNAL", "# derog-borne-journal", "if False:  # derog-borne-journal", "R-DEROG-11", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
+lota_mutant("DEROG-BORNE-RESULTAT", "# derog-borne-resultat", "if False:  # derog-borne-resultat", "R-DEROG-11", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
+
+
 # --- LOT A, constat 2 (H2) : le parseur de définitions d'agent est linéaire, borné, et le cœur se borne lui-même ---------------------
 # Décisions du manager vf-dev-manager, 2026-10-01 (renversables). L'expression `^\s+-\s+(.+?)(\s+#.*)?$` était quadratique : 60 Ko
 # d'espaces dans une définition donnaient plus de 20 s, un fail-open ; le Python orphelin survivait au kill et le fichier de

@@ -59,6 +59,7 @@ except ImportError:
 
 SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
+BORNE_LECTURE_FICHIER = 1048576  # même borne que la lecture du journal par le hook (derog-borne-lecture) : au-delà, aucune dérogation n'y est lue
 GATES = ("G1", "G3", "G4", "G4P", "G5", "G6", "G7", "ROLE", "PLAFOND")
 OPTIONS = ("lab", "gate", "chemin", "qui", "canal", "date", "raison")
 PLACEHOLDERS = ("todo", "tbd", "fixme", "xxx", "n/a", "...")  # derog-placeholders
@@ -336,6 +337,9 @@ def inscrire(lab, valeurs, chemins):
             os.fchmod(descripteur, 0o644)
         if fcntl is not None:
             fcntl.flock(descripteur, fcntl.LOCK_EX)
+        taille = os.fstat(descripteur).st_size
+        if taille > BORNE_LECTURE_FICHIER:  # derog-borne-journal
+            raise Refus(1, "le journal des dérogations est déjà au-delà de %d octets (BORNE_LECTURE_FICHIER) : le hook ne le lirait plus, aucune écriture" % BORNE_LECTURE_FICHIER)
         existant = lire_tout(descripteur)
         identifiants = [int(i) for i in IDENTIFIANT_RE.findall(existant.decode("utf-8", "replace"))]
         suivant = (max(identifiants) if identifiants else 0) + 1
@@ -348,6 +352,8 @@ def inscrire(lab, valeurs, chemins):
                 _jeton_journal(valeurs["qui"], "-"), _jeton_journal(valeurs["canal"], "-"), valeurs["date"], raison_j))
         donnees = ("\n" if existant and not existant.endswith(b"\n") else "") + "".join(l + "\n" for l in lignes)
         octets = donnees.encode("utf-8")
+        if len(existant) + len(octets) > BORNE_LECTURE_FICHIER:  # derog-borne-resultat
+            raise Refus(1, "l'écriture ferait dépasser %d octets au journal des dérogations (BORNE_LECTURE_FICHIER) : le hook ne le lirait plus, aucune écriture" % BORNE_LECTURE_FICHIER)
         while octets:
             ecrit = os.write(descripteur, octets)
             octets = octets[ecrit:]
