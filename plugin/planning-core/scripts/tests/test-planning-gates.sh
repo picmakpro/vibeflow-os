@@ -5348,7 +5348,7 @@ lota_mutant("BUDGET-SIGNAL", "# role-signal", "for signal in []:  # role-signal"
 # contrôle la compare, mécaniquement, aux constantes du hook (table d'armement, noms protégés par G6, nom du journal de dérogation,
 # marqueurs de code, ordre de résolution des agents), à la commande enregistrée de hooks.json (outils refusés en mode dégradé, outil
 # laissé ouvert) et à la table CANARIS du canary (cas par gate) : tout écart rougit — une référence qui annoncerait un gate armé qui ne
-# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (bs) sont chacune sur sa propre ligne canonique
+# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (bu) sont chacune sur sa propre ligne canonique
 # `- **limite (X)**` avec ses mots-clés. Chaque mutant retire ou fausse UNE chose, sur une copie de la référence écrite sous le dossier
 # de travail (ou, pour MUT-REFERENCE-CODE, sur les constantes du hook, la référence restant intacte) ; le contrôle doit alors rendre un
 # écart. Les lignes d'écart du contrôle commencent par `ECART` ; la suite ne les imprime que si la VRAIE référence est en écart (un
@@ -5400,32 +5400,34 @@ LIMITES_REFERENCE = (
     ("ao", ("cwd", "new_cwd")),
     ("ap", ("SubagentHandback", "juges", "G4′ est ouvert")),
     ("aq", ("inconnu",)),
-    ("ar", ("CLOTURE.md", "SUMMARY.md", "Bash", "limite (g)")),
+    ("ar", ("CLOTURE.md", "SUMMARY.md", "Bash", "limite (g)", "N-5", "indéterminé")),
     ("as", ("G3", "PLAN.md", "illisible", "G1")),
     ("at", (".DS_Store", "Thumbs.db", "empreinte")),
     ("au", ("falsification",)),
     ("av", ("Bash", "P46-D-02b")),
     ("aw", ("fork", "A4", "A6")),
-    ("ax", ("#95440",)),
+    ("ax", ("#95440", "N-5")),
     ("ay", ("auteur", "intention")),
     ("az", ("watchPaths", "A2", "A3")),
     ("ba", ("référence", "fail-open")),
     ("bb", ("Phase 48", "Phase 50", "P46-D-13")),
     ("be", ("BORNE_LECTURE_PLAN", "1 Mio", "G3", "G4", "recalcul")),
-    ("bf", ("NFC", "NFD", "racine", "ext4", "APFS", "readdir", "D1", "G2")),
-    ("bg", ("BORNE_WATCHPATHS", "BORNE_OCTETS_RECONCILIATION", "plus récentes", "signal")),
+    ("bf", ("NFC", "NFD", "racine", "ext4", "APFS", "readdir", "D1", "G2", "G7", "fail-closed")),
+    ("bg", ("BORNE_WATCHPATHS", "BORNE_OCTETS_RECONCILIATION", "plus récentes", "signal", "N-4", "leurres")),
     ("bh", ("juges", "Bash", "prouvé", "D1")),
     ("bi", ("canary", "SessionStart", "CwdChanged", "vérificateur de juges")),
     ("bj", ("BORNE_LECTURE_FICHIER", "CADRAGE.md", "VERDICT.md", "config.json", "code 3", "dérogation", "lire_payload")),
     ("bk", ("A5", "reference", "contournement", "P46 lot B, b3, reportée à une phase ultérieure")),
     ("bl", ("A7", "intention", "config.json", "P46 lot B, b3, reportée à une phase ultérieure")),
-    ("bm", ("A10", "--juge=", "canary", "P46 lot B, b3, reportée à une phase ultérieure")),
-    ("bn", ("A6", "surveillance.log", "D1-f", "D1-c3", "empreinte")),
-    ("bo", ("A8", ".recalc-cache.json", "ecrit:", "PLAN.md")),
-    ("bp", ("SUMMARY.md", "VERDICT.md", "G4", "343")),
+    ("bm", ("A10", "--juge=", "canary", "P46 lot B, b3, reportée à une phase ultérieure", "N-7", "hors-index", "definition-illisible")),
+    ("bn", ("A6", "surveillance.log", "D1-f", "D1-c3", "empreinte", "N-3", "clone", "TRONCATURE")),
+    ("bo", ("A8", ".recalc-cache.json", "ecrit:", "PLAN.md", "N-6", "signature")),
+    ("bp", ("SUMMARY.md", "VERDICT.md", "G4", "343", "F-5", "périmé")),
     ("bq", ("2.1.288", "settings.json", "#63148")),
     ("br", ("#60490", "code 2", "P46-D-10")),
     ("bs", ("G4′", "A2", "A3", "A4", "P1", "préalables à tout armement")),
+    ("bt", ("N-2", "ecrit:", "PLAN.md", "G3")),
+    ("bu", ("F-2", "COUVERTURE-REJEU", "plancher", "G4′")),
 )
 PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 
