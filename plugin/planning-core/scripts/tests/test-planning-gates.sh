@@ -166,7 +166,7 @@ TOKEN = "{{VF_SCRIPTS}}"
 OUTILS_BANC = ("Write", "Edit", "NotebookEdit", "Bash", "Agent", "Task")
 # Table d'armement ATTENDUE de l'état livré : chaque armement d'une étape (45-05 à 45-09) met à
 # jour la constante du script ET cette table dans le MÊME commit (R-TABLE-01).
-TABLE_ATTENDUE = {"G6": "armed", "G5": "armed", "G1": "armed", "G7": "armed", "ROLE": "armed", "G3": "observe", "G4": "observe", "G4P": "observe"}
+TABLE_ATTENDUE = {"G6": "armed", "G5": "armed", "G1": "armed", "G7": "armed", "ROLE": "armed", "G3": "armed", "G4": "observe", "G4P": "observe"}
 ORDRE_ATTENDU = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",), ("G3", "G4"), ("G4P",))
 
 
@@ -751,11 +751,11 @@ def controle_table_02(ctx, script):
     refusees = {"G1 armé sans G6 ni G5": T(o, o, a, o, o), "G6 armé sans G5": T(a, o, o, o, o),
                 "G5 armé sans G6": T(o, a, o, o, o), "ROLE armé sans G7": T(a, a, a, o, a),
                 "G7 armé sans G1": T(a, a, o, a, o), "valeur inconnue": T("arme", "arme", o, o, o),
-                "G3 et G4 armés sans ROLE": T(a, a, a, a, o, a, a, o), "G3 armé, G4 en observe": T(a, a, a, a, a, a, o, o),
+                "G3 et G4 armés sans ROLE": T(a, a, a, a, o, a, a, o), "G3 armé sans ROLE": T(a, a, a, a, o, a, o, o),
                 "G4 armé, G3 en observe": T(a, a, a, a, a, o, a, o), "G4P armé sans G3 ni G4": T(a, a, a, a, a, o, o, a),
                 "G4P armé, G3 et G4 en observe": T(a, a, a, a, a, o, o, a), "G3 et G4 armés, G4P armé sans ROLE": T(a, a, a, a, o, a, a, a)}
     acceptees = {"tout à observe": T(o, o, o, o, o), "étape 1": T(a, a, o, o, o), "étapes 1-2": T(a, a, a, o, o),
-                 "étapes 1-3": T(a, a, a, a, o), "étapes 1-4": T(a, a, a, a, a), "étapes 1-5": T(a, a, a, a, a, a, a, o),
+                 "étapes 1-3": T(a, a, a, a, o), "étapes 1-4": T(a, a, a, a, a), "étapes 1-5a (G3 seul)": T(a, a, a, a, a, a, o, o), "étapes 1-5": T(a, a, a, a, a, a, a, o),
                  "étapes 1-6": T(a, a, a, a, a, a, a, a)}
     fautes = []
     for nom, t in refusees.items():
@@ -768,21 +768,23 @@ def controle_table_02(ctx, script):
 
 
 def controle_table_04(ctx, script):
-    """R-TABLE-04 (Phase 46, 46-05 ; P46-D-11) : G3 et G4 sont UN seul geste (l'étape 5) : une table qui les arme à des valeurs différentes est
-    refusée, comme G4P armé avant G3 et G4 ; G3 et G4 armés ensemble, G4P en observe, est acceptée. Trace : table refusée ou table acceptée."""
+    """R-TABLE-04 (Phase 46, 46-11 ; P46-D-11, étape 5 scindée : arbitrage Willy, AskUserQuestion session principale, 2026-10-06) : G3 s'arme seul
+    (5a) et la table « G3 armé, G4 en observe » est ACCEPTÉE ; G4 armé sans G3 est refusé, comme G4P armé sans G3 ET G4 (G3 seul ne suffit pas) ;
+    G3 et G4 armés, G4P en observe, reste acceptée. Trace : table refusée ou table acceptée."""
     ns = charger_module(script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh"))
     av = ns["armement_valide"]
     o, a = "observe", "armed"
     base = {"G6": a, "G5": a, "G1": a, "G7": a, "ROLE": a}
-    cas = (("G3 armé, G4 en observe", dict(base, G3=a, G4=o, G4P=o), False),
+    cas = (("G3 armé, G4 en observe (5a, l'état livré)", dict(base, G3=a, G4=o, G4P=o), True),
            ("G4 armé, G3 en observe", dict(base, G3=o, G4=a, G4P=o), False),
            ("G4P armé sans G3 ni G4", dict(base, G3=o, G4=o, G4P=a), False),
+           ("G4P armé, G3 armé, G4 en observe", dict(base, G3=a, G4=o, G4P=a), False),
            ("G3 et G4 armés, G4P en observe", dict(base, G3=a, G4=a, G4P=o), True))
     fautes = []
     for nom, table, attendue in cas:
         if av(table) != attendue:
             fautes.append("table %s : %s" % ("acceptée" if av(table) else "refusée", nom))
-    return (not fautes), ("; ".join(fautes) if fautes else "table refusée : G3 armé avec G4 en observe, G4 armé avec G3 en observe, G4P armé sans G3 ni G4 ; table acceptée : G3 et G4 armés ensemble")
+    return (not fautes), ("; ".join(fautes) if fautes else "table acceptée : G3 armé seul (étape 5a), G3 et G4 armés ; table refusée : G4 armé sans G3, G4P armé sans G3 ni G4, G4P armé avec G4 en observe")
 
 
 def controle_parseur(ctx, script):
@@ -1810,8 +1812,8 @@ def lancer_canary_dossier(ctx, dossier):
 
 
 def scripts_canary_g3(ctx, source, valeur, hook=None, armes=("G6", "G5")):
-    """`scripts_canary`, pour les cas de G3 armé : G3 et G4 sont UN seul geste (armement_valide), donc un G3 armé arme G4, et tant que G4 n'a pas
-    son cas dans CANARIS le canary signale « gate armé sans canary : G4 » avant de rejouer quoi que ce soit. Dans ce cas seulement (aucun cas G4 dans
+    """`scripts_canary`, pour les cas de G3 armé (depuis 46-11 G3 s'arme seul, étape 5a ; l'ancienne règle « G3 et G4 UN seul geste » est levée) :
+    si un G4 armé figurait dans la table sans son cas dans CANARIS le canary signalerait « gate armé sans canary : G4 » avant de rejouer quoi que ce soit. Dans ce cas seulement (aucun cas G4 dans
     le check-gates-alive.sh posé), la copie du canary ne regarde ni G4 ni G4′ (GATES réduit à G3) : le cas G3 est rejoué pour de bon. Dès que G4 a
     son cas, la copie est celle du canary livré, sans réduction."""
     d = scripts_canary(ctx, source, valeur, hook=hook, armes=armes)
@@ -1828,38 +1830,41 @@ def scripts_canary_g3(ctx, source, valeur, hook=None, armes=("G6", "G5")):
 
 
 def controle_cang_g3_01(ctx, script):
-    """R-CANG-G3-01 (46-05 ; P46-D-11) : état livré (G3 en observe), `--settings` vers un réglage jetable portant la commande de référence : le
+    """R-CANG-G3-01 (46-05 ; P46-D-11 ; 46-11 : la copie met tout en observe, l'état livré armant G3 depuis l'étape 5a), `--settings` vers un réglage jetable portant la commande de référence : le
     canary rend 3, stdout vide — le cas `G3-livrable-absent` trouve sa ligne `gate=G3` au journal d'observation du rejeu (jamais « silence
     sans ligne d'observation »)."""
-    d = scripts_canary(ctx, _dossier(ctx, script), "observe", tel_quel=True)
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe", armes=())
     texte = open(os.path.join(d, "check-gates-alive.sh"), encoding="utf-8").read()
     if texte.count('"G3-livrable-absent|G3|nominal|Write:.planning/cycles/01-c/phases/01-p/CLOTURE.md|fil-principal"') != 1:
         return False, "le cas G3-livrable-absent (Write d'un CLOTURE.md, fil principal) n'est pas dans CANARIS"
     rc, out, err = lancer_canary_dossier(ctx, d)
     if rc != 3 or out != b"":
         return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
-    return True, "état livré (G3 en observe) : code 3, stdout vide (G3-livrable-absent trouve sa ligne gate=G3 au journal d'observation du rejeu)"
+    return True, "copie en observe (ARMEMENT_* tous à observe) : code 3, stdout vide (G3-livrable-absent trouve sa ligne gate=G3 au journal d'observation du rejeu)"
 
 
 def controle_cang_g3_02(ctx, script):
-    """R-CANG-G3-02 : copie où G3 et G4 sont armés (et toutes les étapes avant) : le canary rend 3, le cas obtient un deny `[planning-core] G3 :`
-    (rejoué aussi directement sur la copie : la raison porte le préfixe du gate)."""
+    """R-CANG-G3-02 : deux copies — l'état LIVRÉ (46-11 : G3 armé seul, étape 5a, G4 en observation) et une copie où G3 et G4 sont armés (et toutes
+    les étapes avant) : sur chacune le canary rend 3, le cas obtient un deny `[planning-core] G3 :` (rejoué aussi directement sur la copie : la
+    raison porte le préfixe du gate)."""
     dossier = _dossier(ctx, script)
-    d = scripts_canary_g3(ctx, dossier, "armed", armes=("G6", "G5", "G1", "G7", "ROLE", "G3", "G4"))
-    rc, out, err = lancer_canary_dossier(ctx, d)
-    if rc != 3 or out != b"":
-        return False, "canary : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
-    lab = ctx.unique("cang-g3-lab")
-    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
-    ecrire(os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-p", "PLAN.md"), "---\necrit: livrables/absent.md\n---\n")
-    rc2, out2, err2 = ctx.lancer("A", payload("Write", entree_outil("Write", lab + "/.planning/cycles/01-c/phases/01-p/CLOTURE.md"), lab), cwd=lab,
-                                 dossier=os.path.join(d))
-    if classer(rc2, out2) != "deny":
-        return False, "rejeu direct : %s %s" % (classer(rc2, out2), court(out2))
-    raison = json.loads(out2.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
-    if not raison.startswith("[planning-core] G3 :"):
-        return False, "raison : " + raison
-    return True, "G3 et G4 armed : canary code 3 (le cas obtient un refus de gate) et le deny porte « [planning-core] G3 : »"
+    legs = (("état livré (G3 armé seul)", scripts_canary(ctx, dossier, "armed", tel_quel=True)),
+            ("G3 et G4 armed", scripts_canary_g3(ctx, dossier, "armed", armes=("G6", "G5", "G1", "G7", "ROLE", "G3", "G4"))))
+    for nom, d in legs:
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        if rc != 3 or out != b"":
+            return False, "%s, canary : rc=%d stdout=%s stderr=%s" % (nom, rc, court(out), court(err))
+        lab = ctx.unique("cang-g3-lab")
+        ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+        ecrire(os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-p", "PLAN.md"), "---\necrit: livrables/absent.md\n---\n")
+        rc2, out2, err2 = ctx.lancer("A", payload("Write", entree_outil("Write", lab + "/.planning/cycles/01-c/phases/01-p/CLOTURE.md"), lab), cwd=lab,
+                                     dossier=os.path.join(d))
+        if classer(rc2, out2) != "deny":
+            return False, "%s, rejeu direct : %s %s" % (nom, classer(rc2, out2), court(out2))
+        raison = json.loads(out2.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+        if not raison.startswith("[planning-core] G3 :"):
+            return False, "%s, raison : %s" % (nom, raison)
+    return True, "état livré (G3 armé seul) et G3 + G4 armed : canary code 3 (le cas obtient un refus de gate) et le deny porte « [planning-core] G3 : »"
 
 
 def controle_cang_g3_03(ctx, script):
@@ -3545,8 +3550,8 @@ def sec_cang(ctx):
             ("R-CANG-COUVERTURE", controle_cang_couverture, "canary de session, couverture minimale déclarée (P45-D-20)"),
             ("R-CANG-EVT-01", controle_cang_evt_01, "canary de session, la commande sous les cinq événements (Phase 46)"),
             ("R-CANG-EVT-02", controle_cang_evt_02, "canary de session, cas DEGRADE D09 et D10 (SubagentHandback en mode dégradé)"),
-            ("R-CANG-G3-01", controle_cang_g3_01, "canary de session, cas G3-livrable-absent, état livré (G3 en observe)"),
-            ("R-CANG-G3-02", controle_cang_g3_02, "canary de session, cas G3-livrable-absent, G3 et G4 armed"),
+            ("R-CANG-G3-01", controle_cang_g3_01, "canary de session, cas G3-livrable-absent, copie en observe"),
+            ("R-CANG-G3-02", controle_cang_g3_02, "canary de session, cas G3-livrable-absent, état livré (G3 armé seul) et G3 + G4 armed"),
             ("R-CANG-G3-03", controle_cang_g3_03, "canary de session, evaluer_g3 neutralisé"),
             ("R-CANG-D1", controle_cang_d1, "canary de session, cas D1-trace (FileChanged synthétique, trace exigée)")):
         bon, detail = ctrl(ctx, None)
@@ -3899,8 +3904,8 @@ def sec_mutants(ctx):
          "R-TABLE-02", controle_table_02),
         ("TABLE-ORDRE-REFUS", "gates = [gate for etape in ORDRE_ETAPES for gate in etape]  # armement-valide-debut", "return True",
          "R-TABLE-03", controle_table_03),
-        # 46-05 : G3 et G4 sont UN seul geste (P46-D-11) : la garde d'égalité neutralisée, une table à G3 armé et G4 en observe est acceptée
-        ("ARMEMENT-G3-G4", "# armement-g3-g4", "if False:  # armement-g3-g4", "R-TABLE-04", controle_table_04),
+        # 46-11 : étape 5 scindée (P46-D-11) : la garde « G4 armé exige G3 armé » neutralisée, une table à G4 armé sans G3 est acceptée
+        ("ARMEMENT-G3-G4", "return False  # armement-g3-g4", "pass  # armement-g3-g4", "R-TABLE-04", controle_table_04),
         # 46 (fix-46-a, A1) : la normalisation NFC des composants relatifs au lab retirée -> les jumeaux NFD du banc rendent une autre décision
         ("NFD-GATES", "# nfc-chemin", 'return [c for c in rel.split(os.sep) if c not in ("", ".")]  # nfc-chemin', "R-NFD-GATES", controle_nfd_gates),
         # 46 (fix-46-a tour 2, A1-readdir) : le nom lu par readdir sans NFC -> une unité au nom de DISQUE NFD n'est plus vue de G2 (jumeau disque NFD)
@@ -5377,6 +5382,7 @@ LIMITES_REFERENCE = (
     ("bm", ("A10", "--juge=", "canary", "P46 lot B, b3, reportée à une phase ultérieure")),
     ("bn", ("A6", "surveillance.log", "D1-f", "D1-c3", "empreinte")),
     ("bo", ("A8", ".recalc-cache.json", "ecrit:", "PLAN.md")),
+    ("bp", ("SUMMARY.md", "VERDICT.md", "G4", "343")),
 )
 PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 

@@ -135,7 +135,7 @@ ARMEMENT_G5 = "armed"  # etape-1
 ARMEMENT_G1 = "armed"  # etape-2
 ARMEMENT_G7 = "armed"  # etape-3
 ARMEMENT_ROLE = "armed"  # etape-4
-ARMEMENT_G3 = "observe"  # etape-5
+ARMEMENT_G3 = "armed"  # etape-5
 ARMEMENT_G4 = "observe"  # etape-5
 ARMEMENT_G4P = "observe"  # etape-6
 G2_MODE = "avertit"
@@ -549,23 +549,24 @@ def verifier_adhesion(planning):
 
 # --- Table d'armement : cohérence de l'ordre (P45-D-03) --------------------------------------
 def armement_valide(table):
-    """Vrai si chaque étape armée a toutes ses étapes antérieures armées et si G6 et G5 ont la
-    même valeur (l'étape 1 est UN seul geste), de même G3 et G4 (l'étape 5 est UN seul geste, Phase 46,
-    P46-D-11). L'ordre est celui de ORDRE_ETAPES."""
+    """Vrai si chaque étape qui commence à être armée a toutes ses étapes antérieures armées en entier,
+    et si G6 et G5 ont la même valeur (l'étape 1 est UN seul geste). L'étape 5 est scindée (Phase 46, P46-D-11,
+    arbitrage Willy, AskUserQuestion session principale, 2026-10-06) : G3 s'arme seul (5a), G4 ne s'arme qu'avec
+    G3 armé (5b), G4P exige G3 ET G4 armés. L'ordre est celui de ORDRE_ETAPES."""
     gates = [gate for etape in ORDRE_ETAPES for gate in etape]  # armement-valide-debut
     for gate in gates:
         if table.get(gate) not in ("observe", "armed"):
             return False
     if table.get("G6") != table.get("G5"):
         return False
-    if table.get("G3") != table.get("G4"):  # armement-g3-g4
-        return False
+    if table.get("G4") == "armed" and table.get("G3") != "armed":
+        return False  # armement-g3-g4
     precedente_armee = True
     for etape in ORDRE_ETAPES:
-        armee = all(table.get(gate) == "armed" for gate in etape)
-        if armee and not precedente_armee:
+        commencee = any(table.get(gate) == "armed" for gate in etape)
+        if commencee and not precedente_armee:
             return False
-        precedente_armee = armee
+        precedente_armee = all(table.get(gate) == "armed" for gate in etape)
     return True
 
 
