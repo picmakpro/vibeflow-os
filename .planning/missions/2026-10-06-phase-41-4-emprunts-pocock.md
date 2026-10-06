@@ -126,3 +126,25 @@ merge de #134 et de cette PR. Ensuite la clôture du jalon `fiabilite-v1.0`.
   - Les mineurs m4-02 à m4-07 sont dans `scratchpad/revue-t4/`.
 - **Décompte final** : 4 tours de correction sur 4, 5 revues complètes, 3 tours de sonde. La PR reste en brouillon,
   conformément au mandat : sortie seulement si les deux axes passent.
+
+## État final (après le correctif M4-01)
+
+- **M4-01 corrigé** (feu vert : arbitrage Samuel, AskUserQuestion session principale, 2026-10-06, correctif seul),
+  commit `b7ca6f72`. Il touche 2 fichiers : le CHANGELOG de dev-orchestrator et le ROADMAP `fiabilite`. Ce sont
+  uniquement les deux phrases « sonde reste à jouer », remplacées par « jouée dans les deux sens et consignée dans
+  `41.4-SONDE-POCK04.md` ». Aucun autre contenu n'a changé.
+- **Témoins** :
+  - job CI `gates` rejoué en clone de `b7ca6f72` : 18 étapes sur 18 à rc=0 ;
+  - test-dev-orchestrator 279/0 ;
+  - check-state-integrity conforme.
+- **Revue** : le seul majeur du tour 4 (M4-01) est fermé. L'axe Standards était déjà `passed` au tour 4.
+- **PR #135 sortie du brouillon.** Le merge et la release restent des gestes humains. Elle reste BLOCKED jusqu'à
+  la revue de `@picmakpro` (`ci.yml`).
+- **#134 fermée sans merge** : elle est absorbée par #135, qui porte ses deux commits réécrits à l'identique.
+- **Reste ouvert** :
+  - les mineurs de la revue t4, m4-02 à m4-07 (rapport `scratchpad/revue-t4/`) ;
+  - les mutants de gardes mineures A6/S8, A9, A13 et E7 ;
+  - le manifeste `check-agents-manifest.json`, qui périme le 2026-10-23 : la CI rougira après cette date ;
+  - les budgets de méthode dépassés : BACKLOG à 38 sujets ouverts pour un budget de 20, ROADMAP `fiabilite` à
+    152 Ko pour 64 Ko, STATE `gouvernance` à 21 Ko pour 8 Ko, 6 worktrees pour un budget de 3 ;
+  - deux branches distantes intégrées dont la suppression reste un geste humain.
