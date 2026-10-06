@@ -1249,9 +1249,11 @@ constats. Le prédicat est réévalué à **chaque** écriture : retoucher le `S
 verdict tient. Un `PLAN.md` absent, illisible, de plus de 1 Mio (`BORNE_LECTURE_PLAN`, A11), sans `ecrit:` valide ou dont `ecrit:`
 contient l'unité rend l'unité indéterminée au modèle : refus. Un `SUMMARY.md` de toute autre forme n'est jamais jugé. Le verdict porte le chemin relatif du `SUMMARY.md` écrit
 (dérogation nominative : `deroger-gate.sh --gate=G4`, usage unique). Messages, relatifs au lab : `aucun VERDICT.md : faites juger
-l'unité (poser-verdict.sh)` ; `VERDICT.md invalide (règle R6)` ; `constat en échec : <critère> — corrigez puis re-jugez
-(tentative n+1)` ; `verdict périmé : re-juger (tentative n+1)` (n lu dans `tentative` du verdict, sans numéro si elle est
-illisible) ; `livrables hors borne : <libellé>` ; `PLAN.md de l'unité au-delà de 1048576 octets (BORNE_LECTURE_PLAN) : non lu — le
+l'unité (poser-verdict.sh)` ; `VERDICT.md invalide (règle R6)` ; `constat en échec : <critère> — corrigez puis re-jugez<fin>`
+; `verdict périmé : re-juger<fin>` où `<fin>` vaut ` (tentative n+1 sur 3, k restante(s) après elle)` tant que n+1 ne dépasse pas
+le plafond de 3 (`PLAFOND_TENTATIVES`, même valeur que `poser-verdict.sh`), ` (plafond de 3 tentatives atteint : dérogation PLAFOND
+requise, deroger-gate.sh --gate=PLAFOND)` au-delà (F6 : « tentative 4 » promettait une pose que la commande refuse), et vide si
+`tentative` est illisible dans le verdict (n lu dans `tentative` du verdict) ; `livrables hors borne : <libellé>` ; `PLAN.md de l'unité au-delà de 1048576 octets (BORNE_LECTURE_PLAN) : non lu — le
 verdict ne peut pas être vérifié` ; `VERDICT.md de l'unité au-delà de 1048576 octets (BORNE_LECTURE_FICHIER) : non lu — le verdict ne peut pas être
 vérifié, faites re-juger l'unité (poser-verdict.sh)` (un `VERDICT.md` de plus de 1 Mio refuse aussi : A11-classe, limite (bj)). Entonnoir existant : en `observe` il journalise, armé il refuse (deny), une erreur
 interne refuse quand il est armé.
