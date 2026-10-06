@@ -246,7 +246,7 @@
         "plugin/**",
         "scripts/**"
       ],
-      "status": "running"
+      "status": "failed"
     },
     {
       "id": "nonreg-t4",
@@ -256,7 +256,7 @@
         "corr-d"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     }
   ]
 }

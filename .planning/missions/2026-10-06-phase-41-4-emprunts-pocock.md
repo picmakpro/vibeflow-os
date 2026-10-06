@@ -102,3 +102,27 @@ donné plus bas, séparément.
 
 Un tour de correction ciblée des 4 majeurs et des mineurs auto-fix du rapport t3, sur feu vert de Samuel, puis le
 merge de #134 et de cette PR. Ensuite la clôture du jalon `fiabilite-v1.0`.
+
+## Tour 4 (P414-D-23 — arbitrage Samuel, AskUserQuestion session principale, 2026-10-06)
+
+- **Rebase** sur `origin/main` (`ee625735`, PR #131) : 61 commits rejoués. Deux conflits ont été résolus en
+  conservant les deux inscriptions : la ligne « Depends on » du ROADMAP `fiabilite`, et le paragraphe 41.2 de
+  STATE, préfixé « Antérieur ». L'équivalence est prouvée par `cmp` et `comm`. Le tour 4 est commité au HEAD
+  `f5fcfcad`, poussé avec lease.
+- **Correction D** : M3-01 à M3-04 fermés.
+  - E3 rend le même verdict sous BWK, mawk 1.3.4 et 20240123, busybox et gawk (mesuré par la revue).
+  - T38d rougit désormais.
+  - CHANGELOG mis à jour sur D-20 et D-22.
+  - Gardes E15 et E18 épinglées.
+  - Mineurs T3-03 à T3-07 et `od -v` traités.
+- **Témoins** :
+  - job `gates` rejoué : 18 étapes sur 18 à rc=0 ;
+  - suites de la phase : check-skills 126/0, check-ajout-retrait 83/0, check-mission-exit 135/0, consolidator 90/0,
+    dev-orchestrator rc=0, check-gate-touche 34/0, quick-validate 5/0, scaffold-docs 26/0.
+- **Revue tour 4** : Standards `passed` (6 mineurs), Spec `gaps_found` à cause d'un majeur.
+  - **M4-01** : `plugin/dev-orchestrator/CHANGELOG.md:23-24` et `ROADMAP.md:1642` (fiabilite) disent encore que la
+    sonde POCK-04 « reste à jouer », alors qu'elle a été jouée (`41.4-SONDE-POCK04.md`).
+  - Le correctif tient en trois lignes de texte.
+  - Les mineurs m4-02 à m4-07 sont dans `scratchpad/revue-t4/`.
+- **Décompte final** : 4 tours de correction sur 4, 5 revues complètes, 3 tours de sonde. La PR reste en brouillon,
+  conformément au mandat : sortie seulement si les deux axes passent.

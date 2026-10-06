@@ -35,17 +35,14 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: **41.4** (Emprunts Pocock) — exécutée, 11 plans + corrections ciblées A, B, C (2026-10-06), POCK-01..08
-cochées, sonde réelle POCK-04 jouée dans les deux sens ; PR en brouillon empilée sur #134 (revue `@picmakpro`
-requise : `ci.yml`). Revue tour 3 : 4 majeurs auto-fix ouverts (budget épuisé, arrêt sur consigne de Samuel).
-Phase 41.2 : voir l'archive et sa mission. `current_phase` reste 41.
-Next: tour de correction des 4 majeurs de la 41.4 (sur feu vert), merge de #134 puis de la PR 41.4, clôture du
+cochées, sonde réelle POCK-04 jouée dans les deux sens ; tour 4 (P414-D-23) fait : rebasée sur `origin/main`,
+4 majeurs du tour 3 fermés. PR #135 en brouillon (revue `@picmakpro` requise : `ci.yml`) ; revue tour 4 : Standards
+`passed`, Spec `gaps_found` sur 1 majeur de texte (M4-01 : CHANGELOG dev-orchestrator et ROADMAP disent encore la
+sonde « à jouer »), budget de 4 tours épuisé. `current_phase` reste 41.
+Antérieur (état de main, 2026-10-02) — phase **41.2** : exécutée, plans 01-06 + corrections ciblées 01-02, PR ouverte
+en revue ; vérification human_needed (E1 + parcours réel). Les plans 41-07 à 41-13 sont confiés à Willy, hors clôture.
+Next: correction de M4-01 (texte, sur feu vert), sortie du brouillon de #135, merge (#135 absorbe #134), clôture du
 jalon `fiabilite-v1.0`.
-Antérieur (état de main, 2026-10-02) — phase **41.2** (Choisir la partition du planning au démarrage d'un lab) — exécutée, plans 01-06 + corrections
-ciblées 01-02 (2026-10-02), PR ouverte en revue (revue `@picmakpro` requise : `ci.yml` et baseline du budget) ;
-`current_phase` reste 41. Phase 41.3 mergée (PR #123). Vérification de phase : human_needed (E1 + parcours réel).
-Next: arbitrage E1 (sujet actif par défaut après partition), merge de la 41.2, puis clôture du jalon `fiabilite-v1.0`
-(les plans 41-07 à 41-13 sont confiés à Willy, hors clôture).
-Last activity: 2026-10-02 — mission `.planning/missions/2026-10-01-phase-41-2-partition-au-demarrage.md`.
 Last activity: 2026-10-06 — mission `.planning/missions/2026-10-06-phase-41-4-emprunts-pocock.md`.
 
 ## Accumulated Context
