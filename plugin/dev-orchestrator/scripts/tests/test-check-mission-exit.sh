@@ -527,6 +527,35 @@ e3_case 50a "E3 deux lignes Porte — le message nomme la ligne Porte" "$GH_TWOP
 e3_case 51a "E3 Porte hors section — le message nomme la ligne Porte" "$GH_PORTELATE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
 e3_case 52a "E3 Porte avec texte parasite — le message nomme la ligne Porte" "$GH_PORTEPARASITE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
 
+# === Cas 66a-66d, 73-75 — E3, tour 4 (2026-10-06, M3-01, M3-04) : même verdict sous BWK awk et mawk, gardes Rayon et Porte ===
+# 66a-66c — fence indentée de 1, 2, 3 espaces, fermée par 2 espaces, section « leurre » dedans et vraie section après :
+# SAIN. Sous mawk 1.3.4 l'ancien retrait « sub(/^ ? ? ?/) » n'ôtait qu'un espace et le bloc ne se fermait jamais ; strip3 est
+# une boucle explicite, sans quantificateur répété ni intervalle.
+SEC='## Merge-danger call\nPorte : sens unique\n'"$RD"'\n'
+GH_FENCEIND1_BIN="$(mk_gh_pr fenceind1 '{"state":"OPEN","body":" ```\n'"$SEC"' ```\n\n'"$SEC"'"}')"
+GH_FENCEIND2_BIN="$(mk_gh_pr fenceind2 '{"state":"OPEN","body":"  ```\n'"$SEC"'  ```\n\n'"$SEC"'"}')"
+GH_FENCEIND3_BIN="$(mk_gh_pr fenceind3 '{"state":"OPEN","body":"   ```\n'"$SEC"'  ```\n\n'"$SEC"'"}')"
+GH_FENCEBULLET_BIN="$(mk_gh_pr fencebullet '{"state":"OPEN","body":"- étape\n  ```bash\n  echo\n  ```\n\n'"$SEC"'"}')"
+e3_sain 66a "E3 fence indentée de 1 espace fermée, section après — SAIN (même verdict sous BWK awk et mawk)" "$GH_FENCEIND1_BIN"
+e3_sain 66b "E3 fence indentée de 2 espaces fermée, section après — SAIN" "$GH_FENCEIND2_BIN"
+e3_sain 66c "E3 fence ouverte à 3 espaces, fermée à 2, section après — SAIN" "$GH_FENCEIND3_BIN"
+e3_sain 66d "E3 bloc de code imbriqué dans une puce (2 espaces), section visible après — SAIN" "$GH_FENCEBULLET_BIN"
+# 73 — la ligne « Rayon d'explosion : » ne compte que DANS la section : avant le titre, ou sous un autre titre « ## », elle est ignorée.
+GH_RAYONAVANT_BIN="$(mk_gh_pr rayonavant '{"state":"OPEN","body":"'"$RD"'\n\n## Merge-danger call\nPorte : sens unique\n"}')"
+GH_RAYONAPRES_BIN="$(mk_gh_pr rayonapres '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\n\n## Suite\n'"$RD"'\n"}')"
+e3_case 73 "E3 « Rayon d'explosion : » AVANT le titre — hors section, MANQUE" "$GH_RAYONAVANT_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_case 73a "E3 « Rayon d'explosion : » sous un autre titre « ## » — hors section, MANQUE" "$GH_RAYONAPRES_BIN" 0 "rayon d'explosion de moins de 10" ""
+# 74 — une « Porte : » invalide ET une valide dans la section : MANQUE (la valide ne rachète pas l'autre).
+GH_PORTEMIX_BIN="$(mk_gh_pr portemix '{"state":"OPEN","body":"## Merge-danger call\nPorte : peut-être\nPorte : sens unique\n'"$RD"'\n"}')"
+e3_case 74 "E3 « Porte : peut-être » puis « Porte : sens unique » — deux lignes, MANQUE nommé" "$GH_PORTEMIX_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+# 75 — portabilité PAR CONSTRUCTION : le programme awk de l'analyseur ne contient ni « ? » répété ni intervalle {n,m}
+# (sémantique différente entre BWK awk et mawk 1.3.4). Pas de mawk sur ce poste : la preuve est la forme du code.
+awk_portable() { ! sed -n '/^e3_merge_danger() {/,/^}/p' "$1" | grep -qE ' \? \?|\{[0-9]+,[0-9]*\}'; }
+if awk_portable "$SCRIPT"; then ok "75 E3 analyseur : aucun quantificateur « ? » répété ni intervalle {n,m} dans le programme awk"; else ko "75 E3 portabilité awk" "forme non portable dans e3_merge_danger"; fi
+fport="$TMP/mut-e3port.sh"
+awk '{ if (index($0, "(m = strip3(l)) ~ /^(```|~~~)/ {") > 0) { sub(/\(m = strip3\(l\)\) ~ \/\^\(/, "l ~ /^ ? ? ?(", $0) } print }' "$SCRIPT" > "$fport"
+if ! cmp -s "$fport" "$SCRIPT" && ! awk_portable "$fport"; then ok "75a E3 mutant « regex à ? répétés » TUE : le contrôle de forme rougit (portable à l'original, non portable au mutant)"; else ko "75a mutant de portabilité NON TUE" "mutant identique ou encore portable"; fi
+
 # === Cas 28-36 — E7 : rien de rangeable n'est laissé (SOBR-07, plan 41.3-04) ==============================
 CONDUCTOR_REAL="$(cd "$(dirname "$SCRIPT")/../../conductor" && pwd)"
 mk_inst() { # <script à installer> <real|none|stub:<corps>> -> imprime le chemin de la copie (lab « installé » jetable)
@@ -741,20 +770,29 @@ e7_mutant "E3g (blancs comptés comme caractères)" "    | LC_ALL=C tr -d '[:spa
 e7_mutant "E3u (longueur en octets, pas en caractères)" "    | awk 'NF && (\$1 < 128 || \$1 >= 192) { n++ } END { print n + 0 }'" "    | awk 'NF { n++ } END { print n + 0 }'" sc_e3u 0 3
 e7_mutant "E3n (espace insécable comptée comme caractère)" '    | LC_ALL=C sed -e "$E3_BLANCS_SED" \' '    | cat \' sc_e3n 0 3
 L_COM='    { while ((i = index(mask(l), "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }'
-L_OPEN='    l ~ /^ ? ? ?(```|~~~)/ { m = l; sub(/^ ? ? ?/, "", m); fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }'
-e7_mutant "E3f (bloc de code lu comme du texte rendu : l'ouverture saute la ligne sans entrer dans la zone)" "$L_OPEN" '    l ~ /^ ? ? ?(```|~~~)/ { next }' sc_e3f 0 3
+L_OPEN='    (m = strip3(l)) ~ /^(```|~~~)/ { fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }'
+e7_mutant "E3f (bloc de code lu comme du texte rendu : l'ouverture saute la ligne sans entrer dans la zone)" "$L_OPEN" '    (m = strip3(l)) ~ /^(```|~~~)/ { next }' sc_e3f 0 3
 e7_mutant "E3k (commentaire HTML lu comme du texte rendu)" "$L_COM" '    { l = l }' sc_e3k 0 3
 e7_mutant "E3m (échec de l'analyseur lu comme un manque de la PR)" '            *) E3_STATUS="indet"; E3_MSG="[E3] analyse du merge-danger call impossible (outil d'"'"'analyse en échec) — invérifiable" ;;' '            *) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : ligne Porte absente" ;;' sc_e3m 4 0
-L_CLOSE='    infence { m = l; sub(/^ ? ? ?/, "", m); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }'
-e7_mutant "E3p (une fence se ferme par n'importe quel caractère de fence : ~~~ ferme un bloc d'accents graves)" "$L_CLOSE" '    infence { m = l; sub(/^ ? ? ?/, "", m); n = 0; while (substr(m, n + 1, 1) ~ /[`~]/) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }' sc_e3fm 0 3
-e7_mutant "E3q (longueur de fermeture ignorée : une fence de 3 ferme un bloc de 4)" "$L_CLOSE" '    infence { m = l; sub(/^ ? ? ?/, "", m); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= 1 && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }' sc_e3fl 0 3
-e7_mutant "E3r (fence ~~~ non reconnue à l'ouverture)" "$L_OPEN" '    l ~ /^ ? ? ?(```)/ { m = l; sub(/^ ? ? ?/, "", m); fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }' sc_e3ft 0 3
-e7_mutant "E3s2 (fence indentée de 1 à 3 espaces non reconnue)" "$L_OPEN" '    l ~ /^(```|~~~)/ { m = l; sub(/^ ? ? ?/, "", m); fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }' sc_e3fi 0 3
+L_CLOSE='    infence { m = strip3(l); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }'
+e7_mutant "E3p (une fence se ferme par n'importe quel caractère de fence : ~~~ ferme un bloc d'accents graves)" "$L_CLOSE" '    infence { m = strip3(l); n = 0; while (substr(m, n + 1, 1) ~ /[`~]/) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }' sc_e3fm 0 3
+e7_mutant "E3q (longueur de fermeture ignorée : une fence de 3 ferme un bloc de 4)" "$L_CLOSE" '    infence { m = strip3(l); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= 1 && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }' sc_e3fl 0 3
+e7_mutant "E3r (fence ~~~ non reconnue à l'ouverture)" "$L_OPEN" '    (m = strip3(l)) ~ /^(```)/ { fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }' sc_e3ft 0 3
+e7_mutant "E3s2 (fence indentée de 1 à 3 espaces non reconnue)" "$L_OPEN" '    l ~ /^(```|~~~)/ { m = l; fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }' sc_e3fi 0 3
 e7_mutant "E3w (« <!-- » en code inline masque la suite)" "$L_COM" '    { while ((i = index(l, "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }' sc_e3cc 3 0
 e7_mutant "E3o (reste de ligne perdu après un commentaire HTML d'une ligne)" "$L_COM" '    { while ((i = index(mask(l), "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) } }' sc_e3c1 3 0
 e7_mutant "E3s (seuil du rayon à 9 caractères au lieu de 10)" '                if [ "$(e3_charcount "$E3_V")" -ge 10 ]; then E3_STATUS="sain"; E3_MSG=""; fi' '                if [ "$(e3_charcount "$E3_V")" -ge 9 ]; then E3_STATUS="sain"; E3_MSG=""; fi' sc_e3r9 0 3
 e7_mutant "E3v (od sans -v : les lignes répétées deviennent un « * » compté)" "    | od -v -An -tu1 | tr -s ' \\n' '\\n' \\" "    | od -An -tu1 | tr -s ' \\n' '\\n' \\" sc_e3em 3 0
 e3_msg_mutant "E3z (ligne Porte invalide rendue « section absente » : code 11 au lieu de 12)" '      if (ptot != 1 || pval != 1) exit 12' '      if (ptot != 1 || pval != 1) exit 11' "$GH_BADPORTE_BIN" "$PORTE_MSG"
+
+# Tour 4 (M3-01, M3-04) : un mutant par garde neuve, joué sur le corps qui la discrimine.
+sc_e3i2() { sc_e3 "$1" "$2" "$GH_FENCEIND2_BIN"; }
+sc_e3ra() { sc_e3 "$1" "$2" "$GH_RAYONAVANT_BIN"; }
+sc_e3pm() { sc_e3 "$1" "$2" "$GH_PORTEMIX_BIN"; }
+e7_mutant "E3x (strip3 ne retire qu'UN espace — comportement de mawk 1.3.4 face à l'ancien sub : la fence indentée de 2 espaces n'est plus reconnue)" '      while (k < 3 && substr(s, k + 1, 1) == " ") k++' '      while (k < 1 && substr(s, k + 1, 1) == " ") k++' sc_e3i2 3 0
+e7_mutant "E3x2 (strip3 ne retire plus rien : aucune fence indentée reconnue)" '      while (k < 3 && substr(s, k + 1, 1) == " ") k++' '      while (k < 0 && substr(s, k + 1, 1) == " ") k++' sc_e3i2 3 0
+e7_mutant "E18 (ligne Rayon comptée hors section : « insec && » retiré)" '    insec && l ~ /^Rayon d(\047|’)explosion ?:/ { v = l; sub(/^[^:]*:/, "", v); print v }' '    l ~ /^Rayon d(\047|’)explosion ?:/ { v = l; sub(/^[^:]*:/, "", v); print v }' sc_e3ra 0 3
+e7_mutant "E15 (« Porte » invalide + valide : ptot ignoré, la valide suffit)" '      if (ptot != 1 || pval != 1) exit 12' '      if (pval != 1) exit 12' sc_e3pm 0 3
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
