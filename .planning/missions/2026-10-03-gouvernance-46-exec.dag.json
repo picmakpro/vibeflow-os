@@ -224,7 +224,7 @@
         "fix-46-a"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "ckpt-46-12",
@@ -234,7 +234,7 @@
         "exec-46-11"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-46-12",
@@ -244,7 +244,7 @@
         "ckpt-46-12"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "verif-46",
@@ -413,7 +413,23 @@
       "stage": "checkpoint",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
+    },
+    {
+      "id": "arb-46-g4",
+      "step": "arbitrage Willy : 343 faux refus G4 (unités historiques sans VERDICT de jarvis-keystone) + 6 G7 — (a) attendus et armement, (b) rien armé, (c) G3 seul",
+      "stage": "checkpoint",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "constat-g7",
+      "step": "constat lecture seule des 6 faux refus de G7 (aucun correctif sans Willy)",
+      "stage": "audit",
+      "deps": [],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
