@@ -93,7 +93,7 @@ chemin du PLAN de l'étape : c'est l'entrée de l'axe Spec (§Étage revue, « D
   commit, périmètre de fichiers du nœud) ET pointe la spec du crafter (chemin sur disque) comme
   **source du cadrage** — l'entrée de `vf-coder` devient cette spec, pas la ROADMAP (sa chaîne
   `gsd-discuss-phase` s'y ancre). Le digest d'un nœud `revue:écran-X` ne porte aucun PLAN d'étape :
-  l'axe Spec y est `skipped`, motif « mission design, pas de PLAN d'étape » (§Étage revue, P414-D-22).
+  statut de l'axe Spec et motif au §Étage revue (P414-D-22).
 
 Le worker lit le digest D'ABORD, et ne relit du disque que ce que son mandat exige
 (index-first). Un digest contredit par le disque → le disque gagne, et le worker le signale.
@@ -149,6 +149,8 @@ remplace pas.
 - Ligne `Rayon d'explosion : …` — qui et quoi casse si c'est faux, au moins 10 caractères non blancs
   (asymétrie assumée avec `Porte` : une répétition n'est pas refusée, il suffit qu'une ligne du
   rayon atteigne les 10 caractères).
+- La section doit être **rendue** : un bloc de code (``` ou ~~~, indenté de 0 à 3 espaces) et un
+  commentaire HTML (`<!-- -->`) sont ignorés par E3 — une section écrite dans un exemple fencé rend MANQUE.
 - E3 rend MANQUE (nommé) si la section manque ou est incomplète, INDÉTERMINÉ si le corps est
   illisible. Les replis du tableau ci-dessous (pas de remote, `gh` absent) laissent E3 indéterminé.
   Forme vérifiée, jamais la véracité de la déclaration : c'est un appel pour le relecteur humain.
@@ -381,10 +383,13 @@ Règle de **conjonction** : un axe `skipped` n'y entre pas ; le statut global se
 **jugés**, au moins un. Il vaut `passed` si et seulement si tous les axes jugés sont `passed`, sinon
 le premier présent dans l'ordre fixe `human_needed`, `blocked`, `gaps_found` — dérivation mécanique
 pour la table de pilotage (Pattern C), jamais un reclassement de findings. Aucun axe jugé (les deux
-`skipped`, ou un axe jugé non produit) → jamais `passed` : `blocked`. Les `findings` à la racine sont la
+`skipped`) → jamais `passed` : `blocked`. Un axe **attendu** (non `skipped`) dont le rapport n'a pas été
+produit (échec de dispatch, bloc typé absent) n'est ni `passed` ni `skipped` : il compte `blocked`,
+jamais exclu de la conjonction. Les `findings` à la racine sont la
 concaténation des findings Standards puis Spec, chacun tagué `"axe": "standards"` ou `"axe": "spec"`,
 jamais retriés par sévérité entre axes ; le mandat de correction ciblée les transmet groupés par axe.
-Un PLAN d'étape attendu mais absent du brief (nœud `revue-N`/`join-N`) n'est PAS un `skipped` : c'est
+Un PLAN d'étape attendu mais absent du brief (nœud `revue-N`/`join-N`, ou revue d'un diff donné sans
+nœud nommé ni motif `skipped` déclaré par le brief) n'est PAS un `skipped` : c'est
 un défaut de mandat, `axes.spec.statut` vaut `blocked` avec le finding
 `{ "severity": "bloquant", "action": "ask-user", "ref": "brief:plan-absent", "axe": "spec" }`.
 

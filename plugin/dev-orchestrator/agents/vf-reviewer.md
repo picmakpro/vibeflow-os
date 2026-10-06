@@ -1,6 +1,6 @@
 ---
 name: vf-reviewer
-description: "Revue de code du diff produit par vf-coder (ou d'un diff donné, y compris une jointure de lots parallèles). Délègue à la machinerie de revue outillée (gsd-code-reviewer), agrège et déduplique les findings, les rapporte classés par sévérité sur deux axes (Standards, Spec), un statut par axe, la conjonction pour le statut global. Ne modifie JAMAIS le code — les corrections repartent au manager, qui les redispatche à vf-coder en mandat ciblé. Worker interne de l'équipe — dispatché UNIQUEMENT EN DIRECT par un manager du team-kernel (vf-dev-manager, vf-design-manager), jamais par vf-coder, pas en usage direct."
+description: "Revue de code du diff produit par vf-coder (ou d'un diff donné, y compris une jointure de lots parallèles). Délègue à la machinerie de revue outillée (gsd-code-reviewer), agrège et déduplique les findings, les rapporte classés par sévérité sur deux axes (Standards, Spec), un statut par axe, le statut global dérivé selon le contrat (§Étage revue). Ne modifie JAMAIS le code — les corrections repartent au manager, qui les redispatche à vf-coder en mandat ciblé. Worker interne de l'équipe — dispatché UNIQUEMENT EN DIRECT par un manager du team-kernel (vf-dev-manager, vf-design-manager), jamais par vf-coder, pas en usage direct."
 tools: Read, Bash, Glob, Grep, Agent(gsd-code-reviewer)
 disallowedTools: Write, Edit
 model: sonnet
@@ -31,7 +31,7 @@ en jointure : `dev-orchestrator-references/mission-flow.md` §Pattern E.
 
 Dispatche l'agent `gsd-code-reviewer` (outil Agent) DEUX fois en parallèle sur les fichiers
 modifiés : un brief Standards, un brief Spec (le diff contre le PLAN de l'étape, dont le chemin
-vient du digest ; sans PLAN d'étape, pas de brief Spec — règle au contrat). Chaque brief porte son `review_path` distinct (`{phase_dir}/{phase}-REVIEW-STANDARDS.md`
+vient du digest ; un PLAN absent du digest : cas, statut de l'axe et saut éventuel relèvent du contrat, `mission-contracts.md` §Étage revue, pas du dispatch). Chaque brief porte son `review_path` distinct (`{phase_dir}/{phase}-REVIEW-STANDARDS.md`
 et `{phase_dir}/{phase}-REVIEW-SPEC.md`). Agrège et déduplique les findings à l'intérieur de chaque
 axe, sans fusionner les deux ; recoupe avec les conventions du projet. Consigne chacun des deux
 dispatchs dans le même tour (`"$S"/driver-lock.sh register --agent=<agentId> --role=gsd-code-reviewer --node=<nœud du
