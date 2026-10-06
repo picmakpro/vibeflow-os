@@ -1,0 +1,30 @@
+--- a/saluer.sh
++++ b/saluer.sh
+@@ -1,4 +1,26 @@
+ #!/usr/bin/env bash
+ set -eu
+ 
+-echo "Bonjour, monde!"
++# saluer.sh — salue la personne nommée en argument.
++
++aide="usage: saluer.sh [-h] <nom>"
++
++erreur() {
++  echo "erreur: $1"
++  exit 2
++}
++
++if [ "$#" -ge 1 ]; then
++  case "$1" in
++    -h|--help) echo "$aide"; exit 0 ;;
++  esac
++fi
++
++[ "$#" -ge 1 ] || erreur "nom manquant"
++[ "$#" -le 1 ] || erreur "trop d'arguments"
++[ -n "$1" ] || erreur "nom vide"
++case "$1" in
++  -*) erreur "option inconnue" ;;
++esac
++
++echo "Bonjour, $1!"
