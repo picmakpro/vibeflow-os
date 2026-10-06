@@ -941,6 +941,9 @@ plus proche `.planning`, lecture de `config.json` — et :
 - dans un lab adhérent (ou dans le doute, voir (u)), elle émet un refus JSON statique avec un message
   de réparation (mettre à jour VibeFlow, ou installer `python3`, puis relancer la session) ;
 - hors d'un lab adhérent, elle se tait : un lab dev sans `python3` n'est jamais refusé (P45-D-06a) ;
+- un `config.json` de plus de 1 Mio (`BORNE_LECTURE_FICHIER`, A11-classe) rend l'adhésion **indéterminée** : sous `PreToolUse` le cœur sort en code 3 sans
+  rien décider et cette couche tranche par son `grep` (refus dans un lab qu'elle dit adhérent, silence dans un lab dev et sur `Bash`) ; sur les autres
+  événements le cœur se tait (limite (bj)) ;
 - le **timeout** du harnais reste un fail-open sans réglage possible : le canary est obligatoire de
   toute façon (P45-D-06, P45-D-20). La couche shell ne s'y expose plus par la longueur d'une valeur du
   payload : au-delà de 4096 caractères elle ne parcourt pas la valeur, la refuse si elle nomme `.planning` ou `.claude` ou porte un antislash et la tranche sinon sur le cwd ; le cœur la lit sous deux formes en temps linéaire (réduite lexicalement, physique) et n'en décide dans le doute que si elle reste trop longue (F-01, N-01, N2-01, N3-01, limite (aa)).
@@ -1042,6 +1045,7 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (bg)** — D1 (Phase 46, fix-46-a ; critère et plafond : choix du planificateur du quick 261006-23m, renversables) : la liste surveillée garde les unités non closes les plus récentes d'abord — ordre DÉCLARÉ par le nom (préfixe numérique décroissant comparé comme un entier, puis le nom), jamais par une date du disque — et se tronque à `BORNE_WATCHPATHS` chemins ; la réconciliation ne hache pas au-delà de `BORNE_OCTETS_RECONCILIATION` octets cumulés (256 Mio) ni un fichier de plus de 128 Mio : un fichier écarté n'est ni surveillé en séance (s'il est hors liste) ni réconcilié ; la borne est tracée (`genre=borne`, `sha256` = empreinte de la liste) et le signal ne la répète pas tant que la liste tronquée ne change pas.
 - **limite (bh)** — P46-D-06a (Phase 46, fix-46-a, revue P4) : le `VERDICT.md` d'un juge n'est protégé par G5 que contre l'écriture par OUTIL : un agent qui a `Bash` peut écrire sous `.planning/juges/<juge>/` un verdict qui porte le `hash` de la sortie piégée et le critère visé en `échec`, et le vérificateur range alors le juge « prouvé » ; D1 ne surveille pas `.planning/juges/` (hors de la liste surveillée) : cette écriture n'est ni tracée ni signalée (mesuré par sonde, quick 261006-23m : juge compté prouvé, aucune ligne du journal de D1, aucun chemin de `.planning/juges/` dans `watchPaths`).
 - **limite (bi)** — P46-D-11 (Phase 46, fix-46-a, audit A15) : le canary de session (`CANARIS`) rejoue `PreToolUse` (dont `SubagentHandback`), `SubagentStop` et `FileChanged` ; il ne rejoue ni `SessionStart` (liste surveillée et réconciliation de D1), ni `CwdChanged`, ni le vérificateur de juges (`verifier_juges`) — il vérifie seulement que la commande de référence est câblée sous les cinq événements : leur panne n'est pas signalée au démarrage de session ; seules les suites (`test-d1-surveillance.sh`, `test-juges-canary.sh`) la voient.
+- **limite (bj)** — A11, classe (Phase 46, fix-46-a tour 2) : toute lecture par le hook d'un fichier du lab que l'agent contrôle est bornée — `BORNE_LECTURE_FICHIER` (1 048 576 octets LUS, jamais la taille annoncée, défaut de `lire_octets_bornes` et de `lire_frontmatter_fichier`) pour `CADRAGE.md`, `VERDICT.md` (G4 et vérificateur de juges), `config.json` (adhésion et G6) et le journal des dérogations ; `BORNE_LECTURE_PLAN` pour `PLAN.md` (limite (be)) ; `BORNE_OCTETS_LIVRABLES` octets lus pour les livrables et les fichiers surveillés de D1 ; fenêtre de fin pour le journal de D1 (limite (ba)). Au-delà : G1 refuse la planification — un `CADRAGE.md` hors borne n'est pas l'état indéterminé de F5 (limite (j)), le recalcul le lit : un refus de plus, jamais un passage —, G4 refuse le `SUMMARY.md`, le vérificateur range le juge sans preuve (`verdict-hors-borne`), un `config.json` hors borne rend l'adhésion indéterminée — `PreToolUse` sort en code 3 et la couche de repli tranche par son `grep` (refus dans un lab qu'il dit adhérent, silence dans un lab dev et sur `Bash` ; ce `grep` lit le fichier entier, et un `config.json` invisible au `grep`, limite (ah), s'y tait), les autres événements se taisent —, aucune dérogation n'est lue (le refus est maintenu), D1 ne réconcilie pas le fichier ; le recalcul et `poser-verdict.sh` lisent sans ces bornes (limite (be)) ; le fichier de transport du payload (`lire_payload`) n'est pas borné : ce n'est pas un fichier du lab, et le borner changerait un refus (point remonté au manager, quick 261006-638).
 
 ### Contrat de sortie par événement (Phase 46)
 
@@ -1169,7 +1173,9 @@ G1 refuse l'écriture (`Write`, `Edit`) d'un `PLAN.md` de forme modèle — dire
 structurante sans statut (le refus cite les identifiants ouverts). Il lit l'état que le modèle dérive
 par des copies ast-identiques du parseur de frontmatter et du registre, contrôlées phase par phase
 contre le vrai `recalc-planning.sh --read-only` (CROISE-G1). La valeur d'un statut n'est jamais jugée.
-Un `PLAN.md` du socle v2 ou sous un nom d'unité invalide n'est jamais visé. Bord : limite (j).
+Un `PLAN.md` du socle v2 ou sous un nom d'unité invalide n'est jamais visé. Bord : limite (j). Un `CADRAGE.md` de plus de 1 Mio
+(`BORNE_LECTURE_FICHIER`, A11-classe) n'est pas l'état indéterminé de F5 (le recalcul le lit) : il est **refusé** par un message qui nomme la borne
+(`le CADRAGE.md de la phase <phase> dépasse 1048576 octets (BORNE_LECTURE_FICHIER) : non lu`), limite (bj).
 
 ### G7 — pas de planning orphelin (GATE-07)
 
@@ -1223,7 +1229,8 @@ contient l'unité rend l'unité indéterminée au modèle : refus. Un `SUMMARY.m
 l'unité (poser-verdict.sh)` ; `VERDICT.md invalide (règle R6)` ; `constat en échec : <critère> — corrigez puis re-jugez
 (tentative n+1)` ; `verdict périmé : re-juger (tentative n+1)` (n lu dans `tentative` du verdict, sans numéro si elle est
 illisible) ; `livrables hors borne : <libellé>` ; `PLAN.md de l'unité au-delà de 1048576 octets (BORNE_LECTURE_PLAN) : non lu — le
-verdict ne peut pas être vérifié`. Entonnoir existant : en `observe` il journalise, armé il refuse (deny), une erreur
+verdict ne peut pas être vérifié` ; `VERDICT.md de l'unité au-delà de 1048576 octets (BORNE_LECTURE_FICHIER) : non lu — le verdict ne peut pas être
+vérifié, faites re-juger l'unité (poser-verdict.sh)` (un `VERDICT.md` de plus de 1 Mio refuse aussi : A11-classe, limite (bj)). Entonnoir existant : en `observe` il journalise, armé il refuse (deny), une erreur
 interne refuse quand il est armé.
 
 ### G4′ — pas de rapport sans sortie brute (Phase 46)
@@ -1315,7 +1322,8 @@ sont signalés en **une ligne** de `additionalContext`, sans jamais bloquer : `[
 surveillés depuis la séance précédente (<trois premiers chemins relatifs>…) — tracées dans .planning/surveillance.log` ; la ligne `signal` posée
 ensuite empêche qu'un `SessionStart` sans nouveau contournement le répète. La réconciliation rattrape aussi ce que le watcher ne voit pas (limite (ax)).
 **Plafond d'octets** (D1, fix-46-a) : la réconciliation ne hache pas plus de `BORNE_OCTETS_RECONCILIATION` octets cumulés (256 Mio, tailles annoncées par
-`lstat`) et aucun fichier de plus de `BORNE_OCTETS_LIVRABLES` (128 Mio) ; un fichier écarté n'est pas réconcilié à ce `SessionStart` (aucune ligne). Coût
+`lstat`) et aucun fichier de plus de `BORNE_OCTETS_LIVRABLES` (128 Mio) ; un fichier écarté n'est pas réconcilié à ce `SessionStart` (aucune ligne) ;
+l'empreinte d'un fichier est elle-même bornée en octets **lus** (`BORNE_OCTETS_LIVRABLES`), même si le fichier grandit après le `lstat` (A11-classe, limite (bj)). Coût
 mesuré (sonde p13 après correction) : 0,2 s au premier comme au second `SessionStart` pour 96 fichiers creux de 127 Mio (deux seulement sont hachés), l'échéance
 du cœur étant de 8 s (avant la correction : 8,1 s mesurés au départ de ce quick, 5,9 s à l'audit ; au-delà de l'échéance le `SessionStart` sort en silence, la
 liste n'est pas rendue). **Signal de borne** : une borne — liste tronquée ou fichiers écartés —
@@ -1350,7 +1358,7 @@ définitions de `.claude/agents/` du lab dont le rôle dérivé est `juge` (jama
 |---|---|
 | **prouvé** | verdict valide (règle R6 : constats non vides, chaque résultat `passé` ou `échec`), `hash` égal au sha256 de `SORTIE-PIEGEE.md`, le critère visé porté en `échec` et seulement en `échec` |
 | **laxiste** | verdict valide et à jour dont le critère visé n'est pas en `échec` : absent des constats, ou porté en `passé` ne serait-ce qu'une fois |
-| **sans preuve** | tout le reste, avec un motif : `nom-hors-forme`, `dossier-absent` (ou lien), `sortie-piegee-absente`, `sortie-piegee-invalide` (lien, non régulière), `sortie-piegee-hors-borne` (plus de 1 Mio), `sortie-piegee-illisible`, `critere-vise-absent`, `verdict-absent`, `verdict-invalide`, `verdict-perime` (la sortie piégée a changé depuis le verdict), `erreur-<type>` |
+| **sans preuve** | tout le reste, avec un motif : `nom-hors-forme`, `dossier-absent` (ou lien), `sortie-piegee-absente`, `sortie-piegee-invalide` (lien, non régulière), `sortie-piegee-hors-borne` (plus de 1 Mio), `sortie-piegee-illisible`, `critere-vise-absent`, `verdict-absent`, `verdict-hors-borne` (plus de 1 Mio, `BORNE_LECTURE_FICHIER`), `verdict-invalide`, `verdict-perime` (la sortie piégée a changé depuis le verdict), `erreur-<type>` |
 
 **« Juge sans preuve » n'est jamais vert** : toute erreur de lecture range le juge sans preuve, jamais prouvé. Aucun seuil de juge n'est lu ni posé dans
 `config.json` (P46-D-13) ; `config.json` n'est lu que pour l'adhésion.
@@ -1418,7 +1426,7 @@ aucune horloge ne conditionne l'acceptation (spec §5.2). Durée de vie : **usag
 (gate, chemin) ; le hook qui laisse passer une action grâce à elle ajoute une ligne `consommee` et la
 **cite** dans la sortie de l'action (numéro, gate, chemin, auteur, canal, date, raison) ; sans effet
 sur un gate en observation. Le journal doit être un fichier régulier : un lien annule toute
-dérogation. Limite : l'identité déclarée (`--qui`) n'est pas vérifiée, la commande ne peut pas savoir
+dérogation ; un journal de plus de 1 Mio (`BORNE_LECTURE_FICHIER`) n'est pas lu : aucune dérogation, le refus est maintenu (limite (bj)). Limite : l'identité déclarée (`--qui`) n'est pas vérifiée, la commande ne peut pas savoir
 qui la lance (T-45-34). Le jeton `PLAFOND` (P46-D-05) lève le plafond de trois tentatives de la commande de
 verdict : son chemin est le dossier de l'unité, et c'est `poser-verdict.sh`, non le hook, qui la consomme.
 

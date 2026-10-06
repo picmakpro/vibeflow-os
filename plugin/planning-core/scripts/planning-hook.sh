@@ -29,7 +29,8 @@
 # commande enregistrée dans hooks.json, qui tranche elle-même (fail-closed dans un lab adhérent,
 # silence ailleurs — P45-D-06, P45-D-06a) :
 #    0  décidé (stdout vide ou UN objet JSON)
-#    3  erreur Python AVANT que l'adhésion soit connue (stdout vide)
+#    3  adhésion inconnue : erreur Python AVANT que l'adhésion soit connue, ou config.json au-delà de BORNE_LECTURE_FICHIER sous PreToolUse
+#       (stdout vide)
 #   70  mktemp impossible
 #   71  lecture de stdin impossible
 #   72  aucun interpréteur Python (python3 puis python, ADR-054)
@@ -486,23 +487,53 @@ def est_fichier_regulier(chemin):
         return False
 
 
+# A11, classe (fix-46-a tour 2) : TOUTE lecture par le hook d'un fichier du lab que l'agent contrôle est bornée ; au-delà, le fichier n'est pas lu
+# (jamais un contenu partiel) et chaque appelant décide — refus là où le gate refuse (G1, G4, dérogations), juge sans preuve, adhésion indéterminée
+# pour config.json, silence pour D1. Recensement figé par R-LECTURE-RECENSEMENT ; limite (bj).
+BORNE_LECTURE_FICHIER = 1048576  # borne-generique
+
+
+class AdhesionIndeterminee(Exception):
+    """config.json au-delà de BORNE_LECTURE_FICHIER : l'adhésion ne peut pas être lue (A11, classe). PreToolUse sort en code 3 (la couche de repli
+    tranche, P45-D-06a) ; tout autre événement se tait (P46-D-10)."""
+
+
+def lire_octets_bornes(chemin, borne=BORNE_LECTURE_FICHIER):
+    """(statut, octets) d'un fichier du lab : `absent` (pas un fichier régulier par lstat : absent, lien, dossier, tube), `illisible` (ouverture ou
+    lecture en erreur, fstat non régulier), `hors-borne` (plus de `borne` octets LUS : lecture bornée à `borne` + 1 octets, jamais la taille annoncée
+    — un fichier creux de 2 Gio ne coûte qu'un Mio), `ok` et les octets. Ouverture sans suivre de lien ni bloquer. Lecteur générique du hook (A11,
+    classe) ; les marqueurs `lff-…` sont ceux du tour 1, gardés pour ses mutants."""
+    if not est_fichier_regulier(chemin):
+        return ("absent", None)
+    try:
+        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN | SANS_BLOCAGE)
+        with os.fdopen(descripteur, "rb") as fh:
+            if not stat.S_ISREG(os.fstat(fh.fileno()).st_mode):
+                return ("illisible", None)
+            octets = fh.read(borne + 1)  # lff-lecture-bornee
+    except OSError:
+        return ("illisible", None)
+    if len(octets) > borne:  # lff-hors-borne
+        return ("hors-borne", None)
+    return ("ok", octets)
+
+
 def verifier_adhesion(planning):
     """Sans config.json déclarant EXACTEMENT "planning_version": "cycles-v1", le planning n'a pas
     adhéré : fichier absent ou non régulier, JSON invalide, racine non objet, clé absente, autre
-    valeur, valeur non chaîne sont TOUS non adhérents."""
+    valeur, valeur non chaîne sont TOUS non adhérents. Un config.json de plus de BORNE_LECTURE_FICHIER octets n'est pas lu :
+    l'adhésion est indéterminée (`AdhesionIndeterminee`, A11, classe)."""
     chemin = os.path.join(planning, "config.json")
     resultat = {"attendue": SCHEMA_ADHESION, "declaree": None, "adherente": False, "config": "absent"}
     if not est_fichier_regulier(chemin):
         return resultat
+    statut, octets = lire_octets_bornes(chemin)
+    if statut == "hors-borne":
+        raise AdhesionIndeterminee("config.json au-delà de %d octets (BORNE_LECTURE_FICHIER)" % BORNE_LECTURE_FICHIER)  # adhesion-hors-borne
     try:
-        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
-        with os.fdopen(descripteur, "r", encoding="utf-8") as fh:
-            texte = fh.read()
-    except (OSError, UnicodeDecodeError):
-        resultat["config"] = "illisible"
-        return resultat
-    try:
-        donnees = json.loads(texte)
+        if statut != "ok":
+            raise ValueError("config.json illisible")
+        donnees = json.loads(octets.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n"))
     except ValueError:
         resultat["config"] = "illisible"
         return resultat
@@ -652,27 +683,20 @@ def _lire_liste_indentee(corps, depart):
     return (items, j)
 
 
-def lire_frontmatter_fichier(chemin, borne=None):
-    """Frontmatter d'un fichier du modèle : fichier régulier seulement (lstat, jamais de suivi de
-    lien), ouverture O_NOFOLLOW, UTF-8 strict. Sans `borne` (défaut) : lecture du fichier entier. Avec `borne`
-    (A11, complément, fix-46-a) : lecture binaire de `borne` + 1 octets AU PLUS — jamais la taille annoncée, un
-    fichier creux de 2 Gio ne coûte qu'un Mio — ; au-delà de `borne` octets lus, le fichier n'est pas lu et le
-    statut est `invalide:hors-borne` (jamais un contenu partiel) ; sous la borne, décodage UTF-8 strict puis fins
-    de ligne universelles : le même résultat qu'une lecture sans borne."""
-    if not est_fichier_regulier(chemin):
+def lire_frontmatter_fichier(chemin, borne=BORNE_LECTURE_FICHIER):
+    """Frontmatter d'un fichier du modèle, lu par `lire_octets_bornes` (fichier régulier seulement, jamais de suivi de lien, `borne` + 1 octets au
+    plus : BORNE_LECTURE_FICHIER par défaut — A11, classe : aucun appelant ne lit sans borne) ; au-delà de `borne` octets lus, `invalide:hors-borne`
+    (jamais un contenu partiel) ; sous la borne, UTF-8 strict puis fins de ligne universelles (le résultat de l'ancienne lecture en mode texte)."""
+    statut, octets = lire_octets_bornes(chemin, borne)
+    if statut == "absent":
         return ("absent", {})
+    if statut == "hors-borne":
+        return ("invalide:hors-borne", {})
+    if statut != "ok":
+        return ("invalide:illisible", {})
     try:
-        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
-        if borne is None:
-            with os.fdopen(descripteur, "r", encoding="utf-8") as fh:
-                texte = fh.read()
-        else:
-            with os.fdopen(descripteur, "rb") as fh:
-                octets = fh.read(borne + 1)  # lff-lecture-bornee
-            if len(octets) > borne:  # lff-hors-borne
-                return ("invalide:hors-borne", {})
-            texte = octets.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
-    except (OSError, UnicodeDecodeError):
+        texte = octets.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    except UnicodeDecodeError:
         return ("invalide:illisible", {})
     return lire_frontmatter(texte)
 
@@ -1369,13 +1393,16 @@ def _derogation_non_consommee(entrees, gate, chemin_rel):
 
 def derogation_active(racine, gate, chemin_rel):
     """La plus ancienne dérogation non consommée qui couvre (gate, chemin_rel), ou None. Toute erreur
-    de lecture : aucune dérogation (le refus est maintenu, jamais un passage par défaut)."""
+    de lecture : aucune dérogation (le refus est maintenu, jamais un passage par défaut) ; un journal de plus de BORNE_LECTURE_FICHIER octets
+    n'est pas lu : aucune dérogation, le refus est maintenu (A11, classe)."""
     try:
         descripteur = _ouvrir_journal_derogations(racine, os.O_RDONLY)
         if descripteur is None:
             return None
         with os.fdopen(descripteur, "rb") as fh:
-            octets = fh.read()
+            octets = fh.read(BORNE_LECTURE_FICHIER + 1)  # derog-borne-lecture
+        if len(octets) > BORNE_LECTURE_FICHIER:  # derog-borne-test
+            return None
         return _derogation_non_consommee(_entrees_journal(octets), gate, chemin_rel)
     except Exception:
         return None
@@ -1384,7 +1411,8 @@ def derogation_active(racine, gate, chemin_rel):
 def consommer(racine, entree):
     """Ajoute la ligne `consommee` de la dérogation, sous verrou (lecture + ajout) quand le module
     existe : la dérogation est relue sous le verrou, une consommation concurrente l'a peut-être déjà
-    prise. Vrai seulement si la ligne est écrite ; toute erreur : faux (le refus est maintenu)."""
+    prise. Vrai seulement si la ligne est écrite ; toute erreur : faux (le refus est maintenu), un journal de plus de BORNE_LECTURE_FICHIER octets
+    lus aussi (A11, classe)."""
     try:
         descripteur = _ouvrir_journal_derogations(racine, os.O_RDWR | os.O_APPEND)
         if descripteur is None:
@@ -1393,11 +1421,14 @@ def consommer(racine, entree):
             if fcntl is not None:
                 fcntl.flock(descripteur, fcntl.LOCK_EX)
             os.lseek(descripteur, 0, os.SEEK_SET)
-            morceaux = []
+            morceaux, lus = [], 0
             while True:
                 lu = os.read(descripteur, 65536)
                 if not lu:
                     break
+                lus += len(lu)
+                if lus > BORNE_LECTURE_FICHIER:  # derog-borne-verrou
+                    return False
                 morceaux.append(lu)
             existant = b"".join(morceaux)
             restante = _derogation_non_consommee(_entrees_journal(existant), entree["gate"], entree["chemin"])
@@ -1617,11 +1648,12 @@ def _appliquer_edit(cible, entree):
     ancien, nouveau = entree.get("old_string"), entree.get("new_string")
     if not isinstance(ancien, str) or not isinstance(nouveau, str) or ancien == "":
         return None
+    statut, octets = lire_octets_bornes(cible)
+    if statut != "ok":
+        return None
     try:
-        descripteur = os.open(cible, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
-        with os.fdopen(descripteur, "r", encoding="utf-8") as fh:
-            courant = fh.read()
-    except (OSError, UnicodeDecodeError):
+        courant = octets.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    except UnicodeDecodeError:
         return None
     n = courant.count(ancien)
     if entree.get("replace_all") is True:
@@ -1738,10 +1770,15 @@ def evaluer_g1(contexte):
         return [Verdict("G1", chemin_rel, "la phase %s n'a pas de CADRAGE.md — cadrez avant de planifier (spec §5)" % phase)]
     # F5 = f5-etats (P45-D-21a) : un CADRAGE.md que le modèle ne peut pas lire (non régulier — dossier, lien, autre
     # type —, frontmatter invalide, registre invalide ou format hérité sans clé `inconnues:`) est un état
-    # INDÉTERMINÉ : le modèle ne l'interdit pas, G1 ne le refuse jamais (limite T-45-55, nommée et acceptée).
+    # INDÉTERMINÉ : le modèle ne l'interdit pas, G1 ne le refuse jamais (limite T-45-55, nommée et acceptée). Un CADRAGE.md de plus de
+    # BORNE_LECTURE_FICHIER octets n'est PAS l'état indéterminé de F5 (le recalcul le lit) : G1 le refuse par un message qui nomme la borne
+    # (A11, classe, limite (bj)).
     if not est_fichier_regulier(cadrage):
         return []
     statut, donnees = lire_frontmatter_fichier(cadrage)
+    if statut == "invalide:hors-borne":  # g1-borne-cadrage
+        return [Verdict("G1", chemin_rel, "le CADRAGE.md de la phase %s dépasse %d octets (BORNE_LECTURE_FICHIER) : non lu — le registre ne peut "
+                                          "pas être vérifié, la planification est refusée ; allégez CADRAGE.md (spec §5)" % (phase, BORNE_LECTURE_FICHIER))]
     if statut != "ok":
         return []
     registre_ok, registre_clos = lire_registre(donnees)
@@ -1842,11 +1879,14 @@ def evaluer_g3(contexte):
 # Toute écriture par Write, Edit ou NotebookEdit d'un SUMMARY.md d'unité de forme modèle (même forme que G3, `unite_de_fichier`) est jugée
 # sur le `VERDICT.md` voisin : absent, invalide (règle R6 du recalcul : constats vides ou hors passé/échec), périmé (`hash` différent du
 # sha256 du PLAN.md, `hash_livrables` absent ou différent de l'empreinte des livrables), ou portant un constat `échec` -> refus ; un PLAN.md
-# absent, illisible, de plus de 1 Mio (BORNE_LECTURE_PLAN, A11) ou sans `ecrit:` valide refuse aussi. Même
+# absent, illisible, de plus de 1 Mio (BORNE_LECTURE_PLAN, A11) ou sans `ecrit:` valide refuse aussi, comme un VERDICT.md de plus de 1 Mio
+# (BORNE_LECTURE_FICHIER, A11, classe). Même
 # ordre que le recalcul (R6, puis E, puis R7) : un verdict périmé se re-juge avant qu'on lise ses constats. Le prédicat est réévalué à
 # CHAQUE écriture : retoucher le SUMMARY.md d'une unité close reste permis tant que le verdict tient. Les empreintes viennent de la copie
 # partagée du bloc (jamais d'une réécriture) ; un SUMMARY.md de toute autre forme n'est jamais jugé.
 RAISON_G4_PLAN = "PLAN.md de l'unité absent, illisible ou sans ecrit: valide — l'unité est indéterminée au modèle, le verdict ne peut pas être vérifié"
+RAISON_G4_VERDICT_BORNE = ("VERDICT.md de l'unité au-delà de %d octets (BORNE_LECTURE_FICHIER) : non lu — le verdict ne peut pas être vérifié, "
+                           "faites re-juger l'unité (poser-verdict.sh)" % BORNE_LECTURE_FICHIER)
 
 
 def _tentative_suivante(donnees):
@@ -1873,6 +1913,8 @@ def evaluer_g4(contexte):
     if not os.path.lexists(verdict):  # g4-verdict-absent
         return [Verdict("G4", chemin_rel, "aucun VERDICT.md : faites juger l'unité (poser-verdict.sh)")]
     statut, donnees = lire_frontmatter_fichier(verdict)
+    if statut == "invalide:hors-borne":  # g4-borne-verdict
+        return [Verdict("G4", chemin_rel, RAISON_G4_VERDICT_BORNE)]
     constats = donnees.get("constats") if statut == "ok" else None
     if not isinstance(constats, list) or len(constats) == 0 or any(  # g4-invalide
             not isinstance(c, dict) or c.get("resultat") not in ("passé", "échec") for c in constats):
@@ -2828,7 +2870,7 @@ def chemin_relatif_surveille(racine, chemin):
 def empreinte_fichier(chemin):
     """sha256 hexadécimal du fichier régulier `chemin`, lu sans suivre de lien ; `absent` s'il n'existe pas ou n'est pas un fichier régulier (un
     lien, un dossier, un tube comptent comme absents) ; None si la lecture échoue ou si le fichier dépasse BORNE_OCTETS_LIVRABLES (aucune ligne :
-    D1 est fail-open)."""
+    D1 est fail-open), None aussi au-delà de BORNE_OCTETS_LIVRABLES octets LUS, même si le fichier grandit après le lstat (A11, classe)."""
     import hashlib
     try:
         etat = os.lstat(chemin)
@@ -2843,10 +2885,14 @@ def empreinte_fichier(chemin):
     try:
         hacheur = hashlib.sha256()
         with os.fdopen(os.open(chemin, DRAPEAUX_LIVRABLE), "rb") as fh:
+            lus = 0
             while True:
                 bloc = fh.read(1048576)
                 if not bloc:
                     break
+                lus += len(bloc)
+                if lus > BORNE_OCTETS_LIVRABLES:  # d1-lecture-hachage
+                    return None
                 hacheur.update(bloc)
     except OSError:
         return None
@@ -3112,6 +3158,8 @@ def _verifier_un_juge(racine, juge):
     statut_v, donnees_v = lire_frontmatter_fichier(os.path.join(dossier, NOM_VERDICT_JUGE))
     if statut_v == "absent":
         return "sans-preuve", "verdict-absent"
+    if statut_v == "invalide:hors-borne":  # juge-borne-verdict
+        return "sans-preuve", "verdict-hors-borne"
     constats = donnees_v.get("constats") if statut_v == "ok" else None
     if not isinstance(constats, list) or len(constats) == 0 or any(
             not isinstance(c, dict) or c.get("resultat") not in ("passé", "échec") for c in constats):
@@ -3313,6 +3361,8 @@ def main():
             racine_forme = racine_lab(forme)
             if racine_forme is not None and verifier_adhesion(os.path.join(racine_forme, ".planning"))["adherente"]:
                 autres.append((forme, racine_forme))
+    except AdhesionIndeterminee:  # adhesion-inconnue
+        sys.exit(3 if evenement == EVT_PRETOOLUSE else 0)
     except BaseException as exc_doute:  # phase-a-doute
         if evenement != EVT_PRETOOLUSE:  # evt-doute-pretooluse : la décision dans le doute ne vaut que pour PreToolUse
             sys.exit(0)

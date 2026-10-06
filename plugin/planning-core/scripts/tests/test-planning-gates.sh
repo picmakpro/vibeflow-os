@@ -85,6 +85,11 @@
 #                   sont recensées avec leur décision (deux « NFC » : `_sous_dossiers` et `_verdicts_du_planning` ; cinq neutres, une brute, deux hors lab) ;
 #                   une énumération nouvelle, déplacée ou une normalisation NFC retirée fait rougir ; MUT-RECENSEMENT-READDIR : la normalisation de
 #                   `_verdicts_du_planning` retirée (équivalent en comportement : seul le recensement le voit)
+#   R-LECTURE-RECENSEMENT (section `env_statique`, A11-classe, fix-46-a tour 2) : les douze lectures de fichier du cœur Python (AST : `.read`, `os.read`,
+#                   `read_text`, `read_bytes`, `readline(s)`, `json.load`) sont recensées avec leur borne, une par fonction ; la seule sans argument est
+#                   `lire_payload` (fichier de transport du harnais, hors classe, point remonté REM-1) ; chaque fonction à compteur porte sa garde dans sa boucle
+#                   de lecture ; `lire_octets_bornes` et `lire_frontmatter_fichier` ont BORNE_LECTURE_FICHIER pour défaut ; une lecture nouvelle, sans borne
+#                   ou à la borne changée fait rougir ; MUT-RECENSEMENT-LECTURE : le journal des dérogations relu sans borne
 #   LOT A           (section `lota` ; correction ciblée post-45-09, décisions du manager vf-dev-manager, 2026-10-01) : R-IMB-01..05 un `.planning`
 #                   imbriqué n'est jamais une racine de lab ; R-DEROG-09 une dérogation n'est consommée que si la décision finale est un
 #                   passage ; R-DEROG-10 droits du journal jamais élargis, argv UTF-8 ; R-VERDICT-06..09 poser-verdict.sh (contrôles, forme
@@ -944,6 +949,97 @@ def controle_recensement_readdir(ctx, script):
     total = sum(len(v) for v in enumerations.values())
     detail = "%d énumérations de dossiers dans %d fonctions (%s), une par fonction" % (
         total, len(enumerations), ", ".join("%d %s" % (decisions[d], d) for d in ("nfc", "neutre", "brut", "hors-lab") if d in decisions))
+    return (not fautes), ("; ".join(fautes) if fautes else detail)
+
+
+# A11, classe (fix-46-a tour 2) : chaque appel de lecture du cœur (`.read`, `os.read`, `read_text`, `read_bytes`, `readline(s)`, `json.load`) et sa
+# borne : texte `ast.unparse` de l'argument de taille (pour os.read : le second), None = appel sans argument (lecture entière).
+RECENSEMENT_LECTURE = {
+    "lire_payload": None,                                       # fichier de transport du harnais : hors classe (REM-1)
+    "lire_octets_bornes": "borne + 1",                          # lecteur générique : CADRAGE.md, VERDICT.md, config.json, PLAN.md de G2
+    "_hacher_dans": "65536",                                    # livrables, budget commun (bloc partagé)
+    "derogation_active": "BORNE_LECTURE_FICHIER + 1",
+    "consommer": "65536",                                       # sous verrou, compteur
+    "octets_plan_du_dossier": "BORNE_LECTURE_PLAN + 1",
+    "lire_definition_bornee": "BORNE_LECTURE_DEFINITION + 1",
+    "candidat_definition": "BORNE_ENTETE_DEFINITION",
+    "_versions_installees": "BORNE_LECTURE_DEFINITION + 1",
+    "empreinte_fichier": "1048576",                             # compteur
+    "lire_surveillance": "BORNE_LECTURE_SURVEILLANCE",
+    "_verifier_un_juge": "BORNE_SORTIE_PIEGEE + 1",
+}
+GARDES_COMPTEUR = {"_hacher_dans": "_borne_depassee", "consommer": "BORNE_LECTURE_FICHIER", "empreinte_fichier": "BORNE_OCTETS_LIVRABLES"}
+
+
+def _lectures_et_fonctions(texte):
+    """({fonction: [(ligne, appel, borne), …]}, {fonction: nœud}) : les appels de lecture de fichier du cœur Python, rangés par la fonction qui les contient
+    (la plus interne) ; `borne` est le texte de l'argument de taille (le second pour `os.read`), None s'il n'y en a pas."""
+    arbre = ast.parse(corps_python(texte))
+    lectures, fonctions = {}, {}
+
+    def visiter(n, f):
+        if isinstance(n, ast.FunctionDef):
+            f = n.name
+            fonctions.setdefault(f, n)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
+            nom = n.func.attr
+            base = n.func.value.id if isinstance(n.func.value, ast.Name) else None
+            lecture = (nom in ("read", "read_text", "read_bytes", "readline", "readlines")) or (base == "json" and nom == "load")
+            if lecture:
+                position = 1 if (base == "os" and nom == "read") else 0
+                borne = ast.unparse(n.args[position]) if len(n.args) > position else None
+                lectures.setdefault(f, []).append((n.lineno, "%s.%s" % (base, nom), borne))
+        for enfant in ast.iter_child_nodes(n):
+            visiter(enfant, f)
+
+    visiter(arbre, "<module>")
+    return lectures, fonctions
+
+
+def _garde_dans_une_boucle(noeud, garde):
+    """Vrai si une boucle `while` du nœud contient la garde : un appel de `_borne_depassee`, ou une comparaison qui porte la constante nommée `garde`."""
+    for boucle in (n for n in ast.walk(noeud) if isinstance(n, ast.While)):
+        for n in ast.walk(boucle):
+            if garde == "_borne_depassee":
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == garde:
+                    return True
+            elif isinstance(n, ast.Compare) and any(isinstance(x, ast.Name) and x.id == garde for x in [n.left] + list(n.comparators)):
+                return True
+    return False
+
+
+def controle_recensement_lecture(ctx, script):
+    """R-LECTURE-RECENSEMENT (A11-classe, fix-46-a tour 2) : l'AST du cœur porte EXACTEMENT les lectures de fichier de `RECENSEMENT_LECTURE`, une par fonction,
+    chacune avec la borne déclarée (None pour `lire_payload` seul) ; une lecture dans une fonction non recensée rougit (« lecture non recensée dans <f> »), une
+    borne différente aussi (« <f> : borne <obtenue>, attendu <déclarée> »), une entrée sans lecture aussi (« recensement périmé ») ; chaque fonction de
+    `GARDES_COMPTEUR` porte sa garde dans sa boucle de lecture (sinon « <f> : compteur sans garde <g> ») ; le défaut du paramètre `borne` de `lire_octets_bornes`
+    et de `lire_frontmatter_fichier` est le nom BORNE_LECTURE_FICHIER. `script` : le chemin du script ou son dossier."""
+    chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
+    lectures, fonctions = _lectures_et_fonctions(open(chemin, encoding="utf-8").read())
+    fautes = []
+    for f in sorted(lectures):
+        if f not in RECENSEMENT_LECTURE:
+            fautes.append("lecture non recensée dans %s : borner la lecture (BORNE_LECTURE_FICHIER) ou la recenser comme hors classe" % f)
+        elif len(lectures[f]) != 1:
+            fautes.append("%s : %d lectures (une par fonction attendue)" % (f, len(lectures[f])))
+        elif lectures[f][0][2] != RECENSEMENT_LECTURE[f]:
+            fautes.append("%s : borne %s, attendu %s" % (f, lectures[f][0][2], RECENSEMENT_LECTURE[f]))
+    for f in sorted(RECENSEMENT_LECTURE):
+        if f not in lectures:
+            fautes.append("recensement périmé : %s ne lit plus de fichier" % f)
+    for f, garde in sorted(GARDES_COMPTEUR.items()):
+        if f not in fonctions or not _garde_dans_une_boucle(fonctions[f], garde):
+            fautes.append("%s : compteur sans garde %s" % (f, garde))
+    for f in ("lire_octets_bornes", "lire_frontmatter_fichier"):
+        noeud = fonctions.get(f)
+        defauts = [ast.unparse(d) for d in noeud.args.defaults] if noeud is not None else []
+        if defauts != ["BORNE_LECTURE_FICHIER"]:
+            fautes.append("%s : défaut de borne %s, attendu BORNE_LECTURE_FICHIER" % (f, defauts if noeud is not None else "fonction absente"))
+    sans_borne = sorted(f for f, v in lectures.items() if f in RECENSEMENT_LECTURE and v[0][2] is None)
+    total = sum(len(v) for v in lectures.values())
+    detail = "%d lectures dans %d fonctions, %s (%s)" % (
+        total, len(lectures), "une seule sans borne (lire_payload, hors classe, REM-1)" if sans_borne == ["lire_payload"] else "sans borne : %s" % sans_borne,
+        "BORNE_LECTURE_FICHIER pour défaut de lire_octets_bornes et de lire_frontmatter_fichier ; gardes de compteur : %s" % ", ".join(sorted(GARDES_COMPTEUR)))
     return (not fautes), ("; ".join(fautes) if fautes else detail)
 
 
@@ -3280,6 +3376,9 @@ def sec_env_statique(ctx):
     bon, detail = controle_recensement_readdir(ctx, ctx.hook)
     ok("R-READDIR-RECENSEMENT recensement des énumérations de dossiers du cœur : " + detail) if bon else ko(
         "R-READDIR-RECENSEMENT", "chaque énumération de dossiers du cœur est recensée avec sa décision (NFC avant le test de forme, ou neutre, brute, hors lab)", "aucune faute", detail)
+    bon, detail = controle_recensement_lecture(ctx, ctx.hook)
+    ok("R-LECTURE-RECENSEMENT recensement des lectures de fichier du cœur : " + detail) if bon else ko(
+        "R-LECTURE-RECENSEMENT", "chaque lecture de fichier du cœur est recensée avec sa borne (BORNE_LECTURE_FICHIER, BORNE_LECTURE_PLAN… ; la seule sans borne : lire_payload)", "aucune faute", detail)
 
 
 def sec_g5(ctx):
@@ -3786,7 +3885,7 @@ def sec_banc(ctx):
 
 
 CTRL_FICHIER = (controle_table_02, controle_table_04, controle_parseur, controle_env_statique, controle_jeton, controle_registre, controle_g7_05,
-                controle_recensement_readdir)
+                controle_recensement_readdir, controle_recensement_lecture)
 
 
 def sec_mutants(ctx):
@@ -3808,6 +3907,8 @@ def sec_mutants(ctx):
         ("READDIR-NFC", "# nfc-readdir-unites", "if not NOM_UNITE.match(nom):  # nfc-readdir-unites", "R-NFD-GATES", controle_nfd_gates),
         # mutant équivalent en comportement (sans effet sur un nom ASCII) : seul le recensement statique le voit, c'est son rôle
         ("RECENSEMENT-READDIR", "# nfc-readdir-verdicts", "if nom.casefold() == NOM_VERDICT:  # nfc-readdir-verdicts", "R-READDIR-RECENSEMENT", controle_recensement_readdir),
+        # 46 (fix-46-a tour 2, A11-classe) : le journal des dérogations relu sans borne -> une lecture dont la borne n'est plus celle du recensement
+        ("RECENSEMENT-LECTURE", "# derog-borne-lecture", "octets = fh.read()  # derog-borne-lecture", "R-LECTURE-RECENSEMENT", controle_recensement_lecture),
         ("PARSEUR", 'return ("invalide:frontmatter-non-ferme", {})', 'return ("invalide:frontmatter-non-ferme-mute", {})',
          "R-PARSEUR", controle_parseur),
         ("ENV-ADHESION", 'SCHEMA_ADHESION = "cycles-v1"', 'SCHEMA_ADHESION = os.environ.get("VF_SCHEMA_ADHESION", "cycles-v1")',
@@ -5270,6 +5371,7 @@ LIMITES_REFERENCE = (
     ("bg", ("BORNE_WATCHPATHS", "BORNE_OCTETS_RECONCILIATION", "plus récentes", "signal")),
     ("bh", ("juges", "Bash", "prouvé", "D1")),
     ("bi", ("canary", "SessionStart", "CwdChanged", "vérificateur de juges")),
+    ("bj", ("BORNE_LECTURE_FICHIER", "CADRAGE.md", "VERDICT.md", "config.json", "code 3", "dérogation", "lire_payload")),
 )
 PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 

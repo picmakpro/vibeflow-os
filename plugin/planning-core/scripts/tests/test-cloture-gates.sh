@@ -21,6 +21,18 @@
 #   R-PLAN-BORNE-G2 (A11, complément, fix-46-a) G2 (`plans_ouverts` -> `lire_frontmatter_fichier(chemin, borne)`) lit le PLAN.md avec la même borne : espion de
 #             lecture (jamais plus de BORNE_LECTURE_PLAN + 1 octets, PLAN.md creux de 2 Gio ignoré, PLAN.md d'exactement la borne rendu), hors-borne rendu
 #             par la fonction, résultat identique à une lecture sans borne en deçà (CRLF, UTF-8 invalide) ; de bout en bout : borne + 1 octet avertit
+#   R-LECTURE-BORNEE (A11, classe, fix-46-a tour 2) copie armée : TOUTE lecture d'un fichier du lab que l'agent contrôle est bornée par BORNE_LECTURE_FICHIER
+#             (1 Mio, octets LUS) : CADRAGE.md de borne + 1 octets (ou creux de 2 Gio) -> UN deny G1 qui nomme la borne, jumeau d'exactement la borne -> passe ;
+#             VERDICT.md posé par la VRAIE poser-verdict.sh puis complété à borne + 1 octets (ou creux) -> UN deny G4 qui nomme la borne, jumeau à la borne -> passe ;
+#             VERDICT.md d'un juge (`planning-hook.sh --juges`) -> `sans_preuve` `verdict-hors-borne`, jumeau à la borne -> prouvé ; espion : `lire_octets_bornes`
+#             du hook jugé rend `hors-borne` sur les deux fichiers creux sans jamais demander plus de borne + 1 octets
+#   R-ADHESION-BORNEE (A11, classe) config.json de borne + 1 octets : adhésion indéterminée -> le cœur lancé directement sort en code 3 (stdout et stderr vides) sous
+#             PreToolUse ; la commande enregistrée refuse par la couche de repli (« hook central indisponible », jamais le message de G1) dans un lab que son
+#             grep dit adhérent, se tait sur Bash et sur SessionStart ; jumeau à la borne exacte : le cœur lit l'adhésion (deny G1, watchPaths) ; config.json dev
+#             hors borne : silence (P46-D-16) ; config.json creux de 2 Gio : code 3 ; espion de `verifier_adhesion` et de `_appliquer_edit` (G6)
+#   R-JOURNAUX-BORNES (A11, classe) journal des dérogations de borne + 1 octets : aucune dérogation lue (G3 maintient son refus, journal inchangé,
+#             `derogation_active` appelée directement rend None), `consommer` rend False sans écrire, jumeau à la borne -> dérogation citée et consommée ;
+#             `empreinte_fichier` de D1 ne lit jamais plus de BORNE_OCTETS_LIVRABLES octets + 1 Mio même devant un lecteur infini
 # Familles de G4 (verdicts posés par la VRAIE poser-verdict.sh, jamais un hash écrit à la main sauf verdict volontairement faux) :
 #   R-G4-01   copie observe : Write de SUMMARY.md sans VERDICT.md voisin -> silence, code 0, UNE ligne gate=G4
 #   R-G4-02   copie armée : VERDICT.md absent, invalide (frontmatter, constats vides, résultat hors passé/échec, lien), constat en échec, PLAN.md
@@ -53,6 +65,12 @@
 #   la fonction), MUT-PLAN-G2-HORS-BORNE (test de la borne neutralisé dans la fonction) -> R-PLAN-BORNE-G2 ;
 #   MUT-READDIR-NFC (le nom lu par readdir sans NFC dans `_sous_dossiers` : l'unité au nom de disque NFD disparaît de la liste surveillée de D1) et
 #   MUT-RECENCE-NFC (`cle_recence` sans NFC : `05-côté` du disque NFD passe après `05-cz`) -> R-BANC-NFD (A1-readdir, fix-46-a tour 2) ;
+#   A11-classe (fix-46-a tour 2) : MUT-BORNE-GENERIQUE (la borne générique retirée : tout est lu et accepté), MUT-G1-BORNE-CADRAGE, MUT-G4-BORNE-VERDICT,
+#   MUT-JUGE-BORNE-VERDICT -> R-LECTURE-BORNEE ; MUT-ADHESION-BORNE (l'adhésion hors borne rendue non adhérente), MUT-ADHESION-INCONNUE (la clause de
+#   `main` retirée : la décision dans le doute refuse en code 0) -> R-ADHESION-BORNEE ; MUT-DEROG-BORNE (`derogation_active` lit au-delà de la borne,
+#   appel direct), MUT-DEROG-VERROU (`consommer` lit au-delà), MUT-D1-LECTURE-HACHAGE (le compteur de `empreinte_fichier` retiré) -> R-JOURNAUX-BORNES ;
+#   MUT-PLAN-G2-BORNE est RE-CIBLÉ (tour 2) : le défaut de `lire_frontmatter_fichier` valant désormais BORNE_LECTURE_PLAN, retirer la borne explicite est
+#   devenu un mutant ÉQUIVALENT ; il relâche la borne (2 * BORNE_LECTURE_PLAN) et reste tué par R-PLAN-BORNE-G2 ;
 #   MUT-G4-ABSENT, MUT-G4-ECHEC (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
@@ -716,18 +734,51 @@ class _OsEspion:
         return _FichierEspion(self._reel.fdopen(descripteur, *args, **kw), self._lectures, self._borne)
 
 
+def _remplissage(octets, debut="<!-- ", fin=" -->\n"):
+    """EXACTEMENT `octets` octets (ASCII) de lignes de commentaire `debut` + « remplissage » + `fin`, l'octet exact ajusté sur la dernière ligne."""
+    ligne = debut + "remplissage" + fin
+    if octets == 0:
+        return ""
+    if octets < 2 * len(ligne):
+        raise RuntimeError("remplissage de %d octets impossible (minimum %d)" % (octets, 2 * len(ligne)))
+    n = octets // len(ligne) - 1
+    dernier = octets - n * len(ligne)
+    texte = ligne * n + debut + "r" * (dernier - len(debut) - len(fin)) + fin
+    if len(texte.encode("utf-8")) != octets:
+        raise RuntimeError("remplissage de %d octets mal construit : %d" % (octets, len(texte.encode("utf-8"))))
+    return texte
+
+
+def _fichier_de_taille(entete, taille):
+    """Texte de EXACTEMENT `taille` octets : `entete` en tête, puis des lignes de commentaire Markdown, l'octet exact ajusté sur la dernière ligne."""
+    return entete + _remplissage(taille - len(entete.encode("utf-8")))
+
+
+def _completer(chemin, taille, debut="<!-- ", fin=" -->\n"):
+    """Complète le fichier EXISTANT `chemin` jusqu'à EXACTEMENT `taille` octets par des lignes de commentaire (`<!-- remplissage -->`, ou `# remplissage` pour
+    le journal), sans toucher à ses premiers octets (ajout en fin de fichier)."""
+    existant = os.path.getsize(chemin)
+    with open(chemin, "rb") as fh:
+        fh.seek(max(0, existant - 1))
+        fin_de_ligne = fh.read(1) == b"\n" if existant else True
+    ajout = ("" if fin_de_ligne else "\n") + _remplissage(taille - existant - (0 if fin_de_ligne else 1), debut, fin)
+    with open(chemin, "ab") as fh:
+        fh.write(ajout.encode("utf-8"))
+    if os.path.getsize(chemin) != taille:
+        raise RuntimeError("%s : %d octets, attendu %d" % (chemin, os.path.getsize(chemin), taille))
+
+
 def _plan_de_taille(taille):
     """PLAN.md de EXACTEMENT `taille` octets : frontmatter valide en tête (`ecrit: livrables/rapport.md`), puis des lignes de commentaire Markdown, l'octet
     exact ajusté sur la dernière ligne."""
-    entete = "---\necrit: " + LIVRABLE + "\n---\n"
-    ligne = "<!-- remplissage -->\n"
-    reste = taille - len(entete)
-    n = reste // len(ligne) - 1
-    dernier = reste - n * len(ligne)
-    texte = entete + ligne * n + "<!-- " + "r" * (dernier - 10) + " -->\n"
-    if len(texte.encode("utf-8")) != taille:
-        raise RuntimeError("PLAN.md de %d octets mal construit : %d" % (taille, len(texte.encode("utf-8"))))
-    return texte
+    return _fichier_de_taille("---\necrit: " + LIVRABLE + "\n---\n", taille)
+
+
+def coeur(ctx, dossier, lab, brut, args=()):
+    """Le cœur LANCÉ DIRECTEMENT (`bash <dossier>/planning-hook.sh`), sans la couche de repli, charge utile sur stdin, cwd le lab ; (rc, stdout, stderr)."""
+    p = subprocess.run(["bash", os.path.join(dossier, "planning-hook.sh")] + list(args), input=brut, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                       env=ctx.env(), cwd=lab, timeout=120)
+    return p.returncode, p.stdout, p.stderr
 
 
 def controle_plan_borne(ctx, script):
@@ -805,7 +856,8 @@ def controle_plan_borne_g2(ctx, script):
     """Copie armée et espion : `plans_ouverts` du hook jugé (G2) lit le PLAN.md d'une unité ouverte par `lire_frontmatter_fichier(chemin, borne)` ; sur un
     PLAN.md creux de 2 Gio il ne demande jamais une lecture de plus de BORNE_LECTURE_PLAN + 1 octets et IGNORE ce plan (fail-open de G2, spec §5.1, comme tout
     PLAN.md au frontmatter illisible) ; sur un PLAN.md d'exactement BORNE_LECTURE_PLAN octets il le rend ; `lire_frontmatter_fichier` rend
-    `invalide:hors-borne` au-delà de la borne et, sous la borne, le même résultat qu'une lecture sans borne (y compris pour des fins de ligne CRLF) ; de
+    `invalide:hors-borne` au-delà de la borne — SANS borne explicite aussi (tour 2, A11-classe : la borne générique BORNE_LECTURE_FICHIER s'applique) — et, sous
+    la borne, le même résultat avec ou sans borne explicite (y compris pour des fins de ligne CRLF) ; de
     bout en bout, l'écriture d'un livrable déclaré par un PLAN.md de borne + 1 octet n'est plus couverte (avertissement de G2), celle d'un PLAN.md d'exactement
     la borne l'est (silence)."""
     dossier_jugé = _dossier(ctx, script)
@@ -815,12 +867,14 @@ def controle_plan_borne_g2(ctx, script):
     fautes = []
 
     def plans_espionnes(lectures):
-        """`plans_ouverts` et `lire_frontmatter_fichier` du hook jugé, reconstruits sur un espace de noms dont `os.fdopen` consigne les `read(n)`."""
+        """`plans_ouverts`, `lire_frontmatter_fichier` et `lire_octets_bornes` du hook jugé (la lecture vit dans le dernier depuis le tour 2, A11-classe),
+        reconstruits sur un espace de noms dont `os.fdopen` consigne les `read(n)`."""
         ns_e = dict(ns)
         ns_e["os"] = _OsEspion(os, lectures, borne)
-        for nom in ("lire_frontmatter_fichier", "plans_ouverts"):
-            f = ns[nom]
-            ns_e[nom] = types.FunctionType(f.__code__, ns_e, f.__name__, f.__defaults__)
+        for nom in ("lire_octets_bornes", "lire_frontmatter_fichier", "plans_ouverts"):
+            f = ns.get(nom)
+            if f is not None:
+                ns_e[nom] = types.FunctionType(f.__code__, ns_e, f.__name__, f.__defaults__)
         return ns_e["plans_ouverts"]
 
     # 1. espion, PLAN.md creux de 2 Gio : lecture bornée, plan ignoré
@@ -842,7 +896,7 @@ def controle_plan_borne_g2(ctx, script):
         fautes.append("espion, jumeau à la borne : plans_ouverts rend %s (attendu : un plan, entrée %s)" % (court(str(plans)), LIVRABLE))
     if any(n is None or not 0 < n <= borne + 1 for n in lectures_exact):
         fautes.append("espion, jumeau à la borne : lecture non bornée, read(n) demandés : %s" % lectures_exact)
-    # 3. la fonction elle-même : hors-borne au-delà, même résultat qu'une lecture sans borne en deçà (CRLF compris), appelants sans borne inchangés
+    # 3. la fonction elle-même : hors-borne au-delà, SANS borne explicite aussi (la borne générique), même résultat avec et sans borne en deçà (CRLF compris)
     lff_reel = ns["lire_frontmatter_fichier"]
 
     def lff(chemin, *borne_optionnelle):
@@ -856,8 +910,10 @@ def controle_plan_borne_g2(ctx, script):
     rendu = lff(plus1, borne)
     if rendu != ("invalide:hors-borne", {}):
         fautes.append("lire_frontmatter_fichier(PLAN.md de borne + 1 octets, borne) rend %s (attendu ('invalide:hors-borne', {}))" % court(str(rendu)))
-    if lff(plus1)[0] != "ok":
-        fautes.append("lire_frontmatter_fichier sans borne : le PLAN.md de borne + 1 octets n'est plus lu comme avant : %s" % court(str(lff(plus1)[:1])))
+    rendu_defaut = lff(plus1)
+    if rendu_defaut != ("invalide:hors-borne", {}):
+        fautes.append("lire_frontmatter_fichier SANS borne explicite sur un PLAN.md de borne + 1 octets rend %s (attendu ('invalide:hors-borne', {}) : la borne "
+                      "générique BORNE_LECTURE_FICHIER s'applique)" % court(str(rendu_defaut)))
     crlf = ctx.unique("plan-borne-g2-crlf")
     ecrire(os.path.join(crlf, "PLAN.md"), "---\r\necrit: " + LIVRABLE + "\r\n---\r\nPlan.\r\n")
     avec, sans = lff(os.path.join(crlf, "PLAN.md"), borne), lff(os.path.join(crlf, "PLAN.md"))
@@ -886,6 +942,374 @@ def controle_plan_borne_g2(ctx, script):
                           "G2 (plans_ouverts) : PLAN.md creux de 2 Gio ignoré sans lecture de plus de %d octets, PLAN.md d'exactement %d octets rendu, hors-borne rendu par "
                           "lire_frontmatter_fichier au-delà et même résultat qu'une lecture sans borne en deçà (CRLF, UTF-8 invalide) ; de bout en bout : borne + 1 octet "
                           "avertit, exactement la borne couvre" % (borne + 1, borne))
+
+
+# --- A11, classe (fix-46-a tour 2) : toute lecture d'un fichier du lab contrôlé par l'agent est bornée -----------------------------------------------
+def _def_juge(nom):
+    """Définition d'un JUGE (rôle dérivé `juge` : Write et Edit retirés) — recette de test-juges-canary.sh."""
+    return "---\nname: %s\ndescription: juge synthétique d'un cas de test, jamais exécuté\ndisallowedTools: Write, Edit\n---\nCorps.\n" % nom
+
+
+def _texte_sortie_piegee(juge, critere):
+    """SORTIE-PIEGEE.md d'un juge — recette de test-juges-canary.sh."""
+    return ("---\njuge: %s\ncritere_vise: %s\nprovenance: exemple raté fabriqué à la main pour un cas de test\n---\n\n# Sortie piégée\n\n"
+            "Un rapport qui viole délibérément le critère %s.\n" % (juge, critere, critere))
+
+
+def _lab_juge(ctx, nom):
+    """(lab, chemin du VERDICT.md du juge `juge-x`) : lab adhérent au chemin physique, définition du juge, sortie piégée visant `critere-x` et verdict de
+    canary posé par la VRAIE poser-verdict.sh (`critere-x::échec`, `critere-y::passé`)."""
+    lab = os.path.realpath(fabriquer_lab(ctx, nom))
+    ecrire(os.path.join(lab, ".claude", "agents", "juge-x.md"), _def_juge("juge-x"))
+    ecrire(os.path.join(lab, ".planning", "juges", "juge-x", "SORTIE-PIEGEE.md"), _texte_sortie_piegee("juge-x", "critere-x"))
+    args = ["bash", os.path.join(ctx.scripts_dir, "poser-verdict.sh"), "--unite=" + os.path.join(lab, ".planning", "juges", "juge-x"), "--juge=juge-x",
+            "--tentative=1", "--score=8/10", "--constat=critere-x::échec", "--constat=critere-y::passé"]
+    p = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=ctx.env(), cwd=lab, timeout=120)
+    if p.returncode != 0:
+        raise RuntimeError("poser-verdict.sh refuse le verdict du juge : rc=%d %s" % (p.returncode, court(p.stderr)))
+    return lab, os.path.join(lab, ".planning", "juges", "juge-x", "VERDICT.md")
+
+
+def _verificateur_de_juges(ctx, dossier, lab):
+    """Sortie JSON de `planning-hook.sh --juges <lab>` du dossier donné (stdin fermé), ou le texte de l'échec."""
+    p = subprocess.run(["bash", os.path.join(dossier, "planning-hook.sh"), "--juges", lab], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE, env=ctx.env(), cwd=lab, timeout=120)
+    try:
+        return json.loads(p.stdout.decode("utf-8"))
+    except ValueError:
+        return "rc=%d stdout=%s stderr=%s" % (p.returncode, court(p.stdout), court(p.stderr))
+
+
+def controle_lecture_bornee(ctx, script):
+    """Copie armée : (a) CADRAGE.md au registre CLOS de BORNE_LECTURE_FICHIER + 1 octets -> Write du PLAN.md de la phase : UN deny G1 dont la raison nomme
+    BORNE_LECTURE_FICHIER et 1048576 ; jumeau d'EXACTEMENT la borne -> passe ; creux de 2 Gio -> deny G1 qui nomme la borne ; (b) VERDICT.md posé par la vraie
+    poser-verdict.sh puis complété à borne + 1 octets -> Write du SUMMARY.md : UN deny G4 qui nomme la borne ; jumeau à la borne -> passe ; creux -> deny ;
+    (c) VERDICT.md d'un juge : `--juges` range le juge `sans_preuve` `verdict-hors-borne` à borne + 1 octets (et sur un creux), le prouve à la borne exacte ;
+    (d) espion : `lire_octets_bornes` du hook jugé rend `hors-borne` sur les deux fichiers creux sans jamais demander plus de borne + 1 octets."""
+    dossier_jugé = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_jugé, "armed")
+    ns = espace_du_hook(ctx, dossier_jugé)
+    borne = ns.get("BORNE_LECTURE_FICHIER", 1048576)
+    fautes = []
+    entete = "---\ninconnues: []\n---\n"
+    plan_phase = UNITE + "/PLAN.md"
+
+    def refus(nom, gate, lab, rel):
+        bon, detail, raison = _refus_gate(ctx, gate, d, lab, "Write", rel)
+        if not bon:
+            fautes.append("%s : %s" % (nom, detail))
+            return
+        for fragment in ("BORNE_LECTURE_FICHIER", "1048576"):
+            if fragment not in raison:
+                fautes.append("%s : la raison ne nomme pas %s : %s" % (nom, fragment, raison))
+                return
+        fautes.extend("%s : %s" % (nom, f) for f in fautes_de_message(raison, lab))
+
+    def passe(nom, gate, lab, rel):
+        rc, out, err = ecrire_dans(ctx, d, lab, "Write", rel)
+        v = classer(rc, out)
+        if v not in ("silence", "avertit") or err:
+            fautes.append("%s : %s %s" % (nom, v, court(out)))
+        elif v == "avertit" and gate in contexte_de(out):
+            fautes.append("%s : un avertissement parle de %s : %s" % (nom, gate, court(out)))
+
+    def creux(chemin):
+        os.truncate(chemin, 2 * 1024 ** 3)
+
+    # (a) CADRAGE.md, G1
+    lab = fabriquer_lab(ctx, "lb-cadrage-plus1", fichiers={UNITE + "/CADRAGE.md": _fichier_de_taille(entete, borne + 1)})
+    refus("CADRAGE.md de 1 Mio + 1 octet, G1", "G1", lab, plan_phase)
+    lab = fabriquer_lab(ctx, "lb-cadrage-exact", fichiers={UNITE + "/CADRAGE.md": _fichier_de_taille(entete, borne)})
+    passe("CADRAGE.md d'exactement 1 Mio, G1", "G1", lab, plan_phase)
+    lab_cadrage_creux = fabriquer_lab(ctx, "lb-cadrage-creux", fichiers={UNITE + "/CADRAGE.md": entete})
+    cadrage_creux = os.path.join(lab_cadrage_creux, UNITE, "CADRAGE.md")
+    creux(cadrage_creux)
+    debut = time.monotonic()
+    refus("CADRAGE.md creux de 2 Gio, G1", "G1", lab_cadrage_creux, plan_phase)
+    print("DUREE lecture-bornee-cadrage-creux-2gio s=%.1f (affichée, jamais assertée)" % (time.monotonic() - debut))
+    # (b) VERDICT.md, G4
+    lab = lab_g4(ctx, "lb-verdict-plus1")
+    _completer(os.path.join(lab, VERDICT), borne + 1)
+    refus("VERDICT.md de 1 Mio + 1 octet, G4", "G4", lab, SUMMARY)
+    lab = lab_g4(ctx, "lb-verdict-exact")
+    _completer(os.path.join(lab, VERDICT), borne)
+    passe("VERDICT.md d'exactement 1 Mio, G4", "G4", lab, SUMMARY)
+    lab_verdict_creux = lab_g4(ctx, "lb-verdict-creux")
+    verdict_creux = os.path.join(lab_verdict_creux, VERDICT)
+    creux(verdict_creux)
+    debut = time.monotonic()
+    refus("VERDICT.md creux de 2 Gio, G4", "G4", lab_verdict_creux, SUMMARY)
+    print("DUREE lecture-bornee-verdict-creux-2gio s=%.1f (affichée, jamais assertée)" % (time.monotonic() - debut))
+    # (c) VERDICT.md d'un juge, vérificateur de juges
+    def juge_attendu(nom, lab, prouve, motif=None):
+        classes = _verificateur_de_juges(ctx, dossier_jugé, lab)
+        if not isinstance(classes, dict):
+            fautes.append("%s : sortie de --juges illisible : %s" % (nom, classes))
+        elif prouve:
+            if classes.get("prouves") != ["juge-x"] or classes.get("sans_preuve"):
+                fautes.append("%s : prouvés %s, sans preuve %s (attendu juge-x prouvé)" % (nom, classes.get("prouves"), court(str(classes.get("sans_preuve")))))
+        elif classes.get("prouves") or classes.get("sans_preuve") != [{"juge": "juge-x", "motif": motif}]:
+            fautes.append("%s : prouvés %s, sans preuve %s (attendu juge-x sans preuve, motif %s)" % (nom, classes.get("prouves"), court(str(classes.get("sans_preuve"))), motif))
+
+    lab, verdict = _lab_juge(ctx, "lb-juge-plus1")
+    _completer(verdict, borne + 1)
+    juge_attendu("VERDICT.md de juge de 1 Mio + 1 octet", lab, False, "verdict-hors-borne")
+    lab, verdict = _lab_juge(ctx, "lb-juge-exact")
+    _completer(verdict, borne)
+    juge_attendu("VERDICT.md de juge d'exactement 1 Mio", lab, True)
+    lab, verdict_juge_creux = _lab_juge(ctx, "lb-juge-creux")
+    creux(verdict_juge_creux)
+    debut = time.monotonic()
+    juge_attendu("VERDICT.md de juge creux de 2 Gio", lab, False, "verdict-hors-borne")
+    print("DUREE lecture-bornee-juge-creux-2gio s=%.1f (affichée, jamais assertée)" % (time.monotonic() - debut))
+    # (d) espion : la lecture générique du hook jugé ne demande jamais plus de borne + 1 octets
+    lire = ns.get("lire_octets_bornes")
+    if lire is None:
+        fautes.append("espion : lire_octets_bornes absente du hook jugé (la lecture générique bornée n'existe pas)")
+    else:
+        for nom, chemin in (("CADRAGE.md creux", cadrage_creux), ("VERDICT.md creux", verdict_creux), ("VERDICT.md de juge creux", verdict_juge_creux)):
+            lectures = []
+            ns_e = dict(ns)
+            ns_e["os"] = _OsEspion(os, lectures, borne)
+            fonction = types.FunctionType(lire.__code__, ns_e, lire.__name__, lire.__defaults__)
+            statut = fonction(chemin)[0]
+            if statut != "hors-borne":
+                fautes.append("espion : lire_octets_bornes rend %r sur le %s de 2 Gio (attendu hors-borne)" % (statut, nom))
+            if not lectures or any(n is None or not 0 < n <= borne + 1 for n in lectures):
+                fautes.append("espion : lecture non bornée sur le %s, read(n) demandés : %s (attendu 0 < n <= %d)" % (nom, lectures, borne + 1))
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "CADRAGE.md (G1) et VERDICT.md (G4) de borne + 1 octets et creux de 2 Gio : UN deny qui nomme BORNE_LECTURE_FICHIER (1048576) ; à la borne exacte : "
+                          "G1 et G4 passent ; VERDICT.md de juge : verdict-hors-borne au-delà, prouvé à la borne ; espion : hors-borne rendu sans lecture de plus de "
+                          "%d octets" % (borne + 1))
+
+
+def controle_adhesion_bornee(ctx, script):
+    """config.json adhérent de BORNE_LECTURE_FICHIER + 1 octets (espaces) : l'adhésion est indéterminée. (1) cœur lancé directement sur un Write du PLAN.md
+    d'une phase sans CADRAGE.md : code 3, stdout et stderr vides ; commande enregistrée : deny de la couche de repli (« hook central indisponible »), jamais le
+    message de G1 ; Bash : silence ; SessionStart : code 0, stdout vide ; (2) jumeau à la borne exacte : deny G1 (le cœur lit l'adhésion), SessionStart émet
+    watchPaths ; (3) config.json DEV hors borne : silence par la commande enregistrée (P46-D-16) ; (4) config.json adhérent creux de 2 Gio : cœur direct, code 3 ;
+    (5) espion : `verifier_adhesion` du hook jugé lève `AdhesionIndeterminee` sans lire plus de borne + 1 octets ; (6) `_appliquer_edit` (G6) rend None sur un
+    config.json de borne + 1 octets et le contenu édité à la borne exacte."""
+    dossier_jugé = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_jugé, "armed")
+    ns = espace_du_hook(ctx, dossier_jugé)
+    borne = ns.get("BORNE_LECTURE_FICHIER", 1048576)
+    fautes = []
+    adherent, dev = '{"planning_version": "cycles-v1"}', '{"planning_version": "2.0"}'
+    plan_phase = UNITE + "/PLAN.md"
+
+    def lab_config(nom, entete, taille):
+        lab = fabriquer_lab(ctx, nom)
+        ecrire(os.path.join(lab, ".planning", "config.json"), entete + " " * (taille - len(entete)))
+        return lab
+
+    def ecriture(lab):
+        return payload("Write", entree_outil("Write", os.path.join(lab, plan_phase)), lab)
+
+    # (1) borne + 1 octets, adhérent
+    lab = lab_config("ab-plus1", adherent, borne + 1)
+    rc, out, err = coeur(ctx, d, lab, ecriture(lab))
+    if rc != 3 or out != b"" or err != b"":
+        fautes.append("cœur direct, Write : rc=%d stdout=%s stderr=%s (attendu : code 3, stdout et stderr vides)" % (rc, court(out), court(err)))
+    rc, out, err = ctx.lancer(ecriture(lab), cwd=lab, dossier=d)
+    if classer(rc, out) != "deny" or err:
+        fautes.append("commande enregistrée, Write : %s %s (attendu : deny de la couche de repli)" % (classer(rc, out), court(out)))
+    else:
+        raison = raison_de(out)
+        if "hook central indisponible" not in raison or "[planning-core] G1 :" in raison:
+            fautes.append("commande enregistrée, Write : raison %s (attendu « hook central indisponible », jamais le message de G1)" % court(raison))
+    rc, out, err = ctx.lancer(payload("Bash", {"command": "ls"}, lab), cwd=lab, dossier=d)
+    if rc != 0 or out != b"" or err:
+        fautes.append("commande enregistrée, Bash : rc=%d stdout=%s stderr=%s (attendu le silence)" % (rc, court(out), court(err)))
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or out != b"" or err:
+        fautes.append("commande enregistrée, SessionStart : rc=%d stdout=%s stderr=%s (attendu : code 0, stdout vide)" % (rc, court(out), court(err)))
+    lab_plus1 = lab
+    # (2) jumeau à la borne exacte
+    lab = lab_config("ab-exact", adherent, borne)
+    bon, detail, _raison = _refus_gate(ctx, "G1", d, lab, "Write", plan_phase)
+    if not bon:
+        fautes.append("config.json d'exactement 1 Mio, Write : %s (attendu le deny de G1 : le cœur lit l'adhésion)" % detail)
+    rc, out, err = session(ctx, d, lab)
+    surveilles = surveilles_de(out)
+    if rc != 0 or err or not surveilles:
+        fautes.append("config.json d'exactement 1 Mio, SessionStart : rc=%d stdout=%s stderr=%s (attendu watchPaths)" % (rc, court(out), court(err)))
+    # (3) lab dev hors borne : silence
+    lab = lab_config("ab-dev-plus1", dev, borne + 1)
+    rc, out, err = ctx.lancer(ecriture(lab), cwd=lab, dossier=d)
+    if rc != 0 or out != b"" or err:
+        fautes.append("config.json DEV de borne + 1 octets, Write : rc=%d stdout=%s stderr=%s (attendu le silence, P46-D-16)" % (rc, court(out), court(err)))
+    # (4) adhérent creux de 2 Gio
+    lab = fabriquer_lab(ctx, "ab-creux")
+    ecrire(os.path.join(lab, ".planning", "config.json"), adherent)
+    os.truncate(os.path.join(lab, ".planning", "config.json"), 2 * 1024 ** 3)
+    debut = time.monotonic()
+    rc, out, err = coeur(ctx, d, lab, ecriture(lab))
+    print("DUREE adhesion-bornee-config-creux-2gio s=%.1f (affichée, jamais assertée)" % (time.monotonic() - debut))
+    if rc != 3 or out != b"" or err != b"":
+        fautes.append("config.json creux de 2 Gio, cœur direct : rc=%d stdout=%s stderr=%s (attendu : code 3, stdout et stderr vides)" % (rc, court(out), court(err)))
+    # (5) espion de verifier_adhesion
+    exception = ns.get("AdhesionIndeterminee")
+    if ns.get("lire_octets_bornes") is None or exception is None:
+        fautes.append("espion : lire_octets_bornes ou AdhesionIndeterminee absente du hook jugé")
+    else:
+        lectures = []
+        ns_e = dict(ns)
+        ns_e["os"] = _OsEspion(os, lectures, borne)
+        for nom in ("lire_octets_bornes", "verifier_adhesion"):
+            f = ns[nom]
+            ns_e[nom] = types.FunctionType(f.__code__, ns_e, f.__name__, f.__defaults__)
+        try:
+            ns_e["verifier_adhesion"](os.path.join(lab_plus1, ".planning"))
+            fautes.append("espion : verifier_adhesion ne lève pas AdhesionIndeterminee sur un config.json de borne + 1 octets")
+        except exception:
+            pass
+        if not lectures or any(n is None or not 0 < n <= borne + 1 for n in lectures):
+            fautes.append("espion : lecture non bornée par verifier_adhesion, read(n) demandés : %s (attendu 0 < n <= %d)" % (lectures, borne + 1))
+    # (6) _appliquer_edit (G6)
+    edit = ns.get("_appliquer_edit")
+    if edit is None:
+        fautes.append("_appliquer_edit absente du hook jugé")
+    else:
+        entree = {"old_string": "cycles-v1", "new_string": "cycles-v2"}
+        rendu = edit(os.path.join(lab_plus1, ".planning", "config.json"), entree)
+        if rendu is not None:
+            fautes.append("_appliquer_edit sur un config.json de borne + 1 octets rend un contenu de %d caractères (attendu None)" % len(rendu))
+        exact = os.path.join(lab_config("ab-edit-exact", adherent, borne), ".planning", "config.json")
+        attendu = adherent.replace("cycles-v1", "cycles-v2") + " " * (borne - len(adherent))
+        rendu = edit(exact, entree)
+        if rendu != attendu:
+            fautes.append("_appliquer_edit sur un config.json d'exactement 1 Mio : %s (attendu le contenu édité)" % ("None" if rendu is None else "contenu différent"))
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "config.json adhérent de borne + 1 octets (et creux de 2 Gio) : cœur direct code 3, couche de repli deny « hook central indisponible », Bash et "
+                          "SessionStart silencieux ; à la borne exacte : le cœur lit l'adhésion (deny G1, watchPaths) ; lab dev hors borne : silence ; espion : "
+                          "AdhesionIndeterminee sans lecture de plus de %d octets ; _appliquer_edit : None au-delà, contenu à la borne" % (borne + 1))
+
+
+class LectureNonBornee(Exception):
+    """Levée par le lecteur infini de R-JOURNAUX-BORNES quand le hook en lit sans fin (ce n'est pas une OSError : le hook ne l'attrape pas)."""
+
+
+class _LecteurInfini:
+    """Fichier ouvert par `os.fdopen` qui rend n octets à chaque `read(n)`, sans fin ; au-delà de `limite` octets fournis, lève LectureNonBornee."""
+    _BLOC = b"x" * 1048576
+
+    def __init__(self, compte, limite):
+        self._compte, self._limite = compte, limite
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def read(self, n=-1):
+        n = 1048576 if (n is None or n < 0) else n
+        if self._compte[0] + n > self._limite:
+            raise LectureNonBornee("plus de %d octets demandés" % self._limite)
+        self._compte[0] += n
+        return self._BLOC[:n] if n <= len(self._BLOC) else b"x" * n
+
+
+class _OsInfini:
+    """Le module `os` du hook, à l'identique, sauf `fdopen` qui ferme le descripteur réel et rend un `_LecteurInfini`."""
+
+    def __init__(self, reel, compte, limite):
+        self._reel, self._compte, self._limite = reel, compte, limite
+
+    def __getattr__(self, nom):
+        return getattr(self._reel, nom)
+
+    def fdopen(self, descripteur, *args, **kw):
+        self._reel.close(descripteur)
+        return _LecteurInfini(self._compte, self._limite)
+
+
+def controle_journaux_bornes(ctx, script):
+    """Copie armée. (a) CLOTURE.md refusé par G3 (livrable absent), dérogation inscrite par la vraie deroger-gate.sh, journal complété APRÈS la dérogation à
+    BORNE_LECTURE_FICHIER + 1 octets : Write -> deny G3, journal inchangé (aucune ligne `consommee`) ET `derogation_active` du hook jugé, appelée DIRECTEMENT sur ce
+    journal, rend None ; jumeau à la borne exacte -> passe, dérogation citée et consommée ; (b) `consommer` appelée directement sur un journal de borne + 1 octets qui
+    porte la dérogation -> False, journal inchangé ; (c) `empreinte_fichier` (D1) sur un lecteur INFINI -> None sans fournir plus de BORNE_OCTETS_LIVRABLES + 1 Mio."""
+    dossier_jugé = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_jugé, "armed")
+    ns = espace_du_hook(ctx, dossier_jugé)
+    borne = ns.get("BORNE_LECTURE_FICHIER", 1048576)
+    borne_d1 = ns.get("BORNE_OCTETS_LIVRABLES", 134217728)
+    fautes = []
+
+    def lab_derogation(nom):
+        lab = fabriquer_lab(ctx, nom)
+        rc, _out, err = deroger(ctx, lab, "G3", (CLOTURE,))
+        if rc != 0:
+            raise RuntimeError("deroger-gate.sh refuse le scénario : rc=%d %s" % (rc, court(err)))
+        return lab, os.path.join(lab, ".planning", "derogations-gates.log")
+
+    active, consomme = ns.get("derogation_active"), ns.get("consommer")
+    # (a) journal de borne + 1 octets : aucune dérogation lue, refus maintenu
+    lab, journal = lab_derogation("jb-plus1")
+    _completer(journal, borne + 1, "# ", "\n")
+    avant = open(journal, "rb").read()
+    bon, detail, _raison = _refus_g3(ctx, d, lab, "Write", CLOTURE)
+    if not bon:
+        fautes.append("journal de borne + 1 octets, Write du CLOTURE.md : %s (attendu le deny de G3 : aucune dérogation lue)" % detail)
+    apres = open(journal, "rb").read()
+    if apres != avant or b"consommee" in apres:
+        fautes.append("journal de borne + 1 octets : la taille ou le contenu a changé (%d -> %d octets) ou une ligne `consommee` a été écrite" % (len(avant), len(apres)))
+    if active is None:
+        fautes.append("derogation_active absente du hook jugé")
+    else:
+        rendu = active(lab, "G3", CLOTURE)
+        if rendu is not None:
+            fautes.append("derogation_active appelée directement sur un journal de borne + 1 octets rend une dérogation : %s (attendu None)" % court(str(rendu)))
+    # (a) jumeau à la borne exacte : la dérogation est lue, citée, consommée
+    lab, journal = lab_derogation("jb-exact")
+    _completer(journal, borne, "# ", "\n")
+    rc, out, err = ecrire_dans(ctx, d, lab, "Write", CLOTURE)
+    texte = open(journal, encoding="utf-8").read()
+    if classer(rc, out) != "avertit" or err or "consommée" not in contexte_de(out):
+        fautes.append("journal d'exactement 1 Mio, Write du CLOTURE.md : %s %s (attendu un passage qui cite la dérogation consommée)" % (classer(rc, out), court(out)))
+    if texte.count("  consommee  id=1  gate=G3  ") != 1:
+        fautes.append("journal d'exactement 1 Mio : %d ligne(s) `consommee` (attendu 1)" % texte.count("  consommee  id=1  gate=G3  "))
+    # (b) consommer, appelée directement
+    lab, journal = lab_derogation("jb-consommer")
+    entree = active(lab, "G3", CLOTURE) if active is not None else None
+    if active is not None and entree is None:
+        fautes.append("témoin : derogation_active ne lit pas la dérogation d'un journal sous la borne")
+    _completer(journal, borne + 1, "# ", "\n")
+    avant = open(journal, "rb").read()
+    if consomme is None:
+        fautes.append("consommer absente du hook jugé")
+    elif entree is not None:
+        rendu = consomme(lab, entree)
+        apres = open(journal, "rb").read()
+        if rendu is not False:
+            fautes.append("consommer appelée directement sur un journal de borne + 1 octets rend %r (attendu False)" % (rendu,))
+        if apres != avant:
+            fautes.append("consommer a modifié un journal de borne + 1 octets (%d -> %d octets)" % (len(avant), len(apres)))
+    # (c) empreinte_fichier : jamais plus de BORNE_OCTETS_LIVRABLES octets lus, même devant un lecteur infini
+    empreinte = ns.get("empreinte_fichier")
+    if empreinte is None:
+        fautes.append("empreinte_fichier absente du hook jugé")
+    else:
+        petit = ctx.unique("jb-d1")
+        ecrire(petit, "petit fichier régulier\n")
+        compte = [0]
+        ns_e = dict(ns)
+        ns_e["os"] = _OsInfini(os, compte, 2 * (borne_d1 + 1))
+        fonction = types.FunctionType(empreinte.__code__, ns_e, empreinte.__name__, empreinte.__defaults__)
+        try:
+            rendu = fonction(petit)
+        except LectureNonBornee:
+            fautes.append("empreinte_fichier : lecture non bornée (%d octets fournis sans que le hook s'arrête)" % compte[0])
+        else:
+            if rendu is not None:
+                fautes.append("empreinte_fichier rend %s devant un lecteur infini (attendu None)" % court(str(rendu)))
+            if compte[0] > borne_d1 + 1048576:
+                fautes.append("empreinte_fichier a lu %d octets (attendu au plus BORNE_OCTETS_LIVRABLES + 1 Mio = %d)" % (compte[0], borne_d1 + 1048576))
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "journal des dérogations de borne + 1 octets : G3 maintient son refus, journal inchangé, derogation_active rend None, consommer rend False ; à la "
+                          "borne exacte : dérogation citée et consommée ; empreinte_fichier (D1) : None sans fournir plus de %d octets devant un lecteur infini"
+                          % (borne_d1 + 1048576))
 
 
 # --- A13 (fix-46-a) : un livrable hors borne n'est pas « à produire » -------------------------------------------------------
@@ -1814,6 +2238,9 @@ def sec_g3(ctx):
             ("R-G3-04", controle_g3_04, "dérogation et erreur interne"),
             ("R-PLAN-BORNE", controle_plan_borne, "PLAN.md au-delà de 1 Mio : refus explicite de G3 et G4, lecture bornée"),
             ("R-PLAN-BORNE-G2", controle_plan_borne_g2, "PLAN.md au-delà de 1 Mio : lecture bornée aussi par G2 (plans_ouverts), plan ignoré"),
+            ("R-LECTURE-BORNEE", controle_lecture_bornee, "toute lecture d'un fichier du lab contrôlé par l'agent bornée : CADRAGE.md (G1), VERDICT.md (G4, juges), espion"),
+            ("R-ADHESION-BORNEE", controle_adhesion_bornee, "config.json au-delà de la borne : adhésion indéterminée, code 3 sous PreToolUse, silence ailleurs, zéro régression hors adhésion"),
+            ("R-JOURNAUX-BORNES", controle_journaux_bornes, "journal des dérogations et fichiers de D1 : lecture bornée, refus maintenu, silence de D1"),
             ("R-G3-05", controle_g3_05, "livrable hors borne : message distinct qui nomme la borne"),
             ("R-NFD-02", controle_nfd_02, "forme NFD : chemin mixte, voie cwd, lien à cible NFD, dérogation, copie observe")):
         bon, detail = original_de(ctx, ident, ctrl)
@@ -1856,10 +2283,24 @@ def sec_mutants_g3(ctx):
     tuer(ctx, "G3-BORNE-MESSAGE", "# g3-borne", "if False:  # g3-borne", "R-G3-05", controle_g3_05)
     tuer(ctx, "PLAN-BORNE-TEST", "# plan-hors-borne", "if False:  # plan-hors-borne", "R-PLAN-BORNE", controle_plan_borne)
     tuer(ctx, "PLAN-LECTURE", "# plan-lecture-bornee", "octets = fh.read()  # plan-lecture-bornee", "R-PLAN-BORNE", controle_plan_borne)
-    tuer(ctx, "PLAN-G2-BORNE", "# g2-plan-borne", 'statut, donnees = lire_frontmatter_fichier(os.path.join(dossier, "PLAN.md"))  # g2-plan-borne',
+    # re-ciblé (tour 2, A11-classe) : le défaut de `lire_frontmatter_fichier` valant BORNE_LECTURE_FICHIER (= BORNE_LECTURE_PLAN), retirer la borne explicite
+    # est devenu un mutant équivalent ; celui-ci relâche la borne de G2 (2 * BORNE_LECTURE_PLAN)
+    tuer(ctx, "PLAN-G2-BORNE", "# g2-plan-borne", 'statut, donnees = lire_frontmatter_fichier(os.path.join(dossier, "PLAN.md"), 2 * BORNE_LECTURE_PLAN)  # g2-plan-borne',
          "R-PLAN-BORNE-G2", controle_plan_borne_g2)
     tuer(ctx, "PLAN-G2-LECTURE", "# lff-lecture-bornee", "octets = fh.read()  # lff-lecture-bornee", "R-PLAN-BORNE-G2", controle_plan_borne_g2)
     tuer(ctx, "PLAN-G2-HORS-BORNE", "# lff-hors-borne", "if False:  # lff-hors-borne", "R-PLAN-BORNE-G2", controle_plan_borne_g2)
+    # A11-classe (fix-46-a tour 2) : la borne générique, G1, G4, le vérificateur de juges
+    tuer(ctx, "BORNE-GENERIQUE", "# lff-lecture-bornee", "octets = fh.read(); borne = len(octets)  # lff-lecture-bornee", "R-LECTURE-BORNEE", controle_lecture_bornee)
+    tuer(ctx, "G1-BORNE-CADRAGE", "# g1-borne-cadrage", "if False:  # g1-borne-cadrage", "R-LECTURE-BORNEE", controle_lecture_bornee)
+    tuer(ctx, "G4-BORNE-VERDICT", "# g4-borne-verdict", "if False:  # g4-borne-verdict", "R-LECTURE-BORNEE", controle_lecture_bornee)
+    tuer(ctx, "JUGE-BORNE-VERDICT", "# juge-borne-verdict", "if False:  # juge-borne-verdict", "R-LECTURE-BORNEE", controle_lecture_bornee)
+    # config.json : l'adhésion hors borne rendue non adhérente ; la clause de `main` retirée (la décision dans le doute refuse en code 0)
+    tuer(ctx, "ADHESION-BORNE", "# adhesion-hors-borne", "return resultat  # adhesion-hors-borne", "R-ADHESION-BORNEE", controle_adhesion_bornee)
+    tuer(ctx, "ADHESION-INCONNUE", "# adhesion-inconnue", "except ZeroDivisionError:  # adhesion-inconnue", "R-ADHESION-BORNEE", controle_adhesion_bornee)
+    # journaux : derogation_active (appel direct), consommer (sous verrou), empreinte_fichier de D1
+    tuer(ctx, "DEROG-BORNE", "# derog-borne-test", "if False:  # derog-borne-test", "R-JOURNAUX-BORNES", controle_journaux_bornes)
+    tuer(ctx, "DEROG-VERROU", "# derog-borne-verrou", "if False:  # derog-borne-verrou", "R-JOURNAUX-BORNES", controle_journaux_bornes)
+    tuer(ctx, "D1-LECTURE-HACHAGE", "# d1-lecture-hachage", "if False:  # d1-lecture-hachage", "R-JOURNAUX-BORNES", controle_journaux_bornes)
 
 
 def sec_mutants_g4(ctx):
