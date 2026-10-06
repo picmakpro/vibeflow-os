@@ -285,7 +285,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -308,7 +308,7 @@
         "docs"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-46-socle",

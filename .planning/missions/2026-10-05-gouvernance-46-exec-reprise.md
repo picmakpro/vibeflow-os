@@ -188,7 +188,26 @@ Relayées verbatim des blocs typés, par sprint :
 - Remonté à Willy : repos du lab (a/b/c/d, recommandé a) et ckpt-46-12 par avance (recommandé
   `etape-6-mesure`, vu A2, A3, A4, P1 ; P5 : journal ignoré).
 
+## Fin de mission (2026-10-06 → 2026-10-07)
+
+- Arbitrages reçus (Willy, AskUserQuestion session principale) : 2026-10-06 — arrêt des processus de
+  ~/BusinessFlow-Lab (étapes 5 et 6), étape 5 « (c) Armer G3 seul », ckpt-46-12 « etape-6-mesure »,
+  P5 « l'ignorer », Q-G7 « (a) », Q-B « (1) » ; 2026-10-07 — Phase 46.1 insérée.
+- 46-11 : rejeu réel joué (labs au repos après arrêt de 12 processus) — G3 0/0, G4 343 (unités closes
+  avant G4), G7 6 (attendus de la 45 non chargés : constat, ni régression ni changement des labs).
+  **G3 armé seul** (`b703d73d`), étape 5 scindée.
+- 46-12 : mesure de l'étape 6 (session strategist arrêtée), rejouée après la recopie des attendus G7 :
+  G4P 0/0 sur 96 cas, G7 0 faux refus, G4 343 ; référence, v2.10.0 sans release, P5.
+- Étage final : vérification 11/11 (3 sous arbitrage) ; revue finale PASS (5 mineurs) ; audit final
+  OPEN_THREATS sans HIGH (G3 armé tient) ; lot final fix-46-c (quick 261006-qpz : N-1, N-7, N-8,
+  deroger-gate borné, .planning/.gitignore, limites exactes, F5/F6) ; messages de 7 commits réécrits
+  avant tout push (un chemin par trailer Gate-Touche), ref de sauvegarde
+  `refs/vf-backup/fix-46-c-avant-reecriture`.
+- Nœud docs : Phase 46.1 insérée, ROADMAP/REQUIREMENTS/STATE à jour.
+- CI complète verte sur `8acff1ad`. **PR #136** (base `gouvernance/phase-46-cadrage` = PR #133, empilée
+  sur #124). Aucun merge, tag ni release.
+
 ## Next step
 
-Relancer exec-46-11 Tâche 2 dès que ~/BusinessFlow-Lab est au repos (ou selon la réponse de Willy),
-puis 46-12 selon ckpt-46-12, revue/audit/non-régression finaux, docs, PR empilée sur #124.
+Revue code owner de la pile #124 → #133 → #136 par Samuel, puis cadrage de la Phase 46.1 (armement de G4 et G4′)
+— ou, selon la feuille de route, cadrage de la Phase 47.
