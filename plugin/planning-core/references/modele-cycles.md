@@ -800,7 +800,7 @@ ici :
 | Code | Libellé |
 |---|---|
 | `combinaison-non-prevue` | combinaison de signaux non prévue |
-| `verdict-perime` | verdict périmé : re-juger (tentative n+1) |
+| `verdict-perime` | verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise) |
 | `livrable-modifie-apres-cloture` | livrable ou plan modifié après la clôture |
 | `empreinte-hors-borne` | empreinte des livrables hors borne |
 | `SUMMARY.md-sans-PLAN.md` | SUMMARY.md sans PLAN.md |
@@ -832,7 +832,7 @@ espaces — jamais un `KeyError`.
 
 **La raison d'un `à juger` périmé** (P46-D-03b) se lit aussi : une unité `à juger` dont la raison vaut
 `verdict-perime` rend, dans `INDEX.md` (ligne du cycle) et dans `STATE.md` (`etat`),
-`à juger — verdict périmé : re-juger (tentative n+1)` ; un `à juger` ordinaire (sans verdict) reste `à juger`
+`à juger — verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise)` ; un `à juger` ordinaire (sans verdict) reste `à juger`
 tout court. Le cycle et la phase à plans remontent la raison de leur unité courante.
 
 Le JSON, lui, garde **toujours** le code brut dans `raison` : la forme lisible n'habille que

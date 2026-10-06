@@ -1122,15 +1122,15 @@ else
   ko "R27 ancien libellé" "absent de INDEX.md et STATE.md" "présent" "$(cat "$R27A_DIR/.planning/INDEX.md" 2>/dev/null)"
 fi
 # 46-03 (P46-D-03b) : la raison d'un `à juger` périmé se lit dans l'index et dans l'état.
-if grep -qF '| cycles/01-c | à juger — verdict périmé : re-juger (tentative n+1) | 01-p |' "$R27C_DIR/.planning/INDEX.md" 2>/dev/null; then
-  ok "R27 INDEX.md (verdict-perime) porte « verdict périmé : re-juger (tentative n+1) »"
+if grep -qF '| cycles/01-c | à juger — verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise) | 01-p |' "$R27C_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 INDEX.md (verdict-perime) porte « verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise) »"
 else
-  ko "R27 INDEX.md verdict périmé" "à juger — verdict périmé : re-juger (tentative n+1)" "$(cat "$R27C_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+  ko "R27 INDEX.md verdict périmé" "à juger — verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise)" "$(cat "$R27C_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
 fi
-if grep -qF 'etat: à juger — verdict périmé : re-juger (tentative n+1)' "$R27C_DIR/.planning/STATE.md" 2>/dev/null; then
-  ok "R27 STATE.md (verdict-perime) porte « verdict périmé : re-juger (tentative n+1) »"
+if grep -qF 'etat: à juger — verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise)' "$R27C_DIR/.planning/STATE.md" 2>/dev/null; then
+  ok "R27 STATE.md (verdict-perime) porte « verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise) »"
 else
-  ko "R27 STATE.md verdict périmé" "etat: à juger — verdict périmé : re-juger (tentative n+1)" "$(cat "$R27C_DIR/.planning/STATE.md" 2>/dev/null)" "-"
+  ko "R27 STATE.md verdict périmé" "etat: à juger — verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise)" "$(cat "$R27C_DIR/.planning/STATE.md" 2>/dev/null)" "-"
 fi
 # Jumeau négatif : un `à juger` ordinaire (sans verdict) ne porte aucune raison dans l'index.
 R27D_DIR="$WORK/r27d"

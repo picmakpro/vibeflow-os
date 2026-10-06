@@ -116,7 +116,7 @@ LIBELLES = {
     # ce libellé (F6, 2026-09-28) ; il reste dans la table pour le jour où une règle nouvelle
     # laisserait un trou.
     "combinaison-non-prevue": "combinaison de signaux non prévue",
-    "verdict-perime": "verdict périmé : re-juger (tentative n+1)",
+    "verdict-perime": "verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise)",
     "livrable-modifie-apres-cloture": "livrable ou plan modifié après la clôture",
     "empreinte-hors-borne": "empreinte des livrables hors borne",
     "SUMMARY.md-sans-PLAN.md": "SUMMARY.md sans PLAN.md",
