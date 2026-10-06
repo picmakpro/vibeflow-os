@@ -6,6 +6,9 @@
 #   2. Cluster : >= 3 learnings sur meme tag/categorie sans rule
 #   3. Non-encode : champ "Encode dans:" vide ou "Non encode"
 #
+# Tri de chaque candidate (POCK-05, P414-D-10) :
+#   nature      mecanique | jugement  (heuristique lexicale, defaut jugement ; tri final humain)
+#   proposition check | brouillon-regle  (mecanique -> check ; jugement -> brouillon de regle)
 # Output : JSON sur stdout
 #
 # Usage:
@@ -33,6 +36,12 @@ with open("$LEARNINGS_FILE") as f:
 # Split by "## LRN-XXX" headers
 sections = re.split(r'\n(?=## LRN-\d+)', content)
 
+# Indices lexicaux d'un motif mecanique (heuristique : defaut jugement, tri final humain).
+INDICES_MECANIQUES = ['lint', 'hook', 'regex', 'grep', 'commit', 'chemin', 'fichier',
+                      'import', 'console.log', 'frontmatter', 'job ci']
+RE_MECA = re.compile(r'\b(?:' + '|'.join(re.escape(i) for i in INDICES_MECANIQUES) + r')s?\b'
+                     r'|\.(?:sh|md|json|ya?ml|ts|tsx|js|jsx|py|swift|go)\b')
+
 entries = []
 for sec in sections:
     if not sec.startswith('## LRN-'):
@@ -57,24 +66,28 @@ for sec in sections:
     keywords = ['toujours', 'jamais', 'eviter', 'forcer', 'obligatoire', 'interdire', 'prefer', 'always', 'never', 'avoid', 'must']
     operational = any(kw in body_preview for kw in keywords)
 
-    entries.append((lrn_id, title, cat, encoded, operational))
+    nature = 'mecanique' if RE_MECA.search(title.lower() + ' ' + body_preview) else 'jugement'
+
+    entries.append((lrn_id, title, cat, encoded, operational, nature))
 
 # Operational singles (non encoded)
 print("###OPERATIONAL###")
-for lrn_id, title, cat, encoded, op in entries:
+for lrn_id, title, cat, encoded, op, nature in entries:
     if op and not encoded:
-        print(f"{lrn_id}|{title[:80]}|{cat}")
+        print(f"{lrn_id}|{title[:80]}|{cat}|{nature}")
 
 # Clusters by category (>=3 non-encoded)
 print("###CLUSTERS###")
 from collections import defaultdict
 clusters = defaultdict(list)
-for lrn_id, title, cat, encoded, op in entries:
+for lrn_id, title, cat, encoded, op, nature in entries:
     if not encoded:
-        clusters[cat].append(lrn_id)
-for cat, ids in clusters.items():
-    if len(ids) >= 3:
-        print(f"{cat}|{','.join(ids)}")
+        clusters[cat].append((lrn_id, nature))
+for cat, members in clusters.items():
+    if len(members) >= 3:
+        # Cluster mecanique seulement si TOUS ses membres le sont.
+        cluster_nature = 'mecanique' if all(n == 'mecanique' for _, n in members) else 'jugement'
+        print(f"{cat}|{','.join(i for i, _ in members)}|{cluster_nature}")
 PYEOF
 }
 
@@ -90,23 +103,35 @@ echo "  \"timestamp\": \"$(date -Iseconds 2>/dev/null || date)\","
 echo "  \"candidates\": ["
 
 first=true
-while IFS='|' read -r lrn_id title cat; do
+# Proposition derivee de la nature (enumeration fermee : mecanique -> check, sinon brouillon-regle)
+proposition_of() {
+  case "$1" in
+    mecanique) echo "check" ;;
+    *) echo "brouillon-regle" ;;
+  esac
+}
+
+while IFS='|' read -r lrn_id title cat nature; do
   [ -z "$lrn_id" ] && continue
   $first || echo ","
   first=false
+  [ "$nature" = "mecanique" ] || nature="jugement"
+  proposition=$(proposition_of "$nature")
   # Generate slug from title
   slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed 's/--*/-/g' | sed 's/^-//;s/-$//' | cut -c 1-50)
-  printf '    {"type": "operational_single", "lrn_id": "%s", "title": "%s", "category": "%s", "rule_slug": "%s", "confidence": 0.85}' \
-    "$lrn_id" "$title" "$cat" "$slug"
+  printf '    {"type": "operational_single", "lrn_id": "%s", "title": "%s", "category": "%s", "rule_slug": "%s", "nature": "%s", "proposition": "%s", "confidence": 0.85}' \
+    "$lrn_id" "$title" "$cat" "$slug" "$nature" "$proposition"
 done <<< "$operational_section"
 
-while IFS='|' read -r cat ids; do
+while IFS='|' read -r cat ids nature; do
   [ -z "$cat" ] && continue
   $first || echo ","
   first=false
+  [ "$nature" = "mecanique" ] || nature="jugement"
+  proposition=$(proposition_of "$nature")
   slug=$(echo "$cat" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
-  printf '    {"type": "frequency_cluster", "category": "%s", "lrn_ids": "%s", "rule_slug": "cluster-%s", "confidence": 0.7}' \
-    "$cat" "$ids" "$slug"
+  printf '    {"type": "frequency_cluster", "category": "%s", "lrn_ids": "%s", "rule_slug": "cluster-%s", "nature": "%s", "proposition": "%s", "confidence": 0.7}' \
+    "$cat" "$ids" "$slug" "$nature" "$proposition"
 done <<< "$clusters_section"
 
 echo ""

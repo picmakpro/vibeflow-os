@@ -8,6 +8,7 @@
 #   T4 — archive.sh --dry-run détecte BLK RÉSOLU + skip ACTIF
 #   T5 — detect-duplicates.sh détecte collisions IDs
 #   T6 — detect-promotions.sh sort candidats operational + cluster
+#   T6b-T6g — nature/proposition par candidate (+ mutant T6f), findings T6e (POCK-05)
 #   T7 — reindex.sh --apply : backups isolés + rotation + gitignore (ADR-049)
 #
 # Fiabilisation CSL :
@@ -110,6 +111,108 @@ echo "=== T6 — detect-promotions.sh sort candidats ==="
 output=$(cd "$WORK_DIR" && MEMORY_DIR=".claude/memory" "$WORK_DIR/.claude/scripts/detect-promotions.sh" 2>&1)
 # LRN-002 contient "toujours" → operational_single
 assert "T6.1 — LRN-002 candidate operational" "$output" '"lrn_id": "LRN-002"'
+
+echo ""
+echo "=== T6b-T6f — detect-promotions.sh : nature + proposition par candidate (POCK-05, P414-D-10) ==="
+# Fixture construite dans le test (la fixture partagée LEARNINGS-mini.md n'est pas modifiée).
+mk_lrn() { # <dossier> : LRN-901 mécanique (lint, fichiers .sh) + LRN-902 jugement, tous deux non encodés
+  mkdir -p "$1/.claude/memory"
+  cat > "$1/.claude/memory/LEARNINGS.md" <<'EOF'
+# Registre des Learnings — fixture T6b
+
+---
+
+## LRN-901 — Toujours lancer le lint avant commit sur les fichiers .sh
+
+**Date** : 2026-10-06
+**Categorie** : Process
+**Encode dans** : Non encode
+
+### Apprentissage
+
+Le lint doit passer avant chaque commit.
+
+---
+
+## LRN-902 — Toujours privilégier la clarté du découpage entre modules
+
+**Date** : 2026-10-06
+**Categorie** : Architecture
+**Encode dans** : Non encode
+
+### Apprentissage
+
+Un découpage lisible vaut mieux qu'un découpage malin.
+EOF
+}
+# Sortie JSON -> "nature|proposition" de la candidate <lrn_id>, ou ABSENTE.
+cand_of() { # <script> <dossier> <lrn_id>
+  (cd "$2" && MEMORY_DIR=".claude/memory" "$1" 2>/dev/null) | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+for c in d["candidates"]:
+    if c.get("lrn_id") == sys.argv[1]:
+        print(c.get("nature", "?") + "|" + c.get("proposition", "?"))
+        sys.exit(0)
+print("ABSENTE")
+' "$3" 2>&1
+}
+T6B="$WORK_DIR/t6b"; mk_lrn "$T6B"
+DP="$WORK_DIR/.claude/scripts/detect-promotions.sh"
+assert "T6b — LRN-901 (lint, .sh) : nature mecanique, proposition check" "$(cand_of "$DP" "$T6B" LRN-901)" "mecanique|check"
+assert "T6c — LRN-902 (clarté du découpage) : nature jugement, proposition brouillon-regle" "$(cand_of "$DP" "$T6B" LRN-902)" "jugement|brouillon-regle"
+json_rc=0
+(cd "$T6B" && MEMORY_DIR=".claude/memory" "$DP" 2>/dev/null) | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1 || json_rc=$?
+assert "T6d — la sortie complète se charge comme JSON" "$json_rc" "0"
+
+# T6f — mutant : la ligne qui calcule la nature est remplacée par une nature figée à jugement.
+T6F="$WORK_DIR/t6f"; mkdir -p "$T6F"
+cp "$DP" "$T6F/detect-promotions.sh"
+MUT_MOTIF="nature = 'mecanique' if RE_MECA.search"
+mut_n=$(grep -Fc -- "$MUT_MOTIF" "$T6F/detect-promotions.sh" || true)
+assert "T6f.0 — motif de mutation unique dans detect-promotions.sh" "$mut_n" "1"
+MUT_MOTIF_ENV="$MUT_MOTIF" awk '
+  index($0, ENVIRON["MUT_MOTIF_ENV"]) { match($0, /^[ \t]*/); print substr($0, RSTART, RLENGTH) "nature = '"'"'jugement'"'"'"; next }
+  { print }
+' "$DP" > "$T6F/mut.sh"
+chmod +x "$T6F/mut.sh"
+mut_same=$(cmp -s "$T6F/mut.sh" "$DP" && echo identique || echo distinct)
+assert "T6f.1 — le mutant diffère de l'original (opposable)" "$mut_same" "distinct"
+mut_syntax=$(bash -n "$T6F/mut.sh" 2>&1 && echo ok || echo KO)
+assert "T6f.2 — le mutant reste syntaxiquement valide (bash -n)" "$mut_syntax" "ok"
+mut_got=$(cand_of "$T6F/mut.sh" "$T6B" LRN-901)
+echo "     trace du rouge — assertion T6b sur le mutant : attendu 'mecanique|check', obtenu '$mut_got'"
+assert "T6f.3 — mutant : T6b rouge (attendu mecanique|check, obtenu jugement|brouillon-regle) ; fixture vivante" "$mut_got" "jugement|brouillon-regle"
+if [[ "$mut_got" == *"mecanique|check"* ]]; then
+  assert "T6f.4 — T6b doit être rouge sur le mutant" "mutant vert (fixture morte)" "mutant rouge"
+else
+  assert "T6f.4 — T6b rouge sur le mutant, vert sur l'original" "$(cand_of "$DP" "$T6B" LRN-901)" "mecanique|check"
+fi
+
+# T6g — cluster : mécanique seulement si TOUS ses membres le sont (3 membres mécaniques, puis 2 + 1 jugement).
+cluster_of() { # <dossier> -> "nature|proposition" du cluster, ou ABSENT
+  (cd "$1" && MEMORY_DIR=".claude/memory" "$DP" 2>/dev/null) | python3 -c '
+import json, sys
+for c in json.load(sys.stdin)["candidates"]:
+    if c.get("type") == "frequency_cluster":
+        print(c.get("nature", "?") + "|" + c.get("proposition", "?"))
+        sys.exit(0)
+print("ABSENT")
+' 2>&1
+}
+mk_cluster() { # <dossier> <titre du 3e membre>
+  mkdir -p "$1/.claude/memory"
+  {
+    for n in 1 2; do
+      printf '## LRN-80%s — Lint des fichiers .sh\n\n**Categorie** : Process\n**Encode dans** : Non encode\n\ntexte\n\n' "$n"
+    done
+    printf '## LRN-803 — %s\n\n**Categorie** : Process\n**Encode dans** : Non encode\n\ntexte\n' "$2"
+  } > "$1/.claude/memory/LEARNINGS.md"
+}
+mk_cluster "$WORK_DIR/t6g1" "Lint du fichier de config"
+assert "T6g.1 — cluster de 3 membres mécaniques : mecanique|check" "$(cluster_of "$WORK_DIR/t6g1")" "mecanique|check"
+mk_cluster "$WORK_DIR/t6g2" "Clarté du découpage entre modules"
+assert "T6g.2 — cluster dont un membre est jugement : jugement|brouillon-regle" "$(cluster_of "$WORK_DIR/t6g2")" "jugement|brouillon-regle"
 
 echo ""
 echo "=== T7 — reindex.sh --apply : backups isolés + rotation + gitignore (ADR-049) ==="
