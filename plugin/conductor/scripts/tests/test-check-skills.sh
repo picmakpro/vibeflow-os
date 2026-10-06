@@ -35,6 +35,24 @@
 #   T20 — --file : conforme / violation / introuvable
 #   T21 — fraîcheur de champs_frontmatter_skills : périmée (avertissement), fraîche, absente
 #   MUT-SD1/SD2 — élagages de découverte neutralisés ; gardes du harnais MUT-SYNTAXE, MUT-REFUS-COMPTE
+#
+# (41.4-01, POCK-07 — classe d'invocation, fixtures d'ARBRE via mk_tree, T33 à T43, MUT-INV1 à INV5) :
+#   T33 — non classé : conforme sous --callers-root si classé, « non classe » + POCK-07 sinon
+#   T34 — vf-invocation User / auto / vide -> rc 1, avec ET sans --callers-root (+ témoin model rc 0)
+#   T35 — cohérence avec disable-model-invocation : user sans true, model avec true -> rc 1
+#   T36 — arêtes machine : commande, préchargement (3 formes), agent outillé Skill, agent sans tools:,
+#         {module}/AGENT.md -> rc 1 ; prose sans Skill, disallowedTools Skill, skill model -> rc 0
+#   T37 — user -> user rc 1 ; user -> model rc 0 (P414-D-01)
+#   T38 — user niché : agents/openai.yaml absent / true / lien symbolique -> rc 1 ; false -> rc 0
+#   T39 — user non niché : rc 0 + avertissement « dette Type 1 » (P414-D-03)
+#   T40 — racine d'arêtes absente ou sans appelant -> rc 3 ; --callers-root vide, sans « = », avec
+#         --file -> rc 1 (usage)
+#   T41 — ligne d'information « sans appelant machine », jamais comptée en avertissement
+#   T42 — sans --callers-root, un skill non classé reste conforme (hook de lab inchangé)
+#   T43 — octet ESC jamais reflété brut ; nom à point (a.b) n'apparie pas axb
+#   MUT-INV1 — appel valider_invocation neutralisé · INV2 — controler_aretes · INV3 — sortie
+#              INDETERMINE de la racine absente · INV4 — controler_codex · INV5 — filtre d'outillage
+#              Skill (tout agent compté outillé) : chaque mutant bascule le rc ET perd le jeton de refus
 
 set -uo pipefail
 
@@ -1500,6 +1518,48 @@ if [ "$RC_A" -eq 0 ] && [ "$RC_B" -eq 1 ] && echo "$OUT_B" | grep -q "commands/x
 else
   ko "T43b (axb=$RC_A, a.b=$RC_B) : $OUT_B"
 fi
+
+# ---------- MUT-INV1 à MUT-INV5 — mutation rouge de la classe d'invocation (QUAL-01) ----------------
+# Chaque contrôle neuf est neutralisé UNE fois (motif fixe unique du gate, refus « MOTIF AMBIGU OU
+# ABSENT » sinon — le helper n'est jamais assoupli) ; le MÊME fixture est joué contre le gate
+# original et contre le mutant : le rc bascule ET le jeton de refus n'est présent que du côté rouge.
+# La trace de chaque mutant dit assertion, attendu, obtenu — un mutant non tué la porte en KO.
+mut_inv() { # <id> <motif> <remplacement> <mode avec|sans|absent> <rc_mutant_attendu> <rc_original_attendu> <jeton> <cas>
+  local id="$1" mode="$4" rcm_att="$5" rco_att="$6" jeton="$7" cas="$8"
+  make_gate_mutant "$id" "$2" "$3" || return 0
+  local m="$MUT_DIR/check-skills.sh" out_m out_o rc_m rc_o args
+  case "$mode" in
+    avec)   args=(--strict "--skills-dir=$TREE/skills" "--callers-root=$TREE") ;;
+    sans)   args=(--strict "--skills-dir=$TREE/skills") ;;
+    absent) args=(--strict "--skills-dir=$TREE/skills" "--callers-root=$WORK/racine-absente-xyz") ;;
+  esac
+  out_m="$(bash "$m" "${args[@]}" 2>&1)"; rc_m=$?
+  out_o="$(bash "$CHECK" "${args[@]}" 2>&1)"; rc_o=$?
+  local rouge vert
+  if [ "$rco_att" -ne 0 ]; then rouge="$out_o"; vert="$out_m"; else rouge="$out_m"; vert="$out_o"; fi
+  if [ "$rc_m" -eq "$rcm_att" ] && [ "$rc_o" -eq "$rco_att" ] \
+     && printf '%s' "$rouge" | grep -qF -- "$jeton" && ! printf '%s' "$vert" | grep -qF -- "$jeton"; then
+    okmut "$id" "$rc_m" "$rcm_att" "$rc_o" "$rco_att" "assertion « $cas » ; jeton « $jeton » présent côté rouge, absent côté vert ; attendu mutant=$rcm_att original=$rco_att ; obtenu mutant=$rc_m original=$rc_o"
+  else
+    komut "$id" "$cas" "mutant rc=$rcm_att, original rc=$rco_att, jeton « $jeton » côté rouge seulement" "mutant rc=$rc_m, original rc=$rc_o ; sortie rouge : $(printf '%s' "$rouge" | head -c 300)"
+  fi
+}
+
+# INV1 — valeur de vf-invocation (T34) : « auto » refusé par l'original, accepté par le mutant
+mk_tree mut-inv1; mk_sk a a 'vf-invocation: auto\ndisable-model-invocation: true\n'; mk_cmd x.md 'commande de fixture'
+mut_inv INV1 "errors.extend(valider_invocation(" "pass  # MUT-INV1" sans 0 1 "vf-invocation invalide" "T34 vf-invocation: auto"
+# INV2 — arête commande vers un user (T36) : refusée par l'original, acceptée par le mutant
+mk_tree mut-inv2; mk_user u1 u1; mk_cmd x.md 'La commande lance le skill u1 puis rend la main.'
+mut_inv INV2 "errors.extend(controler_aretes(" "pass  # MUT-INV2" avec 0 1 "user-invoked appele par commands/x.md" "T36 user nommé par commands/x.md"
+# INV3 — racine d'arêtes absente (T40a) : INDETERMINE rc 3 par l'original, vert à vide (rc 0) par le mutant
+mk_tree mut-inv3; mk_sk a a 'vf-invocation: model\n'
+mut_inv INV3 "if not appelants_trouves:" "if False:  # MUT-INV3" absent 0 3 "ARETES-ABSENTES" "T40a racine d'arêtes absente"
+# INV4 — équivalent Codex (T38) : user niché sans openai.yaml refusé par l'original, accepté par le mutant
+mk_tree mut-inv4; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_cmd x.md 'sans rapport'
+mut_inv INV4 "errors.extend(controler_codex(" "pass  # MUT-INV4" avec 0 1 "user-invoked niche sans agents/openai.yaml" "T38 user niché sans openai.yaml"
+# INV5 — filtre d'outillage Skill (T36) : l'agent sans Skill qui cite en prose passe (rc 0) ; tout agent compté outillé -> rc 1
+mk_tree mut-inv5; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\n' 'Utilise le skill u1 en prose, sans outil Skill.'
+mut_inv INV5 'if not agent_outille_skill(ap["fm"]):' "if False:  # MUT-INV5" avec 1 0 "user-invoked appele par agents/ag.md" "T36 agent tools: Read, Bash qui cite u1 en prose"
 
 # ---------- MUT-DR3 — appel ecart_nature_marqueurs neutralisé (pass) -------------------------------
 if make_gate_mutant DR3 "warnings.extend(ecart_nature_marqueurs(" "pass  # MUT-DR3"; then

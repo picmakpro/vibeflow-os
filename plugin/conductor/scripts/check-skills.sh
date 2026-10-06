@@ -3,8 +3,8 @@
 #
 # Doctrine (Phase 43, spec fabrique §6) : chaque skill déclare sa NATURE en frontmatter —
 # `vf-nature: referentiel | outil | procedure`, DÉFAUT « outil » quand la clé est absente
-# (D-Q1, D-Q2 — aucun des 25 SKILL.md du corpus ne change de comportement à l'armement de ce
-# gate). Une valeur PRÉSENTE mais hors de cet ensemble exact est REFUSÉE (rc 1) — jamais ramenée
+# (D-Q1, D-Q2 — aucun des SKILL.md du corpus (25 à l'armement, Phase 43 ; 26 au 2026-10-06) ne change
+# de comportement à l'armement de ce gate). Une valeur PRÉSENTE mais hors de cet ensemble exact est REFUSÉE (rc 1) — jamais ramenée
 # au défaut « outil » (B-03 : jamais un défaut silencieux sur une déclaration invalide).
 # Une PROCÉDURE doit déclarer `ecrit:` (son périmètre d'écriture, moteur D-10) ET
 # `vf-rubrique-juge:` (sa rubrique de juge) ; l'absence de l'un, de l'autre ou des deux est un
@@ -15,8 +15,8 @@
 # FABR-07 (détection de dérive procédurale, écart déclaration/prose) n'est PAS posée par ce
 # script — elle arrive en 43-02, un plan distinct, sur le même gate.
 #
-# Contrat de clés (D-Q1, costly) : ces six clés (`vf-nature`, `ecrit`, `vf-rubrique-juge`,
-# `vf-gate-bloquant`, `vf-livrable-tiers`, `vf-couche-qualite`) sont des CONVENTIONS VibeFlow —
+# Contrat de clés (D-Q1, costly) : ces sept clés (`vf-nature`, `ecrit`, `vf-rubrique-juge`,
+# `vf-gate-bloquant`, `vf-livrable-tiers`, `vf-couche-qualite`, `vf-invocation`) sont des CONVENTIONS VibeFlow —
 # `VIBEFLOW_SKILL_FIELDS`, en dur dans ce script, JAMAIS dans le manifeste daté (même frontière
 # que D-01 de la Phase 42 : le manifeste ne porte que des champs d'origine NATIVE, périssables
 # avec la doc externe ; une convention du dépôt ne périme pas).
@@ -55,6 +55,9 @@
 #   check-skills.sh --hook                 # SessionStart : compact, exit 0 toujours
 #   check-skills.sh --file <SKILL.md>      # un seul fichier
 #   check-skills.sh --skills-dir=PATH      # défaut .claude/skills
+#   check-skills.sh --callers-root=PATH    # + classe d'invocation (POCK-07) : classement exigé et arêtes
+#                                          # d'appel lues sous PATH (commands/, agents/, */AGENT.md,
+#                                          # */agents/) · incompatible avec --file · absent = inchangé
 #   check-skills.sh --allow-empty          # avec --strict : tolère une cible vide ou absente
 #   check-skills.sh --third-party-prefix=PFX     # répétable, défaut gsd- (accumule AU-DESSUS
 #                                                 # du défaut ; --no-third-party-prefix avant pour repartir de zéro)
@@ -110,6 +113,36 @@
 # Écart nature <-> marqueurs (B-03, C-15, Tâche 2 de 43-02) : au moins un marqueur déclaré true et vf-nature différente de procedure (absente comptée comme outil) -> avertissement « ecart » citant B-03 et C-15 ; la nature n'est JAMAIS réécrite ni déduite (B-03 écarte la dérivation automatique). Appel unique dans check_file, vers la liste des avertissements (cible MUT-DR3).
 #
 # Mesure du corpus réel sous cette règle (2026-09-26, lecture seule, hors module doc-only, plugin/reference exclu) : 26 avertissements « derive » sur 11 SKILL.md/21 (0 « ecart » -- aucun marqueur encore déclaré true dans le corpus) ; liste complète au SUMMARY de 43-02 (CORPUS-DERIVE) — corpus laissé non corrigé (D-Q5, backlog séparé, .planning/BACKLOG.md entrée e36e6f2).
+#
+# --- Classe d'invocation (POCK-07, Phase 41.4) — posée en 41.4-01, sur ce même gate ----------------
+# Champ VibeFlow `vf-invocation: user | model` (convention du dépôt, hors manifeste daté), jugé en
+# tous les modes : valeur hors {user, model} (casse exacte) -> refus ; `user` exige le champ natif
+# `disable-model-invocation: true` (insensible à la casse), `model` l'interdit (P414-D-01). Classer
+# un skill est un acte HUMAIN : le gate refuse l'absence, il ne pose jamais la classe.
+# Option `--callers-root=PATH` (racine d'arêtes : un dossier plugin/ source, ou .claude/ d'un lab) —
+# sans elle, le comportement du hook de lab et des arbres par module (T4/T32) est INCHANGÉ. Sous
+# l'option, en plus des contrôles ci-dessus :
+#   - classement exigé : un SKILL.md sans vf-invocation est « non classe » (POCK-07) ;
+#   - arêtes d'appel dérivées par MOT ENTIER (nom passé par re.escape, bornes [A-Za-z0-9_-]) sur
+#     commands/*.md (commande), le champ skills: d'un agent (préchargement) et un agent qui cite le
+#     nom ET peut appeler Skill (jeton Skill dans tools:, ou aucune ligne tools: = hérite de tout,
+#     sauf disallowedTools: Skill) — jamais un nom de module en dur, agents lus : agents/*.md,
+#     */AGENT.md, */agents/*.md. Une prose qui cite un skill depuis un agent SANS l'outil Skill
+#     n'est PAS une arête machine ;
+#   - un skill `user` appelé par l'une de ces arêtes est refusé, l'appelant nommé (P414-D-02) ; un
+#     `user` dont le corps cite un autre `user` est refusé (P414-D-01) ; un `user` qui cite un
+#     `model` est légitime ;
+#   - équivalent Codex (P414-D-03) : un `user` NICHÉ (skills/<nom>/SKILL.md) exige
+#     agents/openai.yaml, fichier régulier portant une ligne `allow_implicit_invocation: false` ;
+#     un `user` NON niché (module Type 1, SKILL.md copié seul par l'installeur) est une DETTE
+#     signalée par avertissement, jamais un refus ;
+#   - ligne d'information « sans appelant machine » (jamais comptée en avertissement) : le gate LISTE
+#     les skills sans aucune arête, candidats user-invoked seulement si effet de bord lourd — le
+#     jugement humain n'est pas calculé (P414-D-01).
+# TROIS ISSUES de ce régime : 0 = conforme (dettes Type 1 et information permises) · 1 = skill non
+# classé, valeur invalide, user appelé, user -> user, ou agents/openai.yaml absent ou non conforme ·
+# 3 = INDETERMINE : racine d'arêtes absente ou sans aucun fichier appelant (jeton ARETES-ABSENTES) —
+# jamais un vert à vide ; sous --hook, 3 devient 0 à la frontière du shell comme ailleurs.
 
 set -uo pipefail
 
