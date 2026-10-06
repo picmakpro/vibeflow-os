@@ -115,7 +115,7 @@ jamais un diff.
 Résolution du gate de sortie par la **cascade des scripts frères** documentée dans
 `mission-flow.md` §Résolution — jamais un chemin en dur.
 
-Six contrôles, chacun bon marché et déterministe :
+Sept contrôles, chacun bon marché et déterministe :
 
 - **E1** — verrou de driver relâché.
 - **E2** — arbre propre (hors artefacts gitignorés attendus).
@@ -124,6 +124,7 @@ Six contrôles, chacun bon marché et déterministe :
 - **E5** — rapport détaillé présent sur disque, à son chemin canonique `.planning/missions/…`.
 - **E6** — chaque verdict du rapport porte sa preuve (commande + code de sortie + SHA) : voir le
   **Contrat de preuves E6 (verdict → head)** de `mission-contracts.md`.
+- **E7** — rien de rangeable laissé par la mission (budgets de méthode, archivage borné) : voir `mission-flow.md` §Budgets de méthode.
 
 Hors gate, non bloquant : la section `## Budgets` du rapport (STATE, worktrees ; `mission-flow.md`
 §Budgets de méthode) est relayée telle quelle à l'utilisateur, jamais tue.
@@ -163,6 +164,21 @@ continue (D-12).
 (c) **Une** preuve manquante se rejoue ; **deux ou plus** signalent que la source n'a pas appliqué
 le contrat — dans ce cas, mandat de clôture ciblée et source consignée pour amendement, jamais une
 rafale de re-jeux (D-14).
+
+**Frontière de phase (POCK-03)** — à la sortie d'un geste ou d'une mission, avant d'enchaîner, le
+head prend la PREMIÈRE branche qui s'applique, dans cet ordre :
+
+1. **continuer** — gratuit, à exclure d'abord : la suite partage le contexte utile et la fenêtre a de la marge.
+2. **clear** — rien du contexte courant ne sert à la suite : `/clear`, critères de `GSD-PIPELINE.md` §4 (renvoi, pas de copie).
+3. **handoff** — seulement si la suite change de porteur (harness, dossier, collègue, fork) : l'état non écrit est écrit sur disque avant de rendre la main.
+4. **sous-agent** — la suite est cloisonnable et peut tourner sans l'humain : mandat à une équipe selon l'échelle du §1 plutôt que charger la fenêtre.
+5. **compact** — en dernier, seulement si aucune branche précédente ne tient, toujours avec une instruction de compaction qui nomme ce qu'il faut garder.
+
+**Moins cher la prochaine fois** : ligne OBLIGATOIRE du rapport de sortie du head après chaque
+mission — « Moins cher la prochaine fois : {ce qui, dans l'environnement, aurait rendu la mission
+suivante moins chère} ». Elle est consignée au BACKLOG seulement si elle est actionnable (un geste
+ou un fichier nommé), sinon la ligne dit « rien d'actionnable ». Elle n'est PAS un contrôle E et ne
+change aucun code de sortie du gate.
 
 ## 4. Économie (trois règles, un décompte)
 
