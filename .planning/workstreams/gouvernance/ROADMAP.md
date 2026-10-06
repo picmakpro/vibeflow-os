@@ -244,34 +244,34 @@ réel, étape 5) et 46-12 (porte de G4′, étape 6).
 Plans:
 **Wave 1**
 
-- [ ] 46-01-PLAN.md — modèle côté pose : prédicat « livrable présent », deux empreintes (plan A3 + livrables), plafond de 3 tentatives (CLOT-01, 03, 05)
-- [ ] 46-02-PLAN.md — amendements de la spec moteur (§3.1, §5, §5.1-1, §10) et texte de la note ROADMAP de la 47 (CLOT-12)
+- [x] 46-01-PLAN.md — modèle côté pose : prédicat « livrable présent », deux empreintes (plan A3 + livrables), plafond de 3 tentatives (CLOT-01, 03, 05)
+- [x] 46-02-PLAN.md — amendements de la spec moteur (§3.1, §5, §5.1-1, §10) et texte de la note ROADMAP de la 47 (CLOT-12)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 46-03-PLAN.md — recalcul : R4 « absent ou vide », vérification des deux empreintes, état `à clore` (CLOT-01, 03, 04)
+- [x] 46-03-PLAN.md — recalcul : R4 « absent ou vide », vérification des deux empreintes, état `à clore` (CLOT-01, 03, 04)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 46-04-PLAN.md — câblage : une commande, un mode par événement, `SubagentHandback` au matcher, canary, inventaire des hooks (CLOT-09, 11, 12)
+- [x] 46-04-PLAN.md — câblage : une commande, un mode par événement, `SubagentHandback` au matcher, canary, inventaire des hooks (CLOT-09, 11, 12)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 46-05-PLAN.md — G3 et G4 en observation, fail-closed, banc de clôture et mutation d'armement (CLOT-01, 02, 03, 09, 10)
+- [x] 46-05-PLAN.md — G3 et G4 en observation, fail-closed, banc de clôture et mutation d'armement (CLOT-01, 02, 03, 09, 10)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 46-06-PLAN.md — G4′ en observation : `PreToolUse(SubagentHandback)` + repli `SubagentStop`, agents qui ont Bash (CLOT-06, 09, 12)
+- [x] 46-06-PLAN.md — G4′ en observation : `PreToolUse(SubagentHandback)` + repli `SubagentStop`, agents qui ont Bash (CLOT-06, 09, 12)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 46-07-PLAN.md — D1 : `FileChanged`/`watchPaths`, journal protégé par G6, réconciliation par hash au `SessionStart` (CLOT-07, 09, 11)
-- [ ] 46-08-PLAN.md — outil de rejeu étendu aux étapes 5 et 6, constructeurs G3/G4/G4′ (CLOT-10)
+- [x] 46-07-PLAN.md — D1 : `FileChanged`/`watchPaths`, journal protégé par G6, réconciliation par hash au `SessionStart` (CLOT-07, 09, 11)
+- [x] 46-08-PLAN.md — outil de rejeu étendu aux étapes 5 et 6, constructeurs G3/G4/G4′ (CLOT-10)
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 46-09-PLAN.md — canary de juge C-16 : contrat de la sortie piégée, vérificateur déterministe, « juge sans preuve » (CLOT-08)
-- [ ] 46-10-PLAN.md — zéro régression lab dev par événement, coût hors adhésion mesuré (CLOT-11)
+- [x] 46-09-PLAN.md — canary de juge C-16 : contrat de la sortie piégée, vérificateur déterministe, « juge sans preuve » (CLOT-08)
+- [x] 46-10-PLAN.md — zéro régression lab dev par événement, coût hors adhésion mesuré (CLOT-11)
 
 **Wave 8** *(blocked on Wave 7 completion)*
 

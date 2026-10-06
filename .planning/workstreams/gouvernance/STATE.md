@@ -5,25 +5,24 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 46
 current_phase_name: Moteur — gates de clôture et verdicts hachés
-status: "Phase 46 cadrée et planifiée (12 plans, 9 vagues, plan-check PASSED), non exécutée ; Phase 45 close, PR #124 ouverte, non mergée"
+status: "Phase 46 en exécution : 46-01..46-10 livrés, revue/audit/non-régression d'avant armement faits, corrections lot A closes ; 46-11 et 46-12 attendent les arbitrages de Willy (ckpt-46-11, lot B)"
 created: 2026-09-23
-last_updated: "2026-10-03T00:00:00.000Z"
-last_activity: 2026-10-03
+last_updated: "2026-10-06T07:30:00.000Z"
+last_activity: 2026-10-06
 last_activity_desc: >-
-  Cadrage et planification de la Phase 46 (mission vf-dev-manager-p46-cadrage), feu vert de Willy
-  (message en session principale, 2026-10-03). Q1 à Q9 tranchées par Willy, AskUserQuestion
-  session principale, 2026-10-03 ; exigences CLOT-01..12 ; 12 plans en 9 vagues, plan-check frais
-  PASSED au tour 2 ; aucune exécution.
+  Reprise de l'exécution de la Phase 46 (mission vf-dev-manager-p46-exec, feu vert Willy, message en
+  session principale, 2026-10-05) : 46-04 à 46-10 exécutés, revue + audit + non-régression d'avant
+  armement, corrections lot A (quick 261006-23m et 261006-638), CI verte.
 stopped_at: >-
-  Phase 46 planifiée le 2026-10-03 (12 plans, 9 vagues), PR de planification empilée sur la PR #124,
-  sans merge, tag ni release. Prochain : exécution de la 46 après décision de Willy (vague 1 :
-  46-01 ∥ 46-02).
+  Phase 46 arrêtée avant 46-11 (2026-10-06) : checkpoint ckpt-46-11 (rejeu réel étapes 5/6, armement
+  étape 5) et arbitrage du lot B de l'audit (D1, canary de juge) posés à Willy, sans réponse.
+  Prochain : relancer la mission avec les réponses ; 46-11, 46-12, revue/audit finaux, PR empilée sur #124.
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 40
-  completed_plans: 28
-  percent: 70
+  completed_plans: 38
+  percent: 95
 ---
 
 # Project State
@@ -46,11 +45,11 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 ## Progress
 
 **Phases Complete:** 4 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée ; Phase 45 : close le 2026-10-02, PR #124 ouverte, non mergée).
-**Current Plan:** aucun — Phase 46 planifiée (12 plans), non exécutée ; prochaine étape : exécution, vague 1 (46-01 ∥ 46-02)
+**Current Plan:** 46-11 (étape 5, armement G3 + G4) — bloqué sur le checkpoint ckpt-46-11 posé à Willy ; 46-01..46-10 livrés (mission `vf-dev-manager-p46-exec`, rapport `.planning/missions/2026-10-05-gouvernance-46-exec-reprise.md`)
 
 ## Session Continuity
 
-**Stopped At:** Phase 46 cadrée et planifiée (2026-10-03), PR de planification empilée sur la PR #124 (non mergée, revue de Samuel attendue). Prochain geste : exécuter la Phase 46 (`gsd-execute-phase 46 --ws gouvernance`), le rejeu réel de 46-11 restant à autoriser par Willy au moment de l'exécution.
+**Stopped At:** Phase 46 exécutée jusqu'à 46-10 (2026-10-06), revue + audit + non-régression d'avant armement faits, corrections lot A closes, CI verte ; en attente de Willy : ckpt-46-11 (rejeu réel et armement de l'étape 5) et lot B de l'audit (D1, canary de juge).
 **Resume File (Phase 46) :** `.planning/missions/2026-10-03-gouvernance-46-plan.md`
 **Resume File (Phase 45) :** `.planning/missions/2026-09-30-gouvernance-45-exec.md`
 **Resume File:** `.planning/missions/2026-09-27-gouvernance-44.md`
