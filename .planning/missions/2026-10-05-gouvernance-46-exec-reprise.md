@@ -105,6 +105,11 @@ Relayées verbatim des blocs typés, par sprint :
 - 46-08 : `[{"verdict":"recette","preuve":"amont"}]`
 - 46-09 : `[{"verdict":"recette","preuve":"amont"},{"verdict":"test-juges-canary","commande":"bash plugin/planning-core/scripts/tests/test-juges-canary.sh","exit_code":0,"sha":"e70217f2"}]`
 - 46-10 : `[{"verdict":"recette","preuve":"amont"}]`
+- 46-04, `gate:code_review` : relayé `absent` par le worker (aucun hook de revue GSD vu) ; clôture ciblée
+  du 2026-10-07 (mandat du head) : le diff de 46-04 a été revu par revue-46-a (74de2f0a..009bee12) et
+  revue-46-b ; gate rejoué une fois par sa commande canonique, la suite du module qui porte 46-04
+  (`test-planning-hook-registered.sh` : `== Résultat : 113 OK · 0 KO ==`, DUREE s=426, rc 0) sur
+  HEAD `199efde9`.
 - fix-46-a (tours 1, 2 et 3) : `[{"verdict":"recette","preuve":"amont"}]`
 
 ```json
@@ -117,7 +122,9 @@ Relayées verbatim des blocs typés, par sprint :
   },
   {
    "verdict": "gate:code_review",
-   "preuve": "absent",
+   "commande": "bash plugin/planning-core/scripts/tests/test-planning-hook-registered.sh",
+   "exit_code": 0,
+   "sha": "199efde9106383c13977a8e309b8420f50cd104d",
    "sprint": "46-04"
   },
   {
