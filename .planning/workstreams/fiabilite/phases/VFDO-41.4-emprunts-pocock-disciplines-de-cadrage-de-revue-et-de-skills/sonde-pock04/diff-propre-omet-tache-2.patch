@@ -1,0 +1,37 @@
+--- a/compte.sh
++++ b/compte.sh
+@@ -1,11 +1,31 @@
+ #!/usr/bin/env bash
+ # compte.sh — imprime le nombre de lignes non vides d'un fichier.
++# Option -q : silencieux, code 0 si au moins une ligne non vide, 1 sinon.
+ set -eu
+
+-if [ "$#" -lt 1 ]; then
+-  echo "usage: compte.sh <fichier>" >&2
++usage() {
++  echo "usage: compte.sh [-q] <fichier>" >&2
+   exit 64
++}
++
++silencieux=0
++if [ "$#" -ge 1 ] && [ "$1" = "-q" ]; then
++  silencieux=1
++  shift
+ fi
+
++if [ "$#" -lt 1 ]; then
++  usage
++fi
++
+ fichier="$1"
+-grep -c -v '^[[:space:]]*$' "$fichier" || true
++n=$(grep -c -v '^[[:space:]]*$' "$fichier" || true)
++
++if [ "$silencieux" -eq 1 ]; then
++  if [ "$n" -gt 0 ]; then
++    exit 0
++  fi
++  exit 1
++fi
++
++echo "$n"
