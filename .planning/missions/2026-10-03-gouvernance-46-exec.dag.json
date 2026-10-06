@@ -298,7 +298,7 @@
         "nonreg-b"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "pr",
@@ -308,7 +308,7 @@
         "docs"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-46-socle",
