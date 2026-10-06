@@ -1172,7 +1172,11 @@ exactement quand R4 rend `indéterminé` pour la même unité (preuve croisée R
 forme (planning de style GSD sous `.planning/phases/`, niveau cycle, `CLOTURE.md.bak`, un livrable nommé `CLOTURE.md` hors de
 `.planning/`) n'est jamais jugé. Le verdict porte le chemin relatif du `CLOTURE.md` écrit : c'est le chemin d'une dérogation
 nominative (`deroger-gate.sh --gate=G3`, usage unique). Messages, relatifs au lab : `livrable déclaré <statut> : <entrée> —
-produisez-le (non vide, sans lien) avant de clore (spec §5)` ; `PLAN.md de l'unité absent, illisible ou sans ecrit: valide —
+produisez-le (non vide, sans lien) avant de clore (spec §5)` (le statut est `absent`, `vide`, `lien` ou `illisible` : le livrable est à
+produire ou à corriger) ; `livrable déclaré hors borne : <entrée> — <libellé de la borne> (budget commun aux entrées ecrit: du
+PLAN.md) : la clôture ne peut pas être vérifiée au-delà de cette borne, qui ne se lève pas — allégez le livrable ou découpez l'unité
+(spec §5)` (A13, fix-46-a : le libellé nomme la borne franchie, `BORNE_FICHIERS_LIVRABLES` ou `BORNE_OCTETS_LIVRABLES`, et le message
+ne demande plus de « produire » un livrable qui existe) ; `PLAN.md de l'unité absent, illisible ou sans ecrit: valide —
 l'unité est indéterminée au modèle, la clôture est refusée` ; `PLAN.md de l'unité au-delà de 1048576 octets (BORNE_LECTURE_PLAN) :
 non lu — l'unité est indéterminée au hook, la clôture est refusée`. Entré en `PreToolUse` par l'entonnoir existant : en `observe` il
 journalise, armé il refuse (deny), une erreur interne refuse quand il est armé.

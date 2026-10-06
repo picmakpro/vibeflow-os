@@ -11,6 +11,8 @@
 #   R-G3-03   jumeaux qui passent (copie armée) : livrables présents et non vides (fichier, dossier, dossier avec .DS_Store) ; CLOTURE.md de style GSD,
 #             de niveau cycle, nom d'unité invalide, CLOTURE.md.bak, livrable nommé CLOTURE.md hors .planning/ : jamais jugés ; lab dev : octet vide
 #   R-G3-04   dérogation nominative G3 sur le chemin du CLOTURE.md (usage unique) ; erreur interne injectée : armée deny, observe ligne d'observation
+#   R-G3-05   (A13, fix-46-a) livrable hors borne (2001 fichiers, fichier creux de BORNE_OCTETS_LIVRABLES + 1 octets, budget commun franchi par la seconde
+#             entrée) -> UN deny G3 qui nomme la borne franchie et l'entrée, sans l'injonction de « produire » ; livrable absent : message générique inchangé
 #   R-PLAN-BORNE (A11, fix-46-a) PLAN.md de 1 Mio + 1 octet ou creux de 2 Gio -> UN deny G3 (CLOTURE.md) et UN deny G4 (SUMMARY.md) qui nomment
 #             BORNE_LECTURE_PLAN ; PLAN.md d'exactement 1 Mio -> passe ; espion de lecture : `octets_plan_du_dossier` du hook jugé ne demande jamais
 #             plus de BORNE_LECTURE_PLAN + 1 octets (durée du cas creux affichée, jamais assertée)
@@ -32,7 +34,7 @@
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-G3-LIVRABLE (contrôle du statut neutralisé -> R-G3-02), MUT-G3-FORME (forme élargie à tout CLOTURE.md sous .planning/ -> R-G3-03),
 #   MUT-G3-ADHESION (adhésion forcée vraie, commande sans pré-filtre -> jumeau lab dev de R-G3-03), MUT-PLAN-BORNE-TEST (test de la borne neutralisé),
-#   MUT-PLAN-LECTURE (lecture sans borne) -> R-PLAN-BORNE ;
+#   MUT-PLAN-LECTURE (lecture sans borne) -> R-PLAN-BORNE, MUT-G3-BORNE-MESSAGE (branche `borne` neutralisée -> R-G3-05) ;
 #   MUT-G4-ABSENT, MUT-G4-ECHEC (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
@@ -726,6 +728,51 @@ def controle_plan_borne(ctx, script):
                           "d'exactement 1 Mio : G3 et G4 passent ; espion : hors-borne rendu sans lecture de plus de %d octets" % (borne + 1))
 
 
+# --- A13 (fix-46-a) : un livrable hors borne n'est pas « à produire » -------------------------------------------------------
+def controle_g3_05(ctx, script):
+    """Copie armée : livrable dossier de 2001 fichiers -> UN deny G3 dont la raison contient « hors borne », l'entrée déclarée, « 2000 fichiers » et
+    « BORNE_FICHIERS_LIVRABLES » et ne demande pas de « produire » le livrable ; livrable fichier creux de BORNE_OCTETS_LIVRABLES + 1 octets -> « 134217728
+    octets » et « BORNE_OCTETS_LIVRABLES » ; deux entrées dont la seconde franchit le budget commun (1000 + 1001 fichiers) -> la raison nomme la SECONDE
+    entrée et « budget commun » ; jumeau : livrable absent -> le message générique d'avant, inchangé."""
+    dossier_jugé = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_jugé, "armed")
+    ns = espace_du_hook(ctx, dossier_jugé)
+    borne_octets = ns.get("BORNE_OCTETS_LIVRABLES", 134217728)
+    fautes = []
+
+    def cas(nom, lab, attendus):
+        bon, detail, raison = _refus_g3(ctx, d, lab, "Write", CLOTURE)
+        if not bon:
+            fautes.append("%s : %s" % (nom, detail))
+            return
+        manque = [m for m in attendus if m not in raison]
+        if manque:
+            fautes.append("%s : la raison ne contient pas %s : %s" % (nom, manque, raison))
+        if "produisez-le" in raison:
+            fautes.append("%s : la raison demande encore de « produire » le livrable : %s" % (nom, raison))
+        fautes.extend("%s : %s" % (nom, f) for f in fautes_de_message(raison, lab))
+
+    lab = fabriquer_lab(ctx, "g3-05-fichiers", plan="ecrit: livrables", fichiers={"livrables/f%04d.md" % i: "x" for i in range(2001)})
+    cas("2001 fichiers", lab, ("hors borne", "livrables", "2000 fichiers", "BORNE_FICHIERS_LIVRABLES"))
+    lab = fabriquer_lab(ctx, "g3-05-octets", plan="ecrit: livrables/gros.bin", fichiers={"livrables/gros.bin": "x"})
+    os.truncate(os.path.join(lab, "livrables", "gros.bin"), borne_octets + 1)
+    cas("fichier creux de BORNE_OCTETS_LIVRABLES + 1 octets", lab, ("hors borne", "livrables/gros.bin", "%d octets" % borne_octets, "BORNE_OCTETS_LIVRABLES"))
+    plan = "---\necrit:\n  - livrables/a\n  - livrables/b\n---\nPlan.\n"
+    fichiers = {"livrables/a/f%04d.md" % i: "x" for i in range(1000)}
+    fichiers.update({"livrables/b/f%04d.md" % i: "x" for i in range(1001)})
+    lab = fabriquer_lab(ctx, "g3-05-commun", plan=plan, fichiers=fichiers)
+    cas("deux entrées, budget commun franchi par la seconde", lab, ("hors borne", "livrables/b", "budget commun"))
+    bon, detail, raison = _refus_g3(ctx, d, fabriquer_lab(ctx, "g3-05-absent"), "Write", CLOTURE)
+    attendu = "livrable déclaré absent : " + LIVRABLE + " — produisez-le (non vide, sans lien) avant de clore (spec §5)"
+    if not bon:
+        fautes.append("jumeau absent : " + detail)
+    elif attendu not in raison or "hors borne" in raison:
+        fautes.append("jumeau absent : le message générique a changé : %s" % raison)
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "livrable hors borne (2001 fichiers, fichier creux de %d octets + 1, budget commun franchi par la seconde entrée) : UN deny G3 qui nomme la borne "
+                          "franchie et l'entrée, sans l'injonction de produire ; livrable absent : le message générique inchangé" % borne_octets)
+
+
 # =================================================================================================
 # G4 : contrôles. Les verdicts valides sont posés par la VRAIE poser-verdict.sh ; seuls les verdicts volontairement faux sont écrits à la main.
 # =================================================================================================
@@ -1383,7 +1430,8 @@ def sec_g3(ctx):
             ("R-G3-02", controle_g3_02, "copie armée, refus"),
             ("R-G3-03", controle_g3_03, "copie armée, jumeaux qui passent"),
             ("R-G3-04", controle_g3_04, "dérogation et erreur interne"),
-            ("R-PLAN-BORNE", controle_plan_borne, "PLAN.md au-delà de 1 Mio : refus explicite de G3 et G4, lecture bornée")):
+            ("R-PLAN-BORNE", controle_plan_borne, "PLAN.md au-delà de 1 Mio : refus explicite de G3 et G4, lecture bornée"),
+            ("R-G3-05", controle_g3_05, "livrable hors borne : message distinct qui nomme la borne")):
         bon, detail = original_de(ctx, ident, ctrl)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
@@ -1416,6 +1464,7 @@ def sec_mutants_g3(ctx):
          'unite = composants[:-1] if composants and composants[0].casefold() == ".planning" and composants[-1].casefold() == "cloture.md" else None  # g3-forme',
          "R-G3-03", controle_g3_03)
     tuer(ctx, "G3-ADHESION", "sys.exit(0)  # non-adherent", "pass", "R-G3-03", controle_g3_03)
+    tuer(ctx, "G3-BORNE-MESSAGE", "# g3-borne", "if False:  # g3-borne", "R-G3-05", controle_g3_05)
     tuer(ctx, "PLAN-BORNE-TEST", "# plan-hors-borne", "if False:  # plan-hors-borne", "R-PLAN-BORNE", controle_plan_borne)
     tuer(ctx, "PLAN-LECTURE", "# plan-lecture-bornee", "octets = fh.read()  # plan-lecture-bornee", "R-PLAN-BORNE", controle_plan_borne)
 

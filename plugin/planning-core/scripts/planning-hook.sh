@@ -1798,7 +1798,11 @@ def evaluer_g3(contexte):
         return [Verdict("G3", chemin_rel, "ecrit: contient le dossier de l'unité (%s) — l'unité est indéterminée au modèle, la clôture est refusée" % detail)]
     if motif != "ok":
         return [Verdict("G3", chemin_rel, RAISON_G3_PLAN)]
-    for entree, statut, _detail in livrables_presents(racine, detail):
+    for entree, statut, libelle in livrables_presents(racine, detail):
+        if statut == "borne":  # g3-borne
+            return [Verdict("G3", chemin_rel, "livrable déclaré hors borne : %s — %s (budget commun aux entrées ecrit: du PLAN.md) : la clôture "
+                                              "ne peut pas être vérifiée au-delà de cette borne, qui ne se lève pas — allégez le livrable ou "
+                                              "découpez l'unité (spec §5)" % (entree, libelle))]
         if statut != "present":  # g3-livrable
             return [Verdict("G3", chemin_rel, "livrable déclaré %s : %s — produisez-le (non vide, sans lien) avant de clore (spec §5)"
                             % (LIBELLES_LIVRABLE_G3.get(statut, statut), entree))]
