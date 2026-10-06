@@ -3,8 +3,11 @@
 ## [v1.5.12] — 2026-10-06 (classe d'invocation des skills, Phase 41.4)
 
 **Patch** — les `SKILL.md` `vf-design` et `vf-sketch` déclarent leur classe d'invocation
-(`vf-invocation: model`, vérifiée par `check-skills.sh --callers-root`, POCK-07, P414-D-01) ;
-aucun changement de comportement.
+(`vf-invocation: model`, vérifiée par `check-skills.sh --callers-root`, POCK-07, P414-D-01).
+`agents/vf-design-manager.md` : le critère de « vert » de l'étage implémentation change de
+formulation — critique ≥ seuil ET statut global de la revue `passed` (revue à deux axes, axe Spec
+`skipped` sans PLAN d'étape, règle au contrat dev-orchestrator §Étage revue, P414-D-22) au lieu de
+« revue PASS » ; budgets 3+3 inchangés.
 
 ## [v1.5.11] — 2026-09-25 (Phase 42, correction ciblée — nœud fix-42-condition-samuel, exécution de la condition posée par Samuel en ratifiant D-08)
 

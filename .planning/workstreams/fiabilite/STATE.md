@@ -40,7 +40,7 @@ requise : `ci.yml`). Revue tour 3 : 4 majeurs auto-fix ouverts (budget épuisé,
 Phase 41.2 : voir l'archive et sa mission. `current_phase` reste 41.
 Next: tour de correction des 4 majeurs de la 41.4 (sur feu vert), merge de #134 puis de la PR 41.4, clôture du
 jalon `fiabilite-v1.0`.
-Phase: **41.2** (Choisir la partition du planning au démarrage d'un lab) — exécutée, plans 01-06 + corrections
+Antérieur (état de main, 2026-10-02) — phase **41.2** (Choisir la partition du planning au démarrage d'un lab) — exécutée, plans 01-06 + corrections
 ciblées 01-02 (2026-10-02), PR ouverte en revue (revue `@picmakpro` requise : `ci.yml` et baseline du budget) ;
 `current_phase` reste 41. Phase 41.3 mergée (PR #123). Vérification de phase : human_needed (E1 + parcours réel).
 Next: arbitrage E1 (sujet actif par défaut après partition), merge de la 41.2, puis clôture du jalon `fiabilite-v1.0`

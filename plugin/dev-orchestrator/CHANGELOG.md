@@ -14,11 +14,14 @@
   le décompte devient « sept contrôles » (E1 à E7). E3 y est décrit comme le gate réel (merge-danger call conforme, MANQUE ou
   INDÉTERMINÉ).
 - **`agents/vf-reviewer.md`, `references/mission-contracts.md` §Étage revue** (POCK-04, P414-D-05,
-  P414-D-07) : revue à deux axes, Standards et Spec (contre le PLAN de l'étape), en parallèle, un
-  `review_path` distinct par axe ; le statut global est la conjonction (`passed` ssi les deux axes le
-  sont) ; sans PLAN dans le brief, `axes.spec` vaut `blocked`. Remplace le verdict unique « PASS /
-  correctifs requis ». La preuve de comportement (sonde réelle) reste à jouer : le contrat et la
-  fixture sont livrés, pas la sonde.
+  P414-D-07, P414-D-20, P414-D-22) : revue à deux axes, Standards et Spec (contre le PLAN de
+  l'étape), en parallèle, un `review_path` distinct par axe. Règle finale, écrite une seule fois au
+  contrat : un axe est `passed` sans finding bloquant ni majeur (seuil d'un axe, D-20) ; un axe Spec
+  `skipped` (revue d'implémentation d'une mission design, sans PLAN, nœud `revue:écran-X`) sort de la
+  conjonction, le statut global se calcule sur les axes jugés ; aucun axe jugé, ou un axe attendu non
+  produit, ou un PLAN attendu absent du brief (`revue-N`/`join-N`) → `blocked` (D-22, ratifiée par
+  Samuel). Remplace le verdict unique « PASS / correctifs requis ». La preuve de comportement
+  (sonde réelle) reste à jouer : le contrat et la fixture sont livrés, pas la sonde.
 - **`scripts/check-mission-exit.sh` E3** (POCK-06, P414-D-11) : lit la section `## Merge-danger call`
   du corps de PR (Porte sens unique / double sens, Rayon d'explosion d'au moins 10 caractères) ;
   issues SAIN, MANQUE nommé, INDÉTERMINÉ. Contenu discriminé : section absente, répétée (titre exact
@@ -27,8 +30,12 @@
   l'analyseur tombe en INDÉTERMINÉ, jamais lue « Porte absente ».
 - **`references/docs-flow.md`** (POCK-02) : régime du glossaire de domaine du lab (`docs/_transverse/`),
   exception « pendant le cadrage ».
-- **Tests** : `test-dev-orchestrator.sh` T39 à T43 (ancres de doctrine, 36 mutants discriminants) ;
-  `test-check-mission-exit.sh` cas 44 à 62 et mutants E3a à E3m.
+- **Tests** : `test-dev-orchestrator.sh` T39 à T43 (ancres de doctrine, 39 mutants discriminants) ;
+  `test-check-mission-exit.sh` 135 assertions (cas 44 à 75), 35 lignes « TUE » (mutants E3a à E3z,
+  E3x, E3x2, E15, E18, contrôle de portabilité awk). E3 donne le même verdict sous BWK awk et sous
+  mawk : la fence indentée de 0 à 3 espaces se retire par une boucle explicite (`strip3`), jamais par
+  un quantificateur répété ni un intervalle ; la ligne « Rayon d'explosion » hors section et « Porte »
+  invalide + valide rendent MANQUE (cas 73, 74).
 - **`skills/vf-dev`, `skills/vf-auto`** : `vf-invocation: model` (POCK-07, classe vérifiée par
   `check-skills.sh --callers-root`).
 
