@@ -3015,7 +3015,41 @@ def texte_borne(tronquee, exclus):
     return "[planning-core] D1 : surveillance bornée — " + " ; ".join(morceaux) + " — tracé dans .planning/surveillance.log (genre=borne)"
 
 
-def reconcilier(racine, liste, tronquee):
+SOURCES_DE_REPRISE = ("resume", "clear", "compact")  # d1-journal-reprise : une séance déjà ouverte dans ce lab a eu son SessionStart `startup`
+TRACES_ETAT_PRECEDENT = (".recalc-cache.json",)  # écrit par le recalcul seul, jamais au journal ; INDEX.md et STATE.md peuvent être posés à la main avant D1
+
+
+def anomalie_journal(racine, source):
+    """Libellé de l'état du journal de D1 quand il ne peut plus faire son office (A6, P46 lot B, b3), None quand il est sain ou que son absence n'a rien
+    d'anormal. Sans écrire : `lstat` et ouvertures SANS création ni troncature. Un journal qui n'est pas un fichier
+    régulier (lien compris), qui ne se lit pas ou n'est pas inscriptible pour son propriétaire (droits 0600 requis, et l'ouverture le confirme : root
+    passe les droits). Un journal ABSENT n'est signalé que si l'état précédent existe — une séance de reprise (`resume`, `clear`, `compact` : le
+    `startup` de la séance d'origine l'a posé) ou une trace du recalcul (`TRACES_ETAT_PRECEDENT`) : sans l'une ni l'autre, une première séance est
+    indiscernable d'un journal supprimé (limite (bn))."""
+    planning = os.path.join(racine, NOM_PLANNING)
+    chemin = os.path.join(planning, NOM_SURVEILLANCE)
+    try:
+        try:
+            etat = os.lstat(chemin)
+        except FileNotFoundError:
+            precedent = source in SOURCES_DE_REPRISE or any(os.path.lexists(os.path.join(planning, nom)) for nom in TRACES_ETAT_PRECEDENT)  # d1-journal-absent
+            return ("absent alors qu'un état précédent existe : les références sont reposées à neuf, les écritures antérieures ne sont plus expliquées"
+                    if precedent else None)
+        if not stat.S_ISREG(etat.st_mode):  # d1-journal-irregulier
+            return "inutilisable (ce n'est pas un fichier régulier : lien ou autre) : D1 n'y inscrit plus rien"
+        if (etat.st_mode & 0o600) != 0o600:  # d1-journal-droits
+            return "inutilisable (droits qui interdisent sa lecture ou son écriture) : D1 n'y inscrit plus rien"
+        for drapeau, libelle in ((os.O_RDONLY, "il ne se lit pas"), (os.O_WRONLY | os.O_APPEND, "il n'est pas inscriptible")):
+            try:
+                os.close(os.open(chemin, drapeau | SANS_SUIVI_DE_LIEN | SANS_BLOCAGE))  # d1-journal-ouverture
+            except OSError:
+                return "inutilisable (" + libelle + ") : D1 n'y inscrit plus rien"
+    except OSError:
+        return "inutilisable (erreur du système de fichiers) : D1 n'y inscrit plus rien"
+    return None
+
+
+def reconcilier(racine, liste, tronquee, source=None):
     """Réconciliation par hash au SessionStart (P46-D-07) : chaque fichier de la liste est comparé au dernier état connu du journal (une lecture
     bornée du journal, une lecture de chaque fichier gardé). Plafond (D1, fix-46-a) : au plus BORNE_OCTETS_RECONCILIATION octets hachés (tailles
     annoncées cumulées) et aucun fichier de plus de BORNE_OCTETS_LIVRABLES ; un fichier écarté n'est pas réconcilié à ce SessionStart. Une borne
@@ -3023,6 +3057,7 @@ def reconcilier(racine, liste, tronquee):
     empreinte change ; elle est signalée si une ligne `borne` est arrivée depuis la dernière ligne `signal` (même règle anti-répétition que les
     contournements). Rend le texte du signal (contournements, borne) ou None ; la ligne `signal` est posée dès qu'un signal est rendu."""
     import hashlib
+    anomalie = anomalie_journal(racine, source)  # d1-journal-etat : AVANT toute inscription (la première référence recrée un journal absent)
     entrees = lire_surveillance(racine)
     par_chemin = entrees_par_chemin(entrees)
     contournements = []
@@ -3059,6 +3094,8 @@ def reconcilier(racine, liste, tronquee):
             inscrire_surveillance(racine, "borne", None, empreinte_borne, PAR_HOOK, "reconciliation")  # d1-troncature
             borne_en_attente = True
     textes = []
+    if anomalie:  # d1-journal-signal
+        textes.append("[planning-core] D1 : le journal .planning/surveillance.log est " + anomalie + " — sans lui, une écriture hors moteur n'est plus tracée")
     if contournements:
         distincts = []
         for chemin in contournements:
@@ -3251,7 +3288,7 @@ def mode_session_start(contexte):
     elle ne change ni la liste ni le signal de D1."""
     racine = contexte["racine"]
     liste, tronquee = chemins_surveilles(racine)  # d1-liste
-    signal = reconcilier(racine, liste, tronquee)
+    signal = reconcilier(racine, liste, tronquee, contexte["payload"].get("source"))
     if contexte["payload"].get("source") == "startup":  # juge-source
         try:
             ligne_juges = signal_juges(verifier_juges(racine))

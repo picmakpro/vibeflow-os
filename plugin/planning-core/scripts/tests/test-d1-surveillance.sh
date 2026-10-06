@@ -35,6 +35,8 @@
 #   R-D1-13  erreur injectée dans chaque mode de D1 : stdout vide, code 0, aucun refus ; aucune sortie de D1 ne contient `deny` ni `block`
 #   R-D1-14  journal de plus de 5 Mio dont la dernière référence est hors de la fenêtre des 4 Mio de fin : première observation (jumeau : dans la fenêtre,
 #            contournement) ; un SessionStart sur 128 chemins lit chaque fichier une fois (mesure structurelle)
+#   R-D1-19  (A6, P46 lot B, b3) journal réduit au silence par Bash (lien vers /dev/null, chmod 000, `chflags uchg`, absent alors que l'état précédent existe : reprise ou cache du
+#            recalcul) : signal D1 au SessionStart, rien d'écrit ; jumeaux : première séance sans journal, journal sain, séance suivante (pas de répétition)
 #   Le cas de canary R-CANG-D1 vit dans la section `cang` de test-planning-gates.sh.
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-D1-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-D1-03), MUT-D1-DOSSIER (le dossier de l'unité dans la liste -> R-D1-01),
@@ -45,7 +47,8 @@
 #   MUT-D1-FENETRE (fenêtre de lecture retirée -> R-D1-14), MUT-D1-ORDRE (parcours des phases par ordre croissant -> R-D1-16), MUT-D1-ANNONCE-BORNE
 #   (signal de borne retiré -> R-D1-16), MUT-D1-IDENTITE-BORNE (une ligne borne à chaque SessionStart -> R-D1-16), MUT-D1-OCTETS (plafond d'octets retiré -> R-D1-17), MUT-D1-NFC (-> R-D1-15),
 #   MUT-D1-MOTEUR-NFD (ligne moteur d'un verdict hachée sous la forme NFC -> R-D1-18 ; opposable sur un système SENSIBLE à la normalisation seulement : sur APFS ou HFS+
-#   la forme NFC désigne le même dossier, la suite rend `non applicable ici`).
+#   la forme NFC désigne le même dossier, la suite rend `non applicable ici`), MUT-D1-JOURNAL-SIGNAL / -ETAT / -IRREGULIER / -DROITS / -ABSENT / -PREMIERE-SEANCE / -OUVERTURE
+#   (chaque contrôle d'`anomalie_journal` retiré seul, ou forcé -> R-D1-19 ; -OUVERTURE non applicable sans `chflags`).
 # Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, moteur, mutants_moteur, reconciliation, mutants_reconciliation).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
@@ -87,8 +90,10 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import unicodedata
 import urllib.parse
@@ -1324,6 +1329,99 @@ def entrees_journal_de_fin(lab):
 
 
 # --- Mutants --------------------------------------------------------------------------------------------------------
+def drapeaux_utilisables():
+    """Vrai si `chflags uchg` (journal immuable : droits intacts, ouverture en écriture refusée) est disponible ici (macOS, BSD) ; sinon la branche d'ouverture
+    de `anomalie_journal` n'a pas de cas portable et le mutant qui la retire est déclaré non applicable."""
+    try:
+        sonde = tempfile.mkdtemp(prefix="d1-chflags-")
+        chemin = os.path.join(sonde, "f")
+        ecrire(chemin, "x")
+        p = subprocess.run(["chflags", "uchg", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if p.returncode == 0:
+            subprocess.run(["chflags", "nouchg", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        shutil.rmtree(sonde, ignore_errors=True)
+        return p.returncode == 0
+    except (OSError, ValueError):
+        return False
+
+
+def controle_d1_19(ctx, script):
+    """(A6, P46 lot B, b3) Le journal de D1 réduit au silence par Bash est SIGNALÉ au SessionStart, sans écrire : lien (vers /dev/null), droits retirés
+    (chmod 000), journal immuable (`chflags uchg`, là où il existe), journal absent alors que l'état précédent existe (séance de reprise, ou cache du recalcul).
+    Jumeaux : première séance sans journal : aucun signal ; un journal sain : aucun signal ; le signal d'absence n'est pas répété (la séance suivante, le journal
+    recréé est sain)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    fautes, vus = [], []
+
+    def verifier(nom, out, mots):
+        signal = contexte_de(out)
+        if mots is None:
+            if signal is not None:
+                fautes.append("%s : aucun signal attendu — obtenu %r" % (nom, signal))
+            return
+        if not isinstance(signal, str) or not all(m in signal for m in ("[planning-core] D1", "surveillance.log") + mots):
+            fautes.append("%s : un signal de D1 qui porte %s attendu — obtenu %r" % (nom, list(mots), signal))
+        elif "/" in signal.replace(".planning/surveillance.log", ""):
+            fautes.append("%s : aucun chemin absolu dans le signal — obtenu %r" % (nom, signal))
+
+    # A. lien vers /dev/null
+    lab = fabriquer_lab(ctx, "d1-19a")
+    session(ctx, d, lab)
+    os.remove(chemin_journal(lab))
+    os.symlink("/dev/null", chemin_journal(lab))
+    rc, out, err = session(ctx, d, lab)
+    verifier("lien", out, ("régulier",))
+    if not os.path.islink(chemin_journal(lab)):
+        fautes.append("lien : le journal en lien n'est ni suivi ni remplacé")
+    vus.append("lien")
+    # B. droits retirés
+    lab = fabriquer_lab(ctx, "d1-19b")
+    session(ctx, d, lab)
+    os.chmod(chemin_journal(lab), 0)
+    try:
+        rc, out, err = session(ctx, d, lab)
+    finally:
+        os.chmod(chemin_journal(lab), 0o600)
+    verifier("chmod 000", out, ("droits",))
+    vus.append("droits")
+    # C. absent, séance de reprise ; puis la séance suivante : rien (anti-répétition)
+    lab = fabriquer_lab(ctx, "d1-19c")
+    session(ctx, d, lab)
+    os.remove(chemin_journal(lab))
+    rc, out, err = ctx.lancer(payload_session(lab, "resume"), cwd=lab, dossier=d)
+    verifier("absent (reprise)", out, ("absent",))
+    rc, out, err = ctx.lancer(payload_session(lab, "resume"), cwd=lab, dossier=d)
+    verifier("absent : séance suivante", out, None)
+    vus.append("absent-reprise")
+    # D. absent, trace du recalcul (cache) à `startup`
+    lab = fabriquer_lab(ctx, "d1-19d")
+    ecrire(os.path.join(lab, ".planning", ".recalc-cache.json"), "{}")
+    rc, out, err = session(ctx, d, lab)
+    verifier("absent (cache du recalcul)", out, ("absent",))
+    vus.append("absent-cache")
+    # E. jumeaux : première séance sans journal ni trace ; reprise sur journal sain
+    lab = fabriquer_lab(ctx, "d1-19e")
+    rc, out, err = session(ctx, d, lab)
+    verifier("première séance sans journal", out, None)
+    rc, out, err = ctx.lancer(payload_session(lab, "resume"), cwd=lab, dossier=d)
+    verifier("reprise sur journal sain", out, None)
+    vus.append("jumeaux")
+    # F. journal immuable (droits intacts, ouverture en écriture refusée)
+    if drapeaux_utilisables():
+        lab = fabriquer_lab(ctx, "d1-19f")
+        session(ctx, d, lab)
+        subprocess.run(["chflags", "uchg", chemin_journal(lab)])
+        try:
+            rc, out, err = session(ctx, d, lab)
+        finally:
+            subprocess.run(["chflags", "nouchg", chemin_journal(lab)])
+        verifier("journal immuable", out, ("inscriptible",))
+        vus.append("immuable")
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "journal en lien, sans droits%s, absent alors que l'état précédent existe (reprise ; cache du recalcul) : un signal D1 qui le nomme, sans chemin absolu, "
+                          "rien d'écrit ; jumeaux (première séance sans journal, journal sain, séance suivante) : aucun signal" % (", immuable" if "immuable" in vus else ""))
+
+
 def original_de(ctx, ident, controle):
     """Résultat d'un contrôle sur le script réel, calculé une seule fois (les sections et les mutants lisent la même exécution)."""
     if ident not in ctx.originaux:
@@ -1408,6 +1506,7 @@ def sec_reconciliation(ctx):
     rendre("R-D1-14", "fenêtre de lecture du journal et coût du SessionStart", controle_d1_14, ctx)
     rendre("R-D1-16", "les unités les plus récentes d'abord, la borne signalée sans répétition", controle_d1_16, ctx)
     rendre("R-D1-17", "la réconciliation plafonne les octets hachés et le signale", controle_d1_17, ctx)
+    rendre("R-D1-19", "A6 : un journal de D1 réduit au silence par Bash est signalé au SessionStart", controle_d1_19, ctx)
 
 
 def sec_mutants_reconciliation(ctx):
@@ -1423,6 +1522,17 @@ def sec_mutants_reconciliation(ctx):
     tuer(ctx, "D1-ANNONCE-BORNE", "# d1-annonce-borne", "if False:  # d1-annonce-borne", "R-D1-16", controle_d1_16)
     tuer(ctx, "D1-IDENTITE-BORNE", "# d1-identite-borne", "if True:  # d1-identite-borne", "R-D1-16", controle_d1_16)
     tuer(ctx, "D1-OCTETS", "# d1-octets-exclus", "if False:  # d1-octets-exclus", "R-D1-17", controle_d1_17)
+    # A6 : chaque contrôle d'`anomalie_journal` retiré seul, et le signal lui-même
+    tuer(ctx, "D1-JOURNAL-SIGNAL", "# d1-journal-signal", "if False:  # d1-journal-signal", "R-D1-19", controle_d1_19)
+    tuer(ctx, "D1-JOURNAL-ETAT", "# d1-journal-etat", "anomalie = None  # d1-journal-etat", "R-D1-19", controle_d1_19)
+    tuer(ctx, "D1-JOURNAL-IRREGULIER", "# d1-journal-irregulier", "if False:  # d1-journal-irregulier", "R-D1-19", controle_d1_19)
+    tuer(ctx, "D1-JOURNAL-DROITS", "# d1-journal-droits", "if False:  # d1-journal-droits", "R-D1-19", controle_d1_19)
+    tuer(ctx, "D1-JOURNAL-ABSENT", "# d1-journal-absent", "precedent = False  # d1-journal-absent", "R-D1-19", controle_d1_19)
+    tuer(ctx, "D1-JOURNAL-PREMIERE-SEANCE", "# d1-journal-absent", "precedent = True  # d1-journal-absent", "R-D1-19", controle_d1_19)
+    if drapeaux_utilisables():
+        tuer(ctx, "D1-JOURNAL-OUVERTURE", "# d1-journal-ouverture", "pass  # d1-journal-ouverture", "R-D1-19", controle_d1_19)
+    else:
+        ok("MUT-D1-JOURNAL-OUVERTURE non applicable ici : pas de `chflags` (aucun cas portable de journal aux droits intacts mais inscriptible en refus)")
 
 
 SECTIONS = {
