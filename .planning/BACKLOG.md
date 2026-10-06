@@ -1,3 +1,11 @@
+## Routage « crée une PR / ship » vers gsd-ship contre « ouvrir une PR = geste VibeFlow » — consigné 2026-10-06
+
+**Statut : consigné par la Phase 41.4 (P414-D-16, décision du manager), non cadré — changer une route est hors périmètre de la phase.**
+
+**Constat.** `intent-routing.md:76` (ligne 77 depuis les ajouts de la Phase 41.4) route « crée une PR / ship » vers `gsd-ship` ; `GSD-PIPELINE.md:122` et `mission-contracts.md` §Isolation de branche font de l'ouverture de PR un geste de l'équipe, désormais contrôlé par E3 avec le merge-danger call (POCK-06). Aucune route n'a changé.
+
+**À trancher au cadrage.** Une demande « crée une PR » en conversation doit-elle aller à `gsd-ship` (PR sans merge-danger call ni contrôle E3) ou au geste de l'équipe ?
+
 ## Choisir la partition du planning AU DÉMARRAGE, pas après coup — demandé 2026-09-23
 
 **Statut : besoin exprimé par Samuel (session principale, 2026-09-23), non cadré.** À passer par
