@@ -2730,9 +2730,13 @@ def evaluer_gates(contexte):
 # FileChanged, entre les séances par une réconciliation par hash au SessionStart. D1 DÉTECTE, ne refuse JAMAIS (fail-open déclaré : toute
 # erreur sort en silence, code 0) et ne coûte rien hors adhésion (aucune liste n'est renvoyée, le watcher ne démarre pas). Fichiers surveillés,
 # un par un (jamais un dossier, #91634) : cinq à la racine du dossier de planning, quatre par unité de forme modèle dont SUMMARY.md est absent
-# (approximation déterministe d'« unité non close », sans recalcul). Le journal de D1 n'en fait jamais partie. Limites : (ax) à (ba) de la
-# référence.
+# (approximation déterministe d'« unité non close », sans recalcul). Le journal de D1 n'en fait jamais partie. Les unités sont parcourues la
+# plus RÉCENTE d'abord (`cle_recence`, ordre déclaré par le nom, jamais par une date du disque) : la liste se tronque à BORNE_WATCHPATHS
+# chemins en gardant les plus récentes, et la réconciliation ne hache pas au-delà de BORNE_OCTETS_RECONCILIATION octets ; l'une et l'autre
+# borne sont tracées (`genre=borne`) et signalées dans `additionalContext`, une fois par liste tronquée (D1, fix-46-a). Limites : (ax) à
+# (ba), (bg) de la référence.
 BORNE_WATCHPATHS = 128
+BORNE_OCTETS_RECONCILIATION = 268435456  # d1-plafond-reconciliation
 BORNE_LECTURE_SURVEILLANCE = 4194304
 PAR_HOOK = "planning-hook.sh"
 FICHIERS_RACINE_SURVEILLES = ("STATE.md", "INDEX.md", "cloture.log", NOM_JOURNAL_DEROGATIONS, NOM_CONFIG)
@@ -2740,23 +2744,31 @@ FICHIERS_UNITE_SURVEILLES = ("PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md"
 LIGNE_SURVEILLANCE_RE = re.compile(r"^(\S+)  genre=(\S+)  chemin=(\S+)  sha256=(\S+)  par=(\S+)  source=(\S+)$")
 
 
+def cle_recence(nom):
+    """Clé d'un nom d'unité (NOM_UNITE : chiffres, tiret, reste) triée à l'envers pour mettre la plus RÉCENTE en tête : le préfixe numérique
+    comparé comme un entier SANS conversion (longueur des chiffres significatifs, puis les chiffres), puis le nom entier (déterministe à
+    préfixe égal). Ordre déclaré par le nom, jamais par une date du disque (D1, fix-46-a)."""
+    chiffres = nom.split("-", 1)[0].lstrip("0")
+    return (len(chiffres), chiffres, nom)
+
+
 def _unites_non_closes(racine):
-    """Dossiers des unités de forme modèle dont SUMMARY.md est absent, en parcours trié : pour chaque phase de chaque cycle, le dossier de la
-    phase puis ceux de ses plans (comme `plans_ouverts`, sans lire ni PLAN.md ni CLOTURE.md : aucune dérivation d'état). Un générateur : le
-    consommateur s'arrête dès que la borne est atteinte."""
+    """Dossiers des unités de forme modèle dont SUMMARY.md est absent, la plus RÉCENTE d'abord (D1, fix-46-a) : cycles, puis phases de chaque
+    cycle, par `cle_recence` décroissante ; pour une phase, son dossier puis ceux de ses plans (même ordre). Sans lire ni PLAN.md ni CLOTURE.md
+    (aucune dérivation d'état). Un générateur : le consommateur s'arrête dès que la borne est atteinte."""
     base = os.path.join(racine, NOM_PLANNING, "cycles")
-    for cycle in _sous_dossiers(base):
+    for cycle in sorted(_sous_dossiers(base), key=cle_recence, reverse=True):  # d1-recence-cycles
         phases = os.path.join(base, cycle, "phases")
-        for phase in _sous_dossiers(phases):
+        for phase in sorted(_sous_dossiers(phases), key=cle_recence, reverse=True):  # d1-recence-phases
             dossier_phase = os.path.join(phases, phase)
-            dossiers = [dossier_phase] + [os.path.join(dossier_phase, "plans", plan) for plan in _sous_dossiers(os.path.join(dossier_phase, "plans"))]
-            for dossier in dossiers:
+            plans = sorted(_sous_dossiers(os.path.join(dossier_phase, "plans")), key=cle_recence, reverse=True)  # d1-recence-plans
+            for dossier in [dossier_phase] + [os.path.join(dossier_phase, "plans", plan) for plan in plans]:
                 if not os.path.lexists(os.path.join(dossier, "SUMMARY.md")):
                     yield dossier
 
 
 def chemins_surveilles(racine):
-    """(liste de chemins ABSOLUS, tronquée) : les cinq fichiers racine du dossier de planning puis, par unité non close, ses quatre fichiers
+    """(liste de chemins ABSOLUS, tronquée) : les cinq fichiers racine du dossier de planning puis, par unité non close, la plus RÉCENTE d'abord, ses quatre fichiers
     (SUMMARY.md encore absent compris), FICHIER PAR FICHIER — jamais un dossier, un watcher récursif sur un dossier géant bloquant le fil
     principal (#91634). Au plus BORNE_WATCHPATHS chemins ; la troncature est signalée à l'appelant, qui la trace. Ni le journal de D1 ni le
     cache du recalcul n'en font partie."""
@@ -2917,39 +2929,86 @@ def inscrire_intentions(payload, cibles):
         return
 
 
+def _taille_surveillee(chemin):
+    """Taille annoncée (lstat) d'un fichier surveillé régulier ; 0 s'il est absent, n'est pas un fichier régulier ou ne se lit pas."""
+    try:
+        etat = os.lstat(chemin)
+    except OSError:
+        return 0
+    return etat.st_size if stat.S_ISREG(etat.st_mode) else 0
+
+
+def texte_borne(tronquee, exclus):
+    """Signal de borne de D1, une ligne, chemins relatifs seulement : la liste tronquée à BORNE_WATCHPATHS et/ou les fichiers non réconciliés
+    au-delà des bornes d'octets."""
+    morceaux = []
+    if tronquee:
+        morceaux.append("liste surveillée tronquée à %d chemins (BORNE_WATCHPATHS) : les unités non closes les plus anciennes ne sont pas "
+                        "surveillées en séance" % BORNE_WATCHPATHS)
+    if exclus:
+        morceaux.append("%d fichier(s) surveillé(s) non réconcilié(s) au-delà de %d octets hachés (BORNE_OCTETS_RECONCILIATION) ou de %d octets "
+                        "par fichier (%s%s)" % (len(exclus), BORNE_OCTETS_RECONCILIATION, BORNE_OCTETS_LIVRABLES, ", ".join(exclus[:3]),
+                                                "…" if len(exclus) > 3 else ""))
+    return "[planning-core] D1 : surveillance bornée — " + " ; ".join(morceaux) + " — tracé dans .planning/surveillance.log (genre=borne)"
+
+
 def reconcilier(racine, liste, tronquee):
-    """Réconciliation par hash au SessionStart (P46-D-07) : les empreintes des fichiers surveillés sont comparées au dernier état connu du journal (une
-    lecture bornée du journal, une lecture de chaque fichier de la liste). Une première observation pose la référence ; un changement que rien n'explique
-    est tracé comme contournement (`source=reconciliation`) ; une troncature à la borne est tracée. Rend le signal à porter au contexte — les
-    contournements tracés depuis la séance précédente, c'est-à-dire depuis la dernière ligne `signal` — ou None ; la ligne `signal` est posée, de sorte
-    qu'un SessionStart sans nouveau contournement ne le répète pas."""
+    """Réconciliation par hash au SessionStart (P46-D-07) : chaque fichier de la liste est comparé au dernier état connu du journal (une lecture
+    bornée du journal, une lecture de chaque fichier gardé). Plafond (D1, fix-46-a) : au plus BORNE_OCTETS_RECONCILIATION octets hachés (tailles
+    annoncées cumulées) et aucun fichier de plus de BORNE_OCTETS_LIVRABLES ; un fichier écarté n'est pas réconcilié à ce SessionStart. Une borne
+    (liste tronquée ou fichiers écartés) est tracée par une ligne `borne` dont le sha256 est l'empreinte de la liste, posée seulement quand cette
+    empreinte change ; elle est signalée si une ligne `borne` est arrivée depuis la dernière ligne `signal` (même règle anti-répétition que les
+    contournements). Rend le texte du signal (contournements, borne) ou None ; la ligne `signal` est posée dès qu'un signal est rendu."""
+    import hashlib
     entrees = lire_surveillance(racine)
     par_chemin = entrees_par_chemin(entrees)
     contournements = []
+    borne_en_attente = False
+    derniere_borne = None
     for entree in entrees:
         if entree["genre"] == "signal":
             contournements = []
+            borne_en_attente = False
         elif entree["genre"] == "contournement":
             contournements.append(entree["chemin"])
+        elif entree["genre"] == "borne":
+            borne_en_attente = True
+            derniere_borne = entree["sha"]
+    gardes, exclus, hache = [], [], 0
     for chemin in liste:
         rel = "/".join(unicodedata.normalize("NFC", c) for c in os.path.relpath(chemin, racine).split(os.sep))  # nfc-cle-d1
+        gardes.append(rel)
+        taille = _taille_surveillee(chemin)
+        if taille > BORNE_OCTETS_LIVRABLES or hache + taille > BORNE_OCTETS_RECONCILIATION:  # d1-octets-exclus
+            exclus.append(rel)
+            continue
+        hache += taille
         sha = empreinte_fichier(chemin)
         if sha is None:
             continue
         genres = tracer_changement(racine, rel, sha, par_chemin.get(rel, []), "reconciliation")  # d1-reconciliation
         if "contournement" in genres:
             contournements.append(rel)
-    if tronquee:
-        inscrire_surveillance(racine, "borne", None, None, PAR_HOOK, "reconciliation")  # d1-troncature
-    if not contournements:
+    borne = tronquee or bool(exclus)
+    if borne:
+        empreinte_borne = hashlib.sha256(("\n".join(gardes) + "\n--\n" + "\n".join(exclus)).encode("utf-8")).hexdigest()
+        if empreinte_borne != derniere_borne:  # d1-identite-borne
+            inscrire_surveillance(racine, "borne", None, empreinte_borne, PAR_HOOK, "reconciliation")  # d1-troncature
+            borne_en_attente = True
+    textes = []
+    if contournements:
+        distincts = []
+        for chemin in contournements:
+            if chemin not in distincts:
+                distincts.append(chemin)
+        textes.append("[planning-core] D1 : %d écriture(s) non expliquée(s) de fichiers surveillés depuis la séance précédente (%s%s) — tracées "
+                      "dans .planning/surveillance.log" % (len(contournements), ", ".join(distincts[:3]), "…" if len(distincts) > 3 else ""))
+    if borne and borne_en_attente:  # d1-annonce-borne
+        textes.append(texte_borne(tronquee, exclus))
+    if not textes:
         return None
-    distincts = []
-    for chemin in contournements:
-        if chemin not in distincts:
-            distincts.append(chemin)
     inscrire_surveillance(racine, "signal", None, None, PAR_HOOK, "reconciliation")  # d1-signal
-    return ("[planning-core] D1 : %d écriture(s) non expliquée(s) de fichiers surveillés depuis la séance précédente (%s%s) — tracées dans .planning/surveillance.log"
-            % (len(contournements), ", ".join(distincts[:3]), "…" if len(distincts) > 3 else ""))
+    return "\n".join(textes)
 
 
 def sortie_surveillance(evenement, liste, texte):

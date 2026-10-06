@@ -5104,6 +5104,7 @@ LIMITES_REFERENCE = (
     ("bb", ("Phase 48", "Phase 50", "P46-D-13")),
     ("be", ("BORNE_LECTURE_PLAN", "1 Mio", "G3", "G4", "recalcul")),
     ("bf", ("NFC", "NFD", "racine", "ext4", "APFS")),
+    ("bg", ("BORNE_WATCHPATHS", "BORNE_OCTETS_RECONCILIATION", "plus récentes", "signal")),
 )
 PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 

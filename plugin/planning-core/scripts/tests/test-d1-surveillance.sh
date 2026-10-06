@@ -8,7 +8,7 @@
 # Familles :
 #   R-D1-01  SessionStart d'un lab adhérent (deux unités ouvertes, une close) : `watchPaths` en chemins absolus, fichier par fichier — les cinq fichiers racine
 #            et les quatre fichiers de chaque unité ouverte (SUMMARY.md encore absent compris), aucun dossier, aucun fichier de l'unité close, jamais le journal
-#   R-D1-02  lab de 40 unités ouvertes : exactement 128 chemins et une ligne `genre=borne` au journal
+#   R-D1-02  lab de 40 unités ouvertes : exactement 128 chemins et une ligne `genre=borne` au journal (sha256 = empreinte de la liste), signal de borne dans additionalContext
 #   R-D1-03  lab dev et ce dépôt : SessionStart, CwdChanged, FileChanged -> stdout d'octet vide, code 0, aucun fichier créé (empreinte de l'arbre identique)
 #   R-D1-04  références posées au SessionStart, STATE.md réécrit hors moteur, FileChanged -> une ligne `contournement` (source=seance) puis une `reference` ;
 #            un FileChanged sans changement de contenu et une première observation : aucun contournement
@@ -20,6 +20,10 @@
 #   R-D1-08  Write laissé passer (copie observe) : une ligne `intention`, FileChanged expliqué ; un second changement sans nouvelle intention : contournement ;
 #            un Write refusé (copie G6), un Write hors liste : aucune intention
 #   R-D1-09  `inscrire_surveillance` et `_jeton_journal` ast-identiques dans les quatre scripts ; un chemin à saut de ligne reste UNE ligne encodée
+#   R-D1-16  (A9, fix-46-a) 41 phases ouvertes : les unités les PLUS RÉCENTES d'abord (`cle_recence`), 41-active surveillée, signal de borne sans chemin absolu, une seule fois par liste
+#            tronquée (S2 : rien de plus ; S3 : liste changée, seconde ligne borne et signal de nouveau) ; ordre `100-a`, `99-z`, `010-b`, `02-a`, `01-a`
+#   R-D1-17  (A9, fix-46-a) plafond d'octets hachés à la réconciliation (copie à BORNE_OCTETS_RECONCILIATION = 4096) : fichier écarté sans ligne, une ligne borne, signal qui le nomme, sans répétition ;
+#            fichier au-delà de BORNE_OCTETS_LIVRABLES : même signal
 #   R-D1-15  (A1, fix-46-a) unité `01-été` : références de chemin NFC ; Write par le chemin NFD du CLOTURE.md -> UNE ligne `intention` de chemin NFC ; FileChanged sur le
 #            chemin NFC : aucun contournement ; FileChanged d'un chemin NFD exercé là où la forme NFD désigne le fichier (MUT-D1-NFC)
 #   R-D1-10  SessionStart (références posées), CLOTURE.md créé hors séance, SessionStart -> un contournement (source=reconciliation) et le signal D1 avec le chemin,
@@ -36,7 +40,8 @@
 #   R-D1-06), MUT-D1-INTENTION (ligne d'intention retirée -> R-D1-08), MUT-D1-INTENTION-REUTILISEE (une intention explique plusieurs changements ->
 #   R-D1-08), MUT-D1-AST (une copie divergente -> R-D1-09), MUT-D1-RECONCILIATION (réconciliation retirée -> R-D1-10), MUT-D1-SIGNAL-REPETE (ligne `signal`
 #   non posée -> R-D1-10), MUT-D1-REFUS (une erreur de D1 transformée en deny -> R-D1-13), MUT-D1-WATCH-FILECHANGED (FileChanged renvoie la liste -> R-D1-12),
-#   MUT-D1-FENETRE (fenêtre de lecture retirée -> R-D1-14).
+#   MUT-D1-FENETRE (fenêtre de lecture retirée -> R-D1-14), MUT-D1-ORDRE (parcours des phases par ordre croissant -> R-D1-16), MUT-D1-ANNONCE-BORNE
+#   (signal de borne retiré -> R-D1-16), MUT-D1-IDENTITE-BORNE (une ligne borne à chaque SessionStart -> R-D1-16), MUT-D1-OCTETS (plafond d'octets retiré -> R-D1-17), MUT-D1-NFC (-> R-D1-15).
 # Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, moteur, mutants_moteur, reconciliation, mutants_reconciliation).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
@@ -80,6 +85,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import unicodedata
 import urllib.parse
 
@@ -471,7 +477,12 @@ def controle_d1_02(ctx, script):
     bornes = [e for e in entrees_journal(lab) if e["genre"] == "borne"]
     if len(bornes) != 1:
         fautes.append("UNE ligne genre=borne attendue au journal — obtenu %d" % len(bornes))
-    return (not fautes), ("; ".join(fautes[:3]) if fautes else "40 unités ouvertes : exactement 128 chemins distincts (la borne) et UNE ligne genre=borne au journal")
+    elif not re.fullmatch(r"[0-9a-f]{64}", bornes[0]["sha"]):
+        fautes.append("le sha256 de la ligne borne est l'empreinte de la liste (64 chiffres hexadécimaux) — obtenu %r" % (bornes[0]["sha"],))
+    contexte = doc["hookSpecificOutput"].get("additionalContext")
+    if not isinstance(contexte, str) or "[planning-core] D1 : surveillance bornée" not in contexte or "BORNE_WATCHPATHS" not in contexte:
+        fautes.append("additionalContext : le signal de borne (« surveillance bornée », « BORNE_WATCHPATHS ») attendu — obtenu %r" % (contexte,))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else "40 unités ouvertes : exactement 128 chemins distincts (la borne), UNE ligne genre=borne (sha256 = empreinte de la liste) et le signal de borne dans additionalContext")
 
 
 def _etat_hors_adhesion(ctx, dossier, np, labs):
@@ -957,6 +968,144 @@ def controle_d1_10(ctx, script):
                           "troisième SessionStart sans changement : aucun signal")
 
 
+def fonction_du_hook(ctx, script, nom):
+    """Fonction `nom` du corps Python du hook DU DOSSIER jugé (réel ou mutant), exécutée seule dans un espace de noms jetable ; None si elle n'existe pas."""
+    hook = os.path.join(_dossier(ctx, script), "planning-hook.sh")
+    for noeud in ast.parse(corps_python(open(hook, encoding="utf-8").read())).body:
+        if isinstance(noeud, ast.FunctionDef) and noeud.name == nom:
+            espace = {}
+            exec(compile(ast.Module(body=[noeud], type_ignores=[]), hook, "exec"), espace)
+            return espace[nom]
+    return None
+
+
+def controle_d1_16(ctx, script):
+    """D1 surveille les unités non closes les PLUS RÉCENTES d'abord (A9, fix-46-a) : phases `01-ancienne` à `40-ancienne` et `41-active` -> au SessionStart S1 les quatre
+    fichiers de `41-active` sont dans `watchPaths`, aucun de `01-ancienne`, 128 chemins, signal de borne présent, aucun chemin absolu dans l'additionalContext ; S2 sans
+    changement -> aucun signal de borne, aucune ligne `borne` ni `signal` de plus ; PLAN.md de `41-active` réécrit hors moteur et phase `42-nouvelle` créée -> S3 : un
+    contournement `source=reconciliation` pour ce PLAN.md, une seconde ligne `borne`, signal de borne de nouveau, fichiers de `42-nouvelle` surveillés ; `cle_recence`
+    (chargée du hook jugé) trie `01-a`, `100-a`, `99-z`, `010-b`, `02-a` en `100-a`, `99-z`, `010-b`, `02-a`, `01-a`."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    ouvertes = tuple("%02d-ancienne" % i for i in range(1, 41)) + ("41-active",)
+    lab = fabriquer_lab(ctx, "d1-16", ouvertes=ouvertes, closes=())
+    phases = os.path.join(lab, ".planning", "cycles", "01-c", "phases")
+    fautes = []
+    rc, out, err = session(ctx, d, lab)
+    chemins, doc = watch_paths(out)
+    if rc != 0 or err or chemins is None:
+        return False, "S1 : code 0 et watchPaths attendus — obtenu rc=%d %s" % (rc, court(out))
+    actifs = [os.path.join(phases, "41-active", nom) for nom in UNITE]
+    if [c for c in actifs if c not in chemins] or any("01-ancienne" in c for c in chemins) or len(chemins) != 128:
+        fautes.append("S1 : les quatre fichiers de 41-active surveillés, aucun de 01-ancienne, 128 chemins attendus — obtenu %d chemin(s), 41-active : %d/4, 01-ancienne : %d" % (
+            len(chemins), len([c for c in actifs if c in chemins]), len([c for c in chemins if "01-ancienne" in c])))
+    signal = contexte_de(out)
+    if not isinstance(signal, str) or "[planning-core] D1 : surveillance bornée" not in signal or "BORNE_WATCHPATHS" not in signal or lab in signal:
+        fautes.append("S1 : le signal de borne sans chemin absolu attendu dans additionalContext — obtenu %r" % (signal,))
+    comptes1 = (len(lignes_de(lab, "borne")), len(lignes_de(lab, "signal")))
+    if comptes1 != (1, 1):
+        fautes.append("S1 : UNE ligne borne et UNE ligne signal attendues — obtenu %s" % (comptes1,))
+    # S2 : aucun changement
+    avant = len(lignes_journal(lab))
+    rc, out, err = session(ctx, d, lab)
+    signal = contexte_de(out)
+    if rc != 0 or (isinstance(signal, str) and "surveillance bornée" in signal) or len(lignes_journal(lab)) != avant or (len(lignes_de(lab, "borne")), len(lignes_de(lab, "signal"))) != comptes1:
+        fautes.append("S2 : sans changement, aucun signal de borne et aucune ligne borne ni signal de plus attendus — obtenu %r, %d ligne(s) de plus, %d borne(s), %d signal(aux)" % (
+            signal, len(lignes_journal(lab)) - avant, len(lignes_de(lab, "borne")), len(lignes_de(lab, "signal"))))
+    # S3 : PLAN.md de 41-active réécrit hors moteur, phase 42-nouvelle créée
+    plan_actif = ".planning/cycles/01-c/phases/41-active/PLAN.md"
+    ecrire(os.path.join(lab, *plan_actif.split("/")), "---\necrit: []\n---\nplan réécrit hors moteur\n")
+    ecrire(os.path.join(phases, "42-nouvelle", "PLAN.md"), "---\necrit: []\n---\nplan de 42-nouvelle\n")
+    rc, out, err = session(ctx, d, lab)
+    chemins3, _doc3 = watch_paths(out)
+    if rc != 0 or chemins3 is None:
+        return False, "S3 : code 0 et watchPaths attendus — obtenu rc=%d %s" % (rc, court(out))
+    ligne = contournements(lab, plan_actif)
+    if len(ligne) != 1 or ligne[0]["source"] != "reconciliation":
+        fautes.append("S3 : UN contournement (source=reconciliation) pour le PLAN.md de 41-active attendu — obtenu %s" % [(l["source"]) for l in ligne])
+    if len(lignes_de(lab, "borne")) != 2:
+        fautes.append("S3 : une seconde ligne borne (la liste a changé) attendue — obtenu %d" % len(lignes_de(lab, "borne")))
+    signal = contexte_de(out)
+    if not isinstance(signal, str) or "surveillance bornée" not in signal:
+        fautes.append("S3 : le signal de borne de nouveau attendu — obtenu %r" % (signal,))
+    if [c for c in (os.path.join(phases, "42-nouvelle", nom) for nom in UNITE) if c not in chemins3]:
+        fautes.append("S3 : les quatre fichiers de 42-nouvelle surveillés attendus")
+    # l'ordre déclaré par le nom
+    cle = fonction_du_hook(ctx, script, "cle_recence")
+    if cle is None:
+        fautes.append("cle_recence absente du hook : l'ordre de récence n'est pas déclaré")
+    else:
+        trie = sorted(["01-a", "100-a", "99-z", "010-b", "02-a"], key=cle, reverse=True)
+        if trie != ["100-a", "99-z", "010-b", "02-a", "01-a"]:
+            fautes.append("cle_recence trie 01-a, 100-a, 99-z, 010-b, 02-a en %s (attendu 100-a, 99-z, 010-b, 02-a, 01-a)" % trie)
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "41 phases ouvertes : les quatre fichiers de 41-active sont surveillés (aucun de 01-ancienne), signal de borne sans chemin absolu ; S2 sans changement : rien de plus ; "
+                          "S3 (PLAN.md réécrit, phase 42 créée) : un contournement, une seconde ligne borne, le signal de nouveau, 42-nouvelle surveillée ; cle_recence : 100-a, 99-z, 010-b, 02-a, 01-a")
+
+
+def copie_plafond(ctx, dossier, valeur):
+    """Copie `observe` du hook du dossier jugé dont BORNE_OCTETS_RECONCILIATION vaut `valeur` (la ligne `# d1-plafond-reconciliation`, comptée exactement une fois)."""
+    texte = observe_partout(open(os.path.join(dossier, "planning-hook.sh"), encoding="utf-8").read())
+    lignes = [l for l in texte.split("\n") if "# d1-plafond-reconciliation" in l]
+    if len(lignes) != 1 or not lignes[0].startswith("BORNE_OCTETS_RECONCILIATION = "):
+        raise RuntimeError("la ligne `BORNE_OCTETS_RECONCILIATION = … # d1-plafond-reconciliation` est attendue exactement une fois (%d trouvée(s))" % len(lignes))
+    texte = texte.replace(lignes[0], "BORNE_OCTETS_RECONCILIATION = %d  # d1-plafond-reconciliation" % valeur)
+    d = ctx.unique("plafond")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
+        fh.write(texte)
+    os.chmod(os.path.join(d, "planning-hook.sh"), 0o755)
+    return d
+
+
+def controle_d1_17(ctx, script):
+    """La réconciliation plafonne les octets hachés (A9, fix-46-a) : copie observe dont BORNE_OCTETS_RECONCILIATION vaut 4096 ; STATE.md et INDEX.md de 3000 octets ->
+    référence posée pour STATE.md, AUCUNE ligne pour INDEX.md, une ligne `borne`, additionalContext qui nomme « BORNE_OCTETS_RECONCILIATION » et « .planning/INDEX.md » ;
+    second SessionStart identique -> rien de plus ; copie observe ORDINAIRE : `cloture.log` creux de BORNE_OCTETS_LIVRABLES + 1 octets -> aucune ligne pour lui, une ligne
+    `borne`, un signal qui le nomme (durée affichée)."""
+    dossier_jugé = _dossier(ctx, script)
+    fautes = []
+    try:
+        d = copie_plafond(ctx, dossier_jugé, 4096)
+    except RuntimeError as exc:
+        return False, str(exc)
+    lab = fabriquer_lab(ctx, "d1-17", ouvertes=(), closes=())
+    for nom in ("STATE.md", "INDEX.md"):
+        ecrire(os.path.join(lab, ".planning", nom), "x" * 2999 + "\n")
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err:
+        return False, "SessionStart (plafond de 4096 octets) : code 0 attendu — obtenu rc=%d %s" % (rc, court(err))
+    if len(lignes_de(lab, "reference", ".planning/STATE.md")) != 1 or lignes_de(lab, "reference", ".planning/INDEX.md") or [e for e in entrees_journal(lab) if e["chemin"] == ".planning/INDEX.md"]:
+        fautes.append("plafond de 4096 octets : une référence pour STATE.md et AUCUNE ligne pour INDEX.md attendues — obtenu STATE %d, INDEX %d" % (
+            len(lignes_de(lab, "reference", ".planning/STATE.md")), len([e for e in entrees_journal(lab) if e["chemin"] == ".planning/INDEX.md"])))
+    signal = contexte_de(out)
+    if len(lignes_de(lab, "borne")) != 1 or not isinstance(signal, str) or "BORNE_OCTETS_RECONCILIATION" not in signal or ".planning/INDEX.md" not in signal:
+        fautes.append("plafond de 4096 octets : UNE ligne borne et un signal qui nomme BORNE_OCTETS_RECONCILIATION et .planning/INDEX.md attendus — obtenu %d borne(s), %r" % (len(lignes_de(lab, "borne")), signal))
+    avant = len(lignes_journal(lab))
+    rc, out, err = session(ctx, d, lab)
+    signal = contexte_de(out)
+    if rc != 0 or len(lignes_journal(lab)) != avant or (isinstance(signal, str) and "BORNE_OCTETS_RECONCILIATION" in signal):
+        fautes.append("second SessionStart identique : aucune ligne de plus, aucun signal de borne attendus — obtenu %d ligne(s) de plus, %r" % (len(lignes_journal(lab)) - avant, signal))
+    # copie ordinaire : un fichier surveillé au-delà de BORNE_OCTETS_LIVRABLES
+    trouve = re.search(r"^BORNE_OCTETS_LIVRABLES = ([0-9]+)", open(os.path.join(dossier_jugé, "planning-hook.sh"), encoding="utf-8").read(), flags=re.M)
+    borne_octets = int(trouve.group(1)) if trouve else 134217728
+    lab2 = fabriquer_lab(ctx, "d1-17-creux", ouvertes=(), closes=())
+    with open(os.path.join(lab2, ".planning", "cloture.log"), "wb") as fh:
+        fh.truncate(borne_octets + 1)
+    debut = time.monotonic()
+    rc, out, err = session(ctx, ctx.copie_forcee(dossier_jugé, "observe"), lab2)
+    duree = time.monotonic() - debut
+    signal = contexte_de(out)
+    if rc != 0 or [e for e in entrees_journal(lab2) if e["chemin"] == ".planning/cloture.log" and e["genre"] in ("reference", "contournement")]:
+        fautes.append("cloture.log de BORNE_OCTETS_LIVRABLES + 1 octets : aucune ligne de référence ni de contournement attendue — obtenu rc=%d" % rc)
+    if len(lignes_de(lab2, "borne")) != 1 or not isinstance(signal, str) or ".planning/cloture.log" not in signal:
+        fautes.append("cloture.log hors borne : UNE ligne borne et un signal qui le nomme attendus — obtenu %d borne(s), %r" % (len(lignes_de(lab2, "borne")), signal))
+    if script is None:
+        print("DUREE d1-17-creux s=%.1f (affichée, jamais assertée)" % duree)
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "plafond de 4096 octets : STATE.md référencé, INDEX.md écarté (aucune ligne), une ligne borne, signal qui nomme BORNE_OCTETS_RECONCILIATION et .planning/INDEX.md, "
+                          "second SessionStart sans rien de plus ; cloture.log creux au-delà de BORNE_OCTETS_LIVRABLES : aucune ligne, une ligne borne, signal qui le nomme")
+
+
 def controle_d1_11(ctx, script):
     """Une écriture du moteur entre deux séances (recalc-planning.sh réécrit STATE.md et INDEX.md) : aucun contournement à la réconciliation, aucun signal."""
     d = ctx.copie_forcee(_dossier(ctx, script), "observe")
@@ -1197,6 +1346,8 @@ def sec_reconciliation(ctx):
     rendre("R-D1-12", "CwdChanged : deux formes de watchPaths ; FileChanged : jamais de watchPaths", controle_d1_12, ctx)
     rendre("R-D1-13", "fail-open : une erreur de D1 sort en silence, aucun refus", controle_d1_13, ctx)
     rendre("R-D1-14", "fenêtre de lecture du journal et coût du SessionStart", controle_d1_14, ctx)
+    rendre("R-D1-16", "les unités les plus récentes d'abord, la borne signalée sans répétition", controle_d1_16, ctx)
+    rendre("R-D1-17", "la réconciliation plafonne les octets hachés et le signale", controle_d1_17, ctx)
 
 
 def sec_mutants_reconciliation(ctx):
@@ -1208,6 +1359,10 @@ def sec_mutants_reconciliation(ctx):
     tuer(ctx, "D1-WATCH-FILECHANGED", "return None  # evt-mode-filechanged",
          'sortie_d1(sortie_surveillance(EVT_SESSION_START, chemins_surveilles(racine)[0], None)); return None  # evt-mode-filechanged', "R-D1-12", controle_d1_12)
     tuer(ctx, "D1-FENETRE", "# d1-fenetre", "debut = 0  # d1-fenetre", "R-D1-14", controle_d1_14)
+    tuer(ctx, "D1-ORDRE", "# d1-recence-phases", "for phase in _sous_dossiers(phases):  # d1-recence-phases", "R-D1-16", controle_d1_16)
+    tuer(ctx, "D1-ANNONCE-BORNE", "# d1-annonce-borne", "if False:  # d1-annonce-borne", "R-D1-16", controle_d1_16)
+    tuer(ctx, "D1-IDENTITE-BORNE", "# d1-identite-borne", "if True:  # d1-identite-borne", "R-D1-16", controle_d1_16)
+    tuer(ctx, "D1-OCTETS", "# d1-octets-exclus", "if False:  # d1-octets-exclus", "R-D1-17", controle_d1_17)
 
 
 SECTIONS = {

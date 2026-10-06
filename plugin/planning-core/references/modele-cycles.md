@@ -1029,6 +1029,7 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (bb)** — P46-D-06, P46-D-13 (Phase 46, 46-09) : aucun dispatch de juge en Phase 46 — le premier passage d'un juge sur sa sortie piégée est une étape écrite du premier cycle, portée par le manager jusqu'à l'orchestrateur générique de la Phase 48 ; les sorties piégées sont fabriquées par l'initialisation en Phase 50 (à la main sinon) : « juge sans preuve » est donc attendu sur tout lab existant, et ce n'est jamais vert ; la qualité d'une sortie piégée (trop facile à refuser) relève de la Phase 50 ; le seuil de juge n'est ni lu ni posé dans `config.json` (P46-D-13, Phase 50).
 - **limite (be)** — A11 (Phase 46, fix-46-a) : G3 et G4 ne lisent pas plus de 1 Mio d'un `PLAN.md` (`BORNE_LECTURE_PLAN`, 1 048 576 octets LUS, jamais la taille annoncée) : au-delà, le `PLAN.md` est tenu pour illisible, la clôture et le `SUMMARY.md` sont refusés par un message qui nomme la borne ; le recalcul et `poser-verdict.sh` le lisent sans cette borne (le recalcul peut rendre un état, la commande poser un verdict, là où le hook refuse : un refus de plus, jamais un passage).
 - **limite (bf)** — A1 (Phase 46, fix-46-a) : la normalisation NFC porte sur les composants SOUS la racine du lab, jamais sur la racine (préfixe tel que la résolution physique le rend) ; sur APFS et HFS+, insensibles à la normalisation, les formes NFC et NFD d'un nom désignent le même dossier ; sur un système sensible à la normalisation (ext4), le hook lit l'unité sous sa forme NFC : une unité dont le nom de disque n'est pas en NFC (le recalcul la range « Hors modèle », sauf un nom qui reste conforme à `NOM_UNITE` une fois décomposé — jamo hangûl, idéogrammes de compatibilité CJK) y est lue absente, d'où un refus de G1, G3 ou G4, jamais un passage ; une jumelle NFC posée à côté serait lue à sa place, le recalcul gardant la vue du disque.
+- **limite (bg)** — D1 (Phase 46, fix-46-a ; critère et plafond : choix du planificateur du quick 261006-23m, renversables) : la liste surveillée garde les unités non closes les plus récentes d'abord — ordre DÉCLARÉ par le nom (préfixe numérique décroissant comparé comme un entier, puis le nom), jamais par une date du disque — et se tronque à `BORNE_WATCHPATHS` chemins ; la réconciliation ne hache pas au-delà de `BORNE_OCTETS_RECONCILIATION` octets cumulés (256 Mio) ni un fichier de plus de 128 Mio : un fichier écarté n'est ni surveillé en séance (s'il est hors liste) ni réconcilié ; la borne est tracée (`genre=borne`, `sha256` = empreinte de la liste) et le signal ne la répète pas tant que la liste tronquée ne change pas.
 
 ### Contrat de sortie par événement (Phase 46)
 
@@ -1257,8 +1258,12 @@ récursivement et a bloqué le fil principal de 20 à 45 s sur 137 000 fichiers)
 `STATE.md`, `INDEX.md`, `cloture.log`, le journal de dérogation et `config.json` à la racine du dossier de planning, puis `PLAN.md`,
 `CLOTURE.md`, `VERDICT.md` et `SUMMARY.md` de chaque **unité de forme modèle dont `SUMMARY.md` est absent** (approximation déterministe
 d'« unité non close », sans recalcul : une unité close voit ses écarts par la règle E du recalcul ; `SUMMARY.md` encore absent est dans la
-liste, pour voir sa création). Les unités sont parcourues dans l'ordre trié, la phase puis ses plans. Une troncature à la borne est tracée
-(une ligne `genre=borne`). Le journal de D1 n'en fait jamais partie : un watcher sur le fichier que sa propre trace réécrit bouclerait.
+liste, pour voir sa création). Les unités sont parcourues **la plus récente d'abord** (D1, fix-46-a ; critère : choix du planificateur du quick
+261006-23m, renversable) : cycles, puis phases de chaque cycle, par `cle_recence` décroissante — le préfixe numérique du nom comparé comme un
+entier (longueur des chiffres significatifs, puis les chiffres), puis le nom entier ; la phase, puis ses plans dans le même ordre. L'ordre est
+**déclaré par le nom**, jamais par une date du disque. La liste se tronque donc en gardant les unités les plus récentes (l'unité active reste
+surveillée) ; la troncature est tracée (une ligne `genre=borne`, `sha256` = empreinte de la liste) **et signalée** dans `additionalContext` (voir la
+réconciliation). Le journal de D1 n'en fait jamais partie : un watcher sur le fichier que sa propre trace réécrit bouclerait.
 
 **Sorties par événement.** `SessionStart` : `{"hookSpecificOutput":{"hookEventName":"SessionStart","watchPaths":[…],"additionalContext":"…"}}`
 (les clés `watchPaths` et `additionalContext` ne sont présentes que si elles sont non vides) ; `CwdChanged` : la même liste, `watchPaths` au premier
@@ -1294,10 +1299,20 @@ l'ajout au journal de dérogation ; le hook central après une ligne `consommee`
 sont signalés en **une ligne** de `additionalContext`, sans jamais bloquer : `[planning-core] D1 : <n> écriture(s) non expliquée(s) de fichiers
 surveillés depuis la séance précédente (<trois premiers chemins relatifs>…) — tracées dans .planning/surveillance.log` ; la ligne `signal` posée
 ensuite empêche qu'un `SessionStart` sans nouveau contournement le répète. La réconciliation rattrape aussi ce que le watcher ne voit pas (limite (ax)).
+**Plafond d'octets** (D1, fix-46-a) : la réconciliation ne hache pas plus de `BORNE_OCTETS_RECONCILIATION` octets cumulés (256 Mio, tailles annoncées par
+`lstat`) et aucun fichier de plus de `BORNE_OCTETS_LIVRABLES` (128 Mio) ; un fichier écarté n'est pas réconcilié à ce `SessionStart` (aucune ligne). Coût
+mesuré (sonde p13 après correction) : 0,2 s au premier comme au second `SessionStart` pour 96 fichiers creux de 127 Mio (deux seulement sont hachés), l'échéance
+du cœur étant de 8 s (avant la correction : 8,1 s mesurés au départ de ce quick, 5,9 s à l'audit ; au-delà de l'échéance le `SessionStart` sort en silence, la
+liste n'est pas rendue). **Signal de borne** : une borne — liste tronquée ou fichiers écartés —
+est tracée par une ligne `borne` dont le `sha256` est l'empreinte de la liste surveillée et des fichiers écartés, posée seulement quand cette empreinte change ;
+elle est signalée en une ligne de `additionalContext` (`[planning-core] D1 : surveillance bornée — liste surveillée tronquée à 128 chemins
+(BORNE_WATCHPATHS) : … ; <n> fichier(s) surveillé(s) non réconcilié(s) au-delà de <octets> octets hachés (BORNE_OCTETS_RECONCILIATION) ou de <octets>
+octets par fichier (<trois premiers chemins relatifs>) — tracé dans .planning/surveillance.log (genre=borne)`) si une ligne `borne` est arrivée depuis la
+dernière ligne `signal` : même règle anti-répétition que les contournements, une troncature identique à la dernière tracée n'est pas re-signalée.
 
 **Canary.** D1 n'a pas de constante d'armement mais a son canary : le cas `D1-trace` (catégorie `D1` de `CANARIS`) rejoue un `FileChanged` synthétique
 sur un fichier surveillé du lab synthétique, d'abord sur son état initial (la référence), puis modifié hors du moteur : la commande doit se taire ET
-ajouter une ligne `contournement` au journal du lab synthétique ; l'attendu est `trace`, jamais dérivé de la table d'armement. Limites : (ax) à (ba).
+ajouter une ligne `contournement` au journal du lab synthétique ; l'attendu est `trace`, jamais dérivé de la table d'armement. Limites : (ax) à (ba), (bg).
 
 ### Canary de juge (C-16, Phase 46)
 
