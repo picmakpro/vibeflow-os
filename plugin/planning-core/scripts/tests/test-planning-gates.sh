@@ -969,6 +969,7 @@ RECENSEMENT_LECTURE = {
     "empreinte_fichier": "1048576",                             # compteur
     "lire_surveillance": "BORNE_LECTURE_SURVEILLANCE",
     "_verifier_un_juge": "BORNE_SORTIE_PIEGEE + 1",
+    "poser_gitignore_planning": "BORNE_GITIGNORE_PLANNING + 1",    # Q-B (fix-46-c) : .planning/.gitignore existant, lecture bornée à 64 Kio
 }
 GARDES_COMPTEUR = {"_hacher_dans": "_borne_depassee", "consommer": "BORNE_LECTURE_FICHIER", "empreinte_fichier": "BORNE_OCTETS_LIVRABLES"}
 
