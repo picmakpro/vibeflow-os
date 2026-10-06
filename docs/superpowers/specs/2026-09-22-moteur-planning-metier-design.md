@@ -212,7 +212,7 @@ Keystone — **il est postérieur de 16 jours**, n'est pas bloquant, et n'est pa
 `clients/<nom>/diagnostics/2026-09-22/`, la phase pointe dessus. Trois altitudes possibles — plan,
 phase, cycle.
 
-### 3.1 Les huit états dérivés
+### 3.1 Les neuf états dérivés
 
 | Statut | Ce que la machine constate |
 |---|---|
