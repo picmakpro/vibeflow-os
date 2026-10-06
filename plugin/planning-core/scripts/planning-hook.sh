@@ -2389,19 +2389,22 @@ def candidat_definition(chemin, nom_fichier, cible):
     return False
 
 
-def definitions_dossier(dossier, cible=None, signaux=None):
+def definitions_dossier(dossier, cible=None, signaux=None, hors_index=None):
     """{nom normalisé: [(rôle, chemin)]} des `*.md` RÉGULIERS directement sous `dossier` (glob : jamais un fichier
     caché ; jamais un lien symbolique, comme check-agents.sh qui refuse un agent .md en lien — A1), parcours trié
     et borné. `cible` (nom normalisé de l'agent appelant) borne l'indexation à ce qui est nécessaire : seuls les fichiers CANDIDATS
     (`candidat_definition`) sont lus en entier et décomptés du budget d'octets, le rôle n'est dérivé que pour les définitions de ce nom
     (lot A, H2 ; lot C, N1 : des fichiers frères triés avant l'agent visé n'épuisent plus le budget). Un budget épuisé sur un candidat rend
-    la définition INDÉTERMINÉE (rôle `illisible`) et le signale (`signaux` reçoit `budget-indexation`)."""
+    la définition INDÉTERMINÉE (rôle `illisible`) et le signale (`signaux` reçoit `budget-indexation`). `hors_index` (liste, optionnelle) reçoit
+    les noms de fichier (sans `.md`) que l'index n'a pas lus : au-delà de BORNE_AGENTS_PAR_DOSSIER entrées, ou budget d'octets déjà épuisé (N-7)."""
     res = {}
     budget = [BORNE_OCTETS_INDEX]
     try:
         noms = sorted(os.listdir(dossier))
     except OSError:
         return res
+    if hors_index is not None:
+        hors_index.extend(n[:-3] for n in noms[BORNE_AGENTS_PAR_DOSSIER:] if n.endswith(".md") and not n.startswith("."))  # juge-hors-index
     for nom in noms[:BORNE_AGENTS_PAR_DOSSIER]:
         chemin = os.path.join(dossier, nom)
         if not nom.endswith(".md") or nom.startswith(".") or not est_fichier_regulier(chemin):
@@ -2413,6 +2416,8 @@ def definitions_dossier(dossier, cible=None, signaux=None):
             if signaux is not None and "budget-indexation" not in signaux:
                 signaux.append("budget-indexation")
             continue
+        if cible is None and hors_index is not None and budget[0] <= 0:
+            hors_index.append(nom[:-3])  # juge-budget-index
         role, nom_agent, texte = lire_definition_agent(chemin, budget)
         cle = normaliser(nom_agent)
         if cible is not None and cle != cible:
@@ -3227,15 +3232,21 @@ def _verifier_un_juge(racine, juge):
 def verifier_juges(racine):
     """Vérificateur de juges du lab de racine `racine` : {"prouves": [noms], "laxistes": [noms], "sans_preuve": [{"juge": nom, "motif": motif}]}, noms
     triés. Les juges sont les définitions de `<racine>/.claude/agents/` dont le rôle dérivé est `juge` (`definitions_dossier`, `deriver_role`) ; une
-    erreur sur un juge le range SANS PREUVE avec le motif `erreur-<type>`, jamais prouvé. Ne lit ni config.json ni aucun seuil (P46-D-13)."""
+    erreur sur un juge le range SANS PREUVE avec le motif `erreur-<type>`, jamais prouvé. Un juge que l'index n'a pas pu lire n'est JAMAIS omis
+    (N-7) : un nom qui a un dossier `.planning/juges/<nom>` (le lab le déclare juge) et dont la définition est illisible (`definition-illisible`) ou
+    hors de l'index — au-delà de BORNE_AGENTS_PAR_DOSSIER entrées ou budget BORNE_OCTETS_INDEX épuisé (`hors-index`) — est rangé sans preuve. Ne lit ni
+    config.json ni aucun seuil (P46-D-13)."""
     prouves, laxistes, sans_preuve = [], [], []
+    hors_index = []
     try:
-        definitions = definitions_dossier(os.path.join(racine, ".claude", "agents"))
+        definitions = definitions_dossier(os.path.join(racine, ".claude", "agents"), hors_index=hors_index)
     except Exception:
         definitions = {}
+    vus = set()
     for nom in sorted(definitions):
         if not any(role == "juge" for role, _chemin in definitions[nom]):
             continue
+        vus.add(nom)
         try:
             classe, motif = _verifier_un_juge(racine, nom)
         except Exception as exc:
@@ -3246,6 +3257,15 @@ def verifier_juges(racine):
             laxistes.append(nom)
         else:
             sans_preuve.append({"juge": nom, "motif": motif})
+    inconnus = {nom: "definition-illisible" for nom in definitions if any(role == "illisible" for role, _chemin in definitions[nom])}  # juge-illisible
+    for stem in hors_index:
+        inconnus[normaliser(stem)] = "hors-index"  # juge-hors-definitions
+    for nom in sorted(inconnus):
+        if nom in vus or JUGE_RE.match(nom) is None:
+            continue
+        if _dossier_reel(os.path.join(racine, NOM_PLANNING, NOM_DOSSIER_JUGES, nom)):
+            sans_preuve.append({"juge": nom, "motif": inconnus[nom]})
+    sans_preuve.sort(key=lambda entree: entree["juge"])
     return {"prouves": prouves, "laxistes": laxistes, "sans_preuve": sans_preuve}
 
 

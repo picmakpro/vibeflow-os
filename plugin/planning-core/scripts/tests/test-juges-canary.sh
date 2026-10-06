@@ -20,11 +20,15 @@
 #   R-JUGE-06  `planning-hook.sh --juges <lab>` : UNE ligne JSON des trois classes, code 0, stdin non lu, arbre du lab identique ; racine inexistante : trois listes vides
 #   R-JUGE-07  recalc-planning.sh --read-only : `juges` absent de `hors_modele`, aucune unité dérivée sous `juges` ; jumeaux : `juges-autre` hors modèle, `juges` fichier
 #              hors modèle
+#   R-JUGE-09  (N-7, audit-46-b) un juge qui a un dossier `.planning/juges/<juge>` mais que l'index n'a pas lu — budget d'octets épuisé ou au-delà de 1000 entrées
+#              (`hors-index`), définition à ligne de plus de 32 768 caractères (`definition-illisible`) — est SANS PREUVE, jamais omis ; jumeaux : agent illisible sans
+#              dossier de juge hors de la sortie, juge lisible prouvé
 #   R-JUGE-08  copie armée : Write et Edit de `.planning/juges/<juge>/VERDICT.md` -> deny de G5 ; jumeaux : SORTIE-PIEGEE.md du même dossier et cible neutre -> silence
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-JUGE-SANS-PREUVE-VERT (un juge sans dossier compté prouvé -> R-JUGE-01), MUT-JUGE-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-JUGE-02),
 #   MUT-JUGE-SOURCE (la source du SessionStart n'est plus filtrée -> R-JUGE-03), MUT-JUGE-LAXISTE (un critère visé en `passé` compté prouvé -> R-JUGE-04),
-#   MUT-JUGE-HASH (contrôle du hash de la sortie piégée retiré -> R-JUGE-05), MUT-JUGE-NOMS-MODELE (`juges` retiré des noms du modèle du recalcul -> R-JUGE-07).
+#   MUT-JUGE-HASH (contrôle du hash de la sortie piégée retiré -> R-JUGE-05), MUT-JUGE-NOMS-MODELE (`juges` retiré des noms du modèle du recalcul -> R-JUGE-07),
+#   MUT-JUGE-ILLISIBLE-OMIS / -HORS-INDEX-OMIS / -BUDGET-NON-SIGNALE (N-7 -> R-JUGE-09).
 # Variables : VF_JUGES_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, etats, mutants_etats).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
@@ -771,6 +775,49 @@ def controle_juge_08(ctx, script):
                           "copie armée : Write et Edit du VERDICT.md d'un juge -> deny G5 ; jumeaux (SORTIE-PIEGEE.md du même dossier, cible neutre) : silence")
 
 
+def controle_juge_09(ctx, script):
+    """(audit-46-b N-7) Un juge que l'index des définitions n'a pas lu n'est JAMAIS omis : il a un dossier `.planning/juges/<juge>` (le lab le déclare juge),
+    `--juges` le range SANS PREUVE — `hors-index` quand dix agents de 0,9 Mo triés avant lui épuisent BORNE_OCTETS_INDEX, ou quand il vient après les 1000
+    premières entrées du dossier ; `definition-illisible` quand sa définition porte une ligne de plus de 32 768 caractères. Jumeaux : un agent illisible SANS
+    dossier de juge reste hors de la sortie ; un juge lisible du même lab reste prouvé."""
+    fautes = []
+    attendu = {"prouves": [], "laxistes": [], "sans_preuve": [{"juge": "zz-juge", "motif": "hors-index"}]}
+    # (1) budget d'octets épuisé avant le juge
+    lab = fabriquer_lab(ctx, "juge-09a", agents={"zz-juge": def_juge("zz-juge")})
+    echec = juge_prouve(ctx, lab, "zz-juge")
+    if echec:
+        return False, "fixture : " + echec
+    for i in range(10):
+        ecrire(os.path.join(lab, ".claude", "agents", "aa-%02d.md" % i), "---\nname: aa-%02d\ndescription: d\nmodel: sonnet\n---\n" % i + ("x" * 999 + "\n") * 900)
+    rc, out, err = lancer_diagnostic(ctx, lab, script)
+    if rc != 0 or json.loads(out.decode("utf-8")) != attendu:
+        fautes.append("budget d'index épuisé : %s attendu — obtenu %s" % (json.dumps(attendu), court(out)))
+    # (2) au-delà des 1000 premières entrées
+    lab = fabriquer_lab(ctx, "juge-09b", agents={"zz-juge": def_juge("zz-juge")})
+    echec = juge_prouve(ctx, lab, "zz-juge")
+    if echec:
+        return False, "fixture : " + echec
+    for i in range(1000):
+        ecrire(os.path.join(lab, ".claude", "agents", "a%04d.md" % i), "---\nname: a%04d\ndescription: d\nmodel: sonnet\n---\n" % i)
+    rc, out, err = lancer_diagnostic(ctx, lab, script)
+    if rc != 0 or json.loads(out.decode("utf-8")) != attendu:
+        fautes.append("1001e entrée : %s attendu — obtenu %s" % (json.dumps(attendu), court(out)))
+    # (3) définition illisible + jumeaux
+    lab = fabriquer_lab(ctx, "juge-09c", agents={"juge-ok": def_juge("juge-ok"), "juge-long": def_juge("juge-long") + "x" * 40000 + "\n",
+                                                  "autre-long": def_producteur("autre-long") + "x" * 40000 + "\n"})
+    for juge in ("juge-ok", "juge-long"):
+        echec = juge_prouve(ctx, lab, juge)
+        if echec:
+            return False, "fixture : " + echec
+    rc, out, err = lancer_diagnostic(ctx, lab, script)
+    attendu3 = {"prouves": ["juge-ok"], "laxistes": [], "sans_preuve": [{"juge": "juge-long", "motif": "definition-illisible"}]}
+    if rc != 0 or json.loads(out.decode("utf-8")) != attendu3:
+        fautes.append("définition illisible : %s attendu — obtenu %s" % (json.dumps(attendu3), court(out)))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "juge hors budget d'index (hors-index), au-delà de 1000 entrées (hors-index), définition illisible (definition-illisible) : rangés sans preuve, jamais omis ; "
+                          "jumeaux : agent illisible sans dossier de juge absent, juge lisible prouvé")
+
+
 # --- Mutants --------------------------------------------------------------------------------------------------------
 def original_de(ctx, ident, controle):
     """Résultat d'un contrôle sur le script réel, calculé une seule fois (les sections et les mutants lisent la même exécution)."""
@@ -826,6 +873,7 @@ def sec_etats(ctx):
     rendre("R-JUGE-06", "diagnostic --juges : une ligne JSON des trois classes", controle_juge_06, ctx)
     rendre("R-JUGE-07", "juges est un dossier du modèle, jamais dérivé", controle_juge_07, ctx)
     rendre("R-JUGE-08", "G5 protège le verdict de canary", controle_juge_08, ctx)
+    rendre("R-JUGE-09", "N-7 : un juge hors index ou illisible est sans preuve, jamais omis", controle_juge_09, ctx)
 
 
 def sec_mutants_etats(ctx):
@@ -834,6 +882,10 @@ def sec_mutants_etats(ctx):
     # Le contrôle du hash de la sortie piégée retiré : une sortie piégée affaiblie après le verdict reste prouvée
     tuer(ctx, "JUGE-HASH", "# juge-hash", "if False:  # juge-hash", "R-JUGE-05", controle_juge_05)
     # `juges` retiré des noms du modèle : le dossier redevient « Hors modèle »
+    # N-7 : l'illisible omis, le hors-index (au-delà de 1000 entrées) omis, le budget d'octets non signalé (motif `definition-illisible` au lieu de `hors-index`)
+    tuer(ctx, "JUGE-ILLISIBLE-OMIS", "# juge-illisible", "inconnus = {}  # juge-illisible", "R-JUGE-09", controle_juge_09)
+    tuer(ctx, "JUGE-HORS-INDEX-OMIS", "# juge-hors-index", "pass  # juge-hors-index", "R-JUGE-09", controle_juge_09)
+    tuer(ctx, "JUGE-BUDGET-NON-SIGNALE", "# juge-budget-index", "pass  # juge-budget-index", "R-JUGE-09", controle_juge_09)
     tuer(ctx, "JUGE-NOMS-MODELE", "NOMS_MODELE_RACINE_DOSSIERS = (", 'NOMS_MODELE_RACINE_DOSSIERS = ("cycles", "baux", "missions")', "R-JUGE-07", controle_juge_07,
          script="recalc-planning.sh")
 
