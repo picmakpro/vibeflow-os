@@ -1414,24 +1414,24 @@ t36_cas() { # <attendu rc> <jeton attendu dans la sortie ou -> <libellé>
 }
 T36_OK=1
 mk_tree t36a; mk_user u1 u1; mk_cmd x.md 'La commande lance le skill u1 puis rend la main.'
-run_tree; t36_cas 1 "commands/x.md" "commande qui nomme le skill user"
+run_tree; t36_cas 1 "commands/x.md (commande)" "commande qui nomme le skill user"
 echo "$OUT" | grep -q "P414-D-02" || { T36_OK=0; echo "    [T36] ✗ P414-D-02 absent : $OUT"; }
 mk_tree t36b1; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills:\n  - u1\n' 'Agent précharge u1.'
-run_tree; t36_cas 1 "prechargement" "préchargement en liste de bloc"
+run_tree; t36_cas 1 "agents/ag.md (prechargement)" "préchargement en liste de bloc"
 mk_tree t36b2; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills: [autre, u1]\n' 'Agent.'
-run_tree; t36_cas 1 "prechargement" "préchargement en liste en ligne"
+run_tree; t36_cas 1 "agents/ag.md (prechargement)" "préchargement en liste en ligne"
 mk_tree t36b3; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills: autre, u1\n' 'Agent.'
-run_tree; t36_cas 1 "prechargement" "préchargement scalaire séparé par des virgules"
+run_tree; t36_cas 1 "agents/ag.md (prechargement)" "préchargement scalaire séparé par des virgules"
 mk_tree t36b4; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [u1]\n' 'Agent sans Skill mais qui précharge.'
-run_tree; t36_cas 1 "prechargement" "préchargement par un agent sans outil Skill (indépendant de tools)"
+run_tree; t36_cas 1 "agents/ag.md (prechargement)" "préchargement par un agent sans outil Skill (indépendant de tools)"
 mk_tree t36c; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Skill\n' 'Route vers u1.'
-run_tree; t36_cas 1 "agents/ag.md" "agent tools: Read, Skill qui cite le skill"
+run_tree; t36_cas 1 "agents/ag.md (agent)" "agent tools: Read, Skill qui cite le skill"
 mk_tree t36c2; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: [Read, "Skill(u1)"]\n' 'Route vers u1.'
-run_tree; t36_cas 1 "agents/ag.md" "agent tools avec Skill(u1) en liste en ligne"
+run_tree; t36_cas 1 "agents/ag.md (agent)" "agent tools avec Skill(u1) en liste en ligne"
 mk_tree t36d; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md '' 'Route vers u1.'
-run_tree; t36_cas 1 "agents/ag.md" "agent SANS ligne tools: (hérite de tout) qui cite le skill"
+run_tree; t36_cas 1 "agents/ag.md (agent)" "agent SANS ligne tools: (hérite de tout) qui cite le skill"
 mk_tree t36m; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_mod_ag modx 'Le module route vers u1.'
-run_tree; t36_cas 1 "modx/AGENT.md" "{module}/AGENT.md sans tools: qui cite le skill"
+run_tree; t36_cas 1 "modx/AGENT.md (agent)" "{module}/AGENT.md sans tools: qui cite le skill"
 mk_tree t36e; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\n' 'Utilise le skill u1 en prose, sans outil Skill.'
 run_tree; t36_cas 0 "-" "agent tools: Read, Bash qui cite en prose -> aucune arête machine (cas vf-mobile-test)"
 mk_tree t36f; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'disallowedTools: Skill\n' 'Cite u1.'
@@ -1551,15 +1551,15 @@ mk_cmd x.md 'sans rapport'
 run_tree; tk_cas 1 "identite du skill indeterminable" "M-01 name: vide -> identité indéterminable, refusé"
 # M-02 : commentaire de fin de ligne
 mk_tree t44b1; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [u1] # precharge\n' 'Agent.'
-run_tree; tk_cas 1 "prechargement" "M-02 skills: [u1] # commentaire (liste en ligne)"
+run_tree; tk_cas 1 "agents/ag.md (prechargement)" "M-02 skills: [u1] # commentaire (liste en ligne)"
 mk_tree t44b2; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: u1 # precharge\n' 'Agent.'
-run_tree; tk_cas 1 "prechargement" "M-02 skills: u1 # commentaire (scalaire)"
+run_tree; tk_cas 1 "agents/ag.md (prechargement)" "M-02 skills: u1 # commentaire (scalaire)"
 mk_tree t44b3; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Skill # x\n' 'Route vers u1.'
-run_tree; tk_cas 1 "agents/ag.md" "M-02 tools: Read, Skill # commentaire (outil Skill vu)"
+run_tree; tk_cas 1 "agents/ag.md (agent)" "M-02 tools: Read, Skill # commentaire (outil Skill vu)"
 mk_tree t44b4; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'disallowed-tools: Skill # x\n' 'Cite u1.'
 run_tree; tk_cas 0 "-" "M-02 disallowed-tools: Skill # commentaire (interdit lu) -> aucune arête"
 mk_tree t44b5; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: ["autre # pas un commentaire", u1]\n' 'Agent.'
-run_tree; tk_cas 1 "prechargement" "M-02 un # entre guillemets n'est pas un commentaire (u1 reste lu)"
+run_tree; tk_cas 1 "agents/ag.md (prechargement)" "M-02 un # entre guillemets n'est pas un commentaire (u1 reste lu)"
 mk_tree t44b6; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [u1\n' 'Agent.'
 run_tree; tk_cas 1 "non interpretable" "M-02 liste en ligne non refermée -> refusée, pas ignorée"
 # M-03 : valeur RÉSOLUE de policy.allow_implicit_invocation
@@ -1614,13 +1614,50 @@ run_tree; tk_cas 0 "-" "K16 agent en lien symbolique non suivi"
 mk_tree t44d4; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: True\n'; mk_oy a 'policy:
   allow_implicit_invocation: false'; mk_cmd x.md 'sans rapport'
 run_tree; tk_cas 0 "-" "K14 disable-model-invocation: True (casse YAML) reconnu"
-mk_tree t44d5; mk_user u1 u1; mk_sk seul seul 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
+mk_tree t44d5; mk_user u1 u1; mk_sk zzmodele zzmodele 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
 run_tree
-if echo "$OUT" | grep 'sans appelant machine' | grep -qF "seul" && ! echo "$OUT" | grep 'sans appelant machine' | grep -qF "u1"; then
+if echo "$OUT" | grep 'sans appelant machine' | grep -qF "zzmodele" && ! echo "$OUT" | grep 'sans appelant machine' | grep -qF "u1"; then
   echo "    [T44] ✓ K12 la ligne « sans appelant machine » liste le model, jamais un user"
 else
   TK_OK=0; echo "    [T44] ✗ K12 ligne « sans appelant machine » : $OUT"
 fi
+# T44e — revue deux axes tour 2 (2026-10-06, N-02, N-13) : chaque garde ajoutée a une fixture dont le verdict bascule.
+OY=$'policy:\n\tallow_implicit_invocation: false'
+oy_cas 8 1 "tabulation en indentation" "tabulation en indentation -> refus (non interprétable)"
+OY='interface:
+  policy:
+    allow_implicit_invocation: false'
+oy_cas 9 1 "cle policy: absente ou en double" "policy: imbriquée sous un autre bloc (indentation > 0) -> refus"
+OY='policy:
+  allow_implicit_invocation: false
+policy:
+  autre: 1'
+oy_cas 10 1 "cle policy: absente ou en double" "deux clés policy: -> refus"
+OY='policy:
+  autre:
+    allow_implicit_invocation: false'
+oy_cas 11 1 "absent ou en double sous policy:" "allow_implicit_invocation seulement en petit-enfant de policy: -> refus"
+mk_tree t44e1; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [l'"'"'x, u1] # precharge\n' 'Agent.'
+run_tree; tk_cas 1 "agents/ag.md (prechargement)" "M-02 une apostrophe de mot n'ouvre pas de chaîne (u1 reste lu malgré le commentaire)"
+mk_tree t44e2; mk_user u1 'u1 # skill'; mk_cmd x.md 'La commande lance le skill u1 maintenant.'
+run_tree; tk_cas 1 "user-invoked appele par commands/x.md" "M-02 name: u1 # skill — l'identité lue sans le commentaire (arête commande)"
+mk_tree t44e3; mk_sk a a 'vf-invocation: model # classe\n'; mk_cmd x.md 'commande de fixture'
+run_tree; tk_cas 0 "! vf-invocation invalide" "N-13 vf-invocation: model # classe — une seule lecture du frontmatter, aucun faux rouge"
+mk_tree t44e4; mk_user u1 u1; mk_cmd x.md 'sans rapport'
+sed 's/^vf-invocation: user$/vf-invocation: user # classe/; s/^disable-model-invocation: true$/disable-model-invocation: true # x/' "$TREE/skills/u1/SKILL.md" > "$TREE/n.md" && mv "$TREE/n.md" "$TREE/skills/u1/SKILL.md"
+run_tree; tk_cas 0 "! disable-model-invocation" "N-13 user # classe + disable-model-invocation: true # x — aucun faux rouge"
+# K16b / K16c / K22 : dossier de module et AGENT.md en lien symbolique non suivis ; dossiers cachés et *-references non lus comme appelants
+mkdir -p "$WORK/realmod"; printf -- '---\nname: realmod\ndescription: Agent.\n---\nRoute vers u1.\n' > "$WORK/realmod/AGENT.md"
+mk_tree t44e5; mk_user u1 u1; mk_cmd x.md 'sans rapport'; ln -s "$WORK/realmod" "$TREE/modlink"
+run_tree; tk_cas 0 "-" "K16b dossier de module en lien symbolique non suivi"
+mk_tree t44e6; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/modl"; ln -s "$WORK/realmod/AGENT.md" "$TREE/modl/AGENT.md"
+run_tree; tk_cas 0 "-" "K16c AGENT.md en lien symbolique non suivi"
+mk_tree t44e7; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/.cache"; cp "$WORK/realmod/AGENT.md" "$TREE/.cache/AGENT.md"
+run_tree; tk_cas 0 "-" "K22a dossier caché non lu comme appelant"
+mk_tree t44e8; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/x-references"; cp "$WORK/realmod/AGENT.md" "$TREE/x-references/AGENT.md"
+run_tree; tk_cas 0 "-" "K22b dossier *-references non lu comme appelant"
+mk_tree t44e9; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/modok"; cp "$WORK/realmod/AGENT.md" "$TREE/modok/AGENT.md"
+run_tree; tk_cas 1 "modok/AGENT.md (agent)" "K16/K22 témoin : le même AGENT.md sous un dossier de module ordinaire EST un appelant"
 if [ "$TK_OK" -eq 1 ]; then
   ok "T44 revue W1 (M-01..M-04) : identité sans name:, commentaires YAML, valeur résolue openai.yaml, gardes d'arêtes (K12, K14-K18)"
 else
@@ -1682,14 +1719,14 @@ mut_inv K16 "if n.endswith('.md') and os.path.isfile(p) and not os.path.islink(p
 mk_tree mut-k14; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: True\n'; mk_oy a 'policy:
   allow_implicit_invocation: false'; mk_cmd x.md 'sans rapport'
 mut_inv K14 'return isinstance(v, str) and v.strip().lower() == "true"' 'return isinstance(v, str) and v.strip() == "true"' avec 1 0 "vf-invocation: user sans disable-model-invocation: true" "K14 est_vrai sensible à la casse"
-mk_tree mut-k12; mk_user u1 u1; mk_sk seul seul 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
+mk_tree mut-k12; mk_user u1 u1; mk_sk zzmodele zzmodele 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
 if make_gate_mutant K12 'if fm.get("vf-invocation") != "user" and nom and not aretes.get(rel):' 'if nom and not aretes.get(rel):'; then
   OUT_M="$(bash "$MUT_DIR/check-skills.sh" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1 | grep 'sans appelant machine')"
   OUT_O="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1 | grep 'sans appelant machine')"
-  if echo "$OUT_M" | grep -qF "u1" && ! echo "$OUT_O" | grep -qF "u1" && echo "$OUT_O" | grep -qF "seul"; then
+  if echo "$OUT_M" | grep -qF "u1" && ! echo "$OUT_O" | grep -qF "u1" && echo "$OUT_O" | grep -qF "zzmodele"; then
     okmut K12 0 0 0 0 "assertion « T44 K12 ligne sans appelant » ; « u1 » (user) présent dans la ligne du mutant, absent de l'original ; attendu original sans u1 ; obtenu mutant avec u1"
   else
-    komut K12 "la ligne « sans appelant machine » ne liste jamais un user" "mutant: u1 listé ; original: seul listé, u1 non" "mutant=[$OUT_M] original=[$OUT_O]"
+    komut K12 "la ligne « sans appelant machine » ne liste jamais un user" "mutant: u1 listé ; original: zzmodele listé, u1 non" "mutant=[$OUT_M] original=[$OUT_O]"
   fi
 fi
 mk_tree mut-m01; mk_user u1 u1; sans_name u1; mk_cmd x.md 'La commande lance le skill u1 maintenant.'
@@ -1706,6 +1743,59 @@ mut_inv M03b 'if len(vals) != 1:' 'if len(vals) < 1:  # MUT-M03b' avec 0 1 "en d
 mk_tree mut-m03c; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a 'policy:
   allow_implicit_invocation: false # note'; mk_cmd x.md 'sans rapport'
 mut_inv M03c 'vals.append(sans_commentaire_yaml(m.group(1).strip()).strip(chr(34) + chr(39)))' 'vals.append(m.group(1).strip().strip(chr(34) + chr(39)))' avec 1 0 "valeur resolue" "M-03 commentaire de fin de ligne non exclu"
+
+# Revue deux axes tour 2 (N-01, N-02, N-05, N-13) — mêmes helpers ; chaque garde neuve a son mutant.
+mk_tree mut-k4b; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills:\n  - u1\n' 'Agent précharge u1.'
+mut_inv K4b 'liste.append(("prechargement", ap["rel"]))' 'liste.append(("agent", ap["rel"]))' avec 1 1 "agents/ag.md (prechargement)" "K4b famille préchargement renommée « agent » (même rc, jeton propre au skill jugé)"
+mk_tree mut-k4c; mk_user u1 u1; mk_cmd x.md 'La commande lance le skill u1 puis rend la main.'
+mut_inv K4c 'liste.append(("commande", ap["rel"]))' 'liste.append(("agent", ap["rel"]))' avec 1 1 "commands/x.md (commande)" "K4c famille commande renommée « agent » (même rc, jeton propre au skill jugé)"
+mk_tree mut-k4d; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Skill\n' 'Route vers u1.'
+mut_inv K4d 'liste.append(("agent", ap["rel"]))' 'liste.append(("prechargement", ap["rel"]))' avec 1 1 "agents/ag.md (agent)" "K4d famille agent renommée « prechargement » (même rc, jeton propre au skill jugé)"
+mk_tree mut-k12b; mk_user u1 u1; mk_sk zzmodele zzmodele 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
+if make_gate_mutant K12b 'noms.add(nom)' 'pass  # MUT-K12b'; then
+  OUT_M="$(bash "$MUT_DIR/check-skills.sh" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1 | grep 'sans appelant machine')"
+  OUT_O="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1 | grep 'sans appelant machine')"
+  if echo "$OUT_O" | grep -qF "zzmodele" && ! echo "$OUT_M" | grep -qF "zzmodele"; then
+    okmut K12b 0 0 0 0 "assertion « T44 K12 ligne sans appelant liste le model » ; « zzmodele » (nom absent de tout texte constant) présent à l'original, absent du mutant"
+  else
+    komut K12b "la ligne « sans appelant machine » liste le model sans appelant" "original: zzmodele listé ; mutant: zzmodele absent" "mutant=[$OUT_M] original=[$OUT_O]"
+  fi
+fi
+OY='interface:
+  policy:
+    allow_implicit_invocation: false'
+mk_tree mut-m03g; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a "$OY"; mk_cmd x.md 'sans rapport'
+mut_inv M03g 'policies = [i for i, (ind, c) in enumerate(lignes) if ind == 0 and re.match(r"^policy\s*:", c)]' 'policies = [i for i, (ind, c) in enumerate(lignes) if re.match(r"^policy\s*:", c)]' avec 0 1 "cle policy: absente ou en double" "M-03 policy: acceptée à n'importe quelle indentation"
+OY='policy:
+  allow_implicit_invocation: false
+policy:
+  autre: 1'
+mk_tree mut-m03a; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a "$OY"; mk_cmd x.md 'sans rapport'
+mut_inv M03a2 'if len(policies) != 1:' 'if len(policies) < 1:' avec 0 1 "cle policy: absente ou en double" "M-03 deux clés policy: acceptées (la première gagne)"
+OY='policy:
+  autre:
+    allow_implicit_invocation: false'
+mk_tree mut-m03c2; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a "$OY"; mk_cmd x.md 'sans rapport'
+mut_inv M03c2 'if ind == indent_enfant:' 'if ind >= indent_enfant:' avec 0 1 "absent ou en double sous policy:" "M-03 tout descendant de policy: compté comme enfant direct"
+OY=$'policy:\n\tallow_implicit_invocation: false'
+mk_tree mut-m03f; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a "$OY"; mk_cmd x.md 'sans rapport'
+mut_inv M03f 'if "\t" in l[:len(l) - len(l.lstrip())]:' 'if False:  # MUT-M03f' avec 1 1 "tabulation en indentation" "M-03 tabulation en indentation acceptée (même rc, cause de refus perdue)"
+mk_tree mut-m02b; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: ["autre # pas un commentaire", u1]\n' 'Agent.'
+mut_inv M02b 'elif c in (chr(34), chr(39)) and (i == 0 or val[i - 1] in " \t[,"):' 'elif False:  # MUT-M02b' avec 1 1 "agents/ag.md (prechargement)" "M-02 guillemets ignorés par le retrait de commentaire (# entre guillemets lu comme commentaire)"
+mk_tree mut-m02h; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [l'"'"'x, u1] # precharge\n' 'Agent.'
+mut_inv M02h 'elif c in (chr(34), chr(39)) and (i == 0 or val[i - 1] in " \t[,"):' 'elif c in (chr(34), chr(39)):' avec 1 1 "agents/ag.md (prechargement)" "M-02 une apostrophe de mot ouvre une chaîne (le commentaire n'est plus retiré)"
+mk_tree mut-m02e; mk_user u1 'u1 # skill'; mk_cmd x.md 'La commande lance le skill u1 maintenant.'
+mut_inv M02e 'fm = parse_frontmatter(text, commentaires=True)' 'fm = parse_frontmatter(text)' avec 0 1 "user-invoked appele par commands/x.md" "M-02/N-13 frontmatter d'un skill lu sans retrait du commentaire (identité « u1 # skill »)"
+mk_tree mut-n13; mk_sk a a 'vf-invocation: model # classe\n'; mk_cmd x.md 'commande de fixture'
+mut_inv N13 'fm = parse_frontmatter(text, commentaires=True)' 'fm = parse_frontmatter(text)' sans 1 0 "vf-invocation invalide" "N-13 vf-invocation: model # classe — deux définitions de la valeur du champ"
+mk_tree mut-k16b; mk_user u1 u1; mk_cmd x.md 'sans rapport'; ln -s "$WORK/realmod" "$TREE/modlink"
+mut_inv K16b 'if os.path.islink(dp) or not os.path.isdir(dp):' 'if not os.path.isdir(dp):' avec 1 0 "user-invoked appele par modlink/AGENT.md" "K16b dossier de module en lien symbolique suivi"
+mk_tree mut-k16c; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/modl"; ln -s "$WORK/realmod/AGENT.md" "$TREE/modl/AGENT.md"
+mut_inv K16c 'if os.path.isfile(ag) and not os.path.islink(ag):' 'if os.path.isfile(ag):' avec 1 0 "user-invoked appele par modl/AGENT.md" "K16c AGENT.md en lien symbolique suivi"
+mk_tree mut-k22a; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/.cache"; cp "$WORK/realmod/AGENT.md" "$TREE/.cache/AGENT.md"
+mut_inv K22a "if d.startswith('.') or d.endswith('-references'):" "if d.endswith('-references'):" avec 1 0 "user-invoked appele par .cache/AGENT.md" "K22a dossier caché lu comme appelant"
+mk_tree mut-k22b; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/x-references"; cp "$WORK/realmod/AGENT.md" "$TREE/x-references/AGENT.md"
+mut_inv K22b "if d.startswith('.') or d.endswith('-references'):" "if d.startswith('.'):" avec 1 0 "user-invoked appele par x-references/AGENT.md" "K22b dossier *-references lu comme appelant"
 
 # ---------- MUT-DR3 — appel ecart_nature_marqueurs neutralisé (pass) -------------------------------
 if make_gate_mutant DR3 "warnings.extend(ecart_nature_marqueurs(" "pass  # MUT-DR3"; then

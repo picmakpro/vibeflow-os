@@ -133,7 +133,9 @@
 #     `user` dont le corps cite un autre `user` est refusé (P414-D-01) ; un `user` qui cite un
 #     `model` est légitime ;
 #   - équivalent Codex (P414-D-03) : un `user` NICHÉ (skills/<nom>/SKILL.md) exige
-#     agents/openai.yaml, fichier régulier portant une ligne `allow_implicit_invocation: false` ;
+#     agents/openai.yaml, fichier régulier dont la valeur RÉSOLUE de `policy.allow_implicit_invocation`
+#     (enfant direct de l'unique clé `policy:` de niveau 0, commentaire de fin de ligne exclu, ni
+#     tabulation d'indentation ni forme en flux) vaut `false` — lecteur `valeur_implicite_codex` ;
 #     un `user` NON niché (module Type 1, SKILL.md copié seul par l'installeur) est une DETTE
 #     signalée par avertissement, jamais un refus ;
 #   - ligne d'information « sans appelant machine » (jamais comptée en avertissement) : le gate LISTE
@@ -371,9 +373,10 @@ def sans_commentaire_yaml(val):
 def parse_frontmatter(text, commentaires=False):
     """Meme tokenizer YAML-tolerant (scalaire/liste/continuation) que check-agents.sh — recopie
     verbatim, aucune divergence de comportement entre les deux gates sur ce point. Option
-    `commentaires` (M-02, calcul des aretes SEULEMENT) : la valeur lue est la valeur YAML, le
-    commentaire de fin de ligne exclu, quelle que soit la forme (scalaire, liste en ligne ; la
-    liste de bloc le fait deja) — les autres appels gardent le comportement d'origine."""
+    `commentaires` (M-02, N-13) : la valeur lue est la valeur YAML, le commentaire de fin de ligne
+    exclu, quelle que soit la forme (scalaire, liste en ligne ; la liste de bloc le fait deja) —
+    jouee par check_file (UNE seule lecture du frontmatter d'un SKILL.md, controles ET aretes) et
+    par decouvrir_appelants."""
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
         return None
@@ -889,8 +892,9 @@ def valeur_implicite_codex(texte):
 
 def controler_codex(juges):
     """P414-D-03 : un skill `user` NICHE exige {dossier}/agents/openai.yaml — fichier regulier
-    (jamais un lien) portant une ligne `allow_implicit_invocation: false` (equivalent Codex de
-    disable-model-invocation, policy.allow_implicit_invocation)."""
+    (jamais un lien) dont la valeur RESOLUE de policy.allow_implicit_invocation vaut `false`
+    (lecteur valeur_implicite_codex : cle policy: unique au niveau 0, enfant direct unique,
+    commentaire exclu — equivalent Codex de disable-model-invocation)."""
     msgs = []
     for rel, chemin, fm, _texte in juges:
         if fm.get("vf-invocation") != "user" or not est_imbrique(chemin):
@@ -927,14 +931,17 @@ def sans_appelant(juges, appelants):
     return sorted(noms)
 
 def check_file(rel, text):
+    """Juge un SKILL.md ; rend SON frontmatter (None si illisible). UNE seule lecture (N-13) : la
+    valeur d'un champ est la valeur YAML (commentaire de fin de ligne exclu) pour TOUS les controles
+    ET pour le calcul des aretes — `vf-invocation: model # classe` ne rougit plus a tort."""
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
         errors.append(f"{rel} : frontmatter absent (--- ... ---) — aucun verdict possible")
-        return
-    fm = parse_frontmatter(text)
+        return None
+    fm = parse_frontmatter(text, commentaires=True)
     if fm is None:
         errors.append(f"{rel} : frontmatter jamais referme (--- ... ---) — aucun verdict possible")
-        return
+        return None
     errors.extend(valider_nature(rel, fm))
     errors.extend(invariant_procedure(rel, fm))
     errors.extend(valider_ecrit(rel, fm.get("ecrit")))
@@ -946,6 +953,7 @@ def check_file(rel, text):
     for k in fm:
         if k not in KNOWN:
             warnings.append(f"{rel} : champ inconnu — {k} (typo ? verifier la doc)")
+    return fm
 
 if single:
     if os.path.islink(single):
@@ -996,9 +1004,8 @@ else:
         if matched_prefix:
             thirdparty_files_total += 1
             continue
-        check_file(os.path.relpath(f, skills_dir), text)
+        fm_juge = check_file(os.path.relpath(f, skills_dir), text)
         linted_paths.append(f)
-        fm_juge = parse_frontmatter(text, commentaires=True)
         if fm_juge is not None:
             skills_juges.append((os.path.relpath(f, skills_dir), f, fm_juge, text))
 
