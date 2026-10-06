@@ -16,6 +16,7 @@
 #   - fichiers  plugin/<module>/scripts/{check,guard}-*.sh  et  scripts/check-*.sh
 #   - fichiers  plugin/<module>/rules/*.md                     (règles de module)
 #   - fichiers  .claude/agent-memory/**/*.md  hors MEMORY.md (l'index), sous-dossiers compris
+#   - fichiers  SKILL.md sous plugin/ (genre skill, POCK-08) ; un SKILL.md supprimé en compense un
 #   - titres    `## ADR-NNN` ajoutés dans docs/ADR.md          (clé : ADR-NNN)
 #   - CLAUDE.md titres `## ` ET puces de tête de ligne (`- `, `N. `) ajoutés  (clé : CLAUDE.md) ; une
 #               puce se compare SANS son marqueur (un renumérotage n'est pas un ajout)
@@ -23,7 +24,8 @@
 # ajout de ce genre (un pour un) ; dans ADR.md et CLAUDE.md, seul l'EXCÈS d'ajouts sur les retraits (par
 # contenu) est jugé. Un remplacement ne rougit donc pas : il est listé AJOUT-COMPENSE, jamais tu.
 #
-# COUVERTURE : un trailer `Ajout-Retrait: <chemin|ADR-NNN|CLAUDE.md> — <retrait | aucun : justification>`
+# COUVERTURE : un trailer `Ajout-Retrait: <chemin|ADR-NNN|CLAUDE.md> — <retrait | aucun : justification>
+# — défaillance : {session, geste ou commit daté}`
 # dans un commit de la BRANCHE (portée branche, comme G-2 : un commit ultérieur couvre un ajout
 # antérieur). Motif = glob `case`, jamais eval, jamais une virgule (un trailer = un motif) ; un glob ne
 # couvre pas le monde : il n'est admis que dans le DERNIER segment (`plugin/*` et `*` refusés) et doit y
@@ -31,7 +33,16 @@
 # et rien n'est couvert. Le
 # séparateur est ` — ` (ou ` - `, borne ASCII). Après le séparateur : soit un retrait nommé (10
 # caractères non blancs au moins), soit `aucun :` SUIVI d'une justification de 10 caractères au moins
-# — `aucun :` seul ne couvre rien.
+# — `aucun :` seul ne couvre rien. TROISIÈME segment OBLIGATOIRE (POCK-08) : `— défaillance : {session,
+# geste ou commit daté}` en fin de trailer, sur la DERNIÈRE occurrence d'un séparateur suivi de
+# `défaillance :` (graphie ASCII `defaillance :` admise ; un retrait peut contenir lui-même ` — `) ;
+# la défaillance garde au moins 10 caractères non blancs ET une date ISO (AAAA-MM-JJ) ou un SHA (7 à
+# 40 hexadécimaux) — forme vérifiée, jamais la véracité ; la justification de 10 caractères se mesure
+# AVANT le segment (une défaillance longue ne rattrape pas un « aucun : » court). Sans segment valide :
+# MARQUEUR-MAL-FORME et rien n'est couvert. Hypothèse Q4 : exigé sur TOUT trailer Ajout-Retrait
+# (gate, règle, ADR, mémoire, CLAUDE.md, SKILL.md), pas seulement skill/gate/règle.
+# Origine : POCK-08, Phase 41.4, P414-D-04 (arbitrage Samuel, AskUserQuestion session principale,
+# 2026-10-06) ; resserre la grammaire SOBR-05 d'origine, qui acceptait une justification hypothétique.
 #
 # Usage : check-ajout-retrait.sh [--root DIR] [--base-ref REF] [--strict] [--ci]
 # Exit : 0 = couvert, rien à juger, ou défaut consultatif · 1 = --strict et ajout non couvert ·
@@ -105,6 +116,7 @@ awk -F'\t' '
   p ~ /^plugin\/[^\/]+\/scripts\/(check|guard)-[^\/]+\.sh$/ { print p "\tfichier"; next }
   p ~ /^scripts\/check-[^\/]+\.sh$/ { print p "\tfichier"; next }
   p ~ /^plugin\/[^\/]+\/rules\/[^\/]+\.md$/ { print p "\trules"; next }
+  p ~ /^plugin\// && n == "SKILL.md" { print p "\tskill"; next }
   p ~ /^\.claude\/agent-memory\/.+\.md$/ && n != "MEMORY.md" { print p "\tmemoire" }
 ' "$TMPD/diff_a" >> "$AJOUTS"
 
@@ -116,6 +128,7 @@ awk -F'\t' '
   p ~ /^plugin\/[^\/]+\/scripts\/(check|guard)-[^\/]+\.sh$/ { print "fichier"; next }
   p ~ /^scripts\/check-[^\/]+\.sh$/ { print "fichier"; next }
   p ~ /^plugin\/[^\/]+\/rules\/[^\/]+\.md$/ { print "rules"; next }
+  p ~ /^plugin\// && n == "SKILL.md" { print "skill"; next }
   p ~ /^\.claude\/agent-memory\/.+\.md$/ && n != "MEMORY.md" { print "memoire" }
 ' "$TMPD/diff_d" > "$TMPD/retraits"
 COMPENSES="$TMPD/compenses"; : > "$COMPENSES"
@@ -266,7 +279,7 @@ while IFS="$(printf '\t')" read -r cle genre; do
     echo "AJOUT-COUVERT: ${cle} (${genre})"
   else
     echo "AJOUT-NON-COUVERT: ${cle} (${genre}) — trailer attendu : Ajout-Retrait: ${cle} — {retrait | aucun : justification} — défaillance : {session, geste ou commit daté}"
-    [ "$CI_MODE" -eq 1 ] && echo "::warning::check-ajout-retrait (consultatif) : ${cle} (${genre}) ajouté sans trailer Ajout-Retrait — dire ce qu'on retire, ou pourquoi rien"
+    [ "$CI_MODE" -eq 1 ] && echo "::warning::check-ajout-retrait (consultatif) : ${cle} (${genre}) ajouté sans trailer Ajout-Retrait — dire ce qu'on retire, ou pourquoi rien, et la défaillance observée"
     NON_COUVERTS=$((NON_COUVERTS + 1))
   fi
 done < "$AJOUTS"
