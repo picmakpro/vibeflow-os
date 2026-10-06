@@ -1671,7 +1671,8 @@ jobs:
         # Ajouts surveillés : gates et gardes, mémoires d'agents, SKILL.md de plugin/, titres ADR et règles de
         # CLAUDE.md. Sans trailer `Ajout-Retrait:` (forme vérifiée, jamais la véracité) dans un commit de la
         # branche — trailer qui porte un segment `défaillance :` daté obligatoire (POCK-08, P414-D-04) :
-        # `::warning::`, jamais un échec (ADR-074 amendé, ADR-076). Les cas et douze mutants vivent dans
+        # `::warning::`, jamais un échec (ADR-074 amendé, ADR-076). Les cas et les 29 mutants (nombre compté
+        # sur les lignes « TUE » de la sortie de la suite, à re-compter à chaque ajout) vivent dans
         # plugin/conductor/scripts/tests/test-check-ajout-retrait.sh. LIMITE DE FOND (ADR-072) : la PR qu'il
         # juge peut modifier ce script, sa suite et cette étape.
         run: |

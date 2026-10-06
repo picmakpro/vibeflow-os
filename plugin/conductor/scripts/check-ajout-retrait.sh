@@ -167,7 +167,7 @@ net_excess "$TMPD/plus" "$TMPD/moins" | awk 'NF { t = substr($0, 1, 60); print "
 
 # --- Trailers : portée BRANCHE, forme seule ---------------------------------------------------------
 charcount() {  # codepoints UTF-8, jamais d'octets, sans dépendre d'aucune locale installée
-  printf '%s' "$1" | tr -d '[:space:]' | od -An -tu1 | tr -s ' \n' '\n' | awk 'NF && ($1 < 128 || $1 >= 192) { n++ } END { print n + 0 }'
+  printf '%s' "$1" | tr -d '[:space:]' | od -v -An -tu1 | tr -s ' \n' '\n' | awk 'NF && ($1 < 128 || $1 >= 192) { n++ } END { print n + 0 }'
 }
 glob_admis() {  # <motif> : un glob ne couvre pas le monde (dernier segment seul, >= 6 caractères littéraux)
   local m="$1" dirs last lit

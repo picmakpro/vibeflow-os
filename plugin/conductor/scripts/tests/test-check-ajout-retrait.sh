@@ -3,7 +3,7 @@
 # Chaque cas construit SON dépôt jetable sous mktemp -d, jamais le dépôt réel ; identité git par -c ;
 # comparaisons par cmp/comm, jamais diff. Trois issues QUAL-01 : PASS (couvert), FAIL (non couvert,
 # rc 1 sous --strict) et imparsable BRUYANT (base introuvable : stderr + rc 2 sous --strict), plus
-# douze mutants opposables, chacun asserté avec le rc EXACT sur le mutant ET sur l'original :
+# des mutants opposables (le nombre exact : compter les lignes « TUE » de la sortie), chacun asserté avec le rc EXACT sur le mutant ET sur l'original :
 # « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
 # POCK-08 (plan 41.4-02) : segment « défaillance : » obligatoire, genre skill (A12-A14, MUT-10 à MUT-12).
 # LIMITE DE FOND : la garde, sa suite et son étape CI vivent dans le dépôt qu'elles jugent.
@@ -300,7 +300,7 @@ expect "Rien d'ajouté dans la surface → RIEN-A-JUGER, rc 0" 0 "$R" "$O" "RIEN
 run O R "$SCRIPT" "$D" --bogus
 expect "Usage : argument inconnu → rc 64" 64 "$R" "$O"
 
-echo "== test-check-ajout-retrait : MUTANTS (MUT-1 à MUT-12, S1, S2, S4, M5a à M5d) =="
+echo "== test-check-ajout-retrait : MUTANTS (MUT-1 à MUT-12, S1, S2, S4, M5a à M5d, S2e à S2g, S3b à S3e, S6b1, S6b2, Sod) =="
 make_mutant() {  # <nom> <ancienne ligne> <nouvelle ligne> ; 0 = opposable, 1 = identique, 2 = syntaxe invalide
   local out="$MUTD/$1.sh"
   MUT_OLD_ENV="$2" MUT_NEW_ENV="$3" awk '{ if ($0 == ENVIRON["MUT_OLD_ENV"]) print ENVIRON["MUT_NEW_ENV"]; else print }' "$SCRIPT" > "$out"
@@ -393,6 +393,49 @@ mut_df M5c '    [ "${#t}" -ge 7 ] && [ "${#t}" -le 40 ] || continue' '    :' "a1
 mut_df M5d "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])(\$|[^0-9])' && return 0" "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-[0-9]{2}-[0-9]{2}(\$|[^0-9])' && return 0" "9999-99-99 voila" 1 0
 # M5a : les classes de caractères comptent de nouveau comme littéraux du glob.
 mut_df M5a "  lit=\"\$(printf '%s' \"\$last\" | sed -e 's/\\[[^]]*\\]//g' | tr -d '*?[]')\"" "  lit=\"\$(printf '%s' \"\$last\" | tr -d '*?[]')\"" "2026-10-06 session de revue" 1 0 'plugin/conductor/scripts/[a-zA-Z]*'
+
+# Revue deux axes tour 2 (2026-10-06, N-02, N-03, N-11) — un mutant par garde de défaillance_valide / charcount / graphie.
+# Le premier argument de mut_df est le segment (après « défaillance : ») ; rc original puis rc mutant.
+SHA40="abcdef1234567890abcdef1234567890abcdef12"
+SHA41="${SHA40}3"
+L_DATE="  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])(\$|[^0-9])' && return 0"
+# S2f : un jeton « SHA » peut contenir des non-hexadécimaux (abc123xyz).
+mut_df S2f '    case "$t" in *[!0-9a-f]*) continue ;; esac' '    :' "abc123xyz de plus" 1 0
+# S2e : longueur maximale de 40 retirée (41 hexadécimaux acceptés) ; S2g : borne 40 devenue exclusive (le SHA entier de 40 refusé).
+mut_df S2e '    [ "${#t}" -ge 7 ] && [ "${#t}" -le 40 ] || continue' '    [ "${#t}" -ge 7 ] || continue' "commit $SHA41 constaté" 1 0
+mut_df S2g '    [ "${#t}" -ge 7 ] && [ "${#t}" -le 40 ] || continue' '    [ "${#t}" -ge 7 ] && [ "${#t}" -lt 40 ] || continue' "commit $SHA40 constaté" 0 1
+# S3b / S3c / S3d / S3e : mois quelconque, jour quelconque, borne gauche ou borne droite de la date ISO retirées.
+mut_df S3b "$L_DATE" "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-[0-9]{2}-(0[1-9]|[12][0-9]|3[01])(\$|[^0-9])' && return 0" "2026-13-01 voila" 1 0
+mut_df S3c "$L_DATE" "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}(\$|[^0-9])' && return 0" "2026-10-32 voila" 1 0
+mut_df S3d "$L_DATE" "  printf '%s' \"\$1\" | grep -Eq '[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])(\$|[^0-9])' && return 0" "12026-10-06 voila" 1 0
+mut_df S3e "$L_DATE" "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])' && return 0" "2026-10-061 voila" 1 0
+# S6b : graphies « défaillance: » et « defaillance: » (deux-points collé), chacune retirée de la boucle ; fixture : segment SANS espace avant « : ».
+mut_nospace() {  # <id> <ancienne> <nouvelle> <mot du segment>
+  local d b
+  d="$(mk_repo "m$1")"; b="$(base_of "$d")"; add_gate "$d"
+  commit_avec "$d" "feat: gate
+
+$TR $NEW_GATE — $TRG — $4: 2026-10-06 session de revue"
+  mutant "$1" "$2" "$3" "$d" 0 1 --strict --base-ref "$b"
+}
+L_DF="        for df_m in 'défaillance :' 'défaillance:' 'defaillance :' 'defaillance:'; do"
+mut_nospace S6b1 "$L_DF" "        for df_m in 'défaillance :' 'defaillance :' 'defaillance:'; do" "défaillance"
+mut_nospace S6b2 "$L_DF" "        for df_m in 'défaillance :' 'défaillance:' 'defaillance :'; do" "defaillance"
+# Sod (N-03) : od sans -v réduit les lignes répétées à un « * » compté ; 10 émojis identiques (40 octets périodiques) font 7 au lieu de 10.
+D="$(mk_repo mSod)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — 🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂$DF"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A23 justification de 10 émojis identiques (comptage exact, périodique) → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
+mutant Sod "  printf '%s' \"\$1\" | tr -d '[:space:]' | od -v -An -tu1 | tr -s ' \\n' '\\n' | awk 'NF && (\$1 < 128 || \$1 >= 192) { n++ } END { print n + 0 }'" "  printf '%s' \"\$1\" | tr -d '[:space:]' | od -An -tu1 | tr -s ' \\n' '\\n' | awk 'NF && (\$1 < 128 || \$1 >= 192) { n++ } END { print n + 0 }'" "$D" 0 1 --strict --base-ref "$B"
+# Témoins positifs des gardes ci-dessus (original seul) : le SHA de 40, la date valide et la graphie collée sont bien acceptés.
+D="$(mk_repo a24)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — $TRG — défaillance: 2026-10-06 session de revue"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A24 graphie « défaillance: » (deux-points collé) → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
 
 echo
 echo "Résultat : $PASS vert(s), $FAIL rouge(s)"
