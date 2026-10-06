@@ -1626,9 +1626,11 @@ clôture de `fiabilite-v1.0`. Touche `dev-orchestrator` (références du head, `
      signale un dépôt sans garde-fou ; un no-op d'instruction est un finding (POCK-05).
   6. Une PR ouverte par la chaîne de ship porte son merge-danger call : porte à sens unique ou
      double sens, rayon d'explosion (POCK-06).
-  7. Chaque skill VibeFlow est classé user-invoked ou model-invoked ; les orchestrateurs portent
-     `disable-model-invocation: true` (et l'équivalent Codex) ; un gate le vérifie et rougit sur
-     un skill non classé (POCK-07).
+  7. Chaque skill VibeFlow est classé user-invoked ou model-invoked par un champ vérifié par
+     machine ; un skill user porte `disable-model-invocation: true` et, s'il est niché,
+     l'équivalent Codex ; un gate rougit sur un skill non classé ou sur un user-invoked qui en
+     appelle un autre (POCK-07). *Reformulé le 2026-10-06, P414-D-18 (arbitrage Samuel,
+     AskUserQuestion session principale, 2026-10-06).*
   8. Un ajout de skill, gate ou règle cite une **défaillance observée** (session, geste, écart)
      ou est refusé ; `check-ajout-retrait` l'exige en plus de SOBR-05 (POCK-08).
   9. **Sobriété** (SOBR-05) : chaque ajout de doctrine désigne ce qu'il remplace ou resserre ;
