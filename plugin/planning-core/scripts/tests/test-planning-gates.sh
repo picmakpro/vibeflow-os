@@ -5372,6 +5372,11 @@ LIMITES_REFERENCE = (
     ("bh", ("juges", "Bash", "prouvé", "D1")),
     ("bi", ("canary", "SessionStart", "CwdChanged", "vérificateur de juges")),
     ("bj", ("BORNE_LECTURE_FICHIER", "CADRAGE.md", "VERDICT.md", "config.json", "code 3", "dérogation", "lire_payload")),
+    ("bk", ("A5", "reference", "contournement", "P46 lot B, b3, reportée à une phase ultérieure")),
+    ("bl", ("A7", "intention", "config.json", "P46 lot B, b3, reportée à une phase ultérieure")),
+    ("bm", ("A10", "--juge=", "canary", "P46 lot B, b3, reportée à une phase ultérieure")),
+    ("bn", ("A6", "surveillance.log", "D1-f", "D1-c3", "empreinte")),
+    ("bo", ("A8", ".recalc-cache.json", "ecrit:", "PLAN.md")),
 )
 PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 
