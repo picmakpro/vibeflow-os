@@ -201,7 +201,7 @@
         "exec-46-10"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "fix-46-a",
@@ -224,7 +224,7 @@
         "fix-46-a"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "ckpt-46-12",
@@ -393,7 +393,19 @@
       "stage": "checkpoint",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
+    },
+    {
+      "id": "fix-46-b",
+      "step": "lot B b3 : corriger A6 (journal D1 neutralisé) et A8 (cache forgé) ; A5, A7, A10 nommés en limites",
+      "stage": "fix",
+      "deps": [
+        "arb-46-d1"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "done"
     }
   ]
 }
