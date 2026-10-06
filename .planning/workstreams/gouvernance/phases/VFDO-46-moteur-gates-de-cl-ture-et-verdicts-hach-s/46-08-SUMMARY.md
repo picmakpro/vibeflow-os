@@ -101,7 +101,7 @@ Non lancés en local (charge machine 137 à 226, et non concernés par le diff :
 
 **8. Registre de tête du plan** : l'écriture de `gsd-plan-head-before-46-08` dans le dossier git a été refusée par la garde d'isolation ; `plan_head_before` est la base connue `92ef7cff`, `commits:` mesuré par `rev-list --count 92ef7cff..HEAD` = 2.
 
-**9. Incident de scratchpad** : un chemin de scratchpad mal saisi (`/private/tmp/claude-501/-Users-makwilmak/…`) a créé un dossier ; je l'ai supprimé par `rm -rf` sans avoir vérifié qu'il n'existait pas déjà (il pouvait appartenir à une autre session). Aucun fichier du dépôt ni du worktree n'est concerné.
+**9. Incident de scratchpad** : un chemin de scratchpad mal saisi (`<scratchpad>/…`, préfixe de projet tronqué) a créé un dossier ; je l'ai supprimé par `rm -rf` sans avoir vérifié qu'il n'existait pas déjà (il pouvait appartenir à une autre session). Aucun fichier du dépôt ni du worktree n'est concerné.
 
 ## Known Stubs
 
