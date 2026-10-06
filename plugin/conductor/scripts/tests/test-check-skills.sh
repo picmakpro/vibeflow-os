@@ -1465,11 +1465,13 @@ mk_tree t38c; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n';
 run_tree; RC_C=$RC; OUT_C="$OUT"
 T38D_OK=1
 mk_tree t38d; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_cmd x.md 'sans rapport'
-printf 'allow_implicit_invocation: false\n' > "$TREE/vrai-openai.yaml"
+# La cible du lien est un yaml CONFORME (policy.allow_implicit_invocation: false) : seul le refus du lien
+# symbolique peut faire rougir la fixture (revue tour 3, M3-02) ; le jeton de la cause est asserté.
+printf 'policy:\n  allow_implicit_invocation: false\n' > "$TREE/vrai-openai.yaml"
 mkdir -p "$TREE/skills/a/agents"
 if ln -s "$TREE/vrai-openai.yaml" "$TREE/skills/a/agents/openai.yaml" 2>/dev/null; then
   run_tree
-  if [ "$RC" -ne 1 ]; then T38D_OK=0; fi
+  if [ "$RC" -ne 1 ] || ! printf '%s' "$OUT" | grep -qF "fichier absent, illisible ou lien symbolique"; then T38D_OK=0; fi
 fi
 if [ "$RC_A" -eq 1 ] && echo "$OUT_A" | grep -q "openai.yaml" && echo "$OUT_A" | grep -q "P414-D-03" \
    && [ "$RC_B" -eq 0 ] && [ "$RC_C" -eq 1 ] && [ "$T38D_OK" -eq 1 ]; then
@@ -1743,6 +1745,12 @@ mut_inv M03b 'if len(vals) != 1:' 'if len(vals) < 1:  # MUT-M03b' avec 0 1 "en d
 mk_tree mut-m03c; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a 'policy:
   allow_implicit_invocation: false # note'; mk_cmd x.md 'sans rapport'
 mut_inv M03c 'vals.append(sans_commentaire_yaml(m.group(1).strip()).strip(chr(34) + chr(39)))' 'vals.append(m.group(1).strip().strip(chr(34) + chr(39)))' avec 1 0 "valeur resolue" "M-03 commentaire de fin de ligne non exclu"
+
+# Revue tour 3 (M3-02) : la garde « lien symbolique » de openai.yaml a son mutant — la cible du lien est conforme.
+mk_tree mut-sg; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_cmd x.md 'sans rapport'
+printf 'policy:\n  allow_implicit_invocation: false\n' > "$TREE/vrai-openai.yaml"; mkdir -p "$TREE/skills/a/agents"
+ln -s "$TREE/vrai-openai.yaml" "$TREE/skills/a/agents/openai.yaml"
+mut_inv SG 'if os.path.isfile(oy) and not os.path.islink(oy):' 'if os.path.isfile(oy):  # MUT-SG' avec 0 1 "fichier absent, illisible ou lien symbolique" "M3-02 openai.yaml conforme derrière un lien symbolique accepté"
 
 # Revue deux axes tour 2 (N-01, N-02, N-05, N-13) — mêmes helpers ; chaque garde neuve a son mutant.
 mk_tree mut-k4b; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills:\n  - u1\n' 'Agent précharge u1.'
