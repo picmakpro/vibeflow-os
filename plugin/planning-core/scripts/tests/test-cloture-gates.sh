@@ -51,8 +51,9 @@
 #             refus et un passage par gate, un silence) ; une différence nomme « jumeau NFD », l'écriture et les deux décisions
 #             A1-readdir (fix-46-a tour 2) : chaque lab qui porte un nom d'unité composable (cl-nfc et cl-nfc-dev) est AUSSI matérialisé au disque NFD (noms du
 #             disque décomposés, `materialiser_disque_nfd`) ; SessionStart (`source: startup`, copie armée) y rend, pour D1, la même liste surveillée que sur le
-#             disque NFC (chemins relatifs en NFC, même ordre, plus de cinq chemins dont un au moins en forme de disque NFD) et les mêmes (genre, chemin) au
-#             journal de D1 ; le jumeau dev se tait ; un lab d'égalité de préfixe (`05-côté`, `05-cz`) rend `05-côté` avant `05-cz` des deux côtés (nom NFC
+#             disque NFC (chemins relatifs en NFC, même ordre, plus de cinq chemins dont un au moins en forme de disque NFD) et les MÊMES (genre, chemin) au
+#             journal de D1, ENTIER, sur tout système : les verdicts du banc sont posés par la vraie poser-verdict.sh sur les DEUX disques (fix-46-a tour 3 ; un
+#             écart nomme les lignes d'un seul côté) ; le jumeau dev se tait ; un lab d'égalité de préfixe (`05-côté`, `05-cz`) rend `05-côté` avant `05-cz` des deux côtés (nom NFC
 #             décroissant) ; sur un système insensible à la normalisation (APFS, HFS+) seulement, chaque écriture G3/G4 composable est rejouée sur le disque NFD
 #             sous les deux formes de charge utile (même sortie que la référence), sinon une ligne `~` qui nomme la limite (bf)
 #   R-CROISE-01 preuve croisée d'un seul prédicat : pour chaque unité du banc, G3 sur l'écriture de son CLOTURE.md et l'état rendu par recalc-planning.sh
@@ -179,6 +180,12 @@ def disque_insensible(ctx):
         os.makedirs(os.path.join(d, "é"))
         ctx._insensible = os.path.isdir(os.path.join(d, "é"))
     return ctx._insensible
+
+
+def _lignes_seules(lignes):
+    """Les éléments (genre, chemin) présents d'un seul côté, triés, trois au plus (le reste compté) ; `-` s'il n'y en a aucun."""
+    triees = sorted(lignes)
+    return ", ".join("%s %s" % (g, c) for g, c in triees[:3]) + (" …(+%d)" % (len(triees) - 3) if len(triees) > 3 else "") if triees else "-"
 
 
 def relatifs_nfc(chemins, lab):
@@ -1901,21 +1908,37 @@ def materialiser(ctx, labs, nom, destination):
         poser_jusqua(ctx, destination, v["unite"], v["tentative"], v["constats"])
 
 
-def materialiser_disque_nfd(ctx, labs, nom, destination):
+def _sous_planning(chemin):
+    """Vrai si `chemin` (relatif au lab, séparateur `/`) est `.planning` ou se trouve dessous."""
+    return chemin == ".planning" or chemin.startswith(".planning/")
+
+
+def materialiser_disque_nfd(ctx, labs, nom, destination, hors_planning_declare=False):
     """La MÊME chaîne que `materialiser`, mais chaque chemin de dossier, de fichier, de lien ET la cible relative d'un lien passent par `jumeau_nfd` : les
-    noms du DISQUE sont en NFD (A1-readdir, fix-46-a tour 2). Les contenus restent ceux du banc (noms en NFC). Les verdicts ne sont posés par
-    `poser_jusqua` que sur un système insensible à la normalisation (sur ext4, poser-verdict.sh lit `--unite` en NFC, qui n'y existe pas : limite (bf))."""
+    noms du DISQUE sont en NFD (A1-readdir, fix-46-a tour 2). Les contenus restent ceux du banc (noms en NFC). Par défaut les verdicts ne sont posés par
+    `poser_jusqua` que sur un système insensible à la normalisation : sur un système sensible (ext4), un livrable stocké sous un nom NFD est ABSENT sous la
+    forme que `ecrit:` déclare (NFC), et poser-verdict.sh refuse alors la pose (64, « livrable … est absent », limite (bf) ; mesuré sous simulation, quick
+    261006-aw0 : `--unite` est lue sous le nom du disque, ce n'est pas elle qui manque).
+    `hors_planning_declare` (fix-46-a tour 3, D1 de R-BANC-NFD) : tout chemin de dossier, de fichier, de lien et toute cible de lien qui n'est PAS sous
+    `.planning/` garde sa forme du banc (celle que `ecrit:` déclare : D1 ne lit pas les livrables), seuls les noms sous `.planning/` passent en NFD ; les
+    verdicts sont alors posés par la vraie commande sur TOUT système, pour que les deux disques portent les mêmes écritures du moteur."""
+    def disque(chemin):
+        return jumeau_nfd(chemin) if (not hors_planning_declare or _sous_planning(chemin)) else chemin
+
+    def disque_cible(chemin, cible):
+        resolue = os.path.normpath(os.path.join(os.path.dirname(chemin), cible))
+        return jumeau_nfd(cible) if (not hors_planning_declare or _sous_planning(resolue)) else cible
     lab = labs[nom]
     os.makedirs(destination, exist_ok=True)
     for dossier in lab["dossiers"]:
-        os.makedirs(os.path.join(destination, jumeau_nfd(dossier)), exist_ok=True)
+        os.makedirs(os.path.join(destination, disque(dossier)), exist_ok=True)
     for chemin, contenu in lab["fichiers"].items():
-        ecrire(os.path.join(destination, jumeau_nfd(chemin)), contenu)
+        ecrire(os.path.join(destination, disque(chemin)), contenu)
     for chemin, cible in lab["liens"]:
-        os.makedirs(os.path.dirname(os.path.join(destination, jumeau_nfd(chemin))), exist_ok=True)
-        os.symlink(jumeau_nfd(cible), os.path.join(destination, jumeau_nfd(chemin)))
+        os.makedirs(os.path.dirname(os.path.join(destination, disque(chemin))), exist_ok=True)
+        os.symlink(disque_cible(chemin, cible), os.path.join(destination, disque(chemin)))
     resoudre_jetons(ctx, destination)
-    if disque_insensible(ctx):
+    if hors_planning_declare or disque_insensible(ctx):
         for v in lab["verdicts"]:
             poser_jusqua(ctx, destination, jumeau_nfd(v["unite"]), v["tentative"], v["constats"])
 
@@ -2012,8 +2035,9 @@ def controle_banc_nfd(ctx, script):
     NFC, l'autre le jumeau NFD), mêmes code, stdout et stderr (vide) ; au moins un refus et un passage pour G3 et pour G4, au moins un silence (jumeau dev).
     (2) Disque NFD, D1 (A1-readdir) : pour chaque lab qui porte un nom d'unité composable (l'adhérent et son jumeau dev), SessionStart (`source: startup`)
     rend, sur un disque dont les noms sont en NFD, la même liste surveillée (chemins relatifs en NFC, même ordre ; plus de cinq chemins pour l'adhérent, dont
-    au moins un en forme de disque NFD : le nom du disque construit le chemin d'accès) et les mêmes (genre, chemin) au journal de D1 que sur le disque NFC ;
-    le jumeau dev se tait des deux côtés ; PLUS un lab d'égalité de préfixe (phases `05-côté` et `05-cz`) : mêmes listes, `05-côté` avant `05-cz` (ordre
+    au moins un en forme de disque NFD : le nom du disque construit le chemin d'accès) et les mêmes (genre, chemin) au journal de D1 que sur le disque NFC,
+    COMPARÉ EN ENTIER sur tout système (fix-46-a tour 3) : les deux disques portent les mêmes verdicts, posés par la vraie poser-verdict.sh (`hors_planning_declare`),
+    donc les mêmes lignes `moteur` ; un écart nomme les lignes d'un seul côté ; le jumeau dev se tait des deux côtés ; PLUS un lab d'égalité de préfixe (phases `05-côté` et `05-cz`) : mêmes listes, `05-côté` avant `05-cz` (ordre
     déclaré : nom NFC décroissant ; sans NFC dans `cle_recence` l'unité NFD passerait après `05-cz`).
     (3) Disque NFD, G3 et G4, seulement sur un système insensible à la normalisation (APFS, HFS+) : chaque écriture composable rejouée sur le disque NFD sous
     les deux formes de charge utile rend la sortie de la référence ; sinon une ligne `~` qui nomme la limite (bf).
@@ -2066,7 +2090,7 @@ def controle_banc_nfd(ctx, script):
             # D1 : SessionStart dans deux matérialisations FRAÎCHES (les écritures ci-dessus ne laissent aucune ligne `intention` dans ces journaux)
             lab_d1_nfc, lab_d1_nfd = ctx.unique("d1-nfc-" + nom), ctx.unique("d1-nfd-" + nom)
             materialiser(ctx, labs, nom, lab_d1_nfc)
-            materialiser_disque_nfd(ctx, labs, nom, lab_d1_nfd)
+            materialiser_disque_nfd(ctx, labs, nom, lab_d1_nfd, hors_planning_declare=True)
             r_a, r_b = session(ctx, d, lab_d1_nfc), session(ctx, d, lab_d1_nfd)
             wp_a, wp_b = surveilles_de(r_a[1]), surveilles_de(r_b[1])
             if wp_a is None or wp_b is None:
@@ -2086,8 +2110,9 @@ def controle_banc_nfd(ctx, script):
                 elif not any(p != unicodedata.normalize("NFC", p) for p in wp_b):
                     ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s : aucun chemin surveillé en forme de disque NFD (le nom du disque construit le chemin d'accès)" % nom)
                 elif journal_d1(lab_d1_nfc) != journal_d1(lab_d1_nfd):
-                    ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s : journal de D1 différent (%d ligne(s) NFC, %d disque NFD)" % (
-                        nom, len(journal_d1(lab_d1_nfc)), len(journal_d1(lab_d1_nfd))))
+                    j_nfc, j_nfd = journal_d1(lab_d1_nfc), journal_d1(lab_d1_nfd)
+                    ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s : journal de D1 différent (%d ligne(s) NFC, %d disque NFD) ; NFC seul : %s ; disque NFD seul : %s" % (
+                        nom, len(j_nfc), len(j_nfd), _lignes_seules(j_nfc - j_nfd), _lignes_seules(j_nfd - j_nfc)))
                 else:
                     d1_labs += 1
                     d1_chemins = max(d1_chemins, len(liste_a))

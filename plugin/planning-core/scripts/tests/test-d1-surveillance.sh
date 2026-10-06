@@ -26,6 +26,8 @@
 #            fichier au-delà de BORNE_OCTETS_LIVRABLES : même signal
 #   R-D1-15  (A1, fix-46-a) unité `01-été` : références de chemin NFC ; Write par le chemin NFD du CLOTURE.md -> UNE ligne `intention` de chemin NFC ; FileChanged sur le
 #            chemin NFC : aucun contournement ; FileChanged d'un chemin NFD exercé là où la forme NFD désigne le fichier (MUT-D1-NFC)
+#   R-D1-18  (A1, fix-46-a tour 3) unité `01-été` créée sous son nom NFD sur le disque : poser-verdict.sh du dossier jugé, sur le chemin du disque, inscrit UNE ligne `moteur`
+#            de clé NFC (sha256 du VERDICT.md du disque) et le FileChanged qui suit n'est pas un contournement (MUT-D1-MOTEUR-NFD)
 #   R-D1-10  SessionStart (références posées), CLOTURE.md créé hors séance, SessionStart -> un contournement (source=reconciliation) et le signal D1 avec le chemin,
 #            une ligne `signal` posée ; un troisième SessionStart sans changement : aucun signal
 #   R-D1-11  une écriture du moteur entre deux séances : aucun contournement à la réconciliation
@@ -41,7 +43,9 @@
 #   R-D1-08), MUT-D1-AST (une copie divergente -> R-D1-09), MUT-D1-RECONCILIATION (réconciliation retirée -> R-D1-10), MUT-D1-SIGNAL-REPETE (ligne `signal`
 #   non posée -> R-D1-10), MUT-D1-REFUS (une erreur de D1 transformée en deny -> R-D1-13), MUT-D1-WATCH-FILECHANGED (FileChanged renvoie la liste -> R-D1-12),
 #   MUT-D1-FENETRE (fenêtre de lecture retirée -> R-D1-14), MUT-D1-ORDRE (parcours des phases par ordre croissant -> R-D1-16), MUT-D1-ANNONCE-BORNE
-#   (signal de borne retiré -> R-D1-16), MUT-D1-IDENTITE-BORNE (une ligne borne à chaque SessionStart -> R-D1-16), MUT-D1-OCTETS (plafond d'octets retiré -> R-D1-17), MUT-D1-NFC (-> R-D1-15).
+#   (signal de borne retiré -> R-D1-16), MUT-D1-IDENTITE-BORNE (une ligne borne à chaque SessionStart -> R-D1-16), MUT-D1-OCTETS (plafond d'octets retiré -> R-D1-17), MUT-D1-NFC (-> R-D1-15),
+#   MUT-D1-MOTEUR-NFD (ligne moteur d'un verdict hachée sous la forme NFC -> R-D1-18 ; opposable sur un système SENSIBLE à la normalisation seulement : sur APFS ou HFS+
+#   la forme NFC désigne le même dossier, la suite rend `non applicable ici`).
 # Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, moteur, mutants_moteur, reconciliation, mutants_reconciliation).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
@@ -856,6 +860,53 @@ def controle_d1_15(ctx, script):
                           "unité 01-été : références de chemin NFC ; Write par le chemin NFD du CLOTURE.md : UNE intention de chemin NFC ; FileChanged sur le chemin NFC : aucun contournement")
 
 
+def disque_insensible(ctx):
+    """Vrai si le système de fichiers du dossier de travail est insensible à la normalisation (APFS, HFS+) : un dossier créé sous un nom NFC se retrouve sous son
+    nom NFD. Calculé une fois (même recette que `disque_insensible` de test-cloture-gates.sh)."""
+    if getattr(ctx, "_insensible", None) is None:
+        d = ctx.unique("sonde-normalisation")
+        os.makedirs(os.path.join(d, "\u00e9"))
+        ctx._insensible = os.path.isdir(os.path.join(d, unicodedata.normalize("NFD", "\u00e9")))
+    return ctx._insensible
+
+
+def controle_d1_18(ctx, script):
+    """A1, tour 3 (fix-46-a ; NFD ext4) : unité `01-été` créée sous son nom NFD SUR LE DISQUE (PLAN.md `ecrit: [livrables/rapport.md]`, livrable ASCII : patron de
+    R-D1-07), SessionStart, poser-verdict.sh du dossier JUGÉ sur le chemin du DISQUE, puis FileChanged sur ce chemin : UNE ligne `moteur` de clé NFC dont le sha256
+    est celui du VERDICT.md du disque, aucun contournement. Toute I/O du contrôle porte sur la forme du disque (NFD) ; seule la clé attendue au journal est NFC. Sur
+    un système sensible à la normalisation, une ligne moteur hachée sous la forme NFC y serait perdue (le fichier n'existe pas sous ce nom) et le FileChanged
+    suivant tracerait un contournement à tort."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    unite = "01-\u00e9t\u00e9"
+    rel_nfc = ".planning/cycles/01-c/phases/%s" % unite
+    rel_disque = jumeau_nfd(rel_nfc)
+    lab = fabriquer_lab(ctx, "d1-18", ouvertes=(), closes=())
+    dossier_disque = os.path.join(lab, *rel_disque.split("/"))
+    ecrire(os.path.join(dossier_disque, "PLAN.md"), "---\necrit: [livrables/rapport.md]\n---\nplan\n")
+    ecrire(os.path.join(lab, "livrables", "rapport.md"), "livrable\n")
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err:
+        return False, "SessionStart : code 0 attendu — obtenu rc=%d %s" % (rc, court(err))
+    rc, out, err = lancer_script(ctx, [script_de(ctx, script, "poser-verdict.sh"), "--unite=" + dossier_disque, "--juge=juge-test", "--tentative=1", "--score=ok",
+                                       "--constat=critere::passé"], lab)
+    if rc != 0:
+        return False, "poser-verdict.sh sur l'unité au nom de disque NFD : code 0 attendu — obtenu %d %s" % (rc, court(err))
+    cle = rel_nfc + "/VERDICT.md"
+    verdict_disque = os.path.join(dossier_disque, "VERDICT.md")
+    fautes = []
+    moteur = lignes_de(lab, "moteur", cle)
+    if len(moteur) != 1 or moteur[0]["par"] != "poser-verdict.sh" or moteur[0]["sha"] != sha_du_fichier(verdict_disque):
+        fautes.append("verdict posé dans une unité au nom de disque NFD : UNE ligne moteur de clé NFC attendue (sha256 du VERDICT.md du disque) — obtenu %s" % (
+            [(m["par"], m["sha"][:12]) for m in moteur], ))
+    rc, out, err = ctx.lancer(payload_fichier(lab, verdict_disque), cwd=lab, dossier=d)
+    if rc != 0 or out != b"" or contournements(lab, cle):
+        fautes.append("verdict posé dans une unité au nom de disque NFD, FileChanged sur le chemin du disque : aucun contournement attendu — obtenu rc=%d %s %d contournement(s)" % (
+            rc, court(out), len(contournements(lab, cle))))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "unité 01-été au nom de disque NFD : poser-verdict.sh inscrit UNE ligne moteur de clé NFC (sha256 du VERDICT.md du disque), le FileChanged sur le chemin du disque "
+                          "n'est pas un contournement")
+
+
 def _fonctions(chemin, marqueur, noms):
     """{nom: ast.dump} des fonctions `noms` du corps Python du script (docstring comprise) et leur nombre de définitions."""
     arbre = ast.parse(corps_python(open(chemin, encoding="utf-8").read(), marqueur))
@@ -1330,6 +1381,7 @@ def sec_moteur(ctx):
     rendre("R-D1-08", "une écriture par outil laissée passer est une intention, une seule fois", controle_d1_08, ctx)
     rendre("R-D1-09", "la fonction qui inscrit est ast-identique dans les quatre scripts", controle_d1_09, ctx)
     rendre("R-D1-15", "A1 : un chemin NFD est tracé sous sa forme NFC", controle_d1_15, ctx)
+    rendre("R-D1-18", "A1, tour 3 : un verdict posé dans une unité au nom de disque NFD est expliqué par sa ligne moteur", controle_d1_18, ctx)
 
 
 def sec_mutants_moteur(ctx):
@@ -1337,6 +1389,13 @@ def sec_mutants_moteur(ctx):
     tuer(ctx, "D1-INTENTION", "# d1-intention", "pass  # d1-intention", "R-D1-08", controle_d1_08)
     tuer(ctx, "D1-INTENTION-REUTILISEE", "# d1-apres", "apres = entrees  # d1-apres", "R-D1-08", controle_d1_08)
     tuer(ctx, "D1-NFC", "# nfc-d1", "composants = os.path.relpath(os.path.join(os.path.realpath(parent), nom), racine).split(os.sep)  # nfc-d1", "R-D1-15", controle_d1_15)
+    # I/O de la ligne moteur d'un verdict sur la forme NFC (HEAD de fix-46-a tour 2) : opposable seulement sur un système sensible à la normalisation (sur APFS, la forme
+    # NFC désigne le même dossier que le nom du disque)
+    if disque_insensible(ctx):
+        ok("MUT-D1-MOTEUR-NFD non applicable ici : système de fichiers insensible à la normalisation (le mutant n'y est pas opposable)")
+    else:
+        tuer(ctx, "D1-MOTEUR-NFD", "# d1-moteur-verdict", 'inscrire_ecriture_moteur(racine, unite_rel + "/VERDICT.md", "poser-verdict.sh")  # d1-moteur-verdict',
+             "R-D1-18", controle_d1_18, script="poser-verdict.sh")
     # Une copie divergente : la fonction de poser-verdict.sh perd la garde du lien (le contrôle des arbres rougit)
     tuer(ctx, "D1-AST", "if os.path.islink(planning) or (", "if os.path.islink(planning):", "R-D1-09", controle_d1_09, script="poser-verdict.sh")
 

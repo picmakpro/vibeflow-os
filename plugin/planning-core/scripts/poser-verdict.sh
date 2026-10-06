@@ -783,12 +783,16 @@ def inscrire_surveillance(racine, genre, chemin_rel, empreinte, par, source):
         return
 
 
-def inscrire_ecriture_moteur(racine, chemin_rel, par):
+def inscrire_ecriture_moteur(racine, chemin_rel, par, chemin=None):
     """D1 (Phase 46, 46-07 ; P46-D-07a) : après une écriture EFFECTIVE du moteur sur `chemin_rel` (relatif au lab, séparateur `/`), inscrit la ligne
     `moteur` au journal de D1 avec le sha256 du fichier APRÈS écriture : elle explique le changement que le watcher verra. Une erreur n'a AUCUN effet sur
-    le code de sortie (aucune ligne)."""
+    le code de sortie (aucune ligne). `chemin_rel` est la CLÉ du journal (forme NFC) ; `chemin`, quand l'appelant le fournit, est le chemin d'ACCÈS du fichier
+    écrit, sous le nom du DISQUE (fix-46-a tour 3 : sur un système sensible à la normalisation, la jonction de `racine` et d'un `chemin_rel` en NFC désignerait
+    un fichier qui n'existe pas pour une unité au nom de disque NFD, et la ligne serait perdue). Sans `chemin`, la jonction de `racine` et de `chemin_rel`
+    (noms ASCII du dossier de planning)."""
     try:
-        chemin = os.path.join(racine, *chemin_rel.split("/"))
+        if chemin is None:
+            chemin = os.path.join(racine, *chemin_rel.split("/"))  # d1-moteur-brut
         if not stat.S_ISREG(os.lstat(chemin).st_mode):
             return
         hacheur = hashlib.sha256()
@@ -1074,7 +1078,7 @@ def poser(valeurs, constats_bruts):
         inscrire_ecriture_moteur(racine, ".planning/" + NOM_JOURNAL_DEROGATIONS, "poser-verdict.sh")  # d1-moteur-plafond
         print(citer(derogation))
     ecrire_atomique(unite, "VERDICT.md", texte)
-    inscrire_ecriture_moteur(racine, unite_rel + "/VERDICT.md", "poser-verdict.sh")  # d1-moteur-verdict
+    inscrire_ecriture_moteur(racine, unite_rel + "/VERDICT.md", "poser-verdict.sh", chemin_verdict)  # d1-moteur-verdict
     print("[poser-verdict] VERDICT.md écrit : %s (juge %s, tentative %d, hash %s, hash_livrables %s)" % (
         unite_rel + "/VERDICT.md", juge, tentative, empreinte, empreinte_livr))
 
