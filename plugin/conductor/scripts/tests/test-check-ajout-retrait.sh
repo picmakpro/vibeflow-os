@@ -358,7 +358,7 @@ mutant 9 '  n="$(awk '"'"'END { print NR }'"'"' "$TMPD/po")"; m="$(awk '"'"'END 
 D="$(mk_repo m10)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate
 
 $TR $NEW_GATE — retire check-old.sh devenu redondant avec lui"
-mutant 10 '      if ! defaillance_valide "$defaillance"; then ok=0; trimmed="$trimmed  [segment « défaillance : » absent ou sans date ISO ni SHA — POCK-08]"; fi' '      :' "$D" 1 0 --strict --base-ref "$B"
+mutant 10 '      if ! defaillance_valide "$defaillance"; then ok=0; trimmed="$trimmed  [segment « défaillance : » absent ou sans date ISO ni SHA (SHA : 7 à 40 hexadécimaux, au moins un chiffre ET une lettre a-f) — POCK-08]"; fi' '      :' "$D" 1 0 --strict --base-ref "$B"
 # MUT-11 (A14b, POCK-08) : le genre skill de l'awk des ajouts est neutralisé — un SKILL.md ajouté n'est plus vu.
 D="$(mk_repo m11)"; B="$(base_of "$D")"; add_skill "$D" "$SK" y; commit_avec "$D" "feat: skill nu"
 mutant 11 '  p ~ /^plugin\// && n == "SKILL.md" { print p "\tskill"; next }' '  p ~ /^plugin\// && n == "SKILL.md" { next }' "$D" 1 0 --strict --base-ref "$B"

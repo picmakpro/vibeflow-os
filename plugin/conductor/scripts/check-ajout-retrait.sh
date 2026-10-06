@@ -232,7 +232,7 @@ while IFS= read -r c; do
       esac
       [ "$ok" -eq 1 ] && [ "$(charcount "$just")" -lt 10 ] && ok=0
       if [ "$ok" -eq 1 ] && ! glob_admis "$motif"; then ok=0; trimmed="$trimmed  [motif glob trop large : admis seulement dans le dernier segment, 6 caractères littéraux au moins]"; fi
-      if ! defaillance_valide "$defaillance"; then ok=0; trimmed="$trimmed  [segment « défaillance : » absent ou sans date ISO ni SHA — POCK-08]"; fi
+      if ! defaillance_valide "$defaillance"; then ok=0; trimmed="$trimmed  [segment « défaillance : » absent ou sans date ISO ni SHA (SHA : 7 à 40 hexadécimaux, au moins un chiffre ET une lettre a-f) — POCK-08]"; fi
     fi
     if [ "$ok" -eq 1 ]; then
       MARQ_OK=$((MARQ_OK + 1))
