@@ -254,7 +254,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "revue-46-b",
@@ -264,7 +264,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -275,7 +275,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "nonreg-b",
@@ -285,7 +285,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "docs",
@@ -437,7 +437,19 @@
       "stage": "exec",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "done"
+    },
+    {
+      "id": "fix-46-c",
+      "step": "lot final : G7 attendus (Willy a), .planning/.gitignore (Willy 1), N-1, N-7, N-8, deroger-gate borné, limites exactes, CHANGELOG chiffres étape 6, rejeu étape 6 final gardé",
+      "stage": "fix",
+      "deps": [
+        "revue-46-b",
+        "audit-46-b",
+        "rejeu-46-6"
+      ],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
