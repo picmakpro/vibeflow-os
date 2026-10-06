@@ -131,8 +131,20 @@ remplace pas.
 2. **Pendant** — tous les commits de la mission et de ses workers y vont. Le manager ne bascule
    jamais de branche en cours de route et ne merge jamais lui-même.
 3. **À la fin** — pousser la branche et ouvrir la PR (`gh pr create`), titre et corps dérivés du
-   rapport de mission. **Ne jamais merger, ne jamais fermer.** Le rapport rendu à la conversation
-   principale cite l'URL de la PR.
+   rapport de mission, le corps portant OBLIGATOIREMENT la section merge-danger call ci-dessous
+   (contrôlée par E3 du gate de sortie). **Ne jamais merger, ne jamais fermer.** Le rapport rendu à
+   la conversation principale cite l'URL de la PR.
+
+**Merge-danger call (POCK-06)** — forme exacte de la section du corps de PR :
+
+- Titre exact `## Merge-danger call` ; la section court jusqu'au titre `## ` suivant ou la fin du corps.
+- Ligne `Porte : sens unique` (le merge ne se défait pas proprement : données, migration, publication,
+  état distant) ou `Porte : double sens` (un revert suffit). Énumération fermée ; espace avant les
+  deux-points facultative.
+- Ligne `Rayon d'explosion : …` — qui et quoi casse si c'est faux, au moins 10 caractères non blancs.
+- E3 rend MANQUE (nommé) si la section manque ou est incomplète, INDÉTERMINÉ si le corps est
+  illisible. Les replis du tableau ci-dessous (pas de remote, `gh` absent) laissent E3 indéterminé.
+  Forme vérifiée, jamais la véracité de la déclaration : c'est un appel pour le relecteur humain.
 
 **Replis, dans cet ordre — une mission n'échoue JAMAIS pour cette règle :**
 
