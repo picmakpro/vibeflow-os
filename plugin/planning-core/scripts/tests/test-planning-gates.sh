@@ -4991,7 +4991,9 @@ LIMITES_REFERENCE = (
     ("az", ("watchPaths", "A2", "A3")),
     ("ba", ("référence", "fail-open")),
     ("bb", ("Phase 48", "Phase 50", "P46-D-13")),
+    ("be", ("BORNE_LECTURE_PLAN", "1 Mio", "G3", "G4", "recalcul")),
 )
+PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 
 
 def section_reference(texte):
@@ -5154,7 +5156,7 @@ def sec_reference(ctx):
             print(e)
         ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
         return
-    ok("R-REFERENCE la table d'armement (huit gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (bb) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
+    ok("R-REFERENCE la table d'armement (huit gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées %s sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % (len(LIMITES_REFERENCE), PLAGE_LIMITES))
     original = open(chemin, encoding="utf-8").read()
 
     def mutant_texte(ident, fonction, motif):
@@ -5211,10 +5213,10 @@ def sec_reference(ctx):
         if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
             non_tuees.append(lettre)
     if non_tuees:
-        komut("REFERENCE-LIMITES", "chaque limite (a) à (bb) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+        komut("REFERENCE-LIMITES", "chaque limite %s retirée seule fait rougir R-REFERENCE en la nommant" % PLAGE_LIMITES, "%d limites tuées" % len(LIMITES_REFERENCE),
               "non tuées : " + ", ".join(non_tuees))
     else:
-        okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))
+        okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées %s retirée seule est nommée par le contrôle" % (len(LIMITES_REFERENCE), PLAGE_LIMITES))
     # Côté code : une constante du hook change, la référence reste intacte.
     ns_mut = dict(ns)
     # Q-ARM (Willy, AskUserQuestion session principale, 2026-09-30) : la constante est INVERSÉE (observe <-> armed), jamais posée à une valeur

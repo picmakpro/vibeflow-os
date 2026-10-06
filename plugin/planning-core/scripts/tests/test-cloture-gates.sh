@@ -11,6 +11,9 @@
 #   R-G3-03   jumeaux qui passent (copie armée) : livrables présents et non vides (fichier, dossier, dossier avec .DS_Store) ; CLOTURE.md de style GSD,
 #             de niveau cycle, nom d'unité invalide, CLOTURE.md.bak, livrable nommé CLOTURE.md hors .planning/ : jamais jugés ; lab dev : octet vide
 #   R-G3-04   dérogation nominative G3 sur le chemin du CLOTURE.md (usage unique) ; erreur interne injectée : armée deny, observe ligne d'observation
+#   R-PLAN-BORNE (A11, fix-46-a) PLAN.md de 1 Mio + 1 octet ou creux de 2 Gio -> UN deny G3 (CLOTURE.md) et UN deny G4 (SUMMARY.md) qui nomment
+#             BORNE_LECTURE_PLAN ; PLAN.md d'exactement 1 Mio -> passe ; espion de lecture : `octets_plan_du_dossier` du hook jugé ne demande jamais
+#             plus de BORNE_LECTURE_PLAN + 1 octets (durée du cas creux affichée, jamais assertée)
 # Familles de G4 (verdicts posés par la VRAIE poser-verdict.sh, jamais un hash écrit à la main sauf verdict volontairement faux) :
 #   R-G4-01   copie observe : Write de SUMMARY.md sans VERDICT.md voisin -> silence, code 0, UNE ligne gate=G4
 #   R-G4-02   copie armée : VERDICT.md absent, invalide (frontmatter, constats vides, résultat hors passé/échec, lien), constat en échec, PLAN.md
@@ -28,7 +31,8 @@
 #             --read-only (R4 : livrable-absent:, livrable-vide:… ou PLAN.md indéterminé) concordent ; une discordance est imprimée nommément
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-G3-LIVRABLE (contrôle du statut neutralisé -> R-G3-02), MUT-G3-FORME (forme élargie à tout CLOTURE.md sous .planning/ -> R-G3-03),
-#   MUT-G3-ADHESION (adhésion forcée vraie, commande sans pré-filtre -> jumeau lab dev de R-G3-03) ;
+#   MUT-G3-ADHESION (adhésion forcée vraie, commande sans pré-filtre -> jumeau lab dev de R-G3-03), MUT-PLAN-BORNE-TEST (test de la borne neutralisé),
+#   MUT-PLAN-LECTURE (lecture sans borne) -> R-PLAN-BORNE ;
 #   MUT-G4-ABSENT, MUT-G4-ECHEC (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
@@ -79,6 +83,8 @@ import shutil
 import stat
 import subprocess
 import sys
+import time
+import types
 import urllib.parse
 
 TOKEN = "{{VF_SCRIPTS}}"
@@ -582,6 +588,142 @@ def controle_g3_04(ctx, script):
         return False, "sonde, armée : " + classer(rc, out) + " " + court(out)
     return True, ("dérogation G3 : premier Write passe et cité, dérogation consommée, second Write refusé ; erreur interne de G3 : en observe aucun "
                   "refus et une ligne d'erreur au journal, armée un deny « erreur interne du gate »")
+
+
+# --- A11 (fix-46-a) : lecture du PLAN.md de l'unité bornée par G3 et G4 -------------------------------------------------------
+def espace_du_hook(ctx, dossier):
+    """Espace de noms du corps Python du hook DU DOSSIER donné (le hook jugé, réel ou mutant : `espace(ctx, "hook")` lit toujours le hook réel), sans
+    l'appel final à main()."""
+    cle = ("hook-jugé", dossier)
+    if cle not in ctx._ns:
+        chemin = os.path.join(dossier, "planning-hook.sh")
+        arbre = ast.parse(corps_python(open(chemin, encoding="utf-8").read()))
+        arbre.body = [n for n in arbre.body if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Call) and getattr(n.value.func, "id", "") == "main")]
+        ns = {"__name__": "bloc_charge_cloture"}
+        exec(compile(arbre, chemin, "exec"), ns)
+        ctx._ns[cle] = ns
+    return ctx._ns[cle]
+
+
+class _FichierEspion:
+    """Enveloppe d'un fichier ouvert par `os.fdopen` : consigne chaque `read(n)` ; une lecture sans borne (`read()`, n < 0, n au-delà de la borne) est
+    consignée puis ramenée à `borne + 1` octets (la mémoire du test reste bornée, même devant un hook fautif)."""
+
+    def __init__(self, fichier, lectures, borne):
+        self._fichier, self._lectures, self._borne = fichier, lectures, borne
+
+    def __enter__(self):
+        self._fichier.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        return self._fichier.__exit__(*args)
+
+    def fileno(self):
+        return self._fichier.fileno()
+
+    def read(self, n=-1):
+        self._lectures.append(n)
+        if n is None or n < 0 or n > self._borne + 1:
+            return self._fichier.read(self._borne + 1)
+        return self._fichier.read(n)
+
+
+class _OsEspion:
+    """Le module `os` du hook, à l'identique, sauf `fdopen` qui rend un `_FichierEspion`."""
+
+    def __init__(self, reel, lectures, borne):
+        self._reel, self._lectures, self._borne = reel, lectures, borne
+
+    def __getattr__(self, nom):
+        return getattr(self._reel, nom)
+
+    def fdopen(self, descripteur, *args, **kw):
+        return _FichierEspion(self._reel.fdopen(descripteur, *args, **kw), self._lectures, self._borne)
+
+
+def _plan_de_taille(taille):
+    """PLAN.md de EXACTEMENT `taille` octets : frontmatter valide en tête (`ecrit: livrables/rapport.md`), puis des lignes de commentaire Markdown, l'octet
+    exact ajusté sur la dernière ligne."""
+    entete = "---\necrit: " + LIVRABLE + "\n---\n"
+    ligne = "<!-- remplissage -->\n"
+    reste = taille - len(entete)
+    n = reste // len(ligne) - 1
+    dernier = reste - n * len(ligne)
+    texte = entete + ligne * n + "<!-- " + "r" * (dernier - 10) + " -->\n"
+    if len(texte.encode("utf-8")) != taille:
+        raise RuntimeError("PLAN.md de %d octets mal construit : %d" % (taille, len(texte.encode("utf-8"))))
+    return texte
+
+
+def controle_plan_borne(ctx, script):
+    """Copie armée : PLAN.md de BORNE_LECTURE_PLAN + 1 octets (frontmatter valide en tête, livrable présent, verdict posé par la vraie commande) -> UN deny G3
+    (CLOTURE.md) et UN deny G4 (SUMMARY.md) dont la raison nomme BORNE_LECTURE_PLAN et 1048576 ; jumeau d'EXACTEMENT BORNE_LECTURE_PLAN octets -> passe ;
+    PLAN.md creux de 2 Gio -> deny G3 qui nomme la borne (durée affichée, jamais assertée) ; espion : `octets_plan_du_dossier` du hook jugé rend `hors-borne`
+    sur le creux et ne demande jamais une lecture de plus de BORNE_LECTURE_PLAN + 1 octets."""
+    dossier_jugé = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_jugé, "armed")
+    ns = espace_du_hook(ctx, dossier_jugé)
+    borne = ns.get("BORNE_LECTURE_PLAN", 1048576)
+    fautes = []
+
+    def refus(nom, gate, lab, rel):
+        bon, detail, raison = _refus_gate(ctx, gate, d, lab, "Write", rel)
+        if not bon:
+            fautes.append("%s : %s" % (nom, detail))
+            return
+        for fragment in ("BORNE_LECTURE_PLAN", "1048576"):
+            if fragment not in raison:
+                fautes.append("%s : la raison ne nomme pas %s : %s" % (nom, fragment, raison))
+                return
+        fautes.extend("%s : %s" % (nom, f) for f in fautes_de_message(raison, lab))
+
+    def passe(nom, lab, rel):
+        rc, out, err = ecrire_dans(ctx, d, lab, "Write", rel)
+        v = classer(rc, out)
+        if v not in ("silence", "avertit") or err:
+            fautes.append("%s : %s %s" % (nom, v, court(out)))
+
+    # 1. borne + 1 octets : refus de G3 et de G4 qui nomment la borne
+    lab = lab_g4(ctx, "plan-borne-plus1", plan=_plan_de_taille(1048576 + 1))
+    refus("PLAN.md de 1 Mio + 1 octet, G3", "G3", lab, CLOTURE)
+    refus("PLAN.md de 1 Mio + 1 octet, G4", "G4", lab, SUMMARY)
+    # 2. jumeau à la borne : EXACTEMENT 1 Mio -> passe
+    lab = lab_g4(ctx, "plan-borne-exact", plan=_plan_de_taille(1048576))
+    passe("PLAN.md d'exactement 1 Mio, G3", lab, CLOTURE)
+    passe("PLAN.md d'exactement 1 Mio, G4", lab, SUMMARY)
+    # 3. PLAN.md creux de 2 Gio : frontmatter écrit puis `truncate`
+    lab = fabriquer_lab(ctx, "plan-borne-creux", plan="---\necrit: " + LIVRABLE + "\n---\n", fichiers={LIVRABLE: "contenu\n"})
+    plan_creux = os.path.join(lab, UNITE, "PLAN.md")
+    os.truncate(plan_creux, 2 * 1024 ** 3)
+    debut = time.monotonic()
+    refus("PLAN.md creux de 2 Gio, G3", "G3", lab, CLOTURE)
+    print("DUREE plan-creux-2gio s=%.1f (affichée, jamais assertée)" % (time.monotonic() - debut))
+    # 4. espion : la lecture du hook jugé ne dépasse jamais borne + 1 octets
+    lectures = []
+    ns_espion = dict(ns)
+    ns_espion["os"] = _OsEspion(os, lectures, borne)
+    fonction = types.FunctionType(ns["octets_plan_du_dossier"].__code__, ns_espion)
+    resultat = fonction(os.path.join(lab, UNITE))
+    statut = resultat[0] if isinstance(resultat, tuple) else ("ok" if resultat else "illisible")
+    if statut != "hors-borne":
+        fautes.append("espion : octets_plan_du_dossier rend %r sur le PLAN.md creux de 2 Gio (attendu hors-borne)" % (statut,))
+    if not lectures or any(n is None or not 0 < n <= borne + 1 for n in lectures):
+        fautes.append("espion : lecture non bornée, read(n) demandés : %s (attendu 0 < n <= %d)" % (lectures, borne + 1))
+    lectures_jumeau = []
+    ns_jumeau = dict(ns)
+    ns_jumeau["os"] = _OsEspion(os, lectures_jumeau, borne)
+    fonction = types.FunctionType(ns["octets_plan_du_dossier"].__code__, ns_jumeau)
+    lab_exact = ctx.unique("plan-borne-espion")
+    ecrire(os.path.join(lab_exact, UNITE, "PLAN.md"), _plan_de_taille(borne))
+    resultat = fonction(os.path.join(lab_exact, UNITE))
+    if not (isinstance(resultat, tuple) and resultat[0] == "ok" and len(resultat[1]) == borne):
+        fautes.append("espion : le PLAN.md d'exactement %d octets n'est pas rendu ('ok', octets) : %s" % (borne, court(str(resultat))))
+    if any(n is None or not 0 < n <= borne + 1 for n in lectures_jumeau):
+        fautes.append("espion, jumeau : lecture non bornée, read(n) demandés : %s" % lectures_jumeau)
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "PLAN.md de 1 Mio + 1 octet et PLAN.md creux de 2 Gio : UN deny G3 et UN deny G4 qui nomment BORNE_LECTURE_PLAN (1048576) ; PLAN.md "
+                          "d'exactement 1 Mio : G3 et G4 passent ; espion : hors-borne rendu sans lecture de plus de %d octets" % (borne + 1))
 
 
 # =================================================================================================
@@ -1240,7 +1382,8 @@ def sec_g3(ctx):
             ("R-G3-01", controle_g3_01, "copie observe, livrable absent : une ligne gate=G3"),
             ("R-G3-02", controle_g3_02, "copie armée, refus"),
             ("R-G3-03", controle_g3_03, "copie armée, jumeaux qui passent"),
-            ("R-G3-04", controle_g3_04, "dérogation et erreur interne")):
+            ("R-G3-04", controle_g3_04, "dérogation et erreur interne"),
+            ("R-PLAN-BORNE", controle_plan_borne, "PLAN.md au-delà de 1 Mio : refus explicite de G3 et G4, lecture bornée")):
         bon, detail = original_de(ctx, ident, ctrl)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
@@ -1273,6 +1416,8 @@ def sec_mutants_g3(ctx):
          'unite = composants[:-1] if composants and composants[0].casefold() == ".planning" and composants[-1].casefold() == "cloture.md" else None  # g3-forme',
          "R-G3-03", controle_g3_03)
     tuer(ctx, "G3-ADHESION", "sys.exit(0)  # non-adherent", "pass", "R-G3-03", controle_g3_03)
+    tuer(ctx, "PLAN-BORNE-TEST", "# plan-hors-borne", "if False:  # plan-hors-borne", "R-PLAN-BORNE", controle_plan_borne)
+    tuer(ctx, "PLAN-LECTURE", "# plan-lecture-bornee", "octets = fh.read()  # plan-lecture-bornee", "R-PLAN-BORNE", controle_plan_borne)
 
 
 def sec_mutants_g4(ctx):

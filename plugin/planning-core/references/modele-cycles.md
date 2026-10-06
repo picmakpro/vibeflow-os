@@ -1015,6 +1015,7 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (az)** — P46-D-07a, P46-D-08 (Phase 46, 46-07) : `watchPaths` **remplace** la liste dynamique du harnais : un autre hook qui en renvoie la remplace, et la liste de D1 disparaît pour la session ; la forme de `watchPaths` hors `SessionStart` (A2 : `CwdChanged` renvoie les deux formes, premier niveau et sous `hookSpecificOutput`, sans mesure) et la surveillance d'un chemin encore inexistant (A3 : `SUMMARY.md` absent, créé plus tard) ne sont pas mesurées ; la réconciliation du `SessionStart` rattrape ce que le watcher ne voit pas.
 - **limite (ba)** — P46-D-07, P46-D-10 (Phase 46, 46-07) : la première observation d'un fichier surveillé pose sa référence sans contournement (un fichier déjà modifié avant le premier `SessionStart` d'un lab n'est pas tracé) ; le journal est lu sur ses 4 Mio de fin (`BORNE_LECTURE_SURVEILLANCE`) : une référence plus ancienne est inconnue et se repose en première observation ; D1 est fail-open (toute erreur sort en silence, code 0) : une trace perdue en séance est rattrapée au `SessionStart` suivant.
 - **limite (bb)** — P46-D-06, P46-D-13 (Phase 46, 46-09) : aucun dispatch de juge en Phase 46 — le premier passage d'un juge sur sa sortie piégée est une étape écrite du premier cycle, portée par le manager jusqu'à l'orchestrateur générique de la Phase 48 ; les sorties piégées sont fabriquées par l'initialisation en Phase 50 (à la main sinon) : « juge sans preuve » est donc attendu sur tout lab existant, et ce n'est jamais vert ; la qualité d'une sortie piégée (trop facile à refuser) relève de la Phase 50 ; le seuil de juge n'est ni lu ni posé dans `config.json` (P46-D-13, Phase 50).
+- **limite (be)** — A11 (Phase 46, fix-46-a) : G3 et G4 ne lisent pas plus de 1 Mio d'un `PLAN.md` (`BORNE_LECTURE_PLAN`, 1 048 576 octets LUS, jamais la taille annoncée) : au-delà, le `PLAN.md` est tenu pour illisible, la clôture et le `SUMMARY.md` sont refusés par un message qui nomme la borne ; le recalcul et `poser-verdict.sh` le lisent sans cette borne (le recalcul peut rendre un état, la commande poser un verdict, là où le hook refuse : un refus de plus, jamais un passage).
 
 ### Contrat de sortie par événement (Phase 46)
 
@@ -1164,14 +1165,16 @@ Limite T-45-61 (acceptée, sévérité basse) : un `.claude/` garni d'un faux ag
 G3 refuse, en `PreToolUse`, l'écriture par `Write`, `Edit` ou `NotebookEdit` d'un `CLOTURE.md` d'**unité de forme modèle**
 (`.planning/cycles/<cycle>/phases/<phase>[/plans/<plan>]/CLOTURE.md`, noms d'unité conformes à `NOM_UNITE`, noms fixes comparés
 sans égard à la casse, chemin résolu physiquement) quand un livrable déclaré par `ecrit:` du `PLAN.md` voisin est absent, vide,
-lien ou hors borne, ou quand ce `PLAN.md` est absent, illisible ou sans `ecrit:` valide (P46-D-01, P46-D-12). Il appelle la MÊME
+lien ou hors borne, ou quand ce `PLAN.md` est absent, illisible, de plus de 1 Mio (`BORNE_LECTURE_PLAN`, 1 048 576 octets lus,
+jamais la taille annoncée : A11, fix-46-a) ou sans `ecrit:` valide (P46-D-01, P46-D-12). Il appelle la MÊME
 chaîne que la règle R4 du recalcul (`entrees_du_plan`, puis `livrables_presents`, budget commun par `PLAN.md`) : G3 refuse
 exactement quand R4 rend `indéterminé` pour la même unité (preuve croisée R-CROISE-01, 46-05). Un `CLOTURE.md` de toute autre
 forme (planning de style GSD sous `.planning/phases/`, niveau cycle, `CLOTURE.md.bak`, un livrable nommé `CLOTURE.md` hors de
 `.planning/`) n'est jamais jugé. Le verdict porte le chemin relatif du `CLOTURE.md` écrit : c'est le chemin d'une dérogation
 nominative (`deroger-gate.sh --gate=G3`, usage unique). Messages, relatifs au lab : `livrable déclaré <statut> : <entrée> —
 produisez-le (non vide, sans lien) avant de clore (spec §5)` ; `PLAN.md de l'unité absent, illisible ou sans ecrit: valide —
-l'unité est indéterminée au modèle, la clôture est refusée`. Entré en `PreToolUse` par l'entonnoir existant : en `observe` il
+l'unité est indéterminée au modèle, la clôture est refusée` ; `PLAN.md de l'unité au-delà de 1048576 octets (BORNE_LECTURE_PLAN) :
+non lu — l'unité est indéterminée au hook, la clôture est refusée`. Entré en `PreToolUse` par l'entonnoir existant : en `observe` il
 journalise, armé il refuse (deny), une erreur interne refuse quand il est armé.
 
 ### G4 — pas de SUMMARY.md sans verdict qui tienne (Phase 46)
@@ -1182,12 +1185,13 @@ hors `passé`/`échec`, frontmatter illisible), **périmé** — `hash` différe
 différent de l'empreinte des livrables, relue par la copie partagée du bloc — ou **portant un constat `échec`** (P46-D-01,
 P46-D-03). Ordre du recalcul : R6, puis E (empreintes), puis R7 (échec) : un verdict périmé se re-juge avant qu'on lise ses
 constats. Le prédicat est réévalué à **chaque** écriture : retoucher le `SUMMARY.md` d'une unité close reste permis tant que le
-verdict tient. Un `PLAN.md` absent, illisible, sans `ecrit:` valide ou dont `ecrit:` contient l'unité rend l'unité indéterminée au
-modèle : refus. Un `SUMMARY.md` de toute autre forme n'est jamais jugé. Le verdict porte le chemin relatif du `SUMMARY.md` écrit
+verdict tient. Un `PLAN.md` absent, illisible, de plus de 1 Mio (`BORNE_LECTURE_PLAN`, A11), sans `ecrit:` valide ou dont `ecrit:`
+contient l'unité rend l'unité indéterminée au modèle : refus. Un `SUMMARY.md` de toute autre forme n'est jamais jugé. Le verdict porte le chemin relatif du `SUMMARY.md` écrit
 (dérogation nominative : `deroger-gate.sh --gate=G4`, usage unique). Messages, relatifs au lab : `aucun VERDICT.md : faites juger
 l'unité (poser-verdict.sh)` ; `VERDICT.md invalide (règle R6)` ; `constat en échec : <critère> — corrigez puis re-jugez
 (tentative n+1)` ; `verdict périmé : re-juger (tentative n+1)` (n lu dans `tentative` du verdict, sans numéro si elle est
-illisible) ; `livrables hors borne : <libellé>`. Entonnoir existant : en `observe` il journalise, armé il refuse (deny), une erreur
+illisible) ; `livrables hors borne : <libellé>` ; `PLAN.md de l'unité au-delà de 1048576 octets (BORNE_LECTURE_PLAN) : non lu — le
+verdict ne peut pas être vérifié`. Entonnoir existant : en `observe` il journalise, armé il refuse (deny), une erreur
 interne refuse quand il est armé.
 
 ### G4′ — pas de rapport sans sortie brute (Phase 46)

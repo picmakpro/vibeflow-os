@@ -1727,9 +1727,9 @@ def evaluer_g1(contexte):
 # Toute écriture par Write, Edit ou NotebookEdit d'un CLOTURE.md d'unité de forme modèle — `.planning/cycles/<cycle>/phases/<phase>`
 # ou `.../phases/<phase>/plans/<plan>/CLOTURE.md`, noms d'unité conformes à NOM_UNITE, noms fixes en casefold, chemin résolu
 # physiquement — est jugée sur le `PLAN.md` voisin : un livrable déclaré par `ecrit:` absent, vide, lien ou hors borne (le prédicat
-# partagé `livrables_presents`, MÊME chaîne que la règle R4 du recalcul, R-CROISE-01) refuse ; un PLAN.md absent, illisible ou sans
-# `ecrit:` valide refuse aussi (l'unité est indéterminée au modèle, R1 et R2 : écart assumé avec G1, qui se tait sur un état illisible,
-# F5). Un CLOTURE.md de toute autre forme (planning de style GSD, niveau cycle, nom voisin) n'est jamais jugé.
+# partagé `livrables_presents`, MÊME chaîne que la règle R4 du recalcul, R-CROISE-01) refuse ; un PLAN.md absent, illisible, de plus de
+# 1 Mio (BORNE_LECTURE_PLAN : jamais lu au-delà, A11) ou sans `ecrit:` valide refuse aussi (l'unité est indéterminée au modèle, R1 et R2 :
+# écart assumé avec G1, qui se tait sur un état illisible, F5). Un CLOTURE.md de toute autre forme (planning de style GSD, niveau cycle, nom voisin) n'est jamais jugé.
 def unite_de_fichier(composants, nom):
     """Composants du DOSSIER de l'unité (cinq ou sept, relatifs à la racine du lab) si `composants` désignent le fichier `nom`
     (casefold) d'une unité de forme modèle, sinon None. Généralise `unite_de_plan` sans la toucher ; même forme que `forme_unite` de
@@ -1747,18 +1747,32 @@ def unite_de_fichier(composants, nom):
     return composants[:-1]
 
 
+BORNE_LECTURE_PLAN = 1048576  # A11 (fix-46-a) : au-delà, le PLAN.md de l'unité n'est pas lu (G3 et G4 refusent)
+RAISON_G3_PLAN_BORNE = ("PLAN.md de l'unité au-delà de %d octets (BORNE_LECTURE_PLAN) : non lu — l'unité est indéterminée au hook, "
+                        "la clôture est refusée" % BORNE_LECTURE_PLAN)
+RAISON_G4_PLAN_BORNE = ("PLAN.md de l'unité au-delà de %d octets (BORNE_LECTURE_PLAN) : non lu — le verdict ne peut pas être vérifié"
+                        % BORNE_LECTURE_PLAN)
+
+
 def octets_plan_du_dossier(dossier):
-    """Octets du PLAN.md de l'unité `dossier` : fichier régulier requis (lstat, jamais de suivi de lien), ouverture O_NOFOLLOW ; None
-    si non régulier ou illisible (jamais un contenu partiel)."""
+    """(statut, octets) du PLAN.md de l'unité `dossier` : `ok` et ses octets ; `illisible` (pas un fichier régulier — absent, lien,
+    dossier, tube — ou erreur de lecture) ; `hors-borne` au-delà de BORNE_LECTURE_PLAN octets LUS (lecture bornée à
+    BORNE_LECTURE_PLAN + 1 octets, jamais la taille annoncée : un fichier creux de 2 Gio ne coûte qu'un Mio). Ouverture sans suivre de
+    lien ni bloquer, fstat régulier. Jamais un contenu partiel (A11, fix-46-a)."""
     chemin = os.path.join(dossier, "PLAN.md")
     if not est_fichier_regulier(chemin):
-        return None
+        return ("illisible", None)
     try:
-        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN | SANS_BLOCAGE)
         with os.fdopen(descripteur, "rb") as fh:
-            return fh.read()
+            if not stat.S_ISREG(os.fstat(fh.fileno()).st_mode):
+                return ("illisible", None)
+            octets = fh.read(BORNE_LECTURE_PLAN + 1)  # plan-lecture-bornee
     except OSError:
-        return None
+        return ("illisible", None)
+    if len(octets) > BORNE_LECTURE_PLAN:  # plan-hors-borne
+        return ("hors-borne", None)
+    return ("ok", octets)
 
 
 RAISON_G3_PLAN = "PLAN.md de l'unité absent, illisible ou sans ecrit: valide — l'unité est indéterminée au modèle, la clôture est refusée"
@@ -1776,7 +1790,9 @@ def evaluer_g3(contexte):
     if unite is None:
         return []
     chemin_rel = "/".join(composants)
-    octets = octets_plan_du_dossier(os.path.join(racine, *unite))
+    lecture, octets = octets_plan_du_dossier(os.path.join(racine, *unite))
+    if lecture == "hors-borne":  # g3-lecture-plan
+        return [Verdict("G3", chemin_rel, RAISON_G3_PLAN_BORNE)]
     motif, detail = ("frontmatter", "illisible") if octets is None else entrees_du_plan(octets, "/".join(unite))  # g3-plan
     if motif == "unite":
         return [Verdict("G3", chemin_rel, "ecrit: contient le dossier de l'unité (%s) — l'unité est indéterminée au modèle, la clôture est refusée" % detail)]
@@ -1792,7 +1808,8 @@ def evaluer_g3(contexte):
 # --- G4 : pas de SUMMARY.md sans verdict qui tienne (CLOT-02, CLOT-03, 46-05 ; P46-D-01, P46-D-03) ----------------------------
 # Toute écriture par Write, Edit ou NotebookEdit d'un SUMMARY.md d'unité de forme modèle (même forme que G3, `unite_de_fichier`) est jugée
 # sur le `VERDICT.md` voisin : absent, invalide (règle R6 du recalcul : constats vides ou hors passé/échec), périmé (`hash` différent du
-# sha256 du PLAN.md, `hash_livrables` absent ou différent de l'empreinte des livrables), ou portant un constat `échec` -> refus. Même
+# sha256 du PLAN.md, `hash_livrables` absent ou différent de l'empreinte des livrables), ou portant un constat `échec` -> refus ; un PLAN.md
+# absent, illisible, de plus de 1 Mio (BORNE_LECTURE_PLAN, A11) ou sans `ecrit:` valide refuse aussi. Même
 # ordre que le recalcul (R6, puis E, puis R7) : un verdict périmé se re-juge avant qu'on lise ses constats. Le prédicat est réévalué à
 # CHAQUE écriture : retoucher le SUMMARY.md d'une unité close reste permis tant que le verdict tient. Les empreintes viennent de la copie
 # partagée du bloc (jamais d'une réécriture) ; un SUMMARY.md de toute autre forme n'est jamais jugé.
@@ -1830,7 +1847,9 @@ def evaluer_g4(contexte):
         return [Verdict("G4", chemin_rel, "VERDICT.md invalide (règle R6)")]
     suivante = _tentative_suivante(donnees)
     reessai = "" if suivante is None else " (tentative %d)" % suivante
-    octets = octets_plan_du_dossier(dossier)
+    lecture, octets = octets_plan_du_dossier(dossier)
+    if lecture == "hors-borne":  # g4-lecture-plan
+        return [Verdict("G4", chemin_rel, RAISON_G4_PLAN_BORNE)]
     motif, detail = ("frontmatter", "illisible") if octets is None else entrees_du_plan(octets, "/".join(unite))
     if motif == "unite":
         return [Verdict("G4", chemin_rel, "ecrit: contient le dossier de l'unité (%s) — l'unité est indéterminée au modèle, le verdict ne peut pas être vérifié" % detail)]
