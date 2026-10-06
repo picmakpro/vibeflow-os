@@ -18,6 +18,9 @@
 #   R-PLAN-BORNE (A11, fix-46-a) PLAN.md de 1 Mio + 1 octet ou creux de 2 Gio -> UN deny G3 (CLOTURE.md) et UN deny G4 (SUMMARY.md) qui nomment
 #             BORNE_LECTURE_PLAN ; PLAN.md d'exactement 1 Mio -> passe ; espion de lecture : `octets_plan_du_dossier` du hook jugé ne demande jamais
 #             plus de BORNE_LECTURE_PLAN + 1 octets (durée du cas creux affichée, jamais assertée)
+#   R-PLAN-BORNE-G2 (A11, complément, fix-46-a) G2 (`plans_ouverts` -> `lire_frontmatter_fichier(chemin, borne)`) lit le PLAN.md avec la même borne : espion de
+#             lecture (jamais plus de BORNE_LECTURE_PLAN + 1 octets, PLAN.md creux de 2 Gio ignoré, PLAN.md d'exactement la borne rendu), hors-borne rendu
+#             par la fonction, résultat identique à une lecture sans borne en deçà (CRLF, UTF-8 invalide) ; de bout en bout : borne + 1 octet avertit
 # Familles de G4 (verdicts posés par la VRAIE poser-verdict.sh, jamais un hash écrit à la main sauf verdict volontairement faux) :
 #   R-G4-01   copie observe : Write de SUMMARY.md sans VERDICT.md voisin -> silence, code 0, UNE ligne gate=G4
 #   R-G4-02   copie armée : VERDICT.md absent, invalide (frontmatter, constats vides, résultat hors passé/échec, lien), constat en échec, PLAN.md
@@ -40,7 +43,8 @@
 #   MUT-G3-LIVRABLE (contrôle du statut neutralisé -> R-G3-02), MUT-G3-FORME (forme élargie à tout CLOTURE.md sous .planning/ -> R-G3-03),
 #   MUT-G3-ADHESION (adhésion forcée vraie, commande sans pré-filtre -> jumeau lab dev de R-G3-03), MUT-PLAN-BORNE-TEST (test de la borne neutralisé),
 #   MUT-PLAN-LECTURE (lecture sans borne) -> R-PLAN-BORNE, MUT-G3-BORNE-MESSAGE (branche `borne` neutralisée -> R-G3-05), MUT-NFD-CHEMIN (normalisation NFC
-#   des composants retirée -> R-BANC-NFD) ;
+#   des composants retirée -> R-BANC-NFD), MUT-PLAN-G2-BORNE (G2 appelle `lire_frontmatter_fichier` sans borne), MUT-PLAN-G2-LECTURE (lecture sans borne dans
+#   la fonction), MUT-PLAN-G2-HORS-BORNE (test de la borne neutralisé dans la fonction) -> R-PLAN-BORNE-G2 ;
 #   MUT-G4-ABSENT, MUT-G4-ECHEC (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
@@ -739,6 +743,94 @@ def controle_plan_borne(ctx, script):
     return (not fautes), ("; ".join(fautes[:6]) if fautes else
                           "PLAN.md de 1 Mio + 1 octet et PLAN.md creux de 2 Gio : UN deny G3 et UN deny G4 qui nomment BORNE_LECTURE_PLAN (1048576) ; PLAN.md "
                           "d'exactement 1 Mio : G3 et G4 passent ; espion : hors-borne rendu sans lecture de plus de %d octets" % (borne + 1))
+
+
+# --- A11, complément (fix-46-a) : G2 lit aussi le PLAN.md de l'unité (`plans_ouverts` -> `lire_frontmatter_fichier`) : sa lecture est bornée ------
+def controle_plan_borne_g2(ctx, script):
+    """Copie armée et espion : `plans_ouverts` du hook jugé (G2) lit le PLAN.md d'une unité ouverte par `lire_frontmatter_fichier(chemin, borne)` ; sur un
+    PLAN.md creux de 2 Gio il ne demande jamais une lecture de plus de BORNE_LECTURE_PLAN + 1 octets et IGNORE ce plan (fail-open de G2, spec §5.1, comme tout
+    PLAN.md au frontmatter illisible) ; sur un PLAN.md d'exactement BORNE_LECTURE_PLAN octets il le rend ; `lire_frontmatter_fichier` rend
+    `invalide:hors-borne` au-delà de la borne et, sous la borne, le même résultat qu'une lecture sans borne (y compris pour des fins de ligne CRLF) ; de
+    bout en bout, l'écriture d'un livrable déclaré par un PLAN.md de borne + 1 octet n'est plus couverte (avertissement de G2), celle d'un PLAN.md d'exactement
+    la borne l'est (silence)."""
+    dossier_jugé = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_jugé, "armed")
+    ns = espace_du_hook(ctx, dossier_jugé)
+    borne = ns.get("BORNE_LECTURE_PLAN", 1048576)
+    fautes = []
+
+    def plans_espionnes(lectures):
+        """`plans_ouverts` et `lire_frontmatter_fichier` du hook jugé, reconstruits sur un espace de noms dont `os.fdopen` consigne les `read(n)`."""
+        ns_e = dict(ns)
+        ns_e["os"] = _OsEspion(os, lectures, borne)
+        for nom in ("lire_frontmatter_fichier", "plans_ouverts"):
+            f = ns[nom]
+            ns_e[nom] = types.FunctionType(f.__code__, ns_e, f.__name__, f.__defaults__)
+        return ns_e["plans_ouverts"]
+
+    # 1. espion, PLAN.md creux de 2 Gio : lecture bornée, plan ignoré
+    lab = fabriquer_lab(ctx, "plan-borne-g2-creux", plan="---\necrit: " + LIVRABLE + "\n---\n", fichiers={LIVRABLE: "contenu\n"})
+    os.truncate(os.path.join(lab, UNITE, "PLAN.md"), 2 * 1024 ** 3)
+    lectures = []
+    debut = time.monotonic()
+    plans = plans_espionnes(lectures)(lab)
+    print("DUREE g2-plans-ouverts-creux-2gio s=%.1f (affichée, jamais assertée)" % (time.monotonic() - debut))
+    if plans:
+        fautes.append("espion, creux : plans_ouverts rend %s (attendu : le PLAN.md hors borne est ignoré)" % court(str(plans)))
+    if not lectures or any(n is None or not 0 < n <= borne + 1 for n in lectures):
+        fautes.append("espion, creux : lecture non bornée, read(n) demandés : %s (attendu 0 < n <= %d)" % (lectures, borne + 1))
+    # 2. espion, PLAN.md d'exactement la borne : rendu
+    lab_exact = fabriquer_lab(ctx, "plan-borne-g2-exact", plan=_plan_de_taille(borne), fichiers={LIVRABLE: "contenu\n"})
+    lectures_exact = []
+    plans = plans_espionnes(lectures_exact)(lab_exact)
+    if not (len(plans) == 1 and plans[0][1] == [LIVRABLE]):
+        fautes.append("espion, jumeau à la borne : plans_ouverts rend %s (attendu : un plan, entrée %s)" % (court(str(plans)), LIVRABLE))
+    if any(n is None or not 0 < n <= borne + 1 for n in lectures_exact):
+        fautes.append("espion, jumeau à la borne : lecture non bornée, read(n) demandés : %s" % lectures_exact)
+    # 3. la fonction elle-même : hors-borne au-delà, même résultat qu'une lecture sans borne en deçà (CRLF compris), appelants sans borne inchangés
+    lff_reel = ns["lire_frontmatter_fichier"]
+
+    def lff(chemin, *borne_optionnelle):
+        try:
+            return lff_reel(chemin, *borne_optionnelle)
+        except TypeError as exc:  # le code d'avant n'accepte pas de borne : une faute nommée, jamais un plantage du contrôle
+            fautes.append("lire_frontmatter_fichier n'accepte pas de borne : %s" % exc)
+            return ("erreur", {})
+
+    plus1 = os.path.join(fabriquer_lab(ctx, "plan-borne-g2-plus1", plan=_plan_de_taille(borne + 1)), UNITE, "PLAN.md")
+    rendu = lff(plus1, borne)
+    if rendu != ("invalide:hors-borne", {}):
+        fautes.append("lire_frontmatter_fichier(PLAN.md de borne + 1 octets, borne) rend %s (attendu ('invalide:hors-borne', {}))" % court(str(rendu)))
+    if lff(plus1)[0] != "ok":
+        fautes.append("lire_frontmatter_fichier sans borne : le PLAN.md de borne + 1 octets n'est plus lu comme avant : %s" % court(str(lff(plus1)[:1])))
+    crlf = ctx.unique("plan-borne-g2-crlf")
+    ecrire(os.path.join(crlf, "PLAN.md"), "---\r\necrit: " + LIVRABLE + "\r\n---\r\nPlan.\r\n")
+    avec, sans = lff(os.path.join(crlf, "PLAN.md"), borne), lff(os.path.join(crlf, "PLAN.md"))
+    if avec != sans or avec[0] != "ok":
+        fautes.append("lire_frontmatter_fichier : avec borne %s, sans borne %s (attendu : identiques, ok)" % (court(str(avec)), court(str(sans))))
+    invalide = ctx.unique("plan-borne-g2-utf8")
+    os.makedirs(invalide, exist_ok=True)
+    with open(os.path.join(invalide, "PLAN.md"), "wb") as fh:
+        fh.write(b"---\necrit: \xff\xfe\n---\n")
+    if lff(os.path.join(invalide, "PLAN.md"), borne)[0] != "invalide:illisible" or lff(os.path.join(invalide, "PLAN.md"))[0] != "invalide:illisible":
+        fautes.append("lire_frontmatter_fichier : un PLAN.md qui n'est pas de l'UTF-8 n'est pas rendu invalide:illisible avec et sans borne")
+    # 4. de bout en bout (copie armée) : le PLAN.md de borne + 1 octet ne couvre plus son livrable, celui d'exactement la borne le couvre
+    lab_plus1 = fabriquer_lab(ctx, "plan-borne-g2-e2e-plus1", plan=_plan_de_taille(borne + 1), fichiers={LIVRABLE: "contenu\n"})
+    rc, out, err = ecrire_dans(ctx, d, lab_plus1, "Write", LIVRABLE)
+    if classer(rc, out) != "avertit" or err or "[planning-core] G2" not in out.decode("utf-8", "replace"):
+        fautes.append("bout en bout, borne + 1 octet : %s %s (attendu un avertissement de G2 : le plan hors borne est ignoré)" % (classer(rc, out), court(out)))
+    rc, out, err = ecrire_dans(ctx, d, lab_exact, "Write", LIVRABLE)
+    if classer(rc, out) != "silence" or err:
+        fautes.append("bout en bout, exactement la borne : %s %s (attendu silence : le plan couvre son livrable)" % (classer(rc, out), court(out)))
+    debut = time.monotonic()
+    rc, out, err = ecrire_dans(ctx, d, lab, "Write", LIVRABLE)
+    print("DUREE g2-ecriture-plan-creux-2gio s=%.1f (affichée, jamais assertée)" % (time.monotonic() - debut))
+    if classer(rc, out) not in ("avertit", "silence") or err:
+        fautes.append("bout en bout, PLAN.md creux de 2 Gio : %s %s (attendu : pas d'échec, le plan est ignoré)" % (classer(rc, out), court(out)))
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "G2 (plans_ouverts) : PLAN.md creux de 2 Gio ignoré sans lecture de plus de %d octets, PLAN.md d'exactement %d octets rendu, hors-borne rendu par "
+                          "lire_frontmatter_fichier au-delà et même résultat qu'une lecture sans borne en deçà (CRLF, UTF-8 invalide) ; de bout en bout : borne + 1 octet "
+                          "avertit, exactement la borne couvre" % (borne + 1, borne))
 
 
 # --- A13 (fix-46-a) : un livrable hors borne n'est pas « à produire » -------------------------------------------------------
@@ -1561,6 +1653,7 @@ def sec_g3(ctx):
             ("R-G3-03", controle_g3_03, "copie armée, jumeaux qui passent"),
             ("R-G3-04", controle_g3_04, "dérogation et erreur interne"),
             ("R-PLAN-BORNE", controle_plan_borne, "PLAN.md au-delà de 1 Mio : refus explicite de G3 et G4, lecture bornée"),
+            ("R-PLAN-BORNE-G2", controle_plan_borne_g2, "PLAN.md au-delà de 1 Mio : lecture bornée aussi par G2 (plans_ouverts), plan ignoré"),
             ("R-G3-05", controle_g3_05, "livrable hors borne : message distinct qui nomme la borne"),
             ("R-NFD-02", controle_nfd_02, "forme NFD : chemin mixte, voie cwd, lien à cible NFD, dérogation, copie observe")):
         bon, detail = original_de(ctx, ident, ctrl)
@@ -1599,6 +1692,10 @@ def sec_mutants_g3(ctx):
     tuer(ctx, "G3-BORNE-MESSAGE", "# g3-borne", "if False:  # g3-borne", "R-G3-05", controle_g3_05)
     tuer(ctx, "PLAN-BORNE-TEST", "# plan-hors-borne", "if False:  # plan-hors-borne", "R-PLAN-BORNE", controle_plan_borne)
     tuer(ctx, "PLAN-LECTURE", "# plan-lecture-bornee", "octets = fh.read()  # plan-lecture-bornee", "R-PLAN-BORNE", controle_plan_borne)
+    tuer(ctx, "PLAN-G2-BORNE", "# g2-plan-borne", 'statut, donnees = lire_frontmatter_fichier(os.path.join(dossier, "PLAN.md"))  # g2-plan-borne',
+         "R-PLAN-BORNE-G2", controle_plan_borne_g2)
+    tuer(ctx, "PLAN-G2-LECTURE", "# lff-lecture-bornee", "octets = fh.read()  # lff-lecture-bornee", "R-PLAN-BORNE-G2", controle_plan_borne_g2)
+    tuer(ctx, "PLAN-G2-HORS-BORNE", "# lff-hors-borne", "if False:  # lff-hors-borne", "R-PLAN-BORNE-G2", controle_plan_borne_g2)
 
 
 def sec_mutants_g4(ctx):

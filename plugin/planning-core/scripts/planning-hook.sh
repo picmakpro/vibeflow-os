@@ -651,15 +651,26 @@ def _lire_liste_indentee(corps, depart):
     return (items, j)
 
 
-def lire_frontmatter_fichier(chemin):
+def lire_frontmatter_fichier(chemin, borne=None):
     """Frontmatter d'un fichier du modèle : fichier régulier seulement (lstat, jamais de suivi de
-    lien), ouverture O_NOFOLLOW, UTF-8 strict."""
+    lien), ouverture O_NOFOLLOW, UTF-8 strict. Sans `borne` (défaut) : lecture du fichier entier. Avec `borne`
+    (A11, complément, fix-46-a) : lecture binaire de `borne` + 1 octets AU PLUS — jamais la taille annoncée, un
+    fichier creux de 2 Gio ne coûte qu'un Mio — ; au-delà de `borne` octets lus, le fichier n'est pas lu et le
+    statut est `invalide:hors-borne` (jamais un contenu partiel) ; sous la borne, décodage UTF-8 strict puis fins
+    de ligne universelles : le même résultat qu'une lecture sans borne."""
     if not est_fichier_regulier(chemin):
         return ("absent", {})
     try:
         descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
-        with os.fdopen(descripteur, "r", encoding="utf-8") as fh:
-            texte = fh.read()
+        if borne is None:
+            with os.fdopen(descripteur, "r", encoding="utf-8") as fh:
+                texte = fh.read()
+        else:
+            with os.fdopen(descripteur, "rb") as fh:
+                octets = fh.read(borne + 1)  # lff-lecture-bornee
+            if len(octets) > borne:  # lff-hors-borne
+                return ("invalide:hors-borne", {})
+            texte = octets.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
     except (OSError, UnicodeDecodeError):
         return ("invalide:illisible", {})
     return lire_frontmatter(texte)
@@ -1027,7 +1038,8 @@ def plans_ouverts(racine):
     """[(chemin relatif du PLAN.md, [entrées ecrit valides])] des plans OUVERTS de forme modèle :
     `.planning/cycles/<cycle>/phases/<phase>/PLAN.md` et `.../phases/<phase>/plans/<plan>/PLAN.md`.
     Ouvert = ni CLOTURE.md ni DEROGATION.md dans son dossier. Un PLAN.md au frontmatter illisible
-    est ignoré (G2 est fail-open, spec §5.1). Parcours trié."""
+    est ignoré (G2 est fail-open, spec §5.1), un PLAN.md de plus de BORNE_LECTURE_PLAN octets aussi (lecture bornée,
+    A11, complément, fix-46-a : jamais plus de BORNE_LECTURE_PLAN + 1 octets lus). Parcours trié."""
     base = os.path.join(racine, ".planning", "cycles")
     res = []
     for cycle in _sous_dossiers(base):
@@ -1040,7 +1052,7 @@ def plans_ouverts(racine):
             for dossier in dossiers:
                 if os.path.lexists(os.path.join(dossier, "CLOTURE.md")) or os.path.lexists(os.path.join(dossier, "DEROGATION.md")):  # g2-clos
                     continue
-                statut, donnees = lire_frontmatter_fichier(os.path.join(dossier, "PLAN.md"))
+                statut, donnees = lire_frontmatter_fichier(os.path.join(dossier, "PLAN.md"), BORNE_LECTURE_PLAN)  # g2-plan-borne
                 if statut != "ok":
                     continue
                 valeurs = _valeurs_ecrit(donnees) or []
