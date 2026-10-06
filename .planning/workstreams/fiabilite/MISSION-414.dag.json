@@ -219,6 +219,44 @@
         ".github/workflows/ci.yml"
       ],
       "status": "done"
+    },
+    {
+      "id": "corr-d",
+      "step": "tour 4 : rebase sur origin/main + correction ciblee D (4 majeurs + mineurs t3)",
+      "stage": "",
+      "deps": [
+        "revue-414"
+      ],
+      "scope": [
+        "plugin/**",
+        "scripts/**",
+        "docs/_transverse/**",
+        ".planning/workstreams/fiabilite/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-t4",
+      "step": "revue deux axes du diff du tour 4",
+      "stage": "",
+      "deps": [
+        "corr-d"
+      ],
+      "scope": [
+        "plugin/**",
+        "scripts/**"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "nonreg-t4",
+      "step": "rejeu job gates + suites de la phase apres tour 4",
+      "stage": "",
+      "deps": [
+        "corr-d"
+      ],
+      "scope": [],
+      "status": "running"
     }
   ]
 }
