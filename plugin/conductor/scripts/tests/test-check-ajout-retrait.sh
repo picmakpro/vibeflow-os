@@ -45,6 +45,9 @@ expect() {  # <libellé> <rc_attendu> <rc> <sortie> [<fragment attendu dans la s
   ok "$1"
 }
 TR='Ajout-Retrait:'
+# POCK-08 : segment « défaillance : » obligatoire sur tout trailer (forme : >= 10 caractères non blancs + date ISO ou SHA).
+DF=' — défaillance : 2026-10-06 étude Pocock §5, ajout justifié sans défaillance citée'
+DFA=' - defaillance : 2026-10-06 etude Pocock §5, ajout justifie sans defaillance citee'
 NEW_GATE='plugin/conductor/scripts/check-new.sh'
 add_gate() { printf '#!/bin/sh\necho new\n' > "$1/$NEW_GATE"; }
 # Contenu sans rapport avec check-old.sh : git ne le lit pas comme un renommage (qui n'est pas un ajout).
@@ -56,13 +59,13 @@ echo "== test-check-ajout-retrait : PASS / FAIL / BRUYANT =="
 D="$(mk_repo a1)"; B="$(base_of "$D")"; add_gate "$D"
 commit_avec "$D" "feat: gate
 
-$TR $NEW_GATE — retire check-old.sh devenu redondant avec lui"
+$TR $NEW_GATE — retire check-old.sh devenu redondant avec lui$DF"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A1 gate ajouté + trailer conforme → rc 0 COUVERT" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
 D="$(mk_repo a1b)"; B="$(base_of "$D")"; add_gate "$D"
 commit_avec "$D" "feat: gate
 
-$TR plugin/conductor/scripts/check-*.sh - aucun : premier gate de ce genre, rien à remplacer"
+$TR plugin/conductor/scripts/check-*.sh - aucun : premier gate de ce genre, rien à remplacer$DFA"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A1b motif glob + séparateur ASCII + « aucun : justification » → rc 0" 0 "$R" "$O" "COUVERT"
 
@@ -75,14 +78,14 @@ expect "A2 sans trailer → --strict rc 1, ajout nommé" 1 "$R" "$O" "AJOUT-NON-
 D="$(mk_repo a3)"; B="$(base_of "$D")"; add_gate "$D"
 commit_avec "$D" "feat: gate
 
-$TR $NEW_GATE — aucun :"
+$TR $NEW_GATE — aucun :$DF"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A3 « aucun : » sans justification → rc 1 + MARQUEUR-MAL-FORME" 1 "$R" "$O" "MARQUEUR-MAL-FORME"
 D="$(mk_repo a3b)"; B="$(base_of "$D")"; add_gate "$D"
 commit_avec "$D" "feat: gate
 
-$TR $NEW_GATE — aucun : court
-$TR $NEW_GATE, autre.sh — retire tout ce qu'il faut retirer ici"
+$TR $NEW_GATE — aucun : court$DF
+$TR $NEW_GATE, autre.sh — retire tout ce qu'il faut retirer ici$DF"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A3b justification < 10 caractères ET motif à virgule → non couvert" 1 "$R" "$O" "AJOUT-NON-COUVERT"
 
@@ -92,7 +95,7 @@ run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A4 titre ## ADR-076 ajouté, sans trailer → rc 1, clé ADR-076" 1 "$R" "$O" "AJOUT-NON-COUVERT: ADR-076"
 git_c "$D" commit -q --allow-empty -m "docs: couverture
 
-$TR ADR-076 — aucun : premier ADR sur ce sujet, rien à remplacer" >/dev/null
+$TR ADR-076 — aucun : premier ADR sur ce sujet, rien à remplacer$DF" >/dev/null
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A4 … puis couvert par son identifiant (commit ultérieur)" 0 "$R" "$O" "AJOUT-COUVERT: ADR-076"
 D="$(mk_repo a4b)"; B="$(base_of "$D")"; sed -i.bak 's/^## ADR-001 : premier/## ADR-001 : premier, reformulé/' "$D/docs/ADR.md"; rm -f "$D/docs/ADR.md.bak"; commit_avec "$D" "docs: reformule"
@@ -130,7 +133,7 @@ expect "A7b --ci : ::warning:: sur l'ajout non couvert" 0 "$R" "$O" "::warning::
 D="$(mk_repo a8)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate nu"
 git_c "$D" commit -q --allow-empty -m "docs: couverture
 
-$TR $NEW_GATE — aucun : ajout couvert après coup par un commit de documentation" >/dev/null
+$TR $NEW_GATE — aucun : ajout couvert après coup par un commit de documentation$DF" >/dev/null
 git_c "$D" commit -q --allow-empty -m "chore: dernier commit sans trailer" >/dev/null
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A8 trailer d'un commit ultérieur (pas le dernier) → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT"
@@ -169,10 +172,19 @@ for motif in '*' 'plugin/*' '*.sh' 'plugin/*/scripts/check-new.sh'; do
   D="$(mk_repo "a11-$(printf '%s' "$motif" | cksum | cut -d' ' -f1)")"; B="$(base_of "$D")"; add_gate "$D"
   commit_avec "$D" "feat: gate
 
-$TR $motif — aucun : motif volontairement trop large pour tout couvrir d'un coup"
+$TR $motif — aucun : motif volontairement trop large pour tout couvrir d'un coup$DF"
   run O R "$SCRIPT" "$D" --strict --base-ref "$B"
   expect "A11 motif « $motif » → refusé, ajout non couvert, rc 1" 1 "$R" "$O" "motif glob trop large"
 done
+
+# A12 (POCK-08, P414-D-04) — sans segment « défaillance : » daté, un trailer ne couvre rien.
+D="$(mk_repo a12)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — retire check-old.sh devenu redondant avec lui"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A12 trailer sans segment « défaillance : » → rc 1, ajout non couvert" 1 "$R" "$O" "AJOUT-NON-COUVERT: $NEW_GATE"
+expect "A12 … et MARQUEUR-MAL-FORME nomme le segment manquant" 1 "$R" "$O" "MARQUEUR-MAL-FORME: $TR $NEW_GATE — retire check-old.sh devenu redondant avec lui  [segment « défaillance : » absent"
 
 D="$(mk_repo vide)"; B="$(base_of "$D")"; printf 'x\n' > "$D/notes.txt"; commit_avec "$D" "docs: notes"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
@@ -200,7 +212,7 @@ mutant() {  # <n> <ancienne> <nouvelle> <fixture> <args…> ; rc attendus : orig
 # MUT-1 (A3) : une justification vide ou courte est acceptée.
 D="$(mk_repo m1)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate
 
-$TR $NEW_GATE — aucun :"
+$TR $NEW_GATE — aucun :$DF"
 mutant 1 '      [ "$ok" -eq 1 ] && [ "$(charcount "$just")" -lt 10 ] && ok=0' '      :' "$D" 1 0 --strict --base-ref "$B"
 # MUT-2 (A4) : les titres ADR sont ignorés.
 D="$(mk_repo m2)"; B="$(base_of "$D")"; printf '## ADR-076 : neuf\n' >> "$D/docs/ADR.md"; commit_avec "$D" "docs: adr"
@@ -212,7 +224,7 @@ mutant 3 '  [ "$STRICT" -eq 1 ] && exit 2' '  :' "$D" 2 0 --strict --base-ref "r
 D="$(mk_repo m4)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate nu"
 git_c "$D" commit -q --allow-empty -m "docs: couverture
 
-$TR $NEW_GATE — aucun : ajout couvert après coup par un commit de documentation" >/dev/null
+$TR $NEW_GATE — aucun : ajout couvert après coup par un commit de documentation$DF" >/dev/null
 git_c "$D" commit -q --allow-empty -m "chore: dernier commit sans trailer" >/dev/null
 mutant 4 'COMMITS_LIST="$(git rev-list "${BASE}..${HEAD_SHA}" 2>/dev/null)"' 'COMMITS_LIST="$(git rev-list -1 "${HEAD_SHA}" 2>/dev/null)"' "$D" 0 1 --strict --base-ref "$B"
 # MUT-5 : le défaut consultatif devient bloquant (rc 1 sans --strict).
@@ -225,7 +237,7 @@ mutant 6 '  ($2 in r) && r[$2] > 0 { r[$2]--; print $0 > cf; next }' '  ($2 in r
 # MUT-7 (A11, m3) : n'importe quel glob est admis.
 D="$(mk_repo m7)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate
 
-$TR * — aucun : motif volontairement trop large pour tout couvrir d'un coup"
+$TR * — aucun : motif volontairement trop large pour tout couvrir d'un coup$DF"
 mutant 7 '  [ "${#lit}" -ge 6 ]' '  true' "$D" 1 0 --strict --base-ref "$B"
 # MUT-8 (A9, m1) : les puces de CLAUDE.md ne sont plus lues.
 D="$(mk_repo m8)"; B="$(base_of "$D")"; printf -- '- Une règle neuve en puce, sans titre.\n' >> "$D/CLAUDE.md"; commit_avec "$D" "docs: puce"

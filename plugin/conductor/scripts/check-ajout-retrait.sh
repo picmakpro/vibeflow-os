@@ -163,6 +163,11 @@ glob_admis() {  # <motif> : un glob ne couvre pas le monde (dernier segment seul
   lit="$(printf '%s' "$last" | tr -d '*?[]')"
   [ "${#lit}" -ge 6 ]
 }
+defaillance_valide() {  # <texte> : >= 10 caractères non blancs ET une date ISO ou un SHA (7 à 40 hexadécimaux) — forme seule, jamais la véracité
+  [ "$(charcount "$1")" -ge 10 ] || return 1
+  printf '%s' "$1" | grep -Eq '(^|[^0-9])[0-9]{4}-[0-9]{2}-[0-9]{2}($|[^0-9])' && return 0
+  printf '%s' "$1" | grep -Eq '(^|[^0-9A-Za-z])[0-9a-f]{7,40}($|[^0-9A-Za-z])'
+}
 COMMITS_LIST="$(git rev-list "${BASE}..${HEAD_SHA}" 2>/dev/null)"
 COMMITS_COUNT="$(printf '%s\n' "$COMMITS_LIST" | awk 'NF { n++ } END { print n + 0 }')"
 MARQ_OK=0
@@ -184,6 +189,19 @@ while IFS= read -r c; do
     motif=""; reste=""; ok=0
     if [ -n "$sep" ]; then
       motif="${value%%"$sep"*}"; reste="${value#*"$sep"}"
+      # POCK-08 (P414-D-04) : segment « défaillance : » en fin de trailer — DERNIÈRE occurrence d'un
+      # séparateur suivi du mot (un retrait peut contenir lui-même ` — `), expansions et `case` seuls.
+      df_avant=""; defaillance=""; df_pos=-1
+      for df_s in ' — ' ' - '; do
+        for df_m in 'défaillance :' 'défaillance:' 'defaillance :' 'defaillance:'; do
+          case "$reste" in
+            *"${df_s}${df_m}"*)
+              df_cand="${reste%"${df_s}${df_m}"*}"
+              if [ "${#df_cand}" -gt "$df_pos" ]; then df_pos="${#df_cand}"; df_avant="$df_cand"; defaillance="${reste##*"${df_s}${df_m}"}"; fi ;;
+          esac
+        done
+      done
+      [ "$df_pos" -ge 0 ] && reste="$df_avant"
       ok=1
       [ -n "$motif" ] || ok=0
       case "$motif" in *,*) ok=0 ;; esac
@@ -194,6 +212,7 @@ while IFS= read -r c; do
       esac
       [ "$ok" -eq 1 ] && [ "$(charcount "$just")" -lt 10 ] && ok=0
       if [ "$ok" -eq 1 ] && ! glob_admis "$motif"; then ok=0; trimmed="$trimmed  [motif glob trop large : admis seulement dans le dernier segment, 6 caractères littéraux au moins]"; fi
+      if ! defaillance_valide "$defaillance"; then ok=0; trimmed="$trimmed  [segment « défaillance : » absent ou sans date ISO ni SHA — POCK-08]"; fi
     fi
     if [ "$ok" -eq 1 ]; then
       MARQ_OK=$((MARQ_OK + 1))
@@ -246,7 +265,7 @@ while IFS="$(printf '\t')" read -r cle genre; do
   if [ "$couvert" -eq 1 ]; then
     echo "AJOUT-COUVERT: ${cle} (${genre})"
   else
-    echo "AJOUT-NON-COUVERT: ${cle} (${genre}) — trailer attendu : Ajout-Retrait: ${cle} — <retrait | aucun : justification>"
+    echo "AJOUT-NON-COUVERT: ${cle} (${genre}) — trailer attendu : Ajout-Retrait: ${cle} — {retrait | aucun : justification} — défaillance : {session, geste ou commit daté}"
     [ "$CI_MODE" -eq 1 ] && echo "::warning::check-ajout-retrait (consultatif) : ${cle} (${genre}) ajouté sans trailer Ajout-Retrait — dire ce qu'on retire, ou pourquoi rien"
     NON_COUVERTS=$((NON_COUVERTS + 1))
   fi
