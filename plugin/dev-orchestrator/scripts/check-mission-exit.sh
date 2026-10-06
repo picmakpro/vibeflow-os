@@ -46,7 +46,13 @@
 #   E2 — l'arbre de travail est propre (`git status --porcelain` capturé en variable, JAMAIS
 #        canalisé dans un compteur de lignes — une sortie vide y devient une ligne sous un hook
 #        de proxy de commandes actif, piège déjà tracé de ce dépôt).
-#   E3 — une branche dédiée existe et sa PR est ouverte.
+#   E3 — une branche dédiée existe, sa PR est ouverte et son corps porte un merge-danger call
+#        conforme (POCK-06 : section « ## Merge-danger call », ligne « Porte : sens unique|double
+#        sens », ligne « Rayon d'explosion : » d'au moins 10 caractères — forme au contrat
+#        `references/mission-contracts.md` §Isolation de branche). Corps absent ou non chaîne :
+#        INDÉTERMINÉ ; section absente ou incomplète : MANQUE nommé. Le corps de PR est une donnée
+#        NON FIABLE : extrait par jq, analysé par awk sur stdin, comparé à une énumération fermée,
+#        messages fixes — aucune interpolation, aucune évaluation dynamique de chaîne, aucun écho.
 #   E4 — la feuille de route et le fichier d'état portent la marque du travail, pour chaque
 #        étape déclarée en argument.
 #   E5 — le rapport détaillé de mission est présent et lisible sur disque.
@@ -295,8 +301,24 @@ else
 fi
 # <<< E2
 
+# e3_merge_danger — analyse du corps de PR LU SUR L'ENTRÉE STANDARD (POCK-06). N'imprime rien. Rend
+# 0 conforme · 1 section « ## Merge-danger call » absente · 2 ligne « Porte : » absente, hors
+# énumération fermée (sens unique | double sens), répétée ou contradictoire · 3 rayon d'explosion
+# de moins de 10 caractères non blancs. Section = du titre exact (blancs de fin tolérés) au titre
+# « ## » suivant ou à la fin du corps. L'apostrophe droite s'écrit en octal (\047) : le programme
+# awk vit entre apostrophes ; l'apostrophe typographique est admise en alternative.
+e3_merge_danger() {
+  awk '
+    BEGIN { found = 0; insec = 0; ptot = 0; pval = 0; rayon = 0 }
+    /^## / { if ($0 ~ /^## Merge-danger call[ \t]*$/ && !found) { found = 1; insec = 1 } else { insec = 0 }; next }
+    insec && /^Porte ?:/ { ptot++; if ($0 ~ /^Porte ?:[ \t]*(sens unique|double sens)[ \t]*$/) pval++ }
+    insec && /^Rayon d(\047|’)explosion ?:/ { v = $0; sub(/^[^:]*:/, "", v); gsub(/[ \t]/, "", v); if (length(v) >= 10) rayon = 1 }
+    END { if (!found) exit 1; if (ptot != 1 || pval != 1) exit 2; if (!rayon) exit 3; exit 0 }
+  '
+}
+
 # >>> E3
-# E3 — branche dédiée et PR ouverte.
+# E3 — branche dédiée, PR ouverte et merge-danger call conforme (POCK-06).
 E3_CURRENT="$(git_safe symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 if [ -z "$E3_CURRENT" ]; then
   E3_STATUS="indet"
@@ -325,14 +347,30 @@ else
       E3_STATUS="indet"
       E3_MSG="[E3] client GitHub non authentifié — état de la PR invérifiable"
     else
-      E3_PR_JSON="$(cd "$ROOT" && gh pr view --json state 2>/dev/null)"
+      E3_PR_JSON="$(cd "$ROOT" && gh pr view --json state,body 2>/dev/null)"
       E3_PR_RC=$?
       E3_PR_STATE="$(printf '%s' "$E3_PR_JSON" | jq -r '.state // empty' 2>/dev/null)"
       if [ "$E3_PR_RC" -ne 0 ] || [ -z "$E3_PR_STATE" ]; then
         E3_STATUS="indet"
         E3_MSG="[E3] aucune PR lisible pour la branche courante ($E3_CURRENT)"
       elif [ "$E3_PR_STATE" = "OPEN" ]; then
-        E3_STATUS="sain"
+        # Merge-danger call (POCK-06). Corps = donnée NON FIABLE : type testé (jamais un vert par défaut
+        # sur une clé absente), extraction par jq, analyse sur stdin, énumération fermée, messages fixes.
+        E3_BODY_TYPE="$(printf '%s' "$E3_PR_JSON" | jq -r '.body | type' 2>/dev/null)"
+        if [ "$E3_BODY_TYPE" != "string" ]; then
+          E3_STATUS="indet"
+          E3_MSG="[E3] corps de PR illisible (clé body absente ou non chaîne) — merge-danger call invérifiable"
+        else
+          E3_BODY="$(printf '%s' "$E3_PR_JSON" | jq -r '.body' 2>/dev/null | tr -d '\r')"
+          printf '%s\n' "$E3_BODY" | e3_merge_danger; E3_MD_RC=$?
+          case "$E3_MD_RC" in
+            0) E3_STATUS="sain" ;;
+            1) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : section « ## Merge-danger call » absente" ;;
+            2) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : ligne « Porte : sens unique|double sens » absente ou invalide" ;;
+            3) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : rayon d'explosion de moins de 10 caractères" ;;
+            *) E3_STATUS="indet"; E3_MSG="[E3] analyse du merge-danger call impossible (outil d'analyse en échec) — invérifiable" ;;
+          esac
+        fi
       else
         E3_STATUS="manque"
         E3_MSG="[E3] PR de la branche courante en état $E3_PR_STATE (attendu OPEN)"

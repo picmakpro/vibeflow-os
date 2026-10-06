@@ -4,7 +4,8 @@
 # Un cas par comportement du contrat (cf. en-tête du script testé), plus les six mutations de
 # fixture (une par contrôle E1-E6) et deux mutations structurelles (D-11, cascade E1). Cas 28-43 :
 # contrôle E7 (SOBR-07, plan 41.3-04, delta depuis le snapshot de début de mission), huit mutants de script
-# tués (rc attendu/obtenu). Fixtures
+# tués (rc attendu/obtenu). Cas 44-49 (POCK-06, plan 41.4-06) : E3 lit le merge-danger call du corps de PR
+# (SAIN 1/44, MANQUE 45-47/49, INDÉTERMINÉ 48, corps hostile 48b) ; mutants E3a/E3b tués. Fixtures
 # isolées via mktemp -d + git init + dépôt nu, jamais sur le repo réel. Chaque cas capture la
 # sortie ET le code de retour dans deux variables distinctes, assertées séparément.
 # Cas 23-27 (issue #82) : E1 lit aussi `children_running` du registre des agents dispatchés
@@ -39,7 +40,7 @@ mkdir -p "$GH_OK_BIN"
 cat > "$GH_OK_BIN/gh" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = "auth" ] && [ "$2" = "status" ]; then exit 0; fi
-if [ "$1" = "pr" ] && [ "$2" = "view" ]; then echo '{"state":"OPEN"}'; exit 0; fi
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then echo '{"state":"OPEN","body":"## Merge-danger call\nPorte : double sens\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}'; exit 0; fi
 exit 1
 EOF
 chmod +x "$GH_OK_BIN/gh"
@@ -53,10 +54,30 @@ if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
   echo "error: not logged in. run gh auth login" >&2
   exit 1
 fi
-if [ "$1" = "pr" ] && [ "$2" = "view" ]; then echo '{"state":"OPEN"}'; exit 0; fi
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then echo '{"state":"OPEN","body":"## Merge-danger call\nPorte : double sens\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}'; exit 0; fi
 exit 1
 EOF
 chmod +x "$GH_NOAUTH_BIN/gh"
+
+# --- Talons `gh` à corps de PR (POCK-06, E3) : même forme que GH_OK_BIN, le JSON rendu par `pr view` est ----
+# --- écrit tel quel dans pr.json (apostrophe du rayon d'explosion : quotée '\'' côté shell). --------------
+mk_gh_pr() { # <nom> <JSON brut rendu par `gh pr view`> -> imprime le dossier du talon
+  local d="$TMP/bin-gh-$1"; mkdir -p "$d"
+  printf '%s\n' "$2" > "$d/pr.json"
+  cat > "$d/gh" <<'GHEOF'
+#!/usr/bin/env bash
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then exit 0; fi
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then cat "$(dirname "$0")/pr.json"; exit 0; fi
+exit 1
+GHEOF
+  chmod +x "$d/gh"; printf '%s' "$d"
+}
+GH_CRLF_BIN="$(mk_gh_pr crlf '{"state":"OPEN","body":"## Merge-danger call\r\nPorte : double sens\r\nRayon d'\''explosion : doctrine seule, aucune donnée écrite\r\n"}')"
+GH_NOSECTION_BIN="$(mk_gh_pr nosection '{"state":"OPEN","body":"## Résumé\nUne mission sans appel de merge.\n"}')"
+GH_BADPORTE_BIN="$(mk_gh_pr badporte '{"state":"OPEN","body":"## Merge-danger call\nPorte : peut-être\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}')"
+GH_SHORTRAYON_BIN="$(mk_gh_pr shortrayon '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : tout"}')"
+GH_NOBODY_BIN="$(mk_gh_pr nobody '{"state":"OPEN"}')"
+GH_EMPTYBODY_BIN="$(mk_gh_pr emptybody '{"state":"OPEN","body":""}')"
 
 # --- Talons de verrou de driver (dag.sh sentinelle + driver-lock.sh) --------------------------------
 write_lock_stub_absent() { # <dir>
@@ -394,6 +415,44 @@ named=0; case "$err" in *"registre des agents non exposé"*) named=1 ;; esac
 if [ "$rc" -eq 3 ] && [ "$named" -eq 1 ]; then ok "27 E1 registre : champ absent (kernel antérieur), code 3, non-applicabilité dite sur stderr"
 else ko "27 E1 registre : champ absent (kernel antérieur), code 3, non-applicabilité dite sur stderr" "rc=$rc err=[$err]"; fi
 
+# === Cas 44-49 — E3 : le corps de PR porte un merge-danger call conforme (POCK-06, plan 41.4-06) ==========
+# Trois issues : SAIN (cas 1, 44), MANQUE nommé (45, 46, 47, 49), INDÉTERMINÉ (48). Le rc de précédence 64 > 4 > 0 > 3 est inchangé (cas 11).
+D="$(mk_sane_fixture c44)"
+out="$(PATH="$GH_CRLF_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "44 E3 corps conforme en CRLF — code 3, stdout vide (SAIN)"; else ko "44 E3 corps CRLF" "rc=$rc out=[$out]"; fi
+# 44a — apostrophe typographique dans « Rayon d’explosion » et espace avant les deux-points absente : conforme (T-41.4-20).
+GH_TYPO_BIN="$(mk_gh_pr typo '{"state":"OPEN","body":"Résumé\n\n## Merge-danger call  \nPorte: sens unique\nRayon d’explosion: les lecteurs du gate de sortie\n\n## Suite\nrien\n"}')"
+D="$(mk_sane_fixture c44a)"
+out="$(PATH="$GH_TYPO_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "44a E3 apostrophe typographique, deux-points collés, blancs de fin de titre — code 3 (SAIN)"; else ko "44a E3 forme tolérée" "rc=$rc out=[$out]"; fi
+e3_case() { # <n> <libellé> <talon> <rc attendu> <fragment attendu dans la sortie, ou vide> <fragment interdit>
+  local d out rc named=1 leak=0
+  d="$(mk_sane_fixture "c$1")"
+  out="$(PATH="$3:$PATH" run_gate --root "$d" --report "$REPORT_REL" --step "$STEP" 2>&1)"; rc=$?
+  if [ -n "$5" ]; then case "$out" in *"$5"*) named=1 ;; *) named=0 ;; esac; fi
+  if [ -n "$6" ]; then case "$out" in *"$6"*) leak=1 ;; esac; fi
+  if [ "$rc" -eq 3 ]; then ko "$1 $2 — mutant NON OPPOSABLE" "rc=3 identique au sain"
+  elif [ "$rc" -eq "$4" ] && [ "$named" -eq 1 ] && [ "$leak" -eq 0 ]; then ok "$1 $2 — code $4"
+  else ko "$1 $2" "rc=$rc attendu $4 nommé=$named fuite=$leak out=[$out]"; fi
+}
+e3_case 45 "E3 corps sans section — MANQUE nommé" "$GH_NOSECTION_BIN" 0 "[E3] PR ouverte sans merge-danger call conforme" ""
+e3_case 45a "E3 corps sans section — le titre manquant est dit" "$GH_NOSECTION_BIN" 0 "Merge-danger call" ""
+e3_case 46 "E3 « Porte : peut-être » (hors énumération) — MANQUE nommé" "$GH_BADPORTE_BIN" 0 "[E3] PR ouverte sans merge-danger call conforme" "peut-être"
+e3_case 47 "E3 rayon d'explosion de 4 caractères — MANQUE nommé" "$GH_SHORTRAYON_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_case 48 "E3 JSON sans clé body — INDÉTERMINÉ, jamais un vert" "$GH_NOBODY_BIN" 4 "" ""
+e3_case 49 "E3 corps vide — MANQUE (lisible, section absente), distinct de 48" "$GH_EMPTYBODY_BIN" 0 "[E3] PR ouverte sans merge-danger call conforme" ""
+# 48a — l'indétermination est dite sur stderr, avec sa cause (corps illisible), distincte du manque du cas 49.
+D="$(mk_sane_fixture c48a)"
+err="$(PATH="$GH_NOBODY_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>&1 1>/dev/null)"
+case "$err" in *"[E3] corps de PR illisible"*) named=1 ;; *) named=0 ;; esac
+if [ "$named" -eq 1 ]; then ok "48a E3 corps illisible — cause nommée sur stderr"; else ko "48a E3 corps illisible" "err=[$err]"; fi
+# 48b — le corps n'est jamais réémis : un corps hostile (faux titre, substitution, séquence de contrôle) ne fuit pas dans la sortie.
+GH_HOSTILE_BIN="$(mk_gh_pr hostile '{"state":"OPEN","body":"## Merge-danger call\nPorte : $(touch '"$TMP"'/e3-pwned-48b) `id`\nRayon d'\''explosion : \u001b[31mHOSTILE-MARKER\n"}')"
+D="$(mk_sane_fixture c48b)"
+out="$(PATH="$GH_HOSTILE_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>&1)"; rc=$?
+leak=0; case "$out" in *HOSTILE-MARKER*|*"touch"*|*"uid="*) leak=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$leak" -eq 0 ] && [ ! -e "$TMP/e3-pwned-48b" ]; then ok "48b E3 corps hostile — MANQUE, rien du corps réémis, aucune exécution"; else ko "48b E3 corps hostile" "rc=$rc leak=$leak out=[$out]"; fi
+
 # === Cas 28-36 — E7 : rien de rangeable n'est laissé (SOBR-07, plan 41.3-04) ==============================
 CONDUCTOR_REAL="$(cd "$(dirname "$SCRIPT")/../../conductor" && pwd)"
 mk_inst() { # <script à installer> <real|none|stub:<corps>> -> imprime le chemin de la copie (lab « installé » jetable)
@@ -556,6 +615,16 @@ e7_mutant "E7k (snapshot pris sans --dry-run : un refus préexistant est imputé
 e7_mutant "E7l (snapshot sans identité accepté)" '  if [ -z "$E7_SGEN" ]; then' '  if false; then' sc_l 4 3
 e7_mutant "E7i (ARCHIVAGE NON TENTÉ redevenu silence)" '  if [ -n "$E7_NONTENTE" ]; then' '  if false; then' sc_i 4 3
 e7_mutant "E7f (--auto retiré)" '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?' '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict 2>/dev/null)"; E7_RC=$?' sc_f 3 0
+# Mutants E3 (POCK-06) : le scénario installe la copie (mk_inst real, sinon E7 ne résout pas check-method-budget.sh
+# depuis le dossier temporaire et le code serait 4 pour une raison étrangère) et l'exécute avec le talon `gh` voulu.
+sc_e3() { # <script> <nom de fixture> <dossier du talon gh> -> rc du gate
+  local d g; d="$(mk_sane_fixture "$2")"; g="$(mk_inst "$1" real)"
+  ( HOME="$EMPTY_HOME"; export HOME; unset CLAUDE_PLUGIN_ROOT GSD_WORKSTREAM 2>/dev/null; PATH="$3:$PATH" bash "$g" --root "$d" --report "$REPORT_REL" --step "$STEP" >/dev/null 2>&1 ); return $?
+}
+sc_e3a() { sc_e3 "$1" "$2" "$GH_NOSECTION_BIN"; }
+sc_e3b() { sc_e3 "$1" "$2" "$GH_NOBODY_BIN"; }
+e7_mutant "E3a (section absente lue saine)" '            1) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : section « ## Merge-danger call » absente" ;;' '            1) E3_STATUS="sain" ;;' sc_e3a 0 3
+e7_mutant "E3b (type du corps non testé : clé body absente lue comme corps)" '        if [ "$E3_BODY_TYPE" != "string" ]; then' '        if false; then' sc_e3b 4 0
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
