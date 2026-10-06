@@ -1,33 +1,20 @@
-# Relevé du rejeu réel de l'étape 6 (46-12, Tâche 2) — mesure seule
+# Relevé du rejeu réel de l'étape 6 (46-12, Tâche 2) — mesure seule, rejoué après les attendus G7
 
-- Date : 2026-10-06 (rejeu lancé à 19:01:58, terminé à 19:08:15 heure locale du poste).
-- COMMIT-REJOUE : 0f9db46e22265fac46603c238406713db7137e05 (HEAD de la branche gouvernance/phase-46-execution au moment du rejeu ; code et constantes `ARMEMENT_*` inchangés).
-- Commande : `bash plugin/planning-core/scripts/rejeu-reel.sh --lab=~/jarvis-keystone --lab=~/BusinessFlow-Lab --etape=6 --attendus=<46-REJEU-ATTENDUS.txt> --rapport=<ce fichier>` ; code de sortie 0 ; lecture seule sur copies des deux labs (empreintes identiques avant/après, voir plus bas).
+- Date : 2026-10-06 (rejeu lancé à 20:55:30, terminé à 21:03:29 heure locale du poste). Il remplace le relevé de 19:01:58 (même étape, attendus G7 absents) ; l'historique reste dans git.
+- COMMIT-REJOUE : 3f02ed37e8d68e007d4f10c3e34acfbbf852e13c (HEAD de la branche gouvernance/phase-46-execution au moment du rejeu, avant la réécriture des messages de commit du lot fix-46-c ; arbre `plugin/` = 488a9463782979d73dfac1e65b73bc3b46e5bef9, inchangé par cette réécriture). Code livré : constantes `ARMEMENT_*` inchangées.
+- Commande : `bash plugin/planning-core/scripts/rejeu-reel.sh --lab=~/jarvis-keystone --lab=~/BusinessFlow-Lab --etape=6 --attendus=<46-REJEU-ATTENDUS.txt> --rapport=<ce fichier>`, lancée par le script de garde (aucun processus avec son répertoire courant sous les deux labs) ; code de sortie 0 ; lecture seule sur copies des deux labs.
+- Attendus : 46-REJEU-ATTENDUS.txt porte désormais les 10 lignes G7 de 45-REJEU-ATTENDUS.txt (arbitrage Willy, AskUserQuestion session principale, 2026-10-06, Q-G7 « (a) Recopier les 10 lignes » ; origine : arbitrage Willy, AskUserQuestion session principale, 2026-09-29, ed117c7e). G7 (code) non touché.
 - Décisions citées (toutes : arbitrage Willy, AskUserQuestion session principale, 2026-10-06) :
   - ckpt-46-11 « rejeu-5-6-oui » : rejeu réel en lecture seule des étapes 5 et 6 sur copies des deux labs ;
   - ckpt-46-12 « etape-6-mesure » : mesure agent par agent, G4′ reste en observation ;
   - étape 5 « (c) Armer G3 seul » : G3 armé, G4 en observation ;
-  - arrêt de la session active du lab BusinessFlow : « tu peux la fermer ».
+  - Q-G7 « (a) Recopier les 10 lignes » (ci-dessus).
 - État livré : G6, G5, G1, G7, ROLE et G3 armés ; G4 et G4P en observation. Aucun armement n'est fait par ce rejeu.
-- Contrôles de repos (garde dure, script du scratchpad, comptage des processus dont le répertoire courant est sous ~/jarvis-keystone ou ~/BusinessFlow-Lab) : AVANT = 0 (19:01:58) ; APRÈS = 0 (19:08:15).
-- Processus arrêtés avant le rejeu (périmètre : cwd dans ~/BusinessFlow-Lab ; aucun ancêtre du shell de la mission concerné ; le zsh 94251 était un panneau tmux interactif dans le lab, le serveur tmux parent 64647 n'a PAS été touché) :
-
-| PID | Commande (anonymisée) | Signal | Résultat |
-|---|---|---|---|
-| 97668 | `~/.cache/uv/archive-v0/<hash>/bin/python …/nanobanana-mcp-server` | SIGTERM | terminé |
-| 96318 | `node ~/.npm/_npx/<hash>/node_modules/.bin/mcp-image` | SIGTERM | terminé |
-| 96296 | `node ~/.npm/_npx/<hash>/node_modules/.bin/context7-mcp` | SIGTERM | terminé |
-| 95987 | `npm exec @upstash/context7-mcp@latest` | SIGTERM | terminé |
-| 95994 | `npm exec mcp-image` | SIGTERM | terminé |
-| 96269 | `/opt/homebrew/bin/uv tool uvx nanobanana-mcp-server@latest` | SIGTERM | terminé |
-| 94899 | `claude --agent strategist --dangerously-skip-permissions --remote-control` | SIGTERM | terminé |
-| 94251 | `-zsh` (interactif, panneau tmux) | SIGTERM puis SIGKILL | a survécu 60 s au SIGTERM (un zsh interactif l'ignore) ; SIGKILL, terminé |
-
-  Après le SIGKILL : relevé = 0, puis 0 encore 5 s plus tard. Aucun processus n'est réapparu.
+- Contrôles de repos (garde dure : comptage des processus dont le répertoire courant est sous ~/jarvis-keystone ou ~/BusinessFlow-Lab) : AVANT = 0 (20:55:30) ; APRÈS = 0 (21:03:29). Aucun processus n'a été arrêté pour ce rejeu.
 
 ## Non armé — mesure seule (etape-6-mesure)
 
-Ce rejeu ne modifie aucune constante `ARMEMENT_*` et n'arme rien : G4 et G4P restent en observation, la décision d'armer G4′ relève d'un arbitrage séparé de Willy. Le rejeu `--etape=6` arme en simulation G3, G4 et G4P pour mesurer ; le total REJEU-ETAPE-6 mêle donc G4 et G7 et ne se lit pas comme un total unique.
+Ce rejeu ne modifie aucune constante `ARMEMENT_*` et n'arme rien : G4 et G4P restent en observation, la décision d'armer G4′ relève d'un arbitrage séparé de Willy. Le rejeu `--etape=6` arme en simulation G3, G4 et G4P pour mesurer ; le total REJEU-ETAPE-6 compte G4 (343 faux refus, limite (bp)) et ne se lit pas comme une mesure de G4′ : aucun faux refus G7 ni G4P n'y figure.
 
 ## Synthèse G4P-AGENT (agent par agent)
 
@@ -62,11 +49,11 @@ Cumul G4P : 96 cas (28 ~/jarvis-keystone, 68 ~/BusinessFlow-Lab) ; 66 passent co
 
 ## Lecture par gate
 
-- **G4P (objet de la mesure)** : 0 faux refus, 0 faux accept sur 24 agents (7 dans ~/jarvis-keystone, 17 dans ~/BusinessFlow-Lab). Les 15 agents « producteur » avec Bash et le rapport sans sortie de commande brute sont refusés ; les rapports avec sortie sont acceptés ; `contracts` (rôle illisible) et `sales` (sans Bash) passent dans tous les cas, conformément aux attendus. Aucun attendu ajouté.
-- **G4 (343 faux refus)** : unités closes avant G4, limite (bp) déjà connue ; ce total n'est pas imputable à G4P et reste renvoyé à cette limite.
-- **G7 (6 faux refus)** : attendus de la 45 non chargés dans ce rejeu, constat rendu, décision de Willy en cours ; renvoyé à ce constat.
+- **G4P (objet de la mesure)** : 0 faux refus, 0 faux accept sur 24 agents (7 dans ~/jarvis-keystone, 17 dans ~/BusinessFlow-Lab), 96 cas (`COUVERTURE-REJEU G4P n=96 plancher=8`) ; relevé agent par agent identique à celui de 19:01:58. Les 15 agents « producteur » avec Bash et le rapport sans sortie de commande brute sont refusés ; les rapports avec sortie sont acceptés ; `contracts` (rôle illisible) et `sales` (sans Bash) passent dans tous les cas, conformément aux attendus. Aucun attendu ajouté.
+- **G4 (343 faux refus)** : unités closes avant G4, limite (bp) déjà connue ; ce total n'est pas imputable à G4P et reste renvoyé à cette limite (G4 reste en observation). Inchangé.
+- **G7 (0 faux refus, 6 refus conformes au modèle)** : avec les 10 lignes de la 45 chargées, les 6 refus de G7 (`00-doctrine` de ~/jarvis-keystone ; `projects/avma`, `projects/dmflow`, `projects/lead-recovery`, `projects/formation` et `ProjetFlow-FROZEN-A1` de ~/BusinessFlow-Lab) sont `doit-refuser-modele`, comptés à part : `COMPTE G7 faux-refus=0 faux-accept=0 refus-conforme-modele=6` (relevé de 19:01:58 : faux-refus=6, attendus G7 non chargés).
 - **G6, G5, ROLE, G3** : 0 faux refus, 0 faux accept. **G1** : 0 faux refus, 0 faux accept, 196 refus conformes au modèle (comptés à part).
-- Total `REJEU-ETAPE-6 faux-refus=349 faux-accept=0 refus-conforme-modele=196` = 343 (G4) + 6 (G7) ; il ne contient aucun faux refus G4P.
+- Total `REJEU-ETAPE-6 faux-refus=343 faux-accept=0 refus-conforme-modele=202` = 343 (G4) ; 202 = 196 (G1) + 6 (G7) ; il ne contient aucun faux refus G4P ni G7.
 - Empreintes : `EMPREINTE-IDENTIQUE` et `EMPREINTE-ARBRE-IDENTIQUE` pour les deux labs (aucune écriture dans les labs).
 
 ## Sortie brute du rejeu
@@ -1831,9 +1818,9 @@ G3 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/69-reel-21-too
 G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/71-g4-conforme-fichier/SUMMARY.md | doit-passer | passe | passe
 G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/72-g4-conforme-dossier/SUMMARY.md | doit-passer | passe | passe
 G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/73-g4-verdict-absent/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : aucun VERDICT.md : faites juger l'unité (poser-verdict.sh)
-G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/74-g4-echec/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : constat en échec : rejeu — corrigez puis re-jugez (tentative 2)
-G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/75-g4-perime-plan/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : verdict périmé : re-juger (tentative 2)
-G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/76-g4-perime-livrable/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : verdict périmé : re-juger (tentative 2)
+G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/74-g4-echec/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : constat en échec : rejeu — corrigez puis re-jugez (tentative 2 sur 3, 1 restante(s) après elle)
+G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/75-g4-perime-plan/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : verdict périmé : re-juger (tentative 2 sur 3, 1 restante(s) après elle)
+G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/76-g4-perime-livrable/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : verdict périmé : re-juger (tentative 2 sur 3, 1 restante(s) après elle)
 G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/77-g4-verdict-invalide/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : VERDICT.md invalide (règle R6)
 G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/79-reel-02-10-pilotage/SUMMARY.md | doit-passer | passe | passe
 G4 | ~/jarvis-keystone | .planning/cycles/99-rejeu-cloture/phases/79-reel-04-30-captation/SUMMARY.md | doit-passer | passe | passe
@@ -2363,7 +2350,7 @@ G6 | ~/jarvis-keystone | 00-doctrine/.planning/INDEX.md | doit-refuser | refus |
 G6 | ~/jarvis-keystone | 00-doctrine/.planning/STATE.md | doit-refuser | refus | [planning-core] G6 : STATE.md est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/jarvis-keystone | 00-doctrine/.planning/cloture.log | doit-refuser | refus | [planning-core] G6 : cloture.log est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/jarvis-keystone | 00-doctrine/.planning/config.json | doit-passer | passe | passe
-G7 | ~/jarvis-keystone | 00-doctrine/.planning/config.json [création] | doit-passer | refus | [planning-core] G7 : créer un .planning/ dans 00-doctrine exige un .claude/ habité (au moins un agent et une mémoire) ou un marqueur de projet de code — sinon ce planning serait orphelin (spec D-05)
+G7 | ~/jarvis-keystone | 00-doctrine/.planning/config.json [création] | doit-refuser-modele | refus | refus conforme au modèle, lab non migré
 - | ~/jarvis-keystone | 00-doctrine/.planning/cycles/01-socle-exploitable/ROADMAP.md | doit-passer | passe | passe
 - | ~/jarvis-keystone | 00-doctrine/.planning/cycles/01-socle-exploitable/phases/01-le-depot-s-ouvre-et-son-controle-dit-vrai/CADRAGE.md | doit-passer | passe | passe
 - | ~/jarvis-keystone | 00-doctrine/.planning/cycles/01-socle-exploitable/phases/01-le-depot-s-ouvre-et-son-controle-dit-vrai/MANDAT-EXECUTION.md | doit-passer | passe | passe
@@ -4536,9 +4523,9 @@ G3 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/69-reel-17-ww
 G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/71-g4-conforme-fichier/SUMMARY.md | doit-passer | passe | passe
 G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/72-g4-conforme-dossier/SUMMARY.md | doit-passer | passe | passe
 G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/73-g4-verdict-absent/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : aucun VERDICT.md : faites juger l'unité (poser-verdict.sh)
-G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/74-g4-echec/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : constat en échec : rejeu — corrigez puis re-jugez (tentative 2)
-G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/75-g4-perime-plan/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : verdict périmé : re-juger (tentative 2)
-G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/76-g4-perime-livrable/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : verdict périmé : re-juger (tentative 2)
+G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/74-g4-echec/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : constat en échec : rejeu — corrigez puis re-jugez (tentative 2 sur 3, 1 restante(s) après elle)
+G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/75-g4-perime-plan/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : verdict périmé : re-juger (tentative 2 sur 3, 1 restante(s) après elle)
+G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/76-g4-perime-livrable/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : verdict périmé : re-juger (tentative 2 sur 3, 1 restante(s) après elle)
 G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/77-g4-verdict-invalide/SUMMARY.md | doit-refuser | refus | [planning-core] G4 : VERDICT.md invalide (règle R6)
 G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/79-reel-01---png/SUMMARY.md | doit-passer | passe | passe
 G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/79-reel-02-CLAUDE.md/SUMMARY.md | doit-passer | passe | passe
@@ -4562,7 +4549,7 @@ G6 | ~/BusinessFlow-Lab | projects/avma/.planning/INDEX.md | doit-refuser | refu
 G6 | ~/BusinessFlow-Lab | projects/avma/.planning/STATE.md | doit-refuser | refus | [planning-core] G6 : STATE.md est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/avma/.planning/cloture.log | doit-refuser | refus | [planning-core] G6 : cloture.log est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/avma/.planning/config.json | doit-passer | passe | passe
-G7 | ~/BusinessFlow-Lab | projects/avma/.planning/config.json [création] | doit-passer | refus | [planning-core] G7 : créer un .planning/ dans projects/avma exige un .claude/ habité (au moins un agent et une mémoire) ou un marqueur de projet de code — sinon ce planning serait orphelin (spec D-05)
+G7 | ~/BusinessFlow-Lab | projects/avma/.planning/config.json [création] | doit-refuser-modele | refus | refus conforme au modèle, lab non migré
 G1 | ~/BusinessFlow-Lab | projects/avma/.planning/cycles/99-rejeu/phases/99-rejeu-registre-ouvert/PLAN.md | doit-refuser | refus | [planning-core] G1 : le registre de CADRAGE.md de la phase 99-rejeu-registre-ouvert porte des lignes structurantes sans statut (I-99) — tranchez-les avant de planifier (spec §5)
 G1 | ~/BusinessFlow-Lab | projects/avma/.planning/cycles/99-rejeu/phases/99-rejeu-sans-cadrage/PLAN.md | doit-refuser | refus | [planning-core] G1 : la phase 99-rejeu-sans-cadrage n'a pas de CADRAGE.md — cadrez avant de planifier (spec §5)
 G6 | ~/BusinessFlow-Lab | projects/avma/.planning/derogations-gates.log | doit-refuser | refus | [planning-core] G6 : derogations-gates.log est un fichier inscrit par deroger-gate.sh — l'écriture par outil est refusée ; inscrivez la dérogation par deroger-gate.sh
@@ -4573,7 +4560,7 @@ G6 | ~/BusinessFlow-Lab | projects/dmflow/.planning/INDEX.md | doit-refuser | re
 G6 | ~/BusinessFlow-Lab | projects/dmflow/.planning/STATE.md | doit-refuser | refus | [planning-core] G6 : STATE.md est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/dmflow/.planning/cloture.log | doit-refuser | refus | [planning-core] G6 : cloture.log est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/dmflow/.planning/config.json | doit-passer | passe | passe
-G7 | ~/BusinessFlow-Lab | projects/dmflow/.planning/config.json [création] | doit-passer | refus | [planning-core] G7 : créer un .planning/ dans projects/dmflow exige un .claude/ habité (au moins un agent et une mémoire) ou un marqueur de projet de code — sinon ce planning serait orphelin (spec D-05)
+G7 | ~/BusinessFlow-Lab | projects/dmflow/.planning/config.json [création] | doit-refuser-modele | refus | refus conforme au modèle, lab non migré
 G1 | ~/BusinessFlow-Lab | projects/dmflow/.planning/cycles/99-rejeu/phases/99-rejeu-registre-ouvert/PLAN.md | doit-refuser | refus | [planning-core] G1 : le registre de CADRAGE.md de la phase 99-rejeu-registre-ouvert porte des lignes structurantes sans statut (I-99) — tranchez-les avant de planifier (spec §5)
 G1 | ~/BusinessFlow-Lab | projects/dmflow/.planning/cycles/99-rejeu/phases/99-rejeu-sans-cadrage/PLAN.md | doit-refuser | refus | [planning-core] G1 : la phase 99-rejeu-sans-cadrage n'a pas de CADRAGE.md — cadrez avant de planifier (spec §5)
 G6 | ~/BusinessFlow-Lab | projects/dmflow/.planning/derogations-gates.log | doit-refuser | refus | [planning-core] G6 : derogations-gates.log est un fichier inscrit par deroger-gate.sh — l'écriture par outil est refusée ; inscrivez la dérogation par deroger-gate.sh
@@ -4584,7 +4571,7 @@ G6 | ~/BusinessFlow-Lab | projects/formation/.planning/INDEX.md | doit-refuser |
 G6 | ~/BusinessFlow-Lab | projects/formation/.planning/STATE.md | doit-refuser | refus | [planning-core] G6 : STATE.md est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/formation/.planning/cloture.log | doit-refuser | refus | [planning-core] G6 : cloture.log est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/formation/.planning/config.json | doit-passer | passe | passe
-G7 | ~/BusinessFlow-Lab | projects/formation/.planning/config.json [création] | doit-passer | refus | [planning-core] G7 : créer un .planning/ dans projects/formation exige un .claude/ habité (au moins un agent et une mémoire) ou un marqueur de projet de code — sinon ce planning serait orphelin (spec D-05)
+G7 | ~/BusinessFlow-Lab | projects/formation/.planning/config.json [création] | doit-refuser-modele | refus | refus conforme au modèle, lab non migré
 G1 | ~/BusinessFlow-Lab | projects/formation/.planning/cycles/99-rejeu/phases/99-rejeu-registre-ouvert/PLAN.md | doit-refuser | refus | [planning-core] G1 : le registre de CADRAGE.md de la phase 99-rejeu-registre-ouvert porte des lignes structurantes sans statut (I-99) — tranchez-les avant de planifier (spec §5)
 G1 | ~/BusinessFlow-Lab | projects/formation/.planning/cycles/99-rejeu/phases/99-rejeu-sans-cadrage/PLAN.md | doit-refuser | refus | [planning-core] G1 : la phase 99-rejeu-sans-cadrage n'a pas de CADRAGE.md — cadrez avant de planifier (spec §5)
 G6 | ~/BusinessFlow-Lab | projects/formation/.planning/derogations-gates.log | doit-refuser | refus | [planning-core] G6 : derogations-gates.log est un fichier inscrit par deroger-gate.sh — l'écriture par outil est refusée ; inscrivez la dérogation par deroger-gate.sh
@@ -4613,7 +4600,7 @@ G6 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZE
 G6 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1/.planning/STATE.md | doit-refuser | refus | [planning-core] G6 : STATE.md est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1/.planning/cloture.log | doit-refuser | refus | [planning-core] G6 : cloture.log est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1/.planning/config.json | doit-passer | passe | passe
-G7 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1/.planning/config.json [création] | doit-passer | refus | [planning-core] G7 : créer un .planning/ dans projetflow-staging/ProjetFlow-FROZEN-A1 exige un .claude/ habité (au moins un agent et une mémoire) ou un marqueur de projet de code — sinon ce planning serait orphelin (spec D-05)
+G7 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1/.planning/config.json [création] | doit-refuser-modele | refus | refus conforme au modèle, lab non migré
 G1 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1/.planning/cycles/99-rejeu/phases/99-rejeu-registre-ouvert/PLAN.md | doit-refuser | refus | [planning-core] G1 : le registre de CADRAGE.md de la phase 99-rejeu-registre-ouvert porte des lignes structurantes sans statut (I-99) — tranchez-les avant de planifier (spec §5)
 G1 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1/.planning/cycles/99-rejeu/phases/99-rejeu-sans-cadrage/PLAN.md | doit-refuser | refus | [planning-core] G1 : la phase 99-rejeu-sans-cadrage n'a pas de CADRAGE.md — cadrez avant de planifier (spec §5)
 G6 | ~/BusinessFlow-Lab | projects/formation/projetflow-staging/ProjetFlow-FROZEN-A1/.planning/derogations-gates.log | doit-refuser | refus | [planning-core] G6 : derogations-gates.log est un fichier inscrit par deroger-gate.sh — l'écriture par outil est refusée ; inscrivez la dérogation par deroger-gate.sh
@@ -4645,7 +4632,7 @@ G6 | ~/BusinessFlow-Lab | projects/lead-recovery/.planning/INDEX.md | doit-refus
 G6 | ~/BusinessFlow-Lab | projects/lead-recovery/.planning/STATE.md | doit-refuser | refus | [planning-core] G6 : STATE.md est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/lead-recovery/.planning/cloture.log | doit-refuser | refus | [planning-core] G6 : cloture.log est un fichier généré par recalc-planning.sh — l'écriture par outil est refusée ; recalculez par recalc-planning.sh
 G6 | ~/BusinessFlow-Lab | projects/lead-recovery/.planning/config.json | doit-passer | passe | passe
-G7 | ~/BusinessFlow-Lab | projects/lead-recovery/.planning/config.json [création] | doit-passer | refus | [planning-core] G7 : créer un .planning/ dans projects/lead-recovery exige un .claude/ habité (au moins un agent et une mémoire) ou un marqueur de projet de code — sinon ce planning serait orphelin (spec D-05)
+G7 | ~/BusinessFlow-Lab | projects/lead-recovery/.planning/config.json [création] | doit-refuser-modele | refus | refus conforme au modèle, lab non migré
 G1 | ~/BusinessFlow-Lab | projects/lead-recovery/.planning/cycles/99-rejeu/phases/99-rejeu-registre-ouvert/PLAN.md | doit-refuser | refus | [planning-core] G1 : le registre de CADRAGE.md de la phase 99-rejeu-registre-ouvert porte des lignes structurantes sans statut (I-99) — tranchez-les avant de planifier (spec §5)
 G1 | ~/BusinessFlow-Lab | projects/lead-recovery/.planning/cycles/99-rejeu/phases/99-rejeu-sans-cadrage/PLAN.md | doit-refuser | refus | [planning-core] G1 : la phase 99-rejeu-sans-cadrage n'a pas de CADRAGE.md — cadrez avant de planifier (spec §5)
 G6 | ~/BusinessFlow-Lab | projects/lead-recovery/.planning/derogations-gates.log | doit-refuser | refus | [planning-core] G6 : derogations-gates.log est un fichier inscrit par deroger-gate.sh — l'écriture par outil est refusée ; inscrivez la dérogation par deroger-gate.sh
@@ -4671,12 +4658,12 @@ ROLE | ~/BusinessFlow-Lab | rejeu-role/vibeflow-validator.md [Write@vibeflow-val
 COMPTE G6 faux-refus=0 faux-accept=0 refus-conforme-modele=0
 COMPTE G5 faux-refus=0 faux-accept=0 refus-conforme-modele=0
 COMPTE G1 faux-refus=0 faux-accept=0 refus-conforme-modele=196
-COMPTE G7 faux-refus=6 faux-accept=0 refus-conforme-modele=0
+COMPTE G7 faux-refus=0 faux-accept=0 refus-conforme-modele=6
 COMPTE ROLE faux-refus=0 faux-accept=0 refus-conforme-modele=0
 COMPTE G3 faux-refus=0 faux-accept=0 refus-conforme-modele=0
 COMPTE G4 faux-refus=343 faux-accept=0 refus-conforme-modele=0
 COMPTE G4P faux-refus=0 faux-accept=0 refus-conforme-modele=0
-REJEU-ETAPE-6 faux-refus=349 faux-accept=0 refus-conforme-modele=196
+REJEU-ETAPE-6 faux-refus=343 faux-accept=0 refus-conforme-modele=202
 COUVERTURE-REJEU G3 n=52 plancher=12
 COUVERTURE-REJEU G4 n=44 plancher=12
 COUVERTURE-REJEU G4P n=96 plancher=8
@@ -4712,7 +4699,7 @@ BORNE-LIVRABLES lab=~/jarvis-keystone entree=_essais-manuel fichiers=4888 octets
 BORNE-LIVRABLES lab=~/jarvis-keystone entree=tools fichiers=2430 octets=632893864
 BORNE-LIVRABLES lab=~/BusinessFlow-Lab entree=images fichiers=267 octets=307938100
 BORNE-LIVRABLES lab=~/BusinessFlow-Lab entree=node_modules fichiers=4805 octets=43431864
-BORNE-LIVRABLES lab=~/BusinessFlow-Lab entree=pipeline fichiers=3392 octets=567795120
+BORNE-LIVRABLES lab=~/BusinessFlow-Lab entree=pipeline fichiers=3392 octets=567795951
 BORNE-LIVRABLES lab=~/BusinessFlow-Lab entree=projects fichiers=109604 octets=3227168358
 G4P-AGENT lab=~/jarvis-keystone agent=data-engineer role=manager bash=oui attendu=doit-passer
 G4P-AGENT lab=~/jarvis-keystone agent=plan-manager role=manager bash=oui attendu=doit-passer
