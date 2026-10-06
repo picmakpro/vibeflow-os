@@ -5,24 +5,24 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 46
 current_phase_name: Moteur — gates de clôture et verdicts hachés
-status: "Phase 46 en exécution : 46-01..46-10 livrés, lots A et B de l'audit corrigés ; 46-11 bloqué sur la précondition de repos (session active dans ~/BusinessFlow-Lab), ckpt-46-12 posé à Willy"
+status: "Phase 46 exécutée, vérifiée 11/11 (3 sous arbitrage) : G3 armé, G4 et G4′ en observation (reportés à la Phase 46.1, insérée le 2026-10-07) ; non close, PR non mergée"
 created: 2026-09-23
-last_updated: "2026-10-06T07:30:00.000Z"
-last_activity: 2026-10-06
+last_updated: "2026-10-07T08:00:00.000Z"
+last_activity: 2026-10-07
 last_activity_desc: >-
-  Reprise de l'exécution de la Phase 46 (mission vf-dev-manager-p46-exec, feu vert Willy, message en
-  session principale, 2026-10-05) : 46-04 à 46-10 exécutés, revue + audit + non-régression d'avant
-  armement, corrections lot A (quick 261006-23m et 261006-638), CI verte.
+  Fin d'exécution de la Phase 46 (mission vf-dev-manager-p46-exec) : 46-11 et 46-12 livrés, G3 armé,
+  G4 et G4′ en observation sous arbitrage de Willy (2026-10-06), vérifiée 11/11 ; Phase 46.1
+  insérée (arbitrage Willy, AskUserQuestion session principale, 2026-10-07).
 stopped_at: >-
-  Phase 46 arrêtée au rejeu réel de 46-11 (2026-10-06) : ~/BusinessFlow-Lab non au repos (session
-  claude --resume active). Banc 0/0 et canary verts, rien armé. En attente de Willy : repos du lab
-  et ckpt-46-12 (porte de G4′). Rapport : .planning/missions/2026-10-05-gouvernance-46-exec-reprise.md.
+  Phase 46 exécutée et vérifiée (12/12 plans) ; hygiène documentaire de fin de phase en cours ;
+  PR non mergée donc phase non close. Suite : revue de la PR puis cadrage de la Phase 46.1.
+  Rapport : .planning/missions/2026-10-05-gouvernance-46-exec-reprise.md.
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 4
   total_plans: 40
-  completed_plans: 38
-  percent: 95
+  completed_plans: 40
+  percent: 100
 ---
 
 # Project State
@@ -45,11 +45,11 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 ## Progress
 
 **Phases Complete:** 4 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée ; Phase 45 : close le 2026-10-02, PR #124 ouverte, non mergée).
-**Current Plan:** 46-11 (étape 5, armement G3 + G4) — bloqué sur le checkpoint ckpt-46-11 posé à Willy ; 46-01..46-10 livrés (mission `vf-dev-manager-p46-exec`, rapport `.planning/missions/2026-10-05-gouvernance-46-exec-reprise.md`)
+**Current Plan:** aucun — 46-01..46-12 livrés (12/12), vérifiée 11/11 (`46-VERIFICATION.md`, 3 sous arbitrage) ; Phase 46.1 insérée, non cadrée (0 plan)
 
 ## Session Continuity
 
-**Stopped At:** 46-11 bloqué avant le rejeu réel (2026-10-06) : ~/BusinessFlow-Lab non au repos ; arbitrages de Willy du 2026-10-06 appliqués (ckpt-46-11 = rejeu-5-6-oui, lot B = b3, AskUserQuestion session principale) ; en attente : repos du lab et ckpt-46-12.
+**Stopped At:** Phase 46 exécutée et vérifiée, non close (PR non mergée) ; G3 armé, G4 et G4′ en observation ; prochaine étape : revue de la PR, puis cadrage de la Phase 46.1 (aucune planification avant).
 **Resume File (Phase 46) :** `.planning/missions/2026-10-03-gouvernance-46-plan.md`
 **Resume File (Phase 45) :** `.planning/missions/2026-09-30-gouvernance-45-exec.md`
 **Resume File:** `.planning/missions/2026-09-27-gouvernance-44.md`
@@ -118,6 +118,14 @@ est ton compartiment, rejoue le gate toi-même avec `--file .planning/workstream
 explicitement ; n'attends rien de la CI sur ce point.
 
 ### Decisions
+
+- **2026-10-07 — arbitrages de Willy de la mission d'exécution de la Phase 46 (vf-dev-manager-p46-exec)**,
+  tous AskUserQuestion session principale. **2026-10-06** : ckpt-46-11 = rejeu-5-6-oui ; lot B de
+  l'audit = b3 ; arrêt des processus des labs ; étape 5 = « (c) Armer G3 seul » (G4 en observation,
+  limite (bp)) ; ckpt-46-12 = etape-6-mesure (G4′ en observation, limite (bs)) ; P5 = ignorer ;
+  Q-G7 = (a) ; Q-B = (1). **2026-10-07** : « (1) Phase 46.1 insérée (Recommandé) » — Phase 46.1
+  « Armement de G4 et G4′ » inscrite dans la ROADMAP (règle des unités antérieures à G4, préalables de
+  G4′, remèdes reportés de D1), non cadrée, aucune planification.
 
 - **2026-10-05 — reprise de l'exécution de la Phase 46 (vf-dev-manager-p46-exec)** : feu vert
   de Willy, message en session principale, 2026-10-05. Verrou périmé (heartbeat figé au 2026-10-03
