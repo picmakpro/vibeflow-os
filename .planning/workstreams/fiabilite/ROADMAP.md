@@ -1639,7 +1639,7 @@ clôture de `fiabilite-v1.0`. Touche `dev-orchestrator` (références du head, `
   9. **Sobriété** (SOBR-05) : chaque ajout de doctrine désigne ce qu'il remplace ou resserre ;
      aucun skill neuf, aucun agent neuf.
 
-**Plans:** 11/11 plans exécutés (2026-10-06) ; phase ni vérifiée ni clôturée : la sonde réelle de POCK-04 reste à jouer par le manager
+**Plans:** 11/11 plans exécutés (2026-10-06) ; phase ni vérifiée ni clôturée ; sonde réelle POCK-04 jouée dans les deux sens et consignée dans `41.4-SONDE-POCK04.md`
 
 Plans:
 

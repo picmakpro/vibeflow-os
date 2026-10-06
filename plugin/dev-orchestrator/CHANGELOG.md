@@ -20,8 +20,9 @@
   `skipped` (revue d'implémentation d'une mission design, sans PLAN, nœud `revue:écran-X`) sort de la
   conjonction, le statut global se calcule sur les axes jugés ; aucun axe jugé, ou un axe attendu non
   produit, ou un PLAN attendu absent du brief (`revue-N`/`join-N`) → `blocked` (D-22, ratifiée par
-  Samuel). Remplace le verdict unique « PASS / correctifs requis ». La preuve de comportement
-  (sonde réelle) reste à jouer : le contrat et la fixture sont livrés, pas la sonde.
+  Samuel). Remplace le verdict unique « PASS / correctifs requis ». La sonde réelle est jouée dans
+  les deux sens et consignée dans `41.4-SONDE-POCK04.md` (P414-D-07 étendue par P414-D-21) ; limite :
+  elle exerce la définition de l'agent du worktree, pas l'agent installé.
 - **`scripts/check-mission-exit.sh` E3** (POCK-06, P414-D-11) : lit la section `## Merge-danger call`
   du corps de PR (Porte sens unique / double sens, Rayon d'explosion d'au moins 10 caractères) ;
   issues SAIN, MANQUE nommé, INDÉTERMINÉ. Contenu discriminé : section absente, répétée (titre exact
