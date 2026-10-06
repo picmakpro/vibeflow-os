@@ -1,5 +1,10 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v2.0.14] — 2026-10-06 (classe d'invocation du skill, Phase 41.4)
+
+**Patch** — le `SKILL.md` déclare sa classe d'invocation (`vf-invocation: model`, vérifiée par
+`check-skills.sh --callers-root`, POCK-07, P414-D-01) ; aucun changement de comportement.
+
 ## [v2.0.13] — 2026-09-25 (Phase 42, correction ciblée — nœud fix-42-condition-samuel)
 
 **Patch** :

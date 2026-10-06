@@ -1,5 +1,10 @@
 # Changelog — planning-core
 
+## [v2.8.1] — 2026-10-06 (classe d'invocation du skill, Phase 41.4)
+
+**Patch** — le `SKILL.md` déclare sa classe d'invocation (`vf-invocation: model`, vérifiée par
+`check-skills.sh --callers-root`, POCK-07, P414-D-01) ; aucun changement de comportement.
+
 ## [v2.8.0] — 2026-09-28 (moteur de planning métier — modèle par cycles et recalcul d'état dérivé du disque, Phase 44)
 
 **Minor** (nouvelle capacité) :

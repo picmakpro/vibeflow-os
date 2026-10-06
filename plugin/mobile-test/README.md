@@ -4,7 +4,7 @@
 > à VibeFlow le moyen de le prouver : il exécute réellement l'app sur simulateur iOS / émulateur
 > Android, joue une régression Maestro, et diagnostique visuellement les échecs.
 
-**Type** : skill + script + config · **Version** : v1.0.2 · **Dépend de** : aucun module
+**Type** : skill + script + config · **Version** : v1.0.3 · **Dépend de** : aucun module
 
 ---
 

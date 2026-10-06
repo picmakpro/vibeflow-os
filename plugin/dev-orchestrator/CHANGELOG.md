@@ -1,5 +1,37 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.27.0] — 2026-10-06 (emprunts Pocock : cadrage, revue, frontière de phase, Phase 41.4)
+
+**Minor** (comportements neufs, POCK-01 à POCK-04, POCK-06) :
+
+- **`references/mission-flow.md` §Pattern F, frontière de questions** (POCK-01, P414-D-08) : un cadrage
+  pose toute sa frontière en un tour (une recommandation par question, un fait ne se demande jamais à
+  l'humain, `AskUserQuestion` groupé par zone) ; fin de cadrage = frontière vide. Une seule voix :
+  `head-governance.md` §1, `intent-routing.md`, `AGENT.md` (« une question courte » resserré en
+  renvoi) et `vf-dev-manager.md` y renvoient au lieu de la recopier (P414-D-12).
+- **`references/head-governance.md` §3** (POCK-03) : frontière de phase à la sortie d'un geste ou d'une
+  mission (continuer, clear, handoff, sous-agent, compact) et ligne « moins cher la prochaine fois » ;
+  le décompte devient « sept contrôles » (E1 à E7). E3 y est décrit comme le gate réel (merge-danger call conforme, MANQUE ou
+  INDÉTERMINÉ).
+- **`agents/vf-reviewer.md`, `references/mission-contracts.md` §Étage revue** (POCK-04, P414-D-05,
+  P414-D-07) : revue à deux axes, Standards et Spec (contre le PLAN de l'étape), en parallèle, un
+  `review_path` distinct par axe ; le statut global est la conjonction (`passed` ssi les deux axes le
+  sont) ; sans PLAN dans le brief, `axes.spec` vaut `blocked`. Remplace le verdict unique « PASS /
+  correctifs requis ». La preuve de comportement (sonde réelle) reste à jouer : le contrat et la
+  fixture sont livrés, pas la sonde.
+- **`scripts/check-mission-exit.sh` E3** (POCK-06, P414-D-11) : lit la section `## Merge-danger call`
+  du corps de PR (Porte sens unique / double sens, Rayon d'explosion d'au moins 10 caractères) ;
+  issues SAIN, MANQUE nommé, INDÉTERMINÉ. Contenu discriminé : section absente, répétée (titre exact
+  en double), Porte absente, invalide, répétée ou contradictoire ; seuil compté en caractères, blancs
+  exclus ; une section dans un bloc de code ou un commentaire HTML n'existe pas ; une erreur de
+  l'analyseur tombe en INDÉTERMINÉ, jamais lue « Porte absente ».
+- **`references/docs-flow.md`** (POCK-02) : régime du glossaire de domaine du lab (`docs/_transverse/`),
+  exception « pendant le cadrage ».
+- **Tests** : `test-dev-orchestrator.sh` T39 à T43 (ancres de doctrine, 36 mutants discriminants) ;
+  `test-check-mission-exit.sh` cas 44 à 62 et mutants E3a à E3m.
+- **`skills/vf-dev`, `skills/vf-auto`** : `vf-invocation: model` (POCK-07, classe vérifiée par
+  `check-skills.sh --callers-root`).
+
 ## [v2.26.0] — 2026-10-01 (contrôle E7 de fin de mission, Phase 41.3)
 
 **Minor** (nouveau contrôle de sortie) :

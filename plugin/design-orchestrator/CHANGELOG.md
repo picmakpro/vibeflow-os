@@ -1,5 +1,11 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.12] — 2026-10-06 (classe d'invocation des skills, Phase 41.4)
+
+**Patch** — les `SKILL.md` `vf-design` et `vf-sketch` déclarent leur classe d'invocation
+(`vf-invocation: model`, vérifiée par `check-skills.sh --callers-root`, POCK-07, P414-D-01) ;
+aucun changement de comportement.
+
 ## [v1.5.11] — 2026-09-25 (Phase 42, correction ciblée — nœud fix-42-condition-samuel, exécution de la condition posée par Samuel en ratifiant D-08)
 
 **Patch** :
