@@ -301,20 +301,46 @@ else
 fi
 # <<< E2
 
-# e3_merge_danger — analyse du corps de PR LU SUR L'ENTRÉE STANDARD (POCK-06). N'imprime rien. Rend
-# 0 conforme · 1 section « ## Merge-danger call » absente · 2 ligne « Porte : » absente, hors
-# énumération fermée (sens unique | double sens), répétée ou contradictoire · 3 rayon d'explosion
-# de moins de 10 caractères non blancs. Section = du titre exact (blancs de fin tolérés) au titre
-# « ## » suivant ou à la fin du corps. L'apostrophe droite s'écrit en octal (\047) : le programme
+# e3_merge_danger — analyse du corps de PR LU SUR L'ENTRÉE STANDARD (POCK-06). Rend 0 structure
+# conforme (alors IMPRIME, une par ligne, la valeur de chaque ligne « Rayon d'explosion : » de la
+# section — jamais réémise, seulement mesurée par e3_charcount) · 11 section « ## Merge-danger call »
+# absente · 12 section répétée, ligne « Porte : » absente, hors énumération fermée (sens unique |
+# double sens), répétée ou contradictoire. Codes de CONTENU réservés (11, 12) : une erreur d'awk sort
+# en 2 et ne se confond jamais avec un verdict de contenu (branche « indéterminé » de l'appelant).
+# Section = du titre exact (blancs de fin tolérés) au titre « ## » suivant ou à la fin du corps ; ce
+# qui n'est pas rendu à la relecture humaine n'existe pas : un bloc de code (``` ou ~~~) et un
+# commentaire HTML (<!-- -->) sont ignorés. L'apostrophe droite s'écrit en octal (\047) : le programme
 # awk vit entre apostrophes ; l'apostrophe typographique est admise en alternative.
 e3_merge_danger() {
   awk '
-    BEGIN { found = 0; insec = 0; ptot = 0; pval = 0; rayon = 0 }
-    /^## / { if ($0 ~ /^## Merge-danger call[ \t]*$/ && !found) { found = 1; insec = 1 } else { insec = 0 }; next }
-    insec && /^Porte ?:/ { ptot++; if ($0 ~ /^Porte ?:[ \t]*(sens unique|double sens)[ \t]*$/) pval++ }
-    insec && /^Rayon d(\047|’)explosion ?:/ { v = $0; sub(/^[^:]*:/, "", v); gsub(/[ \t]/, "", v); if (length(v) >= 10) rayon = 1 }
-    END { if (!found) exit 1; if (ptot != 1 || pval != 1) exit 2; if (!rayon) exit 3; exit 0 }
+    BEGIN { ntit = 0; insec = 0; infence = 0; incom = 0; ptot = 0; pval = 0 }
+    { l = $0 }
+    incom { k = index(l, "-->"); if (k == 0) next; l = substr(l, k + 3); incom = 0 }
+    { while ((i = index(l, "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }
+    l ~ /^ ? ? ?(```|~~~)/ { infence = !infence; next }
+    infence { next }
+    l ~ /^## / { if (l ~ /^## Merge-danger call[ \t]*$/) { ntit++; insec = (ntit == 1) } else { insec = 0 }; next }
+    insec && l ~ /^Porte ?:/ { ptot++; if (l ~ /^Porte ?:[ \t]*(sens unique|double sens)[ \t]*$/) pval++ }
+    insec && l ~ /^Rayon d(\047|’)explosion ?:/ { v = l; sub(/^[^:]*:/, "", v); print v }
+    END {
+      if (ntit == 0) exit 11
+      if (ntit > 1) exit 12
+      if (ptot != 1 || pval != 1) exit 12
+      exit 0
+    }
   '
+}
+
+# e3_charcount — longueur d'une valeur en CARACTÈRES (codepoints UTF-8, jamais d'octets, sans dépendre
+# d'aucune locale), hors blancs : espaces, tabulations, espace insécable U+00A0, espaces U+2000-200B,
+# U+202F et U+3000. Même règle que `charcount` de check-ajout-retrait.sh.
+E3_BLANCS_SED="s/$(printf '\302\240')//g;s/$(printf '\342\200')[$(printf '\200-\213\257')]//g;s/$(printf '\343\200\200')//g"
+e3_charcount() {
+  printf '%s' "$1" \
+    | LC_ALL=C sed -e "$E3_BLANCS_SED" \
+    | LC_ALL=C tr -d '[:space:]' \
+    | od -An -tu1 | tr -s ' \n' '\n' \
+    | awk 'NF && ($1 < 128 || $1 >= 192) { n++ } END { print n + 0 }'
 }
 
 # >>> E3
@@ -362,12 +388,18 @@ else
           E3_MSG="[E3] corps de PR illisible (clé body absente ou non chaîne) — merge-danger call invérifiable"
         else
           E3_BODY="$(printf '%s' "$E3_PR_JSON" | jq -r '.body' 2>/dev/null | tr -d '\r')"
-          printf '%s\n' "$E3_BODY" | e3_merge_danger; E3_MD_RC=$?
+          E3_RAYONS="$(printf '%s\n' "$E3_BODY" | e3_merge_danger)"; E3_MD_RC=$?
           case "$E3_MD_RC" in
-            0) E3_STATUS="sain" ;;
-            1) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : section « ## Merge-danger call » absente" ;;
-            2) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : ligne « Porte : sens unique|double sens » absente ou invalide" ;;
-            3) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : rayon d'explosion de moins de 10 caractères" ;;
+            0)
+              E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : rayon d'explosion de moins de 10 caractères"
+              while IFS= read -r E3_V; do
+                if [ "$(e3_charcount "$E3_V")" -ge 10 ]; then E3_STATUS="sain"; E3_MSG=""; fi
+              done <<EOF_RAYONS
+$E3_RAYONS
+EOF_RAYONS
+              ;;
+            11) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : section « ## Merge-danger call » absente" ;;
+            12) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : section répétée, ligne « Porte : sens unique|double sens » absente, invalide ou répétée" ;;
             *) E3_STATUS="indet"; E3_MSG="[E3] analyse du merge-danger call impossible (outil d'analyse en échec) — invérifiable" ;;
           esac
         fi
