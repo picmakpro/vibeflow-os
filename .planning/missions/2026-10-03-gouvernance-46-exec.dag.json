@@ -244,7 +244,7 @@
         "ckpt-46-12"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "verif-46",
@@ -254,7 +254,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-46-b",
@@ -264,7 +264,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "blocked",
+      "status": "ready",
       "review_regime": "full"
     },
     {
@@ -275,7 +275,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "nonreg-b",
@@ -285,7 +285,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "docs",
@@ -430,6 +430,14 @@
       "deps": [],
       "scope": [],
       "status": "done"
+    },
+    {
+      "id": "rejeu-46-6",
+      "step": "mesure de l'étape 6 à rejouer, labs au repos (session strategist active dans ~/BusinessFlow-Lab) — gate manuel avant docs",
+      "stage": "exec",
+      "deps": [],
+      "scope": [],
+      "status": "ready"
     }
   ]
 }
