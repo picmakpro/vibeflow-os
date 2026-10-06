@@ -4,7 +4,8 @@
 # dans un lab adhérent `cycles-v1` (P45-D-01a) ; ailleurs — labs dev, ce dépôt compris — il ne sort
 # RIEN et rend 0 (P45-D-04, P46-D-16). La racine du lab est dérivée du chemin écrit (à défaut du cwd du
 # payload, à défaut du cwd physique du processus), jamais de $CLAUDE_PROJECT_DIR (P45-D-12) ; pour un
-# FileChanged, du `file_path` de premier niveau du payload.
+# FileChanged, du `file_path` de premier niveau du payload. Les tests de forme portent sur les composants relatifs au lab mis en forme
+# normale NFC, la racine jamais : `composants_nfc` (A1, fix-46-a) ; un nom d'unité en NFD rend la même décision que sa forme NFC.
 #
 # Cinq événements, UNE commande enregistrée (hooks.json), le champ `hook_event_name` du payload
 # aiguillant (absent : PreToolUse, compatibilité des payloads existants ; inconnu : silence, limite (aq)) :
@@ -91,6 +92,7 @@ import shlex
 import stat
 import sys
 import time
+import unicodedata
 import urllib.parse
 
 try:
@@ -233,7 +235,9 @@ def cible_de(payload, home=""):
     (`decider_dans_le_doute`) prend la main. Une valeur de plus de BORNE_VALEUR caractères est lue sous deux formes (réduite
     lexicalement, physique) rendues en temps linéaire ; si l'une reste trop longue, ValeurTropLongue (décision dans le doute). Un chemin
     RELATIF sous un cwd de plus de BORNE_VALEUR caractères n'est jamais résolu contre le cwd du processus : ValueError (N3-02) ; un cwd
-    long, sinon, est remplacé par sa forme réduite (`cwd_borne`)."""
+    long, sinon, est remplacé par sa forme réduite (`cwd_borne`). Aucune normalisation Unicode ici : elle se fait aux tests de forme
+    (`composants_nfc`), jamais sur un chemin absolu (une forme absolue normalisée désignerait un autre dossier sur un système de fichiers
+    sensible à la normalisation)."""
     cwd = payload.get("cwd")
     if not isinstance(cwd, str):
         cwd = None
@@ -460,6 +464,16 @@ def racine_lab(depart):
         if parent == courant:
             return None
         courant = parent
+
+
+def composants_nfc(chemin, racine):
+    """Composants du chemin `chemin`, résolu physiquement (realpath) puis rendu relatif à la racine du lab `racine`, CHACUN en forme
+    normale NFC (A1, fix-46-a). Tout test de forme d'un gate (NOM_UNITE, noms fixes comparés en casefold, `.planning`) et toute lecture
+    de l'unité (`os.path.join(racine, *composants)`) passent par ici : un nom saisi en NFD — qu'APFS et HFS+ résolvent vers le dossier de
+    sa forme NFC — rend la MÊME décision que sa forme NFC, sur tout système de fichiers. La racine n'est jamais normalisée : elle vient
+    de la résolution physique et sert de préfixe telle quelle (limite (bf))."""
+    rel = os.path.relpath(os.path.realpath(chemin), racine)
+    return [unicodedata.normalize("NFC", c) for c in rel.split(os.sep) if c not in ("", ".")]  # nfc-chemin
 
 
 # --- Adhésion (même lecture que le moteur de recalcul, P44-D-02) ------------------------------
@@ -957,11 +971,12 @@ def empreinte_livrables(racine, entrees):
 
 
 def _couvre_unite(entree, unite_rel):
-    """Vrai si l'entrée `ecrit:` EST le dossier de l'unité (`unite_rel`, relatif au lab) ou l'un de ses ancêtres, comparé par
-    composants et sans égard à la casse (sur un système de fichiers insensible à la casse, `.PLANNING` désigne le même dossier).
-    Une entrée qui se normalise en rien (`.`) n'est pas un livrable : le prédicat la rend `absente`, elle n'est pas traitée ici."""
-    cible = [c.casefold() for c in _normaliser_livrable(entree).split("/") if c != ""]
-    unite = [c.casefold() for c in unite_rel.split("/") if c not in ("", ".")]
+    """Vrai si l'entrée `ecrit:` EST le dossier de l'unité (`unite_rel`, relatif au lab) ou l'un de ses ancêtres, comparé par composants,
+    chacun en forme normale NFC puis sans égard à la casse (sur un système de fichiers insensible à la casse ou à la normalisation, `.PLANNING`
+    et un nom saisi en NFD désignent le même dossier ; A1, fix-46-a). Une entrée qui se normalise en rien (`.`) n'est pas un livrable : le
+    prédicat la rend `absente`, elle n'est pas traitée ici."""
+    cible = [unicodedata.normalize("NFC", c).casefold() for c in _normaliser_livrable(entree).split("/") if c != ""]  # nfc-couvre
+    unite = [unicodedata.normalize("NFC", c).casefold() for c in unite_rel.split("/") if c not in ("", ".")]
     return len(cible) > 0 and len(cible) <= len(unite) and unite[:len(cible)] == cible
 
 
@@ -1039,7 +1054,7 @@ def _couvert(composants, plans):
     situé dessous. Union des entrées de tous les plans ouverts."""
     for _plan, entrees in plans:  # g2-union
         for entree in entrees:
-            cible = [c for c in entree.split("/") if c not in ("", ".")]
+            cible = [unicodedata.normalize("NFC", c) for c in entree.split("/") if c not in ("", ".")]  # nfc-g2
             if cible and composants[: len(cible)] == cible:
                 return True
     return False
@@ -1088,10 +1103,9 @@ def evaluer_g2(contexte):
         hors = []
         for absolu in _candidats_g2(contexte):
             try:
-                rel = os.path.relpath(os.path.realpath(absolu), racine)
+                composants = composants_nfc(absolu, racine)
             except (OSError, ValueError):
                 continue
-            composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
             if not composants or composants[0] == "..":
                 continue
             if composants[0] in (".planning", ".claude"):
@@ -1433,8 +1447,7 @@ def evaluer_g5(contexte):
     racine = contexte["racine"]  # g5-sonde
     if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
         return []
-    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
-    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    composants = composants_nfc(contexte["ecrit"], racine)
     if not _lien_dur_vers_verdict(contexte["ecrit"], racine):  # g5-identite
         if not composants or composants[0].casefold() != ".planning":  # g5-perimetre
             return []
@@ -1531,6 +1544,7 @@ def fichier_protege(ecrit, racine):
     planning = os.path.realpath(os.path.join(racine, ".planning"))
     cible = os.path.realpath(ecrit)
     parent, nom = os.path.split(cible)
+    nom = unicodedata.normalize("NFC", nom)  # nfc-g6
     a_la_racine = _meme_dossier(parent, planning)  # g6-racine
     if a_la_racine and nom.casefold() in PROTEGES_G6:  # id-casefold
         return PROTEGES_G6[nom.casefold()]
@@ -1566,6 +1580,7 @@ def script_protege(ecrit, racine):
     dossier = os.path.join(racine, *DOSSIER_SCRIPTS_REL)
     cible = os.path.realpath(ecrit)
     parent, nom = os.path.split(cible)
+    nom = unicodedata.normalize("NFC", nom)  # nfc-script-g6
     if _meme_dossier(parent, os.path.realpath(dossier)):  # g6-script-racine
         for canonique in SCRIPTS_HOOK_G6:
             if canonique.casefold() == nom.casefold():  # g6-script-casefold
@@ -1696,8 +1711,7 @@ def evaluer_g1(contexte):
     if contexte["outil"] not in ("Write", "Edit") or not contexte["ecrit"]:
         return []
     racine = contexte["racine"]
-    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
-    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    composants = composants_nfc(contexte["ecrit"], racine)
     dossier_phase = unite_de_plan(composants)  # g1-forme
     if dossier_phase is None:
         return []
@@ -1784,8 +1798,7 @@ def evaluer_g3(contexte):
     racine = contexte["racine"]  # g3-sonde
     if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
         return []
-    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
-    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    composants = composants_nfc(contexte["ecrit"], racine)
     unite = unite_de_fichier(composants, "CLOTURE.md")  # g3-forme
     if unite is None:
         return []
@@ -1833,8 +1846,7 @@ def evaluer_g4(contexte):
     racine = contexte["racine"]  # g4-sonde
     if contexte["outil"] not in OUTILS_ECRITURE or not contexte["ecrit"]:
         return []
-    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
-    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    composants = composants_nfc(contexte["ecrit"], racine)
     unite = unite_de_fichier(composants, "SUMMARY.md")  # g4-forme
     if unite is None:
         return []
@@ -1959,8 +1971,7 @@ def evaluer_g7(contexte):
     if contexte["outil"] not in OUTILS_CREATION or not contexte["ecrit"]:
         return []
     racine = contexte["racine"]
-    rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
-    composants = [c for c in rel.split(os.sep) if c not in ("", ".")]
+    composants = composants_nfc(contexte["ecrit"], racine)
     indice = _creation_planning(racine, composants)
     if indice is None:
         return []
@@ -2544,8 +2555,7 @@ def evaluer_role(contexte):
     if role == "juge" and outil in OUTILS_ECRITURE:
         chemin_rel = None
         if contexte["ecrit"]:
-            rel = os.path.relpath(os.path.realpath(contexte["ecrit"]), racine)
-            chemin_rel = "/".join(c for c in rel.split(os.sep) if c not in ("", "."))
+            chemin_rel = "/".join(composants_nfc(contexte["ecrit"], racine))
         return [Verdict("ROLE", chemin_rel, RAISON_JUGE % agent_type)]
     if role == "worker" and outil in OUTILS_DISPATCH:  # role-worker
         entree = payload.get("tool_input")
@@ -2769,7 +2779,7 @@ def chemin_relatif_surveille(racine, chemin):
     est résolu physiquement (l'alias d'un dossier ne change pas le lab) ; le fichier lui-même n'est jamais suivi."""
     try:
         parent, nom = os.path.split(chemin)
-        composants = os.path.relpath(os.path.join(os.path.realpath(parent), nom), racine).split(os.sep)
+        composants = [unicodedata.normalize("NFC", c) for c in os.path.relpath(os.path.join(os.path.realpath(parent), nom), racine).split(os.sep)]  # nfc-d1
     except (OSError, ValueError):
         return None
     reste = composants[1:]
@@ -2922,7 +2932,7 @@ def reconcilier(racine, liste, tronquee):
         elif entree["genre"] == "contournement":
             contournements.append(entree["chemin"])
     for chemin in liste:
-        rel = os.path.relpath(chemin, racine).replace(os.sep, "/")
+        rel = "/".join(unicodedata.normalize("NFC", c) for c in os.path.relpath(chemin, racine).split(os.sep))  # nfc-cle-d1
         sha = empreinte_fichier(chemin)
         if sha is None:
             continue

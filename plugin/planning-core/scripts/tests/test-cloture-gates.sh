@@ -13,6 +13,8 @@
 #   R-G3-04   dérogation nominative G3 sur le chemin du CLOTURE.md (usage unique) ; erreur interne injectée : armée deny, observe ligne d'observation
 #   R-G3-05   (A13, fix-46-a) livrable hors borne (2001 fichiers, fichier creux de BORNE_OCTETS_LIVRABLES + 1 octets, budget commun franchi par la seconde
 #             entrée) -> UN deny G3 qui nomme la borne franchie et l'entrée, sans l'injonction de « produire » ; livrable absent : message générique inchangé
+#   R-NFD-02  (A1, fix-46-a) copie armée : un nom d'unité en NFD rend la même sortie que sa forme NFC par chemin mixte, voie cwd (file_path relatif à un cwd NFD)
+#             et lien à cible NFD ; dérogation inscrite avec --chemin en NFD (journal en NFC, écriture NFD citée) ; copie observe : une ligne, chemin NFC
 #   R-PLAN-BORNE (A11, fix-46-a) PLAN.md de 1 Mio + 1 octet ou creux de 2 Gio -> UN deny G3 (CLOTURE.md) et UN deny G4 (SUMMARY.md) qui nomment
 #             BORNE_LECTURE_PLAN ; PLAN.md d'exactement 1 Mio -> passe ; espion de lecture : `octets_plan_du_dossier` du hook jugé ne demande jamais
 #             plus de BORNE_LECTURE_PLAN + 1 octets (durée du cas creux affichée, jamais assertée)
@@ -27,14 +29,18 @@
 #   R-G4-05   dérogation G4 sur le chemin du SUMMARY.md (usage unique) ; erreur interne injectée : armée deny, observe ligne d'observation
 #   R-G4-06   aucun refus de G3 ou de G4 ne porte le chemin absolu du lab, « no such file » ni « can't open »
 #   R-FORME-01 `unite_de_fichier` du hook et `forme_unite` de poser-verdict.sh rendent la même unité sur un lot de chemins (copies ast chargées du texte)
-#   BANC      fixtures/cloture-banc.txt : dix labs adhérents et leurs dix jumeaux `-dev`, chaque écriture rejouée sur copie armée ; COUVERTURE G3, G4 (au moins
+#   BANC      fixtures/cloture-banc.txt : onze labs adhérents et leurs onze jumeaux `-dev`, chaque écriture rejouée sur copie armée ; COUVERTURE G3, G4 (au moins
 #             quatre doit-refuser et quatre doit-passer réellement joués par gate) ; COMPTE G3, COMPTE G4 : faux-refus=0 faux-accept=0
+#   R-BANC-NFD (A1, fix-46-a) chaque écriture du banc dont le chemin porte un caractère composable (labs cl-nfc et cl-nfc-dev, noms en NFC) est rejouée sur copie
+#             armée dans deux matérialisations fraîches, sous sa forme NFC et sous son jumeau NFD : mêmes code, stdout et stderr ; COUVERTURE NFD (au moins un
+#             refus et un passage par gate, un silence) ; une différence nomme « jumeau NFD », l'écriture et les deux décisions
 #   R-CROISE-01 preuve croisée d'un seul prédicat : pour chaque unité du banc, G3 sur l'écriture de son CLOTURE.md et l'état rendu par recalc-planning.sh
 #             --read-only (R4 : livrable-absent:, livrable-vide:… ou PLAN.md indéterminé) concordent ; une discordance est imprimée nommément
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-G3-LIVRABLE (contrôle du statut neutralisé -> R-G3-02), MUT-G3-FORME (forme élargie à tout CLOTURE.md sous .planning/ -> R-G3-03),
 #   MUT-G3-ADHESION (adhésion forcée vraie, commande sans pré-filtre -> jumeau lab dev de R-G3-03), MUT-PLAN-BORNE-TEST (test de la borne neutralisé),
-#   MUT-PLAN-LECTURE (lecture sans borne) -> R-PLAN-BORNE, MUT-G3-BORNE-MESSAGE (branche `borne` neutralisée -> R-G3-05) ;
+#   MUT-PLAN-LECTURE (lecture sans borne) -> R-PLAN-BORNE, MUT-G3-BORNE-MESSAGE (branche `borne` neutralisée -> R-G3-05), MUT-NFD-CHEMIN (normalisation NFC
+#   des composants retirée -> R-BANC-NFD) ;
 #   MUT-G4-ABSENT, MUT-G4-ECHEC (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
@@ -87,6 +93,7 @@ import subprocess
 import sys
 import time
 import types
+import unicodedata
 import urllib.parse
 
 TOKEN = "{{VF_SCRIPTS}}"
@@ -126,6 +133,12 @@ def court(octets, n=200):
     texte = octets.decode("utf-8", "replace") if isinstance(octets, bytes) else str(octets)
     texte = texte.replace("\n", "\\n")
     return texte if len(texte) <= n else texte[:n] + "…(+" + str(len(texte) - n) + ")"
+
+
+def jumeau_nfd(texte):
+    """Forme NFD, composant par composant (séparateur `/`), d'un chemin, d'un cwd ou d'une commande : égale au texte s'il ne porte aucun
+    caractère composable (dans ce cas, aucun jumeau)."""
+    return "/".join(unicodedata.normalize("NFD", c) for c in texte.split("/"))
 
 
 # --- Payload du harnais ------------------------------------------------------------------------------------------
@@ -773,6 +786,76 @@ def controle_g3_05(ctx, script):
                           "franchie et l'entrée, sans l'injonction de produire ; livrable absent : le message générique inchangé" % borne_octets)
 
 
+# --- A1 (fix-46-a) : un nom en forme NFD rend la même décision que sa forme NFC (R-NFD-02) -----------------------------------
+# Les noms composables sont écrits par échappements \u : ni une relecture ni un éditeur ne peut les renormaliser.
+CYCLE_NFC = ".planning/cycles/01-\u00e9t\u00e9"
+UNITE_NFC = CYCLE_NFC + "/phases/02-re\u00e7u"
+CLOTURE_NFC = UNITE_NFC + "/CLOTURE.md"
+
+
+def _est_deny_g3(rc, out, err):
+    return classer(rc, out) == "deny" and not err and raison_de(out).startswith("[planning-core] G3 :")
+
+
+def controle_nfd_02(ctx, script):
+    """A1 : le hook rend la même décision pour un nom d'unité en NFD que pour sa forme NFC, par toutes les voies — (i) chemin mixte (cycle NFC, phase NFD),
+    (ii) `file_path` RELATIF à un `cwd` NFD, (iii) lien du lab dont la CIBLE est écrite en NFD, (iv) dérogation G3 inscrite par deroger-gate.sh avec
+    `--chemin` en NFD (le journal porte la forme NFC, l'écriture NFD passe en la citant), (v) copie observe : l'écriture NFD laisse UNE ligne
+    d'observation dont le chemin est la forme NFC. (i) à (iii) rendent la MÊME sortie que l'écriture NFC absolue."""
+    dossier_jugé = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_jugé, "armed")
+    fautes = []
+    lab = fabriquer_lab(ctx, "nfd-02", unite=UNITE_NFC)
+    base = ecrire_dans(ctx, d, lab, "Write", CLOTURE_NFC)
+    if not _est_deny_g3(*base):
+        return False, "écriture NFC absolue : pas un deny G3 : %s %s" % (classer(base[0], base[1]), court(base[1]))
+
+    def meme_sortie(nom, resultat):
+        if resultat != base:
+            fautes.append("%s : %s %s (écriture NFC absolue : %s)" % (nom, classer(resultat[0], resultat[1]), court(resultat[1] or resultat[2]), classer(base[0], base[1])))
+
+    # (i) chemin mixte : cycle en NFC, phase en NFD
+    mixte = CYCLE_NFC + "/phases/" + jumeau_nfd("02-re\u00e7u") + "/CLOTURE.md"
+    meme_sortie("(i) chemin mixte", ecrire_dans(ctx, d, lab, "Write", mixte))
+    # (ii) voie cwd : file_path relatif à un cwd NFD dans le lab, processus lancé dans le lab
+    brut = payload("Write", {"file_path": jumeau_nfd("phases/02-re\u00e7u/CLOTURE.md"), "content": "x"}, os.path.join(lab, jumeau_nfd(CYCLE_NFC)))
+    meme_sortie("(ii) voie cwd", ctx.lancer(brut, cwd=lab, dossier=d))
+    # (iii) lien du lab dont la cible est écrite en NFD
+    os.symlink(jumeau_nfd(CYCLE_NFC), os.path.join(lab, "raccourci"))
+    meme_sortie("(iii) lien à cible NFD", ecrire_dans(ctx, d, lab, "Write", "raccourci/phases/02-re\u00e7u/CLOTURE.md"))
+    # (iv) dérogation inscrite avec --chemin en NFD
+    lab_d = fabriquer_lab(ctx, "nfd-02-derog", unite=UNITE_NFC)
+    rc, out, err = deroger(ctx, lab_d, "G3", (jumeau_nfd(CLOTURE_NFC),))
+    if rc != 0:
+        fautes.append("(iv) deroger-gate.sh refuse --chemin en NFD : rc=%d %s" % (rc, court(err or out)))
+    else:
+        journal = os.path.join(lab_d, ".planning", "derogations-gates.log")
+        lignes = [l for l in open(journal, encoding="utf-8").read().split("\n") if "  derogation  " in l] if os.path.exists(journal) else []
+        chemins = [urllib.parse.unquote(c[len("chemin="):]) for l in lignes for c in l.split("  ") if c.startswith("chemin=")]
+        if chemins != [CLOTURE_NFC]:
+            fautes.append("(iv) la ligne `derogation` ne porte pas le chemin NFC : %s" % chemins)
+        r1 = ecrire_dans(ctx, d, lab_d, "Write", jumeau_nfd(CLOTURE_NFC))
+        if classer(r1[0], r1[1]) != "avertit" or r1[2] or "#1" not in contexte_de(r1[1]) or "G3" not in contexte_de(r1[1]):
+            fautes.append("(iv) l'écriture NFD ne passe pas en citant la dérogation : %s %s" % (classer(r1[0], r1[1]), court(r1[1])))
+        r2 = ecrire_dans(ctx, d, lab_d, "Write", jumeau_nfd(CLOTURE_NFC))
+        if classer(r2[0], r2[1]) != "deny":
+            fautes.append("(iv) la dérogation (usage unique) n'est pas consommée : second Write %s" % classer(r2[0], r2[1]))
+    # (v) copie observe : UNE ligne d'observation, chemin décodé en forme NFC
+    lab_o = fabriquer_lab(ctx, "nfd-02-observe", unite=UNITE_NFC)
+    cache = dossier_neuf(ctx, "cache-nfd-02")
+    rc, out, err = ecrire_dans(ctx, ctx.copie_forcee(dossier_jugé, "observe"), lab_o, "Write", jumeau_nfd(CLOTURE_NFC), extra_env={"XDG_CACHE_HOME": cache})
+    lignes = lignes_journal(cache)
+    if rc != 0 or out != b"" or err or len(lignes) != 1:
+        fautes.append("(v) copie observe : rc=%d stdout=%s stderr=%s lignes=%d (attendu : silence et UNE ligne)" % (rc, court(out), court(err), len(lignes)))
+    else:
+        champ = [urllib.parse.unquote(c[len("chemin="):]) for c in lignes[0].split("  ") if c.startswith("chemin=")]
+        if champ != [CLOTURE_NFC]:
+            fautes.append("(v) la ligne d'observation ne porte pas le chemin NFC : %s" % champ)
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "écriture NFD de CLOTURE.md : (i) chemin mixte, (ii) file_path relatif à un cwd NFD, (iii) lien à cible NFD rendent la même sortie que l'écriture "
+                          "NFC absolue (deny G3) ; (iv) dérogation inscrite en NFD : journal en NFC, écriture NFD citée puis consommée ; (v) copie observe : une ligne, chemin NFC")
+
+
 # =================================================================================================
 # G4 : contrôles. Les verdicts valides sont posés par la VRAIE poser-verdict.sh ; seuls les verdicts volontairement faux sont écrits à la main.
 # =================================================================================================
@@ -1318,6 +1401,53 @@ def sec_banc(ctx):
         else:
             ko("R-BANC-" + gate, "banc sur copie armée : zéro faux refus, zéro faux accept, sur un banc non vide", "%s [0, 0] sur >= 1 écriture" % gate,
                "%s=%s sur %d écriture(s)" % (gate, faux.get(gate), n))
+    bon, detail = original_de(ctx, "R-BANC-NFD", controle_banc_nfd)
+    ok("R-BANC-NFD jumeaux NFD du banc sur copie armée : " + detail) if bon else ko("R-BANC-NFD", "chaque écriture composable du banc rend, sous sa forme NFD, le même code et la même sortie",
+                                                                                      "jumeaux identiques", detail)
+
+
+def controle_banc_nfd(ctx, script):
+    """R-BANC-NFD (A1, fix-46-a) : pour chaque écriture du banc dont le chemin porte un caractère composable, rejouée sur copie armée dans deux matérialisations
+    FRAÎCHES du lab (l'une reçoit la forme NFC, l'autre le jumeau NFD), mêmes code, stdout et stderr (vide). Au moins un refus et un passage pour G3 et pour G4,
+    au moins un silence (jumeau dev) ; une différence nomme « jumeau NFD », l'écriture et les deux décisions."""
+    dossier_jugé = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_jugé, "armed")
+    ordre, labs = parser_banc(open(ctx.banc, encoding="utf-8").read())
+    compte = {"G3": {"doit-refuser": 0, "doit-passer": 0}, "G4": {"doit-refuser": 0, "doit-passer": 0}}
+    silences, jouees, ecarts = 0, 0, []
+    for nom in ordre:
+        composables = [e for e in labs[nom]["ecritures"] if jumeau_nfd(e["chemin"]) != e["chemin"]]
+        if not composables:
+            continue
+        lab_nfc, lab_nfd = ctx.unique("nfd-nfc-" + nom), ctx.unique("nfd-nfd-" + nom)
+        materialiser(ctx, labs, nom, lab_nfc)
+        materialiser(ctx, labs, nom, lab_nfd)
+        for e in composables:
+            jouees += 1
+            r_nfc = ecrire_dans(ctx, d, lab_nfc, e["outil"], e["chemin"], agent=e["agent"])
+            r_nfd = ecrire_dans(ctx, d, lab_nfd, e["outil"], jumeau_nfd(e["chemin"]), agent=e["agent"])
+            v_nfc, v_nfd = classer(r_nfc[0], r_nfc[1]), classer(r_nfd[0], r_nfd[1])
+            if r_nfc != r_nfd or r_nfc[2]:
+                ecarts.append("jumeau NFD de %s %s :: %s %s : NFC -> %s, NFD -> %s" % (e["outil"], e["chemin"], e["attendu"], e["gate"], v_nfc + " " + court(r_nfc[1], 80),
+                                                                                       v_nfd + " " + court(r_nfd[1], 80)))
+                continue
+            conforme = (v_nfc == "deny" and ("[planning-core] %s :" % e["gate"]) in raison_de(r_nfc[1])) if e["attendu"] == "doit-refuser" else (
+                v_nfc in ("silence", "avertit") if e["attendu"] == "doit-passer" else v_nfc == "silence")
+            if not conforme:
+                ecarts.append("jumeau NFD de %s %s : la forme NFC elle-même ne rend pas l'attendu %s %s (%s)" % (e["outil"], e["chemin"], e["attendu"], e["gate"], v_nfc))
+            elif e["attendu"] == "silence":
+                silences += 1
+            else:
+                compte[e["gate"]][e["attendu"]] += 1
+    resume = "G3 refus=%d passage=%d ; G4 refus=%d passage=%d ; silence=%d ; %d écritures composables rejouées, jumeau NFD de décision identique" % (
+        compte["G3"]["doit-refuser"], compte["G3"]["doit-passer"], compte["G4"]["doit-refuser"], compte["G4"]["doit-passer"], silences, jouees - len(ecarts))
+    if dossier_jugé == ctx.scripts_dir:
+        print("COUVERTURE NFD " + resume)
+    if ecarts:
+        return False, "%d écart(s) : %s" % (len(ecarts), " | ".join(ecarts[:3]))
+    if any(compte[g][k] < 1 for g in compte for k in compte[g]) or silences < 1:
+        return False, "preuve trop pauvre : " + resume + " (attendu : au moins un refus et un passage par gate, un silence)"
+    return True, resume
 
 
 # =================================================================================================
@@ -1431,7 +1561,8 @@ def sec_g3(ctx):
             ("R-G3-03", controle_g3_03, "copie armée, jumeaux qui passent"),
             ("R-G3-04", controle_g3_04, "dérogation et erreur interne"),
             ("R-PLAN-BORNE", controle_plan_borne, "PLAN.md au-delà de 1 Mio : refus explicite de G3 et G4, lecture bornée"),
-            ("R-G3-05", controle_g3_05, "livrable hors borne : message distinct qui nomme la borne")):
+            ("R-G3-05", controle_g3_05, "livrable hors borne : message distinct qui nomme la borne"),
+            ("R-NFD-02", controle_nfd_02, "forme NFD : chemin mixte, voie cwd, lien à cible NFD, dérogation, copie observe")):
         bon, detail = original_de(ctx, ident, ctrl)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
@@ -1464,6 +1595,7 @@ def sec_mutants_g3(ctx):
          'unite = composants[:-1] if composants and composants[0].casefold() == ".planning" and composants[-1].casefold() == "cloture.md" else None  # g3-forme',
          "R-G3-03", controle_g3_03)
     tuer(ctx, "G3-ADHESION", "sys.exit(0)  # non-adherent", "pass", "R-G3-03", controle_g3_03)
+    tuer(ctx, "NFD-CHEMIN", "# nfc-chemin", 'return [c for c in rel.split(os.sep) if c not in ("", ".")]  # nfc-chemin', "R-BANC-NFD", controle_banc_nfd)
     tuer(ctx, "G3-BORNE-MESSAGE", "# g3-borne", "if False:  # g3-borne", "R-G3-05", controle_g3_05)
     tuer(ctx, "PLAN-BORNE-TEST", "# plan-hors-borne", "if False:  # plan-hors-borne", "R-PLAN-BORNE", controle_plan_borne)
     tuer(ctx, "PLAN-LECTURE", "# plan-lecture-bornee", "octets = fh.read()  # plan-lecture-bornee", "R-PLAN-BORNE", controle_plan_borne)

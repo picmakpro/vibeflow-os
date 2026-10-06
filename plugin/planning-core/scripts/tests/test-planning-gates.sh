@@ -72,6 +72,10 @@
 #                   +1, écriture atomique, refus hors lab adhérent, jamais vue par G5 (45-04, F8 et A3)
 #   R-ACCORD        chemin relatif : avertissement G2 en mode A <=> deny en mode C (limite h)
 #   BANC            chaque `@@ ecriture` de fixtures/gates-banc.txt rend son attendu ; COUVERTURE
+#   R-NFD-GATES     (A1, fix-46-a) chaque écriture du banc dont le chemin, le cwd= ou la commande= porte un caractère composable (labs nfc-adherent et nfc-dev,
+#                   noms en NFC) est rejouée sur copie armée sous sa forme NFC et sous son jumeau NFD (payload au cwd NFD, processus dans le cwd NFC) : même
+#                   code, même stdout, même stderr ; G1, G5, G6, G7, ROLE, G2 (Write et Bash), silence, plus le cas G4′ (SubagentHandback, cwd composable) ;
+#                   MUT-NFD-GATES : la normalisation NFC retirée de `composants_nfc`, tuée par R-NFD-GATES
 #   LOT A           (section `lota` ; correction ciblée post-45-09, décisions du manager vf-dev-manager, 2026-10-01) : R-IMB-01..05 un `.planning`
 #                   imbriqué n'est jamais une racine de lab ; R-DEROG-09 une dérogation n'est consommée que si la décision finale est un
 #                   passage ; R-DEROG-10 droits du journal jamais élargis, argv UTF-8 ; R-VERDICT-06..09 poser-verdict.sh (contrôles, forme
@@ -140,6 +144,7 @@ import stat
 import subprocess
 import sys
 import time
+import unicodedata
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 
@@ -209,6 +214,12 @@ def ecrire(chemin, contenu):
     os.makedirs(os.path.dirname(chemin), exist_ok=True)
     with open(chemin, "w", encoding="utf-8") as fh:
         fh.write(contenu)
+
+
+def jumeau_nfd(texte):
+    """Forme NFD, composant par composant (séparateur `/`), d'un chemin, d'un cwd ou d'une commande : égale au texte s'il ne porte aucun
+    caractère composable (dans ce cas, aucun jumeau)."""
+    return "/".join(unicodedata.normalize("NFD", c) for c in texte.split("/"))
 
 
 # --- Contexte : la commande enregistrée, modes A (script réel) et C (script absent) ------------
@@ -3458,6 +3469,101 @@ def sec_accord(ctx):
     ok("R-ACCORD " + detail) if bon else ko("R-ACCORD", "chemin relatif : avertissement G2 en mode A <=> deny en mode C (limite h)", "accord des deux couches", detail)
 
 
+def _jumeau_ecriture(e):
+    """Copie de l'écriture `e` dont le chemin (s'il n'est pas `-`), le cwd et la commande passent par `jumeau_nfd`."""
+    j = dict(e)
+    if e["chemin"] != "-":
+        j["chemin"] = jumeau_nfd(e["chemin"])
+    if e["cwd"]:
+        j["cwd"] = jumeau_nfd(e["cwd"])
+    if e["commande"]:
+        j["commande"] = jumeau_nfd(e["commande"])
+    return j
+
+
+def controle_nfd_gates(ctx, script):
+    """R-NFD-GATES (A1, fix-46-a) : pour chaque écriture du banc dont le chemin, le `cwd=` ou la `commande=` porte un caractère composable, le jumeau NFD (payload au
+    cwd NFD, processus lancé dans le cwd NFC existant) rendu sur copie armée dans une matérialisation FRAÎCHE du lab rend le même code, le même stdout et le même
+    stderr que la forme NFC. Au moins un refus et un passage pour G1 et G7, un refus pour G5 et ROLE, un passage pour G6, un avertissement G2 (Write et Bash), un
+    silence ; PLUS le cas G4′ : SubagentHandback sans sortie brute d'un worker doté de Bash, `cwd` dans un sous-dossier composable du lab, NFC et NFD : même deny.
+    Une différence nomme « jumeau NFD », l'écriture et les deux décisions."""
+    dossier_jugé = _dossier(ctx, script)
+    ordre, labs = parser_banc(open(ctx.banc, encoding="utf-8").read())
+    compte = {}
+    ecarts, jouees = [], 0
+    for nom in ordre:
+        composables = [e for e in labs[nom]["ecritures"] if any(e[c] and jumeau_nfd(e[c]) != e[c] for c in ("chemin", "cwd", "commande"))]
+        if not composables:
+            continue
+        lab_nfc, lab_nfd = ctx.unique("nfd-nfc-" + nom), ctx.unique("nfd-nfd-" + nom)
+        materialiser(labs, nom, lab_nfc)
+        materialiser(labs, nom, lab_nfd)
+        for e in composables:
+            jouees += 1
+            dossier = ctx.copie_forcee(dossier_jugé, "armed") if e["armee"] else dossier_jugé
+            brut_nfc, cwd_nfc = entree_de_ecriture(e, lab_nfc)
+            r_nfc = ctx.lancer("A", brut_nfc, cwd=cwd_nfc, dossier=dossier)
+            j = _jumeau_ecriture(e)
+            brut_nfd, _cwd_nfd = entree_de_ecriture(j, lab_nfd)
+            cwd_processus = os.path.join(lab_nfd, e["cwd"]) if e["cwd"] else lab_nfd   # le cwd NFC existant : le payload seul porte le cwd NFD
+            r_nfd = ctx.lancer("A", brut_nfd, cwd=cwd_processus, dossier=dossier)
+            v_nfc, v_nfd = classer(r_nfc[0], r_nfc[1]), classer(r_nfd[0], r_nfd[1])
+            if r_nfc != r_nfd or r_nfc[2]:
+                ecarts.append("jumeau NFD de %s %s%s%s :: %s %s : NFC -> %s %s, NFD -> %s %s" % (
+                    e["outil"], e["chemin"], (" cwd=" + e["cwd"]) if e["cwd"] else "", (" commande=" + e["commande"]) if e["commande"] else "", e["attendu"],
+                    e["gate"] or "", v_nfc, court(r_nfc[1], 60), v_nfd, court(r_nfd[1], 60)))
+                continue
+            conforme, obtenu = juger(e["attendu"], e["gate"], r_nfc[0], r_nfc[1])
+            if not conforme:
+                ecarts.append("jumeau NFD de %s %s : la forme NFC elle-même ne rend pas l'attendu %s %s (%s)" % (e["outil"], e["chemin"], e["attendu"], e["gate"], obtenu))
+                continue
+            cle = (e["gate"], e["attendu"], "Bash" if e["outil"] == "Bash" else "outil")
+            compte[cle] = compte.get(cle, 0) + 1
+    # cas G4′ : SubagentHandback sans sortie brute d'un worker doté de Bash, cwd dans un sous-dossier composable du lab
+    g4p = ctx.copie_forcee(dossier_jugé, "armed")
+    texte = re.sub(r'^(ARMEMENT_G4P = )"observe"', r'\1"armed"', open(os.path.join(g4p, "planning-hook.sh"), encoding="utf-8").read(), flags=re.M)
+    d_g4p = ctx.unique("force-g4p")
+    os.makedirs(d_g4p, exist_ok=True)
+    ecrire(os.path.join(d_g4p, "planning-hook.sh"), texte)
+    os.chmod(os.path.join(d_g4p, "planning-hook.sh"), 0o755)
+    sous = "livrables/\u00e9quipe"
+    resultats_g4p = []
+    for variante, cwd_rel in (("NFC", sous), ("NFD", jumeau_nfd(sous))):
+        lab = ctx.unique("nfd-g4p-" + variante.lower())
+        ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+        ecrire(os.path.join(lab, ".claude", "agents", "worker-nfc.md"),
+               "---\nname: worker-nfc\ndescription: Worker du cas G4 prime NFD\nvf-internal: true\ntools: Read, Bash\n---\nCorps du worker.\n")
+        os.makedirs(os.path.join(lab, sous), exist_ok=True)
+        brut = json.dumps({"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": os.path.join(lab, cwd_rel), "permission_mode": "default",
+                           "agent_id": "agent-test", "agent_type": "worker-nfc", "hook_event_name": "PreToolUse", "tool_name": "SubagentHandback",
+                           "tool_input": {"message": "Rapport sans sortie brute."}}, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        resultats_g4p.append(ctx.lancer("A", brut, cwd=os.path.join(lab, sous), dossier=d_g4p))
+    jouees += 1
+    if resultats_g4p[0] != resultats_g4p[1] or resultats_g4p[0][2]:
+        ecarts.append("jumeau NFD de SubagentHandback (G4′, cwd composable) : NFC -> %s %s, NFD -> %s %s" % (
+            classer(resultats_g4p[0][0], resultats_g4p[0][1]), court(resultats_g4p[0][1], 60), classer(resultats_g4p[1][0], resultats_g4p[1][1]), court(resultats_g4p[1][1], 60)))
+    elif classer(resultats_g4p[0][0], resultats_g4p[0][1]) != "deny":
+        ecarts.append("jumeau NFD de SubagentHandback (G4′) : la forme NFC elle-même ne refuse pas : %s" % classer(resultats_g4p[0][0], resultats_g4p[0][1]))
+    else:
+        compte[("G4P", "doit-refuser", "outil")] = 1
+    attendus = (("G1", "doit-refuser"), ("G1", "doit-passer"), ("G7", "doit-refuser"), ("G7", "doit-passer"), ("G5", "doit-refuser"), ("ROLE", "doit-refuser"),
+                ("G6", "doit-passer"), ("G4P", "doit-refuser"))
+    manque = [a for a in attendus if not any(k[0] == a[0] and k[1] == a[1] for k in compte)]
+    if not any(k[1] == "silence" for k in compte):
+        manque.append(("-", "silence (jumeau dev)"))
+    if not any(k[0] == "G2" and k[1] == "avertit" and k[2] == "outil" for k in compte) or not any(k[0] == "G2" and k[1] == "avertit" and k[2] == "Bash" for k in compte):
+        manque.append(("G2", "avertit Write et Bash"))
+    detail = "%d écritures composables rejouées (jumeau NFD de même code, même stdout, même stderr) : %s" % (
+        jouees - len(ecarts), ", ".join("%s %s %d" % (k[0] or "-", k[1], v) for k, v in sorted(compte.items(), key=str)))
+    if dossier_jugé == ctx.scripts_dir:
+        print("COUVERTURE NFD " + detail)
+    if ecarts:
+        return False, "%d écart(s) : %s" % (len(ecarts), " | ".join(ecarts[:3]))
+    if manque:
+        return False, "preuve trop pauvre : cas absents %s ; %s" % (manque, detail)
+    return True, detail
+
+
 def sec_banc(ctx):
     ordre, labs, chemins = labs_banc(ctx)
     compte = {}
@@ -3516,6 +3622,9 @@ def sec_banc(ctx):
     for nom in ordre:
         if labs[nom]["jumeau_de"] and not labs[nom]["ecritures"]:
             ko("COUVERTURE jumeau " + nom, "un lab jumeau porte des écritures", ">= 1", "0")
+    bon, detail = controle_nfd_gates(ctx, None)
+    ok("R-NFD-GATES jumeaux NFD du banc sur copie armée : " + detail) if bon else ko("R-NFD-GATES", "chaque écriture composable du banc rend, sous sa forme NFD, le même code et la même sortie",
+                                                                                       "jumeaux identiques", detail)
 
 
 CTRL_FICHIER = (controle_table_02, controle_table_04, controle_parseur, controle_env_statique, controle_jeton, controle_registre, controle_g7_05)
@@ -3534,6 +3643,8 @@ def sec_mutants(ctx):
          "R-TABLE-03", controle_table_03),
         # 46-05 : G3 et G4 sont UN seul geste (P46-D-11) : la garde d'égalité neutralisée, une table à G3 armé et G4 en observe est acceptée
         ("ARMEMENT-G3-G4", "# armement-g3-g4", "if False:  # armement-g3-g4", "R-TABLE-04", controle_table_04),
+        # 46 (fix-46-a, A1) : la normalisation NFC des composants relatifs au lab retirée -> les jumeaux NFD du banc rendent une autre décision
+        ("NFD-GATES", "# nfc-chemin", 'return [c for c in rel.split(os.sep) if c not in ("", ".")]  # nfc-chemin', "R-NFD-GATES", controle_nfd_gates),
         ("PARSEUR", 'return ("invalide:frontmatter-non-ferme", {})', 'return ("invalide:frontmatter-non-ferme-mute", {})',
          "R-PARSEUR", controle_parseur),
         ("ENV-ADHESION", 'SCHEMA_ADHESION = "cycles-v1"', 'SCHEMA_ADHESION = os.environ.get("VF_SCHEMA_ADHESION", "cycles-v1")',
@@ -4992,6 +5103,7 @@ LIMITES_REFERENCE = (
     ("ba", ("référence", "fail-open")),
     ("bb", ("Phase 48", "Phase 50", "P46-D-13")),
     ("be", ("BORNE_LECTURE_PLAN", "1 Mio", "G3", "G4", "recalcul")),
+    ("bf", ("NFC", "NFD", "racine", "ext4", "APFS")),
 )
 PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 

@@ -292,7 +292,7 @@ def valider(valeurs, chemins_bruts):
     for brut in chemins_bruts:
         if not entree_ecrit_valide(brut):
             raise Refus(64, "--chemin : chemin concret relatif au lab attendu, reçu : " + brut)
-        normal = "/".join(c for c in brut.split("/") if c not in ("", "."))
+        normal = "/".join(unicodedata.normalize("NFC", c) for c in brut.split("/") if c not in ("", "."))  # nfc-derog
         if normal == "":
             raise Refus(64, "--chemin : chemin vide après normalisation : " + brut)
         if normal not in chemins:

@@ -650,11 +650,12 @@ def empreinte_livrables(racine, entrees):
 
 
 def _couvre_unite(entree, unite_rel):
-    """Vrai si l'entrée `ecrit:` EST le dossier de l'unité (`unite_rel`, relatif au lab) ou l'un de ses ancêtres, comparé par
-    composants et sans égard à la casse (sur un système de fichiers insensible à la casse, `.PLANNING` désigne le même dossier).
-    Une entrée qui se normalise en rien (`.`) n'est pas un livrable : le prédicat la rend `absente`, elle n'est pas traitée ici."""
-    cible = [c.casefold() for c in _normaliser_livrable(entree).split("/") if c != ""]
-    unite = [c.casefold() for c in unite_rel.split("/") if c not in ("", ".")]
+    """Vrai si l'entrée `ecrit:` EST le dossier de l'unité (`unite_rel`, relatif au lab) ou l'un de ses ancêtres, comparé par composants,
+    chacun en forme normale NFC puis sans égard à la casse (sur un système de fichiers insensible à la casse ou à la normalisation, `.PLANNING`
+    et un nom saisi en NFD désignent le même dossier ; A1, fix-46-a). Une entrée qui se normalise en rien (`.`) n'est pas un livrable : le
+    prédicat la rend `absente`, elle n'est pas traitée ici."""
+    cible = [unicodedata.normalize("NFC", c).casefold() for c in _normaliser_livrable(entree).split("/") if c != ""]  # nfc-couvre
+    unite = [unicodedata.normalize("NFC", c).casefold() for c in unite_rel.split("/") if c not in ("", ".")]
     return len(cible) > 0 and len(cible) <= len(unite) and unite[:len(cible)] == cible
 
 
@@ -1023,7 +1024,7 @@ def poser(valeurs, constats_bruts):
     if racine is None or not verifier_adhesion(os.path.join(racine, ".planning"))["adherente"]:
         raise Refus(2, "lab non adhérent : le config.json du dossier de planning doit déclarer "
                        "\"planning_version\": \"cycles-v1\"")
-    composants = [c for c in os.path.relpath(unite, racine).split(os.sep) if c not in ("", ".")]
+    composants = [unicodedata.normalize("NFC", c) for c in os.path.relpath(unite, racine).split(os.sep) if c not in ("", ".")]  # nfc-verdict-unite
     juge_forme = forme_juge(composants)
     if not (forme_unite(composants) or juge_forme): raise Refus(64, "--unite : l'unité doit être un dossier de phase ou de plan du modèle (.planning/cycles/<cycle>/phases/<phase>[/plans/<plan>]) ou le dossier d'un juge (.planning/juges/<juge>)")  # verdict-forme-unite
     nom_artefact = NOM_SORTIE_PIEGEE if juge_forme else "PLAN.md"
@@ -1059,7 +1060,7 @@ def poser(valeurs, constats_bruts):
     ecrire_atomique(unite, "VERDICT.md", texte)
     inscrire_ecriture_moteur(racine, unite_rel + "/VERDICT.md", "poser-verdict.sh")  # d1-moteur-verdict
     print("[poser-verdict] VERDICT.md écrit : %s (juge %s, tentative %d, hash %s, hash_livrables %s)" % (
-        os.path.join(os.path.relpath(unite, racine), "VERDICT.md"), juge, tentative, empreinte, empreinte_livr))
+        unite_rel + "/VERDICT.md", juge, tentative, empreinte, empreinte_livr))
 
 
 def main():

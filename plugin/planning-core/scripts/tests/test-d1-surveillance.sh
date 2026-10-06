@@ -20,6 +20,8 @@
 #   R-D1-08  Write laissé passer (copie observe) : une ligne `intention`, FileChanged expliqué ; un second changement sans nouvelle intention : contournement ;
 #            un Write refusé (copie G6), un Write hors liste : aucune intention
 #   R-D1-09  `inscrire_surveillance` et `_jeton_journal` ast-identiques dans les quatre scripts ; un chemin à saut de ligne reste UNE ligne encodée
+#   R-D1-15  (A1, fix-46-a) unité `01-été` : références de chemin NFC ; Write par le chemin NFD du CLOTURE.md -> UNE ligne `intention` de chemin NFC ; FileChanged sur le
+#            chemin NFC : aucun contournement ; FileChanged d'un chemin NFD exercé là où la forme NFD désigne le fichier (MUT-D1-NFC)
 #   R-D1-10  SessionStart (références posées), CLOTURE.md créé hors séance, SessionStart -> un contournement (source=reconciliation) et le signal D1 avec le chemin,
 #            une ligne `signal` posée ; un troisième SessionStart sans changement : aucun signal
 #   R-D1-11  une écriture du moteur entre deux séances : aucun contournement à la réconciliation
@@ -78,6 +80,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 import urllib.parse
 
 TOKEN = "{{VF_SCRIPTS}}"
@@ -116,6 +119,11 @@ def court(octets, n=240):
 
 def sha(octets):
     return hashlib.sha256(octets).hexdigest()
+
+
+def jumeau_nfd(texte):
+    """Forme NFD, composant par composant (séparateur `/`) : égale au texte s'il ne porte aucun caractère composable."""
+    return "/".join(unicodedata.normalize("NFD", c) for c in texte.split("/"))
 
 
 # --- Payloads du harnais (46-RECHERCHE-HOOKS §2 et §3) ----------------------------------------------------------------------
@@ -801,6 +809,42 @@ def controle_d1_08(ctx, script):
                           "aucune intention")
 
 
+def controle_d1_15(ctx, script):
+    """A1 (fix-46-a) : unité ouverte `01-été` (nom écrit par échappements \\u) ; références posées par SessionStart, toutes de chemin NFC ; Write par le chemin NFD
+    du CLOTURE.md de l'unité (copie observe) -> UNE ligne `intention` de chemin NFC ; le fichier écrit au chemin NFC puis FileChanged sur le chemin enregistré (NFC)
+    -> aucun contournement ; FileChanged d'un chemin NFD exercé seulement là où la forme NFD désigne le fichier (sinon une ligne `~`, sans ✓)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    unite = "01-\u00e9t\u00e9"
+    lab = fabriquer_lab(ctx, "d1-15", ouvertes=(unite,), closes=())
+    cloture_rel = ".planning/cycles/01-c/phases/%s/CLOTURE.md" % unite
+    cloture_nfd = jumeau_nfd(cloture_rel)
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err:
+        return False, "SessionStart : code 0 attendu — obtenu rc=%d %s" % (rc, court(err))
+    fautes = []
+    refs = lignes_de(lab, "reference")
+    if not any(unite in r["chemin"] for r in refs) or any(not unicodedata.is_normalized("NFC", r["chemin"]) for r in refs):
+        fautes.append("références de SessionStart : toutes de chemin NFC et au moins une sous l'unité %s attendues — obtenu %s" % (unite, [r["chemin"] for r in refs][:3]))
+    rc, out, err = ctx.lancer(payload_ecriture(lab, os.path.join(lab, *cloture_nfd.split("/"))), cwd=lab, dossier=d)
+    intentions = lignes_de(lab, "intention", cloture_rel)
+    if rc != 0 or verdict_de(rc, out) == "deny" or len(intentions) != 1:
+        return False, "Write du CLOTURE.md par son chemin NFD : UNE ligne intention de chemin NFC attendue — obtenu rc=%d %s, %d intention(s) %s" % (
+            rc, verdict_de(rc, out), len(intentions), [i["chemin"] for i in lignes_de(lab, "intention")][:3])
+    ecrire(os.path.join(lab, *cloture_rel.split("/")), "clôture écrite au chemin NFC\n")
+    rc, out, err = changement(ctx, d, lab, cloture_rel)
+    if rc != 0 or out != b"" or contournements(lab, cloture_rel):
+        fautes.append("FileChanged sur le chemin enregistré (NFC) après l'écriture : aucun contournement attendu — obtenu rc=%d %d contournement(s)" % (rc, len(contournements(lab, cloture_rel))))
+    if os.path.exists(os.path.join(lab, *cloture_nfd.split("/"))):
+        ecrire(os.path.join(lab, *cloture_rel.split("/")), "clôture réécrite hors outil\n")
+        rc, out, err = ctx.lancer(payload_fichier(lab, os.path.join(lab, *cloture_nfd.split("/"))), cwd=lab, dossier=d)
+        if rc != 0 or len(contournements(lab, cloture_rel)) != 1:
+            fautes.append("FileChanged d'un chemin NFD : UN contournement de chemin NFC attendu — obtenu rc=%d %d contournement(s)" % (rc, len(contournements(lab, cloture_rel))))
+    elif script is None:
+        print("  ~ R-D1-15 (FileChanged NFD) non exercé (système de fichiers sensible à la normalisation)")
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "unité 01-été : références de chemin NFC ; Write par le chemin NFD du CLOTURE.md : UNE intention de chemin NFC ; FileChanged sur le chemin NFC : aucun contournement")
+
+
 def _fonctions(chemin, marqueur, noms):
     """{nom: ast.dump} des fonctions `noms` du corps Python du script (docstring comprise) et leur nombre de définitions."""
     arbre = ast.parse(corps_python(open(chemin, encoding="utf-8").read(), marqueur))
@@ -1135,12 +1179,14 @@ def sec_moteur(ctx):
     rendre("R-D1-07", "pose de verdict, dérogation et consommation inscrites", controle_d1_07, ctx)
     rendre("R-D1-08", "une écriture par outil laissée passer est une intention, une seule fois", controle_d1_08, ctx)
     rendre("R-D1-09", "la fonction qui inscrit est ast-identique dans les quatre scripts", controle_d1_09, ctx)
+    rendre("R-D1-15", "A1 : un chemin NFD est tracé sous sa forme NFC", controle_d1_15, ctx)
 
 
 def sec_mutants_moteur(ctx):
     tuer(ctx, "D1-MOTEUR", "# d1-moteur-state", "pass  # d1-moteur-state", "R-D1-06", controle_d1_06, script="recalc-planning.sh")
     tuer(ctx, "D1-INTENTION", "# d1-intention", "pass  # d1-intention", "R-D1-08", controle_d1_08)
     tuer(ctx, "D1-INTENTION-REUTILISEE", "# d1-apres", "apres = entrees  # d1-apres", "R-D1-08", controle_d1_08)
+    tuer(ctx, "D1-NFC", "# nfc-d1", "composants = os.path.relpath(os.path.join(os.path.realpath(parent), nom), racine).split(os.sep)  # nfc-d1", "R-D1-15", controle_d1_15)
     # Une copie divergente : la fonction de poser-verdict.sh perd la garde du lien (le contrôle des arbres rougit)
     tuer(ctx, "D1-AST", "if os.path.islink(planning) or (", "if os.path.islink(planning):", "R-D1-09", controle_d1_09, script="poser-verdict.sh")
 

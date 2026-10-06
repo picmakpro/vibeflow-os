@@ -19,6 +19,9 @@
 #   R-EMP-11  l'empreinte ne dépend pas de l'ordre d'énumération (trois ordres provoqués, texte canonique recalculé par la suite)
 #   R-EMP-12  lecture sans lien à aucun composant (ouvertures chaînées, O_NOFOLLOW), sans blocage sur un FIFO (O_NONBLOCK) ; le
 #             repli sans descripteur de dossier rend la même empreinte
+#   R-EMP-13  (A1, fix-46-a) les écrivains comparent et nomment les chemins en forme NFC : `_couvre_unite` des trois copies (entrée NFD, unité NFD, livrable
+#             voisin) ; pose refusée pour un ancêtre de l'unité déclaré en NFD ; `--unite` en NFD posée, ligne imprimée et ligne `moteur` de D1 en NFC ;
+#             deroger-gate.sh `--chemin` en NFD : ligne `derogation` en NFC (MUT-EMP-COUVRE-NFC, MUT-VERDICT-UNITE-NFC, MUT-DEROG-NFC)
 #   R-PLAF-01 à 04  plafond de trois tentatives (code 65, VERDICT.md inchangé), dérogation PLAFOND à usage unique consommée sous
 #             verrou avant l'écriture, constante du code (jamais un fichier du lab ni l'environnement), ordre prouvé par l'ast
 #   R-JUGE-FORME-01, 02  la forme d'unité `.planning/juges/<juge>` (artefact haché SORTIE-PIEGEE.md, pas de hash_livrables, plafond
@@ -71,6 +74,8 @@ import stat
 import subprocess
 import sys
 import time
+import unicodedata
+import urllib.parse
 
 MARQUEUR_POSER = "PY_POSER_VERDICT_EOF"
 UNITE = ".planning/cycles/01-c/phases/01-p"
@@ -1037,6 +1042,74 @@ def controle_emp_04(ctx, dossier):
                           % (len(NOMS_BLOC) + len(NOMS_ENTREES), len(NOMS_JOURNAL), len(cas), len(JEUX_PLAN)))
 
 
+# --- R-EMP-13 : les écrivains comparent et nomment les chemins en forme NFC (A1, fix-46-a) -----------------------------------------------
+# Les noms composables sont écrits par échappements \u : ni une relecture ni un éditeur ne peut les renormaliser.
+CYCLE_E = ".planning/cycles/01-\u00e9t\u00e9"
+UNITE_E = CYCLE_E + "/phases/01-p"
+
+
+def jumeau_nfd(texte):
+    """Forme NFD, composant par composant (séparateur `/`) : égale au texte s'il ne porte aucun caractère composable."""
+    return "/".join(unicodedata.normalize("NFD", c) for c in texte.split("/"))
+
+
+def controle_emp_13(ctx, dossier):
+    """A1 : (a) `_couvre_unite` des TROIS copies compare en NFC (entrée NFD de l'ancêtre, unité NFC -> vrai ; entrée NFC, unité NFD -> vrai ; un livrable
+    `livrables/été.md` -> faux) ; (b) une pose dont le PLAN.md déclare l'ancêtre de l'unité en NFD est refusée (64, « dossier de l'unité »), aucun VERDICT.md ;
+    (c) `--unite` en NFD est posée (0), la ligne imprimée et la ligne `moteur` du journal de D1 nomment la forme NFC ; (d) deroger-gate.sh `--chemin` en NFD :
+    la ligne `derogation` porte la forme NFC. Chaque faute contient « NFC »."""
+    fautes = []
+    ancetre_nfd, ancetre_nfc = jumeau_nfd(CYCLE_E), CYCLE_E
+    unite_nfd = jumeau_nfd(UNITE_E)
+    # (a) le prédicat des trois copies
+    for script, marqueur in TROIS_COPIES:
+        couvre = charger_bloc(os.path.join(dossier, script), marqueur)["_couvre_unite"]
+        for nom, entree, unite, attendu in (("entrée NFD, unité NFC", ancetre_nfd, UNITE_E, True), ("entrée NFC, unité NFD", ancetre_nfc, unite_nfd, True),
+                                            ("livrable voisin", "livrables/\u00e9t\u00e9.md", UNITE_E, False)):
+            if couvre(entree, unite) is not attendu:
+                fautes.append("(a) NFC : %s : _couvre_unite(%r, %r) de %s rend %s (attendu %s)" % (nom, entree, unite, script, not attendu, attendu))
+    # (b) pose dont le PLAN.md déclare l'ancêtre de l'unité en NFD
+    lab = lab_neuf(ctx, "emp13b", (ancetre_nfd,), unite=UNITE_E)
+    rc, out, err = poser_cmd(ctx, dossier, lab, 1, unite=UNITE_E)
+    texte = (out + err).decode("utf-8", "replace")
+    if rc != 64 or MOT_UNITE not in texte:
+        fautes.append("(b) NFC : ecrit: ancêtre de l'unité écrit en NFD : code %d (attendu 64, « %s ») : %s" % (rc, MOT_UNITE, court(err)))
+    if verdicts_ecrits(lab):
+        fautes.append("(b) NFC : un VERDICT.md écrit malgré le refus « %s » (ancêtre en NFD)" % MOT_UNITE)
+    # (c) --unite en NFD : le dossier NFD désigne celui de la forme NFC sur un système insensible à la normalisation, sinon un dossier NFD créé par le test
+    lab = lab_neuf(ctx, "emp13c", unite=UNITE_E)
+    insensible = os.path.isdir(os.path.join(lab, *unite_nfd.split("/")))
+    if not insensible:
+        ecrire(os.path.join(lab, *unite_nfd.split("/"), "PLAN.md"), plan_md(("livrables/rapport.md", "donnees")))
+    rc, out, err = poser_cmd(ctx, dossier, lab, 1, unite=unite_nfd)
+    sortie = out.decode("utf-8", "replace")
+    if rc != 0:
+        fautes.append("(c) NFC : --unite en NFD : code %d (attendu 0) : %s" % (rc, court(err)))
+    else:
+        if (UNITE_E + "/VERDICT.md") not in sortie or unicodedata.normalize("NFC", sortie) != sortie:
+            fautes.append("(c) NFC : la ligne imprimée ne nomme pas la forme NFC de l'unité : %s" % court(sortie))
+        if insensible:
+            moteur = [l for l in octets(os.path.join(lab, ".planning", "surveillance.log")).decode("utf-8").split("\n") if "  genre=moteur  " in l] \
+                if os.path.exists(os.path.join(lab, ".planning", "surveillance.log")) else []
+            chemins = [urllib.parse.unquote(c[len("chemin="):]) for l in moteur for c in l.split("  ") if c.startswith("chemin=")]
+            if chemins != [UNITE_E + "/VERDICT.md"]:
+                fautes.append("(c) NFC : la ligne `moteur` du journal de D1 ne nomme pas la forme NFC de l'unité : %s" % chemins)
+        else:
+            ctx.notes.append("  ~ R-EMP-13 (c) ligne `moteur` non exercée (système de fichiers sensible à la normalisation : le verdict est écrit dans le dossier NFD, que la ligne ne nomme pas)")
+    # (d) deroger-gate.sh --chemin en NFD
+    lab = lab_neuf(ctx, "emp13d", unite=UNITE_E)
+    rc, out, err = deroger_cmd(ctx, dossier, lab, "G3", jumeau_nfd(UNITE_E + "/CLOTURE.md"))
+    if rc != 0:
+        fautes.append("(d) NFC : deroger-gate.sh --chemin en NFD : code %d (attendu 0) : %s" % (rc, court(err or out)))
+    else:
+        chemins = [urllib.parse.unquote(c[len("chemin="):]) for l in journal_derogations(lab) if "  derogation  " in l for c in l.split("  ") if c.startswith("chemin=")]
+        if chemins != [UNITE_E + "/CLOTURE.md"]:
+            fautes.append("(d) NFC : la ligne `derogation` ne porte pas le chemin en forme NFC : %s" % chemins)
+    return (not fautes), ("; ".join(fautes[:4]) if fautes else
+                          "forme NFC : `_couvre_unite` des trois copies compare en NFC (entrée NFD, unité NFD, livrable voisin) ; pose refusée (64, « %s ») pour un ancêtre déclaré en NFD ; "
+                          "--unite en NFD posée, ligne imprimée%s en NFC ; deroger-gate.sh --chemin en NFD : ligne `derogation` en NFC" % (MOT_UNITE, " et ligne moteur" if insensible else ""))
+
+
 # --- R-PLAF-01 à 04 : le plafond de tentatives -------------------------------------------------------------------------
 def controle_plaf_01(ctx, dossier):
     lab = lab_neuf(ctx, "plaf01")
@@ -1409,6 +1482,7 @@ def sec_emp(ctx):
     rendre("R-EMP-10", "nom non UTF-8 ou à caractère de contrôle : livrable illisible", controle_emp_10, ctx, d)
     rendre("R-EMP-11", "empreinte indépendante de l'ordre d'énumération", controle_emp_11, ctx, d)
     rendre("R-EMP-12", "lecture sans lien, sans blocage, repli sans descripteur", controle_emp_12, ctx, d)
+    rendre("R-EMP-13", "A1 : les écrivains comparent et nomment les chemins en NFC", controle_emp_13, ctx, d)
 
 
 MUTANTS = [
@@ -1460,6 +1534,13 @@ MUTANTS = [
      "DRAPEAUX_LIVRABLE = os.O_RDONLY | SANS_SUIVI_DE_LIEN  # livrable-ouverture", "R-EMP-12", controle_emp_12, "O_NONBLOCK", True),
     ("DIRFD", "poser-verdict.sh", MARQUEUR_POSER, "# livrable-dirfd", "AVEC_DESCRIPTEURS = False  # livrable-dirfd",
      "R-EMP-12", controle_emp_12, "lien", True),
+    # A1 (fix-46-a) : la forme NFC des chemins chez les écrivains
+    ("EMP-COUVRE-NFC", "poser-verdict.sh", MARQUEUR_POSER, "# nfc-couvre",
+     'cible = [c.casefold() for c in _normaliser_livrable(entree).split("/") if c != ""]  # nfc-couvre', "R-EMP-13", controle_emp_13, "NFC", True),
+    ("VERDICT-UNITE-NFC", "poser-verdict.sh", MARQUEUR_POSER, "# nfc-verdict-unite",
+     'composants = [c for c in os.path.relpath(unite, racine).split(os.sep) if c not in ("", ".")]  # nfc-verdict-unite', "R-EMP-13", controle_emp_13, "NFC", True),
+    ("DEROG-NFC", "deroger-gate.sh", "PY_DEROGER_GATE_EOF", "# nfc-derog",
+     'normal = "/".join(c for c in brut.split("/") if c not in ("", "."))  # nfc-derog', "R-EMP-13", controle_emp_13, "NFC", True),
 ]
 
 

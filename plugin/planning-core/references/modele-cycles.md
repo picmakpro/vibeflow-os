@@ -461,7 +461,7 @@ feuille, P46-D-03b) ; G4 le vérifie à l'écriture de `SUMMARY.md` (plan 46-05)
   de pose, R4 du recalcul et son cache l'appellent ; G3 et G4 l'appellent (plan 46-05) ; aucun ne la
   réécrit.
 - **Point fixe** : une entrée `ecrit:` qui **est ou contient le dossier de l'unité** (l'unité elle-même,
-  `.planning` ou un autre ancêtre, comparés par composants et sans égard à la casse) est **refusée à la
+  `.planning` ou un autre ancêtre, comparés par composants, en forme NFC puis sans égard à la casse) est **refusée à la
   pose** (code 64, message distinct « … est ou contient le dossier de l'unité … »), jamais posée : le
   verdict s'écrit dans ce dossier, `hash_livrables` y serait périmé dès la pose. Le refus précède toute
   lecture de `VERDICT.md`, tout temporaire et toute consommation de dérogation. Étiquette :
@@ -895,6 +895,18 @@ chaque arbitrage humain nomme son canal et sa date.
 - **Racine dérivée du chemin écrit** (P45-D-12), jamais de `$CLAUDE_PROJECT_DIR`, qui ne suit pas
   `EnterWorktree` : la racine du lab est le plus proche ancêtre du chemin écrit (à défaut, du `cwd` du
   payload pour un dispatch) qui contient un dossier `.planning` ; le plus proche gagne.
+- **Forme normale NFC sous la racine** (fix-46-a, A1, correction de classe). Tout test de forme d'un gate (`NOM_UNITE`, noms
+  fixes comparés en casefold, `.planning`) et toute lecture de l'unité passent par `composants_nfc` : le chemin résolu
+  physiquement, rendu relatif à la racine du lab, chaque composant en forme normale NFC. Un nom d'unité saisi en NFD — qu'APFS et
+  HFS+ résolvent vers le dossier de sa forme NFC, où `NOM_UNITE` ne reconnaissait plus rien, d'où un passage de G1, G3 et G4 — rend la
+  MÊME décision que sa forme NFC, sur tout système de fichiers : le hook lit l'unité sous la forme NFC de ses composants. Voies couvertes :
+  `file_path` et `notebook_path` (G1, G3, G4, G5, G6, G7, ROLE), chemins tirés d'une commande Bash (G2), `cwd` (un chemin relatif est
+  joint au `cwd` puis normalisé ; `cible_de` ne normalise rien), `file_path` de FileChanged et intentions de D1
+  (`chemin_relatif_surveille`), clés de la réconciliation. Les écrivains normalisent aux mêmes endroits : `poser-verdict.sh` (`--unite`,
+  clé de la dérogation PLAFOND et du journal de D1), `deroger-gate.sh` (`--chemin`), `_couvre_unite` (bloc partagé, trois copies
+  ast-identiques) ; `recalc-planning.sh` ne change que `_couvre_unite` (il dérive les unités des noms du disque, jamais d'un chemin
+  fourni par un agent). Preuves : R-BANC-NFD (banc de clôture), R-NFD-GATES (banc des gates), R-NFD-02, R-EMP-13, R-D1-15 et leurs
+  mutants ; limite (bf).
 - **Un refus est un JSON `permissionDecision: "deny"` rendu avec le code 0** (P45-D-08), jamais un
   exit 2 ; toute erreur interne du script, dans le périmètre adhérent, est piégée et rendue en `deny`.
 - **Périmètre d'environnement** (P45-D-12a ; amendement de R-ENV-02, décisions du manager
@@ -1016,6 +1028,7 @@ corrections ciblées et les relectures de la phase ont ajoutées (décisions du 
 - **limite (ba)** — P46-D-07, P46-D-10 (Phase 46, 46-07) : la première observation d'un fichier surveillé pose sa référence sans contournement (un fichier déjà modifié avant le premier `SessionStart` d'un lab n'est pas tracé) ; le journal est lu sur ses 4 Mio de fin (`BORNE_LECTURE_SURVEILLANCE`) : une référence plus ancienne est inconnue et se repose en première observation ; D1 est fail-open (toute erreur sort en silence, code 0) : une trace perdue en séance est rattrapée au `SessionStart` suivant.
 - **limite (bb)** — P46-D-06, P46-D-13 (Phase 46, 46-09) : aucun dispatch de juge en Phase 46 — le premier passage d'un juge sur sa sortie piégée est une étape écrite du premier cycle, portée par le manager jusqu'à l'orchestrateur générique de la Phase 48 ; les sorties piégées sont fabriquées par l'initialisation en Phase 50 (à la main sinon) : « juge sans preuve » est donc attendu sur tout lab existant, et ce n'est jamais vert ; la qualité d'une sortie piégée (trop facile à refuser) relève de la Phase 50 ; le seuil de juge n'est ni lu ni posé dans `config.json` (P46-D-13, Phase 50).
 - **limite (be)** — A11 (Phase 46, fix-46-a) : G3 et G4 ne lisent pas plus de 1 Mio d'un `PLAN.md` (`BORNE_LECTURE_PLAN`, 1 048 576 octets LUS, jamais la taille annoncée) : au-delà, le `PLAN.md` est tenu pour illisible, la clôture et le `SUMMARY.md` sont refusés par un message qui nomme la borne ; le recalcul et `poser-verdict.sh` le lisent sans cette borne (le recalcul peut rendre un état, la commande poser un verdict, là où le hook refuse : un refus de plus, jamais un passage).
+- **limite (bf)** — A1 (Phase 46, fix-46-a) : la normalisation NFC porte sur les composants SOUS la racine du lab, jamais sur la racine (préfixe tel que la résolution physique le rend) ; sur APFS et HFS+, insensibles à la normalisation, les formes NFC et NFD d'un nom désignent le même dossier ; sur un système sensible à la normalisation (ext4), le hook lit l'unité sous sa forme NFC : une unité dont le nom de disque n'est pas en NFC (le recalcul la range « Hors modèle », sauf un nom qui reste conforme à `NOM_UNITE` une fois décomposé — jamo hangûl, idéogrammes de compatibilité CJK) y est lue absente, d'où un refus de G1, G3 ou G4, jamais un passage ; une jumelle NFC posée à côté serait lue à sa place, le recalcul gardant la vue du disque.
 
 ### Contrat de sortie par événement (Phase 46)
 

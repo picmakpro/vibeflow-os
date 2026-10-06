@@ -1249,11 +1249,12 @@ def empreinte_livrables(racine, entrees):
 
 
 def _couvre_unite(entree, unite_rel):
-    """Vrai si l'entrée `ecrit:` EST le dossier de l'unité (`unite_rel`, relatif au lab) ou l'un de ses ancêtres, comparé par
-    composants et sans égard à la casse (sur un système de fichiers insensible à la casse, `.PLANNING` désigne le même dossier).
-    Une entrée qui se normalise en rien (`.`) n'est pas un livrable : le prédicat la rend `absente`, elle n'est pas traitée ici."""
-    cible = [c.casefold() for c in _normaliser_livrable(entree).split("/") if c != ""]
-    unite = [c.casefold() for c in unite_rel.split("/") if c not in ("", ".")]
+    """Vrai si l'entrée `ecrit:` EST le dossier de l'unité (`unite_rel`, relatif au lab) ou l'un de ses ancêtres, comparé par composants,
+    chacun en forme normale NFC puis sans égard à la casse (sur un système de fichiers insensible à la casse ou à la normalisation, `.PLANNING`
+    et un nom saisi en NFD désignent le même dossier ; A1, fix-46-a). Une entrée qui se normalise en rien (`.`) n'est pas un livrable : le
+    prédicat la rend `absente`, elle n'est pas traitée ici."""
+    cible = [unicodedata.normalize("NFC", c).casefold() for c in _normaliser_livrable(entree).split("/") if c != ""]  # nfc-couvre
+    unite = [unicodedata.normalize("NFC", c).casefold() for c in unite_rel.split("/") if c not in ("", ".")]
     return len(cible) > 0 and len(cible) <= len(unite) and unite[:len(cible)] == cible
 
 

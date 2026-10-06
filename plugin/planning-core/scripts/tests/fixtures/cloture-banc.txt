@@ -15,6 +15,8 @@
 @@ #
 @@ # Ce banc est un FICHIER TEXTE, pas une arborescence versionnée : l'installeur pose `fixtures/` à plat, et aucun dossier `.planning/` imbriqué n'est
 @@ # versionné dans ce dépôt. Chaque lab adhérent porte son jumeau `-dev` (hors adhésion : aucun gate ne le garde).
+@@ # Toute écriture dont le chemin, le cwd ou la commande porte un caractère composable a son jumeau NFD, dérivé par la suite (R-BANC-NFD / R-NFD-GATES) :
+@@ # les noms composables s'écrivent ici en NFC, jamais en NFD (une forme NFD saisie est invisible à la relecture).
 
 @@ lab cl-absent
 @@ fichier .planning/config.json
@@ -782,3 +784,87 @@ ecrit: livrables/rapport.md
 @@ ecriture Write .planning/cycles/01-c/phases/01-sans-verdict/SUMMARY.md :: silence G4
 @@ ecriture Edit .planning/cycles/01-c/phases/01-sans-verdict/SUMMARY.md :: silence G4
 @@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-sans-verdict/SUMMARY.md :: silence G4
+
+@@ # --- Noms composables (A1, fix-46-a) : cycle `01-été`, phases accentuées ; chaque écriture se rejoue aussi sous sa forme NFD (R-BANC-NFD).
+@@ lab cl-nfc
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+@@ fichier .planning/cycles/01-été/CYCLE.md
+---
+titre: Cycle d'été
+---
+@@ fichier .planning/cycles/01-été/phases/01-reçu/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-été/phases/01-reçu/PLAN.md
+---
+ecrit: livrables/reçu-absent.md
+---
+@@ fichier .planning/cycles/01-été/phases/02-prêt/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-été/phases/02-prêt/PLAN.md
+---
+ecrit: livrables/prêt.md
+---
+@@ fichier livrables/prêt.md
+contenu
+@@ fichier .planning/cycles/01-été/phases/03-jugé/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-été/phases/03-jugé/PLAN.md
+---
+ecrit: livrables/jugé.md
+---
+@@ fichier livrables/jugé.md
+contenu
+@@ fichier .planning/cycles/01-été/phases/04-échoué/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-été/phases/04-échoué/PLAN.md
+---
+ecrit: livrables/échoué.md
+---
+@@ fichier livrables/échoué.md
+contenu
+@@ fichier .planning/cycles/01-été/phases/05-côté/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-été/phases/05-côté/plans/01-tâche/PLAN.md
+---
+ecrit: livrables/tâche-absente.md
+---
+@@ verdict .planning/cycles/01-été/phases/03-jugé tentative=1 constats=critère-a::passé
+@@ verdict .planning/cycles/01-été/phases/04-échoué tentative=1 constats=critère-a::échec
+@@ ecriture Write .planning/cycles/01-été/phases/01-reçu/CLOTURE.md :: doit-refuser G3
+@@ ecriture Edit .planning/cycles/01-été/phases/01-reçu/CLOTURE.md :: doit-refuser G3
+@@ ecriture NotebookEdit .planning/cycles/01-été/phases/01-reçu/CLOTURE.md :: doit-refuser G3
+@@ ecriture Write .planning/cycles/01-été/phases/02-prêt/CLOTURE.md :: doit-passer G3
+@@ ecriture Write .planning/cycles/01-été/phases/05-côté/plans/01-tâche/CLOTURE.md :: doit-refuser G3
+@@ ecriture Write .planning/cycles/01-été/phases/01-reçu/SUMMARY.md :: doit-refuser G4
+@@ ecriture Write .planning/cycles/01-été/phases/03-jugé/SUMMARY.md :: doit-passer G4
+@@ ecriture Edit .planning/cycles/01-été/phases/03-jugé/SUMMARY.md :: doit-passer G4
+@@ ecriture Write .planning/cycles/01-été/phases/04-échoué/SUMMARY.md :: doit-refuser G4
+
+@@ lab cl-nfc-dev jumeau-de=cl-nfc
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+@@ fichier .planning/cycles/01-été/CYCLE.md
+---
+titre: Cycle d'été
+---
+@@ fichier .planning/cycles/01-été/phases/01-reçu/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-été/phases/01-reçu/PLAN.md
+---
+ecrit: livrables/reçu-absent.md
+---
+@@ ecriture Write .planning/cycles/01-été/phases/01-reçu/CLOTURE.md :: silence G3
+@@ ecriture Write .planning/cycles/01-été/phases/01-reçu/SUMMARY.md :: silence G4
