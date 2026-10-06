@@ -652,6 +652,169 @@ def ecart_nature_marqueurs(rel, fm):
         f"marqueur designe une procedure (B-03, C-15) ; la nature reste declaree, jamais deduite"
     ]
 
+def est_vrai(v):
+    """Valeur YAML « true » d'un champ NATIF (disable-model-invocation) : insensible a la casse,
+    comme le lit le harnais — `True` desactive aussi l'invocation par le modele."""
+    return isinstance(v, str) and v.strip().lower() == "true"
+
+def valider_invocation(rel, fm):
+    """POCK-07, P414-D-01 : vf-invocation PRESENT doit valoir exactement user ou model (casse
+    exacte, jamais ramene a un defaut) ET etre coherent avec le champ natif : `user` exige
+    disable-model-invocation: true, `model` l'interdit. Joue dans TOUS les modes — la valeur est
+    un fait du fichier, pas une arete. Cle ABSENTE : jamais une erreur ICI (skills_non_classes la
+    juge, sous --callers-root seulement)."""
+    if "vf-invocation" not in fm:
+        return []
+    val = fm["vf-invocation"]
+    if not isinstance(val, str) or val not in CLASSES_INVOCATION:
+        return [f"{rel} : vf-invocation invalide — {esc(val)} (attendu user ou model, POCK-07)"]
+    desactive = est_vrai(fm.get("disable-model-invocation"))
+    if val == "user" and not desactive:
+        return [f"{rel} : vf-invocation: user sans disable-model-invocation: true (P414-D-01)"]
+    if val == "model" and desactive:
+        return [f"{rel} : vf-invocation: model avec disable-model-invocation: true (P414-D-01)"]
+    return []
+
+def mot_entier_re(nom):
+    """Regex de mot ENTIER pour un nom de skill (T-41.4-01) : le nom est passe par re.escape (un
+    point reste un point litteral), bornes = aucun caractere [A-Za-z0-9_-] de part et d'autre
+    (« vf-dev » n'apparie pas « vf-dev-manager »)."""
+    return re.compile(r"(?<![A-Za-z0-9_-])" + re.escape(nom) + r"(?![A-Za-z0-9_-])")
+
+def jetons_champ(v):
+    """Jetons d'un champ de frontmatter : liste (bloc ou en ligne) ou scalaire separe par des
+    virgules ; vides ecartes."""
+    if isinstance(v, list):
+        items = v
+    elif isinstance(v, str):
+        items = v.split(",")
+    else:
+        return []
+    out = []
+    for x in items:
+        x = str(x).strip().strip(chr(34)).strip(chr(39))
+        if x:
+            out.append(x)
+    return out
+
+def agent_outille_skill(fm):
+    """Un agent peut appeler un skill s'il porte l'outil Skill (jeton `Skill` ou `Skill(...)` dans
+    tools:) OU n'a aucune ligne tools: (il herite de tout) — sauf si disallowedTools porte le jeton
+    Skill. Un agent de tools: Read, Bash qui cite un skill en prose n'a AUCUNE arete machine."""
+    tools = jetons_champ(fm.get("tools"))
+    if not tools:
+        outille = True
+    else:
+        outille = any(t == "Skill" or t.startswith("Skill(") for t in tools)
+    interdits = jetons_champ(fm.get("disallowedTools", fm.get("disallowed-tools")))
+    if "Skill" in interdits:
+        return False
+    return outille
+
+def aretes_par_skill(juges, appelants):
+    """Aretes d'appel DERIVEES (jamais un nom de module en dur) : rel du skill -> liste de
+    (famille, rel de l'appelant). Familles : commande (fichier commands/*.md qui contient le nom,
+    mot entier), prechargement (nom dans le champ skills: d'un agent), agent (agent qui contient
+    le nom ET dont l'outillage permet Skill)."""
+    aretes = {}
+    for rel, _chemin, fm, _texte in juges:
+        liste = []
+        aretes[rel] = liste
+        nom = fm.get("name")
+        if not isinstance(nom, str) or not nom:
+            continue
+        motif = mot_entier_re(nom)
+        for ap in appelants:
+            if ap["kind"] == "commande":
+                if motif.search(ap["text"]):
+                    liste.append(("commande", ap["rel"]))
+                continue
+            if nom in jetons_champ(ap["fm"].get("skills")):
+                liste.append(("prechargement", ap["rel"]))
+                continue
+            if not motif.search(ap["text"]):
+                continue
+            if not agent_outille_skill(ap["fm"]):
+                continue
+            liste.append(("agent", ap["rel"]))
+    return aretes
+
+def corps_sans_frontmatter(texte):
+    lignes = texte.split("\n")
+    i = 1
+    while i < len(lignes) and lignes[i].strip() != "---":
+        i += 1
+    return "\n".join(lignes[i + 1:])
+
+def controler_aretes(juges, appelants):
+    """POCK-07, P414-D-01/D-02 : un skill `user` appele par une commande, un prechargement ou un
+    agent outille Skill est refuse (une erreur par appelant, qui le nomme) ; un `user` dont le
+    corps cite un AUTRE `user` est refuse. Un user qui cite un model est legitime."""
+    aretes = aretes_par_skill(juges, appelants)
+    users = {}
+    for rel, _chemin, fm, _texte in juges:
+        nom = fm.get("name")
+        if fm.get("vf-invocation") == "user" and isinstance(nom, str) and nom:
+            users[nom] = rel
+    msgs = []
+    for rel, _chemin, fm, texte in juges:
+        if fm.get("vf-invocation") != "user":
+            continue
+        for famille, ap_rel in aretes.get(rel, []):
+            msgs.append(f"{rel} : user-invoked appele par {ap_rel} ({famille}) — refuse (P414-D-02)")
+        corps = corps_sans_frontmatter(texte)
+        for nom_cible in sorted(users):
+            if nom_cible == fm.get("name"):
+                continue
+            if mot_entier_re(nom_cible).search(corps):
+                msgs.append(f"{rel} : user-invoked cite le user-invoked {esc(nom_cible)} — refuse (P414-D-01)")
+    return msgs
+
+def est_imbrique(chemin):
+    """Skill NICHE (Type 2) : le dossier parent de son dossier se nomme `skills`
+    (skills/<nom>/SKILL.md). Un SKILL.md sous un dossier de module (Type 1) ne l'est pas."""
+    dossier_skill = os.path.dirname(os.path.abspath(chemin))
+    return os.path.basename(os.path.dirname(dossier_skill)) == "skills"
+
+def controler_codex(juges):
+    """P414-D-03 : un skill `user` NICHE exige {dossier}/agents/openai.yaml — fichier regulier
+    (jamais un lien) portant une ligne `allow_implicit_invocation: false` (equivalent Codex de
+    disable-model-invocation, policy.allow_implicit_invocation)."""
+    msgs = []
+    for rel, chemin, fm, _texte in juges:
+        if fm.get("vf-invocation") != "user" or not est_imbrique(chemin):
+            continue
+        oy = os.path.join(os.path.dirname(chemin), "agents", "openai.yaml")
+        conforme = False
+        if os.path.isfile(oy) and not os.path.islink(oy):
+            try:
+                with open(oy, encoding="utf-8-sig") as fh:
+                    conforme = any(l.strip() == "allow_implicit_invocation: false" for l in fh.read().split("\n"))
+            except OSError:
+                conforme = False
+        if not conforme:
+            msgs.append(f"{rel} : user-invoked niche sans agents/openai.yaml (policy.allow_implicit_invocation: false) — P414-D-03")
+    return msgs
+
+def dette_type1(juges):
+    """P414-D-03 : un skill `user` NON niche (module Type 1, copie du SKILL.md seul par
+    l'installeur) ne peut pas transporter l'equivalent Codex — avertissement de dette, jamais un
+    refus (le poser dans plugin/<mod>/agents/ le ferait installer comme AGENT)."""
+    return [f"{rel} : dette Type 1 (P414-D-03) — equivalent Codex non transporte par l'installeur (copie du SKILL.md seul)"
+            for rel, chemin, fm, _texte in juges
+            if fm.get("vf-invocation") == "user" and not est_imbrique(chemin)]
+
+def sans_appelant(juges, appelants):
+    """Noms des skills non user sans aucune arete machine (commande, prechargement, agent outille
+    Skill) — information pour le jugement humain (P414-D-01) ; le gate LISTE, il ne pose rien."""
+    aretes = aretes_par_skill(juges, appelants)
+    noms = set()
+    for rel, _chemin, fm, _texte in juges:
+        nom = fm.get("name")
+        if fm.get("vf-invocation") != "user" and isinstance(nom, str) and nom and not aretes.get(rel):
+            noms.add(nom)
+    return sorted(noms)
+
 def check_file(rel, text):
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
@@ -666,6 +829,7 @@ def check_file(rel, text):
     errors.extend(valider_ecrit(rel, fm.get("ecrit")))
     errors.extend(valider_rubrique_juge(rel, fm.get("vf-rubrique-juge")))
     errors.extend(valider_marqueurs(rel, fm))
+    errors.extend(valider_invocation(rel, fm))
     warnings.extend(detecter_derive(rel, fm, lignes_de_portee(text)))
     warnings.extend(ecart_nature_marqueurs(rel, fm))
     for k in fm:
@@ -731,6 +895,7 @@ else:
 # Le hook de lab et les arbres par module (T4/T32) n'ont pas de racine d'aretes : leur comportement
 # est inchange. Racine absente ou sans aucun fichier appelant = INDETERMINE (rc 3) — jamais un vert
 # a vide, la conformite d'un skill « user » ne se juge pas sans ses aretes (T-41.4-02).
+liste_sans_appelant = None  # None hors --callers-root : la ligne d'information n'est pas imprimee
 if callers_root:
     appelants_trouves = decouvrir_appelants(callers_root)
     if not appelants_trouves:
@@ -739,6 +904,10 @@ if callers_root:
             print(f"[check-skills] ✗ INDETERMINE : {callers_root} — ARETES-ABSENTES, aucune arete calculable ({cause}) — aucun verdict rendu")
         sys.exit(3)
     errors.extend(skills_non_classes(skills_juges))
+    errors.extend(controler_aretes(skills_juges, appelants_trouves))
+    errors.extend(controler_codex(skills_juges))
+    warnings.extend(dette_type1(skills_juges))
+    liste_sans_appelant = sans_appelant(skills_juges, appelants_trouves)
 
 n_err, n_warn = len(errors), len(warnings)
 
@@ -764,6 +933,10 @@ for w in warnings:
 if thirdparty_files_total:
     pfx_str = ','.join(third_party_prefixes) if third_party_prefixes else '—'
     print(f"[check-skills] {thirdparty_files_total} skill(s) tiers non linte(s) (prefixe(s) : {pfx_str})")
+if liste_sans_appelant is not None:
+    # Information, JAMAIS comptee en avertissement : le gate liste, il ne pose rien (P414-D-01).
+    noms_sans_appelant = ", ".join(esc(n) for n in liste_sans_appelant) if liste_sans_appelant else "(aucun)"
+    print(f"[check-skills] sans appelant machine (commande, prechargement, agent outille Skill) : {noms_sans_appelant} — candidats user-invoked seulement si effet de bord lourd (jugement humain, P414-D-01)")
 if n_err:
     print(f"[check-skills] ✗ {n_err} non-conformite(s) bloquante(s) :")
     for e in errors:

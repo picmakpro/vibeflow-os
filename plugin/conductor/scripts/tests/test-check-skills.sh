@@ -1346,6 +1346,161 @@ else
   ko "T42 (rc=$RC, hook=$RC_H) : $OUT"
 fi
 
+# ---------- T34 — valeurs de vf-invocation hors {user, model} -> rc 1, avec ET sans --callers-root ----
+T34_OK=1
+for VAL in 'User' 'auto' ''; do
+  mk_tree t34; mk_sk a a "vf-invocation: ${VAL}\ndisable-model-invocation: true\n"; mk_cmd x.md 'commande de fixture'
+  run_tree; RC_A=$RC; OUT_A="$OUT"
+  OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC_B=$?
+  if [ "$RC_A" -ne 1 ] || [ "$RC_B" -ne 1 ] || ! echo "$OUT_A" | grep -q "vf-invocation invalide" || ! echo "$OUT" | grep -q "vf-invocation invalide"; then
+    T34_OK=0; echo "    [T34] valeur '${VAL}' : rc(avec)=$RC_A rc(sans)=$RC_B : $OUT_A"
+  fi
+done
+if [ "$T34_OK" -eq 1 ]; then
+  ok "T34 vf-invocation User / auto / vide -> rc=1 « vf-invocation invalide » (avec ET sans --callers-root)"
+else
+  ko "T34 (voir détails ci-dessus)"
+fi
+mk_tree t34-ok; mk_sk a a 'vf-invocation: model\n'
+OUT_T34_MODEL="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC_T34_MODEL=$?
+if [ "$RC_T34_MODEL" -eq 0 ]; then
+  ok "T34b témoin positif : vf-invocation: model valide -> rc=0 (le contrôle de valeur n'est pas aveugle)"
+else
+  ko "T34b (rc=$RC_T34_MODEL) : $OUT_T34_MODEL"
+fi
+
+# ---------- T35 — cohérence avec le champ natif disable-model-invocation ---------------------------
+mk_tree t35a; mk_sk a a 'vf-invocation: user\n'; mk_oy a 'allow_implicit_invocation: false'; mk_cmd x.md 'commande de fixture'
+run_tree; RC_A=$RC; OUT_A="$OUT"
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC_A2=$?
+mk_tree t35b; mk_sk a a 'vf-invocation: model\ndisable-model-invocation: true\n'; mk_cmd x.md 'commande de fixture'
+run_tree; RC_B=$RC; OUT_B="$OUT"
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC_B2=$?
+mk_tree t35c; mk_user a a; mk_cmd x.md 'commande de fixture'
+run_tree; RC_C=$RC; OUT_C="$OUT"
+if [ "$RC_A" -eq 1 ] && [ "$RC_A2" -eq 1 ] && echo "$OUT_A" | grep -q "vf-invocation: user sans disable-model-invocation: true" \
+   && [ "$RC_B" -eq 1 ] && [ "$RC_B2" -eq 1 ] && echo "$OUT_B" | grep -q "vf-invocation: model avec disable-model-invocation: true" \
+   && [ "$RC_C" -eq 0 ]; then
+  ok "T35 user sans dmi true -> rc=1 ; model avec dmi true -> rc=1 (avec ET sans --callers-root) ; user + true -> rc=0"
+else
+  ko "T35 (a=$RC_A/$RC_A2 b=$RC_B/$RC_B2 c=$RC_C) : $OUT_A | $OUT_B | $OUT_C"
+fi
+
+# ---------- T36 — un skill user appelé (commande, préchargement, agent outillé Skill) -> rc 1 -------
+t36_cas() { # <attendu rc> <jeton attendu dans la sortie ou -> <libellé>
+  if [ "$RC" -eq "$1" ] && { [ "$2" = "-" ] || echo "$OUT" | grep -qF -- "$2"; }; then
+    echo "    [T36] ✓ $3 (rc=$RC)"
+  else
+    T36_OK=0; echo "    [T36] ✗ $3 (rc=$RC, attendu $1, jeton '$2') : $OUT"
+  fi
+}
+T36_OK=1
+mk_tree t36a; mk_user u1 u1; mk_cmd x.md 'La commande lance le skill u1 puis rend la main.'
+run_tree; t36_cas 1 "commands/x.md" "commande qui nomme le skill user"
+echo "$OUT" | grep -q "P414-D-02" || { T36_OK=0; echo "    [T36] ✗ P414-D-02 absent : $OUT"; }
+mk_tree t36b1; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills:\n  - u1\n' 'Agent précharge u1.'
+run_tree; t36_cas 1 "prechargement" "préchargement en liste de bloc"
+mk_tree t36b2; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills: [autre, u1]\n' 'Agent.'
+run_tree; t36_cas 1 "prechargement" "préchargement en liste en ligne"
+mk_tree t36b3; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills: autre, u1\n' 'Agent.'
+run_tree; t36_cas 1 "prechargement" "préchargement scalaire séparé par des virgules"
+mk_tree t36b4; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [u1]\n' 'Agent sans Skill mais qui précharge.'
+run_tree; t36_cas 1 "prechargement" "préchargement par un agent sans outil Skill (indépendant de tools)"
+mk_tree t36c; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Skill\n' 'Route vers u1.'
+run_tree; t36_cas 1 "agents/ag.md" "agent tools: Read, Skill qui cite le skill"
+mk_tree t36c2; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: [Read, "Skill(u1)"]\n' 'Route vers u1.'
+run_tree; t36_cas 1 "agents/ag.md" "agent tools avec Skill(u1) en liste en ligne"
+mk_tree t36d; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md '' 'Route vers u1.'
+run_tree; t36_cas 1 "agents/ag.md" "agent SANS ligne tools: (hérite de tout) qui cite le skill"
+mk_tree t36m; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_mod_ag modx 'Le module route vers u1.'
+run_tree; t36_cas 1 "modx/AGENT.md" "{module}/AGENT.md sans tools: qui cite le skill"
+mk_tree t36e; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\n' 'Utilise le skill u1 en prose, sans outil Skill.'
+run_tree; t36_cas 0 "-" "agent tools: Read, Bash qui cite en prose -> aucune arête machine (cas vf-mobile-test)"
+mk_tree t36f; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'disallowedTools: Skill\n' 'Cite u1.'
+run_tree; t36_cas 0 "-" "agent dont disallowedTools porte Skill -> aucune arête"
+mk_tree t36g; mk_sk m m 'vf-invocation: model\n'; mk_cmd x.md 'La commande lance m.'; mk_ag ag.md '' 'Cite m.'
+run_tree; t36_cas 0 "-" "témoin : un skill model appelé par commande et agent reste conforme"
+if [ "$T36_OK" -eq 1 ]; then
+  ok "T36 arêtes machine : commande, préchargement (3 formes), agent outillé Skill, agent sans tools:, {module}/AGENT.md -> rc=1 ; prose sans Skill, disallowedTools Skill, skill model -> rc=0"
+else
+  ko "T36 (voir détails ci-dessus)"
+fi
+
+# ---------- T37 — un user n'en appelle jamais un autre (P414-D-01) ---------------------------------
+mk_tree t37a; mk_user a a 'Ce skill enchaîne avec b.'; mk_user b b; mk_cmd x.md 'sans rapport'
+run_tree; RC_A=$RC; OUT_A="$OUT"
+mk_tree t37b; mk_user a a 'Ce skill enchaîne avec m.'; mk_sk m m 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
+run_tree; RC_B=$RC; OUT_B="$OUT"
+if [ "$RC_A" -eq 1 ] && echo "$OUT_A" | grep -q "P414-D-01" && echo "$OUT_A" | grep -q "user-invoked cite le user-invoked 'b'"&& [ "$RC_B" -eq 0 ]; then
+  ok "T37 user -> user rc=1 (P414-D-01, nomme la cible) ; user -> model rc=0"
+else
+  ko "T37 (a=$RC_A b=$RC_B) : $OUT_A | $OUT_B"
+fi
+
+# ---------- T38 — équivalent Codex d'un user niché : agents/openai.yaml -----------------------------
+mk_tree t38a; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_cmd x.md 'sans rapport'
+run_tree; RC_A=$RC; OUT_A="$OUT"
+mk_tree t38b; mk_user a a; mk_cmd x.md 'sans rapport'
+run_tree; RC_B=$RC; OUT_B="$OUT"
+mk_tree t38c; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a 'policy:
+  allow_implicit_invocation: true'; mk_cmd x.md 'sans rapport'
+run_tree; RC_C=$RC; OUT_C="$OUT"
+T38D_OK=1
+mk_tree t38d; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_cmd x.md 'sans rapport'
+printf 'allow_implicit_invocation: false\n' > "$TREE/vrai-openai.yaml"
+mkdir -p "$TREE/skills/a/agents"
+if ln -s "$TREE/vrai-openai.yaml" "$TREE/skills/a/agents/openai.yaml" 2>/dev/null; then
+  run_tree
+  if [ "$RC" -ne 1 ]; then T38D_OK=0; fi
+fi
+if [ "$RC_A" -eq 1 ] && echo "$OUT_A" | grep -q "openai.yaml" && echo "$OUT_A" | grep -q "P414-D-03" \
+   && [ "$RC_B" -eq 0 ] && [ "$RC_C" -eq 1 ] && [ "$T38D_OK" -eq 1 ]; then
+  ok "T38 user niché : sans openai.yaml rc=1 (P414-D-03) ; allow_implicit_invocation: false rc=0 ; true rc=1 ; openai.yaml en lien symbolique rc=1"
+else
+  ko "T38 (a=$RC_A b=$RC_B c=$RC_C d_ok=$T38D_OK) : $OUT_A | $OUT_B | $OUT_C"
+fi
+
+# ---------- T39 — user NON niché (Type 1) : avertissement de dette, pas de refus --------------------
+mk_tree t39; mkdir -p "$TREE/plugin/modtype1"
+printf -- '---\nname: type1-user\ndescription: Fixture Type 1.\nvf-invocation: user\ndisable-model-invocation: true\n---\nCorps.\n' > "$TREE/plugin/modtype1/SKILL.md"
+mk_cmd x.md 'sans rapport'
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/plugin" --callers-root="$TREE" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "dette Type 1" && echo "$OUT" | grep -q "P414-D-03"; then
+  ok "T39 user non niché -> rc=0 + avertissement « dette Type 1 » (P414-D-03)"
+else
+  ko "T39 (rc=$RC) : $OUT"
+fi
+
+# ---------- T41 — ligne d'information « sans appelant machine » -------------------------------------
+mk_tree t41; mk_sk seul zz-seul 'vf-invocation: model\n'; mk_sk appele zz-appele 'vf-invocation: model\n'
+mk_cmd x.md 'La commande lance zz-appele.'
+run_tree
+LIGNE_T41="$(echo "$OUT" | grep 'sans appelant machine')"
+if [ "$RC" -eq 0 ] && [ -n "$LIGNE_T41" ] && echo "$LIGNE_T41" | grep -q "zz-seul" && ! echo "$LIGNE_T41" | grep -q "zz-appele" \
+   && ! echo "$OUT" | grep -q "warning(s)"; then
+  ok "T41 ligne « sans appelant machine » : liste le skill sans appelant, pas celui nommé par une commande, jamais comptée en avertissement"
+else
+  ko "T41 (rc=$RC) : $OUT"
+fi
+
+# ---------- T43 — octet de contrôle et nom à point : jamais reflétés bruts, jamais lâches -----------
+mk_tree t43a; mk_sk a a "vf-invocation: us\033er\ndisable-model-invocation: true\n"; mk_cmd x.md 'sans rapport'
+run_tree
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-invocation invalide" && ! printf '%s' "$OUT" | grep -q "$(printf '\033')"; then
+  ok "T43a octet ESC dans vf-invocation -> rc=1, aucun octet ESC brut en sortie"
+else
+  ko "T43a (rc=$RC) : $OUT"
+fi
+mk_tree t43b; mk_user ab a.b; mk_cmd x.md 'La commande lance axb, pas le skill au nom a-point-b.'
+run_tree; RC_A=$RC
+mk_cmd x.md 'La commande lance a.b puis rend la main.'
+run_tree; RC_B=$RC; OUT_B="$OUT"
+if [ "$RC_A" -eq 0 ] && [ "$RC_B" -eq 1 ] && echo "$OUT_B" | grep -q "commands/x.md"; then
+  ok "T43b nom de skill à point : « axb » n'apparie pas « a.b » (rc=0) ; « a.b » littéral l'apparie (rc=1)"
+else
+  ko "T43b (axb=$RC_A, a.b=$RC_B) : $OUT_B"
+fi
+
 # ---------- MUT-DR3 — appel ecart_nature_marqueurs neutralisé (pass) -------------------------------
 if make_gate_mutant DR3 "warnings.extend(ecart_nature_marqueurs(" "pass  # MUT-DR3"; then
   M="$MUT_DIR/check-skills.sh"
