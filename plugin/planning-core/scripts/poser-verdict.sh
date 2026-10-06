@@ -803,6 +803,9 @@ def inscrire_ecriture_moteur(racine, chemin_rel, par):
         return
 
 
+# Borne de lecture du journal des dérogations (A11-classe, fix-46-a tour 2) : même constante et même code que le hook central
+# (R-EMP-04) ; un journal de plus de BORNE_LECTURE_FICHIER octets n'est pas lu : aucune dérogation, le plafond est maintenu (65).
+BORNE_LECTURE_FICHIER = 1048576  # borne-generique
 NOM_JOURNAL_DEROGATIONS = "derogations-gates.log"
 LIGNE_DEROGATION_RE = re.compile(r"^(\S+)  (derogation|consommee)  id=([0-9]+)  gate=(\S+)  chemin=(\S+)(?:  (.*))?$")
 
@@ -850,13 +853,16 @@ def _derogation_non_consommee(entrees, gate, chemin_rel):
 
 def derogation_active(racine, gate, chemin_rel):
     """La plus ancienne dérogation non consommée qui couvre (gate, chemin_rel), ou None. Toute erreur
-    de lecture : aucune dérogation (le refus est maintenu, jamais un passage par défaut)."""
+    de lecture : aucune dérogation (le refus est maintenu, jamais un passage par défaut) ; un journal de plus de BORNE_LECTURE_FICHIER octets
+    n'est pas lu : aucune dérogation, le refus est maintenu (A11, classe)."""
     try:
         descripteur = _ouvrir_journal_derogations(racine, os.O_RDONLY)
         if descripteur is None:
             return None
         with os.fdopen(descripteur, "rb") as fh:
-            octets = fh.read()
+            octets = fh.read(BORNE_LECTURE_FICHIER + 1)  # derog-borne-lecture
+        if len(octets) > BORNE_LECTURE_FICHIER:  # derog-borne-test
+            return None
         return _derogation_non_consommee(_entrees_journal(octets), gate, chemin_rel)
     except Exception:
         return None
@@ -865,7 +871,8 @@ def derogation_active(racine, gate, chemin_rel):
 def consommer(racine, entree):
     """Ajoute la ligne `consommee` de la dérogation, sous verrou (lecture + ajout) quand le module
     existe : la dérogation est relue sous le verrou, une consommation concurrente l'a peut-être déjà
-    prise. Vrai seulement si la ligne est écrite ; toute erreur : faux (le refus est maintenu)."""
+    prise. Vrai seulement si la ligne est écrite ; toute erreur : faux (le refus est maintenu), un journal de plus de BORNE_LECTURE_FICHIER octets
+    lus aussi (A11, classe)."""
     try:
         descripteur = _ouvrir_journal_derogations(racine, os.O_RDWR | os.O_APPEND)
         if descripteur is None:
@@ -874,11 +881,14 @@ def consommer(racine, entree):
             if fcntl is not None:
                 fcntl.flock(descripteur, fcntl.LOCK_EX)
             os.lseek(descripteur, 0, os.SEEK_SET)
-            morceaux = []
+            morceaux, lus = [], 0
             while True:
                 lu = os.read(descripteur, 65536)
                 if not lu:
                     break
+                lus += len(lu)
+                if lus > BORNE_LECTURE_FICHIER:  # derog-borne-verrou
+                    return False
                 morceaux.append(lu)
             existant = b"".join(morceaux)
             restante = _derogation_non_consommee(_entrees_journal(existant), entree["gate"], entree["chemin"])

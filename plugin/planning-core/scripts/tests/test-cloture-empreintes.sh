@@ -24,6 +24,10 @@
 #             deroger-gate.sh `--chemin` en NFD : ligne `derogation` en NFC (MUT-EMP-COUVRE-NFC, MUT-VERDICT-UNITE-NFC, MUT-DEROG-NFC)
 #   R-PLAF-01 à 04  plafond de trois tentatives (code 65, VERDICT.md inchangé), dérogation PLAFOND à usage unique consommée sous
 #             verrou avant l'écriture, constante du code (jamais un fichier du lab ni l'environnement), ordre prouvé par l'ast
+#   R-PLAF-05 (A11-classe, fix-46-a tour 2, reprise) le journal des dérogations est borné à BORNE_LECTURE_FICHIER octets LUS chez
+#             poser-verdict.sh comme chez le hook central (même code, R-EMP-04) : un journal de borne + 1 octets ne porte plus la
+#             dérogation PLAFOND (65 maintenu, VERDICT.md et journal inchangés) ; à la borne exacte elle est citée et consommée ;
+#             `derogation_active` rend None et `consommer` rend False sans écrire, appelées directement (MUT-PLAF-DEROG-*)
 #   R-JUGE-FORME-01, 02  la forme d'unité `.planning/juges/<juge>` (artefact haché SORTIE-PIEGEE.md, pas de hash_livrables, plafond
 #             appliqué) et ses jumeaux négatifs (toute autre forme reste refusée, une unité de cycle garde sa règle)
 #   MUT-*     chaque garde est tuée par un mutant à motif unique : la trace du rouge (assertion, attendu, obtenu) est imprimée ;
@@ -981,7 +985,8 @@ JEUX_PLAN = (
     ("entrée voisine hors de l'unité", ("---\necrit: %s\n---\n" % VOISINE).encode("utf-8")),
 )
 NOMS_JOURNAL = ("NOM_JOURNAL_DEROGATIONS", "LIGNE_DEROGATION_RE", "_jeton_journal", "_chemin_journal_derogations",
-                "_ouvrir_journal_derogations", "_entrees_journal", "_derogation_non_consommee", "derogation_active", "consommer", "citer")
+                "_ouvrir_journal_derogations", "_entrees_journal", "_derogation_non_consommee", "derogation_active", "consommer", "citer",
+                "BORNE_LECTURE_FICHIER")
 
 
 def corps_ast(dossier, script, marqueur):
@@ -1250,6 +1255,82 @@ def controle_plaf_04(ctx, dossier):
                           "celui du hook, qui prend le verrou exclusif du journal")
 
 
+# --- R-PLAF-05 : le journal des dérogations est borné chez poser-verdict.sh (A11-classe, fix-46-a tour 2) ---------------------------------
+def _completer_journal(chemin, taille):
+    """Complète le journal à EXACTEMENT `taille` octets par une ligne `# xxx` que le parseur ignore (aucune entrée de plus)."""
+    actuel = len(octets(chemin))
+    manque = taille - actuel
+    if manque < 4:
+        raise RuntimeError("journal de %d octets, impossible de le compléter à %d" % (actuel, taille))
+    with open(chemin, "ab") as fh:
+        fh.write(b"# " + b"x" * (manque - 3) + b"\n")
+
+
+def controle_plaf_05(ctx, dossier):
+    ns = charger_bloc(os.path.join(dossier, "poser-verdict.sh"))
+    borne = 1048576  # 1 Mio, écrit ici en clair : la borne jugée ne se déduit jamais de la constante du script jugé
+    active, consomme = ns.get("derogation_active"), ns.get("consommer")
+    fautes = []
+    if ns.get("BORNE_LECTURE_FICHIER") != borne:
+        fautes.append("BORNE_LECTURE_FICHIER vaut %r dans poser-verdict.sh (attendu %d, comme le hook central)" % (ns.get("BORNE_LECTURE_FICHIER"), borne))
+
+    def lab_derogation(nom):
+        lab = lab_neuf(ctx, nom)
+        for n in (1, 2, 3):
+            rc, out, err = poser_cmd(ctx, dossier, lab, n)
+            if rc != 0:
+                raise RuntimeError("tentative %d : rc=%d %s" % (n, rc, court(err)))
+        rc, out, err = deroger_cmd(ctx, dossier, lab, "PLAFOND", UNITE)
+        if rc != 0:
+            raise RuntimeError("deroger-gate.sh refuse la dérogation PLAFOND : rc=%d %s" % (rc, court(err)))
+        return lab, os.path.join(lab, ".planning", "derogations-gates.log"), os.path.join(lab, UNITE, "VERDICT.md")
+
+    # (a) de bout en bout : journal de borne + 1 octets -> la dérogation n'est pas lue, le plafond est maintenu (65), rien n'est écrit
+    lab, journal, verdict = lab_derogation("plaf05-plus1")
+    _completer_journal(journal, borne + 1)
+    j_avant, v_avant = octets(journal), octets(verdict)
+    rc, out, err = poser_cmd(ctx, dossier, lab, 4)
+    if rc != 65:
+        fautes.append("4e tentative sous un journal de borne + 1 octets portant la dérogation PLAFOND : rc=%d (attendu 65) %s" % (rc, court(err)))
+    if octets(journal) != j_avant or b"consommee" in octets(journal):
+        fautes.append("le journal de borne + 1 octets a changé (%d -> %d octets) ou une ligne `consommee` a été écrite" % (len(j_avant), len(octets(journal))))
+    if octets(verdict) != v_avant:
+        fautes.append("VERDICT.md modifié sous un journal de borne + 1 octets")
+    if [n for n in os.listdir(os.path.join(lab, UNITE)) if n.startswith(".")]:
+        fautes.append("fichier temporaire laissé sous un journal de borne + 1 octets")
+    # (a) jumeau à la borne exacte : la dérogation est lue, citée et consommée (le refus ne vient pas d'une borne trop basse)
+    lab, journal, verdict = lab_derogation("plaf05-exact")
+    _completer_journal(journal, borne)
+    rc, out, err = poser_cmd(ctx, dossier, lab, 4)
+    lignes = [l for l in octets(journal).decode("utf-8", "replace").split("\n") if "  consommee  " in l and "gate=PLAFOND" in l]
+    if rc != 0 or len(lignes) != 1 or b"consomm" not in out:
+        fautes.append("journal d'exactement %d octets : rc=%d, %d ligne(s) `consommee` PLAFOND, citation %s (attendu 0, 1, une citation) %s"
+                      % (borne, rc, len(lignes), "présente" if b"consomm" in out else "absente", court(err)))
+    # (b) appels directs : derogation_active rend None, consommer rend False et n'écrit rien
+    lab, journal, _verdict = lab_derogation("plaf05-direct")
+    if active is None or consomme is None:
+        fautes.append("derogation_active ou consommer absente de poser-verdict.sh")
+    else:
+        entree = active(lab, "PLAFOND", UNITE)
+        if entree is None:
+            fautes.append("témoin : derogation_active ne lit pas la dérogation d'un journal sous la borne")
+        _completer_journal(journal, borne + 1)
+        avant = octets(journal)
+        rendu = active(lab, "PLAFOND", UNITE)
+        if rendu is not None:
+            fautes.append("derogation_active appelée directement sur un journal de borne + 1 octets rend une dérogation : %s (attendu None)" % court(str(rendu)))
+        if entree is not None:
+            rendu = consomme(lab, entree)
+            if rendu is not False:
+                fautes.append("consommer appelée directement sur un journal de borne + 1 octets rend %r (attendu False)" % (rendu,))
+            if octets(journal) != avant:
+                fautes.append("consommer a modifié un journal de borne + 1 octets (%d -> %d octets)" % (len(avant), len(octets(journal))))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "journal de borne + 1 octets : la 4e tentative reste refusée (65), VERDICT.md, journal et dossier de l'unité inchangés, "
+                          "derogation_active rend None et consommer rend False sans écrire ; à la borne exacte (%d octets) : dérogation PLAFOND "
+                          "citée et consommée" % borne)
+
+
 # --- R-JUGE-FORME-01 et 02 : la forme d'unité d'un juge ------------------------------------------------------------------
 UNITE_JUGE = ".planning/juges/vf-design-judge"
 
@@ -1461,6 +1542,7 @@ def sec_plaf(ctx):
     rendre("R-PLAF-02", "dérogation PLAFOND nominative, à usage unique", controle_plaf_02, ctx, d)
     rendre("R-PLAF-03", "le plafond est une constante du code", controle_plaf_03, ctx, d)
     rendre("R-PLAF-04", "ordre verrou, dérogation, consommation, écriture (structurel)", controle_plaf_04, ctx, d)
+    rendre("R-PLAF-05", "journal des dérogations borné : un journal de borne + 1 octets ne porte plus la dérogation PLAFOND", controle_plaf_05, ctx, d)
 
 
 def sec_juge(ctx):
@@ -1504,6 +1586,15 @@ MUTANTS = [
     ("PLAF-ORDRE", "poser-verdict.sh", MARQUEUR_POSER, "# verdict-consommation",
      'ecrire_atomique(unite, "VERDICT.md", texte); consommer(racine, derogation)  # verdict-consommation',
      "R-PLAF-04", controle_plaf_04, "ecrire_atomique", True),
+    # A11-classe (fix-46-a tour 2, reprise) : le journal des dérogations est borné dans la copie de poser-verdict.sh
+    ("PLAF-DEROG-BORNE", "poser-verdict.sh", MARQUEUR_POSER, "# derog-borne-test", "if False:  # derog-borne-test",
+     "R-PLAF-05", controle_plaf_05, "derogation_active appelée directement", True),
+    ("PLAF-DEROG-VERROU", "poser-verdict.sh", MARQUEUR_POSER, "# derog-borne-verrou", "if False:  # derog-borne-verrou",
+     "R-PLAF-05", controle_plaf_05, "consommer appelée directement", True),
+    ("PLAF-DEROG-CONSTANTE", "poser-verdict.sh", MARQUEUR_POSER, "# borne-generique", "BORNE_LECTURE_FICHIER = 8388608  # borne-generique",
+     "R-PLAF-05", controle_plaf_05, "attendu 65", True),
+    ("PLAF-DEROG-LECTURE", "poser-verdict.sh", MARQUEUR_POSER, "# derog-borne-lecture", "octets = fh.read()  # derog-borne-lecture",
+     "R-EMP-04", controle_emp_04, "derogation_active : arbre ast différent", True),
     ("JUGE-FORME", "poser-verdict.sh", MARQUEUR_POSER, "# verdict-forme-juge",
      'return len(composants) == 3 and composants[0].casefold() == ".planning" and composants[1] == "juges"  # verdict-forme-juge',
      "R-JUGE-FORME-02", controle_juge_02, "Majuscule", True),
