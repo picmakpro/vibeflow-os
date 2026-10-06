@@ -1634,7 +1634,21 @@ clôture de `fiabilite-v1.0`. Touche `dev-orchestrator` (références du head, `
   9. **Sobriété** (SOBR-05) : chaque ajout de doctrine désigne ce qu'il remplace ou resserre ;
      aucun skill neuf, aucun agent neuf.
 
-**Plans:** à planifier (`/gsd-plan-phase 41.4`)
+**Plans:** 11 plans (4 vagues, planifiés le 2026-10-06)
+
+Plans:
+
+- [ ] 41.4-01-PLAN.md — vague 1 : gate de classe d'invocation des skills (`check-skills.sh --callers-root`, `vf-invocation`) — POCK-07
+- [ ] 41.4-02-PLAN.md — vague 1 : segment « défaillance : » obligatoire et SKILL.md surveillés (`check-ajout-retrait.sh`) — POCK-08
+- [ ] 41.4-03-PLAN.md — vague 1 : grille de rétro mécanique/jugement et findings (`detect-promotions.sh`, `promotion.md`) — POCK-05
+- [ ] 41.4-04-PLAN.md — vague 1 : frontière de questions (§Pattern F) et frontière de phase (`head-governance.md` §3) — POCK-01, POCK-03
+- [ ] 41.4-05-PLAN.md — vague 1 : glossaire du lab (`docs/_transverse/` scaffoldé ici, régime dans `docs-flow.md`) — POCK-02
+- [ ] 41.4-06-PLAN.md — vague 1 : merge-danger call au contrat et contrôlé par E3 — POCK-06
+- [ ] 41.4-07-PLAN.md — vague 2 : revue à deux axes Standards/Spec + fixture de la sonde réelle (jouée par le manager) — POCK-04
+- [ ] 41.4-08-PLAN.md — vague 2 : arbitrage Q1/Q2 puis classe posée sur les 26 SKILL.md — POCK-07
+- [ ] 41.4-09-PLAN.md — vague 3 : étape CI propre de check-skills, commentaire CI corrigé (revue `@picmakpro`) — POCK-07, POCK-08
+- [ ] 41.4-10-PLAN.md — vague 3 : tests statiques d'ancres T39-T43 avec mutations — POCK-01, 02, 03, 04, 06
+- [ ] 41.4-11-PLAN.md — vague 4 : bumps de modules (jamais la racine), ledger, critère 7, dogfood des gardes — POCK-01 à POCK-08
 
 ## 📋 Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (Phases 51-56)
 
