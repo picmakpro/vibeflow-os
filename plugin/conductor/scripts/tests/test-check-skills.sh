@@ -1250,6 +1250,102 @@ else
   ko "T32 (modules=$T32_MODS échecs=$T32_FAIL)"
 fi
 
+# ================================ 41.4-01 (POCK-07) : classe d'invocation ==========================
+# Fixtures d'ARBRE : une racine `$TREE` portant skills/, commands/, agents/ (et {mod}/AGENT.md à la
+# demande). Le gate y est joué `--strict --skills-dir=$TREE/skills --callers-root=$TREE` via $CHECK
+# (copie au manifeste frais), jamais contre le manifeste réel.
+mk_tree() { # <nom> -> TREE = racine de fixture
+  TREE="$WORK/tree-$1"
+  rm -rf "$TREE"
+  mkdir -p "$TREE/skills" "$TREE/commands" "$TREE/agents"
+}
+mk_sk() { # <dossier> <name:> <lignes de frontmatter, %b> [corps]
+  mkdir -p "$TREE/skills/$1"
+  printf -- '---\nname: %s\ndescription: Fixture de la classe invocation.\n%b---\n%s\n' "$2" "$3" "${4:-Corps.}" > "$TREE/skills/$1/SKILL.md"
+}
+mk_oy() { # <dossier-skill> <contenu> : skills/<dossier>/agents/openai.yaml
+  mkdir -p "$TREE/skills/$1/agents"
+  printf '%s\n' "$2" > "$TREE/skills/$1/agents/openai.yaml"
+}
+mk_cmd() { # <fichier> <contenu> : commands/<fichier>
+  printf '%s\n' "$2" > "$TREE/commands/$1"
+}
+mk_ag() { # <fichier> <lignes de frontmatter, %b> <corps> : agents/<fichier>
+  printf -- '---\nname: %s\ndescription: Agent de fixture.\n%b---\n%s\n' "${1%.md}" "$2" "$3" > "$TREE/agents/$1"
+}
+mk_mod_ag() { # <module> <corps> : <module>/AGENT.md (forme AGENT.md d'un module)
+  mkdir -p "$TREE/$1"
+  printf -- '---\nname: %s\ndescription: Agent de module de fixture.\n---\n%s\n' "$1" "$2" > "$TREE/$1/AGENT.md"
+}
+run_tree() { # -> OUT, RC ; GATE (facultatif) = copie mutante du gate
+  OUT="$(bash "${GATE:-$CHECK}" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1)"; RC=$?
+}
+# Un skill `user` conforme de bout en bout (dmi true + équivalent Codex) : base des fixtures d'arêtes.
+mk_user() { # <dossier> <name:> [corps]
+  mk_sk "$1" "$2" 'vf-invocation: user\ndisable-model-invocation: true\n' "${3:-Corps.}"
+  mk_oy "$1" 'policy:
+  allow_implicit_invocation: false'
+}
+
+# ---------- T33 — un skill non classé rougit sous --callers-root -----------------------------------
+mk_tree t33a; mk_sk a a 'vf-invocation: model\n'; mk_cmd x.md 'commande de fixture'
+run_tree
+if [ "$RC" -eq 0 ]; then
+  ok "T33a skill classé model sous --callers-root -> rc=0"
+else
+  ko "T33a (rc=$RC) : $OUT"
+fi
+mk_tree t33b; mk_sk a a ''; mk_cmd x.md 'commande de fixture'
+run_tree
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "non classe" && echo "$OUT" | grep -q "POCK-07"; then
+  ok "T33b skill sans vf-invocation sous --callers-root -> rc=1, « non classe » et POCK-07"
+else
+  ko "T33b (rc=$RC) : $OUT"
+fi
+
+# ---------- T40 — racine d'arêtes absente ou sans appelant = INDETERMINE rc 3, usage rc 1 ----------
+mk_tree t40; mk_sk a a 'vf-invocation: model\n'
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root="$WORK/racine-absente-xyz" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "INDETERMINE" && echo "$OUT" | grep -q "ARETES-ABSENTES"; then
+  ok "T40a racine d'arêtes absente -> rc=3, INDETERMINE + ARETES-ABSENTES"
+else
+  ko "T40a (rc=$RC) : $OUT"
+fi
+run_tree   # racine présente mais sans aucun fichier commands/ ni agents/
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "ARETES-ABSENTES"; then
+  ok "T40b racine présente sans aucun fichier appelant -> rc=3 (jamais un vert à vide)"
+else
+  ko "T40b (rc=$RC) : $OUT"
+fi
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root= 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "callers-root vide"; then
+  ok "T40c --callers-root= vide -> rc=1 (usage)"
+else
+  ko "T40c (rc=$RC) : $OUT"
+fi
+OUT="$(bash "$CHECK" --strict --callers-root="$TREE" --file "$TREE/skills/a/SKILL.md" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "callers-root"; then
+  ok "T40d --callers-root avec --file -> rc=1 (usage, jamais ignoré en silence)"
+else
+  ko "T40d (rc=$RC) : $OUT"
+fi
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root "$TREE" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "callers-root"; then
+  ok "T40e --callers-root sans « = » -> rc=1 (usage, jamais ignoré en silence)"
+else
+  ko "T40e (rc=$RC) : $OUT"
+fi
+
+# ---------- T42 — sans --callers-root, un skill non classé reste conforme (hook de lab) ------------
+mk_tree t42; mk_sk a a ''
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC=$?
+OUT_H="$(bash "$CHECK" --hook --skills-dir="$TREE/skills" 2>&1)"; RC_H=$?
+if [ "$RC" -eq 0 ] && [ "$RC_H" -eq 0 ] && ! echo "$OUT" | grep -q "non classe"; then
+  ok "T42 skill non classé SANS --callers-root -> rc=0 (--strict et --hook), comportement inchangé"
+else
+  ko "T42 (rc=$RC, hook=$RC_H) : $OUT"
+fi
+
 # ---------- MUT-DR3 — appel ecart_nature_marqueurs neutralisé (pass) -------------------------------
 if make_gate_mutant DR3 "warnings.extend(ecart_nature_marqueurs(" "pass  # MUT-DR3"; then
   M="$MUT_DIR/check-skills.sh"

@@ -119,6 +119,7 @@ HOOK_MODE=false
 ALLOW_EMPTY=false
 SINGLE_FILE=""
 THIRD_PARTY_PREFIXES="gsd-"
+CALLERS_ROOT=""
 
 for arg in "$@"; do
   case "$arg" in
@@ -134,6 +135,18 @@ for arg in "$@"; do
       fi
       SKILLS_DIR="$v"
       ;;
+    --callers-root=*)
+      v="${arg#*=}"
+      if [ -z "$v" ]; then
+        echo "[check-skills] ✗ --callers-root vide — un chemin est requis" >&2
+        exit 1
+      fi
+      CALLERS_ROOT="$v"
+      ;;
+    --callers-root)
+      echo "[check-skills] ✗ --callers-root exige la forme --callers-root=PATH (jamais ignoré en silence)" >&2
+      exit 1
+      ;;
     --third-party-prefix=*)
       v="${arg#*=}"
       if [ -z "$THIRD_PARTY_PREFIXES" ]; then THIRD_PARTY_PREFIXES="$v"; else THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES:$v"; fi
@@ -148,6 +161,10 @@ for arg in "$@"; do
   [ "$prev" = "--file" ] && SINGLE_FILE="$arg"
   prev="$arg"
 done
+if [ -n "$CALLERS_ROOT" ] && [ -n "$SINGLE_FILE" ]; then
+  echo "[check-skills] ✗ --callers-root incompatible avec --file — les aretes se calculent sur un arbre, jamais sur un fichier isole" >&2
+  exit 1
+fi
 
 # --- Traduction du silence interne vers le harness (uniquement sous --hook) — meme patron que ---
 # check-agents.sh : le SEUL code de silence interne (3 = INDETERMINE) devient 0 a la frontiere du
@@ -174,6 +191,7 @@ esac
 
 VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" \
 VF_ALLOW_EMPTY="$ALLOW_EMPTY" VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" VF_MANIFEST="$VF_MANIFEST" \
+VF_CALLERS_ROOT="$CALLERS_ROOT" \
 "$PYBIN" - <<'PY_CHECK_SKILLS_EOF'
 import glob, json, os, re, sys
 from datetime import date
@@ -184,13 +202,15 @@ strict = os.environ["VF_STRICT"] == "true"
 hook = os.environ["VF_HOOK"] == "true"
 allow_empty = os.environ["VF_ALLOW_EMPTY"] == "true"
 single = os.environ["VF_SINGLE"]
+callers_root = os.environ.get("VF_CALLERS_ROOT", "")
 third_party_prefixes = [p for p in os.environ.get("VF_THIRD_PARTY_PREFIXES", "").split(":") if p]
 
 # Conventions VibeFlow en dur (D-Q1) — jamais dans le manifeste, jamais sujettes a la peremption
 # d'une doc Anthropic externe (meme frontiere que D-01, Phase 42) :
 VIBEFLOW_SKILL_FIELDS = {"vf-nature", "ecrit", "vf-rubrique-juge", "vf-gate-bloquant",
-                         "vf-livrable-tiers", "vf-couche-qualite"}
+                         "vf-livrable-tiers", "vf-couche-qualite", "vf-invocation"}
 NATURES = {"referentiel", "outil", "procedure"}
+CLASSES_INVOCATION = {"user", "model"}
 MARQUEURS = ("vf-gate-bloquant", "vf-livrable-tiers", "vf-couche-qualite")
 
 def decouvrir_skills(racine, refuses=None):
@@ -298,6 +318,7 @@ def charger_referentiel():
 errors, warnings = [], []
 thirdparty_files_total = 0
 linted_paths = []
+skills_juges = []  # (chemin relatif, chemin reel, frontmatter, texte) de chaque skill juge (POCK-07)
 
 def parse_frontmatter(text):
     """Meme tokenizer YAML-tolerant (scalaire/liste/continuation) que check-agents.sh — recopie
@@ -441,6 +462,67 @@ def skill_display_name(text):
     if fm and isinstance(fm.get("name"), str) and fm.get("name"):
         return fm["name"]
     return ""
+
+def skills_non_classes(juges):
+    """POCK-07, P414-D-01 : un skill sans cle vf-invocation n'est pas classe. Joue SOUS
+    --callers-root seulement (le hook de lab, arbre par module, reste inchange). Une cle PRESENTE
+    mais vide ou invalide n'est pas « non classe » : valider_invocation la refuse deja."""
+    msgs = []
+    for rel, _chemin, fm, _texte in juges:
+        if "vf-invocation" not in fm:
+            msgs.append(f"{rel} : non classe — vf-invocation absent (POCK-07, P414-D-01) ; attendu user ou model")
+    return msgs
+
+def lister_md(dossier):
+    """Fichiers .md reguliers DIRECTEMENT sous dossier — aucun lien symbolique (fichier) retenu,
+    ordre stable. Dossier absent ou illisible : liste vide."""
+    try:
+        noms = sorted(os.listdir(dossier))
+    except OSError:
+        return []
+    out = []
+    for n in noms:
+        p = os.path.join(dossier, n)
+        if n.endswith('.md') and os.path.isfile(p) and not os.path.islink(p):
+            out.append(p)
+    return out
+
+def decouvrir_appelants(racine):
+    """POCK-07 : fichiers qui PEUVENT appeler un skill, sous la racine d'aretes —
+    {racine}/commands/*.md (commande), {racine}/agents/*.md, {racine}/*/AGENT.md et
+    {racine}/*/agents/*.md (agent). Memes exclusions que la decouverte des skills : dossiers caches
+    et *-references, aucun lien symbolique suivi. Rend une liste de dicts
+    {rel, kind, fm, text} ; racine absente ou sans aucun de ces fichiers : liste vide (l'appelant
+    en fait un INDETERMINE, jamais un vert a vide). Aucun nom de module en dur."""
+    if not os.path.isdir(racine):
+        return []
+    cibles = [("commande", p) for p in lister_md(os.path.join(racine, "commands"))]
+    cibles += [("agent", p) for p in lister_md(os.path.join(racine, "agents"))]
+    try:
+        sous_dossiers = sorted(os.listdir(racine))
+    except OSError:
+        sous_dossiers = []
+    for d in sous_dossiers:
+        if d.startswith('.') or d.endswith('-references'):
+            continue
+        dp = os.path.join(racine, d)
+        if os.path.islink(dp) or not os.path.isdir(dp):
+            continue
+        ag = os.path.join(dp, "AGENT.md")
+        if os.path.isfile(ag) and not os.path.islink(ag):
+            cibles.append(("agent", ag))
+        cibles += [("agent", p) for p in lister_md(os.path.join(dp, "agents"))]
+    appelants = []
+    for kind, chemin in cibles:
+        rel = os.path.relpath(chemin, racine).replace(os.sep, "/")
+        try:
+            texte = open(chemin, encoding="utf-8-sig").read()
+        except OSError as e:
+            errors.append(f"{rel} : appelant illisible ({e}) — aretes non calculables")
+            continue
+        fm = parse_frontmatter(texte) if kind == "agent" else None
+        appelants.append({"rel": rel, "kind": kind, "fm": fm if fm is not None else {}, "text": texte})
+    return appelants
 
 # --- Detection de derive (D-Q1, D-Q5, FABR-07) -- regle Q-PORTEE complete dans l'en-tete du script
 # (decision deleguee par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26)
@@ -641,6 +723,22 @@ else:
             continue
         check_file(os.path.relpath(f, skills_dir), text)
         linted_paths.append(f)
+        fm_juge = parse_frontmatter(text)
+        if fm_juge is not None:
+            skills_juges.append((os.path.relpath(f, skills_dir), f, fm_juge, text))
+
+# --- Classe d'invocation (POCK-07, Phase 41.4) : jouee SEULEMENT sous --callers-root -------------
+# Le hook de lab et les arbres par module (T4/T32) n'ont pas de racine d'aretes : leur comportement
+# est inchange. Racine absente ou sans aucun fichier appelant = INDETERMINE (rc 3) — jamais un vert
+# a vide, la conformite d'un skill « user » ne se juge pas sans ses aretes (T-41.4-02).
+if callers_root:
+    appelants_trouves = decouvrir_appelants(callers_root)
+    if not appelants_trouves:
+        if not hook:
+            cause = "racine absente" if not os.path.isdir(callers_root) else "aucun fichier appelant (commands/*.md, agents/*.md, */AGENT.md, */agents/*.md)"
+            print(f"[check-skills] ✗ INDETERMINE : {callers_root} — ARETES-ABSENTES, aucune arete calculable ({cause}) — aucun verdict rendu")
+        sys.exit(3)
+    errors.extend(skills_non_classes(skills_juges))
 
 n_err, n_warn = len(errors), len(warnings)
 

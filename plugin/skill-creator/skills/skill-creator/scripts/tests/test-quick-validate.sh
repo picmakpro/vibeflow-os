@@ -7,6 +7,8 @@
 # 3   : une clé inconnue reste refusée (le validateur discrimine toujours)
 # 4   : parité avec conductor/scripts/check-skills.sh (VIBEFLOW_SKILL_FIELDS) — une clé ajoutée
 #       au gate sans l'être ici rougit
+# 5   : classe d'invocation (POCK-07) : vf-invocation: user + disable-model-invocation: true
+#       acceptés ; une valeur de classe n'est jamais jugée ici (check-skills.sh la juge)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -69,6 +71,11 @@ EOF
     fi
   fi
 fi
+
+# 5. classe d'invocation (POCK-07) : un skill user produit par le flux doit passer le validateur
+mk_skill demo-user 'vf-invocation: user\ndisable-model-invocation: true\n'
+out=$(python3 "$SCRIPT" "$TMP/demo-user" 2>&1); rc=$?
+[ $rc -eq 0 ] && ok "vf-invocation: user + disable-model-invocation: true → exit 0" || ko "classe user refusée (rc=$rc) : $out"
 
 echo "== bilan : $pass ok / $fail ko =="
 [ $((pass + fail)) -gt 0 ] || { echo "  ✗ aucune assertion exécutée"; exit 1; }
