@@ -5,7 +5,7 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 46
 current_phase_name: Moteur — gates de clôture et verdicts hachés
-status: "Phase 46 en exécution : 46-01..46-10 livrés, revue/audit/non-régression d'avant armement faits, corrections lot A closes ; 46-11 et 46-12 attendent les arbitrages de Willy (ckpt-46-11, lot B)"
+status: "Phase 46 en exécution : 46-01..46-10 livrés, lots A et B de l'audit corrigés ; 46-11 bloqué sur la précondition de repos (session active dans ~/BusinessFlow-Lab), ckpt-46-12 posé à Willy"
 created: 2026-09-23
 last_updated: "2026-10-06T07:30:00.000Z"
 last_activity: 2026-10-06
@@ -14,9 +14,9 @@ last_activity_desc: >-
   session principale, 2026-10-05) : 46-04 à 46-10 exécutés, revue + audit + non-régression d'avant
   armement, corrections lot A (quick 261006-23m et 261006-638), CI verte.
 stopped_at: >-
-  Phase 46 arrêtée avant 46-11 (2026-10-06) : checkpoint ckpt-46-11 (rejeu réel étapes 5/6, armement
-  étape 5) et arbitrage du lot B de l'audit (D1, canary de juge) posés à Willy, sans réponse.
-  Prochain : relancer la mission avec les réponses ; 46-11, 46-12, revue/audit finaux, PR empilée sur #124.
+  Phase 46 arrêtée au rejeu réel de 46-11 (2026-10-06) : ~/BusinessFlow-Lab non au repos (session
+  claude --resume active). Banc 0/0 et canary verts, rien armé. En attente de Willy : repos du lab
+  et ckpt-46-12 (porte de G4′). Rapport : .planning/missions/2026-10-05-gouvernance-46-exec-reprise.md.
 progress:
   total_phases: 9
   completed_phases: 4
@@ -49,7 +49,7 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 
 ## Session Continuity
 
-**Stopped At:** Phase 46 exécutée jusqu'à 46-10 (2026-10-06), revue + audit + non-régression d'avant armement faits, corrections lot A closes, CI verte ; en attente de Willy : ckpt-46-11 (rejeu réel et armement de l'étape 5) et lot B de l'audit (D1, canary de juge).
+**Stopped At:** 46-11 bloqué avant le rejeu réel (2026-10-06) : ~/BusinessFlow-Lab non au repos ; arbitrages de Willy du 2026-10-06 appliqués (ckpt-46-11 = rejeu-5-6-oui, lot B = b3, AskUserQuestion session principale) ; en attente : repos du lab et ckpt-46-12.
 **Resume File (Phase 46) :** `.planning/missions/2026-10-03-gouvernance-46-plan.md`
 **Resume File (Phase 45) :** `.planning/missions/2026-09-30-gouvernance-45-exec.md`
 **Resume File:** `.planning/missions/2026-09-27-gouvernance-44.md`

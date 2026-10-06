@@ -406,6 +406,14 @@
         "plugin/planning-core"
       ],
       "status": "done"
+    },
+    {
+      "id": "arb-46-repos",
+      "step": "arbitrage Willy : session active dans ~/BusinessFlow-Lab (précondition de repos de 46-11) + ckpt-46-12 posé par avance",
+      "stage": "checkpoint",
+      "deps": [],
+      "scope": [],
+      "status": "running"
     }
   ]
 }

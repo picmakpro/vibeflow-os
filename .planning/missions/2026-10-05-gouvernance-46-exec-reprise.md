@@ -173,7 +173,22 @@ Relayées verbatim des blocs typés, par sprint :
 }
 ```
 
+## Reprise du 2026-10-06 (après arbitrages)
+
+- Arbitrages reçus (Willy, AskUserQuestion session principale, 2026-10-06, relayés par la session
+  principale) : ckpt-46-11 = « rejeu-5-6-oui » ; lot B = « b3 mixte ».
+- Verrou ré-acquis (génération `DRIVER.lock.gen.1791283184.40031`), snapshot de budget E7 posé.
+- **fix-46-b (quick `261006-i5x`)** : A6 corrigé (journal D1 inutilisable signalé au SessionStart,
+  `92898ef3`), A8 corrigé (cache revalidé contre PLAN.md, `d764e67d`), A5/A7/A10 en limites (bk)-(bm),
+  résidus en (bn) (journal supprimé sans trace d'état, ligne `moteur` forgée) et (bo) (cache forgé de
+  bout en bout). Suites vertes.
+- **exec-46-11** : banc `COMPTE G3 faux-refus=0 faux-accept=0` (97), `COMPTE G4 … =0` (72), canary
+  vert ; rejeu réel NON joué : ~/BusinessFlow-Lab non au repos (12 processus, session `claude
+  --resume` et ses MCP). Rien lu dans les labs, rien armé. `ESCALADE-WILLY ETAPE-5` (`14195252`).
+- Remonté à Willy : repos du lab (a/b/c/d, recommandé a) et ckpt-46-12 par avance (recommandé
+  `etape-6-mesure`, vu A2, A3, A4, P1 ; P5 : journal ignoré).
+
 ## Next step
 
-Relancer la mission avec les réponses de Willy à ckpt-46-11 et au lot B : exec-46-11 (rejeu réel et
-armement de l'étape 5), puis ckpt-46-12 (porte de G4′, avec A2/A3/A4/P1/P5).
+Relancer exec-46-11 Tâche 2 dès que ~/BusinessFlow-Lab est au repos (ou selon la réponse de Willy),
+puis 46-12 selon ckpt-46-12, revue/audit/non-régression finaux, docs, PR empilée sur #124.
