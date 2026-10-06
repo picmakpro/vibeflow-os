@@ -7241,7 +7241,7 @@ done
 T41_MC="$REFS_DIR/mission-contracts.md"
 T41_MC_ZS='^### Deux axes de revue : Standards et Spec [(]POCK-04[)]'
 T41_MC_ZE='^## '
-T41_MC_ANCRES=('axes.standards' 'axes.spec' 'conjonction' 'review_path' 'brief:plan-absent')
+T41_MC_ANCRES=('axes.standards' 'axes.spec' 'conjonction' 'review_path' 'brief:plan-absent' 'P414-D-20' 'P414-D-22' 'skipped')
 T41_RV_ANCRES=('axes.standards' 'axes.spec' 'review_path')
 T41_MF="$REFS_DIR/mission-flow.md"
 T41_MF_ZS='^## Pattern E'

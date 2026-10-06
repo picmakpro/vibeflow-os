@@ -308,17 +308,24 @@ fi
 # double sens), répétée ou contradictoire. Codes de CONTENU réservés (11, 12) : une erreur d'awk sort
 # en 2 et ne se confond jamais avec un verdict de contenu (branche « indéterminé » de l'appelant).
 # Section = du titre exact (blancs de fin tolérés) au titre « ## » suivant ou à la fin du corps ; ce
-# qui n'est pas rendu à la relecture humaine n'existe pas : un bloc de code (``` ou ~~~) et un
-# commentaire HTML (<!-- -->) sont ignorés. L'apostrophe droite s'écrit en octal (\047) : le programme
+# qui n'est pas rendu à la relecture humaine n'existe pas : un bloc de code (``` ou ~~~, indenté de
+# 0 à 3 espaces) et un commentaire HTML (<!-- -->) sont ignorés. Un bloc ne se ferme que par une fence
+# du MÊME caractère et de longueur au moins égale ; un « <!-- » dans un bloc de code ou entre accents
+# graves (code inline) ne masque rien. L'apostrophe droite s'écrit en octal (\047) : le programme
 # awk vit entre apostrophes ; l'apostrophe typographique est admise en alternative.
 e3_merge_danger() {
   awk '
-    BEGIN { ntit = 0; insec = 0; infence = 0; incom = 0; ptot = 0; pval = 0 }
+    function mask(s,   o, p) {
+      o = ""
+      while (match(s, /`[^`]*`/)) { p = sprintf("%" RLENGTH "s", ""); gsub(/ /, "x", p); o = o substr(s, 1, RSTART - 1) p; s = substr(s, RSTART + RLENGTH) }
+      return o s
+    }
+    BEGIN { ntit = 0; insec = 0; infence = 0; incom = 0; ptot = 0; pval = 0; fch = ""; flen = 0 }
     { l = $0 }
+    infence { m = l; sub(/^ ? ? ?/, "", m); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }
     incom { k = index(l, "-->"); if (k == 0) next; l = substr(l, k + 3); incom = 0 }
-    { while ((i = index(l, "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }
-    l ~ /^ ? ? ?(```|~~~)/ { infence = !infence; next }
-    infence { next }
+    { while ((i = index(mask(l), "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }
+    l ~ /^ ? ? ?(```|~~~)/ { m = l; sub(/^ ? ? ?/, "", m); fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }
     l ~ /^## / { if (l ~ /^## Merge-danger call[ \t]*$/) { ntit++; insec = (ntit == 1) } else { insec = 0 }; next }
     insec && l ~ /^Porte ?:/ { ptot++; if (l ~ /^Porte ?:[ \t]*(sens unique|double sens)[ \t]*$/) pval++ }
     insec && l ~ /^Rayon d(\047|’)explosion ?:/ { v = l; sub(/^[^:]*:/, "", v); print v }
@@ -339,7 +346,7 @@ e3_charcount() {
   printf '%s' "$1" \
     | LC_ALL=C sed -e "$E3_BLANCS_SED" \
     | LC_ALL=C tr -d '[:space:]' \
-    | od -An -tu1 | tr -s ' \n' '\n' \
+    | od -v -An -tu1 | tr -s ' \n' '\n' \
     | awk 'NF && ($1 < 128 || $1 >= 192) { n++ } END { print n + 0 }'
 }
 

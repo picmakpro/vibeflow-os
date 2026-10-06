@@ -496,6 +496,37 @@ e3_sain 61 "E3 section conforme suivie d'un bloc de code portant titre et Porte 
 # 62 — l'échec de l'analyseur (awk rc 2) n'est PAS un manque de la PR : INDÉTERMINÉ (rc 4), cause nommée, jamais « Porte absente ».
 e3_case 62 "E3 analyseur en échec (awk rc 2) — INDÉTERMINÉ, jamais « Porte absente »" "$GH_AWKFAIL_BIN" 4 "analyse du merge-danger call impossible" "Porte"
 
+# === Cas 63-72 — E3, revue deux axes tour 2 (2026-10-06, N-02/N-03/N-04) : fences, commentaires, seuil, comptage, message « Porte » ===
+RD='Rayon d'\''explosion : doctrine seule, aucune donnée écrite'
+GH_FENCEMIX_BIN="$(mk_gh_pr fencemix '{"state":"OPEN","body":"```\n~~~\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n```"}')"
+GH_FENCELONG_BIN="$(mk_gh_pr fencelong '{"state":"OPEN","body":"````\n```\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n````"}')"
+GH_FENCETILDE_BIN="$(mk_gh_pr fencetilde '{"state":"OPEN","body":"~~~\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n~~~"}')"
+GH_FENCEINDENT_BIN="$(mk_gh_pr fenceindent '{"state":"OPEN","body":"   ```\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n   ```"}')"
+GH_COMCODE_BIN="$(mk_gh_pr comcode '{"state":"OPEN","body":"```\nex : <!-- ouvre un commentaire\n```\nVoir `<!--` dans la doc.\n\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n"}')"
+GH_COM1TITRE_BIN="$(mk_gh_pr com1titre '{"state":"OPEN","body":"<!-- ## Merge-danger call -->\nPorte : sens unique\n'"$RD"'\n"}')"
+GH_COM1REST_BIN="$(mk_gh_pr com1rest '{"state":"OPEN","body":"## Merge-danger call\nPorte : <!-- x -->sens unique\n'"$RD"'\n"}')"
+GH_RAYON9_BIN="$(mk_gh_pr rayon9 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : 123456789"}')"
+GH_EMOJI10_BIN="$(mk_gh_pr emoji10 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : 🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂"}')"
+GH_EMOJI9_BIN="$(mk_gh_pr emoji9 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : 🙂🙂🙂🙂🙂🙂🙂🙂🙂"}')"
+GH_AAA100_BIN="$(mk_gh_pr aaa100 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')"
+e3_case 63 "E3 fence ouverte par \`\`\` puis ~~~ : le ~~~ ne ferme pas, la section reste dans le bloc de code, MANQUE" "$GH_FENCEMIX_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_case 64 "E3 fence de 4 accents graves : un \`\`\` plus court ne la ferme pas, MANQUE" "$GH_FENCELONG_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_case 65 "E3 section dans un bloc ~~~ — invisible, MANQUE" "$GH_FENCETILDE_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_case 66 "E3 section dans un bloc indenté de 3 espaces — invisible, MANQUE" "$GH_FENCEINDENT_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_sain 67 "E3 « <!-- » littéral en bloc de code et en code inline avant la section rendue — ne masque rien, SAIN" "$GH_COMCODE_BIN"
+e3_case 68 "E3 titre dans un commentaire HTML d'une seule ligne — invisible, MANQUE" "$GH_COM1TITRE_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_sain 69 "E3 « Porte : <!-- x -->sens unique » — le reste de la ligne après un commentaire d'une ligne est conservé, SAIN" "$GH_COM1REST_BIN"
+e3_case 70 "E3 rayon de 9 caractères — seuil exact de 10, MANQUE" "$GH_RAYON9_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_sain 71 "E3 rayon de 10 émojis identiques (40 octets périodiques) — compté 10, SAIN" "$GH_EMOJI10_BIN"
+e3_case 71a "E3 rayon de 9 émojis identiques — compté 9, MANQUE (témoin de 71)" "$GH_EMOJI9_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_sain 72 "E3 rayon de 100 « a » — SAIN (comptage exact, non réduit par les lignes répétées d'od)" "$GH_AAA100_BIN"
+# Le message d'une ligne « Porte » invalide dit la ligne Porte, jamais « section absente » (le prefixe commun ne suffit pas).
+PORTE_MSG="ligne « Porte : sens unique|double sens »"
+e3_case 46a "E3 « Porte : peut-être » — le message nomme la ligne Porte" "$GH_BADPORTE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+e3_case 50a "E3 deux lignes Porte — le message nomme la ligne Porte" "$GH_TWOPORTE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+e3_case 51a "E3 Porte hors section — le message nomme la ligne Porte" "$GH_PORTELATE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+e3_case 52a "E3 Porte avec texte parasite — le message nomme la ligne Porte" "$GH_PORTEPARASITE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+
 # === Cas 28-36 — E7 : rien de rangeable n'est laissé (SOBR-07, plan 41.3-04) ==============================
 CONDUCTOR_REAL="$(cd "$(dirname "$SCRIPT")/../../conductor" && pwd)"
 mk_inst() { # <script à installer> <real|none|stub:<corps>> -> imprime le chemin de la copie (lab « installé » jetable)
@@ -680,6 +711,27 @@ sc_e3n() { sc_e3 "$1" "$2" "$GH_NBSP_BIN"; }
 sc_e3f() { sc_e3 "$1" "$2" "$GH_FENCE_BIN"; }
 sc_e3k() { sc_e3 "$1" "$2" "$GH_COMMENT_BIN"; }
 sc_e3m() { sc_e3 "$1" "$2" "$GH_AWKFAIL_BIN"; }
+# Revue deux axes tour 2 (N-02/N-03/N-04) : un mutant par garde ajoutée, joué sur le corps qui la discrimine.
+sc_e3fm() { sc_e3 "$1" "$2" "$GH_FENCEMIX_BIN"; }
+sc_e3fl() { sc_e3 "$1" "$2" "$GH_FENCELONG_BIN"; }
+sc_e3ft() { sc_e3 "$1" "$2" "$GH_FENCETILDE_BIN"; }
+sc_e3fi() { sc_e3 "$1" "$2" "$GH_FENCEINDENT_BIN"; }
+sc_e3cc() { sc_e3 "$1" "$2" "$GH_COMCODE_BIN"; }
+sc_e3c1() { sc_e3 "$1" "$2" "$GH_COM1REST_BIN"; }
+sc_e3r9() { sc_e3 "$1" "$2" "$GH_RAYON9_BIN"; }
+sc_e3em() { sc_e3 "$1" "$2" "$GH_EMOJI10_BIN"; }
+e3_msg_mutant() { # <id> <ancienne ligne> <nouvelle ligne> <talon> <fragment que le message ORIGINAL contient et que le mutant ne contient plus>
+  local id="$1" f d g oo om
+  MUT_N=$((MUT_N+1)); f="$TMP/mut-e3msg-$MUT_N.sh"
+  MUT_OLD="$2" MUT_NEW="$3" awk '{ if ($0 == ENVIRON["MUT_OLD"]) print ENVIRON["MUT_NEW"]; else print }' "$SCRIPT" > "$f"
+  if cmp -s "$f" "$SCRIPT" || ! bash -n "$f" 2>/dev/null; then ko "35 $id mutant NON OPPOSABLE" "mutation appliquée et syntaxe valide"; return; fi
+  d="$(mk_sane_fixture "mo$MUT_N")"; g="$(mk_inst "$SCRIPT" real)"
+  oo="$( ( HOME="$EMPTY_HOME"; export HOME; unset CLAUDE_PLUGIN_ROOT GSD_WORKSTREAM 2>/dev/null; PATH="$4:$PATH" bash "$g" --root "$d" --report "$REPORT_REL" --step "$STEP" 2>&1 ) )"
+  d="$(mk_sane_fixture "mm$MUT_N")"; g="$(mk_inst "$f" real)"
+  om="$( ( HOME="$EMPTY_HOME"; export HOME; unset CLAUDE_PLUGIN_ROOT GSD_WORKSTREAM 2>/dev/null; PATH="$4:$PATH" bash "$g" --root "$d" --report "$REPORT_REL" --step "$STEP" 2>&1 ) )"
+  case "$oo" in *"$5"*) : ;; *) ko "35 $id NON TUE" "l'original ne porte pas le fragment attendu [$5] : [$oo]"; return ;; esac
+  case "$om" in *"$5"*) ko "35 $id NON TUE" "le mutant porte encore le fragment [$5] : [$om]" ;; *) ok "35 $id TUE : fragment [$5] présent à l'original, absent du mutant" ;; esac
+}
 e7_mutant "E3c (unicité de « Porte : » : une seule ligne valide suffit)" '      if (ptot != 1 || pval != 1) exit 12' '      if (pval < 1) exit 12' sc_e3c 0 3
 e7_mutant "E3t (section répétée acceptée : la première gagne)" '      if (ntit > 1) exit 12' '      ntit = ntit' sc_e3t 0 3
 e7_mutant "E3d (la section ne se termine jamais au titre « ## » suivant)" '    l ~ /^## / { if (l ~ /^## Merge-danger call[ \t]*$/) { ntit++; insec = (ntit == 1) } else { insec = 0 }; next }' '    l ~ /^## / { if (l ~ /^## Merge-danger call[ \t]*$/) { ntit++; insec = (ntit == 1) }; next }' sc_e3d 0 3
@@ -688,9 +740,21 @@ e7_mutant "E3j (titre exact : ancre de fin retirée, « calls » ouvre la sectio
 e7_mutant "E3g (blancs comptés comme caractères)" "    | LC_ALL=C tr -d '[:space:]' \\" '    | cat \' sc_e3g 0 3
 e7_mutant "E3u (longueur en octets, pas en caractères)" "    | awk 'NF && (\$1 < 128 || \$1 >= 192) { n++ } END { print n + 0 }'" "    | awk 'NF { n++ } END { print n + 0 }'" sc_e3u 0 3
 e7_mutant "E3n (espace insécable comptée comme caractère)" '    | LC_ALL=C sed -e "$E3_BLANCS_SED" \' '    | cat \' sc_e3n 0 3
-e7_mutant "E3f (bloc de code lu comme du texte rendu)" '    l ~ /^ ? ? ?(```|~~~)/ { infence = !infence; next }' '    l ~ /^ ? ? ?(```|~~~)/ { next }' sc_e3f 0 3
-e7_mutant "E3k (commentaire HTML lu comme du texte rendu)" '    { while ((i = index(l, "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }' '    { l = l }' sc_e3k 0 3
+L_COM='    { while ((i = index(mask(l), "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }'
+L_OPEN='    l ~ /^ ? ? ?(```|~~~)/ { m = l; sub(/^ ? ? ?/, "", m); fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }'
+e7_mutant "E3f (bloc de code lu comme du texte rendu : l'ouverture saute la ligne sans entrer dans la zone)" "$L_OPEN" '    l ~ /^ ? ? ?(```|~~~)/ { next }' sc_e3f 0 3
+e7_mutant "E3k (commentaire HTML lu comme du texte rendu)" "$L_COM" '    { l = l }' sc_e3k 0 3
 e7_mutant "E3m (échec de l'analyseur lu comme un manque de la PR)" '            *) E3_STATUS="indet"; E3_MSG="[E3] analyse du merge-danger call impossible (outil d'"'"'analyse en échec) — invérifiable" ;;' '            *) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : ligne Porte absente" ;;' sc_e3m 4 0
+L_CLOSE='    infence { m = l; sub(/^ ? ? ?/, "", m); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }'
+e7_mutant "E3p (une fence se ferme par n'importe quel caractère de fence : ~~~ ferme un bloc d'accents graves)" "$L_CLOSE" '    infence { m = l; sub(/^ ? ? ?/, "", m); n = 0; while (substr(m, n + 1, 1) ~ /[`~]/) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }' sc_e3fm 0 3
+e7_mutant "E3q (longueur de fermeture ignorée : une fence de 3 ferme un bloc de 4)" "$L_CLOSE" '    infence { m = l; sub(/^ ? ? ?/, "", m); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= 1 && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }' sc_e3fl 0 3
+e7_mutant "E3r (fence ~~~ non reconnue à l'ouverture)" "$L_OPEN" '    l ~ /^ ? ? ?(```)/ { m = l; sub(/^ ? ? ?/, "", m); fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }' sc_e3ft 0 3
+e7_mutant "E3s2 (fence indentée de 1 à 3 espaces non reconnue)" "$L_OPEN" '    l ~ /^(```|~~~)/ { m = l; sub(/^ ? ? ?/, "", m); fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }' sc_e3fi 0 3
+e7_mutant "E3w (« <!-- » en code inline masque la suite)" "$L_COM" '    { while ((i = index(l, "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }' sc_e3cc 3 0
+e7_mutant "E3o (reste de ligne perdu après un commentaire HTML d'une ligne)" "$L_COM" '    { while ((i = index(mask(l), "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) } }' sc_e3c1 3 0
+e7_mutant "E3s (seuil du rayon à 9 caractères au lieu de 10)" '                if [ "$(e3_charcount "$E3_V")" -ge 10 ]; then E3_STATUS="sain"; E3_MSG=""; fi' '                if [ "$(e3_charcount "$E3_V")" -ge 9 ]; then E3_STATUS="sain"; E3_MSG=""; fi' sc_e3r9 0 3
+e7_mutant "E3v (od sans -v : les lignes répétées deviennent un « * » compté)" "    | od -v -An -tu1 | tr -s ' \\n' '\\n' \\" "    | od -An -tu1 | tr -s ' \\n' '\\n' \\" sc_e3em 3 0
+e3_msg_mutant "E3z (ligne Porte invalide rendue « section absente » : code 11 au lieu de 12)" '      if (ptot != 1 || pval != 1) exit 12' '      if (ptot != 1 || pval != 1) exit 11' "$GH_BADPORTE_BIN" "$PORTE_MSG"
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="
