@@ -35,7 +35,7 @@ Réponse de la Tâche 1 : `rejeu-5-6-oui` — arbitrage Willy, AskUserQuestion s
 
 Banc : `COMPTE G3 faux-refus=0 faux-accept=0`, `COMPTE G4 faux-refus=0 faux-accept=0` (73 OK, 0 KO). Canary : 29 OK, 0 KO.
 
-Rejeu réel joué (commit rejoué `99efa381`, une exécution, labs au repos avant et après) : `REJEU-ETAPE-5 faux-refus=349 faux-accept=0 refus-conforme-modele=196` ; `EMPREINTE-ARBRE-IDENTIQUE` pour chacun des deux labs, aucune divergence. G3 : 0/0 sur 52 cas. Les 349 faux refus : G4 343 (`SUMMARY.md` réels de `~/jarvis-keystone` sans `VERDICT.md`), G7 6 (créations de `.planning/config.json`).
+Rejeu réel joué (commit rejoué `99efa381`, une exécution, labs au repos avant et après) : `REJEU-ETAPE-5 faux-refus=349 faux-accept=0 refus-conforme-modele=196` ; `EMPREINTE-ARBRE-IDENTIQUE` pour chacun des deux labs, aucune divergence. G3 : 0/0 sur 52 unités synthétiques `99-rejeu-cloture` sur entrées réelles des deux labs. Les 349 faux refus : G4 343 (`SUMMARY.md` réels de `~/jarvis-keystone` sans `VERDICT.md`), G7 6 (créations de `.planning/config.json`).
 
 Décision mécanique : condition « 0 faux refus » non remplie, donc `ARMEMENT_G3` et `ARMEMENT_G4` restent `observe` ; `ARMEMENT_G4P` inchangé ; aucun attendu nominatif ajouté (la décision sur le périmètre de G4 revient à Willy). Ligne d'escalade : `ESCALADE-WILLY ETAPE-5`.
 

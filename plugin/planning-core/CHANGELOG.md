@@ -7,11 +7,11 @@
 - **État d'armement livré** : `ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7`, `ARMEMENT_ROLE` et `ARMEMENT_G3` valent
   `armed` ; `ARMEMENT_G4` et `ARMEMENT_G4P` valent `observe` ; `G2_MODE` vaut `avertit` ; D1 n'a pas de constante d'armement.
   L'étape 5 est scindée (P46-D-11) : **5a, G3, est armé** (commit `b703d73d`, rejeu réel à 0 faux refus et 0 faux accept sur
-  52 cas réels, relevé de phase `46-REJEU-ETAPE-5`) sur la décision « (c) Armer G3 seul » (arbitrage Willy, AskUserQuestion
+  52 unités synthétiques `99-rejeu-cloture` sur entrées réelles des deux labs, relevé de phase `46-REJEU-ETAPE-5`) sur la décision « (c) Armer G3 seul » (arbitrage Willy, AskUserQuestion
   session principale, 2026-10-06) ; **5b, G4, reste en observation** : 343 unités closes avant G4 seraient refusées à la
   réécriture de leur `SUMMARY.md`, reportées à une phase ultérieure (limite (bp)). **G4′ (étape 6) reste en observation** :
   « etape-6-mesure » (arbitrage Willy, AskUserQuestion session principale, 2026-10-06) ; quatre points d'audit (A2, A3, A4, P1)
-  sont reportés à une phase ultérieure, préalables à tout armement de G4′ (limite (bs)). Mesure de l'étape 6 : relevé à venir.
+  sont reportés à une phase ultérieure, préalables à tout armement de G4′ (limite (bs)). Mesure de l'étape 6 (relevé de phase `46-REJEU-ETAPE-6`, rejeu en lecture seule des deux labs réels) : `COMPTE G4P` 0 faux refus et 0 faux accept sur 96 cas et 24 agents, empreintes des deux labs identiques avant et après.
 - **G3 — pas de clôture sans livrable** (CLOT-01) : refuse par `deny` l'écriture par outil d'un `CLOTURE.md` d'unité d'un lab
   adhérent sans livrable présent. **G4 — pas de `SUMMARY.md` sans verdict qui tienne** (CLOT-02), **G4′ — pas de rapport sans
   sortie brute** (CLOT-06, workers et producteurs dotés de `Bash`, `SubagentHandback` en mode auto, repli `SubagentStop`) :
@@ -29,7 +29,7 @@
   module) ; en scope project l'installation ne touche jamais au `.gitignore` (SCOPE-04), le journal n'y est pas ignoré.
 - **Lot B** (arbitrage Willy, AskUserQuestion session principale, 2026-10-06, « b3 mixte ») : A6 et A8 corrigés (résidus en
   limites (bn), (bo)) ; A5, A7 et A10 déclarés en limites (bk), (bl), (bm).
-- **Référence** (`references/modele-cycles.md`) alignée sur l'état livré : table d'armement à huit gates, limites (a) à (bs)
+- **Référence** (`references/modele-cycles.md`) alignée sur l'état livré : table d'armement à huit gates, limites (a) à (bu)
   contrôlées par R-REFERENCE, dont les limites non mesurées : déclenchement de `FileChanged` sous `settings.json` en 2.1.288 et
   #63148 sans objet (bq), #60490 sans objet (br).
 - **Exigences** : CLOT-01 à CLOT-12 (famille CLOT, P46-D-15).

@@ -4637,8 +4637,12 @@ ESCALADE-WILLY ETAPE-5 faux-refus=349 (G4 : 343 SUMMARY.md d'unités sans VERDIC
 
 Décision humaine : étape 5 → « (c) Armer G3 seul (Recommandé) » — arbitrage Willy, AskUserQuestion session principale, 2026-10-06 (P46-D-11 : l'étape 5 se scinde en 5a, G3, et 5b, G4).
 
-- **G3 armé** par le commit `b703d73d` (`ARMEMENT_G3 = "armed"`, `armement_valide` accepte « G3 armé, G4 en observation », refuse G4 armé sans G3 et G4P armé sans G3 ET G4) : au relevé ci-dessus G3 est à 0 faux refus et 0 faux accept sur 52 cas réels (plancher 12), empreintes d'arbre identiques.
+- **G3 armé** par le commit `b703d73d` (`ARMEMENT_G3 = "armed"`, `armement_valide` accepte « G3 armé, G4 en observation », refuse G4 armé sans G3 et G4P armé sans G3 ET G4) : au relevé ci-dessus G3 est à 0 faux refus et 0 faux accept sur 52 unités synthétiques `99-rejeu-cloture` sur entrées réelles des deux labs (plancher 12), empreintes d'arbre identiques.
 - **G4 non armé** : `ARMEMENT_G4` reste `observe`. Les 343 `SUMMARY.md` d'unités closes avant G4, sans `VERDICT.md`, de `~/jarvis-keystone` sont reportés à une phase ultérieure ; la référence les porte en limite (bp) de `modele-cycles.md`.
 - `ARMEMENT_G4P` inchangé (`observe`) : l'étape 6 exige G3 ET G4 armés.
 - Les 6 lignes G7 du relevé ne sont pas l'objet de cette décision (hors périmètre de ce commit).
 - Vérifications après armement (état livré) : canary `test-planning-hook-installed.sh` 29 OK 0 KO et R-CANG-G3-02 (cas G3 : deny `[planning-core] G3 :` sur l'état livré) ; `test-cloture-gates.sh` 73/0 ; `test-planning-gates.sh` 497/0 ; `test-planning-hook-registered.sh` 113/0 ; `test-rejeu-gates.sh` 100/0 ; `test-d1-surveillance.sh` 45/0 ; `test-g4p-sortie-brute.sh` 19/0 ; `test-juges-canary.sh` 14/0.
+
+## Note du 2026-10-06 (fix-46-c, F-3)
+
+Le libellé « 52 cas » / « 52 cas réels » de ce relevé (tableau « Lignes non nulles », section de décision) se lit : **52 unités synthétiques `99-rejeu-cloture` construites sur des entrées réelles des deux labs** (ligne `COUVERTURE-REJEU G3 n=52 plancher=12`), non 52 cas réels au sens d'écritures observées. La sortie brute plus haut n'est pas réécrite.
