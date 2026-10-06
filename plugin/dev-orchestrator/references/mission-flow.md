@@ -417,6 +417,21 @@ le nœud de cadrage et ses dépendances — seul change qui exécute le nœud, p
 **Outil de question indisponible** : cas réel, déjà documenté au filet de repli D-09 du manager
 (§Entrée) — `human_needed` remonté, jamais un retour au mode d'enchaînement.
 
+**Frontière de questions (POCK-01)** — portée : toute question posée à l'humain pendant un cadrage
+(le manager ici ; le head par renvoi depuis `head-governance.md` §1). P414-D-12.
+
+- **Un tour = toute la frontière** : numérotée, seules les questions dont les prérequis sont réglés ;
+  une question dépendante attend le tour suivant.
+- **Une recommandation par question** : l'option recommandée est marquée, motif en une ligne.
+- **Un fait ne se demande jamais à l'humain** : ce qu'un sous-agent peut établir (lecture du dépôt,
+  mesure, documentation) l'est par un éclaireur en lecture seule avant le tour ; seules les décisions remontent.
+- **AskUserQuestion groupé par zone** : un appel par zone, options cochables, jamais la frontière
+  rendue en texte ; outil indisponible : filet de repli D-09 du manager.
+- **Fin de cadrage = frontière vide** : rien d'assumé en silence ; une hypothèse retenue faute de
+  réponse est écrite comme hypothèse au registre de décisions.
+- **Vocabulaire** : un terme flou challengé ou un mot surchargé résolu pendant le tour entre au
+  glossaire du lab, régime : `docs-flow.md` §Famille savoir (P414-D-08).
+
 **Ce que le worker ne fait plus** : `vf-coder` n'invoque plus jamais le cadrage lui-même.
 
 ---

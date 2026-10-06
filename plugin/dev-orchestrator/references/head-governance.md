@@ -72,6 +72,10 @@ explicite, il **dispatche d'office** sans redemander. ADR-031 reste intact : ce 
 autorisation nouvelle, c'est la même heuristique de proposition déjà en vigueur, qui se scinde
 selon le mode plutôt que de rester muette dessus.
 
+**Questions à l'humain (POCK-01).** Le head qui cadre en conversation applique la frontière de
+questions décrite dans la section Pattern F de `mission-flow.md` (un tour, une recommandation par
+question, aucun fait demandé à l'humain) : un renvoi, pas une copie.
+
 ## 2. Séquencement (parallélisme au niveau mission)
 
 Le manager parallélise des **nœuds** à périmètres disjoints (frontière `ready`, team-kernel). Le
