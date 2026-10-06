@@ -969,11 +969,12 @@ def controle_d1_10(ctx, script):
 
 
 def fonction_du_hook(ctx, script, nom):
-    """Fonction `nom` du corps Python du hook DU DOSSIER jugé (réel ou mutant), exécutée seule dans un espace de noms jetable ; None si elle n'existe pas."""
+    """Fonction `nom` du corps Python du hook DU DOSSIER jugé (réel ou mutant), exécutée seule dans un espace de noms jetable (le seul module fourni est
+    `unicodedata` : `cle_recence` départage sur la forme NFC du nom, A1-readdir, fix-46-a tour 2) ; None si elle n'existe pas."""
     hook = os.path.join(_dossier(ctx, script), "planning-hook.sh")
     for noeud in ast.parse(corps_python(open(hook, encoding="utf-8").read())).body:
         if isinstance(noeud, ast.FunctionDef) and noeud.name == nom:
-            espace = {}
+            espace = {"unicodedata": unicodedata}
             exec(compile(ast.Module(body=[noeud], type_ignores=[]), hook, "exec"), espace)
             return espace[nom]
     return None

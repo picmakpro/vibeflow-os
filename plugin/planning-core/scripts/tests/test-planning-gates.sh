@@ -76,6 +76,15 @@
 #                   noms en NFC) est rejouée sur copie armée sous sa forme NFC et sous son jumeau NFD (payload au cwd NFD, processus dans le cwd NFC) : même
 #                   code, même stdout, même stderr ; G1, G5, G6, G7, ROLE, G2 (Write et Bash), silence, plus le cas G4′ (SubagentHandback, cwd composable) ;
 #                   MUT-NFD-GATES : la normalisation NFC retirée de `composants_nfc`, tuée par R-NFD-GATES
+#                   A1-readdir (fix-46-a tour 2) : chaque lab qui porte des écritures composables est AUSSI matérialisé au disque NFD (noms du disque
+#                   décomposés) ; sur un système insensible à la normalisation (APFS, HFS+), chaque écriture composable y est rejouée sous les deux formes de
+#                   charge utile et rend la sortie de la référence ; sur un système sensible (ext4), seules les écritures de G2 sous la forme du disque sont
+#                   comparées, les autres sortent en une ligne `~` (limite (bf)) ; preuve trop pauvre sans `avertit` ET `silence` de G2 (Write et Bash) au disque
+#                   NFD ; MUT-READDIR-NFC : le nom lu par readdir sans NFC dans `_sous_dossiers`, tué par le jumeau disque NFD de G2
+#   R-READDIR-RECENSEMENT (section `env_statique`, A1-readdir) : les dix énumérations de dossiers du cœur Python (AST : os.listdir, os.scandir, os.walk, glob…)
+#                   sont recensées avec leur décision (deux « NFC » : `_sous_dossiers` et `_verdicts_du_planning` ; cinq neutres, une brute, deux hors lab) ;
+#                   une énumération nouvelle, déplacée ou une normalisation NFC retirée fait rougir ; MUT-RECENSEMENT-READDIR : la normalisation de
+#                   `_verdicts_du_planning` retirée (équivalent en comportement : seul le recensement le voit)
 #   LOT A           (section `lota` ; correction ciblée post-45-09, décisions du manager vf-dev-manager, 2026-10-01) : R-IMB-01..05 un `.planning`
 #                   imbriqué n'est jamais une racine de lab ; R-DEROG-09 une dérogation n'est consommée que si la décision finale est un
 #                   passage ; R-DEROG-10 droits du journal jamais élargis, argv UTF-8 ; R-VERDICT-06..09 poser-verdict.sh (contrôles, forme
@@ -539,6 +548,31 @@ def materialiser(labs, nom, destination):
     resoudre_jetons(destination)
 
 
+def materialiser_disque_nfd(labs, nom, destination):
+    """La MÊME chaîne que `materialiser`, mais chaque chemin de dossier, de fichier, de lien ET la cible relative d'un lien passent par `jumeau_nfd` : les
+    noms du DISQUE sont en NFD (A1-readdir, fix-46-a tour 2). Les contenus restent ceux du banc (noms en NFC)."""
+    lab = labs[nom]
+    os.makedirs(destination, exist_ok=True)
+    for dossier in lab["dossiers"]:
+        os.makedirs(os.path.join(destination, jumeau_nfd(dossier)), exist_ok=True)
+    for chemin, contenu in lab["fichiers"].items():
+        ecrire(os.path.join(destination, jumeau_nfd(chemin)), contenu)
+    for chemin, cible in lab["liens"]:
+        os.makedirs(os.path.dirname(os.path.join(destination, jumeau_nfd(chemin))), exist_ok=True)
+        os.symlink(jumeau_nfd(cible), os.path.join(destination, jumeau_nfd(chemin)))
+    resoudre_jetons(destination)
+
+
+def disque_insensible(ctx):
+    """Vrai si le système de fichiers du dossier de travail est insensible à la normalisation (APFS, HFS+) : un dossier créé sous un nom NFC se
+    retrouve sous son nom NFD. Calculé une fois."""
+    if getattr(ctx, "_insensible", None) is None:
+        d = ctx.unique("sonde-normalisation")
+        os.makedirs(os.path.join(d, "\u00e9"))
+        ctx._insensible = os.path.isdir(os.path.join(d, "e\u0301"))
+    return ctx._insensible
+
+
 def entree_de_ecriture(e, racine):
     cwd = os.path.join(racine, e["cwd"]) if e["cwd"] else racine
     chemin = None if e["chemin"] == "-" else os.path.join(racine, e["chemin"])
@@ -836,6 +870,81 @@ def controle_env_statique(ctx, script):
         if lectures.get(nom, 0) != 1:
             fautes.append("lanceur : %d lecture(s) de %s (attendu 1)" % (lectures.get(nom, 0), nom))
     return (not fautes), ("; ".join(fautes) if fautes else "aucune lecture d'environnement dans le cœur Python (expanduser et expandvars compris) ; lanceur : TMPDIR une fois (ligne du mktemp), XDG_CACHE_HOME et HOME une fois chacune (ligne d'appel du cœur)")
+
+
+# A1-readdir (fix-46-a tour 2) : chaque appel os.listdir / os.scandir / os.walk du cœur (ou glob, iglob, iterdir, rglob) et sa décision. « nfc » exige
+# un `unicodedata.normalize("NFC", …)` dans la fonction (nom lu en NFC avant le test de forme, nom du disque pour le chemin d'accès).
+RECENSEMENT_READDIR = {
+    "_parcourir_livrable": "brut",        # bloc partagé : les noms lus SONT le contenu de l'empreinte des livrables (R-EMP-04)
+    "_sous_dossiers": "nfc",              # NOM_UNITE — unités de D1 et de G2 (W1)
+    "_verdicts_du_planning": "nfc",       # VERDICT.md (G5) — arbre des unités et des juges
+    "fichier_protege": "neutre",          # noms fixes ASCII de G6 en casefold, racine du dossier de planning
+    "porte_marqueur_code": "neutre",      # suffixe ASCII, parité avec le glob de detect-gsd-engine.sh
+    "_a_un_agent": "neutre",              # suffixe .md, prédicat littéral de P45-D-14
+    "_a_une_memoire": "neutre",           # aucun test de nom
+    "definitions_dossier": "neutre",      # vérificateur : JUGE_RE ASCII ; identité du rôle : P45-D-09 (REM-5)
+    "_sous_dossiers_reels": "hors-lab",   # cache des plugins sous HOME
+    "dossiers_agents_version": "hors-lab",
+}
+
+
+def _enumerations_et_fonctions(texte):
+    """({fonction: [(ligne, appel), …]}, {fonction: nœud}) : les appels d'énumération de dossiers du cœur Python (`os.listdir`, `os.scandir`, `os.walk`, `glob`,
+    `iglob`, `iterdir`, `rglob`), rangés par la fonction qui les contient (la plus interne)."""
+    arbre = ast.parse(corps_python(texte))
+    enumerations, fonctions = {}, {}
+
+    def visiter(n, f):
+        if isinstance(n, ast.FunctionDef):
+            f = n.name
+            fonctions.setdefault(f, n)
+        if isinstance(n, ast.Call):
+            fn = n.func
+            nom = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", None)
+            base = fn.value.id if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name) else None
+            if (base == "os" and nom in ("listdir", "scandir", "walk")) or nom in ("glob", "iglob", "iterdir", "rglob"):
+                enumerations.setdefault(f, []).append((n.lineno, "%s.%s" % (base, nom)))
+        for enfant in ast.iter_child_nodes(n):
+            visiter(enfant, f)
+
+    visiter(arbre, "<module>")
+    return enumerations, fonctions
+
+
+def _normalise_en_nfc(noeud):
+    """Vrai si le nœud contient un appel `unicodedata.normalize("NFC", …)` (premier argument : la constante « NFC »)."""
+    for n in ast.walk(noeud):
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "normalize" and isinstance(n.func.value, ast.Name)
+                and n.func.value.id == "unicodedata" and n.args and isinstance(n.args[0], ast.Constant) and n.args[0].value == "NFC"):
+            return True
+    return False
+
+
+def controle_recensement_readdir(ctx, script):
+    """R-READDIR-RECENSEMENT (A1-readdir, fix-46-a tour 2) : l'AST du cœur porte EXACTEMENT les énumérations de dossiers de `RECENSEMENT_READDIR`, une par
+    fonction ; une énumération dans une fonction non recensée rougit (« énumération non recensée dans <f> : décider NFC ou neutre »), une entrée sans énumération
+    aussi (« recensement périmé ») ; chaque fonction « nfc » contient un `unicodedata.normalize("NFC", …)` (sinon « <f> : nom lu non normalisé en NFC avant le
+    test de forme »). `script` : le chemin du script ou son dossier."""
+    chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
+    enumerations, fonctions = _enumerations_et_fonctions(open(chemin, encoding="utf-8").read())
+    fautes = []
+    for f in sorted(enumerations):
+        if f not in RECENSEMENT_READDIR:
+            fautes.append("énumération non recensée dans %s : décider NFC ou neutre" % f)
+        elif len(enumerations[f]) != 1:
+            fautes.append("%s : %d énumérations (une par fonction attendue)" % (f, len(enumerations[f])))
+    for f in sorted(RECENSEMENT_READDIR):
+        if f not in enumerations:
+            fautes.append("recensement périmé : %s n'énumère plus de dossier" % f)
+        elif RECENSEMENT_READDIR[f] == "nfc" and not _normalise_en_nfc(fonctions[f]):
+            fautes.append("%s : nom lu non normalisé en NFC avant le test de forme" % f)
+    decisions = {}
+    for d in RECENSEMENT_READDIR.values():
+        decisions[d] = decisions.get(d, 0) + 1
+    total = sum(len(v) for v in enumerations.values())
+    detail = "%d énumérations de dossiers dans %d fonctions (%s), une par fonction" % (
+        total, len(enumerations), ", ".join("%d %s" % (decisions[d], d) for d in ("nfc", "neutre", "brut", "hors-lab") if d in decisions))
+    return (not fautes), ("; ".join(fautes) if fautes else detail)
 
 
 def controle_env(ctx, scripts):
@@ -3168,6 +3277,9 @@ def sec_env_statique(ctx):
     bon, detail = controle_env_statique(ctx, ctx.hook)
     ok("R-ENV-02 garde statique : " + detail) if bon else ko(
         "R-ENV-02", "aucune lecture d'environnement dans le cœur Python de planning-hook.sh (expanduser et expandvars compris) ; lanceur : TMPDIR sur la ligne du mktemp, XDG_CACHE_HOME et HOME sur la ligne d'appel du cœur, une fois chacune", "aucune faute", detail)
+    bon, detail = controle_recensement_readdir(ctx, ctx.hook)
+    ok("R-READDIR-RECENSEMENT recensement des énumérations de dossiers du cœur : " + detail) if bon else ko(
+        "R-READDIR-RECENSEMENT", "chaque énumération de dossiers du cœur est recensée avec sa décision (NFC avant le test de forme, ou neutre, brute, hors lab)", "aucune faute", detail)
 
 
 def sec_g5(ctx):
@@ -3481,23 +3593,41 @@ def _jumeau_ecriture(e):
     return j
 
 
+def _vue_sortie(rc, out):
+    """Décision d'une sortie, lisible dans un écart : pour un avertissement de G2, le nombre de plans ouverts qu'il annonce (la différence d'un jumeau disque NFD
+    dont l'unité n'est pas vue : « 0 plan(s) ouvert(s) »)."""
+    v = classer(rc, out)
+    if v == "avertit":
+        m = re.search(r"\((\d+) plan\(s\) ouvert\(s\)\)", contexte_de(out))
+        return v + (" (%s plan(s) ouvert(s))" % m.group(1) if m else " " + court(out, 60))
+    return v + " " + court(out, 60)
+
+
 def controle_nfd_gates(ctx, script):
     """R-NFD-GATES (A1, fix-46-a) : pour chaque écriture du banc dont le chemin, le `cwd=` ou la `commande=` porte un caractère composable, le jumeau NFD (payload au
     cwd NFD, processus lancé dans le cwd NFC existant) rendu sur copie armée dans une matérialisation FRAÎCHE du lab rend le même code, le même stdout et le même
     stderr que la forme NFC. Au moins un refus et un passage pour G1 et G7, un refus pour G5 et ROLE, un passage pour G6, un avertissement G2 (Write et Bash), un
     silence ; PLUS le cas G4′ : SubagentHandback sans sortie brute d'un worker doté de Bash, `cwd` dans un sous-dossier composable du lab, NFC et NFD : même deny.
-    Une différence nomme « jumeau NFD », l'écriture et les deux décisions."""
+    A1-readdir (fix-46-a tour 2) : chaque lab qui porte des écritures composables est AUSSI matérialisé au disque NFD (`materialiser_disque_nfd` : les noms du
+    DISQUE sont décomposés). Sur un système insensible à la normalisation (`disque_insensible`), chaque écriture composable y est rejouée sous les deux formes
+    de charge utile (NFC et jumeau NFD ; processus lancé dans le dossier du disque) : même code, stdout et stderr que la référence (disque NFC, charge NFC) ;
+    sur un système sensible, seules les écritures de G2 sous la forme du disque (NFD) sont comparées, les autres sortent en une ligne `~` qui nomme la limite
+    (bf) ; preuve trop pauvre si le disque NFD ne compte pas au moins un `avertit` ET un `silence` de G2 pour Write ET pour Bash.
+    Une différence nomme « jumeau NFD » ou « jumeau disque NFD », l'écriture et les deux décisions."""
     dossier_jugé = _dossier(ctx, script)
     ordre, labs = parser_banc(open(ctx.banc, encoding="utf-8").read())
-    compte = {}
+    compte, compte_disque = {}, {}
     ecarts, jouees = [], 0
+    insensible = disque_insensible(ctx)
+    disque_hors_g2 = 0
     for nom in ordre:
         composables = [e for e in labs[nom]["ecritures"] if any(e[c] and jumeau_nfd(e[c]) != e[c] for c in ("chemin", "cwd", "commande"))]
         if not composables:
             continue
-        lab_nfc, lab_nfd = ctx.unique("nfd-nfc-" + nom), ctx.unique("nfd-nfd-" + nom)
+        lab_nfc, lab_nfd, lab_disque = ctx.unique("nfd-nfc-" + nom), ctx.unique("nfd-nfd-" + nom), ctx.unique("nfd-disque-" + nom)
         materialiser(labs, nom, lab_nfc)
         materialiser(labs, nom, lab_nfd)
+        materialiser_disque_nfd(labs, nom, lab_disque)
         for e in composables:
             jouees += 1
             dossier = ctx.copie_forcee(dossier_jugé, "armed") if e["armee"] else dossier_jugé
@@ -3508,6 +3638,23 @@ def controle_nfd_gates(ctx, script):
             cwd_processus = os.path.join(lab_nfd, e["cwd"]) if e["cwd"] else lab_nfd   # le cwd NFC existant : le payload seul porte le cwd NFD
             r_nfd = ctx.lancer("A", brut_nfd, cwd=cwd_processus, dossier=dossier)
             v_nfc, v_nfd = classer(r_nfc[0], r_nfc[1]), classer(r_nfd[0], r_nfd[1])
+            disque_ok = None   # None : non rejouée sur le disque NFD (système sensible, hors G2)
+            if not insensible and e["gate"] != "G2":
+                disque_hors_g2 += 1
+            else:
+                disque_ok = True
+                cwd_disque = os.path.join(lab_disque, jumeau_nfd(e["cwd"])) if e["cwd"] else lab_disque   # le dossier du disque : ses noms sont en NFD
+                for charge, nom_charge in ((e, "NFC"), (j, "NFD")):
+                    if nom_charge == "NFC" and not insensible:
+                        continue
+                    brut_disque, _cwd_charge = entree_de_ecriture(charge, lab_disque)
+                    r_disque = ctx.lancer("A", brut_disque, cwd=cwd_disque, dossier=dossier)
+                    if r_disque != r_nfc or r_disque[2]:
+                        disque_ok = False
+                        ecarts.append("jumeau disque NFD de %s %s%s%s :: %s %s (charge %s) : disque NFC -> %s, disque NFD -> %s" % (
+                            e["outil"], e["chemin"], (" cwd=" + e["cwd"]) if e["cwd"] else "", (" commande=" + e["commande"]) if e["commande"] else "", e["attendu"],
+                            e["gate"] or "", nom_charge, _vue_sortie(r_nfc[0], r_nfc[1]), _vue_sortie(r_disque[0], r_disque[1])))
+                        break
             if r_nfc != r_nfd or r_nfc[2]:
                 ecarts.append("jumeau NFD de %s %s%s%s :: %s %s : NFC -> %s %s, NFD -> %s %s" % (
                     e["outil"], e["chemin"], (" cwd=" + e["cwd"]) if e["cwd"] else "", (" commande=" + e["commande"]) if e["commande"] else "", e["attendu"],
@@ -3519,6 +3666,8 @@ def controle_nfd_gates(ctx, script):
                 continue
             cle = (e["gate"], e["attendu"], "Bash" if e["outil"] == "Bash" else "outil")
             compte[cle] = compte.get(cle, 0) + 1
+            if disque_ok:
+                compte_disque[cle] = compte_disque.get(cle, 0) + 1
     # cas G4′ : SubagentHandback sans sortie brute d'un worker doté de Bash, cwd dans un sous-dossier composable du lab
     g4p = ctx.copie_forcee(dossier_jugé, "armed")
     texte = re.sub(r'^(ARMEMENT_G4P = )"observe"', r'\1"armed"', open(os.path.join(g4p, "planning-hook.sh"), encoding="utf-8").read(), flags=re.M)
@@ -3553,15 +3702,24 @@ def controle_nfd_gates(ctx, script):
         manque.append(("-", "silence (jumeau dev)"))
     if not any(k[0] == "G2" and k[1] == "avertit" and k[2] == "outil" for k in compte) or not any(k[0] == "G2" and k[1] == "avertit" and k[2] == "Bash" for k in compte):
         manque.append(("G2", "avertit Write et Bash"))
+    manque_disque = [(g, a, o) for g in ("G2",) for a in ("avertit", "silence") for o in ("outil", "Bash") if not compte_disque.get((g, a, o))]
     detail = "%d écritures composables rejouées (jumeau NFD de même code, même stdout, même stderr) : %s" % (
         jouees - len(ecarts), ", ".join("%s %s %d" % (k[0] or "-", k[1], v) for k, v in sorted(compte.items(), key=str)))
+    detail_disque = "disque NFD : %s ; G2 %s" % (
+        "toutes les écritures composables sous les deux formes de charge" if insensible else "écritures de G2 sous la forme du disque (système sensible)",
+        ", ".join("%s %s %d" % (k[1], "Bash" if k[2] == "Bash" else "Write", v) for k, v in sorted(compte_disque.items(), key=str) if k[0] == "G2"))
     if dossier_jugé == ctx.scripts_dir:
         print("COUVERTURE NFD " + detail)
+        print("COUVERTURE NFD DISQUE " + detail_disque)
+        if not insensible:
+            print("  ~ R-NFD-GATES (disque NFD, %d écritures hors G2) non exercé (système de fichiers sensible à la normalisation, limite (bf))" % disque_hors_g2)
     if ecarts:
         return False, "%d écart(s) : %s" % (len(ecarts), " | ".join(ecarts[:3]))
     if manque:
         return False, "preuve trop pauvre : cas absents %s ; %s" % (manque, detail)
-    return True, detail
+    if manque_disque:
+        return False, "preuve trop pauvre (disque NFD) : cas de G2 absents %s ; %s" % (manque_disque, detail_disque)
+    return True, detail + " ; " + detail_disque
 
 
 def sec_banc(ctx):
@@ -3627,7 +3785,8 @@ def sec_banc(ctx):
                                                                                        "jumeaux identiques", detail)
 
 
-CTRL_FICHIER = (controle_table_02, controle_table_04, controle_parseur, controle_env_statique, controle_jeton, controle_registre, controle_g7_05)
+CTRL_FICHIER = (controle_table_02, controle_table_04, controle_parseur, controle_env_statique, controle_jeton, controle_registre, controle_g7_05,
+                controle_recensement_readdir)
 
 
 def sec_mutants(ctx):
@@ -3645,6 +3804,10 @@ def sec_mutants(ctx):
         ("ARMEMENT-G3-G4", "# armement-g3-g4", "if False:  # armement-g3-g4", "R-TABLE-04", controle_table_04),
         # 46 (fix-46-a, A1) : la normalisation NFC des composants relatifs au lab retirée -> les jumeaux NFD du banc rendent une autre décision
         ("NFD-GATES", "# nfc-chemin", 'return [c for c in rel.split(os.sep) if c not in ("", ".")]  # nfc-chemin', "R-NFD-GATES", controle_nfd_gates),
+        # 46 (fix-46-a tour 2, A1-readdir) : le nom lu par readdir sans NFC -> une unité au nom de DISQUE NFD n'est plus vue de G2 (jumeau disque NFD)
+        ("READDIR-NFC", "# nfc-readdir-unites", "if not NOM_UNITE.match(nom):  # nfc-readdir-unites", "R-NFD-GATES", controle_nfd_gates),
+        # mutant équivalent en comportement (sans effet sur un nom ASCII) : seul le recensement statique le voit, c'est son rôle
+        ("RECENSEMENT-READDIR", "# nfc-readdir-verdicts", "if nom.casefold() == NOM_VERDICT:  # nfc-readdir-verdicts", "R-READDIR-RECENSEMENT", controle_recensement_readdir),
         ("PARSEUR", 'return ("invalide:frontmatter-non-ferme", {})', 'return ("invalide:frontmatter-non-ferme-mute", {})',
          "R-PARSEUR", controle_parseur),
         ("ENV-ADHESION", 'SCHEMA_ADHESION = "cycles-v1"', 'SCHEMA_ADHESION = os.environ.get("VF_SCHEMA_ADHESION", "cycles-v1")',
@@ -5103,7 +5266,7 @@ LIMITES_REFERENCE = (
     ("ba", ("référence", "fail-open")),
     ("bb", ("Phase 48", "Phase 50", "P46-D-13")),
     ("be", ("BORNE_LECTURE_PLAN", "1 Mio", "G3", "G4", "recalcul")),
-    ("bf", ("NFC", "NFD", "racine", "ext4", "APFS")),
+    ("bf", ("NFC", "NFD", "racine", "ext4", "APFS", "readdir", "D1", "G2")),
     ("bg", ("BORNE_WATCHPATHS", "BORNE_OCTETS_RECONCILIATION", "plus récentes", "signal")),
     ("bh", ("juges", "Bash", "prouvé", "D1")),
     ("bi", ("canary", "SessionStart", "CwdChanged", "vérificateur de juges")),

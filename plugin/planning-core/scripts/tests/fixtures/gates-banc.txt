@@ -21,6 +21,8 @@
 @@ #
 @@ # Toute écriture dont le chemin, le cwd ou la commande porte un caractère composable a son jumeau NFD, dérivé par la suite (R-NFD-GATES) :
 @@ # les noms composables s'écrivent ici en NFC, jamais en NFD (une forme NFD saisie est invisible à la relecture).
+@@ # Tout lab qui porte des écritures composables est aussi matérialisé au disque NFD (noms du disque décomposés) : ses écritures de G2 y rendent
+@@ # la même décision et la même sortie (R-NFD-GATES, A1-readdir).
 
 @@ lab g2-adherent
 
@@ -965,6 +967,8 @@ Corps du juge.
 @@ ecriture Write livrables/rédaction.md agent=juge-nfc armee :: doit-refuser ROLE
 @@ ecriture Write livrables/hors-écrit.md :: avertit G2
 @@ ecriture Bash - cwd=livrables/équipe commande=cat ../hors-écrit.md :: avertit G2
+@@ ecriture Write livrables/genèse.md :: silence G2
+@@ ecriture Bash - commande=cat livrables/genèse.md :: silence G2
 
 @@ lab nfc-dev jumeau-de=nfc-adherent
 

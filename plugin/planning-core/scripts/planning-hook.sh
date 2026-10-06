@@ -5,7 +5,8 @@
 # RIEN et rend 0 (P45-D-04, P46-D-16). La racine du lab est dérivée du chemin écrit (à défaut du cwd du
 # payload, à défaut du cwd physique du processus), jamais de $CLAUDE_PROJECT_DIR (P45-D-12) ; pour un
 # FileChanged, du `file_path` de premier niveau du payload. Les tests de forme portent sur les composants relatifs au lab mis en forme
-# normale NFC, la racine jamais : `composants_nfc` (A1, fix-46-a) ; un nom d'unité en NFD rend la même décision que sa forme NFC.
+# normale NFC, la racine jamais : `composants_nfc` (A1, fix-46-a) ; un nom d'unité en NFD rend la même décision que sa forme NFC ; les noms lus par readdir
+# aussi, avant leur test de forme (`_sous_dossiers`, `_verdicts_du_planning`, A1-readdir, fix-46-a tour 2).
 #
 # Cinq événements, UNE commande enregistrée (hooks.json), le champ `hook_event_name` du payload
 # aiguillant (absent : PreToolUse, compatibilité des payloads existants ; inconnu : silence, limite (aq)) :
@@ -1017,14 +1018,16 @@ def entrees_du_plan(octets_plan, unite_rel):
 
 
 def _sous_dossiers(dossier):
-    """Noms d'unité (règle NOM_UNITE) des vrais dossiers de `dossier`, triés ; jamais un lien."""
+    """Noms d'unité (règle NOM_UNITE) des vrais dossiers de `dossier`, triés ; jamais un lien. Le test de forme porte sur la forme NFC du nom LU
+    (A1-readdir, fix-46-a tour 2) : une unité dont le nom de DISQUE est en NFD est vue de D1 et de G2 comme son jumeau NFC. Le nom rendu reste celui
+    du disque : lui seul construit le chemin d'accès (sur un système sensible à la normalisation, la forme NFC désignerait un autre dossier, limite (bf))."""
     try:
         noms = sorted(os.listdir(dossier))
     except OSError:
         return []
     res = []
     for nom in noms:
-        if not NOM_UNITE.match(nom):
+        if not NOM_UNITE.match(unicodedata.normalize("NFC", nom)):  # nfc-readdir-unites
             continue
         try:
             if stat.S_ISDIR(os.lstat(os.path.join(dossier, nom)).st_mode):
@@ -1470,7 +1473,8 @@ def evaluer_g5(contexte):
 
 def _verdicts_du_planning(planning):
     """Chemins des VERDICT.md (casse ignorée) sous `planning` : parcours trié, liens de dossier non suivis,
-    borné à BORNE_PARCOURS_VERDICTS entrées."""
+    borné à BORNE_PARCOURS_VERDICTS entrées. Le nom lu passe en NFC avant le test (A1-readdir, fix-46-a tour 2 ; sans effet sur un nom ASCII, gardé par
+    R-READDIR-RECENSEMENT) ; le chemin rendu garde le nom du disque."""
     trouves, vus = [], 0
     for dossier, sous_dossiers, fichiers in os.walk(planning, followlinks=False):
         sous_dossiers.sort()
@@ -1478,7 +1482,7 @@ def _verdicts_du_planning(planning):
             vus += 1
             if vus > BORNE_PARCOURS_VERDICTS:
                 return trouves
-            if nom.casefold() == NOM_VERDICT:
+            if unicodedata.normalize("NFC", nom).casefold() == NOM_VERDICT:  # nfc-readdir-verdicts
                 trouves.append(os.path.join(dossier, nom))
     return trouves
 
@@ -2743,7 +2747,7 @@ def evaluer_gates(contexte):
 # erreur sort en silence, code 0) et ne coûte rien hors adhésion (aucune liste n'est renvoyée, le watcher ne démarre pas). Fichiers surveillés,
 # un par un (jamais un dossier, #91634) : cinq à la racine du dossier de planning, quatre par unité de forme modèle dont SUMMARY.md est absent
 # (approximation déterministe d'« unité non close », sans recalcul). Le journal de D1 n'en fait jamais partie. Les unités sont parcourues la
-# plus RÉCENTE d'abord (`cle_recence`, ordre déclaré par le nom, jamais par une date du disque) : la liste se tronque à BORNE_WATCHPATHS
+# plus RÉCENTE d'abord (`cle_recence`, ordre déclaré par le nom en forme NFC, jamais par une date du disque) : la liste se tronque à BORNE_WATCHPATHS
 # chemins en gardant les plus récentes, et la réconciliation ne hache pas au-delà de BORNE_OCTETS_RECONCILIATION octets ; l'une et l'autre
 # borne sont tracées (`genre=borne`) et signalées dans `additionalContext`, une fois par liste tronquée (D1, fix-46-a). Limites : (ax) à
 # (ba), (bg) de la référence.
@@ -2758,10 +2762,11 @@ LIGNE_SURVEILLANCE_RE = re.compile(r"^(\S+)  genre=(\S+)  chemin=(\S+)  sha256=(
 
 def cle_recence(nom):
     """Clé d'un nom d'unité (NOM_UNITE : chiffres, tiret, reste) triée à l'envers pour mettre la plus RÉCENTE en tête : le préfixe numérique
-    comparé comme un entier SANS conversion (longueur des chiffres significatifs, puis les chiffres), puis le nom entier (déterministe à
-    préfixe égal). Ordre déclaré par le nom, jamais par une date du disque (D1, fix-46-a)."""
+    comparé comme un entier SANS conversion (longueur des chiffres significatifs, puis les chiffres), puis le nom entier en forme NFC (déterministe à
+    préfixe égal, et le même rang pour un nom de disque NFD et son jumeau NFC : A1-readdir). Ordre déclaré par le nom, jamais par une date du disque
+    (D1, fix-46-a)."""
     chiffres = nom.split("-", 1)[0].lstrip("0")
-    return (len(chiffres), chiffres, nom)
+    return (len(chiffres), chiffres, unicodedata.normalize("NFC", nom))  # nfc-recence
 
 
 def _unites_non_closes(racine):

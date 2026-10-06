@@ -17,6 +17,8 @@
 @@ # versionné dans ce dépôt. Chaque lab adhérent porte son jumeau `-dev` (hors adhésion : aucun gate ne le garde).
 @@ # Toute écriture dont le chemin, le cwd ou la commande porte un caractère composable a son jumeau NFD, dérivé par la suite (R-BANC-NFD / R-NFD-GATES) :
 @@ # les noms composables s'écrivent ici en NFC, jamais en NFD (une forme NFD saisie est invisible à la relecture).
+@@ # Tout lab qui porte un nom d'unité composable est aussi matérialisé au disque NFD : SessionStart y rend la même liste surveillée que sous la forme NFC
+@@ # (R-BANC-NFD, D1, A1-readdir).
 
 @@ lab cl-absent
 @@ fichier .planning/config.json

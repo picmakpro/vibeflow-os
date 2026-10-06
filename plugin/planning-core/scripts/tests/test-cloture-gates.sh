@@ -37,6 +37,12 @@
 #   R-BANC-NFD (A1, fix-46-a) chaque écriture du banc dont le chemin porte un caractère composable (labs cl-nfc et cl-nfc-dev, noms en NFC) est rejouée sur copie
 #             armée dans deux matérialisations fraîches, sous sa forme NFC et sous son jumeau NFD : mêmes code, stdout et stderr ; COUVERTURE NFD (au moins un
 #             refus et un passage par gate, un silence) ; une différence nomme « jumeau NFD », l'écriture et les deux décisions
+#             A1-readdir (fix-46-a tour 2) : chaque lab qui porte un nom d'unité composable (cl-nfc et cl-nfc-dev) est AUSSI matérialisé au disque NFD (noms du
+#             disque décomposés, `materialiser_disque_nfd`) ; SessionStart (`source: startup`, copie armée) y rend, pour D1, la même liste surveillée que sur le
+#             disque NFC (chemins relatifs en NFC, même ordre, plus de cinq chemins dont un au moins en forme de disque NFD) et les mêmes (genre, chemin) au
+#             journal de D1 ; le jumeau dev se tait ; un lab d'égalité de préfixe (`05-côté`, `05-cz`) rend `05-côté` avant `05-cz` des deux côtés (nom NFC
+#             décroissant) ; sur un système insensible à la normalisation (APFS, HFS+) seulement, chaque écriture G3/G4 composable est rejouée sur le disque NFD
+#             sous les deux formes de charge utile (même sortie que la référence), sinon une ligne `~` qui nomme la limite (bf)
 #   R-CROISE-01 preuve croisée d'un seul prédicat : pour chaque unité du banc, G3 sur l'écriture de son CLOTURE.md et l'état rendu par recalc-planning.sh
 #             --read-only (R4 : livrable-absent:, livrable-vide:… ou PLAN.md indéterminé) concordent ; une discordance est imprimée nommément
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
@@ -45,6 +51,8 @@
 #   MUT-PLAN-LECTURE (lecture sans borne) -> R-PLAN-BORNE, MUT-G3-BORNE-MESSAGE (branche `borne` neutralisée -> R-G3-05), MUT-NFD-CHEMIN (normalisation NFC
 #   des composants retirée -> R-BANC-NFD), MUT-PLAN-G2-BORNE (G2 appelle `lire_frontmatter_fichier` sans borne), MUT-PLAN-G2-LECTURE (lecture sans borne dans
 #   la fonction), MUT-PLAN-G2-HORS-BORNE (test de la borne neutralisé dans la fonction) -> R-PLAN-BORNE-G2 ;
+#   MUT-READDIR-NFC (le nom lu par readdir sans NFC dans `_sous_dossiers` : l'unité au nom de disque NFD disparaît de la liste surveillée de D1) et
+#   MUT-RECENCE-NFC (`cle_recence` sans NFC : `05-côté` du disque NFD passe après `05-cz`) -> R-BANC-NFD (A1-readdir, fix-46-a tour 2) ;
 #   MUT-G4-ABSENT, MUT-G4-ECHEC (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
@@ -143,6 +151,22 @@ def jumeau_nfd(texte):
     """Forme NFD, composant par composant (séparateur `/`), d'un chemin, d'un cwd ou d'une commande : égale au texte s'il ne porte aucun
     caractère composable (dans ce cas, aucun jumeau)."""
     return "/".join(unicodedata.normalize("NFD", c) for c in texte.split("/"))
+
+
+def disque_insensible(ctx):
+    """Vrai si le système de fichiers du dossier de travail est insensible à la normalisation (APFS, HFS+) : un dossier créé sous un nom NFC se
+    retrouve sous son nom NFD. Calculé une fois."""
+    if getattr(ctx, "_insensible", None) is None:
+        d = ctx.unique("sonde-normalisation")
+        os.makedirs(os.path.join(d, "é"))
+        ctx._insensible = os.path.isdir(os.path.join(d, "é"))
+    return ctx._insensible
+
+
+def relatifs_nfc(chemins, lab):
+    """Les chemins (absolus) rendus relatifs au lab, chaque composant en NFC, l'ordre conservé. Le hook rend des chemins résolus physiquement : l'appelant passe
+    la racine du lab résolue (`os.path.realpath`)."""
+    return [unicodedata.normalize("NFC", os.path.relpath(p, lab)) for p in chemins]
 
 
 # --- Payload du harnais ------------------------------------------------------------------------------------------
@@ -379,6 +403,37 @@ def fabriquer_lab(ctx, nom, plan="ecrit: " + LIVRABLE, unite=UNITE, fichiers=Non
 def ecrire_dans(ctx, dossier_hook, lab, outil, rel, agent=None, extra_env=None):
     brut = payload(outil, entree_outil(outil, os.path.join(lab, rel)), lab, agent_type=agent)
     return ctx.lancer(brut, cwd=lab, dossier=dossier_hook, extra_env=extra_env)
+
+
+def session(ctx, dossier_hook, lab):
+    """SessionStart (`source: startup`) d'un lab, rejoué par la commande enregistrée avec le script du dossier donné ; (rc, stdout, stderr)."""
+    brut = json.dumps({"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": lab, "hook_event_name": "SessionStart", "source": "startup"},
+                      separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return ctx.lancer(brut, cwd=lab, dossier=dossier_hook)
+
+
+def surveilles_de(out):
+    """Liste de `hookSpecificOutput.watchPaths` d'un SessionStart ; [] si la sortie est vide ; None si elle n'est pas conforme."""
+    if out == b"":
+        return []
+    try:
+        liste = json.loads(out.decode("utf-8"))["hookSpecificOutput"]["watchPaths"]
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return None
+    return liste if isinstance(liste, list) else None
+
+
+def journal_d1(lab):
+    """Ensemble des (genre, chemin décodé) des lignes de `.planning/surveillance.log` d'un lab (vide si le journal est absent)."""
+    chemin = os.path.join(lab, ".planning", "surveillance.log")
+    if not os.path.isfile(chemin):
+        return set()
+    res = set()
+    for ligne in open(chemin, encoding="utf-8").read().split("\n"):
+        m = re.match(r"^\S+  genre=(\S+)  chemin=(\S+)  ", ligne)
+        if m:
+            res.add((m.group(1), urllib.parse.unquote(m.group(2))))
+    return res
 
 
 def deroger(ctx, lab, gate, chemins):
@@ -1422,6 +1477,25 @@ def materialiser(ctx, labs, nom, destination):
         poser_jusqua(ctx, destination, v["unite"], v["tentative"], v["constats"])
 
 
+def materialiser_disque_nfd(ctx, labs, nom, destination):
+    """La MÊME chaîne que `materialiser`, mais chaque chemin de dossier, de fichier, de lien ET la cible relative d'un lien passent par `jumeau_nfd` : les
+    noms du DISQUE sont en NFD (A1-readdir, fix-46-a tour 2). Les contenus restent ceux du banc (noms en NFC). Les verdicts ne sont posés par
+    `poser_jusqua` que sur un système insensible à la normalisation (sur ext4, poser-verdict.sh lit `--unite` en NFC, qui n'y existe pas : limite (bf))."""
+    lab = labs[nom]
+    os.makedirs(destination, exist_ok=True)
+    for dossier in lab["dossiers"]:
+        os.makedirs(os.path.join(destination, jumeau_nfd(dossier)), exist_ok=True)
+    for chemin, contenu in lab["fichiers"].items():
+        ecrire(os.path.join(destination, jumeau_nfd(chemin)), contenu)
+    for chemin, cible in lab["liens"]:
+        os.makedirs(os.path.dirname(os.path.join(destination, jumeau_nfd(chemin))), exist_ok=True)
+        os.symlink(jumeau_nfd(cible), os.path.join(destination, jumeau_nfd(chemin)))
+    resoudre_jetons(ctx, destination)
+    if disque_insensible(ctx):
+        for v in lab["verdicts"]:
+            poser_jusqua(ctx, destination, jumeau_nfd(v["unite"]), v["tentative"], v["constats"])
+
+
 def labs_banc(ctx):
     if ctx._banc is None:
         ordre, labs = parser_banc(open(ctx.banc, encoding="utf-8").read())
@@ -1498,27 +1572,60 @@ def sec_banc(ctx):
                                                                                       "jumeaux identiques", detail)
 
 
+def _ecrire_lab_egalite(racine, disque_nfd):
+    """Lab synthétique d'égalité de préfixe : adhérent, cycle `01-c`, phases `05-côté` et `05-cz` (même préfixe numérique), sans SUMMARY.md (toutes
+    deux non closes). `disque_nfd` : chaque composant de chemin est écrit en NFD (les contenus restent ceux du banc)."""
+    fichiers = {".planning/config.json": '{"planning_version": "cycles-v1"}\n',
+                ".planning/cycles/01-c/phases/05-côté/PLAN.md": "---\necrit: livrables/c.md\n---\nPlan.\n",
+                ".planning/cycles/01-c/phases/05-cz/PLAN.md": "---\necrit: livrables/z.md\n---\nPlan.\n"}
+    for chemin, contenu in fichiers.items():
+        ecrire(os.path.join(racine, jumeau_nfd(chemin) if disque_nfd else chemin), contenu)
+
+
 def controle_banc_nfd(ctx, script):
-    """R-BANC-NFD (A1, fix-46-a) : pour chaque écriture du banc dont le chemin porte un caractère composable, rejouée sur copie armée dans deux matérialisations
-    FRAÎCHES du lab (l'une reçoit la forme NFC, l'autre le jumeau NFD), mêmes code, stdout et stderr (vide). Au moins un refus et un passage pour G3 et pour G4,
-    au moins un silence (jumeau dev) ; une différence nomme « jumeau NFD », l'écriture et les deux décisions."""
+    """R-BANC-NFD (A1, fix-46-a ; A1-readdir, fix-46-a tour 2). Trois preuves sur copie armée, la forme NFC servant de référence.
+    (1) Pour chaque écriture du banc dont le chemin porte un caractère composable, rejouée dans deux matérialisations FRAÎCHES du lab (l'une reçoit la forme
+    NFC, l'autre le jumeau NFD), mêmes code, stdout et stderr (vide) ; au moins un refus et un passage pour G3 et pour G4, au moins un silence (jumeau dev).
+    (2) Disque NFD, D1 (A1-readdir) : pour chaque lab qui porte un nom d'unité composable (l'adhérent et son jumeau dev), SessionStart (`source: startup`)
+    rend, sur un disque dont les noms sont en NFD, la même liste surveillée (chemins relatifs en NFC, même ordre ; plus de cinq chemins pour l'adhérent, dont
+    au moins un en forme de disque NFD : le nom du disque construit le chemin d'accès) et les mêmes (genre, chemin) au journal de D1 que sur le disque NFC ;
+    le jumeau dev se tait des deux côtés ; PLUS un lab d'égalité de préfixe (phases `05-côté` et `05-cz`) : mêmes listes, `05-côté` avant `05-cz` (ordre
+    déclaré : nom NFC décroissant ; sans NFC dans `cle_recence` l'unité NFD passerait après `05-cz`).
+    (3) Disque NFD, G3 et G4, seulement sur un système insensible à la normalisation (APFS, HFS+) : chaque écriture composable rejouée sur le disque NFD sous
+    les deux formes de charge utile rend la sortie de la référence ; sinon une ligne `~` qui nomme la limite (bf).
+    Une différence nomme « jumeau NFD » ou « jumeau disque NFD », l'écriture et les deux décisions."""
     dossier_jugé = _dossier(ctx, script)
     d = ctx.copie_forcee(dossier_jugé, "armed")
     ordre, labs = parser_banc(open(ctx.banc, encoding="utf-8").read())
+    insensible = disque_insensible(ctx)
     compte = {"G3": {"doit-refuser": 0, "doit-passer": 0}, "G4": {"doit-refuser": 0, "doit-passer": 0}}
     silences, jouees, ecarts = 0, 0, []
+    disque_rejouees, disque_hors = 0, 0
+    d1_labs, d1_chemins, d1_nfd_forme = 0, 0, 0
     for nom in ordre:
         composables = [e for e in labs[nom]["ecritures"] if jumeau_nfd(e["chemin"]) != e["chemin"]]
-        if not composables:
+        nom_composable = any(jumeau_nfd(c) != c for c in list(labs[nom]["fichiers"]) + list(labs[nom]["dossiers"]))
+        if not composables and not nom_composable:
             continue
-        lab_nfc, lab_nfd = ctx.unique("nfd-nfc-" + nom), ctx.unique("nfd-nfd-" + nom)
+        lab_nfc, lab_nfd, lab_disque = ctx.unique("nfd-nfc-" + nom), ctx.unique("nfd-nfd-" + nom), ctx.unique("nfd-disque-" + nom)
         materialiser(ctx, labs, nom, lab_nfc)
         materialiser(ctx, labs, nom, lab_nfd)
+        materialiser_disque_nfd(ctx, labs, nom, lab_disque)
         for e in composables:
             jouees += 1
             r_nfc = ecrire_dans(ctx, d, lab_nfc, e["outil"], e["chemin"], agent=e["agent"])
             r_nfd = ecrire_dans(ctx, d, lab_nfd, e["outil"], jumeau_nfd(e["chemin"]), agent=e["agent"])
             v_nfc, v_nfd = classer(r_nfc[0], r_nfc[1]), classer(r_nfd[0], r_nfd[1])
+            if insensible:
+                for forme in (e["chemin"], jumeau_nfd(e["chemin"])):
+                    r_disque = ecrire_dans(ctx, d, lab_disque, e["outil"], forme, agent=e["agent"])
+                    disque_rejouees += 1
+                    if r_disque != r_nfc:
+                        ecarts.append("jumeau disque NFD de %s %s (charge %s) :: %s %s : disque NFC -> %s, disque NFD -> %s" % (
+                            e["outil"], e["chemin"], "NFC" if forme == e["chemin"] else "NFD", e["attendu"], e["gate"],
+                            v_nfc + " " + court(r_nfc[1], 80), classer(r_disque[0], r_disque[1]) + " " + court(r_disque[1], 80)))
+            else:
+                disque_hors += 1
             if r_nfc != r_nfd or r_nfc[2]:
                 ecarts.append("jumeau NFD de %s %s :: %s %s : NFC -> %s, NFD -> %s" % (e["outil"], e["chemin"], e["attendu"], e["gate"], v_nfc + " " + court(r_nfc[1], 80),
                                                                                        v_nfd + " " + court(r_nfd[1], 80)))
@@ -1531,14 +1638,67 @@ def controle_banc_nfd(ctx, script):
                 silences += 1
             else:
                 compte[e["gate"]][e["attendu"]] += 1
-    resume = "G3 refus=%d passage=%d ; G4 refus=%d passage=%d ; silence=%d ; %d écritures composables rejouées, jumeau NFD de décision identique" % (
-        compte["G3"]["doit-refuser"], compte["G3"]["doit-passer"], compte["G4"]["doit-refuser"], compte["G4"]["doit-passer"], silences, jouees - len(ecarts))
+        if nom_composable:
+            # D1 : SessionStart dans deux matérialisations FRAÎCHES (les écritures ci-dessus ne laissent aucune ligne `intention` dans ces journaux)
+            lab_d1_nfc, lab_d1_nfd = ctx.unique("d1-nfc-" + nom), ctx.unique("d1-nfd-" + nom)
+            materialiser(ctx, labs, nom, lab_d1_nfc)
+            materialiser_disque_nfd(ctx, labs, nom, lab_d1_nfd)
+            r_a, r_b = session(ctx, d, lab_d1_nfc), session(ctx, d, lab_d1_nfd)
+            wp_a, wp_b = surveilles_de(r_a[1]), surveilles_de(r_b[1])
+            if wp_a is None or wp_b is None:
+                ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s : sortie non conforme (NFC %s, disque NFD %s)" % (nom, court(r_a[1], 60), court(r_b[1], 60)))
+            elif r_a[0] != r_b[0] or r_a[0] != 0 or r_a[2] or r_b[2]:
+                ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s : code NFC %d, disque NFD %d, stderr %s %s" % (nom, r_a[0], r_b[0], court(r_a[2], 60), court(r_b[2], 60)))
+            elif labs[nom]["jumeau_de"]:
+                if wp_a or wp_b or r_a[1] != b"" or r_b[1] != b"":
+                    ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s (hors adhésion) : doit se taire, NFC %s, disque NFD %s" % (nom, court(r_a[1], 60), court(r_b[1], 60)))
+            else:
+                liste_a, liste_b = relatifs_nfc(wp_a, os.path.realpath(lab_d1_nfc)), relatifs_nfc(wp_b, os.path.realpath(lab_d1_nfd))
+                if liste_a != liste_b:
+                    ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s : liste surveillée de %d chemin(s) sur le disque NFD, %d sur le disque NFC (absents du disque NFD : %s)" % (
+                        nom, len(liste_b), len(liste_a), ", ".join([p for p in liste_a if p not in liste_b][:2]) or "-"))
+                elif len(liste_a) <= 5:
+                    ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s : preuve trop pauvre, %d chemin(s) surveillé(s) (au moins une unité attendue)" % (nom, len(liste_a)))
+                elif not any(p != unicodedata.normalize("NFC", p) for p in wp_b):
+                    ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s : aucun chemin surveillé en forme de disque NFD (le nom du disque construit le chemin d'accès)" % nom)
+                elif journal_d1(lab_d1_nfc) != journal_d1(lab_d1_nfd):
+                    ecarts.append("jumeau disque NFD de SessionStart (D1) du lab %s : journal de D1 différent (%d ligne(s) NFC, %d disque NFD)" % (
+                        nom, len(journal_d1(lab_d1_nfc)), len(journal_d1(lab_d1_nfd))))
+                else:
+                    d1_labs += 1
+                    d1_chemins = max(d1_chemins, len(liste_a))
+                    d1_nfd_forme += sum(1 for p in wp_b if p != unicodedata.normalize("NFC", p))
+    # D1, égalité de préfixe : `05-côté` et `05-cz`, listes égales en ordre, `05-côté` d'abord (nom NFC décroissant)
+    lab_e_nfc, lab_e_nfd = ctx.unique("d1-egalite-nfc"), ctx.unique("d1-egalite-nfd")
+    _ecrire_lab_egalite(lab_e_nfc, False)
+    _ecrire_lab_egalite(lab_e_nfd, True)
+    r_a, r_b = session(ctx, d, lab_e_nfc), session(ctx, d, lab_e_nfd)
+    wp_a, wp_b = surveilles_de(r_a[1]), surveilles_de(r_b[1])
+    egalite = "non joué"
+    if not wp_a or not wp_b:
+        ecarts.append("jumeau disque NFD de SessionStart (D1, égalité de préfixe) : liste vide (NFC %s, disque NFD %s)" % (court(r_a[1], 60), court(r_b[1], 60)))
+    else:
+        liste_a, liste_b = relatifs_nfc(wp_a, os.path.realpath(lab_e_nfc)), relatifs_nfc(wp_b, os.path.realpath(lab_e_nfd))
+        cote, cz = ".planning/cycles/01-c/phases/05-côté/PLAN.md", ".planning/cycles/01-c/phases/05-cz/PLAN.md"
+        if liste_a != liste_b:
+            ecarts.append("jumeau disque NFD de SessionStart (D1, égalité de préfixe) : listes différentes en ordre (NFC %s ; disque NFD %s)" % (
+                [p.split("/")[-2] for p in liste_a if p.endswith("/PLAN.md")], [p.split("/")[-2] for p in liste_b if p.endswith("/PLAN.md")]))
+        elif cote not in liste_a or cz not in liste_a or liste_a.index(cote) > liste_a.index(cz):
+            ecarts.append("jumeau disque NFD de SessionStart (D1, égalité de préfixe) : `05-côté` doit précéder `05-cz` (nom NFC décroissant), ordre rendu %s" % (
+                [p.split("/")[-2] for p in liste_a if p.endswith("/PLAN.md")]))
+        else:
+            egalite = "05-côté avant 05-cz sur les deux disques"
+    resume = "G3 refus=%d passage=%d ; G4 refus=%d passage=%d ; silence=%d ; %d écritures composables rejouées, jumeau NFD de décision identique ; D1 disque NFD : %d lab(s) adhérent(s), %d chemins surveillés dont %d en forme de disque NFD, journal identique, égalité de préfixe : %s ; disque NFD G3/G4 : %s" % (
+        compte["G3"]["doit-refuser"], compte["G3"]["doit-passer"], compte["G4"]["doit-refuser"], compte["G4"]["doit-passer"], silences, jouees,
+        d1_labs, d1_chemins, d1_nfd_forme, egalite, ("%d rejeux sous les deux formes de charge" % disque_rejouees) if insensible else "non exercé (système sensible)")
     if dossier_jugé == ctx.scripts_dir:
         print("COUVERTURE NFD " + resume)
+        if not insensible:
+            print("  ~ R-BANC-NFD (disque NFD, %d écritures G3/G4) non exercé (système de fichiers sensible à la normalisation, limite (bf))" % disque_hors)
     if ecarts:
         return False, "%d écart(s) : %s" % (len(ecarts), " | ".join(ecarts[:3]))
-    if any(compte[g][k] < 1 for g in compte for k in compte[g]) or silences < 1:
-        return False, "preuve trop pauvre : " + resume + " (attendu : au moins un refus et un passage par gate, un silence)"
+    if any(compte[g][k] < 1 for g in compte for k in compte[g]) or silences < 1 or d1_labs < 1 or egalite == "non joué":
+        return False, "preuve trop pauvre : " + resume + " (attendu : au moins un refus et un passage par gate, un silence, un lab D1 conforme, l'égalité de préfixe)"
     return True, resume
 
 
@@ -1689,6 +1849,10 @@ def sec_mutants_g3(ctx):
          "R-G3-03", controle_g3_03)
     tuer(ctx, "G3-ADHESION", "sys.exit(0)  # non-adherent", "pass", "R-G3-03", controle_g3_03)
     tuer(ctx, "NFD-CHEMIN", "# nfc-chemin", 'return [c for c in rel.split(os.sep) if c not in ("", ".")]  # nfc-chemin', "R-BANC-NFD", controle_banc_nfd)
+    # A1-readdir (fix-46-a tour 2) : le nom lu par readdir sans NFC -> l'unité au nom de disque NFD disparaît de la liste surveillée de D1 (jumeau disque NFD)
+    tuer(ctx, "READDIR-NFC", "# nfc-readdir-unites", "if not NOM_UNITE.match(nom):  # nfc-readdir-unites", "R-BANC-NFD", controle_banc_nfd)
+    # A1-readdir : le départage de `cle_recence` sans NFC -> `05-côté` du disque NFD passe après `05-cz` (cas d'égalité de préfixe)
+    tuer(ctx, "RECENCE-NFC", "# nfc-recence", "return (len(chiffres), chiffres, nom)  # nfc-recence", "R-BANC-NFD", controle_banc_nfd)
     tuer(ctx, "G3-BORNE-MESSAGE", "# g3-borne", "if False:  # g3-borne", "R-G3-05", controle_g3_05)
     tuer(ctx, "PLAN-BORNE-TEST", "# plan-hors-borne", "if False:  # plan-hors-borne", "R-PLAN-BORNE", controle_plan_borne)
     tuer(ctx, "PLAN-LECTURE", "# plan-lecture-bornee", "octets = fh.read()  # plan-lecture-bornee", "R-PLAN-BORNE", controle_plan_borne)
