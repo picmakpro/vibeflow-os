@@ -885,6 +885,14 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SOBR-06 | Phase 41.3 | Complete — 2026-09-30, plans 41.3-03 : budgets BACKLOG, index mémoire, ROADMAP ; archivage seul (--archive, --auto) |
 | SOBR-07 | Phase 41.3 | Complete — 2026-09-30, plans 41.3-04 : garde de fin de geste (Stop) et contrôle E7 de check-mission-exit |
 | SOBR-08 | Phase 41.3 | Complete — 2026-09-30, plans 41.3-03 : prose plafonnée, sujets clos archivés hors du fichier courant |
+| POCK-01 | Phase 41.4 | Pending — inscrite 2026-10-06 (arbitrage Samuel, session principale, 2026-10-06 ; demande de Willy) |
+| POCK-02 | Phase 41.4 | Pending — inscrite 2026-10-06 (arbitrage Samuel, session principale, 2026-10-06 ; demande de Willy) |
+| POCK-03 | Phase 41.4 | Pending — inscrite 2026-10-06 (arbitrage Samuel, session principale, 2026-10-06 ; demande de Willy) |
+| POCK-04 | Phase 41.4 | Pending — inscrite 2026-10-06 (arbitrage Samuel, session principale, 2026-10-06 ; demande de Willy) |
+| POCK-05 | Phase 41.4 | Pending — inscrite 2026-10-06 (arbitrage Samuel, session principale, 2026-10-06 ; demande de Willy) |
+| POCK-06 | Phase 41.4 | Pending — inscrite 2026-10-06 (arbitrage Samuel, session principale, 2026-10-06 ; demande de Willy) |
+| POCK-07 | Phase 41.4 | Pending — inscrite 2026-10-06 (arbitrage Samuel, session principale, 2026-10-06 ; demande de Willy) |
+| POCK-08 | Phase 41.4 | Pending — inscrite 2026-10-06 (arbitrage Samuel, session principale, 2026-10-06 ; demande de Willy) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1249,6 +1257,16 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **SOBR-06**: Budgets étendus — plafonds mesurés sur le BACKLOG ouvert, l'index de mémoire et le ROADMAP, en plus de STATE et des worktrees ; au-delà, l'outil archive seul (déplacement tracé et réversible), écrit comme précision d'ADR-031.
 - [x] **SOBR-07**: Nettoyage en fin de geste — la clôture d'une mission de manager **et** la fin d'un travail direct rangent worktrees, branches, stash et mémoires non versionnées ; gaté, pas facultatif.
 - [x] **SOBR-08**: Prose plafonnée — une note de STATE ou une entrée de BACKLOG a une taille maximale ; un sujet clos quitte le fichier courant pour une archive.
+
+### Emprunts Pocock (Phase 41.4 — INSERTED 2026-10-06)
+- [ ] **POCK-01**: Frontière de questions — un cadrage (head, panel du manager) ne pose que les questions dont les prérequis sont réglés, une recommandation par question, jamais un fait qu'un sous-agent peut établir ; rendu AskUserQuestion groupé par zone.
+- [ ] **POCK-02**: Glossaire de domaine du lab — `docs/_transverse/` porte un glossaire que le cadrage alimente (termes flous challengés, mots surchargés résolus) et que les briques lisent ; régime fixé dans `docs-flow.md`.
+- [ ] **POCK-03**: Frontière de phase — à la sortie d'un geste ou d'une mission, le head applique l'arbre continuer → clear → handoff → sous-agent → compact (en dernier, avec instruction), et note ce qui dans l'environnement aurait rendu la mission suivante moins chère.
+- [ ] **POCK-04**: Revue à deux axes — `vf-reviewer` rend Standards (conventions, smells, sécurité) et Spec (fidélité au plan de l'étape : manquant, non demandé, implémenté faux) en dispatches séparés, jamais re-rankés en un verdict unique.
+- [ ] **POCK-05**: Grille de rétro — la promotion d'un LEARNING trie mécanique → check déterministe, jugement → standard ; un dépôt sans garde-fou et une instruction sans effet sont des findings.
+- [ ] **POCK-06**: Merge-danger call — une PR ouverte par la chaîne de ship déclare porte à sens unique ou double sens et rayon d'explosion.
+- [ ] **POCK-07**: Skills classés — chaque skill VibeFlow est user-invoked (`disable-model-invocation: true` + équivalent Codex) ou model-invoked ; un gate rougit sur un skill non classé ; un user-invoked n'invoque jamais un autre user-invoked.
+- [ ] **POCK-08**: Défaillance observée — tout ajout de skill, gate ou règle cite la session ou le geste qui a mal tourné, sinon refus ; `check-ajout-retrait` l'exige en plus de SOBR-05.
 
 ### Transverse
 - [x] **QUAL-01**: Tout nouveau gate du milestone naît avec ses trois issues (PASS / FAIL / imparsable BRUYANT) et sa mutation rouge prouvée — mesuré satisfait sur la Phase 41 le 2026-09-18 (vingt mutants tués sur les trois gardes plus neuf sur les deux outils de phase, total vingt-neuf, rc=0 sur les cinq suites), **puis RÉGRESSÉ** (partition du planning, PR #94, 2026-09-23, résolution de racine cassée), **réparé le 2026-09-24** (résolution par `git rev-parse --show-toplevel`), mesure alors incomplète à **28/29** (`check-trace-arbitrage.sh` refusait PAR CONCEPTION les citations multiples distinctes et conformes). **RE-SATISFAIT le 2026-09-24** : trois défauts de conception corrigés dans `check-trace-arbitrage.sh` (citations multiples distinctes conformes acceptées, merges réels de PR et commits de release exclus du jugement, mot déclencheur insensible à la casse — arbitrage Samuel, AskUserQuestion session principale, 2026-09-24), neuf cas de test et neuf mutants ajoutés (dont MUT-2 repurposé), `BASE-TRACE-ARBITRAGE` avancée de `f1d6589` à `0b4d9a7` (7 commits antérieurs acceptés en l'état, identifiant de migration sans rapport confondu avec le registre de décisions de la phase — hors des trois défauts corrigés). **Mesuré ce jour, rc=0 sur les cinq suites : `test-check-trace-arbitrage.sh` 9 mutants tués (MUT-1 à MUT-9), `test-check-aucune-fermeture.sh` 3 mutants tués (inchangé), plus les vingt mutants inchangés des trois gardes CI (`check-baseline-arbitrage.sh` 9, `check-gate-touche.sh` 6, `check-push-sans-pr.sh` 5) — total 32 mutants tués sur cinq suites, toutes vertes.**

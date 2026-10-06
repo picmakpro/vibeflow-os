@@ -99,6 +99,16 @@ donc **jamais en bloc** : on emprunte des disciplines transcrites, pas un pipeli
   **double sens**, plus le **rayon d'explosion**. Cinq lignes dans le gabarit de `gsd-ship` ; sur
   ce dépôt, c'est exactement ce qu'une relecture adverse SOBR-04 veut lire en premier.
 
+- **g. La séparation user-invoked / model-invoked des skills, enforcée par frontmatter**
+  (`disable-model-invocation: true` côté Claude Code, `policy.allow_implicit_invocation: false`
+  dans `agents/openai.yaml` côté Codex). Ajouté le 2026-10-06 après relecture à blanc (« si on
+  recréait le projet ») : c'est l'idée **structurelle** la plus forte du pack, plus qu'aucun
+  skill — « les user-invoked orchestrent, les model-invoked portent la discipline, un
+  user-invoked n'appelle jamais un autre user-invoked ». VibeFlow l'a pour les agents (Pattern
+  12, `vf-internal: true`), pas pour les skills : les nôtres disent tous « invocable par
+  l'utilisateur ET en autonomie ». → classer chaque skill VF, poser le frontmatter sur ceux qui
+  orchestrent, et le faire vérifier par `check-agents.sh` ou un gate frère (ADR-044).
+
 Aucun de ces emprunts n'installe `mattpocock-skills` : un seul catalogue tiers (superpowers),
 décision du 2026-08-28 (mémoire `agent-skills-ecarte-superpowers-reste`). Le `tdd` et le
 `diagnosing-bugs` de Pocock ne remplacent pas ceux de superpowers.
@@ -126,8 +136,9 @@ décision du 2026-08-28 (mémoire `agent-skills-ecarte-superpowers-reste`). Le `
 obligatoire** (une hypothèse « ce serait mieux si » ne tient pas une issue), **zéro nouveau skill**
 (composer, sinon rien), **un fichier par refus** relu avant toute proposition, `misc/` gelé avec
 toutes ses issues fermées. Un dépôt à 274k étoiles tient 27 skills ; la pression inverse (le
-volume ECC, 292 skills) est celle qu'on a écartée le 2026-09-25. Rien à copier, c'est une
-confirmation de la Phase 41.3.
+volume ECC, 292 skills) est celle qu'on a écartée le 2026-09-25. Une confirmation de la Phase
+41.3 — avec **un cran de plus à reprendre** : le critère de **défaillance observée** (une
+proposition sans session réelle qui a mal tourné ne tient pas), que SOBR-05 n'exige pas.
 
 ## 6. Collisions et séquencement
 
@@ -139,13 +150,12 @@ confirmation de la Phase 41.3.
 | e | `consolidator` (`detect-promotions.sh`) | ECC-3 (Phase 53), Phase 48 | **moyenne** — à fondre dans la Phase 53, pas une phase à part |
 | f | `gsd-ship` est amont (gsd-core) : gabarit côté `mission-contracts.md` ou note de ship | — | faible |
 
-**Recommandation de séquencement** : pas de jalon dédié. Deux gestes :
-
-1. **a + c + d + f** = doctrine du head et du reviewer, **une phase `dev-orchestrator`** dans le
-   compartiment `fiabilite`, minor (comportement installé qui change), après la clôture de
-   `fiabilite-v1.0` et avant ou à côté de la 51 (indépendante).
-2. **b + e** se fondent dans le jalon `ecc-inspiration-v1.0` : b dans la phase documentaire la
-   plus proche (ou une 52bis), e dans la **Phase 53** (apprentissage adossé à l'observation).
+**Séquencement tranché** (arbitrage Samuel, session principale, 2026-10-06) : **tous les emprunts
+retenus (a à g, plus le critère de défaillance observée du §5) dans une seule phase courte,
+Phase 41.4, compartiment `fiabilite`, avant la clôture de `fiabilite-v1.0`** — pas de jalon
+dédié, rien de reporté sur le jalon ECC. La recommandation initiale de l'étude (scinder a/c/d/f
+et b/e) est **superseded** par cet arbitrage. L'emprunt e composera avec la Phase 53 quand elle
+viendra : la 41.4 pose la grille de tri, la 53 l'adosse à l'observation.
 
 Points de sérialisation inchangés : `VERSION` et le tag (une release à la fois), numérotation des
 ADR (à la suite du dernier posé), `BACKLOG.md` et `docs/ADR.md` (un seul écrivain par PR).
