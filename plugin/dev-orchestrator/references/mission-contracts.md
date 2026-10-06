@@ -63,6 +63,9 @@ DIGEST (cache — le disque fait foi)
 - Conventions cibles : <2-3 lignes du CLAUDE.md projet qui engagent ce mandat>
 ```
 
+Pour un nœud `revue-N` (ou `join-N` : l'union des plans des lots joints), le digest porte en plus le
+chemin du PLAN de l'étape : c'est l'entrée de l'axe Spec (§Étage revue, « Deux axes de revue »).
+
 ### Composition du négatif (bullet « NE charge PAS », G1)
 
 1. **D'où vient la donnée** — deux champs que le socle émet déjà, jamais recalculés : (a) le
@@ -341,6 +344,34 @@ sur les trois axes. Arbitrage complet, avec le critère écrit : `docs/ADR.md` A
 désormais aussi, sur les mêmes axes, le hook de revue de code du moteur face au nœud `revue-N`, et
 le hook d'audit de sécurité face à l'auditeur VibeFlow (Phase 23, plan 23-06). Aucun câblage
 automatique de `gsd-review` dans le DAG de mission — décision distincte, non prise ici.
+
+### Deux axes de revue : Standards et Spec (POCK-04)
+
+`vf-reviewer` dispatche en PARALLÈLE deux fois l'agent de revue délégué (aucun agent neuf) : l'axe
+**Standards** (conventions du dépôt et de ses règles, smells, sécurité, bugs — le périmètre d'avant)
+et l'axe **Spec** (le diff jugé contre le PLAN de l'étape : tâche manquante, ajout non demandé,
+implémenté faux ; chaque finding porte en `ref` la ligne du plan, `{chemin du PLAN}:{ligne}`).
+Chaque brief passe un `review_path` DISTINCT — `{phase_dir}/{phase}-REVIEW-STANDARDS.md` et
+`{phase_dir}/{phase}-REVIEW-SPEC.md` — sinon les deux écrivent le même fichier de revue ; deux
+enregistrements au registre des agents (`register` puis `close`, un par sous-agent). Les deux axes
+tournent en régime plein comme allégé (P414-D-05, P414-D-06 ; hypothèse Q6 : le coût double est assumé).
+
+Schéma : champ optionnel frère de `statut`/`findings` (même patron que `cause`/`mandat`), un objet à
+deux clés, `axes.standards` et `axes.spec`, chacune `{ "statut": …, "findings": [...] }` :
+
+```json
+"axes": { "standards": { "statut": "passed", "findings": [] },
+          "spec": { "statut": "gaps_found", "findings": [{ "severity": "majeur", "action": "auto-fix", "ref": "PLAN.md:42", "axe": "spec" }] } }
+```
+
+Règle de **conjonction** : le statut global vaut `passed` si et seulement si les deux axes sont
+`passed`, sinon le premier présent dans l'ordre fixe `human_needed`, `blocked`, `gaps_found` —
+dérivation mécanique pour la table de pilotage (Pattern C), jamais un reclassement de findings.
+Les `findings` à la racine sont la concaténation des findings Standards puis Spec, chacun tagué
+`"axe": "standards"` ou `"axe": "spec"`, jamais retriés par sévérité entre axes ; le mandat de
+correction ciblée les transmet groupés par axe. Chemin du PLAN absent du brief : `axes.spec.statut`
+vaut `blocked` avec le finding `{ "severity": "bloquant", "action": "ask-user", "ref": "brief:plan-absent", "axe": "spec" }`,
+jamais `passed` par défaut.
 
 ## `.planning/STATE.md` — ne jamais « réparer » via `gsd-tools state` (ADR-063)
 

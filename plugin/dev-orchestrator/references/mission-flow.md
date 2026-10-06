@@ -304,6 +304,8 @@ manager↔worker↔worker de revue). Sur un rapport typé `gaps_found` :
 3. Re-dispatch `vf-reviewer` sur le diff corrigé.
    Un même verdict qui revient deux fois sur ce nœud : édition-à-la-source, pas un 4ᵉ redispatch — règle et seuil au niveau kernel (`team-kernel.md` §Règles d'instanciation, G5).
 
+Le rapport de `vf-reviewer` porte deux axes (`axes.standards`, `axes.spec` ; schéma : `mission-contracts.md` §Étage revue) : le nœud ne passe que si les deux axes sont `passed`, en régime plein comme allégé, et la correction ciblée reçoit les findings groupés par axe.
+
 Budget **3 tours**, au grain **étape** et **partagé** avec les autres boucles de correction de la
 même étape (§6 ci-dessous) — un budget séparé par boucle se contournerait mécaniquement, par
 renommage du problème, ce que ce Pattern dit précisément vouloir empêcher. La valeur ne bouge pas
