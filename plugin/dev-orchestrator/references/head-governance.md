@@ -120,8 +120,9 @@ Sept contrôles, chacun bon marché et déterministe :
 - **E2** — arbre propre (hors artefacts gitignorés attendus).
 - **E3** — branche dédiée, PR ouverte (ADR-059), dont le corps porte un merge-danger call conforme
   (POCK-06) : forme exacte dans `mission-contracts.md` §Isolation de branche. Un MANQUE E3 peut donc
-  signifier « corps sans merge-danger call » (correction : compléter le corps de PR) ; un corps de PR
-  illisible rend INDÉTERMINÉ, jamais SAIN.
+  signifier « corps sans merge-danger call » (correction : compléter le corps de PR) ou « section ou
+  ligne `Porte` répétée » (correction : dédoublonner, une seule section et une seule ligne `Porte`,
+  jamais compléter) ; un corps de PR illisible rend INDÉTERMINÉ, jamais SAIN.
 - **E4** — STATE/ROADMAP marqués pour les étapes de la mission.
 - **E5** — rapport détaillé présent sur disque, à son chemin canonique `.planning/missions/…`.
 - **E6** — chaque verdict du rapport porte sa preuve (commande + code de sortie + SHA) : voir le

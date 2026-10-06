@@ -92,7 +92,8 @@ chemin du PLAN de l'étape : c'est l'entrée de l'axe Spec (§Étage revue, « D
   `Conventions cibles` embarque les conventions code cibles (CLAUDE.md du projet, conventions de
   commit, périmètre de fichiers du nœud) ET pointe la spec du crafter (chemin sur disque) comme
   **source du cadrage** — l'entrée de `vf-coder` devient cette spec, pas la ROADMAP (sa chaîne
-  `gsd-discuss-phase` s'y ancre).
+  `gsd-discuss-phase` s'y ancre). Le digest d'un nœud `revue:écran-X` ne porte aucun PLAN d'étape :
+  l'axe Spec y est `skipped`, motif « mission design, pas de PLAN d'étape » (§Étage revue, P414-D-22).
 
 Le worker lit le digest D'ABORD, et ne relit du disque que ce que son mandat exige
 (index-first). Un digest contredit par le disque → le disque gagne, et le worker le signale.
@@ -140,11 +141,14 @@ remplace pas.
 
 **Merge-danger call (POCK-06)** — forme exacte de la section du corps de PR :
 
-- Titre exact `## Merge-danger call` ; la section court jusqu'au titre `## ` suivant ou la fin du corps.
-- Ligne `Porte : sens unique` (le merge ne se défait pas proprement : données, migration, publication,
-  état distant) ou `Porte : double sens` (un revert suffit). Énumération fermée ; espace avant les
-  deux-points facultative.
-- Ligne `Rayon d'explosion : …` — qui et quoi casse si c'est faux, au moins 10 caractères non blancs.
+- Titre exact `## Merge-danger call`, **une seule section** dans le corps ; elle court jusqu'au titre
+  `## ` suivant ou la fin du corps. Un titre répété rend MANQUE.
+- **Une seule** ligne `Porte : sens unique` (le merge ne se défait pas proprement : données, migration,
+  publication, état distant) ou `Porte : double sens` (un revert suffit), même répétée à l'identique :
+  une seconde ligne `Porte` rend MANQUE. Énumération fermée ; espace avant les deux-points facultative.
+- Ligne `Rayon d'explosion : …` — qui et quoi casse si c'est faux, au moins 10 caractères non blancs
+  (asymétrie assumée avec `Porte` : une répétition n'est pas refusée, il suffit qu'une ligne du
+  rayon atteigne les 10 caractères).
 - E3 rend MANQUE (nommé) si la section manque ou est incomplète, INDÉTERMINÉ si le corps est
   illisible. Les replis du tableau ci-dessous (pas de remote, `gh` absent) laissent E3 indéterminé.
   Forme vérifiée, jamais la véracité de la déclaration : c'est un appel pour le relecteur humain.
@@ -364,14 +368,25 @@ deux clés, `axes.standards` et `axes.spec`, chacune `{ "statut": …, "findings
           "spec": { "statut": "gaps_found", "findings": [{ "severity": "majeur", "action": "auto-fix", "ref": "PLAN.md:42", "axe": "spec" }] } }
 ```
 
-Règle de **conjonction** : le statut global vaut `passed` si et seulement si les deux axes sont
-`passed`, sinon le premier présent dans l'ordre fixe `human_needed`, `blocked`, `gaps_found` —
-dérivation mécanique pour la table de pilotage (Pattern C), jamais un reclassement de findings.
-Les `findings` à la racine sont la concaténation des findings Standards puis Spec, chacun tagué
-`"axe": "standards"` ou `"axe": "spec"`, jamais retriés par sévérité entre axes ; le mandat de
-correction ciblée les transmet groupés par axe. Chemin du PLAN absent du brief : `axes.spec.statut`
-vaut `blocked` avec le finding `{ "severity": "bloquant", "action": "ask-user", "ref": "brief:plan-absent", "axe": "spec" }`,
-jamais `passed` par défaut.
+**Seuil d'un axe (P414-D-20)** : un axe est `passed` s'il ne porte aucun finding bloquant ni majeur ;
+les mineurs sont rapportés ; un mineur `auto-fix` part dans la correction ciblée s'il y en a une de
+toute façon, mais ne relance jamais la boucle à lui seul.
+
+**Axe `skipped` (P414-D-22)** : quand la revue ne reçoit aucun PLAN d'étape (revue d'implémentation
+d'une mission design : nœud `revue:écran-X`, digest croisé sans PLAN), l'axe Spec rend
+`{ "statut": "skipped", "motif": "…", "findings": [] }` — jamais `passed`, jamais `blocked`. Le motif
+est rapporté tel quel (ex. « mission design, pas de PLAN d'étape »).
+
+Règle de **conjonction** : un axe `skipped` n'y entre pas ; le statut global se calcule sur les axes
+**jugés**, au moins un. Il vaut `passed` si et seulement si tous les axes jugés sont `passed`, sinon
+le premier présent dans l'ordre fixe `human_needed`, `blocked`, `gaps_found` — dérivation mécanique
+pour la table de pilotage (Pattern C), jamais un reclassement de findings. Aucun axe jugé (les deux
+`skipped`, ou un axe jugé non produit) → jamais `passed` : `blocked`. Les `findings` à la racine sont la
+concaténation des findings Standards puis Spec, chacun tagué `"axe": "standards"` ou `"axe": "spec"`,
+jamais retriés par sévérité entre axes ; le mandat de correction ciblée les transmet groupés par axe.
+Un PLAN d'étape attendu mais absent du brief (nœud `revue-N`/`join-N`) n'est PAS un `skipped` : c'est
+un défaut de mandat, `axes.spec.statut` vaut `blocked` avec le finding
+`{ "severity": "bloquant", "action": "ask-user", "ref": "brief:plan-absent", "axe": "spec" }`.
 
 ## `.planning/STATE.md` — ne jamais « réparer » via `gsd-tools state` (ADR-063)
 

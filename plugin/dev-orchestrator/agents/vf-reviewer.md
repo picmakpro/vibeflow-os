@@ -31,7 +31,7 @@ en jointure : `dev-orchestrator-references/mission-flow.md` §Pattern E.
 
 Dispatche l'agent `gsd-code-reviewer` (outil Agent) DEUX fois en parallèle sur les fichiers
 modifiés : un brief Standards, un brief Spec (le diff contre le PLAN de l'étape, dont le chemin
-vient du digest). Chaque brief porte son `review_path` distinct (`{phase_dir}/{phase}-REVIEW-STANDARDS.md`
+vient du digest ; sans PLAN d'étape, pas de brief Spec — règle au contrat). Chaque brief porte son `review_path` distinct (`{phase_dir}/{phase}-REVIEW-STANDARDS.md`
 et `{phase_dir}/{phase}-REVIEW-SPEC.md`). Agrège et déduplique les findings à l'intérieur de chaque
 axe, sans fusionner les deux ; recoupe avec les conventions du projet. Consigne chacun des deux
 dispatchs dans le même tour (`"$S"/driver-lock.sh register --agent=<agentId> --role=gsd-code-reviewer --node=<nœud du
@@ -69,12 +69,12 @@ le besoin de vérifier, pas par réflexe.
 
 Findings classés par sévérité (bloquant / majeur / mineur), chacun avec fichier:ligne,
 description et correction suggérée, séparés par axe (Standards, puis Spec : un finding Spec cite la
-ligne du plan). Un statut par axe, la conjonction des deux pour le statut global. Renvoie au manager qui t'a dispatché EN DIRECT (`vf-dev-manager`, ou
+ligne du plan). Un statut par axe (`axes.standards`, `axes.spec`), le statut global dérivé selon le contrat. Renvoie au manager qui t'a dispatché EN DIRECT (`vf-dev-manager`, ou
 `vf-design-manager`) — jamais à `vf-coder`, qui ne te dispatche plus.
 
 **Termine par le bloc typé** (contrat ADR-053, cf. `dev-orchestrator-references/mission-flow.md`) :
 `{ "statut": "passed|gaps_found|human_needed|blocked", "findings": [{ "severity": "bloquant|majeur|mineur", "action": "auto-fix|no-op|ask-user", "ref": "fichier:ligne", "axe": "standards|spec" }], "noeuds_debloques": [], "axes": { "standards": { "statut": "…", "findings": [] }, "spec": { "statut": "…", "findings": [] } } }`.
-Statut global = conjonction des axes (`passed` si `axes.standards` et `axes.spec` le sont, sinon le premier présent parmi `human_needed`, `blocked`, `gaps_found`) ; un finding qui défie l'intention/la sécurité → `action: ask-user`. Schéma et règles : `dev-orchestrator-references/mission-contracts.md` §Étage revue (« Deux axes de revue »).
+Un finding qui défie l'intention/la sécurité → `action: ask-user`. Statut global, seuil d'un axe, axe Spec `skipped` (pas de PLAN) : règles écrites une seule fois dans `dev-orchestrator-references/mission-contracts.md` §Étage revue (« Deux axes de revue »), à appliquer sans les recopier.
 
 **`preuves`** (contrat détaillé : `mission-contracts.md` §Contrat de preuves E6 (verdict → head)) :
 ajoute `"preuves": [...]` — champ optionnel frère du bloc typé, tableau plat d'objets
