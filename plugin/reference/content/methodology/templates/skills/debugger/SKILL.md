@@ -1,6 +1,7 @@
 ---
 name: debugger
 description: Debugging systematique en 4 phases (Reproduire, Identifier cause racine, Fixer, Verifier). Iron Law "ALWAYS FIND ROOT CAUSE BEFORE ATTEMPTING FIXES" — interdit les correctifs aleatoires. Utiliser pour tout bug, erreur, comportement inattendu, ou regression. Trigger quand un test echoue de maniere inexpliquee, quand l'utilisateur signale un comportement bizarre, ou quand un agent doit comprendre pourquoi quelque chose ne marche pas. Documente la chaine d'hypotheses eliminees dans BLOCKERS.md.
+vf-invocation: model
 ---
 
 # Skill : Debugger

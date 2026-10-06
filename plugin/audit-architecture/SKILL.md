@@ -1,6 +1,7 @@
 ---
 name: audit-architecture
 description: Concevoir et forcer une structure d'audit multi-couches pour N'IMPORTE QUEL process qui transforme un brief en output (génération de contenu/carrousel/script, montage de dossier, feature de code, séquence de vente, design...). Invoquer dès qu'on crée un process générateur, qu'on sent qu'un output sort "sans contrôle", qu'on veut fiabiliser une chaîne de production, ou qu'on audite un lab pour repérer les process sans garde-fou. Dérive depuis le brief les couches à auditer (dimension + auditeur indépendant + rubric + verdict bloquant + anti-boucle), choisit le mécanisme d'enforcement le long du spectre déterministe↔jugement, puis matérialise la structure. Universel, pas dev-spécifique. Opérationnalise le principe Core P8 (Évaluer) au niveau process.
+vf-invocation: model
 ---
 
 # Skill : Audit Architecture — Concevoir des structures d'audit multi-couches

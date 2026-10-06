@@ -1,6 +1,7 @@
 ---
 name: software-architecture
 description: "Architecture logicielle AI-safe. Invoquer dès qu'on crée/édite du code, qu'un fichier grossit, qu'on planifie un refactor/restructuration, ou qu'on sent une dette structurelle (god file, couplage, frontières floues). Applique les philosophies de dev — SOLID/SRP/SoC, DRY, KISS, YAGNI, Clean Architecture (Dependency Rule), Clean Code, et une carte TDD — le seuil de taille 300L, et des garde-fous machine-enforced."
+vf-invocation: model
 ---
 
 # Architecture Logicielle AI-Safe
