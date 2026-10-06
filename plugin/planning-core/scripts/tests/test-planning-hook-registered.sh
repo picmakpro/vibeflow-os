@@ -19,7 +19,7 @@
 #
 # Phase 46, plan 46-04 (P46-D-09, P46-D-10, P46-D-16) : la MÊME commande est câblée sous cinq événements (PreToolUse élargi à
 # SubagentHandback, SubagentStop, SessionStart, CwdChanged, FileChanged). R-CMD-01 et R-CMD-02 portent sur les cinq entrées ;
-# R-EVT-01 à R-EVT-07 prouvent le contrat de chaque événement (VF_REG_SECTIONS=evenements pour les rejouer seuls) :
+# R-EVT-01 à R-EVT-08 prouvent le contrat de chaque événement (VF_REG_SECTIONS=evenements pour les rejouer seuls) :
 #   R-EVT-01  hors adhésion (lab dev fixture ET ce dépôt), chaque événement et le nouvel outil rendent un octet vide et 0 sous
 #             quatre shells, SANS lancer le script ni python3 (marqueurs) ; R-EVT-01b : la copie sonde du cœur, rejouée sans
 #             pré-filtre, n'écrit AUCUNE ligne au journal hors adhésion et une ligne dans un lab adhérent (témoin)
@@ -31,6 +31,11 @@
 #   R-EVT-05  `hook_event_name` absent = PreToolUse ; inconnu ou non chaîne = silence
 #   R-EVT-06  FileChanged : la racine se lit dans `file_path` de premier niveau, jamais dans `cwd`
 #   R-EVT-07  contrat de sortie : SubagentStop `decision: block` code 0, jamais le code 2 ; les trois autres ne refusent jamais
+#   R-EVT-08  (M1, M2, fix-46-a) le juge `emission_sans_refus`, appelé directement, rend False sans jamais lever sur un `watchPaths` qui sort du lab
+#             par `..` (normpath avant startswith), qui n'est pas une liste ou dont un élément n'est pas une chaîne, et sur un `additionalContext` qui n'est
+#             pas une chaîne ou qui porte un chemin absolu hors du lab ; True sur une émission conforme (chemin relatif et fichier du lab permis)
+#   R-DEPOT-INTACT (M3, fix-46-a) aucune section n'écrit dans ce dépôt : « cksum taille chemin » de chaque journal de D1 (surveillance.log) sous .planning/
+#             comparés avant et après chaque groupe de sections ; un journal apparu, modifié (même vidé) ou disparu rougit
 #   Mutants : MUT-EVT-REPLI-HANDBACK, MUT-EVT-FAILOPEN, MUT-EVT-ADHESION, MUT-EVT-PREFILTRE, MUT-EVT-FILEPATH, MUT-EVT-EXIT2,
 #   MUT-EVT-EXIT2-STATIQUE, MUT-CMD01-* (hooks.json mutés), chacun avec sa trace assertion / attendu / obtenu.
 #
@@ -390,7 +395,7 @@ def make_hook_mutant(ctx, ident, motif, remplacement, source=None):
 # =================================================================================================
 # =================================================================================================
 # Phase 46, plan 46-04 (P46-D-09, P46-D-10, P46-D-16) : la MÊME commande sous cinq événements.
-# R-CMD-01 (forme des cinq entrées), puis R-EVT-01 à R-EVT-07 (contrat de chaque événement, silence hors adhésion, repli, fail-open).
+# R-CMD-01 (forme des cinq entrées), puis R-EVT-01 à R-EVT-08 (contrat de chaque événement, silence hors adhésion, repli, fail-open, juge d'émission).
 # =================================================================================================
 EVENEMENTS_CABLES = ("PreToolUse", "SubagentStop", "CwdChanged", "FileChanged", "SessionStart")
 MATCHER_PRETOOLUSE = "Write|Edit|NotebookEdit|Bash|Agent|Task|SubagentHandback"
@@ -2107,8 +2112,10 @@ def emission_sans_refus(evt, rc, out, err, racine):
     """P46-D-07/D-10 : SessionStart et CwdChanged d'un lab adhérent émettent la liste surveillée de D1 mais ne refusent JAMAIS. Conforme :
     code 0, stderr vide, et stdout vide OU UN objet JSON sans `decision`/`permissionDecision`/`deny`/`block` (en clé, à aucun niveau),
     dont la clé `hookSpecificOutput` (seule clé de premier niveau, avec `watchPaths` pour CwdChanged, forme non mesurée P46-D-08) porte
-    `hookEventName` = l'événement et des clés dans {hookEventName, watchPaths, additionalContext} ; aucun chemin absolu hors du lab ; ni
-    « no such file » ni « can't open ». Rend (conforme, détail)."""
+    `hookEventName` = l'événement et des clés dans {hookEventName, watchPaths, additionalContext} ; aucun chemin absolu hors du lab, ni dans
+    `watchPaths` (une liste de chaînes, comparées APRÈS normpath : un `..` qui sort du lab est refusé) ni dans `additionalContext` (une chaîne dont
+    aucun jeton de chemin absolu ne sort du lab, normpath compris ; un chemin relatif est permis) ; ni « no such file » ni « can't open ».
+    Ne lève jamais : un type inattendu rend (False, motif). Rend (conforme, détail)."""
     if rc != 0 or err != b"":
         return False, "code 0 et stderr vide (attendu) — obtenu rc=%d err=%s" % (rc, court(err))
     if out == b"":
@@ -2141,9 +2148,24 @@ def emission_sans_refus(evt, rc, out, err, racine):
     if interdit:
         return False, "ni %s (attendu) — obtenu %s" % (FRAGMENTS_INTERDITS, interdit)
     racines = tuple(sorted({racine.rstrip("/") + "/", os.path.realpath(racine).rstrip("/") + "/"}))
-    for chemin in (spec.get("watchPaths") or []) + (obj.get("watchPaths") or []):
-        if not isinstance(chemin, str) or not chemin.startswith(racines):
-            return False, "chemins sous le lab (attendu) — obtenu %r" % (chemin,)
+    chemins = []
+    for porteur in (spec, obj):
+        valeur = porteur.get("watchPaths")
+        if valeur is None:
+            continue
+        if not isinstance(valeur, list):
+            return False, "watchPaths en liste (attendu) — obtenu %s" % type(valeur).__name__
+        chemins.extend(valeur)
+    for chemin in chemins:
+        if not isinstance(chemin, str) or not (os.path.normpath(chemin) + "/").startswith(racines):
+            return False, "chemins sous le lab, après normpath (attendu) — obtenu %r" % (chemin,)
+    contexte = spec.get("additionalContext")
+    if contexte is not None:
+        if not isinstance(contexte, str):
+            return False, "additionalContext en chaîne (attendu) — obtenu %s" % type(contexte).__name__
+        for jeton in re.findall(r"(?:^|(?<=[\s(«\"'`,;=]))(/[^\s)»\"'`,;]+)", contexte):
+            if not (os.path.normpath(jeton) + "/").startswith(racines):
+                return False, "aucun chemin absolu hors du lab dans additionalContext (attendu) — obtenu %r" % (jeton,)
     return True, "emission"
 
 
@@ -2402,8 +2424,54 @@ def controle_evt_07(ctx, adh, source=None):
                           "SubagentStop : `decision: block` + `reason`, code 0 (cœur seul et commande), fragments « no such file » / « can't open » neutralisés ; SessionStart, CwdChanged, FileChanged ne refusent jamais ; aucun `exit 2`")
 
 
+def controle_evt_08(ctx, adh):
+    """R-EVT-08 (M1, M2, fix-46-a) : le juge `emission_sans_refus`, appelé directement (aucun hook lancé), rend (False, motif) — jamais une exception — sur
+    une émission de D1 qui sort du contrat : un `watchPaths` qui sort du lab par `..` (normpath avant `startswith`), qui n'est pas une liste (SessionStart,
+    puis CwdChanged au premier niveau) ou dont un élément n'est pas une chaîne, un `additionalContext` qui n'est pas une chaîne ou qui porte un chemin absolu
+    hors du lab ; et (True, « emission ») sur une émission conforme (chemins sous le lab, `additionalContext` qui nomme un fichier du lab ou un chemin
+    relatif)."""
+    fautes = []
+
+    def objet(evt, spec, haut=None):
+        obj = {"hookSpecificOutput": dict(spec, hookEventName=evt)}
+        obj.update(haut or {})
+        return json.dumps(obj).encode("utf-8")
+
+    def cas(nom, evt, out, attendu, fragment=None):
+        try:
+            bon, detail = emission_sans_refus(evt, 0, out, b"", adh)
+        except Exception as exc:  # un juge ne lève jamais : il rend False
+            fautes.append("%s : le juge lève %s (attendu : un verdict) : %s" % (nom, type(exc).__name__, exc))
+            return
+        if bon != attendu:
+            fautes.append("%s : rend %s (%s), attendu %s" % (nom, bon, detail, attendu))
+        elif fragment is not None and fragment not in detail:
+            fautes.append("%s : le motif ne contient pas %r : %s" % (nom, fragment, detail))
+
+    cas("watchPaths qui sort du lab par ..", "SessionStart", objet("SessionStart", {"watchPaths": [adh + "/../dehors/x"]}), False, "après normpath")
+    cas("watchPaths chaîne (SessionStart)", "SessionStart", objet("SessionStart", {"watchPaths": adh + "/.planning/STATE.md"}), False, "en liste")
+    cas("watchPaths de premier niveau non liste (CwdChanged)", "CwdChanged", objet("CwdChanged", {}, {"watchPaths": 5}), False, "en liste")
+    cas("watchPaths dont un élément n'est pas une chaîne", "SessionStart", objet("SessionStart", {"watchPaths": [adh + "/.planning/STATE.md", 5]}), False, "après normpath")
+    cas("additionalContext qui n'est pas une chaîne", "SessionStart", objet("SessionStart", {"additionalContext": ["x"]}), False, "additionalContext")
+    cas("additionalContext avec un chemin absolu hors du lab", "SessionStart", objet("SessionStart", {"additionalContext": "voir /etc/hosts"}), False, "additionalContext")
+    cas("additionalContext avec un chemin absolu qui sort du lab par ..", "SessionStart",
+        objet("SessionStart", {"additionalContext": "voir " + adh + "/../dehors/x"}), False, "additionalContext")
+    cas("additionalContext qui nomme un fichier du lab", "SessionStart", objet("SessionStart", {"additionalContext": "voir " + adh + "/.planning/STATE.md"}), True)
+    cas("additionalContext relatif", "SessionStart", objet("SessionStart", {"additionalContext": "[planning-core] D1 : tracées dans .planning/surveillance.log (genre=borne)"}), True)
+    cas("objet de D1 conforme", "SessionStart",
+        objet("SessionStart", {"watchPaths": [adh + "/.planning/STATE.md", adh + "/.planning/INDEX.md"], "additionalContext": "tracées dans .planning/surveillance.log"}), True)
+    cas("objet de D1 conforme (CwdChanged, watchPaths aux deux niveaux)", "CwdChanged",
+        objet("CwdChanged", {"watchPaths": [adh + "/.planning/STATE.md"]}, {"watchPaths": [adh + "/.planning/STATE.md"]}), True)
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "emission_sans_refus : normpath avant startswith, type de watchPaths (liste) et de additionalContext (chaîne) contrôlés sans exception, aucun chemin absolu "
+                          "hors du lab dans additionalContext, émissions conformes acceptées")
+
+
 def sec_evenements(ctx):
     adh, dev = _labs_simples(ctx, "evt")
+    # --- R-EVT-08 (appels directs du juge d'émission : aucun hook lancé, aucune écriture)
+    o8 = controle_evt_08(ctx, adh)
+    ok("R-EVT-08 " + o8[1]) if o8[0] else ko("R-EVT-08", "emission_sans_refus juge watchPaths (normpath, type) et additionalContext sans jamais lever", "conforme", o8[1])
     labs = [("lab dev fixture", dev, dev + "/.planning/STATE.md")]
     if ctx.repo_root and os.path.isfile(os.path.join(ctx.repo_root, "plugin", "planning-core", "scripts", "planning-hook.sh")):
         labs.append(("ce dépôt", ctx.repo_root, os.path.join(ctx.repo_root, ".planning", "STATE.md")))
@@ -2512,9 +2580,9 @@ def main():
 main()
 PY_AIDES_REG_EOF
 
-journaux_depot() { # <fichier de sortie> : liste triée des journaux de D1 sous .planning/ de la racine du dépôt (vide hors dépôt)
+journaux_depot() { # <fichier de sortie> : « cksum taille chemin » de chaque journal de D1 sous .planning/ de la racine du dépôt, trié (vide hors dépôt)
   if [ -n "$REPO_ROOT" ] && [ -d "$REPO_ROOT/.planning" ]; then
-    find "$REPO_ROOT/.planning" -maxdepth 4 -name surveillance.log -not -type d 2>/dev/null | LC_ALL=C sort > "$1"
+    find "$REPO_ROOT/.planning" -maxdepth 4 -name surveillance.log -not -type d -exec cksum {} + 2>/dev/null | LC_ALL=C sort > "$1"
   else
     : > "$1"
   fi
@@ -2527,12 +2595,10 @@ run_sections() { # <sections séparées par des virgules>
   "$PYBIN" "$AIDES" "$1" "$SCRIPTS_DIR" "$HOOKS_JSON" "$REPO_ROOT" "$WORK" "$SETTINGS_LAB" > "$out" 2>&1
   rc=$?
   journaux_depot "$WORK/journaux-apres-$1.txt"
-  if [ -n "$REPO_ROOT" ]; then
-    local apparus
-    apparus="$(comm -13 "$WORK/journaux-avant-$1.txt" "$WORK/journaux-apres-$1.txt" | head -n 3 | tr '\n' ' ')"
-    if [ -n "$apparus" ]; then
-      ko "R-DEPOT-INTACT ($1)" "aucune section n'écrit dans le dépôt : aucun journal de D1 (surveillance.log) n'apparaît sous .planning/" "aucun fichier nouveau" "apparu : $apparus"
-    fi
+  if [ -n "$REPO_ROOT" ] && ! cmp -s "$WORK/journaux-avant-$1.txt" "$WORK/journaux-apres-$1.txt"; then
+    local changes
+    changes="$(LC_ALL=C comm -13 "$WORK/journaux-avant-$1.txt" "$WORK/journaux-apres-$1.txt" | head -n 3 | tr '\n' ' ')"
+    ko "R-DEPOT-INTACT ($1)" "aucune section n'écrit dans le dépôt : aucun journal de D1 (surveillance.log) n'apparaît ni ne change (cksum, taille) sous .planning/" "journaux identiques avant et après" "apparu ou modifié : ${changes:-un journal a disparu}"
   fi
   while IFS= read -r line; do
     printf '%s\n' "$line"
