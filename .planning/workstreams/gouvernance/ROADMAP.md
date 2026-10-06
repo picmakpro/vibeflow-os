@@ -15,7 +15,8 @@
 - [x] Phase 43: Fabrique — gate des skills par nature et alignement de skill-creator (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-27, PR #111
 - [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
 - [x] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécutée 2026-09-30 → 2026-10-02 (10/10 plans, 15 quick de correction), cinq gates ARMÉS en cascade le 2026-10-01 ; audit de sécurité final SECURED (4 tours) ; vérifiée 15/15 — clôturée 2026-10-02 (clôture validée par Willy, message en session principale, 2026-10-01), PR #124 ouverte (non mergée)
-- [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-03 (12 plans, 9 vagues, plan-check frais PASSED), PR de planification empilée sur la PR #124
+- [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-03 (12 plans, 9 vagues, plan-check frais PASSED), PR de planification empilée sur la PR #124 ; exécutée 2026-10-05 → 2026-10-07 (12/12 plans), vérifiée 11/11 (3 sous arbitrage de Willy) : G3 ARMÉ, G4 et G4′ en observation (reportés à la Phase 46.1) — non clôturée, PR non mergée
+- [ ] Phase 46.1: Armement de G4 et G4′ (INSERTED, 2026-10-07) — non cadrée
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 49: Initialisation — script des trois gates de la grille (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -234,6 +235,7 @@ Willy, AskUserQuestion session principale, 2026-10-03).
 - Décisions du manager, renversables : P46-D-02a, 03a, 03b, 06a, 07a, 09 à 19, 10a.
 - Le rejeu réel des étapes 5 et 6 sur `~/jarvis-keystone` et `~/BusinessFlow-Lab` **n'est pas
   autorisé par le planning** : le checkpoint de 46-11 le demande à Willy au moment de l'exécution.
+**État (2026-10-07)** : exécutée, vérifiée 11/11 (3 sous arbitrage) — `46-VERIFICATION.md`, 12/12 plans. **Armé** : G3 (`ARMEMENT_G3 = armed`), avec G6, G5, G1, G7 et le rôle (Phase 45). **En observation** : G4 (`ARMEMENT_G4 = observe`, limite (bp)) et G4′ (`ARMEMENT_G4P = observe`, limite (bs)) ; D1 n'est jamais armé. Arbitrages de Willy, AskUserQuestion session principale, 2026-10-06 : « (c) Armer G3 seul » (CLOT-02, CLOT-10) et « etape-6-mesure » (CLOT-06, CLOT-10). Ce qui reste en observation est repris par la **Phase 46.1**. **Non close** : la PR n'est pas mergée.
 **Plans:** 12 plans en 9 vagues. Ordre d'armement P46-D-11 : (G3 + G4, empreintes comprises) →
 G4′ ; D1 n'est jamais armé. Plan-check frais : tour 1 (deux checkers, objectif et exécutabilité)
 0 bloquant ; révision 1 (Q9, mode dégradé, codes de sortie des vérifications, replis sûrs) ; tour 2
@@ -275,11 +277,26 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 46-11-PLAN.md — étape 5 : autorisation du rejeu réel demandée à Willy, banc, canary, rejeu en lecture seule, armement de G3 + G4 (CLOT-10)
+- [x] 46-11-PLAN.md — étape 5 : autorisation du rejeu réel demandée à Willy, banc, canary, rejeu en lecture seule, armement de G3 + G4 (CLOT-10)
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
-- [ ] 46-12-PLAN.md — étape 6 : porte de G4′, rejeu, armement, référence et limites, `planning-core` v2.10.0 sans release (CLOT-10, 12)
+- [x] 46-12-PLAN.md — étape 6 : porte de G4′, rejeu, armement, référence et limites, `planning-core` v2.10.0 sans release (CLOT-10, 12)
+
+### Phase 46.1: Armement de G4 et G4′ (INSERTED)
+
+**Goal:** G4 puis G4′ passent de l'observation à l'armement : la règle des unités antérieures à G4 est tranchée, les préalables de G4′ sont levés, et les remèdes que la 46 a reportés pour D1 sont traités ou re-décidés — chaque armement à 0 faux refus et 0 faux accept sur le banc puis sur le rejeu en lecture seule.
+**Requirements**: à définir au cadrage
+**Depends on:** Phase 46.
+**Origine** : insertion décidée par Willy, AskUserQuestion session principale, 2026-10-07 (« (1) Phase 46.1 insérée (Recommandé) »), à l'issue de la vérification de la Phase 46 (G3 armé seul ; G4 et G4′ en observation sous arbitrage, 2026-10-06). **Statut : non cadrée** — à cadrer plus tard (`gsd-discuss-phase 46.1`), aucune planification maintenant.
+**Points repris** (limites de `plugin/planning-core/references/modele-cycles.md`) :
+- **Règle des unités antérieures à G4** — limite **(bp)** : 343 unités closes avant G4 sur `~/jarvis-keystone` (`SUMMARY.md` existant sans `VERDICT.md`, refusé à la réécriture une fois G4 armé) ; la règle à poser conditionne l'armement de G4.
+- **Préalables de G4′** — limite **(bs)** : A2 (leurre de définition d'agent), A3 (lab dérivé du `cwd`), A4 (repli `SubagentStop` : relance sans verrou, muet sur une panne du cœur), P1 (`stop_hook_active` non lu).
+- **Remèdes reportés de D1** — limites **(bk)** (A5 : forge d'une unité neuve, D1 aveugle), **(bl)** (A7 : intention sans effet ni limite de durée), et N-4 (éviction de l'unité active de la liste surveillée, limite **(bg)**) ; N-5 (`SUMMARY.md` forgé par `Bash` non tracé, limites **(ar)** et **(ax)**).
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 46.1 to break down)
 
 ### Phase 47: Moteur — baux générationnels et jeton monotone
 
