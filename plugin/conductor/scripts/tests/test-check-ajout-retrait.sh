@@ -256,13 +256,51 @@ D="$(mk_repo a14c)"; B="$(base_of "$D")"; add_skill "$D" "docs/exemples/SKILL.md
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A14c SKILL.md hors de plugin/ → non surveillé, RIEN-A-JUGER rc 0" 0 "$R" "$O" "RIEN-A-JUGER"
 
+# A15..A22 (revue W1, 2026-10-06, M-05) : le CONTENU du segment « défaillance : » est jugé, pas seulement sa présence.
+TRG="retire check-old.sh devenu redondant avec lui"
+df_cas() {  # <id> <libellé> <rc attendu> <fragment attendu ou -> <texte du segment>
+  local d b
+  d="$(mk_repo "a$1")"; b="$(base_of "$d")"; add_gate "$d"
+  commit_avec "$d" "feat: gate
+
+$TR $NEW_GATE — $TRG — défaillance : $5"
+  run O R "$SCRIPT" "$d" --strict --base-ref "$b"
+  if [ "$4" = "-" ]; then expect "$1 $2" "$3" "$R" "$O"; else expect "$1 $2" "$3" "$R" "$O" "$4"; fi
+}
+df_cas A15 "défaillance sous le plancher de 10 caractères (SHA de 7) → rc 1" 1 "sans date ISO ni SHA" "abc1234"
+df_cas A16 "SHA de forme plausible (12 hexadécimaux, chiffre et lettre) sans date → couvert, rc 0" 0 "AJOUT-COUVERT: $NEW_GATE" "commit f3a9c1e7b2d4 constaté en revue"
+df_cas A17 "nombre nu de 8 chiffres n'est pas un SHA → rc 1" 1 "sans date ISO ni SHA" "12345678 voila"
+df_cas A18 "mot tout en [a-f] n'est pas un SHA → rc 1" 1 "sans date ISO ni SHA" "effacee xyzzy ok"
+df_cas A19 "hexadécimal de 6 caractères trop court pour un SHA → rc 1" 1 "sans date ISO ni SHA" "a1b2c3 de plus"
+df_cas A20 "date non calendaire (9999-99-99) → rc 1" 1 "sans date ISO ni SHA" "9999-99-99 voila"
+# A21 — DERNIÈRE occurrence : deux segments, la justification se mesure avant le dernier (jamais avant le premier).
+D="$(mk_repo a21)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — rm a — défaillance : x - defaillance : 2026-10-06 session de revue"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A21 deux segments « défaillance : » → le dernier découpe, la justification court jusqu'à lui → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
+# A22 — une classe de caractères ne compte pas comme littéraux d'un glob (plancher de 6).
+D="$(mk_repo a22)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR plugin/conductor/scripts/[a-zA-Z]* — $TRG$DF"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A22 glob [a-zA-Z]* (classe de caractères) → refusé, rc 1" 1 "$R" "$O" "motif glob trop large"
+D="$(mk_repo a22b)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR plugin/conductor/scripts/check-[a-z]*.sh — $TRG$DF"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A22b témoin : check-[a-z]*.sh garde 9 littéraux hors classe → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
+
 D="$(mk_repo vide)"; B="$(base_of "$D")"; printf 'x\n' > "$D/notes.txt"; commit_avec "$D" "docs: notes"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "Rien d'ajouté dans la surface → RIEN-A-JUGER, rc 0" 0 "$R" "$O" "RIEN-A-JUGER"
 run O R "$SCRIPT" "$D" --bogus
 expect "Usage : argument inconnu → rc 64" 64 "$R" "$O"
 
-echo "== test-check-ajout-retrait : MUTANTS (MUT-1 à MUT-12) =="
+echo "== test-check-ajout-retrait : MUTANTS (MUT-1 à MUT-12, S1, S2, S4, M5a à M5d) =="
 make_mutant() {  # <nom> <ancienne ligne> <nouvelle ligne> ; 0 = opposable, 1 = identique, 2 = syntaxe invalide
   local out="$MUTD/$1.sh"
   MUT_OLD_ENV="$2" MUT_NEW_ENV="$3" awk '{ if ($0 == ENVIRON["MUT_OLD_ENV"]) print ENVIRON["MUT_NEW_ENV"]; else print }' "$SCRIPT" > "$out"
@@ -329,6 +367,32 @@ D="$(mk_repo m12)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: 
 
 $TR $NEW_GATE — aucun :$DF"
 mutant 12 '      [ "$df_pos" -ge 0 ] && reste="$df_avant"' '      :' "$D" 1 0 --strict --base-ref "$B"
+
+# Revue W1 (2026-10-06, M-05) — chaque branche d'acceptation de la défaillance et le choix de l'occurrence.
+mut_df() {  # <id> <ancienne> <nouvelle> <segment défaillance> <rc original> <rc mutant> [<chemin du trailer>]
+  local d b
+  d="$(mk_repo "m$1")"; b="$(base_of "$d")"; add_gate "$d"
+  commit_avec "$d" "feat: gate
+
+$TR ${7:-$NEW_GATE} — $TRG — défaillance : $4"
+  mutant "$1" "$2" "$3" "$d" "$5" "$6" --strict --base-ref "$b"
+}
+# S1 : plancher de 10 caractères de la défaillance neutralisé — « abc1234 » (7) couvre.
+mut_df S1 '  [ "$(charcount "$1")" -ge 10 ] || return 1' '  :' "abc1234" 1 0
+# S2 : branche SHA supprimée — un SHA de forme plausible, sans date, ne couvre plus.
+mut_df S2 '    case "$t" in *[0-9]*) case "$t" in *[a-f]*) return 0 ;; esac ;; esac' '    :' "commit f3a9c1e7b2d4 constaté en revue" 0 1
+# S4 : DERNIÈRE occurrence -> première trouvée — la justification est alors mesurée avant le premier segment.
+D="$(mk_repo mS4)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — rm a — défaillance : x - defaillance : 2026-10-06 session de revue"
+mutant S4 '              if [ "${#df_cand}" -gt "$df_pos" ]; then df_pos="${#df_cand}"; df_avant="$df_cand"; defaillance="${reste##*"${df_s}${df_m}"}"; fi ;;' '              if [ "$df_pos" -lt 0 ]; then df_pos="${#df_cand}"; df_avant="$df_cand"; defaillance="${reste##*"${df_s}${df_m}"}"; fi ;;' "$D" 0 1 --strict --base-ref "$B"
+# M5b : nombre nu / mot accepté comme SHA ; M5c : longueur minimale d'un SHA supprimée ; M5d : date non calendaire acceptée.
+mut_df M5b '    case "$t" in *[0-9]*) case "$t" in *[a-f]*) return 0 ;; esac ;; esac' '    return 0' "12345678 voila" 1 0
+mut_df M5c '    [ "${#t}" -ge 7 ] && [ "${#t}" -le 40 ] || continue' '    :' "a1b2c3 de plus" 1 0
+mut_df M5d "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])(\$|[^0-9])' && return 0" "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-[0-9]{2}-[0-9]{2}(\$|[^0-9])' && return 0" "9999-99-99 voila" 1 0
+# M5a : les classes de caractères comptent de nouveau comme littéraux du glob.
+mut_df M5a "  lit=\"\$(printf '%s' \"\$last\" | sed -e 's/\\[[^]]*\\]//g' | tr -d '*?[]')\"" "  lit=\"\$(printf '%s' \"\$last\" | tr -d '*?[]')\"" "2026-10-06 session de revue" 1 0 'plugin/conductor/scripts/[a-zA-Z]*'
 
 echo
 echo "Résultat : $PASS vert(s), $FAIL rouge(s)"

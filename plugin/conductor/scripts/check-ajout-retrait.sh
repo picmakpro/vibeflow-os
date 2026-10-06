@@ -36,8 +36,9 @@
 # — `aucun :` seul ne couvre rien. TROISIÈME segment OBLIGATOIRE (POCK-08) : `— défaillance : {session,
 # geste ou commit daté}` en fin de trailer, sur la DERNIÈRE occurrence d'un séparateur suivi de
 # `défaillance :` (graphie ASCII `defaillance :` admise ; un retrait peut contenir lui-même ` — `) ;
-# la défaillance garde au moins 10 caractères non blancs ET une date ISO (AAAA-MM-JJ) ou un SHA (7 à
-# 40 hexadécimaux) — forme vérifiée, jamais la véracité ; la justification de 10 caractères se mesure
+# la défaillance garde au moins 10 caractères non blancs ET une date ISO calendaire (AAAA-MM-JJ, mois
+# 01-12, jour 01-31) ou un SHA (7 à 40 hexadécimaux contenant au moins un chiffre ET une lettre a-f :
+# un nombre nu ou un mot n'en est pas un) — forme vérifiée, jamais la véracité ; la justification de 10 caractères se mesure
 # AVANT le segment (une défaillance longue ne rattrape pas un « aucun : » court). Sans segment valide :
 # MARQUEUR-MAL-FORME et rien n'est couvert. Hypothèse Q4 : exigé sur TOUT trailer Ajout-Retrait
 # (gate, règle, ADR, mémoire, CLAUDE.md, SKILL.md), pas seulement skill/gate/règle.
@@ -173,13 +174,19 @@ glob_admis() {  # <motif> : un glob ne couvre pas le monde (dernier segment seul
   case "$m" in */*) dirs="${m%/*}"; last="${m##*/}" ;; *) dirs=""; last="$m" ;; esac
   case "$m" in *'*'*|*'?'*|*'['*) ;; *) return 0 ;; esac
   case "$dirs" in *'*'*|*'?'*|*'['*) return 1 ;; esac
-  lit="$(printf '%s' "$last" | tr -d '*?[]')"
+  lit="$(printf '%s' "$last" | sed -e 's/\[[^]]*\]//g' | tr -d '*?[]')"
   [ "${#lit}" -ge 6 ]
 }
-defaillance_valide() {  # <texte> : >= 10 caractères non blancs ET une date ISO ou un SHA (7 à 40 hexadécimaux) — forme seule, jamais la véracité
+defaillance_valide() {  # <texte> : >= 10 caractères non blancs ET une date ISO calendaire ou un SHA (7 à 40 hexadécimaux dont au moins un chiffre ET une lettre a-f : ni nombre nu ni mot) — forme seule, jamais la véracité
   [ "$(charcount "$1")" -ge 10 ] || return 1
-  printf '%s' "$1" | grep -Eq '(^|[^0-9])[0-9]{4}-[0-9]{2}-[0-9]{2}($|[^0-9])' && return 0
-  printf '%s' "$1" | grep -Eq '(^|[^0-9A-Za-z])[0-9a-f]{7,40}($|[^0-9A-Za-z])'
+  printf '%s' "$1" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])($|[^0-9])' && return 0
+  local t
+  for t in $(printf '%s' "$1" | tr -cs '0-9A-Za-z' ' '); do
+    case "$t" in *[!0-9a-f]*) continue ;; esac
+    [ "${#t}" -ge 7 ] && [ "${#t}" -le 40 ] || continue
+    case "$t" in *[0-9]*) case "$t" in *[a-f]*) return 0 ;; esac ;; esac
+  done
+  return 1
 }
 COMMITS_LIST="$(git rev-list "${BASE}..${HEAD_SHA}" 2>/dev/null)"
 COMMITS_COUNT="$(printf '%s\n' "$COMMITS_LIST" | awk 'NF { n++ } END { print n + 0 }')"
