@@ -227,7 +227,7 @@ phase, cycle.
 
 Plus `abandonné | remplacé | gelé`, **non dérivables**, posés par dérogation nominative.
 
-**Amendement du 2026-10-03 (P46-D-04).** La machine dérive **neuf** états, non plus huit : s'ajoute `à clore` — constats du verdict tous `passé`, deux empreintes conformes (P46-D-03, §10), `SUMMARY.md` absent. Il est **non terminal** : la phase attend sa clôture. Il remplace `indéterminé` (motif `verdict-passe-sans-SUMMARY.md`) pour ce seul cas ; P44-D-08 est levée sur ce point, et sur ce point seulement. Le titre de la section n'est pas renommé (les liens existants restent valides) et le tableau d'origine reste lisible tel qu'il a été écrit.
+**Amendement du 2026-10-03 (P46-D-04).** La machine dérive **neuf** états, non plus huit : s'ajoute `à clore` — constats du verdict tous `passé`, deux empreintes conformes (P46-D-03, §10), `SUMMARY.md` absent. Il est **non terminal** : la phase attend sa clôture. Il remplace `indéterminé` (motif `verdict-passe-sans-SUMMARY.md`) pour ce seul cas ; P44-D-08 est levée sur ce point, et sur ce point seulement. Le titre de la section a été aligné sur ce décompte le 2026-10-06 (« Les neuf états dérivés », fix-46-c, F5) ; le tableau d'origine reste lisible tel qu'il a été écrit.
 Décision (Willy, AskUserQuestion session principale, 2026-10-03, Q4 = a) : un neuvième état dérivé `à clore`, non terminal, à la place d'`indéterminé` pour « verdict passé sans SUMMARY.md » (P46-D-04).
 
 **Précision du 2026-10-03 (P46-D-03b).** Le recalcul vérifie aussi les deux empreintes du verdict. Un verdict périmé **avant** `SUMMARY.md` rend `à juger` (motif `verdict-perime`) ; **après** `SUMMARY.md`, `indéterminé` (motif `livrable-modifie-apres-cloture`). Un `VERDICT.md` sans l'empreinte des livrables est traité comme périmé.
