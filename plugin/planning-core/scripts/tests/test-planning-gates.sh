@@ -44,6 +44,10 @@
 #   R-CANG-ROLE     les cas de canary du rôle (45-09) : écriture d'un juge, dispatch d'un worker sous Agent ET sous Task, sur des
 #                   définitions d'agents que le canary pose dans son lab synthétique ; observe (une ligne gate=ROLE par cas) puis armed
 #   R-CANG-ROLE-MORT evaluer_role neutralisé : le canary signale, une ligne qui nomme ROLE-juge
+#   R-CANG-D1      le cas de canary `D1-trace` (46-07, P46-D-11 : D1 n'est jamais armé mais a son canary) : un FileChanged synthétique sur un
+#                   fichier surveillé modifié hors du moteur exige une ligne de contournement au journal du lab synthétique (état livré et
+#                   copie armée : code 3) ; une copie du hook où la trace est neutralisée fait signaler le canary, une ligne qui nomme D1-trace
+#                   (MUT-CANG-D1-CAS : le cas retiré de CANARIS)
 #   R-CANG-COUVERTURE la couverture minimale de P45-D-20 (script absent, python3 absent, Task, Agent, fil principal, plugin:), étiquetée cas
 #                   par cas et vérifiée contre le payload ; `--couverture` ; une couverture incomplète fait signaler le canary
 #                   (MUT-CANG-TASK : le cas Task retiré ; MUT-CANG-COUVERTURE : le contrôle de couverture qui rend toujours « complet »)
@@ -68,6 +72,24 @@
 #                   +1, écriture atomique, refus hors lab adhérent, jamais vue par G5 (45-04, F8 et A3)
 #   R-ACCORD        chemin relatif : avertissement G2 en mode A <=> deny en mode C (limite h)
 #   BANC            chaque `@@ ecriture` de fixtures/gates-banc.txt rend son attendu ; COUVERTURE
+#   R-NFD-GATES     (A1, fix-46-a) chaque écriture du banc dont le chemin, le cwd= ou la commande= porte un caractère composable (labs nfc-adherent et nfc-dev,
+#                   noms en NFC) est rejouée sur copie armée sous sa forme NFC et sous son jumeau NFD (payload au cwd NFD, processus dans le cwd NFC) : même
+#                   code, même stdout, même stderr ; G1, G5, G6, G7, ROLE, G2 (Write et Bash), silence, plus le cas G4′ (SubagentHandback, cwd composable) ;
+#                   MUT-NFD-GATES : la normalisation NFC retirée de `composants_nfc`, tuée par R-NFD-GATES
+#                   A1-readdir (fix-46-a tour 2) : chaque lab qui porte des écritures composables est AUSSI matérialisé au disque NFD (noms du disque
+#                   décomposés) ; sur un système insensible à la normalisation (APFS, HFS+), chaque écriture composable y est rejouée sous les deux formes de
+#                   charge utile et rend la sortie de la référence ; sur un système sensible (ext4), seules les écritures de G2 sous la forme du disque sont
+#                   comparées, les autres sortent en une ligne `~` (limite (bf)) ; preuve trop pauvre sans `avertit` ET `silence` de G2 (Write et Bash) au disque
+#                   NFD ; MUT-READDIR-NFC : le nom lu par readdir sans NFC dans `_sous_dossiers`, tué par le jumeau disque NFD de G2
+#   R-READDIR-RECENSEMENT (section `env_statique`, A1-readdir) : les dix énumérations de dossiers du cœur Python (AST : os.listdir, os.scandir, os.walk, glob…)
+#                   sont recensées avec leur décision (deux « NFC » : `_sous_dossiers` et `_verdicts_du_planning` ; cinq neutres, une brute, deux hors lab) ;
+#                   une énumération nouvelle, déplacée ou une normalisation NFC retirée fait rougir ; MUT-RECENSEMENT-READDIR : la normalisation de
+#                   `_verdicts_du_planning` retirée (équivalent en comportement : seul le recensement le voit)
+#   R-LECTURE-RECENSEMENT (section `env_statique`, A11-classe, fix-46-a tour 2) : les douze lectures de fichier du cœur Python (AST : `.read`, `os.read`,
+#                   `read_text`, `read_bytes`, `readline(s)`, `json.load`) sont recensées avec leur borne, une par fonction ; la seule sans argument est
+#                   `lire_payload` (fichier de transport du harnais, hors classe, point remonté REM-1) ; chaque fonction à compteur porte sa garde dans sa boucle
+#                   de lecture ; `lire_octets_bornes` et `lire_frontmatter_fichier` ont BORNE_LECTURE_FICHIER pour défaut ; une lecture nouvelle, sans borne
+#                   ou à la borne changée fait rougir ; MUT-RECENSEMENT-LECTURE : le journal des dérogations relu sans borne
 #   LOT A           (section `lota` ; correction ciblée post-45-09, décisions du manager vf-dev-manager, 2026-10-01) : R-IMB-01..05 un `.planning`
 #                   imbriqué n'est jamais une racine de lab ; R-DEROG-09 une dérogation n'est consommée que si la décision finale est un
 #                   passage ; R-DEROG-10 droits du journal jamais élargis, argv UTF-8 ; R-VERDICT-06..09 poser-verdict.sh (contrôles, forme
@@ -136,6 +158,7 @@ import stat
 import subprocess
 import sys
 import time
+import unicodedata
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 
@@ -143,8 +166,8 @@ TOKEN = "{{VF_SCRIPTS}}"
 OUTILS_BANC = ("Write", "Edit", "NotebookEdit", "Bash", "Agent", "Task")
 # Table d'armement ATTENDUE de l'état livré : chaque armement d'une étape (45-05 à 45-09) met à
 # jour la constante du script ET cette table dans le MÊME commit (R-TABLE-01).
-TABLE_ATTENDUE = {"G6": "armed", "G5": "armed", "G1": "armed", "G7": "armed", "ROLE": "armed"}
-ORDRE_ATTENDU = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",))
+TABLE_ATTENDUE = {"G6": "armed", "G5": "armed", "G1": "armed", "G7": "armed", "ROLE": "armed", "G3": "armed", "G4": "observe", "G4P": "observe"}
+ORDRE_ATTENDU = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",), ("G3", "G4"), ("G4P",))
 
 
 def ok(libelle):
@@ -207,7 +230,26 @@ def ecrire(chemin, contenu):
         fh.write(contenu)
 
 
+def jumeau_nfd(texte):
+    """Forme NFD, composant par composant (séparateur `/`), d'un chemin, d'un cwd ou d'une commande : égale au texte s'il ne porte aucun
+    caractère composable (dans ce cas, aucun jumeau)."""
+    return "/".join(unicodedata.normalize("NFD", c) for c in texte.split("/"))
+
+
 # --- Contexte : la commande enregistrée, modes A (script réel) et C (script absent) ------------
+ETAPES_FORCEES = ("G6", "G5", "G1", "G7", "ROLE")  # étapes 1 à 4 de la Phase 45 : les seules que cette suite arme
+
+
+def forcer_armement(texte, valeur):
+    """(texte réécrit, nombre de constantes réécrites). Les cinq gates de la Phase 45 (étapes 1 à 4) valent `valeur` ; G3, G4 et G4′ (étapes 5 et 6,
+    Phase 46) valent TOUJOURS `observe` : cette suite mesure G5, G1, G7, le rôle et les bancs d'écriture, qui rejouent des écritures de `SUMMARY.md`
+    sans `VERDICT.md` — un G4 armé les refuserait à bon droit (46-05). G3, G4 et G4′ sont prouvés armés par test-cloture-gates.sh et
+    test-g4p-sortie-brute.sh, qui arment leurs propres copies."""
+    def remplacement(m):
+        return m.group(1) + '"' + (valeur if m.group(2) in ETAPES_FORCEES else "observe") + '"'
+    return re.subn(r'^(ARMEMENT_(G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', remplacement, texte, flags=re.M)
+
+
 class Ctx:
     def __init__(self, scripts_dir, hooks_json, work, settings_lab):
         self.scripts_dir = scripts_dir
@@ -278,14 +320,14 @@ class Ctx:
         return p.returncode, p.stdout, p.stderr
 
     def copie_forcee(self, dossier_scripts, valeur):
-        """Copie du script du dossier donné dont les cinq constantes ARMEMENT_* valent `valeur`
+        """Copie du script du dossier donné dont les huit constantes ARMEMENT_* valent `valeur`
         (`observe` ou `armed`) : les cas de gate ne dépendent jamais de l'état livré."""
         cle = (dossier_scripts, valeur)
         if cle not in self._forcees:
             texte = open(os.path.join(dossier_scripts, "planning-hook.sh"), encoding="utf-8").read()
-            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"' + valeur + '"', texte, flags=re.M)
-            if n != 5:
-                raise RuntimeError("cinq constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
+            texte, n = forcer_armement(texte, valeur)
+            if n != 8:
+                raise RuntimeError("huit constantes ARMEMENT_* attendues, %d trouvée(s)" % n)
             d = self.unique("force-" + valeur)
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
@@ -295,10 +337,10 @@ class Ctx:
         return self._forcees[cle]
 
     def copie_armee(self):
-        """Copie du script dont les cinq constantes ARMEMENT_* valent `armed` (armement FORCÉ)."""
+        """Copie du script dont les huit constantes ARMEMENT_* valent `armed` (armement FORCÉ)."""
         if self._armee is None:
             texte = open(self.hook, encoding="utf-8").read()
-            texte, n = re.subn(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"armed"', texte, flags=re.M)
+            texte, n = forcer_armement(texte, "armed")
             d = self.unique("armee")
             os.makedirs(d, exist_ok=True)
             with open(os.path.join(d, "planning-hook.sh"), "w", encoding="utf-8") as fh:
@@ -309,15 +351,22 @@ class Ctx:
 
 
 def classer(rc, out):
-    """`silence`, `avertit` (additionalContext sans décision), `deny`, ou `autre:...`."""
+    """`silence`, `avertit` (additionalContext sans décision), `deny`, `block` (SubagentStop : décision JSON, Phase 46), `watchPaths`, ou
+    `autre:...`."""
     if rc != 0:
         return "autre:rc=%d" % rc
     if out == b"":
         return "silence"
     try:
         obj = json.loads(out.decode("utf-8"))
+        if isinstance(obj, dict) and obj.get("decision") == "block" and isinstance(obj.get("reason"), str) and "hookSpecificOutput" not in obj:
+            return "block"
+        if isinstance(obj, dict) and isinstance(obj.get("watchPaths"), list):
+            return "watchPaths"
         s = obj["hookSpecificOutput"]
-    except (ValueError, KeyError, TypeError):
+        if isinstance(s.get("watchPaths"), list):
+            return "watchPaths"
+    except (ValueError, KeyError, TypeError, AttributeError):
         return "autre:document"
     if s.get("hookEventName") != "PreToolUse":
         return "autre:enveloppe"
@@ -430,6 +479,67 @@ def _parser_ecriture(reste):
     return e
 
 
+JETON_PLAN = "{{sha256-plan}}"
+JETON_LIVRABLES = "{{empreinte-livrables}}"
+POSER_VERDICT_SH = None  # chemin de poser-verdict.sh, posé par main() : la source du bloc partagé qui résout les jetons du banc
+
+
+class JetonNonResolu(RuntimeError):
+    """Un jeton du banc ne se résout pas : ni un OSError ni un ValueError, pour que `_labs_croises` ne l'écarte jamais en silence."""
+
+
+def _bloc_poser_verdict():
+    """Espace de noms du corps Python de poser-verdict.sh, sans l'appel final à main() : les jetons du banc sont résolus par la copie du
+    bloc partagé que lit la vraie commande de pose, jamais par celle du recalcul (preuve croisée, 46-03)."""
+    if not POSER_VERDICT_SH or not os.path.isfile(POSER_VERDICT_SH):
+        raise JetonNonResolu("jeton du banc non résolu : poser-verdict.sh introuvable")
+    arbre = ast.parse(corps_python(open(POSER_VERDICT_SH, encoding="utf-8").read(), "PY_POSER_VERDICT_EOF"))
+    arbre.body = [n for n in arbre.body
+                  if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Call) and getattr(n.value.func, "id", "") == "main")]
+    ns = {"__name__": "bloc_charge_banc"}
+    exec(compile(arbre, POSER_VERDICT_SH, "exec"), ns)
+    return ns
+
+
+def resoudre_jetons(destination):
+    """Résout, APRÈS l'écriture de tous les fichiers du lab, `{{sha256-plan}}` (sha256 des octets du PLAN.md voisin du VERDICT.md) et
+    `{{empreinte-livrables}}` (empreinte des entrées `ecrit:` de ce PLAN.md, par la copie du bloc lue dans poser-verdict.sh), comme le
+    matérialiseur de test-recalc-planning.sh : sans quoi un verdict valide du banc de recalcul deviendrait périmé ici. Un jeton qui ne se
+    résout pas lève JetonNonResolu avec un message nommé, jamais une substitution vide."""
+    ns = None
+    for racine, _dossiers, fichiers in os.walk(destination, followlinks=False):
+        if "VERDICT.md" not in fichiers:
+            continue
+        chemin = os.path.join(racine, "VERDICT.md")
+        rel = os.path.relpath(chemin, destination)
+        if not stat.S_ISREG(os.lstat(chemin).st_mode):
+            continue
+        texte = open(chemin, encoding="utf-8").read()
+        if JETON_PLAN not in texte and JETON_LIVRABLES not in texte:
+            continue
+        plan = os.path.join(racine, "PLAN.md")
+        if not os.path.isfile(plan) or os.path.islink(plan):
+            raise JetonNonResolu("jeton du banc non résolu : PLAN.md voisin absent de " + rel)
+        octets_plan = open(plan, "rb").read()
+        if JETON_PLAN in texte:
+            texte = texte.replace(JETON_PLAN, hashlib.sha256(octets_plan).hexdigest())
+        if JETON_LIVRABLES in texte:
+            if ns is None:
+                ns = _bloc_poser_verdict()
+            statut_fm, donnees = ns["lire_frontmatter"](octets_plan.decode("utf-8"))
+            if statut_fm != "ok":
+                raise JetonNonResolu("jeton du banc non résolu : frontmatter du PLAN.md voisin illisible (" + rel + ")")
+            valeurs = ns["_valeurs_ecrit"](donnees)
+            if not valeurs:
+                raise JetonNonResolu("jeton du banc non résolu : ecrit: absent du PLAN.md voisin (" + rel + ")")
+            statut, detail = ns["empreinte_livrables"](destination, valeurs)
+            if statut != "ok":
+                raise JetonNonResolu("jeton du banc non résolu : empreinte des livrables " + statut + " (" + str(detail) + ") pour " + rel)
+            texte = texte.replace(JETON_LIVRABLES, detail)
+        with open(chemin, "w", encoding="utf-8") as fh:
+            fh.write(texte)
+
+
 def materialiser(labs, nom, destination):
     lab = labs[nom]
     os.makedirs(destination, exist_ok=True)
@@ -440,6 +550,32 @@ def materialiser(labs, nom, destination):
     for chemin, cible in lab["liens"]:
         os.makedirs(os.path.dirname(os.path.join(destination, chemin)), exist_ok=True)
         os.symlink(cible, os.path.join(destination, chemin))
+    resoudre_jetons(destination)
+
+
+def materialiser_disque_nfd(labs, nom, destination):
+    """La MÊME chaîne que `materialiser`, mais chaque chemin de dossier, de fichier, de lien ET la cible relative d'un lien passent par `jumeau_nfd` : les
+    noms du DISQUE sont en NFD (A1-readdir, fix-46-a tour 2). Les contenus restent ceux du banc (noms en NFC)."""
+    lab = labs[nom]
+    os.makedirs(destination, exist_ok=True)
+    for dossier in lab["dossiers"]:
+        os.makedirs(os.path.join(destination, jumeau_nfd(dossier)), exist_ok=True)
+    for chemin, contenu in lab["fichiers"].items():
+        ecrire(os.path.join(destination, jumeau_nfd(chemin)), contenu)
+    for chemin, cible in lab["liens"]:
+        os.makedirs(os.path.dirname(os.path.join(destination, jumeau_nfd(chemin))), exist_ok=True)
+        os.symlink(jumeau_nfd(cible), os.path.join(destination, jumeau_nfd(chemin)))
+    resoudre_jetons(destination)
+
+
+def disque_insensible(ctx):
+    """Vrai si le système de fichiers du dossier de travail est insensible à la normalisation (APFS, HFS+) : un dossier créé sous un nom NFC se
+    retrouve sous son nom NFD. Calculé une fois."""
+    if getattr(ctx, "_insensible", None) is None:
+        d = ctx.unique("sonde-normalisation")
+        os.makedirs(os.path.join(d, "\u00e9"))
+        ctx._insensible = os.path.isdir(os.path.join(d, "e\u0301"))
+    return ctx._insensible
 
 
 def entree_de_ecriture(e, racine):
@@ -462,10 +598,10 @@ def juger(attendu, gate, rc, out):
 
 # --- Mutants du script (make_hook_mutant) ----------------------------------------------------
 def observe_partout(texte):
-    """Le texte du script dont les cinq constantes ARMEMENT_* valent `observe` (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30) : la
+    """Le texte du script dont les huit constantes ARMEMENT_* valent `observe` (Q-ARM, Willy, AskUserQuestion session principale, 2026-09-30) : la
     base d'un mutant ne dépend pas de l'état d'armement courant (les contrôles forcent eux-mêmes l'état qu'ils mesurent, par copie_forcee ; le
     témoin « Write neutre » ne doit pas voir un gate armé refuser à la place du mutant). Sans ligne ARMEMENT_* (le canary), le texte est rendu tel quel."""
-    return re.sub(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE) = )"(?:observe|armed)"', r'\1"observe"', texte, flags=re.M)
+    return re.sub(r'^(ARMEMENT_(?:G6|G5|G1|G7|ROLE|G3|G4|G4P) = )"(?:observe|armed)"', r'\1"observe"', texte, flags=re.M)
 
 
 def make_script_mutant(ctx, nom, marqueur, ident, motif, remplacement):
@@ -609,14 +745,18 @@ def controle_table_02(ctx, script):
     av = ns["armement_valide"]
     o, a = "observe", "armed"
 
-    def T(g6, g5, g1, g7, role):
-        return {"G6": g6, "G5": g5, "G1": g1, "G7": g7, "ROLE": role}
+    def T(g6, g5, g1, g7, role, g3=o, g4=o, g4p=o):
+        return {"G6": g6, "G5": g5, "G1": g1, "G7": g7, "ROLE": role, "G3": g3, "G4": g4, "G4P": g4p}
 
     refusees = {"G1 armé sans G6 ni G5": T(o, o, a, o, o), "G6 armé sans G5": T(a, o, o, o, o),
                 "G5 armé sans G6": T(o, a, o, o, o), "ROLE armé sans G7": T(a, a, a, o, a),
-                "G7 armé sans G1": T(a, a, o, a, o), "valeur inconnue": T("arme", "arme", o, o, o)}
+                "G7 armé sans G1": T(a, a, o, a, o), "valeur inconnue": T("arme", "arme", o, o, o),
+                "G3 et G4 armés sans ROLE": T(a, a, a, a, o, a, a, o), "G3 armé sans ROLE": T(a, a, a, a, o, a, o, o),
+                "G4 armé, G3 en observe": T(a, a, a, a, a, o, a, o), "G4P armé sans G3 ni G4": T(a, a, a, a, a, o, o, a),
+                "G4P armé, G3 et G4 en observe": T(a, a, a, a, a, o, o, a), "G3 et G4 armés, G4P armé sans ROLE": T(a, a, a, a, o, a, a, a)}
     acceptees = {"tout à observe": T(o, o, o, o, o), "étape 1": T(a, a, o, o, o), "étapes 1-2": T(a, a, a, o, o),
-                 "étapes 1-3": T(a, a, a, a, o), "étapes 1-4": T(a, a, a, a, a)}
+                 "étapes 1-3": T(a, a, a, a, o), "étapes 1-4": T(a, a, a, a, a), "étapes 1-5a (G3 seul)": T(a, a, a, a, a, a, o, o), "étapes 1-5": T(a, a, a, a, a, a, a, o),
+                 "étapes 1-6": T(a, a, a, a, a, a, a, a)}
     fautes = []
     for nom, t in refusees.items():
         if av(t):
@@ -624,7 +764,27 @@ def controle_table_02(ctx, script):
     for nom, t in acceptees.items():
         if not av(t):
             fautes.append("refusée à tort : " + nom)
-    return (not fautes), ("; ".join(fautes) if fautes else "6 tables rejetées, 5 préfixes de l'ordre acceptés")
+    return (not fautes), ("; ".join(fautes) if fautes else "%d tables rejetées, %d préfixes de l'ordre acceptés (huit gates, six étapes)" % (len(refusees), len(acceptees)))
+
+
+def controle_table_04(ctx, script):
+    """R-TABLE-04 (Phase 46, 46-11 ; P46-D-11, étape 5 scindée : arbitrage Willy, AskUserQuestion session principale, 2026-10-06) : G3 s'arme seul
+    (5a) et la table « G3 armé, G4 en observe » est ACCEPTÉE ; G4 armé sans G3 est refusé, comme G4P armé sans G3 ET G4 (G3 seul ne suffit pas) ;
+    G3 et G4 armés, G4P en observe, reste acceptée. Trace : table refusée ou table acceptée."""
+    ns = charger_module(script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh"))
+    av = ns["armement_valide"]
+    o, a = "observe", "armed"
+    base = {"G6": a, "G5": a, "G1": a, "G7": a, "ROLE": a}
+    cas = (("G3 armé, G4 en observe (5a, l'état livré)", dict(base, G3=a, G4=o, G4P=o), True),
+           ("G4 armé, G3 en observe", dict(base, G3=o, G4=a, G4P=o), False),
+           ("G4P armé sans G3 ni G4", dict(base, G3=o, G4=o, G4P=a), False),
+           ("G4P armé, G3 armé, G4 en observe", dict(base, G3=a, G4=o, G4P=a), False),
+           ("G3 et G4 armés, G4P en observe", dict(base, G3=a, G4=a, G4P=o), True))
+    fautes = []
+    for nom, table, attendue in cas:
+        if av(table) != attendue:
+            fautes.append("table %s : %s" % ("acceptée" if av(table) else "refusée", nom))
+    return (not fautes), ("; ".join(fautes) if fautes else "table acceptée : G3 armé seul (étape 5a), G3 et G4 armés ; table refusée : G4 armé sans G3, G4P armé sans G3 ni G4, G4P armé avec G4 en observe")
 
 
 def controle_parseur(ctx, script):
@@ -717,6 +877,173 @@ def controle_env_statique(ctx, script):
         if lectures.get(nom, 0) != 1:
             fautes.append("lanceur : %d lecture(s) de %s (attendu 1)" % (lectures.get(nom, 0), nom))
     return (not fautes), ("; ".join(fautes) if fautes else "aucune lecture d'environnement dans le cœur Python (expanduser et expandvars compris) ; lanceur : TMPDIR une fois (ligne du mktemp), XDG_CACHE_HOME et HOME une fois chacune (ligne d'appel du cœur)")
+
+
+# A1-readdir (fix-46-a tour 2) : chaque appel os.listdir / os.scandir / os.walk du cœur (ou glob, iglob, iterdir, rglob) et sa décision. « nfc » exige
+# un `unicodedata.normalize("NFC", …)` dans la fonction (nom lu en NFC avant le test de forme, nom du disque pour le chemin d'accès).
+RECENSEMENT_READDIR = {
+    "_parcourir_livrable": "brut",        # bloc partagé : les noms lus SONT le contenu de l'empreinte des livrables (R-EMP-04)
+    "_sous_dossiers": "nfc",              # NOM_UNITE — unités de D1 et de G2 (W1)
+    "_verdicts_du_planning": "nfc",       # VERDICT.md (G5) — arbre des unités et des juges
+    "fichier_protege": "neutre",          # noms fixes ASCII de G6 en casefold, racine du dossier de planning
+    "porte_marqueur_code": "neutre",      # suffixe ASCII, parité avec le glob de detect-gsd-engine.sh
+    "_a_un_agent": "neutre",              # suffixe .md, prédicat littéral de P45-D-14
+    "_a_une_memoire": "neutre",           # aucun test de nom
+    "definitions_dossier": "neutre",      # vérificateur : JUGE_RE ASCII ; identité du rôle : P45-D-09 (REM-5)
+    "_sous_dossiers_reels": "hors-lab",   # cache des plugins sous HOME
+    "dossiers_agents_version": "hors-lab",
+}
+
+
+def _enumerations_et_fonctions(texte):
+    """({fonction: [(ligne, appel), …]}, {fonction: nœud}) : les appels d'énumération de dossiers du cœur Python (`os.listdir`, `os.scandir`, `os.walk`, `glob`,
+    `iglob`, `iterdir`, `rglob`), rangés par la fonction qui les contient (la plus interne)."""
+    arbre = ast.parse(corps_python(texte))
+    enumerations, fonctions = {}, {}
+
+    def visiter(n, f):
+        if isinstance(n, ast.FunctionDef):
+            f = n.name
+            fonctions.setdefault(f, n)
+        if isinstance(n, ast.Call):
+            fn = n.func
+            nom = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", None)
+            base = fn.value.id if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name) else None
+            if (base == "os" and nom in ("listdir", "scandir", "walk")) or nom in ("glob", "iglob", "iterdir", "rglob"):
+                enumerations.setdefault(f, []).append((n.lineno, "%s.%s" % (base, nom)))
+        for enfant in ast.iter_child_nodes(n):
+            visiter(enfant, f)
+
+    visiter(arbre, "<module>")
+    return enumerations, fonctions
+
+
+def _normalise_en_nfc(noeud):
+    """Vrai si le nœud contient un appel `unicodedata.normalize("NFC", …)` (premier argument : la constante « NFC »)."""
+    for n in ast.walk(noeud):
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "normalize" and isinstance(n.func.value, ast.Name)
+                and n.func.value.id == "unicodedata" and n.args and isinstance(n.args[0], ast.Constant) and n.args[0].value == "NFC"):
+            return True
+    return False
+
+
+def controle_recensement_readdir(ctx, script):
+    """R-READDIR-RECENSEMENT (A1-readdir, fix-46-a tour 2) : l'AST du cœur porte EXACTEMENT les énumérations de dossiers de `RECENSEMENT_READDIR`, une par
+    fonction ; une énumération dans une fonction non recensée rougit (« énumération non recensée dans <f> : décider NFC ou neutre »), une entrée sans énumération
+    aussi (« recensement périmé ») ; chaque fonction « nfc » contient un `unicodedata.normalize("NFC", …)` (sinon « <f> : nom lu non normalisé en NFC avant le
+    test de forme »). `script` : le chemin du script ou son dossier."""
+    chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
+    enumerations, fonctions = _enumerations_et_fonctions(open(chemin, encoding="utf-8").read())
+    fautes = []
+    for f in sorted(enumerations):
+        if f not in RECENSEMENT_READDIR:
+            fautes.append("énumération non recensée dans %s : décider NFC ou neutre" % f)
+        elif len(enumerations[f]) != 1:
+            fautes.append("%s : %d énumérations (une par fonction attendue)" % (f, len(enumerations[f])))
+    for f in sorted(RECENSEMENT_READDIR):
+        if f not in enumerations:
+            fautes.append("recensement périmé : %s n'énumère plus de dossier" % f)
+        elif RECENSEMENT_READDIR[f] == "nfc" and not _normalise_en_nfc(fonctions[f]):
+            fautes.append("%s : nom lu non normalisé en NFC avant le test de forme" % f)
+    decisions = {}
+    for d in RECENSEMENT_READDIR.values():
+        decisions[d] = decisions.get(d, 0) + 1
+    total = sum(len(v) for v in enumerations.values())
+    detail = "%d énumérations de dossiers dans %d fonctions (%s), une par fonction" % (
+        total, len(enumerations), ", ".join("%d %s" % (decisions[d], d) for d in ("nfc", "neutre", "brut", "hors-lab") if d in decisions))
+    return (not fautes), ("; ".join(fautes) if fautes else detail)
+
+
+# A11, classe (fix-46-a tour 2) : chaque appel de lecture du cœur (`.read`, `os.read`, `read_text`, `read_bytes`, `readline(s)`, `json.load`) et sa
+# borne : texte `ast.unparse` de l'argument de taille (pour os.read : le second), None = appel sans argument (lecture entière).
+RECENSEMENT_LECTURE = {
+    "lire_payload": None,                                       # fichier de transport du harnais : hors classe (REM-1)
+    "lire_octets_bornes": "borne + 1",                          # lecteur générique : CADRAGE.md, VERDICT.md, config.json, PLAN.md de G2
+    "_hacher_dans": "65536",                                    # livrables, budget commun (bloc partagé)
+    "derogation_active": "BORNE_LECTURE_FICHIER + 1",
+    "consommer": "65536",                                       # sous verrou, compteur
+    "octets_plan_du_dossier": "BORNE_LECTURE_PLAN + 1",
+    "lire_definition_bornee": "BORNE_LECTURE_DEFINITION + 1",
+    "candidat_definition": "BORNE_ENTETE_DEFINITION",
+    "_versions_installees": "BORNE_LECTURE_DEFINITION + 1",
+    "empreinte_fichier": "1048576",                             # compteur
+    "lire_surveillance": "BORNE_LECTURE_SURVEILLANCE",
+    "_verifier_un_juge": "BORNE_SORTIE_PIEGEE + 1",
+    "poser_gitignore_planning": "BORNE_GITIGNORE_PLANNING + 1",    # Q-B (fix-46-c) : .planning/.gitignore existant, lecture bornée à 64 Kio
+}
+GARDES_COMPTEUR = {"_hacher_dans": "_borne_depassee", "consommer": "BORNE_LECTURE_FICHIER", "empreinte_fichier": "BORNE_OCTETS_LIVRABLES"}
+
+
+def _lectures_et_fonctions(texte):
+    """({fonction: [(ligne, appel, borne), …]}, {fonction: nœud}) : les appels de lecture de fichier du cœur Python, rangés par la fonction qui les contient
+    (la plus interne) ; `borne` est le texte de l'argument de taille (le second pour `os.read`), None s'il n'y en a pas."""
+    arbre = ast.parse(corps_python(texte))
+    lectures, fonctions = {}, {}
+
+    def visiter(n, f):
+        if isinstance(n, ast.FunctionDef):
+            f = n.name
+            fonctions.setdefault(f, n)
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute):
+            nom = n.func.attr
+            base = n.func.value.id if isinstance(n.func.value, ast.Name) else None
+            lecture = (nom in ("read", "read_text", "read_bytes", "readline", "readlines")) or (base == "json" and nom == "load")
+            if lecture:
+                position = 1 if (base == "os" and nom == "read") else 0
+                borne = ast.unparse(n.args[position]) if len(n.args) > position else None
+                lectures.setdefault(f, []).append((n.lineno, "%s.%s" % (base, nom), borne))
+        for enfant in ast.iter_child_nodes(n):
+            visiter(enfant, f)
+
+    visiter(arbre, "<module>")
+    return lectures, fonctions
+
+
+def _garde_dans_une_boucle(noeud, garde):
+    """Vrai si une boucle `while` du nœud contient la garde : un appel de `_borne_depassee`, ou une comparaison qui porte la constante nommée `garde`."""
+    for boucle in (n for n in ast.walk(noeud) if isinstance(n, ast.While)):
+        for n in ast.walk(boucle):
+            if garde == "_borne_depassee":
+                if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == garde:
+                    return True
+            elif isinstance(n, ast.Compare) and any(isinstance(x, ast.Name) and x.id == garde for x in [n.left] + list(n.comparators)):
+                return True
+    return False
+
+
+def controle_recensement_lecture(ctx, script):
+    """R-LECTURE-RECENSEMENT (A11-classe, fix-46-a tour 2) : l'AST du cœur porte EXACTEMENT les lectures de fichier de `RECENSEMENT_LECTURE`, une par fonction,
+    chacune avec la borne déclarée (None pour `lire_payload` seul) ; une lecture dans une fonction non recensée rougit (« lecture non recensée dans <f> »), une
+    borne différente aussi (« <f> : borne <obtenue>, attendu <déclarée> »), une entrée sans lecture aussi (« recensement périmé ») ; chaque fonction de
+    `GARDES_COMPTEUR` porte sa garde dans sa boucle de lecture (sinon « <f> : compteur sans garde <g> ») ; le défaut du paramètre `borne` de `lire_octets_bornes`
+    et de `lire_frontmatter_fichier` est le nom BORNE_LECTURE_FICHIER. `script` : le chemin du script ou son dossier."""
+    chemin = script if script.endswith(".sh") else os.path.join(script, "planning-hook.sh")
+    lectures, fonctions = _lectures_et_fonctions(open(chemin, encoding="utf-8").read())
+    fautes = []
+    for f in sorted(lectures):
+        if f not in RECENSEMENT_LECTURE:
+            fautes.append("lecture non recensée dans %s : borner la lecture (BORNE_LECTURE_FICHIER) ou la recenser comme hors classe" % f)
+        elif len(lectures[f]) != 1:
+            fautes.append("%s : %d lectures (une par fonction attendue)" % (f, len(lectures[f])))
+        elif lectures[f][0][2] != RECENSEMENT_LECTURE[f]:
+            fautes.append("%s : borne %s, attendu %s" % (f, lectures[f][0][2], RECENSEMENT_LECTURE[f]))
+    for f in sorted(RECENSEMENT_LECTURE):
+        if f not in lectures:
+            fautes.append("recensement périmé : %s ne lit plus de fichier" % f)
+    for f, garde in sorted(GARDES_COMPTEUR.items()):
+        if f not in fonctions or not _garde_dans_une_boucle(fonctions[f], garde):
+            fautes.append("%s : compteur sans garde %s" % (f, garde))
+    for f in ("lire_octets_bornes", "lire_frontmatter_fichier"):
+        noeud = fonctions.get(f)
+        defauts = [ast.unparse(d) for d in noeud.args.defaults] if noeud is not None else []
+        if defauts != ["BORNE_LECTURE_FICHIER"]:
+            fautes.append("%s : défaut de borne %s, attendu BORNE_LECTURE_FICHIER" % (f, defauts if noeud is not None else "fonction absente"))
+    sans_borne = sorted(f for f, v in lectures.items() if f in RECENSEMENT_LECTURE and v[0][2] is None)
+    total = sum(len(v) for v in lectures.values())
+    detail = "%d lectures dans %d fonctions, %s (%s)" % (
+        total, len(lectures), "une seule sans borne (lire_payload, hors classe, REM-1)" if sans_borne == ["lire_payload"] else "sans borne : %s" % sans_borne,
+        "BORNE_LECTURE_FICHIER pour défaut de lire_octets_bornes et de lire_frontmatter_fichier ; gardes de compteur : %s" % ", ".join(sorted(GARDES_COMPTEUR)))
+    return (not fautes), ("; ".join(fautes) if fautes else detail)
 
 
 def controle_env(ctx, scripts):
@@ -1009,7 +1336,7 @@ def controle_verdict_01(ctx, script):
     empreinte = hashlib.sha256(octets(os.path.join(lab, UNITE, "PLAN.md"))).hexdigest()
     mode = stat.S_IMODE(os.stat(chemin).st_mode)
     fautes = []
-    if lignes[0] != "---" or cles != ["juge", "hash", "tentative", "score", "constats"]:
+    if lignes[0] != "---" or cles != ["juge", "hash", "hash_livrables", "tentative", "score", "constats"]:
         fautes.append("clés du frontmatter : %s" % cles)
     for attendu in ('juge: "vf-design-judge"', 'hash: "%s"' % empreinte, "tentative: 1", 'score: "8/10"',
                     '  - critere: "critere-a"', '    resultat: "passé"', '  - critere: "critere-b"', '    resultat: "échec"'):
@@ -1017,12 +1344,14 @@ def controle_verdict_01(ctx, script):
             fautes.append("ligne absente : " + attendu)
     if "# Verdict" not in lignes[fin + 1:]:
         fautes.append("corps sans « # Verdict »")
+    if not any(re.fullmatch(r'hash_livrables: "[0-9a-f]{64}"', l) for l in lignes[1:fin]):
+        fautes.append("hash_livrables absent ou mal formé (empreinte de 64 hexadécimaux attendue)")
     if mode != 0o644:
         fautes.append("permissions %o" % mode)
     restes = [n for n in os.listdir(os.path.join(lab, UNITE)) if n.startswith(".")]
     if restes:
         fautes.append("fichier temporaire laissé : %s" % restes)
-    return (not fautes), ("; ".join(fautes) if fautes else "code 0, VERDICT.md au format du gabarit, hash = sha256 des octets du PLAN.md, tentative 1, 0644, aucun temporaire")
+    return (not fautes), ("; ".join(fautes) if fautes else "code 0, VERDICT.md au format du gabarit (deux empreintes, 46-01), hash = sha256 des octets du PLAN.md, tentative 1, 0644, aucun temporaire")
 
 
 def controle_verdict_02(ctx, script):
@@ -1431,7 +1760,7 @@ def scripts_canary(ctx, source, valeur, hook=None, armes=("G6", "G5"), tel_quel=
     défaut de `source`) dont les gates de `armes` (G6 et G5 par défaut) valent `valeur`, les autres gates restant à
     observe ; `tel_quel` : le hook n'est pas réécrit (l'état livré)."""
     texte = open(hook or os.path.join(source, "planning-hook.sh"), encoding="utf-8").read()
-    for gate in ("G6", "G5", "G1", "G7", "ROLE"):
+    for gate in ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P"):
         if tel_quel:
             break
         v = valeur if gate in armes else "observe"
@@ -1448,23 +1777,141 @@ def scripts_canary(ctx, source, valeur, hook=None, armes=("G6", "G5"), tel_quel=
     return d
 
 
+EVENEMENTS_CABLES = ("PreToolUse", "SubagentStop", "CwdChanged", "FileChanged", "SessionStart")
+
+
+def reglage_cinq_evenements(chemin, commande, sans=(), autre=None):
+    """Réglage jetable : `commande` sous les cinq événements (PreToolUse au matcher Write, les quatre autres sans matcher, Phase 46) ;
+    `sans` : événements omis ; `autre` : (événement, commande) remplace la commande de cet événement."""
+    hooks = {}
+    for evt in EVENEMENTS_CABLES:
+        if evt in sans:
+            continue
+        groupe = {"hooks": [{"type": "command", "command": autre[1] if autre and autre[0] == evt else commande}]}
+        if evt == "PreToolUse":
+            groupe["matcher"] = "Write"
+        hooks[evt] = [groupe]
+    ecrire(chemin, json.dumps({"hooks": hooks}))
+
+
 def lancer_canary_dossier(ctx, dossier):
     """Lance le check-gates-alive.sh de `dossier` (= <projet>/.claude/scripts) dans une session adhérente,
     `--settings` vers un réglage jetable dont la commande enregistrée (hooks.json, scope projet :
-    "$CLAUDE_PROJECT_DIR"/.claude/scripts) vise ce même projet."""
+    "$CLAUDE_PROJECT_DIR"/.claude/scripts) vise ce même projet, posée sous les cinq événements (Phase 46)."""
     if TOKEN not in (ctx.cmd or ""):
         raise RuntimeError("la commande enregistrée ne porte pas le jeton " + TOKEN)
     projet = os.path.dirname(os.path.dirname(dossier))
     lab = ctx.unique("session-canary")
     ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
     reglage = os.path.join(ctx.unique("reglage-canary"), "settings.json")
-    ecrire(reglage, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [
-        {"type": "command", "command": ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')}]}]}}))
+    reglage_cinq_evenements(reglage, ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts'))
     p = subprocess.run(["bash", os.path.join(dossier, "check-gates-alive.sh"), "--settings=" + reglage],
                        input=json.dumps({"cwd": lab}).encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                        env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": ctx.home, "CLAUDE_PROJECT_DIR": projet},
                        cwd=lab, timeout=240)
     return p.returncode, p.stdout, p.stderr
+
+
+def scripts_canary_g3(ctx, source, valeur, hook=None, armes=("G6", "G5")):
+    """`scripts_canary`, pour les cas de G3 armé (depuis 46-11 G3 s'arme seul, étape 5a ; l'ancienne règle « G3 et G4 UN seul geste » est levée) :
+    si un G4 armé figurait dans la table sans son cas dans CANARIS le canary signalerait « gate armé sans canary : G4 » avant de rejouer quoi que ce soit. Dans ce cas seulement (aucun cas G4 dans
+    le check-gates-alive.sh posé), la copie du canary ne regarde ni G4 ni G4′ (GATES réduit à G3) : le cas G3 est rejoué pour de bon. Dès que G4 a
+    son cas, la copie est celle du canary livré, sans réduction."""
+    d = scripts_canary(ctx, source, valeur, hook=hook, armes=armes)
+    chemin = os.path.join(d, "check-gates-alive.sh")
+    texte = open(chemin, encoding="utf-8").read()
+    if re.search(r'"[A-Za-z0-9_-]+\|G4\|nominal\|', texte):
+        return d
+    complet = 'GATES = ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P")'
+    if texte.count(complet) != 1:
+        raise RuntimeError("une ligne GATES de huit gates attendue dans le canary, %d trouvée(s)" % texte.count(complet))
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write(texte.replace(complet, 'GATES = ("G6", "G5", "G1", "G7", "ROLE", "G3")', 1))
+    return d
+
+
+def controle_cang_g3_01(ctx, script):
+    """R-CANG-G3-01 (46-05 ; P46-D-11 ; 46-11 : la copie met tout en observe, l'état livré armant G3 depuis l'étape 5a), `--settings` vers un réglage jetable portant la commande de référence : le
+    canary rend 3, stdout vide — le cas `G3-livrable-absent` trouve sa ligne `gate=G3` au journal d'observation du rejeu (jamais « silence
+    sans ligne d'observation »)."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe", armes=())
+    texte = open(os.path.join(d, "check-gates-alive.sh"), encoding="utf-8").read()
+    if texte.count('"G3-livrable-absent|G3|nominal|Write:.planning/cycles/01-c/phases/01-p/CLOTURE.md|fil-principal"') != 1:
+        return False, "le cas G3-livrable-absent (Write d'un CLOTURE.md, fil principal) n'est pas dans CANARIS"
+    rc, out, err = lancer_canary_dossier(ctx, d)
+    if rc != 3 or out != b"":
+        return False, "rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err))
+    return True, "copie en observe (ARMEMENT_* tous à observe) : code 3, stdout vide (G3-livrable-absent trouve sa ligne gate=G3 au journal d'observation du rejeu)"
+
+
+def controle_cang_g3_02(ctx, script):
+    """R-CANG-G3-02 : deux copies — l'état LIVRÉ (46-11 : G3 armé seul, étape 5a, G4 en observation) et une copie où G3 et G4 sont armés (et toutes
+    les étapes avant) : sur chacune le canary rend 3, le cas obtient un deny `[planning-core] G3 :` (rejoué aussi directement sur la copie : la
+    raison porte le préfixe du gate)."""
+    dossier = _dossier(ctx, script)
+    legs = (("état livré (G3 armé seul)", scripts_canary(ctx, dossier, "armed", tel_quel=True)),
+            ("G3 et G4 armed", scripts_canary_g3(ctx, dossier, "armed", armes=("G6", "G5", "G1", "G7", "ROLE", "G3", "G4"))))
+    for nom, d in legs:
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        if rc != 3 or out != b"":
+            return False, "%s, canary : rc=%d stdout=%s stderr=%s" % (nom, rc, court(out), court(err))
+        lab = ctx.unique("cang-g3-lab")
+        ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+        ecrire(os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-p", "PLAN.md"), "---\necrit: livrables/absent.md\n---\n")
+        rc2, out2, err2 = ctx.lancer("A", payload("Write", entree_outil("Write", lab + "/.planning/cycles/01-c/phases/01-p/CLOTURE.md"), lab), cwd=lab,
+                                     dossier=os.path.join(d))
+        if classer(rc2, out2) != "deny":
+            return False, "%s, rejeu direct : %s %s" % (nom, classer(rc2, out2), court(out2))
+        raison = json.loads(out2.decode("utf-8"))["hookSpecificOutput"]["permissionDecisionReason"]
+        if not raison.startswith("[planning-core] G3 :"):
+            return False, "%s, raison : %s" % (nom, raison)
+    return True, "état livré (G3 armé seul) et G3 + G4 armed : canary code 3 (le cas obtient un refus de gate) et le deny porte « [planning-core] G3 : »"
+
+
+def controle_cang_g3_03(ctx, script):
+    """R-CANG-G3-03 : evaluer_g3 ne rend jamais de verdict (G3 retiré de GATES_A_VERDICT) -> le canary signale, code 0, UNE ligne qui nomme G3,
+    observe comme armed."""
+    dossier = _dossier(ctx, script)
+    neutre, raison = make_hook_mutant(ctx, "G3-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict')
+    if neutre is None:
+        return False, "mutant du hook invalide : " + raison
+    fautes = []
+    for valeur, armes in (("observe", ()), ("armed", ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4"))):
+        d = scripts_canary_g3(ctx, dossier, valeur, hook=os.path.join(neutre, "planning-hook.sh"), armes=armes)
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+        if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G3-livrable-absent" not in lignes[0] or "G6-principal" in lignes[0] or "G1-sans-cadrage" in lignes[0]:
+            fautes.append("evaluer_g3 neutralisé (%s) : rc=%d %s" % (valeur, rc, court(out)))
+    return (not fautes), ("; ".join(fautes) if fautes else "evaluer_g3 neutralisé : code 0 et une ligne qui nomme G3-livrable-absent (et ni G6 ni G1), observe comme armed")
+
+
+def controle_cang_d1(ctx, script):
+    """R-CANG-D1 (46-07 ; P46-D-11) : le canary porte le cas `D1-trace` (FileChanged synthétique sur un fichier surveillé) ; état livré et copie armée
+    (les étapes 1 : D1 n'a pas de constante d'armement) : code 3, stdout vide (la trace attendue est trouvée au journal du lab synthétique) ; copie du hook
+    où la trace est neutralisée (plus aucune ligne de contournement) : code 0, UNE ligne de signal qui nomme D1-trace et aucun gate."""
+    dossier = _dossier(ctx, script)
+    texte = open(os.path.join(dossier, "check-gates-alive.sh"), encoding="utf-8").read()
+    cas = '"D1-trace|D1|nominal|FileChanged:.planning/" + NOM_ETAT + "|",'
+    if texte.count(cas) != 1:
+        return False, "le cas %s n'est pas (une seule fois) dans CANARIS" % cas
+    fautes = []
+    for valeur, tel_quel in (("observe", True), ("armed", False)):
+        d = scripts_canary(ctx, dossier, valeur, tel_quel=tel_quel)
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        if rc != 3 or out != b"":
+            fautes.append("%s : code 3 et stdout vide attendus — obtenu rc=%d stdout=%s stderr=%s" % ("état livré" if tel_quel else "copie armée", rc, court(out), court(err)))
+    neutre, raison = make_hook_mutant(ctx, "D1-TRACE-NEUTRE", "# d1-contournement", 'return ["reference"]  # d1-contournement')
+    if neutre is None:
+        return False, "mutant du hook invalide : " + raison
+    for valeur in ("observe", "armed"):
+        d = scripts_canary(ctx, dossier, valeur, hook=os.path.join(neutre, "planning-hook.sh"))
+        rc, out, err = lancer_canary_dossier(ctx, d)
+        lignes = [l for l in out.decode("utf-8", "replace").split("\n") if l]
+        if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "D1-trace" not in lignes[0] or "G6-principal" in lignes[0]:
+            fautes.append("trace neutralisée (%s) : code 0 et une ligne qui nomme D1-trace attendus — obtenu rc=%d %s" % (valeur, rc, court(out)))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "cas D1-trace : état livré et copie armée, code 3 (la ligne de contournement est trouvée) ; trace neutralisée : code 0 et une ligne qui nomme D1-trace, "
+                          "observe comme armed")
 
 
 def controle_cang_01(ctx, script):
@@ -1487,7 +1934,7 @@ def controle_cang_02(ctx, script):
 
 def controle_cang_03(ctx, script):
     """evaluer_g6 neutralisé (jamais de verdict) : le canary signale, code 0, UNE ligne qui nomme G6 — observe comme armed."""
-    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G6-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("ROLE", evaluer_role), ("G3", evaluer_g3))  # gates-a-verdict')
     if neutre is None:
         return False, "mutant du hook invalide : " + raison
     fautes = []
@@ -1499,6 +1946,78 @@ def controle_cang_03(ctx, script):
         if rc != 0 or len(lignes) != 1 or not lignes[0].startswith("[planning-core] canary : ") or "G6" not in lignes[0] or "G5-verdict" in lignes[0]:
             fautes.append("%s : rc=%d %s" % (valeur, rc, court(out)))
     return (not fautes), ("; ".join(fautes) if fautes else "evaluer_g6 neutralisé, observe et armed : code 0 et une ligne qui nomme G6 (et pas G5)")
+
+
+# --- Phase 46, 46-04 : le canary retrouve la commande sous les cinq événements ; deux cas DEGRADE pour SubagentHandback ---------
+def controle_cang_evt_01(ctx, script):
+    """R-CANG-EVT-01 : un réglage jetable portant la commande de référence sous les cinq événements : code 3 (sain), stdout vide ; privé de
+    l'entrée FileChanged (puis SubagentStop, CwdChanged, SessionStart) : code 0 et UNE ligne de signal qui nomme l'événement manquant,
+    sous --hook comme en direct ; deux événements manquants : les deux nommés ; une AUTRE commande sous SubagentStop : signal « non reconnue »
+    qui nomme l'événement, la commande n'étant jamais exécutée."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe", tel_quel=True)
+    projet = os.path.dirname(os.path.dirname(d))
+    reelle = ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')
+    fautes = []
+
+    def lancer(args=(), **kw):
+        reglage = os.path.join(ctx.unique("reglage-evt"), "settings.json")
+        reglage_cinq_evenements(reglage, reelle, **kw)
+        return canary_direct(ctx, d, reglage, args, projet=projet)
+
+    rc, out, err = lancer()
+    if rc != 3 or out != b"":
+        fautes.append("cinq événements : code 3 et stdout vide (attendu) — obtenu rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
+    for args in ((), ("--hook",)):
+        rc, out, err = lancer(args, sans=("FileChanged",))
+        raison = une_ligne_canary(out, ("FileChanged", "non câblé"))
+        if rc != 0 or raison:
+            fautes.append("sans FileChanged %s : code 0 et UNE ligne qui nomme FileChanged (attendu) — obtenu rc=%d %s" % (" ".join(args) or "sans --hook", rc, raison or ""))
+    for evt in ("SubagentStop", "CwdChanged", "SessionStart"):
+        rc, out, err = lancer(sans=(evt,))
+        raison = une_ligne_canary(out, (evt, "non câblé"))
+        if rc != 0 or raison:
+            fautes.append("sans %s : code 0 et UNE ligne qui nomme %s (attendu) — obtenu rc=%d %s" % (evt, evt, rc, raison or ""))
+    rc, out, err = lancer(sans=("CwdChanged", "FileChanged"))
+    raison = une_ligne_canary(out, ("CwdChanged", "FileChanged"))
+    if rc != 0 or raison:
+        fautes.append("sans CwdChanged ni FileChanged : code 0 et UNE ligne qui nomme les deux (attendu) — obtenu rc=%d %s" % (rc, raison or ""))
+    marqueur = os.path.join(ctx.unique("marqueur-evt"), "cree")
+    os.makedirs(os.path.dirname(marqueur))
+    rc, out, err = lancer(autre=("SubagentStop", "touch '%s' # planning-hook.sh" % marqueur))
+    raison = une_ligne_canary(out, ("non reconnue", "SubagentStop"))
+    if rc != 0 or raison or os.path.exists(marqueur):
+        fautes.append("autre commande sous SubagentStop : code 0, UNE ligne « non reconnue » qui nomme SubagentStop, commande jamais exécutée (attendu) — obtenu rc=%d %s marqueur=%s"
+                      % (rc, raison or "", os.path.exists(marqueur)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "cinq événements : code 3 ; privé de FileChanged (--hook compris), SubagentStop, CwdChanged ou SessionStart : une ligne qui nomme l'événement ; deux manquants : les deux nommés ; autre commande sous SubagentStop : « non reconnue », jamais exécutée")
+
+
+def controle_cang_evt_02(ctx, script):
+    """R-CANG-EVT-02 : les cas DEGRADE `D09` (script absent) et `D10` (python absent), payload SubagentHandback, sont dans CANARIS ; ils sont
+    COUVERTS : sur une commande de référence dont la couche de repli a perdu l'alternative SubagentHandback, le canary signale (code 0, UNE
+    ligne « cas en échec ») exactement ces deux cas ; sur la commande livrée il est sain (R-CANG-EVT-01)."""
+    d = scripts_canary(ctx, _dossier(ctx, script), "observe", tel_quel=True)
+    projet = os.path.dirname(os.path.dirname(d))
+    texte = open(os.path.join(d, "check-gates-alive.sh"), encoding="utf-8").read()
+    fautes = []
+    for ident, mode in (("D09", "script-absent"), ("D10", "python-absent")):
+        motif = '"%s|DEGRADE|%s|SubagentHandback|%s",' % (ident, mode, mode)
+        if texte.count(motif) != 1:
+            fautes.append("cas %s dans CANARIS (attendu : une ligne `%s`) — obtenu %d occurrence(s)" % (ident, motif, texte.count(motif)))
+    alternative = "|*'\"tool_name\":\"SubagentHandback\"'*|*'\"tool_name\":\"Agent\"'*"
+    if ctx.cmd.count(alternative) != 1:
+        return False, "la commande enregistrée porte l'alternative SubagentHandback entre NotebookEdit et Agent (attendu 1) — obtenu %d" % ctx.cmd.count(alternative)
+    sans_repli = ctx.cmd.replace(alternative, "|*'\"tool_name\":\"Agent\"'*")
+    reference = os.path.join(ctx.unique("reference-evt"), "reference.txt")
+    ecrire(reference, sans_repli)
+    reglage = os.path.join(ctx.unique("reglage-evt02"), "settings.json")
+    reglage_cinq_evenements(reglage, sans_repli.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts'))
+    rc, out, err = canary_direct(ctx, d, reglage, ("--reference=" + reference,), projet=projet)
+    raison = une_ligne_canary(out, ("2 cas en échec", "D09", "D10"))
+    if rc != 0 or raison:
+        fautes.append("repli sans SubagentHandback : code 0 et UNE ligne « 2 cas en échec » qui nomme D09 et D10 (attendu) — obtenu rc=%d %s stderr=%s" % (rc, raison or "", court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "D09 et D10 présents dans CANARIS ; couverts : sans l'alternative SubagentHandback du repli, le canary signale exactement ces deux cas (« 2 cas en échec »)")
 
 
 # --- 45-05 : identité des fichiers protégés (Pattern 5), périmètre F6 et F7b ---------------------------------
@@ -1987,7 +2506,7 @@ def controle_cang_g1(ctx, script):
     rc, out, err = lancer_canary_dossier(ctx, d)
     if rc != 3 or out != b"":
         fautes.append("G6, G5 et G1 armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
-    neutre, raison = make_hook_mutant(ctx, "G1-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G7", evaluer_g7), ("ROLE", evaluer_role))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G1-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G7", evaluer_g7), ("ROLE", evaluer_role), ("G3", evaluer_g3))  # gates-a-verdict')
     if neutre is None:
         fautes.append("mutant du hook invalide : " + raison)
     else:
@@ -2229,7 +2748,7 @@ def controle_cang_g7(ctx, script):
     rc, out, err = lancer_canary_dossier(ctx, d)
     if rc != 3 or out != b"":
         fautes.append("étapes 1 à 3 armed : rc=%d stdout=%s stderr=%s" % (rc, court(out), court(err)))
-    neutre, raison = make_hook_mutant(ctx, "G7-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("ROLE", evaluer_role))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "G7-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("ROLE", evaluer_role), ("G3", evaluer_g3))  # gates-a-verdict')
     if neutre is None:
         fautes.append("mutant du hook invalide : " + raison)
     else:
@@ -2268,7 +2787,7 @@ def controle_cang_role(ctx, script):
 def controle_cang_role_mort(ctx, script):
     """R-CANG-ROLE-MORT : evaluer_role ne rend jamais de verdict -> le canary signale (code 0, UNE ligne qui nomme ROLE), observe comme armed."""
     dossier = _dossier(ctx, script)
-    neutre, raison = make_hook_mutant(ctx, "ROLE-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7))  # gates-a-verdict')
+    neutre, raison = make_hook_mutant(ctx, "ROLE-NEUTRE", "# gates-a-verdict", 'GATES_A_VERDICT = (("G6", evaluer_g6), ("G5", evaluer_g5), ("G1", evaluer_g1), ("G7", evaluer_g7), ("G3", evaluer_g3))  # gates-a-verdict')
     if neutre is None:
         return False, "mutant du hook invalide : " + raison
     fautes = []
@@ -2712,7 +3231,7 @@ def sec_table(ctx):
     corps = corps_python(texte)
     fautes = []
     for gate, valeur in TABLE_ATTENDUE.items():
-        motif = re.compile(r'^ARMEMENT_%s = "(observe|armed)"  # etape-[1-4]$' % gate, re.M)
+        motif = re.compile(r'^ARMEMENT_%s = "(observe|armed)"  # etape-[1-6]$' % gate, re.M)
         trouves = motif.findall(corps)
         if len(trouves) != 1:
             fautes.append("ARMEMENT_%s : %d ligne(s)" % (gate, len(trouves)))
@@ -2732,15 +3251,20 @@ def sec_table(ctx):
         fautes.append("TABLE_ARMEMENT %r != TABLE_ATTENDUE" % (ns["TABLE_ARMEMENT"],))
     if fautes:
         for f in fautes:
-            ko("R-TABLE-01", "les cinq constantes ARMEMENT_* (une ligne chacune) valent TABLE_ATTENDUE, G2_MODE vaut avertit, ordre de l'interface",
+            ko("R-TABLE-01", "les huit constantes ARMEMENT_* (une ligne chacune) valent TABLE_ATTENDUE, G2_MODE vaut avertit, ordre de l'interface",
                "table livrée = table attendue", f)
     else:
-        ok("R-TABLE-01 cinq constantes ARMEMENT_* sur une ligne chacune = TABLE_ATTENDUE (l'état courant), G2_MODE avertit, ORDRE_ETAPES conforme, armement_valide vrai")
+        ok("R-TABLE-01 huit constantes ARMEMENT_* sur une ligne chacune = TABLE_ATTENDUE (l'état courant), G2_MODE avertit, ORDRE_ETAPES conforme, armement_valide vrai")
     bon, detail = controle_table_02(ctx, ctx.hook)
     if bon:
         ok("R-TABLE-02 " + detail)
     else:
-        ko("R-TABLE-02", "armement_valide rejette un ordre violé et accepte les préfixes", "6 rejets, 5 acceptations", detail)
+        ko("R-TABLE-02", "armement_valide rejette un ordre violé et accepte les préfixes", "12 rejets, 7 acceptations", detail)
+    bon, detail = controle_table_04(ctx, ctx.hook)
+    if bon:
+        ok("R-TABLE-04 " + detail)
+    else:
+        ko("R-TABLE-04", "G3 et G4 tenus égaux, G4P après eux (armement_valide)", "table refusée / table acceptée selon le cas", detail)
     # Table livrée incohérente (G1 armé sans G6 ni G5) : le hook refuse dans un lab adhérent
     bon, detail = controle_table_03(ctx, ctx.scripts_dir)
     if bon:
@@ -2751,13 +3275,14 @@ def sec_table(ctx):
 
 def controle_table_03(ctx, script):
     """R-TABLE-03 : une table incohérente (G1 armé, G6 et G5 en observe : vraie QUEL QUE SOIT l'état courant d'armement, Q-ARM, Willy,
-    AskUserQuestion session principale, 2026-09-30) construite en réécrivant les cinq constantes du script livré -> deny « table
+    AskUserQuestion session principale, 2026-09-30) construite en réécrivant les huit constantes du script livré -> deny « table
     d'armement incohérente », code 0, dans un lab adhérent."""
     texte = open(os.path.join(_dossier(ctx, script), "planning-hook.sh"), encoding="utf-8").read()
     d = ctx.unique("incoherente")
     os.makedirs(d, exist_ok=True)
     incoh = texte
-    for gate, valeur in (("G6", "observe"), ("G5", "observe"), ("G1", "armed"), ("G7", "observe"), ("ROLE", "observe")):
+    for gate, valeur in (("G6", "observe"), ("G5", "observe"), ("G1", "armed"), ("G7", "observe"), ("ROLE", "observe"),
+                         ("G3", "observe"), ("G4", "observe"), ("G4P", "observe")):
         incoh, n = re.subn(r'^(ARMEMENT_%s = )"(?:observe|armed)"' % gate, r'\1"%s"' % valeur, incoh, count=1, flags=re.M)
         if n != 1:
             return False, "ARMEMENT_%s : %d ligne(s) réécrite(s) (attendu 1)" % (gate, n)
@@ -2842,8 +3367,8 @@ def sec_g2(ctx):
 
 def sec_env(ctx):
     armee, n = ctx.copie_armee()
-    if n != 5:
-        ko("R-ENV-01", "la copie à l'armement forcé réécrit cinq constantes", "5", str(n))
+    if n != 8:
+        ko("R-ENV-01", "la copie à l'armement forcé réécrit huit constantes", "8", str(n))
         return
     bon, detail = controle_env(ctx, [ctx.scripts_dir, armee])
     ok("R-ENV-01 adhésion et armement indépendants de l'environnement (état livré et copie armée) : " + detail) if bon else ko(
@@ -2854,6 +3379,12 @@ def sec_env_statique(ctx):
     bon, detail = controle_env_statique(ctx, ctx.hook)
     ok("R-ENV-02 garde statique : " + detail) if bon else ko(
         "R-ENV-02", "aucune lecture d'environnement dans le cœur Python de planning-hook.sh (expanduser et expandvars compris) ; lanceur : TMPDIR sur la ligne du mktemp, XDG_CACHE_HOME et HOME sur la ligne d'appel du cœur, une fois chacune", "aucune faute", detail)
+    bon, detail = controle_recensement_readdir(ctx, ctx.hook)
+    ok("R-READDIR-RECENSEMENT recensement des énumérations de dossiers du cœur : " + detail) if bon else ko(
+        "R-READDIR-RECENSEMENT", "chaque énumération de dossiers du cœur est recensée avec sa décision (NFC avant le test de forme, ou neutre, brute, hors lab)", "aucune faute", detail)
+    bon, detail = controle_recensement_lecture(ctx, ctx.hook)
+    ok("R-LECTURE-RECENSEMENT recensement des lectures de fichier du cœur : " + detail) if bon else ko(
+        "R-LECTURE-RECENSEMENT", "chaque lecture de fichier du cœur est recensée avec sa borne (BORNE_LECTURE_FICHIER, BORNE_LECTURE_PLAN… ; la seule sans borne : lire_payload)", "aucune faute", detail)
 
 
 def sec_g5(ctx):
@@ -3017,9 +3548,33 @@ def sec_cang(ctx):
             ("R-CANG-G7", controle_cang_g7, "canary de session, cas G7-orphelin"),
             ("R-CANG-ROLE", controle_cang_role, "canary de session, cas du rôle (juge, worker sous Agent, worker sous Task)"),
             ("R-CANG-ROLE-MORT", controle_cang_role_mort, "canary de session, evaluer_role neutralisé"),
-            ("R-CANG-COUVERTURE", controle_cang_couverture, "canary de session, couverture minimale déclarée (P45-D-20)")):
+            ("R-CANG-COUVERTURE", controle_cang_couverture, "canary de session, couverture minimale déclarée (P45-D-20)"),
+            ("R-CANG-EVT-01", controle_cang_evt_01, "canary de session, la commande sous les cinq événements (Phase 46)"),
+            ("R-CANG-EVT-02", controle_cang_evt_02, "canary de session, cas DEGRADE D09 et D10 (SubagentHandback en mode dégradé)"),
+            ("R-CANG-G3-01", controle_cang_g3_01, "canary de session, cas G3-livrable-absent, copie en observe"),
+            ("R-CANG-G3-02", controle_cang_g3_02, "canary de session, cas G3-livrable-absent, état livré (G3 armé seul) et G3 + G4 armed"),
+            ("R-CANG-G3-03", controle_cang_g3_03, "canary de session, evaluer_g3 neutralisé"),
+            ("R-CANG-D1", controle_cang_d1, "canary de session, cas D1-trace (FileChanged synthétique, trace exigée)")):
         bon, detail = ctrl(ctx, None)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
+    # Mutants du canary (Phase 46) : l'événement non câblé n'est plus vu, une autre commande est reconnue, le cas D09 est retiré
+    for ident, motif, remplacement, ctrl, nom_ctrl in (
+            ("CANG-EVT-MANQUANT", "# canary-evenements", "sans, non_reconnus = [], []  # canary-evenements", controle_cang_evt_01, "R-CANG-EVT-01"),
+            ("CANG-EVT-RECONNUE", "# canary-evenement-reconnue", "if True:  # canary-evenement-reconnue", controle_cang_evt_01, "R-CANG-EVT-01"),
+            ("CANG-EVT-CAS-D09", '"D09|DEGRADE|script-absent|SubagentHandback|script-absent",', "", controle_cang_evt_02, "R-CANG-EVT-02"),
+            ("CANG-D1-CAS", '"D1-trace|D1|nominal|FileChanged:.planning/" + NOM_ETAT + "|",', "", controle_cang_d1, "R-CANG-D1")):
+        dossier, raison = make_script_mutant(ctx, "check-gates-alive.sh", "PY_CHECK_GATES_ALIVE_EOF", ident, motif, remplacement)
+        if dossier is None:
+            komut(ident, "mutant du canary valide (texte distinct, bash -n, compilation du corps)", "mutant valide", raison)
+            continue
+        original = ctrl(ctx, None)
+        mutant = ctrl(ctx, dossier)
+        if not original[0]:
+            komut(ident, "l'original passe " + nom_ctrl, "conforme", original[1])
+        elif mutant[0]:
+            komut(ident, nom_ctrl + " rougit sous le mutant", "rouge", "vert : " + mutant[1] + " (mutant non opposable)")
+        else:
+            okmut(ident, "%s rougit · attendu (original) : %s · obtenu (mutant) : %s" % (nom_ctrl, original[1], mutant[1][:400]))
 
 
 def sec_g1(ctx):
@@ -3131,6 +3686,147 @@ def sec_accord(ctx):
     ok("R-ACCORD " + detail) if bon else ko("R-ACCORD", "chemin relatif : avertissement G2 en mode A <=> deny en mode C (limite h)", "accord des deux couches", detail)
 
 
+def _jumeau_ecriture(e):
+    """Copie de l'écriture `e` dont le chemin (s'il n'est pas `-`), le cwd et la commande passent par `jumeau_nfd`."""
+    j = dict(e)
+    if e["chemin"] != "-":
+        j["chemin"] = jumeau_nfd(e["chemin"])
+    if e["cwd"]:
+        j["cwd"] = jumeau_nfd(e["cwd"])
+    if e["commande"]:
+        j["commande"] = jumeau_nfd(e["commande"])
+    return j
+
+
+def _vue_sortie(rc, out):
+    """Décision d'une sortie, lisible dans un écart : pour un avertissement de G2, le nombre de plans ouverts qu'il annonce (la différence d'un jumeau disque NFD
+    dont l'unité n'est pas vue : « 0 plan(s) ouvert(s) »)."""
+    v = classer(rc, out)
+    if v == "avertit":
+        m = re.search(r"\((\d+) plan\(s\) ouvert\(s\)\)", contexte_de(out))
+        return v + (" (%s plan(s) ouvert(s))" % m.group(1) if m else " " + court(out, 60))
+    return v + " " + court(out, 60)
+
+
+def controle_nfd_gates(ctx, script):
+    """R-NFD-GATES (A1, fix-46-a) : pour chaque écriture du banc dont le chemin, le `cwd=` ou la `commande=` porte un caractère composable, le jumeau NFD (payload au
+    cwd NFD, processus lancé dans le cwd NFC existant) rendu sur copie armée dans une matérialisation FRAÎCHE du lab rend le même code, le même stdout et le même
+    stderr que la forme NFC. Au moins un refus et un passage pour G1 et G7, un refus pour G5 et ROLE, un passage pour G6, un avertissement G2 (Write et Bash), un
+    silence ; PLUS le cas G4′ : SubagentHandback sans sortie brute d'un worker doté de Bash, `cwd` dans un sous-dossier composable du lab, NFC et NFD : même deny.
+    A1-readdir (fix-46-a tour 2) : chaque lab qui porte des écritures composables est AUSSI matérialisé au disque NFD (`materialiser_disque_nfd` : les noms du
+    DISQUE sont décomposés). Sur un système insensible à la normalisation (`disque_insensible`), chaque écriture composable y est rejouée sous les deux formes
+    de charge utile (NFC et jumeau NFD ; processus lancé dans le dossier du disque) : même code, stdout et stderr que la référence (disque NFC, charge NFC) ;
+    sur un système sensible, seules les écritures de G2 sous la forme du disque (NFD) sont comparées, les autres sortent en une ligne `~` qui nomme la limite
+    (bf) ; preuve trop pauvre si le disque NFD ne compte pas au moins un `avertit` ET un `silence` de G2 pour Write ET pour Bash.
+    Une différence nomme « jumeau NFD » ou « jumeau disque NFD », l'écriture et les deux décisions."""
+    dossier_jugé = _dossier(ctx, script)
+    ordre, labs = parser_banc(open(ctx.banc, encoding="utf-8").read())
+    compte, compte_disque = {}, {}
+    ecarts, jouees = [], 0
+    insensible = disque_insensible(ctx)
+    disque_hors_g2 = 0
+    for nom in ordre:
+        composables = [e for e in labs[nom]["ecritures"] if any(e[c] and jumeau_nfd(e[c]) != e[c] for c in ("chemin", "cwd", "commande"))]
+        if not composables:
+            continue
+        lab_nfc, lab_nfd, lab_disque = ctx.unique("nfd-nfc-" + nom), ctx.unique("nfd-nfd-" + nom), ctx.unique("nfd-disque-" + nom)
+        materialiser(labs, nom, lab_nfc)
+        materialiser(labs, nom, lab_nfd)
+        materialiser_disque_nfd(labs, nom, lab_disque)
+        for e in composables:
+            jouees += 1
+            dossier = ctx.copie_forcee(dossier_jugé, "armed") if e["armee"] else dossier_jugé
+            brut_nfc, cwd_nfc = entree_de_ecriture(e, lab_nfc)
+            r_nfc = ctx.lancer("A", brut_nfc, cwd=cwd_nfc, dossier=dossier)
+            j = _jumeau_ecriture(e)
+            brut_nfd, _cwd_nfd = entree_de_ecriture(j, lab_nfd)
+            cwd_processus = os.path.join(lab_nfd, e["cwd"]) if e["cwd"] else lab_nfd   # le cwd NFC existant : le payload seul porte le cwd NFD
+            r_nfd = ctx.lancer("A", brut_nfd, cwd=cwd_processus, dossier=dossier)
+            v_nfc, v_nfd = classer(r_nfc[0], r_nfc[1]), classer(r_nfd[0], r_nfd[1])
+            disque_ok = None   # None : non rejouée sur le disque NFD (système sensible, hors G2)
+            if not insensible and e["gate"] != "G2":
+                disque_hors_g2 += 1
+            else:
+                disque_ok = True
+                cwd_disque = os.path.join(lab_disque, jumeau_nfd(e["cwd"])) if e["cwd"] else lab_disque   # le dossier du disque : ses noms sont en NFD
+                for charge, nom_charge in ((e, "NFC"), (j, "NFD")):
+                    if nom_charge == "NFC" and not insensible:
+                        continue
+                    brut_disque, _cwd_charge = entree_de_ecriture(charge, lab_disque)
+                    r_disque = ctx.lancer("A", brut_disque, cwd=cwd_disque, dossier=dossier)
+                    if r_disque != r_nfc or r_disque[2]:
+                        disque_ok = False
+                        ecarts.append("jumeau disque NFD de %s %s%s%s :: %s %s (charge %s) : disque NFC -> %s, disque NFD -> %s" % (
+                            e["outil"], e["chemin"], (" cwd=" + e["cwd"]) if e["cwd"] else "", (" commande=" + e["commande"]) if e["commande"] else "", e["attendu"],
+                            e["gate"] or "", nom_charge, _vue_sortie(r_nfc[0], r_nfc[1]), _vue_sortie(r_disque[0], r_disque[1])))
+                        break
+            if r_nfc != r_nfd or r_nfc[2]:
+                ecarts.append("jumeau NFD de %s %s%s%s :: %s %s : NFC -> %s %s, NFD -> %s %s" % (
+                    e["outil"], e["chemin"], (" cwd=" + e["cwd"]) if e["cwd"] else "", (" commande=" + e["commande"]) if e["commande"] else "", e["attendu"],
+                    e["gate"] or "", v_nfc, court(r_nfc[1], 60), v_nfd, court(r_nfd[1], 60)))
+                continue
+            conforme, obtenu = juger(e["attendu"], e["gate"], r_nfc[0], r_nfc[1])
+            if not conforme:
+                ecarts.append("jumeau NFD de %s %s : la forme NFC elle-même ne rend pas l'attendu %s %s (%s)" % (e["outil"], e["chemin"], e["attendu"], e["gate"], obtenu))
+                continue
+            cle = (e["gate"], e["attendu"], "Bash" if e["outil"] == "Bash" else "outil")
+            compte[cle] = compte.get(cle, 0) + 1
+            if disque_ok:
+                compte_disque[cle] = compte_disque.get(cle, 0) + 1
+    # cas G4′ : SubagentHandback sans sortie brute d'un worker doté de Bash, cwd dans un sous-dossier composable du lab
+    g4p = ctx.copie_forcee(dossier_jugé, "armed")
+    texte = re.sub(r'^(ARMEMENT_G4P = )"observe"', r'\1"armed"', open(os.path.join(g4p, "planning-hook.sh"), encoding="utf-8").read(), flags=re.M)
+    d_g4p = ctx.unique("force-g4p")
+    os.makedirs(d_g4p, exist_ok=True)
+    ecrire(os.path.join(d_g4p, "planning-hook.sh"), texte)
+    os.chmod(os.path.join(d_g4p, "planning-hook.sh"), 0o755)
+    sous = "livrables/\u00e9quipe"
+    resultats_g4p = []
+    for variante, cwd_rel in (("NFC", sous), ("NFD", jumeau_nfd(sous))):
+        lab = ctx.unique("nfd-g4p-" + variante.lower())
+        ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+        ecrire(os.path.join(lab, ".claude", "agents", "worker-nfc.md"),
+               "---\nname: worker-nfc\ndescription: Worker du cas G4 prime NFD\nvf-internal: true\ntools: Read, Bash\n---\nCorps du worker.\n")
+        os.makedirs(os.path.join(lab, sous), exist_ok=True)
+        brut = json.dumps({"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": os.path.join(lab, cwd_rel), "permission_mode": "default",
+                           "agent_id": "agent-test", "agent_type": "worker-nfc", "hook_event_name": "PreToolUse", "tool_name": "SubagentHandback",
+                           "tool_input": {"message": "Rapport sans sortie brute."}}, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        resultats_g4p.append(ctx.lancer("A", brut, cwd=os.path.join(lab, sous), dossier=d_g4p))
+    jouees += 1
+    if resultats_g4p[0] != resultats_g4p[1] or resultats_g4p[0][2]:
+        ecarts.append("jumeau NFD de SubagentHandback (G4′, cwd composable) : NFC -> %s %s, NFD -> %s %s" % (
+            classer(resultats_g4p[0][0], resultats_g4p[0][1]), court(resultats_g4p[0][1], 60), classer(resultats_g4p[1][0], resultats_g4p[1][1]), court(resultats_g4p[1][1], 60)))
+    elif classer(resultats_g4p[0][0], resultats_g4p[0][1]) != "deny":
+        ecarts.append("jumeau NFD de SubagentHandback (G4′) : la forme NFC elle-même ne refuse pas : %s" % classer(resultats_g4p[0][0], resultats_g4p[0][1]))
+    else:
+        compte[("G4P", "doit-refuser", "outil")] = 1
+    attendus = (("G1", "doit-refuser"), ("G1", "doit-passer"), ("G7", "doit-refuser"), ("G7", "doit-passer"), ("G5", "doit-refuser"), ("ROLE", "doit-refuser"),
+                ("G6", "doit-passer"), ("G4P", "doit-refuser"))
+    manque = [a for a in attendus if not any(k[0] == a[0] and k[1] == a[1] for k in compte)]
+    if not any(k[1] == "silence" for k in compte):
+        manque.append(("-", "silence (jumeau dev)"))
+    if not any(k[0] == "G2" and k[1] == "avertit" and k[2] == "outil" for k in compte) or not any(k[0] == "G2" and k[1] == "avertit" and k[2] == "Bash" for k in compte):
+        manque.append(("G2", "avertit Write et Bash"))
+    manque_disque = [(g, a, o) for g in ("G2",) for a in ("avertit", "silence") for o in ("outil", "Bash") if not compte_disque.get((g, a, o))]
+    detail = "%d écritures composables rejouées (jumeau NFD de même code, même stdout, même stderr) : %s" % (
+        jouees - len(ecarts), ", ".join("%s %s %d" % (k[0] or "-", k[1], v) for k, v in sorted(compte.items(), key=str)))
+    detail_disque = "disque NFD : %s ; G2 %s" % (
+        "toutes les écritures composables sous les deux formes de charge" if insensible else "écritures de G2 sous la forme du disque (système sensible)",
+        ", ".join("%s %s %d" % (k[1], "Bash" if k[2] == "Bash" else "Write", v) for k, v in sorted(compte_disque.items(), key=str) if k[0] == "G2"))
+    if dossier_jugé == ctx.scripts_dir:
+        print("COUVERTURE NFD " + detail)
+        print("COUVERTURE NFD DISQUE " + detail_disque)
+        if not insensible:
+            print("  ~ R-NFD-GATES (disque NFD, %d écritures hors G2) non exercé (système de fichiers sensible à la normalisation, limite (bf))" % disque_hors_g2)
+    if ecarts:
+        return False, "%d écart(s) : %s" % (len(ecarts), " | ".join(ecarts[:3]))
+    if manque:
+        return False, "preuve trop pauvre : cas absents %s ; %s" % (manque, detail)
+    if manque_disque:
+        return False, "preuve trop pauvre (disque NFD) : cas de G2 absents %s ; %s" % (manque_disque, detail_disque)
+    return True, detail + " ; " + detail_disque
+
+
 def sec_banc(ctx):
     ordre, labs, chemins = labs_banc(ctx)
     compte = {}
@@ -3189,9 +3885,13 @@ def sec_banc(ctx):
     for nom in ordre:
         if labs[nom]["jumeau_de"] and not labs[nom]["ecritures"]:
             ko("COUVERTURE jumeau " + nom, "un lab jumeau porte des écritures", ">= 1", "0")
+    bon, detail = controle_nfd_gates(ctx, None)
+    ok("R-NFD-GATES jumeaux NFD du banc sur copie armée : " + detail) if bon else ko("R-NFD-GATES", "chaque écriture composable du banc rend, sous sa forme NFD, le même code et la même sortie",
+                                                                                       "jumeaux identiques", detail)
 
 
-CTRL_FICHIER = (controle_table_02, controle_parseur, controle_env_statique, controle_jeton, controle_registre, controle_g7_05)
+CTRL_FICHIER = (controle_table_02, controle_table_04, controle_parseur, controle_env_statique, controle_jeton, controle_registre, controle_g7_05,
+                controle_recensement_readdir, controle_recensement_lecture)
 
 
 def sec_mutants(ctx):
@@ -3205,6 +3905,16 @@ def sec_mutants(ctx):
          "R-TABLE-02", controle_table_02),
         ("TABLE-ORDRE-REFUS", "gates = [gate for etape in ORDRE_ETAPES for gate in etape]  # armement-valide-debut", "return True",
          "R-TABLE-03", controle_table_03),
+        # 46-11 : étape 5 scindée (P46-D-11) : la garde « G4 armé exige G3 armé » neutralisée, une table à G4 armé sans G3 est acceptée
+        ("ARMEMENT-G3-G4", "return False  # armement-g3-g4", "pass  # armement-g3-g4", "R-TABLE-04", controle_table_04),
+        # 46 (fix-46-a, A1) : la normalisation NFC des composants relatifs au lab retirée -> les jumeaux NFD du banc rendent une autre décision
+        ("NFD-GATES", "# nfc-chemin", 'return [c for c in rel.split(os.sep) if c not in ("", ".")]  # nfc-chemin', "R-NFD-GATES", controle_nfd_gates),
+        # 46 (fix-46-a tour 2, A1-readdir) : le nom lu par readdir sans NFC -> une unité au nom de DISQUE NFD n'est plus vue de G2 (jumeau disque NFD)
+        ("READDIR-NFC", "# nfc-readdir-unites", "if not NOM_UNITE.match(nom):  # nfc-readdir-unites", "R-NFD-GATES", controle_nfd_gates),
+        # mutant équivalent en comportement (sans effet sur un nom ASCII) : seul le recensement statique le voit, c'est son rôle
+        ("RECENSEMENT-READDIR", "# nfc-readdir-verdicts", "if nom.casefold() == NOM_VERDICT:  # nfc-readdir-verdicts", "R-READDIR-RECENSEMENT", controle_recensement_readdir),
+        # 46 (fix-46-a tour 2, A11-classe) : le journal des dérogations relu sans borne -> une lecture dont la borne n'est plus celle du recensement
+        ("RECENSEMENT-LECTURE", "# derog-borne-lecture", "octets = fh.read()  # derog-borne-lecture", "R-LECTURE-RECENSEMENT", controle_recensement_lecture),
         ("PARSEUR", 'return ("invalide:frontmatter-non-ferme", {})', 'return ("invalide:frontmatter-non-ferme-mute", {})',
          "R-PARSEUR", controle_parseur),
         ("ENV-ADHESION", 'SCHEMA_ADHESION = "cycles-v1"', 'SCHEMA_ADHESION = os.environ.get("VF_SCHEMA_ADHESION", "cycles-v1")',
@@ -3446,6 +4156,7 @@ def lab_imbrique(ctx, variante):
     ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
     phase = os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-p")
     ecrire(os.path.join(phase, "PLAN.md"), "---\necrit: livrables\n---\n")
+    ecrire(os.path.join(lab, "livrables", "rapport.md"), "x\n")  # 46-01 : poser-verdict.sh refuse un livrable absent ou vide
     imbrique = {"a": os.path.join(lab, ".planning", ".planning"), "b": os.path.join(lab, ".planning", "cycles", ".planning"),
                 "c": os.path.join(phase, ".planning")}[variante]
     os.makedirs(imbrique)
@@ -3503,8 +4214,7 @@ def canary_degrade(ctx, dossier, cwd_session):
     os.makedirs(d)
     shutil.copy(os.path.join(dossier, "check-gates-alive.sh"), os.path.join(d, "check-gates-alive.sh"))
     reglage = os.path.join(ctx.unique("reglage-canary-imb"), "settings.json")
-    ecrire(reglage, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [
-        {"type": "command", "command": ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')}]}]}}))
+    reglage_cinq_evenements(reglage, ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts'))
     p = subprocess.run(["bash", os.path.join(d, "check-gates-alive.sh"), "--settings=" + reglage],
                        input=json.dumps({"cwd": cwd_session}).encode("utf-8"), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                        env={"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": ctx.home, "CLAUDE_PROJECT_DIR": projet},
@@ -3840,13 +4550,13 @@ def controle_verdict_forme_unite(ctx, script):
                  ".planning/cycles/01-c/phases/01-p/foo/01-a", ".planning/cycles/01-c/foo/01-p", ".planning/notes/01-c/phases/01-p")
     for unite in invalides:
         lab = lab_frais(ctx)
-        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: a\n---\n")
+        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: livrables/rapport.md\n---\n")
         rc, _o, err = poser(ctx, d, lab, 1, unite=unite)
         if rc != 64 or verdicts_ecrits(lab):
             fautes.append("%s : rc=%d (attendu 64), écrit %s" % (unite, rc, [os.path.relpath(e, lab) for e in verdicts_ecrits(lab)]))
     for unite in (".planning/cycles/01-c/phases/01-p", ".planning/cycles/01-c/phases/01-p/plans/01-a"):
         lab = lab_frais(ctx)
-        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: a\n---\n")
+        ecrire(os.path.join(lab, unite, "PLAN.md"), "---\necrit: livrables/rapport.md\n---\n")
         rc, _o, err = poser(ctx, d, lab, 1, unite=unite)
         if rc != 0 or not os.path.isfile(os.path.join(lab, unite, "VERDICT.md")):
             fautes.append("unité valide %s : rc=%d %s" % (unite, rc, court(err)))
@@ -3952,6 +4662,46 @@ def controle_derog_droits_utf8(ctx, script):
 
 lota_mutant("DEROG-FCHMOD", "# derog-fchmod", 'if hasattr(os, "fchmod"):  # derog-fchmod', "R-DEROG-10", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
 lota_mutant("DEROG-UTF8", "# derog-utf8", "pass  # derog-utf8", "R-DEROG-10", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
+
+
+# --- fix-46-c (revue m1) : deroger-gate.sh n'écrit jamais dans un journal que le hook ne lirait plus ----------------------------------
+@lota("R-DEROG-11")
+def controle_derog_borne_journal(ctx, script):
+    """Le hook ne lit pas un journal des dérogations de plus de BORNE_LECTURE_FICHIER (1 048 576) octets : aucune dérogation n'y serait honorée. La commande
+    refuse donc d'y écrire (code 1, message qui nomme BORNE_LECTURE_FICHIER, journal inchangé) — journal déjà au-delà de la borne, ou écriture qui le
+    ferait dépasser ; jumeau : un journal sous la borne (de quoi accueillir la ligne) reçoit la dérogation."""
+    d = _dossier(ctx, script)
+    fautes = []
+    BORNE = 1048576
+
+    def journal_de_taille(taille):
+        lab = lab_frais(ctx)
+        journal = journal_derog(lab)
+        if os.path.exists(journal):
+            os.remove(journal)
+        ligne = b"2026-10-06T00:00:00+00:00  derogation  id=1  gate=G6  chemin=.planning/STATE.md  qui=w  canal=c  date=2026-10-06  raison=r\n"
+        contenu = (ligne * (taille // len(ligne) + 1))[:taille - 1] + b"\n"
+        with open(journal, "wb") as fh:
+            fh.write(contenu)
+        return lab, journal
+
+    for taille, motif in ((BORNE + 4096, "déjà au-delà"), (BORNE - 10, "ferait dépasser")):
+        lab, journal = journal_de_taille(taille)
+        avant = octets(journal)
+        rc, _o, err = deroger(ctx, lab, d, gate="G6", chemins=(".planning/STATE.md",))
+        texte = err.decode("utf-8", "replace") if isinstance(err, bytes) else str(err)
+        if rc != 1 or "BORNE_LECTURE_FICHIER" not in texte or motif not in texte or octets(journal) != avant:
+            fautes.append("journal de %d octets : code 1, message nommant BORNE_LECTURE_FICHIER (%s) et journal inchangé attendus — obtenu rc=%d %s" % (taille, motif, rc, court(err)))
+    lab, journal = journal_de_taille(BORNE - 4096)
+    rc, _o, err = deroger(ctx, lab, d, gate="G6", chemins=(".planning/STATE.md",))
+    if rc != 0 or os.path.getsize(journal) > BORNE:
+        fautes.append("jumeau (journal sous la borne) : dérogation inscrite, journal <= %d octets attendus — obtenu rc=%d taille=%d %s" % (BORNE, rc, os.path.getsize(journal), court(err)))
+    return (not fautes), ("; ".join(fautes) if fautes else
+                          "journal au-delà de la borne : refus (1, BORNE_LECTURE_FICHIER, journal intact) ; écriture qui le ferait dépasser : refus ; jumeau sous la borne : inscrit")
+
+
+lota_mutant("DEROG-BORNE-JOURNAL", "# derog-borne-journal", "if False:  # derog-borne-journal", "R-DEROG-11", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
+lota_mutant("DEROG-BORNE-RESULTAT", "# derog-borne-resultat", "if False:  # derog-borne-resultat", "R-DEROG-11", "deroger-gate.sh", "PY_DEROGER_GATE_EOF")
 
 
 # --- LOT A, constat 2 (H2) : le parseur de définitions d'agent est linéaire, borné, et le cœur se borne lui-même ---------------------
@@ -4445,8 +5195,13 @@ def canary_direct(ctx, dossier_scripts, reglage, args=(), session=None, home=Non
 
 
 def reglage_de(ctx, commandes, prefixe="reglage-m2"):
+    """Réglage jetable : `commandes` sous PreToolUse (chacune dans son groupe) ; la commande réelle sous les quatre autres événements (Phase 46 :
+    le canary signale un événement non câblé, ce que ces cas ne veulent pas mesurer)."""
     chemin = os.path.join(ctx.unique(prefixe), "settings.json")
-    ecrire(chemin, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [{"type": "command", "command": c}]} for c in commandes]}}))
+    hooks = {"PreToolUse": [{"matcher": "Write", "hooks": [{"type": "command", "command": c}]} for c in commandes]}
+    for evt in EVENEMENTS_CABLES[1:]:
+        hooks[evt] = [{"hooks": [{"type": "command", "command": ctx.cmd.replace(TOKEN, '"$CLAUDE_PROJECT_DIR"/.claude/scripts')}]}]
+    ecrire(chemin, json.dumps({"hooks": hooks}))
     return chemin
 
 
@@ -4594,13 +5349,13 @@ lota_mutant("BUDGET-SIGNAL", "# role-signal", "for signal in []:  # role-signal"
 # contrôle la compare, mécaniquement, aux constantes du hook (table d'armement, noms protégés par G6, nom du journal de dérogation,
 # marqueurs de code, ordre de résolution des agents), à la commande enregistrée de hooks.json (outils refusés en mode dégradé, outil
 # laissé ouvert) et à la table CANARIS du canary (cas par gate) : tout écart rougit — une référence qui annoncerait un gate armé qui ne
-# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (ae) sont chacune sur sa propre ligne canonique
+# l'est pas serait un faux vert documentaire (T-45-90). Les limites déclarées (a) à (bu) sont chacune sur sa propre ligne canonique
 # `- **limite (X)**` avec ses mots-clés. Chaque mutant retire ou fausse UNE chose, sur une copie de la référence écrite sous le dossier
 # de travail (ou, pour MUT-REFERENCE-CODE, sur les constantes du hook, la référence restant intacte) ; le contrôle doit alors rendre un
 # écart. Les lignes d'écart du contrôle commencent par `ECART` ; la suite ne les imprime que si la VRAIE référence est en écart (un
 # mutant tué n'imprime que sa trace, sans ce mot : une exécution verte n'a aucune ligne ECART).
 TITRE_REFERENCE = re.compile(r"^## Hook central et gates d.écriture \(Phase 45\)")
-GATES_REFERENCE = ("G6", "G5", "G1", "G7", "ROLE", "G2")
+GATES_REFERENCE = ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P", "G2")
 LIMITES_REFERENCE = (
     ("a", ("compact", "tool_name", "N-06")),
     ("b", ("cycles-v1", "une ligne")),
@@ -4643,7 +5398,39 @@ LIMITES_REFERENCE = (
     ("al", ("N4-02", "/.vol", "inode", "macOS")),
     ("am", ("N4-03", "dérogation", "fail-closed")),
     ("an", ("N4-05", "lstat", "readlink", "OSError")),
+    ("ao", ("cwd", "new_cwd")),
+    ("ap", ("SubagentHandback", "juges", "G4′ est ouvert")),
+    ("aq", ("inconnu",)),
+    ("ar", ("CLOTURE.md", "SUMMARY.md", "Bash", "limite (g)", "N-5", "indéterminé")),
+    ("as", ("G3", "PLAN.md", "illisible", "G1")),
+    ("at", (".DS_Store", "Thumbs.db", "empreinte")),
+    ("au", ("falsification",)),
+    ("av", ("Bash", "P46-D-02b")),
+    ("aw", ("fork", "A4", "A6")),
+    ("ax", ("#95440", "N-5")),
+    ("ay", ("auteur", "intention")),
+    ("az", ("watchPaths", "A2", "A3")),
+    ("ba", ("référence", "fail-open")),
+    ("bb", ("Phase 48", "Phase 50", "P46-D-13")),
+    ("be", ("BORNE_LECTURE_PLAN", "1 Mio", "G3", "G4", "recalcul")),
+    ("bf", ("NFC", "NFD", "racine", "ext4", "APFS", "readdir", "D1", "G2", "G7", "fail-closed")),
+    ("bg", ("BORNE_WATCHPATHS", "BORNE_OCTETS_RECONCILIATION", "plus récentes", "signal", "N-4", "leurres")),
+    ("bh", ("juges", "Bash", "prouvé", "D1")),
+    ("bi", ("canary", "SessionStart", "CwdChanged", "vérificateur de juges")),
+    ("bj", ("BORNE_LECTURE_FICHIER", "CADRAGE.md", "VERDICT.md", "config.json", "code 3", "dérogation", "lire_payload")),
+    ("bk", ("A5", "reference", "contournement", "P46 lot B, b3, reportée à une phase ultérieure")),
+    ("bl", ("A7", "intention", "config.json", "P46 lot B, b3, reportée à une phase ultérieure")),
+    ("bm", ("A10", "--juge=", "canary", "P46 lot B, b3, reportée à une phase ultérieure", "N-7", "hors-index", "definition-illisible")),
+    ("bn", ("A6", "surveillance.log", "D1-f", "D1-c3", "empreinte", "N-3", "clone", "TRONCATURE")),
+    ("bo", ("A8", ".recalc-cache.json", "ecrit:", "PLAN.md", "N-6", "signature")),
+    ("bp", ("SUMMARY.md", "VERDICT.md", "G4", "343", "F-5", "périmé")),
+    ("bq", ("2.1.288", "settings.json", "#63148")),
+    ("br", ("#60490", "code 2", "P46-D-10")),
+    ("bs", ("G4′", "A2", "A3", "A4", "P1", "préalables à tout armement")),
+    ("bt", ("N-2", "ecrit:", "PLAN.md", "G3")),
+    ("bu", ("F-2", "COUVERTURE-REJEU", "plancher", "G4′")),
 )
+PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 
 
 def section_reference(texte):
@@ -4661,7 +5448,7 @@ def jetons_reference(ligne):
 
 def canaris_par_gate(texte_canary):
     res = {}
-    for ident, gate in re.findall(r'"([A-Za-z0-9_-]+)\|(G6|G5|G1|G7|ROLE)\|nominal\|', texte_canary):
+    for ident, gate in re.findall(r'"([A-Za-z0-9_-]+)\|(G6|G5|G1|G7|ROLE|G3|G4P|G4)\|nominal\|', texte_canary):
         res.setdefault(gate, set()).add(ident)
     return res
 
@@ -4716,10 +5503,12 @@ def ecarts_reference(texte, ns, texte_hook, canaris, commande, matcher):
         if cases[1] != attendue:
             ecarts.append("ECART %s : étape « %s » dans la référence, « %s » dans ORDRE_ETAPES" % (gate, cases[1], attendue))
         ids = {x.strip() for x in cases[4].split(",")}
-        ids_code = {"aucun"} if gate == "G2" else canaris.get(gate, set())
+        # `aucun` : G2 (jamais de refus) ou un gate en observe sans cas dans CANARIS (G4 et G4′ avant leur canary) ; un gate armé sans cas reste un écart
+        ids_code = {"aucun"} if (gate == "G2" or (etat == "observe" and not canaris.get(gate))) else canaris.get(gate, set())
         if ids != ids_code:
             ecarts.append("ECART %s : cas de canary %s dans la référence, %s dans CANARIS" % (gate, sorted(ids), sorted(ids_code)))
-        releve = "aucun" if gate == "G2" else "45-REJEU-ETAPE-" + (etape.get(gate) or "?")
+        # relevé : « 45-REJEU-ETAPE-<n> » pour les étapes 1 à 4 (Phase 45), « 46-REJEU-ETAPE-<n> » pour les étapes 5 et 6 (Phase 46)
+        releve = "aucun" if gate == "G2" else ("46" if etape.get(gate) in ("5", "6") else "45") + "-REJEU-ETAPE-" + (etape.get(gate) or "?")
         if cases[5] != releve:
             ecarts.append("ECART %s : relevé « %s » dans la référence, « %s » attendu" % (gate, cases[5], releve))
     toutes_observe = all(v == "observe" for v in table.values())
@@ -4804,7 +5593,7 @@ def sec_reference(ctx):
             print(e)
         ko("R-REFERENCE", "la référence est identique au hook livré, à la commande enregistrée et au canary (aucun écart)", "aucun écart", "%d écart(s)" % len(ecarts))
         return
-    ok("R-REFERENCE la table d'armement (six gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées (a) à (an) sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % len(LIMITES_REFERENCE))
+    ok("R-REFERENCE la table d'armement (huit gates : état, étape, cas de canary, relevé), les noms protégés par G6, le journal de dérogation, les marqueurs de code, l'ordre de résolution, les outils refusés et laissés ouverts en mode dégradé et les %d limites déclarées %s sont ceux du code livré ; la présence de la phrase « Aucun gate n'est armé » suit l'état d'armement du code" % (len(LIMITES_REFERENCE), PLAGE_LIMITES))
     original = open(chemin, encoding="utf-8").read()
 
     def mutant_texte(ident, fonction, motif):
@@ -4861,10 +5650,10 @@ def sec_reference(ctx):
         if not any(("limite (%s)" % lettre) in e for e in controler(copie)):
             non_tuees.append(lettre)
     if non_tuees:
-        komut("REFERENCE-LIMITES", "chaque limite (a) à (an) retirée seule fait rougir R-REFERENCE en la nommant", "%d limites tuées" % len(LIMITES_REFERENCE),
+        komut("REFERENCE-LIMITES", "chaque limite %s retirée seule fait rougir R-REFERENCE en la nommant" % PLAGE_LIMITES, "%d limites tuées" % len(LIMITES_REFERENCE),
               "non tuées : " + ", ".join(non_tuees))
     else:
-        okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées retirée seule est nommée par le contrôle" % len(LIMITES_REFERENCE))
+        okmut("REFERENCE-LIMITES", "R-REFERENCE rougit · attendu (original) : aucun écart · obtenu (mutant) : chacune des %d limites déclarées %s retirée seule est nommée par le contrôle" % (len(LIMITES_REFERENCE), PLAGE_LIMITES))
     # Côté code : une constante du hook change, la référence reste intacte.
     ns_mut = dict(ns)
     # Q-ARM (Willy, AskUserQuestion session principale, 2026-09-30) : la constante est INVERSÉE (observe <-> armed), jamais posée à une valeur
@@ -4912,7 +5701,9 @@ SECTIONS = {
 
 
 def main():
+    global POSER_VERDICT_SH
     scripts_dir, hooks_json, banc, work, settings_lab = sys.argv[2:7]
+    POSER_VERDICT_SH = os.path.join(scripts_dir, "poser-verdict.sh")
     ctx = Ctx(scripts_dir, hooks_json or None, work, settings_lab or None)
     ctx.banc = banc
     ctx.banc_recalc = sys.argv[7] if len(sys.argv) > 7 and sys.argv[7] else None

@@ -1159,7 +1159,7 @@ gitignore_add_paths() {
   # Scope local seulement : user/project ne touchent JAMAIS au .gitignore.
   [ "$VF_SCOPE" = "local" ] || return 0
 
-  local gi_prefix
+  local gi_prefix gi_journal
   if ! gi_prefix="$(vf_gitignore_target_prefix)"; then
     log "  gitignore : --target ($TARGET_ROOT) sort de l'arbre du repo — .gitignore non modifié (ne peut pas couvrir une cible hors-arbre)"
     return 0
@@ -1221,6 +1221,21 @@ gitignore_add_paths() {
   # écrit réellement dans ces fichiers à cette install) déclenche l'ajout.
   [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one "${gi_prefix}/settings.json"
   [ -f "$module_dir/hooks/hooks.json" ] && gitignore_add_one "${gi_prefix}/settings.local.json"
+  # Journal de D1 du moteur de planning (46-12, P5 ; arbitrage Willy, AskUserQuestion session principale,
+  # 2026-10-06, « L'ignorer ») : `.planning/surveillance.log` est écrit à l'exécution par le hook central
+  # (une ligne par écriture surveillée) et ne doit jamais être committé. Il vit à la racine du lab (le cwd
+  # de l'installation, comme ./.gitignore), pas sous la cible. Sélecteur data-driven : seul un module qui PORTE
+  # le hook central (scripts/planning-hook.sh) déclenche l'ajout. Sous `--target <lab>/.claude` le lab n'est plus
+  # le cwd : la ligne est préfixée par le chemin du lab relatif au cwd (`${gi_prefix%/.claude}`, correctif fix-46-c,
+  # revue de P5) ; une cible qui n'est pas un `.claude` ne dit pas où est le lab : rien (jamais une ligne fausse).
+  # Conservée à côté de `.planning/.gitignore` (posé par le hook au SessionStart, Q-B) : un moteur lancé en CLI
+  # avant toute séance écrit déjà le journal.
+  gi_journal=""
+  case "$gi_prefix" in
+    .claude)   gi_journal=".planning/surveillance.log" ;;
+    */.claude) gi_journal="${gi_prefix%/.claude}/.planning/surveillance.log" ;;
+  esac
+  [ -f "$module_dir/scripts/planning-hook.sh" ] && [ -n "$gi_journal" ] && gitignore_add_one "$gi_journal"
   # Lib partagée de portabilité (Phase 30 tâche 2, copy_engine_lib()) : posée par l'ENGINE, pas
   # par un module — donc jamais vue par la boucle scripts/ plus haut (elle vient du cache
   # _internal, jamais de $module_dir/scripts). Gap constaté en tâche 4 lors de la vérification

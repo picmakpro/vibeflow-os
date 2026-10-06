@@ -9,13 +9,21 @@
 # que .github/workflows/ci.yml change.
 #
 # Familles :
-#   R-INST-01  l'installeur pose exactement UNE entrée PreToolUse qui cite planning-hook.sh dans
-#              settings.json, aucune dans settings.local.json ; le script posé est exécutable
+#   R-INST-01  l'installeur pose exactement UNE entrée qui cite planning-hook.sh PAR ÉVÉNEMENT (PreToolUse au matcher élargi à
+#              SubagentHandback, SubagentStop, CwdChanged, FileChanged, SessionStart ; Phase 46, 46-04) dans settings.json, aucune
+#              dans settings.local.json, aucun jeton résiduel ; le script posé est exécutable ; une SECONDE installation laisse une
+#              entrée par événement (idempotence de la purge de merge-hooks)
 #   R-INST-02  lab adhérent, script présent, Write d'une cible neutre : code 0, stdout vide
 #   R-INST-03  lab adhérent, script absent / python absent / script qui sort 1 / qui sort 2 : deny
 #              pour Write, Edit, NotebookEdit, Agent, Task ; silence pour Bash (limite déclarée,
 #              P45-D-06b)
-#   R-INST-04  lab dev dans les mêmes modes et pour les six outils : stdout d'octet vide, code 0
+#   R-INST-04  lab dev dans les mêmes modes et pour les six outils : stdout d'octet vide, code 0 ; R-INST-04b : de même pour
+#              SubagentHandback, SubagentStop, SessionStart, CwdChanged, FileChanged (P46-D-16, tel qu'installé)
+#   R-INST-DEV-01 à 03  (46-10, P46-D-16) lab dev INSTALLÉ (copie du lab installé, config 2.0) : l'entrée posée de chacun des cinq événements et
+#              SubagentHandback sous PreToolUse rendent un stdout d'octet vide et le code 0, sans écrire (empreinte de l'arbre identique) ;
+#              même résultat dans ce dépôt (non adhérent) ; aucune clé `watchPaths` hors adhésion, donc aucun watcher et FileChanged nul
+#              par construction (témoin : un lab adhérent en rend une). MUT-DEV-ADHESION : le cœur qui ignore l'adhésion, rejoué par la
+#              commande SANS pré-filtre sur un lab dev fixture, rougit R-INST-DEV-01 pour chacune des six sondes (une trace par sonde)
 #   R-INST-05  contrôle négatif anti-vert-à-vide : un settings.json vidé de l'entrée fait rougir
 #              l'assertion R-INST-01 (verdict inversé attendu)
 #   R-INST-07  Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01), scope projet : sur une copie ARMÉE du lab installé, G6 refuse
@@ -77,6 +85,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -84,6 +93,10 @@ import time
 SIX_OUTILS = ("Write", "Edit", "NotebookEdit", "Bash", "Agent", "Task")
 FILTRES = ("Write", "Edit", "NotebookEdit", "Agent", "Task")
 CITE = "planning-hook.sh"
+# Phase 46 (46-04) : la même commande sous cinq événements ; le matcher PreToolUse est élargi à SubagentHandback.
+EVENEMENTS_CABLES = ("PreToolUse", "SubagentStop", "CwdChanged", "FileChanged", "SessionStart")
+MATCHER_PRETOOLUSE = "Write|Edit|NotebookEdit|Bash|Agent|Task|SubagentHandback"
+NOUVELLES_ENTREES = ("SubagentHandback", "SubagentStop", "SessionStart", "CwdChanged", "FileChanged")
 
 
 def ok(libelle):
@@ -117,6 +130,25 @@ def payload(outil, entree, cwd):
            "prompt_id": "prompt-test", "permission_mode": "default",
            "hook_event_name": "PreToolUse", "tool_name": outil, "tool_input": entree,
            "tool_use_id": "toolu_test"}
+    return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def payload_evt(evt, cwd):
+    """Payload d'une des cinq entrées nouvelles (champs documentés) ; SubagentHandback est un outil de PreToolUse."""
+    if evt == "SubagentHandback":
+        obj = {"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": cwd, "prompt_id": "prompt-test",
+               "permission_mode": "default", "agent_id": "agent-test", "agent_type": "agent-test", "hook_event_name": "PreToolUse",
+               "tool_name": "SubagentHandback", "tool_input": {"message": "rapport"}, "tool_use_id": "toolu_test"}
+    else:
+        obj = {"session_id": "sess-test", "transcript_path": "transcript.jsonl", "cwd": cwd, "hook_event_name": evt}
+        if evt == "SubagentStop":
+            obj.update({"stop_hook_active": False, "agent_id": "agent-test", "agent_type": "agent-test", "last_assistant_message": "fin"})
+        elif evt == "SessionStart":
+            obj.update({"source": "startup", "model": "modele-test"})
+        elif evt == "CwdChanged":
+            obj.update({"old_cwd": cwd, "new_cwd": cwd})
+        else:
+            obj.update({"file_path": cwd + "/.planning/STATE.md", "event": "change"})
     return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
@@ -154,23 +186,40 @@ def lire_json(chemin):
         return json.load(fh)
 
 
-def entrees_du_hook(chemin):
-    """Commandes des entrées PreToolUse qui citent planning-hook.sh dans un réglage (liste vide si
-    le fichier est absent). Une exception de lecture remonte : jamais un vert sur un fichier illisible."""
+def entrees_du_hook(chemin, evenement="PreToolUse"):
+    """Commandes des entrées de `evenement` (PreToolUse par défaut ; None : TOUS les événements) qui citent planning-hook.sh dans un
+    réglage (liste vide si le fichier est absent). Une exception de lecture remonte : jamais un vert sur un fichier illisible."""
     if not os.path.isfile(chemin):
         return []
     d = lire_json(chemin)
     res = []
-    for groupe in (d.get("hooks", {}) or {}).get("PreToolUse", []) or []:
-        for h in groupe.get("hooks", []) or []:
-            if CITE in str(h.get("command", "")):
-                res.append(h["command"])
+    for evt, groupes in ((d.get("hooks", {}) or {}).items()):
+        if evenement is not None and evt != evenement:
+            continue
+        for groupe in groupes or []:
+            for h in groupe.get("hooks", []) or []:
+                if CITE in str(h.get("command", "")):
+                    res.append(h["command"])
+    return res
+
+
+def entrees_par_evenement(chemin):
+    """{événement: [(matcher, entrée)]} des entrées qui citent planning-hook.sh dans un réglage."""
+    res = {}
+    if not os.path.isfile(chemin):
+        return res
+    d = lire_json(chemin)
+    for evt, groupes in ((d.get("hooks", {}) or {}).items()):
+        for groupe in groupes or []:
+            for h in groupe.get("hooks", []) or []:
+                if CITE in str(h.get("command", "")):
+                    res.setdefault(evt, []).append((groupe.get("matcher"), h))
     return res
 
 
 def verifier_pose(lab):
-    """R-INST-01 : liste des écarts (vide = conforme). Exactement UNE entrée dans settings.json,
-    aucune dans settings.local.json, script posé exécutable, aucun jeton résiduel."""
+    """R-INST-01 : liste des écarts (vide = conforme). Exactement UNE entrée PAR ÉVÉNEMENT (les cinq) dans settings.json, matcher
+    PreToolUse élargi, même commande partout, aucune dans settings.local.json, script posé exécutable, aucun jeton résiduel."""
     ecarts = []
     reglage = os.path.join(lab, ".claude", "settings.json")
     local = os.path.join(lab, ".claude", "settings.local.json")
@@ -178,10 +227,20 @@ def verifier_pose(lab):
         return ["settings.json absent (0 entrée posée — garde anti-vert-à-vide)"]
     if "{{" in open(reglage, encoding="utf-8").read():
         ecarts.append("jeton {{…}} résiduel dans settings.json")
-    n = len(entrees_du_hook(reglage))
-    if n != 1:
-        ecarts.append("%d entrée(s) PreToolUse citant %s dans settings.json (attendu 1)" % (n, CITE))
-    nl = len(entrees_du_hook(local))
+    posees = entrees_par_evenement(reglage)
+    if sorted(posees) != sorted(EVENEMENTS_CABLES):
+        ecarts.append("entrées citant %s sous %s dans settings.json (attendu : exactement %s)" % (CITE, sorted(posees), sorted(EVENEMENTS_CABLES)))
+    for evt, liste in sorted(posees.items()):
+        if len(liste) != 1:
+            ecarts.append("%d entrée(s) %s citant %s dans settings.json (attendu 1)" % (len(liste), evt, CITE))
+    for evt, liste in sorted(posees.items()):
+        for matcher, h in liste:
+            attendu = MATCHER_PRETOOLUSE if evt == "PreToolUse" else None
+            if matcher != attendu:
+                ecarts.append("matcher de l'entrée %s : %r (attendu %r)" % (evt, matcher, attendu))
+    if len({h.get("command") for liste in posees.values() for _m, h in liste}) > 1:
+        ecarts.append("la commande posée diffère d'un événement à l'autre (attendu : le même texte)")
+    nl = len(entrees_du_hook(local, None))
     if nl != 0:
         ecarts.append("%d entrée(s) citant %s dans settings.local.json (attendu 0)" % (nl, CITE))
     script = os.path.join(lab, ".claude", "scripts", CITE)
@@ -318,17 +377,38 @@ def sec_install(ctx):
     if ctx.charger_commande() is None:
         ko("R-INST-01", "la commande posée est lisible (entrée unique)", "1 commande", "introuvable")
         sys.exit(1)
-    ok("R-INST-01 install réelle (scope projet) : UNE entrée PreToolUse qui cite planning-hook.sh dans settings.json, aucune dans settings.local.json, script posé exécutable")
+    ok("R-INST-01 install réelle (scope projet) : UNE entrée par événement (PreToolUse au matcher élargi à SubagentHandback, SubagentStop, CwdChanged, FileChanged, SessionStart) qui cite planning-hook.sh dans settings.json, aucune dans settings.local.json, aucun jeton résiduel, script posé exécutable")
+    # seconde installation : la purge de merge-hooks (toute entrée citant le script, dans les groupes du MÊME événement) laisse UNE entrée par événement
+    rc2, sortie2 = ctx.installateur("install")
+    ecarts2 = verifier_pose(ctx.lab) if rc2 == 0 else ["seconde installation : code %d : %s" % (rc2, court(sortie2))]
+    if ecarts2:
+        ko("R-INST-01", "une SECONDE installation laisse une entrée par événement (idempotence de la purge)", "aucun écart", "; ".join(ecarts2))
+        sys.exit(1)
+    ok("R-INST-01 seconde installation : toujours UNE entrée par événement, matcher élargi, aucune dans settings.local.json (idempotence de la purge de merge-hooks)")
 
     # R-INST-05 : contrôle négatif — l'assertion R-INST-01 doit ROUGIR sur des réglages sans l'entrée.
     fautes = []
     for nom, contenu in (("settings.json vidé de ses hooks", '{"hooks": {}}'),
                          ("settings.json absent", None),
-                         ("entrée déplacée dans settings.local.json seul", "deplace")):
+                         ("entrée déplacée dans settings.local.json seul", "deplace"),
+                         ("entrée FileChanged retirée", "sans-filechanged"),
+                         ("matcher PreToolUse sans SubagentHandback", "sans-handback"),
+                         ("entrée SessionStart retirée", "sans-sessionstart")):
         faux = ctx.unique("neg")
         os.makedirs(os.path.join(faux, ".claude", "scripts"), exist_ok=True)
         shutil.copy2(os.path.join(ctx.lab, ".claude", "scripts", CITE), os.path.join(faux, ".claude", "scripts", CITE))
-        if contenu == "deplace":
+        if contenu in ("sans-filechanged", "sans-handback", "sans-sessionstart"):
+            d = lire_json(os.path.join(ctx.lab, ".claude", "settings.json"))
+            if contenu == "sans-filechanged":
+                del d["hooks"]["FileChanged"]
+            elif contenu == "sans-handback":
+                for g in d["hooks"]["PreToolUse"]:
+                    g["matcher"] = "|".join(o for o in g["matcher"].split("|") if o != "SubagentHandback")
+            else:
+                for g in d["hooks"]["SessionStart"]:
+                    g["hooks"] = [h for h in g["hooks"] if CITE not in h.get("command", "")]
+            ecrire(os.path.join(faux, ".claude", "settings.json"), json.dumps(d))
+        elif contenu == "deplace":
             shutil.copy2(os.path.join(ctx.lab, ".claude", "settings.json"), os.path.join(faux, ".claude", "settings.local.json"))
             ecrire(os.path.join(faux, ".claude", "settings.json"), '{"hooks": {}}')
         elif contenu is not None:
@@ -338,7 +418,7 @@ def sec_install(ctx):
     if fautes:
         ko("R-INST-05", "l'assertion R-INST-01 rougit sur des réglages sans l'entrée (verdict inversé)", "au moins un écart signalé pour chaque cas", "aucun écart pour : " + ", ".join(fautes))
     else:
-        ok("R-INST-05 contrôle négatif : settings.json vidé, absent ou dont l'entrée n'est que dans settings.local.json fait rougir R-INST-01 (aucun vert à vide)")
+        ok("R-INST-05 contrôle négatif : settings.json vidé, absent, dont l'entrée n'est que dans settings.local.json, privé de l'entrée FileChanged ou SessionStart, ou au matcher sans SubagentHandback fait rougir R-INST-01 (aucun vert à vide)")
 
 
 def sec_modes(ctx):
@@ -384,6 +464,310 @@ def sec_modes(ctx):
             ko("R-INST-04", "lab dev : " + cas, a, b)
     else:
         ok("R-INST-04 lab dev (config 2.0), cinq modes, six outils : stdout d'octet vide et code 0 — %d rejeux" % n)
+
+    # R-INST-04b : lab dev, les cinq modes, SubagentHandback et les quatre événements nouveaux — octet vide, code 0 (P46-D-16, tel qu'installé)
+    fautes = []
+    n = 0
+    for mode in ("present", "script-absent", "python-absent", "exit1", "exit2"):
+        for evt in NOUVELLES_ENTREES:
+            rc, out, err = ctx.rejouer(mode, payload_evt(evt, ctx.dev), ctx.dev)
+            n += 1
+            if rc != 0 or out != b"" or err:
+                fautes.append((mode + " " + evt, "stdout 0 octet, code 0", "rc=%d out=%s err=%s" % (rc, court(out), court(err))))
+    if fautes:
+        for cas, a, b in fautes:
+            ko("R-INST-04b", "lab dev, entrées nouvelles : " + cas, a, b)
+    else:
+        ok("R-INST-04b lab dev (config 2.0), cinq modes, SubagentHandback, SubagentStop, SessionStart, CwdChanged, FileChanged : stdout d'octet vide et code 0 — %d rejeux" % n)
+
+
+# --- Phase 46 (46-10, P46-D-16) : un lab qui n'a pas adhéré ne voit RIEN, tel qu'installé, pour chaque événement ------------------
+# R-INST-DEV-01 (lab dev installé : copie du lab où l'installeur a posé planning-core, config 2.0), R-INST-DEV-02 (ce dépôt, non adhérent),
+# R-INST-DEV-03 (aucun `watchPaths` : aucun watcher, donc FileChanged hors adhésion nul par construction) et MUT-DEV-ADHESION (le cœur qui
+# ignore l'adhésion, rejoué par la commande SANS pré-filtre, rougit R-INST-DEV-01 pour chacune des six sondes). Toute section qui rejoue un
+# cœur le fait sur un lab FIXTURE temporaire (jamais ce dépôt : le script posé et le journal de D1 écriraient dans l'arbre) ; ce dépôt n'est
+# rejoué que par la commande installée COMPLÈTE, dont le pré-filtre court-circuite avant le cœur, et son arbre est empreinté avant et après.
+SONDES_DEV = ("PreToolUse", "SubagentHandback", "SubagentStop", "SessionStart", "CwdChanged", "FileChanged")
+MOTIF_ADHESION = "adherent = racine is not None and verifier_adhesion("
+REMPLACEMENT_ADHESION = "adherent = True or racine is not None and verifier_adhesion("
+APPEL_PREFILTRE = "vf_pre && exit 0\n"
+DEBUT_PREFILTRE = "_pn='\n'\nvf_pp()"
+AGENT_DEV = "agent-test"
+
+
+def empreinte_arbre(racine):
+    """{chemin relatif: (type, mode, contenu)} de TOUT l'arbre, liens non suivis : sha256 et mtime des fichiers réguliers, cible des liens.
+    Un fichier créé, supprimé, réécrit ou touché change l'empreinte."""
+    res = {}
+    for dossier, noms_d, noms_f in os.walk(racine, followlinks=False):
+        noms_d.sort()
+        for nom in sorted(noms_d + noms_f):
+            chemin = os.path.join(dossier, nom)
+            rel = os.path.relpath(chemin, racine)
+            st = os.lstat(chemin)
+            if stat.S_ISLNK(st.st_mode):
+                res[rel] = ("lien", "", os.readlink(chemin))
+            elif stat.S_ISDIR(st.st_mode):
+                res[rel] = ("dossier", oct(stat.S_IMODE(st.st_mode)), "")
+            elif stat.S_ISREG(st.st_mode):
+                with open(chemin, "rb") as fh:
+                    res[rel] = ("fichier", oct(stat.S_IMODE(st.st_mode)), hashlib.sha256(fh.read()).hexdigest() + ":" + str(st.st_mtime_ns))
+            else:
+                res[rel] = ("autre", oct(st.st_mode), "")
+    return res
+
+
+def ecarts_arbre(avant, apres):
+    ecarts = []
+    for rel in sorted(set(avant) | set(apres)):
+        if rel not in avant:
+            ecarts.append("créé " + rel)
+        elif rel not in apres:
+            ecarts.append("supprimé " + rel)
+        elif avant[rel] != apres[rel]:
+            ecarts.append("modifié " + rel)
+    return ecarts
+
+
+def commande_sans_prefiltre(cmd):
+    """La commande posée SANS le bloc du pré-filtre (la couche shell d'avant, comme test-planning-prefilter.sh la construit) ; None si le bloc
+    n'est pas présent une seule fois."""
+    if cmd.count(APPEL_PREFILTRE) != 1 or cmd.count(DEBUT_PREFILTRE) != 1 or cmd.index(DEBUT_PREFILTRE) > cmd.index(APPEL_PREFILTRE):
+        return None
+    return cmd[:cmd.index(DEBUT_PREFILTRE)] + cmd[cmd.index(APPEL_PREFILTRE) + len(APPEL_PREFILTRE):]
+
+
+def payload_sonde(evt, lab):
+    """Payload de la sonde `evt` pour le lab `lab` : un Write de .planning/STATE.md (PreToolUse), SubagentHandback (outil de PreToolUse), puis les
+    quatre autres événements ; FileChanged porte `file_path` de premier niveau (.planning/STATE.md du lab)."""
+    if evt == "PreToolUse":
+        return payload("Write", entree_outil("Write", lab + "/.planning/STATE.md"), lab)
+    return payload_evt(evt, lab)
+
+
+def commandes_par_sonde(posees):
+    """{sonde: commande posée} : chaque sonde rejoue l'entrée posée de SON événement (SubagentHandback : l'entrée PreToolUse)."""
+    return {s: posees["PreToolUse" if s == "SubagentHandback" else s][0][1]["command"] for s in SONDES_DEV}
+
+
+def lignes_observation(xdg):
+    chemin = os.path.join(xdg, "vibeflow", "gates-observation", "observation.log")
+    try:
+        with open(chemin, encoding="utf-8", errors="replace") as fh:
+            return [l for l in fh.read().split("\n") if l]
+    except OSError:
+        return []
+
+
+def rejouer_brut(ctx, commande, projet, cwd, brut, arbre):
+    """La commande `commande` rejouée telle quelle (/bin/sh -c) avec `brut` sur stdin, cwd = `cwd`, le script lu sous `projet`, un XDG_CACHE_HOME
+    jetable, l'arbre `arbre` empreinté avant et après. Rend {rc, out, err, journal (lignes du journal d'observation), ecarts (arbre)}."""
+    xdg = ctx.unique("xdg-dev")
+    os.makedirs(xdg)
+    avant = empreinte_arbre(arbre)
+    rc, out, err = rejouer_dans(commande, brut, cwd, {"HOME": ctx.home, "CLAUDE_PROJECT_DIR": projet, "XDG_CACHE_HOME": xdg})
+    return {"rc": rc, "out": out, "err": err, "journal": lignes_observation(xdg), "ecarts": ecarts_arbre(avant, empreinte_arbre(arbre))}
+
+
+def est_silence(r):
+    return r["rc"] == 0 and r["out"] == b"" and r["err"] == b"" and not r["journal"] and not r["ecarts"]
+
+
+def decrire_rejeu(r):
+    return "rc=%d stdout=%s stderr=%s journal=%d ligne(s) arbre=%s" % (r["rc"], court(r["out"]) or "vide", court(r["err"]) or "vide", len(r["journal"]),
+                                                                       ("; ".join(r["ecarts"][:4]) if r["ecarts"] else "identique"))
+
+
+def jouer_serie(ctx, commandes, projet, lab, arbre):
+    """Les six sondes sur `lab`, chacune par l'entrée posée de son événement ; l'arbre `arbre` est empreinté avant et après la SÉRIE
+    (écarts de la série, en plus de ceux de chaque rejeu). Rend ({sonde: rejeu}, écarts de la série)."""
+    avant = empreinte_arbre(arbre)
+    res = {s: rejouer_brut(ctx, commandes[s], projet, lab, payload_sonde(s, lab), arbre) for s in SONDES_DEV}
+    return res, ecarts_arbre(avant, empreinte_arbre(arbre))
+
+
+def fabriquer_lab_dev_installe(ctx):
+    """Lab dev INSTALLÉ : copie du lab où l'installeur a posé planning-core (settings.json, scripts sous .claude/), config 2.0, un STATE.md, un
+    agent producteur doté de Bash (périmètre de G4′), G6 et G5 armés dans le script posé (copie) : le silence ne tient donc pas à un
+    armement absent."""
+    lab = copier_lab(ctx, "lab-dev-installe")
+    ecrire(os.path.join(lab, ".planning", "config.json"), '{"planning_version": "2.0"}')
+    ecrire(os.path.join(lab, ".planning", "STATE.md"), "---\nstatus: lab dev\n---\n")
+    ecrire(os.path.join(lab, ".claude", "agents", AGENT_DEV + ".md"),
+           "---\nname: " + AGENT_DEV + "\ndescription: producteur synthétique, jamais exécuté\ntools: Read, Bash\n---\nCorps.\n")
+    armer_copie(lab, ("G6", "G5"))
+    return lab
+
+
+def sec_dev(ctx):
+    """R-INST-DEV-01 à R-INST-DEV-03."""
+    dev = fabriquer_lab_dev_installe(ctx)
+    posees = entrees_par_evenement(os.path.join(dev, ".claude", "settings.json"))
+    if sorted(posees) != sorted(EVENEMENTS_CABLES) or any(len(v) != 1 for v in posees.values()):
+        ko("R-INST-DEV-01", "le lab dev installé porte UNE entrée posée par événement dans settings.json", "cinq entrées", "événements " + str(sorted(posees)))
+        return
+    commandes = commandes_par_sonde(posees)
+
+    # R-INST-DEV-01 : lab dev installé, chaque entrée posée rejouée avec son payload
+    res, ecarts = jouer_serie(ctx, commandes, dev, dev, dev)
+    fautes = ["%s : %s" % (s, decrire_rejeu(r)) for s, r in res.items() if not est_silence(r)]
+    if ecarts:
+        fautes.append("empreinte de l'arbre du lab, avant et après la série : " + "; ".join(ecarts[:6]))
+    if fautes:
+        for f in fautes:
+            ko("R-INST-DEV-01", "lab dev installé (config 2.0) : stdout d'octet vide, stderr vide, code 0, aucune ligne au journal d'observation, arbre identique — " + f.split(" : ")[0], "silence, arbre identique", f)
+    else:
+        ok("R-INST-DEV-01 lab dev installé (copie du lab installé, config 2.0, G6 et G5 armés, agent producteur doté de Bash) : l'entrée posée de chacun des cinq événements (PreToolUse, SubagentStop, SessionStart, CwdChanged, FileChanged) et SubagentHandback sous PreToolUse rendent un stdout d'octet vide, un stderr vide et le code 0, aucune ligne au journal d'observation, empreinte de l'arbre du lab identique avant et après — %d rejeux" % len(res))
+
+    # R-INST-DEV-02 : ce dépôt (non adhérent), même rejeu, cwd = racine du dépôt
+    depot = os.path.dirname(ctx.plugin_dir)
+    config_depot = os.path.join(depot, ".planning", "config.json")
+    if not os.path.isfile(config_depot):
+        print("NOTE R-INST-DEV-02 hors dépôt : .planning/config.json absent à la racine de ce dépôt — cas non rejoué (jamais un vert)")
+    else:
+        try:
+            declaree = lire_json(config_depot).get("planning_version")
+        except (ValueError, AttributeError):
+            declaree = None
+        if declaree == "cycles-v1":
+            ko("R-INST-DEV-02", "ce dépôt est un lab non adhérent (planning_version différent de cycles-v1)", "non adhérent", "cycles-v1")
+        else:
+            res_d, ecarts_d = jouer_serie(ctx, commandes, dev, depot, depot)
+            fautes = ["%s : %s" % (s, decrire_rejeu(r)) for s, r in res_d.items() if not est_silence(r)]
+            if ecarts_d:
+                fautes.append("empreinte de l'arbre de ce dépôt, avant et après la série : " + "; ".join(ecarts_d[:6]))
+            if fautes:
+                for f in fautes:
+                    ko("R-INST-DEV-02", "ce dépôt (non adhérent), cwd = racine du dépôt : silence, arbre identique — " + f.split(" : ")[0], "silence, arbre identique", f)
+            else:
+                ok("R-INST-DEV-02 ce dépôt (non adhérent), cwd = sa racine : les six sondes rendent un stdout d'octet vide, un stderr vide et le code 0, aucune ligne au journal d'observation, empreinte de l'arbre du dépôt identique avant et après — %d rejeux" % len(res_d))
+
+    # R-INST-DEV-03 : aucun `watchPaths` hors adhésion (aucun watcher, donc FileChanged nul par construction) ; témoin en lab adhérent
+    def avec_source(lab, source):
+        obj = json.loads(payload_evt("SessionStart", lab).decode("utf-8"))
+        obj["source"] = source
+        return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+    def watch_paths(out):
+        try:
+            obj = json.loads(out.decode("utf-8"))
+        except ValueError:
+            return None
+        spec = obj.get("hookSpecificOutput") if isinstance(obj, dict) else None
+        liste = (obj.get("watchPaths") if isinstance(obj, dict) else None) or (spec.get("watchPaths") if isinstance(spec, dict) else None)
+        return liste if isinstance(liste, list) and liste else None
+    fautes, n = [], 0
+    lieux = [("lab dev installé", dev)] + ([("ce dépôt", depot)] if os.path.isfile(config_depot) else [])
+    for lieu, lab in lieux:
+        for evt, bruts in (("SessionStart", [(s, avec_source(lab, s)) for s in ("startup", "resume", "clear", "compact")]), ("CwdChanged", [("", payload_evt("CwdChanged", lab))])):
+            for source, brut in bruts:
+                r = rejouer_brut(ctx, commandes[evt], dev, lab, brut, dev)
+                n += 1
+                if r["rc"] != 0 or r["out"] != b"" or b"watchPaths" in r["out"]:
+                    fautes.append("%s, %s %s : stdout d'octet vide, aucune clé watchPaths — obtenu %s" % (lieu, evt, source, decrire_rejeu(r)))
+    temoin = ctx.unique("lab-temoin-adherent")
+    ecrire(os.path.join(temoin, ".planning", "config.json"), '{"planning_version": "cycles-v1"}')
+    ecrire(os.path.join(temoin, ".planning", "STATE.md"), "---\nstatus: lab adherent\n---\n")
+    for evt in ("SessionStart", "CwdChanged"):
+        r = rejouer_brut(ctx, commandes[evt], dev, temoin, payload_evt(evt, temoin), temoin)
+        if r["rc"] != 0 or watch_paths(r["out"]) is None:
+            fautes.append("témoin (lab adhérent, %s) : une liste watchPaths non vide — obtenu %s" % (evt, decrire_rejeu(r)))
+    if fautes:
+        for f in fautes:
+            ko("R-INST-DEV-03", "hors adhésion, SessionStart et CwdChanged ne renvoient aucune clé watchPaths (le watcher de FileChanged ne démarre pas) ; le témoin adhérent en renvoie une", "aucun watchPaths hors adhésion, une liste en lab adhérent", f)
+    else:
+        ok("R-INST-DEV-03 SessionStart (sources startup, resume, clear, compact) et CwdChanged rendent un stdout d'octet vide, sans clé watchPaths, dans le lab dev installé et dans ce dépôt (%d rejeux) : aucun watcher ne démarre, FileChanged hors adhésion coûte zéro par construction ; témoin : les mêmes rejeux en lab adhérent rendent une liste watchPaths non vide" % n)
+
+
+def muter_coeur(ctx, lab_source, ident):
+    """Copie de `lab_source` dont le planning-hook.sh posé a l'UNIQUE motif d'adhésion remplacé par l'adhésion forcée vraie (bash -n et compilation
+    du corps Python vérifiés). Rend (lab_muté, None) ou (None, raison)."""
+    lab = ctx.unique("lab-mut-" + ident)
+    shutil.copytree(lab_source, lab, symlinks=True)
+    chemin = os.path.join(lab, ".claude", "scripts", CITE)
+    original = open(chemin, encoding="utf-8").read()
+    if original.count(MOTIF_ADHESION) != 1:
+        return None, "MOTIF AMBIGU OU ABSENT (occurrences=%d)" % original.count(MOTIF_ADHESION)
+    mute = original.replace(MOTIF_ADHESION, REMPLACEMENT_ADHESION)
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write(mute)
+    p = subprocess.run(["bash", "-n", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if p.returncode != 0:
+        return None, "bash -n ÉCHOUE : " + court(p.stderr)
+    corps, dedans = [], False
+    for ligne in mute.split("\n"):
+        if ligne == "PY_PLANNING_HOOK_EOF":
+            dedans = False
+        if dedans:
+            corps.append(ligne)
+        if ligne.endswith("<<'PY_PLANNING_HOOK_EOF'"):
+            dedans = True
+    try:
+        compile("\n".join(corps) + "\n", chemin, "exec")
+    except SyntaxError as e:
+        return None, "SyntaxError du corps Python : " + str(e)
+    return lab, None
+
+
+def mort_de(evt, r):
+    """(signal attendu, signal vu) : la mort prouvée de chaque sonde sous le cœur qui ignore l'adhésion."""
+    if evt == "PreToolUse":
+        return "un deny (G6 armé) sur le Write de .planning/STATE.md", b"permissionDecision" in r["out"]
+    if evt in ("SubagentHandback", "SubagentStop"):
+        return "une ligne gate=G4P au journal d'observation (G4′ en observation)", any("gate=G4P" in l for l in r["journal"])
+    if evt in ("SessionStart", "CwdChanged"):
+        return "une sortie non vide qui porte watchPaths", b"watchPaths" in r["out"]
+    return "un fichier créé sous le lab (journal de D1 .planning/surveillance.log)", "créé .planning/surveillance.log" in r["ecarts"]
+
+
+def sec_mut_dev(ctx):
+    """MUT-DEV-ADHESION : le cœur qui ignore l'adhésion (motif unique), rejoué par la commande SANS pré-filtre sur un lab dev installé FIXTURE,
+    fait rougir R-INST-DEV-01 pour chacune des six sondes (une trace par sonde) ; le cœur d'origine, lui, reste muet : le silence est une
+    propriété du cœur, pas seulement du pré-filtre. Une sonde que la mutation ne fait pas rougir est un KO nommé (« preuve aveugle »)."""
+    dev = fabriquer_lab_dev_installe(ctx)
+    posees = entrees_par_evenement(os.path.join(dev, ".claude", "settings.json"))
+    if sorted(posees) != sorted(EVENEMENTS_CABLES):
+        komut("DEV-ADHESION", "le lab dev installé porte une entrée posée par événement", "cinq entrées", str(sorted(posees)))
+        return
+    sans = {s: commande_sans_prefiltre(c) for s, c in commandes_par_sonde(posees).items()}
+    if any(c is None for c in sans.values()):
+        komut("DEV-ADHESION", "la commande posée porte le bloc du pré-filtre UNE fois (la commande sans pré-filtre est dérivable)", "1 bloc", "absent ou en double")
+        return
+    # témoin : le cœur d'origine, atteint par la commande sans pré-filtre, se tait pour les six sondes
+    origine, ecarts_o = jouer_serie(ctx, sans, dev, dev, dev)
+    bruyantes = ["%s : %s" % (s, decrire_rejeu(r)) for s, r in origine.items() if not est_silence(r)] + (["arbre : " + "; ".join(ecarts_o[:4])] if ecarts_o else [])
+    if bruyantes:
+        komut("DEV-ADHESION", "l'original (cœur seul, commande sans pré-filtre) est silencieux pour les six sondes en lab dev", "silence", "; ".join(bruyantes))
+        return
+    mute, raison = muter_coeur(ctx, dev, "adhesion")
+    if mute is None:
+        komut("DEV-ADHESION", "mutant du cœur valide (adhésion forcée vraie, motif unique)", "mutant valide", raison)
+        return
+    traces, aveugles = [], []
+    for evt in SONDES_DEV:
+        copie = ctx.unique("lab-mut-adh-" + evt.lower())
+        shutil.copytree(mute, copie, symlinks=True)
+        r = rejouer_brut(ctx, sans[evt], copie, copie, payload_sonde(evt, copie), copie)
+        attendu_signal, vu = mort_de(evt, r)
+        if est_silence(r):
+            aveugles.append(evt)
+            print("  ✗ MUT-DEV-ADHESION NON TUÉ — preuve aveugle pour " + evt)
+            print("    assertion : R-INST-DEV-01 rougit sous le cœur qui ignore l'adhésion pour " + evt)
+            print("    attendu (mutant)   : " + attendu_signal)
+            print("    obtenu (mutant)    : " + decrire_rejeu(r) + " (silence : preuve aveugle pour " + evt + ")")
+        elif not vu:
+            aveugles.append(evt)
+            print("  ✗ MUT-DEV-ADHESION NON TUÉ — mort sans le signal attendu pour " + evt)
+            print("    assertion : R-INST-DEV-01 rougit sous le cœur qui ignore l'adhésion pour " + evt)
+            print("    attendu (mutant)   : " + attendu_signal)
+            print("    obtenu (mutant)    : " + decrire_rejeu(r))
+        else:
+            traces.append("    trace MUT-DEV-ADHESION %s · assertion : R-INST-DEV-01 (silence en lab dev) · attendu (original) : %s · obtenu (mutant) : %s (%s)"
+                          % (evt, decrire_rejeu(origine[evt]), decrire_rejeu(r), attendu_signal))
+    for t in traces:
+        print(t)
+    if not aveugles:
+        okmut("DEV-ADHESION", "R-INST-DEV-01 rougit pour les %d sondes (cinq événements et SubagentHandback) quand le cœur ignore l'adhésion, la commande étant rejouée SANS pré-filtre sur un lab dev installé fixture ; le cœur d'origine reste muet pour les six" % len(traces))
 
 
 # --- Q-G6 = (b) (Willy, AskUserQuestion session principale, 2026-10-01) : G6 protège les scripts du hook posés ------
@@ -448,8 +832,9 @@ def sec_g6_scripts(ctx):
         ko("R-INST-08", "l'installeur inchangé pose planning-core en scope compte (HOME jetable)", "code 0", "code %d : %s" % (p.returncode, court(p.stdout)))
         return
     cmds = entrees_du_hook(os.path.join(home, ".claude", "settings.json"))
-    if len(cmds) != 1 or not os.path.isfile(os.path.join(home, ".claude", "scripts", CITE)):
-        ko("R-INST-08", "scope compte : UNE entrée posée et le script sous ~/.claude/scripts/", "1 entrée, script présent", "%d entrée(s)" % len(cmds))
+    posees_compte = entrees_par_evenement(os.path.join(home, ".claude", "settings.json"))
+    if len(cmds) != 1 or sorted(posees_compte) != sorted(EVENEMENTS_CABLES) or not os.path.isfile(os.path.join(home, ".claude", "scripts", CITE)):
+        ko("R-INST-08", "scope compte : UNE entrée PreToolUse posée (et une par événement) et le script sous ~/.claude/scripts/", "1 entrée PreToolUse, cinq événements, script présent", "%d entrée(s) PreToolUse, événements %s" % (len(cmds), sorted(posees_compte)))
         return
     armer_copie(home, ("G6", "G5"))
     env_c = {"HOME": home}
@@ -555,8 +940,11 @@ def reglage_temoin(ctx, nom, marqueur, corps=None):
     exécution : la trace prouve qu'un rejeu a eu lieu (ou n'a pas eu lieu)."""
     cmd = corps if corps is not None else (": > '" + marqueur + "'; cat >/dev/null # planning-hook.sh")
     chemin = os.path.join(ctx.work, nom)
-    ecrire(chemin, json.dumps({"hooks": {"PreToolUse": [{"matcher": "Write", "hooks": [
-        {"type": "command", "command": cmd}]}]}}))
+    entree = {"type": "command", "command": cmd}
+    reglage = {"PreToolUse": [{"matcher": "Write", "hooks": [dict(entree)]}]}
+    for evt in EVENEMENTS_CABLES[1:]:  # Phase 46 : le canary exige la commande sous les cinq événements
+        reglage[evt] = [{"hooks": [dict(entree)]}]
+    ecrire(chemin, json.dumps({"hooks": reglage}))
     ecrire(chemin + ".ref", cmd)  # lot A (audit M2) : le canary ne rejoue qu'une commande égale à sa référence ; ces commandes-témoins sont la leur
     return chemin
 
@@ -928,7 +1316,7 @@ def sec_desinstall(ctx):
         n = sum(len(g.get("hooks", [])) for gs in (d.get("hooks", {}) or {}).values() for g in gs)
         if n != 0:
             fautes.append("%s porte encore %d entrée(s) de hooks" % (nom, n))
-        if entrees_du_hook(chemin):
+        if entrees_du_hook(chemin, None):
             fautes.append(nom + " cite encore " + CITE)
     if fautes:
         ko("R-INST-06", "désinstallation : aucune entrée résiduelle, JSON valides", "aucune", "; ".join(fautes))
@@ -949,10 +1337,12 @@ def sec_isolation(ctx):
 SECTIONS = {
     "install": sec_install,
     "modes": sec_modes,
+    "dev": sec_dev,
     "g6_scripts": sec_g6_scripts,
     "can": sec_can,
     "can_m2": sec_can_m2,
     "mutants": sec_mutants,
+    "mut_dev": sec_mut_dev,
     "desinstall": sec_desinstall,
     "isolation": sec_isolation,
 }
@@ -994,7 +1384,7 @@ run_sections() { # <sections séparées par des virgules>
 # Empreinte du VRAI ~/.claude avant la suite (sous-chemins que l'installeur écrit seulement).
 EMPREINTE_AVANT="$("$PYBIN" "$AIDES" empreinte "$REAL_HOME")"
 
-run_sections install,modes,g6_scripts,can,can_m2,mutants,desinstall,isolation
+run_sections install,modes,dev,g6_scripts,can,can_m2,mutants,mut_dev,desinstall,isolation
 
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]

@@ -19,7 +19,10 @@
 #
 # Réglages lus, dans l'ordre : `$CLAUDE_PROJECT_DIR/.claude/settings.json` puis
 # `$HOME/.claude/settings.json` (ou le seul --settings). L'entrée retenue est la première entrée
-# PreToolUse dont la commande cite planning-hook.sh ET est STRICTEMENT égale à la commande de référence. CLAUDE_PROJECT_DIR et HOME
+# PreToolUse dont la commande cite planning-hook.sh ET est STRICTEMENT égale à la commande de référence.
+# Phase 46 (46-04, P46-D-10, P46-D-11) : la MÊME commande est câblée sous cinq événements (PreToolUse, SubagentStop, CwdChanged,
+# FileChanged, SessionStart) ; le canary retrouve la commande de référence sous chacun (dans l'ensemble des réglages lus : le harnais
+# les fusionne) et SIGNALE — code 0, une ligne, jamais un blocage — un événement non câblé, ou câblé avec une autre commande. CLAUDE_PROJECT_DIR et HOME
 # sont les DEUX entrées déclarées de ce script (où chercher les réglages, quelle copie du hook rejouer) : aucune variable
 # d'environnement ne change ce qu'il exige d'un gate (P45-D-12a). Aucun contenu de payload n'est journalisé.
 #
@@ -40,7 +43,9 @@
 #
 # Signaux, dans l'ordre où le canary les cherche (UN seul par exécution) :
 #   1. hook central non enregistré (F2) : aucun réglage ne porte la commande ; ou commande enregistrée non reconnue : un réglage cite
-#      planning-hook.sh avec une commande qui n'est pas celle de la référence (rien n'est exécuté)
+#      planning-hook.sh avec une commande qui n'est pas celle de la référence (rien n'est exécuté) ; ou événement non câblé (Phase 46) :
+#      la commande de référence manque sous SubagentStop, CwdChanged, FileChanged ou SessionStart (la citer avec une autre commande est
+#      « non reconnue »)
 #   2. mode dégradé : la commande, rejouée sur le cas nominal, refuse — le script ou python3 manque
 #      ou plante ; écritures par outil et dispatchs Agent et Task refusés, Bash reste ouvert (limite
 #      déclarée, P45-D-06b)
@@ -50,18 +55,23 @@
 #   4. cas en échec : un cas de CANARIS n'obtient pas l'attendu que la table d'armement en dérive
 #
 # Table des cas : la constante CANARIS ci-dessous, une ligne par cas `<id>|<gate>|<mode>|<payload>|<couvre>`.
-#   <gate>    DEGRADE (cas du fail-closed de la commande) ou G6, G5, G1, G7, ROLE
+#   <gate>    DEGRADE (cas du fail-closed de la commande), D1 (Phase 46, 46-07 : la détection des écritures, jamais armée, P46-D-11) ou G6, G5,
+#             G1, G7, ROLE, G3, G4, G4P
 #   <mode>    script-absent (CLAUDE_PROJECT_DIR vers un dossier vide) | python-absent (PATH réduit) |
 #             nominal (le script réel)
 #   <payload> <outil>[:<chemin relatif au lab synthétique>][@<agent_type>] ; pour Agent et Task, le
-#             « chemin » est le subagent_type du dispatch
+#             « chemin » est le subagent_type du dispatch ; pour SubagentHandback (PreToolUse, `tool_input.message`) et SubagentStop
+#             (événement non outil, `last_assistant_message`, `permission_mode: "default"`, Phase 46), le « chemin » nomme le rapport :
+#             `sans-sortie` ou `avec-sortie` (RAPPORTS_G4P), les cas de G4′ (agent canary-producteur, doté de Bash) ; pour FileChanged
+#             (événement non outil, `file_path` et `event` de premier niveau, Phase 46), le « chemin » est le fichier surveillé du lab synthétique
 #   <couvre>  éléments de COUVERTURE_MINIMALE que le cas couvre, séparés par des virgules (P45-D-20) :
 #             script-absent, python-absent (mode du cas), Task, Agent (payload du gate en mode nominal),
 #             fil-principal (aucun agent_type), plugin (agent_type préfixé `<plugin>:`). Une étiquette
 #             fausse rend le canary indéterminé : elle est vérifiée contre le mode et le payload du cas.
 # L'ATTENDU EST DÉRIVÉ, jamais écrit dans la table : DEGRADE -> refus (Write, Agent, Task) ou silence
 # (Bash : limite déclarée P45-D-06b, exercée et non seulement écrite) ; gate `armed` -> refus d'un
-# gate (`deny-gate`, jamais le texte du fail-closed `deny-degrade`) ; gate `observe` -> observation
+# gate (`deny-gate`, jamais le texte du fail-closed `deny-degrade` ; `block-gate`, l'objet `decision: "block"`, pour un cas SubagentStop) ;
+# gate `observe` -> observation ; D1 -> `trace` (jamais dérivé d'un armement : D1 n'en a pas)
 # (P45-D-20) : stdout vide ET une nouvelle ligne `gate=<G>` au journal d'observation, dont le
 # XDG_CACHE_HOME du rejeu est un dossier jetable — un gate qui se tait sans journaliser n'est pas
 # vivant. 45-05 à 45-09 ajoutent leurs cas ; un gate armé sans cas fait signaler ce canary et rougir
@@ -146,6 +156,9 @@ SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 PREFIXE = "[planning-core] canary : "
 CITE = "planning-hook.sh"
+# Les cinq événements sous lesquels la commande de référence est câblée (Phase 46, P46-D-09) : PreToolUse d'abord (matcher élargi à
+# SubagentHandback), puis les quatre événements nouveaux. L'événement de mise à jour de tâche n'est pas câblé (P46-D-01).
+EVENEMENTS_CABLES = ("PreToolUse", "SubagentStop", "CwdChanged", "FileChanged", "SessionStart")
 # Commande de référence : celle de hooks/hooks.json (jeton {{VF_SCRIPTS}} non résolu), embarquée ; la suite la compare à hooks.json.
 JETON_SCRIPTS = "{{VF_SCRIPTS}}"
 PREFIXES_INSTALLEUR = ('"$CLAUDE_PROJECT_DIR"/.claude/scripts', '"$HOME"/.claude/scripts')
@@ -162,7 +175,7 @@ vf_pre() { _pa=; _pb=0; case $I in *"$_pn"*|*'\u00'[2-7]*) return 1 ;; esac; _pm
 vf_pre && exit 0
 if [ -f "$S" ]; then O=$(printf '%s' "$I" | bash "$S"); R=$?; fi
 if [ "$R" -eq 0 ]; then [ -z "$O" ] || printf '%s\n' "$O"; exit 0; fi
-case $I in *'"tool_name":"Write"'*|*'"tool_name":"Edit"'*|*'"tool_name":"NotebookEdit"'*|*'"tool_name":"Agent"'*|*'"tool_name":"Task"'*) ;; *) exit 0 ;; esac
+case $I in *'"tool_name":"Write"'*|*'"tool_name":"Edit"'*|*'"tool_name":"NotebookEdit"'*|*'"tool_name":"SubagentHandback"'*|*'"tool_name":"Agent"'*|*'"tool_name":"Task"'*) ;; *) exit 0 ;; esac
 NL='
 '; TB=$(printf '\t')
 vf_get() { B=0; _m=$(printf '%s' "$I" | LC_ALL=C grep -a -o -E '"'"$1"'"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"' | head -n 1); [ -n "$_m" ] || return 1; if [ "${#_m}" -gt 4096 ]; then B=1; V=; X=0; printf '%s' "$_m" | LC_ALL=C grep -a -q -i -E '[.](planning|claude)|[\\]' && G=1; return 0; fi; _m=${_m#*:}; while :; do case $_m in ' '*|"$TB"*) _m=${_m#?} ;; *) break ;; esac; done; _m=${_m#\"}; V=""; X=1; while :; do _s=${_m%%[\"\\]*}; V=$V$_s; _m=${_m#"$_s"}; case $_m in '') X=0; return 0 ;; \"*) return 0 ;; \\\"*) V=$V\" ;; \\\\*) V=$V\\ ;; \\/*) V=$V/ ;; \\n*) V=$V$NL ;; \\t*) V=$V$TB ;; *) X=0; return 0 ;; esac; _m=${_m#??}; done; }
@@ -173,12 +186,13 @@ D=1; B=0; G=0; for K in file_path notebook_path; do if vf_get "$K"; then if [ "$
 if [ "$K" = long ]; then if vf_get cwd && [ "$B" = 0 ]; then vf_tight "$V" && D=0; else vf_tight "$(pwd -P)" && D=0; fi; elif [ "$K" != done ]; then if vf_get cwd && [ "$B" = 0 ]; then vf_tight "$V" && D=0; else vf_tight "$(pwd -P)" && D=0; fi; fi
 [ "$D" -eq 0 ] || [ "$G" = 1 ] || exit 0
 W='dans un lab adherent cycles-v1 : ecritures par outil refusees'
+case $I in *'"tool_name":"SubagentHandback"'*) W='dans un lab adherent cycles-v1 : le rapport du sous-agent (SubagentHandback) est refuse tant que le hook central est indisponible' ;; esac
 if [ "$K" = long ]; then W='doute d adhesion du lab (chemin trop long pour etre analyse) : ecritures par outil refusees par precaution'; fi
 if [ "$G" = 1 ]; then W='doute d adhesion du lab (chemin trop long pour etre analyse, il nomme .planning ou .claude, ou porte un echappement JSON) : ecritures par outil refusees par precaution'; fi
 if [ "$K" = done ] && [ "$PX" = 0 ] && ! vf_tight "$P"; then W='doute d adhesion du lab (chemin non analysable) : ecritures par outil refusees par precaution'; fi
 printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[planning-core] hook central indisponible (script ou python3 absent, ou en erreur) '"$W"'. Reparer : mettre a jour VibeFlow (/vf-update) ou installer python3, puis relancer la session."}}'
 exit 0'''
-GATES = ("G6", "G5", "G1", "G7", "ROLE")
+GATES = ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P")
 # Couverture minimale exigée par P45-D-20 (le script absent, python3 absent, un payload Task et un payload Agent, un fil
 # principal, un agent_type préfixé `plugin:`) ; chaque cas de CANARIS déclare ce qu'il en couvre.
 COUVERTURE_MINIMALE = ("script-absent", "python-absent", "Task", "Agent", "fil-principal", "plugin")
@@ -201,12 +215,20 @@ LIVRABLE_CANARY = "livrables/canary.md"
 DOSSIER_LIVRABLES = "livrables"
 AGENT_JUGE = "canary-juge"
 AGENT_WORKER = "canary-worker"
+AGENT_PRODUCTEUR = "canary-producteur"
 HORS_LISTE = "hors-liste"
+# Étape 6 (46-06) : les rapports des cas de G4′. `sans-sortie` : aucune sortie de commande brute (le gate refuse) ; `avec-sortie` : un bloc délimité
+# dont la première ligne est `$ <commande>`, suivie d'une ligne de sortie (le gate laisse passer). Un payload qui nomme autre chose porte ce texte tel quel.
+RAPPORTS_G4P = {"sans-sortie": "rapport du canary : travail terminé, tout fonctionne",
+                "avec-sortie": "rapport du canary\n```\n$ true\nok\n```\n"}
 DEFINITIONS_CANARY = (
     (AGENT_JUGE, "---\nname: canary-juge\ndescription: juge synthétique du canary, jamais exécuté\n"
                  "tools: Read, Glob, Grep\ndisallowedTools: Write, Edit\nomitClaudeMd: true\n---\nCorps.\n"),
     (AGENT_WORKER, "---\nname: canary-worker\ndescription: worker synthétique du canary, jamais exécuté\n"
                    "vf-internal: true\ntools: Read, Agent(canary-cible)\n---\nCorps.\n"),
+    # Producteur synthétique doté de Bash (ni vf-internal, ni allowlist Agent, Write et Edit permis) : dans le périmètre de G4′ (P46-D-02b).
+    (AGENT_PRODUCTEUR, "---\nname: canary-producteur\ndescription: producteur synthétique du canary, jamais exécuté\n"
+                       "tools: Read, Bash\n---\nCorps.\n"),
 )
 
 # --- Table des cas (une ligne par cas) : <id>|<gate>|<mode>|<payload>. L'attendu est DÉRIVÉ. ------
@@ -221,6 +243,9 @@ CANARIS = (
     "D06|DEGRADE|python-absent|Agent|python-absent",
     "D07|DEGRADE|python-absent|Task|python-absent",
     "D08|DEGRADE|python-absent|Bash|python-absent",
+    # Phase 46 (46-04, P46-D-10) : en mode dégradé la couche shell refuse aussi `SubagentHandback` (rapport d'un sous-agent), sans dériver le rôle.
+    "D09|DEGRADE|script-absent|SubagentHandback|script-absent",
+    "D10|DEGRADE|python-absent|SubagentHandback|python-absent",
     # Étape 1 (45-05) : G6 (fichier généré, fil principal puis agent de plugin) et G5 (verdict, agent inconnu).
     "G6-principal|G6|nominal|Write:.planning/" + NOM_ETAT + "|fil-principal",
     "G6-plugin|G6|nominal|Write:.planning/" + NOM_ETAT + "@plugin-inconnu:agent-inconnu|plugin",
@@ -238,6 +263,17 @@ CANARIS = (
     "ROLE-juge|ROLE|nominal|Write:" + LIVRABLE_CANARY + "@" + AGENT_JUGE + "|",
     "ROLE-worker-Agent|ROLE|nominal|Agent:" + HORS_LISTE + "@" + AGENT_WORKER + "|Agent",
     "ROLE-worker-Task|ROLE|nominal|Task:" + HORS_LISTE + "@" + AGENT_WORKER + "|Task",
+    # Étape 5 (46-05, P46-D-11) : G3 (CLOTURE.md d'une unité de forme modèle dont le PLAN.md voisin déclare des livrables qui n'existent pas
+    # dans le lab synthétique, fil principal) ; G4 (SUMMARY.md de la même unité, sans VERDICT.md voisin, fil principal) ; le cas de G4′ arrive avec G4′.
+    "G3-livrable-absent|G3|nominal|Write:.planning/cycles/01-c/phases/01-p/CLOTURE.md|fil-principal",
+    "G4-sans-verdict|G4|nominal|Write:.planning/cycles/01-c/phases/01-p/SUMMARY.md|fil-principal",
+    # Étape 6 (46-06, P46-D-02, P46-D-11) : G4′ — le rapport sans sortie de commande brute d'un producteur doté de Bash, au PreToolUse de SubagentHandback
+    # (`tool_input.message`) puis au repli SubagentStop hors mode auto (`last_assistant_message`, `permission_mode: "default"`).
+    "G4P-handback|G4P|nominal|SubagentHandback:sans-sortie@" + AGENT_PRODUCTEUR + "|",
+    "G4P-stop|G4P|nominal|SubagentStop:sans-sortie@" + AGENT_PRODUCTEUR + "|",
+    # D1 (46-07, P46-D-11) : pas de constante d'armement, mais un canary — le rejeu d'un FileChanged synthétique sur un fichier surveillé modifié hors du moteur
+    # exige UNE ligne de contournement de plus au journal du lab synthétique (la trace, jamais un refus : la sortie reste vide).
+    "D1-trace|D1|nominal|FileChanged:.planning/" + NOM_ETAT + "|",
 )
 
 
@@ -341,6 +377,39 @@ def trouver_commande(candidats, reconnues):
     return None, None, illisible, citee
 
 
+def evenements_non_cables(candidats, reconnues):
+    """(manquants, non reconnus) : parmi les quatre événements NOUVEAUX de EVENEMENTS_CABLES (PreToolUse est tranché par `trouver_commande`),
+    ceux sous lesquels AUCUN réglage lu ne porte la commande de référence (`manquants`, dans l'ordre de la constante), et ceux qui citent
+    planning-hook.sh sans l'avoir (`non reconnus`). Les réglages sont lus ENSEMBLE (le harnais les fusionne : scope projet et scope
+    compte) ; un réglage illisible ou absent n'apporte rien."""
+    evenements = [e for e in EVENEMENTS_CABLES if e != "PreToolUse"]
+    trouvees = {e: False for e in evenements}
+    citees = {e: False for e in evenements}
+    for chemin in candidats:
+        if not os.path.isfile(chemin):
+            continue
+        try:
+            with open(chemin, encoding="utf-8") as fh:
+                donnees = json.load(fh)
+            reglage = donnees.get("hooks", {}) if isinstance(donnees, dict) else None
+            if not isinstance(reglage, dict):
+                continue
+            for evt in evenements:
+                for groupe in reglage.get(evt, []) or []:
+                    for h in groupe.get("hooks", []) or []:
+                        commande = h.get("command") if isinstance(h, dict) else None
+                        if isinstance(commande, str) and CITE in commande:
+                            if commande in reconnues:  # canary-evenement-reconnue
+                                trouvees[evt] = True
+                            else:
+                                citees[evt] = True
+        except (OSError, ValueError, AttributeError, TypeError):
+            continue
+    manquants = [e for e in evenements if not trouvees[e] and not citees[e]]
+    non_reconnus = [e for e in evenements if not trouvees[e] and citees[e]]
+    return manquants, non_reconnus
+
+
 # --- Rejeu ---------------------------------------------------------------------------------------
 def fabriquer_payload(spec, lab):
     outil, _, reste = spec.partition(":")
@@ -351,6 +420,22 @@ def fabriquer_payload(spec, lab):
         entree = {"description": "d", "prompt": "p", "subagent_type": chemin or "general-purpose"}
     elif outil == "Bash":
         entree = {"command": "true"}
+    elif outil == "SubagentHandback":
+        entree = {"message": RAPPORTS_G4P.get(chemin, chemin or "rapport du canary")}
+    elif outil == "SubagentStop":
+        # Repli de G4′ (Phase 46) : l'événement n'est pas un outil, le rapport est `last_assistant_message` ; hors mode auto.
+        stop = {"session_id": "canary", "transcript_path": "transcript.jsonl", "cwd": lab, "permission_mode": "default",
+                "hook_event_name": "SubagentStop", "stop_hook_active": False}
+        if agent:
+            stop["agent_id"] = "canary-agent"
+            stop["agent_type"] = agent
+        stop["last_assistant_message"] = RAPPORTS_G4P.get(chemin, chemin or "rapport du canary")
+        return json.dumps(stop, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    elif outil == "FileChanged":
+        # D1 (Phase 46) : l'événement n'est pas un outil, `file_path` et `event` sont de PREMIER niveau.
+        change = {"session_id": "canary", "transcript_path": "transcript.jsonl", "cwd": lab, "hook_event_name": "FileChanged",
+                  "file_path": os.path.join(lab, chemin), "event": "change"}
+        return json.dumps(change, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     elif outil == "NotebookEdit":
         entree = {"notebook_path": os.path.join(lab, chemin), "new_source": "x"}
     elif outil == "Edit":
@@ -371,11 +456,19 @@ def fabriquer_payload(spec, lab):
 
 def verdict(rc, sortie):
     """`silence`, `deny-degrade` (UN objet JSON deny, code 0, dont la raison porte le texte statique du
-    fail-closed), `deny-gate` (même objet, autre raison : un gate qui refuse) ou un état d'échec nommé."""
+    fail-closed), `deny-gate` (même objet, autre raison : un gate qui refuse), `block-gate` (SubagentStop : UN objet `decision: "block"` et sa
+    `reason`, rien d'autre, code 0 — le refus d'un gate au repli de G4′) ou un état d'échec nommé."""
     if rc != 0:
         return "code " + str(rc)
     if sortie == b"":
         return "silence"
+    try:
+        document = json.loads(sortie.decode("utf-8"))
+        if isinstance(document, dict) and document.get("decision") == "block" and isinstance(document.get("reason"), str) \
+                and set(document) == {"decision", "reason"}:
+            return "block-gate"  # canary-block
+    except ValueError:
+        return "document inattendu"
     try:
         s = json.loads(sortie.decode("utf-8"))["hookSpecificOutput"]
         if s["hookEventName"] == "PreToolUse" and s["permissionDecision"] == "deny" \
@@ -449,6 +542,37 @@ class Rejeu:
             return "observation"
         return "silence sans ligne d'observation"
 
+    def lignes_contournement(self):
+        """Nombre de lignes `genre=contournement` du journal de D1 du lab synthétique."""
+        chemin = os.path.join(self.lab, ".planning", "surveillance.log")
+        try:
+            with open(chemin, encoding="utf-8", errors="replace") as fh:
+                texte = fh.read()
+        except OSError:
+            return 0
+        return sum(1 for ligne in texte.split("\n") if "  genre=contournement  " in ligne)
+
+    def jouer_trace(self, mode, spec):
+        """Cas de D1 : `trace` si le rejeu d'un FileChanged synthétique, le fichier surveillé modifié hors du moteur, se tait (stdout vide : D1 ne refuse jamais)
+        ET ajoute UNE ligne de contournement au journal du lab synthétique ; sinon le verdict obtenu, ou `silence sans ligne de contournement`. Un premier
+        FileChanged, sur l'état initial, pose la référence (première observation : aucune ligne de contournement)."""
+        fichier = os.path.join(self.lab, spec.partition(":")[2].partition("@")[0])
+        os.makedirs(os.path.dirname(fichier), exist_ok=True)
+        with open(fichier, "w", encoding="utf-8") as fh:
+            fh.write("état de référence du canary\n")
+        premier = self.jouer(mode, spec)
+        if premier != "silence":
+            return premier
+        with open(fichier, "w", encoding="utf-8") as fh:
+            fh.write("écrit hors du moteur\n")
+        avant = self.lignes_contournement()
+        obtenu = self.jouer(mode, spec)
+        if obtenu != "silence":
+            return obtenu
+        if self.lignes_contournement() == avant + 1:  # canary-trace
+            return "trace"
+        return "silence sans ligne de contournement"
+
     def jouer(self, mode, spec):
         try:
             p = subprocess.run(["/bin/sh", "-c", self.commande], input=fabriquer_payload(spec, self.lab),
@@ -499,7 +623,7 @@ def lire_canaris():
     cas = []
     for ligne in CANARIS:
         morceaux = ligne.split("|")
-        if len(morceaux) != 5 or morceaux[1] not in ("DEGRADE",) + GATES \
+        if len(morceaux) != 5 or morceaux[1] not in ("DEGRADE", "D1") + GATES \
                 or morceaux[2] not in ("script-absent", "python-absent", "nominal"):
             raise Indetermine("ligne de CANARIS mal formée : " + ligne)
         etiquettes = tuple(e for e in morceaux[4].split(",") if e)
@@ -531,7 +655,11 @@ def attendu_de(gate, spec, table):
     """L'attendu est DÉRIVÉ de la table d'armement, jamais écrit dans CANARIS."""
     if gate == "DEGRADE":
         return "silence" if spec.split(":")[0].split("@")[0] == "Bash" else "deny-degrade"
-    return "deny-gate" if table[gate] == "armed" else "observation"
+    if gate == "D1":
+        return "trace"  # canary-d1 : une détection ne s'arme pas (P46-D-11), son attendu ne dépend d'aucune constante
+    if table[gate] != "armed":
+        return "observation"
+    return "block-gate" if spec.partition(":")[0].partition("@")[0] == "SubagentStop" else "deny-gate"  # canary-attendu-stop
 
 
 def main_couverture():
@@ -586,6 +714,17 @@ def main():
                  "session ; préparer le projet (/vf-update).")
         return 0
 
+    sans, non_reconnus = evenements_non_cables(candidats, commandes_reconnues(reference))  # canary-evenements
+    if non_reconnus:
+        signaler("commande enregistrée non reconnue sous " + ", ".join(non_reconnus) + " : un réglage cite planning-hook.sh avec une commande qui n'est pas, octet "
+                 "pour octet, celle que l'installeur pose (hooks.json) — rien n'a été exécuté, les gates de cet événement ne sont pas vérifiés "
+                 "dans cette session ; réparer : /vf-update.")
+        return 0
+    if sans:
+        signaler("hook central non câblé sous " + ", ".join(sans) + " : la commande de planning-hook.sh manque sous cet événement dans les réglages du "
+                 "projet et du compte (installation périmée ?) — les gates de cet événement ne gardent rien dans cette session ; "
+                 "réparer : /vf-update, puis relancer la session.")
+        return 0
     try:
         cas = lire_canaris()
     except Indetermine:
@@ -600,7 +739,7 @@ def main():
         nominal = rejeu.jouer("nominal", NOMINAL)
         if nominal == "deny-degrade":
             signaler("hook central en mode dégradé : le script ou python3 manque ou plante ; dans ce lab adhérent "
-                     "les écritures par outil et les dispatchs Agent et Task sont refusés, Bash reste ouvert "
+                     "les écritures par outil, les dispatchs Agent et Task et les rapports de sous-agent (SubagentHandback) sont refusés, Bash reste ouvert "
                      "(limite déclarée, P45-D-06b) — réparer : /vf-update ou installer python3, puis relancer la session.")
             return 0
         try:
@@ -616,7 +755,12 @@ def main():
             echecs.append("nominal (attendu silence, obtenu " + nominal + ")")
         for identifiant, gate, mode, spec, _etiquettes in cas:
             attendu = attendu_de(gate, spec, table)
-            obtenu = rejeu.jouer_observation(mode, spec, gate) if attendu == "observation" else rejeu.jouer(mode, spec)
+            if attendu == "observation":
+                obtenu = rejeu.jouer_observation(mode, spec, gate)
+            elif attendu == "trace":
+                obtenu = rejeu.jouer_trace(mode, spec)
+            else:
+                obtenu = rejeu.jouer(mode, spec)
             if obtenu != attendu:
                 echecs.append(identifiant + " (attendu " + attendu + ", obtenu " + obtenu + ")")
         if echecs:

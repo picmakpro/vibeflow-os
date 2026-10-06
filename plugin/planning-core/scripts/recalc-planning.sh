@@ -79,7 +79,7 @@ from datetime import datetime
 
 # --- Constantes du contrat -----------------------------------------------------------------
 SCHEMA_ADHESION = "cycles-v1"
-CACHE_SCHEMA_VERSION = 1
+CACHE_SCHEMA_VERSION = 2
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
 # Candidats bash FIXES pour lancer le détecteur (F1/F44-07, correction de classe) : jamais
 # `shutil.which("bash")` sur le PATH hérité — un PATH détourné (un faux `bash` en tête) rendrait
@@ -102,7 +102,7 @@ NOMS_MODELE_PLAN = ("PLAN.md", "CLOTURE.md", "VERDICT.md", "SUMMARY.md", "DEROGA
 TERMINAUX = frozenset({"close", "abandonné", "remplacé"})
 JOURNALISABLES = frozenset({"close", "abandonné", "remplacé", "gelé"})
 ETATS_TOUS = (
-    "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger",
+    "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger", "à clore",
     "close", "indéterminé", "abandonné", "remplacé", "gelé",
 )
 # Table LIBELLES (code -> gabarit de phrase), reproduite depuis references/modele-cycles.md
@@ -116,7 +116,9 @@ LIBELLES = {
     # ce libellé (F6, 2026-09-28) ; il reste dans la table pour le jour où une règle nouvelle
     # laisserait un trou.
     "combinaison-non-prevue": "combinaison de signaux non prévue",
-    "verdict-passe-sans-SUMMARY.md": "verdict passé, SUMMARY absent",
+    "verdict-perime": "verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise)",
+    "livrable-modifie-apres-cloture": "livrable ou plan modifié après la clôture",
+    "empreinte-hors-borne": "empreinte des livrables hors borne",
     "SUMMARY.md-sans-PLAN.md": "SUMMARY.md sans PLAN.md",
     "CLOTURE.md-sans-PLAN.md": "CLOTURE.md sans PLAN.md",
     "VERDICT.md-sans-CLOTURE.md": "VERDICT.md sans CLOTURE.md (marqueur)",
@@ -127,6 +129,9 @@ LIBELLES = {
     "phase-indeterminee": "phase `{}` indéterminée",
     "plan-indetermine": "plan `{}` indéterminé",
     "livrable-absent": "livrable absent : {}",
+    "livrable-vide": "livrable vide : {}",
+    "livrable-hors-borne": "livrable hors borne : {}",
+    "ecrit-contient-unite": "ecrit: couvre le dossier de l'unité : {}",
 }
 
 
@@ -755,7 +760,9 @@ def scanner(planning):
 
 
 # --- Hors modèle et garde-fous de chemin (44-04, P44-D-04) ----------------------------------
-NOMS_MODELE_RACINE_DOSSIERS = ("cycles", "baux", "missions")
+# `juges` (Phase 46, 46-09, P46-D-06a) : le dossier du canary de juge (`.planning/juges/<juge>/{SORTIE-PIEGEE.md, VERDICT.md}`) est un emplacement du
+# modèle à la racine, jamais « Hors modèle » ; il n'est ni descendu ni dérivé (seul `cycles/` porte des unités de cycle).
+NOMS_MODELE_RACINE_DOSSIERS = ("cycles", "baux", "missions", "juges")
 NOMS_MODELE_RACINE_FICHIERS = (
     "PROJECT.md", "REQUIREMENTS.md", "config.json", "INDEX.md", "STATE.md",
     "cloture.log", ".recalc-cache.json",
@@ -763,6 +770,12 @@ NOMS_MODELE_RACINE_FICHIERS = (
     # 2026-09-30) : emplacement du modèle, jamais « Hors modèle » dans INDEX.md. Même nom consommé
     # par la commande de dérogation (45-04) et le gate G6 (45-05).
     "derogations-gates.log",
+    # Journal de D1, la détection des écritures sur les fichiers surveillés (Phase 46, 46-07, P46-D-07a) : emplacement du modèle, jamais
+    # « Hors modèle » ; inscrit par les écrivains du moteur et par le hook central, protégé par G6, jamais surveillé.
+    "surveillance.log",
+    # `.planning/.gitignore` (fix-46-c, Q-B ; arbitrage Willy, AskUserQuestion session principale, 2026-10-06) : posé par le hook central au SessionStart d'un
+    # lab adhérent, une seule ligne `surveillance.log` ; emplacement du modèle, jamais « Hors modèle ». Ni généré par le recalcul, ni protégé par G6.
+    ".gitignore",
 )
 
 
@@ -963,9 +976,9 @@ def lire_registre(donnees_cadrage):
 
 
 def entree_ecrit_valide(entree):
-    """Une entrée `ecrit:` valide (§ Fichiers du modèle, PLAN.md) : chemin concret relatif à la
-    racine du lab, non vide, sans `/` ni `~` initial, sans segment `..`, sans caractère de
-    contrôle ni `\\`, sans métacaractère `*?[]{}<>` — jamais un motif."""
+    """Une entrée `ecrit:` valide : chemin concret relatif à la racine du lab, non vide, sans `/`
+    ni `~` initial, sans segment `..`, sans caractère de contrôle ni `\\`, sans métacaractère
+    `*?[]{}<>` — jamais un motif (même règle que le moteur de recalcul)."""
     if not isinstance(entree, str) or entree == "":
         return False
     if entree.startswith("/") or entree.startswith("~"):
@@ -988,6 +1001,289 @@ def _valeurs_ecrit(donnees):
     if isinstance(ecrit, list):
         return ecrit
     return None
+
+
+# --- Entrées `ecrit:`, prédicat « livrable présent » et empreinte des livrables : bloc partagé (Phase 46, 46-01 ; P46-D-03a, P46-D-12) ----------
+# MÊME texte dans poser-verdict.sh, planning-hook.sh et recalc-planning.sh (l'installeur ne pose que des `*.sh` : pas de module
+# partagé, des copies ast-identiques que la suite test-cloture-empreintes.sh compare, R-EMP-04). Le bloc porte l'ENCHAÎNEMENT
+# complet « PLAN.md -> entrées `ecrit:` -> validation -> présence -> empreinte » (`entrees_du_plan`, `livrables_presents`,
+# `empreinte_livrables`) : G3, G4, la règle R4 du recalcul et la commande de pose l'appellent, aucun ne le réécrit ; ses ENTRÉES
+# (parseur de frontmatter, `entree_ecrit_valide`, `_valeurs_ecrit`, `SANS_SUIVI_DE_LIEN`) sont comparées avec lui. Le parcours est
+# borné PAR PLAN.md : les bornes comptent les ENTRÉES parcourues (fichiers, sous-dossiers, liens) et les octets, avec UN budget
+# commun à toutes les entrées d'un même PLAN.md ; un dépassement est un refus explicite, jamais une empreinte partielle ni un
+# livrable « présent ». Les noms de NOMS_EXCLUS_LIVRABLES sont ignorés partout (prédicat « vide » ET empreinte) : ouvrir un
+# dossier livrable dans le Finder ou l'Explorateur ne doit pas périmer un verdict.
+BORNE_FICHIERS_LIVRABLES = 2000
+BORNE_OCTETS_LIVRABLES = 134217728
+NOMS_EXCLUS_LIVRABLES = (".DS_Store", "Thumbs.db", "desktop.ini")
+SANS_BLOCAGE = getattr(os, "O_NONBLOCK", 0)
+DRAPEAUX_LIVRABLE = os.O_RDONLY | SANS_SUIVI_DE_LIEN | SANS_BLOCAGE  # livrable-ouverture
+AVEC_DESCRIPTEURS = os.open in os.supports_dir_fd and hasattr(os, "O_DIRECTORY")  # livrable-dirfd
+
+
+def _normaliser_livrable(entree):
+    """Entrée `ecrit:` normalisée : composants non vides et différents de `.`, rejoints par `/` (barre finale retirée)."""
+    return "/".join(c for c in entree.split("/") if c not in ("", "."))
+
+
+def _fichier_non_vide(taille):
+    """Vrai si un fichier régulier de `taille` octets (lstat) n'est pas vide."""
+    return taille > 0  # livrable-vide
+
+
+def _nom_sain(nom):
+    """Vrai si le nom d'une entrée de dossier se décode en UTF-8 et ne porte aucun caractère de contrôle : sans cela le texte
+    canonique de l'empreinte serait ambigu (tabulation, saut de ligne) ou non encodable."""
+    try:
+        nom.encode("utf-8")
+    except UnicodeEncodeError:
+        return False  # livrable-nom-utf8
+    return not any(ord(c) < 0x20 or ord(c) == 0x7F for c in nom)  # livrable-nom-controle
+
+
+def _borne_depassee(budget):
+    """Libellé de la borne franchie par `budget` = [entrées parcourues, octets annoncés par lstat, octets lus], ou None."""
+    if budget[0] > BORNE_FICHIERS_LIVRABLES:  # livrable-borne
+        return "borne de %d fichiers dépassée (BORNE_FICHIERS_LIVRABLES)" % BORNE_FICHIERS_LIVRABLES
+    if budget[1] > BORNE_OCTETS_LIVRABLES or budget[2] > BORNE_OCTETS_LIVRABLES:  # livrable-octets
+        return "borne de %d octets dépassée (BORNE_OCTETS_LIVRABLES)" % BORNE_OCTETS_LIVRABLES
+    return None
+
+
+def _parcourir_livrable(dossier, relatif, budget):
+    """(statut, detail, fichiers) : les fichiers réguliers du sous-arbre de `dossier` (`relatif` : son chemin relatif au lab),
+    triés par chemin relatif, sous forme (relatif, taille). Lstat sur chaque entrée : un lien et un fichier spécial interne ne sont
+    ni suivis ni retenus. Le tri final rend l'empreinte indépendante de l'ordre d'énumération du système de fichiers. Statut `ok`,
+    `borne` (detail = libellé de la borne) ou `illisible`."""
+    fichiers = []
+    pile = [(dossier, relatif)]
+    while pile:
+        courant, rel = pile.pop()
+        try:
+            with os.scandir(courant) as entrees:
+                for entree in entrees:
+                    nom = entree.name
+                    if nom in NOMS_EXCLUS_LIVRABLES:  # livrable-exclus
+                        continue
+                    if not _nom_sain(nom):
+                        return ("illisible", rel, [])
+                    info = entree.stat(follow_symlinks=False)
+                    budget[0] += 1
+                    if stat.S_ISREG(info.st_mode):
+                        budget[1] += info.st_size
+                    depasse = _borne_depassee(budget)
+                    if depasse is not None:
+                        return ("borne", depasse, [])
+                    if stat.S_ISDIR(info.st_mode):
+                        pile.append((entree.path, rel + "/" + nom))
+                    elif stat.S_ISREG(info.st_mode):
+                        fichiers.append((rel + "/" + nom, info.st_size))
+        except OSError:
+            return ("illisible", rel, [])
+    fichiers.sort()  # livrable-tri
+    return ("ok", relatif, fichiers)
+
+
+def _examiner_livrable(racine, entree, budget):
+    """(statut, detail, genre, fichiers) d'une entrée `ecrit:`. Le chemin est parcouru composant par composant par lstat : un
+    lien, terminal ou intermédiaire, rend le livrable `lien` (jamais suivi). Un fichier régulier de 0 octet est `vide` ; un dossier
+    sans aucun fichier régulier non vide est `vide` ; une entrée absente, un composant intermédiaire qui n'est pas un dossier ou un
+    fichier spécial (FIFO, socket, périphérique) est `absent` ; une erreur de lecture est `illisible` ; un dépassement de borne est
+    `borne`. `genre` vaut `fichier` ou `dossier` pour un livrable `present`. `fichiers` : (chemin relatif au lab, taille)."""
+    normale = _normaliser_livrable(entree)
+    composants = normale.split("/") if normale != "" else []
+    if not composants:
+        return ("absent", entree if entree != "" else ".", "", [])
+    courant = racine
+    info = None
+    for rang, composant in enumerate(composants):
+        courant = os.path.join(courant, composant)
+        try:
+            info = os.lstat(courant)  # livrable-lien
+        except (FileNotFoundError, NotADirectoryError):
+            return ("absent", normale, "", [])
+        except OSError:
+            return ("illisible", normale, "", [])
+        if stat.S_ISLNK(info.st_mode):
+            return ("lien", normale, "", [])
+        if rang < len(composants) - 1 and not stat.S_ISDIR(info.st_mode):
+            return ("absent", normale, "", [])
+    if stat.S_ISREG(info.st_mode):
+        budget[0] += 1
+        budget[1] += info.st_size
+        depasse = _borne_depassee(budget)
+        if depasse is not None:
+            return ("borne", depasse, "", [])
+        if not _fichier_non_vide(info.st_size):
+            return ("vide", normale, "", [])
+        return ("present", normale, "fichier", [(normale, info.st_size)])
+    if stat.S_ISDIR(info.st_mode):
+        statut, detail, fichiers = _parcourir_livrable(courant, normale, budget)
+        if statut != "ok":
+            return (statut, detail, "", [])
+        if not any(_fichier_non_vide(f[1]) for f in fichiers):
+            return ("vide", normale, "", [])
+        return ("present", normale, "dossier", fichiers)
+    return ("absent", normale, "", [])
+
+
+def livrables_presents(racine, entrees):
+    """[(entrée, statut, détail)], une par entrée de `entrees` et dans leur ordre : le prédicat « livrable présent » d'un PLAN.md
+    entier (P46-D-12), statut `present`, `absent`, `lien`, `vide`, `borne` ou `illisible` (voir `_examiner_livrable`). UN budget
+    commun à toutes les entrées : le coût d'un PLAN.md est borné comme l'empreinte, jamais proportionnel au nombre d'entrées qui se
+    recouvrent. Dès qu'une borne est franchie, cette entrée et toutes les suivantes valent `borne` (jamais `present`). Le prédicat
+    unique de G3 et de la règle R4 du recalcul : aucun appelant n'examine une entrée isolément."""
+    budget = [0, 0, 0]
+    resultats = []
+    for entree in entrees:
+        depasse = _borne_depassee(budget)
+        if depasse is not None:
+            resultats.append((entree, "borne", depasse))
+            continue
+        statut, detail, _genre, _fichiers = _examiner_livrable(racine, entree, budget)  # livrables-budget-commun
+        resultats.append((entree, statut, detail))
+    return resultats
+
+
+def _ouvrir_dossier_livrable(racine, composants):
+    """Poignée du dossier `racine`/`composants`, ouvert sans suivre de lien à AUCUN composant : sous POSIX un descripteur obtenu par
+    ouvertures chaînées relatives à un descripteur de dossier (openat), O_NOFOLLOW à chaque pas (DRAPEAUX_LIVRABLE) ; sans descripteurs
+    de dossier (Windows), le chemin : limite déclarée. La racine du lab est celle de l'appelant, déjà résolue. Lève OSError."""
+    if not AVEC_DESCRIPTEURS:
+        return os.path.join(racine, *composants)
+    dossier = os.open(racine, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for composant in composants:
+            suivant = os.open(composant, DRAPEAUX_LIVRABLE | os.O_DIRECTORY, dir_fd=dossier)
+            os.close(dossier)
+            dossier = suivant
+    except BaseException:
+        os.close(dossier)
+        raise
+    return dossier
+
+
+def _fermer_dossier_livrable(poignee):
+    if AVEC_DESCRIPTEURS:
+        os.close(poignee)
+
+
+def _hacher_dans(poignee, nom, budget):
+    """(statut, valeur) : `ok` et le sha256 hexadécimal du fichier `nom` du dossier `poignee`, ouvert sans suivre de lien et sans
+    bloquer (O_NOFOLLOW, O_NONBLOCK : un FIFO substitué à un fichier après le parcours ne bloque pas l'ouverture), puis fstat
+    régulier, lu par blocs, octets lus ajoutés au budget partagé ; `borne` et le libellé de la borne ; ou `illisible`. Jamais un
+    hash partiel."""
+    import hashlib
+    try:
+        if AVEC_DESCRIPTEURS:
+            descripteur = os.open(nom, DRAPEAUX_LIVRABLE, dir_fd=poignee)
+        else:
+            descripteur = os.open(os.path.join(poignee, nom), DRAPEAUX_LIVRABLE)
+    except OSError:
+        return ("illisible", "")
+    hacheur = hashlib.sha256()
+    try:
+        with os.fdopen(descripteur, "rb") as fh:
+            if not stat.S_ISREG(os.fstat(fh.fileno()).st_mode):
+                return ("illisible", "")
+            while True:
+                bloc = fh.read(65536)
+                if not bloc:
+                    break
+                budget[2] += len(bloc)
+                depasse = _borne_depassee(budget)
+                if depasse is not None:
+                    return ("borne", depasse)
+                hacheur.update(bloc)
+    except OSError:
+        return ("illisible", "")
+    return ("ok", hacheur.hexdigest())
+
+
+def _hacher_livrables(racine, fichiers, budget):
+    """("ok", {chemin relatif: sha256}) ou (statut d'échec, chemin relatif ou libellé de borne) pour `fichiers` = [(chemin relatif au
+    lab, taille)]. Chaque dossier est ouvert UNE fois (le coût d'une lecture ne dépend pas de la profondeur du fichier), sans suivre de
+    lien à aucun composant : un lien substitué à un composant après le parcours rend le fichier `illisible`, jamais lu."""
+    par_dossier = {}
+    for rel, _taille in fichiers:
+        dossier_rel, _, nom = rel.rpartition("/")
+        par_dossier.setdefault(dossier_rel, []).append(nom)
+    valeurs = {}
+    for dossier_rel in sorted(par_dossier):
+        noms = sorted(par_dossier[dossier_rel])
+        try:
+            poignee = _ouvrir_dossier_livrable(racine, [c for c in dossier_rel.split("/") if c != ""])
+        except OSError:
+            return ("illisible", dossier_rel + "/" + noms[0] if dossier_rel != "" else noms[0])
+        try:
+            for nom in noms:
+                rel = dossier_rel + "/" + nom if dossier_rel != "" else nom
+                statut, valeur = _hacher_dans(poignee, nom, budget)
+                if statut != "ok":
+                    return (statut, valeur if valeur != "" else rel)
+                valeurs[rel] = valeur
+        finally:
+            _fermer_dossier_livrable(poignee)
+    return ("ok", valeurs)
+
+
+def empreinte_livrables(racine, entrees):
+    """("ok", sha256 hexadécimal) ou (statut d'échec, entrée ou libellé de borne) pour les entrées `ecrit:` `entrees`. Texte
+    canonique : entrées normalisées, dédoublonnées et triées ; une ligne `fichier<TAB><chemin relatif au lab><TAB><sha256>` par
+    entrée fichier ; pour une entrée dossier, une ligne `dossier<TAB><entrée>` puis une ligne `fichier…` par fichier régulier du
+    sous-arbre, triées par chemin relatif ; lignes jointes par `\\n`, saut final, haché en UTF-8. Le budget (entrées et octets) est
+    commun à toutes les entrées. Une entrée qui n'est pas `present` (absente, vide, lien, borne, illisible) fait échouer le calcul."""
+    import hashlib
+    budget = [0, 0, 0]
+    lignes = []
+    for entree in sorted(set(_normaliser_livrable(e) for e in entrees)):  # empreinte-tri
+        statut, detail, genre, fichiers = _examiner_livrable(racine, entree, budget)
+        if statut != "present":
+            return (statut, detail)
+        if genre == "dossier":
+            lignes.append("dossier\t" + detail)
+        statut_hache, valeurs = _hacher_livrables(racine, fichiers, budget)
+        if statut_hache != "ok":
+            return (statut_hache, valeurs)
+        for rel, _taille in fichiers:
+            lignes.append("fichier\t" + rel + "\t" + valeurs[rel])
+    texte = "\n".join(lignes) + "\n"
+    return ("ok", hashlib.sha256(texte.encode("utf-8")).hexdigest())
+
+
+def _couvre_unite(entree, unite_rel):
+    """Vrai si l'entrée `ecrit:` EST le dossier de l'unité (`unite_rel`, relatif au lab) ou l'un de ses ancêtres, comparé par composants,
+    chacun en forme normale NFC puis sans égard à la casse (sur un système de fichiers insensible à la casse ou à la normalisation, `.PLANNING`
+    et un nom saisi en NFD désignent le même dossier ; A1, fix-46-a). Une entrée qui se normalise en rien (`.`) n'est pas un livrable : le
+    prédicat la rend `absente`, elle n'est pas traitée ici."""
+    cible = [unicodedata.normalize("NFC", c).casefold() for c in _normaliser_livrable(entree).split("/") if c != ""]  # nfc-couvre
+    unite = [unicodedata.normalize("NFC", c).casefold() for c in unite_rel.split("/") if c not in ("", ".")]
+    return len(cible) > 0 and len(cible) <= len(unite) and unite[:len(cible)] == cible
+
+
+def entrees_du_plan(octets_plan, unite_rel):
+    """(motif, détail) : `("ok", [entrées déclarées, dans l'ordre])` ou le premier échec de la chaîne PLAN.md -> entrées -> validation :
+    `non-utf8` ; `frontmatter` (détail : statut du parseur) ; `absent` (`ecrit:` absent ou vide) ; `invalide` (détail : la valeur
+    fautive telle que lue) ; `unite` (détail : l'entrée normalisée) quand une entrée EST ou CONTIENT le dossier de l'unité
+    `unite_rel` — le verdict s'écrit dans ce dossier, donc `hash_livrables` serait périmé dès la pose (décision du manager,
+    renversable). Le chemin unique de G3, G4, de R4 du recalcul et de la commande de pose : `octets_plan` est lu par l'appelant."""
+    try:
+        texte = octets_plan.decode("utf-8")
+    except UnicodeDecodeError:
+        return ("non-utf8", "")
+    statut, donnees = lire_frontmatter(texte)
+    if statut != "ok":
+        return ("frontmatter", statut)
+    valeurs = _valeurs_ecrit(donnees)
+    if not valeurs:
+        return ("absent", "")
+    for valeur in valeurs:
+        if not entree_ecrit_valide(valeur):
+            return ("invalide", valeur)
+    for valeur in valeurs:
+        if _couvre_unite(valeur, unite_rel):  # entrees-unite
+            return ("unite", _normaliser_livrable(valeur))
+    return ("ok", list(valeurs))
 
 
 # --- Dérogation nominative (Φ0, P44-D-07) ------------------------------------------------------
@@ -1025,12 +1321,15 @@ def _meta_unite(chemin_abs, entrees):
             auteur = donnees.get("auteur")
     tentative = None
     hash_juge = None
+    hash_livrables = None
     if "VERDICT.md" in entrees:
         statut, donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "VERDICT.md"))
         if statut == "ok":
             tentative = donnees.get("tentative")
             hash_juge = donnees.get("hash")
-    return {"auteur": auteur or "inconnu", "tentative": tentative, "hash_juge": hash_juge, "type_derivation": None}
+            hash_livrables = donnees.get("hash_livrables")
+    return {"auteur": auteur or "inconnu", "tentative": tentative, "hash_juge": hash_juge,
+            "hash_livrables": hash_livrables, "type_derivation": None}
 
 
 # --- Φ1 : régularité et lisibilité des fichiers du modèle présents ------------------------------
@@ -1083,13 +1382,17 @@ def _r1_a_r8(chemin_abs, entrees, racine_lab, meta):
         if verdict_present:
             return ("indéterminé", "VERDICT.md-sans-PLAN.md", meta)
         return ("à planifier", None, meta)
-    # R2
-    plan_statut, plan_donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "PLAN.md"))
-    if plan_statut != "ok":
+    # R2 : la chaîne unique PLAN.md -> entrées -> validation du bloc partagé (`entrees_du_plan`, P46-D-12) ; une entrée qui est ou
+    # contient le dossier de l'unité (motif `unite`) ne décide RIEN ici : R3 d'abord, R4 ensuite (unité à CLOTURE.md)
+    octets_plan = _octets_plan(chemin_abs)
+    unite_rel = os.path.relpath(chemin_abs, racine_lab).replace(os.sep, "/")
+    motif_plan, detail_plan = ("frontmatter", "illisible") if octets_plan is None else entrees_du_plan(octets_plan, unite_rel)
+    if motif_plan in ("non-utf8", "frontmatter"):
         return ("indéterminé", "frontmatter-invalide:PLAN.md", meta)
-    valeurs = _valeurs_ecrit(plan_donnees)
-    if not valeurs or not all(entree_ecrit_valide(v) for v in valeurs):
+    if motif_plan in ("absent", "invalide"):
         return ("indéterminé", "ecrit-invalide", meta)
+    entree_unite = detail_plan if motif_plan == "unite" else None
+    valeurs = detail_plan if motif_plan == "ok" else []
     # R3
     if not cloture_present:
         if verdict_present:
@@ -1097,10 +1400,20 @@ def _r1_a_r8(chemin_abs, entrees, racine_lab, meta):
         if summary_present:
             return ("indéterminé", "SUMMARY.md-sans-CLOTURE.md", meta)
         return ("à exécuter", None, meta)
-    # R4
-    manquant = next((v for v in valeurs if not os.path.lexists(os.path.join(racine_lab, v))), None)
-    if manquant is not None:
-        return ("indéterminé", "livrable-absent:" + manquant, meta)
+    # R4 : une entrée qui est ou contient le dossier de l'unité y périmerait tout verdict dès sa pose (refus de la pose, décision du
+    # manager, renversable) ; sinon « absent ou vide » par le prédicat partagé d'un PLAN.md entier (P46-D-12), à budget COMMUN à toutes
+    # ses entrées : une entrée après une borne vaut `borne` ; un lien, terminal ou intermédiaire, est absent ; première entrée fautive
+    # dans l'ordre déclaré
+    if entree_unite is not None:
+        return ("indéterminé", "ecrit-contient-unite:" + entree_unite, meta)
+    presents = livrables_presents(racine_lab, valeurs)  # r4-predicat
+    for v, statut_livrable, _detail_livrable in presents:
+        if statut_livrable == "vide":
+            return ("indéterminé", "livrable-vide:" + v, meta)
+        if statut_livrable == "borne":
+            return ("indéterminé", "livrable-hors-borne:" + v, meta)
+        if statut_livrable != "present":
+            return ("indéterminé", "livrable-absent:" + v, meta)
     # R5
     if not verdict_present:
         if summary_present:
@@ -1115,6 +1428,20 @@ def _r1_a_r8(chemin_abs, entrees, racine_lab, meta):
         not isinstance(c, dict) or c.get("resultat") not in ("passé", "échec") for c in constats
     ):
         return ("indéterminé", "verdict-invalide", meta)
+    # E : les deux empreintes du verdict (P46-D-03b) — `hash` (sha256 des octets du PLAN.md) et `hash_livrables` (empreinte composée
+    # des entrées `ecrit:`, copie partagée de 46-01). Un écart, ou un `hash_livrables` absent, périme le verdict : R7 et R8 ne
+    # s'appliquent qu'à un verdict conforme.
+    empreinte_plan = hash_contenu(os.path.join(chemin_abs, "PLAN.md"))  # r-empreintes
+    perime = empreinte_plan is None or meta["hash_juge"] != empreinte_plan
+    if not perime:
+        statut_emp, valeur_emp = empreinte_livrables(racine_lab, valeurs)  # r-empreintes-livrables
+        if statut_emp == "borne":
+            return ("indéterminé", "empreinte-hors-borne", meta)
+        perime = statut_emp != "ok" or meta["hash_livrables"] != valeur_emp
+    if perime:
+        if summary_present:
+            return ("indéterminé", "livrable-modifie-apres-cloture", meta)
+        return ("à juger", "verdict-perime", meta)
     # R7
     if any(c.get("resultat") == "échec" for c in constats):
         if summary_present:
@@ -1125,7 +1452,7 @@ def _r1_a_r8(chemin_abs, entrees, racine_lab, meta):
         meta2 = dict(meta)
         meta2["type_derivation"] = "feuille"
         return ("close", None, meta2)
-    return ("indéterminé", "verdict-passe-sans-SUMMARY.md", meta)
+    return ("à clore", None, meta)  # r8-a-clore
 
 
 def deriver_feuille(unite, racine_lab):
@@ -1190,17 +1517,33 @@ def signature_unite(unite, noms_modele, chemin_cadrage_supplementaire=None):
     return hashlib.sha256(texte.encode("utf-8")).hexdigest()
 
 
-def _lire_ecrit_reel(chemin_abs):
-    """Liste triée des entrées `ecrit:` valides de PLAN.md, [] si absent, illisible ou invalide —
-    ne DÉCIDE rien (R2/R4 restent le seul juge de l'état), seulement ce que le cache doit
-    surveiller pour la reprise (P44-D-13, existence des livrables revue à chaque passage)."""
-    plan_statut, plan_donnees = _lire_frontmatter_fichier(os.path.join(chemin_abs, "PLAN.md"))
-    if plan_statut != "ok":
+def _octets_plan(chemin_abs):
+    """Octets du PLAN.md de l'unité `chemin_abs` : fichier régulier requis (`est_fichier_regulier`, lstat, non suivi), ouverture
+    `SANS_SUIVI_DE_LIEN`, lecture binaire ; None si non régulier ou illisible (jamais un contenu partiel)."""
+    chemin = os.path.join(chemin_abs, "PLAN.md")
+    if not est_fichier_regulier(chemin):
+        return None
+    try:
+        descripteur = os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN)
+        with os.fdopen(descripteur, "rb") as fh:
+            return fh.read()
+    except OSError:
+        return None
+
+
+def _lire_ecrit_reel(chemin_abs, racine_lab):
+    """Liste triée des entrées `ecrit:` de PLAN.md lues par la chaîne unique du bloc partagé (`entrees_du_plan`, mêmes octets et
+    même unité que R2), [] si PLAN.md est absent, illisible ou invalide, ou si une entrée couvre le dossier de l'unité — ne DÉCIDE
+    rien (R2/R4 restent le seul juge de l'état), seulement ce que le cache doit surveiller pour la reprise (P44-D-13, existence des
+    livrables revue à chaque passage)."""
+    octets_plan = _octets_plan(chemin_abs)
+    if octets_plan is None:
         return []
-    valeurs = _valeurs_ecrit(plan_donnees)
-    if not valeurs:
+    unite_rel = os.path.relpath(chemin_abs, racine_lab).replace(os.sep, "/")
+    motif, entrees = entrees_du_plan(octets_plan, unite_rel)
+    if motif != "ok":
         return []
-    return sorted(v for v in valeurs if entree_ecrit_valide(v))
+    return sorted(entrees)
 
 
 def charger_cache(planning):
@@ -1242,30 +1585,52 @@ def charger_cache(planning):
     return ("valide", donnees)
 
 
+def _livrables_pour_cache(racine_lab, entrees):
+    """Valeur JSON, comparable d'un passage à l'autre, de l'état des livrables `ecrit:` `entrees` d'une unité : `["ok", empreinte]`
+    quand tous sont présents et hachables (copie partagée, bornée) — `["ok", None]` quand il n'y a aucune entrée, la dérivation ne
+    dépend alors d'aucun livrable —, `["statuts", {entrée: statut}]` quand au moins un livrable n'est pas présent (la dérivation ne
+    dépend alors que de ces statuts, pas du contenu) ; None quand le calcul de l'empreinte échoue alors que tous les livrables sont
+    présents (borne dépassée, lecture impossible) : une telle entrée n'est jamais reprise."""
+    if not entrees:
+        return ["ok", None]
+    statut, valeur = empreinte_livrables(racine_lab, entrees)
+    if statut == "ok":
+        return ["ok", valeur]
+    statuts = {e: s for e, s, _d in livrables_presents(racine_lab, entrees)}
+    if all(s == "present" for s in statuts.values()):
+        return None
+    return ["statuts", statuts]
+
+
 def _deriver_feuille_cache(unite, racine_lab, cache_ctx, chemin_cadrage_supplementaire=None):
     """Enveloppe de `deriver_feuille` consciente du cache (44-04, P44-D-13) : `cache_ctx` None ->
     jamais consulté ni écrit (mode lecture seule, T-44-21) — délègue alors directement à
-    `deriver_feuille`. Sinon, reprend l'entrée du cache existant SI la signature ET l'existence
-    des livrables re-vérifiée à cet instant concordent toutes deux ; sinon recalcule et enregistre
-    la nouvelle entrée."""
+    `deriver_feuille`. Sinon, reprend l'entrée du cache existant SI la signature ET l'état des
+    livrables (empreinte de leur contenu, recalculée à cet instant par la copie partagée, bornée),
+    concordent toutes deux ; sinon recalcule et enregistre la nouvelle entrée. Aucune signature par
+    date : le contenu seul (spec §10, incrémentalité par hash, jamais par mtime)."""
     if cache_ctx is None:
         return deriver_feuille(unite, racine_lab)
     chemin_rel = unite["chemin_rel"]
     signature = signature_unite(unite, NOMS_MODELE_PLAN, chemin_cadrage_supplementaire)
     entree_cache = (cache_ctx["existant"] or {}).get(chemin_rel)
+    ecrit_reel = None
     if isinstance(entree_cache, dict) and entree_cache.get("signature") == signature:
-        ecrit_cache = entree_cache.get("ecrit") or []
-        livrables_cache = entree_cache.get("livrables") or {}
-        livrables_actuels = {v: os.path.lexists(os.path.join(racine_lab, v)) for v in ecrit_cache}
-        if livrables_actuels == livrables_cache:
-            cache_ctx["nouveau"][chemin_rel] = entree_cache
-            cache_ctx["reprises"] += 1
-            return (entree_cache.get("etat"), entree_cache.get("raison"), dict(entree_cache.get("meta") or {}))
+        # A8 (P46 lot B, b3) : le cache est un fichier du lab, qu'un agent qui a Bash peut réécrire. Une entrée n'est reprise que si SES entrées
+        # `ecrit:` sont celles du PLAN.md réel (relu à chaque reprise, même chaîne que R2) ET si l'empreinte, recalculée sur les entrées RÉELLES,
+        # est celle qu'elle porte ; un écart : recalcul complet, jamais `close` sur la foi du cache.
+        ecrit_reel = _lire_ecrit_reel(unite["chemin_abs"], racine_lab)  # cache-ecrit-reel
+        if entree_cache.get("ecrit") == ecrit_reel:  # cache-ecrit
+            livrables_actuels = _livrables_pour_cache(racine_lab, ecrit_reel)
+            if livrables_actuels is not None and livrables_actuels == entree_cache.get("empreinte_livrables"):  # cache-empreinte
+                cache_ctx["nouveau"][chemin_rel] = entree_cache
+                cache_ctx["reprises"] += 1
+                return (entree_cache.get("etat"), entree_cache.get("raison"), dict(entree_cache.get("meta") or {}))
     etat, raison, meta = deriver_feuille(unite, racine_lab)
-    ecrit_reel = _lire_ecrit_reel(unite["chemin_abs"])
-    livrables_reel = {v: os.path.lexists(os.path.join(racine_lab, v)) for v in ecrit_reel}
+    if ecrit_reel is None:
+        ecrit_reel = _lire_ecrit_reel(unite["chemin_abs"], racine_lab)
     cache_ctx["nouveau"][chemin_rel] = {
-        "signature": signature, "ecrit": ecrit_reel, "livrables": livrables_reel,
+        "signature": signature, "ecrit": ecrit_reel, "empreinte_livrables": _livrables_pour_cache(racine_lab, ecrit_reel),
         "etat": etat, "raison": raison, "meta": meta,
     }
     cache_ctx["recalculees"] += 1
@@ -1273,6 +1638,12 @@ def _deriver_feuille_cache(unite, racine_lab, cache_ctx, chemin_cadrage_suppleme
 
 
 # --- Agrégation ----------------------------------------------------------------------------------
+def _raison_a_juger(unite):
+    """La raison d'une unité `à juger` (le seul état non terminal et non indéterminé qui en porte une : `verdict-perime`), None
+    pour tout autre état — la remonte du plan à la phase et au cycle pour que INDEX.md et STATE.md la rendent."""
+    return unite.get("raison") if unite["etat"] == "à juger" else None
+
+
 def agreger(etats):
     """Première unité (déjà triée par nom) dont l'état n'est ni close ni abandonné ni remplacé ;
     si toutes sont terminales, close prime dès qu'au moins une l'est, sinon abandonné."""
@@ -1322,7 +1693,7 @@ def _agreger_plans(phase, racine_lab, cache_ctx=None):
         return ("indéterminé", "plan-indetermine:" + premier["nom"], meta_phase, plans_derives)
     courant = agreger(plans_derives)
     if courant["etat"] not in TERMINAUX:
-        return (courant["etat"], None, meta_phase, plans_derives)
+        return (courant["etat"], _raison_a_juger(courant), meta_phase, plans_derives)
     if any(p["etat"] == "close" for p in plans_derives):
         return ("close", None, meta_phase, plans_derives)
     return ("abandonné", None, meta_phase, plans_derives)
@@ -1402,7 +1773,7 @@ def deriver_cycle(cycle, racine_lab, cache_ctx=None):
                 "phase_courante": premiere["nom"], "phases": phases_derivees}
     courante = agreger(phases_derivees)
     if courante["etat"] not in TERMINAUX:
-        return {"nom": cycle["nom"], "chemin": chemin, "etat": courante["etat"], "raison": None,
+        return {"nom": cycle["nom"], "chemin": chemin, "etat": courante["etat"], "raison": _raison_a_juger(courante),
                 "phase_courante": courante["nom"], "phases": phases_derivees}
     if any(p["etat"] == "close" for p in phases_derivees):
         return {"nom": cycle["nom"], "chemin": chemin, "etat": "close", "raison": None,
@@ -1587,6 +1958,45 @@ def _jeton_journal(valeur, repli):
     return jeton
 
 
+# Journal de D1 (Phase 46, 46-07 ; P46-D-07a) : copie ast-identique de `inscrire_surveillance` dans planning-hook.sh, recalc-planning.sh,
+# poser-verdict.sh et deroger-gate.sh (un contrôle de test-d1-surveillance.sh compare les arbres de syntaxe, R-D1-09) : les écrivains
+# du moteur y inscrivent ce qu'ils écrivent, le hook y trace ce qu'il observe.
+def inscrire_surveillance(racine, genre, chemin_rel, empreinte, par, source):
+    """Ajoute UNE ligne au journal de D1, `<racine>/.planning/surveillance.log` : `<horodatage ISO UTC>  genre=<g>  chemin=<jeton>  sha256=<hex|absent|->
+    par=<jeton>  source=<seance|reconciliation|->` (deux espaces entre champs), chaque valeur par `_jeton_journal` (injectif : un nom de fichier
+    qui porte un saut de ligne reste UNE ligne). Ajout seul (O_APPEND, O_NOFOLLOW, 0600), sous verrou exclusif quand `fcntl` existe. Un
+    journal qui n'est pas un fichier régulier (lien compris), un dossier de planning en lien, toute erreur : AUCUNE ligne, jamais une
+    exception qui remonte (D1 est fail-open, P46-D-10). Jamais appelée en lecture seule."""
+    try:
+        import time as _temps
+        try:
+            import fcntl as _verrou
+        except ImportError:
+            _verrou = None
+        planning = os.path.join(racine, ".planning")
+        chemin = os.path.join(planning, "surveillance.log")
+        if os.path.islink(planning) or (os.path.lexists(chemin) and not stat.S_ISREG(os.lstat(chemin).st_mode)):
+            return
+        ligne = "{}  genre={}  chemin={}  sha256={}  par={}  source={}\n".format(
+            _temps.strftime("%Y-%m-%dT%H:%M:%SZ", _temps.gmtime()), _jeton_journal(genre, "-"), _jeton_journal(chemin_rel, "-"),
+            _jeton_journal(empreinte, "-"), _jeton_journal(par, "-"), _jeton_journal(source, "-"))
+        descripteur = os.open(chemin, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0), 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(descripteur).st_mode):
+                return
+            if hasattr(os, "fchmod"):
+                os.fchmod(descripteur, 0o600)
+            if _verrou is not None:
+                _verrou.flock(descripteur, _verrou.LOCK_EX)
+            octets = ligne.encode("utf-8")
+            while octets:
+                octets = octets[os.write(descripteur, octets):]
+        finally:
+            os.close(descripteur)
+    except Exception:
+        return
+
+
 def _formater_ligne_journal(horodatage, unite):
     chemin = _jeton_journal(unite["chemin"], "-")
     auteur = _jeton_journal(unite["auteur"], "inconnu")
@@ -1614,6 +2024,8 @@ def ajouter_au_journal(chemin, lignes):
 def _texte_etat_cycle(cycle):
     if cycle["etat"] == "indéterminé":
         return "indéterminé — " + libelle_cycle_indetermine(cycle["raison"], cycle["phases"]) + " (" + cycle["chemin"] + ")"
+    if cycle["etat"] == "à juger" and cycle["raison"] == "verdict-perime":
+        return "à juger — " + libelle_raison(cycle["raison"])
     return cycle["etat"]
 
 
@@ -1905,6 +2317,20 @@ def archiver_socle_v2(planning):
     return 0
 
 
+def inscrire_ecriture_moteur(racine, planning, nom):
+    """D1 (Phase 46, 46-07 ; P46-D-07a) : après une écriture EFFECTIVE de `nom` dans le dossier de planning du lab, inscrit la ligne `moteur` au journal de
+    D1 avec le sha256 du fichier APRÈS écriture : elle explique le changement que le watcher verra. Rien pour un dossier de planning qui n'est pas celui
+    de la racine du lab (un compartiment n'est pas surveillé) ; jamais appelée en lecture seule ; une erreur n'a AUCUN effet sur le code de sortie."""
+    try:
+        if os.path.realpath(planning) != os.path.realpath(os.path.join(racine, ".planning")):
+            return
+        empreinte = hash_contenu(os.path.join(planning, nom))
+        if empreinte is not None:
+            inscrire_surveillance(racine, "moteur", ".planning/" + nom, empreinte, "recalc-planning.sh", None)
+    except Exception:
+        return
+
+
 def appliquer_ecritures(planning, racine_lab, derivation, cache_ctx, statut_cache):
     try:
         planning_est_lien = stat.S_ISLNK(os.lstat(planning).st_mode)
@@ -1929,12 +2355,16 @@ def appliquer_ecritures(planning, racine_lab, derivation, cache_ctx, statut_cach
     horodatage = datetime.now().astimezone().isoformat(timespec="seconds")
     nouvelles_lignes = [_formater_ligne_journal(horodatage, u) for u in a_ajouter]
     ajouter_au_journal(os.path.join(planning, "cloture.log"), nouvelles_lignes)
+    if nouvelles_lignes:
+        inscrire_ecriture_moteur(racine_lab, planning, "cloture.log")  # d1-moteur-cloture
     lignes_completes, _ = lire_journal(planning)
     ecrits = []
     if ecrire_si_different(os.path.join(planning, "INDEX.md"), rendre_index(derivation, lignes_completes)):
         ecrits.append("INDEX.md")
+        inscrire_ecriture_moteur(racine_lab, planning, "INDEX.md")  # d1-moteur-index
     if ecrire_si_different(os.path.join(planning, "STATE.md"), rendre_state(derivation)):
         ecrits.append("STATE.md")
+        inscrire_ecriture_moteur(racine_lab, planning, "STATE.md")  # d1-moteur-state
     nouveau_cache_texte = json.dumps(
         {
             "cache_schema_version": CACHE_SCHEMA_VERSION,

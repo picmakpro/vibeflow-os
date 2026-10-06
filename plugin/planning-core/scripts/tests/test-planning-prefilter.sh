@@ -32,8 +32,14 @@
 #   structurel indépendant de l'horloge). Propriété (G) : le coût d'une exécution ne dépend d'AUCUN contenu du système de fichiers que l'agent
 #   contrôle (re-audit, tour 2, F-P3 et F-P4 ; PF-CREUX-01) : une config de plus de 64 Kio (creuse de 2 Gio, lien vers elle, de 1 Mio, sur un
 #   ancêtre) fait DIFFÉRER avant toute lecture, 64 lectures de config au plus par exécution (copie instrumentée : le nombre de `grep` d'une
-#   `config.json` est compté, jamais déduit de l'horloge), `_pa` et le compteur hérités de l'environnement sans effet. Les sections se lancent une à une : VF_PF_SECTIONS=table,bornes | corpus | mutants, et
+#   `config.json` est compté, jamais déduit de l'horloge), `_pa` et le compteur hérités de l'environnement sans effet. Les sections se lancent une à une : VF_PF_SECTIONS=table,bornes | corpus | evenements | mutants, et
 #   VF_PF_MUT=<préfixes de mutants séparés par des virgules> (la suite entière dépasse dix minutes sur une machine chargée).
+#
+# Phase 46 (46-10, P46-D-16), section `evenements` : l'équivalence (A)(B)(E) tient sur les payloads des cinq entrées ajoutées (SubagentHandback, SubagentStop,
+#   SessionStart, CwdChanged, FileChanged) : PF-EVT-01 (A et E : sous-ensemble déterministe du banc et des arbres adverses, tout report rejoué), PF-EVT-02 (B : l'oracle
+#   dérive la racine comme le cœur, `depart_evenement` chargé depuis planning-hook.sh ; FileChanged : `file_path` de premier niveau ; cas croisés fichier-adhérent /
+#   cwd-dev), PF-EVT-03 (plancher de court-circuits et de reports par événement) ; mutant MUT-PF-EVT-FILECHANGED (oracle qui ignore le `file_path` de premier niveau).
+#   VF_PF_SECTIONS=evenements les rejoue seuls ; VF_PF_MUT=MUT-PF-EVT rejoue le seul mutant neuf par la section `mutants`.
 #
 # Mutants (chacun doit rougir la garde, trace nom · assertion · attendu · obtenu) : (i) sortie trop tôt — sans vérifier cycles-v1, sans le
 # cwd du payload, sans le cwd du processus, sans les ancêtres ; (ii) sans résolution physique, sans le lien pendant ; (iii) valeur longue,
@@ -219,8 +225,11 @@ class Ctx:
         rc, out, err = self.lancer(cmd_pre, cas.brut, cas.cwd_proc, shell=shell)
         return out.decode("utf-8", "replace") if rc == 0 else "ERR rc=%d %s" % (rc, court(err))
 
-    def coeur(self, cas):
-        """Oracle : ce que le cœur juge de ce payload — `adherent`, `non`, `invalide` (JSON refusé, code 3), `doute` (l'analyse lève)."""
+    def coeur(self, cas, ignorer_file_path=False):
+        """Oracle : ce que le cœur juge de ce payload — `adherent`, `non`, `invalide` (JSON refusé, code 3), `doute` (l'analyse lève). Le chemin de
+        départ est celui du cœur POUR CHAQUE ÉVÉNEMENT (`evenement_de` et `depart_evenement`, chargés depuis planning-hook.sh, jamais réécrits ;
+        FileChanged : le `file_path` de premier niveau). Un événement que le cœur ne connaît pas sort en silence : `non`. `ignorer_file_path` n'est
+        que le mutant MUT-PF-EVT-FILECHANGED : l'oracle d'avant la 46, qui lit le chemin dans `tool_input` ou le cwd, jamais le `file_path` de premier niveau."""
         ns = self.ns
         f = self.unique("transport")
         with open(f, "wb") as fh:
@@ -234,7 +243,13 @@ class Ctx:
                 return "invalide"
             try:
                 ecrit, cwd, variantes = ns["cible_de"](payload, self.home)
-                depart = ecrit if ecrit is not None else (cwd if cwd is not None else os.getcwd())
+                evenement = ns["evenement_de"](payload)
+                if evenement not in ns["EVENEMENTS_CONNUS"]:
+                    return "non"
+                if ignorer_file_path and evenement == ns["EVT_FILE_CHANGED"]:
+                    depart = ecrit if ecrit is not None else (cwd if cwd is not None else os.getcwd())
+                else:
+                    depart = ns["depart_evenement"](payload, evenement, cwd, ecrit)
                 racine = ns["racine_lab"](depart)
                 adh = racine is not None and ns["verifier_adhesion"](os.path.join(racine, ".planning"))["adherente"]
                 for forme in variantes:
@@ -486,10 +501,10 @@ def parser_banc(texte):
     return ordre, labs
 
 
-def corpus_banc(ctx):
+def fabriquer_banc(ctx):
+    """Les labs du banc, fabriqués sous le dossier temporaire de la suite. Rend (racine, ordre des labs, description des labs)."""
     ordre, labs = parser_banc(open(ctx.banc, encoding="utf-8").read())
     racine = os.path.realpath(ctx.unique("banc"))
-    cas = []
     for nom in ordre:
         dest = os.path.join(racine, nom)
         os.makedirs(dest, exist_ok=True)
@@ -500,6 +515,12 @@ def corpus_banc(ctx):
         for chemin, cible in labs[nom]["liens"]:
             os.makedirs(os.path.dirname(os.path.join(dest, chemin)), exist_ok=True)
             os.symlink(cible, os.path.join(dest, chemin))
+    return racine, ordre, labs
+
+
+def corpus_banc(ctx):
+    racine, ordre, labs = fabriquer_banc(ctx)
+    cas = []
     for nom in ordre:
         dest = os.path.join(racine, nom)
         lots = [(e["chemin"], e["cwd"]) for e in labs[nom]["ecritures"]] + [("-", None)]
@@ -740,7 +761,7 @@ def verdict_pre(ctx, cmd_pre, cas, shell=None):
     return ctx.pre(cmd_pre, cas, shell)
 
 
-def garde(ctx, cmd, cas_liste, mutant=False, max_ko=8, avec_a=True):
+def garde(ctx, cmd, cas_liste, mutant=False, max_ko=8, avec_a=True, pas_e=8, pas_e_absent=16):
     """Rend (violations, stats). Une violation = (assertion, attendu, obtenu, cas). Propriétés A, B, C, D selon `mutant`."""
     np, pre = ctx.derive(cmd)
     if np is None:
@@ -757,11 +778,11 @@ def garde(ctx, cmd, cas_liste, mutant=False, max_ko=8, avec_a=True):
         rep = {nom: ctx.pre(pre, c, argv) for nom, argv in (shells if c.pos % 3 == 0 or c.cat == "banc" else shells[:1])}
         a = None
         e = None
-        if avec_a and rep[shells[0][0]] == "DEFER" and c.pos % 8 == 0:
+        if avec_a and rep[shells[0][0]] == "DEFER" and c.pos % pas_e == 0:
             # (E) DEFER ⇒ le chemin d'avant est INCHANGÉ : la commande complète rend exactement la sortie de la commande sans pré-filtre
             # (le pré-filtre ne laisse aucune variable ni aucun effet de bord derrière lui) ; un cas sur huit, script présent, un sur seize, script absent
             e = [(ctx.lancer(np, c.brut, c.cwd_proc, ctx.scripts_dir), ctx.lancer(cmd, c.brut, c.cwd_proc, ctx.scripts_dir), False)]
-            if c.pos % 16 == 0:
+            if c.pos % pas_e_absent == 0:
                 e.append((ctx.lancer(np, c.brut, c.cwd_proc, ctx.vide), ctx.lancer(cmd, c.brut, c.cwd_proc, ctx.vide), True))
         if avec_a and rep[shells[0][0]] == "SHORT":
             a = []
@@ -1164,6 +1185,173 @@ def sec_corpus(ctx, L):
     return total
 
 
+# --- événements nouveaux (46-10, P46-D-16) : équivalence du pré-filtre sur SubagentHandback, SubagentStop, SessionStart, CwdChanged, FileChanged -----
+EVT5 = ("SubagentHandback", "SubagentStop", "SessionStart", "CwdChanged", "FileChanged")
+PLANCHER_COURTS_EVT = 8
+PLANCHER_DIFFERES_ADH_EVT = 4
+MUTANT_EVT = "MUT-PF-EVT-FILECHANGED"
+
+
+def payload_evenement(evt, cwd, fichier=None, extra=None):
+    """Payload du harnais pour l'entrée `evt` (champs de l'interface du plan 46-10, compact) : SubagentHandback est un outil de PreToolUse
+    (`tool_name`, `tool_input.message`) ; SubagentStop porte `agent_id`, `agent_type`, `last_assistant_message`, `permission_mode` ; SessionStart
+    `source` ; CwdChanged `old_cwd`, `new_cwd`, `cwd` ; FileChanged `file_path` et `event` de PREMIER niveau (clé omise quand `fichier` est None)."""
+    if evt == "SubagentHandback":
+        obj = payload_obj("SubagentHandback", {"message": "rapport du sous-agent"}, cwd)
+        obj.update({"agent_id": "agent-test", "agent_type": "agent-test"})
+    else:
+        obj = {"session_id": "sess-test", "transcript_path": "transcript.jsonl"}
+        if cwd is not None:
+            obj["cwd"] = cwd
+        obj["hook_event_name"] = evt
+        if evt == "SubagentStop":
+            obj.update({"permission_mode": "default", "stop_hook_active": False, "agent_id": "agent-test", "agent_type": "agent-test",
+                        "agent_transcript_path": "sub.jsonl", "last_assistant_message": "fin"})
+        elif evt == "SessionStart":
+            obj.update({"source": "startup", "model": "modele-test"})
+        elif evt == "CwdChanged":
+            obj.update({"old_cwd": cwd, "new_cwd": cwd})
+        elif evt == "FileChanged":
+            if fichier is not None:
+                obj["file_path"] = fichier
+            obj["event"] = "change"
+        else:
+            raise KeyError(evt)
+    if extra:
+        obj.update(extra)
+    return compact(obj)
+
+
+def cas_croises(ctx, L):
+    """(événement, identifiant, payload, cwd du processus, jugement attendu du cœur). Les jugements attendus sont posés PAR CONSTRUCTION (le lab
+    où le cœur dérive la racine est connu de la fabrication de l'arbre) et servent à CALIBRER l'oracle : un oracle qui ne lit pas la racine
+    comme le cœur (FileChanged : le `file_path` de premier niveau) ne rend plus ces jugements."""
+    adh, dev, plain, pfx, pfxdev = L["adh"], L["dev"], L["plain"], L["pfx"], L["pfxdev"]
+    etat = lambda lab: lab + "/.planning/STATE.md"
+    c = []
+    c.append(("FileChanged", "fichier adhérent, cwd dev, processus dev", payload_evenement("FileChanged", dev, etat(adh)), dev, "adherent"))
+    c.append(("FileChanged", "fichier adhérent, cwd dev, processus hors lab", payload_evenement("FileChanged", dev, etat(adh)), plain, "adherent"))
+    c.append(("FileChanged", "fichier adhérent, sans cwd, processus hors lab", payload_evenement("FileChanged", None, etat(adh)), plain, "adherent"))
+    c.append(("FileChanged", "fichier adhérent par lien, cwd dev", payload_evenement("FileChanged", dev, L["racine"] + "/lnk-adh/.planning/STATE.md"), dev, "adherent"))
+    c.append(("FileChanged", "fichier dans pfx (adhérent), cwd pfx-dev", payload_evenement("FileChanged", pfxdev, etat(pfx)), pfxdev, "adherent"))
+    c.append(("FileChanged", "fichier dev, cwd adhérent, processus adhérent", payload_evenement("FileChanged", adh, etat(dev)), adh, "non"))
+    c.append(("FileChanged", "file_path relatif, cwd adhérent (le cœur n'en dérive aucune racine)", payload_evenement("FileChanged", adh, ".planning/STATE.md"), adh, "non"))
+    c.append(("FileChanged", "sans file_path, cwd adhérent (le cœur n'en dérive aucune racine)", payload_evenement("FileChanged", adh, None), adh, "non"))
+    for evt in EVT5:
+        c.append((evt, "cwd dev, processus adhérent (le cœur lit le cwd du payload)", payload_evenement(evt, dev, etat(dev) if evt == "FileChanged" else None), adh, "non"))
+    for evt in EVT5[:4]:
+        c.append((evt, "sans cwd, processus adhérent (le cœur lit le cwd du processus)", payload_evenement(evt, None), adh, "adherent"))
+    c.append(("CwdChanged", "cwd dev, new_cwd adhérent (limite (ao) : le cœur lit `cwd`, jamais `new_cwd`)", payload_evenement("CwdChanged", dev, extra={"old_cwd": adh, "new_cwd": adh}), dev, "non"))
+    return c
+
+
+def corpus_evenements(ctx, L):
+    """Rend ({événement: [Cas]}, [Cas croisés avec jugement attendu]). Sous-ensemble DÉTERMINISTE du banc (14 labs) et des arbres adverses
+    (14 lieux de la forêt : adhérent, dev, sans config, hors lab, worktree, config échappée, illisible, FIFO, lien de config, lien vers un lab
+    adhérent, lien pendant…), chaque événement joué dans chaque lieu, FileChanged sur deux fichiers par lieu ; plus les cas CROISÉS (fichier dans
+    un lab, cwd dans un autre). Aucune graine aléatoire : rejouable à l'identique."""
+    par = {e: [] for e in EVT5}
+
+    def ajouter(evt, ident, brut, proc, note, attendu=None):
+        cas = Cas("evenements", "evt:%s:%s" % (evt, ident), brut, proc, note)
+        cas.attendu = attendu
+        par[evt].append(cas)
+        return cas
+    racine, ordre, _ = fabriquer_banc(ctx)
+    for nom in ordre:
+        dest = os.path.join(racine, nom)
+        for evt in EVT5:
+            ajouter(evt, "banc:" + nom, payload_evenement(evt, dest, dest + "/.planning/STATE.md"), dest, "banc %s" % nom)
+    lieux = [(n, L[n]) for n in ("adh", "dev", "nodev", "plain", "wt", "esc", "illisible", "fifo", "cfglink", "dur", "hl", "accent")] \
+        + [("lnk-adh", L["racine"] + "/lnk-adh"), ("pend-adh", L["racine"] + "/pend-adh")]
+    for i, (nom, base) in enumerate(lieux):
+        proc = base if (i % 2 == 0 and os.path.isdir(base)) else L["plain"]
+        for evt in EVT5:
+            if evt == "FileChanged":
+                for suffixe in ("/.planning/STATE.md", "/sub/neuf.md"):
+                    ajouter(evt, "foret:%s%s" % (nom, suffixe), payload_evenement(evt, base, base + suffixe), proc, "forêt %s%s" % (nom, suffixe))
+            else:
+                ajouter(evt, "foret:" + nom, payload_evenement(evt, base), proc, "forêt %s" % nom)
+    croises = []
+    for evt, ident, brut, proc, attendu in cas_croises(ctx, L):
+        croises.append(ajouter(evt, "croise:" + ident, brut, proc, ident, attendu))
+    return par, croises
+
+
+def verifier_croises(ctx, cmd, croises, ignorer_file_path=False):
+    """Propriété (B) sur les cas croisés : l'oracle rend le jugement attendu (il dérive la racine comme le cœur) ET le pré-filtre ne court-circuite
+    jamais un cas que le cœur juge adhérent. `ignorer_file_path` : l'oracle du mutant MUT-PF-EVT-FILECHANGED."""
+    _, pre = ctx.derive(cmd)
+    viol = []
+    for c in croises:
+        juge = ctx.coeur(c, ignorer_file_path)
+        if juge != c.attendu:
+            viol.append(("(B) l'oracle d'adhésion dérive la racine comme le cœur pour chaque événement (FileChanged : `file_path` de premier niveau)",
+                         "cœur : %s" % c.attendu, "oracle : %s" % juge, c))
+        elif c.attendu == "adherent":
+            verdict = ctx.pre(pre, c)
+            if verdict != "DEFER":
+                viol.append(("(B) le pré-filtre ne court-circuite jamais un payload que le cœur juge adhérent", "DEFER (cœur : adherent)", verdict, c))
+    return viol
+
+
+def mutant_evenements(ctx, croises, original_propre):
+    """MUT-PF-EVT-FILECHANGED : l'oracle qui ignore le `file_path` de premier niveau de FileChanged fait rougir PF-EVT-02 sur les cas FileChanged
+    croisés (fichier dans un lab adhérent, cwd dans un lab dev) ; il ne fait rougir aucun autre événement."""
+    if not original_propre:
+        print("  ✗ %s NON TUÉ" % MUTANT_EVT)
+        print("    assertion : condition (a) : l'original passe PF-EVT-02")
+        print("    attendu (original) : vert")
+        print("    obtenu (mutant)     : l'original rougit déjà")
+        return
+    viol = verifier_croises(ctx, ctx.cmd, croises, ignorer_file_path=True)
+    sur_file = [v for v in viol if v[3].ident.startswith("evt:FileChanged:")]
+    autres = [v for v in viol if not v[3].ident.startswith("evt:FileChanged:")]
+    if not sur_file:
+        print("  ✗ %s NON TUÉ" % MUTANT_EVT)
+        print("    assertion : PF-EVT-02 rougit sous l'oracle qui ignore le `file_path` de premier niveau de FileChanged")
+        print("    attendu (original) : vert")
+        print("    obtenu (mutant)     : vert (mutant non opposable)")
+    elif autres:
+        print("  ✗ %s NON TUÉ" % MUTANT_EVT)
+        print("    assertion : le mutant ne vise que FileChanged")
+        print("    attendu (original) : aucune violation hors FileChanged")
+        print("    obtenu (mutant)     : %d violation(s) hors FileChanged, première : %s" % (len(autres), autres[0][3].ident))
+    else:
+        a, b, c, cas = sur_file[0]
+        print("  ✓ %s TUÉ — PF-EVT-02 rougit sur %d cas FileChanged · cas %s (%s) · assertion : %s · attendu (original) : %s · obtenu (mutant) : %s"
+              % (MUTANT_EVT, len(sur_file), cas.ident, cas.note, a, b, court(c, 120)))
+
+
+def sec_evenements(ctx, L):
+    par, croises = corpus_evenements(ctx, L)
+    viol_01, viol_02, stats, details = [], [], {}, []
+    for evt in EVT5:
+        t0 = time.time()
+        viol, st = garde(ctx, ctx.cmd, par[evt], pas_e=1, pas_e_absent=4)
+        stats[evt] = st
+        viol_02 += [v for v in viol if v[0].startswith("(B)")]
+        viol_01 += [v for v in viol if not v[0].startswith("(B)")]
+        details.append("%s %d cas (%d SHORT, %d DEFER dont %d adhérents selon le cœur ; %d rejeux A, %d rejeux E ; %.0f s)"
+                       % (evt, st["cas"], st["courts"], st["differes"], st["differes_adh"], st["A_rejeux"], st["E_rejeux"], time.time() - t0))
+    viol_02 += verifier_croises(ctx, ctx.cmd, croises)
+    montrer("PF-EVT-01", viol_01, "équivalence (A)(E) sur les payloads des cinq entrées, sous quatre shells au besoin : chaque court-circuit correspond à un octet vide et au code 0 de la "
+            "commande sans pré-filtre, script présent comme script absent, et la commande complète rend la même chose ; chaque report rend, script présent (et absent sur un cas "
+            "sur quatre), exactement la sortie de la commande sans pré-filtre — " + " · ".join(details))
+    montrer("PF-EVT-02", viol_02, "propriété (B) : le pré-filtre ne court-circuite jamais un payload que le cœur juge adhérent, l'oracle dérivant la racine comme le cœur pour chaque "
+            "événement (`depart_evenement` chargé depuis planning-hook.sh ; FileChanged : `file_path` de premier niveau) ; %d cas croisés calibrent l'oracle "
+            "(fichier dans un lab adhérent et cwd dans un lab dev : jamais de court-circuit)" % len(croises))
+    manques = []
+    for evt in EVT5:
+        st = stats[evt]
+        if st["courts"] < PLANCHER_COURTS_EVT or st["differes_adh"] < PLANCHER_DIFFERES_ADH_EVT or st["A_rejeux"] != 2 * st["courts"] or st["E_rejeux"] < st["differes"]:
+            manques.append(("plancher de %s : au moins %d court-circuits, %d reports adhérents, tous rejoués (A et E)" % (evt, PLANCHER_COURTS_EVT, PLANCHER_DIFFERES_ADH_EVT),
+                            "courts >= %d, reports adhérents >= %d, A = 2 x courts, E >= reports" % (PLANCHER_COURTS_EVT, PLANCHER_DIFFERES_ADH_EVT),
+                            "courts=%d, reports adhérents=%d, A=%d, E=%d (reports=%d)" % (st["courts"], st["differes_adh"], st["A_rejeux"], st["E_rejeux"], st["differes"]), None))
+    montrer("PF-EVT-03", manques, "plancher par événement (jamais un vert à vide) : " + " · ".join("%s %d SHORT, %d DEFER adhérents" % (e, stats[e]["courts"], stats[e]["differes_adh"]) for e in EVT5))
+    mutant_evenements(ctx, croises, not viol_02)
+
+
 MUTANTS = [
     ("IV-PK-REMIS", 'case $_pa/ in "$_pd"/*) _pa=$_pt; return 0 ;; esac; vf_pc "$_pd" || return 1; if [ "$_pd" = / ]; then _pa=$_pt; return 0; fi;',
      'case $_pk in *"$_pn$_pd$_pn"*) ;; *) _pk=$_pk$_pd$_pn; vf_pc "$_pd" || return 1 ;; esac; [ "$_pd" = / ] && return 0;',
@@ -1196,9 +1384,17 @@ MUTANTS = [
 def sec_mutants(ctx, L, familles):
     cas_tous = [c for _, liste, _ in familles for c in liste]
     filtre = os.environ.get("VF_PF_MUT", "")
+    choisis = 0
+    # famille neuve du plan 46-10 (MUT-PF-EVT-FILECHANGED, oracle de la section `evenements`) : rejouable seule par VF_PF_MUT=MUT-PF-EVT, jamais deux fois en
+    # exécution par défaut (la section `evenements` la joue déjà)
+    if filtre and any(p and (MUTANT_EVT.startswith(p) or p.startswith("MUT-PF-EVT")) for p in filtre.split(",")):
+        choisis += 1
+        _, croises = corpus_evenements(ctx, L)
+        mutant_evenements(ctx, croises, not verifier_croises(ctx, ctx.cmd, croises))
     for nom, motif, remplacement, role in MUTANTS:
         if filtre and not any(nom.startswith(p) for p in filtre.split(",")):
             continue
+        choisis += 1
         n = ctx.cmd.count(motif)
         if n != 1:
             print("  ✗ MUT-%s NON TUÉ" % nom)
@@ -1232,6 +1428,8 @@ def sec_mutants(ctx, L, familles):
                 traces.append("%s : cas %s (%s) · assertion : %s · attendu (original) : %s · obtenu (mutant) : %s"
                               % (src, cas.ident if cas else "-", cas.note if cas else "-", a, b, court(c, 120)))
         print("  ✓ MUT-%s TUÉ — %s · %s" % (nom, role, " ‖ ".join(traces)))
+    if filtre and choisis == 0:
+        ko("MUT-FILTRE", "VF_PF_MUT=%s sélectionne au moins un mutant (jamais un vert à vide)" % filtre, ">= 1 mutant", "aucun")
 
 
 def main():
@@ -1240,19 +1438,23 @@ def main():
     if not sec_commande(ctx):
         sys.exit(1)
     L = foret(ctx)
+    mutants_faits = False
     for nom in sys.argv[1].split(","):
         if nom == "table":
             sec_table(ctx, L)
         elif nom == "bornes":
             sec_bornes(ctx, L)
-        elif nom == "mutants":
+        elif nom == "mutants" and not mutants_faits:
+            mutants_faits = True
             familles = [(n, liste, None) for n, liste in (("banc", corpus_banc(ctx)), ("adverse", corpus_adverse(ctx, L)), ("generatif", corpus_generatif(ctx, L)), ("arbres", corpus_arbres(ctx)))]
             sec_mutants(ctx, L, familles)
         elif nom == "corpus":
             familles = sec_corpus(ctx, L)
-            if "mutants" in sys.argv[1].split(","):
+            if "mutants" in sys.argv[1].split(",") and not mutants_faits:
+                mutants_faits = True
                 sec_mutants(ctx, L, familles)
-            break
+        elif nom == "evenements":
+            sec_evenements(ctx, L)
 
 
 main()
@@ -1276,7 +1478,7 @@ run_sections() { # <sections séparées par des virgules>
   fi
 }
 
-run_sections "${VF_PF_SECTIONS:-table,bornes,corpus,mutants}"
+run_sections "${VF_PF_SECTIONS:-table,bornes,corpus,mutants,evenements}"
 
 T_FIN="$(date +%s)"
 echo "DUREE s=$((T_FIN - T_DEBUT))"

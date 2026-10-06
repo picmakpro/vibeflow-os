@@ -7,7 +7,7 @@
 > Sur un lab de code, le planning du **projet** appartient au moteur de développement : ce module
 > redirige vers le verbe adéquat au lieu de produire un format concurrent (ADR-055).
 
-**Type** : `skill + references + scripts` · **Version** : v2.9.0 · **Dépend de** : rien.
+**Type** : `skill + references + scripts` · **Version** : v2.10.0 · **Dépend de** : rien.
 
 ---
 
@@ -100,7 +100,7 @@ planning-core/
     rejeu-gates.sh             # rejeu en lecture seule d'un lab sur copie : faux refus, faux accept (Phase 45)
     rejeu-reel.sh              # geste de rejeu sur lab réel, empreinte de tout l'arbre avant et après (Phase 45)
     workstream-policy.sh       # politique unique de nom de workstream, à sourcer (suite test-workstream-policy.sh)
-    tests/                     # 12 suites (planning-core, hooks, hardening, detect-*, recalc-planning, gates, rejeu)
+    tests/                     # 18 suites (planning-core, hooks, hardening, detect-*, recalc-planning, gates, rejeu, pré-filtre, G4′, D1, clôture, canary de juge)
 ```
 
 ## Moteur par cycles (recalc-planning.sh)

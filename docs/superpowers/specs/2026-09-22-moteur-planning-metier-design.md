@@ -212,7 +212,7 @@ Keystone — **il est postérieur de 16 jours**, n'est pas bloquant, et n'est pa
 `clients/<nom>/diagnostics/2026-09-22/`, la phase pointe dessus. Trois altitudes possibles — plan,
 phase, cycle.
 
-### 3.1 Les huit états dérivés
+### 3.1 Les neuf états dérivés
 
 | Statut | Ce que la machine constate |
 |---|---|
@@ -226,6 +226,12 @@ phase, cycle.
 | **`indéterminé`** | **les signaux se contredisent** |
 
 Plus `abandonné | remplacé | gelé`, **non dérivables**, posés par dérogation nominative.
+
+**Amendement du 2026-10-03 (P46-D-04).** La machine dérive **neuf** états, non plus huit : s'ajoute `à clore` — constats du verdict tous `passé`, deux empreintes conformes (P46-D-03, §10), `SUMMARY.md` absent. Il est **non terminal** : la phase attend sa clôture. Il remplace `indéterminé` (motif `verdict-passe-sans-SUMMARY.md`) pour ce seul cas ; P44-D-08 est levée sur ce point, et sur ce point seulement. Le titre de la section a été aligné sur ce décompte le 2026-10-06 (« Les neuf états dérivés », fix-46-c, F5) ; le tableau d'origine reste lisible tel qu'il a été écrit.
+Décision (Willy, AskUserQuestion session principale, 2026-10-03, Q4 = a) : un neuvième état dérivé `à clore`, non terminal, à la place d'`indéterminé` pour « verdict passé sans SUMMARY.md » (P46-D-04).
+
+**Précision du 2026-10-03 (P46-D-03b).** Le recalcul vérifie aussi les deux empreintes du verdict. Un verdict périmé **avant** `SUMMARY.md` rend `à juger` (motif `verdict-perime`) ; **après** `SUMMARY.md`, `indéterminé` (motif `livrable-modifie-apres-cloture`). Un `VERDICT.md` sans l'empreinte des livrables est traité comme périmé.
+Décision du manager de mission (annoncée à Willy en session principale le 2026-10-03, renversable) : cette précision (P46-D-03b).
 
 ### 3.2 Pourquoi la v1 était fausse — et ce que ça impose
 
@@ -343,6 +349,26 @@ d'appeler. La v2 s'appuie sur les événements qu'il ne peut pas ne pas déclenc
 | **G7** | on crée un `.planning/` sans `.claude/` (agents + mémoire) ni marqueur de projet de code | `PreToolUse(Write)` | **refus** |
 | **D1** | — *ne refuse rien* : signale toute écriture sur un chemin surveillé | **`FileChanged`** | **détection** |
 
+**Amendement du 2026-10-03 (P46-D-01, P46-D-02).** La table d'origine n'est pas réécrite ; elle se lit ainsi pour G3, G4 et G4′ :
+
+- **G3** refuse **par deny** l'écriture par outil (`Write`, `Edit`, `NotebookEdit`) d'un `CLOTURE.md` d'unité quand un livrable déclaré par `ecrit:` du `PLAN.md` voisin est absent, vide ou un lien.
+- **G4** refuse **par deny** l'écriture par outil d'un `SUMMARY.md` d'unité quand le `VERDICT.md` voisin est absent, invalide, porte un constat `échec` ou une empreinte périmée. Le prédicat est réévalué à chaque écriture : retoucher le `SUMMARY.md` d'une unité close reste permis tant que le verdict tient.
+- G3 et G4 sont portés par `PreToolUse`, dans le hook central de la Phase 45. **L'événement de mise à jour de tâche (`TaskCompleted`) n'est pas utilisé** : il n'existe pas par défaut sur les modèles récents, il ne refuse que par code de sortie et il ne porte pas le lien vers le plan.
+- **G4′** est porté par `PreToolUse(SubagentHandback)` (le rapport est dans `tool_input.message`), avec pour repli, hors mode auto, `SubagentStop` par `decision: "block"` (plafond natif de huit relances). Périmètre : les sous-agents de rôle worker ou producteur d'un lab adhérent (P46-D-02) ; les juges, le fil principal, l'agent inconnu et les `agent_type` vides en sont exclus.
+- Les écritures par `Bash` restent ouvertes : le recalcul les voit (R4, R7) et D1 les trace.
+- G2′ et la ligne `TaskCompleted` du texte d'origine restent écrites telles quelles : leur point d'accroche se re-décide au cadrage de la Phase 47 (P46-D-19).
+
+Décision (Willy, AskUserQuestion session principale, 2026-10-03, Q1 = a) : G3 et G4 en `PreToolUse` sur l'écriture de `CLOTURE.md` et de `SUMMARY.md` (P46-D-01).
+Décision (Willy, AskUserQuestion session principale, 2026-10-03, Q2 = a) : G4′ en `PreToolUse(SubagentHandback)`, repli `SubagentStop` hors mode auto, périmètre worker et producteur d'un lab adhérent (P46-D-02).
+Décision du manager de mission (annoncée à Willy en session principale le 2026-10-03, renversable) : en mode dégradé (script ou `python3` absent) hors mode auto, le repli `SubagentStop` est fail-open — sans rôle dérivable, un blocage statique arrêterait chaque sous-agent, juges et agents internes compris, huit fois de suite ; **G4′ est donc ouvert dans ce cas** (P46-D-10a).
+
+**Amendement du 2026-10-03 (P46-D-02b).** Le périmètre de G4′ est resserré aux workers et producteurs **qui ont Bash** dans un lab adhérent — le champ `tools:` de leur fichier d'agent le déclare ; restriction livrée par le plan 46-06. Un agent sans Bash est couvert par le verdict du juge (G4), qui tient alors la preuve. Le motif est celui qui exclut déjà les juges : sans Bash, aucune sortie de commande brute n'est possible, le rapport serait refusé à chaque fois.
+Décision (Willy, AskUserQuestion session principale, 2026-10-03, Q9 = a) : P46-D-02b — G4′ ne vise que les workers et producteurs qui ont Bash dans un lab adhérent ; ce n'est pas une décision du manager de mission, et ce n'est pas une hypothèse renversable par lui.
+**Précision du 2026-10-05 (P46-D-02b, plan 46-06).** Le périmètre réellement livré lit la définition de l'agent : G4′ vise un worker ou un producteur dont le champ `tools:` nomme `Bash` (ou une forme `Bash(…)`) ou est absent — un agent sans champ `tools:` hérite des outils de la session, Bash compris, et reste dans le périmètre — et dont `disallowedTools` ne retire pas `Bash` ; les juges, les managers, le fil principal (`agent_id` ou `agent_type` absent ou vide) et l'agent inconnu, ambigu ou illisible en sont exclus. Cette restriction aux agents qui ont Bash est l'arbitrage de Willy (AskUserQuestion session principale, 2026-10-03, Q9 = a), P46-D-02b. Le repli `SubagentStop` n'évalue rien en mode auto (`permission_mode` égal à `auto`) : le rapport a déjà passé le `PreToolUse` de `SubagentHandback`, et un second jugement le refuserait deux fois.
+
+**D1 (P46-D-07).** D1 devient `FileChanged` + une réconciliation par hash au `SessionStart` : en séance, la surveillance des fichiers d'un lab adhérent ; entre les séances, la comparaison des empreintes au dernier état connu ; un changement que rien n'explique est tracé comme contournement. D1 ne refuse jamais.
+Décision (Willy, AskUserQuestion session principale, 2026-10-03, Q7 = b) : `FileChanged` + réconciliation par hash au `SessionStart` (P46-D-07).
+
 **G1 et G2′ sont les deux gardes d'ordre** : pas de plan sans cadrage, pas de clôture sur un
 périmètre non tenu.
 
@@ -365,6 +391,9 @@ périmètre non tenu.
 
 1. **Le refus passe par `permissionDecision: deny`, jamais par le code de sortie.** Mesure DIV-2 du
    dépôt : `exit 2` *« fuit en plus le chemin »*.
+
+   **Amendement du 2026-10-03 (P46-D-10).** Contrat de sortie **par événement** : `PreToolUse` refuse par un JSON `permissionDecision: "deny"` en code 0 ; `SubagentStop` refuse par un JSON `decision: "block"` en code 0, **jamais par un code 2** ; `SessionStart`, `CwdChanged` et `FileChanged` ne refusent jamais. Aucun message ne porte de chemin absolu hors du lab ni les chaînes « no such file » ou « can't open ». En mode dégradé, le repli refuse aussi `SubagentHandback`, sans dériver le rôle ; hors mode auto, le repli `SubagentStop` reste ouvert (P46-D-10a, §5).
+   Décision du manager de mission (annoncée à Willy en session principale le 2026-10-03, renversable) : ce contrat de sortie par événement (P46-D-10).
 2. **Le comportement d'un gate qui ne peut pas s'exécuter doit être déclaré — et certains cas ne
    se choisissent pas.** Ce moteur choisit **fail-closed pour G1, G3, G4, G5, G6** et **fail-open
    pour G2**. Mais trois défaillances sont fail-open **par le harnais, sans réglage possible** : un
@@ -374,6 +403,9 @@ périmètre non tenu.
    hook bloqué pour faire office de gate »*. Corollaire non négociable : **tout gate doit se prouver
    en vie**, par un canary qui vérifie qu'il refuse encore ce qu'il est censé refuser. Un gate
    supposé est un gate absent.
+
+   **Précision du 2026-10-03 (P46-D-10).** G4′ s'ajoute à la liste fail-closed, dans le périmètre adhérent (erreur interne = refus) ; G3 et G4 le restent, empreintes comprises. D1 est fail-open, déclaré : une trace perdue en séance est rattrapée par la réconciliation au `SessionStart`.
+   Décision du manager de mission (annoncée à Willy en session principale le 2026-10-03, renversable) : cette liste fail-closed étendue (P46-D-10).
 3. **Tout gate d'écriture doit prouver qu'il refuse à tort dans une proportion mesurée.** Le prior
    empirique du corpus est terrifiant : un gate d'écriture mal calibré a **refusé 200 des 206
    entrées du dépôt pendant cinq jours**, en silence — **97 % de faux refus** — parce qu'une regex
@@ -641,8 +673,15 @@ re-cadrée. **L'exemption n'est écrite nulle part.**
   de tours vit dans le contexte d'un manager et **un compact le perd** — le corpus contient déjà
   l'incident : *« je lui ai renvoyé deux fois des pièces qu'il avait rejetées »*, *« un verdict qui
   n'est pas écrit sera refait »*.
+
+  **Amendement du 2026-10-03 (P46-D-03, P46-D-05).** `VERDICT.md` porte **deux empreintes** : `hash` (sha256 du `PLAN.md`, conservé) et `hash_livrables` (empreinte composée des entrées `ecrit:` : une seule implémentation partagée par la pose du verdict, le hook et le recalcul ; aucun lien suivi ; parcours borné, un dépassement est un refus et jamais une empreinte partielle). G4 et le recalcul vérifient les deux ; un écart refuse avec « verdict périmé : re-juger ». Le **plafond est de trois tentatives**, constante du code livré (jamais un fichier du lab), levé seulement par une dérogation nominative couvrant l'unité. Aucun `VERDICT.md` n'existe sur les labs réels (§11.3) : le changement de format ne migre rien.
+  Décision (Willy, AskUserQuestion session principale, 2026-10-03, Q3 = a) : deux empreintes dans `VERDICT.md`, plan et livrables (P46-D-03).
+  Décision (Willy, AskUserQuestion session principale, 2026-10-03, Q5 = a) : plafond de trois tentatives, constante du code, levé par dérogation nominative (P46-D-05).
 - **Le seuil de juge vit dans `config.json`** ; le modifier est un refus de classe G5 sauf
   dérogation nominative.
+
+  **Amendement du 2026-10-03 (P46-D-13).** Le seuil de juge dans `config.json` est hors périmètre de la Phase 46 et renvoyé à la Phase 50 : le score n'est pas bloquant (D-02 amendée) et les seuils vivent aujourd'hui dans les prompts des juges.
+  Décision du manager de mission (annoncée à Willy en session principale le 2026-10-03, renversable) : seuil de juge renvoyé à la Phase 50 (P46-D-13).
 
 ### 10.1 Ce que l'état de l'art dit de ces choix
 

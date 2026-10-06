@@ -18,6 +18,11 @@
 @@ # Ce banc est un FICHIER TEXTE, pas une arborescence versionnée : l'installeur pose `fixtures/` à
 @@ # plat, et aucun dossier `.planning/` imbriqué n'est versionné dans ce dépôt. Le dossier de
 @@ # planning s'écrit `.planning/` dans le banc : c'est du texte.
+@@ #
+@@ # Toute écriture dont le chemin, le cwd ou la commande porte un caractère composable a son jumeau NFD, dérivé par la suite (R-NFD-GATES) :
+@@ # les noms composables s'écrivent ici en NFC, jamais en NFD (une forme NFD saisie est invisible à la relecture).
+@@ # Tout lab qui porte des écritures composables est aussi matérialisé au disque NFD (noms du disque décomposés) : ses écritures de G2 y rendent
+@@ # la même décision et la même sortie (R-NFD-GATES, A1-readdir).
 
 @@ lab g2-adherent
 
@@ -897,3 +902,102 @@ ecrit: livrables/rapport.md
 
 @@ ecriture Write .planning/STATE.md armee :: silence G6
 @@ ecriture Write .planning/cycles/01-c/phases/01-p/VERDICT.md armee :: silence G5
+
+@@ # --- Noms composables (A1, fix-46-a) : cycle `01-été`, phases accentuées, agent `juge-nfc`, dossiers accentués. Chaque écriture se rejoue aussi sous
+@@ # sa forme NFD, sur copie armée, et doit rendre le même code et la même sortie (R-NFD-GATES) : G1, G5, G6, G7, ROLE, G2 (Write et Bash).
+@@ lab nfc-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-été/CYCLE.md
+---
+titre: Cycle d'été
+---
+
+@@ fichier .planning/cycles/01-été/phases/01-genèse/PLAN.md
+---
+ecrit: livrables/genèse.md
+---
+
+@@ fichier .planning/cycles/01-été/phases/02-clôturé/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-été/phases/02-clôturé/PLAN.md
+---
+ecrit: livrables/clôture.md
+---
+
+@@ fichier .planning/cycles/01-été/phases/03-côté/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-été/phases/03-côté/plans/01-tâche/PLAN.md
+---
+ecrit: livrables/tâche.md
+---
+
+@@ fichier .claude/agents/juge-nfc.md
+---
+name: juge-nfc
+description: Juge du banc NFC
+tools: Read, Glob, Grep
+disallowedTools: Write, Edit
+omitClaudeMd: true
+vf-internal: true
+---
+Corps du juge.
+
+@@ dossier équipe/vide
+@@ dossier livrables/équipe
+@@ fichier élan/package.json
+{}
+
+@@ ecriture Write .planning/cycles/01-été/phases/01-genèse/PLAN.md armee :: doit-refuser G1
+@@ ecriture Edit .planning/cycles/01-été/phases/01-genèse/PLAN.md armee :: doit-refuser G1
+@@ ecriture Write .planning/cycles/01-été/phases/02-clôturé/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-été/phases/03-côté/plans/01-tâche/PLAN.md armee :: doit-passer G1
+@@ ecriture Write .planning/cycles/01-été/phases/02-clôturé/VERDICT.md armee :: doit-refuser G5
+@@ ecriture Write .planning/ÉTAT.md armee :: doit-passer G6
+@@ ecriture Write équipe/vide/.planning/config.json armee :: doit-refuser G7
+@@ ecriture Write élan/.planning/config.json armee :: doit-passer G7
+@@ ecriture Write livrables/rédaction.md agent=juge-nfc armee :: doit-refuser ROLE
+@@ ecriture Write livrables/hors-écrit.md :: avertit G2
+@@ ecriture Bash - cwd=livrables/équipe commande=cat ../hors-écrit.md :: avertit G2
+@@ ecriture Write livrables/genèse.md :: silence G2
+@@ ecriture Bash - commande=cat livrables/genèse.md :: silence G2
+
+@@ lab nfc-dev jumeau-de=nfc-adherent
+
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+
+@@ fichier .planning/cycles/01-été/CYCLE.md
+---
+titre: Cycle d'été
+---
+
+@@ fichier .planning/cycles/01-été/phases/01-genèse/PLAN.md
+---
+ecrit: livrables/genèse.md
+---
+
+@@ fichier .planning/cycles/01-été/phases/02-clôturé/CADRAGE.md
+---
+inconnues: []
+---
+
+@@ fichier .planning/cycles/01-été/phases/02-clôturé/PLAN.md
+---
+ecrit: livrables/clôture.md
+---
+
+@@ dossier équipe/vide
+
+@@ ecriture Write .planning/cycles/01-été/phases/01-genèse/PLAN.md armee :: silence G1
+@@ ecriture Write .planning/cycles/01-été/phases/02-clôturé/VERDICT.md armee :: silence G5
+@@ ecriture Write équipe/vide/.planning/config.json armee :: silence G7
+@@ ecriture Write livrables/rédaction.md agent=juge-nfc armee :: silence ROLE

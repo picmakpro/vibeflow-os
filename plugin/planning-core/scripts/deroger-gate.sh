@@ -4,7 +4,7 @@
 # `.planning/derogations-gates.log` (F7a = f7a-racine, Willy, AskUserQuestion session principale,
 # 2026-09-30), enfant direct du dossier de planning, déclaré au modèle par 45-02.
 #
-# Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G5|G6|G7|ROLE> --chemin=<relatif> [--chemin=...]
+# Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G3|G4|G4P|G5|G6|G7|ROLE|PLAFOND> --chemin=<relatif> [--chemin=...]
 #                         --qui=<nom> --canal=<canal> --date=<AAAA-MM-JJ> --raison=<texte> [-h]
 #
 # Trois règles de l'échappatoire (spec §5.2) : nominative (qui, canal, date, gate, chemins, raison) ;
@@ -23,6 +23,10 @@
 # Codes : 0 inscrit · 1 erreur de lecture ou d'écriture · 2 lab non adhérent · 64 usage ou champ refusé
 # (le message nomme le champ).
 #
+# Le jeton PLAFOND (Phase 46, 46-01 ; P46-D-05) lève le plafond de trois tentatives de poser-verdict.sh : son `--chemin` est le
+# dossier de l'unité, relatif au lab (`.planning/cycles/<cycle>/phases/<phase>[/plans/<plan>]` ou `.planning/juges/<juge>`) ;
+# c'est poser-verdict.sh, non le hook, qui la consomme (usage unique, sous verrou, avant l'écriture du verdict).
+#
 # Limite déclarée (T-45-34) : la commande ne peut pas savoir qui la lance ; `--qui` est déclaratif.
 set -u
 
@@ -40,6 +44,7 @@ esac
 
 "$PYBIN" -I -S - "$@" <<'PY_DEROGER_GATE_EOF'
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -54,11 +59,12 @@ except ImportError:
 
 SCHEMA_ADHESION = "cycles-v1"
 SANS_SUIVI_DE_LIEN = getattr(os, "O_NOFOLLOW", 0)
-GATES = ("G1", "G5", "G6", "G7", "ROLE")
+BORNE_LECTURE_FICHIER = 1048576  # même borne que la lecture du journal par le hook (derog-borne-lecture) : au-delà, aucune dérogation n'y est lue
+GATES = ("G1", "G3", "G4", "G4P", "G5", "G6", "G7", "ROLE", "PLAFOND")
 OPTIONS = ("lab", "gate", "chemin", "qui", "canal", "date", "raison")
 PLACEHOLDERS = ("todo", "tbd", "fixme", "xxx", "n/a", "...")  # derog-placeholders
 IDENTIFIANT_RE = re.compile(r"^\S+  (?:derogation|consommee)  id=([0-9]+)  ", re.M)
-USAGE = ("Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G5|G6|G7|ROLE> --chemin=<relatif> "
+USAGE = ("Usage : deroger-gate.sh --lab=<racine> --gate=<G1|G3|G4|G4P|G5|G6|G7|ROLE|PLAFOND> --chemin=<relatif> "
          "[--chemin=...] --qui=<nom> --canal=<canal> --date=<AAAA-MM-JJ> --raison=<texte> [-h]")
 
 
@@ -177,6 +183,65 @@ def _jeton_journal(valeur, repli):
     return jeton
 
 
+# Journal de D1 (Phase 46, 46-07 ; P46-D-07a) : copie ast-identique de `inscrire_surveillance` dans planning-hook.sh, recalc-planning.sh,
+# poser-verdict.sh et deroger-gate.sh (un contrôle de test-d1-surveillance.sh compare les arbres de syntaxe, R-D1-09) : les écrivains
+# du moteur y inscrivent ce qu'ils écrivent, le hook y trace ce qu'il observe.
+def inscrire_surveillance(racine, genre, chemin_rel, empreinte, par, source):
+    """Ajoute UNE ligne au journal de D1, `<racine>/.planning/surveillance.log` : `<horodatage ISO UTC>  genre=<g>  chemin=<jeton>  sha256=<hex|absent|->
+    par=<jeton>  source=<seance|reconciliation|->` (deux espaces entre champs), chaque valeur par `_jeton_journal` (injectif : un nom de fichier
+    qui porte un saut de ligne reste UNE ligne). Ajout seul (O_APPEND, O_NOFOLLOW, 0600), sous verrou exclusif quand `fcntl` existe. Un
+    journal qui n'est pas un fichier régulier (lien compris), un dossier de planning en lien, toute erreur : AUCUNE ligne, jamais une
+    exception qui remonte (D1 est fail-open, P46-D-10). Jamais appelée en lecture seule."""
+    try:
+        import time as _temps
+        try:
+            import fcntl as _verrou
+        except ImportError:
+            _verrou = None
+        planning = os.path.join(racine, ".planning")
+        chemin = os.path.join(planning, "surveillance.log")
+        if os.path.islink(planning) or (os.path.lexists(chemin) and not stat.S_ISREG(os.lstat(chemin).st_mode)):
+            return
+        ligne = "{}  genre={}  chemin={}  sha256={}  par={}  source={}\n".format(
+            _temps.strftime("%Y-%m-%dT%H:%M:%SZ", _temps.gmtime()), _jeton_journal(genre, "-"), _jeton_journal(chemin_rel, "-"),
+            _jeton_journal(empreinte, "-"), _jeton_journal(par, "-"), _jeton_journal(source, "-"))
+        descripteur = os.open(chemin, os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0), 0o600)
+        try:
+            if not stat.S_ISREG(os.fstat(descripteur).st_mode):
+                return
+            if hasattr(os, "fchmod"):
+                os.fchmod(descripteur, 0o600)
+            if _verrou is not None:
+                _verrou.flock(descripteur, _verrou.LOCK_EX)
+            octets = ligne.encode("utf-8")
+            while octets:
+                octets = octets[os.write(descripteur, octets):]
+        finally:
+            os.close(descripteur)
+    except Exception:
+        return
+
+
+def inscrire_ecriture_moteur(racine, chemin_rel, par):
+    """D1 (Phase 46, 46-07 ; P46-D-07a) : après une écriture EFFECTIVE du moteur sur `chemin_rel` (relatif au lab, séparateur `/`), inscrit la ligne
+    `moteur` au journal de D1 avec le sha256 du fichier APRÈS écriture : elle explique le changement que le watcher verra. Une erreur n'a AUCUN effet sur
+    le code de sortie (aucune ligne)."""
+    try:
+        chemin = os.path.join(racine, *chemin_rel.split("/"))
+        if not stat.S_ISREG(os.lstat(chemin).st_mode):
+            return
+        hacheur = hashlib.sha256()
+        with os.fdopen(os.open(chemin, os.O_RDONLY | SANS_SUIVI_DE_LIEN), "rb") as fh:
+            while True:
+                bloc = fh.read(65536)
+                if not bloc:
+                    break
+                hacheur.update(bloc)
+        inscrire_surveillance(racine, "moteur", chemin_rel, hacheur.hexdigest(), par, None)
+    except Exception:
+        return
+
+
 def analyser(args):
     valeurs = {}
     chemins = []
@@ -223,12 +288,12 @@ def raison_placeholder(raison):
 
 def valider(valeurs, chemins_bruts):
     if valeurs["gate"] not in GATES:
-        raise Refus(64, "--gate : G1, G5, G6, G7 ou ROLE attendu, reçu : " + valeurs["gate"])
+        raise Refus(64, "--gate : G1, G3, G4, G4P, G5, G6, G7, ROLE ou PLAFOND attendu, reçu : " + valeurs["gate"])
     chemins = []
     for brut in chemins_bruts:
         if not entree_ecrit_valide(brut):
             raise Refus(64, "--chemin : chemin concret relatif au lab attendu, reçu : " + brut)
-        normal = "/".join(c for c in brut.split("/") if c not in ("", "."))
+        normal = "/".join(unicodedata.normalize("NFC", c) for c in brut.split("/") if c not in ("", "."))  # nfc-derog
         if normal == "":
             raise Refus(64, "--chemin : chemin vide après normalisation : " + brut)
         if normal not in chemins:
@@ -272,6 +337,9 @@ def inscrire(lab, valeurs, chemins):
             os.fchmod(descripteur, 0o644)
         if fcntl is not None:
             fcntl.flock(descripteur, fcntl.LOCK_EX)
+        taille = os.fstat(descripteur).st_size
+        if taille > BORNE_LECTURE_FICHIER:  # derog-borne-journal
+            raise Refus(1, "le journal des dérogations est déjà au-delà de %d octets (BORNE_LECTURE_FICHIER) : le hook ne le lirait plus, aucune écriture" % BORNE_LECTURE_FICHIER)
         existant = lire_tout(descripteur)
         identifiants = [int(i) for i in IDENTIFIANT_RE.findall(existant.decode("utf-8", "replace"))]
         suivant = (max(identifiants) if identifiants else 0) + 1
@@ -284,6 +352,8 @@ def inscrire(lab, valeurs, chemins):
                 _jeton_journal(valeurs["qui"], "-"), _jeton_journal(valeurs["canal"], "-"), valeurs["date"], raison_j))
         donnees = ("\n" if existant and not existant.endswith(b"\n") else "") + "".join(l + "\n" for l in lignes)
         octets = donnees.encode("utf-8")
+        if len(existant) + len(octets) > BORNE_LECTURE_FICHIER:  # derog-borne-resultat
+            raise Refus(1, "l'écriture ferait dépasser %d octets au journal des dérogations (BORNE_LECTURE_FICHIER) : le hook ne le lirait plus, aucune écriture" % BORNE_LECTURE_FICHIER)
         while octets:
             ecrit = os.write(descripteur, octets)
             octets = octets[ecrit:]
@@ -299,6 +369,7 @@ def deroger(valeurs, chemins_bruts):
         raise Refus(2, "lab non adhérent : le config.json du dossier de planning doit déclarer "
                        "\"planning_version\": \"cycles-v1\"")
     premier = inscrire(lab, valeurs, chemins)
+    inscrire_ecriture_moteur(lab, ".planning/derogations-gates.log", "deroger-gate.sh")  # d1-moteur-derogation
     for rang, chemin in enumerate(chemins):
         print("[deroger-gate] dérogation #%d inscrite : %s sur %s (%s, %s, %s)" % (
             premier + rang, valeurs["gate"], chemin, valeurs["qui"], valeurs["canal"], valeurs["date"]))

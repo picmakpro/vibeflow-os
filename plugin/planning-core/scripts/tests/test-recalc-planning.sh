@@ -116,6 +116,8 @@ BASH_BIN="$(command -v bash)"
 # CET instantané, jamais contre le fichier lui-même (qui serait trivialement identique à soi).
 RECALC_SNAPSHOT="$WORK/recalc-planning-snapshot.sh"
 cp "$RECALC" "$RECALC_SNAPSHOT"
+# Les jetons du banc ({{sha256-plan}}, {{empreinte-livrables}}) sont résolus par la copie du bloc partagé lue dans poser-verdict.sh.
+export AIDES_POSER_VERDICT="$SCRIPTS_DIR/poser-verdict.sh"
 
 # ================================================================================================
 # Aides Python (materialiser / empreinte / coureur du banc) — un seul fichier, invoqué par sous-
@@ -227,6 +229,76 @@ def parser_banc(texte):
     return ordre_labs, labs
 
 
+JETON_PLAN = "{{sha256-plan}}"
+JETON_LIVRABLES = "{{empreinte-livrables}}"
+
+
+def _corps_python(texte, marqueur):
+    corps, dedans = [], False
+    for ligne in texte.split("\n"):
+        if ligne == marqueur:
+            dedans = False
+        if dedans:
+            corps.append(ligne)
+        if ligne.endswith("<<'" + marqueur + "'"):
+            dedans = True
+    return "\n".join(corps) + "\n"
+
+
+def _bloc_poser_verdict():
+    """Espace de noms du corps Python de poser-verdict.sh (chemin dans AIDES_POSER_VERDICT), sans l'appel final à main() : les jetons
+    du banc sont résolus par la copie du bloc partagé que lit la vraie commande de pose, jamais par celle du recalcul (preuve croisée)."""
+    import ast
+    chemin = os.environ.get("AIDES_POSER_VERDICT")
+    if not chemin or not os.path.isfile(chemin):
+        raise ValueError("jeton du banc non résolu : poser-verdict.sh introuvable (AIDES_POSER_VERDICT)")
+    arbre = ast.parse(_corps_python(open(chemin, encoding="utf-8").read(), "PY_POSER_VERDICT_EOF"))
+    arbre.body = [n for n in arbre.body
+                  if not (isinstance(n, ast.Expr) and isinstance(n.value, ast.Call) and getattr(n.value.func, "id", "") == "main")]
+    ns = {"__name__": "bloc_charge_banc"}
+    exec(compile(arbre, chemin, "exec"), ns)
+    return ns
+
+
+def resoudre_jetons(destination):
+    """Résout, APRÈS l'écriture de tous les fichiers du lab, les jetons `{{sha256-plan}}` (sha256 des octets du PLAN.md voisin du
+    VERDICT.md) et `{{empreinte-livrables}}` (empreinte des entrées `ecrit:` de ce PLAN.md, copie du bloc de poser-verdict.sh). Un
+    jeton qui ne se résout pas (PLAN.md voisin absent, `ecrit:` illisible, livrable absent, vide ou lien) lève ValueError avec un message
+    nommé : jamais une substitution vide."""
+    ns = None
+    for racine, _dossiers, fichiers in os.walk(destination, followlinks=False):
+        if "VERDICT.md" not in fichiers:
+            continue
+        chemin = os.path.join(racine, "VERDICT.md")
+        rel = os.path.relpath(chemin, destination)
+        if not stat.S_ISREG(os.lstat(chemin).st_mode):
+            continue
+        texte = open(chemin, encoding="utf-8").read()
+        if JETON_PLAN not in texte and JETON_LIVRABLES not in texte:
+            continue
+        plan = os.path.join(racine, "PLAN.md")
+        if not os.path.isfile(plan) or os.path.islink(plan):
+            raise ValueError("jeton du banc non résolu : PLAN.md voisin absent de " + rel)
+        octets_plan = open(plan, "rb").read()
+        if JETON_PLAN in texte:
+            texte = texte.replace(JETON_PLAN, hashlib.sha256(octets_plan).hexdigest())
+        if JETON_LIVRABLES in texte:
+            if ns is None:
+                ns = _bloc_poser_verdict()
+            statut_fm, donnees = ns["lire_frontmatter"](octets_plan.decode("utf-8"))
+            if statut_fm != "ok":
+                raise ValueError("jeton du banc non résolu : frontmatter du PLAN.md voisin illisible (" + rel + ")")
+            valeurs = ns["_valeurs_ecrit"](donnees)
+            if not valeurs:
+                raise ValueError("jeton du banc non résolu : ecrit: absent du PLAN.md voisin (" + rel + ")")
+            statut, detail = ns["empreinte_livrables"](destination, valeurs)
+            if statut != "ok":
+                raise ValueError("jeton du banc non résolu : empreinte des livrables " + statut + " (" + str(detail) + ") pour " + rel)
+            texte = texte.replace(JETON_LIVRABLES, detail)
+        with open(chemin, "w", encoding="utf-8") as fh:
+            fh.write(texte)
+
+
 def materialiser(banc_path, nom_lab, destination):
     texte = open(banc_path, encoding="utf-8").read()
     ordre, labs = parser_banc(texte)
@@ -260,6 +332,7 @@ def materialiser(banc_path, nom_lab, destination):
         else:
             cible_resolue = os.path.join(destination, cible)
         os.symlink(cible_resolue, chemin_lien)
+    resoudre_jetons(destination)
     return lab["attendus"]
 
 
@@ -307,7 +380,12 @@ def coureur(banc_path, work_dir, recalc_sh):
     tout_ok = True
     for nom in ordre:
         dest = os.path.join(work_dir, "bancs", nom)
-        attendus = materialiser(banc_path, nom, dest)
+        try:
+            attendus = materialiser(banc_path, nom, dest)
+        except ValueError as e:
+            print("✗ BANC " + nom + " : " + str(e))
+            tout_ok = False
+            continue
         proc = subprocess.run(
             ["bash", recalc_sh, "--planning=" + os.path.join(dest, ".planning"), "--read-only"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
@@ -353,20 +431,20 @@ def coureur(banc_path, work_dir, recalc_sh):
     sys.exit(0 if tout_ok else 1)
 
 
-ETATS_ONZE = (
-    "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger",
+ETATS_DOUZE = (
+    "à cadrer", "en cadrage", "à planifier", "à exécuter", "à juger", "à corriger", "à clore",
     "close", "indéterminé", "abandonné", "remplacé", "gelé",
 )
 
 
 def couverture(banc_path):
-    """R20 : pour chacun des onze états, un lab non jumeau porte un `@@ attendu` à cet état sur
+    """R20 : pour chacun des douze états (onze plus `à clore`), un lab non jumeau porte un `@@ attendu` à cet état sur
     une unité U ET un lab `jumeau-de=` ce lab porte un `@@ attendu` sur la MÊME unité U à un état
     différent."""
     texte = open(banc_path, encoding="utf-8").read()
     ordre, labs = parser_banc(texte)
     tout_ok = True
-    for etat in ETATS_ONZE:
+    for etat in ETATS_DOUZE:
         trouve = None
         for nom in ordre:
             lab = labs[nom]
@@ -417,6 +495,13 @@ def main():
     if action == "materialiser":
         materialiser(sys.argv[2], sys.argv[3], sys.argv[4])
         return
+    if action == "jetons":
+        try:
+            resoudre_jetons(sys.argv[2])
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(1)
+        return
     if action == "empreinte":
         for type_, rel, valeur in empreinte(sys.argv[2]):
             print(type_ + "\t" + rel + "\t" + valeur)
@@ -439,6 +524,8 @@ PY_AIDES_EOF
 
 materialiser() { "$PYBIN" "$AIDES_PY" materialiser "$BANC" "$1" "$2"; }
 empreinte() { "$PYBIN" "$AIDES_PY" empreinte "$1"; }
+# jetons — résout les jetons de verdict d'un lab déjà matérialisé (un VERDICT.md réécrit à la main par un cas inline).
+jetons() { "$PYBIN" "$AIDES_PY" jetons "$1"; }
 
 echo "== test-recalc-planning =="
 echo ""
@@ -772,15 +859,15 @@ else
   ko "R14 permissions" "644 chacun" "$R14_MODES" "-"
 fi
 
-# ---------- R20 — contrôle de couverture (onze états, positif + jumeau, P44-D-06/D-17) ----------
+# ---------- R20 — contrôle de couverture (douze états : onze plus `à clore`, positif + jumeau, P44-D-06/D-17, P46-D-04) ----------
 R20_OUT="$WORK/r20-out.txt"
 "$PYBIN" "$AIDES_PY" couverture "$BANC" > "$R20_OUT" 2>&1
 R20_RC=$?
 cat "$R20_OUT"
-if [ "$R20_RC" -eq 0 ] && [ "$(grep -c '^COUVERTURE ' "$R20_OUT")" -eq 11 ]; then
-  ok "R20 couverture : onze états couverts, chacun par un positif et un jumeau"
+if [ "$R20_RC" -eq 0 ] && [ "$(grep -c '^COUVERTURE ' "$R20_OUT")" -eq 12 ]; then
+  ok "R20 couverture : douze états couverts, chacun par un positif et un jumeau"
 else
-  ko "R20 couverture" "code 0, onze lignes COUVERTURE" "code=$R20_RC, $(grep -c '^COUVERTURE ' "$R20_OUT") ligne(s)" "$(grep '✗' "$R20_OUT" | head -1)"
+  ko "R20 couverture" "code 0, douze lignes COUVERTURE" "code=$R20_RC, $(grep -c '^COUVERTURE ' "$R20_OUT") ligne(s)" "$(grep '✗' "$R20_OUT" | head -1)"
 fi
 BANC_LABS_N="$(grep -oE 'BANC-LABS n=[0-9]+' "$R20_OUT" | grep -oE '[0-9]+')"
 if [ -n "$BANC_LABS_N" ] && [ "$BANC_LABS_N" -ge 18 ]; then
@@ -997,31 +1084,337 @@ fi
 
 # ---------- R27 — libellés lisibles distincts (INDEX.md et STATE.md, décision (a) 2026-09-28) ----
 R27A_DIR="$WORK/r27a"
-materialiser etat-a-corriger-jumeau "$R27A_DIR"
+materialiser etat-a-clore "$R27A_DIR"
 ( cd "$R27A_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27a-err.txt" )
 R27B_DIR="$WORK/r27b"
 materialiser d08-summary-sans-plan "$R27B_DIR"
 ( cd "$R27B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27b-err.txt" )
-if grep -qF 'verdict passé, SUMMARY absent' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null; then
-  ok "R27 INDEX.md (etat-a-corriger-jumeau) contient « verdict passé, SUMMARY absent »"
+R27C_DIR="$WORK/r27c"
+materialiser verdict-perime "$R27C_DIR"
+( cd "$R27C_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27c-err.txt" )
+# 46-03 (P46-D-04) : « verdict passé, SUMMARY absent » est un état à part entière, `à clore` ; son ancien libellé n'existe plus.
+if grep -qF '| cycles/01-c | à clore | 01-p |' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 INDEX.md (etat-a-clore) porte l'état « à clore » (phase courante 01-p)"
 else
-  ko "R27 INDEX.md libellé A" "verdict passé, SUMMARY absent" "$(cat "$R27A_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+  ko "R27 INDEX.md libellé A" "| cycles/01-c | à clore | 01-p |" "$(cat "$R27A_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
 fi
 if grep -qF 'SUMMARY.md sans PLAN.md' "$R27B_DIR/.planning/INDEX.md" 2>/dev/null; then
   ok "R27 INDEX.md (d08-summary-sans-plan) contient « SUMMARY.md sans PLAN.md »"
 else
   ko "R27 INDEX.md libellé B" "SUMMARY.md sans PLAN.md" "$(cat "$R27B_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
 fi
-if ! grep -qF 'verdict passé, SUMMARY absent' "$R27B_DIR/.planning/INDEX.md" 2>/dev/null \
-   && ! grep -qF 'SUMMARY.md sans PLAN.md' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null; then
-  ok "R27 les deux libellés sont distincts (jamais le même générique)"
+if ! grep -qF 'SUMMARY.md sans PLAN.md' "$R27A_DIR/.planning/INDEX.md" 2>/dev/null \
+   && ! grep -qF 'à clore' "$R27B_DIR/.planning/INDEX.md" 2>/dev/null \
+   && ! grep -qF 'verdict périmé' "$R27A_DIR/.planning/INDEX.md" "$R27B_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 les libellés sont distincts (jamais le même générique)"
 else
-  ko "R27 distinction des libellés" "les deux libellés diffèrent" "chevauchement détecté" "-"
+  ko "R27 distinction des libellés" "les libellés diffèrent d'un lab à l'autre" "chevauchement détecté" "-"
 fi
-if grep -qF 'verdict passé, SUMMARY absent' "$R27A_DIR/.planning/STATE.md" 2>/dev/null; then
-  ok "R27 STATE.md (etat-a-corriger-jumeau) porte le libellé lisible de phase-indeterminee:01-p"
+if grep -qF 'etat: à clore' "$R27A_DIR/.planning/STATE.md" 2>/dev/null; then
+  ok "R27 STATE.md (etat-a-clore) porte l'état « à clore »"
 else
-  ko "R27 STATE.md libellé" "verdict passé, SUMMARY absent" "$(cat "$R27A_DIR/.planning/STATE.md" 2>/dev/null)" "-"
+  ko "R27 STATE.md libellé" "etat: à clore" "$(cat "$R27A_DIR/.planning/STATE.md" 2>/dev/null)" "-"
+fi
+if ! grep -qF 'verdict passé, SUMMARY absent' "$R27A_DIR/.planning/INDEX.md" "$R27A_DIR/.planning/STATE.md" 2>/dev/null \
+   && ! grep -qF 'verdict-passe-sans-SUMMARY' "$R27A_DIR/.planning/INDEX.md" "$R27A_DIR/.planning/STATE.md" 2>/dev/null; then
+  ok "R27 le libellé « verdict passé, SUMMARY absent » n'apparaît plus (INDEX.md, STATE.md)"
+else
+  ko "R27 ancien libellé" "absent de INDEX.md et STATE.md" "présent" "$(cat "$R27A_DIR/.planning/INDEX.md" 2>/dev/null)"
+fi
+# 46-03 (P46-D-03b) : la raison d'un `à juger` périmé se lit dans l'index et dans l'état.
+if grep -qF '| cycles/01-c | à juger — verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise) | 01-p |' "$R27C_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 INDEX.md (verdict-perime) porte « verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise) »"
+else
+  ko "R27 INDEX.md verdict périmé" "à juger — verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise)" "$(cat "$R27C_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+if grep -qF 'etat: à juger — verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise)' "$R27C_DIR/.planning/STATE.md" 2>/dev/null; then
+  ok "R27 STATE.md (verdict-perime) porte « verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise) »"
+else
+  ko "R27 STATE.md verdict périmé" "etat: à juger — verdict périmé : re-juger (tentative n+1 ; plafond de 3 atteint : dérogation PLAFOND requise)" "$(cat "$R27C_DIR/.planning/STATE.md" 2>/dev/null)" "-"
+fi
+# Jumeau négatif : un `à juger` ordinaire (sans verdict) ne porte aucune raison dans l'index.
+R27D_DIR="$WORK/r27d"
+materialiser livrable-vide-jumeau "$R27D_DIR"
+( cd "$R27D_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r27d-err.txt" )
+if grep -qF '| cycles/01-c | à juger | 01-p |' "$R27D_DIR/.planning/INDEX.md" 2>/dev/null \
+   && ! grep -qF 'verdict périmé' "$R27D_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R27 INDEX.md (jumeau, à juger sans verdict) ne porte aucune raison de péremption"
+else
+  ko "R27 jumeau à juger" "| cycles/01-c | à juger | 01-p | sans « verdict périmé »" "$(cat "$R27D_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+
+# ---------- 46-03 — état « à clore », empreintes du verdict, R4 « absent ou vide » (P46-D-04, P46-D-03b, P46-D-12) -----
+phase_etat_raison() { # <recalc.sh> <dossier du lab> -> « état|raison » de la phase 01-p ; ERREUR si le recalcul échoue
+  local recalc="$1" dir="$2" sortie
+  sortie="$WORK/per-courant.json"
+  bash "$recalc" --planning="$dir/.planning" --read-only > "$sortie" 2>"$WORK/per-courant.err" || { echo "ERREUR"; return 0; }
+  "$PYBIN" -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    p = [ph for c in d["cycles"] for ph in c["phases"] if ph["nom"] == "01-p"][0]
+    print(p["etat"] + "|" + str(p.get("raison") or ""))
+except Exception:
+    print("ERREUR")
+' "$sortie"
+}
+cycle_etat_raison() { # <recalc.sh> <dossier du lab> -> « état|raison » du cycle 01-c
+  local recalc="$1" dir="$2" sortie
+  sortie="$WORK/per-courant.json"
+  bash "$recalc" --planning="$dir/.planning" --read-only > "$sortie" 2>"$WORK/per-courant.err" || { echo "ERREUR"; return 0; }
+  "$PYBIN" -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    c = [c for c in d["cycles"] if c["nom"] == "01-c"][0]
+    print(c["etat"] + "|" + str(c.get("raison") or ""))
+except Exception:
+    print("ERREUR")
+' "$sortie"
+}
+verifier_etat() { # <id> <libellé> <recalc.sh> <lab du banc> <attendu « état|raison »>
+  local id="$1" libelle="$2" recalc="$3" lab="$4" attendu="$5" dir obtenu
+  dir="$WORK/per-lab-$lab"
+  [ -d "$dir" ] || materialiser "$lab" "$dir"
+  obtenu="$(phase_etat_raison "$recalc" "$dir")"
+  if [ "$obtenu" = "$attendu" ]; then ok "$id $libelle ($lab : $attendu)"; else ko "$id $libelle" "état|raison de $lab" "$attendu" "$obtenu $(cat "$WORK/per-courant.err" 2>/dev/null)"; fi
+}
+
+# R-CLORE-01 — constats tous passé, deux empreintes conformes, SUMMARY.md absent : `à clore`, sans raison, non terminal.
+verifier_etat R-CLORE-01 "état à clore" "$RECALC" etat-a-clore 'à clore|'
+verifier_etat R-CLORE-01 "jumeau : le même verdict avec SUMMARY.md" "$RECALC" etat-a-clore-jumeau 'close|'
+R_CLORE_CYCLE="$(cycle_etat_raison "$RECALC" "$WORK/per-lab-etat-a-clore")"
+if [ "$R_CLORE_CYCLE" = 'à clore|' ]; then
+  ok "R-CLORE-01 l'agrégat du cycle suit l'état non terminal (à clore, jamais indéterminé)"
+else
+  ko "R-CLORE-01 agrégat du cycle" "à clore|" "$R_CLORE_CYCLE" "-"
+fi
+R_CLORE_JSON="$WORK/per-lab-etat-a-clore-rapport.json"
+bash "$RECALC" --planning="$WORK/per-lab-etat-a-clore/.planning" --read-only > "$R_CLORE_JSON" 2>/dev/null
+R_CLORE_FAITS="$("$PYBIN" -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("compte=%s journal=%d" % (d["compte_par_etat"].get("à clore"), len(d["cloture_a_ajouter"])))
+' "$R_CLORE_JSON" 2>/dev/null || echo ERREUR)"
+if [ "$R_CLORE_FAITS" = "compte=1 journal=0" ]; then
+  ok "R-CLORE-01 compte_par_etat compte l'état et rien n'est journalisé (non terminal : aucune ligne de cloture.log)"
+else
+  ko "R-CLORE-01 compte et journal" "compte=1 journal=0" "$R_CLORE_FAITS" "-"
+fi
+
+# R-PERIME-01 — un écart d'empreinte, ou un hash_livrables absent, avant SUMMARY.md : `à juger` (verdict-perime).
+verifier_etat R-PERIME-01 "hash_livrables littéral faux" "$RECALC" verdict-perime 'à juger|verdict-perime'
+verifier_etat R-PERIME-01 "jumeau : empreintes conformes" "$RECALC" verdict-perime-jumeau 'à clore|'
+verifier_etat R-PERIME-01 "hash_livrables absent" "$RECALC" verdict-sans-empreinte-livrables 'à juger|verdict-perime'
+verifier_etat R-PERIME-01 "jumeau : hash_livrables présent" "$RECALC" verdict-sans-empreinte-livrables-jumeau 'à clore|'
+verifier_etat R-PERIME-01 "hash du PLAN.md faux" "$RECALC" plan-modifie 'à juger|verdict-perime'
+verifier_etat R-PERIME-01 "jumeau : hash du PLAN.md conforme" "$RECALC" plan-modifie-jumeau 'à clore|'
+R_PERIME_CYCLE="$(cycle_etat_raison "$RECALC" "$WORK/per-lab-verdict-perime")"
+if [ "$R_PERIME_CYCLE" = 'à juger|verdict-perime' ]; then
+  ok "R-PERIME-01 le cycle remonte la raison verdict-perime de sa phase courante"
+else
+  ko "R-PERIME-01 raison du cycle" "à juger|verdict-perime" "$R_PERIME_CYCLE" "-"
+fi
+# Réécriture réelle : un livrable (ou le PLAN.md) change APRÈS la résolution du verdict ; un fichier non déclaré, jamais.
+R_PERIME_VIVANT="$WORK/per-vivant-a-clore"
+materialiser etat-a-clore "$R_PERIME_VIVANT"
+printf 'Hors ecrit: du plan.\n' > "$R_PERIME_VIVANT/autre-fichier.md"
+R_AVANT="$(phase_etat_raison "$RECALC" "$R_PERIME_VIVANT")"
+printf 'Livrable non vide!\n' > "$R_PERIME_VIVANT/livrables/rapport.md"   # même taille que « Livrable non vide. » (+0 octet)
+R_APRES_LIVRABLE="$(phase_etat_raison "$RECALC" "$R_PERIME_VIVANT")"
+if [ "$R_AVANT" = 'à clore|' ] && [ "$R_APRES_LIVRABLE" = 'à juger|verdict-perime' ]; then
+  ok "R-PERIME-01 un octet d'un livrable réécrit après la résolution : à clore -> à juger (verdict-perime)"
+else
+  ko "R-PERIME-01 réécriture du livrable" "à clore| puis à juger|verdict-perime" "$R_AVANT puis $R_APRES_LIVRABLE" "-"
+fi
+R_PERIME_JUMEAU="$WORK/per-vivant-jumeau"
+materialiser etat-a-clore "$R_PERIME_JUMEAU"
+printf 'Hors ecrit: du plan.\n' > "$R_PERIME_JUMEAU/autre-fichier.md"
+printf 'Autre contenu hors plan.\n' > "$R_PERIME_JUMEAU/autre-fichier.md"   # réécrit : aucun `ecrit:` ne le couvre
+R_APRES_AUTRE="$(phase_etat_raison "$RECALC" "$R_PERIME_JUMEAU")"
+if [ "$R_APRES_AUTRE" = 'à clore|' ]; then
+  ok "R-PERIME-01 jumeau : un fichier hors ecrit: réécrit ne périme pas le verdict (à clore)"
+else
+  ko "R-PERIME-01 jumeau fichier hors ecrit:" "à clore|" "$R_APRES_AUTRE" "-"
+fi
+R_PERIME_PLAN="$WORK/per-vivant-plan"
+materialiser etat-a-clore "$R_PERIME_PLAN"
+printf '\nPrécision ajoutée au plan après le verdict.\n' >> "$R_PERIME_PLAN/.planning/cycles/01-c/phases/01-p/PLAN.md"
+R_APRES_PLAN="$(phase_etat_raison "$RECALC" "$R_PERIME_PLAN")"
+if [ "$R_APRES_PLAN" = 'à juger|verdict-perime' ]; then
+  ok "R-PERIME-01 le PLAN.md modifié après le verdict le périme (à juger, verdict-perime)"
+else
+  ko "R-PERIME-01 PLAN.md modifié" "à juger|verdict-perime" "$R_APRES_PLAN" "-"
+fi
+# Conséquence voulue (modele-cycles.md) : un verdict en échec suivi d'une correction du livrable repasse en `à juger`.
+R_ECHEC_CORRIGE="$WORK/per-echec-corrige"
+materialiser etat-a-corriger "$R_ECHEC_CORRIGE"
+R_ECHEC_AVANT="$(phase_etat_raison "$RECALC" "$R_ECHEC_CORRIGE")"
+printf 'Livrable corrigé.\n' > "$R_ECHEC_CORRIGE/livrables/rapport.md"
+R_ECHEC_APRES="$(phase_etat_raison "$RECALC" "$R_ECHEC_CORRIGE")"
+if [ "$R_ECHEC_AVANT" = 'à corriger|' ] && [ "$R_ECHEC_APRES" = 'à juger|verdict-perime' ]; then
+  ok "R-PERIME-01 un verdict en échec suivi d'une correction du livrable : à corriger -> à juger (verdict-perime)"
+else
+  ko "R-PERIME-01 correction après échec" "à corriger| puis à juger|verdict-perime" "$R_ECHEC_AVANT puis $R_ECHEC_APRES" "-"
+fi
+
+# R-PERIME-02 — un écart d'empreinte avec SUMMARY.md présent : `indéterminé` (livrable-modifie-apres-cloture).
+verifier_etat R-PERIME-02 "hash_livrables littéral faux, SUMMARY.md présent" "$RECALC" livrable-modifie-apres-cloture 'indéterminé|livrable-modifie-apres-cloture'
+verifier_etat R-PERIME-02 "jumeau : empreintes conformes, SUMMARY.md présent" "$RECALC" livrable-modifie-apres-cloture-jumeau 'close|'
+R_CLOS_VIVANT="$WORK/per-vivant-close"
+materialiser etat-close "$R_CLOS_VIVANT"
+R_CLOS_AVANT="$(phase_etat_raison "$RECALC" "$R_CLOS_VIVANT")"
+printf 'Livrable de etat-close!\n' > "$R_CLOS_VIVANT/livrables/rapport.md"   # même taille que « Livrable de etat-close. »
+R_CLOS_APRES="$(phase_etat_raison "$RECALC" "$R_CLOS_VIVANT")"
+if [ "$R_CLOS_AVANT" = 'close|' ] && [ "$R_CLOS_APRES" = 'indéterminé|livrable-modifie-apres-cloture' ]; then
+  ok "R-PERIME-02 un livrable réécrit après la clôture : close -> indéterminé (livrable-modifie-apres-cloture)"
+else
+  ko "R-PERIME-02 réécriture après clôture" "close| puis indéterminé|livrable-modifie-apres-cloture" "$R_CLOS_AVANT puis $R_CLOS_APRES" "-"
+fi
+
+# R-R4VIDE-01 — R4 par le prédicat partagé : absent ou vide ; un lien (jamais suivi) compte comme absent.
+verifier_etat R-R4VIDE-01 "livrable de 0 octet" "$RECALC" livrable-vide 'indéterminé|livrable-vide:livrables/rapport.md'
+verifier_etat R-R4VIDE-01 "jumeau : livrable non vide" "$RECALC" livrable-vide-jumeau 'à juger|'
+verifier_etat R-R4VIDE-01 "livrable lien vers un fichier non vide" "$RECALC" livrable-lien 'indéterminé|livrable-absent:livrables/lien.md'
+verifier_etat R-R4VIDE-01 "jumeau : fichier réel au même chemin" "$RECALC" livrable-lien-jumeau 'à juger|'
+verifier_etat R-R4VIDE-01 "dossier sans aucun fichier" "$RECALC" livrable-dossier-vide 'indéterminé|livrable-vide:livrables/dossier'
+verifier_etat R-R4VIDE-01 "jumeau : dossier avec un fichier non vide" "$RECALC" livrable-dossier-vide-jumeau 'à juger|'
+verifier_etat R-R4VIDE-01 "dossier avec le seul .DS_Store (exclusion fixe)" "$RECALC" livrable-dossier-ds-store 'indéterminé|livrable-vide:livrables/dossier'
+verifier_etat R-R4VIDE-01 "jumeau : un fichier ordinaire à côté du .DS_Store" "$RECALC" livrable-dossier-ds-store-jumeau 'à juger|'
+
+# ---------- quick 261003-ps1 — R4 par la chaîne unique du bloc partagé (`entrees_du_plan`, `livrables_presents`) ----------------
+# Copies matérialisées du lab de banc `livrable-vide-jumeau` (état `à juger`, unité de phase 01-p, CLOTURE.md présent), PLAN.md
+# réécrit dans la suite : le banc de fixtures n'est pas touché.
+UNITE_01P=".planning/cycles/01-c/phases/01-p"
+ecrire_plan_ecrit() { # <dossier du lab> <entrée> : réécrit le PLAN.md de l'unité 01-p avec une seule entrée `ecrit:`
+  printf '%s\n' '---' "ecrit: $2" '---' > "$1/$UNITE_01P/PLAN.md"
+}
+ecrire_fichiers() { # <dossier> <nombre> : <nombre> fichiers non vides dans <dossier>
+  "$PYBIN" -c '
+import os, sys
+base, n = sys.argv[1], int(sys.argv[2])
+os.makedirs(base, exist_ok=True)
+for i in range(n):
+    with open(os.path.join(base, "f%04d.txt" % i), "w") as fh:
+        fh.write("x")
+' "$1" "$2"
+}
+verifier_copie() { # <id> <libellé> <dossier du lab> <attendu « état|raison »>
+  local obtenu
+  obtenu="$(phase_etat_raison "$RECALC" "$3")"
+  if [ "$obtenu" = "$4" ]; then ok "$1 $2 ($4)"; else ko "$1 $2" "état|raison de la phase 01-p" "$4" "$obtenu $(cat "$WORK/per-courant.err" 2>/dev/null)"; fi
+}
+
+# R-UNITE-01 — une entrée `ecrit:` qui est ou contient le dossier de l'unité (unité à CLOTURE.md) : R4 rend
+# `ecrit-contient-unite:<entrée>` (la pose la refuse : décision du manager, renversable) ; sans CLOTURE.md, R3 décide.
+R_UNITE_A="$WORK/r-unite-a"
+materialiser livrable-vide-jumeau "$R_UNITE_A"
+ecrire_plan_ecrit "$R_UNITE_A" "$UNITE_01P"
+verifier_copie R-UNITE-01 "ecrit: = le dossier de l'unité, CLOTURE.md présent" "$R_UNITE_A" "indéterminé|ecrit-contient-unite:$UNITE_01P"
+R_UNITE_B="$WORK/r-unite-b"
+materialiser livrable-vide-jumeau "$R_UNITE_B"
+ecrire_plan_ecrit "$R_UNITE_B" ".planning"
+verifier_copie R-UNITE-01 "ecrit: .planning (ancêtre de l'unité), CLOTURE.md présent" "$R_UNITE_B" 'indéterminé|ecrit-contient-unite:.planning'
+R_UNITE_C="$WORK/r-unite-c"
+materialiser livrable-vide-jumeau "$R_UNITE_C"
+ecrire_plan_ecrit "$R_UNITE_C" "$UNITE_01P"
+rm -f "$R_UNITE_C/$UNITE_01P/CLOTURE.md"
+verifier_copie R-UNITE-01 "jumeau : même entrée, CLOTURE.md retiré (R3 décide)" "$R_UNITE_C" 'à exécuter|'
+R_UNITE_D="$WORK/r-unite-d"
+materialiser livrable-vide-jumeau "$R_UNITE_D"
+ecrire_plan_ecrit "$R_UNITE_D" "$UNITE_01P/notes.md"
+printf '%s\n' 'Notes de l unité.' > "$R_UNITE_D/$UNITE_01P/notes.md"
+verifier_copie R-UNITE-01 "jumeau : entrée DANS l'unité (fichier non vide)" "$R_UNITE_D" 'à juger|'
+
+# R-R4BORNE-01 — budget COMMUN à toutes les entrées d'un PLAN.md : deux entrées chacune sous la borne réelle (2000 entrées) dont la
+# somme la dépasse rendent `livrable-hors-borne:<seconde entrée>` ; 250 entrées imbriquées ne coûtent pas 250 parcours.
+R_BORNE_A="$WORK/r-r4borne-a"
+materialiser livrable-vide-jumeau "$R_BORNE_A"
+printf '%s\n' '---' 'ecrit:' '  - livrables/a' '  - livrables/b' '---' > "$R_BORNE_A/$UNITE_01P/PLAN.md"
+ecrire_fichiers "$R_BORNE_A/livrables/a" 1000
+ecrire_fichiers "$R_BORNE_A/livrables/b" 1001
+verifier_copie R-R4BORNE-01 "1000 + 1001 fichiers sur deux entrées (borne 2000)" "$R_BORNE_A" 'indéterminé|livrable-hors-borne:livrables/b'
+R_BORNE_B="$WORK/r-r4borne-b"
+materialiser livrable-vide-jumeau "$R_BORNE_B"
+printf '%s\n' '---' 'ecrit:' '  - livrables/a' '  - livrables/b' '---' > "$R_BORNE_B/$UNITE_01P/PLAN.md"
+ecrire_fichiers "$R_BORNE_B/livrables/a" 1000
+ecrire_fichiers "$R_BORNE_B/livrables/b" 1000
+verifier_copie R-R4BORNE-01 "jumeau : 1000 + 1000 fichiers (à la borne)" "$R_BORNE_B" 'à juger|'
+R_BORNE_C="$WORK/r-r4borne-c"
+materialiser livrable-vide-jumeau "$R_BORNE_C"
+"$PYBIN" -c '
+import os, sys
+lab, plan = sys.argv[1], sys.argv[2]
+rel, entrees = "", []
+for _i in range(250):
+    rel = rel + "/a" if rel else "a"
+    entrees.append(rel)
+os.makedirs(os.path.join(lab, rel))
+for i in range(1600):
+    with open(os.path.join(lab, rel, "f%04d" % i), "w") as fh:
+        fh.write("x")
+with open(plan, "w") as fh:
+    fh.write("---\necrit:\n" + "".join("  - %s\n" % e for e in entrees) + "---\n")
+' "$R_BORNE_C" "$R_BORNE_C/$UNITE_01P/PLAN.md"
+R_BORNE_T0="$(date +%s)"
+R_BORNE_P4="$(phase_etat_raison "$RECALC" "$R_BORNE_C")"
+R_BORNE_DUREE=$(( $(date +%s) - R_BORNE_T0 ))
+if [ "$R_BORNE_P4" = 'indéterminé|livrable-hors-borne:a/a' ]; then
+  ok "R-R4BORNE-01 cas p4 : 250 entrées imbriquées et 1600 fichiers -> indéterminé|livrable-hors-borne:a/a (durée indicative ${R_BORNE_DUREE} s)"
+else
+  ko "R-R4BORNE-01 cas p4" "état|raison de la phase 01-p" 'indéterminé|livrable-hors-borne:a/a' "$R_BORNE_P4 $(cat "$WORK/per-courant.err" 2>/dev/null)"
+fi
+
+# R-JETON-01 — un jeton du banc qui ne se résout pas fait échouer le lab avec un message nommé (jamais une substitution vide).
+R_JETON_BANC="$WORK/banc-jeton.txt"
+cat > "$R_JETON_BANC" <<'JETON_BANC_EOF'
+@@ lab jeton-sans-plan
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ attendu cycles/01-c :: à cadrer
+@@ lab jeton-livrable-absent
+
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+
+@@ fichier .planning/cycles/01-c/phases/01-p/PLAN.md
+---
+ecrit: livrables/inexistant.md
+---
+
+@@ fichier .planning/cycles/01-c/phases/01-p/VERDICT.md
+---
+juge: relecteur-banc
+hash: {{sha256-plan}}
+hash_livrables: {{empreinte-livrables}}
+tentative: 1
+constats:
+  - resultat: passé
+---
+
+@@ attendu cycles/01-c :: à cadrer
+JETON_BANC_EOF
+R_JETON_OUT="$WORK/banc-jeton-out.txt"
+"$PYBIN" "$AIDES_PY" coureur "$R_JETON_BANC" "$WORK/r-jeton" "$RECALC" > "$R_JETON_OUT" 2>&1
+R_JETON_RC=$?
+if [ "$R_JETON_RC" -eq 1 ] \
+   && grep -qF '✗ BANC jeton-sans-plan : jeton du banc non résolu : PLAN.md voisin absent de .planning/cycles/01-c/phases/01-p/VERDICT.md' "$R_JETON_OUT" \
+   && grep -qF '✗ BANC jeton-livrable-absent : jeton du banc non résolu : empreinte des livrables absent (livrables/inexistant.md)' "$R_JETON_OUT"; then
+  ok "R-JETON-01 un jeton non résolu (PLAN.md voisin absent, livrable absent) fait échouer le lab avec un message nommé"
+else
+  ko "R-JETON-01 jeton non résolu" "code 1 et deux lignes ✗ BANC nommées" "code=$R_JETON_RC $(tr '\n' ' ' < "$R_JETON_OUT")" "-"
 fi
 
 # ================================================================================================
@@ -1434,6 +1827,161 @@ if [ "$R58_RC" -eq 0 ] && grep -qF "$R58_LIGNE_ATTENDUE" "$R58_DIR/.planning/IND
   ok "R58 livrable supprimé : indéterminé (livrable-absent:livrables/rapport.md) malgré signature stable"
 else
   ko "R58 INDEX.md" "$R58_LIGNE_ATTENDUE" "rc=$R58_RC $(cat "$R58_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+
+# ---------- R-CACHE2-01 — livrable RÉÉCRIT (taille égale) après un passage à cache valide : jamais `close` (46-03, P46-D-03b) --
+# Jumeau de R58 (livrable supprimé) pour une réécriture : la signature de l'unité (fichiers du modèle) est stable, seule l'empreinte du
+# contenu des livrables, recalculée à chaque passage, voit l'écart.
+RC2_DIR="$WORK/r-cache2-01"
+materialiser traceur "$RC2_DIR"
+( cd "$RC2_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc2-premier.json" 2>/dev/null )
+RC2_CACHE_SCHEMA="$("$PYBIN" -c '
+import json, re, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+e = d["unites"]["cycles/01-traceur/phases/01-livree"]
+v = e.get("empreinte_livrables")
+print("%s %s %s" % (d["cache_schema_version"], v[0], bool(re.fullmatch("[0-9a-f]{64}", v[1] or ""))))
+' "$RC2_DIR/.planning/.recalc-cache.json" 2>/dev/null || echo ERREUR)"
+if [ "$RC2_CACHE_SCHEMA" = "2 ok True" ]; then
+  ok "R-CACHE2-01 le cache écrit est de schéma 2 et porte l'empreinte des livrables de la phase close (64 hexadécimaux)"
+else
+  ko "R-CACHE2-01 schéma et empreinte du cache" "2 ok True" "$RC2_CACHE_SCHEMA" "-"
+fi
+RC2_TAILLE_AVANT="$("$PYBIN" -c 'import os,sys; print(os.path.getsize(sys.argv[1]))' "$RC2_DIR/livrables/rapport.md")"
+"$PYBIN" -c '
+import sys
+chemin = sys.argv[1]
+octets = bytearray(open(chemin, "rb").read())
+octets[0] = ord("M") if octets[0] != ord("M") else ord("L")
+open(chemin, "wb").write(bytes(octets))
+' "$RC2_DIR/livrables/rapport.md"
+RC2_TAILLE_APRES="$("$PYBIN" -c 'import os,sys; print(os.path.getsize(sys.argv[1]))' "$RC2_DIR/livrables/rapport.md")"
+( cd "$RC2_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc2-second.json" 2>"$WORK/rc2-second.err" )
+RC2_RC=$?
+RC2_LIGNE='indéterminé — phase `01-livree` indéterminée : livrable ou plan modifié après la clôture (cycles/01-traceur)'
+RC2_RECALCULEES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/rc2-second.json" 2>/dev/null || echo '?')"
+if [ "$RC2_RC" -eq 0 ] && [ "$RC2_TAILLE_AVANT" = "$RC2_TAILLE_APRES" ] && grep -qF "$RC2_LIGNE" "$RC2_DIR/.planning/INDEX.md" 2>/dev/null \
+   && [ "$RC2_RECALCULEES" = "1" ]; then
+  ok "R-CACHE2-01 un octet d'un livrable réécrit à taille égale : le second recalcul, par le cache, rend indéterminé (livrable-modifie-apres-cloture), jamais close ; une seule unité recalculée"
+else
+  ko "R-CACHE2-01 réécriture du livrable" "indéterminé (livrable ou plan modifié après la clôture), 1 unité recalculée, tailles égales" "rc=$RC2_RC taille=$RC2_TAILLE_AVANT/$RC2_TAILLE_APRES recalculees=$RC2_RECALCULEES $(cat "$RC2_DIR/.planning/INDEX.md" 2>/dev/null)" "$(cat "$WORK/rc2-second.err" 2>/dev/null)"
+fi
+# Jumeau négatif : réécrire un fichier que aucun `ecrit:` ne déclare laisse l'unité close et reprise du cache.
+RC2J_DIR="$WORK/r-cache2-01-jumeau"
+materialiser traceur "$RC2J_DIR"
+printf 'Hors ecrit: A.\n' > "$RC2J_DIR/autre-fichier.md"
+( cd "$RC2J_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+printf 'Hors ecrit: B.\n' > "$RC2J_DIR/autre-fichier.md"
+( cd "$RC2J_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc2j-second.json" 2>/dev/null )
+RC2J_FAITS="$("$PYBIN" -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("reprises=%s recalculees=%s" % (d["unites_reprises"], d["unites_recalculees"]))
+' "$WORK/rc2j-second.json" 2>/dev/null || echo ERREUR)"
+if [ "$RC2J_FAITS" = "reprises=2 recalculees=0" ] && ! grep -qF 'modifié après la clôture' "$RC2J_DIR/.planning/INDEX.md" 2>/dev/null; then
+  ok "R-CACHE2-01 jumeau : un fichier hors ecrit: réécrit laisse les deux unités reprises du cache (close conservé)"
+else
+  ko "R-CACHE2-01 jumeau fichier hors ecrit:" "reprises=2 recalculees=0, aucune péremption" "$RC2J_FAITS $(cat "$RC2J_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
+fi
+
+# ---------- R-CACHE3-01 — cache FORGÉ par Bash (A6/A8, P46 lot B, b3) : l'entrée n'est reprise que si ses `ecrit:` sont ceux du PLAN.md réel ----------
+# Le cache est un fichier du lab : un agent qui a Bash le réécrit. Forgé (`ecrit: []`, empreinte `["ok", null]`) et livrable réécrit : le recalcul
+# relit les `ecrit:` du PLAN.md, constate l'écart et recalcule — jamais `close` sur la foi du cache. Jumeau : seul `ecrit` forgé (empreinte intacte) :
+# l'entrée n'est pas reprise non plus, le cache est réécrit avec les `ecrit:` réels.
+RC3_DIR="$WORK/r-cache3-01"
+materialiser traceur "$RC3_DIR"
+( cd "$RC3_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+"$PYBIN" -c "
+import json
+p = '$RC3_DIR/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+e = d['unites']['cycles/01-traceur/phases/01-livree']
+e['ecrit'] = []
+e['empreinte_livrables'] = ['ok', None]
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
+"
+"$PYBIN" -c '
+import sys
+chemin = sys.argv[1]
+octets = bytearray(open(chemin, "rb").read())
+octets[0] = ord("M") if octets[0] != ord("M") else ord("L")
+open(chemin, "wb").write(bytes(octets))
+' "$RC3_DIR/livrables/rapport.md"
+( cd "$RC3_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc3-second.json" 2>"$WORK/rc3-second.err" )
+RC3_RC=$?
+RC3_RECALCULEES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/rc3-second.json" 2>/dev/null || echo '?')"
+if [ "$RC3_RC" -eq 0 ] && grep -qF "$RC2_LIGNE" "$RC3_DIR/.planning/INDEX.md" 2>/dev/null && [ "$RC3_RECALCULEES" = "1" ]; then
+  ok "R-CACHE3-01 cache forgé (ecrit: [] et empreinte forcées) et livrable réécrit : indéterminé (livrable-modifie-apres-cloture), jamais close ; une unité recalculée"
+else
+  ko "R-CACHE3-01 cache forgé" "indéterminé (livrable ou plan modifié après la clôture), 1 unité recalculée" "rc=$RC3_RC recalculees=$RC3_RECALCULEES $(cat "$RC3_DIR/.planning/INDEX.md" 2>/dev/null | tr '\n' ' ' | cut -c1-300)" "-"
+fi
+RC3J_DIR="$WORK/r-cache3-01-jumeau"
+materialiser traceur "$RC3J_DIR"
+( cd "$RC3J_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+RC3J_ECRIT_REEL="$("$PYBIN" -c "
+import json
+print(json.dumps(json.load(open('$RC3J_DIR/.planning/.recalc-cache.json', encoding='utf-8'))['unites']['cycles/01-traceur/phases/01-livree']['ecrit']))
+")"
+"$PYBIN" -c "
+import json
+p = '$RC3J_DIR/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+d['unites']['cycles/01-traceur/phases/01-livree']['ecrit'] = ['autre-fichier-forge.md']
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
+"
+( cd "$RC3J_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc3j-second.json" 2>/dev/null )
+RC3J_FAITS="$("$PYBIN" -c "
+import json
+r = json.load(open('$WORK/rc3j-second.json'))
+e = json.load(open('$RC3J_DIR/.planning/.recalc-cache.json', encoding='utf-8'))['unites']['cycles/01-traceur/phases/01-livree']['ecrit']
+print('recalculees=%s ecrit_reecrit=%s' % (r['unites_recalculees'], json.dumps(e) == '$RC3J_ECRIT_REEL'.replace(chr(39), '')))
+")"
+if [ "$RC3J_FAITS" = "recalculees=1 ecrit_reecrit=True" ]; then
+  ok "R-CACHE3-01 jumeau : seul ecrit forgé (empreinte intacte) : l'entrée n'est pas reprise, le cache est réécrit avec les ecrit: réels du PLAN.md"
+else
+  ko "R-CACHE3-01 jumeau ecrit forgé" "recalculees=1 ecrit_reecrit=True" "$RC3J_FAITS (réels : $RC3J_ECRIT_REEL)" "-"
+fi
+
+# ---------- R-CACHE2-02 — un cache de schéma 1 est relu comme `autre-format` : recalcul complet, résultat identique (46-03) ----
+RC2B_DIR="$WORK/r-cache2-02"
+materialiser traceur "$RC2B_DIR"
+( cd "$RC2B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+cp "$RC2B_DIR/.planning/INDEX.md" "$WORK/rc2b-index-ref.md"
+cp "$RC2B_DIR/.planning/STATE.md" "$WORK/rc2b-state-ref.md"
+"$PYBIN" -c "
+import json
+p = '$RC2B_DIR/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+d['cache_schema_version'] = 1
+for e in d['unites'].values():
+    e.pop('empreinte_livrables', None)
+    e['livrables'] = {v: True for v in e.get('ecrit', [])}
+json.dump(d, open(p, 'w', encoding='utf-8'))
+"
+( cd "$RC2B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc2b-out.json" 2>"$WORK/rc2b-err.txt" )
+RC2B_RC=$?
+RC2B_FAITS="$("$PYBIN" -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+print("cache=%s reprises=%s recalculees=%s unites=%s" % (d["cache"], d["unites_reprises"], d["unites_recalculees"], d["unites"]))
+' "$WORK/rc2b-out.json" 2>/dev/null || echo ERREUR)"
+if [ "$RC2B_RC" -eq 0 ] && [ "$RC2B_FAITS" = "cache=autre-format reprises=0 recalculees=2 unites=2" ]; then
+  ok "R-CACHE2-02 cache de schéma 1 : autre-format, aucune reprise, recalcul complet ($RC2B_FAITS)"
+else
+  ko "R-CACHE2-02 cache de schéma 1" "cache=autre-format reprises=0 recalculees=2 unites=2" "rc=$RC2B_RC $RC2B_FAITS" "$(cat "$WORK/rc2b-err.txt" 2>/dev/null)"
+fi
+rm -f "$RC2B_DIR/.planning/.recalc-cache.json"
+( cd "$RC2B_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+if cmp -s "$WORK/rc2b-index-ref.md" "$RC2B_DIR/.planning/INDEX.md" && cmp -s "$WORK/rc2b-state-ref.md" "$RC2B_DIR/.planning/STATE.md"; then
+  ok "R-CACHE2-02 INDEX.md et STATE.md identiques au recalcul sans cache (cache de schéma 1, cache absent, cache valide)"
+else
+  ko "R-CACHE2-02 identité avec le recalcul sans cache" "INDEX.md et STATE.md identiques" "diffèrent" "-"
+fi
+RC2B_SCHEMA_FINAL="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["cache_schema_version"])' "$RC2B_DIR/.planning/.recalc-cache.json" 2>/dev/null || echo '?')"
+if [ "$RC2B_SCHEMA_FINAL" = "2" ]; then
+  ok "R-CACHE2-02 le cache réécrit après le schéma 1 est de schéma 2"
+else
+  ko "R-CACHE2-02 schéma réécrit" "2" "$RC2B_SCHEMA_FINAL" "-"
 fi
 
 # ================================================================================================
@@ -1900,8 +2448,8 @@ fi
 
 # ---------- MUT-LIVRABLES — contrôle R4 (livrable présent) neutralisé ---------------------------
 if make_recalc_mutant LIVRABLES \
-  'manquant = next((v for v in valeurs if not os.path.lexists(os.path.join(racine_lab, v))), None)' \
-  'manquant = None  # MUT-LIVRABLES'
+  'presents = livrables_presents(racine_lab, valeurs)  # r4-predicat' \
+  'presents = [(v, "present", "") for v in valeurs]  # MUT-LIVRABLES'
 then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-livrables-cas"
@@ -1914,6 +2462,62 @@ then
     else
       okmut LIVRABLES "état de etat-a-juger-jumeau · attendu (original) : indéterminé (livrable-absent) · obtenu (mutant) : $ETAT_M"
     fi
+  fi
+fi
+
+# ---------- MUT-R4-VIDE — le prédicat partagé « livrable présent » remplacé par l'ancienne existence nue (46-03, P46-D-12) ----
+if make_recalc_mutant R4-VIDE \
+  'presents = livrables_presents(racine_lab, valeurs)  # r4-predicat' \
+  'presents = [(v, "present" if os.path.lexists(os.path.join(racine_lab, v)) else "absent", "") for v in valeurs]  # MUT-R4-VIDE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-r4-vide-cas"
+  materialiser livrable-vide "$DIR_CAS"
+  ETAT_M="$(phase_etat_raison "$MR" "$DIR_CAS")"
+  if ! _verifier_plantage R4-VIDE "état/raison de livrable-vide" "$WORK/per-courant.json" "$WORK/per-courant.err" "0"; then
+    if [ "$ETAT_M" = 'indéterminé|livrable-vide:livrables/rapport.md' ]; then
+      komut R4-VIDE "état/raison de livrable-vide" "indéterminé|livrable-vide:livrables/rapport.md (original)" "$ETAT_M (mutant non opposable)"
+    elif [ "$ETAT_M" = "ERREUR" ]; then
+      komut R4-VIDE "état/raison de livrable-vide" "indéterminé|livrable-vide:livrables/rapport.md (original)" "ERREUR : le mutant plante, il n'est pas tué par la bonne raison"
+    else
+      okmut R4-VIDE "état/raison de livrable-vide · attendu (original) : indéterminé|livrable-vide:livrables/rapport.md · obtenu (mutant, existence nue) : $ETAT_M"
+    fi
+  fi
+fi
+
+# ---------- MUT-EMPREINTES-RECALC — règle E neutralisée : un verdict périmé reste cru (46-03, P46-D-03b) ------------------
+if make_recalc_mutant EMPREINTES-RECALC \
+  'if perime:' \
+  'if False:  # MUT-EMPREINTES-RECALC'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-empreintes-recalc-cas"
+  materialiser verdict-perime "$DIR_CAS"
+  ETAT_M="$(phase_etat_raison "$MR" "$DIR_CAS")"
+  if [ "$ETAT_M" = 'à juger|verdict-perime' ]; then
+    komut EMPREINTES-RECALC "état/raison de verdict-perime" "à juger|verdict-perime (original)" "$ETAT_M (mutant non opposable)"
+  elif [ "$ETAT_M" = "ERREUR" ]; then
+    komut EMPREINTES-RECALC "état/raison de verdict-perime" "à juger|verdict-perime (original)" "ERREUR : le mutant plante, il n'est pas tué par la bonne raison"
+  else
+    okmut EMPREINTES-RECALC "état/raison de verdict-perime · attendu (original) : à juger|verdict-perime · obtenu (mutant, règle E neutralisée) : $ETAT_M"
+  fi
+fi
+
+# ---------- MUT-A-CLORE — R8 rend l'ancien `indéterminé` au lieu de `à clore` (46-03, P46-D-04) --------------------------
+if make_recalc_mutant A-CLORE \
+  'return ("à clore", None, meta)  # r8-a-clore' \
+  'return ("indéterminé", "verdict-passe-sans-SUMMARY.md", meta)  # MUT-A-CLORE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-a-clore-cas"
+  materialiser etat-a-clore "$DIR_CAS"
+  ETAT_M="$(phase_etat_raison "$MR" "$DIR_CAS")"
+  if [ "$ETAT_M" = 'à clore|' ]; then
+    komut A-CLORE "état/raison de etat-a-clore" "à clore| (original)" "$ETAT_M (mutant non opposable)"
+  elif [ "$ETAT_M" = "ERREUR" ]; then
+    komut A-CLORE "état/raison de etat-a-clore" "à clore| (original)" "ERREUR : le mutant plante, il n'est pas tué par la bonne raison"
+  else
+    okmut A-CLORE "état/raison de etat-a-clore · attendu (original) : à clore| · obtenu (mutant, R8 rend l'ancien indéterminé) : $ETAT_M"
   fi
 fi
 
@@ -2261,7 +2865,7 @@ fi
 
 # ---------- MUT-LIVRABLES-CACHE — existence des livrables non revue à la reprise -----------------
 if make_recalc_mutant LIVRABLES-CACHE \
-  'if livrables_actuels == livrables_cache:' \
+  'if livrables_actuels is not None and livrables_actuels == entree_cache.get("empreinte_livrables"):  # cache-empreinte' \
   'if True:  # MUT-LIVRABLES-CACHE'
 then
   MR="$MUT_DIR/recalc-planning.sh"
@@ -2271,10 +2875,83 @@ then
   rm -f "$DIR_CAS/livrables/rapport.md"
   ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-livrables-cache-out.json" 2>"$WORK/mut-livrables-cache-err.txt" ); RC_M=$?
   if ! _verifier_plantage LIVRABLES-CACHE "état de la phase de R58 après suppression du livrable" "$WORK/mut-livrables-cache-out.json" "$WORK/mut-livrables-cache-err.txt" "$RC_M"; then
-    if grep -qF 'livrable absent : livrables/rapport.md' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null; then
-      komut LIVRABLES-CACHE "état de la phase de R58 après suppression du livrable" "indéterminé, livrable-absent (original)" "indéterminé, livrable-absent (mutant non opposable)"
+    # Second scénario (R-CACHE2-01) : un octet du livrable réécrit à taille égale, sur un lab neuf.
+    DIR_CAS2="$WORK/mut-livrables-cache-cas2"
+    materialiser traceur "$DIR_CAS2"
+    ( cd "$DIR_CAS2" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+    "$PYBIN" -c '
+import sys
+chemin = sys.argv[1]
+octets = bytearray(open(chemin, "rb").read())
+octets[0] = ord("M") if octets[0] != ord("M") else ord("L")
+open(chemin, "wb").write(bytes(octets))
+' "$DIR_CAS2/livrables/rapport.md"
+    ( cd "$DIR_CAS2" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-livrables-cache-out2.json" 2>"$WORK/mut-livrables-cache-err2.txt" ); RC_M2=$?
+    if ! _verifier_plantage LIVRABLES-CACHE "état de la phase de R-CACHE2-01 après réécriture du livrable" "$WORK/mut-livrables-cache-out2.json" "$WORK/mut-livrables-cache-err2.txt" "$RC_M2"; then
+      LIVR_R58_TUE=0; LIVR_RC2_TUE=0
+      grep -qF 'livrable absent : livrables/rapport.md' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null || LIVR_R58_TUE=1
+      grep -qF 'modifié après la clôture' "$DIR_CAS2/.planning/INDEX.md" 2>/dev/null || LIVR_RC2_TUE=1
+      if [ "$LIVR_R58_TUE" -eq 1 ] && [ "$LIVR_RC2_TUE" -eq 1 ]; then
+        okmut LIVRABLES-CACHE "tué par R58 ET par R-CACHE2-01 · R58 : attendu (original) : indéterminé (livrable-absent:livrables/rapport.md) · obtenu (mutant) : $(grep 'cycles/01-traceur' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null) · R-CACHE2-01 : attendu (original) : indéterminé (livrable ou plan modifié après la clôture) · obtenu (mutant) : $(grep 'cycles/01-traceur' "$DIR_CAS2/.planning/INDEX.md" 2>/dev/null) (l'état repris du cache reste en place malgré le livrable manquant ou réécrit)"
+      else
+        komut LIVRABLES-CACHE "état après suppression (R58) puis après réécriture (R-CACHE2-01) du livrable" "indéterminé dans les deux scénarios (original)" "mutant non opposable : R58 tué=$LIVR_R58_TUE, R-CACHE2-01 tué=$LIVR_RC2_TUE"
+      fi
+    fi
+  fi
+fi
+
+# ---------- MUT-CACHE-ECRIT — les `ecrit:` de l'entrée de cache crus sans relire le PLAN.md (A8, P46 lot B, b3) ----------
+# Deux mutants, un par contrôle : (1) la relecture retirée (les `ecrit:` du cache font foi : le comportement d'avant la correction) rend le cache forgé
+# opposable ; (2) l'égalité `ecrit` cache / PLAN.md retirée laisse reprendre une entrée dont les `ecrit:` ne sont pas ceux du plan.
+if make_recalc_mutant CACHE-ECRIT-RELECTURE \
+  '# cache-ecrit-reel' \
+  'ecrit_reel = entree_cache.get("ecrit") or []  # MUT-CACHE-ECRIT-RELECTURE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-cache-ecrit-relecture-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+  "$PYBIN" -c "
+import json
+p = '$DIR_CAS/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+e = d['unites']['cycles/01-traceur/phases/01-livree']
+e['ecrit'] = []
+e['empreinte_livrables'] = ['ok', None]
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
+"
+  printf 'REECRIT\n' > "$DIR_CAS/livrables/rapport.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-cache-ecrit-relecture-out.json" 2>"$WORK/mut-cache-ecrit-relecture-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CACHE-ECRIT-RELECTURE "état de 01-livree sur cache forgé (R-CACHE3-01)" "$WORK/mut-cache-ecrit-relecture-out.json" "$WORK/mut-cache-ecrit-relecture-err.txt" "$RC_M"; then
+    if grep -qF 'modifié après la clôture' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null; then
+      komut CACHE-ECRIT-RELECTURE "état de 01-livree sur cache forgé" "indéterminé (original)" "indéterminé (mutant non opposable)"
     else
-      okmut LIVRABLES-CACHE "état de la phase de R58 après suppression du livrable · attendu (original) : indéterminé (livrable-absent:livrables/rapport.md) · obtenu (mutant) : $(grep 'cycles/01-traceur' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null) (l'état repris du cache reste close malgré le livrable manquant)"
+      okmut CACHE-ECRIT-RELECTURE "état de 01-livree sur cache forgé · attendu (original) : indéterminé (livrable modifié après la clôture) · obtenu (mutant) : $(grep 'traceur' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null | head -1 | cut -c1-160) (le cache forgé est cru, un livrable réécrit reste close)"
+    fi
+  fi
+fi
+if make_recalc_mutant CACHE-ECRIT-EGALITE \
+  'if entree_cache.get("ecrit") == ecrit_reel:' \
+  'if True:  # MUT-CACHE-ECRIT-EGALITE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-cache-ecrit-egalite-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+  "$PYBIN" -c "
+import json
+p = '$DIR_CAS/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+d['unites']['cycles/01-traceur/phases/01-livree']['ecrit'] = ['autre-fichier-forge.md']
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
+"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-cache-ecrit-egalite-out.json" 2>"$WORK/mut-cache-ecrit-egalite-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CACHE-ECRIT-EGALITE "unites_recalculees sur cache dont seul ecrit est forgé (R-CACHE3-01 jumeau)" "$WORK/mut-cache-ecrit-egalite-out.json" "$WORK/mut-cache-ecrit-egalite-err.txt" "$RC_M"; then
+    RECALC_M="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/mut-cache-ecrit-egalite-out.json" 2>/dev/null || echo '?')"
+    if [ "$RECALC_M" = "1" ]; then
+      komut CACHE-ECRIT-EGALITE "unites_recalculees sur ecrit forgé" "1 (original)" "1 (mutant non opposable)"
+    else
+      okmut CACHE-ECRIT-EGALITE "unites_recalculees sur ecrit forgé · attendu (original) : 1 (l'entrée aux ecrit: étrangers n'est pas reprise) · obtenu (mutant) : $RECALC_M (reprise sans comparer les ecrit: au PLAN.md)"
     fi
   fi
 fi
@@ -4331,10 +5008,12 @@ fi
 R_INJ_DIR="$WORK/r-injectif-roundtrip"
 materialiser traceur "$R_INJ_DIR"
 VERDICT_CIBLE="$R_INJ_DIR/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
-printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "3 4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+printf -- '---\njuge: relecteur-banc\nhash: {{sha256-plan}}\nhash_livrables: {{empreinte-livrables}}\ntentative: "3 4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+jetons "$R_INJ_DIR"
 ( cd "$R_INJ_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r-injectif-err1.txt" )
 R_INJ_RC1=$?
-printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "3_4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+printf -- '---\njuge: relecteur-banc\nhash: {{sha256-plan}}\nhash_livrables: {{empreinte-livrables}}\ntentative: "3_4"\nconstats:\n  - resultat: passé\n---\n' > "$VERDICT_CIBLE"
+jetons "$R_INJ_DIR"
 ( cd "$R_INJ_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/r-injectif-out2.json" 2>"$WORK/r-injectif-err2.txt" )
 R_INJ_RC2=$?
 NB_LIGNES_CLOTURE="$(grep -c "01-livree" "$R_INJ_DIR/.planning/cloture.log")"
@@ -4368,8 +5047,9 @@ fi
 # relu dans le fichier de l'autre.
 R_DEDASSAINI_DIR="$WORK/r-dedoublonnage-assaini"
 materialiser traceur "$R_DEDASSAINI_DIR"
-printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
+printf -- '---\njuge: relecteur-banc\nhash: {{sha256-plan}}\nhash_livrables: {{empreinte-livrables}}\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
   > "$R_DEDASSAINI_DIR/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+jetons "$R_DEDASSAINI_DIR"
 ( cd "$R_DEDASSAINI_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>"$WORK/r-dedassaini-err1.txt" )
 R_DEDASSAINI_RC1=$?
 LIGNES_APRES_1="$(wc -l < "$R_DEDASSAINI_DIR/.planning/cloture.log" | tr -d ' ')"
@@ -4401,8 +5081,9 @@ then
   MR="$MUT_DIR/recalc-planning.sh"
   DIR_CAS="$WORK/mut-dedoublonnage-brut-cas"
   materialiser traceur "$DIR_CAS"
-  printf -- '---\njuge: relecteur-banc\nhash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcd\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
+  printf -- '---\njuge: relecteur-banc\nhash: {{sha256-plan}}\nhash_livrables: {{empreinte-livrables}}\ntentative: "1  FORGED-RECORD  verdict=close  tentative=99  date=observation"\nconstats:\n  - resultat: passé\n---\n' \
     > "$DIR_CAS/.planning/cycles/01-traceur/phases/01-livree/VERDICT.md"
+  jetons "$DIR_CAS"
   ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>"$WORK/mut-dedoublonnage-brut-err1.txt" )
   ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-dedoublonnage-brut-out2.txt" 2>"$WORK/mut-dedoublonnage-brut-err2.txt" ); RC_M=$?
   if ! _verifier_plantage DEDOUBLONNAGE-BRUT "cloture_ajouts du second recalcul (valeur piégée espaces+=)" "$WORK/mut-dedoublonnage-brut-out2.txt" "$WORK/mut-dedoublonnage-brut-err2.txt" "$RC_M"; then

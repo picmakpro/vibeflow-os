@@ -49,18 +49,18 @@
 | GATE-13 | Phase 45 | Complete |
 | GATE-14 | Phase 45 | Complete |
 | GATE-15 | Phase 45 | Complete (CI Linux de la PR #124, validé par Willy 2026-10-01) |
-| CLOT-01 | Phase 46 | Pending |
-| CLOT-02 | Phase 46 | Pending |
-| CLOT-03 | Phase 46 | Pending |
-| CLOT-04 | Phase 46 | Pending |
-| CLOT-05 | Phase 46 | Pending |
-| CLOT-06 | Phase 46 | Pending |
-| CLOT-07 | Phase 46 | Pending |
-| CLOT-08 | Phase 46 | Pending |
-| CLOT-09 | Phase 46 | Pending |
-| CLOT-10 | Phase 46 | Pending |
-| CLOT-11 | Phase 46 | Pending |
-| CLOT-12 | Phase 46 | Pending |
+| CLOT-01 | Phase 46 | Complete |
+| CLOT-02 | Phase 46 | Complete sous arbitrage (G4 livré, non armé : Willy, AskUserQuestion session principale, 2026-10-06, « (c) Armer G3 seul » ; limite (bp) ; reprise Phase 46.1) |
+| CLOT-03 | Phase 46 | Complete |
+| CLOT-04 | Phase 46 | Complete |
+| CLOT-05 | Phase 46 | Complete |
+| CLOT-06 | Phase 46 | Partiel sous arbitrage (G4′ livré, non armé : Willy, AskUserQuestion session principale, 2026-10-06, « etape-6-mesure » ; limite (bs) ; reprise Phase 46.1) |
+| CLOT-07 | Phase 46 | Complete (part harnais en séance à vérifier, item humain de 46-VERIFICATION) |
+| CLOT-08 | Phase 46 | Complete |
+| CLOT-09 | Phase 46 | Complete |
+| CLOT-10 | Phase 46 | Complete sous arbitrage, partiel (G3 seul armé ; G4 et G4′ en observation, arbitrages du 2026-10-06 ; reprise Phase 46.1) |
+| CLOT-11 | Phase 46 | Complete |
+| CLOT-12 | Phase 46 | Complete |
 
 ## Milestone gouvernance-labs-v1.0 — « le planning métier tenu par une machine » (inscrit 2026-09-23)
 
@@ -189,42 +189,42 @@
 > 0 correspondance, rc=1). Chaque exigence dérive d'une décision de `46-CONTEXT.md` (préfixe `P46-D-NN`,
 > ADR-075) et ne pose aucune décision nouvelle.
 
-- [ ] **CLOT-01**: G3 refuse par deny l'écriture par outil d'un `CLOTURE.md` d'unité d'un lab adhérent
+- [x] **CLOT-01**: G3 refuse par deny l'écriture par outil d'un `CLOTURE.md` d'unité d'un lab adhérent
   quand un livrable `ecrit:` du `PLAN.md` voisin est absent, vide ou un lien ; le même prédicat
   « livrable présent » sert à R4 du recalcul (P46-D-01, P46-D-12).
-- [ ] **CLOT-02**: G4 refuse par deny l'écriture par outil d'un `SUMMARY.md` d'unité quand le
+- [x] **CLOT-02**: G4 refuse par deny l'écriture par outil d'un `SUMMARY.md` d'unité quand le
   `VERDICT.md` voisin est absent, invalide, porte un constat `échec` ou une empreinte périmée ; le
   prédicat est réévalué à chaque écriture (P46-D-01, P46-D-03).
-- [ ] **CLOT-03**: `poser-verdict.sh` pose deux empreintes (plan, livrables composés, une seule
+- [x] **CLOT-03**: `poser-verdict.sh` pose deux empreintes (plan, livrables composés, une seule
   implémentation, aucun lien suivi, parcours borné, dépassement = refus) ; G4 et le recalcul les
   vérifient (`à juger` motif `verdict-perime` avant clôture, `indéterminé` après) (P46-D-03,
   P46-D-03a, P46-D-03b).
-- [ ] **CLOT-04**: le recalcul dérive un neuvième état non terminal, `à clore` (constats passés,
+- [x] **CLOT-04**: le recalcul dérive un neuvième état non terminal, `à clore` (constats passés,
   empreintes conformes, `SUMMARY.md` absent), à la place d'`indéterminé` pour ce cas (P46-D-04).
-- [ ] **CLOT-05**: `poser-verdict.sh` refuse une quatrième tentative, avec un message distinct, sauf
+- [x] **CLOT-05**: `poser-verdict.sh` refuse une quatrième tentative, avec un message distinct, sauf
   dérogation nominative couvrant l'unité ; le plafond est une constante du code (P46-D-05).
-- [ ] **CLOT-06**: G4′ refuse le rapport d'un worker ou d'un producteur **qui a Bash**, dans un lab
+- [~] **CLOT-06**: G4′ refuse le rapport d'un worker ou d'un producteur **qui a Bash**, dans un lab
   adhérent, sans sortie de commande brute, par deny sur `PreToolUse(SubagentHandback)` et par
   `decision: "block"` sur `SubagentStop` en repli ; agents sans Bash, juges, fil principal, agent
   inconnu et `agent_type` vide exclus ; le trou « hors mode auto, mode dégradé » est déclaré
   (P46-D-02, P46-D-02a, P46-D-02b, P46-D-10a).
-- [ ] **CLOT-07**: D1 trace toute écriture non expliquée d'un fichier surveillé d'un lab adhérent, en
+- [x] **CLOT-07**: D1 trace toute écriture non expliquée d'un fichier surveillé d'un lab adhérent, en
   séance (`FileChanged`, `watchPaths` fichier par fichier depuis `SessionStart`/`CwdChanged`) et
   entre les séances (réconciliation par hash au `SessionStart`) ; il ne refuse jamais ; hors
   adhésion, aucun `watchPaths` (P46-D-07, P46-D-07a).
-- [ ] **CLOT-08**: un vérificateur déterministe signale au `SessionStart` d'un lab adhérent chaque juge
+- [x] **CLOT-08**: un vérificateur déterministe signale au `SessionStart` d'un lab adhérent chaque juge
   laxiste (verdict de canary sans `échec` sur le critère visé) et chaque « juge sans preuve » ; le
   contrat de la sortie piégée, l'étape écrite du premier cycle et les fixtures sont livrés
   (P46-D-06, P46-D-06a).
-- [ ] **CLOT-09**: le hook central traite chaque événement par son mode, avec le contrat de sortie de
+- [x] **CLOT-09**: le hook central traite chaque événement par son mode, avec le contrat de sortie de
   P46-D-10 (jamais exit 2) ; G3, G4 et G4′ sont fail-closed, D1 fail-open déclaré ; le canary
   couvre chaque nouveau gate, le mode dégradé et D1 (P46-D-09, P46-D-10).
-- [ ] **CLOT-10**: l'armement suit (G3 + G4) → G4′, chaque étape à 0 faux refus et 0 faux accept sur
+- [x] **CLOT-10**: l'armement suit (G3 + G4) → G4′, chaque étape à 0 faux refus et 0 faux accept sur
   le banc puis sur le rejeu en lecture seule ; constantes dans le code livré (P46-D-11).
-- [ ] **CLOT-11**: zéro régression sur les labs dev (octet vide et 0 pour chaque nouvel événement,
+- [x] **CLOT-11**: zéro régression sur les labs dev (octet vide et 0 pour chaque nouvel événement,
   mutation « ignorer l'adhésion » rouge) et coût du pré-filtre mesuré par nouvel événement, écrit
   dans la référence ; `FileChanged` hors adhésion prouvé nul (P46-D-16).
-- [ ] **CLOT-12**: la spec moteur est amendée (§3.1, §5, §5.1, §10) avec date et canal ;
+- [x] **CLOT-12**: la spec moteur est amendée (§3.1, §5, §5.1, §10) avec date et canal ;
   `modele-cycles.md` porte les nouveaux gates, l'état `à clore`, les empreintes et les limites
   déclarées (P46-D-08) ; les suites tournent en CI Linux avec une mutation rouge tracée par garde ;
   `planning-core` passe en v2.10.0 sans release ; `HOOKS-CONTRAT-SORTIE.md` et l'inventaire des
