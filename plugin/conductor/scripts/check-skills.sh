@@ -353,9 +353,27 @@ thirdparty_files_total = 0
 linted_paths = []
 skills_juges = []  # (chemin relatif, chemin reel, frontmatter, texte) de chaque skill juge (POCK-07)
 
-def parse_frontmatter(text):
+def sans_commentaire_yaml(val):
+    """Valeur YAML d'un scalaire ou d'une liste en ligne : le commentaire de fin de ligne
+    (`#` precede d'un blanc ou en tete, HORS guillemets) est exclu. Un guillemet n'ouvre une
+    chaine qu'en debut de jeton (apres blanc, `[` ou `,`) : une apostrophe de mot ne masque rien."""
+    quote = None
+    for i, c in enumerate(val):
+        if quote:
+            if c == quote:
+                quote = None
+        elif c in (chr(34), chr(39)) and (i == 0 or val[i - 1] in " \t[,"):
+            quote = c
+        elif c == "#" and (i == 0 or val[i - 1] in " \t"):
+            return val[:i].rstrip()
+    return val
+
+def parse_frontmatter(text, commentaires=False):
     """Meme tokenizer YAML-tolerant (scalaire/liste/continuation) que check-agents.sh — recopie
-    verbatim, aucune divergence de comportement entre les deux gates sur ce point."""
+    verbatim, aucune divergence de comportement entre les deux gates sur ce point. Option
+    `commentaires` (M-02, calcul des aretes SEULEMENT) : la valeur lue est la valeur YAML, le
+    commentaire de fin de ligne exclu, quelle que soit la forme (scalaire, liste en ligne ; la
+    liste de bloc le fait deja) — les autres appels gardent le comportement d'origine."""
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
         return None
@@ -369,6 +387,8 @@ def parse_frontmatter(text):
         if m:
             current_key = m.group(1)
             val = m.group(2).strip()
+            if commentaires:
+                val = sans_commentaire_yaml(val)
             if val.startswith("[") and val.endswith("]"):
                 items = [x.strip().strip(chr(34)).strip(chr(39)) for x in val[1:-1].split(",") if x.strip()]
                 fm[current_key] = items
@@ -553,7 +573,11 @@ def decouvrir_appelants(racine):
         except OSError as e:
             errors.append(f"{rel} : appelant illisible ({e}) — aretes non calculables")
             continue
-        fm = parse_frontmatter(texte) if kind == "agent" else None
+        fm = parse_frontmatter(texte, commentaires=True) if kind == "agent" else None
+        for cle in (("skills", "tools", "disallowedTools", "disallowed-tools") if fm else ()):
+            v = fm.get(cle)
+            if isinstance(v, str) and v.startswith("["):
+                errors.append(f"{rel} : champ {cle} non interpretable (liste en ligne non refermee) — aretes non calculables")
         appelants.append({"rel": rel, "kind": kind, "fm": fm if fm is not None else {}, "text": texte})
     return appelants
 
@@ -744,17 +768,29 @@ def agent_outille_skill(fm):
         return False
     return outille
 
+def identite_skill(chemin, fm):
+    """Identite d'un skill dans le calcul des aretes (M-01) : le `name:` declare, a defaut le nom
+    de son dossier (c'est ainsi que le harnais le nomme). None si ni l'un ni l'autre n'est
+    exploitable : le skill est alors REFUSE par controler_aretes, jamais exempte en silence."""
+    nom = fm.get("name")
+    if isinstance(nom, str) and nom:
+        return nom
+    if "name" in fm:
+        return None  # name present mais vide ou non scalaire : ne pas deviner
+    dossier = os.path.basename(os.path.dirname(os.path.abspath(chemin)))
+    return dossier or None
+
 def aretes_par_skill(juges, appelants):
     """Aretes d'appel DERIVEES (jamais un nom de module en dur) : rel du skill -> liste de
     (famille, rel de l'appelant). Familles : commande (fichier commands/*.md qui contient le nom,
     mot entier), prechargement (nom dans le champ skills: d'un agent), agent (agent qui contient
     le nom ET dont l'outillage permet Skill)."""
     aretes = {}
-    for rel, _chemin, fm, _texte in juges:
+    for rel, chemin, fm, _texte in juges:
         liste = []
         aretes[rel] = liste
-        nom = fm.get("name")
-        if not isinstance(nom, str) or not nom:
+        nom = identite_skill(chemin, fm)
+        if not nom:
             continue
         motif = mot_entier_re(nom)
         for ap in appelants:
@@ -785,19 +821,21 @@ def controler_aretes(juges, appelants):
     corps cite un AUTRE `user` est refuse. Un user qui cite un model est legitime."""
     aretes = aretes_par_skill(juges, appelants)
     users = {}
-    for rel, _chemin, fm, _texte in juges:
-        nom = fm.get("name")
-        if fm.get("vf-invocation") == "user" and isinstance(nom, str) and nom:
-            users[nom] = rel
     msgs = []
-    for rel, _chemin, fm, texte in juges:
+    for rel, chemin, fm, _texte in juges:
+        nom = identite_skill(chemin, fm)
+        if not nom:
+            msgs.append(f"{rel} : identite du skill indeterminable (name: vide ou non scalaire) — aretes non calculables, refuse (M-01)")
+        elif fm.get("vf-invocation") == "user":
+            users[nom] = rel
+    for rel, chemin, fm, texte in juges:
         if fm.get("vf-invocation") != "user":
             continue
         for famille, ap_rel in aretes.get(rel, []):
             msgs.append(f"{rel} : user-invoked appele par {ap_rel} ({famille}) — refuse (P414-D-02)")
         corps = corps_sans_frontmatter(texte)
         for nom_cible in sorted(users):
-            if nom_cible == fm.get("name"):
+            if nom_cible == identite_skill(chemin, fm):
                 continue
             if mot_entier_re(nom_cible).search(corps):
                 msgs.append(f"{rel} : user-invoked cite le user-invoked {esc(nom_cible)} — refuse (P414-D-01)")
@@ -809,6 +847,46 @@ def est_imbrique(chemin):
     dossier_skill = os.path.dirname(os.path.abspath(chemin))
     return os.path.basename(os.path.dirname(dossier_skill)) == "skills"
 
+def valeur_implicite_codex(texte):
+    """M-03 : valeur RESOLUE et unique de policy.allow_implicit_invocation dans un openai.yaml.
+    Lecteur YAML minimal par indentation (aucune dependance) : la cle `policy:` au niveau 0 (une
+    seule), la cle `allow_implicit_invocation` parmi SES enfants directs (une seule), valeur
+    booleenne `false` (commentaire de fin de ligne exclu). Rend (conforme, raison) ; toute forme
+    non interpretable (flux `{...}`, doublon, mauvais parent, valeur non booleenne) = refus."""
+    lignes = []
+    for brut in texte.split("\n"):
+        l = brut.rstrip("\r")
+        if not l.strip() or l.lstrip().startswith("#"):
+            continue
+        if "\t" in l[:len(l) - len(l.lstrip())]:
+            return False, "tabulation en indentation, non interpretable"
+        lignes.append((len(l) - len(l.lstrip(" ")), l.strip()))
+    policies = [i for i, (ind, c) in enumerate(lignes) if ind == 0 and re.match(r"^policy\s*:", c)]
+    if len(policies) != 1:
+        return False, "cle policy: absente ou en double"
+    debut = policies[0]
+    reste = sans_commentaire_yaml(lignes[debut][1].split(":", 1)[1].strip())
+    if reste:
+        return False, "policy: en forme de flux ou de scalaire, non interpretable"
+    enfants, indent_enfant = [], None
+    for ind, c in lignes[debut + 1:]:
+        if ind == 0:
+            break
+        if indent_enfant is None:
+            indent_enfant = ind
+        if ind == indent_enfant:
+            enfants.append(c)
+    vals = []
+    for c in enfants:
+        m = re.match(r"^allow_implicit_invocation\s*:(.*)$", c)
+        if m:
+            vals.append(sans_commentaire_yaml(m.group(1).strip()).strip(chr(34) + chr(39)))
+    if len(vals) != 1:
+        return False, "allow_implicit_invocation absent ou en double sous policy:"
+    if vals[0].lower() != "false":
+        return False, f"valeur resolue {vals[0]!r} (attendu false)"
+    return True, ""
+
 def controler_codex(juges):
     """P414-D-03 : un skill `user` NICHE exige {dossier}/agents/openai.yaml — fichier regulier
     (jamais un lien) portant une ligne `allow_implicit_invocation: false` (equivalent Codex de
@@ -818,15 +896,15 @@ def controler_codex(juges):
         if fm.get("vf-invocation") != "user" or not est_imbrique(chemin):
             continue
         oy = os.path.join(os.path.dirname(chemin), "agents", "openai.yaml")
-        conforme = False
+        conforme, raison = False, "fichier absent, illisible ou lien symbolique"
         if os.path.isfile(oy) and not os.path.islink(oy):
             try:
                 with open(oy, encoding="utf-8-sig") as fh:
-                    conforme = any(l.strip() == "allow_implicit_invocation: false" for l in fh.read().split("\n"))
+                    conforme, raison = valeur_implicite_codex(fh.read())
             except OSError:
-                conforme = False
+                conforme, raison = False, "fichier illisible"
         if not conforme:
-            msgs.append(f"{rel} : user-invoked niche sans agents/openai.yaml (policy.allow_implicit_invocation: false) — P414-D-03")
+            msgs.append(f"{rel} : user-invoked niche sans agents/openai.yaml (policy.allow_implicit_invocation: false) — P414-D-03 [{raison}]")
     return msgs
 
 def dette_type1(juges):
@@ -842,9 +920,9 @@ def sans_appelant(juges, appelants):
     Skill) — information pour le jugement humain (P414-D-01) ; le gate LISTE, il ne pose rien."""
     aretes = aretes_par_skill(juges, appelants)
     noms = set()
-    for rel, _chemin, fm, _texte in juges:
-        nom = fm.get("name")
-        if fm.get("vf-invocation") != "user" and isinstance(nom, str) and nom and not aretes.get(rel):
+    for rel, chemin, fm, _texte in juges:
+        nom = identite_skill(chemin, fm)
+        if fm.get("vf-invocation") != "user" and nom and not aretes.get(rel):
             noms.add(nom)
     return sorted(noms)
 
@@ -920,7 +998,7 @@ else:
             continue
         check_file(os.path.relpath(f, skills_dir), text)
         linted_paths.append(f)
-        fm_juge = parse_frontmatter(text)
+        fm_juge = parse_frontmatter(text, commentaires=True)
         if fm_juge is not None:
             skills_juges.append((os.path.relpath(f, skills_dir), f, fm_juge, text))
 
