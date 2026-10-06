@@ -1,0 +1,92 @@
+{
+  "nodes": [
+    {
+      "id": "discuss-414",
+      "step": "cadrage 41.4 (manager, Pattern F)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-41.4-*"
+      ],
+      "status": "running"
+    },
+    {
+      "id": "plan-414",
+      "step": "plan 41.4 (vf-coder -> gsd-plan-phase)",
+      "stage": "",
+      "deps": [
+        "discuss-414"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-41.4-*"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-414",
+      "step": "execution 41.4 (vf-coder -> gsd-execute-phase)",
+      "stage": "",
+      "deps": [
+        "plan-414"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/**",
+        "plugin/conductor/**",
+        "plugin/consolidator/**",
+        "plugin/*/skills/**",
+        ".planning/workstreams/fiabilite/phases/VFDO-41.4-*"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-414",
+      "step": "revue code 41.4 (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "exec-414"
+      ],
+      "scope": [
+        "plugin/**"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "nonreg-414",
+      "step": "rejeu job CI gates + decouverte complete des suites",
+      "stage": "",
+      "deps": [
+        "exec-414"
+      ],
+      "scope": [
+        "plugin/**",
+        "scripts/**"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire",
+      "stage": "",
+      "deps": [
+        "exec-414"
+      ],
+      "scope": [
+        "docs/**",
+        "plugin/*/README.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-414",
+      "step": "push + PR (empilee sur #134)",
+      "stage": "",
+      "deps": [
+        "revue-414",
+        "nonreg-414",
+        "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
