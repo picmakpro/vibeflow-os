@@ -518,6 +518,8 @@ def controle_d1_02(ctx, script):
     contexte = doc["hookSpecificOutput"].get("additionalContext")
     if not isinstance(contexte, str) or "[planning-core] D1 : surveillance bornée" not in contexte or "BORNE_WATCHPATHS" not in contexte:
         fautes.append("additionalContext : le signal de borne (« surveillance bornée », « BORNE_WATCHPATHS ») attendu — obtenu %r" % (contexte,))
+    elif "ni surveillées ni réconciliées" not in contexte:  # N-8 (audit-46-b) : les unités hors liste ne sont pas non plus réconciliées
+        fautes.append("additionalContext : « ni surveillées ni réconciliées » attendu dans le signal de borne — obtenu %r" % (contexte,))
     return (not fautes), ("; ".join(fautes[:3]) if fautes else "40 unités ouvertes : exactement 128 chemins distincts (la borne), UNE ligne genre=borne (sha256 = empreinte de la liste) et le signal de borne dans additionalContext")
 
 

@@ -3026,8 +3026,8 @@ def texte_borne(tronquee, exclus):
     au-delà des bornes d'octets."""
     morceaux = []
     if tronquee:
-        morceaux.append("liste surveillée tronquée à %d chemins (BORNE_WATCHPATHS) : les unités non closes les plus anciennes ne sont pas "
-                        "surveillées en séance" % BORNE_WATCHPATHS)
+        morceaux.append("liste surveillée tronquée à %d chemins (BORNE_WATCHPATHS) : les unités non closes les plus anciennes ne sont ni "
+                        "surveillées ni réconciliées" % BORNE_WATCHPATHS)
     if exclus:
         morceaux.append("%d fichier(s) surveillé(s) non réconcilié(s) au-delà de %d octets hachés (BORNE_OCTETS_RECONCILIATION) ou de %d octets "
                         "par fichier (%s%s)" % (len(exclus), BORNE_OCTETS_RECONCILIATION, BORNE_OCTETS_LIVRABLES, ", ".join(exclus[:3]),
