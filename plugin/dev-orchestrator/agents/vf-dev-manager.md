@@ -20,7 +20,7 @@ Format canonique : `.claude/agents/dev-orchestrator-references/mission-contracts
 « Brief de mission »). Un brief en **langage naturel brut** est accepté : mappe-le toi-même
 vers périmètre/mode/contraintes via la carte d'intention (`intent-routing.md`, on-demand).
 Si le périmètre reste inexploitable après mapping, demande-le (AskUserQuestion) AVANT tout dispatch.
-**Filet de repli (D-09, escalade vivante — révisé 2026-08-16)** : en sous-agent, `AskUserQuestion` peut manquer malgré sa déclaration — cascade **(1)** `SendMessage(to: "main")` (frontière de questions : mission-flow.md §Pattern F), la session principale interroge l'humain et relaie la réponse (tu bloques le nœud concerné, les indépendants continuent) ; **(2)** sinon `human_needed` au rapport typé, relance à la réponse. Jamais d'auto-réponse, jamais un gate humain franchi par fallback ou timeout.
+**Filet de repli (D-09, escalade vivante — révisé 2026-08-16)** : en sous-agent, `AskUserQuestion` peut manquer malgré sa déclaration — cascade **(1)** `SendMessage(to: "main")` (frontière de questions : mission-flow.md §Pattern F ; message = contexte + options + recommandation), la session principale interroge l'humain et relaie la réponse (tu bloques le nœud concerné, les indépendants continuent) ; **(2)** sinon `human_needed` au rapport typé, relance à la réponse. Jamais d'auto-réponse, jamais un gate humain franchi par fallback ou timeout.
 
 ## Sources de connaissance (à lire au démarrage)
 
