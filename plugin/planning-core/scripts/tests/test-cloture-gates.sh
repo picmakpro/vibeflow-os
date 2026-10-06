@@ -38,7 +38,7 @@
 #   R-G4-02   copie armée : VERDICT.md absent, invalide (frontmatter, constats vides, résultat hors passé/échec, lien), constat en échec, PLAN.md
 #             absent, ecrit: qui contient l'unité, livrables hors borne -> UN deny `[planning-core] G4 :` chacun, message distinct par cas
 #   R-G4-03   verdict posé (tentative 2) puis un octet d'un livrable, le PLAN.md, `hash_livrables` retiré, un livrable supprimé -> « verdict périmé : re-juger
-#             (tentative 3) »
+#             (tentative 3 sur 3, 0 restante(s) après elle) »
 #   R-G4-04   jumeaux qui passent : verdict conforme, Write, Edit, NotebookEdit, seconde écriture d'une unité close, unité de plan ; style GSD, niveau
 #             cycle, noms voisins jamais jugés ; lab dev : octet vide
 #   R-G4-05   dérogation G4 sur le chemin du SUMMARY.md (usage unique) ; erreur interne injectée : armée deny, observe ligne d'observation
@@ -72,7 +72,7 @@
 #   appel direct), MUT-DEROG-VERROU (`consommer` lit au-delà), MUT-D1-LECTURE-HACHAGE (le compteur de `empreinte_fichier` retiré) -> R-JOURNAUX-BORNES ;
 #   MUT-PLAN-G2-BORNE est RE-CIBLÉ (tour 2) : le défaut de `lire_frontmatter_fichier` valant désormais BORNE_LECTURE_PLAN, retirer la borne explicite est
 #   devenu un mutant ÉQUIVALENT ; il relâche la borne (2 * BORNE_LECTURE_PLAN) et reste tué par R-PLAN-BORNE-G2 ;
-#   MUT-G4-ABSENT, MUT-G4-ECHEC (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
+#   MUT-G4-ABSENT, MUT-G4-ECHEC, MUT-G4-PLAFOND-MESSAGE (F6, fix-46-c) (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; `cmp -s` jamais `diff` ; tout le travail fin est fait par
@@ -1537,7 +1537,12 @@ def controle_g4_02(ctx, script):
     # 3. constat en échec : le numéro de la tentative suivante est lu dans le verdict
     for tentative in (1, 2):
         lab = lab_g4(ctx, "g4-02-echec-%d" % tentative, tentative=tentative, constats=("critere-a::passé", "critere-b::échec"))
-        cas("échec tentative %d" % tentative, lab, "constat en échec : critere-b — corrigez puis re-jugez (tentative %d)" % (tentative + 1), genre="echec")
+        cas("échec tentative %d" % tentative, lab, "constat en échec : critere-b — corrigez puis re-jugez (tentative %d sur 3, %d restante(s) après elle)" % (tentative + 1, 2 - tentative),
+            genre="echec")
+    # F6 (fix-46-c) : à la 3e tentative le plafond de poser-verdict.sh est atteint, le message nomme la dérogation PLAFOND (jamais « tentative 4 »)
+    lab = lab_g4(ctx, "g4-02-echec-3", tentative=3, constats=("critere-a::passé", "critere-b::échec"))
+    cas("échec tentative 3 (plafond)", lab, "constat en échec : critere-b — corrigez puis re-jugez (plafond de 3 tentatives atteint : dérogation PLAFOND requise, "
+        "deroger-gate.sh --gate=PLAFOND)", genre="echec")
     # 4. PLAN.md absent ; ecrit: qui contient l'unité (verdicts écrits à la main : la commande de pose les aurait refusés)
     lab = fabriquer_lab(ctx, "g4-02-plan-absent", sans_plan=True)
     verdict_a_la_main(lab, hash_plan="0" * 64, hash_livrables="0" * 64)
@@ -1560,10 +1565,10 @@ def controle_g4_02(ctx, script):
 
 def controle_g4_03(ctx, script):
     """Copie armée : verdict posé par la vraie commande (tentative 2), puis un octet d'un livrable, le PLAN.md, `hash_livrables` retiré ou un livrable supprimé
-    -> « verdict périmé : re-juger (tentative 3) »."""
+    -> « verdict périmé : re-juger (tentative 3 sur 3, 0 restante(s) après elle) »."""
     d = ctx.copie_forcee(_dossier(ctx, script), "armed")
     fautes = []
-    attendu = "[planning-core] G4 : verdict périmé : re-juger (tentative 3)"
+    attendu = "[planning-core] G4 : verdict périmé : re-juger (tentative 3 sur 3, 0 restante(s) après elle)"
 
     def perime(nom, lab):
         bon, detail, raison = _refus_g4(ctx, d, lab, "Write", SUMMARY)
@@ -1593,7 +1598,7 @@ def controle_g4_03(ctx, script):
     perime("livrable supprimé", lab)
     return (not fautes), ("; ".join(fautes[:6]) if fautes else
                           "verdict posé (tentative 2) puis un octet d'un livrable, le PLAN.md, hash_livrables retiré ou un livrable supprimé : "
-                          "« verdict périmé : re-juger (tentative 3) » chaque fois")
+                          "« verdict périmé : re-juger (tentative 3 sur 3, 0 restante(s) après elle) » chaque fois")
 
 
 def controle_g4_04(ctx, script):
@@ -2331,6 +2336,7 @@ def sec_mutants_g3(ctx):
 def sec_mutants_g4(ctx):
     tuer(ctx, "G4-ABSENT", "# g4-verdict-absent", "if False:  # g4-verdict-absent", "R-G4-02", controle_g4_02)
     tuer(ctx, "G4-ECHEC", "# g4-echec", "if False:  # g4-echec", "R-G4-02", controle_g4_02)
+    tuer(ctx, "G4-PLAFOND-MESSAGE", "# g4-plafond-atteint", "if False:  # g4-plafond-atteint", "R-G4-02", controle_g4_02)  # F6
     tuer(ctx, "G4-HASH", "# g4-hash-plan", "if False:  # g4-hash-plan", "R-G4-03", controle_g4_03)
     tuer(ctx, "G4-HASH-LIVRABLES", "# g4-hash-livrables", 'if statut_emp != "ok":  # g4-hash-livrables', "R-G4-03", controle_g4_03)
     tuer(ctx, "G4-FAILOPEN", "# protege-erreur",

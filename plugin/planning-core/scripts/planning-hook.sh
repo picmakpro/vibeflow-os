@@ -1898,6 +1898,19 @@ def _tentative_suivante(donnees):
     return None
 
 
+PLAFOND_TENTATIVES = 3  # g4-plafond : même valeur que la constante de poser-verdict.sh (au-delà, la pose est refusée, code 65, sauf dérogation PLAFOND)
+
+
+def _texte_reessai(suivante):
+    """Fin de message de G4 sur la prochaine tentative de verdict (`suivante`, None si illisible) : le nombre de tentatives restant tant que le plafond de
+    poser-verdict.sh n'est pas atteint, la dérogation PLAFOND quand il l'est (F6 : « tentative 4 » promettait une pose que la commande refuse)."""
+    if suivante is None:
+        return ""
+    if suivante > PLAFOND_TENTATIVES:  # g4-plafond-atteint
+        return " (plafond de %d tentatives atteint : dérogation PLAFOND requise, deroger-gate.sh --gate=PLAFOND)" % PLAFOND_TENTATIVES
+    return " (tentative %d sur %d, %d restante(s) après elle)" % (suivante, PLAFOND_TENTATIVES, PLAFOND_TENTATIVES - suivante)
+
+
 def evaluer_g4(contexte):
     """G4 : voir l'en-tête de section. Verdict `G4` sur le chemin relatif du SUMMARY.md écrit (dérogation nominative sur ce chemin)."""
     racine = contexte["racine"]  # g4-sonde
@@ -1920,8 +1933,7 @@ def evaluer_g4(contexte):
     if not isinstance(constats, list) or len(constats) == 0 or any(  # g4-invalide
             not isinstance(c, dict) or c.get("resultat") not in ("passé", "échec") for c in constats):
         return [Verdict("G4", chemin_rel, "VERDICT.md invalide (règle R6)")]
-    suivante = _tentative_suivante(donnees)
-    reessai = "" if suivante is None else " (tentative %d)" % suivante
+    reessai = _texte_reessai(_tentative_suivante(donnees))
     lecture, octets = octets_plan_du_dossier(dossier)
     if lecture == "hors-borne":  # g4-lecture-plan
         return [Verdict("G4", chemin_rel, RAISON_G4_PLAN_BORNE)]
