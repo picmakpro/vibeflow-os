@@ -331,6 +331,84 @@ jobs:
           echo "== $found dossier(s) vérifiés en monde fermé, $fail échec(s) =="
           [ "$fail" -eq 0 ]
 
+      - name: check-skills (classe d'invocation des skills — POCK-07, étape propre)
+        # POURQUOI CETTE ÉTAPE EXISTE : `check-skills.sh` n'avait AUCUNE étape dans ce job — il ne tournait
+        # que via sa suite (`tests/test-check-skills.sh`), qui juge des fixtures et jamais l'arbre réel avec
+        # ses arêtes d'appel. Un skill non classé, ou un user-invoked appelé par une commande, un agent ou un
+        # préchargement, restait donc invisible de la CI (P414-D-03, arbitrage Samuel, AskUserQuestion
+        # session principale, 2026-10-06). Elle juge les SKILL.md de `plugin/` avec leurs arêtes (commandes,
+        # agents, AGENT.md) : rc 0 exigé ; rc 1 = refus nommé ; rc 3 = INDETERMINE, traité comme rouge, jamais
+        # comme un vert. Une étape qui ne mesurerait que le dépôt réel serait verte par construction si le
+        # gate perdait sa capacité à discriminer (ADR-059) : quatre bascules ISOLÉES, chacune sur une
+        # fixture reconstruite depuis zéro à chaque appel (B0 témoin conforme → 0, B1 skill non classé → 1,
+        # B2 user-invoked appelé par une commande → 1, B3 racine d'arêtes absente → 3), prouvent à chaque run
+        # qu'il sait encore rendre rouge. LIMITE DE FOND : cette étape et la garde qu'elle invoque peuvent
+        # être modifiée par la PR qu'elle juge — elle rend visible et trace, elle ne verrouille rien.
+        run: |
+          set -eu
+
+          S="plugin/conductor/scripts/check-skills.sh"
+          fail=0
+          note() { echo "::error::check-skills CI : $1"; fail=$((fail + 1)); }
+
+          # --- Bloc 1 — l'arbre réel : rc 0 seul accepté --------------------------------------------
+          rc=0
+          out="$(bash "$S" --strict --skills-dir=plugin --callers-root=plugin 2>&1)" || rc=$?
+          echo "== 1/2 arbre réel (plugin/, arêtes lues sous plugin/) : rc=$rc =="
+          if [ "$rc" -eq 0 ]; then
+            printf '%s\n' "$out" | tail -2
+          else
+            printf '%s\n' "$out"
+          fi
+          case "$rc" in
+            0) ;;
+            1) note "arbre réel rc=1 — skill non classé, user-invoked appelé ou arête user vers user : refus nommés ci-dessus" ;;
+            3) note "arbre réel rc=3 — INDETERMINE (cible ou racine d'arêtes absente) : jamais un vert" ;;
+            *) note "arbre réel rc=$rc, attendu 0" ;;
+          esac
+
+          # --- Bloc 2 — quatre bascules ISOLÉES, fixture reconstruite depuis zéro à chaque appel -----
+          FIX="$(mktemp -d)"
+          trap 'rm -rf "$FIX"' EXIT
+
+          write_base() {
+            rm -rf "$FIX/r"
+            mkdir -p "$FIX/r/skills/a" "$FIX/r/commands"
+            printf '%s\n' '---' 'name: a' 'description: skill de fixture CI' 'vf-invocation: model' '---' '' '# a' > "$FIX/r/skills/a/SKILL.md"
+            printf '%s\n' '---' 'description: commande de fixture CI' '---' '' 'Utilise le skill a.' > "$FIX/r/commands/x.md"
+          }
+
+          # bascule <libellé> <rc attendu> <racine d'arêtes>
+          bascule() {
+            rc=0
+            bout="$(bash "$S" --strict --skills-dir="$FIX/r/skills" --callers-root="$3" 2>&1)" || rc=$?
+            echo "== 2/2 $1 : rc=$rc (attendu $2) =="
+            if [ "$rc" -ne "$2" ]; then
+              printf '%s\n' "$bout"
+              note "$1 : rc=$rc, attendu $2 — le gate a perdu sa capacité à discriminer"
+            fi
+          }
+
+          write_base
+          bascule "B0 témoin conforme" 0 "$FIX/r"
+
+          write_base
+          printf '%s\n' '---' 'name: a' 'description: skill de fixture CI' '---' '' '# a' > "$FIX/r/skills/a/SKILL.md"
+          bascule "B1 skill non classé (vf-invocation retiré)" 1 "$FIX/r"
+
+          write_base
+          printf '%s\n' '---' 'name: a' 'description: skill de fixture CI' 'vf-invocation: user' 'disable-model-invocation: true' '---' '' '# a' > "$FIX/r/skills/a/SKILL.md"
+          # l'équivalent Codex est posé : seul l'appel par la commande peut rendre cette bascule rouge
+          mkdir -p "$FIX/r/skills/a/agents"
+          printf '%s\n' 'policy:' '  allow_implicit_invocation: false' > "$FIX/r/skills/a/agents/openai.yaml"
+          bascule "B2 user-invoked appelé par une commande" 1 "$FIX/r"
+
+          write_base
+          bascule "B3 racine d'arêtes absente" 3 "$FIX/absent"
+
+          echo "== BILAN check-skills : $fail écart(s) sur l'arbre réel et quatre bascules =="
+          [ "$fail" -eq 0 ]
+
       - name: check-blueprints (le frontmatter cible passe le gate qu'il vise)
         # POURQUOI CETTE ÉTAPE EXISTE : un blueprint publie un « frontmatter cible » que vf-new-lab
         # recopie dans l'agent instancié — et ce frontmatter n'était soumis à AUCUN gate. Mesuré le
