@@ -1884,6 +1884,64 @@ else
   ko "R-CACHE2-01 jumeau fichier hors ecrit:" "reprises=2 recalculees=0, aucune péremption" "$RC2J_FAITS $(cat "$RC2J_DIR/.planning/INDEX.md" 2>/dev/null)" "-"
 fi
 
+# ---------- R-CACHE3-01 — cache FORGÉ par Bash (A6/A8, P46 lot B, b3) : l'entrée n'est reprise que si ses `ecrit:` sont ceux du PLAN.md réel ----------
+# Le cache est un fichier du lab : un agent qui a Bash le réécrit. Forgé (`ecrit: []`, empreinte `["ok", null]`) et livrable réécrit : le recalcul
+# relit les `ecrit:` du PLAN.md, constate l'écart et recalcule — jamais `close` sur la foi du cache. Jumeau : seul `ecrit` forgé (empreinte intacte) :
+# l'entrée n'est pas reprise non plus, le cache est réécrit avec les `ecrit:` réels.
+RC3_DIR="$WORK/r-cache3-01"
+materialiser traceur "$RC3_DIR"
+( cd "$RC3_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+"$PYBIN" -c "
+import json
+p = '$RC3_DIR/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+e = d['unites']['cycles/01-traceur/phases/01-livree']
+e['ecrit'] = []
+e['empreinte_livrables'] = ['ok', None]
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
+"
+"$PYBIN" -c '
+import sys
+chemin = sys.argv[1]
+octets = bytearray(open(chemin, "rb").read())
+octets[0] = ord("M") if octets[0] != ord("M") else ord("L")
+open(chemin, "wb").write(bytes(octets))
+' "$RC3_DIR/livrables/rapport.md"
+( cd "$RC3_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc3-second.json" 2>"$WORK/rc3-second.err" )
+RC3_RC=$?
+RC3_RECALCULEES="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/rc3-second.json" 2>/dev/null || echo '?')"
+if [ "$RC3_RC" -eq 0 ] && grep -qF "$RC2_LIGNE" "$RC3_DIR/.planning/INDEX.md" 2>/dev/null && [ "$RC3_RECALCULEES" = "1" ]; then
+  ok "R-CACHE3-01 cache forgé (ecrit: [] et empreinte forcées) et livrable réécrit : indéterminé (livrable-modifie-apres-cloture), jamais close ; une unité recalculée"
+else
+  ko "R-CACHE3-01 cache forgé" "indéterminé (livrable ou plan modifié après la clôture), 1 unité recalculée" "rc=$RC3_RC recalculees=$RC3_RECALCULEES $(cat "$RC3_DIR/.planning/INDEX.md" 2>/dev/null | tr '\n' ' ' | cut -c1-300)" "-"
+fi
+RC3J_DIR="$WORK/r-cache3-01-jumeau"
+materialiser traceur "$RC3J_DIR"
+( cd "$RC3J_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >/dev/null 2>&1 )
+RC3J_ECRIT_REEL="$("$PYBIN" -c "
+import json
+print(json.dumps(json.load(open('$RC3J_DIR/.planning/.recalc-cache.json', encoding='utf-8'))['unites']['cycles/01-traceur/phases/01-livree']['ecrit']))
+")"
+"$PYBIN" -c "
+import json
+p = '$RC3J_DIR/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+d['unites']['cycles/01-traceur/phases/01-livree']['ecrit'] = ['autre-fichier-forge.md']
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
+"
+( cd "$RC3J_DIR" && GSD_HOME="$FAKE_GSD" bash "$RECALC" >"$WORK/rc3j-second.json" 2>/dev/null )
+RC3J_FAITS="$("$PYBIN" -c "
+import json
+r = json.load(open('$WORK/rc3j-second.json'))
+e = json.load(open('$RC3J_DIR/.planning/.recalc-cache.json', encoding='utf-8'))['unites']['cycles/01-traceur/phases/01-livree']['ecrit']
+print('recalculees=%s ecrit_reecrit=%s' % (r['unites_recalculees'], json.dumps(e) == '$RC3J_ECRIT_REEL'.replace(chr(39), '')))
+")"
+if [ "$RC3J_FAITS" = "recalculees=1 ecrit_reecrit=True" ]; then
+  ok "R-CACHE3-01 jumeau : seul ecrit forgé (empreinte intacte) : l'entrée n'est pas reprise, le cache est réécrit avec les ecrit: réels du PLAN.md"
+else
+  ko "R-CACHE3-01 jumeau ecrit forgé" "recalculees=1 ecrit_reecrit=True" "$RC3J_FAITS (réels : $RC3J_ECRIT_REEL)" "-"
+fi
+
 # ---------- R-CACHE2-02 — un cache de schéma 1 est relu comme `autre-format` : recalcul complet, résultat identique (46-03) ----
 RC2B_DIR="$WORK/r-cache2-02"
 materialiser traceur "$RC2B_DIR"
@@ -2838,6 +2896,62 @@ open(chemin, "wb").write(bytes(octets))
       else
         komut LIVRABLES-CACHE "état après suppression (R58) puis après réécriture (R-CACHE2-01) du livrable" "indéterminé dans les deux scénarios (original)" "mutant non opposable : R58 tué=$LIVR_R58_TUE, R-CACHE2-01 tué=$LIVR_RC2_TUE"
       fi
+    fi
+  fi
+fi
+
+# ---------- MUT-CACHE-ECRIT — les `ecrit:` de l'entrée de cache crus sans relire le PLAN.md (A8, P46 lot B, b3) ----------
+# Deux mutants, un par contrôle : (1) la relecture retirée (les `ecrit:` du cache font foi : le comportement d'avant la correction) rend le cache forgé
+# opposable ; (2) l'égalité `ecrit` cache / PLAN.md retirée laisse reprendre une entrée dont les `ecrit:` ne sont pas ceux du plan.
+if make_recalc_mutant CACHE-ECRIT-RELECTURE \
+  '# cache-ecrit-reel' \
+  'ecrit_reel = entree_cache.get("ecrit") or []  # MUT-CACHE-ECRIT-RELECTURE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-cache-ecrit-relecture-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+  "$PYBIN" -c "
+import json
+p = '$DIR_CAS/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+e = d['unites']['cycles/01-traceur/phases/01-livree']
+e['ecrit'] = []
+e['empreinte_livrables'] = ['ok', None]
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
+"
+  printf 'REECRIT\n' > "$DIR_CAS/livrables/rapport.md"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-cache-ecrit-relecture-out.json" 2>"$WORK/mut-cache-ecrit-relecture-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CACHE-ECRIT-RELECTURE "état de 01-livree sur cache forgé (R-CACHE3-01)" "$WORK/mut-cache-ecrit-relecture-out.json" "$WORK/mut-cache-ecrit-relecture-err.txt" "$RC_M"; then
+    if grep -qF 'modifié après la clôture' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null; then
+      komut CACHE-ECRIT-RELECTURE "état de 01-livree sur cache forgé" "indéterminé (original)" "indéterminé (mutant non opposable)"
+    else
+      okmut CACHE-ECRIT-RELECTURE "état de 01-livree sur cache forgé · attendu (original) : indéterminé (livrable modifié après la clôture) · obtenu (mutant) : $(grep 'traceur' "$DIR_CAS/.planning/INDEX.md" 2>/dev/null | head -1 | cut -c1-160) (le cache forgé est cru, un livrable réécrit reste close)"
+    fi
+  fi
+fi
+if make_recalc_mutant CACHE-ECRIT-EGALITE \
+  'if entree_cache.get("ecrit") == ecrit_reel:' \
+  'if True:  # MUT-CACHE-ECRIT-EGALITE'
+then
+  MR="$MUT_DIR/recalc-planning.sh"
+  DIR_CAS="$WORK/mut-cache-ecrit-egalite-cas"
+  materialiser traceur "$DIR_CAS"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >/dev/null 2>&1 )
+  "$PYBIN" -c "
+import json
+p = '$DIR_CAS/.planning/.recalc-cache.json'
+d = json.load(open(p, encoding='utf-8'))
+d['unites']['cycles/01-traceur/phases/01-livree']['ecrit'] = ['autre-fichier-forge.md']
+json.dump(d, open(p, 'w', encoding='utf-8'), ensure_ascii=False)
+"
+  ( cd "$DIR_CAS" && GSD_HOME="$FAKE_GSD" bash "$MR" >"$WORK/mut-cache-ecrit-egalite-out.json" 2>"$WORK/mut-cache-ecrit-egalite-err.txt" ); RC_M=$?
+  if ! _verifier_plantage CACHE-ECRIT-EGALITE "unites_recalculees sur cache dont seul ecrit est forgé (R-CACHE3-01 jumeau)" "$WORK/mut-cache-ecrit-egalite-out.json" "$WORK/mut-cache-ecrit-egalite-err.txt" "$RC_M"; then
+    RECALC_M="$("$PYBIN" -c 'import json,sys; print(json.load(open(sys.argv[1]))["unites_recalculees"])' "$WORK/mut-cache-ecrit-egalite-out.json" 2>/dev/null || echo '?')"
+    if [ "$RECALC_M" = "1" ]; then
+      komut CACHE-ECRIT-EGALITE "unites_recalculees sur ecrit forgé" "1 (original)" "1 (mutant non opposable)"
+    else
+      okmut CACHE-ECRIT-EGALITE "unites_recalculees sur ecrit forgé · attendu (original) : 1 (l'entrée aux ecrit: étrangers n'est pas reprise) · obtenu (mutant) : $RECALC_M (reprise sans comparer les ecrit: au PLAN.md)"
     fi
   fi
 fi

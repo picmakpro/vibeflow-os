@@ -1611,14 +1611,21 @@ def _deriver_feuille_cache(unite, racine_lab, cache_ctx, chemin_cadrage_suppleme
     chemin_rel = unite["chemin_rel"]
     signature = signature_unite(unite, NOMS_MODELE_PLAN, chemin_cadrage_supplementaire)
     entree_cache = (cache_ctx["existant"] or {}).get(chemin_rel)
+    ecrit_reel = None
     if isinstance(entree_cache, dict) and entree_cache.get("signature") == signature:
-        livrables_actuels = _livrables_pour_cache(racine_lab, entree_cache.get("ecrit") or [])
-        if livrables_actuels is not None and livrables_actuels == entree_cache.get("empreinte_livrables"):  # cache-empreinte
-            cache_ctx["nouveau"][chemin_rel] = entree_cache
-            cache_ctx["reprises"] += 1
-            return (entree_cache.get("etat"), entree_cache.get("raison"), dict(entree_cache.get("meta") or {}))
+        # A8 (P46 lot B, b3) : le cache est un fichier du lab, qu'un agent qui a Bash peut réécrire. Une entrée n'est reprise que si SES entrées
+        # `ecrit:` sont celles du PLAN.md réel (relu à chaque reprise, même chaîne que R2) ET si l'empreinte, recalculée sur les entrées RÉELLES,
+        # est celle qu'elle porte ; un écart : recalcul complet, jamais `close` sur la foi du cache.
+        ecrit_reel = _lire_ecrit_reel(unite["chemin_abs"], racine_lab)  # cache-ecrit-reel
+        if entree_cache.get("ecrit") == ecrit_reel:  # cache-ecrit
+            livrables_actuels = _livrables_pour_cache(racine_lab, ecrit_reel)
+            if livrables_actuels is not None and livrables_actuels == entree_cache.get("empreinte_livrables"):  # cache-empreinte
+                cache_ctx["nouveau"][chemin_rel] = entree_cache
+                cache_ctx["reprises"] += 1
+                return (entree_cache.get("etat"), entree_cache.get("raison"), dict(entree_cache.get("meta") or {}))
     etat, raison, meta = deriver_feuille(unite, racine_lab)
-    ecrit_reel = _lire_ecrit_reel(unite["chemin_abs"], racine_lab)
+    if ecrit_reel is None:
+        ecrit_reel = _lire_ecrit_reel(unite["chemin_abs"], racine_lab)
     cache_ctx["nouveau"][chemin_rel] = {
         "signature": signature, "ecrit": ecrit_reel, "empreinte_livrables": _livrables_pour_cache(racine_lab, ecrit_reel),
         "etat": etat, "raison": raison, "meta": meta,
