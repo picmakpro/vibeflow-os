@@ -254,7 +254,7 @@
         "exec-46-12"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-46-b",
@@ -449,7 +449,7 @@
         "rejeu-46-6"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     }
   ]
 }
