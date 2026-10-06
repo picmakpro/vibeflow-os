@@ -39,7 +39,11 @@ revue-46-a ∥ audit-46-a ∥ nonreg-a ∥ ckpt-46-11 → fix-46-a → [gelé] e
 7. **fix-46-a (lot A), deux tours** (quick `261006-23m`, `261006-638`) : NFC sur toute la classe de
    chemins (A1, haute), lectures bornées sur toute la classe (A11), D1 unités récentes d'abord et
    borne signalée, contrat #35/#37, gardes de suites durcies, message G3 hors borne, limites
-   nommées. CI verte sur `488a4915` (tour 1) ; tour 2 poussé, CI à lire.
+   nommées. Tour 2 (quick `261006-638`) : NFC sur les noms lus par readdir, toute lecture du hook
+   bornée, bloc partagé borné dans toutes ses copies. Tour 3 (quick `261006-aw0`, `18188d96`) : rouge
+   ext4 (journal D1 « 31 / 29 ») — attente de test aveugle au FS ET défaut de production (ligne
+   `moteur` de poser-verdict.sh jointe sur la clé NFC). CI verte sur `488a4915` (tour 1) et sur
+   `d29bcb8d` (tours 2 et 3).
 
 ## Verdicts
 
@@ -51,7 +55,7 @@ revue-46-a ∥ audit-46-a ∥ nonreg-a ∥ ckpt-46-11 → fix-46-a → [gelé] e
 | revue suites | 3 mineurs (M1-M3 corrigés), 40+ mutants tués pour leur raison |
 | audit sécurité | OPEN_THREATS : 1 haute (A1, corrigée), 11 moyennes/basses |
 | non-régression a | CI complète verte sur `009bee12` |
-| fix-46-a | gsd-verifier passed 11/11 (tour 2) ; CI verte tour 1 |
+| fix-46-a | 3 tours ; gsd-verifier passed (tours 2 et 3) ; CI complète verte sur `d29bcb8d` |
 
 ## Arbitrages en attente (Willy)
 
@@ -74,6 +78,7 @@ revue-46-a ∥ audit-46-a ∥ nonreg-a ∥ ckpt-46-11 → fix-46-a → [gelé] e
 
 - `scripts/check-machine-paths.sh` : sa regex laisse passer `/private/tmp/claude-501/-Users-<compte>`.
 - `deroger-gate.sh` écrit dans un journal > 1 Mio que le hook ne lit plus : dérogation inerte sans signal.
+- G7 lit l'unité en NFC : sur ext4 une unité au nom disque NFD est refusée (fail-closed), G7 absent de la limite (bf).
 - `lire_payload` (payload du harnais) non borné ; G1 refuse un CADRAGE.md > 1 Mio (écart P45-D-21a).
 - Contrôle de durée `substr($0,8)` faux dans les `<automated>` de 46-01, 46-05, 46-07, 46-08, 46-10
   (joué en `substr($0,9)`, plans non corrigés) ; `check-gate-touche.sh --base-ref=` → forme espace.
@@ -84,10 +89,10 @@ revue-46-a ∥ audit-46-a ∥ nonreg-a ∥ ckpt-46-11 → fix-46-a → [gelé] e
 ## Décompte
 
 Mandats émis par le manager : 15 dispatches (vf-coder 10, gsd-plan-checker 2, vf-reviewer 2,
-vf-auditer 1), plus 5 reprises par `SendMessage` (46-07 après coupure API, 46-08, correction de
-fuite, tour 2 de fix-46-a, conflit du bloc partagé). Jetons rapportés par les blocs typés reçus :
-2 835 120 (somme des `subagent_tokens` des 17 rendus connus ; deux runs coupés par la panne API
-non comptés). Commits : 58 hors merge, 3 merges, depuis `744ebca0`.
+vf-auditer 1), plus 6 reprises par `SendMessage` (46-07 après coupure API, 46-08, correction de
+fuite, tours 2 et 3 de fix-46-a, conflit du bloc partagé). Jetons rapportés par les blocs typés reçus :
+3 138 419 (somme des `subagent_tokens` des 18 rendus connus ; deux runs coupés par la panne API
+non comptés). Commits depuis `744ebca0` : voir `git log 744ebca0..HEAD`.
 
 ## Preuves E6
 
@@ -100,7 +105,7 @@ Relayées verbatim des blocs typés, par sprint :
 - 46-08 : `[{"verdict":"recette","preuve":"amont"}]`
 - 46-09 : `[{"verdict":"recette","preuve":"amont"},{"verdict":"test-juges-canary","commande":"bash plugin/planning-core/scripts/tests/test-juges-canary.sh","exit_code":0,"sha":"e70217f2"}]`
 - 46-10 : `[{"verdict":"recette","preuve":"amont"}]`
-- fix-46-a (tours 1 et 2) : `[{"verdict":"recette","preuve":"amont"}]`
+- fix-46-a (tours 1, 2 et 3) : `[{"verdict":"recette","preuve":"amont"}]`
 
 ## Next step
 
