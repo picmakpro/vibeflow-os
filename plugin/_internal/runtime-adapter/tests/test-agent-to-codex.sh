@@ -44,6 +44,10 @@
 #        convertisseur qui crée un fichier VIDE -> refus aussi (un fichier présent ne suffit pas).
 #        Le refus se reconnaît à son message « sans écrire de rôle » : le mv qui suit la garde
 #        échouerait de toute façon sur un fichier absent, mais avec un autre message.
+#        Conséquence : pour le fichier absent (T9a, T9b) la garde par mv protège seule du faux succès,
+#        et la garde de contenu (-s) n'a d'effet observable que sur T9d (fichier vide). Les étiquettes
+#        ko distinguent « faux succès » (code 0 ou « rôle posé » affiché) de « refus au mauvais
+#        message » (code non nul, message attendu absent).
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -386,6 +390,20 @@ cp "$REGISTER" "$T9_REAL_DIR/register-codex-agent.sh"
 cp "$CONVERTER" "$T9_REAL_DIR/agent-to-codex.mjs"
 printf 'process.exit(0);\n' > "$T9_STUB_DIR/agent-to-codex.mjs"
 
+# Diagnostic des rouges de T9, pour que l'étiquette dise ce qui s'est passé : faux succès (code 0
+# ou « rôle posé » affiché), refus au mauvais message (code non nul sans « sans écrire de rôle »),
+# ou refus correct mais effet de bord inattendu sur les fichiers.
+t9_diag() {
+  local status="$1" out="$2" err="$3"
+  if [ "$status" -eq 0 ] || printf '%s%s' "$out" "$err" | grep -qF 'rôle posé'; then
+    echo "faux succès"
+  elif ! printf '%s' "$err" | grep -qF 'sans écrire de rôle'; then
+    echo "refus au mauvais message (code non nul, « sans écrire de rôle » absent)"
+  else
+    echo "refus attendu mais effet de bord inattendu sur les fichiers"
+  fi
+}
+
 # T9a — aucun .toml préexistant : le bouchon n'écrit rien, le registrar doit refuser.
 CH_T9A="$WORKDIR/codex-home-t9a"
 OUT_T9A="$(bash "$T9_STUB_DIR/register-codex-agent.sh" "$FIXTURE_AGENT" --codex-home "$CH_T9A" 2>"$WORKDIR/t9a.err")"
@@ -398,7 +416,7 @@ if [ "$STATUS_T9A" -ne 0 ] \
   && [ ! -e "$CH_T9A/$T9_ROLE_REL" ]; then
   ok "T9a : convertisseur qui n'écrit rien -> refus explicite sur stderr (rc=$STATUS_T9A), aucun « rôle posé », aucun .toml"
 else
-  ko "T9a : faux succès (status=$STATUS_T9A, stdout='$OUT_T9A', stderr='$ERR_T9A', .toml présent=$([ -e "$CH_T9A/$T9_ROLE_REL" ] && echo oui || echo non))"
+  ko "T9a : $(t9_diag "$STATUS_T9A" "$OUT_T9A" "$ERR_T9A") (status=$STATUS_T9A, stdout='$OUT_T9A', stderr='$ERR_T9A', .toml présent=$([ -e "$CH_T9A/$T9_ROLE_REL" ] && echo oui || echo non))"
 fi
 
 # T9b — un .toml d'une pose précédente existe : un simple test d'existence passerait à tort.
@@ -415,7 +433,7 @@ if [ "$STATUS_T9B" -ne 0 ] \
   && [ "$(cat "$CH_T9B/$T9_ROLE_REL")" = "ANCIEN-ROLE-POSE-PAR-UN-RUN-PRECEDENT" ]; then
   ok "T9b : .toml périmé présent + convertisseur qui n'écrit rien -> refus (rc=$STATUS_T9B), pas de « rôle posé », ancien .toml intact"
 else
-  ko "T9b : l'ancien .toml fait passer un faux succès (status=$STATUS_T9B, stdout='$OUT_T9B', stderr='$ERR_T9B', contenu='$(cat "$CH_T9B/$T9_ROLE_REL" 2>/dev/null)')"
+  ko "T9b : $(t9_diag "$STATUS_T9B" "$OUT_T9B" "$ERR_T9B") avec un ancien .toml présent (status=$STATUS_T9B, stdout='$OUT_T9B', stderr='$ERR_T9B', contenu='$(cat "$CH_T9B/$T9_ROLE_REL" 2>/dev/null)')"
 fi
 
 # T9c — témoin : même scénario (.toml périmé présent), convertisseur réel -> pose et renouvelle.
@@ -450,7 +468,7 @@ if [ "$STATUS_T9D" -ne 0 ] \
   && [ ! -e "$CH_T9D/$T9_ROLE_REL" ]; then
   ok "T9d : convertisseur qui crée un fichier vide -> refus (rc=$STATUS_T9D), aucun « rôle posé », aucun .toml vide laissé"
 else
-  ko "T9d : un fichier vide passe pour un rôle posé (status=$STATUS_T9D, stdout='$OUT_T9D', stderr='$ERR_T9D', .toml présent=$([ -e "$CH_T9D/$T9_ROLE_REL" ] && echo oui || echo non))"
+  ko "T9d : $(t9_diag "$STATUS_T9D" "$OUT_T9D" "$ERR_T9D") avec un fichier vide (status=$STATUS_T9D, stdout='$OUT_T9D', stderr='$ERR_T9D', .toml présent=$([ -e "$CH_T9D/$T9_ROLE_REL" ] && echo oui || echo non))"
 fi
 
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
