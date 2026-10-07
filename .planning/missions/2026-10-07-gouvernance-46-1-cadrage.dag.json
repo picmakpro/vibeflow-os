@@ -1,0 +1,79 @@
+{
+  "nodes": [
+    {
+      "id": "scouting-461",
+      "step": "etat des lieux code 46.1 (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-46.1-armement-de-g4-et-g4/46.1-SCOUTING.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "recherche-461",
+      "step": "recherche doc hooks 46.1 (ADR-045)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-46.1-armement-de-g4-et-g4/46.1-RECHERCHE-HOOKS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "discuss-461",
+      "step": "cadrage 46.1 (manager, Pattern F)",
+      "stage": "",
+      "deps": [
+        "scouting-461",
+        "recherche-461"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-46.1-armement-de-g4-et-g4/46.1-CONTEXT.md"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "plan-461",
+      "step": "plan 46.1 (vf-coder, gsd-plan-phase)",
+      "stage": "",
+      "deps": [
+        "discuss-461"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases/VFDO-46.1-armement-de-g4-et-g4/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "plancheck-461",
+      "step": "plan-check frais 46.1",
+      "stage": "",
+      "deps": [
+        "plan-461"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "suivi-461",
+      "step": "ROADMAP/STATE/rapport",
+      "stage": "",
+      "deps": [
+        "plancheck-461"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-461",
+      "step": "PR de planification empilee sur #136",
+      "stage": "",
+      "deps": [
+        "suivi-461"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
