@@ -28,6 +28,13 @@
 #   T7 — Bloquant 2 (D-38) : parseur YAML frontmatter réel. T7a : description: > (scalaire
 #        replié, cas réel plugin/conductor/AGENT.md) -> texte complet, jamais '">"' littéral.
 #        T7b : styles |, >-, |- tous parsés (littéral vs replié, clip vs strip).
+#   T8 — chemin d'appel à lien symbolique : node résout le lien pour import.meta.url mais pas pour
+#        process.argv[1], donc isMainModule() (comparaison des deux) rendait false et le CLI sortait
+#        rc=0 sans rien écrire ni dire. T8a : par un lien, même .toml et même digest que par le
+#        chemin physique. T8b : register-codex-agent.sh lancé par un lien pose réellement le .toml.
+#        T8c : l'import du module par un lien n'exécute pas le CLI (la garde isMainModule tient
+#        encore). Le lien est créé par la suite (rouge sur Linux comme sur macOS) ; SKIP propre
+#        si `ln -s` est indisponible.
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -305,6 +312,53 @@ EOF
 run_style_case 'literal' '|'
 run_style_case 'folded-strip' '>-'
 run_style_case 'literal-strip' '|-'
+
+# ---------------------------------------------------------------------------
+# T8 — chemin d'appel qui traverse un lien symbolique : même sortie que par le chemin physique.
+# Une seule variable change par rapport à un appel direct : le chemin passé à node. Le lien est
+# posé sous $WORKDIR par la suite elle-même (aucune dépendance au /tmp de la machine).
+# ---------------------------------------------------------------------------
+LINK_DIR="$WORKDIR/lien-adaptateur"
+if ln -s "$ADAPTER_DIR" "$LINK_DIR" 2>/dev/null && [ -L "$LINK_DIR" ]; then
+  PHYS_TOML="$WORKDIR/t8-physique.toml"
+  LINK_TOML="$WORKDIR/t8-via-lien.toml"
+  PHYS_DIGEST="$(node "$CONVERTER" "$FIXTURE_AGENT" --out "$PHYS_TOML" 2>&1 1>/dev/null)"
+  LINK_DIGEST="$(node "$LINK_DIR/agent-to-codex.mjs" "$FIXTURE_AGENT" --out "$LINK_TOML" 2>&1 1>/dev/null)"
+  LINK_STATUS=$?
+  if [ "$LINK_STATUS" -eq 0 ] && [ -s "$LINK_TOML" ] && [ -s "$PHYS_TOML" ] \
+    && cmp -s "$PHYS_TOML" "$LINK_TOML" \
+    && [ -n "$LINK_DIGEST" ] && [ "$LINK_DIGEST" = "$PHYS_DIGEST" ]; then
+    ok "T8a : conversion par un chemin à lien symbolique -> même .toml et même digest que par le chemin physique"
+  else
+    ko "T8a : conversion par lien symbolique muette ou différente (status=$LINK_STATUS, .toml présent=$([ -s "$LINK_TOML" ] && echo oui || echo non), digest lien='$LINK_DIGEST')"
+  fi
+
+  # T8b — de bout en bout : register-codex-agent.sh lancé par le lien pose réellement le rôle.
+  # Le défaut d'origine annonçait « rôle posé » (rc=0) sans écrire le fichier.
+  CH_LINK="$WORKDIR/codex-home-lien"
+  OUT_REG="$(bash "$LINK_DIR/register-codex-agent.sh" "$FIXTURE_AGENT" --codex-home "$CH_LINK" 2>&1)"
+  STATUS_REG=$?
+  if [ "$STATUS_REG" -eq 0 ] && grep -qF 'name = "vf-content-writer"' "$CH_LINK/agents/vibeflow/vf-content-writer.toml" 2>/dev/null; then
+    ok "T8b : register-codex-agent.sh lancé par un lien symbolique -> rôle .toml réellement posé"
+  else
+    ko "T8b : register par lien symbolique : status=$STATUS_REG, .toml présent=$([ -f "$CH_LINK/agents/vibeflow/vf-content-writer.toml" ] && echo oui || echo non), sortie='$OUT_REG'"
+  fi
+
+  # T8c — la garde tient : importer le module par le lien (sans qu'il soit le script lancé) ne
+  # déclenche pas le CLI. Un correctif qui rendrait isMainModule() toujours vrai afficherait
+  # l'usage et sortirait en 2.
+  IMPORTER="$WORKDIR/t8-importeur.mjs"
+  printf "import { convertAgentToCodexRole } from '%s/agent-to-codex.mjs';\nconsole.log(typeof convertAgentToCodexRole);\n" "$LINK_DIR" > "$IMPORTER"
+  IMPORT_OUT="$(node "$IMPORTER" 2>&1)"
+  IMPORT_STATUS=$?
+  if [ "$IMPORT_STATUS" -eq 0 ] && [ "$IMPORT_OUT" = "function" ]; then
+    ok "T8c : import du module par un lien symbolique -> aucune exécution du CLI (export disponible, aucune sortie parasite)"
+  else
+    ko "T8c : import par lien symbolique : status=$IMPORT_STATUS, sortie='$IMPORT_OUT' (attendu : 'function' seul, rc 0)"
+  fi
+else
+  skip "T8 : ln -s indisponible sur ce poste, chemin à lien symbolique non testable ici"
+fi
 
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ] && exit 0 || exit 1
