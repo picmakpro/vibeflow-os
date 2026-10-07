@@ -28,6 +28,11 @@
 # plutôt qu'en `rm -rf` global du répertoire — un uninstall_module() d'un SEUL module ne doit
 # jamais supprimer les rôles d'un AUTRE module encore installé en coexistence.
 #
+# Codes de sortie : 0 succès (« rôle posé » n'est affiché que si le .toml a été écrit par ce run) ;
+# 1 refus ou échec (name absent ou invalide, conversion en échec, convertisseur qui n'écrit rien,
+# vérification ADPT-04 en échec) ; 2 usage ou agent introuvable ; 3 prérequis absent (node, ou
+# codex pour --verify).
+#
 # Imprime le digest (une ligne par champ, LOST/PENDING/PRESERVED/PRESERVED_BY_OMISSION/ABSENT)
 # sur stdout, TEL QUEL — jamais résumé.
 set -uo pipefail
@@ -139,11 +144,32 @@ fi
 
 mkdir -p "$AGENTS_DIR"
 
-DIGEST_OUTPUT="$(node "$CONVERTER" "$AGENT_MD" --out "$ROLE_TOML" 2>&1 1>/dev/null)"
+# Le convertisseur écrit dans un fichier TEMPORAIRE voisin (même répertoire, donc mv atomique sur
+# le même système de fichiers, suffixe hors *.toml donc jamais pris pour un rôle), puis le rôle
+# n'est posé qu'après avoir constaté que CE run a produit un contenu. Pourquoi : un convertisseur
+# peut sortir 0 sans rien écrire (ex. CLI muet), et un test d'existence sur $ROLE_TOML serait
+# trompé par le .toml d'une pose précédente. Un ancien rôle reste intact tant que la conversion
+# n'a pas réussi.
+ROLE_TMP="${ROLE_TOML}.tmp.$$"
+trap 'rm -f "$ROLE_TMP"' EXIT
+
+DIGEST_OUTPUT="$(node "$CONVERTER" "$AGENT_MD" --out "$ROLE_TMP" 2>&1 1>/dev/null)"
 CONVERT_STATUS=$?
 if [ "$CONVERT_STATUS" -ne 0 ]; then
   echo "[register-codex-agent] échec de conversion pour $AGENT_MD :" >&2
   echo "$DIGEST_OUTPUT" >&2
+  exit 1
+fi
+
+# Code 1 : même famille que l'échec de conversion ci-dessus (la pose a été tentée et n'a pas
+# abouti), distinct de 2 (usage, agent introuvable) et de 3 (prérequis absent : node, codex).
+if [ ! -s "$ROLE_TMP" ]; then
+  echo "[register-codex-agent] le convertisseur a rendu 0 sans écrire de rôle pour $AGENT_MD : rien posé sous $ROLE_TOML (un éventuel rôle antérieur est laissé tel quel)" >&2
+  [ -n "$DIGEST_OUTPUT" ] && echo "$DIGEST_OUTPUT" >&2
+  exit 1
+fi
+if ! mv -f "$ROLE_TMP" "$ROLE_TOML"; then
+  echo "[register-codex-agent] impossible de poser le rôle : $ROLE_TOML" >&2
   exit 1
 fi
 
