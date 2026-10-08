@@ -1,5 +1,47 @@
 # Milestones — VibeFlow Dev Orchestrator (VFDO)
 
+## ✅ fiabilite-v1.0 — « ce qui survit » (clos 2026-10-08)
+
+**Statut :** SHIPPED — 18 phases livrées (30 à 35, 37 à 41.4, et 18 et 25 héritées ; la 36 est réservée sans
+exécution). **Releases :** de `v2.53.0` à `v2.69.0`. **Snapshots :** `.planning/milestones/fiabilite-v1.0-ROADMAP.md`
+et `-REQUIREMENTS.md`.
+
+**But :** fermer les dettes de gouvernance nées d'incidents réels du jalon précédent (driver-lock contourné,
+stall silencieux, dérive du ledger, régression #38) et rendre l'install et l'update dignes de confiance sur toutes
+les plateformes.
+
+**Livré :**
+
+- portabilité Windows II (30, `v2.53.0`) ;
+- manifeste d'install et dry-run (31) ;
+- durcissement du driver-lock (32, `v2.55.0`) ;
+- watchdog et notifications opt-in (33, `v2.56.0`) ;
+- survie du ledger à la clôture de jalon (18, `v2.57.0`) ;
+- ré-armement worktree clos en option A (35, `v2.57.1`) ;
+- portabilité multi-runtime, spike puis livraison Codex et Kimi (37-38, `v2.59.0`) ;
+- workstreams et partition du planning (39, `v2.60.0`) ;
+- gaps agency-agents (34) ;
+- budget d'instructions (25) ;
+- vibeflow-head (40, `v2.63.0`) ;
+- révision d'ADR-029 (40.1, `v2.63.2`) ;
+- gardes CI de protection du dépôt et rulesets posés par Willy (41, `v2.64.0`) ;
+- gates workstream-aware (41.1, `v2.66.0`) ;
+- sobriété de méthode (41.3, `v2.68.0`) ;
+- choix de la partition au démarrage d'un lab (41.2) et emprunts Pocock (41.4), publiés dans `v2.69.0`.
+
+**Clôture :** ledger réaligné le 2026-10-08. Les cases WSAW-01..07 et WSCH-01..05 sont cochées, et les lignes de
+traçabilité PORT, WKTR-03 et QUAL-01 sont passées à Complete. La #135 a été mergée en `--admin` (arbitrage Samuel,
+AskUserQuestion session principale, 2026-10-08).
+
+**Reste ouvert au-delà du jalon, tracé :**
+
+- **AGTS-02** : reportée avec trace (run réel rouge, `34-RUN-MOBILE.md`).
+- **WSCH-01** : réserve de recette en session interactive (BACKLOG).
+- **Plans 41-07 à 41-13** : confiés à Willy, dont le complément de mesure de PROT-01.
+- **LEDG-03** : issue amont `open-gsd/gsd-core#3556` ouverte.
+- **WKTR-01** : requalifiée.
+- **Tri humain du BACKLOG et du ROADMAP** : résidu (5) de la 41.3.
+
 ## ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (clos 2026-08-15)
 
 **Statut :** SHIPPED — 13 phases livrées (15→29, **18 et 25 reportées** au prochain milestone) ·

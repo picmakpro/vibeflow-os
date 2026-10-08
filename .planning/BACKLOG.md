@@ -13,58 +13,8 @@
 
 **À trancher au cadrage.** Une demande « crée une PR » en conversation doit-elle aller à `gsd-ship` (PR sans merge-danger call ni contrôle E3) ou au geste de l'équipe ?
 
-## Choisir la partition du planning AU DÉMARRAGE, pas après coup — demandé 2026-09-23
-
-**Statut : besoin exprimé par Samuel (session principale, 2026-09-23), non cadré.** À passer par
-`/gsd-discuss-phase` avant toute écriture de code — rien n'est décidé ici.
-
-**Le besoin, dans ses mots** : « on devrait pouvoir choisir si on partitionne ou pas dès le début,
-et proposer des skills et scripts pour ça. On doit faciliter le travail. »
-
-**Ce qui le motive, mesuré le jour même.** La partition réelle de ce dépôt (D-02, PR #94) a coûté
-**13 commits**. Le geste de partition lui-même tenait en une commande : `workstream create`. Tout
-le reste — l'essentiel — a consisté à réparer ce qui **supposait un planning unique** : la CI qui
-traitait la racine comme l'oracle de sa propre non-partition, le ledger d'exigences, `E4` de
-`check-mission-exit.sh`, `check-state-integrity`. Partitionner au démarrage n'économise pas la
-commande, il économise **cette réparation**, parce que rien n'a encore eu le temps de supposer le
-contraire.
-
-**Ce qui va dans le même sens** : ADR-069 interdit déjà de partitionner tant qu'une phase est en
-vol. Le seul moment structurellement sûr est donc le démarrage — la doctrine pointe déjà vers ce
-besoin sans le servir.
-
-**La réserve, à trancher au cadrage.** Partitionner un lab que personne ne travaille à plusieurs
-n'apporte rien et coûte : il faut passer `--ws` partout, ou vivre avec un pointeur qu'on oublie.
-La valeur apparaît quand **deux flux avancent en parallèle sur des périmètres disjoints** — c'est
-exactement le cas de ce dépôt avec Willy, et ce n'est pas le cas de la plupart des labs. Un
-« partitionner par défaut » serait une sur-ingénierie ; un « choix éclairé posé au bon moment »
-est le vrai besoin. La question à poser à l'initialisation n'est donc pas « veux-tu des
-workstreams ? » (jargon) mais « plusieurs personnes ou agents vont-ils travailler en parallèle sur
-des sujets séparés ? ».
-
-**Le piège à ne pas multiplier.** La partition de ce dépôt a laissé un angle mort déjà consigné
-plus bas dans ce fichier : un gate câblé en dur sur un compartiment laisse les autres **sans
-garde** (`ci.yml` vise `fiabilite`, `gouvernance` n'est jamais vérifié). Si VibeFlow se met à
-proposer la partition dès le départ, ce défaut se reproduira dans chaque lab qui accepte. Le
-remède connu — itérer sur les compartiments présents sur le disque, jamais revenir à une
-résolution par `GSD_WORKSTREAM` — devrait être livré **avec** la capacité, pas après elle.
-
-**Pistes, non arbitrées :**
-- Une question à l'initialisation d'un lab (`vibeflow-conductor`), formulée en langage d'usage et
-  non en jargon de moteur.
-- Des gabarits de gates et de CI **nés workstream-aware**, plutôt que réparés après coup.
-- Un skill qui porte le geste de bascule pour un lab déjà démarré, avec la précondition d'ADR-069
-  vérifiée par machine (aucune phase en vol) plutôt que rappelée en prose.
-- La partie distribuable existe déjà : le moteur `@opengsd/gsd-core` fournit `workstream
-  create/list` et `--ws` ; VibeFlow fournit déjà la doctrine (`workstreams.md`, ADR-069) et les
-  gardes (`check-divergence.sh`, `check-workstream-pointer.sh`, `workstream-policy.sh`). Le
-  manquant est **l'ergonomie du choix**, pas la mécanique.
-
-**Preuve d'usage à exiger au cadrage** : un lab neuf initialisé en mode partitionné dont les gates
-passent au vert sur **chaque** compartiment, sans réparation manuelle — sinon la capacité ne fait
-que déplacer les 13 commits chez l'utilisateur.
-
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Traçabilité des arbitrages humains dans les messages de commit — ADOPTÉE 2026-09-10 -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-08.md — ## Choisir la partition du planning AU DÉMARRAGE, pas après coup — demandé 2026-09-23 — CLOS (2026-10-08) -->
 ## Les juges d'un artefact de planning ne gardent pas ce qu'on croit — mesuré 2026-09-23
 
 **Statut : constat mesuré, NON réparé. Différé volontairement** — réparer ici élargirait les Phases
@@ -732,31 +682,7 @@ se re-dérive, il ne se fige jamais dans le test qui le vérifie.
 
 **Déclencheur de reprise :** le prochain cas où ce test casse sur un ajout légitime de référence.
 
-## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23)
-
-**Capturé :** 2026-09-23, mission « partition réelle du planning D-02 » (`.planning/missions/2026-09-23-partition-planning-d02.md`).
-
-**Le défaut :** l'étape CI « check-state-integrity (anti-régression du frontmatter … ADR-063) »
-(`.github/workflows/ci.yml:353`) cible explicitement `.planning/workstreams/fiabilite/STATE.md` —
-en dur, pas résolu par `GSD_WORKSTREAM` ni par le pointeur partagé. C'est le bon remède contre le
-détournement du gate par l'environnement (défense en profondeur ADR-063, déjà la doctrine avant
-cette mission) — mais son effet de bord est que la CI ne vérifie QUE ce compartiment. Mesuré
-concret : `.planning/workstreams/gouvernance/STATE.md` (compartiment tout juste créé, gabarit frais
-du moteur, pas encore de champ `milestone:` ni de ligne `^Phase:`) rend `rc=2` (« milestone
-introuvable ») si on le vérifie explicitement — et la CI ne le verra JAMAIS, ni pour le dire cassé
-ni pour le dire bon. L'angle mort grandit mécaniquement avec chaque compartiment ajouté (aujourd'hui
-2 : `fiabilite`/`gouvernance` ; demain N).
-
-**Piste de fix :** ne pas revenir à une résolution par `GSD_WORKSTREAM`/pointeur (c'est précisément
-le vecteur de détournement qu'ADR-063 a fermé). À la place, itérer sur les compartiments PRÉSENTS
-SUR LE DISQUE (`.planning/workstreams/*/`) au moment du run CI et appeler
-`check-state-integrity.sh --file .planning/workstreams/<nom>/STATE.md` pour chacun explicitement —
-chemins toujours en dur, énumération dynamique. Même logique que `check-divergence.sh`, qui
-inspecte déjà tous les compartiments présents sans se fier à un pointeur.
-
-**Déclencheur de reprise :** l'ajout d'un troisième compartiment, ou le premier incident réel où un
-compartiment autre que `fiabilite` régresse sans que la CI ne le voie.
-
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-08.md — ## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23) — CLOS (2026-10-08) -->
 ## Mise en conformité du corpus de skills en dérive procédurale non déclarée (différé de la Phase 43, 2026-09-24)
 
 **Capturé :** 2026-09-24, cadrage de la Phase 43 (compartiment `gouvernance`, `43-CONTEXT.md` D-Q5).
@@ -1074,3 +1000,17 @@ permissions étaient dégradées.
 
 Tracés, non corrigés (décision du manager, 2026-09-30) : (1) snapshot de mission unique par dépôt, écrasé par une mission concurrente (`check-mission-exit.sh:184`) — E7 rend SAIN sur le snapshot d'une autre mission quand le verrou est relâché ; (2) avis d'archivage perdu si la session s'arrête après un Stop bloquant, ou si l'écriture de `.now` échoue après archivage (`guard-fin-de-geste.sh:142`) ; (3) snapshot de session pris sans `--auto --dry-run` (`:126`) : un refus préexistant est rapporté comme neuf ; (4) entrées CHANGELOG `conductor` et `dev-orchestrator` à écrire à la prochaine release fonctionnelle (aucun bump en 41.3) ; (5) tri humain : BACKLOG racine à 35 sujets ouverts pour 20, ROADMAP `fiabilite` à 143 Ko pour 64 ; (6) STATE `gouvernance` à 21 Ko (Willy).
 **Déclencheur de reprise :** la prochaine release fonctionnelle (4), la clôture du jalon `fiabilite-v1.0` (5), une reprise de la garde de fin de geste (1 à 3).
+
+## Recette réelle de `/vf-split-planning` en session interactive (réserve WSCH-01) — DIFFÉRÉ (2026-10-08)
+
+**Origine :** `41.2-VERIFICATION.md` est resté en `human_needed` (5/6). Le contrat écrit du skill est prouvé par
+`test-vf-split-planning.sh`, mais personne n'a vérifié qu'un agent pose bien la question à la fin de l'initialisation
+d'un lab, ni le repli en sous-agent. WSCH-01 a été coché avec cette réserve à la clôture de `fiabilite-v1.0`
+(arbitrage Samuel, AskUserQuestion session principale, 2026-10-08 : « Dette tracée, on clôt »).
+
+**Geste attendu :** sur un lab jetable fraîchement initialisé, lancer `/vf-split-planning`, observer la question,
+répondre « non » (planning unique, aucun appel au geste), puis rejouer le même parcours en sous-agent, où
+AskUserQuestion n'est pas disponible. Consigner le résultat dans `41.2-VERIFICATION.md`.
+
+**Déclencheur de reprise :** la prochaine initialisation réelle d'un lab de code, ou une évolution de `vf-split-planning`
+ou de `vf-new-lab`.
