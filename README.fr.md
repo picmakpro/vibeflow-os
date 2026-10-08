@@ -11,7 +11,7 @@ déroule le pipeline (cadrage → plan → exécution → preuve), et des **gate
 pas des promesses. Claude Code est le runtime de référence ; l'install et l'usage sont aussi
 mesurés de bout en bout sur **Codex** et **kimi-code**.
 
-[![Version](https://img.shields.io/badge/version-2.67.1-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.68.0-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#-installation)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
@@ -144,7 +144,7 @@ est sa documentation complète — même structure partout.
 ## 🔒 Confiance
 
 - **Source-available** : code et historique publics — voir [LICENSE](./LICENSE).
-- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`95 suites` en CI — les
+- **Auditable** : bash + `jq`, chaque script couvert par sa suite (`98 suites` en CI — les
   nouvelles prouvent le dispatch CLI multi-runtime (RUNT-01/02) et la forme exec des hooks du
   périmètre dev telle qu'installée, leur contrat de sortie, et la résolution Python partagée),
   install **idempotente** avec backup avant écrasement.
@@ -165,6 +165,7 @@ Historique complet : **[CHANGELOG.md](./CHANGELOG.md)**, canon unique — la tab
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.68.0` | 2026-10-01 | **Sobriété de méthode et planning métier par cycles (minor).** Budgets de méthode étendus (BACKLOG, index mémoire, ROADMAP) avec archivage automatique réversible, hook `Stop` de fin de geste et contrôle E7 (`conductor` v1.46.0, `dev-orchestrator` v2.26.0, Phase 41.3) ; `recalc-planning.sh` et modèle par cycles (`planning-core` v2.8.0, Phase 44) ; `check-overlaps` résout un agent par son `name:` (#119). |
 | `v2.67.1` | 2026-09-29 | **Hotfix : deux régressions de v2.67.0.** `popd` contournait le verrou de driver (`conductor` v1.45.1) : dans `pushd <autre-dépôt> && git commit && popd && git commit`, le second commit, fait dans le lab, passait sous le verrou d'une autre session, ce que v2.66.0 refusait ; `popd` rend désormais la cible indéterminée et le verrou s'applique. `skill-creator` v1.1.1 : v1.1.0 demandait `vf-nature` (et `ecrit:`, `vf-rubrique-juge:`, les trois marqueurs) dans le frontmatter alors que son propre `quick_validate.py` les rejetait, si bien qu'un skill produit par ce flux échouait à la validation et à l'empaquetage ; les six clés du gate des skills sont acceptées. Chaque correctif vient avec des cas rouges sans lui. Coupée depuis le tag `v2.67.0` : la Phase 44 (`planning-core` v2.8.0), mergée sur `main` sans release, n'est pas embarquée. **92 suites.** |
 | `v2.67.0` | 2026-09-28 | **Budgets de méthode et verrou de driver borné au lab (minor).** Nouveau `check-method-budget.sh` (`conductor` v1.45.0), en lecture seule : `STATE.md` à 8 Ko au plus, 3 worktrees actifs au plus par dépôt, chaque worktree classé actif, RANGEABLE (travaillé puis intégré) ou ORPHELIN. `dev-orchestrator` v2.25.0 le lance à la clôture de mission, avant le relâchement du verrou : le point de la mission remplace la position courante au lieu de s'empiler, les worktrees intégrés qu'elle a créés sont retirés sans `--force`, le reste va au rapport. Le verrou ne bloque plus un geste qui vise avec certitude un autre dépôt (`cd <autre-dépôt> && git commit`, `git -C <autre-dépôt> push`, Write dans le `.planning/` d'un autre dépôt) ; toute ambiguïté garde le verrou. Embarque aussi les Phases 42 et 43 (manifeste daté des agents, gate des skills par nature, `conductor` v1.43.0 et v1.44.0) et `dev-orchestrator` v2.24.2, mergées mais jamais publiées. |
 | `v2.66.0` | 2026-09-25 | **Presets d'install, confiance des rapports typés, gates de planning workstream-aware (minor).** `/vibeflow-install` choisit un lab de dev parmi des presets nommés (`dev`, `dev-mobile`, `dev-audite`) résolus depuis les données. Les rapports typés gagnent un champ optionnel `confiance` et un `SEUIL_CONFIANCE` unique : un jugement peu sûr n'est jamais un vert. Le head alloue l'équipe à partir de trois questions indépendantes. Les gates de planning énumèrent chaque compartiment de workstream sur le disque (`planning-core` v2.7.1, `conductor` v1.42.0, `dev-orchestrator` v2.24.1), `measure-server-rulesets.sh --dry-run` ne mute plus ce qu'il mesure, et les identifiants de décision portent leur registre (ADR-075). |

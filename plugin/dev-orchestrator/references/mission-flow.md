@@ -304,6 +304,8 @@ manager↔worker↔worker de revue). Sur un rapport typé `gaps_found` :
 3. Re-dispatch `vf-reviewer` sur le diff corrigé.
    Un même verdict qui revient deux fois sur ce nœud : édition-à-la-source, pas un 4ᵉ redispatch — règle et seuil au niveau kernel (`team-kernel.md` §Règles d'instanciation, G5).
 
+Le rapport de `vf-reviewer` porte deux axes (`axes.standards`, `axes.spec` ; schéma : `mission-contracts.md` §Étage revue) : le statut global se calcule sur les axes jugés (règle au contrat, §Étage revue, P414-D-22 : en régime plein, le nœud ne passe que si les deux axes sont `passed`), en régime plein comme allégé, et la correction ciblée reçoit les findings groupés par axe.
+
 Budget **3 tours**, au grain **étape** et **partagé** avec les autres boucles de correction de la
 même étape (§6 ci-dessous) — un budget séparé par boucle se contournerait mécaniquement, par
 renommage du problème, ce que ce Pattern dit précisément vouloir empêcher. La valeur ne bouge pas
@@ -416,6 +418,21 @@ le nœud de cadrage et ses dépendances — seul change qui exécute le nœud, p
 
 **Outil de question indisponible** : cas réel, déjà documenté au filet de repli D-09 du manager
 (§Entrée) — `human_needed` remonté, jamais un retour au mode d'enchaînement.
+
+**Frontière de questions (POCK-01)** — portée : toute question posée à l'humain pendant un cadrage
+(le manager ici ; le head par renvoi depuis `head-governance.md` §1). P414-D-12.
+
+- **Un tour = toute la frontière** : numérotée, seules les questions dont les prérequis sont réglés ;
+  une question dépendante attend le tour suivant.
+- **Une recommandation par question** : l'option recommandée est marquée, motif en une ligne.
+- **Un fait ne se demande jamais à l'humain** : ce qu'un sous-agent peut établir (lecture du dépôt,
+  mesure, documentation) l'est par un éclaireur en lecture seule avant le tour ; seules les décisions remontent.
+- **AskUserQuestion groupé par zone** : un appel par zone, options cochables, jamais la frontière
+  rendue en texte ; outil indisponible : filet de repli D-09 du manager.
+- **Fin de cadrage = frontière vide** : rien d'assumé en silence ; une hypothèse retenue faute de
+  réponse est écrite comme hypothèse au registre de décisions.
+- **Vocabulaire** : un terme flou challengé ou un mot surchargé résolu pendant le tour entre au
+  glossaire du lab, régime : `docs-flow.md` §Famille savoir (P414-D-08).
 
 **Ce que le worker ne fait plus** : `vf-coder` n'invoque plus jamais le cadrage lui-même.
 

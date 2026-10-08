@@ -121,7 +121,7 @@ tokens du crafter : la spec devient la SOURCE DU CADRAGE de `vf-coder` (son entr
 ROADMAP — sa chaîne `gsd-discuss-phase` s'y ancre) ; le digest embarque les conventions code
 cibles. Après l'implémentation, **double juge parallèle** dans la MÊME frontière DAG :
 `vf-design-judge` re-score le rendu contre la DA ET `vf-reviewer` relit le diff — « vert »
-complet = critique ≥ seuil ET revue PASS, jamais l'un sans l'autre. **Budgets séparés 3+3 par
+complet = critique ≥ seuil ET statut global de revue `passed` (calcul et axe Spec sans PLAN : `mission-contracts.md` §Étage revue), jamais l'un sans l'autre. **Budgets séparés 3+3 par
 écran** : 3 tours craft→critique pour la spec, puis 3 tours implémentation→(re-critique ∥
 revue) pour le rendu — deux compteurs distincts. Lock, DAG et rapport restent uniques, portés
 par toi seul : tu ne dispatches JAMAIS `vf-dev-manager`. Doctrine complète :

@@ -1,6 +1,7 @@
 ---
 name: consolidator
 description: Consolide la memoire structuree d'un lab VibeFlow (registres DECISIONS/LEARNINGS/BLOCKERS/JOURNAL/EVALS) sur 5 piliers — Indexation (header strict + colonne #Ligne), Archivage (3 criteres statut/age/refs, hook SessionEnd async), Fusion (deduplication LLM-based des doublons), Promotion (learning -> rule semi-auto avec validation humaine), Memoire vivante (decroissance de confiance par categorie + supersession non destructive de la couche fichier-par-entree .claude/memory/knowledge/, ADR-052). Utiliser ce skill quand un registre depasse 800 lignes, quand des doublons d'IDs apparaissent, en entretien a la release / au jalon (labs solo) ou mensuel (labs d'equipe actifs), lors d'un /vf-audit, ou via /consolidator. Reference ADR-032 + ADR-009 + ADR-029 + ADR-052. Iron Law : "La lecture d'un registre = lecture de l'index uniquement par defaut".
+vf-invocation: model
 ---
 
 # Skill : Consolidator — Consolidation Memoire 5 Piliers
@@ -169,9 +170,9 @@ Voir `references/fusion.md`.
    - Frequence : meme tag/theme present dans ≥ 3 learnings
    - Operationnel : presence de mots-cles d'instruction (`toujours`, `jamais`, `eviter`, `forcer`)
    - Non encore encode : champ `Encode dans:` = `Non encode`
-2. **Draft auto** : pour chaque candidat, l'agent (Claude) genere un draft rule dans `.claude/rules/_draft/[slug].md` avec frontmatter `paths:` propose.
+2. **Draft auto** : brouillon sous `.claude/rules/_draft/` selon la `nature` de la candidate (check si mecanique, regle si jugement) — grille : `references/promotion.md` §Grille de tri.
 3. **Validation humaine** : le user revoit chaque draft, valide ou rejette.
-4. **Promotion finale** : draft valide -> `.claude/rules/[slug].md`, learnings sources marques `Encode dans: .claude/rules/[slug].md`, learnings archives si redondants.
+4. **Promotion finale** : draft de rule valide -> `.claude/rules/[slug].md`, learnings sources marques `Encode dans: .claude/rules/[slug].md`, learnings archives si redondants. Brouillon de check valide -> proposition de controle executable a l'emplacement nomme (lint, hook ou job CI), pose par un geste humain ou un mandat de dev ; une fois pose, learnings sources marques `Encode dans: [chemin du controle]` (jamais `.claude/rules/`) — `references/promotion.md` Phases C et D.
 
 ### Quand declencher
 

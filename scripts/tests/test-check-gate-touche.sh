@@ -9,8 +9,8 @@
 # PR qu'elle juge — elle, cette suite, et l'etape CI qui l'invoque — et rester verte. Une suite
 # incapable de rougir est un defaut, au meme titre que le gate qu'elle verifie.
 #
-# Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et SIX mutants opposables
-# (MUT-1 a MUT-6), un par comparaison du script sous test (MUT-6 cible la borne sur la virgule du
+# Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et SEPT mutants opposables
+# (MUT-1 a MUT-7), un par comparaison du script sous test (MUT-6 cible la borne sur la virgule du
 # motif, ajoutee dans la meme comparaison 3) — regle de comptage (decision du manager, 2026-09-17,
 # reprise du plan 41-14) : chaque mutant asserte le rc EXACT attendu sur le mutant ET sur
 # l'original. Un mutant qui « echoue » par un plantage (rc 2) ou une plage vide (rc 3) la ou le
@@ -386,7 +386,7 @@ safe_run out rc "$TMP/chemin-inexistant-xyz"
 safe_run out rc "$TMP" --base-ref
 [ "$rc" -eq 64 ] && ok "USAGE --base-ref sans valeur -> 64" || ko "USAGE --base-ref sans valeur" "rc=64" "rc=$rc :: $out"
 
-echo "== test-check-gate-touche : MUTANTS (MUT-1 a MUT-6) =="
+echo "== test-check-gate-touche : MUTANTS (MUT-1 a MUT-7) =="
 
 # --- MUT-1 : retire la classe des suites (scripts/tests/test-*.sh) ----------------------------------
 MUT1_OLD='    if (p ~ /^scripts\/tests\/test-[^\/]+\.sh$/) return "suite"'
@@ -499,6 +499,26 @@ else
   TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D" --base-ref "$B"
   if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 6 "$rc_mut" 0 "$rc_orig" 1
   else komut 6 "rejet des motifs a virgule neutralise" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
+# --- MUT-7 : od sans -v (revue tour 3, m3-05) : « od » replie les lignes identiques en « * » ; une raison de
+# 10 émojis identiques (40 octets périodiques) était comptée 7 et refusée à tort. Original : DECLARE rc 0 ;
+# mutant (le -v retiré) : MARQUEUR-MAL-FORME, le chemin reste non déclaré, rc 1.
+MUT7_OLD="$(grep -F 'reason_charcount="$(' "$SCRIPT")"
+MUT7_NEW="${MUT7_OLD/od -v -An/od -An}"
+MUT7_PATH="$(make_mutant mut7 "$MUT7_OLD" "$MUT7_NEW")"; MUT7_STAT=$?
+D="$(mk_repo mut7)"; B="$(base_of "$D")"
+printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh"
+commit_avec "$D" "feat: raison de 10 emojis identiques (fixture MUT-7)
+
+Gate-Touche: scripts/check-demo.sh — 🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂"
+if [ "$MUT7_STAT" -eq 1 ]; then komut 7 "od sans -v" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
+elif [ "$MUT7_STAT" -eq 2 ]; then komut 7 "od sans -v" "bash -n OK sur le mutant" "syntaxe invalide"
+else
+  TARGET="$MUT7_PATH"; safe_run _mutout rc_mut "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D" --base-ref "$B"
+  if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then okmut 7 "$rc_mut" 1 "$rc_orig" 0
+  else komut 7 "od sans -v" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
 fi
 
 TARGET="$SCRIPT"

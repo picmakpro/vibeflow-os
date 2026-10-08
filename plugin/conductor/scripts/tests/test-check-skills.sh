@@ -35,6 +35,24 @@
 #   T20 — --file : conforme / violation / introuvable
 #   T21 — fraîcheur de champs_frontmatter_skills : périmée (avertissement), fraîche, absente
 #   MUT-SD1/SD2 — élagages de découverte neutralisés ; gardes du harnais MUT-SYNTAXE, MUT-REFUS-COMPTE
+#
+# (41.4-01, POCK-07 — classe d'invocation, fixtures d'ARBRE via mk_tree, T33 à T43, MUT-INV1 à INV5) :
+#   T33 — non classé : conforme sous --callers-root si classé, « non classe » + POCK-07 sinon
+#   T34 — vf-invocation User / auto / vide -> rc 1, avec ET sans --callers-root (+ témoin model rc 0)
+#   T35 — cohérence avec disable-model-invocation : user sans true, model avec true -> rc 1
+#   T36 — arêtes machine : commande, préchargement (3 formes), agent outillé Skill, agent sans tools:,
+#         {module}/AGENT.md -> rc 1 ; prose sans Skill, disallowedTools Skill, skill model -> rc 0
+#   T37 — user -> user rc 1 ; user -> model rc 0 (P414-D-01)
+#   T38 — user niché : agents/openai.yaml absent / true / lien symbolique -> rc 1 ; false -> rc 0
+#   T39 — user non niché : rc 0 + avertissement « dette Type 1 » (P414-D-03)
+#   T40 — racine d'arêtes absente ou sans appelant -> rc 3 ; --callers-root vide, sans « = », avec
+#         --file -> rc 1 (usage)
+#   T41 — ligne d'information « sans appelant machine », jamais comptée en avertissement
+#   T42 — sans --callers-root, un skill non classé reste conforme (hook de lab inchangé)
+#   T43 — octet ESC jamais reflété brut ; nom à point (a.b) n'apparie pas axb
+#   MUT-INV1 — appel valider_invocation neutralisé · INV2 — controler_aretes · INV3 — sortie
+#              INDETERMINE de la racine absente · INV4 — controler_codex · INV5 — filtre d'outillage
+#              Skill (tout agent compté outillé) : chaque mutant bascule le rc ET perd le jeton de refus
 
 set -uo pipefail
 
@@ -1249,6 +1267,543 @@ if [ "$T32_FAIL" -eq 0 ] && [ "$T32_MODS" -gt 0 ]; then
 else
   ko "T32 (modules=$T32_MODS échecs=$T32_FAIL)"
 fi
+
+# ================================ 41.4-01 (POCK-07) : classe d'invocation ==========================
+# Fixtures d'ARBRE : une racine `$TREE` portant skills/, commands/, agents/ (et {mod}/AGENT.md à la
+# demande). Le gate y est joué `--strict --skills-dir=$TREE/skills --callers-root=$TREE` via $CHECK
+# (copie au manifeste frais), jamais contre le manifeste réel.
+mk_tree() { # <nom> -> TREE = racine de fixture
+  TREE="$WORK/tree-$1"
+  rm -rf "$TREE"
+  mkdir -p "$TREE/skills" "$TREE/commands" "$TREE/agents"
+}
+mk_sk() { # <dossier> <name:> <lignes de frontmatter, %b> [corps]
+  mkdir -p "$TREE/skills/$1"
+  printf -- '---\nname: %s\ndescription: Fixture de la classe invocation.\n%b---\n%s\n' "$2" "$3" "${4:-Corps.}" > "$TREE/skills/$1/SKILL.md"
+}
+mk_oy() { # <dossier-skill> <contenu> : skills/<dossier>/agents/openai.yaml
+  mkdir -p "$TREE/skills/$1/agents"
+  printf '%s\n' "$2" > "$TREE/skills/$1/agents/openai.yaml"
+}
+mk_cmd() { # <fichier> <contenu> : commands/<fichier>
+  printf '%s\n' "$2" > "$TREE/commands/$1"
+}
+mk_ag() { # <fichier> <lignes de frontmatter, %b> <corps> : agents/<fichier>
+  printf -- '---\nname: %s\ndescription: Agent de fixture.\n%b---\n%s\n' "${1%.md}" "$2" "$3" > "$TREE/agents/$1"
+}
+mk_mod_ag() { # <module> <corps> : <module>/AGENT.md (forme AGENT.md d'un module)
+  mkdir -p "$TREE/$1"
+  printf -- '---\nname: %s\ndescription: Agent de module de fixture.\n---\n%s\n' "$1" "$2" > "$TREE/$1/AGENT.md"
+}
+run_tree() { # -> OUT, RC ; GATE (facultatif) = copie mutante du gate
+  OUT="$(bash "${GATE:-$CHECK}" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1)"; RC=$?
+}
+# Un skill `user` conforme de bout en bout (dmi true + équivalent Codex) : base des fixtures d'arêtes.
+mk_user() { # <dossier> <name:> [corps]
+  mk_sk "$1" "$2" 'vf-invocation: user\ndisable-model-invocation: true\n' "${3:-Corps.}"
+  mk_oy "$1" 'policy:
+  allow_implicit_invocation: false'
+}
+
+# ---------- T33 — un skill non classé rougit sous --callers-root -----------------------------------
+mk_tree t33a; mk_sk a a 'vf-invocation: model\n'; mk_cmd x.md 'commande de fixture'
+run_tree
+if [ "$RC" -eq 0 ]; then
+  ok "T33a skill classé model sous --callers-root -> rc=0"
+else
+  ko "T33a (rc=$RC) : $OUT"
+fi
+mk_tree t33b; mk_sk a a ''; mk_cmd x.md 'commande de fixture'
+run_tree
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "non classe" && echo "$OUT" | grep -q "POCK-07"; then
+  ok "T33b skill sans vf-invocation sous --callers-root -> rc=1, « non classe » et POCK-07"
+else
+  ko "T33b (rc=$RC) : $OUT"
+fi
+
+# ---------- T40 — racine d'arêtes absente ou sans appelant = INDETERMINE rc 3, usage rc 1 ----------
+mk_tree t40; mk_sk a a 'vf-invocation: model\n'
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root="$WORK/racine-absente-xyz" 2>&1)"; RC=$?
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "INDETERMINE" && echo "$OUT" | grep -q "ARETES-ABSENTES"; then
+  ok "T40a racine d'arêtes absente -> rc=3, INDETERMINE + ARETES-ABSENTES"
+else
+  ko "T40a (rc=$RC) : $OUT"
+fi
+run_tree   # racine présente mais sans aucun fichier commands/ ni agents/
+if [ "$RC" -eq 3 ] && echo "$OUT" | grep -q "ARETES-ABSENTES"; then
+  ok "T40b racine présente sans aucun fichier appelant -> rc=3 (jamais un vert à vide)"
+else
+  ko "T40b (rc=$RC) : $OUT"
+fi
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root= 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "callers-root vide"; then
+  ok "T40c --callers-root= vide -> rc=1 (usage)"
+else
+  ko "T40c (rc=$RC) : $OUT"
+fi
+OUT="$(bash "$CHECK" --strict --callers-root="$TREE" --file "$TREE/skills/a/SKILL.md" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "callers-root"; then
+  ok "T40d --callers-root avec --file -> rc=1 (usage, jamais ignoré en silence)"
+else
+  ko "T40d (rc=$RC) : $OUT"
+fi
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root "$TREE" 2>&1)"; RC=$?
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "callers-root"; then
+  ok "T40e --callers-root sans « = » -> rc=1 (usage, jamais ignoré en silence)"
+else
+  ko "T40e (rc=$RC) : $OUT"
+fi
+
+# ---------- T42 — sans --callers-root, un skill non classé reste conforme (hook de lab) ------------
+mk_tree t42; mk_sk a a ''
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC=$?
+OUT_H="$(bash "$CHECK" --hook --skills-dir="$TREE/skills" 2>&1)"; RC_H=$?
+if [ "$RC" -eq 0 ] && [ "$RC_H" -eq 0 ] && ! echo "$OUT" | grep -q "non classe"; then
+  ok "T42 skill non classé SANS --callers-root -> rc=0 (--strict et --hook), comportement inchangé"
+else
+  ko "T42 (rc=$RC, hook=$RC_H) : $OUT"
+fi
+
+# ---------- T34 — valeurs de vf-invocation hors {user, model} -> rc 1, avec ET sans --callers-root ----
+T34_OK=1
+for VAL in 'User' 'auto' ''; do
+  mk_tree t34; mk_sk a a "vf-invocation: ${VAL}\ndisable-model-invocation: true\n"; mk_cmd x.md 'commande de fixture'
+  run_tree; RC_A=$RC; OUT_A="$OUT"
+  OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC_B=$?
+  if [ "$RC_A" -ne 1 ] || [ "$RC_B" -ne 1 ] || ! echo "$OUT_A" | grep -q "vf-invocation invalide" || ! echo "$OUT" | grep -q "vf-invocation invalide"; then
+    T34_OK=0; echo "    [T34] valeur '${VAL}' : rc(avec)=$RC_A rc(sans)=$RC_B : $OUT_A"
+  fi
+done
+if [ "$T34_OK" -eq 1 ]; then
+  ok "T34 vf-invocation User / auto / vide -> rc=1 « vf-invocation invalide » (avec ET sans --callers-root)"
+else
+  ko "T34 (voir détails ci-dessus)"
+fi
+mk_tree t34-ok; mk_sk a a 'vf-invocation: model\n'
+OUT_T34_MODEL="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC_T34_MODEL=$?
+if [ "$RC_T34_MODEL" -eq 0 ]; then
+  ok "T34b témoin positif : vf-invocation: model valide -> rc=0 (le contrôle de valeur n'est pas aveugle)"
+else
+  ko "T34b (rc=$RC_T34_MODEL) : $OUT_T34_MODEL"
+fi
+
+# ---------- T35 — cohérence avec le champ natif disable-model-invocation ---------------------------
+mk_tree t35a; mk_sk a a 'vf-invocation: user\n'; mk_oy a 'allow_implicit_invocation: false'; mk_cmd x.md 'commande de fixture'
+run_tree; RC_A=$RC; OUT_A="$OUT"
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC_A2=$?
+mk_tree t35b; mk_sk a a 'vf-invocation: model\ndisable-model-invocation: true\n'; mk_cmd x.md 'commande de fixture'
+run_tree; RC_B=$RC; OUT_B="$OUT"
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" 2>&1)"; RC_B2=$?
+mk_tree t35c; mk_user a a; mk_cmd x.md 'commande de fixture'
+run_tree; RC_C=$RC; OUT_C="$OUT"
+if [ "$RC_A" -eq 1 ] && [ "$RC_A2" -eq 1 ] && echo "$OUT_A" | grep -q "vf-invocation: user sans disable-model-invocation: true" \
+   && [ "$RC_B" -eq 1 ] && [ "$RC_B2" -eq 1 ] && echo "$OUT_B" | grep -q "vf-invocation: model avec disable-model-invocation: true" \
+   && [ "$RC_C" -eq 0 ]; then
+  ok "T35 user sans dmi true -> rc=1 ; model avec dmi true -> rc=1 (avec ET sans --callers-root) ; user + true -> rc=0"
+else
+  ko "T35 (a=$RC_A/$RC_A2 b=$RC_B/$RC_B2 c=$RC_C) : $OUT_A | $OUT_B | $OUT_C"
+fi
+
+# ---------- T36 — un skill user appelé (commande, préchargement, agent outillé Skill) -> rc 1 -------
+t36_cas() { # <attendu rc> <jeton attendu dans la sortie ou -> <libellé>
+  if [ "$RC" -eq "$1" ] && { [ "$2" = "-" ] || echo "$OUT" | grep -qF -- "$2"; }; then
+    echo "    [T36] ✓ $3 (rc=$RC)"
+  else
+    T36_OK=0; echo "    [T36] ✗ $3 (rc=$RC, attendu $1, jeton '$2') : $OUT"
+  fi
+}
+T36_OK=1
+mk_tree t36a; mk_user u1 u1; mk_cmd x.md 'La commande lance le skill u1 puis rend la main.'
+run_tree; t36_cas 1 "commands/x.md (commande)" "commande qui nomme le skill user"
+echo "$OUT" | grep -q "P414-D-02" || { T36_OK=0; echo "    [T36] ✗ P414-D-02 absent : $OUT"; }
+mk_tree t36b1; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills:\n  - u1\n' 'Agent précharge u1.'
+run_tree; t36_cas 1 "agents/ag.md (prechargement)" "préchargement en liste de bloc"
+mk_tree t36b2; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills: [autre, u1]\n' 'Agent.'
+run_tree; t36_cas 1 "agents/ag.md (prechargement)" "préchargement en liste en ligne"
+mk_tree t36b3; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills: autre, u1\n' 'Agent.'
+run_tree; t36_cas 1 "agents/ag.md (prechargement)" "préchargement scalaire séparé par des virgules"
+mk_tree t36b4; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [u1]\n' 'Agent sans Skill mais qui précharge.'
+run_tree; t36_cas 1 "agents/ag.md (prechargement)" "préchargement par un agent sans outil Skill (indépendant de tools)"
+mk_tree t36c; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Skill\n' 'Route vers u1.'
+run_tree; t36_cas 1 "agents/ag.md (agent)" "agent tools: Read, Skill qui cite le skill"
+mk_tree t36c2; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: [Read, "Skill(u1)"]\n' 'Route vers u1.'
+run_tree; t36_cas 1 "agents/ag.md (agent)" "agent tools avec Skill(u1) en liste en ligne"
+mk_tree t36d; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md '' 'Route vers u1.'
+run_tree; t36_cas 1 "agents/ag.md (agent)" "agent SANS ligne tools: (hérite de tout) qui cite le skill"
+mk_tree t36m; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_mod_ag modx 'Le module route vers u1.'
+run_tree; t36_cas 1 "modx/AGENT.md (agent)" "{module}/AGENT.md sans tools: qui cite le skill"
+mk_tree t36e; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\n' 'Utilise le skill u1 en prose, sans outil Skill.'
+run_tree; t36_cas 0 "-" "agent tools: Read, Bash qui cite en prose -> aucune arête machine (cas vf-mobile-test)"
+mk_tree t36f; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'disallowedTools: Skill\n' 'Cite u1.'
+run_tree; t36_cas 0 "-" "agent dont disallowedTools porte Skill -> aucune arête"
+mk_tree t36g; mk_sk m m 'vf-invocation: model\n'; mk_cmd x.md 'La commande lance m.'; mk_ag ag.md '' 'Cite m.'
+run_tree; t36_cas 0 "-" "témoin : un skill model appelé par commande et agent reste conforme"
+if [ "$T36_OK" -eq 1 ]; then
+  ok "T36 arêtes machine : commande, préchargement (3 formes), agent outillé Skill, agent sans tools:, {module}/AGENT.md -> rc=1 ; prose sans Skill, disallowedTools Skill, skill model -> rc=0"
+else
+  ko "T36 (voir détails ci-dessus)"
+fi
+
+# ---------- T37 — un user n'en appelle jamais un autre (P414-D-01) ---------------------------------
+mk_tree t37a; mk_user a a 'Ce skill enchaîne avec b.'; mk_user b b; mk_cmd x.md 'sans rapport'
+run_tree; RC_A=$RC; OUT_A="$OUT"
+mk_tree t37b; mk_user a a 'Ce skill enchaîne avec m.'; mk_sk m m 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
+run_tree; RC_B=$RC; OUT_B="$OUT"
+if [ "$RC_A" -eq 1 ] && echo "$OUT_A" | grep -q "P414-D-01" && echo "$OUT_A" | grep -q "user-invoked cite le user-invoked 'b'"&& [ "$RC_B" -eq 0 ]; then
+  ok "T37 user -> user rc=1 (P414-D-01, nomme la cible) ; user -> model rc=0"
+else
+  ko "T37 (a=$RC_A b=$RC_B) : $OUT_A | $OUT_B"
+fi
+
+# ---------- T38 — équivalent Codex d'un user niché : agents/openai.yaml -----------------------------
+mk_tree t38a; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_cmd x.md 'sans rapport'
+run_tree; RC_A=$RC; OUT_A="$OUT"
+mk_tree t38b; mk_user a a; mk_cmd x.md 'sans rapport'
+run_tree; RC_B=$RC; OUT_B="$OUT"
+mk_tree t38c; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a 'policy:
+  allow_implicit_invocation: true'; mk_cmd x.md 'sans rapport'
+run_tree; RC_C=$RC; OUT_C="$OUT"
+T38D_OK=1
+mk_tree t38d; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_cmd x.md 'sans rapport'
+# La cible du lien est un yaml CONFORME (policy.allow_implicit_invocation: false) : seul le refus du lien
+# symbolique peut faire rougir la fixture (revue tour 3, M3-02) ; le jeton de la cause est asserté.
+printf 'policy:\n  allow_implicit_invocation: false\n' > "$TREE/vrai-openai.yaml"
+mkdir -p "$TREE/skills/a/agents"
+if ln -s "$TREE/vrai-openai.yaml" "$TREE/skills/a/agents/openai.yaml" 2>/dev/null; then
+  run_tree
+  if [ "$RC" -ne 1 ] || ! printf '%s' "$OUT" | grep -qF "fichier absent, illisible ou lien symbolique"; then T38D_OK=0; fi
+fi
+if [ "$RC_A" -eq 1 ] && echo "$OUT_A" | grep -q "openai.yaml" && echo "$OUT_A" | grep -q "P414-D-03" \
+   && [ "$RC_B" -eq 0 ] && [ "$RC_C" -eq 1 ] && [ "$T38D_OK" -eq 1 ]; then
+  ok "T38 user niché : sans openai.yaml rc=1 (P414-D-03) ; allow_implicit_invocation: false rc=0 ; true rc=1 ; openai.yaml en lien symbolique rc=1"
+else
+  ko "T38 (a=$RC_A b=$RC_B c=$RC_C d_ok=$T38D_OK) : $OUT_A | $OUT_B | $OUT_C"
+fi
+
+# ---------- T39 — user NON niché (Type 1) : avertissement de dette, pas de refus --------------------
+mk_tree t39; mkdir -p "$TREE/plugin/modtype1"
+printf -- '---\nname: type1-user\ndescription: Fixture Type 1.\nvf-invocation: user\ndisable-model-invocation: true\n---\nCorps.\n' > "$TREE/plugin/modtype1/SKILL.md"
+mk_cmd x.md 'sans rapport'
+OUT="$(bash "$CHECK" --strict --skills-dir="$TREE/plugin" --callers-root="$TREE" 2>&1)"; RC=$?
+if [ "$RC" -eq 0 ] && echo "$OUT" | grep -q "dette Type 1" && echo "$OUT" | grep -q "P414-D-03"; then
+  ok "T39 user non niché -> rc=0 + avertissement « dette Type 1 » (P414-D-03)"
+else
+  ko "T39 (rc=$RC) : $OUT"
+fi
+
+# ---------- T41 — ligne d'information « sans appelant machine » -------------------------------------
+mk_tree t41; mk_sk seul zz-seul 'vf-invocation: model\n'; mk_sk appele zz-appele 'vf-invocation: model\n'
+mk_cmd x.md 'La commande lance zz-appele.'
+run_tree
+LIGNE_T41="$(echo "$OUT" | grep 'sans appelant machine')"
+if [ "$RC" -eq 0 ] && [ -n "$LIGNE_T41" ] && echo "$LIGNE_T41" | grep -q "zz-seul" && ! echo "$LIGNE_T41" | grep -q "zz-appele" \
+   && ! echo "$OUT" | grep -q "warning(s)"; then
+  ok "T41 ligne « sans appelant machine » : liste le skill sans appelant, pas celui nommé par une commande, jamais comptée en avertissement"
+else
+  ko "T41 (rc=$RC) : $OUT"
+fi
+
+# ---------- T43 — octet de contrôle et nom à point : jamais reflétés bruts, jamais lâches -----------
+mk_tree t43a; mk_sk a a "vf-invocation: us\033er\ndisable-model-invocation: true\n"; mk_cmd x.md 'sans rapport'
+run_tree
+if [ "$RC" -eq 1 ] && echo "$OUT" | grep -q "vf-invocation invalide" && ! printf '%s' "$OUT" | grep -q "$(printf '\033')"; then
+  ok "T43a octet ESC dans vf-invocation -> rc=1, aucun octet ESC brut en sortie"
+else
+  ko "T43a (rc=$RC) : $OUT"
+fi
+mk_tree t43b; mk_user ab a.b; mk_cmd x.md 'La commande lance axb, pas le skill au nom a-point-b.'
+run_tree; RC_A=$RC
+mk_cmd x.md 'La commande lance a.b puis rend la main.'
+run_tree; RC_B=$RC; OUT_B="$OUT"
+if [ "$RC_A" -eq 0 ] && [ "$RC_B" -eq 1 ] && echo "$OUT_B" | grep -q "commands/x.md"; then
+  ok "T43b nom de skill à point : « axb » n'apparie pas « a.b » (rc=0) ; « a.b » littéral l'apparie (rc=1)"
+else
+  ko "T43b (axb=$RC_A, a.b=$RC_B) : $OUT_B"
+fi
+
+# ---------- T44 — correction de la revue deux axes de la vague 1 (2026-10-06) : M-01..M-04 -----------
+# Chaque cas dit rc ET jeton attendu : le jeton distingue la bonne raison de refus d'une autre.
+tk_cas() { # <attendu rc> <jeton ou -> <libellé> ; jeton « ! x » = x absent de la sortie
+  local ok=1
+  [ "$RC" -eq "$1" ] || ok=0
+  case "$2" in
+    -) : ;;
+    '! '*) ! echo "$OUT" | grep -qF -- "${2#! }" || ok=0 ;;
+    *) echo "$OUT" | grep -qF -- "$2" || ok=0 ;;
+  esac
+  if [ "$ok" -eq 1 ]; then echo "    [T44] ✓ $3 (rc=$RC)"; else TK_OK=0; echo "    [T44] ✗ $3 (rc=$RC, attendu $1, jeton '$2') : $OUT"; fi
+}
+mk_ag_mod() { # <module> <fichier> <frontmatter %b> <corps> : <module>/agents/<fichier>
+  mkdir -p "$TREE/$1/agents"
+  printf -- '---\nname: %s\ndescription: Agent de module de fixture.\n%b---\n%s\n' "${2%.md}" "$3" "$4" > "$TREE/$1/agents/$2"
+}
+sans_name() { # <dossier-skill> : retire la ligne name: du SKILL.md
+  grep -v '^name: ' "$TREE/skills/$1/SKILL.md" > "$TREE/skills/$1/SKILL.md.new" && mv "$TREE/skills/$1/SKILL.md.new" "$TREE/skills/$1/SKILL.md"
+}
+TK_OK=1
+# M-01 : un skill SANS name: est jugé sous le nom de son dossier
+mk_tree t44a; mk_user u1 u1; sans_name u1; mk_cmd x.md 'La commande lance le skill u1 maintenant.'
+run_tree; tk_cas 1 "user-invoked appele par commands/x.md" "M-01 user sans name: appelé par une commande (nom du dossier)"
+mk_tree t44a2; mk_user ua ua 'Ce skill enchaîne avec ub.'; mk_user ub ub; mk_cmd x.md 'sans rapport'; sans_name ua; sans_name ub
+run_tree; tk_cas 1 "user-invoked cite le user-invoked 'ub'" "M-01 user -> user, tous deux sans name:"
+mk_tree t44a3; mk_sk m m 'vf-invocation: model\n'; sans_name m; mk_cmd x.md 'La commande lance m.'
+run_tree; tk_cas 0 "-" "M-01 témoin : un model sans name: appelé reste conforme"
+mk_tree t44a4; mk_sk u1 u1 'vf-invocation: model\n'; sed 's/^name: u1$/name:/' "$TREE/skills/u1/SKILL.md" > "$TREE/n.md" && mv "$TREE/n.md" "$TREE/skills/u1/SKILL.md"
+mk_cmd x.md 'sans rapport'
+run_tree; tk_cas 1 "identite du skill indeterminable" "M-01 name: vide -> identité indéterminable, refusé"
+# M-02 : commentaire de fin de ligne
+mk_tree t44b1; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [u1] # precharge\n' 'Agent.'
+run_tree; tk_cas 1 "agents/ag.md (prechargement)" "M-02 skills: [u1] # commentaire (liste en ligne)"
+mk_tree t44b2; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: u1 # precharge\n' 'Agent.'
+run_tree; tk_cas 1 "agents/ag.md (prechargement)" "M-02 skills: u1 # commentaire (scalaire)"
+mk_tree t44b3; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Skill # x\n' 'Route vers u1.'
+run_tree; tk_cas 1 "agents/ag.md (agent)" "M-02 tools: Read, Skill # commentaire (outil Skill vu)"
+mk_tree t44b4; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'disallowed-tools: Skill # x\n' 'Cite u1.'
+run_tree; tk_cas 0 "-" "M-02 disallowed-tools: Skill # commentaire (interdit lu) -> aucune arête"
+mk_tree t44b5; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: ["autre # pas un commentaire", u1]\n' 'Agent.'
+run_tree; tk_cas 1 "agents/ag.md (prechargement)" "M-02 un # entre guillemets n'est pas un commentaire (u1 reste lu)"
+mk_tree t44b6; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [u1\n' 'Agent.'
+run_tree; tk_cas 1 "non interpretable" "M-02 liste en ligne non refermée -> refusée, pas ignorée"
+# M-03 : valeur RÉSOLUE de policy.allow_implicit_invocation
+oy_cas() { # <suffixe> <attendu rc> <jeton ou -> <libellé> ; le contenu vient de $OY
+  mk_tree "t44c$1"; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a "$OY"; mk_cmd x.md 'sans rapport'
+  run_tree; tk_cas "$2" "$3" "M-03 $4"
+}
+OY='policy:
+  allow_implicit_invocation: false
+  allow_implicit_invocation: true'
+oy_cas 1 1 "en double" "false puis true sous policy: -> refus (valeur non unique)"
+OY='interface:
+  allow_implicit_invocation: false
+policy:
+  allow_implicit_invocation: true'
+oy_cas 2 1 "valeur resolue 'true'" "false sous interface:, true sous policy: -> refus"
+OY='interface:
+  allow_implicit_invocation: false
+policy:
+  other: x'
+oy_cas 3 1 "absent ou en double" "false sous le mauvais parent seulement -> refus"
+OY='policy:
+  allow_implicit_invocation: false # note'
+oy_cas 4 0 "-" "false # commentaire -> accepté (valeur YAML)"
+OY='policy:
+  allow_implicit_invocation: yes'
+oy_cas 5 1 "valeur resolue 'yes'" "valeur non booléenne -> refus"
+OY='policy: {allow_implicit_invocation: false}'
+oy_cas 6 1 "non interpretable" "forme en flux -> refus (jamais un vert par lecture plus faible)"
+OY='# en-tete
+interface:
+  name: x
+policy:
+  other: 1
+  allow_implicit_invocation: "false"'
+oy_cas 7 0 "-" "témoin : false entre guillemets, après un autre enfant, derrière un autre bloc -> accepté"
+# M-04 : gardes de controler_aretes / decouvrir_appelants / mot_entier_re
+mk_tree t44d1; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag_mod modk ag.md 'tools: Read, Bash\nskills: [u1]\n' 'Agent.'
+run_tree; tk_cas 1 "modk/agents/ag.md" "K15 appelant sous {module}/agents/*.md découvert"
+mk_tree t44d2; mk_user vf-dev vf-dev; mk_cmd x.md 'La commande lance vf-dev-manager puis rend la main.'
+run_tree; tk_cas 0 "-" "K17 vf-dev n'apparie pas vf-dev-manager (borne droite)"
+mk_cmd x.md 'La commande lance pre-vf-dev puis rend la main.'
+run_tree; tk_cas 0 "-" "K18 vf-dev n'apparie pas pre-vf-dev (borne gauche)"
+mk_cmd x.md 'La commande lance vf-dev puis rend la main.'
+run_tree; tk_cas 1 "commands/x.md" "K17/K18 témoin : vf-dev entier est apparié"
+mk_tree t44d3; mk_user u1 u1; mk_cmd x.md 'sans rapport'
+printf 'La commande lance u1.\n' > "$TREE/vraie-commande.md"; ln -s "$TREE/vraie-commande.md" "$TREE/commands/lien.md"
+run_tree; tk_cas 0 "-" "K16 commande en lien symbolique non suivie"
+rm -f "$TREE/commands/lien.md"
+printf -- '---\nname: lien\ndescription: Agent.\n---\nRoute vers u1.\n' > "$TREE/vrai-agent.md"; ln -s "$TREE/vrai-agent.md" "$TREE/agents/lien.md"
+run_tree; tk_cas 0 "-" "K16 agent en lien symbolique non suivi"
+mk_tree t44d4; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: True\n'; mk_oy a 'policy:
+  allow_implicit_invocation: false'; mk_cmd x.md 'sans rapport'
+run_tree; tk_cas 0 "-" "K14 disable-model-invocation: True (casse YAML) reconnu"
+mk_tree t44d5; mk_user u1 u1; mk_sk zzmodele zzmodele 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
+run_tree
+if echo "$OUT" | grep 'sans appelant machine' | grep -qF "zzmodele" && ! echo "$OUT" | grep 'sans appelant machine' | grep -qF "u1"; then
+  echo "    [T44] ✓ K12 la ligne « sans appelant machine » liste le model, jamais un user"
+else
+  TK_OK=0; echo "    [T44] ✗ K12 ligne « sans appelant machine » : $OUT"
+fi
+# T44e — revue deux axes tour 2 (2026-10-06, N-02, N-13) : chaque garde ajoutée a une fixture dont le verdict bascule.
+OY=$'policy:\n\tallow_implicit_invocation: false'
+oy_cas 8 1 "tabulation en indentation" "tabulation en indentation -> refus (non interprétable)"
+OY='interface:
+  policy:
+    allow_implicit_invocation: false'
+oy_cas 9 1 "cle policy: absente ou en double" "policy: imbriquée sous un autre bloc (indentation > 0) -> refus"
+OY='policy:
+  allow_implicit_invocation: false
+policy:
+  autre: 1'
+oy_cas 10 1 "cle policy: absente ou en double" "deux clés policy: -> refus"
+OY='policy:
+  autre:
+    allow_implicit_invocation: false'
+oy_cas 11 1 "absent ou en double sous policy:" "allow_implicit_invocation seulement en petit-enfant de policy: -> refus"
+mk_tree t44e1; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [l'"'"'x, u1] # precharge\n' 'Agent.'
+run_tree; tk_cas 1 "agents/ag.md (prechargement)" "M-02 une apostrophe de mot n'ouvre pas de chaîne (u1 reste lu malgré le commentaire)"
+mk_tree t44e2; mk_user u1 'u1 # skill'; mk_cmd x.md 'La commande lance le skill u1 maintenant.'
+run_tree; tk_cas 1 "user-invoked appele par commands/x.md" "M-02 name: u1 # skill — l'identité lue sans le commentaire (arête commande)"
+mk_tree t44e3; mk_sk a a 'vf-invocation: model # classe\n'; mk_cmd x.md 'commande de fixture'
+run_tree; tk_cas 0 "! vf-invocation invalide" "N-13 vf-invocation: model # classe — une seule lecture du frontmatter, aucun faux rouge"
+mk_tree t44e4; mk_user u1 u1; mk_cmd x.md 'sans rapport'
+sed 's/^vf-invocation: user$/vf-invocation: user # classe/; s/^disable-model-invocation: true$/disable-model-invocation: true # x/' "$TREE/skills/u1/SKILL.md" > "$TREE/n.md" && mv "$TREE/n.md" "$TREE/skills/u1/SKILL.md"
+run_tree; tk_cas 0 "! disable-model-invocation" "N-13 user # classe + disable-model-invocation: true # x — aucun faux rouge"
+# K16b / K16c / K22 : dossier de module et AGENT.md en lien symbolique non suivis ; dossiers cachés et *-references non lus comme appelants
+mkdir -p "$WORK/realmod"; printf -- '---\nname: realmod\ndescription: Agent.\n---\nRoute vers u1.\n' > "$WORK/realmod/AGENT.md"
+mk_tree t44e5; mk_user u1 u1; mk_cmd x.md 'sans rapport'; ln -s "$WORK/realmod" "$TREE/modlink"
+run_tree; tk_cas 0 "-" "K16b dossier de module en lien symbolique non suivi"
+mk_tree t44e6; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/modl"; ln -s "$WORK/realmod/AGENT.md" "$TREE/modl/AGENT.md"
+run_tree; tk_cas 0 "-" "K16c AGENT.md en lien symbolique non suivi"
+mk_tree t44e7; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/.cache"; cp "$WORK/realmod/AGENT.md" "$TREE/.cache/AGENT.md"
+run_tree; tk_cas 0 "-" "K22a dossier caché non lu comme appelant"
+mk_tree t44e8; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/x-references"; cp "$WORK/realmod/AGENT.md" "$TREE/x-references/AGENT.md"
+run_tree; tk_cas 0 "-" "K22b dossier *-references non lu comme appelant"
+mk_tree t44e9; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/modok"; cp "$WORK/realmod/AGENT.md" "$TREE/modok/AGENT.md"
+run_tree; tk_cas 1 "modok/AGENT.md (agent)" "K16/K22 témoin : le même AGENT.md sous un dossier de module ordinaire EST un appelant"
+if [ "$TK_OK" -eq 1 ]; then
+  ok "T44 revue W1 (M-01..M-04) : identité sans name:, commentaires YAML, valeur résolue openai.yaml, gardes d'arêtes (K12, K14-K18)"
+else
+  ko "T44 (voir détails ci-dessus)"
+fi
+
+# ---------- MUT-INV1 à MUT-INV5 — mutation rouge de la classe d'invocation (QUAL-01) ----------------
+# Chaque contrôle neuf est neutralisé UNE fois (motif fixe unique du gate, refus « MOTIF AMBIGU OU
+# ABSENT » sinon — le helper n'est jamais assoupli) ; le MÊME fixture est joué contre le gate
+# original et contre le mutant : le rc bascule ET le jeton de refus n'est présent que du côté rouge.
+# La trace de chaque mutant dit assertion, attendu, obtenu — un mutant non tué la porte en KO.
+mut_inv() { # <id> <motif> <remplacement> <mode avec|sans|absent> <rc_mutant_attendu> <rc_original_attendu> <jeton> <cas>
+  local id="$1" mode="$4" rcm_att="$5" rco_att="$6" jeton="$7" cas="$8"
+  make_gate_mutant "$id" "$2" "$3" || return 0
+  local m="$MUT_DIR/check-skills.sh" out_m out_o rc_m rc_o args
+  case "$mode" in
+    avec)   args=(--strict "--skills-dir=$TREE/skills" "--callers-root=$TREE") ;;
+    sans)   args=(--strict "--skills-dir=$TREE/skills") ;;
+    absent) args=(--strict "--skills-dir=$TREE/skills" "--callers-root=$WORK/racine-absente-xyz") ;;
+  esac
+  out_m="$(bash "$m" "${args[@]}" 2>&1)"; rc_m=$?
+  out_o="$(bash "$CHECK" "${args[@]}" 2>&1)"; rc_o=$?
+  local rouge vert
+  if [ "$rco_att" -ne 0 ]; then rouge="$out_o"; vert="$out_m"; else rouge="$out_m"; vert="$out_o"; fi
+  if [ "$rc_m" -eq "$rcm_att" ] && [ "$rc_o" -eq "$rco_att" ] \
+     && printf '%s' "$rouge" | grep -qF -- "$jeton" && ! printf '%s' "$vert" | grep -qF -- "$jeton"; then
+    okmut "$id" "$rc_m" "$rcm_att" "$rc_o" "$rco_att" "assertion « $cas » ; jeton « $jeton » présent côté rouge, absent côté vert ; attendu mutant=$rcm_att original=$rco_att ; obtenu mutant=$rc_m original=$rc_o"
+  else
+    komut "$id" "$cas" "mutant rc=$rcm_att, original rc=$rco_att, jeton « $jeton » côté rouge seulement" "mutant rc=$rc_m, original rc=$rc_o ; sortie rouge : $(printf '%s' "$rouge" | head -c 300)"
+  fi
+}
+
+# INV1 — valeur de vf-invocation (T34) : « auto » refusé par l'original, accepté par le mutant
+mk_tree mut-inv1; mk_sk a a 'vf-invocation: auto\ndisable-model-invocation: true\n'; mk_cmd x.md 'commande de fixture'
+mut_inv INV1 "errors.extend(valider_invocation(" "pass  # MUT-INV1" sans 0 1 "vf-invocation invalide" "T34 vf-invocation: auto"
+# INV2 — arête commande vers un user (T36) : refusée par l'original, acceptée par le mutant
+mk_tree mut-inv2; mk_user u1 u1; mk_cmd x.md 'La commande lance le skill u1 puis rend la main.'
+mut_inv INV2 "errors.extend(controler_aretes(" "pass  # MUT-INV2" avec 0 1 "user-invoked appele par commands/x.md" "T36 user nommé par commands/x.md"
+# INV3 — racine d'arêtes absente (T40a) : INDETERMINE rc 3 par l'original, vert à vide (rc 0) par le mutant
+mk_tree mut-inv3; mk_sk a a 'vf-invocation: model\n'
+mut_inv INV3 "if not appelants_trouves:" "if False:  # MUT-INV3" absent 0 3 "ARETES-ABSENTES" "T40a racine d'arêtes absente"
+# INV4 — équivalent Codex (T38) : user niché sans openai.yaml refusé par l'original, accepté par le mutant
+mk_tree mut-inv4; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_cmd x.md 'sans rapport'
+mut_inv INV4 "errors.extend(controler_codex(" "pass  # MUT-INV4" avec 0 1 "user-invoked niche sans agents/openai.yaml" "T38 user niché sans openai.yaml"
+# INV5 — filtre d'outillage Skill (T36) : l'agent sans Skill qui cite en prose passe (rc 0) ; tout agent compté outillé -> rc 1
+mk_tree mut-inv5; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\n' 'Utilise le skill u1 en prose, sans outil Skill.'
+mut_inv INV5 'if not agent_outille_skill(ap["fm"]):' "if False:  # MUT-INV5" avec 1 0 "user-invoked appele par agents/ag.md" "T36 agent tools: Read, Bash qui cite u1 en prose"
+
+# K12..K18, M01..M03 — corrections de la revue W1 (2026-10-06). Même helper : mutant à une ligne, motif
+# unique, jeton de refus côté rouge seulement. Les fixtures sont celles de T44, rejouées contre le mutant.
+mk_tree mut-k15; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag_mod modk ag.md 'tools: Read, Bash\nskills: [u1]\n' 'Agent.'
+mut_inv K15 'cibles += [("agent", p) for p in lister_md(os.path.join(dp, "agents"))]' "pass  # MUT-K15" avec 0 1 "modk/agents/ag.md" "K15 agent sous {module}/agents/ non découvert"
+mk_tree mut-k17; mk_user vf-dev vf-dev; mk_cmd x.md 'La commande lance vf-dev-manager puis rend la main.'
+mut_inv K17 'return re.compile(r"(?<![A-Za-z0-9_-])" + re.escape(nom)' 'return re.compile(r"(?<![A-Za-z0-9_-])" + re.escape(nom))' avec 1 0 "user-invoked appele par commands/x.md" "K17 borne droite supprimée (vf-dev / vf-dev-manager)"
+mk_tree mut-k18; mk_user vf-dev vf-dev; mk_cmd x.md 'La commande lance pre-vf-dev puis rend la main.'
+mut_inv K18 'return re.compile(r"(?<![A-Za-z0-9_-])" + re.escape(nom)' 'return re.compile(r"(?<![A-Za-z0-9_])" + re.escape(nom) + r"(?![A-Za-z0-9_-])")' avec 1 0 "user-invoked appele par commands/x.md" "K18 tiret admis comme borne gauche (pre-vf-dev)"
+mk_tree mut-k16; mk_user u1 u1; mk_cmd x.md 'sans rapport'; printf 'La commande lance u1.\n' > "$TREE/vraie-commande.md"; ln -s "$TREE/vraie-commande.md" "$TREE/commands/lien.md"
+mut_inv K16 "if n.endswith('.md') and os.path.isfile(p) and not os.path.islink(p):" "if n.endswith('.md') and os.path.isfile(p):" avec 1 0 "user-invoked appele par commands/lien.md" "K16 commande en lien symbolique suivie"
+mk_tree mut-k14; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: True\n'; mk_oy a 'policy:
+  allow_implicit_invocation: false'; mk_cmd x.md 'sans rapport'
+mut_inv K14 'return isinstance(v, str) and v.strip().lower() == "true"' 'return isinstance(v, str) and v.strip() == "true"' avec 1 0 "vf-invocation: user sans disable-model-invocation: true" "K14 est_vrai sensible à la casse"
+mk_tree mut-k12; mk_user u1 u1; mk_sk zzmodele zzmodele 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
+if make_gate_mutant K12 'if fm.get("vf-invocation") != "user" and nom and not aretes.get(rel):' 'if nom and not aretes.get(rel):'; then
+  OUT_M="$(bash "$MUT_DIR/check-skills.sh" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1 | grep 'sans appelant machine')"
+  OUT_O="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1 | grep 'sans appelant machine')"
+  if echo "$OUT_M" | grep -qF "u1" && ! echo "$OUT_O" | grep -qF "u1" && echo "$OUT_O" | grep -qF "zzmodele"; then
+    okmut K12 0 0 0 0 "assertion « T44 K12 ligne sans appelant » ; « u1 » (user) présent dans la ligne du mutant, absent de l'original ; attendu original sans u1 ; obtenu mutant avec u1"
+  else
+    komut K12 "la ligne « sans appelant machine » ne liste jamais un user" "mutant: u1 listé ; original: zzmodele listé, u1 non" "mutant=[$OUT_M] original=[$OUT_O]"
+  fi
+fi
+mk_tree mut-m01; mk_user u1 u1; sans_name u1; mk_cmd x.md 'La commande lance le skill u1 maintenant.'
+mut_inv M01 'dossier = os.path.basename(os.path.dirname(os.path.abspath(chemin)))' 'dossier = None' avec 1 1 "user-invoked appele par commands/x.md" "M-01 repli sur le nom du dossier supprimé"
+mk_tree mut-m02; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: u1 # precharge\n' 'Agent.'
+mut_inv M02 'if commentaires:' 'if False:  # MUT-M02' avec 0 1 "agents/ag.md (prechargement)" "M-02 commentaire de fin de ligne lu comme valeur"
+mk_tree mut-m03a; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a 'policy:
+  allow_implicit_invocation: yes'; mk_cmd x.md 'sans rapport'
+mut_inv M03a 'if vals[0].lower() != "false":' 'if False:  # MUT-M03a' avec 0 1 "valeur resolue" "M-03 valeur non booléenne acceptée"
+mk_tree mut-m03b; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a 'policy:
+  allow_implicit_invocation: false
+  allow_implicit_invocation: true'; mk_cmd x.md 'sans rapport'
+mut_inv M03b 'if len(vals) != 1:' 'if len(vals) < 1:  # MUT-M03b' avec 0 1 "en double" "M-03 doublon accepté (la première valeur gagne)"
+mk_tree mut-m03c; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a 'policy:
+  allow_implicit_invocation: false # note'; mk_cmd x.md 'sans rapport'
+mut_inv M03c 'vals.append(sans_commentaire_yaml(m.group(1).strip()).strip(chr(34) + chr(39)))' 'vals.append(m.group(1).strip().strip(chr(34) + chr(39)))' avec 1 0 "valeur resolue" "M-03 commentaire de fin de ligne non exclu"
+
+# Revue tour 3 (M3-02) : la garde « lien symbolique » de openai.yaml a son mutant — la cible du lien est conforme.
+mk_tree mut-sg; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_cmd x.md 'sans rapport'
+printf 'policy:\n  allow_implicit_invocation: false\n' > "$TREE/vrai-openai.yaml"; mkdir -p "$TREE/skills/a/agents"
+ln -s "$TREE/vrai-openai.yaml" "$TREE/skills/a/agents/openai.yaml"
+mut_inv SG 'if os.path.isfile(oy) and not os.path.islink(oy):' 'if os.path.isfile(oy):  # MUT-SG' avec 0 1 "fichier absent, illisible ou lien symbolique" "M3-02 openai.yaml conforme derrière un lien symbolique accepté"
+
+# Revue deux axes tour 2 (N-01, N-02, N-05, N-13) — mêmes helpers ; chaque garde neuve a son mutant.
+mk_tree mut-k4b; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'skills:\n  - u1\n' 'Agent précharge u1.'
+mut_inv K4b 'liste.append(("prechargement", ap["rel"]))' 'liste.append(("agent", ap["rel"]))' avec 1 1 "agents/ag.md (prechargement)" "K4b famille préchargement renommée « agent » (même rc, jeton propre au skill jugé)"
+mk_tree mut-k4c; mk_user u1 u1; mk_cmd x.md 'La commande lance le skill u1 puis rend la main.'
+mut_inv K4c 'liste.append(("commande", ap["rel"]))' 'liste.append(("agent", ap["rel"]))' avec 1 1 "commands/x.md (commande)" "K4c famille commande renommée « agent » (même rc, jeton propre au skill jugé)"
+mk_tree mut-k4d; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Skill\n' 'Route vers u1.'
+mut_inv K4d 'liste.append(("agent", ap["rel"]))' 'liste.append(("prechargement", ap["rel"]))' avec 1 1 "agents/ag.md (agent)" "K4d famille agent renommée « prechargement » (même rc, jeton propre au skill jugé)"
+mk_tree mut-k12b; mk_user u1 u1; mk_sk zzmodele zzmodele 'vf-invocation: model\n'; mk_cmd x.md 'sans rapport'
+if make_gate_mutant K12b 'noms.add(nom)' 'pass  # MUT-K12b'; then
+  OUT_M="$(bash "$MUT_DIR/check-skills.sh" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1 | grep 'sans appelant machine')"
+  OUT_O="$(bash "$CHECK" --strict --skills-dir="$TREE/skills" --callers-root="$TREE" 2>&1 | grep 'sans appelant machine')"
+  if echo "$OUT_O" | grep -qF "zzmodele" && ! echo "$OUT_M" | grep -qF "zzmodele"; then
+    okmut K12b 0 0 0 0 "assertion « T44 K12 ligne sans appelant liste le model » ; « zzmodele » (nom absent de tout texte constant) présent à l'original, absent du mutant"
+  else
+    komut K12b "la ligne « sans appelant machine » liste le model sans appelant" "original: zzmodele listé ; mutant: zzmodele absent" "mutant=[$OUT_M] original=[$OUT_O]"
+  fi
+fi
+OY='interface:
+  policy:
+    allow_implicit_invocation: false'
+mk_tree mut-m03g; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a "$OY"; mk_cmd x.md 'sans rapport'
+mut_inv M03g 'policies = [i for i, (ind, c) in enumerate(lignes) if ind == 0 and re.match(r"^policy\s*:", c)]' 'policies = [i for i, (ind, c) in enumerate(lignes) if re.match(r"^policy\s*:", c)]' avec 0 1 "cle policy: absente ou en double" "M-03 policy: acceptée à n'importe quelle indentation"
+OY='policy:
+  allow_implicit_invocation: false
+policy:
+  autre: 1'
+mk_tree mut-m03a; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a "$OY"; mk_cmd x.md 'sans rapport'
+mut_inv M03a2 'if len(policies) != 1:' 'if len(policies) < 1:' avec 0 1 "cle policy: absente ou en double" "M-03 deux clés policy: acceptées (la première gagne)"
+OY='policy:
+  autre:
+    allow_implicit_invocation: false'
+mk_tree mut-m03c2; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a "$OY"; mk_cmd x.md 'sans rapport'
+mut_inv M03c2 'if ind == indent_enfant:' 'if ind >= indent_enfant:' avec 0 1 "absent ou en double sous policy:" "M-03 tout descendant de policy: compté comme enfant direct"
+OY=$'policy:\n\tallow_implicit_invocation: false'
+mk_tree mut-m03f; mk_sk a a 'vf-invocation: user\ndisable-model-invocation: true\n'; mk_oy a "$OY"; mk_cmd x.md 'sans rapport'
+mut_inv M03f 'if "\t" in l[:len(l) - len(l.lstrip())]:' 'if False:  # MUT-M03f' avec 1 1 "tabulation en indentation" "M-03 tabulation en indentation acceptée (même rc, cause de refus perdue)"
+mk_tree mut-m02b; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: ["autre # pas un commentaire", u1]\n' 'Agent.'
+mut_inv M02b 'elif c in (chr(34), chr(39)) and (i == 0 or val[i - 1] in " \t[,"):' 'elif False:  # MUT-M02b' avec 1 1 "agents/ag.md (prechargement)" "M-02 guillemets ignorés par le retrait de commentaire (# entre guillemets lu comme commentaire)"
+mk_tree mut-m02h; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mk_ag ag.md 'tools: Read, Bash\nskills: [l'"'"'x, u1] # precharge\n' 'Agent.'
+mut_inv M02h 'elif c in (chr(34), chr(39)) and (i == 0 or val[i - 1] in " \t[,"):' 'elif c in (chr(34), chr(39)):' avec 1 1 "agents/ag.md (prechargement)" "M-02 une apostrophe de mot ouvre une chaîne (le commentaire n'est plus retiré)"
+mk_tree mut-m02e; mk_user u1 'u1 # skill'; mk_cmd x.md 'La commande lance le skill u1 maintenant.'
+mut_inv M02e 'fm = parse_frontmatter(text, commentaires=True)' 'fm = parse_frontmatter(text)' avec 0 1 "user-invoked appele par commands/x.md" "M-02/N-13 frontmatter d'un skill lu sans retrait du commentaire (identité « u1 # skill »)"
+mk_tree mut-n13; mk_sk a a 'vf-invocation: model # classe\n'; mk_cmd x.md 'commande de fixture'
+mut_inv N13 'fm = parse_frontmatter(text, commentaires=True)' 'fm = parse_frontmatter(text)' sans 1 0 "vf-invocation invalide" "N-13 vf-invocation: model # classe — deux définitions de la valeur du champ"
+mk_tree mut-k16b; mk_user u1 u1; mk_cmd x.md 'sans rapport'; ln -s "$WORK/realmod" "$TREE/modlink"
+mut_inv K16b 'if os.path.islink(dp) or not os.path.isdir(dp):' 'if not os.path.isdir(dp):' avec 1 0 "user-invoked appele par modlink/AGENT.md" "K16b dossier de module en lien symbolique suivi"
+mk_tree mut-k16c; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/modl"; ln -s "$WORK/realmod/AGENT.md" "$TREE/modl/AGENT.md"
+mut_inv K16c 'if os.path.isfile(ag) and not os.path.islink(ag):' 'if os.path.isfile(ag):' avec 1 0 "user-invoked appele par modl/AGENT.md" "K16c AGENT.md en lien symbolique suivi"
+mk_tree mut-k22a; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/.cache"; cp "$WORK/realmod/AGENT.md" "$TREE/.cache/AGENT.md"
+mut_inv K22a "if d.startswith('.') or d.endswith('-references'):" "if d.endswith('-references'):" avec 1 0 "user-invoked appele par .cache/AGENT.md" "K22a dossier caché lu comme appelant"
+mk_tree mut-k22b; mk_user u1 u1; mk_cmd x.md 'sans rapport'; mkdir -p "$TREE/x-references"; cp "$WORK/realmod/AGENT.md" "$TREE/x-references/AGENT.md"
+mut_inv K22b "if d.startswith('.') or d.endswith('-references'):" "if d.startswith('.'):" avec 1 0 "user-invoked appele par x-references/AGENT.md" "K22b dossier *-references lu comme appelant"
 
 # ---------- MUT-DR3 — appel ecart_nature_marqueurs neutralisé (pass) -------------------------------
 if make_gate_mutant DR3 "warnings.extend(ecart_nature_marqueurs(" "pass  # MUT-DR3"; then

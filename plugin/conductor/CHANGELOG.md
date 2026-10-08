@@ -1,8 +1,48 @@
 # Changelog — conductor
 
-## [Non publié] — 2026-09-30 (check-overlaps.sh — present() ajoute une résolution par name: incarné)
+## [v1.47.0] — 2026-10-06 (classe d'invocation des skills et défaillance observée, Phase 41.4)
 
-**Patch** (correctif de détection) :
+**Minor** (gates durcis, POCK-07, POCK-08) :
+
+- **`scripts/check-skills.sh --callers-root=`** (POCK-07, P414-D-01 à D-03) : chaque `SKILL.md` déclare
+  `vf-invocation: user | model` ; un skill non classé rougit ; un skill `user` appelé par une
+  commande, un préchargement, un agent outillé `Skill` ou un autre skill `user` rougit ; un `user`
+  porte `disable-model-invocation: true` et, s'il est niché, l'équivalent Codex jugé sur la valeur
+  résolue de `policy.allow_implicit_invocation` (doublon, mauvais parent, valeur non booléenne ou
+  forme en flux refusés) ; racine d'arêtes illisible = INDÉTERMINÉ (rc 3). L'identité d'un skill est
+  son `name:` (à défaut son dossier), la valeur YAML est lue commentaire de fin de ligne exclu. Suite
+  `test-check-skills.sh` : T33 à T44, 126 cas, 41 lignes « TUE » (MUT-INV1 à 5, K4b-d, K12 à K18,
+  M01 à M03, MUT-SG : un `openai.yaml` conforme derrière un lien symbolique reste refusé).
+- **`scripts/check-ajout-retrait.sh`** (POCK-08, P414-D-04) : le trailer `Ajout-Retrait:` exige un
+  troisième segment `— défaillance : {fait daté}` (≥ 10 caractères non blancs, date ISO calendaire ou
+  SHA hexadécimal de 7 à 40 caractères mêlant chiffre et lettre ; dernière occurrence) ; sans lui il ne
+  couvre rien. Un `SKILL.md` ajouté sous `plugin/` est un ajout surveillé ; le plancher de 6
+  littéraux d'un glob ignore les classes de caractères. Consultatif en CI, `--strict` 0/1/2
+  inchangé. Suite : 83 cas, 29 lignes « TUE ». Le message de refus de la défaillance dit la règle du SHA.
+- **Skills du module** (`vf-calibrate`, `vf-new-lab`, `vf-notify`, `vf-split-planning`, `vf-update`) :
+  `vf-invocation: model`.
+
+## [v1.46.0] — 2026-10-01 (sobriété de méthode, Phase 41.3)
+
+**Minor** (nouveaux gates et hook) :
+
+- **`scripts/guard-fin-de-geste.sh`** (nouveau hook `Stop`, SOBR-07) : bloque la fin d'un geste tant
+  qu'un rangement attribué à la session reste à faire ; coupe-circuit visible ; sortie JSON valide
+  même sans `jq` ni `python3`. Suite `tests/test-guard-fin-de-geste.sh`. **N'agit que dans un lab
+  armé** : la garde (Stop et `--snapshot`) ne fait rien tant que la racine git ne porte pas
+  `.planning/.fin-de-geste-armed` ; elle s'arme par cette sentinelle (arbitrage Samuel, AskUserQuestion
+  session principale, 2026-10-01 : installée en scope user, elle bloquait sinon dans tous les dépôts).
+- **`scripts/check-method-budget.sh`** (SOBR-01/02/06/08) : budgets étendus au BACKLOG, à l'index de
+  mémoire et au ROADMAP, avec plafonds de prose ; `--auto` archive seul au-delà du budget, trace le
+  déplacement dans `.planning/archives/INDEX.tsv`, réversible depuis le blob ; constate branches,
+  stash et branches distantes de l'auteur seulement. Suite étendue (24 mutants MU + 3 MW tués).
+- **`scripts/check-ajout-retrait.sh`** (nouveau, SOBR-05, consultatif) : un ajout à la méthode
+  (gate, garde, mémoire d'agent, ADR, règle de `CLAUDE.md`) sans trailer `Ajout-Retrait:` lève un
+  `::warning::`, jamais un échec. Suite `tests/test-check-ajout-retrait.sh` (cinq mutants).
+- **`scripts/check-blueprints.sh`** (SOBR-03) : ne balaie plus `.claude/worktrees/`.
+- **`hooks/hooks.json`** : câble le hook `Stop` de fin de geste et son instantané de référence (`--snapshot`) au démarrage de session.
+
+**Patch** (contribution externe #119) :
 
 - **`scripts/check-overlaps.sh`, `present()`, cas par défaut** — un agent local n'était détecté que
   par son nom de fichier (`$AGENTS_DIR/$ref.md`), jamais par le `name:` de son frontmatter. Un
@@ -16,8 +56,7 @@
   fichier ne devient invisible par cet ajout. Suite `tests/test-check-overlaps.sh` étendue de 16 à
   25 cas : T17 (reproduction), T18 (correspondance exacte), T19 (lecture confinée au frontmatter),
   T20-T23 (formes YAML valides du `name:` : guillemets doubles, guillemets simples, BOM, CRLF),
-  T24-T25 (gardes de non-régression sur la résolution par nom de fichier). Numéro de version laissé
-  aux mainteneurs (pas de bump dans cette entrée : contribution externe, `CONTRIBUTING.md`).
+  T24-T25 (gardes de non-régression sur la résolution par nom de fichier).
 
 ## [v1.45.1] — 2026-09-29 (correctif : `popd` contournait le verrou de driver)
 

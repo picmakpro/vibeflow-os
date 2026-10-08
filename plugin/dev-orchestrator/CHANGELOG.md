@@ -1,5 +1,55 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.27.0] — 2026-10-06 (emprunts Pocock : cadrage, revue, frontière de phase, Phase 41.4)
+
+**Minor** (comportements neufs, POCK-01 à POCK-04, POCK-06) :
+
+- **`references/mission-flow.md` §Pattern F, frontière de questions** (POCK-01, P414-D-08) : un cadrage
+  pose toute sa frontière en un tour (une recommandation par question, un fait ne se demande jamais à
+  l'humain, `AskUserQuestion` groupé par zone) ; fin de cadrage = frontière vide. Une seule voix :
+  `head-governance.md` §1, `intent-routing.md`, `AGENT.md` (« une question courte » resserré en
+  renvoi) et `vf-dev-manager.md` y renvoient au lieu de la recopier (P414-D-12).
+- **`references/head-governance.md` §3** (POCK-03) : frontière de phase à la sortie d'un geste ou d'une
+  mission (continuer, clear, handoff, sous-agent, compact) et ligne « moins cher la prochaine fois » ;
+  le décompte devient « sept contrôles » (E1 à E7). E3 y est décrit comme le gate réel (merge-danger call conforme, MANQUE ou
+  INDÉTERMINÉ).
+- **`agents/vf-reviewer.md`, `references/mission-contracts.md` §Étage revue** (POCK-04, P414-D-05,
+  P414-D-07, P414-D-20, P414-D-22) : revue à deux axes, Standards et Spec (contre le PLAN de
+  l'étape), en parallèle, un `review_path` distinct par axe. Règle finale, écrite une seule fois au
+  contrat : un axe est `passed` sans finding bloquant ni majeur (seuil d'un axe, D-20) ; un axe Spec
+  `skipped` (revue d'implémentation d'une mission design, sans PLAN, nœud `revue:écran-X`) sort de la
+  conjonction, le statut global se calcule sur les axes jugés ; aucun axe jugé, ou un axe attendu non
+  produit, ou un PLAN attendu absent du brief (`revue-N`/`join-N`) → `blocked` (D-22, ratifiée par
+  Samuel). Remplace le verdict unique « PASS / correctifs requis ». La sonde réelle est jouée dans
+  les deux sens et consignée dans `41.4-SONDE-POCK04.md` (P414-D-07 étendue par P414-D-21) ; limite :
+  elle exerce la définition de l'agent du worktree, pas l'agent installé.
+- **`scripts/check-mission-exit.sh` E3** (POCK-06, P414-D-11) : lit la section `## Merge-danger call`
+  du corps de PR (Porte sens unique / double sens, Rayon d'explosion d'au moins 10 caractères) ;
+  issues SAIN, MANQUE nommé, INDÉTERMINÉ. Contenu discriminé : section absente, répétée (titre exact
+  en double), Porte absente, invalide, répétée ou contradictoire ; seuil compté en caractères, blancs
+  exclus ; une section dans un bloc de code ou un commentaire HTML n'existe pas ; une erreur de
+  l'analyseur tombe en INDÉTERMINÉ, jamais lue « Porte absente ».
+- **`references/docs-flow.md`** (POCK-02) : régime du glossaire de domaine du lab (`docs/_transverse/`),
+  exception « pendant le cadrage ».
+- **Tests** : `test-dev-orchestrator.sh` T39 à T43 (ancres de doctrine, 39 mutants discriminants) ;
+  `test-check-mission-exit.sh` 135 assertions (cas 44 à 75), 35 lignes « TUE » (mutants E3a à E3z,
+  E3x, E3x2, E15, E18, contrôle de portabilité awk). E3 donne le même verdict sous BWK awk et sous
+  mawk : la fence indentée de 0 à 3 espaces se retire par une boucle explicite (`strip3`), jamais par
+  un quantificateur répété ni un intervalle ; la ligne « Rayon d'explosion » hors section et « Porte »
+  invalide + valide rendent MANQUE (cas 73, 74).
+- **`skills/vf-dev`, `skills/vf-auto`** : `vf-invocation: model` (POCK-07, classe vérifiée par
+  `check-skills.sh --callers-root`).
+
+## [v2.26.0] — 2026-10-01 (contrôle E7 de fin de mission, Phase 41.3)
+
+**Minor** (nouveau contrôle de sortie) :
+
+- **`scripts/check-mission-exit.sh` E7** (SOBR-07) : contrôle en delta du rangement de la mission
+  (budgets de méthode, archivage `--auto`) ; issues MANQUE / SAIN / INDÉTERMINÉ. Suite
+  `tests/test-check-mission-exit.sh` étendue.
+- **`references/mission-flow.md`** : la clôture de mission déclenche l'archivage automatique et le
+  contrôle E7 ; `agents/vf-dev-manager.md` aligné.
+
 ## [v2.25.0] — 2026-09-28 (budgets de méthode à la clôture de mission)
 
 **Minor** (nouvelle étape de clôture) :

@@ -28,6 +28,26 @@
 #   T7 — Bloquant 2 (D-38) : parseur YAML frontmatter réel. T7a : description: > (scalaire
 #        replié, cas réel plugin/conductor/AGENT.md) -> texte complet, jamais '">"' littéral.
 #        T7b : styles |, >-, |- tous parsés (littéral vs replié, clip vs strip).
+#   T8 — chemin d'appel à lien symbolique : node résout le lien pour import.meta.url mais pas pour
+#        process.argv[1], donc isMainModule() (comparaison des deux) rendait false et le CLI sortait
+#        rc=0 sans rien écrire ni dire. T8a : par un lien, même .toml et même digest que par le
+#        chemin physique. T8b : register-codex-agent.sh lancé par un lien pose réellement le .toml.
+#        T8c : l'import du module par un lien n'exécute pas le CLI (la garde isMainModule tient
+#        encore). Le lien est créé par la suite (rouge sur Linux comme sur macOS) ; SKIP propre
+#        si `ln -s` est indisponible.
+#   T9 — « rôle posé » n'est annoncé que si le .toml a été écrit PAR CE RUN. Une seule variable
+#        change : le convertisseur placé à côté d'une copie du registrar. T9a : convertisseur qui
+#        sort 0 sans rien écrire, aucun .toml préexistant -> refus (rc != 0), pas de « rôle posé ».
+#        T9b : même convertisseur, mais un .toml d'une pose précédente existe (un simple test
+#        d'existence passerait à tort) -> refus, l'ancien .toml reste intact. T9c (témoin) :
+#        convertisseur réel, .toml périmé présent -> rôle posé et contenu renouvelé. T9d :
+#        convertisseur qui crée un fichier VIDE -> refus aussi (un fichier présent ne suffit pas).
+#        Le refus se reconnaît à son message « sans écrire de rôle » : le mv qui suit la garde
+#        échouerait de toute façon sur un fichier absent, mais avec un autre message.
+#        Conséquence : pour le fichier absent (T9a, T9b) la garde par mv protège seule du faux succès,
+#        et la garde de contenu (-s) n'a d'effet observable que sur T9d (fichier vide). Les étiquettes
+#        ko distinguent « faux succès » (code 0 ou « rôle posé » affiché) de « refus au mauvais
+#        message » (code non nul, message attendu absent).
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -305,6 +325,151 @@ EOF
 run_style_case 'literal' '|'
 run_style_case 'folded-strip' '>-'
 run_style_case 'literal-strip' '|-'
+
+# ---------------------------------------------------------------------------
+# T8 — chemin d'appel qui traverse un lien symbolique : même sortie que par le chemin physique.
+# Une seule variable change par rapport à un appel direct : le chemin passé à node. Le lien est
+# posé sous $WORKDIR par la suite elle-même (aucune dépendance au /tmp de la machine).
+# ---------------------------------------------------------------------------
+LINK_DIR="$WORKDIR/lien-adaptateur"
+if ln -s "$ADAPTER_DIR" "$LINK_DIR" 2>/dev/null && [ -L "$LINK_DIR" ]; then
+  PHYS_TOML="$WORKDIR/t8-physique.toml"
+  LINK_TOML="$WORKDIR/t8-via-lien.toml"
+  PHYS_DIGEST="$(node "$CONVERTER" "$FIXTURE_AGENT" --out "$PHYS_TOML" 2>&1 1>/dev/null)"
+  LINK_DIGEST="$(node "$LINK_DIR/agent-to-codex.mjs" "$FIXTURE_AGENT" --out "$LINK_TOML" 2>&1 1>/dev/null)"
+  LINK_STATUS=$?
+  if [ "$LINK_STATUS" -eq 0 ] && [ -s "$LINK_TOML" ] && [ -s "$PHYS_TOML" ] \
+    && cmp -s "$PHYS_TOML" "$LINK_TOML" \
+    && [ -n "$LINK_DIGEST" ] && [ "$LINK_DIGEST" = "$PHYS_DIGEST" ]; then
+    ok "T8a : conversion par un chemin à lien symbolique -> même .toml et même digest que par le chemin physique"
+  else
+    ko "T8a : conversion par lien symbolique muette ou différente (status=$LINK_STATUS, .toml présent=$([ -s "$LINK_TOML" ] && echo oui || echo non), digest lien='$LINK_DIGEST')"
+  fi
+
+  # T8b — de bout en bout : register-codex-agent.sh lancé par le lien pose réellement le rôle.
+  # Le défaut d'origine annonçait « rôle posé » (rc=0) sans écrire le fichier.
+  CH_LINK="$WORKDIR/codex-home-lien"
+  OUT_REG="$(bash "$LINK_DIR/register-codex-agent.sh" "$FIXTURE_AGENT" --codex-home "$CH_LINK" 2>&1)"
+  STATUS_REG=$?
+  if [ "$STATUS_REG" -eq 0 ] && grep -qF 'name = "vf-content-writer"' "$CH_LINK/agents/vibeflow/vf-content-writer.toml" 2>/dev/null; then
+    ok "T8b : register-codex-agent.sh lancé par un lien symbolique -> rôle .toml réellement posé"
+  else
+    ko "T8b : register par lien symbolique : status=$STATUS_REG, .toml présent=$([ -f "$CH_LINK/agents/vibeflow/vf-content-writer.toml" ] && echo oui || echo non), sortie='$OUT_REG'"
+  fi
+
+  # T8c — la garde tient : importer le module par le lien (sans qu'il soit le script lancé) ne
+  # déclenche pas le CLI. Un correctif qui rendrait isMainModule() toujours vrai afficherait
+  # l'usage et sortirait en 2.
+  IMPORTER="$WORKDIR/t8-importeur.mjs"
+  printf "import { convertAgentToCodexRole } from '%s/agent-to-codex.mjs';\nconsole.log(typeof convertAgentToCodexRole);\n" "$LINK_DIR" > "$IMPORTER"
+  IMPORT_OUT="$(node "$IMPORTER" 2>&1)"
+  IMPORT_STATUS=$?
+  if [ "$IMPORT_STATUS" -eq 0 ] && [ "$IMPORT_OUT" = "function" ]; then
+    ok "T8c : import du module par un lien symbolique -> aucune exécution du CLI (export disponible, aucune sortie parasite)"
+  else
+    ko "T8c : import par lien symbolique : status=$IMPORT_STATUS, sortie='$IMPORT_OUT' (attendu : 'function' seul, rc 0)"
+  fi
+else
+  skip "T8 : ln -s indisponible sur ce poste, chemin à lien symbolique non testable ici"
+fi
+
+# ---------------------------------------------------------------------------
+# T9 — le registrar n'annonce « rôle posé » que si le .toml a été écrit par CE run. Copie du
+# registrar posée à côté d'un convertisseur : SCRIPT_DIR en dérive CONVERTER, donc seul le
+# convertisseur change entre T9a/T9b (bouchon : sort 0, n'écrit rien) et T9c (convertisseur réel).
+# ---------------------------------------------------------------------------
+T9_ROLE_REL="agents/vibeflow/vf-content-writer.toml"
+# Base RÉSOLUE (pwd -P) : le convertisseur réel de T9c ne doit pas dépendre du défaut de lien
+# symbolique que T8 couvre (sur macOS le mktemp -d passe par le lien /var -> /private/var).
+T9_BASE="$(cd "$WORKDIR" && pwd -P)"
+T9_STUB_DIR="$T9_BASE/t9-bouchon"
+T9_REAL_DIR="$T9_BASE/t9-reel"
+mkdir -p "$T9_STUB_DIR" "$T9_REAL_DIR"
+cp "$REGISTER" "$T9_STUB_DIR/register-codex-agent.sh"
+cp "$REGISTER" "$T9_REAL_DIR/register-codex-agent.sh"
+cp "$CONVERTER" "$T9_REAL_DIR/agent-to-codex.mjs"
+printf 'process.exit(0);\n' > "$T9_STUB_DIR/agent-to-codex.mjs"
+
+# Diagnostic des rouges de T9, pour que l'étiquette dise ce qui s'est passé : faux succès (code 0
+# ou « rôle posé » affiché), refus au mauvais message (code non nul sans « sans écrire de rôle »),
+# ou refus correct mais effet de bord inattendu sur les fichiers.
+t9_diag() {
+  local status="$1" out="$2" err="$3"
+  if [ "$status" -eq 0 ] || printf '%s%s' "$out" "$err" | grep -qF 'rôle posé'; then
+    echo "faux succès"
+  elif ! printf '%s' "$err" | grep -qF 'sans écrire de rôle'; then
+    echo "refus au mauvais message (code non nul, « sans écrire de rôle » absent)"
+  else
+    echo "refus attendu mais effet de bord inattendu sur les fichiers"
+  fi
+}
+
+# T9a — aucun .toml préexistant : le bouchon n'écrit rien, le registrar doit refuser.
+CH_T9A="$WORKDIR/codex-home-t9a"
+OUT_T9A="$(bash "$T9_STUB_DIR/register-codex-agent.sh" "$FIXTURE_AGENT" --codex-home "$CH_T9A" 2>"$WORKDIR/t9a.err")"
+STATUS_T9A=$?
+ERR_T9A="$(cat "$WORKDIR/t9a.err")"
+if [ "$STATUS_T9A" -ne 0 ] \
+  && ! printf '%s%s' "$OUT_T9A" "$ERR_T9A" | grep -qF 'rôle posé' \
+  && printf '%s' "$ERR_T9A" | grep -qF '[register-codex-agent]' \
+  && printf '%s' "$ERR_T9A" | grep -qF 'sans écrire de rôle' \
+  && [ ! -e "$CH_T9A/$T9_ROLE_REL" ]; then
+  ok "T9a : convertisseur qui n'écrit rien -> refus explicite sur stderr (rc=$STATUS_T9A), aucun « rôle posé », aucun .toml"
+else
+  ko "T9a : $(t9_diag "$STATUS_T9A" "$OUT_T9A" "$ERR_T9A") (status=$STATUS_T9A, stdout='$OUT_T9A', stderr='$ERR_T9A', .toml présent=$([ -e "$CH_T9A/$T9_ROLE_REL" ] && echo oui || echo non))"
+fi
+
+# T9b — un .toml d'une pose précédente existe : un simple test d'existence passerait à tort.
+CH_T9B="$WORKDIR/codex-home-t9b"
+mkdir -p "$CH_T9B/agents/vibeflow"
+printf 'ANCIEN-ROLE-POSE-PAR-UN-RUN-PRECEDENT\n' > "$CH_T9B/$T9_ROLE_REL"
+OUT_T9B="$(bash "$T9_STUB_DIR/register-codex-agent.sh" "$FIXTURE_AGENT" --codex-home "$CH_T9B" 2>"$WORKDIR/t9b.err")"
+STATUS_T9B=$?
+ERR_T9B="$(cat "$WORKDIR/t9b.err")"
+if [ "$STATUS_T9B" -ne 0 ] \
+  && ! printf '%s%s' "$OUT_T9B" "$ERR_T9B" | grep -qF 'rôle posé' \
+  && printf '%s' "$ERR_T9B" | grep -qF '[register-codex-agent]' \
+  && printf '%s' "$ERR_T9B" | grep -qF 'sans écrire de rôle' \
+  && [ "$(cat "$CH_T9B/$T9_ROLE_REL")" = "ANCIEN-ROLE-POSE-PAR-UN-RUN-PRECEDENT" ]; then
+  ok "T9b : .toml périmé présent + convertisseur qui n'écrit rien -> refus (rc=$STATUS_T9B), pas de « rôle posé », ancien .toml intact"
+else
+  ko "T9b : $(t9_diag "$STATUS_T9B" "$OUT_T9B" "$ERR_T9B") avec un ancien .toml présent (status=$STATUS_T9B, stdout='$OUT_T9B', stderr='$ERR_T9B', contenu='$(cat "$CH_T9B/$T9_ROLE_REL" 2>/dev/null)')"
+fi
+
+# T9c — témoin : même scénario (.toml périmé présent), convertisseur réel -> pose et renouvelle.
+CH_T9C="$WORKDIR/codex-home-t9c"
+mkdir -p "$CH_T9C/agents/vibeflow"
+printf 'ANCIEN-ROLE-POSE-PAR-UN-RUN-PRECEDENT\n' > "$CH_T9C/$T9_ROLE_REL"
+OUT_T9C="$(bash "$T9_REAL_DIR/register-codex-agent.sh" "$FIXTURE_AGENT" --codex-home "$CH_T9C" 2>&1)"
+STATUS_T9C=$?
+if [ "$STATUS_T9C" -eq 0 ] \
+  && printf '%s' "$OUT_T9C" | grep -qF "rôle posé : $CH_T9C/$T9_ROLE_REL" \
+  && grep -qF 'name = "vf-content-writer"' "$CH_T9C/$T9_ROLE_REL" \
+  && ! grep -qF 'ANCIEN-ROLE' "$CH_T9C/$T9_ROLE_REL" \
+  && ! ls "$CH_T9C/agents/vibeflow" | grep -qv '^vf-content-writer\.toml$'; then
+  ok "T9c : convertisseur réel + .toml périmé -> « rôle posé », contenu renouvelé, aucun fichier temporaire laissé"
+else
+  ko "T9c : pose légitime cassée (status=$STATUS_T9C, sortie='$OUT_T9C', dossier='$(ls "$CH_T9C/agents/vibeflow" 2>/dev/null | tr '\n' ' ')')"
+fi
+
+# T9d — convertisseur qui crée un fichier VIDE puis sort 0 : le mv réussirait, seule la garde de
+# contenu (fichier non vide) empêche d'annoncer un rôle qui n'en est pas un.
+T9_EMPTY_DIR="$T9_BASE/t9-vide"
+mkdir -p "$T9_EMPTY_DIR"
+cp "$REGISTER" "$T9_EMPTY_DIR/register-codex-agent.sh"
+printf "import { writeFileSync } from 'node:fs';\nwriteFileSync(process.argv[process.argv.indexOf('--out') + 1], '');\n" > "$T9_EMPTY_DIR/agent-to-codex.mjs"
+CH_T9D="$WORKDIR/codex-home-t9d"
+OUT_T9D="$(bash "$T9_EMPTY_DIR/register-codex-agent.sh" "$FIXTURE_AGENT" --codex-home "$CH_T9D" 2>"$WORKDIR/t9d.err")"
+STATUS_T9D=$?
+ERR_T9D="$(cat "$WORKDIR/t9d.err")"
+if [ "$STATUS_T9D" -ne 0 ] \
+  && ! printf '%s%s' "$OUT_T9D" "$ERR_T9D" | grep -qF 'rôle posé' \
+  && printf '%s' "$ERR_T9D" | grep -qF 'sans écrire de rôle' \
+  && [ ! -e "$CH_T9D/$T9_ROLE_REL" ]; then
+  ok "T9d : convertisseur qui crée un fichier vide -> refus (rc=$STATUS_T9D), aucun « rôle posé », aucun .toml vide laissé"
+else
+  ko "T9d : $(t9_diag "$STATUS_T9D" "$OUT_T9D" "$ERR_T9D") avec un fichier vide (status=$STATUS_T9D, stdout='$OUT_T9D', stderr='$ERR_T9D', .toml présent=$([ -e "$CH_T9D/$T9_ROLE_REL" ] && echo oui || echo non))"
+fi
 
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ] && exit 0 || exit 1

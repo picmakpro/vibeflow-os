@@ -79,6 +79,16 @@
 #         §1 de head-governance.md ne portent AUCUN `gsd-*` dans leur colonne d'équipe/Mind
 #         (le geste gsd-* reste celui de l'équipe dispatchée), vf-coder.md nomme vibeflow-head
 #         comme dispatcheur possible, et la détection est prouvée DISCRIMINANTE par mutation.
+#   T39 — Phase 41.4, POCK-01 (P414-D-12) : frontière de questions de mission-flow.md §Pattern F,
+#         renvois de head-governance.md, intent-routing.md et vf-dev-manager.md ; ancres épinglées
+#         (présence de doctrine, pas preuve de comportement), chacune prouvée par mutation.
+#   T40 — POCK-03 (P414-D-09) : frontière de phase de head-governance.md (cinq branches dans l'ordre,
+#         « Moins cher la prochaine fois »), contrôle E7 et décompte des contrôles ; mutations.
+#   T42 — POCK-02 (P414-D-08) : glossaire du lab dans docs-flow.md §Famille savoir ; mutations.
+#   T41 — POCK-04 (P414-D-07) : contrat à deux axes de revue présent dans vf-reviewer.md ET dans
+#         mission-contracts.md, et dit au pilotage (§Pattern E) ; test statique, mutations.
+#   T43 — POCK-06 (P414-D-11) : forme du merge-danger call dans mission-contracts.md §Isolation de
+#         branche (côté contrat ; le gate E3 qui la lit a sa propre suite) ; mutations.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -6987,6 +6997,320 @@ fi
 rm -rf "$T38_TMPDIR"
 
 [ "$t38_ok" -eq 1 ] && ok "T38 : contrôle de profondeur (B1/B2) présent sur les 4 fichiers de doctrine, détection prouvée discriminante par mutation"
+
+# ---------------------------------------------------------------------------
+# T39, T40, T42 — Phase 41.4 (emprunts Pocock : POCK-01 frontière de questions, POCK-03 frontière de
+# phase, POCK-02 glossaire du lab ; décisions P414-D-08, P414-D-09, P414-D-11, P414-D-12).
+#
+# CE QUE CES TESTS GARDENT, ET CE QU'ILS NE GARDENT PAS. Une discipline de jugement n'a pas de test
+# de comportement réalisable ici : on épingle sa PRÉSENCE (des ancres littérales, dans la section
+# qui les porte), pas le fait qu'un agent s'y conforme. Une ablation silencieuse de la discipline
+# rougit la suite ; un agent qui l'ignorerait malgré sa présence, non — preuve de comportement :
+# sonde réelle jouée par le manager, hors de ce fichier.
+#
+# DISCRIMINANCE. Chaque ancre est prouvée par mutation sur une COPIE sous mktemp -d (suivie par
+# vf_tmp_track) : la copie privée de l'ancre doit être refusée par la MÊME fonction de contrôle, la
+# copie identique à l'original est refusée (mutation sans effet), et le témoin positif (le fichier
+# réel accepté) est exigé avant de conclure qu'un mutant est « tué ». Les ablations des sections
+# bornées sont elles-mêmes bornées à la section : une ancre présente ailleurs dans le fichier ne
+# sauve pas le mutant — c'est ce qui prouve que le contrôle lit bien SA section.
+# ---------------------------------------------------------------------------
+T414_TMP="$(mktemp -d)"; vf_tmp_track "$T414_TMP"
+
+# Zone d'un fichier : du premier titre qui matche <début> (inclus) jusqu'au premier titre qui matche
+# <fin> (exclu) ; fin vide = fin du fichier ; début '^' = fichier entier. Sortie PLIÉE : sauts de ligne
+# et blancs multiples ramenés à un blanc, donc insensible au wrap à 100 colonnes (défaut B6).
+t414_zone() { # <fichier> <début ERE> [<fin ERE>]
+  [ -f "$1" ] || return 0
+  awk -v s="$2" -v e="${3:-}" '
+    !on { if ($0 ~ s) { on = 1; print }; next }
+    e != "" && $0 ~ e { exit }
+    { print }
+  ' "$1" | tr '\n' ' ' | tr -s '[:space:]' ' '
+}
+
+# Imprime chaque littéral absent de <zone> ; rc 1 si au moins un manque.
+t414_missing() { # <zone> <littéral>...
+  local z="$1" lit miss=0; shift
+  for lit in "$@"; do
+    case "$z" in *"$lit"*) ;; *) printf '« %s » ' "$lit"; miss=1 ;; esac
+  done
+  [ "$miss" -eq 0 ]
+}
+
+# rc 0 si chaque littéral est présent ET si leurs premières occurrences suivent l'ordre donné.
+t414_order() { # <zone> <littéral>...
+  local z="$1" lit pre pos prev=-1; shift
+  for lit in "$@"; do
+    case "$z" in *"$lit"*) ;; *) printf 'absent « %s »' "$lit"; return 1 ;; esac
+    pre="${z%%"$lit"*}"; pos=${#pre}
+    if [ "$pos" -le "$prev" ]; then
+      printf 'hors ordre « %s » (position %s, après %s)' "$lit" "$pos" "$prev"; return 1
+    fi
+    prev=$pos
+  done
+}
+
+# Mutation par ablation : toute occurrence littérale de <littéral> est remplacée par un témoin, dans
+# la zone <début>..<fin> si elle est donnée (borne ESSENTIELLE : voir l'en-tête), sinon partout.
+t414_ablate() { # <source> <destination> <littéral> [<début ERE> [<fin ERE>]]
+  local dst_TMP="$2"
+  awk -v lit="$3" -v zs="${4:-}" -v ze="${5:-}" '
+    BEGIN { on = (zs == ""); n = length(lit) }
+    { if (!on && zs != "" && !done && $0 ~ zs) on = 1
+      else if (on && zs != "" && ze != "" && $0 ~ ze) { on = 0; done = 1 }
+      if (!on) { print; next }
+      line = $0; out = ""
+      while ((i = index(line, lit)) > 0) { out = out substr(line, 1, i - 1) "@@"; line = substr(line, i + n) }
+      print out line }
+  ' "$1" > "$dst_TMP"
+}
+
+# Mutation d'ordre : la première ligne de la zone qui porte <à déplacer> est retirée de sa place et
+# réinsérée juste avant la première ligne de la zone qui porte <devant>.
+t414_move_before() { # <source> <destination> <début ERE> <à déplacer> <devant>
+  local dst_TMP="$2"
+  awk -v zs="$3" -v mv="$4" -v bf="$5" '
+    NR == FNR { if (!st && $0 ~ zs) st = FNR
+                if (st && !mn && index($0, mv)) { mn = FNR; ml = $0 }
+                if (st && !bn && index($0, bf)) bn = FNR
+                next }
+    FNR == mn { next }
+    FNR == bn { print ml }
+    { print }
+  ' "$1" "$1" > "$dst_TMP"
+}
+
+# Verdict d'un mutant : témoin positif exigé, copie identique refusée, puis la fonction de contrôle
+# doit REFUSER le mutant. Un mutant accepté est une assertion qui ne garde rien.
+t414_mutant() { # <étiquette> <fonction de contrôle> <original> <mutant>
+  local label="$1" fn="$2" orig="$3" mut="$4" trace
+  if ! "$fn" "$orig" >/dev/null 2>&1; then
+    ko "$label : témoin positif absent (le contrôle refuse déjà le fichier réel)"; return
+  fi
+  if cmp -s "$orig" "$mut"; then
+    ko "$label : mutant identique à l'original (la mutation n'a rien mordu)"; return
+  fi
+  if "$fn" "$mut" >/dev/null 2>&1; then
+    ko "$label NON DISCRIMINANTE : le mutant est encore accepté"
+  else
+    trace="$("$fn" "$mut" 2>&1 | head -c 110)"
+    ok "$label (DISCRIMINANT) : mutant refusé — $trace"
+  fi
+}
+
+# ---- T39 : frontière de questions (POCK-01, P414-D-12) --------------------------------------
+T39_MF="$REFS_DIR/mission-flow.md"
+T39_GOV="$REFS_DIR/head-governance.md"
+T39_ROUTE="$REFS_DIR/intent-routing.md"
+T39_FLOW_ZS='^## Pattern F'
+T39_FLOW_ZE='^## Pattern D'
+T39_GOV_ZS='Questions à l.humain [(]POCK-01[)]'
+T39_GOV_ZE='^## '
+T39_FLOW_ANCRES=(
+  'Frontière de questions (POCK-01)'
+  'Un tour = toute la frontière'
+  'Une recommandation par question'
+  "Un fait ne se demande jamais à l'humain"
+  'AskUserQuestion groupé par zone'
+  'Fin de cadrage = frontière vide'
+  '**Vocabulaire**'
+)
+# L'ancienne formule de question brève est construite en deux morceaux : cette ligne de test ne doit
+# pas être elle-même la cible d'un balayage de prose.
+T39_OLD="question "; T39_OLD+="courte"
+
+t39_flow() { # <mission-flow.md>
+  local z; z="$(t414_zone "$1" "$T39_FLOW_ZS" "$T39_FLOW_ZE")"
+  [ -n "$z" ] || { printf 'section « Pattern F » introuvable ou vide'; return 1; }
+  local out; out="$(t414_missing "$z" "${T39_FLOW_ANCRES[@]}")" || { printf 'ancres absentes de §Pattern F : %s' "$out"; return 1; }
+}
+t39_gov() { # <head-governance.md>
+  local z; z="$(t414_zone "$1" "$T39_GOV_ZS" "$T39_GOV_ZE")"
+  [ -n "$z" ] || { printf 'paragraphe « Questions à l'"'"'humain (POCK-01) » introuvable'; return 1; }
+  local out; out="$(t414_missing "$z" 'Pattern F')" || { printf 'renvoi absent du paragraphe : %s' "$out"; return 1; }
+}
+t39_route() { # <intent-routing.md>
+  local z strip n lit='Pattern F'; z="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf 'intent-routing.md absent ou vide'; return 1; }
+  case "$z" in *"$T39_OLD"*) printf 'ancienne formule de question brève encore présente'; return 1 ;; esac
+  strip="${z//"$lit"/}"; n=$(( (${#z} - ${#strip}) / ${#lit} ))
+  [ "$n" -ge 2 ] || { printf '%s renvoi(s) « Pattern F » (au moins 2 attendus)' "$n"; return 1; }
+}
+t39_mgr() { # <vf-dev-manager.md>
+  local z; z="$(t414_zone "$1" '^')"
+  local out; out="$(t414_missing "$z" 'frontière de questions')" || { printf 'renvoi absent : %s' "$out"; return 1; }
+}
+
+t39_out="$(t39_flow "$T39_MF")" && ok "T39 (a) mission-flow.md §Pattern F porte la frontière de questions (${#T39_FLOW_ANCRES[@]} ancres, bornées à la section)" \
+  || ko "T39 (a) mission-flow.md §Pattern F : attendu — ${#T39_FLOW_ANCRES[@]} ancres de la frontière de questions ; obtenu — $t39_out"
+t39_out="$(t39_gov "$T39_GOV")" && ok "T39 (b) head-governance.md : « Questions à l'humain (POCK-01) » renvoie à Pattern F" \
+  || ko "T39 (b) head-governance.md : attendu — paragraphe POCK-01 renvoyant à Pattern F ; obtenu — $t39_out"
+t39_out="$(t39_route "$T39_ROUTE")" && ok "T39 (c) intent-routing.md : plus de formule de question brève, au moins 2 renvois « Pattern F »" \
+  || ko "T39 (c) intent-routing.md : attendu — formule brève absente, ≥ 2 renvois Pattern F ; obtenu — $t39_out"
+t39_out="$(t39_mgr "$DEVMGR")" && ok "T39 (d) vf-dev-manager.md renvoie à la frontière de questions" \
+  || ko "T39 (d) vf-dev-manager.md : attendu — « frontière de questions » ; obtenu — $t39_out"
+# (e) garde de BUDGET, pas de discipline : ADR-029 plafonne le manager à 250 lignes avant alerte. Ce cas
+# est vert AVANT la phase comme après (le manager faisait 250 lignes à la base) : il ne garde donc pas
+# POCK-01, il garde que le renvoi ajouté n'a pas fait déborder le fichier.
+t39_lines="$(wc -l < "$DEVMGR" | tr -d ' ')"
+if [ "${t39_lines:-9999}" -le 250 ]; then
+  ok "T39 (e) budget seul, VERT AVANT ET APRÈS la phase (ne garde pas POCK-01) : vf-dev-manager.md ${t39_lines} lignes <= 250"
+else
+  ko "T39 (e) budget : attendu — vf-dev-manager.md <= 250 lignes ; obtenu — ${t39_lines}"
+fi
+
+t39_k=0
+for t39_a in "${T39_FLOW_ANCRES[@]}"; do
+  t39_k=$((t39_k+1))
+  t414_ablate "$T39_MF" "$T414_TMP/t39-flow-$t39_k.md" "$t39_a" "$T39_FLOW_ZS" "$T39_FLOW_ZE"
+  t414_mutant "T39 mutant (a) copie de mission-flow.md privée de « $t39_a »" t39_flow "$T39_MF" "$T414_TMP/t39-flow-$t39_k.md"
+done
+t414_ablate "$T39_GOV" "$T414_TMP/t39-gov-1.md" 'Pattern F' "$T39_GOV_ZS" "$T39_GOV_ZE"
+t414_mutant "T39 mutant (b) copie de head-governance.md privée du renvoi « Pattern F »" t39_gov "$T39_GOV" "$T414_TMP/t39-gov-1.md"
+t414_ablate "$T39_GOV" "$T414_TMP/t39-gov-2.md" "Questions à l'humain (POCK-01)" "$T39_GOV_ZS" "$T39_GOV_ZE"
+t414_mutant "T39 mutant (b) copie de head-governance.md privée de « Questions à l'humain (POCK-01) »" t39_gov "$T39_GOV" "$T414_TMP/t39-gov-2.md"
+# Témoin positif de l'ABSENCE : sans la réinjection de l'ancienne formule, une garde négative ne
+# prouverait rien (un négatif aveugle ne prouve pas que le canal est fermé).
+{ cat "$T39_ROUTE"; printf '%s\n' "Rien ne correspond : poser une ${T39_OLD} plutôt que de deviner."; } > "$T414_TMP/t39-route-1.md"
+t414_mutant "T39 mutant (c) copie d'intent-routing.md où l'ancienne formule de question brève est réinjectée" t39_route "$T39_ROUTE" "$T414_TMP/t39-route-1.md"
+t414_ablate "$T39_ROUTE" "$T414_TMP/t39-route-2.md" 'Pattern F'
+t414_mutant "T39 mutant (c) copie d'intent-routing.md privée de ses renvois « Pattern F »" t39_route "$T39_ROUTE" "$T414_TMP/t39-route-2.md"
+t414_ablate "$DEVMGR" "$T414_TMP/t39-mgr-1.md" 'frontière de questions'
+t414_mutant "T39 mutant (d) copie de vf-dev-manager.md privée de « frontière de questions »" t39_mgr "$DEVMGR" "$T414_TMP/t39-mgr-1.md"
+
+# ---- T40 : frontière de phase (POCK-03, P414-D-09) + contrôle E7 --------------------------------
+T40_GOV="$REFS_DIR/head-governance.md"
+T40_ZS='^[*][*]Frontière de phase [(]POCK-03[)]'
+T40_ZE='^## '
+T40_LABELS=('**continuer**' '**clear**' '**handoff**' '**sous-agent**' '**compact**')
+T40_OLD="Six "; T40_OLD+="contrôles"   # ancien décompte, construit en deux morceaux (voir T39_OLD)
+
+t40_check() { # <head-governance.md>
+  local z all out
+  z="$(t414_zone "$1" "$T40_ZS" "$T40_ZE")"; all="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf 'section « Frontière de phase (POCK-03) » introuvable ou vide'; return 1; }
+  out="$(t414_order "$z" "${T40_LABELS[@]}")" || { printf 'ordre des cinq branches : %s' "$out"; return 1; }
+  out="$(t414_missing "$z" 'en dernier' 'Moins cher la prochaine fois' 'BACKLOG')" || { printf 'absent de la section : %s' "$out"; return 1; }
+  out="$(t414_missing "$all" 'Sept contrôles' '- **E7**')" || { printf 'décompte des contrôles : %s' "$out"; return 1; }
+  case "$all" in *"$T40_OLD"*) printf 'ancien décompte « %s » encore présent' "$T40_OLD"; return 1 ;; esac
+}
+
+t40_out="$(t40_check "$T40_GOV")" && ok "T40 head-governance.md : frontière de phase (cinq branches dans l'ordre, « en dernier », « Moins cher la prochaine fois », BACKLOG), Sept contrôles et E7, ancien décompte absent" \
+  || ko "T40 head-governance.md : attendu — frontière de phase ordonnée, Sept contrôles, puce E7, ancien décompte absent ; obtenu — $t40_out"
+
+t414_move_before "$T40_GOV" "$T414_TMP/t40-order.md" "$T40_ZS" '**compact**' '**continuer**'
+t414_mutant "T40 mutant (ordre) copie où « **compact** » passe avant « **continuer** »" t40_check "$T40_GOV" "$T414_TMP/t40-order.md"
+t414_ablate "$T40_GOV" "$T414_TMP/t40-moins.md" 'Moins cher la prochaine fois' "$T40_ZS" "$T40_ZE"
+t414_mutant "T40 mutant copie privée de « Moins cher la prochaine fois »" t40_check "$T40_GOV" "$T414_TMP/t40-moins.md"
+t414_ablate "$T40_GOV" "$T414_TMP/t40-e7.md" '- **E7**'
+t414_mutant "T40 mutant copie privée de la puce « **E7** »" t40_check "$T40_GOV" "$T414_TMP/t40-e7.md"
+t414_ablate "$T40_GOV" "$T414_TMP/t40-sept.md" 'Sept contrôles'
+t414_mutant "T40 mutant copie privée de « Sept contrôles »" t40_check "$T40_GOV" "$T414_TMP/t40-sept.md"
+{ cat "$T40_GOV"; printf '%s\n' "${T40_OLD}, chacun bon marché et déterministe."; } > "$T414_TMP/t40-old.md"
+t414_mutant "T40 mutant copie où l'ancien décompte est réinjecté" t40_check "$T40_GOV" "$T414_TMP/t40-old.md"
+
+# ---- T42 : glossaire du lab (POCK-02, P414-D-08) ------------------------------------------------
+T42_DF="$REFS_DIR/docs-flow.md"
+T42_ZS='^## Famille savoir'
+T42_ZE='^## Famille entrée'
+T42_ANCRES=('Glossaire du lab (POCK-02)' 'docs/_transverse/REFERENCE.md' '## Vocabulaire' 'pendant le cadrage')
+
+t42_check() { # <docs-flow.md>
+  local z out; z="$(t414_zone "$1" "$T42_ZS" "$T42_ZE")"
+  [ -n "$z" ] || { printf 'section « Famille savoir » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T42_ANCRES[@]}")" || { printf 'ancres absentes de §Famille savoir : %s' "$out"; return 1; }
+}
+
+t42_out="$(t42_check "$T42_DF")" && ok "T42 docs-flow.md §Famille savoir : glossaire du lab (${#T42_ANCRES[@]} ancres, bornées à la section)" \
+  || ko "T42 docs-flow.md §Famille savoir : attendu — ${#T42_ANCRES[@]} ancres du glossaire ; obtenu — $t42_out"
+t42_k=0
+for t42_a in "${T42_ANCRES[@]}"; do
+  t42_k=$((t42_k+1))
+  t414_ablate "$T42_DF" "$T414_TMP/t42-$t42_k.md" "$t42_a" "$T42_ZS" "$T42_ZE"
+  t414_mutant "T42 mutant copie de docs-flow.md privée de « $t42_a » dans sa section" t42_check "$T42_DF" "$T414_TMP/t42-$t42_k.md"
+done
+
+# ---- T41 : contrat à deux axes de revue, dans l'agent ET dans le contrat (POCK-04, P414-D-07) ----
+# TEST STATIQUE de P414-D-07 : les champs du contrat (axes.standards, axes.spec, review_path,
+# conjonction, brief:plan-absent) existent dans la définition de vf-reviewer ET dans mission-contracts.md,
+# et la table de pilotage de mission-flow.md §Pattern E le dit. Il ne prouve PAS qu'un revieweur rend
+# deux axes : la preuve de comportement est la sonde réelle jouée par le manager (dossier de phase,
+# sonde-pock04/SONDE.md). Aucun item numéroté portant les trois libellés d'axes (T30-F) n'est écrit
+# dans references/ : les copies mutées vivent sous mktemp -d, hors du balayage de T30.
+T41_MC="$REFS_DIR/mission-contracts.md"
+T41_MC_ZS='^### Deux axes de revue : Standards et Spec [(]POCK-04[)]'
+T41_MC_ZE='^## '
+T41_MC_ANCRES=('axes.standards' 'axes.spec' 'conjonction' 'review_path' 'brief:plan-absent' 'P414-D-20' 'P414-D-22' 'skipped')
+T41_RV_ANCRES=('axes.standards' 'axes.spec' 'review_path')
+T41_MF="$REFS_DIR/mission-flow.md"
+T41_MF_ZS='^## Pattern E'
+T41_MF_ZE='^## Briques dormantes'
+
+t41_contracts() { # <mission-contracts.md>
+  local z out; z="$(t414_zone "$1" "$T41_MC_ZS" "$T41_MC_ZE")"
+  [ -n "$z" ] || { printf 'sous-section « Deux axes de revue » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T41_MC_ANCRES[@]}")" || { printf 'ancres absentes du contrat : %s' "$out"; return 1; }
+}
+t41_reviewer() { # <vf-reviewer.md>
+  local z out; z="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf 'vf-reviewer.md absent ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T41_RV_ANCRES[@]}")" || { printf 'champs absents de l'"'"'agent : %s' "$out"; return 1; }
+}
+t41_flow() { # <mission-flow.md>
+  local z out; z="$(t414_zone "$1" "$T41_MF_ZS" "$T41_MF_ZE")"
+  [ -n "$z" ] || { printf 'section « Pattern E » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'les deux axes sont')" || { printf 'pilotage absent de §Pattern E : %s' "$out"; return 1; }
+}
+
+t41_out="$(t41_contracts "$T41_MC")" && ok "T41 (a) mission-contracts.md : contrat à deux axes (${#T41_MC_ANCRES[@]} ancres, bornées à la sous-section)" \
+  || ko "T41 (a) mission-contracts.md : attendu — ${#T41_MC_ANCRES[@]} ancres du contrat à deux axes ; obtenu — $t41_out"
+t41_out="$(t41_reviewer "$REVIEWER_FILE")" && ok "T41 (b) vf-reviewer.md porte le même contrat (${#T41_RV_ANCRES[@]} champs)" \
+  || ko "T41 (b) vf-reviewer.md : attendu — ${#T41_RV_ANCRES[@]} champs du contrat ; obtenu — $t41_out"
+t41_out="$(t41_flow "$T41_MF")" && ok "T41 (c) mission-flow.md §Pattern E : « les deux axes sont » dans le pilotage" \
+  || ko "T41 (c) mission-flow.md §Pattern E : attendu — « les deux axes sont » ; obtenu — $t41_out"
+
+t41_k=0
+for t41_a in "${T41_MC_ANCRES[@]}"; do
+  t41_k=$((t41_k+1))
+  t414_ablate "$T41_MC" "$T414_TMP/t41-mc-$t41_k.md" "$t41_a" "$T41_MC_ZS" "$T41_MC_ZE"
+  t414_mutant "T41 mutant (a) copie de mission-contracts.md privée de « $t41_a » dans sa sous-section" t41_contracts "$T41_MC" "$T414_TMP/t41-mc-$t41_k.md"
+done
+t41_k=0
+for t41_a in "${T41_RV_ANCRES[@]}"; do
+  t41_k=$((t41_k+1))
+  t414_ablate "$REVIEWER_FILE" "$T414_TMP/t41-rv-$t41_k.md" "$t41_a"
+  t414_mutant "T41 mutant (b) copie de vf-reviewer.md privée de « $t41_a »" t41_reviewer "$REVIEWER_FILE" "$T414_TMP/t41-rv-$t41_k.md"
+done
+t414_ablate "$T41_MF" "$T414_TMP/t41-mf.md" 'les deux axes sont' "$T41_MF_ZS" "$T41_MF_ZE"
+t414_mutant "T41 mutant (c) copie de mission-flow.md privée de « les deux axes sont » dans §Pattern E" t41_flow "$T41_MF" "$T414_TMP/t41-mf.md"
+
+# ---- T43 : forme du merge-danger call, côté contrat (POCK-06, P414-D-11) ------------------------
+# Garde la PRÉSENCE de la forme exacte dans mission-contracts.md §Isolation de branche. Le gate qui la
+# LIT (E3 de check-mission-exit.sh) a sa propre suite avec mutants ; ce test garde que le contrat qui
+# la définit ne dérive pas sans que le gate le sache.
+T43_MC="$REFS_DIR/mission-contracts.md"
+T43_ZS='^## Isolation de branche'
+T43_ZE='^## Contrat'
+T43_ANCRES=('Merge-danger call (POCK-06)' '## Merge-danger call' 'Porte : sens unique' 'Porte : double sens' 'Rayon d' 'explosion')
+
+t43_check() { # <mission-contracts.md>
+  local z out; z="$(t414_zone "$1" "$T43_ZS" "$T43_ZE")"
+  [ -n "$z" ] || { printf 'section « Isolation de branche » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'Merge-danger call (POCK-06)' '## Merge-danger call' 'Porte : sens unique' 'Porte : double sens')" \
+    || { printf 'absent de §Isolation de branche : %s' "$out"; return 1; }
+  # Rayon d'explosion : « Rayon d » puis « explosion », l'apostrophe n'étant pas épinglée (droite ou typographique).
+  out="$(t414_order "$z" 'Rayon d' 'explosion')" || { printf 'ligne Rayon d'"'"'explosion : %s' "$out"; return 1; }
+}
+
+t43_out="$(t43_check "$T43_MC")" && ok "T43 mission-contracts.md §Isolation de branche : forme du merge-danger call (sens unique, double sens, Rayon d'explosion)" \
+  || ko "T43 mission-contracts.md : attendu — forme exacte du merge-danger call ; obtenu — $t43_out"
+t43_k=0
+for t43_a in "${T43_ANCRES[@]}"; do
+  t43_k=$((t43_k+1))
+  t414_ablate "$T43_MC" "$T414_TMP/t43-$t43_k.md" "$t43_a" "$T43_ZS" "$T43_ZE"
+  t414_mutant "T43 mutant copie de mission-contracts.md privée de « $t43_a » dans §Isolation de branche" t43_check "$T43_MC" "$T414_TMP/t43-$t43_k.md"
+done
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="

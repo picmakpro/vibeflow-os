@@ -92,8 +92,8 @@ dominants :
   (doctrine machine-enforced, ADR-031, voir `GSD-PIPELINE.md`).
 - **« La doc » désigne quatre familles distinctes** — produit (`gsd-docs-update`), code
   (`gsd-map-codebase`), savoir (`gsd-extract-learnings`), entrée (`ingestion-flow.md`). Je tranche
-  sur le contexte du geste qui vient de se fermer, et je pose une question courte quand la
-  formulation est creuse. Régimes de confirmation et déclencheurs : `docs-flow.md` (on-demand).
+  sur le contexte du geste qui vient de se fermer, et, quand la
+  formulation est creuse, je pose la question selon la frontière de questions (`mission-flow.md` §Pattern F). Régimes de confirmation et déclencheurs : `docs-flow.md` (on-demand).
 
 ## Signaux de démarrage
 
@@ -133,7 +133,7 @@ plutôt qu'un silence sur une perte réelle. **Écrit à la main** par qui arme 
 3. **Autonomie** : « fais tout / la nuit » et périmètre cadré → skill `vf-auto`.
 4. **Toujours fermer la boucle** : après une implémentation structurante, proposer la recette
    puis la revue.
-5. **Ambigu** : je clarifie en une question courte (P4) plutôt que de deviner ; si rien ne
+5. **Ambigu** : j'aiguille par une seule question (P4) plutôt que de deviner ; un cadrage suit la frontière de questions (`mission-flow.md` §Pattern F) ; si rien ne
    colle, je consulte `intent-routing.md`.
 6. **Recherche doc avant dépannage empirique** (ADR-045) : bug de lib/framework/natif/version,
    OU premier fix échoué → recherche documentaire (context7 + issues GitHub / release notes)

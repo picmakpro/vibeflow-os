@@ -1,0 +1,262 @@
+{
+  "nodes": [
+    {
+      "id": "discuss-414",
+      "step": "cadrage 41.4 (manager, Pattern F)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-41.4-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-414",
+      "step": "plan 41.4 (vf-coder -> gsd-plan-phase)",
+      "stage": "",
+      "deps": [
+        "discuss-414"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-41.4-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-414",
+      "step": "execution 41.4 (vf-coder -> gsd-execute-phase)",
+      "stage": "",
+      "deps": [
+        "plan-414"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/**",
+        "plugin/conductor/**",
+        "plugin/consolidator/**",
+        "plugin/*/skills/**",
+        ".planning/workstreams/fiabilite/phases/VFDO-41.4-*"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-414",
+      "step": "revue code 41.4 (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "exec-414"
+      ],
+      "scope": [
+        "plugin/**"
+      ],
+      "status": "failed"
+    },
+    {
+      "id": "nonreg-414",
+      "step": "rejeu job CI gates + decouverte complete des suites",
+      "stage": "",
+      "deps": [
+        "exec-414"
+      ],
+      "scope": [
+        "plugin/**",
+        "scripts/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire",
+      "stage": "",
+      "deps": [
+        "exec-414"
+      ],
+      "scope": [
+        "docs/**",
+        "plugin/*/README.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "pr-414",
+      "step": "push + PR (empilee sur #134)",
+      "stage": "",
+      "deps": [
+        "revue-414",
+        "nonreg-414",
+        "docs"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-w1",
+      "step": "vague 1 : plans 01-06 (gates POCK-07/08, consolidator, doctrine head/manager, glossaire, E3)",
+      "stage": "",
+      "deps": [
+        "plan-414"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/**",
+        "plugin/consolidator/**",
+        "plugin/dev-orchestrator/references/**",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md",
+        "plugin/dev-orchestrator/scripts/check-mission-exit.sh",
+        "docs/_transverse/**",
+        ".planning/BACKLOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-w2",
+      "step": "vague 2 : plans 07-08 (vf-reviewer deux axes, frontmatter 26 SKILL.md — checkpoint Q1)",
+      "stage": "",
+      "deps": [
+        "exec-w1"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/agents/vf-reviewer.md",
+        "plugin/**/SKILL.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "sonde-pock04",
+      "step": "sonde reelle POCK-04 (manager)",
+      "stage": "",
+      "deps": [
+        "exec-w2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-w3",
+      "step": "vague 3 : plans 09-10 (ci.yml, tests T39-T43)",
+      "stage": "",
+      "deps": [
+        "exec-w2"
+      ],
+      "scope": [
+        ".github/workflows/ci.yml",
+        "plugin/dev-orchestrator/tests/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-w4",
+      "step": "vague 4 : plan 11 (bumps, REQUIREMENTS, ROADMAP)",
+      "stage": "",
+      "deps": [
+        "exec-w3",
+        "sonde-pock04"
+      ],
+      "scope": [
+        "plugin/*/VERSION",
+        "plugin/*/CHANGELOG.md",
+        ".planning/workstreams/fiabilite/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-w1",
+      "step": "revue deux axes du diff vague 1",
+      "stage": "",
+      "deps": [
+        "exec-w1"
+      ],
+      "scope": [
+        "plugin/**",
+        "docs/_transverse/**"
+      ],
+      "status": "failed",
+      "review_regime": "full"
+    },
+    {
+      "id": "corr-a",
+      "step": "correction ciblee A : revue w1 (gates conductor, consolidator, E3) + fixture sonde",
+      "stage": "",
+      "deps": [
+        "exec-w1"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/check-skills.sh",
+        "plugin/conductor/scripts/check-ajout-retrait.sh",
+        "plugin/conductor/scripts/tests/**",
+        "plugin/consolidator/**",
+        "plugin/dev-orchestrator/scripts/check-mission-exit.sh",
+        "plugin/dev-orchestrator/scripts/tests/test-check-mission-exit.sh",
+        "docs/_transverse/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "corr-b",
+      "step": "correction ciblee B : doctrine dev-orchestrator (head-governance, AGENT.md, vf-dev-manager)",
+      "stage": "",
+      "deps": [
+        "exec-w3"
+      ],
+      "scope": [
+        "plugin/dev-orchestrator/references/head-governance.md",
+        "plugin/dev-orchestrator/AGENT.md",
+        "plugin/dev-orchestrator/agents/vf-dev-manager.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "corr-c",
+      "step": "correction ciblee C (tour 3, dernier) : D-20/D-22, mutants, fixtures",
+      "stage": "",
+      "deps": [
+        "corr-a",
+        "corr-b"
+      ],
+      "scope": [
+        "plugin/conductor/scripts/**",
+        "plugin/dev-orchestrator/scripts/**",
+        "plugin/dev-orchestrator/references/**",
+        "plugin/dev-orchestrator/agents/vf-reviewer.md",
+        ".github/workflows/ci.yml"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "corr-d",
+      "step": "tour 4 : rebase sur origin/main + correction ciblee D (4 majeurs + mineurs t3)",
+      "stage": "",
+      "deps": [
+        "revue-414"
+      ],
+      "scope": [
+        "plugin/**",
+        "scripts/**",
+        "docs/_transverse/**",
+        ".planning/workstreams/fiabilite/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-t4",
+      "step": "revue deux axes du diff du tour 4",
+      "stage": "",
+      "deps": [
+        "corr-d"
+      ],
+      "scope": [
+        "plugin/**",
+        "scripts/**"
+      ],
+      "status": "failed"
+    },
+    {
+      "id": "nonreg-t4",
+      "step": "rejeu job gates + suites de la phase apres tour 4",
+      "stage": "",
+      "deps": [
+        "corr-d"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ]
+}
