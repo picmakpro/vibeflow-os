@@ -13,6 +13,39 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.69.0] — 2026-10-08
+
+**Minor** (choix de la partition au démarrage d'un lab, emprunts Pocock ; release demandée par Samuel, session
+principale Claude Code, 2026-10-08 ; elle accompagne la clôture du jalon `fiabilite-v1.0`) :
+
+- **Choisir la partition du planning au démarrage d'un lab — Phase 41.2** (`conductor` v1.47.0 → v1.48.0,
+  `dev-orchestrator` v2.27.0 → v2.27.1).
+  - Nouveau skill `vf-split-planning` et commande `/vf-split-planning`. À la fin de l'initialisation d'un lab, ils
+    posent une seule question : un seul planning (le défaut) ou des sujets parallèles. Ils portent aussi la bascule
+    pour un lab déjà démarré.
+  - Création des compartiments par le moteur (`split-planning.sh`).
+  - Précondition « aucune phase en vol » vérifiée par machine (`check-planning-not-inflight.sh`).
+  - Balayage d'intégrité par sujet extrait dans une lib unique (`fanout-state-integrity.sh`).
+  - La carte d'intention route « reprends le sujet X ».
+  - Réserve : comportement de l'agent en session interactive non exercé, recette tracée. PR #130.
+- **Emprunts Pocock — Phase 41.4** (`dev-orchestrator` v2.27.0, `conductor` v1.47.0, `consolidator` v1.11.0,
+  patch pour 12 autres modules).
+  - Frontière de questions au cadrage, glossaire de domaine du lab, frontière de phase du head.
+  - Revue à deux axes (`axes.standards` / `axes.spec`) de `vf-reviewer`.
+  - Grille mécanique / jugement pour la promotion des LEARNINGS, merge-danger call obligatoire en PR de mission.
+  - Classe d'invocation `vf-invocation` sur les 26 SKILL.md, contrôlée par `check-skills.sh`.
+  - Segment `défaillance :` du trailer `Ajout-Retrait:`.
+  - Aucun skill ni agent neuf, aucune dépendance au plugin de Pocock. PR #135, mergée en `--admin` (arbitrage
+    Samuel, AskUserQuestion session principale, 2026-10-08).
+- **Correctifs externes.**
+  - `agent-to-codex.mjs` convertit aussi quand son chemin d'appel traverse un lien symbolique, et
+    `register-codex-agent.sh` n'annonce plus « rôle posé » quand rien n'a été écrit (PR #137).
+  - Le squelette d'agent de `vf-new-lab` déclare `effort` comme requis, alignement sur `check-agents.sh` (PR #129).
+- **Dépôt (non distribué)** :
+  - Manuel rattrapé jusqu'à v2.68.0, avec `check-manual.sh` en CI (PR #132).
+  - Garde de fin de geste armée sur ce dépôt (PR #128).
+  - Clôture du jalon `fiabilite-v1.0` (PR #138).
+
 ## [v2.68.0] — 2026-10-01
 
 **Minor** (sobriété de méthode, moteur de planning métier par cycles ; release demandée par Samuel,

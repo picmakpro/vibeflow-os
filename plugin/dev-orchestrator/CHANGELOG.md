@@ -1,5 +1,16 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.27.1] — 2026-10-08 (carte d'intention : choix du planning, Phase 41.2)
+
+**Patch** (routage, PR #130) :
+
+- **`references/intent-routing.md`** :
+  - « démarrer un projet » et « onboarde ce codebase » enchaînent sur `vf-split-planning` à la fin de
+    l'initialisation.
+  - Nouvelle intention : « on sera plusieurs sur ce lab / sépare le planning en sujets ».
+  - Nouvelle intention : « reprends / travaille sur le sujet X ». Le sujet X est passé explicitement dans le mandat
+    de l'équipe dispatchée (P412-D-10).
+
 ## [v2.27.0] — 2026-10-06 (emprunts Pocock : cadrage, revue, frontière de phase, Phase 41.4)
 
 **Minor** (comportements neufs, POCK-01 à POCK-04, POCK-06) :

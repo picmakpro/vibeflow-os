@@ -1,8 +1,29 @@
 # Changelog — conductor
 
-## [Non publié] — 2026-10-02 (vf-new-lab — effort aligné sur check-agents.sh)
+## [v1.48.0] — 2026-10-08 (choisir la partition du planning au démarrage d'un lab, Phase 41.2)
 
-**Patch** (correctif de documentation) :
+**Minor** (nouveau skill, deux scripts et une lib ; WSCH-01..05, PR #130) :
+
+- **`skills/vf-split-planning/SKILL.md` (neuf)**, appelé par la commande `/vf-split-planning`. À la fin de
+  l'initialisation d'un lab de code, il pose **une seule** question en langage d'usage : un seul planning (le défaut)
+  ou des sujets parallèles. Il ne la pose jamais en autonomie, et une question sautée, une réponse négative ou une
+  session non interactive donnent un planning unique. Pour un lab déjà démarré, il porte la bascule. Après la
+  partition, le sujet actif par défaut est le premier, et « reprends / travaille sur le sujet X » change de sujet
+  (P412-D-10).
+- **`scripts/split-planning.sh` (neuf)** : le geste. Les compartiments sont créés **par le moteur**
+  (`workstream create`), puis rendus conformes par ses propres verbes. VibeFlow n'écrit aucun frontmatter. Sortie JSON
+  gelée (`mode`, `subject`, `state`).
+- **`scripts/check-planning-not-inflight.sh` (neuf)** : la précondition d'ADR-069 vérifiée par machine. Le gate
+  refuse la partition tant qu'une phase est en vol, et son refus nomme le champ du disque lu (codes 0/1/2/64, 8 mutants
+  tués).
+- **`scripts/fanout-state-integrity.sh` (neuf, lib sourcée)** : le balayage d'intégrité par sujet, qui n'a plus
+  qu'une définition. La CI et la suite WSCH-04 l'appellent telle quelle ; plus aucune copie inline dans `ci.yml`.
+- **`skills/vf-new-lab/SKILL.md`** : une fois `gsd-new-project` terminé, il renvoie à `vf-split-planning`. Il ne pose
+  pas la question lui-même.
+- **Réserve (WSCH-01)** : le contrat écrit du skill est prouvé par sa suite, mais le comportement de l'agent en session
+  interactive n'a pas été exercé. La recette est tracée au BACKLOG du dépôt.
+
+**Patch** (correctif de documentation, PR #129) :
 
 - **`skills/vf-new-lab/SKILL.md`, squelette d'agent (Phase 5) et énumération du Gate C** —
   le squelette présentait `effort: <optionnel : low|medium|high|xhigh|max>`, alors que
