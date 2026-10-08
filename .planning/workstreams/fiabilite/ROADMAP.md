@@ -94,6 +94,7 @@
 - [x] Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED 2026-09-23, demande Samuel session principale : « généralise le remède, ça ne doit plus se reproduire »)
 - [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage) — exécutée 2026-10-02, PR en revue (non mergée)
 - [x] Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED 2026-09-29, arbitrage Samuel AskUserQuestion session principale ; dernière phase avant la clôture du jalon) — complete 2026-09-30
+- [ ] Phase 41.4: Emprunts Pocock — disciplines de cadrage, de revue et de skills (INSERTED 2026-10-06, arbitrage Samuel session principale ; demande de Willy ; dernière phase avant la clôture du jalon, après la 41.3)
 - [ ] Phase 51: Snapshot de planning avant compaction (PreCompact) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 52: Télémétrie d'usage des skills et agents, et coût de mission (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 53: Apprentissage adossé à l'observation — preuves dans la mémoire vivante (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
@@ -1554,7 +1555,7 @@ qu'elle a créé.
 
 **Requirements**: SOBR-01 à SOBR-08
 **Depends on:** aucune ; en parallèle possible de la 41.2 (fichiers disjoints). Le jalon se clôt
-après la 41.2 et la 41.3 ; les plans 41-07 à 41-13 sont confiés à Willy et ne bloquent plus la clôture (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
+après la 41.2, la 41.3 et la 41.4 (insérée le 2026-10-06) ; les plans 41-07 à 41-13 sont confiés à Willy et ne bloquent plus la clôture (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
 **Arbitrages (Samuel, AskUserQuestion session principale, 2026-09-29)** : phase dans `fiabilite`
 avant clôture ; les quatre principes (un ajout un retrait, budgets étendus, nettoyage en fin de
 geste, prose plafonnée) ; **appliquer à ce dépôt d'abord**, généraliser ensuite.
@@ -1587,6 +1588,72 @@ Plans:
 - [x] 41.3-02-PLAN.md — vague 1 : appliquer ici, outillage (`check-method-budget` constate, `check-blueprints`, `.worktreeinclude`) — SOBR-01, SOBR-03
 - [x] 41.3-03-PLAN.md — vague 2 : généraliser les budgets et l'archivage automatique, installeur — SOBR-03, SOBR-06, SOBR-08
 - [x] 41.3-04-PLAN.md — vague 2 : ADR des quatre principes, release adverse, ajout/retrait, fin de geste — SOBR-04, SOBR-05, SOBR-07
+
+### Phase 41.4: Emprunts Pocock — disciplines de cadrage, de revue et de skills (INSERTED)
+
+> **Origine** : demande de Willy (« regarder le plugin de Matt Pocock pour améliorer vf-dev »),
+> relayée par Samuel en session principale le 2026-10-06. Étude livrée le même jour
+> (`.planning/research/2026-10-06-pocock-skills-etude.md`, PR #134) : `mattpocock/skills` v1.3.1,
+> 38 skills, 0 agent, 0 hook, posé *contre* GSD par construction. Le pack ne s'installe pas
+> (un seul catalogue tiers, décision du 2026-08-28) ; on transcrit sept disciplines.
+> **Arbitrage Samuel (session principale, 2026-10-06)** : tous les points positifs de l'étude,
+> une phase courte, avant la clôture du jalon ; superpowers reste, aucune dépendance au plugin.
+
+**Goal**: Le head, le manager et le reviewer tiennent les disciplines de Pocock qui nous
+manquaient — frontière de questions au cadrage, glossaire de domaine du lab, frontière de phase
+à la sortie d'un geste, revue à deux axes, grille de tri d'une rétro, merge-danger call en PR —
+et les skills VibeFlow déclarent machine-vérifiablement qui peut les invoquer.
+
+**Requirements**: POCK-01 à POCK-08
+**Depends on:** 41.3 (close) ; aucun fichier commun avec la 41.2. Dernière phase avant la
+clôture de `fiabilite-v1.0`. Touche `dev-orchestrator` (références du head, `vf-dev-manager`,
+`vf-reviewer`), `conductor` (glossaire de lab, gate des skills), `consolidator` (grille de rétro).
+**Success Criteria** (what must be TRUE):
+
+  1. Un cadrage mené par le head ou un panel du manager pose ses questions **par frontière**
+     (prérequis réglés seulement), chacune avec une recommandation, et ne demande jamais un fait
+     qu'un sous-agent peut établir — rendu AskUserQuestion groupé par zone, jamais en texte
+     (POCK-01).
+  2. Un lab dispose d'un glossaire de domaine (`docs/_transverse/`) que le cadrage alimente et
+     que les briques lisent ; `docs-flow.md` en fixe le régime (POCK-02).
+  3. À la sortie d'un geste ou d'une mission, le head applique l'arbre de la frontière de phase
+     (continuer → clear → handoff → sous-agent → compact en dernier) et se demande ce qui, dans
+     l'environnement, aurait rendu la mission suivante moins chère (POCK-03).
+  4. `vf-reviewer` rend deux axes séparés — Standards et Spec (fidélité au plan de l'étape) —
+     jamais re-rankés en un verdict unique ; prouvé sur un diff qui passe l'un et rate l'autre
+     (POCK-04).
+  5. La promotion d'un LEARNING trie « mécanique → check déterministe, jugement → standard » et
+     signale un dépôt sans garde-fou ; un no-op d'instruction est un finding (POCK-05).
+  6. Une PR ouverte par la chaîne de ship porte son merge-danger call : porte à sens unique ou
+     double sens, rayon d'explosion (POCK-06).
+  7. Chaque skill VibeFlow est classé user-invoked ou model-invoked par un champ vérifié par
+     machine ; un skill user porte `disable-model-invocation: true` et, s'il est niché,
+     l'équivalent Codex ; un gate rougit sur un skill non classé ou sur un user-invoked qui en
+     appelle un autre (POCK-07). *Reformulé le 2026-10-06, P414-D-18 (arbitrage Samuel,
+     AskUserQuestion session principale, 2026-10-06).*
+  8. Un ajout de skill, gate ou règle cite une **défaillance observée** (session, geste, commit
+     daté) ; `check-ajout-retrait` l'exige en plus de SOBR-05 et signale tout ajout qui ne la cite
+     pas — consultatif en CI (P414-D-04), le refus reste un geste de relecture (POCK-08).
+     *Reformulé le 2026-10-06, P414-D-19 (arbitrage Samuel, AskUserQuestion session principale,
+     2026-10-06).*
+  9. **Sobriété** (SOBR-05) : chaque ajout de doctrine désigne ce qu'il remplace ou resserre ;
+     aucun skill neuf, aucun agent neuf.
+
+**Plans:** 11/11 plans exécutés (2026-10-06) ; phase ni vérifiée ni clôturée ; sonde réelle POCK-04 jouée dans les deux sens et consignée dans `41.4-SONDE-POCK04.md`
+
+Plans:
+
+- [x] 41.4-01-PLAN.md — vague 1 : gate de classe d'invocation des skills (`check-skills.sh --callers-root`, `vf-invocation`) — POCK-07
+- [x] 41.4-02-PLAN.md — vague 1 : segment « défaillance : » obligatoire et SKILL.md surveillés (`check-ajout-retrait.sh`) — POCK-08
+- [x] 41.4-03-PLAN.md — vague 1 : grille de rétro mécanique/jugement et findings (`detect-promotions.sh`, `promotion.md`) — POCK-05
+- [x] 41.4-04-PLAN.md — vague 1 : frontière de questions (§Pattern F) et frontière de phase (`head-governance.md` §3) — POCK-01, POCK-03
+- [x] 41.4-05-PLAN.md — vague 1 : glossaire du lab (`docs/_transverse/` scaffoldé ici, régime dans `docs-flow.md`) — POCK-02
+- [x] 41.4-06-PLAN.md — vague 1 : merge-danger call au contrat et contrôlé par E3 — POCK-06
+- [x] 41.4-07-PLAN.md — vague 2 : revue à deux axes Standards/Spec + fixture de la sonde réelle (jouée par le manager) — POCK-04
+- [x] 41.4-08-PLAN.md — vague 2 : arbitrage Q1/Q2 puis classe posée sur les 26 SKILL.md — POCK-07
+- [x] 41.4-09-PLAN.md — vague 3 : étape CI propre de check-skills, commentaire CI corrigé (revue `@picmakpro`) — POCK-07, POCK-08
+- [x] 41.4-10-PLAN.md — vague 3 : tests statiques d'ancres T39-T43 avec mutations — POCK-01, 02, 03, 04, 06
+- [x] 41.4-11-PLAN.md — vague 4 : bumps de modules (jamais la racine), ledger, critère 7, dogfood des gardes — POCK-01 à POCK-08
 
 ## 📋 Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (Phases 51-56)
 

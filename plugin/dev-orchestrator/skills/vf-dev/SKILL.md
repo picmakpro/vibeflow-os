@@ -1,6 +1,7 @@
 ---
 name: vf-dev
 description: "Utiliser quand la demande de dev ne désigne aucun geste précis — « aide-moi à avancer », « pilote-moi ça », « fais ce qu'il faut », « occupe-toi de ce projet », « démêle cette histoire ». Incarne l'agent vibeflow-head, qui détecte l'intention, gouverne et lance l'équipe (vf-dev-manager, vf-coder) qui porte le geste. Invocable par l'utilisateur ET par l'agent en autonomie."
+vf-invocation: model
 ---
 
 # vf-dev — Point d'entrée générique

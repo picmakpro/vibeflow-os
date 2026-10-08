@@ -21,7 +21,7 @@ la seule affaire d'`intent-routing.md` (ADR-057).
 |---|---|---|
 | **produit** | `gsd-docs-update` | 6 docs toujours-on (README, ARCHITECTURE, GETTING-STARTED, DEVELOPMENT, TESTING, CONFIGURATION) + 3 conditionnelles (API si routes, CONTRIBUTING si open source, DEPLOYMENT si config de déploiement), une review queue des docs manuscrites, la détection de trous. **CHANGELOG jamais régénéré.** |
 | **code** | `gsd-map-codebase` | `.planning/codebase/` — 7 documents produits par 4 mappeurs parallèles. |
-| **savoir** | `gsd-extract-learnings` ; `gsd-graphify` (conditionnelle : graphify.enabled) — refusée Phase 24, voir §Famille savoir | LEARNINGS.md d'étape et graphe de connaissance. |
+| **savoir** | `gsd-extract-learnings` ; `gsd-graphify` (conditionnelle : graphify.enabled) — refusée Phase 24, voir §Famille savoir | LEARNINGS.md d'étape et graphe de connaissance, et glossaire du lab (`docs/_transverse/REFERENCE.md` §Vocabulaire). |
 | **entrée** | `gsd-ingest-docs`, `gsd-import` | specs/ADR/PRD → `.planning/` — doctrinée ailleurs, voir plus bas. |
 
 ## Famille produit — gsd-docs-update
@@ -57,6 +57,15 @@ entier — `--fast` et la cartographie complète continuent, eux, de fonctionner
 surprises — dérivé de PLAN, SUMMARY, VERIFICATION, UAT et STATE. Cette famille se déclenche
 **après** une vérification ou une clôture d'étape — jamais pendant, le matériau qu'elle synthétise
 n'existe pas encore.
+
+**Glossaire du lab (POCK-02)** — slot : la section `## Vocabulaire` de `docs/_transverse/REFERENCE.md`,
+posée par `scaffold-docs.sh` (aucun fichier neuf, P414-D-08). Seule **exception** de cette famille à
+« jamais pendant » : le glossaire est alimenté **pendant le cadrage**, dont il est le matériau — un
+terme flou challengé ou un mot surchargé résolu donne une entrée `terme — définition — source`.
+Lu par les briques via le pointeur `@docs/_transverse/` que `vf-new-lab` pose dans le `CLAUDE.md` du
+lab (ADR-042) ; un lab sans ce pointeur : le manager cite le chemin dans le digest de l'étape qui
+touche ce vocabulaire. Aucune entrée sans source, aucune réécriture en masse : le glossaire suit le
+cadrage, il ne le devance pas (puce Vocabulaire : `mission-flow.md` §Pattern F).
 
 `gsd-graphify` (conditionnelle : graphify.enabled) — refusée en Phase 24 :
 aucun consommateur prescrit dans le module ; poser ce toggle est ce qui la rendrait active.

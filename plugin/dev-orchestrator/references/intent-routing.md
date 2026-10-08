@@ -42,7 +42,8 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
    Les skills gsd-* se déclenchent aussi nativement sur leurs propres descriptions — cette carte
    sert quand l'intention est ambiguë, quand plusieurs briques semblent candidates, ou en pilotage
    agentique (mission).
-2. **Rien ne correspond ?** Poser une question courte plutôt que de deviner (heuristique 5 de
+2. **Rien ne correspond ?** Poser la question par frontière (`mission-flow.md` §Pattern F : une
+   recommandation, AskUserQuestion, jamais un fait qu'un sous-agent peut établir) plutôt que de deviner (heuristique 5 de
    `AGENT.md`). Ne jamais inventer une brique qui n'existe pas (vérifier l'index).
 3. **Fermer la boucle** : après le geste, proposer le next step depuis `ROADMAP`/`STATE`.
 
@@ -121,7 +122,7 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 > et du code a bougé → **produit** ; le repo est inconnu, `.planning/codebase/` absent ou daté →
 > **code** ; une étape vient d'être vérifiée ou clôturée → **savoir** ; un document de cadrage
 > traîne hors de la feuille de route → **entrée** (`ingestion-flow.md`). Rien de tout cela —
-> formulation creuse en début de session → **une question courte, jamais une devinette**.
+> formulation creuse en début de session → **une question posée par frontière (`mission-flow.md` §Pattern F), jamais une devinette**.
 >
 > Les trois lignes `gsd-docs-update` ci-dessus ne sont pas trois briques mais **trois régimes** de
 > la même : auditer sans écrire, générer sous confirmation, régénérer en écrasant. La différence

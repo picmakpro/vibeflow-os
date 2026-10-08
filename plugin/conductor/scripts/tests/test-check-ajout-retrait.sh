@@ -3,8 +3,9 @@
 # Chaque cas construit SON dépôt jetable sous mktemp -d, jamais le dépôt réel ; identité git par -c ;
 # comparaisons par cmp/comm, jamais diff. Trois issues QUAL-01 : PASS (couvert), FAIL (non couvert,
 # rc 1 sous --strict) et imparsable BRUYANT (base introuvable : stderr + rc 2 sous --strict), plus
-# neuf mutants opposables, chacun asserté avec le rc EXACT sur le mutant ET sur l'original :
+# des mutants opposables (le nombre exact : compter les lignes « TUE » de la sortie), chacun asserté avec le rc EXACT sur le mutant ET sur l'original :
 # « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
+# POCK-08 (plan 41.4-02) : segment « défaillance : » obligatoire, genre skill (A12-A14, MUT-10 à MUT-12).
 # LIMITE DE FOND : la garde, sa suite et son étape CI vivent dans le dépôt qu'elles jugent.
 set -uo pipefail
 
@@ -45,6 +46,9 @@ expect() {  # <libellé> <rc_attendu> <rc> <sortie> [<fragment attendu dans la s
   ok "$1"
 }
 TR='Ajout-Retrait:'
+# POCK-08 : segment « défaillance : » obligatoire sur tout trailer (forme : >= 10 caractères non blancs + date ISO ou SHA).
+DF=' — défaillance : 2026-10-06 étude Pocock §5, ajout justifié sans défaillance citée'
+DFA=' - defaillance : 2026-10-06 etude Pocock §5, ajout justifie sans defaillance citee'
 NEW_GATE='plugin/conductor/scripts/check-new.sh'
 add_gate() { printf '#!/bin/sh\necho new\n' > "$1/$NEW_GATE"; }
 # Contenu sans rapport avec check-old.sh : git ne le lit pas comme un renommage (qui n'est pas un ajout).
@@ -56,13 +60,13 @@ echo "== test-check-ajout-retrait : PASS / FAIL / BRUYANT =="
 D="$(mk_repo a1)"; B="$(base_of "$D")"; add_gate "$D"
 commit_avec "$D" "feat: gate
 
-$TR $NEW_GATE — retire check-old.sh devenu redondant avec lui"
+$TR $NEW_GATE — retire check-old.sh devenu redondant avec lui$DF"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A1 gate ajouté + trailer conforme → rc 0 COUVERT" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
 D="$(mk_repo a1b)"; B="$(base_of "$D")"; add_gate "$D"
 commit_avec "$D" "feat: gate
 
-$TR plugin/conductor/scripts/check-*.sh - aucun : premier gate de ce genre, rien à remplacer"
+$TR plugin/conductor/scripts/check-*.sh - aucun : premier gate de ce genre, rien à remplacer$DFA"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A1b motif glob + séparateur ASCII + « aucun : justification » → rc 0" 0 "$R" "$O" "COUVERT"
 
@@ -75,14 +79,14 @@ expect "A2 sans trailer → --strict rc 1, ajout nommé" 1 "$R" "$O" "AJOUT-NON-
 D="$(mk_repo a3)"; B="$(base_of "$D")"; add_gate "$D"
 commit_avec "$D" "feat: gate
 
-$TR $NEW_GATE — aucun :"
+$TR $NEW_GATE — aucun :$DF"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A3 « aucun : » sans justification → rc 1 + MARQUEUR-MAL-FORME" 1 "$R" "$O" "MARQUEUR-MAL-FORME"
 D="$(mk_repo a3b)"; B="$(base_of "$D")"; add_gate "$D"
 commit_avec "$D" "feat: gate
 
-$TR $NEW_GATE — aucun : court
-$TR $NEW_GATE, autre.sh — retire tout ce qu'il faut retirer ici"
+$TR $NEW_GATE — aucun : court$DF
+$TR $NEW_GATE, autre.sh — retire tout ce qu'il faut retirer ici$DF"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A3b justification < 10 caractères ET motif à virgule → non couvert" 1 "$R" "$O" "AJOUT-NON-COUVERT"
 
@@ -92,7 +96,7 @@ run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A4 titre ## ADR-076 ajouté, sans trailer → rc 1, clé ADR-076" 1 "$R" "$O" "AJOUT-NON-COUVERT: ADR-076"
 git_c "$D" commit -q --allow-empty -m "docs: couverture
 
-$TR ADR-076 — aucun : premier ADR sur ce sujet, rien à remplacer" >/dev/null
+$TR ADR-076 — aucun : premier ADR sur ce sujet, rien à remplacer$DF" >/dev/null
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A4 … puis couvert par son identifiant (commit ultérieur)" 0 "$R" "$O" "AJOUT-COUVERT: ADR-076"
 D="$(mk_repo a4b)"; B="$(base_of "$D")"; sed -i.bak 's/^## ADR-001 : premier/## ADR-001 : premier, reformulé/' "$D/docs/ADR.md"; rm -f "$D/docs/ADR.md.bak"; commit_avec "$D" "docs: reformule"
@@ -130,7 +134,7 @@ expect "A7b --ci : ::warning:: sur l'ajout non couvert" 0 "$R" "$O" "::warning::
 D="$(mk_repo a8)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate nu"
 git_c "$D" commit -q --allow-empty -m "docs: couverture
 
-$TR $NEW_GATE — aucun : ajout couvert après coup par un commit de documentation" >/dev/null
+$TR $NEW_GATE — aucun : ajout couvert après coup par un commit de documentation$DF" >/dev/null
 git_c "$D" commit -q --allow-empty -m "chore: dernier commit sans trailer" >/dev/null
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
 expect "A8 trailer d'un commit ultérieur (pas le dernier) → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT"
@@ -169,10 +173,126 @@ for motif in '*' 'plugin/*' '*.sh' 'plugin/*/scripts/check-new.sh'; do
   D="$(mk_repo "a11-$(printf '%s' "$motif" | cksum | cut -d' ' -f1)")"; B="$(base_of "$D")"; add_gate "$D"
   commit_avec "$D" "feat: gate
 
-$TR $motif — aucun : motif volontairement trop large pour tout couvrir d'un coup"
+$TR $motif — aucun : motif volontairement trop large pour tout couvrir d'un coup$DF"
   run O R "$SCRIPT" "$D" --strict --base-ref "$B"
   expect "A11 motif « $motif » → refusé, ajout non couvert, rc 1" 1 "$R" "$O" "motif glob trop large"
 done
+
+# A12 (POCK-08, P414-D-04) — sans segment « défaillance : » daté, un trailer ne couvre rien.
+D="$(mk_repo a12)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — retire check-old.sh devenu redondant avec lui"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A12 trailer sans segment « défaillance : » → rc 1, ajout non couvert" 1 "$R" "$O" "AJOUT-NON-COUVERT: $NEW_GATE"
+expect "A12 … et MARQUEUR-MAL-FORME nomme le segment manquant" 1 "$R" "$O" "MARQUEUR-MAL-FORME: $TR $NEW_GATE — retire check-old.sh devenu redondant avec lui  [segment « défaillance : » absent"
+
+# A12b — segment présent mais sans date ISO ni SHA : forme insuffisante, non couvert.
+D="$(mk_repo a12b)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — retire check-old.sh devenu redondant avec lui — défaillance : on verra plus tard"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A12b défaillance sans date ISO ni SHA → rc 1, MAL-FORMÉ" 1 "$R" "$O" "sans date ISO ni SHA"
+# A12c — graphie ASCII (séparateur et mot) : couvert ; A12c2 — graphie mixte (retrait en « — », segment en « - defaillance »).
+D="$(mk_repo a12c)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE - retire check-old.sh devenu redondant avec lui$DFA"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A12c graphie ASCII « - defaillance : » → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
+D="$(mk_repo a12c2)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — aucun : justification suffisante ici$DFA"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A12c2 séparateur « — » puis segment ASCII « - defaillance : » → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
+# A12d — un retrait qui contient lui-même « — » : le segment est extrait par la DERNIÈRE occurrence.
+D="$(mk_repo a12d)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — retire check-old.sh — devenu redondant avec lui — et son test$DF"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A12d retrait contenant « — » + segment en fin → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
+# A12e (hypothèse Q4, les deux sens) — le segment est exigé aussi pour ADR, mémoire d'agent.
+D="$(mk_repo a12e1)"; B="$(base_of "$D")"; printf '## ADR-076 : neuf\n' >> "$D/docs/ADR.md"
+commit_avec "$D" "docs: adr
+
+$TR ADR-076 — aucun : premier ADR sur ce sujet, rien à remplacer"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A12e ADR ajouté, trailer sans segment → non couvert, rc 1" 1 "$R" "$O" "AJOUT-NON-COUVERT: ADR-076"
+D="$(mk_repo a12e2)"; B="$(base_of "$D")"; printf '## ADR-076 : neuf\n' >> "$D/docs/ADR.md"
+commit_avec "$D" "docs: adr
+
+$TR ADR-076 — aucun : premier ADR sur ce sujet, rien à remplacer$DF"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A12e ADR ajouté, trailer avec segment → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: ADR-076"
+D="$(mk_repo a12e3)"; B="$(base_of "$D")"; printf -- '---\nname: x\n---\n' > "$D/.claude/agent-memory/a/project_x.md"
+commit_avec "$D" "docs: memoire
+
+$TR .claude/agent-memory/a/project_x.md — aucun : mémoire neuve, rien à remplacer ici"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A12e mémoire ajoutée, trailer sans segment → non couvert, rc 1" 1 "$R" "$O" "AJOUT-NON-COUVERT: .claude/agent-memory/a/project_x.md"
+
+# A13 — un SKILL.md ajouté sous plugin/ est un ajout surveillé (genre skill) ; couvert par son chemin.
+SK='plugin/x/skills/y/SKILL.md'
+add_skill() { mkdir -p "$1/$(dirname "$2")"; printf -- '---\nname: %s\n---\ncorps\n' "$3" > "$1/$2"; }
+D="$(mk_repo a13)"; B="$(base_of "$D")"; add_skill "$D" "$SK" y
+commit_avec "$D" "feat: skill
+
+$TR $SK — aucun : premier skill de ce module, rien à remplacer$DF"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A13 SKILL.md ajouté + trailer conforme → AJOUT-COUVERT (skill), rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $SK (skill)"
+# A14 — un SKILL.md supprimé dans le même diff compense (un pour un) ; sans trailer = non couvert ; hors plugin/ = pas surveillé.
+D="$(mk_repo a14)"; add_skill "$D" "plugin/x/skills/vieux/SKILL.md" vieux; commit_avec "$D" "fixture: un skill existant"; B="$(git_c "$D" rev-parse HEAD)"
+mkdir -p "$D/$(dirname "$SK")"; printf -- '---\nname: y\ndescription: un tout autre skill\n---\nÉtapes complètement différentes\nde celles du skill supprimé.\n' > "$D/$SK"  # contenu distinct : pas un renommage
+git_c "$D" rm -q plugin/x/skills/vieux/SKILL.md; commit_avec "$D" "feat: skill qui remplace vieux"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A14 SKILL.md ajouté + autre SKILL.md supprimé → AJOUT-COMPENSE, rc 0" 0 "$R" "$O" "AJOUT-COMPENSE: $SK"
+D="$(mk_repo a14b)"; B="$(base_of "$D")"; add_skill "$D" "$SK" y; commit_avec "$D" "feat: skill nu"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A14b SKILL.md ajouté sans trailer → AJOUT-NON-COUVERT (skill), rc 1" 1 "$R" "$O" "AJOUT-NON-COUVERT: $SK (skill)"
+D="$(mk_repo a14c)"; B="$(base_of "$D")"; add_skill "$D" "docs/exemples/SKILL.md" ex; commit_avec "$D" "docs: exemple de skill hors plugin"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A14c SKILL.md hors de plugin/ → non surveillé, RIEN-A-JUGER rc 0" 0 "$R" "$O" "RIEN-A-JUGER"
+
+# A15..A22 (revue W1, 2026-10-06, M-05) : le CONTENU du segment « défaillance : » est jugé, pas seulement sa présence.
+TRG="retire check-old.sh devenu redondant avec lui"
+df_cas() {  # <id> <libellé> <rc attendu> <fragment attendu ou -> <texte du segment>
+  local d b
+  d="$(mk_repo "a$1")"; b="$(base_of "$d")"; add_gate "$d"
+  commit_avec "$d" "feat: gate
+
+$TR $NEW_GATE — $TRG — défaillance : $5"
+  run O R "$SCRIPT" "$d" --strict --base-ref "$b"
+  if [ "$4" = "-" ]; then expect "$1 $2" "$3" "$R" "$O"; else expect "$1 $2" "$3" "$R" "$O" "$4"; fi
+}
+df_cas A15 "défaillance sous le plancher de 10 caractères (SHA de 7) → rc 1" 1 "sans date ISO ni SHA" "abc1234"
+df_cas A16 "SHA de forme plausible (12 hexadécimaux, chiffre et lettre) sans date → couvert, rc 0" 0 "AJOUT-COUVERT: $NEW_GATE" "commit f3a9c1e7b2d4 constaté en revue"
+df_cas A17 "nombre nu de 8 chiffres n'est pas un SHA → rc 1" 1 "sans date ISO ni SHA" "12345678 voila"
+df_cas A18 "mot tout en [a-f] n'est pas un SHA → rc 1" 1 "sans date ISO ni SHA" "effacee xyzzy ok"
+df_cas A19 "hexadécimal de 6 caractères trop court pour un SHA → rc 1" 1 "sans date ISO ni SHA" "a1b2c3 de plus"
+df_cas A20 "date non calendaire (9999-99-99) → rc 1" 1 "sans date ISO ni SHA" "9999-99-99 voila"
+# A21 — DERNIÈRE occurrence : deux segments, la justification se mesure avant le dernier (jamais avant le premier).
+D="$(mk_repo a21)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — rm a — défaillance : x - defaillance : 2026-10-06 session de revue"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A21 deux segments « défaillance : » → le dernier découpe, la justification court jusqu'à lui → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
+# A22 — une classe de caractères ne compte pas comme littéraux d'un glob (plancher de 6).
+D="$(mk_repo a22)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR plugin/conductor/scripts/[a-zA-Z]* — $TRG$DF"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A22 glob [a-zA-Z]* (classe de caractères) → refusé, rc 1" 1 "$R" "$O" "motif glob trop large"
+D="$(mk_repo a22b)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR plugin/conductor/scripts/check-[a-z]*.sh — $TRG$DF"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A22b témoin : check-[a-z]*.sh garde 9 littéraux hors classe → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
 
 D="$(mk_repo vide)"; B="$(base_of "$D")"; printf 'x\n' > "$D/notes.txt"; commit_avec "$D" "docs: notes"
 run O R "$SCRIPT" "$D" --strict --base-ref "$B"
@@ -180,7 +300,7 @@ expect "Rien d'ajouté dans la surface → RIEN-A-JUGER, rc 0" 0 "$R" "$O" "RIEN
 run O R "$SCRIPT" "$D" --bogus
 expect "Usage : argument inconnu → rc 64" 64 "$R" "$O"
 
-echo "== test-check-ajout-retrait : MUTANTS (MUT-1 à MUT-9) =="
+echo "== test-check-ajout-retrait : MUTANTS (MUT-1 à MUT-12, S1, S2, S4, M5a à M5d, S2e à S2g, S3b à S3e, S6b1, S6b2, Sod) =="
 make_mutant() {  # <nom> <ancienne ligne> <nouvelle ligne> ; 0 = opposable, 1 = identique, 2 = syntaxe invalide
   local out="$MUTD/$1.sh"
   MUT_OLD_ENV="$2" MUT_NEW_ENV="$3" awk '{ if ($0 == ENVIRON["MUT_OLD_ENV"]) print ENVIRON["MUT_NEW_ENV"]; else print }' "$SCRIPT" > "$out"
@@ -200,7 +320,7 @@ mutant() {  # <n> <ancienne> <nouvelle> <fixture> <args…> ; rc attendus : orig
 # MUT-1 (A3) : une justification vide ou courte est acceptée.
 D="$(mk_repo m1)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate
 
-$TR $NEW_GATE — aucun :"
+$TR $NEW_GATE — aucun :$DF"
 mutant 1 '      [ "$ok" -eq 1 ] && [ "$(charcount "$just")" -lt 10 ] && ok=0' '      :' "$D" 1 0 --strict --base-ref "$B"
 # MUT-2 (A4) : les titres ADR sont ignorés.
 D="$(mk_repo m2)"; B="$(base_of "$D")"; printf '## ADR-076 : neuf\n' >> "$D/docs/ADR.md"; commit_avec "$D" "docs: adr"
@@ -212,7 +332,7 @@ mutant 3 '  [ "$STRICT" -eq 1 ] && exit 2' '  :' "$D" 2 0 --strict --base-ref "r
 D="$(mk_repo m4)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate nu"
 git_c "$D" commit -q --allow-empty -m "docs: couverture
 
-$TR $NEW_GATE — aucun : ajout couvert après coup par un commit de documentation" >/dev/null
+$TR $NEW_GATE — aucun : ajout couvert après coup par un commit de documentation$DF" >/dev/null
 git_c "$D" commit -q --allow-empty -m "chore: dernier commit sans trailer" >/dev/null
 mutant 4 'COMMITS_LIST="$(git rev-list "${BASE}..${HEAD_SHA}" 2>/dev/null)"' 'COMMITS_LIST="$(git rev-list -1 "${HEAD_SHA}" 2>/dev/null)"' "$D" 0 1 --strict --base-ref "$B"
 # MUT-5 : le défaut consultatif devient bloquant (rc 1 sans --strict).
@@ -225,7 +345,7 @@ mutant 6 '  ($2 in r) && r[$2] > 0 { r[$2]--; print $0 > cf; next }' '  ($2 in r
 # MUT-7 (A11, m3) : n'importe quel glob est admis.
 D="$(mk_repo m7)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate
 
-$TR * — aucun : motif volontairement trop large pour tout couvrir d'un coup"
+$TR * — aucun : motif volontairement trop large pour tout couvrir d'un coup$DF"
 mutant 7 '  [ "${#lit}" -ge 6 ]' '  true' "$D" 1 0 --strict --base-ref "$B"
 # MUT-8 (A9, m1) : les puces de CLAUDE.md ne sont plus lues.
 D="$(mk_repo m8)"; B="$(base_of "$D")"; printf -- '- Une règle neuve en puce, sans titre.\n' >> "$D/CLAUDE.md"; commit_avec "$D" "docs: puce"
@@ -233,6 +353,89 @@ mutant 8 '    l ~ /^- / { sub(/^- /, "", l); print l; next }' '    l ~ /^- / { n
 # MUT-9 (A10c, m2) : dans CLAUDE.md, le retrait ne compense plus l'ajout (seul l'ajout est compté).
 D="$(mk_repo m9)"; B="$(base_of "$D")"; printf '# Titre\n## Règle remplacée\ntexte\n' > "$D/CLAUDE.md"; commit_avec "$D" "docs: remplace une règle"
 mutant 9 '  n="$(awk '"'"'END { print NR }'"'"' "$TMPD/po")"; m="$(awk '"'"'END { print NR }'"'"' "$TMPD/mo")"; ex=$((n - m))' '  n="$(awk '"'"'END { print NR }'"'"' "$TMPD/po")"; m="$(awk '"'"'END { print NR }'"'"' "$TMPD/mo")"; ex=$n' "$D" 0 1 --strict --base-ref "$B"
+
+# MUT-10 (A12, POCK-08) : le contrôle du segment « défaillance : » est neutralisé — un trailer sans défaillance couvre.
+D="$(mk_repo m10)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — retire check-old.sh devenu redondant avec lui"
+mutant 10 '      if ! defaillance_valide "$defaillance"; then ok=0; trimmed="$trimmed  [segment « défaillance : » absent ou sans date ISO ni SHA (SHA : 7 à 40 hexadécimaux, au moins un chiffre ET une lettre a-f) — POCK-08]"; fi' '      :' "$D" 1 0 --strict --base-ref "$B"
+# MUT-11 (A14b, POCK-08) : le genre skill de l'awk des ajouts est neutralisé — un SKILL.md ajouté n'est plus vu.
+D="$(mk_repo m11)"; B="$(base_of "$D")"; add_skill "$D" "$SK" y; commit_avec "$D" "feat: skill nu"
+mutant 11 '  p ~ /^plugin\// && n == "SKILL.md" { print p "\tskill"; next }' '  p ~ /^plugin\// && n == "SKILL.md" { next }' "$D" 1 0 --strict --base-ref "$B"
+# MUT-12 (A3 + DF, T-41.4-07) : la justification est mesurée sur le reste COMPLET (segment compris) — une défaillance longue rattrape un « aucun : » vide.
+D="$(mk_repo m12)"; B="$(base_of "$D")"; add_gate "$D"; commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — aucun :$DF"
+mutant 12 '      [ "$df_pos" -ge 0 ] && reste="$df_avant"' '      :' "$D" 1 0 --strict --base-ref "$B"
+
+# Revue W1 (2026-10-06, M-05) — chaque branche d'acceptation de la défaillance et le choix de l'occurrence.
+mut_df() {  # <id> <ancienne> <nouvelle> <segment défaillance> <rc original> <rc mutant> [<chemin du trailer>]
+  local d b
+  d="$(mk_repo "m$1")"; b="$(base_of "$d")"; add_gate "$d"
+  commit_avec "$d" "feat: gate
+
+$TR ${7:-$NEW_GATE} — $TRG — défaillance : $4"
+  mutant "$1" "$2" "$3" "$d" "$5" "$6" --strict --base-ref "$b"
+}
+# S1 : plancher de 10 caractères de la défaillance neutralisé — « abc1234 » (7) couvre.
+mut_df S1 '  [ "$(charcount "$1")" -ge 10 ] || return 1' '  :' "abc1234" 1 0
+# S2 : branche SHA supprimée — un SHA de forme plausible, sans date, ne couvre plus.
+mut_df S2 '    case "$t" in *[0-9]*) case "$t" in *[a-f]*) return 0 ;; esac ;; esac' '    :' "commit f3a9c1e7b2d4 constaté en revue" 0 1
+# S4 : DERNIÈRE occurrence -> première trouvée — la justification est alors mesurée avant le premier segment.
+D="$(mk_repo mS4)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — rm a — défaillance : x - defaillance : 2026-10-06 session de revue"
+mutant S4 '              if [ "${#df_cand}" -gt "$df_pos" ]; then df_pos="${#df_cand}"; df_avant="$df_cand"; defaillance="${reste##*"${df_s}${df_m}"}"; fi ;;' '              if [ "$df_pos" -lt 0 ]; then df_pos="${#df_cand}"; df_avant="$df_cand"; defaillance="${reste##*"${df_s}${df_m}"}"; fi ;;' "$D" 0 1 --strict --base-ref "$B"
+# M5b : nombre nu / mot accepté comme SHA ; M5c : longueur minimale d'un SHA supprimée ; M5d : date non calendaire acceptée.
+mut_df M5b '    case "$t" in *[0-9]*) case "$t" in *[a-f]*) return 0 ;; esac ;; esac' '    return 0' "12345678 voila" 1 0
+mut_df M5c '    [ "${#t}" -ge 7 ] && [ "${#t}" -le 40 ] || continue' '    :' "a1b2c3 de plus" 1 0
+mut_df M5d "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])(\$|[^0-9])' && return 0" "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-[0-9]{2}-[0-9]{2}(\$|[^0-9])' && return 0" "9999-99-99 voila" 1 0
+# M5a : les classes de caractères comptent de nouveau comme littéraux du glob.
+mut_df M5a "  lit=\"\$(printf '%s' \"\$last\" | sed -e 's/\\[[^]]*\\]//g' | tr -d '*?[]')\"" "  lit=\"\$(printf '%s' \"\$last\" | tr -d '*?[]')\"" "2026-10-06 session de revue" 1 0 'plugin/conductor/scripts/[a-zA-Z]*'
+
+# Revue deux axes tour 2 (2026-10-06, N-02, N-03, N-11) — un mutant par garde de défaillance_valide / charcount / graphie.
+# Le premier argument de mut_df est le segment (après « défaillance : ») ; rc original puis rc mutant.
+SHA40="abcdef1234567890abcdef1234567890abcdef12"
+SHA41="${SHA40}3"
+L_DATE="  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])(\$|[^0-9])' && return 0"
+# S2f : un jeton « SHA » peut contenir des non-hexadécimaux (abc123xyz).
+mut_df S2f '    case "$t" in *[!0-9a-f]*) continue ;; esac' '    :' "abc123xyz de plus" 1 0
+# S2e : longueur maximale de 40 retirée (41 hexadécimaux acceptés) ; S2g : borne 40 devenue exclusive (le SHA entier de 40 refusé).
+mut_df S2e '    [ "${#t}" -ge 7 ] && [ "${#t}" -le 40 ] || continue' '    [ "${#t}" -ge 7 ] || continue' "commit $SHA41 constaté" 1 0
+mut_df S2g '    [ "${#t}" -ge 7 ] && [ "${#t}" -le 40 ] || continue' '    [ "${#t}" -ge 7 ] && [ "${#t}" -lt 40 ] || continue' "commit $SHA40 constaté" 0 1
+# S3b / S3c / S3d / S3e : mois quelconque, jour quelconque, borne gauche ou borne droite de la date ISO retirées.
+mut_df S3b "$L_DATE" "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-[0-9]{2}-(0[1-9]|[12][0-9]|3[01])(\$|[^0-9])' && return 0" "2026-13-01 voila" 1 0
+mut_df S3c "$L_DATE" "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-[0-9]{2}(\$|[^0-9])' && return 0" "2026-10-32 voila" 1 0
+mut_df S3d "$L_DATE" "  printf '%s' \"\$1\" | grep -Eq '[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])(\$|[^0-9])' && return 0" "12026-10-06 voila" 1 0
+mut_df S3e "$L_DATE" "  printf '%s' \"\$1\" | grep -Eq '(^|[^0-9])[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])' && return 0" "2026-10-061 voila" 1 0
+# S6b : graphies « défaillance: » et « defaillance: » (deux-points collé), chacune retirée de la boucle ; fixture : segment SANS espace avant « : ».
+mut_nospace() {  # <id> <ancienne> <nouvelle> <mot du segment>
+  local d b
+  d="$(mk_repo "m$1")"; b="$(base_of "$d")"; add_gate "$d"
+  commit_avec "$d" "feat: gate
+
+$TR $NEW_GATE — $TRG — $4: 2026-10-06 session de revue"
+  mutant "$1" "$2" "$3" "$d" 0 1 --strict --base-ref "$b"
+}
+L_DF="        for df_m in 'défaillance :' 'défaillance:' 'defaillance :' 'defaillance:'; do"
+mut_nospace S6b1 "$L_DF" "        for df_m in 'défaillance :' 'defaillance :' 'defaillance:'; do" "défaillance"
+mut_nospace S6b2 "$L_DF" "        for df_m in 'défaillance :' 'défaillance:' 'defaillance :'; do" "defaillance"
+# Sod (N-03) : od sans -v réduit les lignes répétées à un « * » compté ; 10 émojis identiques (40 octets périodiques) font 7 au lieu de 10.
+D="$(mk_repo mSod)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — 🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂$DF"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A23 justification de 10 émojis identiques (comptage exact, périodique) → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
+mutant Sod "  printf '%s' \"\$1\" | tr -d '[:space:]' | od -v -An -tu1 | tr -s ' \\n' '\\n' | awk 'NF && (\$1 < 128 || \$1 >= 192) { n++ } END { print n + 0 }'" "  printf '%s' \"\$1\" | tr -d '[:space:]' | od -An -tu1 | tr -s ' \\n' '\\n' | awk 'NF && (\$1 < 128 || \$1 >= 192) { n++ } END { print n + 0 }'" "$D" 0 1 --strict --base-ref "$B"
+# Témoins positifs des gardes ci-dessus (original seul) : le SHA de 40, la date valide et la graphie collée sont bien acceptés.
+D="$(mk_repo a24)"; B="$(base_of "$D")"; add_gate "$D"
+commit_avec "$D" "feat: gate
+
+$TR $NEW_GATE — $TRG — défaillance: 2026-10-06 session de revue"
+run O R "$SCRIPT" "$D" --strict --base-ref "$B"
+expect "A24 graphie « défaillance: » (deux-points collé) → couvert, rc 0" 0 "$R" "$O" "AJOUT-COUVERT: $NEW_GATE"
 
 echo
 echo "Résultat : $PASS vert(s), $FAIL rouge(s)"

@@ -46,7 +46,13 @@
 #   E2 — l'arbre de travail est propre (`git status --porcelain` capturé en variable, JAMAIS
 #        canalisé dans un compteur de lignes — une sortie vide y devient une ligne sous un hook
 #        de proxy de commandes actif, piège déjà tracé de ce dépôt).
-#   E3 — une branche dédiée existe et sa PR est ouverte.
+#   E3 — une branche dédiée existe, sa PR est ouverte et son corps porte un merge-danger call
+#        conforme (POCK-06 : section « ## Merge-danger call », ligne « Porte : sens unique|double
+#        sens », ligne « Rayon d'explosion : » d'au moins 10 caractères — forme au contrat
+#        `references/mission-contracts.md` §Isolation de branche). Corps absent ou non chaîne :
+#        INDÉTERMINÉ ; section absente ou incomplète : MANQUE nommé. Le corps de PR est une donnée
+#        NON FIABLE : extrait par jq, analysé par awk sur stdin, comparé à une énumération fermée,
+#        messages fixes — aucune interpolation, aucune évaluation dynamique de chaîne, aucun écho.
 #   E4 — la feuille de route et le fichier d'état portent la marque du travail, pour chaque
 #        étape déclarée en argument.
 #   E5 — le rapport détaillé de mission est présent et lisible sur disque.
@@ -295,8 +301,63 @@ else
 fi
 # <<< E2
 
+# e3_merge_danger — analyse du corps de PR LU SUR L'ENTRÉE STANDARD (POCK-06). Rend 0 structure
+# conforme (alors IMPRIME, une par ligne, la valeur de chaque ligne « Rayon d'explosion : » de la
+# section — jamais réémise, seulement mesurée par e3_charcount) · 11 section « ## Merge-danger call »
+# absente · 12 section répétée, ligne « Porte : » absente, hors énumération fermée (sens unique |
+# double sens), répétée ou contradictoire. Codes de CONTENU réservés (11, 12) : une erreur d'awk sort
+# en 2 et ne se confond jamais avec un verdict de contenu (branche « indéterminé » de l'appelant).
+# Section = du titre exact (blancs de fin tolérés) au titre « ## » suivant ou à la fin du corps ; ce
+# qui n'est pas rendu à la relecture humaine n'existe pas : un bloc de code (``` ou ~~~, indenté de
+# 0 à 3 espaces, retirés par strip3 : jamais de quantificateur « ? » répété ni d'intervalle {n,m}, que
+# mawk 1.3.4 n'applique pas comme BWK awk) et un commentaire HTML (<!-- -->) sont ignorés. Un bloc ne se ferme que par une fence
+# du MÊME caractère et de longueur au moins égale ; un « <!-- » dans un bloc de code ou entre accents
+# graves (code inline) ne masque rien. L'apostrophe droite s'écrit en octal (\047) : le programme
+# awk vit entre apostrophes ; l'apostrophe typographique est admise en alternative.
+e3_merge_danger() {
+  awk '
+    function mask(s,   o, p) {
+      o = ""
+      while (match(s, /`[^`]*`/)) { p = sprintf("%" RLENGTH "s", ""); gsub(/ /, "x", p); o = o substr(s, 1, RSTART - 1) p; s = substr(s, RSTART + RLENGTH) }
+      return o s
+    }
+    function strip3(s,   k) {
+      k = 0
+      while (k < 3 && substr(s, k + 1, 1) == " ") k++
+      return substr(s, k + 1)
+    }
+    BEGIN { ntit = 0; insec = 0; infence = 0; incom = 0; ptot = 0; pval = 0; fch = ""; flen = 0 }
+    { l = $0 }
+    infence { m = strip3(l); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }
+    incom { k = index(l, "-->"); if (k == 0) next; l = substr(l, k + 3); incom = 0 }
+    { while ((i = index(mask(l), "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }
+    (m = strip3(l)) ~ /^(```|~~~)/ { fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }
+    l ~ /^## / { if (l ~ /^## Merge-danger call[ \t]*$/) { ntit++; insec = (ntit == 1) } else { insec = 0 }; next }
+    insec && l ~ /^Porte ?:/ { ptot++; if (l ~ /^Porte ?:[ \t]*(sens unique|double sens)[ \t]*$/) pval++ }
+    insec && l ~ /^Rayon d(\047|’)explosion ?:/ { v = l; sub(/^[^:]*:/, "", v); print v }
+    END {
+      if (ntit == 0) exit 11
+      if (ntit > 1) exit 12
+      if (ptot != 1 || pval != 1) exit 12
+      exit 0
+    }
+  '
+}
+
+# e3_charcount — longueur d'une valeur en CARACTÈRES (codepoints UTF-8, jamais d'octets, sans dépendre
+# d'aucune locale), hors blancs : espaces, tabulations, espace insécable U+00A0, espaces U+2000-200B,
+# U+202F et U+3000. Même règle que `charcount` de check-ajout-retrait.sh.
+E3_BLANCS_SED="s/$(printf '\302\240')//g;s/$(printf '\342\200')[$(printf '\200-\213\257')]//g;s/$(printf '\343\200\200')//g"
+e3_charcount() {
+  printf '%s' "$1" \
+    | LC_ALL=C sed -e "$E3_BLANCS_SED" \
+    | LC_ALL=C tr -d '[:space:]' \
+    | od -v -An -tu1 | tr -s ' \n' '\n' \
+    | awk 'NF && ($1 < 128 || $1 >= 192) { n++ } END { print n + 0 }'
+}
+
 # >>> E3
-# E3 — branche dédiée et PR ouverte.
+# E3 — branche dédiée, PR ouverte et merge-danger call conforme (POCK-06).
 E3_CURRENT="$(git_safe symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
 if [ -z "$E3_CURRENT" ]; then
   E3_STATUS="indet"
@@ -325,14 +386,36 @@ else
       E3_STATUS="indet"
       E3_MSG="[E3] client GitHub non authentifié — état de la PR invérifiable"
     else
-      E3_PR_JSON="$(cd "$ROOT" && gh pr view --json state 2>/dev/null)"
+      E3_PR_JSON="$(cd "$ROOT" && gh pr view --json state,body 2>/dev/null)"
       E3_PR_RC=$?
       E3_PR_STATE="$(printf '%s' "$E3_PR_JSON" | jq -r '.state // empty' 2>/dev/null)"
       if [ "$E3_PR_RC" -ne 0 ] || [ -z "$E3_PR_STATE" ]; then
         E3_STATUS="indet"
         E3_MSG="[E3] aucune PR lisible pour la branche courante ($E3_CURRENT)"
       elif [ "$E3_PR_STATE" = "OPEN" ]; then
-        E3_STATUS="sain"
+        # Merge-danger call (POCK-06). Corps = donnée NON FIABLE : type testé (jamais un vert par défaut
+        # sur une clé absente), extraction par jq, analyse sur stdin, énumération fermée, messages fixes.
+        E3_BODY_TYPE="$(printf '%s' "$E3_PR_JSON" | jq -r '.body | type' 2>/dev/null)"
+        if [ "$E3_BODY_TYPE" != "string" ]; then
+          E3_STATUS="indet"
+          E3_MSG="[E3] corps de PR illisible (clé body absente ou non chaîne) — merge-danger call invérifiable"
+        else
+          E3_BODY="$(printf '%s' "$E3_PR_JSON" | jq -r '.body' 2>/dev/null | tr -d '\r')"
+          E3_RAYONS="$(printf '%s\n' "$E3_BODY" | e3_merge_danger)"; E3_MD_RC=$?
+          case "$E3_MD_RC" in
+            0)
+              E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : rayon d'explosion de moins de 10 caractères"
+              while IFS= read -r E3_V; do
+                if [ "$(e3_charcount "$E3_V")" -ge 10 ]; then E3_STATUS="sain"; E3_MSG=""; fi
+              done <<EOF_RAYONS
+$E3_RAYONS
+EOF_RAYONS
+              ;;
+            11) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : section « ## Merge-danger call » absente" ;;
+            12) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : section répétée, ligne « Porte : sens unique|double sens » absente, invalide ou répétée" ;;
+            *) E3_STATUS="indet"; E3_MSG="[E3] analyse du merge-danger call impossible (outil d'analyse en échec) — invérifiable" ;;
+          esac
+        fi
       else
         E3_STATUS="manque"
         E3_MSG="[E3] PR de la branche courante en état $E3_PR_STATE (attendu OPEN)"

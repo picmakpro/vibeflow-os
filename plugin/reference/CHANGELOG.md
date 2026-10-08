@@ -1,5 +1,12 @@
 # CHANGELOG — reference
 
+## [v2.5.7] — 2026-10-06 (classe d'invocation des templates de skills, Phase 41.4)
+
+**Patch** — les quatre `SKILL.md` de `methodology/templates/skills/` (`agent-density-auditor`,
+`debugger`, `metier-orchestration`, `safe-execute`) déclarent leur classe d'invocation
+(`vf-invocation: model`, vérifiée par `check-skills.sh --callers-root`, POCK-07, P414-D-01) ;
+aucun changement de comportement.
+
 ## [v2.5.6] — 2026-09-17 (hotfix v2.63.2 — profondeur de spawn B1/B2)
 
 **Patch** :

@@ -270,7 +270,7 @@ while IFS= read -r c; do
         # dumpe les octets en decimal, awk ne garde que les octets qui ne sont PAS une suite de
         # continuation UTF-8 (10xxxxxx, soit 128-191) : chaque octet ASCII ou tete de sequence
         # multi-octets compte pour un caractere, chaque octet de continuation ne compte pas.
-        reason_charcount="$(printf '%s' "$reason_stripped" | od -An -tu1 | tr -s ' \n' '\n' | awk 'NF && ($1 < 128 || $1 >= 192) { n++ } END { print n + 0 }')"
+        reason_charcount="$(printf '%s' "$reason_stripped" | od -v -An -tu1 | tr -s ' \n' '\n' | awk 'NF && ($1 < 128 || $1 >= 192) { n++ } END { print n + 0 }')"
         if [ "${reason_charcount:-0}" -lt 10 ]; then
           echo "MARQUEUR-MAL-FORME: ${trimmed}"
           continue
