@@ -169,7 +169,8 @@
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 
-## ✅ Milestone fiabilite-v1.0 — « ce qui survit » (Phases 30-35, 37-41.4 + 18 et 25 héritées) — clos 2026-10-08
+<details>
+<summary>✅ fiabilite-v1.0 — « ce qui survit » (Phases 30-35, 37-41.4 + 18 et 25 héritées) — SHIPPED 2026-10-08, releases `v2.53.0` → `v2.69.0`</summary>
 
 > **Clos le 2026-10-08** (arbitrage Samuel, session principale, 2026-10-08 : « on clôt le jalon fiabilité V1 »).
 > Bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0. Snapshots :
@@ -1268,113 +1269,6 @@ Plans:
 - [x] 40.1-15-PLAN.md — suite design-orchestrator (vague 2), bump patch dérivé
 - [x] 40.1-14-PLAN.md — clôture (vague 4, base contenant le hotfix) : recensement nul, contrôles négatifs, rejeu tests+gates, invariants, bumps, ledger
 
-### Phase 41: Posture de protection du dépôt
-
-> **Origine** : finding de l'audit de mission de la Phase 25 (vague 3, 2026-09-15) —
-> `gh api repos/picmakpro/vibeflow-os/rulesets` rend `[]` : `main` n'est protégée par rien, donc
-> **tout gate in-repo est neutralisable depuis la PR qu'il juge** (une même PR peut modifier un
-> gate, sa suite de tests et l'étape CI qui l'invoque). Risque structurel et antérieur à la 25,
-> nommé par aucun threat ID de son registre STRIDE. Décision Samuel (AskUserQuestion session
-> principale, 2026-09-15) : **ouvrir une phase dédiée** plutôt que poser un ruleset au passage
-> d'une mission — changer les règles du merge pendant qu'une PR est ouverte modifierait les
-> conditions de cette PR en cours de route. Cahier des charges : `BACKLOG.md` § « Posture de
-> protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15) ».
-
-**Goal**: La branche `main` est protégée par une règle machine — CI verte requise avant merge —
-sans casser le flux de release existant (bump → merge → tag annoté → release GitHub) ni les
-hotfix urgents.
-**Depends on**: aucune dépendance de code. Séquencée **après la Phase 40 et la calibration 25-04** :
-les deux PR en attente ne doivent pas changer de règles de merge en vol — même raison qui a fait
-différer cette inscription après le merge de la PR #67.
-**Requirements**: PROT-01, PROT-02, PROT-03, PROT-04 (cadrage du 2026-09-17, `41-CONTEXT.md`) —
-PROT-01 (rulesets de branche et de tags posés et prouvés), PROT-02 (compatibilité avec la
-discipline de release du `CLAUDE.md` — `check-release-tag` `main`-only, tag et release GitHub
-post-merge, hook `pre-push` conservé), PROT-03 (politique hotfix et de contournement écrite,
-ADR-072), PROT-04 (O-3 « gardée par défaut + tracée » : CODEOWNERS `@picmakpro` + revue code owner).
-**Success Criteria** (what must be TRUE):
-
-  1. `gh api repos/picmakpro/vibeflow-os/rulesets` ne rend plus `[]` : un ruleset actif sur
-     `main` exige le statut CI vert avant merge (PROT-01).
-
-  2. Une PR rouge est **refusée par défaut** ; la contourner demande un **geste explicite** et
-     laisse une **trace dans GitHub** — prouvé en deux temps par des essais réels tracés (refus
-     d'un merge sans contournement sur une PR jetable ; trace d'un contournement lue dans les rule
-     suites), références des PR dans le SUMMARY, jamais par la seule lecture de la configuration
-     (PROT-01). *Reformulé le 2026-09-17 — arbitrage Samuel, AskUserQuestion session principale,
-     2026-09-17 (P-1 du `41-CONTEXT.md`) : le bypass est accordé au rôle `write`, le libellé
-     d'origine « ne peut pas être mergée » était inatteignable.*
-
-  3. Le flux de release est rejoué vert sous la nouvelle règle : bump → PR → merge → tag annoté
-     → release GitHub → `bash scripts/check-release-tag.sh --remote` ✓ ; la politique hotfix
-     (ce qui peut contourner quoi, avec quelle trace) est écrite, emplacement tranché au cadrage
-     (PROT-02, PROT-03).
-
-  4. QUAL-01 s'applique si un gate naît (mutation rouge prouvée) ; sinon la phase n'en crée
-     aucun et le dit.
-
-> **PRÉMISSE RENVERSÉE le 2026-09-17** (constat et arbitrage Samuel, AskUserQuestion session
-> principale, 2026-09-17) : le compte `picmakpro`, seul admin, appartient à un **tiers** ;
-> `permissions` du dépôt = `admin: false, maintain: false, push: true`. **Aucun ruleset ne peut être
-> posé dans cette session.** Les critères de succès 1, 2 et 3 ci-dessus sont **inatteignables sans
-> accès admin** ; les décisions D-01 à D-08 du `41-CONTEXT.md` sont **suspendues** et les plans
-> 41-01 (T2/T3), 41-04 à 41-09 et la partie « sous la règle » de 41-11 à 41-13 sont **différés en
-> attente d'accès** (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »). L'exécution a
-> été arrêtée après 41-01 Task 1 (registre `41-PREUVES.md` conservé). Un **périmètre sans admin**
-> (gardes in-repo visibles et tracées) est proposé à l'arbitrage — il remplacera les critères de
-> succès de cette phase une fois tranché.
-
-> **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ ET CLOS le 2026-09-18** (option (a), arbitrage Samuel,
-> AskUserQuestion session principale, 2026-09-17) : six plans neufs (41-14 à 41-19, ci-dessous)
-> livrent trois gardes in-repo qui SIGNALENT et TRACENT sans jamais verrouiller — G-1
-> `scripts/check-baseline-arbitrage.sh` (PROT-04), G-2 `scripts/check-gate-touche.sh` (PROT-05),
-> G-3 `scripts/check-push-sans-pr.sh` (PROT-05) — plus la doctrine `docs/ADR.md` § ADR-072
-> (PROT-03) et O-3 du `25-SECURITY.md` portée à **« signalée et tracée »**. Ledger
-> `.planning/REQUIREMENTS.md` : PROT-02/03/04/05 **cochés sur pièce** ; **PROT-01 reste NON COCHÉ** (depuis cochée le 2026-09-24)
-> — hors d'atteinte sans accès admin, déclencheur de reprise écrit. **Les critères de succès 1, 2
-> et 3 ci-dessus restent INATTEIGNABLES sans accès admin** (constat explicite,
-> `41-PREUVES.md` § 41-19) et ne sont **pas** réécrits ici — ils décrivent la posture serveur
-> différée, pas le périmètre livré. Critère 4 (QUAL-01) satisfait : 3 gates neufs, 29 mutants
-> mesurés tués au total (G-1=9, G-2=6, G-3=5, plus les deux outils de phase). Rejeu final `gates`
-> rc=0 (13 étapes) et `tests` rc=0 (82 suites, 0 échec). Les plans 41-01 (T2/T3), 41-02, 41-04 à
-> 41-09, 41-11 à 41-13 restent **différés faute d'accès admin**, tels quels, non exécutés
-> (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »).
-
-**Reprise du volet admin le 2026-09-23** : accès admin constaté (`picmakpro`, Willy), contournement
-par deux utilisateurs nommés (D-02bis, arbitrage Willy, AskUserQuestion session principale,
-2026-09-23), plans 41-01 à 41-13 révisés puis vérifiés (vérificateur frais, passé). Voir
-`41-CONTEXT.md` § REPRISE.
-
-**Chaîne des mesures confiée à Willy le 2026-10-02** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy », puis étendu le même jour, même canal : « Toute la chaîne à Willy ») : les plans 41-07, 41-08 et 41-09 mesurent la protection posée par Willy et dépendent de ses gestes d'admin (checkpoint avant le merge `--admin` de #101, clé de déploiement temporaire). Les plans 41-10, 41-11, 41-12 et 41-13 prolongent cette chaîne (chacun dépend du précédent) et sont confiés eux aussi à Willy. Tous sortent du périmètre de clôture de `fiabilite-v1.0` ; la Phase 41 est livrée sur 41-01 à 41-06 (+ 41-14 à 41-19), ces mesures résiduelles sont déclarées, aucun PLAN supprimé. `fiabilite-v1.0` se clôt avec **PROT-01 cochée le 2026-09-24 sur la pose des rulesets, complément attendu** : la mesure du refus réel d'un push direct (41-09, complément en 41-13) est confiée à Willy (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02). 41-07 est partiellement entamé (lignes `PR-R-*` de `41-PREUVES.md`, 2026-09-24).
-
-**Plans:** 12/19 plans executed en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
-dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré. **Six plans supplémentaires
-(41-14 à 41-19) ajoutés et exécutés le 2026-09-18** pour le périmètre sans admin (option (a)) — voir
-liste ci-dessous.
-
-Plans:
-
-- [x] 41-01-PLAN.md — préalables re-mesurés (identité admin, collaborateurs, #29, checks requis), JSON des deux rulesets à deux `User` `always` (D-02bis, révisé 2026-09-23)
-- [x] 41-02-PLAN.md — `.github/CODEOWNERS` étroit, ledger PROT-01..04 non cochés
-- [x] 41-03-PLAN.md — ADR-072 (contournement et hotfix), amendement d'ADR-059, `CLAUDE.md`
-- [x] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
-- [x] 41-05-PLAN.md — décision explicite avant pose, pose par l'exécutant, relecture serveur des deux `User`, état des PR en vol, mesure M-2 (révisé 2026-09-23)
-- [x] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement — `CO-VERDICT: ECART` accepté et documenté (Willy, 2026-09-24) : `mergeStateStatus`/`reviewDecision` masqués par le contournement `always` des deux seuls collaborateurs
-- [ ] 41-07-PLAN.md — PR rouge jetable : mesure M-1, refus, fermeture sans merge — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy ») ; partiellement entamé : lignes `PR-R-*` de `41-PREUVES.md` (2026-09-24).
-- [ ] 41-08-PLAN.md — contournement réel et trace dans les rule suites, mesure M-3 — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy »).
-- [ ] 41-09-PLAN.md — push direct refusé pour un acteur hors liste (clé de déploiement temporaire), règles de tags, mesure M-4 (révisé 2026-09-23) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy »).
-- [ ] 41-10-PLAN.md — doctrine post-preuves (O-3 « gardée par défaut + tracée », BACKLOG, ADR-072) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
-- [ ] 41-11-PLAN.md — décision du mode de release (« Quand publier »), bump éventuel, PR des preuves entrée sur `main` sans contournement (révisé 2026-09-23) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
-- [ ] 41-12-PLAN.md — tag, release GitHub, `check-release-tag --remote`, invariants de phase (humain) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
-- [ ] 41-13-PLAN.md — clôture : PROT-01 coché sur preuve, ROADMAP/STATE, éligibilité de la clôture du jalon (révisé 2026-09-23) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
-
-Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-18) :
-
-- [x] 41-14-PLAN.md — G-1 `scripts/check-baseline-arbitrage.sh` (PROT-04) : hausse de baseline ou sentinelle neutralisée sans arbitrage cité, 9 mutants
-- [x] 41-15-PLAN.md — outillage de preuve de phase (`tools/check-aucune-fermeture.sh`, `tools/check-trace-arbitrage.sh`, `41-PREUVES.md`)
-- [x] 41-16-PLAN.md — G-2 `scripts/check-gate-touche.sh` (PROT-05) : surface de gate touchée sans marqueur déclaratif `Gate-Touche:`, 6 mutants
-- [x] 41-17-PLAN.md — G-3 `scripts/check-push-sans-pr.sh` (PROT-05) : alarme après coup sur un push direct vers `main` sans PR associée, 5 mutants
-- [x] 41-18-PLAN.md — doctrine : ADR-072, résumé `CLAUDE.md`, renvois `BACKLOG.md`, O-3 « signalée et tracée »
-- [x] 41-19-PLAN.md — clôture du périmètre sans admin : rejeu final, ledger `REQUIREMENTS.md` (PROT-01 non coché, PROT-02/03/04/05 cochés), constat d'inatteignabilité des critères 1-3
 ### Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED)
 
 > **Origine** (2026-09-23, le jour même de la partition réelle du dépôt) : la PR #94 a partitionné
@@ -1666,6 +1560,121 @@ Plans:
 - [x] 41.4-09-PLAN.md — vague 3 : étape CI propre de check-skills, commentaire CI corrigé (revue `@picmakpro`) — POCK-07, POCK-08
 - [x] 41.4-10-PLAN.md — vague 3 : tests statiques d'ancres T39-T43 avec mutations — POCK-01, 02, 03, 04, 06
 - [x] 41.4-11-PLAN.md — vague 4 : bumps de modules (jamais la racine), ledger, critère 7, dogfood des gardes — POCK-01 à POCK-08
+
+</details>
+
+## Phase 41 — chaîne de mesures confiée à Willy (hors clôture de fiabilite-v1.0)
+
+> Jalon clos le 2026-10-08. Cette fiche reste dépliée parce que les plans 41-07 à 41-13 continuent
+> côté Willy (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02).
+
+### Phase 41: Posture de protection du dépôt
+
+> **Origine** : finding de l'audit de mission de la Phase 25 (vague 3, 2026-09-15) —
+> `gh api repos/picmakpro/vibeflow-os/rulesets` rend `[]` : `main` n'est protégée par rien, donc
+> **tout gate in-repo est neutralisable depuis la PR qu'il juge** (une même PR peut modifier un
+> gate, sa suite de tests et l'étape CI qui l'invoque). Risque structurel et antérieur à la 25,
+> nommé par aucun threat ID de son registre STRIDE. Décision Samuel (AskUserQuestion session
+> principale, 2026-09-15) : **ouvrir une phase dédiée** plutôt que poser un ruleset au passage
+> d'une mission — changer les règles du merge pendant qu'une PR est ouverte modifierait les
+> conditions de cette PR en cours de route. Cahier des charges : `BACKLOG.md` § « Posture de
+> protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15) ».
+
+**Goal**: La branche `main` est protégée par une règle machine — CI verte requise avant merge —
+sans casser le flux de release existant (bump → merge → tag annoté → release GitHub) ni les
+hotfix urgents.
+**Depends on**: aucune dépendance de code. Séquencée **après la Phase 40 et la calibration 25-04** :
+les deux PR en attente ne doivent pas changer de règles de merge en vol — même raison qui a fait
+différer cette inscription après le merge de la PR #67.
+**Requirements**: PROT-01, PROT-02, PROT-03, PROT-04 (cadrage du 2026-09-17, `41-CONTEXT.md`) —
+PROT-01 (rulesets de branche et de tags posés et prouvés), PROT-02 (compatibilité avec la
+discipline de release du `CLAUDE.md` — `check-release-tag` `main`-only, tag et release GitHub
+post-merge, hook `pre-push` conservé), PROT-03 (politique hotfix et de contournement écrite,
+ADR-072), PROT-04 (O-3 « gardée par défaut + tracée » : CODEOWNERS `@picmakpro` + revue code owner).
+**Success Criteria** (what must be TRUE):
+
+  1. `gh api repos/picmakpro/vibeflow-os/rulesets` ne rend plus `[]` : un ruleset actif sur
+     `main` exige le statut CI vert avant merge (PROT-01).
+
+  2. Une PR rouge est **refusée par défaut** ; la contourner demande un **geste explicite** et
+     laisse une **trace dans GitHub** — prouvé en deux temps par des essais réels tracés (refus
+     d'un merge sans contournement sur une PR jetable ; trace d'un contournement lue dans les rule
+     suites), références des PR dans le SUMMARY, jamais par la seule lecture de la configuration
+     (PROT-01). *Reformulé le 2026-09-17 — arbitrage Samuel, AskUserQuestion session principale,
+     2026-09-17 (P-1 du `41-CONTEXT.md`) : le bypass est accordé au rôle `write`, le libellé
+     d'origine « ne peut pas être mergée » était inatteignable.*
+
+  3. Le flux de release est rejoué vert sous la nouvelle règle : bump → PR → merge → tag annoté
+     → release GitHub → `bash scripts/check-release-tag.sh --remote` ✓ ; la politique hotfix
+     (ce qui peut contourner quoi, avec quelle trace) est écrite, emplacement tranché au cadrage
+     (PROT-02, PROT-03).
+
+  4. QUAL-01 s'applique si un gate naît (mutation rouge prouvée) ; sinon la phase n'en crée
+     aucun et le dit.
+
+> **PRÉMISSE RENVERSÉE le 2026-09-17** (constat et arbitrage Samuel, AskUserQuestion session
+> principale, 2026-09-17) : le compte `picmakpro`, seul admin, appartient à un **tiers** ;
+> `permissions` du dépôt = `admin: false, maintain: false, push: true`. **Aucun ruleset ne peut être
+> posé dans cette session.** Les critères de succès 1, 2 et 3 ci-dessus sont **inatteignables sans
+> accès admin** ; les décisions D-01 à D-08 du `41-CONTEXT.md` sont **suspendues** et les plans
+> 41-01 (T2/T3), 41-04 à 41-09 et la partie « sous la règle » de 41-11 à 41-13 sont **différés en
+> attente d'accès** (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »). L'exécution a
+> été arrêtée après 41-01 Task 1 (registre `41-PREUVES.md` conservé). Un **périmètre sans admin**
+> (gardes in-repo visibles et tracées) est proposé à l'arbitrage — il remplacera les critères de
+> succès de cette phase une fois tranché.
+
+> **PÉRIMÈTRE SANS ADMIN EXÉCUTÉ ET CLOS le 2026-09-18** (option (a), arbitrage Samuel,
+> AskUserQuestion session principale, 2026-09-17) : six plans neufs (41-14 à 41-19, ci-dessous)
+> livrent trois gardes in-repo qui SIGNALENT et TRACENT sans jamais verrouiller — G-1
+> `scripts/check-baseline-arbitrage.sh` (PROT-04), G-2 `scripts/check-gate-touche.sh` (PROT-05),
+> G-3 `scripts/check-push-sans-pr.sh` (PROT-05) — plus la doctrine `docs/ADR.md` § ADR-072
+> (PROT-03) et O-3 du `25-SECURITY.md` portée à **« signalée et tracée »**. Ledger
+> `.planning/REQUIREMENTS.md` : PROT-02/03/04/05 **cochés sur pièce** ; **PROT-01 reste NON COCHÉ** (depuis cochée le 2026-09-24)
+> — hors d'atteinte sans accès admin, déclencheur de reprise écrit. **Les critères de succès 1, 2
+> et 3 ci-dessus restent INATTEIGNABLES sans accès admin** (constat explicite,
+> `41-PREUVES.md` § 41-19) et ne sont **pas** réécrits ici — ils décrivent la posture serveur
+> différée, pas le périmètre livré. Critère 4 (QUAL-01) satisfait : 3 gates neufs, 29 mutants
+> mesurés tués au total (G-1=9, G-2=6, G-3=5, plus les deux outils de phase). Rejeu final `gates`
+> rc=0 (13 étapes) et `tests` rc=0 (82 suites, 0 échec). Les plans 41-01 (T2/T3), 41-02, 41-04 à
+> 41-09, 41-11 à 41-13 restent **différés faute d'accès admin**, tels quels, non exécutés
+> (`BACKLOG.md` § « Protection de `main` côté GitHub — DIFFÉRÉ »).
+
+**Reprise du volet admin le 2026-09-23** : accès admin constaté (`picmakpro`, Willy), contournement
+par deux utilisateurs nommés (D-02bis, arbitrage Willy, AskUserQuestion session principale,
+2026-09-23), plans 41-01 à 41-13 révisés puis vérifiés (vérificateur frais, passé). Voir
+`41-CONTEXT.md` § REPRISE.
+
+**Chaîne des mesures confiée à Willy le 2026-10-02** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy », puis étendu le même jour, même canal : « Toute la chaîne à Willy ») : les plans 41-07, 41-08 et 41-09 mesurent la protection posée par Willy et dépendent de ses gestes d'admin (checkpoint avant le merge `--admin` de #101, clé de déploiement temporaire). Les plans 41-10, 41-11, 41-12 et 41-13 prolongent cette chaîne (chacun dépend du précédent) et sont confiés eux aussi à Willy. Tous sortent du périmètre de clôture de `fiabilite-v1.0` ; la Phase 41 est livrée sur 41-01 à 41-06 (+ 41-14 à 41-19), ces mesures résiduelles sont déclarées, aucun PLAN supprimé. `fiabilite-v1.0` se clôt avec **PROT-01 cochée le 2026-09-24 sur la pose des rulesets, complément attendu** : la mesure du refus réel d'un push direct (41-09, complément en 41-13) est confiée à Willy (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02). 41-07 est partiellement entamé (lignes `PR-R-*` de `41-PREUVES.md`, 2026-09-24).
+
+**Plans:** 12/19 plans executed en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
+dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré. **Six plans supplémentaires
+(41-14 à 41-19) ajoutés et exécutés le 2026-09-18** pour le périmètre sans admin (option (a)) — voir
+liste ci-dessous.
+
+Plans:
+
+- [x] 41-01-PLAN.md — préalables re-mesurés (identité admin, collaborateurs, #29, checks requis), JSON des deux rulesets à deux `User` `always` (D-02bis, révisé 2026-09-23)
+- [x] 41-02-PLAN.md — `.github/CODEOWNERS` étroit, ledger PROT-01..04 non cochés
+- [x] 41-03-PLAN.md — ADR-072 (contournement et hotfix), amendement d'ADR-059, `CLAUDE.md`
+- [x] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
+- [x] 41-05-PLAN.md — décision explicite avant pose, pose par l'exécutant, relecture serveur des deux `User`, état des PR en vol, mesure M-2 (révisé 2026-09-23)
+- [x] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement — `CO-VERDICT: ECART` accepté et documenté (Willy, 2026-09-24) : `mergeStateStatus`/`reviewDecision` masqués par le contournement `always` des deux seuls collaborateurs
+- [ ] 41-07-PLAN.md — PR rouge jetable : mesure M-1, refus, fermeture sans merge — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy ») ; partiellement entamé : lignes `PR-R-*` de `41-PREUVES.md` (2026-09-24).
+- [ ] 41-08-PLAN.md — contournement réel et trace dans les rule suites, mesure M-3 — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy »).
+- [ ] 41-09-PLAN.md — push direct refusé pour un acteur hors liste (clé de déploiement temporaire), règles de tags, mesure M-4 (révisé 2026-09-23) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy »).
+- [ ] 41-10-PLAN.md — doctrine post-preuves (O-3 « gardée par défaut + tracée », BACKLOG, ADR-072) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
+- [ ] 41-11-PLAN.md — décision du mode de release (« Quand publier »), bump éventuel, PR des preuves entrée sur `main` sans contournement (révisé 2026-09-23) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
+- [ ] 41-12-PLAN.md — tag, release GitHub, `check-release-tag --remote`, invariants de phase (humain) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
+- [ ] 41-13-PLAN.md — clôture : PROT-01 coché sur preuve, ROADMAP/STATE, éligibilité de la clôture du jalon (révisé 2026-09-23) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
+
+Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-18) :
+
+- [x] 41-14-PLAN.md — G-1 `scripts/check-baseline-arbitrage.sh` (PROT-04) : hausse de baseline ou sentinelle neutralisée sans arbitrage cité, 9 mutants
+- [x] 41-15-PLAN.md — outillage de preuve de phase (`tools/check-aucune-fermeture.sh`, `tools/check-trace-arbitrage.sh`, `41-PREUVES.md`)
+- [x] 41-16-PLAN.md — G-2 `scripts/check-gate-touche.sh` (PROT-05) : surface de gate touchée sans marqueur déclaratif `Gate-Touche:`, 6 mutants
+- [x] 41-17-PLAN.md — G-3 `scripts/check-push-sans-pr.sh` (PROT-05) : alarme après coup sur un push direct vers `main` sans PR associée, 5 mutants
+- [x] 41-18-PLAN.md — doctrine : ADR-072, résumé `CLAUDE.md`, renvois `BACKLOG.md`, O-3 « signalée et tracée »
+- [x] 41-19-PLAN.md — clôture du périmètre sans admin : rejeu final, ledger `REQUIREMENTS.md` (PROT-01 non coché, PROT-02/03/04/05 cochés), constat d'inatteignabilité des critères 1-3
 
 ## 📋 Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (Phases 51-56)
 
