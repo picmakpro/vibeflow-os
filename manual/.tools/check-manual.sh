@@ -20,8 +20,10 @@
 # sans entrée toc.yml correspondante DANS SA LANGUE, ou une entrée toc.yml dont le fichier de
 # sa langue est absent, est une rupture de bijection (C2).
 #
-# Ce gate ne s'exécute qu'à la main, en local (D-13) — jamais référencé dans
-# .github/workflows/ci.yml, jamais posé sous scripts/.
+# Ce gate reste exécutable à la main, en local, et il est aussi une étape bloquante du job
+# `gates` de .github/workflows/ci.yml (arbitrage Samuel, AskUserQuestion session principale,
+# 2026-10-02 — la clause D-13 « jamais référencé dans ci.yml » est levée). Jamais posé sous
+# scripts/. Portable bash 3.2 (macOS) et bash 5 + mawk (ubuntu-latest).
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"

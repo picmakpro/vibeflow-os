@@ -24,7 +24,10 @@ moment ou l'apparente évidence d'une correction.
 - **La validation humaine avant tout geste irréversible (ADR-031).** Un fix, une suppression, une
   matérialisation de fichier structurant ne se fait jamais sans ton accord explicite — l'engagement
   central déjà détaillé dans
-  [gates-et-validation-humaine.md](../02-concepts/gates-et-validation-humaine.md).
+  [gates-et-validation-humaine.md](../02-concepts/gates-et-validation-humaine.md). Une décision
+  voisine (ADR-076) précise sa portée : l'archivage automatique de la trace d'un lab est un
+  déplacement tracé et réversible, jamais une correction, et il ne supprime ni ne commite rien
+  (voir [ranger-ce-qu-on-cree.md](../05-equipe-agents/ranger-ce-qu-on-cree.md)).
 - **L'accès MCP au minimum nécessaire (ADR-051).** Un agent qui compile ou teste ton code reçoit
   automatiquement l'accès aux seuls serveurs MCP que **ton propre projet** déclare — jamais un accès
   plus large, jamais un nom de serveur deviné ou codé en dur (déjà vu à la page

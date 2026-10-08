@@ -26,14 +26,16 @@ qu'elles vérifient, quand elles s'exécutent, et l'effet d'un échec.
 | Fraîcheur de la doctrine | Un document de cadrage ou de règle a dérivé de sa source sans mise à jour correspondante | Au démarrage de session, périodiquement | Un avertissement s'affiche, rien n'est modifié à ta place |
 | Audit d'infrastructure | L'état réel de tes hooks, scripts et outillage n'a pas dérivé silencieusement d'une mise à jour | Au démarrage de session, si le dernier contrôle date de plus de deux semaines | Un avertissement s'affiche avec le détail de la dérive détectée |
 | Recherche documentaire avant debug | Un debug intensif sur une bibliothèque, un framework ou un comportement natif est précédé d'une recherche documentaire | Au démarrage de session, en rappel | Un avertissement s'affiche, rien n'empêche de continuer sans avoir cherché |
+| Verrou de driver | Une session non enregistrée sous le verrou d'un autre pilote ne fait aucun geste git mutant (commit, changement de branche, `reset`, `merge`, `rebase`, `stash`, `tag`, `branch`, `git worktree remove`…, liste non exhaustive), ne publie pas (`git push`, `gh pr`, `gh release`) et n'écrit pas dans `.planning/` pendant que ce verrou est tenu — dans le lab seulement | Avant chaque commande shell et chaque écriture de fichier (bloquant) | Le geste est refusé avec le nom du détenteur et trois issues (se ré-attacher, travailler dans un arbre séparé, ou une dérogation explicite, consignée dans un journal à côté du verrou dans la mesure du possible : cette écriture ne bloque jamais et un échec est ignoré) |
+| [Fin de geste](../05-equipe-agents/ranger-ce-qu-on-cree.md) | Rien de rangeable n'est apparu depuis le début de la session (worktree ou branche intégrés, stash, mémoire non indexée) ; le hook archive des fichiers de planning (ce qu'un budget dépassé désigne, y compris les sujets clos du `BACKLOG.md`), jamais supprimés, et retient l'arrêt tant que la session n'a pas rangé elle-même ce qu'elle a créé | À la fin de chaque tour ; bloquant seulement dans un lab armé par le fichier `.planning/.fin-de-geste-armed` (`VF_FIN_DE_GESTE=warn` se contente de le dire, `off` coupe la garde) | La session ne s'arrête pas tant qu'il reste du rangement ; après trois blocages de suite sans progrès, elle sort avec un message visible |
+| Santé des gardes | Un garde du parc n'a pas pu tourner récemment (interpréteur absent, par exemple) : il a alors laissé passer sans rien vérifier | Au démarrage de session | Un constat s'affiche (`check-guard-health.sh`) ; rien n'est bloqué ni corrigé à ta place |
+| Sujet actif | Sur un lab dont le planning est partitionné en sujets, un sujet est bien résolu | Au démarrage de session ; muet sur un lab non partitionné | Un constat s'affiche avec le remède (`check-workstream-pointer.sh`) ; rien n'est bloqué |
 
-Deux mécanismes complètent ce tableau sans en être des lignes à part entière. Le **verrou de
-pilotage** empêche deux managers de mission de piloter la même étape en même temps : celui qui
-arrive en second attend que le premier relâche le verrou, ou récupère un verrou abandonné après un
-délai d'inactivité fixé par défaut à trente minutes. Et **le juge n'écrit jamais** : un agent qui
+Un principe complète ce tableau sans en être une ligne : **le juge n'écrit jamais**. Un agent qui
 évalue un livrable (relecture, audit, gate qualité) reçoit un accès en lecture seule au code qu'il
 juge — un garde-fou posé au niveau des outils qu'on lui donne, pas d'une règle qu'il pourrait
-enfreindre sous pression.
+enfreindre sous pression. Le verrou de driver, lui, a désormais sa ligne : la mécanique complète est
+dans [une-mission-longue.md](../05-equipe-agents/une-mission-longue.md).
 
 ### Le principe du fail-open
 
@@ -60,7 +62,7 @@ explique un refus que tu pourrais prendre pour un caprice :
 
 **À ne pas surpromettre :** la charte recommande de garder un agent à 300 lignes au plus, avec un
 avertissement dès 251. Les agents distribués par VibeFlow sont **mesurés** dans la CI du dépôt de
-distribution depuis v2.62.0 (`check-instruction-budget.sh`) ; le blocage est actif dans cette CI
+distribution depuis l'introduction du budget d'instructions (`check-instruction-budget.sh`) ; le blocage est actif dans cette CI
 depuis l'armement du ratchet (PR #73), mais sa portée a changé en cours de route : entre
 l'armement et la révision du gate (PR #76), il bloquait tout dépassement de lignes **et**
 d'instructions, plafond fixé à 250 lignes ; depuis cette révision, il ne bloque plus que les

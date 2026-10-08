@@ -85,10 +85,11 @@ the framing was mushy, it will produce well-made work on the wrong thing, with m
 than a lone session. Splitting into roles protects against degradation, not against a wrong
 starting point.
 
-And one structural limit worth knowing: the coordination mechanisms between sessions are
-**declarative**. They assume every actor consults them. A session that ignores them isn't stopped —
-that's detailed, bluntly, in [a-long-mission.md](./a-long-mission.md) and
-[branches-and-worktrees.md](./branches-and-worktrees.md).
+And one structural limit worth knowing: the coordination mechanisms between sessions are not all
+binding. The branch claim informs without blocking. The driver lock does refuse another session's
+actions — but only inside a Claude Code session where it is installed: a plain terminal or an
+editor doesn't go through it. That's detailed, bluntly, in [a-long-mission.md](./a-long-mission.md)
+and [branches-and-worktrees.md](./branches-and-worktrees.md).
 
 None of this is a reason to distrust the mechanism — it's a reason to read the next two pages
 before trusting it blindly on something that matters.

@@ -8,8 +8,10 @@
 #
 # ROOT par défaut = le dossier parent de ce script (manual/). Idempotent : deux exécutions
 # consécutives laissent l'arbre strictement identique (propriété exploitée par le contrôle
-# C4 de check-manual.sh). Ce script ne s'exécute qu'à la main, en local (D-13) — jamais
-# référencé dans .github/workflows/ci.yml, jamais posé sous scripts/.
+# C4 de check-manual.sh). Ce script s'exécute à la main, en local ; il n'est pas une étape de
+# .github/workflows/ci.yml en propre, mais C4 de check-manual.sh (étape du job `gates` depuis
+# l'arbitrage Samuel, AskUserQuestion session principale, 2026-10-02) le rejoue sur une copie
+# jetable. Jamais posé sous scripts/.
 #
 # H-1 levée (wave 26-10, cf. toc.yml) : FR et EN peuvent avoir des dossiers ET des slugs de
 # fichier différents. L'appariement d'une page/thème entre les deux langues n'est donc PLUS

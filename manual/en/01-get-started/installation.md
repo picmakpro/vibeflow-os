@@ -76,12 +76,24 @@ reasonable default is already suggested based on the detected context (for examp
 current folder is a git repository). A dedicated page later in this theme details each option and
 how to choose — this page only confirms your choice.
 
-**3. Module choice.** The minimal governance baseline (the `conductor` module) is installed
-automatically — this isn't a choice, it's the foundation without which nothing else can work
-correctly. After that, you're offered one structuring choice: a development lab (code), or a new
-lab for a different field. The full list of available modules is derived from the catalog present
-on your disk, never hardcoded here — always check each module's `module.json` or the repo's
-`CHANGELOG.md` for the exact state of the catalog at the moment you're reading this manual.
+**3. Module choice.** The baseline — the modules the catalog marks as mandatory, today `conductor`
+(the governance guardian) and `consolidator` (the lab's memory), along with their dependencies — is
+installed automatically. This isn't a choice: a lab without them has neither a consistency safety
+net nor a registry to build up knowledge in. After that, you're offered one structuring choice: a
+development lab, or a new lab for a different field.
+
+- **Development lab**: three presets, `dev` pre-selected by default (the complete dev cycle: head,
+  mission team, cross-checked design), `dev-mobile` (the dev lab plus the test loop on a simulator
+  or emulator, for an Expo, React Native or iOS project) and `dev-audite` (the dev lab plus software
+  architecture audit and the conformance validator, for a repository that lives long or has several
+  contributors). A preset is a list of starting modules; their dependencies are added for you.
+- **New lab (another field)**: the installer adds nothing more, and the rest goes through
+  `/vf-new-lab`, which clarifies your field and wires the relevant modules itself.
+
+An advanced user can also explicitly ask for one specific module (à la carte), but that isn't the
+first-use path. With no usable answer, the installer falls back to the `dev-orchestrator` module
+alone. The list of modules and presets always comes from the catalog on your disk (each module's
+`module.json`, `presets.json`), never hardcoded here.
 
 **4. Summary, then installation.** Before installing anything, you're shown a summary of
 everything that's about to be installed (the module you chose sometimes pulls in other modules it

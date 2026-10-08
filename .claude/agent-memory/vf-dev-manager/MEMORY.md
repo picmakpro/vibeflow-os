@@ -88,3 +88,6 @@
 - [Hook rtk + garde : git refusé](project_hook-rtk-git-refuse-par-garde.md) — tout `git` réécrit en `rtk git` puis refusé en worktree isolé : wrapper `g.sh` au scratchpad, chemin absolu
 - [Contrat de verdict sans seuil](feedback_contrat-de-verdict-sans-seuil.md) — sans seuil de « passed », un juge rougit au premier mineur : 2 tours de sonde brûlés en 41.4
 - [Commiter avant de rendre](feedback_commiter-avant-de-rendre.md) — 2 workers figés après rédaction, avant commit : exiger le commit avant le rapport, aucun rejeu long en fin de mandat
+- [`git log` via rtk masque les merges](project_rtk-git-log-masque-les-merges.md) — pointe d'origin/main lue fausse (2aa307df au lieu du merge 0c14757b) : SHA de base par `git rev-parse`
+- [Attendre un worker : sleep bloqué](project_attendre-un-worker-sleep-bloque.md) — une boucle `until … sleep` rend instantanément ; attendre par `python3 time.sleep` + heartbeat
+- [Rapport de mission = fichier versionné](feedback_rapport-de-mission-passe-les-gates.md) — un chemin absolu dans le bloc E6 a rougi gates+tests après une livraison verte : `check-machine-paths` avant push
