@@ -2,23 +2,23 @@
 gsd_state_version: "1.0"
 milestone: fiabilite-v1.0
 milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-current_phase_name: Posture de protection du dépôt
-status: executing
+current_phase_name: Emprunts Pocock — disciplines de cadrage, de revue et de skills
+status: completed
 stopped_at: >-
-  Phase 41.4 exécutée (11 plans + 3 corrections ciblées, 2026-10-06), PR en brouillon empilée sur
-  #134 ; revue tour 3 gaps_found (4 majeurs auto-fix, budget de 3 tours épuisé, arrêt sur consigne).
-  Ancien texte de ce champ : `git show 13a52c8f:.planning/workstreams/fiabilite/STATE.md`.
-last_updated: "2026-10-06T00:00:00.000Z"
-last_activity: 2026-10-06
+  fiabilite-v1.0 milestone complete (2026-10-08) — 41.2 (PR #130) et 41.4 (PR #135, --admin) mergées,
+  ledger réaligné, snapshots posés ; release v2.69.0 à suivre.
+  Ancien texte de ce champ : `git show 0e99ff71:.planning/workstreams/fiabilite/STATE.md`.
+last_updated: "2026-10-08T00:00:00.000Z"
+last_activity: 2026-10-08
 last_activity_desc: >-
-  Phase 41.4 exécutée (11 plans), PR en brouillon ; détail : § Current Position.
+  Clôture du jalon fiabilite-v1.0 ; détail : § Current Position.
 progress:
-  total_phases: 16
-  completed_phases: 12
+  total_phases: 18
+  completed_phases: 18
   total_plans: 115
   completed_plans: 105
-  percent: 75
-current_phase: 41
+  percent: 100
+current_phase: 41.4
 ---
 
 # Project State
@@ -34,16 +34,16 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: **41.4** (Emprunts Pocock) — exécutée, 11 plans + corrections ciblées A, B, C (2026-10-06), POCK-01..08
-cochées, sonde réelle POCK-04 jouée dans les deux sens ; tour 4 (P414-D-23) fait : rebasée sur `origin/main`,
-4 majeurs du tour 3 fermés. PR #135 en brouillon (revue `@picmakpro` requise : `ci.yml`) ; revue tour 4 : Standards
-`passed`, Spec `gaps_found` sur 1 majeur de texte (M4-01 : CHANGELOG dev-orchestrator et ROADMAP disent encore la
-sonde « à jouer »), budget de 4 tours épuisé. `current_phase` reste 41.
-Antérieur (état de main, 2026-10-02) — phase **41.2** : exécutée, plans 01-06 + corrections ciblées 01-02, PR ouverte
-en revue ; vérification human_needed (E1 + parcours réel). Les plans 41-07 à 41-13 sont confiés à Willy, hors clôture.
-Next: correction de M4-01 (texte, sur feu vert), sortie du brouillon de #135, merge (#135 absorbe #134), clôture du
-jalon `fiabilite-v1.0`.
-Last activity: 2026-10-06 — mission `.planning/missions/2026-10-06-phase-41-4-emprunts-pocock.md`.
+Phase: **41.4** (Emprunts Pocock), dernière phase du jalon — complete, mergée PR #135.
+Jalon **`fiabilite-v1.0` CLOS le 2026-10-08** (arbitrage Samuel, session principale, 2026-10-08). 18 phases livrées,
+de la 18 à la 41.4. Les compteurs de plans restent à 105/115 : les 7 plans 41-07 à 41-13 sont confiés à Willy, hors
+clôture, et la Phase 40 a 5 plans pour un seul `40-SUMMARY.md` consolidé. Bilan et réserves :
+`.planning/MILESTONES.md` § fiabilite-v1.0.
+Dernières entrées : la 41.2 a été mergée le 2026-10-02 (PR #130) ; WSCH-01 est coché avec une réserve de recette en
+session, tracée au BACKLOG. La 41.4 a été mergée le 2026-10-08 (PR #135, en `--admin`).
+Next: release `v2.69.0` (41.2 et 41.4 publiées), puis ouverture de `ecc-inspiration-v1.0` (Phases 51-56,
+ordre 51 → 52 → 54 → 53 → 55 → 56).
+Last activity: 2026-10-08 — clôture du jalon.
 
 ## Accumulated Context
 
@@ -54,6 +54,9 @@ Historique complet (jalons, décisions, arbitrages 2026-07 à 2026-09) : voir l'
 - 2026-10-01/02 — Phase 41.2 : P412-D-01 à D-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-01),
   P412-D-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02) ; P412-D-04, D-06, D-07, D-08 =
   décisions du manager. Registre : `41.2-CONTEXT.md` du dossier de phase.
+- 2026-10-08 — Clôture de `fiabilite-v1.0` : #135 mergée en `--admin` (arbitrage Samuel, AskUserQuestion session
+  principale, 2026-10-08 : « Merger #135 en --admin ») ; réserve WSCH-01 tracée au BACKLOG (même canal, même date :
+  « Dette tracée, on clôt »).
 - 2026-10-06 — Phase 41.4 : P414-D-01..D-11, D-17..D-22 (arbitrage Samuel, AskUserQuestion session principale,
   2026-10-06) ; D-12..D-16 = décisions du manager ; interprétation de D-22 (axe `skipped` hors conjonction) à
   ratifier. Registre : `41.4-CONTEXT.md` du dossier de phase.

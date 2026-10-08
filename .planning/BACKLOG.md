@@ -13,7 +13,10 @@
 
 **À trancher au cadrage.** Une demande « crée une PR » en conversation doit-elle aller à `gsd-ship` (PR sans merge-danger call ni contrôle E3) ou au geste de l'équipe ?
 
-## Choisir la partition du planning AU DÉMARRAGE, pas après coup — demandé 2026-09-23
+## Choisir la partition du planning AU DÉMARRAGE, pas après coup — demandé 2026-09-23 — CLOS (2026-10-08)
+
+**Clos le 2026-10-08** : livré par la Phase 41.2 (WSCH-01..05, PR #130, mergée le 2026-10-02). Réserve de recette
+en session : sujet « Recette réelle de `/vf-split-planning` » plus bas.
 
 **Statut : besoin exprimé par Samuel (session principale, 2026-09-23), non cadré.** À passer par
 `/gsd-discuss-phase` avant toute écriture de code — rien n'est décidé ici.
@@ -732,7 +735,10 @@ se re-dérive, il ne se fige jamais dans le test qui le vérifie.
 
 **Déclencheur de reprise :** le prochain cas où ce test casse sur un ajout légitime de référence.
 
-## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23)
+## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23) — CLOS (2026-10-08)
+
+**Clos le 2026-10-08** : livré par la Phase 41.1 (WSAW-01..07, PR #100, release `v2.66.0`) ; `ci.yml:353` est nommé
+par WSAW-02 et passe par le fan-out de compartiments.
 
 **Capturé :** 2026-09-23, mission « partition réelle du planning D-02 » (`.planning/missions/2026-09-23-partition-planning-d02.md`).
 
@@ -1074,3 +1080,17 @@ permissions étaient dégradées.
 
 Tracés, non corrigés (décision du manager, 2026-09-30) : (1) snapshot de mission unique par dépôt, écrasé par une mission concurrente (`check-mission-exit.sh:184`) — E7 rend SAIN sur le snapshot d'une autre mission quand le verrou est relâché ; (2) avis d'archivage perdu si la session s'arrête après un Stop bloquant, ou si l'écriture de `.now` échoue après archivage (`guard-fin-de-geste.sh:142`) ; (3) snapshot de session pris sans `--auto --dry-run` (`:126`) : un refus préexistant est rapporté comme neuf ; (4) entrées CHANGELOG `conductor` et `dev-orchestrator` à écrire à la prochaine release fonctionnelle (aucun bump en 41.3) ; (5) tri humain : BACKLOG racine à 35 sujets ouverts pour 20, ROADMAP `fiabilite` à 143 Ko pour 64 ; (6) STATE `gouvernance` à 21 Ko (Willy).
 **Déclencheur de reprise :** la prochaine release fonctionnelle (4), la clôture du jalon `fiabilite-v1.0` (5), une reprise de la garde de fin de geste (1 à 3).
+
+## Recette réelle de `/vf-split-planning` en session interactive (réserve WSCH-01) — DIFFÉRÉ (2026-10-08)
+
+**Origine :** `41.2-VERIFICATION.md` est resté en `human_needed` (5/6). Le contrat écrit du skill est prouvé par
+`test-vf-split-planning.sh`, mais personne n'a vérifié qu'un agent pose bien la question à la fin de l'initialisation
+d'un lab, ni le repli en sous-agent. WSCH-01 a été coché avec cette réserve à la clôture de `fiabilite-v1.0`
+(arbitrage Samuel, AskUserQuestion session principale, 2026-10-08 : « Dette tracée, on clôt »).
+
+**Geste attendu :** sur un lab jetable fraîchement initialisé, lancer `/vf-split-planning`, observer la question,
+répondre « non » (planning unique, aucun appel au geste), puis rejouer le même parcours en sous-agent, où
+AskUserQuestion n'est pas disponible. Consigner le résultat dans `41.2-VERIFICATION.md`.
+
+**Déclencheur de reprise :** la prochaine initialisation réelle d'un lab de code, ou une évolution de `vf-split-planning`
+ou de `vf-new-lab`.
