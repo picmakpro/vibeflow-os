@@ -1,6 +1,7 @@
 ---
 name: vf-split-planning
 description: "Utiliser quand on veut des sujets de planning parallèles — « on sera plusieurs sur ce lab », « deux chantiers en parallèle », « sépare le planning en sujets », ou en fin d'initialisation d'un lab de code. ✘ pas pour créer le lab → /vf-new-lab. Invocable par l'utilisateur ET par `vibeflow-conductor`."
+vf-invocation: model
 ---
 
 # vf-split-planning — Choisir un planning unique ou des sujets parallèles

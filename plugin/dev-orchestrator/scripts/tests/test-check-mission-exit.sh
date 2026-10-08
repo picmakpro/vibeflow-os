@@ -4,7 +4,8 @@
 # Un cas par comportement du contrat (cf. en-tête du script testé), plus les six mutations de
 # fixture (une par contrôle E1-E6) et deux mutations structurelles (D-11, cascade E1). Cas 28-43 :
 # contrôle E7 (SOBR-07, plan 41.3-04, delta depuis le snapshot de début de mission), huit mutants de script
-# tués (rc attendu/obtenu). Fixtures
+# tués (rc attendu/obtenu). Cas 44-49 (POCK-06, plan 41.4-06) : E3 lit le merge-danger call du corps de PR
+# (SAIN 1/44, MANQUE 45-47/49, INDÉTERMINÉ 48, corps hostile 48b) ; mutants E3a/E3b tués. Fixtures
 # isolées via mktemp -d + git init + dépôt nu, jamais sur le repo réel. Chaque cas capture la
 # sortie ET le code de retour dans deux variables distinctes, assertées séparément.
 # Cas 23-27 (issue #82) : E1 lit aussi `children_running` du registre des agents dispatchés
@@ -39,7 +40,7 @@ mkdir -p "$GH_OK_BIN"
 cat > "$GH_OK_BIN/gh" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = "auth" ] && [ "$2" = "status" ]; then exit 0; fi
-if [ "$1" = "pr" ] && [ "$2" = "view" ]; then echo '{"state":"OPEN"}'; exit 0; fi
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then echo '{"state":"OPEN","body":"## Merge-danger call\nPorte : double sens\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}'; exit 0; fi
 exit 1
 EOF
 chmod +x "$GH_OK_BIN/gh"
@@ -53,10 +54,30 @@ if [ "$1" = "auth" ] && [ "$2" = "status" ]; then
   echo "error: not logged in. run gh auth login" >&2
   exit 1
 fi
-if [ "$1" = "pr" ] && [ "$2" = "view" ]; then echo '{"state":"OPEN"}'; exit 0; fi
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then echo '{"state":"OPEN","body":"## Merge-danger call\nPorte : double sens\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}'; exit 0; fi
 exit 1
 EOF
 chmod +x "$GH_NOAUTH_BIN/gh"
+
+# --- Talons `gh` à corps de PR (POCK-06, E3) : même forme que GH_OK_BIN, le JSON rendu par `pr view` est ----
+# --- écrit tel quel dans pr.json (apostrophe du rayon d'explosion : quotée '\'' côté shell). --------------
+mk_gh_pr() { # <nom> <JSON brut rendu par `gh pr view`> -> imprime le dossier du talon
+  local d="$TMP/bin-gh-$1"; mkdir -p "$d"
+  printf '%s\n' "$2" > "$d/pr.json"
+  cat > "$d/gh" <<'GHEOF'
+#!/usr/bin/env bash
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then exit 0; fi
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then cat "$(dirname "$0")/pr.json"; exit 0; fi
+exit 1
+GHEOF
+  chmod +x "$d/gh"; printf '%s' "$d"
+}
+GH_CRLF_BIN="$(mk_gh_pr crlf '{"state":"OPEN","body":"## Merge-danger call\r\nPorte : double sens\r\nRayon d'\''explosion : doctrine seule, aucune donnée écrite\r\n"}')"
+GH_NOSECTION_BIN="$(mk_gh_pr nosection '{"state":"OPEN","body":"## Résumé\nUne mission sans appel de merge.\n"}')"
+GH_BADPORTE_BIN="$(mk_gh_pr badporte '{"state":"OPEN","body":"## Merge-danger call\nPorte : peut-être\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}')"
+GH_SHORTRAYON_BIN="$(mk_gh_pr shortrayon '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : tout"}')"
+GH_NOBODY_BIN="$(mk_gh_pr nobody '{"state":"OPEN"}')"
+GH_EMPTYBODY_BIN="$(mk_gh_pr emptybody '{"state":"OPEN","body":""}')"
 
 # --- Talons de verrou de driver (dag.sh sentinelle + driver-lock.sh) --------------------------------
 write_lock_stub_absent() { # <dir>
@@ -394,6 +415,147 @@ named=0; case "$err" in *"registre des agents non exposé"*) named=1 ;; esac
 if [ "$rc" -eq 3 ] && [ "$named" -eq 1 ]; then ok "27 E1 registre : champ absent (kernel antérieur), code 3, non-applicabilité dite sur stderr"
 else ko "27 E1 registre : champ absent (kernel antérieur), code 3, non-applicabilité dite sur stderr" "rc=$rc err=[$err]"; fi
 
+# === Cas 44-49 — E3 : le corps de PR porte un merge-danger call conforme (POCK-06, plan 41.4-06) ==========
+# Trois issues : SAIN (cas 1, 44), MANQUE nommé (45, 46, 47, 49), INDÉTERMINÉ (48). Le rc de précédence 64 > 4 > 0 > 3 est inchangé (cas 11).
+D="$(mk_sane_fixture c44)"
+out="$(PATH="$GH_CRLF_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "44 E3 corps conforme en CRLF — code 3, stdout vide (SAIN)"; else ko "44 E3 corps CRLF" "rc=$rc out=[$out]"; fi
+# 44a — apostrophe typographique dans « Rayon d’explosion » et espace avant les deux-points absente : conforme (T-41.4-20).
+GH_TYPO_BIN="$(mk_gh_pr typo '{"state":"OPEN","body":"Résumé\n\n## Merge-danger call  \nPorte: sens unique\nRayon d’explosion: les lecteurs du gate de sortie\n\n## Suite\nrien\n"}')"
+D="$(mk_sane_fixture c44a)"
+out="$(PATH="$GH_TYPO_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "44a E3 apostrophe typographique, deux-points collés, blancs de fin de titre — code 3 (SAIN)"; else ko "44a E3 forme tolérée" "rc=$rc out=[$out]"; fi
+e3_case() { # <n> <libellé> <talon> <rc attendu> <fragment attendu dans la sortie, ou vide> <fragment interdit>
+  local d out rc named=1 leak=0
+  d="$(mk_sane_fixture "c$1")"
+  out="$(PATH="$3:$PATH" run_gate --root "$d" --report "$REPORT_REL" --step "$STEP" 2>&1)"; rc=$?
+  if [ -n "$5" ]; then case "$out" in *"$5"*) named=1 ;; *) named=0 ;; esac; fi
+  if [ -n "$6" ]; then case "$out" in *"$6"*) leak=1 ;; esac; fi
+  if [ "$rc" -eq 3 ]; then ko "$1 $2 — mutant NON OPPOSABLE" "rc=3 identique au sain"
+  elif [ "$rc" -eq "$4" ] && [ "$named" -eq 1 ] && [ "$leak" -eq 0 ]; then ok "$1 $2 — code $4"
+  else ko "$1 $2" "rc=$rc attendu $4 nommé=$named fuite=$leak out=[$out]"; fi
+}
+e3_case 45 "E3 corps sans section — MANQUE nommé" "$GH_NOSECTION_BIN" 0 "[E3] PR ouverte sans merge-danger call conforme" ""
+e3_case 45a "E3 corps sans section — le titre manquant est dit" "$GH_NOSECTION_BIN" 0 "Merge-danger call" ""
+e3_case 46 "E3 « Porte : peut-être » (hors énumération) — MANQUE nommé" "$GH_BADPORTE_BIN" 0 "[E3] PR ouverte sans merge-danger call conforme" "peut-être"
+e3_case 47 "E3 rayon d'explosion de 4 caractères — MANQUE nommé" "$GH_SHORTRAYON_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_case 48 "E3 JSON sans clé body — INDÉTERMINÉ, jamais un vert" "$GH_NOBODY_BIN" 4 "" ""
+e3_case 49 "E3 corps vide — MANQUE (lisible, section absente), distinct de 48" "$GH_EMPTYBODY_BIN" 0 "[E3] PR ouverte sans merge-danger call conforme" ""
+# 48a — l'indétermination est dite sur stderr, avec sa cause (corps illisible), distincte du manque du cas 49.
+D="$(mk_sane_fixture c48a)"
+err="$(PATH="$GH_NOBODY_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>&1 1>/dev/null)"
+case "$err" in *"[E3] corps de PR illisible"*) named=1 ;; *) named=0 ;; esac
+if [ "$named" -eq 1 ]; then ok "48a E3 corps illisible — cause nommée sur stderr"; else ko "48a E3 corps illisible" "err=[$err]"; fi
+# 48b — le corps n'est jamais réémis : un corps hostile (faux titre, substitution, séquence de contrôle) ne fuit pas dans la sortie.
+GH_HOSTILE_BIN="$(mk_gh_pr hostile '{"state":"OPEN","body":"## Merge-danger call\nPorte : $(touch '"$TMP"'/e3-pwned-48b) `id`\nRayon d'\''explosion : \u001b[31mHOSTILE-MARKER\n"}')"
+D="$(mk_sane_fixture c48b)"
+out="$(PATH="$GH_HOSTILE_BIN:$PATH" run_gate --root "$D" --report "$REPORT_REL" --step "$STEP" 2>&1)"; rc=$?
+leak=0; case "$out" in *HOSTILE-MARKER*|*"touch"*|*"uid="*) leak=1 ;; esac
+if [ "$rc" -eq 0 ] && [ "$leak" -eq 0 ] && [ ! -e "$TMP/e3-pwned-48b" ]; then ok "48b E3 corps hostile — MANQUE, rien du corps réémis, aucune exécution"; else ko "48b E3 corps hostile" "rc=$rc leak=$leak out=[$out]"; fi
+
+# === Cas 50-62 — E3, revue W1 (2026-10-06, M-06/m-07/m-08) : chaque contrainte du merge-danger call a un corps qui la discrimine ===
+GH_TWOPORTE_BIN="$(mk_gh_pr twoporte '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nPorte : double sens\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}')"
+GH_PORTELATE_BIN="$(mk_gh_pr portelate '{"state":"OPEN","body":"## Merge-danger call\nRayon d'\''explosion : doctrine seule, aucune donnée écrite\n\n## Suite\nPorte : sens unique"}')"
+GH_PORTEPARASITE_BIN="$(mk_gh_pr porteparasite '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique, mais pas vraiment\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}')"
+GH_TITRESUFFIXE_BIN="$(mk_gh_pr titresuffixe '{"state":"OPEN","body":"## Merge-danger calls\nPorte : sens unique\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}')"
+GH_TWOSECTIONS_BIN="$(mk_gh_pr twosections '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : doctrine seule, aucune donnée écrite\n\n## Merge-danger call\nPorte : double sens\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}')"
+GH_BLANCS_BIN="$(mk_gh_pr blancs '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion :            ab"}')"
+GH_ACCENTS5_BIN="$(mk_gh_pr accents5 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : ééééé"}')"
+GH_ACCENTS10_BIN="$(mk_gh_pr accents10 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : éééééééééé"}')"
+GH_NBSP_BIN="$(mk_gh_pr nbsp '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion :             "}')"
+GH_FENCE_BIN="$(mk_gh_pr fence '{"state":"OPEN","body":"```\n## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : doctrine seule, aucune donnée écrite\n```"}')"
+GH_COMMENT_BIN="$(mk_gh_pr comment '{"state":"OPEN","body":"<!--\n## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : doctrine seule, aucune donnée écrite\n-->"}')"
+GH_SAINFENCE_BIN="$(mk_gh_pr sainfence '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : doctrine seule, aucune donnée écrite\n```\n## Autre\nPorte : double sens\n```\n"}')"
+GH_AWKFAIL_BIN="$(mk_gh_pr awkfail '{"state":"OPEN","body":"## Merge-danger call\nPorte : double sens\nRayon d'\''explosion : doctrine seule, aucune donnée écrite"}')"
+AWK_REAL="$(command -v awk)"
+cat > "$GH_AWKFAIL_BIN/awk" <<AWKEOF
+#!/usr/bin/env bash
+# talon : l'analyseur du merge-danger call échoue (rc 2, comme une erreur de syntaxe d'awk) ; tout autre awk est le vrai
+case "\$*" in *Merge-danger*) echo "awk: erreur simulée" >&2; exit 2 ;; esac
+exec "$AWK_REAL" "\$@"
+AWKEOF
+chmod +x "$GH_AWKFAIL_BIN/awk"
+e3_sain() { # <n> <libellé> <talon> : SAIN (code 3, stdout vide) — témoin positif de la contrainte voisine
+  local d out rc; d="$(mk_sane_fixture "c$1")"
+  out="$(PATH="$3:$PATH" run_gate --root "$d" --report "$REPORT_REL" --step "$STEP" 2>/dev/null)"; rc=$?
+  if [ "$rc" -eq 3 ] && [ -z "$out" ]; then ok "$1 $2 — code 3 (SAIN)"; else ko "$1 $2" "rc=$rc out=[$out]"; fi
+}
+M_ERR="[E3] PR ouverte sans merge-danger call conforme"
+e3_case 50 "E3 deux lignes « Porte : » (répétée, contradictoire) — MANQUE nommé" "$GH_TWOPORTE_BIN" 0 "$M_ERR" ""
+e3_case 51 "E3 « Porte : » placée après le titre « ## » suivant — hors section, MANQUE" "$GH_PORTELATE_BIN" 0 "$M_ERR" ""
+e3_case 52 "E3 « Porte : sens unique, mais pas vraiment » (texte parasite) — MANQUE" "$GH_PORTEPARASITE_BIN" 0 "$M_ERR" ""
+e3_case 53 "E3 titre « ## Merge-danger calls » (suffixe) — pas le titre exact, MANQUE" "$GH_TITRESUFFIXE_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_case 54 "E3 section répétée (deux titres exacts) — MANQUE nommé" "$GH_TWOSECTIONS_BIN" 0 "section répétée" ""
+e3_case 55 "E3 rayon fait de blancs et de 2 lettres — moins de 10 caractères non blancs, MANQUE" "$GH_BLANCS_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_case 56 "E3 rayon de 5 caractères accentués (10 octets) — compté en caractères, MANQUE" "$GH_ACCENTS5_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_case 57 "E3 rayon fait d'espaces insécables — aucun caractère non blanc, MANQUE" "$GH_NBSP_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_case 58 "E3 section conforme dans un bloc de code — invisible à la relecture, MANQUE" "$GH_FENCE_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_case 59 "E3 section conforme dans un commentaire HTML — invisible, MANQUE" "$GH_COMMENT_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_sain 60 "E3 rayon de 10 caractères accentués — SAIN (témoin de 56)" "$GH_ACCENTS10_BIN"
+e3_sain 61 "E3 section conforme suivie d'un bloc de code portant titre et Porte — ignorés, SAIN (témoin de 58)" "$GH_SAINFENCE_BIN"
+# 62 — l'échec de l'analyseur (awk rc 2) n'est PAS un manque de la PR : INDÉTERMINÉ (rc 4), cause nommée, jamais « Porte absente ».
+e3_case 62 "E3 analyseur en échec (awk rc 2) — INDÉTERMINÉ, jamais « Porte absente »" "$GH_AWKFAIL_BIN" 4 "analyse du merge-danger call impossible" "Porte"
+
+# === Cas 63-72 — E3, revue deux axes tour 2 (2026-10-06, N-02/N-03/N-04) : fences, commentaires, seuil, comptage, message « Porte » ===
+RD='Rayon d'\''explosion : doctrine seule, aucune donnée écrite'
+GH_FENCEMIX_BIN="$(mk_gh_pr fencemix '{"state":"OPEN","body":"```\n~~~\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n```"}')"
+GH_FENCELONG_BIN="$(mk_gh_pr fencelong '{"state":"OPEN","body":"````\n```\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n````"}')"
+GH_FENCETILDE_BIN="$(mk_gh_pr fencetilde '{"state":"OPEN","body":"~~~\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n~~~"}')"
+GH_FENCEINDENT_BIN="$(mk_gh_pr fenceindent '{"state":"OPEN","body":"   ```\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n   ```"}')"
+GH_COMCODE_BIN="$(mk_gh_pr comcode '{"state":"OPEN","body":"```\nex : <!-- ouvre un commentaire\n```\nVoir `<!--` dans la doc.\n\n## Merge-danger call\nPorte : sens unique\n'"$RD"'\n"}')"
+GH_COM1TITRE_BIN="$(mk_gh_pr com1titre '{"state":"OPEN","body":"<!-- ## Merge-danger call -->\nPorte : sens unique\n'"$RD"'\n"}')"
+GH_COM1REST_BIN="$(mk_gh_pr com1rest '{"state":"OPEN","body":"## Merge-danger call\nPorte : <!-- x -->sens unique\n'"$RD"'\n"}')"
+GH_RAYON9_BIN="$(mk_gh_pr rayon9 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : 123456789"}')"
+GH_EMOJI10_BIN="$(mk_gh_pr emoji10 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : 🙂🙂🙂🙂🙂🙂🙂🙂🙂🙂"}')"
+GH_EMOJI9_BIN="$(mk_gh_pr emoji9 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : 🙂🙂🙂🙂🙂🙂🙂🙂🙂"}')"
+GH_AAA100_BIN="$(mk_gh_pr aaa100 '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\nRayon d'\''explosion : aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')"
+e3_case 63 "E3 fence ouverte par \`\`\` puis ~~~ : le ~~~ ne ferme pas, la section reste dans le bloc de code, MANQUE" "$GH_FENCEMIX_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_case 64 "E3 fence de 4 accents graves : un \`\`\` plus court ne la ferme pas, MANQUE" "$GH_FENCELONG_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_case 65 "E3 section dans un bloc ~~~ — invisible, MANQUE" "$GH_FENCETILDE_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_case 66 "E3 section dans un bloc indenté de 3 espaces — invisible, MANQUE" "$GH_FENCEINDENT_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_sain 67 "E3 « <!-- » littéral en bloc de code et en code inline avant la section rendue — ne masque rien, SAIN" "$GH_COMCODE_BIN"
+e3_case 68 "E3 titre dans un commentaire HTML d'une seule ligne — invisible, MANQUE" "$GH_COM1TITRE_BIN" 0 "section « ## Merge-danger call » absente" ""
+e3_sain 69 "E3 « Porte : <!-- x -->sens unique » — le reste de la ligne après un commentaire d'une ligne est conservé, SAIN" "$GH_COM1REST_BIN"
+e3_case 70 "E3 rayon de 9 caractères — seuil exact de 10, MANQUE" "$GH_RAYON9_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_sain 71 "E3 rayon de 10 émojis identiques (40 octets périodiques) — compté 10, SAIN" "$GH_EMOJI10_BIN"
+e3_case 71a "E3 rayon de 9 émojis identiques — compté 9, MANQUE (témoin de 71)" "$GH_EMOJI9_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_sain 72 "E3 rayon de 100 « a » — SAIN (comptage exact, non réduit par les lignes répétées d'od)" "$GH_AAA100_BIN"
+# Le message d'une ligne « Porte » invalide dit la ligne Porte, jamais « section absente » (le prefixe commun ne suffit pas).
+PORTE_MSG="ligne « Porte : sens unique|double sens »"
+e3_case 46a "E3 « Porte : peut-être » — le message nomme la ligne Porte" "$GH_BADPORTE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+e3_case 50a "E3 deux lignes Porte — le message nomme la ligne Porte" "$GH_TWOPORTE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+e3_case 51a "E3 Porte hors section — le message nomme la ligne Porte" "$GH_PORTELATE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+e3_case 52a "E3 Porte avec texte parasite — le message nomme la ligne Porte" "$GH_PORTEPARASITE_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+
+# === Cas 66a-66d, 73-75 — E3, tour 4 (2026-10-06, M3-01, M3-04) : même verdict sous BWK awk et mawk, gardes Rayon et Porte ===
+# 66a-66c — fence indentée de 1, 2, 3 espaces, fermée par 2 espaces, section « leurre » dedans et vraie section après :
+# SAIN. Sous mawk 1.3.4 l'ancien retrait « sub(/^ ? ? ?/) » n'ôtait qu'un espace et le bloc ne se fermait jamais ; strip3 est
+# une boucle explicite, sans quantificateur répété ni intervalle.
+SEC='## Merge-danger call\nPorte : sens unique\n'"$RD"'\n'
+GH_FENCEIND1_BIN="$(mk_gh_pr fenceind1 '{"state":"OPEN","body":" ```\n'"$SEC"' ```\n\n'"$SEC"'"}')"
+GH_FENCEIND2_BIN="$(mk_gh_pr fenceind2 '{"state":"OPEN","body":"  ```\n'"$SEC"'  ```\n\n'"$SEC"'"}')"
+GH_FENCEIND3_BIN="$(mk_gh_pr fenceind3 '{"state":"OPEN","body":"   ```\n'"$SEC"'  ```\n\n'"$SEC"'"}')"
+GH_FENCEBULLET_BIN="$(mk_gh_pr fencebullet '{"state":"OPEN","body":"- étape\n  ```bash\n  echo\n  ```\n\n'"$SEC"'"}')"
+e3_sain 66a "E3 fence indentée de 1 espace fermée, section après — SAIN (même verdict sous BWK awk et mawk)" "$GH_FENCEIND1_BIN"
+e3_sain 66b "E3 fence indentée de 2 espaces fermée, section après — SAIN" "$GH_FENCEIND2_BIN"
+e3_sain 66c "E3 fence ouverte à 3 espaces, fermée à 2, section après — SAIN" "$GH_FENCEIND3_BIN"
+e3_sain 66d "E3 bloc de code imbriqué dans une puce (2 espaces), section visible après — SAIN" "$GH_FENCEBULLET_BIN"
+# 73 — la ligne « Rayon d'explosion : » ne compte que DANS la section : avant le titre, ou sous un autre titre « ## », elle est ignorée.
+GH_RAYONAVANT_BIN="$(mk_gh_pr rayonavant '{"state":"OPEN","body":"'"$RD"'\n\n## Merge-danger call\nPorte : sens unique\n"}')"
+GH_RAYONAPRES_BIN="$(mk_gh_pr rayonapres '{"state":"OPEN","body":"## Merge-danger call\nPorte : sens unique\n\n## Suite\n'"$RD"'\n"}')"
+e3_case 73 "E3 « Rayon d'explosion : » AVANT le titre — hors section, MANQUE" "$GH_RAYONAVANT_BIN" 0 "rayon d'explosion de moins de 10" ""
+e3_case 73a "E3 « Rayon d'explosion : » sous un autre titre « ## » — hors section, MANQUE" "$GH_RAYONAPRES_BIN" 0 "rayon d'explosion de moins de 10" ""
+# 74 — une « Porte : » invalide ET une valide dans la section : MANQUE (la valide ne rachète pas l'autre).
+GH_PORTEMIX_BIN="$(mk_gh_pr portemix '{"state":"OPEN","body":"## Merge-danger call\nPorte : peut-être\nPorte : sens unique\n'"$RD"'\n"}')"
+e3_case 74 "E3 « Porte : peut-être » puis « Porte : sens unique » — deux lignes, MANQUE nommé" "$GH_PORTEMIX_BIN" 0 "$PORTE_MSG" "section « ## Merge-danger call » absente"
+# 75 — portabilité PAR CONSTRUCTION : le programme awk de l'analyseur ne contient ni « ? » répété ni intervalle {n,m}
+# (sémantique différente entre BWK awk et mawk 1.3.4). Pas de mawk sur ce poste : la preuve est la forme du code.
+awk_portable() { ! sed -n '/^e3_merge_danger() {/,/^}/p' "$1" | grep -qE ' \? \?|\{[0-9]+,[0-9]*\}'; }
+if awk_portable "$SCRIPT"; then ok "75 E3 analyseur : aucun quantificateur « ? » répété ni intervalle {n,m} dans le programme awk"; else ko "75 E3 portabilité awk" "forme non portable dans e3_merge_danger"; fi
+fport="$TMP/mut-e3port.sh"
+awk '{ if (index($0, "(m = strip3(l)) ~ /^(```|~~~)/ {") > 0) { sub(/\(m = strip3\(l\)\) ~ \/\^\(/, "l ~ /^ ? ? ?(", $0) } print }' "$SCRIPT" > "$fport"
+if ! cmp -s "$fport" "$SCRIPT" && ! awk_portable "$fport"; then ok "75a E3 mutant « regex à ? répétés » TUE : le contrôle de forme rougit (portable à l'original, non portable au mutant)"; else ko "75a mutant de portabilité NON TUE" "mutant identique ou encore portable"; fi
+
 # === Cas 28-36 — E7 : rien de rangeable n'est laissé (SOBR-07, plan 41.3-04) ==============================
 CONDUCTOR_REAL="$(cd "$(dirname "$SCRIPT")/../../conductor" && pwd)"
 mk_inst() { # <script à installer> <real|none|stub:<corps>> -> imprime le chemin de la copie (lab « installé » jetable)
@@ -556,6 +718,81 @@ e7_mutant "E7k (snapshot pris sans --dry-run : un refus préexistant est imputé
 e7_mutant "E7l (snapshot sans identité accepté)" '  if [ -z "$E7_SGEN" ]; then' '  if false; then' sc_l 4 3
 e7_mutant "E7i (ARCHIVAGE NON TENTÉ redevenu silence)" '  if [ -n "$E7_NONTENTE" ]; then' '  if false; then' sc_i 4 3
 e7_mutant "E7f (--auto retiré)" '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?' '  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict 2>/dev/null)"; E7_RC=$?' sc_f 3 0
+# Mutants E3 (POCK-06) : le scénario installe la copie (mk_inst real, sinon E7 ne résout pas check-method-budget.sh
+# depuis le dossier temporaire et le code serait 4 pour une raison étrangère) et l'exécute avec le talon `gh` voulu.
+sc_e3() { # <script> <nom de fixture> <dossier du talon gh> -> rc du gate
+  local d g; d="$(mk_sane_fixture "$2")"; g="$(mk_inst "$1" real)"
+  ( HOME="$EMPTY_HOME"; export HOME; unset CLAUDE_PLUGIN_ROOT GSD_WORKSTREAM 2>/dev/null; PATH="$3:$PATH" bash "$g" --root "$d" --report "$REPORT_REL" --step "$STEP" >/dev/null 2>&1 ); return $?
+}
+sc_e3a() { sc_e3 "$1" "$2" "$GH_NOSECTION_BIN"; }
+sc_e3b() { sc_e3 "$1" "$2" "$GH_NOBODY_BIN"; }
+e7_mutant "E3a (section absente lue saine)" '            11) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : section « ## Merge-danger call » absente" ;;' '            11) E3_STATUS="sain" ;;' sc_e3a 0 3
+e7_mutant "E3b (type du corps non testé : clé body absente lue comme corps)" '        if [ "$E3_BODY_TYPE" != "string" ]; then' '        if false; then' sc_e3b 4 0
+# Revue W1 (M-06) : un mutant par contrainte de e3_merge_danger / e3_charcount, chacun joué sur le corps qui la discrimine.
+sc_e3c() { sc_e3 "$1" "$2" "$GH_TWOPORTE_BIN"; }
+sc_e3t() { sc_e3 "$1" "$2" "$GH_TWOSECTIONS_BIN"; }
+sc_e3d() { sc_e3 "$1" "$2" "$GH_PORTELATE_BIN"; }
+sc_e3h() { sc_e3 "$1" "$2" "$GH_PORTEPARASITE_BIN"; }
+sc_e3j() { sc_e3 "$1" "$2" "$GH_TITRESUFFIXE_BIN"; }
+sc_e3g() { sc_e3 "$1" "$2" "$GH_BLANCS_BIN"; }
+sc_e3u() { sc_e3 "$1" "$2" "$GH_ACCENTS5_BIN"; }
+sc_e3n() { sc_e3 "$1" "$2" "$GH_NBSP_BIN"; }
+sc_e3f() { sc_e3 "$1" "$2" "$GH_FENCE_BIN"; }
+sc_e3k() { sc_e3 "$1" "$2" "$GH_COMMENT_BIN"; }
+sc_e3m() { sc_e3 "$1" "$2" "$GH_AWKFAIL_BIN"; }
+# Revue deux axes tour 2 (N-02/N-03/N-04) : un mutant par garde ajoutée, joué sur le corps qui la discrimine.
+sc_e3fm() { sc_e3 "$1" "$2" "$GH_FENCEMIX_BIN"; }
+sc_e3fl() { sc_e3 "$1" "$2" "$GH_FENCELONG_BIN"; }
+sc_e3ft() { sc_e3 "$1" "$2" "$GH_FENCETILDE_BIN"; }
+sc_e3fi() { sc_e3 "$1" "$2" "$GH_FENCEINDENT_BIN"; }
+sc_e3cc() { sc_e3 "$1" "$2" "$GH_COMCODE_BIN"; }
+sc_e3c1() { sc_e3 "$1" "$2" "$GH_COM1REST_BIN"; }
+sc_e3r9() { sc_e3 "$1" "$2" "$GH_RAYON9_BIN"; }
+sc_e3em() { sc_e3 "$1" "$2" "$GH_EMOJI10_BIN"; }
+e3_msg_mutant() { # <id> <ancienne ligne> <nouvelle ligne> <talon> <fragment que le message ORIGINAL contient et que le mutant ne contient plus>
+  local id="$1" f d g oo om
+  MUT_N=$((MUT_N+1)); f="$TMP/mut-e3msg-$MUT_N.sh"
+  MUT_OLD="$2" MUT_NEW="$3" awk '{ if ($0 == ENVIRON["MUT_OLD"]) print ENVIRON["MUT_NEW"]; else print }' "$SCRIPT" > "$f"
+  if cmp -s "$f" "$SCRIPT" || ! bash -n "$f" 2>/dev/null; then ko "35 $id mutant NON OPPOSABLE" "mutation appliquée et syntaxe valide"; return; fi
+  d="$(mk_sane_fixture "mo$MUT_N")"; g="$(mk_inst "$SCRIPT" real)"
+  oo="$( ( HOME="$EMPTY_HOME"; export HOME; unset CLAUDE_PLUGIN_ROOT GSD_WORKSTREAM 2>/dev/null; PATH="$4:$PATH" bash "$g" --root "$d" --report "$REPORT_REL" --step "$STEP" 2>&1 ) )"
+  d="$(mk_sane_fixture "mm$MUT_N")"; g="$(mk_inst "$f" real)"
+  om="$( ( HOME="$EMPTY_HOME"; export HOME; unset CLAUDE_PLUGIN_ROOT GSD_WORKSTREAM 2>/dev/null; PATH="$4:$PATH" bash "$g" --root "$d" --report "$REPORT_REL" --step "$STEP" 2>&1 ) )"
+  case "$oo" in *"$5"*) : ;; *) ko "35 $id NON TUE" "l'original ne porte pas le fragment attendu [$5] : [$oo]"; return ;; esac
+  case "$om" in *"$5"*) ko "35 $id NON TUE" "le mutant porte encore le fragment [$5] : [$om]" ;; *) ok "35 $id TUE : fragment [$5] présent à l'original, absent du mutant" ;; esac
+}
+e7_mutant "E3c (unicité de « Porte : » : une seule ligne valide suffit)" '      if (ptot != 1 || pval != 1) exit 12' '      if (pval < 1) exit 12' sc_e3c 0 3
+e7_mutant "E3t (section répétée acceptée : la première gagne)" '      if (ntit > 1) exit 12' '      ntit = ntit' sc_e3t 0 3
+e7_mutant "E3d (la section ne se termine jamais au titre « ## » suivant)" '    l ~ /^## / { if (l ~ /^## Merge-danger call[ \t]*$/) { ntit++; insec = (ntit == 1) } else { insec = 0 }; next }' '    l ~ /^## / { if (l ~ /^## Merge-danger call[ \t]*$/) { ntit++; insec = (ntit == 1) }; next }' sc_e3d 0 3
+e7_mutant "E3h (ancre de fin de la ligne « Porte : » retirée : texte parasite accepté)" '    insec && l ~ /^Porte ?:/ { ptot++; if (l ~ /^Porte ?:[ \t]*(sens unique|double sens)[ \t]*$/) pval++ }' '    insec && l ~ /^Porte ?:/ { ptot++; if (l ~ /^Porte ?:[ \t]*(sens unique|double sens)/) pval++ }' sc_e3h 0 3
+e7_mutant "E3j (titre exact : ancre de fin retirée, « calls » ouvre la section)" '    l ~ /^## / { if (l ~ /^## Merge-danger call[ \t]*$/) { ntit++; insec = (ntit == 1) } else { insec = 0 }; next }' '    l ~ /^## / { if (l ~ /^## Merge-danger call/) { ntit++; insec = (ntit == 1) } else { insec = 0 }; next }' sc_e3j 0 3
+e7_mutant "E3g (blancs comptés comme caractères)" "    | LC_ALL=C tr -d '[:space:]' \\" '    | cat \' sc_e3g 0 3
+e7_mutant "E3u (longueur en octets, pas en caractères)" "    | awk 'NF && (\$1 < 128 || \$1 >= 192) { n++ } END { print n + 0 }'" "    | awk 'NF { n++ } END { print n + 0 }'" sc_e3u 0 3
+e7_mutant "E3n (espace insécable comptée comme caractère)" '    | LC_ALL=C sed -e "$E3_BLANCS_SED" \' '    | cat \' sc_e3n 0 3
+L_COM='    { while ((i = index(mask(l), "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }'
+L_OPEN='    (m = strip3(l)) ~ /^(```|~~~)/ { fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }'
+e7_mutant "E3f (bloc de code lu comme du texte rendu : l'ouverture saute la ligne sans entrer dans la zone)" "$L_OPEN" '    (m = strip3(l)) ~ /^(```|~~~)/ { next }' sc_e3f 0 3
+e7_mutant "E3k (commentaire HTML lu comme du texte rendu)" "$L_COM" '    { l = l }' sc_e3k 0 3
+e7_mutant "E3m (échec de l'analyseur lu comme un manque de la PR)" '            *) E3_STATUS="indet"; E3_MSG="[E3] analyse du merge-danger call impossible (outil d'"'"'analyse en échec) — invérifiable" ;;' '            *) E3_STATUS="manque"; E3_MSG="[E3] PR ouverte sans merge-danger call conforme (POCK-06) : ligne Porte absente" ;;' sc_e3m 4 0
+L_CLOSE='    infence { m = strip3(l); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }'
+e7_mutant "E3p (une fence se ferme par n'importe quel caractère de fence : ~~~ ferme un bloc d'accents graves)" "$L_CLOSE" '    infence { m = strip3(l); n = 0; while (substr(m, n + 1, 1) ~ /[`~]/) n++; if (n >= flen && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }' sc_e3fm 0 3
+e7_mutant "E3q (longueur de fermeture ignorée : une fence de 3 ferme un bloc de 4)" "$L_CLOSE" '    infence { m = strip3(l); n = 0; while (substr(m, n + 1, 1) == fch) n++; if (n >= 1 && substr(m, n + 1) ~ /^[ \t]*$/) infence = 0; next }' sc_e3fl 0 3
+e7_mutant "E3r (fence ~~~ non reconnue à l'ouverture)" "$L_OPEN" '    (m = strip3(l)) ~ /^(```)/ { fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }' sc_e3ft 0 3
+e7_mutant "E3s2 (fence indentée de 1 à 3 espaces non reconnue)" "$L_OPEN" '    l ~ /^(```|~~~)/ { m = l; fch = substr(m, 1, 1); flen = 0; while (substr(m, flen + 1, 1) == fch) flen++; infence = 1; next }' sc_e3fi 0 3
+e7_mutant "E3w (« <!-- » en code inline masque la suite)" "$L_COM" '    { while ((i = index(l, "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) substr(l, i + j + 6) } }' sc_e3cc 3 0
+e7_mutant "E3o (reste de ligne perdu après un commentaire HTML d'une ligne)" "$L_COM" '    { while ((i = index(mask(l), "<!--")) > 0) { j = index(substr(l, i + 4), "-->"); if (j == 0) { l = substr(l, 1, i - 1); incom = 1; break }; l = substr(l, 1, i - 1) } }' sc_e3c1 3 0
+e7_mutant "E3s (seuil du rayon à 9 caractères au lieu de 10)" '                if [ "$(e3_charcount "$E3_V")" -ge 10 ]; then E3_STATUS="sain"; E3_MSG=""; fi' '                if [ "$(e3_charcount "$E3_V")" -ge 9 ]; then E3_STATUS="sain"; E3_MSG=""; fi' sc_e3r9 0 3
+e7_mutant "E3v (od sans -v : les lignes répétées deviennent un « * » compté)" "    | od -v -An -tu1 | tr -s ' \\n' '\\n' \\" "    | od -An -tu1 | tr -s ' \\n' '\\n' \\" sc_e3em 3 0
+e3_msg_mutant "E3z (ligne Porte invalide rendue « section absente » : code 11 au lieu de 12)" '      if (ptot != 1 || pval != 1) exit 12' '      if (ptot != 1 || pval != 1) exit 11' "$GH_BADPORTE_BIN" "$PORTE_MSG"
+
+# Tour 4 (M3-01, M3-04) : un mutant par garde neuve, joué sur le corps qui la discrimine.
+sc_e3i2() { sc_e3 "$1" "$2" "$GH_FENCEIND2_BIN"; }
+sc_e3ra() { sc_e3 "$1" "$2" "$GH_RAYONAVANT_BIN"; }
+sc_e3pm() { sc_e3 "$1" "$2" "$GH_PORTEMIX_BIN"; }
+e7_mutant "E3x (strip3 ne retire qu'UN espace — comportement de mawk 1.3.4 face à l'ancien sub : la fence indentée de 2 espaces n'est plus reconnue)" '      while (k < 3 && substr(s, k + 1, 1) == " ") k++' '      while (k < 1 && substr(s, k + 1, 1) == " ") k++' sc_e3i2 3 0
+e7_mutant "E3x2 (strip3 ne retire plus rien : aucune fence indentée reconnue)" '      while (k < 3 && substr(s, k + 1, 1) == " ") k++' '      while (k < 0 && substr(s, k + 1, 1) == " ") k++' sc_e3i2 3 0
+e7_mutant "E18 (ligne Rayon comptée hors section : « insec && » retiré)" '    insec && l ~ /^Rayon d(\047|’)explosion ?:/ { v = l; sub(/^[^:]*:/, "", v); print v }' '    l ~ /^Rayon d(\047|’)explosion ?:/ { v = l; sub(/^[^:]*:/, "", v); print v }' sc_e3ra 0 3
+e7_mutant "E15 (« Porte » invalide + valide : ptot ignoré, la valide suffit)" '      if (ptot != 1 || pval != 1) exit 12' '      if (pval != 1) exit 12' sc_e3pm 0 3
 
 echo ""
 echo "== résultat : $PASS ok, $FAIL ko =="

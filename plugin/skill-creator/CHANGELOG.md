@@ -1,5 +1,15 @@
 # CHANGELOG — skill-creator
 
+## [v1.1.2] — 2026-10-06 (le validateur admet la classe d'invocation, Phase 41.4)
+
+**Patch** (POCK-07, P414-D-01) :
+
+- **`skills/skill-creator/scripts/quick_validate.py`** : `vf-invocation` et `disable-model-invocation`
+  sont des clés de frontmatter acceptées (leurs valeurs restent jugées par
+  `conductor/scripts/check-skills.sh --callers-root`) ; la suite `test-quick-validate.sh` garde la
+  parité avec les clés du gate.
+- **`skill-creator`, `skill-creator-workflow`** : `vf-invocation: model`.
+
 ## [v1.1.1] — 2026-09-29 (correctif : le validateur refusait les clés que le skill demande)
 
 **Patch** (régression de v1.1.0) :

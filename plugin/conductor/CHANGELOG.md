@@ -1,5 +1,27 @@
 # Changelog — conductor
 
+## [v1.47.0] — 2026-10-06 (classe d'invocation des skills et défaillance observée, Phase 41.4)
+
+**Minor** (gates durcis, POCK-07, POCK-08) :
+
+- **`scripts/check-skills.sh --callers-root=`** (POCK-07, P414-D-01 à D-03) : chaque `SKILL.md` déclare
+  `vf-invocation: user | model` ; un skill non classé rougit ; un skill `user` appelé par une
+  commande, un préchargement, un agent outillé `Skill` ou un autre skill `user` rougit ; un `user`
+  porte `disable-model-invocation: true` et, s'il est niché, l'équivalent Codex jugé sur la valeur
+  résolue de `policy.allow_implicit_invocation` (doublon, mauvais parent, valeur non booléenne ou
+  forme en flux refusés) ; racine d'arêtes illisible = INDÉTERMINÉ (rc 3). L'identité d'un skill est
+  son `name:` (à défaut son dossier), la valeur YAML est lue commentaire de fin de ligne exclu. Suite
+  `test-check-skills.sh` : T33 à T44, 126 cas, 41 lignes « TUE » (MUT-INV1 à 5, K4b-d, K12 à K18,
+  M01 à M03, MUT-SG : un `openai.yaml` conforme derrière un lien symbolique reste refusé).
+- **`scripts/check-ajout-retrait.sh`** (POCK-08, P414-D-04) : le trailer `Ajout-Retrait:` exige un
+  troisième segment `— défaillance : {fait daté}` (≥ 10 caractères non blancs, date ISO calendaire ou
+  SHA hexadécimal de 7 à 40 caractères mêlant chiffre et lettre ; dernière occurrence) ; sans lui il ne
+  couvre rien. Un `SKILL.md` ajouté sous `plugin/` est un ajout surveillé ; le plancher de 6
+  littéraux d'un glob ignore les classes de caractères. Consultatif en CI, `--strict` 0/1/2
+  inchangé. Suite : 83 cas, 29 lignes « TUE ». Le message de refus de la défaillance dit la règle du SHA.
+- **Skills du module** (`vf-calibrate`, `vf-new-lab`, `vf-notify`, `vf-split-planning`, `vf-update`) :
+  `vf-invocation: model`.
+
 ## [v1.46.0] — 2026-10-01 (sobriété de méthode, Phase 41.3)
 
 **Minor** (nouveaux gates et hook) :

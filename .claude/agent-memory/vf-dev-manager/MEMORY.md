@@ -85,6 +85,8 @@
 - [Cas vert des deux côtés ne garde rien](feedback_cas-vert-des-deux-cotes-ne-garde-rien.md) — ne pas le rendre discriminant de force, mais le renommer : le coût est le crédit qu'on lui accorde, pas le cas inutile
 - [Escalade : attendre la vraie réponse](feedback_escalade-sendmessage-attendre-la-vraie-reponse.md) — une notification de tâche de fond n'est jamais la réponse de l'humain ; incident d'arbitrage fabriqué, Phase 18
 - [.worktreeinclude lu dans l arbre principal](project_worktreeinclude-lu-dans-l-arbre-principal.md) — worktree isolé part d origin/main, hérite des ignorés selon l arbre NON commité du principal
+- [Hook rtk + garde : git refusé](project_hook-rtk-git-refuse-par-garde.md) — tout `git` réécrit en `rtk git` puis refusé en worktree isolé : wrapper `g.sh` au scratchpad, chemin absolu
+- [Contrat de verdict sans seuil](feedback_contrat-de-verdict-sans-seuil.md) — sans seuil de « passed », un juge rougit au premier mineur : 2 tours de sonde brûlés en 41.4
 - [Commiter avant de rendre](feedback_commiter-avant-de-rendre.md) — 2 workers figés après rédaction, avant commit : exiger le commit avant le rapport, aucun rejeu long en fin de mandat
 - [`git log` via rtk masque les merges](project_rtk-git-log-masque-les-merges.md) — pointe d'origin/main lue fausse (2aa307df au lieu du merge 0c14757b) : SHA de base par `git rev-parse`
 - [Attendre un worker : sleep bloqué](project_attendre-un-worker-sleep-bloque.md) — une boucle `until … sleep` rend instantanément ; attendre par `python3 time.sleep` + heartbeat

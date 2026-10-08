@@ -1,5 +1,10 @@
 # Changelog — audit-architecture
 
+## [v1.0.4] — 2026-10-06 (classe d'invocation du skill, Phase 41.4)
+
+**Patch** — le `SKILL.md` déclare sa classe d'invocation (`vf-invocation: model`, vérifiée par
+`check-skills.sh --callers-root`, POCK-07, P414-D-01) ; aucun changement de comportement.
+
 ## [v1.0.3] — 2026-09-16 (Phase 40.1)
 
 **Patch** :

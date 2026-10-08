@@ -43,7 +43,12 @@ def validate_skill(skill_path):
     # Conventions VibeFlow que SKILL.md demande d'écrire (FABR-08) : sans elles, un skill généré
     # par ce flux échouait ici. Leurs valeurs sont validées par conductor/scripts/check-skills.sh.
     ALLOWED_PROPERTIES |= {'vf-nature', 'ecrit', 'vf-rubrique-juge',
-                           'vf-gate-bloquant', 'vf-livrable-tiers', 'vf-couche-qualite'}
+                           'vf-gate-bloquant', 'vf-livrable-tiers', 'vf-couche-qualite',
+                           'vf-invocation'}
+    # Classe d'invocation (POCK-07, Phase 41.4) : `vf-invocation: user` impose le champ NATIF
+    # `disable-model-invocation: true` (verifie par check-skills.sh) — sans lui, un skill user
+    # produit par ce flux serait refuse ici.
+    ALLOWED_PROPERTIES |= {'disable-model-invocation'}
 
     # Check for unexpected properties (excluding nested keys under metadata)
     unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES
