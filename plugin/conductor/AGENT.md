@@ -39,6 +39,7 @@ skills:
 | crée / initialise / monte un lab / nouveau lab / démarre un lab [métier] | skill `vf-new-lab` |
 | installe VibeFlow / ajoute un module / change de scope / désinstalle | commande plugin `/vibeflow-install` (skill de niveau plugin — jamais posé dans le lab, donc pas dans `skills:`) |
 | mets en place le planning / la doc / le suivi **du lab** | skill `vf-planning` |
+| on sera plusieurs sur ce lab / sépare le planning en sujets parallèles | skill `vf-split-planning` |
 | où en est-on / avancement **d'un projet de code** | skill `gsd-progress` (ADR-055) |
 | vérifie / audite / conformité / est-ce que tout est aligné | déléguer à l'agent `vibeflow-validator` (Task) |
 | mets à jour / le framework a bougé / recalibre / migre le lab | skill `vf-calibrate` |

@@ -10,7 +10,7 @@
 # Cette suite exige le VRAI moteur (`~/.claude/gsd-core/bin/gsd-tools.cjs`) : le job `tests` de la CI
 # l'installe, le job `gates` non.
 #
-# DISCRIMINANCE PAR MUTATION (QUAL-01). Huit mutants du GATE, chacun appliqué à une copie du gate ET
+# DISCRIMINANCE PAR MUTATION (QUAL-01). Neuf mutants du GATE, chacun appliqué à une copie du gate ET
 # de workstream-policy.sh côte à côte dans un dossier jetable (jamais un fichier écrit sous
 # `plugin/`) : témoin préalable (la copie non mutée rend la matrice de l'original), unicité de la
 # ligne-ancre (`grep -c` = 1), `cmp -s` mutant ≠ copie (sinon « mutant NON OPPOSABLE »), `bash -n`.
@@ -164,6 +164,18 @@ matrix() {
   D="$(mkflat f4b '"Executing"')"
   g "$TMP" -- --path "$D"
   expect F4b "status: \"Executing\" (guillemets, casse) : REFUSÉ, lecture (a)" 1 "" "(a)"
+
+  # F4c/F4d — STATE.md enregistré avec BOM UTF-8 et fins de ligne CRLF (éditeur Windows) : lu comme
+  # sans BOM. Avant le correctif, le frontmatter n'était jamais ouvert : NON VÉRIFIABLE sur un lab sain.
+  D="$(mkflat f4c executing)"
+  { printf '\357\273\277'; sed 's/$/\r/' "$D/.planning/STATE.md"; } > "$D/.planning/STATE.tmp" && mv "$D/.planning/STATE.tmp" "$D/.planning/STATE.md"
+  g "$TMP" -- --path "$D"
+  expect F4c "STATE.md avec BOM + CRLF, status: executing : REFUSÉ, lecture (a)" 1 "" "(a)"
+
+  D="$(mkflat f4d planning)"
+  { printf '\357\273\277'; sed 's/$/\r/' "$D/.planning/STATE.md"; } > "$D/.planning/STATE.tmp" && mv "$D/.planning/STATE.tmp" "$D/.planning/STATE.md"
+  g "$TMP" -- --path "$D"
+  expect F4d "STATE.md avec BOM + CRLF, status: planning : accepté « plat »" 0 "plat" "-"
 
   D="$TMP/mx$MXN/f5"; mkdir -p "$D/.planning/workstreams/ws1"
   printf -- '---\nworkstream: ws1\n---\n' > "$D/.planning/workstreams/ws1/STATE.md"
@@ -339,21 +351,22 @@ fi
 
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre ; l'ensemble attendu est celui des cas
 # dont le verdict doit basculer, et lui seul.
-mutant a         'status_lc" = "executing"'                    's/"executing"/"zzz-jamais"/'                                   'F4 F4b'
+mutant a         'status_lc" = "executing"'                    's/"executing"/"zzz-jamais"/'                                   'F4 F4b F4c'
 mutant b         'select(.plan_count > .summary_count)'        's/select(.plan_count > .summary_count)/select(false)/'          'F2b F9'
 mutant bprime    '^bp_min=1$'                                  's/1/999999/'                                                    'F10'
-mutant cmp       'select(.plan_count > .summary_count)'        's/plan_count > /plan_count >= /'                                'F1 F3'
+mutant cmp       'select(.plan_count > .summary_count)'        's/plan_count > /plan_count >= /'                                'F1 F3 F4d'
 mutant env       'cwd "$ROOT" query'                       's/env -u GSD_WORKSTREAM //'                                     'F9'
 mutant forme     'jq -e "$VALID_JQ"'                           's/jq -e "$VALID_JQ"/jq -e true/'                                'F8 F16'
+mutant bom       'index($0,"'                                  's/index(\$0,"[^"]*")==1/0/'                                    'F4c F4d'
 mutant partition 'echo "partitionne"; exit 0'                  's/echo "partitionne"; exit 0/:/'                                'F5'
 mutant cwd       '^GT=""$'                                     's|^GT=""$|GT=""; for _c in gsd-core/bin/gsd-tools.cjs .claude/gsd-core/bin/gsd-tools.cjs; do test -f "$_c" \&\& { GT="$_c"; break; }; done|' 'F17'
 
 QUIET=0
 echo ""
-if [ "$KILLED" -eq 8 ]; then
-  echo "== mutants : 8/8 tués =="
+if [ "$KILLED" -eq 9 ]; then
+  echo "== mutants : 9/9 tués =="
 else
-  echo "== mutants : $KILLED/8 tués =="
+  echo "== mutants : $KILLED/9 tués =="
   FAIL=$((FAIL+1))
 fi
 echo "== resultat : $PASS ok, $FAIL ko ($((PASS+FAIL)) cas) =="

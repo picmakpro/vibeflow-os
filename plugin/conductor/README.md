@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.48.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.48.1 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -51,7 +51,7 @@ branchent aujourd'hui : **dev-orchestrator** (implémentation de référence, `v
 **mobile-test-team** (`vf-test-orchestrator`), **design-orchestrator** (`vf-design-manager`,
 première instanciation non-dev) et les **bundles métier** (business-pilot, content, growth).
 
-## Les 4 skills
+## Les 5 skills
 
 - **`vf-new-lab`** — Lab Factory clarification-first : cadrage à gates machine (Gate A brief,
   Gate B capacités, Gate C conformité), manifeste de capacités, fan-out `skill-creator`, ficelage
@@ -67,6 +67,11 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
 - **`vf-notify`** — toggle des notifications OS natives de mission (`on`/`off`/`status`/`test`),
   patron `stop-notify` (touch/rm -f, zéro JSON). Opt-in **OFF par défaut** (D-33-H) : le sentinel
   scope machine arme/désarme l'émission de `notify.sh` aux jalons `done`/`failed` du DAG.
+- **`vf-split-planning`** — choix du planning d'un lab de code, unique ou en sujets parallèles. Il pose une seule
+  question à la fin de l'initialisation (un planning unique par défaut) et porte la bascule pour un lab déjà démarré.
+  Les compartiments sont créés par le moteur (`split-planning.sh`), et la précondition « aucune phase en vol » est
+  vérifiée par machine (`check-planning-not-inflight.sh`). Le balayage d'intégrité par sujet vit dans la lib
+  `fanout-state-integrity.sh`.
 
 ## Hooks (posés automatiquement à l'install)
 
@@ -248,6 +253,7 @@ conductor/
     vf-calibrate/SKILL.md          # propagation update + migration
     vf-update/SKILL.md             # mise à jour plugin + modules
     vf-notify/SKILL.md             # toggle notifications OS (opt-in, D-33-H)
+    vf-split-planning/SKILL.md     # choix du planning : unique ou sujets parallèles (Phase 41.2)
   scripts/                         # 30 scripts (familles ci-dessus) + tests/ (31 suites)
   references/
     team-kernel.md                 # contrat du noyau d'équipe (manager/workers/juges)
