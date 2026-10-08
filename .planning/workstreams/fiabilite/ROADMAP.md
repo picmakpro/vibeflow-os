@@ -16,6 +16,9 @@
   (demande client). Périmètre arbitré par Samuel le 2026-08-15 (familles PORT/MANI/LOCK/WTCH/LEDG/
   BUDG/WKTR/SKIL/AGTS + QUAL-01 transverse). Recherche : `.planning/research/SUMMARY.md` +
   `ARCHITECTURE.md` (ordre de construction dicté par les fichiers).
+- 📋 **equipe-produit-v1.0** — « l'équipe produit : rôles humains, amont produit, état partagé » — Phases
+  57-62 — **inscrit 2026-10-08**, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Germe de `SEED-001` : ses trois déclencheurs
+  sont réunis à la clôture de `fiabilite-v1.0`. Spec : `docs/superpowers/specs/2026-09-16-equipe-produit-bmad-design.md`.
 - 📋 **ecc-inspiration-v1.0** — « ce qu'on emprunte à ECC » — Phases 51-56 — **inscrit
   2026-09-25** — six emprunts mesurés au dépôt `affaan-m/ECC` (snapshot avant compaction,
   télémétrie d'usage et coût, apprentissage adossé à l'observation, audit du harness comme
@@ -101,6 +104,12 @@
 - [ ] Phase 54: Audit du harness comme surface d'attaque (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 55: Installeur et mémoire portables entre runtimes (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 56: Packs de règles par langage (module optionnel) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
+- [ ] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [ ] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [ ] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [ ] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [ ] Phase 62: Décision sur l'approche plateforme, sur preuve (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -1691,7 +1700,8 @@ distincte dans la ROADMAP plate, **sans `gsd-new-milestone`** (le STATE reste mo
 `fiabilite-v1.0`, Phase 41.2 ouverte). Numéros 51-56 posés à la main (le moteur propose un mauvais
 numéro sur ce dépôt ; 42-50 appartiennent au compartiment `gouvernance`).
 
-**Aucune exécution avant la clôture de `fiabilite-v1.0`** (il reste la Phase 41.2). **Être inscrite
+**Exécution reportée après `equipe-produit-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08, à la clôture de `fiabilite-v1.0` : les déclencheurs des
+deux jalons tombaient en même temps, l'équipe produit passe d'abord). **Être inscrite
 ne vaut pas feu vert** : chaque phase passe par `gsd-discuss-phase` puis `gsd-plan-phase`, et ses
 exigences (familles réservées `SNAP`, `TELE`, `OBSV`, `HARN`, `MRUN`, `LANG` — vérifiées libres le
 2026-09-25) sont posées au cadrage, jamais avant.
@@ -1861,3 +1871,125 @@ path-scopées) ; ADR-029, ADR-067.
 Plans:
 
 - [ ] TBD (run /gsd-plan-phase 56 to break down)
+
+## 📋 Milestone equipe-produit-v1.0 — « l'équipe produit » (Phases 57-62)
+
+**Milestone Goal :** VibeFlow sert une **équipe** et plus seulement un humain qui a tous les modules. Il apporte des
+rôles de poste (solo par défaut, product, dev), des artefacts amont lisibles par un non-dev, et un état partagé entre
+clones, sans recréer de couche de personas synonymes. Un rôle est **une vue, pas un droit** : git ne tient aucun
+cloisonnement humain, et la doc le dit dès sa première ligne. Spec :
+`docs/superpowers/specs/2026-09-16-equipe-produit-bmad-design.md`. Germe : `.planning/seeds/SEED-001-equipe-produit-v1.md`,
+dont les douze arbitrages A-01 à A-12 du 2026-09-16 tiennent, sauf A-09 (révisé ci-dessous). Doctrine :
+`.planning/notes/2026-09-16-doctrine-agentique-ouverte-collaboration-humaine.md`.
+
+**Inscription :** 2026-10-08, à la clôture de `fiabilite-v1.0`. Choix de ce jalon avant `ecc-inspiration-v1.0`, forme
+d'inscription et place du verrou : arbitrage Samuel, AskUserQuestion session principale, 2026-10-08. Même forme qu'ECC et `gouvernance-labs-v1.0` : section distincte de la
+ROADMAP plate, **sans `gsd-new-milestone`**. Les numéros 57 à 62 sont posés à la main (42-50 : compartiment
+`gouvernance` ; 51-56 : ECC).
+
+**Révision d'A-09, tracée.** La SEED supposait le verrou de driver par compartiment livré « avant, dans D-02 ». La
+mission D-02 du 2026-09-23 n'a fait que la partition. Mesuré le 2026-10-08 : `driver-lock.sh` ne connaît aucun
+workstream, et ADR-053 n'a reçu aucun amendement. Le verrou devient donc la **première phase du jalon** (57) ; c'est
+une précondition dure de la collaboration à deux humains (61) (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
+
+**Être inscrite ne vaut pas feu vert.** Chaque phase passe par `gsd-discuss-phase` puis `gsd-plan-phase`. Ses exigences
+sont posées au cadrage, jamais avant, dans les familles réservées et vérifiées libres le 2026-10-08 : `DLWS` (57),
+`RLPO` (58), `PRDT` (59), `ARCG` (60), `COLB` (61), `PLTF` (62). `ROLE` était déjà pris, 41 occurrences.
+
+**Critères de succès du jalon** (spec §9) :
+1. Une install `VF_ROLE=product` n'expose aucune commande dev et pose `conductor` et `consolidator`.
+2. Une install sans rôle reste **identique** à aujourd'hui : non-régression, suites existantes vertes.
+3. Depuis un lab vide, le rôle product produit `BRIEF.md` et un PRD (`PROJECT.md` + `REQUIREMENTS.md`) jugés
+   au-dessus du seuil par `prd-gate`. Le head refuse ensuite le découpage tant que l'architecture n'est pas validée.
+4. Deux humains, deux clones, deux rôles, un workstream : trois semaines sans divergence subie en silence.
+5. Aucun agent neuf au-delà de 250 lignes ; tous passent `check-agents.sh --strict`.
+6. Zéro nom de client dans le dépôt (dépôt public).
+
+**Ce que ce jalon ne fait pas** (spec §5.5) : pas de contrôle d'accès, pas de SaaS ni de Notion, pas de fork ni de copie
+de prompts BMAD (marques protégées, aucun module nommé « BMAD »), pas de nouveau moteur de planning, pas d'agent
+« scrum master » (`vf-dev-manager` l'est déjà).
+
+**Collisions avec le jalon de Willy, à vérifier au cadrage de chaque phase :** l'installeur et `module.json` (58), à
+côté de sa Phase 42 livrée ; `planning-core` (59, gabarit `product`) ; `conductor` et le kernel (57). Un seul écrivain
+à la fois par module, rebase avant merge.
+
+**Critère transverse (QUAL-01) :** tout gate ou hook livré naît avec ses trois issues et sa mutation rouge prouvée, en
+forme exec (ADR-071).
+
+### Phase 57: Verrou de driver par compartiment
+
+**Goal:** `driver-lock.sh` devient compartiment-aware : un verrou nommé par workstream, et un amendement daté d'ADR-053 change l'invariant en « un manager **par compartiment** ». `guard-driver-lock.sh` est aligné. Le head passe `--ws` et un `GSD_SESSION_KEY` distinct **par manager**. Un lab non partitionné garde exactement le comportement d'aujourd'hui.
+**Requirements**: TBD — famille `DLWS` réservée, posée au cadrage.
+**Depends on:** aucune. Première du jalon.
+**Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
+**Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 57 to break down)
+
+### Phase 58: Rôles de poste — installeur, profils solo / product / dev
+
+**Goal:** `/vibeflow-install` demande le rôle sur ce projet, pré-coché « solo », avec un mode non interactif par `VF_ROLE`. `module.json` porte `roles` (absent = tous), et `build-module-catalog.sh` filtre le catalogue. Le rôle vit dans un fichier local non versionné (A-11) ; le projet ne porte que la liste des rôles autorisés, vérifiée par `check-role-consistency.sh`. Trois profils seulement (A-02).
+**Requirements**: TBD — famille `RLPO` réservée, posée au cadrage.
+**Depends on:** 57.
+**Sources:** spec §5.1, §5.4 ; SEED A-02, A-04, A-11 ; `plugin/installer/`, `plugin/_internal/vibeflow-update.sh`.
+**Hors périmètre :** les rôles architecte, QA et scrum master (A-02) ; tout contrôle d'accès.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 58 to break down)
+
+### Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
+
+**Goal:** Un bundle produit sur le moule de `business-pilot-bundle`. La front door `vibeflow-product`, sur le moule de `vibeflow-design`, produit `BRIEF.md` (le seul fichier nouveau, A-06) et le PRD (`PROJECT.md` + `REQUIREMENTS.md`, gabarit `product` de `planning-core`). Un juge frais `prd-gate`, en lecture seule et sur rubric /100, rend éliminatoire toute exigence sans critère d'acceptation. `vibeflow-head` lit le rôle pour rediriger au lieu de dispatcher `vf-coder` (A-05). Le bundle reste `proposable: false` jusqu'à preuve sur un lab réel (Q-09, défaut probable).
+**Requirements**: TBD — famille `PRDT` réservée, posée au cadrage.
+**Depends on:** 58.
+**Sources:** spec §5.2 ; SEED A-05, A-06, A-10 (vocabulaire : on garde l'existant, aucun renommage) ; `plugin/business-pilot-bundle/`, `plugin/design-orchestrator/`.
+**Hors périmètre :** un fichier PRD.md séparé (A-06) ; les termes « epic » et « story » (Q-11, fermée par doctrine).
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 59 to break down)
+
+### Phase 60: Gate architecture avant découpage et validation des phases proposées
+
+**Goal:** Un gate séparé assemble l'existant : `software-architecture` et GSD (`gsd-map-codebase`, `gsd-graphify`). Le head refuse le découpage en phases tant que `ARCHITECTURE.md` n'est pas validée (A-08). Une phase ajoutée par le rôle product ou par le head reste **proposée** jusqu'à sa validation par un dev ; en solo, elle est auto-validée. Le mécanisme passe par un marqueur sur la phase et `check-phase-validation.sh` (A-07).
+**Requirements**: TBD — famille `ARCG` réservée, posée au cadrage.
+**Depends on:** 59.
+**Sources:** spec §5.2 ; SEED A-07, A-08 ; `plugin/software-architecture/`, `plugin/audit-architecture/`.
+**Hors périmètre :** un gate bloquant sans halt condition (Q-04 : ADR-031 penche pour l'advisory).
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 60 to break down)
+
+### Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel
+
+**Goal:** Pour un lab multi-humains, `check-divergence.sh` et son hook `post-merge` sont armés par défaut. Le champ `role:` s'ajoute aux entrées des registres (DECISIONS, LEARNINGS, BLOCKERS). La preuve est faite à **deux humains, deux clones, deux rôles, un workstream** sur un lab réel, pas sur un clone jetable (spec §9, critère 4 ; spec head §6, point 4).
+**Requirements**: TBD — famille `COLB` réservée, posée au cadrage.
+**Depends on:** 57 et 60.
+**Sources:** spec §5.3 ; Phase 39 (`check-divergence.sh`) ; ADR-069.
+**Hors périmètre :** un workstream par rôle (deux vérités, refusé par la spec §5.3).
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 61 to break down)
+
+### Phase 62: Décision sur l'approche plateforme, sur preuve
+
+**Goal:** Une décision écrite sur l'approche C de la spec (plateforme collaborative : hub, base centrale), prise sur mesure : le besoin non-dev sans terminal est-il réel (Q-06) ? À défaut de preuve, le jalon se clôt sur un déclencheur daté de reprise. Aucun code avant la décision.
+**Requirements**: TBD — famille `PLTF` réservée, posée au cadrage.
+**Depends on:** 61.
+**Sources:** spec §4 C, §7 Q-05/Q-06.
+**Hors périmètre :** toute implémentation de plateforme.
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 62 to break down)
