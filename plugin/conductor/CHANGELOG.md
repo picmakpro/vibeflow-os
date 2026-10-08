@@ -1,8 +1,25 @@
 # Changelog — conductor
 
+## [v1.48.1] — 2026-10-08 (mineurs de la relecture SOBR-04 de v2.69.0)
+
+**Patch** :
+
+- **`scripts/check-planning-not-inflight.sh`** : le STATE.md racine est lu en tolérant un BOM UTF-8 et les CR de fin
+  de ligne, comme le fait déjà `fm_get` de `split-planning.sh`. Avant, un STATE.md enregistré avec BOM rendait
+  « NON VÉRIFIABLE … sans clé status » (rc=2) sur un lab sain. La suite gagne F4c (BOM + CRLF + `executing`,
+  refusé) et F4d (BOM + CRLF + `planning`, accepté), plus un neuvième mutant `bom` qui fait basculer exactement ces
+  deux cas : 37 cas, 9/9 mutants tués.
+- **`README.md`** (section des skills et arbre du module) et **`AGENT.md`** (table de routage) : `vf-split-planning`
+  et ses scripts y figurent enfin. Le budget d'instructions d'`AGENT.md` est inchangé (25).
+- **`CHANGELOG.md`, entrée v1.48.0** : une note explique pourquoi v1.47.0 cite déjà `vf-split-planning`.
+
 ## [v1.48.0] — 2026-10-08 (choisir la partition du planning au démarrage d'un lab, Phase 41.2)
 
 **Minor** (nouveau skill, deux scripts et une lib ; WSCH-01..05, PR #130) :
+
+> **Ordre des versions.** La Phase 41.2 a été mergée le 2026-10-02, avant la 41.4 (v1.47.0), mais sans bump ni
+> entrée. Elle n'est versionnée qu'ici, à la release v2.69.0. Voilà pourquoi l'entrée v1.47.0 cite déjà
+> `vf-split-planning` : le skill était sur `main` quand la 41.4 a classé les skills.
 
 - **`skills/vf-split-planning/SKILL.md` (neuf)**, appelé par la commande `/vf-split-planning`. À la fin de
   l'initialisation d'un lab de code, il pose **une seule** question en langage d'usage : un seul planning (le défaut)

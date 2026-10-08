@@ -93,7 +93,8 @@ command -v jq >/dev/null 2>&1 || nv "jq introuvable"
 # --- (a) clé status: du frontmatter du STATE.md racine ----------------------------------------------
 STATE="$PLANNING/STATE.md"
 { [ -f "$STATE" ] && [ -r "$STATE" ]; } || nv "STATE.md racine absent ou illisible : $STATE"
-status="$(awk '/^---[[:space:]]*$/{n++; if(n==1) next; if(n==2) exit} n==1 && /^status:/{sub(/^status:[[:space:]]*/,""); gsub(/^["'\'']|["'\'']$/,""); print; exit}' "$STATE")"
+# BOM UTF-8 et CR final tolérés : même lecture que fm_get de split-planning.sh (relecture SOBR-04, v2.69.0).
+status="$(LC_ALL=C awk 'NR==1 && index($0,"\357\273\277")==1{$0=substr($0,4)} {sub(/\r$/,"")} /^---[[:space:]]*$/{n++; if(n==1) next; if(n==2) exit} n==1 && /^status:/{sub(/^status:[[:space:]]*/,""); gsub(/^["'\'']|["'\'']$/,""); print; exit}' "$STATE")"
 [ -n "$status" ] || nv "frontmatter de $STATE sans clé status"
 status_lc="$(printf '%s' "$status" | tr '[:upper:]' '[:lower:]' | sed 's/[[:space:]]*$//')"
 hit_a=0
