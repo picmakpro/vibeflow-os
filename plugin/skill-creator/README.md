@@ -3,7 +3,7 @@
 > Transforme « il nous faudrait un skill pour X » en un SKILL.md chirurgical, ancré dans le réel
 > (recherche par facettes → draft → eval-loop), au lieu d'un skill générique écrit de mémoire.
 
-> **Type** : agent + 2 skills · **Version** : v1.1.1 · **Dépend de** : aucun (module autonome)
+> **Type** : agent + 2 skills · **Version** : v1.1.2 · **Dépend de** : aucun (module autonome)
 
 ---
 

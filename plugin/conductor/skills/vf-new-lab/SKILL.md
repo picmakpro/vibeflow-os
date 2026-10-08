@@ -1,6 +1,7 @@
 ---
 name: vf-new-lab
 description: "Utiliser pour créer/initialiser un NOUVEAU lab VibeFlow dans n'importe quel métier — « crée un lab d'acquisition », « monte un lab de contenu », « initialise un lab pour mon agence », « je veux un espace VibeFlow pour [métier] ». Moteur clarification-first + Lab Factory : clarifie en profondeur (gate machine-enforced), dérive un manifeste de capacités, FABRIQUE les skills en parallèle (fan-out skill-creator), ficelle les auditeurs des procédures, puis assemble un lab opérationnel — pas un squelette. NE PRÉSUME JAMAIS « dev ». Mode EXPRESS intégré (lab opérationnel ≤ 15 min, 3 questions max, dégradé assumé) quand l'utilisateur exprime l'urgence ou la légèreté — « ce soir », « vite », « simple », « juste pour tester » — ou le demande explicitement. ✘ pas pour remettre à niveau un lab qui existe déjà → /vf-calibrate · ✘ pas pour amorcer un dossier de **code** et son démarrage de projet → brique `gsd-new-project` du moteur de dev · ✘ pas pour poser le socle documentaire d'un lab déjà créé → /vf-planning. Invocable par l'utilisateur ET par `vibeflow-conductor`."
+vf-invocation: model
 ---
 
 # vf-new-lab — Lab Factory (init clarification-first + fabrication des capacités)
@@ -175,6 +176,8 @@ Dériver puis poser (déléguer, ne pas réinventer) :
    socle adapté au métier ; *lab de code* → le socle du **projet** appartient au moteur de développement,
    router la brique **`gsd-new-project`** (`vf-planning` n'y pose plus le tronc, il tient l'altitude lab
    et redirige — carte : `dev-orchestrator/references/intent-routing.md`).
+   Une fois `gsd-new-project` **terminé** (jamais avant, jamais en autonomie — BOOT-04), router le skill
+   **`vf-split-planning`**, qui pose la question du planning en parallèle ; `vf-new-lab` ne la pose pas.
    **Lab à compartiments** (quel que soit le métier) : `.planning/` du lab en *steering +
    `INDEX.md`* (jamais de ROADMAP global) ; un socle par compartiment **qualifié** (seuil d'autonomie),
    typé `deliverable` (roadmap+phases) ou `continuous` (`BOARD.md` + cadence). Sous le seuil / infra →

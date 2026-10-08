@@ -42,7 +42,8 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
    Les skills gsd-* se déclenchent aussi nativement sur leurs propres descriptions — cette carte
    sert quand l'intention est ambiguë, quand plusieurs briques semblent candidates, ou en pilotage
    agentique (mission).
-2. **Rien ne correspond ?** Poser une question courte plutôt que de deviner (heuristique 5 de
+2. **Rien ne correspond ?** Poser la question par frontière (`mission-flow.md` §Pattern F : une
+   recommandation, AskUserQuestion, jamais un fait qu'un sous-agent peut établir) plutôt que de deviner (heuristique 5 de
    `AGENT.md`). Ne jamais inventer une brique qui n'existe pas (vérifier l'index).
 3. **Fermer la boucle** : après le geste, proposer le next step depuis `ROADMAP`/`STATE`.
 
@@ -59,8 +60,10 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 | quelle option / compare ces approches / A ou B / aide-moi à choisir | `gsd-discuss-phase` (mode advisor — panel de décision) |
 | planifie / découpe / cadre / prépare le sprint / structure le boulot | `gsd-discuss-phase` puis `gsd-plan-phase` |
 | la plus petite version qui marche / une tranche verticale / le MVP de cette étape | `gsd-mvp-phase` |
-| démarrer un projet / repartir de zéro / nouveau repo (confirmation explicite, FIRST-02) | `gsd-new-project` |
-| onboarde ce codebase / reprends ce repo légué / c'est un projet existant, pas from scratch (FIRST-02) | `gsd-onboard` (fallback : `gsd-map-codebase` puis `gsd-new-project` si le skill est absent de l'index) |
+| démarrer un projet / repartir de zéro / nouveau repo (confirmation explicite, FIRST-02) | `gsd-new-project`, puis `vf-split-planning` à la fin de l'initialisation (choix du planning) |
+| onboarde ce codebase / reprends ce repo légué / c'est un projet existant, pas from scratch (FIRST-02) | `gsd-onboard` (fallback : `gsd-map-codebase` puis `gsd-new-project` si le skill est absent de l'index), puis `vf-split-planning` à la fin de l'initialisation (choix du planning) |
+| on sera plusieurs sur ce lab / deux chantiers en parallèle / sépare le planning en sujets | skill `vf-split-planning` |
+| reprends le sujet X / travaille sur le sujet X / on reprend le sujet X (lab partitionné) | l'équipe dispatchée reçoit le sujet X explicitement dans son mandat : `--ws X` sur chaque appel du moteur, et la variable d'environnement de sujet exportée dans le worktree (règle du §3 de la référence sur les sujets) ; si X n'existe pas, le dire et proposer `/vf-split-planning` |
 | intègre cette spec à la feuille de route / importe ce plan (doctrine : `ingestion-flow.md`) | `gsd-ingest-docs`, `gsd-import` |
 
 ## Construction
@@ -119,7 +122,7 @@ l'inverse : on n'édite pas l'index pour faire tomber une couverture juste.
 > et du code a bougé → **produit** ; le repo est inconnu, `.planning/codebase/` absent ou daté →
 > **code** ; une étape vient d'être vérifiée ou clôturée → **savoir** ; un document de cadrage
 > traîne hors de la feuille de route → **entrée** (`ingestion-flow.md`). Rien de tout cela —
-> formulation creuse en début de session → **une question courte, jamais une devinette**.
+> formulation creuse en début de session → **une question posée par frontière (`mission-flow.md` §Pattern F), jamais une devinette**.
 >
 > Les trois lignes `gsd-docs-update` ci-dessus ne sont pas trois briques mais **trois régimes** de
 > la même : auditer sans écrire, générer sous confirmation, régénérer en écrasant. La différence

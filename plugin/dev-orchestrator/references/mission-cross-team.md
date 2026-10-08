@@ -71,8 +71,9 @@
   "$S"/dag.sh add --file="$DAG" --id=critique-rendu:écran-X --step="re-critique rendu X"     --deps=impl:écran-X
   "$S"/dag.sh add --file="$DAG" --id=revue:écran-X          --step="revue code écran X"      --deps=impl:écran-X
   ```
-- **« Vert » complet** = `critique-rendu` ≥ seuil ET revue PASS — les deux, jamais l'un ou
-  l'autre seul.
+- **« Vert » complet** = `critique-rendu` ≥ seuil ET statut global de la revue `passed` — les
+  deux, jamais l'un ou l'autre seul. Pas de PLAN d'étape ici : statut de l'axe Spec de `revue:écran-X` et calcul du statut global —
+  règle au contrat (`mission-contracts.md` §Étage revue, P414-D-22).
 - **Budgets séparés, deux compteurs distincts** : 3 tours max craft→critique pour la spec (régime
   déjà en place, inchangé), PUIS 3 tours max implémentation→(re-critique ∥ revue) pour le rendu.
   Un correctif sur le rendu réouvre `impl:<écran>` (`dag.sh reopen`), jamais le craft original —

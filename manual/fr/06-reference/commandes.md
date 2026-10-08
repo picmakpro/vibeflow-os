@@ -6,23 +6,23 @@
 
 Une commande tapée avec un `/` n'est pas la porte d'entrée du produit. VibeFlow entier est conçu
 pour qu'on lui parle en langage naturel — « améliore le design », « crée un lab de contenu »,
-« vérifie mon lab » — et que l'agent qui t'écoute route lui-même vers la bonne brique. Les sept
+« vérifie mon lab » — et que l'agent qui t'écoute route lui-même vers la bonne brique. Les huit
 commandes de cette page sont des **raccourcis** : elles évitent de reformuler une phrase quand tu
 sais déjà exactement quel geste tu veux déclencher. Tu peux ignorer cette page entièrement et ne
 jamais taper de `/` — rien ne fonctionne moins bien pour autant.
 
 Cette liste a été établie en énumérant `plugin/commands/*.md` sur le disque (2026-08-01, revérifié
-le 2026-08-17 lors de l'ajout de `/vf-notify`) : sept fichiers, aucun ailleurs dans le dépôt. C'est
-la liste complète, par construction — il ne peut pas en exister une huitième non répertoriée ici.
+le 2026-10-02 lors de l'ajout de `/vf-split-planning`) : huit fichiers, aucun ailleurs dans le dépôt. C'est
+la liste complète, par construction — il ne peut pas en exister une neuvième non répertoriée ici.
 
-## Les sept commandes
+## Les huit commandes
 
 ### `/vibeflow`
 
 Le point d'entrée générique. Tape `/vibeflow` suivi de ta demande en langage naturel — « crée un
 lab d'acquisition », « vérifie le lab », « mets à jour » — et elle est transmise telle quelle à
 l'agent `vibeflow-conductor`, qui route vers la bonne action. Utile quand tu ne sais pas encore
-laquelle des cinq commandes suivantes correspond à ton besoin, ou quand ta demande touche plusieurs
+laquelle des huit commandes suivantes correspond à ton besoin, ou quand ta demande touche plusieurs
 d'entre elles à la fois (par exemple installer un module puis vérifier la conformité). Elle ne fait
 jamais elle-même le travail métier — uniquement la configuration du lab.
 
@@ -99,6 +99,19 @@ changer l'état.
 Une chose qu'il ne coupe jamais : l'alerte de mission bloquée. Si un agent cale, le signal
 apparaît dans ta session quel que soit ce réglage — le toggle éteint le confort, jamais l'alarme.
 
+### `/vf-split-planning`
+
+Choisit si le planning de ton lab reste unique ou se sépare en plusieurs sujets qui avancent en
+parallèle. VibeFlow te pose une seule question, à la fin de l'initialisation d'un lab de code — et
+tu peux la reposer plus tard avec cette commande. Par défaut, un seul planning suffit : si tu
+réponds non, ou si tu ne réponds pas, rien ne change. Si tu réponds oui, VibeFlow sépare le
+planning, te propose les fichiers à commiter, puis t'indique comment lancer le premier jalon d'un
+sujet suivant. Elle refuse de séparer le planning tant qu'une phase est en cours : termine-la
+d'abord.
+
+*Exemple* : `/vf-split-planning refonte-mobile` — le nom passé en argument est celui du nouveau
+sujet ; sans argument, VibeFlow propose le titre de ton projet.
+
 ## La frontière avec les skills
 
 Une commande et un skill ne sont pas la même chose, même si presque toutes les commandes de cette
@@ -114,10 +127,10 @@ ressemblent en surface.
 ## D'où vient cette liste
 
 Chaque commande ci-dessus correspond à un fichier réel sous `plugin/commands/`, énuméré au moment
-de l'écriture de cette page (2026-08-01, revérifié le 2026-08-17) plutôt que recopié d'une
+de l'écriture de cette page (2026-08-01, revérifié le 2026-10-02) plutôt que recopié d'une
 documentation existante — c'est la règle qui s'applique à tout ce thème de référence. Si tu veux
 revérifier toi-même, la commande est `ls plugin/commands/*.md` depuis la racine du dépôt : le compte
-doit rester à sept tant qu'aucune n'a été ajoutée ou retirée.
+doit rester à huit tant qu'aucune n'a été ajoutée ou retirée.
 
 <!-- vf-manual:nav -->
 [← Précédent](../05-equipe-agents/equipes-specialisees.md) · [↑ Sommaire](../README.md) · [Suivant →](../06-reference/skills.md)

@@ -74,6 +74,8 @@ planifié de la Phase 42 (6 plans + `42-CONTEXT.md`/`42-RESEARCH.md`/`42-PATTERN
 a été déplacé tel quel depuis la racine, rien réécrit. Détail complet de la partition :
 `.planning/missions/2026-09-23-partition-planning-d02.md`.
 
+**À toi (2026-10-02)** : les plans 41-07 à 41-13 de la Phase 41 (chaîne des mesures de la protection serveur, `fiabilite`) te sont confiés, hors clôture de `fiabilite-v1.0` (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy », après « Les confier à Willy » pour 41-07 à 41-09) — voir `.planning/workstreams/fiabilite/ROADMAP.md` § Phase 41.
+
 **Ce qui change concrètement** : `.planning/active-workstream` (racine, partagé) pointe par défaut
 sur `fiabilite` — toute commande `gsd-tools`/`gsd_run` qui ne précise rien résout `fiabilite`, PAS
 `gouvernance`. Pour travailler ici, passe `--ws gouvernance` explicitement à chaque appel, ou exporte

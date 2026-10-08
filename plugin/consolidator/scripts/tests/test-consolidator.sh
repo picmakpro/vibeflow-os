@@ -8,6 +8,7 @@
 #   T4 — archive.sh --dry-run détecte BLK RÉSOLU + skip ACTIF
 #   T5 — detect-duplicates.sh détecte collisions IDs
 #   T6 — detect-promotions.sh sort candidats operational + cluster
+#   T6b-T6g — nature/proposition par candidate (+ mutant T6f), findings T6e (POCK-05)
 #   T7 — reindex.sh --apply : backups isolés + rotation + gitignore (ADR-049)
 #
 # Fiabilisation CSL :
@@ -110,6 +111,272 @@ echo "=== T6 — detect-promotions.sh sort candidats ==="
 output=$(cd "$WORK_DIR" && MEMORY_DIR=".claude/memory" "$WORK_DIR/.claude/scripts/detect-promotions.sh" 2>&1)
 # LRN-002 contient "toujours" → operational_single
 assert "T6.1 — LRN-002 candidate operational" "$output" '"lrn_id": "LRN-002"'
+
+echo ""
+echo "=== T6b-T6f — detect-promotions.sh : nature + proposition par candidate (POCK-05, P414-D-10) ==="
+# Fixture construite dans le test (la fixture partagée LEARNINGS-mini.md n'est pas modifiée).
+mk_lrn() { # <dossier> : LRN-901 mécanique (lint, fichiers .sh) + LRN-902 jugement, tous deux non encodés
+  mkdir -p "$1/.claude/memory"
+  cat > "$1/.claude/memory/LEARNINGS.md" <<'EOF'
+# Registre des Learnings — fixture T6b
+
+---
+
+## LRN-901 — Toujours lancer le lint avant commit sur les fichiers .sh
+
+**Date** : 2026-10-06
+**Categorie** : Process
+**Encode dans** : Non encode
+
+### Apprentissage
+
+Le lint doit passer avant chaque commit.
+
+---
+
+## LRN-902 — Toujours privilégier la clarté du découpage entre modules
+
+**Date** : 2026-10-06
+**Categorie** : Architecture
+**Encode dans** : Non encode
+
+### Apprentissage
+
+Un découpage lisible vaut mieux qu'un découpage malin.
+EOF
+}
+# Sortie JSON -> "nature|proposition" de la candidate <lrn_id>, ou ABSENTE.
+cand_of() { # <script> <dossier> <lrn_id>
+  (cd "$2" && MEMORY_DIR=".claude/memory" "$1" 2>/dev/null) | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+for c in d["candidates"]:
+    if c.get("lrn_id") == sys.argv[1]:
+        print(c.get("nature", "?") + "|" + c.get("proposition", "?"))
+        sys.exit(0)
+print("ABSENTE")
+' "$3" 2>&1
+}
+T6B="$WORK_DIR/t6b"; mk_lrn "$T6B"
+DP="$WORK_DIR/.claude/scripts/detect-promotions.sh"
+assert "T6b — LRN-901 (lint, .sh) : nature mecanique, proposition check" "$(cand_of "$DP" "$T6B" LRN-901)" "mecanique|check"
+assert "T6c — LRN-902 (clarté du découpage) : nature jugement, proposition brouillon-regle" "$(cand_of "$DP" "$T6B" LRN-902)" "jugement|brouillon-regle"
+json_rc=0
+(cd "$T6B" && MEMORY_DIR=".claude/memory" "$DP" 2>/dev/null) | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1 || json_rc=$?
+assert "T6d — la sortie complète se charge comme JSON" "$json_rc" "0"
+
+# T6f — mutant : la ligne qui calcule la nature est remplacée par une nature figée à jugement.
+T6F="$WORK_DIR/t6f"; mkdir -p "$T6F"
+cp "$DP" "$T6F/detect-promotions.sh"
+MUT_MOTIF="nature = 'mecanique' if RE_MECA.search"
+mut_n=$(grep -Fc -- "$MUT_MOTIF" "$T6F/detect-promotions.sh" || true)
+assert "T6f.0 — motif de mutation unique dans detect-promotions.sh" "$mut_n" "1"
+MUT_MOTIF_ENV="$MUT_MOTIF" awk '
+  index($0, ENVIRON["MUT_MOTIF_ENV"]) { match($0, /^[ \t]*/); print substr($0, RSTART, RLENGTH) "nature = '"'"'jugement'"'"'"; next }
+  { print }
+' "$DP" > "$T6F/mut.sh"
+chmod +x "$T6F/mut.sh"
+mut_same=$(cmp -s "$T6F/mut.sh" "$DP" && echo identique || echo distinct)
+assert "T6f.1 — le mutant diffère de l'original (opposable)" "$mut_same" "distinct"
+mut_syntax=$(bash -n "$T6F/mut.sh" 2>&1 && echo ok || echo KO)
+assert "T6f.2 — le mutant reste syntaxiquement valide (bash -n)" "$mut_syntax" "ok"
+mut_got=$(cand_of "$T6F/mut.sh" "$T6B" LRN-901)
+echo "     trace du rouge — assertion T6b sur le mutant : attendu 'mecanique|check', obtenu '$mut_got'"
+assert "T6f.3 — mutant : T6b rouge (attendu mecanique|check, obtenu jugement|brouillon-regle) ; fixture vivante" "$mut_got" "jugement|brouillon-regle"
+if [[ "$mut_got" == *"mecanique|check"* ]]; then
+  assert "T6f.4 — T6b doit être rouge sur le mutant" "mutant vert (fixture morte)" "mutant rouge"
+else
+  assert "T6f.4 — T6b rouge sur le mutant, vert sur l'original" "$(cand_of "$DP" "$T6B" LRN-901)" "mecanique|check"
+fi
+
+# T6g — cluster : mécanique seulement si TOUS ses membres le sont (3 membres mécaniques, puis 2 + 1 jugement).
+cluster_of() { # <dossier> -> "nature|proposition" du cluster, ou ABSENT
+  (cd "$1" && MEMORY_DIR=".claude/memory" "$DP" 2>/dev/null) | python3 -c '
+import json, sys
+for c in json.load(sys.stdin)["candidates"]:
+    if c.get("type") == "frequency_cluster":
+        print(c.get("nature", "?") + "|" + c.get("proposition", "?"))
+        sys.exit(0)
+print("ABSENT")
+' 2>&1
+}
+mk_cluster() { # <dossier> <titre du 3e membre>
+  mkdir -p "$1/.claude/memory"
+  {
+    for n in 1 2; do
+      printf '## LRN-80%s — Lint des fichiers .sh\n\n**Categorie** : Process\n**Encode dans** : Non encode\n\ntexte\n\n' "$n"
+    done
+    printf '## LRN-803 — %s\n\n**Categorie** : Process\n**Encode dans** : Non encode\n\ntexte\n' "$2"
+  } > "$1/.claude/memory/LEARNINGS.md"
+}
+mk_cluster "$WORK_DIR/t6g1" "Lint du fichier de config"
+assert "T6g.1 — cluster de 3 membres mécaniques : mecanique|check" "$(cluster_of "$WORK_DIR/t6g1")" "mecanique|check"
+mk_cluster "$WORK_DIR/t6g2" "Clarté du découpage entre modules"
+assert "T6g.2 — cluster dont un membre est jugement : jugement|brouillon-regle" "$(cluster_of "$WORK_DIR/t6g2")" "jugement|brouillon-regle"
+
+# T6e — finding « dépôt sans garde-fou » (Q7 : MESURÉ). Dossier NEUF, jamais la racine $WORK_DIR dont
+# .claude/scripts est un lien vers les scripts du module ; script invoqué par chemin absolu.
+findings_of() { # <dossier> [<script>] -> "types des findings séparés par une virgule", ou "(vide)"
+  (cd "$1" && MEMORY_DIR=".claude/memory" "${2:-$DP}" 2>/dev/null) | python3 -c '
+import json, sys
+f = json.load(sys.stdin)["findings"]
+print(",".join(x["type"] for x in f) if f else "(vide)")
+' 2>&1
+}
+T6E="$WORK_DIR/t6e"; mk_lrn "$T6E"
+assert "T6e-a — aucun workflow, check-*.sh ni hook : finding depot_sans_garde_fou" "$(findings_of "$T6E")" "depot_sans_garde_fou"
+mkdir -p "$T6E/.github/workflows"; printf 'name: ci\n' > "$T6E/.github/workflows/ci.yml"
+assert "T6e-b — avec .github/workflows/ci.yml : findings vide" "$(findings_of "$T6E")" "(vide)"
+# Les deux autres familles lèvent aussi le finding (check-*.sh ; hooks déclarés dans settings.json).
+T6E2="$WORK_DIR/t6e2"; mk_lrn "$T6E2"; mkdir -p "$T6E2/scripts"; printf '#!/bin/sh\n' > "$T6E2/scripts/check-x.sh"
+assert "T6e-c — avec scripts/check-x.sh : findings vide" "$(findings_of "$T6E2")" "(vide)"
+# T6e-d (revue W1, M-08) : `{"hooks": {}}` n'est PAS un garde-fou — la chaîne "hooks" ne vaut pas un hook déclaré.
+T6E3="$WORK_DIR/t6e3"; mk_lrn "$T6E3"; printf '{"hooks": {}}\n' > "$T6E3/.claude/settings.json"
+assert "T6e-d — settings.json avec \"hooks\": {} (aucune entrée) : finding depot_sans_garde_fou" "$(findings_of "$T6E3")" "depot_sans_garde_fou"
+printf '{"hooks": {"Stop": []}}\n' > "$T6E3/.claude/settings.json"
+assert "T6e-d2 — settings.json avec un événement de hook sans entrée : finding depot_sans_garde_fou" "$(findings_of "$T6E3")" "depot_sans_garde_fou"
+printf '{"hooks": {"PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "x"}]}]}}\n' > "$T6E3/.claude/settings.json"
+assert "T6e-e — settings.json déclarant une entrée de hook non vide : findings vide" "$(findings_of "$T6E3")" "(vide)"
+T6E4="$WORK_DIR/t6e4"; mk_lrn "$T6E4"; printf 'repos: []\n' > "$T6E4/.pre-commit-config.yaml"
+assert "T6e-f — avec .pre-commit-config.yaml : findings vide" "$(findings_of "$T6E4")" "(vide)"
+# T6e-g : la racine mesurée est celle du REGISTRE analysé (MEMORY_DIR), pas le répertoire courant.
+T6E5="$WORK_DIR/t6e5-nu"; mk_lrn "$T6E5"
+findings_depuis() { # <script> <cwd> <MEMORY_DIR>
+  (cd "$2" && MEMORY_DIR="$3" "$1" 2>/dev/null) | python3 -c '
+import json, sys
+f = json.load(sys.stdin)["findings"]
+print(",".join(x["type"] for x in f) if f else "(vide)")
+' 2>&1
+}
+assert "T6e-g — cwd portant un workflow, registre d'un lab nu : finding (mesure sur la racine du registre)" "$(findings_depuis "$DP" "$T6E" "$T6E5/.claude/memory")" "depot_sans_garde_fou"
+
+# T6h (revue W1, M-07) — la nature se juge sur l'APPRENTISSAGE : un learning de pur jugement qui contient un mot courant
+# (fichier, commit, .md) ou dont les métadonnées portent un indice reste `jugement`. M-m09 : titre à guillemet et à barre.
+mk_lrn_jug() { # <dossier>
+  mkdir -p "$1/.claude/memory"
+  cat > "$1/.claude/memory/LEARNINGS.md" <<'EOF'
+# Registre des Learnings — fixture T6h
+
+---
+
+## LRN-911 — Toujours préférer un fichier par responsabilité dans une équipe
+
+**Date** : 2026-10-06
+**Categorie** : Architecture
+**Encode dans** : Non encode
+
+### Apprentissage
+
+Choix de conception, pas une règle mécanique : le fichier suit le sens.
+
+---
+
+## LRN-912 — Toujours arbitrer le commit message avec le client selon le contexte
+
+**Date** : 2026-10-06
+**Categorie** : Process
+**Encode dans** : Non encode
+
+### Apprentissage
+
+Arbitrage de contexte, jamais figé.
+
+---
+
+## LRN-913 — Toujours documenter la décision dans README.md avant de fusionner
+
+**Date** : 2026-10-06
+**Categorie** : Docs
+**Encode dans** : Non encode
+
+### Apprentissage
+
+Un choix de rédaction, pas un motif détectable.
+
+---
+
+## LRN-914 — Toujours arbitrer la granularité des modules
+
+**Date** : 2026-10-06
+**Categorie** : Qualite
+**Source** : revue du lint de la CI
+**Encode dans** : Non encode
+
+### Apprentissage
+
+Un arbitrage de conception.
+
+---
+
+## LRN-915 — Toujours citer "la source" des chiffres | et la date
+
+**Date** : 2026-10-06
+**Categorie** : Sources
+**Encode dans** : [.claude/rules/xxx.md]
+
+### Apprentissage
+
+Un titre à guillemets et à barre ne casse ni le JSON ni les champs voisins.
+EOF
+}
+T6J="$WORK_DIR/t6j"; mk_lrn_jug "$T6J"
+for n in 911 912 913 914; do
+  assert "T6h — LRN-$n (jugement pur, mot courant ou métadonnée à indice) : jugement|brouillon-regle" "$(cand_of "$DP" "$T6J" LRN-$n)" "jugement|brouillon-regle"
+done
+json_ok() { # <script> <dossier> -> valide | invalide
+  if (cd "$2" && MEMORY_DIR=".claude/memory" "$1" 2>/dev/null) | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then echo valide; else echo invalide; fi
+}
+assert "T6h-json — la sortie reste un JSON valide avec un titre à guillemet et à barre" "$(json_ok "$DP" "$T6J")" "valide"
+title_of() { # <script> <dossier> <lrn_id> -> titre|categorie de la candidate
+  (cd "$2" && MEMORY_DIR=".claude/memory" "$1" 2>/dev/null) | python3 -c '
+import json, sys
+for c in json.load(sys.stdin)["candidates"]:
+    if c.get("lrn_id") == sys.argv[1]:
+        print(c["title"] + "|" + c["category"]); sys.exit(0)
+print("ABSENTE")
+' "$3" 2>&1
+}
+T6J2="$WORK_DIR/t6j2"; mkdir -p "$T6J2/.claude/memory"
+sed 's/\[.claude\/rules\/xxx.md\]/Non encode/' "$T6J/.claude/memory/LEARNINGS.md" > "$T6J2/.claude/memory/LEARNINGS.md"
+assert "T6h-champ — le titre à guillemet et à barre est rendu intact, la catégorie ne se décale pas" "$(title_of "$DP" "$T6J2" LRN-915)" 'Toujours citer "la source" des chiffres | et la date|Sources'
+
+# Mutants du script (revue W1) : motif unique, mutant distinct et syntaxiquement valide, puis le rouge DU MUTANT (l'assertion
+# attend la mauvaise valeur : elle n'est vraie que si le mutant casse la propriété) et le vert de l'original.
+mut_dp() { # <id> <motif> <remplacement> -> MUT_DP
+  local id="$1" d="$WORK_DIR/mutdp-$1" n st
+  mkdir -p "$d"
+  n=$(grep -Fc -- "$2" "$DP" || true)
+  assert "$id.0 — motif de mutation unique dans detect-promotions.sh" "$n" "1"
+  MUT_MOTIF_ENV="$2" MUT_REPL_ENV="$3" awk '
+    index($0, ENVIRON["MUT_MOTIF_ENV"]) { match($0, /^[ \t]*/); print substr($0, RSTART, RLENGTH) ENVIRON["MUT_REPL_ENV"]; next }
+    { print }
+  ' "$DP" > "$d/mut.sh"
+  chmod +x "$d/mut.sh"
+  if cmp -s "$d/mut.sh" "$DP"; then st="identique"; elif bash -n "$d/mut.sh" 2>/dev/null; then st="distinct-ok"; else st="KO"; fi
+  assert "$id.1 — le mutant diffère de l'original et reste syntaxiquement valide" "$st" "distinct-ok"
+  MUT_DP="$d/mut.sh"
+}
+mut_dp M07a "INDICES_MECANIQUES = ['lint'" "INDICES_MECANIQUES = ['lint', 'regex', 'grep', 'console.log', 'frontmatter', 'job ci', 'fichier', 'commit', 'chemin', 'import', 'hook']"
+got=$(cand_of "$MUT_DP" "$T6J" LRN-911)
+echo "     trace du rouge — T6h LRN-911 sur le mutant M07a : attendu 'jugement|brouillon-regle', obtenu '$got'"
+assert "M07a — mots courants rétablis comme indices : LRN-911 devient mecanique|check (T6h rouge)" "$got" "mecanique|check"
+mut_dp M07b "prose = '\\n'.join(l for l in sec.split" "prose = sec[:500]"
+got=$(cand_of "$MUT_DP" "$T6J" LRN-914)
+echo "     trace du rouge — T6h LRN-914 sur le mutant M07b : attendu 'jugement|brouillon-regle', obtenu '$got'"
+assert "M07b — métadonnées lues comme apprentissage : LRN-914 devient mecanique|check (T6h rouge)" "$got" "mecanique|check"
+mut_dp M08 'if declare(data.get("hooks")):' 'if "hooks" in data:'
+got=$(findings_of "$T6E3" "$MUT_DP"); printf '{"hooks": {}}\n' > "$T6E3/.claude/settings.json"; got=$(findings_of "$T6E3" "$MUT_DP")
+echo "     trace du rouge — T6e-d sur le mutant M08 : attendu 'depot_sans_garde_fou', obtenu '$got'"
+assert "M08 — présence de la chaîne \"hooks\" lue comme hook déclaré : findings vide (T6e-d rouge)" "$got" "(vide)"
+assert "M08 — l'original rend bien le finding sur {\"hooks\": {}}" "$(findings_of "$T6E3")" "depot_sans_garde_fou"
+mut_dp M09 'print(json.dumps(cand, ensure_ascii=False))' 'print(json.dumps(cand, ensure_ascii=False).replace(chr(92) + chr(34), chr(34)))'
+got=$(json_ok "$MUT_DP" "$T6J")
+echo "     trace du rouge — T6h-json sur le mutant M09 : attendu 'valide', obtenu '$got'"
+assert "M09 — guillemets du titre non échappés : sortie invalide (T6h-json rouge)" "$got" "invalide"
+mut_dp M10 'LAB_ROOT="${MEMORY_DIR%/.claude/memory*}" ;;' '*/.claude/memory|*/.claude/memory/) LAB_ROOT="." ;;'
+got=$(findings_depuis "$MUT_DP" "$T6E" "$T6E5/.claude/memory")
+echo "     trace du rouge — T6e-g sur le mutant M10 : attendu 'depot_sans_garde_fou', obtenu '$got'"
+assert "M10 — mesure sur le répertoire courant au lieu de la racine du registre : findings vide (T6e-g rouge)" "$got" "(vide)"
 
 echo ""
 echo "=== T7 — reindex.sh --apply : backups isolés + rotation + gitignore (ADR-049) ==="

@@ -1,5 +1,13 @@
 # Changelog — mobile-test
 
+## v1.0.3 — 2026-10-06
+
+### Modifié
+- **Patch** — le `SKILL.md` déclare sa classe d'invocation (`vf-invocation: model`, vérifiée par
+  `check-skills.sh --callers-root`, POCK-07, P414-D-01, Phase 41.4) ; `vf-mobile-test` reste
+  model-invoked (option a de P414-D-17, arbitrage Samuel, AskUserQuestion session principale,
+  2026-10-06) ; aucun changement de comportement.
+
 ## v1.0.2 — 2026-07-26
 
 ### Modifié

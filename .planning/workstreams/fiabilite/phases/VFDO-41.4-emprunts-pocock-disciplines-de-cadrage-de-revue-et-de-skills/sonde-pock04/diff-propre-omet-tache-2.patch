@@ -1,0 +1,58 @@
+--- a/compte.sh
++++ b/compte.sh
+@@ -1,11 +1,52 @@
+ #!/usr/bin/env bash
+ # compte.sh — imprime le nombre de lignes non vides d'un fichier.
++# Option -q : silencieux ; 0 si au moins une ligne non vide, 1 si aucune (voir les codes ci-dessous).
++# Codes de sortie : 0 succès (avec -q : au moins une ligne non vide) · 1 aucune ligne non vide (-q
++# seulement) · 2 lecture impossible (fichier absent, illisible, répertoire) ou écriture de la sortie
++# impossible · 64 usage.
++# Avec -q, rien n'est écrit sur stdout, y compris en erreur ; seuls l'usage et « lecture impossible »
++# vont sur stderr (un échec d'écriture sur stderr ne change jamais le code de sortie). Option inconnue
++# et argument en trop refusés ; `--` termine les options. L'opérande `-` est refusé (usage, 64) partout,
++# `--` compris : l'entrée standard n'est pas prise en charge ; un fichier nommé « - » se désigne par `./-`.
+ set -eu
+ 
+-if [ "$#" -lt 1 ]; then
+-  echo "usage: compte.sh <fichier>" >&2
++usage() {
++  printf 'usage: compte.sh [-q] [--] <fichier>\n' >&2 || true
+   exit 64
++}
++
++silencieux=0
++while [ "$#" -gt 0 ]; do
++  case "$1" in
++    -q) silencieux=1; shift ;;
++    --) shift; break ;;
++    -*) usage ;;
++    *) break ;;
++  esac
++done
++
++if [ "$#" -ne 1 ] || [ "$1" = "-" ]; then
++  usage
+ fi
+ 
+ fichier="$1"
+-grep -c -v '^[[:space:]]*$' "$fichier" || true
++rc=0
++n=$(grep -c -v -e '^[[:space:]]*$' -- "$fichier" 2>/dev/null) || rc=$?
++# grep -c : code 1 = aucune ligne retenue (n vaut 0) ; code >= 2 = erreur de lecture, jamais masquée.
++if [ "$rc" -gt 1 ]; then
++  if [ ! -e "$fichier" ]; then raison="absent"
++  elif [ -d "$fichier" ]; then raison="répertoire"
++  elif [ ! -r "$fichier" ]; then raison="illisible"
++  else raison="erreur de lecture"; fi
++  printf 'compte.sh: lecture impossible (%s) : %q\n' "$raison" "$fichier" >&2 || true
++  exit 2
++fi
++
++if [ "$silencieux" -eq 1 ]; then
++  if [ "$n" -gt 0 ]; then
++    exit 0
++  fi
++  exit 1
++fi
++
++printf '%s\n' "$n" || exit 2

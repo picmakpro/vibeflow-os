@@ -3,8 +3,8 @@
 #
 # Doctrine (Phase 43, spec fabrique §6) : chaque skill déclare sa NATURE en frontmatter —
 # `vf-nature: referentiel | outil | procedure`, DÉFAUT « outil » quand la clé est absente
-# (D-Q1, D-Q2 — aucun des 25 SKILL.md du corpus ne change de comportement à l'armement de ce
-# gate). Une valeur PRÉSENTE mais hors de cet ensemble exact est REFUSÉE (rc 1) — jamais ramenée
+# (D-Q1, D-Q2 — aucun des SKILL.md du corpus (25 à l'armement, Phase 43 ; 26 au 2026-10-06) ne change
+# de comportement à l'armement de ce gate). Une valeur PRÉSENTE mais hors de cet ensemble exact est REFUSÉE (rc 1) — jamais ramenée
 # au défaut « outil » (B-03 : jamais un défaut silencieux sur une déclaration invalide).
 # Une PROCÉDURE doit déclarer `ecrit:` (son périmètre d'écriture, moteur D-10) ET
 # `vf-rubrique-juge:` (sa rubrique de juge) ; l'absence de l'un, de l'autre ou des deux est un
@@ -15,8 +15,8 @@
 # FABR-07 (détection de dérive procédurale, écart déclaration/prose) n'est PAS posée par ce
 # script — elle arrive en 43-02, un plan distinct, sur le même gate.
 #
-# Contrat de clés (D-Q1, costly) : ces six clés (`vf-nature`, `ecrit`, `vf-rubrique-juge`,
-# `vf-gate-bloquant`, `vf-livrable-tiers`, `vf-couche-qualite`) sont des CONVENTIONS VibeFlow —
+# Contrat de clés (D-Q1, costly) : ces sept clés (`vf-nature`, `ecrit`, `vf-rubrique-juge`,
+# `vf-gate-bloquant`, `vf-livrable-tiers`, `vf-couche-qualite`, `vf-invocation`) sont des CONVENTIONS VibeFlow —
 # `VIBEFLOW_SKILL_FIELDS`, en dur dans ce script, JAMAIS dans le manifeste daté (même frontière
 # que D-01 de la Phase 42 : le manifeste ne porte que des champs d'origine NATIVE, périssables
 # avec la doc externe ; une convention du dépôt ne périme pas).
@@ -55,6 +55,9 @@
 #   check-skills.sh --hook                 # SessionStart : compact, exit 0 toujours
 #   check-skills.sh --file <SKILL.md>      # un seul fichier
 #   check-skills.sh --skills-dir=PATH      # défaut .claude/skills
+#   check-skills.sh --callers-root=PATH    # + classe d'invocation (POCK-07) : classement exigé et arêtes
+#                                          # d'appel lues sous PATH (commands/, agents/, */AGENT.md,
+#                                          # */agents/) · incompatible avec --file · absent = inchangé
 #   check-skills.sh --allow-empty          # avec --strict : tolère une cible vide ou absente
 #   check-skills.sh --third-party-prefix=PFX     # répétable, défaut gsd- (accumule AU-DESSUS
 #                                                 # du défaut ; --no-third-party-prefix avant pour repartir de zéro)
@@ -110,6 +113,38 @@
 # Écart nature <-> marqueurs (B-03, C-15, Tâche 2 de 43-02) : au moins un marqueur déclaré true et vf-nature différente de procedure (absente comptée comme outil) -> avertissement « ecart » citant B-03 et C-15 ; la nature n'est JAMAIS réécrite ni déduite (B-03 écarte la dérivation automatique). Appel unique dans check_file, vers la liste des avertissements (cible MUT-DR3).
 #
 # Mesure du corpus réel sous cette règle (2026-09-26, lecture seule, hors module doc-only, plugin/reference exclu) : 26 avertissements « derive » sur 11 SKILL.md/21 (0 « ecart » -- aucun marqueur encore déclaré true dans le corpus) ; liste complète au SUMMARY de 43-02 (CORPUS-DERIVE) — corpus laissé non corrigé (D-Q5, backlog séparé, .planning/BACKLOG.md entrée e36e6f2).
+#
+# --- Classe d'invocation (POCK-07, Phase 41.4) — posée en 41.4-01, sur ce même gate ----------------
+# Champ VibeFlow `vf-invocation: user | model` (convention du dépôt, hors manifeste daté), jugé en
+# tous les modes : valeur hors {user, model} (casse exacte) -> refus ; `user` exige le champ natif
+# `disable-model-invocation: true` (insensible à la casse), `model` l'interdit (P414-D-01). Classer
+# un skill est un acte HUMAIN : le gate refuse l'absence, il ne pose jamais la classe.
+# Option `--callers-root=PATH` (racine d'arêtes : un dossier plugin/ source, ou .claude/ d'un lab) —
+# sans elle, le comportement du hook de lab et des arbres par module (T4/T32) est INCHANGÉ. Sous
+# l'option, en plus des contrôles ci-dessus :
+#   - classement exigé : un SKILL.md sans vf-invocation est « non classe » (POCK-07) ;
+#   - arêtes d'appel dérivées par MOT ENTIER (nom passé par re.escape, bornes [A-Za-z0-9_-]) sur
+#     commands/*.md (commande), le champ skills: d'un agent (préchargement) et un agent qui cite le
+#     nom ET peut appeler Skill (jeton Skill dans tools:, ou aucune ligne tools: = hérite de tout,
+#     sauf disallowedTools: Skill) — jamais un nom de module en dur, agents lus : agents/*.md,
+#     */AGENT.md, */agents/*.md. Une prose qui cite un skill depuis un agent SANS l'outil Skill
+#     n'est PAS une arête machine ;
+#   - un skill `user` appelé par l'une de ces arêtes est refusé, l'appelant nommé (P414-D-02) ; un
+#     `user` dont le corps cite un autre `user` est refusé (P414-D-01) ; un `user` qui cite un
+#     `model` est légitime ;
+#   - équivalent Codex (P414-D-03) : un `user` NICHÉ (skills/<nom>/SKILL.md) exige
+#     agents/openai.yaml, fichier régulier dont la valeur RÉSOLUE de `policy.allow_implicit_invocation`
+#     (enfant direct de l'unique clé `policy:` de niveau 0, commentaire de fin de ligne exclu, ni
+#     tabulation d'indentation ni forme en flux) vaut `false` — lecteur `valeur_implicite_codex` ;
+#     un `user` NON niché (module Type 1, SKILL.md copié seul par l'installeur) est une DETTE
+#     signalée par avertissement, jamais un refus ;
+#   - ligne d'information « sans appelant machine » (jamais comptée en avertissement) : le gate LISTE
+#     les skills sans aucune arête, candidats user-invoked seulement si effet de bord lourd — le
+#     jugement humain n'est pas calculé (P414-D-01).
+# TROIS ISSUES de ce régime : 0 = conforme (dettes Type 1 et information permises) · 1 = skill non
+# classé, valeur invalide, user appelé, user -> user, ou agents/openai.yaml absent ou non conforme ·
+# 3 = INDETERMINE : racine d'arêtes absente ou sans aucun fichier appelant (jeton ARETES-ABSENTES) —
+# jamais un vert à vide ; sous --hook, 3 devient 0 à la frontière du shell comme ailleurs.
 
 set -uo pipefail
 
@@ -119,6 +154,7 @@ HOOK_MODE=false
 ALLOW_EMPTY=false
 SINGLE_FILE=""
 THIRD_PARTY_PREFIXES="gsd-"
+CALLERS_ROOT=""
 
 for arg in "$@"; do
   case "$arg" in
@@ -134,6 +170,18 @@ for arg in "$@"; do
       fi
       SKILLS_DIR="$v"
       ;;
+    --callers-root=*)
+      v="${arg#*=}"
+      if [ -z "$v" ]; then
+        echo "[check-skills] ✗ --callers-root vide — un chemin est requis" >&2
+        exit 1
+      fi
+      CALLERS_ROOT="$v"
+      ;;
+    --callers-root)
+      echo "[check-skills] ✗ --callers-root exige la forme --callers-root=PATH (jamais ignoré en silence)" >&2
+      exit 1
+      ;;
     --third-party-prefix=*)
       v="${arg#*=}"
       if [ -z "$THIRD_PARTY_PREFIXES" ]; then THIRD_PARTY_PREFIXES="$v"; else THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES:$v"; fi
@@ -148,6 +196,10 @@ for arg in "$@"; do
   [ "$prev" = "--file" ] && SINGLE_FILE="$arg"
   prev="$arg"
 done
+if [ -n "$CALLERS_ROOT" ] && [ -n "$SINGLE_FILE" ]; then
+  echo "[check-skills] ✗ --callers-root incompatible avec --file — les aretes se calculent sur un arbre, jamais sur un fichier isole" >&2
+  exit 1
+fi
 
 # --- Traduction du silence interne vers le harness (uniquement sous --hook) — meme patron que ---
 # check-agents.sh : le SEUL code de silence interne (3 = INDETERMINE) devient 0 a la frontiere du
@@ -174,6 +226,7 @@ esac
 
 VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" \
 VF_ALLOW_EMPTY="$ALLOW_EMPTY" VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" VF_MANIFEST="$VF_MANIFEST" \
+VF_CALLERS_ROOT="$CALLERS_ROOT" \
 "$PYBIN" - <<'PY_CHECK_SKILLS_EOF'
 import glob, json, os, re, sys
 from datetime import date
@@ -184,13 +237,15 @@ strict = os.environ["VF_STRICT"] == "true"
 hook = os.environ["VF_HOOK"] == "true"
 allow_empty = os.environ["VF_ALLOW_EMPTY"] == "true"
 single = os.environ["VF_SINGLE"]
+callers_root = os.environ.get("VF_CALLERS_ROOT", "")
 third_party_prefixes = [p for p in os.environ.get("VF_THIRD_PARTY_PREFIXES", "").split(":") if p]
 
 # Conventions VibeFlow en dur (D-Q1) — jamais dans le manifeste, jamais sujettes a la peremption
 # d'une doc Anthropic externe (meme frontiere que D-01, Phase 42) :
 VIBEFLOW_SKILL_FIELDS = {"vf-nature", "ecrit", "vf-rubrique-juge", "vf-gate-bloquant",
-                         "vf-livrable-tiers", "vf-couche-qualite"}
+                         "vf-livrable-tiers", "vf-couche-qualite", "vf-invocation"}
 NATURES = {"referentiel", "outil", "procedure"}
+CLASSES_INVOCATION = {"user", "model"}
 MARQUEURS = ("vf-gate-bloquant", "vf-livrable-tiers", "vf-couche-qualite")
 
 def decouvrir_skills(racine, refuses=None):
@@ -298,10 +353,30 @@ def charger_referentiel():
 errors, warnings = [], []
 thirdparty_files_total = 0
 linted_paths = []
+skills_juges = []  # (chemin relatif, chemin reel, frontmatter, texte) de chaque skill juge (POCK-07)
 
-def parse_frontmatter(text):
+def sans_commentaire_yaml(val):
+    """Valeur YAML d'un scalaire ou d'une liste en ligne : le commentaire de fin de ligne
+    (`#` precede d'un blanc ou en tete, HORS guillemets) est exclu. Un guillemet n'ouvre une
+    chaine qu'en debut de jeton (apres blanc, `[` ou `,`) : une apostrophe de mot ne masque rien."""
+    quote = None
+    for i, c in enumerate(val):
+        if quote:
+            if c == quote:
+                quote = None
+        elif c in (chr(34), chr(39)) and (i == 0 or val[i - 1] in " \t[,"):
+            quote = c
+        elif c == "#" and (i == 0 or val[i - 1] in " \t"):
+            return val[:i].rstrip()
+    return val
+
+def parse_frontmatter(text, commentaires=False):
     """Meme tokenizer YAML-tolerant (scalaire/liste/continuation) que check-agents.sh — recopie
-    verbatim, aucune divergence de comportement entre les deux gates sur ce point."""
+    verbatim, aucune divergence de comportement entre les deux gates sur ce point. Option
+    `commentaires` (M-02, N-13) : la valeur lue est la valeur YAML, le commentaire de fin de ligne
+    exclu, quelle que soit la forme (scalaire, liste en ligne ; la liste de bloc le fait deja) —
+    jouee par check_file (UNE seule lecture du frontmatter d'un SKILL.md, controles ET aretes) et
+    par decouvrir_appelants."""
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
         return None
@@ -315,6 +390,8 @@ def parse_frontmatter(text):
         if m:
             current_key = m.group(1)
             val = m.group(2).strip()
+            if commentaires:
+                val = sans_commentaire_yaml(val)
             if val.startswith("[") and val.endswith("]"):
                 items = [x.strip().strip(chr(34)).strip(chr(39)) for x in val[1:-1].split(",") if x.strip()]
                 fm[current_key] = items
@@ -441,6 +518,71 @@ def skill_display_name(text):
     if fm and isinstance(fm.get("name"), str) and fm.get("name"):
         return fm["name"]
     return ""
+
+def skills_non_classes(juges):
+    """POCK-07, P414-D-01 : un skill sans cle vf-invocation n'est pas classe. Joue SOUS
+    --callers-root seulement (le hook de lab, arbre par module, reste inchange). Une cle PRESENTE
+    mais vide ou invalide n'est pas « non classe » : valider_invocation la refuse deja."""
+    msgs = []
+    for rel, _chemin, fm, _texte in juges:
+        if "vf-invocation" not in fm:
+            msgs.append(f"{rel} : non classe — vf-invocation absent (POCK-07, P414-D-01) ; attendu user ou model")
+    return msgs
+
+def lister_md(dossier):
+    """Fichiers .md reguliers DIRECTEMENT sous dossier — aucun lien symbolique (fichier) retenu,
+    ordre stable. Dossier absent ou illisible : liste vide."""
+    try:
+        noms = sorted(os.listdir(dossier))
+    except OSError:
+        return []
+    out = []
+    for n in noms:
+        p = os.path.join(dossier, n)
+        if n.endswith('.md') and os.path.isfile(p) and not os.path.islink(p):
+            out.append(p)
+    return out
+
+def decouvrir_appelants(racine):
+    """POCK-07 : fichiers qui PEUVENT appeler un skill, sous la racine d'aretes —
+    {racine}/commands/*.md (commande), {racine}/agents/*.md, {racine}/*/AGENT.md et
+    {racine}/*/agents/*.md (agent). Memes exclusions que la decouverte des skills : dossiers caches
+    et *-references, aucun lien symbolique suivi. Rend une liste de dicts
+    {rel, kind, fm, text} ; racine absente ou sans aucun de ces fichiers : liste vide (l'appelant
+    en fait un INDETERMINE, jamais un vert a vide). Aucun nom de module en dur."""
+    if not os.path.isdir(racine):
+        return []
+    cibles = [("commande", p) for p in lister_md(os.path.join(racine, "commands"))]
+    cibles += [("agent", p) for p in lister_md(os.path.join(racine, "agents"))]
+    try:
+        sous_dossiers = sorted(os.listdir(racine))
+    except OSError:
+        sous_dossiers = []
+    for d in sous_dossiers:
+        if d.startswith('.') or d.endswith('-references'):
+            continue
+        dp = os.path.join(racine, d)
+        if os.path.islink(dp) or not os.path.isdir(dp):
+            continue
+        ag = os.path.join(dp, "AGENT.md")
+        if os.path.isfile(ag) and not os.path.islink(ag):
+            cibles.append(("agent", ag))
+        cibles += [("agent", p) for p in lister_md(os.path.join(dp, "agents"))]
+    appelants = []
+    for kind, chemin in cibles:
+        rel = os.path.relpath(chemin, racine).replace(os.sep, "/")
+        try:
+            texte = open(chemin, encoding="utf-8-sig").read()
+        except OSError as e:
+            errors.append(f"{rel} : appelant illisible ({e}) — aretes non calculables")
+            continue
+        fm = parse_frontmatter(texte, commentaires=True) if kind == "agent" else None
+        for cle in (("skills", "tools", "disallowedTools", "disallowed-tools") if fm else ()):
+            v = fm.get(cle)
+            if isinstance(v, str) and v.startswith("["):
+                errors.append(f"{rel} : champ {cle} non interpretable (liste en ligne non refermee) — aretes non calculables")
+        appelants.append({"rel": rel, "kind": kind, "fm": fm if fm is not None else {}, "text": texte})
+    return appelants
 
 # --- Detection de derive (D-Q1, D-Q5, FABR-07) -- regle Q-PORTEE complete dans l'en-tete du script
 # (decision deleguee par Willy au head (/vf-decide), AskUserQuestion session principale, 2026-09-26)
@@ -570,25 +712,248 @@ def ecart_nature_marqueurs(rel, fm):
         f"marqueur designe une procedure (B-03, C-15) ; la nature reste declaree, jamais deduite"
     ]
 
+def est_vrai(v):
+    """Valeur YAML « true » d'un champ NATIF (disable-model-invocation) : insensible a la casse,
+    comme le lit le harnais — `True` desactive aussi l'invocation par le modele."""
+    return isinstance(v, str) and v.strip().lower() == "true"
+
+def valider_invocation(rel, fm):
+    """POCK-07, P414-D-01 : vf-invocation PRESENT doit valoir exactement user ou model (casse
+    exacte, jamais ramene a un defaut) ET etre coherent avec le champ natif : `user` exige
+    disable-model-invocation: true, `model` l'interdit. Joue dans TOUS les modes — la valeur est
+    un fait du fichier, pas une arete. Cle ABSENTE : jamais une erreur ICI (skills_non_classes la
+    juge, sous --callers-root seulement)."""
+    if "vf-invocation" not in fm:
+        return []
+    val = fm["vf-invocation"]
+    if not isinstance(val, str) or val not in CLASSES_INVOCATION:
+        return [f"{rel} : vf-invocation invalide — {esc(val)} (attendu user ou model, POCK-07)"]
+    desactive = est_vrai(fm.get("disable-model-invocation"))
+    if val == "user" and not desactive:
+        return [f"{rel} : vf-invocation: user sans disable-model-invocation: true (P414-D-01)"]
+    if val == "model" and desactive:
+        return [f"{rel} : vf-invocation: model avec disable-model-invocation: true (P414-D-01)"]
+    return []
+
+def mot_entier_re(nom):
+    """Regex de mot ENTIER pour un nom de skill (T-41.4-01) : le nom est passe par re.escape (un
+    point reste un point litteral), bornes = aucun caractere [A-Za-z0-9_-] de part et d'autre
+    (« vf-dev » n'apparie pas « vf-dev-manager »)."""
+    return re.compile(r"(?<![A-Za-z0-9_-])" + re.escape(nom) + r"(?![A-Za-z0-9_-])")
+
+def jetons_champ(v):
+    """Jetons d'un champ de frontmatter : liste (bloc ou en ligne) ou scalaire separe par des
+    virgules ; vides ecartes."""
+    if isinstance(v, list):
+        items = v
+    elif isinstance(v, str):
+        items = v.split(",")
+    else:
+        return []
+    out = []
+    for x in items:
+        x = str(x).strip().strip(chr(34)).strip(chr(39))
+        if x:
+            out.append(x)
+    return out
+
+def agent_outille_skill(fm):
+    """Un agent peut appeler un skill s'il porte l'outil Skill (jeton `Skill` ou `Skill(...)` dans
+    tools:) OU n'a aucune ligne tools: (il herite de tout) — sauf si disallowedTools porte le jeton
+    Skill. Un agent de tools: Read, Bash qui cite un skill en prose n'a AUCUNE arete machine."""
+    tools = jetons_champ(fm.get("tools"))
+    if not tools:
+        outille = True
+    else:
+        outille = any(t == "Skill" or t.startswith("Skill(") for t in tools)
+    interdits = jetons_champ(fm.get("disallowedTools", fm.get("disallowed-tools")))
+    if "Skill" in interdits:
+        return False
+    return outille
+
+def identite_skill(chemin, fm):
+    """Identite d'un skill dans le calcul des aretes (M-01) : le `name:` declare, a defaut le nom
+    de son dossier (c'est ainsi que le harnais le nomme). None si ni l'un ni l'autre n'est
+    exploitable : le skill est alors REFUSE par controler_aretes, jamais exempte en silence."""
+    nom = fm.get("name")
+    if isinstance(nom, str) and nom:
+        return nom
+    if "name" in fm:
+        return None  # name present mais vide ou non scalaire : ne pas deviner
+    dossier = os.path.basename(os.path.dirname(os.path.abspath(chemin)))
+    return dossier or None
+
+def aretes_par_skill(juges, appelants):
+    """Aretes d'appel DERIVEES (jamais un nom de module en dur) : rel du skill -> liste de
+    (famille, rel de l'appelant). Familles : commande (fichier commands/*.md qui contient le nom,
+    mot entier), prechargement (nom dans le champ skills: d'un agent), agent (agent qui contient
+    le nom ET dont l'outillage permet Skill)."""
+    aretes = {}
+    for rel, chemin, fm, _texte in juges:
+        liste = []
+        aretes[rel] = liste
+        nom = identite_skill(chemin, fm)
+        if not nom:
+            continue
+        motif = mot_entier_re(nom)
+        for ap in appelants:
+            if ap["kind"] == "commande":
+                if motif.search(ap["text"]):
+                    liste.append(("commande", ap["rel"]))
+                continue
+            if nom in jetons_champ(ap["fm"].get("skills")):
+                liste.append(("prechargement", ap["rel"]))
+                continue
+            if not motif.search(ap["text"]):
+                continue
+            if not agent_outille_skill(ap["fm"]):
+                continue
+            liste.append(("agent", ap["rel"]))
+    return aretes
+
+def corps_sans_frontmatter(texte):
+    lignes = texte.split("\n")
+    i = 1
+    while i < len(lignes) and lignes[i].strip() != "---":
+        i += 1
+    return "\n".join(lignes[i + 1:])
+
+def controler_aretes(juges, appelants):
+    """POCK-07, P414-D-01/D-02 : un skill `user` appele par une commande, un prechargement ou un
+    agent outille Skill est refuse (une erreur par appelant, qui le nomme) ; un `user` dont le
+    corps cite un AUTRE `user` est refuse. Un user qui cite un model est legitime."""
+    aretes = aretes_par_skill(juges, appelants)
+    users = {}
+    msgs = []
+    for rel, chemin, fm, _texte in juges:
+        nom = identite_skill(chemin, fm)
+        if not nom:
+            msgs.append(f"{rel} : identite du skill indeterminable (name: vide ou non scalaire) — aretes non calculables, refuse (M-01)")
+        elif fm.get("vf-invocation") == "user":
+            users[nom] = rel
+    for rel, chemin, fm, texte in juges:
+        if fm.get("vf-invocation") != "user":
+            continue
+        for famille, ap_rel in aretes.get(rel, []):
+            msgs.append(f"{rel} : user-invoked appele par {ap_rel} ({famille}) — refuse (P414-D-02)")
+        corps = corps_sans_frontmatter(texte)
+        for nom_cible in sorted(users):
+            if nom_cible == identite_skill(chemin, fm):
+                continue
+            if mot_entier_re(nom_cible).search(corps):
+                msgs.append(f"{rel} : user-invoked cite le user-invoked {esc(nom_cible)} — refuse (P414-D-01)")
+    return msgs
+
+def est_imbrique(chemin):
+    """Skill NICHE (Type 2) : le dossier parent de son dossier se nomme `skills`
+    (skills/<nom>/SKILL.md). Un SKILL.md sous un dossier de module (Type 1) ne l'est pas."""
+    dossier_skill = os.path.dirname(os.path.abspath(chemin))
+    return os.path.basename(os.path.dirname(dossier_skill)) == "skills"
+
+def valeur_implicite_codex(texte):
+    """M-03 : valeur RESOLUE et unique de policy.allow_implicit_invocation dans un openai.yaml.
+    Lecteur YAML minimal par indentation (aucune dependance) : la cle `policy:` au niveau 0 (une
+    seule), la cle `allow_implicit_invocation` parmi SES enfants directs (une seule), valeur
+    booleenne `false` (commentaire de fin de ligne exclu). Rend (conforme, raison) ; toute forme
+    non interpretable (flux `{...}`, doublon, mauvais parent, valeur non booleenne) = refus."""
+    lignes = []
+    for brut in texte.split("\n"):
+        l = brut.rstrip("\r")
+        if not l.strip() or l.lstrip().startswith("#"):
+            continue
+        if "\t" in l[:len(l) - len(l.lstrip())]:
+            return False, "tabulation en indentation, non interpretable"
+        lignes.append((len(l) - len(l.lstrip(" ")), l.strip()))
+    policies = [i for i, (ind, c) in enumerate(lignes) if ind == 0 and re.match(r"^policy\s*:", c)]
+    if len(policies) != 1:
+        return False, "cle policy: absente ou en double"
+    debut = policies[0]
+    reste = sans_commentaire_yaml(lignes[debut][1].split(":", 1)[1].strip())
+    if reste:
+        return False, "policy: en forme de flux ou de scalaire, non interpretable"
+    enfants, indent_enfant = [], None
+    for ind, c in lignes[debut + 1:]:
+        if ind == 0:
+            break
+        if indent_enfant is None:
+            indent_enfant = ind
+        if ind == indent_enfant:
+            enfants.append(c)
+    vals = []
+    for c in enfants:
+        m = re.match(r"^allow_implicit_invocation\s*:(.*)$", c)
+        if m:
+            vals.append(sans_commentaire_yaml(m.group(1).strip()).strip(chr(34) + chr(39)))
+    if len(vals) != 1:
+        return False, "allow_implicit_invocation absent ou en double sous policy:"
+    if vals[0].lower() != "false":
+        return False, f"valeur resolue {vals[0]!r} (attendu false)"
+    return True, ""
+
+def controler_codex(juges):
+    """P414-D-03 : un skill `user` NICHE exige {dossier}/agents/openai.yaml — fichier regulier
+    (jamais un lien) dont la valeur RESOLUE de policy.allow_implicit_invocation vaut `false`
+    (lecteur valeur_implicite_codex : cle policy: unique au niveau 0, enfant direct unique,
+    commentaire exclu — equivalent Codex de disable-model-invocation)."""
+    msgs = []
+    for rel, chemin, fm, _texte in juges:
+        if fm.get("vf-invocation") != "user" or not est_imbrique(chemin):
+            continue
+        oy = os.path.join(os.path.dirname(chemin), "agents", "openai.yaml")
+        conforme, raison = False, "fichier absent, illisible ou lien symbolique"
+        if os.path.isfile(oy) and not os.path.islink(oy):
+            try:
+                with open(oy, encoding="utf-8-sig") as fh:
+                    conforme, raison = valeur_implicite_codex(fh.read())
+            except OSError:
+                conforme, raison = False, "fichier illisible"
+        if not conforme:
+            msgs.append(f"{rel} : user-invoked niche sans agents/openai.yaml (policy.allow_implicit_invocation: false) — P414-D-03 [{raison}]")
+    return msgs
+
+def dette_type1(juges):
+    """P414-D-03 : un skill `user` NON niche (module Type 1, copie du SKILL.md seul par
+    l'installeur) ne peut pas transporter l'equivalent Codex — avertissement de dette, jamais un
+    refus (le poser dans plugin/<mod>/agents/ le ferait installer comme AGENT)."""
+    return [f"{rel} : dette Type 1 (P414-D-03) — equivalent Codex non transporte par l'installeur (copie du SKILL.md seul)"
+            for rel, chemin, fm, _texte in juges
+            if fm.get("vf-invocation") == "user" and not est_imbrique(chemin)]
+
+def sans_appelant(juges, appelants):
+    """Noms des skills non user sans aucune arete machine (commande, prechargement, agent outille
+    Skill) — information pour le jugement humain (P414-D-01) ; le gate LISTE, il ne pose rien."""
+    aretes = aretes_par_skill(juges, appelants)
+    noms = set()
+    for rel, chemin, fm, _texte in juges:
+        nom = identite_skill(chemin, fm)
+        if fm.get("vf-invocation") != "user" and nom and not aretes.get(rel):
+            noms.add(nom)
+    return sorted(noms)
+
 def check_file(rel, text):
+    """Juge un SKILL.md ; rend SON frontmatter (None si illisible). UNE seule lecture (N-13) : la
+    valeur d'un champ est la valeur YAML (commentaire de fin de ligne exclu) pour TOUS les controles
+    ET pour le calcul des aretes — `vf-invocation: model # classe` ne rougit plus a tort."""
     lines = text.split("\n")
     if not lines or lines[0].strip() != "---":
         errors.append(f"{rel} : frontmatter absent (--- ... ---) — aucun verdict possible")
-        return
-    fm = parse_frontmatter(text)
+        return None
+    fm = parse_frontmatter(text, commentaires=True)
     if fm is None:
         errors.append(f"{rel} : frontmatter jamais referme (--- ... ---) — aucun verdict possible")
-        return
+        return None
     errors.extend(valider_nature(rel, fm))
     errors.extend(invariant_procedure(rel, fm))
     errors.extend(valider_ecrit(rel, fm.get("ecrit")))
     errors.extend(valider_rubrique_juge(rel, fm.get("vf-rubrique-juge")))
     errors.extend(valider_marqueurs(rel, fm))
+    errors.extend(valider_invocation(rel, fm))
     warnings.extend(detecter_derive(rel, fm, lignes_de_portee(text)))
     warnings.extend(ecart_nature_marqueurs(rel, fm))
     for k in fm:
         if k not in KNOWN:
             warnings.append(f"{rel} : champ inconnu — {k} (typo ? verifier la doc)")
+    return fm
 
 if single:
     if os.path.islink(single):
@@ -639,8 +1004,28 @@ else:
         if matched_prefix:
             thirdparty_files_total += 1
             continue
-        check_file(os.path.relpath(f, skills_dir), text)
+        fm_juge = check_file(os.path.relpath(f, skills_dir), text)
         linted_paths.append(f)
+        if fm_juge is not None:
+            skills_juges.append((os.path.relpath(f, skills_dir), f, fm_juge, text))
+
+# --- Classe d'invocation (POCK-07, Phase 41.4) : jouee SEULEMENT sous --callers-root -------------
+# Le hook de lab et les arbres par module (T4/T32) n'ont pas de racine d'aretes : leur comportement
+# est inchange. Racine absente ou sans aucun fichier appelant = INDETERMINE (rc 3) — jamais un vert
+# a vide, la conformite d'un skill « user » ne se juge pas sans ses aretes (T-41.4-02).
+liste_sans_appelant = None  # None hors --callers-root : la ligne d'information n'est pas imprimee
+if callers_root:
+    appelants_trouves = decouvrir_appelants(callers_root)
+    if not appelants_trouves:
+        if not hook:
+            cause = "racine absente" if not os.path.isdir(callers_root) else "aucun fichier appelant (commands/*.md, agents/*.md, */AGENT.md, */agents/*.md)"
+            print(f"[check-skills] ✗ INDETERMINE : {callers_root} — ARETES-ABSENTES, aucune arete calculable ({cause}) — aucun verdict rendu")
+        sys.exit(3)
+    errors.extend(skills_non_classes(skills_juges))
+    errors.extend(controler_aretes(skills_juges, appelants_trouves))
+    errors.extend(controler_codex(skills_juges))
+    warnings.extend(dette_type1(skills_juges))
+    liste_sans_appelant = sans_appelant(skills_juges, appelants_trouves)
 
 n_err, n_warn = len(errors), len(warnings)
 
@@ -666,6 +1051,10 @@ for w in warnings:
 if thirdparty_files_total:
     pfx_str = ','.join(third_party_prefixes) if third_party_prefixes else '—'
     print(f"[check-skills] {thirdparty_files_total} skill(s) tiers non linte(s) (prefixe(s) : {pfx_str})")
+if liste_sans_appelant is not None:
+    # Information, JAMAIS comptee en avertissement : le gate liste, il ne pose rien (P414-D-01).
+    noms_sans_appelant = ", ".join(esc(n) for n in liste_sans_appelant) if liste_sans_appelant else "(aucun)"
+    print(f"[check-skills] sans appelant machine (commande, prechargement, agent outille Skill) : {noms_sans_appelant} — candidats user-invoked seulement si effet de bord lourd (jugement humain, P414-D-01)")
 if n_err:
     print(f"[check-skills] ✗ {n_err} non-conformite(s) bloquante(s) :")
     for e in errors:

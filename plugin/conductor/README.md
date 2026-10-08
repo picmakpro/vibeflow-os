@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.46.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.47.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -141,6 +141,9 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   manifeste daté à sept listes que `check-agents.sh` (fraîcheur de la liste
   `champs_frontmatter_skills` seule, avertissement uniquement). Contrat 0/1/3, mêmes options que
   `check-agents.sh` (`--strict`, `--hook`, `--file`, `--skills-dir=`, `--third-party-prefix=`).
+  Sous `--callers-root=` (Phase 41.4, POCK-07), il exige aussi `vf-invocation: user | model` sur
+  chaque `SKILL.md` : un skill non classé rougit, un skill `user` appelé par une commande, un
+  agent ou un autre skill rougit ; sans racine d'arêtes lisible, le verdict est INDÉTERMINÉ (rc 3).
   **N'est PAS câblé au `SessionStart` dans cette phase** — il est lancé par la CI (découverte des
   suites de test + ses propres cas sur l'arbre réel) et par `skill-creator` (`--file`, à l'écriture
   d'un `SKILL.md`) ; le câblage SessionStart/hook est différé à la mise en conformité du corpus
@@ -168,8 +171,11 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   `guard-fin-de-geste.sh` et le contrôle E7 de `check-mission-exit.sh`.
 - `check-ajout-retrait.sh` — garde consultative « un ajout, un retrait » (Phase 41.3, SOBR-05) :
   un gate, un ADR, une règle (titre ou puce de `CLAUDE.md`, `plugin/*/rules/*.md`) ou une mémoire
-  ajoutés sans trailer `Ajout-Retrait:` sont listés ; un remplacement (retrait dans le diff) ne
-  rougit pas, un glob trop large ne couvre rien.
+  ou un `SKILL.md` ajoutés sans trailer `Ajout-Retrait:` sont listés ; un remplacement (retrait
+  dans le diff) ne rougit pas, un glob trop large ne couvre rien. Le trailer a trois segments
+  (`{chemin} — {retrait | aucun : justification} — défaillance : {fait daté}`, Phase 41.4,
+  POCK-08) : sans le fait observé qui a mal tourné (date ISO ou SHA, contenu jugé), il ne couvre
+  rien.
 - `guard-fin-de-geste.sh` — hooks `SessionStart --snapshot` et `Stop` du nettoyage de fin de geste
   (voir § Hooks ci-dessus).
 - `check-map-drift.sh` — gate anti-drift carte↔disque (contrat de routage par dossier).

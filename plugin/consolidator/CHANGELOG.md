@@ -1,5 +1,23 @@
 # CHANGELOG — consolidator
 
+## [v1.11.0] — 2026-10-06 (grille de tri de la promotion, Phase 41.4)
+
+**Minor** (POCK-05, P414-D-10) :
+
+- **`scripts/detect-promotions.sh`** : chaque candidate porte `nature` (`mecanique` | `jugement`) et
+  `proposition` (`check` | `brouillon-regle`), et un tableau `findings` (`depot_sans_garde_fou`,
+  mesuré sur la racine du registre analysé, hook déclaré = entrée de hook non vide du JSON parsé).
+  `nature` lit le titre et la prose de l'apprentissage seulement, sur des motifs de contrôle sans
+  ambiguïté (lint, regex, grep, frontmatter, job CI, extension de script) ; heuristique grossière,
+  défaut `jugement`, tri humain. Un cluster n'est mécanique que si tous ses membres le sont. Sortie
+  émise par `json.dumps` : un titre à guillemet ou à barre ne casse plus le JSON.
+- **`references/promotion.md`** : Grille de tri et Findings ; une candidate mécanique validée aboutit
+  à une proposition de contrôle exécutable (lint, hook ou job CI) à un emplacement nommé, jamais à un
+  fichier de règle ; l'apprentissage source est marqué `Encode dans: <contrôle>` une fois le contrôle
+  posé ; la validation humaine reste obligatoire, rien n'est posé automatiquement. `SKILL.md` renvoie
+  à la grille et porte `vf-invocation: model`.
+- **Suite** `test-consolidator.sh` : T6b à T6h, mutants M07a, M07b, M08 à M10.
+
 ## [v1.10.0] — 2026-08-16 (Portabilité Windows II — codes de sortie, PORT-03/D-07)
 
 ### Changé

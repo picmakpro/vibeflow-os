@@ -90,10 +90,11 @@
 - [x] Phase 39: Workstreams — partition du planning et collaboration concurrente (cadrée 2026-09-09, exécutée 2026-09-10, 3 plans clos avec SUMMARY, revue ×3 + audit infra + juge frais sur le diff de correction ; **SHIPPÉE v2.60.0 le 2026-09-14 — PR #62** (conductor v1.35.0 : `check-divergence.sh` S2/S4/S5 + suite 17 cas dont 3 mutants, hook `post-merge` opt-in ancré sur `--git-common-dir` après RCE démontrée, étape CI ; dev-orchestrator v2.20.4 : dispatch `--ws` explicite ; `PART-01..09` gravées, `GSDA-19` superseded, ADR-069 amendé). Hotfix PR #61 regroupé dans la même release (arbitrage Samuel, AskUserQuestion session principale, 2026-09-14). **Dépôt volontairement NON partitionné** — partition réelle = geste humain séparé, déclencheur D-02 en STATE § Decisions. Réserves : premier run CI distant observé sur la PR #62 seulement ; le clone jetable prouve un mécanisme, pas un usage concurrent réel)
 - [x] Phase 40: vibeflow-head — head of minds du dev-orchestrator (exécutée le 2026-09-15 sur `feat/phase-40-vibeflow-head` — `vibeflow-dev` renommé `vibeflow-head`, 5 plans/3 vagues, zéro agent neuf, kernel intact (diff nul), renommage sur 22 chemins + garde anti-alias T36 (mutation prouvée), `head-governance.md` neuf, `check-mission-exit.sh` E1-E6 codes 3/0/4/64 (23/23 cas, 6 mutations rouges), contrat de preuves E6 + ses trois émetteurs (D-19, amendement post-cadrage), racine bumpée v2.63.0, `dev-orchestrator` v2.22.0 — **PR, tag et release GitHub restent des gestes humains non posés à cette date**. **HEAD-01 partiellement close** — `intent-routing.md` jamais mis à jour pour renvoyer à `head-governance.md`, laissée ouverte au ledger, détail `40-SUMMARY.md`)
 - [x] Phase 40.1: Révision ADR-029 et du gate du budget d'instructions (INSERTED 2026-09-16 — plafond 300 lignes, ratchet sur les instructions seules ; arbitrages Samuel AskUserQuestion session principale ; avant la 41)
-- [x] Phase 41: Posture de protection du dépôt (inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date — **PÉRIMÈTRE RECADRÉ SANS ADMIN LIVRÉ le 2026-09-18, mergée PR #80, SHIPPÉE v2.64.0** : trois gardes in-repo qui signalent et tracent sans jamais verrouiller (G-1 `check-baseline-arbitrage.sh`, G-2 `check-gate-touche.sh`, G-3 `check-push-sans-pr.sh`) + doctrine ADR-072 ; **critères de succès 1 à 3 du ROADMAP d'origine restent HORS D'ATTEINTE sans accès admin GitHub** (PROT-01 non coché, `REQUIREMENTS.md`) ; volet rulesets côté serveur **DIFFÉRÉ au BACKLOG** avec son déclencheur de reprise — le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce volet (WhatsApp, 2026-09-23) **avant** la clôture de `fiabilite-v1.0`, puisque PROT-01 en fait partie (correction du 2026-09-23 : la formulation précédente inversait la séquence — cf. `BACKLOG.md` § « Protection de `main` côté GitHub »))
+- [x] Phase 41: Posture de protection du dépôt (**plans 41-07 à 41-13 confiés à Willy, hors clôture de `fiabilite-v1.0` — arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy » pour 41-07 à 41-09, étendu à toute la chaîne (« Toute la chaîne à Willy ») ; 41-07 partiellement entamé, lignes `PR-R-*` de `41-PREUVES.md`, 2026-09-24 ; PROT-01 cochée le 2026-09-24 sur la pose des rulesets, complément attendu : la mesure du refus réel d'un push direct (41-09, complément en 41-13) est confiée à Willy** ; inscrite 2026-09-15, arbitrage Samuel AskUserQuestion session principale ; cahier des charges au BACKLOG ; séquencée après la 40 ET la calibration 25-04 ; **cadrée le 2026-09-17** — `41-CONTEXT.md`, arbitrages Samuel AskUserQuestion session principale 2026-09-17 : bypass rôle write, PR obligatoire, 4 checks requis, CODEOWNERS étroit, tags v* protégés ; critère 2 reformulé et méthodes de merge non restreintes, mêmes canal et date — **PÉRIMÈTRE RECADRÉ SANS ADMIN LIVRÉ le 2026-09-18, mergée PR #80, SHIPPÉE v2.64.0** : trois gardes in-repo qui signalent et tracent sans jamais verrouiller (G-1 `check-baseline-arbitrage.sh`, G-2 `check-gate-touche.sh`, G-3 `check-push-sans-pr.sh`) + doctrine ADR-072 ; **critères de succès 1 à 3 du ROADMAP d'origine restent HORS D'ATTEINTE sans accès admin GitHub** (au 2026-09-18 : PROT-01 non coché, `REQUIREMENTS.md` — depuis cochée le 2026-09-24) ; au 2026-09-18 : volet rulesets côté serveur **DIFFÉRÉ au BACKLOG** (rulesets posés depuis le 2026-09-23) avec son déclencheur de reprise — le compte `picmakpro` est celui de Willy, co-mainteneur du dépôt, qui a accepté de poser ce volet (WhatsApp, 2026-09-23) **avant** la clôture de `fiabilite-v1.0`, puisque PROT-01 en fait partie (correction du 2026-09-23 : la formulation précédente inversait la séquence — cf. `BACKLOG.md` § « Protection de `main` côté GitHub »))
 - [x] Phase 41.1: Gates de planning workstream-aware — balayage des compartiments présents sur le disque (INSERTED 2026-09-23, demande Samuel session principale : « généralise le remède, ça ne doit plus se reproduire »)
-- [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage)
+- [ ] Phase 41.2: Choisir la partition du planning au démarrage d'un lab (INSERTED 2026-09-23, demande Samuel session principale ; dépend de la 41.1 pour sa preuve d'usage) — exécutée 2026-10-02, PR en revue (non mergée)
 - [x] Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED 2026-09-29, arbitrage Samuel AskUserQuestion session principale ; dernière phase avant la clôture du jalon) — complete 2026-09-30
+- [ ] Phase 41.4: Emprunts Pocock — disciplines de cadrage, de revue et de skills (INSERTED 2026-10-06, arbitrage Samuel session principale ; demande de Willy ; dernière phase avant la clôture du jalon, après la 41.3)
 - [ ] Phase 51: Snapshot de planning avant compaction (PreCompact) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 52: Télémétrie d'usage des skills et agents, et coût de mission (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 53: Apprentissage adossé à l'observation — preuves dans la mémoire vivante (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
@@ -1316,7 +1317,7 @@ ADR-072), PROT-04 (O-3 « gardée par défaut + tracée » : CODEOWNERS `@picmak
 > `scripts/check-baseline-arbitrage.sh` (PROT-04), G-2 `scripts/check-gate-touche.sh` (PROT-05),
 > G-3 `scripts/check-push-sans-pr.sh` (PROT-05) — plus la doctrine `docs/ADR.md` § ADR-072
 > (PROT-03) et O-3 du `25-SECURITY.md` portée à **« signalée et tracée »**. Ledger
-> `.planning/REQUIREMENTS.md` : PROT-02/03/04/05 **cochés sur pièce** ; **PROT-01 reste NON COCHÉ**
+> `.planning/REQUIREMENTS.md` : PROT-02/03/04/05 **cochés sur pièce** ; **PROT-01 reste NON COCHÉ** (depuis cochée le 2026-09-24)
 > — hors d'atteinte sans accès admin, déclencheur de reprise écrit. **Les critères de succès 1, 2
 > et 3 ci-dessus restent INATTEIGNABLES sans accès admin** (constat explicite,
 > `41-PREUVES.md` § 41-19) et ne sont **pas** réécrits ici — ils décrivent la posture serveur
@@ -1331,6 +1332,8 @@ par deux utilisateurs nommés (D-02bis, arbitrage Willy, AskUserQuestion session
 2026-09-23), plans 41-01 à 41-13 révisés puis vérifiés (vérificateur frais, passé). Voir
 `41-CONTEXT.md` § REPRISE.
 
+**Chaîne des mesures confiée à Willy le 2026-10-02** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy », puis étendu le même jour, même canal : « Toute la chaîne à Willy ») : les plans 41-07, 41-08 et 41-09 mesurent la protection posée par Willy et dépendent de ses gestes d'admin (checkpoint avant le merge `--admin` de #101, clé de déploiement temporaire). Les plans 41-10, 41-11, 41-12 et 41-13 prolongent cette chaîne (chacun dépend du précédent) et sont confiés eux aussi à Willy. Tous sortent du périmètre de clôture de `fiabilite-v1.0` ; la Phase 41 est livrée sur 41-01 à 41-06 (+ 41-14 à 41-19), ces mesures résiduelles sont déclarées, aucun PLAN supprimé. `fiabilite-v1.0` se clôt avec **PROT-01 cochée le 2026-09-24 sur la pose des rulesets, complément attendu** : la mesure du refus réel d'un push direct (41-09, complément en 41-13) est confiée à Willy (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02). 41-07 est partiellement entamé (lignes `PR-R-*` de `41-PREUVES.md`, 2026-09-24).
+
 **Plans:** 12/19 plans executed en 13 vagues séquentielles (planifiés le 2026-09-17, vérificateur frais 3 tours),
 dont 10 **différés faute d'accès admin** ; seul 41-01 Task 1 est livré. **Six plans supplémentaires
 (41-14 à 41-19) ajoutés et exécutés le 2026-09-18** pour le périmètre sans admin (option (a)) — voir
@@ -1344,13 +1347,13 @@ Plans:
 - [x] 41-04-PLAN.md — rejeu des gates, PR de la phase mergée avant toute pose (humain)
 - [x] 41-05-PLAN.md — décision explicite avant pose, pose par l'exécutant, relecture serveur des deux `User`, état des PR en vol, mesure M-2 (révisé 2026-09-23)
 - [x] 41-06-PLAN.md — preuve de la revue code owner (baseline comprise), refus sans contournement — `CO-VERDICT: ECART` accepté et documenté (Willy, 2026-09-24) : `mergeStateStatus`/`reviewDecision` masqués par le contournement `always` des deux seuls collaborateurs
-- [ ] 41-07-PLAN.md — PR rouge jetable : mesure M-1, refus, fermeture sans merge
-- [ ] 41-08-PLAN.md — contournement réel et trace dans les rule suites, mesure M-3
-- [ ] 41-09-PLAN.md — push direct refusé pour un acteur hors liste (clé de déploiement temporaire), règles de tags, mesure M-4 (révisé 2026-09-23)
-- [ ] 41-10-PLAN.md — doctrine post-preuves (O-3 « gardée par défaut + tracée », BACKLOG, ADR-072)
-- [ ] 41-11-PLAN.md — décision du mode de release (« Quand publier »), bump éventuel, PR des preuves entrée sur `main` sans contournement (révisé 2026-09-23)
-- [ ] 41-12-PLAN.md — tag, release GitHub, `check-release-tag --remote`, invariants de phase (humain)
-- [ ] 41-13-PLAN.md — clôture : PROT-01 coché sur preuve, ROADMAP/STATE, éligibilité de la clôture du jalon (révisé 2026-09-23)
+- [ ] 41-07-PLAN.md — PR rouge jetable : mesure M-1, refus, fermeture sans merge — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy ») ; partiellement entamé : lignes `PR-R-*` de `41-PREUVES.md` (2026-09-24).
+- [ ] 41-08-PLAN.md — contournement réel et trace dans les rule suites, mesure M-3 — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy »).
+- [ ] 41-09-PLAN.md — push direct refusé pour un acteur hors liste (clé de déploiement temporaire), règles de tags, mesure M-4 (révisé 2026-09-23) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy »).
+- [ ] 41-10-PLAN.md — doctrine post-preuves (O-3 « gardée par défaut + tracée », BACKLOG, ADR-072) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
+- [ ] 41-11-PLAN.md — décision du mode de release (« Quand publier »), bump éventuel, PR des preuves entrée sur `main` sans contournement (révisé 2026-09-23) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
+- [ ] 41-12-PLAN.md — tag, release GitHub, `check-release-tag --remote`, invariants de phase (humain) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
+- [ ] 41-13-PLAN.md — clôture : PROT-01 coché sur preuve, ROADMAP/STATE, éligibilité de la clôture du jalon (révisé 2026-09-23) — **CONFIÉ À WILLY, hors clôture de `fiabilite-v1.0`** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
 
 Plans du périmètre sans admin (option (a), ajoutés et exécutés le 2026-09-18) :
 
@@ -1523,11 +1526,16 @@ sur chaque compartiment sans réparation manuelle**.
 
   6. QUAL-01 : tout gate neuf ou modifié naît avec ses trois issues et sa mutation rouge prouvée.
 
-**Plans:** TBD (run /gsd-plan-phase 41.2 to break down)
+**Plans:** 6 plans en 4 vagues (planifiés le 2026-10-02, vérifiés par le plan-checker ; tous exécutés le 2026-10-02, plus 2 corrections ciblées de revue, un `*-SUMMARY.md` par plan)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 41.2 to break down)
+- [x] 41.2-01 — mesure du verbe d'état du moteur sur fixture jetable + `check-planning-not-inflight.sh` (précondition ADR-069 par machine, QUAL-01) — vague 1
+- [x] 41.2-02 — balayage par sujet extrait en `fanout-state-integrity.sh` sourcé (deux copies de `ci.yml` retirées) + outil de rejeu CI — vague 1
+- [x] 41.2-03 — le geste `split-planning.sh` (précondition → `workstream create` → séquence d'état moteur) + cas S1-S12 — vague 2
+- [x] 41.2-04 — preuve d'usage WSCH-04 de bout en bout (lab neuf partitionné vert sur chaque sujet) + mutations — vague 3
+- [x] 41.2-05 — skill `vf-split-planning` + commande + renvois `vf-new-lab` / `intent-routing.md` + sonde WSCH-01 (checkpoint F1 : budget d'instructions) — vague 3
+- [x] 41.2-06 — remise WSAW-07 (`41.2-WSAW07-HANDOFF.md`) + clôture rejouée — vague 4
 
 
 ### Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED)
@@ -1547,7 +1555,7 @@ qu'elle a créé.
 
 **Requirements**: SOBR-01 à SOBR-08
 **Depends on:** aucune ; en parallèle possible de la 41.2 (fichiers disjoints). Le jalon se clôt
-après la 41.2, la 41.3 et les plans 41-07 à 41-09.
+après la 41.2, la 41.3 et la 41.4 (insérée le 2026-10-06) ; les plans 41-07 à 41-13 sont confiés à Willy et ne bloquent plus la clôture (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Toute la chaîne à Willy »).
 **Arbitrages (Samuel, AskUserQuestion session principale, 2026-09-29)** : phase dans `fiabilite`
 avant clôture ; les quatre principes (un ajout un retrait, budgets étendus, nettoyage en fin de
 geste, prose plafonnée) ; **appliquer à ce dépôt d'abord**, généraliser ensuite.
@@ -1580,6 +1588,72 @@ Plans:
 - [x] 41.3-02-PLAN.md — vague 1 : appliquer ici, outillage (`check-method-budget` constate, `check-blueprints`, `.worktreeinclude`) — SOBR-01, SOBR-03
 - [x] 41.3-03-PLAN.md — vague 2 : généraliser les budgets et l'archivage automatique, installeur — SOBR-03, SOBR-06, SOBR-08
 - [x] 41.3-04-PLAN.md — vague 2 : ADR des quatre principes, release adverse, ajout/retrait, fin de geste — SOBR-04, SOBR-05, SOBR-07
+
+### Phase 41.4: Emprunts Pocock — disciplines de cadrage, de revue et de skills (INSERTED)
+
+> **Origine** : demande de Willy (« regarder le plugin de Matt Pocock pour améliorer vf-dev »),
+> relayée par Samuel en session principale le 2026-10-06. Étude livrée le même jour
+> (`.planning/research/2026-10-06-pocock-skills-etude.md`, PR #134) : `mattpocock/skills` v1.3.1,
+> 38 skills, 0 agent, 0 hook, posé *contre* GSD par construction. Le pack ne s'installe pas
+> (un seul catalogue tiers, décision du 2026-08-28) ; on transcrit sept disciplines.
+> **Arbitrage Samuel (session principale, 2026-10-06)** : tous les points positifs de l'étude,
+> une phase courte, avant la clôture du jalon ; superpowers reste, aucune dépendance au plugin.
+
+**Goal**: Le head, le manager et le reviewer tiennent les disciplines de Pocock qui nous
+manquaient — frontière de questions au cadrage, glossaire de domaine du lab, frontière de phase
+à la sortie d'un geste, revue à deux axes, grille de tri d'une rétro, merge-danger call en PR —
+et les skills VibeFlow déclarent machine-vérifiablement qui peut les invoquer.
+
+**Requirements**: POCK-01 à POCK-08
+**Depends on:** 41.3 (close) ; aucun fichier commun avec la 41.2. Dernière phase avant la
+clôture de `fiabilite-v1.0`. Touche `dev-orchestrator` (références du head, `vf-dev-manager`,
+`vf-reviewer`), `conductor` (glossaire de lab, gate des skills), `consolidator` (grille de rétro).
+**Success Criteria** (what must be TRUE):
+
+  1. Un cadrage mené par le head ou un panel du manager pose ses questions **par frontière**
+     (prérequis réglés seulement), chacune avec une recommandation, et ne demande jamais un fait
+     qu'un sous-agent peut établir — rendu AskUserQuestion groupé par zone, jamais en texte
+     (POCK-01).
+  2. Un lab dispose d'un glossaire de domaine (`docs/_transverse/`) que le cadrage alimente et
+     que les briques lisent ; `docs-flow.md` en fixe le régime (POCK-02).
+  3. À la sortie d'un geste ou d'une mission, le head applique l'arbre de la frontière de phase
+     (continuer → clear → handoff → sous-agent → compact en dernier) et se demande ce qui, dans
+     l'environnement, aurait rendu la mission suivante moins chère (POCK-03).
+  4. `vf-reviewer` rend deux axes séparés — Standards et Spec (fidélité au plan de l'étape) —
+     jamais re-rankés en un verdict unique ; prouvé sur un diff qui passe l'un et rate l'autre
+     (POCK-04).
+  5. La promotion d'un LEARNING trie « mécanique → check déterministe, jugement → standard » et
+     signale un dépôt sans garde-fou ; un no-op d'instruction est un finding (POCK-05).
+  6. Une PR ouverte par la chaîne de ship porte son merge-danger call : porte à sens unique ou
+     double sens, rayon d'explosion (POCK-06).
+  7. Chaque skill VibeFlow est classé user-invoked ou model-invoked par un champ vérifié par
+     machine ; un skill user porte `disable-model-invocation: true` et, s'il est niché,
+     l'équivalent Codex ; un gate rougit sur un skill non classé ou sur un user-invoked qui en
+     appelle un autre (POCK-07). *Reformulé le 2026-10-06, P414-D-18 (arbitrage Samuel,
+     AskUserQuestion session principale, 2026-10-06).*
+  8. Un ajout de skill, gate ou règle cite une **défaillance observée** (session, geste, commit
+     daté) ; `check-ajout-retrait` l'exige en plus de SOBR-05 et signale tout ajout qui ne la cite
+     pas — consultatif en CI (P414-D-04), le refus reste un geste de relecture (POCK-08).
+     *Reformulé le 2026-10-06, P414-D-19 (arbitrage Samuel, AskUserQuestion session principale,
+     2026-10-06).*
+  9. **Sobriété** (SOBR-05) : chaque ajout de doctrine désigne ce qu'il remplace ou resserre ;
+     aucun skill neuf, aucun agent neuf.
+
+**Plans:** 11/11 plans exécutés (2026-10-06) ; phase ni vérifiée ni clôturée ; sonde réelle POCK-04 jouée dans les deux sens et consignée dans `41.4-SONDE-POCK04.md`
+
+Plans:
+
+- [x] 41.4-01-PLAN.md — vague 1 : gate de classe d'invocation des skills (`check-skills.sh --callers-root`, `vf-invocation`) — POCK-07
+- [x] 41.4-02-PLAN.md — vague 1 : segment « défaillance : » obligatoire et SKILL.md surveillés (`check-ajout-retrait.sh`) — POCK-08
+- [x] 41.4-03-PLAN.md — vague 1 : grille de rétro mécanique/jugement et findings (`detect-promotions.sh`, `promotion.md`) — POCK-05
+- [x] 41.4-04-PLAN.md — vague 1 : frontière de questions (§Pattern F) et frontière de phase (`head-governance.md` §3) — POCK-01, POCK-03
+- [x] 41.4-05-PLAN.md — vague 1 : glossaire du lab (`docs/_transverse/` scaffoldé ici, régime dans `docs-flow.md`) — POCK-02
+- [x] 41.4-06-PLAN.md — vague 1 : merge-danger call au contrat et contrôlé par E3 — POCK-06
+- [x] 41.4-07-PLAN.md — vague 2 : revue à deux axes Standards/Spec + fixture de la sonde réelle (jouée par le manager) — POCK-04
+- [x] 41.4-08-PLAN.md — vague 2 : arbitrage Q1/Q2 puis classe posée sur les 26 SKILL.md — POCK-07
+- [x] 41.4-09-PLAN.md — vague 3 : étape CI propre de check-skills, commentaire CI corrigé (revue `@picmakpro`) — POCK-07, POCK-08
+- [x] 41.4-10-PLAN.md — vague 3 : tests statiques d'ancres T39-T43 avec mutations — POCK-01, 02, 03, 04, 06
+- [x] 41.4-11-PLAN.md — vague 4 : bumps de modules (jamais la racine), ledger, critère 7, dogfood des gardes — POCK-01 à POCK-08
 
 ## 📋 Milestone ecc-inspiration-v1.0 — « ce qu'on emprunte à ECC » (Phases 51-56)
 
