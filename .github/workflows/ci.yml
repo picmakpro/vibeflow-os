@@ -1798,6 +1798,16 @@ jobs:
             echo "::warning::check-affirmation-non-mesuree : NÉANT — aucun fichier porteur résolu (misconfiguration, jamais un vert à vide)"
           fi
 
+      - name: check-manual (cohérence du manuel utilisateur FR+EN — manual/.tools/check-manual.sh)
+        # POURQUOI CETTE ÉTAPE EXISTE. Le gate ne se jouait qu'à la main, en local (D-13) : un manuel
+        # qui dérive (page orpheline, lien mort, version en dur, bandeau périmé) ne rougissait que
+        # si quelqu'un pensait à le lancer avant la PR. Il est désormais une étape bloquante du job
+        # `gates` (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02). Il reste
+        # exécutable à la main. C4 rejoue manual/.tools/build-nav.sh sur une copie jetable ; les deux
+        # scripts sont vérifiés portables (bash GNU + mawk d'ubuntu-latest, aucun BSD-isme). C0 refuse
+        # un verdict sur un manuel vide : pas de vert à vide.
+        run: bash manual/.tools/check-manual.sh
+
       - name: check-push-sans-pr (G-3 — preuve par fixture, sans condition)
         # POURQUOI DEUX ÉTAPES. Une étape GitHub Actions ne porte qu'une seule condition. La
         # mesure réelle ne peut tourner que sur un push vers `main` (elle a besoin de GH_TOKEN et

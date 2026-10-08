@@ -10,7 +10,7 @@
 // (piège n°2 mesuré, 38-CONTEXT.md). Champs requis par Codex 0.150.1 (mesuré, pas la doc) :
 // name, description, developer_instructions. Zéro dépendance npm (T-38-SC).
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -257,10 +257,14 @@ export function formatDigest(digest) {
 }
 
 // --- Mode CLI : node agent-to-codex.mjs <agent.md> --out <role.toml> -------------------------
+// Les DEUX côtés sont résolus : node suit les liens symboliques pour import.meta.url mais pas pour
+// process.argv[1], donc une comparaison brute rend false par tout chemin d'appel qui traverse un
+// lien (ex. /tmp -> /private/tmp sur macOS) et le CLI sort en silence, rc=0, sans rien écrire.
+// argv[1] inexistant : realpathSync lève, le catch rend false (comportement inchangé).
 function isMainModule() {
   if (process.argv.length < 2) return false;
   try {
-    return fileURLToPath(import.meta.url) === process.argv[1];
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
   } catch {
     return false;
   }

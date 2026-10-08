@@ -41,7 +41,11 @@ It doesn't protect against the other, more insidious case, also observed on this
 2026-07-31, a mission driven by a manager and an ordinary conversational session wrote to the same
 branch in parallel — three out-of-scope commits ended up in the PR of a mission that hadn't
 produced them. The driver lock already existed, but it only protected a step, and above all it was
-only consulted by managers; an ordinary session walks right over it without ever knowing.
+only consulted by managers; an ordinary session walked right over it without ever knowing. It is
+enforced now: a session that isn't registered under a live lock has its commit, branch switch or
+write to `.planning/` refused before it runs, with the holder's name. That refusal doesn't replace
+the rule below — it can't see a terminal outside Claude Code, nor two actors in the same session —
+and a separate tree remains the only barrier that depends on nothing.
 
 The rule that follows (ADR-064): **as soon as two actors work in parallel on the same
 repository — two missions, a mission and a conversational session, two waves of the same
@@ -88,10 +92,10 @@ refusal (who's driving, since when) and stops rather than pushing forward blind.
 
 What you see in that case depends on how fresh the lock is. If it's active and recent, the refused
 mission tells you and waits for your call — retry later, or confirm the first mission is indeed the
-one that should keep going. If it's stale (the holder vanished without releasing it), the recovery
-mechanism described in [a-long-mission.md](./a-long-mission.md) takes over on its own, and
-the reclaim gets recorded in the report — you have nothing to unblock by hand in that specific
-case.
+one that should keep going. If it's stale (the holder vanished without releasing it), the next
+manager takes it over through an explicit, recorded action, as described in
+[a-long-mission.md](./a-long-mission.md), and the takeover appears in the report — you have nothing
+to unblock by hand in that specific case.
 
 Once a mission is done and its PR merged, the cleanup gesture is short: remove the worktree that
 was dedicated to it (`git worktree remove`), and delete the merged branch if you don't plan to
@@ -104,5 +108,5 @@ tree of its own. That single habit is what turns a physical isolation mechanism 
 actually benefit from, instead of a safety net you only discover after tripping it.
 
 <!-- vf-manual:nav -->
-[← Previous](../05-agent-team/what-is-asked-of-you.md) · [↑ Contents](../README.md) · [Next →](../05-agent-team/specialized-teams.md)
+[← Previous](../05-agent-team/what-is-asked-of-you.md) · [↑ Contents](../README.md) · [Next →](../05-agent-team/parallel-topics.md)
 <!-- /vf-manual:nav -->

@@ -26,6 +26,10 @@ exécution, revue — plus la capacité de traiter une phase d'interface sans ch
 t'empêche de laisser grossir une god class pendant six semaines. Ce que tu ne prends pas : les
 bundles métier, qui poseraient des équipes d'agents que tu n'appelleras jamais.
 
+L'installeur te propose ces compositions de développement en presets : `dev` (le cycle complet),
+`dev-mobile` (`dev` plus la boucle de test mobile) et `dev-audite` (`dev` plus l'architecture
+logicielle et le validateur). Le détail est dans [installation.md](../01-demarrer/installation.md).
+
 **Vous êtes plusieurs sur un dépôt partagé.** Même base que ci-dessus, avec deux différences de
 posture. D'abord le scope : installe au niveau du projet pour que la configuration soit versionnée
 avec le code et identique pour tout le monde — c'est la seule façon d'éviter que chacun ait son

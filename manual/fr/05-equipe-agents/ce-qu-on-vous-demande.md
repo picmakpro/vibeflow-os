@@ -60,16 +60,20 @@ l'état tel quel sur le disque ; une pause demandée le rend lisible pour qui re
 source de vérité de toute mission VibeFlow. Une nouvelle session qui redémarre le même manager n'a
 besoin d'aucun contexte que tu lui répéterais : il relit lui-même l'état du projet
 (`.planning/ROADMAP.md`, `.planning/STATE.md`) et le graphe de la mission, reconstruit sa position,
-et reprend le dispatch là où il s'était arrêté — y compris en récupérant un verrou de driver périmé
+et reprend le dispatch là où il s'était arrêté — y compris en reprenant un verrou de driver périmé
 si la coupure a été assez longue pour ça (voir
-[une-mission-longue.md](./une-mission-longue.md)). Tu n'as rien à reconstituer toi-même ; c'est
+[une-mission-longue.md](./une-mission-longue.md)). Avant tout nouveau dispatch, il consulte aussi le
+registre des agents que l'ancien pilote avait lancés, et arrête ceux qui tournent encore : un agent
+resté en route ne continue pas d'écrire dans le dépôt pendant que le nouveau manager redistribue le
+travail. Tu n'as rien à reconstituer toi-même ; c'est
 précisément ce que le rapport de la session précédente et l'état sur disque rendent possible.
 
 Une nuance à connaître : une coupure nette (fermer l'onglet, couper le processus) ne relâche pas
 forcément le verrou de driver proprement — c'est la limite déjà dite dans
 [une-mission-longue.md](./une-mission-longue.md). Ce n'est pas grave : le mécanisme de récupération
 sur verrou périmé existe justement pour ce cas, et une session suivante qui relance la même mission
-le récupère automatiquement, avec la reprise consignée. Tu n'as rien à nettoyer toi-même à la main.
+le reprend sans te solliciter, avec la reprise consignée et l'arrêt des agents laissés en route. Tu
+n'as rien à nettoyer toi-même à la main.
 
 ## Où atterrissent les artefacts, et ce qu'on relit avant d'accepter
 
@@ -90,7 +94,9 @@ Ce que tu relis avant d'accepter reprend, sans le redire intégralement, la list
 critères de réussite du plan. Une mission d'équipe ajoute une pièce propre : le **rapport de
 mission** rendu à la fin, qui résume le verdict global, le détail par étape (fait / verdicts /
 commits), les décisions prises en autonomie et par quel mécanisme, et les points qui attendent
-explicitement ton arbitrage. Commence toujours par ce dernier point — c'est lui qui bloque la
+explicitement ton arbitrage. Une section `## Budgets` y recense ce que la mission laisse derrière
+elle et qu'elle n'a pas pu ranger seule (un dépassement de budget, un worktree qu'elle n'a pas
+créé) — ce qu'elle range et comment, [ranger-ce-qu-on-cree.md](./ranger-ce-qu-on-cree.md) le dit. Commence toujours par ce dernier point — c'est lui qui bloque la
 suite, exactement comme en mode autonome simple.
 
 Une dernière chose à vérifier, propre aux missions les plus longues : si le plan portait une

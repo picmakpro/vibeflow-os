@@ -77,13 +77,25 @@ raisonnable t'est déjà proposé selon le contexte détecté (par exemple si le
 un dépôt git). Une page dédiée de ce même thème détaille chaque option et comment choisir ; cette
 page-ci ne fait que confirmer ton choix.
 
-**3. Choix des modules.** Le socle de gouvernance minimal (le module `conductor`) est posé
-automatiquement — ce n'est pas un choix, c'est la base sans laquelle rien d'autre ne peut
-fonctionner correctement. Ensuite, un seul choix structurant t'est proposé : un lab de
-développement (code), ou un nouveau lab pour un autre métier. La liste complète des modules
-disponibles est dérivée du catalogue présent sur ton disque, jamais recopiée en dur ici — consulte
-toujours `module.json` de chaque module ou le `CHANGELOG.md` du dépôt pour l'état exact du
-catalogue à l'instant où tu lis ce manuel.
+**3. Choix des modules.** Le socle — les modules que le catalogue marque comme obligatoires,
+aujourd'hui `conductor` (le gardien de gouvernance) et `consolidator` (la mémoire du lab), avec
+leurs dépendances — est posé automatiquement. Ce n'est pas un choix : un lab sans eux n'a ni filet
+de cohérence ni registre où capitaliser. Ensuite, un seul choix structurant t'est proposé : un lab
+de développement, ou un nouveau lab pour un autre métier.
+
+- **Lab de développement** : trois presets, `dev` pré-coché par défaut (le cycle de dev complet :
+  head, équipe de mission, design croisé), `dev-mobile` (le lab de dev plus la boucle de test sur
+  simulateur ou émulateur, pour un projet Expo, React Native ou iOS) et `dev-audite` (le lab de dev
+  plus l'audit d'architecture logicielle et le validateur de conformité, pour un dépôt qui vit
+  longtemps ou à plusieurs). Un preset est une liste de modules de départ ; ses dépendances sont
+  ajoutées pour toi.
+- **Nouveau lab (autre métier)** : l'installeur ne pose rien de plus, et la suite passe par
+  `/vf-new-lab`, qui clarifie ton métier et câble lui-même les modules pertinents.
+
+Un utilisateur averti peut aussi demander explicitement un module précis (à la carte), mais ce
+n'est pas le chemin du premier usage. Sans réponse exploitable, l'installeur retombe sur le seul
+module `dev-orchestrator`. La liste des modules et des presets vient toujours du catalogue présent
+sur ton disque (`module.json` de chaque module, `presets.json`), jamais recopiée en dur ici.
 
 **4. Récapitulatif puis installation.** Avant de poser quoi que ce soit, on te montre un récapitulatif
 de tout ce qui va être installé (le module que tu as choisi entraîne parfois d'autres modules dont

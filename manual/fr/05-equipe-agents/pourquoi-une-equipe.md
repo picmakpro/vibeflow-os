@@ -90,9 +90,10 @@ constance qu'une session seule. Le découpage en rôles protège de la dégradat
 départ.
 
 Et une limite structurelle qu'il vaut mieux connaître : les mécanismes de coordination entre
-sessions sont **déclaratifs**. Ils supposent que chaque acteur les consulte. Une session qui les
-ignore n'est pas arrêtée — c'est détaillé, sans détour, en
-[une-mission-longue.md](./une-mission-longue.md) et
+sessions ne sont pas tous contraignants. Le claim de branche informe sans bloquer. Le verrou de
+driver, lui, refuse les gestes d'une autre session — mais seulement dans une session Claude Code où
+il est installé : un terminal ordinaire ou un éditeur ne passent pas par lui. C'est détaillé, sans
+détour, en [une-mission-longue.md](./une-mission-longue.md) et
 [branches-et-worktrees.md](./branches-et-worktrees.md).
 
 Rien de tout ça n'est une raison de te méfier du mécanisme — c'est une raison de lire les deux

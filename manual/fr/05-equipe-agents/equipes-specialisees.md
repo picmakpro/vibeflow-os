@@ -108,5 +108,5 @@ par leur conception, mais la qualité de ce qu'elles produisent dépend toujours
 raconté au lab sur ton activité avant de les lancer.
 
 <!-- vf-manual:nav -->
-[← Précédent](../05-equipe-agents/branches-et-worktrees.md) · [↑ Sommaire](../README.md) · [Suivant →](../06-reference/commandes.md)
+[← Précédent](../05-equipe-agents/ranger-ce-qu-on-cree.md) · [↑ Sommaire](../README.md) · [Suivant →](../06-reference/commandes.md)
 <!-- /vf-manual:nav -->

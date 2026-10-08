@@ -26,13 +26,16 @@ each verifies, when it runs, and the effect of a failure.
 | Doctrine freshness | A framing or rule document has drifted from its source without a matching update | At session startup, periodically | A warning is shown, nothing is changed on your behalf |
 | Infrastructure audit | The real state of your hooks, scripts, and tooling hasn't silently drifted after an update | At session startup, if the last check is more than two weeks old | A warning is shown with the detected drift |
 | Documentation research before debugging | An intensive debug session on a library, framework, or native behavior is preceded by documentation research | At session startup, as a reminder | A warning is shown; nothing prevents continuing without having searched |
+| Driver lock | A session not registered under another driver's lock makes no mutating git gesture (commit, branch switch, `reset`, `merge`, `rebase`, `stash`, `tag`, `branch`, `git worktree remove`…, a non-exhaustive list), doesn't publish (`git push`, `gh pr`, `gh release`) and doesn't write to `.planning/` while that lock is held — inside the lab only | Before every shell command and every file write (blocking) | The gesture is refused, naming the holder and offering three ways out (re-attach, work in a separate tree, or an explicit override recorded, as far as possible, in a journal next to the lock: that write never blocks and a failure is ignored) |
+| [End of gesture](../05-agent-team/tidying-up-after-yourself.md) | Nothing tidy-able has appeared since the session began (merged worktree or branch, stash, unindexed memory); the hook archives planning files (whatever an exceeded budget points at, closed `BACKLOG.md` topics included), never deleted, and holds the stop until the session has tidied up what it created itself | At the end of every turn; blocking only in a lab armed by the `.planning/.fin-de-geste-armed` file (`VF_FIN_DE_GESTE=warn` only says so, `off` switches the guard off) | The session doesn't stop while tidying remains; after three blocks in a row with no progress, it exits with a visible message |
+| Guard health | A guard in the fleet was unable to run recently (a missing interpreter, say): it then let things through without checking anything | At session startup | A finding is shown (`check-guard-health.sh`); nothing is blocked or fixed on your behalf |
+| Active topic | In a lab whose planning is split into topics, a topic is actually resolved | At session startup; silent in a lab that isn't split | A finding is shown with the remedy (`check-workstream-pointer.sh`); nothing is blocked |
 
-Two mechanisms round out this table without being rows of their own. The **driver lock** stops two
-mission managers from driving the same step at the same time: whoever arrives second waits for the
-first to release the lock, or recovers an abandoned lock after a default inactivity window of thirty
-minutes. And **the judge never writes**: an agent evaluating a deliverable (a review, an audit, a
-quality gate) is given read-only access to the code it's judging — a guardrail enforced at the tool
-level, not a rule it could break under pressure.
+One principle rounds out this table without being a row: **the judge never writes**. An agent
+evaluating a deliverable (a review, an audit, a quality gate) is given read-only access to the code
+it's judging — a guardrail enforced at the tool level, not a rule it could break under pressure.
+The driver lock, for its part, now has its own row: the full mechanics are in
+[a-long-mission.md](../05-agent-team/a-long-mission.md).
 
 ### The fail-open principle
 
@@ -57,7 +60,7 @@ might otherwise mistake for a whim:
 
 **Not to overpromise:** the charter recommends keeping an agent at 300 lines at most, with a
 warning from 251. Agents distributed by VibeFlow are **measured** in the CI of the distribution
-repository since v2.62.0 (`check-instruction-budget.sh`); blocking has been active in that CI
+repository since the instruction budget was introduced (`check-instruction-budget.sh`); blocking has been active in that CI
 since the ratchet was armed (PR #73), but its scope changed along the way: between the arming and
 the gate's revision (PR #76), it blocked any overrun of lines **and** instructions, cap set at 250
 lines; since that revision, it only blocks instructions added without a named decision, cap

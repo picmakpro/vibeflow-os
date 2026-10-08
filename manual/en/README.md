@@ -88,6 +88,8 @@ flowchart LR
 - [A long mission, the mechanics](./05-agent-team/a-long-mission.md)
 - [What's asked of you](./05-agent-team/what-is-asked-of-you.md)
 - [Branches and worktrees](./05-agent-team/branches-and-worktrees.md)
+- [Several topics in parallel](./05-agent-team/parallel-topics.md)
+- [Tidying up after yourself](./05-agent-team/tidying-up-after-yourself.md)
 - [Specialized teams](./05-agent-team/specialized-teams.md)
 ### Reference
 - [Commands](./06-reference/commands.md)

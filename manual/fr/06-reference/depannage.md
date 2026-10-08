@@ -14,7 +14,7 @@ Chaque panne ci-dessous suit le même patron : le symptôme exact tel que tu le 
 plus fréquente, le geste à faire, et comment vérifier que c'est réglé. Aucun geste proposé ici
 n'est destructeur sans que la page ne dise explicitement ce qu'il détruit.
 
-## Les six pannes connues
+## Les neuf pannes connues
 
 ### L'agent ne s'est pas déclenché
 
@@ -124,7 +124,68 @@ n'efface aucun commit déjà poussé sur la branche.
 **Vérification.** La PR passe à fusionnée ou fermée seulement après ton geste explicite ; rien ne
 l'automatise à ta place.
 
-## Si le problème ne ressemble à aucune de ces six pannes
+### Un geste est refusé : un verrou de driver appartient à une autre session
+
+**Symptôme.** Ton commit, ton changement de branche ou une écriture sous `.planning/` est refusé
+avant d'être exécuté, avec un message qui commence par « Lock de driver ACTIF, tenu par … » et qui
+nomme le détenteur, son étape, sa branche et l'âge du verrou.
+
+**Cause la plus fréquente.** Une mission tient un verrou vivant sur ce dépôt et ta session n'est pas
+enregistrée sous lui : c'est le garde-fou qui fait son travail, pas une panne. Cas fréquent à
+vérifier : tu **es** le détenteur, mais ta session a changé d'identifiant (après un `/clear`, ou un
+`--continue` ambigu).
+
+**Geste.** Trois issues, dans cet ordre de prudence. Si tu es le détenteur : ré-attache ta
+session au verrou avec `driver-lock.sh reclaim --owner=<détenteur>`, puis réessaie. Sinon : attends la
+fin du mandat, ou travaille dans un arbre séparé (`git worktree add`), qui n'est pas soumis au
+verrou. En dernier recours, pour un geste précis que tu assumes, le message décrit un marqueur de
+dérogation explicite ; elle est consignée dans la mesure du possible (une écriture qui échoue est
+ignorée), et ne se pose jamais « au cas où ».
+
+**Vérification.** Le même geste passe, ou une nouvelle tentative nomme le même détenteur tant que
+sa mission n'est pas terminée. Le garde-fou ne voit ni un terminal hors Claude Code ni une commande
+déguisée : ne le prends pas pour une garantie absolue.
+
+### La session refuse de s'arrêter
+
+**Symptôme.** À la fin d'un tour, la session ne s'arrête pas et affiche « Fin de geste : cette
+session laisse du rangement derrière elle », avec un compteur de blocage (« 1/3 ») et la liste de
+ce qu'elle a créé : worktree, branche intégrée, stash, mémoire non indexée.
+
+**Cause.** Ton dépôt est armé pour le rangement de fin de geste (il contient
+`.planning/.fin-de-geste-armed`), et la session a créé quelque chose depuis son démarrage qu'elle
+n'a pas rangé. Rien n'est cassé : le message dit quoi faire.
+
+**Geste.** Range, avec les gestes exacts du message, ce que **cette session** a créé — jamais un
+objet qui n'est pas de ta main, que tu cites plutôt dans ton compte rendu. Si tu préfères ne pas
+être arrêté, `VF_FIN_DE_GESTE=warn` signale sans bloquer, `off` coupe la garde, et supprimer le
+fichier sentinelle désarme le dépôt. Sans rien faire, la garde te laisse sortir seule après trois
+blocages sans progrès.
+
+**Vérification.** Au tour suivant, la session s'arrête sans message ; le détail est dans
+[ranger-ce-qu-on-cree.md](../05-equipe-agents/ranger-ce-qu-on-cree.md).
+
+### Les exécutants sont refusés sur un lab à racine non-git
+
+**Symptôme.** Sur un lab dont la racine n'est pas un dépôt git (un `.planning/` à la racine, les
+dépôts de code en dessous), le moteur de planning finit par refuser de lancer les agents
+exécutants, plusieurs fois par jour.
+
+**Cause.** L'isolation par worktree suppose un dépôt git à la racine ; sans lui, un repère
+d'isolation périme au bout de dix minutes et le moteur refuse alors tout exécutant.
+
+**Geste.** Pose la clé toi-même, c'est le chemin fiable : dans `.planning/config.json`, ajoute
+`"workflow": { "use_worktrees": false }` (si un bloc `workflow` existe déjà, ajoute seulement
+`"use_worktrees": false` dedans). L'installation sait aussi la poser, mais seulement quand elle
+installe un module ou qu'elle met à jour un module dont la version change, que `.planning/config.json`
+existe, que `node` est disponible, que git répond que la racine n'est pas un dépôt, et que la clé
+n'est pas déjà fixée. Un `/vf-update` sur un module déjà à jour ne la pose pas. Une valeur que tu as
+fixée n'est jamais réécrite. Conséquence : les exécutants tournent à la suite, sans isolation par
+worktree.
+
+**Vérification.** La clé figure dans `.planning/config.json` et les exécutants ne sont plus refusés.
+
+## Si le problème ne ressemble à aucune de ces neuf pannes
 
 Décris exactement ce que tu vois — le message complet, la phrase que tu as tapée — plutôt que de
 deviner une cause : c'est ce qui permet de retrouver le plus vite lequel des mécanismes ci-dessus
