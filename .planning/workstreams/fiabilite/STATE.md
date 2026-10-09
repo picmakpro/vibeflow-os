@@ -41,8 +41,9 @@ clôture, et la Phase 40 a 5 plans pour un seul `40-SUMMARY.md` consolidé. Bila
 `.planning/MILESTONES.md` § fiabilite-v1.0.
 Dernières entrées : la 41.2 a été mergée le 2026-10-02 (PR #130) ; WSCH-01 est coché avec une réserve de recette en
 session, tracée au BACKLOG. La 41.4 a été mergée le 2026-10-08 (PR #135, en `--admin`).
-Next: release `v2.69.0` (41.2 et 41.4 publiées), puis ouverture de `ecc-inspiration-v1.0` (Phases 51-56,
-ordre 51 → 52 → 54 → 53 → 55 → 56).
+Release `v2.69.0` publiée le 2026-10-08 (tag, release GitHub, gate ✓).
+Next: cadrage de la Phase 57 (verrou de driver par compartiment), première de `equipe-produit-v1.0` (Phases 57-62,
+inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
 Last activity: 2026-10-08 — clôture du jalon.
 
 ## Accumulated Context

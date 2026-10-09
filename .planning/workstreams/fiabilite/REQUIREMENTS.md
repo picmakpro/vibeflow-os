@@ -1297,9 +1297,20 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > installeur et mémoire multi-runtime), `LANG` (56, packs de règles par langage). `QUAL-01`
 > transverse s'applique de plein droit à tout gate ou hook livré.
 
+
+## Milestone equipe-produit-v1.0 — « l'équipe produit » (inscrit 2026-10-08)
+
+> Phases 57-62, compartiment `fiabilite`, prochain jalon exécuté (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). Spec source :
+> `docs/superpowers/specs/2026-09-16-equipe-produit-bmad-design.md` ; germe `SEED-001`. **Aucune exigence posée à
+> l'inscription** : chaque phase reçoit sa famille à son cadrage (`gsd-discuss-phase`). Préfixes **réservés et vérifiés
+> libres** le 2026-10-08 (`grep -rhoE '\bXXXX-[0-9]+' .planning docs plugin`, 0 occurrence chacun) : `DLWS` (57, verrou
+> par compartiment), `RLPO` (58, rôles de poste), `PRDT` (59, bundle produit), `ARCG` (60, gate architecture), `COLB`
+> (61, collaboration à deux humains), `PLTF` (62, décision plateforme). `ROLE` était déjà pris. `QUAL-01` transverse
+> s'applique de plein droit.
+
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-10-08 — **clôture de `fiabilite-v1.0`** : WSAW-01..07 cochées (déjà Complete en traçabilité, seules les cases avaient dérivé), WSCH-01..05 cochées (WSCH-01 avec réserve de recette en session), AGTS-02 reste reportée avec trace ; snapshot `.planning/milestones/fiabilite-v1.0-REQUIREMENTS.md` ; précédent : 2026-09-25 — jalon `ecc-inspiration-v1.0` inscrit (Phases 51-56, six familles réservées et vérifiées libres, exigences posées au cadrage, aucune ligne de traçabilité tant qu'aucun ID n'existe) ; précédent : 2026-09-23 — **HEAD-01 fermée** (correction d'un ledger périmé) :
+*Last updated: 2026-10-08 — jalon `equipe-produit-v1.0` inscrit (Phases 57-62, six familles réservées et vérifiées libres, exigences posées au cadrage) ; précédent : 2026-10-08 — **clôture de `fiabilite-v1.0`** : WSAW-01..07 cochées (déjà Complete en traçabilité, seules les cases avaient dérivé), WSCH-01..05 cochées (WSCH-01 avec réserve de recette en session), AGTS-02 reste reportée avec trace ; snapshot `.planning/milestones/fiabilite-v1.0-REQUIREMENTS.md` ; précédent : 2026-09-25 — jalon `ecc-inspiration-v1.0` inscrit (Phases 51-56, six familles réservées et vérifiées libres, exigences posées au cadrage, aucune ligne de traçabilité tant qu'aucun ID n'existe) ; précédent : 2026-09-23 — **HEAD-01 fermée** (correction d'un ledger périmé) :
 `intent-routing.md` renvoie déjà à `head-governance.md` (lignes 15 et 17, commit `5829bd0`,
 2026-09-15) et la case ci-dessus est déjà cochée avec sa preuve — seule cette note de bas de
 fichier était restée en contradiction avec le disque, corrigée sans rouvrir de travail ; précédent :

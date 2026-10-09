@@ -1,6 +1,8 @@
 ---
 id: SEED-001
-status: dormant
+status: germinated
+germinated: 2026-10-08
+germinated_as: "equipe-produit-v1.0, Phases 57-62 (section de la ROADMAP fiabilite)"
 planted: 2026-09-16
 planted_during: fiabilite-v1.0 / Phase 40 releasée v2.63.0 (25-04 et 41 restantes)
 trigger_when: "25-04 gravé ET Phase 41 close ET D-02 (partition réelle d'un lab, Phase 39) exécuté — les trois, arbitrage Samuel (AskUserQuestion, session principale, 2026-09-16)"
@@ -45,7 +47,7 @@ Tous : arbitrage Samuel, AskUserQuestion, session principale, 2026-09-16.
 | A-06 | PRD | `PROJECT.md` + `REQUIREMENTS.md` avec gabarit produit (H-04 confirmée). Pas de PRD.md. `BRIEF.md` reste le seul fichier nouveau. |
 | A-07 | Validation des phases | Une phase ajoutée par product ou head est **proposée** jusqu'à validation par un dev ; en solo, auto-validée. Mécanisme : marqueur sur la phase + `check-phase-validation.sh` + refus des managers de planifier/exécuter une phase non validée. Pas de hook bloquant (ADR-031). Ce n'est pas de la sécurité : un rôle est une vue, pas un droit. |
 | A-08 | Gate architecture | **Gate séparé**, qui assemble l'existant : `software-architecture` (expertise senior, gates de feature) + GSD (`gsd-map-codebase`, `gsd-graphify`) pour la connaissance du système de fichiers. Aucun script existant ne rend rouge aujourd'hui (RQ-EP-04) : le gate est à écrire sur ces briques, pas à réutiliser tel quel. |
-| A-09 | Verrou par compartiment | Avant, dans D-02. Pas dans ce milestone. |
+| A-09 | Verrou par compartiment | Avant, dans D-02. Pas dans ce milestone. **Révisé le 2026-10-08** : D-02 ne l'a pas livré (`driver-lock.sh` sans workstream, ADR-053 non amendé) ; il devient la Phase 57, première du jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08). |
 | A-10 | Vocabulaire | **Révisé le 2026-09-16 (arbitrage Samuel, message session principale, après la passe de recherche)** : on suit la dernière recommandation de BMAD, qui a fusionné scrum master, QA et dev dans un seul Developer (v6.3.0). Entre « fusionner comme BMAD » et « garder ce qu'on fait », Samuel laisse le choix ; choix retenu : **garder l'existant**. Head + manager + workers cloisonnés (`vf-coder`, `vf-reviewer`, `vf-auditer`) sont déjà cette consolidation, en plus rigoureux (Pattern 12). **Aucun renommage côté dev.** Le seul vocabulaire à aligner est celui du rôle product nouveau (`vibeflow-product`, `BRIEF.md`, gabarit PRD), sur les noms BMAD **courants** vérifiés au cadrage (`pm` admis ; `analyst`, `architect`, `ux-expert` non résolus). Arbitrage initial (renommer, sauf « manager ») remplacé. |
 | A-11 | Rôle au poste | Fichier local non versionné (`settings.local.json` / scope `local` de l'engine), jamais `user.email` → rôle dans `config.json` : dépôt public, PII. Défaut retenu par la session, non contesté. |
 | A-12 | Déclencheur | Les trois conditions ci-dessus. Graine, pas inscription de milestone. |
