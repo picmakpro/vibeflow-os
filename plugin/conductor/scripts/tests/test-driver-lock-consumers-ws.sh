@@ -54,6 +54,9 @@ cexp_not() { # <étiquette> <obtenu> <sous-chaîne interdite>
 cexp_rc() { # <étiquette> <rc obtenu> <rc attendu>
   [ "$2" = "$3" ] || CASE_BAD="$CASE_BAD [$1 : attendu exit $3 obtenu exit $2]"
 }
+cexp_eq() { # <étiquette> <obtenu> <attendu> (nombres)
+  [ "$2" = "$3" ] || CASE_BAD="$CASE_BAD [$1 : attendu $3 obtenu $2]"
+}
 cend() { if [ -z "$CASE_BAD" ]; then ok "$CASE_ID"; else ko "$CASE_ID" "$CASE_BAD"; fi; }
 
 # Laboratoire PARTITIONNÉ jetable : dépôt git, deux compartiments (alpha = 1er, omega = dernier).
@@ -146,7 +149,7 @@ matrice() {
   cexp "ligne stall" "$out" "stall detecte"
   cexp "sujet nommé" "$out" "ws=alpha"
   cexp "owner" "$out" "owner=m1"
-  n="$(printf '%s\n' "$out" | grep -c .)"; cexp_rc "une seule ligne" "$n" 1
+  n="$(printf '%s\n' "$out" | grep -c .)"; cexp_eq "une seule ligne" "$n" 1
   cend
 
   dl "$LAB" sess-A release --ws=alpha --owner=m1 >/dev/null
@@ -177,7 +180,7 @@ matrice() {
   cbegin CW-HEALTH-MULTI
   cgh "$LAB" "$WORK_DIR/h-multi" --hook; out="$CGH_OUT"
   cexp_rc "exit" "$CGH_RC" 0
-  n="$(printf '%s\n' "$out" | grep -c .)"; cexp_rc "une seule ligne pour la famille" "$n" 1
+  n="$(printf '%s\n' "$out" | grep -c .)"; cexp_eq "une seule ligne pour la famille" "$n" 1
   cexp "abandon prioritaire" "$out" "abandon detecte"
   cexp "sujet de l'abandon" "$out" "ws=omega"
   cexp "suffixe" "$out" "(+1 autre(s) verrou(s) en signal — driver-lock.sh status --all)"
@@ -298,6 +301,84 @@ if [ "$CW_MODE" = "full" ]; then
   echo "== test-driver-lock-consumers-ws =="
 fi
 matrice
+
+if [ "$CW_MODE" = "full" ]; then
+echo
+echo "== mutants =="
+# Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du script, posée à côté de
+# ses voisins réels (driver-lock.sh, workstream-policy.sh, et check-guard-health.sh pour dag.sh : sinon la copie
+# rougirait pour la mauvaise raison). La matrice (tous les cas ci-dessus) est rejouée en sous-processus contre la
+# copie ; l'ensemble des cas dont le verdict bascule est comparé EXACTEMENT à l'attendu. Matrices en parallèle.
+MUT_KILLED=0; MUT_TOTAL=4; MUT_IDS=""; t0=$SECONDS
+mut_fail_ids() { LC_ALL=C sed -n 's/^  ✗ \(CW-[A-Za-z0-9-]*\) .*/\1/p' "$1" | LC_ALL=C sort -u; }
+mut_dir() { # <dossier> <cgh|dag> → pose les voisins réels dans le dossier d'une copie
+  mkdir -p "$1"; cp "$DL" "$1/driver-lock.sh"; cp "$POLICY" "$1/workstream-policy.sh"
+  [ "$2" = dag ] && cp "$SCRIPTS/check-guard-health.sh" "$1/check-guard-health.sh"
+  chmod +x "$1"/*.sh
+}
+mut_run() { # <kind> <dossier> <journal>
+  if [ "$1" = cgh ]; then CW_MODE=matrice CW_CGH="$2/check-guard-health.sh" bash "$SUITE" > "$3" 2>&1
+  else CW_MODE=matrice CW_DAG="$2/dag.sh" bash "$SUITE" > "$3" 2>&1; fi
+}
+mutant() { # <id> <cgh|dag> <ancre BRE> <expression sed> <attendu : cas séparés par des espaces>
+  local id="$1" kind="$2" anchor="$3" expr="$4" expected="$5" dir="$WORK_DIR/mut-$1" f n
+  [ "$kind" = cgh ] && f="check-guard-health.sh" || f="dag.sh"
+  MUT_IDS="$MUT_IDS $id"
+  mut_dir "$dir" "$kind"
+  printf '%s\n' $expected | LC_ALL=C sort -u > "$dir/attendu.txt"
+  cp "$SCRIPTS/$f" "$dir/$f"; chmod +x "$dir/$f"; cp "$dir/$f" "$dir/copie-temoin.sh"
+  n="$(grep -c -e "$anchor" "$dir/$f")"
+  if [ "$n" != "1" ]; then echo "ancre non unique ($n occurrences de [$anchor])" > "$dir/prepko"; return; fi
+  sed -i.bak -e "/$anchor/$expr" "$dir/$f"; rm -f "$dir/$f.bak"
+  if cmp -s "$dir/$f" "$dir/copie-temoin.sh"; then echo "mutant NON OPPOSABLE : la substitution n'a rien changé" > "$dir/prepko"; return; fi
+  if ! bash -n "$dir/$f" 2>/dev/null; then echo "le mutant n'est pas un script valide (il rougirait pour la mauvaise raison)" > "$dir/prepko"; return; fi
+  ( mut_run "$kind" "$dir" "$dir/matrice.log"; echo $? > "$dir/rc" ) &
+}
+mutant_eval() { # <id>
+  local id="$1" dir="$WORK_DIR/mut-$1" rc got fam
+  if [ -f "$dir/prepko" ]; then ko "CW-M-$id" "$(cat "$dir/prepko")"; return; fi
+  rc="$(cat "$dir/rc" 2>/dev/null || echo absent)"
+  if [ "$rc" != 0 ] && [ "$rc" != 1 ]; then ko "CW-M-$id" "la matrice a planté (exit $rc), pas un échec de cas"; return; fi
+  grep -q '^== Résultat : ' "$dir/matrice.log" || { ko "CW-M-$id" "la matrice n'a pas atteint son bilan"; return; }
+  mut_fail_ids "$dir/matrice.log" > "$dir/obtenu.txt"
+  got="$(tr '\n' ' ' < "$dir/obtenu.txt")"
+  if cmp -s "$dir/attendu.txt" "$dir/obtenu.txt"; then
+    ok "CW-M-$id — mutant tué : bascule exactement {$(tr '\n' ' ' < "$dir/attendu.txt")}"
+    while IFS= read -r fam; do
+      LC_ALL=C sed -n "s/^  ✗ $fam — /      rouge $fam : /p" "$dir/matrice.log" | head -1
+    done < "$dir/obtenu.txt"
+    MUT_KILLED=$((MUT_KILLED+1))
+  else
+    ko "CW-M-$id" "ensemble basculé INATTENDU : attendu {$(tr '\n' ' ' < "$dir/attendu.txt")} obtenu {$got}"
+  fi
+}
+
+# Témoin préalable : les copies NON mutées (avec leurs voisins) ne basculent AUCUN cas.
+mut_dir "$WORK_DIR/mut-temoin-cgh" cgh; cp "$SCRIPTS/check-guard-health.sh" "$WORK_DIR/mut-temoin-cgh/check-guard-health.sh"
+mut_dir "$WORK_DIR/mut-temoin-dag" dag; cp "$SCRIPTS/dag.sh" "$WORK_DIR/mut-temoin-dag/dag.sh"
+( mut_run cgh "$WORK_DIR/mut-temoin-cgh" "$WORK_DIR/mut-temoin-cgh/matrice.log" ) &
+( mut_run dag "$WORK_DIR/mut-temoin-dag" "$WORK_DIR/mut-temoin-dag/matrice.log" ) &
+
+mutant a cgh 'DRIVER_LOCK_SH" status --all 2>' 's/status --all/status/' "CW-HEALTH-MULTI CW-Q-SIGNAL CW-TRACE-1 CW-TRACE-3"
+mutant b cgh 'if best is None or rank > best_rank:' 's/rank > best_rank/rank < best_rank/' "CW-HEALTH-MULTI"
+mutant f dag '"mark-progress", f"--owner={owner}"' 's/\] + ws_args,/],/' "CW-DAG-WS"
+mutant g dag 'init_dag\["ws"\] = ws_arg' 's/init_dag\["ws"\] = ws_arg/pass/' "CW-DAG-KEEP CW-DAG-WS"
+
+wait
+for t in cgh dag; do
+  nko="$(mut_fail_ids "$WORK_DIR/mut-temoin-$t/matrice.log" | wc -l | tr -d ' ')"
+  if grep -q '^== Résultat : ' "$WORK_DIR/mut-temoin-$t/matrice.log" && [ "$nko" = 0 ]; then ok "CW-M-témoin-$t — la copie non mutée ne bascule aucun cas"
+  else ko "CW-M-témoin-$t" "la copie non mutée rend $nko cas en échec (ou n'a pas atteint son bilan)"; fi
+done
+for id in $MUT_IDS; do mutant_eval "$id"; done
+echo "  durée des mutants : $((SECONDS-t0))s"
+if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
+  echo "== mutants : 4/4 tués =="
+else
+  echo "== mutants : $MUT_KILLED/4 tués =="
+  FAIL=$((FAIL+1))
+fi
+fi   # CW_MODE = full (mutants)
 
 echo
 echo "== Résultat : $PASS OK · $FAIL KO =="
