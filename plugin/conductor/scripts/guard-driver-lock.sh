@@ -497,9 +497,10 @@ def fail_closed_hook(etype, value, tb):
     except Exception:
         pass
 
-def git_hardened(args, cwd):
+def git_hardened(args, cwd, raw=False):
     """git durci (check-mission-exit.sh) : pas de fsmonitor ni de hooks du dépôt, pas de verrou optionnel,
-    pas de configuration système, pas d invite, 2 s maximum. Rend la sortie standard, ou None."""
+    pas de configuration système, pas d invite, 2 s maximum. Rend la sortie standard (octets si raw, sinon
+    texte), ou None."""
     try:
         import subprocess
         env = dict(os.environ)
@@ -511,6 +512,8 @@ def git_hardened(args, cwd):
             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2, env=env)
         if r.returncode != 0:
             return None
+        if raw:
+            return r.stdout
         return r.stdout.decode("utf-8", "replace")
     except Exception:
         return None
@@ -638,6 +641,7 @@ def held_by_other(lk, sid):
     out["owner"] = meta.get("owner", "?")
     out["step"] = meta.get("step", "")
     out["branch"] = meta.get("branch", "")
+    out["worktree"] = meta.get("worktree", "")
     out["age"] = age
     return out
 
@@ -672,6 +676,142 @@ def reclaim_command(lk):
         return base + " --depot"
     return "VF_DRIVER_LOCK=.planning/DRIVER.lock " + base
 
+# ---------------------------------------------------------------------------------------------------
+# Plan 57-08 : volet Bash du guard partitionne. Un commit est juge sur ce quil embarque (P57-D-10).
+# ---------------------------------------------------------------------------------------------------
+class Unreadable(Exception):
+    """Une source du jugement de commit est illisible : le geste est REFUSE (fail-closed, P57-D-10)."""
+
+def toplevel_of(cwd):
+    out = git_hardened(["rev-parse", "--show-toplevel"], cwd)
+    if not out:
+        return None
+    t = out.rstrip("\n")
+    return os.path.realpath(t) if t else None
+
+def gesture_classes(cmd):
+    """Gestes concernes de la commande, meme segmentation que bash_command_concerned. Tracer : la classe
+    commit est reconnue ; tout autre geste concerne garde la regle historique (classe historique)."""
+    gestures = []
+    cmd = strip_heredocs(cmd)
+    for line in re.split(r"[\n\r]+", cmd):
+        for seg in re.split(r"\|\||&&|;|\||&", line):
+            toks = tokens(seg)
+            for idx in command_positions(toks):
+                name = os.path.basename(toks[idx])
+                if name == "git":
+                    j = skip_git_globals(toks, idx + 1)
+                    if j >= len(toks):
+                        continue
+                    sub = toks[j]
+                    rest = toks[j + 1:]
+                    if sub == "worktree":
+                        s2 = rest[0] if rest else ""
+                        if s2 == "remove":
+                            gestures.append({"cls": "historique"})
+                        continue
+                    if sub in RESUMABLE_SUBVERBS:
+                        if any(o in rest for o in RESUME_EXIT_OPTIONS):
+                            continue
+                        gestures.append({"cls": "historique"})
+                    elif sub == "commit":
+                        gestures.append({"cls": "commit"})
+                    elif sub in MUTATING_GIT_VERBS:
+                        gestures.append({"cls": "historique"})
+                elif name == "gh":
+                    sub = toks[idx + 1] if idx + 1 < len(toks) else ""
+                    if sub in ("pr", "release"):
+                        gestures.append({"cls": "historique"})
+    return gestures
+
+def split_z(raw):
+    return [x for x in raw.split(b"\x00") if x]
+
+def commit_paths(cwd, top):
+    """Chemins (octets, relatifs au toplevel) que le commit embarque : sortie -z decoupee sur NUL, aucune
+    normalisation. Toute source illisible leve Unreadable avec son nom."""
+    paths = []
+    srcs = [("diff --cached", ["diff", "--cached", "--no-renames", "--name-only", "-z"])]
+    for name, args in srcs:
+        out = git_hardened(args, top, raw=True)
+        if out is None:
+            raise Unreadable(name)
+        paths.extend(split_z(out))
+    return paths
+
+def map_repo_path(pb, prefix):
+    """Chemin (octets, relatif au toplevel) -> ("compartiment", segment) | ("commun", b"") | ("hors", b"").
+    prefix : chemin du lab sous le toplevel (octets, vide si le lab est le toplevel)."""
+    if prefix:
+        if not pb.startswith(prefix + b"/"):
+            return ("hors", b"")
+        pb = pb[len(prefix) + 1:]
+    parts = pb.split(b"/")
+    if parts[0].lower() == b".planning":
+        if len(parts) >= 2 and parts[1].lower() == b"workstreams":
+            if len(parts) < 3:
+                return ("incertain", b"")
+            return ("compartiment", parts[2])
+        return ("commun", b"")
+    return ("hors", b"")
+
+def cite_paths(paths):
+    shown = []
+    for pb in paths[:3]:
+        shown.append(json.dumps(os.fsdecode(pb)[:120], ensure_ascii=True))
+    return ", ".join(shown)
+
+def judge_bash(cmd, held, cwd):
+    """Jugement du geste Bash, apres le court-circuit aucun verrou tenu par autrui. Rend (verrous refusants,
+    notes de motif)."""
+    gestures = gesture_classes(cmd)
+    blockers = []
+    notes = []
+    def add(hs):
+        for h in hs:
+            if all(b["path"] != h["path"] for b in blockers):
+                blockers.append(h)
+    if not gestures:
+        add(held)
+    for g in gestures:
+        if g["cls"] == "commit":
+            try:
+                top = toplevel_of(cwd)
+                if top is None:
+                    raise Unreadable("rev-parse --show-toplevel")
+                rel = os.path.relpath(os.path.realpath(cwd), top)
+                prefix = b"" if rel == "." else os.fsencode(rel)
+                paths = commit_paths(cwd, top)
+            except Unreadable as e:
+                add(held)
+                notes.append("source illisible : " + str(e))
+                continue
+            except Exception:
+                add(held)
+                notes.append("source illisible : exception interne")
+                continue
+            hit = []
+            for pb in paths:
+                kind, seg = map_repo_path(pb, prefix)
+                if kind == "compartiment":
+                    sd = os.fsdecode(seg)
+                    hs = [h for h in held if h["scope"] == "compartiment"
+                          and (h["ws"] == sd or h["ws"].casefold() == sd.casefold())]
+                elif kind == "commun":
+                    hs = [h for h in held if h["scope"] in ("depot", "ancien")]
+                elif kind == "incertain":
+                    hs = list(held)
+                else:
+                    hs = []
+                if hs:
+                    add(hs)
+                    hit.append(pb)
+            if hit:
+                notes.append("le commit embarque : " + cite_paths(hit))
+        else:
+            add(held)
+    return blockers, notes
+
 def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker):
     """Decision du chemin partitionne. SORT TOUJOURS (allow silencieux, echappatoire journalisee, ou deny).
     Write/Edit : jugement par ce que le chemin touche (P57-D-09). Bash : regle historique, refus sous tout
@@ -685,8 +825,11 @@ def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker):
             sys.exit(0)
     locks = discover_locks(cwd)
     held = [h for h in (held_by_other(lk, sid) for lk in locks) if h is not None]
+    notes = []
+    if not held:
+        sys.exit(0)  # aucun verrou tenu par autrui : allow SANS lancer le moindre git diff (DLWS-06, empty)
     if tool == "Bash":
-        blockers = held
+        blockers, notes = judge_bash(target, held, cwd)
     else:
         kind, seg = map_path(abs_path, cwd)
         if kind == "compartiment":
@@ -719,6 +862,8 @@ def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker):
         + " dans un arbre séparé (`git worktree add`), ou pose le marqueur " + MARKER + " sur CE geste précis"
         + " pour passer outre exceptionnellement."
     )
+    if notes:
+        reason += " Detail : " + " ; ".join(notes) + "."
     print(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
