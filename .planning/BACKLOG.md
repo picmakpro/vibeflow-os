@@ -899,12 +899,17 @@ figé de la base à `424cb23`, 1509=1509 (vert). L'écart a une seule source ide
 garde-fou d'intégrité de `~/.claude`, ou un incident où ce faux rouge a bloqué une CI/un push.
 
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Pour Samuel — hooks GSD introuvables dans les worktrees (constaté 2026-09-28) — CLOS (Phase 41.3, 2026-09-30) -->
-## guard-driver-lock.sh sous EnterWorktree vise le checkout principal — DIFFÉRÉ (2026-09-29)
+## guard-driver-lock.sh sous EnterWorktree vise le checkout principal — OUVERTE pour les labs plats, absorbée pour les labs partitionnés (Phase 57, 2026-10-10)
 
 **Constat :** sous EnterWorktree, `guard-driver-lock.sh` vise le checkout principal, non le
 worktree. `.worktreeinclude` (Phase 41.3, plan 02) y recopie `.claude/scripts/` mais ne corrige pas
 cette résolution : hors périmètre, non traité. **Déclencheur de reprise :** un verrou de driver lu
 ou posé au mauvais endroit depuis un worktree.
+
+**Labs partitionnés :** absorbée par la Phase 57 — le guard et `driver-lock.sh` résolvent les
+verrous sous `git rev-parse --git-common-dir`, partagés par les worktrees du clone (P57-D-07,
+P57-D-08). **Labs plats :** reste ouverte, aucun changement de comportement (P57-D-03) ;
+déclencheur de reprise inchangé.
 
 ## Pour Samuel — `vf_ws_enumerate` ne restitue pas fidèlement un compartiment à saut de ligne
 (constaté 2026-09-28)
