@@ -8,6 +8,9 @@ Cadrage `gsd-discuss-phase` en session principale, quatre zones, questions regro
 option recommandée retenue à chaque fois. P57-D-12 à P57-D-15 sont laissés à la discrétion du planificateur
 (arbitrage Samuel, même canal, même date : « Écris le CONTEXT »).
 
+**Exigences :** DLWS-01 à DLWS-08 (`REQUIREMENTS.md`), posées le 2026-10-10 à l'ouverture de la planification. Elles
+reformulent P57-D-01 à P57-D-15 sans rien y ajouter ; aucun arbitrage neuf n'a été demandé.
+
 <domain>
 ## Phase Boundary
 

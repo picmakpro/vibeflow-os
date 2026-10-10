@@ -1919,7 +1919,7 @@ forme exec (ADR-071).
 ### Phase 57: Verrou de driver par compartiment
 
 **Goal:** `driver-lock.sh` devient compartiment-aware : un verrou nommé par workstream, et un amendement daté d'ADR-053 change l'invariant en « un manager **par compartiment** ». `guard-driver-lock.sh` est aligné. Le head passe `--ws` et un `GSD_SESSION_KEY` distinct **par manager**. Un lab non partitionné garde exactement le comportement d'aujourd'hui.
-**Requirements**: TBD — famille `DLWS` réservée, posée au cadrage.
+**Requirements**: DLWS-01 à DLWS-08
 **Depends on:** aucune. Première du jalon.
 **Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
 **Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
