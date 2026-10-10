@@ -167,6 +167,8 @@ réécrivent pas : ce sont des archives datées).
 
 ## 6. La voie workstreams — pourquoi elle n'est pas la voie du jour
 
+> **Note du 2026-10-10 (Phase 57).** Points 1 à 3 livrés par la Phase 57 (amendement daté d'ADR-053) ; point 4 → Phase 61 ; la mention d'un dépôt non partitionné est périmée depuis la PR #94. Le corps de la section reste l'état du 2026-09-15.
+
 Question posée au cadrage : « il me semblait qu'on avait mis en place des workstreams pour ça ? »
 Réponse sur pièces (`39-CONTEXT.md`, ADR-069, `workstreams.md`, `driver-lock.sh`) :
 

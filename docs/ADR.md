@@ -618,6 +618,89 @@ Protocole détaillé (source de vérité) : `plugin/dev-orchestrator/references/
 
 - S'appuie sur ADR-048/049 (backups isolés — le lock protège leur intégrité), ADR-044 (agents machine-enforced — les agents modifiés repassent `check-agents.sh`), ADR-031 (la taxonomie `ask-user` raffine « jamais de fix sans validation humaine »). Aucune rule nouvelle.
 
+### Amendement du 2026-10-10 — un manager par compartiment, un seul geste de dépôt à la fois
+
+**Origine.** La Phase 57 (« Verrou de driver par compartiment », compartiment `fiabilite`) réalise
+les points 1 à 3 de la voie workstreams du spec head (§ 6) : le jour où un lab est réellement
+partitionné, le verrou de driver doit être nommé par compartiment, le guard aligné, et le head
+doit passer `--ws` et un `GSD_SESSION_KEY` distinct par manager. Le point 4 — la preuve d'usage
+concurrent réel, à deux humains — est porté par la Phase 61, pas par celle-ci. Cet amendement
+complète la Décision 1 ci-dessus sans la réécrire : le dépôt est partitionné depuis la PR #94
+(compartiments `fiabilite` et `gouvernance`), ce que le spec head dit encore au conditionnel.
+
+**Invariant amendé.** Dans un lab **partitionné**, l'invariant « un seul manager » devient
+« **un manager par compartiment, un seul geste de dépôt à la fois** ». Deux missions sur deux
+compartiments avancent en parallèle ; deux gestes qui touchent des fichiers communs, jamais. Un lab
+**non partitionné** ne voit aucune différence, au bit près.
+
+**Mécanisme.**
+- Emplacement : `<git-common-dir>/vf-driver/ws/<sujet>` pour un compartiment et
+  `<git-common-dir>/vf-driver/repo` pour le dépôt, partagés par tous les worktrees du clone ; hors
+  git, repli sur le checkout, que le JSON déclare (`location`).
+- Le compartiment vient d'un `--ws=<sujet>` **explicite**, jamais déduit d'un export ni du pointeur
+  `active-workstream` (même règle que les gates, amendement d'ADR-069 du 2026-09-23). Un `--ws` oublié
+  replie sur le verrou de dépôt (`scope: depot`, `scope_reason: ws-absent`) ; un `--ws` qui ne désigne
+  aucun compartiment est refusé (`unknown-ws`, `ws-invalid`).
+- Un ancien `.planning/DRIVER.lock` vivant vaut verrou de dépôt : tout `acquire` refuse
+  `legacy-lock-held` avec la commande de release exacte, jamais de reprise silencieuse.
+- `guard-driver-lock.sh` résout le verrou au même endroit, juge les écritures sous `.planning/` et
+  les commits sur les fichiers indexés (`commit -a`, pathspec, `--amend` compris), et reste
+  **fail-closed** en lab partitionné : une exception ou une source illisible rend un refus.
+- Lab plat, ou `VF_DRIVER_LOCK` posé : ancien régime à verrou unique, inchangé.
+
+**Décisions citées.**
+- P57-D-01 à P57-D-11 (granularité, gestes sous verrou de dépôt, lab plat, source du compartiment,
+  repli, mission à un seul sujet, emplacement, entrée BACKLOG, écritures, commits, branches) :
+  arbitrage Samuel, AskUserQuestion session principale, 2026-10-10.
+- P57-D-12 à P57-D-15 : discrétion du planificateur, arbitrage Samuel, même canal, même date
+  (« Écris le CONTEXT »).
+- P57-D-16 à P57-D-21 (autres gestes git, « même checkout », fichiers communs hors `.planning/`,
+  `commit -a`, limites de l'isolation, layout et champs JSON) : arbitrage Samuel, AskUserQuestion
+  session principale, 2026-10-10.
+- P57-D-22 à P57-D-30 : discrétion du planificateur, soumis à veto par le même canal le même jour,
+  « Aucun veto ».
+- P57-D-31 à P57-D-37, état de ratification lu dans le registre de la phase (`57-CONTEXT.md`) le
+  jour de la rédaction : P57-D-34 (le head sérialise ses managers jusqu'à la Phase 61), P57-D-36
+  (périmètre documentaire élargi) et P57-D-37 (exception `--help` à P57-D-03) **ratifiées** —
+  arbitrage Samuel, AskUserQuestion session principale, 2026-10-10 ; P57-D-31, P57-D-32,
+  P57-D-33 et P57-D-35 soumises pour veto par le même canal le même jour, **sans veto**.
+
+**Mesures** (recopiées des SUMMARY de la phase, jamais estimées).
+- Concurrence (57-04) : 24 acquisitions × 5 tours, « rounds hors contrat : 0 » sur les quatre
+  scénarios (compartiments, prises périmées, dépôt, checkout + worktree lié) — un seul gagnant par
+  verrou à chaque tour. Suite `test-driver-lock-ws.sh` : 492 assertions.
+- A/B du lab plat (57-04) : `A/B lab plat : IDENTIQUE` (20 étapes, `cmp -s` contre la copie gelée
+  d'avant la phase) ; `--help` exclu (P57-D-37). Neuf mutants : `== mutants : 9/9 tués ==`.
+- Gate de sortie (57-07) : `== mutants : 5/5 tués ==`, 54 assertions ; un lab partitionné sans
+  `--ws` est indéterminé, jamais vert.
+- Claim de branche (57-09) : `== mutants : 7/7 tués ==`, 30 assertions.
+- Guard (57-11) : `A/B guard lab plat : IDENTIQUE` (73 payloads × 5 états de verrou × 2 régimes,
+  365 passages par régime), `== mutants : 12/12 tués ==`, 180 assertions. Latence par appel de
+  `git commit`, 50 appels : 4,7 ms en lab plat sans verrou, 72,6 ms en lab partitionné sous le
+  verrou d'autrui, 39,8 ms en lab plat sous un ancien verrou d'autrui.
+
+**Limites assumées.**
+- Le guard isole des **sessions**, pas des managers d'une même session, qui partagent le
+  `session_id`. `GSD_SESSION_KEY` protège le pointeur GSD, pas le guard. Jusqu'à la preuve d'usage
+  réel (Phase 61), un head sérialise donc ses propres managers (P57-D-34).
+- Le verrou unique ne ferme plus « par construction » la chaîne manager → worker → manager vers un
+  autre compartiment : elle n'est tenue que par les allowlists `Agent(...)` (P57-D-20), un lint.
+  Aucun refus actif neuf.
+- Deux `.planning/` dans un même clone partagent `vf-driver/` : hors périmètre (P57-D-29).
+- Non mesuré : Windows. Les labs plats sous `EnterWorktree` restent ouverts au BACKLOG (P57-D-08).
+- Aucune release dans la phase : elle reste un geste humain après la phase (P57-D-30, ADR-073).
+  L'étape de release de `CLAUDE.md` prend le verrou de dépôt pour deux gestes courts seulement
+  (le bump et son commit, puis le tag et la release GitHub), jamais pendant la relecture, la PR ou
+  le merge (P57-D-01, P57-D-02).
+- Réversibilité **coûteuse** : P57-D-03 (lab plat au bit près), P57-D-07 (emplacement au niveau du
+  clone) et P57-D-21 (layout et champs JSON). Les défaire changerait le comportement de tous les
+  labs installés ou obligerait à migrer les verrous tenus.
+
+**Correction de lecture.** La Décision 1 dit « acquisition **atomique** par `mkdir` ». Depuis la
+Phase 30, l'acquisition est un lien remplacé par `rename(2)` : `mkdir` seul laissait passer
+plusieurs gagnants sous concurrence. Le texte d'origine n'est pas réécrit ; chaque verrou nommé
+réutilise la mécanique actuelle telle quelle.
+
 ---
 
 ## ADR-054 : Portabilité Windows — normalisation CRLF, préflight, gardes réellement actives, gate de synchro versions
