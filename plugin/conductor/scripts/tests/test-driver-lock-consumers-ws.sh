@@ -46,7 +46,7 @@ ko() { echo "  ✗ $1 — $2"; FAIL=$((FAIL+1)); }
 CASE_ID=""; CASE_BAD=""
 cbegin() { CASE_ID="$1"; CASE_BAD=""; }
 cexp() { # <étiquette> <obtenu> <sous-chaîne attendue>
-  case "$2" in *"$3"*) ;; *) CASE_BAD="$CASE_BAD [$1 : attendu «$3» obtenu «$2»]" ;; esac
+  case "$2" in *"$3"*) ;; *) CASE_BAD="$CASE_BAD [$1 : attendu «$3» obtenu «$(printf '%s' "$2" | tr -s '\n ' '  ')»]" ;; esac
 }
 cexp_not() { # <étiquette> <obtenu> <sous-chaîne interdite>
   case "$2" in *"$3"*) CASE_BAD="$CASE_BAD [$1 : interdit «$3» obtenu «$2»]" ;; esac
@@ -100,6 +100,9 @@ dl() { # <lab> <session> <args...>
 lock_path_of() { # <lab> <ws>
   dl "$1" probe status --ws="$2" 2>/dev/null | sed -n 's/.*"lock": "\([^"]*\)".*/\1/p'
 }
+lock_path_of_depot() { # <lab>
+  dl "$1" probe status 2>/dev/null | sed -n 's/.*"lock": "\([^"]*\)".*/\1/p'
+}
 lock_meta_path() { # <lock>
   if [ -L "$1" ]; then echo "$(dirname "$1")/$(readlink "$1")/meta"; else echo "$1/meta"; fi
 }
@@ -117,8 +120,20 @@ cgh() { # <lab> <health> [args...]
   CGH_OUT="$(cd "$lab" && "$CGH" --dir="$health" "$@" 2>"$WORK_DIR/cgh.err" </dev/null)"; CGH_RC=$?
 }
 
+# dag.sh réel depuis la fixture : positionne DAG_OUT (stdout) et DAG_RC ; stderr dans $WORK_DIR/dag.err.
+DAG_RC=0; DAG_OUT=""
+dag() { # <lab> <args...>
+  local lab="$1"; shift
+  DAG_OUT="$(cd "$lab" && "$DAGSH" "$@" 2>"$WORK_DIR/dag.err" </dev/null)"; DAG_RC=$?
+}
+# progress_epoch d'un verrou lu par `status` (mêmes arguments que le verbe : --ws=… ou rien).
+progress_of() { # <lab> [args...]
+  local lab="$1"; shift
+  dl "$lab" probe status "$@" 2>/dev/null | sed -n 's/.*"progress_epoch": \([0-9]*\).*/\1/p'
+}
+
 matrice() {
-  local LAB L1 L2 out n
+  local LAB L1 L2 out n F e0 e1 d0 d1 ISO
 
   echo "=== CW-TRACE — le watchdog voit un compartiment, de bout en bout, sur clone jetable ==="
   LAB="$(mk_lab trace)"
@@ -167,6 +182,115 @@ matrice() {
   cexp "sujet de l'abandon" "$out" "ws=omega"
   cexp "suffixe" "$out" "(+1 autre(s) verrou(s) en signal — driver-lock.sh status --all)"
   cexp_not "le stall n'est pas nommé" "$out" "ws=alpha"
+  cend
+
+  echo "=== CW-Q — les quatre issues du watchdog partitionné ==="
+  LAB="$(mk_lab q)"
+  L1="$(lock_path_of "$LAB" alpha)"
+  dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s-alpha >/dev/null
+  backdate "$L1" progress_epoch 1000
+  cbegin CW-Q-SIGNAL
+  cgh "$LAB" "$WORK_DIR/h-q1"; out="$CGH_OUT"
+  cexp_rc "exit signal" "$CGH_RC" 0
+  cexp "ligne" "$out" "[mission-watchdog] stall detecte"
+  cexp "sujet" "$out" "ws=alpha"
+  cend
+  # Verrou présent ET sain (les deux horloges fraîches) : jamais un signal.
+  dl "$LAB" sess-A release --ws=alpha --owner=m1 >/dev/null 2>&1
+  dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s-alpha >/dev/null
+  cbegin CW-Q-SAIN
+  cgh "$LAB" "$WORK_DIR/h-q2"; out="$CGH_OUT"
+  cexp_rc "exit SAIN" "$CGH_RC" 3
+  cexp "stdout vide" "[$out]" "[]"
+  cend
+  dl "$LAB" sess-A release --ws=alpha --owner=m1 >/dev/null 2>&1
+
+  # Partition illisible (dossier des compartiments remplacé par un lien) : status --all refuse, le watchdog
+  # est INDÉTERMINÉ et BRUYANT, jamais SAIN.
+  LAB="$(mk_lab qb)"
+  mv "$LAB/.planning/workstreams" "$WORK_DIR/qb-reel"
+  ln -s "$WORK_DIR/qb-reel" "$LAB/.planning/workstreams"
+  cbegin CW-Q-BRUYANT
+  cgh "$LAB" "$WORK_DIR/h-qb"; out="$CGH_OUT"
+  cexp_rc "exit INDÉTERMINÉ" "$CGH_RC" 4
+  cexp "stdout vide" "[$out]" "[]"
+  [ -f "$WORK_DIR/h-qb/check-guard-health.sh.marker" ] || CASE_BAD="$CASE_BAD [marqueur de santé absent]"
+  [ -s "$WORK_DIR/cgh.err" ] || CASE_BAD="$CASE_BAD [stderr vide : indéterminé silencieux]"
+  cend
+
+  # JSON de sibling non conforme (`locks` n'est pas un tableau) : silence total, jamais une ligne ni un marqueur.
+  ISO="$WORK_DIR/q-silence/conductor/scripts"; mkdir -p "$ISO"
+  cp "$CGH" "$ISO/check-guard-health.sh"; chmod +x "$ISO/check-guard-health.sh"
+  printf '#!/usr/bin/env bash\necho '"'"'{"present": true, "locks": "oops"}'"'"'\nexit 0\n' > "$ISO/driver-lock.sh"
+  chmod +x "$ISO/driver-lock.sh"
+  cbegin CW-Q-SILENCE
+  out="$("$ISO/check-guard-health.sh" --hook --dir="$WORK_DIR/h-qs" 2>/dev/null </dev/null)"; e0=$?
+  cexp_rc "exit hook" "$e0" 0
+  cexp "stdout vide" "[$out]" "[]"
+  out="$("$ISO/check-guard-health.sh" --dir="$WORK_DIR/h-qs" 2>/dev/null </dev/null)"; e0=$?
+  cexp_rc "exit SAIN" "$e0" 3
+  [ ! -e "$WORK_DIR/h-qs" ] || CASE_BAD="$CASE_BAD [dossier de santé créé à tort]"
+  cend
+
+  echo "=== CW-DAG — le DAG est lié à son compartiment ==="
+  LAB="$(mk_lab dag)"
+  F="$WORK_DIR/dag-ws.json"
+  L1="$(lock_path_of "$LAB" alpha)"; L2="$(lock_path_of_depot "$LAB")"
+  dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s-alpha >/dev/null
+  dl "$LAB" sess-D acquire --owner=md --step=s-depot >/dev/null
+  backdate "$L1" progress_epoch 500
+  backdate "$L2" progress_epoch 500
+  dag "$LAB" init --file="$F" --ws=alpha
+  dag "$LAB" add --file="$F" --id=a --step=1
+  e0="$(progress_of "$LAB" --ws=alpha)"; d0="$(progress_of "$LAB")"
+  dag "$LAB" mark --file="$F" --id=a --status=running
+  e1="$(progress_of "$LAB" --ws=alpha)"; d1="$(progress_of "$LAB")"
+  cbegin CW-DAG-WS
+  cexp "ws écrit par init" "$(cat "$F")" '"ws": "alpha"'
+  cexp_rc "mark" "$DAG_RC" 0
+  [ -n "$e0" ] && [ -n "$e1" ] && [ "$e1" -gt "$e0" ] 2>/dev/null || CASE_BAD="$CASE_BAD [progress_epoch de alpha n'a pas avancé : $e0 -> $e1]"
+  [ -n "$d0" ] && [ "$d1" = "$d0" ] || CASE_BAD="$CASE_BAD [progress_epoch du dépôt a bougé : $d0 -> $d1]"
+  cend
+  dag "$LAB" add --file="$F" --id=b --step=2 --deps=a
+  dag "$LAB" mark --file="$F" --id=a --status=done
+  dag "$LAB" reopen --file="$F" --id=a
+  cbegin CW-DAG-KEEP
+  cexp_rc "reopen" "$DAG_RC" 0
+  cexp "ws conservé après add, mark et reopen" "$(cat "$F")" '"ws": "alpha"'
+  cexp "noeuds conservés" "$(cat "$F")" '"id": "b"'
+  cend
+  dl "$LAB" sess-A release --ws=alpha --owner=m1 >/dev/null 2>&1
+  dl "$LAB" sess-D release --owner=md >/dev/null 2>&1
+
+  LAB="$(mk_lab dagn)"
+  F="$WORK_DIR/dag-nows.json"
+  L2="$(lock_path_of_depot "$LAB")"
+  dl "$LAB" sess-D acquire --owner=md --step=s-depot >/dev/null
+  backdate "$L2" progress_epoch 500
+  dag "$LAB" init --file="$F"
+  cbegin CW-DAG-NOWS
+  printf '{\n  "nodes": []\n}\n' > "$WORK_DIR/dag-nows.attendu"
+  cmp -s "$F" "$WORK_DIR/dag-nows.attendu" || CASE_BAD="$CASE_BAD [init sans --ws : octets différents d'aujourd'hui]"
+  cexp_not "aucune clé ws" "$(cat "$F")" '"ws"'
+  dag "$LAB" add --file="$F" --id=a --step=1
+  d0="$(progress_of "$LAB")"
+  dag "$LAB" mark --file="$F" --id=a --status=running
+  d1="$(progress_of "$LAB")"
+  [ -n "$d0" ] && [ -n "$d1" ] && [ "$d1" -gt "$d0" ] 2>/dev/null || CASE_BAD="$CASE_BAD [mark sans ws : le verrou du dépôt n'a pas avancé : $d0 -> $d1]"
+  cexp_not "aucune clé ws après mark" "$(cat "$F")" '"ws"'
+  cend
+  dl "$LAB" sess-D release --owner=md >/dev/null 2>&1
+
+  cbegin CW-DAG-OPT
+  F="$WORK_DIR/dag-opt.json"
+  dag "$LAB" init --file="$F"
+  cp "$F" "$WORK_DIR/dag-opt.avant"
+  dag "$LAB" add --file="$F" --id=x --ws=alpha
+  cexp_rc "add --ws" "$DAG_RC" 1
+  cexp "message d'usage nommé" "$(cat "$WORK_DIR/dag.err")" "n'est admis que par init"
+  cmp -s "$F" "$WORK_DIR/dag-opt.avant" || CASE_BAD="$CASE_BAD [le fichier a changé malgré le refus]"
+  dag "$LAB" mark --file="$F" --id=x --status=done --ws=alpha
+  cexp_rc "mark --ws" "$DAG_RC" 1
   cend
 }
 
