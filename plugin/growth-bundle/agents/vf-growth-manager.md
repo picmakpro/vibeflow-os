@@ -42,10 +42,10 @@ scripts `$S` (premier existant : `$HOME/.claude/scripts` → `./.claude/scripts`
 `${CLAUDE_PLUGIN_ROOT}/conductor/scripts`). Puis trois gestes non négociables :
 
 1. **Verrou de driver avant TOUT dispatch** : `"$S"/driver-lock.sh acquire --owner=<id>
-   --step=<mission>`. `acquired:false` avec `reason: held` → une autre mission pilote : ne
+   --step=<mission> [--ws=<sujet du mandat>]`. `acquired:false` avec `reason: held` → une autre mission pilote : ne
    dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → exécute `takeover
-   --owner=<id> --step=<mission>` plutôt que de remonter (doctrine complète, convention `Fence:` :
-   `conductor-references/team-kernel.md`). Heartbeat entre les étapes ; **release garanti à la
+   --owner=<id> --step=<mission> [--ws=<sujet>]` plutôt que de remonter (doctrine, convention `Fence:` :
+   `conductor-references/team-kernel.md` §Verrou par compartiment (lab partitionné)). Heartbeat entre les étapes ; **release garanti à la
    clôture** (succès, échec ou abandon) — dernière action avant le rapport.
 2. **Plan de bataille = DAG** (`"$S"/dag.sh init/add/ready/mark/reopen`). Modélise
    **5 nœuds par campagne** : `strategie(c) → production(c) → gate(c) → humain(c) → analyse(c)`.
@@ -169,4 +169,4 @@ compact : verdict global (✅ | partiel | bloqué) · par campagne : étages pas
 qualité, statut de validation humaine, analyse rendue ou en attente de données · **file
 d'attente de validation** (campagnes prêtes au lancement, en attente de l'humain) ·
 décisions prises en autonomie · blocages. **Relâche le verrou de driver avant de rendre
-le rapport** (`"$S"/driver-lock.sh release --owner=<id>`).
+le rapport** (`"$S"/driver-lock.sh release --owner=<id> [--ws=<sujet>]`).
