@@ -4,9 +4,9 @@ milestone: fiabilite-v1.0
 current_phase: 57
 current_phase_name: Verrou de driver par compartiment
 status: executing
-last_updated: "2026-10-10T21:45:00.000Z"
+last_updated: "2026-10-10T22:30:00.000Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 57 plan 12 complete (team-kernel §Verrou par compartiment, managers design/business/content/growth avec --ws à instructions constantes, vf-split-planning sous acquire --depot ; 7 commandes kernel et 4 de partition exit 0)
+last_activity_desc: Phase 57 plan 13 complete (amendement daté d'ADR-053 « un manager par compartiment, un seul geste de dépôt à la fois », note spec head §6, entrée n°27 fail-closed, release de CLAUDE.md sous deux gestes de dépôt courts, manuel FR+EN ; check-manual et check-machine-paths verts)
 state_head: 1413af28
 progress:
   total_phases: 18
@@ -14,7 +14,7 @@ progress:
   total_plans: 115
   completed_plans: 105
 milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-stopped_at: "Completed 57-12-PLAN.md (2026-10-10) — kernel + 4 managers hors dev + partition sous verrou de dépôt, budget d'instructions inchangé ; next plan 57-13."
+stopped_at: "Completed 57-13-PLAN.md (2026-10-10) — doctrine de l'invariant amendé (ADR-053, spec head, hooks, CLAUDE.md, manuel FR+EN) ; next plan 57-14."
 ---
 
 # Project State
@@ -48,7 +48,7 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Last activity: 2026-10-10 — Phase 57 plan 57-12 complete (12/16)
+Last activity: 2026-10-10 — Phase 57 plan 57-13 complete (13/16)
 
 ## Accumulated Context
 
