@@ -366,6 +366,116 @@ json_ok "$out"; assert_exit "WS-LEG-4.5 — JSON valide" "$?" 0
 [ ! -e "$GC/vf-driver" ]; assert_exit "WS-LEG-4.7 — aucun verrou neuf posé" "$?" 0
 
 echo
+echo "=== WS-LOC — un verrou de compartiment est partagé entre les worktrees du clone (P57-D-07) ==="
+LAB="$(mk_lab loc)"; GC="$(fixture_common_dir "$LAB")"
+WT="$WORK_DIR/loc-wt"
+git -C "$LAB" worktree add -q -b loc-branch "$WT" >/dev/null 2>&1
+# Préflight du worktree : son dossier commun DOIT être celui de la fixture, sous $WORK_DIR.
+wtc="$(fixture_common_dir "$WT")" || wtc=""
+if [ "$wtc" != "$GC" ]; then echo "PRÉFLIGHT FIXTURE CASSÉ — worktree '$wtc' ≠ clone '$GC'" >&2; exit 2; fi
+out="$(dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-LOC-1.1 — alpha pris depuis le checkout principal" "$rc" 0
+out="$(dl "$WT" sess-B acquire --ws=alpha --owner=m2 --step=s)"; rc=$?
+assert_exit "WS-LOC-1.2 — depuis le worktree lié : acquire --ws=alpha refusé, exit 1" "$rc" 1
+assert "WS-LOC-1.3 — reason held, held_by m1" "$out" '"held_by": "m1"'
+out="$(dl "$WT" sess-B acquire --ws=omega --owner=m2 --step=s)"; rc=$?
+assert_exit "WS-LOC-2.1 — omega pris depuis le worktree lié" "$rc" 0
+out="$(dl "$LAB" sess-A acquire --ws=omega --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-LOC-2.2 — réciproque : depuis le checkout principal, omega refusé, exit 1" "$rc" 1
+assert "WS-LOC-2.3 — reason held, held_by m2" "$out" '"held_by": "m2"'
+out="$(dl "$WT" sess-B status --ws=alpha)"
+assert "WS-LOC-3.1 — status --ws=alpha depuis le worktree lit le verrou du principal" "$out" '"owner": "m1"'
+leftover="$(ls -d "$WT"/.planning/DRIVER.lock* "$LAB"/.planning/DRIVER.lock* 2>/dev/null)"
+assert "WS-LOC-3.2 — aucun .planning/DRIVER.lock* créé, ni dans le worktree ni dans le principal" "[$leftover]" "[]"
+out="$(dl "$WT" sess-B acquire --depot --owner=m3 --step=s)"; rc=$?
+assert_exit "WS-LOC-4.1 — le dépôt est pris depuis le worktree" "$rc" 0
+out="$(dl "$LAB" sess-C acquire --depot --owner=m4 --step=s)"; rc=$?
+assert_exit "WS-LOC-4.2 — réciproque : le dépôt est refusé depuis le principal, exit 1" "$rc" 1
+
+echo
+echo "=== WS-NOGIT — hors git, le lab partitionné se replie sous .planning/DRIVER.lock.d, et le JSON le déclare (P57-D-07, P57-D-21) ==="
+mk_nogit() { # <nom>
+  local d="$WORK_DIR/$1"
+  mkdir -p "$d/.planning/workstreams/alpha" "$d/.planning/workstreams/omega"
+  printf -- '---\nstatus: active\n---\n' > "$d/.planning/workstreams/alpha/STATE.md"
+  printf -- '---\nstatus: active\n---\n' > "$d/.planning/workstreams/omega/STATE.md"
+  # PRÉFLIGHT : la fixture NE DOIT PAS être dans un dépôt git, sinon le cas ne mesure plus le repli.
+  if ( cd "$d" && git rev-parse --git-common-dir >/dev/null 2>&1 ); then
+    echo "PRÉFLIGHT FIXTURE CASSÉ — '$d' est dans un dépôt git : le repli hors git n'est pas mesurable" >&2; exit 2
+  fi
+  printf '%s' "$d"
+}
+NG="$(mk_nogit nogit)"
+out="$(dl "$NG" sess-A acquire --ws=alpha --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-NOGIT-1.1 — acquire --ws=alpha hors git : exit 0" "$rc" 0
+json_ok "$out"; assert_exit "WS-NOGIT-1.2 — JSON valide" "$?" 0
+assert "WS-NOGIT-1.3 — location checkout" "$out" '"location": "checkout"'
+assert "WS-NOGIT-1.4 — scope compartiment, ws alpha" "$out" '"scope": "compartiment", "ws": "alpha"'
+[ -L "$NG/.planning/DRIVER.lock.d/ws/alpha/DRIVER.lock" ]; assert_exit "WS-NOGIT-1.5 — lien .planning/DRIVER.lock.d/ws/alpha/DRIVER.lock" "$?" 0
+out="$(dl "$NG" sess-B acquire --ws=alpha --owner=m2 --step=s)"; rc=$?
+assert_exit "WS-NOGIT-1.6 — un second owner sur alpha : refus, exit 1" "$rc" 1
+assert "WS-NOGIT-1.7 — reason held" "$out" '"reason": "held"'
+out="$(dl "$NG" sess-B acquire --depot --owner=m2 --step=s)"; rc=$?
+assert_exit "WS-NOGIT-2.1 — acquire --depot hors git : exit 0" "$rc" 0
+assert "WS-NOGIT-2.2 — location checkout, scope depot" "$out" '"scope": "depot", "ws": "", "location": "checkout"'
+[ -L "$NG/.planning/DRIVER.lock.d/repo/DRIVER.lock" ]; assert_exit "WS-NOGIT-2.3 — lien .planning/DRIVER.lock.d/repo/DRIVER.lock" "$?" 0
+out="$(dl "$NG" sess-A status --ws=alpha)"
+assert "WS-NOGIT-3.1 — status --ws=alpha hors git : owner m1, location checkout" "$out" '"owner": "m1"'
+assert "WS-NOGIT-3.2 — status porte location checkout" "$out" '"location": "checkout"'
+out="$(dl "$NG" sess-A release --ws=alpha --owner=m1)"
+assert "WS-NOGIT-3.3 — release --ws=alpha hors git" "$out" '"released": true'
+# Le chemin de repli est ignoré par le .gitignore du dépôt (mesuré sur une copie, dans un dépôt jetable).
+REPO_ROOT="$(cd "$HERE/../../../.." && pwd)"
+IGN="$WORK_DIR/ign"; mkdir -p "$IGN"; git -C "$IGN" init -q >/dev/null 2>&1
+cp "$REPO_ROOT/.gitignore" "$IGN/.gitignore"
+( cd "$IGN" && git check-ignore -q ".planning/DRIVER.lock.d/ws/alpha/DRIVER.lock" ); assert_exit "WS-NOGIT-4.1 — le verrou de compartiment de repli est ignoré par git" "$?" 0
+( cd "$IGN" && git check-ignore -q ".planning/DRIVER.lock.d/repo/DRIVER.lock" ); assert_exit "WS-NOGIT-4.2 — le verrou de dépôt de repli est ignoré par git" "$?" 0
+( cd "$IGN" && git check-ignore -q ".planning/DRIVER.lock.d/ws/alpha/DRIVER.lock.children.jsonl" ); assert_exit "WS-NOGIT-4.3 — le registre voisin du repli est ignoré par git" "$?" 0
+( cd "$IGN" && git check-ignore -q ".planning/workstreams/alpha/STATE.md" ); assert_exit "WS-NOGIT-4.4 — témoin négatif : un fichier de compartiment n'est PAS ignoré (rc 1 attendu)" "$((1 - $?))" 0
+
+echo
+echo "=== WS-VFL — VF_DRIVER_LOCK posé force le mode verrou unique, même en lab partitionné (P57-D-22) ==="
+LAB="$(mk_lab vfl)"; GC="$(fixture_common_dir "$LAB")"
+VFL_PATH="$WORK_DIR/vfl-out/DRIVER.lock"; mkdir -p "$WORK_DIR/vfl-out"
+out="$( export VF_DRIVER_LOCK="$VFL_PATH"; dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s )"; rc=$?
+assert_exit "WS-VFL.1 — acquire --ws=alpha sous VF_DRIVER_LOCK : exit 0" "$rc" 0
+assert "WS-VFL.2 — acquis" "$out" '"acquired": true'
+assert_not "WS-VFL.3 — aucun champ de portée" "$out" '"scope"'
+[ -L "$VFL_PATH" ]; assert_exit "WS-VFL.4 — verrou posé au chemin désigné" "$?" 0
+[ ! -e "$GC/vf-driver" ]; assert_exit "WS-VFL.5 — rien dans le dossier commun du clone" "$?" 0
+out="$( export VF_DRIVER_LOCK="$VFL_PATH"; dl "$LAB" sess-B acquire --depot --owner=m2 --step=s )"; rc=$?
+assert_exit "WS-VFL.6 — --depot sans effet : le même verrou unique est tenu, refus exit 1" "$rc" 1
+assert "WS-VFL.7 — reason held, held_by m1" "$out" '"held_by": "m1"'
+out="$( export VF_DRIVER_LOCK="$VFL_PATH"; dl "$LAB" sess-B acquire --ws=zeta --owner=m2 --step=s )"; rc=$?
+assert_exit "WS-VFL.8 — --ws=zeta (inconnu) sans effet : pas de refus de compartiment, refus held exit 1" "$rc" 1
+assert_not "WS-VFL.9 — pas de unknown-ws" "$out" 'unknown-ws'
+out="$( export VF_DRIVER_LOCK="$VFL_PATH"; dl "$LAB" sess-A status --ws=alpha )"
+assert_not "WS-VFL.10 — status sans portée" "$out" '"scope"'
+assert_not "WS-VFL.11 — status sans legacy_lock" "$out" 'legacy_lock'
+assert "WS-VFL.12 — status lit le verrou désigné" "$out" '"owner": "m1"'
+
+echo
+echo "=== WS-FLATWS — lab plat : --ws et --depot sont acceptés et sans effet, octet pour octet (P57-D-03, P57-D-31) ==="
+norm() { sed -e 's/[0-9]\{10\}/EPOCH/g' -e 's/"age_seconds": [0-9]*/"age_seconds": N/g' -e 's/"progress_age_seconds": [0-9]*/"progress_age_seconds": N/g' -e 's/"lease_seconds": [0-9]*/"lease_seconds": N/g' -e 's/\.gen\.EPOCH\.[0-9]*/.gen.EPOCH.PID/g'; }
+flat_run() { # <nom> <opt> → écrit $WORK_DIR/flat-<nom>.out : acquire, status, release avec l'option
+  local nom="$1" opt="$2" lab f
+  lab="$(mk_flat "flat-$nom")"; f="$WORK_DIR/flat-$nom.out"; : > "$f"
+  { dl "$lab" sess-A acquire ${opt:+"$opt"} --owner=m1 --step=s; echo "rc=$?"
+    dl "$lab" sess-A status ${opt:+"$opt"}; echo "rc=$?"
+    dl "$lab" sess-A release ${opt:+"$opt"} --owner=m1; echo "rc=$?"
+  } 2>&1 | norm > "$f"
+}
+flat_run base ""
+flat_run ws "--ws=alpha"
+flat_run depot "--depot"
+[ -s "$WORK_DIR/flat-base.out" ]; assert_exit "WS-FLATWS.1 — la sortie de référence n'est pas vide (témoin)" "$?" 0
+assert "WS-FLATWS.2 — la référence contient acquire, status et release" "$(cat "$WORK_DIR/flat-base.out")" '"released": true'
+cmp -s "$WORK_DIR/flat-base.out" "$WORK_DIR/flat-ws.out"; assert_exit "WS-FLATWS.3 — acquire/status/release --ws=alpha identiques à la référence" "$?" 0
+cmp -s "$WORK_DIR/flat-base.out" "$WORK_DIR/flat-depot.out"; assert_exit "WS-FLATWS.4 — acquire/status/release --depot identiques à la référence" "$?" 0
+assert_not "WS-FLATWS.5 — aucun champ de portée en lab plat" "$(cat "$WORK_DIR/flat-ws.out" "$WORK_DIR/flat-depot.out")" '"scope"'
+assert_not "WS-FLATWS.6 — aucun legacy_lock en lab plat" "$(cat "$WORK_DIR/flat-ws.out" "$WORK_DIR/flat-depot.out")" 'legacy_lock'
+
+echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
 [ "$PASS" -gt 0 ] || { echo "❌ FAIL — zéro assertion exécutée"; exit 1; }
 [ "$FAIL" -eq 0 ]
