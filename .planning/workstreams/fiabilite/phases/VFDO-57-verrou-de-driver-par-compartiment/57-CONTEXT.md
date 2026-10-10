@@ -197,6 +197,49 @@ Samuel pour veto par le même canal, à la même date. Réponse : « Aucun veto 
 - **P57-D-30 (release)** : aucune release dans la 57. La release reste un geste humain, après la phase
   (ADR-073).
 
+### Décisions nées de la planification (2026-10-10)
+
+Le planificateur a posé P57-D-31 à P57-D-37 en écrivant les plans. Trois d'entre elles touchent une
+décision verrouillée, le périmètre ou la doctrine du head ; elles sont **remontées à Samuel** :
+**P57-D-34, P57-D-36 et P57-D-37, arbitrage Samuel, AskUserQuestion session principale, 2026-10-10**.
+Il a retenu à chaque fois l'option recommandée. Les quatre autres lui ont été soumises pour veto, par le même
+canal à la même date : aucun veto. Le détail de chaque décision vit dans les plans qui la citent.
+
+- **P57-D-31 (régime plat et forcé)** : dans un lab plat, ou quand `VF_DRIVER_LOCK` est posé, `--ws` et
+  `--depot` sont acceptés sans effet. Dans ces deux cas, `status --all` rend exactement la sortie de
+  `status`. `--all` n'est accepté que par `status`. `VF_DRIVER_CHILDREN` n'est honorée qu'en mode verrou
+  unique.
+- **P57-D-32 (forme JSON complémentaire)** : en lab partitionné, le JSON ajoute `scope_reason`
+  (`ws-absent` | `legacy-fallback`) et `legacy_lock` à la forme ratifiée par P57-D-21. La forme de
+  `status --all` est fixée par 57-01. Un `--ws` vide, ou `--ws` combiné à `--depot`, est refusé
+  `ws-invalid`.
+- **P57-D-33 (guard, cas limites)** :
+  - `git worktree remove` reste refusé sous tout verrou d'autrui.
+  - Une cible git incertaine (`-C`, `--git-dir`, `--work-tree`) reprend la règle d'avant la phase :
+    refus sous tout verrou d'autrui.
+  - Un `git add` placé dans la même commande que le commit entre dans le jugement.
+  - Le nom de compartiment est comparé exactement, ou sans tenir compte de la casse.
+  - Une erreur interne du chemin partitionné donne un refus.
+- **P57-D-34 (le head sérialise ses managers)** : jusqu'à la preuve d'usage réel (Phase 61), un head
+  sérialise toujours ses propres managers. Les mandats portent déjà `--ws` et
+  `GSD_SESSION_KEY=vf-<sujet>-<owner>`. Motif : la limite P57-D-20 ; dans la 57, la parallélisation par
+  compartiment ne vaut qu'entre sessions distinctes. *Ratifiée par Samuel.*
+- **P57-D-35 (gate de sortie)** : `check-mission-exit.sh --ws` couvre E1, l'identité d'E7 et la surcharge
+  d'E4. Sans `--ws`, dans un lab partitionné, E1 est indéterminé. Un verrou de dépôt tenu est signalé
+  sur stderr, jamais compté comme un manque.
+- **P57-D-36 (périmètre élargi)** : au-delà de l'inventaire de P57-D-15, la phase modifie aussi :
+  - l'étape de release de `CLAUDE.md`, en réécrivant les items existants ;
+  - le skill `vf-split-planning`, dont la partition passe sous verrou de dépôt ;
+  - le manuel FR et EN ;
+  - l'entrée n°27 de `docs/HOOKS-CONTRAT-SORTIE.md` ;
+  - une note datée au § 6 du spec head.
+
+  *Ratifiée par Samuel.*
+- **P57-D-37 (exception `--help` à P57-D-03)** : la sortie de `driver-lock.sh --help` change aussi dans un
+  lab plat, puisque l'en-tête documente les nouvelles options. Elle est exclue du témoin A/B, et cette
+  exclusion est écrite dans le témoin. Tous les verbes restent identiques octet pour octet. *Ratifiée par
+  Samuel ; P57-D-03 est précisée, pas réécrite.*
+
 </decisions>
 
 <canonical_refs>
