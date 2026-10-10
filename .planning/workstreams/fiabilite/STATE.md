@@ -6,15 +6,15 @@ current_phase_name: Verrou de driver par compartiment
 status: executing
 last_updated: "2026-10-10T18:15:59.073Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 57 plan 01 complete (verrou par compartiment, --ws/--depot)
-state_head: b6f57e7e02449e29ababc3e68ea416d3f1528b21
+last_activity_desc: Phase 57 plan 02 complete (ancien verrou, worktrees, repli hors git)
+state_head: 96545195
 progress:
   total_phases: 18
   completed_phases: 18
   total_plans: 115
   completed_plans: 105
 milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-stopped_at: "Completed 57-01-PLAN.md (2026-10-10) — driver-lock.sh --ws/--depot, suite test-driver-lock-ws.sh ; next plan 57-02 (ancien verrou, partage entre worktrees, repli hors git)."
+stopped_at: "Completed 57-02-PLAN.md (2026-10-10) — ancien verrou refusé, repli hors git, partage entre worktrees prouvé ; next plan 57-03 (status --all, --ws sur tous les verbes, registre par verrou)."
 ---
 
 # Project State
@@ -48,7 +48,7 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Last activity: 2026-10-10 — Phase 57 plan 57-01 complete (1/16)
+Last activity: 2026-10-10 — Phase 57 plan 57-02 complete (2/16)
 
 ## Accumulated Context
 
@@ -68,6 +68,7 @@ Historique complet (jalons, décisions, arbitrages 2026-07 à 2026-09) : voir l'
 
 - 2026-10-02 — Plans 41-07 à 41-13 (chaîne des mesures de la protection serveur) confiés à Willy, hors clôture de `fiabilite-v1.0` (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy » pour 41-07 à 41-09, puis « Toute la chaîne à Willy » pour 41-10 à 41-13) ; PROT-01 cochée le 2026-09-24 sur la pose des rulesets, complément attendu : mesure du refus réel d'un push direct (41-09, complément en 41-13) confiée à Willy ; 41-07 partiellement entamé (`PR-R-*`, 2026-09-24).
 - [Phase 57]: 57-01 : le suffixe JSON de portée est posé sur acquire, status et release ; les autres verbes résolvent le verrou nommé mais n'émettent pas encore la portée (57-03) — contrat de la phase posé par le tracer ; le reste est livré par 57-03
+- [Phase 57]: 57-02 : repli legacy-fallback sur tout verbe autre qu'acquire sans --ws ni --depot quand le dépôt est absent ; status porte legacy_lock pour toute cible en lab partitionné (P57-D-24, P57-D-26, P57-D-32)
 
 ### Pending Todos
 
