@@ -476,6 +476,102 @@ assert_not "WS-FLATWS.5 — aucun champ de portée en lab plat" "$(cat "$WORK_DI
 assert_not "WS-FLATWS.6 — aucun legacy_lock en lab plat" "$(cat "$WORK_DIR/flat-ws.out" "$WORK_DIR/flat-depot.out")" 'legacy_lock'
 
 echo
+echo "=== WS-ALL — status --all : tous les verrous d'un lab partitionne d'un seul appel (P57-D-24, P57-D-31, P57-D-32) ==="
+# Evalue une expression python sur le JSON passe en $1 (parse REEL, jamais un grep) ; imprime le resultat.
+pj() { printf '%s' "$1" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(eval(sys.argv[1]))' "$2" 2>&1; }
+LAB="$(mk_lab all1)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=sa >/dev/null
+dl "$LAB" sess-B acquire --depot --owner=m2 --step=sd >/dev/null
+out="$(dl "$LAB" sess-A status --all)"; rc=$?
+assert_exit "WS-ALL-1.1 — status --all exit 0" "$rc" 0
+json_ok "$out"; assert_exit "WS-ALL-1.2 — une ligne JSON valide (parse python)" "$?" 0
+assert "WS-ALL-1.3 — une seule ligne" "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" "1"
+assert "WS-ALL-1.4 — scope lab" "$(pj "$out" 'd["scope"]')" "lab"
+assert "WS-ALL-1.5 — present vrai si au moins une entree est presente" "$(pj "$out" 'd["present"]')" "True"
+assert "WS-ALL-1.6 — locks : depot, alpha, omega, dans cet ordre" "$(pj "$out" '[e["ws"] for e in d["locks"]]')" "['', 'alpha', 'omega']"
+assert "WS-ALL-1.7 — omega est une entree absente" "$(pj "$out" '[e["present"] for e in d["locks"]]')" "[True, True, False]"
+assert "WS-ALL-1.8 — chaque entree porte scope, ws et location" "$(pj "$out" 'all(k in e for e in d["locks"] for k in ("scope","ws","location"))')" "True"
+assert "WS-ALL-1.9 — chaque entree presente conserve son ttl" "$(pj "$out" 'all(e["ttl"] == 1800 for e in d["locks"] if e["present"])')" "True"
+assert "WS-ALL-1.10 — owners par entree" "$(pj "$out" '[e.get("owner") for e in d["locks"]]')" "['m2', 'm1', None]"
+assert "WS-ALL-1.11 — scopes par entree" "$(pj "$out" '[e["scope"] for e in d["locks"]]')" "['depot', 'compartiment', 'compartiment']"
+assert "WS-ALL-1.12 — legacy_lock faux au niveau lab" "$(pj "$out" 'd["legacy_lock"]')" "False"
+assert "WS-ALL-1.13 — children_running somme (0)" "$(pj "$out" 'd["children_running"]')" "0"
+
+LAB="$(mk_lab all2)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=sa >/dev/null
+dl "$LAB" sess-B acquire --depot --owner=m2 --step=sd >/dev/null
+# verrou de compartiment tenu SANS dossier de compartiment sur le disque : pose en mode verrou unique
+mkdir -p "$GC/vf-driver/ws/zeta"
+( cd "$LAB" && VF_DRIVER_LOCK="$GC/vf-driver/ws/zeta/DRIVER.lock" CLAUDE_CODE_SESSION_ID=sess-Z "$SCRIPT" acquire --owner=mz --step=sz >/dev/null )
+# noms forges dans le dossier commun : ne doivent JAMAIS entrer dans le JSON (T-57-38)
+mkdir -p "$GC/vf-driver/ws/bad name/DRIVER.lock" "$GC/vf-driver/ws/a\"b/DRIVER.lock"
+dl "$LAB" sess-A register --ws=alpha --agent=a1 --role=coder >/dev/null
+dl "$LAB" sess-A register --ws=alpha --agent=a2 --role=coder >/dev/null
+dl "$LAB" sess-A register --ws=omega --agent=a3 --role=coder >/dev/null
+dl "$LAB" sess-A close --ws=omega --agent=a3 --status=done >/dev/null
+dl "$LAB" sess-A register --depot --agent=a4 --role=coder >/dev/null
+mk_legacy "$LAB" old
+out="$(dl "$LAB" sess-A status --all)"; err="$(dl "$LAB" sess-A status --all 2>&1 >/dev/null)"
+json_ok "$out"; assert_exit "WS-ALL-2.1 — JSON valide avec ancien verrou, zeta et noms forges" "$?" 0
+assert "WS-ALL-2.2 — ordre : depot, ancien verrou, alpha, omega, zeta" "$(pj "$out" '[e["ws"] for e in d["locks"]]')" "['', '', 'alpha', 'omega', 'zeta']"
+assert "WS-ALL-2.3 — l'entree de l'ancien verrou est marquee" "$(pj "$out" '[e.get("legacy_lock") for e in d["locks"]]')" "[None, True, None, None, None]"
+assert "WS-ALL-2.4 — l'ancien verrou tient son propre owner" "$(pj "$out" 'd["locks"][1]["owner"]')" "old"
+assert "WS-ALL-2.5 — zeta (sans dossier de compartiment) est present dans locks" "$(pj "$out" '[e["present"] for e in d["locks"] if e["ws"] == "zeta"]')" "[True]"
+assert "WS-ALL-2.6 — legacy_lock vrai au niveau lab" "$(pj "$out" 'd["legacy_lock"]')" "True"
+assert "WS-ALL-2.7 — children_running = somme des registres consignes (alpha 2 + omega 0 + depot 1)" "$(pj "$out" 'd["children_running"]')" "3"
+assert "WS-ALL-2.8 — children_running par entree : depot 1, ancien 0, alpha 2, omega 0, zeta 0" "$(pj "$out" '[e["children_running"] for e in d["locks"]]')" "[1, 0, 2, 0, 0]"
+assert_not "WS-ALL-2.9 — un nom forge n'est jamais imprime (espace)" "$out" "bad name"
+assert_not "WS-ALL-2.10 — un nom forge n'est jamais imprime (guillemet)" "$out" 'a\"b'
+assert "WS-ALL-2.11 — les noms ecartes sont signales sur stderr" "$err" "ecart"
+assert "WS-ALL-2.12 — present vrai" "$(pj "$out" 'd["present"]')" "True"
+
+LAB="$(mk_lab all3)"
+out="$(dl "$LAB" sess-A status --all)"; rc=$?
+assert_exit "WS-ALL-3.1 — aucun verrou tenu : exit 0" "$rc" 0
+assert "WS-ALL-3.2 — present faux" "$(pj "$out" 'd["present"]')" "False"
+assert "WS-ALL-3.3 — locks complet : depot, alpha, omega, tous absents" "$(pj "$out" '[(e["ws"], e["present"]) for e in d["locks"]]')" "[('', False), ('alpha', False), ('omega', False)]"
+FLAT="$(mk_flat all3-flat)"
+a="$(dl "$FLAT" sess-A status | norm)"; b="$(dl "$FLAT" sess-A status --all | norm)"
+[ -n "$a" ]; assert_exit "WS-ALL-3.4 — temoin : status de lab plat non vide" "$?" 0
+assert "WS-ALL-3.5 — lab plat vide : status --all identique a status" "[$b]" "[$a]"
+dl "$FLAT" sess-A acquire --owner=m1 --step=s >/dev/null
+a="$(dl "$FLAT" sess-A status | norm)"; b="$(dl "$FLAT" sess-A status --all | norm)"
+assert "WS-ALL-3.6 — lab plat tenu : status --all identique a status" "[$b]" "[$a]"
+assert_not "WS-ALL-3.7 — lab plat : aucun champ lab" "$b" '"locks"'
+VP="$WORK_DIR/all3-vfl/DRIVER.lock"; mkdir -p "$WORK_DIR/all3-vfl"
+( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A acquire --owner=m1 --step=s >/dev/null )
+a="$( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A status | norm )"; b="$( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A status --all | norm )"
+[ -n "$a" ]; assert_exit "WS-ALL-3.8 — temoin : status sous VF_DRIVER_LOCK non vide" "$?" 0
+assert "WS-ALL-3.9 — VF_DRIVER_LOCK : status --all identique a status" "[$b]" "[$a]"
+assert_not "WS-ALL-3.10 — VF_DRIVER_LOCK : aucun champ lab" "$b" '"locks"'
+
+LAB="$(mk_lab all4)"
+out="$(dl "$LAB" sess-A orphans --all 2>/dev/null)"; rc=$?
+assert_exit "WS-ALL-4.1 — orphans --all : exit 1" "$rc" 1
+assert "WS-ALL-4.2 — orphans --all : rien sur stdout" "[$out]" "[]"
+err="$(dl "$LAB" sess-A orphans --all 2>&1 >/dev/null)"
+assert "WS-ALL-4.3 — message d'usage sur stderr, --all nomme" "$err" "--all"
+out="$(dl "$LAB" sess-A acquire --all --owner=m1 2>/dev/null)"; rc=$?
+assert_exit "WS-ALL-4.4 — acquire --all : exit 1, rien acquis" "$rc" 1
+assert "WS-ALL-4.5 — acquire --all : rien sur stdout" "[$out]" "[]"
+FLAT="$(mk_flat all4-flat)"
+dl "$FLAT" sess-A release --all --owner=m1 >/dev/null 2>&1; assert_exit "WS-ALL-4.6 — lab plat : release --all : exit 1 aussi" "$?" 1
+out="$(dl "$LAB" sess-A status --all --ws=alpha)"; rc=$?
+assert_exit "WS-ALL-4.7 — status --all --ws=alpha : exit 1" "$rc" 1
+assert "WS-ALL-4.8 — reason ws-invalid, cle de tete error" "$out" '"error": "ws-invalid"'
+assert_not "WS-ALL-4.9 — jamais present" "$out" '"present"'
+json_ok "$out"; assert_exit "WS-ALL-4.10 — JSON valide" "$?" 0
+out="$(dl "$LAB" sess-A status --all --depot)"; rc=$?
+assert_exit "WS-ALL-4.11 — status --all --depot : exit 1" "$rc" 1
+assert "WS-ALL-4.12 — reason ws-invalid" "$out" '"reason": "ws-invalid"'
+LAB="$(mk_lab all4-unreadable)"
+rm -rf "$LAB/.planning/workstreams"; printf 'pas un dossier\n' > "$LAB/.planning/workstreams"
+out="$(dl "$LAB" sess-A status --all)"; rc=$?
+assert_exit "WS-ALL-4.13 — workstreams illisible : exit 1" "$rc" 1
+assert "WS-ALL-4.14 — partition-unreadable, cle de tete error" "$out" '"error": "partition-unreadable"'
+assert_not "WS-ALL-4.15 — jamais present" "$out" '"present"'
+
+echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
 [ "$PASS" -gt 0 ] || { echo "❌ FAIL — zéro assertion exécutée"; exit 1; }
 [ "$FAIL" -eq 0 ]
