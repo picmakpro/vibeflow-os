@@ -45,12 +45,14 @@ EW_MODE="${EW_MODE:-full}"
 EW_KO_FILE="${EW_KO_FILE:-}"
 
 # Cas dont le verdict DOIT basculer sous chaque mutant (mesurés puis relus un par un : le cas nommé par le
-# plan en fait partie). Les cas sont nommés sans suffixe numérique de sous-assertion (EW-TRACE-1.1 → EW-TRACE-1).
-MUT_A="EW-TRACE-1 EW-TRACE-3"
-MUT_B="EW-NOWS EW-Q-INDET"
-MUT_C="EW-GEN"
-MUT_D="EW-E4"
-MUT_E="EW-SNAP"
+# plan en fait partie). Un cas = le libellé sans suffixe de sous-assertion (EW-TRACE-1.1 → EW-TRACE-1).
+# EW-NOWS-2 (verdict global 4) ne bascule pas sous EW-M-b : E4, E5 et E6 sont indéterminés faute d'arguments,
+# le 4 global tient sans E1 — c'est EW-NOWS-1 et EW-Q-INDET-1 qui portent la preuve d'E1.
+MUT_A="EW-CHILD-1 EW-Q-INDET-2 EW-Q-INDET-3 EW-Q-MANQUE-1 EW-TRACE-1 EW-TRACE-3"
+MUT_B="EW-NOWS-1 EW-Q-INDET-1"
+MUT_C="EW-GEN-2 EW-GEN-3 EW-GEN-5"
+MUT_D="EW-E4-1 EW-E4-2"
+MUT_E="EW-SNAP-1 EW-SNAP-2 EW-SNAP-4"
 
 # DÉSARMEMENT en tête (P57-D-22) : un VF_DRIVER_LOCK hérité forcerait le mode « verrou unique » ;
 # les autres variables déplaceraient la cible. GIT_* : une suite jouée depuis un hook git hériterait
@@ -182,7 +184,8 @@ echo '{"present": false, "children_running": 0}'
 EOF
   chmod +x "$LABF/.claude/scripts/driver-lock.sh"
   VF_DRIVER_LOCK=/nonexistent/hérité.lock g --root "$LABF" --ws alpha
-  SEEN="$(cat "$LABF/.claude/scripts/seen.txt" 2>/dev/null)"
+  # La ligne de la lecture du compartiment SEULE : la lecture du verrou de dépôt, qui suit, vide aussi la variable.
+  SEEN="$(grep -F 'status --ws=alpha' "$LABF/.claude/scripts/seen.txt" 2>/dev/null)"
   has "EW-TRACE-3.1 — lab partitionné : VF_DRIVER_LOCK reçu VIDE malgré un export hérité" "$SEEN" "val=[]"
   hasnt "EW-TRACE-3.2 — le chemin hérité n'atteint pas le driver-lock.sh frère" "$SEEN" "hérité"
   has "EW-TRACE-3.3 — la lecture est status --ws=alpha" "$SEEN" "status --ws=alpha"
@@ -365,8 +368,8 @@ PY
 }
 
 MUT_OK=0; MUT_TOTAL=0
-mutant() { # <id> <cas attendus (ensemble exact)> <ancre> <remplacement>
-  local id="$1" expected="$2" old="$3" new="$4" m gate kof sub got named
+mutant() { # <id> <cas nommé par le plan> <cas attendus (ensemble exact, ordre C)> <ancre> <remplacement>
+  local id="$1" named="$2" expected="$3" old="$4" new="$5" m gate kof sub got
   MUT_TOTAL=$((MUT_TOTAL+1))
   m="$(mk_layout "$id")"; gate="$m/dev-orchestrator/scripts/check-mission-exit.sh"
   if ! py_replace "$gate" "$old" "$new"; then ko "EW-M-$id" "ancre absente ou non unique, ou remplacement identique"; return; fi
@@ -375,7 +378,6 @@ mutant() { # <id> <cas attendus (ensemble exact)> <ancre> <remplacement>
   kof="$TMP/ko-$id.txt"; : > "$kof"
   sub="$(EW_MODE=matrice EW_KO_FILE="$kof" GATE_SCRIPT="$gate" bash "$SUITE" 2>&1 </dev/null)" || true
   got="$(LC_ALL=C sort -u "$kof" | tr '\n' ' ' | sed 's/ $//')"
-  named="${expected%% *}"
   if [ "$got" = "$expected" ]; then
     ok "EW-M-$id tué — rouge $named : basculé {$got}"
     printf '%s\n' "$sub" | { grep -F "✗ $named" || true; } | head -2 | sed 's/^ *✗ /    rouge /'
@@ -386,13 +388,13 @@ mutant() { # <id> <cas attendus (ensemble exact)> <ancre> <remplacement>
 }
 
 echo "=== Mutants EW-M-a à EW-M-e (copies dans la disposition du plugin) ==="
-mutant a "$MUT_A" 'VF_DRIVER_LOCK= "$E1_S_DIR/driver-lock.sh" status --ws="$WS"' 'VF_DRIVER_LOCK="$ROOT/.planning/DRIVER.lock" "$E1_S_DIR/driver-lock.sh" status --ws="$WS"'
-mutant b "$MUT_B" 'E1_STATUS="indet"
+mutant a EW-TRACE-1 "$MUT_A" 'VF_DRIVER_LOCK= "$E1_S_DIR/driver-lock.sh" status --ws="$WS"' 'VF_DRIVER_LOCK="$ROOT/.planning/DRIVER.lock" "$E1_S_DIR/driver-lock.sh" status --ws="$WS"'
+mutant b EW-NOWS-1 "$MUT_B" 'E1_STATUS="indet"
   E1_MSG="[E1] lab partitionné' 'E1_STATUS="sain"
   E1_MSG="[E1] lab partitionné'
-mutant c "$MUT_C" 'if is_partitioned; then # CURGEN' 'if false; then # CURGEN'
-mutant d "$MUT_D" 'vf_ws_resolve "$E4_PLANNING_DIR" "$WS"' 'vf_ws_resolve "$E4_PLANNING_DIR"'
-mutant e "$MUT_E" 'if is_partitioned && [ -z "$WS" ]; then # SNAPWS' 'if false; then # SNAPWS'
+mutant c EW-GEN-2 "$MUT_C" 'if is_partitioned; then # CURGEN' 'if false; then # CURGEN'
+mutant d EW-E4-1 "$MUT_D" 'vf_ws_resolve "$E4_PLANNING_DIR" "$WS"' 'vf_ws_resolve "$E4_PLANNING_DIR"'
+mutant e EW-SNAP-1 "$MUT_E" 'if is_partitioned && [ -z "$WS" ]; then # SNAPWS' 'if false; then # SNAPWS'
 
 echo
 if [ "$MUT_OK" -eq 5 ] && [ "$MUT_TOTAL" -eq 5 ]; then echo "== mutants : 5/5 tués =="; else echo "== mutants : $MUT_OK/5 tués — ÉCHEC =="; fi
