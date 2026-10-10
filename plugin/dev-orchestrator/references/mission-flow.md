@@ -35,7 +35,7 @@ Toutes les commandes ci-dessous utilisent `"$S"/…`. (Sans cette cascade, un la
 ## Pattern A — Lock de driver unique (anti-collision de pilotage)
 
 Empêche deux missions/sessions de piloter la **même étape** en parallèle (corruption des backups isolés
-ADR-048/049). Acquisition **atomique** (`mkdir`). Le manager est l'unique porteur du lock pour sa mission.
+ADR-048/049). Acquisition **atomique** (un lien symbolique posé puis remplacé par `rename(2)` depuis la Phase 30, plus un `mkdir`). Le manager est l'unique porteur du lock pour sa mission.
 
 **Protocole (obligatoire) :**
 
@@ -102,6 +102,46 @@ trailer `Fence: <generation>` (bloc de trailers, aux côtés de `Co-Authored-By:
 Convention d'agent, jamais posée ni vérifiée par une machine (comme les deux autres trailers du
 dépôt). Audit : `git log --grep='^Fence: ' -E --format='%H %s'` (zéro résultat est valide tant
 qu'aucun commit n'a encore posé le trailer).
+
+### Verrou par compartiment (lab partitionné)
+
+Un dépôt est partitionné quand `.planning/workstreams/` existe. Le mandat porte alors un **sujet** (un
+compartiment) et le verrou se nomme par compartiment : un manager par compartiment, en parallèle (P57-D-01).
+Le manager passe le **même sujet** à tous les gestes de sa mission ; `<sujet>` et `<id>` ci-dessous sont les
+valeurs du mandat (P57-D-23, P57-D-35) :
+
+```bash
+"$S"/driver-lock.sh acquire --owner="<id>" --step="mission" --ws="<sujet>"
+"$S"/check-mission-exit.sh --budget-snapshot --ws "<sujet>"        # APRÈS l'acquire (identité de la mission)
+"$S"/dag.sh init --file="<F>" --ws="<sujet>"                      # le DAG est lié au verrou du compartiment
+"$S"/driver-lock.sh heartbeat --owner="<id>" --ws="<sujet>"
+"$S"/driver-lock.sh mark-progress --owner="<id>" --ws="<sujet>"
+"$S"/driver-lock.sh register --agent="<agentId>" --role="vf-coder" --node="<nœud>" --ws="<sujet>"
+"$S"/driver-lock.sh close --agent="<agentId>" --status=done --ws="<sujet>"
+"$S"/driver-lock.sh orphans --ws="<sujet>"
+"$S"/driver-lock.sh reclaim --owner="<id>" --ws="<sujet>"          # `takeover` : même option, mêmes refus
+"$S"/driver-lock.sh release --owner="<id>" --ws="<sujet>"          # dernière action avant le rapport
+# geste de dépôt (release du plugin, BACKLOG.md, docs/ADR.md, fichiers racine de .planning/, partition) :
+"$S"/driver-lock.sh acquire --depot --owner="<id>" --step="<geste>"
+# … le geste, court …
+"$S"/driver-lock.sh release --depot --owner="<id>"
+```
+
+- **Même `--ws` partout.** Un verbe sans `--ws` vise le verrou de DÉPÔT (P57-D-24) : un `release` sans `--ws`
+  laisse donc le verrou du compartiment tenu (E1 le rattrape à la sortie, `check-mission-exit.sh --ws <sujet>`).
+  Un `acquire` sans `--ws` prend le dépôt et le dit (`scope: depot`, `scope_reason: ws-absent`, P57-D-05) : la
+  mission est alors sérialisée comme avant. Lab plat : `--ws` y est sans effet (P57-D-31).
+- **Un seul compartiment par mission.** Le transverse passe par le dépôt ou se découpe en deux missions (P57-D-06).
+  Le gate de sortie sans `--ws` sur un lab partitionné est INDÉTERMINÉ ; `--budget-snapshot` sans `--ws` sort 4
+  (P57-D-35).
+- **Gestes de dépôt courts** (P57-D-01, P57-D-02) : `acquire --depot`, le geste, puis `release --depot` aussitôt,
+  jamais gardé pendant la mission.
+- **Refus nommés** (JSON, `reason` + `hint`, exit 1) : `unknown-ws`, `ws-invalid`, `partition-unreadable`,
+  `policy-missing` → corriger le mandat, jamais deviner un sujet. `legacy-lock-held` (un ancien
+  `.planning/DRIVER.lock` est tenu, il vaut verrou de dépôt) → remonter à l'humain avec le `hint`, qui nomme la
+  commande de release : l'ancien verrou se relâche par son détenteur, rien ne le reprend en silence (P57-D-26).
+- **Clé de session.** Le manager exporte le `GSD_SESSION_KEY` reçu du mandat (`vf-<sujet>-<owner>`), distinct par
+  manager (P57-D-34) ; lecture globale de l'état : `driver-lock.sh status --all`.
 
 ---
 
@@ -542,7 +582,12 @@ orphans` (conductor v1.39.0).
 
 `.planning/DRIVER.lock.children.jsonl` (variable `VF_DRIVER_CHILDREN`), écrit et lu par
 `driver-lock.sh` seul, frère du verrou comme le journal des reprises, jamais dans la génération du
-verrou (qui meurt au `takeover`). Pourquoi là, et pas dans le `dag.json` de mission :
+verrou (qui meurt au `takeover`). **Lab partitionné** : le registre est le frère du verrou RÉSOLU,
+`<git-common-dir>/vf-driver/ws/<sujet>/DRIVER.lock.children.jsonl` (un registre par compartiment, `repo/` pour le
+dépôt) ; `VF_DRIVER_CHILDREN` n'y est honorée qu'en mode verrou unique (P57-D-31). `register`, `close` et `orphans` prennent
+le `--ws` de la mission, manager comme worker (P57-D-15, P57-D-24) ; `status --all` somme les `children_running` de
+tous les registres, ce qui rattrape un worker qui aurait consigné sans `--ws`. Pourquoi là, et pas dans le
+`dag.json` de mission :
 
 - le manager de remplacement touche le verrou AVANT de connaître quoi que ce soit de la mission
   (`reclaim` ou `takeover` est son premier geste) : l'inventaire vit là où la reprise commence,
@@ -674,7 +719,8 @@ en Metro ou en « quelle branche ? ». La doctrine « STATE ne garde que le cour
 - Worktrees actifs : **3 par dépôt** au plus, arbre principal non compté.
 
 **Début de mission : le snapshot.** Juste après l'`acquire` du verrou, le manager pose la référence
-de ce qui existe déjà : `"$S"/check-mission-exit.sh --budget-snapshot` (pris en `--auto --dry-run`, rien n'est écrit ;
+de ce qui existe déjà : `"$S"/check-mission-exit.sh --budget-snapshot` (lab partitionné : `--budget-snapshot --ws <sujet>`,
+sans `--ws` exit 4, P57-D-35 ; pris en `--auto --dry-run`, rien n'est écrit ;
 le fichier vit sous le répertoire git commun, `vf-mission-budget.snap`, jamais dans l'arbre : E2 reste
 propre). Sans lui, E7 est INDÉTERMINÉ, jamais sain : il ne saurait pas distinguer ce que la mission a
 créé de ce qui existait (branche d'un autre mainteneur, worktree d'une autre mission). Le snapshot porte

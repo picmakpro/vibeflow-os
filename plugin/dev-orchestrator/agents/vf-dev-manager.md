@@ -27,7 +27,7 @@ Si le périmètre reste inexploitable après mapping, demande-le (AskUserQuestio
 - **Feuille de route / état** : `.planning/ROADMAP.md`, `.planning/STATE.md`, `.planning/PROJECT.md`
   (Core Value, Out of Scope, Key Decisions, Constraints), `.planning/phases/` — chemins **racine**.
   `.planning/workstreams/` présent = dépôt partitionné : résous le compartiment AVANT toute lecture,
-  exporte `GSD_WORKSTREAM`, passe `--ws` — `dev-orchestrator-references/workstreams.md`.
+  exporte `GSD_WORKSTREAM` et le `GSD_SESSION_KEY` du mandat, passe `--ws` au moteur ET au verrou — `dev-orchestrator-references/workstreams.md`.
 - **Dette et risques** : `.planning/codebase/CONCERNS.md` et `TESTING.md` s'ils existent.
 - **Invariants de mission** : `.planning/MISSION-INVARIANTS.md` (zones de risque falsifiables,
   table des fichiers gelés dérivée par `dag.sh status`, contrainte d'outillage du moment) — au
@@ -45,8 +45,8 @@ une machine bi-scope, prendre les scripts du user divergerait silencieusement de
 lab). Puis six gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
-   `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape>`, puis `"$S"/check-mission-exit.sh --budget-snapshot` (référence d'E7).
-   `acquired:false` avec `reason: held` (`held_by`) → **une autre mission pilote déjà** : ne dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → PAS une remontée systématique : exécute `"$S"/driver-lock.sh takeover --owner=<id> --step=<étape>` (commande nommée par le champ `hint` du refus JSON), consigne la reprise (STATE `### Decisions`).
+   `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<étape> [--ws=<sujet du mandat>]`, puis `"$S"/check-mission-exit.sh --budget-snapshot [--ws <sujet>]` (référence d'E7) ; même `--ws` à chaque verbe : `mission-flow.md` §Verrou par compartiment.
+   `acquired:false` avec `reason: held` (`held_by`) ou `legacy-lock-held` (avec son `hint`) → **une autre mission pilote déjà** : ne dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → PAS une remontée systématique : exécute `"$S"/driver-lock.sh takeover --owner=<id> --step=<étape>` (commande nommée par le champ `hint` du refus JSON), consigne la reprise (STATE `### Decisions`).
    `reclaim --owner=<id>` : même geste si ton identité de session a changé (`/clear`, reprise) sur un lock que tu tiens encore — jamais traité comme périmé. Trailer `Fence: <generation>` sur le premier commit qui suit : `dev-orchestrator-references/mission-flow.md` §Jeton de fence.
    **Registre des agents** : chaque `Task` que tu émets est consigné dans le même tour (`"$S"/driver-lock.sh register --agent=<agentId> --role=<rôle> --node=<nœud>`) et fermé à son retour (`close --agent=<agentId> --status=done|failed`) ; `reclaim`/`takeover` rendent `orphans_count` et `orphans` : un compte non nul se traite AVANT le premier dispatch (`mission-flow.md` §Pattern I).
    **Heartbeat** entre les étapes (`driver-lock.sh heartbeat --owner=…`), sur la cadence INDÉPENDANTE des transitions de `dag.sh mark` (`progress_epoch`) qu'exige D-33-E — protocole amendé, ne pas le dupliquer ici : `dev-orchestrator-references/mission-flow.md`. **Release** garanti à la
@@ -247,4 +247,4 @@ rapport détaillé sous `.planning/missions/` — source du contrôle E6 du gate
 dispatchés et tours consommés se comptent sur tes mandats émis et les blocs typés reçus — jamais estimés, jamais arrondis.
 
 **Avant de rendre le rapport** : `"$S"/check-method-budget.sh --auto --no-remote --quiet` et ses suites (`mission-flow.md` §Budgets de méthode),
-puis **relâche le verrou de driver** : `"$S"/driver-lock.sh release --owner=<id>` (geste de clôture garanti, quel que soit l'issue).
+puis **relâche le verrou de driver** : `"$S"/driver-lock.sh release --owner=<id> [--ws=<sujet>]` (geste de clôture garanti, quel que soit l'issue).
