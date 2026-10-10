@@ -21,6 +21,23 @@ set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$(cd "$HERE/.." && pwd)/driver-lock.sh"
+# Ensembles de cas dont le verdict DOIT basculer sous chaque mutant (mesurés puis relus un par un : le cas nommé
+# par le plan en fait partie ; WS-LAST est ABSENT de DL-M-i, signature du piège P1 : le dernier compartiment passe).
+MUT_A="WS-LOC-1 WS-LOC-2 WS-LOC-3 WS-LOC-4"
+MUT_B="WS-INV WS-INV-dotdot WS-INV-quote WS-INV-slash WS-VERBS-5a WS-VERBS-5b WS-VERBS-5c WS-VERBS-5d WS-VERBS-5e WS-VERBS-5f WS-VERBS-5g WS-VERBS-5h WS-VERBS-5i WS-VERBS-5j"
+MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ENV WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-NOWS WS-VERBS-4"
+MUT_D="WS-LEG-1 WS-LEG-4"
+MUT_E="WS-ENV"
+MUT_F="WS-AB"
+MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-VFL"
+MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien WS-RC2-vide"
+MUT_I="WS-ALL-1 WS-ALL-2 WS-DEPOT WS-ENV WS-FIRST WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
+# Mode de la suite. `full` (défaut) : tout, concurrence et mutants compris. `matrice` : sous-processus d'un
+# mutant (DL-M-*), qui rejoue les cas WS-* hors concurrence contre une COPIE mutée du script (DLWS_SCRIPT)
+# posée à côté de sa politique ; il n'y a alors ni concurrence ni mutants (pas de récursion).
+DLWS_MODE="${DLWS_MODE:-full}"
+SUITE="$HERE/$(basename "$0")"
+[ -z "${DLWS_SCRIPT:-}" ] || SCRIPT="$DLWS_SCRIPT"
 POLICY="$(cd "$HERE/../../../planning-core/scripts" && pwd)/workstream-policy.sh"
 
 # DÉSARMEMENT en tête (P57-D-22) : un VF_DRIVER_LOCK hérité forcerait le mode « verrou unique » et
@@ -749,6 +766,7 @@ refus_case "WS-VERBS-5h" '"closed": false' close --agent=a --status=done
 refus_case "WS-VERBS-5i" '"error": "ws-invalid"' orphans
 refus_case "WS-VERBS-5j" '"error": "ws-invalid"' status
 
+if [ "$DLWS_MODE" = full ]; then
 echo
 echo "=== WS-CONC — un SEUL gagnant par verrou sous concurrence : 24 par verrou × 5 tours (patron T13/T32, P57-D-12) ==="
 # Protocole de test-driver-lock.sh T13/T32 : lancement en arrière-plan, `wait`, gagnants comptés par
@@ -848,7 +866,206 @@ rm -rf "$R".*
 leftover="$(ls -d "$WT"/.planning/DRIVER.lock* "$LAB"/.planning/DRIVER.lock* 2>/dev/null)"
 assert "WS-CONC-WT.2 — aucun .planning/DRIVER.lock* créé dans le principal ni le worktree" "[$leftover]" "[]"
 
+fi   # DLWS_MODE = full (concurrence)
+
+echo
+echo "=== WS-AB — lab plat : la copie gelée d'avant la phase et le script courant rendent la MÊME transcription, octet pour octet (P57-D-03, P57-D-37) ==="
+# Référence : copie gelée de driver-lock.sh d'avant la Phase 57 (dernier commit e8771d94 qui touchait le
+# script), jamais modifiée. Même séquence jouée par elle et par le script courant, chacun sur une fixture
+# reconstruite à neuf AU MÊME CHEMIN (les champs `lock`/`registry` portent des chemins), transcriptions
+# (code, stdout, stderr de chaque étape) normalisées puis comparées par `cmp -s` : une assertion de
+# sous-chaîne ne prouve pas le bit près (piège P10).
+# A/B : --help est EXCLU, et par construction : l'aide s'imprime depuis les lignes `# ` de l'en-tête du
+# script (`grep '^# ' "$0"`), que les plans de la phase ont réécrites — la comparer rougirait à tort (P57-D-37).
+FROZEN="$HERE/fixtures/driver-lock-pre-e8771d9.sh"
+AB_REF=e8771d94
+AB_PATH_IN_REF=plugin/conductor/scripts/driver-lock.sh
+echo "  A/B : --help exclu (P57-D-37)"
+
+# Normalisation : le chemin du script (la ligne `Usage:` l'imprime par $0), epoch à 10 chiffres, âges, ISO,
+# suffixe de génération `.gen.<epoch>.<pid>`. Les âges avant l'epoch générique pour garder leur clé lisible.
+ab_norm() { # <chemin du script à masquer> ; tout en ERE (-E), jamais de mélange avec la BRE
+  sed -E -e "s|$1|<SCRIPT>|g" \
+      -e 's/\.gen\.[0-9]{10}\.[0-9]*/.gen.EPOCH.PID/g' \
+      -e 's/"(age_seconds|lease_seconds|progress_age_seconds)": [0-9]+/"\1": N/g' \
+      -e 's/[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]*/ISO/g' \
+      -e 's/[0-9]{10}/EPOCH/g'
+}
+
+# ab_run <script> <chemin VF_DRIVER_LOCK ou vide> <fichier de transcription normalisée>
+ab_run() {
+  local script="$1" lock="$2" out="$3" lab="$WORK_DIR/ab/lab" raw="$WORK_DIR/ab.raw" lockpath
+  rm -rf "$WORK_DIR/ab"; mkdir -p "$lab/.planning"
+  printf '# projet\n' > "$lab/.planning/PROJECT.md"
+  printf -- '---\nstatus: active\n---\n' > "$lab/.planning/STATE.md"
+  git -C "$lab" init -q -b main >/dev/null 2>&1 || git -C "$lab" init -q >/dev/null 2>&1
+  git -C "$lab" add -A >/dev/null 2>&1
+  git -C "$lab" -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -q -m init >/dev/null 2>&1
+  preflight "$lab"
+  lockpath="${lock:-.planning/DRIVER.lock}"
+  : > "$raw"
+  ab_step() { # <nom> <session> <args...>
+    local name="$1" sid="$2" rc; shift 2
+    if [ -n "$lock" ]; then
+      ( cd "$lab" && export VF_DRIVER_LOCK="$lock" CLAUDE_CODE_SESSION_ID="$sid" && "$script" "$@" ) >"$WORK_DIR/ab.so" 2>"$WORK_DIR/ab.se"; rc=$?
+    else
+      ( cd "$lab" && export CLAUDE_CODE_SESSION_ID="$sid" && "$script" "$@" ) >"$WORK_DIR/ab.so" 2>"$WORK_DIR/ab.se"; rc=$?
+    fi
+    { echo "### $name rc=$rc"; echo "--- stdout"; cat "$WORK_DIR/ab.so"; echo "--- stderr"; cat "$WORK_DIR/ab.se"; } >> "$raw"
+  }
+  ab_age() { # antidate le heartbeat du verrou (identique des deux côtés)
+    local m="$lab/$lockpath/meta"
+    sed 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+  }
+  ab_step "01 acquire m1"                 sess-A acquire --owner=m1 --step=s1
+  ab_step "02 acquire m1 (même owner)"    sess-A acquire --owner=m1 --step=s1
+  ab_step "03 acquire m2 (autre owner)"   sess-B acquire --owner=m2 --step=s2
+  ab_step "04 status"                     sess-A status
+  ab_step "05 heartbeat"                  sess-A heartbeat --owner=m1 --step=s3
+  ab_step "06 mark-progress"              sess-A mark-progress --owner=m1
+  ab_step "07 register"                   sess-A register --agent=a1 --role=coder --node=n1 --depth=2 --owner=m1
+  ab_step "08 orphans"                    sess-A orphans
+  ab_step "09 close"                      sess-A close --agent=a1 --status=done
+  ab_step "10 reclaim (autre session)"    sess-C reclaim --owner=m1
+  ab_step "11 status après reclaim"       sess-C status
+  ab_age
+  ab_step "12 acquire sur verrou périmé"  sess-B acquire --owner=m3 --step=s4
+  ab_step "13 takeover"                   sess-B takeover --owner=m3 --step=s4
+  ab_age
+  ab_step "14 recover"                    sess-B recover
+  ab_step "15 recover (rien à élaguer)"   sess-B recover
+  ab_step "16 acquire m4"                 sess-D acquire --owner=m4 --step=s5
+  ab_step "17 release m4"                 sess-D release --owner=m4
+  ab_step "18 release m4 (déjà relâché)"  sess-D release --owner=m4
+  ab_step "19 status final"               sess-D status
+  ab_step "20 verbe inconnu"              sess-D frobnicate
+  ab_norm "$script" < "$raw" > "$out"
+}
+
+# Première ligne divergente de deux transcriptions, avec son numéro (awk : jamais `diff`, qui ne sert pas
+# à comparer des ensembles sur ce poste).
+ab_first_divergence() { # <A> <B>
+  awk 'NR==FNR{a[FNR]=$0; na=FNR; next} {nb=FNR; if(!(FNR in a) || a[FNR]!=$0){print "ligne " FNR " : A=[" a[FNR] "] B=[" $0 "]"; found=1; exit}} END{if(!found && na!=nb) print "longueurs différentes : A=" na " B=" nb}' "$1" "$2"
+}
+
+ab_ok=1
+for mode in "sans VF_DRIVER_LOCK:" "avec VF_DRIVER_LOCK:.planning/alt/DRIVER.lock"; do
+  label="${mode%%:*}"; lockv="${mode#*:}"
+  ab_run "$FROZEN" "$lockv" "$WORK_DIR/ab-frozen.txt"
+  ab_run "$SCRIPT" "$lockv" "$WORK_DIR/ab-current.txt"
+  if [ -s "$WORK_DIR/ab-frozen.txt" ] && grep -q 'acquired": true' "$WORK_DIR/ab-frozen.txt" && grep -q 'released": true' "$WORK_DIR/ab-frozen.txt" \
+     && grep -q 'stale-requires-takeover' "$WORK_DIR/ab-frozen.txt" && grep -q 'Unknown arg' "$WORK_DIR/ab-frozen.txt"; then
+    assert_exit "WS-AB.témoin — la transcription de référence ($label) contient acquire, release, le refus périmé et le verbe inconnu" 0 0
+  else
+    assert_exit "WS-AB.témoin — la transcription de référence ($label) est vide ou incomplète" 1 0
+  fi
+  if cmp -s "$WORK_DIR/ab-frozen.txt" "$WORK_DIR/ab-current.txt"; then
+    assert_exit "WS-AB.$label — copie gelée et script courant : transcriptions identiques ($(grep -c '^### ' "$WORK_DIR/ab-frozen.txt") étapes)" 0 0
+  else
+    assert_exit "WS-AB.$label — transcriptions DIFFÉRENTES" 1 0
+    echo "     première divergence : $(ab_first_divergence "$WORK_DIR/ab-frozen.txt" "$WORK_DIR/ab-current.txt")"
+    ab_ok=0
+  fi
+done
+if [ "$ab_ok" = 1 ]; then echo "  A/B lab plat : IDENTIQUE"; else echo "  A/B lab plat : DIFFÉRENT"; fi
+
+# Intégrité de la copie gelée (T-57-40) : identique au blob du dépôt quand l'objet est présent ; absent
+# (clone superficiel de la CI), la ligne SKIP est écrite — jamais un vert muet.
+if git -C "$HERE" cat-file -e "$AB_REF:$AB_PATH_IN_REF" 2>/dev/null; then
+  git -C "$HERE" show "$AB_REF:$AB_PATH_IN_REF" > "$WORK_DIR/ab-ref.sh" 2>/dev/null
+  cmp -s "$FROZEN" "$WORK_DIR/ab-ref.sh"; assert_exit "WS-AB-INTEGRITE.1 — la copie gelée est identique à git show $AB_REF:$AB_PATH_IN_REF" "$?" 0
+else
+  echo "  SKIP-INTEGRITE (objet absent) — $AB_REF non disponible localement (clone superficiel) : intégrité de la copie gelée NON vérifiée ici"
+fi
+[ -x "$FROZEN" ]; assert_exit "WS-AB-INTEGRITE.2 — la copie gelée est exécutable" "$?" 0
+
+if [ "$DLWS_MODE" = full ]; then
+echo
+echo "=== MUTANTS DL-M-a à DL-M-i — chaque comportement neuf de driver-lock.sh rougit sous sa mutation (QUAL-01, P57-D-12, P57-D-28) ==="
+# Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du script, posée à côté
+# d'une copie de workstream-policy.sh (sinon policy-missing rougirait pour la mauvaise raison). La matrice (les
+# cas WS-* hors concurrence, WS-AB compris) est rejouée en sous-processus contre la copie ; l'ensemble des cas
+# dont le verdict bascule est comparé EXACTEMENT à l'attendu (un cas basculé hors de l'ensemble fait échouer).
+MUT_KILLED=0; MUT_TOTAL=9; t0=$SECONDS
+mut_families() { # <journal> → familles de cas en échec, triées, une par ligne
+  LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sed 's/\..*$//' | LC_ALL=C sort -u
+}
+mut_trace() { # <journal> <famille> → première assertion violée de la famille, attendu/obtenu (octets : LC_ALL=C)
+  LC_ALL=C awk -v f="$2" '
+    /^  ❌ FAIL — /{ t=$0; sub(/^  ❌ FAIL — /,"",t); k=t; sub(/ .*$/,"",k); sub(/\..*$/,"",k)
+                    if (!done && k==f) { print "      rouge " f " : " t; p=1; done=1; next } p=0 }
+    p && /^     /{ print "        " $0; next }
+    { p=0 }' "$1"
+}
+mut_run() { # <script> <journal> → code de sortie du sous-processus
+  DLWS_MODE=matrice DLWS_SCRIPT="$1" bash "$SUITE" > "$2" 2>&1
+}
+MUT_IDS=""
+mutant() { # <id> <ancre BRE> <expression sed s> <attendu : cas séparés par des espaces>
+  # Prépare le mutant puis lance sa matrice EN ARRIÈRE-PLAN (neuf matrices en série dépassent la borne de durée) ;
+  # le verdict est rendu par mutant_eval, dans l'ordre, après `wait`. Chaque sous-processus a son propre WORK_DIR.
+  local id="$1" anchor="$2" expr="$3" expected="$4" dir="$WORK_DIR/mut-$1" n
+  mkdir -p "$dir"; MUT_IDS="$MUT_IDS $id"
+  printf '%s\n' $expected | LC_ALL=C sort -u > "$dir/attendu.txt"
+  cp "$SCRIPT" "$dir/driver-lock.sh"; cp "$POLICY" "$dir/workstream-policy.sh"
+  cp "$dir/driver-lock.sh" "$dir/copie-temoin.sh"
+  n="$(grep -c -e "$anchor" "$dir/driver-lock.sh")"
+  if [ "$n" != "1" ]; then echo "ancre non unique ($n occurrences de [$anchor])" > "$dir/prepko"; return; fi
+  sed -i.bak -e "/$anchor/$expr" "$dir/driver-lock.sh"; rm -f "$dir/driver-lock.sh.bak"
+  if cmp -s "$dir/driver-lock.sh" "$dir/copie-temoin.sh"; then echo "mutant NON OPPOSABLE : la substitution n'a rien changé" > "$dir/prepko"; return; fi
+  if ! bash -n "$dir/driver-lock.sh" 2>/dev/null; then echo "le mutant n'est pas un script valide (il rougirait pour la mauvaise raison)" > "$dir/prepko"; return; fi
+  chmod +x "$dir/driver-lock.sh"
+  ( mut_run "$dir/driver-lock.sh" "$dir/matrice.log"; echo $? > "$dir/rc" ) &
+}
+mutant_eval() { # <id>
+  local id="$1" dir="$WORK_DIR/mut-$1" rc got
+  if [ -f "$dir/prepko" ]; then assert_exit "DL-M-$id — $(cat "$dir/prepko")" 1 0; return; fi
+  rc="$(cat "$dir/rc" 2>/dev/null || echo absent)"
+  if [ "$rc" != 0 ] && [ "$rc" != 1 ]; then assert_exit "DL-M-$id — la matrice a planté (exit $rc), pas un échec de cas" 1 0; return; fi
+  grep -q '^=== Bilan : ' "$dir/matrice.log" || { assert_exit "DL-M-$id — la matrice n'a pas atteint son bilan" 1 0; return; }
+  mut_families "$dir/matrice.log" > "$dir/obtenu.txt"
+  got="$(tr '\n' ' ' < "$dir/obtenu.txt")"
+  if cmp -s "$dir/attendu.txt" "$dir/obtenu.txt"; then
+    assert_exit "DL-M-$id — mutant tué : bascule exactement {$(tr '\n' ' ' < "$dir/attendu.txt")}" 0 0
+    while IFS= read -r fam; do mut_trace "$dir/matrice.log" "$fam"; done < "$dir/obtenu.txt"
+    MUT_KILLED=$((MUT_KILLED+1))
+  else
+    assert_exit "DL-M-$id — ensemble basculé INATTENDU" 1 0
+    echo "     attendu: {$(tr '\n' ' ' < "$dir/attendu.txt")}"
+    echo "     obtenu:  {$got}"
+  fi
+}
+
+# Témoin préalable : la copie NON mutée (script + politique côte à côte) ne bascule AUCUN cas.
+mkdir -p "$WORK_DIR/mut-temoin"; cp "$SCRIPT" "$WORK_DIR/mut-temoin/driver-lock.sh"; cp "$POLICY" "$WORK_DIR/mut-temoin/workstream-policy.sh"
+chmod +x "$WORK_DIR/mut-temoin/driver-lock.sh"
+mut_run "$WORK_DIR/mut-temoin/driver-lock.sh" "$WORK_DIR/mut-temoin/matrice.log"; rc=$?
+tn="$(mut_families "$WORK_DIR/mut-temoin/matrice.log" | wc -l | tr -d ' ')"
+assert_exit "DL-M-témoin — la copie non mutée rend zéro cas en échec (exit $rc, $tn famille(s) en échec, ${SECONDS}s écoulées)" "$((rc + tn))" 0
+
+mutant a 'd="$(git rev-parse --git-common-dir' 's@--git-common-dir@--git-dir@' "$MUT_A"
+mutant b 'vf_ws_name_valid "$WS" ||' 's@vf_ws_name_valid "$WS" ||@true ||@' "$MUT_B"
+mutant c 'DEPOT" = 1 ] || SCOPE_JSON' 's@SCOPE_JSON="$SCOPE_JSON, .*$@vf_dl_refuse ws-invalid "mutant"@' "$MUT_C"
+mutant d 'lock_present || exit 0' 's@lock_present || exit 0@exit 0@' "$MUT_D"
+mutant e '^  if \[ "$WS_GIVEN" = 1 \]; then$' 's@^  if \[ "$WS_GIVEN" = 1 \]; then$@  if [ -n "${GSD_WORKSTREAM:-}" ] \&\& [ "$WS_GIVEN" = 0 ]; then WS="$GSD_WORKSTREAM"; WS_GIVEN=1; fi; if [ "$WS_GIVEN" = 1 ]; then@' "$MUT_E"
+mutant f '"step": "%s", "generation": "%s", "session_ids"' 's@"orphans": %s%s}@"orphans": %s%s, "x": 1}@' "$MUT_F"
+mutant g 'z "${VF_DRIVER_LOCK:-}" ] || return 0' 's@\[ -z "${VF_DRIVER_LOCK:-}" \] || return 0@:@' "$MUT_G"
+mutant h 'vf_dl_refuse partition-unreadable' 's@\*) vf_dl_refuse partition-unreadable .*@*) return 0 ;;@' "$MUT_H"
+mutant i 'vf_ws_dir_resolve ".planning" "$WS"; rc=$?' 's@vf_ws_dir_resolve ".planning" "$WS"; rc=$?@_l="$(vf_ws_enumerate ".planning" 2>/dev/null)"; { for _e in $_l; do printf "%s\\n" "$_e"; sleep 0.3; done; } | grep -q -- "/$WS\$"; rc=$?@' "$MUT_I"
+
+wait
+for id in $MUT_IDS; do mutant_eval "$id"; done
+echo "  durée des mutants : $((SECONDS-t0))s"
+if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
+  echo "== mutants : 9/9 tués =="
+else
+  echo "== mutants : $MUT_KILLED/9 tués =="
+  FAIL=$((FAIL+1))
+fi
+fi   # DLWS_MODE = full (mutants)
+
 echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
+echo "== resultat : $PASS ok, $FAIL ko =="
 [ "$PASS" -gt 0 ] || { echo "❌ FAIL — zéro assertion exécutée"; exit 1; }
 [ "$FAIL" -eq 0 ]
