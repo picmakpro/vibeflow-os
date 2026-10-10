@@ -5,13 +5,12 @@ milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritée
 current_phase_name: Emprunts Pocock — disciplines de cadrage, de revue et de skills
 status: completed
 stopped_at: >-
-  fiabilite-v1.0 milestone complete (2026-10-08) — 41.2 (PR #130) et 41.4 (PR #135, --admin) mergées,
-  ledger réaligné, snapshots posés ; release v2.69.0 à suivre.
-  Ancien texte de ce champ : `git show 0e99ff71:.planning/workstreams/fiabilite/STATE.md`.
-last_updated: "2026-10-08T00:00:00.000Z"
-last_activity: 2026-10-08
+  Phase 57 context gathered (2026-10-10) — 57-CONTEXT.md, P57-D-01..15 ; next /gsd-plan-phase 57 --ws fiabilite.
+  Ancien texte de ce champ : `git show 102f7bab:.planning/workstreams/fiabilite/STATE.md`.
+last_updated: "2026-10-10T00:00:00.000Z"
+last_activity: 2026-10-10
 last_activity_desc: >-
-  Clôture du jalon fiabilite-v1.0 ; détail : § Current Position.
+  Cadrage de la Phase 57 (verrou de driver par compartiment) ; détail : § Current Position.
 progress:
   total_phases: 18
   completed_phases: 18
@@ -42,7 +41,9 @@ clôture, et la Phase 40 a 5 plans pour un seul `40-SUMMARY.md` consolidé. Bila
 Dernières entrées : la 41.2 a été mergée le 2026-10-02 (PR #130) ; WSCH-01 est coché avec une réserve de recette en
 session, tracée au BACKLOG. La 41.4 a été mergée le 2026-10-08 (PR #135, en `--admin`).
 Release `v2.69.0` publiée le 2026-10-08 (tag, release GitHub, gate ✓).
-Next: cadrage de la Phase 57 (verrou de driver par compartiment), première de `equipe-produit-v1.0` (Phases 57-62,
+Phase 57 cadrée le 2026-10-10 (`57-CONTEXT.md`, P57-D-01..11 arbitrage Samuel, AskUserQuestion session principale,
+2026-10-10 ; P57-D-12..15 à la discrétion du planificateur).
+Next: `/gsd-plan-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
 Last activity: 2026-10-08 — clôture du jalon.
 
