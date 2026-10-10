@@ -333,6 +333,57 @@ assert "GW-CRASH-PRE-c.3 — lab PLAT : la sonde « dispatch » est inerte, le g
 assert_not_internal() { if [[ "$2" != *"erreur interne"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; FAIL=$((FAIL+1)); fi; }
 assert_not_internal "GW-CRASH-PRE-c.4 — lab PLAT : aucun refus « erreur interne »" "$out"
 
+# ---------------------------------------------------------------------------------------------------------------
+# Plan 57-08 — volet Bash : un commit est jugé sur ce qu'il embarque (P57-D-10, P57-D-18, P57-D-19, P57-D-33).
+# Tâche 1 (tracer) : GW-C-IDX, GW-C-EMPTY, GW-NOLOCK. Index RÉEL, guard RÉEL, clone jetable.
+# ---------------------------------------------------------------------------------------------------------------
+stage()   { git -C "$1" add -- "${@:2}" >/dev/null 2>&1; }   # <lab> <chemins...>
+unstage() { git -C "$1" reset -q >/dev/null 2>&1; git -C "$1" checkout -q -- . >/dev/null 2>&1; }   # <lab> : jetable, vide index et arbre suivi
+touch_file() { mkdir -p "$(dirname "$2")"; printf 'x %s\n' "$RANDOM" >> "$2"; }   # <lab> <chemin absolu>
+
+echo
+echo "=== GW-C-IDX — un commit est jugé sur son index (P57-D-10) ==="
+LAB="$(mk_lab cidx)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"; stage "$LAB" .planning/workstreams/alpha/STATE.md
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"
+assert "GW-C-IDX-1 — alpha indexé, alpha tenu par autrui : deny" "$out" "$DENY"
+assert "GW-C-IDX-2 — motif : le chemin indexé est cité" "$out" ".planning/workstreams/alpha/STATE.md"
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-A "$LAB")")"
+assert_empty "GW-C-IDX-3 — le détenteur commite son compartiment : stdout vide (discriminance)" "$out"
+unstage "$LAB"
+touch_file "$LAB" "$LAB/.planning/workstreams/omega/STATE.md"; stage "$LAB" .planning/workstreams/omega/STATE.md
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"
+assert_empty "GW-C-IDX-4 — seul omega indexé (alpha tenu par autrui) : stdout vide" "$out"
+unstage "$LAB"
+touch_file "$LAB" "$LAB/src/x.sh"; stage "$LAB" src/x.sh
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"
+assert_empty "GW-C-IDX-5 — un fichier de code seul : stdout vide (P57-D-10)" "$out"
+
+echo
+echo "=== GW-C-EMPTY — union des sources vide : le commit passe ==="
+LAB="$(mk_lab cempty)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"; rc=$?
+assert_exit "GW-C-EMPTY-1 — rien d'indexé : exit 0" "$rc" 0
+assert_empty "GW-C-EMPTY-2 — rien d'indexé, pas de -a, verrou alpha d'autrui : stdout vide" "$out"
+
+echo
+echo "=== GW-NOLOCK — partition sans verrou : aucun git diff n'est lancé ==="
+LAB="$(mk_lab nolock)"
+FAKE_BIN="$WORK_DIR/fake-bin"; FAKE_LOG="$WORK_DIR/fake-git.log"; mkdir -p "$FAKE_BIN"; : > "$FAKE_LOG"
+REAL_GIT="$(command -v git)"
+printf '#!/bin/bash\nprintf "%%s\\n" "$@" >> "%s"\nprintf -- "---\\n" >> "%s"\nexec "%s" "$@"\n' "$FAKE_LOG" "$FAKE_LOG" "$REAL_GIT" > "$FAKE_BIN/git"
+chmod +x "$FAKE_BIN/git"
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"; stage "$LAB" .planning/workstreams/alpha/STATE.md
+hash -r
+out="$(run_guard_with "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")" PATH="$FAKE_BIN:$PATH")"
+assert_empty "GW-NOLOCK-1 — aucun verrou : commit permis" "$out"
+out="$(run_guard_with "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")" PATH="$FAKE_BIN:$PATH")"
+assert_empty "GW-NOLOCK-2 — aucun verrou : Write permis" "$out"
+[ "$(grep -cx 'rev-parse' "$FAKE_LOG" 2>/dev/null || true)" -ge 1 ]; assert_exit "GW-NOLOCK-3 — témoin positif : au moins un rev-parse vu par la sonde" "$?" 0
+assert_exit "GW-NOLOCK-4 — aucun git diff lancé (DLWS-06 « empty », volet commit)" "$(grep -cx 'diff' "$FAKE_LOG" 2>/dev/null || true)" 0
+
 echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
 echo "== resultat : $PASS ok, $FAIL ko =="
