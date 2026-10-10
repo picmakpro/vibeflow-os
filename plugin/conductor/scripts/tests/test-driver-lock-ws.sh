@@ -6,6 +6,7 @@
 #
 # Plan 57-02 : WS-LEG (ancien verrou), WS-LOC (worktrees), WS-NOGIT (repli hors git), WS-VFL (VF_DRIVER_LOCK),
 # WS-FLATWS (options inertes en lab plat).
+# Plan 57-04 : WS-CONC (un gagnant par verrou sous concurrence, 24 x 5 tours), puis WS-AB et mutants DL-M-a a DL-M-i.
 #
 # TRACER (tâche 1) — un compartiment se verrouille au niveau du clone, de bout en bout :
 #   WS-TRACE-1 acquire --ws → JSON de portée · WS-TRACE-2 lien dans le dossier commun du clone, rien
@@ -747,6 +748,105 @@ refus_case "WS-VERBS-5g" '"registered": false' register --agent=a --role=r
 refus_case "WS-VERBS-5h" '"closed": false' close --agent=a --status=done
 refus_case "WS-VERBS-5i" '"error": "ws-invalid"' orphans
 refus_case "WS-VERBS-5j" '"error": "ws-invalid"' status
+
+echo
+echo "=== WS-CONC — un SEUL gagnant par verrou sous concurrence : 24 par verrou × 5 tours (patron T13/T32, P57-D-12) ==="
+# Protocole de test-driver-lock.sh T13/T32 : lancement en arrière-plan, `wait`, gagnants comptés par
+# fichier contenant `"acquired": true` (boucle shell, aucun pipeline de comptage). Fixtures sous $WORK_DIR
+# seulement (préflight de mk_lab) ; le dossier de verrous du clone est vidé entre deux tours.
+CONC_N=24; CONC_ROUNDS=5
+num_eq() { if [ "$2" -eq "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: $3"; echo "     obtenu:  $2"; FAIL=$((FAIL+1)); fi; }
+conc_won() { # <préfixe de fichiers résultat> → nombre de fichiers où un verrou a été acquis
+  local f n=0
+  for f in "$1"*; do [ -e "$f" ] || continue; grep -q '"acquired": true' "$f" && n=$((n+1)); done
+  printf '%s' "$n"
+}
+# Témoin du compteur lui-même (un compteur incapable de voir 0 ou 2 gagnants rendrait un vert à vide) :
+# trois fichiers synthétiques, deux « acquired: true » → 2 ; aucun → 0.
+mkdir -p "$WORK_DIR/conc-temoin"
+printf '{"acquired": true}\n' > "$WORK_DIR/conc-temoin/w.1"; printf '{"acquired": true}\n' > "$WORK_DIR/conc-temoin/w.2"
+printf '{"acquired": false}\n' > "$WORK_DIR/conc-temoin/w.3"; printf '{"acquired": false}\n' > "$WORK_DIR/conc-temoin/l.1"
+num_eq "WS-CONC-TEMOIN.1 — le compteur voit 2 gagnants quand il y en a 2" "$(conc_won "$WORK_DIR/conc-temoin/w.")" 2
+num_eq "WS-CONC-TEMOIN.2 — le compteur voit 0 gagnant quand il n'y en a aucun" "$(conc_won "$WORK_DIR/conc-temoin/l.")" 0
+# Antidate le heartbeat d'un verrou posé (réécriture du meta, jamais une suppression) : périmé au sens du TTL.
+conc_age() { # <dossier commun> <chemin relatif sous vf-driver du lien DRIVER.lock>
+  local m="$1/vf-driver/$2/meta"
+  sed 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+}
+
+# --- WS-CONC-ACQ : deux compartiments EN MÊME TEMPS, 24 acquéreurs chacun, 5 tours ---
+LAB="$(mk_lab conc-acq)"; GC="$(fixture_common_dir "$LAB")"; R="$WORK_DIR/conc-acq.res"
+bad=0; worst_round=0; worst_a=1; worst_o=1; t0=$SECONDS
+for round in $(seq 1 "$CONC_ROUNDS"); do
+  rm -rf "$GC/vf-driver" "$R".*
+  for i in $(seq 1 "$CONC_N"); do
+    ( dl "$LAB" "sess-A$i" acquire --ws=alpha --owner="A$i" --step=y >"$R.a$i" 2>/dev/null ) &
+    ( dl "$LAB" "sess-O$i" acquire --ws=omega --owner="O$i" --step=y >"$R.o$i" 2>/dev/null ) &
+  done
+  wait
+  wa="$(conc_won "$R.a")"; wo="$(conc_won "$R.o")"
+  if [ "$wa" -ne 1 ] || [ "$wo" -ne 1 ]; then bad=$((bad+1)); worst_round="$round"; worst_a="$wa"; worst_o="$wo"; fi
+done
+[ "$bad" -eq 0 ] || echo "     pire tour : tour $worst_round, alpha=$worst_a gagnant(s), omega=$worst_o gagnant(s)"
+num_eq "WS-CONC-ACQ — $CONC_ROUNDS tours × ($CONC_N alpha + $CONC_N omega) simultanés : rounds hors contrat : $bad (attendu 1 gagnant par compartiment à chaque tour ; ${SECONDS}s écoulées, ce bloc $((SECONDS-t0))s)" "$bad" 0
+rm -rf "$R".*
+
+# --- WS-CONC-TKO : takeover concurrent d'un verrou PÉRIMÉ, par compartiment ---
+LAB="$(mk_lab conc-tko)"; GC="$(fixture_common_dir "$LAB")"; R="$WORK_DIR/conc-tko.res"
+bad=0; worst_round=0; worst_a=1; worst_o=1; t0=$SECONDS
+for round in $(seq 1 "$CONC_ROUNDS"); do
+  rm -rf "$GC/vf-driver" "$R".*
+  dl "$LAB" sess-DA acquire --ws=alpha --owner=DEAD-A --step=x >/dev/null 2>&1
+  dl "$LAB" sess-DO acquire --ws=omega --owner=DEAD-O --step=x >/dev/null 2>&1
+  conc_age "$GC" ws/alpha/DRIVER.lock; conc_age "$GC" ws/omega/DRIVER.lock
+  for i in $(seq 1 "$CONC_N"); do
+    ( dl "$LAB" "sess-A$i" takeover --ws=alpha --owner="TA$i" --step=y >"$R.a$i" 2>/dev/null ) &
+    ( dl "$LAB" "sess-O$i" takeover --ws=omega --owner="TO$i" --step=y >"$R.o$i" 2>/dev/null ) &
+  done
+  wait
+  wa="$(conc_won "$R.a")"; wo="$(conc_won "$R.o")"
+  if [ "$wa" -ne 1 ] || [ "$wo" -ne 1 ]; then bad=$((bad+1)); worst_round="$round"; worst_a="$wa"; worst_o="$wo"; fi
+done
+[ "$bad" -eq 0 ] || echo "     pire tour : tour $worst_round, alpha=$worst_a gagnant(s), omega=$worst_o gagnant(s)"
+num_eq "WS-CONC-TKO — $CONC_ROUNDS tours × ($CONC_N takeover alpha + $CONC_N omega) sur verrous périmés : rounds hors contrat : $bad (attendu 1 gagnant par compartiment ; ce bloc $((SECONDS-t0))s)" "$bad" 0
+rm -rf "$R".*
+
+# --- WS-CONC-DEPOT : le verrou de dépôt, 24 acquéreurs ---
+LAB="$(mk_lab conc-depot)"; GC="$(fixture_common_dir "$LAB")"; R="$WORK_DIR/conc-depot.res"
+bad=0; worst_round=0; worst=1; t0=$SECONDS
+for round in $(seq 1 "$CONC_ROUNDS"); do
+  rm -rf "$GC/vf-driver" "$R".*
+  for i in $(seq 1 "$CONC_N"); do ( dl "$LAB" "sess-D$i" acquire --depot --owner="D$i" --step=y >"$R.d$i" 2>/dev/null ) & done
+  wait
+  w="$(conc_won "$R.d")"
+  if [ "$w" -ne 1 ]; then bad=$((bad+1)); worst_round="$round"; worst="$w"; fi
+done
+[ "$bad" -eq 0 ] || echo "     pire tour : tour $worst_round, $worst gagnant(s)"
+num_eq "WS-CONC-DEPOT — $CONC_ROUNDS tours × $CONC_N acquire --depot simultanés : rounds hors contrat : $bad (attendu 1 gagnant ; ce bloc $((SECONDS-t0))s)" "$bad" 0
+rm -rf "$R".*
+
+# --- WS-CONC-WT : 12 depuis le checkout principal + 12 depuis un worktree lié, même compartiment ---
+LAB="$(mk_lab conc-wt)"; GC="$(fixture_common_dir "$LAB")"; R="$WORK_DIR/conc-wt.res"
+WT="$WORK_DIR/conc-wt-tree"
+git -C "$LAB" worktree add -q -b conc-wt-branch "$WT" >/dev/null 2>&1
+wtc="$(fixture_common_dir "$WT")" || wtc=""
+if [ "$wtc" != "$GC" ]; then echo "PRÉFLIGHT FIXTURE CASSÉ — worktree '$wtc' ≠ clone '$GC'" >&2; exit 2; fi
+bad=0; worst_round=0; worst=1; t0=$SECONDS; HALF=$((CONC_N/2))
+for round in $(seq 1 "$CONC_ROUNDS"); do
+  rm -rf "$GC/vf-driver" "$R".*
+  for i in $(seq 1 "$HALF"); do
+    ( dl "$LAB" "sess-M$i" acquire --ws=alpha --owner="M$i" --step=y >"$R.m$i" 2>/dev/null ) &
+    ( dl "$WT"  "sess-W$i" acquire --ws=alpha --owner="W$i" --step=y >"$R.w$i" 2>/dev/null ) &
+  done
+  wait
+  w="$(conc_won "$R.m")"; w=$((w + $(conc_won "$R.w")))
+  if [ "$w" -ne 1 ]; then bad=$((bad+1)); worst_round="$round"; worst="$w"; fi
+done
+[ "$bad" -eq 0 ] || echo "     pire tour : tour $worst_round, $worst gagnant(s) au total"
+num_eq "WS-CONC-WT — $CONC_ROUNDS tours × ($HALF checkout principal + $HALF worktree lié) sur alpha : rounds hors contrat : $bad (attendu 1 gagnant au total ; ce bloc $((SECONDS-t0))s)" "$bad" 0
+rm -rf "$R".*
+leftover="$(ls -d "$WT"/.planning/DRIVER.lock* "$LAB"/.planning/DRIVER.lock* 2>/dev/null)"
+assert "WS-CONC-WT.2 — aucun .planning/DRIVER.lock* créé dans le principal ni le worktree" "[$leftover]" "[]"
 
 echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
