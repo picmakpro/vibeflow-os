@@ -139,6 +139,200 @@ assert "GW-TRACE-4.3 — motif : verrou de dépôt, commande de reclaim --depot"
 out="$(run_guard_in "$LAB" "$(mk_write "$ROOT_F" "x" sess-A "$LAB")")"
 assert_empty "GW-TRACE-4.4 — fichier racine, détenteur du dépôt : stdout vide" "$out"
 
+# ---------------------------------------------------------------------------------------------------------------
+# Tâche 2 — écritures aux bords : ancien verrou, casse, chemin non cartographiable, worktrees, échappatoire,
+# quatre issues (QUAL-01), sondes de crash avant et pendant la décision.
+# ---------------------------------------------------------------------------------------------------------------
+
+# Laboratoire PLAT jetable : STATE.md racine, aucun dossier de compartiments.
+mk_flat() { # <nom>
+  local d="$WORK_DIR/$1"
+  mkdir -p "$d/.planning"
+  printf '# projet\n' > "$d/.planning/PROJECT.md"
+  printf -- '---\nstatus: active\n---\n' > "$d/.planning/STATE.md"
+  git -C "$d" init -q -b main >/dev/null 2>&1 || git -C "$d" init -q >/dev/null 2>&1
+  git -C "$d" add -A >/dev/null 2>&1
+  git -C "$d" -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -q -m init >/dev/null 2>&1
+  lab_preflight "$d"
+  printf '%s' "$d"
+}
+
+# Ancien verrou unique (.planning/DRIVER.lock) posé par le VRAI driver-lock.sh en régime « verrou unique ».
+legacy_acquire() { # <lab> <session> <owner>
+  ( cd "$1" && CLAUDE_CODE_SESSION_ID="$2" VF_DRIVER_LOCK=.planning/DRIVER.lock "$DRIVER" acquire --owner="$3" --step=leg )
+}
+
+echo
+echo "=== GW-W-LEG — ancien verrou unique d'autrui : la racine suit, le compartiment reste libre (P57-D-26) ==="
+LAB="$(mk_lab wleg)"
+out="$(legacy_acquire "$LAB" sess-A old)"
+assert "GW-PRE — fixture : ancien verrou acquis par sess-A" "$out" '"acquired": true'
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/PROJECT.md" x sess-B "$LAB")")"
+assert "GW-W-LEG-1 — Write racine sous l'ancien verrou d'autrui : deny" "$out" "$DENY"
+assert "GW-W-LEG-2 — motif : ancien verrou nommé, reclaim au régime VF_DRIVER_LOCK" "$out" "VF_DRIVER_LOCK=.planning/DRIVER.lock driver-lock.sh reclaim --owner=old"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-W-LEG-3 — Write de compartiment sous l'ancien verrou d'autrui : permis" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/PROJECT.md" x sess-A "$LAB")")"
+assert_empty "GW-W-LEG-4 — détenteur de l'ancien verrou : Write racine permis" "$out"
+
+echo
+echo "=== GW-W-CASE — le segment de compartiment s'apparie à l'égalité exacte ou casefold ==="
+LAB="$(mk_lab wcase)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/ALPHA/STATE.md" x sess-B "$LAB")")"
+assert "GW-W-CASE-1 — ALPHA sous le verrou alpha d'autrui : deny (casefold)" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/ALPHA/STATE.md" x sess-A "$LAB")")"
+assert_empty "GW-W-CASE-2 — le détenteur écrit sous ALPHA : permis (discriminance)" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/WORKSTREAMS/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-W-CASE-3 — le dossier workstreams lui-même en casse différente : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-W-UNMAP — chemin non cartographiable : refusé sous tout verrou d'autrui (T-57-14) ==="
+LAB="$(mk_lab wunmap)"
+mkdir -p "$LAB/elsewhere"
+mv "$LAB/.planning/workstreams/alpha" "$LAB/alpha-gone"
+ln -s ../../elsewhere "$LAB/.planning/workstreams/alpha"
+[ -L "$LAB/.planning/workstreams/alpha" ]; assert_exit "GW-PRE — fixture : alpha est un lien qui sort de .planning/ (reste dans le lab)" "$?" 0
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-W-UNMAP-0 — lien non cartographiable SANS verrou d'autrui : permis (le refus vient du verrou)" "$out"
+dl "$LAB" sess-A acquire --ws=omega --owner=m9 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-W-UNMAP-1 — lien qui sort de .planning/, un verrou d'autrui tenu ailleurs : deny" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-A "$LAB")")"
+assert_empty "GW-W-UNMAP-2 — le détenteur du seul verrou tenu : permis" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams" x sess-B "$LAB")")"
+assert "GW-W-UNMAP-3 — « workstreams » seul : non cartographiable, deny sous verrou d'autrui" "$out" "$DENY"
+
+echo
+echo "=== GW-LOC — les verrous se résolvent au même endroit que driver-lock.sh (P57-D-07, P57-D-08) ==="
+LAB="$(mk_lab loc)"
+WT="$WORK_DIR/loc-wt"
+git -C "$LAB" worktree add -q -b wtb "$WT" >/dev/null 2>&1
+lab_preflight "$WT"
+[ -d "$WT/.planning/workstreams" ]; assert_exit "GW-PRE — fixture : le worktree lié est partitionné" "$?" 0
+out="$(dl "$WT" sess-A acquire --ws=alpha --owner=mw --step=s)"
+assert "GW-PRE — fixture : alpha acquis DEPUIS le worktree" "$out" '"acquired": true'
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-LOC-1.1 — verrou pris depuis un worktree, vu depuis le checkout principal : deny" "$out" "$DENY"
+dl "$LAB" sess-A acquire --ws=omega --owner=mp --step=s >/dev/null
+out="$(run_guard_in "$WT" "$(mk_write "$WT/.planning/workstreams/omega/STATE.md" x sess-B "$WT")")"
+assert "GW-LOC-1.2 — verrou pris depuis le checkout principal, vu depuis le worktree : deny" "$out" "$DENY"
+out="$(run_guard_in "$WT" "$(mk_write "$WT/.planning/workstreams/omega/STATE.md" x sess-A "$WT")")"
+assert_empty "GW-LOC-1.3 — le détenteur, depuis le worktree : permis" "$out"
+
+# PATH sans git (python joignable) : la lecture documentée du layout `.git` doit retrouver le dossier commun.
+LOC_BIN="$WORK_DIR/loc-bin"; mkdir -p "$LOC_BIN"
+for t in cat dirname basename sed grep mkdir rm mv date readlink stat uname tr head awk env; do
+  p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$LOC_BIN/$t" 2>/dev/null
+done
+PYP="$(command -v python3 2>/dev/null)"; [ -n "$PYP" ] && ln -sf "$PYP" "$LOC_BIN/python3"
+LOC_PRE=1
+hash -r   # la table de hachage de bash garde « git » des appels précédents et fausserait le test de PATH
+PATH="$LOC_BIN" command -v git >/dev/null 2>&1 && LOC_PRE=0
+PATH="$LOC_BIN" command -v python3 >/dev/null 2>&1 || LOC_PRE=0
+for t in cat dirname; do [ -x "$LOC_BIN/$t" ] || LOC_PRE=0; done
+assert_exit "GW-PRE — fixture : PATH sans git, avec python3" "$LOC_PRE" 1
+if [ "$LOC_PRE" -eq 1 ]; then
+  out="$(run_guard_with "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")" PATH="$LOC_BIN")"
+  assert "GW-LOC-2.1 — PATH sans git, checkout principal : verrou toujours découvert, deny" "$out" "$DENY"
+  out="$(run_guard_with "$WT" "$(mk_write "$WT/.planning/workstreams/omega/STATE.md" x sess-B "$WT")" PATH="$LOC_BIN")"
+  assert "GW-LOC-2.2 — PATH sans git, worktree lié (.git fichier + commondir) : verrou toujours découvert, deny" "$out" "$DENY"
+  out="$(run_guard_with "$WT" "$(mk_write "$WT/.planning/workstreams/omega/STATE.md" x sess-A "$WT")" PATH="$LOC_BIN")"
+  assert_empty "GW-LOC-2.3 — PATH sans git, le détenteur : permis (discriminance)" "$out"
+fi
+
+echo
+echo "=== GW-MARK-W — l'échappatoire est évaluée APRÈS le calcul du refus, et journalisée à côté du verrou refusant ==="
+LAB="$(mk_lab mark)"
+GCM="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+EVLOG="$GCM/vf-driver/ws/alpha/DRIVER.lock.events.log"
+count_override() { if [ -f "$EVLOG" ]; then grep -c '"event": "override"' "$EVLOG" 2>/dev/null || true; else echo 0; fi; }
+n0="$(count_override)"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" "x vibeflow:allow-lock-override" sess-B "$LAB")")"
+assert_empty "GW-MARK-W-1 — marqueur dans le contenu d'un Write qui serait refusé : stdout vide" "$out"
+n1="$(count_override)"
+assert_exit "GW-MARK-W-2 — une ligne override apparaît dans le journal du verrou refusant" "$((n1 - n0))" 1
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/omega/STATE.md" "x vibeflow:allow-lock-override" sess-B "$LAB")")"
+assert_empty "GW-MARK-W-3 — Write permis avec marqueur : stdout vide" "$out"
+n2="$(count_override)"
+assert_exit "GW-MARK-W-4 — un Write qui serait permis sort sans journal" "$((n2 - n1))" 0
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" "x" sess-B "$LAB")")"
+assert "GW-MARK-W-5 — sans marqueur le même Write reste refusé (discriminance)" "$out" "$DENY"
+
+echo
+echo "=== GW-Q — QUAL-01 : quatre issues sur le chemin partitionné ==="
+LAB="$(mk_lab q)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/omega/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-Q-PASS — issue 1, PASS : silence (voir GW-TRACE-2)" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-Q-DENY — issue 2, DENY : JSON (voir GW-TRACE-1)" "$out" "$DENY"
+out="$(run_guard_with "$LAB" 'ceci n est pas du json mais ca contient le mot commit quelque part')"; rc=$?
+assert_exit "GW-Q-UNPARSE.1 — payload non JSON : exit 0" "$rc" 0
+assert_empty "GW-Q-UNPARSE.2 — payload non JSON : stdout STRICTEMENT vide (issue 3)" "$out"
+out="$(run_guard_with "$LAB" '["commit"]')"; rc=$?
+assert_exit "GW-Q-UNPARSE-OBJ.1 — JSON valide mais tableau : exit 0" "$rc" 0
+assert_empty "GW-Q-UNPARSE-OBJ.2 — JSON valide mais tableau : stdout vide" "$out"
+out="$(run_guard_with "$LAB" '')"; rc=$?
+assert_exit "GW-Q-EMPTY.1 — payload vide : exit 0" "$rc" 0
+assert_empty "GW-Q-EMPTY.2 — payload vide : stdout vide" "$out"
+Q_BIN="$WORK_DIR/q-bin"; mkdir -p "$Q_BIN"
+for t in cat dirname basename sed grep mkdir rm mv date readlink stat; do
+  p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$Q_BIN/$t" 2>/dev/null
+done
+Q_PRE=1
+for t in cat dirname mkdir mv rm date; do [ -x "$Q_BIN/$t" ] || Q_PRE=0; done
+if PATH="$Q_BIN" command -v python3 >/dev/null 2>&1 || PATH="$Q_BIN" command -v python >/dev/null 2>&1; then Q_PRE=0; fi
+assert_exit "GW-PRE — fixture : outils présents, aucun interprète joignable" "$Q_PRE" 1
+if [ "$Q_PRE" -eq 1 ]; then
+  Q_HEALTH="$WORK_DIR/q-health"
+  out="$(cd "$LAB" && printf '%s' "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")" | env PATH="$Q_BIN" VF_GUARD_HEALTH_DIR="$Q_HEALTH" "$BASH_BIN" "$GUARD" 2>"$WORK_DIR/q.err")"; rc=$?
+  assert_exit "GW-Q-NOPY.1 — interprète indisponible, lab partitionné : code de garde 17 (issue 4)" "$rc" 17
+  assert_empty "GW-Q-NOPY.2 — stdout vide" "$out"
+  assert "GW-Q-NOPY.3 — diagnostic préfixé sur stderr" "$(cat "$WORK_DIR/q.err" 2>/dev/null)" "guard-driver-lock.sh"
+  [ -f "$Q_HEALTH/guard-driver-lock.sh.marker" ] && mk=present || mk=absent
+  assert "GW-Q-NOPY.4 — marqueur de santé écrit" "$mk" "present"
+fi
+
+echo
+echo "=== GW-CRASH — fail-closed : une exception du chemin partitionné rend un refus (T-57-08) ==="
+LAB="$(mk_lab crash)"
+PAY_W="$(mk_write "$LAB/.planning/workstreams/omega/STATE.md" x sess-B "$LAB")"
+out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=decide)"; rc=$?
+assert_exit "GW-CRASH.1 — exception de la décision : exit 0 (le repli bash ramène le code)" "$rc" 0
+assert "GW-CRASH.2 — deny" "$out" "$DENY"
+assert "GW-CRASH.3 — motif « erreur interne du guard, fail-closed »" "$out" "erreur interne du guard, fail-closed"
+json_ok() { printf '%s' "$1" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; }
+json_ok "$out"; assert_exit "GW-CRASH.4 — la sortie est un JSON valide, une seule décision" "$?" 0
+errout="$(cd "$LAB" && printf '%s' "$PAY_W" | env VF_GUARD_TEST_RAISE=decide "$BASH_BIN" "$GUARD" 2>&1 >/dev/null)"
+assert_empty "GW-CRASH.5 — aucune trace sur stderr" "$errout"
+out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=autre-valeur)"
+assert_empty "GW-CRASH.6 — la sonde est inerte pour toute autre valeur" "$out"
+
+echo
+echo "=== GW-CRASH-PRE — exception AVANT la décision : dispatch, règle C6 (T-57-08) ==="
+out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=dispatch)"; rc=$?
+assert_exit "GW-CRASH-PRE-a.1 — sonde « dispatch » : exit 0" "$rc" 0
+assert "GW-CRASH-PRE-a.2 — deny « erreur interne » (verrou libre)" "$out" "erreur interne du guard, fail-closed"
+NUL_PAY="$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB" nul)"
+out="$(run_guard_in "$LAB" "$NUL_PAY")"; rc=$?
+assert_exit "GW-CRASH-PRE-b.1 — chemin à octet NUL : exit 0" "$rc" 0
+assert "GW-CRASH-PRE-b.2 — realpath lève dans la règle C6 : deny « erreur interne » (verrou libre)" "$out" "erreur interne du guard, fail-closed"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$NUL_PAY")"
+assert "GW-CRASH-PRE-b.3 — chemin à octet NUL, verrou tenu : deny « erreur interne »" "$out" "erreur interne du guard, fail-closed"
+FLAT="$(mk_flat flat)"
+legacy_acquire "$FLAT" sess-A old >/dev/null
+NUL_FLAT="$(mk_write "$FLAT/.planning/STATE.md" x sess-B "$FLAT" nul)"
+out="$(run_guard_in "$FLAT" "$NUL_FLAT")"; rc=$?
+assert_exit "GW-CRASH-PRE-c.1 — lab PLAT, même payload à octet NUL : exit 0" "$rc" 0
+assert_empty "GW-CRASH-PRE-c.2 — lab PLAT : comportement d'aujourd'hui, stdout vide (repli silencieux conservé)" "$out"
+out="$(run_guard_with "$FLAT" "$(mk_write "$FLAT/.planning/STATE.md" x sess-B "$FLAT")" VF_GUARD_TEST_RAISE=dispatch)"
+assert "GW-CRASH-PRE-c.3 — lab PLAT : la sonde « dispatch » est inerte, le guard historique refuse (ancien verrou d'autrui)" "$out" "$DENY"
+assert_not_internal() { if [[ "$2" != *"erreur interne"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; FAIL=$((FAIL+1)); fi; }
+assert_not_internal "GW-CRASH-PRE-c.4 — lab PLAT : aucun refus « erreur interne »" "$out"
+
 echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
 echo "== resultat : $PASS ok, $FAIL ko =="
