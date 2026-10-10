@@ -572,6 +572,183 @@ assert "WS-ALL-4.14 — partition-unreadable, cle de tete error" "$out" '"error"
 assert_not "WS-ALL-4.15 — jamais present" "$out" '"present"'
 
 echo
+echo "=== WS-VERBS — tous les verbes visent le verrou de leur compartiment, et leur JSON le dit (P57-D-24, P57-D-32) ==="
+# Valeur d'un champ du meta d'un verrou : <dossier commun> <ws|repo> <cle>
+meta_of() { grep "^$3=" "$1/vf-driver/$2/DRIVER.lock/meta" 2>/dev/null | head -1 | cut -d= -f2-; }
+# Antidate heartbeat ET progress d'un verrou (reecriture du meta, jamais une suppression).
+backdate_lock() { # <dossier commun> <ws/alpha|repo>
+  local m="$1/vf-driver/$2/DRIVER.lock/meta"
+  sed -e 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' -e 's/^progress_epoch=.*/progress_epoch=1000/' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+}
+scoped() { # <id> <json> <scope> <ws> : le JSON est valide et porte scope, ws, location
+  json_ok "$2"; assert_exit "$1.json — JSON valide" "$?" 0
+  assert "$1.scope — scope $3, ws '$4', location" "$2" "\"scope\": \"$3\", \"ws\": \"$4\", \"location\": \"git-common-dir\""
+}
+
+LAB="$(mk_lab verbs1)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=sa >/dev/null
+dl "$LAB" sess-B acquire --depot --owner=m2 --step=sd >/dev/null
+backdate_lock "$GC" ws/alpha; backdate_lock "$GC" repo
+out="$(dl "$LAB" sess-A mark-progress --ws=alpha --owner=m1)"; rc=$?
+assert_exit "WS-VERBS-1.1 — mark-progress --ws=alpha exit 0" "$rc" 0
+scoped "WS-VERBS-1.2" "$out" compartiment alpha
+assert "WS-VERBS-1.3 — progress_epoch d'alpha avance" "[$(meta_of "$GC" ws/alpha progress_epoch)]" "[$(printf '%s' "$out" | sed -n 's/.*"progress_epoch": \([0-9]*\).*/\1/p')]"
+assert "WS-VERBS-1.4b — heartbeat_epoch d'alpha reste 1000" "$(meta_of "$GC" ws/alpha heartbeat_epoch)" "1000"
+assert "WS-VERBS-1.5 — le depot n'a pas bouge (progress_epoch 1000)" "$(meta_of "$GC" repo progress_epoch)" "1000"
+out="$(dl "$LAB" sess-A heartbeat --ws=alpha --owner=m1)"; rc=$?
+assert_exit "WS-VERBS-1.6 — heartbeat --ws=alpha exit 0" "$rc" 0
+scoped "WS-VERBS-1.7" "$out" compartiment alpha
+assert_not "WS-VERBS-1.8 — heartbeat_epoch d'alpha avance" "[$(meta_of "$GC" ws/alpha heartbeat_epoch)]" "[1000]"
+assert "WS-VERBS-1.9 — le depot n'a pas bouge (heartbeat_epoch 1000)" "$(meta_of "$GC" repo heartbeat_epoch)" "1000"
+out="$(dl "$LAB" sess-A status --ws=alpha)"
+assert "WS-VERBS-1.10 — status --ws=alpha lit l'avance (age_seconds < 100)" "$(pj "$out" 'd["age_seconds"] < 100')" "True"
+out="$(dl "$LAB" sess-B status --depot)"
+assert "WS-VERBS-1.11 — status --depot lit un verrou toujours perime" "$(pj "$out" 'd["stale"]')" "True"
+out="$(dl "$LAB" sess-A heartbeat --ws=alpha --owner=autre)"; rc=$?
+assert_exit "WS-VERBS-1.12 — heartbeat d'un autre owner : refus, exit 1" "$rc" 1
+scoped "WS-VERBS-1.13" "$out" compartiment alpha
+assert "WS-VERBS-1.14 — not-owner" "$out" '"reason": "not-owner"'
+out="$(dl "$LAB" sess-A heartbeat --ws=omega --owner=m1)"; rc=$?
+assert_exit "WS-VERBS-1.15 — heartbeat sur un compartiment non tenu : no-lock, exit 1" "$rc" 1
+scoped "WS-VERBS-1.16" "$out" compartiment omega
+assert "WS-VERBS-1.17 — no-lock" "$out" '"reason": "no-lock"'
+out="$(dl "$LAB" sess-A mark-progress --ws=alpha)"; rc=$?
+assert_exit "WS-VERBS-1.18 — mark-progress sans owner : exit 1" "$rc" 1
+scoped "WS-VERBS-1.19" "$out" compartiment alpha
+assert "WS-VERBS-1.20 — owner-required" "$out" '"error": "owner-required"'
+
+LAB="$(mk_lab verbs2)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=sa >/dev/null
+dl "$LAB" sess-B acquire --depot --owner=m2 --step=sd >/dev/null
+out="$(dl "$LAB" sess-T takeover --ws=alpha --owner=m9 --step=t)"; rc=$?
+assert_exit "WS-VERBS-2.1 — takeover d'un alpha FRAIS : refus, exit 1" "$rc" 1
+scoped "WS-VERBS-2.2" "$out" compartiment alpha
+assert "WS-VERBS-2.3 — still-fresh" "$out" '"reason": "still-fresh"'
+backdate_lock "$GC" ws/alpha
+out="$(dl "$LAB" sess-T takeover --ws=alpha --owner=m9 --step=t)"; rc=$?
+assert_exit "WS-VERBS-2.4 — takeover --ws=alpha d'un alpha perime : exit 0" "$rc" 0
+scoped "WS-VERBS-2.5" "$out" compartiment alpha
+assert "WS-VERBS-2.6 — acquis, previous_owner m1" "$out" '"previous_owner": "m1"'
+assert "WS-VERBS-2.7 — le verrou d'alpha est a m9" "$(meta_of "$GC" ws/alpha owner)" "m9"
+assert "WS-VERBS-2.8 — le depot est intact (m2)" "$(meta_of "$GC" repo owner)" "m2"
+[ -f "$GC/vf-driver/ws/alpha/DRIVER.lock.events.log" ]; assert_exit "WS-VERBS-2.9 — journal des reprises frere du verrou d'alpha" "$?" 0
+[ ! -e "$GC/vf-driver/repo/DRIVER.lock.events.log" ]; assert_exit "WS-VERBS-2.10 — aucun journal cote depot" "$?" 0
+out="$(dl "$LAB" sess-NEW reclaim --ws=alpha --owner=m9)"; rc=$?
+assert_exit "WS-VERBS-2.11 — reclaim --ws=alpha avec une session neuve : exit 0" "$rc" 0
+scoped "WS-VERBS-2.12" "$out" compartiment alpha
+assert "WS-VERBS-2.13 — reclaimed true, session sess-NEW" "$out" '"session_id": "sess-NEW"'
+assert "WS-VERBS-2.14 — la session neuve est dans alpha" "$(meta_of "$GC" ws/alpha session_ids)" "sess-NEW"
+assert_not "WS-VERBS-2.15 — pas dans le depot" "$(meta_of "$GC" repo session_ids)" "sess-NEW"
+out="$(dl "$LAB" sess-NEW reclaim --ws=alpha --owner=autre)"; rc=$?
+assert_exit "WS-VERBS-2.16 — reclaim d'un autre owner : refus, exit 1" "$rc" 1
+scoped "WS-VERBS-2.17" "$out" compartiment alpha
+out="$(dl "$LAB" sess-NEW recover --ws=alpha)"; rc=$?
+assert_exit "WS-VERBS-2.18 — recover --ws=alpha d'un verrou frais : refus, exit 1" "$rc" 1
+scoped "WS-VERBS-2.19" "$out" compartiment alpha
+backdate_lock "$GC" ws/alpha
+out="$(dl "$LAB" sess-NEW recover --ws=alpha)"; rc=$?
+assert_exit "WS-VERBS-2.20 — recover --ws=alpha d'un verrou perime : exit 0" "$rc" 0
+scoped "WS-VERBS-2.21" "$out" compartiment alpha
+assert "WS-VERBS-2.22 — recovered true, previous_owner m9" "$out" '"previous_owner": "m9"'
+[ ! -e "$GC/vf-driver/ws/alpha/DRIVER.lock" ]; assert_exit "WS-VERBS-2.23 — le verrou d'alpha est elague" "$?" 0
+[ -L "$GC/vf-driver/repo/DRIVER.lock" ]; assert_exit "WS-VERBS-2.24 — le depot est toujours tenu" "$?" 0
+out="$(dl "$LAB" sess-NEW recover --ws=alpha)"; rc=$?
+assert_exit "WS-VERBS-2.25 — recover sans verrou : no-lock, exit 0" "$rc" 0
+scoped "WS-VERBS-2.26" "$out" compartiment alpha
+out="$(dl "$LAB" sess-T takeover --ws=omega --owner=m9)"; rc=$?
+assert_exit "WS-VERBS-2.27 — takeover d'un compartiment non tenu : no-lock, exit 1" "$rc" 1
+scoped "WS-VERBS-2.28" "$out" compartiment omega
+out="$(dl "$LAB" sess-NEW reclaim --ws=omega --owner=m9)"; rc=$?
+scoped "WS-VERBS-2.29" "$out" compartiment omega
+
+LAB="$(mk_lab verbs3)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=sa >/dev/null
+OTHER="$WORK_DIR/other.children.jsonl"
+out="$( export VF_DRIVER_CHILDREN="$OTHER"; dl "$LAB" sess-A register --ws=alpha --agent=a1 --role=coder --node=n1 )"; rc=$?
+assert_exit "WS-VERBS-3.1 — register --ws=alpha exit 0" "$rc" 0
+scoped "WS-VERBS-3.2" "$out" compartiment alpha
+REGA="$GC/vf-driver/ws/alpha/DRIVER.lock.children.jsonl"
+[ -f "$REGA" ]; assert_exit "WS-VERBS-3.3 — registre frere du verrou d'alpha" "$?" 0
+[ ! -e "$OTHER" ]; assert_exit "WS-VERBS-3.4 — VF_DRIVER_CHILDREN ignoree en lab partitionne" "$?" 0
+assert "WS-VERBS-3.5 — le JSON nomme le registre d'alpha" "$out" "\"registry\": \"$REGA\""
+out="$( export VF_DRIVER_CHILDREN="$OTHER"; dl "$LAB" sess-A orphans --ws=alpha )"; rc=$?
+assert_exit "WS-VERBS-3.6 — orphans --ws=alpha exit 0" "$rc" 0
+scoped "WS-VERBS-3.7" "$out" compartiment alpha
+assert "WS-VERBS-3.8 — un agent running dans alpha" "$(pj "$out" 'd["count"]')" "1"
+out="$(dl "$LAB" sess-A orphans --depot)"
+scoped "WS-VERBS-3.9" "$out" depot ""
+assert "WS-VERBS-3.10 — le depot ne voit pas le registre d'alpha" "$(pj "$out" 'd["count"]')" "0"
+out="$( export VF_DRIVER_CHILDREN="$OTHER"; dl "$LAB" sess-A close --ws=alpha --agent=a1 --status=done )"; rc=$?
+assert_exit "WS-VERBS-3.11 — close --ws=alpha exit 0" "$rc" 0
+scoped "WS-VERBS-3.12" "$out" compartiment alpha
+assert "WS-VERBS-3.13 — previous_status running" "$out" '"previous_status": "running"'
+out="$(dl "$LAB" sess-A orphans --ws=alpha)"
+assert "WS-VERBS-3.14 — plus aucun agent running dans alpha" "$(pj "$out" 'd["count"]')" "0"
+out="$(dl "$LAB" sess-A close --ws=omega --agent=a1 --status=done)"; rc=$?
+assert_exit "WS-VERBS-3.15 — close dans un compartiment sans registre : no-registry, exit 1" "$rc" 1
+scoped "WS-VERBS-3.16" "$out" compartiment omega
+assert "WS-VERBS-3.17 — no-registry" "$out" '"reason": "no-registry"'
+out="$(dl "$LAB" sess-A register --ws=alpha --agent=a2)"; rc=$?
+assert_exit "WS-VERBS-3.18 — register sans role : exit 1" "$rc" 1
+scoped "WS-VERBS-3.19" "$out" compartiment alpha
+out="$(dl "$LAB" sess-A close --ws=alpha --agent=a1 --status=nimporte)"; rc=$?
+assert_exit "WS-VERBS-3.20 — close avec un statut invalide : exit 1" "$rc" 1
+scoped "WS-VERBS-3.21" "$out" compartiment alpha
+out="$(dl "$LAB" sess-A release --ws=alpha --owner=m1)"
+assert "WS-VERBS-3.22 — release --ws=alpha sans enfant ouvert supprime le registre d'alpha" "[$([ -e "$REGA" ] && echo present || echo absent)]" "[absent]"
+
+LAB="$(mk_lab verbs4)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=sa >/dev/null
+dl "$LAB" sess-B acquire --depot --owner=m2 --step=sd >/dev/null
+chk_depot() { # <id> <json> : portee depot, cible non designee
+  scoped "$1" "$2" depot ""
+  assert "$1.reason — scope_reason ws-absent" "$2" '"scope_reason": "ws-absent"'
+}
+out="$(dl "$LAB" sess-B heartbeat --owner=m2)"; chk_depot "WS-VERBS-4.1" "$out"
+assert "WS-VERBS-4.1b — ok true" "$out" '"ok": true'
+out="$(dl "$LAB" sess-B mark-progress --owner=m2)"; chk_depot "WS-VERBS-4.2" "$out"
+out="$(dl "$LAB" sess-B2 reclaim --owner=m2)"; chk_depot "WS-VERBS-4.3" "$out"
+assert "WS-VERBS-4.3b — reclaimed true" "$out" '"reclaimed": true'
+out="$(dl "$LAB" sess-B takeover --owner=m2)"; chk_depot "WS-VERBS-4.4" "$out"
+out="$(dl "$LAB" sess-B recover)"; chk_depot "WS-VERBS-4.5" "$out"
+out="$(dl "$LAB" sess-B register --agent=d1 --role=coder)"; chk_depot "WS-VERBS-4.6" "$out"
+[ -f "$GC/vf-driver/repo/DRIVER.lock.children.jsonl" ]; assert_exit "WS-VERBS-4.7 — registre du depot dans vf-driver/repo" "$?" 0
+out="$(dl "$LAB" sess-B orphans)"; chk_depot "WS-VERBS-4.8" "$out"
+assert "WS-VERBS-4.8b — un agent running au depot" "$(pj "$out" 'd["count"]')" "1"
+out="$(dl "$LAB" sess-B close --agent=d1 --status=done)"; chk_depot "WS-VERBS-4.9" "$out"
+assert "WS-VERBS-4.10 — alpha n'a jamais bouge (m1)" "$(meta_of "$GC" ws/alpha owner)" "m1"
+out="$(dl "$LAB" sess-B release --owner=m2)"; chk_depot "WS-VERBS-4.11" "$out"
+assert "WS-VERBS-4.11b — depot relache" "$out" '"released": true'
+[ -L "$GC/vf-driver/ws/alpha/DRIVER.lock" ]; assert_exit "WS-VERBS-4.12 — alpha toujours tenu" "$?" 0
+out="$(dl "$LAB" sess-B heartbeat --depot --owner=m2)"; rc=$?
+assert_exit "WS-VERBS-4.13 — heartbeat --depot sur un depot relache : no-lock, exit 1" "$rc" 1
+scoped "WS-VERBS-4.14" "$out" depot ""
+assert_not "WS-VERBS-4.15 — --depot explicite : pas de scope_reason" "$out" 'scope_reason'
+
+LAB="$(mk_lab verbs5)"
+refus_case() { # <id> <cle de tete attendue> <verbe> <args...>
+  local id="$1" key="$2" verb="$3" o r; shift 3
+  o="$(dl "$LAB" sess-A "$verb" "$@" --ws=../x)"; r=$?
+  assert_exit "$id.1 — $verb --ws=../x : exit 1" "$r" 1
+  assert "$id.2 — cle de tete $key" "$o" "{$key"
+  assert "$id.3 — reason ws-invalid" "$o" '"reason": "ws-invalid"'
+  assert "$id.4 — hint present" "$o" '"hint": "'
+  assert_not "$id.5 — la valeur brute n'est pas reimprimee" "$o" '../x'
+  assert_not "$id.6 — jamais la cle present" "$o" '"present"'
+  json_ok "$o"; assert_exit "$id.7 — JSON valide" "$?" 0
+}
+refus_case "WS-VERBS-5a" '"acquired": false' takeover --owner=m1
+refus_case "WS-VERBS-5b" '"reclaimed": false' reclaim --owner=m1
+refus_case "WS-VERBS-5c" '"ok": false' heartbeat --owner=m1
+refus_case "WS-VERBS-5d" '"ok": false' mark-progress --owner=m1
+refus_case "WS-VERBS-5e" '"released": false' release --owner=m1
+refus_case "WS-VERBS-5f" '"recovered": false' recover
+refus_case "WS-VERBS-5g" '"registered": false' register --agent=a --role=r
+refus_case "WS-VERBS-5h" '"closed": false' close --agent=a --status=done
+refus_case "WS-VERBS-5i" '"error": "ws-invalid"' orphans
+refus_case "WS-VERBS-5j" '"error": "ws-invalid"' status
+
+echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
 [ "$PASS" -gt 0 ] || { echo "❌ FAIL — zéro assertion exécutée"; exit 1; }
 [ "$FAIL" -eq 0 ]
