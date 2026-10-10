@@ -211,7 +211,7 @@ canal à la même date : aucun veto. Le détail de chaque décision vit dans les
   unique.
 - **P57-D-32 (forme JSON complémentaire)** : en lab partitionné, le JSON ajoute `scope_reason`
   (`ws-absent` | `legacy-fallback`) et `legacy_lock` à la forme ratifiée par P57-D-21. La forme de
-  `status --all` est fixée par 57-01. Un `--ws` vide, ou `--ws` combiné à `--depot`, est refusé
+  `status --all` est fixée par la table de contrat de 57-01 et implémentée par 57-03. Un `--ws` vide, ou `--ws` combiné à `--depot`, est refusé
   `ws-invalid`.
 - **P57-D-33 (guard, cas limites)** :
   - `git worktree remove` reste refusé sous tout verrou d'autrui.

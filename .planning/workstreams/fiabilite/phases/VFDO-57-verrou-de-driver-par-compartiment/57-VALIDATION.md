@@ -24,7 +24,7 @@ created: "2026-10-10"
 | **Config file** | none — découverte CI `find plugin scripts -type f -path '*/tests/test-*.sh'` (`ci.yml`) |
 | **Quick run command** | `bash plugin/conductor/scripts/tests/test-driver-lock-ws.sh && bash plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh && bash plugin/conductor/scripts/tests/test-driver-lock.sh && bash plugin/conductor/scripts/tests/test-guard-driver-lock.sh` |
 | **Full suite command** | `for t in $(find plugin scripts -type f -path '*/tests/test-*.sh' \| sort); do bash "$t" \|\| echo "FAIL $t"; done` + `bash plugin/conductor/scripts/check-planning-consumers-registered.sh` + `bash plugin/conductor/scripts/check-instruction-budget.sh` (à rejouer sous `HOME=$(mktemp -d)` pour le job `tests`) |
-| **Estimated runtime** | ~40 s (quick) ; boucle complète > 600 s, à détacher (`nohup`) |
+| **Estimated runtime** | plusieurs minutes pour le quick run (les suites neuves rejouent mutants et boucles de concurrence, à détacher par `nohup`, borne 600 s) ; boucle complète > 600 s, à détacher |
 
 ---
 
@@ -33,7 +33,7 @@ created: "2026-10-10"
 - **After every task commit:** les 4 suites du Quick run.
 - **After every plan wave:** suites existantes de la classe E (driver-lock, guard, dag, guard-health, branch-claim, mission-exit, dev-orchestrator, design-orchestrator, hook-exit-*) + les 4 suites neuves + lint des consommateurs + budget d'instructions.
 - **Before `/gsd-verify-work`:** boucle CI complète verte (rejeu des commandes du job `gates` de `ci.yml`, jamais une liste de rapport).
-- **Max feedback latency:** 60 s.
+- **Max feedback latency:** 600 s (suites neuves détachées).
 
 ---
 
@@ -82,7 +82,7 @@ created: "2026-10-10"
 - [ ] Sampling continuity: no 3 consecutive tasks without automated verify
 - [ ] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
+- [ ] Feedback latency < 600s
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending

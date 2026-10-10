@@ -1923,11 +1923,44 @@ forme exec (ADR-071).
 **Depends on:** aucune. Première du jalon.
 **Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
 **Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
-**Plans:** 0 plans
+**Plans:** 16 plans (10 vagues)
 
 Plans:
+**Wave 1**
+- [ ] 57-01-PLAN.md — vague 1 : `driver-lock.sh`, verrou d'un compartiment, verrou de dépôt, refus nommés (contrat de la phase), suite `test-driver-lock-ws.sh`
 
-- [ ] TBD (run /gsd-plan-phase 57 to break down)
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 57-02-PLAN.md — vague 2 : `driver-lock.sh`, ancien verrou à la mise à jour, partage entre worktrees, repli hors git, mode verrou unique
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 57-03-PLAN.md — vague 3 : `driver-lock.sh`, `status --all`, `--ws` sur tous les verbes, registre par verrou
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 57-04-PLAN.md — vague 4 : preuves de `driver-lock.sh` (concurrence 24×5, A/B lab plat contre copie gelée, mutants DL-M-*)
+- [ ] 57-05-PLAN.md — vague 4 : `guard-driver-lock.sh`, écritures par compartiment, découverte des verrous, fail-closed dès l'aiguillage, quatre issues, suite `test-guard-driver-lock-ws.sh`
+- [ ] 57-06-PLAN.md — vague 4 : consommateurs de progrès (watchdog `status --all`, `dag.sh init --ws`), suite `test-driver-lock-consumers-ws.sh`
+- [ ] 57-07-PLAN.md — vague 4 : gate de sortie `check-mission-exit.sh --ws` (E1, identité d'E7, surcharge d'E4), suite `test-check-mission-exit-ws.sh`
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 57-08-PLAN.md — vague 5 : `guard-driver-lock.sh`, jugement de commit sur l'union des sources, trois classes de gestes git
+- [ ] 57-09-PLAN.md — vague 5 : claim de branche sur les verrous du clone, bilan 7/7 des mutants des consommateurs
+- [ ] 57-10-PLAN.md — vague 5 : doctrine dev-orchestrator (mission-flow, vf-dev-manager, workers, head-governance, intent-routing, mission-cross-team)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 57-11-PLAN.md — vague 6 : preuves du guard (A/B lab plat contre copie gelée, mutants GW-M-*, latence)
+- [ ] 57-12-PLAN.md — vague 6 : team-kernel, managers design et bundles, skill `vf-split-planning` sous verrou de dépôt
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 57-13-PLAN.md — vague 7 : amendement daté d'ADR-053, spec head §6, contrat des hooks, étape de release de `CLAUDE.md` en deux gestes de dépôt courts, manuel FR+EN
+
+**Wave 8** *(blocked on Wave 7 completion)*
+- [ ] 57-14-PLAN.md — vague 8 : bumps de cinq modules sans release (conductor, dev-orchestrator, design-orchestrator, business-pilot-bundle, content-bundle)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+- [ ] 57-15-PLAN.md — vague 9 : bump de growth-bundle, compte de suites des README racine, BACKLOG réécrit
+
+**Wave 10** *(blocked on Wave 9 completion)*
+- [ ] 57-16-PLAN.md — vague 10 : porte de phase rejouée depuis `ci.yml`, puis ledger à la main
 
 ### Phase 58: Rôles de poste — installeur, profils solo / product / dev
 

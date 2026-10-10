@@ -429,7 +429,25 @@ paths = [p for p in r.stdout.decode("utf-8","strict").split("\0") if p]   # Unic
 | A5 | Latence du guard : `git rev-parse` ≈ 8 ms et `git diff --cached` ≈ 9 ms nets (mesure sur ce poste : 10,1 et 11,1 ms contre 2,1 ms de `bash -c true`) acceptables car seulement sur chemin partitionné + verbe concerné | Architecture | Budget de latence « 6,7 ms » du profil rapide (en-tête du guard) dépassé sur chaque commit d'un lab partitionné |
 | A6 | Un seul `.planning/` par clone (lab à la racine) | Pitfall P9 | Collision inter-labs sur monorepo |
 
-## Open Questions (pour Samuel — NON résolues ici)
+## Open Questions (RESOLVED)
+
+Toutes résolues au `57-CONTEXT.md` § Arbitrages de planification (2026-10-10) ; le texte des questions ci-dessous est
+conservé tel que la recherche l'a posé. Une ligne par question :
+
+- Q1 → RESOLVED : P57-D-16 (trois classes de gestes git), arbitrage Samuel, AskUserQuestion session principale, 2026-10-10.
+- Q2 → RESOLVED : P57-D-17 (lecture (a), `meta.worktree` comparé au `--show-toplevel` courant), même canal, même date.
+- Q3 → RESOLVED : P57-D-18 (liste codée en dur des fichiers de forme de release, aucun fichier de configuration neuf), même canal, même date.
+- Q4 → RESOLVED : P57-D-19 (union des sources, fail-closed ; P57-D-10 prolongé, pas réécrit), même canal, même date.
+- Q5 → RESOLVED : P57-D-20 (limite assumée écrite dans l'amendement d'ADR-053 : le guard isole des sessions), même canal, même date.
+- Q6 → RESOLVED : P57-D-20 (chaîne manager → worker → manager tenue par les allowlists, aucun refus actif neuf), même canal, même date.
+- Q7 → RESOLVED : P57-D-22 (`VF_DRIVER_LOCK` posé = mode verrou unique ; E1 cesse de l'exporter en partitionné), discrétion du planificateur, « Aucun veto », même canal, même date.
+- Q8 → RESOLVED : P57-D-23 (champ additif `ws` du DAG, `mark-progress --ws`), discrétion, « Aucun veto ».
+- Q9 → RESOLVED : P57-D-24 (verbes sans `--ws` → dépôt puis ancien verrou, `scope` dit ; `status --all` agrège), discrétion, « Aucun veto ».
+- Q10 → RESOLVED : P57-D-25 (rc 2 → refus `partition-unreadable`, cas « fichier régulier » non figé au-delà), discrétion, « Aucun veto ».
+- Q11 → RESOLVED : P57-D-21 (layout `vf-driver/{ws/<sujet>,repo}` et champs `scope`/`ws`/`location` ratifiés), arbitrage Samuel, même canal, même date.
+- Q12 → RESOLVED : hors périmètre — P57-D-29 (deux `.planning/` dans un même clone partagent `vf-driver/`, limite écrite), discrétion, « Aucun veto ».
+- Q13 → RESOLVED : P57-D-30 (aucune release dans la 57, geste humain après la phase, ADR-073), discrétion, « Aucun veto ».
+- Divergences mineures → RESOLVED : (1) P57-D-27 (validation par `vf_ws_name_valid` + `vf_ws_dir_resolve`) ; (2) constat documentaire, aucune décision requise (la citation « P412-D-10 » renvoie à `plugin/dev-orchestrator/CHANGELOG.md:11-12`, § Classe B) ; (3) P57-D-28 (quatre issues pour le guard, trois pour `driver-lock.sh`).
 
 1. **Q1 — Gestes Bash hors `commit`/`checkout`/`switch`.** `MUTATING_GIT_VERBS = {"commit", "checkout", "switch", "restore", "reset", "clean", "push", "tag", "branch"}`, `RESUMABLE_SUBVERBS = {"rebase", "merge", "cherry-pick", "revert", "stash"}` (guard l. 153-154), `gh pr|release`. P57-D-09..11 ne disent rien de `push`, `tag`, `branch`, `gh pr`, `reset`, `rebase`… sous un verrou d'**un autre compartiment**. Refuser tout sous n'importe quel verrou d'autrui (= statu quo) interdit à B de `git push`/`gh pr create` pendant que A est tenu : la parallélisation visée échoue au dernier geste. *Recommandation :* trois classes — (i) arbre/index du checkout (`checkout, switch, restore, reset, clean, merge, rebase, cherry-pick, revert, stash, worktree remove`) : refus si verrou d'autrui **du même worktree** (Q2) ; (ii) `commit` : jugé sur l'index ; (iii) `push, branch, gh pr` : permis sous verrou de compartiment d'autrui, refusés sous verrou de **dépôt** d'autrui ; `tag`, `gh release` = geste de release : exigent que le dépôt ne soit pas tenu par autrui. *À trancher avant le plan du guard.*
 2. **Q2 — Lecture de « dans le même checkout » (P57-D-11).** Voir P6. Deux lectures : (a) condition `meta.worktree == toplevel courant` (recommandée) ; (b) sans condition → tue le parallélisme entre worktrees. À confirmer.
