@@ -731,7 +731,7 @@ vf_dl_legacy_probe() {
 }
 
 require_owner() {
-  [ -n "$OWNER" ] || { log "--owner requis pour '$ACTION'"; echo '{"error": "owner-required"}'; exit 1; }
+  [ -n "$OWNER" ] || { log "--owner requis pour '$ACTION'"; printf '{"error": "owner-required"%s}\n' "$SCOPE_JSON"; exit 1; }
 }
 
 case "$ACTION" in
@@ -814,18 +814,18 @@ case "$ACTION" in
 
   takeover)
     require_owner
-    lock_present || { echo '{"acquired": false, "reason": "no-lock"}'; exit 1; }
+    lock_present || { printf '{"acquired": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     age="$(lock_age)"; held="$(meta_get owner)"; observed_gen="$(lock_gen)"
     if [ "$age" -le "$TTL" ]; then
-      printf '{"acquired": false, "reason": "still-fresh", "held_by": "%s", "age_seconds": %s, "ttl": %s}\n' \
-        "$held" "$age" "$TTL"
+      printf '{"acquired": false, "reason": "still-fresh", "held_by": "%s", "age_seconds": %s, "ttl": %s%s}\n' \
+        "$held" "$age" "$TTL" "$SCOPE_JSON"
       exit 1
     fi
     # L'ORDRE compte : dans l'ancien bloc PERIME d'`acquire`, la generation candidate etait creee
     # AVANT de savoir si la voie etait libre (necessaire a la voie libre elle-meme). Ici, elle n'a
     # de sens qu'une fois la peremption etablie — creer d'abord et tester ensuite laisserait un
     # dechet de generation a chaque refus (still-fresh, no-lock).
-    gen="$(new_generation)" || { echo '{"acquired": false, "reason": "generation-failed"}'; exit 1; }
+    gen="$(new_generation)" || { printf '{"acquired": false, "reason": "generation-failed"%s}\n' "$SCOPE_JSON"; exit 1; }
     # DEPLACE tel quel depuis l'ancien bloc 3 « PERIME » d'`acquire` (D-32-02) — un SEUL
     # recuperateur par generation. Le mutex porte le nom de la generation observee : `ln -s`
     # echoue si un concurrent l'a deja pris, et une generation neuve donnerait un autre nom (donc
@@ -833,7 +833,7 @@ case "$ACTION" in
     mutex="${LOCK_DIR}.rec.$(printf '%s' "$observed_gen" | tr -c 'A-Za-z0-9._-' '_')"
     if ! ln_atomic "$$" "$mutex"; then
       rm -rf "${LOCK_PARENT:?}/$gen"
-      printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
+      printf '{"acquired": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     # BL-3 (fuite de mutex sous panne) : liberation GARANTIE, meme si ce process est tue entre la
     # prise du mutex et sa liberation normale. Aujourd'hui ce mutex est pris sur une generation
@@ -854,7 +854,7 @@ case "$ACTION" in
     if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -le "$TTL" ]; then
       rm -rf "${LOCK_PARENT:?}/$gen"
       rm -f "$mutex"; trap - EXIT INT TERM
-      printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
+      printf '{"acquired": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     old_gen="$observed_gen"
     if [ -L "$LOCK_DIR" ]; then
@@ -873,32 +873,32 @@ case "$ACTION" in
       # racine, parce que c'est le moment ou le repreneur decide de son premier dispatch.
       _orph="$(orphans_count)"
       [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) par l'ancien tenant encore running. Les arreter (feuille -> racine) avant tout dispatch"
-      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s}\n' \
-        "$OWNER" "$STEP" "$held" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)"
+      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s%s}\n' \
+        "$OWNER" "$STEP" "$held" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
       exit 0
     fi
     rm -f "${LOCK_DIR}.new.$$"; rm -rf "${LOCK_PARENT:?}/$gen"
     rm -f "$mutex"; trap - EXIT INT TERM
-    printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
+    printf '{"acquired": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
     ;;
 
   reclaim)
     require_owner
-    lock_present || { echo '{"reclaimed": false, "reason": "no-lock"}'; exit 1; }
+    lock_present || { printf '{"reclaimed": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     sid="$(sanitize_session_id "${CLAUDE_CODE_SESSION_ID:-}")"
-    [ -n "$sid" ] || { echo '{"reclaimed": false, "reason": "no-session-id"}'; exit 1; }
+    [ -n "$sid" ] || { printf '{"reclaimed": false, "reason": "no-session-id"%s}\n' "$SCOPE_JSON"; exit 1; }
     age="$(lock_age)"; held="$(meta_get owner)"; observed_gen="$(lock_gen)"
     if [ "$age" -gt "$TTL" ]; then
-      echo '{"reclaimed": false, "reason": "stale-requires-takeover"}'; exit 1
+      printf '{"reclaimed": false, "reason": "stale-requires-takeover"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     if [ "$held" != "$OWNER" ]; then
-      printf '{"reclaimed": false, "reason": "not-owner", "held_by": "%s"}\n' "$held"; exit 1
+      printf '{"reclaimed": false, "reason": "not-owner", "held_by": "%s"%s}\n' "$held" "$SCOPE_JSON"; exit 1
     fi
     # (D-32-03(f)) MEME mutex, MEME construction de nom que `takeover` — `reclaim` ne reinvente
     # PAS un patron de concurrence separe, il reutilise mot pour mot celui mesure correct.
     mutex="${LOCK_DIR}.rec.$(printf '%s' "$observed_gen" | tr -c 'A-Za-z0-9._-' '_')"
     if ! ln_atomic "$$" "$mutex"; then
-      echo '{"reclaimed": false, "reason": "race-during-reclaim"}'; exit 1
+      printf '{"reclaimed": false, "reason": "race-during-reclaim"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     # BL-3 : MEME trap que `takeover`. C'est ICI, sur `reclaim`, que la fuite mesuree est la plus
     # grave — ce mutex se prend sur une generation VIVANTE et DURABLE (a chaque `/clear`), jamais
@@ -920,7 +920,7 @@ case "$ACTION" in
     # lock VIVANT, dont l'owner peut changer par release puis acquire pendant la fenetre.
     if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -gt "$TTL" ] || [ "$(meta_get owner)" != "$OWNER" ]; then
       rm -f "$mutex"; trap - EXIT INT TERM
-      echo '{"reclaimed": false, "reason": "race-during-reclaim"}'; exit 1
+      printf '{"reclaimed": false, "reason": "race-during-reclaim"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     new_sids="$(session_ids_append "$(lock_session_ids)" "$sid")"
     hb="$(meta_get heartbeat_epoch)"
@@ -935,28 +935,28 @@ case "$ACTION" in
     # revient (ou son remplacant, meme owner) voit d'un coup ce qui tourne encore en son nom.
     _orph="$(orphans_count)"
     [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running sous ce lock. Verifier ListAgents, arreter feuille -> racine, puis close --status=stopped"
-    printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s, "orphans_count": %s, "orphans": %s}\n' \
-      "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease" "$_orph" "$(orphans_ids_json)"
+    printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s, "orphans_count": %s, "orphans": %s%s}\n' \
+      "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
     exit 0
     ;;
 
   heartbeat)
     require_owner
-    lock_present || { echo '{"ok": false, "reason": "no-lock"}'; exit 1; }
+    lock_present || { printf '{"ok": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     if [ "$(meta_get owner)" = "$OWNER" ]; then
       # rafraichit l'horodatage (maj step si --step fourni) — un seul ts pour meta + rapport
       [ -z "$STEP" ] && STEP="$(meta_get step)"
       ts="$(now)"
       rewrite_meta "$ts"
-      printf '{"ok": true, "owner": "%s", "heartbeat_epoch": %s}\n' "$OWNER" "$ts"
+      printf '{"ok": true, "owner": "%s", "heartbeat_epoch": %s%s}\n' "$OWNER" "$ts" "$SCOPE_JSON"
       exit 0
     fi
-    printf '{"ok": false, "reason": "not-owner", "held_by": "%s"}\n' "$(meta_get owner)"; exit 1
+    printf '{"ok": false, "reason": "not-owner", "held_by": "%s"%s}\n' "$(meta_get owner)" "$SCOPE_JSON"; exit 1
     ;;
 
   mark-progress)
     require_owner
-    lock_present || { echo '{"ok": false, "reason": "no-lock"}'; exit 1; }
+    lock_present || { printf '{"ok": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     if [ "$(meta_get owner)" = "$OWNER" ]; then
       # (D-33-A) Garde OBLIGATOIRE, EXACTEMENT le meme patron que heartbeat/reclaim ci-dessus :
       # mark-progress n'a PAS de flag --step=, donc $STEP est TOUJOURS vide a ce point. Sans cette
@@ -969,10 +969,10 @@ case "$ACTION" in
       # seule, qui garantit que heartbeat_epoch ne bouge JAMAIS sous mark-progress. Le 3e argument
       # ($ts) est le SEUL champ que ce verbe avance.
       rewrite_meta "$(meta_get heartbeat_epoch)" "$(lock_session_ids)" "$ts"
-      printf '{"ok": true, "owner": "%s", "progress_epoch": %s}\n' "$OWNER" "$ts"
+      printf '{"ok": true, "owner": "%s", "progress_epoch": %s%s}\n' "$OWNER" "$ts" "$SCOPE_JSON"
       exit 0
     fi
-    printf '{"ok": false, "reason": "not-owner", "held_by": "%s"}\n' "$(meta_get owner)"; exit 1
+    printf '{"ok": false, "reason": "not-owner", "held_by": "%s"%s}\n' "$(meta_get owner)" "$SCOPE_JSON"; exit 1
     ;;
 
   release)
@@ -1005,13 +1005,13 @@ case "$ACTION" in
     ;;
 
   recover)
-    lock_present || { echo '{"recovered": false, "reason": "no-lock"}'; exit 0; }
+    lock_present || { printf '{"recovered": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 0; }
     age="$(lock_age)"; held="$(meta_get owner)"
     if [ "$age" -gt "$TTL" ]; then
       observed_gen="$(lock_gen)"
       mutex="${LOCK_DIR}.rec.$(printf '%s' "$observed_gen" | tr -c 'A-Za-z0-9._-' '_')"
       if ! ln_atomic "$$" "$mutex"; then
-        printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
+        printf '{"recovered": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
       fi
       # BL-3 (correction juge #2, meme patron EXACT que takeover et reclaim) : `recover` prend le
       # MEME mutex, sur la MEME construction de nom, dans le MEME espace de noms que les deux
@@ -1026,7 +1026,7 @@ case "$ACTION" in
       [ -n "${VF_DRIVER_TEST_DIE_AFTER_MUTEX:-}" ] && exit 137
       if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -le "$TTL" ]; then
         rm -f "$mutex"; trap - EXIT INT TERM
-        printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
+        printf '{"recovered": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
       fi
       drop_lock; rm -f "$mutex"; trap - EXIT INT TERM
       # (correction juge #7) new_owner/session_id journalises quand CONNUS : `recover` n'exige pas
@@ -1036,9 +1036,9 @@ case "$ACTION" in
       # couvre QUE les TROIS natures de reprise — takeover/reclaim/recover — jamais l'acquisition
       # ordinaire, meme apres un takeover : voir le docstring de journal_event ci-dessus).
       journal_event recover "$held" "$OWNER" "$(sanitize_session_id "${CLAUDE_CODE_SESSION_ID:-}")" "$age" "$observed_gen"
-      printf '{"recovered": true, "previous_owner": "%s", "age_seconds": %s}\n' "$held" "$age"; exit 0
+      printf '{"recovered": true, "previous_owner": "%s", "age_seconds": %s%s}\n' "$held" "$age" "$SCOPE_JSON"; exit 0
     fi
-    printf '{"recovered": false, "reason": "still-fresh", "age_seconds": %s, "ttl": %s}\n' "$age" "$TTL"
+    printf '{"recovered": false, "reason": "still-fresh", "age_seconds": %s, "ttl": %s%s}\n' "$age" "$TTL" "$SCOPE_JSON"
     exit 1
     ;;
 
@@ -1048,9 +1048,9 @@ case "$ACTION" in
     # meme, c'est tout l'objet. owner/generation sont RELEVES sur le lock courant s'il existe
     # (sauf --owner explicite), pour que l'inventaire puisse dire « consigne sous quel mandat ».
     AGENT="$(sanitize_session_id "$AGENT")"
-    [ -n "$AGENT" ] || { log "--agent requis pour 'register'"; echo '{"registered": false, "reason": "agent-required"}'; exit 1; }
+    [ -n "$AGENT" ] || { log "--agent requis pour 'register'"; printf '{"registered": false, "reason": "agent-required"%s}\n' "$SCOPE_JSON"; exit 1; }
     ROLE="$(sanitize_reg_field "$ROLE")"
-    [ -n "$ROLE" ] || { log "--role requis pour 'register'"; echo '{"registered": false, "reason": "role-required"}'; exit 1; }
+    [ -n "$ROLE" ] || { log "--role requis pour 'register'"; printf '{"registered": false, "reason": "role-required"%s}\n' "$SCOPE_JSON"; exit 1; }
     NODE="$(sanitize_reg_field "$NODE")"; PARENT="$(sanitize_session_id "$PARENT")"
     case "$DEPTH" in ''|*[!0-9]*) DEPTH="" ;; esac
     _reg_owner="$OWNER"; _reg_gen=""
@@ -1067,10 +1067,10 @@ case "$ACTION" in
       # BRUYANT et non nul, a l'inverse du journal des reprises : un dispatch non consigne est
       # precisement l'orphelin introuvable que ce registre existe pour empecher.
       log "registre inaccessible en ecriture ($REG) : dispatch NON consigne"
-      printf '{"registered": false, "reason": "registry-unwritable", "registry": "%s"}\n' "$REG"; exit 1
+      printf '{"registered": false, "reason": "registry-unwritable", "registry": "%s"%s}\n' "$REG" "$SCOPE_JSON"; exit 1
     fi
-    printf '{"registered": true, "agent_id": "%s", "role": "%s", "node": "%s", "parent": "%s", "owner": "%s", "registry": "%s"}\n' \
-      "$AGENT" "$ROLE" "$NODE" "$PARENT" "$_reg_owner" "$REG"
+    printf '{"registered": true, "agent_id": "%s", "role": "%s", "node": "%s", "parent": "%s", "owner": "%s", "registry": "%s"%s}\n' \
+      "$AGENT" "$ROLE" "$NODE" "$PARENT" "$_reg_owner" "$REG" "$SCOPE_JSON"
     exit 0
     ;;
 
@@ -1079,25 +1079,25 @@ case "$ACTION" in
     # normal d'un agent, `stopped` apres un arret verifie par ListAgents (jamais sur la seule
     # reponse de TaskStop, qui peut etre sans effet immediat).
     AGENT="$(sanitize_session_id "$AGENT")"
-    [ -n "$AGENT" ] || { log "--agent requis pour 'close'"; echo '{"closed": false, "reason": "agent-required"}'; exit 1; }
+    [ -n "$AGENT" ] || { log "--agent requis pour 'close'"; printf '{"closed": false, "reason": "agent-required"%s}\n' "$SCOPE_JSON"; exit 1; }
     case "$CSTATUS" in
       done|failed|stopped) ;;
-      *) log "--status attendu parmi done|failed|stopped pour 'close'"; printf '{"closed": false, "reason": "invalid-status", "status": "%s"}\n' "$(sanitize_reg_field "$CSTATUS")"; exit 1 ;;
+      *) log "--status attendu parmi done|failed|stopped pour 'close'"; printf '{"closed": false, "reason": "invalid-status", "status": "%s"%s}\n' "$(sanitize_reg_field "$CSTATUS")" "$SCOPE_JSON"; exit 1 ;;
     esac
-    [ -f "$REG" ] || { echo '{"closed": false, "reason": "no-registry"}'; exit 1; }
+    [ -f "$REG" ] || { printf '{"closed": false, "reason": "no-registry"%s}\n' "$SCOPE_JSON"; exit 1; }
     _known="$(registry_fold | awk -F'\t' -v a="$AGENT" '$1 == a { print $10; exit }')"
-    [ -n "$_known" ] || { printf '{"closed": false, "reason": "unknown-agent", "agent_id": "%s"}\n' "$AGENT"; exit 1; }
+    [ -n "$_known" ] || { printf '{"closed": false, "reason": "unknown-agent", "agent_id": "%s"%s}\n' "$AGENT" "$SCOPE_JSON"; exit 1; }
     if ! printf '{"event": "close", "agent_id": "%s", "status": "%s", "closed_at": "%s", "epoch": %s}\n' \
         "$AGENT" "$CSTATUS" "$(iso)" "$(now)" >> "$REG" 2>/dev/null; then
       log "registre inaccessible en ecriture ($REG) : fermeture NON consignee"
-      printf '{"closed": false, "reason": "registry-unwritable", "registry": "%s"}\n' "$REG"; exit 1
+      printf '{"closed": false, "reason": "registry-unwritable", "registry": "%s"%s}\n' "$REG" "$SCOPE_JSON"; exit 1
     fi
     # children_running : ce que ce parent laisse derriere lui. Un parent ferme avec un enfant
     # encore running est le motif exact du reveil d'un parent « completed » (issue #82, cas 2 et 3).
     _kids="$(children_running_of_json "$AGENT")"
     [ "$_kids" != "[]" ] && log "close $AGENT : des enfants consignes tournent encore ($_kids). Les fermer ou les arreter, sinon ils restent orphelins"
-    printf '{"closed": true, "agent_id": "%s", "status": "%s", "previous_status": "%s", "children_running": %s}\n' \
-      "$AGENT" "$CSTATUS" "$_known" "$_kids"
+    printf '{"closed": true, "agent_id": "%s", "status": "%s", "previous_status": "%s", "children_running": %s%s}\n' \
+      "$AGENT" "$CSTATUS" "$_known" "$_kids" "$SCOPE_JSON"
     exit 0
     ;;
 
@@ -1105,9 +1105,9 @@ case "$ACTION" in
     # Lecture seule, exit 0 dans tous les cas (registre absent compris) : c'est un inventaire, pas
     # un verdict. Ordre FEUILLE -> RACINE, l'ordre d'arret impose par la reprise.
     if [ -f "$REG" ]; then
-      printf '{"present": true, "registry": "%s", "count": %s, "orphans": %s}\n' "$REG" "$(orphans_count)" "$(orphans_json)"
+      printf '{"present": true, "registry": "%s", "count": %s, "orphans": %s%s}\n' "$REG" "$(orphans_count)" "$(orphans_json)" "$SCOPE_JSON"
     else
-      printf '{"present": false, "registry": "%s", "count": 0, "orphans": []}\n' "$REG"
+      printf '{"present": false, "registry": "%s", "count": 0, "orphans": []%s}\n' "$REG" "$SCOPE_JSON"
     fi
     exit 0
     ;;
