@@ -1,5 +1,27 @@
 # Changelog — conductor
 
+## [v1.48.2] — 2026-10-10 (l'archivage roadmap ne retire plus les phases dont les dossiers existent)
+
+**Patch** (correctif ; arbitrage Samuel « Revert + correctif d'abord », AskUserQuestion session principale, 2026-10-10) :
+
+- **`scripts/check-method-budget.sh`** : `--archive roadmap` et `--auto` déplaçaient un bloc `<details>` ✅/SHIPPED
+  avec ses en-têtes `### Phase N:` alors que les dossiers `phases/…-N-*` du compartiment restaient sur le disque ;
+  `check-divergence.sh` rendait alors S4(a) et l'étape CI « check-divergence.sh en CI » rougissait (constaté le
+  2026-10-08, annulé à la main, puis le 2026-10-10 à l'archivage automatique au Stop). Un bloc qui contient au moins
+  un en-tête dont le dossier existe encore dans le MÊME compartiment n'est désormais jamais déplacé : il reste en
+  place et `ARCHIVAGE REFUSÉ : <fichier> — bloc « <résumé> » porte des phases dont les dossiers existent (N, M…) ;
+  archiver d'abord les dossiers de phase` est rendu. Correspondance non vérifiable : même refus, rien déplacé. Le
+  refus n'ajoute pas de blocage de la garde de fin de geste (ses refus sont non bloquants) et la photographie de
+  début de mission (`--auto --dry-run`) le porte déjà. `backlog` et `state` inchangés.
+- **`scripts/check-divergence.sh`** : nouveau mode lecture `--list-phase-numbers <phases_dir>` (numéros normalisés des
+  dossiers de phase) : source unique de la correspondance numéro → dossier, réutilisée par l'archivage au lieu d'être
+  recopiée. `extract_num`, `normalize_num` et `list_phase_dirs` sont remontés avant les vérifications de dépôt, sans
+  changement de comportement des signaux S2/S4/S5.
+- **Suites** : `test-check-method-budget.sh` gagne DLWS1-DLWS5 (refus + cmp, rc, `--auto`/`--dry-run`, archivage
+  inchangé sans dossier, compartiment de workstream, normalisation des zéros) et le mutant MUD1 (garde retirée : seul
+  DLWS1 rougit, DLWS2 reste vert) ; borne X9 de la région exemptée portée de 230 à 240 lignes (le programme awk de la
+  garde y vit). `test-check-divergence.sh` gagne LPN1-LPN3.
+
 ## [v1.48.1] — 2026-10-08 (mineurs de la relecture SOBR-04 de v2.69.0)
 
 **Patch** :

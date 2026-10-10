@@ -68,7 +68,15 @@
 #            TITRES ET DATES : les sous-sections d'historique et les entrées « Point du … » partent avec leur titre ;
 #            le STATE ne garde que les titres de conteneur (Historique, Décisions…), le frontmatter, la ligne ^Phase:,
 #            les pointeurs déjà posés et UN SEUL pointeur par archivage ; un second passage ne déplace rien ; roadmap :
-#            au-delà du budget, les blocs <details> dont le résumé porte ✅ ou SHIPPED (un jalon non livré reste). La racine `.planning/` est toujours incluse ; un compartiment
+#            au-delà du budget, les blocs <details> dont le résumé porte ✅ ou SHIPPED (un jalon non livré reste) ; JAMAIS un bloc qui contient un en-tête
+#            `### Phase N` dont le dossier de phase existe encore dans le MÊME compartiment (`<compartiment>/phases/`,
+#            correspondance numéro → dossier = `check-divergence.sh --list-phase-numbers`, la même que S4(a)) : le
+#            déplacer ferait rougir S4(a) « numéro(s) de phase sans en-tête ROADMAP ». Le bloc reste en place, un constat
+#            `ARCHIVAGE REFUSÉ : <fichier> — bloc « <résumé> » porte des phases dont les dossiers existent (N, M…) ;
+#            archiver d'abord les dossiers de phase` est rendu (aucun effet sur le rc d'un --auto, rc 2 sous --archive
+#            explicite) ; le constat ne varie pas d'une exécution à l'autre, donc la photographie de début de mission
+#            (--auto --dry-run) le porte déjà et ne l'impute pas à la mission. Correspondance non vérifiable : même
+#            refus, rien déplacé. La racine `.planning/` est toujours incluse ; un compartiment
 #            de workstream n'est archivé que s'il est nommé par --ws (répétable) ; un compartiment protégé
 #            (VF_ARCHIVE_PROTECTED_WS) rend 64. Une source modifiée ou non suivie par git : refus, rien écrit,
 #            rc 2. Destination `.planning/archives/<type>/<compartiment|racine>-<fichier>-<AAAA-MM-JJ>.md` :
@@ -188,6 +196,15 @@ UNVERIFIABLE=0
 say() { [ "$QUIET" -eq 1 ] || echo "[budget] $*"; }
 flag() { echo "[budget] $*"; }
 
+roadmap_phase_set() { # <phases_dir> : imprime « |1|5.2| » (numéros normalisés des dossiers de phase) ; rc 1 si non vérifiable
+  # Source UNIQUE de la correspondance dossier -> numéro : check-divergence.sh --list-phase-numbers (la même que S4(a)).
+  # Script introuvable ou en échec = NON VÉRIFIABLE, jamais un repli sur une garde plus faible.
+  local divg ph
+  divg="$(dirname "$0")/check-divergence.sh"
+  [ -r "$divg" ] || return 1
+  ph="$(bash "$divg" --list-phase-numbers "$1" 2>/dev/null)" || return 1
+  printf '|%s|' "$(printf '%s' "$ph" | tr '\n' '|')"
+}
 # >>> vf-archive-writer
 # --- Lecture des fichiers de planning : BACKLOG, STATE, ROADMAP (lecture seule) ---------------------
 # Programmes awk (LC_ALL=C : octets, le vocabulaire est en UTF-8). SANS apostrophe : ils vivent dans des chaînes
@@ -274,18 +291,31 @@ END { print n + 0 > CNT }
 AWK_ROADMAP_ARCHIVE="$AWK_COMMON"'
 function chk(l,   m) { if (sum == "" && match(l, /<summary>.*<\/summary>/)) sum = substr(l, RSTART + 9, RLENGTH - 19) }
 function shipped(t) { return (t ~ /✅/ || t ~ /SHIPPED/) }
+# Garde (DLWS) : un en-tête « ### Phase N » (même motif que ROADMAP_HEADER_RE de check-divergence.sh) dont le numéro,
+# normalisé, figure dans PH (« |1|5.2| », rendu par check-divergence.sh --list-phase-numbers) a encore son dossier.
+function chkph(l,   s, k, nrm) {
+  if (match(l, /^### Phase [0-9]+(\.[0-9]+)?/)) {
+    s = substr(l, 11, RLENGTH - 10); k = index(s, ".")
+    nrm = (k ? (substr(s, 1, k - 1) + 0) substr(s, k) : (s + 0))
+    if (index(PH, "|" nrm "|") > 0 && index(held, "|" nrm "|") == 0) held = held "|" nrm "|"
+  }
+}
+function heldlist(   h) { h = held; gsub(/\|\|/, ", ", h); gsub(/\|/, "", h); return h }
 function flushd(   i) {
-  if (shipped(sum)) {
+  if (shipped(sum) && held != "") {
+    print sanit(sum) "\t" heldlist() > REF
+    for (i = 1; i <= nb; i++) print buf[i]
+  } else if (shipped(sum)) {
     for (i = 1; i <= nb; i++) { if (index(buf[i], "<!-- vf-archive: ") == 1) print buf[i]; else print buf[i] > ARCH }
     n++; print "<!-- vf-archive: " ARCHREL " — " sanit(sum) " -->"
   } else for (i = 1; i <= nb; i++) print buf[i]
-  nb = 0; sum = ""
+  nb = 0; sum = ""; held = ""
 }
 {
   if (depth == 0 && isfence($0)) fence = !fence
-  if (depth == 0 && !fence && $0 ~ /^<details[ >]/) { depth = 1; nb = 0; sum = ""; buf[++nb] = $0; chk($0); next }
+  if (depth == 0 && !fence && $0 ~ /^<details[ >]/) { depth = 1; nb = 0; sum = ""; held = ""; buf[++nb] = $0; chk($0); chkph($0); next }
   if (depth > 0) {
-    buf[++nb] = $0; chk($0)
+    buf[++nb] = $0; chk($0); chkph($0)
     if ($0 ~ /<details[ >]/) depth++
     if ($0 ~ /<\/details>/) depth--
     if (depth == 0) flushd()
@@ -369,10 +399,20 @@ archive_one_locked() { # <type> <label> <fichier absolu> <nom du fichier>
   : > "$TMPD/cnt"; : > "$TMPD/arch"
   # La décision porte sur un INSTANTANÉ de la source ; le remplacement n'a lieu que si la source lui est encore identique.
   cp "$src" "$TMPD/snap" || { archive_refuse "${rel} : lecture impossible (copie de travail en échec)"; UNVERIFIABLE=1; return 0; }
-  local prog
+  local prog ph="" refl sum_held
   case "$type" in backlog) prog="$AWK_BACKLOG_ARCHIVE" ;; state) prog="$AWK_STATE_ARCHIVE" ;; roadmap) prog="$AWK_ROADMAP_ARCHIVE" ;; esac
-  LC_ALL=C awk -v ARCH="$TMPD/arch" -v ARCHREL="$archrel" -v CNT="$TMPD/cnt" "$prog" "$TMPD/snap" > "$TMPD/new" \
+  : > "$TMPD/held"
+  if [ "$type" = "roadmap" ]; then   # garde DLWS : numéros de phase des dossiers du compartiment ; non vérifiable = rien déplacé
+    ph="$(roadmap_phase_set "$(dirname "$src")/phases")" \
+      || { archive_refuse "${rel} — correspondance numéro de phase → dossier non vérifiable, rien déplacé"; UNVERIFIABLE=1; return 0; }
+  fi
+  LC_ALL=C awk -v ARCH="$TMPD/arch" -v ARCHREL="$archrel" -v CNT="$TMPD/cnt" -v REF="$TMPD/held" -v PH="$ph" "$prog" "$TMPD/snap" > "$TMPD/new" \
     || { archive_refuse "${rel} : lecture impossible (awk en échec)"; UNVERIFIABLE=1; return 0; }
+  # Blocs gardés (roadmap) : un constat par bloc, dit même quand rien d'autre n'est archivable.
+  while IFS="$(printf '\t')" read -r sum_held refl; do
+    [ -n "$sum_held" ] || continue
+    archive_refuse "${rel} — bloc « ${sum_held} » porte des phases dont les dossiers existent (${refl}) ; archiver d'abord les dossiers de phase"
+  done < "$TMPD/held"
   n=$(cat "$TMPD/cnt"); case "$n" in ''|*[!0-9]*) n=0 ;; esac
   [ "$n" -gt 0 ] || return 0
   if why=$(src_unclean "$rel"); then archive_refuse "$rel $why, rien déplacé"; return 0; fi
