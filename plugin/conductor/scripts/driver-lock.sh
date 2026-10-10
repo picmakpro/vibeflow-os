@@ -54,6 +54,14 @@
 # "ws" ("" pour le depot) et "location" (git-common-dir). Refus nommes, chacun avec un "hint" :
 # unknown-ws, ws-invalid, partition-unreadable, policy-missing. Le nom du sujet est valide par
 # vf_ws_name_valid puis vf_ws_dir_resolve AVANT d'entrer dans un chemin ou un JSON.
+# ANCIEN VERROU (P57-D-14, P57-D-24, P57-D-26) : en lab partitionne, un .planning/DRIVER.lock tenu
+# vaut verrou de depot. Tout acquire (compartiment ou depot) refuse "legacy-lock-held" avec en hint la
+# commande de release exacte ; perime, "stale-requires-takeover" avec le recover cible. Rien n'est
+# repris, relache ni supprime en silence, et aucun verbe n'est neuf : l'ancien verrou se manie par
+# VF_DRIVER_LOCK=.planning/DRIVER.lock. Les verbes autres qu'acquire, appeles sans --ws ni --depot
+# quand le verrou de depot est absent, retombent sur l'ancien verrou ("scope_reason":
+# "legacy-fallback", "legacy_lock": true) : un manager en vol pendant la mise a jour garde son verrou.
+# status porte toujours "legacy_lock" (true|false) en lab partitionne.
 # LAB PLAT, ou VF_DRIVER_LOCK pose : comportement historique, au bit pres — la politique de noms
 # n'est meme pas chargee. LIMITE ECRITE (P57-D-29) : deux .planning/ dans un meme clone partagent
 # vf-driver/, hors perimetre.
@@ -185,6 +193,9 @@ session_ids_append() {
 # en silence (P57-D-25) ; la detection fine est vf_ws_enumerate, rc 0/2/3.
 # ---------------------------------------------------------------------------------------------
 PARTITIONED=0; SCOPE=""; LOCATION=""; SCOPE_JSON=""
+# Ancien verrou unique (P57-D-26) : le chemin historique, evalue par rapport au cwd comme le defaut
+# de LOCK_DIR. Lu seulement en lab partitionne ; jamais cree, jamais supprime par la resolution.
+LEGACY_DIR=".planning/DRIVER.lock"; LEGACY_PRESENT=false
 
 # Refus nomme, rejouable. La cle de tete suit le verbe (`error` pour status/orphans : JAMAIS une
 # cle `present`, qui se lirait « relache »). $3 = nom de sujet DEJA valide (jamais une valeur brute).
@@ -264,6 +275,20 @@ vf_dl_resolve() {
     SCOPE="depot"
     SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"\", \"location\": \"$LOCATION\""
     [ "$DEPOT" = 1 ] || SCOPE_JSON="$SCOPE_JSON, \"scope_reason\": \"ws-absent\""
+    # Repli sur l'ancien verrou (P57-D-24) : un verbe autre qu'acquire, sans --ws ni --depot, quand
+    # le verrou de depot est absent et l'ancien present, vise l'ancien. C'est ce qui garde un manager
+    # en vol pendant la mise a jour : ses verbes sans --ws retombent sur SON verrou.
+    if [ "$ACTION" != acquire ] && [ "$DEPOT" = 0 ] && [ ! -L "$LOCK_DIR" ] && [ ! -d "$LOCK_DIR" ] \
+       && { [ -L "$LEGACY_DIR" ] || [ -d "$LEGACY_DIR" ]; }; then
+      LOCK_DIR="$LEGACY_DIR"
+      LOCATION="checkout"
+      SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"\", \"location\": \"$LOCATION\", \"scope_reason\": \"legacy-fallback\", \"legacy_lock\": true"
+    fi
+  fi
+  # status expose toujours legacy_lock en lab partitionne (P57-D-26, P57-D-32), cible ou non.
+  if [ -L "$LEGACY_DIR" ] || [ -d "$LEGACY_DIR" ]; then LEGACY_PRESENT=true; fi
+  if [ "$ACTION" = status ]; then
+    case "$SCOPE_JSON" in *'"legacy_lock"'*) ;; *) SCOPE_JSON="$SCOPE_JSON, \"legacy_lock\": $LEGACY_PRESENT" ;; esac
   fi
   META="$LOCK_DIR/meta"
 }
@@ -588,6 +613,22 @@ json_status() {
     "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page" "$children" "$SCOPE_JSON"
 }
 
+# Sonde de l'ancien verrou unique (P57-D-26), appelee en tete d'acquire en lab partitionne. Evalue
+# l'ancien verrou en REUTILISANT lock_present, lock_age et meta_get dans un sous-shell qui reassigne
+# LOCK_DIR/META : aucune copie de leur logique, et le shell appelant garde sa cible. Rend trois
+# lignes (etat vivant|perime, age, owner) ou rien si l'ancien verrou est absent. Lecture seule :
+# ni reprise, ni suppression, ni relachement.
+vf_dl_legacy_probe() {
+  (
+    LOCK_DIR="$LEGACY_DIR"; META="$LOCK_DIR/meta"
+    lock_present || exit 0
+    _age="$(lock_age)"
+    if [ "$_age" -le "$TTL" ]; then echo vivant; else echo perime; fi
+    echo "$_age"
+    sanitize_field "$(meta_get owner)"; echo
+  )
+}
+
 require_owner() {
   [ -n "$OWNER" ] || { log "--owner requis pour '$ACTION'"; echo '{"error": "owner-required"}'; exit 1; }
 }
@@ -595,6 +636,26 @@ require_owner() {
 case "$ACTION" in
   acquire)
     require_owner
+    # 0. ANCIEN VERROU (P57-D-26) : en lab partitionne, un .planning/DRIVER.lock tenu vaut verrou de
+    #    depot, donc il refuse toute acquisition neuve, compartiment compris. Refus nomme avec la
+    #    commande exacte a rejouer ; JAMAIS de reprise, de relachement ni de suppression ici. Place
+    #    AVANT new_generation : un refus ne laisse aucun dechet de generation.
+    if [ "$PARTITIONED" = 1 ]; then
+      _leg="$(vf_dl_legacy_probe)"
+      if [ -n "$_leg" ]; then
+        _leg_state="$(printf '%s\n' "$_leg" | sed -n 1p)"
+        _leg_age="$(printf '%s\n' "$_leg" | sed -n 2p)"
+        _leg_owner="$(printf '%s\n' "$_leg" | sed -n 3p)"
+        if [ "$_leg_state" = vivant ]; then
+          printf '{"acquired": false, "reason": "legacy-lock-held", "held_by": "%s", "age_seconds": %s, "hint": "VF_DRIVER_LOCK=%s driver-lock.sh release --owner=%s"%s}\n' \
+            "$_leg_owner" "$_leg_age" "$LEGACY_DIR" "$_leg_owner" "$SCOPE_JSON"
+        else
+          printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "VF_DRIVER_LOCK=%s driver-lock.sh recover"%s}\n' \
+            "$_leg_owner" "$_leg_age" "$LEGACY_DIR" "$SCOPE_JSON"
+        fi
+        exit 1
+      fi
+    fi
     # 1. VOIE LIBRE — generation complete d'abord, publication par `ln -s` ensuite. `ln -s` echoue
     #    si le nom existe : c'est le primitif atomique qui departage, et il ne publie qu'un lock
     #    deja complet.
