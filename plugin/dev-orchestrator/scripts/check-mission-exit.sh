@@ -30,8 +30,13 @@
 # Usage :
 #   check-mission-exit.sh [--root <dir>] [--report <path>] [--step <phase>]... [--hook|--quiet]
 #   check-mission-exit.sh --budget-snapshot [--root <dir>]   # DÉBUT de mission, une fois (voir E7)
+#   Lab PARTITIONNÉ (Phase 57) : ajouter --ws <sujet>, le compartiment de la mission (P57-D-35).
 # Defaults : --root .   (pas de --report ni --step par défaut : leur absence est INDÉTERMINÉE,
 #            jamais un vert — le gate n'a alors aucune source de vérité sur ce qu'il devait lire.)
+#
+# --ws <sujet> désigne le compartiment de la mission (valeur séparée ; absente : exit 64). Il couvre E1, l'identité
+# d'E7 et la surcharge d'E4 (premier canal de la résolution, devant GSD_WORKSTREAM). Lab PLAT : accepté, sans effet.
+# Lab PARTITIONNÉ sans --ws : E1 INDÉTERMINÉ (jamais un vert), `--budget-snapshot` exit 4, avant toute écriture.
 #
 # --hook ne change que le format d'affichage (parité d'interface avec les autres gates du dépôt) ;
 # --quiet supprime les diagnostics informatifs sur la sortie d'erreur. Mutuellement exclusifs.
@@ -43,6 +48,9 @@
 #        des agents dispatchés (issue #82) : un verrou relâché avec `children_running` > 0 est
 #        un manque (mission terminée mais pas inerte) ; champ absent = kernel antérieur, le
 #        sous-contrôle est dit non applicable sur la sortie d'erreur.
+#        Lab partitionné (P57-D-15, P57-D-22) : le verrou jugé est celui du compartiment `--ws`, lu par
+#        `driver-lock.sh status --ws=<sujet>` depuis --root, VF_DRIVER_LOCK vidé ; un verrou de DÉPÔT tenu est dit sur
+#        la sortie d'erreur, jamais compté comme un manque (il peut appartenir à une autre session).
 #   E2 — l'arbre de travail est propre (`git status --porcelain` capturé en variable, JAMAIS
 #        canalisé dans un compteur de lignes — une sortie vide y devient une ligne sous un hook
 #        de proxy de commandes actif, piège déjà tracé de ce dépôt).
@@ -200,13 +208,36 @@ budget_lines() { { grep -E "$BUDGET_TOK" || true; } | sed 's/^\[budget\] *//' | 
 # Identité de la mission : le NOM de la génération du verrou de driver courant (lien DRIVER.lock → DRIVER.lock.gen.<epoch>.<pid>),
 # « - » sans verrou. Même chemin que E1 (le verrou du dépôt jugé), jamais une variable d'environnement.
 cur_lock_gen() {
-  local l="$ROOT/.planning/DRIVER.lock" t
+  local l="$ROOT/.planning/DRIVER.lock" t sd out pr gn
+  if is_partitioned; then # CURGEN
+    # Lab partitionné (P57-D-35) : l'identité de la mission est la génération du verrou du compartiment DÉSIGNÉ,
+    # lue par le driver-lock.sh du lab depuis --root, VF_DRIVER_LOCK vidé. « - » seulement si le verrou est
+    # relâché ; toute lecture impossible (pas de --ws, script absent, rc non nul, JSON illisible) rend « ? ».
+    [ -n "$WS" ] || { printf '?'; return 0; }
+    sd="$(resolve_S)" || { printf '?'; return 0; }
+    [ -f "$sd/driver-lock.sh" ] || { printf '?'; return 0; }
+    out="$( cd "$ROOT" 2>/dev/null && VF_DRIVER_LOCK= "$sd/driver-lock.sh" status --ws="$WS" 2>/dev/null )" || { printf '?'; return 0; }
+    pr="$(printf '%s' "$out" | jq -r 'if has("present") then (.present | tostring) else "" end' 2>/dev/null)"
+    case "$pr" in
+      false) printf -- '-' ;;
+      true) gn="$(printf '%s' "$out" | jq -r '.generation // ""' 2>/dev/null)"
+            if [ -n "$gn" ]; then printf '%s' "$gn"; else printf '?'; fi ;;
+      *) printf '?' ;;
+    esac
+    return 0
+  fi
   if [ -L "$l" ]; then t="$(readlink "$l" 2>/dev/null)"; printf '%s' "${t##*/}"
   elif [ -e "$l" ]; then printf 'legacy'
   else printf -- '-'; fi
 }
 
 if [ "$BUDGET_SNAPSHOT" -eq 1 ]; then
+  if is_partitioned && [ -z "$WS" ]; then # SNAPWS
+    # Lab partitionné sans compartiment désigné : l'identité de la mission serait illisible (P57-D-35). Refus AVANT
+    # toute résolution du script de budget et toute écriture.
+    echo "[check-mission-exit] --budget-snapshot : lab partitionné : --ws <sujet> requis pour poser le snapshot de la mission" >&2
+    exit 4
+  fi
   # Geste du manager, UNE fois, au démarrage de la mission : photographie SANS ÉCRITURE (--auto --dry-run : la
   # décision d'archivage est prise, rien n'est écrit) de ce qui est déjà rangeable ; écrit hors de l'arbre de travail.
   SNAP_BUDGET="$(resolve_budget)" || { echo "[check-mission-exit] --budget-snapshot : check-method-budget.sh introuvable" >&2; exit 4; }
@@ -240,7 +271,10 @@ E7_STATUS="sain"; E7_MSG=""
 # E1 — verrou de driver relâché. Lecture SEULE (D-11) : ce script n'invoque que le sous-verbe qui
 # rend l'état courant, jamais un verbe qui modifierait le verrou.
 E1_S_DIR="$(resolve_S || true)"
-if [ -z "$E1_S_DIR" ]; then
+if is_partitioned && [ -z "$WS" ]; then
+  E1_STATUS="indet"
+  E1_MSG="[E1] lab partitionné : --ws <sujet> requis pour juger le verrou de la mission"
+elif [ -z "$E1_S_DIR" ]; then
   E1_STATUS="indet"
   E1_MSG="[E1] cascade non résolue : aucun candidat ne porte dag.sh"
 elif [ ! -x "$E1_S_DIR/driver-lock.sh" ] && [ ! -f "$E1_S_DIR/driver-lock.sh" ]; then
@@ -298,6 +332,16 @@ else
         E1_MSG="[E1] champ present ni true ni false ($E1_PRESENT)"
         ;;
     esac
+    if is_partitioned && [ -n "$WS" ]; then
+      # Verrou de DÉPÔT (P57-D-01, P57-D-35) : peut appartenir à une autre session ; dit sur stderr, jamais compté
+      # comme un manque de la mission. Lecture seule, même sous-shell, VF_DRIVER_LOCK vidé ; échec de lecture : tu.
+      E1_DEPOT="$( cd "$ROOT" 2>/dev/null && VF_DRIVER_LOCK= "$E1_S_DIR/driver-lock.sh" status --depot 2>/dev/null )" && {
+        if [ "$(printf '%s' "$E1_DEPOT" | jq -r 'if has("present") then (.present | tostring) else "" end' 2>/dev/null)" = "true" ]; then
+          E1_DEPOT_OWNER="$(printf '%s' "$E1_DEPOT" | jq -r '.owner // "?"' 2>/dev/null | tr -d '[:cntrl:]')"
+          say "[E1] verrou de dépôt tenu (owner=$E1_DEPOT_OWNER) — non imputé à la mission"
+        fi
+      }
+    fi
   fi
 fi
 # <<< E1
@@ -470,7 +514,7 @@ else
   E4_ROADMAP="$E4_PLANNING_DIR/ROADMAP.md"
   E4_STATE_OVERRIDE=""
   if command -v vf_ws_resolve >/dev/null 2>&1; then
-    vf_ws_resolve "$E4_PLANNING_DIR"
+    vf_ws_resolve "$E4_PLANNING_DIR" "$WS"
     if [ -n "${VF_WS_NAME:-}" ] && command -v vf_ws_dir_resolve >/dev/null 2>&1; then
       vf_ws_dir_resolve "$E4_PLANNING_DIR" "$VF_WS_NAME"
       if [ -n "${VF_WS_DIR:-}" ]; then
