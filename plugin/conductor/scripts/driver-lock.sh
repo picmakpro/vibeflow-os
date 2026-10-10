@@ -256,6 +256,14 @@ vf_dl_resolve() {
     LOCK_DIR="$common/vf-driver/ws/$WS/DRIVER.lock"
     SCOPE="compartiment"
     SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"$WS\", \"location\": \"$LOCATION\""
+  else
+    # Cible = DEPOT : un emplacement distinct (`repo/`, jamais `ws/…`), independant de tout verrou
+    # de compartiment (P57-D-01, P57-D-02). Sans --ws NI --depot, la cible n'a pas ete designee :
+    # le JSON le dit (`scope_reason`), un export oublie ne se transforme jamais en verrou de sujet.
+    LOCK_DIR="$common/vf-driver/repo/DRIVER.lock"
+    SCOPE="depot"
+    SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"\", \"location\": \"$LOCATION\""
+    [ "$DEPOT" = 1 ] || SCOPE_JSON="$SCOPE_JSON, \"scope_reason\": \"ws-absent\""
   fi
   META="$LOCK_DIR/meta"
 }
