@@ -62,6 +62,13 @@
 # quand le verrou de depot est absent, retombent sur l'ancien verrou ("scope_reason":
 # "legacy-fallback", "legacy_lock": true) : un manager en vol pendant la mise a jour garde son verrou.
 # status porte toujours "legacy_lock" (true|false) en lab partitionne.
+# HORS GIT (P57-D-07) : sans dossier commun, le repli est .planning/DRIVER.lock.d/{ws/<sujet>,repo}/
+# DRIVER.lock, sous le motif .planning/DRIVER.lock* du .gitignore ; le JSON dit "location": "checkout".
+# LIMITE ECRITE (A4, T-57-37) : un worktree sur une branche d'avant la partition n'a pas de dossier
+# de compartiments, il bascule donc en regime plat (verrou historique) alors que le clone est
+# partitionne ; non mesure ici, l'usage reel releve de la Phase 61.
+# VF_DRIVER_LOCK non vide, ou lab plat : mode verrou unique, --ws/--depot acceptes et sans effet
+# (P57-D-22, P57-D-31) ; vf_dl_resolve rend la main avant toute lecture de ces options.
 # LAB PLAT, ou VF_DRIVER_LOCK pose : comportement historique, au bit pres — la politique de noms
 # n'est meme pas chargee. LIMITE ECRITE (P57-D-29) : deux .planning/ dans un meme clone partagent
 # vf-driver/, hors perimetre.
@@ -232,7 +239,7 @@ vf_dl_resolve() {
   [ -z "${VF_DRIVER_LOCK:-}" ] || return 0
   [ -e .planning/workstreams ] || [ -L .planning/workstreams ] || return 0
 
-  local policy="" cand common rc=0
+  local policy="" cand common LOCK_ROOT rc=0
   for cand in "$(dirname "$0")/workstream-policy.sh" \
               "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
     [ -f "$cand" ] && { policy="$cand"; break; }
@@ -250,8 +257,14 @@ vf_dl_resolve() {
   esac
   PARTITIONED=1
 
-  common="$(vf_dl_common_dir)" || vf_dl_refuse no-git-common-dir "dossier commun du clone introuvable : lancer la commande dans un depot git"
-  LOCATION="git-common-dir"
+  # Emplacement (P57-D-07, P57-D-21) : le dossier commun du clone, partage par tous ses worktrees ;
+  # hors depot git, repli sous .planning/DRIVER.lock.d (couvert par le motif .planning/DRIVER.lock*
+  # du .gitignore), que le JSON declare ("location": "checkout").
+  if common="$(vf_dl_common_dir)"; then
+    LOCK_ROOT="$common/vf-driver"; LOCATION="git-common-dir"
+  else
+    LOCK_ROOT=".planning/DRIVER.lock.d"; LOCATION="checkout"
+  fi
 
   if [ "$WS_GIVEN" = 1 ]; then
     # Validation AVANT tout chemin ou JSON (T-57-01, T-57-06). La liste n'est jamais passee dans
@@ -264,14 +277,14 @@ vf_dl_resolve() {
       2) vf_dl_refuse ws-invalid "le compartiment designe est un lien symbolique, refuse : rejouer avec un compartiment reel" ;;
       *) vf_dl_refuse unknown-ws "aucun compartiment de ce nom : lister les compartiments avec driver-lock.sh status --all puis rejouer" "$WS" ;;
     esac
-    LOCK_DIR="$common/vf-driver/ws/$WS/DRIVER.lock"
+    LOCK_DIR="$LOCK_ROOT/ws/$WS/DRIVER.lock"
     SCOPE="compartiment"
     SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"$WS\", \"location\": \"$LOCATION\""
   else
     # Cible = DEPOT : un emplacement distinct (`repo/`, jamais `ws/…`), independant de tout verrou
     # de compartiment (P57-D-01, P57-D-02). Sans --ws NI --depot, la cible n'a pas ete designee :
     # le JSON le dit (`scope_reason`), un export oublie ne se transforme jamais en verrou de sujet.
-    LOCK_DIR="$common/vf-driver/repo/DRIVER.lock"
+    LOCK_DIR="$LOCK_ROOT/repo/DRIVER.lock"
     SCOPE="depot"
     SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"\", \"location\": \"$LOCATION\""
     [ "$DEPOT" = 1 ] || SCOPE_JSON="$SCOPE_JSON, \"scope_reason\": \"ws-absent\""
