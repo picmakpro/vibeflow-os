@@ -103,6 +103,7 @@ STEPS=""
 HOOK=0
 QUIET=0
 BUDGET_SNAPSHOT=0
+WS=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -124,6 +125,12 @@ while [ "$#" -gt 0 ]; do
         exit 64
       fi
       STEPS="${STEPS}${2}"$'\n'; shift 2 ;;
+    --ws)
+      if [ "$#" -lt 2 ]; then
+        echo "[check-mission-exit] --ws nécessite une valeur" >&2
+        exit 64
+      fi
+      WS="$2"; shift 2 ;;
     --hook) HOOK=1; shift ;;
     --quiet) QUIET=1; shift ;;
     --budget-snapshot) BUDGET_SNAPSHOT=1; shift ;;
@@ -185,6 +192,9 @@ budget_snap_path() { # chemin absolu du snapshot, sous le répertoire git commun
   case "$g" in /*) ;; *) g="$ROOT/$g" ;; esac
   printf '%s/vf-mission-budget.snap' "$g"
 }
+# Lab partitionné (Phase 57) : le dossier des compartiments existe sous --root (dossier, lien ou
+# fichier : un état illisible est jugé par driver-lock.sh, jamais replié sur le lab plat ici).
+is_partitioned() { [ -e "$ROOT/.planning/workstreams" ] || [ -L "$ROOT/.planning/workstreams" ]; }
 BUDGET_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ'
 budget_lines() { { grep -E "$BUDGET_TOK" || true; } | sed 's/^\[budget\] *//' | LC_ALL=C sort -u; }
 # Identité de la mission : le NOM de la génération du verrou de driver courant (lien DRIVER.lock → DRIVER.lock.gen.<epoch>.<pid>),
@@ -237,8 +247,16 @@ elif [ ! -x "$E1_S_DIR/driver-lock.sh" ] && [ ! -f "$E1_S_DIR/driver-lock.sh" ];
   E1_STATUS="indet"
   E1_MSG="[E1] \$S résolu, driver-lock.sh absent (dossier : $E1_S_DIR)"
 else
-  E1_OUT="$(VF_DRIVER_LOCK="$ROOT/.planning/DRIVER.lock" "$E1_S_DIR/driver-lock.sh" status 2>/dev/null)"
-  E1_RC=$?
+  if is_partitioned && [ -n "$WS" ]; then
+    # Lab partitionné (P57-D-15, P57-D-22) : le verrou jugé est celui du compartiment DÉSIGNÉ, lu par le
+    # driver-lock.sh du lab depuis --root, VF_DRIVER_LOCK vidé (un export hérité forcerait le mode verrou
+    # unique et déplacerait la cible). Un driver-lock.sh d'avant la phase rend rc 1 : indéterminé, jamais sain.
+    E1_OUT="$( cd "$ROOT" 2>/dev/null && VF_DRIVER_LOCK= "$E1_S_DIR/driver-lock.sh" status --ws="$WS" 2>/dev/null )"
+    E1_RC=$?
+  else
+    E1_OUT="$(VF_DRIVER_LOCK="$ROOT/.planning/DRIVER.lock" "$E1_S_DIR/driver-lock.sh" status 2>/dev/null)"
+    E1_RC=$?
+  fi
   if [ "$E1_RC" -ne 0 ]; then
     E1_STATUS="indet"
     E1_MSG="[E1] driver-lock.sh status a rendu un code non nul ($E1_RC)"
