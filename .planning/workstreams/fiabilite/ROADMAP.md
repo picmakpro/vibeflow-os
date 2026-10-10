@@ -1452,7 +1452,6 @@ Plans:
 - [x] 41.2-05 — skill `vf-split-planning` + commande + renvois `vf-new-lab` / `intent-routing.md` + sonde WSCH-01 (checkpoint F1 : budget d'instructions) — vague 3
 - [x] 41.2-06 — remise WSAW-07 (`41.2-WSAW07-HANDOFF.md`) + clôture rejouée — vague 4
 
-
 ### Phase 41.3: Sobriété de méthode — ce qu'on crée, on le range (INSERTED)
 
 > **Origine** : audit du 2026-09-29 (session principale). Mesuré ce jour-là : `STATE.md` de
@@ -1923,7 +1922,7 @@ forme exec (ADR-071).
 **Depends on:** aucune. Première du jalon.
 **Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
 **Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
-**Plans:** 11/16 plans executed (10 vagues)
+**Plans:** 12/16 plans executed (10 vagues)
 
 Plans:
 **Wave 1**
@@ -1948,7 +1947,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [x] 57-11-PLAN.md — vague 6 : preuves du guard (A/B lab plat contre copie gelée, mutants GW-M-*, latence)
-- [ ] 57-12-PLAN.md — vague 6 : team-kernel, managers design et bundles, skill `vf-split-planning` sous verrou de dépôt
+- [x] 57-12-PLAN.md — vague 6 : team-kernel, managers design et bundles, skill `vf-split-planning` sous verrou de dépôt
 
 **Wave 7** *(blocked on Wave 6 completion)*
 - [ ] 57-13-PLAN.md — vague 7 : amendement daté d'ADR-053, spec head §6, contrat des hooks, étape de release de `CLAUDE.md` en deux gestes de dépôt courts, manuel FR+EN
