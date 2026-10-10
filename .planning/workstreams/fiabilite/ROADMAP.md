@@ -1923,7 +1923,7 @@ forme exec (ADR-071).
 **Depends on:** aucune. Première du jalon.
 **Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
 **Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
-**Plans:** 2/16 plans executed (10 vagues)
+**Plans:** 3/16 plans executed (10 vagues)
 
 Plans:
 **Wave 1**
@@ -1933,7 +1933,7 @@ Plans:
 - [x] 57-02-PLAN.md — vague 2 : `driver-lock.sh`, ancien verrou à la mise à jour, partage entre worktrees, repli hors git, mode verrou unique
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 57-03-PLAN.md — vague 3 : `driver-lock.sh`, `status --all`, `--ws` sur tous les verbes, registre par verrou
+- [x] 57-03-PLAN.md — vague 3 : `driver-lock.sh`, `status --all`, `--ws` sur tous les verbes, registre par verrou
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 57-04-PLAN.md — vague 4 : preuves de `driver-lock.sh` (concurrence 24×5, A/B lab plat contre copie gelée, mutants DL-M-*)
