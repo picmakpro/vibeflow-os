@@ -35,7 +35,7 @@ vient du digest ; un PLAN absent du digest : cas, statut de l'axe et saut évent
 et `{phase_dir}/{phase}-REVIEW-SPEC.md`). Agrège et déduplique les findings à l'intérieur de chaque
 axe, sans fusionner les deux ; recoupe avec les conventions du projet. Consigne chacun des deux
 dispatchs dans le même tour (`"$S"/driver-lock.sh register --agent=<agentId> --role=gsd-code-reviewer --node=<nœud du
-digest> --depth=2`, `$S` résolu comme en `mission-flow.md` §Résolution) et ferme-le à son retour
+digest> --depth=2 [--ws=<sujet du mandat>]`, `$S` résolu comme en `mission-flow.md` §Résolution) et ferme-le à son retour
 (`close --agent=<agentId> --status=done|failed`) : après la mort d'un manager, le registre est le
 seul moyen de retrouver tes sous-agents (`mission-flow.md` §Pattern I, issue #82).
 
