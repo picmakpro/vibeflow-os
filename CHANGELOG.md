@@ -13,6 +13,21 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.69.1] — 2026-10-10
+
+**Patch** (garde de fin de geste et mineurs de relecture ; release demandée par Samuel, AskUserQuestion session
+principale, 2026-10-10 : « Release v2.69.1 + /vf-update ») :
+
+- **L'archivage du ROADMAP ne réarchive plus un bloc dont les dossiers de phase existent encore** (`conductor`
+  v1.48.1 → v1.48.2, PR #143). Motif : la garde de fin de geste exécute la copie installée du plugin, qui n'avait pas
+  ce correctif et réarchivait le ROADMAP du compartiment `fiabilite` à chaque fin de tour, ce qui cassait
+  `check-divergence` S4(a).
+- **Mineurs de la relecture SOBR-04 de la v2.69.0** (`conductor` v1.48.0 → v1.48.1, PR #140) : BOM toléré par
+  `check-planning-not-inflight.sh`, documentation de `vf-split-planning`.
+- Docs et planning seulement, rien à distribuer : PR #141, #142, #144 (inscription du jalon `equipe-produit-v1.0`,
+  cadrage et plan de la Phase 57).
+
+
 ## [v2.69.0] — 2026-10-08
 
 **Minor** (choix de la partition au démarrage d'un lab, emprunts Pocock ; release demandée par Samuel, session

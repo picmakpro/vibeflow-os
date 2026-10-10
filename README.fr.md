@@ -11,7 +11,7 @@ déroule le pipeline (cadrage → plan → exécution → preuve), et des **gate
 pas des promesses. Claude Code est le runtime de référence ; l'install et l'usage sont aussi
 mesurés de bout en bout sur **Codex** et **kimi-code**.
 
-[![Version](https://img.shields.io/badge/version-2.69.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.69.1-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#-installation)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
@@ -165,6 +165,7 @@ Historique complet : **[CHANGELOG.md](./CHANGELOG.md)**, canon unique — la tab
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.69.1` | 2026-10-10 | **Correctif de la garde de fin de geste (patch).** L'archivage du ROADMAP ne réarchive plus un bloc dont les dossiers de phase existent encore (`conductor` v1.48.2, #143), ce qui cassait `check-divergence` S4(a) quand la copie installée du plugin n'avait pas le correctif ; mineurs de la relecture SOBR-04 de la v2.69.0 : BOM toléré par `check-planning-not-inflight.sh`, doc de `vf-split-planning` (`conductor` v1.48.1, #140). |
 | `v2.69.0` | 2026-10-08 | **Choix de la partition du planning au démarrage d'un lab, emprunts Pocock (minor).** Nouveau skill `vf-split-planning` : une seule question à la fin de l'initialisation d'un lab (un planning unique par défaut, ou des sujets parallèles), compartiments créés par le moteur, précondition « aucune phase en vol » vérifiée par machine (`conductor` v1.48.0, `dev-orchestrator` v2.27.1). Disciplines de Pocock : frontière de questions, glossaire du lab, revue à deux axes, classe d'invocation des skills (`dev-orchestrator` v2.27.0, `consolidator` v1.11.0). Correctifs externes de l'adaptateur Codex et de `vf-new-lab`. Clôt le jalon `fiabilite-v1.0`. |
 | `v2.68.0` | 2026-10-01 | **Sobriété de méthode et planning métier par cycles (minor).** Budgets de méthode étendus (BACKLOG, index mémoire, ROADMAP) avec archivage automatique réversible, hook `Stop` de fin de geste et contrôle E7 (`conductor` v1.46.0, `dev-orchestrator` v2.26.0, Phase 41.3) ; `recalc-planning.sh` et modèle par cycles (`planning-core` v2.8.0, Phase 44) ; `check-overlaps` résout un agent par son `name:` (#119). |
 | `v2.67.1` | 2026-09-29 | **Hotfix : deux régressions de v2.67.0.** `popd` contournait le verrou de driver (`conductor` v1.45.1) : dans `pushd <autre-dépôt> && git commit && popd && git commit`, le second commit, fait dans le lab, passait sous le verrou d'une autre session, ce que v2.66.0 refusait ; `popd` rend désormais la cible indéterminée et le verrou s'applique. `skill-creator` v1.1.1 : v1.1.0 demandait `vf-nature` (et `ecrit:`, `vf-rubrique-juge:`, les trois marqueurs) dans le frontmatter alors que son propre `quick_validate.py` les rejetait, si bien qu'un skill produit par ce flux échouait à la validation et à l'empaquetage ; les six clés du gate des skills sont acceptées. Chaque correctif vient avec des cas rouges sans lui. Coupée depuis le tag `v2.67.0` : la Phase 44 (`planning-core` v2.8.0), mergée sur `main` sans release, n'est pas embarquée. **92 suites.** |
