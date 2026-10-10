@@ -770,6 +770,142 @@ else
 fi
 fi   # GW_MODE = full (A/B)
 
+if [ "$GW_MODE" = full ]; then
+echo
+echo "=== MUTANTS GW-M-a à GW-M-l — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
+# Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du guard, posée à côté d'une
+# copie de vf-portable.sh (sinon le locator sortirait en code 17 pour la mauvaise raison). Le programme python
+# embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
+# sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
+# est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
+MUT_TOTAL=12; MUT_KILLED=0; t0=$SECONDS
+# a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
+#     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
+MUT_A="GW-C-NONASCII-1=1 GW-C-REL-tenu=2"
+MUT_B="GW-C-REN-1=1 GW-C-REN-2=1"
+MUT_C="GW-CRASH.2=1 GW-CRASH.3=1 GW-CRASH.4=1 GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1"
+MUT_D="GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1"
+MUT_E="GW-T-EXEMPT-1=1"
+MUT_F="GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1"
+# g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
+MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-D-TAG-detenteur=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
+# h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
+MUT_H="GW-MARK-W-4=1 GW-Q-PASS=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
+MUT_I="GW-C-REL-tenu=2"
+MUT_J="GW-C-ALL-1=1 GW-C-ALL-2=1"
+MUT_K="GW-C-ADD-1=1"
+MUT_L="GW-W-LEG-1=1 GW-W-LEG-2=1"
+gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
+  awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
+}
+gw_py_compiles() { # <fichier python>
+  python3 -I -c 'import sys; compile(open(sys.argv[1], encoding="utf-8").read(), "guard-embarque", "exec")' "$1" 2>/dev/null
+}
+mut_ids() { # <journal> → « identifiant=nombre d'échecs », trié, une par ligne
+  LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sort | LC_ALL=C uniq -c | LC_ALL=C awk '{print $2 "=" $1}' | LC_ALL=C sort
+}
+mut_trace() { # <journal> <identifiant> → première assertion violée, attendu/obtenu (octets : LC_ALL=C, lignes tronquées)
+  LC_ALL=C awk -v f="$2" '
+    /^  ❌ FAIL — /{ t=$0; sub(/^  ❌ FAIL — /,"",t); k=t; sub(/ .*$/,"",k)
+                    if (!done && k==f) { print "      rouge " substr(t,1,170); p=1; done=1; next } p=0 }
+    p && /^     /{ print "        " substr($0,1,170); next }
+    { p=0 }' "$1"
+}
+mut_run() { # <guard> <journal> → code de sortie du sous-processus
+  GW_MODE=matrice GW_GUARD="$1" "$BASH_BIN" "$SUITE" > "$2" 2>&1 < /dev/null
+}
+MUT_IDS=""
+mutant() { # <id> <ancre BRE> <expression sed s> <attendu> [<ancre 2> <expression 2>]
+  # Prépare le mutant puis lance sa matrice EN ARRIÈRE-PLAN ; le verdict est rendu par mutant_eval, dans l'ordre,
+  # après `wait`. Chaque sous-processus a son propre WORK_DIR.
+  local id="$1" anchor="$2" expr="$3" expected="$4" anchor2="${5:-}" expr2="${6:-}" dir="$WORK_DIR/gw-mut-$1" n
+  mkdir -p "$dir"; MUT_IDS="$MUT_IDS $id"
+  printf '%s\n' $expected | LC_ALL=C sort -u > "$dir/attendu.txt"
+  cp "$GUARD" "$dir/guard-driver-lock.sh"; cp "$PORTABLE" "$dir/vf-portable.sh"
+  cp "$dir/guard-driver-lock.sh" "$dir/copie-temoin.sh"
+  n="$(grep -c -e "$anchor" "$dir/guard-driver-lock.sh")"
+  if [ "$n" != "1" ]; then echo "ancre non unique ($n occurrences de [$anchor])" > "$dir/prepko"; return; fi
+  sed -i.bak -e "/$anchor/$expr" "$dir/guard-driver-lock.sh"; rm -f "$dir/guard-driver-lock.sh.bak"
+  if [ -n "$anchor2" ]; then
+    n="$(grep -c -e "$anchor2" "$dir/guard-driver-lock.sh")"
+    if [ "$n" != "1" ]; then echo "ancre 2 non unique ($n occurrences de [$anchor2])" > "$dir/prepko"; return; fi
+    sed -i.bak -e "/$anchor2/$expr2" "$dir/guard-driver-lock.sh"; rm -f "$dir/guard-driver-lock.sh.bak"
+  fi
+  if cmp -s "$dir/guard-driver-lock.sh" "$dir/copie-temoin.sh"; then echo "mutant NON OPPOSABLE : la substitution n'a rien changé" > "$dir/prepko"; return; fi
+  if ! bash -n "$dir/guard-driver-lock.sh" 2>/dev/null; then echo "le mutant n'est pas un script valide (il rougirait pour la mauvaise raison)" > "$dir/prepko"; return; fi
+  gw_extract_py "$dir/guard-driver-lock.sh" "$dir/embarque.py"
+  if ! gw_py_compiles "$dir/embarque.py"; then echo "le programme python embarqué du mutant ne compile pas (il rougirait pour la mauvaise raison)" > "$dir/prepko"; return; fi
+  chmod +x "$dir/guard-driver-lock.sh"
+  ( mut_run "$dir/guard-driver-lock.sh" "$dir/matrice.log"; echo $? > "$dir/rc" ) &
+}
+mutant_eval() { # <id>
+  local id="$1" dir="$WORK_DIR/gw-mut-$1" rc got
+  if [ -f "$dir/prepko" ]; then assert_exit "GW-M-$id — $(cat "$dir/prepko")" 1 0; return; fi
+  rc="$(cat "$dir/rc" 2>/dev/null || echo absent)"
+  if [ "$rc" != 0 ] && [ "$rc" != 1 ]; then assert_exit "GW-M-$id — la matrice a planté (exit $rc), pas un échec de cas" 1 0; return; fi
+  grep -q '^=== Bilan : ' "$dir/matrice.log" || { assert_exit "GW-M-$id — la matrice n'a pas atteint son bilan" 1 0; return; }
+  mut_ids "$dir/matrice.log" > "$dir/obtenu.txt"
+  got="$(tr '\n' ' ' < "$dir/obtenu.txt")"
+  if [ ! -s "$dir/attendu.txt" ]; then
+    assert_exit "GW-M-$id — ensemble attendu vide (un mutant sans cas attendu ne prouve rien)" 1 0
+    echo "     obtenu:  {$got}"
+  elif cmp -s "$dir/attendu.txt" "$dir/obtenu.txt"; then
+    assert_exit "GW-M-$id — mutant tué : bascule exactement {$(tr '\n' ' ' < "$dir/attendu.txt")}" 0 0
+    while IFS= read -r one; do mut_trace "$dir/matrice.log" "${one%=*}"; done < "$dir/obtenu.txt"
+    MUT_KILLED=$((MUT_KILLED+1))
+  else
+    assert_exit "GW-M-$id — ensemble basculé INATTENDU" 1 0
+    echo "     attendu: {$(tr '\n' ' ' < "$dir/attendu.txt")}"
+    echo "     obtenu:  {$got}"
+  fi
+}
+
+# Témoin préalable : la copie NON mutée (guard + vf-portable.sh côte à côte) ne bascule AUCUN cas et son programme
+# embarqué compile.
+mkdir -p "$WORK_DIR/gw-mut-temoin"; cp "$GUARD" "$WORK_DIR/gw-mut-temoin/guard-driver-lock.sh"; cp "$PORTABLE" "$WORK_DIR/gw-mut-temoin/vf-portable.sh"
+chmod +x "$WORK_DIR/gw-mut-temoin/guard-driver-lock.sh"
+gw_extract_py "$WORK_DIR/gw-mut-temoin/guard-driver-lock.sh" "$WORK_DIR/gw-mut-temoin/embarque.py"
+gw_py_compiles "$WORK_DIR/gw-mut-temoin/embarque.py"; assert_exit "GW-M-témoin.1 — le programme python embarqué du guard non muté compile ($(wc -l < "$WORK_DIR/gw-mut-temoin/embarque.py" | tr -d ' ') lignes extraites)" "$?" 0
+mut_run "$WORK_DIR/gw-mut-temoin/guard-driver-lock.sh" "$WORK_DIR/gw-mut-temoin/matrice.log"; rc=$?
+tn="$(mut_ids "$WORK_DIR/gw-mut-temoin/matrice.log" | wc -l | tr -d ' ')"
+assert_exit "GW-M-témoin.2 — la copie non mutée rend zéro assertion en échec (exit $rc, $tn en échec, ${SECONDS}s écoulées)" "$((rc + tn))" 0
+
+# a : `-z` retiré de la source « diff --cached » -> la sortie n'est plus découpée sur NUL, un nom non ASCII sort cité
+mutant a 'srcs = \[("diff --cached"' 's@"--name-only", "-z"\])@"--name-only"])@' "$MUT_A"
+# b : `--no-renames` retiré -> un renommage ne montre plus que sa destination, la source d'un autre compartiment disparaît
+mutant b 'srcs = \[("diff --cached"' 's@"--cached", "--no-renames", @"--cached", @' "$MUT_B"
+# c : crochet d'exception fail-closed neutralisé (rend le silence) -> toute exception ré-ouvre par le repli bash
+mutant c '^    sys.excepthook = fail_closed_hook$' 's@fail_closed_hook$@lambda *a: None@' "$MUT_C"
+# d : crochet posé seulement à l'entrée de decide_partitioned, après le dispatch d'outil -> les exceptions du dispatch passent
+mutant d '^    sys.excepthook = fail_closed_hook$' 's@sys.excepthook = fail_closed_hook$@pass@' "$MUT_D" '57-08)\."""$' 's@"""$@"""; sys.excepthook = fail_closed_hook@'
+# e : exemption `git worktree add` retirée -> la porte de sortie prescrite par le verrou est refusée
+mutant e 'continue  # exemption nomm.*e : porte de sortie prescrite' 's@continue  # exemption nomm.*$@return True@' "$MUT_E"
+# f : condition de worktree retirée -> un geste d'arbre est refusé depuis un AUTRE worktree que celui du verrou
+mutant f 'if not wt or top is None or same_checkout(wt, top):' 's@if not wt or top is None or same_checkout(wt, top):@if True:@' "$MUT_F"
+# g : session courante traitée comme autrui -> le détenteur est refusé comme un tiers
+mutant g '^    if sid and sid in session_ids:$' 's@in session_ids:$@in session_ids and False:@' "$MUT_G"
+# h : cartographie par compartiment retirée -> tout verrou d'autrui bloque tout chemin
+mutant h 'kind, seg = map_path(abs_path, cwd)' 's@map_path(abs_path, cwd)@("incertain", "")@' "$MUT_H"
+# i : RELEASE_FORM_FILES vidée -> VERSION et docs/ADR.md ne sont plus des gestes de dépôt
+mutant i 'if pb in RELEASE_FORM_FILES:' 's@RELEASE_FORM_FILES:@():@' "$MUT_I"
+# j : source `-a` retirée -> `git commit -a` n'embarque plus les modifications non indexées
+mutant j 'if g\["a_flag"\] or g\["pathspec"\] or wide:' 's@g\["a_flag"\] or @@' "$MUT_J"
+# k : chemins d'ajout ignorés -> un `git add <littéral> && git commit` n'est plus jugé sur ce qu'il ajoute
+mutant k '^    paths.extend(lit)$' 's@paths.extend(lit)@pass@' "$MUT_K"
+# l : ancien verrou non lu -> .planning/DRIVER.lock d'autrui n'est plus vu en lab partitionné
+mutant l 'if os.path.lexists(legacy):' 's@lexists(legacy):@lexists(legacy) and False:@' "$MUT_L"
+
+wait
+for id in $MUT_IDS; do mutant_eval "$id"; done
+echo "  durée des mutants : $((SECONDS-t0))s"
+if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
+  echo "== mutants : 12/12 tués =="
+else
+  echo "== mutants : $MUT_KILLED/12 tués =="
+  FAIL=$((FAIL+1))
+fi
+fi   # GW_MODE = full (mutants)
+
 echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
 echo "== resultat : $PASS ok, $FAIL ko =="
