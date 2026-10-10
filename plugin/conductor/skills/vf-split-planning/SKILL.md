@@ -92,9 +92,20 @@ bash .claude/scripts/split-planning.sh --path . --lab-state
 
 ### 5. Le geste
 
+Le geste se fait sous le verrou de dépôt : jamais pendant un autre geste de dépôt (release, backlog,
+registre des décisions, fichiers racine du planning).
+
 ```sh
+bash .claude/scripts/driver-lock.sh acquire --depot --owner=vf-split-planning --step=partition
 bash .claude/scripts/split-planning.sh --path . --name "<nom>"
+bash .claude/scripts/driver-lock.sh release --owner=vf-split-planning
 ```
+
+`acquired:false` (`held`, `legacy-lock-held`, `stale-requires-takeover`) → dire « Un autre geste est en
+cours dans ce lab (<held_by>) : je ne sépare pas le planning maintenant. » et s'arrêter : aucun appel au
+geste, rien n'est changé. Le `release` se joue APRÈS le geste, quelle que soit l'issue. Il n'a pas de
+`--ws` : dans un lab plat, `--depot` est sans effet et le verrou unique sérialise la partition ; une fois
+le lab partitionné, ce verrou devient l'ancien verrou du lab, et `release` sans `--ws` le vise.
 
 Une ligne JSON sur stdout (`mode`, `subject`, `state`), diagnostics sur stderr. Seul le moteur
 écrit : ce skill n'écrit aucun fichier de planning et aucun frontmatter, et ne
