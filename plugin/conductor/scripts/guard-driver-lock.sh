@@ -65,6 +65,28 @@
 # imparsable → fail-open SILENCIEUX (exit 0, stdout vide) / interprète indisponible → fail-open
 # BRUYANT (vf_guard_unavailable : marqueur de santé + stderr + code de garde, JAMAIS écrasé par 0).
 
+# LAB PARTITIONNÉ (Phase 57, P57-D-07/09/10/26/28/33) — `.planning/workstreams` présent ET VF_DRIVER_LOCK vide :
+# le guard juge les ÉCRITURES (Write/Edit) sur ce qu'elles touchent. Un chemin sous
+# `.planning/workstreams/<sujet>/` n'est refusé que si le verrou HOMONYME du compartiment est tenu par une
+# autre session ; un fichier racine de `.planning/` que si le verrou de dépôt (ou l'ancien verrou unique
+# `.planning/DRIVER.lock`) l'est ; un chemin non cartographiable (lien qui sort de `.planning/`, `workstreams`
+# seul) l'est sous tout verrou d'autrui. Les verrous sont cherchés au MÊME endroit que driver-lock.sh
+# (<git-common-dir>/vf-driver/{repo,ws/*}, repli .planning/DRIVER.lock.d) par une résolution PROPRE au guard
+# (git durci, puis lecture documentée du layout `.git` quand git est absent du PATH du hook). Le segment de
+# compartiment s'apparie au nom du verrou à l'égalité exacte ou casefold ; le guard ne valide aucun nom et ne
+# recopie aucune politique. Un geste Bash concerné y est jugé par la règle historique (refus sous tout verrou
+# tenu par autrui) ; le jugement par classes de gestes est livré par le plan 57-08.
+# FAIL-CLOSED : en lab partitionné, toute exception entre le parse du payload et la décision (dispatch d'outil,
+# règles C4/C5/C6, décision) est captée par un crochet sys.excepthook posé juste après l'aiguillage : il écrit,
+# sur stdout, un refus JSON « erreur interne du guard, fail-closed » — jamais l'ouverture du repli
+# ` 2>/dev/null || exit 0` du bas de ce fichier (python sort en 1, le repli ramène le code à 0, le refus est
+# déjà lu). Le silence reste réservé au payload vide, imparsable ou qui n'est pas un objet. Un lab plat (ou
+# VF_DRIVER_LOCK posé) n'évalue ni l'aiguillage, ni le crochet, ni le chemin partitionné : le code d'avant la
+# Phase 57 s'exécute ligne pour ligne (P57-D-03).
+# LIMITE (P57-D-20) : le guard isole des SESSIONS, pas des managers d'une même session (ils partagent le
+# session_id, règle 3) ; aucun refus actif neuf n'est ajouté pour les séparer. Latence ajoutée, chemin
+# partitionné seulement : un interprète python + un `git rev-parse` durci (hypothèse A5 de la recherche).
+
 set -uo pipefail
 
 INPUT="$(cat 2>/dev/null || true)"
@@ -76,7 +98,14 @@ INPUT="$(cat 2>/dev/null || true)"
 # situation normale, la grande majorité du temps sur ce dépôt même. Un faux négatif sur ce chemin
 # (lock créé entre la sonde et l'évaluation réelle, fenêtre de quelques millisecondes) reste un
 # ALLOW, jamais une perte de sûreté : la revalidation réelle se fait plus loin, sur le `meta`.
-[ -e "${VF_DRIVER_LOCK:-.planning/DRIVER.lock}" ] || exit 0
+# Lab partitionné (VF_DRIVER_LOCK vide ET .planning/workstreams présent ou lien) : les verrous vivent sous le
+# dossier commun de git, pas dans .planning/ — la sonde ne sort plus ici, la décision revient au python. Tout
+# autre cas (lab plat, VF_DRIVER_LOCK posé) : la ligne d'avant la Phase 57, mêmes instructions, même latence.
+if [ -z "${VF_DRIVER_LOCK:-}" ] && { [ -e .planning/workstreams ] || [ -L .planning/workstreams ]; }; then
+  :
+else
+  [ -e "${VF_DRIVER_LOCK:-.planning/DRIVER.lock}" ] || exit 0
+fi
 
 # PRÉFILTRE PUR-BASH (surenset strict du domaine de deny — le python ne peut denier que si l'une
 # de ces sous-chaînes figure dans le payload) : les verbes git mutants de la surface A du rejeu,
@@ -417,10 +446,304 @@ def bash_targets_outside_lab(cmd, root):
             base = None  # la chaîne a pu s arrêter avant ou après le cd : dossier indéterminé
     return outside > 0
 
+# ---------------------------------------------------------------------------------------------------
+# LAB PARTITIONNE (Phase 57, plan 57-05). Aucune apostrophe dans ce bloc : il vit dans un programme
+# python embarque dans une chaine bash a guillemets simples (les apostrophes des chaines passent par
+# \x27). Rien de ce qui suit ne tourne en lab plat ni sous VF_DRIVER_LOCK.
+# ---------------------------------------------------------------------------------------------------
+def partition_switch(payload):
+    """Vrai si le lab est partitionné : VF_DRIVER_LOCK vide ET .planning/workstreams present (lexists, un
+    lien compte). Relatif au cwd du payload quand c est une chaîne non vide, sinon au cwd du process. Ne
+    leve JAMAIS : toute exception replie sur la condition même de la sonde bash (cwd du process)."""
+    try:
+        if os.environ.get("VF_DRIVER_LOCK"):
+            return False
+        base = None
+        if isinstance(payload, dict):
+            c = payload.get("cwd")
+            if isinstance(c, str) and c:
+                base = c
+        if base is None:
+            return os.path.lexists(".planning/workstreams")
+        return os.path.lexists(os.path.join(base, ".planning", "workstreams"))
+    except Exception:
+        try:
+            return os.path.lexists(".planning/workstreams")
+        except Exception:
+            return False
+
+FAIL_CLOSED_REASON = (
+    "Refus : erreur interne du guard, fail-closed (verrou de driver par compartiment). Le geste est "
+    "REFUSE par precaution plutot que laisse passer sans jugement. Rejouer le geste ; si l\x27erreur "
+    "persiste, la signaler (guard-driver-lock.sh)."
+)
+
+def fail_closed_hook(etype, value, tb):
+    """sys.excepthook du chemin partitionne : ecrit le refus JSON sur stdout et le vide. Aucune trace sur
+    stderr. Python sort ensuite en 1 ; le repli bash ramene le code du guard a 0, le refus est deja lu."""
+    try:
+        try:
+            out = json.dumps({
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": FAIL_CLOSED_REASON,
+                }
+            }, ensure_ascii=True)
+        except Exception:
+            out = "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"erreur interne du guard, fail-closed\"}}"
+        sys.stdout.write(out + "\n")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+def git_hardened(args, cwd):
+    """git durci (check-mission-exit.sh) : pas de fsmonitor ni de hooks du dépôt, pas de verrou optionnel,
+    pas de configuration système, pas d invite, 2 s maximum. Rend la sortie standard, ou None."""
+    try:
+        import subprocess
+        env = dict(os.environ)
+        env["GIT_CONFIG_NOSYSTEM"] = "1"
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GIT_OPTIONAL_LOCKS"] = "0"
+        r = subprocess.run(
+            ["git", "-C", cwd, "-c", "core.fsmonitor=", "-c", "core.hooksPath=/dev/null", "--no-optional-locks"] + list(args),
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2, env=env)
+        if r.returncode != 0:
+            return None
+        return r.stdout.decode("utf-8", "replace")
+    except Exception:
+        return None
+
+def first_line(path):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return f.readline().strip()
+
+def common_dir_from_layout(cwd):
+    """Lecture documentee du layout quand git est indisponible : `.git` dossier -> le dossier commun ; `.git`
+    fichier `gitdir: <chemin>` -> ce dossier, puis `commondir` s il existe. Remonte les parents (bornee)."""
+    try:
+        d = os.path.realpath(cwd)
+        for _ in range(40):
+            g = os.path.join(d, ".git")
+            if os.path.isdir(g):
+                return os.path.realpath(g)
+            if os.path.isfile(g):
+                first = first_line(g)
+                if not first.startswith("gitdir:"):
+                    return None
+                gd = first[len("gitdir:"):].strip()
+                if not os.path.isabs(gd):
+                    gd = os.path.join(d, gd)
+                gd = os.path.realpath(gd)
+                cf = os.path.join(gd, "commondir")
+                if os.path.isfile(cf):
+                    cd = first_line(cf)
+                    if cd:
+                        if not os.path.isabs(cd):
+                            cd = os.path.join(gd, cd)
+                        return os.path.realpath(cd)
+                return gd
+            parent = os.path.dirname(d)
+            if parent == d:
+                break
+            d = parent
+    except Exception:
+        pass
+    return None
+
+def discover_locks(cwd):
+    """Verrous du lab, cherches AU MEME ENDROIT que driver-lock.sh mais par une resolution propre au guard :
+    <git-common-dir>/vf-driver/{repo,ws/*}/DRIVER.lock, repli .planning/DRIVER.lock.d/{repo,ws/*}, et
+    l ancien verrou unique .planning/DRIVER.lock (traité comme verrou de dépôt, P57-D-26). Racines
+    dedoublonnees par realpath. Chaque verrou : {path, scope, ws}."""
+    roots = []
+    seen = set()
+    def add_root(r):
+        try:
+            rr = os.path.realpath(r)
+        except Exception:
+            return
+        if rr not in seen:
+            seen.add(rr)
+            roots.append(rr)
+    common = None
+    out = git_hardened(["rev-parse", "--git-common-dir", "--show-toplevel"], cwd)
+    if out:
+        lines = out.split("\n")
+        c = lines[0].strip() if lines else ""
+        if c:
+            common = c if os.path.isabs(c) else os.path.join(cwd, c)
+    if common is None:
+        common = common_dir_from_layout(cwd)
+    if common:
+        add_root(os.path.join(common, "vf-driver"))
+    add_root(os.path.join(cwd, ".planning", "DRIVER.lock.d"))
+    locks = []
+    for r in roots:
+        depot = os.path.join(r, "repo", "DRIVER.lock")
+        if os.path.lexists(depot):
+            locks.append({"path": depot, "scope": "depot", "ws": ""})
+        wsdir = os.path.join(r, "ws")
+        try:
+            names = sorted(os.listdir(wsdir))
+        except Exception:
+            names = []
+        for n in names:
+            p = os.path.join(wsdir, n, "DRIVER.lock")
+            if os.path.lexists(p):
+                locks.append({"path": p, "scope": "compartiment", "ws": n})
+    legacy = os.path.join(cwd, ".planning", "DRIVER.lock")
+    if os.path.lexists(legacy):
+        locks.append({"path": legacy, "scope": "ancien", "ws": ""})
+    return locks
+
+def held_by_other(lk, sid):
+    """Meta du verrou et regles 1-2 historiques : absent, illisible, perime ou sans session_ids -> None
+    (le verrou ne tient pas). Sinon, tenu par autrui si sid n est pas dans ses session_ids : rend le meta
+    enrichi (owner, step, branch, age), sinon None."""
+    meta_path = os.path.join(lk["path"], "meta")
+    try:
+        if not os.path.isfile(meta_path):
+            return None
+        with open(meta_path, encoding="utf-8", errors="replace") as f:
+            meta_lines = f.readlines()
+    except Exception:
+        return None
+    meta = {}
+    for ln in meta_lines:
+        if "=" in ln:
+            k, v = ln.rstrip("\n").split("=", 1)
+            meta[k] = v
+    try:
+        ttl = int(os.environ.get("VF_DRIVER_TTL", "1800"))
+    except ValueError:
+        ttl = 1800
+    try:
+        hb = int(meta.get("heartbeat_epoch", ""))
+    except ValueError:
+        try:
+            hb = int(os.stat(lk["path"]).st_mtime)
+        except Exception:
+            return None
+    age = now_epoch() - hb
+    if age > ttl:
+        return None
+    session_ids = [x for x in meta.get("session_ids", "").split(",") if x]
+    if not session_ids:
+        return None
+    if sid and sid in session_ids:
+        return None
+    out = dict(lk)
+    out["owner"] = meta.get("owner", "?")
+    out["step"] = meta.get("step", "")
+    out["branch"] = meta.get("branch", "")
+    out["age"] = age
+    return out
+
+def map_path(abs_path, cwd):
+    """Cartographie un chemin vers ce qu il touche, sur son realpath relatif a <cwd>/.planning :
+    workstreams/<seg>/... -> ("compartiment", seg) ; autre chemin sous .planning/ -> ("racine", "") ;
+    chemin qui sort de .planning/, ou `workstreams` seul -> ("incertain", ""). Ne valide aucun nom."""
+    planning = os.path.realpath(os.path.join(os.path.realpath(cwd), ".planning"))
+    real = os.path.realpath(abs_path)
+    rel = os.path.relpath(real, planning)
+    if rel == ".." or rel.startswith(".." + os.sep):
+        return ("incertain", "")
+    parts = [x for x in rel.split(os.sep) if x and x != "."]
+    if parts and parts[0].casefold() == "workstreams":
+        if len(parts) < 2:
+            return ("incertain", "")
+        return ("compartiment", parts[1])
+    return ("racine", "")
+
+def scope_label(lk):
+    if lk["scope"] == "compartiment":
+        return "compartiment « " + lk["ws"] + " »"
+    if lk["scope"] == "depot":
+        return "verrou de dépôt"
+    return "ancien verrou unique (.planning/DRIVER.lock)"
+
+def reclaim_command(lk):
+    base = "driver-lock.sh reclaim --owner=" + lk["owner"]
+    if lk["scope"] == "compartiment":
+        return base + " --ws=" + lk["ws"]
+    if lk["scope"] == "depot":
+        return base + " --depot"
+    return "VF_DRIVER_LOCK=.planning/DRIVER.lock " + base
+
+def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker):
+    """Decision du chemin partitionne. SORT TOUJOURS (allow silencieux, echappatoire journalisee, ou deny).
+    Write/Edit : jugement par ce que le chemin touche (P57-D-09). Bash : regle historique, refus sous tout
+    verrou tenu par autrui (le jugement par classes de gestes arrive en 57-08)."""
+    if os.environ.get("VF_GUARD_TEST_RAISE") == "decide":
+        raise RuntimeError("sonde de test : exception de la decision")
+    if tool == "Bash":
+        if not bash_command_concerned(target):
+            sys.exit(0)
+        if bash_targets_outside_lab(target, os.path.realpath(cwd)):
+            sys.exit(0)
+    locks = discover_locks(cwd)
+    held = [h for h in (held_by_other(lk, sid) for lk in locks) if h is not None]
+    if tool == "Bash":
+        blockers = held
+    else:
+        kind, seg = map_path(abs_path, cwd)
+        if kind == "compartiment":
+            blockers = [h for h in held if h["scope"] == "compartiment"
+                        and (h["ws"] == seg or h["ws"].casefold() == seg.casefold())]
+        elif kind == "racine":
+            blockers = [h for h in held if h["scope"] in ("depot", "ancien")]
+        else:
+            blockers = held
+    if not blockers:
+        sys.exit(0)
+    # Echappatoire (D-32-06), evaluee APRES le calcul des refus : un geste permis sort sans journal ; un
+    # geste refuse journalise une ligne override a cote de CHAQUE verrou refusant (best-effort).
+    if os.environ.get("VF_DRIVER_LOCK_OVERRIDE") == "1" or MARKER in text_for_marker:
+        for h in blockers:
+            journal_override(os.path.dirname(h["path"]) or ".", os.path.basename(h["path"]), sid, text_for_marker)
+        sys.exit(0)
+    parts = []
+    for h in blockers:
+        parts.append(
+            scope_label(h) + " tenu par \x27" + h["owner"] + "\x27"
+            + (" (étape : " + h["step"] + ")" if h["step"] else "")
+            + (", branche \x27" + h["branch"] + "\x27" if h["branch"] else "")
+            + ", depuis " + str(h["age"] // 60) + " min"
+            + " ; re-rattachement : `" + reclaim_command(h) + "`")
+    reason = (
+        "Verrou de driver ACTIF : " + " | ".join(parts) + ". Ce geste est REFUSÉ (session non enregistrée sous"
+        + " ce verrou). Si tu ES le détenteur avec un identifiant de session neuf (/clear, --continue ambigu) :"
+        + " la commande de re-rattachement ci-dessus, puis réessaie. Sinon : attends la fin du mandat, travaille"
+        + " dans un arbre séparé (`git worktree add`), ou pose le marqueur " + MARKER + " sur CE geste précis"
+        + " pour passer outre exceptionnellement."
+    )
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }, ensure_ascii=False))
+    sys.exit(0)
+
 try:
     payload = json.load(sys.stdin)
 except Exception:
     sys.exit(0)  # imparsable -> fail-open SILENCIEUX (QUAL-01 issue 3)
+
+# AIGUILLAGE (P57-D-10, P57-D-33) : lab partitionné ou non. Hors lab partitionne, rien de ce qui suit
+# jusqu au dispatch n est évalué : le code d avant la Phase 57 s exécute ligne pour ligne.
+PARTITIONED = partition_switch(payload)
+if PARTITIONED:
+    if not isinstance(payload, dict):
+        sys.exit(0)  # payload qui n est pas un objet -> classe imparsable, SILENCIEUSE (comme le lab plat)
+    # Crochet fail-closed, posé AVANT tout le dispatch : une exception du dispatch d outil, des règles
+    # C4/C5/C6 ou de la decision devient un refus JSON, jamais l ouverture du repli bash.
+    sys.excepthook = fail_closed_hook
+    if os.environ.get("VF_GUARD_TEST_RAISE") == "dispatch":
+        raise RuntimeError("sonde de test : exception du dispatch")
 
 tool = payload.get("tool_name") or ""
 ti = payload.get("tool_input") or {}
@@ -459,6 +782,12 @@ elif tool in ("Write", "Edit"):
     text_for_marker = content if isinstance(content, str) else ""
 else:
     sys.exit(0)  # C5 : outil hors périmètre (ni Bash, ni Write, ni Edit) -> allow
+
+# Lab partitionné : la décision (verrous par compartiment, dépôt, ancien verrou) remplace tout ce qui
+# suit, qui n est lu que pour un lab plat ou sous VF_DRIVER_LOCK. decide_partitioned() sort toujours.
+if PARTITIONED:
+    decide_partitioned(tool, cmd if tool == "Bash" else "", abs_w if tool != "Bash" else "", sid, cwd, text_for_marker)
+    sys.exit(0)
 
 # Résolution du chemin du lock, relativement au cwd du payload s il est relatif.
 lock_raw = os.environ.get("VF_DRIVER_LOCK", ".planning/DRIVER.lock")
