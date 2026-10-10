@@ -4,9 +4,9 @@ milestone: fiabilite-v1.0
 current_phase: 57
 current_phase_name: Verrou de driver par compartiment
 status: executing
-last_updated: "2026-10-10T20:45:00.000Z"
+last_updated: "2026-10-10T21:15:00.000Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 57 plan 10 complete (protocole du verrou par compartiment dans mission-flow, prompts manager/workers, head-governance ; instructions constantes, test-dev-orchestrator 279/0)
+last_activity_desc: Phase 57 plan 11 complete (preuves du guard : A/B lab plat identique contre la copie gelée cff1e2af, 12/12 mutants GW-M-a à GW-M-l tués, latence 4,7 ms plat / 72,6 ms partitionné ; suite 180/0)
 state_head: 1413af28
 progress:
   total_phases: 18
@@ -14,7 +14,7 @@ progress:
   total_plans: 115
   completed_plans: 105
 milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-stopped_at: "Completed 57-10-PLAN.md (2026-10-10) — mission-flow §Verrou par compartiment, --ws dans vf-dev-manager/vf-coder/vf-reviewer à instructions constantes (46/22/9), head-governance « mécanisme livré (Phase 57) », mission-cross-team par compartiment ; next plan 57-11."
+stopped_at: "Completed 57-11-PLAN.md (2026-10-10) — test-guard-driver-lock-ws.sh 180 assertions : A/B guard lab plat IDENTIQUE (73 payloads x 5 états x 2 régimes), GW-AB-INTEGRITE, 12/12 mutants dont fail-closed neutralisé et posé trop tard ; guard inchangé ; next plan 57-12."
 ---
 
 # Project State
@@ -48,7 +48,7 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Last activity: 2026-10-10 — Phase 57 plan 57-10 complete (10/16)
+Last activity: 2026-10-10 — Phase 57 plan 57-11 complete (11/16)
 
 ## Accumulated Context
 
@@ -72,6 +72,7 @@ Historique complet (jalons, décisions, arbitrages 2026-07 à 2026-09) : voir l'
 - [Phase 57]: 57-04 : mutants rejoués en parallèle (neuf matrices, 75 s au lieu de 302 s), cas basculés comparés exactement ; A/B du lab plat contre la copie gelée e8771d94, --help exclu (P57-D-03, P57-D-12, P57-D-28, P57-D-37)
 - [Phase 57]: 57-06 : watchdog et dag.sh ne détectent pas la partition (status --all / champ ws du DAG), lab plat et DAG sans ws octet pour octet ; agrégation abandon > stall, une ligne, suffixe +N ; 4 mutants tués (P57-D-15, P57-D-23, P57-D-24)
 - [Phase 57]: 57-05 : guard partitionné = crochet sys.excepthook fail-closed posé juste après l'aiguillage, lab plat inchangé ligne pour ligne ; tâche 2 sans RED (comportement livré par la tâche 1), discriminance par 4 mutants (P57-D-09, P57-D-10, P57-D-26, P57-D-33)
+- [Phase 57]: 57-11 : l'A/B du guard en lab plat se joue sur copie gelée de cff1e2af posée à côté de vf-portable.sh, 73 payloads dans cinq états de verrou et deux régimes, `cmp -s` ; les mutants se comparent par assertion (identifiant=échecs), le mutant -z bascule aussi GW-C-REL-tenu ; latence mesurée hors suite, 4,7 ms (plat sans verrou) contre 72,6 ms (partitionné, verrou d'autrui) (P57-D-03, P57-D-22, P57-D-28)
 - [Phase 57]: 57-10 : le protocole vit dans mission-flow §Verrou par compartiment, les prompts y renvoient à instructions constantes ; un head sérialise ses propres managers jusqu'à la preuve d'usage réel de la Phase 61, mandat = --ws <sujet> + GSD_SESSION_KEY=vf-<sujet>-<owner> ; vers un autre compartiment la chaîne manager → worker → manager est tenue par les allowlists, pas par le verrou (P57-D-20, P57-D-34, P57-D-35)
 - [Phase 57]: 57-09 : le claim de branche lit les dossiers de verrous du clone sans détecter la partition ni nommer le dossier des compartiments ; signal > indéterminé > sain, meta illisible = indéterminé ; --lock / VF_DRIVER_LOCK = verrou unique ; sans verrou du clone, chemin d'avant inchangé (P57-D-03, P57-D-07, P57-D-15, P57-D-22) ; mutants CW-M-c/d/e, bilan 7/7
 - [Phase 57]: 57-08 : un commit est jugé sur l'union index / -a / pathspec / HEAD (--amend) / git add de la même commande, en octets ; source illisible = refus nommé ; gestes d'arbre refusés depuis le worktree qui a pris le verrou seulement, retrait de worktree et cible git incertaine refusés sous tout verrou d'autrui, push/branch/tag/gh sous le seul verrou de dépôt (P57-D-10, P57-D-16 à P57-D-19, P57-D-33) ; mutants dans 57-11

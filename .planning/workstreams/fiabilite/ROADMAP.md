@@ -1923,7 +1923,7 @@ forme exec (ADR-071).
 **Depends on:** aucune. Première du jalon.
 **Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
 **Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
-**Plans:** 10/16 plans executed (10 vagues)
+**Plans:** 11/16 plans executed (10 vagues)
 
 Plans:
 **Wave 1**
@@ -1947,7 +1947,7 @@ Plans:
 - [x] 57-10-PLAN.md — vague 5 : doctrine dev-orchestrator (mission-flow, vf-dev-manager, workers, head-governance, intent-routing, mission-cross-team)
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 57-11-PLAN.md — vague 6 : preuves du guard (A/B lab plat contre copie gelée, mutants GW-M-*, latence)
+- [x] 57-11-PLAN.md — vague 6 : preuves du guard (A/B lab plat contre copie gelée, mutants GW-M-*, latence)
 - [ ] 57-12-PLAN.md — vague 6 : team-kernel, managers design et bundles, skill `vf-split-planning` sous verrou de dépôt
 
 **Wave 7** *(blocked on Wave 6 completion)*
