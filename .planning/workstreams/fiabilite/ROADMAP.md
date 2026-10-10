@@ -1956,7 +1956,7 @@ Plans:
 - [x] 57-14-PLAN.md — vague 8 : bumps de cinq modules sans release (conductor, dev-orchestrator, design-orchestrator, business-pilot-bundle, content-bundle)
 
 **Wave 9** *(blocked on Wave 8 completion)*
-- [ ] 57-15-PLAN.md — vague 9 : bump de growth-bundle, compte de suites des README racine, BACKLOG réécrit
+- [x] 57-15-PLAN.md — vague 9 : bump de growth-bundle, compte de suites des README racine, BACKLOG réécrit
 
 **Wave 10** *(blocked on Wave 9 completion)*
 - [ ] 57-16-PLAN.md — vague 10 : porte de phase rejouée depuis `ci.yml`, puis ledger à la main

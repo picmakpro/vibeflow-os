@@ -4,9 +4,9 @@ milestone: fiabilite-v1.0
 current_phase: 57
 current_phase_name: Verrou de driver par compartiment
 status: executing
-last_updated: "2026-10-10T23:30:00.000Z"
+last_updated: "2026-10-10T23:50:00.000Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 57 plan 14 complete (bumps de module sans release : conductor v1.49.0, dev-orchestrator v2.28.0, design-orchestrator v1.5.13, business-pilot-bundle et content-bundle v2.0.15 ; fichiers de forme de release racine intacts)
+last_activity_desc: Phase 57 plan 15 complete (growth-bundle v2.0.14 sans release, compte de suites des README racine 102, entrée BACKLOG EnterWorktree réécrite ; check-version-sync exit 0)
 state_head: 1413af28
 progress:
   total_phases: 18
@@ -14,7 +14,7 @@ progress:
   total_plans: 115
   completed_plans: 105
 milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-stopped_at: "Completed 57-14-PLAN.md (2026-10-10) — cinq modules bumpés sans release (P57-D-30) ; next plan 57-15."
+stopped_at: "Completed 57-15-PLAN.md (2026-10-10) — growth-bundle bumpé, README racine à 102 suites, BACKLOG réécrit (P57-D-08, P57-D-30) ; next plan 57-16."
 ---
 
 # Project State
@@ -48,7 +48,7 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Last activity: 2026-10-10 — Phase 57 plan 57-14 complete (14/16)
+Last activity: 2026-10-10 — Phase 57 plan 57-15 complete (15/16)
 
 ## Accumulated Context
 
