@@ -565,7 +565,7 @@ driver-lock — (a) emplacement relatif au checkout au lieu du clone (**mesuré 
 ## Sources
 
 ### Primary (HIGH confidence) — lus ou exécutés cette session
-- `/Users/samuel/Documents/dev/vibeflow-os/plugin/conductor/scripts/driver-lock.sh` (838 l.) — lu en entier ; l. 15-17, 46, 48, 154-155, 235, 324, 361, 553, 581, 619, 731 citées
+- `plugin/conductor/scripts/driver-lock.sh` (838 l.) — lu en entier ; l. 15-17, 46, 48, 154-155, 235, 324, 361, 553, 581, 619, 731 citées
 - `…/guard-driver-lock.sh` (549 l.) — lu en entier ; l. 18-19, 64, 79, 142, 153-154, 449, 464, 523, 548
 - `…/workstream-policy.sh` (375 l.) — lu en entier (`vf_ws_enumerate` codes 0/2/3, `vf_ws_dir_resolve`, `vf_ws_name_valid`)
 - `…/check-branch-claim.sh`, `check-guard-health.sh` (l. 55-110, 175-300), `dag.sh` (l. 1-110, 185-260), `check-mission-exit.sh` (l. 30-60, 100-190, 185-290, 425-470), `check-method-budget.sh:603-608`, `check-planning-consumers-registered.sh` (en-tête), `check-planning-not-inflight.sh:60-110, 296-352`, `check-instruction-budget.sh` (en-tête, `count_instructions`), `check-gate-touche.sh` (en-tête)
@@ -594,7 +594,7 @@ linked worktree, cwd=x/y       → /…/gcd/main/.git
 --path-format=absolute (wt)    → /…/gcd/main/.git
 hors git                       → fatal: not a git repository…   rc=128
 ```
-Dépôt réel : main → `.git` ; worktree `.claude/worktrees/etude-qualite` → `/Users/samuel/Documents/dev/vibeflow-os/.git` ; `plugin/conductor` → `../../.git`. **Conclusion :** sortie tantôt relative (au cwd), tantôt absolue ⇒ canonicaliser par `cd "$d" && pwd -P` (jamais comparer la sortie brute).
+Dépôt réel : main → `.git` ; worktree `.claude/worktrees/etude-qualite` → `/Users/<user>/Documents/dev/vibeflow-os/.git` (chemin absolu) ; `plugin/conductor` → `../../.git`. **Conclusion :** sortie tantôt relative (au cwd), tantôt absolue ⇒ canonicaliser par `cd "$d" && pwd -P` (jamais comparer la sortie brute).
 
 **M3 — repli hors git couvert par `.gitignore`** — `git check-ignore -v .planning/DRIVER.lock.d/ws/A/DRIVER.lock` → `.gitignore:1:.planning/DRIVER.lock*` rc=0 ; `.planning/vf-driver/ws/A/DRIVER.lock` → rc=1 (non ignoré).
 
