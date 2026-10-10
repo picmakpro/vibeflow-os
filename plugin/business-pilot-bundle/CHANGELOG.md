@@ -1,5 +1,11 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v2.0.15] — 2026-10-10 (verrou de driver par compartiment, Phase 57)
+
+**Patch** — `agents/vf-business-manager.md` passe `--ws=<sujet du mandat>` (optionnel) à `acquire`, `takeover` et `release` du
+verrou de driver, et renvoie au protocole du kernel (`team-kernel.md` §Verrou par compartiment) à instructions
+constantes ; aucun autre changement de comportement (P57-D-30, aucune release).
+
 ## [v2.0.14] — 2026-10-06 (classe d'invocation du skill, Phase 41.4)
 
 **Patch** — le `SKILL.md` déclare sa classe d'invocation (`vf-invocation: model`, vérifiée par
