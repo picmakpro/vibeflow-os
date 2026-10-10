@@ -1,5 +1,22 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.28.0] — 2026-10-10 (verrou de driver par compartiment : gate de sortie et doctrine, Phase 57)
+
+**Minor** (comportement neuf du gate de sortie et de la doctrine de dispatch, DLWS-04..06 ; arbitrages P57-D-34,
+D-36 et D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucune release, P57-D-30) :
+
+- **`scripts/check-mission-exit.sh`** : l'option `--ws <sujet>` désigne le compartiment dont le verrou est jugé
+  (E1, identité d'E7, surcharge d'E4). Un lab partitionné sans `--ws` est INDÉTERMINÉ (E1) ou exit 4
+  (`--budget-snapshot`), jamais un vert ; lab plat inchangé. Suite neuve `scripts/tests/test-check-mission-exit-ws.sh`
+  (mutants 5/5 tués) ; `test-dev-orchestrator.sh` 279 OK / 0 KO (T37 et T38 inclus).
+- **`references/mission-flow.md`** : nouvelle section « Verrou par compartiment » (acquire, snapshot, `dag.sh init`,
+  heartbeat, register / close, release, tous avec `--ws`, et un `GSD_SESSION_KEY` distinct par session) ;
+  `references/mission-cross-team.md` et `references/head-governance.md` alignés : « un manager par compartiment », avec
+  sa limite (allowlists d'agents, pas verrou), et le paragraphe « Extension non livrée » remplacé par « mécanisme
+  livré (Phase 57) » ; `references/intent-routing.md` : l'intention « reprends le sujet X » passe `--ws X` aussi sur chaque verbe du verrou.
+- **Prompts** : `agents/vf-dev-manager.md` (250 lignes, instructions 46/46), `agents/vf-coder.md` et
+  `agents/vf-reviewer.md` renvoient au protocole à instructions constantes (budget d'instructions tenu).
+
 ## [v2.27.1] — 2026-10-08 (carte d'intention : choix du planning, Phase 41.2)
 
 **Patch** (routage, PR #130) :
