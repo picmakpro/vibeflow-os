@@ -150,6 +150,7 @@ mk_claim_lab() { # <nom> → positionne CLAIM_LAB (principal) et CLAIM_WT (lié)
   CLAIM_WT="$WORK_DIR/$1-wt"
   git -C "$CLAIM_LAB" worktree add -q -b b "$CLAIM_WT" >/dev/null 2>&1
   CLAIM_WT="$(cd "$CLAIM_WT" && pwd -P)"
+  CLAIM_L1="$(lock_path_of "$CLAIM_WT" alpha)"   # lu AVANT l'acquisition (l'entrée présente ne porte plus `lock`)
   dl "$CLAIM_WT" sess-A acquire --ws=alpha --owner=m1 --step=s-alpha >/dev/null
   git -C "$CLAIM_LAB" checkout -q --ignore-other-worktrees b >/dev/null 2>&1
 }
@@ -327,6 +328,79 @@ matrice() {
   cexp_rc "exit signal (CLI)" "$CBC_RC" 0
   cexp "diagnostic sur stderr" "$CBC_ERR" "revendiquee par un lock actif"
   cend
+
+  # Même verrou, interrogé DEPUIS le worktree qui le tient : même arbre, rien à signaler.
+  cbegin CW-CLAIM-SAME
+  cbc "$CLAIM_WT"
+  cexp_rc "exit SAIN" "$CBC_RC" 3
+  cexp "message" "$CBC_ERR" "SAIN"
+  cexp "verrou examiné et compté" "$CBC_ERR" "1 lock(s) de driver examine(s)"
+  cbc "$CLAIM_WT" --hook
+  cexp_rc "exit hook" "$CBC_RC" 0
+  cexp "stdout vide" "[$CBC_OUT]" "[]"
+  cend
+
+  # Aucun verrou, ni du clone ni du checkout : le message d'avant, octet pour octet.
+  LAB="$(mk_lab claimnone)"
+  cbegin CW-CLAIM-NONE
+  cbc "$LAB"
+  cexp_rc "exit SAIN" "$CBC_RC" 3
+  cexp "message d'avant" "$CBC_ERR" "SAIN — aucun lock de driver actif (.planning/DRIVER.lock absent)."
+  cend
+
+  # Meta illisible : INDÉTERMINÉ, jamais SAIN ; un signal d'un AUTRE verrou l'emporte.
+  LAB="$(mk_lab claimmeta)"
+  L2="$(lock_path_of "$LAB" omega)"
+  dl "$LAB" sess-B acquire --ws=omega --owner=m2 --step=s-omega >/dev/null
+  rm -f "$(lock_meta_path "$L2")"
+  cbegin CW-CLAIM-META
+  cbc "$LAB"
+  cexp_rc "exit INDÉTERMINÉ" "$CBC_RC" 4
+  cexp "message" "$CBC_ERR" "INDETERMINE"
+  cexp "meta nommé" "$CBC_ERR" "meta est illisible"
+  cbc "$LAB" --hook
+  cexp_rc "exit hook (silence harness)" "$CBC_RC" 0
+  cexp "stdout vide" "[$CBC_OUT]" "[]"
+  git -C "$LAB" worktree add -q -b b "$WORK_DIR/claimmeta-wt" >/dev/null 2>&1
+  dl "$WORK_DIR/claimmeta-wt" sess-A acquire --ws=alpha --owner=m1 --step=s-alpha >/dev/null
+  git -C "$LAB" checkout -q --ignore-other-worktrees b >/dev/null 2>&1
+  cbc "$LAB" --hook
+  cexp_rc "exit signal malgré l'indéterminé" "$CBC_RC" 0
+  cexp "signal nommé" "$CBC_OUT" "compartiment alpha"
+  cend
+
+  # --lock / VF_DRIVER_LOCK : UN seul verrou examiné, ceux du clone sont ignorés (P57-D-22).
+  L1="$CLAIM_L1"
+  cbegin CW-CLAIM-LOCKOPT
+  cbc "$CLAIM_LAB" --lock="$WORK_DIR/aucun-verrou"
+  cexp_rc "--lock absent" "$CBC_RC" 3
+  cexp "message du seul verrou désigné" "$CBC_ERR" "aucun lock de driver actif ($WORK_DIR/aucun-verrou absent)"
+  VF_DRIVER_LOCK="$WORK_DIR/aucun-verrou" cbc "$CLAIM_LAB"
+  cexp_rc "VF_DRIVER_LOCK absent" "$CBC_RC" 3
+  cexp "message env" "$CBC_ERR" "aucun lock de driver actif ($WORK_DIR/aucun-verrou absent)"
+  cbc "$CLAIM_LAB" --lock="$L1"
+  cexp_rc "--lock désignant le verrou signalant" "$CBC_RC" 0
+  cexp_not "pas de compartiment nommé en verrou unique" "$CBC_ERR" "compartiment"
+  cend
+
+  # Les trois issues du claim partitionné.
+  cbegin CW-Q-CLAIM-SIGNAL
+  cbc "$CLAIM_LAB" --hook
+  cexp_rc "exit" "$CBC_RC" 0
+  cexp "ligne" "$CBC_OUT" "[branch-claim]"
+  cend
+  cbegin CW-Q-CLAIM-SAIN
+  cbc "$CLAIM_WT"
+  cexp_rc "exit" "$CBC_RC" 3
+  cexp "diagnostic" "$CBC_ERR" "SAIN"
+  cend
+  cbegin CW-Q-CLAIM-INDET
+  LAB="$WORK_DIR/claimmeta"
+  git -C "$LAB" checkout -q --ignore-other-worktrees main >/dev/null 2>&1
+  cbc "$LAB"
+  cexp_rc "exit" "$CBC_RC" 4
+  cexp "diagnostic" "$CBC_ERR" "INDETERMINE"
+  cend
 }
 
 if [ "$CW_MODE" = "full" ]; then
@@ -341,20 +415,21 @@ echo "== mutants =="
 # ses voisins réels (driver-lock.sh, workstream-policy.sh, et check-guard-health.sh pour dag.sh : sinon la copie
 # rougirait pour la mauvaise raison). La matrice (tous les cas ci-dessus) est rejouée en sous-processus contre la
 # copie ; l'ensemble des cas dont le verdict bascule est comparé EXACTEMENT à l'attendu. Matrices en parallèle.
-MUT_KILLED=0; MUT_TOTAL=4; MUT_IDS=""; t0=$SECONDS
+MUT_KILLED=0; MUT_TOTAL=7; MUT_IDS=""; t0=$SECONDS
 mut_fail_ids() { LC_ALL=C sed -n 's/^  ✗ \(CW-[A-Za-z0-9-]*\) .*/\1/p' "$1" | LC_ALL=C sort -u; }
-mut_dir() { # <dossier> <cgh|dag> → pose les voisins réels dans le dossier d'une copie
+mut_dir() { # <dossier> <cgh|dag|cbc> → pose les voisins réels dans le dossier d'une copie (cbc n'en source aucun)
   mkdir -p "$1"; cp "$DL" "$1/driver-lock.sh"; cp "$POLICY" "$1/workstream-policy.sh"
   [ "$2" = dag ] && cp "$SCRIPTS/check-guard-health.sh" "$1/check-guard-health.sh"
   chmod +x "$1"/*.sh
 }
 mut_run() { # <kind> <dossier> <journal>
   if [ "$1" = cgh ]; then CW_MODE=matrice CW_CGH="$2/check-guard-health.sh" bash "$SUITE" > "$3" 2>&1
+  elif [ "$1" = cbc ]; then CW_MODE=matrice CW_CBC="$2/check-branch-claim.sh" bash "$SUITE" > "$3" 2>&1
   else CW_MODE=matrice CW_DAG="$2/dag.sh" bash "$SUITE" > "$3" 2>&1; fi
 }
 mutant() { # <id> <cgh|dag> <ancre BRE> <expression sed> <attendu : cas séparés par des espaces>
   local id="$1" kind="$2" anchor="$3" expr="$4" expected="$5" dir="$WORK_DIR/mut-$1" f n
-  [ "$kind" = cgh ] && f="check-guard-health.sh" || f="dag.sh"
+  case "$kind" in cgh) f="check-guard-health.sh" ;; cbc) f="check-branch-claim.sh" ;; *) f="dag.sh" ;; esac
   MUT_IDS="$MUT_IDS $id"
   mut_dir "$dir" "$kind"
   printf '%s\n' $expected | LC_ALL=C sort -u > "$dir/attendu.txt"
@@ -389,15 +464,21 @@ mutant_eval() { # <id>
 mut_dir "$WORK_DIR/mut-temoin-cgh" cgh; cp "$SCRIPTS/check-guard-health.sh" "$WORK_DIR/mut-temoin-cgh/check-guard-health.sh"
 mut_dir "$WORK_DIR/mut-temoin-dag" dag; cp "$SCRIPTS/dag.sh" "$WORK_DIR/mut-temoin-dag/dag.sh"
 ( mut_run cgh "$WORK_DIR/mut-temoin-cgh" "$WORK_DIR/mut-temoin-cgh/matrice.log" ) &
+mut_dir "$WORK_DIR/mut-temoin-cbc" cbc; cp "$SCRIPTS/check-branch-claim.sh" "$WORK_DIR/mut-temoin-cbc/check-branch-claim.sh"
 ( mut_run dag "$WORK_DIR/mut-temoin-dag" "$WORK_DIR/mut-temoin-dag/matrice.log" ) &
+( mut_run cbc "$WORK_DIR/mut-temoin-cbc" "$WORK_DIR/mut-temoin-cbc/matrice.log" ) &
 
 mutant a cgh 'DRIVER_LOCK_SH" status --all 2>' 's/status --all/status/' "CW-HEALTH-MULTI CW-Q-SIGNAL CW-TRACE-1 CW-TRACE-3"
 mutant b cgh 'if best is None or rank > best_rank:' 's/rank > best_rank/rank < best_rank/' "CW-HEALTH-MULTI"
 mutant f dag '"mark-progress", f"--owner={owner}"' 's/\] + ws_args,/],/' "CW-DAG-WS"
 mutant g dag 'init_dag\["ws"\] = ws_arg' 's/init_dag\["ws"\] = ws_arg/pass/' "CW-DAG-KEEP CW-DAG-WS"
+# Claim de branche (57-09) : examen des verrous du clone retiré / comparaison d'arbre retirée / indéterminé agrégé comme sain.
+mutant c cbc 'if \[ -n "\$COMMON" \]; then' 's/if \[ -n "\$COMMON" \]; then/if false; then/' "CW-CLAIM-META CW-CLAIM-SAME CW-CLAIM-WT CW-Q-CLAIM-INDET CW-Q-CLAIM-SIGNAL"
+mutant d cbc 'if \[ "\$(norm_path "\$claim_worktree")" = ' 's/if \[ "\$(norm_path "\$claim_worktree")" = .*; then$/if false; then/' "CW-CLAIM-SAME CW-Q-CLAIM-SAIN"
+mutant e cbc '\[ -z "\$INDET_MSG" \] || indetermine' 's/\[ -z "\$INDET_MSG" \] || indetermine "\$INDET_MSG"/:/' "CW-CLAIM-META CW-Q-CLAIM-INDET"
 
 wait
-for t in cgh dag; do
+for t in cgh dag cbc; do
   nko="$(mut_fail_ids "$WORK_DIR/mut-temoin-$t/matrice.log" | wc -l | tr -d ' ')"
   if grep -q '^== Résultat : ' "$WORK_DIR/mut-temoin-$t/matrice.log" && [ "$nko" = 0 ]; then ok "CW-M-témoin-$t — la copie non mutée ne bascule aucun cas"
   else ko "CW-M-témoin-$t" "la copie non mutée rend $nko cas en échec (ou n'a pas atteint son bilan)"; fi
@@ -405,9 +486,9 @@ done
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 4/4 tués =="
+  echo "== mutants : 7/7 tués =="
 else
-  echo "== mutants : $MUT_KILLED/4 tués =="
+  echo "== mutants : $MUT_KILLED/7 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # CW_MODE = full (mutants)
