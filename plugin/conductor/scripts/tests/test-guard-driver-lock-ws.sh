@@ -13,6 +13,10 @@
 # Chaque payload porte `cwd` = le clone ; le guard est lancé depuis un sous-shell qui `cd` dans le clone (la
 # sonde bash lit le cwd du process). Les payloads sont construits par python, jamais concaténés.
 #
+# Plan 57-11 : GW-AB (le guard d'un lab PLAT rend, sur une matrice de payloads, les mêmes stdout/stderr/code que la
+# copie gelée d'avant la phase, au bit près, deux régimes de verrou), GW-AB-INTEGRITE (T-57-40) et les douze mutants
+# GW-M-a à GW-M-l (QUAL-01 : chaque comportement neuf du guard rougit sous sa mutation, ensemble basculé exact).
+#
 # Exit 0 si tout passe, 1 sinon, 2 si la fixture est cassée (préflight).
 
 set -uo pipefail
@@ -22,6 +26,13 @@ SCRIPTS="$(cd "$HERE/.." && pwd)"
 GUARD="$SCRIPTS/guard-driver-lock.sh"
 DRIVER="$SCRIPTS/driver-lock.sh"
 BASH_BIN="${BASH:-bash}"
+# Mode de la suite. `full` (défaut) : tout, A/B et mutants compris. `matrice` : sous-processus d'un mutant (GW-M-*),
+# qui rejoue les cas GW-* (A/B exclu) contre une COPIE mutée du guard (GW_GUARD) posée à côté de vf-portable.sh ;
+# ni A/B ni mutants (pas de récursion).
+GW_MODE="${GW_MODE:-full}"
+SUITE="$HERE/$(basename "$0")"
+[ -z "${GW_GUARD:-}" ] || GUARD="$GW_GUARD"
+PORTABLE="$(cd "$SCRIPTS/../../_internal/lib" && pwd)/vf-portable.sh"
 
 # DÉSARMEMENT en tête (P57-D-22) : un VF_DRIVER_LOCK hérité forcerait le régime « verrou unique » et la suite ne
 # mesurerait plus rien du chemin partitionné.
@@ -588,6 +599,176 @@ assert_empty "GW-MARK-B-4 — geste permis avec marqueur : stdout vide" "$out"
 assert_exit "GW-MARK-B-5 — un geste qui serait permis sort sans journal" "$(( $(cnt "$EV_A") - a1 ))" 0
 out="$(gb "$LAB" 'git reset --hard' sess-B)"
 assert "GW-MARK-B-6 — sans marqueur le même geste reste refusé (discriminance)" "$out" "$DENY"
+
+if [ "$GW_MODE" = full ]; then
+echo
+echo "=== GW-AB — lab PLAT : la copie gelée du guard d'avant la phase et le guard courant rendent la MÊME transcription, octet pour octet (P57-D-03, P57-D-22) ==="
+# Référence : copie gelée du guard d'avant la Phase 57 (dernier commit cff1e2af qui touchait le script), jamais
+# modifiée. Les deux copies sont posées dans un dossier jetable À CÔTÉ d'une copie de vf-portable.sh (le locator du
+# guard cherche d'abord $(dirname $0)/vf-portable.sh) : elles s'exécutent dans les mêmes conditions. Même matrice de
+# payloads jouée par chacune sur une fixture reconstruite à neuf AU MÊME CHEMIN, dans cinq états de verrou (aucun,
+# tenu, périmé, sans session_ids, sans meta), transcription (code, stdout, stderr) normalisée puis comparée par
+# `cmp -s` : une assertion de sous-chaîne ne prouve pas le bit près (piège P10). Verrous posés par la copie gelée de
+# driver-lock.sh de 57-04. Régimes : VF_DRIVER_LOCK posé, puis chemin par défaut .planning/DRIVER.lock.
+FROZEN_GUARD="$HERE/fixtures/guard-driver-lock-pre-cff1e2a.sh"
+FROZEN_DL="$HERE/fixtures/driver-lock-pre-e8771d9.sh"
+GW_AB_REF=cff1e2af
+GW_AB_PATH_IN_REF=plugin/conductor/scripts/guard-driver-lock.sh
+GWAB="$WORK_DIR/gwab"; mkdir -p "$GWAB"
+for who in frozen current; do mkdir -p "$GWAB/$who"; cp "$PORTABLE" "$GWAB/$who/vf-portable.sh"; done
+cp "$FROZEN_GUARD" "$GWAB/frozen/guard-driver-lock.sh" 2>/dev/null; cp "$GUARD" "$GWAB/current/guard-driver-lock.sh"
+
+# Matrice de payloads : une ligne « identifiant US charge-utile ». Construite UNE fois par python (jamais concaténée
+# en bash) ; le lab, l'autre dépôt et leurs chemins sont constants d'un passage à l'autre.
+cat > "$GWAB/matrix.py" <<'PYMATRIX'
+import json, sys
+lab, other = sys.argv[1], sys.argv[2]
+def bash(cmd, sid, cwd=None):
+    d = {"tool_name": "Bash", "tool_input": {"command": cmd}, "cwd": cwd or lab}
+    if sid is not None:
+        d["session_id"] = sid
+    return d
+def write(fp, content, sid, tool="Write"):
+    ti = {"file_path": fp, "content": content} if tool == "Write" else {"file_path": fp, "old_string": "a", "new_string": content}
+    return {"tool_name": tool, "tool_input": ti, "session_id": sid, "cwd": lab}
+out = []
+for sid in ("sess-B", "sess-A"):
+    s = sid[-1]
+    out += [
+        ("commit." + s, bash("git commit -m x", sid)),
+        ("commit-am." + s, bash("git commit -am x", sid)),
+        ("amend." + s, bash("git commit --amend --no-edit", sid)),
+        ("checkout." + s, bash("git checkout -b x", sid)),
+        ("switch." + s, bash("git switch main", sid)),
+        ("reset." + s, bash("git reset --hard", sid)),
+        ("push." + s, bash("git push", sid)),
+        ("tag." + s, bash("git tag v1", sid)),
+        ("gh-pr." + s, bash("gh pr create", sid)),
+        ("wt-add." + s, bash("git worktree add ../w -b w", sid)),
+        ("wt-remove." + s, bash("git worktree remove ../w", sid)),
+        ("rebase." + s, bash("git rebase main", sid)),
+        ("rebase-abort." + s, bash("git rebase --abort", sid)),
+        ("cd-other." + s, bash("cd " + other + " && git commit -m x", sid)),
+        ("gitC-other." + s, bash("git -C " + other + " commit -m x", sid)),
+        ("popd." + s, bash("popd && git commit -m x", sid)),
+        ("chain." + s, bash("echo a; git add -A && git commit -m x", sid)),
+        ("heredoc." + s, bash("cat > f <<EOF\nx\nEOF\ngit commit -m x", sid)),
+        ("ls." + s, bash("ls -la", sid)),
+        ("marker-commit." + s, bash("git commit -m x # vibeflow:allow-lock-override", sid)),
+        ("w-planning." + s, write(lab + "/.planning/STATE.md", "x", sid)),
+        ("w-planning-rel." + s, write(".planning/STATE.md", "x", sid)),
+        ("w-planning-ws." + s, write(lab + "/.planning/workstreams/alpha/STATE.md", "x", sid)),
+        ("e-planning." + s, write(lab + "/.planning/STATE.md", "y", sid, "Edit")),
+        ("w-marker." + s, write(lab + "/.planning/STATE.md", "x vibeflow:allow-lock-override", sid)),
+        ("w-outside." + s, write(lab + "/src/x.sh", "x", sid)),
+        ("w-other-planning." + s, write(other + "/.planning/STATE.md", "x", sid)),
+        ("w-nul." + s, write(lab + "/.planning/STATE.md\x00x", "x", sid)),
+        ("w-nofp." + s, {"tool_name": "Write", "tool_input": {"content": "x"}, "session_id": sid, "cwd": lab}),
+        ("read-tool." + s, {"tool_name": "Read", "tool_input": {"file_path": lab + "/.planning/STATE.md"}, "session_id": sid, "cwd": lab}),
+        ("bash-empty." + s, bash("", sid)),
+        ("ti-nondict." + s, {"tool_name": "Bash", "tool_input": "git commit", "session_id": sid, "cwd": lab}),
+    ]
+out += [
+    ("commit.nosid", bash("git commit -m x", None)),
+    ("w-planning.nosid", {"tool_name": "Write", "tool_input": {"file_path": lab + "/.planning/STATE.md", "content": "x"}, "cwd": lab}),
+    ("commit.nocwd", {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}, "session_id": "sess-B"}),
+    ("notool", {"session_id": "sess-B", "cwd": lab, "tool_input": {"command": "git commit -m x"}}),
+]
+raw = [("unparse", "ceci n est pas du json mais ca contient le mot commit"), ("nonobj-array", "[\"commit\"]"),
+       ("nonobj-null", "null"), ("nonobj-str", "\"git commit\""), ("empty", "")]
+with open(sys.argv[3], "w", encoding="utf-8") as f:
+    for k, v in out:
+        f.write(k + "\x1f" + json.dumps(v, ensure_ascii=True) + "\n")
+    for k, v in raw:
+        f.write(k + "\x1f" + v + "\n")
+PYMATRIX
+python3 "$GWAB/matrix.py" "$GWAB/lab" "$GWAB/other" "$GWAB/matrix.txt"
+[ -s "$GWAB/matrix.txt" ]; assert_exit "GW-AB.matrice — $(wc -l < "$GWAB/matrix.txt" | tr -d ' ') payloads construits" "$?" 0
+
+# Normalisation : l'âge « depuis N min » du motif de refus (varie d'une minute à l'autre entre deux passages).
+gw_ab_norm() { sed -E -e 's/depuis [0-9]+ min/depuis N min/g'; }
+
+# gw_ab_pass <guard> <VF_DRIVER_LOCK ou vide> <fichier de transcription normalisée>
+gw_ab_pass() {
+  local g="$1" lockv="$2" out="$3" lab="$GWAB/lab" other="$GWAB/other" raw="$GWAB/raw" lockpath m
+  rm -rf "$lab" "$other"; mkdir -p "$lab/.planning" "$other/.planning"
+  printf '# projet\n' > "$lab/.planning/PROJECT.md"
+  printf -- '---\nstatus: active\n---\n' > "$lab/.planning/STATE.md"
+  git -C "$lab" init -q -b main >/dev/null 2>&1 || git -C "$lab" init -q >/dev/null 2>&1
+  git -C "$lab" add -A >/dev/null 2>&1
+  git -C "$lab" -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -q -m init >/dev/null 2>&1
+  lab_preflight "$lab"
+  lockpath="${lockv:-.planning/DRIVER.lock}"
+  m="$lab/$lockpath/meta"
+  : > "$raw"
+  gw_ab_play() { # <état>
+    local id payload rc
+    while IFS=$'\x1f' read -r id payload; do
+      ( cd "$lab" && if [ -n "$lockv" ]; then export VF_DRIVER_LOCK="$lockv"; fi; printf '%s' "$payload" | "$BASH_BIN" "$g" ) >"$GWAB/so" 2>"$GWAB/se"; rc=$?
+      { echo "### $1/$id rc=$rc"; echo "--- stdout"; cat "$GWAB/so"; echo "--- stderr"; cat "$GWAB/se"; } >> "$raw"
+    done < "$GWAB/matrix.txt"
+  }
+  gw_ab_dl() { ( cd "$lab" && export CLAUDE_CODE_SESSION_ID=sess-A && if [ -n "$lockv" ]; then export VF_DRIVER_LOCK="$lockv"; fi; "$FROZEN_DL" "$@" ) >/dev/null 2>&1; }
+  gw_ab_play aucun
+  gw_ab_dl acquire --owner=m1 --step=s1
+  [ -f "$m" ] || echo "### FIXTURE CASSÉE : le verrou n'a pas été posé" >> "$raw"
+  gw_ab_play tenu
+  sed 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+  gw_ab_play perime
+  sed -e "s/^heartbeat_epoch=.*/heartbeat_epoch=$(date +%s)/" -e '/^session_ids=/d' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+  gw_ab_play sans-session-ids
+  rm -f "$m"
+  gw_ab_play sans-meta
+  gw_ab_norm < "$raw" > "$out"
+}
+
+gw_ab_stdout() { # <transcription> <état/identifiant> : le bloc stdout d'un passage
+  awk -v want="### $2 " 'index($0, want)==1 {on=1; next} /^### /{on=0} on && /^--- stdout$/{o=1; next} on && /^--- stderr$/{o=0} on && o {print}' "$1"
+}
+
+gw_ab_first_divergence() { # <A> <B> : première ligne divergente (awk : jamais `diff`, qui ne sert pas à comparer des ensembles ici)
+  awk 'NR==FNR{a[FNR]=$0; na=FNR; next} {nb=FNR; if(!(FNR in a) || a[FNR]!=$0){print "ligne " FNR " : A=[" a[FNR] "] B=[" $0 "]"; found=1; exit}} END{if(!found && na!=nb) print "longueurs différentes : A=" na " B=" nb}' "$1" "$2"
+}
+
+gw_ab_ok=1
+if [ -f "$FROZEN_GUARD" ]; then
+  for mode in "VF_DRIVER_LOCK posé:.planning/alt/DRIVER.lock" "chemin par défaut:"; do
+    label="${mode%%:*}"; lockv="${mode#*:}"
+    gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "$lockv" "$GWAB/ab-frozen.txt"
+    gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "$lockv" "$GWAB/ab-current.txt"
+    if [ -s "$GWAB/ab-frozen.txt" ] && ! grep -q 'FIXTURE CASSÉE' "$GWAB/ab-frozen.txt" \
+       && gw_ab_stdout "$GWAB/ab-frozen.txt" tenu/commit.B | grep -q '"permissionDecision": "deny"' \
+       && gw_ab_stdout "$GWAB/ab-frozen.txt" tenu/w-planning.B | grep -q '"permissionDecision": "deny"' \
+       && [ -z "$(gw_ab_stdout "$GWAB/ab-frozen.txt" tenu/commit.A)" ] \
+       && [ -z "$(gw_ab_stdout "$GWAB/ab-frozen.txt" perime/commit.B)" ] \
+       && grep -q '^### tenu/w-nul.B rc=' "$GWAB/ab-frozen.txt"; then
+      assert_exit "GW-AB.témoin — la transcription de référence ($label) contient un refus sous verrou tenu, le détenteur et le verrou périmé laissés passer" 0 0
+    else
+      assert_exit "GW-AB.témoin — la transcription de référence ($label) est vide ou incomplète" 1 0
+    fi
+    if cmp -s "$GWAB/ab-frozen.txt" "$GWAB/ab-current.txt"; then
+      assert_exit "GW-AB.$label — copie gelée et guard courant : transcriptions identiques ($(grep -c '^### ' "$GWAB/ab-frozen.txt") passages)" 0 0
+    else
+      assert_exit "GW-AB.$label — transcriptions DIFFÉRENTES" 1 0
+      echo "     première divergence : $(gw_ab_first_divergence "$GWAB/ab-frozen.txt" "$GWAB/ab-current.txt")"
+      gw_ab_ok=0
+    fi
+  done
+else
+  assert_exit "GW-AB — la copie gelée $FROZEN_GUARD est absente" 1 0
+  gw_ab_ok=0
+fi
+if [ "$gw_ab_ok" = 1 ]; then echo "  A/B guard lab plat : IDENTIQUE"; else echo "  A/B guard lab plat : DIFFÉRENT"; fi
+
+# Intégrité de la copie gelée (T-57-40) : identique au blob du dépôt quand l'objet est présent ; absent (clone
+# superficiel de la CI), la ligne SKIP est écrite — jamais un vert muet.
+if git -C "$HERE" cat-file -e "$GW_AB_REF:$GW_AB_PATH_IN_REF" 2>/dev/null; then
+  git -C "$HERE" show "$GW_AB_REF:$GW_AB_PATH_IN_REF" > "$GWAB/ref.sh" 2>/dev/null
+  cmp -s "$FROZEN_GUARD" "$GWAB/ref.sh"; assert_exit "GW-AB-INTEGRITE.1 — la copie gelée est identique à git show $GW_AB_REF:$GW_AB_PATH_IN_REF" "$?" 0
+else
+  echo "  SKIP-INTEGRITE (objet absent) — $GW_AB_REF non disponible localement (clone superficiel) : intégrité de la copie gelée NON vérifiée ici"
+fi
+fi   # GW_MODE = full (A/B)
 
 echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
