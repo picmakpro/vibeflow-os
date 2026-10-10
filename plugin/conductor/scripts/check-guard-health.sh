@@ -178,7 +178,7 @@ py_resolve_local() {
   return 1
 }
 
-# check_driver_stall() : lit `driver-lock.sh status` (sibling resolu par repertoire de script,
+# check_driver_stall() : lit `driver-lock.sh status --all` (sibling resolu par repertoire de script,
 # DRIVER_LOCK_SH ci-dessus) et distingue TROIS verdicts (D-33-A) : SAIN (rien a signaler), STALL
 # (heartbeat frais, progres fige au-dela de STALL_WINDOW), ABANDON (heartbeat mort, `stale: true`).
 # Positionne STALL_INDETERMINATE et STALL_LINE — jamais n'imprime elle-meme, jamais de code de
@@ -205,10 +205,10 @@ check_driver_stall() {
   }
 
   local out rc_status
-  out="$("$DRIVER_LOCK_SH" status 2>/dev/null)"
+  out="$("$DRIVER_LOCK_SH" status --all 2>/dev/null)"
   rc_status=$?
   if [ "$rc_status" -ne 0 ]; then
-    report_self_unavailable "driver-lock.sh status a rendu un code non nul ($rc_status)"
+    report_self_unavailable "driver-lock.sh status --all a rendu un code non nul ($rc_status)"
     STALL_INDETERMINATE=1
     return 0
   fi
@@ -219,7 +219,7 @@ check_driver_stall() {
   # patron que le producteur reproduit ici).
   local parsed rc_py
   # shellcheck disable=SC2086
-  parsed="$(STATUS_JSON="$out" $py_invoke <<'PYEOF'
+  parsed="$(STATUS_JSON="$out" STALL_WINDOW="$STALL_WINDOW" $py_invoke <<'PYEOF'
 import json, os, sys
 raw = os.environ.get("STATUS_JSON", "")
 try:
@@ -228,18 +228,65 @@ except Exception:
     sys.exit(1)
 if not isinstance(data, dict):
     sys.exit(1)
-present = data.get("present")
-stale = data.get("stale")
-owner = data.get("owner")
-step = data.get("step")
-progress_age = data.get("progress_age_seconds")
-ttl = data.get("ttl")
+# Deux formes (P57-D-31) : lab partitionne -> objet portant `locks` (une entree par verrou) ; lab plat ou
+# VF_DRIVER_LOCK -> objet unique, la sortie de `status`. Forme `locks` : on retient l entree la plus grave
+# (verrou present et perime = abandon, puis present au progres fige au-dela du seuil = stall), une seule ligne
+# pour la famille ; `extra_signals` compte les AUTRES entrees en signal.
+ws = ""
+scope = ""
+extra = 0
+if "locks" in data:
+    locks = data.get("locks")
+    if not isinstance(locks, list):
+        sys.exit(1)
+    try:
+        win = int(os.environ.get("STALL_WINDOW", "900"))
+    except Exception:
+        win = 900
+    best = None
+    best_rank = 0
+    signals = 0
+    first_present = None
+    for e in locks:
+        if not isinstance(e, dict) or not e.get("present"):
+            continue
+        if first_present is None:
+            first_present = e
+        pa = e.get("progress_age_seconds")
+        if e.get("stale"):
+            rank = 2
+        elif isinstance(pa, int) and not isinstance(pa, bool) and pa > win:
+            rank = 1
+        else:
+            rank = 0
+        if rank:
+            signals += 1
+            if best is None or rank > best_rank:
+                best, best_rank = e, rank
+    entry = best if best is not None else first_present
+    if entry is None:
+        entry = {"present": False}
+    else:
+        extra = signals - 1 if best is not None else 0
+        scope = str(entry.get("scope", ""))
+        ws = str(entry.get("ws", "")) if scope == "compartiment" else ""
+else:
+    entry = data
+present = entry.get("present")
+stale = entry.get("stale")
+owner = entry.get("owner")
+step = entry.get("step")
+progress_age = entry.get("progress_age_seconds")
+ttl = entry.get("ttl")
 print("present=%s" % ("true" if present else "false"))
 print("stale=%s" % ("true" if stale else "false"))
 print("owner=%s" % (owner if owner is not None else ""))
 print("step=%s" % (step if step is not None else ""))
 print("progress_age_seconds=%s" % ("" if progress_age is None else progress_age))
 print("ttl=%s" % ("" if ttl is None else ttl))
+print("ws=%s" % ws)
+print("scope=%s" % scope)
+print("extra_signals=%s" % extra)
 PYEOF
 )"
   rc_py=$?
@@ -247,7 +294,7 @@ PYEOF
     return 0
   fi
 
-  local d_present="" d_stale="" d_owner="" d_step="" d_progress_age="" d_ttl=""
+  local d_present="" d_stale="" d_owner="" d_step="" d_progress_age="" d_ttl="" d_ws="" d_scope="" d_extra=0
   while IFS='=' read -r k v; do
     case "$k" in
       present) d_present="$v" ;;
@@ -256,6 +303,9 @@ PYEOF
       step) d_step="$v" ;;
       progress_age_seconds) d_progress_age="$v" ;;
       ttl) d_ttl="$v" ;;
+      ws) d_ws="$v" ;;
+      scope) d_scope="$v" ;;
+      extra_signals) d_extra="$v" ;;
     esac
   done <<STATUS_PARSED
 $parsed
@@ -278,8 +328,17 @@ STATUS_PARSED
     *) [ "$STALL_WINDOW" -ge "$d_ttl" ] && echo "[check-guard-health] AVERTISSEMENT invariant : STALL_WINDOW (${STALL_WINDOW}s) >= ttl du lock (${d_ttl}s) — le verdict STALL redevient inatteignable (regression deja mesuree), baissez VF_STALL_WINDOW sous VF_DRIVER_TTL" >&2 ;;
   esac
 
+  # Portee du verrou retenu (lab partitionne seulement) : le sujet nomme, ou le depot ; vide en lab plat.
+  local tag="" suffix=""
+  case "$d_scope" in
+    compartiment) [ -n "$d_ws" ] && tag=" ws=$d_ws" ;;
+    depot) tag=" scope=depot" ;;
+  esac
+  case "$d_extra" in ''|*[!0-9]*) d_extra=0 ;; esac
+  [ "$d_extra" -gt 0 ] && suffix=" (+${d_extra} autre(s) verrou(s) en signal — driver-lock.sh status --all)"
+
   if [ "$d_stale" = "true" ]; then
-    STALL_LINE="[mission-watchdog] abandon detecte — owner=$d_owner step=$d_step (heartbeat mort, lock perime) — ne JAMAIS tuer (ADR-031), takeover disponible si legitime"
+    STALL_LINE="[mission-watchdog] abandon detecte — owner=$d_owner step=$d_step$tag (heartbeat mort, lock perime) — ne JAMAIS tuer (ADR-031), takeover disponible si legitime$suffix"
     return 0
   fi
 
@@ -287,7 +346,7 @@ STATUS_PARSED
     ''|*[!0-9]*) return 0 ;;
   esac
   if [ "$d_progress_age" -gt "$STALL_WINDOW" ]; then
-    STALL_LINE="[mission-watchdog] stall detecte — owner=$d_owner step=$d_step (progres fige depuis ${d_progress_age}s, heartbeat frais, seuil=${STALL_WINDOW}s) — verifier la session en cours, ne JAMAIS tuer (ADR-031)"
+    STALL_LINE="[mission-watchdog] stall detecte — owner=$d_owner step=$d_step$tag (progres fige depuis ${d_progress_age}s, heartbeat frais, seuil=${STALL_WINDOW}s) — verifier la session en cours, ne JAMAIS tuer (ADR-031)$suffix"
   fi
   return 0
 }
