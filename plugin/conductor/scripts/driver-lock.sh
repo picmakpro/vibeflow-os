@@ -218,6 +218,9 @@ session_ids_append() {
 # en silence (P57-D-25) ; la detection fine est vf_ws_enumerate, rc 0/2/3.
 # ---------------------------------------------------------------------------------------------
 PARTITIONED=0; SCOPE=""; LOCATION=""; SCOPE_JSON=""; LOCK_ROOT=""
+# Option de cible a rejouer avec une commande nommee par un hint (R-1) : " --ws=<sujet>" ou " --depot"
+# en lab partitionne, vide ailleurs (le hint du lab plat reste celui d'avant la phase, octet pour octet).
+HINT_TARGET=""
 # Ancien verrou unique (P57-D-26) : le chemin historique, evalue par rapport au cwd comme le defaut
 # de LOCK_DIR. Lu seulement en lab partitionne ; jamais cree, jamais supprime par la resolution.
 LEGACY_DIR=".planning/DRIVER.lock"; LEGACY_PRESENT=false
@@ -301,6 +304,7 @@ vf_dl_resolve() {
     esac
     LOCK_DIR="$LOCK_ROOT/ws/$WS/DRIVER.lock"
     SCOPE="compartiment"
+    HINT_TARGET=" --ws=$WS"
     SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"$WS\", \"location\": \"$LOCATION\""
   else
     # Cible = DEPOT : un emplacement distinct (`repo/`, jamais `ws/…`), independant de tout verrou
@@ -308,6 +312,7 @@ vf_dl_resolve() {
     # le JSON le dit (`scope_reason`), un export oublie ne se transforme jamais en verrou de sujet.
     LOCK_DIR="$LOCK_ROOT/repo/DRIVER.lock"
     SCOPE="depot"
+    HINT_TARGET=" --depot"
     SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"\", \"location\": \"$LOCATION\""
     [ "$DEPOT" = 1 ] || SCOPE_JSON="$SCOPE_JSON, \"scope_reason\": \"ws-absent\""
     # Repli sur l'ancien verrou (P57-D-24) : un verbe autre qu'acquire, sans --ws ni --depot, quand
@@ -807,8 +812,8 @@ case "$ACTION" in
     #    `takeover` ci-dessous.
     rm -rf "${LOCK_PARENT:?}/$gen"
     log "lock perime (age ${age}s > ${TTL}s, owner=$held) — takeover requis"
-    printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "driver-lock.sh takeover --owner=%s --step=<etape>"%s}\n' \
-      "$held" "$age" "$OWNER" "$SCOPE_JSON"
+    printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "driver-lock.sh takeover --owner=%s --step=<etape>%s"%s}\n' \
+      "$held" "$age" "$OWNER" "$HINT_TARGET" "$SCOPE_JSON"
     exit 1
     ;;
 

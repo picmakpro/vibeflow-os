@@ -25,13 +25,13 @@ SCRIPT="$(cd "$HERE/.." && pwd)/driver-lock.sh"
 # par le plan en fait partie ; WS-LAST est ABSENT de DL-M-i, signature du piège P1 : le dernier compartiment passe).
 MUT_A="WS-LOC-1 WS-LOC-2 WS-LOC-3 WS-LOC-4"
 MUT_B="WS-INV WS-INV-dotdot WS-INV-quote WS-INV-slash WS-VERBS-5a WS-VERBS-5b WS-VERBS-5c WS-VERBS-5d WS-VERBS-5e WS-VERBS-5f WS-VERBS-5g WS-VERBS-5h WS-VERBS-5i WS-VERBS-5j"
-MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ENV WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-NOWS WS-VERBS-4"
+MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ENV WS-HINT-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-NOWS WS-VERBS-4"
 MUT_D="WS-LEG-1 WS-LEG-4"
 MUT_E="WS-ENV"
 MUT_F="WS-AB"
 MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-VFL"
 MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien WS-RC2-vide"
-MUT_I="WS-ALL-1 WS-ALL-2 WS-DEPOT WS-ENV WS-FIRST WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
+MUT_I="WS-ALL-1 WS-ALL-2 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
 # Mode de la suite. `full` (défaut) : tout, concurrence et mutants compris. `matrice` : sous-processus d'un
 # mutant (DL-M-*), qui rejoue les cas WS-* hors concurrence contre une COPIE mutée du script (DLWS_SCRIPT)
 # posée à côté de sa politique ; il n'y a alors ni concurrence ni mutants (pas de récursion).

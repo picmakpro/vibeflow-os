@@ -77,7 +77,7 @@ sans release. Le TTL + heartbeat reste le seul filet, mais `acquire` ne récupè
 périmé lui-même (D-32-02) — il REFUSE (`reason: stale-requires-takeover`) et nomme la commande dans
 son champ `hint`. Sur ce refus :
 ```bash
-"$S"/driver-lock.sh takeover --owner="<id>" --step="<étape>"
+"$S"/driver-lock.sh takeover --owner="<id>" --step="<étape>" [--ws="<sujet>" | --depot]
 ```
 Succès → `acquired: true` avec l'ancien tenant nommé (`previous_owner: "<ancien owner>"`) et la
 génération neuve publiée : consigner la reprise dans `STATE.md ### Decisions`. `reason: still-fresh`
