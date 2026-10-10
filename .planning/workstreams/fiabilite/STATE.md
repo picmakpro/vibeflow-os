@@ -6,15 +6,15 @@ current_phase_name: Verrou de driver par compartiment
 status: executing
 last_updated: "2026-10-10T18:15:59.073Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 57 plan 04 complete (concurrence 24x5, A/B lab plat, mutants DL-M-a a DL-M-i)
-state_head: 896a2b8c
+last_activity_desc: Phase 57 plan 05 complete (guard par compartiment, fail-closed, suite test-guard-driver-lock-ws.sh 71/0)
+state_head: ebf7a1bf
 progress:
   total_phases: 18
   completed_phases: 18
   total_plans: 115
   completed_plans: 105
 milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-stopped_at: "Completed 57-04-PLAN.md (2026-10-10) — un gagnant par verrou sous concurrence (24x5), lab plat identique au bit près à la copie gelée e8771d94, 9/9 mutants tués ; next plan 57-05 (guard par compartiment)."
+stopped_at: "Completed 57-05-PLAN.md (2026-10-10) — guard-driver-lock.sh juge les écritures par compartiment, fail-closed (sys.excepthook), 71 assertions, 4 mutants tués ; next plan 57-06 (consommateurs de progrès)."
 ---
 
 # Project State
@@ -48,7 +48,7 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Last activity: 2026-10-10 — Phase 57 plan 57-04 complete (4/16)
+Last activity: 2026-10-10 — Phase 57 plan 57-05 complete (5/16)
 
 ## Accumulated Context
 
@@ -70,6 +70,7 @@ Historique complet (jalons, décisions, arbitrages 2026-07 à 2026-09) : voir l'
 - [Phase 57]: 57-01 : le suffixe JSON de portée est posé sur acquire, status et release ; les autres verbes résolvent le verrou nommé mais n'émettent pas encore la portée (57-03) — contrat de la phase posé par le tracer ; le reste est livré par 57-03
 - [Phase 57]: 57-03 : status --all = ligne de json_status par verrou (ttl par entrée présente), forme lab en partitionné, sortie de status en verrou unique ; registre frère du verrou, VF_DRIVER_CHILDREN ignorée en partitionné (P57-D-24, P57-D-31, P57-D-32)
 - [Phase 57]: 57-04 : mutants rejoués en parallèle (neuf matrices, 75 s au lieu de 302 s), cas basculés comparés exactement ; A/B du lab plat contre la copie gelée e8771d94, --help exclu (P57-D-03, P57-D-12, P57-D-28, P57-D-37)
+- [Phase 57]: 57-05 : guard partitionné = crochet sys.excepthook fail-closed posé juste après l'aiguillage, lab plat inchangé ligne pour ligne ; tâche 2 sans RED (comportement livré par la tâche 1), discriminance par 4 mutants (P57-D-09, P57-D-10, P57-D-26, P57-D-33)
 - [Phase 57]: 57-02 : repli legacy-fallback sur tout verbe autre qu'acquire sans --ws ni --depot quand le dépôt est absent ; status porte legacy_lock pour toute cible en lab partitionné (P57-D-24, P57-D-26, P57-D-32)
 
 ### Pending Todos

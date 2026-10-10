@@ -1923,7 +1923,7 @@ forme exec (ADR-071).
 **Depends on:** aucune. Première du jalon.
 **Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
 **Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
-**Plans:** 4/16 plans executed (10 vagues)
+**Plans:** 5/16 plans executed (10 vagues)
 
 Plans:
 **Wave 1**
@@ -1937,7 +1937,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [x] 57-04-PLAN.md — vague 4 : preuves de `driver-lock.sh` (concurrence 24×5, A/B lab plat contre copie gelée, mutants DL-M-*)
-- [ ] 57-05-PLAN.md — vague 4 : `guard-driver-lock.sh`, écritures par compartiment, découverte des verrous, fail-closed dès l'aiguillage, quatre issues, suite `test-guard-driver-lock-ws.sh`
+- [x] 57-05-PLAN.md — vague 4 : `guard-driver-lock.sh`, écritures par compartiment, découverte des verrous, fail-closed dès l'aiguillage, quatre issues, suite `test-guard-driver-lock-ws.sh`
 - [ ] 57-06-PLAN.md — vague 4 : consommateurs de progrès (watchdog `status --all`, `dag.sh init --ws`), suite `test-driver-lock-consumers-ws.sh`
 - [ ] 57-07-PLAN.md — vague 4 : gate de sortie `check-mission-exit.sh --ws` (E1, identité d'E7, surcharge d'E4), suite `test-check-mission-exit-ws.sh`
 
