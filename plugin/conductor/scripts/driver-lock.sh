@@ -67,6 +67,17 @@
 # LIMITE ECRITE (A4, T-57-37) : un worktree sur une branche d'avant la partition n'a pas de dossier
 # de compartiments, il bascule donc en regime plat (verrou historique) alors que le clone est
 # partitionne ; non mesure ici, l'usage reel releve de la Phase 61.
+# STATUS --ALL (P57-D-24, P57-D-31, P57-D-32) : en lab partitionne, une ligne JSON {"present": <au moins
+# une entree presente>, "scope": "lab", "location", "legacy_lock", "locks": [ une entree par verrou ],
+# "children_running": <somme>}. Entrees dans l'ordre depot, ancien verrou (s'il existe), chaque
+# compartiment du disque, puis tout verrou de compartiment present sous le dossier commun sans dossier
+# de compartiment. Chaque entree est la ligne de status de CE verrou (ttl compris pour une entree
+# presente). Un nom de dossier ecarte par vf_ws_name_valid n'entre jamais dans le JSON : il est
+# compte sur stderr. --all n'est accepte que par status ; avec --ws ou --depot en lab partitionne
+# -> ws-invalid. Mode verrou unique : exactement la sortie de status.
+# REGISTRE PAR VERROU (P57-D-31) : en lab partitionne le registre des agents est le frere du verrou
+# resolu (vf-driver/ws/<sujet>/DRIVER.lock.children.jsonl) ; VF_DRIVER_CHILDREN n'est honoree qu'en
+# mode verrou unique. Tous les verbes portent --ws et le suffixe de portee (scope, ws, location).
 # VF_DRIVER_LOCK non vide, ou lab plat : mode verrou unique, --ws/--depot acceptes et sans effet
 # (P57-D-22, P57-D-31) ; vf_dl_resolve rend la main avant toute lecture de ces options.
 # LAB PLAT, ou VF_DRIVER_LOCK pose : comportement historique, au bit pres — la politique de noms
@@ -83,7 +94,7 @@ SESSION_MAX="${VF_DRIVER_SESSION_MAX:-8}"
 case "$SESSION_MAX" in ''|*[!0-9]*) SESSION_MAX=8 ;; esac  # meme garde que TTL (D-32-03, plafond LRU)
 
 ACTION=""; OWNER=""; STEP=""
-WS=""; WS_GIVEN=0; DEPOT=0
+WS=""; WS_GIVEN=0; DEPOT=0; ALL=0
 AGENT=""; ROLE=""; NODE=""; PARENT=""; DEPTH=""; CSTATUS=""
 for arg in "$@"; do
   case "$arg" in
@@ -92,6 +103,7 @@ for arg in "$@"; do
     --step=*)   STEP="${arg#*=}" ;;
     --ws=*)     WS="${arg#*=}"; WS_GIVEN=1 ;;
     --depot)    DEPOT=1 ;;
+    --all)      ALL=1 ;;
     --agent=*)  AGENT="${arg#*=}" ;;
     --role=*)   ROLE="${arg#*=}" ;;
     --node=*)   NODE="${arg#*=}" ;;
@@ -102,6 +114,12 @@ for arg in "$@"; do
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
+
+# --all n'est accepte que par status (P57-D-31) : message d'usage sur stderr, rien sur stdout, exit 1.
+if [ "$ALL" = 1 ] && [ "$ACTION" != status ]; then
+  echo "Usage: $0 status --all (--all n'est accepte que par status)" >&2
+  exit 1
+fi
 
 log() { echo "[driver-lock.sh] $*" >&2; }
 now() { date +%s; }
@@ -199,7 +217,7 @@ session_ids_append() {
 # test nu `-d` ignorerait un lien et un fichier regulier, qui seraient alors pris pour un lab plat
 # en silence (P57-D-25) ; la detection fine est vf_ws_enumerate, rc 0/2/3.
 # ---------------------------------------------------------------------------------------------
-PARTITIONED=0; SCOPE=""; LOCATION=""; SCOPE_JSON=""
+PARTITIONED=0; SCOPE=""; LOCATION=""; SCOPE_JSON=""; LOCK_ROOT=""
 # Ancien verrou unique (P57-D-26) : le chemin historique, evalue par rapport au cwd comme le defaut
 # de LOCK_DIR. Lu seulement en lab partitionne ; jamais cree, jamais supprime par la resolution.
 LEGACY_DIR=".planning/DRIVER.lock"; LEGACY_PRESENT=false
@@ -239,7 +257,7 @@ vf_dl_resolve() {
   [ -z "${VF_DRIVER_LOCK:-}" ] || return 0
   [ -e .planning/workstreams ] || [ -L .planning/workstreams ] || return 0
 
-  local policy="" cand common LOCK_ROOT rc=0
+  local policy="" cand common rc=0
   for cand in "$(dirname "$0")/workstream-policy.sh" \
               "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
     [ -f "$cand" ] && { policy="$cand"; break; }
@@ -266,6 +284,10 @@ vf_dl_resolve() {
     LOCK_ROOT=".planning/DRIVER.lock.d"; LOCATION="checkout"
   fi
 
+  # status --all vise le lab entier : une cible designee en plus est une erreur (P57-D-32).
+  if [ "$ALL" = 1 ] && { [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; }; then
+    vf_dl_refuse ws-invalid "--all lit tous les verrous du lab : rejouer sans --ws ni --depot, ou avec --ws=<sujet> sans --all"
+  fi
   if [ "$WS_GIVEN" = 1 ]; then
     # Validation AVANT tout chemin ou JSON (T-57-01, T-57-06). La liste n'est jamais passee dans
     # un pipeline vers une recherche a sortie anticipee (SIGPIPE sous pipefail, piege P1).
@@ -291,7 +313,7 @@ vf_dl_resolve() {
     # Repli sur l'ancien verrou (P57-D-24) : un verbe autre qu'acquire, sans --ws ni --depot, quand
     # le verrou de depot est absent et l'ancien present, vise l'ancien. C'est ce qui garde un manager
     # en vol pendant la mise a jour : ses verbes sans --ws retombent sur SON verrou.
-    if [ "$ACTION" != acquire ] && [ "$DEPOT" = 0 ] && [ ! -L "$LOCK_DIR" ] && [ ! -d "$LOCK_DIR" ] \
+    if [ "$ACTION" != acquire ] && [ "$ALL" = 0 ] && [ "$DEPOT" = 0 ] && [ ! -L "$LOCK_DIR" ] && [ ! -d "$LOCK_DIR" ] \
        && { [ -L "$LEGACY_DIR" ] || [ -d "$LEGACY_DIR" ]; }; then
       LOCK_DIR="$LEGACY_DIR"
       LOCATION="checkout"
@@ -514,7 +536,11 @@ journal_event() {
 # de vie d'un agent reste `ListAgents` cote Claude Code ; `orphans` liste ce qu'il faut ALLER
 # verifier, et `close --status=stopped` se pose apres la verification, jamais avant.
 # ---------------------------------------------------------------------------------------------
-REG="${VF_DRIVER_CHILDREN:-$LOCK_PARENT/${LOCK_BASE}.children.jsonl}"
+if [ "$PARTITIONED" = 1 ]; then
+  REG="$LOCK_PARENT/${LOCK_BASE}.children.jsonl"   # frere du verrou resolu ; VF_DRIVER_CHILDREN ignoree (P57-D-31)
+else
+  REG="${VF_DRIVER_CHILDREN:-$LOCK_PARENT/${LOCK_BASE}.children.jsonl}"
+fi
 TAB="$(printf '\t')"
 
 # Champ libre du registre (role, node) : meme classe que sanitize_field, plus la tabulation, qui
@@ -624,6 +650,68 @@ json_status() {
   page="$(progress_age)" && : || page="null"
   printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s, "children_running": %s%s}\n' \
     "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page" "$children" "$SCOPE_JSON"
+}
+
+# Une entree de status --all : la ligne de json_status d'UN verrou, dans un sous-shell qui reassigne les
+# globales derivees du verrou (LOCK_DIR, META, LOCK_PARENT, LOCK_BASE, REG, SCOPE_JSON). Jamais une
+# seconde mise en forme du JSON. Rend trois lignes : presence (true|false), children_running, JSON.
+vf_dl_entry() { # <dossier du verrou> <suffixe de portee>
+  (
+    LOCK_DIR="$1"; SCOPE_JSON="$2"; META="$LOCK_DIR/meta"
+    LOCK_PARENT="$(dirname "$LOCK_DIR")"; LOCK_BASE="$(basename "$LOCK_DIR")"
+    REG="$LOCK_PARENT/${LOCK_BASE}.children.jsonl"
+    if lock_present; then echo true; else echo false; fi
+    orphans_count
+    if lock_present; then json_status true; else json_status false; fi
+  )
+}
+
+# Aggregat de status --all en lab partitionne (P57-D-24, P57-D-32). Ajoute une entree a ALL_LOCKS,
+# somme les enfants, retient la presence. $3 = "optionnel" : une entree absente est alors ecartee.
+ALL_LOCKS=""; ALL_CHILDREN=0; ALL_PRESENT=false; ALL_SKIPPED=0
+vf_dl_all_add() { # <dossier du verrou> <suffixe de portee> [optionnel]
+  local e pres kids json
+  e="$(vf_dl_entry "$1" "$2")"
+  pres="$(printf '%s\n' "$e" | sed -n 1p)"; kids="$(printf '%s\n' "$e" | sed -n 2p)"; json="$(printf '%s\n' "$e" | sed -n 3p)"
+  if [ "${3:-}" = optionnel ] && [ "$pres" != true ]; then return 0; fi
+  [ "$pres" = true ] && ALL_PRESENT=true
+  ALL_CHILDREN=$((ALL_CHILDREN + kids))
+  if [ -z "$ALL_LOCKS" ]; then ALL_LOCKS="$json"; else ALL_LOCKS="$ALL_LOCKS, $json"; fi
+}
+
+vf_dl_status_all() {
+  local ws_list p name known=" " d lp
+  # depot
+  vf_dl_all_add "$LOCK_ROOT/repo/DRIVER.lock" ", \"scope\": \"depot\", \"ws\": \"\", \"location\": \"$LOCATION\""
+  # ancien verrou, s'il existe
+  if [ "$LEGACY_PRESENT" = true ]; then
+    vf_dl_all_add "$LEGACY_DIR" ", \"scope\": \"depot\", \"ws\": \"\", \"location\": \"checkout\", \"scope_reason\": \"legacy-fallback\", \"legacy_lock\": true"
+  fi
+  # compartiments du disque : sortie capturee en variable, jamais un pipeline vers une recherche a sortie
+  # anticipee (piege P1) ; chaque nom revalide avant d'entrer dans un chemin ou le JSON
+  ws_list="$(vf_ws_enumerate ".planning" 2>/dev/null)"
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    name="$(basename "$p")"
+    if ! vf_ws_name_valid "$name"; then ALL_SKIPPED=$((ALL_SKIPPED + 1)); continue; fi
+    known="$known$name "
+    vf_dl_all_add "$LOCK_ROOT/ws/$name/DRIVER.lock" ", \"scope\": \"compartiment\", \"ws\": \"$name\", \"location\": \"$LOCATION\""
+  done <<EOF
+$ws_list
+EOF
+  # verrous de compartiment presents sans dossier de compartiment sur le disque
+  for d in "$LOCK_ROOT"/ws/*/; do
+    [ -e "$d" ] || continue
+    d="${d%/}"; name="$(basename "$d")"
+    if [ -L "$d" ] || ! vf_ws_name_valid "$name"; then ALL_SKIPPED=$((ALL_SKIPPED + 1)); continue; fi
+    case "$known" in *" $name "*) continue ;; esac
+    lp="$d/DRIVER.lock"
+    { [ -L "$lp" ] || [ -d "$lp" ]; } || continue
+    vf_dl_all_add "$lp" ", \"scope\": \"compartiment\", \"ws\": \"$name\", \"location\": \"$LOCATION\"" optionnel
+  done
+  [ "$ALL_SKIPPED" -eq 0 ] || log "status --all : $ALL_SKIPPED nom(s) de dossier ecarte(s) (nom invalide ou lien symbolique), jamais imprime(s) dans le JSON"
+  printf '{"present": %s, "scope": "lab", "location": "%s", "legacy_lock": %s, "locks": [%s], "children_running": %s}\n' \
+    "$ALL_PRESENT" "$LOCATION" "$LEGACY_PRESENT" "$ALL_LOCKS" "$ALL_CHILDREN"
 }
 
 # Sonde de l'ancien verrou unique (P57-D-26), appelee en tete d'acquire en lab partitionne. Evalue
@@ -911,6 +999,7 @@ case "$ACTION" in
     ;;
 
   status)
+    if [ "$ALL" = 1 ] && [ "$PARTITIONED" = 1 ]; then vf_dl_status_all; exit 0; fi
     lock_present && json_status true || json_status false
     exit 0
     ;;
