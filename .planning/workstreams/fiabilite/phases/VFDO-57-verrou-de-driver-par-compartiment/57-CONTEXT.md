@@ -8,6 +8,9 @@ Cadrage `gsd-discuss-phase` en session principale, quatre zones, questions regro
 option recommandée retenue à chaque fois. P57-D-12 à P57-D-15 sont laissés à la discrétion du planificateur
 (arbitrage Samuel, même canal, même date : « Écris le CONTEXT »).
 
+**Exigences :** DLWS-01 à DLWS-08 (`REQUIREMENTS.md`), posées le 2026-10-10 à l'ouverture de la planification. Elles
+reformulent P57-D-01 à P57-D-15 sans rien y ajouter ; aucun arbitrage neuf n'a été demandé.
+
 <domain>
 ## Phase Boundary
 
@@ -120,6 +123,122 @@ la Phase 61.
   - les managers qui appellent `acquire` (`vf-dev-manager`, `vf-design-manager`, les managers de bundles)
     et `mission-flow.md` ;
   - le recensement `workstream-planning-consumers.md`.
+
+### Arbitrages de planification (2026-10-10)
+
+Questions ouvertes par `57-RESEARCH.md` (§ Open Questions) : la mission de planification les a fait remonter
+à Samuel. **P57-D-16 à P57-D-21 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-10**, en
+deux appels groupés par zone, et l'option recommandée a été retenue à chaque fois. Ils **précisent**
+P57-D-01 à D-11 et n'en réécrivent aucun.
+
+- **P57-D-16 (autres gestes git, Q1)** : le guard répartit les gestes git en trois classes.
+  - **Arbre ou index du checkout** : `restore`, `reset`, `clean`, `merge`, `rebase`, `cherry-pick`,
+    `revert`, `stash`. Ils sont traités comme `checkout`/`switch` (P57-D-11, P57-D-17).
+  - **`commit`** : il est jugé sur l'index (P57-D-10, P57-D-19).
+  - **`push`, `branch`, `gh pr`** : permis sous le verrou de compartiment d'autrui, refusés sous son verrou
+    de dépôt. `tag` et `gh release` sont des gestes de release : ils sont refusés quand autrui tient le
+    verrou de dépôt.
+- **P57-D-17 (« dans le même checkout », Q2)** : le refus de P57-D-11 et de la première classe de P57-D-16
+  ne s'applique que si le verrou d'autrui a été pris **depuis le même worktree**. Le champ `worktree=` du
+  meta fait foi, comparé au `--show-toplevel` courant.
+- **P57-D-18 (fichiers communs hors `.planning/`, Q3)** : le guard porte une liste par défaut, codée en dur,
+  des fichiers qui font partie de la forme de release VF : `VERSION`, `plugin/.claude-plugin/plugin.json`,
+  `.claude-plugin/marketplace.json`, `README.md`, `README.fr.md`, `CHANGELOG.md` racine et `docs/ADR.md`.
+  Un commit qui indexe l'un d'eux est jugé comme un geste de dépôt. Un lab qui n'a pas ces fichiers n'est
+  pas concerné. Aucun fichier de configuration neuf.
+- **P57-D-19 (`commit -a`, pathspec, `--amend`, Q4)** : le jugement d'un commit prend l'union de
+  `git diff --cached --name-only` et de deux autres sources : `git diff --name-only` quand la commande porte
+  `-a`/`--all` ou un pathspec, et les fichiers de `HEAD` quand elle porte `--amend`. Il reste
+  **fail-closed** : une source illisible donne un refus. P57-D-10 est prolongé, pas réécrit.
+- **P57-D-20 (limites de l'isolation, Q5+Q6)** : l'amendement d'ADR-053 écrit deux limites assumées.
+  - Les managers d'une même session partagent le `session_id`. Le guard isole donc des **sessions**, pas
+    des managers. `GSD_SESSION_KEY` protège le pointeur GSD, pas le guard.
+  - Le verrou unique ne ferme plus « par construction » la chaîne manager → worker → manager. Elle
+    reste tenue par les allowlists `Agent(...)`, qui sont un lint.
+  - Aucun refus actif neuf dans la 57.
+- **P57-D-21 (layout et champs JSON, Q11)** : la forme est ratifiée telle quelle.
+  - Emplacements : `$(git rev-parse --git-common-dir)/vf-driver/ws/<sujet>` pour un compartiment et
+    `$(git rev-parse --git-common-dir)/vf-driver/repo` pour le dépôt, avec un dossier par verrou.
+  - Champs JSON, présents **uniquement** dans un lab partitionné : `scope` (`compartiment` | `depot`),
+    `ws` et `location` (`git-common-dir` | `checkout`).
+  - **Reversibility:** costly (P57-D-07).
+
+**P57-D-22 à P57-D-30** relèvent de la discrétion du planificateur (P57-D-12 à D-15). Ils ont été soumis à
+Samuel pour veto par le même canal, à la même date. Réponse : « Aucun veto ».
+
+- **P57-D-22 (`VF_DRIVER_LOCK`)** : quand cette variable est posée, le script fonctionne dans l'ancien mode
+  à verrou unique, même dans un lab partitionné. Le JSON reste inchangé et les suites existantes restent
+  vertes. E1 de `check-mission-exit.sh` cesse de l'exporter dans un lab partitionné.
+- **P57-D-23 (DAG ↔ sujet)** : `dag.json` reçoit un champ additif `ws` (`dag.sh init --ws=`), lu de façon
+  tolérante. La progression (`mark-progress`) passe `--ws`, pour que le watchdog suive le bon verrou.
+- **P57-D-24 (verbes sans `--ws`)** : dans un lab partitionné, `takeover`, `reclaim`, `heartbeat`,
+  `mark-progress`, `release`, `recover` et `status` appelés sans `--ws` visent le verrou de dépôt. Si
+  celui-ci est absent et qu'un ancien `.planning/DRIVER.lock` est présent, ils visent ce dernier. Le JSON
+  dit toujours `scope`. `status --all` agrège tous les verrous.
+- **P57-D-25 (partition illisible)** : un dossier `workstreams/` illisible (lien, fichier régulier, vide
+  au sens de `vf_ws_enumerate` rc 2) donne un **refus** `partition-unreadable`, jamais un repli plat. Le
+  cas « fichier régulier », encore ouvert dans l'amendement d'ADR-069 du 2026-09-23, n'est pas figé
+  au-delà de ce refus.
+- **P57-D-26 (ancien verrou tenu à la mise à jour, réalise P57-D-14)** : dans un lab partitionné, un
+  `.planning/DRIVER.lock` vivant vaut verrou de dépôt.
+  - Tout `acquire` refuse alors `legacy-lock-held`, avec en `hint` la commande de release exacte.
+  - Un ancien verrou périmé donne `stale-requires-takeover`.
+  - Le guard le traite comme un verrou de dépôt et `status` l'expose (`legacy_lock`).
+  - Jamais de reprise silencieuse. Aucun verbe neuf.
+- **P57-D-27 (validation de `--ws`)** : `--ws` est validé par `vf_ws_name_valid` et `vf_ws_dir_resolve`
+  (`workstream-policy.sh`) plutôt que par `vf_ws_enumerate`. Les raisons de refus fermées sont
+  `unknown-ws` et `ws-invalid`, chacune avec son `hint`. La liste des compartiments n'est jamais passée
+  dans un pipeline vers `grep -q` (piège `pipefail`, mesuré).
+- **P57-D-28 (QUAL-01 du guard)** : le guard prouve **quatre** issues : PASS, DENY, payload imparsable
+  silencieux, interprète indisponible bruyant (code 17). Chaque comportement neuf a sa mutation rouge
+  prouvée. `driver-lock.sh` garde trois issues.
+- **P57-D-29 (lab en sous-dossier)** : quand deux `.planning/` vivent dans un même clone, ils partagent
+  `vf-driver/`. Ce cas est **hors périmètre** et écrit comme limite.
+- **P57-D-30 (release)** : aucune release dans la 57. La release reste un geste humain, après la phase
+  (ADR-073).
+
+### Décisions nées de la planification (2026-10-10)
+
+Le planificateur a posé P57-D-31 à P57-D-37 en écrivant les plans. Trois d'entre elles touchent une
+décision verrouillée, le périmètre ou la doctrine du head ; elles sont **remontées à Samuel** :
+**P57-D-34, P57-D-36 et P57-D-37, arbitrage Samuel, AskUserQuestion session principale, 2026-10-10**.
+Il a retenu à chaque fois l'option recommandée. Les quatre autres lui ont été soumises pour veto, par le même
+canal à la même date : aucun veto. Le détail de chaque décision vit dans les plans qui la citent.
+
+- **P57-D-31 (régime plat et forcé)** : dans un lab plat, ou quand `VF_DRIVER_LOCK` est posé, `--ws` et
+  `--depot` sont acceptés sans effet. Dans ces deux cas, `status --all` rend exactement la sortie de
+  `status`. `--all` n'est accepté que par `status`. `VF_DRIVER_CHILDREN` n'est honorée qu'en mode verrou
+  unique.
+- **P57-D-32 (forme JSON complémentaire)** : en lab partitionné, le JSON ajoute `scope_reason`
+  (`ws-absent` | `legacy-fallback`) et `legacy_lock` à la forme ratifiée par P57-D-21. La forme de
+  `status --all` est fixée par la table de contrat de 57-01 et implémentée par 57-03. Un `--ws` vide, ou `--ws` combiné à `--depot`, est refusé
+  `ws-invalid`.
+- **P57-D-33 (guard, cas limites)** :
+  - `git worktree remove` reste refusé sous tout verrou d'autrui.
+  - Une cible git incertaine (`-C`, `--git-dir`, `--work-tree`) reprend la règle d'avant la phase :
+    refus sous tout verrou d'autrui.
+  - Un `git add` placé dans la même commande que le commit entre dans le jugement.
+  - Le nom de compartiment est comparé exactement, ou sans tenir compte de la casse.
+  - Une erreur interne du chemin partitionné donne un refus.
+- **P57-D-34 (le head sérialise ses managers)** : jusqu'à la preuve d'usage réel (Phase 61), un head
+  sérialise toujours ses propres managers. Les mandats portent déjà `--ws` et
+  `GSD_SESSION_KEY=vf-<sujet>-<owner>`. Motif : la limite P57-D-20 ; dans la 57, la parallélisation par
+  compartiment ne vaut qu'entre sessions distinctes. *Ratifiée par Samuel.*
+- **P57-D-35 (gate de sortie)** : `check-mission-exit.sh --ws` couvre E1, l'identité d'E7 et la surcharge
+  d'E4. Sans `--ws`, dans un lab partitionné, E1 est indéterminé. Un verrou de dépôt tenu est signalé
+  sur stderr, jamais compté comme un manque.
+- **P57-D-36 (périmètre élargi)** : au-delà de l'inventaire de P57-D-15, la phase modifie aussi :
+  - l'étape de release de `CLAUDE.md`, en réécrivant les items existants ;
+  - le skill `vf-split-planning`, dont la partition passe sous verrou de dépôt ;
+  - le manuel FR et EN ;
+  - l'entrée n°27 de `docs/HOOKS-CONTRAT-SORTIE.md` ;
+  - une note datée au § 6 du spec head.
+
+  *Ratifiée par Samuel.*
+- **P57-D-37 (exception `--help` à P57-D-03)** : la sortie de `driver-lock.sh --help` change aussi dans un
+  lab plat, puisque l'en-tête documente les nouvelles options. Elle est exclue du témoin A/B, et cette
+  exclusion est écrite dans le témoin. Tous les verbes restent identiques octet pour octet. *Ratifiée par
+  Samuel ; P57-D-03 est précisée, pas réécrite.*
 
 </decisions>
 
