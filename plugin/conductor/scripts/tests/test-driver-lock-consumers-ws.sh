@@ -26,6 +26,7 @@ SUITE="$HERE/$(basename "$0")"
 CGH="${CW_CGH:-$SCRIPTS/check-guard-health.sh}"
 DAGSH="${CW_DAG:-$SCRIPTS/dag.sh}"
 DL="$SCRIPTS/driver-lock.sh"
+CBC="${CW_CBC:-$SCRIPTS/check-branch-claim.sh}"
 POLICY="$(cd "$SCRIPTS/../../planning-core/scripts" && pwd)/workstream-policy.sh"
 CW_MODE="${CW_MODE:-full}"
 
@@ -133,6 +134,24 @@ dag() { # <lab> <args...>
 progress_of() { # <lab> [args...]
   local lab="$1"; shift
   dl "$lab" probe status "$@" 2>/dev/null | sed -n 's/.*"progress_epoch": \([0-9]*\).*/\1/p'
+}
+
+# Claim de branche réel : positionne CBC_OUT (stdout), CBC_ERR (stderr) et CBC_RC (jamais dans une substitution).
+CBC_RC=0; CBC_OUT=""; CBC_ERR=""
+cbc() { # <cwd> <args...>
+  local cwd="$1"; shift
+  CBC_OUT="$(cd "$cwd" && "$CBC" "$@" 2>"$WORK_DIR/cbc.err" </dev/null)"; CBC_RC=$?
+  CBC_ERR="$(cat "$WORK_DIR/cbc.err")"
+}
+# Clone partitionné + worktree lié sur la branche `b` ; verrou du compartiment alpha pris DEPUIS le worktree
+# (le meta porte branch=b et le worktree lié) ; le checkout principal passe ensuite sur `b`.
+mk_claim_lab() { # <nom> → positionne CLAIM_LAB (principal) et CLAIM_WT (lié)
+  CLAIM_LAB="$(mk_lab "$1")"
+  CLAIM_WT="$WORK_DIR/$1-wt"
+  git -C "$CLAIM_LAB" worktree add -q -b b "$CLAIM_WT" >/dev/null 2>&1
+  CLAIM_WT="$(cd "$CLAIM_WT" && pwd -P)"
+  dl "$CLAIM_WT" sess-A acquire --ws=alpha --owner=m1 --step=s-alpha >/dev/null
+  git -C "$CLAIM_LAB" checkout -q --ignore-other-worktrees b >/dev/null 2>&1
 }
 
 matrice() {
@@ -294,6 +313,19 @@ matrice() {
   cmp -s "$F" "$WORK_DIR/dag-opt.avant" || CASE_BAD="$CASE_BAD [le fichier a changé malgré le refus]"
   dag "$LAB" mark --file="$F" --id=x --status=done --ws=alpha
   cexp_rc "mark --ws" "$DAG_RC" 1
+  cend
+
+  echo "=== CW-CLAIM — le claim de branche voit les verrous du clone ==="
+  mk_claim_lab claimwt
+  cbegin CW-CLAIM-WT
+  cbc "$CLAIM_LAB" --hook; out="$CBC_OUT"
+  cexp_rc "exit signal (hook)" "$CBC_RC" 0
+  cexp "ligne" "$out" "[branch-claim]"
+  cexp "compartiment nommé" "$out" "compartiment alpha"
+  n="$(printf '%s\n' "$out" | grep -c .)"; cexp_eq "une seule ligne" "$n" 1
+  cbc "$CLAIM_LAB"
+  cexp_rc "exit signal (CLI)" "$CBC_RC" 0
+  cexp "diagnostic sur stderr" "$CBC_ERR" "revendiquee par un lock actif"
   cend
 }
 
