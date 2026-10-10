@@ -40,6 +40,23 @@
 #             VF_DRIVER_SESSION_MAX (defaut 8, plafond LRU de session_ids),
 #             VF_DRIVER_CHILDREN (defaut <lock>.children.jsonl, registre des agents dispatches).
 # Reference : ADR-053 + .planning/phases/VFDO-09-*/09-CADRAGE-swarm.md §2.
+#
+# LAB PARTITIONNE (Phase 57) — un verrou NOMME par cible, au lieu du verrou unique :
+#   --ws=<sujet>   le verrou du compartiment <sujet> (un manager par compartiment, en parallele)
+#   --depot        le verrou de DEPOT (gestes qui touchent l'ensemble : release, fichiers racine…)
+#   sans --ws      = verrou de depot ; le JSON porte alors "scope_reason": "ws-absent"
+# Le compartiment ne vient JAMAIS que d'un --ws explicite : ni GSD_WORKSTREAM, ni VF_WORKSTREAM, ni
+# le pointeur active-workstream ne deplacent la cible (un export oublie ne verrouille pas le mauvais
+# sujet en silence). Un lab est partitionne quand .planning/workstreams existe (dossier, lien ou
+# fichier : un etat illisible est un refus nomme "partition-unreadable", jamais un repli plat).
+# Emplacement : <git-common-dir>/vf-driver/{ws/<sujet>,repo}/DRIVER.lock, un dossier par verrou,
+# partage entre les worktrees du clone. Le JSON des verbes porte "scope" (compartiment|depot),
+# "ws" ("" pour le depot) et "location" (git-common-dir). Refus nommes, chacun avec un "hint" :
+# unknown-ws, ws-invalid, partition-unreadable, policy-missing. Le nom du sujet est valide par
+# vf_ws_name_valid puis vf_ws_dir_resolve AVANT d'entrer dans un chemin ou un JSON.
+# LAB PLAT, ou VF_DRIVER_LOCK pose : comportement historique, au bit pres — la politique de noms
+# n'est meme pas chargee. LIMITE ECRITE (P57-D-29) : deux .planning/ dans un meme clone partagent
+# vf-driver/, hors perimetre.
 
 set -uo pipefail
 
@@ -51,12 +68,15 @@ SESSION_MAX="${VF_DRIVER_SESSION_MAX:-8}"
 case "$SESSION_MAX" in ''|*[!0-9]*) SESSION_MAX=8 ;; esac  # meme garde que TTL (D-32-03, plafond LRU)
 
 ACTION=""; OWNER=""; STEP=""
+WS=""; WS_GIVEN=0; DEPOT=0
 AGENT=""; ROLE=""; NODE=""; PARENT=""; DEPTH=""; CSTATUS=""
 for arg in "$@"; do
   case "$arg" in
     acquire|heartbeat|release|status|recover|takeover|reclaim|mark-progress|register|close|orphans) ACTION="$arg" ;;
     --owner=*)  OWNER="${arg#*=}" ;;
     --step=*)   STEP="${arg#*=}" ;;
+    --ws=*)     WS="${arg#*=}"; WS_GIVEN=1 ;;
+    --depot)    DEPOT=1 ;;
     --agent=*)  AGENT="${arg#*=}" ;;
     --role=*)   ROLE="${arg#*=}" ;;
     --node=*)   NODE="${arg#*=}" ;;
@@ -150,6 +170,96 @@ session_ids_append() {
   fi
   printf '%s' "$out"
 }
+
+# ---------------------------------------------------------------------------------------------
+# RESOLUTION DU VERROU NOMME (Phase 57) — UN SEUL point d'insertion. LOCK_DIR et META sont
+# reassignes ICI, avant que LOCK_PARENT, LOCK_BASE, REG, les mutex `.rec.*`, le journal
+# `.events.log` et la generation n'en soient derives : toute la mecanique d'acquisition (lien
+# remplace par rename(2), mutex nomme d'apres la generation observee) est PARAMETREE par
+# l'emplacement, jamais retouchee (en-tete l.15-17 : deux correctifs de fenetre mesures pires).
+#
+# LAB PLAT, ou VF_DRIVER_LOCK pose et non vide : la fonction ne fait RIEN — ni `source`, ni `git`,
+# ni test de plus que `-e`/`-L` sur le dossier des compartiments (P57-D-03, comportement historique
+# au bit pres). Le lab est dit partitionne quand .planning/workstreams existe ou est un lien : le
+# test nu `-d` ignorerait un lien et un fichier regulier, qui seraient alors pris pour un lab plat
+# en silence (P57-D-25) ; la detection fine est vf_ws_enumerate, rc 0/2/3.
+# ---------------------------------------------------------------------------------------------
+PARTITIONED=0; SCOPE=""; LOCATION=""; SCOPE_JSON=""
+
+# Refus nomme, rejouable. La cle de tete suit le verbe (`error` pour status/orphans : JAMAIS une
+# cle `present`, qui se lirait « relache »). $3 = nom de sujet DEJA valide (jamais une valeur brute).
+vf_dl_refuse() { # <raison> <hint> [sujet-valide]
+  local reason="$1" hint="$2" extra="" key
+  [ -n "${3:-}" ] && extra=", \"ws\": \"$3\""
+  case "$ACTION" in
+    acquire|takeover)        key='"acquired": false' ;;
+    reclaim)                 key='"reclaimed": false' ;;
+    heartbeat|mark-progress) key='"ok": false' ;;
+    release)                 key='"released": false' ;;
+    recover)                 key='"recovered": false' ;;
+    register)                key='"registered": false' ;;
+    close)                   key='"closed": false' ;;
+    *)                       key="\"error\": \"$reason\"" ;;
+  esac
+  printf '{%s, "reason": "%s", "hint": "%s"%s}\n' "$key" "$reason" "$hint" "$extra"
+  exit 1
+}
+
+# Dossier commun du clone, CANONICALISE (`cd` + `pwd -P`, jamais comparé brut : `--git-common-dir`
+# rend un chemin relatif au cwd dans un checkout simple, absolu dans un worktree lie ; jamais
+# `--path-format=absolute`, absent des git anciens). Rend 1 hors depot git.
+vf_dl_common_dir() {
+  local d
+  d="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
+  [ -n "$d" ] || return 1
+  case "$d" in /*) ;; *) d="$PWD/$d" ;; esac
+  (cd "$d" 2>/dev/null && pwd -P)
+}
+
+vf_dl_resolve() {
+  [ -n "$ACTION" ] || return 0
+  [ -z "${VF_DRIVER_LOCK:-}" ] || return 0
+  [ -e .planning/workstreams ] || [ -L .planning/workstreams ] || return 0
+
+  local policy="" cand common rc=0
+  for cand in "$(dirname "$0")/workstream-policy.sh" \
+              "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+    [ -f "$cand" ] && { policy="$cand"; break; }
+  done
+  [ -n "$policy" ] || vf_dl_refuse policy-missing "script workstream-policy.sh introuvable : /vf-update reinstalle le module planning-core puis rejouer la commande"
+  # shellcheck source=/dev/null
+  . "$policy"
+
+  # Detection fine du regime. rc 3 = le dossier a disparu entre les deux tests : regime plat.
+  vf_ws_enumerate ".planning" >/dev/null 2>&1; rc=$?
+  case "$rc" in
+    0) ;;
+    3) return 0 ;;
+    *) vf_dl_refuse partition-unreadable "le dossier des compartiments est illisible (lien symbolique, fichier regulier ou vide) : le rendre a l'etat de dossier reel non vide puis rejouer la commande" ;;
+  esac
+  PARTITIONED=1
+
+  common="$(vf_dl_common_dir)" || vf_dl_refuse no-git-common-dir "dossier commun du clone introuvable : lancer la commande dans un depot git"
+  LOCATION="git-common-dir"
+
+  if [ "$WS_GIVEN" = 1 ]; then
+    # Validation AVANT tout chemin ou JSON (T-57-01, T-57-06). La liste n'est jamais passee dans
+    # un pipeline vers une recherche a sortie anticipee (SIGPIPE sous pipefail, piege P1).
+    [ "$DEPOT" = 0 ] || vf_dl_refuse ws-invalid "--ws et --depot s'excluent : choisir l'un ou l'autre"
+    [ -n "$WS" ] && vf_ws_name_valid "$WS" || vf_dl_refuse ws-invalid "--ws attend un nom de sujet (lettres, chiffres, point, souligne, tiret) : rejouer avec --ws=<sujet>, ou --depot pour le verrou de depot"
+    vf_ws_dir_resolve ".planning" "$WS"; rc=$?
+    case "$rc" in
+      0) ;;
+      2) vf_dl_refuse ws-invalid "le compartiment designe est un lien symbolique, refuse : rejouer avec un compartiment reel" ;;
+      *) vf_dl_refuse unknown-ws "aucun compartiment de ce nom : lister les compartiments avec driver-lock.sh status --all puis rejouer" "$WS" ;;
+    esac
+    LOCK_DIR="$common/vf-driver/ws/$WS/DRIVER.lock"
+    SCOPE="compartiment"
+    SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"$WS\", \"location\": \"$LOCATION\""
+  fi
+  META="$LOCK_DIR/meta"
+}
+vf_dl_resolve
 
 LOCK_PARENT="$(dirname "$LOCK_DIR")"
 LOCK_BASE="$(basename "$LOCK_DIR")"
@@ -445,7 +555,7 @@ json_status() {
   # exactement le cas « manager termine, enfant jamais ferme » que le gate de sortie doit voir.
   local children; children="$(orphans_count)"
   if [ "$1" = false ]; then
-    printf '{"present": false, "lock": "%s", "children_running": %s}\n' "$LOCK_DIR" "$children"; return
+    printf '{"present": false, "lock": "%s", "children_running": %s%s}\n' "$LOCK_DIR" "$children" "$SCOPE_JSON"; return
   fi
   local o s age stale gen sids lease guard_eff pe page
   o="$(meta_get owner)"; s="$(meta_get step)"; age="$(lock_age)"
@@ -466,8 +576,8 @@ json_status() {
   pe="$(meta_get progress_epoch)"
   case "$pe" in ''|*[!0-9]*) pe="null" ;; esac
   page="$(progress_age)" && : || page="null"
-  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s, "children_running": %s}\n' \
-    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page" "$children"
+  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s, "children_running": %s%s}\n' \
+    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page" "$children" "$SCOPE_JSON"
 }
 
 require_owner() {
@@ -491,7 +601,7 @@ case "$ACTION" in
     # `"acquired": true`, DEUX detenteurs actifs simultanement. Cette garde ne touche NI la
     # creation de generation candidate, NI le mutex de reprise, NI sa revalidation : elle ferme un
     # trou de la voie LIBRE, elle ne rouvre pas le protocole de reprise (T0, T12.2).
-    gen="$(new_generation)" || { echo '{"acquired": false, "reason": "generation-failed"}'; exit 1; }
+    gen="$(new_generation)" || { printf '{"acquired": false, "reason": "generation-failed"%s}\n' "$SCOPE_JSON"; exit 1; }
     if ! lock_present && ln_atomic "$gen" "$LOCK_DIR"; then
       _lease="$(lease_age)" && : || _lease="null"
       # orphans_count (issue #82) : un registre laisse par une mission precedente (release avec
@@ -499,8 +609,8 @@ case "$ACTION" in
       # manager inventorie et arrete AVANT son premier dispatch (mission-flow.md §Pattern I).
       _orph="$(orphans_count)"
       [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running avant cette acquisition. Inventorier (orphans) avant tout dispatch"
-      printf '{"acquired": true, "owner": "%s", "step": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s}\n' \
-        "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)"
+      printf '{"acquired": true, "owner": "%s", "step": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s%s}\n' \
+        "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
       exit 0
     fi
     # 2. OCCUPE — notre generation ne sert pas encore ; on la garde pour une eventuelle
@@ -513,11 +623,11 @@ case "$ACTION" in
         [ -z "$STEP" ] && STEP="$(meta_get step)"
         rewrite_meta "$(now)"
         _lease="$(lease_age)" && : || _lease="null"
-        printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true, "generation": "%s", "session_ids": %s, "lease_seconds": %s}\n' \
-          "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease"
+        printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true, "generation": "%s", "session_ids": %s, "lease_seconds": %s%s}\n' \
+          "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$SCOPE_JSON"
         exit 0
       fi
-      printf '{"acquired": false, "reason": "held", "held_by": "%s", "age_seconds": %s}\n' "$held" "$age"
+      printf '{"acquired": false, "reason": "held", "held_by": "%s", "age_seconds": %s%s}\n' "$held" "$age" "$SCOPE_JSON"
       exit 1
     fi
     # 3. PERIME (D-32-02, LOCK-04) — la reprise d'un lock perime est desormais un geste EXPLICITE,
@@ -527,8 +637,8 @@ case "$ACTION" in
     #    `takeover` ci-dessous.
     rm -rf "${LOCK_PARENT:?}/$gen"
     log "lock perime (age ${age}s > ${TTL}s, owner=$held) — takeover requis"
-    printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "driver-lock.sh takeover --owner=%s --step=<etape>"}\n' \
-      "$held" "$age" "$OWNER"
+    printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "driver-lock.sh takeover --owner=%s --step=<etape>"%s}\n' \
+      "$held" "$age" "$OWNER" "$SCOPE_JSON"
     exit 1
     ;;
 
@@ -697,7 +807,7 @@ case "$ACTION" in
 
   release)
     require_owner
-    lock_present || { echo '{"released": false, "reason": "no-lock"}'; exit 0; }
+    lock_present || { printf '{"released": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 0; }
     held="$(meta_get owner)"
     if [ "$held" = "$OWNER" ]; then
       drop_lock
@@ -708,14 +818,14 @@ case "$ACTION" in
       _orph="$(orphans_count)"
       if [ "$_orph" -gt 0 ]; then
         log "release avec $_orph agent(s) consigne(s) encore running : registre conserve ($REG), a inventorier (orphans)"
-        printf '{"released": true, "owner": "%s", "children_running": %s, "orphans": %s}\n' "$OWNER" "$_orph" "$(orphans_ids_json)"
+        printf '{"released": true, "owner": "%s", "children_running": %s, "orphans": %s%s}\n' "$OWNER" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
       else
         rm -f "$REG"
-        printf '{"released": true, "owner": "%s", "children_running": 0}\n' "$OWNER"
+        printf '{"released": true, "owner": "%s", "children_running": 0%s}\n' "$OWNER" "$SCOPE_JSON"
       fi
       exit 0
     fi
-    printf '{"released": false, "reason": "not-owner", "held_by": "%s"}\n' "$held"; exit 1
+    printf '{"released": false, "reason": "not-owner", "held_by": "%s"%s}\n' "$held" "$SCOPE_JSON"; exit 1
     ;;
 
   status)
