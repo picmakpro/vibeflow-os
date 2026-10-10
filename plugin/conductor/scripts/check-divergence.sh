@@ -37,7 +37,13 @@
 #
 # Usage:
 #   check-divergence.sh [--path <dir>]
+#   check-divergence.sh --list-phase-numbers <phases_dir>
 #   check-divergence.sh --help
+#
+# --list-phase-numbers : mode lecture seule, hors vérification — imprime les numéros de phase NORMALISÉS
+# des dossiers de <phases_dir> (un par ligne, trié, unique), par les MÊMES extract_num / normalize_num /
+# list_phase_dirs que S2/S4/S5. check-method-budget.sh s'y appuie pour ne pas archiver un bloc ROADMAP
+# dont les dossiers de phase existent encore (sinon S4(a)). Rend 0 ; 64 si la valeur manque.
 #
 # Defaults: --path .   (le `.planning/` inspecté est `<--path>/.planning`)
 #
@@ -58,6 +64,7 @@
 set -uo pipefail
 
 ROOT="."
+LIST_PHASES_DIR=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -68,10 +75,65 @@ while [ "$#" -gt 0 ]; do
       ROOT="${1#--path=}"
       [ -n "$ROOT" ] || { echo "[check-divergence] --path nécessite une valeur" >&2; exit 64; }
       shift ;;
+    --list-phase-numbers)
+      [ "$#" -ge 2 ] || { echo "[check-divergence] --list-phase-numbers nécessite une valeur" >&2; exit 64; }
+      LIST_PHASES_DIR="$2"; shift 2 ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-divergence] argument inconnu : $1" >&2; exit 64 ;;
   esac
 done
+
+# --- Extraction / normalisation --------------------------------------------------------------------
+PHASE_DIR_RE='^([A-Za-z]+-)?([0-9]+(\.[0-9]+)?)-'
+ROADMAP_HEADER_RE='^### Phase ([0-9]+(\.[0-9]+)?)'
+
+extract_num() { # <basename> -> imprime le préfixe numérique brut, 1 si aucune correspondance
+  local name="$1"
+  if [[ "$name" =~ $PHASE_DIR_RE ]]; then
+    printf '%s' "${BASH_REMATCH[2]}"
+    return 0
+  fi
+  return 1
+}
+
+normalize_num() { # <brut, ex "01" ou "05.2"> -> forme décimale canonique ("1", "5.2")
+  local raw="$1" int frac="" n
+  # `int` est affecté en instruction SÉPARÉE de sa déclaration `local` : dans `local a=$1 b=$a`,
+  # bash expand TOUS les mots (dont `$a`) AVANT que `local` n'exécute la première affectation —
+  # `$a` référerait alors la variable `a` de la portée ENGLOBANTE (souvent non liée sous `set -u`),
+  # jamais la valeur qu'on croit venir de fixer sur la même ligne. Mesuré ici : "raw: unbound
+  # variable" sur la toute première normalisation de la suite de tests.
+  int="$raw"
+  case "$raw" in
+    *.*) int="${raw%%.*}"; frac="${raw#*.}" ;;
+  esac
+  n=$((10#$int))
+  if [ -n "$frac" ]; then printf '%s.%s' "$n" "$frac"; else printf '%s' "$n"; fi
+}
+
+list_phase_dirs() { # <phases_dir> -> un basename par ligne, répertoires uniquement
+  local d="$1" p
+  [ -d "$d" ] || return 0
+  for p in "$d"/*/; do
+    [ -d "$p" ] || continue
+    basename "$p"
+  done
+}
+
+# --list-phase-numbers <phases_dir> : un numéro de phase NORMALISÉ par ligne (zéros de tête retirés), trié,
+# unique ; rc 0 (dossier absent ou sans phase : sortie vide). Source UNIQUE de la correspondance
+# dossier -> numéro pour les autres scripts du conductor (check-method-budget.sh : garde de l'archivage
+# roadmap). Défini AVANT les vérifications de dépôt : rien d'autre que le dossier donné n'est lu.
+if [ -n "$LIST_PHASES_DIR" ]; then
+  {
+    while IFS= read -r _name; do
+      [ -n "$_name" ] || continue
+      _num="$(extract_num "$_name")" || continue
+      normalize_num "$_num"; printf '\n'
+    done < <(list_phase_dirs "$LIST_PHASES_DIR")
+  } | LC_ALL=C sort -u
+  exit 0
+fi
 
 export GIT_CONFIG_NOSYSTEM=1
 export GIT_TERMINAL_PROMPT=0
@@ -124,48 +186,11 @@ trap 'rm -rf "$TMPD"' EXIT
 FAIL_MSGS=()
 CHECKED=0
 
-# --- Extraction / normalisation --------------------------------------------------------------------
-PHASE_DIR_RE='^([A-Za-z]+-)?([0-9]+(\.[0-9]+)?)-'
-ROADMAP_HEADER_RE='^### Phase ([0-9]+(\.[0-9]+)?)'
-
-extract_num() { # <basename> -> imprime le préfixe numérique brut, 1 si aucune correspondance
-  local name="$1"
-  if [[ "$name" =~ $PHASE_DIR_RE ]]; then
-    printf '%s' "${BASH_REMATCH[2]}"
-    return 0
-  fi
-  return 1
-}
-
-normalize_num() { # <brut, ex "01" ou "05.2"> -> forme décimale canonique ("1", "5.2")
-  local raw="$1" int frac="" n
-  # `int` est affecté en instruction SÉPARÉE de sa déclaration `local` : dans `local a=$1 b=$a`,
-  # bash expand TOUS les mots (dont `$a`) AVANT que `local` n'exécute la première affectation —
-  # `$a` référerait alors la variable `a` de la portée ENGLOBANTE (souvent non liée sous `set -u`),
-  # jamais la valeur qu'on croit venir de fixer sur la même ligne. Mesuré ici : "raw: unbound
-  # variable" sur la toute première normalisation de la suite de tests.
-  int="$raw"
-  case "$raw" in
-    *.*) int="${raw%%.*}"; frac="${raw#*.}" ;;
-  esac
-  n=$((10#$int))
-  if [ -n "$frac" ]; then printf '%s.%s' "$n" "$frac"; else printf '%s' "$n"; fi
-}
-
 frontmatter_block() { # <fichier> -> stdout : lignes du frontmatter (copié de check-state-integrity.sh)
   awk '
     /^---[[:space:]]*$/ { n++; if (n==1) next; if (n==2) exit }
     n==1 { print }
   ' "$1"
-}
-
-list_phase_dirs() { # <phases_dir> -> un basename par ligne, répertoires uniquement
-  local d="$1" p
-  [ -d "$d" ] || return 0
-  for p in "$d"/*/; do
-    [ -d "$p" ] || continue
-    basename "$p"
-  done
 }
 
 # --- S2 : au sein d'un compartiment, deux dossiers partageant le même numéro normalisé ------------

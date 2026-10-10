@@ -357,6 +357,20 @@ else
   fi
 fi
 
+# === Cas LPN — --list-phase-numbers : la correspondance dossier -> numéro, source unique de check-method-budget.sh ===
+# Hors dépôt git et hors partition : le mode ne regarde que le dossier donné (donc rc 0, pas 2/3).
+LPN="$TMP/lpn/phases"; mkdir -p "$LPN/08-zero" "$LPN/VFDO-57-verrou" "$LPN/40.1-dec" "$LPN/10-dix"; : > "$LPN/99-fichier-pas-dossier"
+out="$(bash "$SCRIPT" --list-phase-numbers "$LPN" 2>&1)"; rc=$?
+exp="$(printf '%s\n' 10 40.1 57 8)"
+if [ "$rc" -eq 0 ] && [ "$out" = "$exp" ]; then ok "LPN1 dossiers 08-/VFDO-57-/40.1-/10- → 8, 10, 40.1, 57 normalisés, triés ; un fichier n'est pas une phase"
+else ko "LPN1 --list-phase-numbers" "rc=$rc out=[$out] attendu=[$exp]"; fi
+out="$(bash "$SCRIPT" --list-phase-numbers "$TMP/lpn/absent" 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then ok "LPN2 dossier absent → rc 0, sortie vide"
+else ko "LPN2 dossier absent" "rc=$rc out=[$out]"; fi
+out="$(bash "$SCRIPT" --list-phase-numbers 2>&1)"; rc=$?
+if [ "$rc" -eq 64 ]; then ok "LPN3 valeur manquante → rc 64"
+else ko "LPN3 valeur manquante" "rc=$rc out=[$out]"; fi
+
 echo ""
-echo "== résultat : $PASS ok, $FAIL ko ($((PASS+FAIL)) cas) =="
+echo "== résultat :$PASS ok, $FAIL ko ($((PASS+FAIL)) cas) =="
 [ "$FAIL" -eq 0 ]

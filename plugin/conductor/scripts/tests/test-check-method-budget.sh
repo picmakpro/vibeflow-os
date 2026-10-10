@@ -556,6 +556,45 @@ assert "K6 — l'archive commence par <details> : aucun en-tête" "$(head -n 1 "
 K6b="$WORK_DIR/k6b"; mk_repo "$K6b"; mkdir -p "$K6b/.planning"; printf '# R\n<details>\n<summary>x</summary>\nnon refermé\n%s\n' "$(head -c 2000 /dev/zero | tr '\0' 'x')" > "$K6b/.planning/ROADMAP.md"; kcommit "$K6b"; T6B="$(ktree "$K6b" | cksum)"
 OUT="$(VF_ROADMAP_BUDGET_KB=1 krun "$K6b" --no-remote --archive roadmap)"
 assert_rc "K6 — bloc <details> jamais refermé : rien déplacé (arbre identique)" "$([ "$(ktree "$K6b" | cksum)" = "$T6B" ] && echo 0 || echo 1)" 0
+# DLWS — ROADMAP : un bloc ✅ qui porte une phase dont le dossier existe encore n'est JAMAIS déplacé (sinon check-divergence S4(a))
+mk_roadmap_ph() { # <fichier> <numéros d'en-tête de phase séparés par des espaces> : un seul bloc ✅, long, puis une section courante
+  local n
+  { echo "# Roadmap"; echo; echo "<details>"; echo "<summary>✅ jalon P -- SHIPPED</summary>"; echo
+    for n in $2; do echo "### Phase $n: titre $n"; echo "but de la phase $n"; done
+    for n in $(seq 1 50); do echo "ligne $n xxxxxxxxxxxxxxxxxxxx"; done; echo; echo "</details>"; echo; echo "## Phases en cours"; echo "courant"; } > "$1"
+}
+DLWS="$WORK_DIR/dlws1"; mk_repo "$DLWS"; mkdir -p "$DLWS/.planning/phases/57-verrou-de-driver"; mk_roadmap_ph "$DLWS/.planning/ROADMAP.md" "56 57"; kcommit "$DLWS"
+cp "$DLWS/.planning/ROADMAP.md" "$WORK_DIR/dlws1.avant"; TD1="$(ktree "$DLWS" | cksum)"
+OUT="$(VF_ROADMAP_BUDGET_KB=1 krun "$DLWS" --no-remote --archive roadmap)"; RC=$?
+assert "DLWS1 — bloc ✅ dont un dossier de phase existe : ARCHIVAGE REFUSÉ nomme fichier, bloc et phase" "$OUT" "ARCHIVAGE REFUSÉ : .planning/ROADMAP.md — bloc « ✅ jalon P - SHIPPED » porte des phases dont les dossiers existent (57) ; archiver d'abord les dossiers de phase"
+assert_rc "DLWS1 — rc 2 sous --archive explicite (refus)" "$RC" 2
+refute "DLWS1 — rien d'ARCHIVÉ" "$OUT" "ARCHIVÉ :"
+assert_rc "DLWS1 — ROADMAP inchangé (cmp -s)" "$(cmp -s "$WORK_DIR/dlws1.avant" "$DLWS/.planning/ROADMAP.md"; echo $?)" 0
+assert_rc "DLWS1 — arbre entier identique : ni archive ni INDEX" "$([ "$(ktree "$DLWS" | cksum)" = "$TD1" ] && echo 0 || echo 1)" 0
+OUT="$(VF_ROADMAP_BUDGET_KB=1 krun "$DLWS" --no-remote --auto --dry-run)"; RC=$?
+assert "DLWS1 — --auto --dry-run (photographie de mission) porte le même refus" "$OUT" "ARCHIVAGE REFUSÉ : .planning/ROADMAP.md — bloc « ✅ jalon P - SHIPPED » porte des phases dont les dossiers existent (57)"
+assert_rc "DLWS1 — --auto --dry-run : rc 0, un refus ne fait pas échouer" "$RC" 0
+OUT="$(VF_ROADMAP_BUDGET_KB=1 krun "$DLWS" --no-remote --auto)"; RC=$?
+assert_rc "DLWS1 — --auto : rc 0 (constat seul, jamais 2)" "$RC" 0
+assert_rc "DLWS1 — --auto : ROADMAP inchangé (cmp -s)" "$(cmp -s "$WORK_DIR/dlws1.avant" "$DLWS/.planning/ROADMAP.md"; echo $?)" 0
+DLWS2="$WORK_DIR/dlws2"; mk_repo "$DLWS2"; mkdir -p "$DLWS2/.planning/phases/12-autre-chose"; mk_roadmap_ph "$DLWS2/.planning/ROADMAP.md" "56 57"; kcommit "$DLWS2"
+OUT="$(VF_ROADMAP_BUDGET_KB=1 krun "$DLWS2" --no-remote --archive roadmap)"; RC=$?
+assert "DLWS2 — bloc ✅ dont AUCUN dossier de phase n'existe : archivé comme avant" "$OUT" "ARCHIVÉ : .planning/ROADMAP.md → .planning/archives/roadmap/racine-ROADMAP-$KD.md (1 unité(s)"
+refute "DLWS2 — aucun refus" "$OUT" "ARCHIVAGE REFUSÉ"
+assert_rc "DLWS2 — rc 0" "$RC" 0
+refute "DLWS2 — le bloc a quitté le ROADMAP" "$(cat "$DLWS2/.planning/ROADMAP.md")" "<details>"
+DLWS3="$WORK_DIR/dlws3"; mk_repo "$DLWS3"; mkdir -p "$DLWS3/.planning/workstreams/ws1/phases/VFDO-57-verrou"; mk_roadmap_ph "$DLWS3/.planning/workstreams/ws1/ROADMAP.md" "57"; kcommit "$DLWS3"
+cp "$DLWS3/.planning/workstreams/ws1/ROADMAP.md" "$WORK_DIR/dlws3.avant"
+OUT="$(VF_ROADMAP_BUDGET_KB=1 krun "$DLWS3" --no-remote --archive roadmap --ws ws1)"
+assert "DLWS3 — compartiment de workstream : dossier VFDO-57-* retrouvé, bloc refusé" "$OUT" "ARCHIVAGE REFUSÉ : .planning/workstreams/ws1/ROADMAP.md — bloc « ✅ jalon P - SHIPPED » porte des phases dont les dossiers existent (57)"
+assert_rc "DLWS3 — ROADMAP du compartiment inchangé (cmp -s)" "$(cmp -s "$WORK_DIR/dlws3.avant" "$DLWS3/.planning/workstreams/ws1/ROADMAP.md"; echo $?)" 0
+DLWS4="$WORK_DIR/dlws4"; mk_repo "$DLWS4"; mkdir -p "$DLWS4/.planning/phases/57-verrou"; mk_roadmap_ph "$DLWS4/.planning/ROADMAP.md" "58"; kcommit "$DLWS4"
+OUT="$(VF_ROADMAP_BUDGET_KB=1 krun "$DLWS4" --no-remote --archive roadmap)"
+assert "DLWS4 — le dossier d'une AUTRE phase (57) ne retient pas un bloc qui ne porte que la 58 : archivé" "$OUT" "ARCHIVÉ : .planning/ROADMAP.md"
+# Correspondance : zéros de tête normalisés des deux côtés (dossier 08-*, en-tête « Phase 8 »)
+DLWS5="$WORK_DIR/dlws5"; mk_repo "$DLWS5"; mkdir -p "$DLWS5/.planning/phases/08-zero-pad"; mk_roadmap_ph "$DLWS5/.planning/ROADMAP.md" "8"; kcommit "$DLWS5"
+OUT="$(VF_ROADMAP_BUDGET_KB=1 krun "$DLWS5" --no-remote --archive roadmap)"
+assert "DLWS5 — dossier 08-* et en-tête « Phase 8 » : même phase, bloc refusé (8)" "$OUT" "porte des phases dont les dossiers existent (8)"
 # K7 — STATE : frontmatter, titres et ligne ^Phase: gardés
 K7="$WORK_DIR/k7"; mk_repo "$K7"; state_file "$K7/.planning/workstreams/ws1/STATE.md"; kcommit "$K7"
 OUT="$(VF_STATE_BUDGET_KB=1 krun "$K7" --no-remote --archive state --ws ws1)"
@@ -1091,7 +1130,9 @@ assert_rc "X9 — une seule fermeture" "$NE9" 1
 assert_rc "X9 — l'ouverture précède la fermeture" "$([ "$(grep -n '^# >>> vf-archive-writer$' "$CHECK" | cut -d: -f1)" -lt "$(grep -n '^# <<< vf-archive-writer$' "$CHECK" | cut -d: -f1)" ]; echo $?)" 0
 # ... et BORNÉE EN ÉTENDUE : au plus X9_MAX lignes et exactement les fonctions listées. Une exemption qui s'étendrait
 # (fermeture déplacée plus bas, fonction d'écriture ajoutée dans la région) doit rougir ici.
-X9_MAX=230; X9_FNS="archive_lock archive_one archive_one_locked archive_refuse archive_unlock src_unclean "
+# 230 -> 240 : le programme awk de l'archivage roadmap porte la garde DLWS (~20 lignes, mesurées : région de 238) ; le reste de la garde
+# (roadmap_phase_set) vit HORS région, donc sous le filet d'écriture X8. La liste des fonctions, elle, ne bouge pas.
+X9_MAX=240; X9_FNS="archive_lock archive_one archive_one_locked archive_refuse archive_unlock src_unclean "
 x9_etendue() { # <script> : imprime ok, ou la raison
   local f="$1" o c fns
   o="$(grep -n '^# >>> vf-archive-writer$' "$f" | cut -d: -f1)"; c="$(grep -n '^# <<< vf-archive-writer$' "$f" | cut -d: -f1)"
@@ -1258,6 +1299,8 @@ assert "MU24 — la comparaison gh/origin tient seule : toujours NON VÉRIFIABLE
 # MU25-MU29 — mutants de l'archivage (K) : chacun rougit le cas K qu'il vise, pour la bonne raison
 # Un mutant vit dans $MUTD : la politique de compartiments (sourcée depuis le dossier du script) doit y être voisine.
 cp "$(pwd)/../planning-core/scripts/workstream-policy.sh" "$MUTD/workstream-policy.sh"
+# ... et check-divergence.sh (source de la correspondance numéro de phase -> dossier, garde DLWS de l'archivage roadmap).
+cp "$(pwd)/scripts/check-divergence.sh" "$MUTD/check-divergence.sh"
 K_OLD_CLOS='  return (w == "CLOS" || w == "RÉSORBÉ" || w == "ADOPTÉ" || w == "ADOPTÉE")'
 MU25="$(make_mutant mu25 "$K_OLD_CLOS" '  return 0')"; RM=$?
 assert_rc "MU25 opposable" "$RM" 0
@@ -1409,6 +1452,16 @@ inject_run "$MW3" 'gh api -XDELETE user'
 kills "MW3 enveloppe gh : -X collé accepté : RO4 rougit" "viol=$INJ_VIOL changed=$INJ_CHANGED" "viol=0 changed=0" "RO4 — gh api -XDELETE user refusé"
 inject_run "$WRAPBIN" 'git -C "$REPO" symbolic-ref HEAD refs/heads/x'
 assert "MW — témoin : la même forme est bien refusée par l'enveloppe intacte" "viol=$INJ_VIOL changed=$INJ_CHANGED" "viol=1 changed=0"
+
+# MU-DLWS — mutants de la garde « un bloc dont les dossiers de phase existent n'est jamais archivé »
+# (check-divergence.sh est déjà voisin du mutant dans $MUTD : copié avant MU25.)
+MUD1="$(mut mud1 '  if (shipped(sum) && held != "") {' '  if (0) {')"; RM=$?
+assert_rc "MUD1 opposable" "$RM" 0
+OUT="$(VF_ROADMAP_BUDGET_KB=1 CHECK_UNDER="$MUD1" krun "$DLWS" --no-remote --archive roadmap)"
+kills "MUD1 garde des dossiers de phase retirée : DLWS1 rougit (le bloc est archivé, le refus disparaît)" "$OUT" "ARCHIVÉ : .planning/ROADMAP.md" "DLWS1 — ARCHIVAGE REFUSÉ, rien d'ARCHIVÉ"
+MUD1B="$WORK_DIR/dlws2b"; mk_repo "$MUD1B"; mkdir -p "$MUD1B/.planning/phases/12-autre-chose"; mk_roadmap_ph "$MUD1B/.planning/ROADMAP.md" "56 57"; kcommit "$MUD1B"
+OUT="$(VF_ROADMAP_BUDGET_KB=1 CHECK_UNDER="$MUD1" krun "$MUD1B" --no-remote --archive roadmap)"
+assert "MUD1 — le mutant ne rougit QUE le cas des dossiers présents : DLWS2 (aucun dossier) reste archivé" "$OUT" "ARCHIVÉ : .planning/ROADMAP.md"
 
 echo ""
 echo "=== L1 — étiquettes : un identifiant de cas ne migre pas d'une section à l'autre ==="
