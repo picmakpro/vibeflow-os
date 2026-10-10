@@ -766,6 +766,67 @@ refus_case "WS-VERBS-5h" '"closed": false' close --agent=a --status=done
 refus_case "WS-VERBS-5i" '"error": "ws-invalid"' orphans
 refus_case "WS-VERBS-5j" '"error": "ws-invalid"' status
 
+echo
+echo "=== WS-HINT — le hint d'un refus, rejoué LITTÉRALEMENT, vise la cible du refus qui le porte (P57-D-24, correction R-1) ==="
+# Un verrou de compartiment ET un verrou de dépôt, tous deux périmés, d'owners différents : un hint qui
+# oublie l'option de cible reprend le mauvais des deux sans rien dire.
+hint_of() { pj "$1" 'd["hint"]'; }
+hint_replay() { # <lab> <session> <hint> : rejoue la commande nommée par le hint, mot pour mot (<etape> → s)
+  local a; a="${3#*driver-lock.sh }"; a="${a//<etape>/s}"
+  local -a w; read -r -a w <<< "$a"
+  dl "$1" "$2" "${w[@]}"
+}
+LAB="$(mk_lab hint1)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=sa >/dev/null
+dl "$LAB" sess-D acquire --depot --owner=olddepot --step=sd >/dev/null
+backdate_lock "$GC" ws/alpha; backdate_lock "$GC" repo
+out="$(dl "$LAB" sess-N acquire --ws=alpha --owner=m2 --step=s)"; rc=$?
+assert_exit "WS-HINT-1.1 — acquire --ws=alpha sur un alpha périmé : refus, exit 1" "$rc" 1
+assert "WS-HINT-1.2 — reason stale-requires-takeover" "$out" '"reason": "stale-requires-takeover"'
+h="$(hint_of "$out")"
+assert "WS-HINT-1.3 — le hint nomme la cible du refus (--ws=alpha)" "$h" ' --ws=alpha'
+assert "WS-HINT-1.4 — le hint garde son owner et son verbe" "$h" 'takeover --owner=m2'
+out2="$(hint_replay "$LAB" sess-N "$h")"; rc=$?
+assert_exit "WS-HINT-1.5 — le hint rejoué littéralement réussit" "$rc" 0
+assert "WS-HINT-1.6 — il reprend le verrou du COMPARTIMENT (previous_owner m1)" "$out2" '"previous_owner": "m1"'
+assert "WS-HINT-1.7 — portée compartiment alpha" "$out2" '"scope": "compartiment", "ws": "alpha"'
+assert "WS-HINT-1.8 — le verrou de dépôt périmé n'a pas été repris" "$(meta_of "$GC" repo owner)" "olddepot"
+assert "WS-HINT-1.9 — alpha est à m2" "$(meta_of "$GC" ws/alpha owner)" "m2"
+
+LAB="$(mk_lab hint2)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=sa >/dev/null
+dl "$LAB" sess-D acquire --depot --owner=olddepot --step=sd >/dev/null
+backdate_lock "$GC" ws/alpha; backdate_lock "$GC" repo
+out="$(dl "$LAB" sess-N acquire --depot --owner=m2 --step=s)"; rc=$?
+assert_exit "WS-HINT-2.1 — acquire --depot sur un dépôt périmé : refus, exit 1" "$rc" 1
+h="$(hint_of "$out")"
+assert "WS-HINT-2.2 — le hint nomme la cible du refus (--depot)" "$h" ' --depot'
+out2="$(hint_replay "$LAB" sess-N "$h")"; rc=$?
+assert_exit "WS-HINT-2.3 — le hint rejoué littéralement réussit" "$rc" 0
+assert "WS-HINT-2.4 — il reprend le verrou de DÉPÔT (previous_owner olddepot)" "$out2" '"previous_owner": "olddepot"'
+assert "WS-HINT-2.5 — portée dépôt" "$out2" '"scope": "depot"'
+assert "WS-HINT-2.6 — alpha n'a pas été repris" "$(meta_of "$GC" ws/alpha owner)" "m1"
+
+# Sans cible désignée (ni --ws ni --depot) en lab partitionné : la cible EST le dépôt, le hint le dit.
+LAB="$(mk_lab hint3)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-D acquire --depot --owner=olddepot --step=sd >/dev/null
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=sa >/dev/null
+backdate_lock "$GC" ws/alpha; backdate_lock "$GC" repo
+out="$(dl "$LAB" sess-N acquire --owner=m2 --step=s)"
+h="$(hint_of "$out")"
+assert "WS-HINT-3.1 — cible implicite : le hint nomme --depot" "$h" ' --depot'
+out2="$(hint_replay "$LAB" sess-N "$h")"
+assert "WS-HINT-3.2 — rejoué, il reprend le dépôt" "$out2" '"previous_owner": "olddepot"'
+
+# Lab PLAT : le hint reste celui d'avant la phase (octet pour octet, témoin WS-AB).
+LAB="$(mk_flat hint4)"
+dl "$LAB" sess-A acquire --owner=m1 --step=sa >/dev/null
+sed -e 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' -e 's/^progress_epoch=.*/progress_epoch=1000/' "$LAB/.planning/DRIVER.lock/meta" > "$LAB/.planning/DRIVER.lock/meta.tmp" \
+  && mv "$LAB/.planning/DRIVER.lock/meta.tmp" "$LAB/.planning/DRIVER.lock/meta"
+out="$(dl "$LAB" sess-N acquire --owner=m2 --step=s)"
+assert "WS-HINT-4.1 — lab plat : hint inchangé" "$(hint_of "$out")" 'driver-lock.sh takeover --owner=m2 --step=<etape>'
+assert_not "WS-HINT-4.2 — lab plat : aucune option de cible dans le hint" "$(hint_of "$out")" ' --'"depot"
+
 if [ "$DLWS_MODE" = full ]; then
 echo
 echo "=== WS-CONC — un SEUL gagnant par verrou sous concurrence : 24 par verrou × 5 tours (patron T13/T32, P57-D-12) ==="
