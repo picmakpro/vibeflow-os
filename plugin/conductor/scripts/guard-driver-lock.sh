@@ -689,18 +689,103 @@ def toplevel_of(cwd):
     t = out.rstrip("\n")
     return os.path.realpath(t) if t else None
 
+# Fichiers de la forme de release VF (P57-D-18) : un commit qui en embarque un est juge comme un geste de
+# depot. Liste par defaut codee en dur, aucun fichier de configuration. Chemins relatifs au lab.
+RELEASE_FORM_FILES = (
+    b"VERSION", b"plugin/.claude-plugin/plugin.json", b".claude-plugin/marketplace.json",
+    b"README.md", b"README.fr.md", b"CHANGELOG.md", b"docs/ADR.md",
+)
+COMMIT_VALUE_LONG = ("--author", "--date", "--file", "--message", "--template", "--reuse-message",
+                     "--reedit-message", "--fixup", "--squash", "--trailer", "--cleanup",
+                     "--pathspec-from-file")
+COMMIT_VALUE_SHORT = "mFCct"
+TREE_GIT_VERBS = {"checkout", "switch", "restore", "reset", "clean"}
+DEPOT_GIT_VERBS = {"push", "branch", "tag"}
+ADD_GIT_VERBS = {"add", "rm", "mv", "stage"}
+
+def uncertain_global(t):
+    """Option globale git qui deplace la cible du geste : -C, --git-dir, --work-tree (P57-D-33)."""
+    return t == "-C" or (t.startswith("-C") and len(t) > 2) or t.startswith("--git-dir") or t.startswith("--work-tree")
+
+def commit_flags(rest):
+    """Drapeaux du commit : a_flag (-a, --all, grappe courte avec a), pathspec (jeton non-option apres les
+    options connues pour prendre une valeur, --, -i, -o, --pathspec-from-file : un doute de lecture compte
+    comme un pathspec present), amend."""
+    a_flag = False
+    pathspec = False
+    amend = False
+    i = 0
+    n = len(rest)
+    while i < n:
+        t = rest[i]
+        if t == "--":
+            pathspec = True
+            break
+        if t.startswith("--"):
+            nm = t.split("=", 1)[0]
+            if nm == "--all":
+                a_flag = True
+            elif nm == "--amend":
+                amend = True
+            elif nm in ("--include", "--only", "--pathspec-from-file"):
+                pathspec = True
+            if nm in COMMIT_VALUE_LONG and "=" not in t:
+                i += 1
+        elif t.startswith("-") and len(t) > 1:
+            cl = t[1:]
+            for k, ch in enumerate(cl):
+                if ch in COMMIT_VALUE_SHORT:
+                    if k == len(cl) - 1:
+                        i += 1
+                    break
+                if ch == "a":
+                    a_flag = True
+                elif ch in "io":
+                    pathspec = True
+        else:
+            pathspec = True
+        i += 1
+    return a_flag, pathspec, amend
+
+def add_info(rest, seen_cd):
+    """git add/rm/mv/stage : chemins litteraux, ou forme large (., -A, --all, -u, --update, :/, glob, jeton non
+    resolu, cd precedent) dont les chemins reels ne se lisent que dans l arbre de travail."""
+    wide = bool(seen_cd)
+    paths = []
+    for t in rest:
+        if t == "--":
+            continue
+        if t.startswith("-"):
+            if t in ("--all", "--update") or t.startswith("--pathspec-from-file") or \
+               (not t.startswith("--") and ("A" in t[1:] or "u" in t[1:])):
+                wide = True
+            continue
+        if t in (".", ":/", "") or t.startswith(":") or any(c in t for c in "*?[$`~"):
+            wide = True
+            continue
+        paths.append(t)
+    return {"wide": wide, "paths": paths}
+
 def gesture_classes(cmd):
-    """Gestes concernes de la commande, meme segmentation que bash_command_concerned. Tracer : la classe
-    commit est reconnue ; tout autre geste concerne garde la regle historique (classe historique)."""
+    """Gestes de la commande, meme segmentation que bash_command_concerned (heredocs retires, sauts de ligne puis
+    operateurs, command_positions, skip_git_globals) et memes exemptions D-32-06 (aucune elargie, aucune
+    retiree). Rend (gestes, ajouts). Classes : arbre, commit (a_flag, pathspec, amend), depot,
+    retrait-worktree ; chaque geste porte uncertain (cible git incertaine). Les ajouts (git add/rm/mv/stage)
+    ne sont pas des gestes concernes : ils entrent dans le jugement du commit de la meme commande."""
     gestures = []
+    adds = []
+    seen_cd = False
     cmd = strip_heredocs(cmd)
     for line in re.split(r"[\n\r]+", cmd):
         for seg in re.split(r"\|\||&&|;|\||&", line):
             toks = tokens(seg)
             for idx in command_positions(toks):
                 name = os.path.basename(toks[idx])
-                if name == "git":
+                if name in ("cd", "pushd", "popd"):
+                    seen_cd = True
+                elif name == "git":
                     j = skip_git_globals(toks, idx + 1)
+                    unc = any(uncertain_global(t) for t in toks[idx + 1:j])
                     if j >= len(toks):
                         continue
                     sub = toks[j]
@@ -708,40 +793,80 @@ def gesture_classes(cmd):
                     if sub == "worktree":
                         s2 = rest[0] if rest else ""
                         if s2 == "remove":
-                            gestures.append({"cls": "historique"})
+                            gestures.append({"cls": "retrait-worktree", "uncertain": unc})
                         continue
                     if sub in RESUMABLE_SUBVERBS:
                         if any(o in rest for o in RESUME_EXIT_OPTIONS):
                             continue
-                        gestures.append({"cls": "historique"})
+                        gestures.append({"cls": "arbre", "uncertain": unc})
+                    elif sub in TREE_GIT_VERBS:
+                        gestures.append({"cls": "arbre", "uncertain": unc})
                     elif sub == "commit":
-                        gestures.append({"cls": "commit"})
-                    elif sub in MUTATING_GIT_VERBS:
-                        gestures.append({"cls": "historique"})
+                        a_flag, pathspec, amend = commit_flags(rest)
+                        gestures.append({"cls": "commit", "uncertain": unc, "a_flag": a_flag,
+                                         "pathspec": pathspec, "amend": amend})
+                    elif sub in DEPOT_GIT_VERBS:
+                        gestures.append({"cls": "depot", "uncertain": unc})
+                    elif sub in ADD_GIT_VERBS and not unc:
+                        adds.append(add_info(rest, seen_cd))
                 elif name == "gh":
                     sub = toks[idx + 1] if idx + 1 < len(toks) else ""
                     if sub in ("pr", "release"):
-                        gestures.append({"cls": "historique"})
-    return gestures
+                        gestures.append({"cls": "depot", "uncertain": False})
+    return gestures, adds
 
 def split_z(raw):
     return [x for x in raw.split(b"\x00") if x]
 
-def commit_paths(cwd, top):
-    """Chemins (octets, relatifs au toplevel) que le commit embarque : sortie -z decoupee sur NUL, aucune
-    normalisation. Toute source illisible leve Unreadable avec son nom."""
-    paths = []
+def literal_add_paths(adds, cwd, top):
+    """Chemins litteraux des ajouts, ramenes au toplevel (octets). Un chemin qui couvre .planning ou
+    .planning/workstreams entier est une forme large : rend (chemins, large)."""
+    out = []
+    wide = False
+    base = os.path.realpath(cwd)
+    for a in adds:
+        for p in a["paths"]:
+            full = os.path.normpath(os.path.join(base, os.path.expanduser(p)))
+            rel = os.path.relpath(full, top)
+            if rel == ".." or rel.startswith(".." + os.sep):
+                continue
+            parts = [x for x in rel.split(os.sep) if x and x != "."]
+            low = [x.lower() for x in parts]
+            if not parts or low == [".planning"] or low == [".planning", "workstreams"]:
+                wide = True
+                continue
+            out.append(os.fsencode("/".join(parts)))
+    return out, wide
+
+def commit_paths(g, adds, cwd, top):
+    """Chemins (octets, relatifs au toplevel) que le commit embarque, union (P57-D-10, P57-D-19, P57-D-33) :
+    l index ; les modifications de l arbre si -a/--all, un pathspec ou un ajout large ; les non-suivis si
+    ajout large ; les fichiers de HEAD sous --amend ; les chemins litteraux d un git add de la meme commande.
+    Sorties -z decoupees sur NUL, aucune normalisation. Toute source illisible leve Unreadable (nom de la
+    source) ; la fonction entiere est fail-closed."""
+    lit, lit_wide = literal_add_paths(adds, cwd, top)
+    wide = lit_wide or any(a["wide"] for a in adds)
     srcs = [("diff --cached", ["diff", "--cached", "--no-renames", "--name-only", "-z"])]
+    if g["a_flag"] or g["pathspec"] or wide:
+        srcs.append(("diff", ["diff", "--no-renames", "--name-only", "-z"]))
+    if wide:
+        srcs.append(("ls-files -o", ["ls-files", "-o", "--exclude-standard", "-z"]))
+    if g["amend"]:
+        srcs.append(("diff-tree HEAD", ["diff-tree", "--root", "--no-commit-id", "--no-renames",
+                                         "--name-only", "-r", "-z", "HEAD"]))
+    paths = []
     for name, args in srcs:
         out = git_hardened(args, top, raw=True)
         if out is None:
             raise Unreadable(name)
         paths.extend(split_z(out))
+    paths.extend(lit)
     return paths
 
 def map_repo_path(pb, prefix):
-    """Chemin (octets, relatif au toplevel) -> ("compartiment", segment) | ("commun", b"") | ("hors", b"").
-    prefix : chemin du lab sous le toplevel (octets, vide si le lab est le toplevel)."""
+    """Chemin (octets, relatif au toplevel) -> ("compartiment", segment) | ("commun", b"") | ("incertain", b"")
+    | ("hors", b""). prefix : chemin du lab sous le toplevel (octets, vide si le lab est le toplevel).
+    Commun : racine de .planning/ ou membre de RELEASE_FORM_FILES (P57-D-18)."""
     if prefix:
         if not pb.startswith(prefix + b"/"):
             return ("hors", b"")
@@ -753,6 +878,8 @@ def map_repo_path(pb, prefix):
                 return ("incertain", b"")
             return ("compartiment", parts[2])
         return ("commun", b"")
+    if pb in RELEASE_FORM_FILES:
+        return ("commun", b"")
     return ("hors", b"")
 
 def cite_paths(paths):
@@ -761,10 +888,19 @@ def cite_paths(paths):
         shown.append(json.dumps(os.fsdecode(pb)[:120], ensure_ascii=True))
     return ", ".join(shown)
 
+def same_checkout(wt, top):
+    try:
+        return os.path.realpath(wt) == os.path.realpath(top)
+    except Exception:
+        return True
+
 def judge_bash(cmd, held, cwd):
     """Jugement du geste Bash, apres le court-circuit aucun verrou tenu par autrui. Rend (verrous refusants,
-    notes de motif)."""
-    gestures = gesture_classes(cmd)
+    notes de motif). Cible incertaine : refus sous tout verrou d autrui. arbre : refus si un verrou d autrui
+    a ete pris depuis le MEME worktree (verrou ancien ou toplevel inconnu : refus, prudence). retrait-worktree :
+    refus sous tout verrou d autrui. depot : refus sous le verrou de depot ou l ancien verrou. commit : union
+    des sources."""
+    gestures, adds = gesture_classes(cmd)
     blockers = []
     notes = []
     def add(hs):
@@ -773,15 +909,32 @@ def judge_bash(cmd, held, cwd):
                 blockers.append(h)
     if not gestures:
         add(held)
+    top = None
+    top_done = False
     for g in gestures:
-        if g["cls"] == "commit":
-            try:
+        cls = g["cls"]
+        if g["uncertain"] or cls == "retrait-worktree":
+            add(held)
+        elif cls == "arbre":
+            if not top_done:
                 top = toplevel_of(cwd)
+                top_done = True
+            for h in held:
+                wt = h.get("worktree", "")
+                if not wt or top is None or same_checkout(wt, top):
+                    add([h])
+        elif cls == "depot":
+            add([h for h in held if h["scope"] in ("depot", "ancien")])
+        elif cls == "commit":
+            try:
+                if not top_done:
+                    top = toplevel_of(cwd)
+                    top_done = True
                 if top is None:
                     raise Unreadable("rev-parse --show-toplevel")
                 rel = os.path.relpath(os.path.realpath(cwd), top)
                 prefix = b"" if rel == "." else os.fsencode(rel)
-                paths = commit_paths(cwd, top)
+                paths = commit_paths(g, adds, cwd, top)
             except Unreadable as e:
                 add(held)
                 notes.append("source illisible : " + str(e))
