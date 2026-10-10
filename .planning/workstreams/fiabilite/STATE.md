@@ -1,24 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: fiabilite-v1.0
-milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-current_phase_name: Emprunts Pocock — disciplines de cadrage, de revue et de skills
-status: completed
-stopped_at: >-
-  Phase 57 planned (2026-10-10) — 16 plans en 10 vagues, plan-checker passé (2 tours), DLWS-01..08 et
-  P57-D-01..37 couverts ; next /gsd-execute-phase 57 --ws fiabilite.
-  Ancien texte de ce champ : `git show 102f7bab:.planning/workstreams/fiabilite/STATE.md`.
-last_updated: "2026-10-10T18:50:00.000Z"
+current_phase: 57
+current_phase_name: Verrou de driver par compartiment
+status: executing
+last_updated: "2026-10-10T18:08:06.558Z"
 last_activity: 2026-10-10
-last_activity_desc: >-
-  Planification de la Phase 57 (verrou de driver par compartiment) ; détail : § Current Position.
+last_activity_desc: Phase 57 execution started
+state_head: 0fd8f1913e7bfb2e50dd9f17e4db68f4490498e3
 progress:
   total_phases: 18
   completed_phases: 18
   total_plans: 115
   completed_plans: 105
-  percent: 100
-current_phase: 41.4
+milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
+stopped_at: "Phase 57 planned (2026-10-10) — 16 plans en 10 vagues, plan-checker passé (2 tours), DLWS-01..08 et P57-D-01..37 couverts ; next /gsd-execute-phase 57 --ws fiabilite. Ancien texte de ce champ : `git show 102f7bab:.planning/workstreams/fiabilite/STATE.md`."
 ---
 
 # Project State
@@ -34,7 +30,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: **41.4** (Emprunts Pocock), dernière phase du jalon — complete, mergée PR #135.
+Phase: 57 (Verrou de driver par compartiment) — EXECUTING
 Jalon **`fiabilite-v1.0` CLOS le 2026-10-08** (arbitrage Samuel, session principale, 2026-10-08). 18 phases livrées,
 de la 18 à la 41.4. Les compteurs de plans restent à 105/115 : les 7 plans 41-07 à 41-13 sont confiés à Willy, hors
 clôture, et la Phase 40 a 5 plans pour un seul `40-SUMMARY.md` consolidé. Bilan et réserves :
@@ -52,7 +48,7 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Last activity: 2026-10-10 — planification de la Phase 57.
+Last activity: 2026-10-10 — Phase 57 execution started
 
 ## Accumulated Context
 
