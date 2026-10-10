@@ -88,6 +88,16 @@ une branche déjà pilotée depuis un autre arbre. C'est ce que
 [branches-et-worktrees.md](./branches-et-worktrees.md) détaille : la barrière la plus sûre contre
 deux écrivains simultanés reste de travailler dans des arbres séparés.
 
+Dans un lab **partitionné** en sujets, le verrou est tenu **par sujet** : un manager verrouille le
+sujet qu'on lui désigne explicitement, jamais un sujet deviné depuis l'environnement, et deux
+managers de deux sujets avancent en parallèle. Les verrous vivent au niveau du clone, donc tous les
+arbres de travail d'un même clone les voient. Un verrou de dépôt, tenu le temps d'un geste et pas
+d'une mission, couvre ce qui est commun à tous les sujets (release, BACKLOG, ADR, fichiers racine
+du planning, partition). Le refus ne porte que sur ce que tient une autre session : une écriture
+dans le sujet d'autrui, un commit qui embarque ses fichiers, un fichier commun pendant un geste de
+dépôt, un changement de branche dans le même arbre. La limite : deux managers d'une même session
+ne sont pas séparés par la garde, qui isole des sessions et non des managers.
+
 Un mot sur la récupération. Rien ne garantit qu'un agent qui meurt en cours de route relâche
 proprement ce qu'il tenait — un agent LLM peut s'arrêter sans exécuter sa dernière instruction. Le
 filet est donc la durée de vie plus le battement de cœur. Un verrou dont le battement s'arrête trop

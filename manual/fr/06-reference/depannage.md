@@ -88,6 +88,10 @@ retire proprement — ce geste ne détruit que l'entrée du verrou lui-même, ja
 fichier produit par la mission qui le tenait. S'il n'est **pas** périmé, ne force rien : une autre
 mission le tient légitimement, laisse-la terminer ou relâcher elle-même.
 
+Lab partitionné : `driver-lock.sh status --all` montre tous les verrous. Après une mise à jour,
+`legacy-lock-held` dit qu'un ancien verrou unique est tenu : son détenteur le relâche avec la
+commande du refus.
+
 **Vérification.** L'état repasse à absent, ou affiche un nouvel owner si une autre mission a repris
 la main entre-temps.
 
@@ -140,7 +144,8 @@ session au verrou avec `driver-lock.sh reclaim --owner=<détenteur>`, puis rées
 fin du mandat, ou travaille dans un arbre séparé (`git worktree add`), qui n'est pas soumis au
 verrou. En dernier recours, pour un geste précis que tu assumes, le message décrit un marqueur de
 dérogation explicite ; elle est consignée dans la mesure du possible (une écriture qui échoue est
-ignorée), et ne se pose jamais « au cas où ».
+ignorée), et ne se pose jamais « au cas où ». Lab partitionné : le message nomme le sujet, et la
+reprise est `driver-lock.sh reclaim --owner=<détenteur> --ws=<sujet>`.
 
 **Vérification.** Le même geste passe, ou une nouvelle tentative nomme le même détenteur tant que
 sa mission n'est pas terminée. Le garde-fou ne voit ni un terminal hors Claude Code ni une commande

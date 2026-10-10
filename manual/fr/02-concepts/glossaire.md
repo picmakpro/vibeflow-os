@@ -44,7 +44,10 @@ que de réinventer sa propre coordination d'équipe.
 étape à la fois. Il porte une durée de vie et un battement de cœur (heartbeat) : si le pilote
 disparaît sans le relâcher, le verrou est récupéré proprement plutôt que de rester bloqué pour
 toujours. Le verrou est appliqué : une session qui n'y est pas enregistrée voit ses commits et ses
-écritures dans `.planning/` refusés.
+écritures dans `.planning/` refusés. Dans un lab partitionné en sujets, il y a un verrou par
+compartiment : une mission par sujet à la fois, et deux sujets avancent en parallèle. Un verrou de
+dépôt, court, protège en plus les gestes qui touchent des fichiers communs (release, BACKLOG, ADR,
+fichiers racine du planning, partition). Un lab à planning unique garde un seul verrou.
 
 **Sujet (workstream)** — Un chantier de planning qui avance en parallèle d'un autre, avec ses
 propres phases et son propre état. Un lab n'en a qu'un seul par défaut. Développé dans
