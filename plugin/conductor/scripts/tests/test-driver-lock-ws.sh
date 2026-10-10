@@ -4,6 +4,9 @@
 # Jamais un ajout à test-driver-lock.sh ni à test-guard-driver-lock.sh : ces deux suites sont le
 # témoin de non-régression du lab PLAT (P57-D-03), elles ne bougent pas. Toute preuve neuve vit ici.
 #
+# Plan 57-02 : WS-LEG (ancien verrou), WS-LOC (worktrees), WS-NOGIT (repli hors git), WS-VFL (VF_DRIVER_LOCK),
+# WS-FLATWS (options inertes en lab plat).
+#
 # TRACER (tâche 1) — un compartiment se verrouille au niveau du clone, de bout en bout :
 #   WS-TRACE-1 acquire --ws → JSON de portée · WS-TRACE-2 lien dans le dossier commun du clone, rien
 #   dans .planning/ · WS-TRACE-3 status puis release · WS-TRACE-4 préflight anti-pollution du vrai .git
@@ -277,6 +280,90 @@ assert_exit "WS-POL.4 — lab plat sans politique voisine : fonctionne" "$rc" 0
 assert "WS-POL.5 — acquis" "$out" '"acquired": true'
 assert_not "WS-POL.6 — aucun champ de portée en lab plat" "$out" '"scope"'
 [ -L "$FLAT/.planning/DRIVER.lock" ]; assert_exit "WS-POL.7 — verrou historique .planning/DRIVER.lock" "$?" 0
+
+echo
+echo "=== WS-LEG — ancien verrou unique tenu à la mise à jour : refusé, jamais repris en silence (P57-D-14, P57-D-24, P57-D-26) ==="
+LEGACY_ENV='VF_DRIVER_LOCK=.planning/DRIVER.lock'
+# Pose un ancien verrou unique (mode verrou unique, livré dès 57-01) dans le lab <lab>, owner <owner>.
+mk_legacy() { # <lab> <owner>
+  ( cd "$1" && VF_DRIVER_LOCK=.planning/DRIVER.lock CLAUDE_CODE_SESSION_ID=sess-old "$SCRIPT" acquire --owner="$2" --step=old >/dev/null )
+}
+# Antidate le heartbeat de l'ancien verrou (réécriture du meta, jamais une suppression).
+backdate_legacy() { # <lab>
+  local m="$1/.planning/DRIVER.lock/meta"
+  sed 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+}
+LAB="$(mk_lab leg1)"; GC="$(fixture_common_dir "$LAB")"
+mk_legacy "$LAB" old
+out="$(dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-LEG-1.1 — acquire --ws=alpha avec ancien verrou vivant : exit 1" "$rc" 1
+assert "WS-LEG-1.2 — reason legacy-lock-held" "$out" '"reason": "legacy-lock-held"'
+assert "WS-LEG-1.3 — held_by old" "$out" '"held_by": "old"'
+assert "WS-LEG-1.4 — hint : variable d'ancien verrou" "$out" "$LEGACY_ENV"
+assert "WS-LEG-1.5 — hint : release de l'owner exact" "$out" 'release --owner=old'
+json_ok "$out"; assert_exit "WS-LEG-1.6 — JSON valide" "$?" 0
+assert "WS-LEG-1.7 — le refus porte la portée demandée" "$out" '"scope": "compartiment", "ws": "alpha"'
+out="$(dl "$LAB" sess-A acquire --depot --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-LEG-1.8 — acquire --depot : exit 1 aussi" "$rc" 1
+assert "WS-LEG-1.9 — reason legacy-lock-held" "$out" '"reason": "legacy-lock-held"'
+out="$(dl "$LAB" sess-A acquire --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-LEG-1.10 — acquire sans --ws : exit 1 aussi" "$rc" 1
+assert "WS-LEG-1.11 — reason legacy-lock-held" "$out" '"reason": "legacy-lock-held"'
+[ ! -e "$GC/vf-driver" ]; assert_exit "WS-LEG-1.12 — aucun verrou neuf posé dans le dossier commun" "$?" 0
+[ -L "$LAB/.planning/DRIVER.lock" ]; assert_exit "WS-LEG-1.13 — l'ancien verrou est intact" "$?" 0
+
+LAB="$(mk_lab leg2)"
+mk_legacy "$LAB" old
+out="$(dl "$LAB" sess-old release --owner=old)"; rc=$?
+assert_exit "WS-LEG-2.1 — release sans --ws vise l'ancien verrou : exit 0" "$rc" 0
+assert "WS-LEG-2.2 — released true" "$out" '"released": true'
+assert "WS-LEG-2.3 — scope_reason legacy-fallback" "$out" '"scope_reason": "legacy-fallback"'
+assert "WS-LEG-2.4 — legacy_lock true" "$out" '"legacy_lock": true'
+json_ok "$out"; assert_exit "WS-LEG-2.5 — JSON valide" "$?" 0
+[ ! -e "$LAB/.planning/DRIVER.lock" ] && [ ! -L "$LAB/.planning/DRIVER.lock" ]; assert_exit "WS-LEG-2.6 — l'ancien verrou est relâché" "$?" 0
+out="$(dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-LEG-2.7 — acquire --ws=alpha après le release : exit 0" "$rc" 0
+assert "WS-LEG-2.8 — acquired true" "$out" '"acquired": true'
+LAB="$(mk_lab leg2b)"
+mk_legacy "$LAB" old
+out="$(dl "$LAB" sess-X release --owner=autre)"; rc=$?
+assert_exit "WS-LEG-2.9 — release d'un autre owner sur l'ancien verrou : refus, exit 1" "$rc" 1
+assert "WS-LEG-2.10 — not-owner, held_by old" "$out" '"held_by": "old"'
+[ -L "$LAB/.planning/DRIVER.lock" ]; assert_exit "WS-LEG-2.11 — l'ancien verrou reste en place" "$?" 0
+
+LAB="$(mk_lab leg3)"
+mk_legacy "$LAB" old
+out="$(dl "$LAB" sess-old heartbeat --owner=old)"; rc=$?
+assert_exit "WS-LEG-3.1 — heartbeat sans --ws vise l'ancien verrou : exit 0" "$rc" 0
+assert "WS-LEG-3.2 — ok true" "$out" '"ok": true'
+out="$(dl "$LAB" sess-old status)"; rc=$?
+assert_exit "WS-LEG-3.3 — status sans --ws exit 0" "$rc" 0
+assert "WS-LEG-3.4 — status expose legacy_lock true" "$out" '"legacy_lock": true'
+assert "WS-LEG-3.5 — status lit l'ancien verrou (owner old)" "$out" '"owner": "old"'
+json_ok "$out"; assert_exit "WS-LEG-3.6 — JSON de status valide" "$?" 0
+out="$(dl "$LAB" sess-old status --ws=alpha)"
+assert "WS-LEG-3.7 — status --ws=alpha expose aussi legacy_lock true" "$out" '"legacy_lock": true'
+assert "WS-LEG-3.8 — status --ws=alpha ne lit pas l'ancien verrou" "$out" '"present": false'
+dl "$LAB" sess-old release --owner=old >/dev/null
+out="$(dl "$LAB" sess-old status)"
+assert "WS-LEG-3.9 — ancien verrou absent : legacy_lock false" "$out" '"legacy_lock": false'
+assert "WS-LEG-3.10 — ancien verrou absent : present false" "$out" '"present": false'
+LAB="$(mk_lab leg3b)"
+out="$(dl "$LAB" sess-A heartbeat --owner=old)"; rc=$?
+assert_exit "WS-LEG-3.11 — heartbeat sans aucun verrou : no-lock, exit 1" "$rc" 1
+assert "WS-LEG-3.12 — reason no-lock" "$out" '"reason": "no-lock"'
+
+LAB="$(mk_lab leg4)"; GC="$(fixture_common_dir "$LAB")"
+mk_legacy "$LAB" old
+backdate_legacy "$LAB"
+out="$(dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-LEG-4.1 — ancien verrou périmé : acquire refusé, exit 1" "$rc" 1
+assert "WS-LEG-4.2 — reason stale-requires-takeover" "$out" '"reason": "stale-requires-takeover"'
+assert "WS-LEG-4.3 — held_by old" "$out" '"held_by": "old"'
+assert "WS-LEG-4.4 — hint : recover ciblé sur l'ancien verrou" "$out" "$LEGACY_ENV driver-lock.sh recover"
+json_ok "$out"; assert_exit "WS-LEG-4.5 — JSON valide" "$?" 0
+[ -d "$LAB/.planning/DRIVER.lock" ]; assert_exit "WS-LEG-4.6 — aucune suppression implicite de l'ancien verrou" "$?" 0
+[ ! -e "$GC/vf-driver" ]; assert_exit "WS-LEG-4.7 — aucun verrou neuf posé" "$?" 0
 
 echo
 echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
