@@ -11,7 +11,7 @@ pipeline (scoping → plan → execution → proof), and **machine gates** verif
 Claude Code is the reference runtime; install and usage are also measured end to end on **Codex**
 and **kimi-code**.
 
-[![Version](https://img.shields.io/badge/version-2.69.0-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.69.1-2563eb)](./VERSION)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin-d97757)](https://docs.claude.com/en/docs/claude-code)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#-install)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#-modules)
@@ -160,6 +160,7 @@ Full history: **[CHANGELOG.md](./CHANGELOG.md)**, the single canon — the table
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.69.1` | 2026-10-10 | **End-of-gesture guard fix (patch).** ROADMAP archiving no longer re-archives a block whose phase folders still exist (`conductor` v1.48.2, #143), which broke `check-divergence` S4(a) when the installed plugin copy lacked the fix; SOBR-04 review minors from v2.69.0: BOM tolerated by `check-planning-not-inflight.sh`, `vf-split-planning` doc (`conductor` v1.48.1, #140). |
 | `v2.69.0` | 2026-10-08 | **Choosing the planning partition when a lab starts, and Pocock borrowings (minor).** New `vf-split-planning` skill: one question at the end of a lab's initialisation (single planning by default, or parallel topics), with compartments created by the engine and a machine-checked "no phase in flight" precondition (`conductor` v1.48.0, `dev-orchestrator` v2.27.1). Pocock disciplines: question frontier, lab glossary, two-axis review, skill invocation class (`dev-orchestrator` v2.27.0, `consolidator` v1.11.0). External fixes for the Codex adapter and `vf-new-lab`. Closes the `fiabilite-v1.0` milestone. |
 | `v2.68.0` | 2026-10-01 | **Method sobriety and cycle-based business planning (minor).** Method budgets extended (BACKLOG, memory index, ROADMAP) with reversible automatic archiving, an end-of-gesture `Stop` hook and the E7 mission-exit check (`conductor` v1.46.0, `dev-orchestrator` v2.26.0, Phase 41.3); `recalc-planning.sh` and the cycle model (`planning-core` v2.8.0, Phase 44); `check-overlaps` resolves an agent by its `name:` (#119). |
 | `v2.67.1` | 2026-09-29 | **Hotfix: two v2.67.0 regressions.** `popd` bypassed the driver lock (`conductor` v1.45.1): in `pushd <other-repo> && git commit && popd && git commit`, the second commit, made in the lab, got through under another session's lock, which v2.66.0 refused; `popd` now makes the target undetermined and the lock applies. `skill-creator` v1.1.1: v1.1.0 asked for `vf-nature` (and `ecrit:`, `vf-rubrique-juge:`, the three markers) in the frontmatter while its own `quick_validate.py` rejected them, so a skill produced by that flow failed validation and packaging; the six skill-gate keys are now accepted. Each fix comes with cases that are red without it. Cut from the `v2.67.0` tag: Phase 44 (`planning-core` v2.8.0), merged on `main` unreleased, is not shipped. **92 suites.** |
