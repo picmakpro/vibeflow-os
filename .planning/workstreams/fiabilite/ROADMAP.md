@@ -1923,7 +1923,7 @@ forme exec (ADR-071).
 **Depends on:** aucune. Première du jalon.
 **Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
 **Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
-**Plans:** 7/16 plans executed (10 vagues)
+**Plans:** 8/16 plans executed (10 vagues)
 
 Plans:
 **Wave 1**
@@ -1942,7 +1942,7 @@ Plans:
 - [x] 57-07-PLAN.md — vague 4 : gate de sortie `check-mission-exit.sh --ws` (E1, identité d'E7, surcharge d'E4), suite `test-check-mission-exit-ws.sh`
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 57-08-PLAN.md — vague 5 : `guard-driver-lock.sh`, jugement de commit sur l'union des sources, trois classes de gestes git
+- [x] 57-08-PLAN.md — vague 5 : `guard-driver-lock.sh`, jugement de commit sur l'union des sources, trois classes de gestes git
 - [ ] 57-09-PLAN.md — vague 5 : claim de branche sur les verrous du clone, bilan 7/7 des mutants des consommateurs
 - [ ] 57-10-PLAN.md — vague 5 : doctrine dev-orchestrator (mission-flow, vf-dev-manager, workers, head-governance, intent-routing, mission-cross-team)
 

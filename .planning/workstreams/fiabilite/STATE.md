@@ -4,9 +4,9 @@ milestone: fiabilite-v1.0
 current_phase: 57
 current_phase_name: Verrou de driver par compartiment
 status: executing
-last_updated: "2026-10-10T19:05:00.000Z"
+last_updated: "2026-10-10T19:40:00.000Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 57 plan 07 complete (gate de sortie check-mission-exit.sh --ws, suite test-check-mission-exit-ws.sh 54/0, 5/5 mutants)
+last_activity_desc: Phase 57 plan 08 complete (volet Bash du guard : jugement de commit sur l'union des sources, classes de gestes, suite test-guard-driver-lock-ws.sh 160/0)
 state_head: 1413af28
 progress:
   total_phases: 18
@@ -14,7 +14,7 @@ progress:
   total_plans: 115
   completed_plans: 105
 milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-stopped_at: "Completed 57-07-PLAN.md (2026-10-10) — gate de sortie par compartiment (E1, identité d'E7, surcharge d'E4 par --ws ; partitionné sans --ws = indéterminé / exit 4), 54 assertions, 5/5 mutants tués ; next plan 57-08."
+stopped_at: "Completed 57-08-PLAN.md (2026-10-10) — guard-driver-lock.sh : commit jugé sur l'union des sources, gestes arbre/commit/dépôt, même worktree, fail-closed ; 160 assertions ; next plan 57-09."
 ---
 
 # Project State
@@ -48,7 +48,7 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Last activity: 2026-10-10 — Phase 57 plan 57-07 complete (7/16)
+Last activity: 2026-10-10 — Phase 57 plan 57-08 complete (8/16)
 
 ## Accumulated Context
 
@@ -72,6 +72,7 @@ Historique complet (jalons, décisions, arbitrages 2026-07 à 2026-09) : voir l'
 - [Phase 57]: 57-04 : mutants rejoués en parallèle (neuf matrices, 75 s au lieu de 302 s), cas basculés comparés exactement ; A/B du lab plat contre la copie gelée e8771d94, --help exclu (P57-D-03, P57-D-12, P57-D-28, P57-D-37)
 - [Phase 57]: 57-06 : watchdog et dag.sh ne détectent pas la partition (status --all / champ ws du DAG), lab plat et DAG sans ws octet pour octet ; agrégation abandon > stall, une ligne, suffixe +N ; 4 mutants tués (P57-D-15, P57-D-23, P57-D-24)
 - [Phase 57]: 57-05 : guard partitionné = crochet sys.excepthook fail-closed posé juste après l'aiguillage, lab plat inchangé ligne pour ligne ; tâche 2 sans RED (comportement livré par la tâche 1), discriminance par 4 mutants (P57-D-09, P57-D-10, P57-D-26, P57-D-33)
+- [Phase 57]: 57-08 : un commit est jugé sur l'union index / -a / pathspec / HEAD (--amend) / git add de la même commande, en octets ; source illisible = refus nommé ; gestes d'arbre refusés depuis le worktree qui a pris le verrou seulement, retrait de worktree et cible git incertaine refusés sous tout verrou d'autrui, push/branch/tag/gh sous le seul verrou de dépôt (P57-D-10, P57-D-16 à P57-D-19, P57-D-33) ; mutants dans 57-11
 - [Phase 57]: 57-07 : --ws du gate couvre E1, identité d'E7 (cur_lock_gen, « ? » si illisible) et surcharge d'E4 ; partitionné sans --ws = E1 indéterminé / --budget-snapshot exit 4 ; verrou de dépôt tenu dit sur stderr (P57-D-35) ; mutants dans la disposition miroir du plugin
 - [Phase 57]: 57-02 : repli legacy-fallback sur tout verbe autre qu'acquire sans --ws ni --depot quand le dépôt est absent ; status porte legacy_lock pour toute cible en lab partitionné (P57-D-24, P57-D-26, P57-D-32)
 
