@@ -824,7 +824,8 @@ MUT_TOTAL=12; MUT_KILLED=0; t0=$SECONDS
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 MUT_A="GW-C-NONASCII-1=1 GW-C-REL-tenu=2"
 MUT_B="GW-C-REN-1=1 GW-C-REN-2=1"
-MUT_C="GW-CRASH.2=1 GW-CRASH.3=1 GW-CRASH.4=1 GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1"
+# c : les refus de verrou illisible (R-2) passent aussi par le crochet fail-closed : GW-UNREAD rougit avec lui
+MUT_C="GW-CRASH.2=1 GW-CRASH.3=1 GW-CRASH.4=1 GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1 GW-UNREAD-1.2=1 GW-UNREAD-1.3=1 GW-UNREAD-1.4=1 GW-UNREAD-1.5=1 GW-UNREAD-2.1=1 GW-UNREAD-2.2=1"
 MUT_D="GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1"
 MUT_E="GW-T-EXEMPT-1=1"
 MUT_F="GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1"

@@ -83,6 +83,9 @@
 # déjà lu). Le silence reste réservé au payload vide, imparsable ou qui n'est pas un objet. Un lab plat (ou
 # VF_DRIVER_LOCK posé) n'évalue ni l'aiguillage, ni le crochet, ni le chemin partitionné : le code d'avant la
 # Phase 57 s'exécute ligne pour ligne (P57-D-03).
+# VERROU ILLISIBLE (R-2) : en lab partitionne, un dossier de verrous ou un meta qui EXISTE mais ne se lit pas vaut
+# un refus nomme (« verrou de driver existe mais est illisible »), jamais « pas de verrou » ; seul un meta absent
+# reste « pas de verrou ». Le lab plat garde sa posture historique (meta illisible = allow, Q3c).
 # LIMITE (P57-D-20) : le guard isole des SESSIONS, pas des managers d'une même session (ils partagent le
 # session_id, règle 3) ; aucun refus actif neuf n'est ajouté pour les séparer. Latence ajoutée, chemin
 # partitionné seulement : un interprète python + un `git rev-parse` durci (hypothèse A5 de la recherche).
@@ -478,16 +481,30 @@ FAIL_CLOSED_REASON = (
     "persiste, la signaler (guard-driver-lock.sh)."
 )
 
+class LockUnreadable(Exception):
+    """Un verrou, ou le dossier des verrous de compartiments, EXISTE mais ne se lit pas (droits, type inattendu) :
+    en lab partitionne ce n est jamais « pas de verrou » (P57-D-33, correction R-2). Le crochet fail-closed
+    rend un refus qui nomme le chemin. Le lab plat ne leve jamais cette exception (posture historique Q3c)."""
+
+LOCK_UNREADABLE_REASON = (
+    "Refus : un verrou de driver existe mais est illisible (%s). Le geste est REFUSE par precaution "
+    "(fail-closed) plutot que laisse passer comme s il n y avait aucun verrou. Rendre le verrou lisible, "
+    "ou le liberer avec driver-lock.sh, puis rejouer le geste."
+)
+
 def fail_closed_hook(etype, value, tb):
     """sys.excepthook du chemin partitionne : ecrit le refus JSON sur stdout et le vide. Aucune trace sur
     stderr. Python sort ensuite en 1 ; le repli bash ramene le code du guard a 0, le refus est deja lu."""
     try:
         try:
+            reason = FAIL_CLOSED_REASON
+            if etype is LockUnreadable:
+                reason = LOCK_UNREADABLE_REASON % (str(value),)
             out = json.dumps({
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
-                    "permissionDecisionReason": FAIL_CLOSED_REASON,
+                    "permissionDecisionReason": reason,
                 }
             }, ensure_ascii=True)
         except Exception:
@@ -555,6 +572,18 @@ def common_dir_from_layout(cwd):
         pass
     return None
 
+def present_strict(path):
+    """Existence d un verrou, SANS avaler les erreurs : absent (ENOENT, ENOTDIR) -> False ; toute autre erreur
+    (droits…) -> le verrou est peut-etre la mais indechiffrable : LockUnreadable (R-2). os.path.lexists rendrait
+    False pour les deux."""
+    try:
+        os.lstat(path)
+        return True
+    except (FileNotFoundError, NotADirectoryError, ValueError):
+        return False
+    except OSError:
+        raise LockUnreadable(path)
+
 def discover_locks(cwd):
     """Verrous du lab, cherches AU MEME ENDROIT que driver-lock.sh mais par une resolution propre au guard :
     <git-common-dir>/vf-driver/{repo,ws/*}/DRIVER.lock, repli .planning/DRIVER.lock.d/{repo,ws/*}, et
@@ -585,16 +614,18 @@ def discover_locks(cwd):
     locks = []
     for r in roots:
         depot = os.path.join(r, "repo", "DRIVER.lock")
-        if os.path.lexists(depot):
+        if present_strict(depot):
             locks.append({"path": depot, "scope": "depot", "ws": ""})
         wsdir = os.path.join(r, "ws")
         try:
             names = sorted(os.listdir(wsdir))
-        except Exception:
+        except (FileNotFoundError, NotADirectoryError, ValueError):
             names = []
+        except OSError:
+            raise LockUnreadable(wsdir)
         for n in names:
             p = os.path.join(wsdir, n, "DRIVER.lock")
-            if os.path.lexists(p):
+            if present_strict(p):
                 locks.append({"path": p, "scope": "compartiment", "ws": n})
     legacy = os.path.join(cwd, ".planning", "DRIVER.lock")
     if os.path.lexists(legacy):
@@ -606,13 +637,23 @@ def held_by_other(lk, sid):
     (le verrou ne tient pas). Sinon, tenu par autrui si sid n est pas dans ses session_ids : rend le meta
     enrichi (owner, step, branch, age), sinon None."""
     meta_path = os.path.join(lk["path"], "meta")
+    # Lab partitionne : un meta ABSENT (verrou en cours de pose ou deja libere) reste « pas de verrou » ; un meta
+    # qui existe mais ne se lit pas (droits, pas un fichier) est un refus nomme (R-2, P57-D-33).
     try:
-        if not os.path.isfile(meta_path):
-            return None
+        os.stat(meta_path)
+    except (FileNotFoundError, NotADirectoryError, ValueError):
+        return None
+    except OSError:
+        raise LockUnreadable(meta_path)
+    if not os.path.isfile(meta_path):
+        raise LockUnreadable(meta_path)
+    try:
         with open(meta_path, encoding="utf-8", errors="replace") as f:
             meta_lines = f.readlines()
-    except Exception:
+    except FileNotFoundError:
         return None
+    except Exception:
+        raise LockUnreadable(meta_path)
     meta = {}
     for ln in meta_lines:
         if "=" in ln:
