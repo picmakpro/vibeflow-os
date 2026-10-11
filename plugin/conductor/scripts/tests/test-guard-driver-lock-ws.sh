@@ -622,6 +622,104 @@ chmod 644 "$FLAT/.planning/DRIVER.lock/meta"
 assert_empty "GW-UNREAD-5.2 — lab PLAT, meta illisible : allow, posture historique inchangée (Q3c)" "$out"
 
 echo
+echo "=== GW-TTL — un verrou PÉRIMÉ d'autrui n'est plus un verrou (règle 2 historique, chemin partitionné ; correction R-3 a) ==="
+backdate_ws() { # <dossier commun> <ws/alpha|repo> : antidate heartbeat ET progress (réécriture du meta)
+  local m="$1/vf-driver/$2/DRIVER.lock/meta"
+  sed -e 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' -e 's/^progress_epoch=.*/progress_epoch=1000/' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+}
+LAB="$(mk_lab ttl)"; GCT="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+dl "$LAB" sess-A acquire --depot --owner=md --step=sd >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-TTL-0.1 — témoin : alpha frais tenu par autrui : deny" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/PROJECT.md" x sess-B "$LAB")")"
+assert "GW-TTL-0.2 — témoin : dépôt frais tenu par autrui : deny" "$out" "$DENY"
+backdate_ws "$GCT" ws/alpha; backdate_ws "$GCT" repo
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-TTL-1 — alpha périmé (TTL 1800 s dépassé) : Write permis" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/PROJECT.md" x sess-B "$LAB")")"
+assert_empty "GW-TTL-2 — verrou de dépôt périmé : Write racine permis" "$out"
+out="$(gb "$LAB" 'git reset --hard' sess-B)"
+assert_empty "GW-TTL-3 — geste d'arbre sous des verrous périmés : permis" "$out"
+out="$(run_guard_with "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")" VF_DRIVER_TTL=99999999999)"
+assert "GW-TTL-4 — le même verrou sous un TTL élargi (VF_DRIVER_TTL) redevient vivant : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-UNC — cible git incertaine (-C, --git-dir, --work-tree) : refus sous tout verrou d'autrui, même quand le geste serait permis (P57-D-33 ; correction R-3 b) ==="
+LAB="$(mk_lab unc)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-UNC-0 — témoin : index vide, commit sans option de cible : permis" "$out"
+out="$(gb "$LAB" 'git --git-dir=.git commit -m x' sess-B)"
+assert "GW-UNC-1 — git --git-dir=.git commit (index vide) : deny, cible incertaine" "$out" "$DENY"
+out="$(gb "$LAB" 'git -C . commit -m x' sess-B)"
+assert "GW-UNC-2 — git -C . commit (index vide) : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --work-tree=. commit -m x' sess-B)"
+assert "GW-UNC-3 — git --work-tree=. commit (index vide) : deny" "$out" "$DENY"
+LAB="$(mk_lab unctree)"
+WTU="$WORK_DIR/unctree-wt"
+git -C "$LAB" worktree add -q -b wtu "$WTU" >/dev/null 2>&1
+lab_preflight "$WTU"
+dl "$WTU" sess-A acquire --ws=omega --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git reset --hard' sess-B)"
+assert_empty "GW-UNC-4.1 — verrou pris depuis un autre worktree, geste d'arbre ordinaire : permis (témoin)" "$out"
+out="$(gb "$LAB" 'git -C . reset --hard' sess-B)"
+assert "GW-T-C-1b — le même geste avec -C : deny, SEULE la cible incertaine le distingue" "$out" "$DENY"
+
+echo
+echo "=== GW-C-POS — un pathspec POSITIONNEL de commit compte comme pathspec (doute = union ; correction R-3 c) ==="
+LAB="$(mk_lab cpos)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-POS-0 — témoin : sans pathspec, la modification non indexée n'est pas embarquée : permis" "$out"
+out="$(gb "$LAB" 'git commit -m x .planning/workstreams/alpha/STATE.md' sess-B)"
+assert "GW-C-POS-1 — chemin d'alpha en position d'argument : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit -m x src/x.sh' sess-B)"
+assert "GW-C-POS-2 — autre chemin en position d'argument (doute = union) : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-C-CASE — la casse de .planning et de workstreams dans l'INDEX (comportement actuel du jugement de commit ; correction R-3 d) ==="
+LAB="$(mk_lab ccase)"
+git -C "$LAB" config core.ignorecase false   # sinon git ramène la casse du dossier sur un FS insensible à la casse
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+CASE_BLOB="$(printf 'x\n' | git -C "$LAB" hash-object -w --stdin)"
+idx_add() { git -C "$1" update-index --add --cacheinfo "100644,$CASE_BLOB,$2" >/dev/null 2>&1; }   # <lab> <chemin d'index>
+idx_add "$LAB" ".PLANNING/workstreams/omega/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-CASE-0 — témoin : seul omega (casse différente) est indexé, alpha seul est tenu : permis" "$out"
+unstage "$LAB"
+idx_add "$LAB" ".PLANNING/workstreams/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-CASE-1 — .PLANNING/workstreams/alpha indexé : deny (casse de .planning ignorée)" "$out" "$DENY"
+unstage "$LAB"
+idx_add "$LAB" ".planning/WORKSTREAMS/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-CASE-2 — .planning/WORKSTREAMS/alpha indexé : deny (casse de workstreams ignorée)" "$out" "$DENY"
+unstage "$LAB"
+idx_add "$LAB" ".planning/workstreams/ALPHA/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-CASE-3 — .planning/workstreams/ALPHA indexé : deny (nom de compartiment sans casse)" "$out" "$DENY"
+unstage "$LAB"
+
+echo
+echo "=== GW-C-GEN — une exception INATTENDUE du jugement de commit rend un refus nommé, et l'échappatoire reste honorée (correction R-3 e) ==="
+LAB="$(mk_lab cgen)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+mk_bash_sur() { # <suffixe> <session> <cwd> : un chemin à substitut isolé (\ud800), que os.fsencode ne sait pas encoder
+  python3 -c '
+import json, sys
+cmd = "git add a\ud800b && git commit -m x" + sys.argv[1]
+print(json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}, "session_id": sys.argv[2], "cwd": sys.argv[3]}))' "$1" "$2" "$3"
+}
+out="$(run_guard_in "$LAB" "$(mk_bash_sur '' sess-B "$LAB")")"
+assert "GW-C-GEN-1 — exception inattendue dans le jugement : deny" "$out" "$DENY"
+assert "GW-C-GEN-2 — le refus nomme la cause (source illisible : exception interne)" "$out" "source illisible : exception interne"
+assert "GW-C-GEN-3 — le refus nomme le verrou refusant (compartiment alpha)" "$out" "alpha"
+out="$(run_guard_in "$LAB" "$(mk_bash_sur ' # vibeflow:allow-lock-override' sess-B "$LAB")")"
+assert_empty "GW-C-GEN-4 — avec l'échappatoire, le geste passe : le refus n'est pas celui du crochet fail-closed" "$out"
+
+echo
 echo "=== GW-MARK-B — l'échappatoire Bash est évaluée APRÈS le calcul du refus, journal à côté de chaque verrou refusant ==="
 LAB="$(mk_lab markb)"
 GCB="$(fixture_common_dir "$LAB")"
@@ -813,13 +911,13 @@ fi   # GW_MODE = full (A/B)
 
 if [ "$GW_MODE" = full ]; then
 echo
-echo "=== MUTANTS GW-M-a à GW-M-l — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
+echo "=== MUTANTS GW-M-a à GW-M-r — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du guard, posée à côté d'une
 # copie de vf-portable.sh (sinon le locator sortirait en code 17 pour la mauvaise raison). Le programme python
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=12; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=18; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 MUT_A="GW-C-NONASCII-1=1 GW-C-REL-tenu=2"
@@ -828,7 +926,7 @@ MUT_B="GW-C-REN-1=1 GW-C-REN-2=1"
 MUT_C="GW-CRASH.2=1 GW-CRASH.3=1 GW-CRASH.4=1 GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1 GW-UNREAD-1.2=1 GW-UNREAD-1.3=1 GW-UNREAD-1.4=1 GW-UNREAD-1.5=1 GW-UNREAD-2.1=1 GW-UNREAD-2.2=1"
 MUT_D="GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1"
 MUT_E="GW-T-EXEMPT-1=1"
-MUT_F="GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1"
+MUT_F="GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
 # g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
 MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-D-TAG-detenteur=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
 # h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
@@ -837,6 +935,14 @@ MUT_I="GW-C-REL-tenu=2"
 MUT_J="GW-C-ALL-1=1 GW-C-ALL-2=1"
 MUT_K="GW-C-ADD-1=1"
 MUT_L="GW-W-LEG-1=1 GW-W-LEG-2=1"
+# m à r (correction R-3 de la revue Phase 57) : ensembles mesurés puis relus un par un ; chacun contient le cas qui
+# discrimine le comportement, rien d'autre (GW-T-C-1b est le cas voisin de GW-T-C-1 qui isole la cible incertaine)
+MUT_M="GW-TTL-1=1 GW-TTL-2=1 GW-TTL-3=1"
+MUT_N="GW-T-C-1b=1 GW-UNC-1=1 GW-UNC-2=1 GW-UNC-3=1"
+MUT_O="GW-C-POS-1=1 GW-C-POS-2=1"
+MUT_P="GW-C-CASE-1=1"
+MUT_Q="GW-C-GEN-2=1 GW-C-GEN-3=1 GW-C-GEN-4=1"
+MUT_R="GW-C-CASE-2=1"
 gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
   awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
 }
@@ -936,14 +1042,26 @@ mutant j 'if g\["a_flag"\] or g\["pathspec"\] or wide:' 's@g\["a_flag"\] or @@' 
 mutant k '^    paths.extend(lit)$' 's@paths.extend(lit)@pass@' "$MUT_K"
 # l : ancien verrou non lu -> .planning/DRIVER.lock d'autrui n'est plus vu en lab partitionné
 mutant l 'if os.path.lexists(legacy):' 's@lexists(legacy):@lexists(legacy) and False:@' "$MUT_L"
+# m (R-3 a) : test de péremption TTL retiré -> un verrou périmé d'autrui est de nouveau un verrou
+mutant m '^    if age > ttl:$' 's@if age > ttl:@if False:@' "$MUT_M"
+# n (R-3 b) : uncertain_global neutralisée -> -C, --git-dir, --work-tree ne rendent plus la cible incertaine
+mutant n 'return t == "-C" or' 's@return t == "-C" or .*@return False@' "$MUT_N"
+# o (R-3 c) : le jeton POSITIONNEL d'un commit ne compte plus comme pathspec (la ligne `pathspec = True` de la branche else)
+mutant o 'elif ch in "io":' '{n;n;n;s@pathspec = True@pass@;}' "$MUT_O"
+# p (R-3 d) : casse de .planning ignorée -> comparée à l'identique dans map_repo_path
+mutant p 'if parts\[0\].lower() == b".planning":' 's@parts\[0\].lower()@parts[0]@' "$MUT_P"
+# q (R-3 e) : l'`except Exception` générique du jugement de commit retiré (il n'attrape plus rien)
+mutant q 'except Unreadable as e:' '{n;n;n;n;s@except Exception:@except ZeroDivisionError:@;}' "$MUT_Q"
+# r (R-3 d) : casse de `workstreams` ignorée -> comparée à l'identique dans map_repo_path
+mutant r 'parts\[1\].lower() == b"workstreams"' 's@parts\[1\].lower()@parts[1]@' "$MUT_R"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 12/12 tués =="
+  echo "== mutants : 18/18 tués =="
 else
-  echo "== mutants : $MUT_KILLED/12 tués =="
+  echo "== mutants : $MUT_KILLED/18 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # GW_MODE = full (mutants)
