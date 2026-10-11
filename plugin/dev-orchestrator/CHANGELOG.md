@@ -10,7 +10,7 @@ D-36 et D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-1
   (`--budget-snapshot`), jamais un vert ; lab plat inchangé. Suite neuve `scripts/tests/test-check-mission-exit-ws.sh`
   (mutants 5/5 tués) ; `test-dev-orchestrator.sh` 279 OK / 0 KO (T37 et T38 inclus).
 - **`references/mission-flow.md`** : nouvelle section « Verrou par compartiment » (acquire, snapshot, `dag.sh init`,
-  heartbeat, register / close, release, tous avec `--ws`, et un `GSD_SESSION_KEY` distinct par session) ;
+  heartbeat, register / close, release, tous avec `--ws`, `takeover` avec l'option de cible du `hint` du refus, et un `GSD_SESSION_KEY` distinct par session) ;
   `references/mission-cross-team.md` et `references/head-governance.md` alignés : « un manager par compartiment », avec
   sa limite (allowlists d'agents, pas verrou), et le paragraphe « Extension non livrée » remplacé par « mécanisme
   livré (Phase 57) » ; `references/intent-routing.md` : l'intention « reprends le sujet X » passe `--ws X` aussi sur chaque verbe du verrou.

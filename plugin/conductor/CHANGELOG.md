@@ -10,14 +10,18 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
   d'acquisition inchangée. Le compartiment ne vient que de `--ws` : `GSD_WORKSTREAM`, `VF_WORKSTREAM` et
   `active-workstream` ne déplacent rien. Refus nommés avec `hint` : `ws-invalid`, `unknown-ws`,
   `partition-unreadable`, `policy-missing`, et `legacy-lock-held` / `stale-requires-takeover` tant qu'un ancien
-  `.planning/DRIVER.lock` est tenu (rien n'est repris en silence). `status --all` rend en une ligne l'état de tous
+  `.planning/DRIVER.lock` est tenu (rien n'est repris en silence). Le `hint` d'un `stale-requires-takeover` sur un
+  compartiment ou sur le dépôt porte l'option de la cible (`--ws=<sujet>` ou `--depot`) : rejoué littéralement, il
+  reprend le verrou du refus qui le porte, jamais celui d'une autre cible. `status --all` rend en une ligne l'état de tous
   les verrous du lab ; tous les verbes portent `--ws` et le suffixe `scope`/`ws`/`location`, avec un registre frère
   par verrou. Repli hors git sous `.planning/DRIVER.lock.d`. Lab plat intact (A/B bit à bit contre la copie gelée
   `e8771d94`, 20 étapes, IDENTIQUE).
 - **`scripts/guard-driver-lock.sh`** : le guard refuse une écriture sous un compartiment tenu par une autre session
   et laisse le voisin libre. Volet Bash : un commit est jugé sur ce qu'il embarque (index, `-a`/pathspec, HEAD sous
   `--amend`, `git add` de la même commande) ; gestes git répartis en arbre / commit / dépôt. Fail-closed : toute
-  exception ou source illisible du chemin partitionné rend un refus JSON, jamais une ouverture. Lab plat inchangé
+  exception ou source illisible du chemin partitionné rend un refus JSON, jamais une ouverture ; un verrou ou un
+  dossier de verrous qui existe mais ne se lit pas (droits) donne un refus qui le nomme, seul un meta absent reste
+  « pas de verrou ». Lab plat inchangé (meta illisible = allow, posture historique)
   (A/B IDENTIQUE sur 73 payloads x 5 états de verrou x 2 régimes contre la copie gelée `cff1e2af`).
 - **Consommateurs** : `check-guard-health.sh` voit un stall ou un abandon par compartiment (`ws=<sujet>`, une seule
   ligne, abandon prioritaire) ; `dag.sh init --ws` lie le DAG à un compartiment et `dag.sh mark` avance le
@@ -26,8 +30,9 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
 - **Références et skill** : `references/team-kernel.md` (une mission pilote par compartiment, un geste de dépôt à la
   fois, limite P57-D-20), `references/workstream-planning-consumers.md` (recensement). `skills/vf-split-planning`
   acquiert `--depot` avant la partition et le relâche après.
-- **Suites** : `test-driver-lock-ws.sh` (492 assertions, concurrence 24 x 5 tours à 0 tour hors contrat, A/B,
-  mutants 9/9 tués), `test-guard-driver-lock-ws.sh` (180 assertions, A/B, mutants 12/12 tués),
+- **Suites** : `test-driver-lock-ws.sh` (511 assertions, concurrence 24 x 5 tours à 0 tour hors contrat, A/B,
+  mutants 9/9 tués), `test-guard-driver-lock-ws.sh` (222 assertions, A/B, mutants 18/18 tués : péremption, cible git
+  incertaine, pathspec positionnel, casse de l'index et exception générique du jugement de commit y sont mutés),
   `test-driver-lock-consumers-ws.sh` (30 OK, mutants 7/7 tués) ; copies gelées `tests/fixtures/driver-lock-pre-e8771d9.sh`
   et `guard-driver-lock-pre-cff1e2a.sh`.
 - **Manager en vol pendant la mise à jour** : les scripts sont remplacés sous ses pieds ; d'où le repli des verbes
