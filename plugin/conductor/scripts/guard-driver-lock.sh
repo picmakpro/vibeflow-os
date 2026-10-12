@@ -692,6 +692,12 @@ def map_path(abs_path, cwd):
     chemin qui sort de .planning/, ou `workstreams` seul -> ("incertain", ""). Ne valide aucun nom."""
     planning = os.path.realpath(os.path.join(os.path.realpath(cwd), ".planning"))
     real = os.path.realpath(abs_path)
+    # Le segment .planning se compare sans tenir compte de la casse (P57-D-38) : sur un FS insensible a la casse,
+    # .PLANNING est le meme dossier, et realpath ne rend pas la casse du disque. Seul ce segment est replie.
+    pp = planning.split(os.sep)
+    rp = real.split(os.sep)
+    if len(rp) >= len(pp) and rp[:len(pp) - 1] == pp[:-1] and rp[len(pp) - 1].casefold() == pp[-1].casefold():
+        real = os.sep.join(pp + rp[len(pp):])
     rel = os.path.relpath(real, planning)
     if rel == ".." or rel.startswith(".." + os.sep):
         return ("incertain", "")
@@ -1108,7 +1114,9 @@ elif tool in ("Write", "Edit"):
     # guard-bash-registres.sh:40-42) — sans ces deux formes la garde est inerte sous Windows en
     # PARAISSANT installée. Frontière EXACTE (jamais un suffixe, guard-agent-write.sh:64-67).
     norm = fp.replace("\\\\", "/").replace("\\", "/")
-    if not re.search(r"(^|/)\.planning/", norm):
+    # Lab partitionné : le segment .planning se compare SANS tenir compte de la casse (P57-D-38, F-1 : sur un
+    # système de fichiers insensible à la casse, .PLANNING est le même dossier). Lab plat : inchangé, au bit près.
+    if not re.search(r"(^|/)\.planning/", norm, re.I if PARTITIONED else 0):
         sys.exit(0)  # C4 : hors du dossier de planification -> allow, quel que soit le lock
     root_w = os.path.realpath(cwd)
     abs_w = norm if os.path.isabs(norm) else os.path.join(root_w, norm)
