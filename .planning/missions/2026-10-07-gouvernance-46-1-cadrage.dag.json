@@ -31,7 +31,7 @@
       "scope": [
         ".planning/workstreams/gouvernance/phases/VFDO-46.1-armement-de-g4-et-g4/46.1-CONTEXT.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan-461",
@@ -43,7 +43,7 @@
       "scope": [
         ".planning/workstreams/gouvernance/phases/VFDO-46.1-armement-de-g4-et-g4/"
       ],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "plancheck-461",

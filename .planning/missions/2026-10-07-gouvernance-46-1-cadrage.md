@@ -11,7 +11,7 @@ session (attente humaine).
 **Flags d'enchaînement :** `workflow._auto_chain_active` et `workflow.auto_advance` déjà à `false`,
 vérifiés par lecture de `.planning/config.json` (`gsd_run` non résolu sur ce poste).
 **Budget :** snapshot posé (`check-mission-exit.sh --budget-snapshot`, fichier
-`/Users/makwilmak/vibeflow-os/.git/vf-mission-budget.snap`, partagé entre worktrees : une autre
+`<dépôt principal>/.git/vf-mission-budget.snap`, partagé entre worktrees : une autre
 session peut l'écraser).
 **Issue :** `human_needed` — cadrage gelé dans l'attente des réponses de Willy à Q1-Q5.
 
