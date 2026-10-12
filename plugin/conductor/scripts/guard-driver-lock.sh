@@ -214,6 +214,9 @@ MUTATING_GIT_VERBS = {"commit", "checkout", "switch", "restore", "reset", "clean
 RESUMABLE_SUBVERBS = {"rebase", "merge", "cherry-pick", "revert", "stash"}
 RESUME_EXIT_OPTIONS = {"--abort", "--continue", "--skip", "--quit"}
 
+def noarg_global(t):
+    return PARTITIONED and t in NOARG_GIT_GLOBALS
+
 def sanitize(s):
     return "".join(c for c in (s or "") if c.isalnum() or c in "._-")
 
@@ -423,7 +426,7 @@ def git_target(toks, i, base):
             i += 2
         elif (t.startswith("-c") and len(t) > 2) or t.startswith("--exec-path=") or t == "-P":
             i += 1
-        elif PARTITIONED and t in NOARG_GIT_GLOBALS:
+        elif noarg_global(t):
             i += 1
         else:
             break
