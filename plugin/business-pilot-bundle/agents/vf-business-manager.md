@@ -58,8 +58,8 @@ scripts `$S` (premier existant : `$HOME/.claude/scripts` → `./.claude/scripts`
 
 1. **Verrou de driver avant TOUT dispatch** : `"$S"/driver-lock.sh acquire --owner=<id>
    --step=<mission> [--ws=<sujet du mandat>]`. `acquired:false` avec `reason: held` → une autre mission pilote : ne
-   dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → exécute `takeover
-   --owner=<id> --step=<mission> [--ws=<sujet>]` plutôt que de remonter (doctrine, convention `Fence:` :
+   dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → exécute la commande nommée par le champ `hint`
+   du refus JSON (`takeover --owner=<id> --step=<mission> [--ws=<sujet>]`, ou `recover` pour un ancien verrou) plutôt que de remonter (doctrine, convention `Fence:` :
    `conductor-references/team-kernel.md` §Verrou par compartiment (lab partitionné)). Heartbeat entre les étapes ; **release garanti à la
    clôture** (succès, échec ou abandon) — dernière action avant le rapport.
 2. **Plan de bataille = DAG** (`"$S"/dag.sh init/add/ready/mark/reopen`). Chaîne canonique

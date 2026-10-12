@@ -1,5 +1,12 @@
 # CHANGELOG — growth-bundle
 
+## [v2.0.15] — 2026-10-13 (verrou de driver périmé : cas `recover`)
+
+**Patch** — `agents/vf-growth-manager.md` : sur `reason: stale-requires-takeover`, le manager exécute la commande nommée par le champ
+`hint` du refus JSON (`takeover` pour un compartiment ou un lab plat, `recover` pour un ancien verrou d'avant la mise à jour),
+au lieu de prescrire `takeover` seul ; formulation alignée sur `vf-dev-manager` (ce172d64). Arbitrage Samuel, AskUserQuestion
+session principale, 2026-10-13 (Q7). Aucune release.
+
 ## [v2.0.14] — 2026-10-10 (verrou de driver par compartiment, Phase 57)
 
 **Patch** — `agents/vf-growth-manager.md` passe `--ws=<sujet du mandat>` (optionnel) à `acquire`, `takeover`, `heartbeat` et
