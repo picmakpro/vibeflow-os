@@ -145,6 +145,19 @@ Les résultats d'un passage précédent trouvés au scratchpad (survivants `stal
 Aucun marqueur `TBD/FIXME/XXX/TODO/HACK/PLACEHOLDER` n'est ajouté par la phase (lignes `+` de `dae0147b..HEAD`). Aucune release ni bump racine
 (`VERSION`, `plugin.json`, `marketplace.json` inchangés, P57-D-30) ; cinq modules bumpés sans release, `check-version-sync` vert.
 
+## Réserves traitées (2026-10-12)
+
+Mandat de correction ciblée (vf-dev-manager → vf-coder), HEAD de départ `4262516a`. Le statut du rapport reste `passed`.
+
+| Réserve | Traitement | Commit |
+|---------|-----------|--------|
+| C1 | Renvoyée à `.planning/codebase/CONCERNS.md` (entrée « Phase 57 », point 7) ; aucun code | `c15e08ba` |
+| C2 | Corrigée : `check-mission-exit.sh` transmet `--ws <sujet>` à `check-method-budget.sh` dans E7 et `--budget-snapshot` (sans `--ws`, lignes d'origine conservées à l'octet). RED : cas EW-BWS-1..3 rouges (trace de l'assertion, de l'attendu et de l'obtenu dans le message du commit). GREEN : suite `-ws` 61/0, mutants 7/7 dont EW-M-f (snapshot) et EW-M-g (E7) ; `test-check-mission-exit.sh` 135/0, sans diff contre le merge-base | RED `0722a581`, GREEN `9197ce01` |
+| C3 | Renvoyée à CONCERNS.md (point 6, six branches défensives sans mutant) ; aucun mutant ajouté | `c15e08ba` |
+| C4 | Corrigée : entrée « Phase 57 » de CONCERNS.md (F-3, R-4, R-5, R-6, R-7, C3, C1, chacun avec sa source) | `c15e08ba` |
+| C5 | Corrigée : « Mesures » de l'amendement d'ADR-053 rejouées et recopiées (528/0 et 10/10, 240/0 et 23/23, 61/0 et 7/7, 30/0 et 7/7) ; P57-D-38 et P57-D-39 cités avec canal et date ; CHANGELOG dev-orchestrator v2.28.0 aligné (manuel FR/EN : aucune mesure citée) | `b3ba334a` |
+| C6 | Laissée telle quelle (`57-VALIDATION.md` non touché) | — |
+
 ## Résumé
 
 Treize critères sur treize atteints. Le mécanisme est réel : le script résout un verrou par compartiment et par dépôt au
