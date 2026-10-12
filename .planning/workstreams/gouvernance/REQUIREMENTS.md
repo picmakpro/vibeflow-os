@@ -61,6 +61,16 @@
 | CLOT-10 | Phase 46 | Complete sous arbitrage, partiel (G3 seul armé ; G4 et G4′ en observation, arbitrages du 2026-10-06 ; reprise Phase 46.1) |
 | CLOT-11 | Phase 46 | Complete |
 | CLOT-12 | Phase 46 | Complete |
+| BAIL-01 | Phase 47 | Pending |
+| BAIL-02 | Phase 47 | Pending |
+| BAIL-03 | Phase 47 | Pending |
+| BAIL-04 | Phase 47 | Pending |
+| BAIL-05 | Phase 47 | Pending |
+| BAIL-06 | Phase 47 | Pending |
+| BAIL-07 | Phase 47 | Pending |
+| BAIL-08 | Phase 47 | Pending |
+| BAIL-09 | Phase 47 | Pending |
+| BAIL-10 | Phase 47 | Pending |
 
 ## Milestone gouvernance-labs-v1.0 — « le planning métier tenu par une machine » (inscrit 2026-09-23)
 
@@ -229,3 +239,45 @@
   déclarées (P46-D-08) ; les suites tournent en CI Linux avec une mutation rouge tracée par garde ;
   `planning-core` passe en v2.10.0 sans release ; `HOOKS-CONTRAT-SORTIE.md` et l'inventaire des
   hooks suivent (P46-D-08, P46-D-14, P46-D-17, P46-D-18).
+
+### Moteur — baux générationnels et jeton monotone (Phase 47)
+
+> Préfixe `BAIL` vérifié libre le 2026-10-12 (HEAD, `8519c402`, `origin/main`, disque ; `LOCK` est pris
+> par `fiabilite`). Chaque exigence dérive d'une décision de `47-CONTEXT.md` (préfixe `P47-D-NN`,
+> ADR-075) et ne pose aucune décision nouvelle.
+
+- [ ] **BAIL-01**: un registre de baux par fichier, `.planning/baux/<clé>/gen-<n>/meta`, génération
+  entière monotone jamais effacée ; prise par `mkdir gen-<n+1>` puis relecture du disque ; N preneurs
+  concurrents → exactement un gagnant par génération, prouvé par un cas de concurrence réel rouge sous
+  mutation ; génération sans `meta` complet = détenue par personne (P47-D-02, 02a, 02b).
+- [ ] **BAIL-02**: l'identité du détenteur (`agent_id`, sinon `session_id`) n'est écrite que par le moteur ;
+  le geste de prise d'un agent est reconnu par le hook ; le `meta` est protégé de `Write`/`Edit` par G6
+  étendu à `.planning/baux/` (P47-D-01, 01a).
+- [ ] **BAIL-03**: le gate `BAIL` refuse par deny l'écriture par outil d'un fichier déclaré quand aucune
+  génération n'existe, quand la plus haute est incomplète, ou quand son détenteur n'est pas l'appelant
+  (session revenue, sous-agent frère, détenteur dépassé) ; hors liste ou hors adhésion, aucun effet
+  (P47-D-01, P47-D-03).
+- [ ] **BAIL-04**: la liste des fichiers sous bail est déclarée dans `.planning/config.json`, au fichier
+  près, protégée par G6 ; liste absente ou vide = rien jugé ; fichiers d'état du moteur et append-only
+  hors bail (P47-D-03).
+- [ ] **BAIL-05**: un outil côté écrivain prend, vérifie au moment d'écrire sous `fcntl.flock` et écrit par
+  temporaire + `os.replace` ; un écrivain dépassé se replie avec un code ≠ 0 et une trace ; l'usage par
+  un cron est documenté (P47-D-12).
+- [ ] **BAIL-06**: G2′ refuse par deny l'écriture par outil d'un `CLOTURE.md` d'unité quand un fichier
+  déclaré a bougé depuis l'ouverture de l'unité hors des baux qui le couvrent, sans amendement ; une règle
+  miroir au recalcul traite la clôture par `Bash` ; l'amendement est une prise a posteriori avec raison,
+  tracée (P47-D-04, 04a).
+- [ ] **BAIL-07**: `dag.sh` ne perd plus de mise à jour ni ne se lit tronqué (`flock` + temporaire +
+  `os.replace`), prouvé par un cas concurrent réel rouge sous mutation ; la phase écrit pourquoi le jeton
+  ne le couvre pas ; `conductor` bumpé, renuméroté après `fiabilite`, sans release ; fiche BACKLOG close
+  (P47-D-05).
+- [ ] **BAIL-08**: deux recalculs concurrents se sérialisent (`flock`), le dédoublonnage de `cloture.log`
+  se fait sous verrou ; `INDEX.md` renseigne la colonne « Bail en cours » (P47-D-13).
+- [ ] **BAIL-09**: l'armement suit l'étape 7 `("BAIL", "G2P")`, en observation à la livraison, chaque
+  armement à 0 faux refus et 0 faux accept sur le banc puis sur le rejeu en lecture seule, rejeu réel et
+  armement sous checkpoint humain au moment d'agir ; inarmable tant que G4′ ne l'est pas (P47-D-06, 06a).
+- [ ] **BAIL-10**: zéro régression hors adhésion et sur les labs dev (aucun nouvel événement, mutation
+  « ignorer l'adhésion » rouge) ; le canary couvre `BAIL` et `G2P` ; la spec moteur est amendée (§5,
+  §5.1-2 annotée, §6.1, §6.2, §6.4) avec date et canal ; `modele-cycles.md` porte le registre, les gates,
+  l'outil et les limites nommées ; fiches BACKLOG `onFailure` et `driver-lock.sh` posées ;
+  `planning-core` en v2.12.0 sans release ; suites en CI Linux (P47-D-07, 09, 11, 14, 15, 16).

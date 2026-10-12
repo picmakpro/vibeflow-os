@@ -7,8 +7,9 @@
 **Canal des questions :** relais par la session principale (`SendMessage(main)`, repli D-09 : pas
 d'outil de question en sous-agent) ; réponses attendues de Willy par AskUserQuestion en session
 principale.
-**Statut :** questions envoyées le 2026-10-12, **réponses en attente** — aucune décision humaine
-n'est encore prise ; rien ci-dessous n'est un arbitrage.
+**Statut :** questions envoyées le 2026-10-12 ; **réponses reçues le 2026-10-12** — arbitrages
+Willy, AskUserQuestion session principale, 2026-10-12, relayés verbatim par la session principale.
+Recommandation (a) suivie sur les sept questions. Décisions du manager annoncées : non renversées.
 
 ## Déroulé
 
@@ -20,6 +21,8 @@ n'est encore prise ; rien ci-dessous n'est un arbitrage.
    (P46-D-01) ; `TaskCompleted` reste absent par défaut sur 2.1.296. Le cadrage repart du code livré.
 3. Sept questions de zone grise envoyées d'un bloc, avec faits, options et recommandation, plus la
    liste des décisions que le manager prendra lui-même (renversables).
+4. Réponses de Willy (verbatim du relais) ; elles deviennent P47-D-01 à P47-D-07 dans `47-CONTEXT.md`,
+   les décisions du manager P47-D-08 à P47-D-17.
 
 ## Faits structurants (relevés)
 
@@ -41,7 +44,7 @@ n'est encore prise ; rien ci-dessous n'est un arbitrage.
   enregistrée (`hooks.json`, P461-D-03b), D1, `PROTEGES_G6`, version (v2.11.0). L'étape 7 est
   inarmable tant que G4′ ne l'est pas.
 
-## Questions posées (en attente)
+## Questions posées
 
 | # | Question | Options (recommandation en premier) |
 |---|---|---|
@@ -71,3 +74,17 @@ n'est encore prise ; rien ci-dessous n'est un arbitrage.
   en limites nommées.
 - ROADMAP §47 : ligne `Depends on` remplacée par le texte prêt de `46-NOTE-ROADMAP-47.md` (b) ;
   référence `BACKLOG.md:74` corrigée en `:169`.
+
+## Réponses (verbatim du relais)
+
+| # | Réponse de Willy | Décision |
+|---|---|---|
+| Q1 | « (a) Registre lié à l'appelant (Recommandé) » | P47-D-01 |
+| Q2 | « (a) Un bail par fichier (Recommandé) » (spec §6.1 amendée) | P47-D-02 |
+| Q3 | « (a) Liste déclarée par le lab (Recommandé) » | P47-D-03 |
+| Q4 | « (a) Sur CLOTURE.md, amendement tracé (Recommandé) » | P47-D-04 |
+| Q5 | « (a) Corrigé dans la 47 (Recommandé) » | P47-D-05 |
+| Q6 | « (a) Étape 7, observation d'abord (Recommandé) » | P47-D-06 |
+| Q7 | « (a) Hors 47 (Recommandé) » | P47-D-07 |
+
+Canal : Willy, AskUserQuestion session principale, 2026-10-12.
