@@ -88,3 +88,13 @@ Recommandation (a) suivie sur les sept questions. Décisions du manager annoncé
 | Q7 | « (a) Hors 47 (Recommandé) » | P47-D-07 |
 
 Canal : Willy, AskUserQuestion session principale, 2026-10-12.
+
+## Questions posées en planification (en attente)
+
+Relais par la session principale (`SendMessage(main)`), le 2026-10-12. **Aucune réponse reçue au
+moment de l'écriture** : rien ci-dessous n'est un arbitrage.
+
+| # | Question | Options (recommandation en premier) |
+|---|---|---|
+| Q8 | Armement de `BAIL`/`G2P` (étape 7) tant qu'aucun lab réel n'a de liste déclarée (avant la Phase 50) — condition `LISTE-REELLE n ≥ 1` ajoutée par le planificateur | (a) condition gardée : la 47 livre en observation, l'armement réel attend une liste réelle, le checkpoint de 47-13/47-14 se rejoue à ce moment · (b) condition retirée : armement possible dès la 47 sur banc synthétique + rejeu « absence d'effet » · (c) `BAIL` seul (7a) armable dès la 47, `G2P` (7b) attend une liste réelle |
+| Q9 | Portée de la règle miroir de G2′ au recalcul (P47-D-04 : « règle miroir au recalcul pour une clôture écrite par `Bash` »). Fait : six plan-checks frais successifs ont chacun trouvé un nouveau chemin par lequel une unité close **hors outil** finit `close` en silence (inventaire de départ, sceau, période, exemption, fenêtre avant la pose du registre…) ; chaque correction a ajouté un mécanisme, le tour suivant a trouvé une nouvelle brèche. Cause : contrairement à G3 (fonction pure du disque), G2′ dépend d'un historique, que `Bash` peut contourner ou réécrire (P45-D-10). | (a) **miroir = détection au mieux, garantie bornée à l'outil** : G2′ garantit « jamais close en silence » pour les clôtures par outil (`PreToolUse` sur `CLOTURE.md`) ; au recalcul, une clôture hors outil est signalée quand le journal du moteur porte un changement non couvert, sans prétention de complétude ; la classe « clôture hors outil » est une limite nommée, comme pour G1/G3/G4 · (b) continuer à durcir le miroir jusqu'à un plan-check vert (septième tour et plus, convergence non garantie, ~0,4-0,5 M jetons par tour) · (c) sortir le miroir de la 47 (BACKLOG, phase dédiée) ; G2′ = gate d'outil seul |
