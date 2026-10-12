@@ -244,7 +244,13 @@ if [ "$BUDGET_SNAPSHOT" -eq 1 ]; then
   SNAP_PATH="$(budget_snap_path)" || { echo "[check-mission-exit] --budget-snapshot : $ROOT n'est pas un dépôt git" >&2; exit 4; }
   # --auto --dry-run : la MÊME décision que celle d'E7, rien d'écrit ; un ARCHIVAGE REFUSÉ déjà là au démarrage
   # (source non commitée…) est donc dans la référence et n'est pas imputé à la mission.
+  # Phase 57, réserve C2 : --ws <sujet> est transmis au script de budget (sans quoi un lab partitionné sans GSD_WORKSTREAM
+  # exporté rend « ARCHIVAGE NON TENTÉ »). Sans --ws, la ligne d'origine, inchangée : la suite du lab plat la mute telle quelle.
+  if [ -z "$WS" ]; then
   SNAP_OUT="$(bash "$SNAP_BUDGET" --root "$ROOT" --no-remote --quiet --auto --dry-run 2>/dev/null)"; SNAP_RC=$?
+  else
+  SNAP_OUT="$(bash "$SNAP_BUDGET" --root "$ROOT" --no-remote --quiet --auto --dry-run --ws "$WS" 2>/dev/null)"; SNAP_RC=$?
+  fi
   if [ "$SNAP_RC" -ge 2 ]; then
     echo "[check-mission-exit] --budget-snapshot : check-method-budget.sh a rendu $SNAP_RC, snapshot non posé" >&2
     exit 4
@@ -709,7 +715,12 @@ else
   else
   if [ "$E7_SGEN" = "-" ]; then say "[E7] snapshot posé le ${E7_SDATE:-?} SANS verrou de driver : aucune identité de mission, seule la date le situe"
   else say "[E7] snapshot posé le ${E7_SDATE:-?}, génération du verrou « $E7_SGEN » (verrou courant : $E7_CGEN ; relâché, l'identité n'est plus recontrôlable : seule la date la situe)"; fi
+  # Réserve C2 : même transmission de --ws qu'au snapshot ; la ligne sans --ws reste celle d'origine.
+  if [ -z "$WS" ]; then
   E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto 2>/dev/null)"; E7_RC=$?
+  else
+  E7_OUT="$(bash "$E7_BUDGET" --root "$ROOT" --no-remote --quiet --strict --auto --ws "$WS" 2>/dev/null)"; E7_RC=$?
+  fi
   E7_ARCHIVE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVÉ' || true; } | sed 's/^\[budget\] *//')"
   E7_NONTENTE="$({ printf '%s\n' "$E7_OUT" | grep 'ARCHIVAGE NON TENTÉ' || true; } | sed 's/^\[budget\] *//')"
   E7_NOW="$(mktemp "${TMPDIR:-/tmp}/vf-e7.XXXXXX")"
