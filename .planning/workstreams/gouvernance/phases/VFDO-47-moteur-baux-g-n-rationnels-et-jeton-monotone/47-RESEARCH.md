@@ -793,7 +793,9 @@ def save(dag):
 | A11 | `conductor` : bump de niveau **patch** (durcissement, `CLAUDE.md` « Numérotation »), numéro à recalculer sur `origin/main` au moment d'exécuter (v1.48.2 au 2026-10-12, contre v1.46.0 sur cette branche) | BAIL-07 | renumérotation à refaire à la fusion ; garde-fou du jalon déjà prévu |
 | A12 | Planchers `COUVERTURE-REJEU` pour `BAIL` et `G2P` à fixer au plan (les labs réels n'ont aucun fichier déclaré) | Armement | armement sur une couverture trop faible |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> Toutes tranchées au plan (décisions de plan renversables par le manager ou Willy) : Q1 -> 47-01/47-05 ; Q2 -> limite nommée (47-09) ; Q3 -> 47-07 ; Q4 -> 47-03/47-08/47-11/47-12 ; Q5 -> limite nommée (47-09) ; Q6 -> limite nommée + geste humain (47-09) ; Q7 -> 47-01 ; Q8 -> 47-04.
 
 1. **Ignorer `baux/` par git ?**
    - Known : l'état est local (comme `surveillance.log`) ; `poser_gitignore_planning` ne pose qu'une ligne et `R-D1-20` l'exige (étendre casserait cette suite).
