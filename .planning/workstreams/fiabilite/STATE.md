@@ -49,7 +49,7 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
 Phase 57 : 16/16 plans exécutés le 2026-10-12, porte de phase rejouée depuis `ci.yml` (job `gates` 19/19, 102 suites, deux rouges
-d'environnement prouvées, témoins DLWS-03 intacts), DLWS-01..08 cochées. Correctifs hors plan : revue R-1 à R-3, F-1/F-2 (P57-D-38, P57-D-39).
+d'environnement prouvées, témoins DLWS-03 intacts), DLWS-01..08 cochées. Correctifs hors plan : revue R-1 à R-3, F-1/F-2 = P57-D-38 et P57-D-39 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-11 ; registre `57-CONTEXT.md`).
 Next : vérification de phase, PR ; aucune release (P57-D-30).
 Last activity: 2026-10-12 — Phase 57 plan 57-16 complete (16/16)
 
