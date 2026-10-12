@@ -1172,7 +1172,7 @@ if git -C "$HERE" cat-file -e "$AB_REF:$AB_PATH_IN_REF" 2>/dev/null; then
   cmp -s "$FROZEN" "$WORK_DIR/ab-ref.sh"; assert_exit "WS-AB-INTEGRITE.1 — la copie gelée est identique à git show $AB_REF:$AB_PATH_IN_REF" "$?" 0
   assert "WS-AB-INTEGRITE.3 — l'empreinte épinglée est celle de la référence (git rev-parse $AB_REF:$AB_PATH_IN_REF)" "$(git -C "$HERE" rev-parse "$AB_REF:$AB_PATH_IN_REF" 2>/dev/null)" "$AB_BLOB"
 else
-  echo "  NOTE-INTEGRITE (objet absent) — $AB_REF non disponible localement (clone superficiel) : comparaison à la référence non faite ici, empreinte épinglée vérifiée (WS-AB-INTEGRITE.0)"
+  echo "  NOTE-INTEGRITE (objet absent) — $AB_REF non disponible localement (clone superficiel) : comparaison à la référence non faite ici, l'empreinte épinglée est contrôlée par WS-AB-INTEGRITE.0"
 fi
 [ -x "$FROZEN" ]; assert_exit "WS-AB-INTEGRITE.2 — la copie gelée est exécutable" "$?" 0
 

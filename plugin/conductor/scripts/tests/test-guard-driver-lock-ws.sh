@@ -1111,7 +1111,7 @@ if git -C "$HERE" cat-file -e "$GW_AB_REF:$GW_AB_PATH_IN_REF" 2>/dev/null; then
   cmp -s "$FROZEN_GUARD" "$GWAB/ref.sh"; assert_exit "GW-AB-INTEGRITE.1 — la copie gelée est identique à git show $GW_AB_REF:$GW_AB_PATH_IN_REF" "$?" 0
   assert "GW-AB-INTEGRITE.3 — l'empreinte épinglée est celle de la référence (git rev-parse $GW_AB_REF:$GW_AB_PATH_IN_REF)" "$(git -C "$HERE" rev-parse "$GW_AB_REF:$GW_AB_PATH_IN_REF" 2>/dev/null)" "$GW_AB_BLOB"
 else
-  echo "  NOTE-INTEGRITE (objet absent) — $GW_AB_REF non disponible localement (clone superficiel) : comparaison à la référence non faite ici, empreinte épinglée vérifiée (GW-AB-INTEGRITE.0)"
+  echo "  NOTE-INTEGRITE (objet absent) — $GW_AB_REF non disponible localement (clone superficiel) : comparaison à la référence non faite ici, l'empreinte épinglée est contrôlée par GW-AB-INTEGRITE.0"
 fi
 fi   # GW_MODE = full (A/B)
 
