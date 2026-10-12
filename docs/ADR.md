@@ -668,20 +668,31 @@ compartiments avancent en parallèle ; deux gestes qui touchent des fichiers com
   (périmètre documentaire élargi) et P57-D-37 (exception `--help` à P57-D-03) **ratifiées** —
   arbitrage Samuel, AskUserQuestion session principale, 2026-10-10 ; P57-D-31, P57-D-32,
   P57-D-33 et P57-D-35 soumises pour veto par le même canal le même jour, **sans veto**.
+- P57-D-38 (casse de `.planning` en lab partitionné, option a : le guard compare le segment sans tenir
+  compte de la casse) et P57-D-39 (position du lanceur, option a : `driver-lock.sh` refuse
+  `not-at-lab-root`, le guard détecte le lab depuis la racine git) : arbitrage Samuel,
+  AskUserQuestion session principale, 2026-10-11 (registre `57-CONTEXT.md`) ; ces deux options
+  traitent les constats F-1 et F-2 de la revue de sécurité de la phase.
 
-**Mesures** (recopiées des SUMMARY de la phase, jamais estimées).
-- Concurrence (57-04) : 24 acquisitions × 5 tours, « rounds hors contrat : 0 » sur les quatre
-  scénarios (compartiments, prises périmées, dépôt, checkout + worktree lié) — un seul gagnant par
-  verrou à chaque tour. Suite `test-driver-lock-ws.sh` : 492 assertions.
-- A/B du lab plat (57-04) : `A/B lab plat : IDENTIQUE` (20 étapes, `cmp -s` contre la copie gelée
-  d'avant la phase) ; `--help` exclu (P57-D-37). Neuf mutants : `== mutants : 9/9 tués ==`.
-- Gate de sortie (57-07) : `== mutants : 5/5 tués ==`, 54 assertions ; un lab partitionné sans
-  `--ws` est indéterminé, jamais vert.
-- Claim de branche (57-09) : `== mutants : 7/7 tués ==`, 30 assertions.
-- Guard (57-11) : `A/B guard lab plat : IDENTIQUE` (73 payloads × 5 états de verrou × 2 régimes,
-  365 passages par régime), `== mutants : 12/12 tués ==`, 180 assertions. Latence par appel de
-  `git commit`, 50 appels : 4,7 ms en lab plat sans verrou, 72,6 ms en lab partitionné sous le
-  verrou d'autrui, 39,8 ms en lab plat sous un ancien verrou d'autrui.
+**Mesures** (relevées le 2026-10-12 sur les sorties actuelles des suites de la phase, rejouées sous
+`HOME` jetable et recopiées, jamais estimées ; la latence, non rejouée par les suites, reste celle du
+SUMMARY 57-11).
+- Concurrence (`test-driver-lock-ws.sh`) : 24 acquisitions × 5 tours, « rounds hors contrat : 0 » sur
+  les quatre scénarios (compartiments, prises périmées, dépôt, checkout + worktree lié) — un seul
+  gagnant par verrou à chaque tour. `== resultat : 528 ok, 0 ko ==`.
+- A/B du lab plat (`test-driver-lock-ws.sh`) : `A/B lab plat : IDENTIQUE` (20 étapes, copie gelée
+  d'avant la phase) ; `--help` exclu (P57-D-37). Dix mutants : `== mutants : 10/10 tués ==`.
+- Gate de sortie (`test-check-mission-exit-ws.sh`) : `== mutants : 7/7 tués ==`,
+  `== résultat : 61 ok, 0 ko ==` ; un lab partitionné sans `--ws` est indéterminé, jamais vert, et
+  `--ws` est transmis au script de budget dans E7 et `--budget-snapshot` (EW-BWS, correction de la
+  réserve C2 de la vérification).
+- Consommateurs (`test-driver-lock-consumers-ws.sh`, claim de branche compris) :
+  `== mutants : 7/7 tués ==`, `== Résultat : 30 OK · 0 KO ==`.
+- Guard (`test-guard-driver-lock-ws.sh`) : `A/B guard lab plat : IDENTIQUE` (73 payloads × 5 états de
+  verrou × 2 régimes, 365 passages par régime), `== mutants : 23/23 tués ==`,
+  `== resultat : 240 ok, 0 ko ==`. Latence par appel de `git commit`, 50 appels (SUMMARY 57-11) :
+  4,7 ms en lab plat sans verrou, 72,6 ms en lab partitionné sous le verrou d'autrui, 39,8 ms en
+  lab plat sous un ancien verrou d'autrui.
 
 **Limites assumées.**
 - Le guard isole des **sessions**, pas des managers d'une même session, qui partagent le

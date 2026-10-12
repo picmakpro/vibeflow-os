@@ -7,8 +7,9 @@ D-36 et D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-1
 
 - **`scripts/check-mission-exit.sh`** : l'option `--ws <sujet>` désigne le compartiment dont le verrou est jugé
   (E1, identité d'E7, surcharge d'E4). Un lab partitionné sans `--ws` est INDÉTERMINÉ (E1) ou exit 4
-  (`--budget-snapshot`), jamais un vert ; lab plat inchangé. Suite neuve `scripts/tests/test-check-mission-exit-ws.sh`
-  (mutants 5/5 tués) ; `test-dev-orchestrator.sh` 279 OK / 0 KO (T37 et T38 inclus).
+  (`--budget-snapshot`), jamais un vert ; lab plat inchangé. `--ws` est aussi transmis à `check-method-budget.sh`
+  dans E7 et dans `--budget-snapshot` (sans quoi E7 rendait « ARCHIVAGE NON TENTÉ » hors `GSD_WORKSTREAM`). Suite neuve
+  `scripts/tests/test-check-mission-exit-ws.sh` (61 assertions, mutants 7/7 tués) ; `test-dev-orchestrator.sh` 279 OK / 0 KO (T37 et T38 inclus).
 - **`references/mission-flow.md`** : nouvelle section « Verrou par compartiment » (acquire, snapshot, `dag.sh init`,
   heartbeat, register / close, release, tous avec `--ws`, `takeover` avec l'option de cible du `hint` du refus, le refus nommé `not-at-lab-root` : lancer les verbes depuis la racine du lab, P57-D-39, et un `GSD_SESSION_KEY` distinct par session) ;
   `references/mission-cross-team.md` et `references/head-governance.md` alignés : « un manager par compartiment », avec
