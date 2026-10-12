@@ -739,6 +739,50 @@ assert_exit "GW-MARK-B-5 — un geste qui serait permis sort sans journal" "$(( 
 out="$(gb "$LAB" 'git reset --hard' sess-B)"
 assert "GW-MARK-B-6 — sans marqueur le même geste reste refusé (discriminance)" "$out" "$DENY"
 
+echo
+echo "=== GW-C4 — lab PARTITIONNÉ : le segment .planning se compare sans tenir compte de la casse, préfiltre C4 et cartographie (P57-D-38, correction F-1) ==="
+LAB="$(mk_lab c4case)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-B "$LAB")")"
+assert "GW-C4-0 — témoin : .planning en minuscules sous le verrou alpha d'autrui : deny" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.PLANNING/workstreams/alpha/f" x sess-B "$LAB")")"
+assert "GW-C4-1 — .PLANNING/workstreams/alpha sous le verrou alpha d'autrui : deny (préfiltre C4)" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.PLANNING/workstreams/omega/f" x sess-B "$LAB")")"
+assert_empty "GW-C4-2 — .PLANNING/workstreams/omega, compartiment libre : permis (cartographie, pas un refus par défaut)" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.PLANNING/PROJECT.md" x sess-B "$LAB")")"
+assert_empty "GW-C4-3 — .PLANNING/PROJECT.md (racine) sans verrou de dépôt : permis" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.PLANNING/workstreams/alpha/f" x sess-A "$LAB")")"
+assert_empty "GW-C4-4 — le détenteur écrit sous .PLANNING/workstreams/alpha : permis (discriminance)" "$out"
+FLAT="$(mk_flat c4flat)"
+legacy_acquire "$FLAT" sess-A old >/dev/null
+out="$(run_guard_in "$FLAT" "$(mk_write "$FLAT/.PLANNING/STATE.md" x sess-B "$FLAT")")"
+assert_empty "GW-C4-5 — lab PLAT : .PLANNING reste hors du préfiltre C4 (comportement d'avant la phase, au bit près)" "$out"
+
+echo
+echo "=== GW-SUB — lab PARTITIONNÉ détecté depuis la racine git, plus depuis le cwd : un geste lancé d'un sous-dossier est jugé sous le verrou d'autrui (P57-D-39, correction F-2) ==="
+LAB="$(mk_lab sub)"
+mkdir -p "$LAB/plugin/sub" "$LAB/autre/.planning"
+SUBD="$LAB/plugin/sub"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$SUBD" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-B "$SUBD")")"
+assert "GW-SUB-1 — Write dans alpha d'autrui depuis un sous-dossier : deny" "$out" "$DENY"
+out="$(run_guard_in "$SUBD" "$(mk_write "$LAB/.planning/workstreams/omega/f" x sess-B "$SUBD")")"
+assert_empty "GW-SUB-2 — Write dans omega (libre) depuis un sous-dossier : permis (discriminance)" "$out"
+out="$(run_guard_in "$SUBD" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-A "$SUBD")")"
+assert_empty "GW-SUB-3 — le détenteur depuis un sous-dossier : permis" "$out"
+out="$(gb "$LAB" 'git reset --hard' sess-B "$SUBD")"
+assert "GW-SUB-4 — geste d'arbre sous le verrou d'autrui depuis un sous-dossier : deny" "$out" "$DENY"
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"; stage "$LAB" .planning/workstreams/alpha/STATE.md
+out="$(gb "$LAB" 'git commit -m x' sess-B "$SUBD")"
+assert "GW-SUB-5 — commit qui embarque alpha, lancé d'un sous-dossier : deny (préfixe du lab = la racine, pas le sous-dossier)" "$out" "$DENY"
+unstage "$LAB"
+touch_file "$LAB" "$LAB/.planning/workstreams/omega/STATE.md"; stage "$LAB" .planning/workstreams/omega/STATE.md
+out="$(gb "$LAB" 'git commit -m x' sess-B "$SUBD")"
+assert_empty "GW-SUB-6 — commit qui n'embarque qu'omega depuis un sous-dossier : permis" "$out"
+unstage "$LAB"
+out="$(run_guard_in "$LAB/autre" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-B "$LAB/autre")")"
+assert_empty "GW-SUB-7 — cwd portant son PROPRE .planning (P57-D-29, hors périmètre) : jugé comme avant, permis" "$out"
+
 if [ "$GW_MODE" = full ]; then
 echo
 echo "=== GW-AB — lab PLAT : la copie gelée du guard d'avant la phase et le guard courant rendent la MÊME transcription, octet pour octet (P57-D-03, P57-D-22) ==="

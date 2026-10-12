@@ -827,6 +827,40 @@ out="$(dl "$LAB" sess-N acquire --owner=m2 --step=s)"
 assert "WS-HINT-4.1 — lab plat : hint inchangé" "$(hint_of "$out")" 'driver-lock.sh takeover --owner=m2 --step=<etape>'
 assert_not "WS-HINT-4.2 — lab plat : aucune option de cible dans le hint" "$(hint_of "$out")" ' --'"depot"
 
+echo "=== WS-ROOT — --ws ou --depot hors de la racine d'un lab partitionné : refus nommé not-at-lab-root, jamais un verrou parasite (P57-D-39, correction F-2) ==="
+LAB="$(mk_lab root)"; GC="$(fixture_common_dir "$LAB")"
+mkdir -p "$LAB/plugin/sub" "$LAB/autre/.planning"
+SUBD="$LAB/plugin/sub"
+dl_in() { # <cwd> <session> <args...> : le script lancé depuis un dossier donné (sous-dossier du lab)
+  local cwd="$1" sid="$2"; shift 2
+  ( cd "$cwd" && CLAUDE_CODE_SESSION_ID="$sid" "${DL_SCRIPT:-$SCRIPT}" "$@" )
+}
+out="$(dl_in "$SUBD" sess-A acquire --ws=alpha --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-ROOT-1.1 — acquire --ws depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-1.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+assert "WS-ROOT-1.3 — le hint dit de lancer depuis la racine du lab" "$out" 'racine du lab'
+json_ok "$out"; assert_exit "WS-ROOT-1.4 — JSON valide" "$?" 0
+[ ! -e "$GC/vf-driver" ] && [ ! -e "$SUBD/.planning" ]; assert_exit "WS-ROOT-1.5 — ni verrou ni .planning parasite créés" "$?" 0
+out="$(dl_in "$SUBD" sess-A acquire --depot --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-ROOT-2.1 — acquire --depot depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-2.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+[ ! -e "$GC/vf-driver" ] && [ ! -e "$SUBD/.planning" ]; assert_exit "WS-ROOT-2.3 — ni verrou ni .planning parasite créés" "$?" 0
+out="$(dl_in "$SUBD" sess-A status --ws=alpha)"; rc=$?
+assert_exit "WS-ROOT-3.1 — status --ws depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-3.2 — clé de tête error, jamais present" "$out" '"error": "not-at-lab-root"'
+assert_not "WS-ROOT-3.3 — status refusé ne porte pas present" "$out" '"present"'
+out="$(dl_in "$SUBD" sess-A status)"
+assert_not "WS-ROOT-4 — sans --ws ni --depot, rien ne change (pas de refus not-at-lab-root)" "$out" 'not-at-lab-root'
+out="$(dl_in "$LAB/autre" sess-A status --ws=alpha)"
+assert_not "WS-ROOT-5 — dossier portant son PROPRE .planning (P57-D-29, hors périmètre) : pas de refus not-at-lab-root" "$out" 'not-at-lab-root'
+out="$(cd "$SUBD" && CLAUDE_CODE_SESSION_ID=sess-A VF_DRIVER_LOCK="$WORK_DIR/root-unique/DRIVER.lock" "${DL_SCRIPT:-$SCRIPT}" status --ws=alpha)"
+assert_not "WS-ROOT-6 — VF_DRIVER_LOCK posé force le verrou unique (P57-D-22) : pas de refus not-at-lab-root" "$out" 'not-at-lab-root'
+FLATR="$(mk_flat rootflat)"; mkdir -p "$FLATR/plugin/sub"
+out="$(dl_in "$FLATR/plugin/sub" sess-A status --ws=alpha)"
+assert_not "WS-ROOT-7 — lab PLAT : --ws depuis un sous-dossier reste sans effet (P57-D-03), pas de refus" "$out" 'not-at-lab-root'
+out="$(dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s)"
+assert "WS-ROOT-8 — témoin : depuis la racine du lab, le même acquire réussit" "$out" '"acquired": true'
+
 if [ "$DLWS_MODE" = full ]; then
 echo
 echo "=== WS-CONC — un SEUL gagnant par verrou sous concurrence : 24 par verrou × 5 tours (patron T13/T32, P57-D-12) ==="
