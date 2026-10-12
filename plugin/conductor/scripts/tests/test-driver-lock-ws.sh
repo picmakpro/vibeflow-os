@@ -34,6 +34,15 @@ MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien WS-RC2-vide"
 # j (correction F-2, P57-D-39) : le refus hors racine du lab retiré — seuls les trois cas de refus de WS-ROOT basculent
 # (g y ajoute WS-ROOT-6, le cas VF_DRIVER_LOCK ; i y ajoute WS-ROOT-8, le témoin acquire depuis la racine)
 MUT_J="WS-ROOT-1 WS-ROOT-2 WS-ROOT-3"
+# acq_fallback à gen_kept (réserve C3 de 57-VERIFICATION.md et correction R-4) : acq_fallback = acquire sans cible
+# retombe sur le repli de l'ancien verrou (le suffixe JSON du refus change) ; fallback_depotpresent = le repli ne
+# regarde plus si le verrou de dépôt existe ; skip_link_d = un lien symbolique n'est plus écarté par status --all ;
+# reprobe_none = la re-sonde après la pose est neutralisée ; pose_kept = la pose du processus n'est pas retirée ;
+# gen_kept = sa génération n'est pas retirée.
+MUT_ACQ="WS-LEG-1"
+MUT_FDP="WS-LEG-5"
+MUT_SKL="WS-ALL-5"
+MUT_REP="WS-R4A WS-R4B"
 MUT_I="WS-ALL-1 WS-ALL-2 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-ROOT-8 WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
 # Mode de la suite. `full` (défaut) : tout, concurrence et mutants compris. `matrice` : sous-processus d'un
 # mutant (DL-M-*), qui rejoue les cas WS-* hors concurrence contre une COPIE mutée du script (DLWS_SCRIPT)
@@ -330,6 +339,8 @@ assert "WS-LEG-1.9 — reason legacy-lock-held" "$out" '"reason": "legacy-lock-h
 out="$(dl "$LAB" sess-A acquire --owner=m1 --step=s)"; rc=$?
 assert_exit "WS-LEG-1.10 — acquire sans --ws : exit 1 aussi" "$rc" 1
 assert "WS-LEG-1.11 — reason legacy-lock-held" "$out" '"reason": "legacy-lock-held"'
+assert "WS-LEG-1.14 — le refus sans --ws garde la portée dépôt « ws-absent » (réserve C3, repli ancien verrou réservé aux autres verbes)" "$out" '"scope_reason": "ws-absent"'
+assert_not "WS-LEG-1.15 — le refus d'acquire sans --ws ne porte jamais le suffixe du repli legacy" "$out" 'legacy-fallback'
 [ ! -e "$GC/vf-driver" ]; assert_exit "WS-LEG-1.12 — aucun verrou neuf posé dans le dossier commun" "$?" 0
 [ -L "$LAB/.planning/DRIVER.lock" ]; assert_exit "WS-LEG-1.13 — l'ancien verrou est intact" "$?" 0
 
@@ -373,6 +384,70 @@ LAB="$(mk_lab leg3b)"
 out="$(dl "$LAB" sess-A heartbeat --owner=old)"; rc=$?
 assert_exit "WS-LEG-3.11 — heartbeat sans aucun verrou : no-lock, exit 1" "$rc" 1
 assert "WS-LEG-3.12 — reason no-lock" "$out" '"reason": "no-lock"'
+
+echo
+echo "=== WS-LEG-5 — verrou de dépôt ET ancien verrou présents : un verbe sans cible vise le dépôt, jamais le repli (P57-D-24 ; réserve C3) ==="
+LAB="$(mk_lab leg5)"
+dl "$LAB" sess-A acquire --depot --owner=m1 --step=s >/dev/null
+mk_legacy "$LAB" old
+out="$(dl "$LAB" sess-A status)"
+assert "WS-LEG-5.1 — status sans cible lit le verrou de dépôt (owner m1)" "$out" '"owner": "m1"'
+assert_not "WS-LEG-5.2 — aucun repli sur l'ancien verrou tant que le verrou de dépôt existe" "$out" 'legacy-fallback'
+
+echo
+echo "=== WS-R4 — l'ancien verrou apparaît ENTRE la sonde et la pose : la pose est retirée, le refus est celui d'un ancien verrou présent avant (correction R-4) ==="
+# Ordonnancement déterministe : une COPIE du script (fabriquée ici, dossier temporaire de la suite, jamais un crochet en
+# production) pose l'ancien verrou entre `ln_atomic` réussi et la re-sonde. L'appel interne passe par VF_DRIVER_LOCK
+# (mode verrou unique, partition inerte) : pas de récursion.
+mk_race_copy() { # <vivant|perime> <dossier> : écrit <dossier>/driver-lock.sh, côte à côte avec la politique
+  mkdir -p "$2"; cp "$POLICY" "$2/workstream-policy.sh"
+  python3 -I - "$SCRIPT" "$2/driver-lock.sh" "$1" <<'PYRACE'
+import sys
+src, dst, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+t = open(src, encoding="utf-8").read()
+a = '    if ! lock_present && ln_atomic "$gen" "$LOCK_DIR"; then\n'
+inj = '( VF_DRIVER_LOCK=.planning/DRIVER.lock CLAUDE_CODE_SESSION_ID=sess-old bash "$0" acquire --owner=old --step=old >/dev/null 2>&1 )'
+if mode == "perime":
+    inj += '; sed "s/^heartbeat_epoch=.*/heartbeat_epoch=1000/" .planning/DRIVER.lock/meta > .planning/DRIVER.lock/meta.tmp && mv .planning/DRIVER.lock/meta.tmp .planning/DRIVER.lock/meta'
+b = '    if ! lock_present && ln_atomic "$gen" "$LOCK_DIR" && { [ "$PARTITIONED" = 1 ] && { ' + inj + '; }; true; }; then\n'
+if t.count(a) != 1:
+    sys.stderr.write("ancre non unique (%d)\n" % t.count(a)); sys.exit(3)
+open(dst, "w", encoding="utf-8").write(t.replace(a, b))
+PYRACE
+  chmod +x "$2/driver-lock.sh"
+}
+age_norm() { sed -E 's/"age_seconds": [0-9]+/"age_seconds": N/'; }
+race_case() { # <A|B> <vivant|perime> <libellé du refus attendu> <reason> <fragment du hint>
+  local tag="$1" mode="$2" reason="$4" hint="$5" lab ref gcm out before rc
+  lab="$(mk_lab "r4$tag")"; gcm="$(fixture_common_dir "$lab")"
+  mk_race_copy "$mode" "$WORK_DIR/race-$tag"
+  out="$( cd "$lab" && CLAUDE_CODE_SESSION_ID=sess-A "$WORK_DIR/race-$tag/driver-lock.sh" acquire --ws=alpha --owner=m1 --step=s )"; rc=$?
+  assert_exit "WS-R4$tag.1 — ancien verrou apparu entre la sonde et la pose ($mode) : exit 1" "$rc" 1
+  assert "WS-R4$tag.2 — reason $reason" "$out" "\"reason\": \"$reason\""
+  assert "WS-R4$tag.3 — held_by old" "$out" '"held_by": "old"'
+  assert "WS-R4$tag.4 — hint : $hint" "$out" "$hint"
+  json_ok "$out"; assert_exit "WS-R4$tag.5 — JSON valide" "$?" 0
+  assert "WS-R4$tag.6 — le refus porte la portée demandée" "$out" '"scope": "compartiment", "ws": "alpha"'
+  [ ! -e "$gcm/vf-driver/ws/alpha/DRIVER.lock" ] && [ ! -L "$gcm/vf-driver/ws/alpha/DRIVER.lock" ]
+  assert_exit "WS-R4$tag.7 — la pose du processus est retirée : aucun verrou de compartiment" "$?" 0
+  assert_exit "WS-R4$tag.8 — aucune génération laissée par la pose retirée" "$(find "$gcm/vf-driver/ws/alpha" -name 'DRIVER.lock.gen.*' 2>/dev/null | wc -l | tr -d ' ')" 0
+  [ -L "$lab/.planning/DRIVER.lock" ]; assert_exit "WS-R4$tag.9 — l'ancien verrou est intact" "$?" 0
+  # même refus que si l'ancien verrou était là AVANT (script ordinaire, ancien verrou posé d'abord)
+  ref="$(mk_lab "r4ref$tag")"
+  mk_legacy "$ref" old
+  if [ "$mode" = perime ]; then backdate_legacy "$ref"; fi
+  before="$(dl "$ref" sess-A acquire --ws=alpha --owner=m1 --step=s)"
+  [ "$(printf '%s' "$out" | age_norm | sed "s|$lab|<LAB>|g")" = "$(printf '%s' "$before" | age_norm | sed "s|$ref|<LAB>|g")" ]
+  assert_exit "WS-R4$tag.10 — MÊME refus, octet pour octet (âge normalisé), que celui d'un ancien verrou présent avant" "$?" 0
+  [ "$(printf '%s' "$out" | python3 -c 'import json,sys; print(sorted(json.load(sys.stdin).keys()))')" = "$(printf '%s' "$before" | python3 -c 'import json,sys; print(sorted(json.load(sys.stdin).keys()))')" ]
+  assert_exit "WS-R4$tag.11 — aucun champ JSON neuf, aucune valeur de reason neuve" "$?" 0
+}
+race_case A vivant x legacy-lock-held "release --owner=old"
+race_case B perime x stale-requires-takeover "driver-lock.sh recover"
+LAB="$(mk_lab r4ok)"
+out="$(dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-R4C.1 — témoin : sans ancien verrou, la même acquisition réussit (la re-sonde ne refuse rien à tort)" "$rc" 0
+assert "WS-R4C.2 — acquired true" "$out" '"acquired": true'
 
 LAB="$(mk_lab leg4)"; GC="$(fixture_common_dir "$LAB")"
 mk_legacy "$LAB" old
@@ -558,6 +633,17 @@ assert "WS-ALL-3.5 — lab plat vide : status --all identique a status" "[$b]" "
 dl "$FLAT" sess-A acquire --owner=m1 --step=s >/dev/null
 a="$(dl "$FLAT" sess-A status | norm)"; b="$(dl "$FLAT" sess-A status --all | norm)"
 assert "WS-ALL-3.6 — lab plat tenu : status --all identique a status" "[$b]" "[$a]"
+
+echo
+echo "=== WS-ALL-5 — un lien symbolique parmi les verrous de compartiments est écarté, jamais listé (réserve C3) ==="
+LAB="$(mk_lab all5)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+mkdir -p "$WORK_DIR/lnkreal/DRIVER.lock"
+printf 'owner=lien\nstep=x\nheartbeat_epoch=%s\n' "$(date +%s)" > "$WORK_DIR/lnkreal/DRIVER.lock/meta"
+ln -s "$WORK_DIR/lnkreal" "$GC/vf-driver/ws/lnk"
+out="$(dl "$LAB" sess-A status --all)"; err="$(dl "$LAB" sess-A status --all 2>&1 >/dev/null)"
+assert "WS-ALL-5.1 — locks : depot, alpha, omega (le lien lnk n'y figure pas)" "$(pj "$out" '[e["ws"] for e in d["locks"]]')" "['', 'alpha', 'omega']"
+assert "WS-ALL-5.2 — le lien est compté parmi les noms écartés (stderr)" "$err" "ecart"
 assert_not "WS-ALL-3.7 — lab plat : aucun champ lab" "$b" '"locks"'
 VP="$WORK_DIR/all3-vfl/DRIVER.lock"; mkdir -p "$WORK_DIR/all3-vfl"
 ( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A acquire --owner=m1 --step=s >/dev/null )
@@ -1067,24 +1153,35 @@ for mode in "sans VF_DRIVER_LOCK:" "avec VF_DRIVER_LOCK:.planning/alt/DRIVER.loc
 done
 if [ "$ab_ok" = 1 ]; then echo "  A/B lab plat : IDENTIQUE"; else echo "  A/B lab plat : DIFFÉRENT"; fi
 
-# Intégrité de la copie gelée (T-57-40) : identique au blob du dépôt quand l'objet est présent ; absent
-# (clone superficiel de la CI), la ligne SKIP est écrite — jamais un vert muet.
+# Intégrité de la copie gelée (T-57-40, correction R-7). Empreinte ÉPINGLÉE dans la suite : le blob git de
+# `git rev-parse $AB_REF:$AB_PATH_IN_REF`, dérivé de l'objet de référence puis gelé ici. Elle se vérifie SANS
+# historique : un clone superficiel (le job `tests` de la CI fait un `actions/checkout` sans `fetch-depth`) ne
+# l'ignore plus. Quand l'objet est présent, la copie est en plus comparée au blob du dépôt et l'épingle à la
+# référence : un gel dérivé de la référence, jamais d'un vert muet.
+AB_BLOB=4f6b5c1be98110fe39c2daa0f5bb74ca70b1db5c
+ab_pin_ok() { # <fichier> <blob attendu>
+  [ "$(git hash-object --no-filters "$1" 2>/dev/null)" = "$2" ]
+}
+ab_pin_ok "$FROZEN" "$AB_BLOB"; assert_exit "WS-AB-INTEGRITE.0 — la copie gelée porte l'empreinte épinglée (blob $AB_BLOB), historique présent ou non" "$?" 0
+cp "$FROZEN" "$WORK_DIR/ab-alteree.sh"; printf '#' >> "$WORK_DIR/ab-alteree.sh"
+ab_pin_ok "$WORK_DIR/ab-alteree.sh" "$AB_BLOB"; assert_exit "WS-AB-INTEGRITE.0b — témoin négatif : la même copie altérée d'un octet est REJETÉE par la vérification" "$?" 1
 if git -C "$HERE" cat-file -e "$AB_REF:$AB_PATH_IN_REF" 2>/dev/null; then
   git -C "$HERE" show "$AB_REF:$AB_PATH_IN_REF" > "$WORK_DIR/ab-ref.sh" 2>/dev/null
   cmp -s "$FROZEN" "$WORK_DIR/ab-ref.sh"; assert_exit "WS-AB-INTEGRITE.1 — la copie gelée est identique à git show $AB_REF:$AB_PATH_IN_REF" "$?" 0
+  assert "WS-AB-INTEGRITE.3 — l'empreinte épinglée est celle de la référence (git rev-parse $AB_REF:$AB_PATH_IN_REF)" "$(git -C "$HERE" rev-parse "$AB_REF:$AB_PATH_IN_REF" 2>/dev/null)" "$AB_BLOB"
 else
-  echo "  SKIP-INTEGRITE (objet absent) — $AB_REF non disponible localement (clone superficiel) : intégrité de la copie gelée NON vérifiée ici"
+  echo "  NOTE-INTEGRITE (objet absent) — $AB_REF non disponible localement (clone superficiel) : comparaison à la référence non faite ici, empreinte épinglée vérifiée (WS-AB-INTEGRITE.0)"
 fi
 [ -x "$FROZEN" ]; assert_exit "WS-AB-INTEGRITE.2 — la copie gelée est exécutable" "$?" 0
 
 if [ "$DLWS_MODE" = full ]; then
 echo
-echo "=== MUTANTS DL-M-a à DL-M-j — chaque comportement neuf de driver-lock.sh rougit sous sa mutation (QUAL-01, P57-D-12, P57-D-28) ==="
+echo "=== MUTANTS DL-M-a à DL-M-j, puis DL-M-acq_fallback à DL-M-gen_kept — chaque comportement neuf de driver-lock.sh rougit sous sa mutation (QUAL-01, P57-D-12, P57-D-28) ==="
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du script, posée à côté
 # d'une copie de workstream-policy.sh (sinon policy-missing rougirait pour la mauvaise raison). La matrice (les
 # cas WS-* hors concurrence, WS-AB compris) est rejouée en sous-processus contre la copie ; l'ensemble des cas
 # dont le verdict bascule est comparé EXACTEMENT à l'attendu (un cas basculé hors de l'ensemble fait échouer).
-MUT_KILLED=0; MUT_TOTAL=10; t0=$SECONDS
+MUT_KILLED=0; MUT_TOTAL=17; t0=$SECONDS
 mut_families() { # <journal> → familles de cas en échec, triées, une par ligne
   LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sed 's/\..*$//' | LC_ALL=C sort -u
 }
@@ -1152,14 +1249,20 @@ mutant h 'vf_dl_refuse partition-unreadable' 's@\*) vf_dl_refuse partition-unrea
 mutant i 'vf_ws_dir_resolve ".planning" "$WS"; rc=$?' 's@vf_ws_dir_resolve ".planning" "$WS"; rc=$?@_l="$(vf_ws_enumerate ".planning" 2>/dev/null)"; { for _e in $_l; do printf "%s\\n" "$_e"; sleep 0.3; done; } | grep -q -- "/$WS\$"; rc=$?@' "$MUT_I"
 
 mutant j 'vf_dl_refuse not-at-lab-root' 's@vf_dl_refuse not-at-lab-root .*$@:@' "$MUT_J"
+mutant acq_fallback 'if \[ "$ACTION" != acquire \] && \[ "$ALL" = 0 \]' 's@\[ "$ACTION" != acquire \] \&\& @@' "$MUT_ACQ"
+mutant fallback_depotpresent '\[ ! -L "$LOCK_DIR" \] && \[ ! -d "$LOCK_DIR" \]' 's@ \&\& \[ ! -L "$LOCK_DIR" \] \&\& \[ ! -d "$LOCK_DIR" \]@@' "$MUT_FDP"
+mutant skip_link_d 'if \[ -L "$d" \] || ! vf_ws_name_valid "$name"; then' 's@\[ -L "$d" \] || @@' "$MUT_SKL"
+mutant reprobe_none '_leg_after="$(vf_dl_legacy_probe)"' 's@_leg_after="$(vf_dl_legacy_probe)"@_leg_after=""@' "$MUT_REP"
+mutant pose_kept '= "$gen" \] && rm -f "$LOCK_DIR"' 's@\&\& rm -f "$LOCK_DIR"@\&\& :@' "$MUT_REP"
+mutant gen_kept 'rm -rf "${LOCK_PARENT:?}/${gen:?}"' 's@rm -rf "${LOCK_PARENT:?}/${gen:?}"@:@' "$MUT_REP"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 10/10 tués =="
+  echo "== mutants : 17/17 tués =="
 else
-  echo "== mutants : $MUT_KILLED/10 tués =="
+  echo "== mutants : $MUT_KILLED/17 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # DLWS_MODE = full (mutants)

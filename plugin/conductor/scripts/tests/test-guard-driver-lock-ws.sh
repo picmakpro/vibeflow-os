@@ -798,6 +798,38 @@ out="$(gb "$LAB" 'git commit -m x src/x.sh' sess-B)"
 assert "GW-C-POS-2 — autre chemin en position d'argument (doute = union) : deny" "$out" "$DENY"
 
 echo
+echo "=== GW-C-PSB — --only, --include et --pathspec-from-file comptent comme pathspec : doute = union (réserve C3 de 57-VERIFICATION.md) ==="
+LAB="$(mk_lab cpsb)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-PSB-0 — témoin : sans option de pathspec, la modification non indexée n'est pas embarquée : stdout vide" "$out"
+out="$(gb "$LAB" 'git commit --only -m x' sess-B)"
+assert "GW-C-PSB-1 — git commit --only : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit --include -m x' sess-B)"
+assert "GW-C-PSB-2 — git commit --include : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit --pathspec-from-file=liste.txt -m x' sess-B)"
+assert "GW-C-PSB-3 — git commit --pathspec-from-file=<fichier> : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit --pathspec-from-file liste.txt -m x' sess-B)"
+assert "GW-C-PSB-4 — git commit --pathspec-from-file <fichier> (forme à deux jetons) : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-C-INC — un chemin indexé qui est .planning/workstreams lui-même est « incertain » : refus sous tout verrou d'autrui (réserve C3) ==="
+LAB="$(mk_lab cinc)"
+git -C "$LAB" rm -r -q --cached .planning/workstreams >/dev/null 2>&1
+GIT_T -C "$LAB" commit -q -m "retire du suivi" >/dev/null 2>&1
+dl "$LAB" sess-A acquire --ws=omega --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-INC-0 — témoin : index vide, commit sans chemin : permis" "$out"
+INC_BLOB="$(printf 'x\n' | git -C "$LAB" hash-object -w --stdin)"
+git -C "$LAB" update-index --add --cacheinfo "100644,$INC_BLOB,.planning/workstreams" >/dev/null 2>&1
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-INC-1 — .planning/workstreams indexé, omega tenu par autrui : deny" "$out" "$DENY"
+assert "GW-C-INC-2 — le refus cite le chemin incertain" "$out" ".planning/workstreams"
+out="$(gb "$LAB" 'git commit -m x' sess-A)"
+assert_empty "GW-C-INC-3 — le détenteur : stdout vide (discriminance)" "$out"
+
+echo
 echo "=== GW-C-CASE — la casse de .planning et de workstreams dans l'INDEX (comportement actuel du jugement de commit ; correction R-3 d) ==="
 LAB="$(mk_lab ccase)"
 git -C "$LAB" config core.ignorecase false   # sinon git ramène la casse du dossier sur un FS insensible à la casse
@@ -1062,46 +1094,62 @@ else
 fi
 if [ "$gw_ab_ok" = 1 ]; then echo "  A/B guard lab plat : IDENTIQUE"; else echo "  A/B guard lab plat : DIFFÉRENT"; fi
 
-# Intégrité de la copie gelée (T-57-40) : identique au blob du dépôt quand l'objet est présent ; absent (clone
-# superficiel de la CI), la ligne SKIP est écrite — jamais un vert muet.
+# Intégrité de la copie gelée (T-57-40, correction R-7). Empreinte ÉPINGLÉE dans la suite : le blob git de
+# `git rev-parse $GW_AB_REF:$GW_AB_PATH_IN_REF`, dérivé de l'objet de référence puis gelé ici. Elle se vérifie SANS
+# historique : un clone superficiel (le job `tests` de la CI fait un `actions/checkout` sans `fetch-depth`) ne
+# l'ignore plus. Quand l'objet est présent, la copie est en plus comparée au blob du dépôt et l'épingle à la
+# référence : un gel dérivé de la référence, jamais d'un vert muet.
+GW_AB_BLOB=4d48e50c993520079052f9f2b4c5bc1a5619ba1b
+gw_ab_pin_ok() { # <fichier> <blob attendu>
+  [ "$(git hash-object --no-filters "$1" 2>/dev/null)" = "$2" ]
+}
+gw_ab_pin_ok "$FROZEN_GUARD" "$GW_AB_BLOB"; assert_exit "GW-AB-INTEGRITE.0 — la copie gelée porte l'empreinte épinglée (blob $GW_AB_BLOB), historique présent ou non" "$?" 0
+cp "$FROZEN_GUARD" "$GWAB/alteree.sh"; printf '#' >> "$GWAB/alteree.sh"
+gw_ab_pin_ok "$GWAB/alteree.sh" "$GW_AB_BLOB"; assert_exit "GW-AB-INTEGRITE.0b — témoin négatif : la même copie altérée d'un octet est REJETÉE par la vérification" "$?" 1
 if git -C "$HERE" cat-file -e "$GW_AB_REF:$GW_AB_PATH_IN_REF" 2>/dev/null; then
   git -C "$HERE" show "$GW_AB_REF:$GW_AB_PATH_IN_REF" > "$GWAB/ref.sh" 2>/dev/null
   cmp -s "$FROZEN_GUARD" "$GWAB/ref.sh"; assert_exit "GW-AB-INTEGRITE.1 — la copie gelée est identique à git show $GW_AB_REF:$GW_AB_PATH_IN_REF" "$?" 0
+  assert "GW-AB-INTEGRITE.3 — l'empreinte épinglée est celle de la référence (git rev-parse $GW_AB_REF:$GW_AB_PATH_IN_REF)" "$(git -C "$HERE" rev-parse "$GW_AB_REF:$GW_AB_PATH_IN_REF" 2>/dev/null)" "$GW_AB_BLOB"
 else
-  echo "  SKIP-INTEGRITE (objet absent) — $GW_AB_REF non disponible localement (clone superficiel) : intégrité de la copie gelée NON vérifiée ici"
+  echo "  NOTE-INTEGRITE (objet absent) — $GW_AB_REF non disponible localement (clone superficiel) : comparaison à la référence non faite ici, empreinte épinglée vérifiée (GW-AB-INTEGRITE.0)"
 fi
 fi   # GW_MODE = full (A/B)
 
 if [ "$GW_MODE" = full ]; then
 echo
-echo "=== MUTANTS GW-M-a à GW-M-w — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
+echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-target_noarg — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du guard, posée à côté d'une
 # copie de vf-portable.sh (sinon le locator sortirait en code 17 pour la mauvaise raison). Le programme python
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=23; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=30; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
-MUT_A="GW-C-NONASCII-1=1 GW-C-REL-tenu=2"
+# a : GW-C-INC-1/2 (corrections F-3, R-5, C3) : sans -z, « .planning/workstreams\n » ne se lit plus comme le chemin incertain
+MUT_A="GW-C-INC-1=1 GW-C-INC-2=1 GW-C-NONASCII-1=1 GW-C-REL-tenu=2"
 MUT_B="GW-C-REN-1=1 GW-C-REN-2=1"
 # c : les refus de verrou illisible (R-2) passent aussi par le crochet fail-closed : GW-UNREAD rougit avec lui
 MUT_C="GW-CRASH.2=1 GW-CRASH.3=1 GW-CRASH.4=1 GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1 GW-UNREAD-1.2=1 GW-UNREAD-1.3=1 GW-UNREAD-1.4=1 GW-UNREAD-1.5=1 GW-UNREAD-2.1=1 GW-UNREAD-2.2=1"
 MUT_D="GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1"
 MUT_E="GW-T-EXEMPT-1=1"
-MUT_F="GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
+# f : GW-ENVT-9.1 (témoin de GW-ENVT-9.2, même geste d'arbre depuis un autre worktree)
+MUT_F="GW-ENVT-9.1=1 GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
 # g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
-MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
+# g : GW-C-INC-3, GW-ENVT-7, GW-F3-17 (détenteur, discriminance des cas ajoutés)
+MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
 # h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
 MUT_H="GW-C4-2=1 GW-C4-3=1 GW-MARK-W-4=1 GW-Q-PASS=1 GW-SUB-2=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
 MUT_I="GW-C-REL-tenu=2"
-MUT_J="GW-C-ALL-1=1 GW-C-ALL-2=1"
+# j : GW-F3-0 à 15 (cas -am, F-3) dépendent aussi de la source -a
+MUT_J="GW-C-ALL-1=1 GW-C-ALL-2=1 GW-F3-0=1 GW-F3-1=1 GW-F3-2=1 GW-F3-3=1 GW-F3-4=1 GW-F3-5=1 GW-F3-6=1 GW-F3-7=1 GW-F3-8=1 GW-F3-9=1 GW-F3-10=1 GW-F3-11=1 GW-F3-12=1 GW-F3-13=1 GW-F3-14=1 GW-F3-15=1"
 MUT_K="GW-C-ADD-1=1"
 MUT_L="GW-W-LEG-1=1 GW-W-LEG-2=1"
 # m à r (correction R-3 de la revue Phase 57) : ensembles mesurés puis relus un par un ; chacun contient le cas qui
 # discrimine le comportement, rien d'autre (GW-T-C-1b est le cas voisin de GW-T-C-1 qui isole la cible incertaine)
 MUT_M="GW-TTL-1=1 GW-TTL-2=1 GW-TTL-3=1"
-MUT_N="GW-T-C-1b=1 GW-UNC-1=1 GW-UNC-2=1 GW-UNC-3=1"
+# n : GW-ENVT-8 compare le message de GW-ENVT-1 à celui de --git-dir=
+MUT_N="GW-ENVT-8=1 GW-T-C-1b=1 GW-UNC-1=1 GW-UNC-2=1 GW-UNC-3=1"
 MUT_O="GW-C-POS-1=1 GW-C-POS-2=1"
 MUT_P="GW-C-CASE-1=1"
 MUT_Q="GW-C-GEN-2=1 GW-C-GEN-3=1 GW-C-GEN-4=1"
@@ -1114,6 +1162,19 @@ MUT_T="GW-C4-2=1 GW-C4-3=1"
 MUT_U="GW-SUB-1=1 GW-SUB-4=1 GW-SUB-5=1"
 MUT_V="GW-SUB-1=1 GW-SUB-4=1 GW-SUB-5=1"
 MUT_W="GW-SUB-5=1"
+# pathspec_blind à target_noarg (corrections F-3, R-5 et réserve C3 de 57-VERIFICATION.md) : ensembles mesurés puis relus
+# un par un. pathspec_blind = --only/--include/--pathspec-from-file ne comptent plus comme pathspec ; incertain_none = un
+# chemin indexé « .planning/workstreams » ne bloque plus ; toplevel_none = l'absence de racine git n'est plus nommée
+# (l'exception interne la remplace dans le motif) ; envt_none = GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= ne rendent plus la
+# cible incertaine ; noarg_blind = plus aucun global sans argument n'est sauté ; exec_blind = exec n'est plus un wrapper ;
+# target_noarg = la cible d'un geste ne saute plus les globaux sans argument (git --no-pager -C <hors lab> est refusé).
+MUT_PSB="GW-C-PSB-1=1 GW-C-PSB-2=1 GW-C-PSB-3=1 GW-C-PSB-4=1"
+MUT_INC="GW-C-INC-1=1 GW-C-INC-2=1"
+MUT_TOP="GW-C-NOGITBIN-4=1"
+MUT_ENVT="GW-ENVT-1=1 GW-ENVT-2=1 GW-ENVT-3=1 GW-ENVT-4=1 GW-ENVT-5=1 GW-ENVT-8=1 GW-ENVT-9.2=1"
+MUT_NOARG="GW-F3-1=1 GW-F3-2=1 GW-F3-3=1 GW-F3-4=1 GW-F3-5=1 GW-F3-7=1 GW-F3-8=1 GW-F3-9=1 GW-F3-10=1 GW-F3-11=1 GW-F3-12=1 GW-F3-13=1 GW-F3-14=1 GW-F3-15=1 GW-F3-21=1"
+MUT_EXEC="GW-F3-15=1 GW-F3-6=1"
+MUT_TARGET="GW-F3-18=1"
 gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
   awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
 }
@@ -1230,14 +1291,28 @@ mutant t 'rp\[len(pp) - 1\].casefold()' 's@rp\[len(pp) - 1\].casefold() == pp\[-
 mutant u 'top = toplevel_of(base) or top_by_marker(base)' 's@toplevel_of(base) or top_by_marker(base)@None@' "$MUT_U"
 mutant v 'VF_GUARD_SUBLAB=1; fi' 's@VF_GUARD_SUBLAB=1; fi@VF_GUARD_SUBLAB=0; fi@' "$MUT_V"
 mutant w 'cwd if lab is None else lab' 's@cwd if lab is None else lab@cwd@' "$MUT_W"
+# pathspec_blind (C3) : les trois options qui désignent un pathspec ne comptent plus
+mutant pathspec_blind 'elif nm in ("--include", "--only", "--pathspec-from-file"):' 's@("--include", "--only", "--pathspec-from-file")@("--zzz",)@' "$MUT_PSB"
+# incertain_none (C3) : un chemin « incertain » embarqué par le commit ne bloque plus
+mutant incertain_none 'elif kind == "incertain":' '{n;s@hs = list(held)@hs = []@;}' "$MUT_INC"
+# toplevel_none (C3) : l'absence de racine git ne lève plus Unreadable (l'exception interne la remplace dans le motif)
+mutant toplevel_none 'raise Unreadable("rev-parse --show-toplevel")' 's@raise Unreadable("rev-parse --show-toplevel")@pass@' "$MUT_TOP"
+# envt_none (R-5) : l'affectation GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= ne rend plus la cible incertaine
+mutant envt_none 'unc = unc or env_target_uncertain(toks\[:idx\])' 's@unc = unc or env_target_uncertain(toks\[:idx\])@unc = unc@' "$MUT_ENVT"
+# noarg_blind (F-3) : l'ensemble des globaux sans argument est vide
+mutant noarg_blind '^NOARG_GIT_GLOBALS = {' 's@NOARG_GIT_GLOBALS = {@NOARG_GIT_GLOBALS = set(); NOARG_UNUSED = {@' "$MUT_NOARG"
+# exec_blind (F-3) : exec n'est plus un wrapper
+mutant exec_blind 'os.path.basename(t) == "exec"' 's@(PARTITIONED and os.path.basename(t) == "exec")@False@' "$MUT_EXEC"
+# target_noarg (F-3) : la cible d'un geste ne saute plus les globaux sans argument
+mutant target_noarg 'elif noarg_global(t):' 's@elif noarg_global(t):@elif False:@' "$MUT_TARGET"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 23/23 tués =="
+  echo "== mutants : 30/30 tués =="
 else
-  echo "== mutants : $MUT_KILLED/23 tués =="
+  echo "== mutants : $MUT_KILLED/30 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # GW_MODE = full (mutants)
