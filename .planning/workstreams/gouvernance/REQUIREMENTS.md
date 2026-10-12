@@ -61,6 +61,16 @@
 | CLOT-10 | Phase 46 | Complete sous arbitrage, partiel (G3 seul armé ; G4 et G4′ en observation, arbitrages du 2026-10-06 ; reprise Phase 46.1) |
 | CLOT-11 | Phase 46 | Complete |
 | CLOT-12 | Phase 46 | Complete |
+| ARMG-01 | Phase 46.1 | Pending |
+| ARMG-02 | Phase 46.1 | Pending |
+| ARMG-03 | Phase 46.1 | Pending |
+| ARMG-04 | Phase 46.1 | Pending |
+| ARMG-05 | Phase 46.1 | Pending |
+| ARMG-06 | Phase 46.1 | Pending |
+| ARMG-07 | Phase 46.1 | Pending |
+| ARMG-08 | Phase 46.1 | Pending |
+| ARMG-09 | Phase 46.1 | Pending |
+| ARMG-10 | Phase 46.1 | Pending |
 
 ## Milestone gouvernance-labs-v1.0 — « le planning métier tenu par une machine » (inscrit 2026-09-23)
 
@@ -229,3 +239,21 @@
   déclarées (P46-D-08) ; les suites tournent en CI Linux avec une mutation rouge tracée par garde ;
   `planning-core` passe en v2.10.0 sans release ; `HOOKS-CONTRAT-SORTIE.md` et l'inventaire des
   hooks suivent (P46-D-08, P46-D-14, P46-D-17, P46-D-18).
+
+### Moteur — armement de G4 et G4′ (Phase 46.1)
+
+> Préfixe `ARMG` vérifié libre le 2026-10-07 (`git grep -lE '\b(ARMG|ARME|ARMO|ARMQ)-[0-9]{2}\b'` sur le
+> dépôt suivi : aucun fichier, rc=1). Chaque exigence dérive d'une décision de `46.1-CONTEXT.md` (préfixe
+> `P461-D-NN`) et ne pose aucune décision nouvelle. Elles reprennent ce que CLOT-02, CLOT-06 et CLOT-10 ont
+> laissé sous arbitrage.
+
+- [ ] **ARMG-01**: G4 ne juge pas la réécriture par outil d'un `SUMMARY.md` régulier existant d'une unité sans `VERDICT.md` ni `CLOTURE.md` ; création, lien, et réécriture d'une unité à verdict ou à clôture restent jugés ; le banc porte les familles de réécriture et leurs mutants ; référence, limite (bp) et spec §5 amendées (P461-D-01, P461-D-01a, P461-D-01b).
+- [ ] **ARMG-02**: D1 trace et signale un fichier d'unité posé par `Bash` dans une unité sortie de la liste surveillée, en réconciliant les chemins déjà référencés au journal (N-5) ; limites (ar) et (ax) réécrites (P461-D-05, P461-D-05a).
+- [ ] **ARMG-03**: D1 trace en `contournement` la première observation non expliquée d'un fichier d'unité quand le journal existe déjà (A5) ; faux signaux mesurés sur un lab sain ; limite (bk) réécrite (P461-D-05, P461-D-05a).
+- [ ] **ARMG-04**: un script de décision versionné et testé valide un relevé de rejeu (0/0, empreintes identiques, commit rejoué, couverture ≥ plancher par gate visé) ; les prédicats d'armement l'appellent ; limite (bu) levée (P461-D-06).
+- [ ] **ARMG-05**: G4 est armé (étape 5b) après banc 0/0, canary vert et rejeu réel en lecture seule 0/0 validé par le script d'ARMG-04, sous checkpoint humain à l'exécution (P461-D-07).
+- [ ] **ARMG-06**: G4′ juge un agent dont au moins une définition candidate (union des portées et des deux labs) est worker ou producteur avec `Bash`, ou dont l'indexation est incomplète ou une définition illisible ; un agent sans définition reste non jugé ; le hook par rôle est inchangé ; limite (av) réécrite, renversement partiel de P46-D-02b consigné (P461-D-02, 02a, 02b, P461-D-12).
+- [ ] **ARMG-07**: pour `SubagentHandback` et `SubagentStop`, G4′ juge dès que le lab du `cwd` OU celui de `CLAUDE_PROJECT_DIR` (transmis par la couche shell) est adhérent ; zéro régression sur les labs dev et coût hors adhésion mesuré (P461-D-03, 03a, 03b).
+- [ ] **ARMG-08**: le repli `SubagentStop` bloque au plus une fois par `agent_id` (état sous verrou, borné, protégé par G6, connu du recalcul), trace le passage suivant, ne rejuge jamais un `agent_id` jugé au hand-back, lit `stop_hook_active` ; la couche shell trace une panne du cœur sans bloquer ; le canary couvre ces cas (P461-D-04, 04a, 04b).
+- [ ] **ARMG-09**: G4′ est armé (étape 6) après ARMG-06 à ARMG-08, banc 0/0, canary vert et rejeu réel 0/0 validé par le script d'ARMG-04, sous checkpoint humain à l'exécution ; limite (bs) levée (P461-D-07).
+- [ ] **ARMG-10**: référence, limites, `LIMITES_REFERENCE` et CHANGELOG à jour (limites (ar), (av), (ax), (bk), (bp), (bs), (bu) réécrites ou levées, limites nouvelles de P461-D-02a, 03a, 04a, P461-D-08) ; A7, N-4, (bn), (bo) au BACKLOG ; `modele-cycles.md:1147` corrigé ; `planning-core` v2.11.0 sans release ; `Gate-Touche:` sur chaque commit concerné (P461-D-05, 08, 09, 11, 13).

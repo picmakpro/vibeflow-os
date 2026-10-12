@@ -16,7 +16,7 @@
 - [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
 - [x] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécutée 2026-09-30 → 2026-10-02 (10/10 plans, 15 quick de correction), cinq gates ARMÉS en cascade le 2026-10-01 ; audit de sécurité final SECURED (4 tours) ; vérifiée 15/15 — clôturée 2026-10-02 (clôture validée par Willy, message en session principale, 2026-10-01), PR #124 ouverte (non mergée)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-03 (12 plans, 9 vagues, plan-check frais PASSED), PR de planification empilée sur la PR #124 ; exécutée 2026-10-05 → 2026-10-07 (12/12 plans), vérifiée 11/11 (3 sous arbitrage de Willy) : G3 ARMÉ, G4 et G4′ en observation (reportés à la Phase 46.1) — non clôturée, PR non mergée
-- [ ] Phase 46.1: Armement de G4 et G4′ (INSERTED, 2026-10-07) — non cadrée
+- [ ] Phase 46.1: Armement de G4 et G4′ (INSERTED, 2026-10-07) — cadrée 2026-10-12, planification en cours
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 49: Initialisation — script des trois gates de la grille (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -286,9 +286,9 @@ Plans:
 ### Phase 46.1: Armement de G4 et G4′ (INSERTED)
 
 **Goal:** G4 puis G4′ passent de l'observation à l'armement : la règle des unités antérieures à G4 est tranchée, les préalables de G4′ sont levés, et les remèdes que la 46 a reportés pour D1 sont traités ou re-décidés — chaque armement à 0 faux refus et 0 faux accept sur le banc puis sur le rejeu en lecture seule.
-**Requirements**: à définir au cadrage
+**Requirements**: ARMG-01..ARMG-10 (posées au cadrage, `46.1-CONTEXT.md`, 2026-10-12)
 **Depends on:** Phase 46.
-**Origine** : insertion décidée par Willy, AskUserQuestion session principale, 2026-10-07 (« (1) Phase 46.1 insérée (Recommandé) »), à l'issue de la vérification de la Phase 46 (G3 armé seul ; G4 et G4′ en observation sous arbitrage, 2026-10-06). **Statut : non cadrée** — à cadrer plus tard (`gsd-discuss-phase 46.1`), aucune planification maintenant.
+**Origine** : insertion décidée par Willy, AskUserQuestion session principale, 2026-10-07 (« (1) Phase 46.1 insérée (Recommandé) »), à l'issue de la vérification de la Phase 46 (G3 armé seul ; G4 et G4′ en observation sous arbitrage, 2026-10-06). **Statut : cadrée le 2026-10-12** (mission `vf-dev-manager-p461-cadrage`) : Q1 à Q4 tranchées par Willy, AskUserQuestion session principale, 2026-10-07, Q5 le 2026-10-12 (recommandation suivie partout) ; décisions P461-D-01..15, dont le renversement partiel de P46-D-02b (P461-D-02).
 **Points repris** (limites de `plugin/planning-core/references/modele-cycles.md`) :
 - **Règle des unités antérieures à G4** — limite **(bp)** : 343 unités closes avant G4 sur `~/jarvis-keystone` (`SUMMARY.md` existant sans `VERDICT.md`, refusé à la réécriture une fois G4 armé) ; la règle à poser conditionne l'armement de G4.
 - **Préalables de G4′** — limite **(bs)** : A2 (leurre de définition d'agent), A3 (lab dérivé du `cwd`), A4 (repli `SubagentStop` : relance sans verrou, muet sur une panne du cœur), P1 (`stop_hook_active` non lu).
