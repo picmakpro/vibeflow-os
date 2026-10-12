@@ -25,9 +25,16 @@
 #         silence toléré).
 #   T8  — --inventory n'écrit rien : empreinte de l'arbre de fixture avant/après invocation,
 #         comparaison par comm sur listes triées de chemins ET par empreinte de contenu.
-#   T9  — garde-fou : aucun répertoire temporaire du gate ne fuit hors de mktemp -d.
-#   T10 — garde-fou : l'arbre du dépôt est resté byte-identique pendant toute la suite
-#         (git diff --stat sur plugin/, fichiers suivis, vide après exécution).
+#   T9  — garde-fou : aucun répertoire temporaire du gate ne fuit hors de mktemp -d. Le gate
+#         tourne sous un TMPDIR PRIVÉ au cas (jamais le répertoire temporaire global du poste,
+#         que les processus concurrents polluent) : tout ce qui reste sous ce répertoire est
+#         SA fuite.
+#   T10 — garde-fou : l'arbre jugé est resté byte-identique pendant toute la suite. L'arbre
+#         jugé est un MIROIR de plugin/ pris une fois en tête de suite (le gate tourne sur sa
+#         copie du miroir, jamais sur l'arbre vivant) ; la preuve compare l'empreinte
+#         chemin+contenu (TSV trié chemin<TAB>sha256) avant/après par `comm -3` : ajout,
+#         suppression ou modification rougissent. Plus de `git diff --stat` : il rougissait
+#         sur toute écriture tierce concurrente.
 #
 # Tâche 4 — les DEUX mutants discriminants OBLIGATOIRES, sur une COPIE d'un fichier RÉEL du
 # dépôt (jamais le fichier posé), ajoutés séparément de T0-T10 pour que leur preuve reste isolée
