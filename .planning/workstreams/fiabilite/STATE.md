@@ -57,32 +57,7 @@ Last activity: 2026-10-12 — Phase 57 plan 57-16 complete (16/16)
 
 ### Decisions
 
-Historique complet (jalons, décisions, arbitrages 2026-07 à 2026-09) : voir l'archive ci-dessus.
-
-- 2026-10-01/02 — Phase 41.2 : P412-D-01 à D-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-01),
-  P412-D-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02) ; P412-D-04, D-06, D-07, D-08 =
-  décisions du manager. Registre : `41.2-CONTEXT.md` du dossier de phase.
-- 2026-10-08 — Clôture de `fiabilite-v1.0` : #135 mergée en `--admin` (arbitrage Samuel, AskUserQuestion session
-  principale, 2026-10-08 : « Merger #135 en --admin ») ; réserve WSCH-01 tracée au BACKLOG (même canal, même date :
-  « Dette tracée, on clôt »).
-- 2026-10-06 — Phase 41.4 : P414-D-01..D-11, D-17..D-22 (arbitrage Samuel, AskUserQuestion session principale,
-  2026-10-06) ; D-12..D-16 = décisions du manager ; interprétation de D-22 (axe `skipped` hors conjonction) à
-  ratifier. Registre : `41.4-CONTEXT.md` du dossier de phase.
-
-- 2026-10-02 — Plans 41-07 à 41-13 (chaîne des mesures de la protection serveur) confiés à Willy, hors clôture de `fiabilite-v1.0` (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy » pour 41-07 à 41-09, puis « Toute la chaîne à Willy » pour 41-10 à 41-13) ; PROT-01 cochée le 2026-09-24 sur la pose des rulesets, complément attendu : mesure du refus réel d'un push direct (41-09, complément en 41-13) confiée à Willy ; 41-07 partiellement entamé (`PR-R-*`, 2026-09-24).
-- [Phase 57]: 57-01 : le suffixe JSON de portée est posé sur acquire, status et release ; les autres verbes résolvent le verrou nommé mais n'émettent pas encore la portée (57-03) — contrat de la phase posé par le tracer ; le reste est livré par 57-03
-- [Phase 57]: 57-03 : status --all = ligne de json_status par verrou (ttl par entrée présente), forme lab en partitionné, sortie de status en verrou unique ; registre frère du verrou, VF_DRIVER_CHILDREN ignorée en partitionné (P57-D-24, P57-D-31, P57-D-32)
-- [Phase 57]: 57-04 : mutants rejoués en parallèle (neuf matrices, 75 s au lieu de 302 s), cas basculés comparés exactement ; A/B du lab plat contre la copie gelée e8771d94, --help exclu (P57-D-03, P57-D-12, P57-D-28, P57-D-37)
-- [Phase 57]: 57-06 : watchdog et dag.sh ne détectent pas la partition (status --all / champ ws du DAG), lab plat et DAG sans ws octet pour octet ; agrégation abandon > stall, une ligne, suffixe +N ; 4 mutants tués (P57-D-15, P57-D-23, P57-D-24)
-- [Phase 57]: 57-05 : guard partitionné = crochet sys.excepthook fail-closed posé juste après l'aiguillage, lab plat inchangé ligne pour ligne ; tâche 2 sans RED (comportement livré par la tâche 1), discriminance par 4 mutants (P57-D-09, P57-D-10, P57-D-26, P57-D-33)
-- [Phase 57]: 57-12 : le kernel borne « SEUL garant machine » au même compartiment (autre compartiment = allowlists, P57-D-20), les managers hors dev renvoient à team-kernel §Verrou par compartiment à instructions constantes, la partition prend `acquire --depot` et relâche par `release` sans `--ws` (lab plat : verrou unique ; le moteur laisse `.planning/DRIVER.lock` à la racine) (P57-D-02, P57-D-15, P57-D-24, P57-D-36)
-- [Phase 57]: 57-11 : l'A/B du guard en lab plat se joue sur copie gelée de cff1e2af posée à côté de vf-portable.sh, 73 payloads dans cinq états de verrou et deux régimes, `cmp -s` ; les mutants se comparent par assertion (identifiant=échecs), le mutant -z bascule aussi GW-C-REL-tenu ; latence mesurée hors suite, 4,7 ms (plat sans verrou) contre 72,6 ms (partitionné, verrou d'autrui) (P57-D-03, P57-D-22, P57-D-28)
-- [Phase 57]: 57-10 : le protocole vit dans mission-flow §Verrou par compartiment, les prompts y renvoient à instructions constantes ; un head sérialise ses propres managers jusqu'à la preuve d'usage réel de la Phase 61, mandat = --ws <sujet> + GSD_SESSION_KEY=vf-<sujet>-<owner> ; vers un autre compartiment la chaîne manager → worker → manager est tenue par les allowlists, pas par le verrou (P57-D-20, P57-D-34, P57-D-35)
-- [Phase 57]: 57-09 : le claim de branche lit les dossiers de verrous du clone sans détecter la partition ni nommer le dossier des compartiments ; signal > indéterminé > sain, meta illisible = indéterminé ; --lock / VF_DRIVER_LOCK = verrou unique ; sans verrou du clone, chemin d'avant inchangé (P57-D-03, P57-D-07, P57-D-15, P57-D-22) ; mutants CW-M-c/d/e, bilan 7/7
-- [Phase 57]: 57-08 : un commit est jugé sur l'union index / -a / pathspec / HEAD (--amend) / git add de la même commande, en octets ; source illisible = refus nommé ; gestes d'arbre refusés depuis le worktree qui a pris le verrou seulement, retrait de worktree et cible git incertaine refusés sous tout verrou d'autrui, push/branch/tag/gh sous le seul verrou de dépôt (P57-D-10, P57-D-16 à P57-D-19, P57-D-33) ; mutants dans 57-11
-- [Phase 57]: 57-07 : --ws du gate couvre E1, identité d'E7 (cur_lock_gen, « ? » si illisible) et surcharge d'E4 ; partitionné sans --ws = E1 indéterminé / --budget-snapshot exit 4 ; verrou de dépôt tenu dit sur stderr (P57-D-35) ; mutants dans la disposition miroir du plugin
-- [Phase 57]: 57-02 : repli legacy-fallback sur tout verbe autre qu'acquire sans --ws ni --depot quand le dépôt est absent ; status porte legacy_lock pour toute cible en lab partitionné (P57-D-24, P57-D-26, P57-D-32)
-- 2026-10-11 — Phase 57 : P57-D-38 (casse de `.planning` en lab partitionné, F-1) et P57-D-39 (position du lanceur, refus `not-at-lab-root`, F-2), option (a) à chaque fois (arbitrage Samuel, AskUserQuestion session principale, 2026-10-11). P57-D-31..37 : D-34, D-36, D-37 ratifiées (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10), les autres sans veto (même canal, même date). Registre : `57-CONTEXT.md`.
+<!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-10-12.md -->
 
 ### Pending Todos
 
@@ -114,6 +89,3 @@ Last session: 2026-10-06 — Phase 41.4 exécutée (11 plans), PR en brouillon, 
 
 ## Performance Metrics
 
-| Plan | Duration | Tasks | Files |
-|------|----------|-------|-------|
-| Phase 57 P01 | 15min | 2 tasks | 3 files |
