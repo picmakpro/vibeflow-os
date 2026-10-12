@@ -25,11 +25,13 @@ SCRIPT="$(cd "$HERE/.." && pwd)/driver-lock.sh"
 # par le plan en fait partie ; WS-LAST est ABSENT de DL-M-i, signature du piège P1 : le dernier compartiment passe).
 MUT_A="WS-LOC-1 WS-LOC-2 WS-LOC-3 WS-LOC-4"
 MUT_B="WS-INV WS-INV-dotdot WS-INV-quote WS-INV-slash WS-VERBS-5a WS-VERBS-5b WS-VERBS-5c WS-VERBS-5d WS-VERBS-5e WS-VERBS-5f WS-VERBS-5g WS-VERBS-5h WS-VERBS-5i WS-VERBS-5j"
-MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ENV WS-HINT-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-NOWS WS-VERBS-4"
-MUT_D="WS-LEG-1 WS-LEG-4"
+# c, d, g, i : les familles WS-ALL-5, WS-LEG-5, WS-R4A, WS-R4B et WS-R4C (réserve C3, correction R-4) rougissent aussi
+# sous ces mutants (mesuré puis relu : le refus d'un compartiment, l'ancien verrou, la cible par dossier commun en dépendent)
+MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ALL-5 WS-ENV WS-HINT-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-5 WS-NOWS WS-VERBS-4"
+MUT_D="WS-LEG-1 WS-LEG-4 WS-R4A WS-R4B"
 MUT_E="WS-ENV"
 MUT_F="WS-AB"
-MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-ROOT-6 WS-VFL"
+MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-6 WS-VFL"
 MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien WS-RC2-vide"
 # j (correction F-2, P57-D-39) : le refus hors racine du lab retiré — seuls les trois cas de refus de WS-ROOT basculent
 # (g y ajoute WS-ROOT-6, le cas VF_DRIVER_LOCK ; i y ajoute WS-ROOT-8, le témoin acquire depuis la racine)
@@ -43,7 +45,7 @@ MUT_ACQ="WS-LEG-1"
 MUT_FDP="WS-LEG-5"
 MUT_SKL="WS-ALL-5"
 MUT_REP="WS-R4A WS-R4B"
-MUT_I="WS-ALL-1 WS-ALL-2 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-ROOT-8 WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
+MUT_I="WS-ALL-1 WS-ALL-2 WS-ALL-5 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-R4A WS-R4B WS-R4C WS-ROOT-8 WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
 # Mode de la suite. `full` (défaut) : tout, concurrence et mutants compris. `matrice` : sous-processus d'un
 # mutant (DL-M-*), qui rejoue les cas WS-* hors concurrence contre une COPIE mutée du script (DLWS_SCRIPT)
 # posée à côté de sa politique ; il n'y a alors ni concurrence ni mutants (pas de récursion).
@@ -1181,7 +1183,7 @@ echo "=== MUTANTS DL-M-a à DL-M-j, puis DL-M-acq_fallback à DL-M-gen_kept — 
 # d'une copie de workstream-policy.sh (sinon policy-missing rougirait pour la mauvaise raison). La matrice (les
 # cas WS-* hors concurrence, WS-AB compris) est rejouée en sous-processus contre la copie ; l'ensemble des cas
 # dont le verdict bascule est comparé EXACTEMENT à l'attendu (un cas basculé hors de l'ensemble fait échouer).
-MUT_KILLED=0; MUT_TOTAL=17; t0=$SECONDS
+MUT_KILLED=0; MUT_TOTAL=16; t0=$SECONDS
 mut_families() { # <journal> → familles de cas en échec, triées, une par ligne
   LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sed 's/\..*$//' | LC_ALL=C sort -u
 }
@@ -1254,15 +1256,15 @@ mutant fallback_depotpresent '\[ ! -L "$LOCK_DIR" \] && \[ ! -d "$LOCK_DIR" \]' 
 mutant skip_link_d 'if \[ -L "$d" \] || ! vf_ws_name_valid "$name"; then' 's@\[ -L "$d" \] || @@' "$MUT_SKL"
 mutant reprobe_none '_leg_after="$(vf_dl_legacy_probe)"' 's@_leg_after="$(vf_dl_legacy_probe)"@_leg_after=""@' "$MUT_REP"
 mutant pose_kept '= "$gen" \] && rm -f "$LOCK_DIR"' 's@\&\& rm -f "$LOCK_DIR"@\&\& :@' "$MUT_REP"
-mutant gen_kept 'rm -rf "${LOCK_PARENT:?}/${gen:?}"' 's@rm -rf "${LOCK_PARENT:?}/${gen:?}"@:@' "$MUT_REP"
+mutant gen_kept '{gen:?}' 's@rm -rf "${LOCK_PARENT:?}/${gen:?}"@:@' "$MUT_REP"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 17/17 tués =="
+  echo "== mutants : 16/16 tués =="
 else
-  echo "== mutants : $MUT_KILLED/17 tués =="
+  echo "== mutants : $MUT_KILLED/16 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # DLWS_MODE = full (mutants)
