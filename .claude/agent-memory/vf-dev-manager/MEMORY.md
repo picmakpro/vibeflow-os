@@ -94,3 +94,5 @@
 - [Porte de décisions et ids préfixés](project_porte-decisions-gsd-ids-prefixes.md) — check.decision-coverage-plan rend could-not-parse sur P57-D-NN : rejouer sur un miroir D57-NN, rouge avant / vert après
 - [Archivage auto dans l'arbre partagé](project_archivage-auto-dans-l-arbre-partage.md) — un diff .planning/archives ou ROADMAP non produit par la mission se restaure, jamais ne se commite (revert 2026-10-10, #143)
 - [Escalade vers main inactif](project_escalade-vers-main-inactif-attente-sans-fin.md) — SendMessage(main) attend le prochain tour : 5 h sans réponse en Phase 57 ; borner ~1 h puis rendre human_needed
+- [Budget ROADMAP en octets : <details> inerte](project_roadmap-budget-octets-details-inerte.md) — replier ne réduit rien ; fiabilite déjà replié, levier = archivage bloqué par S4(a)
+- [CI tests shallow, PyYAML user site](project_ci-tests-shallow-pyyaml-user-site.md) — job tests sans fetch-depth = SKIP des preuves historiques ; HOME temp = PyYAML perdu, garder PYTHONUSERBASE

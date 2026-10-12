@@ -5,7 +5,7 @@ current_phase: 57
 current_phase_name: Verrou de driver par compartiment
 status: executing
 last_updated: "2026-10-12T12:00:00.000Z"
-last_activity: 2026-10-12
+last_activity: 2026-10-13
 last_activity_desc: Phase 57 plan 16 complete (porte de phase rejouée depuis ci.yml : gates 19/19, 102 suites dont 2 rouges environnementales prouvées, témoins DLWS-03 intacts ; DLWS-01..08 cochées ; ledger à la main)
 state_head: 1413af28
 progress:
@@ -54,6 +54,9 @@ inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbit
 Phase 57 : 16/16 plans exécutés le 2026-10-12, porte de phase rejouée depuis `ci.yml` (job `gates` 19/19, 102 suites, deux rouges
 d'environnement prouvées, témoins DLWS-03 intacts), DLWS-01..08 cochées. Correctifs hors plan : revue R-1 à R-3, F-1/F-2 = P57-D-38 et P57-D-39 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-11 ; registre `57-CONTEXT.md`).
 Next : vérification de phase, PR ; aucune release (P57-D-30).
+Dette soldée avant la PR le 2026-10-12/13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12) : C1, F-3,
+R-4 à R-7, C3 et la suite instable corrigés ; BACKLOG ramené à 31 sujets ouverts, sans prose dépassée ; P57-D-40 à D-43.
+Sept questions ouvertes (watchdog, ROADMAP, BACKLOG, …) : `.planning/missions/2026-10-12-dette-avant-pr-phase-57.md`.
 Last activity: 2026-10-12 — Phase 57 plan 57-16 complete (16/16)
 
 ## Accumulated Context
