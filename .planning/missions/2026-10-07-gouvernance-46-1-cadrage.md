@@ -70,7 +70,18 @@ rapport.
 
 ## Preuves E6
 
-Aucune : aucun sprint `vf-coder` exécuté dans cette mission.
+Session du 2026-10-07 : aucun sprint `vf-coder`. Reprise du 2026-10-12 : preuves relayées verbatim
+des blocs typés des `vf-coder` de planification et de correction (aucun sprint d'exécution) :
+
+```json
+{
+ "preuves": [
+  {"verdict": "recette", "preuve": "amont", "sprint": "plan-461 (planification)"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "plan-461 (correction n°1)"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "plan-461 (corrections n°2 et n°3)"}
+ ]
+}
+```
 
 ## Next step
 
