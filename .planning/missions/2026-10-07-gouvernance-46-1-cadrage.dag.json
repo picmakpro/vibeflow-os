@@ -43,7 +43,7 @@
       "scope": [
         ".planning/workstreams/gouvernance/phases/VFDO-46.1-armement-de-g4-et-g4/"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plancheck-461",
@@ -53,7 +53,7 @@
         "plan-461"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "suivi-461",
@@ -63,7 +63,7 @@
         "plancheck-461"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "pr-461",
@@ -73,7 +73,7 @@
         "suivi-461"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     }
   ]
 }

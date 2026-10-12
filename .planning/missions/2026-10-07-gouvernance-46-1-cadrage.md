@@ -13,7 +13,9 @@ vérifiés par lecture de `.planning/config.json` (`gsd_run` non résolu sur ce 
 **Budget :** snapshot posé (`check-mission-exit.sh --budget-snapshot`, fichier
 `<dépôt principal>/.git/vf-mission-budget.snap`, partagé entre worktrees : une autre
 session peut l'écraser).
-**Issue :** `human_needed` — cadrage gelé dans l'attente des réponses de Willy à Q1-Q5.
+**Issue (session du 2026-10-07) :** `human_needed` — cadrage gelé dans l'attente des réponses de Willy à Q1-Q5.
+**Issue (reprise du 2026-10-12) :** `passed` — cadrage écrit, 18 plans, plan-check frais PASSED au tour 4, PR de
+planification ouverte (voir § Reprise). Aucune exécution, aucun rejeu, aucun armement.
 
 ## Plan de bataille (DAG `2026-10-07-gouvernance-46-1-cadrage.dag.json`)
 
@@ -75,3 +77,82 @@ Aucune : aucun sprint `vf-coder` exécuté dans cette mission.
 Relayer Q1-Q5 à Willy (AskUserQuestion), puis relancer la mission sur les réponses : écriture de
 `46.1-CONTEXT.md`, exigences `ARMG`, puis `plan-461` (`vf-coder`, `gsd-plan-phase 46.1 --ws
 gouvernance`), plan-check frais, PR empilée sur #136.
+
+## Reprise du 2026-10-12
+
+**Relance :** message de la session principale (coordinateur), 2026-10-12 : les réponses de Willy
+étaient arrivées en session principale le 2026-10-07 sans être relayées à temps (défaut du head,
+pas de la mission). Rapportées verbatim : Q1-Q4 « (a) … (Recommandé) », arbitrages Willy,
+AskUserQuestion session principale, 2026-10-07 ; Q5 « (a) N-5 et A5 (Recommandé) », arbitrage
+Willy, AskUserQuestion session principale, 2026-10-12. Décisions du manager annoncées non
+renversées.
+
+**Contrôles de reprise :** branche inchangée depuis `2840fa5f` (local = origin), base de la PR #136
+inchangée (`78808126`). Snapshot de budget intact mais lié à l'ancienne génération du verrou :
+reposé sous la génération neuve `DRIVER.lock.gen.1791803429.58344` (E7 l'aurait jugé « snapshot
+d'une autre mission »). Verrou ré-acquis, 0 orphelin ; invariants 3 (SAIN) ; flags d'enchaînement à
+`false` (lecture).
+
+**Déroulé :**
+1. Cadrage écrit par le manager (Pattern F) : `46.1-CONTEXT.md` (P461-D-01..15), exigences
+   ARMG-01..10 au ledger du compartiment, journal de discussion complété, ROADMAP (commit
+   `8519c402`). P461-D-02 renverse en partie P46-D-02b, consigné.
+2. Planification par `vf-coder` (`gsd-plan-phase 46.1 --ws gouvernance`) : carte des motifs,
+   18 plans en 18 vagues (planning-hook.sh commun à presque tout), plan-check interne PASSED au
+   3e passage (commit `54054fb1`).
+3. Plan-check frais :
+
+   | Tour | Juge | Résultat |
+   |---|---|---|
+   | 1 | deux checkers (fidélité ; exécutabilité) | 1 bloquant (non-régression non imputable), 4 majeurs, 6 mineurs |
+   | 2 | un checker, angles combinés + régressions | tour 1 fermé ; 1 majeur (suites longues non détachées), 3 mineurs |
+   | 3 | un checker ciblé | 1 majeur (disjonction G4 en commande composée, refusée par la garde d'isolation), 1 mineur |
+   | 4 | un checker ciblé | **PASSED**, 0 bloquant, 0 majeur, 1 mineur |
+
+   Corrections : décisions du manager P461-D-16 (régime de non-régression : base mesurée une
+   fois, découverte complète au manager à trois jalons, imputation d'un rouge par rejeu sur le
+   commit parent) et P461-D-17 (G4 armé couplé au code livré ou à une décision humaine au moment
+   d'agir) (`1caf9110`) ; corrections ciblées des plans `ae40403c`, `4586c57c`, `e1d0c36c`,
+   `0542baa5`.
+4. Suivi : STATE et ROADMAP du compartiment à la main ; gates de planning rejoués à la main
+   (`check-state-integrity.sh --file .planning/workstreams/gouvernance/STATE.md` → rc 0 après
+   correction d'une seconde ligne `^Phase:` que ce suivi venait de créer ;
+   `check-machine-paths.sh` → rc 0, après retrait d'un chemin de machine de ce rapport).
+
+**Reste mineur connu (non bloquant) :** plan 17, cas d'autotest `garder-g4-mal-forme` qui mêle
+deux raisons de rougir (canal vide, date de forme invalide) ; une date de bonne forme mais
+invalide (`2026-13-45`) n'est pas éprouvée. À fermer à l'exécution du plan 17.
+
+**Décisions du manager acceptées sur signalement des workers :** borne de sondage de la mesure de
+base (`BORNE_MESURE_BASE`, 14 400 s, exception déclarée) ; plans 14 et 17 à 4 tâches chacun
+(taille signalée, non scindés) ; contrôle de repos qui compte aussi les fichiers ouverts sous un
+lab (plus strict que P461-D-07) ; borne du rejeu réel de l'étape 6 = 3 × la durée du relevé 5b.
+
+**À dire à Willy avant d'exécuter :** coût d'exécution élevé (18 plans séquentiels, base de
+non-régression ~2-3 h au plan 14, rejeux détachés) ; les checkpoints des plans 04, 05, 11 et 12
+lui demanderont au moment d'agir l'autorisation des rejeux réels, le repos des labs et chaque
+armement ; P461-D-17 lui fera trancher le sort de G4 armé si le code livré n'a pas de relevé
+armable. Un worker de révision a mentionné un message d'un autre agent auquel il n'a pas
+répondu : non suivi par la mission.
+
+### Décompte de la reprise
+
+Mandats émis : 9 (vf-coder planification 1, vf-coder correction 3 dont une reprise par
+`SendMessage`, gsd-plan-checker 5). Jetons rapportés par les blocs typés reçus : 265 307
+(planification) + 199 036 et 159 629 + 174 830 (corrections) + 273 065, 177 530, 130 431,
+95 061, 85 902 (plan-checks) = 1 560 791. Mission entière (avec la session du 2026-10-07) :
+11 mandats, 2 052 877 jetons rapportés.
+
+### Preuves E6
+
+Relayées verbatim des blocs typés `vf-coder` :
+- planification : `[{"verdict":"recette","preuve":"amont"}]`, verdicts `{"code_review":"absent","nyquist":"absent","secure":"absent"}`
+- correction n°1 : `[{"verdict":"recette","preuve":"amont"}]`
+- corrections n°2 et n°3 : `[{"verdict":"recette","preuve":"amont"}]`
+
+Aucun sprint d'exécution dans cette mission.
+
+### Next step
+
+Revue de la pile de PR (#124 → #133 → #136 → PR de planification 46.1) par Samuel, puis
+exécution de la Phase 46.1, plan 14 en premier (mesure de la base de non-régression).

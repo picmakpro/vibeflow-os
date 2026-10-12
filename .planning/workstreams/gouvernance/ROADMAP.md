@@ -16,7 +16,7 @@
 - [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
 - [x] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécutée 2026-09-30 → 2026-10-02 (10/10 plans, 15 quick de correction), cinq gates ARMÉS en cascade le 2026-10-01 ; audit de sécurité final SECURED (4 tours) ; vérifiée 15/15 — clôturée 2026-10-02 (clôture validée par Willy, message en session principale, 2026-10-01), PR #124 ouverte (non mergée)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-03 (12 plans, 9 vagues, plan-check frais PASSED), PR de planification empilée sur la PR #124 ; exécutée 2026-10-05 → 2026-10-07 (12/12 plans), vérifiée 11/11 (3 sous arbitrage de Willy) : G3 ARMÉ, G4 et G4′ en observation (reportés à la Phase 46.1) — non clôturée, PR non mergée
-- [ ] Phase 46.1: Armement de G4 et G4′ (INSERTED, 2026-10-07) — cadrée 2026-10-12, planification en cours
+- [ ] Phase 46.1: Armement de G4 et G4′ (INSERTED, 2026-10-07) — cadrée et planifiée 2026-10-12 (18 plans, une vague par plan, plan-check frais PASSED au tour 4), PR de planification empilée sur la PR #136 ; non exécutée
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 49: Initialisation — script des trois gates de la grille (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -296,8 +296,8 @@ Plans:
 **Plans:** 18 plans (ordre d'exécution : 14, 17, 01, 02, 03, 18, 04, 05, 06, 15, 07, 08, 09, 16, 10, 11, 12, 13 ; une vague par plan)
 
 Plans:
-- [ ] 46.1-14-PLAN.md — outil de contrôle de la phase `46.1-CONTROLES.sh` (suite sous HOME temporaire bash+zsh, découverte complète, invariants, cohérence d'un relevé) (ARMG-04, 05, 09)
-- [ ] 46.1-17-PLAN.md — `--montre` et mode `armement` de l'outil de contrôle (ARMG-05, 09)
+- [ ] 46.1-14-PLAN.md — outil de contrôle de la phase `46.1-CONTROLES.sh` (suite sous HOME temporaire, base de non-régression mesurée une fois, imputation d'un rouge, invariants, cohérence d'un relevé — P461-D-16) (ARMG-04, 05, 09)
+- [ ] 46.1-17-PLAN.md — `--montre`, modes `armement` (option `--garder-g4`, P461-D-17), `imputer`, `etat-reference`, gel de l'outil par empreinte (ARMG-05, 09)
 - [ ] 46.1-01-PLAN.md — étape 5b : exemption étroite de G4, banc et mutants, limite (bp), spec §5 (ARMG-01, 10)
 - [ ] 46.1-02-PLAN.md — D1 : N-5 et A5, faux signaux mesurés, limites (ar), (ax), (bk) (ARMG-02, 03, 10)
 - [ ] 46.1-03-PLAN.md — script de décision `verifier-releve.sh` : prédicats d'armement, limite (bu) (ARMG-04)
