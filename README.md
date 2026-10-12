@@ -21,6 +21,10 @@ and **kimi-code**.
 
 </div>
 
+**VibeFlow in 90 seconds — the philosophy.**
+
+https://github.com/user-attachments/assets/226c4e9b-dfa6-4f4e-b13c-2802c93f6932
+
 ---
 
 📖 **New here?** The [User Manual](./manual/README.md) walks a human through installing,
