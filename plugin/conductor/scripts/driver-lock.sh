@@ -853,6 +853,14 @@ case "$ACTION" in
 
   takeover)
     require_owner
+    # ANCIEN VERROU (P57-D-26, meme regle qu'`acquire`, arbitrage Samuel, AskUserQuestion session
+    # principale, 2026-10-13) : en lab partitionne, un ancien verrou VIVANT vaut verrou de depot, donc
+    # une reprise de compartiment ne passe pas non plus. Sonde AVANT toute generation ; meme refus,
+    # meme reason, meme hint (vf_dl_legacy_refuse). Ancien verrou perime : comportement inchange.
+    if [ "$PARTITIONED" = 1 ]; then
+      _leg="$(vf_dl_legacy_probe)"
+      [ "$(printf '%s\n' "$_leg" | sed -n 1p)" = vivant ] && vf_dl_legacy_refuse "$_leg"
+    fi
     lock_present || { printf '{"acquired": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     age="$(lock_age)"; held="$(meta_get owner)"; observed_gen="$(lock_gen)"
     if [ "$age" -le "$TTL" ]; then
@@ -906,6 +914,15 @@ case "$ACTION" in
       rm -f "${LOCK_DIR}.new.$$"
       case "$old_gen" in */*|''|legacy) ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac
       rm -f "$mutex"; trap - EXIT INT TERM
+      # R-4 (meme re-sonde qu'`acquire`) : un ancien verrou vivant apparu ENTRE la sonde de tete et la
+      # pose. On retire SA propre pose (lien puis generation) et on refuse comme si il avait ete la avant.
+      if [ "$PARTITIONED" = 1 ]; then
+        _tk_after="$(vf_dl_legacy_probe)"
+        if [ "$(printf '%s\n' "$_tk_after" | sed -n 1p)" = vivant ]; then
+          if [ "$(readlink "$LOCK_DIR" 2>/dev/null)" = "$gen" ]; then rm -f "$LOCK_DIR"; fi
+          rm -rf "${LOCK_PARENT:?}/$gen"; vf_dl_legacy_refuse "$_tk_after"
+        fi
+      fi
       _lease="$(lease_age)" && : || _lease="null"
       journal_event takeover "$held" "$OWNER" "" "$age" "$(lock_gen)"
       # orphans (issue #82) : les agents consignes par le tenant mort sont rendus ICI, feuille ->

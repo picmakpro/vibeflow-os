@@ -28,10 +28,10 @@ MUT_B="WS-INV WS-INV-dotdot WS-INV-quote WS-INV-slash WS-VERBS-5a WS-VERBS-5b WS
 # c, d, g, i : les familles WS-ALL-5, WS-LEG-5, WS-R4A, WS-R4B et WS-R4C (réserve C3, correction R-4) rougissent aussi
 # sous ces mutants (mesuré puis relu : le refus d'un compartiment, l'ancien verrou, la cible par dossier commun en dépendent)
 MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ALL-5 WS-ENV WS-HINT-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-5 WS-NOWS WS-VERBS-4"
-MUT_D="WS-LEG-1 WS-LEG-4 WS-R4A WS-R4B"
+MUT_D="WS-LEG-1 WS-LEG-4 WS-R4A WS-R4B WS-TKA WS-TKB"
 MUT_E="WS-ENV"
 MUT_F="WS-AB"
-MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-6 WS-VFL"
+MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-6 WS-TKA WS-TKB WS-VFL"
 MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien WS-RC2-vide"
 # j (correction F-2, P57-D-39) : le refus hors racine du lab retiré — seuls les trois cas de refus de WS-ROOT basculent
 # (g y ajoute WS-ROOT-6, le cas VF_DRIVER_LOCK ; i y ajoute WS-ROOT-8, le témoin acquire depuis la racine)
@@ -45,7 +45,10 @@ MUT_ACQ="WS-LEG-1"
 MUT_FDP="WS-LEG-5"
 MUT_SKL="WS-ALL-5"
 MUT_REP="WS-R4A WS-R4B"
-MUT_I="WS-ALL-1 WS-ALL-2 WS-ALL-5 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-R4A WS-R4B WS-R4C WS-ROOT-8 WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
+# takeover --ws : tk_nosonde fait basculer WS-TKA (la reprise détruit le verrou périmé avant que la re-sonde refuse) ; les trois autres WS-TKB
+MUT_TKH="WS-TKA"
+MUT_TKR="WS-TKB"
+MUT_I="WS-ALL-1 WS-ALL-2 WS-ALL-5 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-R4A WS-R4B WS-R4C WS-ROOT-8 WS-TKA WS-TKB WS-TKC WS-TKD WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
 # Mode de la suite. `full` (défaut) : tout, concurrence et mutants compris. `matrice` : sous-processus d'un
 # mutant (DL-M-*), qui rejoue les cas WS-* hors concurrence contre une COPIE mutée du script (DLWS_SCRIPT)
 # posée à côté de sa politique ; il n'y a alors ni concurrence ni mutants (pas de récursion).
@@ -859,6 +862,82 @@ refus_case "WS-VERBS-5i" '"error": "ws-invalid"' orphans
 refus_case "WS-VERBS-5j" '"error": "ws-invalid"' status
 
 echo
+echo "=== WS-TK — takeover --ws applique la règle d'acquire vis-à-vis de l'ancien verrou : sonde avant, re-sonde après la pose (Q5, arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) ==="
+# Compartiment alpha PÉRIMÉ (tenu par mA) + ancien verrou VIVANT : avant la correction, takeover rendait
+# acquired true, recovered true (AUD-6). Le refus doit être celui d'acquire, octet pour octet (âge normalisé).
+backdate_alpha() { # <lab> : antidate heartbeat et progress du compartiment alpha de <lab>
+  backdate_lock "$(fixture_common_dir "$1")" ws/alpha
+}
+LAB="$(mk_lab tka)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=mA --step=sa >/dev/null
+backdate_alpha "$LAB"
+mk_legacy "$LAB" old
+out="$(dl "$LAB" sess-T takeover --ws=alpha --owner=m9 --step=t)"; rc=$?
+assert_exit "WS-TKA.1 — takeover d'un alpha périmé, ancien verrou vivant : refus, exit 1" "$rc" 1
+assert "WS-TKA.2 — reason legacy-lock-held" "$out" '"reason": "legacy-lock-held"'
+assert "WS-TKA.3 — held_by old" "$out" '"held_by": "old"'
+assert "WS-TKA.4 — hint : release ciblé sur l'ancien verrou" "$out" "$LEGACY_ENV driver-lock.sh release --owner=old"
+assert_not "WS-TKA.5 — aucun acquired true ni recovered" "$out" '"recovered"'
+json_ok "$out"; assert_exit "WS-TKA.6 — JSON valide" "$?" 0
+assert "WS-TKA.7 — le compartiment alpha est resté à mA (aucune reprise)" "$(meta_of "$GC" ws/alpha owner)" "mA"
+[ ! -e "$GC/vf-driver/ws/alpha/DRIVER.lock.events.log" ]; assert_exit "WS-TKA.8 — aucun événement de reprise journalisé" "$?" 0
+assert_exit "WS-TKA.9 — aucune génération neuve (une seule : celle de mA)" "$(find "$GC/vf-driver/ws/alpha" -name 'DRIVER.lock.gen.*' 2>/dev/null | wc -l | tr -d ' ')" 1
+[ -L "$LAB/.planning/DRIVER.lock" ]; assert_exit "WS-TKA.10 — l'ancien verrou est intact" "$?" 0
+ref="$(mk_lab tkaref)"; mk_legacy "$ref" old
+before="$(dl "$ref" sess-T acquire --ws=alpha --owner=m9 --step=t)"
+[ "$(printf '%s' "$out" | age_norm | sed "s|$LAB|<LAB>|g")" = "$(printf '%s' "$before" | age_norm | sed "s|$ref|<LAB>|g")" ]
+assert_exit "WS-TKA.11 — MÊME refus, octet pour octet (âge normalisé), que celui d'acquire" "$?" 0
+
+# L'ancien verrou apparaît ENTRE la sonde de tête et la pose : la pose est retirée, le refus est celui d'un ancien
+# verrou présent avant. Copie du script, dossier temporaire de la suite (jamais un crochet en production).
+mk_takeover_race_copy() { # <dossier>
+  mkdir -p "$1"; cp "$POLICY" "$1/workstream-policy.sh"
+  python3 -I - "$SCRIPT" "$1/driver-lock.sh" <<'PYTK'
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+t = open(src, encoding="utf-8").read()
+a = "      # R-4 (meme re-sonde qu'`acquire`)"
+inj = '      ( VF_DRIVER_LOCK=.planning/DRIVER.lock CLAUDE_CODE_SESSION_ID=sess-old bash "$0" acquire --owner=old --step=old >/dev/null 2>&1 )\n'
+if t.count(a) != 1:
+    sys.stderr.write("ancre non unique (%d)\n" % t.count(a)); sys.exit(3)
+open(dst, "w", encoding="utf-8").write(t.replace(a, inj + a))
+PYTK
+  chmod +x "$1/driver-lock.sh"
+}
+LAB="$(mk_lab tkb)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=mA --step=sa >/dev/null
+backdate_alpha "$LAB"
+mk_takeover_race_copy "$WORK_DIR/race-tk"
+out="$( cd "$LAB" && CLAUDE_CODE_SESSION_ID=sess-T "$WORK_DIR/race-tk/driver-lock.sh" takeover --ws=alpha --owner=m9 --step=t )"; rc=$?
+assert_exit "WS-TKB.1 — ancien verrou apparu entre la sonde et la pose : exit 1" "$rc" 1
+assert "WS-TKB.2 — reason legacy-lock-held" "$out" '"reason": "legacy-lock-held"'
+assert "WS-TKB.3 — held_by old" "$out" '"held_by": "old"'
+json_ok "$out"; assert_exit "WS-TKB.4 — JSON valide" "$?" 0
+[ ! -e "$GC/vf-driver/ws/alpha/DRIVER.lock" ] && [ ! -L "$GC/vf-driver/ws/alpha/DRIVER.lock" ]
+assert_exit "WS-TKB.5 — la pose du processus est retirée : aucun verrou de compartiment" "$?" 0
+assert_exit "WS-TKB.6 — aucune génération laissée par la pose retirée" "$(find "$GC/vf-driver/ws/alpha" -name 'DRIVER.lock.gen.*' 2>/dev/null | wc -l | tr -d ' ')" 0
+[ -L "$LAB/.planning/DRIVER.lock" ]; assert_exit "WS-TKB.7 — l'ancien verrou est intact" "$?" 0
+[ ! -e "$GC/vf-driver/ws/alpha/DRIVER.lock.events.log" ]; assert_exit "WS-TKB.8 — aucun événement de reprise journalisé" "$?" 0
+[ "$(printf '%s' "$out" | age_norm | sed "s|$LAB|<LAB>|g")" = "$(printf '%s' "$before" | age_norm | sed "s|$ref|<LAB>|g")" ]
+assert_exit "WS-TKB.9 — MÊME refus, octet pour octet (âge normalisé), que celui d'acquire avec ancien verrou présent avant" "$?" 0
+
+# Témoin : sans ancien verrou, la même reprise réussit (la sonde ne refuse rien à tort).
+LAB="$(mk_lab tkc)"; GC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=mA --step=sa >/dev/null
+backdate_alpha "$LAB"
+out="$(dl "$LAB" sess-T takeover --ws=alpha --owner=m9 --step=t)"; rc=$?
+assert_exit "WS-TKC.1 — témoin : sans ancien verrou, takeover réussit" "$rc" 0
+assert "WS-TKC.2 — acquired true, recovered true" "$out" '"acquired": true, "owner": "m9", "step": "t", "recovered": true'
+# Ancien verrou PÉRIMÉ : comportement actuel conservé (la reprise passe). Décision d'alignement sur acquire (qui,
+# lui, refuse stale-requires-takeover) en attente d'arbitrage : ce cas épingle l'état présent, il ne le tranche pas.
+LAB="$(mk_lab tkd)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=mA --step=sa >/dev/null
+backdate_alpha "$LAB"
+mk_legacy "$LAB" old; backdate_legacy "$LAB"
+out="$(dl "$LAB" sess-T takeover --ws=alpha --owner=m9 --step=t)"; rc=$?
+assert_exit "WS-TKD.1 — ancien verrou périmé : takeover inchangé, exit 0 (alignement en attente d'arbitrage)" "$rc" 0
+
+echo
 echo "=== WS-HINT — le hint d'un refus, rejoué LITTÉRALEMENT, vise la cible du refus qui le porte (P57-D-24, correction R-1) ==="
 # Un verrou de compartiment ET un verrou de dépôt, tous deux périmés, d'owners différents : un hint qui
 # oublie l'option de cible reprend le mauvais des deux sans rien dire.
@@ -1179,12 +1258,12 @@ fi
 
 if [ "$DLWS_MODE" = full ]; then
 echo
-echo "=== MUTANTS DL-M-a à DL-M-j, puis DL-M-acq_fallback à DL-M-gen_kept — chaque comportement neuf de driver-lock.sh rougit sous sa mutation (QUAL-01, P57-D-12, P57-D-28) ==="
+echo "=== MUTANTS DL-M-a à DL-M-j, puis DL-M-acq_fallback à DL-M-tk_gen_kept — chaque comportement neuf de driver-lock.sh rougit sous sa mutation (QUAL-01, P57-D-12, P57-D-28) ==="
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du script, posée à côté
 # d'une copie de workstream-policy.sh (sinon policy-missing rougirait pour la mauvaise raison). La matrice (les
 # cas WS-* hors concurrence, WS-AB compris) est rejouée en sous-processus contre la copie ; l'ensemble des cas
 # dont le verdict bascule est comparé EXACTEMENT à l'attendu (un cas basculé hors de l'ensemble fait échouer).
-MUT_KILLED=0; MUT_TOTAL=16; t0=$SECONDS
+MUT_KILLED=0; MUT_TOTAL=20; t0=$SECONDS
 mut_families() { # <journal> → familles de cas en échec, triées, une par ligne
   LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sed 's/\..*$//' | LC_ALL=C sort -u
 }
@@ -1258,14 +1337,19 @@ mutant skip_link_d 'if \[ -L "$d" \] || ! vf_ws_name_valid "$name"; then' 's@\[ 
 mutant reprobe_none '_leg_after="$(vf_dl_legacy_probe)"' 's@_leg_after="$(vf_dl_legacy_probe)"@_leg_after=""@' "$MUT_REP"
 mutant pose_kept '= "$gen" \] && rm -f "$LOCK_DIR"' 's@\&\& rm -f "$LOCK_DIR"@\&\& :@' "$MUT_REP"
 mutant gen_kept '{gen:?}' 's@rm -rf "${LOCK_PARENT:?}/${gen:?}"@:@' "$MUT_REP"
+# takeover --ws (Q5, arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) : sonde de tête, re-sonde, retrait de la pose.
+mutant tk_nosonde 'vivant \] && vf_dl_legacy_refuse "$_leg"' 's@vivant \] \&\& vf_dl_legacy_refuse "$_leg"@vivant ] \&\& :@' "$MUT_TKH"
+mutant tk_reprobe_none '_tk_after="$(vf_dl_legacy_probe)"' 's@_tk_after="$(vf_dl_legacy_probe)"@_tk_after=""@' "$MUT_TKR"
+mutant tk_pose_kept 'then rm -f "$LOCK_DIR"; fi' 's@then rm -f "$LOCK_DIR"; fi@then :; fi@' "$MUT_TKR"
+mutant tk_gen_kept 'refuse "$_tk_after"' 's@rm -rf "${LOCK_PARENT:?}/$gen"; vf_dl_legacy_refuse@:; vf_dl_legacy_refuse@' "$MUT_TKR"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 16/16 tués =="
+  echo "== mutants : 20/20 tués =="
 else
-  echo "== mutants : $MUT_KILLED/16 tués =="
+  echo "== mutants : $MUT_KILLED/20 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # DLWS_MODE = full (mutants)
