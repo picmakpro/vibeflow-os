@@ -348,6 +348,61 @@ case_q() {
   eq_str "EW-Q-INDET-4 — driver-lock.sh d'avant la phase : indéterminé, jamais sain" "$(e1_state)" "indet"
 }
 
+case_src() {
+  echo "=== EW-SRC — dépôt SOURCE du plugin : le module voisin prime sur \$HOME/.claude/scripts (réserve C1 de la Phase 57) ==="
+  local SRC OLDH GATE DL rc GEN SNAP OUT ERR LOG ABS LAB NB INST LOGH LOGN
+  # Disposition du dépôt source : <racine>/plugin/{dev-orchestrator,planning-core,conductor}/scripts, racine partitionnée.
+  SRC="$TMP/src-$$-$RANDOM"
+  mkdir -p "$SRC/plugin/dev-orchestrator/scripts" "$SRC/plugin/planning-core/scripts" "$SRC/plugin/conductor/scripts" \
+           "$SRC/.planning/workstreams/alpha" "$SRC/.planning/workstreams/omega"
+  cp "${GATE_SCRIPT:-$SCRIPT}" "$SRC/plugin/dev-orchestrator/scripts/check-mission-exit.sh"
+  cp "$POLICY_REAL" "$SRC/plugin/planning-core/scripts/workstream-policy.sh"
+  cp "$DAG_REAL" "$DL_REAL" "$BUDGET_REAL" "$DIVERGENCE_REAL" "$SRC/plugin/conductor/scripts/"
+  printf '# projet\n' > "$SRC/.planning/PROJECT.md"
+  printf -- '---\nstatus: active\n---\n' > "$SRC/.planning/workstreams/alpha/STATE.md"
+  printf -- '---\nstatus: active\n---\n' > "$SRC/.planning/workstreams/omega/STATE.md"
+  git_init_commit "$SRC"; preflight "$SRC"
+  GATE="$SRC/plugin/dev-orchestrator/scripts/check-mission-exit.sh"
+  DL="$SRC/plugin/conductor/scripts/driver-lock.sh"
+  # $HOME de l'utilisateur : scripts d'AVANT la phase 57 (dag.sh présent, driver-lock.sh sans --ws : rc 1).
+  OLDH="$TMP/oldhome-$$-$RANDOM"; mkdir -p "$OLDH/.claude/scripts"
+  cp "$DAG_REAL" "$OLDH/.claude/scripts/"
+  printf '#!/usr/bin/env bash\necho "Unknown arg: $*" >&2\nexit 1\n' > "$OLDH/.claude/scripts/driver-lock.sh"; chmod +x "$OLDH/.claude/scripts/driver-lock.sh"
+  ( cd "$SRC" && CLAUDE_CODE_SESSION_ID=sess-A bash "$DL" acquire --ws=alpha --owner=m1 --step=s >/dev/null ); rc=$?
+  eq_rc "EW-SRC-0 — acquire --ws=alpha par le driver du module voisin exit 0" "$rc" 0
+  GEN="$( cd "$SRC" && bash "$DL" status --ws=alpha | jq -r '.generation // empty' )"
+  [ -n "$GEN" ] || ko "EW-SRC-0b — génération lue sur le driver voisin" "vide (fixture cassée)"
+  OUT="$( HOME="$OLDH"; export HOME; unset CLAUDE_PLUGIN_ROOT 2>/dev/null; bash "$GATE" --root "$SRC" --ws alpha 2>"$TMP/src.err" </dev/null )"
+  ERR="$(cat "$TMP/src.err")"
+  has "EW-SRC-1 — E1 jugé par le driver voisin : verrou tenu vu (owner=m1), pas un indéterminé" "$(printf '%s\n' "$OUT" | { grep -F '[E1]' || true; })" "owner=m1"
+  hasnt "EW-SRC-2 — E1 n'est pas indéterminé faute d'un driver-lock.sh d'avant la phase" "$ERR" "[E1]"
+  SNAP="$(snap_path "$SRC")"; rm -f "$SNAP"
+  ( HOME="$OLDH"; export HOME; unset CLAUDE_PLUGIN_ROOT 2>/dev/null; bash "$GATE" --root "$SRC" --ws alpha --budget-snapshot >/dev/null 2>&1 </dev/null )
+  eq_str "EW-SRC-3 — l'identité d'E7 est la génération du verrou rendue par le driver voisin (pas ?)" "$(sed -n 's/^#gen=//p' "$SNAP" 2>/dev/null)" "$GEN"
+
+  # Témoins : l'ordre de résolution ne change pas hors du dépôt source. Deux faux driver-lock.sh enregistreurs.
+  # (a) Lab INSTALLÉ : racine sans plugin/, module voisin du gate présent, $HOME porte un driver -> $HOME retenu comme avant.
+  LAB="$(mk_lab srcwit)"; rm -f "$LAB/.claude/scripts/driver-lock.sh" "$LAB/.claude/scripts/dag.sh"
+  INST="$TMP/instwit-$$-$RANDOM"; mkdir -p "$INST/dev-orchestrator/scripts" "$INST/planning-core/scripts" "$INST/conductor/scripts"
+  cp "${GATE_SCRIPT:-$SCRIPT}" "$INST/dev-orchestrator/scripts/check-mission-exit.sh"
+  cp "$POLICY_REAL" "$INST/planning-core/scripts/workstream-policy.sh"
+  cp "$DAG_REAL" "$BUDGET_REAL" "$DIVERGENCE_REAL" "$INST/conductor/scripts/"
+  LOGH="$TMP/log-home-$$"; LOGN="$TMP/log-neighbor-$$"; : > "$LOGH"; : > "$LOGN"
+  printf '#!/usr/bin/env bash\necho "home $*" >> "%s"\necho %s\n' "$LOGH" "'{\"present\": false, \"children_running\": 0}'" > "$OLDH/.claude/scripts/driver-lock.sh"
+  printf '#!/usr/bin/env bash\necho "neighbor $*" >> "%s"\necho %s\n' "$LOGN" "'{\"present\": false, \"children_running\": 0}'" > "$INST/conductor/scripts/driver-lock.sh"
+  chmod +x "$OLDH/.claude/scripts/driver-lock.sh" "$INST/conductor/scripts/driver-lock.sh"
+  ( HOME="$OLDH"; export HOME; unset CLAUDE_PLUGIN_ROOT 2>/dev/null; bash "$INST/dev-orchestrator/scripts/check-mission-exit.sh" --root "$LAB" --ws alpha >/dev/null 2>&1 </dev/null )
+  has "EW-SRC-W1 — lab installé : le driver de \$HOME est retenu (ordre inchangé)" "$(cat "$LOGH")" "home status --ws=alpha"
+  eq_str "EW-SRC-W2 — lab installé : le module voisin n'est pas consulté" "$(cat "$LOGN")" ""
+  # (b) Racine à la forme du dépôt source, mais le module voisin DU GATE est ailleurs : $HOME reste devant.
+  mkdir -p "$LAB/plugin/conductor/scripts"; cp "$DAG_REAL" "$LAB/plugin/conductor/scripts/"
+  printf '#!/usr/bin/env bash\necho "neighbor $*" >> "%s"\necho %s\n' "$LOGN" "'{\"present\": false, \"children_running\": 0}'" > "$LAB/plugin/conductor/scripts/driver-lock.sh"
+  chmod +x "$LAB/plugin/conductor/scripts/driver-lock.sh"; : > "$LOGH"; : > "$LOGN"
+  ( HOME="$OLDH"; export HOME; unset CLAUDE_PLUGIN_ROOT 2>/dev/null; bash "$INST/dev-orchestrator/scripts/check-mission-exit.sh" --root "$LAB" --ws alpha >/dev/null 2>&1 </dev/null )
+  has "EW-SRC-W3 — racine plugin/ sans que le gate en soit le voisin : \$HOME retenu" "$(cat "$LOGH")" "home status --ws=alpha"
+  eq_str "EW-SRC-W4 — le plugin/ de la racine n'est pas consulté" "$(cat "$LOGN")" ""
+}
+
 case_usage() {
   echo "=== EW-USAGE — --ws sans valeur est une erreur d'usage ==="
   local rc
@@ -356,7 +411,7 @@ case_usage() {
 }
 
 run_cases() {
-  case_trace; case_nows; case_child; case_gen; case_snap; case_e4; case_budgetws; case_depot; case_flat; case_q; case_usage
+  case_trace; case_nows; case_child; case_gen; case_snap; case_e4; case_budgetws; case_depot; case_flat; case_q; case_src; case_usage
 }
 
 # ---------------------------------------------------------------------------------------------- matrice
