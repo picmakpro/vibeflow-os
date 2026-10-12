@@ -107,3 +107,11 @@ Relais par la session principale (`SendMessage(main)`), le 2026-10-12. Réponses
 | Q9 | « (a) Détection au mieux (Recommandé) » | P47-D-19 |
 
 Canal : Willy, AskUserQuestion session principale, 2026-10-12.
+
+## Q10 (posée à la reprise, après la réduction de 47-09)
+
+| # | Question | Options | Réponse de Willy | Décision |
+|---|---|---|---|---|
+| Q10 | Clôture par outil d'une unité sans ligne `ouverture`, liste non vide | (a) limite nommée, garantie « par outil, sur une unité ouverte par outil » · (b) raison exigée au gate de `CLOTURE.md` | « (a) Limite nommée (Recommandé) » | P47-D-20 |
+
+Canal : Willy, AskUserQuestion session principale, 2026-10-12.

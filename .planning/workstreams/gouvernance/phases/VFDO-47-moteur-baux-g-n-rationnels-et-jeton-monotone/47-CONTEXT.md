@@ -8,8 +8,8 @@ tiennent à la main.
 **Décisions humaines :** Q1 à Q7 tranchées par Willy, AskUserQuestion session principale,
 2026-10-12, relayées par la session principale au manager de mission (repli D-09, pas d'outil de
 question en sous-agent). Willy a suivi la recommandation (a) sur les sept questions. Elles
-deviennent P47-D-01 à P47-D-07 ; Q8 et Q9, posées en planification le même jour, deviennent
-P47-D-18 et P47-D-19.
+deviennent P47-D-01 à P47-D-07 ; Q8, Q9 et Q10, posées en planification le même jour, deviennent
+P47-D-18, P47-D-19 et P47-D-20.
 **Décisions du manager :** marquées « manager », annoncées à Willy avant l'écriture de ce fichier
 (relais du 2026-10-12, « ne sont pas renversées ») et dérivées ici en P47-D-08 à P47-D-17. Les
 sous-décisions `a`/`b` sont aussi du manager.
@@ -201,6 +201,12 @@ refus dans les deux sens et s'arme dans l'ordre, comme en 45 et 46.
   complétude du miroir (inventaire de départ, exemption par empreinte du triplet, preuve générative à
   équivalence) sortent de 47-09 sauf s'ils servent la détection au mieux à faible coût ; aucun
   plan-check n'exige plus qu'une clôture hors outil ne finisse jamais `close` en silence.
+
+- **P47-D-20 (Q10 → « (a) Limite nommée (Recommandé) ») :** la garantie de G2′ s'écrit « **par outil,
+  sur une unité ouverte par outil** ». Une clôture par outil d'une unité sans ligne `ouverture` (travail
+  fait hors outil) passe avec l'observation `g2p-sans-reference` : c'est une **limite nommée**, régime
+  P45-D-10, aucun faux refus. Arbitrage Willy, AskUserQuestion session principale, 2026-10-12. Précise
+  P47-D-19 sans le renverser.
 
 ### Claude's Discretion
 
