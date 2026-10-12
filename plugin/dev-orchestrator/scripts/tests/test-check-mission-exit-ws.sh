@@ -11,14 +11,14 @@
 # (identité d'E7 = génération du verrou du compartiment, « ? » si illisible) · EW-SNAP (--budget-snapshot sans
 # --ws = exit 4, motif nommé, aucun fichier) · EW-E4 (--ws surcharge GSD_WORKSTREAM) · EW-DEPOT (verrou de dépôt
 # dit sur stderr, jamais un manque) · EW-FLAT (lab plat inchangé) · EW-Q-* (les trois issues d'E1) · EW-USAGE.
-# Réserve C1 : EW-SRC (dépôt source : le module voisin prime sur $HOME ; témoins EW-SRC-W1..W4 : lab installé inchangé).
+# Réserve C1 : EW-SRC (dépôt source : le module voisin prime sur $HOME ; témoins EW-SRC-W1..W4 : lab installé inchangé ; EW-SRC-L1..L3 : dépôt source ET lab local, le lab local prime).
 # Réserve C2 : EW-BWS (--ws transmis à check-method-budget.sh, snapshot et E7 ; budget enregistreur, puis budget réel).
 #
 # Les assertions portent sur les lignes E1 (stdout) et les diagnostics E1 (stderr), jamais sur le
 # verdict global, que les autres contrôles (E2-E7) influencent sur une fixture minimale — sauf EW-NOWS /
 # EW-SNAP, dont le verdict (4, jamais 3) EST le contrat.
 #
-# MUTANTS EW-M-a à EW-M-h : chaque copie mutée du gate vit dans un dossier jetable qui reproduit la
+# MUTANTS EW-M-a à EW-M-i : chaque copie mutée du gate vit dans un dossier jetable qui reproduit la
 # DISPOSITION du plugin (dev-orchestrator/scripts, planning-core/scripts, conductor/scripts), parce que le
 # gate source la politique par ../../planning-core/scripts (E4, repli SILENCIEUX si elle manque) et résout le
 # budget par ../../conductor/scripts (exit 4 s'il manque, ce qui ressemblerait à EW-SNAP). EW-LAYOUT joue le
@@ -58,6 +58,7 @@ MUT_E="EW-SNAP-1 EW-SNAP-2 EW-SNAP-4"
 MUT_F="EW-BWS-1"
 MUT_G="EW-BWS-2 EW-BWS-3"
 MUT_H="EW-SRC-1 EW-SRC-2 EW-SRC-3"
+MUT_I="EW-SRC-L1 EW-SRC-L2"
 
 # DÉSARMEMENT en tête (P57-D-22) : un VF_DRIVER_LOCK hérité forcerait le mode « verrou unique » ;
 # les autres variables déplaceraient la cible. GIT_* : une suite jouée depuis un hook git hériterait
@@ -352,7 +353,7 @@ case_q() {
 
 case_src() {
   echo "=== EW-SRC — dépôt SOURCE du plugin : le module voisin prime sur \$HOME/.claude/scripts (réserve C1 de la Phase 57) ==="
-  local SRC OLDH GATE DL rc GEN SNAP OUT ERR LOG ABS LAB NB INST LOGH LOGN
+  local SRC OLDH GATE DL rc GEN SNAP OUT ERR LOG ABS LAB NB INST LOGH LOGN LOGL
   # Disposition du dépôt source : <racine>/plugin/{dev-orchestrator,planning-core,conductor}/scripts, racine partitionnée.
   SRC="$TMP/src-$$-$RANDOM"
   mkdir -p "$SRC/plugin/dev-orchestrator/scripts" "$SRC/plugin/planning-core/scripts" "$SRC/plugin/conductor/scripts" \
@@ -403,6 +404,17 @@ case_src() {
   ( HOME="$OLDH"; export HOME; unset CLAUDE_PLUGIN_ROOT 2>/dev/null; bash "$INST/dev-orchestrator/scripts/check-mission-exit.sh" --root "$LAB" --ws alpha >/dev/null 2>&1 </dev/null )
   has "EW-SRC-W3 — racine plugin/ sans que le gate en soit le voisin : \$HOME retenu" "$(cat "$LOGH")" "home status --ws=alpha"
   eq_str "EW-SRC-W4 — le plugin/ de la racine n'est pas consulté" "$(cat "$LOGN")" ""
+  # (c) Dépôt SOURCE ET lab local : <racine>/.claude/scripts et le module voisin coexistent, tous deux avec un driver
+  # enregistreur ; le lab local reste le PREMIER candidat (« le lab local prime toujours »), ni le voisin ni $HOME.
+  LOGL="$TMP/log-local-$$"; : > "$LOGL"; : > "$LOGH"; : > "$LOGN"
+  mkdir -p "$SRC/.claude/scripts"; cp "$DAG_REAL" "$SRC/.claude/scripts/"
+  printf '#!/usr/bin/env bash\necho "local $*" >> "%s"\necho %s\n' "$LOGL" "'{\"present\": false, \"children_running\": 0}'" > "$SRC/.claude/scripts/driver-lock.sh"
+  printf '#!/usr/bin/env bash\necho "neighbor $*" >> "%s"\necho %s\n' "$LOGN" "'{\"present\": false, \"children_running\": 0}'" > "$DL"
+  chmod +x "$SRC/.claude/scripts/driver-lock.sh" "$DL"
+  ( HOME="$OLDH"; export HOME; unset CLAUDE_PLUGIN_ROOT 2>/dev/null; bash "$GATE" --root "$SRC" --ws alpha >/dev/null 2>&1 </dev/null )
+  has "EW-SRC-L1 — dépôt source ET lab local : le driver de <racine>/.claude/scripts est retenu (le lab local prime toujours)" "$(cat "$LOGL")" "local status --ws=alpha"
+  eq_str "EW-SRC-L2 — dépôt source ET lab local : le module voisin n'est pas consulté" "$(cat "$LOGN")" ""
+  eq_str "EW-SRC-L3 — dépôt source ET lab local : le driver de \$HOME n'est pas consulté" "$(cat "$LOGH")" ""
 }
 
 case_usage() {
@@ -480,7 +492,7 @@ mutant() { # <id> <cas nommé par le plan> <cas attendus (ensemble exact, ordre 
   fi
 }
 
-echo "=== Mutants EW-M-a à EW-M-h (copies dans la disposition du plugin) ==="
+echo "=== Mutants EW-M-a à EW-M-i (copies dans la disposition du plugin) ==="
 mutant a EW-TRACE-1 "$MUT_A" 'VF_DRIVER_LOCK= "$E1_S_DIR/driver-lock.sh" status --ws="$WS"' 'VF_DRIVER_LOCK="$ROOT/.planning/DRIVER.lock" "$E1_S_DIR/driver-lock.sh" status --ws="$WS"'
 mutant b EW-NOWS-1 "$MUT_B" 'E1_STATUS="indet"
   E1_MSG="[E1] lab partitionné' 'E1_STATUS="sain"
@@ -491,11 +503,12 @@ mutant e EW-SNAP-1 "$MUT_E" 'if is_partitioned && [ -z "$WS" ]; then # SNAPWS' '
 mutant f EW-BWS-1 "$MUT_F" ' --dry-run --ws "$WS" 2>/dev/null)"; SNAP_RC=$?' ' --dry-run 2>/dev/null)"; SNAP_RC=$?'
 mutant g EW-BWS-2 "$MUT_G" ' --strict --auto --ws "$WS" 2>/dev/null)"; E7_RC=$?' ' --strict --auto 2>/dev/null)"; E7_RC=$?'
 mutant h EW-SRC-1 "$MUT_H" '"$ROOT/.claude/scripts" "$src" "$HOME/.claude/scripts"' '"$ROOT/.claude/scripts" "$HOME/.claude/scripts"'
+mutant i EW-SRC-L1 "$MUT_I" '"$ROOT/.claude/scripts" "$src" "$HOME/.claude/scripts"' '"$src" "$ROOT/.claude/scripts" "$HOME/.claude/scripts"'
 
 echo
-if [ "$MUT_OK" -eq 8 ] && [ "$MUT_TOTAL" -eq 8 ]; then echo "== mutants : 8/8 tués =="; else echo "== mutants : $MUT_OK/8 tués — ÉCHEC =="; fi
+if [ "$MUT_OK" -eq 9 ] && [ "$MUT_TOTAL" -eq 9 ]; then echo "== mutants : 9/9 tués =="; else echo "== mutants : $MUT_OK/9 tués — ÉCHEC =="; fi
 echo "== résultat : $PASS ok, $FAIL ko =="
-[ "$MUT_OK" -eq 8 ] || exit 1
+[ "$MUT_OK" -eq 9 ] || exit 1
 [ "$FAIL" -eq 0 ] || exit 1
 [ "$PASS" -gt 0 ] || exit 1
 exit 0
