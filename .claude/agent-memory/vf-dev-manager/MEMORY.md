@@ -91,3 +91,6 @@
 - [`git log` via rtk masque les merges](project_rtk-git-log-masque-les-merges.md) — pointe d'origin/main lue fausse (2aa307df au lieu du merge 0c14757b) : SHA de base par `git rev-parse`
 - [Attendre un worker : sleep bloqué](project_attendre-un-worker-sleep-bloque.md) — une boucle `until … sleep` rend instantanément ; attendre par `python3 time.sleep` + heartbeat
 - [Rapport de mission = fichier versionné](feedback_rapport-de-mission-passe-les-gates.md) — un chemin absolu dans le bloc E6 a rougi gates+tests après une livraison verte : `check-machine-paths` avant push
+- [Porte de décisions et ids préfixés](project_porte-decisions-gsd-ids-prefixes.md) — check.decision-coverage-plan rend could-not-parse sur P57-D-NN : rejouer sur un miroir D57-NN, rouge avant / vert après
+- [Archivage auto dans l'arbre partagé](project_archivage-auto-dans-l-arbre-partage.md) — un diff .planning/archives ou ROADMAP non produit par la mission se restaure, jamais ne se commite (revert 2026-10-10, #143)
+- [Escalade vers main inactif](project_escalade-vers-main-inactif-attente-sans-fin.md) — SendMessage(main) attend le prochain tour : 5 h sans réponse en Phase 57 ; borner ~1 h puis rendre human_needed

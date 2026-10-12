@@ -27,3 +27,4 @@
 - [Assainissement à l’écriture vs comparaison brute](feedback_writetime-sanitize-vs-compare-raw-mismatch.md) — un dédoublonnage qui compare la valeur brute contre du relu-donc-assaini échoue en silence (Phase 44, cloture.log)
 - [rtk + git diff A..B intermittent](feedback_rtk-two-dot-diff-flaky.md) — sortie vide silencieuse sous rtk sur la forme origin/main..HEAD ; rtk proxy ou hashes explicites, jamais confiance à un seul run
 - [Classes de bug des gardes bash (Phase 41)](feedback_bash-gate-bug-classes-phase41.md) — quatre classes confirmées par mutation sur G-1/G-2/G-3, à ressonder sur toute nouvelle garde in-repo
+- [Hint de refus: rejouer litteralement](feedback_hint-replay-must-keep-target.md) — Phase 57 : hint takeover sans --ws reprend le mauvais verrou ; muter aussi les comportements hors liste du plan

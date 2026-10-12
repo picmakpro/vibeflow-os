@@ -6,3 +6,4 @@
 - [ICM w2 — basename + preuves fantômes](project-icm-w2-basename-et-preuves-fantomes.md) — basename fixé (vérifié), mais fixture tiret-initial récidive en preuve fantôme + oracle traversée p2_sens_a hors scope (2026-08-15)
 - [Traversée par libellé de jalon, Phase 18](project-traversal-libelle-jalon-phase18.md) — CLOS (code corrigé, `/` retiré de la classe l.134, recalé 2026-08-28) ; historique : restore-requirements-ledger.sh/check-requirements-survival.sh, ../ survit à la liste blanche, exploité jusqu'à l'écriture (2026-08-18)
 - [Phase 44 recalc-planning.sh, tour 7 (final)](project-phase44-recalc-planning-findings.md) -- CLOS (2026-09-28, HEAD 345303e, SECURED) : lot 7 ferme PERM du tour 6 ; residus LOCAL documentes (TOCTOU garde/detecteur, FIFO STATE.md bloquante)
+- [Phase 57 verrou par compartiment](project-phase57-verrou-compartiment-audit.md) -- SECURED (2026-10-11, HEAD cc17e5f1) ; residuels : casse .PLANNING, --ws muet en sous-dossier, globals git
