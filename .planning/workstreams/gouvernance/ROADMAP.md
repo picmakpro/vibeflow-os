@@ -17,7 +17,7 @@
 - [x] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécutée 2026-09-30 → 2026-10-02 (10/10 plans, 15 quick de correction), cinq gates ARMÉS en cascade le 2026-10-01 ; audit de sécurité final SECURED (4 tours) ; vérifiée 15/15 — clôturée 2026-10-02 (clôture validée par Willy, message en session principale, 2026-10-01), PR #124 ouverte (non mergée)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-03 (12 plans, 9 vagues, plan-check frais PASSED), PR de planification empilée sur la PR #124 ; exécutée 2026-10-05 → 2026-10-07 (12/12 plans), vérifiée 11/11 (3 sous arbitrage de Willy) : G3 ARMÉ, G4 et G4′ en observation (reportés à la Phase 46.1) — non clôturée, PR non mergée
 - [ ] Phase 46.1: Armement de G4 et G4′ (INSERTED, 2026-10-07) — non cadrée
-- [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
+- [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-12 (14 plans, 10 vagues, plan-check frais PASSED au tour 7), PR de planification #147 empilée sur la PR #136 ; exécution APRÈS la Phase 46.1
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 49: Initialisation — script des trois gates de la grille (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 50: Initialisation — grille, interview et fabrique des producteurs et juges (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -301,16 +301,62 @@ Plans:
 ### Phase 47: Moteur — baux générationnels et jeton monotone
 
 **Goal:** Un bail générationnel porte les fichiers d'état réécrits en place, au fichier près ; son numéro de génération est un jeton monotone vérifié par le hook **et** par l'écrivain, qui rejette l'écriture périmée d'une session revenue, d'un cron ou d'un sous-agent en fan-out ; à la clôture, G2′ refuse ce qui a bougé hors du bail sans amendement.
-**Requirements**: TBD (posés au cadrage)
-**Depends on:** Phase 46 (G2′ se branche sur le même événement `TaskCompleted` que G3/G4 ; il vit ici parce qu'il consomme le bail).
-**Note du cadrage de la 46 (P46-D-19, 2026-10-03)** : la prémisse « même `TaskCompleted` que G3/G4 » ne tient plus. La 46 a porté G3/G4 en `PreToolUse` sur l'écriture de `CLOTURE.md`/`SUMMARY.md` (P46-D-01, Willy, AskUserQuestion session principale, 2026-10-03), parce que `TaskCompleted` n'existe pas par défaut sur les modèles récents (`46-RECHERCHE-HOOKS.md` §0). Le point d'accroche de G2′ se re-décide au cadrage de la 47.
+**Requirements**: BAIL-01..BAIL-10 (posées au cadrage, `47-CONTEXT.md`, 2026-10-12)
+**Depends on:** Phase 46 (il vit ici parce qu'il consomme le bail) ; exécutée après la Phase 46.1 (zone partagée : hook central, table d'armement, D1 ; P47-D-10).
+**Note du cadrage de la 46 (P46-D-19, 2026-10-03)** : la prémisse « même `TaskCompleted` que G3/G4 » ne tient plus. La 46 a porté G3/G4 en `PreToolUse` sur l'écriture de `CLOTURE.md`/`SUMMARY.md` (P46-D-01, Willy, AskUserQuestion session principale, 2026-10-03), parce que `TaskCompleted` n'existe pas par défaut sur les modèles récents (`46-RECHERCHE-HOOKS.md` §0). Le point d'accroche de G2′ se re-décide au cadrage de la 47. **Re-décidé le 2026-10-12** : `PreToolUse` sur l'écriture de `CLOTURE.md`, à côté de G3 (P47-D-04).
 **Sources:** `docs/superpowers/specs/2026-09-22-moteur-planning-metier-design.md` §6 (6.1 à 6.4), §5 (G2′), D-04.
-**À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : `save()` de `dag.sh` sans verrou ni écriture atomique, lost update silencieux — `.planning/BACKLOG.md:74`. C'est la même classe d'écriture concurrente que les baux : le jeton monotone doit la couvrir, ou la phase dit pourquoi non.
-**Plans:** 0 plans
+**À embarquer (signalé par Samuel, WhatsApp, 2026-09-23)** : `save()` de `dag.sh` sans verrou ni écriture atomique, lost update silencieux — `.planning/BACKLOG.md:169` (référence corrigée le 2026-10-12, P47-D-17). C'est la même classe d'écriture concurrente que les baux : le jeton monotone doit la couvrir, ou la phase dit pourquoi non.
+**Cadrage (2026-10-12)** : `47-CONTEXT.md`, décisions P47-D-01 à P47-D-17 (plus 01a, 02a, 02b, 04a, 06a), mission `vf-dev-manager-p47-cadrage`. Faits : `47-SCOUTING.md` et `47-RECHERCHE-BAUX.md` (Claude Code 2.1.296).
+- Arbitrages de Willy, AskUserQuestion session principale, 2026-10-12 : Q1 à Q7, recommandation (a) suivie partout — registre lié à l'appelant (`agent_id`, sinon `session_id`), un bail par fichier (spec §6.1 amendée), liste déclarée par le lab dans `config.json`, G2′ sur `CLOTURE.md` avec amendement tracé, `dag.sh` corrigé dans la 47, étape 7 en observation d'abord, `onFailure: "block"` hors 47.
+- Décisions du manager, renversables : P47-D-08 à P47-D-17.
+- Arbitrages de Willy en planification, AskUserQuestion session principale, 2026-10-12 : Q8 (armement après une liste réelle, P47-D-18), Q9 (miroir de G2′ en détection au mieux, garantie bornée aux clôtures par outil, P47-D-19), Q10 (« par outil, sur une unité ouverte par outil », P47-D-20).
+- Plan-check frais : 7 tours ; tours 2 à 6 sur la complétude du miroir de G2′ contre `Bash`, close par Q9 ; tour 7 : 0 bloquant, 0 avertissement, 2 info.
+**Plans:** 14 plans en 10 vagues. Étape 7 d'armement `("BAIL", "G2P")`, scindée 7a/7b, en observation à la livraison ; deux plans `autonomous: false` portent un checkpoint humain borné au moment d'agir (47-13 : 7a, 47-14 : 7b).
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 47 to break down)
+- [ ] 47-01-PLAN.md — registre de baux au fichier près, journal d'empreintes, outil côté écrivain (BAIL-01, 05)
+- [ ] 47-02-PLAN.md — `dag.sh` sans lost update ni lecture déchirée, `conductor` bumpé sans release (BAIL-07)
+- [ ] 47-03-PLAN.md — étape 7 posée dans la table d'armement, constantes `BAIL` et `G2P` en observation (BAIL-09)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 47-04-PLAN.md — recalculs sérialisés, colonne « Bail en cours » d'`INDEX.md` (BAIL-08)
+- [ ] 47-05-PLAN.md — geste de prise reconnu par le hook, liste déclarée, G6 en profondeur sous `.planning/baux/` (BAIL-02, 04)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 47-06-PLAN.md — gate `BAIL` à l'écriture par outil d'un fichier déclaré (BAIL-03, 10)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 47-07-PLAN.md — base de G2′ sur `CLOTURE.md` (BAIL-06)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 47-08-PLAN.md — G2′ côté hook : amendement, budget cumulé, banc et mutants (BAIL-06)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 47-09-PLAN.md — règle miroir de G2′ au recalcul, clôture par `Bash` (BAIL-06)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 47-10-PLAN.md — canary et rejeu de l'étape 7 (BAIL-09, 10)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 47-11-PLAN.md — référence, spec amendée, limites nommées, fiches BACKLOG (BAIL-10)
+- [ ] 47-12-PLAN.md — `planning-core` v2.12.0 (à confirmer), sans release (BAIL-10)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 47-13-PLAN.md — étape 7a : décision d'armement de `BAIL` au moment d'agir (BAIL-09)
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 47-14-PLAN.md — étape 7b : décision d'armement de G2′ au moment d'agir (BAIL-09)
 
 ### Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire
 
