@@ -63,7 +63,10 @@
 # VF_DRIVER_LOCK=.planning/DRIVER.lock. Les verbes autres qu'acquire, appeles sans --ws ni --depot
 # quand le verrou de depot est absent, retombent sur l'ancien verrou ("scope_reason":
 # "legacy-fallback", "legacy_lock": true) : un manager en vol pendant la mise a jour garde son verrou.
-# status porte toujours "legacy_lock" (true|false) en lab partitionne.
+# status porte toujours "legacy_lock" (true|false) en lab partitionne. Un ancien verrou qui apparait ENTRE la
+# sonde et la pose (R-4) est re-sonde apres la pose : le processus retire sa propre pose et rend le MEME refus.
+# Un ancien verrou perime rend le meme reason "stale-requires-takeover" qu'un compartiment perime, avec un hint
+# different (VF_DRIVER_LOCK=<ancien verrou> driver-lock.sh recover) : c'est le hint qui les distingue.
 # HORS GIT (P57-D-07) : sans dossier commun, le repli est .planning/DRIVER.lock.d/{ws/<sujet>,repo}/
 # DRIVER.lock, sous le motif .planning/DRIVER.lock* du .gitignore ; le JSON dit "location": "checkout".
 # LIMITE ECRITE (A4, T-57-37) : un worktree sur une branche d'avant la partition n'a pas de dossier
@@ -748,6 +751,23 @@ vf_dl_legacy_probe() {
   )
 }
 
+# Refus d'acquisition devant un ancien verrou tenu (P57-D-26) : UN SEUL texte, qu'il soit rendu avant la pose ou
+# apres (correction R-4, re-sonde). Argument : la sortie de vf_dl_legacy_probe (etat, age, owner). Sort en 1.
+vf_dl_legacy_refuse() { # <sortie de vf_dl_legacy_probe>
+  local st age owner
+  st="$(printf '%s\n' "$1" | sed -n 1p)"
+  age="$(printf '%s\n' "$1" | sed -n 2p)"
+  owner="$(printf '%s\n' "$1" | sed -n 3p)"
+  if [ "$st" = vivant ]; then
+    printf '{"acquired": false, "reason": "legacy-lock-held", "held_by": "%s", "age_seconds": %s, "hint": "VF_DRIVER_LOCK=%s driver-lock.sh release --owner=%s"%s}\n' \
+      "$owner" "$age" "$LEGACY_DIR" "$owner" "$SCOPE_JSON"
+  else
+    printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "VF_DRIVER_LOCK=%s driver-lock.sh recover"%s}\n' \
+      "$owner" "$age" "$LEGACY_DIR" "$SCOPE_JSON"
+  fi
+  exit 1
+}
+
 require_owner() {
   [ -n "$OWNER" ] || { log "--owner requis pour '$ACTION'"; printf '{"error": "owner-required"%s}\n' "$SCOPE_JSON"; exit 1; }
 }
@@ -762,17 +782,7 @@ case "$ACTION" in
     if [ "$PARTITIONED" = 1 ]; then
       _leg="$(vf_dl_legacy_probe)"
       if [ -n "$_leg" ]; then
-        _leg_state="$(printf '%s\n' "$_leg" | sed -n 1p)"
-        _leg_age="$(printf '%s\n' "$_leg" | sed -n 2p)"
-        _leg_owner="$(printf '%s\n' "$_leg" | sed -n 3p)"
-        if [ "$_leg_state" = vivant ]; then
-          printf '{"acquired": false, "reason": "legacy-lock-held", "held_by": "%s", "age_seconds": %s, "hint": "VF_DRIVER_LOCK=%s driver-lock.sh release --owner=%s"%s}\n' \
-            "$_leg_owner" "$_leg_age" "$LEGACY_DIR" "$_leg_owner" "$SCOPE_JSON"
-        else
-          printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "VF_DRIVER_LOCK=%s driver-lock.sh recover"%s}\n' \
-            "$_leg_owner" "$_leg_age" "$LEGACY_DIR" "$SCOPE_JSON"
-        fi
-        exit 1
+        vf_dl_legacy_refuse "$_leg"
       fi
     fi
     # 1. VOIE LIBRE — generation complete d'abord, publication par `ln -s` ensuite. `ln -s` echoue
@@ -791,6 +801,17 @@ case "$ACTION" in
     # trou de la voie LIBRE, elle ne rouvre pas le protocole de reprise (T0, T12.2).
     gen="$(new_generation)" || { printf '{"acquired": false, "reason": "generation-failed"%s}\n' "$SCOPE_JSON"; exit 1; }
     if ! lock_present && ln_atomic "$gen" "$LOCK_DIR"; then
+      # R-4 : l'ancien verrou a pu apparaitre ENTRE la sonde de l'etape 0 et la pose ci-dessus. Re-sonde apres la
+      # pose ; s'il est la, on retire SA propre pose (le lien, puis sa generation) et on refuse exactement comme
+      # si l'ancien verrou avait ete la avant : meme reason, meme hint, aucun champ neuf. Lab partitionne seulement.
+      if [ "$PARTITIONED" = 1 ]; then
+        _leg_after="$(vf_dl_legacy_probe)"
+        if [ -n "$_leg_after" ]; then
+          [ "$(readlink "$LOCK_DIR" 2>/dev/null)" = "$gen" ] && rm -f "$LOCK_DIR"
+          rm -rf "${LOCK_PARENT:?}/${gen:?}"
+          vf_dl_legacy_refuse "$_leg_after"
+        fi
+      fi
       _lease="$(lease_age)" && : || _lease="null"
       # orphans_count (issue #82) : un registre laisse par une mission precedente (release avec
       # enfants ouverts, ou lock elague par `recover`) est signale des l'acquisition, le nouveau
