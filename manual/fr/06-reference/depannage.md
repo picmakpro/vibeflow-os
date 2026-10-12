@@ -145,7 +145,9 @@ fin du mandat, ou travaille dans un arbre séparé (`git worktree add`), qui n'e
 verrou. En dernier recours, pour un geste précis que tu assumes, le message décrit un marqueur de
 dérogation explicite ; elle est consignée dans la mesure du possible (une écriture qui échoue est
 ignorée), et ne se pose jamais « au cas où ». Lab partitionné : le message nomme le sujet, et la
-reprise est `driver-lock.sh reclaim --owner=<détenteur> --ws=<sujet>`.
+reprise est `driver-lock.sh reclaim --owner=<détenteur> --ws=<sujet>`. Lance toujours `driver-lock.sh`
+depuis la racine du lab : avec `--ws` ou `--depot` depuis un sous-dossier, il refuse (`not-at-lab-root`) au lieu
+de poser un verrou ailleurs.
 
 **Vérification.** Le même geste passe, ou une nouvelle tentative nomme le même détenteur tant que
 sa mission n'est pas terminée. Le garde-fou ne voit ni un terminal hors Claude Code ni une commande

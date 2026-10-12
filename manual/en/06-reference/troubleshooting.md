@@ -137,7 +137,8 @@ work in a separate tree (`git worktree add`), which isn't subject to the lock. A
 one specific action you take responsibility for, the message describes an explicit override marker;
 it is recorded as far as possible (a failed write is ignored), and never set "just in case". Split
 lab: the message names the topic, and the way back is
-`driver-lock.sh reclaim --owner=<holder> --ws=<topic>`.
+`driver-lock.sh reclaim --owner=<holder> --ws=<topic>`. Always run `driver-lock.sh` from the lab root:
+with `--ws` or `--depot` from a subfolder it refuses (`not-at-lab-root`) instead of placing a lock elsewhere.
 
 **Check.** The same action goes through, or a new attempt names the same holder for as long as its
 mission isn't over. The safeguard sees neither a terminal outside Claude Code nor a disguised

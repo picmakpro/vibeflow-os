@@ -240,6 +240,28 @@ canal à la même date : aucun veto. Le détail de chaque décision vit dans les
   exclusion est écrite dans le témoin. Tous les verbes restent identiques octet pour octet. *Ratifiée par
   Samuel ; P57-D-03 est précisée, pas réécrite.*
 
+### Décisions nées après la planification (2026-10-11)
+
+Deux résiduels de l'audit de sécurité (F-1 et F-2, voir `57-SECURITY.md`) ont été soumis à Samuel, qui a
+retenu l'option (a) à chaque fois : **P57-D-38 et P57-D-39, arbitrage Samuel, AskUserQuestion session
+principale, 2026-10-11**.
+
+- **P57-D-38 (casse de `.planning` en lab partitionné, F-1, option a)** : en lab partitionné seulement, le
+  guard Write/Edit compare le segment `.planning` sans tenir compte de la casse, dans le préfiltre C4 et dans
+  la cartographie des chemins. `<lab>/.PLANNING/workstreams/<ws>/f` est donc refusé sous le verrou d'autrui,
+  comme `.planning/Workstreams/FIABILITE/f`. Le lab plat reste identique au bit près (A/B contre la copie
+  gelée IDENTIQUE, témoin DLWS-03 conservé). Complète P57-D-33 (casse du nom de compartiment).
+- **P57-D-39 (position du lanceur, F-2, option a)** : `driver-lock.sh` refuse avec la raison nommée
+  `not-at-lab-root` quand `--ws` ou `--depot` est passé depuis un dossier sans `.planning/` propre alors que
+  la racine git (`git rev-parse --show-toplevel`) porte `.planning/workstreams` ; le hint dit de lancer depuis
+  la racine du lab. Nom choisi dans la série des refus existants (`ws-invalid`, `unknown-ws`,
+  `partition-unreadable`, `policy-missing`, noms kebab de l'objet du défaut) : ici le défaut est la position du
+  lanceur, que le nom dit sans ambiguïté, et aucun des quatre autres ne la décrit. Le guard détecte la
+  partition depuis la racine git, plus depuis le cwd : un commit ou une écriture lancé d'un sous-dossier est
+  jugé comme en lab partitionné (même condition : pas de `.planning/` propre au cwd). Sans `--ws` ni `--depot`,
+  rien ne change ; le lab plat non plus. P57-D-29 (deux `.planning/` dans un même clone) reste hors périmètre et
+  intact.
+
 </decisions>
 
 <canonical_refs>

@@ -640,12 +640,16 @@ compartiments avancent en parallèle ; deux gestes qui touchent des fichiers com
 - Le compartiment vient d'un `--ws=<sujet>` **explicite**, jamais déduit d'un export ni du pointeur
   `active-workstream` (même règle que les gates, amendement d'ADR-069 du 2026-09-23). Un `--ws` oublié
   replie sur le verrou de dépôt (`scope: depot`, `scope_reason: ws-absent`) ; un `--ws` qui ne désigne
-  aucun compartiment est refusé (`unknown-ws`, `ws-invalid`).
+  aucun compartiment est refusé (`unknown-ws`, `ws-invalid`) ; un `--ws` ou `--depot` lancé d'un
+  sous-dossier sans `.planning/` propre, quand la racine git porte les compartiments, l'est aussi
+  (`not-at-lab-root`, P57-D-39).
 - Un ancien `.planning/DRIVER.lock` vivant vaut verrou de dépôt : tout `acquire` refuse
   `legacy-lock-held` avec la commande de release exacte, jamais de reprise silencieuse.
 - `guard-driver-lock.sh` résout le verrou au même endroit, juge les écritures sous `.planning/` et
   les commits sur les fichiers indexés (`commit -a`, pathspec, `--amend` compris), et reste
-  **fail-closed** en lab partitionné : une exception ou une source illisible rend un refus.
+  **fail-closed** en lab partitionné : une exception ou une source illisible rend un refus. Il
+  détecte le lab partitionné depuis la racine git (un geste lancé d'un sous-dossier est jugé de même,
+  P57-D-39) et compare le segment `.planning` sans tenir compte de la casse (P57-D-38).
 - Lab plat, ou `VF_DRIVER_LOCK` posé : ancien régime à verrou unique, inchangé.
 
 **Décisions citées.**
