@@ -46,8 +46,9 @@ ADR-048/049). Acquisition **atomique** (un lien symbolique posé puis remplacé 
    - `acquired: true` → piloter. `acquired: false` avec `reason: held` (`held_by`) → **une autre
      mission pilote déjà** : ne pas dispatcher, remonter à l'humain (ou attendre). `acquired: false`
      avec `reason: stale-requires-takeover` (+ champ `hint`) → lock périmé : PAS un vol implicite,
-     `acquire` ne récupère plus rien lui-même (D-32-02) — exécuter `takeover` (ci-dessous), jamais
-     réinterprété comme un refus terminal.
+     `acquire` ne récupère plus rien lui-même (D-32-02) — exécuter la commande du `hint` (`takeover`
+     ci-dessous ; pour un ANCIEN verrou périmé d'avant la mise à jour, `VF_DRIVER_LOCK=… driver-lock.sh
+     recover`), jamais réinterprété comme un refus terminal.
 2. **Heartbeat ENTRE les étapes** — à chaque relecture ROADMAP/STATE entre deux étapes :
    ```bash
    "$S"/driver-lock.sh heartbeat --owner="<id>"
@@ -74,8 +75,8 @@ ADR-048/049). Acquisition **atomique** (un lien symbolique posé puis remplacé 
 
 **Récupération de claim périmé (`takeover`, geste EXPLICITE — LOCK-04)** : un agent LLM peut mourir
 sans release. Le TTL + heartbeat reste le seul filet, mais `acquire` ne récupère plus JAMAIS un lock
-périmé lui-même (D-32-02) — il REFUSE (`reason: stale-requires-takeover`) et nomme la commande dans
-son champ `hint`. Sur ce refus :
+périmé lui-même (D-32-02) — il REFUSE (`reason: stale-requires-takeover`, aussi pour un ancien verrou
+périmé, `hint` = `recover`) et nomme la commande dans son champ `hint`. Sur ce refus :
 ```bash
 "$S"/driver-lock.sh takeover --owner="<id>" --step="<étape>" [--ws="<sujet>" | --depot]
 ```
@@ -141,7 +142,8 @@ valeurs du mandat (P57-D-23, P57-D-35) :
   d'un sous-dossier sans `.planning/` propre, alors que la racine git porte `.planning/workstreams`, P57-D-39) →
   relancer depuis la racine du lab, jamais poser le verrou « là où on est ». `legacy-lock-held` (un ancien
   `.planning/DRIVER.lock` est tenu, il vaut verrou de dépôt) → remonter à l'humain avec le `hint`, qui nomme la
-  commande de release : l'ancien verrou se relâche par son détenteur, rien ne le reprend en silence (P57-D-26).
+  commande de release : l'ancien verrou se relâche par son détenteur, rien ne le reprend en silence (P57-D-26) ;
+  il peut aussi surgir juste après la pose (re-sonde R-4) : même texte, même conduite.
 - **Clé de session.** Le manager exporte le `GSD_SESSION_KEY` reçu du mandat (`vf-<sujet>-<owner>`), distinct par
   manager (P57-D-34) ; lecture globale de l'état : `driver-lock.sh status --all`.
 

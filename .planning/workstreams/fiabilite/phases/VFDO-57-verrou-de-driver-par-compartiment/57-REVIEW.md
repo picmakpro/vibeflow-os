@@ -83,3 +83,15 @@ arbitrage humain (voir les deux dernières lignes du tableau).
 
 Le cas (d) de R-3 teste le comportement ACTUEL de `map_repo_path` (casse de `.planning` et de `workstreams` dans
 l'index) ; la casse du préfiltre C4 des Write/Edit (F-1) a été corrigée ensuite (P57-D-38, `4df8ebf2`).
+
+## Corrections du 2026-10-12
+
+Arbitrage Samuel (AskUserQuestion, session principale, 2026-10-12) : solder la dette avant la PR. Rattachement aux
+versions non publiées sans bump (P57-D-40). Cette section ne réécrit pas l'historique ci-dessus.
+
+| Finding | Commits | Preuve |
+|---------|---------|--------|
+| R-4 (fenêtre sonde de l'ancien verrou / pose) | `6333d8e4` RED, `8689bbd7` GREEN | `driver-lock.sh` re-sonde l'ancien verrou après la pose et la retire si un ancien verrou est apparu ; la pose du processus est retirée ; prose de `mission-flow.md` alignée (même `reason`, `hint` `recover`) |
+| R-5 (`GIT_*` en préfixe) | `c5ccbab7` RED, `63d5cc4c` GREEN | préfixes `GIT_DIR=`, `GIT_INDEX_FILE=`, `GIT_WORK_TREE=` du même segment = cible incertaine (P57-D-43) ; l'affectation dans un autre segment reste ouverte (CONCERNS) |
+| R-6 (crochet de test en production) | `c5ccbab7`, `63d5cc4c`, `08d25595` | `VF_GUARD_TEST_RAISE` retiré ; l'exception est injectée dans une copie du guard par la suite |
+| R-7 (intégrité de la copie gelée) | `6333d8e4`, `8b957f62` | empreinte de la copie gelée épinglée, établie par le cas `.0` sans objet de référence ; vaut aussi en clone shallow ; le message `NOTE-INTEGRITE` ne prétend plus la vérifier |

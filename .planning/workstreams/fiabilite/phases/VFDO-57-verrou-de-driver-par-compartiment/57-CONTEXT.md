@@ -262,6 +262,27 @@ principale, 2026-10-11**.
   rien ne change ; le lab plat non plus. P57-D-29 (deux `.planning/` dans un même clone) reste hors périmètre et
   intact.
 
+### Décisions du manager de mission (2026-10-12)
+
+Décisions du MANAGER DE MISSION (mission « dette avant PR Phase 57 »), pas des arbitrages de Samuel : elles sont
+prises dans le cadre de l'arbitrage Samuel (AskUserQuestion, session principale, 2026-10-12) de solder la dette de
+la Phase 57 avant sa PR.
+
+- **P57-D-40 (rattachement aux versions non publiées)** : les corrections rejoignent conductor v1.49.0 et
+  dev-orchestrator v2.28.0, non publiées (le dernier tag `v2.69.1` porte conductor v1.48.2 et dev-orchestrator
+  v2.27.1), sans nouveau bump. Précédent : `e97a4196` (entrées complétées sans bump). Aucune release dans la
+  Phase 57 (P57-D-30).
+- **P57-D-41 (compteurs `progress` du STATE fiabilite)** : ils incluent la Phase 57 sous le même `milestone:`
+  (commit `d0a2eb23`), parce que `equipe-produit-v1.0` est inscrit sans `gsd-new-milestone` (arbitrage Samuel,
+  AskUserQuestion session principale, 2026-10-08).
+- **P57-D-42 (F-3 en lab partitionné seulement)** : les globaux git sans argument et `exec` sont reconnus par le
+  guard en lab partitionné seulement ; le lab plat reste inchangé pour tenir l'A/B au bit près contre la copie
+  gelée. L'extension au lab plat est soumise à Samuel (CONCERNS, limite a).
+- **P57-D-43 (périmètre de R-5)** : un préfixe `GIT_DIR=`, `GIT_INDEX_FILE=` ou `GIT_WORK_TREE=` du même segment
+  que le geste git rend la cible incertaine, y compris pour la décision « geste hors du lab ». Une affectation
+  dans un AUTRE segment (`export GIT_INDEX_FILE=…; git commit`) reste non couverte : limite écrite dans CONCERNS
+  (limite c).
+
 </decisions>
 
 <canonical_refs>

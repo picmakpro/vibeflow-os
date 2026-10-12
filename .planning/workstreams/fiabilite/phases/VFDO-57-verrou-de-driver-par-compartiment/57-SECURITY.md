@@ -98,3 +98,11 @@ dépôts jetables (aucune sonde sur le vrai `.git/vf-driver`, structure réelle 
   non touchées par la phase (BL-2, Phase 32), classe Catégorie A de l'en-tête (anti-accident). À consigner dans CONCERNS.md.
 - Notes : un `vf-driver/ws` remplacé par un lien redirige les écritures de verrou hors dépôt (nécessite l'écriture dans `.git`,
   hors modèle de menace) ; CONCERNS.md ne porte encore aucune entrée Phase 57 (dette documentaire à la clôture).
+
+## Corrections du 2026-10-12
+
+Arbitrage Samuel (AskUserQuestion, session principale, 2026-10-12). Cette section ne réécrit pas l'historique ci-dessus.
+
+| Finding | Commits | Preuve |
+|---------|---------|--------|
+| F-3 (`git --no-pager commit -am x` ALLOW) | `c5ccbab7` RED, `63d5cc4c` GREEN, `08d25595` refactor (`noarg_global`) | les 12 globaux git sans argument et `exec` sont reconnus ; refus sous le verrou d'autrui. EN LAB PARTITIONNÉ SEULEMENT (P57-D-42) : le lab plat reste inchangé (A/B au bit près). Reste ouvert (CONCERNS) : lab plat ; globaux à argument et wrappers à option-argument (AUD-2) ; affectation `GIT_*` d'un autre segment (AUD-1) |

@@ -170,3 +170,14 @@ L'usage concurrent réel à deux humains reste, comme annoncé, à la Phase 61.
 
 _Vérifié : 2026-10-12_
 _Vérificateur : Claude (gsd-verifier)_
+
+## Corrections du 2026-10-12
+
+Arbitrage Samuel (AskUserQuestion, session principale, 2026-10-12) : solder la dette avant la PR (rattachement sans bump, P57-D-40). Le statut reste `passed`. Complète « Réserves traitées (2026-10-12) » ci-dessus, dont les lignes C1, C3 et C4 (renvois à CONCERNS) sont dépassées sur ces points.
+
+| Réserve | Commits | Preuve |
+|---------|---------|--------|
+| C1 (`resolve_S` préfère `$HOME/.claude/scripts`) | `fc763a72` RED (cas EW-SRC), `dcba414d` GREEN | `check-mission-exit.sh` préfère le module conductor voisin quand le gate est dans le dépôt source |
+| C3 (six branches défensives sans mutant) | `6333d8e4`, `1f6b555b` | six mutants ajoutés (`acq_fallback`, `fallback_depotpresent`, `skip_link_d`, `pathspec_blind`, `incertain_none`, `toplevel_none`), total driver 16, ensembles complétés |
+| C4 (F-3 rejoué) | `c5ccbab7`, `63d5cc4c` | F-3 refusé en lab partitionné ; lab plat inchangé (P57-D-42) |
+| Annexe (suite flaky) | `c580b45e` | `test-check-description-fidelity.sh` stabilisée (T9 tmpdir privé, T10 miroir), `check-description-fidelity.sh` respecte `TMPDIR` ; 20/30 rouges avant, 0/30 après (`.planning/debug/flaky-description-fidelity.md`) |

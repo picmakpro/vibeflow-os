@@ -18,6 +18,13 @@ D-36 et D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-1
 - **Prompts** : `agents/vf-dev-manager.md` (250 lignes, instructions 46/46), `agents/vf-coder.md` et
   `agents/vf-reviewer.md` renvoient au protocole à instructions constantes (budget d'instructions tenu).
 
+- **Dette soldée avant la PR (2026-10-12)** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12 ;
+  P57-D-40 : rattachée à cette version non publiée, sans bump) :
+  - **C1** (`fc763a72` RED EW-SRC, `dcba414d` GREEN) : `scripts/check-mission-exit.sh` préfère le module conductor voisin
+    quand le gate est dans le dépôt source (plus de « génération du verrou : ? » causée par un `driver-lock.sh` d'avant la phase).
+  - **`references/mission-flow.md`** : précision de prose (R-4) ; un ANCIEN verrou périmé rend le même `reason`
+    `stale-requires-takeover` avec un `hint` `recover` à exécuter tel quel, et `legacy-lock-held` peut aussi surgir juste après la pose.
+
 ## [v2.27.1] — 2026-10-08 (carte d'intention : choix du planning, Phase 41.2)
 
 **Patch** (routage, PR #130) :

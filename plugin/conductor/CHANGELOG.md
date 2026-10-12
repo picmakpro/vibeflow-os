@@ -46,6 +46,20 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
   sans `--ws` sur l'ancien verrou (P57-D-24) — un manager lancé avant la mise à jour continue de viser le verrou de
   dépôt tant qu'il ne passe pas `--ws`.
 
+- **Dette soldée avant la PR (2026-10-12)** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12 ;
+  P57-D-40 : rattachée à cette version non publiée, sans bump) :
+  - **F-3** (`c5ccbab7`, `63d5cc4c`, `08d25595`) : le guard reconnaît les 12 globaux git sans argument et `exec`
+    (`git --no-pager commit -am x` refusé sous le verrou d'autrui), EN LAB PARTITIONNÉ SEULEMENT (P57-D-42) ; lab plat inchangé.
+  - **R-5** (`c5ccbab7`, `63d5cc4c`) : un préfixe `GIT_DIR=`, `GIT_INDEX_FILE=` ou `GIT_WORK_TREE=` du segment du geste =
+    cible incertaine ; l'affectation dans un autre segment reste non couverte (P57-D-43).
+  - **R-6** (`63d5cc4c`) : crochet `VF_GUARD_TEST_RAISE` retiré de la production.
+  - **R-4** (`6333d8e4`, `8689bbd7`) : `driver-lock.sh` re-sonde l'ancien verrou après la pose ; la pose du processus est retirée.
+  - **C3** (`6333d8e4`, `1f6b555b`) : six mutants (`acq_fallback`, `fallback_depotpresent`, `skip_link_d`, `pathspec_blind`,
+    `incertain_none`, `toplevel_none`), total driver 16.
+  - **R-7** (`6333d8e4`, `8b957f62`) : empreinte épinglée de la copie gelée ; l'intégrité face à la référence est établie aussi en clone shallow.
+  - **`check-description-fidelity.sh`** et sa suite (`c580b45e`) : le gate respecte `TMPDIR` ; T9 (tmpdir privé) et T10 (miroir de
+    l'arbre jugé) stabilisés, 20/30 rouges avant, 0/30 après.
+
 ## [v1.48.2] — 2026-10-10 (l'archivage roadmap ne retire plus les phases dont les dossiers existent)
 
 **Patch** (correctif ; arbitrage Samuel « Revert + correctif d'abord », AskUserQuestion session principale, 2026-10-10) :
