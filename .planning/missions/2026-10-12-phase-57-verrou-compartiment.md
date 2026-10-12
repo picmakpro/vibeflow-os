@@ -50,14 +50,20 @@ citées rejouées sous un HOME jetable.
 
 ## Preuves E6
 
-| Verdict | Commande | Sortie | SHA |
-|---|---|---|---|
-| porte | `replay-ci-jobs.sh --job gates` (outil de la Phase 40.1) | 19 rejouées, 3 sautées, 0 en échec | 911a60e1 |
-| porte | boucle des 102 suites, HOME jetable avec moteur | 100 vertes, 2 rouges PyYAML (vertes en vrai HOME, mêmes rouges sur la base) | b66a73af |
-| recette | `test-driver-lock-ws.sh` | 528/0, mutants 10/10, A/B IDENTIQUE | 911a60e1 |
-| recette | `test-guard-driver-lock-ws.sh` | 240/0, mutants 23/23, A/B IDENTIQUE | 911a60e1 |
-| recette | `test-driver-lock.sh` / `test-guard-driver-lock.sh` (témoins DLWS-03, diff vide contre la base) | 243/0 et 103/0 | 911a60e1 |
-| recette | `test-check-mission-exit-ws.sh` | 61/0, mutants 7/7 | 911a60e1 |
+Verdicts rendus sur `911a60e1` (sorties exactes : voir 57-16-SUMMARY.md et 57-VERIFICATION.md), relayés verbatim.
+Le job `gates` de ci.yml, rejoué par le manager (19 rejouées, 3 sautées, 0 en échec), n'est pas une preuve E6 (D-12).
+
+```json
+{"preuves": [
+ {"verdict": "recette", "commande": "bash plugin/conductor/scripts/tests/test-driver-lock-ws.sh", "exit_code": 0, "sha": "911a60e1"},
+ {"verdict": "recette", "commande": "bash plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh", "exit_code": 0, "sha": "911a60e1"},
+ {"verdict": "recette", "commande": "bash plugin/conductor/scripts/tests/test-driver-lock.sh", "exit_code": 0, "sha": "911a60e1"},
+ {"verdict": "recette", "commande": "bash plugin/conductor/scripts/tests/test-guard-driver-lock.sh", "exit_code": 0, "sha": "911a60e1"},
+ {"verdict": "recette", "commande": "bash plugin/conductor/scripts/tests/test-driver-lock-consumers-ws.sh", "exit_code": 0, "sha": "911a60e1"},
+ {"verdict": "recette", "commande": "bash plugin/dev-orchestrator/scripts/tests/test-check-mission-exit-ws.sh", "exit_code": 0, "sha": "911a60e1"},
+ {"verdict": "recette", "commande": "bash plugin/dev-orchestrator/scripts/tests/test-check-mission-exit.sh", "exit_code": 0, "sha": "911a60e1"}
+]}
+```
 
 ## Incidents
 
