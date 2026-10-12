@@ -199,22 +199,9 @@ par levier/coût. Déclencheur naturel : prochaine évolution de `vf-new-lab`, d
 du team-kernel ou de la chaîne validator.
 
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Notifications de progression des agents managers — CLOS -->
-## Convergence de contenu à l'update de module (manifeste par module) — CLOS (2026-10-12)
-
-Preuve : `8e5f4a0a` (plan 31-05, convergence à l'update) et `7e972678` (release v2.54.0), Phase 31, MANI-01/MANI-03 ; réalisé dans `plugin/_internal/vibeflow-update.sh:451` (chemin `.vibeflow-manifest-<module>`) et `:3105-3125` (suppression des chemins absents du nouveau manifeste, avec backup), suite `plugin/_internal/tests/test-manifest.sh`.
-
-**Capturé :** 2026-07-26 · **Origine :** update réel de la machine 2.23.0 → 2.36.0
-
-L'engine `update` re-matérialise le contenu du module mais **ne supprime pas** les fichiers que
-la nouvelle version ne livre plus : les 12 verbes-façades de dev-orchestrator v1.x ont survécu
-à l'update v2.1.1 dans `~/.claude/skills/` (nettoyés à la main), ressuscitant le double
-catalogue que la bascule agentique a tué. Remède proposé : l'engine écrit un **manifeste des
-chemins posés** par module à l'install (`.claude/scripts/.vibeflow-manifest-<module>`), et
-`update` supprime les chemins de l'ancien manifeste absents du nouveau (avec backup). Tests :
-update d'un module dont une skill a disparu → skill retirée du lab.
-
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## check-agents : périmètre des agents tiers (gsd-*, autres chaînes) — CLOS -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Skill-installer global (multi-agents) — CLOS -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Convergence de contenu à l'update de module (manifeste par module) — CLOS (2026-10-12) -->
 ## Template d'agent installable s'appuyant sur dev-orchestrator
 **Capturé :** 2026-06-06 · **À explorer :** quand un besoin réel d'agent de domaine apparaît
 
@@ -244,77 +231,7 @@ direct (agent `vibeflow-dev` + `/vf-*`).
 **Déclencheur de resurgence :** apparition d'un vrai cas d'agent spécialisé (de domaine) à
 distribuer aux utilisateurs.
 
-## Combler les gaps de couverture inspirés du catalogue `agency-agents` — CLOS (2026-10-12)
-
-Preuve : `bf34d493` (merge PR #66), Phase 34, AGTS-01 ; réalisé dans `.planning/workstreams/fiabilite/phases/VFDO-34-gaps-agency-agents-cadrage-skill-installer/34-AUDIT-AGTS.md:128` (« Gaps refusés ») et `:185` (« Limite de la recherche de preuve »). Le résidu `web-test-team` est suivi par l'entrée AGTS-02 (sujet « AGTS-02 — sortie d'expérimental de `mobile-test`(-team) »), qui reste ouverte.
-
-**Capturé :** 2026-07-20 · **À explorer :** au prochain arbitrage d'extension de périmètre
-
-> **Source :** [`msitarzewski/agency-agents`](https://github.com/msitarzewski/agency-agents) —
-> catalogue MIT de 230+ agents-personas Claude Code (`.md` + frontmatter YAML natif), rangés en
-> ~12 divisions. Companion app multi-outils :
-> [`msitarzewski/agency-agents-app`](https://github.com/msitarzewski/agency-agents-app).
-> Modèle « catalogue plat sans orchestration » — **à ne PAS importer tel quel** (densité
-> incompatible ADR-029, aucune gouvernance `conductor`). Valeur = **source d'inspiration et de
-> personas à distiller**, surtout pour élargir vers des labs non-dev.
-
-**Cadrage.** Le cœur VibeFlow (Engineering, Design, Project Management, Marketing/Content) est
-déjà couvert et **supérieur** (orchestration gouvernée vs catalogue). Rien à importer là. Ce qui
-suit ne concerne que les gaps réels, distillés depuis leur taxonomie.
-
-**Mapping divisions → modules (au 2026-07-20) :**
-
-| Division agency-agents | Module VibeFlow | Statut |
-|---|---|---|
-| Engineering | `dev-orchestrator`, `software-architecture` | ✅ Couvert |
-| Design | `design-orchestrator` | ✅ Couvert |
-| Project Management | `planning-core`, `conductor`, `kpi-analyst`, `consolidator` | ✅ Couvert |
-| Marketing / Content | `content-bundle`, `growth-bundle` | ✅ Couvert |
-| Testing | `mobile-test`(-team) | 🟡 Mobile only, expérimental |
-| Security | `infrastructure-audit`, `audit-architecture` (+ agent `vf-auditer` du dev-orchestrator) | 🟡 Audit oui ; pas incident/compliance |
-| Sales | `business-pilot-bundle` (blueprint commercial) | 🟡 Granularité fine à dériver |
-| Product | `planning-core` + `business-pilot-bundle` | 🟡 Pas de module product first-class |
-| Paid Media | `growth-bundle` (crochet par canal) | 🟡 Crochet oui, blueprints non |
-| Support | — | ❌ Manquant |
-| Spatial / Game / Healthcare / GIS / Academic | `vf-new-lab` (dérivation) | ❌ Niche, pas de module |
-
-**Pistes priorisées (valeur/effort décroissant) :**
-1. **`web-test-team`** — test-team web/e2e (Playwright) calqué sur `mobile-test-team`
-   (Pattern 12, workers cloisonnés). Comble un trou de **notre propre chaîne dev** (seul test réel
-   = mobile). Usage interne immédiat → priorité #1.
-2. **Extensions Sales + Paid Media** des bundles existants — crochets déjà présents
-   (`business-pilot-bundle`, `growth-bundle/par-canal`), il ne manque que des blueprints. Leurs
-   personas SDR/discovery/proposal et PPC/programmatic sont directement inspirants à distiller.
-3. **`SupportFlow`** — nouveau bundle métier (customer service / analytics / legal) si l'on vise
-   les labs non-dev. Aucun équivalent aujourd'hui.
-
-**Ce qu'on n'en prend PAS :** le catalogue plat, la densité, tout copier-coller direct dans
-`plugin/`. Chaque geste passe par `check-agents.sh` (ADR-044) + ADR-029 + le brainstorming de
-périmètre avant tout code.
-
-**Pourquoi différé :** aucun besoin bloquant aujourd'hui ; le cœur couvre l'usage courant. C'est
-de l'élargissement de périmètre, à arbitrer selon la stratégie produit.
-
-**Déclencheur de resurgence :** décision d'élargir VibeFlow (test web dans la chaîne dev, ou
-ouverture à des labs non-dev Sales/Support/Paid) — six des onze divisions désormais `refuser`
-faute de preuve D-02 (voir bloc du 2026-09-15 ci-dessous) : leur déclencheur précis est la
-découverte d'un incident documenté, d'une demande externe ou d'un bug récurrent nommé sur l'une
-d'elles, pas une simple décision d'élargir dans l'abstrait. `web-test-team` (Testing) reste
-`reporter`, sur la dépendance AGTS-02 déjà suivie au ROADMAP (Phase 34).
-
-**Verdict par gap — 2026-09-15 (Phase 34, audit AGTS-01, `34-AUDIT-AGTS.md`).** Matrice
-re-mesurée contre le parc réel de `plugin/` (31 fichiers, corpus mesuré identique à la matrice
-d'origine ci-dessus) : Engineering / Design / Project Management / Marketing-Content restent
-`sans objet` (déjà couverts) ; Testing (`web-test-team`) est `reporter`, sur dépendance à
-AGTS-02 déjà suivie au ROADMAP, pas re-arbitrée ici ; les six divisions restantes (Security,
-Sales, Product, Paid Media, Support, Spatial/Game/Healthcare/GIS/Academic) sont `refuser` faute
-de preuve au sens de la règle de preuve du milestone (D-02) — le ❌/🟡 du catalogue seul ne
-suffit pas, il faut un incident documenté, une demande externe ou un bug récurrent, et aucun des
-six n'en a un. Zéro agent créé, zéro persona importée (D-01). Détail des six refus, gap par gap,
-et condition exacte de réouverture : `34-AUDIT-AGTS.md` §§ « Gaps refusés » et « Limite de la
-recherche de preuve ». Aucun item BACKLOG distinct créé par cette note (zéro verdict `combler`,
-`34-AUDIT-AGTS.md` § « Items backlog à créer »).
-
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Combler les gaps de couverture inspirés du catalogue `agency-agents` — CLOS (2026-10-12) -->
 ## AGTS-02 — sortie d'expérimental de `mobile-test`(-team) : REPORTÉE avec trace
 
 **Capturé :** 2026-09-15 (Phase 34, run réel piloté par l'équipe, `34-RUN-MOBILE.md`) ·
@@ -384,31 +301,7 @@ qui doit être durci au prochain protocole du même genre.
 protocole jetable (spike, sonde, plugin de mesure, agent de sonde) — reprendre cet item avant
 d'écrire ce gate, pas après.
 
-## Budget des SKILL.md et du bootstrap — sans enforcement machine (différé de la Phase 25, 2026-09-15) — CLOS (2026-10-12)
-
-Preuve : `fb097cce` (Phase 43, FABR-09, 2026-09-26) ; réalisé dans `plugin/conductor/scripts/check-instruction-budget.sh:125` (plafond SKILL.md 500) et `:163-208` (découverte des SKILL.md), ratchet du bootstrap `@bootstrap:socle` à `.planning/instruction-budget-baselines.tsv:28`. Le plafond de 2 000 tokens du bootstrap reste un objectif suivi par le sujet « Ramener le socle du bootstrap sous 2 000 tokens (ADR-029) ».
-
-**Capturé :** 2026-09-15, clôture de la première PR de la Phase 25 (mandat vf-coder, plan 25-03).
-Hors périmètre de BUDG-01 (D-03) — la phase a délibérément limité sa portée aux agents distribués.
-
-**Le défaut :** ADR-029 borne aussi les `SKILL.md` à 500 lignes et le bootstrap à 2000 tokens, mais
-aucun gate distribué ne mesure ni l'un ni l'autre — `plugin/conductor/scripts/check-instruction-budget.sh`
-ne couvre que `plugin/*/agents/*.md` et `plugin/*/AGENT.md` (glob à un seul niveau, D-03).
-
-**Déclencheur de reprise :** le gate `check-instruction-budget.sh` existe désormais et son contrat
-de mesure (lignes du fichier entier + instructions du body, ratchet par sentinelle) est prouvé.
-Étendre sa découverte à un second corpus (`SKILL.md`) est une **modification de portée**, pas une
-reconstruction — reprendre ce script comme socle plutôt qu'en écrire un nouveau.
-
-**Écarté, et non différé :** la métrique en tokens estimés pour le budget du bootstrap (piste F3,
-`25-CONTEXT.md`) — à ne rouvrir que sur un incident lié à la **taille** du bootstrap plutôt qu'à son
-adhérence à la charte de densité.
-
-**Remédiation, pas ici :** l'abaissement des fichiers d'agents distribués les plus chargés (mesurés
-`SANS-BASELINE` au rejeu du 2026-09-15, ex. `plugin/dev-orchestrator/agents/vf-dev-manager.md` à
-250 lignes) est un geste ultérieur, par lot, chacun abaissant une baseline dans son propre commit —
-jamais un livrable de cette phase, et jamais une réécriture « pour passer » le gate.
-
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Budget des SKILL.md et du bootstrap — sans enforcement machine (différé de la Phase 25, 2026-09-15) — CLOS (2026-10-12) -->
 ## Évasion de mesure du budget d'instructions par bloc de code fenced — DIFFÉRÉ (2026-09-15)
 
 **Capturé :** 2026-09-15, audit de la mission d'exécution du plan 25-03 (mandat vf-coder), au-delà
@@ -509,90 +402,9 @@ le fichier — aucune ligne d'index ne la référence. **Hors périmètre de la 
 au passage pour ne pas mêler une dérive non arbitrée au diff d'une phase dédiée à une autre
 doctrine. **Déclencheur de reprise** : prochain passage sur `docs/ADR.md`.
 
-## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15) — CLOS (2026-10-12)
-
-Preuve : `76985e3f` (sources des rulesets) et `bebd5718` (PROT-01 coché), Phase 41 ; réalisé dans `.github/rulesets/main.json:21` (`pull_request`) et `:36` (`required_status_checks`), ruleset `23892920` `enforcement: active` mesuré par `gh api` le 2026-10-12.
-
-**Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — ouvrir une **phase
-dédiée « posture de protection du dépôt »** (prochain numéro libre, 41). L'inscription au ROADMAP est
-faite par la session principale **après le merge de la PR #67**, délibérément, pour ne pas créer de
-conflit sur `ROADMAP.md` avec la branche de la Phase 25. Le présent item est la trace côté branche ;
-il cesse d'être un `human_needed` et devient le cahier des charges de cette phase.
-
-**Constat mesuré** (audit de la vague 3, Phase 25) : `gh api repos/picmakpro/vibeflow-os/rulesets`
-rend `[]`, et l'endpoint de protection classique rend 404 avec des permissions `push:true,
-admin:false` — cohérent avec « aucune protection configurée », pas avec un refus d'accès. `main`
-n'est donc protégée par rien.
-
-**Conséquence** : **tout gate in-repo de ce dépôt est neutralisable depuis la PR qu'il juge.** Une
-même PR peut modifier un gate, sa suite de tests et l'étape CI qui l'invoque. Le cas est concret pour
-la Phase 25 (`check-instruction-budget.sh` + `test-check-instruction-budget.sh` + l'étape du job
-`gates`), mais le risque est **structurel et antérieur** : il vaut identiquement pour
-`check-divergence.sh`, `check-agents.sh`, `check-version-sync.sh` et tous les autres. Aucun threat ID
-du registre STRIDE de la Phase 25 ne le nomme — il dépasse le périmètre d'une phase de gate.
-
-**Forme attendue** : un ruleset exigeant la **CI verte avant merge** sur `main`. À poser **dans une
-phase à part, jamais au passage d'une mission** : changer les règles du merge pendant qu'une PR est
-ouverte modifierait les conditions de cette PR en cours de route.
-
-**Points à instruire dans la phase 41** : interaction avec la discipline de release du `CLAUDE.md`
-(le gate `check-release-tag` est déjà `main`-only et échoue par construction au merge, rerun requis
-après le tag) ; sort du hook `pre-push` optionnel (`scripts/hooks`) ; effet sur les hotfix urgents.
-
-**Déclencheur de reprise** : inscription au ROADMAP par la session principale après le merge de
-la PR #67.
-
-**Statut partiel (2026-09-18, Phase 41) :** la phase a été ouverte et cadrée, sa prémisse s'est
-renversée (accès admin absent, cf. l'item ci-dessus), et le cahier des charges est désormais
-scindé — la partie in-repo est traitée par ADR-072 (`docs/ADR.md`), la partie côté serveur reste
-au premier item de cette page. La forme attendue décrite ici (« un ruleset exigeant la CI verte
-avant merge ») n'existe pas encore : cet item n'est pas marqué achevé.
-
-## T-25-SC — journal de sécurité de la Phase 25 : TRANCHÉ, geste de clôture (2026-09-15) — CLOS (2026-10-12)
-
-Preuve : `36bca429` (Phase 25, rapport SECURED, 2026-09-16) ; réalisé dans `.planning/workstreams/fiabilite/phases/VFDO-25-budget-d-instructions-et-tage-d-alignement-court/25-SECURITY.md:71` (T-25-SC `closed`, `threats_open: 0`) et `:246` (AR-04).
-
-**Décision** : arbitrage Samuel, AskUserQuestion session principale, 2026-09-15 — le `25-SECURITY.md`
-est produit **à la clôture de la phase, après le plan 25-04**, par `/gsd-secure-phase` sur la phase
-**complète**, une fois la calibration livrée (donc après la Phase 40). Ce n'est pas une dette
-oubliée : c'est un geste de clôture daté et attendu.
-
-**Pourquoi pas maintenant** : la Phase 25 n'est pas close — 3 plans sur 4 sont livrés, `25-04`
-(calibration, gravure des baselines, armement de la sentinelle) reste un checkpoint bloquant-humain.
-Un journal produit sur une phase à moitié livrée serait à refaire.
-
-**Contexte** : T-25-SC (chaîne d'approvisionnement) est classé `accept` dans le registre STRIDE de la
-phase. Le lab a `security_enforcement: true` / `security_block_on: "high"` ; T-25-SC est `low`, il ne
-bloque donc pas `/gsd-ship` aujourd'hui. Le précédent d'un accept tracé est établi par
-`24-SECURITY.md` et `27-SECURITY.md` (archivés sous `.planning/milestones/agentique-v1.0-phases/`).
-
-**Déclencheur de reprise** : livraison du plan 25-04, avant la clôture de la Phase 25.
-
-## `check-overlaps.sh` : `present()` aveugle à un agent local installé sous son nom de fichier canonique — DIFFÉRÉ — CLOS (2026-10-12)
-
-Preuve : `bfc523c4` (fix), mergé par `6e7c40d7` (PR #119, hors phase GSD), publié dans v2.68.0 ; réalisé dans `plugin/conductor/scripts/check-overlaps.sh:87` (`agent_present_by_name`) et `:126` (appel dans `present()`), test T17 à `plugin/conductor/scripts/tests/test-check-overlaps.sh:256`.
-
-**Capturé :** 2026-09-15, hygiène documentaire de clôture de la Phase 40 (mandat vf-coder). Faiblesse
-**préexistante** — non introduite par cette phase, non corrigée ici (« un garde ne se desserre
-jamais dans le commit qu'il autorise »).
-
-**Le défaut :** `present()` (`plugin/conductor/scripts/check-overlaps.sh:72-87`) résout un agent
-local par correspondance de nom de fichier : `[ -f "$AGENTS_DIR/$ref.md" ] && return 0`. Sur un lab
-**installé**, l'agent routeur du dev-orchestrator est posé sous `agents/dev-orchestrator.md` — un
-nom de fichier stable, indépendant du nom sous lequel l'agent s'incarne (`vibeflow-head` depuis la
-Phase 40, `vibeflow-dev` avant). La frontière ADR-057 entre deux front doors potentiellement
-concurrentes (`vibeflow-head` et `gsd-next`, la front door GSD pour qui n'a pas d'agent routeur)
-est donc **déjà muette en lab réel** : `present()` ne peut pas la détecter par ce chemin de
-résolution.
-
-**Piste de fix :** résoudre `present()` par le **nom** déclaré dans le frontmatter de l'agent
-(`name:`), pas par le nom de fichier — même logique que la garde anti-alias T36 de la Phase 40
-(motif assemblé, jamais un chemin en dur). La preuve devra être un cas où le nom de fichier et le
-nom incarné divergent, rouge avant/vert après.
-
-**Déclencheur de reprise :** un incident réel de recouvrement de front doors en lab installé, ou un
-prochain audit `check-overlaps.sh`.
-
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15) — CLOS (2026-10-12) -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## T-25-SC — journal de sécurité de la Phase 25 : TRANCHÉ, geste de clôture (2026-09-15) — CLOS (2026-10-12) -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## `check-overlaps.sh` : `present()` aveugle à un agent local installé sous son nom de fichier canonique — DIFFÉRÉ — CLOS (2026-10-12) -->
 ## `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module — DIFFÉRÉ
 
 **Capturé :** 2026-09-15, hygiène documentaire de clôture de la Phase 40 (mandat vf-coder).
