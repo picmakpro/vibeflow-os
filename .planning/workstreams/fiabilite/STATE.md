@@ -9,10 +9,10 @@ last_activity: 2026-10-12
 last_activity_desc: Phase 57 plan 16 complete (porte de phase rejouée depuis ci.yml : gates 19/19, 102 suites dont 2 rouges environnementales prouvées, témoins DLWS-03 intacts ; DLWS-01..08 cochées ; ledger à la main)
 state_head: 1413af28
 progress:
-  total_phases: 18
+  total_phases: 19
   completed_phases: 18
-  total_plans: 115
-  completed_plans: 105
+  total_plans: 131
+  completed_plans: 121
 milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
 stopped_at: "Completed 57-16-PLAN.md (2026-10-12) — porte de phase verte, ledger à jour (P57-D-12, P57-D-30) ; next : vérification de phase 57, PR, jamais de release dans la 57."
 ---
@@ -32,8 +32,11 @@ See: .planning/PROJECT.md
 
 Phase: 57 (Verrou de driver par compartiment) — EXECUTING
 Jalon **`fiabilite-v1.0` CLOS le 2026-10-08** (arbitrage Samuel, session principale, 2026-10-08). 18 phases livrées,
-de la 18 à la 41.4. Les compteurs de plans restent à 105/115 : les 7 plans 41-07 à 41-13 sont confiés à Willy, hors
-clôture, et la Phase 40 a 5 plans pour un seul `40-SUMMARY.md` consolidé. Bilan et réserves :
+de la 18 à la 41.4. Les 7 plans 41-07 à 41-13 sont confiés à Willy, hors clôture, et la Phase 40 a 5 plans pour un
+seul `40-SUMMARY.md` consolidé. Depuis le 2026-10-12, les compteurs `progress` incluent la Phase 57 (16 plans, tous
+exécutés) : `equipe-produit-v1.0` vit dans la ROADMAP plate sans `gsd-new-milestone` (arbitrage Samuel, AskUserQuestion
+session principale, 2026-10-08), donc sous le même `milestone:`. La 57 ne compte pas encore comme phase terminée : sa
+case ROADMAP reste ouverte jusqu'à la PR. Bilan et réserves :
 `.planning/MILESTONES.md` § fiabilite-v1.0.
 Dernières entrées : la 41.2 a été mergée le 2026-10-02 (PR #130) ; WSCH-01 est coché avec une réserve de recette en
 session, tracée au BACKLOG. La 41.4 a été mergée le 2026-10-08 (PR #135, en `--admin`).
