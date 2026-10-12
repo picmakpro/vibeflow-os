@@ -25,7 +25,7 @@
         "scouting-47"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plan-47",
@@ -35,7 +35,7 @@
         "cadrage-47"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "plancheck-47",
@@ -45,7 +45,7 @@
         "plan-47"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "failed"
     },
     {
       "id": "suivi-47",
