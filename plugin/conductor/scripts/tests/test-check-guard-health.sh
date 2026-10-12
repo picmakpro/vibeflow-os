@@ -34,6 +34,14 @@ case "$WORK_DIR" in
 esac
 [ -d "$WORK_DIR" ] || { echo "PRÉFLIGHT FIXTURE CASSÉ — WORK_DIR introuvable : $WORK_DIR" >&2; exit 2; }
 
+# --- Repertoire courant NEUTRE (Q1, 2026-10-13) : check-guard-health.sh lit le dernier commit du depot git
+# du repertoire courant ; un cas D14-D25 lance depuis le depot qui execute la suite lirait SES commits
+# (frais) et perdrait son stall. La suite tourne donc dans $WORK_DIR, hors de tout depot git (preflight).
+cd "$WORK_DIR" || { echo "PRÉFLIGHT FIXTURE CASSÉ — cd $WORK_DIR impossible" >&2; exit 2; }
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "PRÉFLIGHT FIXTURE CASSÉ — $WORK_DIR est dans un depot git (TMPDIR sous un depot ?)" >&2; exit 2
+fi
+
 # --- Isolation VF_DRIVER_LOCK, PAR DÉFAUT, pour TOUTE la suite (correctif ciblé, mandat 2026-08-17,
 # Bloquant 2) : check_driver_stall() dans check-guard-health.sh lit TOUJOURS `driver-lock.sh
 # status`, y compris pour les cas hérités D1-D7/D9-D11 qui ne le savent pas. Sans cet export, ces
@@ -528,6 +536,109 @@ print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m 
 
   VF_DRIVER_LOCK="$D13_LOCK" "$DRIVER_LOCK" release --owner=mission-d13 >/dev/null 2>&1
 fi
+
+# === Q1 — le commit de la branche courante compte comme progression (arbitrage Samuel, AskUserQuestion
+# session principale, 2026-10-13, Q1 option b) ====================================================
+# Pendant un plan plus long que STALL_WINDOW aucun noeud n'est marque : sans cette regle, faux stall a
+# chaque plan (constate a 1587 s et 1589 s le 2026-10-12). Le script lit le dernier commit (%ct, date de
+# COMMIT) de la branche courante du depot git du repertoire courant ; chaque cas tourne dans un depot
+# fictif sous $WORK_DIR, jamais dans le depot qui execute la suite.
+q1_repo() { # <dir> <secs-d-anciennete-du-commit> — depot git avec UN commit dont %ct = maintenant - secs
+  local d="$1" secs="$2" when
+  mkdir -p "$d" && git -C "$d" init -q 2>/dev/null || return 1
+  when=$(( $(date +%s) - secs ))
+  GIT_COMMITTER_DATE="$when +0000" GIT_AUTHOR_DATE="$when +0000" \
+    git -C "$d" -c user.name=q1 -c user.email=q1@example.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null \
+    commit -q --allow-empty -m q1 2>/dev/null
+}
+q1_run() { # <repo-ou-dir> <lock> <health> — le script tourne DANS <repo-ou-dir>, lock backdate fait par l'appelant
+  ( cd "$1" && VF_DRIVER_LOCK="$2" bash "$SCRIPT" --dir="$3" 2>/dev/null )
+}
+
+echo ""
+echo "=== Q1a — progress_epoch fige a 1000 s, heartbeat frais, commit de branche RECENT -> SAIN (pas de faux stall) ==="
+Q1A_LOCK="$WORK_DIR/q1a-lock"; Q1A_REPO="$WORK_DIR/q1a-repo"
+q1_repo "$Q1A_REPO" 60 || ko "Q1a fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1A_LOCK" "$DRIVER_LOCK" acquire --owner=q1a-owner --step=q1a-step >/dev/null 2>&1
+progress_backdate "$Q1A_LOCK" 1000
+Q1A_OUT="$(q1_run "$Q1A_REPO" "$Q1A_LOCK" "$WORK_DIR/q1a-health")"; Q1A_RC=$?
+[ "$Q1A_RC" -eq 3 ] && ok "Q1a : commit de branche a 60 s -> exit 3 (SAIN)" || ko "Q1a exit" "rc=$Q1A_RC attendu 3 (faux stall malgre un commit recent)"
+[ -z "$Q1A_OUT" ] && ok "Q1a : stdout strictement vide" || ko "Q1a stdout" "out=[$Q1A_OUT]"
+VF_DRIVER_LOCK="$Q1A_LOCK" "$DRIVER_LOCK" release --owner=q1a-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1b — TEMOIN : meme verrou, commit de branche ANCIEN (2000 s) -> STALL maintenu, age effectif imprime ==="
+Q1B_LOCK="$WORK_DIR/q1b-lock"; Q1B_REPO="$WORK_DIR/q1b-repo"
+q1_repo "$Q1B_REPO" 2000 || ko "Q1b fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1B_LOCK" "$DRIVER_LOCK" acquire --owner=q1b-owner --step=q1b-step >/dev/null 2>&1
+progress_backdate "$Q1B_LOCK" 1000
+Q1B_OUT="$(q1_run "$Q1B_REPO" "$Q1B_LOCK" "$WORK_DIR/q1b-health")"; Q1B_RC=$?
+[ "$Q1B_RC" -eq 0 ] && ok "Q1b : commit ancien -> exit 0 (signal)" || ko "Q1b exit" "rc=$Q1B_RC attendu 0"
+case "$Q1B_OUT" in
+  *"stall"*"q1b-owner"*"q1b-step"*"seuil=900s"*) ok "Q1b : ligne de stall, owner, step, seuil inchange" ;;
+  *) ko "Q1b contenu" "out=[$Q1B_OUT]" ;;
+esac
+case "$Q1B_OUT" in
+  *"depuis 1000s"*|*"depuis 1001s"*|*"depuis 1002s"*) ok "Q1b : age imprime = celui du verrou (le plus recent des deux, ici progress_epoch)" ;;
+  *) ko "Q1b age" "out=[$Q1B_OUT]" ;;
+esac
+VF_DRIVER_LOCK="$Q1B_LOCK" "$DRIVER_LOCK" release --owner=q1b-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1c — commit a 1000 s (> seuil), progress_epoch a 1700 s -> STALL, age effectif = celui du COMMIT ==="
+Q1C_LOCK="$WORK_DIR/q1c-lock"; Q1C_REPO="$WORK_DIR/q1c-repo"
+q1_repo "$Q1C_REPO" 1000 || ko "Q1c fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1C_LOCK" "$DRIVER_LOCK" acquire --owner=q1c-owner --step=q1c-step >/dev/null 2>&1
+progress_backdate "$Q1C_LOCK" 1700
+Q1C_OUT="$(q1_run "$Q1C_REPO" "$Q1C_LOCK" "$WORK_DIR/q1c-health")"; Q1C_RC=$?
+[ "$Q1C_RC" -eq 0 ] && ok "Q1c : exit 0 (signal)" || ko "Q1c exit" "rc=$Q1C_RC attendu 0"
+case "$Q1C_OUT" in
+  *"depuis 1000s"*|*"depuis 1001s"*|*"depuis 1002s"*) ok "Q1c : age effectif = depuis le dernier commit (plus recent que progress_epoch)" ;;
+  *) ko "Q1c age" "out=[$Q1C_OUT]" ;;
+esac
+VF_DRIVER_LOCK="$Q1C_LOCK" "$DRIVER_LOCK" release --owner=q1c-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1d — pas de depot git (repertoire courant hors git) -> comportement d'avant : STALL, jamais SAIN fabrique ==="
+Q1D_LOCK="$WORK_DIR/q1d-lock"; Q1D_DIR="$WORK_DIR/q1d-nogit"; mkdir -p "$Q1D_DIR"
+VF_DRIVER_LOCK="$Q1D_LOCK" "$DRIVER_LOCK" acquire --owner=q1d-owner --step=q1d-step >/dev/null 2>&1
+progress_backdate "$Q1D_LOCK" 1000
+Q1D_OUT="$(q1_run "$Q1D_DIR" "$Q1D_LOCK" "$WORK_DIR/q1d-health")"; Q1D_RC=$?
+[ "$Q1D_RC" -eq 0 ] && ok "Q1d : hors git -> exit 0 (stall maintenu)" || ko "Q1d exit" "rc=$Q1D_RC attendu 0"
+case "$Q1D_OUT" in *"stall"*"q1d-owner"*) ok "Q1d : ligne de stall" ;; *) ko "Q1d contenu" "out=[$Q1D_OUT]" ;; esac
+VF_DRIVER_LOCK="$Q1D_LOCK" "$DRIVER_LOCK" release --owner=q1d-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1e — lecture git qui ECHOUE (depot sans aucun commit) -> comportement d'avant : STALL, pas de crash ==="
+Q1E_LOCK="$WORK_DIR/q1e-lock"; Q1E_REPO="$WORK_DIR/q1e-repo"
+mkdir -p "$Q1E_REPO" && git -C "$Q1E_REPO" init -q 2>/dev/null
+VF_DRIVER_LOCK="$Q1E_LOCK" "$DRIVER_LOCK" acquire --owner=q1e-owner --step=q1e-step >/dev/null 2>&1
+progress_backdate "$Q1E_LOCK" 1000
+Q1E_OUT="$(q1_run "$Q1E_REPO" "$Q1E_LOCK" "$WORK_DIR/q1e-health")"; Q1E_RC=$?
+[ "$Q1E_RC" -eq 0 ] && ok "Q1e : git log en echec -> exit 0 (stall maintenu)" || ko "Q1e exit" "rc=$Q1E_RC attendu 0"
+case "$Q1E_OUT" in *"stall"*"q1e-owner"*) ok "Q1e : ligne de stall" ;; *) ko "Q1e contenu" "out=[$Q1E_OUT]" ;; esac
+VF_DRIVER_LOCK="$Q1E_LOCK" "$DRIVER_LOCK" release --owner=q1e-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1f — commit date dans le FUTUR (horloge decalee) -> ignore, STALL maintenu (un commit futur ne masque jamais un stall) ==="
+Q1F_LOCK="$WORK_DIR/q1f-lock"; Q1F_REPO="$WORK_DIR/q1f-repo"
+q1_repo "$Q1F_REPO" -86400 || ko "Q1f fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1F_LOCK" "$DRIVER_LOCK" acquire --owner=q1f-owner --step=q1f-step >/dev/null 2>&1
+progress_backdate "$Q1F_LOCK" 1000
+Q1F_OUT="$(q1_run "$Q1F_REPO" "$Q1F_LOCK" "$WORK_DIR/q1f-health")"; Q1F_RC=$?
+[ "$Q1F_RC" -eq 0 ] && ok "Q1f : commit futur -> exit 0 (stall maintenu)" || ko "Q1f exit" "rc=$Q1F_RC attendu 0"
+VF_DRIVER_LOCK="$Q1F_LOCK" "$DRIVER_LOCK" release --owner=q1f-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1g — ABANDON inchange : heartbeat mort + commit recent -> abandon (le commit n'efface jamais un heartbeat mort) ==="
+Q1G_LOCK="$WORK_DIR/q1g-lock"; Q1G_REPO="$WORK_DIR/q1g-repo"
+q1_repo "$Q1G_REPO" 30 || ko "Q1g fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1G_LOCK" "$DRIVER_LOCK" acquire --owner=q1g-owner --step=q1g-step >/dev/null 2>&1
+heartbeat_backdate "$Q1G_LOCK" 2000
+Q1G_OUT="$(q1_run "$Q1G_REPO" "$Q1G_LOCK" "$WORK_DIR/q1g-health")"; Q1G_RC=$?
+[ "$Q1G_RC" -eq 0 ] && ok "Q1g : exit 0 (signal)" || ko "Q1g exit" "rc=$Q1G_RC attendu 0"
+case "$Q1G_OUT" in *"abandon"*"q1g-owner"*) ok "Q1g : ligne d'abandon malgre le commit recent" ;; *) ko "Q1g contenu" "out=[$Q1G_OUT]" ;; esac
+VF_DRIVER_LOCK="$Q1G_LOCK" "$DRIVER_LOCK" release --owner=q1g-owner >/dev/null 2>&1
 
 echo ""
 echo "=== D12 — anti-vert-à-vide : le compteur d'assertions exécutées n'est jamais zéro ==="
