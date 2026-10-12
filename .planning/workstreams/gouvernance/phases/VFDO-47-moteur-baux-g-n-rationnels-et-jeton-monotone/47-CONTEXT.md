@@ -8,7 +8,8 @@ tiennent à la main.
 **Décisions humaines :** Q1 à Q7 tranchées par Willy, AskUserQuestion session principale,
 2026-10-12, relayées par la session principale au manager de mission (repli D-09, pas d'outil de
 question en sous-agent). Willy a suivi la recommandation (a) sur les sept questions. Elles
-deviennent P47-D-01 à P47-D-07.
+deviennent P47-D-01 à P47-D-07 ; Q8 et Q9, posées en planification le même jour, deviennent
+P47-D-18 et P47-D-19.
 **Décisions du manager :** marquées « manager », annoncées à Willy avant l'écriture de ce fichier
 (relais du 2026-10-12, « ne sont pas renversées ») et dérivées ici en P47-D-08 à P47-D-17. Les
 sous-décisions `a`/`b` sont aussi du manager.
@@ -179,6 +180,27 @@ refus dans les deux sens et s'arme dans l'ordre, comme en 45 et 46.
   sa suite, le workflow CI ou un hook (convention du dépôt).
 - **P47-D-17 :** ROADMAP §47 : la ligne `Depends on` reçoit le texte prêt de `46-NOTE-ROADMAP-47.md`
   (b) ; la référence `BACKLOG.md:74` est corrigée en `:169`.
+
+### Décisions de planification tranchées par Willy (Q8, Q9)
+
+> Arbitrages Willy, AskUserQuestion session principale, 2026-10-12, relayés verbatim par la session
+> principale à la reprise de la mission. Posées après six tours de plan-check frais (Q9) et une
+> condition d'armement ajoutée par le planificateur (Q8).
+
+- **P47-D-18 (Q8 → « (a) Attendre une liste réelle (Recommandé) ») :** la condition `LISTE-REELLE
+  n ≥ 1` est **gardée**. `BAIL` et G2′ sont livrés en observation ; leur armement attend une liste
+  réelle de fichiers déclarés (Phase 50, ou liste posée à la main sur un lab) ; les checkpoints de
+  47-13 et 47-14 se rejouent à ce moment-là. Précise P47-D-06 sans le renverser.
+- **P47-D-19 (Q9 → « (a) Détection au mieux (Recommandé) ») :** la garantie « jamais clos en silence »
+  de G2′ est **bornée aux clôtures par outil** (`PreToolUse` sur `CLOTURE.md`). Au recalcul, la règle
+  miroir est une **détection au mieux** d'une clôture hors outil : elle signale ce que le journal du
+  moteur montre (changement non couvert d'un fichier déclaré), **sans prétention de complétude**.
+  « Clôture hors outil » devient une **limite nommée**, même régime que P45-D-10 (`Bash` invisible au
+  hook). Précise P47-D-04 (« règle miroir au recalcul ») sans le renverser : le miroir reste, sa
+  garantie est retirée. Conséquence de planification : les mécanismes ajoutés au seul service de la
+  complétude du miroir (inventaire de départ, exemption par empreinte du triplet, preuve générative à
+  équivalence) sortent de 47-09 sauf s'ils servent la détection au mieux à faible coût ; aucun
+  plan-check n'exige plus qu'une clôture hors outil ne finisse jamais `close` en silence.
 
 ### Claude's Discretion
 
