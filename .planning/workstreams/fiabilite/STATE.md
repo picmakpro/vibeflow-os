@@ -4,9 +4,9 @@ milestone: fiabilite-v1.0
 current_phase: 57
 current_phase_name: Verrou de driver par compartiment
 status: executing
-last_updated: "2026-10-10T23:50:00.000Z"
-last_activity: 2026-10-10
-last_activity_desc: Phase 57 plan 15 complete (growth-bundle v2.0.14 sans release, compte de suites des README racine 102, entrée BACKLOG EnterWorktree réécrite ; check-version-sync exit 0)
+last_updated: "2026-10-12T12:00:00.000Z"
+last_activity: 2026-10-12
+last_activity_desc: Phase 57 plan 16 complete (porte de phase rejouée depuis ci.yml : gates 19/19, 102 suites dont 2 rouges environnementales prouvées, témoins DLWS-03 intacts ; DLWS-01..08 cochées ; ledger à la main)
 state_head: 1413af28
 progress:
   total_phases: 18
@@ -14,7 +14,7 @@ progress:
   total_plans: 115
   completed_plans: 105
 milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-stopped_at: "Completed 57-15-PLAN.md (2026-10-10) — growth-bundle bumpé, README racine à 102 suites, BACKLOG réécrit (P57-D-08, P57-D-30) ; next plan 57-16."
+stopped_at: "Completed 57-16-PLAN.md (2026-10-12) — porte de phase verte, ledger à jour (P57-D-12, P57-D-30) ; next : vérification de phase 57, PR, jamais de release dans la 57."
 ---
 
 # Project State
@@ -48,7 +48,10 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Last activity: 2026-10-10 — Phase 57 plan 57-15 complete (15/16)
+Phase 57 : 16/16 plans exécutés le 2026-10-12, porte de phase rejouée depuis `ci.yml` (job `gates` 19/19, 102 suites, deux rouges
+d'environnement prouvées, témoins DLWS-03 intacts), DLWS-01..08 cochées. Correctifs hors plan : revue R-1 à R-3, F-1/F-2 (P57-D-38, P57-D-39).
+Next : vérification de phase, PR ; aucune release (P57-D-30).
+Last activity: 2026-10-12 — Phase 57 plan 57-16 complete (16/16)
 
 ## Accumulated Context
 
@@ -79,6 +82,7 @@ Historique complet (jalons, décisions, arbitrages 2026-07 à 2026-09) : voir l'
 - [Phase 57]: 57-08 : un commit est jugé sur l'union index / -a / pathspec / HEAD (--amend) / git add de la même commande, en octets ; source illisible = refus nommé ; gestes d'arbre refusés depuis le worktree qui a pris le verrou seulement, retrait de worktree et cible git incertaine refusés sous tout verrou d'autrui, push/branch/tag/gh sous le seul verrou de dépôt (P57-D-10, P57-D-16 à P57-D-19, P57-D-33) ; mutants dans 57-11
 - [Phase 57]: 57-07 : --ws du gate couvre E1, identité d'E7 (cur_lock_gen, « ? » si illisible) et surcharge d'E4 ; partitionné sans --ws = E1 indéterminé / --budget-snapshot exit 4 ; verrou de dépôt tenu dit sur stderr (P57-D-35) ; mutants dans la disposition miroir du plugin
 - [Phase 57]: 57-02 : repli legacy-fallback sur tout verbe autre qu'acquire sans --ws ni --depot quand le dépôt est absent ; status porte legacy_lock pour toute cible en lab partitionné (P57-D-24, P57-D-26, P57-D-32)
+- 2026-10-11 — Phase 57 : P57-D-38 (casse de `.planning` en lab partitionné, F-1) et P57-D-39 (position du lanceur, refus `not-at-lab-root`, F-2), option (a) à chaque fois (arbitrage Samuel, AskUserQuestion session principale, 2026-10-11). P57-D-31..37 : D-34, D-36, D-37 ratifiées (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10), les autres sans veto (même canal, même date). Registre : `57-CONTEXT.md`.
 
 ### Pending Todos
 
