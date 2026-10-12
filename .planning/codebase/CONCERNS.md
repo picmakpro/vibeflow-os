@@ -226,43 +226,60 @@
   il ne la fourche (Iron Law 2 révisée, ADR-069) ; (c) ne PAS désactiver le toggle pour faire taire
   le bruit : ce serait perdre la garde sur le dépôt, qui, elle, fonctionne.
 
-**Phase 57 — verrou de driver par compartiment : limites connues, consignées et non corrigées** — Sévérité : **LOW**
-- Issue: la Phase 57 est vérifiée `passed` (13/13), mais sept points restent ouverts, tous sans effet sur un
-  critère. Aucun n'est corrigé : consignés ici pour que la prochaine phase touchant le verrou ou le guard les
-  retrouve. Sources : `.planning/workstreams/fiabilite/phases/VFDO-57-verrou-de-driver-par-compartiment/57-VERIFICATION.md` (C1, C3, C4),
-  `57-REVIEW.md` (R-4 à R-7), `57-SECURITY.md` (F-3).
-  1. **F-3, réel** (`57-SECURITY.md`, constaté et rejoué par `57-VERIFICATION.md` C4) : `git --no-pager commit -am x`
-     passe (ALLOW) sous le verrou d'autrui. Cause : `skip_git_globals` de `plugin/conductor/scripts/guard-driver-lock.sh`
-     ignore `--no-pager`, `--paginate`, `-p`, `--no-optional-locks`, `--literal-pathspecs`, et `exec` n'est pas un
-     wrapper reconnu. Ligne héritée de la Phase 32 (BL-2), classe « catégorie A » (anti-accident) de l'en-tête du guard.
-  2. **R-4** (`57-REVIEW.md`) : fenêtre de quelques ms entre la sonde de l'ancien verrou et `ln_atomic` dans
-     `driver-lock.sh` ; les deux gestes ne sont pas atomiques entre eux. En outre, un `stale` legacy rend le même
-     `reason` que celui d'un compartiment, avec une autre commande (`recover`), non distinguée dans la prose.
-  3. **R-5** (`57-REVIEW.md`, P57-D-20) : `GIT_INDEX_FILE=` et `GIT_DIR=` en préfixe d'affectation ne sont pas des
-     cibles incertaines pour le guard : le commit est jugé sur l'index du process.
-  4. **R-6** (`57-REVIEW.md`) : le crochet de test `VF_GUARD_TEST_RAISE` (`guard-driver-lock.sh`, vers la ligne 546)
-     est présent en production ; il ne peut que faire refuser.
-  5. **R-7** (`57-REVIEW.md`) : `WS-AB-INTEGRITE` et `GW-AB-INTEGRITE` s'ignorent (SKIP) quand les objets `e8771d94` /
-     `cff1e2af` sont absents, c'est-à-dire sur un clone shallow : la preuve de lab plat « au bit près » n'y est pas jouée.
-  6. **C3** (`57-VERIFICATION.md`) : QUAL-01 « mutation rouge pour chaque comportement neuf » (DLWS-08) n'est pas
-     exhaustif. Six branches défensives n'ont pas de mutant : côté driver `acq_fallback` (suffixe JSON seul),
-     `fallback_depotpresent` (clause « verrou de dépôt absent » de P57-D-24) et `skip_link_d` (lien symbolique ignoré par
-     `status --all`) ; côté guard `pathspec_blind` (`--pathspec-from-file`, `--only`, `--include`), `incertain_none`
-     (chemin « incertain » dans un commit) et `toplevel_none`. Le code est correct (sondes rejouées) ; seul le témoin manque.
-  7. **C1** (`57-VERIFICATION.md`) : `resolve_S` de `plugin/dev-orchestrator/scripts/check-mission-exit.sh` préfère
-     `$HOME/.claude/scripts` au module voisin. Sur le dépôt source, un `driver-lock.sh` d'avant la phase (sans `--ws`)
-     y répond rc 1 : E1 devient `indet`, l'identité d'E7 vaut `?` (« génération du verrou : ? »). Fail-closed, jamais un
-     vert ; se résorbe avec la release suivante et `/vf-update`.
+**Phase 57 — verrou de driver par compartiment : dette soldée le 2026-10-12, cinq limites restent ouvertes** — Sévérité : **LOW**
+- Issue: la Phase 57 est vérifiée `passed` (13/13). Sept points avaient été consignés ici (`57-VERIFICATION.md` C1, C3, C4 ;
+  `57-REVIEW.md` R-4 à R-7 ; `57-SECURITY.md` F-3). Arbitrage Samuel (AskUserQuestion, session principale, 2026-10-12) :
+  les solder avant la PR. Corrections rattachées aux versions non publiées conductor v1.49.0 et dev-orchestrator v2.28.0
+  sans bump (P57-D-40). Détail des preuves : `57-REVIEW.md`, `57-SECURITY.md` et `57-VERIFICATION.md`, sections
+  « Corrections du 2026-10-12 ».
+  **Fermés :**
+  1. **F-3 en lab partitionné** (`c5ccbab7` RED, `63d5cc4c` GREEN ; refactor `08d25595`) : `git --no-pager commit -am x` est
+     refusé sous le verrou d'autrui ; les 12 globaux git sans argument et `exec` sont reconnus par `skip_git_globals`,
+     EN LAB PARTITIONNÉ SEULEMENT (P57-D-42).
+  2. **R-4** (`6333d8e4` RED, `8689bbd7` GREEN) : `driver-lock.sh` re-sonde l'ancien verrou après la pose ; la fenêtre
+     sonde / `ln_atomic` est fermée, la pose du processus est retirée. La prose de
+     `plugin/dev-orchestrator/references/mission-flow.md` distingue le `reason` identique (`stale-requires-takeover`) et le
+     `hint` (`recover` pour un ancien verrou).
+  3. **R-5, même segment** (`c5ccbab7`, `63d5cc4c`) : un préfixe `GIT_DIR=`, `GIT_INDEX_FILE=` ou `GIT_WORK_TREE=` du segment
+     du geste rend la cible incertaine, aussi pour la décision « geste hors du lab » (P57-D-43). Voir la limite (c).
+  4. **R-6** (`63d5cc4c`) : le crochet `VF_GUARD_TEST_RAISE` est retiré de la production (la suite injecte l'exception
+     dans une copie du guard).
+  5. **R-7** (`6333d8e4`, `8b957f62`) : prémisse corrigée. La preuve A/B n'était pas ignorée en CI ; c'est l'intégrité de la
+     copie gelée face à sa référence qui s'ignorait en clone shallow. L'empreinte de la copie gelée est désormais épinglée
+     et le cas `.0` l'établit sans objet de référence ; le message `NOTE-INTEGRITE` ne prétend plus la vérifier.
+  6. **C3** (`6333d8e4`, `1f6b555b`) : six mutants ajoutés (`acq_fallback`, `fallback_depotpresent`, `skip_link_d`,
+     `pathspec_blind`, `incertain_none`, `toplevel_none`), total driver 16.
+  7. **C1** (`fc763a72` RED EW-SRC, `dcba414d` GREEN) : `check-mission-exit.sh` préfère le module conductor voisin quand le gate
+     est dans le dépôt source.
+  8. Annexe : `check-description-fidelity.sh` respecte `TMPDIR` et `test-check-description-fidelity.sh` est stabilisée (T9 tmpdir
+     privé, T10 miroir de l'arbre jugé ; 20/30 rouges avant, 0/30 après, `c580b45e`,
+     `.planning/debug/flaky-description-fidelity.md`).
+  **Restent OUVERTS** (sonde commune : payload `{"tool_name":"Bash","session_id":"autre","cwd":"<lab>","tool_input":{"command":"<cmd>"}}`
+  sur `guard-driver-lock.sh`, depuis un lab partitionné dont le verrou est tenu par une autre session ; ALLOW = stdout vide,
+  refus = JSON `permissionDecision: deny`) :
+  - (a) **F-3 en lab plat** : inchangé exprès, pour tenir l'A/B au bit près contre la copie gelée (`cff1e2af`). Sonde :
+    `git --no-pager commit -am x` en lab plat sous verrou d'autrui rend ALLOW. Question posée à Samuel (étendre ou non).
+  - (b) **Globaux git à argument devant le verbe et wrappers à option-argument** : `git --git-dir <p>` (deux jetons),
+    `--work-tree <p>`, `--namespace=`, `--config-env=`, `--attr-source=`, `--super-prefix=`, puis `env -u X`, `env -C d`,
+    `nice -n 5`, `exec -a x`, `bash -c "…"` devant `git commit -am x` : ALLOW, identique à la base (AUD-2, S6).
+  - (c) **Affectation `GIT_*` dans un autre segment** : `export GIT_INDEX_FILE=/x; git commit -m y` rend ALLOW (AUD-1, reste de
+    R-5 ; P57-D-43 ne couvre que le préfixe du même segment).
+  - (d) **Épingle R-7 et fixture gelée modifiables ensemble** : une même PR peut changer l'empreinte épinglée et
+    `tests/fixtures/driver-lock-pre-e8771d9.sh` / `guard-driver-lock-pre-cff1e2a.sh` ; seul un trailer `Gate-Touche`
+    déclaratif le trace, et `tests/fixtures/` n'est pas dans la surface de G-2 (AUD-3). Sonde : modifier la fixture et
+    l'épingle dans un commit sans trailer, `scripts/check-gate-touche.sh` reste vert.
+  - (e) **`takeover --ws` ne sonde pas l'ancien verrou** : compartiment `alpha` périmé + ancien `.planning/DRIVER.lock` vivant,
+    `driver-lock.sh takeover --ws=alpha …` rend `acquired: true` (AUD-6, hors diff ; P57-D-26 ne vise qu'`acquire`).
 - Files: `plugin/conductor/scripts/guard-driver-lock.sh`, `plugin/conductor/scripts/driver-lock.sh`,
   `plugin/conductor/scripts/tests/test-driver-lock-ws.sh`, `plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh`,
-  `plugin/dev-orchestrator/scripts/check-mission-exit.sh`
-- Impact: aucun critère de la Phase 57 n'en dépend. Le point 1 est une faille de l'anti-accident (pas du modèle de
-  menace, qui exclut l'écriture dans `.git`) ; les points 2 à 5 sont des limites écrites ; 6 est une réserve de preuve ;
-  7 est du bruit fail-closed propre au dépôt source.
-- Fix approach: (1) faire reconnaître à `skip_git_globals` les globaux sans argument listés et `exec` comme wrapper,
-  avec mutant ; (2 à 5) à ne traiter que si un usage concurrent réel (Phase 61) les rend observables ; (6) six mutants à
-  ajouter dans une correction courte ; (7) facultatif : préférer le module voisin quand `--root` est le dépôt source.
-  La correction C2 (transmission de `--ws` au budget) n'est PAS dans cette liste : elle est faite (`test-check-mission-exit-ws.sh`, EW-BWS).
+  `plugin/dev-orchestrator/scripts/check-mission-exit.sh`, `plugin/dev-orchestrator/references/mission-flow.md`
+- Impact: aucun critère de la Phase 57 n'en dépend. Les limites (a) à (c) sont des trous de l'anti-accident (pas du modèle
+  de menace, qui exclut l'écriture dans `.git` et les contournements de catégorie A de l'en-tête du guard) ; (d) est un
+  trou de traçabilité des gates ; (e) est une reprise qui ignore un ancien verrou vivant.
+- Fix approach: (a) décision de Samuel, puis étendre `skip_git_globals` au lab plat avec un nouvel A/B ; (b) lire
+  l'argument des globaux et des wrappers listés, avec un mutant par forme ; (c) suivre les affectations `GIT_*` exportées
+  dans les segments précédents ; (d) mettre `tests/fixtures/` dans la surface de G-2 ; (e) faire sonder l'ancien verrou à
+  `takeover --ws` comme `acquire`. À ne traiter que si un usage concurrent réel (Phase 61) les rend observables.
 
 ## Known Bugs
 
