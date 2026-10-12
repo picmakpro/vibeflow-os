@@ -9,8 +9,9 @@
 # PR qu'elle juge — elle, cette suite, et l'etape CI qui l'invoque — et rester verte. Une suite
 # incapable de rougir est un defaut, au meme titre que le gate qu'elle verifie.
 #
-# Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et SEPT mutants opposables
-# (MUT-1 a MUT-7), un par comparaison du script sous test (MUT-6 cible la borne sur la virgule du
+# Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et NEUF mutants opposables
+# (MUT-1 a MUT-9 ; MUT-8 et MUT-9 retirent chacun un des deux prefixes de la classe 6, les fixtures
+# des suites surveillees — arbitrage Samuel, AskUserQuestion session principale, 2026-10-13), un par comparaison du script sous test (MUT-6 cible la borne sur la virgule du
 # motif, ajoutee dans la meme comparaison 3) — regle de comptage (decision du manager, 2026-09-17,
 # reprise du plan 41-14) : chaque mutant asserte le rc EXACT attendu sur le mutant ET sur
 # l'original. Un mutant qui « echoue » par un plantage (rc 2) ou une plage vide (rc 3) la ou le
@@ -58,12 +59,13 @@ git_c() {  # <root> <args...> — identite de fixture par -c, jamais la config d
 }
 
 # mk_repo <name> -> imprime <path> ; depot jetable portant la surface reelle en miniature (les
-# cinq classes, un chemin hors surface, un gate d'un AUTRE module) et un premier commit sur main.
+# six classes, un chemin hors surface, un gate et une fixture d'un AUTRE module) et un premier commit sur main.
 mk_repo() {
   local d="$TMP/$1"
   mkdir -p "$d/scripts/tests" "$d/scripts/hooks" \
     "$d/plugin/conductor/scripts/tests" "$d/plugin/dev-orchestrator/scripts" \
-    "$d/.github/workflows" || { echo "  ✗ FIXTURE — mkdir $d impossible" >&2; exit 1; }
+    "$d/.github/workflows" "$d/plugin/conductor/scripts/tests/fixtures" \
+    "$d/scripts/tests/fixtures/traffic-snapshot/sous" "$d/plugin/consolidator/scripts/tests/fixtures" || { echo "  ✗ FIXTURE — mkdir $d impossible" >&2; exit 1; }
   git_c "$d" init -q -b main >/dev/null
   printf '#!/bin/sh\necho demo\n' > "$d/scripts/check-demo.sh"
   printf '#!/bin/sh\necho demo\n' > "$d/scripts/tests/test-check-demo.sh"
@@ -73,6 +75,9 @@ mk_repo() {
   printf 'name: ci\n' > "$d/.github/workflows/ci.yml"
   printf '#!/bin/sh\necho autre module\n' > "$d/plugin/dev-orchestrator/scripts/check-demo.sh"
   printf '# demo readme\n' > "$d/README.md"
+  printf 'gel\n' > "$d/plugin/conductor/scripts/tests/fixtures/gele-demo.sh"
+  printf 'gel\n' > "$d/scripts/tests/fixtures/traffic-snapshot/sous/snap-demo.json"
+  printf 'gel\n' > "$d/plugin/consolidator/scripts/tests/fixtures/autre-module.txt"
   git_c "$d" add -A >/dev/null
   git_c "$d" commit -q -m "fixture: etat initial" >/dev/null
   printf '%s' "$d"
@@ -237,6 +242,26 @@ Gate-Touche: scripts/check-demo.sh — suppression volontaire du gate demo, decl
 safe_run out rc "$D" --base-ref "$B"
 [ "$rc" -eq 0 ] && ok "PASS chemin supprime mais declare -> rc 0" || ko "PASS chemin supprime declare" "rc=0" "rc=$rc :: $out"
 
+# --- PASS 12 : classe 6 (fixture de la suite conductor) touchee, trailer exact -> rc0 ----------------
+D="$(mk_repo pass12)"; B="$(base_of "$D")"
+printf 'gel v2\n' > "$D/plugin/conductor/scripts/tests/fixtures/gele-demo.sh"
+commit_avec "$D" "test: touche une fixture de la suite conductor
+
+Gate-Touche: plugin/conductor/scripts/tests/fixtures/gele-demo.sh — demo pour le cas PASS classe fixtures conductor"
+safe_run out rc "$D" --base-ref "$B"
+case "$out" in *DECLARE*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$has" -eq 1 ]; then ok "PASS classe fixtures-conductor, trailer exact -> rc 0 DECLARE"
+else ko "PASS classe fixtures-conductor" "rc=0 DECLARE" "rc=$rc :: $out"; fi
+
+# --- PASS 13 : classe 6 (fixture scripts/tests, sous-dossiers profonds), motif glob -> rc0 ----------
+D="$(mk_repo pass13)"; B="$(base_of "$D")"
+printf 'gel v2\n' > "$D/scripts/tests/fixtures/traffic-snapshot/sous/snap-demo.json"
+commit_avec "$D" "test: touche une fixture profonde de scripts/tests
+
+Gate-Touche: scripts/tests/fixtures/* — couverture par motif glob des fixtures de scripts/tests"
+safe_run out rc "$D" --base-ref "$B"
+[ "$rc" -eq 0 ] && ok "PASS classe fixtures-scripts (profondeur libre), motif glob -> rc 0" || ko "PASS classe fixtures-scripts" "rc=0" "rc=$rc :: $out"
+
 echo "== test-check-gate-touche : FAIL =="
 
 # --- FAIL 1 : chemin de surface touche sans aucun trailer -> rc1 CHEMIN-NON-DECLARE ------------------
@@ -333,6 +358,24 @@ nverdicts=$(printf '%s\n' "$out" | awk '/^CHEMIN-NON-DECLARE:/ { c++ } END { pri
 if [ "$rc" -eq 1 ] && [ "$hasm" -eq 1 ] && [ "$nverdicts" -eq 2 ]; then ok "FAIL motif avec virgule litterale -> rc 1 MARQUEUR-MAL-FORME + 2 CHEMIN-NON-DECLARE"
 else ko "FAIL motif avec virgule litterale" "rc=1 MARQUEUR-MAL-FORME + 2 CHEMIN-NON-DECLARE" "rc=$rc verdicts=$nverdicts :: $out"; fi
 
+# --- FAIL 7 : fixture de la suite conductor touchee sans trailer -> rc1 CHEMIN-NON-DECLARE ----------
+D="$(mk_repo fail7)"; B="$(base_of "$D")"
+printf 'gel v2\n' > "$D/plugin/conductor/scripts/tests/fixtures/gele-demo.sh"
+commit_avec "$D" "test: touche une fixture conductor sans trailer"
+safe_run out rc "$D" --base-ref "$B"
+case "$out" in *"CHEMIN-NON-DECLARE: plugin/conductor/scripts/tests/fixtures/gele-demo.sh"*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "FAIL fixture conductor sans trailer -> rc 1 CHEMIN-NON-DECLARE (classe fixtures)"
+else ko "FAIL fixture conductor sans trailer" "rc=1 CHEMIN-NON-DECLARE" "rc=$rc :: $out"; fi
+
+# --- FAIL 8 : fixture profonde de scripts/tests touchee sans trailer -> rc1 --------------------------
+D="$(mk_repo fail8)"; B="$(base_of "$D")"
+printf 'gel v2\n' > "$D/scripts/tests/fixtures/traffic-snapshot/sous/snap-demo.json"
+commit_avec "$D" "test: touche une fixture profonde scripts sans trailer"
+safe_run out rc "$D" --base-ref "$B"
+case "$out" in *"CHEMIN-NON-DECLARE: scripts/tests/fixtures/traffic-snapshot/sous/snap-demo.json"*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "FAIL fixture profonde scripts/tests sans trailer -> rc 1 CHEMIN-NON-DECLARE"
+else ko "FAIL fixture profonde scripts/tests sans trailer" "rc=1 CHEMIN-NON-DECLARE" "rc=$rc :: $out"; fi
+
 echo "== test-check-gate-touche : BRUYANT =="
 
 # --- BRUYANT 1 : --base-ref vers une ref inexistante -------------------------------------------------
@@ -375,6 +418,15 @@ case "$out" in *PLAGE-VIDE*) has=1 ;; *) has=0 ;; esac
 if [ "$rc" -eq 3 ] && [ "$has" -eq 1 ]; then ok "SILENCE --base-ref egal HEAD -> rc 3 PLAGE-VIDE"
 else ko "SILENCE --base-ref egal HEAD" "rc=3 PLAGE-VIDE" "rc=$rc :: $out"; fi
 
+# --- SILENCE 4 : fixture d'un AUTRE module touchee seule -> rc3 (borne nommee de la classe 6) --------
+D="$(mk_repo sil4)"; B="$(base_of "$D")"
+printf 'gel v2\n' > "$D/plugin/consolidator/scripts/tests/fixtures/autre-module.txt"
+commit_avec "$D" "test: touche une fixture hors surface (autre module)"
+safe_run out rc "$D" --base-ref "$B"
+case "$out" in *RIEN-A-JUGER*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 3 ] && [ "$has" -eq 1 ]; then ok "SILENCE fixture d'un autre module seule -> rc 3 (controle negatif de la classe 6)"
+else ko "SILENCE fixture d'un autre module seule" "rc=3 RIEN-A-JUGER" "rc=$rc :: $out"; fi
+
 echo "== test-check-gate-touche : USAGE =="
 
 safe_run out rc "$TMP" --option-bidon
@@ -386,7 +438,7 @@ safe_run out rc "$TMP/chemin-inexistant-xyz"
 safe_run out rc "$TMP" --base-ref
 [ "$rc" -eq 64 ] && ok "USAGE --base-ref sans valeur -> 64" || ko "USAGE --base-ref sans valeur" "rc=64" "rc=$rc :: $out"
 
-echo "== test-check-gate-touche : MUTANTS (MUT-1 a MUT-7) =="
+echo "== test-check-gate-touche : MUTANTS (MUT-1 a MUT-9) =="
 
 # --- MUT-1 : retire la classe des suites (scripts/tests/test-*.sh) ----------------------------------
 MUT1_OLD='    if (p ~ /^scripts\/tests\/test-[^\/]+\.sh$/) return "suite"'
@@ -520,6 +572,29 @@ else
   if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then okmut 7 "$rc_mut" 1 "$rc_orig" 0
   else komut 7 "od sans -v" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
 fi
+
+# --- MUT-8 / MUT-9 : retire UN des deux prefixes de la classe 6 (fixtures des suites surveillees) ---
+# Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13. Fixture : la fixture du prefixe
+# retire est touchee sans trailer. Original : CHEMIN-NON-DECLARE, rc 1 ; mutant : plus aucun chemin
+# de surface touche, RIEN-A-JUGER, rc 3.
+mut_fixtures() {  # <n> <old> <fixture_relpath>
+  local n="$1" old="$2" rel="$3" new path stat dm bm
+  new='    if (p ~ /^NEVER-MATCH-FIXTURES-CLASS$/) return "fixtures"'
+  path="$(make_mutant "mut$n" "$old" "$new")"; stat=$?
+  dm="$(mk_repo "mut$n")"; bm="$(base_of "$dm")"
+  printf 'gel v2\n' > "$dm/$rel"
+  commit_avec "$dm" "test: touche une fixture sans trailer (fixture MUT-$n)"
+  if [ "$stat" -eq 1 ]; then komut "$n" "prefixe de la classe fixtures retire" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
+  elif [ "$stat" -eq 2 ]; then komut "$n" "prefixe de la classe fixtures retire" "bash -n OK sur le mutant" "syntaxe invalide"
+  else
+    TARGET="$path"; safe_run _mutout rc_mut "$dm" --base-ref "$bm"
+    TARGET="$SCRIPT"; safe_run _mutout rc_orig "$dm" --base-ref "$bm"
+    if [ "$rc_mut" -eq 3 ] && [ "$rc_orig" -eq 1 ]; then okmut "$n" "$rc_mut" 3 "$rc_orig" 1
+    else komut "$n" "prefixe de la classe fixtures retire" "rc_mutant=3 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+  fi
+}
+mut_fixtures 8 '    if (p ~ /^plugin\/conductor\/scripts\/tests\/fixtures\//) return "fixtures"' "plugin/conductor/scripts/tests/fixtures/gele-demo.sh"
+mut_fixtures 9 '    if (p ~ /^scripts\/tests\/fixtures\//) return "fixtures"' "scripts/tests/fixtures/traffic-snapshot/sous/snap-demo.json"
 
 TARGET="$SCRIPT"
 

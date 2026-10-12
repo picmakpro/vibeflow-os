@@ -21,13 +21,20 @@
 # reprise ici mot pour mot pour que la sonde ne signale plus ce script comme muet sur sa propre
 # limite de fond.
 #
-# CINQ CLASSES DE LA SURFACE SURVEILLEE, ecrites en toutes lettres, celle-la meme et aucune autre :
+# SIX CLASSES DE LA SURFACE SURVEILLEE, ecrites en toutes lettres, celle-la meme et aucune autre :
 #   1. plugin/conductor/scripts/check-*.sh   (un seul niveau, jamais un chemin plus profond)
 #   2. scripts/check-*.sh                    (un seul niveau, jamais un chemin plus profond)
 #   3. leurs suites : plugin/conductor/scripts/tests/test-*.sh ET scripts/tests/test-*.sh
 #      (une seule classe combinee — un mutant qui neutralise cette classe retire les DEUX chemins)
 #   4. .github/workflows/ci.yml              (chemin exact, pas un motif)
 #   5. tout chemin commencant par scripts/hooks/ (profondeur libre)
+#   6. les fixtures de ces suites : tout chemin commencant par plugin/conductor/scripts/tests/fixtures/
+#      OU scripts/tests/fixtures/ (profondeur libre ; une seule classe combinee — un mutant qui la
+#      neutralise retire les DEUX prefixes). Ajoutee sur arbitrage Samuel, AskUserQuestion session
+#      principale, 2026-10-13 (audit AUD-3) : une meme PR pouvait modifier une copie gelee sous
+#      tests/fixtures/ ET l'empreinte qui l'epingle sans que rien ne le trace. BORNE : seules les
+#      fixtures des suites DEJA surveillees (classe 3) sont visees, jamais celles des autres
+#      modules (plugin/_internal/tests/fixtures, plugin/consolidator/..., plugin/planning-core/...).
 # BORNE NOMMEE, JAMAIS UN OUBLI : les gates des AUTRES modules (par exemple
 # plugin/dev-orchestrator/scripts/check-*.sh, plugin/software-architecture/scripts/check-file-size.sh)
 # sont HORS SURFACE par l'arbitrage du perimetre du 2026-09-17 (sans acces admin, la phase 41 ne
@@ -202,7 +209,7 @@ fi
 
 CHEMINS_DIFF=$(awk 'NF > 0 { c++ } END { print c + 0 }' "$DIFF_RAW")
 
-# --- Comparaison 1 — appartenance a la surface, cinq classes, une seule lecture du diff -----------
+# --- Comparaison 1 — appartenance a la surface, six classes, une seule lecture du diff -----------
 awk -F'\t' '
   function classify(p) {
     if (p ~ /^plugin\/conductor\/scripts\/check-[^\/]+\.sh$/) return "gate-conductor"
@@ -211,6 +218,8 @@ awk -F'\t' '
     if (p ~ /^scripts\/tests\/test-[^\/]+\.sh$/) return "suite"
     if (p == ".github/workflows/ci.yml") return "ci"
     if (p ~ /^scripts\/hooks\//) return "hooks"
+    if (p ~ /^plugin\/conductor\/scripts\/tests\/fixtures\//) return "fixtures"
+    if (p ~ /^scripts\/tests\/fixtures\//) return "fixtures"
     return ""
   }
   {
