@@ -549,22 +549,28 @@ Deux constantes de plus font passer le compte des lignes `ARMEMENT_*` de 8 à 10
 
 **Étape 7 et scission 7a/7b (P47-D-06, P47-D-06a)** : `ORDRE_ETAPES` prend `("BAIL", "G2P")` en dernier ; `armement_valide` gagne `G2P armé ⇒ BAIL armé` sur le patron de `armement-g3-g4` (`:562-563`). Recommandation : **scinder dès la livraison** — 7a `BAIL` (gate d'écriture, banc B01-B24, lab sans liste = silence), 7b `G2P` (dépend du journal d'empreintes, plancher de couverture plus bas). Les labs réels n'ont aucun fichier déclaré avant la Phase 50 : le rejeu réel de l'étape 7 mesure surtout l'**absence d'effet** (empreintes d'arbre identiques, 0 faux refus) et des cas synthétiques injectés (liste simulée dans la copie, unités `7x-*`) ; le plancher `COUVERTURE-REJEU` pour `BAIL`/`G2P` est à fixer au plan (valeur `[ASSUMED]`). Rien n'est armé sans le checkpoint humain du moment d'agir.
 
-## Découpage recommandé en plans et vagues (à re-valider contre le code livré par la 46.1)
+## Découpage en plans et vagues (quatorze plans, régénéré depuis les `47-NN-PLAN.md` le 2026-10-12)
+
+> Le découpage initial recommandé par ce document (douze plans) est remplacé : le plan de contrôle a scindé l'ancien 47-07 (G2′) en trois plans chaînés et renuméroté en continu. La source de vérité est le frontmatter des plans ; ce tableau en est dérivé.
 
 | Vague | Plan | Contenu | Exigences |
 |-------|------|---------|-----------|
-| 1 | 47-01 | bloc « registre + journal » (clé, `meta`, prise, relecture, journal, `decider_baux`), suite `test-baux-registre.sh` (tempête 24 × 5, mutants, injection de défaut, ast-identité) | BAIL-01 |
-| 1 | 47-02 | `dag.sh` (verrou, `os.replace`, droits, lien), T50 et suivants, mutants, bump `conductor`, fiche BACKLOG close, texte « pourquoi le jeton ne le couvre pas » | BAIL-07 |
-| 2 | 47-03 | outil écrivain `baux.sh` (prendre, ecrire, repli, usage cron), copie du bloc, G6 sur le script | BAIL-05 |
-| 2 | 47-04 | recalcul : verrou d'écriture, `scanner` sous verrou, colonne « Bail en cours », test de deux recalculs concurrents | BAIL-08 |
-| 3 | 47-05 | hook : identité (`session_id`), liste de `config.json` + sa protection, G6 en profondeur sur `baux/`, `evaluer_bail`, validation de la demande, `effets_baux` (prise), banc B01-B24, `observe` | BAIL-02, 03, 04 |
-| 4 | 47-06 | hook : journal d'empreintes, intention, ouverture d'unité, `evaluer_g2p`, amendement, miroir du recalcul, banc G01-G23, mutants | BAIL-06 |
-| 5 | 47-07 | étape 7 dans les lieux de recopie, canaris `BAIL`/`G2P`, `rejeu-*` (borne 7), `deroger-gate.sh`, test de recensement ; tout en `observe` | BAIL-09, 10 |
-| 6 | 47-08 | zéro régression (pré-filtre, `hook-registered`, `installed`, mutation « ignorer l'adhésion », coût mesuré), référence (`modele-cycles.md`), spec §5/§5.1-2/§6.1/§6.2/§6.4, limites lettrées, fiches BACKLOG (`onFailure`, `driver-lock.sh`), ROADMAP (texte de `46-NOTE-ROADMAP-47.md` (b), `BACKLOG.md:74` → `:169`), v2.12.0, compteurs README | BAIL-10 |
-| 7 | 47-09 | **checkpoint humain** : rejeu réel en lecture seule étape 7a, puis armement de `BAIL` si 0/0 | BAIL-09 |
-| 8 | 47-10 | **checkpoint humain** : rejeu 7b, armement de `G2P` | BAIL-09 |
+| 1 | 47-01 | bloc « registre + journal » (clé, `meta`, prise, relecture, journal, `decider_baux`, `imputer`), outil côté écrivain `baux.sh`, suite `test-baux-registre.sh` (tempête de prise 24 × 5, tempête de l'écrivain, mutants tracés, ast-identité) ; scinder si l'exécution dérive | BAIL-01, BAIL-05 |
+| 1 | 47-02 | `dag.sh` (un verrou par site, `os.replace`, droits, lien), T50 à T52, mutants par site, bump `conductor`, fiche BACKLOG close, texte « pourquoi le jeton ne le couvre pas » | BAIL-07 |
+| 1 | 47-03 | étape 7 d'armement (`BAIL`, `G2P`) en observation, recensement par ensembles des lieux de recopie, scission 7a/7b | BAIL-09 |
+| 2 | 47-04 | recalcul : verrou d'écriture, `scanner` sous verrou, tempête de 8 recalculs, colonne « Bail en cours » | BAIL-08 |
+| 2 | 47-05 | hook : identité (`session_id`), demande de prise, liste de `config.json` + sa protection, G6 en profondeur sur `baux/`, `evaluer_bail` (branche demande), `effets_baux` ; scinder si l'exécution dérive | BAIL-02, BAIL-04 |
+| 3 | 47-06 | hook : gate d'écriture de `evaluer_bail`, banc B01-B24, mutants | BAIL-03, BAIL-10 |
+| 4 | 47-07 | G2′ de base : `evaluer_g2p`, ouverture d'unité idempotente posée par le moteur, intention | BAIL-06 |
+| 5 | 47-08 | G2′ côté hook : amendement, budget de hachage cumulé, sceau de clôture, banc G01-G34, mutants du hook | BAIL-06 |
+| 6 | 47-09 | G2′ au recalcul : règle miroir R4bis (indépendante de `SUMMARY.md`, bornée par le sceau), inventaire de départ, budget du miroir, codes de raison, mutants du recalcul | BAIL-06 |
+| 7 | 47-10 | canaris `BAIL`/`G2P`, `rejeu-*` (borne 7, `LISTE-REELLE`), planchers ; tout en `observe` | BAIL-09, BAIL-10 |
+| 8 | 47-11 | référence (`modele-cycles.md`), spec §5/§5.1-2/§6.1 à §6.4, limites lettrées, trio des copies du bloc, zéro régression | BAIL-10 |
+| 8 | 47-12 | `planning-core` v2.12.0 sans release, fiches BACKLOG (`onFailure`, `driver-lock.sh`), ROADMAP vérifiée en lecture seule | BAIL-10 |
+| 9 | 47-13 | **checkpoint humain** : rejeu réel en lecture seule étape 7a, puis armement de `BAIL` si 0/0 et liste réelle | BAIL-09 |
+| 10 | 47-14 | **checkpoint humain** : rejeu 7b, armement de `G2P` | BAIL-09 |
 
-47-01 et 47-02 sont indépendants ; 47-03 et 47-04 consomment le bloc de 47-01 ; 47-05 et 47-06 touchent le même fichier (`planning-hook.sh`) : à séquencer. Chaque plan qui touche la zone partagée la déclare (P47-D-10) et cite la **fonction**.
+47-01, 47-02 et 47-03 sont indépendants (47-01 et 47-03 sont couplés par lecture seulement : `coupling_justified` dans 47-01) ; 47-04 et 47-05 consomment le bloc de 47-01 ; 47-05, 47-06, 47-07 et 47-08 touchent le même fichier (`planning-hook.sh`) : séquencés par `depends_on`. Chaque plan qui touche la zone partagée la déclare (P47-D-10) et cite la **fonction**. Deux outils de contrôle partagés vivent dans le dossier de la phase : `47-LIGNES-REQUISES.sh` (lignes requises par identifiant entier) et `47-CONTROLE-MARQUEUR-CHEMIN.sh` (marqueur `Gate-Touche:` par chemin).
 
 ## Don't Hand-Roll
 
@@ -795,7 +801,7 @@ def save(dag):
 
 ## Open Questions (RESOLVED)
 
-> Toutes tranchées au plan (décisions de plan renversables par le manager ou Willy) : Q1 -> 47-01/47-05 ; Q2 -> limite nommée (47-09) ; Q3 -> 47-07 ; Q4 -> 47-03/47-08/47-11/47-12 ; Q5 -> limite nommée (47-09) ; Q6 -> limite nommée + geste humain (47-09) ; Q7 -> 47-01 ; Q8 -> 47-04.
+> Toutes tranchées au plan (décisions de plan renversables par le manager ou Willy) : Q1 -> 47-01/47-05 ; Q2 -> limite nommée (47-11) ; Q3 -> 47-07 à 47-09 ; Q4 -> 47-03/47-10/47-13/47-14 ; Q5 -> limite nommée (47-11) ; Q6 -> limite nommée + geste humain (47-11) ; Q7 -> 47-01 ; Q8 -> 47-04.
 
 1. **Ignorer `baux/` par git ?**
    - Known : l'état est local (comme `surveillance.log`) ; `poser_gitignore_planning` ne pose qu'une ligne et `R-D1-20` l'exige (étendre casserait cette suite).
@@ -804,7 +810,7 @@ def save(dag):
 2. **Borne et nettoyage de `demandes/`.**
    - Known : un nom unique par demande accumule des fichiers de quelques centaines d'octets.
    - Recommendation : pas de nettoyage automatique en 47 (jamais effacer, esprit du bail) ; le recalcul peut compter les demandes et en dire le nombre ; limite nommée.
-3. **Unité sans ligne `ouverture` à sa clôture : silence + observation (recommandé) ou refus ?** Silence : on ne refuse pas sur une référence que le moteur n'a jamais posée (précédent : G1 sur état illisible, F5). Décision du manager à annoncer, renversable.
+3. **Unité sans ligne `ouverture` à sa clôture : silence + observation (recommandé) ou refus ?** Silence : on ne refuse pas sur une référence que le moteur n'a jamais posée (précédent : G1 sur état illisible, F5). Décision du manager à annoncer, renversable. **Complément du contrôle de plan (2026-10-12)** : le gate reste silencieux (observation `g2p-sans-reference`), mais le silence n'est plus muet : le recalcul rend l'absence d'ouverture d'une unité close visible par la raison `bail-sans-ouverture:<chemin>` (47-09), sauf pour les unités de l'inventaire de départ (antérieures à la déclaration de la liste et à la Phase 47) ; le résidu (un agent peut provoquer le cas avant le premier recalcul qui pose l'inventaire) est une limite lettrée (47-11).
 4. **Scission 7a/7b dès la livraison.** Recommandé (BAIL puis G2P), P47-D-06a l'autorise.
 5. **Identité d'un script lancé par un sous-agent.** Limite acceptée (P47-D-12) ; extension possible : geste de prise par `Bash` reconnu par le hook avec l'identité du payload, hors périmètre.
 6. **Premier remplissage de `fichiers_sous_bail`.** G6 refuse qu'un outil change la liste ; geste humain ou dérogation nominative `G6` sur `.planning/config.json` ; remplissage systématique par la grille de la Phase 50.
