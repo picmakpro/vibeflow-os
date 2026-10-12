@@ -86,7 +86,8 @@
 #
 # Résolution des scripts frères ($S) : cascade de `references/mission-flow.md` (§Résolution des
 # scripts), sentinelle testée `dag.sh` — PAS `driver-lock.sh`, qui est cherché SEULEMENT une fois
-# le dossier $S résolu, à une étape distincte. Divergence assumée et documentée en commentaire à
+# le dossier $S résolu, à une étape distincte. Dépôt SOURCE du plugin (Phase 57, C1) : le module conductor voisin
+# du gate passe devant $HOME/.claude/scripts (voir src_conductor). Divergence assumée et documentée en commentaire à
 # l'endroit de la résolution : le premier candidat est relatif à --root, pas au répertoire courant
 # du process — sans cette adaptation ce gate ne serait jamais testable sur une fixture jetable.
 #
@@ -176,9 +177,22 @@ git_safe() { # <args...> — toute invocation git de ce script passe par ici, ja
 # lieu de celui qu'on lui désigne, et ne serait jamais testable sur une fixture jetable. Les
 # candidats suivants (scope utilisateur, puis les deux dossiers de scripts du plugin) restent
 # inchangés ; le lab local prime toujours.
+# Phase 57, réserve C1 : dans le dépôt SOURCE du plugin, le module conductor voisin du gate passe devant
+# `$HOME/.claude/scripts`, dont les scripts peuvent dater d'avant la phase (driver-lock.sh sans --ws : rc 1, E1
+# indéterminé, identité d'E7 « ? »). Critère vérifiable de « dépôt source » : le dossier `../../conductor/scripts` du
+# script lui-même, canonicalisé, est exactement `<--root canonicalisé>/plugin/conductor/scripts` et porte dag.sh.
+# Un lab installé (scripts à plat, pas de plugin/ sous la racine) ne remplit jamais ce critère : ordre inchangé.
+src_conductor() {
+  local n r
+  n="$(cd "$(dirname "$0")/../../conductor/scripts" 2>/dev/null && pwd -P)" || return 1
+  r="$(cd "$ROOT" 2>/dev/null && pwd -P)" || return 1
+  [ "$n" = "$r/plugin/conductor/scripts" ] && [ -f "$n/dag.sh" ] || return 1
+  printf '%s' "$n"
+}
 resolve_S() {
-  local candidate
-  for candidate in "$ROOT/.claude/scripts" "$HOME/.claude/scripts" \
+  local candidate src
+  src="$(src_conductor || true)"
+  for candidate in "$ROOT/.claude/scripts" "$src" "$HOME/.claude/scripts" \
                    "${CLAUDE_PLUGIN_ROOT:-}/conductor/scripts" \
                    "${CLAUDE_PLUGIN_ROOT:-}/dev-orchestrator/scripts"; do
     [ -n "$candidate" ] && [ -f "$candidate/dag.sh" ] && { printf '%s' "$candidate"; return 0; }

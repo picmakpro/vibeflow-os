@@ -11,13 +11,14 @@
 # (identité d'E7 = génération du verrou du compartiment, « ? » si illisible) · EW-SNAP (--budget-snapshot sans
 # --ws = exit 4, motif nommé, aucun fichier) · EW-E4 (--ws surcharge GSD_WORKSTREAM) · EW-DEPOT (verrou de dépôt
 # dit sur stderr, jamais un manque) · EW-FLAT (lab plat inchangé) · EW-Q-* (les trois issues d'E1) · EW-USAGE.
+# Réserve C1 : EW-SRC (dépôt source : le module voisin prime sur $HOME ; témoins EW-SRC-W1..W4 : lab installé inchangé).
 # Réserve C2 : EW-BWS (--ws transmis à check-method-budget.sh, snapshot et E7 ; budget enregistreur, puis budget réel).
 #
 # Les assertions portent sur les lignes E1 (stdout) et les diagnostics E1 (stderr), jamais sur le
 # verdict global, que les autres contrôles (E2-E7) influencent sur une fixture minimale — sauf EW-NOWS /
 # EW-SNAP, dont le verdict (4, jamais 3) EST le contrat.
 #
-# MUTANTS EW-M-a à EW-M-g : chaque copie mutée du gate vit dans un dossier jetable qui reproduit la
+# MUTANTS EW-M-a à EW-M-h : chaque copie mutée du gate vit dans un dossier jetable qui reproduit la
 # DISPOSITION du plugin (dev-orchestrator/scripts, planning-core/scripts, conductor/scripts), parce que le
 # gate source la politique par ../../planning-core/scripts (E4, repli SILENCIEUX si elle manque) et résout le
 # budget par ../../conductor/scripts (exit 4 s'il manque, ce qui ressemblerait à EW-SNAP). EW-LAYOUT joue le
@@ -49,13 +50,14 @@ EW_KO_FILE="${EW_KO_FILE:-}"
 # plan en fait partie). Un cas = le libellé sans suffixe de sous-assertion (EW-TRACE-1.1 → EW-TRACE-1).
 # EW-NOWS-2 (verdict global 4) ne bascule pas sous EW-M-b : E4, E5 et E6 sont indéterminés faute d'arguments,
 # le 4 global tient sans E1 — c'est EW-NOWS-1 et EW-Q-INDET-1 qui portent la preuve d'E1.
-MUT_A="EW-CHILD-1 EW-Q-INDET-2 EW-Q-INDET-3 EW-Q-MANQUE-1 EW-TRACE-1 EW-TRACE-3"
+MUT_A="EW-CHILD-1 EW-Q-INDET-2 EW-Q-INDET-3 EW-Q-MANQUE-1 EW-SRC-1 EW-TRACE-1 EW-TRACE-3"
 MUT_B="EW-NOWS-1 EW-Q-INDET-1"
-MUT_C="EW-GEN-2 EW-GEN-3 EW-GEN-5"
+MUT_C="EW-GEN-2 EW-GEN-3 EW-GEN-5 EW-SRC-3"
 MUT_D="EW-E4-1 EW-E4-2"
 MUT_E="EW-SNAP-1 EW-SNAP-2 EW-SNAP-4"
 MUT_F="EW-BWS-1"
 MUT_G="EW-BWS-2 EW-BWS-3"
+MUT_H="EW-SRC-1 EW-SRC-2 EW-SRC-3"
 
 # DÉSARMEMENT en tête (P57-D-22) : un VF_DRIVER_LOCK hérité forcerait le mode « verrou unique » ;
 # les autres variables déplaceraient la cible. GIT_* : une suite jouée depuis un hook git hériterait
@@ -478,7 +480,7 @@ mutant() { # <id> <cas nommé par le plan> <cas attendus (ensemble exact, ordre 
   fi
 }
 
-echo "=== Mutants EW-M-a à EW-M-g (copies dans la disposition du plugin) ==="
+echo "=== Mutants EW-M-a à EW-M-h (copies dans la disposition du plugin) ==="
 mutant a EW-TRACE-1 "$MUT_A" 'VF_DRIVER_LOCK= "$E1_S_DIR/driver-lock.sh" status --ws="$WS"' 'VF_DRIVER_LOCK="$ROOT/.planning/DRIVER.lock" "$E1_S_DIR/driver-lock.sh" status --ws="$WS"'
 mutant b EW-NOWS-1 "$MUT_B" 'E1_STATUS="indet"
   E1_MSG="[E1] lab partitionné' 'E1_STATUS="sain"
@@ -488,11 +490,12 @@ mutant d EW-E4-1 "$MUT_D" 'vf_ws_resolve "$E4_PLANNING_DIR" "$WS"' 'vf_ws_resolv
 mutant e EW-SNAP-1 "$MUT_E" 'if is_partitioned && [ -z "$WS" ]; then # SNAPWS' 'if false; then # SNAPWS'
 mutant f EW-BWS-1 "$MUT_F" ' --dry-run --ws "$WS" 2>/dev/null)"; SNAP_RC=$?' ' --dry-run 2>/dev/null)"; SNAP_RC=$?'
 mutant g EW-BWS-2 "$MUT_G" ' --strict --auto --ws "$WS" 2>/dev/null)"; E7_RC=$?' ' --strict --auto 2>/dev/null)"; E7_RC=$?'
+mutant h EW-SRC-1 "$MUT_H" '"$ROOT/.claude/scripts" "$src" "$HOME/.claude/scripts"' '"$ROOT/.claude/scripts" "$HOME/.claude/scripts"'
 
 echo
-if [ "$MUT_OK" -eq 7 ] && [ "$MUT_TOTAL" -eq 7 ]; then echo "== mutants : 7/7 tués =="; else echo "== mutants : $MUT_OK/7 tués — ÉCHEC =="; fi
+if [ "$MUT_OK" -eq 8 ] && [ "$MUT_TOTAL" -eq 8 ]; then echo "== mutants : 8/8 tués =="; else echo "== mutants : $MUT_OK/8 tués — ÉCHEC =="; fi
 echo "== résultat : $PASS ok, $FAIL ko =="
-[ "$MUT_OK" -eq 7 ] || exit 1
+[ "$MUT_OK" -eq 8 ] || exit 1
 [ "$FAIL" -eq 0 ] || exit 1
 [ "$PASS" -gt 0 ] || exit 1
 exit 0
