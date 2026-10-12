@@ -293,10 +293,27 @@ Plans:
 - **Règle des unités antérieures à G4** — limite **(bp)** : 343 unités closes avant G4 sur `~/jarvis-keystone` (`SUMMARY.md` existant sans `VERDICT.md`, refusé à la réécriture une fois G4 armé) ; la règle à poser conditionne l'armement de G4.
 - **Préalables de G4′** — limite **(bs)** : A2 (leurre de définition d'agent), A3 (lab dérivé du `cwd`), A4 (repli `SubagentStop` : relance sans verrou, muet sur une panne du cœur), P1 (`stop_hook_active` non lu).
 - **Remèdes reportés de D1** — limites **(bk)** (A5 : forge d'une unité neuve, D1 aveugle), **(bl)** (A7 : intention sans effet ni limite de durée), et N-4 (éviction de l'unité active de la liste surveillée, limite **(bg)**) ; N-5 (`SUMMARY.md` forgé par `Bash` non tracé, limites **(ar)** et **(ax)**).
-**Plans:** 0 plans
+**Plans:** 18 plans (ordre d'exécution : 14, 17, 01, 02, 03, 18, 04, 05, 06, 15, 07, 08, 09, 16, 10, 11, 12, 13 ; une vague par plan)
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 46.1 to break down)
+- [ ] 46.1-14-PLAN.md — outil de contrôle de la phase `46.1-CONTROLES.sh` (suite sous HOME temporaire bash+zsh, découverte complète, invariants, cohérence d'un relevé) (ARMG-04, 05, 09)
+- [ ] 46.1-17-PLAN.md — `--montre` et mode `armement` de l'outil de contrôle (ARMG-05, 09)
+- [ ] 46.1-01-PLAN.md — étape 5b : exemption étroite de G4, banc et mutants, limite (bp), spec §5 (ARMG-01, 10)
+- [ ] 46.1-02-PLAN.md — D1 : N-5 et A5, faux signaux mesurés, limites (ar), (ax), (bk) (ARMG-02, 03, 10)
+- [ ] 46.1-03-PLAN.md — script de décision `verifier-releve.sh` : prédicats d'armement, limite (bu) (ARMG-04)
+- [ ] 46.1-18-PLAN.md — `verifier-releve.sh` éprouvé sur la chaîne réelle, le corpus de la 46 et sa couverture (ARMG-04)
+- [ ] 46.1-04-PLAN.md — étape 5b : (bu) levée, rejeu réel en lecture seule sous checkpoint, relevé jugé par le script (ARMG-04, 05, 01, 10)
+- [ ] 46.1-05-PLAN.md — étape 5b : armement de G4 sous checkpoint, ou non-armement consigné (ARMG-05)
+- [ ] 46.1-06-PLAN.md — étape 6 : A2, G4′ juge dès l'ambiguïté (P461-D-02), oracle du rejeu (ARMG-06, 10)
+- [ ] 46.1-15-PLAN.md — étape 6 : banc A2 règle par règle et mutants (ARMG-06)
+- [ ] 46.1-07-PLAN.md — étape 6 : A3 dans le cœur, `CLAUDE_PROJECT_DIR` (ARMG-07, 06, 10)
+- [ ] 46.1-08-PLAN.md — étape 6 : A3 dans la commande enregistrée, zéro régression labs dev, coût mesuré (ARMG-07)
+- [ ] 46.1-09-PLAN.md — étape 6 : A4/P1, compteur par `agent_id` sous verrou, `stop_hook_active` (ARMG-08)
+- [ ] 46.1-16-PLAN.md — étape 6 : gardes de l'état du compteur, G6, recalcul, `.gitignore` (ARMG-08, 10)
+- [ ] 46.1-10-PLAN.md — étape 6 : trace shell sur panne du cœur, canary de session, limite (bs) réécrite (ARMG-08, 09, 10)
+- [ ] 46.1-11-PLAN.md — étape 6 : rejeu réel en lecture seule sous checkpoint, relevé jugé par le script (ARMG-09)
+- [ ] 46.1-12-PLAN.md — étape 6 : armement de G4′ sous checkpoint, ou non-armement consigné, limite (bs) (ARMG-09, 10)
+- [ ] 46.1-13-PLAN.md — clôture : `modele-cycles.md:1147`, BACKLOG, points non documentés, `planning-core` v2.11.0 sans release (ARMG-10)
 
 ### Phase 47: Moteur — baux générationnels et jeton monotone
 
