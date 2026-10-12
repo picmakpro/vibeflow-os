@@ -3,16 +3,18 @@
 # Pourquoi : `index($0, "✓ R-BAUX-11")` accepte aussi `✓ R-BAUX-11b` ; une ligne requise « satisfaite » par la ligne d'un
 # autre identifiant est un vert à tort. Ici un identifiant n'est reconnu que s'il est précédé de `✓ ` ET suivi d'un
 # délimiteur : un espace, `:`, `·` ou la fin de ligne.
-# Usage : <sortie de la suite> | 47-LIGNES-REQUISES.sh '<ID>|<ID>|…'      |      47-LIGNES-REQUISES.sh --autotest
+# Usage : <sortie de la suite> | 47-LIGNES-REQUISES.sh '<ID>|<ID>|…' ['<marque>']      |      47-LIGNES-REQUISES.sh --autotest
+# `<marque>` (facultative) : ce qui précède l'identifiant sur la ligne ; défaut `✓ ` ; `PASS — ` pour les lignes de test-dag.sh.
+# Une ligne « sauté », une simple mention de l'identifiant ou une marque différente ne satisfont jamais un identifiant requis.
 # Sortie : une ligne `MANQUE <ID>` par identifiant absent, puis `LIGNES-REQUISES requis=<n> manquants=<m>`.
 # Codes : 0 tous présents ; 1 au moins un manque, ou liste vide, ou entrée vide (jamais un vert à vide) ; 64 usage.
 # Une seule fonction awk (`trouve`) : les plans l'appellent, ils ne la réécrivent pas.
 set -uo pipefail
 
 verifier() {
-  LC_ALL=C awk -v req="$1" '
+  LC_ALL=C awk -v req="$1" -v marque="${2:-}" '
     function trouve(ligne, id,    aiguille, reste, p, suite) {
-      aiguille = "\342\234\223 " id          # « ✓ » (U+2713, octets E2 9C 93) puis une espace puis l identifiant
+      aiguille = (marque == "" ? "\342\234\223 " : marque) id   # marque par défaut « ✓ » (U+2713, octets E2 9C 93) puis une espace, puis l identifiant
       reste = ligne
       while ((p = index(reste, aiguille)) > 0) {
         suite = substr(reste, p + length(aiguille))
@@ -33,8 +35,8 @@ verifier() {
 
 autotest() {
   ko=0; n=0
-  cas() { # <nom> <attendu 0|1> <ids> <entrée>
-    sortie=$(printf '%s\n' "$4" | verifier "$3"); rc=$?; n=$((n + 1))
+  cas() { # <nom> <attendu 0|1> <ids> <entrée> [<marque>]
+    sortie=$(printf '%s\n' "$4" | verifier "$3" "${5:-}"); rc=$?; n=$((n + 1))
     if [ "$rc" -eq "$2" ]; then echo "✓ AUTOTEST $1 (attendu $2, obtenu $rc)"
     else echo "✗ AUTOTEST $1 : attendu $2, obtenu $rc ($sortie)"; ko=$((ko + 1)); fi
   }
@@ -47,6 +49,11 @@ autotest() {
   cas sans-coche-ne-satisfait-pas 1 'R-A-11' 'R-A-11 : sans coche'
   cas entree-vide 1 'R-A-11' ''
   cas liste-vide 1 '' '✓ R-A-11'
+  cas marque-pass-presente 0 'T50.1' '  ✅ PASS — T50.1 — texte' 'PASS — '
+  cas marque-pass-suffixe-numerique 1 'T50.1' '  ✅ PASS — T50.10 — autre' 'PASS — '
+  cas marque-pass-ligne-fail 1 'T50.1' '  ❌ FAIL — T50.1 — rouge' 'PASS — '
+  cas marque-pass-mention-simple 1 'T50.1' 'voir T50.1 plus haut' 'PASS — '
+  cas ligne-saute-ne-satisfait-pas 1 'MUT-A' 'SAUTÉ MUT-A : non rejoué'
   # mutation : la fonction sans la contrainte du délimiteur doit être TUÉE par le cas suffixe-b-ne-satisfait-pas
   copie=$(mktemp "${TMPDIR:-/tmp}/lignes-requises.XXXXXX") || exit 64
   awk '{ if (index($0, "if (suite == \"\" ||") > 0) print "        return 1"; else print }' "$0" > "$copie"
@@ -61,5 +68,5 @@ autotest() {
 case "${1:-}" in
   --autotest) autotest; exit $? ;;
   '') echo "usage : <sortie> | $0 '<ID>|<ID>…'   |   $0 --autotest" >&2; exit 64 ;;
-  *) verifier "$1"; exit $? ;;
+  *) verifier "$1" "${2:-}"; exit $? ;;
 esac
