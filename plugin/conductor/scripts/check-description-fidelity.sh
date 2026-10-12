@@ -167,7 +167,11 @@ if [ -n "${CDF_EXCEPTIONS_FILE:-}" ]; then
   done < "$CDF_EXCEPTIONS_FILE"
 fi
 
-TMPDIR_GATE="$(mktemp -d)"
+# Gabarit explicite sous $TMPDIR : sur macOS, `mktemp -d` SANS gabarit ignore $TMPDIR (il écrit dans
+# le répertoire temporaire utilisateur du système), si bien qu'un appelant ne pouvait ni confiner ni
+# attribuer les répertoires temporaires du gate (la suite T9 les cherchait dans le répertoire global,
+# partagé avec tous les processus du poste : fuite « détectée » à tort, mesurée).
+TMPDIR_GATE="$(mktemp -d "${TMPDIR:-/tmp}/check-description-fidelity.XXXXXX")"
 trap 'rm -rf "$TMPDIR_GATE"' EXIT
 
 # --- Découverte (bash/awk pur, indépendante de python3/node — la découverte doit fonctionner
