@@ -636,6 +636,14 @@ dl "$FLAT" sess-A acquire --owner=m1 --step=s >/dev/null
 a="$(dl "$FLAT" sess-A status | norm)"; b="$(dl "$FLAT" sess-A status --all | norm)"
 assert "WS-ALL-3.6 — lab plat tenu : status --all identique a status" "[$b]" "[$a]"
 
+assert_not "WS-ALL-3.7 — lab plat : aucun champ lab" "$b" '"locks"'
+VP="$WORK_DIR/all3-vfl/DRIVER.lock"; mkdir -p "$WORK_DIR/all3-vfl"
+( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A acquire --owner=m1 --step=s >/dev/null )
+a="$( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A status | norm )"; b="$( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A status --all | norm )"
+[ -n "$a" ]; assert_exit "WS-ALL-3.8 — temoin : status sous VF_DRIVER_LOCK non vide" "$?" 0
+assert "WS-ALL-3.9 — VF_DRIVER_LOCK : status --all identique a status" "[$b]" "[$a]"
+assert_not "WS-ALL-3.10 — VF_DRIVER_LOCK : aucun champ lab" "$b" '"locks"'
+
 echo
 echo "=== WS-ALL-5 — un lien symbolique parmi les verrous de compartiments est écarté, jamais listé (réserve C3) ==="
 LAB="$(mk_lab all5)"; GC="$(fixture_common_dir "$LAB")"
@@ -646,13 +654,6 @@ ln -s "$WORK_DIR/lnkreal" "$GC/vf-driver/ws/lnk"
 out="$(dl "$LAB" sess-A status --all)"; err="$(dl "$LAB" sess-A status --all 2>&1 >/dev/null)"
 assert "WS-ALL-5.1 — locks : depot, alpha, omega (le lien lnk n'y figure pas)" "$(pj "$out" '[e["ws"] for e in d["locks"]]')" "['', 'alpha', 'omega']"
 assert "WS-ALL-5.2 — le lien est compté parmi les noms écartés (stderr)" "$err" "ecart"
-assert_not "WS-ALL-3.7 — lab plat : aucun champ lab" "$b" '"locks"'
-VP="$WORK_DIR/all3-vfl/DRIVER.lock"; mkdir -p "$WORK_DIR/all3-vfl"
-( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A acquire --owner=m1 --step=s >/dev/null )
-a="$( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A status | norm )"; b="$( export VF_DRIVER_LOCK="$VP"; dl "$LAB" sess-A status --all | norm )"
-[ -n "$a" ]; assert_exit "WS-ALL-3.8 — temoin : status sous VF_DRIVER_LOCK non vide" "$?" 0
-assert "WS-ALL-3.9 — VF_DRIVER_LOCK : status --all identique a status" "[$b]" "[$a]"
-assert_not "WS-ALL-3.10 — VF_DRIVER_LOCK : aucun champ lab" "$b" '"locks"'
 
 LAB="$(mk_lab all4)"
 out="$(dl "$LAB" sess-A orphans --all 2>/dev/null)"; rc=$?
