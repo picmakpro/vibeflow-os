@@ -52,7 +52,9 @@
 # Emplacement : <git-common-dir>/vf-driver/{ws/<sujet>,repo}/DRIVER.lock, un dossier par verrou,
 # partage entre les worktrees du clone. Le JSON des verbes porte "scope" (compartiment|depot),
 # "ws" ("" pour le depot) et "location" (git-common-dir). Refus nommes, chacun avec un "hint" :
-# unknown-ws, ws-invalid, partition-unreadable, policy-missing. Le nom du sujet est valide par
+# unknown-ws, ws-invalid, partition-unreadable, policy-missing, not-at-lab-root (P57-D-39 : --ws ou
+# --depot lance d'un dossier sans .planning/ propre alors que la racine git en porte les compartiments ;
+# hint « lance depuis la racine du lab »). Le nom du sujet est valide par
 # vf_ws_name_valid puis vf_ws_dir_resolve AVANT d'entrer dans un chemin ou un JSON.
 # ANCIEN VERROU (P57-D-14, P57-D-24, P57-D-26) : en lab partitionne, un .planning/DRIVER.lock tenu
 # vaut verrou de depot. Tout acquire (compartiment ou depot) refuse "legacy-lock-held" avec en hint la
@@ -258,6 +260,17 @@ vf_dl_common_dir() {
 vf_dl_resolve() {
   [ -n "$ACTION" ] || return 0
   [ -z "${VF_DRIVER_LOCK:-}" ] || return 0
+  # HORS RACINE DU LAB (P57-D-39, correction F-2) : `--ws` ou `--depot` lance d'un dossier qui ne porte pas son
+  # propre `.planning/` alors que la racine git en porte les compartiments. Sans ce refus la detection (relative
+  # au cwd) rendrait le lab « plat », le verrou d'autrui ne serait pas vu et un `.planning/DRIVER.lock` parasite
+  # serait cree dans le sous-dossier. Un dossier portant SON `.planning/` (P57-D-29) n'est pas concerne.
+  if { [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; } && [ ! -e .planning ] && [ ! -L .planning ]; then
+    local top=""
+    top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
+    if [ -n "$top" ] && { [ -e "$top/.planning/workstreams" ] || [ -L "$top/.planning/workstreams" ]; }; then
+      vf_dl_refuse not-at-lab-root "ce dossier n'est pas la racine du lab partitionne : lance driver-lock.sh depuis la racine du lab (le dossier qui porte .planning/workstreams), puis rejoue la commande avec la meme option --ws ou --depot"
+    fi
+  fi
   [ -e .planning/workstreams ] || [ -L .planning/workstreams ] || return 0
 
   local policy="" cand common rc=0
