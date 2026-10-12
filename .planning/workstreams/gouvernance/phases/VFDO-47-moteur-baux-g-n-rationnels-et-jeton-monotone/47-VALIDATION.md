@@ -43,8 +43,8 @@ Carte des quatorze plans (régénérée depuis les `47-NN-PLAN.md` le 2026-10-12
 | 47-05 | 2 | BAIL-02, BAIL-04 | `test-bail-gate.sh` (sections `prise`, `g6`) |
 | 47-06 | 3 | BAIL-03, BAIL-10 | `test-bail-gate.sh` (sections `ecriture`, `banc`, `mut`) |
 | 47-07 | 4 | BAIL-06 | `test-g2prime.sh` (section `base`, R-G2P-01 à 07) |
-| 47-08 | 5 | BAIL-06 | `test-g2prime.sh` (sections `base` jusqu'à R-G2P-15, `banc`, `mut` du hook) |
-| 47-09 | 6 | BAIL-06 | `test-g2prime.sh` (section `miroir`, `mut` du recalcul), `test-recalc-planning.sh` (R-RECALC-BAIL-06) |
+| 47-08 | 5 | BAIL-06 | `test-g2prime.sh` (sections `base` jusqu'à R-G2P-17, `banc`, `mut` du hook) |
+| 47-09 | 6 | BAIL-06 | `test-g2prime.sh` (sections `miroir`, `gen` : propriété générative R-G2P-MIROIR-18, `mut` du recalcul), `test-recalc-planning.sh` (R-RECALC-BAIL-06) |
 | 47-10 | 7 | BAIL-09, BAIL-10 | `test-planning-gates.sh` (section `cang`), `test-rejeu-gates.sh` |
 | 47-11 | 8 | BAIL-10 | `test-planning-gates.sh` (sections `reference`, `table`), `test-baux-registre.sh` (R-BAUX-TRIO) |
 | 47-12 | 8 | BAIL-10 | `scripts/check-version-sync.sh` |
