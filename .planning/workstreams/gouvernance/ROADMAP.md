@@ -17,7 +17,7 @@
 - [x] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécutée 2026-09-30 → 2026-10-02 (10/10 plans, 15 quick de correction), cinq gates ARMÉS en cascade le 2026-10-01 ; audit de sécurité final SECURED (4 tours) ; vérifiée 15/15 — clôturée 2026-10-02 (clôture validée par Willy, message en session principale, 2026-10-01), PR #124 ouverte (non mergée)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-03 (12 plans, 9 vagues, plan-check frais PASSED), PR de planification empilée sur la PR #124 ; exécutée 2026-10-05 → 2026-10-07 (12/12 plans), vérifiée 11/11 (3 sous arbitrage de Willy) : G3 ARMÉ, G4 et G4′ en observation (reportés à la Phase 46.1) — non clôturée, PR non mergée
 - [ ] Phase 46.1: Armement de G4 et G4′ (INSERTED, 2026-10-07) — non cadrée
-- [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-12 (14 plans, 10 vagues, plan-check frais), PR de planification empilée sur la PR #136 ; exécution APRÈS la Phase 46.1
+- [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-12 (14 plans, 10 vagues, plan-check frais PASSED au tour 7), PR de planification #147 empilée sur la PR #136 ; exécution APRÈS la Phase 46.1
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 49: Initialisation — script des trois gates de la grille (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 50: Initialisation — grille, interview et fabrique des producteurs et juges (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -309,6 +309,8 @@ Plans:
 **Cadrage (2026-10-12)** : `47-CONTEXT.md`, décisions P47-D-01 à P47-D-17 (plus 01a, 02a, 02b, 04a, 06a), mission `vf-dev-manager-p47-cadrage`. Faits : `47-SCOUTING.md` et `47-RECHERCHE-BAUX.md` (Claude Code 2.1.296).
 - Arbitrages de Willy, AskUserQuestion session principale, 2026-10-12 : Q1 à Q7, recommandation (a) suivie partout — registre lié à l'appelant (`agent_id`, sinon `session_id`), un bail par fichier (spec §6.1 amendée), liste déclarée par le lab dans `config.json`, G2′ sur `CLOTURE.md` avec amendement tracé, `dag.sh` corrigé dans la 47, étape 7 en observation d'abord, `onFailure: "block"` hors 47.
 - Décisions du manager, renversables : P47-D-08 à P47-D-17.
+- Arbitrages de Willy en planification, AskUserQuestion session principale, 2026-10-12 : Q8 (armement après une liste réelle, P47-D-18), Q9 (miroir de G2′ en détection au mieux, garantie bornée aux clôtures par outil, P47-D-19), Q10 (« par outil, sur une unité ouverte par outil », P47-D-20).
+- Plan-check frais : 7 tours ; tours 2 à 6 sur la complétude du miroir de G2′ contre `Bash`, close par Q9 ; tour 7 : 0 bloquant, 0 avertissement, 2 info.
 **Plans:** 14 plans en 10 vagues. Étape 7 d'armement `("BAIL", "G2P")`, scindée 7a/7b, en observation à la livraison ; deux plans `autonomous: false` portent un checkpoint humain borné au moment d'agir (47-13 : 7a, 47-14 : 7b).
 
 Plans:
