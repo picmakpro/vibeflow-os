@@ -278,7 +278,8 @@ la Phase 57 avant sa PR.
 - **P57-D-42 (F-3 en lab partitionné seulement)** : les globaux git sans argument et `exec` sont reconnus par le
   guard en lab partitionné seulement ; le lab plat reste inchangé pour tenir l'A/B au bit près contre la copie
   gelée. L'extension au lab plat est soumise à Samuel (CONCERNS, limite a).
-- **P57-D-43 (périmètre de R-5)** : un préfixe `GIT_DIR=`, `GIT_INDEX_FILE=` ou `GIT_WORK_TREE=` du même segment
+- **P57-D-43 (périmètre de R-5)** : en lab partitionné seulement (lab plat inchangé, comme P57-D-42), un préfixe
+  `GIT_DIR=`, `GIT_INDEX_FILE=` ou `GIT_WORK_TREE=` du même segment
   que le geste git rend la cible incertaine, y compris pour la décision « geste hors du lab ». Une affectation
   dans un AUTRE segment (`export GIT_INDEX_FILE=…; git commit`) reste non couverte : limite écrite dans CONCERNS
   (limite c).

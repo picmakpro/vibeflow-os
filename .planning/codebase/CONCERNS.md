@@ -240,8 +240,9 @@
      sonde / `ln_atomic` est fermée, la pose du processus est retirée. La prose de
      `plugin/dev-orchestrator/references/mission-flow.md` distingue le `reason` identique (`stale-requires-takeover`) et le
      `hint` (`recover` pour un ancien verrou).
-  3. **R-5, même segment** (`c5ccbab7`, `63d5cc4c`) : un préfixe `GIT_DIR=`, `GIT_INDEX_FILE=` ou `GIT_WORK_TREE=` du segment
-     du geste rend la cible incertaine, aussi pour la décision « geste hors du lab » (P57-D-43). Voir la limite (c).
+  3. **R-5, même segment** (`c5ccbab7`, `63d5cc4c`, `b66a7dbe`) : en lab partitionné, un préfixe `GIT_DIR=`, `GIT_INDEX_FILE=`
+     ou `GIT_WORK_TREE=` du segment du geste rend la cible incertaine, aussi pour la décision « geste hors du lab »
+     (P57-D-43). Le lab plat ne reconnaît aucune de ces formes. Voir la limite (c).
   4. **R-6** (`63d5cc4c`) : le crochet `VF_GUARD_TEST_RAISE` est retiré de la production (la suite injecte l'exception
      dans une copie du guard).
   5. **R-7** (`6333d8e4`, `8b957f62`) : prémisse corrigée. La preuve A/B n'était pas ignorée en CI ; c'est l'intégrité de la
