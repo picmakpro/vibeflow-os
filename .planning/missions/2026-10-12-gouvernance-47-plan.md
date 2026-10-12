@@ -10,8 +10,9 @@ l'acquisition ni à la clôture.
 parallèle de la 46.1, exécution de la 47 APRÈS la 46.1).
 **Périmètre :** cadrage et planification de la Phase 47. Aucune exécution, aucun rejeu, aucun
 armement, aucun merge, aucune release.
-**Issue :** `human_needed` — planification commitée, plan-check **non PASSED** : Q8 et Q9 attendent
-Willy (inscrites dans `47-DISCUSSION-LOG.md`).
+**Issue :** première session `human_needed` (plan-check gelé sur Q9) ; **reprise du 2026-10-12 :
+plan-check frais PASSED au tour 7** (0 bloquant, 0 avertissement, 2 info), PR #147 sortie du brouillon.
+Verrou de la reprise : génération `DRIVER.lock.gen.1791824508.21388`.
 
 ## Plan de bataille (DAG `2026-10-12-gouvernance-47-plan.dag.json`)
 
@@ -143,8 +144,42 @@ ou dérogation G6 ; empreinte du triplet de clôture sans inode (option A) ; 47-
 Aucune exécution dans cette mission : aucun bloc `preuves` de `vf-coder` à relayer (les mandats étaient
 des mandats de planification ; `estimate`/`actuals` absents, aucun PLAN exécuté).
 
+## Reprise (finition, 2026-10-12)
+
+Réponses de Willy, AskUserQuestion session principale, 2026-10-12, relayées verbatim :
+Q8 « (a) Attendre une liste réelle (Recommandé) » → **P47-D-18** ; Q9 « (a) Détection au mieux
+(Recommandé) » → **P47-D-19** ; puis Q10, apparue pendant la révision (clôture par outil d'une unité
+sans ligne `ouverture`), « (a) Limite nommée (Recommandé) » → **P47-D-20**. Commits `b56a36d1`,
+`8afca9b9`.
+
+- **Révision 7** (`2061d2ca`) : 47-09 réduit à une détection au mieux (3 tâches, 12 cas, 12 mutants,
+  estimation 200k → 100k) ; retirés : inventaire de départ, exemption par empreinte du triplet,
+  photographie de clôture, preuve générative R-G2P-MIROIR-18..20 ; gardés : R4bis, période unique
+  `lignes_de_periode`, copies ast-identiques, verrou partagé en lecture, budget, deux lignes `LIMITE`
+  affichées. 47-11 : limite « clôture hors outil » (régime P45-D-10). 47-13/47-14 : checkpoint rejoué
+  quand une liste réelle existe.
+- **Révision 8** (`e20dac6d`) : alignements (truth de 47-07, tableaux d'artefacts de 8 plans, verrou en
+  lecture seule de 47-04) ; balayage des mécanismes retirés : seules des mentions historiques restent.
+- **Plan-check frais tour 7** (sur `e20dac6d`) : **0 bloquant, 0 avertissement, 2 info**, aucun point de
+  portée. Info non corrigées, consignées pour l'exécution : I-1 (47-11:24, la phrase « jamais un faux
+  `close` » de la ligne de limite n'est vraie que pour une unité ouverte par le moteur et ne s'accorde
+  avec l'acceptation de 47-11:154 que par les backticks) ; I-2 (47-09:255 n'exige pas les 21 mutants du
+  hook alors que 47-09:300 en annonce 33).
+- Après le tour 7, une seule retouche de prose (47-07:28, « en attente de Willy » → P47-D-20), vérifiée
+  par le manager sur le diff, aucune commande touchée.
+
+| Agent (reprise) | Nœud | Jetons |
+|---|---|---|
+| vf-coder, révision 7 (Q9) | plan-47 | 330 610 |
+| vf-coder, révision 8 (alignements) | plan-47 | 86 761 |
+| gsd-plan-checker, tour 7 | plancheck-47 | 128 847 |
+| **Total reprise** | | **546 218** |
+
+**Total mission (deux sessions) : 3 571 783 jetons, 19 mandats** (2 general-purpose, 9 vf-coder,
+8 gsd-plan-checker) ; juges de plan frais : 8 passes pour 7 tours.
+
 ## Next step
 
-Faire trancher Q9 (puis Q8) par Willy ; sur la réponse, relancer une mission courte : révision de
-47-09 (et 47-11) selon Q9, un plan-check frais jusqu'à PASSED, mise à jour de la PR. L'exécution de la
-47 reste conditionnée à la livraison de la 46.1.
+Exécuter la 46.1 (cadrage à finir sur les réponses de Willy, puis plan), puis exécuter la 47 :
+re-validation des plans contre le code livré par la 46.1 (plan-checker frais, P47-D-10) avant la
+vague 1. Revue de la PR #147 par Samuel ou Willy en parallèle.

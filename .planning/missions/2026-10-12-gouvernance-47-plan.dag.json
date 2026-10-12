@@ -45,7 +45,7 @@
         "plan-47"
       ],
       "scope": [],
-      "status": "failed"
+      "status": "done"
     },
     {
       "id": "suivi-47",
@@ -55,7 +55,7 @@
         "plancheck-47"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "pr-47",
@@ -65,7 +65,7 @@
         "suivi-47"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     }
   ]
 }
