@@ -1,0 +1,71 @@
+{
+  "nodes": [
+    {
+      "id": "recherche-47",
+      "step": "recherche doc baux/fencing/hooks fan-out (ADR-045)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "scouting-47",
+      "step": "état des lieux du code livré 44-46 pour la 47 + zone partagée 46.1",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "cadrage-47",
+      "step": "cadrage 47 (manager) + escalade Willy",
+      "stage": "",
+      "deps": [
+        "recherche-47",
+        "scouting-47"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "plan-47",
+      "step": "gsd-plan-phase 47 --ws gouvernance (vf-coder)",
+      "stage": "",
+      "deps": [
+        "cadrage-47"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "plancheck-47",
+      "step": "plan-checkers frais jusqu'au vert",
+      "stage": "",
+      "deps": [
+        "plan-47"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "suivi-47",
+      "step": "ROADMAP §47 + ligne de position STATE à la main + gates de planning",
+      "stage": "",
+      "deps": [
+        "plancheck-47"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-47",
+      "step": "PR empilée sur #136 (push bloqué 403, option C)",
+      "stage": "",
+      "deps": [
+        "suivi-47"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
