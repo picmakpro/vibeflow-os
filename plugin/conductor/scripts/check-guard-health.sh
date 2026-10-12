@@ -78,6 +78,25 @@
 # defaut 1800s) — voir le commentaire dedie plus bas pour le motif mesure. Une ligne PAR FAMILLE de
 # signal (marqueurs de garde, stall de mission) est imprimee — jamais une par marqueur individuel au
 # sein d'une famille — donc au plus DEUX lignes au total.
+#
+# REGLE DE PROGRESSION (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q1 option b) :
+# `progress_age_seconds` du verrou n'avance que par `dag.sh mark` / `driver-lock.sh mark-progress` ; or un
+# plan peut durer plus que STALL_WINDOW sans marquer aucun noeud (faux stall constate a 1587 s et 1589 s le
+# 2026-10-12). L'age de progression EFFECTIF est donc mesure depuis le plus recent de (a) `progress_epoch`
+# du verrou et (b) l'horodatage du dernier commit de la branche courante du depot git du REPERTOIRE
+# COURANT (le lab) : un commit plus recent que la fenetre ecarte le STALL. Seuil, TTL, verdict ABANDON
+# (heartbeat mort : un commit n'y change rien) et forme de sortie sont inchanges ; la ligne de stall
+# imprime l'age effectif. Horodatage retenu : celui du COMMITTER (`%ct`), pas de l'auteur (`%at`) —
+# l'auteur est conserve par rebase, cherry-pick et amend, il peut donc dater de plusieurs jours alors
+# que le commit vient d'etre ecrit (un commit rebase hier a l'instant, vu comme vieux = faux stall) ;
+# `%ct` dit « quand ce commit est entre dans la branche », seule date qui prouve une activite recente.
+# Sans depot git, sans commit, git absent ou lecture en echec, un commit date du futur (horloge
+# decalee : il masquerait un stall pour de bon) : la lecture est ignoree et le comportement est celui
+# d'avant — jamais un SAIN fabrique par une lecture ratee, jamais un crash. En lab partitionne, la
+# logique « entree la plus grave » sur `locks` (P57-D-31) s'applique a l'age effectif de chaque entree.
+# Limite ecrite, NON tranchee : la branche lue est celle du repertoire courant ; un verrou partage entre
+# worktrees (vf-driver/ sous le git-common-dir) peut etre juge sur la branche d'un autre worktree que
+# celui de son proprietaire — choix de comportement laisse a l'arbitrage humain.
 
 set -uo pipefail
 
@@ -217,11 +236,27 @@ check_driver_stall() {
   # le JSON traverse une frontiere de confiance (sous-processus non fiable). $py_invoke reste NON
   # quote volontairement : c'est ce qui permet a "py -3" de porter son argument de lanceur (meme
   # patron que le producteur reproduit ici).
+  # Age du dernier commit de la branche courante (REGLE DE PROGRESSION, en-tete) : vide si illisible.
+  local commit_age="" ct="" now_s
+  if command -v git >/dev/null 2>&1; then
+    ct="$(git log -1 --format=%ct HEAD 2>/dev/null)" && case "$ct" in
+      ''|*[!0-9]*) : ;;
+      *) now_s="$(date +%s)"; [ "$now_s" -ge "$ct" ] && commit_age=$(( now_s - ct )) ;;
+    esac
+  fi
+
   local parsed rc_py
   # shellcheck disable=SC2086
-  parsed="$(STATUS_JSON="$out" STALL_WINDOW="$STALL_WINDOW" $py_invoke <<'PYEOF'
+  parsed="$(STATUS_JSON="$out" STALL_WINDOW="$STALL_WINDOW" COMMIT_AGE="$commit_age" $py_invoke <<'PYEOF'
 import json, os, sys
 raw = os.environ.get("STATUS_JSON", "")
+ca_raw = os.environ.get("COMMIT_AGE", "")
+commit_age = int(ca_raw) if ca_raw.isdigit() else None
+def eff(pa):
+    # age de progression effectif = le plus recent de progress_epoch (pa) et du dernier commit
+    if isinstance(pa, int) and not isinstance(pa, bool) and commit_age is not None:
+        return min(pa, commit_age)
+    return pa
 try:
     data = json.loads(raw)
 except Exception:
@@ -252,7 +287,7 @@ if "locks" in data:
             continue
         if first_present is None:
             first_present = e
-        pa = e.get("progress_age_seconds")
+        pa = eff(e.get("progress_age_seconds"))
         if e.get("stale"):
             rank = 2
         elif isinstance(pa, int) and not isinstance(pa, bool) and pa > win:
@@ -276,7 +311,7 @@ present = entry.get("present")
 stale = entry.get("stale")
 owner = entry.get("owner")
 step = entry.get("step")
-progress_age = entry.get("progress_age_seconds")
+progress_age = eff(entry.get("progress_age_seconds"))
 ttl = entry.get("ttl")
 print("present=%s" % ("true" if present else "false"))
 print("stale=%s" % ("true" if stale else "false"))
