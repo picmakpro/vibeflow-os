@@ -88,6 +88,11 @@ dépôts jetables (aucune sonde sur le vrai `.git/vf-driver`, structure réelle 
   guard (cwd sous-dossier) devient plat : commit sous verrou d'autrui ALLOW. Hérité du régime plat (P57-D-03) mais le
   nouvel indicateur `--ws` le rend muet. Remédiation : remonter au toplevel git pour détecter `.planning/workstreams`, ou
   refuser `--ws`/`--depot` hors racine de lab (`scope_reason` explicite).
+- **Corrections F-1 et F-2 (2026-10-11, arbitrage Samuel, AskUserQuestion session principale, option a pour chacun).**
+  F-1 corrigé par P57-D-38 : `e1101295` RED, `4df8ebf2` GREEN (préfiltre C4 en `re.I` et repli de casse du segment
+  `.planning` dans `map_path`, lab partitionné seulement), mutants s et t `fdec20fd`. F-2 corrigé par P57-D-39 :
+  `0d9bb680` (`driver-lock.sh` refuse `not-at-lab-root`), `5c37114c` (le guard détecte le lab depuis la racine git),
+  mutants j, u, v, w `fdec20fd`. Registre et prose : `32dc6edb`. Lab plat inchangé au bit près (A/B IDENTIQUE).
 - **F-3 (low, no-op/ask-user) — `skip_git_globals` ignore `--no-pager`, `--paginate`, `-p`, `--no-optional-locks`,
   `--literal-pathspecs` et `exec` n'est pas un wrapper** : `git --no-pager commit -am x` ALLOW sous verrou d'autrui. Lignes
   non touchées par la phase (BL-2, Phase 32), classe Catégorie A de l'en-tête (anti-accident). À consigner dans CONCERNS.md.

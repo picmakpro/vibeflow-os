@@ -68,8 +68,8 @@ jugé sur l'index du process. → limite écrite (P57-D-20).
 ## Corrections
 
 Mandat de correction CIBLÉE (vf-dev-manager → vf-coder), 2026-10-11. R-1, R-2 et R-3 corrigés ; R-4 à R-7 non
-corrigés, consignés ci-dessus (limites écrites ou lows). F-1 et F-2 de l'audit (57-SECURITY.md) gelés, arbitrage
-humain en cours.
+corrigés, consignés ci-dessus (limites écrites ou lows). F-1 et F-2 de l'audit (57-SECURITY.md) corrigés après
+arbitrage humain (voir les deux dernières lignes du tableau).
 
 | Finding | Commits | Preuve |
 |---------|---------|--------|
@@ -77,6 +77,9 @@ humain en cours.
 | R-2 | `83507d76` RED (6 KO constatés), `f4a62a8b` GREEN | GW-UNREAD-0..5 : dossier de verrous et meta illisibles = refus nommé en lab partitionné ; meta absent et lab plat inchangés, GW-AB identique |
 | R-3 | `4d326783` | GW-TTL, GW-UNC et GW-T-C-1b, GW-C-POS, GW-C-CASE, GW-C-GEN ; mutants GW-M-m à GW-M-r, trace du rouge (cas, attendu, obtenu) par mutant, témoin non muté à 0 KO, aucun mutant équivalent ; test-guard-driver-lock-ws 222/0, mutants 18/18 |
 | CHANGELOG | `e97a4196` | entrées conductor v1.49.0 et dev-orchestrator v2.28.0 complétées, sans bump |
+| F-1 (audit) | `e1101295` RED (GW-C4-1 rouge), `4df8ebf2` GREEN, `fdec20fd` mutants s et t | P57-D-38, arbitrage Samuel, AskUserQuestion session principale, 2026-10-11 (option a) : `.PLANNING/workstreams/<ws>/f` refusé sous le verrou d'autrui en lab partitionné ; lab plat au bit près, GW-AB IDENTIQUE ; test-guard-driver-lock-ws 240/0, mutants 23/23 |
+| F-2 (audit) | `e1101295` RED (WS-ROOT-1..3 et GW-SUB-1, -4, -5 rouges), `0d9bb680` GREEN driver, `5c37114c` GREEN guard, `fdec20fd` mutants j, u, v, w | P57-D-39, même arbitrage (option a) : refus nommé `not-at-lab-root`, partition détectée depuis la racine git ; test-driver-lock-ws 528/0, mutants 10/10 ; témoin DLWS-03 (diff vide des suites du lab plat) conservé |
+| Registre et prose | `32dc6edb` | P57-D-38 et P57-D-39 au registre de 57-CONTEXT.md ; mission-flow, team-kernel, manuel FR/EN, amendement d'ADR-053 alignés |
 
 Le cas (d) de R-3 teste le comportement ACTUEL de `map_repo_path` (casse de `.planning` et de `workstreams` dans
-l'index) ; la casse du préfiltre C4 des Write/Edit (F-1) n'est pas modifiée.
+l'index) ; la casse du préfiltre C4 des Write/Edit (F-1) a été corrigée ensuite (P57-D-38, `4df8ebf2`).
