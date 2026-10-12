@@ -14,8 +14,10 @@
 # sonde bash lit le cwd du process). Les payloads sont construits par python, jamais concaténés.
 #
 # Plan 57-11 : GW-AB (le guard d'un lab PLAT rend, sur une matrice de payloads, les mêmes stdout/stderr/code que la
-# copie gelée d'avant la phase, au bit près, deux régimes de verrou), GW-AB-INTEGRITE (T-57-40) et les douze mutants
-# GW-M-a à GW-M-l (QUAL-01 : chaque comportement neuf du guard rougit sous sa mutation, ensemble basculé exact).
+# copie gelée d'avant la phase, au bit près, deux régimes de verrou), GW-AB-INTEGRITE (T-57-40) et les mutants
+# GW-M-* (leur nombre est MUT_TOTAL, en tête de la section des mutants ; QUAL-01 : chaque comportement neuf du guard
+# rougit sous sa mutation, ensemble basculé exact), puis GW-AB-MUT (la matrice A/B contient une forme par garde de
+# partition).
 #
 # Exit 0 si tout passe, 1 sinon, 2 si la fixture est cassée (préflight).
 
@@ -786,6 +788,27 @@ out="$(gb "$LAB" 'git status && GIT_DIR=.git git reset --hard' sess-B)"
 assert "GW-ENVT-9.2 — le même geste avec GIT_DIR= en préfixe : deny, SEULE la cible incertaine le distingue" "$out" "$DENY"
 
 echo
+echo "=== GW-ENVT-OUT — le préfixe GIT_*= du MÊME segment rend la cible incertaine aussi pour la décision « geste hors du lab » (réserve AUD-1 de l'audit Phase 57 ; lab partitionné) ==="
+LAB="$(mk_lab envout)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"; stage "$LAB" .planning/workstreams/alpha/STATE.md
+out="$(gb "$LAB" "cd $WORK_DIR && git commit -m x" sess-B)"
+assert_empty "GW-ENVT-OUT-0 — témoin : cd <hors lab> && git commit, sans préfixe : permis (C7 intact)" "$out"
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_DIR=$LAB/.git GIT_WORK_TREE=$LAB git commit -m x" sess-B)"
+assert "GW-ENVT-OUT-1 — cd <hors lab> && GIT_DIR=<lab>/.git GIT_WORK_TREE=<lab> git commit : deny (le commit embarque alpha)" "$out" "$DENY"
+out2="$(gb "$LAB" "cd $WORK_DIR && git --git-dir=$LAB/.git --work-tree=$LAB commit -m x" sess-B)"
+assert "GW-ENVT-OUT-2 — témoin : la forme --git-dir=/--work-tree= équivalente est refusée" "$out2" "$DENY"
+[ "$out" = "$out2" ]; assert_exit "GW-ENVT-OUT-3 — MÊME verdict et MÊME message que la forme --git-dir=/--work-tree=" "$?" 0
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_INDEX_FILE=$LAB/.git/index git commit -m x" sess-B)"
+assert "GW-ENVT-OUT-4 — cd <hors lab> && GIT_INDEX_FILE=… git commit : deny" "$out" "$DENY"
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_WORK_TREE=$LAB git commit -m x" sess-B)"
+assert "GW-ENVT-OUT-5 — cd <hors lab> && GIT_WORK_TREE=… git commit : deny" "$out" "$DENY"
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_AUTHOR_NAME=a git commit -m x" sess-B)"
+assert_empty "GW-ENVT-OUT-6 — une autre variable GIT_* ne déplace pas la cible : permis (aucune classe de refus nouvelle)" "$out"
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_DIR=$LAB/.git GIT_WORK_TREE=$LAB git commit -m x" sess-A)"
+assert_empty "GW-ENVT-OUT-7 — le détenteur : stdout vide (discriminance)" "$out"
+
+echo
 echo "=== GW-C-POS — un pathspec POSITIONNEL de commit compte comme pathspec (doute = union ; correction R-3 c) ==="
 LAB="$(mk_lab cpos)"
 dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
@@ -985,6 +1008,16 @@ for sid in ("sess-B", "sess-A"):
         ("cd-other." + s, bash("cd " + other + " && git commit -m x", sid)),
         ("gitC-other." + s, bash("git -C " + other + " commit -m x", sid)),
         ("popd." + s, bash("popd && git commit -m x", sid)),
+        # Formes reconnues SEULEMENT en lab partitionne (F-3, R-5) : le lab plat doit les lire comme avant la phase
+        # (un global sans argument, exec, un prefixe GIT_*=, y compris devant un cd hors du lab). Retirer la garde de
+        # partition de l une d elles rend cette transcription DIFFERENTE (GW-AB-MUT).
+        ("noarg-commit." + s, bash("git --no-pager commit -am x", sid)),
+        ("noarg-reset." + s, bash("git -p reset --hard", sid)),
+        ("exec-commit." + s, bash("exec git commit -am x", sid)),
+        ("env-dir." + s, bash("GIT_DIR=.git git commit -m x", sid)),
+        ("env-index." + s, bash("GIT_INDEX_FILE=.git/index git commit -m x", sid)),
+        ("env-wt." + s, bash("GIT_WORK_TREE=. git commit -m x", sid)),
+        ("env-out." + s, bash("cd " + other + " && GIT_DIR=.git git commit -m x", sid)),
         ("chain." + s, bash("echo a; git add -A && git commit -m x", sid)),
         ("heredoc." + s, bash("cat > f <<EOF\nx\nEOF\ngit commit -m x", sid)),
         ("ls." + s, bash("ls -la", sid)),
@@ -1094,6 +1127,31 @@ else
 fi
 if [ "$gw_ab_ok" = 1 ]; then echo "  A/B guard lab plat : IDENTIQUE"; else echo "  A/B guard lab plat : DIFFÉRENT"; fi
 
+# GW-AB-MUT (réserve S1 de la revue Phase 57) : la matrice A/B du lab plat doit CONTENIR au moins un payload par forme
+# reconnue seulement en lab partitionné. Preuve : retirer la garde de partition de l'une d'elles (copie mutée du guard
+# courant) rend la transcription DIFFÉRENTE de la copie gelée. Un seul régime (chemin par défaut) par mutant.
+gw_ab_mut() { # <id> <ancre BRE> <expression sed s>
+  local id="$1" anchor="$2" expr="$3" d="$GWAB/abmut-$1" n
+  mkdir -p "$d"; cp "$PORTABLE" "$d/vf-portable.sh"; cp "$GWAB/current/guard-driver-lock.sh" "$d/guard-driver-lock.sh"
+  n="$(grep -c -e "$anchor" "$d/guard-driver-lock.sh")"
+  if [ "$n" != "1" ]; then assert_exit "GW-AB-MUT-$id — ancre non unique ($n occurrences de [$anchor])" 1 0; return; fi
+  sed -i.bak -e "/$anchor/$expr" "$d/guard-driver-lock.sh"; rm -f "$d/guard-driver-lock.sh.bak"
+  if cmp -s "$d/guard-driver-lock.sh" "$GWAB/current/guard-driver-lock.sh"; then assert_exit "GW-AB-MUT-$id — mutant NON OPPOSABLE : la substitution n'a rien changé" 1 0; return; fi
+  gw_ab_pass "$d/guard-driver-lock.sh" "" "$d/ab.txt"
+  gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "" "$d/ab-frozen.txt"
+  if [ -s "$d/ab.txt" ] && ! cmp -s "$d/ab-frozen.txt" "$d/ab.txt"; then
+    assert_exit "GW-AB-MUT-$id — garde de partition retirée : la transcription A/B DIFFÈRE de la copie gelée (la matrice contient la forme)" 0 0
+    echo "     première divergence : $(gw_ab_first_divergence "$d/ab-frozen.txt" "$d/ab.txt")"
+  else
+    assert_exit "GW-AB-MUT-$id — garde de partition retirée : la transcription A/B reste IDENTIQUE (aucun payload de la forme dans la matrice)" 1 0
+  fi
+}
+if [ -f "$FROZEN_GUARD" ]; then
+  gw_ab_mut noarg 'elif PARTITIONED and t in NOARG_GIT_GLOBALS:' 's@elif PARTITIONED and t in@elif t in@'
+  gw_ab_mut exec 'if os.path.basename(t) in WRAPPERS or (PARTITIONED and os.path.basename(t) == "exec"):' 's@or (PARTITIONED and os.path.basename(t) == "exec"):@or os.path.basename(t) == "exec":@'
+  gw_ab_mut env 'if PARTITIONED and env_target_uncertain(seg\[:idx\]):' 's@if PARTITIONED and env_target_uncertain@if env_target_uncertain@'
+fi
+
 # Intégrité de la copie gelée (T-57-40, correction R-7). Empreinte ÉPINGLÉE dans la suite : le blob git de
 # `git rev-parse $GW_AB_REF:$GW_AB_PATH_IN_REF`, dérivé de l'objet de référence puis gelé ici. Elle se vérifie SANS
 # historique : un clone superficiel (le job `tests` de la CI fait un `actions/checkout` sans `fetch-depth`) ne
@@ -1123,7 +1181,7 @@ echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-target_noar
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=30; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=31; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 # a : GW-C-INC-1/2 (corrections F-3, R-5, C3) : sans -z, « .planning/workstreams\n » ne se lit plus comme le chemin incertain
@@ -1136,8 +1194,8 @@ MUT_E="GW-T-EXEMPT-1=1"
 # f : GW-ENVT-9.1 (témoin de GW-ENVT-9.2, même geste d'arbre depuis un autre worktree)
 MUT_F="GW-ENVT-9.1=1 GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
 # g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
-# g : GW-C-INC-3, GW-ENVT-7, GW-F3-17 (détenteur, discriminance des cas ajoutés)
-MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
+# g : GW-C-INC-3, GW-ENVT-7, GW-ENVT-OUT-7, GW-F3-17 (détenteur, discriminance des cas ajoutés)
+MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
 # h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
 MUT_H="GW-C4-2=1 GW-C4-3=1 GW-MARK-W-4=1 GW-Q-PASS=1 GW-SUB-2=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
 MUT_I="GW-C-REL-tenu=2"
@@ -1148,8 +1206,8 @@ MUT_L="GW-W-LEG-1=1 GW-W-LEG-2=1"
 # m à r (correction R-3 de la revue Phase 57) : ensembles mesurés puis relus un par un ; chacun contient le cas qui
 # discrimine le comportement, rien d'autre (GW-T-C-1b est le cas voisin de GW-T-C-1 qui isole la cible incertaine)
 MUT_M="GW-TTL-1=1 GW-TTL-2=1 GW-TTL-3=1"
-# n : GW-ENVT-8 compare le message de GW-ENVT-1 à celui de --git-dir=
-MUT_N="GW-ENVT-8=1 GW-T-C-1b=1 GW-UNC-1=1 GW-UNC-2=1 GW-UNC-3=1"
+# n : GW-ENVT-8 compare le message de GW-ENVT-1 à celui de --git-dir= ; GW-ENVT-OUT-3 compare celui de la forme hors lab
+MUT_N="GW-ENVT-8=1 GW-ENVT-OUT-3=1 GW-T-C-1b=1 GW-UNC-1=1 GW-UNC-2=1 GW-UNC-3=1"
 MUT_O="GW-C-POS-1=1 GW-C-POS-2=1"
 MUT_P="GW-C-CASE-1=1"
 MUT_Q="GW-C-GEN-2=1 GW-C-GEN-3=1 GW-C-GEN-4=1"
@@ -1171,7 +1229,10 @@ MUT_W="GW-SUB-5=1"
 MUT_PSB="GW-C-PSB-1=1 GW-C-PSB-2=1 GW-C-PSB-3=1 GW-C-PSB-4=1"
 MUT_INC="GW-C-INC-1=1 GW-C-INC-2=1"
 MUT_TOP="GW-C-NOGITBIN-4=1"
-MUT_ENVT="GW-ENVT-1=1 GW-ENVT-2=1 GW-ENVT-3=1 GW-ENVT-4=1 GW-ENVT-5=1 GW-ENVT-8=1 GW-ENVT-9.2=1"
+# (GW-ENVT-OUT-3 : le message de la forme --git-dir= hors lab porte « le commit embarque », celui du préfixe, sans la source, non)
+MUT_ENVT="GW-ENVT-1=1 GW-ENVT-2=1 GW-ENVT-3=1 GW-ENVT-4=1 GW-ENVT-5=1 GW-ENVT-8=1 GW-ENVT-9.2=1 GW-ENVT-OUT-3=1"
+# envt_outside (AUD-1) : le préfixe GIT_*= du même segment ne rend plus la cible incertaine pour la décision « hors du lab »
+MUT_ENVOUT="GW-ENVT-OUT-1=1 GW-ENVT-OUT-3=1 GW-ENVT-OUT-4=1 GW-ENVT-OUT-5=1"
 MUT_NOARG="GW-F3-1=1 GW-F3-2=1 GW-F3-3=1 GW-F3-4=1 GW-F3-5=1 GW-F3-7=1 GW-F3-8=1 GW-F3-9=1 GW-F3-10=1 GW-F3-11=1 GW-F3-12=1 GW-F3-13=1 GW-F3-14=1 GW-F3-15=1 GW-F3-21=1"
 MUT_EXEC="GW-F3-15=1 GW-F3-6=1"
 MUT_TARGET="GW-F3-18=1"
@@ -1299,6 +1360,8 @@ mutant incertain_none 'elif kind == "incertain":' '{n;s@hs = list(held)@hs = []@
 mutant toplevel_none 'raise Unreadable("rev-parse --show-toplevel")' 's@raise Unreadable("rev-parse --show-toplevel")@pass@' "$MUT_TOP"
 # envt_none (R-5) : l'affectation GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= ne rend plus la cible incertaine
 mutant envt_none 'unc = unc or env_target_uncertain(toks\[:idx\])' 's@unc = unc or env_target_uncertain(toks\[:idx\])@unc = unc@' "$MUT_ENVT"
+# envt_outside (AUD-1) : le préfixe GIT_*= du même segment est ignoré par la décision « geste hors du lab »
+mutant envt_outside 'if PARTITIONED and env_target_uncertain(seg\[:idx\]):' 's@if PARTITIONED and env_target_uncertain(seg\[:idx\]):@if False:@' "$MUT_ENVOUT"
 # noarg_blind (F-3) : l'ensemble des globaux sans argument est vide
 mutant noarg_blind '^NOARG_GIT_GLOBALS = {' 's@NOARG_GIT_GLOBALS = {@NOARG_GIT_GLOBALS = set(); NOARG_UNUSED = {@' "$MUT_NOARG"
 # exec_blind (F-3) : exec n'est plus un wrapper
@@ -1310,9 +1373,9 @@ wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 30/30 tués =="
+  echo "== mutants : $MUT_TOTAL/$MUT_TOTAL tués =="
 else
-  echo "== mutants : $MUT_KILLED/30 tués =="
+  echo "== mutants : $MUT_KILLED/$MUT_TOTAL tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # GW_MODE = full (mutants)

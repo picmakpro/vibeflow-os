@@ -89,9 +89,12 @@
 # GLOBAUX GIT ET CIBLE (F-3, R-5) : en lab partitionne, `exec` est un wrapper et les options globales de git sans
 # argument (--no-pager, --paginate, -p, --no-optional-locks, --literal-pathspecs, --glob-pathspecs, --noglob-pathspecs,
 # --icase-pathspecs, --no-replace-objects, --no-lazy-fetch, --no-advice, --bare) sont sautees avant le sous-verbe ;
-# une affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git est une cible
-# INCERTAINE, au meme titre que --git-dir (meme verdict, meme message). Le lab plat garde la lecture d avant la
-# Phase 57 (A/B au bit pres) : il ne reconnait ni l un ni l autre.
+# une affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git DU MEME SEGMENT
+# est une cible INCERTAINE, au meme titre que --git-dir, aussi bien pour la classe du geste que pour la decision
+# « geste hors du lab » (meme verdict, meme message). COUVERT : `GIT_DIR=x git commit`, `cd ailleurs && GIT_DIR=x
+# git commit`. NON COUVERT : l affectation dans un AUTRE segment (`export GIT_INDEX_FILE=x; git commit`,
+# `GIT_DIR=x; git commit`), que l analyse ne suit pas. Le lab plat garde la lecture d avant la Phase 57 (A/B au bit
+# pres) : il ne reconnait ni l un ni l autre.
 # AUCUN CROCHET DE TEST (R-6) : le guard ne lit aucune variable de test ; la suite provoque l exception fail-closed
 # dans une COPIE du guard qu elle fabrique elle-meme.
 # LIMITE (P57-D-20) : le guard isole des SESSIONS, pas des managers d'une même session (ils partagent le
@@ -476,6 +479,8 @@ def bash_targets_outside_lab(cmd, root, start=None):
             if bash_command_concerned(" ".join(shlex.quote(t) for t in seg)):
                 if name == "git":
                     target = git_target(seg, idx + 1, base)
+                    if PARTITIONED and env_target_uncertain(seg[:idx]):
+                        target = None  # GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= du meme segment : cible incertaine (R-5)
                 elif any(t in ("-R", "--repo") or t.startswith("--repo=") for t in seg):
                     target = None
                 else:
