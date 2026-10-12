@@ -89,7 +89,7 @@ Tableau complet dans l'archive (section `### Quick Tasks Completed`) ; les nouve
 
 ## Session Continuity
 
-**Resume file:** .planning/workstreams/fiabilite/phases/VFDO-41.4-emprunts-pocock-disciplines-de-cadrage-de-revue-et-de-skills/41.4-CONTEXT.md
+**Resume file:** .planning/milestones/fiabilite-v1.0-phases/VFDO-41.4-emprunts-pocock-disciplines-de-cadrage-de-revue-et-de-skills/41.4-CONTEXT.md
 
 Last session: 2026-10-06 — Phase 41.4 exécutée (11 plans), PR en brouillon, 4 majeurs de revue ouverts.
 

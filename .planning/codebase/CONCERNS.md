@@ -364,7 +364,7 @@ capturées au backlog — voir Tech Debt.
   qu'une entrée qui manque — elle éteint la vigilance.**
 - Files: `scripts/hooks/pre-push` (script appelé fermé, hook lui-même ouvert),
   `scripts/hooks/post-merge` (idem) ;
-  `.planning/phases/VFDO-39-workstreams-partition-du-planning-et-collaboration-concurren/39-01-PLAN.md`
+  `.planning/milestones/fiabilite-v1.0-phases/VFDO-39-workstreams-partition-du-planning-et-collaboration-concurren/39-01-PLAN.md`
   (registre STRIDE, T-39-01)
 - Current mitigation: les deux hooks résolvent l'exécutable **qu'ils appellent** via
   `--git-common-dir` — voir le détail par hook ci-dessus. Aucune mitigation ne couvre encore la
@@ -387,7 +387,7 @@ capturées au backlog — voir Tech Debt.
   arbitrages l'un de l'autre.
 - Files: `plugin/conductor/scripts/driver-lock.sh`, `plugin/conductor/scripts/guard-driver-lock.sh`,
   `plugin/conductor/scripts/check-guard-health.sh`
-- Fermeture (Phase 32, `.planning/phases/VFDO-32-durcissement-du-driver-lock/32-RELIQUATS.md`) :
+- Fermeture (Phase 32, `.planning/milestones/fiabilite-v1.0-phases/VFDO-32-durcissement-du-driver-lock/32-RELIQUATS.md`) :
   `acquire` refuse désormais un lock périmé (`stale-requires-takeover`, jamais de récupération
   implicite) ; guard `PreToolUse(Bash|Write|Edit)` distribué via `merge-hooks`, qui refuse un commit
   ou une écriture `.planning/` sous le lock d'autrui, armé et vérifié en lab jetable ; le
@@ -542,7 +542,7 @@ vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas pri
 
 **`kimi doctor` est un VERT À VIDE sur les agents — il ne les regarde pas** — Sévérité : **HIGH**
 - Files: toute recette d'install/vérification ciblant kimi-code ; constat en
-  `.planning/phases/VFDO-38-*/38-MESURE-KIMI.md` (artefact `71-doctor-populated.txt`)
+  `.planning/milestones/fiabilite-v1.0-phases/VFDO-38-*/38-MESURE-KIMI.md` (artefact `71-doctor-populated.txt`)
 - Why fragile: mesuré le 2026-08-30 — sur un banc peuplé de **11 agents cassés sur 31**, `kimi
   doctor` rend **« All checked config files are valid »**. Il valide les fichiers de configuration
   et **jamais les agents**. Le seul signal est un WARN dans `<KIMI_CODE_HOME>/logs/kimi-code.log`,

@@ -6,7 +6,7 @@ metadata:
 ---
 
 `replay-ci-jobs.sh --job tests` (outil de la Phase 40.1, sous
-`.planning/workstreams/fiabilite/phases/VFDO-40.1-*/tools/`) rougit régulièrement à **une** suite
+`.planning/milestones/fiabilite-v1.0-phases/VFDO-40.1-*/tools/`) rougit régulièrement à **une** suite
 sur 86, et **pas la même d'un run à l'autre**. Mesuré le 2026-09-24, deux rejeux consécutifs sur un
 diff de **prose seule** (3 fichiers `docs/`+`plugin/`) :
 
