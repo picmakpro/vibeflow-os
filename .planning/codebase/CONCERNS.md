@@ -226,6 +226,44 @@
   il ne la fourche (Iron Law 2 révisée, ADR-069) ; (c) ne PAS désactiver le toggle pour faire taire
   le bruit : ce serait perdre la garde sur le dépôt, qui, elle, fonctionne.
 
+**Phase 57 — verrou de driver par compartiment : limites connues, consignées et non corrigées** — Sévérité : **LOW**
+- Issue: la Phase 57 est vérifiée `passed` (13/13), mais sept points restent ouverts, tous sans effet sur un
+  critère. Aucun n'est corrigé : consignés ici pour que la prochaine phase touchant le verrou ou le guard les
+  retrouve. Sources : `.planning/workstreams/fiabilite/phases/VFDO-57-verrou-de-driver-par-compartiment/57-VERIFICATION.md` (C1, C3, C4),
+  `57-REVIEW.md` (R-4 à R-7), `57-SECURITY.md` (F-3).
+  1. **F-3, réel** (`57-SECURITY.md`, constaté et rejoué par `57-VERIFICATION.md` C4) : `git --no-pager commit -am x`
+     passe (ALLOW) sous le verrou d'autrui. Cause : `skip_git_globals` de `plugin/conductor/scripts/guard-driver-lock.sh`
+     ignore `--no-pager`, `--paginate`, `-p`, `--no-optional-locks`, `--literal-pathspecs`, et `exec` n'est pas un
+     wrapper reconnu. Ligne héritée de la Phase 32 (BL-2), classe « catégorie A » (anti-accident) de l'en-tête du guard.
+  2. **R-4** (`57-REVIEW.md`) : fenêtre de quelques ms entre la sonde de l'ancien verrou et `ln_atomic` dans
+     `driver-lock.sh` ; les deux gestes ne sont pas atomiques entre eux. En outre, un `stale` legacy rend le même
+     `reason` que celui d'un compartiment, avec une autre commande (`recover`), non distinguée dans la prose.
+  3. **R-5** (`57-REVIEW.md`, P57-D-20) : `GIT_INDEX_FILE=` et `GIT_DIR=` en préfixe d'affectation ne sont pas des
+     cibles incertaines pour le guard : le commit est jugé sur l'index du process.
+  4. **R-6** (`57-REVIEW.md`) : le crochet de test `VF_GUARD_TEST_RAISE` (`guard-driver-lock.sh`, vers la ligne 546)
+     est présent en production ; il ne peut que faire refuser.
+  5. **R-7** (`57-REVIEW.md`) : `WS-AB-INTEGRITE` et `GW-AB-INTEGRITE` s'ignorent (SKIP) quand les objets `e8771d94` /
+     `cff1e2af` sont absents, c'est-à-dire sur un clone shallow : la preuve de lab plat « au bit près » n'y est pas jouée.
+  6. **C3** (`57-VERIFICATION.md`) : QUAL-01 « mutation rouge pour chaque comportement neuf » (DLWS-08) n'est pas
+     exhaustif. Six branches défensives n'ont pas de mutant : côté driver `acq_fallback` (suffixe JSON seul),
+     `fallback_depotpresent` (clause « verrou de dépôt absent » de P57-D-24) et `skip_link_d` (lien symbolique ignoré par
+     `status --all`) ; côté guard `pathspec_blind` (`--pathspec-from-file`, `--only`, `--include`), `incertain_none`
+     (chemin « incertain » dans un commit) et `toplevel_none`. Le code est correct (sondes rejouées) ; seul le témoin manque.
+  7. **C1** (`57-VERIFICATION.md`) : `resolve_S` de `plugin/dev-orchestrator/scripts/check-mission-exit.sh` préfère
+     `$HOME/.claude/scripts` au module voisin. Sur le dépôt source, un `driver-lock.sh` d'avant la phase (sans `--ws`)
+     y répond rc 1 : E1 devient `indet`, l'identité d'E7 vaut `?` (« génération du verrou : ? »). Fail-closed, jamais un
+     vert ; se résorbe avec la release suivante et `/vf-update`.
+- Files: `plugin/conductor/scripts/guard-driver-lock.sh`, `plugin/conductor/scripts/driver-lock.sh`,
+  `plugin/conductor/scripts/tests/test-driver-lock-ws.sh`, `plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh`,
+  `plugin/dev-orchestrator/scripts/check-mission-exit.sh`
+- Impact: aucun critère de la Phase 57 n'en dépend. Le point 1 est une faille de l'anti-accident (pas du modèle de
+  menace, qui exclut l'écriture dans `.git`) ; les points 2 à 5 sont des limites écrites ; 6 est une réserve de preuve ;
+  7 est du bruit fail-closed propre au dépôt source.
+- Fix approach: (1) faire reconnaître à `skip_git_globals` les globaux sans argument listés et `exec` comme wrapper,
+  avec mutant ; (2 à 5) à ne traiter que si un usage concurrent réel (Phase 61) les rend observables ; (6) six mutants à
+  ajouter dans une correction courte ; (7) facultatif : préférer le module voisin quand `--root` est le dépôt source.
+  La correction C2 (transmission de `--ws` au budget) n'est PAS dans cette liste : elle est faite (`test-check-mission-exit-ws.sh`, EW-BWS).
+
 ## Known Bugs
 
 Aucun bug ouvert confirmé sur disque au 2026-07-26. Les comportements gênants connus (survie de
