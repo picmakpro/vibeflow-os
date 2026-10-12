@@ -15,7 +15,7 @@ vérifiés par lecture de `.planning/config.json` (`gsd_run` non résolu sur ce 
 session peut l'écraser).
 **Issue (session du 2026-10-07) :** `human_needed` — cadrage gelé dans l'attente des réponses de Willy à Q1-Q5.
 **Issue (reprise du 2026-10-12) :** `passed` — cadrage écrit, 18 plans, plan-check frais PASSED au tour 4, PR de
-planification ouverte (voir § Reprise). Aucune exécution, aucun rejeu, aucun armement.
+planification ouverte : PR #146 (base `gouvernance/phase-46-execution`, empilée sur #136). Aucune exécution, aucun rejeu, aucun armement.
 
 ## Plan de bataille (DAG `2026-10-07-gouvernance-46-1-cadrage.dag.json`)
 
