@@ -29,9 +29,12 @@ MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ENV WS-HINT-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS
 MUT_D="WS-LEG-1 WS-LEG-4"
 MUT_E="WS-ENV"
 MUT_F="WS-AB"
-MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-VFL"
+MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-ROOT-6 WS-VFL"
 MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien WS-RC2-vide"
-MUT_I="WS-ALL-1 WS-ALL-2 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
+# j (correction F-2, P57-D-39) : le refus hors racine du lab retiré — seuls les trois cas de refus de WS-ROOT basculent
+# (g y ajoute WS-ROOT-6, le cas VF_DRIVER_LOCK ; i y ajoute WS-ROOT-8, le témoin acquire depuis la racine)
+MUT_J="WS-ROOT-1 WS-ROOT-2 WS-ROOT-3"
+MUT_I="WS-ALL-1 WS-ALL-2 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-ROOT-8 WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
 # Mode de la suite. `full` (défaut) : tout, concurrence et mutants compris. `matrice` : sous-processus d'un
 # mutant (DL-M-*), qui rejoue les cas WS-* hors concurrence contre une COPIE mutée du script (DLWS_SCRIPT)
 # posée à côté de sa politique ; il n'y a alors ni concurrence ni mutants (pas de récursion).
@@ -1076,12 +1079,12 @@ fi
 
 if [ "$DLWS_MODE" = full ]; then
 echo
-echo "=== MUTANTS DL-M-a à DL-M-i — chaque comportement neuf de driver-lock.sh rougit sous sa mutation (QUAL-01, P57-D-12, P57-D-28) ==="
+echo "=== MUTANTS DL-M-a à DL-M-j — chaque comportement neuf de driver-lock.sh rougit sous sa mutation (QUAL-01, P57-D-12, P57-D-28) ==="
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du script, posée à côté
 # d'une copie de workstream-policy.sh (sinon policy-missing rougirait pour la mauvaise raison). La matrice (les
 # cas WS-* hors concurrence, WS-AB compris) est rejouée en sous-processus contre la copie ; l'ensemble des cas
 # dont le verdict bascule est comparé EXACTEMENT à l'attendu (un cas basculé hors de l'ensemble fait échouer).
-MUT_KILLED=0; MUT_TOTAL=9; t0=$SECONDS
+MUT_KILLED=0; MUT_TOTAL=10; t0=$SECONDS
 mut_families() { # <journal> → familles de cas en échec, triées, une par ligne
   LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sed 's/\..*$//' | LC_ALL=C sort -u
 }
@@ -1148,13 +1151,15 @@ mutant g 'z "${VF_DRIVER_LOCK:-}" ] || return 0' 's@\[ -z "${VF_DRIVER_LOCK:-}" 
 mutant h 'vf_dl_refuse partition-unreadable' 's@\*) vf_dl_refuse partition-unreadable .*@*) return 0 ;;@' "$MUT_H"
 mutant i 'vf_ws_dir_resolve ".planning" "$WS"; rc=$?' 's@vf_ws_dir_resolve ".planning" "$WS"; rc=$?@_l="$(vf_ws_enumerate ".planning" 2>/dev/null)"; { for _e in $_l; do printf "%s\\n" "$_e"; sleep 0.3; done; } | grep -q -- "/$WS\$"; rc=$?@' "$MUT_I"
 
+mutant j 'vf_dl_refuse not-at-lab-root' 's@vf_dl_refuse not-at-lab-root .*$@:@' "$MUT_J"
+
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 9/9 tués =="
+  echo "== mutants : 10/10 tués =="
 else
-  echo "== mutants : $MUT_KILLED/9 tués =="
+  echo "== mutants : $MUT_KILLED/10 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # DLWS_MODE = full (mutants)

@@ -955,13 +955,13 @@ fi   # GW_MODE = full (A/B)
 
 if [ "$GW_MODE" = full ]; then
 echo
-echo "=== MUTANTS GW-M-a à GW-M-r — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
+echo "=== MUTANTS GW-M-a à GW-M-w — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du guard, posée à côté d'une
 # copie de vf-portable.sh (sinon le locator sortirait en code 17 pour la mauvaise raison). Le programme python
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=18; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=23; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 MUT_A="GW-C-NONASCII-1=1 GW-C-REL-tenu=2"
@@ -972,9 +972,9 @@ MUT_D="GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1"
 MUT_E="GW-T-EXEMPT-1=1"
 MUT_F="GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
 # g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
-MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-D-TAG-detenteur=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
+MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
 # h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
-MUT_H="GW-MARK-W-4=1 GW-Q-PASS=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
+MUT_H="GW-C4-2=1 GW-C4-3=1 GW-MARK-W-4=1 GW-Q-PASS=1 GW-SUB-2=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
 MUT_I="GW-C-REL-tenu=2"
 MUT_J="GW-C-ALL-1=1 GW-C-ALL-2=1"
 MUT_K="GW-C-ADD-1=1"
@@ -987,6 +987,14 @@ MUT_O="GW-C-POS-1=1 GW-C-POS-2=1"
 MUT_P="GW-C-CASE-1=1"
 MUT_Q="GW-C-GEN-2=1 GW-C-GEN-3=1 GW-C-GEN-4=1"
 MUT_R="GW-C-CASE-2=1"
+# s à w (corrections F-1 et F-2 de l'audit Phase 57, P57-D-38 et P57-D-39) : s = casse de .planning du préfiltre C4 ;
+# t = casse de .planning dans map_path ; u = partition détectée depuis le cwd au lieu de la racine git ; v = même
+# détection, sonde bash pure ; w = préfixe du lab pris sur le cwd au lieu de la racine du lab (commit d'un sous-dossier).
+MUT_S="GW-C4-1=1"
+MUT_T="GW-C4-2=1 GW-C4-3=1"
+MUT_U="GW-SUB-1=1 GW-SUB-4=1 GW-SUB-5=1"
+MUT_V="GW-SUB-1=1 GW-SUB-4=1 GW-SUB-5=1"
+MUT_W="GW-SUB-5=1"
 gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
   awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
 }
@@ -1077,7 +1085,7 @@ mutant f 'if not wt or top is None or same_checkout(wt, top):' 's@if not wt or t
 # g : session courante traitée comme autrui -> le détenteur est refusé comme un tiers
 mutant g '^    if sid and sid in session_ids:$' 's@in session_ids:$@in session_ids and False:@' "$MUT_G"
 # h : cartographie par compartiment retirée -> tout verrou d'autrui bloque tout chemin
-mutant h 'kind, seg = map_path(abs_path, cwd)' 's@map_path(abs_path, cwd)@("incertain", "")@' "$MUT_H"
+mutant h 'kind, seg = map_path(abs_path, lab)' 's@map_path(abs_path, lab)@("incertain", "")@' "$MUT_H"
 # i : RELEASE_FORM_FILES vidée -> VERSION et docs/ADR.md ne sont plus des gestes de dépôt
 mutant i 'if pb in RELEASE_FORM_FILES:' 's@RELEASE_FORM_FILES:@():@' "$MUT_I"
 # j : source `-a` retirée -> `git commit -a` n'embarque plus les modifications non indexées
@@ -1098,14 +1106,19 @@ mutant p 'if parts\[0\].lower() == b".planning":' 's@parts\[0\].lower()@parts[0]
 mutant q 'except Unreadable as e:' '{n;n;n;n;s@except Exception:@except ZeroDivisionError:@;}' "$MUT_Q"
 # r (R-3 d) : casse de `workstreams` ignorée -> comparée à l'identique dans map_repo_path
 mutant r 'parts\[1\].lower() == b"workstreams"' 's@parts\[1\].lower()@parts[1]@' "$MUT_R"
+mutant s 're.I if PARTITIONED else 0' 's@re.I if PARTITIONED else 0@0@' "$MUT_S"
+mutant t 'rp\[len(pp) - 1\].casefold()' 's@rp\[len(pp) - 1\].casefold() == pp\[-1\].casefold()@False@' "$MUT_T"
+mutant u 'top = toplevel_of(base) or top_by_marker(base)' 's@toplevel_of(base) or top_by_marker(base)@None@' "$MUT_U"
+mutant v 'VF_GUARD_SUBLAB=1; fi' 's@VF_GUARD_SUBLAB=1; fi@VF_GUARD_SUBLAB=0; fi@' "$MUT_V"
+mutant w 'cwd if lab is None else lab' 's@cwd if lab is None else lab@cwd@' "$MUT_W"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 18/18 tués =="
+  echo "== mutants : 23/23 tués =="
 else
-  echo "== mutants : $MUT_KILLED/18 tués =="
+  echo "== mutants : $MUT_KILLED/23 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # GW_MODE = full (mutants)
