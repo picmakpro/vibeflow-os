@@ -306,25 +306,58 @@ if [ "$Q_PRE" -eq 1 ]; then
   assert "GW-Q-NOPY.4 — marqueur de santé écrit" "$mk" "present"
 fi
 
+# R-6 : le guard de production ne porte AUCUN crochet de test. Les exceptions du chemin partitionné sont provoquées
+# dans une COPIE du guard fabriquée ici, dans le dossier temporaire de la suite (la copie est faite du guard sous
+# test, mutant éventuel compris) : une ligne `raise` est insérée à un point d'ancrage unique ; le reste du programme
+# (crochet fail-closed compris) est celui du guard mesuré.
+mk_raise_copy() { # <decide|dispatch> <dossier> : écrit <dossier>/guard-driver-lock.sh, côte à côte avec vf-portable.sh
+  mkdir -p "$2"; cp "$PORTABLE" "$2/vf-portable.sh"
+  python3 -I - "$GUARD" "$2/guard-driver-lock.sh" "$1" <<'PYRAISE'
+import sys
+src, dst, point = sys.argv[1], sys.argv[2], sys.argv[3]
+t = open(src, encoding="utf-8").read()
+if point == "decide":
+    a = '    if tool == "Bash":\n        if not bash_command_concerned(target):\n'
+    b = '    raise RuntimeError("sonde de la suite : exception de la decision")\n' + a
+else:
+    a = '\ntool = payload.get("tool_name") or ""\n'
+    b = '\nif PARTITIONED:\n    raise RuntimeError("sonde de la suite : exception du dispatch")\n' + a[1:]
+if t.count(a) != 1:
+    sys.stderr.write("ancre non unique (%d) pour %s\n" % (t.count(a), point)); sys.exit(3)
+open(dst, "w", encoding="utf-8").write(t.replace(a, b))
+PYRAISE
+  chmod +x "$2/guard-driver-lock.sh"
+}
+run_guard_copy() { # <guard> <lab> <payload>
+  ( cd "$2" && printf '%s' "$3" | env "$BASH_BIN" "$1" 2>/dev/null )
+}
+
 echo
-echo "=== GW-CRASH — fail-closed : une exception du chemin partitionné rend un refus (T-57-08) ==="
+echo "=== GW-CRASH — fail-closed : une exception du chemin partitionné rend un refus (T-57-08 ; R-6 : exception injectée dans une copie, aucun crochet en production) ==="
 LAB="$(mk_lab crash)"
 PAY_W="$(mk_write "$LAB/.planning/workstreams/omega/STATE.md" x sess-B "$LAB")"
-out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=decide)"; rc=$?
+mk_raise_copy decide "$WORK_DIR/raise-decide"; assert_exit "GW-CRASH.0 — copie « exception de la décision » fabriquée (ancre unique)" "$?" 0
+RAISE_DECIDE="$WORK_DIR/raise-decide/guard-driver-lock.sh"
+out="$(run_guard_copy "$RAISE_DECIDE" "$LAB" "$PAY_W")"; rc=$?
 assert_exit "GW-CRASH.1 — exception de la décision : exit 0 (le repli bash ramène le code)" "$rc" 0
 assert "GW-CRASH.2 — deny" "$out" "$DENY"
 assert "GW-CRASH.3 — motif « erreur interne du guard, fail-closed »" "$out" "erreur interne du guard, fail-closed"
 json_ok() { printf '%s' "$1" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; }
 json_ok "$out"; assert_exit "GW-CRASH.4 — la sortie est un JSON valide, une seule décision" "$?" 0
-errout="$(cd "$LAB" && printf '%s' "$PAY_W" | env VF_GUARD_TEST_RAISE=decide "$BASH_BIN" "$GUARD" 2>&1 >/dev/null)"
+errout="$(cd "$LAB" && printf '%s' "$PAY_W" | env "$BASH_BIN" "$RAISE_DECIDE" 2>&1 >/dev/null)"
 assert_empty "GW-CRASH.5 — aucune trace sur stderr" "$errout"
-out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=autre-valeur)"
-assert_empty "GW-CRASH.6 — la sonde est inerte pour toute autre valeur" "$out"
+out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=decide)"
+assert_empty "GW-CRASH.6 — le guard de production ignore VF_GUARD_TEST_RAISE=decide (aucun crochet de test en production)" "$out"
+out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=dispatch)"
+assert_empty "GW-CRASH.7 — le guard de production ignore VF_GUARD_TEST_RAISE=dispatch" "$out"
+assert_exit "GW-CRASH.8 — le texte du guard ne contient plus aucune lecture de VF_GUARD_TEST_RAISE" "$(grep -c 'VF_GUARD_TEST_RAISE' "$GUARD" || true)" 0
 
 echo
 echo "=== GW-CRASH-PRE — exception AVANT la décision : dispatch, règle C6 (T-57-08) ==="
-out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=dispatch)"; rc=$?
-assert_exit "GW-CRASH-PRE-a.1 — sonde « dispatch » : exit 0" "$rc" 0
+mk_raise_copy dispatch "$WORK_DIR/raise-dispatch"; assert_exit "GW-CRASH-PRE-a.0 — copie « exception du dispatch » fabriquée (ancre unique)" "$?" 0
+RAISE_DISPATCH="$WORK_DIR/raise-dispatch/guard-driver-lock.sh"
+out="$(run_guard_copy "$RAISE_DISPATCH" "$LAB" "$PAY_W")"; rc=$?
+assert_exit "GW-CRASH-PRE-a.1 — exception du dispatch : exit 0" "$rc" 0
 assert "GW-CRASH-PRE-a.2 — deny « erreur interne » (verrou libre)" "$out" "erreur interne du guard, fail-closed"
 NUL_PAY="$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB" nul)"
 out="$(run_guard_in "$LAB" "$NUL_PAY")"; rc=$?
@@ -339,8 +372,8 @@ NUL_FLAT="$(mk_write "$FLAT/.planning/STATE.md" x sess-B "$FLAT" nul)"
 out="$(run_guard_in "$FLAT" "$NUL_FLAT")"; rc=$?
 assert_exit "GW-CRASH-PRE-c.1 — lab PLAT, même payload à octet NUL : exit 0" "$rc" 0
 assert_empty "GW-CRASH-PRE-c.2 — lab PLAT : comportement d'aujourd'hui, stdout vide (repli silencieux conservé)" "$out"
-out="$(run_guard_with "$FLAT" "$(mk_write "$FLAT/.planning/STATE.md" x sess-B "$FLAT")" VF_GUARD_TEST_RAISE=dispatch)"
-assert "GW-CRASH-PRE-c.3 — lab PLAT : la sonde « dispatch » est inerte, le guard historique refuse (ancien verrou d'autrui)" "$out" "$DENY"
+out="$(run_guard_copy "$RAISE_DISPATCH" "$FLAT" "$(mk_write "$FLAT/.planning/STATE.md" x sess-B "$FLAT")")"
+assert "GW-CRASH-PRE-c.3 — lab PLAT : l'exception du dispatch n'est pas levée, le guard historique refuse (ancien verrou d'autrui)" "$out" "$DENY"
 assert_not_internal() { if [[ "$2" != *"erreur interne"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; FAIL=$((FAIL+1)); fi; }
 assert_not_internal "GW-CRASH-PRE-c.4 — lab PLAT : aucun refus « erreur interne »" "$out"
 
@@ -512,6 +545,7 @@ if [ "$LOC_PRE" -eq 1 ]; then
   out="$(run_guard_with "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")" PATH="$LOC_BIN")"
   assert "GW-C-NOGITBIN-1 — PATH sans git, un verrou d'autrui (découvert par le layout) : deny" "$out" "$DENY"
   assert "GW-C-NOGITBIN-2 — motif : source illisible" "$out" "source illisible"
+  assert "GW-C-NOGITBIN-4 — motif : la source nommée est rev-parse --show-toplevel (pas une exception interne)" "$out" "source illisible : rev-parse --show-toplevel"
   out="$(run_guard_with "$LAB" "$(mk_bash 'git commit -m x' sess-A "$LAB")" PATH="$LOC_BIN")"
   assert_empty "GW-C-NOGITBIN-3 — PATH sans git, le détenteur : stdout vide" "$out"
 else
@@ -665,6 +699,91 @@ out="$(gb "$LAB" 'git reset --hard' sess-B)"
 assert_empty "GW-UNC-4.1 — verrou pris depuis un autre worktree, geste d'arbre ordinaire : permis (témoin)" "$out"
 out="$(gb "$LAB" 'git -C . reset --hard' sess-B)"
 assert "GW-T-C-1b — le même geste avec -C : deny, SEULE la cible incertaine le distingue" "$out" "$DENY"
+
+echo
+echo "=== GW-F3 — globaux git SANS argument et wrapper exec : reconnus comme le verbe qui suit (correction F-3, 57-SECURITY.md ; lab partitionné) ==="
+LAB="$(mk_lab f3)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -am x' sess-B)"
+assert "GW-F3-0 — témoin : git commit -am sans global, alpha tenu par autrui : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-pager commit -am x' sess-B)"
+assert "GW-F3-1 — git --no-pager commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --paginate commit -am x' sess-B)"
+assert "GW-F3-2 — git --paginate commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git -p commit -am x' sess-B)"
+assert "GW-F3-3 — git -p commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-optional-locks commit -am x' sess-B)"
+assert "GW-F3-4 — git --no-optional-locks commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --literal-pathspecs commit -am x' sess-B)"
+assert "GW-F3-5 — git --literal-pathspecs commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'exec git commit -am x' sess-B)"
+assert "GW-F3-6 — exec git commit -am (exec est un wrapper) : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --glob-pathspecs commit -am x' sess-B)"
+assert "GW-F3-7 — git --glob-pathspecs commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --noglob-pathspecs commit -am x' sess-B)"
+assert "GW-F3-8 — git --noglob-pathspecs commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --icase-pathspecs commit -am x' sess-B)"
+assert "GW-F3-9 — git --icase-pathspecs commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-replace-objects commit -am x' sess-B)"
+assert "GW-F3-10 — git --no-replace-objects commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-lazy-fetch commit -am x' sess-B)"
+assert "GW-F3-11 — git --no-lazy-fetch commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-advice commit -am x' sess-B)"
+assert "GW-F3-12 — git --no-advice commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --bare commit -am x' sess-B)"
+assert "GW-F3-13 — git --bare commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-pager -p --no-optional-locks commit -am x' sess-B)"
+assert "GW-F3-14 — plusieurs globaux sans argument enchaînés : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'sudo exec git --no-pager commit -am x' sess-B)"
+assert "GW-F3-15 — exec derrière un autre wrapper : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-pager commit -m x' sess-B)"
+assert_empty "GW-F3-16 — sans -a, la modification non indexée n'est pas embarquée : stdout vide (discriminance)" "$out"
+out="$(gb "$LAB" 'git --no-pager commit -am x' sess-A)"
+assert_empty "GW-F3-17 — le détenteur : stdout vide (discriminance)" "$out"
+out="$(gb "$LAB" "git --no-pager -C $WORK_DIR commit -am x" sess-B)"
+assert_empty "GW-F3-18 — git --no-pager -C <dossier hors du lab> : C7 inchangé, stdout vide" "$out"
+out="$(gb "$LAB" 'echo exec git commit -am x' sess-B)"
+assert_empty "GW-F3-19 — exec en position d'ARGUMENT d'une autre commande : stdout vide (S3 intact)" "$out"
+out="$(gb "$LAB" 'git --no-pager log -1' sess-B)"
+assert_empty "GW-F3-20 — un global sans argument devant un verbe hors surface : stdout vide (aucun refus nouveau)" "$out"
+LAB="$(mk_lab f3tree)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git --no-pager reset --hard' sess-B)"
+assert "GW-F3-21 — geste d'arbre derrière --no-pager, verrou pris depuis le même worktree : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-ENVT — GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE en préfixe d'affectation : cible INCERTAINE, comme --git-dir (correction R-5, P57-D-20 ; lab partitionné) ==="
+LAB="$(mk_lab envt)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-ENVT-0 — témoin : index vide, commit sans préfixe : permis" "$out"
+out="$(gb "$LAB" 'GIT_DIR=.git git commit -m x' sess-B)"
+assert "GW-ENVT-1 — GIT_DIR=.git git commit (index vide) : deny, cible incertaine" "$out" "$DENY"
+out="$(gb "$LAB" 'GIT_INDEX_FILE=.git/index git commit -m x' sess-B)"
+assert "GW-ENVT-2 — GIT_INDEX_FILE=… git commit (index vide) : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'GIT_WORK_TREE=. git commit -m x' sess-B)"
+assert "GW-ENVT-3 — GIT_WORK_TREE=. git commit (index vide) : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'env GIT_DIR=.git git commit -m x' sess-B)"
+assert "GW-ENVT-4 — env GIT_DIR=… git commit : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'FOO=1 GIT_INDEX_FILE=.git/index git commit -m x' sess-B)"
+assert "GW-ENVT-5 — affectation étrangère devant : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'GIT_AUTHOR_NAME=a git commit -m x' sess-B)"
+assert_empty "GW-ENVT-6 — une autre variable GIT_* ne déplace pas la cible : permis (aucune classe de refus nouvelle)" "$out"
+out="$(gb "$LAB" 'GIT_DIR=.git git commit -m x' sess-A)"
+assert_empty "GW-ENVT-7 — le détenteur : stdout vide (discriminance)" "$out"
+out="$(gb "$LAB" 'GIT_DIR=.git git commit -m x' sess-B)"
+out2="$(gb "$LAB" 'git --git-dir=.git commit -m x' sess-B)"
+[ "$out" = "$out2" ]; assert_exit "GW-ENVT-8 — MÊME verdict et MÊME message que --git-dir= (cible incertaine existante)" "$?" 0
+LAB="$(mk_lab envtree)"
+WTE="$WORK_DIR/envtree-wt"
+git -C "$LAB" worktree add -q -b wte "$WTE" >/dev/null 2>&1
+lab_preflight "$WTE"
+dl "$WTE" sess-A acquire --ws=omega --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git reset --hard' sess-B)"
+assert_empty "GW-ENVT-9.1 — verrou pris depuis un autre worktree, geste d'arbre ordinaire : permis (témoin)" "$out"
+out="$(gb "$LAB" 'git status && GIT_DIR=.git git reset --hard' sess-B)"
+assert "GW-ENVT-9.2 — le même geste avec GIT_DIR= en préfixe : deny, SEULE la cible incertaine le distingue" "$out" "$DENY"
 
 echo
 echo "=== GW-C-POS — un pathspec POSITIONNEL de commit compte comme pathspec (doute = union ; correction R-3 c) ==="
