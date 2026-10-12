@@ -93,3 +93,4 @@
 - [Autorisation relayée jamais gravée](feedback_autorisation-relayee-jamais-gravee-dans-un-plan.md) — agir hors worktree s'autorise au moment d'agir ; l'inscrire dans un plan = commit refusé (Instruction Poisoning)
 - [TaskCompleted absent par défaut](project_taskcompleted-absent-modeles-recents.md) — outils Task retirés des modèles récents (2.1.268) : gate posé dessus = absent ; G2′ de la 47 à ré-accrocher
 - [NFC : forme en NFC, I/O sur le nom brut](project_nfc-forme-io-nom-brut.md) — APFS masque le défaut ; 3 tours en 46, seule la CI ext4 ou un shim sensible le montre
+- [Relais main : attente non bornée](project_relais-main-attente-non-bornee.md) — question relayée à main sans retour pendant 5 h : la persister dans le DISCUSSION-LOG, puis rendre human_needed

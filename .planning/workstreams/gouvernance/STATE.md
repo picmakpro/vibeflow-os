@@ -3,33 +3,35 @@ gsd_state_version: 1.0
 workstream: gouvernance
 milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
-current_phase: 46
-current_phase_name: Moteur — gates de clôture et verdicts hachés
-status: "Phase 46 exécutée, vérifiée 11/11 (3 sous arbitrage) : G3 armé, G4 et G4′ en observation (reportés à la Phase 46.1, insérée le 2026-10-07) ; non close, PR non mergée"
+current_phase: 46.1
+current_phase_name: Armement de G4 et G4′
+status: "Phase 46.1 cadrée et planifiée (18 plans, plan-check frais PASSED), non exécutée ; Phase 46 exécutée et vérifiée, non close (PR #136 non mergée)"
 created: 2026-09-23
-last_updated: "2026-10-07T08:00:00.000Z"
-last_activity: 2026-10-07
+last_updated: "2026-10-12T18:00:00.000Z"
+last_activity: 2026-10-12
 last_activity_desc: >-
-  Fin d'exécution de la Phase 46 (mission vf-dev-manager-p46-exec) : 46-11 et 46-12 livrés, G3 armé,
-  G4 et G4′ en observation sous arbitrage de Willy (2026-10-06), vérifiée 11/11 ; Phase 46.1
-  insérée (arbitrage Willy, AskUserQuestion session principale, 2026-10-07).
+  Cadrage et planification de la Phase 46.1 (mission vf-dev-manager-p461-cadrage) : Q1-Q4
+  tranchées par Willy (AskUserQuestion session principale, 2026-10-07), Q5 le 2026-10-12 ;
+  P461-D-01..17, ARMG-01..10, 18 plans, plan-check frais PASSED au tour 4.
 stopped_at: >-
-  Phase 46 exécutée et vérifiée (12/12 plans) ; hygiène documentaire de fin de phase en cours ;
-  PR non mergée donc phase non close. Suite : revue de la PR puis cadrage de la Phase 46.1.
-  Rapport : .planning/missions/2026-10-05-gouvernance-46-exec-reprise.md.
+  Phase 46.1 planifiée (18 plans), non exécutée ; PR de planification empilée sur #136.
+  Suite : revue de la pile #124 → #133 → #136 → 46.1, puis exécution de la 46.1 (plan 14 d'abord).
+  Rapport : .planning/missions/2026-10-07-gouvernance-46-1-cadrage.md.
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 40
+  total_plans: 58
   completed_plans: 40
-  percent: 100
+  percent: 69
 ---
 
 # Project State
 
 ## Current Position
 
-Phase: 46 (Moteur — gates de clôture et verdicts hachés) — cadrée et planifiée le 2026-10-03 (mission `vf-dev-manager-p46-cadrage`, rapport `.planning/missions/2026-10-03-gouvernance-46-plan.md`) : `46-CONTEXT.md` (P46-D-01..19, plus 02a, 02b, 03a, 03b, 06a, 07a, 10a), exigences CLOT-01..12, 12 plans en 9 vagues, plan-check frais PASSED au tour 2 ; non exécutée. G3/G4 en `PreToolUse` sur `CLOTURE.md`/`SUMMARY.md` (pas de `TaskCompleted`, absent par défaut sur les modèles récents), G4′ sur `SubagentHandback` pour les workers et producteurs qui ont Bash, deux empreintes dans `VERDICT.md`, état `à clore`, plafond de 3 tentatives, canary de juge C-16, D1 = `FileChanged` + réconciliation par hash.
+Phase: 46.1 (Armement de G4 et G4′, INSERTED) — cadrée et planifiée le 2026-10-12 (mission `vf-dev-manager-p461-cadrage`, rapport `.planning/missions/2026-10-07-gouvernance-46-1-cadrage.md`) : `46.1-CONTEXT.md` (P461-D-01..17 ; P461-D-02 renverse en partie P46-D-02b), exigences ARMG-01..10, 18 plans (une vague par plan, ordre 14, 17, 01, 02, 03, 18, 04, 05, 06, 15, 07, 08, 09, 16, 10, 11, 12, 13), plan-check frais PASSED au tour 4 ; non exécutée. Arbitrages : Willy, AskUserQuestion session principale, 2026-10-07 (Q1-Q4) et 2026-10-12 (Q5).
+
+Phase précédente : 46 (Moteur — gates de clôture et verdicts hachés) — cadrée et planifiée le 2026-10-03 (mission `vf-dev-manager-p46-cadrage`, rapport `.planning/missions/2026-10-03-gouvernance-46-plan.md`) : `46-CONTEXT.md` (P46-D-01..19, plus 02a, 02b, 03a, 03b, 06a, 07a, 10a), exigences CLOT-01..12, 12 plans en 9 vagues, plan-check frais PASSED au tour 2 ; non exécutée. G3/G4 en `PreToolUse` sur `CLOTURE.md`/`SUMMARY.md` (pas de `TaskCompleted`, absent par défaut sur les modèles récents), G4′ sur `SubagentHandback` pour les workers et producteurs qui ont Bash, deux empreintes dans `VERDICT.md`, état `à clore`, plafond de 3 tentatives, canary de juge C-16, D1 = `FileChanged` + réconciliation par hash.
 Phase précédente : 45 (Moteur — hook central par rôle et gates d'écriture) — exécutée du 2026-09-30 au 2026-10-01 (10/10 plans), cinq gates ARMÉS en cascade le 2026-10-01 (G6+G5 `3d06e503`, G1 `bf6cfa87`, G7 `b6609fa6`, rôle `239df76d` ; G2 avertit), rejeu réel final 0 faux refus / 0 faux accept (`45-REJEU-FINAL.md`, `708debcb`), `planning-core` v2.9.0 sans release ; audit de sécurité final SECURED (4 tours, limites (z) à (al)) ; vérifiée 15/15 (GATE-15 validé par Willy sur la CI Linux de la PR #124) ; CLOSE le 2026-10-02, PR #124 ouverte, non mergée. Phase 44 : exécutée (5/5 plans), vérifiée PASSED (18/18 MOTR-01..18, `44-VERIFICATION.md`), corrigée en 8 lots après revue et audit, CLOSE dans le ROADMAP le 2026-09-28 (PR vers main ouverte, non mergée). Phases 42 et 43 : exécutées, vérifiées et CLÔTURÉES dans le planning (PR #108 et PR #111 mergées sur main le 2026-09-27). Revue code owner de Samuel toujours en attente sur les deux PR (contournement D-02bis).
 **Last Activity:** 2026-10-03
 **Last Activity Description:** Cadrage et planification de la Phase 46 (mission `vf-dev-manager-p46-cadrage`) — arbitrages de Willy Q1 à Q9, AskUserQuestion session principale, 2026-10-03. Précédent : Exécution, armement, audit final et clôture de la Phase 45 (mission `vf-dev-manager-p45-exec`). Plus tôt : cadrage et planification de la Phase 45 (mission `vf-dev-manager-g45-20260929`) — voir `last_activity_desc` en frontmatter. Précédent : clôture de la Phase 44 (mission `mgr-44-reprise`). Dernier lot : correction de CLASSE lot 8 (quick 260928-vk9, CORRECTION MINIMALE, aucun nouveau tour de juges, gsd-verifier PASSED), commit `0c284e3`.
@@ -45,11 +47,12 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 ## Progress
 
 **Phases Complete:** 4 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée ; Phase 45 : close le 2026-10-02, PR #124 ouverte, non mergée).
-**Current Plan:** aucun — 46-01..46-12 livrés (12/12), vérifiée 11/11 (`46-VERIFICATION.md`, 3 sous arbitrage) ; Phase 46.1 insérée, non cadrée (0 plan)
+**Current Plan:** aucun — Phase 46.1 planifiée (0/18 exécutés) ; Phase 46 : 46-01..46-12 livrés (12/12), vérifiée 11/11 (`46-VERIFICATION.md`, 3 sous arbitrage)
 
 ## Session Continuity
 
-**Stopped At:** Phase 46 exécutée et vérifiée, non close (PR non mergée) ; G3 armé, G4 et G4′ en observation ; prochaine étape : revue de la PR, puis cadrage de la Phase 46.1 (aucune planification avant).
+**Stopped At:** Phase 46.1 cadrée et planifiée (18 plans, plan-check frais PASSED), non exécutée ; Phase 46 exécutée et vérifiée, non close (PR #136 non mergée) ; prochaine étape : revue de la pile de PR, puis exécution de la 46.1.
+**Resume File (Phase 46.1) :** `.planning/missions/2026-10-07-gouvernance-46-1-cadrage.md`
 **Resume File (Phase 46) :** `.planning/missions/2026-10-03-gouvernance-46-plan.md`
 **Resume File (Phase 45) :** `.planning/missions/2026-09-30-gouvernance-45-exec.md`
 **Resume File:** `.planning/missions/2026-09-27-gouvernance-44.md`

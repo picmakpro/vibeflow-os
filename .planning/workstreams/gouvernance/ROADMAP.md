@@ -16,7 +16,7 @@
 - [x] Phase 44: Moteur — modèle de données et recalcul d'état dérivé du disque (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — clôturée 2026-09-28, PR vers main ouverte (non mergée)
 - [x] Phase 45: Moteur — hook central par rôle et gates d'écriture (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-09-29 (10 plans, 8 vagues) ; exécutée 2026-09-30 → 2026-10-02 (10/10 plans, 15 quick de correction), cinq gates ARMÉS en cascade le 2026-10-01 ; audit de sécurité final SECURED (4 tours) ; vérifiée 15/15 — clôturée 2026-10-02 (clôture validée par Willy, message en session principale, 2026-10-01), PR #124 ouverte (non mergée)
 - [ ] Phase 46: Moteur — gates de clôture et verdicts hachés (inscrite 2026-09-23, jalon gouvernance-labs-v1.0) — cadrée et planifiée 2026-10-03 (12 plans, 9 vagues, plan-check frais PASSED), PR de planification empilée sur la PR #124 ; exécutée 2026-10-05 → 2026-10-07 (12/12 plans), vérifiée 11/11 (3 sous arbitrage de Willy) : G3 ARMÉ, G4 et G4′ en observation (reportés à la Phase 46.1) — non clôturée, PR non mergée
-- [ ] Phase 46.1: Armement de G4 et G4′ (INSERTED, 2026-10-07) — non cadrée
+- [ ] Phase 46.1: Armement de G4 et G4′ (INSERTED, 2026-10-07) — cadrée et planifiée 2026-10-12 (18 plans, une vague par plan, plan-check frais PASSED au tour 4), PR de planification empilée sur la PR #136 ; non exécutée
 - [ ] Phase 47: Moteur — baux générationnels et jeton monotone (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 48: Moteur — agents génériques de cycle, injection de l'index et pont mémoire (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
 - [ ] Phase 49: Initialisation — script des trois gates de la grille (inscrite 2026-09-23, jalon gouvernance-labs-v1.0)
@@ -286,17 +286,34 @@ Plans:
 ### Phase 46.1: Armement de G4 et G4′ (INSERTED)
 
 **Goal:** G4 puis G4′ passent de l'observation à l'armement : la règle des unités antérieures à G4 est tranchée, les préalables de G4′ sont levés, et les remèdes que la 46 a reportés pour D1 sont traités ou re-décidés — chaque armement à 0 faux refus et 0 faux accept sur le banc puis sur le rejeu en lecture seule.
-**Requirements**: à définir au cadrage
+**Requirements**: ARMG-01..ARMG-10 (posées au cadrage, `46.1-CONTEXT.md`, 2026-10-12)
 **Depends on:** Phase 46.
-**Origine** : insertion décidée par Willy, AskUserQuestion session principale, 2026-10-07 (« (1) Phase 46.1 insérée (Recommandé) »), à l'issue de la vérification de la Phase 46 (G3 armé seul ; G4 et G4′ en observation sous arbitrage, 2026-10-06). **Statut : non cadrée** — à cadrer plus tard (`gsd-discuss-phase 46.1`), aucune planification maintenant.
+**Origine** : insertion décidée par Willy, AskUserQuestion session principale, 2026-10-07 (« (1) Phase 46.1 insérée (Recommandé) »), à l'issue de la vérification de la Phase 46 (G3 armé seul ; G4 et G4′ en observation sous arbitrage, 2026-10-06). **Statut : cadrée le 2026-10-12** (mission `vf-dev-manager-p461-cadrage`) : Q1 à Q4 tranchées par Willy, AskUserQuestion session principale, 2026-10-07, Q5 le 2026-10-12 (recommandation suivie partout) ; décisions P461-D-01..15, dont le renversement partiel de P46-D-02b (P461-D-02).
 **Points repris** (limites de `plugin/planning-core/references/modele-cycles.md`) :
 - **Règle des unités antérieures à G4** — limite **(bp)** : 343 unités closes avant G4 sur `~/jarvis-keystone` (`SUMMARY.md` existant sans `VERDICT.md`, refusé à la réécriture une fois G4 armé) ; la règle à poser conditionne l'armement de G4.
 - **Préalables de G4′** — limite **(bs)** : A2 (leurre de définition d'agent), A3 (lab dérivé du `cwd`), A4 (repli `SubagentStop` : relance sans verrou, muet sur une panne du cœur), P1 (`stop_hook_active` non lu).
 - **Remèdes reportés de D1** — limites **(bk)** (A5 : forge d'une unité neuve, D1 aveugle), **(bl)** (A7 : intention sans effet ni limite de durée), et N-4 (éviction de l'unité active de la liste surveillée, limite **(bg)**) ; N-5 (`SUMMARY.md` forgé par `Bash` non tracé, limites **(ar)** et **(ax)**).
-**Plans:** 0 plans
+**Plans:** 18 plans (ordre d'exécution : 14, 17, 01, 02, 03, 18, 04, 05, 06, 15, 07, 08, 09, 16, 10, 11, 12, 13 ; une vague par plan)
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 46.1 to break down)
+- [ ] 46.1-14-PLAN.md — outil de contrôle de la phase `46.1-CONTROLES.sh` (suite sous HOME temporaire, base de non-régression mesurée une fois, imputation d'un rouge, invariants, cohérence d'un relevé — P461-D-16) (ARMG-04, 05, 09)
+- [ ] 46.1-17-PLAN.md — `--montre`, modes `armement` (option `--garder-g4`, P461-D-17), `imputer`, `etat-reference`, gel de l'outil par empreinte (ARMG-05, 09)
+- [ ] 46.1-01-PLAN.md — étape 5b : exemption étroite de G4, banc et mutants, limite (bp), spec §5 (ARMG-01, 10)
+- [ ] 46.1-02-PLAN.md — D1 : N-5 et A5, faux signaux mesurés, limites (ar), (ax), (bk) (ARMG-02, 03, 10)
+- [ ] 46.1-03-PLAN.md — script de décision `verifier-releve.sh` : prédicats d'armement, limite (bu) (ARMG-04)
+- [ ] 46.1-18-PLAN.md — `verifier-releve.sh` éprouvé sur la chaîne réelle, le corpus de la 46 et sa couverture (ARMG-04)
+- [ ] 46.1-04-PLAN.md — étape 5b : (bu) levée, rejeu réel en lecture seule sous checkpoint, relevé jugé par le script (ARMG-04, 05, 01, 10)
+- [ ] 46.1-05-PLAN.md — étape 5b : armement de G4 sous checkpoint, ou non-armement consigné (ARMG-05)
+- [ ] 46.1-06-PLAN.md — étape 6 : A2, G4′ juge dès l'ambiguïté (P461-D-02), oracle du rejeu (ARMG-06, 10)
+- [ ] 46.1-15-PLAN.md — étape 6 : banc A2 règle par règle et mutants (ARMG-06)
+- [ ] 46.1-07-PLAN.md — étape 6 : A3 dans le cœur, `CLAUDE_PROJECT_DIR` (ARMG-07, 06, 10)
+- [ ] 46.1-08-PLAN.md — étape 6 : A3 dans la commande enregistrée, zéro régression labs dev, coût mesuré (ARMG-07)
+- [ ] 46.1-09-PLAN.md — étape 6 : A4/P1, compteur par `agent_id` sous verrou, `stop_hook_active` (ARMG-08)
+- [ ] 46.1-16-PLAN.md — étape 6 : gardes de l'état du compteur, G6, recalcul, `.gitignore` (ARMG-08, 10)
+- [ ] 46.1-10-PLAN.md — étape 6 : trace shell sur panne du cœur, canary de session, limite (bs) réécrite (ARMG-08, 09, 10)
+- [ ] 46.1-11-PLAN.md — étape 6 : rejeu réel en lecture seule sous checkpoint, relevé jugé par le script (ARMG-09)
+- [ ] 46.1-12-PLAN.md — étape 6 : armement de G4′ sous checkpoint, ou non-armement consigné, limite (bs) (ARMG-09, 10)
+- [ ] 46.1-13-PLAN.md — clôture : `modele-cycles.md:1147`, BACKLOG, points non documentés, `planning-core` v2.11.0 sans release (ARMG-10)
 
 ### Phase 47: Moteur — baux générationnels et jeton monotone
 
