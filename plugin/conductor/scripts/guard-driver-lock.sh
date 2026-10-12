@@ -104,10 +104,24 @@ INPUT="$(cat 2>/dev/null || true)"
 # Lab partitionné (VF_DRIVER_LOCK vide ET .planning/workstreams présent ou lien) : les verrous vivent sous le
 # dossier commun de git, pas dans .planning/ — la sonde ne sort plus ici, la décision revient au python. Tout
 # autre cas (lab plat, VF_DRIVER_LOCK posé) : la ligne d'avant la Phase 57, mêmes instructions, même latence.
+# Racine git (P57-D-39) : un cwd sans .planning/ propre dont la racine git porte .planning/workstreams est un
+# sous-dossier d un lab partitionné ; remontée pure bash jusqu au premier .git, sans spawn. Un cwd avec son propre
+# .planning/ (P57-D-29) ou le lab plat gardent la ligne d avant : mêmes instructions, même latence.
 if [ -z "${VF_DRIVER_LOCK:-}" ] && { [ -e .planning/workstreams ] || [ -L .planning/workstreams ]; }; then
   :
 else
-  [ -e "${VF_DRIVER_LOCK:-.planning/DRIVER.lock}" ] || exit 0
+  VF_GUARD_SUBLAB=0
+  if [ -z "${VF_DRIVER_LOCK:-}" ] && [ ! -e .planning ] && [ ! -L .planning ]; then
+    VF_GUARD_D="$PWD"
+    while [ -n "$VF_GUARD_D" ] && [ "$VF_GUARD_D" != / ]; do
+      if [ -e "$VF_GUARD_D/.git" ] || [ -L "$VF_GUARD_D/.git" ]; then
+        if [ -e "$VF_GUARD_D/.planning/workstreams" ] || [ -L "$VF_GUARD_D/.planning/workstreams" ]; then VF_GUARD_SUBLAB=1; fi
+        break
+      fi
+      VF_GUARD_D="${VF_GUARD_D%/*}"
+    done
+  fi
+  [ "$VF_GUARD_SUBLAB" = 1 ] || [ -e "${VF_DRIVER_LOCK:-.planning/DRIVER.lock}" ] || exit 0
 fi
 
 # PRÉFILTRE PUR-BASH (surenset strict du domaine de deny — le python ne peut denier que si l'une
@@ -397,9 +411,11 @@ def git_target(toks, i, base):
             break
     return target
 
-def bash_targets_outside_lab(cmd, root):
+def bash_targets_outside_lab(cmd, root, start=None):
     """True si TOUS les gestes concernés de `cmd` visent avec certitude un dossier hors de `root`
-    (et qu il y en a au moins un). Toute incertitude rend False : le lock s applique."""
+    (et qu il y en a au moins un). Toute incertitude rend False : le lock s applique. `start` : dossier de
+    départ de la commande quand il diffère de `root` (lab partitionné lancé d un sous-dossier, P57-D-39) ;
+    par défaut `root`, comportement d avant la phase."""
     try:
         import shlex
         flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
@@ -420,7 +436,8 @@ def bash_targets_outside_lab(cmd, root):
             cur.append(t)
     segs.append(cur)
     ops.append("")
-    base = root
+    start = root if start is None else start
+    base = start
     outside = 0
     for seg, op in zip(segs, ops):
         positions = command_positions(seg)
@@ -445,7 +462,7 @@ def bash_targets_outside_lab(cmd, root):
                 if is_inside(target, root):
                     return False
                 outside += 1
-        if op in (";", "||") and base != root:
+        if op in (";", "||") and base != start:
             base = None  # la chaîne a pu s arrêter avant ou après le cd : dossier indéterminé
     return outside > 0
 
@@ -454,26 +471,51 @@ def bash_targets_outside_lab(cmd, root):
 # python embarque dans une chaine bash a guillemets simples (les apostrophes des chaines passent par
 # \x27). Rien de ce qui suit ne tourne en lab plat ni sous VF_DRIVER_LOCK.
 # ---------------------------------------------------------------------------------------------------
-def partition_switch(payload):
-    """Vrai si le lab est partitionné : VF_DRIVER_LOCK vide ET .planning/workstreams present (lexists, un
-    lien compte). Relatif au cwd du payload quand c est une chaîne non vide, sinon au cwd du process. Ne
-    leve JAMAIS : toute exception replie sur la condition même de la sonde bash (cwd du process)."""
+def top_by_marker(base):
+    """Racine git par remontée des parents jusqu au premier `.git` (dossier ou fichier) : repli quand git n est
+    pas utilisable. Rend None si aucun."""
+    try:
+        d = os.path.realpath(base)
+        for _ in range(40):
+            if os.path.lexists(os.path.join(d, ".git")):
+                return d
+            parent = os.path.dirname(d)
+            if parent == d:
+                break
+            d = parent
+    except Exception:
+        pass
+    return None
+
+def partition_lab(payload):
+    """Racine du lab partitionné, ou None. Partitionné : VF_DRIVER_LOCK vide ET .planning/workstreams présent
+    (lexists, un lien compte) au cwd du payload quand c est une chaîne non vide, sinon au cwd du process ; à
+    défaut, ET seulement si ce dossier ne porte pas son PROPRE .planning/ (P57-D-29, hors périmètre), à la
+    racine git (P57-D-39 : un geste lancé d un sous-dossier est jugé comme en lab partitionné). Ne lève JAMAIS :
+    toute exception replie sur la condition même de la sonde bash (cwd du process)."""
     try:
         if os.environ.get("VF_DRIVER_LOCK"):
-            return False
+            return None
         base = None
         if isinstance(payload, dict):
             c = payload.get("cwd")
             if isinstance(c, str) and c:
                 base = c
         if base is None:
-            return os.path.lexists(".planning/workstreams")
-        return os.path.lexists(os.path.join(base, ".planning", "workstreams"))
+            base = "."
+        if os.path.lexists(os.path.join(base, ".planning", "workstreams")):
+            return base
+        if os.path.lexists(os.path.join(base, ".planning")):
+            return None
+        top = toplevel_of(base) or top_by_marker(base)
+        if top and os.path.lexists(os.path.join(top, ".planning", "workstreams")):
+            return top
+        return None
     except Exception:
         try:
-            return os.path.lexists(".planning/workstreams")
+            return "." if os.path.lexists(".planning/workstreams") else None
         except Exception:
-            return False
+            return None
 
 FAIL_CLOSED_REASON = (
     "Refus : erreur interne du guard, fail-closed (verrou de driver par compartiment). Le geste est "
@@ -941,7 +983,7 @@ def same_checkout(wt, top):
     except Exception:
         return True
 
-def judge_bash(cmd, held, cwd):
+def judge_bash(cmd, held, cwd, lab=None):
     """Jugement du geste Bash, apres le court-circuit aucun verrou tenu par autrui. Rend (verrous refusants,
     notes de motif). Cible incertaine : refus sous tout verrou d autrui. arbre : refus si un verrou d autrui
     a ete pris depuis le MEME worktree (verrou ancien ou toplevel inconnu : refus, prudence). retrait-worktree :
@@ -979,7 +1021,7 @@ def judge_bash(cmd, held, cwd):
                     top_done = True
                 if top is None:
                     raise Unreadable("rev-parse --show-toplevel")
-                rel = os.path.relpath(os.path.realpath(cwd), top)
+                rel = os.path.relpath(os.path.realpath(cwd if lab is None else lab), top)
                 prefix = b"" if rel == "." else os.fsencode(rel)
                 paths = commit_paths(g, adds, cwd, top)
             except Unreadable as e:
@@ -1012,7 +1054,7 @@ def judge_bash(cmd, held, cwd):
             add(held)
     return blockers, notes
 
-def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker):
+def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker, lab):
     """Decision du chemin partitionne. SORT TOUJOURS (allow silencieux, echappatoire journalisee, ou deny).
     Write/Edit : jugement par ce que le chemin touche (P57-D-09). Bash : regle historique, refus sous tout
     verrou tenu par autrui (le jugement par classes de gestes arrive en 57-08)."""
@@ -1021,17 +1063,17 @@ def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker):
     if tool == "Bash":
         if not bash_command_concerned(target):
             sys.exit(0)
-        if bash_targets_outside_lab(target, os.path.realpath(cwd)):
+        if bash_targets_outside_lab(target, os.path.realpath(lab), os.path.realpath(cwd)):
             sys.exit(0)
-    locks = discover_locks(cwd)
+    locks = discover_locks(lab)
     held = [h for h in (held_by_other(lk, sid) for lk in locks) if h is not None]
     notes = []
     if not held:
         sys.exit(0)  # aucun verrou tenu par autrui : allow SANS lancer le moindre git diff (DLWS-06, empty)
     if tool == "Bash":
-        blockers, notes = judge_bash(target, held, cwd)
+        blockers, notes = judge_bash(target, held, cwd, lab)
     else:
-        kind, seg = map_path(abs_path, cwd)
+        kind, seg = map_path(abs_path, lab)
         if kind == "compartiment":
             blockers = [h for h in held if h["scope"] == "compartiment"
                         and (h["ws"] == seg or h["ws"].casefold() == seg.casefold())]
@@ -1080,7 +1122,8 @@ except Exception:
 
 # AIGUILLAGE (P57-D-10, P57-D-33) : lab partitionné ou non. Hors lab partitionne, rien de ce qui suit
 # jusqu au dispatch n est évalué : le code d avant la Phase 57 s exécute ligne pour ligne.
-PARTITIONED = partition_switch(payload)
+LAB_ROOT = partition_lab(payload)
+PARTITIONED = LAB_ROOT is not None
 if PARTITIONED:
     if not isinstance(payload, dict):
         sys.exit(0)  # payload qui n est pas un objet -> classe imparsable, SILENCIEUSE (comme le lab plat)
@@ -1120,7 +1163,8 @@ elif tool in ("Write", "Edit"):
         sys.exit(0)  # C4 : hors du dossier de planification -> allow, quel que soit le lock
     root_w = os.path.realpath(cwd)
     abs_w = norm if os.path.isabs(norm) else os.path.join(root_w, norm)
-    if not is_inside(os.path.realpath(abs_w), root_w):
+    # Lab partitionné : la borne est la racine du lab, pas le cwd (P57-D-39) ; lab plat : le cwd, inchangé.
+    if not is_inside(os.path.realpath(abs_w), os.path.realpath(LAB_ROOT) if PARTITIONED else root_w):
         sys.exit(0)  # C6 : le .planning/ d un AUTRE dépôt que le lab -> hors du périmètre du lock
     if tool == "Write":
         content = ti.get("content")
@@ -1133,7 +1177,7 @@ else:
 # Lab partitionné : la décision (verrous par compartiment, dépôt, ancien verrou) remplace tout ce qui
 # suit, qui n est lu que pour un lab plat ou sous VF_DRIVER_LOCK. decide_partitioned() sort toujours.
 if PARTITIONED:
-    decide_partitioned(tool, cmd if tool == "Bash" else "", abs_w if tool != "Bash" else "", sid, cwd, text_for_marker)
+    decide_partitioned(tool, cmd if tool == "Bash" else "", abs_w if tool != "Bash" else "", sid, cwd, text_for_marker, LAB_ROOT)
     sys.exit(0)
 
 # Résolution du chemin du lock, relativement au cwd du payload s il est relatif.
