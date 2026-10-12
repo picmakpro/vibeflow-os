@@ -250,6 +250,39 @@ case_snap() {
   if [ -e "$SNAP" ]; then ko "EW-SNAP-4 — aucun snapshot écrit" "fichier présent : $SNAP"; else ok "EW-SNAP-4 — aucun snapshot écrit"; fi
 }
 
+case_budgetws() {
+  echo "=== EW-BWS — --ws est transmis au script de budget, dans --budget-snapshot ET dans E7 (réserve C2 de la Phase 57) ==="
+  local LAB M GATE ARGS
+  LAB="$(mk_lab bws)"
+  # Disposition miroir avec un script de budget ENREGISTREUR : il consigne ses arguments et rend 0 sans rien dire.
+  M="$TMP/layout-bws-$$-$RANDOM"
+  mkdir -p "$M/dev-orchestrator/scripts" "$M/planning-core/scripts" "$M/conductor/scripts"
+  cp "${GATE_SCRIPT:-$SCRIPT}" "$M/dev-orchestrator/scripts/check-mission-exit.sh"
+  cp "$POLICY_REAL" "$M/planning-core/scripts/workstream-policy.sh"
+  cp "$DIVERGENCE_REAL" "$M/conductor/scripts/"
+  printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "$(dirname "$0")/budget-args.txt"\nexit 0\n' > "$M/conductor/scripts/check-method-budget.sh"
+  GATE="$M/dev-orchestrator/scripts/check-mission-exit.sh"
+  ARGS="$M/conductor/scripts/budget-args.txt"
+  dl "$LAB" acquire --ws=alpha --owner=m1 --step=s >/dev/null
+  # Sans GSD_WORKSTREAM ni VF_WORKSTREAM (désarmés en tête de suite) : seul --ws peut désigner le compartiment.
+  GATE_SCRIPT="$GATE" g --root "$LAB" --ws alpha --budget-snapshot
+  eq_rc "EW-BWS-0 — --budget-snapshot --ws alpha exit 0" "$G_RC" 0
+  has "EW-BWS-1 — l'appel du snapshot transmet --ws alpha au budget" "$(grep -F -e '--dry-run' "$ARGS" 2>/dev/null)" "--ws alpha"
+  : > "$ARGS"
+  GATE_SCRIPT="$GATE" g --root "$LAB" --ws alpha
+  has "EW-BWS-2 — l'appel d'E7 transmet --ws alpha au budget" "$(grep -F -e '--strict' "$ARGS" 2>/dev/null)" "--ws alpha"
+  # Budget RÉEL : sans GSD_WORKSTREAM, E7 ne rend plus « ARCHIVAGE NON TENTÉ ».
+  g --root "$LAB" --ws alpha --budget-snapshot
+  g --root "$LAB" --ws alpha
+  hasnt "EW-BWS-3 — budget réel : E7 n'est pas « ARCHIVAGE NON TENTÉ » sans GSD_WORKSTREAM" "$G_OUT$G_ERR" "ARCHIVAGE NON TENTÉ"
+  # Sans --ws (lab plat), aucun --ws n'est ajouté.
+  local FLAT
+  FLAT="$(mk_flat bwsflat)"
+  : > "$ARGS"
+  GATE_SCRIPT="$GATE" g --root "$FLAT" --budget-snapshot
+  hasnt "EW-BWS-4 — lab plat sans --ws : le budget ne reçoit aucun --ws" "$(cat "$ARGS" 2>/dev/null)" "--ws"
+}
+
 case_e4() {
   echo "=== EW-E4 — --ws surcharge GSD_WORKSTREAM pour la résolution d'E4 ==="
   local LAB
@@ -320,7 +353,7 @@ case_usage() {
 }
 
 run_cases() {
-  case_trace; case_nows; case_child; case_gen; case_snap; case_e4; case_depot; case_flat; case_q; case_usage
+  case_trace; case_nows; case_child; case_gen; case_snap; case_e4; case_budgetws; case_depot; case_flat; case_q; case_usage
 }
 
 # ---------------------------------------------------------------------------------------------- matrice
