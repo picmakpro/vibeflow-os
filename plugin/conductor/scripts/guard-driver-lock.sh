@@ -86,6 +86,14 @@
 # VERROU ILLISIBLE (R-2) : en lab partitionne, un dossier de verrous ou un meta qui EXISTE mais ne se lit pas vaut
 # un refus nomme (« verrou de driver existe mais est illisible »), jamais « pas de verrou » ; seul un meta absent
 # reste « pas de verrou ». Le lab plat garde sa posture historique (meta illisible = allow, Q3c).
+# GLOBAUX GIT ET CIBLE (F-3, R-5) : en lab partitionne, `exec` est un wrapper et les options globales de git sans
+# argument (--no-pager, --paginate, -p, --no-optional-locks, --literal-pathspecs, --glob-pathspecs, --noglob-pathspecs,
+# --icase-pathspecs, --no-replace-objects, --no-lazy-fetch, --no-advice, --bare) sont sautees avant le sous-verbe ;
+# une affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git est une cible
+# INCERTAINE, au meme titre que --git-dir (meme verdict, meme message). Le lab plat garde la lecture d avant la
+# Phase 57 (A/B au bit pres) : il ne reconnait ni l un ni l autre.
+# AUCUN CROCHET DE TEST (R-6) : le guard ne lit aucune variable de test ; la suite provoque l exception fail-closed
+# dans une COPIE du guard qu elle fabrique elle-meme.
 # LIMITE (P57-D-20) : le guard isole des SESSIONS, pas des managers d'une même session (ils partagent le
 # session_id, règle 3) ; aucun refus actif neuf n'est ajouté pour les séparer. Latence ajoutée, chemin
 # partitionné seulement : un interprète python + un `git rev-parse` durci (hypothèse A5 de la recherche).
@@ -190,6 +198,12 @@ import json, os, re, sys, time
 
 MARKER = "vibeflow:allow-lock-override"
 WRAPPERS = {"sudo", "env", "command", "nohup", "time", "xargs", "nice", "stdbuf", "caffeinate"}
+# Lab PARTITIONNE seulement (correction F-3, 57-SECURITY.md) : `exec` est un wrapper, et les options globales de git
+# SANS argument (git help git) sont sautees avant le sous-verbe. Le lab plat garde la lecture d avant la Phase 57,
+# au bit pres (preuve A/B du lab plat) : ni l un ni l autre n y est reconnu.
+NOARG_GIT_GLOBALS = {"--no-pager", "--paginate", "-p", "--no-optional-locks", "--literal-pathspecs",
+                     "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs", "--no-replace-objects",
+                     "--no-lazy-fetch", "--no-advice", "--bare"}
 # Surface A du rejeu (D-32-06) — verbes git mutants dont on ne cherche PAS à sous-analyser
 # davantage (checkout de branche vs de fichier, branch -D vs autre usage…) : les deux mutent
 # l arbre partagé sous le lock d autrui, sous-analyser n ajouterait que de la surface de
@@ -250,7 +264,7 @@ def command_positions(toks):
             i += 1
             continue
         out.append(i)
-        if os.path.basename(t) in WRAPPERS:
+        if os.path.basename(t) in WRAPPERS or (PARTITIONED and os.path.basename(t) == "exec"):
             i += 1
             while i < n and toks[i].startswith("-"):
                 i += 1
@@ -275,6 +289,8 @@ def skip_git_globals(toks, i):
         elif t.startswith("--git-dir=") or t.startswith("--work-tree=") or t.startswith("--exec-path="):
             i += 1
         elif t == "-P":
+            i += 1
+        elif PARTITIONED and t in NOARG_GIT_GLOBALS:
             i += 1
         else:
             break
@@ -406,6 +422,8 @@ def git_target(toks, i, base):
         elif t == "-c":
             i += 2
         elif (t.startswith("-c") and len(t) > 2) or t.startswith("--exec-path=") or t == "-P":
+            i += 1
+        elif PARTITIONED and t in NOARG_GIT_GLOBALS:
             i += 1
         else:
             break
@@ -796,6 +814,13 @@ def uncertain_global(t):
     """Option globale git qui deplace la cible du geste : -C, --git-dir, --work-tree (P57-D-33)."""
     return t == "-C" or (t.startswith("-C") and len(t) > 2) or t.startswith("--git-dir") or t.startswith("--work-tree")
 
+ENV_TARGET_RE = re.compile(r"^(GIT_DIR|GIT_INDEX_FILE|GIT_WORK_TREE)=")
+
+def env_target_uncertain(pre):
+    """Affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git (correction R-5,
+    P57-D-20) : comme --git-dir ou --work-tree, elle deplace la cible du geste, donc cible INCERTAINE."""
+    return any(ENV_TARGET_RE.match(t) for t in pre)
+
 def commit_flags(rest):
     """Drapeaux du commit : a_flag (-a, --all, grappe courte avec a), pathspec (jeton non-option apres les
     options connues pour prendre une valeur, --, -i, -o, --pathspec-from-file : un doute de lecture compte
@@ -875,6 +900,7 @@ def gesture_classes(cmd):
                 elif name == "git":
                     j = skip_git_globals(toks, idx + 1)
                     unc = any(uncertain_global(t) for t in toks[idx + 1:j])
+                    unc = unc or env_target_uncertain(toks[:idx])
                     if j >= len(toks):
                         continue
                     sub = toks[j]
@@ -1058,8 +1084,6 @@ def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker, lab):
     """Decision du chemin partitionne. SORT TOUJOURS (allow silencieux, echappatoire journalisee, ou deny).
     Write/Edit : jugement par ce que le chemin touche (P57-D-09). Bash : regle historique, refus sous tout
     verrou tenu par autrui (le jugement par classes de gestes arrive en 57-08)."""
-    if os.environ.get("VF_GUARD_TEST_RAISE") == "decide":
-        raise RuntimeError("sonde de test : exception de la decision")
     if tool == "Bash":
         if not bash_command_concerned(target):
             sys.exit(0)
@@ -1130,8 +1154,6 @@ if PARTITIONED:
     # Crochet fail-closed, posé AVANT tout le dispatch : une exception du dispatch d outil, des règles
     # C4/C5/C6 ou de la decision devient un refus JSON, jamais l ouverture du repli bash.
     sys.excepthook = fail_closed_hook
-    if os.environ.get("VF_GUARD_TEST_RAISE") == "dispatch":
-        raise RuntimeError("sonde de test : exception du dispatch")
 
 tool = payload.get("tool_name") or ""
 ti = payload.get("tool_input") or {}
