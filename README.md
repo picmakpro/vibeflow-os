@@ -23,7 +23,7 @@ and **kimi-code**.
 
 **VibeFlow in 90 seconds — the philosophy.**
 
-https://github.com/user-attachments/assets/226c4e9b-dfa6-4f4e-b13c-2802c93f6932
+https://github.com/user-attachments/assets/31709de8-a2c0-4e7c-b78e-8328f57e3f43
 
 ---
 
