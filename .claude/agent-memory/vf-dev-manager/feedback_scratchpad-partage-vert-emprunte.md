@@ -25,4 +25,11 @@ lu pendant qu'un process tourne est un `rc` d'autre chose. Même famille que
 [[project_timeout-absent-faux-zero]] et [[feedback_attestation-sur-sha-fige]] : la mesure est juste,
 l'objet mesuré n'est pas celui qu'on croit.
 
+Second visage, Phase 46.1 (2026-10-13) : un outil de rejeu détaché qui exige un dossier VIDE
+(`DETACHE-USAGE dossier non vide`, code 64) rend la collision bloquante au lieu de silencieuse. Un
+correctif de plans a écrit le même `--detache=<scratchpad>/g4p-sortie-brute` dans deux tâches d'un
+même plan, et `planning-gates` dans trois plans, en supposant « un scratchpad par exécuteur » —
+faux. Le plan-check de contrôle l'a vu. Règle écrite dans les plans : dossier neuf, unique, absolu,
+`p461-<plan>-t<tâche>-<objet>`, suffixe `-r2` pour un re-rejeu.
+
 Voir aussi [[project_sonde-inline-zsh-parse-le-case]] (§4, le rejeu complet n'est pas un oracle).

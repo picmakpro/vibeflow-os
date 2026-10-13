@@ -94,3 +94,4 @@
 - [TaskCompleted absent par défaut](project_taskcompleted-absent-modeles-recents.md) — outils Task retirés des modèles récents (2.1.268) : gate posé dessus = absent ; G2′ de la 47 à ré-accrocher
 - [NFC : forme en NFC, I/O sur le nom brut](project_nfc-forme-io-nom-brut.md) — APFS masque le défaut ; 3 tours en 46, seule la CI ext4 ou un shim sensible le montre
 - [Relais main : attente non bornée](project_relais-main-attente-non-bornee.md) — question relayée à main sans retour pendant 5 h : la persister dans le DISCUSSION-LOG, puis rendre human_needed
+- [Outil gelé sans voie de regel](project_outil-gele-sans-voie-de-regel.md) — gel à commit unique : toute correction rougit chaque plan suivant ; exiger un regel tracé et un autotest des deux côtés du seuil
