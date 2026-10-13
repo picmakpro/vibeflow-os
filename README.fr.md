@@ -21,6 +21,10 @@ mesurés de bout en bout sur **Codex** et **kimi-code**.
 
 </div>
 
+**VibeFlow en 90 secondes — la philosophie.**
+
+https://github.com/user-attachments/assets/226c4e9b-dfa6-4f4e-b13c-2802c93f6932
+
 ---
 
 📖 **Nouveau ici ?** Le [manuel utilisateur](./manual/README.md) t'accompagne pour installer,
