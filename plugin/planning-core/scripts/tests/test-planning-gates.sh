@@ -81,8 +81,8 @@
 #                   charge utile et rend la sortie de la référence ; sur un système sensible (ext4), seules les écritures de G2 sous la forme du disque sont
 #                   comparées, les autres sortent en une ligne `~` (limite (bf)) ; preuve trop pauvre sans `avertit` ET `silence` de G2 (Write et Bash) au disque
 #                   NFD ; MUT-READDIR-NFC : le nom lu par readdir sans NFC dans `_sous_dossiers`, tué par le jumeau disque NFD de G2
-#   R-READDIR-RECENSEMENT (section `env_statique`, A1-readdir) : les dix énumérations de dossiers du cœur Python (AST : os.listdir, os.scandir, os.walk, glob…)
-#                   sont recensées avec leur décision (deux « NFC » : `_sous_dossiers` et `_verdicts_du_planning` ; cinq neutres, une brute, deux hors lab) ;
+#   R-READDIR-RECENSEMENT (section `env_statique`, A1-readdir) : les onze énumérations de dossiers du cœur Python (AST : os.listdir, os.scandir, os.walk, glob…)
+#                   sont recensées avec leur décision (trois « NFC » : `_sous_dossiers`, `_verdicts_du_planning` et `chemin_du_disque` (N-5, 46.1-02) ; cinq neutres, une brute, deux hors lab) ;
 #                   une énumération nouvelle, déplacée ou une normalisation NFC retirée fait rougir ; MUT-RECENSEMENT-READDIR : la normalisation de
 #                   `_verdicts_du_planning` retirée (équivalent en comportement : seul le recensement le voit)
 #   R-LECTURE-RECENSEMENT (section `env_statique`, A11-classe, fix-46-a tour 2) : les douze lectures de fichier du cœur Python (AST : `.read`, `os.read`,
@@ -884,6 +884,7 @@ def controle_env_statique(ctx, script):
 RECENSEMENT_READDIR = {
     "_parcourir_livrable": "brut",        # bloc partagé : les noms lus SONT le contenu de l'empreinte des livrables (R-EMP-04)
     "_sous_dossiers": "nfc",              # NOM_UNITE — unités de D1 et de G2 (W1)
+    "chemin_du_disque": "nfc",            # N-5 (46.1-02) : clé NFC du journal de D1 retrouvée sous son nom de disque (composant par composant, NFC avant la comparaison)
     "_verdicts_du_planning": "nfc",       # VERDICT.md (G5) — arbre des unités et des juges
     "fichier_protege": "neutre",          # noms fixes ASCII de G6 en casefold, racine du dossier de planning
     "porte_marqueur_code": "neutre",      # suffixe ASCII, parité avec le glob de detect-gsd-engine.sh
@@ -5401,13 +5402,13 @@ LIMITES_REFERENCE = (
     ("ao", ("cwd", "new_cwd")),
     ("ap", ("SubagentHandback", "juges", "G4′ est ouvert")),
     ("aq", ("inconnu",)),
-    ("ar", ("CLOTURE.md", "SUMMARY.md", "Bash", "limite (g)", "N-5", "indéterminé")),
+    ("ar", ("CLOTURE.md", "SUMMARY.md", "Bash", "limite (g)", "N-5", "indéterminé", "46.1-02", "A5")),
     ("as", ("G3", "PLAN.md", "illisible", "G1")),
     ("at", (".DS_Store", "Thumbs.db", "empreinte")),
     ("au", ("falsification",)),
     ("av", ("Bash", "P46-D-02b")),
     ("aw", ("fork", "A4", "A6")),
-    ("ax", ("#95440", "N-5")),
+    ("ax", ("#95440", "N-5", "46.1-02")),
     ("ay", ("auteur", "intention")),
     ("az", ("watchPaths", "A2", "A3")),
     ("ba", ("référence", "fail-open")),
@@ -5418,7 +5419,7 @@ LIMITES_REFERENCE = (
     ("bh", ("juges", "Bash", "prouvé", "D1")),
     ("bi", ("canary", "SessionStart", "CwdChanged", "vérificateur de juges")),
     ("bj", ("BORNE_LECTURE_FICHIER", "CADRAGE.md", "VERDICT.md", "config.json", "code 3", "dérogation", "lire_payload")),
-    ("bk", ("A5", "reference", "contournement", "P46 lot B, b3, reportée à une phase ultérieure")),
+    ("bk", ("A5", "reference", "contournement", "P461-D-05", "mkdir", "git checkout")),
     ("bl", ("A7", "intention", "config.json", "P46 lot B, b3, reportée à une phase ultérieure")),
     ("bm", ("A10", "--juge=", "canary", "P46 lot B, b3, reportée à une phase ultérieure", "N-7", "hors-index", "definition-illisible")),
     ("bn", ("A6", "surveillance.log", "D1-f", "D1-c3", "empreinte", "N-3", "clone", "TRONCATURE")),
