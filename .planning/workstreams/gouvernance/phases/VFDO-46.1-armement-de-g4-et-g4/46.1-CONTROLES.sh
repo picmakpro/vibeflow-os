@@ -173,7 +173,15 @@
 # lancé dans le dossier de l'outil (`modifie`), si l'outil et son .sha256 sont commités et propres (`non-commite`), si le
 # .sha256 a exactement un commit (`gel-rouvert`) et si aucun commit n'a touché l'outil depuis celui-là (`commit-apres-gel
 # n=<k>`). Ligne `EMPREINTE ok sha256=<h> gel=<commit>`. `--geler` écrit le .sha256 si et seulement s'il est absent et que
-# l'outil est commité et propre (sinon 64) ; le commit de gel est fait ensuite. Les plans suivants lancent `empreinte` dans
+# l'outil est commité et propre (sinon 64) ; le commit de gel est fait ensuite.
+# REGEL TRACÉ (décision du manager, 2026-10-13, née de la correction de la copie détachée, quick 261013-owa : le gel à
+# commit unique ne prévoyait aucune voie pour une correction légitime, chaque plan suivant aurait commencé rouge). Un
+# commit sur le .sha256 après le premier est un regel valide si et seulement s'il ne touche QUE le .sha256 et porte un
+# trailer `Regel-Outil: <id quick> — <raison>` (id `\d{6}-[a-z0-9]{3}`, tiret cadratin, raison non vide ; forme et
+# présence vérifiées, jamais la véracité). Sinon `gel-rouvert` ; `commit-apres-gel` se calcule depuis le DERNIER regel
+# valide. Chaque regel valide imprime `EMPREINTE-REGEL <sha court> <id quick> — <raison>` AVANT la ligne de succès, qui
+# garde son début `EMPREINTE ok sha256=<h> gel=<dernier commit de gel>` et ajoute ` regels=<n>`. La réouverture reste
+# visible, jamais empêchée (ADR-072). Les plans suivants lancent `empreinte` dans
 # la première commande `<automated>` de leur première tâche (avant de présenter à l'humain quoi que ce soit venant de
 # l'outil, quand cette tâche est d'abord un checkpoint) ; rouge, l'exécuteur s'arrête et remonte, il ne répare pas : aucun
 # plan suivant n'édite l'outil, rouvrir le gel est une décision du manager. LIMITE de fond (ADR-072) : une garde qui vit
@@ -339,6 +347,8 @@ CAS_AUTOTEST=(
   jalon-comptes-incoherents jalon-decouverte-partielle jalon-perime jalon-numero-invalide
   empreinte-ok empreinte-absente empreinte-modifie empreinte-commit-apres-gel empreinte-gel-rouvert
   empreinte-non-commite empreinte-geler-refuse empreinte-geler-outil-non-commite
+  empreinte-regel-declare empreinte-regel-sans-trailer empreinte-regel-trailer-mal-forme
+  empreinte-regel-touche-autre empreinte-commit-apres-regel
 )
 
 # ---------------------------------------------------------------------------------------------------------
@@ -2483,7 +2493,8 @@ EOF
 # Mode empreinte (P461-D-16)
 # ---------------------------------------------------------------------------------------------------------
 cmd_empreinte() {
-  local geler=0 d outil sha h gel nc k ec=0 tmp
+  local geler=0 d outil sha h gel nc k ec=0 tmp c rel fichiers corps ligne ok_regel regels=0 premier_gel=1 regel_lignes="" re_regel
+  re_regel='^Regel-Outil: ([0-9]{6}-[a-z0-9]{3}) — ([^[:space:]].*)$'
   while [ $# -gt 0 ]; do
     case $1 in
       --geler) geler=1 ;;
@@ -2523,12 +2534,45 @@ cmd_empreinte() {
     echo "EMPREINTE-ECART non-commite"
     ec=$((ec + 1))
   else
-    nc=$(git log --format=%H -- "$sha" | awk 'END { print NR }')
-    if [ "$nc" -ne 1 ]; then
+    # Historique du .sha256, du plus ancien au plus récent : le premier est le gel ; chaque suivant est un REGEL, valide
+    # si et seulement s'il ne touche QUE le .sha256 et porte un trailer `Regel-Outil: <id quick> — <raison>` (forme
+    # seulement). Un regel invalide : gel-rouvert. Voie déclarée, jamais un verrou (ADR-072).
+    nc=0
+    gel=""
+    rel=$(git ls-files --full-name -- "$sha")
+    while IFS= read -r c; do
+      [ -n "$c" ] || continue
+      nc=$((nc + 1))
+      gel=$c
+      if [ "$premier_gel" -eq 1 ]; then
+        premier_gel=0
+        continue
+      fi
+      fichiers=$(git show --name-only --format= "$c" 2> /dev/null)
+      ok_regel=0
+      if [ "$fichiers" = "$rel" ]; then
+        corps=$(git log -1 --format=%B "$c")
+        while IFS= read -r ligne; do
+          if [[ $ligne =~ $re_regel ]]; then
+            ok_regel=1
+            regel_lignes="$regel_lignes$(printf 'EMPREINTE-REGEL %s %s — %s' "$(git rev-parse --short "$c")" "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}")"$'\n'
+            break
+          fi
+        done <<EOF
+$corps
+EOF
+      fi
+      if [ "$ok_regel" -eq 1 ]; then
+        regels=$((regels + 1))
+      else
+        nc=-1
+        break
+      fi
+    done < <(git log --reverse --format=%H -- "$sha")
+    if [ "$nc" -lt 1 ]; then
       echo "EMPREINTE-ECART gel-rouvert"
       ec=$((ec + 1))
     else
-      gel=$(git log --format=%H -- "$sha")
       k=$(git rev-list --count "$gel..HEAD" -- "$outil")
       if [ "$k" -gt 0 ]; then
         printf 'EMPREINTE-ECART commit-apres-gel n=%s\n' "$k"
@@ -2537,7 +2581,8 @@ cmd_empreinte() {
     fi
   fi
   if [ "$ec" -eq 0 ]; then
-    printf 'EMPREINTE ok sha256=%s gel=%s\n' "$h" "$gel"
+    [ -z "$regel_lignes" ] || printf '%s' "$regel_lignes"
+    printf 'EMPREINTE ok sha256=%s gel=%s regels=%s\n' "$h" "$gel" "$regels"
     return 0
   fi
   return 1
@@ -4531,8 +4576,24 @@ emp_geler() { # gèle (écrit le .sha256) puis le commite
   at_commit
 }
 
+# emp_regel <message> [autre] : l'outil (copie) est modifié et commité, puis le .sha256 est réécrit et commité avec le
+# message donné (et, si « autre » est passé, avec un second fichier dans le même commit).
+emp_regel() {
+  echo "# correction légitime" >> "$COPIE"
+  at_commit
+  python3 -I -S -c '
+import hashlib, sys
+d = sys.argv[1]
+h = hashlib.sha256(open(d + "/46.1-CONTROLES.sh", "rb").read()).hexdigest()
+open(d + "/46.1-CONTROLES.sha256", "w").write(h + "  46.1-CONTROLES.sh\n")
+' "$FD/phase"
+  [ -z "${2:-}" ] || echo autre > "$FD/phase/autre.txt"
+  (cd "$FD" && gitf add -A && gitf commit -q -m "$1") > /dev/null 2>&1
+}
+
 autotest_empreinte() {
   local COPIE=""
+  local TRAILER='Regel-Outil: 261013-owa — correction de la copie détachée'
 
   at_debut empreinte-ok
   emp_prepare
@@ -4574,6 +4635,60 @@ autotest_empreinte() {
   at_commit
   at_lancer_copie empreinte
   at_contient "EMPREINTE-ECART gel-rouvert"; at_compte "EMPREINTE-ECART" 1
+  at_fin 1
+
+  at_debut empreinte-regel-declare
+  emp_prepare
+  emp_geler
+  emp_regel "regel"$'\n\n'"$TRAILER"
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-REGEL "; at_contient " 261013-owa — correction de la copie détachée"
+  at_contient "EMPREINTE ok sha256="; at_contient " regels=1"; at_absent "EMPREINTE-ECART"
+  at_fin 0
+
+  at_debut empreinte-regel-sans-trailer
+  emp_prepare
+  emp_geler
+  emp_regel "regel sans trailer"
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART gel-rouvert"; at_compte "EMPREINTE-ECART" 1
+  at_fin 1
+
+  at_debut empreinte-regel-trailer-mal-forme
+  emp_prepare
+  emp_geler
+  emp_regel "regel"$'\n\n'"Regel-Outil: 26101-owa — raison"
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART gel-rouvert"; at_compte "EMPREINTE-ECART" 1
+  # même forme d'id correcte mais tiret simple au lieu du tiret cadratin, puis raison vide
+  emp_prepare
+  emp_geler
+  emp_regel "regel"$'\n\n'"Regel-Outil: 261013-owa - raison"
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART gel-rouvert"; at_absent "EMPREINTE ok"
+  emp_prepare
+  emp_geler
+  emp_regel "regel"$'\n\n'"Regel-Outil: 261013-owa — "
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART gel-rouvert"; at_absent "EMPREINTE ok"
+  at_fin 1
+
+  at_debut empreinte-regel-touche-autre
+  emp_prepare
+  emp_geler
+  emp_regel "regel"$'\n\n'"$TRAILER" autre
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART gel-rouvert"; at_compte "EMPREINTE-ECART" 1
+  at_fin 1
+
+  at_debut empreinte-commit-apres-regel
+  emp_prepare
+  emp_geler
+  emp_regel "regel"$'\n\n'"$TRAILER"
+  echo "# commit après le regel" >> "$COPIE"
+  at_commit
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART commit-apres-gel n=1"
   at_fin 1
 
   at_debut empreinte-non-commite
