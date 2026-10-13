@@ -1,0 +1,21 @@
+# extrait de 46-REJEU-ETAPE-6.md (relevé réel de la Phase 46, gouvernance), lignes 15,1024,4523,4658,4659,4660,4661,4662,4663,4664,4665,4666,4667,4668,4669,4728,4729,4730,4731
+# extraction ciblée (lignes de synthèse et première ligne de table G4 de chaque lab), reproduite telle quelle : rien n'est complété ni inventé
+## Non armé — mesure seule (etape-6-mesure)
+G4 | ~/jarvis-keystone | .planning/cycles/01-equipe-d-agents/phases/01-le-pattern-manager-worker-juge/SUMMARY.md | doit-passer | refus | [planning-core] G4 : aucun VERDICT.md : faites juger l'unité (poser-verdict.sh)
+G4 | ~/BusinessFlow-Lab | .planning/cycles/99-rejeu-cloture/phases/71-g4-conforme-fichier/SUMMARY.md | doit-passer | passe | passe
+COMPTE G6 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G5 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G1 faux-refus=0 faux-accept=0 refus-conforme-modele=196
+COMPTE G7 faux-refus=0 faux-accept=0 refus-conforme-modele=6
+COMPTE ROLE faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G3 faux-refus=0 faux-accept=0 refus-conforme-modele=0
+COMPTE G4 faux-refus=343 faux-accept=0 refus-conforme-modele=0
+COMPTE G4P faux-refus=0 faux-accept=0 refus-conforme-modele=0
+REJEU-ETAPE-6 faux-refus=343 faux-accept=0 refus-conforme-modele=202
+COUVERTURE-REJEU G3 n=52 plancher=12
+COUVERTURE-REJEU G4 n=44 plancher=12
+COUVERTURE-REJEU G4P n=96 plancher=8
+EMPREINTE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-IDENTIQUE ~/BusinessFlow-Lab
+EMPREINTE-ARBRE-IDENTIQUE ~/jarvis-keystone
+EMPREINTE-ARBRE-IDENTIQUE ~/BusinessFlow-Lab

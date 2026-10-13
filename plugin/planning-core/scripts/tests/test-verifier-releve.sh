@@ -27,6 +27,14 @@
 #                VF_RELEVE_CHAINE_DEPOT (lue SEULEMENT par R-RELEVE-CHAINE, jamais pour décider d'un cas) : si elle désigne un dossier ABSOLU EXISTANT, les trois
 #                relevés composés y sont copiés sous chaine-etape-5.md, chaine-etape-6.md, chaine-etape-6-sans-agent.md — `46.1-CONTROLES.sh releve-chaine` les
 #                passe au contrôle de cohérence de la phase. Variable absente, vide ou relative : rien n'est écrit hors du mktemp de la suite.
+#   R-RELEVE-05  (46.1-18) les deux relevés RÉELS de la Phase 46 (fixtures/releve-46-etape-5.txt et -6.txt, extraites par lignes ciblées, chaque ligne
+#                verbatim, jamais complétées) sont refusés : faux-refus=349 à l'étape 5 ; à l'étape 6 faux-refus=343 ET commit-absent, deux causes indépendantes
+#                (ce relevé ne porte aucune ligne COMMIT-REJOUE, il ne cite son commit qu'en prose)
+#   R-RELEVE-06  (46.1-18) contrôle statique (ast) du cœur Python : ni subprocess ni shutil importés, ni os.system ni os.remove appelés, aucun fichier ouvert
+#                en écriture ; l'analyseur est éprouvé sur des sources fautives (il ne rend pas un vert à vide)
+#   R-RELEVE-COUVERTURE  (46.1-18) la suite lit les marqueurs `# releve-<règle>` du script et exige pour chacun un cas négatif dans CAS_NEGATIFS ET un
+#                mutant joué et tué ; elle imprime `COUVERTURE-SUITE regles=<n> cas-negatifs=<n> mutants=<n>` (n calculés) ; une règle sans cas ou sans mutant
+#                est un échec (`  ✗ R-RELEVE-COUVERTURE`), jamais un vert à vide
 #
 # Le script jugé est lu à côté de la suite (../verifier-releve.sh) ; hors dépôt (script absent) la suite l'écrit et rend `0 OK · 0 KO`, jamais un vert.
 # La chaîne lit aussi rejeu-reel.sh et rejeu-gates.sh (à côté du script jugé) ; elle ne les modifie pas.
@@ -66,6 +74,7 @@ T_DEBUT="$(date +%s)"
 
 AIDES="$WORK/aides.py"
 cat > "$AIDES" <<'PY_AIDES_VERIFIER_RELEVE_EOF'
+import ast
 import os
 import re
 import subprocess
@@ -73,6 +82,7 @@ import sys
 
 SCRIPT = None
 WORK = None
+FIXTURES = None
 BORNE_RELEVE = 64 * 1024 * 1024
 MARQUEUR_RE = re.compile(r"^\s*if .*:  # releve-([a-z-]+)$")
 TERMINATEUR = "PY_VERIFIER_RELEVE_EOF"
@@ -92,7 +102,11 @@ def ko(libelle, assertion, attendu, obtenu):
     print("    obtenu    : " + obtenu)
 
 
+TUES = set()  # identifiants des mutants joués ET tués (R-RELEVE-COUVERTURE les compte)
+
+
 def okmut(ident, trace):
+    TUES.add(ident)
     print("  ✓ MUT-%s TUÉ — %s" % (ident, trace))
 
 
@@ -602,9 +616,14 @@ def executer_mutant_regle(regle, marqueurs):
     okmut(ident, "%s · attendu (original) : code 1, RELEVE-ECART %s · obtenu (mutant) : %s" % (assertion, regle, premiere))
 
 
-def sec_mutants():
+def marqueurs_du_script():
+    """Les règles du script, lues sur les lignes `if …:  # releve-<règle>` (dans l'ordre du script)."""
     source = open(SCRIPT, encoding="utf-8").read()
-    marqueurs = [m.group(1) for m in (MARQUEUR_RE.match(l) for l in source.split("\n")) if m]
+    return [m.group(1) for m in (MARQUEUR_RE.match(l) for l in source.split("\n")) if m]
+
+
+def sec_mutants():
+    marqueurs = marqueurs_du_script()
     for regle in marqueurs:
         executer_mutant_regle(regle, marqueurs)
     for regle in CAS_NEGATIFS:
@@ -807,24 +826,159 @@ def controle_chaine():
     chaine_cas("étape 6, lab synthétique sans aucun agent : couverture-insuffisante sur G4P", "6-sans-agent", 6, False, False)
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# R-RELEVE-05 : les deux relevés RÉELS de la Phase 46 sont refusés (fixtures extraites par lignes ciblées, chaque ligne verbatim)
+# ---------------------------------------------------------------------------------------------------------------------
+LABS_46 = ("~/jarvis-keystone", "~/BusinessFlow-Lab")
+# (fixture, étape, faux refus du relevé, règles refusées dans l'ordre alphabétique, commits attendus dans la fixture)
+CORPUS_46 = (
+    ("releve-46-etape-5.txt", 5, 349, ["faux-refus"], 1),
+    ("releve-46-etape-6.txt", 6, 343, ["commit-absent", "faux-refus"], 0),
+)
+
+
+def controle_05():
+    for nom, etape, refus, regles, commits in CORPUS_46:
+        ident = "R-RELEVE-05 %s (étape %d)" % (nom, etape)
+        chemin = os.path.join(FIXTURES, nom)
+        if not os.path.isfile(chemin):
+            ko(ident, "la fixture du relevé réel de la 46 existe", "fixtures/%s" % nom, "absente")
+            continue
+        lignes = open(chemin, encoding="utf-8").read().split("\n")
+        n_commits = len([l for l in lignes if l.startswith("COMMIT-REJOUE")])
+        rc, out, err = lancer(SCRIPT, ["--etape=%d" % etape] + ["--lab=" + lab for lab in LABS_46] + [chemin])
+        sortie = out + err
+        detail = [l for l in sortie.split("\n") if l.startswith("RELEVE-ECART faux-refus : ") and l.endswith(" : faux-refus=%d" % refus)]
+        attendu = "code 1, écarts %s (dont faux-refus=%d), %d ligne(s) COMMIT-REJOUE dans la fixture, dernière ligne RELEVE-VERDICT non-armable etape=%d ecarts=%d" % (regles, refus, commits, etape, len(regles))
+        if (rc == 1 and sorted(ecarts_de(sortie)) == regles and len(detail) == 1 and n_commits == commits
+                and derniere(sortie) == "RELEVE-VERDICT non-armable etape=%d ecarts=%d" % (etape, len(regles))):
+            ok(ident + " est refusé", "code 1, " + ", ".join("RELEVE-ECART " + r for r in regles) + ", faux-refus=%d, %d ligne(s) COMMIT-REJOUE" % (refus, n_commits))
+        else:
+            ko(ident, "le relevé réel de la 46 qui a fait refuser l'armement est refusé, pour chacune de ses causes et pour elles seules", attendu,
+               "code %d, écarts %s, lignes faux-refus=%d : %d, %d ligne(s) COMMIT-REJOUE, dernière ligne « %s »" % (rc, sorted(ecarts_de(sortie)), refus, len(detail), n_commits, court(derniere(sortie))))
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# R-RELEVE-06 : contrôle statique du cœur Python (ni sous-processus, ni suppression, ni écriture)
+# ---------------------------------------------------------------------------------------------------------------------
+IMPORTS_INTERDITS = ("subprocess", "shutil")
+OS_INTERDITS = ("system", "remove", "unlink", "rename", "replace", "popen", "mkdir", "makedirs", "rmdir", "removedirs", "fork", "write", "truncate", "chmod", "symlink", "link")
+DRAPEAUX_ECRITURE = ("O_WRONLY", "O_RDWR", "O_CREAT", "O_APPEND", "O_TRUNC", "O_EXCL")
+
+
+def violations_statiques(corps):
+    """Liste des violations du cœur Python `corps` : import interdit, appel os interdit (os.system, os.remove…), fichier ouvert en écriture (open, os.open)."""
+    violations = []
+    for noeud in ast.walk(ast.parse(corps)):
+        if isinstance(noeud, ast.Import):
+            violations += ["import " + a.name for a in noeud.names if a.name.split(".")[0] in IMPORTS_INTERDITS]
+        elif isinstance(noeud, ast.ImportFrom):
+            if (noeud.module or "").split(".")[0] in IMPORTS_INTERDITS:
+                violations.append("from %s import …" % noeud.module)
+        elif isinstance(noeud, ast.Attribute):
+            if isinstance(noeud.value, ast.Name) and noeud.value.id == "os" and (noeud.attr in OS_INTERDITS or noeud.attr.startswith(("exec", "spawn"))):
+                violations.append("os." + noeud.attr)
+            if noeud.attr in DRAPEAUX_ECRITURE:
+                violations.append("drapeau " + noeud.attr)
+            if noeud.attr in ("write_text", "write_bytes"):
+                violations.append("." + noeud.attr)
+        elif isinstance(noeud, ast.Call) and isinstance(noeud.func, ast.Name):
+            if noeud.func.id in ("__import__", "exec", "eval"):
+                violations.append(noeud.func.id + "(…)")
+            elif noeud.func.id == "open":
+                mode = noeud.args[1] if len(noeud.args) > 1 else next((k.value for k in noeud.keywords if k.arg == "mode"), None)
+                if mode is None:
+                    continue  # open(chemin) : lecture
+                if not (isinstance(mode, ast.Constant) and isinstance(mode.value, str)):
+                    violations.append("open(…) à mode non constant")
+                elif any(c in mode.value for c in "wax+"):
+                    violations.append("open(…, %r)" % mode.value)
+    return violations
+
+
+SOURCES_FAUTIVES = (
+    ("import subprocess", "import subprocess\n"),
+    ("import shutil", "import os\nimport shutil\n"),
+    ("from subprocess import run", "from subprocess import run\n"),
+    ("os.system", "import os\nos.system('x')\n"),
+    ("os.remove", "import os\nos.remove('x')\n"),
+    ("open en écriture", "open('f', 'w')\n"),
+    ("open en ajout par mot-clé", "open('f', mode='a')\n"),
+    ("open en lecture-écriture", "open('f', 'rb+')\n"),
+    ("os.open en écriture", "import os\nos.open('f', os.O_WRONLY | os.O_CREAT)\n"),
+)
+SOURCE_SAINE = "import os\nimport re\nfd = os.open('f', os.O_RDONLY | os.O_NONBLOCK)\nos.read(fd, 8)\nos.close(fd)\nopen('f').read()\nopen('f', 'rb').read()\n"
+
+
+def controle_06():
+    ident = "R-RELEVE-06"
+    corps = corps_python(open(SCRIPT, encoding="utf-8").read())
+    if corps is None:
+        ko(ident, "le cœur Python du script s'extrait du heredoc", "un heredoc PY_VERIFIER_RELEVE_EOF", "introuvable")
+        return
+    aveugles = [nom for nom, source in SOURCES_FAUTIVES if not violations_statiques(source)]
+    faux_positif = violations_statiques(SOURCE_SAINE)
+    if aveugles or faux_positif:
+        ko(ident, "l'analyseur statique voit chaque source fautive et laisse passer la source saine", "toutes les sources fautives relevées, aucune violation sur la source saine",
+           "non vues : %s ; violations sur la source saine : %s" % (aveugles, faux_positif))
+        return
+    violations = violations_statiques(corps)
+    if violations:
+        ko(ident, "le cœur Python n'importe ni subprocess ni shutil, n'appelle ni os.system ni os.remove et n'ouvre aucun fichier en écriture", "aucune violation", ", ".join(sorted(set(violations))))
+    else:
+        ok(ident + " le cœur Python (%d lignes) n'importe ni subprocess ni shutil, n'appelle ni os.system ni os.remove et n'ouvre aucun fichier en écriture" % len(corps.split("\n")),
+           "analyse ast ; l'analyseur voit les %d sources fautives de la suite" % len(SOURCES_FAUTIVES))
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# R-RELEVE-COUVERTURE : chaque règle marquée du script a un cas négatif ET un mutant tué ; la suite imprime sa couverture
+# ---------------------------------------------------------------------------------------------------------------------
+def evaluer_couverture(marqueurs, table, tues):
+    """(règles, avec cas négatif, avec mutant tué, sans cas, sans mutant, cas sans marqueur) : tout est calculé, rien n'est posé."""
+    sans_cas = [r for r in marqueurs if not table.get(r)]
+    sans_mutant = [r for r in marqueurs if "RELEVE-" + r.upper() not in tues]
+    orphelins = [r for r in table if r not in marqueurs]
+    return len(marqueurs), len(marqueurs) - len(sans_cas), len(marqueurs) - len(sans_mutant), sans_cas, sans_mutant, orphelins
+
+
+def controle_couverture():
+    marqueurs = marqueurs_du_script()
+    n, cas, mutants, sans_cas, sans_mutant, orphelins = evaluer_couverture(marqueurs, CAS_NEGATIFS, TUES)
+    print("COUVERTURE-SUITE regles=%d cas-negatifs=%d mutants=%d" % (n, cas, mutants))
+    # preuve que la couverture n'est pas un vert à vide : sur une règle sans cas, sans mutant, et un cas sans marqueur, elle échoue
+    fn, _, _, fs_cas, fs_mut, f_orph = evaluer_couverture(["a", "b"], {"a": [{"nom": "x"}], "z": [{"nom": "y"}]}, {"RELEVE-A"})
+    sensible = fn == 2 and fs_cas == ["b"] and fs_mut == ["b"] and f_orph == ["z"]
+    if n > 0 and not sans_cas and not sans_mutant and not orphelins and n == cas == mutants and sensible:
+        ok("R-RELEVE-COUVERTURE chacune des %d règles marquées du script a un cas négatif et un mutant tué" % n, "COUVERTURE-SUITE regles=%d cas-negatifs=%d mutants=%d" % (n, cas, mutants))
+    else:
+        ko("R-RELEVE-COUVERTURE", "chaque règle marquée `# releve-<règle>` du script a un cas négatif dans CAS_NEGATIFS ET un mutant joué et tué, sans cas orphelin",
+           "regles=cas-negatifs=mutants, aucune règle sans cas, sans mutant, aucun cas sans marqueur",
+           "regles=%d cas-negatifs=%d mutants=%d ; sans cas %s ; sans mutant tué %s ; cas sans marqueur %s ; analyseur de couverture %s"
+           % (n, cas, mutants, sans_cas, sans_mutant, orphelins, "sensible" if sensible else "AVEUGLE"))
+
+
 def main():
-    global SCRIPT, WORK
+    global SCRIPT, WORK, FIXTURES
     SCRIPT, WORK = sys.argv[1], sys.argv[2]
+    FIXTURES = sys.argv[3] if len(sys.argv) > 3 else os.path.join(os.path.dirname(SCRIPT), "tests", "fixtures")
     controle_01()
     controle_02()
     controle_03()
     controle_04()
     controle_chaine()
+    controle_05()
+    controle_06()
     sec_mutants()
     mutant_toujours_armable()
     mutant_toujours_refus()
+    controle_couverture()
 
 
 main()
 PY_AIDES_VERIFIER_RELEVE_EOF
 
 out="$WORK/sortie-verifier-releve.txt"
-"$PYBIN" "$AIDES" "$SCRIPTS_DIR/verifier-releve.sh" "$WORK" > "$out" 2>&1
+"$PYBIN" "$AIDES" "$SCRIPTS_DIR/verifier-releve.sh" "$WORK" "$TESTS_DIR/fixtures" > "$out" 2>&1
 rc=$?
 while IFS= read -r line; do
   printf '%s\n' "$line"
