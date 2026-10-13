@@ -197,6 +197,16 @@ CAS_AUTOTEST=(
   montre-present montre-absent montre-citation-ignoree montre-suite-rouge montre-vide montre-litteral
   montre-tronque montre-sonder
   reel-temoin-role reel-non-tue reel-bilan reel-ko reel-zero-ok
+  armement-observe armement-arme-coherent armement-arme-releve-non-armable armement-arme-gate-absent
+  armement-g4-etape-6-armable armement-g4-etape-6-non-armable armement-g4-etape-6-code-diverge
+  armement-g4p-etape-6-armable armement-g4p-etape-6-non-armable armement-g4p-simule-etape-6
+  armement-etape-invalide armement-gate-invalide armement-arme-non-joue armement-arme-code-diverge
+  armement-arme-code-diverge-arbre armement-arme-commande-diverge armement-arme-commit-inconnu
+  armement-arme-commit-non-ancetre armement-arme-sans-commit-rejoue armement-constante-illisible
+  armement-simule-armable armement-simule-non-armable
+  garder-g4-vert garder-g4-armable garder-g4-sans-option garder-g4-code-diverge garder-g4-doublon
+  garder-g4-observation garder-g4-canal-vide garder-g4-date-forme garder-g4-date-invalide garder-g4-forme
+  garder-g4-constante-illisible garder-g4-releve-absent garder-g4-observe garder-g4-g4p garder-g4-simule
 )
 
 # ---------------------------------------------------------------------------------------------------------
@@ -880,6 +890,8 @@ EOF
 VERIFICATEUR_DEFAUT=plugin/planning-core/scripts/verifier-releve.sh
 RC_NEC=0
 RC_VERDICT=""
+RC_FRAIS=""
+RC_VERIF_RC=""
 RLABS=()
 
 rc_ecart() {
@@ -901,6 +913,8 @@ releve_coherence() {
   local f=$1 etape=$2 verif=$3 lab moment pref lignes nb v t fraiche attendue args nj ne
   RC_NEC=0
   RC_VERDICT=""
+  RC_FRAIS=""
+  RC_VERIF_RC=""
   if [ ! -f "$f" ]; then
     rc_ecart "absent"
     return 1
@@ -947,8 +961,10 @@ releve_coherence() {
     args=(--etape="$etape")
     for lab in "${RLABS[@]}"; do args+=(--lab="$lab"); done
     bash "$verif" "${args[@]}" "$f" > "$t/frais.txt" 2> /dev/null < /dev/null
+    RC_VERIF_RC=$?
     derniere_ligne "$t/frais.txt" > "$t/frais-verdict.txt"
     fraiche=$(cat "$t/frais-verdict.txt")
+    RC_FRAIS=$fraiche
     case $fraiche in
       "RELEVE-VERDICT "*) ;;
       *) rc_ecart "verificateur-sortie" ;;
@@ -1342,6 +1358,289 @@ EOF
     printf 'BASE-ECRITE %s suites=%s\n' "$BASE_FICHIER" "$n"
   fi
   [ "$n" -ge 1 ] && [ "$r" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------------------------------------
+# Mode armement (P461-D-07 ; ARMG-05, ARMG-09)
+# ---------------------------------------------------------------------------------------------------------
+HOOKS_JSON_REL=plugin/planning-core/hooks/hooks.json
+SURFACE_MESUREE="$HOOK_REL $HOOKS_JSON_REL"
+
+# UNE fonction de lecture des constantes d'armement, partagée par `armement` et `etat-reference` (aucune copie).
+# lire_constante <fichier> <X> : lit les lignes `^ARMEMENT_<X> = "(armed|observe)"  # etape-<n>$`. Pose CONST_VAL et
+# CONST_ETAPE et retourne 0 si EXACTEMENT une ligne de cette forme existe et qu'aucune autre ligne n'affecte
+# ARMEMENT_<X> ; retourne 1 sinon (zéro, plusieurs, valeur autre, étiquette d'étape illisible).
+CONST_VAL=""
+CONST_ETAPE=""
+lire_constante() {
+  local r
+  CONST_VAL=""
+  CONST_ETAPE=""
+  r=$(X="$2" LC_ALL=C awk '
+    BEGIN { x = ENVIRON["X"]; pref = "ARMEMENT_" x " = "; motif = "^ARMEMENT_" x " = \"(armed|observe)\"  # etape-[0-9a-z]+$" }
+    index($0, pref) == 1 { tot++ }
+    $0 ~ motif { ok++; v = $0; sub(/^[^"]*"/, "", v); sub(/".*$/, "", v); e = $0; sub(/^.*# etape-/, "", e); val = v; et = e }
+    END { if (tot == 1 && ok == 1) print val " " et; else print "ILLISIBLE" }' "$1" 2> /dev/null)
+  case $r in ILLISIBLE | "") return 1 ;; esac
+  CONST_VAL=${r%% *}
+  CONST_ETAPE=${r#* }
+  return 0
+}
+
+# Surface mesurée : le texte où la VALEUR entre guillemets de chaque ligne ARMEMENT_* est remplacée par un jeton fixe
+# (le nom de la constante et son étiquette d'étape restent comparés). Lit stdin.
+normaliser_surface() {
+  LC_ALL=C awk '/^ARMEMENT_[A-Z0-9]+ = "[a-z]+"  # etape-[0-9a-z]+$/ { sub(/"[a-z]+"/, "\"JETON\""); print; next } { print }'
+}
+
+# Écarts de surface entre le code rejoué (<sha>) et l'arbre de travail : pour chaque fichier de SURFACE_MESUREE dont
+# le texte normalisé diffère, une ligne `ARMEMENT-ECART code-diverge <fichier> commits=<n>` (n = commits du fichier
+# entre <sha> et HEAD ; `arbre-de-travail` si la différence n'est pas commitée). Retourne le nombre de fichiers.
+surface_ecarts() { # <sha>
+  local sha=$1 f t nb=0 a b n
+  nouveau_tmp
+  t=$NT
+  for f in $SURFACE_MESUREE; do
+    a=0
+    b=0
+    if git show "$sha:$f" > "$t/ref.raw" 2> /dev/null; then a=1; normaliser_surface < "$t/ref.raw" > "$t/ref.txt"; fi
+    if [ -f "$f" ]; then b=1; normaliser_surface < "$f" > "$t/tra.txt"; fi
+    if [ "$a" -eq 0 ] && [ "$b" -eq 0 ]; then continue; fi
+    if [ "$a" -eq 1 ] && [ "$b" -eq 1 ] && cmp -s "$t/ref.txt" "$t/tra.txt"; then continue; fi
+    nb=$((nb + 1))
+    n=arbre-de-travail
+    if git show "HEAD:$f" > "$t/head.raw" 2> /dev/null; then
+      normaliser_surface < "$t/head.raw" > "$t/head.txt"
+      if [ "$a" -eq 0 ] || ! cmp -s "$t/ref.txt" "$t/head.txt"; then
+        n="commits=$(git rev-list --count "$sha..HEAD" -- "$f" 2> /dev/null)"
+      fi
+    elif [ "$a" -eq 1 ]; then
+      n="commits=$(git rev-list --count "$sha..HEAD" -- "$f" 2> /dev/null)"
+    fi
+    printf 'ARMEMENT-ECART code-diverge %s %s\n' "$f" "$n"
+  done
+  return "$nb"
+}
+
+# 0 si la ligne `RELEVE-VERDICT armable etape=<étape> … gates=<liste>` nomme le gate.
+verdict_arme_pour() { # <ligne> <étape> <gate>
+  printf '%s\n' "$1" | E="$2" G="$3" LC_ALL=C awk '
+    BEGIN { e = ENVIRON["E"]; g = ENVIRON["G"] }
+    $1 == "RELEVE-VERDICT" && $2 == "armable" {
+      for (i = 3; i <= NF; i++) {
+        if ($i == "etape=" e) ok_e = 1
+        if (substr($i, 1, 6) == "gates=") { n = split(substr($i, 7), l, ","); for (j = 1; j <= n; j++) if (l[j] == g) ok_g = 1 }
+      }
+    }
+    END { if (ok_e && ok_g) exit 0; exit 1 }'
+}
+
+# Calendrier grégorien : 0 si AAAA-MM-JJ (forme déjà vérifiée) est une date qui existe.
+date_valide() {
+  local y m d dm
+  y=${1%%-*}
+  m=${1#*-}
+  m=${m%%-*}
+  d=${1##*-}
+  y=$((10#$y))
+  m=$((10#$m))
+  d=$((10#$d))
+  { [ "$m" -ge 1 ] && [ "$m" -le 12 ]; } || return 1
+  case $m in
+    1 | 3 | 5 | 7 | 8 | 10 | 12) dm=31 ;;
+    4 | 6 | 9 | 11) dm=30 ;;
+    *) if [ $((y % 4)) -eq 0 ] && { [ $((y % 100)) -ne 0 ] || [ $((y % 400)) -eq 0 ]; }; then dm=29; else dm=28; fi ;;
+  esac
+  { [ "$d" -ge 1 ] && [ "$d" -le "$dm" ]; }
+}
+
+# Décision de P461-D-17 (--garder-g4) : la ligne `DECISION-G4 garder-g4 canal=<non vide> date=AAAA-MM-JJ` du relevé.
+# FORME et PRÉSENCE seulement, jamais la véracité de la décision (même régime que `Gate-Touche:`). Imprime une ligne
+# `ARMEMENT-ECART decision-g4-<motif>` par raison (absente · doublon · observation · forme · canal-vide ·
+# date-forme · date-invalide · releve-absent · constante-illisible · constante-non-armee) ; pose DG_CANAL et DG_DATE.
+# Retourne 0 si la décision est valable.
+DG_CANAL=""
+DG_DATE=""
+decision_g4() { # <relevé>
+  local f=$1 nb ligne reste canal date ec=0
+  DG_CANAL=""
+  DG_DATE=""
+  if [ ! -f "$f" ]; then
+    echo "ARMEMENT-ECART decision-g4-releve-absent"
+    return 1
+  fi
+  if ! lire_constante "$HOOK_REL" G4; then
+    echo "ARMEMENT-ECART decision-g4-constante-illisible"
+    return 1
+  fi
+  if [ "$CONST_VAL" != armed ] || [ "$CONST_ETAPE" != 5 ]; then
+    echo "ARMEMENT-ECART decision-g4-constante-non-armee"
+    return 1
+  fi
+  nb=$(compter_prefixe "$f" "DECISION-G4")
+  if [ "$nb" -eq 0 ]; then
+    echo "ARMEMENT-ECART decision-g4-absente"
+    return 1
+  fi
+  if [ "$nb" -gt 1 ]; then
+    echo "ARMEMENT-ECART decision-g4-doublon"
+    return 1
+  fi
+  ligne=$(LC_ALL=C awk 'index($0, "DECISION-G4") == 1 { print; exit }' "$f")
+  case $ligne in
+    "DECISION-G4 g4-observation"*)
+      echo "ARMEMENT-ECART decision-g4-observation"
+      return 1 ;;
+    "DECISION-G4 garder-g4 canal="*) ;;
+    *)
+      echo "ARMEMENT-ECART decision-g4-forme"
+      return 1 ;;
+  esac
+  reste=${ligne#"DECISION-G4 garder-g4 canal="}
+  case $reste in
+    *" date="*) ;;
+    *)
+      echo "ARMEMENT-ECART decision-g4-forme"
+      return 1 ;;
+  esac
+  canal=${reste%" date="*}
+  date=${reste##*" date="}
+  if [ -z "$(printf '%s' "$canal" | tr -d '[:space:]')" ]; then
+    echo "ARMEMENT-ECART decision-g4-canal-vide"
+    ec=$((ec + 1))
+  fi
+  case $date in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9])
+      if ! date_valide "$date"; then
+        echo "ARMEMENT-ECART decision-g4-date-invalide"
+        ec=$((ec + 1))
+      fi ;;
+    *)
+      echo "ARMEMENT-ECART decision-g4-date-forme"
+      ec=$((ec + 1)) ;;
+  esac
+  [ "$ec" -eq 0 ] || return 1
+  DG_CANAL=$canal
+  DG_DATE=$date
+  return 0
+}
+
+# Cœur d'`armement` : retourne 0 conforme, 1 écart, 64 usage. Lit l'unique constante du gate dans l'arbre de travail.
+armement_coeur() { # <gate> <relevé> <étape> <vérificateur> <simuler 0|1>
+  local gate=$1 f=$2 etape=$3 verif=$4 simuler=$5 etat nb sha ligne rcc t
+  if ! lire_constante "$HOOK_REL" "$gate"; then
+    echo "ARMEMENT-ECART constante-illisible"
+    echo "ARMEMENT-COHERENCE ECART"
+    return 1
+  fi
+  etat=$CONST_VAL
+  if [ "$etat" = observe ] && [ "$simuler" -eq 0 ]; then
+    printf 'ARMEMENT %s observe : rien à justifier\n' "$gate"
+    return 0
+  fi
+  if [ "$simuler" -eq 1 ]; then
+    printf 'ARMEMENT %s simule\n' "$gate"
+  else
+    printf 'ARMEMENT %s armed\n' "$gate"
+  fi
+  # (a) cohérence du relevé (la fonction de `releve`, aucune copie)
+  releve_coherence "$f" "$etape" "$verif"
+  rcc=$?
+  if [ "$rcc" -eq 64 ]; then
+    return 64
+  elif [ "$rcc" -ne 0 ]; then
+    echo "ARMEMENT-ECART releve-incoherent"
+    echo "ARMEMENT-COHERENCE ECART"
+    return 1
+  fi
+  # (b) rejeu joué
+  if [ "$(compter_prefixe "$f" "REJEU-NON-JOUE ")" -gt 0 ]; then
+    echo "ARMEMENT-ECART releve-non-joue"
+    echo "ARMEMENT-COHERENCE ECART"
+    return 1
+  fi
+  # (c) verdict FRAIS du vérificateur : code 0 et gate nommé dans la liste `gates=` du verdict armable
+  if [ "${RC_VERIF_RC:-1}" != 0 ] || ! verdict_arme_pour "$RC_FRAIS" "$etape" "$gate"; then
+    echo "ARMEMENT-ECART releve-non-armable"
+    echo "ARMEMENT-COHERENCE ECART"
+    return 1
+  fi
+  # (d) COMMIT-REJOUE : exactement une ligne, commit connu, ancêtre de HEAD
+  nb=$(compter_prefixe "$f" "COMMIT-REJOUE ")
+  if [ "$nb" -eq 0 ]; then
+    echo "ARMEMENT-ECART commit-rejoue-absent"
+    echo "ARMEMENT-COHERENCE ECART"
+    return 1
+  elif [ "$nb" -gt 1 ]; then
+    echo "ARMEMENT-ECART commit-rejoue-doublon"
+    echo "ARMEMENT-COHERENCE ECART"
+    return 1
+  fi
+  ligne=$(LC_ALL=C awk 'index($0, "COMMIT-REJOUE ") == 1 { print substr($0, 15); exit }' "$f")
+  sha=$ligne
+  case $sha in
+    *[!0-9a-f]* | "") sha="" ;;
+  esac
+  if [ -z "$sha" ] || [ "${#sha}" -lt 7 ] || [ "${#sha}" -gt 40 ] || ! git cat-file -e "${sha}^{commit}" > /dev/null 2>&1; then
+    echo "ARMEMENT-ECART commit-inconnu"
+    echo "ARMEMENT-COHERENCE ECART"
+    return 1
+  fi
+  if ! git merge-base --is-ancestor "$sha" HEAD > /dev/null 2>&1; then
+    echo "ARMEMENT-ECART commit-non-ancetre"
+    echo "ARMEMENT-COHERENCE ECART"
+    return 1
+  fi
+  # (e) même code mesuré : identité d'octets de la surface mesurée, valeurs ARMEMENT_* exceptées
+  t=$(mktemp "${TMPDIR:-/tmp}/c461.XXXXXX") || return 64
+  TMPS+=("$t")
+  surface_ecarts "$sha" > "$t"
+  rcc=$?
+  cat "$t"
+  if [ "$rcc" -ne 0 ]; then
+    echo "ARMEMENT-COHERENCE ECART"
+    return 1
+  fi
+  echo "ARMEMENT-COHERENCE ok"
+  return 0
+}
+
+cmd_armement() {
+  local gate="" releve="" etape="" verif="" simuler=0 garder=0 core
+  RLABS=()
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --gate=*) gate=${1#--gate=} ;;
+      --releve=*) releve=${1#--releve=} ;;
+      --etape=*) etape=${1#--etape=} ;;
+      --lab=*) RLABS+=("${1#--lab=}") ;;
+      --verificateur=*) verif=${1#--verificateur=} ;;
+      --simuler-arme) simuler=1 ;;
+      --garder-g4) garder=1 ;;
+      *) die_usage "armement --gate=<G4|G4P> --releve=<relevé> --etape=<5|6> [--lab=<lab affiché>]… [--verificateur=<script>] [--simuler-arme] [--garder-g4]" ;;
+    esac
+    shift
+  done
+  case $gate in G4 | G4P) ;; *) die_usage "armement : --gate=G4 ou --gate=G4P" ;; esac
+  [ -n "$releve" ] || die_usage "armement : --releve=<relevé>"
+  case $etape in 5 | 6) ;; *) die_usage "armement : --etape=5 ou --etape=6 (étape du RELEVÉ présenté)" ;; esac
+  if [ "$garder" -eq 1 ]; then
+    [ "$gate" = G4 ] || die_usage "armement : --garder-g4 n'existe que pour --gate=G4"
+    [ "$simuler" -eq 0 ] || die_usage "armement : --garder-g4 et --simuler-arme s'excluent"
+  fi
+  racine_ou_sortir
+  [ -n "$verif" ] || verif=$VERIFICATEUR_DEFAUT
+  armement_coeur "$gate" "$releve" "$etape" "$verif" "$simuler"
+  core=$?
+  [ "$core" -ne 64 ] || exit 64
+  if [ "$core" -eq 1 ] && [ "$garder" -eq 1 ]; then
+    # `armement` seul rend 1 : la décision garder-g4 (P461-D-17) n'excuse que G4 armé `# etape-5`, jamais autre chose.
+    if decision_g4 "$releve"; then
+      printf 'ARMEMENT G4 armed : non remesuré, décision garder-g4 canal=%s date=%s\n' "$DG_CANAL" "$DG_DATE"
+      return 0
+    fi
+  fi
+  return "$core"
 }
 
 # ---------------------------------------------------------------------------------------------------------
@@ -2146,7 +2445,8 @@ if awk 'index($0, "FAUX-NON-ARMABLE") == 1 { f = 1 } END { exit f ? 0 : 1 }' "$f
   echo "RELEVE-VERDICT non-armable etape=$etape ecarts=1"
   exit 1
 fi
-echo "RELEVE-VERDICT armable etape=$etape labs=1 gates=G3,G4"
+if [ "$etape" = 6 ]; then gates=G3,G4,G4P; else gates=G3,G4; fi
+echo "RELEVE-VERDICT armable etape=$etape labs=1 gates=$gates"
 exit 0
 VERIF_EOF
 }
@@ -2168,6 +2468,8 @@ mk_releve() { # <fichier>
     echo "REPOS-AVANT <lab-1> processus=${RV_AVANT_N:-0}"
     [ "${RV_SANS_APRES:-0}" = 1 ] || echo "REPOS-APRES <lab-1> processus=0"
     echo "REJEU-ETAPE-$e faux-refus=0 faux-accept=0"
+    [ -z "${RV_COMMIT:-}" ] || echo "COMMIT-REJOUE $RV_COMMIT"
+    [ -z "${RV_DECISION:-}" ] || printf '%s\n' "$RV_DECISION"
     [ "${RV_CHEMIN:-0}" != 1 ] || echo "voir /Users/dev/lab/x"
     if [ "$v" = non-armable ]; then
       echo "FAUX-NON-ARMABLE"
@@ -2178,6 +2480,8 @@ mk_releve() { # <fichier>
       echo "$RV_LIGNE"
     elif [ "$v" = non-armable ]; then
       echo "RELEVE-VERDICT non-armable etape=$e ecarts=1"
+    elif [ "$e" = 6 ]; then
+      echo "RELEVE-VERDICT armable etape=$e labs=1 gates=G3,G4,G4P"
     else
       echo "RELEVE-VERDICT armable etape=$e labs=1 gates=G3,G4"
     fi
@@ -2458,6 +2762,331 @@ autotest_reel_suite() {
   at_fin 1
 }
 
+# mk_hook_arm : faux hook de l'autotest d'armement, deux constantes et une ligne de corps hors ARMEMENT_*, plus une
+# fausse commande enregistrée. Variables : AR_G4, AR_G4P (observe|armed), AR_CORPS, AR_CMD, AR_G4_DOUBLE (deux lignes
+# ARMEMENT_G4), AR_G4_AUCUNE (aucune ligne ARMEMENT_G4).
+mk_hook_arm() {
+  local f="$FD/$HOOK_REL"
+  mkdir -p "$(dirname "$f")" "$FD/$(dirname "$HOOKS_JSON_REL")"
+  {
+    printf '#!/usr/bin/env bash\n'
+    if [ "${AR_G4_DOUBLE:-0}" = 1 ]; then
+      printf 'ARMEMENT_G4 = "observe"  # etape-5\nARMEMENT_G4 = "armed"  # etape-5\n'
+    elif [ "${AR_G4_AUCUNE:-0}" != 1 ]; then
+      printf 'ARMEMENT_G4 = "%s"  # etape-5\n' "${AR_G4:-observe}"
+    fi
+    printf 'ARMEMENT_G4P = "%s"  # etape-6\n' "${AR_G4P:-observe}"
+    printf 'CORPS = %s\n' "${AR_CORPS:-1}"
+  } > "$f"
+  printf '{"hooks": "%s"}\n' "${AR_CMD:-cmd-1}" > "$FD/$HOOKS_JSON_REL"
+}
+
+# arm_prepare : faux dépôt dont le commit REJOUÉ (ARM_SHA) porte les constantes à `observe`, puis un commit
+# d'armement qui pose AR_G4 / AR_G4P (de l'environnement de l'appel) sans toucher au reste.
+arm_prepare() {
+  at_depot
+  AR_G4=observe AR_G4P=observe mk_hook_arm
+  at_commit
+  ARM_SHA=$(cd "$FD" && git rev-parse HEAD)
+  mk_hook_arm
+  at_commit
+}
+
+# at_raison <cas> <motif attendu> : exactement UNE ligne `ARMEMENT-ECART decision-g4-*`, celle attendue ; la trace
+# « raison attendue / raison obtenue » est imprimée pour chaque cas (le motif exact de l'outil, pas le seul code).
+at_raison() {
+  local obt n
+  obt=$(P='ARMEMENT-ECART decision-g4-' LC_ALL=C awk 'BEGIN { p = ENVIRON["P"] } index($0, p) == 1 { sub(/^ARMEMENT-ECART /, ""); printf "%s%s", (n++ ? "," : ""), $0 }' "$AT_OUT")
+  printf '  AUTOTEST-RAISON %s attendue=%s obtenue=%s\n' "$1" "$2" "${obt:-aucune}"
+  [ "$obt" = "$2" ] || at_echec "raison obtenue « ${obt:-aucune} » au lieu de « $2 »"
+}
+
+autotest_armement() {
+  local V R S2 side k
+  local DOK='DECISION-G4 garder-g4 canal=AskUserQuestion date=2026-10-12'
+  nouveau_tmp
+  V=$NT/verif-arm.sh
+  R=$NT/releve-arm.md
+  mk_verif "$V"
+
+  at_debut armement-observe
+  arm_prepare
+  AT_RC=0
+  for k in "G4:5" "G4:6" "G4P:6"; do
+    at_lancer armement --gate="${k%%:*}" --releve="$NT/inexistant.md" --etape="${k##*:}" --lab='<lab-1>' --verificateur="$V"
+    [ "$AT_RC" -eq 0 ] || at_echec "appariement $k : code $AT_RC au lieu de 0"
+    at_contient "ARMEMENT ${k%%:*} observe : rien à justifier"
+  done
+  at_fin 0
+
+  at_debut armement-arme-coherent
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT G4 armed"; at_contient "ARMEMENT-COHERENCE ok"; at_absent "ARMEMENT-ECART"
+  at_fin 0
+
+  at_debut armement-arme-releve-non-armable
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 RV_VERDICT=non-armable mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART releve-non-armable"
+  at_fin 1
+
+  at_debut armement-arme-gate-absent
+  AR_G4P=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 mk_releve "$R"
+  at_lancer armement --gate=G4P --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART releve-non-armable"
+  at_fin 1
+
+  at_debut armement-g4-etape-6-armable
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-COHERENCE ok"; at_absent "ARMEMENT-ECART"
+  at_fin 0
+
+  at_debut armement-g4-etape-6-non-armable
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART releve-non-armable"
+  at_fin 1
+
+  at_debut armement-g4-etape-6-code-diverge
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 mk_releve "$R"
+  AR_G4=armed AR_CORPS=2 mk_hook_arm
+  at_commit
+  at_lancer armement --gate=G4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART code-diverge $HOOK_REL commits=2"
+  at_fin 1
+
+  at_debut armement-g4p-etape-6-armable
+  AR_G4P=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 mk_releve "$R"
+  at_lancer armement --gate=G4P --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT G4P armed"; at_contient "ARMEMENT-COHERENCE ok"; at_absent "ARMEMENT-ECART"
+  at_fin 0
+
+  at_debut armement-g4p-etape-6-non-armable
+  AR_G4P=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable mk_releve "$R"
+  at_lancer armement --gate=G4P --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART releve-non-armable"
+  at_fin 1
+
+  at_debut armement-g4p-simule-etape-6
+  arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 mk_releve "$R"
+  at_lancer armement --gate=G4P --simuler-arme --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT G4P simule"; at_contient "ARMEMENT-COHERENCE ok"
+  at_fin 0
+
+  at_debut armement-etape-invalide
+  arm_prepare
+  at_lancer armement --gate=G4 --releve="$R" --etape=7 --lab='<lab-1>' --verificateur="$V"
+  at_fin 64
+
+  at_debut armement-gate-invalide
+  arm_prepare
+  at_lancer armement --gate=G7 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_fin 64
+
+  at_debut armement-arme-non-joue
+  AR_G4=armed arm_prepare
+  RV_NON_JOUE=1 mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART releve-non-joue"
+  at_fin 1
+
+  at_debut armement-arme-code-diverge
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 mk_releve "$R"
+  AR_G4=armed AR_CORPS=2 mk_hook_arm
+  at_commit
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART code-diverge $HOOK_REL commits=2"; at_absent "code-diverge $HOOKS_JSON_REL"
+  at_fin 1
+
+  at_debut armement-arme-code-diverge-arbre
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 mk_releve "$R"
+  AR_G4=armed AR_CORPS=3 mk_hook_arm
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART code-diverge $HOOK_REL arbre-de-travail"
+  at_fin 1
+
+  at_debut armement-arme-commande-diverge
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 mk_releve "$R"
+  AR_G4=armed AR_CMD=cmd-2 mk_hook_arm
+  at_commit
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART code-diverge $HOOKS_JSON_REL commits=1"; at_absent "code-diverge $HOOK_REL"
+  at_fin 1
+
+  at_debut armement-arme-commit-inconnu
+  AR_G4=armed arm_prepare
+  RV_COMMIT=abababababababababababababababababababab RV_ETAPE=5 mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART commit-inconnu"
+  at_fin 1
+
+  at_debut armement-arme-commit-non-ancetre
+  AR_G4=armed arm_prepare
+  (cd "$FD" && gitf checkout -q -b autre && echo x > x.txt && gitf add -A && gitf commit -q -m autre && gitf checkout -q main) > /dev/null 2>&1
+  side=$(cd "$FD" && git rev-parse autre)
+  RV_COMMIT=$side RV_ETAPE=5 mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART commit-non-ancetre"
+  at_fin 1
+
+  at_debut armement-arme-sans-commit-rejoue
+  AR_G4=armed arm_prepare
+  RV_ETAPE=5 mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART commit-rejoue-absent"
+  at_fin 1
+
+  at_debut armement-constante-illisible
+  AR_G4_DOUBLE=1 arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART constante-illisible"
+  at_fin 1
+
+  at_debut armement-simule-armable
+  arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 mk_releve "$R"
+  at_lancer armement --gate=G4 --simuler-arme --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT G4 simule"; at_contient "ARMEMENT-COHERENCE ok"
+  at_fin 0
+
+  at_debut armement-simule-non-armable
+  arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 RV_VERDICT=non-armable mk_releve "$R"
+  at_lancer armement --gate=G4 --simuler-arme --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART releve-non-armable"
+  at_fin 1
+
+  # --garder-g4 : appariement (G4, 6), constante `armed  # etape-5`, relevé d'étape 6 NON armable sauf mention.
+  at_debut garder-g4-vert
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION="$DOK" mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT G4 armed : non remesuré, décision garder-g4 canal=AskUserQuestion date=2026-10-12"
+  at_contient "ARMEMENT-ECART releve-non-armable"
+  at_fin 0
+
+  at_debut garder-g4-armable
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-COHERENCE ok"; at_absent "non remesuré"; at_absent "ARMEMENT-ECART"
+  at_fin 0
+
+  at_debut garder-g4-sans-option
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION="$DOK" mk_releve "$R"
+  at_lancer armement --gate=G4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART releve-non-armable"; at_absent "non remesuré"
+  at_fin 1
+
+  at_debut garder-g4-code-diverge
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=5 RV_DECISION="$DOK" mk_releve "$R"
+  AR_G4=armed AR_CORPS=2 mk_hook_arm
+  at_commit
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART code-diverge"; at_contient "non remesuré, décision garder-g4"
+  at_fin 0
+
+  at_debut garder-g4-doublon
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION="$DOK
+$DOK" mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_raison garder-g4-doublon decision-g4-doublon; at_absent "non remesuré"
+  at_fin 1
+
+  at_debut garder-g4-observation
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION='DECISION-G4 g4-observation canal=AskUserQuestion date=2026-10-12' mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_raison garder-g4-observation decision-g4-observation; at_absent "non remesuré"
+  at_fin 1
+
+  # Un cas = UNE raison de rougir : le canal vide, la date de mauvaise forme et la date de bonne forme mais
+  # invalide sont trois cas distincts, chacun affirmant le motif exact imprimé par l'outil.
+  at_debut garder-g4-canal-vide
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION='DECISION-G4 garder-g4 canal= date=2026-10-12' mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_raison garder-g4-canal-vide decision-g4-canal-vide; at_absent "non remesuré"
+  at_fin 1
+
+  at_debut garder-g4-date-forme
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION='DECISION-G4 garder-g4 canal=AskUserQuestion date=2026-13-45x' mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_raison garder-g4-date-forme decision-g4-date-forme; at_absent "non remesuré"
+  at_fin 1
+
+  at_debut garder-g4-date-invalide
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION='DECISION-G4 garder-g4 canal=AskUserQuestion date=2026-13-45' mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_raison garder-g4-date-invalide decision-g4-date-invalide; at_absent "non remesuré"
+  at_fin 1
+
+  at_debut garder-g4-forme
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION='DECISION-G4 garder canal=AskUserQuestion date=2026-10-12' mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_raison garder-g4-forme decision-g4-forme
+  at_fin 1
+
+  at_debut garder-g4-constante-illisible
+  AR_G4_DOUBLE=1 arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION="$DOK" mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART constante-illisible"; at_absent "non remesuré"
+  k=$AT_RC
+  AR_G4_AUCUNE=1 arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION="$DOK" mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT-ECART constante-illisible"; at_absent "non remesuré"
+  [ "$k" -eq 1 ] || at_echec "deux lignes ARMEMENT_G4 : code $k au lieu de 1"
+  at_fin 1
+
+  at_debut garder-g4-releve-absent
+  AR_G4=armed arm_prepare
+  at_lancer armement --gate=G4 --garder-g4 --releve="$NT/n-existe-pas.md" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_raison garder-g4-releve-absent decision-g4-releve-absent; at_absent "non remesuré"
+  at_fin 1
+
+  at_debut garder-g4-observe
+  arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION="$DOK" mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_contient "ARMEMENT G4 observe : rien à justifier"; at_absent "non remesuré"
+  at_fin 0
+
+  at_debut garder-g4-g4p
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION="$DOK" mk_releve "$R"
+  at_lancer armement --gate=G4P --garder-g4 --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_fin 64
+
+  at_debut garder-g4-simule
+  AR_G4=armed arm_prepare
+  RV_COMMIT=$ARM_SHA RV_ETAPE=6 RV_VERDICT=non-armable RV_DECISION="$DOK" mk_releve "$R"
+  at_lancer armement --gate=G4 --garder-g4 --simuler-arme --releve="$R" --etape=6 --lab='<lab-1>' --verificateur="$V"
+  at_fin 64
+}
+
 autotest() {
   local manquants=0 c j trouve n d m a
   SANS_REEL=0
@@ -2478,6 +3107,7 @@ autotest() {
   autotest_detache
   autotest_invariants
   autotest_releve
+  autotest_armement
   [ "$SANS_REEL" -eq 1 ] || autotest_reel_suite
   # Cas déclarés contre cas joués : un cas déclaré et non joué est un échec.
   for c in "${CAS_AUTOTEST[@]}"; do
@@ -2537,7 +3167,8 @@ principal() {
     releve) cmd_releve "$@"; return $? ;;
     releve-chaine) cmd_releve_chaine "$@"; return $? ;;
     base-duree) cmd_base_duree "$@"; return $? ;;
-    *) die_usage "46.1-CONTROLES.sh <suite|toutes|sonder|base-duree|invariants|releve|releve-chaine|--autotest|--help>" ;;
+    armement) cmd_armement "$@"; return $? ;;
+    *) die_usage "46.1-CONTROLES.sh <suite|toutes|sonder|base-duree|invariants|releve|releve-chaine|armement|--autotest|--help>" ;;
   esac
 }
 
