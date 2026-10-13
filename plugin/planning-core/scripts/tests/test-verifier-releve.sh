@@ -18,8 +18,18 @@
 #   Les chemins de machine que la suite fabrique pour la règle chemin-machine sont des PLACEHOLDERS (`/Users/dev/…`, `/home/runner/…`) admis par
 #   scripts/check-machine-paths.sh : la règle du script les refuse quand même, et la suite versionnée ne porte aucun vrai chemin.
 #
+#   R-RELEVE-CHAINE  (46.1-18, P461-D-06, P461-D-07) la VRAIE chaîne sur un lab synthétique construit par la suite : rejeu-reel.sh (donc rejeu-gates.sh)
+#                étape 5, étape 6 avec un agent producteur doté de Bash, étape 6 sans aucun agent → relevé → verifier-releve.sh. Étapes 5 et 6 avec agent :
+#                armables ; étape 6 sans agent : `RELEVE-ECART couverture-insuffisante` sur G4P. Chacun des trois relevés est ensuite COMPOSÉ au format des
+#                relevés de la phase (REPOS-AVANT/REPOS-APRES, COMMIT-REJOUE, « ## Sortie brute du rejeu », « ## Décision mécanique » qui reproduit la sortie
+#                du script ; pour le non-armable, « ## Non armé — remonté à Willy » et ESCALADE-WILLY) et le script, rejoué sur le fichier final, rend le même
+#                code et une dernière ligne identique (les lignes reproduites sont inertes). Un écart révélé se corrige dans le lecteur, jamais dans un attendu.
+#                VF_RELEVE_CHAINE_DEPOT (lue SEULEMENT par R-RELEVE-CHAINE, jamais pour décider d'un cas) : si elle désigne un dossier ABSOLU EXISTANT, les trois
+#                relevés composés y sont copiés sous chaine-etape-5.md, chaine-etape-6.md, chaine-etape-6-sans-agent.md — `46.1-CONTROLES.sh releve-chaine` les
+#                passe au contrôle de cohérence de la phase. Variable absente, vide ou relative : rien n'est écrit hors du mktemp de la suite.
+#
 # Le script jugé est lu à côté de la suite (../verifier-releve.sh) ; hors dépôt (script absent) la suite l'écrit et rend `0 OK · 0 KO`, jamais un vert.
-# La preuve que la table couvre chaque marqueur, la chaîne réelle sur lab synthétique et le corpus réel de la 46 sont le plan 46.1-18.
+# La chaîne lit aussi rejeu-reel.sh et rejeu-gates.sh (à côté du script jugé) ; elle ne les modifie pas.
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; `cmp -s` jamais `diff`. Lançable depuis tout cwd, par
 # `bash <suite>` (jamais sourcée). Piège CI : jamais `commande && { … }` nu.
 set -uo pipefail
@@ -675,6 +685,128 @@ def mutant_toujours_refus():
     okmut(ident, "%s · attendu (original) : code 0, RELEVE-VERDICT armable · obtenu (mutant) : %s" % (assertion, premier))
 
 
+# ---------------------------------------------------------------------------------------------------------------------
+# R-RELEVE-CHAINE : la vraie chaîne de rejeu sur un lab synthétique, composée au format des relevés de la phase (46.1-18, P461-D-06, P461-D-07)
+# ---------------------------------------------------------------------------------------------------------------------
+AGENT_PRODUCTEUR_BASH = "---\nname: producteur-bash\ndescription: agent synthétique\ntools: Read, Write, Bash\n---\nCorps.\n"
+FICHIERS_LAB_CHAINE = {".planning/config.json": '{"planning_version": "2.0"}', ".planning/notes.md": "n", "rapport.md": "rapport\n", "dossier-plein/a.txt": "a\n"}
+DEPOT_NOMS = {"5": "chaine-etape-5.md", "6": "chaine-etape-6.md", "6-sans-agent": "chaine-etape-6-sans-agent.md"}
+RE_ECART_COUVERTURE_G4P = re.compile(r"^RELEVE-ECART couverture-insuffisante : gate G4P ligne [0-9]+ : n=0 sous plancher=4$")
+
+
+def env_chaine():
+    """Environnement du rejeu synthétique : un HOME temporaire que le lab n'habite pas (le lab s'affiche donc `<lab-1>`), rien d'autre."""
+    home = os.path.join(WORK, "chaine-home")
+    os.makedirs(home, exist_ok=True)
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HOME": home, "XDG_CACHE_HOME": os.path.join(WORK, "chaine-xdg")}
+    if os.environ.get("TMPDIR"):
+        env["TMPDIR"] = os.environ["TMPDIR"]
+    return env
+
+
+def chaine_rejouer(nom, etape, avec_agent):
+    """(code de rejeu-reel.sh, texte du rapport, erreur standard) du VRAI rejeu sur un lab synthétique tout neuf, construit sous WORK/chaine/<nom>/lab."""
+    racine = os.path.join(WORK, "chaine", nom)
+    lab = os.path.join(racine, "lab")
+    fichiers = dict(FICHIERS_LAB_CHAINE)
+    if avec_agent:
+        fichiers[".claude/agents/producteur-bash.md"] = AGENT_PRODUCTEUR_BASH
+    for rel, contenu in fichiers.items():
+        chemin = os.path.join(lab, rel)
+        os.makedirs(os.path.dirname(chemin), exist_ok=True)
+        with open(chemin, "w", encoding="utf-8") as fh:
+            fh.write(contenu)
+    rapport = os.path.join(racine, "rapport.txt")
+    reel = os.path.join(os.path.dirname(SCRIPT), "rejeu-reel.sh")
+    p = subprocess.run(["bash", reel, "--lab=" + lab, "--etape=%d" % etape, "--rapport=" + rapport], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                       stderr=subprocess.PIPE, env=env_chaine(), cwd=racine, timeout=300)
+    texte = open(rapport, encoding="utf-8").read() if os.path.isfile(rapport) else ""
+    return p.returncode, texte, p.stderr.decode("utf-8", "replace")
+
+
+def chaine_composer(etape, rapport, decision, non_arme):
+    """Le relevé de rejeu au format de la phase : en-tête (repos du lab synthétique, qu'aucun processus n'habite), commit rejoué, sortie brute du rejeu, décision
+    mécanique qui reproduit la sortie du script et, pour un relevé non armable, la section « Non armé » et la ligne d'escalade."""
+    lignes = ["# Relevé de rejeu composé par la suite test-verifier-releve.sh (R-RELEVE-CHAINE, étape %d, lab synthétique)" % etape,
+              "REPOS-AVANT %s processus=0" % LAB_1, "REPOS-APRES %s processus=0" % LAB_1, "COMMIT-REJOUE " + COMMIT, "", "## Sortie brute du rejeu"]
+    lignes += rapport.rstrip("\n").split("\n")
+    lignes += ["", "## Décision mécanique"] + decision.rstrip("\n").split("\n")
+    if non_arme:
+        lignes += ["", "## Non armé — remonté à Willy", "- G4P : couverture insuffisante, aucun agent rejoué (n=0 sous le plancher)", "ESCALADE-WILLY ETAPE-%d couverture" % etape]
+    return "\n".join(lignes) + "\n"
+
+
+def chaine_faits(rapport):
+    """Les comptes du rejeu synthétique, pour la trace : REJEU-ETAPE et COUVERTURE-REJEU, tels que le rejeu les a émis."""
+    return " · ".join(l for l in rapport.split("\n") if l.startswith(("REJEU-ETAPE-", "COUVERTURE-REJEU ")))
+
+
+def depot_chaine():
+    """Dossier de dépôt de VF_RELEVE_CHAINE_DEPOT s'il est absolu et existant, sinon None (variable absente, vide, relative ou dossier absent : rien n'est déposé)."""
+    depot = os.environ.get("VF_RELEVE_CHAINE_DEPOT", "")
+    return depot if depot and os.path.isabs(depot) and os.path.isdir(depot) else None
+
+
+def chaine_cas(libelle, cle, etape, avec_agent, armable_attendu):
+    """Un cas de la chaîne : rejeu réel → ajout de COMMIT-REJOUE → script ; puis relevé composé → script rejoué (même code, même dernière ligne) → dépôt."""
+    ident = "R-RELEVE-CHAINE " + libelle
+    try:
+        rc_reel, rapport, err_reel = chaine_rejouer("cas-" + cle, etape, avec_agent)
+    except (OSError, subprocess.SubprocessError) as exc:
+        ko(ident, "le rejeu réel (rejeu-reel.sh) s'exécute sur le lab synthétique", "un rapport de rejeu", type(exc).__name__ + " " + court(exc))
+        return
+    if rapport == "":
+        ko(ident, "le rejeu réel écrit son rapport", "un rapport non vide", "rapport vide, code %d, erreur « %s »" % (rc_reel, court(err_reel)))
+        return
+    brut = os.path.join(WORK, "chaine", "cas-" + cle, "brut.txt")
+    with open(brut, "w", encoding="utf-8") as fh:
+        fh.write(rapport + "COMMIT-REJOUE " + COMMIT + "\n")
+    p = subprocess.run(["bash", SCRIPT, "--etape=%d" % etape, "--lab=" + LAB_1, brut], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=WORK, timeout=120)
+    rc, sortie = p.returncode, (p.stdout + p.stderr).decode("utf-8", "replace")
+    if armable_attendu:
+        attendu = "rejeu-reel.sh code 0, verifier-releve.sh code 0, dernière ligne RELEVE-VERDICT armable etape=%d, aucun écart" % etape
+        conforme = rc_reel == 0 and armable(rc, sortie) and ("armable etape=%d labs=1 " % etape) in derniere(sortie)
+    else:
+        attendu = "rejeu-reel.sh code 1, verifier-releve.sh code 1, l'unique écart couverture-insuffisante sur G4P (n=0 sous plancher=4)"
+        ecarts = [l for l in sortie.split("\n") if l.startswith("RELEVE-ECART ")]
+        conforme = (rc_reel == 1 and rc == 1 and ecarts_de(sortie) == ["couverture-insuffisante"] and len(ecarts) == 1 and bool(RE_ECART_COUVERTURE_G4P.match(ecarts[0]))
+                    and derniere(sortie) == "RELEVE-VERDICT non-armable etape=%d ecarts=1" % etape)
+    if not conforme:
+        ko(ident, "la chaîne réelle (rejeu-reel.sh → verifier-releve.sh) rend le verdict attendu sur la forme réelle des lignes émises", attendu,
+           "rejeu-reel.sh code %d, verifier-releve.sh code %d, écarts %s, dernière ligne « %s », comptes du rejeu : %s" % (rc_reel, rc, ecarts_de(sortie), court(derniere(sortie)), court(chaine_faits(rapport))))
+        return
+    # le relevé composé au format de la phase : le script, rejoué sur le fichier final, rend le même code et la même dernière ligne
+    final = chaine_composer(etape, rapport, sortie, not armable_attendu)
+    chemin = os.path.join(WORK, "chaine", "cas-" + cle, "final.md")
+    with open(chemin, "w", encoding="utf-8") as fh:
+        fh.write(final)
+    p2 = subprocess.run(["bash", SCRIPT, "--etape=%d" % etape, "--lab=" + LAB_1, chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=WORK, timeout=120)
+    rc2, sortie2 = p2.returncode, (p2.stdout + p2.stderr).decode("utf-8", "replace")
+    machine = [m for m in ("/Users/", "/home/") if m in final]
+    if not (rc2 == rc and derniere(sortie2) == derniere(sortie) and ecarts_de(sortie2) == ecarts_de(sortie) and not machine):
+        ko(ident, "le relevé composé au format de phase redonne le même code et la même dernière ligne (les lignes reproduites sont inertes), sans chemin de machine",
+           "code %d, dernière ligne « %s »" % (rc, derniere(sortie)),
+           "code %d, dernière ligne « %s », écarts %s, chemins de machine %s" % (rc2, court(derniere(sortie2)), ecarts_de(sortie2), machine))
+        return
+    depose = ""
+    depot = depot_chaine()
+    if depot is not None:
+        with open(os.path.join(depot, DEPOT_NOMS[cle]), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(final)
+        depose = " · déposé sous " + DEPOT_NOMS[cle]
+    ok(ident, "%s · %s · composé au format de phase, même dernière ligne « %s »%s" % (chaine_faits(rapport), court(derniere(sortie), 70), court(derniere(sortie2), 70), depose))
+
+
+def controle_chaine():
+    reel = os.path.join(os.path.dirname(SCRIPT), "rejeu-reel.sh")
+    if not os.path.isfile(reel):
+        ko("R-RELEVE-CHAINE", "rejeu-reel.sh est lu à côté du script jugé", "rejeu-reel.sh présent", "absent : la chaîne réelle n'est pas rejouée, jamais un vert")
+        return
+    chaine_cas("étape 5, lab synthétique avec un agent producteur doté de Bash : armable", "5", 5, True, True)
+    chaine_cas("étape 6, lab synthétique avec un agent producteur doté de Bash : armable", "6", 6, True, True)
+    chaine_cas("étape 6, lab synthétique sans aucun agent : couverture-insuffisante sur G4P", "6-sans-agent", 6, False, False)
+
+
 def main():
     global SCRIPT, WORK
     SCRIPT, WORK = sys.argv[1], sys.argv[2]
@@ -682,6 +814,7 @@ def main():
     controle_02()
     controle_03()
     controle_04()
+    controle_chaine()
     sec_mutants()
     mutant_toujours_armable()
     mutant_toujours_refus()
