@@ -118,3 +118,8 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
    `suppression-git=3`) et contournements A5 d'un lab dont le journal ne porte que des lignes
    `moteur` — : P461-D-05a exige de les nommer ; reportés au lot de correction d'avant armement
    (`fix-5b`), sans changement de comportement.
+6. **exec-03** (rapatrié en fast-forward `78574909..f517c934`) : `verifier-releve.sh` (21 règles
+   marquées, 21 mutants de règle + 2 globaux tués), suite neuve `test-verifier-releve.sh` (95 OK ·
+   0 KO, rejouée par le manager après rapatriement : identique), README (110 suites). Limite (bu)
+   levée côté script ; `COMMIT-REJOUE` non confronté au dépôt (l'ascendance relève du mode
+   `armement` de l'outil, plan 17).

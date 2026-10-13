@@ -59,7 +59,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-18",
@@ -71,7 +71,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-5b",
