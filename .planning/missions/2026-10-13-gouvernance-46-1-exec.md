@@ -44,4 +44,22 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
 
 ## Déroulé
 
-(en cours)
+1. **exec-14** (vf-coder, `gsd-execute-phase 46.1 --wave 1`, exécuteur en worktree d'agent,
+   rapatrié par fast-forward `60468efd..483fb472`, SHA gardés : `BASE-MESURE commit=c702f772` doit
+   rester ancêtre). Outil `46.1-CONTROLES.sh` (autotest 87/87 rapporté par l'exécuteur), base
+   `46.1-BASE.txt` : `BASE-BILAN suites=109 vertes=101 rouges=8 zero-ok=0 s=14497`, charge 16 → 50
+   (pics observés par le manager jusqu'à ~250, processus d'AUTRES sessions : `bfs` sur `/`, suites
+   node, etc. — rien de cette mission). `BORNE_MESURE_BASE` (14 400 s) dépassée de 97 s : `sonder` a
+   rendu 3, rien tué, la mesure a abouti seule.
+
+   **Décisions du manager (renversables) sur les trois `ask-user` de l'exécuteur :**
+   - *Base gardée, non remesurée* : la charge vient d'autres sessions et ne baissera pas sur
+     commande ; une base lente rend les plafonds (3 × base) plus larges, jamais plus étroits — risque
+     accepté : un ralentissement réel reste masqué jusqu'à 3 × une durée déjà gonflée ; le verdict
+     d'une suite reste son code de sortie, pas sa durée.
+   - *Dépassement de borne* : consigné, sans effet sur un verdict (exception déclarée du plan).
+   - *Huit rouges locaux à la base, dont `test-planning-hook-registered.sh` (suite à gate)* : la CI
+     Linux est **verte** sur le même code (`b73885c8`, run 38373075869) ; ces rouges sont classés
+     **environnement local** (charge, macOS, worktree), pas défauts du code. Aucune escalade à Willy
+     (P461-D-16 : escalade seulement si une suite rouge garde un gate, et la CI la dit verte) ; la
+     CI Linux fait autorité pour cette suite, à rejouer en CI après les plans 08 et 10.
