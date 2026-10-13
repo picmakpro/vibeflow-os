@@ -901,6 +901,9 @@ def construire_role(lab, ctx):
 # borne). L'attendu d'une entrée réelle vient d'un ORACLE de présence propre au rejeu (`oracle_presence` : lstat par composant, un lien vaut absent,
 # aucun lien suivi), jamais du prédicat du hook (T-46-082). Les CLOTURE.md et SUMMARY.md réels de style GSD sont rejoués en doit-passer par la
 # réécriture générique : seule la forme `.planning/cycles/<c>/phases/<p>[/plans/<pl>]/` est visée par G3 et G4.
+# P461-D-01b : le constructeur G4 rejoue aussi trois RÉÉCRITURES d'un SUMMARY.md déjà écrit sur la copie (sans verdict ni clôture : doit-passer ; sur un verdict
+# périmé : doit-refuser ; avec un CLOTURE.md mais sans VERDICT.md : doit-refuser) — sans elles, le rejeu ne mesurerait jamais un faux accept de l'exemption de réécriture
+# du hook (il le supposerait nul).
 CYCLE_G34 = "99-rejeu-cloture"
 DOSSIER_LIVRABLES_G34 = "rejeu-livrables-g34"
 BORNE_FICHIERS_G34, BORNE_OCTETS_G34 = 2000, 134217728  # P46-D-03a : valeurs PROPRES du rejeu, comparées à celles du hook par la mesure (hypothèse A7)
@@ -1175,6 +1178,22 @@ def preparer_g34(lab, ctx):  # rejeu-g3g4-synthetique
     g4("75-g4-perime-plan", "g4-perime-plan.txt", "doit-refuser", apres=perime_plan)
     g4("76-g4-perime-livrable", "g4-perime-livrable.txt", "doit-refuser", apres=perime_livrable)
     g4("77-g4-verdict-invalide", "g4-verdict-invalide.txt", "doit-refuser", pose=False, apres=verdict_invalide)
+
+    # --- G4, RÉÉCRITURES (P461-D-01b) : le SUMMARY.md existe déjà sur la copie quand le hook le voit réécrit ; attendu dérivé du modèle, jamais du hook ---
+    def summary_existant(absolu, _livrable):
+        ecrire_copie(lab, os.path.join(absolu, "SUMMARY.md"), "# SUMMARY déjà écrit avant la réécriture\n")
+
+    def reecriture_perimee(absolu, chemin_livrable):
+        summary_existant(absolu, chemin_livrable)
+        perime_plan(absolu, chemin_livrable)
+
+    def reecriture_close(absolu, chemin_livrable):
+        summary_existant(absolu, chemin_livrable)
+        ecrire_copie(lab, os.path.join(absolu, "CLOTURE.md"), "clôture déjà écrite, sans verdict\n")
+
+    g4("80-g4-reecriture-sans-verdict", "g4-reecriture-sans-verdict.txt", "doit-passer", pose=False, apres=summary_existant)
+    g4("81-g4-reecriture-perime", "g4-reecriture-perime.txt", "doit-refuser", apres=reecriture_perimee)
+    g4("82-g4-reecriture-cloture", "g4-reecriture-cloture.txt", "doit-refuser", pose=False, apres=reecriture_close)
 
     # --- Entrées RÉELLES de premier niveau : l'attendu vient de l'oracle de présence, jamais du hook ---
     for rang, nom in enumerate(entrees_reelles(lab), 1):

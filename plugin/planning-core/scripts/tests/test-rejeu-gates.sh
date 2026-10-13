@@ -42,6 +42,8 @@
 #   R-REJEU-ETAPES  (46-08) --etape=5 (+ G3 et G4) et --etape=6 (+ G4P) acceptés, armement simulé selon ORDRE_ETAPES ; tout autre numéro : code 64
 #   R-REJEU-G3G4    (46-08) le vrai hook armé à l'étape 5 sur un lab synthétique complet : unités synthétiques à attendu nominatif, entrées réelles
 #                   jugées par l'oracle de présence du rejeu, verdicts posés par la vraie poser-verdict.sh, plancher de couverture, deux sens comptés
+#                   (G4 : aussi trois réécritures d'un SUMMARY.md existant, P461-D-01b ; MUT-REJEU-G4-REECRITURE : un hook dont l'exemption est élargie
+#                   rend un faux accept compté)
 #   R-REJEU-BORNE   (46-08) BORNE-LIVRABLES nomme toute entrée réelle hors borne (2001 entrées, 128 Mio + 1) : mesure de l'hypothèse A7
 #   R-REJEU-G4P     (46-08) le vrai hook armé à l'étape 6 sur six agents : quatre jeux par agent, attendu dérivé du rôle et de la capacité Bash,
 #                   fichier d'attendus nominatif prioritaire
@@ -1181,7 +1183,11 @@ SYNTH_G3 = {"61-g3-present-fichier": ("doit-passer", "passe"), "62-g3-present-do
 SYNTH_G4 = {"71-g4-conforme-fichier": ("doit-passer", "passe"), "72-g4-conforme-dossier": ("doit-passer", "passe"),
             "73-g4-verdict-absent": ("doit-refuser", "refus"), "74-g4-echec": ("doit-refuser", "refus"),
             "75-g4-perime-plan": ("doit-refuser", "refus"), "76-g4-perime-livrable": ("doit-refuser", "refus"),
-            "77-g4-verdict-invalide": ("doit-refuser", "refus")}
+            "77-g4-verdict-invalide": ("doit-refuser", "refus"),
+            # P461-D-01b : RÉÉCRITURES d'un SUMMARY.md déjà écrit sur la copie (attendu d'après le modèle, écrit à la main) : sans verdict ni clôture l'unité
+            # n'a rien à prouver (doit-passer) ; un verdict périmé par le plan, ou une clôture sans VERDICT.md, ne sont pas des exemptions (doit-refuser)
+            "80-g4-reecriture-sans-verdict": ("doit-passer", "passe"), "81-g4-reecriture-perime": ("doit-refuser", "refus"),
+            "82-g4-reecriture-cloture": ("doit-refuser", "refus")}
 UNITES_G34 = ".planning/cycles/99-rejeu-cloture/phases/"
 # Entrées réelles de premier niveau du lab complet, avec le statut que le MODÈLE leur donne (écrit à la main).
 REELLES_PRESENTES = ("rapport.md", "dossier-plein", "dossier avec espace", 'guillemet "x".txt', "Notes: v2.txt")
@@ -2437,6 +2443,21 @@ def sec_mutants(_):
          sc_g4p, lambda o, m: o["rc"] == 0 and o["G4P"] == (0, 0, 0) and m["G4P"] == (0, 4, 0),
          "R-REJEU-G4P : la capacité Bash ignorée dans l'attendu (le worker sans Bash et le producteur à Bash interdit deviennent des doit-refuser que le hook laisse passer : quatre faux accept)",
          compagnons=(RECALC, POSER))
+    # --- P461-D-01b : le rejeu mesure un faux accept de l'exemption de réécriture de G4 (mutant du HOOK, pas du script de rejeu) ---
+    def sc_g4_reecriture(hook):
+        r, aff, _lab, _avant = scenario_g34(REJEU, hook=hook, complet=False, scenario="")  # "" : le vrai script, pas le lanceur d'essai (un hook autre que HOOK en prendrait un)
+        g4 = releve_g34(r, aff).get("G4", {})
+        perime = g4.get(UNITES_G34 + "81-g4-reecriture-perime/SUMMARY.md", [])
+        return {"rc": r.rc, "G4": r.compte.get("G4"), "perime": [(v[0], v[1]) for v in perime]}
+
+    mut_g4 = mutant("REJEU-G4-REECRITURE", HOOK, "PY_PLANNING_HOOK_EOF", "# g4-exempt-verdict", "if True:  # g4-exempt-verdict")
+    if mut_g4 is not None:
+        o_g4, m_g4 = sc_g4_reecriture(HOOK), sc_g4_reecriture(mut_g4)
+        if o_g4["G4"] == (0, 0, 0) and o_g4["perime"] == [("doit-refuser", "refus")] and m_g4["G4"] == (0, 1, 0) and m_g4["perime"] == [("doit-refuser", "passe")]:
+            okmut("REJEU-G4-REECRITURE", "R-REJEU-G3G4 compte le faux accept de l'exemption élargie (un hook dont `# g4-exempt-verdict` est toujours vrai laisse passer la réécriture "
+                  "d'un SUMMARY.md sous verdict périmé) · attendu (original) : COMPTE G4 faux-accept=0 · obtenu (mutant) : COMPTE G4 faux-accept=1 sur l'unité de réécriture à verdict périmé")
+        else:
+            komut("REJEU-G4-REECRITURE", "R-REJEU-G3G4 compte le faux accept de l'exemption élargie", court(o_g4), court(m_g4) + " (mutant non opposable)")
     # --- Quick 45-B : H3 (liens), B2 (relevé), B3 (profondeur) ---
     def sc_lien_ecriture(script):
         lab, ext = lab_ext(unique("lab-ml"), ".planning/cycles", False, False)
