@@ -71,7 +71,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-5b",
@@ -81,7 +81,7 @@
         "exec-18"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "audit-5b",
@@ -91,7 +91,7 @@
         "exec-18"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "nonreg-5b",
@@ -101,7 +101,7 @@
         "exec-18"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-04",

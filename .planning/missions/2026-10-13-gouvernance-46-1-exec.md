@@ -123,3 +123,9 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
    0 KO, rejouée par le manager après rapatriement : identique), README (110 suites). Limite (bu)
    levée côté script ; `COMMIT-REJOUE` non confronté au dépôt (l'ascendance relève du mode
    `armement` de l'outil, plan 17).
+7. **exec-18** (rapatrié en fast-forward `9edefba0..9c34175e`) : chaîne réelle sur lab synthétique
+   (`RELEVE-CHAINE … coherence=ok` ×3), fixtures des relevés réels de la 46 (étape 5 refusée
+   `faux-refus=349`, étape 6 `faux-refus=343` + `commit-absent` : le script refuse bien les relevés
+   qui ne sont pas armables), couverture 21/21/21, `BASE-AJOUT … test-verifier-releve.sh s=11 plan=18`
+   inscrite par l'outil. Base de 11 s : plafond 3 × base étroit sous charge (règle `duree-plafond`
+   seul = instable s'applique).
