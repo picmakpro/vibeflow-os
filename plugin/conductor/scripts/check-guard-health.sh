@@ -223,33 +223,66 @@ commit_epoch_of() { # <rev> <now>
   return 0
 }
 
-# latest_commit_epoch() : imprime le %ct le plus recent parmi les HEAD de tous les worktrees du dossier git commun
-# (REGLE DE PROGRESSION, en-tete), vide si rien de lisible. Jamais d'echec.
-latest_commit_epoch() {
-  command -v git >/dev/null 2>&1 || return 0
-  local now_s best="" wt line sha="" skip=0 ct
-  now_s="$(date +%s)"
-  wt="$(cgh_git worktree list --porcelain 2>/dev/null)" || wt=""
-  # Un bloc par worktree, separes par une ligne vide (le heredoc en ajoute une derniere) : on retient le HEAD du
-  # bloc sauf s'il est marque prunable ; un worktree nu ou sans HEAD n'a pas de ligne `HEAD`.
-  while IFS= read -r line; do
+# worktree_head_shas() : imprime, un par ligne, le HEAD de chaque worktree du dossier git commun (hors prunable, hors
+# bloc suspect). Lecture SEPAREE PAR NUL (`worktree list --porcelain -z`, git >= 2.36) : un chemin de worktree peut
+# contenir un saut de ligne, et en lecture par lignes ce chemin forgeait une ligne `HEAD <sha>` (mesure : age 214 082
+# 152 s -> 0 s, AU3-05). Avec -z un chemin reste UN champ, qui commence par `worktree ` ; un bloc dont le premier champ
+# n'est pas `worktree ` est rejete en entier. REPLI SUR : un git qui ne connait pas `-z` echoue (exit 129), la liste
+# est alors vide et l'appelant retombe sur le HEAD du repertoire courant (jamais une lecture par lignes).
+worktree_head_shas() {
+  local line sha="" skip=0 first=1 bad=0
+  { cgh_git worktree list --porcelain -z 2>/dev/null; printf '\0'; } | while IFS= read -r -d '' line; do
+    if [ -z "$line" ]; then
+      # Champ vide = fin de bloc (un bloc par worktree).
+      case "$sha" in
+        ''|*[!0-9a-f]*) : ;;
+        *) [ "$skip" -eq 0 ] && [ "$bad" -eq 0 ] && printf '%s\n' "$sha" ;;
+      esac
+      sha=""; skip=0; first=1; bad=0
+      continue
+    fi
+    if [ "$first" -eq 1 ]; then
+      first=0
+      case "$line" in "worktree "*) : ;; *) bad=1 ;; esac
+    fi
     case "$line" in
       "HEAD "*) sha="${line#HEAD }" ;;
       prunable*) skip=1 ;;
-      "")
-        case "$sha" in
-          ''|*[!0-9a-f]*) : ;;
-          *) if [ "$skip" -eq 0 ]; then
-               ct="$(commit_epoch_of "$sha" "$now_s")"
-               [ -n "$ct" ] && { [ -z "$best" ] || [ "$ct" -gt "$best" ]; } && best="$ct"
-             fi ;;
-        esac
-        sha=""; skip=0 ;;
     esac
-  done <<EOF_WORKTREES
-$wt
+  done
+  return 0
+}
 
-EOF_WORKTREES
+# latest_commit_epoch() : imprime le %ct le plus recent parmi les HEAD de tous les worktrees du dossier git commun
+# (REGLE DE PROGRESSION, en-tete), vide si rien de lisible. Jamais d'echec. UN SEUL `git log --no-walk` pour tous les
+# HEAD (AU3-06) ; si git le refuse (un HEAD illisible fait echouer l'ensemble), repli sur un processus par HEAD, chaque
+# HEAD juge pour son compte.
+latest_commit_epoch() {
+  command -v git >/dev/null 2>&1 || return 0
+  local now_s best="" sha ct out
+  local -a shas=()
+  now_s="$(date +%s)"
+  while IFS= read -r sha; do
+    [ -n "$sha" ] && shas+=("$sha")
+  done <<EOF_SHAS
+$(worktree_head_shas)
+EOF_SHAS
+  if [ "${#shas[@]}" -gt 0 ]; then
+    if out="$(cgh_git log --no-walk=unsorted --format=%ct "${shas[@]}" -- 2>/dev/null)" && [ -n "$out" ]; then
+      while IFS= read -r ct; do
+        case "$ct" in ''|*[!0-9]*) continue ;; esac
+        [ "$now_s" -ge "$ct" ] || continue   # commit dans le futur : ignore
+        { [ -z "$best" ] || [ "$ct" -gt "$best" ]; } && best="$ct"
+      done <<EOF_CTS
+$out
+EOF_CTS
+    else
+      for sha in "${shas[@]}"; do
+        ct="$(commit_epoch_of "$sha" "$now_s")"
+        [ -n "$ct" ] && { [ -z "$best" ] || [ "$ct" -gt "$best" ]; } && best="$ct"
+      done
+    fi
+  fi
   # Liste vide, en erreur ou sans HEAD lisible : comportement d'avant, le HEAD du repertoire courant.
   [ -n "$best" ] || best="$(commit_epoch_of HEAD "$now_s")"
   printf '%s' "$best"

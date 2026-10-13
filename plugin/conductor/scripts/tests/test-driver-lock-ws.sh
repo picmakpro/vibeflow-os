@@ -35,10 +35,10 @@ MUT_B="WS-INV WS-INV-dotdot WS-INV-quote WS-INV-slash WS-VERBS-5a WS-VERBS-5b WS
 # c, d, g, i : les familles WS-ALL-5, WS-LEG-5, WS-R4A, WS-R4B et WS-R4C (réserve C3, correction R-4) rougissent aussi
 # sous ces mutants (mesuré puis relu : le refus d'un compartiment, l'ancien verrou, la cible par dossier commun en dépendent)
 MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ALL-5 WS-ENV WS-HINT-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-5 WS-NOWS WS-VERBS-4"
-MUT_D="WS-LEG-1 WS-LEG-4 WS-R4A WS-R4B WS-TKA WS-TKB WS-TKD"
+MUT_D="WS-LEG-1 WS-LEG-4 WS-R4A WS-R4B WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV"
 MUT_E="WS-ENV"
 MUT_F="WS-AB"
-MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-6 WS-TKA WS-TKB WS-TKD WS-VFL"
+MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-6 WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV WS-VFL"
 MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien WS-RC2-vide"
 # j (correction F-2, P57-D-39) : le refus hors racine du lab retiré — seuls les trois cas de refus de WS-ROOT basculent
 # (g y ajoute WS-ROOT-6, le cas VF_DRIVER_LOCK ; i y ajoute WS-ROOT-8, le témoin acquire depuis la racine)
@@ -58,7 +58,17 @@ MUT_TKH="WS-TKA WS-TKD"
 MUT_TKR="WS-TKB"
 MUT_TKO="WS-TKB"
 MUT_TKS="WS-TKD"
-MUT_I="WS-ALL-1 WS-ALL-2 WS-ALL-5 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-R4A WS-R4B WS-R4C WS-ROOT-8 WS-TKA WS-TKB WS-TKC WS-TKD WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
+# RV4-01 / AU3-04 : tk_mutex_kept (le mutex fuit après le refus : TKB.10-12, TKR.7-8), tk_restore_dir_none (le dossier réel
+# n'est pas restitué : TKR, et TKV dont la copie perd son ancre), tk_final_restore_none (chemin final : TKP),
+# tk_verify_none (la génération posée est supprimée sans constater la restitution : TKV), tk_noclobber_none (le mv écrase
+# ou enterre : TKV)
+MUT_TKM="WS-TKB WS-TKR"
+MUT_TKRP="WS-TKB WS-TKR WS-TKV"   # tk_reprobe_none : la reprise réussit aussi sur les formes dossier réel
+MUT_TKGK="WS-TKB WS-TKR"          # tk_gen_kept : la génération posée reste aussi après le refus en dossier réel
+MUT_TKD2="WS-TKR WS-TKV"
+MUT_TKF="WS-TKP"
+MUT_TKV="WS-TKV"
+MUT_I="WS-ALL-1 WS-ALL-2 WS-ALL-5 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-R4A WS-R4B WS-R4C WS-ROOT-8 WS-TKA WS-TKB WS-TKC WS-TKD WS-TKP WS-TKR WS-TKV WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
 # Mode de la suite. `full` (défaut) : tout, concurrence et mutants compris. `matrice` : sous-processus d'un
 # mutant (DL-M-*), qui rejoue les cas WS-* hors concurrence contre une COPIE mutée du script (DLWS_SCRIPT)
 # posée à côté de sa politique ; il n'y a alors ni concurrence ni mutants (pas de récursion).
@@ -941,6 +951,103 @@ assert_exit "WS-TKB.6 — aucune génération laissée par la pose retirée (une
 [ "$(printf '%s' "$out" | age_norm | sed "s|$LAB|<LAB>|g")" = "$(printf '%s' "$before" | age_norm | sed "s|$ref|<LAB>|g")" ]
 assert_exit "WS-TKB.9 — MÊME refus, octet pour octet (âge normalisé), que celui d'acquire avec ancien verrou présent avant" "$?" 0
 
+# RV4-01 (mutex) : le refus de WS-TKB libère le mutex (nommé d'après old_gen, qui est restitué), sinon tout takeover ou
+# reclaim suivant sur ce compartiment rendrait race-during-recovery pour toujours. Une fois l'ancien verrou levé, un
+# second takeover réussit.
+assert_exit "WS-TKB.10 — le mutex de reprise est libéré après le refus (aucun DRIVER.lock.rec.*)" "$(find "$GC/vf-driver/ws/alpha" -name 'DRIVER.lock.rec.*' 2>/dev/null | wc -l | tr -d ' ')" 0
+( cd "$LAB" && VF_DRIVER_LOCK=.planning/DRIVER.lock CLAUDE_CODE_SESSION_ID=sess-old "$SCRIPT" release --owner=old >/dev/null 2>&1 )
+out="$(dl "$LAB" sess-T takeover --ws=alpha --owner=m9 --step=t)"; rc=$?
+assert_exit "WS-TKB.11 — ancien verrou levé : un second takeover du même compartiment réussit (pas de race-during-recovery permanent)" "$rc" 0
+assert "WS-TKB.12 — acquired true, recovered true" "$out" '"acquired": true, "owner": "m9", "step": "t", "recovered": true'
+
+# Copies du script pour les scénarios de restitution (dossier temporaire de la suite, jamais un crochet en production).
+# race = ancien verrou apparu entre la sonde et la pose (comme mk_takeover_race_copy) ; gap = en plus, un tenant
+# concurrent prend le nom ENTRE le retrait du lien et le `mv -n` de la restitution ; pubfail = la publication de la
+# génération échoue après la mise de côté du dossier réel (chemin final). Une ancre absente laisse la copie intacte :
+# les assertions du scénario rougissent alors (jamais un vert muet).
+mk_takeover_copy() { # <dossier> <race|gap|pubfail>
+  mkdir -p "$1"; cp "$POLICY" "$1/workstream-policy.sh"
+  python3 -I - "$SCRIPT" "$1/driver-lock.sh" "$2" <<'PYTK2'
+import sys
+src, dst, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+t = open(src, encoding="utf-8").read()
+a = "      # R-4 (meme re-sonde qu'`acquire`)"
+inj = '      ( VF_DRIVER_LOCK=.planning/DRIVER.lock CLAUDE_CODE_SESSION_ID=sess-old bash "$0" acquire --owner=old --step=old >/dev/null 2>&1 )\n'
+if mode in ("race", "gap") and t.count(a) == 1:
+    t = t.replace(a, inj + a)
+if mode == "gap":
+    g = 'rm -f "$LOCK_DIR"; mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"'
+    if t.count(g) == 1:
+        t = t.replace(g, 'rm -f "$LOCK_DIR"; mkdir "$LOCK_PARENT/GTENANT"; ln -s GTENANT "$LOCK_DIR"; mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"')
+if mode == "pubfail":
+    p = 'mv "$LOCK_DIR" "${LOCK_DIR}.old.$$" && ln_atomic "$gen" "$LOCK_DIR"'
+    if t.count(p) == 1:
+        t = t.replace(p, 'mv "$LOCK_DIR" "${LOCK_DIR}.old.$$" && false')
+open(dst, "w", encoding="utf-8").write(t)
+PYTK2
+  chmod +x "$1/driver-lock.sh"
+}
+# Compartiment alpha sous forme « dossier réel » (lock legacy du compartiment : lock_present l'accepte, lock_gen rend
+# `legacy`) : la génération posée par acquire devient le dossier DRIVER.lock lui-même.
+mk_realdir_alpha() { # <lab>
+  local gc a g; gc="$(fixture_common_dir "$1")"; a="$gc/vf-driver/ws/alpha"
+  g="$(readlink "$a/DRIVER.lock")"; rm "$a/DRIVER.lock" && mv "$a/$g" "$a/DRIVER.lock"
+}
+count_in() { find "$1" -name "$2" 2>/dev/null | wc -l | tr -d ' '; }
+
+# WS-TKR (AU3-04) : forme dossier réel (atteignable : un DRIVER.lock de compartiment posé à la main ou par une version
+# antérieure ; lock_present l'accepte) ; l'ancien verrou apparaît entre la sonde et la pose. Le dossier est restitué par
+# un seul `mv -n`, la génération posée est retirée APRÈS la restitution constatée, le mutex est libéré.
+LAB="$(mk_lab tkr)"; GC="$(fixture_common_dir "$LAB")"; TKA="$GC/vf-driver/ws/alpha"
+dl "$LAB" sess-A acquire --ws=alpha --owner=mA --step=sa >/dev/null
+mk_realdir_alpha "$LAB"; backdate_alpha "$LAB"
+cp "$TKA/DRIVER.lock/meta" "$WORK_DIR/tkr-meta-avant"
+mk_takeover_copy "$WORK_DIR/tkr-copy" race
+out="$( cd "$LAB" && CLAUDE_CODE_SESSION_ID=sess-T "$WORK_DIR/tkr-copy/driver-lock.sh" takeover --ws=alpha --owner=m9 --step=t )"; rc=$?
+assert_exit "WS-TKR.1 — dossier réel, ancien verrou apparu entre la sonde et la pose : exit 1" "$rc" 1
+assert "WS-TKR.2 — reason legacy-lock-held" "$out" '"reason": "legacy-lock-held"'
+[ -d "$TKA/DRIVER.lock" ] && [ ! -L "$TKA/DRIVER.lock" ]; assert_exit "WS-TKR.3 — le dossier réel est restitué à sa place (ni lien ni absent)" "$?" 0
+cmp -s "$TKA/DRIVER.lock/meta" "$WORK_DIR/tkr-meta-avant" && [ -s "$WORK_DIR/tkr-meta-avant" ]; assert_exit "WS-TKR.4 — meta octet pour octet" "$?" 0
+assert_exit "WS-TKR.5 — aucun DRIVER.lock.old.* laissé" "$(count_in "$TKA" 'DRIVER.lock.old.*')" 0
+assert_exit "WS-TKR.6 — la génération posée est retirée (aucun DRIVER.lock.gen.*)" "$(count_in "$TKA" 'DRIVER.lock.gen.*')" 0
+assert_exit "WS-TKR.7 — le mutex de reprise est libéré (aucun DRIVER.lock.rec.*)" "$(count_in "$TKA" 'DRIVER.lock.rec.*')" 0
+( cd "$LAB" && VF_DRIVER_LOCK=.planning/DRIVER.lock CLAUDE_CODE_SESSION_ID=sess-old "$SCRIPT" release --owner=old >/dev/null 2>&1 )
+out="$(dl "$LAB" sess-T takeover --ws=alpha --owner=m9 --step=t)"; rc=$?
+assert_exit "WS-TKR.8 — ancien verrou levé : un second takeover réussit" "$rc" 0
+
+# WS-TKV (AU3-04) : un tenant concurrent prend le nom ENTRE le retrait du lien et la restitution. Rien n'est écrasé,
+# rien n'est enterré dans sa génération, la génération posée et le dossier mis de côté restent en place, et le refus le dit.
+LAB="$(mk_lab tkv)"; GC="$(fixture_common_dir "$LAB")"; TKA="$GC/vf-driver/ws/alpha"
+dl "$LAB" sess-A acquire --ws=alpha --owner=mA --step=sa >/dev/null
+mk_realdir_alpha "$LAB"; backdate_alpha "$LAB"
+cp "$TKA/DRIVER.lock/meta" "$WORK_DIR/tkv-meta-avant"
+mk_takeover_copy "$WORK_DIR/tkv-copy" gap
+out="$( cd "$LAB" && CLAUDE_CODE_SESSION_ID=sess-T "$WORK_DIR/tkv-copy/driver-lock.sh" takeover --ws=alpha --owner=m9 --step=t )"; rc=$?
+assert_exit "WS-TKV.1 — restitution impossible : exit 1" "$rc" 1
+assert "WS-TKV.2 — le refus dit restore-failed (et non un refus d'ancien verrou)" "$out" '"reason": "restore-failed"'
+json_ok "$out"; assert_exit "WS-TKV.3 — JSON valide" "$?" 0
+assert "WS-TKV.4 — le tenant concurrent garde le nom (rien n'est écrasé)" "$(readlink "$TKA/DRIVER.lock")" "GTENANT"
+assert_exit "WS-TKV.5 — rien n'est enterré dans la génération du tenant concurrent" "$(find "$TKA/GTENANT" -mindepth 1 2>/dev/null | wc -l | tr -d ' ')" 0
+assert_exit "WS-TKV.6 — le dossier mis de côté reste en place (un seul DRIVER.lock.old.*)" "$(count_in "$TKA" 'DRIVER.lock.old.*')" 1
+old_dir="$(find "$TKA" -name 'DRIVER.lock.old.*' 2>/dev/null | sed -n 1p)"
+cmp -s "$old_dir/meta" "$WORK_DIR/tkv-meta-avant" && [ -s "$WORK_DIR/tkv-meta-avant" ]; assert_exit "WS-TKV.7 — son meta est intact, octet pour octet" "$?" 0
+assert_exit "WS-TKV.8 — la génération posée n'est PAS supprimée tant que la restitution n'est pas constatée (une DRIVER.lock.gen.*)" "$(count_in "$TKA" 'DRIVER.lock.gen.*')" 1
+assert_exit "WS-TKV.9 — le mutex est tout de même libéré (aucun DRIVER.lock.rec.*)" "$(count_in "$TKA" 'DRIVER.lock.rec.*')" 0
+
+# WS-TKP : la publication de la génération échoue après la mise de côté du dossier réel (chemin final) : le dossier est
+# restitué, sans enterrement, la génération candidate retirée, le mutex libéré.
+LAB="$(mk_lab tkp)"; GC="$(fixture_common_dir "$LAB")"; TKA="$GC/vf-driver/ws/alpha"
+dl "$LAB" sess-A acquire --ws=alpha --owner=mA --step=sa >/dev/null
+mk_realdir_alpha "$LAB"; backdate_alpha "$LAB"
+cp "$TKA/DRIVER.lock/meta" "$WORK_DIR/tkp-meta-avant"
+mk_takeover_copy "$WORK_DIR/tkp-copy" pubfail
+out="$( cd "$LAB" && CLAUDE_CODE_SESSION_ID=sess-T "$WORK_DIR/tkp-copy/driver-lock.sh" takeover --ws=alpha --owner=m9 --step=t )"; rc=$?
+assert_exit "WS-TKP.1 — publication échouée : exit 1" "$rc" 1
+assert "WS-TKP.2 — reason race-during-recovery" "$out" '"reason": "race-during-recovery"'
+[ -d "$TKA/DRIVER.lock" ] && [ ! -L "$TKA/DRIVER.lock" ]; assert_exit "WS-TKP.3 — le dossier réel est restitué à sa place" "$?" 0
+cmp -s "$TKA/DRIVER.lock/meta" "$WORK_DIR/tkp-meta-avant" && [ -s "$WORK_DIR/tkp-meta-avant" ]; assert_exit "WS-TKP.4 — meta octet pour octet" "$?" 0
+assert_exit "WS-TKP.5 — aucun DRIVER.lock.old.* ni DRIVER.lock.gen.* ni DRIVER.lock.rec.* laissé" "$(( $(count_in "$TKA" 'DRIVER.lock.old.*') + $(count_in "$TKA" 'DRIVER.lock.gen.*') + $(count_in "$TKA" 'DRIVER.lock.rec.*') ))" 0
+
 # Témoin : sans ancien verrou, la même reprise réussit (la sonde ne refuse rien à tort).
 LAB="$(mk_lab tkc)"; GC="$(fixture_common_dir "$LAB")"
 dl "$LAB" sess-A acquire --ws=alpha --owner=mA --step=sa >/dev/null
@@ -1304,7 +1411,7 @@ echo "=== MUTANTS DL-M-a à DL-M-j, puis DL-M-acq_fallback à DL-M-tk_old_delete
 # d'une copie de workstream-policy.sh (sinon policy-missing rougirait pour la mauvaise raison). La matrice (les
 # cas WS-* hors concurrence, WS-AB compris) est rejouée en sous-processus contre la copie ; l'ensemble des cas
 # dont le verdict bascule est comparé EXACTEMENT à l'attendu (un cas basculé hors de l'ensemble fait échouer).
-MUT_KILLED=0; MUT_TOTAL=22; t0=$SECONDS
+MUT_KILLED=0; MUT_TOTAL=27; t0=$SECONDS
 mut_families() { # <journal> → familles de cas en échec, triées, une par ligne
   LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sed 's/\..*$//' | LC_ALL=C sort -u
 }
@@ -1381,18 +1488,23 @@ mutant gen_kept '{gen:?}' 's@rm -rf "${LOCK_PARENT:?}/${gen:?}"@:@' "$MUT_REP"
 # takeover --ws (Q5, arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) : sonde de tête, re-sonde, retrait de la pose.
 mutant tk_nosonde '\[ -n "$_leg" \] && vf_dl_legacy_refuse "$_leg"' 's@\[ -n "$_leg" \] \&\& vf_dl_legacy_refuse "$_leg"@[ -n "$_leg" ] \&\& :@' "$MUT_TKH"
 mutant tk_stale_resume '\[ -n "$_leg" \] && vf_dl_legacy_refuse "$_leg"' 's@\[ -n "$_leg" \] && vf_dl_legacy_refuse "$_leg"@case "$_leg" in vivant*) vf_dl_legacy_refuse "$_leg" ;; esac@' "$MUT_TKS"
-mutant tk_reprobe_none '_tk_after="$(vf_dl_legacy_probe)"' 's@_tk_after="$(vf_dl_legacy_probe)"@_tk_after=""@' "$MUT_TKR"
+mutant tk_reprobe_none '_tk_after="$(vf_dl_legacy_probe)"' 's@_tk_after="$(vf_dl_legacy_probe)"@_tk_after=""@' "$MUT_TKRP"
 mutant tk_restore_none 'ln_atomic "$old_gen"' 's@ln_atomic "$old_gen" "${LOCK_DIR}.new.$$" \&\& mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"@:@' "$MUT_TKR"
-mutant tk_gen_kept 'retire sa pose$' 's@rm -rf "${LOCK_PARENT:?}/$gen"@:@' "$MUT_TKR"
+mutant tk_gen_kept 'retire sa pose$' 's@rm -rf "${LOCK_PARENT:?}/$gen"@:@' "$MUT_TKGK"
+mutant tk_mutex_kept '# mutex-refus$' 's@rm -f "\$mutex"; trap - EXIT INT TERM # mutex-refus@trap - EXIT INT TERM@' "$MUT_TKM"
+mutant tk_restore_dir_none 'rm -f "$LOCK_DIR"; mv_noclobber' 's@; mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"$@@' "$MUT_TKD2"
+mutant tk_final_restore_none '&& \[ ! -L "$LOCK_DIR" \] && mv_noclobber' 's@&& mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"@\&\& :@' "$MUT_TKF"
+mutant tk_verify_none 'if \[ "$(lock_gen)" = "$old_gen" \] && \[ ! -e' 's@if \[ "$(lock_gen)" = "$old_gen" \] && \[ ! -e "${LOCK_DIR}.old.$$" \]; then@if true; then@' "$MUT_TKV"
+mutant tk_noclobber_none 'mv -nh "$1" "$2"' 's@mv -nh "$1" "$2" 2>/dev/null || mv -nT "$1" "$2" 2>/dev/null@mv "$1" "$2"@' "$MUT_TKV"
 mutant tk_old_deleted '_tk_after="$(vf_dl_legacy_probe)"' 's@_tk_after="$(vf_dl_legacy_probe)"@case "$old_gen" in */*|"") ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac; _tk_after="$(vf_dl_legacy_probe)"@' "$MUT_TKO"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 22/22 tués =="
+  echo "== mutants : 27/27 tués =="
 else
-  echo "== mutants : $MUT_KILLED/22 tués =="
+  echo "== mutants : $MUT_KILLED/27 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # DLWS_MODE = full (mutants)

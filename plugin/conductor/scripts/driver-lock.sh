@@ -363,6 +363,14 @@ mv_link() {
   mv -h "$1" "$2" 2>/dev/null || mv -T "$1" "$2" 2>/dev/null
 }
 
+# Deplacement SANS ECRASER ET SANS SUIVRE un lien (AU3-04) : `mv -n` seul, si la destination est un lien vers un
+# dossier, y deplacerait la source (elle serait enterree dans la generation d'un autre tenant). BSD/macOS : -nh ;
+# GNU/Linux : -nT. Le code de sortie n'est pas fiable (BSD rend 0 devant une destination prise) : l'appelant VERIFIE
+# le resultat (lock_gen), jamais ce code.
+mv_noclobber() {
+  mv -nh "$1" "$2" 2>/dev/null || mv -nT "$1" "$2" 2>/dev/null
+}
+
 # Creation ATOMIQUE d'un lien, qui ECHOUE si le nom est deja pris — c'est le primitif qui
 # departage les acquisitions concurrentes. MEME PIEGE que `mv` : sans option, `ln -s A B` ou B
 # est un lien vers un dossier cree `B/A` et rend 0. Le lock paraissait alors libre a chaque
@@ -926,14 +934,24 @@ case "$ACTION" in
         _tk_after="$(vf_dl_legacy_probe)"
         if [ -n "$_tk_after" ]; then
           if [ -e "${LOCK_DIR}.old.$$" ]; then
-            rm -f "$LOCK_DIR"; mv "${LOCK_DIR}.old.$$" "$LOCK_DIR"
+            # Dossier reel (lock legacy du compartiment) : un seul `mv -n`, apres le retrait de NOTRE lien. Si un
+            # tenant concurrent a pris le nom dans l'intervalle, rien n'est ecrase et rien n'est enterre : la
+            # verification ci-dessous le constate.
+            rm -f "$LOCK_DIR"; mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"
           else
             ln_atomic "$old_gen" "${LOCK_DIR}.new.$$" && mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"
             rm -f "${LOCK_DIR}.new.$$"
           fi
-          rm -rf "${LOCK_PARENT:?}/$gen" # retire sa pose
+          # La generation posee ne se supprime QU'APRES avoir constate la restitution (lock_gen == old_gen, et plus
+          # de `.old.$$`) ; sinon elle reste en place avec le dossier mis de cote, et le refus le dit (AU3-04).
+          if [ "$(lock_gen)" = "$old_gen" ] && [ ! -e "${LOCK_DIR}.old.$$" ]; then
+            rm -rf "${LOCK_PARENT:?}/$gen" # retire sa pose
+            rm -f "$mutex"; trap - EXIT INT TERM # mutex-refus
+            vf_dl_legacy_refuse "$_tk_after"
+          fi
           rm -f "$mutex"; trap - EXIT INT TERM
-          vf_dl_legacy_refuse "$_tk_after"
+          log "restitution du verrou anterieur impossible : generation posee et ${LOCK_DIR}.old.$$ laisses en place"
+          printf '{"acquired": false, "reason": "restore-failed", "detail": "le verrou anterieur n a pas pu etre restitue ; la generation posee et son dossier mis de cote sont laisses en place"%s}\n' "$SCOPE_JSON"; exit 1
         fi
       fi
       case "$old_gen" in */*|''|legacy) ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac
@@ -950,7 +968,7 @@ case "$ACTION" in
       exit 0
     fi
     rm -f "${LOCK_DIR}.new.$$"; rm -rf "${LOCK_PARENT:?}/$gen"
-    [ -e "${LOCK_DIR}.old.$$" ] && [ ! -e "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ] && mv "${LOCK_DIR}.old.$$" "$LOCK_DIR"
+    [ -e "${LOCK_DIR}.old.$$" ] && [ ! -e "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ] && mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"
     rm -f "$mutex"; trap - EXIT INT TERM
     printf '{"acquired": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
     ;;

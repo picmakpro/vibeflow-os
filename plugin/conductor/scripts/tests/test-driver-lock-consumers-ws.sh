@@ -543,7 +543,7 @@ mutant e cbc '\[ -z "\$INDET_MSG" \] || indetermine' 's/\[ -z "\$INDET_MSG" \] |
 # Age de progression effectif (REGLE DE PROGRESSION) : h = age brut dans le tri des entrees de `locks` ; i = lecture
 # limitee au HEAD du repertoire courant (les autres worktrees du clone ne comptent plus).
 mutant h cgh 'pa = eff(e.get("progress_age_seconds"))' 's/pa = eff(e.get("progress_age_seconds"))/pa = e.get("progress_age_seconds")/' "CW-Q-COMMIT-ABANDON"
-mutant i cgh 'wt="\$(cgh_git worktree list' 's/worktree list --porcelain/worktree list --nonexistent-flag/' "CW-Q-WT"
+mutant i cgh 'cgh_git worktree list --porcelain -z' 's/worktree list --porcelain -z/worktree list --nonexistent-flag/' "CW-Q-WT"
 
 wait
 for t in cgh dag cbc; do
