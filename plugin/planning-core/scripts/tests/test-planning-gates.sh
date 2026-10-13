@@ -5423,7 +5423,7 @@ LIMITES_REFERENCE = (
     ("bm", ("A10", "--juge=", "canary", "P46 lot B, b3, reportée à une phase ultérieure", "N-7", "hors-index", "definition-illisible")),
     ("bn", ("A6", "surveillance.log", "D1-f", "D1-c3", "empreinte", "N-3", "clone", "TRONCATURE")),
     ("bo", ("A8", ".recalc-cache.json", "ecrit:", "PLAN.md", "N-6", "signature")),
-    ("bp", ("SUMMARY.md", "VERDICT.md", "G4", "343", "F-5", "périmé")),
+    ("bp", ("SUMMARY.md", "VERDICT.md", "G4", "343", "F-5", "périmé", "P461-D-01", "CLOTURE.md")),
     ("bq", ("2.1.288", "settings.json", "#63148")),
     ("br", ("#60490", "code 2", "P46-D-10")),
     ("bs", ("G4′", "A2", "A3", "A4", "P1", "préalables à tout armement")),
