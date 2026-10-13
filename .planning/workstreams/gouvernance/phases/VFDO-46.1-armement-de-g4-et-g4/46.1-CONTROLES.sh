@@ -194,6 +194,9 @@ CAS_AUTOTEST=(
   releve-non-joue releve-non-joue-mais-mesure releve-absent releve-chemin-machine releve-repos-absent
   releve-repos-non-nul releve-verificateur-absent releve-chaine-saine releve-chaine-depot-incomplet
   releve-chaine-verdict-inattendu
+  montre-present montre-absent montre-citation-ignoree montre-suite-rouge montre-vide montre-litteral
+  montre-tronque montre-sonder
+  reel-temoin-role reel-non-tue reel-bilan reel-ko reel-zero-ok
 )
 
 # ---------------------------------------------------------------------------------------------------------
@@ -214,6 +217,10 @@ DETACHE_INTERNE=""
 RACINE=""
 NT=""
 TMPS=()
+MONTRES=()
+EV_SHELL=bash
+EV_MONTRES=0
+SANS_REEL=0
 
 nettoyer() {
   local t
@@ -400,15 +407,40 @@ exige_present() { # <sortie> <libellé>
     END { exit f ? 0 : 1 }' "$1"
 }
 
-# Évalue un lancement : imprime les lignes retenues de la sortie, les SUITE-ECART, pose EV_TROUVES.
+# Lignes demandées par --montre (P461-D-16) : pour UN motif, imprime chaque ligne de la sortie complète qui COMMENCE
+# par le motif littéral (espaces de tête compris ; aucune expression régulière : un point est un point), sous la
+# forme `SUITE-MONTRE <shell> : <ligne telle quelle>`, au plus 50 par motif puis `SUITE-NOTE montre-tronque <motif>
+# reste=<n>` ; code 0 si au moins une ligne, 1 sinon. Demander une ligne vaut l'exiger : l'appelant en fait un écart.
+montre_lignes() { # <sortie> <motif>
+  local c
+  c=$(P="$2" LC_ALL=C awk 'BEGIN { p = ENVIRON["P"] } index($0, p) == 1 { c++ } END { print c + 0 }' "$1")
+  [ "$c" -gt 0 ] || return 1
+  P="$2" S="$EV_SHELL" LC_ALL=C awk 'BEGIN { p = ENVIRON["P"]; s = ENVIRON["S"] } index($0, p) == 1 { n++; if (n <= 50) print "SUITE-MONTRE " s " : " $0 }' "$1"
+  [ "$c" -le 50 ] || printf 'SUITE-NOTE montre-tronque %s reste=%s\n' "$2" "$((c - 50))"
+  return 0
+}
+
+# Évalue un lancement : imprime les lignes retenues de la sortie, les SUITE-ECART, pose EV_TROUVES et EV_MONTRES.
 evaluer_lancement() { # <sortie> <rc>
-  local sortie=$1 rc=$2 derniere r forme n m s k nt lib
+  local sortie=$1 rc=$2 derniere r forme n m s k nt lib mot absents
   EV_TROUVES=0
+  EV_MONTRES=0
   k=$(LC_ALL=C awk 'index($0, "  ✗ ") == 1 { c++ } END { print c + 0 }' "$sortie")
   nt=$(LC_ALL=C awk 'index($0, "NON TUÉ") > 0 { c++ } END { print c + 0 }' "$sortie")
   derniere=$(derniere_ligne "$sortie")
   LC_ALL=C awk 'index($0, "  ✗ ") == 1 || index($0, "NON TUÉ") > 0' "$sortie"
   printf '%s\n' "$derniere"
+  absents=()
+  for mot in ${MONTRES[@]+"${MONTRES[@]}"}; do
+    if montre_lignes "$sortie" "$mot"; then
+      EV_MONTRES=$((EV_MONTRES + 1))
+    else
+      absents+=("$mot")
+    fi
+  done
+  for mot in ${absents[@]+"${absents[@]}"}; do
+    ecart "montre-absent $mot"
+  done
   [ "$rc" -eq 0 ] || ecart "rc $rc"
   r=$(bilan_lire "$derniere")
   if [ "$r" = inconnue ]; then
@@ -443,6 +475,7 @@ cmd_suite() {
   local b_kind="" b_rc="" b_s="" b_zero="" rcv plafond ajout_s="" premier=1 base_ok=0 detache="" a borne
   local args_detache=()
   EXIGES=()
+  MONTRES=()
   NEC=0
   for a in "$@"; do
     case $a in --detache=*) ;; *) args_detache+=("$a") ;; esac
@@ -451,6 +484,7 @@ cmd_suite() {
     case $1 in
       --detache=*) detache=${1#--detache=}; [ -n "$detache" ] || die_usage "suite : --detache=<dossier>" ;;
       --exige=*) [ -n "${1#--exige=}" ] || die_usage "--exige=<libellé> non vide"; EXIGES+=("${1#--exige=}") ;;
+      --montre=*) [ -n "${1#--montre=}" ] || die_usage "--montre=<motif> non vide"; MONTRES+=("${1#--montre=}") ;;
       --duree-max=*) duree_max=${1#--duree-max=}; dm_set=1 ;;
       --shells=*) shells=${1#--shells=} ;;
       --base-cle=*) cle=${1#--base-cle=} ;;
@@ -537,6 +571,7 @@ EOF
       continue
     fi
     lancer_suite "$suite" "$sh" "$sorties/sortie.$sh"
+    EV_SHELL=$sh
     evaluer_lancement "$sorties/sortie.$sh" "$L_RC"
     if [ "$dm_set" -eq 1 ]; then
       if [ -z "$b_kind" ]; then
@@ -551,7 +586,7 @@ EOF
         fi
       fi
     fi
-    printf 'SUITE %s shell=%s rc=%s duree=%s exiges=%s/%s\n' "$suite" "$sh" "$L_RC" "$L_DUREE" "$EV_TROUVES" "${#EXIGES[@]}"
+    printf 'SUITE %s shell=%s rc=%s duree=%s exiges=%s/%s montres=%s/%s\n' "$suite" "$sh" "$L_RC" "$L_DUREE" "$EV_TROUVES" "${#EXIGES[@]}" "$EV_MONTRES" "${#MONTRES[@]}"
     if [ "$premier" -eq 1 ]; then
       ajout_s=$L_DUREE
       premier=0
@@ -1321,6 +1356,8 @@ AT_RC=0
 AT_OUT=""
 AT_CWD=""
 AT_TMP=""
+AT_RACINE=""
+SB=""
 FD=""
 
 gitf() { git -c user.name=t -c user.email=t@t -c commit.gpgsign=false -c core.hooksPath=/dev/null -c init.defaultBranch=main "$@"; }
@@ -2250,18 +2287,203 @@ autotest_releve() {
   at_fin 1
 }
 
+# --montre (P461-D-16) : une ligne demandée est imprimée telle quelle, son absence est rouge, une citation de la
+# ligne au milieu d'une autre ne compte pas, le motif est un littéral.
+autotest_montre() {
+  local S=plugin/m/tests/test-c.sh CANON='echo "== Résultat : 3 OK · 0 KO =="' BF D
+  BF=$AT_TMP/base-montre.txt
+  at_depot
+
+  at_debut montre-present
+  mk_suite $S "echo 'COMPTE G4 faux-refus=0 faux-accept=0'; $CANON"
+  at_lancer suite $S --montre='COMPTE G4 '
+  at_compte "SUITE-MONTRE bash : COMPTE G4 faux-refus=0 faux-accept=0" 1; at_compte "SUITE-ECART" 0; at_contient "montres=1/1"
+  at_fin 0
+
+  at_debut montre-absent
+  mk_suite $S "echo 'COMPTE G4 faux-refus=0 faux-accept=0'; $CANON"
+  at_lancer suite $S --montre='MOTIF-ABSENT-46-1 '
+  at_contient "SUITE-ECART montre-absent MOTIF-ABSENT-46-1"; at_compte "SUITE-MONTRE" 0; at_contient "montres=0/1"
+  at_fin 1
+
+  at_debut montre-citation-ignoree
+  mk_suite $S "echo '  ✓ R-BANC-G4 mesure … COMPTE G4 faux-refus=0 faux-accept=0'; $CANON"
+  at_lancer suite $S --montre='COMPTE G4 '
+  at_contient "SUITE-ECART montre-absent COMPTE G4"; at_compte "SUITE-MONTRE" 0
+  at_fin 1
+
+  at_debut montre-suite-rouge
+  mk_suite $S "echo '  ✗ x'; echo 'COMPTE G4 faux-refus=0 faux-accept=0'; $CANON"
+  at_lancer suite $S --montre='COMPTE G4 '
+  at_compte "SUITE-MONTRE bash : COMPTE G4 faux-refus=0 faux-accept=0" 1; at_contient "SUITE-ECART ko"; at_absent "SUITE-ECART montre-absent"
+  at_fin 1
+
+  at_debut montre-vide
+  mk_suite $S "$CANON"
+  at_lancer suite $S --montre=
+  at_fin 64
+
+  at_debut montre-litteral
+  mk_suite $S "echo 'COMPTE G4 x'; $CANON"
+  at_lancer suite $S --montre='COMPTE G4.'
+  at_contient "SUITE-ECART montre-absent COMPTE G4."; at_compte "SUITE-MONTRE" 0
+  at_fin 1
+
+  at_debut montre-tronque
+  mk_suite $S "i=0; while [ \$i -lt 52 ]; do echo \"LIGNE \$i\"; i=\$((i + 1)); done; $CANON"
+  at_lancer suite $S --montre='LIGNE '
+  at_compte "SUITE-MONTRE bash : LIGNE " 50; at_contient "SUITE-NOTE montre-tronque LIGNE"; at_contient "reste=2"; at_compte "SUITE-ECART" 0
+  at_fin 0
+
+  at_debut montre-sonder
+  mk_suite $S "echo 'COMPTE G4 faux-refus=0 faux-accept=0'; $CANON"
+  mk_base "$BF" "$S:0:3"
+  D=$AT_TMP/d-montre
+  at_lancer suite $S --montre='COMPTE G4 ' --detache="$D" --base-fichier="$BF"
+  at_attendre_fin "$D" 60 || at_echec "fin.txt n'est jamais apparu"
+  at_lancer sonder "$D"
+  at_contient "SUITE-MONTRE bash : COMPTE G4 faux-refus=0 faux-accept=0"
+  at_fin 0
+}
+
+# Sandbox des cas reel-* : clone partagé SANS extraction (même HEAD, mêmes objets : la base reste valide, aucun
+# fichier du dépôt n'est touché), puis copie des seuls fichiers d'ENTRÉE nommés (dossier ou fichier, chemins relatifs
+# à la racine du dépôt). Pose SB ; retourne 1 (et note l'échec) si elle ne peut pas être montée.
+at_sandbox() {
+  local f
+  if [ -z "$AT_RACINE" ]; then
+    at_echec "racine du dépôt introuvable (les cas reel-* lisent le dépôt)"
+    return 1
+  fi
+  nouveau_tmp
+  SB=$NT/sb
+  if ! git clone -q --shared --no-checkout "$AT_RACINE" "$SB" > /dev/null 2>&1; then
+    at_echec "clone partagé impossible"
+    return 1
+  fi
+  for f in "$@"; do
+    mkdir -p "$SB/$(dirname "$f")"
+    cp -R "$AT_RACINE/$f" "$SB/$f" || { at_echec "copie impossible : $f"; return 1; }
+  done
+  return 0
+}
+
+# Remplace dans <src> la ligne ENTIÈRE <ancre> (unique) par <nouvelle>, ou la fait suivre de <nouvelle> (mode
+# `apres`) ; écrit <dst> (awk vers un fichier neuf, jamais sed -i). Échec reel-ancre si l'ancre n'est pas unique.
+at_perturber() { # <remplace|apres> <src> <dst> <ancre> <nouvelle>
+  A="$4" N="$5" M="$1" LC_ALL=C awk '
+    BEGIN { a = ENVIRON["A"]; n = ENVIRON["N"]; m = ENVIRON["M"] }
+    $0 == a { c++; if (m == "apres") { print; print n } else { print n }; next }
+    { print }
+    END { if (c != 1) exit 3 }' "$2" > "$3" || { at_echec "reel-ancre : « $4 » absente ou multiple dans $2"; return 1; }
+  return 0
+}
+
+# Cas reel-* : VRAIES suites rejouées sur copie sandbox, ENTRÉE perturbée, sortie jamais réécrite. Aucune fixture
+# fabriquée par l'outil : si la recette ne produit pas le motif attendu, le cas échoue (jamais un repli).
+autotest_reel_suite() {
+  local R=scripts/tests/test-role-hook-vs-check-agents.sh P=plugin/planning-core/scripts/planning-hook.sh
+  local C=plugin/planning-core/scripts/tests/test-planning-core.sh K=plugin/planning-core/scripts/check-planning-state.sh
+  local Z=plugin/planning-core/scripts/tests/test-planning-prefilter.sh BASE
+  BASE="$(dirname "$OUTIL_ORIGINE")/46.1-BASE.txt"
+
+  at_debut reel-temoin-role
+  AT_RC=0
+  if at_sandbox plugin $R; then
+    cmp -s "$SB/$R" "$AT_RACINE/$R" || at_echec "la suite copiée diffère de celle du dépôt"
+    cmp -s "$SB/$P" "$AT_RACINE/$P" || at_echec "le hook copié diffère du hook du dépôt (le témoin n'est pas perturbé)"
+    AT_CWD=$SB
+    at_lancer suite $R --duree-max=base --base-cle=$R --base-fichier="$BASE"
+    # Sous forte charge la durée murale peut dépasser le plafond (3 × la durée de base) sans que la suite soit
+    # rouge : seul cet écart, et une seule fois, autorise un second rejeu (nommé) ; tout autre écart reste rouge.
+    if [ "$AT_RC" -eq 1 ] && [ "$(P='SUITE-ECART' LC_ALL=C awk 'BEGIN { p = ENVIRON["P"] } index($0, p) == 1 { c++ } END { print c + 0 }' "$AT_OUT")" -eq 1 ] \
+      && P='SUITE-ECART duree-plafond' LC_ALL=C awk 'BEGIN { p = ENVIRON["P"] } index($0, p) == 1 { f = 1 } END { exit f ? 0 : 1 }' "$AT_OUT"; then
+      echo "  AUTOTEST-NOTE reel-temoin-role : seul écart duree-plafond (charge de la machine), second rejeu"
+      at_lancer suite $R --duree-max=base --base-cle=$R --base-fichier="$BASE"
+    fi
+    at_compte "SUITE-ECART" 0; at_contient "SUITE $R shell=bash rc=0"
+  fi
+  at_fin 0
+
+  at_debut reel-non-tue
+  AT_RC=0
+  if at_sandbox plugin $R; then
+    if at_perturber apres "$SB/$P" "$SB/$P.mut" '    interdits = jetons_nus_agent(lignes, "disallowedTools")' '    interdits = {t for t in interdits if t != "Write" or "Edit" in interdits}'; then
+      mv "$SB/$P.mut" "$SB/$P"
+    fi
+    cmp -s "$SB/$R" "$AT_RACINE/$R" || at_echec "la suite copiée diffère de celle du dépôt"
+    cmp -s "$SB/$P" "$AT_RACINE/$P" && at_echec "le hook copié est identique au hook du dépôt (aucune perturbation)"
+    AT_CWD=$SB
+    at_lancer suite $R --base-cle=$R
+    at_contient "  ✗ MUT-CROISE-JUGE NON TUÉ"; at_contient "SUITE-ECART non-tue n=1"; at_contient "SUITE-ECART ko n=1"
+  fi
+  at_fin 1
+
+  at_debut reel-bilan
+  AT_RC=0
+  if at_sandbox $C $K; then
+    cmp -s "$SB/$C" "$AT_RACINE/$C" || at_echec "la suite copiée diffère de celle du dépôt"
+    cmp -s "$SB/$K" "$AT_RACINE/$K" || at_echec "le script testé copié diffère de celui du dépôt (reel-bilan n'est pas perturbé)"
+    AT_CWD=$SB
+    at_lancer suite $C --base-cle=$C
+    at_contient "SUITE-ECART bilan forme-inconnue"; at_compte "SUITE-ECART" 1
+    at_absent "  ✗ "; at_absent "SUITE-ECART ko"; at_absent "SUITE-ECART rc"; at_absent "SUITE-ECART non-tue"
+  fi
+  at_fin 1
+
+  at_debut reel-ko
+  AT_RC=0
+  if at_sandbox $C $K; then
+    if at_perturber remplace "$SB/$K" "$SB/$K.mut" 'MAX_AGE_DAYS=7' 'MAX_AGE_DAYS=70'; then
+      mv "$SB/$K.mut" "$SB/$K"
+    fi
+    cmp -s "$SB/$C" "$AT_RACINE/$C" || at_echec "la suite copiée diffère de celle du dépôt"
+    cmp -s "$SB/$K" "$AT_RACINE/$K" && at_echec "le script testé copié est identique à celui du dépôt (aucune perturbation)"
+    AT_CWD=$SB
+    at_lancer suite $C --base-cle=$C
+    at_contient "  ✗ STATE périmé (20j)"; at_contient "SUITE-ECART ko"; at_contient "SUITE-ECART rc 1"; at_contient "SUITE-ECART bilan forme-inconnue"
+  fi
+  at_fin 1
+
+  at_debut reel-zero-ok
+  AT_RC=0
+  if at_sandbox $Z; then
+    cmp -s "$SB/$Z" "$AT_RACINE/$Z" || at_echec "la suite copiée diffère de celle du dépôt"
+    [ ! -e "$SB/plugin/planning-core/hooks/hooks.json" ] || at_echec "hooks.json est présent à côté de la suite copiée"
+    [ ! -e "$SB/plugin/planning-core/scripts/planning-hook.sh" ] || at_echec "planning-hook.sh est présent à côté de la suite copiée"
+    AT_CWD=$SB
+    at_lancer suite $Z --base-cle=$Z
+    at_contient "SUITE-ECART bilan zero-ok"; at_compte "SUITE-ECART" 1; at_contient "rc=0"
+  fi
+  at_fin 1
+}
+
 autotest() {
-  local manquants=0 c j trouve n d m
+  local manquants=0 c j trouve n d m a
+  SANS_REEL=0
+  for a in "$@"; do
+    case $a in
+      --sans-reel) SANS_REEL=1 ;;
+      *) die_usage "--autotest [--sans-reel]" ;;
+    esac
+  done
   nouveau_tmp
   AT_TMP=$NT
+  AT_RACINE=$(git rev-parse --show-toplevel 2> /dev/null) || AT_RACINE=""
+  [ "$SANS_REEL" -eq 0 ] || echo "AUTOTEST-PARTIEL sans=reel"
   autotest_suite
+  autotest_montre
   autotest_toutes
   autotest_base
   autotest_detache
   autotest_invariants
   autotest_releve
+  [ "$SANS_REEL" -eq 1 ] || autotest_reel_suite
   # Cas déclarés contre cas joués : un cas déclaré et non joué est un échec.
   for c in "${CAS_AUTOTEST[@]}"; do
+    if [ "$SANS_REEL" -eq 1 ]; then
+      case $c in reel-*) continue ;; esac
+    fi
     trouve=0
     for j in ${AT_JOUES[@]+"${AT_JOUES[@]}"}; do
       [ "$j" = "$c" ] && trouve=$((trouve + 1))
@@ -2282,9 +2504,19 @@ autotest() {
     fi
   done
   n=${#AT_JOUES[@]}
-  d=${#CAS_AUTOTEST[@]}
+  d=0
+  for c in "${CAS_AUTOTEST[@]}"; do
+    if [ "$SANS_REEL" -eq 1 ]; then
+      case $c in reel-*) continue ;; esac
+    fi
+    d=$((d + 1))
+  done
   m=$((AT_KO + manquants))
-  printf 'AUTOTEST-BILAN cas=%s declares=%s echecs=%s\n' "$n" "$d" "$m"
+  if [ "$SANS_REEL" -eq 1 ]; then
+    printf 'AUTOTEST-BILAN cas=%s declares=%s echecs=%s sans-reel=oui\n' "$n" "$d" "$m"
+  else
+    printf 'AUTOTEST-BILAN cas=%s declares=%s echecs=%s\n' "$n" "$d" "$m"
+  fi
   [ "$m" -eq 0 ] && [ "$n" -eq "$d" ]
 }
 
@@ -2297,7 +2529,7 @@ principal() {
   [ $# -eq 0 ] || shift
   case $mode in
     --help | -h) aide; return 0 ;;
-    --autotest) autotest; return $? ;;
+    --autotest) autotest "$@"; return $? ;;
     suite) cmd_suite "$@"; return $? ;;
     toutes) cmd_toutes "$@"; return $? ;;
     sonder) cmd_sonder "$@"; return $? ;;
