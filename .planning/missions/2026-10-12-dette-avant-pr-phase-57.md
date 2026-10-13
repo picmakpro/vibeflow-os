@@ -216,3 +216,61 @@ Il a aussi rendu des mineurs :
 - F8 : correspond à AU2-04.
 
 F1 et F6 rejoignent le tour de correction qui suivra les arbitrages.
+
+## Tour 3 — arbitrages A à D et clôture (2026-10-13)
+
+Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, chaque fois sur la recommandation du manager.
+
+- **A (b)** : le STATE fiabilite passe au jalon `equipe-produit-v1.0` (6 phases, 0 terminée, 16/16 plans), commit
+  `a6745526` ; P57-D-44 remplace P57-D-41. `check-divergence` repasse au vert.
+- **B (b)** : les 37 formes sont épinglées par `tests/fixtures/guard-ab-enum-37.txt` (blob `7156daff`) ; la règle
+  exige `seen == GW_AB_ENUM_N` ; commit `560f4390`. La copie gelée reste `4d48e50c`.
+- **C (a)** : `takeover --ws` rend le même refus qu'`acquire` devant un ancien verrou, vivant ou périmé ; le verrou de
+  compartiment est restitué sur un refus de la re-sonde. Commits `6a43299e` et `8fe96bd7` ; ce dernier ajoute la
+  `reason` `restore-failed` (P57-D-55).
+- **D (b)** : la progression du watchdog est le commit le plus récent parmi les HEAD de tous les worktrees, lus séparés
+  par NUL, avec un git durci et un seul `git log`. Commits `3aa399fc` et `8fe96bd7`.
+- **Corrections des juges** :
+  - F1, F5, AU2-09 et AU2-10 : `3aa399fc` ;
+  - AU2-05 : `46254135` ;
+  - AU2-01/02/03/06/08 et RV3-07 : `560f4390` ;
+  - RV4-01, AU3-04, AU3-05 et AU3-06 : `8fe96bd7` ;
+  - AU3-01 et AU3-02 : `188d86e8`.
+- **Documentation** :
+  - CHANGELOG, `mission-flow.md`, ADR-072 amendée, `CLAUDE.md`, commentaire de ci.yml, CONCERNS, P57-D-44 à P57-D-55 :
+    `5c811809`, `5103f2e8` et `ba0c7700` ;
+  - mémoires d'agents : `3fcb20fd`.
+- **Juges du tour 3** : revue `passed` (RV4-01 à RV4-07) et audit `passed` (AU3-01 à AU3-08). Leurs lows sont corrigés
+  ou inscrits dans CONCERNS.
+
+### Rejeu de fin de mission (HEAD `3fcb20fd`)
+
+- Job `gates` de `ci.yml`, rejoué par `replay-ci-jobs.sh` sous un HOME neuf : 19 étapes rejouées, 3 sautées, 0 en
+  échec.
+- Job `tests` : 102 suites, 98 vertes sous HOME neuf. Les 4 rouges viennent de l'environnement : le moteur gsd-core est
+  absent d'un HOME neuf, alors que la CI l'installe. Il s'agit de `test-dag.sh` (T25, T26 et T28 seulement),
+  `test-check-planning-not-inflight.sh`, `test-split-planning.sh` et `test-check-gsd-config.sh`. Rejouées sous le HOME
+  réel au même HEAD, les quatre rendent rc 0.
+- `check-machine-paths` ✓ ; `check-divergence` (fiabilite) conforme ; `check-state-integrity` ✓.
+- `check-method-budget --no-remote` côté fiabilite : ROADMAP à 62 Ko sur 64 ; BACKLOG à 31 sur 20 (tri après la release,
+  Q3) ; worktrees 3 sur 3.
+
+### Question ouverte
+
+- **RV4-07** : P57-D-52 est une décision du manager, pas de Samuel. Elle rend PLUS PERMISSIF le cas
+  `bash -c "cd <hors-lab> && git …"` (refusé avant, permis désormais), lab plat compris. L'audit n'y a trouvé aucun
+  contournement. ADR-031 invite Samuel à le ratifier avant la release.
+
+## Preuves E6 (tour 3)
+
+```json
+{"preuves": [
+ {"verdict": "recette", "commande": "bash plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh", "exit_code": 0, "sha": "188d86e8"},
+ {"verdict": "recette", "commande": "bash plugin/conductor/scripts/tests/test-driver-lock-ws.sh", "exit_code": 0, "sha": "8fe96bd7"},
+ {"verdict": "recette", "commande": "bash plugin/conductor/scripts/tests/test-check-guard-health.sh", "exit_code": 0, "sha": "8fe96bd7"},
+ {"verdict": "recette", "commande": "bash scripts/tests/test-check-gate-touche.sh", "exit_code": 0, "sha": "46254135"},
+ {"verdict": "revue", "commande": "bash plugin/conductor/scripts/check-divergence.sh", "exit_code": 0, "sha": "560f4390"},
+ {"verdict": "audit", "commande": "bash plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh", "exit_code": 0, "sha": "560f4390"},
+ {"verdict": "recette", "commande": "bash plugin/conductor/scripts/tests/test-dag.sh", "exit_code": 0, "sha": "3fcb20fd"}
+]}
+```
