@@ -45,7 +45,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-03",
@@ -59,7 +59,7 @@
         "README.md",
         "README.fr.md"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-18",

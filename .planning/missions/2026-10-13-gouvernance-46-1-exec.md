@@ -103,4 +103,18 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
      lisait comme un état armé de G4 (`etat-reference` : `ETAT-ECART k4 ligne=1056`) ; reformulée
      (`1b5cba0e`), `etat-reference` rejoué par le manager : `ecarts=0`. La même phrase subsiste dans
      la spec (`docs/superpowers/specs/…`), que `etat-reference` ne lit pas : non touchée.
-   - Autotest final rapporté : `cas=201 declares=201 echecs=0`.
+   - Autotest final rapporté : `cas=201 declares=201 echecs=0` ; rejoué par le manager sur
+     `297f978c` : `AUTOTEST-BILAN cas=201 declares=201 echecs=0`.
+5. **exec-02** (rapatrié en fast-forward `223e073b..0b2cb951`) : D1 N-5 et A5 (`29e49058`,
+   `f3a78f95`), limites (ar), (ax), (bk), recensement READDIR (`66ad38b8`). Suites par l'outil :
+   `test-d1-surveillance.sh rc=0`, `test-planning-gates.sh` rouge au premier rejeu (imputé
+   `imputable` : fonction neuve `chemin_du_disque` absente du recensement des énumérations,
+   `MUT-RECENSEMENT-READDIR` non tué), corrigé dans le plan, vert au rejeu final (`rc=0 duree=353`).
+   Faux signaux sur lab sain : `MESURE-FAUX-SIGNAUX-A5 mkdir-copie=3 git=5 outil=0 moteur=0`.
+   **Décisions du manager :** (a) l'`imputable` corrigé dans le plan avant livraison n'est pas
+   escaladé (état livré vert ; aucune suite d'un gate armé n'est rouge) ; (b) unité posée d'emblée
+   close (SUMMARY présent) toujours aveugle : accepté, écrit dans (ar)/(bk) ; (c) deux faux signaux
+   mesurés mais **non nommés** en limite — `git checkout` qui retire une unité référencée (N-5,
+   `suppression-git=3`) et contournements A5 d'un lab dont le journal ne porte que des lignes
+   `moteur` — : P461-D-05a exige de les nommer ; reportés au lot de correction d'avant armement
+   (`fix-5b`), sans changement de comportement.
