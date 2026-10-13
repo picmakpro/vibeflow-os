@@ -32,7 +32,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-02",
@@ -44,7 +44,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-03",
