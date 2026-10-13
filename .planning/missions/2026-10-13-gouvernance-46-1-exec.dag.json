@@ -45,7 +45,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-03",
@@ -360,7 +360,7 @@
       "scope": [
         ".planning/workstreams/gouvernance/phases"
       ],
-      "status": "running"
+      "status": "done"
     }
   ]
 }

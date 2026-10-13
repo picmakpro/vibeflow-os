@@ -75,3 +75,32 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
    plafond 3 × base dépassé sous charge — constaté une fois sur `reel-temoin-role`, 99 s pour 81 s,
    charge 15 → 72) est classé **instable (charge)**, consigné et remonté, non bloquant ; tout rouge
    de code de sortie reste imputé par `imputer`.
+   Rejeu indépendant du manager : `AUTOTEST-BILAN cas=193 declares=193 echecs=0` (outil `1d1c9e8a`).
+3. **exec-01** (rapatrié en fast-forward `32a23042..28fe140f`) : exemption étroite de G4 dans le
+   hook, banc G4 à familles de réécriture (`COUVERTURE G4 doit-refuser=51 doit-passer=30 silence=31`,
+   `COMPTE G4 faux-refus=0 faux-accept=0` sur copie armée), 8 mutants tués pour leur famille,
+   référence, limite (bp), spec §5. CI Linux verte sur `fbd05a04`. Écarts au texte du plan
+   acceptés par le manager : phrase « reste permis tant que le verdict tient » remise sur une ligne
+   (grep d'acceptation), phrase d'état 5b ajustée, `MUT-G4-R6-REECRITURE` retire la clause
+   `len(constats) == 0` (le `if False:` du plan laissait un `SyntaxError`). L'exécuteur n'a pas pu
+   rejouer ses deux suites par l'outil (défaut ci-dessous) : rejeu de repli par sections, vert.
+4. **fix-outil-01** (quick `261013-owa`, vf-coder inline, deux passes) — défaut CRÉÉ par la phase :
+   - `suite|toutes|imputer --detache` inutilisables pour une suite de base ≥ 480 s (la copie
+     détachée ré-appliquait `detache-requis` : `DETACHE-FIN rc=64`) ; l'autotest ne l'avait jamais vu
+     (base de 4 s dans son cas). Corrigé dans les trois modes (`54936dc9`), trois cas neufs rouges
+     sur l'outil d'avant, verts après ; preuve de bout en bout sur les deux suites longues du plan 01
+     par l'outil : `test-cloture-gates.sh rc=0 duree=102`, `test-planning-gates.sh rc=0 duree=352`.
+   - **Décision du manager (renversable) — regel tracé** : le gel à commit unique (plan 17) n'avait
+     aucune voie pour une correction légitime, chaque plan suivant aurait commencé rouge
+     (`gel-rouvert`). Un regel est désormais valide s'il ne touche que `.sha256` et porte un trailer
+     `Regel-Outil: <id quick> — <raison>` (forme vérifiée, jamais la véracité) ; il est imprimé
+     (`EMPREINTE-REGEL …`) avant `EMPREINTE ok … regels=<n>` à la première commande de chaque plan ;
+     un regel sans trailer reste `gel-rouvert`. Cinq cas d'autotest neufs, mutants tués (`b284c367`).
+     Le premier commit de regel du worker (`e1b5fc94`, sans trailer, jamais poussé) a été retiré de
+     l'historique local par le manager (sauvegarde `vf-backup/p461-fix-outil-avant-reecriture`) ;
+     regel tracé `f108ef1b`. Rejoué par le manager : `EMPREINTE ok … regels=1`, rc 0.
+   - **Défaut du plan 01 fermé** : la phrase de la limite (bp) « qu'un G4 armé aurait refusées » se
+     lisait comme un état armé de G4 (`etat-reference` : `ETAT-ECART k4 ligne=1056`) ; reformulée
+     (`1b5cba0e`), `etat-reference` rejoué par le manager : `ecarts=0`. La même phrase subsiste dans
+     la spec (`docs/superpowers/specs/…`), que `etat-reference` ne lit pas : non touchée.
+   - Autotest final rapporté : `cas=201 declares=201 echecs=0`.
