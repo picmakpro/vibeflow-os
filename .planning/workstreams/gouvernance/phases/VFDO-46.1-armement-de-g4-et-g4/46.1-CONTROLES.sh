@@ -56,6 +56,21 @@
 # couvre pas : le dispatcher (main, cible_de) et la commande enregistrée, couverts par le banc de G4 en CI et par le
 # relevé de l'étape 6 s'il est joué. Lignes `INVARIANT <motif> ok`, puis `INVARIANTS-BILAN ecarts=<n>`.
 #
+# RELEVÉS (`releve <relevé> --etape=<5|6> [--lab=<lab affiché>]… [--verificateur=<script>]`, défaut
+# plugin/planning-core/scripts/verifier-releve.sh). Lignes `RELEVE-COHERENCE ok|ECART <motif>`. Relevé absent ou
+# chemin de machine (/Users/, /home/) : écart. Une ligne `REJEU-NON-JOUE …` : conforme s'il ne porte aucune ligne
+# `REJEU-ETAPE-`. Rejeu joué : au moins un --lab (sinon 64) ; par lab, exactement une ligne REPOS-AVANT et une
+# REPOS-APRES `<lab> processus=0` (repos-absent, repos-doublon, repos-non-nul) ; vérificateur absent ou illisible :
+# écart `verificateur-absent`, jamais un vert ; le relevé porte EXACTEMENT une ligne RELEVE-VERDICT identique
+# (cmp -s) à la dernière ligne de la sortie fraîche du vérificateur (verdict-absent, verdict-doublon,
+# verdict-recopie) ; verdict non-armable : une ligne `## Non armé` et une ligne `ESCALADE-WILLY ` (non-arme-sans-
+# section, non-arme-sans-escalade). Les lignes REPOS-* ne sont lues que par l'outil de phase. Aucun lab n'est lu.
+# `releve-chaine [--suite=<chemin>]` lance UNE fois la suite du script d'armement (défaut test-verifier-releve.sh,
+# R-RELEVE-CHAINE posé en 46.1-18) avec VF_RELEVE_CHAINE_DEPOT=<dossier mktemp>, exige `--exige=R-RELEVE-CHAINE`,
+# exactement trois fichiers déposés (chaine-etape-5.md armable, chaine-etape-6.md armable,
+# chaine-etape-6-sans-agent.md non-armable), passe `releve` sur chacun (lab '<lab-1>'). Lignes `RELEVE-CHAINE
+# <fichier> verdict=<v> coherence=ok|ECART <motif>` et `RELEVE-CHAINE-ECART <motif>`.
+#
 # REJEU DÉTACHÉ (`suite` et `toutes` par --detache=<dossier>, plus `imputer` en 46.1-17). Le dossier est créé s'il
 # n'existe pas et doit être vide (sinon 64). Sans base (hors mesure de la base) ou pour une suite rouge à la base :
 # 64. L'outil s'y copie (`outil.sh` : l'original reste librement éditable pendant le rejeu), écrit `commande.txt`
@@ -175,6 +190,10 @@ CAS_AUTOTEST=(
   invariants-sains invariants-role-change invariants-version-change invariants-tag invariants-base-absente
   g4-fige-observe g4-fige-intact g4-fige-helper-change g4-fige-constante-change g4-fige-transitif
   g4-fige-reference-introuvable
+  releve-armable-coherent releve-non-arme-coherent releve-non-arme-sans-escalade releve-verdict-recopie-faux
+  releve-non-joue releve-non-joue-mais-mesure releve-absent releve-chemin-machine releve-repos-absent
+  releve-repos-non-nul releve-verificateur-absent releve-chaine-saine releve-chaine-depot-incomplet
+  releve-chaine-verdict-inattendu
 )
 
 # ---------------------------------------------------------------------------------------------------------
@@ -818,6 +837,197 @@ EOF
   fi
   printf 'INVARIANTS-BILAN ecarts=%s\n' "$n"
   [ "$n" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------------------------------------
+# Modes releve et releve-chaine
+# ---------------------------------------------------------------------------------------------------------
+VERIFICATEUR_DEFAUT=plugin/planning-core/scripts/verifier-releve.sh
+RC_NEC=0
+RC_VERDICT=""
+RLABS=()
+
+rc_ecart() {
+  printf 'RELEVE-COHERENCE ECART %s\n' "$*"
+  RC_NEC=$((RC_NEC + 1))
+}
+
+# Nombre de lignes de <fichier> qui commencent par <préfixe> (littéral).
+compter_prefixe() { # <fichier> <préfixe>
+  P="$2" LC_ALL=C awk 'BEGIN { p = ENVIRON["P"] } index($0, p) == 1 { c++ } END { print c + 0 }' "$1"
+}
+
+# Cohérence d'un relevé de rejeu avec la décision fraîche du script d'armement. UNE fonction : le mode `armement`
+# de 46.1-17 la réutilise (aucune copie de logique). Aucun lab n'est lu. Entrées : <relevé> <étape> <vérificateur>,
+# labs affichés dans RLABS. Imprime les lignes RELEVE-COHERENCE ; pose RC_VERDICT (premier mot du verdict frais).
+# Retour : 0 cohérent, 1 écart, 64 usage (rejeu joué sans --lab). Ce mode ne dit jamais qu'un gate s'arme : il dit
+# que le relevé reproduit fidèlement la décision du script.
+releve_coherence() {
+  local f=$1 etape=$2 verif=$3 lab moment pref lignes nb v t fraiche attendue args nj ne
+  RC_NEC=0
+  RC_VERDICT=""
+  if [ ! -f "$f" ]; then
+    rc_ecart "absent"
+    return 1
+  fi
+  if LC_ALL=C awk 'index($0, "/Users/") || index($0, "/home/") { f = 1 } END { exit f ? 0 : 1 }' "$f"; then
+    rc_ecart "chemin-machine"
+  fi
+  nj=$(compter_prefixe "$f" "REJEU-NON-JOUE ")
+  ne=$(compter_prefixe "$f" "REJEU-ETAPE-")
+  if [ "$nj" -gt 0 ]; then
+    # Rejeu refusé ou non lancé, consigné : conforme s'il ne porte aucune mesure.
+    [ "$ne" -eq 0 ] || rc_ecart "non-joue-mais-mesure"
+    [ "$RC_NEC" -ne 0 ] || echo "RELEVE-COHERENCE ok"
+    [ "$RC_NEC" -eq 0 ]
+    return $?
+  fi
+  if [ "${#RLABS[@]}" -eq 0 ]; then
+    echo "RELEVE-USAGE un rejeu joué exige au moins un --lab" >&2
+    return 64
+  fi
+  # Repos : exactement une ligne avant et une après par lab, à processus=0.
+  for lab in "${RLABS[@]}"; do
+    for moment in AVANT APRES; do
+      pref="REPOS-$moment $lab processus="
+      lignes=$(P="$pref" LC_ALL=C awk 'BEGIN { p = ENVIRON["P"] } index($0, p) == 1 { print substr($0, length(p) + 1) }' "$f")
+      if [ -z "$lignes" ]; then nb=0; else nb=$(printf '%s\n' "$lignes" | awk 'END { print NR }'); fi
+      if [ "$nb" -eq 0 ]; then
+        rc_ecart "repos-absent $lab $moment"
+      elif [ "$nb" -gt 1 ]; then
+        rc_ecart "repos-doublon $lab $moment"
+      else
+        set -- $lignes
+        v=$1
+        [ "$v" = 0 ] || rc_ecart "repos-non-nul $lab $moment n=$v"
+      fi
+    done
+  done
+  # Vérificateur : jamais un vert sans lui.
+  if [ ! -r "$verif" ] || [ ! -f "$verif" ]; then
+    rc_ecart "verificateur-absent"
+  else
+    nouveau_tmp
+    t=$NT
+    args=(--etape="$etape")
+    for lab in "${RLABS[@]}"; do args+=(--lab="$lab"); done
+    bash "$verif" "${args[@]}" "$f" > "$t/frais.txt" 2> /dev/null < /dev/null
+    derniere_ligne "$t/frais.txt" > "$t/frais-verdict.txt"
+    fraiche=$(cat "$t/frais-verdict.txt")
+    case $fraiche in
+      "RELEVE-VERDICT "*) ;;
+      *) rc_ecart "verificateur-sortie" ;;
+    esac
+    case $fraiche in
+      "RELEVE-VERDICT "*)
+        nb=$(compter_prefixe "$f" "RELEVE-VERDICT ")
+        if [ "$nb" -eq 0 ]; then
+          rc_ecart "verdict-absent"
+        elif [ "$nb" -gt 1 ]; then
+          rc_ecart "verdict-doublon"
+        else
+          LC_ALL=C awk 'index($0, "RELEVE-VERDICT ") == 1' "$f" > "$t/releve-verdict.txt"
+          cmp -s "$t/releve-verdict.txt" "$t/frais-verdict.txt" || rc_ecart "verdict-recopie"
+        fi
+        set -- $fraiche
+        RC_VERDICT=${2:-}
+        if [ "$RC_VERDICT" = non-armable ]; then
+          [ "$(compter_prefixe "$f" "## Non armé")" -gt 0 ] || rc_ecart "non-arme-sans-section"
+          [ "$(compter_prefixe "$f" "ESCALADE-WILLY ")" -gt 0 ] || rc_ecart "non-arme-sans-escalade"
+        fi ;;
+    esac
+  fi
+  [ "$RC_NEC" -ne 0 ] || echo "RELEVE-COHERENCE ok"
+  [ "$RC_NEC" -eq 0 ]
+}
+
+cmd_releve() {
+  local f="" etape="" verif="" rc
+  RLABS=()
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --etape=*) etape=${1#--etape=} ;;
+      --lab=*) RLABS+=("${1#--lab=}") ;;
+      --verificateur=*) verif=${1#--verificateur=} ;;
+      -*) die_usage "releve : option inconnue : $1" ;;
+      *) [ -z "$f" ] || die_usage "releve <relevé> --etape=<5|6>"; f=$1 ;;
+    esac
+    shift
+  done
+  [ -n "$f" ] || die_usage "releve <relevé> --etape=<5|6> [--lab=<lab>]… [--verificateur=<script>]"
+  case $etape in 5 | 6) ;; *) die_usage "releve : --etape=5 ou --etape=6" ;; esac
+  racine_ou_sortir
+  [ -n "$verif" ] || verif=$VERIFICATEUR_DEFAUT
+  releve_coherence "$f" "$etape" "$verif"
+  rc=$?
+  [ "$rc" -ne 64 ] || exit 64
+  return "$rc"
+}
+
+# releve-chaine : la suite du script d'armement dépose les relevés qu'elle compose sur la vraie chaîne synthétique
+# (rejeu-reel.sh -> relevé -> verifier-releve.sh) ; ils passent chacun par le contrôle de cohérence de `releve`.
+cmd_releve_chaine() {
+  local suite=plugin/planning-core/scripts/tests/test-verifier-releve.sh verif="" depot t ec=0 nom f rc exp etape coh att
+  RLABS=()
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --suite=*) suite=${1#--suite=} ;;
+      --verificateur=*) verif=${1#--verificateur=} ;;
+      *) die_usage "releve-chaine [--suite=<chemin>]" ;;
+    esac
+    shift
+  done
+  racine_ou_sortir
+  [ -n "$verif" ] || verif=$VERIFICATEUR_DEFAUT
+  if [ ! -f "$suite" ]; then
+    echo "RELEVE-CHAINE-ECART suite-absente $suite (R-RELEVE-CHAINE : posée par 46.1-03 et 46.1-18)"
+    return 1
+  fi
+  nouveau_tmp
+  t=$NT
+  depot=$t/depot
+  mkdir -p "$depot"
+  EXIGES=("R-RELEVE-CHAINE")
+  NEC=0
+  LANCER_ENV_EXTRA="VF_RELEVE_CHAINE_DEPOT=$depot" lancer_suite "$suite" bash "$t/sortie.txt"
+  evaluer_lancement "$t/sortie.txt" "$L_RC"
+  printf 'SUITE %s shell=bash rc=%s duree=%s exiges=%s/1\n' "$suite" "$L_RC" "$L_DUREE" "$EV_TROUVES"
+  if [ "$NEC" -ne 0 ]; then
+    echo "RELEVE-CHAINE-ECART suite-non-saine"
+    ec=$((ec + 1))
+  fi
+  for nom in $(ls -A "$depot"); do
+    case $nom in
+      chaine-etape-5.md | chaine-etape-6.md | chaine-etape-6-sans-agent.md) ;;
+      *) echo "RELEVE-CHAINE-ECART depot-inattendu $nom"; ec=$((ec + 1)) ;;
+    esac
+  done
+  for exp in "chaine-etape-5.md:5:armable" "chaine-etape-6.md:6:armable" "chaine-etape-6-sans-agent.md:6:non-armable"; do
+    IFS=: read -r nom etape att <<EOF
+$exp
+EOF
+    f=$depot/$nom
+    if [ ! -f "$f" ]; then
+      echo "RELEVE-CHAINE-ECART depot-incomplet $nom"
+      ec=$((ec + 1))
+      continue
+    fi
+    RLABS=("<lab-1>")
+    releve_coherence "$f" "$etape" "$verif" > "$t/coh.txt"
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+      coh=ok
+    else
+      coh="ECART $(awk 'index($0, "RELEVE-COHERENCE ECART ") == 1 { print substr($0, 24); exit }' "$t/coh.txt")"
+      ec=$((ec + 1))
+    fi
+    printf 'RELEVE-CHAINE %s verdict=%s coherence=%s\n' "$nom" "${RC_VERDICT:-inconnu}" "$coh"
+    if [ "$RC_VERDICT" != "$att" ]; then
+      echo "RELEVE-CHAINE-ECART verdict-inattendu $nom attendu=$att obtenu=${RC_VERDICT:-inconnu}"
+      ec=$((ec + 1))
+    fi
+  done
+  [ "$ec" -eq 0 ]
 }
 
 # ---------------------------------------------------------------------------------------------------------
@@ -1881,6 +2091,165 @@ autotest_invariants() {
   at_fin 1
 }
 
+# Faux vérificateur : verdict non-armable si une ligne du relevé commence par FAUX-NON-ARMABLE, armable sinon ;
+# imite la forme de sortie du vrai (dernière ligne = RELEVE-VERDICT …).
+mk_verif() { # <fichier>
+  cat > "$1" <<'VERIF_EOF'
+#!/usr/bin/env bash
+etape=""; fichier=""
+for a in "$@"; do
+  case $a in
+    --etape=*) etape=${a#--etape=} ;;
+    --lab=*) ;;
+    *) fichier=$a ;;
+  esac
+done
+if awk 'index($0, "FAUX-NON-ARMABLE") == 1 { f = 1 } END { exit f ? 0 : 1 }' "$fichier"; then
+  echo "RELEVE-ECART faux : raison"
+  echo "RELEVE-VERDICT non-armable etape=$etape ecarts=1"
+  exit 1
+fi
+echo "RELEVE-VERDICT armable etape=$etape labs=1 gates=G3,G4"
+exit 0
+VERIF_EOF
+}
+
+# Faux relevé. Variables : RV_VERDICT (armable|non-armable), RV_ETAPE, RV_SANS_SECTION, RV_SANS_ESCALADE,
+# RV_AVANT_N, RV_SANS_APRES, RV_LIGNE (ligne RELEVE-VERDICT forcée), RV_NON_JOUE, RV_AVEC_MESURE, RV_CHEMIN.
+mk_releve() { # <fichier>
+  local f=$1 v=${RV_VERDICT:-armable} e=${RV_ETAPE:-5}
+  if [ "${RV_NON_JOUE:-0}" = 1 ]; then
+    {
+      echo "# Relevé de repli"
+      echo "REJEU-NON-JOUE reponse-non"
+      [ "${RV_AVEC_MESURE:-0}" != 1 ] || echo "REJEU-ETAPE-$e faux-refus=0 faux-accept=0"
+    } > "$f"
+    return 0
+  fi
+  {
+    echo "# Relevé synthétique"
+    echo "REPOS-AVANT <lab-1> processus=${RV_AVANT_N:-0}"
+    [ "${RV_SANS_APRES:-0}" = 1 ] || echo "REPOS-APRES <lab-1> processus=0"
+    echo "REJEU-ETAPE-$e faux-refus=0 faux-accept=0"
+    [ "${RV_CHEMIN:-0}" != 1 ] || echo "voir /Users/dev/lab/x"
+    if [ "$v" = non-armable ]; then
+      echo "FAUX-NON-ARMABLE"
+      [ "${RV_SANS_SECTION:-0}" = 1 ] || echo "## Non armé — remonté à Willy"
+      [ "${RV_SANS_ESCALADE:-0}" = 1 ] || echo "ESCALADE-WILLY ETAPE-$e couverture"
+    fi
+    if [ -n "${RV_LIGNE:-}" ]; then
+      echo "$RV_LIGNE"
+    elif [ "$v" = non-armable ]; then
+      echo "RELEVE-VERDICT non-armable etape=$e ecarts=1"
+    else
+      echo "RELEVE-VERDICT armable etape=$e labs=1 gates=G3,G4"
+    fi
+  } > "$f"
+}
+
+autotest_releve() {
+  local V R S CANON='echo "== Résultat : 3 OK · 0 KO =="' src
+  nouveau_tmp
+  V=$NT/verif.sh
+  R=$NT/releve.md
+  mk_verif "$V"
+  at_depot
+
+  at_debut releve-armable-coherent
+  mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ok"
+  at_fin 0
+
+  at_debut releve-non-arme-coherent
+  RV_VERDICT=non-armable mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ok"
+  at_fin 0
+
+  at_debut releve-non-arme-sans-escalade
+  RV_VERDICT=non-armable RV_SANS_ESCALADE=1 mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ECART non-arme-sans-escalade"
+  at_fin 1
+
+  at_debut releve-verdict-recopie-faux
+  RV_VERDICT=non-armable RV_LIGNE="RELEVE-VERDICT armable etape=5 labs=1 gates=G3,G4" mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ECART verdict-recopie"
+  at_fin 1
+
+  at_debut releve-non-joue
+  RV_NON_JOUE=1 mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ok"
+  at_fin 0
+
+  at_debut releve-non-joue-mais-mesure
+  RV_NON_JOUE=1 RV_AVEC_MESURE=1 mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ECART non-joue-mais-mesure"
+  at_fin 1
+
+  at_debut releve-absent
+  at_lancer releve "$NT/inexistant.md" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ECART absent"
+  at_fin 1
+
+  at_debut releve-chemin-machine
+  RV_CHEMIN=1 mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ECART chemin-machine"
+  at_fin 1
+
+  at_debut releve-repos-absent
+  RV_SANS_APRES=1 mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ECART repos-absent <lab-1> APRES"
+  at_fin 1
+
+  at_debut releve-repos-non-nul
+  RV_AVANT_N=2 mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --lab='<lab-1>' --verificateur="$V"
+  at_contient "RELEVE-COHERENCE ECART repos-non-nul <lab-1> AVANT n=2"
+  at_fin 1
+
+  at_debut releve-verificateur-absent
+  mk_releve "$R"
+  at_lancer releve "$R" --etape=5 --lab='<lab-1>' --verificateur="$NT/n-existe-pas.sh"
+  at_contient "RELEVE-COHERENCE ECART verificateur-absent"
+  at_fin 1
+
+  # releve-chaine : la fausse suite dépose les relevés d'un dossier source dans VF_RELEVE_CHAINE_DEPOT.
+  src=$NT/chaine-src
+  mkdir -p "$src"
+  RV_ETAPE=5 mk_releve "$src/chaine-etape-5.md"
+  RV_ETAPE=6 mk_releve "$src/chaine-etape-6.md"
+  RV_ETAPE=6 RV_VERDICT=non-armable mk_releve "$src/chaine-etape-6-sans-agent.md"
+  S=$NT/suite-chaine.sh
+
+  at_debut releve-chaine-saine
+  printf '#!/usr/bin/env bash\ncp %s/*.md "$VF_RELEVE_CHAINE_DEPOT/"\necho "  ✓ R-RELEVE-CHAINE trois relevés déposés"\n%s\n' "$src" "$CANON" > "$S"
+  at_lancer releve-chaine --suite="$S" --verificateur="$V"
+  at_contient "RELEVE-CHAINE chaine-etape-5.md verdict=armable coherence=ok"
+  at_contient "RELEVE-CHAINE chaine-etape-6-sans-agent.md verdict=non-armable coherence=ok"
+  at_absent "RELEVE-CHAINE-ECART"
+  at_fin 0
+
+  at_debut releve-chaine-depot-incomplet
+  printf '#!/usr/bin/env bash\ncp %s/chaine-etape-5.md %s/chaine-etape-6.md "$VF_RELEVE_CHAINE_DEPOT/"\necho "  ✓ R-RELEVE-CHAINE deux relevés"\n%s\n' "$src" "$src" "$CANON" > "$S"
+  at_lancer releve-chaine --suite="$S" --verificateur="$V"
+  at_contient "RELEVE-CHAINE-ECART depot-incomplet chaine-etape-6-sans-agent.md"
+  at_fin 1
+
+  at_debut releve-chaine-verdict-inattendu
+  RV_ETAPE=6 mk_releve "$NT/armable-6.md"
+  printf '#!/usr/bin/env bash\ncp %s/chaine-etape-5.md %s/chaine-etape-6.md "$VF_RELEVE_CHAINE_DEPOT/"\ncp %s/armable-6.md "$VF_RELEVE_CHAINE_DEPOT/chaine-etape-6-sans-agent.md"\necho "  ✓ R-RELEVE-CHAINE verdict faux"\n%s\n' "$src" "$src" "$NT" "$CANON" > "$S"
+  at_lancer releve-chaine --suite="$S" --verificateur="$V"
+  at_contient "RELEVE-CHAINE-ECART verdict-inattendu chaine-etape-6-sans-agent.md attendu=non-armable obtenu=armable"
+  at_fin 1
+}
+
 autotest() {
   local manquants=0 c j trouve n d m
   nouveau_tmp
@@ -1890,6 +2259,7 @@ autotest() {
   autotest_base
   autotest_detache
   autotest_invariants
+  autotest_releve
   # Cas déclarés contre cas joués : un cas déclaré et non joué est un échec.
   for c in "${CAS_AUTOTEST[@]}"; do
     trouve=0
@@ -1932,6 +2302,8 @@ principal() {
     toutes) cmd_toutes "$@"; return $? ;;
     sonder) cmd_sonder "$@"; return $? ;;
     invariants) cmd_invariants "$@"; return $? ;;
+    releve) cmd_releve "$@"; return $? ;;
+    releve-chaine) cmd_releve_chaine "$@"; return $? ;;
     base-duree) cmd_base_duree "$@"; return $? ;;
     *) die_usage "46.1-CONTROLES.sh <suite|toutes|sonder|base-duree|invariants|releve|releve-chaine|--autotest|--help>" ;;
   esac
