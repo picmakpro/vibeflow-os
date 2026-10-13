@@ -14,7 +14,7 @@
 # Il ne lit aucun lab, ne lance aucune sonde `claude -p`, ne modifie ni le module, ni scripts/, ni la CI.
 #
 # MODES (chemin d'une suite : relatif à la racine du dépôt ; c'est aussi sa clé dans la base)
-#   suite <chemin> [--exige=<libellé>]… [--duree-max=base] [--detache=<dossier>] [--shells=bash|bash,zsh]
+#   suite <chemin> [--exige=<libellé>]… [--montre=<motif>]… [--duree-max=base] [--detache=<dossier>] [--shells=bash|bash,zsh]
 #                  [--base-cle=<chemin>] [--base-ajout=<NN>]
 #                  Rejoue `bash <suite>` UNE fois, sous un HOME temporaire neuf (XDG_CACHE_HOME dessous), dans
 #                  un environnement privé de VF_PF_SECTIONS, VF_PF_MUT et VF_RELEVE_CHAINE_DEPOT (une suite
@@ -33,10 +33,21 @@
 #   releve <relevé> --etape=<5|6> [--lab=<lab affiché>]… [--verificateur=<script>]
 #                  Cohérence d'un relevé de rejeu avec la décision fraîche du script d'armement (repos compris).
 #   releve-chaine [--suite=<chemin>]              la même cohérence, éprouvée sur la sortie réelle de la chaîne.
-#   --autotest     Preuve que chaque contrôle sait rougir pour sa raison (fausses suites, faux dépôts, fausse base).
+#   armement --gate=<G4|G4P> --releve=<relevé> --etape=<5|6> [--lab=<lab affiché>]… [--verificateur=<script>]
+#            [--simuler-arme] [--garder-g4]
+#                  Une constante d'armement à `armed` est couplée à un relevé armable du MÊME code (P461-D-07).
+#   etat-reference [--reference=<fichier>] [--hook=<fichier>] [--tests=<fichier>]
+#                  La phrase d'état d'armement de la référence concorde avec les constantes et les limites présentes.
+#   imputer <suite> --commit=<sha> [options de suite] [--detache=<dossier>]   imputation d'un rouge (P461-D-16).
+#   jalon <1|2|3>  lecture des jalons du manager (46.1-JALONS.txt), jamais un vert à vide (P461-D-16).
+#   empreinte [--geler]                          gel de l'outil par empreinte sha256 et par l'historique git.
+#   --autotest [--sans-reel]
+#                  Preuve que chaque contrôle sait rougir pour sa raison (fausses suites, faux dépôts, fausse base) ;
+#                  les cas `reel-*` rejouent de VRAIES suites du dépôt sur un clone partagé (entrée perturbée, sortie
+#                  jamais réécrite) ; `--sans-reel` les omet (AUTOTEST-PARTIEL, jamais la preuve finale d'une tâche de gel).
 #   --help         Cet en-tête.
-#   (46.1-17 ajoute l'option --montre et les modes armement, etat-reference, imputer, jalon, empreinte, puis
-#   FIGE l'outil.)
+#   (Posés par 46.1-17 : l'option --montre et les modes armement, etat-reference, imputer, jalon, empreinte. Elle
+#   FIGE ensuite l'outil : voir EMPREINTE.)
 #
 # CODES. 0 conforme · 1 écart · 64 usage (dont base absente quand un plafond la suppose, base corrompue,
 # arbre non intact, rejeu à lancer détaché) · `sonder` ajoute 2 (en cours dans la borne) et 3 (borne dépassée ou
@@ -71,7 +82,105 @@
 # chaine-etape-6-sans-agent.md non-armable), passe `releve` sur chacun (lab '<lab-1>'). Lignes `RELEVE-CHAINE
 # <fichier> verdict=<v> coherence=ok|ECART <motif>` et `RELEVE-CHAINE-ECART <motif>`.
 #
-# REJEU DÉTACHÉ (`suite` et `toutes` par --detache=<dossier>, plus `imputer` en 46.1-17). Le dossier est créé s'il
+# MONTRE (`suite … --montre=<motif>`, répétable ; P461-D-16). Demander une ligne vaut l'EXIGER. Comparaison LITTÉRALE de
+# chaînes (aucune expression régulière, un point est un point ; motif vide : 64) : une ligne de la sortie complète
+# correspond si elle COMMENCE par le motif, espaces de tête compris (`'  ✓ PF-EVT-04'` vise la ligne de contrôle,
+# `'COMPTE G4 '` la ligne de compte, jamais une ligne `  ✓ …` qui la cite). Pour chaque lancement, chaque ligne qui
+# correspond est imprimée telle quelle, dans l'ordre de la sortie, `SUITE-MONTRE <shell> : <ligne>`, suite verte ou
+# rouge ; au plus 50 par motif, puis `SUITE-NOTE montre-tronque <motif> reste=<n>`. Un motif qu'aucune ligne ne commence
+# est l'écart `SUITE-ECART montre-absent <motif>` (code 1). La ligne `SUITE …` gagne `montres=<trouvés>/<demandés>`. Avec
+# --detache, `sonder` imprime les lignes SUITE-MONTRE du rejeu. Chaque motif de rouge de `suite` (ko, non-tue, bilan,
+# bilan zero-ok) est éprouvé sur la VRAIE sortie d'une suite réelle (cas reel-*).
+#
+# ARMEMENT (`armement --gate=<G4|G4P> --releve=<relevé> --etape=<5|6> …` ; P461-D-07, ARMG-05, ARMG-09). Lit dans
+# l'arbre de travail l'unique ligne `ARMEMENT_<gate> = "(armed|observe)"  # etape-<n>` (fonction lire_constante, partagée
+# avec etat-reference ; zéro, plusieurs ou autre valeur : `ARMEMENT-ECART constante-illisible`). `--etape` est l'étape du
+# RELEVÉ présenté — passée à `releve` et au vérificateur, et portée par le verdict frais — jamais comparée au suffixe
+# `# etape-<n>` de la constante : G4 (`# etape-5`) se couple aussi à un relevé d'étape 6 (P461-D-17) ; un relevé d'étape 5
+# (`gates=G3,G4`) ne peut pas armer G4′ (`releve-non-armable`). `observe` sans --simuler-arme : `ARMEMENT <gate> observe :
+# rien à justifier`, code 0. `armed` ou --simuler-arme : (a) cohérence du relevé (la fonction de `releve`, aucune copie ;
+# sinon `releve-incoherent`) ; (b) rejeu joué (`releve-non-joue`) ; (c) verdict FRAIS du vérificateur en code 0, dernière
+# ligne `RELEVE-VERDICT armable etape=<étape> … gates=<liste>` nommant le gate (`releve-non-armable`) ; (d) exactement une
+# ligne `COMMIT-REJOUE <sha>` (`commit-rejoue-absent`, `commit-rejoue-doublon`), commit connu (`commit-inconnu`) et ancêtre
+# de HEAD (`commit-non-ancetre`) ; (e) surface mesurée — planning-hook.sh et hooks.json — identique octet pour octet entre
+# `git show <sha>:<fichier>` et l'arbre de travail, la valeur de chaque ligne `ARMEMENT_*` remplacée par un jeton fixe
+# des deux côtés (`ARMEMENT-ECART code-diverge <fichier> commits=<n>`, `arbre-de-travail` si la différence n'est pas
+# commitée). LIMITE de « même code mesuré » : identité d'octets de la surface mesurée, valeurs ARMEMENT_* exceptées, aucune
+# équivalence sémantique ; les outils de rejeu hors surface mesurent, ils ne sont pas mesurés ; après l'armement de G4,
+# seule la fermeture d'evaluer_g4 est figée par invariants (g4-fige) — le dispatcher (main, cible_de) et la commande
+# enregistrée ne sont remesurés sur le réel que par le relevé de l'étape 6 s'il est joué. Lignes `ARMEMENT <gate>
+# <armed|observe|simule>`, `ARMEMENT-ECART <motif>`, `ARMEMENT-COHERENCE ok|ECART`. Aucun lab n'est lu.
+#   --garder-g4 (seulement --gate=G4, sans --simuler-arme ; autrement 64) porte la disjonction de P461-D-17 : code 0 si
+#   `armement` seul rendrait 0, OU si — `armement` seul rendant 1 — ARMEMENT_G4 vaut `armed  # etape-5`, le relevé existe et
+#   porte EXACTEMENT une ligne `DECISION-G4`, de la forme `DECISION-G4 garder-g4 canal=<non vide> date=AAAA-MM-JJ` (date
+#   de calendrier valide) : ligne `ARMEMENT G4 armed : non remesuré, décision garder-g4 canal=… date=…`, le motif
+#   d'`armement` seul rappelé en ARMEMENT-ECART. Chaque raison de refus est UNE ligne `ARMEMENT-ECART decision-g4-<motif>` :
+#   absente · doublon · observation · forme · canal-vide · date-forme (mauvaise forme) · date-invalide (bonne forme,
+#   calendrier invalide) · releve-absent · constante-illisible · constante-non-armee. La décision n'excuse rien sans
+#   l'option. L'option lit la ligne, elle n'en juge jamais la véracité (même régime que `Gate-Touche:`).
+#
+# ÉTAT D'ARMEMENT DE LA RÉFÉRENCE (`etat-reference` ; P461-D-07, ARMG-10). Compare TOUTE phrase de modele-cycles.md qui
+# énonce l'état d'un gate aux constantes ARMEMENT_* du hook et aux limites réellement présentes de LIMITES_REFERENCE
+# (tuple extrait par bornes de lignes puis ast.literal_eval). Grammaire FERMÉE à quatre formes, relevée sur la référence
+# réelle (expression exacte de chacune : en tête du Python embarqué, ecrire_py_etat) : K1 clause de constante (`ARMEMENT_<X>`
+# … vaut|valent `armed`|`observe`) ; K2 résumé entre parenthèses « (G3 armé ; G4 et G4′ en observation, limites (bp) et
+# (bs)) » (chaque lettre citée figure dans LIMITES_REFERENCE ET porte sa ligne canonique `- **limite (xx)**`) ; K3 ligne de
+# la table d'armement (état et étape égaux à la constante ; G2 : G2_MODE ; une constante sans ligne, ou une ligne sans
+# constante, est un écart) ; K4 affirmation ancrée (« G4′ reste en observation », « G3, est armé », « G3 (étape 5a, armée
+# seule) »). Exclusions déclarées (`ETAT-IGNORE`) : occurrence précédée dans sa proposition de `si `, `tant que `, `quand `,
+# `dès que `, `une fois `, `exige ` ou `avant `, ou suivie de ` sans ` (condition, exigence, hypothèse). Résidu VISIBLE,
+# jamais tu : toute proposition qui nomme un gate ET un état et qu'aucune forme ne reconnaît est `ETAT-NON-RECONNUE`
+# (information, non rouge). Rouge : `ETAT-ECART <forme> ligne=<n> <gate> dit=<état> constante=<état>` · `limite-absente`
+# · `limite-sans-ligne` · `limites-illisibles` · `constante-illisible <X>` · `gate-non-couvert <gate>` (une constante
+# nommée par AUCUNE phrase K1, K2 ou K4 : une phrase reformulée hors grammaire ne passe jamais en silence) ·
+# `aucune-phrase`. Lignes `ETAT <forme> ligne=<n> gates=… dit=… ok` et `ETAT-BILAN k1=… k2=… k3=… k4=… ignorees=…
+# non-reconnues=… ecarts=…`. Ce mode compare des phrases à des constantes : il ne dit jamais qu'un gate doit être armé.
+#
+# IMPUTATION (`imputer <suite> --commit=<sha> [options de suite] [--detache=<dossier>]` ; P461-D-16). <sha> est le PREMIER
+# commit du plan ; <sha>^ doit exister (sinon 64). Rejeux dans les mêmes conditions que `suite` (HOME temporaire, mêmes
+# options) : C1 sur l'arbre courant ; C2 seulement si C1 est vert ; P sur l'export `git archive <sha>^` sous mktemp
+# seulement si le rouge est reproduit (aucun checkout, stash ni reset : HEAD, index, arbre de travail et pile des stash
+# sont inchangés) ; P2 seulement si P est rouge et que ses motifs recouvrent ceux du courant. Décision : C1 et C2 verts =
+# `instable` (cause=non-reproduit) ; rouge reproduit et suite absente de P (suite-neuve) ou P vert = `imputable` ; P
+# rouge : un motif SUITE-ECART ou une ligne `  ✗ ` du rejeu courant qui manque à P = `imputable` (IMPUTATION-NOUVEAU) ;
+# sinon P2 vert = `imputable` (le parent ne rougissait que sans dépôt) ; sinon suite sensible au dépôt = `instable`
+# (cause=suite-sensible-depot, à trancher par le manager) ; sinon `preexistant`. Lignes `IMPUTATION-REJEU <suite>
+# sur=<courant|parent|parent-depot> n=<k> rc=<rc> motifs=<liste>`, puis `IMPUTATION <suite> verdict=<…> rejeux=<n>
+# escalade-willy=oui|non`. Code 0 : preexistant ou instable à escalade-willy=non (consigner, remonter au manager,
+# poursuivre) ; 1 : imputable, ou tout verdict à escalade-willy=oui ; 64 usage. Détaché : borne = 9 × durée de base.
+#   Limites de l'imputation. L'export n'a ni .git, ni historique, ni fichiers ignorés ou non suivis, ni configuration
+#   locale : le rejeu sur P NE reproduit PAS le dépôt du rejeu courant. Il est suivi (si P est rouge et recouvre le
+#   courant) d'un rejeu P2 sur un second export rendu dépôt par `git init` et UN commit de tout l'export (identité par
+#   -c, GIT_CONFIG_GLOBAL et GIT_CONFIG_SYSTEM vers /dev/null) : P2 reproduit la présence d'un dépôt, pas son historique.
+#   Une suite est « sensible au dépôt » si son source à <sha>^ contient le mot `git` (grep -w) — critère volontairement
+#   large : il ne voit ni les scripts que la suite appelle ni une dépendance à la configuration, et sa conséquence
+#   (`instable`) renvoie au manager, jamais à `preexistant`. Les rejeux de P et P2 ne portent aucun plafond de durée
+#   (une durée dépend de la charge, pas du commit) ni la base. `escalade-willy=oui` seulement pour les douze suites de
+#   SUITES_PORTEUSES (suites qui gardent un gate armé ou à armer, relevées de 46.1-PATTERNS « File Classification »).
+#
+# JALONS (`jalon <1|2|3>` ; P461-D-16). Lit 46.1-JALONS.txt, tenu par le MANAGER : une ligne par jalon `JALON <n>
+# commit=<sha> date=<UTC> TOUTES-BILAN suites=<n> vertes=<v> rouges=<r> zero-ok=<z> s=<secondes> imputables=<i>
+# preexistants=<p> instables=<q>`. Code 0 seulement si EXACTEMENT une ligne `JALON <n>` (jalon-absent, jalon-double), complète
+# (jalon-forme), dont le commit est un ancêtre de HEAD (jalon-commit-non-ancetre), à imputables=0 (jalon-imputables), aux
+# comptes cohérents r = p + i + q (jalon-comptes-incoherents), à découverte non partielle — suites ≥ celles de la
+# BASE-BILAN (jalon-decouverte-partielle) —, et si ni planning-hook.sh ni hooks.json n'a changé depuis le commit, arbre
+# de travail compris (jalon-perime). `<n>` hors 1, 2, 3 : 64. Le mode lit un fait DÉCLARÉ par le manager : il vérifie
+# forme, cohérence et ancienneté, jamais la véracité (même régime que `Gate-Touche:`). Lignes `JALON-VERIF <n> ok`,
+# `JALON-ECART <motif>` ; `--jalons-fichier=<chemin>` n'existe que pour l'autotest (imprime JALONS-FICHIER-ALTERNATIF).
+#
+# EMPREINTE (`empreinte [--geler]` ; P461-D-16). L'outil est FIGÉ à la fin de 46.1-17 : sans option, code 0 seulement si
+# 46.1-CONTROLES.sha256 existe (`EMPREINTE-ECART absente`), égale octet pour octet le `shasum -a 256 46.1-CONTROLES.sh`
+# lancé dans le dossier de l'outil (`modifie`), si l'outil et son .sha256 sont commités et propres (`non-commite`), si le
+# .sha256 a exactement un commit (`gel-rouvert`) et si aucun commit n'a touché l'outil depuis celui-là (`commit-apres-gel
+# n=<k>`). Ligne `EMPREINTE ok sha256=<h> gel=<commit>`. `--geler` écrit le .sha256 si et seulement s'il est absent et que
+# l'outil est commité et propre (sinon 64) ; le commit de gel est fait ensuite. Les plans suivants lancent `empreinte` dans
+# la première commande `<automated>` de leur première tâche (avant de présenter à l'humain quoi que ce soit venant de
+# l'outil, quand cette tâche est d'abord un checkpoint) ; rouge, l'exécuteur s'arrête et remonte, il ne répare pas : aucun
+# plan suivant n'édite l'outil, rouvrir le gel est une décision du manager. LIMITE de fond (ADR-072) : une garde qui vit
+# dans le dépôt peut être modifiée par la PR qu'elle juge ; un gel rouvert avec son empreinte est visible dans l'historique
+# mais pas empêché.
+#
+# REJEU DÉTACHÉ (`suite`, `toutes` et `imputer` par --detache=<dossier>). Le dossier est créé s'il
 # n'existe pas et doit être vide (sinon 64). Sans base (hors mesure de la base) ou pour une suite rouge à la base :
 # 64. L'outil s'y copie (`outil.sh` : l'original reste librement éditable pendant le rejeu), écrit `commande.txt`
 # (mode, options, nombre de suites), `borne.txt` (borne en secondes, calculée AVANT le lancement) et `debut.txt`
@@ -110,8 +219,9 @@
 # sont dans ce cas. La liste ne s'étend que par décision du manager, avec un cas d'autotest par forme.
 #
 # LIGNES ÉMISES (mode suite) : `SUITE-ECART <motif> <détail>` — rc · bilan forme-inconnue | ko=<m> | zero-ok ·
-# ko · non-tue · exige-absent <libellé> · base-absente · base-rouge · duree-plafond <n> > <max> ;
-# `SUITE-NOTE …` ; `SUITE <chemin> shell=<s> rc=<rc> duree=<n> exiges=<trouvés>/<demandés>` par lancement.
+# ko · non-tue · exige-absent <libellé> · montre-absent <motif> · base-absente · base-rouge · duree-plafond <n> > <max> ;
+# `SUITE-NOTE …` ; `SUITE-MONTRE <shell> : <ligne>` ; `SUITE <chemin> shell=<s> rc=<rc> duree=<n> exiges=<trouvés>/<demandés>
+# montres=<trouvés>/<demandés>` par lancement.
 # Mode toutes : `TOUTES <suite> rc=<rc> s=<n>[ zero-ok]`, `TOUTES-FORMES canon=<a> barres=<b> virgules=<c>
 # inconnue=<d>`, `TOUTES-LONGUES <suite> s=<n>` (les cinq plus longues), `TOUTES-BILAN suites=<n> vertes=<v>
 # rouges=<r> zero-ok=<z> s=<secondes>`, `TOUTES-CONTRE-BASE rouges=<r> sur-base=<p> hors-base=<k>`.
@@ -149,7 +259,11 @@
 #   BORNE_MESURE_BASE=14400  remontée de sondage de la seule mesure de la base (elle n'a pas de base d'où dériver
 #                          sa borne) : plus que l'estimation haute de 46.1-14 (3 h) ; ni plafond ni verdict,
 #                          dépassée elle fait remonter, rien n'est tué
-# Source : plan 46.1-14 ; aucune autre valeur de durée n'existe dans l'outil.
+#   FACTEUR_IMPUTER=9      borne d'un rejeu détaché `imputer` = 9 × la durée de base de la suite (trois rejeux au plus,
+#                          chacun sous son plafond de 3 × la base)
+#   SUITES_PORTEUSES       les douze suites qui gardent un gate armé ou à armer (liste du contrat commun de 46.1-14,
+#                          ni plus ni moins) : seules celles-là escaladent un rouge à Willy
+# Source : plans 46.1-14 et 46.1-17 ; aucune autre valeur de durée n'existe dans l'outil.
 #
 # DONNÉES D'AUTOTEST. Fausses suites, faux dépôts git, faux hook, faux vérificateur, faux fichiers de base et
 # faux relevés sont fabriqués sous mktemp, jamais dans ce dépôt ; les chemins de machine n'y figurent que sous
@@ -213,6 +327,14 @@ CAS_AUTOTEST=(
   etat-ref-gate-non-couvert etat-ref-non-reconnue-visible etat-ref-vide etat-ref-constante-illisible
   etat-ref-limites-illisibles etat-ref-fichier-absent etat-ref-hook-sans-constantes
   reel-etat-temoin reel-etat-constante-changee reel-etat-phrase-changee
+  imputer-preexistant imputer-bilan-structurel imputer-imputable imputer-imputable-nouveau-ko imputer-instable
+  imputer-parent-sans-depot imputer-parent-depot-preexistant imputer-suite-sensible-depot imputer-suite-neuve
+  imputer-escalade-porteuse imputer-escalade-hors-liste imputer-sans-effet imputer-commit-inconnu
+  imputer-commit-sans-parent imputer-detache-borne
+  jalon-ok jalon-absent jalon-sans-ligne jalon-double jalon-forme jalon-imputables jalon-commit-non-ancetre
+  jalon-comptes-incoherents jalon-decouverte-partielle jalon-perime jalon-numero-invalide
+  empreinte-ok empreinte-absente empreinte-modifie empreinte-commit-apres-gel empreinte-gel-rouvert
+  empreinte-non-commite empreinte-geler-refuse empreinte-geler-outil-non-commite
 )
 
 # ---------------------------------------------------------------------------------------------------------
@@ -488,7 +610,7 @@ EOF
 # ---------------------------------------------------------------------------------------------------------
 cmd_suite() {
   local suite="" duree_max="" dm_set=0 shells="bash" cle="" ajout="" aj_set=0 sh sorties entree
-  local b_kind="" b_rc="" b_s="" b_zero="" rcv plafond ajout_s="" premier=1 base_ok=0 detache="" a borne
+  local b_kind="" b_rc="" b_s="" b_zero="" rcv plafond ajout_s="" premier=1 base_ok=0 detache="" a borne racine_export=""
   local args_detache=()
   EXIGES=()
   MONTRES=()
@@ -506,12 +628,20 @@ cmd_suite() {
       --base-cle=*) cle=${1#--base-cle=} ;;
       --base-ajout=*) ajout=${1#--base-ajout=}; aj_set=1 ;;
       --base-fichier=*) option_base_fichier "${1#--base-fichier=}" ;;
+      --racine-export=*) racine_export=${1#--racine-export=} ;;
       -*) die_usage "suite : option inconnue : $1" ;;
       *) [ -z "$suite" ] || die_usage "suite : une seule suite par appel"; suite=$1 ;;
     esac
     shift
   done
   [ -n "$suite" ] || die_usage "suite <chemin> [options]"
+  if [ -n "$racine_export" ]; then
+    # Option INTERNE d'`imputer` : la suite est rejouée sous l'export d'un commit parent (ni .git, ni base : aucun
+    # plafond de durée, aucune écriture de la base, aucun rejeu détaché).
+    if [ "$dm_set" -eq 1 ] || [ "$aj_set" -eq 1 ] || [ -n "$detache" ]; then
+      die_usage "suite : --racine-export exclut --duree-max, --base-ajout et --detache"
+    fi
+  fi
   if [ "$dm_set" -eq 1 ] && [ "$duree_max" != base ]; then
     echo "SUITE-USAGE --duree-max n'accepte que la valeur littérale base (aucun plafond numérique)" >&2
     exit 64
@@ -525,7 +655,12 @@ cmd_suite() {
       exit 64
     fi
   fi
-  racine_ou_sortir
+  if [ -n "$racine_export" ]; then
+    RACINE=$(cd "$racine_export" 2> /dev/null && pwd -P) || { echo "SUITE-USAGE racine-export introuvable : $racine_export" >&2; exit 64; }
+    cd "$RACINE" || exit 64
+  else
+    racine_ou_sortir
+  fi
   case $suite in "$RACINE"/*) suite=${suite#"$RACINE"/} ;; esac
   [ -f "$suite" ] || { echo "SUITE-USAGE suite introuvable : $suite" >&2; exit 64; }
   [ -n "$cle" ] || cle=$suite
@@ -2057,6 +2192,345 @@ cmd_etat_reference() {
 }
 
 # ---------------------------------------------------------------------------------------------------------
+# Mode imputer (P461-D-16)
+# ---------------------------------------------------------------------------------------------------------
+# SUITES_PORTEUSES : les douze suites qui gardent un gate armé ou à armer (liste du contrat commun de 46.1-14, relevée
+# de 46.1-PATTERNS « File Classification » ; ni plus ni moins). Seul un rouge sur l'une d'elles est escaladé à Willy
+# (`escalade-willy=oui`) ; toute suite hors liste (dont test-recalc-planning.sh et les suites à bilan ancien) donne `non`.
+SUITES_PORTEUSES="plugin/planning-core/scripts/tests/test-planning-gates.sh plugin/planning-core/scripts/tests/test-cloture-gates.sh plugin/planning-core/scripts/tests/test-cloture-empreintes.sh plugin/planning-core/scripts/tests/test-g4p-sortie-brute.sh plugin/planning-core/scripts/tests/test-rejeu-gates.sh plugin/planning-core/scripts/tests/test-juges-canary.sh plugin/planning-core/scripts/tests/test-planning-hook-registered.sh plugin/planning-core/scripts/tests/test-planning-prefilter.sh plugin/planning-core/scripts/tests/test-d1-surveillance.sh plugin/planning-core/scripts/tests/test-verifier-releve.sh plugin/_internal/tests/test-planning-hook-installed.sh scripts/tests/test-role-hook-vs-check-agents.sh"
+FACTEUR_IMPUTER=9
+IM_OPTS=()
+IR_RC=0
+IR_REJEUX=0
+
+# Clés de motifs d'une sortie de `suite` (une par ligne, triées, uniques) : `motif <motif>` pour chaque SUITE-ECART
+# (bilan : sa nature sans le compte ; exige-absent et montre-absent : le libellé), `ligne <texte>` pour chaque ligne
+# `  ✗ ` ou `NON TUÉ`. Les nombres (ko n=3, rc 1, durée) ne sont jamais comparés.
+imputer_motifs() { # <sortie>
+  LC_ALL=C awk '
+    index($0, "SUITE-ECART ") == 1 {
+      r = substr($0, 13); n = split(r, w, " "); m = w[1]
+      if (m == "bilan") { d = w[2]; sub(/=.*/, "", d); m = "bilan " d }
+      else if (m == "exige-absent" || m == "montre-absent") { m = m " " substr(r, length(w[1]) + 2) }
+      print "motif " m; next
+    }
+    index($0, "  ✗ ") == 1 { print "ligne " $0; next }
+    index($0, "NON TUÉ") > 0 { print "ligne " $0 }
+  ' "$1" | LC_ALL=C sort -u
+}
+
+# Un rejeu : `suite` dans un processus neuf (HOME temporaire, environnement privé : le mode suite lui-même).
+# <exp> vaut `-` pour l'arbre courant, ou le dossier d'un export (parent, sans .git ou avec un dépôt à un commit).
+# Imprime IMPUTATION-REJEU ; pose IR_RC ; le code 64 d'un rejeu est un usage, jamais un verdict.
+imputer_rejeu() { # <sur> <n> <sortie> <exp> <suite>
+  local sur=$1 n=$2 sortie=$3 exp=$4 suite=$5 args a motifs nl
+  args=()
+  if [ "$exp" = - ]; then
+    for a in ${IM_OPTS[@]+"${IM_OPTS[@]}"}; do args+=("$a"); done
+  else
+    for a in ${IM_OPTS[@]+"${IM_OPTS[@]}"}; do
+      case $a in --duree-max=* | --base-cle=* | --base-fichier=*) ;; *) args+=("$a") ;; esac
+    done
+    args+=("--racine-export=$exp")
+  fi
+  bash "$OUTIL" suite "$suite" ${args[@]+"${args[@]}"} "--outil-origine=$OUTIL_ORIGINE" > "$sortie" 2>&1 < /dev/null
+  IR_RC=$?
+  IR_REJEUX=$((IR_REJEUX + 1))
+  motifs=$(imputer_motifs "$sortie" | LC_ALL=C awk 'index($0, "motif ") == 1 { sub(/^motif /, ""); gsub(/ /, "_"); printf "%s%s", (c++ ? "," : ""), $0 }')
+  nl=$(LC_ALL=C awk 'index($0, "  ✗ ") == 1 { c++ } END { print c + 0 }' "$sortie")
+  printf 'IMPUTATION-REJEU %s sur=%s n=%s rc=%s motifs=%s lignes-ko=%s\n' "$suite" "$sur" "$n" "$IR_RC" "${motifs:--}" "$nl"
+}
+
+cmd_imputer() {
+  local suite="" sha="" detache="" a cle esc verdict cause="" t pdir p2dir cur rcp sensible k manque nouveau entree b_kind b_rc b_s b_zero borne rcv
+  local args_detache=()
+  IM_OPTS=()
+  IR_REJEUX=0
+  for a in "$@"; do
+    case $a in --detache=*) ;; *) args_detache+=("$a") ;; esac
+  done
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --commit=*) sha=${1#--commit=} ;;
+      --detache=*) detache=${1#--detache=}; [ -n "$detache" ] || die_usage "imputer : --detache=<dossier>" ;;
+      --base-fichier=*) option_base_fichier "${1#--base-fichier=}"; IM_OPTS+=("$1") ;;
+      --exige=* | --shells=* | --montre=* | --duree-max=* | --base-cle=*) IM_OPTS+=("$1") ;;
+      -*) die_usage "imputer : option inconnue : $1" ;;
+      *) [ -z "$suite" ] || die_usage "imputer : une seule suite par appel"; suite=$1 ;;
+    esac
+    shift
+  done
+  [ -n "$suite" ] && [ -n "$sha" ] || die_usage "imputer <suite> --commit=<sha> [options de suite] [--detache=<dossier>]"
+  racine_ou_sortir
+  case $suite in "$RACINE"/*) suite=${suite#"$RACINE"/} ;; esac
+  if ! git rev-parse --verify -q "${sha}^{commit}" > /dev/null 2>&1; then
+    echo "IMPUTATION-USAGE commit-inconnu $sha" >&2
+    exit 64
+  fi
+  if ! git rev-parse --verify -q "${sha}^" > /dev/null 2>&1; then
+    echo "IMPUTATION-USAGE commit-sans-parent $sha (le PREMIER commit du plan doit avoir un parent)" >&2
+    exit 64
+  fi
+  cle=$suite
+  for a in ${IM_OPTS[@]+"${IM_OPTS[@]}"}; do
+    case $a in --base-cle=*) cle=${a#--base-cle=} ;; esac
+  done
+  esc=non
+  case " $SUITES_PORTEUSES " in *" $cle "*) esc=oui ;; esac
+
+  if [ -n "$detache" ]; then
+    # Rejeu détaché : borne = 9 × durée de base (trois rejeux au plus, chacun sous son plafond), jamais d'ailleurs.
+    if [ -e "$BASE_FICHIER" ]; then
+      base_valider
+      rcv=$?
+      [ "$rcv" -eq 0 ] || exit 64
+      entree=$(base_chercher "$cle")
+    else
+      entree=""
+    fi
+    if [ -z "$entree" ]; then
+      echo "IMPUTATION-USAGE base-absente $cle : aucun rejeu détaché sans durée de base (aucune borne inventée)" >&2
+      exit 64
+    fi
+    read -r b_kind b_rc b_s b_zero <<EOF
+$entree
+EOF
+    if [ "$b_kind" = AJOUT ]; then
+      b_s=$b_rc
+      b_rc=0
+      b_zero=0
+    fi
+    if [ "$b_rc" -ne 0 ] || [ "$b_zero" -ne 0 ]; then
+      echo "IMPUTATION-USAGE base-rouge $cle : suite rouge à la base, sa durée n'est pas une mesure" >&2
+      exit 64
+    fi
+    borne=$((b_s * FACTEUR_IMPUTER))
+    [ "$borne" -ge 1 ] || borne=1
+    detacher "$detache" "$borne" - 1 imputer ${args_detache[@]+"${args_detache[@]}"}
+    return $?
+  fi
+
+  nouveau_tmp
+  t=$NT
+  # C1 sur l'arbre courant ; C2 seulement si C1 est vert.
+  imputer_rejeu courant 1 "$t/c1.txt" - "$suite"
+  [ "$IR_RC" -ne 64 ] || { cat "$t/c1.txt" >&2; exit 64; }
+  cur=$t/c1.txt
+  if [ "$IR_RC" -eq 0 ]; then
+    imputer_rejeu courant 2 "$t/c2.txt" - "$suite"
+    [ "$IR_RC" -ne 64 ] || { cat "$t/c2.txt" >&2; exit 64; }
+    cur=$t/c2.txt
+  fi
+  if [ "$IR_RC" -eq 0 ]; then
+    verdict=instable
+    cause=non-reproduit
+  elif ! git cat-file -e "${sha}^:${suite}" > /dev/null 2>&1; then
+    verdict=imputable
+    echo "IMPUTATION-NOTE suite-neuve $suite : absente du commit parent"
+  else
+    # P : export `git archive` du parent, sans checkout, stash ni reset (HEAD, index, arbre de travail et pile des
+    # stash sont inchangés) ; ÉCART NOMMÉ : l'export n'a ni .git, ni historique, ni fichiers ignorés, ni configuration
+    # locale — il ne reproduit PAS le dépôt du rejeu courant.
+    pdir=$t/parent
+    mkdir -p "$pdir"
+    git archive --format=tar "${sha}^" | tar -x -C "$pdir"
+    imputer_rejeu parent 1 "$t/p.txt" "$pdir" "$suite"
+    [ "$IR_RC" -ne 64 ] || { cat "$t/p.txt" >&2; exit 64; }
+    if [ "$IR_RC" -eq 0 ]; then
+      verdict=imputable
+    else
+      imputer_motifs "$cur" > "$t/cur.keys"
+      imputer_motifs "$t/p.txt" > "$t/p.keys"
+      manque=$(LC_ALL=C comm -23 "$t/cur.keys" "$t/p.keys")
+      if [ -n "$manque" ]; then
+        verdict=imputable
+        while IFS= read -r nouveau; do
+          printf 'IMPUTATION-NOUVEAU %s\n' "${nouveau#* }"
+        done <<EOF
+$manque
+EOF
+      else
+        # P2 : le même export rendu dépôt par `git init` et UN commit de tout l'export (identité passée par -c,
+        # configurations globale et système vers /dev/null). Il reproduit la PRÉSENCE d'un dépôt, pas son historique.
+        p2dir=$t/parent-depot
+        mkdir -p "$p2dir"
+        git archive --format=tar "${sha}^" | tar -x -C "$p2dir"
+        env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git -c init.defaultBranch=main -c user.name=imputer -c user.email=imputer@localhost -c commit.gpgsign=false -c core.hooksPath=/dev/null -C "$p2dir" init -q > /dev/null 2>&1
+        env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git -c user.name=imputer -c user.email=imputer@localhost -c commit.gpgsign=false -c core.hooksPath=/dev/null -C "$p2dir" add -A > /dev/null 2>&1
+        env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null git -c user.name=imputer -c user.email=imputer@localhost -c commit.gpgsign=false -c core.hooksPath=/dev/null -C "$p2dir" commit -q -m export > /dev/null 2>&1
+        imputer_rejeu parent-depot 1 "$t/p2.txt" "$p2dir" "$suite"
+        [ "$IR_RC" -ne 64 ] || { cat "$t/p2.txt" >&2; exit 64; }
+        if [ "$IR_RC" -eq 0 ]; then
+          verdict=imputable
+          echo "IMPUTATION-NOTE parent-vert-avec-depot : le parent ne rougissait que sans dépôt, son rouge n'est pas un fait préexistant"
+        else
+          # Suite « sensible au dépôt » : son source à <sha>^ contient le mot `git` (critère volontairement large).
+          sensible=0
+          if git show "${sha}^:${suite}" 2> /dev/null | grep -qw git; then sensible=1; fi
+          if [ "$sensible" -eq 1 ]; then
+            verdict=instable
+            cause=suite-sensible-depot
+          else
+            verdict=preexistant
+          fi
+        fi
+      fi
+    fi
+  fi
+  if [ "$verdict" = instable ]; then
+    printf 'IMPUTATION %s verdict=%s rejeux=%s escalade-willy=%s cause=%s\n' "$suite" "$verdict" "$IR_REJEUX" "$esc" "$cause"
+  else
+    printf 'IMPUTATION %s verdict=%s rejeux=%s escalade-willy=%s\n' "$suite" "$verdict" "$IR_REJEUX" "$esc"
+  fi
+  [ "$verdict" != imputable ] || return 1
+  [ "$esc" = non ] || return 1
+  return 0
+}
+
+# ---------------------------------------------------------------------------------------------------------
+# Mode jalon (P461-D-16)
+# ---------------------------------------------------------------------------------------------------------
+# Lit un fait DÉCLARÉ par le manager (46.1-JALONS.txt) : forme, cohérence et ancienneté vérifiées, jamais la
+# véracité (même régime que `Gate-Touche:`). Jamais un vert à vide : fichier ou ligne absents = 1.
+cmd_jalon() {
+  local n="" jf="" ec=0 nl champs commit suites vertes rouges zero s imp pre ins bsuites ligne rcv
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --jalons-fichier=*) jf=${1#--jalons-fichier=}; printf 'JALONS-FICHIER-ALTERNATIF %s\n' "$jf" ;;
+      --base-fichier=*) option_base_fichier "${1#--base-fichier=}" ;;
+      -*) die_usage "jalon : option inconnue : $1" ;;
+      *) [ -z "$n" ] || die_usage "jalon <1|2|3>"; n=$1 ;;
+    esac
+    shift
+  done
+  case $n in 1 | 2 | 3) ;; *) die_usage "jalon <1|2|3>" ;; esac
+  racine_ou_sortir
+  [ -n "$jf" ] || jf="$(dirname "$OUTIL_ORIGINE")/46.1-JALONS.txt"
+  jalon_ecart() {
+    printf 'JALON-ECART %s\n' "$1"
+    ec=$((ec + 1))
+  }
+  if [ ! -f "$jf" ]; then
+    jalon_ecart jalon-absent
+    return 1
+  fi
+  nl=$(N="$n" LC_ALL=C awk 'BEGIN { n = ENVIRON["N"] } $1 == "JALON" && $2 == n { c++ } END { print c + 0 }' "$jf")
+  if [ "$nl" -eq 0 ]; then
+    jalon_ecart jalon-absent
+    return 1
+  fi
+  if [ "$nl" -gt 1 ]; then
+    jalon_ecart jalon-double
+    return 1
+  fi
+  ligne=$(N="$n" LC_ALL=C awk 'BEGIN { n = ENVIRON["N"] } $1 == "JALON" && $2 == n { print; exit }' "$jf")
+  champs=$(printf '%s\n' "$ligne" | LC_ALL=C awk '
+    NF == 13 && $3 ~ /^commit=[0-9a-f]+$/ && $4 ~ /^date=[^ ]+$/ && $5 == "TOUTES-BILAN" && $6 ~ /^suites=[0-9]+$/ \
+      && $7 ~ /^vertes=[0-9]+$/ && $8 ~ /^rouges=[0-9]+$/ && $9 ~ /^zero-ok=[0-9]+$/ && $10 ~ /^s=[0-9]+$/ \
+      && $11 ~ /^imputables=[0-9]+$/ && $12 ~ /^preexistants=[0-9]+$/ && $13 ~ /^instables=[0-9]+$/ {
+      print substr($3, 8), substr($6, 8), substr($7, 8), substr($8, 8), substr($9, 9), substr($10, 3), substr($11, 12), substr($12, 14), substr($13, 11); exit 0 }')
+  if [ -z "$champs" ]; then
+    jalon_ecart jalon-forme
+    return 1
+  fi
+  read -r commit suites vertes rouges zero s imp pre ins <<EOF
+$champs
+EOF
+  if ! git merge-base --is-ancestor "$commit" HEAD > /dev/null 2>&1; then
+    jalon_ecart jalon-commit-non-ancetre
+  fi
+  [ "$imp" -eq 0 ] || jalon_ecart jalon-imputables
+  [ "$rouges" -eq $((pre + imp + ins)) ] || jalon_ecart jalon-comptes-incoherents
+  if [ -e "$BASE_FICHIER" ]; then
+    base_valider > /dev/null
+    rcv=$?
+    if [ "$rcv" -eq 0 ]; then
+      bsuites=$(LC_ALL=C awk '$1 == "BASE-BILAN" { print substr($2, 8); exit }' "$BASE_FICHIER")
+      [ "$suites" -ge "$bsuites" ] || jalon_ecart jalon-decouverte-partielle
+    else
+      jalon_ecart jalon-base-illisible
+    fi
+  else
+    jalon_ecart jalon-base-illisible
+  fi
+  # Jalon périmé : le hook ou sa commande enregistrée ont changé (arbre de travail compris) depuis le commit du jalon.
+  if git cat-file -e "${commit}^{commit}" > /dev/null 2>&1; then
+    if [ -n "$(git diff --name-only "$commit" -- "$HOOK_REL" "$HOOKS_JSON_REL" 2> /dev/null)" ]; then
+      jalon_ecart jalon-perime
+    fi
+  fi
+  if [ "$ec" -eq 0 ]; then
+    printf 'JALON-VERIF %s ok\n' "$n"
+    return 0
+  fi
+  return 1
+}
+
+# ---------------------------------------------------------------------------------------------------------
+# Mode empreinte (P461-D-16)
+# ---------------------------------------------------------------------------------------------------------
+cmd_empreinte() {
+  local geler=0 d outil sha h gel nc k ec=0 tmp
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --geler) geler=1 ;;
+      *) die_usage "empreinte [--geler]" ;;
+    esac
+    shift
+  done
+  racine_ou_sortir
+  d=$(cd "$(dirname "$OUTIL_ORIGINE")" && pwd -P) || exit 64
+  outil=$d/46.1-CONTROLES.sh
+  sha=$d/46.1-CONTROLES.sha256
+  [ -f "$outil" ] || { echo "EMPREINTE-USAGE outil introuvable : $outil" >&2; exit 64; }
+  nouveau_tmp
+  tmp=$NT
+  (cd "$d" && shasum -a 256 46.1-CONTROLES.sh) > "$tmp/calcul.txt"
+  h=$(awk '{ print $1; exit }' "$tmp/calcul.txt")
+  if [ "$geler" -eq 1 ]; then
+    if [ -e "$sha" ]; then
+      echo "EMPREINTE-USAGE geler-refuse : $sha existe, le gel posé n'est jamais re-posé" >&2
+      exit 64
+    fi
+    if ! git ls-files --error-unmatch -- "$outil" > /dev/null 2>&1 || [ -n "$(git status --porcelain -- "$outil")" ]; then
+      echo "EMPREINTE-USAGE geler-refuse : l'outil n'est pas commité et propre" >&2
+      exit 64
+    fi
+    cp "$tmp/calcul.txt" "$sha"
+    printf 'EMPREINTE-GELEE sha256=%s\n' "$h"
+    return 0
+  fi
+  if [ ! -f "$sha" ]; then
+    echo "EMPREINTE-ECART absente"
+    return 1
+  fi
+  cmp -s "$tmp/calcul.txt" "$sha" || { echo "EMPREINTE-ECART modifie"; ec=$((ec + 1)); }
+  if ! git ls-files --error-unmatch -- "$outil" > /dev/null 2>&1 || [ -n "$(git status --porcelain -- "$outil")" ] \
+    || ! git ls-files --error-unmatch -- "$sha" > /dev/null 2>&1 || [ -n "$(git status --porcelain -- "$sha")" ]; then
+    echo "EMPREINTE-ECART non-commite"
+    ec=$((ec + 1))
+  else
+    nc=$(git log --format=%H -- "$sha" | awk 'END { print NR }')
+    if [ "$nc" -ne 1 ]; then
+      echo "EMPREINTE-ECART gel-rouvert"
+      ec=$((ec + 1))
+    else
+      gel=$(git log --format=%H -- "$sha")
+      k=$(git rev-list --count "$gel..HEAD" -- "$outil")
+      if [ "$k" -gt 0 ]; then
+        printf 'EMPREINTE-ECART commit-apres-gel n=%s\n' "$k"
+        ec=$((ec + 1))
+      fi
+    fi
+  fi
+  if [ "$ec" -eq 0 ]; then
+    printf 'EMPREINTE ok sha256=%s gel=%s\n' "$h" "$gel"
+    return 0
+  fi
+  return 1
+}
+
+# ---------------------------------------------------------------------------------------------------------
 # Autotest
 # ---------------------------------------------------------------------------------------------------------
 AT_JOUES=()
@@ -2091,7 +2565,7 @@ at_lancer() { # args de l'outil ; cwd = $AT_CWD
   # phase (posée à côté de l'outil) : il reçoit un fichier de base inexistant.
   local extra=()
   case $1 in
-    suite | toutes | base-duree)
+    suite | toutes | base-duree | imputer)
       case " $* " in
         *" --base-fichier="*) ;;
         *) extra=(--base-fichier="$AT_TMP/aucune-base.txt") ;;
@@ -2117,8 +2591,18 @@ at_compte() { # <préfixe> <n> : nombre de lignes qui COMMENCENT par le préfixe
   [ "$c" -eq "$2" ] || at_echec "lignes « $1… » : $c au lieu de $2"
 }
 
+# Trace d'un cas reel-* : les lignes de la VRAIE sortie qui portent le verdict (motifs de rouge obtenus), recopiées
+# telles quelles dans la sortie de l'autotest.
+at_trace() {
+  [ -n "$AT_OUT" ] && [ -f "$AT_OUT" ] || return 0
+  AT_C="$AT_NOM" LC_ALL=C awk '
+    index($0, "SUITE-ECART ") == 1 || index($0, "ETAT-ECART ") == 1 || index($0, "  ✗ ") == 1 || index($0, "SUITE ") == 1 {
+      print "  AUTOTEST-TRACE " ENVIRON["AT_C"] " : " $0 }' "$AT_OUT"
+}
+
 at_fin() { # <attendu>
   local verdict=ok
+  case $AT_NOM in reel-*) at_trace ;; esac
   if [ "$AT_RC" != "$1" ] || [ "$AT_FAIL" -ne 0 ]; then
     verdict=ko
     AT_KO=$((AT_KO + 1))
@@ -3759,6 +4243,316 @@ autotest_reel_etat() {
   at_fin 1
 }
 
+# imp_prepare <suite> <corps parent|-> <corps courant> [<etat parent> <etat courant>] : faux dépôt dont le commit du
+# plan (IMP_SHA, HEAD) a un parent qui porte la suite `corps parent` (`-` : suite absente du parent). Le fichier
+# etat.txt (facultatif) permet à une fausse suite de dépendre d'une donnée que l'export conserve.
+imp_prepare() {
+  at_depot
+  if [ "$2" != - ]; then mk_suite "$1" "$2"; fi
+  if [ -n "${4:-}" ]; then echo "$4" > "$FD/etat.txt"; fi
+  at_commit
+  mk_suite "$1" "$3"
+  if [ -n "${5:-}" ]; then echo "$5" > "$FD/etat.txt"; fi
+  echo plan > "$FD/plan.txt"
+  at_commit
+  IMP_SHA=$(cd "$FD" && git rev-parse HEAD)
+}
+
+autotest_imputer() {
+  local S=plugin/m/tests/test-c.sh SP=plugin/planning-core/scripts/tests/test-planning-gates.sh BF D avant apres
+  local CANON='echo "== Résultat : 3 OK · 0 KO =="'
+  local ROUGE="echo '  ✗ A'; echo '== Résultat : 2 OK · 1 KO =='; exit 1"
+  local ROUGE_AB="echo '  ✗ A'; echo '  ✗ B'; echo '== Résultat : 1 OK · 2 KO =='; exit 1"
+  local SANS_DEPOT='d=.g; d="${d}it"; if [ ! -d "$d" ] || [ "$(cat etat.txt 2>/dev/null)" = rouge ]; then echo "  ✗ A"; echo "== Résultat : 1 OK · 1 KO =="; exit 1; fi; echo "== Résultat : 2 OK · 0 KO =="'
+  local PAR_FICHIER='if [ "$(cat etat.txt 2>/dev/null)" = rouge ]; then echo "  ✗ A"; echo "== Résultat : 1 OK · 1 KO =="; exit 1; fi; echo "== Résultat : 2 OK · 0 KO =="'
+  local SENSIBLE='git rev-parse --git-dir > /dev/null 2>&1; if [ "$(cat etat.txt 2>/dev/null)" = rouge ]; then echo "  ✗ A"; echo "== Résultat : 1 OK · 1 KO =="; exit 1; fi; echo "== Résultat : 2 OK · 0 KO =="'
+  BF=$AT_TMP/base-imputer.txt
+
+  at_debut imputer-preexistant
+  imp_prepare $S "$ROUGE" "$ROUGE"
+  at_lancer imputer $S --commit="$IMP_SHA"
+  at_contient "IMPUTATION $S verdict=preexistant rejeux=3 escalade-willy=non"; at_contient "sur=courant n=1 rc=1"
+  at_contient "sur=parent n=1 rc=1"; at_contient "sur=parent-depot n=1 rc=1"
+  at_fin 0
+
+  at_debut imputer-bilan-structurel
+  imp_prepare $S "echo '== résultat : 3 passés, 0 échoués =='" "echo '== résultat : 3 passés, 0 échoués =='"
+  at_lancer imputer $S --commit="$IMP_SHA"
+  at_contient "IMPUTATION $S verdict=preexistant rejeux=3 escalade-willy=non"; at_contient "motifs=bilan_forme-inconnue"; at_absent "lignes-ko=1"
+  at_fin 0
+
+  at_debut imputer-imputable
+  imp_prepare $S "$CANON" "$ROUGE"
+  at_lancer imputer $S --commit="$IMP_SHA"
+  at_contient "IMPUTATION $S verdict=imputable rejeux=2 escalade-willy=non"; at_contient "sur=parent n=1 rc=0"
+  at_fin 1
+
+  at_debut imputer-imputable-nouveau-ko
+  imp_prepare $S "$ROUGE" "$ROUGE_AB"
+  at_lancer imputer $S --commit="$IMP_SHA"
+  at_contient "IMPUTATION-NOUVEAU   ✗ B"; at_contient "verdict=imputable"; at_absent "sur=parent-depot"
+  at_fin 1
+
+  at_debut imputer-instable
+  imp_prepare $S "$CANON" "$CANON"
+  at_lancer imputer $S --commit="$IMP_SHA"
+  at_contient "IMPUTATION $S verdict=instable rejeux=2 escalade-willy=non cause=non-reproduit"; at_contient "sur=courant n=2 rc=0"
+  at_fin 0
+
+  at_debut imputer-parent-sans-depot
+  imp_prepare $S "$SANS_DEPOT" "$SANS_DEPOT" ok rouge
+  grep -w git "$FD/$S" > /dev/null && at_echec "la fausse suite cite le mot git"
+  at_lancer imputer $S --commit="$IMP_SHA"
+  at_contient "sur=parent n=1 rc=1"; at_contient "sur=parent-depot n=1 rc=0"; at_contient "IMPUTATION $S verdict=imputable rejeux=3"
+  at_fin 1
+
+  at_debut imputer-parent-depot-preexistant
+  imp_prepare $S "$PAR_FICHIER" "$PAR_FICHIER" rouge rouge
+  grep -w git "$FD/$S" > /dev/null && at_echec "la fausse suite cite le mot git"
+  at_lancer imputer $S --commit="$IMP_SHA"
+  at_contient "sur=parent-depot n=1 rc=1"; at_contient "IMPUTATION $S verdict=preexistant rejeux=3 escalade-willy=non"
+  at_fin 0
+
+  at_debut imputer-suite-sensible-depot
+  imp_prepare $S "$SENSIBLE" "$SENSIBLE" rouge rouge
+  at_lancer imputer $S --commit="$IMP_SHA"
+  at_contient "IMPUTATION $S verdict=instable rejeux=3 escalade-willy=non cause=suite-sensible-depot"; at_absent "verdict=preexistant"
+  at_fin 0
+
+  at_debut imputer-suite-neuve
+  imp_prepare $S - "$ROUGE"
+  at_lancer imputer $S --commit="$IMP_SHA"
+  at_contient "IMPUTATION-NOTE suite-neuve"; at_contient "IMPUTATION $S verdict=imputable rejeux=1"
+  at_fin 1
+
+  at_debut imputer-escalade-porteuse
+  imp_prepare $SP "$ROUGE" "$ROUGE"
+  at_lancer imputer $SP --commit="$IMP_SHA"
+  at_contient "IMPUTATION $SP verdict=preexistant rejeux=3 escalade-willy=oui"
+  at_fin 1
+
+  at_debut imputer-escalade-hors-liste
+  imp_prepare plugin/m/tests/test-hors-liste.sh "$ROUGE" "$ROUGE"
+  at_lancer imputer plugin/m/tests/test-hors-liste.sh --commit="$IMP_SHA"
+  at_contient "verdict=preexistant"; at_contient "escalade-willy=non"
+  at_fin 0
+
+  at_debut imputer-sans-effet
+  imp_prepare $S "$SANS_DEPOT" "$SANS_DEPOT" ok rouge
+  avant="$(cd "$FD" && git rev-parse HEAD; git status --porcelain; git stash list; git for-each-ref)"
+  at_lancer imputer $S --commit="$IMP_SHA"
+  apres="$(cd "$FD" && git rev-parse HEAD; git status --porcelain; git stash list; git for-each-ref)"
+  [ "$avant" = "$apres" ] || at_echec "HEAD, index, arbre de travail, pile des stash ou références modifiés"
+  at_contient "sur=parent-depot"
+  [ -z "$(cd "$FD" && git stash list)" ] || at_echec "la pile des stash n'est pas vide"
+  at_fin 1
+
+  at_debut imputer-commit-inconnu
+  imp_prepare $S "$CANON" "$CANON"
+  at_lancer imputer $S --commit=0000000000000000000000000000000000000000
+  at_contient "commit-inconnu"
+  at_fin 64
+
+  at_debut imputer-commit-sans-parent
+  imp_prepare $S "$CANON" "$CANON"
+  at_lancer imputer $S --commit="$(cd "$FD" && git rev-list --max-parents=0 HEAD)"
+  at_contient "commit-sans-parent"
+  at_fin 64
+
+  at_debut imputer-detache-borne
+  imp_prepare $S "$ROUGE" "$ROUGE"
+  mk_base "$BF" "$S:0:4"
+  D=$AT_TMP/d-imputer
+  at_lancer imputer $S --commit="$IMP_SHA" --detache="$D" --base-fichier="$BF"
+  [ "$(cat "$D/borne.txt" 2> /dev/null)" = 36 ] || at_echec "borne.txt vaut « $(cat "$D/borne.txt" 2> /dev/null) » au lieu de 36 (9 × 4)"
+  at_fichier_contient "$D/commande.txt" "mode=imputer"
+  at_attendre_fin "$D" 120 || at_echec "fin.txt n'est jamais apparu"
+  at_lancer sonder "$D"
+  at_contient "IMPUTATION $S verdict=preexistant"
+  at_fin 0
+}
+
+# jal_prepare : faux dépôt avec le hook et sa commande enregistrée commités (JAL_SHA), une base de deux suites
+# (JAL_BF) et un fichier de jalons à écrire (JAL_F). Variables de jal_ligne : JL_N, JL_COMMIT, JL_SUITES, JL_VERTES,
+# JL_ROUGES, JL_IMP, JL_PRE, JL_INS.
+jal_prepare() {
+  at_depot
+  mkdir -p "$FD/$(dirname "$HOOK_REL")" "$FD/$(dirname "$HOOKS_JSON_REL")"
+  echo hook > "$FD/$HOOK_REL"
+  echo '{}' > "$FD/$HOOKS_JSON_REL"
+  at_commit
+  JAL_SHA=$(cd "$FD" && git rev-parse HEAD)
+  JAL_BF=$AT_TMP/base-jalon.txt
+  mk_base "$JAL_BF" "a.sh:0:1" "b.sh:0:1"
+  JAL_F=$AT_TMP/jalons.txt
+}
+
+jal_ligne() {
+  printf 'JALON %s commit=%s date=2026-10-13T10:00:00Z TOUTES-BILAN suites=%s vertes=%s rouges=%s zero-ok=0 s=3600 imputables=%s preexistants=%s instables=%s\n' \
+    "${JL_N:-1}" "${JL_COMMIT:-$JAL_SHA}" "${JL_SUITES:-109}" "${JL_VERTES:-101}" "${JL_ROUGES:-8}" "${JL_IMP:-0}" "${JL_PRE:-8}" "${JL_INS:-0}"
+}
+
+at_jalon() { # <n>
+  at_lancer jalon "$1" --jalons-fichier="$JAL_F" --base-fichier="$JAL_BF"
+}
+
+autotest_jalon() {
+  local side
+  jal_prepare
+
+  at_debut jalon-ok
+  jal_ligne > "$JAL_F"
+  at_jalon 1
+  at_contient "JALON-VERIF 1 ok"; at_absent "JALON-ECART"
+  at_fin 0
+
+  at_debut jalon-absent
+  at_lancer jalon 1 --jalons-fichier="$AT_TMP/n-existe-pas.txt" --base-fichier="$JAL_BF"
+  at_contient "JALON-ECART jalon-absent"
+  at_fin 1
+
+  at_debut jalon-sans-ligne
+  JL_N=2 jal_ligne > "$JAL_F"
+  at_jalon 1
+  at_contient "JALON-ECART jalon-absent"
+  at_fin 1
+
+  at_debut jalon-double
+  { jal_ligne; jal_ligne; } > "$JAL_F"
+  at_jalon 1
+  at_contient "JALON-ECART jalon-double"
+  at_fin 1
+
+  at_debut jalon-forme
+  jal_ligne | sed 's/ instables=0$//' > "$JAL_F"
+  at_jalon 1
+  at_contient "JALON-ECART jalon-forme"
+  at_fin 1
+
+  at_debut jalon-imputables
+  JL_IMP=1 JL_PRE=7 jal_ligne > "$JAL_F"
+  at_jalon 1
+  at_contient "JALON-ECART jalon-imputables"; at_compte "JALON-ECART" 1
+  at_fin 1
+
+  at_debut jalon-commit-non-ancetre
+  (cd "$FD" && gitf checkout -q -b autre && echo x > x.txt && gitf add -A && gitf commit -q -m autre && gitf checkout -q main) > /dev/null 2>&1
+  side=$(cd "$FD" && git rev-parse autre)
+  JL_COMMIT=$side jal_ligne > "$JAL_F"
+  at_jalon 1
+  at_contient "JALON-ECART jalon-commit-non-ancetre"; at_compte "JALON-ECART" 1
+  at_fin 1
+
+  at_debut jalon-comptes-incoherents
+  JL_ROUGES=3 JL_PRE=1 JL_IMP=0 JL_INS=1 jal_ligne > "$JAL_F"
+  at_jalon 1
+  at_contient "JALON-ECART jalon-comptes-incoherents"; at_compte "JALON-ECART" 1
+  at_fin 1
+
+  at_debut jalon-decouverte-partielle
+  JL_SUITES=1 jal_ligne > "$JAL_F"
+  at_jalon 1
+  at_contient "JALON-ECART jalon-decouverte-partielle"; at_compte "JALON-ECART" 1
+  at_fin 1
+
+  at_debut jalon-perime
+  jal_ligne > "$JAL_F"
+  echo "hook change" > "$FD/$HOOK_REL"
+  at_commit
+  at_jalon 1
+  at_contient "JALON-ECART jalon-perime"; at_compte "JALON-ECART" 1
+  at_fin 1
+
+  at_debut jalon-numero-invalide
+  jal_ligne > "$JAL_F"
+  at_jalon 4
+  at_fin 64
+}
+
+# Cas empreinte : une COPIE de l'outil, nommée 46.1-CONTROLES.sh, commitée dans un faux dépôt, est lancée depuis ce
+# dépôt (l'empreinte est celle de l'outil qui s'exécute, à côté de son .sha256).
+at_lancer_copie() { local OUTIL=$COPIE; at_lancer "$@"; }
+
+emp_prepare() {
+  at_depot
+  COPIE=$FD/phase/46.1-CONTROLES.sh
+  cp "$OUTIL" "$COPIE"
+  at_commit
+}
+
+emp_geler() { # gèle (écrit le .sha256) puis le commite
+  at_lancer_copie empreinte --geler
+  at_commit
+}
+
+autotest_empreinte() {
+  local COPIE=""
+
+  at_debut empreinte-ok
+  emp_prepare
+  emp_geler
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE ok sha256="; at_contient " gel="; at_absent "EMPREINTE-ECART"
+  at_fin 0
+
+  at_debut empreinte-absente
+  emp_prepare
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART absente"
+  at_fin 1
+
+  at_debut empreinte-modifie
+  emp_prepare
+  emp_geler
+  echo "# modification après l'empreinte" >> "$COPIE"
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART modifie"
+  at_fin 1
+
+  at_debut empreinte-commit-apres-gel
+  emp_prepare
+  emp_geler
+  echo "# commit après le gel" >> "$COPIE"
+  at_commit
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART commit-apres-gel n=1"
+  at_fin 1
+
+  at_debut empreinte-gel-rouvert
+  emp_prepare
+  emp_geler
+  cp "$FD/phase/46.1-CONTROLES.sha256" "$AT_TMP/sha.sauvegarde"
+  echo "0000" > "$FD/phase/46.1-CONTROLES.sha256"
+  at_commit
+  cp "$AT_TMP/sha.sauvegarde" "$FD/phase/46.1-CONTROLES.sha256"
+  at_commit
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART gel-rouvert"; at_compte "EMPREINTE-ECART" 1
+  at_fin 1
+
+  at_debut empreinte-non-commite
+  emp_prepare
+  at_lancer_copie empreinte --geler
+  at_lancer_copie empreinte
+  at_contient "EMPREINTE-ECART non-commite"; at_compte "EMPREINTE-ECART" 1
+  at_fin 1
+
+  at_debut empreinte-geler-refuse
+  emp_prepare
+  emp_geler
+  at_lancer_copie empreinte --geler
+  at_contient "geler-refuse"
+  at_fin 64
+
+  at_debut empreinte-geler-outil-non-commite
+  emp_prepare
+  echo "# non commité" >> "$COPIE"
+  at_lancer_copie empreinte --geler
+  at_contient "geler-refuse"
+  [ ! -e "$FD/phase/46.1-CONTROLES.sha256" ] || at_echec "un .sha256 a été écrit pour un outil non commité"
+  at_fin 64
+}
+
 autotest() {
   local manquants=0 c j trouve n d m a
   SANS_REEL=0
@@ -3781,6 +4575,9 @@ autotest() {
   autotest_releve
   autotest_armement
   autotest_etat
+  autotest_imputer
+  autotest_jalon
+  autotest_empreinte
   [ "$SANS_REEL" -eq 1 ] || autotest_reel_suite
   [ "$SANS_REEL" -eq 1 ] || autotest_reel_etat
   # Cas déclarés contre cas joués : un cas déclaré et non joué est un échec.
@@ -3843,7 +4640,10 @@ principal() {
     base-duree) cmd_base_duree "$@"; return $? ;;
     armement) cmd_armement "$@"; return $? ;;
     etat-reference) cmd_etat_reference "$@"; return $? ;;
-    *) die_usage "46.1-CONTROLES.sh <suite|toutes|sonder|base-duree|invariants|releve|releve-chaine|armement|etat-reference|--autotest|--help>" ;;
+    imputer) cmd_imputer "$@"; return $? ;;
+    jalon) cmd_jalon "$@"; return $? ;;
+    empreinte) cmd_empreinte "$@"; return $? ;;
+    *) die_usage "46.1-CONTROLES.sh <suite|toutes|sonder|base-duree|invariants|releve|releve-chaine|armement|etat-reference|imputer|jalon|empreinte|--autotest|--help>" ;;
   esac
 }
 
