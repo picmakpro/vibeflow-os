@@ -21,7 +21,7 @@
 #
 # Usage:
 #   driver-lock.sh acquire   --owner=<id> --step=<etape>   # pose le lock (refuse si perime, D-32-02)
-#   driver-lock.sh takeover  --owner=<id> [--step=<etape>] # reprend un lock PERIME (geste explicite) ; avec --ws, refuse legacy-lock-held si l'ancien verrou est VIVANT
+#   driver-lock.sh takeover  --owner=<id> [--step=<etape>] # reprend un lock PERIME (geste explicite) ; avec --ws, refuse comme acquire si l'ancien verrou est tenu (vivant : legacy-lock-held ; perime : stale-requires-takeover)
 #   driver-lock.sh reclaim   --owner=<id>                  # re-rattache la session courante a un lock VIVANT dont on est deja owner
 #   driver-lock.sh heartbeat --owner=<id> [--step=<etape>] # rafraichit le heartbeat entre etapes
 #   driver-lock.sh mark-progress --owner=<id>              # avance progress_epoch (D-33-A), JAMAIS heartbeat_epoch
@@ -58,8 +58,9 @@
 # vf_ws_name_valid puis vf_ws_dir_resolve AVANT d'entrer dans un chemin ou un JSON.
 # ANCIEN VERROU (P57-D-14, P57-D-24, P57-D-26) : en lab partitionne, un .planning/DRIVER.lock tenu
 # vaut verrou de depot. Tout acquire (compartiment ou depot), et takeover --ws sur un ancien verrou VIVANT
-# (Q5, arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 : meme sonde avant la reprise, meme
-# re-sonde apres la pose, meme refus octet pour octet), refuse "legacy-lock-held" avec en hint la
+# ou PERIME (Q5 puis C option (a), arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 : meme sonde
+# avant la reprise, meme re-sonde apres la pose, meme refus octet pour octet ; un refus sur la re-sonde restitue
+# le verrou de compartiment anterieur, sa suppression ne vient qu'apres), refuse "legacy-lock-held" avec en hint la
 # commande de release exacte ; perime, "stale-requires-takeover" avec le recover cible. Rien n'est
 # repris, relache ni supprime en silence, et aucun verbe n'est neuf : l'ancien verrou se manie par
 # VF_DRIVER_LOCK=.planning/DRIVER.lock. Les verbes autres qu'acquire, appeles sans --ws ni --depot
@@ -856,12 +857,13 @@ case "$ACTION" in
   takeover)
     require_owner
     # ANCIEN VERROU (P57-D-26, meme regle qu'`acquire`, arbitrage Samuel, AskUserQuestion session
-    # principale, 2026-10-13) : en lab partitionne, un ancien verrou VIVANT vaut verrou de depot, donc
+    # principale, 2026-10-13) : en lab partitionne, un ancien verrou tenu vaut verrou de depot, donc
     # une reprise de compartiment ne passe pas non plus. Sonde AVANT toute generation ; meme refus,
-    # meme reason, meme hint (vf_dl_legacy_refuse). Ancien verrou perime : comportement inchange.
+    # meme reason, meme hint (vf_dl_legacy_refuse) qu'acquire dans le meme etat : vivant, legacy-lock-held ;
+    # PERIME, stale-requires-takeover avec le recover cible. Rien n'est repris ni supprime.
     if [ "$PARTITIONED" = 1 ]; then
       _leg="$(vf_dl_legacy_probe)"
-      [ "$(printf '%s\n' "$_leg" | sed -n 1p)" = vivant ] && vf_dl_legacy_refuse "$_leg"
+      [ -n "$_leg" ] && vf_dl_legacy_refuse "$_leg"
     fi
     lock_present || { printf '{"acquired": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     age="$(lock_age)"; held="$(meta_get owner)"; observed_gen="$(lock_gen)"
@@ -909,22 +911,34 @@ case "$ACTION" in
     if [ -L "$LOCK_DIR" ]; then
       ln_atomic "$gen" "${LOCK_DIR}.new.$$" && mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"
     else
-      # lock legacy (dossier reel) : pas de lien a remplacer, on elague puis on publie.
-      rm -rf "$LOCK_DIR" && ln_atomic "$gen" "$LOCK_DIR"
+      # lock legacy (dossier reel) : pas de lien a remplacer. On le met de cote (jamais supprime avant la
+      # re-sonde : il est restitue si elle refuse), puis on publie.
+      mv "$LOCK_DIR" "${LOCK_DIR}.old.$$" && ln_atomic "$gen" "$LOCK_DIR"
     fi
     if [ "$(lock_gen)" = "$gen" ]; then
       rm -f "${LOCK_DIR}.new.$$"
-      case "$old_gen" in */*|''|legacy) ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac
-      rm -f "$mutex"; trap - EXIT INT TERM
-      # R-4 (meme re-sonde qu'`acquire`) : un ancien verrou vivant apparu ENTRE la sonde de tete et la
-      # pose. On retire SA propre pose (lien puis generation) et on refuse comme si il avait ete la avant.
+      # R-4 (meme re-sonde qu'`acquire`) : un ancien verrou, vivant OU perime, apparu ENTRE la sonde de tete
+      # et la pose. On retire SA propre pose (lien puis generation) et on RESTITUE le verrou de compartiment
+      # anterieur (lien vers old_gen, generation et registre intacts) : la suppression de old_gen vient
+      # APRES la re-sonde, jamais avant, sinon le refus detruirait ce qu'il pretend ne pas avoir repris (AU2-04).
+      # Le mutex reste tenu jusqu'a la restitution.
       if [ "$PARTITIONED" = 1 ]; then
         _tk_after="$(vf_dl_legacy_probe)"
-        if [ "$(printf '%s\n' "$_tk_after" | sed -n 1p)" = vivant ]; then
-          if [ "$(readlink "$LOCK_DIR" 2>/dev/null)" = "$gen" ]; then rm -f "$LOCK_DIR"; fi
-          rm -rf "${LOCK_PARENT:?}/$gen"; vf_dl_legacy_refuse "$_tk_after"
+        if [ -n "$_tk_after" ]; then
+          if [ -e "${LOCK_DIR}.old.$$" ]; then
+            rm -f "$LOCK_DIR"; mv "${LOCK_DIR}.old.$$" "$LOCK_DIR"
+          else
+            ln_atomic "$old_gen" "${LOCK_DIR}.new.$$" && mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"
+            rm -f "${LOCK_DIR}.new.$$"
+          fi
+          rm -rf "${LOCK_PARENT:?}/$gen" # retire sa pose
+          rm -f "$mutex"; trap - EXIT INT TERM
+          vf_dl_legacy_refuse "$_tk_after"
         fi
       fi
+      case "$old_gen" in */*|''|legacy) ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac
+      rm -rf "${LOCK_DIR}.old.$$"
+      rm -f "$mutex"; trap - EXIT INT TERM
       _lease="$(lease_age)" && : || _lease="null"
       journal_event takeover "$held" "$OWNER" "" "$age" "$(lock_gen)"
       # orphans (issue #82) : les agents consignes par le tenant mort sont rendus ICI, feuille ->
@@ -936,6 +950,7 @@ case "$ACTION" in
       exit 0
     fi
     rm -f "${LOCK_DIR}.new.$$"; rm -rf "${LOCK_PARENT:?}/$gen"
+    [ -e "${LOCK_DIR}.old.$$" ] && [ ! -e "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ] && mv "${LOCK_DIR}.old.$$" "$LOCK_DIR"
     rm -f "$mutex"; trap - EXIT INT TERM
     printf '{"acquired": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
     ;;
