@@ -88,6 +88,7 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 | 261003-1le | Re-audit du pré-filtre tour 2 : F-P3 (config lue sans borne) et F-P4 corrigés ; vérification SECURED, F-P5 déclaré | 2026-10-03 | fed5492 | passed | [261003-1le-correction-f-p3-f-p4-pre-filtre](./quick/261003-1le-correction-f-p3-f-p4-pre-filtre/) |
 | 261003-4gk | CI de la PR #124 : cas 19 de test-check-doc-drift.sh rendu déterministe (maintenance git de fond désactivée dans la fixture ; cas non affaibli, mutant tué) | 2026-10-03 | 90af51c | passed | [261003-4gk-flake-cas-19-doc-drift-gc-auto](./quick/261003-4gk-flake-cas-19-doc-drift-gc-auto/) |
 | 261013-owa | Phase 46.1 fix-outil-01 : la copie détachée de 46.1-CONTROLES.sh ne ré-applique plus detache-requis (suite, toutes, imputer), 3 cas d'autotest base >= 480 s, regel de l'empreinte (gel-rouvert à arbitrer) | 2026-10-13 | 54936dc9 | passed | [261013-owa](./quick/261013-owa-SUMMARY.md) |
+| 261013-t18 | Phase 46.1 fix-5b : lot de correction d'avant armement de G4 (H1..H5 hook/référence, V1..V4 verifier-releve.sh), non-régression des 4 suites, bornage N-5 à décider | 2026-10-13 | 071c517b | passed | [261013-t18](./quick/261013-t18-lot-de-correction-46-1-avant-armement-g4/261013-t18-SUMMARY.md) |
 
 ## Note pour Willy (2026-09-23, partition D-02)
 
