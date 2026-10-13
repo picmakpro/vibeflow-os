@@ -189,3 +189,31 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
     le jalon 1 n'est exigé qu'avant le checkpoint d'armement du plan 05 (P461-D-16 tel qu'écrit au
     plan 04) : exec-04 part pendant que le jalon tourne (exec-04 ne touche ni `planning-hook.sh`
     ni `hooks.json`, le jalon ne périme pas).
+11. **exec-04, Tâche 1** (rapatriée en fast-forward `9801ff84..8379e1af`, trois `Gate-Touche:`) :
+    constructeur G4 de `rejeu-gates.sh` à réécritures, `MUT-REJEU-G4-REECRITURE` tué, (bu) levée ;
+    `test-rejeu-gates.sh rc=0` (101 OK), `RELEVE-CHAINE … coherence=ok` ×3, `etat-reference`
+    `ecarts=0` ; constantes inchangées (G3 armé, G4 et G4′ en observation).
+    **Checkpoint de la Tâche 2 atteint — en attente de Willy** (voir § Checkpoints en attente).
+
+## Checkpoints en attente (relayés à la session principale)
+
+### CKPT-5b — plan 46.1-04, Tâche 2 (`checkpoint:decision`, `gate="blocking-human"`), posé le 2026-10-14
+
+Repos mesuré par l'exécuteur (`lsof -n -F pn`, filtre éprouvé sur entrée synthétique, `LC_ALL=C`) :
+`~/jarvis-keystone` **0 processus** ; `~/BusinessFlow-Lab` **30 processus** dont le répertoire
+courant est dans le lab, aucun fichier ouvert (node 16, zsh 3, uv 3, python3.11 3, Code Helper
+(Plugin) 2, binaires Claude Code `2.1.296` ×2 et `2.1.292` ×1 — sessions Claude ouvertes dans le
+lab). Rien arrêté, aucun lab lu.
+
+- **Q-5b-A — rejeu réel 5b** (options du plan, verbatim) : `rejeu-5b-oui` — « Rejeu réel 5b en
+  lecture seule, labs au repos : une lecture, plus au plus une seconde lecture uniquement sur
+  divergence d'empreinte d'arbre ; aucun attendu ajouté par l'exécuteur » ; `rejeu-5b-non`
+  (défaut) — « Repli sûr : aucun rejeu réel ». Sans réponse explicite : `rejeu-5b-non`.
+- **Q-5b-B — repos de `~/BusinessFlow-Lab`** (le rejeu n'est joué que si 0 processus) : (a) Willy
+  ferme lui-même les sessions ouvertes dans ce lab, la mission re-mesure le repos ; (b) Willy
+  autorise la mission à arrêter ces processus pour CE rejeu seulement ; (c) aucun arrêt : repli,
+  pas de rejeu 5b, donc pas d'armement de G4 dans cette exécution (P461-D-17 le fera trancher en
+  fin de phase).
+- **Recommandation du manager :** `rejeu-5b-oui` + (a) — ce sont des sessions de travail de Willy
+  (dont des `claude` actifs) : les fermer lui-même évite de perdre un travail en cours ; (b) reste
+  possible s'il le préfère.
