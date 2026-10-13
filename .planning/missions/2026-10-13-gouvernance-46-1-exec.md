@@ -172,3 +172,20 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
      rougit sur un relevé réel, la correction se fera alors ;
    - base gelée de `test-verifier-releve.sh` (11 s) : **non rebasée**, `duree-plafond` seul =
      instable.
+10. **plancheck-restants → fix-plans-restants** (re-validation des plans écrits avant les faits) :
+    deux `gsd-plan-checker` frais contre le code livré : **ISSUES** — angle A (04, 05, 11, 12, 13) :
+    5 bloquants, 3 majeurs (relevés prescrits qui rougissent `jeton-deplace`, banc G4 du plan 05
+    lancé au premier plan alors que sa base est 1512 s, lettres de limites) ; angle B (06, 15, 07,
+    08, 09, 16, 10) : 3 bloquants (`test-planning-hook-registered.sh` refusé par l'outil car rouge
+    à la base, suites longues non détachées, collision de la lettre (bx) au plan 10), 15 PASSED.
+    Correction du texte des plans par vf-coder (12 commits `c0c976e5..1eda37f2`, une coupure API
+    « session limit » reprise par réveil, rien perdu), plan-check de contrôle : A, C, D, E, G, H
+    tenues, F avait créé des dossiers de détache dupliqués (scratchpad PARTAGÉ entre agents) ;
+    correction n°2 (11 commits jusqu'à `66fe1fa9`) : dossier neuf, unique, absolu
+    `p461-<plan>-t<tâche>-<objet>` à chaque lancement ; attente du rejeu réel 6 sur la fin du
+    processus. Doublons de `--detache=` relus par le manager : aucun (hors gabarits de prose).
+    **Décisions du manager :** `test-planning-hook-registered.sh` → verdict = CI Linux lue par le
+    manager avant le plan suivant (07, 08, 09, 16, 10) ; lettres (bv) 06, (bw) 07, (by)/(bz) 10 ;
+    le jalon 1 n'est exigé qu'avant le checkpoint d'armement du plan 05 (P461-D-16 tel qu'écrit au
+    plan 04) : exec-04 part pendant que le jalon tourne (exec-04 ne touche ni `planning-hook.sh`
+    ni `hooks.json`, le jalon ne périme pas).

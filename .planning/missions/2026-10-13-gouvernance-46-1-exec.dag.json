@@ -102,7 +102,7 @@
         "fix-5b"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "exec-04",
@@ -111,20 +111,21 @@
       "deps": [
         "revue-5b",
         "audit-5b",
-        "nonreg-5b",
+        "fix-5b",
         "fix-plans-restants"
       ],
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-05",
       "step": "46.1-05 armement G4 (CHECKPOINT humain)",
       "stage": "",
       "deps": [
-        "exec-04"
+        "exec-04",
+        "nonreg-5b"
       ],
       "scope": [
         "plugin/planning-core"
@@ -385,20 +386,19 @@
         "fix-5b"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "fix-plans-restants",
       "step": "correction des textes de plans restants",
       "stage": "",
       "deps": [
-        "plancheck-restants",
-        "nonreg-5b"
+        "plancheck-restants"
       ],
       "scope": [
         ".planning/workstreams/gouvernance/phases"
       ],
-      "status": "blocked"
+      "status": "done"
     }
   ]
 }
