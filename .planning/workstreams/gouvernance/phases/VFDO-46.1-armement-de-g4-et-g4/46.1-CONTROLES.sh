@@ -42,6 +42,20 @@
 # arbre non intact, rejeu à lancer détaché) · `sonder` ajoute 2 (en cours dans la borne) et 3 (borne dépassée ou
 # rejeu mort : REMONTER au manager, ne rien tuer, ne rien relancer).
 #
+# INVARIANTS (`invariants --base=<ref>`, <ref> ancêtre de HEAD sinon 64). Écarts `INVARIANT-ECART <motif>` :
+# `fichier <chemin>` (VERSION, plugin/.claude-plugin/plugin.json, .claude-plugin/marketplace.json ou
+# scripts/tests/test-role-hook-vs-check-agents.sh diffèrent de <ref>, arbre de travail compris) ; `tag <nom>` (un
+# tag pointe sur HEAD) ; `role <fonction>` / `role-absente <fonction>` (l'arbre ast, docstring comprise, d'une
+# fonction de FONCTIONS_ROLE diffère entre <ref> et l'arbre de travail, corps Python extrait du heredoc
+# PY_PLANNING_HOOK_EOF ; une fonction absente de la BASE est une erreur d'usage, 64, jamais un saut silencieux) ;
+# `g4-fige <nom>` : dès que la ligne `ARMEMENT_G4 = "armed"  # etape-5` est dans l'arbre de travail, la fermeture
+# statique d'evaluer_g4 (puis, transitivement, toute définition de niveau module — fonction, classe, affectation —
+# désignée par un ast.Name en lecture dans un élément de la fermeture, les affectations ARMEMENT_* exceptées) doit
+# être ast-identique à celle du PREMIER commit de <ref>..HEAD dont le hook porte cette ligne (aucun :
+# `g4-fige reference-introuvable`). ARMEMENT_G4 à observe : `INVARIANT g4-fige non-applicable`. Ce que g4-fige ne
+# couvre pas : le dispatcher (main, cible_de) et la commande enregistrée, couverts par le banc de G4 en CI et par le
+# relevé de l'étape 6 s'il est joué. Lignes `INVARIANT <motif> ok`, puis `INVARIANTS-BILAN ecarts=<n>`.
+#
 # REJEU DÉTACHÉ (`suite` et `toutes` par --detache=<dossier>, plus `imputer` en 46.1-17). Le dossier est créé s'il
 # n'existe pas et doit être vide (sinon 64). Sans base (hors mesure de la base) ou pour une suite rouge à la base :
 # 64. L'outil s'y copie (`outil.sh` : l'original reste librement éditable pendant le rejeu), écrit `commande.txt`
@@ -158,6 +172,9 @@ CAS_AUTOTEST=(
   detache-sans-base detache-borne-derivee detache-toutes-borne detache-dossier-non-vide mesure-base-borne
   mesure-base-ecrit-par-la-copie sonder-termine-vert sonder-termine-rouge sonder-en-cours sonder-depasse
   sonder-mort sonder-dossier-absent sonder-tranche-trop-grande
+  invariants-sains invariants-role-change invariants-version-change invariants-tag invariants-base-absente
+  g4-fige-observe g4-fige-intact g4-fige-helper-change g4-fige-constante-change g4-fige-transitif
+  g4-fige-reference-introuvable
 )
 
 # ---------------------------------------------------------------------------------------------------------
@@ -575,6 +592,235 @@ EOF
 }
 
 # ---------------------------------------------------------------------------------------------------------
+# Mode invariants
+# ---------------------------------------------------------------------------------------------------------
+HOOK_REL=plugin/planning-core/scripts/planning-hook.sh
+LIGNE_G4_ARME='ARMEMENT_G4 = "armed"  # etape-5'
+FONCTIONS_ROLE="evaluer_role resoudre_agent _choisir_definition definitions_dossier definitions_plugin versions_actives dossiers_agents_version candidat_definition lire_definition_agent deriver_role"
+
+# Python embarqué (python3 -I -S) : extraction du corps du hook (heredoc PY_PLANNING_HOOK_EOF) et comparaison
+# ast. Modes : `roles <base.sh> <travail.sh> <fonction>…` et `g4 <armement.sh> <travail.sh>`.
+# Sorties : lignes `ECART <motif> [<nom>]` ; code 0, 3 (fonction absente de la base : usage), 4 (hook illisible).
+ecrire_py_invariants() { # <fichier>
+  cat > "$1" <<'PY_INVARIANTS_EOF'
+import ast
+import sys
+
+
+def corps(chemin):
+    lignes = open(chemin, encoding="utf-8").read().split("\n")
+    debut = None
+    for i, ligne in enumerate(lignes):
+        if ligne.endswith("<<'PY_PLANNING_HOOK_EOF'"):
+            debut = i + 1
+            break
+    if debut is None:
+        return None
+    for j in range(debut, len(lignes)):
+        if lignes[j] == "PY_PLANNING_HOOK_EOF":
+            return "\n".join(lignes[debut:j]) + "\n"
+    return None
+
+
+def charger(chemin):
+    texte = corps(chemin)
+    if texte is None:
+        raise ValueError("heredoc PY_PLANNING_HOOK_EOF introuvable dans " + chemin)
+    return ast.parse(texte)
+
+
+def definitions(arbre):
+    d = {}
+    for n in arbre.body:
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            d.setdefault(n.name, []).append(n)
+        elif isinstance(n, ast.Assign):
+            for t in n.targets:
+                for x in ast.walk(t):
+                    if isinstance(x, ast.Name) and isinstance(x.ctx, ast.Store):
+                        d.setdefault(x.id, []).append(n)
+        elif isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name):
+            d.setdefault(n.target.id, []).append(n)
+    return d
+
+
+def empreinte(d, nom):
+    return [ast.dump(n) for n in d.get(nom, [])]
+
+
+def fermeture(d, racine):
+    vus = []
+    file = [racine]
+    while file:
+        nom = file.pop()
+        if nom in vus or nom not in d:
+            continue
+        vus.append(nom)
+        for n in d[nom]:
+            for x in ast.walk(n):
+                if isinstance(x, ast.Name) and isinstance(x.ctx, ast.Load):
+                    c = x.id
+                    if c in d and c not in vus and not c.startswith("ARMEMENT_"):
+                        file.append(c)
+    return vus
+
+
+def main():
+    mode = sys.argv[1]
+    try:
+        a = definitions(charger(sys.argv[2]))
+        b = definitions(charger(sys.argv[3]))
+    except (OSError, ValueError, SyntaxError) as e:
+        print("ILLISIBLE " + str(e))
+        return 4
+    if mode == "roles":
+        absente = False
+        for nom in sys.argv[4:]:
+            if not any(isinstance(n, ast.FunctionDef) for n in a.get(nom, [])):
+                print("ABSENTE-BASE " + nom)
+                absente = True
+        if absente:
+            return 3
+        for nom in sys.argv[4:]:
+            if not any(isinstance(n, ast.FunctionDef) for n in b.get(nom, [])):
+                print("ECART role-absente " + nom)
+            elif empreinte(a, nom) != empreinte(b, nom):
+                print("ECART role " + nom)
+        return 0
+    if mode == "g4":
+        if "evaluer_g4" not in a or "evaluer_g4" not in b:
+            print("ECART g4-fige evaluer_g4")
+            return 0
+        noms = sorted(set(fermeture(a, "evaluer_g4")) | set(fermeture(b, "evaluer_g4")))
+        for nom in noms:
+            if empreinte(a, nom) != empreinte(b, nom):
+                print("ECART g4-fige " + nom)
+        return 0
+    print("ILLISIBLE mode " + mode)
+    return 4
+
+
+sys.exit(main())
+PY_INVARIANTS_EOF
+}
+
+cmd_invariants() {
+  local ref="" t f n=0 sortie rcp c commit_arme="" arme=0
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --base=*) ref=${1#--base=} ;;
+      *) die_usage "invariants --base=<ref>" ;;
+    esac
+    shift
+  done
+  [ -n "$ref" ] || die_usage "invariants --base=<ref>"
+  racine_ou_sortir
+  if ! git merge-base --is-ancestor "$ref" HEAD > /dev/null 2>&1; then
+    echo "INVARIANT-USAGE base inconnue ou non ancêtre de HEAD : $ref" >&2
+    exit 64
+  fi
+  nouveau_tmp
+  t=$NT
+  ecrire_py_invariants "$t/inv.py"
+
+  # Fichiers de version et suite de non-régression du hook par rôle (arbre de travail compris).
+  # shellcheck disable=SC2086
+  f=$(git diff --name-only "$ref" -- $INVARIANTS_FICHIERS)
+  if [ -n "$f" ]; then
+    while IFS= read -r c; do
+      printf 'INVARIANT-ECART fichier %s\n' "$c"
+      n=$((n + 1))
+    done <<EOF
+$f
+EOF
+  else
+    echo "INVARIANT fichier ok"
+  fi
+
+  # Aucun tag ne pointe sur HEAD.
+  f=$(git tag --points-at HEAD)
+  if [ -n "$f" ]; then
+    while IFS= read -r c; do
+      printf 'INVARIANT-ECART tag %s\n' "$c"
+      n=$((n + 1))
+    done <<EOF
+$f
+EOF
+  else
+    echo "INVARIANT tag ok"
+  fi
+
+  # Résolution d'agent du hook par rôle : fonctions ast-identiques à la base.
+  if ! git show "$ref:$HOOK_REL" > "$t/base.sh" 2> /dev/null; then
+    echo "INVARIANT-USAGE $HOOK_REL absent de $ref" >&2
+    exit 64
+  fi
+  if [ ! -f "$HOOK_REL" ]; then
+    echo "INVARIANT-ECART role-absente $HOOK_REL"
+    n=$((n + 1))
+  else
+    # shellcheck disable=SC2086
+    sortie=$(python3 -I -S "$t/inv.py" roles "$t/base.sh" "$HOOK_REL" $FONCTIONS_ROLE)
+    rcp=$?
+    case $rcp in
+      0) ;;
+      3) printf '%s\n' "$sortie" | sed 's/^/INVARIANT-USAGE fonction absente de la base : /; s/ABSENTE-BASE //' >&2; exit 64 ;;
+      *) printf 'INVARIANT-ECART hook-illisible %s\n' "$sortie"; n=$((n + 1)); sortie="" ;;
+    esac
+    if [ -n "$sortie" ]; then
+      while IFS= read -r c; do
+        printf 'INVARIANT-%s\n' "$c"
+        n=$((n + 1))
+      done <<EOF
+$sortie
+EOF
+    elif [ "$rcp" -eq 0 ]; then
+      echo "INVARIANT role ok"
+    fi
+  fi
+
+  # Règle g4-fige : dès que ARMEMENT_G4 vaut armed, la fermeture statique d'evaluer_g4 est ast-identique à celle du
+  # commit qui a armé G4. Ne couvre pas le dispatcher (main, cible_de) ni la commande enregistrée : couverts par le
+  # banc de G4 en CI et par le relevé de l'étape 6 s'il est joué.
+  if [ -f "$HOOK_REL" ] && L="$LIGNE_G4_ARME" awk 'BEGIN { l = ENVIRON["L"] } $0 == l { f = 1 } END { exit f ? 0 : 1 }' "$HOOK_REL"; then
+    arme=1
+  fi
+  if [ "$arme" -eq 0 ]; then
+    echo "INVARIANT g4-fige non-applicable"
+  else
+    for c in $(git rev-list --reverse "$ref..HEAD" -- "$HOOK_REL"); do
+      if git show "$c:$HOOK_REL" 2> /dev/null | L="$LIGNE_G4_ARME" awk 'BEGIN { l = ENVIRON["L"] } $0 == l { f = 1 } END { exit f ? 0 : 1 }'; then
+        commit_arme=$c
+        break
+      fi
+    done
+    if [ -z "$commit_arme" ]; then
+      echo "INVARIANT-ECART g4-fige reference-introuvable"
+      n=$((n + 1))
+    else
+      git show "$commit_arme:$HOOK_REL" > "$t/arme.sh"
+      sortie=$(python3 -I -S "$t/inv.py" g4 "$t/arme.sh" "$HOOK_REL")
+      rcp=$?
+      if [ "$rcp" -ne 0 ]; then
+        printf 'INVARIANT-ECART hook-illisible %s\n' "$sortie"
+        n=$((n + 1))
+      elif [ -n "$sortie" ]; then
+        while IFS= read -r c; do
+          printf 'INVARIANT-%s\n' "$c"
+          n=$((n + 1))
+        done <<EOF
+$sortie
+EOF
+      else
+        echo "INVARIANT g4-fige ok"
+      fi
+    fi
+  fi
+  printf 'INVARIANTS-BILAN ecarts=%s\n' "$n"
+  [ "$n" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------------------------------------
 # Rejeu détaché (suite, toutes) et sonder
 # ---------------------------------------------------------------------------------------------------------
 # detacher <dossier> <borne> <exception|-> <nombre de suites> <mode> [args…]
@@ -697,6 +943,7 @@ cmd_sonder() {
 # ---------------------------------------------------------------------------------------------------------
 # Mode toutes
 # ---------------------------------------------------------------------------------------------------------
+INVARIANTS_FICHIERS="VERSION plugin/.claude-plugin/plugin.json .claude-plugin/marketplace.json scripts/tests/test-role-hook-vs-check-agents.sh"
 arbre_intact() { # <ref> : 0 si plugin scripts .github sont identiques à <ref> (suivis et non suivis)
   local d p
   if ! d=$(git diff --name-only "$1" -- plugin scripts .github 2>/dev/null); then
@@ -881,8 +1128,18 @@ at_echec() {
 }
 
 at_lancer() { # args de l'outil ; cwd = $AT_CWD
+  # Isolation : sans --base-fichier explicite, un cas qui lit la base ne doit jamais lire la VRAIE base de la
+  # phase (posée à côté de l'outil) : il reçoit un fichier de base inexistant.
+  local extra=()
+  case $1 in
+    suite | toutes | base-duree)
+      case " $* " in
+        *" --base-fichier="*) ;;
+        *) extra=(--base-fichier="$AT_TMP/aucune-base.txt") ;;
+      esac ;;
+  esac
   AT_OUT="$AT_TMP/out.$AT_N.$RANDOM"
-  (cd "$AT_CWD" && bash "$OUTIL" "$@") > "$AT_OUT" 2>&1 < /dev/null
+  (cd "$AT_CWD" && bash "$OUTIL" "$@" ${extra[@]+"${extra[@]}"}) > "$AT_OUT" 2>&1 < /dev/null
   AT_RC=$?
 }
 
@@ -1097,7 +1354,7 @@ autotest_suite() {
   at_debut suite-filtre-retire
   mk_suite $S 'if [ -n "${VF_PF_SECTIONS:-}${VF_PF_MUT:-}${VF_RELEVE_CHAINE_DEPOT:-}" ]; then echo "== Résultat : 0 OK · 0 KO =="; else echo "== Résultat : 2 OK · 0 KO =="; fi'
   AT_OUT="$AT_TMP/out.filtre"
-  (cd "$AT_CWD" && VF_PF_SECTIONS=x VF_PF_MUT=y VF_RELEVE_CHAINE_DEPOT=z bash "$OUTIL" suite $S) > "$AT_OUT" 2>&1 < /dev/null
+  (cd "$AT_CWD" && VF_PF_SECTIONS=x VF_PF_MUT=y VF_RELEVE_CHAINE_DEPOT=z bash "$OUTIL" suite $S --base-fichier="$AT_TMP/aucune-base.txt")> "$AT_OUT" 2>&1 < /dev/null
   AT_RC=$?
   at_compte "SUITE-ECART" 0
   at_fin 0
@@ -1503,6 +1760,127 @@ autotest_detache() {
   at_fin 64
 }
 
+# mk_hook : écrit un faux hook (heredoc PY_PLANNING_HOOK_EOF) dans le faux dépôt. Variables : HK_ARMEMENT
+# (observe|armed), HK_ROLE (corps de _choisir_definition), HK_SEUIL (constante lue par _h2), HK_H1, HK_H2,
+# HK_AUTRE (fonction hors fermeture), HK_SANS (nom de fonction de rôle à omettre).
+mk_hook() {
+  local f="$FD/$HOOK_REL" nom val
+  mkdir -p "$(dirname "$f")"
+  {
+    printf '#!/usr/bin/env bash\necho avant\npython3 -I -S - "$@" <<'"'"'PY_PLANNING_HOOK_EOF'"'"'\n'
+    printf 'ARMEMENT_G4 = "%s"  # etape-5\n' "${HK_ARMEMENT:-observe}"
+    printf 'SEUIL = %s\n\n' "${HK_SEUIL:-3}"
+    for nom in $FONCTIONS_ROLE; do
+      [ "$nom" != "${HK_SANS:-}" ] || continue
+      val=0
+      [ "$nom" != _choisir_definition ] || val=${HK_ROLE:-1}
+      printf 'def %s(x):\n    """doc de %s"""\n    return %s\n\n' "$nom" "$nom" "$val"
+    done
+    printf 'def _h2(x):\n    return SEUIL + %s\n\n' "${HK_H2:-0}"
+    printf 'def _h1(x):\n    return _h2(x) + %s\n\n' "${HK_H1:-0}"
+    printf 'def evaluer_g4(contexte):\n    return _h1(contexte)\n\n'
+    printf 'def autre(x):\n    return %s\n\n' "${HK_AUTRE:-0}"
+    printf 'PY_PLANNING_HOOK_EOF\necho apres\n'
+  } > "$f"
+}
+
+# Faux dépôt de l'autotest des invariants : fichiers de version et faux hook commités ; REF_AT = commit de base.
+at_depot_inv() {
+  at_depot
+  mkdir -p "$FD/plugin/.claude-plugin" "$FD/.claude-plugin" "$FD/scripts/tests"
+  echo 1.0.0 > "$FD/VERSION"
+  echo '{"version":"1.0.0"}' > "$FD/plugin/.claude-plugin/plugin.json"
+  echo '{"version":"1.0.0"}' > "$FD/.claude-plugin/marketplace.json"
+  echo 'echo suite-role' > "$FD/scripts/tests/test-role-hook-vs-check-agents.sh"
+  mk_hook
+  at_commit
+  REF_AT=$(cd "$FD" && git rev-parse HEAD)
+}
+
+autotest_invariants() {
+  at_debut invariants-sains
+  at_depot_inv
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANTS-BILAN ecarts=0"; at_contient "INVARIANT g4-fige non-applicable"
+  at_fin 0
+
+  at_debut invariants-role-change
+  at_depot_inv
+  HK_ROLE=2 mk_hook; at_commit
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANT-ECART role _choisir_definition"; at_absent "INVARIANT-ECART role resoudre_agent"
+  at_fin 1
+
+  at_debut invariants-version-change
+  at_depot_inv
+  echo 1.0.1 > "$FD/VERSION"; at_commit
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANT-ECART fichier VERSION"
+  at_fin 1
+
+  at_debut invariants-tag
+  at_depot_inv
+  (cd "$FD" && git tag t-invariant) > /dev/null 2>&1
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANT-ECART tag t-invariant"
+  at_fin 1
+
+  at_debut invariants-base-absente
+  at_depot
+  HK_SANS=deriver_role mk_hook; at_commit
+  REF_AT=$(cd "$FD" && git rev-parse HEAD)
+  mk_hook; at_commit
+  at_lancer invariants --base="$REF_AT"
+  at_contient "deriver_role"
+  at_fin 64
+
+  at_debut g4-fige-observe
+  at_depot_inv
+  HK_AUTRE=9 mk_hook; at_commit
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANT g4-fige non-applicable"; at_contient "INVARIANTS-BILAN ecarts=0"
+  at_fin 0
+
+  at_debut g4-fige-intact
+  at_depot_inv
+  HK_ARMEMENT=armed mk_hook; at_commit
+  HK_ARMEMENT=armed HK_AUTRE=9 mk_hook; at_commit
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANT g4-fige ok"; at_contient "INVARIANTS-BILAN ecarts=0"
+  at_fin 0
+
+  at_debut g4-fige-helper-change
+  at_depot_inv
+  HK_ARMEMENT=armed mk_hook; at_commit
+  HK_ARMEMENT=armed HK_H1=5 mk_hook; at_commit
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANT-ECART g4-fige _h1"
+  at_fin 1
+
+  at_debut g4-fige-constante-change
+  at_depot_inv
+  HK_ARMEMENT=armed mk_hook; at_commit
+  HK_ARMEMENT=armed HK_SEUIL=7 mk_hook; at_commit
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANT-ECART g4-fige SEUIL"
+  at_fin 1
+
+  at_debut g4-fige-transitif
+  at_depot_inv
+  HK_ARMEMENT=armed mk_hook; at_commit
+  HK_ARMEMENT=armed HK_H2=5 mk_hook; at_commit
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANT-ECART g4-fige _h2"; at_absent "INVARIANT-ECART g4-fige _h1"
+  at_fin 1
+
+  at_debut g4-fige-reference-introuvable
+  at_depot_inv
+  HK_ARMEMENT=armed mk_hook
+  at_lancer invariants --base="$REF_AT"
+  at_contient "INVARIANT-ECART g4-fige reference-introuvable"
+  at_fin 1
+}
+
 autotest() {
   local manquants=0 c j trouve n d m
   nouveau_tmp
@@ -1511,6 +1889,7 @@ autotest() {
   autotest_toutes
   autotest_base
   autotest_detache
+  autotest_invariants
   # Cas déclarés contre cas joués : un cas déclaré et non joué est un échec.
   for c in "${CAS_AUTOTEST[@]}"; do
     trouve=0
@@ -1552,6 +1931,7 @@ principal() {
     suite) cmd_suite "$@"; return $? ;;
     toutes) cmd_toutes "$@"; return $? ;;
     sonder) cmd_sonder "$@"; return $? ;;
+    invariants) cmd_invariants "$@"; return $? ;;
     base-duree) cmd_base_duree "$@"; return $? ;;
     *) die_usage "46.1-CONTROLES.sh <suite|toutes|sonder|base-duree|invariants|releve|releve-chaine|--autotest|--help>" ;;
   esac
