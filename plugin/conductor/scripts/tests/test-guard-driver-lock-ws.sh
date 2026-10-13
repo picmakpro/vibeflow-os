@@ -1036,6 +1036,68 @@ au2_pass 06.F4 "[plat] témoin : cd <hors lab> && FOO+=1 git commit" "$FL" "cd $
 au2_pass 06.F5 "[plat] FOO+=1 git commit : le détenteur" "$FL" 'FOO+=1 git commit -m x' sess-A
 
 echo
+echo "=== GW-AU3 — audit de la mission q45 (tour 3, 2026-10-13) : séparateur collé à une parenthèse (AU3-01), refus grossier qui ne lit pas .git/ ni --git-dir= ni my-git (AU3-02), deux régimes ==="
+# Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 (Q5, « ferme les contournements restants … bash -c … »). Chaque cas AU3-01 était ALLOW
+# avant la correction (shlex rend `);`, `)&&`, `;(` en UN jeton absent des opérateurs), chaque cas AU3-02 « permis » était DENY ; rouge constaté avant,
+# vert après. Propriété AU3-01 : `X<sép>bash -c C` a le verdict ET le message de `X <sép> bash -c C` et de C. Labs : A (alpha indexé, tenu par autrui,
+# régime partitionné) et FL (verrou unique tenu par sess-A, régime plat).
+au3_norm() { sed -E 's/depuis [0-9]+ min/depuis N min/g'; }
+au3_same() { # <id> <description> <lab> <commande> <canonique> : refus ET message identique à celui de la forme canonique
+  local o c
+  o="$(gb "$3" "$4" sess-B | au3_norm)"; c="$(gb "$3" "$5" sess-B | au3_norm)"
+  if [[ "$o" == *"$DENY"* && "$o" == "$c" ]]; then echo "  ✅ PASS — GW-$1 — $2 : deny, même message que la forme canonique"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-$1 — $2 : deny, même message que la forme canonique"; echo "     canonique: ${c:0:200}"; echo "     obtenu:    ${o:0:200}"; FAIL=$((FAIL+1)); fi
+}
+au3_deny() { assert "GW-$1 — $2 : deny" "$(gb "$3" "$4" "${5:-sess-B}")" "$DENY"; }   # <id> <description> <lab> <commande> [session]
+au3_pass() { assert_empty "GW-$1 — $2 : permis" "$(gb "$3" "$4" "${5:-sess-B}")"; }  # <id> <description> <lab> <commande> [session]
+AU3C='git commit -m x'
+AU3_FORMS=(
+  "x=\$(date); bash -c '$AU3C'"
+  "(true); bash -c '$AU3C'"
+  "(true)&&bash -c '$AU3C'"
+  "( true ); /bin/bash -c '$AU3C'"
+  "(true)|bash -c '$AU3C'"
+  "(true)||bash -c '$AU3C'"
+  "(true)&bash -c '$AU3C'"
+  "(true &); bash -c '$AU3C'"
+  "x=\$(date)&&bash -c '$AU3C'"
+  "true;(bash -c '$AU3C')"
+  "true&&(bash -c '$AU3C')"
+  "true;;bash -c '$AU3C'"
+  "(true) ; bash -c '$AU3C'"
+  "x=\$(date) ; bash -c '$AU3C'"
+)
+for regime in partitionné plat; do
+  if [ "$regime" = plat ]; then L="$FL"; r=F; else L="$LA"; r=P; fi
+  au3_i=0
+  for f in "${AU3_FORMS[@]}"; do
+    au3_i=$((au3_i+1))
+    au3_same "AU3-01.$r.$au3_i" "[$regime] $f" "$L" "$f" "$AU3C"
+  done
+  au3_i=0
+  for f in "(true); bash -c 'echo hi'" "x=\$(date)&&bash -c 'git status'" "true;(bash -c 'echo hi')"; do
+    au3_i=$((au3_i+1))
+    au3_pass "AU3-01.$r.P$au3_i" "[$regime] témoin sans geste concerné : $f" "$L" "$f"
+  done
+  au3_pass "AU3-01.$r.H1" "[$regime] (true); bash -c 'git commit' : le détenteur" "$L" "(true); bash -c '$AU3C'" sess-A
+  au3_pass "AU3-01.$r.H2" "[$regime] x=\$(date)&&bash -c 'git commit' : le détenteur" "$L" "x=\$(date)&&bash -c '$AU3C'" sess-A
+  # AU3-02 : à 4 niveaux de bash -c, git n'est un mot que s'il n'est précédé ni de . ni de - ni de _ (ni d'un alphanumérique).
+  au3_pass "AU3-02.$r.1" "[$regime] 4 niveaux autour de ls .git/hooks && echo commit" "$L" "$(nest_bashc 4 'ls .git/hooks && echo commit')"
+  au3_pass "AU3-02.$r.2" "[$regime] 4 niveaux autour de cat .git/config; grep branch x" "$L" "$(nest_bashc 4 'cat .git/config; grep branch x')"
+  au3_pass "AU3-02.$r.3" "[$regime] 4 niveaux autour de echo --git-dir=x; echo clean" "$L" "$(nest_bashc 4 'echo --git-dir=x; echo clean')"
+  au3_pass "AU3-02.$r.4" "[$regime] 4 niveaux autour de echo my-git tag" "$L" "$(nest_bashc 4 'echo my-git tag')"
+  au3_pass "AU3-02.$r.5" "[$regime] 4 niveaux autour de echo my_git reset" "$L" "$(nest_bashc 4 'echo my_git reset')"
+  au3_pass "AU3-02.$r.6" "[$regime] 5 niveaux autour de ls .git/hooks && echo commit" "$L" "$(nest_bashc 5 'ls .git/hooks && echo commit')"
+  au3_deny "AU3-02.$r.7" "[$regime] témoin : 4 niveaux autour de /usr/bin/git commit restent refusés" "$L" "$(nest_bashc 4 '/usr/bin/git commit -m x')"
+  au3_deny "AU3-02.$r.8" "[$regime] témoin : 4 niveaux autour de g''it commit restent refusés" "$L" "$(nest_bashc 4 "g''it commit -m x")"
+  au3_deny "AU3-02.$r.9" "[$regime] témoin : 4 niveaux autour de ls .git/hooks; git commit (un vrai git après un .git/)" "$L" "$(nest_bashc 4 'ls .git/hooks; git commit -m x')"
+done
+# Redirection collée : >& et &> restent UN jeton qui n'est pas un opérateur (outside_scan lit un & isolé comme un coupe-portée : le geste resterait dans le lab).
+au3_pass "AU3-01.R1" "cd <hors lab> && bash -c 'git commit' >&2 : la redirection n'est pas un coupe-portée" "$LO" "cd $WORK_DIR && bash -c 'git commit -m x' >&2"
+au3_pass "AU3-01.R2" "cd <hors lab> && bash -c 'git commit' &>/dev/null : la redirection n'est pas un coupe-portée" "$LO" "cd $WORK_DIR && bash -c 'git commit -m x' &>/dev/null"
+au3_deny "AU3-01.R3" "témoin : cd <hors lab> ; (bash -c 'git commit') : la parenthèse collée est un coupe-portée, le geste reste dans le lab" "$LO" "cd $WORK_DIR; (bash -c 'git commit -m x')"
+
+echo
 echo "=== GW-C-POS — un pathspec POSITIONNEL de commit compte comme pathspec (doute = union ; correction R-3 c) ==="
 LAB="$(mk_lab cpos)"
 dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
@@ -1630,13 +1692,13 @@ fi   # GW_MODE = full (A/B)
 
 if [ "$GW_MODE" = full ]; then
 echo
-echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-au2_assignpersist — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
+echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-au3_redir — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du guard, posée à côté d'une
 # copie de vf-portable.sh (sinon le locator sortirait en code 17 pour la mauvaise raison). Le programme python
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=49; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=52; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 # a : GW-C-INC-1/2 (corrections F-3, R-5, C3) : sans -z, « .planning/workstreams\n » ne se lit plus comme le chemin incertain
@@ -1650,7 +1712,7 @@ MUT_E="GW-T-EXEMPT-1=1"
 MUT_F="GW-ENVT-9.1=1 GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
 # g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
 # g : GW-C-INC-3, GW-ENVT-7, GW-ENVT-OUT-7, GW-F3-17 (détenteur, discriminance des cas ajoutés)
-MUT_G="GW-AU2-01.8=1 GW-AU2-02.P.6=1 GW-AU2-03.P.7=1 GW-AU2-06.12=1 GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-Q45-H1=1 GW-Q45-H2=1 GW-Q45-H3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
+MUT_G="GW-AU2-01.8=1 GW-AU2-02.P.6=1 GW-AU2-03.P.7=1 GW-AU2-06.12=1 GW-AU3-01.P.H1=1 GW-AU3-01.P.H2=1 GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-Q45-H1=1 GW-Q45-H2=1 GW-Q45-H3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
 # h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
 MUT_H="GW-C4-2=1 GW-C4-3=1 GW-MARK-W-4=1 GW-Q-PASS=1 GW-SUB-2=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
 MUT_I="GW-C-REL-tenu=2"
@@ -1703,27 +1765,36 @@ MUT_TARGET="GW-F3-18=1"
 MUT_QARG="GW-Q45-A1=1 GW-Q45-A3=1 GW-Q45-A5=1 GW-Q45-O9=1 GW-Q45-U0c=1 GW-Q45-U1=1 GW-Q45-U2=1"
 MUT_QEQ="GW-Q45-A2=1 GW-Q45-A4=1 GW-Q45-A6=1 GW-Q45-A7=1"
 MUT_QWRAP="GW-Q45-A10=1 GW-Q45-A11=1 GW-Q45-A13=1 GW-Q45-A15=1 GW-Q45-A17=1 GW-Q45-A18=1 GW-Q45-A9=1 GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1"
-MUT_QSHELL="GW-AU2-01.1=1 GW-AU2-01.2=1 GW-AU2-01.3=1 GW-AU2-01.4=1 GW-AU2-01.5=1 GW-AU2-02.F.4=1 GW-AU2-02.F.5=1 GW-AU2-02.P.4=1 GW-AU2-02.P.5=1 GW-AU2-03.F.1=1 GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.1=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-AU2-06.3=1 GW-Q45-A22=1 GW-Q45-A23=1 GW-Q45-A24=1 GW-Q45-A25=1 GW-Q45-A26=1 GW-Q45-A28=1 GW-Q45-A29=1 GW-Q45-A30=1 GW-Q45-A31=1 GW-Q45-C1=1 GW-Q45-C2=1 GW-Q45-O4=1 GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U9=1"
-MUT_QCOARSE="GW-AU2-02.F.4=1 GW-AU2-02.P.4=1 GW-AU2-03.F.1=1 GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.1=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-Q45-C1=1 GW-Q45-C2=1"
+MUT_QSHELL="GW-AU2-01.1=1 GW-AU2-01.2=1 GW-AU2-01.3=1 GW-AU2-01.4=1 GW-AU2-01.5=1 GW-AU2-02.F.4=1 GW-AU2-02.F.5=1 GW-AU2-02.P.4=1 GW-AU2-02.P.5=1 GW-AU2-03.F.1=1 GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.1=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-AU2-06.3=1 GW-AU3-01.F.10=1 GW-AU3-01.F.11=1 GW-AU3-01.F.12=1 GW-AU3-01.F.13=1 GW-AU3-01.F.14=1 GW-AU3-01.F.1=1 GW-AU3-01.F.2=1 GW-AU3-01.F.3=1 GW-AU3-01.F.4=1 GW-AU3-01.F.5=1 GW-AU3-01.F.6=1 GW-AU3-01.F.7=1 GW-AU3-01.F.8=1 GW-AU3-01.F.9=1 GW-AU3-01.P.10=1 GW-AU3-01.P.11=1 GW-AU3-01.P.12=1 GW-AU3-01.P.13=1 GW-AU3-01.P.14=1 GW-AU3-01.P.1=1 GW-AU3-01.P.2=1 GW-AU3-01.P.3=1 GW-AU3-01.P.4=1 GW-AU3-01.P.5=1 GW-AU3-01.P.6=1 GW-AU3-01.P.7=1 GW-AU3-01.P.8=1 GW-AU3-01.P.9=1 GW-AU3-01.R3=1 GW-AU3-02.F.7=1 GW-AU3-02.F.8=1 GW-AU3-02.P.7=1 GW-AU3-02.P.8=1 GW-Q45-A22=1 GW-Q45-A23=1 GW-Q45-A24=1 GW-Q45-A25=1 GW-Q45-A26=1 GW-Q45-A28=1 GW-Q45-A29=1 GW-Q45-A30=1 GW-Q45-A31=1 GW-Q45-C1=1 GW-Q45-C2=1 GW-Q45-O4=1 GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U9=1"
+MUT_QCOARSE="GW-AU2-02.F.4=1 GW-AU2-02.P.4=1 GW-AU2-03.F.1=1 GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.1=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-AU3-02.F.7=1 GW-AU3-02.F.8=1 GW-AU3-02.P.7=1 GW-AU3-02.P.8=1 GW-Q45-C1=1 GW-Q45-C2=1"
 MUT_QPERSIST="GW-AU2-06.7=1 GW-AU2-06.8=1 GW-Q45-O7=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U5=1 GW-Q45-U6=1 GW-Q45-U7=1 GW-Q45-U8=1"
 MUT_QINHERIT="GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U12=1 GW-Q45-U9=1"
 MUT_QENVCD="GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1"
-MUT_QOUTSH="GW-Q45-O1=1 GW-Q45-O4=1"
+MUT_QOUTSH="GW-AU3-01.R1=1 GW-AU3-01.R2=1 GW-Q45-O1=1 GW-Q45-O4=1"
 # au2_* (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, tour 3 de la mission q45) : un mutant par comportement neuf ; ensembles
 # mesurés puis relus. cdprop = le cd de l'appelant n'est plus transmis à la récursion bash -c ; cdnames = pushd et popd ne comptent plus comme cd
 # (01.3 seul : pushd) ; quad = le refus grossier relit la fin de la chaîne à chaque git (même verdict, coût quadratique : seul le cas de durée rougit) ;
-# bound = plus de borne de longueur ; strip = guillemets et antislash ne sont plus retirés ; slash = git derrière / ou . ou - ne compte plus
-# (/usr/bin/git) ; assigncmd = NOM+= et NOM[i]= ne sont plus des affectations en position de commande ; envtarget = GIT_*+= ne rend plus la cible
+# bound = plus de borne de longueur ; strip = guillemets et antislash ne sont plus retirés ; slash = git derrière / ne compte plus
+# (/usr/bin/git ; AU3-02 refuse aussi le cas 02.7 sous cette mutation) ; assigncmd = NOM+= et NOM[i]= ne sont plus des affectations en position de commande ; envtarget = GIT_*+= ne rend plus la cible
 # incertaine ; assignpersist = une affectation seule NOM+=x ne pose plus la variable pour les segments suivants (06.7 seul).
 MUT_AU2CDPROP="GW-AU2-01.1=1 GW-AU2-01.2=1 GW-AU2-01.3=1 GW-AU2-01.4=1 GW-AU2-01.5=1"
 MUT_AU2CDNAMES="GW-AU2-01.3=1"
 MUT_AU2QUAD="GW-AU2-02.F.1=1 GW-AU2-02.P.1=1"
 MUT_AU2BOUND="GW-AU2-02.F.5=1 GW-AU2-02.P.5=1"
-MUT_AU2STRIP="GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1"
-MUT_AU2SLASH="GW-AU2-03.F.1=1 GW-AU2-03.P.1=1"
+MUT_AU2STRIP="GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-AU3-02.F.8=1 GW-AU3-02.P.8=1"
+MUT_AU2SLASH="GW-AU2-03.F.1=1 GW-AU2-03.P.1=1 GW-AU3-02.F.7=1 GW-AU3-02.P.7=1"
 MUT_AU2ASSIGN="GW-AU2-06.1=1 GW-AU2-06.10=1 GW-AU2-06.2=1 GW-AU2-06.3=1 GW-AU2-06.4=1 GW-AU2-06.5=1 GW-AU2-06.6=1 GW-AU2-06.F1=1 GW-AU2-06.F2=1 GW-AU2-06.F3=1"
 MUT_AU2ENVT="GW-AU2-06.10=1 GW-AU2-06.4=1 GW-AU2-06.5=1 GW-AU2-06.6=1 GW-AU2-06.7=1 GW-AU2-06.8=1 GW-AU2-06.F3=1"
 MUT_AU2PERSIST="GW-AU2-06.7=1"
+# Les cas GW-AU3-* entrent aussi dans les ensembles de g (détenteur : H1, H2), q_shells (formes collées, témoins refusés), q_coarse et au2_strip (02.7, 02.8)
+# et q_outside_shell (R1, R2) : mesurés puis relus, chacun dépend du comportement que la mutation retire.
+# au3_* (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, tour 3 de la mission q45, audit AU3-01 et AU3-02) : punct = les suites de ponctuation
+# ne sont plus découpées (`);`, `)&&`, `;(` redeviennent un jeton absent des opérateurs : les 11 formes collées de chaque régime, jamais les formes isolées) ;
+# coarse = git derrière . ou - redevient un mot du refus grossier (AU3-02 .1 à .4 et .6 ; .5, my_git, n'est pas touché : _ était déjà exclu) ;
+# redir = >& et &> redeviennent deux jetons dont un & isolé, coupe-portée d'outside_scan (R1 et R2).
+MUT_AU3PUNCT="GW-AU3-01.F.10=1 GW-AU3-01.F.11=1 GW-AU3-01.F.1=1 GW-AU3-01.F.2=1 GW-AU3-01.F.3=1 GW-AU3-01.F.4=1 GW-AU3-01.F.5=1 GW-AU3-01.F.6=1 GW-AU3-01.F.7=1 GW-AU3-01.F.8=1 GW-AU3-01.F.9=1 GW-AU3-01.P.10=1 GW-AU3-01.P.11=1 GW-AU3-01.P.1=1 GW-AU3-01.P.2=1 GW-AU3-01.P.3=1 GW-AU3-01.P.4=1 GW-AU3-01.P.5=1 GW-AU3-01.P.6=1 GW-AU3-01.P.7=1 GW-AU3-01.P.8=1 GW-AU3-01.P.9=1"
+MUT_AU3COARSE="GW-AU3-02.F.1=1 GW-AU3-02.F.2=1 GW-AU3-02.F.3=1 GW-AU3-02.F.4=1 GW-AU3-02.F.6=1 GW-AU3-02.P.1=1 GW-AU3-02.P.2=1 GW-AU3-02.P.3=1 GW-AU3-02.P.4=1 GW-AU3-02.P.6=1"
+MUT_AU3REDIR="GW-AU3-01.R1=1 GW-AU3-01.R2=1"
 gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
   awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
 }
@@ -1872,10 +1943,15 @@ mutant au2_cdnames 'in ("cd", "pushd", "popd") for idx in command_positions(cur)
 mutant au2_quad '^    return m is not None and COARSE_VERB_RE' 's@^    return m is not None and .*$@    return any(COARSE_VERB_RE.search(c[k.end():]) is not None for k in COARSE_GIT_RE.finditer(c))@' "$MUT_AU2QUAD"
 mutant au2_bound '^    if len(c) > COARSE_MAX_LEN:$' 's@if len(c) > COARSE_MAX_LEN:@if False:@' "$MUT_AU2BOUND"
 mutant au2_strip '^    c = c.translate(COARSE_STRIP)$' 's@c = c.translate(COARSE_STRIP)@pass@' "$MUT_AU2STRIP"
-mutant au2_slash '^COARSE_GIT_RE = ' 's@9_]@9_./-]@' "$MUT_AU2SLASH"
+mutant au2_slash '^COARSE_GIT_RE = ' 's@9_\.\\-]@9_./\\-]@' "$MUT_AU2SLASH"
 mutant au2_assign '^        if ASSIGN_RE.match(t):$' 's@ASSIGN_RE.match(t)@re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t)@' "$MUT_AU2ASSIGN"
 mutant au2_envtarget '^ENV_TARGET_RE = ' 's@^ENV_TARGET_RE = .*$@ENV_TARGET_RE = re.compile(r"^(GIT_DIR|GIT_INDEX_FILE|GIT_WORK_TREE)=")@' "$MUT_AU2ENVT"
 mutant au2_assignpersist 'if all(ASSIGN_RE.match(t) for t in ts):' 's@all(ASSIGN_RE.match(t) for t in ts)@all(re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t) for t in ts)@' "$MUT_AU2PERSIST"
+
+# au3_* : un mutant par comportement neuf de la correction du tour 3, suite (2026-10-13)
+mutant au3_punct '^    if not t or any(ch not in PUNCT_CHARS for ch in t):$' 's@if not t or@if True or@' "$MUT_AU3PUNCT"
+mutant au3_coarse '^COARSE_GIT_RE = ' 's@9_\.\\-]@9_]@' "$MUT_AU3COARSE"
+mutant au3_redir '^        elif t\[i\] in "<>" or ' 's@elif t\[i\] in "<>" or .*:$@elif False:@' "$MUT_AU3REDIR"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done

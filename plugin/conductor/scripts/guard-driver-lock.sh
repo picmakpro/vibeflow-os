@@ -209,7 +209,7 @@ fi
 # UN SEUL spawn d'interprète ; le payload est rejoué sur son entrée standard. Le bash ne fait que
 # router — la décision (allow silencieux / deny JSON) est entièrement émise par python.
 printf '%s' "$INPUT" | vf_python -c '
-import json, os, re, sys, time
+import json, os, re, shlex, sys, time
 
 MARKER = "vibeflow:allow-lock-override"
 WRAPPERS = {"sudo", "env", "command", "nohup", "time", "xargs", "nice", "stdbuf", "caffeinate"}
@@ -387,6 +387,45 @@ def tokens(seg):
     except ValueError:
         return seg.split()
 
+# AU3-01 : shlex en mode punctuation_chars rend une SUITE de signes de ponctuation comme UN seul jeton (`);`, `)&&`, `;(`, `&)`),
+# absent de SEG_OPS : le separateur collé a une parenthese ne terminait plus le segment et `bash` n etait plus en position de
+# commande. Un separateur collé a une parenthese termine le segment exactement comme le meme separateur isole. Les
+# redirections (`>`, `>>`, `>&`, `&>`, `<&`, `>|`) restent UN jeton qui n est pas un operateur : `&` isole est un coupe-portee de
+# outside_scan, `>&2` ne doit pas le devenir.
+PUNCT_CHARS = "();<>|&"
+PUNCT_OPS2 = ("&&", "||", ";;", ";&", "|&")
+
+def split_punct(t):
+    """Decoupe un jeton fait UNIQUEMENT de signes de ponctuation en operateurs (SEG_OPS) et redirections ; tout autre
+    jeton est rendu tel quel."""
+    if not t or any(ch not in PUNCT_CHARS for ch in t):
+        return [t]
+    out = []
+    i = 0
+    n = len(t)
+    while i < n:
+        if t[i:i + 2] in PUNCT_OPS2:
+            out.append(t[i:i + 2])
+            i += 2
+        elif t[i] in "<>" or (t[i] == "&" and t[i + 1:i + 2] == ">"):
+            j = i + 1
+            while j < n and t[j] in "<>":
+                j += 1
+            if j < n and t[j] in "&|":
+                j += 1
+            out.append(t[i:j])
+            i = j
+        else:
+            out.append(t[i])
+            i += 1
+    return out
+
+def lex_ops(flat):
+    """Jetons de `flat` (shlex posix, ponctuation separee), les suites de ponctuation decoupees par split_punct."""
+    lex = shlex.shlex(flat, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    return [u for t in lex for u in split_punct(t)]
+
 COARSE_VERBS = sorted(MUTATING_GIT_VERBS | RESUMABLE_SUBVERBS)
 
 def sets_git_target(toks):
@@ -437,11 +476,8 @@ def shell_c_inner(cmd):
     la chaine (AU2-01) : le dossier courant du shell fils est celui de l appelant, la recursion doit le savoir. Illisible
     (guillemet non ferme) : liste vide."""
     try:
-        import shlex
         flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
-        lex = shlex.shlex(flat, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
+        toks = lex_ops(flat)
     except ValueError:
         return []
     out = []
@@ -472,7 +508,7 @@ def shell_c_inner(cmd):
 # seulement, comme tout le refus grossier).
 COARSE_MAX_LEN = 65536
 COARSE_STRIP = str.maketrans("", "", "\x27\"\\")
-COARSE_GIT_RE = re.compile(r"(?<![A-Za-z0-9_])git\b")
+COARSE_GIT_RE = re.compile(r"(?<![A-Za-z0-9_.\-])git\b")
 COARSE_VERB_RE = re.compile(r"\b(" + "|".join(COARSE_VERBS) + r")\b")
 
 def coarse_commit_like(c):
@@ -633,11 +669,8 @@ def outside_scan(cmd, root, base, depth, inherit):
     GIT_* heritee d un shell parent). Une chaine `bash -c "..."` est parcourue a part (depth + 1), depuis le dossier
     courant de la commande : un cd INTERNE a la chaine ne bouge pas le dossier de la commande appelante."""
     try:
-        import shlex
         flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
-        lex = shlex.shlex(flat, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
+        toks = lex_ops(flat)
     except ValueError:
         return True, 0
     if "`" in cmd or any(t in SCOPE_BREAKERS for t in toks):
