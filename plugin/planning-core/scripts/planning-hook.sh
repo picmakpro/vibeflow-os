@@ -3007,8 +3007,11 @@ def decider_trace(entrees, sha, journal_existant=False, rel=None):
     (`journal_existant`, calculé UNE fois par l'appelant avant toute inscription : au moins une ligne lue), la première observation d'un fichier d'UNITÉ (`rel` : un
     des quatre noms de FICHIERS_UNITE_SURVEILLES) PRÉSENT (sha ≠ `absent`) qu'aucune ligne `moteur` de même sha ni `intention` n'explique est un `contournement`
     — puis la `reference` de même sha, qui devient la nouvelle base et ne remplace jamais le contournement. Un fichier absent, un fichier racine du dossier de
-    planning, tout fichier d'un lab sans journal restent une `reference` silencieuse. Faux signaux connus, nommés et mesurés (R-D1-23) : une unité créée par `mkdir` et
-    copie, une unité livrée par git (`git pull`, `git checkout`, `git merge`) : D1 ne voit pas d'où vient un fichier. Un journal tronqué à 0 octet vaut « journal absent »
+    planning, tout fichier d'un lab sans journal restent une `reference` silencieuse. Faux signaux connus, nommés et mesurés (fix-5b H4, H5) : (1) une unité créée par `mkdir` et
+    copie, une unité livrée par git (`git pull`, `git checkout`, `git merge`) : D1 ne voit pas d'où vient un fichier (R-D1-23, limite (bk)) ; (2) la fenêtre de 4 Mio : un fichier d'unité
+    présent dont la référence est sortie de la fenêtre lève un contournement à sa première observation, même inchangé (R-D1-14, limites (ba) et (bk)) ; (3) un journal qui ne porte que des
+    lignes `moteur` compte pour « existant » (`journal_existant` : toute ligne lue) : la première séance lève A5 sur chaque fichier d'unité présent (R-D1-23, limite (bk)) ; (4) côté N-5, une
+    unité référencée qui disparaît ou se déplace (`git checkout`, `rm`, `mv`) lève un contournement par fichier référencé (R-D1-23, limite (ar)). Un journal tronqué à 0 octet vaut « journal absent »
     (limite (bn))."""
     derniere = None
     for rang, entree in enumerate(entrees):

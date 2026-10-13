@@ -50,6 +50,8 @@
 #            FileChanged : même règle, même ordre
 #   R-D1-23  (A5, 46.1-02, P461-D-05a) faux signaux MESURÉS sur des labs sains synthétiques : `MESURE-FAUX-SIGNAUX-A5 mkdir-copie=<n> git=<n> outil=<n> moteur=<n>` ; outil=0 et moteur=0 exigés,
 #            mkdir-copie et git égaux au nombre de fichiers d'unité présents qu'ils posent (au moins un chacun)
+#            (fix-5b H5) imprime aussi, pour information et sans assertion, `MESURE-FAUX-SIGNAUX-A5-JOURNAL-MOTEUR premiere-seance=<n>` : première séance d'un lab aux unités déjà posées dont
+#            le journal ne porte que les lignes `moteur` du recalcul
 #   R-D1-24  (H1, fix-5b, audit-5b F-1, P461-D-05) une clé du journal de D1 hors de la forme d'un chemin d'unité (130 000 composants, `..`, `.`, composant vide, 7 composants, nom d'unité hors
 #            NOM_UNITE, composant de 5 000 caractères) est écartée AVANT toute E/S (espion d'os.listdir, scandir, lstat, stat, open ; clé témoin conforme : des E/S vues) ; SessionStart sur un
 #            journal portant la ligne de 130 000 composants et la ligne `..` : code 0, stderr vide, `watchPaths` (avant : échéance du cœur, code 73, stdout vide)
@@ -1794,7 +1796,9 @@ def controle_d1_23(ctx, script):
     d'une branche qui la porte, puis `git merge` d'une autre, la forme d'un `git pull` ; attendu : un contournement par fichier présent, faux signal NOMMÉ) ; une unité écrite
     par Write (intention : zéro) ; une unité dont le VERDICT.md est posé par poser-verdict.sh (moteur : zéro). Imprime `MESURE-FAUX-SIGNAUX-A5 mkdir-copie=<n> git=<n> outil=<n>
     moteur=<n>` et exige outil=0, moteur=0, mkdir-copie et git égaux chacun au nombre de fichiers d'unité présents qu'ils posent, ce nombre valant au moins 1. Imprime aussi, pour
-    information (N-5, non assertée), les contournements que fait lever un `git checkout` qui RETIRE une unité déjà référencée."""
+    information (N-5, non assertée), les contournements que fait lever un `git checkout` qui RETIRE une unité déjà référencée. Imprime enfin, pour information (fix-5b H5, non assertée),
+    `MESURE-FAUX-SIGNAUX-A5-JOURNAL-MOTEUR premiere-seance=<n>` : les contournements de la première séance d'un lab aux unités déjà posées dont le journal ne porte encore que les lignes
+    `moteur` de `recalc-planning.sh` (écriture)."""
     d = ctx.copie_forcee(_dossier(ctx, script), "observe")
     fautes = []
     if shutil.which("git") is None:
@@ -1873,8 +1877,20 @@ def controle_d1_23(ctx, script):
     moteur = nb_contournements_unite(lab_v, "02-p")
     if nb_references_unite(lab_v, "02-p") != 2:
         fautes.append("moteur : 2 fichiers observés (PLAN.md, VERDICT.md) attendus — obtenu %d" % nb_references_unite(lab_v, "02-p"))
+    # 5. journal fait de lignes `moteur` (fix-5b H5) : `recalc-planning.sh` (écriture) inscrit ses lignes `moteur` AVANT le premier SessionStart d'un lab aux unités déjà posées ;
+    # `journal_existant` compte toute ligne lue, `moteur` comprise, donc la première séance lève A5 sur chaque fichier d'unité présent (mesure d'information, non assertée)
+    lab_j = fabriquer_lab(ctx, "d1-23-journal-moteur", ouvertes=("01-u", "02-v"), closes=())
+    rc_r, _out_r, err_r = lancer_recalc(ctx, script, lab_j)
+    lignes_moteur = len(lignes_de(lab_j, "moteur")) if rc_r == 0 else 0
+    if rc_r != 0 or lignes_moteur < 1:
+        return False, "journal de lignes `moteur` : recalc-planning.sh (écriture) code 0 et au moins une ligne `moteur` avant la première séance attendus — obtenu rc=%d, %d ligne(s) %s" % (
+            rc_r, lignes_moteur, court(err_r))
+    session(ctx, d, lab_j)
+    journal_moteur = len({e["chemin"] for e in entrees_journal(lab_j) if e["genre"] == "contournement"})
     if script is None:
         print("MESURE-FAUX-SIGNAUX-A5 mkdir-copie=%d git=%d outil=%d moteur=%d" % (mkdir_copie, git_n, outil, moteur))
+        print("MESURE-FAUX-SIGNAUX-A5-JOURNAL-MOTEUR premiere-seance=%d (information : un journal fait des seules lignes `moteur` de %d ligne(s) du recalcul compte pour « existant » ; "
+              "chaque fichier d'unité présent de la première séance lève un contournement, non asserté)" % (journal_moteur, lignes_moteur))
         print("MESURE-FAUX-SIGNAUX-N5 suppression-git=%d (information : un retrait d'unité par git fait lever un contournement par fichier référencé, non asserté)" % suppression)
     if outil != 0:
         fautes.append("unité écrite par Write : outil=0 attendu — obtenu %d" % outil)
