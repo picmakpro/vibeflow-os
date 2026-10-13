@@ -9,8 +9,8 @@
 # PR qu'elle juge — elle, cette suite, et l'etape CI qui l'invoque — et rester verte. Une suite
 # incapable de rougir est un defaut, au meme titre que le gate qu'elle verifie.
 #
-# Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et NEUF mutants opposables
-# (MUT-1 a MUT-9 ; MUT-8 et MUT-9 retirent chacun un des deux prefixes de la classe 6, les fixtures
+# Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et DIX mutants opposables
+# (MUT-1 a MUT-10 ; MUT-10 revient a la lecture sans -z, AU2-05 ; MUT-8 et MUT-9 retirent chacun un des deux prefixes de la classe 6, les fixtures
 # des suites surveillees — arbitrage Samuel, AskUserQuestion session principale, 2026-10-13), un par comparaison du script sous test (MUT-6 cible la borne sur la virgule du
 # motif, ajoutee dans la meme comparaison 3) — regle de comptage (decision du manager, 2026-09-17,
 # reprise du plan 41-14) : chaque mutant asserte le rc EXACT attendu sur le mutant ET sur
@@ -440,11 +440,62 @@ safe_run out rc "$TMP/chemin-inexistant-xyz"
 safe_run out rc "$TMP" --base-ref
 [ "$rc" -eq 64 ] && ok "USAGE --base-ref sans valeur -> 64" || ko "USAGE --base-ref sans valeur" "rc=64" "rc=$rc :: $out"
 
-echo "== test-check-gate-touche : MUTANTS (MUT-1 a MUT-9) =="
+echo "== test-check-gate-touche : NOMS SPECIAUX (git diff -z, AU2-05) =="
+
+# Un chemin de la surface est classe comme un nom ASCII, quel que soit son nom. Sans -z, git met
+# entre guillemets et echappe tout nom non ASCII ou portant `"`, une tabulation, `\` ou un saut de
+# ligne : le motif ancre ne les classait jamais (RIEN-A-JUGER, rc 3, a tort).
+# special_name_case <etiquette> <nom-de-fichier-relatif-a-fixtures/> : depot jetable, la fixture est
+# ajoutee SANS trailer (attendu rc 1 CHEMIN-NON-DECLARE), puis couverte par un trailer (rc 0).
+FIXD_REL="plugin/conductor/scripts/tests/fixtures"
+special_name_case() {
+  local label="$1" name="$2" d b
+  d="$(mk_repo "spec-$label")"; b="$(base_of "$d")"
+  printf 'x\n' > "$d/$FIXD_REL/$name"
+  commit_avec "$d" "test: fixture a nom special sans trailer ($label)"
+  safe_run out rc "$d" --base-ref "$b"
+  case "$out" in *CHEMIN-NON-DECLARE*) has=1 ;; *) has=0 ;; esac
+  if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "NOM SPECIAL ($label), sans trailer -> rc 1 CHEMIN-NON-DECLARE"
+  else ko "NOM SPECIAL ($label), sans trailer" "rc=1 CHEMIN-NON-DECLARE (jamais RIEN-A-JUGER rc 3)" "rc=$rc :: $out"; fi
+  d="$(mk_repo "spec-ok-$label")"; b="$(base_of "$d")"
+  printf 'x\n' > "$d/$FIXD_REL/$name"
+  commit_avec "$d" "test: fixture a nom special declaree ($label)
+
+Gate-Touche: plugin/conductor/scripts/tests/fixtures/* — fixtures a nom special, cas $label"
+  safe_run out rc "$d" --base-ref "$b"
+  if [ "$rc" -eq 0 ]; then ok "NOM SPECIAL ($label), avec trailer -> rc 0"
+  else ko "NOM SPECIAL ($label), avec trailer" "rc=0 DECLARE" "rc=$rc :: $out"; fi
+}
+special_name_case accent "é.sh"
+special_name_case guillemet 'a"b.sh'
+special_name_case tabulation "$(printf 'a\tb.sh')"
+special_name_case antislash 'a\b.sh'
+special_name_case saut-de-ligne "$(printf 'a\nb.sh')"
+special_name_case espace "a b.sh"
+
+# Un gate a nom non ASCII (classe 2) est classe lui aussi.
+D="$(mk_repo spec-gate)"; B="$(base_of "$D")"
+printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-é.sh"
+commit_avec "$D" "feat: gate a nom accentue sans trailer"
+safe_run out rc "$D" --base-ref "$B"
+case "$out" in *CHEMIN-NON-DECLARE*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "NOM SPECIAL gate scripts/check-é.sh sans trailer -> rc 1"
+else ko "NOM SPECIAL gate accentue" "rc=1 CHEMIN-NON-DECLARE" "rc=$rc :: $out"; fi
+
+# Renommage a deux chemins : l'ancien nom (hors surface) et le nouveau (fixture a nom special).
+D="$(mk_repo spec-ren)"; B="$(base_of "$D")"
+git_c "$D" mv "$D/plugin/conductor/scripts/tests/fixtures/gele-demo.sh" "$D/plugin/conductor/scripts/tests/fixtures/ré-nommé.sh" >/dev/null
+git_c "$D" commit -q -m "test: renomme une fixture vers un nom accentue sans trailer" >/dev/null
+safe_run out rc "$D" --base-ref "$B"
+case "$out" in *CHEMIN-NON-DECLARE*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "NOM SPECIAL renommage vers ré-nommé.sh sans trailer -> rc 1 (deux chemins lus)"
+else ko "NOM SPECIAL renommage" "rc=1 CHEMIN-NON-DECLARE" "rc=$rc :: $out"; fi
+
+echo "== test-check-gate-touche : MUTANTS (MUT-1 a MUT-10) =="
 
 # --- MUT-1 : retire la classe des suites (scripts/tests/test-*.sh) ----------------------------------
-MUT1_OLD='    if (p ~ /^scripts\/tests\/test-[^\/]+\.sh$/) return "suite"'
-MUT1_NEW='    if (p ~ /^NEVER-MATCH-SUITE-CLASS$/) return "suite"'
+MUT1_OLD='    scripts/tests/test-*.sh) seg_ok "$1" scripts/tests/ 8 && CLASS="suite" ;;'
+MUT1_NEW='    NEVER-MATCH-SUITE-CLASS) CLASS="suite" ;;'
 MUT1_PATH="$(make_mutant mut1 "$MUT1_OLD" "$MUT1_NEW")" && MUT1_STAT=0 || MUT1_STAT=$?
 D="$(mk_repo mut1)"; B="$(base_of "$D")"
 printf '#!/bin/sh\necho v2\n' > "$D/scripts/tests/test-check-demo.sh"
@@ -581,7 +632,7 @@ fi
 # de surface touche, RIEN-A-JUGER, rc 3.
 mut_fixtures() {  # <n> <old> <fixture_relpath>
   local n="$1" old="$2" rel="$3" new path stat dm bm
-  new='    if (p ~ /^NEVER-MATCH-FIXTURES-CLASS$/) return "fixtures"'
+  new='    NEVER-MATCH-FIXTURES-CLASS) CLASS="fixtures" ;;'
   path="$(make_mutant "mut$n" "$old" "$new")" && stat=0 || stat=$?
   dm="$(mk_repo "mut$n")"; bm="$(base_of "$dm")"
   printf 'gel v2\n' > "$dm/$rel"
@@ -595,8 +646,28 @@ mut_fixtures() {  # <n> <old> <fixture_relpath>
     else komut "$n" "prefixe de la classe fixtures retire" "rc_mutant=3 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
   fi
 }
-mut_fixtures 8 '    if (p ~ /^plugin\/conductor\/scripts\/tests\/fixtures\//) return "fixtures"' "plugin/conductor/scripts/tests/fixtures/gele-demo.sh"
-mut_fixtures 9 '    if (p ~ /^scripts\/tests\/fixtures\//) return "fixtures"' "scripts/tests/fixtures/traffic-snapshot/sous/snap-demo.json"
+mut_fixtures 8 '    plugin/conductor/scripts/tests/fixtures/*) CLASS="fixtures" ;;' "plugin/conductor/scripts/tests/fixtures/gele-demo.sh"
+mut_fixtures 9 '    scripts/tests/fixtures/*) CLASS="fixtures" ;;' "scripts/tests/fixtures/traffic-snapshot/sous/snap-demo.json"
+
+# --- MUT-10 : revient a la lecture SANS -z (AU2-05) ---------------------------------------------------
+# Le mutant relit `git diff --name-status` ligne a ligne (tabulation et saut de ligne rendus NUL pour
+# rester dans le parseur) : git remet entre guillemets les noms non ASCII, le classement ancre ne les
+# reconnait plus. Fixture : une fixture a nom accentue sans trailer. Original : CHEMIN-NON-DECLARE
+# rc 1 ; mutant : plus aucun chemin de surface, RIEN-A-JUGER rc 3.
+MUT10_OLD='if ! git diff -z --name-status "$BASE" "$HEAD_SHA" > "$DIFF_RAW" 2>/dev/null; then'
+MUT10_NEW='if ! git diff --name-status "$BASE" "$HEAD_SHA" 2>/dev/null | tr "\t\n" "\0\0" > "$DIFF_RAW"; then'
+MUT10_PATH="$(make_mutant mut10 "$MUT10_OLD" "$MUT10_NEW")" && MUT10_STAT=0 || MUT10_STAT=$?
+D="$(mk_repo mut10)"; B="$(base_of "$D")"
+printf 'x\n' > "$D/plugin/conductor/scripts/tests/fixtures/é.sh"
+commit_avec "$D" "test: fixture a nom accentue sans trailer (fixture MUT-10)"
+if [ "$MUT10_STAT" -eq 1 ]; then komut 10 "lecture sans -z" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
+elif [ "$MUT10_STAT" -eq 2 ]; then komut 10 "lecture sans -z" "bash -n OK sur le mutant" "syntaxe invalide"
+else
+  TARGET="$MUT10_PATH"; safe_run _mutout rc_mut "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D" --base-ref "$B"
+  if [ "$rc_mut" -eq 3 ] && [ "$rc_orig" -eq 1 ]; then okmut 10 "$rc_mut" 3 "$rc_orig" 1
+  else komut 10 "lecture sans -z" "rc_mutant=3 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
 
 TARGET="$SCRIPT"
 
