@@ -360,6 +360,12 @@ CAS_NEGATIFS = {
     "chemin-machine": [
         {"nom": "un chemin /Users/… dans une ligne", "ops": [("ajoute", LIGNE_USERS)], "seule": True, "interdit": ["/Users/dev", "dev/lab"]},
         {"nom": "un chemin /home/… dans une ligne", "ops": [("ajoute", LIGNE_HOME)], "seule": True, "interdit": ["/home/runner", "runner/work"]},
+        {"nom": "un chemin /Users/… en URL file:///", "ops": [("ajoute", "NOTE voir file:///Users/dev/x")], "seule": True, "interdit": ["dev/x"]},
+        {"nom": "un chemin /home/… après un signe égal", "ops": [("ajoute", "NOTE chemin=/home/runner/x")], "seule": True, "interdit": ["runner/x"]},
+        {"nom": "un chemin /Users/… entre guillemets français", "ops": [("ajoute", "NOTE voir \u00ab/Users/dev/lab\u00bb")], "seule": True, "interdit": ["dev/lab"]},
+        {"nom": "un chemin /home/… atteint par un détour /tmp/../", "ops": [("ajoute", "NOTE voir /tmp/../home/runner/x")], "seule": True, "interdit": ["runner/x"]},
+        {"nom": "un chemin //home/… à deux barres de tête", "ops": [("ajoute", "NOTE voir //home/runner/x")], "seule": True, "interdit": ["runner/x"]},
+        {"nom": "la racine /home seule, sans barre finale", "ops": [("ajoute", "NOTE voir /home")], "seule": True},
     ],
 }
 
@@ -497,6 +503,12 @@ def controle_04():
     bord("deux --lab sans ligne de table : labs=2", "les labs sont l'union des --lab et des lignes de table", "code 0, labs=2", rc, s, armable(rc, s) and "labs=2 " in derniere(s))
     rc, s = lancer_releve("b-lab-union.txt", base(5), args=["--lab=" + LAB_A])
     bord("un --lab déjà nommé par la table ne compte pas deux fois", "union sans doublon", "code 0, labs=2", rc, s, armable(rc, s) and "labs=2 " in derniere(s))
+    # chemin-machine (fix-5b V2) : seul un chemin ABSOLU de machine rougit ; un dossier relatif nommé `home` ou `Users` est un chemin de lab
+    for nom, ligne in (("une ligne de table dont le chemin est src/pages/home/index.md", "G3 | " + LAB_A + " | src/pages/home/index.md | doit-passer | passe | passe"),
+                       ("une note qui cite ~/home/notes.md", "NOTE voir ~/home/notes.md"),
+                       ("une note qui cite docs/Users/guide.md", "NOTE voir docs/Users/guide.md")):
+        rc, s = lancer_releve("b-machine-relatif.txt", appliquer(base(5), [("ajoute", ligne)]))
+        bord(nom + " est armable (chemin relatif, jamais un chemin de machine)", "seul un chemin absolu /Users ou /home rougit chemin-machine", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
     # bords de forme
     rc, s = lancer_releve("b-sans-fin-de-ligne.txt", None, brut=("\n".join(base(5))).encode("utf-8"))
     bord("relevé sans fin de ligne finale : armable", "la dernière ligne compte même sans \\n", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
@@ -708,6 +720,38 @@ def mutant_toujours_refus():
             komut(ident, "mutant valide : le cas négatif %s reste refusé" % regle, "code 1", "code %d" % rc_m)
             return
     okmut(ident, "%s · attendu (original) : code 0, RELEVE-VERDICT armable · obtenu (mutant) : %s" % (assertion, premier))
+
+
+def mutant_machine_sous_chaine():
+    """MUT-RELEVE-MACHINE-SOUS-CHAINE (fix-5b V2, revue-5b n°5) : la ligne de calcul des chemins de machine (marqueur `# fait-chemin-machine`) rendue à la sous-chaîne `/Users/`, `/home/` -> un
+    bord POSITIF de R-RELEVE-04 (chemin relatif `src/pages/home/index.md`, `~/home/notes.md`, `docs/Users/guide.md`) rougit `chemin-machine` ; l'original les arme tous."""
+    ident = "RELEVE-MACHINE-SOUS-CHAINE"
+    chemin, raison = make_mutant(ident, lambda l: l.rstrip().endswith("# fait-chemin-machine"),
+                                 "chemins_machine = [(i, jeton) for i, ligne in numerotees for jeton in (\"/Users/\", \"/home/\") if jeton in ligne]  # fait-chemin-machine")
+    if chemin is None:
+        komut(ident, "le mutant se construit", "UNE ligne `… # fait-chemin-machine` rendue à la sous-chaîne", raison)
+        return
+    assertion = "R-RELEVE-04 un chemin relatif nommé home ou Users est armable"
+    lignes = ("G3 | " + LAB_A + " | src/pages/home/index.md | doit-passer | passe | passe", "NOTE voir ~/home/notes.md", "NOTE voir docs/Users/guide.md")
+    trace = None
+    for i, ligne in enumerate(lignes):
+        releve = ecrire_releve("m-sous-chaine-%d.txt" % i, appliquer(base(5), [("ajoute", ligne)]))
+        rc_o, out_o, err_o = lancer(SCRIPT, ["--etape=5", releve])
+        if not armable(rc_o, out_o + err_o):
+            komut(ident, assertion + " (original) : " + ligne, "code 0, RELEVE-VERDICT armable", "l'original lui-même refuse : code %d, écarts %s" % (rc_o, ecarts_de(out_o + err_o)))
+            return
+        rc_m, out_m, err_m = lancer(chemin, ["--etape=5", releve])
+        if "chemin-machine" not in ecarts_de(out_m + err_m):
+            komut(ident, assertion + " : " + ligne, "le mutant rougit chemin-machine", "le mutant arme encore : code %d, écarts %s" % (rc_m, ecarts_de(out_m + err_m)))
+            return
+        if trace is None:
+            trace = "code %d, RELEVE-ECART chemin-machine sur « %s »" % (rc_m, ligne)
+    for etape in (5, 6):
+        rc_p, sortie_p = positif(chemin, etape)
+        if not armable(rc_p, sortie_p):
+            komut(ident, "mutant valide : le relevé conforme de l'étape %d reste armable sous le mutant" % etape, "code 0, RELEVE-VERDICT armable", "code %d" % rc_p)
+            return
+    okmut(ident, "%s · attendu (original) : code 0, RELEVE-VERDICT armable · obtenu (mutant) : %s" % (assertion, trace))
 
 
 def mutant_entier_borne():
@@ -1019,6 +1063,7 @@ def main():
     mutant_toujours_armable()
     mutant_toujours_refus()
     mutant_entier_borne()
+    mutant_machine_sous_chaine()
     controle_couverture()
 
 

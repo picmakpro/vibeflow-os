@@ -25,7 +25,8 @@
 #   COUVERTURE-REJEU (G3|G4|G4P) n=<k> plancher=<p>                            par gate visé (étape 5 : G3, G4 ; étape 6 : G3, G4, G4P) : UNE ligne, p ≥ 1, k ≥ p
 #   ligne de table `<gate> | <lab> | …`                                        au moins six champs séparés par « | », premier champ ^[A-Z][A-Z0-9]*$ : nomme un lab
 #                                                                              (labs = union des --lab et des labs de table, au moins un ; une ligne de tableau Markdown, qui commence par `|`, ne compte pas)
-#   aucune ligne ne porte de chemin de machine (/Users/ ou /home/)
+#   aucune ligne ne porte de chemin ABSOLU de machine : un jeton de chemin (suite maximale de caractères de mot, `.~%+@/-`) qui commence par `/` et vaut, une fois normalisé
+#   lexicalement, `/Users` ou `/home` ou est dessous (`file:///Users/<c>`, `a=/home/<c>`, `//home/<c>`, `/tmp/../home/<c>` rougissent ; `src/pages/home/x`, `~/home/x` non — fix-5b V2)
 #   (les lignes `COMPTE …`, `EMPREINTE-IDENTIQUE …`, `RELEVE-ECART …`, `RELEVE-VERDICT …` d'un relevé ne sont JAMAIS lues pour décider)
 # Règles (21, une ligne `if` marquée chacune) : lecture, vide, etape-absente, etape-malformee, etape-doublon, etape-autre (une ligne REJEU-ETAPE-<m>, m ≠ n),
 #   faux-refus, faux-accept, commit-absent, commit-malforme, commit-doublon, labs-absents, empreinte-absente, empreinte-doublon, empreinte-divergente,
@@ -60,13 +61,16 @@ PY_INVOKE="$(py_resolve_local)" || { echo "[verifier-releve] interpréteur Pytho
 # shellcheck disable=SC2086
 exec $PY_INVOKE -I -S - "$@" <<'PY_VERIFIER_RELEVE_EOF'
 import os
+import posixpath
 import re
 import stat
 import sys
 
 BORNE_RELEVE = 64 * 1024 * 1024  # octets ; au-delà : écart lecture
 GATES_PAR_ETAPE = {5: ("G3", "G4"), 6: ("G3", "G4", "G4P")}
-MOTIFS_MACHINE = ("/Users/", "/home/")
+MOTIFS_MACHINE = ("/Users/", "/home/")  # affichage seulement (`sur`, conservateur : tout nom qui en contient un est masqué) ; la règle chemin-machine lit les jetons de chemin (fix-5b V2)
+RACINES_MACHINE = ("/Users", "/home")
+RE_JETON_CHEMIN = re.compile(r"[\w.~%+@/-]+")  # liste BLANCHE : tout autre caractère est une frontière de jeton (fail-closed : un chemin collé à un guillemet, un `=`, un `:` est lu)
 
 # Tout nombre de la grammaire tient en 1 à 9 chiffres (fix-5b V1) : int() n'est appelé que sur un groupe ainsi borné, jamais sur un entier que la limite de conversion de
 # Python >= 3.11 (4 300 chiffres) ferait lever ; un nombre plus long est une ligne malformée, nommée, comme sous toute version de Python.
@@ -89,6 +93,21 @@ def sur(texte):
         return "<nom-masqué>"
     propre = "".join("?" if (ord(c) < 32 or ord(c) == 127) else c for c in texte)
     return propre if len(propre) <= 80 else propre[:77] + "..."
+
+
+def racines_machine(ligne):
+    """Racines de machine (/Users, /home) des chemins ABSOLUS que porte la ligne : la ligne est découpée en jetons de chemin (suites maximales de RE_JETON_CHEMIN), un jeton qui
+    commence par `/` est normalisé lexicalement (barres de tête ramenées à une, `.` et `..` résolus : `//home/<c>`, `/tmp/../home/<c>` sont lus comme `/home/<c>`) et compte s'il vaut
+    `/Users` ou `/home` ou s'il est dessous. Un chemin RELATIF (`src/pages/home/index.md`, `~/home/notes.md`, `docs/Users/guide.md`) n'est jamais un chemin de machine."""
+    trouvees = []
+    for jeton in RE_JETON_CHEMIN.findall(ligne):
+        if not jeton.startswith("/"):
+            continue
+        norme = posixpath.normpath("/" + jeton.lstrip("/"))
+        for racine in RACINES_MACHINE:
+            if norme == racine or norme.startswith(racine + "/"):
+                trouvees.append(racine)
+    return trouvees
 
 
 def usage(message):
@@ -227,7 +246,7 @@ def juger(texte, etape, labs_options):
     gates_sans_couverture = [g for g in gates if g not in couvertures]
     gates_en_doublon = [(g, couvertures[g]) for g in gates if len(couvertures.get(g, ())) > 1]
     couvertures_courtes = [(g, i, n, p) for g in gates for (i, n, p) in couvertures.get(g, ()) if n < p]
-    chemins_machine = [(i, jeton) for i, ligne in numerotees for jeton in MOTIFS_MACHINE if jeton in ligne]
+    chemins_machine = [(i, racine) for i, ligne in numerotees for racine in racines_machine(ligne)]  # fait-chemin-machine
 
     # --- les règles : une ligne `if` marquée chacune, dont le corps appelle l'écart
     if not de_l_etape:  # releve-etape-absente
@@ -282,8 +301,8 @@ def juger(texte, etape, labs_options):
         for g, i, n, p in couvertures_courtes:
             ecart("couverture-insuffisante", "gate %s ligne %d : n=%d sous plancher=%d" % (g, i, n, p))
     if chemins_machine:  # releve-chemin-machine
-        for i, jeton in chemins_machine:
-            ecart("chemin-machine", "ligne %d : jeton %s" % (i, jeton))
+        for i, racine in chemins_machine:
+            ecart("chemin-machine", "ligne %d : chemin absolu de machine (famille %s)" % (i, racine.strip("/").lower()))
     return len(labs)
 
 
