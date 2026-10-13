@@ -42,6 +42,29 @@
 # arbre non intact, rejeu à lancer détaché) · `sonder` ajoute 2 (en cours dans la borne) et 3 (borne dépassée ou
 # rejeu mort : REMONTER au manager, ne rien tuer, ne rien relancer).
 #
+# REJEU DÉTACHÉ (`suite` et `toutes` par --detache=<dossier>, plus `imputer` en 46.1-17). Le dossier est créé s'il
+# n'existe pas et doit être vide (sinon 64). Sans base (hors mesure de la base) ou pour une suite rouge à la base :
+# 64. L'outil s'y copie (`outil.sh` : l'original reste librement éditable pendant le rejeu), écrit `commande.txt`
+# (mode, options, nombre de suites), `borne.txt` (borne en secondes, calculée AVANT le lancement) et `debut.txt`
+# (epoch), lance la copie en arrière-plan sous `nohup`, dans sa propre session (sortie dans `sortie.txt`, pid
+# dans `pid.txt`), imprime `DETACHE <dossier> borne=<s>` et rend 0 aussitôt ; la copie écrit `fin.txt`
+# (`rc=<n> fin=<epoch>`) EN DERNIER. Borne : suite = 3 × sa durée de base ; `toutes` = 2 × la durée murale de la
+# BASE-BILAN ; `imputer` = 9 × durée de base (46.1-17). Exception unique, déclarée : la mesure de la base
+# (`toutes --base`) n'a pas de base d'où dériver sa borne ; sa remontée de sondage est la constante
+# BORNE_MESURE_BASE, et `commande.txt` porte `exception=mesure-base`. La base est écrite par la copie à
+# l'emplacement de l'outil d'origine (option interne --outil-origine), jamais dans le dossier du rejeu. Le code
+# de sortie de la copie est celui du mode (un `toutes --base` à suites rouges rend 1 : la base est écrite quand
+# même, les rouges y sont des faits préexistants).
+#
+# SONDER (`sonder <dossier> [--tranche=<s>]`). Attend au plus UNE tranche (défaut 480 s, maximum 540 : au-delà,
+# 64) en sondant fin.txt toutes les 5 s. Codes : 0 rejeu terminé et vert (imprime les lignes propres de l'outil
+# de sortie.txt — SUITE…, TOUTES…, IMPUTATION…, BASE…, plus `  ✗ ` et `NON TUÉ` — puis `DETACHE-FIN rc=0
+# duree=<s>`) ; 1 terminé et rouge (mêmes lignes, `DETACHE-FIN rc=<n> …` : « terminé » n'est jamais « vert », le
+# code le dit) ; 2 en cours dans la borne à l'issue de la tranche (`DETACHE-EN-COURS ecoule=<s> borne=<s>` et la
+# dernière ligne de progression) : re-sonder ; 3 borne dépassée (`ATTENTE-DEPASSEE ecoule=<s> borne=<s>`) ou rejeu
+# mort sans fin.txt (`DETACHE-MORT`) : REMONTER au manager, ne rien tuer, ne rien relancer ; 64 dossier absent ou
+# illisible, tranche hors limites. `sonder` ne tue jamais le rejeu ; aucun utilitaire de délai externe n'est employé.
+#
 # RÈGLE — jamais un vert à vide. Un bilan `0 OK` n'est jamais vert, en mode `suite` comme en mode `toutes`,
 # avec ou sans `--exige` ; une découverte vide n'est jamais verte (code 1) ; un libellé exigé absent est un
 # écart ; un plafond demandé sans base mesurée est un écart (`base-absente`), jamais un plafond inventé.
@@ -132,6 +155,9 @@ CAS_AUTOTEST=(
   base-duree-ok base-duree-absente base-duree-rouge base-corrompue-bilan base-corrompue-doublon
   base-sans-mesure base-ajout-vert base-ajout-duree-murale base-ajout-connue base-ajout-rouge
   base-ajout-detache
+  detache-sans-base detache-borne-derivee detache-toutes-borne detache-dossier-non-vide mesure-base-borne
+  mesure-base-ecrit-par-la-copie sonder-termine-vert sonder-termine-rouge sonder-en-cours sonder-depasse
+  sonder-mort sonder-dossier-absent sonder-tranche-trop-grande
 )
 
 # ---------------------------------------------------------------------------------------------------------
@@ -378,11 +404,16 @@ EOF
 # ---------------------------------------------------------------------------------------------------------
 cmd_suite() {
   local suite="" duree_max="" dm_set=0 shells="bash" cle="" ajout="" aj_set=0 sh sorties entree
-  local b_kind="" b_rc="" b_s="" b_zero="" rcv plafond ajout_s="" premier=1 base_ok=0
+  local b_kind="" b_rc="" b_s="" b_zero="" rcv plafond ajout_s="" premier=1 base_ok=0 detache="" a borne
+  local args_detache=()
   EXIGES=()
   NEC=0
+  for a in "$@"; do
+    case $a in --detache=*) ;; *) args_detache+=("$a") ;; esac
+  done
   while [ $# -gt 0 ]; do
     case $1 in
+      --detache=*) detache=${1#--detache=}; [ -n "$detache" ] || die_usage "suite : --detache=<dossier>" ;;
       --exige=*) [ -n "${1#--exige=}" ] || die_usage "--exige=<libellé> non vide"; EXIGES+=("${1#--exige=}") ;;
       --duree-max=*) duree_max=${1#--duree-max=}; dm_set=1 ;;
       --shells=*) shells=${1#--shells=} ;;
@@ -403,6 +434,10 @@ cmd_suite() {
   if [ "$aj_set" -eq 1 ]; then
     case $ajout in '' | *[!0-9]*) die_usage "suite : --base-ajout=<NN> (chiffres)" ;; esac
     [ "$dm_set" -eq 0 ] || die_usage "suite : --base-ajout et --duree-max s'excluent"
+    if [ -n "$detache" ]; then
+      echo "SUITE-USAGE --base-ajout et --detache s'excluent : une suite neuve se rejoue au premier plan (si elle n'y tient pas, le plan se scinde et remonte)" >&2
+      exit 64
+    fi
   fi
   racine_ou_sortir
   case $suite in "$RACINE"/*) suite=${suite#"$RACINE"/} ;; esac
@@ -436,6 +471,21 @@ EOF
       echo "SUITE-USAGE base-ajout-connue $cle : déjà dans la base, rien n'est écrit" >&2
       exit 64
     fi
+  fi
+  if [ -n "$detache" ]; then
+    # Rejeu détaché : la borne est dérivée de la base, jamais d'ailleurs.
+    if [ "$base_ok" -ne 1 ] || [ -z "$b_kind" ]; then
+      echo "SUITE-USAGE base-absente $cle : aucun rejeu détaché sans durée de base (aucune borne inventée)" >&2
+      exit 64
+    fi
+    if [ "$b_rc" -ne 0 ] || [ "$b_zero" -ne 0 ]; then
+      echo "SUITE-USAGE base-rouge $cle : suite rouge à la base, sa durée n'est pas une mesure" >&2
+      exit 64
+    fi
+    borne=$((b_s * FACTEUR_SUITE))
+    [ "$borne" -ge 1 ] || borne=1
+    detacher "$detache" "$borne" - 1 suite ${args_detache[@]+"${args_detache[@]}"}
+    return $?
   fi
   if [ -n "$b_kind" ] && [ "$b_rc" -eq 0 ] && [ "$b_zero" -eq 0 ] && [ "$b_s" -ge "$SEUIL_DETACHE" ]; then
     echo "SUITE-USAGE detache-requis $cle : durée de base $b_s s >= $SEUIL_DETACHE s, à lancer détaché (--detache=<dossier>) puis sonder" >&2
@@ -525,6 +575,126 @@ EOF
 }
 
 # ---------------------------------------------------------------------------------------------------------
+# Rejeu détaché (suite, toutes) et sonder
+# ---------------------------------------------------------------------------------------------------------
+# detacher <dossier> <borne> <exception|-> <nombre de suites> <mode> [args…]
+# Le dossier est créé s'il n'existe pas et doit être vide (sinon 64). L'outil s'y copie (outil.sh : l'original
+# reste librement éditable pendant le rejeu), écrit commande.txt, borne.txt (calculée AVANT le lancement) et
+# debut.txt, lance la copie en arrière-plan sous nohup, dans sa propre session (sortie dans sortie.txt, pid dans
+# pid.txt), imprime `DETACHE <dossier> borne=<s>` et rend 0 aussitôt. La copie écrit fin.txt
+# (`rc=<n> fin=<epoch>`) EN DERNIER. C'est le SEUL lancement en arrière-plan de l'outil.
+detacher() {
+  local d=$1 borne=$2 exc=$3 nsuites=$4 mode=$5 pid
+  shift 5
+  if [ -e "$d" ]; then
+    [ -d "$d" ] || { echo "DETACHE-USAGE $d n'est pas un dossier" >&2; return 64; }
+    if [ -n "$(ls -A "$d" 2>/dev/null)" ]; then
+      echo "DETACHE-USAGE dossier non vide : $d" >&2
+      return 64
+    fi
+  else
+    mkdir -p "$d" || { echo "DETACHE-USAGE dossier impossible : $d" >&2; return 64; }
+  fi
+  d=$(cd "$d" && pwd -P) || return 64
+  cp "$OUTIL" "$d/outil.sh" || return 64
+  {
+    echo "mode=$mode"
+    echo "options=$*"
+    echo "suites=$nsuites"
+    [ "$exc" = - ] || echo "exception=$exc"
+  } > "$d/commande.txt"
+  printf '%s\n' "$borne" > "$d/borne.txt"
+  date +%s > "$d/debut.txt"
+  pid=$(python3 -I -S -c '
+import os, subprocess, sys
+d, racine, origine, mode = sys.argv[1:5]
+args = sys.argv[5:]
+sortie = open(os.path.join(d, "sortie.txt"), "wb")
+p = subprocess.Popen(
+    ["nohup", "bash", os.path.join(d, "outil.sh"), mode] + args
+    + ["--outil-origine=" + origine, "--detache-interne=" + d],
+    cwd=racine, stdin=subprocess.DEVNULL, stdout=sortie, stderr=subprocess.STDOUT,
+    start_new_session=True, close_fds=True)
+print(p.pid)
+' "$d" "$RACINE" "$OUTIL_ORIGINE" "$mode" "$@") || { echo "DETACHE-USAGE lancement impossible" >&2; return 64; }
+  printf '%s\n' "$pid" > "$d/pid.txt"
+  printf 'DETACHE %s borne=%s\n' "$d" "$borne"
+  return 0
+}
+
+# sonder <dossier> [--tranche=<s>] : attend au plus UNE tranche. 0 terminé et vert · 1 terminé et rouge ·
+# 2 en cours dans la borne · 3 borne dépassée ou rejeu mort (REMONTER, ne rien tuer, ne rien relancer) ·
+# 64 usage. Ne tue jamais le rejeu.
+cmd_sonder() {
+  local d="" tranche=$TRANCHE_DEFAUT borne debut pid fin_ligne rc_fin fin_ep t_dep now ecoule pas rest restr
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --tranche=*) tranche=${1#--tranche=} ;;
+      -*) die_usage "sonder : option inconnue : $1" ;;
+      *) [ -z "$d" ] || die_usage "sonder <dossier>"; d=$1 ;;
+    esac
+    shift
+  done
+  [ -n "$d" ] || die_usage "sonder <dossier> [--tranche=<s>]"
+  case $tranche in '' | *[!0-9]*) die_usage "sonder : --tranche=<secondes>" ;; esac
+  if [ "$tranche" -lt 1 ] || [ "$tranche" -gt "$TRANCHE_MAX" ]; then
+    echo "SONDER-USAGE tranche $tranche hors de 1..$TRANCHE_MAX (la commande Bash de l'exécuteur plafonne à 10 min)" >&2
+    exit 64
+  fi
+  if [ ! -d "$d" ] || [ ! -r "$d/borne.txt" ] || [ ! -r "$d/debut.txt" ]; then
+    echo "SONDER-USAGE dossier absent ou illisible : $d" >&2
+    exit 64
+  fi
+  borne=$(cat "$d/borne.txt")
+  debut=$(cat "$d/debut.txt")
+  case $borne$debut in '' | *[!0-9]*) echo "SONDER-USAGE borne.txt ou debut.txt illisible" >&2; exit 64 ;; esac
+  t_dep=$(date +%s)
+  while :; do
+    if [ -f "$d/fin.txt" ]; then
+      fin_ligne=$(cat "$d/fin.txt")
+      rc_fin=${fin_ligne#rc=}
+      rc_fin=${rc_fin%% *}
+      fin_ep=${fin_ligne##*fin=}
+      LC_ALL=C awk '/^(SUITE|TOUTES|IMPUTATION|BASE|ARBRE-)/ || index($0, "  ✗ ") == 1 || index($0, "NON TUÉ") > 0' "$d/sortie.txt" 2>/dev/null
+      printf 'DETACHE-FIN rc=%s duree=%s\n' "$rc_fin" "$((fin_ep - debut))"
+      [ "$rc_fin" = 0 ]
+      return $?
+    fi
+    now=$(date +%s)
+    ecoule=$((now - debut))
+    if [ "$ecoule" -gt "$borne" ]; then
+      printf 'ATTENTE-DEPASSEE ecoule=%s borne=%s\n' "$ecoule" "$borne"
+      printf 'DETACHE-PROGRES %s\n' "$(derniere_ligne "$d/sortie.txt" 2>/dev/null)"
+      return 3
+    fi
+    pid=""
+    [ -r "$d/pid.txt" ] && pid=$(cat "$d/pid.txt")
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+      sleep 1
+      if [ -f "$d/fin.txt" ]; then
+        continue
+      fi
+      printf 'DETACHE-MORT pid=%s ecoule=%s borne=%s\n' "$pid" "$ecoule" "$borne"
+      printf 'DETACHE-PROGRES %s\n' "$(derniere_ligne "$d/sortie.txt" 2>/dev/null)"
+      return 3
+    fi
+    if [ $((now - t_dep)) -ge "$tranche" ]; then
+      printf 'DETACHE-EN-COURS ecoule=%s borne=%s\n' "$ecoule" "$borne"
+      printf 'DETACHE-PROGRES %s\n' "$(derniere_ligne "$d/sortie.txt" 2>/dev/null)"
+      return 2
+    fi
+    pas=$PAS_SONDE
+    rest=$((borne - ecoule + 1))
+    [ "$rest" -ge 1 ] || rest=1
+    [ "$rest" -ge "$pas" ] || pas=$rest
+    restr=$((tranche - (now - t_dep)))
+    [ "$restr" -ge 1 ] || restr=1
+    [ "$restr" -ge "$pas" ] || pas=$restr
+    sleep "$pas"
+  done
+}
+
+# ---------------------------------------------------------------------------------------------------------
 # Mode toutes
 # ---------------------------------------------------------------------------------------------------------
 arbre_intact() { # <ref> : 0 si plugin scripts .github sont identiques à <ref> (suivis et non suivis)
@@ -546,11 +716,16 @@ arbre_intact() { # <ref> : 0 si plugin scripts .github sont identiques à <ref> 
 cmd_toutes() {
   local base=0 contre=0 ref=$REF_INTACT ref_alt=0 rcv base_ok=0 bs
   local suites=() s sorties recs n=0 r=0 z=0 f_c=0 f_b=0 f_v=0 f_i=0 v=0 forme nn mm ss der zero rc_s ent
-  local t0 t1 charge_debut charge_fin sur=0 hors=0 annot kind brc bsx bz
+  local t0 t1 charge_debut charge_fin sur=0 hors=0 annot kind brc bsx bz detache="" a borne
+  local args_detache=()
+  for a in "$@"; do
+    case $a in --detache=*) ;; *) args_detache+=("$a") ;; esac
+  done
   while [ $# -gt 0 ]; do
     case $1 in
       --base) base=1 ;;
       --contre-base) contre=1 ;;
+      --detache=*) detache=${1#--detache=}; [ -n "$detache" ] || die_usage "toutes : --detache=<dossier>" ;;
       --arbre-intact=*) ref=${1#--arbre-intact=}; ref_alt=1 ;;
       --base-fichier=*) option_base_fichier "${1#--base-fichier=}" ;;
       *) die_usage "toutes : option inconnue : $1" ;;
@@ -578,7 +753,7 @@ cmd_toutes() {
       echo "BASE-ABSENTE $BASE_FICHIER : --contre-base exige la base mesurée"
       exit 64
     fi
-    if [ "$base_ok" -eq 1 ]; then
+    if [ "$base_ok" -eq 1 ] && [ -z "$detache" ]; then
       bs=$(base_bilan_s)
       if [ "$bs" -ge "$SEUIL_DETACHE" ]; then
         echo "TOUTES-USAGE detache-requis : la durée murale de la base ($bs s) atteint $SEUIL_DETACHE s, la découverte complète se lance détachée (--detache=<dossier>) puis sonder" >&2
@@ -590,6 +765,23 @@ cmd_toutes() {
   while IFS= read -r s; do
     [ -n "$s" ] && suites+=("$s")
   done < <(find plugin scripts -type f -path '*/tests/test-*.sh' 2>/dev/null | LC_ALL=C sort)
+
+  if [ -n "$detache" ]; then
+    # Rejeu détaché. Borne : 2 × la durée murale de la BASE-BILAN, jamais d'ailleurs ; exception unique, la
+    # mesure de la base elle-même (aucune base d'où dériver sa borne) : BORNE_MESURE_BASE.
+    if [ "$base" -eq 1 ]; then
+      detacher "$detache" "$BORNE_MESURE_BASE" mesure-base "${#suites[@]}" toutes ${args_detache[@]+"${args_detache[@]}"}
+      return $?
+    fi
+    if [ "$base_ok" -ne 1 ]; then
+      echo "TOUTES-USAGE base-absente : aucun rejeu détaché sans durée de base (aucune borne inventée)" >&2
+      exit 64
+    fi
+    borne=$(( $(base_bilan_s) * FACTEUR_TOUTES ))
+    [ "$borne" -ge 1 ] || borne=1
+    detacher "$detache" "$borne" - "${#suites[@]}" toutes ${args_detache[@]+"${args_detache[@]}"}
+    return $?
+  fi
 
   nouveau_tmp
   sorties=$NT
@@ -1153,6 +1345,164 @@ autotest_base() {
   at_fin 64
 }
 
+at_attendre_fin() { # <dossier> <max s> : attend fin.txt (borné, dans l'autotest seulement)
+  local i=0
+  while [ ! -f "$1/fin.txt" ] && [ "$i" -lt "$2" ]; do
+    sleep 1
+    i=$((i + 1))
+  done
+  [ -f "$1/fin.txt" ]
+}
+
+at_fichier_contient() { # <fichier> <motif fixe>
+  P="$2" LC_ALL=C awk 'BEGIN { p = ENVIRON["P"] } index($0, p) { f = 1 } END { exit f ? 0 : 1 }' "$1" 2> /dev/null \
+    || at_echec "$(basename "$1") sans « $2 »"
+}
+
+autotest_detache() {
+  local BF D1 D2 D3 D4 D5 D6 D7 S=plugin/m/tests/test-c.sh dead
+  local CANON='echo "== Résultat : 3 OK · 0 KO =="'
+  BF=$AT_TMP/base-d.txt
+  at_depot
+
+  at_debut detache-sans-base
+  mk_suite $S "$CANON"
+  mk_base "$BF" "autre.sh:0:2"
+  at_lancer suite $S --detache="$AT_TMP/d-sans" --base-fichier="$BF"
+  at_contient "base-absente"
+  [ ! -e "$AT_TMP/d-sans/outil.sh" ] || at_echec "un rejeu a été lancé sans base"
+  at_fin 64
+
+  at_debut detache-borne-derivee
+  mk_base "$BF" "$S:0:4"
+  mk_suite $S "sleep 1; $CANON"
+  D1=$AT_TMP/d-borne
+  at_lancer suite $S --detache="$D1" --base-fichier="$BF"
+  at_compte "DETACHE " 1
+  [ "$(cat "$D1/borne.txt" 2> /dev/null)" = 12 ] || at_echec "borne.txt vaut « $(cat "$D1/borne.txt" 2> /dev/null) » au lieu de 12 (3 × 4)"
+  cmp -s "$D1/outil.sh" "$OUTIL" || at_echec "outil.sh diffère de l'outil"
+  if at_attendre_fin "$D1" 60; then
+    [ -f "$D1/pid.txt" ] && [ -f "$D1/debut.txt" ] && [ -f "$D1/commande.txt" ] || at_echec "fichiers du rejeu manquants quand fin.txt existe"
+    at_fichier_contient "$D1/sortie.txt" "SUITE $S shell=bash rc=0"
+    at_fichier_contient "$D1/fin.txt" "rc=0 fin="
+  else
+    at_echec "fin.txt n'est jamais apparu"
+  fi
+  at_fin 0
+
+  at_debut detache-toutes-borne
+  MK_BILAN_S=7 mk_base "$BF" "$S:0:2"
+  D2=$AT_TMP/d-toutes
+  at_lancer toutes --detache="$D2" --base-fichier="$BF"
+  [ "$(cat "$D2/borne.txt" 2> /dev/null)" = 14 ] || at_echec "borne.txt vaut « $(cat "$D2/borne.txt" 2> /dev/null) » au lieu de 14 (2 × 7)"
+  at_fichier_contient "$D2/commande.txt" "mode=toutes"
+  at_attendre_fin "$D2" 60 || at_echec "fin.txt n'est jamais apparu"
+  at_fin 0
+
+  at_debut detache-dossier-non-vide
+  mk_base "$BF" "$S:0:4"
+  mkdir -p "$AT_TMP/d-plein"
+  : > "$AT_TMP/d-plein/occupe"
+  at_lancer suite $S --detache="$AT_TMP/d-plein" --base-fichier="$BF"
+  at_fin 64
+
+  at_debut mesure-base-borne
+  at_depot
+  mk_suite $S "$CANON"
+  at_commit
+  D3=$AT_TMP/d-mesure
+  rm -f "$AT_TMP/base-mesure.txt"
+  at_lancer toutes --base --detache="$D3" --arbre-intact=HEAD --base-fichier="$AT_TMP/base-mesure.txt"
+  [ "$(cat "$D3/borne.txt" 2> /dev/null)" = "$BORNE_MESURE_BASE" ] || at_echec "borne.txt vaut « $(cat "$D3/borne.txt" 2> /dev/null) » au lieu de $BORNE_MESURE_BASE"
+  at_fichier_contient "$D3/commande.txt" "exception=mesure-base"
+  if at_attendre_fin "$D3" 60; then
+    [ -f "$AT_TMP/base-mesure.txt" ] || at_echec "la base n'a pas été écrite"
+  else
+    at_echec "fin.txt n'est jamais apparu"
+  fi
+  at_fin 0
+
+  at_debut mesure-base-ecrit-par-la-copie
+  at_depot
+  mk_suite $S "$CANON"
+  at_commit
+  cp "$OUTIL" "$FD/phase/46.1-CONTROLES.sh"
+  D4=$AT_TMP/d-copie
+  AT_OUT="$AT_TMP/out.copie"
+  (cd "$FD" && bash "$FD/phase/46.1-CONTROLES.sh" toutes --base --detache="$D4" --arbre-intact=HEAD) > "$AT_OUT" 2>&1 < /dev/null
+  AT_RC=$?
+  if at_attendre_fin "$D4" 60; then
+    [ -f "$FD/phase/46.1-BASE.txt" ] || at_echec "la base n'est pas à côté de l'outil d'origine"
+    [ ! -e "$D4/46.1-BASE.txt" ] || at_echec "la base a été écrite dans le dossier de la copie"
+  else
+    at_echec "fin.txt n'est jamais apparu"
+  fi
+  at_fin 0
+
+  at_debut sonder-termine-vert
+  at_lancer sonder "$D1"
+  at_contient "DETACHE-FIN rc=0"; at_contient "SUITE $S shell=bash rc=0"
+  at_fin 0
+
+  at_debut sonder-termine-rouge
+  at_depot
+  mk_suite $S "echo '  ✗ x'; $CANON; exit 1"
+  mk_base "$BF" "$S:0:2"
+  D5=$AT_TMP/d-rouge
+  at_lancer suite $S --detache="$D5" --base-fichier="$BF"
+  at_attendre_fin "$D5" 60 || at_echec "fin.txt n'est jamais apparu"
+  at_lancer sonder "$D5"
+  at_contient "SUITE-ECART rc 1"; at_contient "DETACHE-FIN rc=1"; at_contient "  ✗ x"
+  at_fin 1
+
+  at_debut sonder-en-cours
+  mk_suite $S "sleep 10; $CANON"
+  mk_base "$BF" "$S:0:20"
+  D6=$AT_TMP/d-cours
+  at_lancer suite $S --detache="$D6" --base-fichier="$BF"
+  at_lancer sonder "$D6" --tranche=2
+  at_contient "DETACHE-EN-COURS"
+  at_attendre_fin "$D6" 60 || at_echec "le rejeu en cours n'a pas fini (il ne doit jamais être tué)"
+  at_fin 2
+
+  at_debut sonder-depasse
+  mk_suite $S "sleep 6; $CANON"
+  mk_base "$BF" "$S:0:5"
+  D7=$AT_TMP/d-depasse
+  at_lancer suite $S --detache="$D7" --base-fichier="$BF"
+  printf '1\n' > "$D7/borne.txt"
+  at_lancer sonder "$D7"
+  at_contient "ATTENTE-DEPASSEE"
+  if at_attendre_fin "$D7" 60; then
+    at_fichier_contient "$D7/fin.txt" "rc=0 fin="
+  else
+    at_echec "fin.txt n'est jamais apparu : le rejeu a été tué"
+  fi
+  at_fin 3
+
+  at_debut sonder-mort
+  mkdir -p "$AT_TMP/d-mort"
+  sleep 0 &
+  dead=$!
+  wait "$dead"
+  printf '60\n' > "$AT_TMP/d-mort/borne.txt"
+  date +%s > "$AT_TMP/d-mort/debut.txt"
+  printf '%s\n' "$dead" > "$AT_TMP/d-mort/pid.txt"
+  printf 'mode=suite\n' > "$AT_TMP/d-mort/commande.txt"
+  printf 'SUITE interrompue\n' > "$AT_TMP/d-mort/sortie.txt"
+  at_lancer sonder "$AT_TMP/d-mort"
+  at_contient "DETACHE-MORT"
+  at_fin 3
+
+  at_debut sonder-dossier-absent
+  at_lancer sonder "$AT_TMP/n-existe-pas"
+  at_fin 64
+
+  at_debut sonder-tranche-trop-grande
+  at_lancer sonder "$D1" --tranche=600
+  at_fin 64
+}
+
 autotest() {
   local manquants=0 c j trouve n d m
   nouveau_tmp
@@ -1160,6 +1510,7 @@ autotest() {
   autotest_suite
   autotest_toutes
   autotest_base
+  autotest_detache
   # Cas déclarés contre cas joués : un cas déclaré et non joué est un échec.
   for c in "${CAS_AUTOTEST[@]}"; do
     trouve=0
@@ -1200,6 +1551,7 @@ principal() {
     --autotest) autotest; return $? ;;
     suite) cmd_suite "$@"; return $? ;;
     toutes) cmd_toutes "$@"; return $? ;;
+    sonder) cmd_sonder "$@"; return $? ;;
     base-duree) cmd_base_duree "$@"; return $? ;;
     *) die_usage "46.1-CONTROLES.sh <suite|toutes|sonder|base-duree|invariants|releve|releve-chaine|--autotest|--help>" ;;
   esac
