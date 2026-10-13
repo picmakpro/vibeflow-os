@@ -207,6 +207,12 @@ CAS_AUTOTEST=(
   garder-g4-vert garder-g4-armable garder-g4-sans-option garder-g4-code-diverge garder-g4-doublon
   garder-g4-observation garder-g4-canal-vide garder-g4-date-forme garder-g4-date-invalide garder-g4-forme
   garder-g4-constante-illisible garder-g4-releve-absent garder-g4-observe garder-g4-g4p garder-g4-simule
+  etat-ref-coherent etat-ref-k1-fausse etat-ref-k2-fausse etat-ref-k3-fausse etat-ref-k3-etape-fausse
+  etat-ref-k3-ligne-manquante etat-ref-k4-fausse etat-ref-constante-changee etat-ref-limite-levee
+  etat-ref-limite-sans-ligne etat-ref-conditionnelle-ignoree etat-ref-hypothese-exclue
+  etat-ref-gate-non-couvert etat-ref-non-reconnue-visible etat-ref-vide etat-ref-constante-illisible
+  etat-ref-limites-illisibles etat-ref-fichier-absent etat-ref-hook-sans-constantes
+  reel-etat-temoin reel-etat-constante-changee reel-etat-phrase-changee
 )
 
 # ---------------------------------------------------------------------------------------------------------
@@ -1641,6 +1647,413 @@ cmd_armement() {
     fi
   fi
   return "$core"
+}
+
+# ---------------------------------------------------------------------------------------------------------
+# Mode etat-reference (P461-D-07 ; ARMG-10)
+# ---------------------------------------------------------------------------------------------------------
+REFERENCE_DEFAUT=plugin/planning-core/references/modele-cycles.md
+TESTS_GATES_DEFAUT=plugin/planning-core/scripts/tests/test-planning-gates.sh
+GATES_CONSTANTES="G6 G5 G1 G7 ROLE G3 G4 G4P"
+
+# Python embarqué (python3 -I -S) : GRAMMAIRE FERMÉE de la phrase d'état d'armement, quatre formes, relevée sur la
+# référence réelle. Entrées : <référence> <fichier de tests> <constantes.tsv>. Constantes : `X<TAB>valeur<TAB>étape`
+# ou `X<TAB>ILLISIBLE` (lues par lire_constante, la fonction d'`armement`), `G2_MODE<TAB>valeur`.
+#   K1  clause de constante : une ou plusieurs `ARMEMENT_<X>` séparées par `, ` ou ` et `, puis `vaut` ou `valent` et
+#       `armed` ou `observe` (entre accents graves) — chaque constante nommée vaut cette valeur ;
+#   K2  résumé entre parenthèses (parenthèses équilibrées, `(bp)` compris) qui COMMENCE par une liste de gates et
+#       enchaîne des clauses séparées par ` ; `, chacune `<gates> armé|armés` ou `<gates> en observation`, la dernière
+#       terminée éventuellement par `, limite (xx)` ou `, limites (xx) et (yy)` — chaque gate cité a l'état dit, chaque
+#       lettre citée figure dans LIMITES_REFERENCE ET porte sa ligne canonique `- **limite (xx)**` dans la référence ;
+#   K3  ligne de la table d'armement `| <gate> | <étape> | <état> | …` — un état par constante (G2 : G2_MODE), égal à
+#       la constante, étape égale à `# etape-<n>` ; une constante sans ligne, ou une ligne sans constante, est un écart ;
+#   K4  affirmation ancrée — liste de gates (éventuellement suivie d'un groupe `(étape …)` et d'une virgule) puis `est`,
+#       `reste` ou `reste donc` et un état ; OU liste de gates immédiatement suivie de l'état (`G4′ en observation`) ;
+#       OU `<gate> (étape <id>, <état>…)`. État : `armé|armée|armés|armées`, `en observation`, ``en `observe` ``.
+# Exclusions déclarées : une occurrence précédée, dans sa proposition (jusqu'au `;`, au `. ` ou au début de ligne), de
+# `si `, `tant que `, `quand `, `dès que `, `une fois `, `exige ` ou `avant `, ou suivie de ` sans `, énonce une
+# condition, une exigence ou une hypothèse et non un état : `ETAT-IGNORE`. Résidu visible : toute proposition qui
+# contient un nom de gate ET `armé`, `en observation`, `observe` ou `armed` et qu'aucune forme ne reconnaît :
+# `ETAT-NON-RECONNUE` (information, non rouge). Les lignes de tableau et les blocs de code clôturés sont hors prose.
+ecrire_py_etat() { # <fichier>
+  cat > "$1" <<'PY_ETAT_EOF'
+import ast
+import re
+import sys
+
+PRIME = "′"
+ref_chemin, tests_chemin, const_chemin = sys.argv[1:4]
+
+NOM = r"(?<![\w_])(?:G4" + PRIME + r"|G4'|G4P|G1|G3|G4|G5|G6|G7|ROLE|rôle)(?![\w_-])"
+NOM_NU = NOM[len(r"(?<![\w_])"):]
+LISTE = r"(?:" + NOM_NU + r")(?:(?:, | et | ET )" + NOM_NU + r")*"
+ETAT = r"(?:armée?s?|en observation|en `observe`)(?!\w)"
+RE_NOM = re.compile(NOM)
+RE_LISTE = re.compile(r"(?<![\w_])" + LISTE)
+RE_K1 = re.compile(r"((?:`ARMEMENT_[A-Z0-9]+`)(?:(?:, | et )`ARMEMENT_[A-Z0-9]+`)*) (vaut|valent) `(armed|observe)`")
+RE_K4A = re.compile(r"(?<![\w_])(" + LISTE + r")(\s*\((?:étape|etape)[^()]*\))?(\s*,)?\s+(?:reste donc|reste|est)\s+(" + ETAT + r")")
+RE_K4B = re.compile(r"(?<![\w_])(" + LISTE + r")\s+(" + ETAT + r")")
+RE_K4C = re.compile(r"(?<![\w_])(" + NOM_NU + r")\s*\((?:étape|etape)\s[^(),]*,\s*(" + ETAT + r")[^()]*\)")
+RE_EXCL = re.compile(r"(?<!\w)(si|tant que|quand|dès que|une fois|exige|avant) ")
+RE_RESIDU = re.compile(r"armée?s?(?!\w)|en observation|observe|armed")
+RE_K3 = re.compile(r"^\|\s*(" + NOM_NU + r"|G2)\s*\|\s*([0-9]+|-)\s*\|\s*(armed|observe|avertit)\s*\|")
+RE_LIMITE_LIGNE = re.compile(r"^- \*\*limite \(([a-z]+)\)\*\*")
+RE_LIMITES_SUFFIXE = re.compile(r"^,\s+limites?\s+\(([a-z]+)\)(?:\s+et\s+\(([a-z]+)\))*$")
+RE_CLAUSE = re.compile(r"^(" + LISTE + r")\s+(armés?|en observation)(,\s+limites?\s+.*)?$")
+
+
+def cle_gate(texte):
+    t = texte.replace("'", PRIME)
+    if t in ("G4" + PRIME, "G4P"):
+        return "G4P"
+    if t in ("ROLE", "rôle"):
+        return "ROLE"
+    return t
+
+
+def gates_de(liste):
+    return [cle_gate(m.group(0)) for m in RE_NOM.finditer(liste)]
+
+
+def etat_de(mot):
+    return "observe" if ("observation" in mot or "observe" in mot) else "armed"
+
+
+sorties = []
+ecarts = 0
+cmp_k = {"k1": 0, "k2": 0, "k3": 0, "k4": 0}
+ignorees = 0
+non_reconnues = 0
+couverts = set()
+
+
+def ecart(texte):
+    global ecarts
+    ecarts += 1
+    sorties.append("ETAT-ECART " + texte)
+
+
+# --- constantes
+const = {}
+g2 = None
+for ligne in open(const_chemin, encoding="utf-8").read().split("\n"):
+    if not ligne:
+        continue
+    champs = ligne.split("\t")
+    if champs[0] == "G2_MODE":
+        if len(champs) > 1 and champs[1] != "ILLISIBLE":
+            g2 = champs[1]
+        else:
+            ecart("constante-illisible G2_MODE")
+    elif len(champs) > 2:
+        const[champs[0]] = (champs[1], champs[2])
+    else:
+        ecart("constante-illisible " + champs[0])
+        const[champs[0]] = None
+
+# --- limites
+limites = None
+try:
+    brut = open(tests_chemin, encoding="utf-8").read().split("\n")
+    debut = None
+    for i, l in enumerate(brut):
+        if l.startswith("LIMITES_REFERENCE = ("):
+            debut = i
+            break
+    if debut is not None:
+        fin = None
+        for j in range(debut + 1, len(brut)):
+            if brut[j] == ")":
+                fin = j
+                break
+        if fin is not None:
+            texte = "\n".join(brut[debut:fin + 1])
+            valeur = ast.literal_eval(texte[texte.index("=") + 1:].strip())
+            limites = [e[0] for e in valeur]
+except (OSError, ValueError, SyntaxError, IndexError, TypeError):
+    limites = None
+if limites is None:
+    ecart("limites-illisibles")
+
+# --- référence
+lignes = open(ref_chemin, encoding="utf-8").read().split("\n")
+canoniques = set()
+for l in lignes:
+    m = RE_LIMITE_LIGNE.match(l)
+    if m:
+        canoniques.add(m.group(1))
+
+rows = {}
+
+
+def debut_proposition(texte, p):
+    d = 0
+    for m in re.finditer(r";|\.(?=\s|$)", texte[:p]):
+        d = m.end()
+    return d
+
+
+def exclusion(texte, debut, fin):
+    pd = debut_proposition(texte, debut)
+    m = RE_EXCL.search(texte[pd:debut])
+    if m:
+        return m.group(1)
+    if texte[fin:fin + 6] == " sans ":
+        return "sans"
+    return None
+
+
+def comparer(forme, n, gate, dit):
+    if gate not in const:
+        ecart("%s ligne=%d %s dit=%s constante=absente" % (forme, n, gate, dit))
+        return False
+    if const[gate] is None:
+        return True
+    if const[gate][0] != dit:
+        ecart("%s ligne=%d %s dit=%s constante=%s" % (forme, n, gate, dit, const[gate][0]))
+        return False
+    return True
+
+
+def groupes_parentheses(texte):
+    pile = []
+    out = []
+    for i, ch in enumerate(texte):
+        if ch == "(":
+            pile.append(i)
+        elif ch == ")" and pile:
+            out.append((pile.pop(), i))
+    return sorted(out)
+
+
+def clauses_k2(contenu):
+    morceaux = []
+    prof = 0
+    cur = ""
+    i = 0
+    while i < len(contenu):
+        ch = contenu[i]
+        if ch == "(":
+            prof += 1
+        elif ch == ")":
+            prof -= 1
+        if prof == 0 and contenu[i:i + 3] == " ; ":
+            morceaux.append(cur)
+            cur = ""
+            i += 3
+            continue
+        cur += ch
+        i += 1
+    morceaux.append(cur)
+    return morceaux
+
+
+en_code = False
+for idx, l in enumerate(lignes):
+    n = idx + 1
+    if l.lstrip().startswith("```"):
+        en_code = not en_code
+        continue
+    if en_code:
+        continue
+    m3 = RE_K3.match(l)
+    if m3:
+        nom, etape, etat = m3.group(1), m3.group(2), m3.group(3)
+        g = "G2" if nom == "G2" else cle_gate(nom)
+        cmp_k["k3"] += 1
+        if g in rows:
+            ecart("k3-ligne-doublon ligne=%d %s" % (n, g))
+        rows[g] = n
+        if g == "G2":
+            if g2 is None:
+                continue
+            if etat != g2:
+                ecart("k3 ligne=%d G2 dit=%s constante=%s" % (n, etat, g2))
+            if etape != "-":
+                ecart("k3-etape ligne=%d G2 dit=%s constante=-" % (n, etape))
+        else:
+            if g not in const:
+                ecart("k3-ligne-sans-constante ligne=%d %s" % (n, g))
+            elif const[g] is not None:
+                if etat != const[g][0]:
+                    ecart("k3 ligne=%d %s dit=%s constante=%s" % (n, g, etat, const[g][0]))
+                if etape != const[g][1]:
+                    ecart("k3-etape ligne=%d %s dit=%s constante=%s" % (n, g, etape, const[g][1]))
+        continue
+    if l.startswith("|"):
+        continue
+    masque = list(l)
+    reconnus = []  # (début, fin) des occurrences reconnues, comptées ou ignorées
+
+    def masquer(a, b):
+        for i in range(a, b):
+            masque[i] = " "
+
+    # K1
+    for m in RE_K1.finditer(l):
+        reconnus.append((m.start(), m.end()))
+        masquer(m.start(), m.end())
+        exc = exclusion(l, m.start(), m.end())
+        xs = re.findall(r"`ARMEMENT_([A-Z0-9]+)`", m.group(1))
+        if exc:
+            ignorees += 1
+            sorties.append("ETAT-IGNORE ligne=%d motif=%s %s" % (n, exc, " ".join("ARMEMENT_" + x for x in xs)))
+            continue
+        cmp_k["k1"] += 1
+        dit = m.group(3)
+        bons = [comparer("k1", n, x, dit) for x in xs]
+        for x in xs:
+            couverts.add(x)
+        if all(bons):
+            sorties.append("ETAT k1 ligne=%d gates=%s dit=%s ok" % (n, ",".join(xs), dit))
+    # K2
+    for (a, b) in groupes_parentheses(l):
+        contenu = l[a + 1:b]
+        if not RE_LISTE.match(contenu):
+            continue
+        if any(masque[i] == " " and l[i] != " " for i in range(a, b + 1)):
+            continue
+        parts = clauses_k2(contenu)
+        analyse = []
+        valide = True
+        lettres = []
+        for k, cl in enumerate(parts):
+            mc = RE_CLAUSE.match(cl.strip())
+            if not mc:
+                valide = False
+                break
+            suffixe = mc.group(3)
+            if suffixe:
+                if k != len(parts) - 1 or not RE_LIMITES_SUFFIXE.match(suffixe):
+                    valide = False
+                    break
+                lettres = re.findall(r"\(([a-z]+)\)", suffixe)
+            analyse.append((gates_de(mc.group(1)), etat_de(mc.group(2))))
+        if not valide:
+            continue
+        reconnus.append((a, b + 1))
+        masquer(a, b + 1)
+        exc = exclusion(l, a, b + 1)
+        if exc:
+            ignorees += 1
+            sorties.append("ETAT-IGNORE ligne=%d motif=%s %s" % (n, exc, contenu[:60]))
+            continue
+        cmp_k["k2"] += 1
+        tous = []
+        dits = []
+        bons = []
+        for gates, dit in analyse:
+            for g in gates:
+                tous.append(g)
+                dits.append(dit)
+                couverts.add(g)
+                bons.append(comparer("k2", n, g, dit))
+        for lettre in lettres:
+            if limites is not None and lettre not in limites:
+                ecart("limite-absente %s" % lettre)
+                bons.append(False)
+            elif lettre not in canoniques:
+                ecart("limite-sans-ligne %s" % lettre)
+                bons.append(False)
+        if all(bons):
+            sorties.append("ETAT k2 ligne=%d gates=%s dit=%s ok" % (n, ",".join(tous), ",".join(dits)))
+    # K4 sur la ligne masquée (K1 et K2 déjà traités)
+    texte = "".join(masque)
+    trouves = []
+    for rx, genre in ((RE_K4A, "A"), (RE_K4B, "B"), (RE_K4C, "C")):
+        for m in rx.finditer(texte):
+            if genre == "C":
+                liste, mot = m.group(1), m.group(2)
+            elif genre == "A":
+                liste, mot = m.group(1), m.group(4)
+            else:
+                liste, mot = m.group(1), m.group(2)
+            trouves.append((m.start(), -(m.end() - m.start()), m.end(), liste, mot))
+    trouves.sort()
+    pris = []
+    for (a, _neg, b, liste, mot) in trouves:
+        if any(not (b <= pa or a >= pb) for (pa, pb) in pris):
+            continue
+        pris.append((a, b))
+        reconnus.append((a, b))
+        exc = exclusion(texte, a, b)
+        gates = gates_de(liste)
+        if exc:
+            ignorees += 1
+            sorties.append("ETAT-IGNORE ligne=%d motif=%s %s" % (n, exc, texte[a:b].strip()))
+            continue
+        cmp_k["k4"] += 1
+        dit = etat_de(mot)
+        bons = [comparer("k4", n, g, dit) for g in gates]
+        for g in gates:
+            couverts.add(g)
+        if all(bons):
+            sorties.append("ETAT k4 ligne=%d gates=%s dit=%s ok" % (n, ",".join(gates), dit))
+    # Résidu : propositions de la ligne masquée qui nomment un gate et un état sans être reconnues
+    debut = 0
+    bornes = [m.end() for m in re.finditer(r";|\.(?=\s|$)", texte)] + [len(texte)]
+    for fin in bornes:
+        prop = texte[debut:fin]
+        if RE_NOM.search(prop) and RE_RESIDU.search(prop):
+            if not any(debut <= a < fin for (a, _b) in reconnus):
+                non_reconnues += 1
+                sorties.append("ETAT-NON-RECONNUE ligne=%d %s" % (n, " ".join(prop.split())[:140]))
+        debut = fin
+
+# --- couverture de la table (K3)
+if "G2" not in rows and g2 is not None:
+    ecart("k3-ligne-manquante G2")
+for g in "G6 G5 G1 G7 ROLE G3 G4 G4P".split():
+    if g in const and const[g] is not None and g not in rows:
+        ecart("k3-ligne-manquante %s" % g)
+# --- couverture par gate (K1, K2, K4) : une constante nommée par AUCUNE phrase est un écart
+if cmp_k["k1"] + cmp_k["k2"] + cmp_k["k4"] == 0:
+    ecart("aucune-phrase")
+else:
+    for g in "G6 G5 G1 G7 ROLE G3 G4 G4P".split():
+        if g in const and const[g] is not None and g not in couverts:
+            ecart("gate-non-couvert %s" % g)
+
+for s in sorties:
+    print(s)
+print("ETAT-BILAN k1=%d k2=%d k3=%d k4=%d ignorees=%d non-reconnues=%d ecarts=%d" % (
+    cmp_k["k1"], cmp_k["k2"], cmp_k["k3"], cmp_k["k4"], ignorees, non_reconnues, ecarts))
+sys.exit(1 if ecarts else 0)
+PY_ETAT_EOF
+}
+
+cmd_etat_reference() {
+  local ref="" hook="" tests="" t x r
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --reference=*) ref=${1#--reference=} ;;
+      --hook=*) hook=${1#--hook=} ;;
+      --tests=*) tests=${1#--tests=} ;;
+      *) die_usage "etat-reference [--reference=<fichier>] [--hook=<fichier>] [--tests=<fichier>]" ;;
+    esac
+    shift
+  done
+  racine_ou_sortir
+  [ -n "$ref" ] || ref=$REFERENCE_DEFAUT
+  [ -n "$hook" ] || hook=$HOOK_REL
+  [ -n "$tests" ] || tests=$TESTS_GATES_DEFAUT
+  for x in "$ref" "$hook" "$tests"; do
+    [ -f "$x" ] || { echo "ETAT-USAGE fichier introuvable : $x" >&2; exit 64; }
+  done
+  nouveau_tmp
+  t=$NT
+  : > "$t/constantes.tsv"
+  for x in $GATES_CONSTANTES; do
+    if lire_constante "$hook" "$x"; then
+      printf '%s\t%s\t%s\n' "$x" "$CONST_VAL" "$CONST_ETAPE" >> "$t/constantes.tsv"
+    else
+      printf '%s\tILLISIBLE\n' "$x" >> "$t/constantes.tsv"
+    fi
+  done
+  r=$(LC_ALL=C awk '/^G2_MODE = "[a-z]+"$/ { n++; v = $0; sub(/^[^"]*"/, "", v); sub(/".*$/, "", v); val = v } END { if (n == 1) print val; else print "ILLISIBLE" }' "$hook")
+  printf 'G2_MODE\t%s\n' "$r" >> "$t/constantes.tsv"
+  ecrire_py_etat "$t/etat.py"
+  python3 -I -S "$t/etat.py" "$ref" "$tests" "$t/constantes.tsv"
 }
 
 # ---------------------------------------------------------------------------------------------------------
@@ -3087,6 +3500,265 @@ $DOK" mk_releve "$R"
   at_fin 64
 }
 
+# mk_etat <dossier> : écrit hook.sh, ref.md et tests.sh d'un mini état d'armement cohérent (G4 et G4′ à `observe`).
+# Variables : ET_G4, ET_G4P (valeur des constantes), ET_G4_DOUBLE (deux lignes ARMEMENT_G4), ET_K1, ET_K2, ET_K4 (ligne
+# de phrase de remplacement ; `-` la supprime), ET_T_G4 / ET_T_G4E (état / étape de la ligne G4 de la table),
+# ET_SANS_LIGNE_G4P (pas de ligne G4P), ET_SANS_LIGNE_BS (pas de ligne canonique de la limite (bs)), ET_LIMITES
+# (lettres du tuple, défaut « bp bs »), ET_SANS_LIMITES, ET_SEULEMENT_TABLE (aucune phrase K1/K2/K4), ET_EXTRA (lignes
+# ajoutées).
+etat_mot() { if [ "$1" = armed ]; then printf 'armé'; else printf 'en observation'; fi; }
+
+mk_etat() {
+  local d=$1 g4=${ET_G4:-observe} g4p=${ET_G4P:-observe} l ligne
+  mkdir -p "$d"
+  {
+    printf 'ARMEMENT_G6 = "armed"  # etape-1\nARMEMENT_G5 = "armed"  # etape-1\nARMEMENT_G1 = "armed"  # etape-2\n'
+    printf 'ARMEMENT_G7 = "armed"  # etape-3\nARMEMENT_ROLE = "armed"  # etape-4\nARMEMENT_G3 = "armed"  # etape-5\n'
+    if [ "${ET_G4_DOUBLE:-0}" = 1 ]; then
+      printf 'ARMEMENT_G4 = "observe"  # etape-5\nARMEMENT_G4 = "armed"  # etape-5\n'
+    else
+      printf 'ARMEMENT_G4 = "%s"  # etape-5\n' "$g4"
+    fi
+    printf 'ARMEMENT_G4P = "%s"  # etape-6\nG2_MODE = "avertit"\n' "$g4p"
+  } > "$d/hook.sh"
+  {
+    printf '# Référence de test\n\n'
+    if [ "${ET_SEULEMENT_TABLE:-0}" != 1 ]; then
+      if [ "${ET_K1:-}" = "-" ]; then
+        :
+      elif [ -n "${ET_K1:-}" ]; then
+        printf '%s\n' "$ET_K1"
+      else
+        ligne='Armés : `ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7`, `ARMEMENT_ROLE` et `ARMEMENT_G3` valent `armed`'
+        printf '%s ; `ARMEMENT_G4` vaut `%s` ; `ARMEMENT_G4P` vaut `%s`.\n' "$ligne" "$g4" "$g4p"
+      fi
+      if [ "${ET_K4:-}" = "-" ]; then
+        :
+      elif [ -n "${ET_K4:-}" ]; then
+        printf '%s\n' "$ET_K4"
+      else
+        printf 'G4′ reste %s.\n' "$(etat_mot "$g4p")"
+      fi
+      if [ "${ET_K2:-}" = "-" ]; then
+        :
+      elif [ -n "${ET_K2:-}" ]; then
+        printf '%s\n' "$ET_K2"
+      else
+        printf 'Hors de cette phase : (G3 armé ; G4 %s ; G4′ %s, limites (bp) et (bs)).\n' "$(etat_mot "$g4")" "$(etat_mot "$g4p")"
+      fi
+    fi
+    printf '\n| Gate | Étape | État | Comportement |\n|---|---|---|---|\n'
+    printf '| G6 | 1 | armed | x |\n| G5 | 1 | armed | x |\n| G1 | 2 | armed | x |\n| G7 | 3 | armed | x |\n'
+    printf '| ROLE | 4 | armed | x |\n| G3 | 5 | armed | x |\n'
+    printf '| G4 | %s | %s | x |\n' "${ET_T_G4E:-5}" "${ET_T_G4:-$g4}"
+    [ "${ET_SANS_LIGNE_G4P:-0}" = 1 ] || printf '| G4P | 6 | %s | x |\n' "$g4p"
+    printf '| G2 | - | avertit | x |\n\n'
+    printf -- '- **limite (bp)** — première limite\n'
+    [ "${ET_SANS_LIGNE_BS:-0}" = 1 ] || printf -- '- **limite (bs)** — seconde limite\n'
+    [ -z "${ET_EXTRA:-}" ] || printf '%s\n' "$ET_EXTRA"
+  } > "$d/ref.md"
+  {
+    printf '#!/usr/bin/env bash\necho x\n'
+    if [ "${ET_SANS_LIMITES:-0}" != 1 ]; then
+      printf 'LIMITES_REFERENCE = (\n'
+      for l in ${ET_LIMITES:-bp bs}; do printf '    ("%s", ("mot",)),\n' "$l"; done
+      printf ')\n'
+    fi
+  } > "$d/tests.sh"
+}
+
+at_etat() { # <dossier> : lance etat-reference sur les trois mini fichiers
+  at_lancer etat-reference --reference="$1/ref.md" --hook="$1/hook.sh" --tests="$1/tests.sh"
+}
+
+# Remplace dans <src> la sous-chaîne <ancien> (présente sur UNE seule ligne, une seule fois) par <nouveau> ; écrit <dst>.
+at_remplacer() { # <src> <dst> <ancien> <nouveau>
+  A="$3" N="$4" LC_ALL=C awk '
+    BEGIN { a = ENVIRON["A"]; n = ENVIRON["N"] }
+    { i = index($0, a); if (i > 0) { c++; $0 = substr($0, 1, i - 1) n substr($0, i + length(a)) } print }
+    END { if (c != 1) exit 3 }' "$1" > "$2" || { at_echec "reel-ancre : « $3 » absente ou multiple dans $1"; return 1; }
+  return 0
+}
+
+autotest_etat() {
+  local D
+  at_depot
+  nouveau_tmp
+  D=$NT/etat
+
+  at_debut etat-ref-coherent
+  mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-BILAN"; at_contient "ecarts=0"; at_absent "ETAT-ECART"; at_contient "k3=9"
+  at_fin 0
+
+  at_debut etat-ref-k1-fausse
+  ET_K1='Armés : `ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7`, `ARMEMENT_ROLE` et `ARMEMENT_G3` valent `armed` ; `ARMEMENT_G4` et `ARMEMENT_G4P` valent `armed`.' mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART k1"; at_contient "G4 dit=armed constante=observe"
+  at_fin 1
+
+  at_debut etat-ref-k2-fausse
+  ET_K2='Hors de cette phase : (G3 armé ; G4 armé ; G4′ en observation, limites (bp) et (bs)).' mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART k2"; at_contient "G4 dit=armed constante=observe"
+  at_fin 1
+
+  at_debut etat-ref-k3-fausse
+  ET_T_G4=armed mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART k3 "; at_contient "G4 dit=armed constante=observe"
+  at_fin 1
+
+  at_debut etat-ref-k3-etape-fausse
+  ET_T_G4E=6 mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART k3-etape"; at_contient "G4 dit=6 constante=5"
+  at_fin 1
+
+  at_debut etat-ref-k3-ligne-manquante
+  ET_SANS_LIGNE_G4P=1 mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART k3-ligne-manquante G4P"
+  at_fin 1
+
+  at_debut etat-ref-k4-fausse
+  ET_K4='G4′ reste en observation.' ET_G4P=armed mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART k4"; at_contient "G4P dit=observe constante=armed"
+  at_fin 1
+
+  at_debut etat-ref-constante-changee
+  mk_etat "$D"
+  at_etat "$D"
+  [ "$AT_RC" -eq 0 ] || at_echec "les documents cohérents rendent $AT_RC au lieu de 0"
+  ET_G4P=observe mk_etat "$D"
+  A='ARMEMENT_G4P = "observe"  # etape-6' N='ARMEMENT_G4P = "armed"  # etape-6' awk '$0 == ENVIRON["A"] { $0 = ENVIRON["N"]; c++ } { print } END { if (c == 1) exit 0; exit 3 }' "$D/hook.sh" > "$D/hook.mut" || at_echec "constante de G4P introuvable"
+  mv "$D/hook.mut" "$D/hook.sh"
+  at_etat "$D"
+  at_contient "ETAT-ECART"; at_contient "G4P dit=observe constante=armed"
+  at_fin 1
+
+  at_debut etat-ref-limite-levee
+  ET_LIMITES='bp' mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART limite-absente bs"
+  at_fin 1
+
+  at_debut etat-ref-limite-sans-ligne
+  ET_SANS_LIGNE_BS=1 mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART limite-sans-ligne bs"; at_absent "limite-absente"
+  at_fin 1
+
+  at_debut etat-ref-conditionnelle-ignoree
+  ET_G4=armed ET_G4P=observe ET_EXTRA='Erreur interne : `block` si `ARMEMENT_G4P` vaut `armed`, ligne d'"'"'observation sinon.
+G4 ne refuse rien tant que `ARMEMENT_G4` vaut `observe`.' mk_etat "$D"
+  at_etat "$D"
+  at_contient "ecarts=0"; at_compte "ETAT-IGNORE" 2; at_contient "motif=si"; at_contient "motif=tant que"; at_absent "ETAT-ECART"
+  at_fin 0
+
+  at_debut etat-ref-hypothese-exclue
+  ET_EXTRA='Une table qui la viole (G4 armé sans G3) refuse tout.
+La suite exige G3 ET G4 armés avant tout armement.' mk_etat "$D"
+  at_etat "$D"
+  at_contient "ecarts=0"; at_compte "ETAT-IGNORE" 2; at_contient "motif=sans"; at_contient "motif=exige"; at_absent "ETAT-ECART"
+  at_fin 0
+
+  at_debut etat-ref-gate-non-couvert
+  ET_K1='Armés : `ARMEMENT_G6`, `ARMEMENT_G5`, `ARMEMENT_G1`, `ARMEMENT_G7`, `ARMEMENT_ROLE` et `ARMEMENT_G3` valent `armed` ; `ARMEMENT_G4P` vaut `observe`.' \
+    ET_K2='Hors de cette phase : (G3 armé ; G4′ en observation, limites (bp) et (bs)).' ET_K4='Le gate G4 reste, pour l'"'"'instant, en attente.' mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART gate-non-couvert G4"; at_absent "gate-non-couvert G4P"
+  at_fin 1
+
+  at_debut etat-ref-non-reconnue-visible
+  ET_EXTRA='Le gate G4 est livré en mode observe pour cette étape.' mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-NON-RECONNUE"; at_contient "ecarts=0"; at_contient "non-reconnues=1"
+  at_fin 0
+
+  at_debut etat-ref-vide
+  ET_SEULEMENT_TABLE=1 mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART aucune-phrase"
+  at_fin 1
+
+  at_debut etat-ref-constante-illisible
+  ET_G4_DOUBLE=1 mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART constante-illisible G4"
+  at_fin 1
+
+  at_debut etat-ref-limites-illisibles
+  ET_SANS_LIMITES=1 mk_etat "$D"
+  at_etat "$D"
+  at_contient "ETAT-ECART limites-illisibles"
+  at_fin 1
+
+  at_debut etat-ref-fichier-absent
+  mk_etat "$D"
+  at_lancer etat-reference --reference="$D/n-existe-pas.md" --hook="$D/hook.sh" --tests="$D/tests.sh"
+  at_fin 64
+
+  at_debut etat-ref-hook-sans-constantes
+  mk_etat "$D"
+  at_lancer etat-reference --reference="$D/ref.md" --hook="$D/ref.md" --tests="$D/tests.sh"
+  at_contient "ETAT-ECART constante-illisible"
+  at_fin 1
+}
+
+# Cas reel-etat-* : copies sandbox de la VRAIE référence, du VRAI hook et de la VRAIE suite de tests ; la perturbation
+# ne touche que la copie. Si la grammaire ne reconnaît pas la phrase réelle, la perturbation ne rougit pas et le cas échoue.
+autotest_reel_etat() {
+  local R=plugin/planning-core/references/modele-cycles.md H=plugin/planning-core/scripts/planning-hook.sh
+  local T=plugin/planning-core/scripts/tests/test-planning-gates.sh D
+  nouveau_tmp
+  D=$NT/reel-etat
+  mkdir -p "$D"
+  AT_CWD=$AT_RACINE
+
+  at_debut reel-etat-temoin
+  AT_RC=0
+  if [ -n "$AT_RACINE" ]; then
+    cp "$AT_RACINE/$R" "$D/ref.md" && cp "$AT_RACINE/$H" "$D/hook.sh" && cp "$AT_RACINE/$T" "$D/tests.sh" || at_echec "copie des fichiers réels impossible"
+    cmp -s "$D/ref.md" "$AT_RACINE/$R" || at_echec "la référence copiée diffère de l'originale"
+    at_etat "$D"
+    at_contient "ecarts=0"; at_absent "ETAT-ECART"
+  else
+    at_echec "racine du dépôt introuvable"
+  fi
+  at_fin 0
+
+  at_debut reel-etat-constante-changee
+  AT_RC=0
+  if [ -n "$AT_RACINE" ]; then
+    cp "$AT_RACINE/$R" "$D/ref.md" && cp "$AT_RACINE/$T" "$D/tests.sh" || at_echec "copie des fichiers réels impossible"
+    if at_perturber remplace "$AT_RACINE/$H" "$D/hook.sh" 'ARMEMENT_G4 = "observe"  # etape-5' 'ARMEMENT_G4 = "armed"  # etape-5'; then
+      cmp -s "$D/hook.sh" "$AT_RACINE/$H" && at_echec "le hook copié est identique à l'original (aucune perturbation)"
+      at_etat "$D"
+      at_contient "ETAT-ECART"; at_contient "G4 dit=observe constante=armed"
+    fi
+  else
+    at_echec "racine du dépôt introuvable"
+  fi
+  at_fin 1
+
+  at_debut reel-etat-phrase-changee
+  AT_RC=0
+  if [ -n "$AT_RACINE" ]; then
+    cp "$AT_RACINE/$H" "$D/hook.sh" && cp "$AT_RACINE/$T" "$D/tests.sh" || at_echec "copie des fichiers réels impossible"
+    if at_remplacer "$AT_RACINE/$R" "$D/ref.md" 'G4 et G4′ en observation, limites (bp) et (bs))' 'G4 et G4′ armés, limites (bp) et (bs))'; then
+      cmp -s "$D/ref.md" "$AT_RACINE/$R" && at_echec "la référence copiée est identique à l'originale (aucune perturbation)"
+      at_etat "$D"
+      at_contient "ETAT-ECART k2"; at_contient "G4 dit=armed constante=observe"
+    fi
+  else
+    at_echec "racine du dépôt introuvable"
+  fi
+  at_fin 1
+}
+
 autotest() {
   local manquants=0 c j trouve n d m a
   SANS_REEL=0
@@ -3108,7 +3780,9 @@ autotest() {
   autotest_invariants
   autotest_releve
   autotest_armement
+  autotest_etat
   [ "$SANS_REEL" -eq 1 ] || autotest_reel_suite
+  [ "$SANS_REEL" -eq 1 ] || autotest_reel_etat
   # Cas déclarés contre cas joués : un cas déclaré et non joué est un échec.
   for c in "${CAS_AUTOTEST[@]}"; do
     if [ "$SANS_REEL" -eq 1 ]; then
@@ -3168,7 +3842,8 @@ principal() {
     releve-chaine) cmd_releve_chaine "$@"; return $? ;;
     base-duree) cmd_base_duree "$@"; return $? ;;
     armement) cmd_armement "$@"; return $? ;;
-    *) die_usage "46.1-CONTROLES.sh <suite|toutes|sonder|base-duree|invariants|releve|releve-chaine|armement|--autotest|--help>" ;;
+    etat-reference) cmd_etat_reference "$@"; return $? ;;
+    *) die_usage "46.1-CONTROLES.sh <suite|toutes|sonder|base-duree|invariants|releve|releve-chaine|armement|etat-reference|--autotest|--help>" ;;
   esac
 }
 
