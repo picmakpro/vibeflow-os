@@ -196,3 +196,23 @@ Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13. État au commi
     ci.yml), P57-D-44 et suivants ;
   - une revue et un audit de ce tour ;
   - le rejeu de fin de mission.
+
+### Addendum : le premier réviseur a fini par rendre (2026-10-13)
+
+Le premier réviseur n'était pas mort. Il a rendu `gaps_found` après son remplacement, avec deux findings majeurs :
+
+- **F1 (Q1)** : la règle « un commit récent écarte le stall » n'est testée qu'en lab plat. Le mutant qui retire `eff()`
+  sur la branche `locks` (lab partitionné, cas réel du dépôt) survit. Il faut un cas partitionné qui le tue.
+- **F2** : correspond à la question A (S4(b)). L'étape CI `ci.yml:1290` rougira tant que la question n'est pas
+  tranchée.
+
+Il a aussi rendu des mineurs :
+
+- F3 : CHANGELOG conductor, et « cinq classes » à corriger.
+- F4 : correspond à AU2-10.
+- F5 : `%ct` contre `%at`, aucun cas ne les distingue.
+- F6 : `gw_ab_check` exige `seen > 0` et non `seen == GW_AB_ENUM_N`.
+- F7 : la formulation de Q7 n'est épinglée par aucun test.
+- F8 : correspond à AU2-04.
+
+F1 et F6 rejoignent le tour de correction qui suivra les arbitrages.
