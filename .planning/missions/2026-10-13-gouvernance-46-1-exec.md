@@ -63,3 +63,15 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
      **environnement local** (charge, macOS, worktree), pas défauts du code. Aucune escalade à Willy
      (P461-D-16 : escalade seulement si une suite rouge garde un gate, et la CI la dit verte) ; la
      CI Linux fait autorité pour cette suite, à rejouer en CI après les plans 08 et 10.
+2. **exec-17** (rapatrié en fast-forward `f5075506..1d1c9e8a`) : modes `imputer`, `garder-g4`,
+   `armement`, `etat-reference`, `jalon`, `empreinte` ; outil figé (`46.1-CONTROLES.sha256`, gel
+   `6f77f178` ; empreinte rejouée par le manager après rapatriement : `EMPREINTE ok`, rc 0). Autotest
+   193/193 rapporté par l'exécuteur ; rejeu indépendant du manager lancé. **Mineur du plan-check
+   fermé** : `garder-g4-mal-forme` scindé en `garder-g4-canal-vide`, `garder-g4-date-forme` et
+   `garder-g4-date-invalide` (`2026-13-45`), chacun rouge pour sa seule raison, trois mutants tués
+   chacun par son seul cas. `46.1-17-PLAN.md:310` cite encore l'ancien nom : plan exécuté, non
+   réécrit (le SUMMARY fait foi).
+   **Décision du manager (renversable) :** un rouge qui n'est QUE `duree-plafond` (suite à code 0,
+   plafond 3 × base dépassé sous charge — constaté une fois sur `reel-temoin-role`, 99 s pour 81 s,
+   charge 15 → 72) est classé **instable (charge)**, consigné et remonté, non bloquant ; tout rouge
+   de code de sortie reste imputé par `imputer`.

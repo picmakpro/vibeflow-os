@@ -20,7 +20,7 @@
       "scope": [
         ".planning/workstreams/gouvernance/phases"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-01",
@@ -32,7 +32,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-02",
