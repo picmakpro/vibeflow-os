@@ -28,7 +28,7 @@
 # une garde ANTI-ADVERSAIRE (même formule que guard-agent-write.sh, même statut de garantie).
 # DEUX catégories de contournement CONNUES et NON couvertes :
 #   Catégorie A (pattern-matching, l'analyse syntaxique ne peut pas les voir) — interprétation
-#   indirecte (eval, interprète inline python -c/node -e, `bash -c "…"`), alias shell, substitution
+#   indirecte (eval, interprète inline python -c/node -e ; `bash -c "…"` est LU depuis le 2026-10-13, voir plus bas), alias shell, substitution
 #   de commande, un script DU DÉPÔT qui commite en interne (`bash release.sh`), toute commande dont
 #   le verbe git n'apparaît pas LITTÉRALEMENT en position de commande, et — mesurées en revue,
 #   32-JUGE-* — les formes composites non normalisées : `(`/`)` et `{`/`}` non séparés par un
@@ -82,19 +82,27 @@
 # ` 2>/dev/null || exit 0` du bas de ce fichier (python sort en 1, le repli ramène le code à 0, le refus est
 # déjà lu). Le silence reste réservé au payload vide, imparsable ou qui n'est pas un objet. Un lab plat (ou
 # VF_DRIVER_LOCK posé) n'évalue ni l'aiguillage, ni le crochet, ni le chemin partitionné : le code d'avant la
-# Phase 57 s'exécute ligne pour ligne (P57-D-03).
+# Phase 57 s'exécute ligne pour ligne (P57-D-03), à l'exception des lectures étendues au lab plat le 2026-10-13 (bloc GLOBAUX GIT, ci-dessous).
 # VERROU ILLISIBLE (R-2) : en lab partitionne, un dossier de verrous ou un meta qui EXISTE mais ne se lit pas vaut
 # un refus nomme (« verrou de driver existe mais est illisible »), jamais « pas de verrou » ; seul un meta absent
 # reste « pas de verrou ». Le lab plat garde sa posture historique (meta illisible = allow, Q3c).
-# GLOBAUX GIT ET CIBLE (F-3, R-5) : en lab partitionne, `exec` est un wrapper et les options globales de git sans
+# GLOBAUX GIT, WRAPPERS, SHELLS ET CIBLE (F-3, R-5 ; Q4 et Q5 du 2026-10-13, arbitrage Samuel, AskUserQuestion session
+# principale, 2026-10-13) : en lab partitionne COMME EN LAB PLAT, `exec` est un wrapper ; les options globales de git sans
 # argument (--no-pager, --paginate, -p, --no-optional-locks, --literal-pathspecs, --glob-pathspecs, --noglob-pathspecs,
-# --icase-pathspecs, --no-replace-objects, --no-lazy-fetch, --no-advice, --bare) sont sautees avant le sous-verbe ;
-# une affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git DU MEME SEGMENT
-# est une cible INCERTAINE, au meme titre que --git-dir, aussi bien pour la classe du geste que pour la decision
-# « geste hors du lab » (meme verdict, meme message). COUVERT : `GIT_DIR=x git commit`, `cd ailleurs && GIT_DIR=x
-# git commit`. NON COUVERT : l affectation dans un AUTRE segment (`export GIT_INDEX_FILE=x; git commit`,
-# `GIT_DIR=x; git commit`), que l analyse ne suit pas. Le lab plat garde la lecture d avant la Phase 57 (A/B au bit
-# pres) : il ne reconnait ni l un ni l autre.
+# --icase-pathspecs, --no-replace-objects, --no-lazy-fetch, --no-advice, --bare) et celles qui prennent un argument en
+# deux jetons ou en forme `=` (--git-dir, --work-tree, --namespace, --config-env, --attr-source ; -c, -C ; --super-prefix=)
+# sont sautees avant le sous-verbe ; les wrappers sautent l argument de leur option (`env -u NAME`, `nice -n 5`, `exec -a
+# nom`, `sudo -u`, `xargs -n`) ; `bash|sh|zsh|dash|ksh -c "…"` est re-decoupe et juge comme une commande (WRAPPER_ARG_OPTS,
+# SHELLS, MAX_SHELL_DEPTH = 3 niveaux lus, au-dela un git suivi d un verbe mutant compte comme un geste a cible incertaine).
+# Une affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git DU MEME SEGMENT, un `env -C
+# <dir>`, ou la meme affectation POSEE dans un segment PRECEDENT de la meme commande (`export GIT_INDEX_FILE=x; git commit`,
+# `declare -x`, `GIT_DIR=x; git commit`), heritee par un shell fils, est une cible INCERTAINE, au meme titre que --git-dir
+# : meme verdict, meme message, aussi bien pour la classe du geste que pour la decision « geste hors du lab ». Chaque forme
+# a le verdict de sa forme canonique ; aucun refus n est ajoute hors du verrou d autrui. NON COUVERT, nomme : `eval`, un
+# script du depot (`bash release.sh`), un wrapper hors liste (`timeout 5 git commit`, `env -S "git commit"`), un `export`
+# dans un fichier source ou une fonction, `set -a`, `bash -c` dont la chaine est construite par substitution (categorie A).
+# Preuve A/B du lab plat : la copie gelee d avant la Phase 57 reste la reference ; la suite n en tolere que les ecarts
+# ENUMERES (GW_AB_ENUM de test-guard-driver-lock-ws.sh), tous des refus nouveaux sous le verrou d autrui.
 # AUCUN CROCHET DE TEST (R-6) : le guard ne lit aucune variable de test ; la suite provoque l exception fail-closed
 # dans une COPIE du guard qu elle fabrique elle-meme.
 # LIMITE (P57-D-20) : le guard isole des SESSIONS, pas des managers d'une même session (ils partagent le
@@ -201,9 +209,10 @@ import json, os, re, sys, time
 
 MARKER = "vibeflow:allow-lock-override"
 WRAPPERS = {"sudo", "env", "command", "nohup", "time", "xargs", "nice", "stdbuf", "caffeinate"}
-# Lab PARTITIONNE seulement (correction F-3, 57-SECURITY.md) : `exec` est un wrapper, et les options globales de git
-# SANS argument (git help git) sont sautees avant le sous-verbe. Le lab plat garde la lecture d avant la Phase 57,
-# au bit pres (preuve A/B du lab plat) : ni l un ni l autre n y est reconnu.
+# Correction F-3 (57-SECURITY.md) etendue au lab plat le 2026-10-13 (arbitrage Samuel, AskUserQuestion session
+# principale, 2026-10-13, Q4) : `exec` est un wrapper, et les options globales de git SANS argument (git help git)
+# sont sautees avant le sous-verbe, en lab plat comme en lab partitionne. La preuve A/B du lab plat (suite
+# test-guard-driver-lock-ws.sh, GW-AB) ne tolere plus que les ecarts ENUMERES de ces formes nouvellement refusees.
 NOARG_GIT_GLOBALS = {"--no-pager", "--paginate", "-p", "--no-optional-locks", "--literal-pathspecs",
                      "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs", "--no-replace-objects",
                      "--no-lazy-fetch", "--no-advice", "--bare"}
@@ -218,7 +227,39 @@ RESUMABLE_SUBVERBS = {"rebase", "merge", "cherry-pick", "revert", "stash"}
 RESUME_EXIT_OPTIONS = {"--abort", "--continue", "--skip", "--quit"}
 
 def noarg_global(t):
-    return PARTITIONED and t in NOARG_GIT_GLOBALS
+    return t in NOARG_GIT_GLOBALS
+
+# Options globales de git qui PRENNENT un argument en deux jetons (`--git-dir <p>`, mesure sur git 2.50.1 : seuls
+# ces cinq l acceptent ; `--exec-path <v>` n en prend pas, `--super-prefix` est refuse par git y compris en forme
+# `=`). Leur forme `=` est sautee sur un seul jeton. --git-dir et --work-tree rendent en plus la cible incertaine
+# (uncertain_global, git_target).
+GIT_ARG_GLOBALS = {"--git-dir", "--work-tree", "--namespace", "--config-env", "--attr-source"}
+GIT_EQ_GLOBALS = ("--git-dir=", "--work-tree=", "--exec-path=", "--namespace=", "--config-env=", "--attr-source=",
+                  "--super-prefix=", "--list-cmds=")
+
+# Wrappers a option-argument : le jeton qui suit l option n est PAS la commande. Sans cette table `env -u NAME git
+# commit` lit NAME comme la commande et le verbe git reste invisible. Une option courte groupee dont la derniere
+# lettre prend un argument (`-iu NAME`) consomme le jeton suivant ; une lettre qui prend un argument au milieu du
+# groupe l a deja attache (`-n1`).
+WRAPPER_ARG_OPTS = {
+    "env": {"-u", "-C", "--unset", "--chdir"},
+    "nice": {"-n", "--adjustment"},
+    "exec": {"-a"},
+    "sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t", "-U", "-T", "-R", "--user", "--group", "--host",
+             "--prompt", "--close-from", "--chdir", "--role", "--type", "--other-user", "--command-timeout",
+             "--chroot"},
+    "xargs": {"-a", "-d", "-E", "-I", "-J", "-L", "-n", "-P", "-R", "-S", "-s", "--arg-file", "--delimiter",
+              "--max-args", "--max-lines", "--max-procs", "--max-chars", "--max-replace-args"},
+    "stdbuf": {"-i", "-o", "-e", "--input", "--output", "--error"},
+    "time": {"-f", "-o", "--format", "--output"},
+    "caffeinate": {"-t", "-w"},
+}
+
+# Interpreteurs de commande : `bash -c "..."` est re-decoupe et juge comme une commande (profondeur bornee).
+SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "ash", "fish"}
+SHELL_ARG_OPTS = {"-o", "-O", "+o", "+O", "--rcfile", "--init-file"}
+MAX_SHELL_DEPTH = 3
+SEG_OPS = {"&&", "||", ";", "|", "&", "|&", "(", ")", ";;", ";&"}
 
 def sanitize(s):
     return "".join(c for c in (s or "") if c.isalnum() or c in "._-")
@@ -270,17 +311,44 @@ def command_positions(toks):
             i += 1
             continue
         out.append(i)
-        if os.path.basename(t) in WRAPPERS or (PARTITIONED and os.path.basename(t) == "exec"):
-            i += 1
-            while i < n and toks[i].startswith("-"):
-                i += 1
+        if os.path.basename(t) in WRAPPERS or os.path.basename(t) == "exec":
+            i = skip_wrapper_options(os.path.basename(t), toks, i + 1)
             continue
         break
     return out
 
+def skip_wrapper_options(name, toks, i):
+    """Saute les options d un wrapper (env, nice, exec, sudo...) APRES son nom, y compris l argument des options qui
+    en prennent un (WRAPPER_ARG_OPTS) : `env -u NAME git commit`, `nice -n 5 git commit`, `exec -a x git commit`.
+    Rend l indice du premier jeton qui n est plus une option du wrapper."""
+    argopts = WRAPPER_ARG_OPTS.get(name, ())
+    n = len(toks)
+    while i < n and toks[i].startswith("-"):
+        t = toks[i]
+        if t == "--":
+            return i + 1
+        if t in argopts:
+            i += 2
+        elif t.startswith("--"):
+            i += 1  # --long=valeur, ou option longue sans argument
+        elif len(t) > 2:
+            k = -1
+            for pos in range(1, len(t)):
+                if ("-" + t[pos]) in argopts:
+                    k = pos
+                    break
+            if k == -1 or k < len(t) - 1:
+                i += 1  # aucune lettre a argument, ou valeur deja attachee (-n1)
+            else:
+                i += 2  # derniere lettre a argument (-iu NAME)
+        else:
+            i += 1
+    return i
+
 def skip_git_globals(toks, i):
     """(BL-2) Saute les options GLOBALES connues de `git` (-C <path>, -c <k>=<v>, --git-dir=…,
-    --work-tree=…, --exec-path=…, -P) avant de lire le sous-verbe — sans ce saut, `git -C /repo
+    --work-tree=…, --exec-path=…, -P ; les options a argument en deux jetons, GIT_ARG_GLOBALS ; les options sans
+    argument, NOARG_GIT_GLOBALS) avant de lire le sous-verbe — sans ce saut, `git -C /repo
     commit` et `git -c core.hooksPath=/dev/null commit` (qui neutralise précisément les hooks
     git) ne sont jamais reconnus comme un commit (A6)."""
     n = len(toks)
@@ -292,11 +360,13 @@ def skip_git_globals(toks, i):
             i += 1
         elif t.startswith("-c") and len(t) > 2:
             i += 1
-        elif t.startswith("--git-dir=") or t.startswith("--work-tree=") or t.startswith("--exec-path="):
+        elif t in GIT_ARG_GLOBALS:
+            i += 2  # --git-dir <p>, --work-tree <p>, --namespace <n>, --config-env <k=v>, --attr-source <t>
+        elif t.startswith(GIT_EQ_GLOBALS):
             i += 1
         elif t == "-P":
             i += 1
-        elif PARTITIONED and t in NOARG_GIT_GLOBALS:
+        elif t in NOARG_GIT_GLOBALS:
             i += 1
         else:
             break
@@ -308,6 +378,84 @@ def tokens(seg):
         return shlex.split(seg, posix=True)
     except ValueError:
         return seg.split()
+
+ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+COARSE_VERBS = sorted(MUTATING_GIT_VERBS | RESUMABLE_SUBVERBS)
+
+def sets_git_target(toks):
+    """True si ce segment POSE GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= pour la suite de la commande, sans lancer
+    de commande : `export GIT_INDEX_FILE=x`, `declare -x GIT_DIR=x`, ou une affectation seule `GIT_DIR=x`. La cible
+    des segments SUIVANTS devient incertaine (meme verdict que le prefixe du meme segment, R-5)."""
+    ts = [t for t in toks if t not in STRUCTURAL_SKIP]
+    if not ts:
+        return False
+    if all(ASSIGN_RE.match(t) for t in ts):
+        return any(ENV_TARGET_RE.match(t) for t in ts)
+    if ts[0] in ("export", "declare", "typeset", "readonly"):
+        return any(ENV_TARGET_RE.match(t) for t in ts[1:])
+    return False
+
+def shell_c_string(toks, idx):
+    """toks[idx] est un interpreteur (SHELLS) : la chaine de `-c`, ou None. Les options sont lues jusqu au premier
+    jeton qui n en est pas une (-o/-O/--rcfile prennent un argument) ; `-c` peut etre groupe (-lc, -ec). Sans -c,
+    le premier jeton est un SCRIPT (`bash release.sh`, hors de portee, categorie A)."""
+    i = idx + 1
+    n = len(toks)
+    c_seen = False
+    while i < n:
+        t = toks[i]
+        if t == "--":
+            i += 1
+            break
+        if t in SHELL_ARG_OPTS:
+            i += 2
+            continue
+        if t.startswith("--"):
+            i += 1
+            continue
+        if len(t) > 1 and t[0] in "-+":
+            if t[0] == "-" and "c" in t[1:]:
+                c_seen = True
+            i += 2 if t[-1] in "oO" else 1
+            continue
+        break
+    if c_seen and i < n:
+        return toks[i]
+    return None
+
+def shell_c_inner(cmd):
+    """Chaines `bash -c "..."` (SHELLS) de la commande, lues avec un decoupage qui respecte les guillemets : liste de
+    (chaine, incertain) ; incertain = un GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= du prefixe, ou pose plus haut dans
+    la commande, est herite par le shell fils. Illisible (guillemet non ferme) : liste vide."""
+    try:
+        import shlex
+        flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
+        lex = shlex.shlex(flat, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        toks = list(lex)
+    except ValueError:
+        return []
+    out = []
+    persist = False
+    cur = []
+    for t in toks + [";"]:
+        if t not in SEG_OPS:
+            cur.append(t)
+            continue
+        if sets_git_target(cur):
+            persist = True
+        for idx in command_positions(cur):
+            if os.path.basename(cur[idx]) in SHELLS:
+                c = shell_c_string(cur, idx)
+                if c:
+                    out.append((c, persist or env_target_uncertain(cur[:idx])))
+        cur = []
+    return out
+
+def coarse_commit_like(c):
+    """Au-dela de MAX_SHELL_DEPTH, la chaine n est plus decoupee : un `git` suivi plus loin d un verbe mutant la fait
+    compter comme un geste a cible incertaine (refus sous le verrou d autrui seulement)."""
+    return re.search(r"(^|[^A-Za-z0-9_./-])git\b.*\b(" + "|".join(COARSE_VERBS) + r")\b", c, re.S) is not None
 
 def strip_heredocs(cmd):
     """CSL-05 (durci -- correction juge #1) : ne tronque QUE le CORPS de chaque heredoc, jamais ce
@@ -342,7 +490,7 @@ def strip_heredocs(cmd):
         # tout ce qui suit (i inchangé après le break) reste dans `lines` et sera traité normalement
     return "\n".join(out)
 
-def bash_command_concerned(cmd):
+def bash_command_concerned(cmd, depth=0):
     """True si `cmd` porte, EN POSITION DE COMMANDE, un geste concerné (surface A du rejeu, verbes
     git mutants + outil de PR). (BL-1) Le payload est d abord découpé sur \\n et \\r AVANT la
     segmentation sur les opérateurs de chaînage — un `git commit` qui n est pas le premier segment
@@ -384,6 +532,12 @@ def bash_command_concerned(cmd):
                     sub = toks[idx + 1] if idx + 1 < len(toks) else ""
                     if sub in ("pr", "release"):
                         return True
+    for c, _unc in shell_c_inner(cmd):
+        if depth + 1 > MAX_SHELL_DEPTH:
+            if coarse_commit_like(c):
+                return True
+        elif bash_command_concerned(c, depth + 1):
+            return True
     return False
 
 # PÉRIMÈTRE DU LOCK (budgets de méthode, v2.67.0) : le lock protège le lab dont la session est
@@ -427,7 +581,9 @@ def git_target(toks, i, base):
             return None
         elif t == "-c":
             i += 2
-        elif (t.startswith("-c") and len(t) > 2) or t.startswith("--exec-path=") or t == "-P":
+        elif t in GIT_ARG_GLOBALS:
+            i += 2
+        elif (t.startswith("-c") and len(t) > 2) or t.startswith(GIT_EQ_GLOBALS) or t == "-P":
             i += 1
         elif noarg_global(t):
             i += 1
@@ -440,6 +596,15 @@ def bash_targets_outside_lab(cmd, root, start=None):
     (et qu il y en a au moins un). Toute incertitude rend False : le lock s applique. `start` : dossier de
     départ de la commande quand il diffère de `root` (lab partitionné lancé d un sous-dossier, P57-D-39) ;
     par défaut `root`, comportement d avant la phase."""
+    start = root if start is None else start
+    inside, outside = outside_scan(cmd, root, start, 0, False)
+    return (not inside) and outside > 0
+
+def outside_scan(cmd, root, base, depth, inherit):
+    """Parcours de bash_targets_outside_lab : rend (un geste est DANS le lab ou incertain, nombre de gestes hors du
+    lab). `base` : dossier courant au depart (None = indetermine). `inherit` : la cible est deja incertaine (variable
+    GIT_* heritee d un shell parent). Une chaine `bash -c "..."` est parcourue a part (depth + 1), depuis le dossier
+    courant de la commande : un cd INTERNE a la chaine ne bouge pas le dossier de la commande appelante."""
     try:
         import shlex
         flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
@@ -447,9 +612,9 @@ def bash_targets_outside_lab(cmd, root, start=None):
         lex.whitespace_split = True
         toks = list(lex)
     except ValueError:
-        return False
+        return True, 0
     if "`" in cmd or any(t in SCOPE_BREAKERS for t in toks):
-        return False
+        return True, 0
     segs, ops, cur = [], [], []
     for t in toks:
         if t in ("&&", "||", ";"):
@@ -460,10 +625,12 @@ def bash_targets_outside_lab(cmd, root, start=None):
             cur.append(t)
     segs.append(cur)
     ops.append("")
-    start = root if start is None else start
-    base = start
+    start = base
     outside = 0
+    persist = inherit
     for seg, op in zip(segs, ops):
+        if sets_git_target(seg):
+            persist = True
         positions = command_positions(seg)
         if positions:
             idx = positions[-1]
@@ -476,21 +643,32 @@ def bash_targets_outside_lab(cmd, root, start=None):
             if name == "popd":
                 base = None  # la pile de pushd n est pas suivie : dossier indéterminé, le lock s applique
                 continue
-            if bash_command_concerned(" ".join(shlex.quote(t) for t in seg)):
+            if bash_command_concerned(" ".join(shlex.quote(t) for t in seg), depth):
+                if name in SHELLS:
+                    c = shell_c_string(seg, idx)
+                    if not c or depth + 1 > MAX_SHELL_DEPTH:
+                        return True, 0  # chaine non lue ou trop profonde : le lock s applique
+                    inn, cnt = outside_scan(c, root, base, depth + 1, persist or env_target_uncertain(seg[:idx]))
+                    if inn:
+                        return True, 0
+                    outside += cnt
+                    if op in (";", "||") and base != start:
+                        base = None
+                    continue
                 if name == "git":
                     target = git_target(seg, idx + 1, base)
-                    if PARTITIONED and env_target_uncertain(seg[:idx]):
-                        target = None  # GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= du meme segment : cible incertaine (R-5)
+                    if persist or env_target_uncertain(seg[:idx]):
+                        target = None  # GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= du meme segment, ou pose plus haut : cible incertaine (R-5)
                 elif any(t in ("-R", "--repo") or t.startswith("--repo=") for t in seg):
                     target = None
                 else:
                     target = base
                 if is_inside(target, root):
-                    return False
+                    return True, 0
                 outside += 1
         if op in (";", "||") and base != start:
             base = None  # la chaîne a pu s arrêter avant ou après le cd : dossier indéterminé
-    return outside > 0
+    return False, outside
 
 # ---------------------------------------------------------------------------------------------------
 # LAB PARTITIONNE (Phase 57, plan 57-05). Aucune apostrophe dans ce bloc : il vit dans un programme
@@ -826,8 +1004,17 @@ ENV_TARGET_RE = re.compile(r"^(GIT_DIR|GIT_INDEX_FILE|GIT_WORK_TREE)=")
 
 def env_target_uncertain(pre):
     """Affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git (correction R-5,
-    P57-D-20) : comme --git-dir ou --work-tree, elle deplace la cible du geste, donc cible INCERTAINE."""
-    return any(ENV_TARGET_RE.match(t) for t in pre)
+    P57-D-20) : comme --git-dir ou --work-tree, elle deplace la cible du geste, donc cible INCERTAINE. Un `env -C
+    <dir>` / `env --chdir` (ou `sudo -D <dir>`) devant la commande la deplace de meme."""
+    if any(ENV_TARGET_RE.match(t) for t in pre):
+        return True
+    for k, t in enumerate(pre):
+        b = os.path.basename(t)
+        if b == "env" and any(x == "--chdir" or x.startswith("--chdir=") or re.match(r"^-[^-]*C", x) for x in pre[k + 1:]):
+            return True
+        if b == "sudo" and any(x == "--chdir" or x.startswith("--chdir=") or re.match(r"^-[^-]*D", x) for x in pre[k + 1:]):
+            return True
+    return False
 
 def commit_flags(rest):
     """Drapeaux du commit : a_flag (-a, --all, grappe courte avec a), pathspec (jeton non-option apres les
@@ -888,7 +1075,7 @@ def add_info(rest, seen_cd):
         paths.append(t)
     return {"wide": wide, "paths": paths}
 
-def gesture_classes(cmd):
+def gesture_classes(cmd, inherit=False, depth=0):
     """Gestes de la commande, meme segmentation que bash_command_concerned (heredocs retires, sauts de ligne puis
     operateurs, command_positions, skip_git_globals) et memes exemptions D-32-06 (aucune elargie, aucune
     retiree). Rend (gestes, ajouts). Classes : arbre, commit (a_flag, pathspec, amend), depot,
@@ -897,10 +1084,14 @@ def gesture_classes(cmd):
     gestures = []
     adds = []
     seen_cd = False
+    persist = inherit
+    cmd0 = cmd
     cmd = strip_heredocs(cmd)
     for line in re.split(r"[\n\r]+", cmd):
         for seg in re.split(r"\|\||&&|;|\||&", line):
             toks = tokens(seg)
+            if sets_git_target(toks):
+                persist = True
             for idx in command_positions(toks):
                 name = os.path.basename(toks[idx])
                 if name in ("cd", "pushd", "popd"):
@@ -909,6 +1100,7 @@ def gesture_classes(cmd):
                     j = skip_git_globals(toks, idx + 1)
                     unc = any(uncertain_global(t) for t in toks[idx + 1:j])
                     unc = unc or env_target_uncertain(toks[:idx])
+                    unc = unc or persist
                     if j >= len(toks):
                         continue
                     sub = toks[j]
@@ -936,6 +1128,14 @@ def gesture_classes(cmd):
                     sub = toks[idx + 1] if idx + 1 < len(toks) else ""
                     if sub in ("pr", "release"):
                         gestures.append({"cls": "depot", "uncertain": False})
+    for c, unc_in in shell_c_inner(cmd0):
+        if depth + 1 > MAX_SHELL_DEPTH:
+            if coarse_commit_like(c):
+                gestures.append({"cls": "arbre", "uncertain": True})
+            continue
+        g2, a2 = gesture_classes(c, inherit or unc_in, depth + 1)
+        gestures.extend(g2)
+        adds.extend(a2)
     return gestures, adds
 
 def split_z(raw):
@@ -1083,7 +1283,9 @@ def judge_bash(cmd, held, cwd, lab=None):
                     add(hs)
                     hit.append(pb)
             if hit:
-                notes.append("le commit embarque : " + cite_paths(hit))
+                note = "le commit embarque : " + cite_paths(hit)
+                if note not in notes:  # une chaine bash -c est aussi lue par le decoupage historique : meme note, une seule fois
+                    notes.append(note)
         else:
             add(held)
     return blockers, notes
