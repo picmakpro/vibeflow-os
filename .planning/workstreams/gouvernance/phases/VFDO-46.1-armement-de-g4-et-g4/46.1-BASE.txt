@@ -109,3 +109,4 @@ BASE scripts/tests/test-role-hook-vs-check-agents.sh rc=0 s=27
 BASE scripts/tests/test-traffic-snapshot.sh rc=0 s=3
 BASE-BILAN suites=109 vertes=101 rouges=8 zero-ok=0 s=14497
 BASE-MESURE commit=c702f772c0d9365d7844dad1d7b68243a3e4ba74 date=2026-10-13T13:19:45Z charge=16.09,10.79,7.89/9.67,23.86,50.37 cpu=8
+BASE-AJOUT plugin/planning-core/scripts/tests/test-verifier-releve.sh s=11 plan=18
