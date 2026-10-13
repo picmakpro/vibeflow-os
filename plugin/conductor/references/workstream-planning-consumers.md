@@ -90,7 +90,7 @@ aucun compte n'est figé.
 | plugin/dev-orchestrator/scripts/check-capability-activation.sh | hp | exempté — même motif : renvoi documentaire à `.planning/ROADMAP.md` (l. 90) |
 | plugin/planning-core/scripts/detect-planning-debt.sh | hp | exempté — altitude lab, hors compartiment workstream d'un dépôt dev (D-04) |
 | plugin/planning-core/scripts/planning-task-context.sh | hp | exempté — altitude lab, hors compartiment workstream d'un dépôt dev (D-04) |
-| .planning/workstreams/fiabilite/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/check-no-live-250.sh | hp | exempté — outillage de vérification d'une phase, gelé avec l'artefact de phase qu'il accompagne ; ses littéraux sont des motifs de recherche figés d'une mesure datée, jamais des chemins consommés en production |
+| .planning/milestones/fiabilite-v1.0-phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/check-no-live-250.sh | hp | exempté — outillage de vérification d'une phase, gelé avec l'artefact de phase qu'il accompagne ; ses littéraux sont des motifs de recherche figés d'une mesure datée, jamais des chemins consommés en production |
 | .planning/workstreams/fiabilite/phases/VFDO-41-posture-de-protection-du-d-p-t/tools/check-aucune-fermeture.sh | hp | exempté — même motif : pathspecs figés d'une recette de phase |
 
 ## Non applicables

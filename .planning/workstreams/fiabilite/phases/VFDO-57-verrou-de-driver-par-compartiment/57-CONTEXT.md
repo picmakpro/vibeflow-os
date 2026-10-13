@@ -284,6 +284,38 @@ la Phase 57 avant sa PR.
   dans un AUTRE segment (`export GIT_INDEX_FILE=…; git commit`) reste non couverte : limite écrite dans CONCERNS
   (limite c).
 
+### Arbitrages du 2026-10-13
+
+Sauf mention contraire, chaque décision est un arbitrage Samuel, AskUserQuestion session principale, 2026-10-13.
+
+- **P57-D-44 (STATE au jalon `equipe-produit-v1.0`)** : le STATE fiabilite passe au jalon `equipe-produit-v1.0` (6 phases,
+  0 terminée, 16/16 plans), commit `a6745526` (réponse A (b)). REMPLACE P57-D-41.
+- **P57-D-45 (progression du watchdog)** : la progression est le commit le plus récent (`%ct`) parmi les HEAD de tous les
+  worktrees du dossier git commun ; un commit futur, un worktree prunable ou illisible sont ignorés ; le git est durci
+  (Q1 (b) et D (b)). Commits `f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`. Limite acceptée : un commit sans
+  rapport peut masquer un stall, le watchdog est consultatif.
+- **P57-D-46 (archivage)** : les 17 dossiers de phase de fiabilite-v1.0 sont archivés sous
+  `.planning/milestones/fiabilite-v1.0-phases/` (étape `archive_phases` de gsd-cleanup), puis `--archive roadmap` ;
+  la ROADMAP fait 63 Ko (Q2 (a)). Commit `4a8535ee`.
+- **P57-D-47 (F-3 en lab plat, référence A/B épinglée)** : F-3 vaut aussi en lab plat ; la référence A/B est la copie gelée
+  `4d48e50c` plus une empreinte versionnée de la transcription attendue des 37 formes (verdict, code de sortie, message),
+  avec `seen == GW_AB_ENUM_N` (Q4 + B (b)). Commits `719099dc`, `4fd77ed3`. REMPLACE P57-D-42.
+- **P57-D-48 (contournements Q5)** : fermés dans les deux régimes, R-5 compris : globaux git à argument, wrappers à
+  option-argument (`env -u/-C`, `nice -n`, `exec -a`, `sudo -u`, `xargs -n`…), `bash/sh/zsh -c` (récursion bornée à 3, refus
+  grossier au-delà), `GIT_*` posé dans un segment précédent (Q5). Commits `719099dc`, `4fd77ed3`. PRÉCISE P57-D-43. Lecture
+  du manager : ces contournements existaient dans les deux régimes ; Samuel a ratifié sur recommandation.
+- **P57-D-49 (`takeover --ws`)** : applique la règle d'`acquire` devant un ancien verrou, vivant (`a038c8b6`) comme périmé
+  (`6a43299e`, même `reason` et même `hint` `recover`) ; sur un refus de la re-sonde, le verrou de compartiment antérieur est
+  restitué (AU2-04) (Q5 + C (a)).
+- **P57-D-50 (G-2, classe 6)** : G-2 surveille une classe 6, les fixtures (`plugin/conductor/scripts/tests/fixtures/**`,
+  `scripts/tests/fixtures/**`) ; lecture en `git diff -z`, noms spéciaux compris (Q6). Commits `f76de68b`, `3e426f02`,
+  `42d490b1`, `46254135`. ADR-072 amendée le 2026-10-13.
+- **P57-D-51 (managers et bumps)** : les managers content, business et growth nomment la commande à exécuter par le `hint`
+  d'un refus de verrou périmé ; bumps patch (Q7). Commit `576ba249`.
+- **P57-D-52 (`bash -c "cd <hors-lab> && git …"`)** : passe de deny à allow, verdict de sa forme canonique. Décision du
+  MANAGER DE MISSION (pas de Samuel), constatée par l'audit sans contournement.
+- **P57-D-53 (tri du BACKLOG)** : reporté après la release (Q3) ; la PR part avec 31/20.
+
 </decisions>
 
 <canonical_refs>

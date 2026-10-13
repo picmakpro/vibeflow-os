@@ -119,11 +119,12 @@ section précédente (ADR-072).
   instructions de la baseline du budget d'instructions, ou sur une sentinelle d'armement
   neutralisée, sans citation d'arbitrage conforme dans le commit qui porte le changement.
 - `scripts/check-gate-touche.sh` (G-2) : rougit quand un gate, sa suite, `.github/workflows/ci.yml`
-  ou un hook sont touchés sans marqueur déclaratif dans un commit de la branche.
+  ou un hook sont touchés, ou une fixture des suites surveillées (`plugin/conductor/scripts/tests/fixtures/**`,
+  `scripts/tests/fixtures/**`, six classes, ADR-072 amendement du 2026-10-13), sans marqueur déclaratif dans un commit de la branche.
 - `scripts/check-push-sans-pr.sh` (G-3) : alarme après coup, un commit arrivé sur `main` sans PR
   associée — quand elle rougit, le commit est déjà sur `main`.
 
-**Marqueur** : tout commit qui touche un gate, sa suite, le workflow CI ou un hook porte un trailer
+**Marqueur** : tout commit qui touche un gate, sa suite, les fixtures de ces suites, le workflow CI ou un hook porte un trailer
 `Gate-Touche: <chemin-ou-motif> — <raison>`. Déclaratif — forme et présence vérifiées, jamais la
 véracité de la raison — de portée branche : un commit ultérieur peut couvrir un chemin touché plus
 tôt.

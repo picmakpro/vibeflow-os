@@ -106,3 +106,5 @@ Arbitrage Samuel (AskUserQuestion, session principale, 2026-10-12). Cette sectio
 | Finding | Commits | Preuve |
 |---------|---------|--------|
 | F-3 (`git --no-pager commit -am x` ALLOW) | `c5ccbab7` RED, `63d5cc4c` GREEN, `08d25595` refactor (`noarg_global`) | les 12 globaux git sans argument et `exec` sont reconnus ; refus sous le verrou d'autrui. EN LAB PARTITIONNÉ SEULEMENT (P57-D-42) : le lab plat reste inchangé (A/B au bit près). Reste ouvert (CONCERNS) : lab plat ; globaux à argument et wrappers à option-argument (AUD-2) ; affectation `GIT_*` d'un autre segment (AUD-1) |
+
+- **2026-10-13** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) : limites du guard, watchdog, `takeover --ws` et G-2 tranchés ; voir `57-CONTEXT.md` § « Arbitrages du 2026-10-13 » (P57-D-44 à P57-D-53) et `.planning/codebase/CONCERNS.md`, entrée Phase 57.

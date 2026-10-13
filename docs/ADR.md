@@ -2844,6 +2844,21 @@ Le volet admin ne crée aucun script de gate (D-M11) : CODEOWNERS et rulesets so
 configuration, pas des gates ; les trois gates de la phase (G-1, G-2, G-3) restent celles du
 périmètre sans admin.
 
+### Amendement du 2026-10-13 — G-2 surveille une sixième classe, les fixtures
+
+> **ADR-072 : amendement du 2026-10-13 (Phase 57, P57-D-50)** — arbitrage Samuel, AskUserQuestion
+> session principale, 2026-10-13 (Q6). Le texte d'origine ci-dessus (« CINQ classes ») décrit l'état
+> du 2026-09-17/18 et reste l'historique ; cet amendement le complète sans le réécrire.
+
+G-2 surveille désormais **SIX classes** : aux cinq d'origine s'ajoute la classe des **fixtures**
+des suites surveillées (`plugin/conductor/scripts/tests/fixtures/**` et `scripts/tests/fixtures/**`).
+Motif : une fixture (référence A/B gelée, transcription attendue) est l'étalon d'une suite ; la
+modifier avec la suite fait rester celle-ci verte sans que rien ne le signale (épingle R-7). La
+co-modification reste possible, mais elle est désormais tracée par le trailer `Gate-Touche`
+obligatoire. La limite de fond est inchangée : G-2 reste déclarative et modifiable par la PR qu'elle
+juge. Les chemins sont lus en `git diff -z`, noms non ASCII et spéciaux compris. Commits `f76de68b`,
+`3e426f02`, `42d490b1`, `46254135`.
+
 ## ADR-073 : Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag
 
 **Date** : 2026-09-23 · **Statut** : Validée (non gatée machine) · **Décideur** : Samuel ·

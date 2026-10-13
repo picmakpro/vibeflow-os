@@ -95,3 +95,5 @@ versions non publiées sans bump (P57-D-40). Cette section ne réécrit pas l'hi
 | R-5 (`GIT_*` en préfixe) | `c5ccbab7` RED, `63d5cc4c` GREEN | préfixes `GIT_DIR=`, `GIT_INDEX_FILE=`, `GIT_WORK_TREE=` du même segment = cible incertaine (P57-D-43) ; l'affectation dans un autre segment reste ouverte (CONCERNS) |
 | R-6 (crochet de test en production) | `c5ccbab7`, `63d5cc4c`, `08d25595` | `VF_GUARD_TEST_RAISE` retiré ; l'exception est injectée dans une copie du guard par la suite |
 | R-7 (intégrité de la copie gelée) | `6333d8e4`, `8b957f62` | empreinte de la copie gelée épinglée, établie par le cas `.0` sans objet de référence ; vaut aussi en clone shallow ; le message `NOTE-INTEGRITE` ne prétend plus la vérifier |
+
+- **2026-10-13** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) : limites du guard, watchdog, `takeover --ws` et G-2 tranchés ; voir `57-CONTEXT.md` § « Arbitrages du 2026-10-13 » (P57-D-44 à P57-D-53) et `.planning/codebase/CONCERNS.md`, entrée Phase 57.

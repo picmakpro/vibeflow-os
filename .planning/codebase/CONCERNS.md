@@ -226,61 +226,58 @@
   il ne la fourche (Iron Law 2 révisée, ADR-069) ; (c) ne PAS désactiver le toggle pour faire taire
   le bruit : ce serait perdre la garde sur le dépôt, qui, elle, fonctionne.
 
-**Phase 57 — verrou de driver par compartiment : dette soldée le 2026-10-12, cinq limites restent ouvertes** — Sévérité : **LOW**
-- Issue: la Phase 57 est vérifiée `passed` (13/13). Sept points avaient été consignés ici (`57-VERIFICATION.md` C1, C3, C4 ;
-  `57-REVIEW.md` R-4 à R-7 ; `57-SECURITY.md` F-3). Arbitrage Samuel (AskUserQuestion, session principale, 2026-10-12) :
-  les solder avant la PR. Corrections rattachées aux versions non publiées conductor v1.49.0 et dev-orchestrator v2.28.0
-  sans bump (P57-D-40). Détail des preuves : `57-REVIEW.md`, `57-SECURITY.md` et `57-VERIFICATION.md`, sections
-  « Corrections du 2026-10-12 ».
-  **Fermés :**
-  1. **F-3 en lab partitionné** (`c5ccbab7` RED, `63d5cc4c` GREEN ; refactor `08d25595`) : `git --no-pager commit -am x` est
-     refusé sous le verrou d'autrui ; les 12 globaux git sans argument et `exec` sont reconnus par `skip_git_globals`,
-     EN LAB PARTITIONNÉ SEULEMENT (P57-D-42).
-  2. **R-4** (`6333d8e4` RED, `8689bbd7` GREEN) : `driver-lock.sh` re-sonde l'ancien verrou après la pose ; la fenêtre
-     sonde / `ln_atomic` est fermée, la pose du processus est retirée. La prose de
-     `plugin/dev-orchestrator/references/mission-flow.md` distingue le `reason` identique (`stale-requires-takeover`) et le
-     `hint` (`recover` pour un ancien verrou).
-  3. **R-5, même segment** (`c5ccbab7`, `63d5cc4c`, `b66a7dbe`) : en lab partitionné, un préfixe `GIT_DIR=`, `GIT_INDEX_FILE=`
-     ou `GIT_WORK_TREE=` du segment du geste rend la cible incertaine, aussi pour la décision « geste hors du lab »
-     (P57-D-43). Le lab plat ne reconnaît aucune de ces formes. Voir la limite (c).
-  4. **R-6** (`63d5cc4c`) : le crochet `VF_GUARD_TEST_RAISE` est retiré de la production (la suite injecte l'exception
-     dans une copie du guard).
-  5. **R-7** (`6333d8e4`, `8b957f62`) : prémisse corrigée. La preuve A/B n'était pas ignorée en CI ; c'est l'intégrité de la
-     copie gelée face à sa référence qui s'ignorait en clone shallow. L'empreinte de la copie gelée est désormais épinglée
-     et le cas `.0` l'établit sans objet de référence ; le message `NOTE-INTEGRITE` ne prétend plus la vérifier.
-  6. **C3** (`6333d8e4`, `1f6b555b`) : six mutants ajoutés (`acq_fallback`, `fallback_depotpresent`, `skip_link_d`,
-     `pathspec_blind`, `incertain_none`, `toplevel_none`), total driver 16.
-  7. **C1** (`fc763a72` RED EW-SRC, `dcba414d` GREEN) : `check-mission-exit.sh` préfère le module conductor voisin quand le gate
-     est dans le dépôt source.
-  8. Annexe : `check-description-fidelity.sh` respecte `TMPDIR` et `test-check-description-fidelity.sh` est stabilisée (T9 tmpdir
-     privé, T10 miroir de l'arbre jugé ; 20/30 rouges avant, 0/30 après, `c580b45e`,
-     `.planning/debug/flaky-description-fidelity.md`).
+**Phase 57 — verrou de driver par compartiment : dette soldée les 2026-10-12 et 2026-10-13, limites restantes listées** — Sévérité : **LOW**
+- Issue: la Phase 57 est vérifiée `passed` (13/13). Les points de `57-VERIFICATION.md` (C1, C3, C4), `57-REVIEW.md` (R-4 à R-7)
+  et `57-SECURITY.md` (F-3) ont été soldés avant la PR (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12), puis
+  les limites ouvertes de l'audit ont été tranchées le 2026-10-13 (arbitrage Samuel, AskUserQuestion session principale,
+  2026-10-13 ; P57-D-44 à P57-D-53 dans `57-CONTEXT.md`). Corrections rattachées aux versions non publiées conductor v1.49.0 et
+  dev-orchestrator v2.28.0 sans bump (P57-D-40). Preuves : `57-REVIEW.md`, `57-SECURITY.md`, `57-VERIFICATION.md`, sections « Corrections ».
+  **Fermés le 2026-10-12** : R-4 (`6333d8e4`, `8689bbd7`), R-6 (`63d5cc4c`), R-7 intégrité de la copie gelée (`6333d8e4`, `8b957f62`),
+  C3 (`1f6b555b`), C1 (`fc763a72`, `dcba414d`), `check-description-fidelity.sh` sous `TMPDIR` (`c580b45e`).
+  **Fermés le 2026-10-13** :
+  - (a) **F-3 en lab plat** (`719099dc` RED, `4fd77ed3` GREEN, P57-D-47) : la référence A/B est la copie gelée `4d48e50c` plus une
+    empreinte versionnée de la transcription attendue des 37 formes, avec `seen == GW_AB_ENUM_N`.
+  - (b) **Globaux git à argument et wrappers à option-argument** (`719099dc`, `4fd77ed3`, P57-D-48) : `git --git-dir <p>`, `-C`,
+    `--work-tree`, `--namespace=`, etc. ; `env -u/-C`, `nice -n`, `exec -a`, `sudo -u`, `xargs -n` ; `bash/sh/zsh -c` (récursion bornée
+    à 3, refus grossier au-delà). `bash -c "cd <hors-lab> && git commit"` passe de deny à allow : verdict de sa forme canonique
+    (P57-D-52, décision du manager de mission).
+  - (c) **`GIT_*` posé dans un segment précédent** (`719099dc`, `4fd77ed3`, P57-D-48) ; R-5 vaut aussi en lab plat.
+  - (d) **Épingle R-7 : G-2 surveille les fixtures** (`f76de68b`, `3e426f02`, `42d490b1`, `46254135`, P57-D-50) : la co-modification
+    de la fixture et de l'épingle reste possible, mais elle est tracée par le trailer `Gate-Touche` obligatoire.
+  - (e) **`takeover --ws`** (`a038c8b6`, `6a43299e`, P57-D-49) : applique la règle d'`acquire` devant un ancien verrou, vivant ou
+    périmé ; restitue le verrou de compartiment antérieur sur un refus de la re-sonde (AU2-04).
+  - Watchdog (`f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`, P57-D-45) : progression = commit le plus récent des HEAD de
+    tous les worktrees du dossier git commun. Les lows AU2-01, AU2-02, AU2-03 et AU2-06 du guard étaient en cours de finition à la
+    rédaction : le manager complète leurs SHA.
   **Restent OUVERTS** (sonde commune : payload `{"tool_name":"Bash","session_id":"autre","cwd":"<lab>","tool_input":{"command":"<cmd>"}}`
-  sur `guard-driver-lock.sh`, depuis un lab partitionné dont le verrou est tenu par une autre session ; ALLOW = stdout vide,
-  refus = JSON `permissionDecision: deny`) :
-  - (a) **F-3 en lab plat** : inchangé exprès, pour tenir l'A/B au bit près contre la copie gelée (`cff1e2af`). Sonde :
-    `git --no-pager commit -am x` en lab plat sous verrou d'autrui rend ALLOW. Question posée à Samuel (étendre ou non).
-  - (b) **Globaux git à argument devant le verbe et wrappers à option-argument** : `git --git-dir <p>` (deux jetons),
-    `--work-tree <p>`, `--namespace=`, `--config-env=`, `--attr-source=`, `--super-prefix=`, puis `env -u X`, `env -C d`,
-    `nice -n 5`, `exec -a x`, `bash -c "…"` devant `git commit -am x` : ALLOW, identique à la base (AUD-2, S6).
-  - (c) **Affectation `GIT_*` dans un autre segment** : `export GIT_INDEX_FILE=/x; git commit -m y` rend ALLOW (AUD-1, reste de
-    R-5 ; P57-D-43 ne couvre que le préfixe du même segment).
-  - (d) **Épingle R-7 et fixture gelée modifiables ensemble** : une même PR peut changer l'empreinte épinglée et
-    `tests/fixtures/driver-lock-pre-e8771d9.sh` / `guard-driver-lock-pre-cff1e2a.sh` ; seul un trailer `Gate-Touche`
-    déclaratif le trace, et `tests/fixtures/` n'est pas dans la surface de G-2 (AUD-3). Sonde : modifier la fixture et
-    l'épingle dans un commit sans trailer, `scripts/check-gate-touche.sh` reste vert.
-  - (e) **`takeover --ws` ne sonde pas l'ancien verrou** : compartiment `alpha` périmé + ancien `.planning/DRIVER.lock` vivant,
-    `driver-lock.sh takeover --ws=alpha …` rend `acquired: true` (AUD-6, hors diff ; P57-D-26 ne vise qu'`acquire`).
+  sur `guard-driver-lock.sh`, depuis un lab dont le verrou est tenu par une autre session ; ALLOW = stdout vide, refus = JSON
+  `permissionDecision: deny`). Pour chaque ligne, la sonde est la commande `<cmd>` citée ; elle rend ALLOW alors que le geste commit :
+  - **Interpréteurs** : `eval "git commit -am x"`, un script du dépôt qui lance git, `python3 -c "import subprocess; …"`,
+    `node -e "…"`. Catégorie A de l'en-tête du guard.
+  - **Wrappers hors liste** : `timeout 5 git commit -am x`, `env -S "git commit -am x"`, `setsid`, `ionice -c3`, `chrt`, `taskset`,
+    `builtin`, `su -c`, `sudo -s`, `doas`, `flock f`, `script -c`, `arch`, `xcrun`, `direnv exec . git commit -am x`,
+    `find . -exec git commit -am x \;`, `env -P /usr/bin git commit -am x`.
+  - **Shells hors liste et formes indirectes** : `csh -c`, `tcsh -c`, `busybox sh -c`; un shell alimenté par stdin (`bash <<EOF` puis
+    `git commit -am x`, `echo "git commit -am x" | sh`) ; le trampoline `sh -c '"$@"' _ git commit -am x` ; l'alias git
+    `git -c alias.x=commit x -am y`.
+  - **Affectations venues d'ailleurs** : variable posée par un fichier sourcé, une fonction, `set -a`, `read`, `printf -v`, `for`
+    (`source env.sh; git commit -am x` avec `GIT_DIR` dans `env.sh`).
+  - **Chaîne `bash -c` construite** : `bash -c "$(printf 'git commit -am x')"`, `bash -c "$CMD"`, ou via un alias.
+  - **Mots-clés et formes devant `git`** : `if git commit -am x; then :; fi`, `while`, `until`, `! git commit -am x`, `$'git' commit -am x`,
+    `>/dev/null git commit -am x`.
+  - **Watchdog consultatif** : un commit sans rapport d'un autre worktree masque un vrai stall (limite acceptée, P57-D-45) ; aucun
+    timeout ne borne le git lancé par le hook (question ouverte). Sonde : commit récent dans un worktree voisin, verrou sans
+    heartbeat, `check-guard-health.sh` ne signale pas le stall.
+  - **Aucun timeout déclaré pour le hook guard dans `hooks.json`** : un guard bloqué par un git lent n'est borné que par la valeur
+    par défaut de Claude Code. Sonde : `jq '.hooks' plugin/conductor/hooks/hooks.json`, pas de champ `timeout` sur l'entrée du guard.
 - Files: `plugin/conductor/scripts/guard-driver-lock.sh`, `plugin/conductor/scripts/driver-lock.sh`,
+  `plugin/conductor/scripts/check-guard-health.sh`, `plugin/conductor/scripts/check-gate-touche.sh`,
   `plugin/conductor/scripts/tests/test-driver-lock-ws.sh`, `plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh`,
   `plugin/dev-orchestrator/scripts/check-mission-exit.sh`, `plugin/dev-orchestrator/references/mission-flow.md`
-- Impact: aucun critère de la Phase 57 n'en dépend. Les limites (a) à (c) sont des trous de l'anti-accident (pas du modèle
-  de menace, qui exclut l'écriture dans `.git` et les contournements de catégorie A de l'en-tête du guard) ; (d) est un
-  trou de traçabilité des gates ; (e) est une reprise qui ignore un ancien verrou vivant.
-- Fix approach: (a) décision de Samuel, puis étendre `skip_git_globals` au lab plat avec un nouvel A/B ; (b) lire
-  l'argument des globaux et des wrappers listés, avec un mutant par forme ; (c) suivre les affectations `GIT_*` exportées
-  dans les segments précédents ; (d) mettre `tests/fixtures/` dans la surface de G-2 ; (e) faire sonder l'ancien verrou à
-  `takeover --ws` comme `acquire`. À ne traiter que si un usage concurrent réel (Phase 61) les rend observables.
+- Impact: aucun critère de la Phase 57 n'en dépend. Les limites restantes sont des trous de l'anti-accident (pas du modèle de menace,
+  qui exclut l'écriture dans `.git` et les contournements de catégorie A de l'en-tête du guard).
+- Fix approach: à ne traiter que si un usage concurrent réel (Phase 61) les rend observables ; un wrapper de plus ne change rien à
+  la nature du matching par sous-chaîne, une borne de timeout du hook est le seul item peu coûteux.
 
 ## Known Bugs
 
@@ -396,8 +393,8 @@ capturées au backlog — voir Tech Debt.
 - **Ce qui reste vrai — le guard est anti-accident, pas anti-adversaire** (`32-RELIQUATS.md` §6.2) :
   restent structurellement hors de sa portée une session **non armée**, un **terminal humain** direct
   hors Claude Code, un **IDE ou client git tiers**, un **processus en arrière-plan**, un appel **MCP**,
-  une **autre machine**, et `bash -c`/`eval` (passoires du matching par sous-chaîne de commande, nommées
-  explicitement). Une entrée qui se déclarerait entièrement close mentirait — catégorie C non traitée,
+  une **autre machine**, et `eval` (passoire du matching par sous-chaîne de commande, nommée
+  explicitement ; `bash -c` n'en fait plus partie depuis le 2026-10-13, P57-D-48). Une entrée qui se déclarerait entièrement close mentirait — catégorie C non traitée,
   hors du périmètre livré.
 - Recommendations (résiduel) : si la catégorie C devient un risque mesuré (pas seulement théorique),
   ré-ouvrir sur un mécanisme distinct (ex. hook git natif côté dépôt, hors du seul chemin Claude Code).
