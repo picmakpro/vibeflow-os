@@ -81,7 +81,7 @@
         "exec-18"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "audit-5b",
@@ -91,17 +91,18 @@
         "exec-18"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "nonreg-5b",
       "step": "decouverte complete (jalon 1 P461-D-16)",
       "stage": "",
       "deps": [
-        "exec-18"
+        "exec-18",
+        "fix-5b"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "blocked"
     },
     {
       "id": "exec-04",
@@ -361,6 +362,19 @@
         ".planning/workstreams/gouvernance/phases"
       ],
       "status": "done"
+    },
+    {
+      "id": "fix-5b",
+      "step": "lot de correction d'avant armement G4 (revue-5b + audit-5b)",
+      "stage": "",
+      "deps": [
+        "revue-5b",
+        "audit-5b"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "ready"
     }
   ]
 }
