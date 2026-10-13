@@ -48,7 +48,7 @@ ADR-048/049). Acquisition **atomique** (un lien symbolique posé puis remplacé 
      avec `reason: stale-requires-takeover` (+ champ `hint`) → lock périmé : PAS un vol implicite,
      `acquire` ne récupère plus rien lui-même (D-32-02) — exécuter la commande du `hint` (`takeover`
      ci-dessous ; pour un ANCIEN verrou périmé d'avant la mise à jour, `VF_DRIVER_LOCK=… driver-lock.sh
-     recover`), jamais réinterprété comme un refus terminal.
+     recover`), jamais réinterprété comme un refus terminal. `takeover --ws` refuse aussi devant un ANCIEN verrou, vivant ou périmé : même `recover`.
 2. **Heartbeat ENTRE les étapes** — à chaque relecture ROADMAP/STATE entre deux étapes :
    ```bash
    "$S"/driver-lock.sh heartbeat --owner="<id>"
@@ -65,6 +65,10 @@ ADR-048/049). Acquisition **atomique** (un lien symbolique posé puis remplacé 
    SEULEMENT entre deux étapes explicites — un manager qui surveille un worker unique pendant
    plusieurs minutes sans jamais rappeler `heartbeat` dans l'intervalle reproduit exactement le
    couplage de cadence que cet amendement ferme.
+
+   Progression du watchdog (P57-D-45) : `progress_epoch` OU le commit le plus récent parmi les HEAD des worktrees du dossier
+   git commun (commit futur, worktree prunable ou illisible ignorés). Limite acceptée : un commit sans rapport peut masquer
+   un vrai stall ; le watchdog est consultatif.
 
 3. **Relâcher À LA CLÔTURE — succès, échec OU abandon** (release « RAII » porté par le prompt) :
    ```bash

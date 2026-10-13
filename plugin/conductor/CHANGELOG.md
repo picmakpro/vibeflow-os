@@ -17,8 +17,8 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
   (hint : lancer depuis la racine du lab ; plus de verrou posé ailleurs ni de `.planning/DRIVER.lock` parasite,
   arbitrage P57-D-39, Samuel, AskUserQuestion session principale, 2026-10-11). `status --all` rend en une ligne l'état de tous
   les verrous du lab ; tous les verbes portent `--ws` et le suffixe `scope`/`ws`/`location`, avec un registre frère
-  par verrou. Repli hors git sous `.planning/DRIVER.lock.d`. Lab plat intact (A/B bit à bit contre la copie gelée
-  `e8771d94`, 20 étapes, IDENTIQUE).
+  par verrou. Repli hors git sous `.planning/DRIVER.lock.d`. Lab plat : A/B contre la copie gelée `e8771d94` (20 étapes, IDENTIQUE) pour le verrou ;
+  le guard, lui, a changé en lab plat le 2026-10-13 (F-3, R-5, Q5 : voir « Arbitrages du 2026-10-13 »).
 - **`scripts/guard-driver-lock.sh`** : le guard refuse une écriture sous un compartiment tenu par une autre session
   et laisse le voisin libre. Volet Bash : un commit est jugé sur ce qu'il embarque (index, `-a`/pathspec, HEAD sous
   `--amend`, `git add` de la même commande) ; gestes git répartis en arbre / commit / dépôt. Fail-closed : toute
@@ -49,10 +49,11 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
 - **Dette soldée avant la PR (2026-10-12)** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12 ;
   P57-D-40 : rattachée à cette version non publiée, sans bump) :
   - **F-3** (`c5ccbab7`, `63d5cc4c`, `08d25595`) : le guard reconnaît les 12 globaux git sans argument et `exec`
-    (`git --no-pager commit -am x` refusé sous le verrou d'autrui), EN LAB PARTITIONNÉ SEULEMENT (P57-D-42) ; lab plat inchangé.
+    (`git --no-pager commit -am x` refusé sous le verrou d'autrui) ; d'abord en lab partitionné seulement (P57-D-42),
+    étendu au lab plat le 2026-10-13 (P57-D-47, voir ci-dessous).
   - **R-5** (`c5ccbab7`, `63d5cc4c`, `b66a7dbe`) : en lab partitionné, un préfixe `GIT_DIR=`, `GIT_INDEX_FILE=` ou
     `GIT_WORK_TREE=` du segment du geste = cible incertaine, aussi pour la décision « geste hors du lab » ; l'affectation
-    dans un autre segment reste non couverte, le lab plat ne reconnaît aucune de ces formes (P57-D-43).
+    dans un autre segment, d'abord non couverte, l'est depuis le 2026-10-13, lab plat compris (P57-D-48, voir ci-dessous).
   - **R-6** (`63d5cc4c`) : crochet `VF_GUARD_TEST_RAISE` retiré de la production.
   - **R-4** (`6333d8e4`, `8689bbd7`) : `driver-lock.sh` re-sonde l'ancien verrou après la pose ; la pose du processus est retirée.
   - **C3** (`6333d8e4`, `1f6b555b`) : six mutants (`acq_fallback`, `fallback_depotpresent`, `skip_link_d`, `pathspec_blind`,
@@ -60,6 +61,31 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
   - **R-7** (`6333d8e4`, `8b957f62`) : empreinte épinglée de la copie gelée ; l'intégrité face à la référence est établie aussi en clone shallow.
   - **`check-description-fidelity.sh`** et sa suite (`c580b45e`) : le gate respecte `TMPDIR` ; T9 (tmpdir privé) et T10 (miroir de
     l'arbre jugé) stabilisés, 20/30 rouges avant, 0/30 après.
+
+- **Arbitrages du 2026-10-13** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 ; toujours dans la
+  version non publiée, sans bump) :
+  - **Watchdog, Q1 (b) et D (b)** (`f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`, P57-D-45) :
+    `check-guard-health.sh` compte comme progression le commit le plus récent (`%ct`) parmi les HEAD de tous les
+    worktrees du dossier git commun ; un commit futur, un worktree prunable ou illisible sont ignorés ; le git lancé est durci.
+    Limite acceptée : un commit sans rapport d'un autre worktree peut masquer un vrai stall, le watchdog reste consultatif.
+  - **F-3 et A/B, Q4 et B (b)** (`719099dc`, `4fd77ed3`, P57-D-47, remplace P57-D-42) : F-3 vaut aussi en lab plat ; la
+    référence A/B est la copie gelée `4d48e50c` plus une empreinte versionnée de la transcription attendue des 37 formes
+    (verdict, code de sortie, message), avec `seen == GW_AB_ENUM_N` ; l'épinglage de l'empreinte est en cours de finition.
+  - **Contournements du guard, Q5** (`719099dc`, `4fd77ed3`, P57-D-48, précise P57-D-43) : fermés dans les deux régimes :
+    globaux git à argument, wrappers à option-argument (`env -u/-C`, `nice -n`, `exec -a`, `sudo -u`, `xargs -n`…),
+    `bash/sh/zsh -c` (récursion bornée à 3, refus grossier au-delà), `GIT_*` posé dans un segment précédent ; R-5 vaut aussi
+    en lab plat. `bash -c "cd <hors-lab> && git commit"` passe de deny à allow : c'est le verdict de sa forme canonique
+    (P57-D-52, décision du manager de mission). Reste en cours de finition, propriété sans SHA : le `cd` de l'appelant est
+    propagé à `bash -c` (AU2-01) ; le test est linéaire et la longueur bornée (AU2-02) ; refus grossier sur `/usr/bin/git`
+    et les guillemets (AU2-03) ; préfixes `+=` et `[i]=` reconnus (AU2-06).
+  - **`takeover --ws`, Q5 et C (a)** (`a038c8b6`, `6a43299e`, P57-D-49) : applique la règle d'`acquire` devant un ancien
+    verrou, vivant comme périmé (même `reason`, même `hint` `recover`) ; sur un refus de la re-sonde, le verrou de
+    compartiment antérieur est restitué (AU2-04).
+  - **G-2, classe 6, Q6** (`f76de68b`, `3e426f02`, `42d490b1`, `46254135`, P57-D-50) : `check-gate-touche.sh` surveille les
+    fixtures (`plugin/conductor/scripts/tests/fixtures/**`, `scripts/tests/fixtures/**`) ; lecture en `git diff -z`, noms
+    non ASCII et spéciaux compris (AU2-05).
+  - **Archivage, Q2 (a)** (`4a8535ee`, P57-D-46) : les 17 dossiers de phase de fiabilite-v1.0 sont archivés sous
+    `.planning/milestones/fiabilite-v1.0-phases/`, puis `--archive roadmap`.
 
 ## [v1.48.2] — 2026-10-10 (l'archivage roadmap ne retire plus les phases dont les dossiers existent)
 
