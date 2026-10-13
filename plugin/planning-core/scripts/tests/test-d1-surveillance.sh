@@ -34,8 +34,10 @@
 #   R-D1-11  une écriture du moteur entre deux séances : aucun contournement à la réconciliation
 #   R-D1-12  CwdChanged : `watchPaths` au premier niveau ET sous `hookSpecificOutput` ; FileChanged : jamais de `watchPaths`
 #   R-D1-13  erreur injectée dans chaque mode de D1 : stdout vide, code 0, aucun refus ; aucune sortie de D1 ne contient `deny` ni `block`
-#   R-D1-14  journal de plus de 5 Mio dont la dernière référence est hors de la fenêtre des 4 Mio de fin : première observation (jumeau : dans la fenêtre,
-#            contournement) ; un SessionStart sur 128 chemins lit chaque fichier une fois (mesure structurelle)
+#   R-D1-14  journal de plus de 5 Mio dont la dernière référence est hors de la fenêtre des 4 Mio de fin : pour STATE.md, fichier RACINE (hors de la règle A5), première observation, aveugle,
+#            aucun contournement (jumeau : dans la fenêtre, contournement) ; pour le PLAN.md d'une unité ouverte (fix-5b H4, revue-5b n°2 ; faux signal MESURÉ, nommé en (ba) et (bk)) la
+#            même référence hors fenêtre lève `contournement` puis `reference` et le signal D1, alors que le fichier n'a pas changé (jumeau : dans la fenêtre, aucune ligne) ;
+#            un SessionStart sur 128 chemins lit chaque fichier une fois (mesure structurelle)
 #   R-D1-19  (A6, P46 lot B, b3) journal réduit au silence par Bash (lien vers /dev/null, chmod 000, `chflags uchg`, absent alors que l'état précédent existe : reprise ou cache du
 #            recalcul) : signal D1 au SessionStart, rien d'écrit ; jumeaux : première séance sans journal, journal sain, séance suivante (pas de répétition)
 #   R-D1-20  (Q-B, fix-46-c) `.planning/.gitignore` (une ligne `surveillance.log`) posé au SessionStart d'un lab adhérent : idempotent, existant préservé, hors adhésion rien,
@@ -1380,10 +1382,10 @@ def controle_d1_13(ctx, script):
 LIGNE_REMPLISSAGE = "2026-10-05T00:00:00Z  genre=reference  chemin=.planning/remplissage-%07d.md  sha256=" + "0" * 64 + "  par=planning-hook.sh  source=seance\n"
 
 
-def journal_de_5_mio(lab, ref_au_debut):
-    """Journal de plus de 5 Mio : une référence ANCIENNE de STATE.md, au début (hors de la fenêtre de lecture des 4 Mio de fin) ou à la fin (dans la fenêtre),
-    et des lignes de remplissage valides pour des chemins hors liste."""
-    ref = "2026-10-05T00:00:00Z  genre=reference  chemin=.planning/STATE.md  sha256=" + sha(b"ancien contenu de STATE.md") + "  par=planning-hook.sh  source=seance\n"
+def journal_de_5_mio(lab, ref_au_debut, chemin=".planning/STATE.md", sha_ref=None):
+    """Journal de plus de 5 Mio : une référence ANCIENNE de `chemin` (STATE.md par défaut ; sha `sha_ref`, par défaut celui d'un ancien contenu de STATE.md), au début (hors de la
+    fenêtre de lecture des 4 Mio de fin) ou à la fin (dans la fenêtre), et des lignes de remplissage valides pour des chemins hors liste."""
+    ref = "2026-10-05T00:00:00Z  genre=reference  chemin=" + chemin + "  sha256=" + (sha_ref or sha(b"ancien contenu de STATE.md")) + "  par=planning-hook.sh  source=seance\n"
     corps = "".join(LIGNE_REMPLISSAGE % i for i in range(29000))
     texte = (ref + corps) if ref_au_debut else (corps + ref)
     ecrire(chemin_journal(lab), texte)
@@ -1391,9 +1393,12 @@ def journal_de_5_mio(lab, ref_au_debut):
 
 
 def controle_d1_14(ctx, script):
-    """Journal de plus de 5 Mio dont la dernière référence de STATE.md est HORS de la fenêtre de lecture (4 Mio de fin) : première observation (une référence
-    de plus, aucun contournement, limite (ba)) ; jumeau : la même référence DANS la fenêtre -> un contournement. Coût : un SessionStart sur 128 chemins lit
-    chaque fichier une seule fois (mesure structurelle : nombre de lectures égal au nombre de chemins, jamais une borne d'horloge)."""
+    """Journal de plus de 5 Mio dont la dernière référence est HORS de la fenêtre de lecture (4 Mio de fin). STATE.md, fichier RACINE (hors de la règle A5) : première observation (une
+    référence de plus, aucun contournement, aucun signal, limites (ba) et (bk)) ; jumeau : la même référence DANS la fenêtre -> un contournement. PLAN.md d'une unité ouverte,
+    au sha de son contenu ACTUEL (fix-5b H4, revue-5b n°2 ; D1 reste une détection, P461-D-05a, le comportement n'est pas changé) : hors fenêtre, la référence est inconnue, le fichier
+    présent n'est expliqué par rien, `contournement` puis `reference` et le signal D1 qui nomme le chemin — un FAUX signal, le fichier n'a pas changé ; jumeau : la même référence dans la
+    fenêtre -> aucune ligne pour ce chemin, aucun signal. Coût : un SessionStart sur 128 chemins lit chaque fichier une seule fois (mesure structurelle : nombre de lectures égal au
+    nombre de chemins, jamais une borne d'horloge)."""
     d = ctx.copie_forcee(_dossier(ctx, script), "observe")
     fautes = []
     lab_a = fabriquer_lab(ctx, "d1-14-hors", ouvertes=(), closes=())
@@ -1411,6 +1416,23 @@ def controle_d1_14(ctx, script):
     ref_b = [e for e in entrees_journal_de_fin(lab_b) if e["chemin"] == ".planning/STATE.md" and e["source"] == "reconciliation"]
     if [e["genre"] for e in ref_b] != ["contournement", "reference"]:
         fautes.append("jumeau : la même référence dans la fenêtre : contournement puis référence attendus — obtenu %s" % [e["genre"] for e in ref_b])
+    # Jumeau d'UNITÉ (fix-5b H4, revue-5b n°2) : la référence du PLAN.md d'une unité ouverte, au sha de son contenu ACTUEL, hors fenêtre -> faux signal (le fichier n'a pas changé)
+    rel_plan = ".planning/cycles/01-c/phases/01-u/PLAN.md"
+    lab_uh = fabriquer_lab(ctx, "d1-14-unite-hors", ouvertes=("01-u",), closes=())
+    lab_ud = fabriquer_lab(ctx, "d1-14-unite-dans", ouvertes=("01-u",), closes=())
+    for lab_u, au_debut in ((lab_uh, True), (lab_ud, False)):
+        journal_de_5_mio(lab_u, au_debut, rel_plan, sha_du_fichier(os.path.join(lab_u, *rel_plan.split("/"))))
+    rc, out, err = session(ctx, d, lab_uh)
+    ref_uh = [e["genre"] for e in entrees_journal_de_fin(lab_uh) if e["chemin"] == rel_plan and e["source"] == "reconciliation"]
+    signal_uh = contexte_de(out)
+    if rc != 0 or err or ref_uh != ["contournement", "reference"] or not isinstance(signal_uh, str) or rel_plan not in signal_uh:
+        fautes.append("unité, référence hors de la fenêtre (fichier inchangé) : `contournement` puis `reference` et le signal D1 qui nomme %s attendus (faux signal mesuré) — obtenu rc=%d %s, signal %r" % (
+            rel_plan, rc, ref_uh, signal_uh))
+    rc, out, err = session(ctx, d, lab_ud)
+    ref_ud = [e["genre"] for e in entrees_journal_de_fin(lab_ud) if e["chemin"] == rel_plan and e["source"] == "reconciliation"]
+    signal_ud = contexte_de(out)
+    if rc != 0 or err or ref_ud or (isinstance(signal_ud, str) and rel_plan in signal_ud):
+        fautes.append("jumeau d'unité : la même référence dans la fenêtre : aucune ligne ni signal pour %s attendus — obtenu rc=%d %s, signal %r" % (rel_plan, rc, ref_ud, signal_ud))
     # Coût structurel : une lecture par fichier de la liste
     hook = os.path.join(_dossier(ctx, script), "planning-hook.sh")
     espace = {"__name__": "d1_mesure"}
@@ -1436,7 +1458,8 @@ def controle_d1_14(ctx, script):
     if len(liste) != 128 or not tronquee or lectures != [1] * 128:
         fautes.append("128 chemins lus UNE fois chacun attendus — obtenu %d chemin(s), %d lecture(s), maximum %d par chemin" % (len(liste), sum(lectures), max(lectures or [0])))
     return (not fautes), ("; ".join(fautes[:3]) if fautes else
-                          "journal de %.1f Mio : référence hors fenêtre = première observation (aucun contournement), la même dans la fenêtre = contournement ; SessionStart sur 128 "
+                          "journal de %.1f Mio : STATE.md (fichier racine) référence hors fenêtre = première observation (aucun contournement, aveugle), la même dans la fenêtre = contournement ; "
+                          "PLAN.md d'une unité ouverte, référence hors fenêtre au sha actuel = `contournement` puis `reference` et signal (faux signal mesuré), dans la fenêtre = rien ; SessionStart sur 128 "
                           "chemins : 128 lectures, une par chemin" % (taille_a / 1048576.0))
 
 
