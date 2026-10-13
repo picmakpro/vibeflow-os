@@ -244,11 +244,13 @@
   - (c) **`GIT_*` posé dans un segment précédent** (`719099dc`, `4fd77ed3`, P57-D-48) ; R-5 vaut aussi en lab plat.
   - (d) **Épingle R-7 : G-2 surveille les fixtures** (`f76de68b`, `3e426f02`, `42d490b1`, `46254135`, P57-D-50) : la co-modification
     de la fixture et de l'épingle reste possible, mais elle est tracée par le trailer `Gate-Touche` obligatoire.
-  - (e) **`takeover --ws`** (`a038c8b6`, `6a43299e`, P57-D-49) : applique la règle d'`acquire` devant un ancien verrou, vivant ou
-    périmé ; restitue le verrou de compartiment antérieur sur un refus de la re-sonde (AU2-04).
-  - Watchdog (`f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`, P57-D-45) : progression = commit le plus récent des HEAD de
-    tous les worktrees du dossier git commun. Les lows AU2-01, AU2-02, AU2-03 et AU2-06 du guard étaient en cours de finition à la
-    rédaction : le manager complète leurs SHA.
+  - (e) **`takeover --ws`** (`a038c8b6`, `6a43299e`, `8fe96bd7`, P57-D-49, P57-D-55) : applique la règle d'`acquire` devant un ancien
+    verrou (le refus est celui d'`acquire` dans le même état : vivant `legacy-lock-held`, périmé `stale-requires-takeover`) ; restitue
+    le verrou de compartiment antérieur sur un refus de la re-sonde (AU2-04), restitution vérifiée (AU3-04), nouvelle `reason`
+    `restore-failed` si elle échoue.
+  - Watchdog (`f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`, `8fe96bd7`, P57-D-45) : progression = commit le plus récent
+    des HEAD de tous les worktrees du dossier git commun ; lecture des worktrees séparée par NUL (AU3-05), un seul `git log` (AU3-06).
+  - Lows du guard AU2-01, AU2-02, AU2-03, AU2-06 (`560f4390`) et AU3-01, AU3-02 (`188d86e8`, P57-D-54).
   **Restent OUVERTS** (sonde commune : payload `{"tool_name":"Bash","session_id":"autre","cwd":"<lab>","tool_input":{"command":"<cmd>"}}`
   sur `guard-driver-lock.sh`, depuis un lab dont le verrou est tenu par une autre session ; ALLOW = stdout vide, refus = JSON
   `permissionDecision: deny`). Pour chaque ligne, la sonde est la commande `<cmd>` citée ; elle rend ALLOW alors que le geste commit :
@@ -266,12 +268,21 @@
   - **Mots-clés et formes devant `git`** : `if git commit -am x; then :; fi`, `while`, `until`, `! git commit -am x`, `$'git' commit -am x`,
     `>/dev/null git commit -am x`.
   - **Watchdog consultatif** : un commit sans rapport d'un autre worktree masque un vrai stall (limite acceptée, P57-D-45) ; aucun
-    timeout ne borne le git lancé par le hook (question ouverte). Sonde : commit récent dans un worktree voisin, verrou sans
-    heartbeat, `check-guard-health.sh` ne signale pas le stall.
+    timeout ne borne le git lancé par le hook (question ouverte). Sonde : heartbeat frais, progression figée, commit récent dans un
+    autre worktree, `check-guard-health.sh` rend SAIN (un verrou sans heartbeat donnerait ABANDON). Un montage gelé peut aussi bloquer
+    `git worktree list` (non mesuré).
+  - **AU3-03, la borne de 64 Ko ne borne pas le coût** : `env env … git commit` x4000 prend 26 s (quadratique, antérieur) ; une chaîne
+    d'1 Mo imbriquée à 4 niveaux dépasse 120 s ; le hook n'a pas de timeout.
+  - **AU3-07 (antérieur)** : `git -C <alpha> add STATE.md && git commit`, `builtin cd <alpha> && git add …` et
+    `eval 'cd <alpha>' && …` sont permis sous le verrou d'autrui.
+  - **Asymétrie conservatrice du guard** : `(cd X && git add … && git commit)` (forme collée) est permis, alors que
+    `(cd X && bash -c '…')` est refusé.
+  - **Résiduel d'AU3-04** : en forme dossier réel, un `acquire` concurrent peut gagner entre le `rm -f` du lien et le `mv -n` ; il
+    n'écrase plus rien, et le refus rend `restore-failed`.
   - **Aucun timeout déclaré pour le hook guard dans `hooks.json`** : un guard bloqué par un git lent n'est borné que par la valeur
     par défaut de Claude Code. Sonde : `jq '.hooks' plugin/conductor/hooks/hooks.json`, pas de champ `timeout` sur l'entrée du guard.
 - Files: `plugin/conductor/scripts/guard-driver-lock.sh`, `plugin/conductor/scripts/driver-lock.sh`,
-  `plugin/conductor/scripts/check-guard-health.sh`, `plugin/conductor/scripts/check-gate-touche.sh`,
+  `plugin/conductor/scripts/check-guard-health.sh`, `scripts/check-gate-touche.sh`,
   `plugin/conductor/scripts/tests/test-driver-lock-ws.sh`, `plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh`,
   `plugin/dev-orchestrator/scripts/check-mission-exit.sh`, `plugin/dev-orchestrator/references/mission-flow.md`
 - Impact: aucun critère de la Phase 57 n'en dépend. Les limites restantes sont des trous de l'anti-accident (pas du modèle de menace,

@@ -28,7 +28,9 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
   écriture lancé d'un sous-dossier est jugé comme en lab partitionné (P57-D-39), et le segment `.planning` se compare
   sans tenir compte de la casse (`.PLANNING/workstreams/<ws>/f` est refusé sous le verrou d'autrui, P57-D-38, même
   arbitrage du 2026-10-11). Lab plat inchangé (meta illisible = allow, posture historique)
-  (A/B IDENTIQUE sur 73 payloads x 5 états de verrou x 2 régimes contre la copie gelée `cff1e2af`).
+  (A/B contre la copie gelée `cff1e2af` : identique hors les 37 formes énumérées, épinglées par une transcription
+  versionnée, blob `7156daff`, matrice de 195 payloads à HEAD ; écarts hors matrice nommés ci-dessous : refus neufs
+  AU2-03, AU2-06 et AU3-01, changement plus permissif P57-D-52).
 - **Consommateurs** : `check-guard-health.sh` voit un stall ou un abandon par compartiment (`ws=<sujet>`, une seule
   ligne, abandon prioritaire) ; `dag.sh init --ws` lie le DAG à un compartiment et `dag.sh mark` avance le
   `progress_epoch` de son verrou ; `check-branch-claim.sh` signale une branche revendiquée par un verrou de
@@ -36,11 +38,11 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
 - **Références et skill** : `references/team-kernel.md` (une mission pilote par compartiment, un geste de dépôt à la
   fois, limite P57-D-20), `references/workstream-planning-consumers.md` (recensement). `skills/vf-split-planning`
   acquiert `--depot` avant la partition et le relâche après.
-- **Suites** : `test-driver-lock-ws.sh` (528 assertions, concurrence 24 x 5 tours à 0 tour hors contrat, A/B,
-  mutants 10/10 tués), `test-guard-driver-lock-ws.sh` (240 assertions, A/B, mutants 23/23 tués : péremption, cible git
-  incertaine, pathspec positionnel, casse de l'index, exception générique du jugement de commit, casse de `.planning`
-  et détection depuis la racine git y sont mutés),
-  `test-driver-lock-consumers-ws.sh` (30 OK, mutants 7/7 tués) ; copies gelées `tests/fixtures/driver-lock-pre-e8771d9.sh`
+- **Suites** (état à HEAD `188d86e8`) : `test-driver-lock-ws.sh` (642 assertions, concurrence 24 x 5 tours à 0 tour hors
+  contrat, A/B, mutants 27/27 tués), `test-guard-driver-lock-ws.sh` (563 assertions, A/B sur 195 payloads, mutants
+  52/52 tués : péremption, cible git incertaine, pathspec positionnel, casse de l'index, exception générique du jugement
+  de commit, casse de `.planning` et détection depuis la racine git y sont mutés),
+  `test-driver-lock-consumers-ws.sh` (36 OK, mutants 9/9 tués), `test-check-guard-health.sh` (120 PASS) ; copies gelées `tests/fixtures/driver-lock-pre-e8771d9.sh`
   et `guard-driver-lock-pre-cff1e2a.sh`.
 - **Manager en vol pendant la mise à jour** : les scripts sont remplacés sous ses pieds ; d'où le repli des verbes
   sans `--ws` sur l'ancien verrou (P57-D-24) — un manager lancé avant la mise à jour continue de viser le verrou de
@@ -70,17 +72,31 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
     Limite acceptée : un commit sans rapport d'un autre worktree peut masquer un vrai stall, le watchdog reste consultatif.
   - **F-3 et A/B, Q4 et B (b)** (`719099dc`, `4fd77ed3`, P57-D-47, remplace P57-D-42) : F-3 vaut aussi en lab plat ; la
     référence A/B est la copie gelée `4d48e50c` plus une empreinte versionnée de la transcription attendue des 37 formes
-    (verdict, code de sortie, message), avec `seen == GW_AB_ENUM_N` ; l'épinglage de l'empreinte est en cours de finition.
+    (verdict, code de sortie, message), avec `seen == GW_AB_ENUM_N` ; l'empreinte est épinglée depuis `560f4390` (`fixtures/guard-ab-enum-37.txt`, blob `7156daff` :
+    verdict, code de sortie, message, âge normalisé, `GW-AB-PIN.0..3`) et trois mutants la gardent (`msg`, `amputee`,
+    `amputee-dernier`).
   - **Contournements du guard, Q5** (`719099dc`, `4fd77ed3`, P57-D-48, précise P57-D-43) : fermés dans les deux régimes :
     globaux git à argument, wrappers à option-argument (`env -u/-C`, `nice -n`, `exec -a`, `sudo -u`, `xargs -n`…),
     `bash/sh/zsh -c` (récursion bornée à 3, refus grossier au-delà), `GIT_*` posé dans un segment précédent ; R-5 vaut aussi
     en lab plat. `bash -c "cd <hors-lab> && git commit"` passe de deny à allow : c'est le verdict de sa forme canonique
-    (P57-D-52, décision du manager de mission). Reste en cours de finition, propriété sans SHA : le `cd` de l'appelant est
-    propagé à `bash -c` (AU2-01) ; le test est linéaire et la longueur bornée (AU2-02) ; refus grossier sur `/usr/bin/git`
-    et les guillemets (AU2-03) ; préfixes `+=` et `[i]=` reconnus (AU2-06).
-  - **`takeover --ws`, Q5 et C (a)** (`a038c8b6`, `6a43299e`, P57-D-49) : applique la règle d'`acquire` devant un ancien
-    verrou, vivant comme périmé (même `reason`, même `hint` `recover`) ; sur un refus de la re-sonde, le verrou de
-    compartiment antérieur est restitué (AU2-04).
+    (P57-D-52, décision du manager de mission). Finitions du tour 3 (`560f4390`, `188d86e8`) : le `cd` de l'appelant est
+    propagé à `bash -c` (AU2-01) ; le refus grossier au-delà de la récursion est linéaire et la longueur bornée à 64 Ko
+    (AU2-02) ; il lit `/usr/bin/git` et les guillemets (AU2-03, refus nouveau) ; préfixes `+=` et `[i]=` reconnus
+    (AU2-06, refus nouveau). `188d86e8` : un séparateur collé à une parenthèse (`);`, `)&&`, `;(`), qui laissait `bash`
+    hors position de commande (`x=$(date); bash -c 'git commit'` passait) est découpé (AU3-01, rattaché à Q5 « fermer
+    `bash -c` », P57-D-54, refus nouveau) ; le refus grossier ne prend plus pour `git` les mots `.git/`, `--git-dir=` ni
+    `my-git` (AU3-02).
+  - **`takeover --ws`, Q5 et C (a)** (`a038c8b6`, `6a43299e`, `8fe96bd7`, P57-D-49, P57-D-55) : applique la règle
+    d'`acquire` devant un ancien verrou ; le refus est celui d'`acquire` dans le même état (vivant : `legacy-lock-held`,
+    `hint` `release --owner=…` ; périmé : `stale-requires-takeover`, `hint` `recover`), à exécuter tel qu'il est rendu.
+    Sur un refus de la re-sonde, le verrou de compartiment antérieur est restitué (AU2-04), puis vérifié (`8fe96bd7`) :
+    un seul `mv -n` qui ne suit pas le lien (AU3-04, jamais enterré dans la génération d'un tenant concurrent), la
+    génération posée n'est supprimée qu'après constat `lock_gen == old_gen`, le mutex est libéré par le refus (RV4-01).
+    **Nouvelle `reason` `restore-failed`** quand la restitution échoue (chemin qui laissait auparavant un verrou
+    fantôme ; P57-D-55) : la génération posée reste en place et le refus le dit.
+  - **Watchdog, lecture des worktrees** (`8fe96bd7`) : `git worktree list --porcelain -z` (git >= 2.36), un chemin à saut
+    de ligne ne forge plus de ligne `HEAD` (repli sur le HEAD courant sans `-z`, AU3-05) ; un seul `git log --no-walk`
+    pour tous les HEAD, repli par HEAD (AU3-06) ; quatre mutants de plus côté santé.
   - **G-2, classe 6, Q6** (`f76de68b`, `3e426f02`, `42d490b1`, `46254135`, P57-D-50) : `check-gate-touche.sh` surveille les
     fixtures (`plugin/conductor/scripts/tests/fixtures/**`, `scripts/tests/fixtures/**`) ; lecture en `git diff -z`, noms
     non ASCII et spéciaux compris (AU2-05).

@@ -48,7 +48,7 @@ ADR-048/049). Acquisition **atomique** (un lien symbolique posé puis remplacé 
      avec `reason: stale-requires-takeover` (+ champ `hint`) → lock périmé : PAS un vol implicite,
      `acquire` ne récupère plus rien lui-même (D-32-02) — exécuter la commande du `hint` (`takeover`
      ci-dessous ; pour un ANCIEN verrou périmé d'avant la mise à jour, `VF_DRIVER_LOCK=… driver-lock.sh
-     recover`), jamais réinterprété comme un refus terminal. `takeover --ws` refuse aussi devant un ANCIEN verrou, vivant ou périmé : même `recover`.
+     recover`), jamais réinterprété comme un refus terminal. `takeover --ws` refuse aussi devant un ANCIEN verrou : le refus est celui d'`acquire` dans le même état (vivant : `legacy-lock-held`, `hint` `release --owner=…` ; périmé : `stale-requires-takeover`, `hint` `recover`) ; exécuter le `hint` tel qu'il est rendu.
 2. **Heartbeat ENTRE les étapes** — à chaque relecture ROADMAP/STATE entre deux étapes :
    ```bash
    "$S"/driver-lock.sh heartbeat --owner="<id>"

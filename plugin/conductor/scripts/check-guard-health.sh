@@ -84,7 +84,8 @@
 # plan peut durer plus que STALL_WINDOW sans marquer aucun noeud (faux stall constate a 1587 s et 1589 s le
 # 2026-10-12). L'age de progression EFFECTIF est donc mesure depuis le plus recent de (a) `progress_epoch`
 # du verrou et (b) l'horodatage du commit le plus recent parmi les HEAD de TOUS les worktrees du dossier git
-# commun (`git worktree list --porcelain`, puis `git log -1 --format=%ct <HEAD>` pour chacun ; arbitrage Samuel,
+# commun (`git worktree list --porcelain -z`, lecture separee par NUL, puis UN SEUL `git log --no-walk --format=%ct` pour tous
+# les HEAD, repli par HEAD ; AU3-05, AU3-06 ; arbitrage Samuel,
 # AskUserQuestion session principale, 2026-10-13, D option b) : un verrou partage entre worktrees (vf-driver/
 # sous le git-common-dir) est travaille depuis le worktree de son proprietaire, pas forcement celui ou tourne
 # le watchdog. Un commit plus recent que la fenetre ecarte le STALL. Seuil, TTL, verdict ABANDON (heartbeat

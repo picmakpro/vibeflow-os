@@ -25,7 +25,8 @@ D-36 et D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-1
   - **`references/mission-flow.md`** : précision de prose (R-4) ; un ANCIEN verrou périmé rend le même `reason`
     `stale-requires-takeover` avec un `hint` `recover` à exécuter tel quel, et `legacy-lock-held` peut aussi surgir juste après la pose.
   - **2026-10-13** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 ; P57-D-49, P57-D-45) :
-    `takeover --ws` refuse lui aussi devant un ancien verrou, vivant ou périmé (même `reason`, même `hint` `recover`) ;
+    `takeover --ws` refuse lui aussi devant un ancien verrou : le refus est celui d'`acquire` dans le même état (vivant :
+    `legacy-lock-held`, `hint` `release --owner=…` ; périmé : `stale-requires-takeover`, `hint` `recover`), à exécuter tel qu'il est rendu ;
     `mission-flow.md` dit la progression du watchdog (`progress_epoch` ou commit le plus récent des worktrees du dossier git commun) et sa limite.
 
 ## [v2.27.1] — 2026-10-08 (carte d'intention : choix du planning, Phase 41.2)

@@ -305,7 +305,7 @@ Sauf mention contraire, chaque décision est un arbitrage Samuel, AskUserQuestio
   grossier au-delà), `GIT_*` posé dans un segment précédent (Q5). Commits `719099dc`, `4fd77ed3`. PRÉCISE P57-D-43. Lecture
   du manager : ces contournements existaient dans les deux régimes ; Samuel a ratifié sur recommandation.
 - **P57-D-49 (`takeover --ws`)** : applique la règle d'`acquire` devant un ancien verrou, vivant (`a038c8b6`) comme périmé
-  (`6a43299e`, même `reason` et même `hint` `recover`) ; sur un refus de la re-sonde, le verrou de compartiment antérieur est
+  (`6a43299e`) : le refus est celui d'`acquire` dans le même état (vivant : `legacy-lock-held`, `hint` `release --owner=…` ; périmé : `stale-requires-takeover`, `hint` `recover`), à exécuter tel qu'il est rendu ; sur un refus de la re-sonde, le verrou de compartiment antérieur est
   restitué (AU2-04) (Q5 + C (a)).
 - **P57-D-50 (G-2, classe 6)** : G-2 surveille une classe 6, les fixtures (`plugin/conductor/scripts/tests/fixtures/**`,
   `scripts/tests/fixtures/**`) ; lecture en `git diff -z`, noms spéciaux compris (Q6). Commits `f76de68b`, `3e426f02`,
@@ -315,6 +315,12 @@ Sauf mention contraire, chaque décision est un arbitrage Samuel, AskUserQuestio
 - **P57-D-52 (`bash -c "cd <hors-lab> && git …"`)** : passe de deny à allow, verdict de sa forme canonique. Décision du
   MANAGER DE MISSION (pas de Samuel), constatée par l'audit sans contournement.
 - **P57-D-53 (tri du BACKLOG)** : reporté après la release (Q3) ; la PR part avec 31/20.
+- **P57-D-54 (`);` collé)** : AU3-01, un séparateur collé à une parenthèse (`);`, `)&&`, `;(`) laissait `bash` hors position de
+  commande ; rattaché à Q5 « fermer `bash -c` » et corrigé (`188d86e8`). Décision du MANAGER DE MISSION, prise dans le cadre de
+  l'arbitrage du 2026-10-13 (Samuel, AskUserQuestion session principale).
+- **P57-D-55 (`restore-failed`)** : nouvelle `reason` `restore-failed` quand la restitution du verrou antérieur échoue (chemin
+  d'échec qui laissait auparavant un verrou fantôme ; `8fe96bd7`). Décision du MANAGER DE MISSION, prise dans le cadre de
+  l'arbitrage du 2026-10-13 (Samuel, AskUserQuestion session principale).
 
 </decisions>
 

@@ -13,7 +13,9 @@
 # pose retirée, même refus ; TKC témoin sans ancien verrou ; TKD ancien verrou périmé : refus aligné sur acquire, stale-requires-takeover avec le
 # hint recover, rien repris ni supprimé, arbitrage C option (a), AskUserQuestion session principale, 2026-10-13 ; TKB
 # restitue en plus le verrou de compartiment antérieur, AU2-04). Mutants tk_nosonde (TKA), tk_reprobe_none, tk_restore_none,
-# tk_gen_kept, tk_old_deleted (TKB), tk_stale_resume (TKD).
+# tk_gen_kept, tk_old_deleted (TKB), tk_stale_resume (TKD). Tour 3 (RV4-01, AU3-04) : la restitution est vérifiée, le refus libère
+# le mutex et rend restore-failed si elle échoue ; mutants tk_mutex_kept, tk_restore_dir_none, tk_final_restore_none, tk_verify_none,
+# tk_noclobber_none (WS-TKB.10 à 12, WS-TKR, WS-TKV, WS-TKP).
 #
 # TRACER (tâche 1) — un compartiment se verrouille au niveau du clone, de bout en bout :
 #   WS-TRACE-1 acquire --ws → JSON de portée · WS-TRACE-2 lien dans le dossier commun du clone, rien

@@ -5,7 +5,8 @@
 **Patch** — `agents/vf-business-manager.md` : sur `reason: stale-requires-takeover`, le manager exécute la commande nommée par le champ
 `hint` du refus JSON (`takeover` pour un compartiment ou un lab plat, `recover` pour un ancien verrou d'avant la mise à jour),
 au lieu de prescrire `takeover` seul ; formulation alignée sur `vf-dev-manager` (ce172d64). Arbitrage Samuel, AskUserQuestion
-session principale, 2026-10-13 (Q7). Aucune release.
+session principale, 2026-10-13 (Q7). Aucune release. Précision (revue RV4-04, même version non publiée) : le `hint` d'un ANCIEN verrou
+vivant est `release --owner=<id>` (`legacy-lock-held`), non `recover` ; le manager exécute le `hint` tel qu'il est rendu.
 
 ## [v2.0.15] — 2026-10-10 (verrou de driver par compartiment, Phase 57)
 
