@@ -166,3 +166,33 @@ Verdicts relayés verbatim depuis les blocs typés des workers et depuis le reje
 
 Arbitrer Q1 à Q7, puis ouvrir la PR de `feat/phase-57-verrou-compartiment` vers `main`, sur demande explicite de
 Samuel. Les questions ne bloquent pas la PR : aucune ne touche un critère de la Phase 57.
+
+## Tour 2 — arbitrages Q1 à Q7 (2026-10-13), EN ATTENTE D'ARBITRAGE
+
+Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13. État au commit qui ajoute cette section :
+
+- Faits et prouvés (RED puis GREEN, mutants tués) :
+  - Q1 : `f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1` ;
+  - Q2 : `4a8535ee`, 17 dossiers vers `.planning/milestones/fiabilite-v1.0-phases/` selon l'étape `archive_phases` de
+    gsd-cleanup ; ROADMAP à 63 376 octets ;
+  - Q4/Q5 guard : `719099dc`, `4fd77ed3` ;
+  - Q5 takeover : `a038c8b6` ;
+  - Q6 : `f76de68b`, `3e426f02`, `42d490b1` ;
+  - Q7 : `576ba249`.
+- Juges : l'audit rend `passed` avec 8 lows (AU2-01 à AU2-08) et 2 infos (AU2-09, AU2-10). La revue de remplacement
+  rend `human_needed` : la référence A/B (RV3-01) remonte à Samuel. Le premier réviseur s'est figé sans rendre et a
+  été remplacé.
+- Bloquant : `check-divergence` est rouge en S4(b) depuis l'archivage (`completed_phases=18` pour 2 dossiers
+  présents).
+- Questions renvoyées à Samuel :
+  - S4(b) ;
+  - forme de la référence A/B ;
+  - ancien verrou périmé face à `takeover --ws` ;
+  - branche lue par le watchdog quand le verrou est partagé entre worktrees.
+- Reste à faire après sa réponse :
+  - une correction ciblée : AU2-01 à AU2-06 et AU2-08 à AU2-10, puis RV3-02, RV3-03, RV3-06 et RV3-07 ;
+  - le chemin périmé de `workstream-planning-consumers.md:93` ;
+  - les docs : CONCERNS, CHANGELOG conductor, prose D-33-E de `mission-flow.md`, « cinq classes » (CLAUDE.md, ADR-072,
+    ci.yml), P57-D-44 et suivants ;
+  - une revue et un audit de ce tour ;
+  - le rejeu de fin de mission.

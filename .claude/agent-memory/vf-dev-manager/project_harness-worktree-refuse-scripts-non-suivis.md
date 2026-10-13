@@ -18,4 +18,4 @@ Il accepte :
 
 **Why:** le harness ne peut pas prouver qu'un script non suivi ne lance pas git hors du worktree. Une heure s'est perdue à extraire les `run:` de ci.yml avant de trouver l'outil déjà versionné.
 
-**How to apply:** pour rejouer la CI, lancer `bash .planning/phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/replay-ci-jobs.sh --job gates` puis `--job tests`. Cet outil respecte déjà `bash -e` sans pipefail et saute les étapes `if:`. Pour obtenir un code de sortie, `> /dev/null 2>&1 || echo $?`. Les workers ne subissent pas tous ces refus. Voir [[rejeu-ci-avec-le-mauvais-shell]].
+**How to apply:** pour rejouer la CI, lancer `bash .planning/milestones/fiabilite-v1.0-phases/VFDO-40.1-r-vision-adr-029-et-du-gate-du-budget-d-instructions/tools/replay-ci-jobs.sh --job gates` puis `--job tests`. Cet outil respecte déjà `bash -e` sans pipefail et saute les étapes `if:`. Pour obtenir un code de sortie, `> /dev/null 2>&1 || echo $?`. Les workers ne subissent pas tous ces refus. Voir [[rejeu-ci-avec-le-mauvais-shell]].
