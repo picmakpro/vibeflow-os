@@ -2883,6 +2883,33 @@ def chemins_surveilles(racine):
     return liste, False
 
 
+def _forme_surveillee(composants):
+    """Vrai si la liste de composants (NFC, relative au lab, `.planning` en tête) a la FORME d'un fichier surveillé : un des cinq fichiers racine du dossier de planning, ou un des quatre
+    fichiers d'une unité de forme modèle (`.planning/cycles/<c>/phases/<u>/<f>`, ou `.../phases/<u>/plans/<p>/<f>`). Fonction pure : aucune E/S, aucune énumération (fix-5b H1)."""
+    if not composants or composants[0] != NOM_PLANNING:
+        return False
+    reste = composants[1:]
+    if len(reste) == 1:
+        return reste[0] in FICHIERS_RACINE_SURVEILLES
+    if len(reste) in (5, 7):
+        return (reste[0] == "cycles" and reste[2] == "phases" and NOM_UNITE.match(reste[1]) is not None and NOM_UNITE.match(reste[3]) is not None
+                and reste[-1] in FICHIERS_UNITE_SURVEILLES
+                and (len(reste) == 5 or (reste[4] == "plans" and NOM_UNITE.match(reste[5]) is not None)))
+    return False
+
+
+def cle_de_forme_unite(rel):
+    """Vrai si la clé de journal `rel` (relative au lab, séparateur `/`) a, LEXICALEMENT, la forme d'un fichier d'UNITÉ surveillé : au plus BORNE_VALEUR caractères, 6 ou 8 composants (jamais
+    `..`, `.` ni vide), noms fixes `.planning`/`cycles`/`phases`/`plans`, noms d'unité conformes à NOM_UNITE, nom final parmi FICHIERS_UNITE_SURVEILLES. Fonction pure, coût linéaire en la
+    longueur de la clé, bornée : une clé de journal est de la donnée que Bash peut écrire, elle n'est suivie sur le disque qu'après ce test (fix-5b H1, audit-5b F-1, P461-D-05)."""
+    if not isinstance(rel, str) or len(rel) > BORNE_VALEUR:
+        return False
+    composants = rel.split("/")
+    if len(composants) not in (6, 8) or any(c in ("", ".", "..") for c in composants):
+        return False
+    return composants[-1] in FICHIERS_UNITE_SURVEILLES and _forme_surveillee(composants)
+
+
 def chemin_relatif_surveille(racine, chemin):
     """Chemin relatif au lab (séparateur `/`) si `chemin` a la FORME d'un fichier surveillé — un des cinq fichiers racine du dossier de
     planning, ou un des quatre fichiers d'une unité de forme modèle, SUMMARY.md compris (sa création est précisément ce qu'un contournement
@@ -2893,18 +2920,7 @@ def chemin_relatif_surveille(racine, chemin):
         composants = [unicodedata.normalize("NFC", c) for c in os.path.relpath(os.path.join(os.path.realpath(parent), nom), racine).split(os.sep)]  # nfc-d1
     except (OSError, ValueError):
         return None
-    reste = composants[1:]
-    if composants[0] != NOM_PLANNING:
-        return None
-    if len(reste) == 1:
-        conforme = reste[0] in FICHIERS_RACINE_SURVEILLES
-    elif len(reste) in (5, 7):
-        conforme = (reste[0] == "cycles" and reste[2] == "phases" and NOM_UNITE.match(reste[1]) is not None and NOM_UNITE.match(reste[3]) is not None
-                    and reste[-1] in FICHIERS_UNITE_SURVEILLES
-                    and (len(reste) == 5 or (reste[4] == "plans" and NOM_UNITE.match(reste[5]) is not None)))
-    else:
-        conforme = False
-    return "/".join(composants) if conforme else None
+    return "/".join(composants) if _forme_surveillee(composants) else None
 
 
 def empreinte_fichier(chemin):
@@ -3106,7 +3122,8 @@ def chemin_du_disque(racine, rel, cache):
     """Chemin d'accès, sous le nom du DISQUE, d'une clé de journal `rel` (relative au lab, séparateur `/`, composants en forme NFC) : chaque composant est
     cherché dans son dossier par sa forme NFC (le nom littéral d'abord), le nom du disque pouvant être en NFD ; un composant introuvable est gardé tel quel (le
     fichier sera lu `absent`). `cache` (dict, un par réconciliation) : un dossier n'est listé qu'une fois. Règle NFC : forme et clé en NFC, I/O sur le nom du
-    disque (limite (bf))."""
+    disque (limite (bf)). Ne s'appelle que sur une clé dont `cle_de_forme_unite` a validé la forme (6 ou 8 composants, ni `..` ni vide, longueur bornée) : son coût
+    est donc borné (fix-5b H1, audit-5b F-1) — sur une clé libre il serait quadratique en son nombre de composants et suivrait les `..` hors du lab."""
     courant = racine
     for composant in rel.split("/"):
         if courant not in cache:
@@ -3126,12 +3143,15 @@ def chemins_references_hors_liste(racine, par_chemin, liste):
     (les quatre noms de FICHIERS_UNITE_SURVEILLES, de la forme de `chemin_relatif_surveille`) DÉJÀ référencés dans la fenêtre lue du journal (`par_chemin`, aucune
     lecture nouvelle) et absents de `liste` : une unité dont SUMMARY.md est apparu quitte la liste surveillée, et ce que Bash y écrit ensuite ne serait plus
     jamais vu. Ordre déterministe : tri lexical des clés NFC du journal. La liste rendue par SessionStart n'en est pas changée : l'extension vit dans
-    `reconcilier`, qui les hache sous le MÊME compteur d'octets que la liste. Le nom de fichier est testé avant toute lecture du disque (un journal de
-    dizaines de milliers de chemins hors modèle ne coûte qu'un test de nom chacun)."""
+    `reconcilier`, qui les hache sous le MÊME compteur d'octets que la liste. Propriété (fix-5b H1, audit-5b F-1) : aucune E/S disque sur une clé du journal avant la validation
+    LEXICALE de sa forme (`cle_de_forme_unite` : 6 ou 8 composants, noms fixes, NOM_UNITE, nom final d'unité, ni `..` ni `.` ni vide, longueur bornée) ; une clé hors forme
+    (ligne géante, `..`, composant vide) ne coûte qu'un test linéaire en sa longueur, quel que soit le contenu du journal."""
     en_liste = {"/".join(unicodedata.normalize("NFC", c) for c in os.path.relpath(chemin, racine).split(os.sep)) for chemin in liste}
     cache, res = {}, []
     for rel in sorted(par_chemin):
-        if rel in en_liste or rel.rsplit("/", 1)[-1] not in FICHIERS_UNITE_SURVEILLES:
+        if rel in en_liste:
+            continue
+        if not cle_de_forme_unite(rel):  # d1-n5-cle-forme
             continue
         chemin = chemin_du_disque(racine, rel, cache)
         if chemin_relatif_surveille(racine, chemin) != rel:  # d1-n5-forme
@@ -3155,7 +3175,8 @@ def reconcilier(racine, liste, tronquee, source=None):
     déjà référencés dans la fenêtre lue du journal et absents de la liste (`chemins_references_hors_liste` : une unité dont SUMMARY.md est apparu en est sortie), à la
     suite de la liste et dans le MÊME compteur d'octets, avec la même garde et le même traitement ; la liste rendue à SessionStart, elle, ne change pas. Un SUMMARY.md,
     VERDICT.md ou CLOTURE.md posé par Bash dans une telle unité est tracé `contournement` (source=reconciliation) et signalé. D1 reste une détection : aucune sortie ne
-    refuse (P461-D-05a)."""
+    refuse (P461-D-05a). Le coût de cette extension ne dépend pas du contenu du journal : une clé hors de la forme d'un chemin d'unité est écartée avant toute E/S
+    (fix-5b H1, audit-5b F-1), le SessionStart ne devient plus muet sous une ligne géante ou un `..`."""
     import hashlib
     anomalie = anomalie_journal(racine, source)  # d1-journal-etat : AVANT toute inscription (la première référence recrée un journal absent)
     entrees = lire_surveillance(racine)

@@ -48,6 +48,9 @@
 #            FileChanged : même règle, même ordre
 #   R-D1-23  (A5, 46.1-02, P461-D-05a) faux signaux MESURÉS sur des labs sains synthétiques : `MESURE-FAUX-SIGNAUX-A5 mkdir-copie=<n> git=<n> outil=<n> moteur=<n>` ; outil=0 et moteur=0 exigés,
 #            mkdir-copie et git égaux au nombre de fichiers d'unité présents qu'ils posent (au moins un chacun)
+#   R-D1-24  (H1, fix-5b, audit-5b F-1, P461-D-05) une clé du journal de D1 hors de la forme d'un chemin d'unité (130 000 composants, `..`, `.`, composant vide, 7 composants, nom d'unité hors
+#            NOM_UNITE, composant de 5 000 caractères) est écartée AVANT toute E/S (espion d'os.listdir, scandir, lstat, stat, open ; clé témoin conforme : des E/S vues) ; SessionStart sur un
+#            journal portant la ligne de 130 000 composants et la ligne `..` : code 0, stderr vide, `watchPaths` (avant : échéance du cœur, code 73, stdout vide)
 #   (A5) R-D1-16 (S3) compte désormais aussi la première observation du PLAN.md de la phase neuve (attendu changé par A5)
 #   Le cas de canary R-CANG-D1 vit dans la section `cang` de test-planning-gates.sh.
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
@@ -62,6 +65,7 @@
 #   la forme NFC désigne le même dossier, la suite rend `non applicable ici`), MUT-D1-JOURNAL-SIGNAL / -ETAT / -IRREGULIER / -DROITS / -ABSENT / -PREMIERE-SEANCE / -OUVERTURE
 #   (chaque contrôle d'`anomalie_journal` retiré seul, ou forcé -> R-D1-19 ; -OUVERTURE non applicable sans `chflags`).
 #   (46.1-02) MUT-D1-N5 (l'ajout des chemins déjà référencés retiré -> R-D1-21), MUT-D1-N5-PLAFOND (la garde d'octets de la liste retirée, éprouvée par le jumeau de plafond de R-D1-21).
+#   (fix-5b H1) MUT-D1-N5-FORME-CLE (le test de forme de la clé du journal retiré avant `chemin_du_disque` -> R-D1-24).
 #   (46.1-02) MUT-D1-A5 (la ligne de première observation ne rend plus que `reference` -> R-D1-22), MUT-D1-A5-RACINE (restriction aux fichiers d'unité retirée -> R-D1-22, jumeau STATE.md),
 #   MUT-D1-A5-RELU (drapeau « journal existant » recalculé après la première inscription -> R-D1-22, jumeau lab sans journal), MUT-D1-A5-ABSENT (sha `absent` plus exempté -> R-D1-22).
 # Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, moteur, mutants_moteur, reconciliation, mutants_reconciliation).
@@ -1858,6 +1862,88 @@ def controle_d1_23(ctx, script):
                           "lab sain synthétique : mkdir-copie=%d git=%d (un contournement par fichier d'unité présent posé : faux signaux attendus, nommés), outil=%d moteur=%d" % (mkdir_copie, git_n, outil, moteur))
 
 
+class EspionES(Exception):
+    """Levée par l'espion d'E/S de R-D1-24 à la première E/S sur autre chose que la racine du lab."""
+
+
+def espionner_es(espace, lab, cles, arreter):
+    """H1 (fix-5b) : appelle `chemins_references_hors_liste(lab, {clé: []}, [])` du corps Python chargé dans `espace`, en remplaçant PENDANT l'appel seulement os.listdir, os.scandir,
+    os.lstat, os.stat et os.open par des enregistreurs (os.path.realpath, exists, lexists passent par eux). Rend (E/S vues sur autre chose que la racine du lab : liste de (appel, chemin),
+    résultat ou None). `arreter` : la première E/S hors racine lève EspionES — une clé hostile de 130 000 composants irait jusqu'au bout en quelques secondes ; l'arrêt la montre sans l'attendre."""
+    noms = ("listdir", "scandir", "lstat", "stat", "open")
+    reels = {nom: getattr(os, nom) for nom in noms}
+    vues = []
+
+    def fabrique(nom):
+        def espion(chemin=".", *args, **kwargs):
+            cible = chemin if isinstance(chemin, str) else repr(chemin)
+            if cible != lab:
+                vues.append((nom, cible))
+                if arreter:
+                    raise EspionES(nom)
+            return reels[nom](chemin, *args, **kwargs)
+        return espion
+
+    for nom in noms:
+        setattr(os, nom, fabrique(nom))
+    try:
+        res = espace["chemins_references_hors_liste"](lab, {cle: [] for cle in cles}, [])
+    except EspionES:
+        res = None
+    finally:
+        for nom in noms:
+            setattr(os, nom, reels[nom])
+    return vues, res
+
+
+def controle_d1_24(ctx, script):
+    """H1 (fix-5b, audit-5b F-1, P461-D-05) : une clé du journal de D1 qui n'a pas la forme d'un chemin d'unité est écartée AVANT toute E/S disque, et le SessionStart n'en dépend plus.
+    (i) Espion structurel, sans horloge : `chemins_references_hors_liste` appelée sur chaque clé hostile (130 000 composants, `..` vers un vrai dossier hors du lab, `.` et composant vide,
+    7 composants, nom d'unité hors NOM_UNITE, composant de 5 000 caractères conforme à NOM_UNITE) ne fait AUCUNE E/S (listdir, scandir, lstat, stat, open) hors la racine du lab ; une clé
+    conforme d'une unité réelle (témoin) en fait et rend son chemin (l'espion n'est pas aveugle). (ii) Bout en bout : journal portant la ligne de 130 000 composants et la ligne `..` ->
+    SessionStart par la commande enregistrée : code 0, stderr vide, `watchPaths` (avant : l'échéance du cœur tombait, code 73, stdout vide)."""
+    dossier_juge = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_juge, "observe")
+    hook = os.path.join(dossier_juge, "planning-hook.sh")
+    espace = {"__name__": "d1_espion"}
+    exec(compile(corps_python(open(hook, encoding="utf-8").read()), hook, "exec"), espace)
+    fautes = []
+    lab = fabriquer_lab(ctx, "d1-24", ouvertes=("01-u",), closes=())
+    ecrire(os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-u", "SUMMARY.md"), "bilan de 01-u\n")
+    dehors = ctx.unique("d1-24-dehors")
+    ecrire(os.path.join(dehors, "SUMMARY.md"), "hors du lab\n")
+    base = ".planning/cycles/01-c/phases/"
+    hostiles = [
+        ("130 000 composants", "a/" * 130000 + "SUMMARY.md"),
+        ("`..` vers un dossier hors du lab", ".planning/../../" + os.path.basename(dehors) + "/SUMMARY.md"),
+        ("composant `.`", ".planning/cycles/./phases/01-u/SUMMARY.md"),
+        ("composant vide", ".planning/cycles//phases/01-u/SUMMARY.md"),
+        ("7 composants", base + "01-u/plans/SUMMARY.md"),
+        ("nom d'unité hors NOM_UNITE", base + "zz-u/SUMMARY.md"),
+        ("composant de 5 000 caractères conforme à NOM_UNITE", base + "01-" + "u" * 5000 + "/SUMMARY.md"),
+    ]
+    for libelle, cle in hostiles:
+        vues, _res = espionner_es(espace, lab, [cle], True)
+        if vues:
+            fautes.append("clé à %s : aucune E/S avant la validation de sa forme attendue — obtenu %s(%s)" % (libelle, vues[0][0], court(vues[0][1], 90)))
+    cle_temoin = base + "01-u/SUMMARY.md"
+    attendu_temoin = os.path.join(lab, *cle_temoin.split("/"))
+    vues_t, res_t = espionner_es(espace, lab, [cle_temoin], False)
+    if res_t != [attendu_temoin] or not any(chemin.endswith("01-u") for _appel, chemin in vues_t):
+        fautes.append("clé témoin (unité réelle) : son chemin rendu et des E/S vues sur l'unité attendus (jamais un vert à vide) — obtenu %s, %d E/S" % (res_t, len(vues_t)))
+    # (ii) bout en bout : la ligne géante et la ligne `..` dans le journal
+    lab_e = fabriquer_lab(ctx, "d1-24-bout", ouvertes=("01-u",), closes=())
+    modele = "2026-10-13T00:00:00Z  genre=reference  chemin=%s  sha256=%s  par=planning-hook.sh  source=reconciliation\n"
+    ecrire(chemin_journal(lab_e), (modele % (base + "01-u/PLAN.md", "a" * 64)) + (modele % (hostiles[0][1], "b" * 64)) + (modele % (hostiles[1][1], "c" * 64)))
+    rc, out, err = session(ctx, d, lab_e)
+    chemins, _doc = watch_paths(out)
+    if rc != 0 or err or chemins is None or not any(c.endswith("01-u/PLAN.md") for c in chemins):
+        fautes.append("SessionStart sur un journal à ligne de 130 000 composants et ligne `..` : code 0, stderr vide et watchPaths attendus — obtenu rc=%d, stdout %s, stderr %s" % (rc, court(out, 80) or "vide", court(err, 80) or "vide"))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "%d clés hostiles (130 000 composants, `..`, `.`, composant vide, 7 composants, nom hors NOM_UNITE, composant de 5 000 caractères) : aucune E/S avant la validation de la forme ; "
+                          "clé témoin : %d E/S vues et son chemin rendu ; SessionStart sur un journal à ligne de 130 000 composants et ligne `..` : code 0, stderr vide, watchPaths" % (len(hostiles), len(vues_t)))
+
+
 def original_de(ctx, ident, controle):
     """Résultat d'un contrôle sur le script réel, calculé une seule fois (les sections et les mutants lisent la même exécution)."""
     if ident not in ctx.originaux:
@@ -1954,6 +2040,7 @@ def sec_reconciliation(ctx):
     rendre("R-D1-21", "N-5 : un fichier d'unité posé hors séance dans une unité sortie de la liste est tracé", controle_d1_21, ctx)
     rendre("R-D1-22", "A5 : la première observation non expliquée d'un fichier d'unité, journal existant, est tracée puis référencée", controle_d1_22, ctx)
     rendre("R-D1-23", "A5 : faux signaux mesurés sur des labs sains synthétiques (mkdir-copie, git, outil, moteur)", controle_d1_23, ctx)
+    rendre("R-D1-24", "H1 : une clé du journal hors de la forme d'un chemin d'unité est écartée avant toute E/S", controle_d1_24, ctx)
 
 
 def sec_mutants_reconciliation(ctx):
@@ -1983,6 +2070,8 @@ def sec_mutants_reconciliation(ctx):
     # N-5 (46.1-02, P461-D-05) : l'ajout des chemins déjà référencés retiré ; la garde d'octets de la liste retirée, éprouvée cette fois par le jumeau de plafond de R-D1-21
     tuer(ctx, "D1-N5", "# d1-n5-journal", "supplement = []  # d1-n5-journal", "R-D1-21", controle_d1_21)
     tuer(ctx, "D1-N5-PLAFOND", "# d1-octets-exclus", "if False:  # d1-octets-exclus", "R-D1-21", controle_d1_21)
+    # H1 (fix-5b, audit-5b F-1) : le test de forme de la clé retiré -> une clé hors forme est suivie sur le disque (l'espion la voit, le SessionStart retombe muet)
+    tuer(ctx, "D1-N5-FORME-CLE", "# d1-n5-cle-forme", "if False:  # d1-n5-cle-forme", "R-D1-24", controle_d1_24)
     # A5 (46.1-02, P461-D-05) : la ligne de première observation ne rend plus que `reference` (le comportement d'avant A5) ; la restriction aux fichiers d'unité retirée
     # (STATE.md devient un contournement) ; le drapeau « journal existant » recalculé à l'usage, donc après la première inscription (un lab sans journal en pose dès le
     # second fichier) ; la règle « un sha absent reste une référence » retirée
