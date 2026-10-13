@@ -51,6 +51,8 @@
 #   R-D1-24  (H1, fix-5b, audit-5b F-1, P461-D-05) une clé du journal de D1 hors de la forme d'un chemin d'unité (130 000 composants, `..`, `.`, composant vide, 7 composants, nom d'unité hors
 #            NOM_UNITE, composant de 5 000 caractères) est écartée AVANT toute E/S (espion d'os.listdir, scandir, lstat, stat, open ; clé témoin conforme : des E/S vues) ; SessionStart sur un
 #            journal portant la ligne de 130 000 composants et la ligne `..` : code 0, stderr vide, `watchPaths` (avant : échéance du cœur, code 73, stdout vide)
+#   R-D1-25  (H3, fix-5b, revue-5b n°1, P461-D-05) N-5 ne hache jamais un fichier dont la forme résolue diffère de la clé : dossier d'unité référencée remplacé par un lien vers un dossier hors du lab
+#            qui porte un SUMMARY.md d'un autre contenu -> aucune ligne du journal de plus pour la clé, aucun signal, le fichier extérieur n'est jamais ouvert
 #   (A5) R-D1-16 (S3) compte désormais aussi la première observation du PLAN.md de la phase neuve (attendu changé par A5)
 #   Le cas de canary R-CANG-D1 vit dans la section `cang` de test-planning-gates.sh.
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
@@ -65,6 +67,7 @@
 #   la forme NFC désigne le même dossier, la suite rend `non applicable ici`), MUT-D1-JOURNAL-SIGNAL / -ETAT / -IRREGULIER / -DROITS / -ABSENT / -PREMIERE-SEANCE / -OUVERTURE
 #   (chaque contrôle d'`anomalie_journal` retiré seul, ou forcé -> R-D1-19 ; -OUVERTURE non applicable sans `chflags`).
 #   (46.1-02) MUT-D1-N5 (l'ajout des chemins déjà référencés retiré -> R-D1-21), MUT-D1-N5-PLAFOND (la garde d'octets de la liste retirée, éprouvée par le jumeau de plafond de R-D1-21).
+#   (fix-5b H3) MUT-D1-N5-FORME (la garde « forme résolue égale à la clé » retirée -> R-D1-25).
 #   (fix-5b H1) MUT-D1-N5-FORME-CLE (le test de forme de la clé du journal retiré avant `chemin_du_disque` -> R-D1-24).
 #   (46.1-02) MUT-D1-A5 (la ligne de première observation ne rend plus que `reference` -> R-D1-22), MUT-D1-A5-RACINE (restriction aux fichiers d'unité retirée -> R-D1-22, jumeau STATE.md),
 #   MUT-D1-A5-RELU (drapeau « journal existant » recalculé après la première inscription -> R-D1-22, jumeau lab sans journal), MUT-D1-A5-ABSENT (sha `absent` plus exempté -> R-D1-22).
@@ -1862,6 +1865,67 @@ def controle_d1_23(ctx, script):
                           "lab sain synthétique : mkdir-copie=%d git=%d (un contournement par fichier d'unité présent posé : faux signaux attendus, nommés), outil=%d moteur=%d" % (mkdir_copie, git_n, outil, moteur))
 
 
+def controle_d1_25(ctx, script):
+    """H3 (fix-5b, revue-5b n°1, P461-D-05) : N-5 ne hache JAMAIS un fichier dont la forme résolue diffère de la clé du journal. Lab dont l'unité `01-u` est référencée au journal (UNE
+    `reference` de sha connu pour son SUMMARY.md) puis REMPLACÉE par un lien vers un dossier HORS du lab qui porte un SUMMARY.md d'un autre contenu (le dossier d'unité en lien n'entre pas dans
+    la liste surveillée : seule N-5 le verrait). (i) SessionStart par la commande enregistrée : aucune ligne du journal pour cette clé en plus de la référence posée, aucun contournement, aucun
+    signal qui la nomme, le sha du fichier extérieur absent du journal ; (ii) en processus, espion d'os.open autour de `reconcilier` : le SUMMARY.md du dossier extérieur n'est jamais ouvert."""
+    dossier_juge = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_juge, "observe")
+    fautes = []
+    rel = ".planning/cycles/01-c/phases/01-u/SUMMARY.md"
+
+    def lab_en_lien(nom):
+        lab = fabriquer_lab(ctx, nom, ouvertes=("01-u",), closes=())
+        session(ctx, d, lab)
+        ajouter_ligne_journal(lab, "reference", rel, sha(b"ancien contenu de 01-u/SUMMARY.md\n"), "planning-hook.sh")
+        dehors = ctx.unique(nom + "-dehors")
+        ecrire(os.path.join(dehors, "SUMMARY.md"), "contenu d'un autre dossier, hors du lab\n")
+        unite = os.path.join(lab, ".planning", "cycles", "01-c", "phases", "01-u")
+        shutil.rmtree(unite)
+        os.symlink(dehors, unite)
+        return lab, dehors
+
+    # (i) par la commande enregistrée
+    lab, dehors = lab_en_lien("d1-25")
+    avant = [e for e in entrees_journal(lab) if e["chemin"] == rel]
+    rc, out, err = session(ctx, d, lab)
+    apres = [e for e in entrees_journal(lab) if e["chemin"] == rel]
+    sha_dehors = sha(open(os.path.join(dehors, "SUMMARY.md"), "rb").read())
+    signal = contexte_de(out)
+    if rc != 0 or err:
+        fautes.append("SessionStart : code 0 et stderr vide attendus — obtenu rc=%d %s" % (rc, court(err)))
+    if len(apres) != len(avant) or contournements(lab, rel) or any(e["sha"] == sha_dehors for e in entrees_journal(lab)):
+        fautes.append("dossier d'unité en lien hors du lab : aucune ligne de plus pour %s (ni contournement, ni sha du fichier extérieur) attendue — obtenu %d ligne(s) de plus, contournements %s" % (
+            rel, len(apres) - len(avant), [(e["source"], e["sha"][:12]) for e in contournements(lab, rel)]))
+    if isinstance(signal, str) and rel in signal:
+        fautes.append("aucun signal D1 ne doit nommer %s — obtenu %r" % (rel, signal))
+    # (ii) en processus : le fichier extérieur n'est jamais ouvert
+    lab_p, dehors_p = lab_en_lien("d1-25-processus")
+    hook = os.path.join(dossier_juge, "planning-hook.sh")
+    espace = {"__name__": "d1_h3"}
+    exec(compile(corps_python(open(hook, encoding="utf-8").read()), hook, "exec"), espace)
+    liste, tronquee = espace["chemins_surveilles"](lab_p)
+    ouverts, reel = [], os.open
+
+    def espion(chemin, *args, **kwargs):
+        ouverts.append(str(chemin))
+        return reel(chemin, *args, **kwargs)
+
+    os.open = espion
+    try:
+        espace["reconcilier"](lab_p, liste, tronquee)
+    finally:
+        os.open = reel
+    cible = os.path.join(dehors_p, "SUMMARY.md")
+    ouverts_cible = [c for c in ouverts if c in (cible, os.path.join(lab_p, *rel.split("/")))]
+    if ouverts_cible:
+        fautes.append("espion d'os.open : le SUMMARY.md du dossier extérieur ne doit jamais être ouvert — obtenu %s" % ouverts_cible)
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "dossier d'unité remplacé par un lien vers un dossier hors du lab : aucune ligne de plus au journal pour %s (aucun contournement, aucun signal, sha extérieur absent), "
+                          "et le SUMMARY.md extérieur n'est jamais ouvert" % rel)
+
+
 class EspionES(Exception):
     """Levée par l'espion d'E/S de R-D1-24 à la première E/S sur autre chose que la racine du lab."""
 
@@ -2041,6 +2105,7 @@ def sec_reconciliation(ctx):
     rendre("R-D1-22", "A5 : la première observation non expliquée d'un fichier d'unité, journal existant, est tracée puis référencée", controle_d1_22, ctx)
     rendre("R-D1-23", "A5 : faux signaux mesurés sur des labs sains synthétiques (mkdir-copie, git, outil, moteur)", controle_d1_23, ctx)
     rendre("R-D1-24", "H1 : une clé du journal hors de la forme d'un chemin d'unité est écartée avant toute E/S", controle_d1_24, ctx)
+    rendre("R-D1-25", "H3 : N-5 ne hache jamais un fichier dont la forme résolue diffère de la clé du journal", controle_d1_25, ctx)
 
 
 def sec_mutants_reconciliation(ctx):
@@ -2072,6 +2137,8 @@ def sec_mutants_reconciliation(ctx):
     tuer(ctx, "D1-N5-PLAFOND", "# d1-octets-exclus", "if False:  # d1-octets-exclus", "R-D1-21", controle_d1_21)
     # H1 (fix-5b, audit-5b F-1) : le test de forme de la clé retiré -> une clé hors forme est suivie sur le disque (l'espion la voit, le SessionStart retombe muet)
     tuer(ctx, "D1-N5-FORME-CLE", "# d1-n5-cle-forme", "if False:  # d1-n5-cle-forme", "R-D1-24", controle_d1_24)
+    # H3 (fix-5b, revue-5b n°1) : la garde « la forme résolue égale la clé » retirée (mutant du relecteur, qui survivait : 11 OK) -> le fichier d'un dossier en lien hors du lab est haché
+    tuer(ctx, "D1-N5-FORME", "# d1-n5-forme", "if False:  # d1-n5-forme", "R-D1-25", controle_d1_25)
     # A5 (46.1-02, P461-D-05) : la ligne de première observation ne rend plus que `reference` (le comportement d'avant A5) ; la restriction aux fichiers d'unité retirée
     # (STATE.md devient un contournement) ; le drapeau « journal existant » recalculé à l'usage, donc après la première inscription (un lab sans journal en pose dès le
     # second fichier) ; la règle « un sha absent reste une référence » retirée
