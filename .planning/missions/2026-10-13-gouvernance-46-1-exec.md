@@ -194,6 +194,17 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
     `test-rejeu-gates.sh rc=0` (101 OK), `RELEVE-CHAINE … coherence=ok` ×3, `etat-reference`
     `ecarts=0` ; constantes inchangées (G3 armé, G4 et G4′ en observation).
     **Checkpoint de la Tâche 2 atteint — en attente de Willy** (voir § Checkpoints en attente).
+12. **nonreg-5b — jalon 1** (geste du manager, P461-D-16) : `46.1-CONTROLES.sh toutes --contre-base`
+    détaché, lancé sur `9cbdf16e` (après fix-5b) : `TOUTES-BILAN suites=110 vertes=103 rouges=7
+    zero-ok=0 s=4752` ; les 7 rouges sont tous `rouge-sur-base=oui` (préexistants, verts en CI
+    Linux) ; `test-planning-hook-registered.sh`, rouge à la base sous charge, est **vert** ici
+    (rouge de base = instable de charge). Pendant le rejeu, le dépôt a reçu des commits de plans
+    (texte) et, à 00:49:33, le fast-forward de 46.1-04 Tâche 1 (`rejeu-gates.sh` et sa suite) : seul
+    la dernière minute du rejeu (suites `plugin/skill-creator`, `scripts/tests`) a tourné sur ces
+    fichiers ; les suites de `planning-core` ont tourné sur le code de `9cbdf16e`, et l'exécuteur de
+    04 a rejoué `test-rejeu-gates.sh` sur le code neuf (`rc=0`). `planning-hook.sh` et `hooks.json`
+    inchangés depuis `9cbdf16e`. Consigné dans `46.1-JALONS.txt` ; `46.1-CONTROLES.sh jalon 1` →
+    `JALON-VERIF 1 ok`.
 
 ## Checkpoints en attente (relayés à la session principale)
 

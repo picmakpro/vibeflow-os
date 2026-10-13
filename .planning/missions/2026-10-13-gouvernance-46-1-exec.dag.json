@@ -102,7 +102,7 @@
         "fix-5b"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "exec-04",
@@ -117,7 +117,7 @@
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "running"
+      "status": "ready"
     },
     {
       "id": "exec-05",
