@@ -16,8 +16,13 @@
 # Plan 57-11 : GW-AB (le guard d'un lab PLAT rend, sur une matrice de payloads, les mêmes stdout/stderr/code que la
 # copie gelée d'avant la phase, au bit près, deux régimes de verrou), GW-AB-INTEGRITE (T-57-40) et les mutants
 # GW-M-* (leur nombre est MUT_TOTAL, en tête de la section des mutants ; QUAL-01 : chaque comportement neuf du guard
-# rougit sous sa mutation, ensemble basculé exact), puis GW-AB-MUT (la matrice A/B contient une forme par garde de
-# partition).
+# rougit sous sa mutation, ensemble basculé exact), puis GW-AB-MUT (la règle de comparaison A/B peut rougir : un mutant
+# par comportement énuméré, et des mutants du lab plat sur des formes hors liste).
+#
+# 2026-10-13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q4 et Q5) : F-3 et R-5 s'étendent au lab plat,
+# et les contournements restants (globaux git à argument, wrappers à option-argument, bash -c, GIT_* posée dans un autre
+# segment) se ferment dans les DEUX régimes. GW-Q45-* (lab partitionné) en prouvent le verdict et le message ; GW-AB compare le
+# lab plat à la copie gelée sauf sur la liste énumérée GW_AB_ENUM (règle et traçage des empreintes : en tête de la section).
 #
 # Exit 0 si tout passe, 1 sinon, 2 si la fixture est cassée (préflight).
 
@@ -809,6 +814,120 @@ out="$(gb "$LAB" "cd $WORK_DIR && GIT_DIR=$LAB/.git GIT_WORK_TREE=$LAB git commi
 assert_empty "GW-ENVT-OUT-7 — le détenteur : stdout vide (discriminance)" "$out"
 
 echo
+echo "=== GW-Q45 — contournements fermés (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q5) : globaux git à argument, wrappers à option-argument, bash -c, affectation GIT_* d'un autre segment (lab partitionné) ==="
+# Chaque forme avait le verdict ALLOW avant la correction (rouge constaté : voir le rapport de la mission q45) ; elle a désormais
+# le verdict ET le message de sa forme canonique. Trois laboratoires : A (alpha tenu par autrui, alpha INDEXÉ : un commit à cible
+# certaine l'embarque, donc la reconnaissance du verbe suffit à refuser), U (index vide : seule la cible incertaine refuse),
+# O (alpha indexé, geste précédé d'un cd hors du lab : la décision « hors du lab »).
+q45_norm() { sed -E 's/depuis [0-9]+ min/depuis N min/g'; }
+nest_bashc() { python3 -c '
+import shlex, sys
+c = sys.argv[2]
+for _ in range(int(sys.argv[1])):
+    c = "bash -c " + shlex.quote(c)
+print(c)' "$1" "$2"; }
+q45_same() { # <id> <description> <lab> <commande> <canonique> : refus ET message identique à celui de la forme canonique
+  local o c
+  o="$(gb "$3" "$4" sess-B | q45_norm)"; c="$(gb "$3" "$5" sess-B | q45_norm)"
+  if [[ "$o" == *"$DENY"* && "$o" == "$c" ]]; then echo "  ✅ PASS — GW-Q45-$1 — $2 : deny, même message que la forme canonique"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-Q45-$1 — $2 : deny, même message que la forme canonique"; echo "     canonique: ${c:0:200}"; echo "     obtenu:    ${o:0:200}"; FAIL=$((FAIL+1)); fi
+}
+q45_unc() { # <id> <description> <lab> <commande> : refus d'une cible INCERTAINE (le motif ne porte aucun « Detail », comme celui de --git-dir=)
+  local o
+  o="$(gb "$3" "$4" sess-B)"
+  if [[ "$o" == *"$DENY"* && "$o" != *"Detail :"* ]]; then echo "  ✅ PASS — GW-Q45-$1 — $2 : deny, motif d'une cible incertaine (aucun détail de commit)"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-Q45-$1 — $2 : deny, motif d'une cible incertaine (aucun détail de commit)"; echo "     obtenu: ${o:0:300}"; FAIL=$((FAIL+1)); fi
+}
+q45_deny() { # <id> <description> <lab> <commande>
+  assert "GW-Q45-$1 — $2 : deny" "$(gb "$3" "$4" sess-B)" "$DENY"
+}
+q45_pass() { # <id> <description> <lab> <commande> [session]
+  assert_empty "GW-Q45-$1 — $2 : permis" "$(gb "$3" "$4" "${5:-sess-B}")"
+}
+LA="$(mk_lab q45a)"
+dl "$LA" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LA" "$LA/.planning/workstreams/alpha/STATE.md"; stage "$LA" .planning/workstreams/alpha/STATE.md
+q45_deny A0 "témoin : git commit -m x, alpha indexé et tenu par autrui" "$LA" 'git commit -m x'
+CAN='git commit -m x'
+q45_same A1 "git --namespace ns commit (deux jetons)" "$LA" 'git --namespace ns commit -m x' "$CAN"
+q45_same A2 "git --namespace=ns commit" "$LA" 'git --namespace=ns commit -m x' "$CAN"
+q45_same A3 "git --config-env a.b=HOME commit (deux jetons)" "$LA" 'git --config-env a.b=HOME commit -m x' "$CAN"
+q45_same A4 "git --config-env=a.b=HOME commit" "$LA" 'git --config-env=a.b=HOME commit -m x' "$CAN"
+q45_same A5 "git --attr-source HEAD commit (deux jetons)" "$LA" 'git --attr-source HEAD commit -m x' "$CAN"
+q45_same A6 "git --attr-source=HEAD commit" "$LA" 'git --attr-source=HEAD commit -m x' "$CAN"
+q45_same A7 "git --super-prefix=x commit" "$LA" 'git --super-prefix=x commit -m x' "$CAN"
+q45_same A8 "git -c a.b=c commit (existant)" "$LA" 'git -c a.b=c commit -m x' "$CAN"
+q45_same A9 "env -u FOO git commit" "$LA" 'env -u FOO git commit -m x' "$CAN"
+q45_same A10 "env --unset FOO git commit" "$LA" 'env --unset FOO git commit -m x' "$CAN"
+q45_same A11 "env -iu FOO git commit (option groupée)" "$LA" 'env -iu FOO git commit -m x' "$CAN"
+q45_same A12 "env -i git commit" "$LA" 'env -i git commit -m x' "$CAN"
+q45_same A13 "nice -n 5 git commit" "$LA" 'nice -n 5 git commit -m x' "$CAN"
+q45_same A14 "nice -5 git commit" "$LA" 'nice -5 git commit -m x' "$CAN"
+q45_same A15 "exec -a nm git commit" "$LA" 'exec -a nm git commit -m x' "$CAN"
+q45_same A16 "exec -c git commit" "$LA" 'exec -c git commit -m x' "$CAN"
+q45_same A17 "sudo -u root git commit" "$LA" 'sudo -u root git commit -m x' "$CAN"
+q45_same A18 "xargs -n 1 git commit" "$LA" 'xargs -n 1 git commit -m x' "$CAN"
+q45_same A19 "command git commit" "$LA" 'command git commit -m x' "$CAN"
+q45_same A20 "nohup git commit" "$LA" 'nohup git commit -m x' "$CAN"
+q45_same A21 "time git commit" "$LA" 'time git commit -m x' "$CAN"
+q45_same A22 "bash -c \"git commit\"" "$LA" 'bash -c "git commit -m x"' "$CAN"
+q45_same A23 "sh -c 'git commit'" "$LA" "sh -c 'git commit -m x'" "$CAN"
+q45_same A24 "zsh -c \"git commit\"" "$LA" 'zsh -c "git commit -m x"' "$CAN"
+q45_same A25 "bash -lc \"git commit\" (option groupée)" "$LA" 'bash -lc "git commit -m x"' "$CAN"
+q45_same A26 "bash -ec 'git commit'" "$LA" "bash -ec 'git commit -m x'" "$CAN"
+q45_same A27 "/bin/bash -c \"git add -A && git commit\"" "$LA" '/bin/bash -c "git add -A && git commit -m x"' 'git add -A && git commit -m x'
+q45_same A28 "sudo bash -c \"git commit\"" "$LA" 'sudo bash -c "git commit -m x"' "$CAN"
+q45_same A29 "bash -c dans bash -c (2 niveaux)" "$LA" "$(nest_bashc 2 'git commit -m x')" "$CAN"
+q45_same A30 "bash -c à 3 niveaux (lu en entier)" "$LA" "$(nest_bashc 3 'git commit -m x')" "$CAN"
+q45_same A31 "env FOO=1 bash -c \"git commit\"" "$LA" 'env FOO=1 bash -c "git commit -m x"' "$CAN"
+q45_deny C1 "bash -c à 4 niveaux (au-delà de la profondeur lue : refus grossier, git commit-like)" "$LA" "$(nest_bashc 4 'git commit -m x')"
+q45_deny C2 "bash -c à 6 niveaux (git commit-like)" "$LA" "$(nest_bashc 6 'git commit -m x')"
+q45_pass P1 "bash -c \"git status\" (aucun geste concerné)" "$LA" 'bash -c "git status"'
+q45_pass P2 "bash release.sh (script du dépôt, hors de portée nommée)" "$LA" 'bash release.sh'
+q45_pass P3 "bash -c \"echo hi\"" "$LA" 'bash -c "echo hi"'
+q45_pass P4 "4 niveaux de bash -c autour d'un echo (aucun git commit-like)" "$LA" "$(nest_bashc 4 'echo hi')"
+q45_pass P5 "eval \"git commit\" (interprétation indirecte, hors de portée nommée)" "$LA" 'eval "git commit -m x"'
+q45_pass P6 "timeout 5 git commit (wrapper non reconnu, hors de portée nommée)" "$LA" 'timeout 5 git commit -m x'
+q45_pass H1 "env -u FOO git commit : le détenteur" "$LA" 'env -u FOO git commit -m x' sess-A
+q45_pass H2 "bash -c \"git commit\" : le détenteur" "$LA" 'bash -c "git commit -m x"' sess-A
+LU="$(mk_lab q45u)"
+dl "$LU" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+q45_pass U0 "témoin : index vide, git commit -m x" "$LU" 'git commit -m x'
+q45_same U0c "git --git-dir .git commit (deux jetons)" "$LU" 'git --git-dir .git commit -m x' 'git --git-dir=.git commit -m x'
+q45_unc U1 "git --git-dir .git commit (deux jetons) : cible incertaine" "$LU" 'git --git-dir .git commit -m x'
+q45_unc U2 "git --work-tree . commit (deux jetons) : cible incertaine" "$LU" 'git --work-tree . commit -m x'
+q45_unc U3 "env -C . git commit : cible incertaine" "$LU" 'env -C . git commit -m x'
+q45_unc U4 "env --chdir . git commit : cible incertaine" "$LU" 'env --chdir . git commit -m x'
+q45_unc U5 "export GIT_INDEX_FILE=… ; git commit (autre segment)" "$LU" 'export GIT_INDEX_FILE=/tmp/x; git commit -m x'
+q45_unc U6 "export GIT_DIR=… && git commit (autre segment)" "$LU" 'export GIT_DIR=/tmp/x && git commit -m x'
+q45_unc U7 "GIT_DIR=… ; git commit (affectation seule)" "$LU" 'GIT_DIR=/tmp/x; git commit -m x'
+q45_unc U8 "declare -x GIT_WORK_TREE=… ; git commit" "$LU" 'declare -x GIT_WORK_TREE=/tmp/x; git commit -m x'
+q45_unc U9 "GIT_DIR=… bash -c \"git commit\" (variable héritée par le shell fils)" "$LU" 'GIT_DIR=.git bash -c "git commit -m x"'
+q45_unc U10 "export GIT_DIR=… ; bash -c \"git commit\"" "$LU" 'export GIT_DIR=/tmp/x; bash -c "git commit -m x"'
+q45_unc U11 "bash -c \"export GIT_DIR=… ; git commit\" (posée dans la chaîne)" "$LU" 'bash -c "export GIT_DIR=/tmp/x; git commit -m x"'
+q45_unc U12 "export GIT_DIR=… ; bash -c dans bash -c" "$LU" "export GIT_DIR=/tmp/x; $(nest_bashc 2 'git commit -m x')"
+q45_pass V1 "export FOO=1 ; git commit (variable étrangère : aucune classe de refus nouvelle)" "$LU" 'export FOO=1; git commit -m x'
+q45_pass V2 "git commit ; export GIT_DIR=… (posée APRÈS le geste)" "$LU" 'git commit -m x; export GIT_DIR=/tmp/x'
+q45_pass V3 "bash -c \"git commit\" ; export GIT_DIR=… (l'héritage suit la position)" "$LU" 'bash -c "git commit -m x"; export GIT_DIR=/tmp/x'
+q45_pass V4 "bash -c \"git commit\" sans variable, index vide" "$LU" 'bash -c "git commit -m x"'
+q45_pass V5 "git --namespace ns commit, index vide (le global ne déplace pas la cible)" "$LU" 'git --namespace ns commit -m x'
+q45_pass V6 "nice -n 5 git commit, index vide" "$LU" 'nice -n 5 git commit -m x'
+q45_pass H3 "export GIT_INDEX_FILE=… ; git commit : le détenteur" "$LU" 'export GIT_INDEX_FILE=/tmp/x; git commit -m x' sess-A
+LO="$(mk_lab q45o)"
+dl "$LO" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LO" "$LO/.planning/workstreams/alpha/STATE.md"; stage "$LO" .planning/workstreams/alpha/STATE.md
+q45_pass O1 "cd <hors lab> && bash -c \"git commit\" (même verdict que la forme canonique)" "$LO" "cd $WORK_DIR && bash -c \"git commit -m x\""
+q45_pass O2 "cd <hors lab> && env -u FOO git commit" "$LO" "cd $WORK_DIR && env -u FOO git commit -m x"
+q45_pass O3 "cd <hors lab> && nice -n 5 git --no-pager commit" "$LO" "cd $WORK_DIR && nice -n 5 git --no-pager commit -m x"
+q45_pass O4 "bash -c \"cd <hors lab> && git commit\"" "$LO" "bash -c \"cd $WORK_DIR && git commit -m x\""
+q45_pass O5 "cd <hors lab> && git --namespace ns commit (le global ne déplace pas la cible)" "$LO" "cd $WORK_DIR && git --namespace ns commit -m x"
+q45_unc O6 "cd <hors lab> && env -C . git commit : cible incertaine" "$LO" "cd $WORK_DIR && env -C . git commit -m x"
+q45_unc O7 "cd <hors lab> && export GIT_INDEX_FILE=… && git commit" "$LO" "cd $WORK_DIR && export GIT_INDEX_FILE=$LO/.git/index && git commit -m x"
+q45_unc O8 "cd <hors lab> && GIT_DIR=… bash -c \"git commit\"" "$LO" "cd $WORK_DIR && GIT_DIR=$LO/.git bash -c \"git commit -m x\""
+q45_unc O9 "cd <hors lab> && git --git-dir <p> commit (deux jetons)" "$LO" "cd $WORK_DIR && git --git-dir $LO/.git commit -m x"
+q45_deny O10 "bash -c \"cd <hors lab>\" ; git commit (le cd d'un shell fils ne bouge pas l'appelant)" "$LO" "bash -c \"cd $WORK_DIR\"; git commit -m x"
+
+echo
 echo "=== GW-C-POS — un pathspec POSITIONNEL de commit compte comme pathspec (doute = union ; correction R-3 c) ==="
 LAB="$(mk_lab cpos)"
 dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
@@ -959,7 +1078,22 @@ assert_empty "GW-SUB-7 — cwd portant son PROPRE .planning (P57-D-29, hors pér
 
 if [ "$GW_MODE" = full ]; then
 echo
-echo "=== GW-AB — lab PLAT : la copie gelée du guard d'avant la phase et le guard courant rendent la MÊME transcription, octet pour octet (P57-D-03, P57-D-22) ==="
+echo "=== GW-AB — lab PLAT : la copie gelée du guard d'avant la phase et le guard courant rendent la MÊME transcription, octet pour octet, SAUF sur la liste ÉNUMÉRÉE des formes nouvellement refusées (P57-D-03, P57-D-22 ; Q4 du 2026-10-13) ==="
+# RÉFÉRENCE REFAITE le 2026-10-13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q4 : « étends F-3 au lab plat.
+# Refais proprement la référence de comparaison au bit près, en traçant l'ancienne et la nouvelle empreinte »). Forme choisie : la
+# copie gelée d'avant la phase RESTE la référence (pas de seconde copie à entretenir) ; ce qui change est la RÈGLE de comparaison.
+#   - Empreinte de la référence (git hash-object de fixtures/guard-driver-lock-pre-cff1e2a.sh) : ANCIENNE 4d48e50c993520079052f9f2b4c5bc1a5619ba1b,
+#     NOUVELLE 4d48e50c993520079052f9f2b4c5bc1a5619ba1b (inchangée : GW_AB_BLOB plus bas, GW-AB-INTEGRITE.*).
+#   - Empreinte du guard courant (git hash-object de guard-driver-lock.sh) : ANCIENNE 5d949965bf62000eac0a37830322a657bdb66a9b (fc28dabf),
+#     NOUVELLE 543d36b85c8510fbaa8b20e537f59b8316adbfe0 (mission q45, 2026-10-13 ; elle change à chaque correction du guard, ce n'est pas
+#     une épingle de la suite : la référence gelée en est une).
+#   - Règle : la transcription du guard courant est identique à celle de la copie gelée, passage par passage, SAUF les passages
+#     « tenu/<identifiant>.B » (session non détentrice, verrou tenu) des identifiants de GW_AB_ENUM ; sur ces passages, la copie gelée LAISSE
+#     PASSER et le guard courant REFUSE (GW-AB.enum-*). Aucune autre divergence n'est tolérée : ni dans un autre état de verrou (aucun, périmé,
+#     sans session_ids, sans meta), ni pour le détenteur (.A), ni sur une forme hors liste.
+# La liste est ÉPINGLÉE par son effectif (GW_AB_ENUM_N) : l'allonger pour absorber un écart exige de modifier le nombre, donc la ligne.
+GW_AB_ENUM="noarg-commit noarg-reset exec-commit env-out g2-gitdir-sp g2-worktree-sp g2-namespace-sp g2-namespace-eq g2-configenv-sp g2-configenv-eq g2-attrsrc-sp g2-attrsrc-eq g2-superprefix-eq wr-env-u wr-env-unset wr-env-iu wr-env-C wr-nice-n wr-exec-a wr-exec-c wr-sudo-u wr-xargs-n sh-bash sh-sh sh-zsh sh-bash-lc sh-nested2 sh-nested4 sh-sudo sh-envprefix ex-out-index ex-out-declare ex-out-assign ex-shell-inherit ex-out-sh ex-out-shell-env ex-out-shell-export"
+GW_AB_ENUM_N=37
 # Référence : copie gelée du guard d'avant la Phase 57 (dernier commit cff1e2af qui touchait le script), jamais
 # modifiée. Les deux copies sont posées dans un dossier jetable À CÔTÉ d'une copie de vf-portable.sh (le locator du
 # guard cherche d'abord $(dirname $0)/vf-portable.sh) : elles s'exécutent dans les mêmes conditions. Même matrice de
@@ -988,6 +1122,11 @@ def bash(cmd, sid, cwd=None):
 def write(fp, content, sid, tool="Write"):
     ti = {"file_path": fp, "content": content} if tool == "Write" else {"file_path": fp, "old_string": "a", "new_string": content}
     return {"tool_name": tool, "tool_input": ti, "session_id": sid, "cwd": lab}
+def nest(n, c):  # n niveaux de bash -c, guillemetage produit par shlex.quote (jamais a la main)
+    import shlex
+    for _ in range(n):
+        c = "bash -c " + shlex.quote(c)
+    return c
 out = []
 for sid in ("sess-B", "sess-A"):
     s = sid[-1]
@@ -1008,9 +1147,8 @@ for sid in ("sess-B", "sess-A"):
         ("cd-other." + s, bash("cd " + other + " && git commit -m x", sid)),
         ("gitC-other." + s, bash("git -C " + other + " commit -m x", sid)),
         ("popd." + s, bash("popd && git commit -m x", sid)),
-        # Formes reconnues SEULEMENT en lab partitionne (F-3, R-5) : le lab plat doit les lire comme avant la phase
-        # (un global sans argument, exec, un prefixe GIT_*=, y compris devant un cd hors du lab). Retirer la garde de
-        # partition de l une d elles rend cette transcription DIFFERENTE (GW-AB-MUT).
+        # Formes que le lab plat lisait autrement avant le 2026-10-13 (F-3, R-5 et contournements de Q5) : voir la liste
+        # ENUMEREE GW_AB_ENUM plus bas ; les autres restent identiques a la copie gelee (GW-AB.*).
         ("noarg-commit." + s, bash("git --no-pager commit -am x", sid)),
         ("noarg-reset." + s, bash("git -p reset --hard", sid)),
         ("exec-commit." + s, bash("exec git commit -am x", sid)),
@@ -1021,6 +1159,63 @@ for sid in ("sess-B", "sess-A"):
         ("chain." + s, bash("echo a; git add -A && git commit -m x", sid)),
         ("heredoc." + s, bash("cat > f <<EOF\nx\nEOF\ngit commit -m x", sid)),
         ("ls." + s, bash("ls -la", sid)),
+        # Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 (Q4, Q5) : globaux git a argument, wrappers a
+        # option-argument, bash -c, affectation GIT_* d un autre segment. Les formes dont le verdict change en lab plat
+        # sont dans GW_AB_ENUM ; les autres sont des TEMOINS (formes voisines, reconnues ou non, qui ne bougent pas).
+        ("g2-gitdir-sp." + s, bash("git --git-dir .git commit -m x", sid)),
+        ("g2-gitdir-eq." + s, bash("git --git-dir=.git commit -m x", sid)),
+        ("g2-worktree-sp." + s, bash("git --work-tree . commit -m x", sid)),
+        ("g2-namespace-sp." + s, bash("git --namespace ns commit -m x", sid)),
+        ("g2-namespace-eq." + s, bash("git --namespace=ns commit -m x", sid)),
+        ("g2-configenv-sp." + s, bash("git --config-env a.b=HOME commit -m x", sid)),
+        ("g2-configenv-eq." + s, bash("git --config-env=a.b=HOME commit -m x", sid)),
+        ("g2-attrsrc-sp." + s, bash("git --attr-source HEAD commit -m x", sid)),
+        ("g2-attrsrc-eq." + s, bash("git --attr-source=HEAD commit -m x", sid)),
+        ("g2-superprefix-eq." + s, bash("git --super-prefix=x commit -m x", sid)),
+        ("g2-superprefix-sp." + s, bash("git --super-prefix commit -m x", sid)),
+        ("g2-c." + s, bash("git -c a.b=c commit -m x", sid)),
+        ("g2-C." + s, bash("git -C . commit -m x", sid)),
+        ("g2-execpath." + s, bash("git --exec-path x commit -m x", sid)),
+        ("wr-env-u." + s, bash("env -u FOO git commit -m x", sid)),
+        ("wr-env-unset." + s, bash("env --unset FOO git commit -m x", sid)),
+        ("wr-env-iu." + s, bash("env -iu FOO git commit -m x", sid)),
+        ("wr-env-C." + s, bash("env -C . git commit -m x", sid)),
+        ("wr-env-i." + s, bash("env -i git commit -m x", sid)),
+        ("wr-nice-n." + s, bash("nice -n 5 git commit -m x", sid)),
+        ("wr-nice-N." + s, bash("nice -5 git commit -m x", sid)),
+        ("wr-exec-a." + s, bash("exec -a nm git commit -m x", sid)),
+        ("wr-exec-c." + s, bash("exec -c git commit -m x", sid)),
+        ("wr-sudo-u." + s, bash("sudo -u root git commit -m x", sid)),
+        ("wr-xargs-n." + s, bash("xargs -n 1 git commit -m x", sid)),
+        ("wr-command." + s, bash("command git commit -m x", sid)),
+        ("wr-nohup." + s, bash("nohup git commit -m x", sid)),
+        ("wr-time." + s, bash("time git commit -m x", sid)),
+        ("wr-timeout." + s, bash("timeout 5 git commit -m x", sid)),
+        ("wr-env-S." + s, bash("env -S 'git commit -m x'", sid)),
+        ("sh-bash." + s, bash("bash -c \"git commit -m x\"", sid)),
+        ("sh-sh." + s, bash("sh -c 'git commit -m x'", sid)),
+        ("sh-zsh." + s, bash("zsh -c \"git commit -m x\"", sid)),
+        ("sh-bash-lc." + s, bash("bash -lc \"git commit -m x\"", sid)),
+        ("sh-bash-add." + s, bash("bash -c \"git add -A && git commit -m x\"", sid)),
+        ("sh-nested2." + s, bash("bash -c \"bash -c \\\"git commit -m x\\\"\"", sid)),
+        ("sh-nested4." + s, bash(nest(4, "git commit -m x"), sid)),
+        ("sh-nested4-nogit." + s, bash(nest(4, "echo hi"), sid)),
+        ("sh-sudo." + s, bash("sudo bash -c \"git commit -m x\"", sid)),
+        ("sh-envprefix." + s, bash("GIT_DIR=.git bash -c \"git commit -m x\"", sid)),
+        ("sh-cd-other." + s, bash("cd " + other + " && bash -c \"git commit -m x\"", sid)),
+        ("sh-nogesture." + s, bash("bash -c \"git status\"", sid)),
+        ("sh-script." + s, bash("bash release.sh", sid)),
+        ("sh-eval." + s, bash("eval \"git commit -m x\"", sid)),
+        ("ex-index." + s, bash("export GIT_INDEX_FILE=/tmp/x; git commit -m x", sid)),
+        ("ex-out-index." + s, bash("cd " + other + " && export GIT_INDEX_FILE=/tmp/x && git commit -m x", sid)),
+        ("ex-out-declare." + s, bash("cd " + other + " && declare -x GIT_DIR=/tmp/x && git commit -m x", sid)),
+        ("ex-out-assign." + s, bash("cd " + other + " && GIT_DIR=/tmp/x && git commit -m x", sid)),
+        ("ex-out-plain." + s, bash("cd " + other + " && export FOO=1 && git commit -m x", sid)),
+        ("ex-shell-inherit." + s, bash("export GIT_DIR=/tmp/x; bash -c \"git commit -m x\"", sid)),
+        ("ex-out-shell-env." + s, bash("cd " + other + " && GIT_DIR=/tmp/x bash -c \"git commit -m x\"", sid)),
+        ("ex-out-shell-export." + s, bash("cd " + other + " && export GIT_DIR=/tmp/x && bash -c \"git commit -m x\"", sid)),
+        ("ex-out-wr." + s, bash("cd " + other + " && env -u FOO git commit -m x", sid)),
+        ("ex-out-sh." + s, bash("cd " + other + " && env -C . git commit -m x", sid)),
         ("marker-commit." + s, bash("git commit -m x # vibeflow:allow-lock-override", sid)),
         ("w-planning." + s, write(lab + "/.planning/STATE.md", "x", sid)),
         ("w-planning-rel." + s, write(".planning/STATE.md", "x", sid)),
@@ -1058,6 +1253,7 @@ gw_ab_norm() { sed -E -e 's/depuis [0-9]+ min/depuis N min/g'; }
 # gw_ab_pass <guard> <VF_DRIVER_LOCK ou vide> <fichier de transcription normalisée>
 gw_ab_pass() {
   local g="$1" lockv="$2" out="$3" lab="$GWAB/lab" other="$GWAB/other" raw="$GWAB/raw" lockpath m
+  local mx="${GW_AB_MATRIX:-$GWAB/matrix.txt}" states=" ${GW_AB_STATES:-aucun tenu perime sans-session-ids sans-meta} "
   rm -rf "$lab" "$other"; mkdir -p "$lab/.planning" "$other/.planning"
   printf '# projet\n' > "$lab/.planning/PROJECT.md"
   printf -- '---\nstatus: active\n---\n' > "$lab/.planning/STATE.md"
@@ -1073,19 +1269,19 @@ gw_ab_pass() {
     while IFS=$'\x1f' read -r id payload; do
       ( cd "$lab" && if [ -n "$lockv" ]; then export VF_DRIVER_LOCK="$lockv"; fi; printf '%s' "$payload" | "$BASH_BIN" "$g" ) >"$GWAB/so" 2>"$GWAB/se"; rc=$?
       { echo "### $1/$id rc=$rc"; echo "--- stdout"; cat "$GWAB/so"; echo "--- stderr"; cat "$GWAB/se"; } >> "$raw"
-    done < "$GWAB/matrix.txt"
+    done < "$mx"
   }
   gw_ab_dl() { ( cd "$lab" && export CLAUDE_CODE_SESSION_ID=sess-A && if [ -n "$lockv" ]; then export VF_DRIVER_LOCK="$lockv"; fi; "$FROZEN_DL" "$@" ) >/dev/null 2>&1; }
-  gw_ab_play aucun
+  case "$states" in *" aucun "*) gw_ab_play aucun ;; esac
   gw_ab_dl acquire --owner=m1 --step=s1
   [ -f "$m" ] || echo "### FIXTURE CASSÉE : le verrou n'a pas été posé" >> "$raw"
-  gw_ab_play tenu
+  case "$states" in *" tenu "*) gw_ab_play tenu ;; esac
   sed 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
-  gw_ab_play perime
+  case "$states" in *" perime "*) gw_ab_play perime ;; esac
   sed -e "s/^heartbeat_epoch=.*/heartbeat_epoch=$(date +%s)/" -e '/^session_ids=/d' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
-  gw_ab_play sans-session-ids
+  case "$states" in *" sans-session-ids "*) gw_ab_play sans-session-ids ;; esac
   rm -f "$m"
-  gw_ab_play sans-meta
+  case "$states" in *" sans-meta "*) gw_ab_play sans-meta ;; esac
   gw_ab_norm < "$raw" > "$out"
 }
 
@@ -1097,7 +1293,36 @@ gw_ab_first_divergence() { # <A> <B> : première ligne divergente (awk : jamais 
   awk 'NR==FNR{a[FNR]=$0; na=FNR; next} {nb=FNR; if(!(FNR in a) || a[FNR]!=$0){print "ligne " FNR " : A=[" a[FNR] "] B=[" $0 "]"; found=1; exit}} END{if(!found && na!=nb) print "longueurs différentes : A=" na " B=" nb}' "$1" "$2"
 }
 
+# gw_ab_strip <transcription> : la transcription SANS les passages « tenu/<identifiant>.B » de la liste énumérée. awk : un bloc
+# commence à « ### » et dure jusqu au « ### » suivant.
+gw_ab_strip() {
+  awk -v ids="$GW_AB_ENUM" 'BEGIN{n=split(ids,a," "); for(i=1;i<=n;i++) skip["tenu/" a[i] ".B"]=1}
+       /^### /{split($2,h," "); on=!($2 in skip)} on{print}' "$1"
+}
+# gw_ab_check <transcription gelée> <transcription courante> : rend 0 si la règle tient, sinon 1 et écrit GW_AB_WHY.
+#   (1) hors passages énumérés, les deux transcriptions sont identiques au bit près (cmp -s) ;
+#   (2) chaque passage énuméré PRÉSENT dans la transcription : stdout vide côté gelé (laisse passer), refus côté courant.
+GW_AB_WHY=""
+gw_ab_check() { # <gelée> <courante> [noenum : sous-matrice sans forme énumérée, le vert à vide ne s applique pas]
+  local fz="$1" cu="$2" id n=0 seen=0
+  gw_ab_strip "$fz" > "$GWAB/strip-fz.txt"; gw_ab_strip "$cu" > "$GWAB/strip-cu.txt"
+  if ! cmp -s "$GWAB/strip-fz.txt" "$GWAB/strip-cu.txt"; then
+    GW_AB_WHY="divergence HORS liste énumérée : $(gw_ab_first_divergence "$GWAB/strip-fz.txt" "$GWAB/strip-cu.txt")"; return 1
+  fi
+  for id in $GW_AB_ENUM; do
+    grep -q "^### tenu/$id.B rc=" "$cu" || continue
+    seen=$((seen+1))
+    if [ -n "$(gw_ab_stdout "$fz" "tenu/$id.B")" ]; then GW_AB_WHY="$id : la copie gelée REFUSE déjà (la forme n est pas nouvelle, la liste est fausse)"; return 1; fi
+    if ! gw_ab_stdout "$cu" "tenu/$id.B" | grep -q '"permissionDecision": "deny"'; then GW_AB_WHY="$id : le guard courant ne refuse pas cette forme énumérée"; return 1; fi
+  done
+  [ "$seen" -gt 0 ] || [ "${3:-}" = noenum ] || { GW_AB_WHY="aucun passage énuméré dans la transcription (vert à vide)"; return 1; }
+  GW_AB_WHY="$seen formes énumérées refusées, le reste identique"; return 0
+}
+
 gw_ab_ok=1
+GW_AB_N=$(printf '%s\n' $GW_AB_ENUM | wc -l | tr -d ' ')
+[ "$GW_AB_N" = "$GW_AB_ENUM_N" ]; assert_exit "GW-AB.enum-effectif — la liste énumérée porte exactement $GW_AB_ENUM_N formes (obtenu $GW_AB_N)" "$?" 0
+[ "$(printf '%s\n' $GW_AB_ENUM | sort | uniq -d | wc -l | tr -d ' ')" = 0 ]; assert_exit "GW-AB.enum-unique — aucun identifiant en double dans la liste énumérée" "$?" 0
 if [ -f "$FROZEN_GUARD" ]; then
   for mode in "VF_DRIVER_LOCK posé:.planning/alt/DRIVER.lock" "chemin par défaut:"; do
     label="${mode%%:*}"; lockv="${mode#*:}"
@@ -1113,43 +1338,72 @@ if [ -f "$FROZEN_GUARD" ]; then
     else
       assert_exit "GW-AB.témoin — la transcription de référence ($label) est vide ou incomplète" 1 0
     fi
-    if cmp -s "$GWAB/ab-frozen.txt" "$GWAB/ab-current.txt"; then
-      assert_exit "GW-AB.$label — copie gelée et guard courant : transcriptions identiques ($(grep -c '^### ' "$GWAB/ab-frozen.txt") passages)" 0 0
+    [ "$(grep -c '^### ' "$GWAB/ab-frozen.txt")" = "$(grep -c '^### ' "$GWAB/ab-current.txt")" ]; assert_exit "GW-AB.$label — même nombre de passages ($(grep -c '^### ' "$GWAB/ab-frozen.txt"))" "$?" 0
+    if gw_ab_check "$GWAB/ab-frozen.txt" "$GWAB/ab-current.txt"; then
+      assert_exit "GW-AB.$label — copie gelée et guard courant : transcriptions identiques hors liste énumérée ($GW_AB_WHY)" 0 0
     else
-      assert_exit "GW-AB.$label — transcriptions DIFFÉRENTES" 1 0
-      echo "     première divergence : $(gw_ab_first_divergence "$GWAB/ab-frozen.txt" "$GWAB/ab-current.txt")"
+      assert_exit "GW-AB.$label — transcriptions DIFFÉRENTES hors règle" 1 0
+      echo "     $GW_AB_WHY"
       gw_ab_ok=0
     fi
+    cp "$GWAB/ab-frozen.txt" "$GWAB/ab-frozen-$([ -n "$lockv" ] && echo posé || echo défaut).txt"
   done
 else
   assert_exit "GW-AB — la copie gelée $FROZEN_GUARD est absente" 1 0
   gw_ab_ok=0
 fi
-if [ "$gw_ab_ok" = 1 ]; then echo "  A/B guard lab plat : IDENTIQUE"; else echo "  A/B guard lab plat : DIFFÉRENT"; fi
+if [ "$gw_ab_ok" = 1 ]; then echo "  A/B guard lab plat : IDENTIQUE hors liste énumérée ($GW_AB_ENUM_N formes)"; else echo "  A/B guard lab plat : DIFFÉRENT"; fi
 
-# GW-AB-MUT (réserve S1 de la revue Phase 57) : la matrice A/B du lab plat doit CONTENIR au moins un payload par forme
-# reconnue seulement en lab partitionné. Preuve : retirer la garde de partition de l'une d'elles (copie mutée du guard
-# courant) rend la transcription DIFFÉRENTE de la copie gelée. Un seul régime (chemin par défaut) par mutant.
-gw_ab_mut() { # <id> <ancre BRE> <expression sed s>
-  local id="$1" anchor="$2" expr="$3" d="$GWAB/abmut-$1" n
+# GW-AB-MUT (réserve S1 de la revue Phase 57, refaite le 2026-10-13 avec la règle énumérée) : la règle de comparaison doit
+# POUVOIR rougir. Chaque mutant est une copie du guard courant ; sa transcription est comparée à celle de la copie gelée par
+# gw_ab_check, sur une sous-matrice (états « tenu » seul, identifiants nommés .A et .B) : la règle doit ÉCHOUER.
+#   - famille « énumérée » : le mutant retire la lecture d une forme énumérée (le guard courant ne la refuse plus) ;
+#   - famille « hors liste » (iii) : le mutant change le comportement du lab plat sur une forme NON énumérée (la copie gelée
+#     la lisait autrement) -> divergence hors liste.
+gw_ab_mut() { # <id> <identifiants de la sous-matrice, séparés par des espaces> <ancre BRE> <expression sed s> <famille: enum|hors-liste>
+  local id="$1" ids="$2" anchor="$3" expr="$4" fam="$5" d="$GWAB/abmut-$1" n sub saved_enum
   mkdir -p "$d"; cp "$PORTABLE" "$d/vf-portable.sh"; cp "$GWAB/current/guard-driver-lock.sh" "$d/guard-driver-lock.sh"
   n="$(grep -c -e "$anchor" "$d/guard-driver-lock.sh")"
   if [ "$n" != "1" ]; then assert_exit "GW-AB-MUT-$id — ancre non unique ($n occurrences de [$anchor])" 1 0; return; fi
   sed -i.bak -e "/$anchor/$expr" "$d/guard-driver-lock.sh"; rm -f "$d/guard-driver-lock.sh.bak"
   if cmp -s "$d/guard-driver-lock.sh" "$GWAB/current/guard-driver-lock.sh"; then assert_exit "GW-AB-MUT-$id — mutant NON OPPOSABLE : la substitution n'a rien changé" 1 0; return; fi
-  gw_ab_pass "$d/guard-driver-lock.sh" "" "$d/ab.txt"
-  gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "" "$d/ab-frozen.txt"
-  if [ -s "$d/ab.txt" ] && ! cmp -s "$d/ab-frozen.txt" "$d/ab.txt"; then
-    assert_exit "GW-AB-MUT-$id — garde de partition retirée : la transcription A/B DIFFÈRE de la copie gelée (la matrice contient la forme)" 0 0
-    echo "     première divergence : $(gw_ab_first_divergence "$d/ab-frozen.txt" "$d/ab.txt")"
+  if ! bash -n "$d/guard-driver-lock.sh" 2>/dev/null; then assert_exit "GW-AB-MUT-$id — le mutant n'est pas un script valide (il rougirait pour la mauvaise raison)" 1 0; return; fi
+  sub="$d/matrix-sub.txt"; : > "$sub"
+  for one in $ids; do grep -F "$(printf '%s.A\037' "$one")" "$GWAB/matrix.txt" >> "$sub"; grep -F "$(printf '%s.B\037' "$one")" "$GWAB/matrix.txt" >> "$sub"; done
+  [ -s "$sub" ] || { assert_exit "GW-AB-MUT-$id — sous-matrice vide (identifiants inconnus : $ids)" 1 0; return; }
+  GW_AB_MATRIX="$sub" GW_AB_STATES="tenu" gw_ab_pass "$d/guard-driver-lock.sh" "" "$d/ab.txt"
+  GW_AB_MATRIX="$sub" GW_AB_STATES="tenu" gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "" "$d/ab-frozen.txt"
+  # Témoin de la sous-matrice : le guard NON muté la satisfait (sinon le mutant rougirait pour la mauvaise raison).
+  local need=""; [ "$fam" = enum ] || need=noenum
+  GW_AB_MATRIX="$sub" GW_AB_STATES="tenu" gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "" "$d/ab-ok.txt"
+  gw_ab_check "$d/ab-frozen.txt" "$d/ab-ok.txt" $need; assert_exit "GW-AB-MUT-$id.0 — témoin : le guard non muté satisfait la règle sur la sous-matrice ($GW_AB_WHY)" "$?" 0
+  if [ -s "$d/ab.txt" ] && ! gw_ab_check "$d/ab-frozen.txt" "$d/ab.txt" $need; then
+    assert_exit "GW-AB-MUT-$id — mutant tué : la règle de comparaison ROUGIT ($GW_AB_WHY)" 0 0
   else
-    assert_exit "GW-AB-MUT-$id — garde de partition retirée : la transcription A/B reste IDENTIQUE (aucun payload de la forme dans la matrice)" 1 0
+    assert_exit "GW-AB-MUT-$id — la règle de comparaison reste VERTE sous ce mutant ($GW_AB_WHY)" 1 0
   fi
 }
 if [ -f "$FROZEN_GUARD" ]; then
-  gw_ab_mut noarg 'elif PARTITIONED and t in NOARG_GIT_GLOBALS:' 's@elif PARTITIONED and t in@elif t in@'
-  gw_ab_mut exec 'if os.path.basename(t) in WRAPPERS or (PARTITIONED and os.path.basename(t) == "exec"):' 's@or (PARTITIONED and os.path.basename(t) == "exec"):@or os.path.basename(t) == "exec":@'
-  gw_ab_mut env 'if PARTITIONED and env_target_uncertain(seg\[:idx\]):' 's@if PARTITIONED and env_target_uncertain@if env_target_uncertain@'
+  # famille énumérée : un mutant par comportement neuf du lab plat
+  gw_ab_mut noarg "noarg-commit noarg-reset" 'elif t in NOARG_GIT_GLOBALS:' 's@elif t in NOARG_GIT_GLOBALS:@elif False:@' enum
+  gw_ab_mut exec "exec-commit wr-exec-a wr-exec-c" 'or os.path.basename(t) == "exec":' 's@ or os.path.basename(t) == "exec":@:@' enum
+  gw_ab_mut env-out "env-out ex-out-sh" 'if persist or env_target_uncertain(seg\[:idx\]):' 's@if persist or env_target_uncertain(seg\[:idx\]):@if persist:@' enum
+  gw_ab_mut persist-out "ex-out-index ex-out-declare ex-out-assign" 'if persist or env_target_uncertain(seg\[:idx\]):' 's@if persist or env_target_uncertain@if env_target_uncertain@' enum
+  gw_ab_mut persist "ex-out-index ex-out-declare ex-out-assign" 'ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]' 's@ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]@ts = []@' enum
+  gw_ab_mut argglobals "g2-gitdir-sp g2-worktree-sp g2-namespace-sp g2-configenv-sp g2-attrsrc-sp" '^GIT_ARG_GLOBALS = {' 's@^GIT_ARG_GLOBALS = {@GIT_ARG_GLOBALS = set(); GIT_ARG_UNUSED = {@' enum
+  gw_ab_mut eqglobals "g2-namespace-eq g2-configenv-eq g2-attrsrc-eq g2-superprefix-eq" 'elif t.startswith(GIT_EQ_GLOBALS):' 's@elif t.startswith(GIT_EQ_GLOBALS):@elif t.startswith(("--git-dir=", "--work-tree=", "--exec-path=")):@' enum
+  gw_ab_mut wrapperopts "wr-env-u wr-env-unset wr-env-iu wr-nice-n wr-sudo-u wr-xargs-n wr-exec-a" '^WRAPPER_ARG_OPTS = {' 's@^WRAPPER_ARG_OPTS = {@WRAPPER_ARG_OPTS = {}; WAO_UNUSED = {@' enum
+  gw_ab_mut env-chdir "wr-env-C ex-out-sh" 'if b == "env" and any(' 's@if b == "env" and any(@if False and any(@' enum
+  gw_ab_mut shells "sh-bash sh-sh sh-zsh sh-bash-lc sh-nested2 sh-sudo" '^SHELLS = {' 's@^SHELLS = {@SHELLS = set(); SH_UNUSED = {@' enum
+  gw_ab_mut coarse "sh-nested4" 'return re.search(r' 's@return re.search(@return None and re.search(@' enum
+  gw_ab_mut inherit "ex-out-shell-env ex-out-shell-export" 'inn, cnt = outside_scan(c, root, base, depth + 1, persist or env_target_uncertain(seg\[:idx\]))' 's@depth + 1, persist or env_target_uncertain(seg\[:idx\]))@depth + 1, False)@' enum
+  # famille hors liste (iii) : changements du lab plat sur des formes que la copie gelée lisait autrement et que la liste ne contient pas
+  gw_ab_mut hl-worktree-add "wt-add" 'continue  # exemption nomm.*e : porte de sortie prescrite' 's@continue  # exemption nomm.*$@return True@' hors-liste
+  gw_ab_mut hl-nohup "wr-nohup" '^WRAPPERS = ' 's@"nohup", @@' hors-liste
+  gw_ab_mut hl-tag "tag" '^MUTATING_GIT_VERBS = ' 's@, "tag"@@' hors-liste
+  gw_ab_mut hl-superprefix-sp "g2-superprefix-sp" '"--no-lazy-fetch", "--no-advice", "--bare"}' 's@"--bare"}@"--bare", "--super-prefix"}@' hors-liste
+  gw_ab_mut hl-export-plain "ex-out-plain" 'ts\[1:\]' 's@return any(ENV_TARGET_RE.match(t) for t in ts\[1:\])@return True@' hors-liste
+  gw_ab_mut hl-shell-outside "sh-cd-other" '^                    if inn:$' 's@if inn:@if True:@' hors-liste
 fi
 
 # Intégrité de la copie gelée (T-57-40, correction R-7). Empreinte ÉPINGLÉE dans la suite : le blob git de
@@ -1181,7 +1435,7 @@ echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-target_noar
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=31; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=40; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 # a : GW-C-INC-1/2 (corrections F-3, R-5, C3) : sans -z, « .planning/workstreams\n » ne se lit plus comme le chemin incertain
@@ -1195,7 +1449,7 @@ MUT_E="GW-T-EXEMPT-1=1"
 MUT_F="GW-ENVT-9.1=1 GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
 # g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
 # g : GW-C-INC-3, GW-ENVT-7, GW-ENVT-OUT-7, GW-F3-17 (détenteur, discriminance des cas ajoutés)
-MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
+MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-Q45-H1=1 GW-Q45-H2=1 GW-Q45-H3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
 # h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
 MUT_H="GW-C4-2=1 GW-C4-3=1 GW-MARK-W-4=1 GW-Q-PASS=1 GW-SUB-2=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
 MUT_I="GW-C-REL-tenu=2"
@@ -1207,7 +1461,7 @@ MUT_L="GW-W-LEG-1=1 GW-W-LEG-2=1"
 # discrimine le comportement, rien d'autre (GW-T-C-1b est le cas voisin de GW-T-C-1 qui isole la cible incertaine)
 MUT_M="GW-TTL-1=1 GW-TTL-2=1 GW-TTL-3=1"
 # n : GW-ENVT-8 compare le message de GW-ENVT-1 à celui de --git-dir= ; GW-ENVT-OUT-3 compare celui de la forme hors lab
-MUT_N="GW-ENVT-8=1 GW-ENVT-OUT-3=1 GW-T-C-1b=1 GW-UNC-1=1 GW-UNC-2=1 GW-UNC-3=1"
+MUT_N="GW-ENVT-8=1 GW-ENVT-OUT-3=1 GW-Q45-O9=1 GW-Q45-U0c=1 GW-Q45-U1=1 GW-Q45-U2=1 GW-T-C-1b=1 GW-UNC-1=1 GW-UNC-2=1 GW-UNC-3=1"
 MUT_O="GW-C-POS-1=1 GW-C-POS-2=1"
 MUT_P="GW-C-CASE-1=1"
 MUT_Q="GW-C-GEN-2=1 GW-C-GEN-3=1 GW-C-GEN-4=1"
@@ -1230,12 +1484,30 @@ MUT_PSB="GW-C-PSB-1=1 GW-C-PSB-2=1 GW-C-PSB-3=1 GW-C-PSB-4=1"
 MUT_INC="GW-C-INC-1=1 GW-C-INC-2=1"
 MUT_TOP="GW-C-NOGITBIN-4=1"
 # (GW-ENVT-OUT-3 : le message de la forme --git-dir= hors lab porte « le commit embarque », celui du préfixe, sans la source, non)
-MUT_ENVT="GW-ENVT-1=1 GW-ENVT-2=1 GW-ENVT-3=1 GW-ENVT-4=1 GW-ENVT-5=1 GW-ENVT-8=1 GW-ENVT-9.2=1 GW-ENVT-OUT-3=1"
+MUT_ENVT="GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1 GW-ENVT-1=1 GW-ENVT-2=1 GW-ENVT-3=1 GW-ENVT-4=1 GW-ENVT-5=1 GW-ENVT-8=1 GW-ENVT-9.2=1 GW-ENVT-OUT-3=1"
 # envt_outside (AUD-1) : le préfixe GIT_*= du même segment ne rend plus la cible incertaine pour la décision « hors du lab »
-MUT_ENVOUT="GW-ENVT-OUT-1=1 GW-ENVT-OUT-3=1 GW-ENVT-OUT-4=1 GW-ENVT-OUT-5=1"
+MUT_ENVOUT="GW-Q45-O6=1 GW-ENVT-OUT-1=1 GW-ENVT-OUT-3=1 GW-ENVT-OUT-4=1 GW-ENVT-OUT-5=1"
 MUT_NOARG="GW-F3-1=1 GW-F3-2=1 GW-F3-3=1 GW-F3-4=1 GW-F3-5=1 GW-F3-7=1 GW-F3-8=1 GW-F3-9=1 GW-F3-10=1 GW-F3-11=1 GW-F3-12=1 GW-F3-13=1 GW-F3-14=1 GW-F3-15=1 GW-F3-21=1"
-MUT_EXEC="GW-F3-15=1 GW-F3-6=1"
+MUT_EXEC="GW-F3-15=1 GW-F3-6=1 GW-Q45-A15=1 GW-Q45-A16=1"
 MUT_TARGET="GW-F3-18=1"
+# q_* (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q5) : un mutant par comportement neuf ; ensembles mesurés puis relus.
+# q_argglobals = les globaux git à argument en DEUX jetons ne sont plus sautés ; q_eqglobals = leur forme `=` non plus ; q_wrapperopts = les
+# wrappers (env -u, nice -n, exec -a, sudo -u, xargs -n) ne sautent plus l'argument de leur option ; q_shells = bash/sh/zsh -c ne sont plus lus ;
+# q_coarse = au-delà de la profondeur lue, plus de refus grossier ; q_persist = export/declare/affectation seule GIT_* ne rend plus la suite
+# incertaine ; q_inherit = le shell fils n'hérite plus de la variable GIT_* du préfixe ou d'un segment précédent ; q_envchdir = env -C/--chdir ne
+# rend plus la cible incertaine ; q_outside_shell = une chaîne bash -c est toujours dans le lab pour la décision « hors du lab ».
+# Lectures : O9 (git --git-dir <p> hors lab) bascule aussi sous n et q_argglobals, parce que sa preuve est le motif SANS « Detail » d'une cible
+# incertaine ; O8 bascule sous q_inherit pour la même raison (le geste devient certain, il embarque alpha, le motif porte un « Detail ») ;
+# A27 (git add -A && git commit dans bash -c) ne bascule PAS sous q_shells : le découpage historique en lit une moitié, même motif.
+MUT_QARG="GW-Q45-A1=1 GW-Q45-A3=1 GW-Q45-A5=1 GW-Q45-O9=1 GW-Q45-U0c=1 GW-Q45-U1=1 GW-Q45-U2=1"
+MUT_QEQ="GW-Q45-A2=1 GW-Q45-A4=1 GW-Q45-A6=1 GW-Q45-A7=1"
+MUT_QWRAP="GW-Q45-A10=1 GW-Q45-A11=1 GW-Q45-A13=1 GW-Q45-A15=1 GW-Q45-A17=1 GW-Q45-A18=1 GW-Q45-A9=1 GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1"
+MUT_QSHELL="GW-Q45-A22=1 GW-Q45-A23=1 GW-Q45-A24=1 GW-Q45-A25=1 GW-Q45-A26=1 GW-Q45-A28=1 GW-Q45-A29=1 GW-Q45-A30=1 GW-Q45-A31=1 GW-Q45-C1=1 GW-Q45-C2=1 GW-Q45-O4=1 GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U9=1"
+MUT_QCOARSE="GW-Q45-C1=1 GW-Q45-C2=1"
+MUT_QPERSIST="GW-Q45-O7=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U5=1 GW-Q45-U6=1 GW-Q45-U7=1 GW-Q45-U8=1"
+MUT_QINHERIT="GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U12=1 GW-Q45-U9=1"
+MUT_QENVCD="GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1"
+MUT_QOUTSH="GW-Q45-O1=1 GW-Q45-O4=1"
 gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
   awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
 }
@@ -1361,13 +1633,23 @@ mutant toplevel_none 'raise Unreadable("rev-parse --show-toplevel")' 's@raise Un
 # envt_none (R-5) : l'affectation GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= ne rend plus la cible incertaine
 mutant envt_none 'unc = unc or env_target_uncertain(toks\[:idx\])' 's@unc = unc or env_target_uncertain(toks\[:idx\])@unc = unc@' "$MUT_ENVT"
 # envt_outside (AUD-1) : le préfixe GIT_*= du même segment est ignoré par la décision « geste hors du lab »
-mutant envt_outside 'if PARTITIONED and env_target_uncertain(seg\[:idx\]):' 's@if PARTITIONED and env_target_uncertain(seg\[:idx\]):@if False:@' "$MUT_ENVOUT"
+mutant envt_outside 'if persist or env_target_uncertain(seg\[:idx\]):' 's@if persist or env_target_uncertain(seg\[:idx\]):@if persist:@' "$MUT_ENVOUT"
 # noarg_blind (F-3) : l'ensemble des globaux sans argument est vide
 mutant noarg_blind '^NOARG_GIT_GLOBALS = {' 's@NOARG_GIT_GLOBALS = {@NOARG_GIT_GLOBALS = set(); NOARG_UNUSED = {@' "$MUT_NOARG"
 # exec_blind (F-3) : exec n'est plus un wrapper
-mutant exec_blind 'os.path.basename(t) == "exec"' 's@(PARTITIONED and os.path.basename(t) == "exec")@False@' "$MUT_EXEC"
+mutant exec_blind 'or os.path.basename(t) == "exec":' 's@ or os.path.basename(t) == "exec":@:@' "$MUT_EXEC"
 # target_noarg (F-3) : la cible d'un geste ne saute plus les globaux sans argument
 mutant target_noarg 'elif noarg_global(t):' 's@elif noarg_global(t):@elif False:@' "$MUT_TARGET"
+# q_* : un mutant par comportement neuf de la correction du 2026-10-13
+mutant q_argglobals '^GIT_ARG_GLOBALS = {' 's@^GIT_ARG_GLOBALS = {@GIT_ARG_GLOBALS = set(); GIT_ARG_UNUSED = {@' "$MUT_QARG"
+mutant q_eqglobals 'elif t.startswith(GIT_EQ_GLOBALS):' 's@elif t.startswith(GIT_EQ_GLOBALS):@elif t.startswith(("--git-dir=", "--work-tree=", "--exec-path=")):@' "$MUT_QEQ"
+mutant q_wrapperopts '^WRAPPER_ARG_OPTS = {' 's@^WRAPPER_ARG_OPTS = {@WRAPPER_ARG_OPTS = {}; WAO_UNUSED = {@' "$MUT_QWRAP"
+mutant q_shells '^SHELLS = {' 's@^SHELLS = {@SHELLS = set(); SH_UNUSED = {@' "$MUT_QSHELL"
+mutant q_coarse 'return re.search(r' 's@return re.search(@return None and re.search(@' "$MUT_QCOARSE"
+mutant q_persist 'ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]' 's@ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]@ts = []@' "$MUT_QPERSIST"
+mutant q_inherit 'out.append((c, persist or env_target_uncertain(cur\[:idx\])))' 's@out.append((c, persist or env_target_uncertain(cur\[:idx\])))@out.append((c, False))@' "$MUT_QINHERIT"
+mutant q_envchdir 'if b == "env" and any(' 's@if b == "env" and any(@if False and any(@' "$MUT_QENVCD"
+mutant q_outside_shell '^                    if inn:$' 's@if inn:@if True:@' "$MUT_QOUTSH"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
