@@ -43,6 +43,8 @@
 #             cycle, noms voisins jamais jugés ; lab dev : octet vide
 #   R-G4-05   dérogation G4 sur le chemin du SUMMARY.md (usage unique) ; erreur interne injectée : armée deny, observe ligne d'observation
 #   R-G4-06   aucun refus de G3 ou de G4 ne porte le chemin absolu du lab, « no such file » ni « can't open »
+#   R-G4-07   (46.1-01, P461-D-01) copie armée : exemption étroite de la réécriture — un SUMMARY.md qui existe déjà en fichier régulier (lstat du chemin tel
+#             qu'écrit) d'une unité sans VERDICT.md ni CLOTURE.md (au sens lexists) se réécrit par Write, Edit, NotebookEdit (famille A) ; sa création reste refusée (G)
 #   R-FORME-01 `unite_de_fichier` du hook et `forme_unite` de poser-verdict.sh rendent la même unité sur un lot de chemins (copies ast chargées du texte)
 #   BANC      fixtures/cloture-banc.txt : onze labs adhérents et leurs onze jumeaux `-dev`, chaque écriture rejouée sur copie armée ; COUVERTURE G3, G4 (au moins
 #             quatre doit-refuser et quatre doit-passer réellement joués par gate) ; COMPTE G3, COMPTE G4 : faux-refus=0 faux-accept=0
@@ -72,6 +74,7 @@
 #   appel direct), MUT-DEROG-VERROU (`consommer` lit au-delà), MUT-D1-LECTURE-HACHAGE (le compteur de `empreinte_fichier` retiré) -> R-JOURNAUX-BORNES ;
 #   MUT-PLAN-G2-BORNE est RE-CIBLÉ (tour 2) : le défaut de `lire_frontmatter_fichier` valant désormais BORNE_LECTURE_PLAN, retirer la borne explicite est
 #   devenu un mutant ÉQUIVALENT ; il relâche la borne (2 * BORNE_LECTURE_PLAN) et reste tué par R-PLAN-BORNE-G2 ;
+#   MUT-G4-REECRITURE (l'exemption de la réécriture rendue sans effet -> R-G4-07) ;
 #   MUT-G4-ABSENT, MUT-G4-ECHEC, MUT-G4-PLAFOND-MESSAGE (F6, fix-46-c) (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
@@ -1715,6 +1718,50 @@ def controle_g4_06(ctx, script):
                           "%d refus de G3 et de G4 : ni chemin absolu du lab, ni « no such file », ni « can't open »" % n)
 
 
+def _lab_reecriture(ctx, nom, **kw):
+    """Lab adhérent de forme modèle dont l'unité porte un livrable présent et un SUMMARY.md RÉGULIER déjà écrit (la réécriture de P461-D-01) ; `fichiers`
+    s'ajoute, jamais ne remplace."""
+    fich = {LIVRABLE: "contenu\n", SUMMARY: "Résumé déjà écrit.\n"}
+    fich.update(kw.pop("fichiers", None) or {})
+    return fabriquer_lab(ctx, nom, fichiers=fich, **kw)
+
+
+def controle_g4_07(ctx, script):
+    """Copie armée, exemption étroite de la réécriture (P461-D-01) : le SUMMARY.md qui existe déjà en fichier régulier (lstat du chemin tel qu'écrit) d'une
+    unité sans VERDICT.md ni CLOTURE.md (au sens lexists) se réécrit par Write, Edit et NotebookEdit (famille A) ; sa CRÉATION reste refusée (famille G)."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "armed")
+    fautes = []
+
+    def passe(nom, lab, outil, rel=SUMMARY):
+        rc, out, err = ecrire_dans(ctx, d, lab, outil, rel)
+        v = classer(rc, out)
+        if v not in ("silence", "avertit") or err:
+            fautes.append("%s %s : passage attendu, obtenu %s %s" % (nom, outil, v, raison_de(out) if v == "deny" else court(out)))
+        elif v == "avertit" and "G4" in contexte_de(out):
+            fautes.append("%s %s : un avertissement parle de G4 : %s" % (nom, outil, court(out)))
+
+    def refuse(nom, lab, outil, attendu, rel=SUMMARY):
+        bon, detail, raison = _refus_g4(ctx, d, lab, outil, rel)
+        if not bon:
+            fautes.append("%s %s : refus attendu, obtenu %s" % (nom, outil, detail))
+        elif not raison.startswith("[planning-core] G4 : " + attendu):
+            fautes.append("%s %s : la raison ne commence pas par « %s » : %s" % (nom, outil, attendu, raison))
+        else:
+            fautes.extend("%s %s : %s" % (nom, outil, f) for f in fautes_de_message(raison, lab))
+
+    # A. réécriture, ni VERDICT.md ni CLOTURE.md : passage pour les trois outils
+    lab = _lab_reecriture(ctx, "g4-07-a")
+    for outil in ("Write", "Edit", "NotebookEdit"):
+        passe("A réécriture sans verdict ni clôture", lab, outil)
+    # G. création : jugée
+    lab = fabriquer_lab(ctx, "g4-07-g", fichiers={LIVRABLE: "contenu\n"})
+    for outil in ("Write", "Edit", "NotebookEdit"):
+        refuse("G création sans verdict", lab, outil, "aucun VERDICT.md")
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "réécriture d'un SUMMARY.md régulier d'une unité sans verdict ni clôture : passage pour Write, Edit, NotebookEdit ; création : UN deny "
+                          "« [planning-core] G4 : aucun VERDICT.md » pour les trois outils")
+
+
 # =================================================================================================
 # R-FORME-01 : la forme d'unité du hook et celle de la commande de pose sont la même règle
 # =================================================================================================
@@ -2284,7 +2331,8 @@ def sec_g4(ctx):
             ("R-G4-03", controle_g4_03, "copie armée, verdict périmé (livrable, plan, hash_livrables retiré, livrable supprimé)"),
             ("R-G4-04", controle_g4_04, "copie armée, jumeaux qui passent"),
             ("R-G4-05", controle_g4_05, "dérogation et erreur interne"),
-            ("R-G4-06", controle_g4_06, "aucun chemin absolu, « no such file » ni « can't open » dans un refus de G3 ou de G4")):
+            ("R-G4-06", controle_g4_06, "aucun chemin absolu, « no such file » ni « can't open » dans un refus de G3 ou de G4"),
+            ("R-G4-07", controle_g4_07, "copie armée, réécriture d'un SUMMARY.md existant : exemption étroite (P461-D-01)")):
         bon, detail = original_de(ctx, ident, ctrl)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
@@ -2339,6 +2387,7 @@ def sec_mutants_g4(ctx):
     tuer(ctx, "G4-PLAFOND-MESSAGE", "# g4-plafond-atteint", "if False:  # g4-plafond-atteint", "R-G4-02", controle_g4_02)  # F6
     tuer(ctx, "G4-HASH", "# g4-hash-plan", "if False:  # g4-hash-plan", "R-G4-03", controle_g4_03)
     tuer(ctx, "G4-HASH-LIVRABLES", "# g4-hash-livrables", 'if statut_emp != "ok":  # g4-hash-livrables', "R-G4-03", controle_g4_03)
+    tuer(ctx, "G4-REECRITURE", "# g4-exempt-retour", "pass  # g4-exempt-retour", "R-G4-07", controle_g4_07)
     tuer(ctx, "G4-FAILOPEN", "# protege-erreur",
          'return [] if gate == "G4" else [Verdict(gate, None, "erreur interne du gate : " + type(exc).__name__)]  # protege-erreur', "R-G4-05", controle_g4_05)
 

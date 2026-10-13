@@ -1883,7 +1883,11 @@ def evaluer_g3(contexte):
 # absent, illisible, de plus de 1 Mio (BORNE_LECTURE_PLAN, A11) ou sans `ecrit:` valide refuse aussi, comme un VERDICT.md de plus de 1 Mio
 # (BORNE_LECTURE_FICHIER, A11, classe). Même
 # ordre que le recalcul (R6, puis E, puis R7) : un verdict périmé se re-juge avant qu'on lise ses constats. Le prédicat est réévalué à
-# CHAQUE écriture : retoucher le SUMMARY.md d'une unité close reste permis tant que le verdict tient. Les empreintes viennent de la copie
+# CHAQUE écriture : retoucher le SUMMARY.md d'une unité close reste permis tant que le verdict tient. Exemption étroite (P461-D-01 ; Willy,
+# AskUserQuestion session principale, 2026-10-07) : la RÉÉCRITURE d'un SUMMARY.md qui existe déjà en fichier régulier (lstat du chemin tel
+# qu'écrit, jamais du chemin résolu : un lien, un dossier ou un tube est une création) dans une unité qui n'a ni VERDICT.md ni CLOTURE.md
+# (au sens `lexists` : un lien, même pendant, compte comme présent) n'est pas jugée ; sa création l'est toujours, et une unité qui porte un
+# VERDICT.md ou un CLOTURE.md reste jugée comme ci-dessus. Les empreintes viennent de la copie
 # partagée du bloc (jamais d'une réécriture) ; un SUMMARY.md de toute autre forme n'est jamais jugé.
 RAISON_G4_PLAN = "PLAN.md de l'unité absent, illisible ou sans ecrit: valide — l'unité est indéterminée au modèle, le verdict ne peut pas être vérifié"
 RAISON_G4_VERDICT_BORNE = ("VERDICT.md de l'unité au-delà de %d octets (BORNE_LECTURE_FICHIER) : non lu — le verdict ne peut pas être vérifié, "
@@ -1924,6 +1928,10 @@ def evaluer_g4(contexte):
     chemin_rel = "/".join(composants)
     dossier = os.path.join(racine, *unite)
     verdict = os.path.join(dossier, "VERDICT.md")
+    if est_fichier_regulier(contexte["ecrit"]):  # g4-exempt-regulier
+        if not os.path.lexists(verdict):  # g4-exempt-verdict
+            if not os.path.lexists(os.path.join(dossier, "CLOTURE.md")):  # g4-exempt-cloture
+                return []  # g4-exempt-retour
     if not os.path.lexists(verdict):  # g4-verdict-absent
         return [Verdict("G4", chemin_rel, "aucun VERDICT.md : faites juger l'unité (poser-verdict.sh)")]
     statut, donnees = lire_frontmatter_fichier(verdict)
