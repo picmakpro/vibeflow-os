@@ -2975,18 +2975,31 @@ def entrees_par_chemin(entrees):
     return groupes
 
 
-def decider_trace(entrees, sha):
+def decider_trace(entrees, sha, journal_existant=False, rel=None):
     """Lignes que le fichier dont `entrees` sont les lignes du journal (dans l'ordre), de sha256 courant `sha` (`absent` s'il n'existe pas),
     appelle au journal. Règle d'explication, déterministe : sans référence antérieure, la première observation pose la référence sans
-    contournement (limite (ba)) ; un sha égal à celui de la dernière référence n'est pas un changement (rien à inscrire : un événement répété ne se
-    compte pas deux fois) ; un changement est EXPLIQUÉ s'il existe, APRÈS la dernière référence du chemin, une ligne `moteur` de sha `sha` (une
-    écriture du moteur, journalisée par son écrivain) ou une ligne `intention` (une écriture par outil que le hook a laissée passer) — une intention
-    n'explique qu'UN changement, puisque la référence qui suit la dépasse. Expliqué : `reference` seule ; sinon `contournement` puis `reference`."""
+    contournement (limite (ba)) — sauf la règle A5 ci-dessous ; un sha égal à celui de la dernière référence n'est pas un changement (rien à inscrire : un
+    événement répété ne se compte pas deux fois) ; un changement est EXPLIQUÉ s'il existe, APRÈS la dernière référence du chemin, une ligne `moteur` de sha
+    `sha` (une écriture du moteur, journalisée par son écrivain) ou une ligne `intention` (une écriture par outil que le hook a laissée passer) — une intention
+    n'explique qu'UN changement, puisque la référence qui suit la dépasse. Expliqué : `reference` seule ; sinon `contournement` puis `reference`.
+
+    Règle A5 (46.1-02, P461-D-05 ; Willy, AskUserQuestion session principale, 2026-10-12, « (a) N-5 et A5 (Recommandé) ») : quand le journal EXISTE déjà
+    (`journal_existant`, calculé UNE fois par l'appelant avant toute inscription : au moins une ligne lue), la première observation d'un fichier d'UNITÉ (`rel` : un
+    des quatre noms de FICHIERS_UNITE_SURVEILLES) PRÉSENT (sha ≠ `absent`) qu'aucune ligne `moteur` de même sha ni `intention` n'explique est un `contournement`
+    — puis la `reference` de même sha, qui devient la nouvelle base et ne remplace jamais le contournement. Un fichier absent, un fichier racine du dossier de
+    planning, tout fichier d'un lab sans journal restent une `reference` silencieuse. Faux signaux connus, nommés et mesurés (R-D1-23) : une unité créée par `mkdir` et
+    copie, une unité livrée par git (`git pull`, `git checkout`, `git merge`) : D1 ne voit pas d'où vient un fichier. Un journal tronqué à 0 octet vaut « journal absent »
+    (limite (bn))."""
     derniere = None
     for rang, entree in enumerate(entrees):
         if entree["genre"] == "reference":
             derniere = rang
     if derniere is None:
+        unite = rel is not None and rel.rsplit("/", 1)[-1] in FICHIERS_UNITE_SURVEILLES  # d1-a5-unite
+        present = sha != "absent"  # d1-a5-absent
+        expliquee = any((e["genre"] == "moteur" and e["sha"] == sha) or e["genre"] == "intention" for e in entrees)
+        if journal_existant and unite and present and not expliquee:
+            return ["contournement", "reference"]  # d1-premiere-observation
         return ["reference"]
     if entrees[derniere]["sha"] == sha:
         return []
@@ -2995,10 +3008,10 @@ def decider_trace(entrees, sha):
     return ["reference"] if expliquee else ["contournement", "reference"]  # d1-contournement
 
 
-def tracer_changement(racine, rel, sha, entrees, source):
-    """Inscrit les lignes que `decider_trace` demande pour le fichier `rel` (`entrees` : ses lignes du journal) et rend les genres inscrits ; un
-    contournement n'a pas d'auteur (`par` vide : aucun auteur dans le payload, limite (ay))."""
-    genres = decider_trace(entrees, sha)
+def tracer_changement(racine, rel, sha, entrees, source, journal_existant=False):
+    """Inscrit les lignes que `decider_trace` demande pour le fichier `rel` (`entrees` : ses lignes du journal ; `journal_existant` : le drapeau d'A5, calculé par
+    l'appelant avant toute inscription) et rend les genres inscrits ; un contournement n'a pas d'auteur (`par` vide : aucun auteur dans le payload, limite (ay))."""
+    genres = decider_trace(entrees, sha, journal_existant, rel)
     for genre in genres:
         inscrire_surveillance(racine, genre, rel, sha, None if genre == "contournement" else PAR_HOOK, source)
     return genres
@@ -3135,6 +3148,9 @@ def reconcilier(racine, liste, tronquee, source=None):
     empreinte change ; elle est signalée si une ligne `borne` est arrivée depuis la dernière ligne `signal` (même règle anti-répétition que les
     contournements). Rend le texte du signal (contournements, borne) ou None ; la ligne `signal` est posée dès qu'un signal est rendu.
 
+    A5 (46.1-02, P461-D-05) : le drapeau « journal existant » est calculé UNE fois, sur les entrées lues avant la boucle, et passé à `tracer_changement` ; la première observation
+    d'un fichier d'unité non expliquée y est un `contournement` signalé (voir `decider_trace`).
+
     N-5 (46.1-02, P461-D-05 ; Willy, AskUserQuestion session principale, 2026-10-12, « (a) N-5 et A5 (Recommandé) ») : la réconciliation hache AUSSI les fichiers d'unité
     déjà référencés dans la fenêtre lue du journal et absents de la liste (`chemins_references_hors_liste` : une unité dont SUMMARY.md est apparu en est sortie), à la
     suite de la liste et dans le MÊME compteur d'octets, avec la même garde et le même traitement ; la liste rendue à SessionStart, elle, ne change pas. Un SUMMARY.md,
@@ -3143,6 +3159,7 @@ def reconcilier(racine, liste, tronquee, source=None):
     import hashlib
     anomalie = anomalie_journal(racine, source)  # d1-journal-etat : AVANT toute inscription (la première référence recrée un journal absent)
     entrees = lire_surveillance(racine)
+    journal_existant = len(entrees) > 0  # d1-journal-existant : calculé UNE fois, avant toute inscription de la boucle (jamais relu fichier par fichier)
     par_chemin = entrees_par_chemin(entrees)
     contournements = []
     borne_en_attente = False
@@ -3170,7 +3187,7 @@ def reconcilier(racine, liste, tronquee, source=None):
         sha = empreinte_fichier(chemin)
         if sha is None:
             continue
-        genres = tracer_changement(racine, rel, sha, par_chemin.get(rel, []), "reconciliation")  # d1-reconciliation
+        genres = tracer_changement(racine, rel, sha, par_chemin.get(rel, []), "reconciliation", journal_existant)  # d1-reconciliation
         if "contournement" in genres:
             contournements.append(rel)
     borne = tronquee or bool(exclus)
@@ -3461,13 +3478,16 @@ def mode_file_changed(contexte):
     """D1 en séance (46-07) : un fichier surveillé d'un lab adhérent a changé (`file_path` de premier niveau, `event` change, add ou unlink).
     Son sha256 courant (`absent` s'il a disparu) est comparé à la dernière référence du journal ; un changement que rien n'explique est tracé comme
     contournement, puis la référence est mise à jour. Un fichier qui n'est pas surveillé : rien. Ne refuse jamais et ne renvoie JAMAIS de
-    `watchPaths` (P46-D-07)."""
+    `watchPaths` (P46-D-07). A5 (46.1-02, P461-D-05) : le journal est lu UNE fois ; s'il a déjà une ligne, la première observation non expliquée d'un fichier d'unité est un
+    `contournement` (inscrit, non signalé : le FileChanged n'a pas de canal de signal) puis une `reference`."""
     racine, chemin = contexte["racine"], contexte["ecrit"]
     rel = chemin_relatif_surveille(racine, chemin)
     if rel is not None:
         sha = empreinte_fichier(chemin)
         if sha is not None:
-            tracer_changement(racine, rel, sha, entrees_par_chemin(lire_surveillance(racine)).get(rel, []), "seance")  # d1-trace
+            entrees = lire_surveillance(racine)
+            journal_existant = len(entrees) > 0  # d1-fc-journal-existant : une seule lecture, avant l'inscription
+            tracer_changement(racine, rel, sha, entrees_par_chemin(entrees).get(rel, []), "seance", journal_existant)  # d1-trace
     return None  # evt-mode-filechanged
 
 

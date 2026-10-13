@@ -43,6 +43,12 @@
 #   R-D1-21  (N-5, 46.1-02, P461-D-05) un SUMMARY.md posé hors séance dans une unité qui sort de la liste surveillée (SUMMARY.md présent) est tracé `contournement`
 #            (source=reconciliation) et signalé au SessionStart, la liste `watchPaths` rendue restant celle de R-D1-01 ; jumeaux : ligne `moteur` de même sha -> rien ; plafond
 #            d'octets abaissé -> chemin écarté, ligne `borne`, aucun contournement ; unité au nom de disque NFD -> clé NFC
+#   R-D1-22  (A5, 46.1-02, P461-D-05) journal existant : la première observation d'un fichier d'unité présent qu'aucune ligne `moteur` (même sha) ni `intention` n'explique est tracée
+#            `contournement` PUIS `reference` de même sha, et signalée au SessionStart ; jumeaux : lab sans journal, sha `absent`, fichier racine, Write, ligne `moteur` -> `reference` seule ;
+#            FileChanged : même règle, même ordre
+#   R-D1-23  (A5, 46.1-02, P461-D-05a) faux signaux MESURÉS sur des labs sains synthétiques : `MESURE-FAUX-SIGNAUX-A5 mkdir-copie=<n> git=<n> outil=<n> moteur=<n>` ; outil=0 et moteur=0 exigés,
+#            mkdir-copie et git égaux au nombre de fichiers d'unité présents qu'ils posent (au moins un chacun)
+#   (A5) R-D1-16 (S3) compte désormais aussi la première observation du PLAN.md de la phase neuve (attendu changé par A5)
 #   Le cas de canary R-CANG-D1 vit dans la section `cang` de test-planning-gates.sh.
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-D1-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-D1-03), MUT-D1-DOSSIER (le dossier de l'unité dans la liste -> R-D1-01), MUT-D1-GITIGNORE-APPEL / -IDEMPOTENT / -ATOMIQUE (Q-B -> R-D1-20), MUT-D1-GITIGNORE-MODELE (`.gitignore` retiré des noms du modèle du recalcul -> R-D1-05), MUT-D1-JAMAIS-UN-DOSSIER (filtre « absent ou fichier régulier » retiré -> R-D1-01, N-1),
@@ -56,6 +62,8 @@
 #   la forme NFC désigne le même dossier, la suite rend `non applicable ici`), MUT-D1-JOURNAL-SIGNAL / -ETAT / -IRREGULIER / -DROITS / -ABSENT / -PREMIERE-SEANCE / -OUVERTURE
 #   (chaque contrôle d'`anomalie_journal` retiré seul, ou forcé -> R-D1-19 ; -OUVERTURE non applicable sans `chflags`).
 #   (46.1-02) MUT-D1-N5 (l'ajout des chemins déjà référencés retiré -> R-D1-21), MUT-D1-N5-PLAFOND (la garde d'octets de la liste retirée, éprouvée par le jumeau de plafond de R-D1-21).
+#   (46.1-02) MUT-D1-A5 (la ligne de première observation ne rend plus que `reference` -> R-D1-22), MUT-D1-A5-RACINE (restriction aux fichiers d'unité retirée -> R-D1-22, jumeau STATE.md),
+#   MUT-D1-A5-RELU (drapeau « journal existant » recalculé après la première inscription -> R-D1-22, jumeau lab sans journal), MUT-D1-A5-ABSENT (sha `absent` plus exempté -> R-D1-22).
 # Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, moteur, mutants_moteur, reconciliation, mutants_reconciliation).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
@@ -1146,7 +1154,7 @@ def controle_d1_16(ctx, script):
     """D1 surveille les unités non closes les PLUS RÉCENTES d'abord (A9, fix-46-a) : phases `01-ancienne` à `40-ancienne` et `41-active` -> au SessionStart S1 les quatre
     fichiers de `41-active` sont dans `watchPaths`, aucun de `01-ancienne`, 128 chemins, signal de borne présent, aucun chemin absolu dans l'additionalContext ; S2 sans
     changement -> aucun signal de borne, aucune ligne `borne` ni `signal` de plus ; PLAN.md de `41-active` réécrit hors moteur et phase `42-nouvelle` créée -> S3 : un
-    contournement `source=reconciliation` pour ce PLAN.md, une seconde ligne `borne`, signal de borne de nouveau, fichiers de `42-nouvelle` surveillés ; `cle_recence`
+    contournement `source=reconciliation` pour ce PLAN.md (et, A5, un `contournement` puis une `reference` pour le PLAN.md de la phase neuve), une seconde ligne `borne`, signal de borne de nouveau, fichiers de `42-nouvelle` surveillés ; `cle_recence`
     (chargée du hook jugé) trie `01-a`, `100-a`, `99-z`, `010-b`, `02-a` en `100-a`, `99-z`, `010-b`, `02-a`, `01-a`."""
     d = ctx.copie_forcee(_dossier(ctx, script), "observe")
     ouvertes = tuple("%02d-ancienne" % i for i in range(1, 41)) + ("41-active",)
@@ -1187,6 +1195,12 @@ def controle_d1_16(ctx, script):
         fautes.append("S3 : UN contournement (source=reconciliation) pour le PLAN.md de 41-active attendu — obtenu %s" % [(l["source"]) for l in ligne])
     if len(lignes_de(lab, "borne")) != 2:
         fautes.append("S3 : une seconde ligne borne (la liste a changé) attendue — obtenu %d" % len(lignes_de(lab, "borne")))
+    # attendu changé par A5 (P461-D-05) : le PLAN.md de la phase neuve 42-nouvelle est la première observation d'un fichier d'unité dans un lab dont le journal existe, que rien
+    # n'explique -> `contournement` puis `reference` (avant A5 : `reference` seule) ; le contrôle ne le disait pas, il compte désormais cette ligne
+    plan_nouveau = ".planning/cycles/01-c/phases/42-nouvelle/PLAN.md"
+    genres_nouveau = [e["genre"] for e in entrees_journal(lab) if e["chemin"] == plan_nouveau]
+    if genres_nouveau != ["contournement", "reference"]:
+        fautes.append("S3 : le PLAN.md de 42-nouvelle (première observation, journal existant, A5) : `contournement` puis `reference` attendus — obtenu %s" % genres_nouveau)
     signal = contexte_de(out)
     if not isinstance(signal, str) or "surveillance bornée" not in signal:
         fautes.append("S3 : le signal de borne de nouveau attendu — obtenu %r" % (signal,))
@@ -1202,7 +1216,7 @@ def controle_d1_16(ctx, script):
             fautes.append("cle_recence trie 01-a, 100-a, 99-z, 010-b, 02-a en %s (attendu 100-a, 99-z, 010-b, 02-a, 01-a)" % trie)
     return (not fautes), ("; ".join(fautes[:3]) if fautes else
                           "41 phases ouvertes : les quatre fichiers de 41-active sont surveillés (aucun de 01-ancienne), signal de borne sans chemin absolu ; S2 sans changement : rien de plus ; "
-                          "S3 (PLAN.md réécrit, phase 42 créée) : un contournement, une seconde ligne borne, le signal de nouveau, 42-nouvelle surveillée ; cle_recence : 100-a, 99-z, 010-b, 02-a, 01-a")
+                          "S3 (PLAN.md réécrit, phase 42 créée) : un contournement pour le PLAN.md réécrit et, A5, un contournement puis une référence pour celui de 42-nouvelle, une seconde ligne borne, le signal de nouveau, 42-nouvelle surveillée ; cle_recence : 100-a, 99-z, 010-b, 02-a, 01-a")
 
 
 def copie_plafond(ctx, dossier, valeur):
@@ -1619,6 +1633,231 @@ def controle_d1_21(ctx, script):
                           "nom de disque NFD -> clé NFC")
 
 
+def rel_unite(nom_unite, fichier):
+    return ".planning/cycles/01-c/phases/%s/%s" % (nom_unite, fichier)
+
+
+def poser_unite(lab, nom_unite, fichiers, texte="posé hors séance"):
+    """Écrit `fichiers` (noms de FICHIERS d'unité) dans l'unité `nom_unite` du lab, sans le moteur ni aucune intention ; rend les chemins relatifs."""
+    res = []
+    for fichier in fichiers:
+        ecrire(os.path.join(lab, *rel_unite(nom_unite, fichier).split("/")), "%s : %s de %s\n" % (texte, fichier, nom_unite))
+        res.append(rel_unite(nom_unite, fichier))
+    return res
+
+
+def controle_d1_22(ctx, script):
+    """A5 (46.1-02, P461-D-05) : quand le journal existe déjà (au moins une ligne lue AVANT la boucle de réconciliation), la première observation d'un fichier d'UNITÉ
+    présent qu'aucune ligne `moteur` (même sha) ni `intention` n'explique est tracée `contournement` PUIS `reference` de même sha (la nouvelle base), et signalée au
+    SessionStart. Lab à journal, unité neuve `02-v` (PLAN.md, CLOTURE.md, VERDICT.md posés hors séance, SUMMARY.md absent : une unité qui porte déjà son SUMMARY.md
+    n'est pas dans la liste, rien ne l'observe) -> pour chacun des trois, `contournement` puis `reference` de même sha et le signal D1 qui les nomme ; SUMMARY.md absent
+    -> `reference` seule (sha `absent`) ; un second SessionStart n'ajoute aucun `contournement`. Jumeaux : (a) lab SANS journal -> `reference` seule partout ; (c) fichier
+    RACINE (STATE.md) jamais observé dans un lab à journal -> `reference` seule ; (d) PLAN.md écrit par Write (ligne `intention`) -> `reference` seule ; (e) VERDICT.md
+    expliqué par une ligne `moteur` de même sha -> `reference` seule ; (f) au FileChanged d'un fichier d'unité non référencé, journal existant -> `contournement` puis
+    `reference` (source=seance), dans cet ordre."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    fautes = []
+    # Scénario principal : lab à journal, unité neuve
+    lab = fabriquer_lab(ctx, "d1-22", ouvertes=("01-u",), closes=())
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err or not lignes_journal(lab):
+        return False, "premier SessionStart : code 0 et un journal posé attendus — obtenu rc=%d %s" % (rc, court(err))
+    trois = poser_unite(lab, "02-v", ("PLAN.md", "CLOTURE.md", "VERDICT.md"))
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or err:
+        fautes.append("SessionStart de première observation : code 0 attendu — obtenu rc=%d %s" % (rc, court(err)))
+    for rel in trois:
+        entrees = [e for e in entrees_journal(lab) if e["chemin"] == rel]
+        genres = [(e["genre"], e["source"]) for e in entrees]
+        sha_disque = sha_du_fichier(os.path.join(lab, *rel.split("/")))
+        if genres != [("contournement", "reconciliation"), ("reference", "reconciliation")] or {e["sha"] for e in entrees} != {sha_disque}:
+            fautes.append("%s : `contournement` puis `reference` de même sha (source=reconciliation) attendus — obtenu %s" % (rel, genres))
+    signal = contexte_de(out)
+    if not isinstance(signal, str) or not signal.startswith("[planning-core] D1 : 3 écriture(s) non expliquée(s)") or any(rel not in signal for rel in trois):
+        fautes.append("additionalContext : le signal D1 qui nomme les trois fichiers attendu — obtenu %r" % (signal,))
+    absent = [e for e in entrees_journal(lab) if e["chemin"] == rel_unite("02-v", "SUMMARY.md")]
+    if [(e["genre"], e["sha"]) for e in absent] != [("reference", "absent")]:
+        fautes.append("jumeau (b) SUMMARY.md absent de 02-v : `reference` seule (sha absent) attendue — obtenu %s" % [(e["genre"], e["sha"][:8]) for e in absent])
+    avant = len(lignes_journal(lab))
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or contexte_de(out) is not None or len(lignes_journal(lab)) != avant:
+        fautes.append("second SessionStart sans changement : aucun contournement, aucun signal attendus — obtenu %r, %d ligne(s) de plus" % (contexte_de(out), len(lignes_journal(lab)) - avant))
+    # (a) lab SANS journal : la même unité, posée avant toute séance -> références silencieuses
+    lab_a = fabriquer_lab(ctx, "d1-22-sans-journal", ouvertes=("01-u",), closes=())
+    poser_unite(lab_a, "02-v", ("PLAN.md", "CLOTURE.md", "VERDICT.md"))
+    rc, out, err = session(ctx, d, lab_a)
+    if rc != 0 or [e for e in entrees_journal(lab_a) if e["genre"] == "contournement"] or contexte_de(out) is not None or not lignes_de(lab_a, "reference", trois[0]):
+        fautes.append("jumeau (a) lab sans journal : `reference` seule, aucun contournement ni signal attendus — obtenu %d contournement(s), %r" % (
+            len([e for e in entrees_journal(lab_a) if e["genre"] == "contournement"]), contexte_de(out)))
+    # (c) fichier RACINE jamais observé, journal existant
+    lab_c = fabriquer_lab(ctx, "d1-22-racine", ouvertes=("01-u",), closes=())
+    session(ctx, d, lab_c)
+    gardees = [l for l in lignes_journal(lab_c) if "chemin=.planning/STATE.md" not in l]
+    ecrire(chemin_journal(lab_c), "\n".join(gardees) + "\n")
+    rc, out, err = session(ctx, d, lab_c)
+    etat = [e["genre"] for e in entrees_journal(lab_c) if e["chemin"] == ".planning/STATE.md"]
+    if rc != 0 or etat != ["reference"] or contexte_de(out) is not None:
+        fautes.append("jumeau (c) STATE.md jamais observé, journal existant : `reference` seule, aucun signal attendus — obtenu %s %r" % (etat, contexte_de(out)))
+    # (d) PLAN.md écrit par Write (ligne `intention`) ; (e) VERDICT.md expliqué par une ligne `moteur` de même sha
+    lab_d = fabriquer_lab(ctx, "d1-22-intention", ouvertes=("01-u",), closes=())
+    session(ctx, d, lab_d)
+    plan_d = rel_unite("03-w", "PLAN.md")
+    rc, out, err = ctx.lancer(payload_ecriture(lab_d, os.path.join(lab_d, *plan_d.split("/"))), cwd=lab_d, dossier=d)
+    if rc != 0 or len(lignes_de(lab_d, "intention", plan_d)) != 1:
+        return False, "jumeau (d) : le Write de PLAN.md doit laisser UNE ligne intention — obtenu rc=%d %d" % (rc, len(lignes_de(lab_d, "intention", plan_d)))
+    poser_unite(lab_d, "03-w", ("PLAN.md",), "écrit par l'outil")
+    verdict_d = poser_unite(lab_d, "03-w", ("VERDICT.md",), "écrit par le moteur")[0]
+    ajouter_ligne_journal(lab_d, "moteur", verdict_d, sha_du_fichier(os.path.join(lab_d, *verdict_d.split("/"))), "poser-verdict.sh")
+    rc, out, err = session(ctx, d, lab_d)
+    genres_d = [(rel, [e["genre"] for e in entrees_journal(lab_d) if e["chemin"] == rel and e["genre"] in ("contournement", "reference")]) for rel in (plan_d, verdict_d)]
+    if rc != 0 or genres_d != [(plan_d, ["reference"]), (verdict_d, ["reference"])] or contexte_de(out) is not None:
+        fautes.append("jumeaux (d) Write et (e) moteur : `reference` seule, aucun signal attendus — obtenu %s %r" % (genres_d, contexte_de(out)))
+    # (f) FileChanged d'un fichier d'unité non référencé, journal existant
+    lab_f = fabriquer_lab(ctx, "d1-22-filechanged", ouvertes=("01-u",), closes=())
+    session(ctx, d, lab_f)
+    plan_f = poser_unite(lab_f, "04-x", ("PLAN.md",))[0]
+    rc, out, err = changement(ctx, d, lab_f, plan_f)
+    entrees_f = [(e["genre"], e["source"]) for e in entrees_journal(lab_f) if e["chemin"] == plan_f]
+    if rc != 0 or out != b"" or entrees_f != [("contournement", "seance"), ("reference", "seance")]:
+        fautes.append("(f) FileChanged d'un PLAN.md non référencé, journal existant : `contournement` puis `reference` (source=seance) et stdout vide attendus — obtenu rc=%d %s" % (rc, entrees_f))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "journal existant : PLAN.md, CLOTURE.md et VERDICT.md d'une unité neuve posés hors séance -> chacun `contournement` puis `reference` de même sha, signal D1 qui les nomme, SUMMARY.md absent "
+                          "en `reference` seule, second SessionStart sans rien de plus ; jumeaux : lab sans journal, STATE.md, Write (intention), ligne moteur -> `reference` seule ; "
+                          "FileChanged : `contournement` puis `reference`")
+
+
+def lab_sous_depot(ctx, nom, ouvertes=("01-u",)):
+    """Lab jetable SOUS DÉPÔT (le dépôt est celui de la suite : identité passée par `-c`, jamais la configuration de l'utilisateur) : fabriqué, commité sur la branche
+    `base`. Rend (lab, fonction qui lance un sous-commande du dépôt)."""
+    lab = fabriquer_lab(ctx, nom, ouvertes=ouvertes, closes=())
+    env = ctx.env({"GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_SYSTEM": os.devnull, "GIT_TERMINAL_PROMPT": "0"})
+
+    def depot(*args):
+        p = subprocess.run(["git", "-c", "user.name=suite-d1", "-c", "user.email=suite-d1@example.invalid", "-c", "commit.gpgsign=false", "-c", "core.hooksPath=" + os.devnull]
+                           + list(args), cwd=lab, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
+        if p.returncode != 0:
+            raise RuntimeError("git %s : code %d %s" % (" ".join(args), p.returncode, court(p.stderr)))
+        return p.stdout
+
+    depot("init", "-q")
+    depot("checkout", "-q", "-b", "base")
+    depot("add", "-A")
+    depot("commit", "-q", "-m", "base du lab synthétique")
+    return lab, depot
+
+
+def nb_contournements_unite(lab, nom_unite):
+    """Chemins distincts de l'unité `nom_unite` portant au moins une ligne `contournement`."""
+    prefixe = rel_unite(nom_unite, "")
+    return len({e["chemin"] for e in entrees_journal(lab) if e["genre"] == "contournement" and e["chemin"].startswith(prefixe)})
+
+
+def nb_references_unite(lab, nom_unite):
+    """Chemins distincts de l'unité `nom_unite` portant une ligne `reference` d'un sha réel (fichier présent)."""
+    prefixe = rel_unite(nom_unite, "")
+    return len({e["chemin"] for e in entrees_journal(lab) if e["genre"] == "reference" and e["sha"] != "absent" and e["chemin"].startswith(prefixe)})
+
+
+def controle_d1_23(ctx, script):
+    """Faux signaux d'A5, MESURÉS sur des labs sains synthétiques (46.1-02, P461-D-05a ; jamais un lab réel). Quatre cas, chacun dans un lab à journal : une unité
+    créée par `mkdir` + copie de fichiers (attendu : un contournement par fichier présent, faux signal NOMMÉ) ; une unité livrée par git dans un lab sous git (`git checkout`
+    d'une branche qui la porte, puis `git merge` d'une autre, la forme d'un `git pull` ; attendu : un contournement par fichier présent, faux signal NOMMÉ) ; une unité écrite
+    par Write (intention : zéro) ; une unité dont le VERDICT.md est posé par poser-verdict.sh (moteur : zéro). Imprime `MESURE-FAUX-SIGNAUX-A5 mkdir-copie=<n> git=<n> outil=<n>
+    moteur=<n>` et exige outil=0, moteur=0, mkdir-copie et git égaux chacun au nombre de fichiers d'unité présents qu'ils posent, ce nombre valant au moins 1. Imprime aussi, pour
+    information (N-5, non assertée), les contournements que fait lever un `git checkout` qui RETIRE une unité déjà référencée."""
+    d = ctx.copie_forcee(_dossier(ctx, script), "observe")
+    fautes = []
+    if shutil.which("git") is None:
+        return False, "git est requis pour mesurer le faux signal d'une unité livrée par git (aucune mesure à zéro tenue pour verte)"
+    fichiers = ("PLAN.md", "CLOTURE.md", "VERDICT.md")
+    # 1. mkdir + copie
+    lab = fabriquer_lab(ctx, "d1-23-mkdir", ouvertes=("01-u",), closes=())
+    session(ctx, d, lab)
+    modele = ctx.unique("modele-unite")
+    for fichier in fichiers:
+        ecrire(os.path.join(modele, fichier), "copié depuis un modèle : " + fichier + "\n")
+    cible = os.path.join(lab, *rel_unite("02-m", "").rstrip("/").split("/"))
+    os.makedirs(cible)
+    for fichier in fichiers:
+        shutil.copy(os.path.join(modele, fichier), os.path.join(cible, fichier))
+    session(ctx, d, lab)
+    posees_mkdir, mkdir_copie = len(fichiers), nb_contournements_unite(lab, "02-m")
+    if nb_references_unite(lab, "02-m") != posees_mkdir:
+        fautes.append("mkdir + copie : %d fichiers observés (une référence chacun) attendus — obtenu %d" % (posees_mkdir, nb_references_unite(lab, "02-m")))
+    # 2. dépôt git : `git checkout` d'une branche qui porte l'unité, puis `git merge`
+    try:
+        lab_c, depot_c = lab_sous_depot(ctx, "d1-23-checkout")
+        session(ctx, d, lab_c)
+        depot_c("checkout", "-q", "-b", "unite")
+        poser_unite(lab_c, "02-g", fichiers, "livré par git")
+        depot_c("add", "-A")
+        depot_c("commit", "-q", "-m", "unité livrée")
+        depot_c("checkout", "-q", "base")
+        if os.path.exists(os.path.join(lab_c, *rel_unite("02-g", "PLAN.md").split("/"))):
+            fautes.append("git checkout base : l'unité devait disparaître de l'arbre")
+        depot_c("checkout", "-q", "unite")
+        session(ctx, d, lab_c)
+        n_checkout = nb_contournements_unite(lab_c, "02-g")
+        if nb_references_unite(lab_c, "02-g") != len(fichiers):
+            fautes.append("git checkout : %d fichiers observés attendus — obtenu %d" % (len(fichiers), nb_references_unite(lab_c, "02-g")))
+        avant = len([e for e in entrees_journal(lab_c) if e["genre"] == "contournement"])
+        depot_c("checkout", "-q", "base")
+        session(ctx, d, lab_c)
+        suppression = len([e for e in entrees_journal(lab_c) if e["genre"] == "contournement"]) - avant
+        lab_m, depot_m = lab_sous_depot(ctx, "d1-23-merge")
+        session(ctx, d, lab_m)
+        depot_m("checkout", "-q", "-b", "fusion")
+        poser_unite(lab_m, "03-h", fichiers[:2], "livré par git")
+        depot_m("add", "-A")
+        depot_m("commit", "-q", "-m", "unité à fusionner")
+        depot_m("checkout", "-q", "base")
+        depot_m("merge", "-q", "--no-edit", "fusion")
+        session(ctx, d, lab_m)
+        n_merge = nb_contournements_unite(lab_m, "03-h")
+        if nb_references_unite(lab_m, "03-h") != 2:
+            fautes.append("git merge : 2 fichiers observés attendus — obtenu %d" % nb_references_unite(lab_m, "03-h"))
+    except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
+        return False, "lab synthétique sous git : %s" % exc
+    posees_git, git_n = len(fichiers) + 2, n_checkout + n_merge
+    # 3. outil : Write de PLAN.md, CLOTURE.md, VERDICT.md par le hook (une intention chacun), puis écriture des fichiers
+    lab_o = fabriquer_lab(ctx, "d1-23-outil", ouvertes=("01-u",), closes=())
+    session(ctx, d, lab_o)
+    for fichier in fichiers:
+        ctx.lancer(payload_ecriture(lab_o, os.path.join(lab_o, *rel_unite("02-o", fichier).split("/"))), cwd=lab_o, dossier=d)
+    poser_unite(lab_o, "02-o", fichiers, "écrit par l'outil")
+    session(ctx, d, lab_o)
+    outil = nb_contournements_unite(lab_o, "02-o")
+    if nb_references_unite(lab_o, "02-o") != len(fichiers):
+        fautes.append("outil : %d fichiers observés attendus — obtenu %d" % (len(fichiers), nb_references_unite(lab_o, "02-o")))
+    # 4. moteur : PLAN.md par Write, puis VERDICT.md posé par poser-verdict.sh
+    lab_v = fabriquer_lab(ctx, "d1-23-moteur", ouvertes=("01-u",), closes=())
+    session(ctx, d, lab_v)
+    ctx.lancer(payload_ecriture(lab_v, os.path.join(lab_v, *rel_unite("02-p", "PLAN.md").split("/"))), cwd=lab_v, dossier=d)
+    ecrire(os.path.join(lab_v, *rel_unite("02-p", "PLAN.md").split("/")), "---\necrit: [livrables/rapport.md]\n---\nplan écrit par l'outil\n")
+    ecrire(os.path.join(lab_v, "livrables", "rapport.md"), "livrable\n")
+    rc, out, err = lancer_script(ctx, [script_de(ctx, script, "poser-verdict.sh"), "--unite=" + os.path.join(lab_v, *rel_unite("02-p", "").rstrip("/").split("/")), "--juge=juge-test",
+                                       "--tentative=1", "--score=ok", "--constat=critere::passé"], lab_v)
+    if rc != 0:
+        return False, "poser-verdict.sh : code 0 attendu — obtenu %d %s" % (rc, court(err))
+    session(ctx, d, lab_v)
+    moteur = nb_contournements_unite(lab_v, "02-p")
+    if nb_references_unite(lab_v, "02-p") != 2:
+        fautes.append("moteur : 2 fichiers observés (PLAN.md, VERDICT.md) attendus — obtenu %d" % nb_references_unite(lab_v, "02-p"))
+    if script is None:
+        print("MESURE-FAUX-SIGNAUX-A5 mkdir-copie=%d git=%d outil=%d moteur=%d" % (mkdir_copie, git_n, outil, moteur))
+        print("MESURE-FAUX-SIGNAUX-N5 suppression-git=%d (information : un retrait d'unité par git fait lever un contournement par fichier référencé, non asserté)" % suppression)
+    if outil != 0:
+        fautes.append("unité écrite par Write : outil=0 attendu — obtenu %d" % outil)
+    if moteur != 0:
+        fautes.append("VERDICT.md posé par poser-verdict.sh : moteur=0 attendu — obtenu %d" % moteur)
+    if posees_mkdir < 1 or mkdir_copie != posees_mkdir:
+        fautes.append("mkdir + copie : un contournement par fichier présent posé (%d, au moins 1) attendu — obtenu %d" % (posees_mkdir, mkdir_copie))
+    if posees_git < 1 or git_n != posees_git:
+        fautes.append("git (checkout + merge) : un contournement par fichier présent posé (%d, au moins 1) attendu — obtenu %d" % (posees_git, git_n))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "lab sain synthétique : mkdir-copie=%d git=%d (un contournement par fichier d'unité présent posé : faux signaux attendus, nommés), outil=%d moteur=%d" % (mkdir_copie, git_n, outil, moteur))
+
+
 def original_de(ctx, ident, controle):
     """Résultat d'un contrôle sur le script réel, calculé une seule fois (les sections et les mutants lisent la même exécution)."""
     if ident not in ctx.originaux:
@@ -1713,6 +1952,8 @@ def sec_reconciliation(ctx):
     rendre("R-D1-17", "la réconciliation plafonne les octets hachés et le signale", controle_d1_17, ctx)
     rendre("R-D1-19", "A6 : un journal de D1 réduit au silence par Bash est signalé au SessionStart", controle_d1_19, ctx)
     rendre("R-D1-21", "N-5 : un fichier d'unité posé hors séance dans une unité sortie de la liste est tracé", controle_d1_21, ctx)
+    rendre("R-D1-22", "A5 : la première observation non expliquée d'un fichier d'unité, journal existant, est tracée puis référencée", controle_d1_22, ctx)
+    rendre("R-D1-23", "A5 : faux signaux mesurés sur des labs sains synthétiques (mkdir-copie, git, outil, moteur)", controle_d1_23, ctx)
 
 
 def sec_mutants_reconciliation(ctx):
@@ -1742,6 +1983,14 @@ def sec_mutants_reconciliation(ctx):
     # N-5 (46.1-02, P461-D-05) : l'ajout des chemins déjà référencés retiré ; la garde d'octets de la liste retirée, éprouvée cette fois par le jumeau de plafond de R-D1-21
     tuer(ctx, "D1-N5", "# d1-n5-journal", "supplement = []  # d1-n5-journal", "R-D1-21", controle_d1_21)
     tuer(ctx, "D1-N5-PLAFOND", "# d1-octets-exclus", "if False:  # d1-octets-exclus", "R-D1-21", controle_d1_21)
+    # A5 (46.1-02, P461-D-05) : la ligne de première observation ne rend plus que `reference` (le comportement d'avant A5) ; la restriction aux fichiers d'unité retirée
+    # (STATE.md devient un contournement) ; le drapeau « journal existant » recalculé à l'usage, donc après la première inscription (un lab sans journal en pose dès le
+    # second fichier) ; la règle « un sha absent reste une référence » retirée
+    tuer(ctx, "D1-A5", "# d1-premiere-observation", 'return ["reference"]  # d1-premiere-observation', "R-D1-22", controle_d1_22)
+    tuer(ctx, "D1-A5-RACINE", "# d1-a5-unite", "unite = True  # d1-a5-unite", "R-D1-22", controle_d1_22)
+    tuer(ctx, "D1-A5-RELU", "# d1-journal-existant",
+         'journal_existant = type("Relu", (), {"__bool__": lambda self: len(lire_surveillance(racine)) > 0})()  # d1-journal-existant', "R-D1-22", controle_d1_22)
+    tuer(ctx, "D1-A5-ABSENT", "# d1-a5-absent", "present = True  # d1-a5-absent", "R-D1-22", controle_d1_22)
 
 
 SECTIONS = {
