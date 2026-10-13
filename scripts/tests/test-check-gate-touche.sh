@@ -111,6 +111,8 @@ safe_run() {
   eval "$__vrc=\$__rc"
 }
 
+# APPEL : `P="$(make_mutant …)" && S=0 || S=$?` — jamais `P="$(…)"; S=$?` : safe_run rend `set -e` actif,
+# et un mutant identique (retour 1) ferait sortir la suite sans bilan ni trace (faiblesse signalee en revue Q6).
 # make_mutant <name> <old> <new> -> imprime le chemin du mutant ; retour 0 = opposable et valide,
 # 1 = identique a l'original (NON OPPOSABLE), 2 = syntaxe invalide.
 #
@@ -443,7 +445,7 @@ echo "== test-check-gate-touche : MUTANTS (MUT-1 a MUT-9) =="
 # --- MUT-1 : retire la classe des suites (scripts/tests/test-*.sh) ----------------------------------
 MUT1_OLD='    if (p ~ /^scripts\/tests\/test-[^\/]+\.sh$/) return "suite"'
 MUT1_NEW='    if (p ~ /^NEVER-MATCH-SUITE-CLASS$/) return "suite"'
-MUT1_PATH="$(make_mutant mut1 "$MUT1_OLD" "$MUT1_NEW")"; MUT1_STAT=$?
+MUT1_PATH="$(make_mutant mut1 "$MUT1_OLD" "$MUT1_NEW")" && MUT1_STAT=0 || MUT1_STAT=$?
 D="$(mk_repo mut1)"; B="$(base_of "$D")"
 printf '#!/bin/sh\necho v2\n' > "$D/scripts/tests/test-check-demo.sh"
 commit_avec "$D" "test: touche suite scripts sans trailer (fixture MUT-1)"
@@ -459,7 +461,7 @@ fi
 # --- MUT-2 : neutralise la recherche de trailer (couverture toujours acquise) -----------------------
 MUT2_OLD='  covered=0'
 MUT2_NEW='  covered=1'
-MUT2_PATH="$(make_mutant mut2 "$MUT2_OLD" "$MUT2_NEW")"; MUT2_STAT=$?
+MUT2_PATH="$(make_mutant mut2 "$MUT2_OLD" "$MUT2_NEW")" && MUT2_STAT=0 || MUT2_STAT=$?
 D="$(mk_repo mut2)"; B="$(base_of "$D")"
 printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh"
 commit_avec "$D" "feat: touche gate scripts sans trailer (fixture MUT-2)"
@@ -475,7 +477,7 @@ fi
 # --- MUT-3 : neutralise le controle de forme du marqueur (raison vide/courte acceptee) ---------------
 MUT3_OLD='        if [ "${reason_charcount:-0}" -lt 10 ]; then'
 MUT3_NEW='        if [ "0" -eq 1 ]; then'
-MUT3_PATH="$(make_mutant mut3 "$MUT3_OLD" "$MUT3_NEW")"; MUT3_STAT=$?
+MUT3_PATH="$(make_mutant mut3 "$MUT3_OLD" "$MUT3_NEW")" && MUT3_STAT=0 || MUT3_STAT=$?
 D="$(mk_repo mut3)"; B="$(base_of "$D")"
 printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh"
 commit_avec "$D" "feat: touche gate scripts, raison courte (fixture MUT-3)
@@ -493,7 +495,7 @@ fi
 # --- MUT-4 : rend la correspondance chemin <-> motif universelle -------------------------------------
 MUT4_OLD='        ($motif) covered=1; break ;;'
 MUT4_NEW='        (*) covered=1; break ;;'
-MUT4_PATH="$(make_mutant mut4 "$MUT4_OLD" "$MUT4_NEW")"; MUT4_STAT=$?
+MUT4_PATH="$(make_mutant mut4 "$MUT4_OLD" "$MUT4_NEW")" && MUT4_STAT=0 || MUT4_STAT=$?
 D="$(mk_repo mut4)"; B="$(base_of "$D")"
 printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh"
 commit_avec "$D" "feat: touche gate scripts, motif non apparie (fixture MUT-4)
@@ -511,7 +513,7 @@ fi
 # --- MUT-5 : remplace merge-base par l'adjacence HEAD^ (derivation de la base) ------------------------
 MUT5_OLD='BASE="$(git merge-base HEAD "$REF_RESOLVED" 2>/dev/null)"'
 MUT5_NEW='BASE="$(git rev-parse HEAD^ 2>/dev/null)"'
-MUT5_PATH="$(make_mutant mut5 "$MUT5_OLD" "$MUT5_NEW")"; MUT5_STAT=$?
+MUT5_PATH="$(make_mutant mut5 "$MUT5_OLD" "$MUT5_NEW")" && MUT5_STAT=0 || MUT5_STAT=$?
 D="$(mk_repo mut5)"; B="$(base_of "$D")"
 printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh"
 commit_avec "$D" "chore: commit 1 - touche gate scripts sans trailer (fixture MUT-5)"
@@ -538,7 +540,7 @@ fi
 # flip 1->0 est la preuve que le controle ajoute, et lui seul, empeche cette couverture accidentelle.
 MUT6_OLD='          *,*)'
 MUT6_NEW='          *NEVER-MATCH-COMMA-XYZ*)'
-MUT6_PATH="$(make_mutant mut6 "$MUT6_OLD" "$MUT6_NEW")"; MUT6_STAT=$?
+MUT6_PATH="$(make_mutant mut6 "$MUT6_OLD" "$MUT6_NEW")" && MUT6_STAT=0 || MUT6_STAT=$?
 D="$(mk_repo mut6)"; B="$(base_of "$D")"
 printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh, foo.sh"
 commit_avec "$D" "feat: touche un chemin nomme avec virgule litterale (fixture MUT-6)
@@ -558,7 +560,7 @@ fi
 # mutant (le -v retiré) : MARQUEUR-MAL-FORME, le chemin reste non déclaré, rc 1.
 MUT7_OLD="$(grep -F 'reason_charcount="$(' "$SCRIPT")"
 MUT7_NEW="${MUT7_OLD/od -v -An/od -An}"
-MUT7_PATH="$(make_mutant mut7 "$MUT7_OLD" "$MUT7_NEW")"; MUT7_STAT=$?
+MUT7_PATH="$(make_mutant mut7 "$MUT7_OLD" "$MUT7_NEW")" && MUT7_STAT=0 || MUT7_STAT=$?
 D="$(mk_repo mut7)"; B="$(base_of "$D")"
 printf '#!/bin/sh\necho v2\n' > "$D/scripts/check-demo.sh"
 commit_avec "$D" "feat: raison de 10 emojis identiques (fixture MUT-7)
@@ -580,7 +582,7 @@ fi
 mut_fixtures() {  # <n> <old> <fixture_relpath>
   local n="$1" old="$2" rel="$3" new path stat dm bm
   new='    if (p ~ /^NEVER-MATCH-FIXTURES-CLASS$/) return "fixtures"'
-  path="$(make_mutant "mut$n" "$old" "$new")"; stat=$?
+  path="$(make_mutant "mut$n" "$old" "$new")" && stat=0 || stat=$?
   dm="$(mk_repo "mut$n")"; bm="$(base_of "$dm")"
   printf 'gel v2\n' > "$dm/$rel"
   commit_avec "$dm" "test: touche une fixture sans trailer (fixture MUT-$n)"

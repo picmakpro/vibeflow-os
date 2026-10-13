@@ -69,7 +69,12 @@ mk_lab() { # <nom>
   printf -- '---\nstatus: active\n---\n' > "$d/.planning/workstreams/omega/STATE.md"
   git -C "$d" init -q -b main >/dev/null 2>&1 || git -C "$d" init -q >/dev/null 2>&1
   git -C "$d" add -A >/dev/null 2>&1
-  git -C "$d" -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -q -m init >/dev/null 2>&1
+  # Commit init ANTIDATÉ de 2000 s (> fenêtre de stall de 900 s) : check-guard-health.sh compte le dernier
+  # commit de la branche comme progression (arbitrage Samuel, AskUserQuestion session principale,
+  # 2026-10-13, Q1) ; un commit frais ferait disparaître les stalls que les cas fabriquent.
+  local when=$(( $(date +%s) - 2000 ))
+  GIT_COMMITTER_DATE="$when +0000" GIT_AUTHOR_DATE="$when +0000" \
+    git -C "$d" -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -q -m init >/dev/null 2>&1
   preflight "$d"
   printf '%s' "$d"
 }

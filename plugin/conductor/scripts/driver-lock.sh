@@ -21,7 +21,7 @@
 #
 # Usage:
 #   driver-lock.sh acquire   --owner=<id> --step=<etape>   # pose le lock (refuse si perime, D-32-02)
-#   driver-lock.sh takeover  --owner=<id> [--step=<etape>] # reprend un lock PERIME (geste explicite)
+#   driver-lock.sh takeover  --owner=<id> [--step=<etape>] # reprend un lock PERIME (geste explicite) ; avec --ws, refuse legacy-lock-held si l'ancien verrou est VIVANT
 #   driver-lock.sh reclaim   --owner=<id>                  # re-rattache la session courante a un lock VIVANT dont on est deja owner
 #   driver-lock.sh heartbeat --owner=<id> [--step=<etape>] # rafraichit le heartbeat entre etapes
 #   driver-lock.sh mark-progress --owner=<id>              # avance progress_epoch (D-33-A), JAMAIS heartbeat_epoch
@@ -57,7 +57,9 @@
 # hint « lance depuis la racine du lab »). Le nom du sujet est valide par
 # vf_ws_name_valid puis vf_ws_dir_resolve AVANT d'entrer dans un chemin ou un JSON.
 # ANCIEN VERROU (P57-D-14, P57-D-24, P57-D-26) : en lab partitionne, un .planning/DRIVER.lock tenu
-# vaut verrou de depot. Tout acquire (compartiment ou depot) refuse "legacy-lock-held" avec en hint la
+# vaut verrou de depot. Tout acquire (compartiment ou depot), et takeover --ws sur un ancien verrou VIVANT
+# (Q5, arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 : meme sonde avant la reprise, meme
+# re-sonde apres la pose, meme refus octet pour octet), refuse "legacy-lock-held" avec en hint la
 # commande de release exacte ; perime, "stale-requires-takeover" avec le recover cible. Rien n'est
 # repris, relache ni supprime en silence, et aucun verbe n'est neuf : l'ancien verrou se manie par
 # VF_DRIVER_LOCK=.planning/DRIVER.lock. Les verbes autres qu'acquire, appeles sans --ws ni --depot

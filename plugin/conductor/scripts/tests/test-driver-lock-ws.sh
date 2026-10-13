@@ -7,6 +7,10 @@
 # Plan 57-02 : WS-LEG (ancien verrou), WS-LOC (worktrees), WS-NOGIT (repli hors git), WS-VFL (VF_DRIVER_LOCK),
 # WS-FLATWS (options inertes en lab plat).
 # Plan 57-04 : WS-CONC (un gagnant par verrou sous concurrence, 24 x 5 tours), puis WS-AB et mutants DL-M-a a DL-M-i.
+# Q5 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) : WS-TKA à WS-TKD, takeover --ws applique la règle
+# d'acquire vis-à-vis de l'ancien verrou (TKA vivant avant : refus legacy-lock-held ; TKB apparu entre la sonde et la pose :
+# pose retirée, même refus ; TKC témoin sans ancien verrou ; TKD ancien verrou périmé : takeover inchangé). Mutants
+# tk_nosonde (TKA), tk_reprobe_none, tk_pose_kept, tk_gen_kept (TKB).
 #
 # TRACER (tâche 1) — un compartiment se verrouille au niveau du clone, de bout en bout :
 #   WS-TRACE-1 acquire --ws → JSON de portée · WS-TRACE-2 lien dans le dossier commun du clone, rien
