@@ -43,10 +43,13 @@
 #             cycle, noms voisins jamais jugés ; lab dev : octet vide
 #   R-G4-05   dérogation G4 sur le chemin du SUMMARY.md (usage unique) ; erreur interne injectée : armée deny, observe ligne d'observation
 #   R-G4-06   aucun refus de G3 ou de G4 ne porte le chemin absolu du lab, « no such file » ni « can't open »
-#   R-G4-07   (46.1-01, P461-D-01) copie armée : exemption étroite de la réécriture — un SUMMARY.md qui existe déjà en fichier régulier (lstat du chemin tel
-#             qu'écrit) d'une unité sans VERDICT.md ni CLOTURE.md (au sens lexists) se réécrit par Write, Edit, NotebookEdit (famille A) ; sa création reste refusée (G)
+#   R-G4-07   (46.1-01, P461-D-01, P461-D-01b) copie armée : exemption étroite de la réécriture — un SUMMARY.md qui existe déjà en fichier régulier (lstat du
+#             chemin tel qu'écrit) d'une unité sans VERDICT.md ni CLOTURE.md (au sens lexists) se réécrit par Write, Edit, NotebookEdit (famille A) ; refusés, avec un
+#             message de G4 : B verdict périmé, C constat en échec, D VERDICT.md invalide (R6), E CLOTURE.md sans VERDICT.md, F SUMMARY.md lien vers celui d'une autre
+#             unité, G création ; bords : VERDICT.md ou CLOTURE.md en lien (même pendant), SUMMARY.md dossier ou tube jugés, lien pendant vers un nom hors forme
+#             silencieux (jumeau négatif), `summary.md` à côté de SUMMARY.md selon la sensibilité à la casse du système (l'autre branche : « non applicable ici »)
 #   R-FORME-01 `unite_de_fichier` du hook et `forme_unite` de poser-verdict.sh rendent la même unité sur un lot de chemins (copies ast chargées du texte)
-#   BANC      fixtures/cloture-banc.txt : onze labs adhérents et leurs onze jumeaux `-dev`, chaque écriture rejouée sur copie armée ; COUVERTURE G3, G4 (au moins
+#   BANC      fixtures/cloture-banc.txt : dix-sept labs adhérents (dont six `cl-g4-reecriture-a` à `-f`, P461-D-01b) et leurs dix-sept jumeaux `-dev`, chaque écriture rejouée sur copie armée ; COUVERTURE G3, G4 (au moins
 #             quatre doit-refuser et quatre doit-passer réellement joués par gate) ; COMPTE G3, COMPTE G4 : faux-refus=0 faux-accept=0
 #   R-BANC-NFD (A1, fix-46-a) chaque écriture du banc dont le chemin porte un caractère composable (labs cl-nfc et cl-nfc-dev, noms en NFC) est rejouée sur copie
 #             armée dans deux matérialisations fraîches, sous sa forme NFC et sous son jumeau NFD : mêmes code, stdout et stderr ; COUVERTURE NFD (au moins un
@@ -74,7 +77,8 @@
 #   appel direct), MUT-DEROG-VERROU (`consommer` lit au-delà), MUT-D1-LECTURE-HACHAGE (le compteur de `empreinte_fichier` retiré) -> R-JOURNAUX-BORNES ;
 #   MUT-PLAN-G2-BORNE est RE-CIBLÉ (tour 2) : le défaut de `lire_frontmatter_fichier` valant désormais BORNE_LECTURE_PLAN, retirer la borne explicite est
 #   devenu un mutant ÉQUIVALENT ; il relâche la borne (2 * BORNE_LECTURE_PLAN) et reste tué par R-PLAN-BORNE-G2 ;
-#   MUT-G4-REECRITURE (l'exemption de la réécriture rendue sans effet -> R-G4-07) ;
+#   MUT-G4-REECRITURE (l'exemption de la réécriture rendue sans effet), MUT-G4-REECRITURE-VERDICT (B, C, D), MUT-G4-REECRITURE-CLOTURE (E), MUT-G4-REECRITURE-LSTAT
+#   (F), MUT-G4-REECRITURE-CREATION (G), MUT-G4-HASH-REECRITURE (B), MUT-G4-ECHEC-REECRITURE (C), MUT-G4-R6-REECRITURE (D) -> R-G4-07, chacun pour SA famille ;
 #   MUT-G4-ABSENT, MUT-G4-ECHEC, MUT-G4-PLAFOND-MESSAGE (F6, fix-46-c) (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
@@ -1727,10 +1731,15 @@ def _lab_reecriture(ctx, nom, **kw):
 
 
 def controle_g4_07(ctx, script):
-    """Copie armée, exemption étroite de la réécriture (P461-D-01) : le SUMMARY.md qui existe déjà en fichier régulier (lstat du chemin tel qu'écrit) d'une
-    unité sans VERDICT.md ni CLOTURE.md (au sens lexists) se réécrit par Write, Edit et NotebookEdit (famille A) ; sa CRÉATION reste refusée (famille G)."""
+    """Copie armée, exemption étroite de la réécriture (P461-D-01, P461-D-01b) : le SUMMARY.md qui existe déjà en fichier régulier (lstat du chemin tel
+    qu'écrit) d'une unité sans VERDICT.md ni CLOTURE.md (au sens lexists) se réécrit par Write, Edit et NotebookEdit (A) ; tout le reste de G4 tient :
+    verdict périmé (B), constat en échec (C), verdict invalide (D), CLOTURE.md sans VERDICT.md (E), SUMMARY.md en lien vers celui d'une autre unité (F) et
+    création (G) sont refusés ; bords : VERDICT.md ou CLOTURE.md en lien (même pendant), SUMMARY.md dossier ou tube sont jugés, un lien pendant vers un nom hors
+    forme se tait, `summary.md` à côté de SUMMARY.md suit la sensibilité à la casse du système de fichiers."""
     d = ctx.copie_forcee(_dossier(ctx, script), "armed")
     fautes = []
+    outils = ("Write", "Edit", "NotebookEdit")
+    reelle = _dossier(ctx, script) == ctx.scripts_dir
 
     def passe(nom, lab, outil, rel=SUMMARY):
         rc, out, err = ecrire_dans(ctx, d, lab, outil, rel)
@@ -1749,17 +1758,78 @@ def controle_g4_07(ctx, script):
         else:
             fautes.extend("%s %s : %s" % (nom, outil, f) for f in fautes_de_message(raison, lab))
 
+    deja = {SUMMARY: "Résumé déjà écrit.\n"}
     # A. réécriture, ni VERDICT.md ni CLOTURE.md : passage pour les trois outils
     lab = _lab_reecriture(ctx, "g4-07-a")
-    for outil in ("Write", "Edit", "NotebookEdit"):
+    for outil in outils:
         passe("A réécriture sans verdict ni clôture", lab, outil)
+    # B. verdict périmé (le PLAN.md change après la pose, par la vraie commande)
+    lab = lab_g4(ctx, "g4-07-b", tentative=2, fichiers=deja)
+    with open(os.path.join(lab, UNITE, "PLAN.md"), "a", encoding="utf-8") as fh:
+        fh.write("Une ligne de plus.\n")
+    for outil in outils:
+        refuse("B verdict périmé", lab, outil, "verdict périmé")
+    # C. constat en échec
+    lab = lab_g4(ctx, "g4-07-c", constats=("critere-a::échec",), fichiers=deja)
+    for outil in outils:
+        refuse("C constat en échec", lab, outil, "constat en échec")
+    # D. verdict invalide (constats vides, règle R6), volontairement faux
+    lab = _lab_reecriture(ctx, "g4-07-d")
+    verdict_a_la_main(lab, constats=(), hash_plan="0" * 64)
+    for outil in outils:
+        refuse("D verdict invalide", lab, outil, "VERDICT.md invalide (règle R6)")
+    # E. CLOTURE.md sans VERDICT.md
+    lab = _lab_reecriture(ctx, "g4-07-e", fichiers={CLOTURE: "Clôture déjà écrite.\n"})
+    for outil in outils:
+        refuse("E CLOTURE.md sans VERDICT.md", lab, outil, "aucun VERDICT.md")
+    # F. SUMMARY.md lien vers le SUMMARY.md d'une AUTRE unité de forme modèle (sinon le realpath sort de la forme et le hook se tait)
+    cible = ".planning/cycles/01-c/phases/02-cible"
+    lab = fabriquer_lab(ctx, "g4-07-f", fichiers={LIVRABLE: "contenu\n", cible + "/SUMMARY.md": "Résumé de la cible.\n",
+                                                  cible + "/PLAN.md": "---\necrit: " + LIVRABLE + "\n---\nPlan de la cible.\n"},
+                        liens={SUMMARY: "../02-cible/SUMMARY.md"})
+    for outil in outils:
+        refuse("F SUMMARY.md lien", lab, outil, "aucun VERDICT.md")
     # G. création : jugée
     lab = fabriquer_lab(ctx, "g4-07-g", fichiers={LIVRABLE: "contenu\n"})
-    for outil in ("Write", "Edit", "NotebookEdit"):
+    for outil in outils:
         refuse("G création sans verdict", lab, outil, "aucun VERDICT.md")
+    # bords : un VERDICT.md ou un CLOTURE.md en lien compte comme présent (lexists), même pendant
+    lab = _lab_reecriture(ctx, "g4-07-verdict-lien-pendant", liens={VERDICT: "absent.md"})
+    refuse("bord VERDICT.md lien pendant", lab, "Write", "VERDICT.md invalide (règle R6)")
+    lab = _lab_reecriture(ctx, "g4-07-cloture-lien", fichiers={UNITE + "/autre.md": "x\n"}, liens={CLOTURE: "autre.md"})
+    refuse("bord CLOTURE.md lien", lab, "Write", "aucun VERDICT.md")
+    lab = _lab_reecriture(ctx, "g4-07-cloture-lien-pendant", liens={CLOTURE: "absent.md"})
+    refuse("bord CLOTURE.md lien pendant", lab, "Write", "aucun VERDICT.md")
+    # bords : SUMMARY.md dossier ou tube = création jugée (lstat du chemin tel qu'écrit)
+    lab = fabriquer_lab(ctx, "g4-07-dossier", fichiers={LIVRABLE: "contenu\n"}, dossiers=(SUMMARY,))
+    refuse("bord SUMMARY.md dossier", lab, "Write", "aucun VERDICT.md")
+    if hasattr(os, "mkfifo"):
+        lab = fabriquer_lab(ctx, "g4-07-tube", fichiers={LIVRABLE: "contenu\n"})
+        os.mkfifo(os.path.join(lab, SUMMARY))
+        refuse("bord SUMMARY.md tube", lab, "Write", "aucun VERDICT.md")
+    elif reelle:
+        print("  ~ R-G4-07 (SUMMARY.md tube) non exercé : os.mkfifo absent ici (non applicable ici)")
+    # bord : lien pendant vers un nom hors forme -> silence (jumeau négatif, déjà vrai avant l'exemption : le chemin résolu n'est plus un SUMMARY.md)
+    lab = fabriquer_lab(ctx, "g4-07-lien-hors-forme", fichiers={LIVRABLE: "contenu\n"}, liens={SUMMARY: "NOTES.md"})
+    passe("bord lien pendant vers un nom hors forme (jumeau négatif)", lab, "Write")
+    # bord : `summary.md` à côté d'un SUMMARY.md existant -> création jugée sur un système sensible à la casse, même fichier sur un système insensible
+    lab = _lab_reecriture(ctx, "g4-07-casse")
+    rel_casse = UNITE + "/summary.md"
+    insensible = os.path.lexists(os.path.join(lab, rel_casse))
+    if insensible:
+        for outil in outils:
+            passe("bord summary.md (système insensible à la casse : même fichier, exemption)", lab, outil, rel_casse)
+        casse = "système insensible à la casse (APFS, HFS+) : `summary.md` est le même fichier, exemption rejouée ; branche sensible non applicable ici"
+    else:
+        for outil in outils:
+            refuse("bord summary.md (système sensible à la casse : création)", lab, outil, "aucun VERDICT.md", rel_casse)
+        casse = "système sensible à la casse : `summary.md` est une création, refus rejoué ; branche insensible non applicable ici"
+    if reelle:
+        print("  ~ R-G4-07 (casse) %s" % casse)
     return (not fautes), ("; ".join(fautes[:6]) if fautes else
-                          "réécriture d'un SUMMARY.md régulier d'une unité sans verdict ni clôture : passage pour Write, Edit, NotebookEdit ; création : UN deny "
-                          "« [planning-core] G4 : aucun VERDICT.md » pour les trois outils")
+                          "A réécriture sans verdict ni clôture : passage pour Write, Edit, NotebookEdit ; refus « [planning-core] G4 : » pour les trois outils : B verdict "
+                          "périmé, C constat en échec, D VERDICT.md invalide (R6), E CLOTURE.md sans VERDICT.md, F SUMMARY.md lien vers une autre unité, G création ; bords : "
+                          "VERDICT.md et CLOTURE.md en lien (même pendant), SUMMARY.md dossier et tube jugés, lien pendant vers un nom hors forme : silence ; casse : " + casse)
 
 
 # =================================================================================================
@@ -2388,6 +2458,15 @@ def sec_mutants_g4(ctx):
     tuer(ctx, "G4-HASH", "# g4-hash-plan", "if False:  # g4-hash-plan", "R-G4-03", controle_g4_03)
     tuer(ctx, "G4-HASH-LIVRABLES", "# g4-hash-livrables", 'if statut_emp != "ok":  # g4-hash-livrables', "R-G4-03", controle_g4_03)
     tuer(ctx, "G4-REECRITURE", "# g4-exempt-retour", "pass  # g4-exempt-retour", "R-G4-07", controle_g4_07)
+    # chaque branche de l'exemption a son mutant, tué par SA famille (46.1-01, P461-D-01b) : verdict absent toujours vrai (B, C, D), clôture absente toujours
+    # vraie (E), lstat remplacé par un test qui suit le lien (F), fichier régulier toujours vrai (G) ; trois mutants du reste de G4 sur la réécriture
+    tuer(ctx, "G4-REECRITURE-VERDICT", "# g4-exempt-verdict", "if True:  # g4-exempt-verdict", "R-G4-07", controle_g4_07)
+    tuer(ctx, "G4-REECRITURE-CLOTURE", "# g4-exempt-cloture", "if True:  # g4-exempt-cloture", "R-G4-07", controle_g4_07)
+    tuer(ctx, "G4-REECRITURE-LSTAT", "# g4-exempt-regulier", 'if os.path.exists(contexte["ecrit"]):  # g4-exempt-regulier', "R-G4-07", controle_g4_07)
+    tuer(ctx, "G4-REECRITURE-CREATION", "# g4-exempt-regulier", "if True:  # g4-exempt-regulier", "R-G4-07", controle_g4_07)
+    tuer(ctx, "G4-HASH-REECRITURE", "# g4-hash-plan", "if False:  # g4-hash-plan", "R-G4-07", controle_g4_07)
+    tuer(ctx, "G4-ECHEC-REECRITURE", "# g4-echec", "if False:  # g4-echec", "R-G4-07", controle_g4_07)
+    tuer(ctx, "G4-R6-REECRITURE", "# g4-invalide", "if not isinstance(constats, list) or any(  # g4-invalide", "R-G4-07", controle_g4_07)
     tuer(ctx, "G4-FAILOPEN", "# protege-erreur",
          'return [] if gate == "G4" else [Verdict(gate, None, "erreur interne du gate : " + type(exc).__name__)]  # protege-erreur', "R-G4-05", controle_g4_05)
 

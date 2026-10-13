@@ -787,6 +787,340 @@ ecrit: livrables/rapport.md
 @@ ecriture Edit .planning/cycles/01-c/phases/01-sans-verdict/SUMMARY.md :: silence G4
 @@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-sans-verdict/SUMMARY.md :: silence G4
 
+@@ # --- Réécriture d'un SUMMARY.md existant (46.1-01, P461-D-01, P461-D-01b) : l'exemption étroite de G4 ne couvre que la réécriture d'un fichier
+@@ # régulier d'une unité sans VERDICT.md ni CLOTURE.md ; verdict périmé, constat en échec, verdict invalide, CLOTURE.md sans VERDICT.md et SUMMARY.md en lien
+@@ # restent jugés (doit-refuser). Chaque lab adhérent a son jumeau `-dev`.
+@@ lab cl-g4-reecriture-a
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-libre/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-libre/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier livrables/rapport.md
+contenu
+@@ fichier .planning/cycles/01-c/phases/01-libre/SUMMARY.md
+Résumé déjà écrit.
+@@ ecriture Write .planning/cycles/01-c/phases/01-libre/SUMMARY.md :: doit-passer G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-libre/SUMMARY.md :: doit-passer G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-libre/SUMMARY.md :: doit-passer G4
+@@ ecriture Write .planning/cycles/01-c/phases/01-libre/SUMMARY.md agent=agent-inconnu :: doit-passer G4
+
+@@ lab cl-g4-reecriture-a-dev jumeau-de=cl-g4-reecriture-a
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-libre/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-libre/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier .planning/cycles/01-c/phases/01-libre/SUMMARY.md
+Résumé déjà écrit.
+@@ ecriture Write .planning/cycles/01-c/phases/01-libre/SUMMARY.md :: silence G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-libre/SUMMARY.md :: silence G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-libre/SUMMARY.md :: silence G4
+
+@@ lab cl-g4-reecriture-b
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-perime-livrable/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-perime-livrable/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier .planning/cycles/01-c/phases/02-perime-plan/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/02-perime-plan/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier livrables/rapport.md
+contenu
+@@ fichier .planning/cycles/01-c/phases/01-perime-livrable/SUMMARY.md
+Résumé déjà écrit.
+@@ fichier .planning/cycles/01-c/phases/02-perime-plan/SUMMARY.md
+Résumé déjà écrit.
+@@ fichier .planning/cycles/01-c/phases/01-perime-livrable/VERDICT.md
+---
+juge: "banc"
+hash: "{{sha256-plan}}"
+hash_livrables: "0000000000000000000000000000000000000000000000000000000000000000"
+tentative: 1
+score: "ok"
+constats:
+  - critere: "critere-a"
+    resultat: "passé"
+---
+@@ fichier .planning/cycles/01-c/phases/02-perime-plan/VERDICT.md
+---
+juge: "banc"
+hash: "0000000000000000000000000000000000000000000000000000000000000000"
+hash_livrables: "{{empreinte-livrables}}"
+tentative: 1
+score: "ok"
+constats:
+  - critere: "critere-a"
+    resultat: "passé"
+---
+@@ ecriture Write .planning/cycles/01-c/phases/01-perime-livrable/SUMMARY.md :: doit-refuser G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-perime-livrable/SUMMARY.md :: doit-refuser G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-perime-livrable/SUMMARY.md :: doit-refuser G4
+@@ ecriture Write .planning/cycles/01-c/phases/02-perime-plan/SUMMARY.md :: doit-refuser G4
+@@ ecriture Edit .planning/cycles/01-c/phases/02-perime-plan/SUMMARY.md :: doit-refuser G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/02-perime-plan/SUMMARY.md :: doit-refuser G4
+
+@@ lab cl-g4-reecriture-b-dev jumeau-de=cl-g4-reecriture-b
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-perime-livrable/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-perime-livrable/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier .planning/cycles/01-c/phases/01-perime-livrable/SUMMARY.md
+Résumé déjà écrit.
+@@ ecriture Write .planning/cycles/01-c/phases/01-perime-livrable/SUMMARY.md :: silence G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-perime-livrable/SUMMARY.md :: silence G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-perime-livrable/SUMMARY.md :: silence G4
+
+@@ lab cl-g4-reecriture-c
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-echec/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-echec/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier livrables/rapport.md
+contenu
+@@ fichier .planning/cycles/01-c/phases/01-echec/SUMMARY.md
+Résumé déjà écrit.
+@@ verdict .planning/cycles/01-c/phases/01-echec tentative=1 constats=critere-a::échec
+@@ ecriture Write .planning/cycles/01-c/phases/01-echec/SUMMARY.md :: doit-refuser G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-echec/SUMMARY.md :: doit-refuser G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-echec/SUMMARY.md :: doit-refuser G4
+
+@@ lab cl-g4-reecriture-c-dev jumeau-de=cl-g4-reecriture-c
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-echec/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-echec/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier .planning/cycles/01-c/phases/01-echec/SUMMARY.md
+Résumé déjà écrit.
+@@ ecriture Write .planning/cycles/01-c/phases/01-echec/SUMMARY.md :: silence G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-echec/SUMMARY.md :: silence G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-echec/SUMMARY.md :: silence G4
+
+@@ lab cl-g4-reecriture-d
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-invalide/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-invalide/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier livrables/rapport.md
+contenu
+@@ fichier .planning/cycles/01-c/phases/01-invalide/SUMMARY.md
+Résumé déjà écrit.
+@@ fichier .planning/cycles/01-c/phases/01-invalide/VERDICT.md
+---
+juge: "banc"
+hash: "0000000000000000000000000000000000000000000000000000000000000000"
+tentative: 1
+score: "ok"
+constats: []
+---
+@@ ecriture Write .planning/cycles/01-c/phases/01-invalide/SUMMARY.md :: doit-refuser G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-invalide/SUMMARY.md :: doit-refuser G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-invalide/SUMMARY.md :: doit-refuser G4
+
+@@ lab cl-g4-reecriture-d-dev jumeau-de=cl-g4-reecriture-d
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-invalide/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-invalide/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier .planning/cycles/01-c/phases/01-invalide/SUMMARY.md
+Résumé déjà écrit.
+@@ ecriture Write .planning/cycles/01-c/phases/01-invalide/SUMMARY.md :: silence G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-invalide/SUMMARY.md :: silence G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-invalide/SUMMARY.md :: silence G4
+
+@@ lab cl-g4-reecriture-e
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-cloture/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-cloture/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier livrables/rapport.md
+contenu
+@@ fichier .planning/cycles/01-c/phases/01-cloture/SUMMARY.md
+Résumé déjà écrit.
+@@ fichier .planning/cycles/01-c/phases/01-cloture/CLOTURE.md
+Clôture déjà écrite.
+@@ ecriture Write .planning/cycles/01-c/phases/01-cloture/SUMMARY.md :: doit-refuser G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-cloture/SUMMARY.md :: doit-refuser G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-cloture/SUMMARY.md :: doit-refuser G4
+
+@@ lab cl-g4-reecriture-e-dev jumeau-de=cl-g4-reecriture-e
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-cloture/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-cloture/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier .planning/cycles/01-c/phases/01-cloture/SUMMARY.md
+Résumé déjà écrit.
+@@ fichier .planning/cycles/01-c/phases/01-cloture/CLOTURE.md
+Clôture déjà écrite.
+@@ ecriture Write .planning/cycles/01-c/phases/01-cloture/SUMMARY.md :: silence G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-cloture/SUMMARY.md :: silence G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-cloture/SUMMARY.md :: silence G4
+
+@@ lab cl-g4-reecriture-f
+@@ fichier .planning/config.json
+{"planning_version": "cycles-v1"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-lien/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-lien/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier .planning/cycles/01-c/phases/02-cible/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/02-cible/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier livrables/rapport.md
+contenu
+@@ fichier .planning/cycles/01-c/phases/02-cible/SUMMARY.md
+Résumé déjà écrit.
+@@ lien .planning/cycles/01-c/phases/01-lien/SUMMARY.md -> ../02-cible/SUMMARY.md
+@@ ecriture Write .planning/cycles/01-c/phases/01-lien/SUMMARY.md :: doit-refuser G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-lien/SUMMARY.md :: doit-refuser G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-lien/SUMMARY.md :: doit-refuser G4
+
+@@ lab cl-g4-reecriture-f-dev jumeau-de=cl-g4-reecriture-f
+@@ fichier .planning/config.json
+{"planning_version": "2.0"}
+@@ fichier .planning/cycles/01-c/CYCLE.md
+---
+titre: Cycle de clôture
+---
+@@ fichier .planning/cycles/01-c/phases/01-lien/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/01-lien/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier .planning/cycles/01-c/phases/02-cible/CADRAGE.md
+---
+inconnues: []
+---
+@@ fichier .planning/cycles/01-c/phases/02-cible/PLAN.md
+---
+ecrit: livrables/rapport.md
+---
+@@ fichier .planning/cycles/01-c/phases/02-cible/SUMMARY.md
+Résumé déjà écrit.
+@@ lien .planning/cycles/01-c/phases/01-lien/SUMMARY.md -> ../02-cible/SUMMARY.md
+@@ ecriture Write .planning/cycles/01-c/phases/01-lien/SUMMARY.md :: silence G4
+@@ ecriture Edit .planning/cycles/01-c/phases/01-lien/SUMMARY.md :: silence G4
+@@ ecriture NotebookEdit .planning/cycles/01-c/phases/01-lien/SUMMARY.md :: silence G4
+
 @@ # --- Noms composables (A1, fix-46-a) : cycle `01-été`, phases accentuées ; chaque écriture se rejoue aussi sous sa forme NFD (R-BANC-NFD).
 @@ lab cl-nfc
 @@ fichier .planning/config.json
