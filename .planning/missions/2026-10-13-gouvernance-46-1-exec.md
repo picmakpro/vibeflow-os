@@ -6,7 +6,10 @@ revu ») — exécution sans attendre la revue code owner de la pile ; aucun mer
 **Branche :** `gouvernance/phase-46.1-execution`, partie de `origin/gouvernance/phase-46.1-cadrage` @
 `b73885c8` (PR #146), poussée avec suivi amont ; worktree `.claude/worktrees/gouvernance-46-1`.
 **Compartiment :** `gouvernance` (`--ws gouvernance` à chaque commande GSD ; gsd-tools 1.14.0 du compte).
-**Verrou :** acquis, génération `DRIVER.lock.gen.1791881933.48268`, 0 orphelin.
+**Verrou :** acquis, génération `DRIVER.lock.gen.1791881933.48268`, 0 orphelin ; relâché en fin de
+session (attente humaine).
+**Issue (session du 2026-10-13 → 2026-10-14) :** `human_needed` — DAG exécuté jusqu'au checkpoint 5b
+(plan 46.1-04, Tâche 2) ; `exec-04` (Tâches 2-3) et toute la suite attendent Willy (Q-5b-A, Q-5b-B).
 **Invariants :** `check-mission-invariants.sh` → 3 (SAIN).
 **Flags d'enchaînement :** `workflow.auto_advance` et `workflow._auto_chain_active` à `false`, vérifiés
 par lecture de `.planning/config.json` (`gsd_run` non résolu sur ce poste).
@@ -228,3 +231,81 @@ lab). Rien arrêté, aucun lab lu.
 - **Recommandation du manager :** `rejeu-5b-oui` + (a) — ce sont des sessions de travail de Willy
   (dont des `claude` actifs) : les fermer lui-même évite de perdre un travail en cours ; (b) reste
   possible s'il le préfère.
+
+## État à la remise (2026-10-14)
+
+- **Plans livrés :** 14, 17, 01, 02, 03, 18 (6/18) + 46.1-04 Tâche 1. Lots quick : `261013-owa`
+  (outil de contrôle), `261013-t18` (fix-5b). Plans 04-13 et 16 re-validés et corrigés.
+- **Gates :** G3 armé (Phase 46) ; **G4 et G4′ en observation** — rien n'a été armé.
+- **Juges :** revue-5b PASS (7 mineurs) ; audit-5b OPEN_THREATS sans HIGH (3 MEDIUM, 1 LOW) → tous
+  fermés par fix-5b ; plan-checks : ISSUES → corrigés → contrôle (2 points) → corrigés.
+- **Non-régression :** base 109 suites (8 rouges locaux, verts en CI) ; jalon 1 : 110 suites, 103
+  vertes, 7 rouges préexistants, 0 imputable (`JALON-VERIF 1 ok`). CI Linux verte sur chaque push,
+  dernier `7ff70821`.
+- **Branche :** `gouvernance/phase-46.1-execution`, poussée. Aucune PR encore (nœud `pr` en fin de
+  DAG). Aucun merge, tag ni release.
+
+## Reprise (pour la relance)
+
+1. Réponses de Willy à Q-5b-A et Q-5b-B (verbatim, canal + date).
+2. Si (a) ou (b) : re-mesure du repos ; nouveau `vf-coder` sur `exec-04` avec le champ `reprise`
+   (`plan_id 46.1-04`, `checkpoint` Tâche 2, `gate blocking-human`, `attendu` = options du plan,
+   `reponse_humaine` verbatim, `taches_faites` = Tâche 1 `8379e1af`) → Tâche 3 (rejeu ou repli),
+   puis `exec-05` (checkpoint d'armement de G4 : jalon 1 déjà consigné, `JALON-VERIF 1 ok`).
+3. Puis 06, 15, 07, 08, 09, 16, 10, revue-6 ∥ audit-6 ∥ jalon 2, 11, 12 (checkpoints), 13, étage
+   final, docs, PR empilée sur #146.
+
+## Décompte (mandats émis par le manager, blocs typés reçus)
+
+Dispatches : 15 — vf-coder 10 (exec-14, exec-17, exec-01, fix-outil-01, exec-02, exec-03,
+exec-18, fix-5b, fix-plans-restants, exec-04), vf-reviewer 1, vf-auditer 1, gsd-plan-checker 3 ;
+reprises par `SendMessage` : 3 (fix-outil-01 passe 2, fix-plans-restants réveil après coupure API
+et correction n°2). Tours de revue : 1 (revue-5b) ; tours d'audit : 1 ; tours de plan-check : 2.
+`subagent_tokens` des blocs typés : exec-14 680 873 ; exec-17 494 297 ; exec-01 317 259 ;
+exec-02 328 678 ; exec-03 344 433 ; exec-18 244 807 ; audit-5b 201 081 ; fix-5b 1 019 259
+(planificateur 495 508 + exécuteur 523 751) ; exec-04 200 754 ; fix-outil-01, revue-5b,
+fix-plans-restants : 0 déclaré. Usage rapporté par le harnais pour les mandats sans compte : fix-outil
+143 504 + 178 897, revue 304 882, plan-checks 190 015 + 116 815 + 213 904, fix-plans 251 314 + 290 713.
+
+## Preuves E6
+
+Relayées verbatim des blocs typés `vf-coder`, par sprint :
+
+```json
+{
+ "preuves": [
+  {"verdict": "recette", "preuve": "amont", "sprint": "exec-14"},
+  {"verdict": "autotest", "preuve": "amont-agent", "detail": "AUTOTEST-BILAN cas=87 declares=87 echecs=0, rapporté par le gsd-executor, non rejoué par moi", "sprint": "exec-14"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "exec-17"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "exec-01"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "fix-outil-01 (passe 1)"},
+  {"verdict": "autotest-apres", "commande": "bash .planning/workstreams/gouvernance/phases/VFDO-46.1-armement-de-g4-et-g4/46.1-CONTROLES.sh --autotest", "exit_code": 1, "sha": "54936dc9", "sprint": "fix-outil-01 (passe 1)"},
+  {"verdict": "autotest-mutant-avant-fix", "commande": "CONTROLES-mutant-avant-fix.sh --autotest --sans-reel (scratchpad)", "exit_code": 1, "sha": "54936dc9", "sprint": "fix-outil-01 (passe 1)"},
+  {"verdict": "e2e-suite-detachee", "commande": "46.1-CONTROLES.sh suite … test-cloture-gates.sh --duree-max=base --detache=… puis sonder", "exit_code": 0, "sha": "54936dc9", "sprint": "fix-outil-01 (passe 1)"},
+  {"verdict": "empreinte", "commande": "46.1-CONTROLES.sh empreinte", "exit_code": 1, "sha": "e1b5fc94", "sprint": "fix-outil-01 (passe 1)"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "fix-outil-01 (passe 2)"},
+  {"verdict": "autotest-final", "commande": "bash …/46.1-CONTROLES.sh --autotest", "exit_code": 0, "sha": "1b5cba0e", "sprint": "fix-outil-01 (passe 2)"},
+  {"verdict": "empreinte", "commande": "bash …/46.1-CONTROLES.sh empreinte", "exit_code": 0, "sha": "f108ef1b", "sprint": "fix-outil-01 (passe 2)"},
+  {"verdict": "suite-detachee-gates", "commande": "46.1-CONTROLES.sh suite … test-planning-gates.sh --duree-max=base --detache=… puis sonder", "exit_code": 0, "sha": "f108ef1b", "sprint": "fix-outil-01 (passe 2)"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "exec-02"},
+  {"verdict": "suite:test-d1-surveillance.sh", "commande": "46.1-CONTROLES.sh suite plugin/planning-core/scripts/tests/test-d1-surveillance.sh (exiges de la tâche 2) --montre", "exit_code": 0, "sha": "f3a78f95", "sprint": "exec-02"},
+  {"verdict": "suite:test-planning-gates.sh", "commande": "46.1-CONTROLES.sh suite plugin/planning-core/scripts/tests/test-planning-gates.sh --detache", "exit_code": 0, "sha": "66ad38b8", "sprint": "exec-02"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "exec-03"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "exec-18"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "fix-5b"},
+  {"verdict": "recette", "preuve": "amont", "sprint": "exec-04 (Tâche 1)"},
+  {"verdict": "banc G4 (cité de 46.1-01-SUMMARY.md)", "preuve": "amont", "detail": "COMPTE G4 faux-refus=0 faux-accept=0 ; COUVERTURE G4 doit-refuser=51 doit-passer=30 silence=31", "sprint": "exec-04 (Tâche 1)"},
+  {"verdict": "MUT-REJEU-G4-REECRITURE", "preuve": "amont", "detail": "tué : original « COMPTE G4 faux-accept=0 », mutant « COMPTE G4 faux-accept=1 » sur l'unité à verdict périmé", "sprint": "exec-04 (Tâche 1)"},
+  {"verdict": "constantes ARMEMENT_*", "preuve": "amont", "detail": "inchangées : ARMEMENT_G3 armed, ARMEMENT_G4 observe, ARMEMENT_G4P observe", "sprint": "exec-04 (Tâche 1)"},
+  {"verdict": "critères d'acceptation Tâche 1 (exécuteur)", "preuve": "amont", "detail": "limite (bu) : 0 ligne ; entrée (\"bu\",) : 0 ; verifier-releve.sh --etape= : 1 ; check-machine-paths.sh vert, 2003 fichiers", "sprint": "exec-04 (Tâche 1)"}
+ ]
+}
+```
+
+Verdicts des hooks moteur relayés : `{"code_review":"absent","nyquist":"absent","secure":"absent"}` pour
+chaque sprint (aucun hook vu). `estimate`/`actuals` : absents (aucun plan ne porte `estimate:`).
+
+## Next step
+
+Relayer Q-5b-A et Q-5b-B à Willy (AskUserQuestion), puis relancer la mission sur ses réponses :
+reprise de `exec-04` (Tâche 3), puis checkpoint d'armement de G4 (plan 05).

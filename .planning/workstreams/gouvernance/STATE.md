@@ -5,24 +5,24 @@ milestone: gouvernance-labs-v1.0
 milestone_name: « le planning métier tenu par une machine »
 current_phase: 46.1
 current_phase_name: Armement de G4 et G4′
-status: "Phase 46.1 cadrée et planifiée (18 plans, plan-check frais PASSED), non exécutée ; Phase 46 exécutée et vérifiée, non close (PR #136 non mergée)"
+status: "Phase 46.1 en exécution : 6/18 plans livrés (14, 17, 01, 02, 03, 18) + 46.1-04 Tâche 1, jalon 1 vert ; checkpoint 5b en attente de Willy ; G3 armé, G4 et G4′ en observation"
 created: 2026-09-23
-last_updated: "2026-10-12T18:00:00.000Z"
-last_activity: 2026-10-12
+last_updated: "2026-10-14T00:00:00.000Z"
+last_activity: 2026-10-14
 last_activity_desc: >-
-  Cadrage et planification de la Phase 46.1 (mission vf-dev-manager-p461-cadrage) : Q1-Q4
-  tranchées par Willy (AskUserQuestion session principale, 2026-10-07), Q5 le 2026-10-12 ;
-  P461-D-01..17, ARMG-01..10, 18 plans, plan-check frais PASSED au tour 4.
+  Exécution de la Phase 46.1 (mission vf-dev-manager-p461-exec, feu vert Willy 2026-10-13) :
+  plans 14, 17, 01, 02, 03, 18 livrés, lots quick 261013-owa et 261013-t18, revue PASS, audit
+  sans HIGH, plans restants re-validés et corrigés, jalon 1 vert, 46.1-04 Tâche 1 livrée.
 stopped_at: >-
-  Phase 46.1 planifiée (18 plans), non exécutée ; PR de planification empilée sur #136.
-  Suite : revue de la pile #124 → #133 → #136 → 46.1, puis exécution de la 46.1 (plan 14 d'abord).
-  Rapport : .planning/missions/2026-10-07-gouvernance-46-1-cadrage.md.
+  Phase 46.1, checkpoint 5b du plan 46.1-04 (Tâche 2) en attente de Willy : rejeu réel 5b et
+  repos de ~/BusinessFlow-Lab (30 processus). Rapport :
+  .planning/missions/2026-10-13-gouvernance-46-1-exec.md.
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 58
-  completed_plans: 40
-  percent: 69
+  completed_plans: 46
+  percent: 79
 ---
 
 # Project State
@@ -47,12 +47,12 @@ Précédent : correction ciblée lots 1+2 (quick task `260928-b4c`) : gardes F3/
 ## Progress
 
 **Phases Complete:** 4 (Phase 42 : PR #108 mergée 2026-09-27 ; Phase 43 : PR #111 mergée 2026-09-27 — revue code owner de Samuel en attente sur les deux ; Phase 44 : close le 2026-09-28, PR vers main ouverte, non mergée ; Phase 45 : close le 2026-10-02, PR #124 ouverte, non mergée).
-**Current Plan:** aucun — Phase 46.1 planifiée (0/18 exécutés) ; Phase 46 : 46-01..46-12 livrés (12/12), vérifiée 11/11 (`46-VERIFICATION.md`, 3 sous arbitrage)
+**Current Plan:** Phase 46.1 en exécution — 6/18 livrés (14, 17, 01, 02, 03, 18), 46.1-04 Tâche 1 livrée, checkpoint 5b (Tâche 2) en attente de Willy ; Phase 46 : 46-01..46-12 livrés (12/12), vérifiée 11/11 (`46-VERIFICATION.md`, 3 sous arbitrage)
 
 ## Session Continuity
 
-**Stopped At:** Phase 46.1 cadrée et planifiée (18 plans, plan-check frais PASSED), non exécutée ; Phase 46 exécutée et vérifiée, non close (PR #136 non mergée) ; prochaine étape : revue de la pile de PR, puis exécution de la 46.1.
-**Resume File (Phase 46.1) :** `.planning/missions/2026-10-07-gouvernance-46-1-cadrage.md`
+**Stopped At:** Phase 46.1 en exécution (mission `vf-dev-manager-p461-exec`), arrêtée au checkpoint 5b du plan 46.1-04 (rejeu réel 5b, repos de ~/BusinessFlow-Lab) en attente de Willy ; Phase 46 exécutée et vérifiée, non close (PR #136 non mergée).
+**Resume File (Phase 46.1) :** `.planning/missions/2026-10-13-gouvernance-46-1-exec.md` (exécution) ; cadrage : `.planning/missions/2026-10-07-gouvernance-46-1-cadrage.md`
 **Resume File (Phase 46) :** `.planning/missions/2026-10-03-gouvernance-46-plan.md`
 **Resume File (Phase 45) :** `.planning/missions/2026-09-30-gouvernance-45-exec.md`
 **Resume File:** `.planning/missions/2026-09-27-gouvernance-44.md`
@@ -124,6 +124,16 @@ explicitement ; n'attends rien de la CI sur ce point.
 
 ### Decisions
 
+- **2026-10-14 — décisions du manager de la mission d'exécution de la Phase 46.1
+  (vf-dev-manager-p461-exec), renversables par Willy** : base de non-régression gardée malgré
+  la charge (autres sessions) ; un rouge QUE `duree-plafond` = instable, non bloquant ; outil de
+  contrôle corrigé (détache des suites longues) et **regel tracé** de son empreinte (trailer
+  `Regel-Outil:`, sinon `gel-rouvert`) ; lot fix-5b (revue + audit d'avant armement G4, F-2 de
+  l'audit tranché par le manager : ligne à jeton déplacé = malformée, `REJEU-ETAPE` recoupé avec
+  `COMPTE`, plancher auto-déclaré en limite (bx)) ; plans restants re-validés et corrigés avant
+  exécution ; `test-planning-hook-registered.sh` jugé par la CI Linux ; lettres de limites (bv) 06,
+  (bw) 07, (by)/(bz) 10 ; jalon 1 exigé avant le checkpoint d'armement du plan 05 seulement.
+  Détail : `.planning/missions/2026-10-13-gouvernance-46-1-exec.md`.
 - **2026-10-07 — arbitrages de Willy de la mission d'exécution de la Phase 46 (vf-dev-manager-p46-exec)**,
   tous AskUserQuestion session principale. **2026-10-06** : ckpt-46-11 = rejeu-5-6-oui ; lot B de
   l'audit = b3 ; arrêt des processus des labs ; étape 5 = « (c) Armer G3 seul » (G4 en observation,
