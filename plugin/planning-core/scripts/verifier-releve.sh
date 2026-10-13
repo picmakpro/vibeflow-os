@@ -26,12 +26,15 @@
 #   COUVERTURE-REJEU (G3|G4|G4P) n=<k> plancher=<p>                            par gate visé (étape 5 : G3, G4 ; étape 6 : G3, G4, G4P) : UNE ligne, p ≥ 1, k ≥ p
 #   ligne de table `<gate> | <lab> | …`                                        au moins six champs séparés par « | », premier champ ^[A-Z][A-Z0-9]*$ : nomme un lab
 #                                                                              (labs = union des --lab et des labs de table, au moins un ; une ligne de tableau Markdown, qui commence par `|`, ne compte pas)
+#   aucune ligne ne porte un jeton de la grammaire ailleurs qu'en position 0 (REJEU-ETAPE-, COMMIT-REJOUE, EMPREINTE-ARBRE-, EMPREINTE-DIVERGENTE, MESURE-VIDE, COUVERTURE-REJEU, et la tête
+#   d'une ligne de compte `COMPTE <gate> faux-refus` : « COMPTE » seul est un mot courant) : une ligne décalée d'une espace ou citée est malformée, jamais ignorée (fix-5b V4 (a)) ;
+#   la SORTIE du script ne porte aucun de ces jetons (ses détails nomment la famille en minuscules) : reproduite dans un relevé versionné, elle ne change pas la décision
 #   aucune ligne ne porte de chemin ABSOLU de machine : un jeton de chemin (suite maximale de caractères de mot, `.~%+@/-`) qui commence par `/` et vaut, une fois normalisé
 #   lexicalement, `/Users` ou `/home` ou est dessous (`file:///Users/<c>`, `a=/home/<c>`, `//home/<c>`, `/tmp/../home/<c>` rougissent ; `src/pages/home/x`, `~/home/x` non — fix-5b V2)
 #   (les lignes `COMPTE …`, `EMPREINTE-IDENTIQUE …`, `RELEVE-ECART …`, `RELEVE-VERDICT …` d'un relevé ne sont JAMAIS lues pour décider)
-# Règles (22, une ligne `if` marquée chacune) : lecture, vide, etape-absente, etape-malformee, etape-doublon, etape-autre (une ligne REJEU-ETAPE-<m>, m ≠ n),
+# Règles (23, une ligne `if` marquée chacune) : lecture, vide, etape-absente, etape-malformee, etape-doublon, etape-autre (une ligne REJEU-ETAPE-<m>, m ≠ n),
 #   faux-refus, faux-accept, commit-absent, commit-malforme, commit-doublon, labs-absents, empreinte-absente, empreinte-doublon, empreinte-divergente, rejeu-divergent,
-#   mesure-vide, couverture-absente, couverture-malformee (dont plancher=0), couverture-doublon, couverture-insuffisante, chemin-machine.
+#   mesure-vide, couverture-absente, couverture-malformee (dont plancher=0), couverture-doublon, couverture-insuffisante, jeton-deplace, chemin-machine.
 # Une section « Non armé » n'a AUCUN effet sur la décision : aucune règle ne la lit.
 #
 # Ce que ce script ne fait PAS : il ne recalcule rien, ne lance aucun sous-processus, n'écrit aucun fichier, ne lit aucun lab, et ne
@@ -80,6 +83,11 @@ RE_COMMIT = re.compile(r"COMMIT-REJOUE [0-9a-f]{40}")
 RE_EMPREINTE = re.compile(r"EMPREINTE-ARBRE-(IDENTIQUE|DIVERGENTE) (.+)")
 RE_COUVERTURE = re.compile(r"COUVERTURE-REJEU (G3|G4|G4P) n=([0-9]{1,9}) plancher=([0-9]{1,9})")
 RE_GATE = re.compile(r"[A-Z][A-Z0-9]*")
+# Jetons de la grammaire (fix-5b V4 (a)) : une ligne qui en porte un ailleurs qu'en position 0 est malformée (règle jeton-deplace) ; la SORTIE du script n'en porte jamais (elle est
+# reproduite dans les relevés versionnés, puis relue : un jeton y rougirait chaque relevé non armable). `COMPTE` est un mot courant (« COMPTE RENDU.md ») : son jeton est la tête
+# structurelle d'une ligne de compte, pas le mot seul.
+JETONS_LITTERAUX = ("REJEU-ETAPE-", "COMMIT-REJOUE", "EMPREINTE-ARBRE-", "EMPREINTE-DIVERGENTE", "MESURE-VIDE", "COUVERTURE-REJEU")
+RE_TETE_COMPTE = re.compile(r"COMPTE[ \t]+\S+[ \t]+faux-refus")
 
 ECARTS = []
 
@@ -89,8 +97,8 @@ def ecart(regle, detail):
 
 
 def sur(texte):
-    """Forme affichable d'un nom tiré du relevé : jamais un chemin de machine, ni un caractère de contrôle, borné."""
-    if any(t in texte for t in MOTIFS_MACHINE):
+    """Forme affichable d'un nom tiré du relevé : jamais un chemin de machine, ni un jeton de la grammaire, ni un caractère de contrôle, borné."""
+    if any(t in texte for t in MOTIFS_MACHINE) or any(j in texte for j in JETONS_LITTERAUX) or RE_TETE_COMPTE.search(texte):
         return "<nom-masqué>"
     propre = "".join("?" if (ord(c) < 32 or ord(c) == 127) else c for c in texte)
     return propre if len(propre) <= 80 else propre[:77] + "..."
@@ -109,6 +117,11 @@ def racines_machine(ligne):
             if norme == racine or norme.startswith(racine + "/"):
                 trouvees.append(racine)
     return trouvees
+
+
+def jeton_deplace(ligne):
+    """Vrai si la ligne porte un jeton de la grammaire ailleurs qu'en position 0 (recherche à partir de l'index 1, toute ligne, table comprise)."""
+    return any(ligne.find(jeton, 1) != -1 for jeton in JETONS_LITTERAUX) or RE_TETE_COMPTE.search(ligne, 1) is not None
 
 
 def usage(message):
@@ -251,18 +264,19 @@ def juger(texte, etape, labs_options):
     gates_en_doublon = [(g, couvertures[g]) for g in gates if len(couvertures.get(g, ())) > 1]
     couvertures_courtes = [(g, i, n, p) for g in gates for (i, n, p) in couvertures.get(g, ()) if n < p]
     chemins_machine = [(i, racine) for i, ligne in numerotees for racine in racines_machine(ligne)]  # fait-chemin-machine
+    jetons_deplaces = [i for i, ligne in numerotees if jeton_deplace(ligne)]
 
     # --- les règles : une ligne `if` marquée chacune, dont le corps appelle l'écart
     if not de_l_etape:  # releve-etape-absente
-        ecart("etape-absente", "aucune ligne REJEU-ETAPE-%d conforme à la grammaire" % etape)
+        ecart("etape-absente", "aucune ligne d'étape %d conforme à la grammaire" % etape)
     if etapes_mal:  # releve-etape-malformee
         for i in etapes_mal:
-            ecart("etape-malformee", "ligne %d : jeton REJEU-ETAPE- sans la grammaire exacte" % i)
+            ecart("etape-malformee", "ligne %d : ligne d'étape sans la grammaire exacte" % i)
     if len(de_l_etape) > 1:  # releve-etape-doublon
-        ecart("etape-doublon", "%d lignes REJEU-ETAPE-%d (lignes %s)" % (len(de_l_etape), etape, ",".join(str(e[0]) for e in de_l_etape)))
+        ecart("etape-doublon", "%d lignes d'étape %d (lignes %s)" % (len(de_l_etape), etape, ",".join(str(e[0]) for e in de_l_etape)))
     if autres_etapes:  # releve-etape-autre
         for i, m, _, _ in autres_etapes:
-            ecart("etape-autre", "ligne %d : REJEU-ETAPE-%d alors que --etape=%d" % (i, m, etape))
+            ecart("etape-autre", "ligne %d : ligne d'étape %d alors que --etape=%d" % (i, m, etape))
     if refus_non_nuls:  # releve-faux-refus
         for i, _, a, _ in refus_non_nuls:
             ecart("faux-refus", "ligne %d : faux-refus=%d" % (i, a))
@@ -270,43 +284,46 @@ def juger(texte, etape, labs_options):
         for i, _, _, b in accepts_non_nuls:
             ecart("faux-accept", "ligne %d : faux-accept=%d" % (i, b))
     if not commits_valides:  # releve-commit-absent
-        ecart("commit-absent", "aucune ligne COMMIT-REJOUE conforme (40 hexadécimaux minuscules)")
+        ecart("commit-absent", "aucune ligne de commit rejoué conforme (40 hexadécimaux minuscules)")
     if commits_mal:  # releve-commit-malforme
         for i in commits_mal:
-            ecart("commit-malforme", "ligne %d : jeton COMMIT-REJOUE sans la grammaire exacte" % i)
+            ecart("commit-malforme", "ligne %d : ligne de commit rejoué sans la grammaire exacte" % i)
     if len(commits_valides) > 1:  # releve-commit-doublon
-        ecart("commit-doublon", "%d lignes COMMIT-REJOUE conformes (lignes %s)" % (len(commits_valides), ",".join(str(i) for i in commits_valides)))
+        ecart("commit-doublon", "%d lignes de commit rejoué conformes (lignes %s)" % (len(commits_valides), ",".join(str(i) for i in commits_valides)))
     if not labs:  # releve-labs-absents
         ecart("labs-absents", "aucun lab : ni --lab, ni ligne de table `<gate> | <lab> | …`")
     if labs_sans_empreinte or empreintes_mal:  # releve-empreinte-absente
         for lab in labs_sans_empreinte:
-            ecart("empreinte-absente", "lab %s : aucune ligne EMPREINTE-ARBRE-IDENTIQUE" % sur(lab))
+            ecart("empreinte-absente", "lab %s : aucune ligne d'empreinte d'arbre identique" % sur(lab))
         for i in empreintes_mal:
-            ecart("empreinte-absente", "ligne %d : jeton EMPREINTE-ARBRE- sans la grammaire exacte" % i)
+            ecart("empreinte-absente", "ligne %d : ligne d'empreinte d'arbre sans la grammaire exacte" % i)
     if empreintes_doublons:  # releve-empreinte-doublon
         for lab, numeros in empreintes_doublons:
-            ecart("empreinte-doublon", "lab %s : %d lignes EMPREINTE-ARBRE-IDENTIQUE (lignes %s)" % (sur(lab), len(numeros), ",".join(str(i) for i in numeros)))
+            ecart("empreinte-doublon", "lab %s : %d lignes d'empreinte d'arbre identique (lignes %s)" % (sur(lab), len(numeros), ",".join(str(i) for i in numeros)))
     if divergentes:  # releve-empreinte-divergente
         for i, lab in divergentes:
-            ecart("empreinte-divergente", "ligne %d : EMPREINTE-ARBRE-DIVERGENTE pour le lab %s" % (i, sur(lab)))
+            ecart("empreinte-divergente", "ligne %d : empreinte d'arbre divergente pour le lab %s" % (i, sur(lab)))
     if rejeux_divergents:  # releve-rejeu-divergent
         for i, lab in rejeux_divergents:
             ecart("rejeu-divergent", "ligne %d : le rejeu a modifié le lab %s" % (i, sur(lab) if lab else "(non nommé)"))
     if mesures_vides:  # releve-mesure-vide
         for i in mesures_vides:
-            ecart("mesure-vide", "ligne %d : jeton MESURE-VIDE (un lab sans ligne mesurée n'est jamais un vert)" % i)
+            ecart("mesure-vide", "ligne %d : mesure vide (un lab sans ligne mesurée n'est jamais un vert)" % i)
     if gates_sans_couverture:  # releve-couverture-absente
         for g in gates_sans_couverture:
-            ecart("couverture-absente", "gate %s : aucune ligne COUVERTURE-REJEU conforme (plancher >= 1)" % g)
+            ecart("couverture-absente", "gate %s : aucune ligne de couverture du rejeu conforme (plancher >= 1)" % g)
     if couvertures_mal:  # releve-couverture-malformee
         for i in couvertures_mal:
-            ecart("couverture-malformee", "ligne %d : jeton COUVERTURE-REJEU sans la grammaire exacte, ou plancher=0" % i)
+            ecart("couverture-malformee", "ligne %d : ligne de couverture du rejeu sans la grammaire exacte, ou plancher=0" % i)
     if gates_en_doublon:  # releve-couverture-doublon
         for g, lots in gates_en_doublon:
-            ecart("couverture-doublon", "gate %s : %d lignes COUVERTURE-REJEU conformes (lignes %s)" % (g, len(lots), ",".join(str(x[0]) for x in lots)))
+            ecart("couverture-doublon", "gate %s : %d lignes de couverture du rejeu conformes (lignes %s)" % (g, len(lots), ",".join(str(x[0]) for x in lots)))
     if couvertures_courtes:  # releve-couverture-insuffisante
         for g, i, n, p in couvertures_courtes:
             ecart("couverture-insuffisante", "gate %s ligne %d : n=%d sous plancher=%d" % (g, i, n, p))
+    if jetons_deplaces:  # releve-jeton-deplace
+        for i in jetons_deplaces:
+            ecart("jeton-deplace", "ligne %d : jeton de la grammaire ailleurs qu'en tête de ligne" % i)
     if chemins_machine:  # releve-chemin-machine
         for i, racine in chemins_machine:
             ecart("chemin-machine", "ligne %d : chemin absolu de machine (famille %s)" % (i, racine.strip("/").lower()))

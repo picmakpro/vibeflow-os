@@ -339,6 +339,16 @@ CAS_NEGATIFS = {
         {"nom": "une ligne EMPREINTE-DIVERGENTE (rejeu-gates.sh) à côté des conformes", "ops": [("ajoute", "EMPREINTE-DIVERGENTE " + LAB_A)], "seule": True},
         {"nom": "une ligne EMPREINTE-DIVERGENTE sans nom de lab", "ops": [("ajoute", "EMPREINTE-DIVERGENTE")], "seule": True},
     ],
+    "jeton-deplace": [
+        {"nom": "la ligne REJEU-ETAPE-5 conforme décalée d'une espace, à côté de l'originale (forme de l'attaque audit-5b F-2 (a))",
+         "ops": [("ajoute", " REJEU-ETAPE-5 faux-refus=0 faux-accept=0 refus-conforme-modele=196")], "seule": True},
+        {"nom": "COMMIT-REJOUE en commentaire", "ops": [("ajoute", "# COMMIT-REJOUE " + COMMIT)], "seule": True},
+        {"nom": "COUVERTURE-REJEU entre guillemets français", "ops": [("ajoute", "\u00ab COUVERTURE-REJEU G4 n=44 plancher=12 \u00bb")], "seule": True},
+        {"nom": "une ligne COMPTE indentée de deux espaces", "ops": [("ajoute", "  COMPTE G4 faux-refus=343 faux-accept=0 refus-conforme-modele=0")], "seule": True},
+        {"nom": "EMPREINTE-ARBRE-IDENTIQUE précédé d'un préfixe", "ops": [("ajoute", "x-EMPREINTE-ARBRE-IDENTIQUE " + LAB_A)], "seule": True},
+        {"nom": "MESURE-VIDE précédé d'une espace", "ops": [("ajoute", " MESURE-VIDE " + LAB_1)], "seule": True},
+        {"nom": "EMPREINTE-DIVERGENTE précédé d'une espace", "ops": [("ajoute", " EMPREINTE-DIVERGENTE " + LAB_A)], "seule": True},
+    ],
     "mesure-vide": [
         {"nom": "une ligne MESURE-VIDE", "ops": [("ajoute", "MESURE-VIDE " + LAB_1)], "seule": True},
     ],
@@ -507,6 +517,9 @@ def controle_04():
     bord("deux --lab sans ligne de table : labs=2", "les labs sont l'union des --lab et des lignes de table", "code 0, labs=2", rc, s, armable(rc, s) and "labs=2 " in derniere(s))
     rc, s = lancer_releve("b-lab-union.txt", base(5), args=["--lab=" + LAB_A])
     bord("un --lab déjà nommé par la table ne compte pas deux fois", "union sans doublon", "code 0, labs=2", rc, s, armable(rc, s) and "labs=2 " in derniere(s))
+    # jeton-deplace (fix-5b V4 (a)) : « COMPTE » est un mot courant ; seule la tête structurelle d'une ligne de compte est un jeton
+    rc, s = lancer_releve("b-compte-rendu.txt", appliquer(base(5), [("ajoute", "G3 | " + LAB_A + " | livrables/COMPTE RENDU.md | doit-passer | passe | passe")]))
+    bord("une ligne de table au chemin livrables/COMPTE RENDU.md est armable", "COMPTE seul, dans un nom de fichier, n'est pas un jeton", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
     # chemin-machine (fix-5b V2) : seul un chemin ABSOLU de machine rougit ; un dossier relatif nommé `home` ou `Users` est un chemin de lab
     for nom, ligne in (("une ligne de table dont le chemin est src/pages/home/index.md", "G3 | " + LAB_A + " | src/pages/home/index.md | doit-passer | passe | passe"),
                        ("une note qui cite ~/home/notes.md", "NOTE voir ~/home/notes.md"),
@@ -726,6 +739,72 @@ def mutant_toujours_refus():
     okmut(ident, "%s · attendu (original) : code 0, RELEVE-VERDICT armable · obtenu (mutant) : %s" % (assertion, premier))
 
 
+JETONS_LITTERAUX = ("REJEU-ETAPE-", "COMMIT-REJOUE", "EMPREINTE-ARBRE-", "EMPREINTE-DIVERGENTE", "MESURE-VIDE", "COUVERTURE-REJEU")
+RE_TETE_COMPTE = re.compile(r"COMPTE[ \t]+\S+[ \t]+faux-refus")
+
+
+def jetons_dans(ligne):
+    """Jetons de la grammaire que porte la ligne, n'importe où : les six jetons littéraux et la tête structurelle d'une ligne de compte."""
+    return [j for j in JETONS_LITTERAUX if j in ligne] + (["COMPTE"] if RE_TETE_COMPTE.search(ligne) else [])
+
+
+def fautes_point_fixe(script):
+    """R-RELEVE-08 (fix-5b V4 (a)) : pour chaque cas texte de la table, (1) aucune ligne de la SORTIE du script ne porte un jeton de la grammaire ; (2) le relevé suivi d'une ligne vide, de
+    `## Décision mécanique` et de la sortie du script (la forme des relevés versionnés) redonne le même code, la même dernière ligne et la même liste d'écarts. Rend (fautes, nombre de cas)."""
+    fautes, n = [], 0
+    for regle, cas, args in tous_les_cas():
+        if cas.get("special"):
+            continue
+        rc, out, err = lancer(script, args)
+        sortie = out + err
+        porteuses = [l for l in sortie.split("\n") if jetons_dans(l)]
+        if porteuses:
+            fautes.append("%s · %s : la sortie porte un jeton de la grammaire : %s" % (regle, cas["nom"], court(porteuses[0], 90)))
+            continue
+        releve = open(args[-1], "rb").read()
+        chemin = ecrire_octets("point-fixe-%03d.txt" % n, releve.rstrip(b"\n") + b"\n\n## D\xc3\xa9cision m\xc3\xa9canique\n" + sortie.encode("utf-8"))
+        n += 1
+        rc2, out2, err2 = lancer(script, args[:-1] + [chemin])
+        s2 = out2 + err2
+        if not (rc2 == rc and derniere(s2) == derniere(sortie) and ecarts_de(s2) == ecarts_de(sortie)):
+            fautes.append("%s · %s : relevé + décision reproduite : code %d écarts %s, attendu code %d écarts %s" % (regle, cas["nom"], rc2, ecarts_de(s2), rc, ecarts_de(sortie)))
+    return fautes, n
+
+
+def controle_08():
+    fautes, n = fautes_point_fixe(SCRIPT)
+    if n > 0 and not fautes:
+        ok("R-RELEVE-08 point fixe : %d relevés non armables, relevé + sa décision reproduite = même code, même dernière ligne, mêmes écarts ; aucune ligne de sortie ne porte un jeton" % n)
+    else:
+        ko("R-RELEVE-08", "la sortie du script ne porte aucun jeton de la grammaire et sa reproduction dans un relevé ne change pas la décision (point fixe)", "aucune faute sur %d cas" % n,
+           "%d faute(s) : %s" % (len(fautes), "; ".join(fautes[:3]) or "aucun cas joué"))
+
+
+def mutant_sortie_jeton():
+    """MUT-RELEVE-SORTIE-JETON (fix-5b V4 (a)) : le détail de `etape-malformee` recite un jeton de la grammaire (le libellé d'avant le correctif) -> R-RELEVE-08 rougit."""
+    ident = "RELEVE-SORTIE-JETON"
+    chemin, raison = make_mutant(ident, lambda l: l.lstrip().startswith('ecart("etape-malformee"'),
+                                 'ecart("etape-malformee", "ligne %d : jeton REJEU-ETAPE- sans la grammaire exacte" % i)')
+    if chemin is None:
+        komut(ident, "le mutant se construit", "UNE ligne `ecart(\"etape-malformee\", …)` qui recite un jeton", raison)
+        return
+    assertion = "R-RELEVE-08 aucune ligne de sortie ne porte un jeton"
+    fautes_o, n_o = fautes_point_fixe(SCRIPT)
+    if fautes_o or n_o == 0:
+        komut(ident, assertion + " (original)", "aucune faute", "l'original lui-même rougit : %s" % court("; ".join(fautes_o), 120))
+        return
+    fautes_m, _ = fautes_point_fixe(chemin)
+    if not fautes_m:
+        komut(ident, assertion, "R-RELEVE-08 rougit sous le mutant", "le mutant passe encore")
+        return
+    for etape in (5, 6):
+        rc_p, sortie_p = positif(chemin, etape)
+        if not armable(rc_p, sortie_p):
+            komut(ident, "mutant valide : le relevé conforme de l'étape %d reste armable sous le mutant" % etape, "code 0, RELEVE-VERDICT armable", "code %d" % rc_p)
+            return
+    okmut(ident, "%s · attendu (original) : aucune faute sur %d cas · obtenu (mutant) : %d faute(s), la première : %s" % (assertion, n_o, len(fautes_m), court(fautes_m[0], 110)))
+
+
 def mutant_machine_sous_chaine():
     """MUT-RELEVE-MACHINE-SOUS-CHAINE (fix-5b V2, revue-5b n°5) : la ligne de calcul des chemins de machine (marqueur `# fait-chemin-machine`) rendue à la sous-chaîne `/Users/`, `/home/` -> un
     bord POSITIF de R-RELEVE-04 (chemin relatif `src/pages/home/index.md`, `~/home/notes.md`, `docs/Users/guide.md`) rougit `chemin-machine` ; l'original les arme tous."""
@@ -927,8 +1006,8 @@ def controle_chaine():
 LABS_46 = ("~/jarvis-keystone", "~/BusinessFlow-Lab")
 # (fixture, étape, faux refus du relevé, règles refusées dans l'ordre alphabétique, commits attendus dans la fixture)
 CORPUS_46 = (
-    ("releve-46-etape-5.txt", 5, 349, ["faux-refus"], 1),
-    ("releve-46-etape-6.txt", 6, 343, ["commit-absent", "faux-refus"], 0),
+    ("releve-46-etape-5.txt", 5, 349, ["faux-refus", "jeton-deplace"], 1),
+    ("releve-46-etape-6.txt", 6, 343, ["commit-absent", "faux-refus", "jeton-deplace"], 0),
 )
 
 
@@ -944,13 +1023,27 @@ def controle_05():
         rc, out, err = lancer(SCRIPT, ["--etape=%d" % etape] + ["--lab=" + lab for lab in LABS_46] + [chemin])
         sortie = out + err
         detail = [l for l in sortie.split("\n") if l.startswith("RELEVE-ECART faux-refus : ") and l.endswith(" : faux-refus=%d" % refus)]
-        attendu = "code 1, écarts %s (dont faux-refus=%d), %d ligne(s) COMMIT-REJOUE dans la fixture, dernière ligne RELEVE-VERDICT non-armable etape=%d ecarts=%d" % (regles, refus, commits, etape, len(regles))
-        if (rc == 1 and sorted(ecarts_de(sortie)) == regles and len(detail) == 1 and n_commits == commits
+        attendu = "code 1, écarts %s (dont faux-refus=%d ; jeton-deplace sur la seule ligne 1, le commentaire d'extraction de la fixture), %d ligne(s) COMMIT-REJOUE dans la fixture, dernière ligne RELEVE-VERDICT non-armable etape=%d ecarts=%d" % (regles, refus, commits, etape, len(regles))
+        jetons = [l for l in sortie.split("\n") if l.startswith("RELEVE-ECART jeton-deplace : ")]
+        if (rc == 1 and sorted(ecarts_de(sortie)) == regles and len(detail) == 1 and len(jetons) == 1 and jetons[0].startswith("RELEVE-ECART jeton-deplace : ligne 1 : ") and n_commits == commits
                 and derniere(sortie) == "RELEVE-VERDICT non-armable etape=%d ecarts=%d" % (etape, len(regles))):
             ok(ident + " est refusé", "code 1, " + ", ".join("RELEVE-ECART " + r for r in regles) + ", faux-refus=%d, %d ligne(s) COMMIT-REJOUE" % (refus, n_commits))
         else:
             ko(ident, "le relevé réel de la 46 qui a fait refuser l'armement est refusé, pour chacune de ses causes et pour elles seules", attendu,
                "code %d, écarts %s, lignes faux-refus=%d : %d, %d ligne(s) COMMIT-REJOUE, dernière ligne « %s »" % (rc, sorted(ecarts_de(sortie)), refus, len(detail), n_commits, court(derniere(sortie))))
+    # retouche (a) d'un relevé réel (audit-5b F-2 (a)) : la ligne REJEU-ETAPE-5 décalée d'une espace, une ligne propre à 0 ajoutée ; la ligne 1 de la fixture (commentaire d'extraction,
+    # absent du relevé réel) est écartée pour que seule la retouche parle
+    chemin = os.path.join(FIXTURES, "releve-46-etape-5.txt")
+    if os.path.isfile(chemin):
+        reelles = [l for l in open(chemin, encoding="utf-8").read().split("\n") if l != "" and not l.startswith("# extrait de ")]
+        retouchee = [(" " + l if l.startswith("REJEU-ETAPE-5 ") else l) for l in reelles] + ["REJEU-ETAPE-5 faux-refus=0 faux-accept=0 refus-conforme-modele=196"]
+        rc, out, err = lancer(SCRIPT, ["--etape=5"] + ["--lab=" + lab for lab in LABS_46] + [ecrire_releve("retouche-a.txt", retouchee)])
+        sortie = out + err
+        if rc == 1 and ecarts_de(sortie) == ["jeton-deplace"]:
+            ok("R-RELEVE-05 retouche (a) du relevé réel de l'étape 5 (ligne REJEU-ETAPE-5 décalée d'une espace + ligne propre à 0) est refusée", "code 1, RELEVE-ECART jeton-deplace")
+        else:
+            ko("R-RELEVE-05 retouche (a)", "un relevé réel retouché (ligne REJEU-ETAPE décalée d'une espace, ligne propre ajoutée) n'est pas armable", "code 1, l'écart jeton-deplace",
+               "code %d, écarts %s, dernière ligne « %s »" % (rc, ecarts_de(sortie), court(derniere(sortie))))
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -1060,6 +1153,7 @@ def main():
     controle_02()
     controle_03()
     controle_04()
+    controle_08()
     controle_chaine()
     controle_05()
     controle_06()
@@ -1068,6 +1162,7 @@ def main():
     mutant_toujours_refus()
     mutant_entier_borne()
     mutant_machine_sous_chaine()
+    mutant_sortie_jeton()
     controle_couverture()
 
 
