@@ -1929,8 +1929,12 @@ def evaluer_g4(contexte):
     dossier = os.path.join(racine, *unite)
     verdict = os.path.join(dossier, "VERDICT.md")
     if est_fichier_regulier(contexte["ecrit"]):  # g4-exempt-regulier
-        if not os.path.lexists(verdict):  # g4-exempt-verdict
-            if not os.path.lexists(os.path.join(dossier, "CLOTURE.md")):  # g4-exempt-cloture
+        # fix-5b H2 (revue-5b n°3, audit-5b F-3) : forme et clé en NFC, E/S sur le nom du disque. `dossier` (clé NFC) peut ne pas être le dossier qui contient RÉELLEMENT le fichier
+        # écrit : sur un système sensible à la normalisation, une unité au nom de disque NFD s'y lit absente. La présence de VERDICT.md ou de CLOTURE.md est donc testée dans les
+        # DEUX dossiers (union) : l'exemption n'est jamais plus permissive qu'avant 46.1-01.
+        dossier_disque = os.path.dirname(os.path.realpath(contexte["ecrit"]))  # g4-exempt-disque
+        if not (os.path.lexists(verdict) or os.path.lexists(os.path.join(dossier_disque, "VERDICT.md"))):  # g4-exempt-verdict
+            if not (os.path.lexists(os.path.join(dossier, "CLOTURE.md")) or os.path.lexists(os.path.join(dossier_disque, "CLOTURE.md"))):  # g4-exempt-cloture
                 return []  # g4-exempt-retour
     if not os.path.lexists(verdict):  # g4-verdict-absent
         return [Verdict("G4", chemin_rel, "aucun VERDICT.md : faites juger l'unité (poser-verdict.sh)")]

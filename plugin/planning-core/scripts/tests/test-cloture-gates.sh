@@ -48,6 +48,9 @@
 #             message de G4 : B verdict périmé, C constat en échec, D VERDICT.md invalide (R6), E CLOTURE.md sans VERDICT.md, F SUMMARY.md lien vers celui d'une autre
 #             unité, G création ; bords : VERDICT.md ou CLOTURE.md en lien (même pendant), SUMMARY.md dossier ou tube jugés, lien pendant vers un nom hors forme
 #             silencieux (jumeau négatif), `summary.md` à côté de SUMMARY.md selon la sensibilité à la casse du système (l'autre branche : « non applicable ici »)
+#   R-G4-08   (H2, fix-5b, revue-5b n°3, audit-5b F-3, P461-D-01) l'exemption de la réécriture teste VERDICT.md et CLOTURE.md dans le dossier PHYSIQUE du fichier écrit (nom du disque) ET dans le
+#             dossier de la clé NFC : copie SENSIBLE à la normalisation (shim du relecteur inséré après l'unique `import urllib.parse`, auto-vérifié), unité au nom de disque NFD -> refus G4 avec
+#             VERDICT.md, refus avec CLOTURE.md seul, passage sans l'un ni l'autre ; dossiers jumeaux NFC et NFD (système sensible seulement) ; vrai système (discriminant à la CI Linux)
 #   R-FORME-01 `unite_de_fichier` du hook et `forme_unite` de poser-verdict.sh rendent la même unité sur un lot de chemins (copies ast chargées du texte)
 #   BANC      fixtures/cloture-banc.txt : dix-sept labs adhérents (dont six `cl-g4-reecriture-a` à `-f`, P461-D-01b) et leurs dix-sept jumeaux `-dev`, chaque écriture rejouée sur copie armée ; COUVERTURE G3, G4 (au moins
 #             quatre doit-refuser et quatre doit-passer réellement joués par gate) ; COMPTE G3, COMPTE G4 : faux-refus=0 faux-accept=0
@@ -79,6 +82,7 @@
 #   devenu un mutant ÉQUIVALENT ; il relâche la borne (2 * BORNE_LECTURE_PLAN) et reste tué par R-PLAN-BORNE-G2 ;
 #   MUT-G4-REECRITURE (l'exemption de la réécriture rendue sans effet), MUT-G4-REECRITURE-VERDICT (B, C, D), MUT-G4-REECRITURE-CLOTURE (E), MUT-G4-REECRITURE-LSTAT
 #   (F), MUT-G4-REECRITURE-CREATION (G), MUT-G4-HASH-REECRITURE (B), MUT-G4-ECHEC-REECRITURE (C), MUT-G4-R6-REECRITURE (D) -> R-G4-07, chacun pour SA famille ;
+#   (fix-5b H2) MUT-G4-REECRITURE-DISQUE (la présence testée dans le seul dossier de la clé NFC -> R-G4-08) ;
 #   MUT-G4-ABSENT, MUT-G4-ECHEC, MUT-G4-PLAFOND-MESSAGE (F6, fix-46-c) (-> R-G4-02), MUT-G4-HASH, MUT-G4-HASH-LIVRABLES (-> R-G4-03), MUT-G4-FAILOPEN (sonde d'erreur rendue silencieuse pour G4
 #   dans evaluer_protege -> R-G4-05) ; MUT-CROISE (la copie du prédicat du hook seule rendue plus laxiste sur « vide » -> R-CROISE-01).
 # Variables : VF_CLOT_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : g3, g4, forme, banc, croise, mutants_g3, mutants_g4, mutants_croise).
@@ -1832,6 +1836,132 @@ def controle_g4_07(ctx, script):
                           "VERDICT.md et CLOTURE.md en lien (même pendant), SUMMARY.md dossier et tube jugés, lien pendant vers un nom hors forme : silence ; casse : " + casse)
 
 
+# --- H2 (fix-5b, revue-5b n°3, audit-5b F-3) : l'exemption de réécriture lit VERDICT.md et CLOTURE.md dans le dossier du DISQUE ------------------------
+# Un système de fichiers sensible à la normalisation Unicode (ext4, xfs, btrfs) distingue le dossier NFC du dossier NFD : une unité au nom de disque NFD,
+# écrite par son chemin NFD, n'est pas le dossier que la clé NFC désigne. Ici le système (APFS, HFS+) est insensible : le shim de l'auditeur (`hook-armed-sens.sh`
+# du relecteur) remplace `os.path.lexists` dans le corps Python de la COPIE jugée par une version qui exige chaque composant NON ASCII tel quel dans le `listdir` de son dossier
+# (même vérité que la lettre du relecteur, qui listait aussi les composants ASCII : sur un dossier temporaire chargé, ces `listdir` faisaient tomber l'échéance du cœur).
+SHIM_SENSIBLE = '''_orig_lexists = os.path.lexists
+def _lexists_sensible(p):
+    # simule un systeme de fichiers sensible a la normalisation Unicode : chaque composant NON ASCII d'un chemin absolu doit figurer tel quel dans le listdir de son dossier
+    # (un nom ASCII est identique en NFC et en NFD : le lister n'apporte rien et coute un listdir de /tmp entier a chaque appel) ; l'existence est ensuite celle du systeme
+    if not os.path.isabs(p):
+        return _orig_lexists(p)
+    cur = "/"
+    for c in [x for x in p.split("/") if x]:
+        if not c.isascii():
+            try:
+                if c not in os.listdir(cur):
+                    return False
+            except OSError:
+                return False
+        cur = os.path.join(cur, c)
+    return _orig_lexists(p)
+os.path.lexists = _lexists_sensible
+'''
+
+
+def copie_sensible(ctx, dossier_scripts):
+    """Copie armée du hook du dossier donné dont le corps Python porte le shim de sensibilité à la normalisation, inséré juste après l'UNIQUE ligne `import urllib.parse` ;
+    une ancre absente ou multiple, un `bash -n` ou une compilation en échec lèvent RuntimeError (un KO nommé, jamais un vert)."""
+    cle = ("sensible", dossier_scripts)
+    if cle not in ctx._forcees:
+        base = ctx.copie_forcee(dossier_scripts, "armed")
+        texte = open(os.path.join(base, "planning-hook.sh"), encoding="utf-8").read()
+        ancre = "\nimport urllib.parse\n"
+        if texte.count(ancre) != 1:
+            raise RuntimeError("une seule ligne `import urllib.parse` attendue dans le corps Python du hook (%d trouvée(s))" % texte.count(ancre))
+        texte = texte.replace(ancre, ancre + SHIM_SENSIBLE, 1)
+        d = ctx.unique("force-sensible")
+        os.makedirs(d, exist_ok=True)
+        chemin = os.path.join(d, "planning-hook.sh")
+        with open(chemin, "w", encoding="utf-8") as fh:
+            fh.write(texte)
+        os.chmod(chemin, 0o755)
+        p = subprocess.run(["bash", "-n", chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if p.returncode != 0:
+            raise RuntimeError("bash -n échoue sur la copie sensible : " + court(p.stderr))
+        try:
+            compile(corps_python(texte), chemin, "exec")
+        except SyntaxError as exc:
+            raise RuntimeError("SyntaxError du corps Python de la copie sensible : %s" % exc)
+        ctx._forcees[cle] = d
+    return ctx._forcees[cle]
+
+
+def shim_actif(ctx):
+    """Auto-vérification : le shim chargé SEUL rend faux sur la forme NFC d'un dossier créé sous son nom NFD et vrai sur sa forme NFD (il n'est pas inerte)."""
+    d = ctx.unique("sonde-shim")
+    nfd = unicodedata.normalize("NFD", "\u00e9")
+    os.makedirs(os.path.join(d, nfd))
+    reel, ns = os.path.lexists, {"os": os}
+    try:
+        exec(SHIM_SENSIBLE, ns)
+        sur_nfc = ns["_lexists_sensible"](os.path.join(d, unicodedata.normalize("NFC", "\u00e9")))
+        sur_nfd = ns["_lexists_sensible"](os.path.join(d, nfd))
+    finally:
+        os.path.lexists = reel
+    return (sur_nfc is False and sur_nfd is True), "forme NFC : %s, forme NFD : %s (attendus faux, vrai)" % (sur_nfc, sur_nfd)
+
+
+def controle_g4_08(ctx, script):
+    """H2 (fix-5b, revue-5b n°3, audit-5b F-3, P461-D-01) : l'exemption de la réécriture teste VERDICT.md et CLOTURE.md dans le dossier PHYSIQUE qui contient le fichier écrit (nom du
+    disque) ET dans le dossier de la clé NFC — jamais plus permissive qu'avant 46.1-01. (i) copie SENSIBLE à la normalisation (shim du relecteur), unité au nom de disque NFD, SUMMARY.md
+    régulier : Write par le chemin NFD avec VERDICT.md présent -> refus G4 ; avec CLOTURE.md seul -> refus G4 ; jumeau sans VERDICT.md ni CLOTURE.md -> passage (l'exemption tient). (ii)
+    dossiers jumeaux NFC et NFD côte à côte (système sensible seulement), VERDICT.md dans le NFC seul, SUMMARY.md dans le NFD -> refus. (iii) comme (i), sans shim, sur le vrai système :
+    refus (discriminant sur un système sensible, donc à la CI Linux)."""
+    dossier_jugé = _dossier(ctx, script)
+    reelle = dossier_jugé == ctx.scripts_dir
+    fautes = []
+    actif, detail_shim = shim_actif(ctx)
+    if not actif:
+        return False, "le shim de sensibilité est inerte : " + detail_shim
+    try:
+        ds = copie_sensible(ctx, dossier_jugé)
+    except (RuntimeError, OSError) as exc:
+        return False, "copie sensible : %s" % exc
+    d_reel = ctx.copie_forcee(dossier_jugé, "armed")
+    unite_nfd = jumeau_nfd(UNITE_NFC)
+    summary_nfd = unite_nfd + "/SUMMARY.md"
+    base = {LIVRABLE: "contenu\n", summary_nfd: "Résumé déjà écrit.\n"}
+
+    def lab_de(nom, extra=None):
+        return fabriquer_lab(ctx, nom, unite=unite_nfd, fichiers=dict(base, **(extra or {})))
+
+    def refuse(nom, d, lab, rel=summary_nfd):
+        bon, detail, raison = _refus_g4(ctx, d, lab, "Write", rel)
+        if not bon:
+            fautes.append("%s : refus G4 attendu, obtenu %s" % (nom, detail))
+        elif not raison.startswith("[planning-core] G4 :"):
+            fautes.append("%s : la raison ne commence pas par « [planning-core] G4 : » : %s" % (nom, raison))
+
+    # (i) copie sensible, unité au nom de disque NFD
+    refuse("(i) VERDICT.md présent", ds, lab_de("g4-08-verdict", {unite_nfd + "/VERDICT.md": "verdict posé\n"}))
+    refuse("(i) CLOTURE.md seul", ds, lab_de("g4-08-cloture", {unite_nfd + "/CLOTURE.md": "clôture posée\n"}))
+    rc, out, err = ecrire_dans(ctx, ds, lab_de("g4-08-jumeau"), "Write", summary_nfd)
+    v = classer(rc, out)
+    if v not in ("silence", "avertit") or err:
+        fautes.append("(i) jumeau sans VERDICT.md ni CLOTURE.md : passage (l'exemption tient) attendu, obtenu %s %s" % (v, raison_de(out) if v == "deny" else court(out or err)))
+    # (ii) dossiers jumeaux NFC et NFD côte à côte (système sensible seulement)
+    lab_t = fabriquer_lab(ctx, "g4-08-jumeaux", unite=UNITE_NFC, fichiers={LIVRABLE: "contenu\n", UNITE_NFC + "/VERDICT.md": "verdict dans le dossier NFC\n"})
+    os.makedirs(os.path.join(lab_t, unite_nfd), exist_ok=True)
+    if os.path.samefile(os.path.join(lab_t, UNITE_NFC), os.path.join(lab_t, unite_nfd)):
+        if reelle:
+            print("  ~ R-G4-08 (ii) dossiers jumeaux NFC et NFD non exercés : système de fichiers insensible à la normalisation (APFS, HFS+), un seul dossier — non applicable ici")
+        jumeaux = "non applicable ici"
+    else:
+        ecrire(os.path.join(lab_t, summary_nfd), "Résumé déjà écrit.\n")
+        refuse("(ii) VERDICT.md dans le dossier NFC seul", d_reel, lab_t)
+        jumeaux = "refus"
+    # (iii) comme (i), sans shim, sur le vrai système
+    refuse("(iii) vrai système", d_reel, lab_de("g4-08-reel", {unite_nfd + "/VERDICT.md": "verdict posé\n"}))
+    if reelle and disque_insensible(ctx):
+        print("  ~ R-G4-08 (iii) non discriminant ici : système insensible à la normalisation, la forme NFC désigne le dossier du disque ; discriminant sur un système sensible (CI Linux)")
+    return (not fautes), ("; ".join(fautes[:6]) if fautes else
+                          "copie sensible à la normalisation, unité au nom de disque NFD : Write du SUMMARY.md par son chemin NFD refusé avec VERDICT.md présent, refusé avec CLOTURE.md seul, "
+                          "passage sans l'un ni l'autre ; dossiers jumeaux NFC et NFD : %s ; vrai système : refus" % jumeaux)
+
+
 # =================================================================================================
 # R-FORME-01 : la forme d'unité du hook et celle de la commande de pose sont la même règle
 # =================================================================================================
@@ -2402,7 +2532,8 @@ def sec_g4(ctx):
             ("R-G4-04", controle_g4_04, "copie armée, jumeaux qui passent"),
             ("R-G4-05", controle_g4_05, "dérogation et erreur interne"),
             ("R-G4-06", controle_g4_06, "aucun chemin absolu, « no such file » ni « can't open » dans un refus de G3 ou de G4"),
-            ("R-G4-07", controle_g4_07, "copie armée, réécriture d'un SUMMARY.md existant : exemption étroite (P461-D-01)")):
+            ("R-G4-07", controle_g4_07, "copie armée, réécriture d'un SUMMARY.md existant : exemption étroite (P461-D-01)"),
+            ("R-G4-08", controle_g4_08, "H2 : l'exemption de réécriture lit VERDICT.md et CLOTURE.md dans le dossier du disque (nom NFD), jamais plus permissive qu'avant 46.1-01")):
         bon, detail = original_de(ctx, ident, ctrl)
         ok(ident + " " + titre + " : " + detail) if bon else ko(ident, titre, "conforme", detail)
 
@@ -2464,6 +2595,8 @@ def sec_mutants_g4(ctx):
     tuer(ctx, "G4-REECRITURE-CLOTURE", "# g4-exempt-cloture", "if True:  # g4-exempt-cloture", "R-G4-07", controle_g4_07)
     tuer(ctx, "G4-REECRITURE-LSTAT", "# g4-exempt-regulier", 'if os.path.exists(contexte["ecrit"]):  # g4-exempt-regulier', "R-G4-07", controle_g4_07)
     tuer(ctx, "G4-REECRITURE-CREATION", "# g4-exempt-regulier", "if True:  # g4-exempt-regulier", "R-G4-07", controle_g4_07)
+    # H2 (fix-5b) : la présence testée dans le seul dossier de la clé NFC (le dossier du disque lu comme avant le correctif) -> une unité au nom de disque NFD est exemptée à tort
+    tuer(ctx, "G4-REECRITURE-DISQUE", "# g4-exempt-disque", "dossier_disque = dossier  # g4-exempt-disque", "R-G4-08", controle_g4_08)
     tuer(ctx, "G4-HASH-REECRITURE", "# g4-hash-plan", "if False:  # g4-hash-plan", "R-G4-07", controle_g4_07)
     tuer(ctx, "G4-ECHEC-REECRITURE", "# g4-echec", "if False:  # g4-echec", "R-G4-07", controle_g4_07)
     tuer(ctx, "G4-R6-REECRITURE", "# g4-invalide", "if not isinstance(constats, list) or any(  # g4-invalide", "R-G4-07", controle_g4_07)
