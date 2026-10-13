@@ -1,0 +1,353 @@
+{
+  "nodes": [
+    {
+      "id": "exec-14",
+      "step": "46.1-14 outil de controle + base de non-regression",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "exec-17",
+      "step": "46.1-17 imputer + garder-g4 (mineur garder-g4-mal-forme)",
+      "stage": "",
+      "deps": [
+        "exec-14"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-01",
+      "step": "46.1-01 exemption etroite G4 (bp)",
+      "stage": "",
+      "deps": [
+        "exec-17"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-02",
+      "step": "46.1-02 D1 N-5 et A5",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-03",
+      "step": "46.1-03 verifier-releve.sh (bu)",
+      "stage": "",
+      "deps": [
+        "exec-02"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        "README.md",
+        "README.fr.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-18",
+      "step": "46.1-18 verifier-releve fixtures reelles",
+      "stage": "",
+      "deps": [
+        "exec-03"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-5b",
+      "step": "revue jointure 14,17,01,02,03,18",
+      "stage": "",
+      "deps": [
+        "exec-18"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-5b",
+      "step": "audit securite avant armement G4",
+      "stage": "",
+      "deps": [
+        "exec-18"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "nonreg-5b",
+      "step": "decouverte complete (jalon 1 P461-D-16)",
+      "stage": "",
+      "deps": [
+        "exec-18"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-04",
+      "step": "46.1-04 rejeu 5b (CHECKPOINT humain)",
+      "stage": "",
+      "deps": [
+        "revue-5b",
+        "audit-5b",
+        "nonreg-5b"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-05",
+      "step": "46.1-05 armement G4 (CHECKPOINT humain)",
+      "stage": "",
+      "deps": [
+        "exec-04"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-06",
+      "step": "46.1-06 A2 G4p des l'ambiguite",
+      "stage": "",
+      "deps": [
+        "exec-05"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-15",
+      "step": "46.1-15 G4p suite",
+      "stage": "",
+      "deps": [
+        "exec-06"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-07",
+      "step": "46.1-07 A3 cwd OU projet",
+      "stage": "",
+      "deps": [
+        "exec-15"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-08",
+      "step": "46.1-08 commande enregistree",
+      "stage": "",
+      "deps": [
+        "exec-07"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        "plugin/_internal/tests",
+        "docs/HOOKS-CONTRAT-SORTIE.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-09",
+      "step": "46.1-09 compteur SubagentStop",
+      "stage": "",
+      "deps": [
+        "exec-08"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-16",
+      "step": "46.1-16 compteur recalc/G6",
+      "stage": "",
+      "deps": [
+        "exec-09"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-10",
+      "step": "46.1-10 trace panne du coeur + canary",
+      "stage": "",
+      "deps": [
+        "exec-16"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        "plugin/_internal/tests",
+        "docs/HOOKS-CONTRAT-SORTIE.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-6",
+      "step": "revue jointure 04..10",
+      "stage": "",
+      "deps": [
+        "exec-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-6",
+      "step": "audit securite avant armement G4p",
+      "stage": "",
+      "deps": [
+        "exec-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "nonreg-6",
+      "step": "decouverte complete (jalon 2)",
+      "stage": "",
+      "deps": [
+        "exec-10"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-11",
+      "step": "46.1-11 rejeu 6 (CHECKPOINT humain)",
+      "stage": "",
+      "deps": [
+        "revue-6",
+        "audit-6",
+        "nonreg-6"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-12",
+      "step": "46.1-12 armement G4p + P461-D-17 (CHECKPOINT humain)",
+      "stage": "",
+      "deps": [
+        "exec-11"
+      ],
+      "scope": [
+        "plugin/planning-core"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-13",
+      "step": "46.1-13 cloture v2.11.0 sans release",
+      "stage": "",
+      "deps": [
+        "exec-12"
+      ],
+      "scope": [
+        "plugin/planning-core",
+        ".planning/BACKLOG.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-final",
+      "step": "revue finale 11..13",
+      "stage": "",
+      "deps": [
+        "exec-13"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-final",
+      "step": "audit securite final",
+      "stage": "",
+      "deps": [
+        "exec-13"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "verif-461",
+      "step": "verification de phase",
+      "stage": "",
+      "deps": [
+        "exec-13"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "nonreg-final",
+      "step": "decouverte complete (jalon 3)",
+      "stage": "",
+      "deps": [
+        "exec-13"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiene documentaire",
+      "stage": "",
+      "deps": [
+        "exec-13",
+        "verif-461",
+        "revue-final",
+        "audit-final",
+        "nonreg-final"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr",
+      "step": "PR empilee sur #146",
+      "stage": "",
+      "deps": [
+        "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
