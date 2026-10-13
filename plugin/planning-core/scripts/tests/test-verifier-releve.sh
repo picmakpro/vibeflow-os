@@ -7,9 +7,16 @@
 #   R-RELEVE-02  l'usage : sans --etape, --etape hors 5/6, option inconnue, aucun relevé ou deux relevés → code 64, aucune ligne RELEVE-VERDICT
 #   R-RELEVE-03  UNE table (CAS_NEGATIFS : règle → cas) jouée par une boucle : chaque cas rend le code 1 et SA ligne `RELEVE-ECART <règle> : …`
 #                et une dernière ligne `RELEVE-VERDICT non-armable …`
+#   R-RELEVE-04  les bords : n = plancher armable (jumeau de n = plancher - 1), un faux-refus=343 avec une section « Non armé » refusé, seul
+#                EMPREINTE-IDENTIQUE (périmètre restreint) = empreinte-absente, lignes RELEVE-VERDICT / RELEVE-ECART reproduites inertes, lignes COMPTE
+#                jamais lues, gate non visé ignoré, labs (union des --lab et des lignes de table), CRLF, sortie déterministe sans la ligne fautive,
+#                aucun sous-processus ni écriture
 #   MUT-RELEVE-<RÈGLE>  un mutant par marqueur `# releve-<règle>` lu dans le script (la ligne `if …:` devient `if False:`), GÉNÉRÉ par une boucle :
 #                le cas négatif de la règle ne rend plus SA ligne (et, pour un cas « seul », le code 0), le cas positif reste vert sous le mutant.
 #                La trace est imprimée : assertion · attendu (original) · obtenu (mutant). Un marqueur sans cas dans la table est un `  ✗ `.
+#   MUT-RELEVE-TOUJOURS-ARMABLE (verdict final forcé à armable : R-RELEVE-03 rougit) et MUT-RELEVE-TOUJOURS-REFUS (forcé à non armable : R-RELEVE-01 rougit)
+#   Les chemins de machine que la suite fabrique pour la règle chemin-machine sont des PLACEHOLDERS (`/Users/dev/…`, `/home/runner/…`) admis par
+#   scripts/check-machine-paths.sh : la règle du script les refuse quand même, et la suite versionnée ne porte aucun vrai chemin.
 #
 # Le script jugé est lu à côté de la suite (../verifier-releve.sh) ; hors dépôt (script absent) la suite l'écrit et rend `0 OK · 0 KO`, jamais un vert.
 # La preuve que la table couvre chaque marqueur, la chaîne réelle sur lab synthétique et le corpus réel de la 46 sont le plan 46.1-18.
@@ -231,6 +238,12 @@ def fabriquer(cas):
 # ---------------------------------------------------------------------------------------------------------------------
 REFUS_UN = "REJEU-ETAPE-5 faux-refus=1 faux-accept=0 refus-conforme-modele=196"
 ACCEPT_UN = "REJEU-ETAPE-5 faux-refus=0 faux-accept=1 refus-conforme-modele=196"
+AUTRE_ETAPE = "REJEU-ETAPE-6 faux-refus=0 faux-accept=0 refus-conforme-modele=0"
+ID_A, ID_1 = "EMPREINTE-ARBRE-IDENTIQUE " + LAB_A, "EMPREINTE-ARBRE-IDENTIQUE " + LAB_1
+# Les chemins de machine de la suite sont des PLACEHOLDERS admis par scripts/check-machine-paths.sh (compte `dev`, compte `runner`) :
+# la règle du script les refuse quand même, et la suite versionnée ne porte aucun vrai chemin.
+LIGNE_USERS = "NOTE rejeu lancé depuis /Users/dev/lab"
+LIGNE_HOME = "NOTE rejeu lancé depuis /home/runner/work/lab"
 
 CAS_NEGATIFS = {
     "lecture": [
@@ -248,11 +261,75 @@ CAS_NEGATIFS = {
     "etape-absente": [
         {"nom": "aucune ligne REJEU-ETAPE-5", "ops": [("sans", "REJEU-ETAPE-5 ")], "seule": True},
     ],
+    "etape-malformee": [
+        {"nom": "ligne sans refus-conforme-modele, seule du relevé", "ops": [("remplace", "REJEU-ETAPE-5 ", "REJEU-ETAPE-5 faux-refus=0 faux-accept=0")]},
+        {"nom": "ligne sans refus-conforme-modele, à côté d'une ligne conforme", "ops": [("ajoute", "REJEU-ETAPE-5 faux-refus=0 faux-accept=0")], "seule": True},
+        {"nom": "ligne conforme suivie de \\r", "ops": [("crlf", "REJEU-ETAPE-5 ")]},
+    ],
+    "etape-doublon": [
+        {"nom": "la ligne REJEU-ETAPE-5 en double", "ops": [("double", "REJEU-ETAPE-5 ")], "seule": True},
+    ],
+    "etape-autre": [
+        {"nom": "une ligne REJEU-ETAPE-6 à côté de la ligne 5 (--etape=5)", "ops": [("ajoute", AUTRE_ETAPE)], "seule": True},
+        {"nom": "la seule ligne est REJEU-ETAPE-6 (--etape=5)", "ops": [("remplace", "REJEU-ETAPE-5 ", AUTRE_ETAPE)]},
+    ],
     "faux-refus": [
         {"nom": "faux-refus=1", "ops": [("remplace", "REJEU-ETAPE-5 ", REFUS_UN)], "seule": True},
     ],
     "faux-accept": [
         {"nom": "faux-accept=1", "ops": [("remplace", "REJEU-ETAPE-5 ", ACCEPT_UN)], "seule": True},
+    ],
+    "commit-absent": [
+        {"nom": "aucune ligne COMMIT-REJOUE", "ops": [("sans", "COMMIT-REJOUE")], "seule": True},
+    ],
+    "commit-malforme": [
+        {"nom": "COMMIT-REJOUE à 39 hex, seule du relevé", "ops": [("remplace", "COMMIT-REJOUE ", "COMMIT-REJOUE " + COMMIT[:39])]},
+        {"nom": "COMMIT-REJOUE en majuscules, seule du relevé", "ops": [("remplace", "COMMIT-REJOUE ", "COMMIT-REJOUE " + COMMIT.upper())]},
+        {"nom": "COMMIT-REJOUE à 41 hex, à côté d'une ligne conforme", "ops": [("ajoute", "COMMIT-REJOUE " + COMMIT + "0")], "seule": True},
+        {"nom": "COMMIT-REJOUE conforme suivie de \\r", "ops": [("crlf", "COMMIT-REJOUE ")]},
+    ],
+    "commit-doublon": [
+        {"nom": "la ligne COMMIT-REJOUE en double", "ops": [("double", "COMMIT-REJOUE ")], "seule": True},
+    ],
+    "labs-absents": [
+        {"nom": "ni --lab ni ligne de table", "ops": [("sans", "G3 | "), ("sans", "G4 | ")], "seule": True},
+    ],
+    "empreinte-absente": [
+        {"nom": "une seule empreinte pour deux labs", "ops": [("sans", ID_1)], "seule": True},
+        {"nom": "un --lab sans ligne d'empreinte", "args": ["--lab=~/lab-z"], "seule": True},
+        {"nom": "ligne EMPREINTE-ARBRE-IDENTIQUE sans lab, à côté des conformes", "ops": [("ajoute", "EMPREINTE-ARBRE-IDENTIQUE")], "seule": True},
+        {"nom": "l'empreinte d'un lab suivie de \\r", "ops": [("crlf", ID_1)], "seule": True},
+    ],
+    "empreinte-doublon": [
+        {"nom": "l'empreinte d'un lab en double", "ops": [("double", ID_A)], "seule": True},
+    ],
+    "empreinte-divergente": [
+        {"nom": "une ligne DIVERGENTE à côté des IDENTIQUE", "ops": [("ajoute", "EMPREINTE-ARBRE-DIVERGENTE " + LAB_A)], "seule": True},
+        {"nom": "l'empreinte d'un lab est DIVERGENTE", "ops": [("remplace", ID_1, "EMPREINTE-ARBRE-DIVERGENTE " + LAB_1)]},
+    ],
+    "mesure-vide": [
+        {"nom": "une ligne MESURE-VIDE", "ops": [("ajoute", "MESURE-VIDE " + LAB_1)], "seule": True},
+    ],
+    "couverture-absente": [
+        {"nom": "G4 sans COUVERTURE-REJEU à l'étape 5", "ops": [("sans", "COUVERTURE-REJEU G4 ")], "seule": True},
+        {"nom": "G4P sans COUVERTURE-REJEU à l'étape 6", "etape": 6, "ops": [("sans", "COUVERTURE-REJEU G4P ")], "seule": True},
+    ],
+    "couverture-malformee": [
+        {"nom": "COUVERTURE-REJEU sans plancher, à côté des conformes", "ops": [("ajoute", "COUVERTURE-REJEU G4 n=44")], "seule": True},
+        {"nom": "COUVERTURE-REJEU d'un gate inconnu, à côté des conformes", "ops": [("ajoute", "COUVERTURE-REJEU G9 n=1 plancher=1")], "seule": True},
+        {"nom": "plancher=0, seule ligne de G4", "ops": [("remplace", "COUVERTURE-REJEU G4 ", "COUVERTURE-REJEU G4 n=44 plancher=0")]},
+        {"nom": "COUVERTURE-REJEU conforme suivie de \\r", "ops": [("crlf", "COUVERTURE-REJEU G3 ")]},
+    ],
+    "couverture-doublon": [
+        {"nom": "la ligne COUVERTURE-REJEU G4 en double", "ops": [("double", "COUVERTURE-REJEU G4 ")], "seule": True},
+    ],
+    "couverture-insuffisante": [
+        {"nom": "G4 n=11 sous plancher=12 (p-1)", "ops": [("remplace", "COUVERTURE-REJEU G4 ", "COUVERTURE-REJEU G4 n=11 plancher=12")], "seule": True},
+        {"nom": "G4P n=0 sous plancher=8 à l'étape 6", "etape": 6, "ops": [("remplace", "COUVERTURE-REJEU G4P ", "COUVERTURE-REJEU G4P n=0 plancher=8")], "seule": True},
+    ],
+    "chemin-machine": [
+        {"nom": "un chemin /Users/… dans une ligne", "ops": [("ajoute", LIGNE_USERS)], "seule": True, "interdit": ["/Users/dev", "dev/lab"]},
+        {"nom": "un chemin /home/… dans une ligne", "ops": [("ajoute", LIGNE_HOME)], "seule": True, "interdit": ["/home/runner", "runner/work"]},
     ],
 }
 
@@ -305,6 +382,14 @@ def controle_02():
                "code %d, %d ligne(s) RELEVE-VERDICT, sortie standard %s" % (rc, len(verdicts_de(out + err)), court(out, 60)))
 
 
+def cas_rouge(rc, sortie, regle, cas):
+    """Vrai si le cas négatif est refusé pour SA raison : code 1, sa ligne RELEVE-ECART, une seule dernière ligne RELEVE-VERDICT non-armable, et
+    jamais le chemin de machine ni la ligne fautive dans la sortie."""
+    if not (rc == 1 and regle in ecarts_de(sortie) and derniere(sortie).startswith("RELEVE-VERDICT non-armable ") and len(verdicts_de(sortie)) == 1):
+        return False
+    return not any(motif in sortie for motif in cas.get("interdit", ()))
+
+
 def controle_03():
     for regle, cas_regle in CAS_NEGATIFS.items():
         for cas in cas_regle:
@@ -314,13 +399,96 @@ def controle_03():
                 continue
             rc, out, err = lancer(SCRIPT, args)
             sortie = out + err
-            vus = ecarts_de(sortie)
-            if rc == 1 and regle in vus and derniere(sortie).startswith("RELEVE-VERDICT non-armable ") and len(verdicts_de(sortie)) == 1:
+            if cas_rouge(rc, sortie, regle, cas):
                 ok("R-RELEVE-03 %s rougit : %s" % (regle, cas["nom"]), "code 1, RELEVE-ECART %s" % regle)
             else:
                 ko("R-RELEVE-03 %s : %s" % (regle, cas["nom"]), "le cas négatif de la règle %s est refusé pour SA raison" % regle,
-                   "code 1, une ligne RELEVE-ECART %s, dernière ligne RELEVE-VERDICT non-armable" % regle,
-                   "code %d, écarts %s, dernière ligne « %s »" % (rc, vus, court(derniere(sortie))))
+                   "code 1, une ligne RELEVE-ECART %s, dernière ligne RELEVE-VERDICT non-armable%s" % (regle, ", jamais %s dans la sortie" % cas["interdit"] if cas.get("interdit") else ""),
+                   "code %d, écarts %s, dernière ligne « %s »" % (rc, ecarts_de(sortie), court(derniere(sortie))))
+
+
+def lancer_releve(nom, lignes, etape=5, args=(), brut=None, cwd=None):
+    """(rc, sortie) du script original sur un relevé fabriqué (lignes, ou octets bruts)."""
+    chemin = ecrire_octets(nom, brut) if brut is not None else ecrire_releve(nom, lignes)
+    p = subprocess.run(["bash", SCRIPT, "--etape=%d" % etape] + list(args) + [chemin], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd or WORK, timeout=120)
+    return p.returncode, (p.stdout + p.stderr).decode("utf-8", "replace")
+
+
+def bord(nom, assertion, attendu, rc, sortie, conforme):
+    if conforme:
+        ok("R-RELEVE-04 " + nom, attendu)
+    else:
+        ko("R-RELEVE-04 " + nom, assertion, attendu, "code %d, écarts %s, dernière ligne « %s »" % (rc, ecarts_de(sortie), court(derniere(sortie))))
+
+
+def armable(rc, sortie):
+    return rc == 0 and derniere(sortie).startswith("RELEVE-VERDICT armable ") and not ecarts_de(sortie)
+
+
+def refuse_pour(rc, sortie, *regles):
+    return rc == 1 and derniere(sortie).startswith("RELEVE-VERDICT non-armable ") and all(r in ecarts_de(sortie) for r in regles)
+
+
+def controle_04():
+    # n = plancher : jumeau positif de n = plancher - 1 (couverture-insuffisante)
+    rc, s = lancer_releve("b-plancher.txt", appliquer(base(5), [("remplace", "COUVERTURE-REJEU G4 ", "COUVERTURE-REJEU G4 n=12 plancher=12")]))
+    bord("n = plancher est armable (jumeau positif de n = plancher - 1)", "k >= p suffit", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
+    rc, s = lancer_releve("b-plancher-6.txt", appliquer(base(6), [("remplace", "COUVERTURE-REJEU G4P ", "COUVERTURE-REJEU G4P n=8 plancher=8")]), etape=6)
+    bord("étape 6 : G4P n = plancher est armable", "k >= p suffit à chaque gate visé", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
+    # la section « Non armé » n'excuse rien (l'ancien awk de 46-11 acceptait faux-refus != 0 si elle était là)
+    rc, s = lancer_releve("b-non-arme.txt", appliquer(base(5), [("remplace", "REJEU-ETAPE-5 ", "REJEU-ETAPE-5 faux-refus=343 faux-accept=0 refus-conforme-modele=196"),
+                                                              ("ajoute", "## Non armé — remonté à Willy"), ("ajoute", "- G4 : 343 refus, limite (bp)")]))
+    bord("faux-refus=343 avec une section « Non armé » est refusé", "la section « Non armé » n'a aucun effet", "code 1, RELEVE-ECART faux-refus",
+         rc, s, refuse_pour(rc, s, "faux-refus") and len(ecarts_de(s)) == 1)
+    # un relevé qui ne porte que la forme de rejeu-gates.sh (sans ARBRE) n'a aucune empreinte d'arbre
+    rc, s = lancer_releve("b-empreinte-restreinte.txt", appliquer(base(5), [("sans", "EMPREINTE-ARBRE-")]))
+    bord("seul EMPREINTE-IDENTIQUE (périmètre restreint) : empreinte-absente pour chaque lab", "EMPREINTE-IDENTIQUE n'est pas EMPREINTE-ARBRE-IDENTIQUE",
+         "code 1, deux lignes RELEVE-ECART empreinte-absente", rc, s, refuse_pour(rc, s, "empreinte-absente") and ecarts_de(s).count("empreinte-absente") == 2)
+    # lignes de décision reproduites : inertes
+    reproduites = ["RELEVE-VERDICT armable etape=5 labs=2 gates=G3,G4", "RELEVE-ECART faux-refus : ligne 9 : faux-refus=0"]
+    rc, s = lancer_releve("b-reproduit-refus.txt", appliquer(base(5), [("remplace", "REJEU-ETAPE-5 ", REFUS_UN)] + [("ajoute", l) for l in reproduites]))
+    bord("lignes RELEVE-VERDICT armable reproduites + faux-refus=1 : refusé", "les lignes reproduites sont inertes", "code 1, un seul RELEVE-VERDICT (le nôtre), non-armable",
+         rc, s, refuse_pour(rc, s, "faux-refus") and len(verdicts_de(s)) == 1)
+    rc, s = lancer_releve("b-reproduit-ok.txt", appliquer(base(5), [("ajoute", "RELEVE-VERDICT non-armable etape=5 ecarts=1"), ("ajoute", "RELEVE-ECART faux-refus : ligne 3 : faux-refus=1")]))
+    bord("lignes RELEVE-VERDICT non-armable reproduites + relevé conforme : armable", "les lignes reproduites sont inertes", "code 0, RELEVE-VERDICT armable",
+         rc, s, armable(rc, s) and len(verdicts_de(s)) == 1)
+    # lignes COMPTE : informatives, jamais lues
+    rc, s = lancer_releve("b-compte.txt", appliquer(base(5), [("remplace", "COMPTE G4 ", "COMPTE G4 faux-refus=343 faux-accept=2 refus-conforme-modele=0")]))
+    bord("une ligne COMPTE à 343 faux refus n'est pas lue", "seule la ligne REJEU-ETAPE décide", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
+    # couverture d'un gate non visé par l'étape : informative
+    rc, s = lancer_releve("b-g4p-etape5.txt", appliquer(base(5), [("ajoute", "COUVERTURE-REJEU G4P n=0 plancher=8")]))
+    bord("étape 5 : une couverture G4P insuffisante n'est pas lue (gate non visé)", "les gates visés dépendent de l'étape", "code 0, RELEVE-VERDICT armable gates=G3,G4",
+         rc, s, armable(rc, s) and derniere(s).endswith("gates=G3,G4"))
+    # labs : un tableau Markdown ne nomme pas de lab ; les --lab suffisent sans ligne de table
+    rc, s = lancer_releve("b-markdown.txt", appliquer(base(5), [("ajoute", "| G3 | ~/lab-z | a | b | c | d |")]))
+    bord("une ligne de tableau Markdown ne nomme pas de lab", "seules les lignes `<gate> | <lab> | …` comptent", "code 0, labs=2", rc, s,
+         armable(rc, s) and "labs=2 " in derniere(s))
+    rc, s = lancer_releve("b-lab-options.txt", appliquer(base(5), [("sans", "G3 | "), ("sans", "G4 | ")]), args=["--lab=" + LAB_A, "--lab=" + LAB_1])
+    bord("deux --lab sans ligne de table : labs=2", "les labs sont l'union des --lab et des lignes de table", "code 0, labs=2", rc, s, armable(rc, s) and "labs=2 " in derniere(s))
+    rc, s = lancer_releve("b-lab-union.txt", base(5), args=["--lab=" + LAB_A])
+    bord("un --lab déjà nommé par la table ne compte pas deux fois", "union sans doublon", "code 0, labs=2", rc, s, armable(rc, s) and "labs=2 " in derniere(s))
+    # bords de forme
+    rc, s = lancer_releve("b-sans-fin-de-ligne.txt", None, brut=("\n".join(base(5))).encode("utf-8"))
+    bord("relevé sans fin de ligne finale : armable", "la dernière ligne compte même sans \\n", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
+    rc, s = lancer_releve("b-crlf.txt", None, brut=("\r\n".join(base(5)) + "\r\n").encode("utf-8"))
+    bord("relevé entièrement en CRLF : refusé", "un \\r final rend chaque ligne malformée", "code 1, RELEVE-ECART etape-malformee et commit-malforme",
+         rc, s, refuse_pour(rc, s, "etape-malformee", "commit-malforme", "etape-absente", "commit-absent"))
+    # sortie reproductible : ni la ligne fautive, ni deux sorties différentes
+    rc1, s1 = lancer_releve("b-deterministe.txt", appliquer(base(5), [("remplace", "REJEU-ETAPE-5 ", REFUS_UN)]))
+    rc2, s2 = lancer_releve("b-deterministe.txt", appliquer(base(5), [("remplace", "REJEU-ETAPE-5 ", REFUS_UN)]))
+    bord("la sortie est déterministe et ne recopie pas la ligne fautive", "la sortie est reproduite telle quelle dans les relevés versionnés",
+         "deux sorties identiques, sans « %s »" % REFUS_UN, rc1, s1, rc1 == rc2 and s1 == s2 and REFUS_UN not in s1)
+    # ni sous-processus, ni écriture : cwd vide avant et après, aucune primitive de lancement ou d'écriture dans le cœur
+    dossier = os.path.join(WORK, "lecture-seule")
+    os.makedirs(dossier, exist_ok=True)
+    avant = sorted(os.listdir(dossier))
+    rc, s = lancer_releve("b-lecture-seule.txt", base(5), cwd=dossier)
+    apres = sorted(os.listdir(dossier))
+    corps = corps_python(open(SCRIPT, encoding="utf-8").read()) or ""
+    interdits = [m for m in ("subprocess", "os.system", "Popen", "os.popen", "os.exec", "os.spawn", "os.fork", "os.write(", "os.mkdir", "os.rename", "os.remove", "os.unlink", "shutil") if m in corps]
+    interdits += [m for m in re.findall(r"open\([^)]*[\"'][wax]\+?b?[\"']", corps)]
+    bord("aucun sous-processus et aucune écriture", "le script lit, il ne recalcule ni n'écrit rien", "dossier de travail inchangé, aucune primitive de lancement ou d'écriture dans le cœur",
+         rc, s, armable(rc, s) and avant == apres and not interdits)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -389,6 +557,7 @@ def executer_mutant_regle(regle, marqueurs):
         return
     assertion = "R-RELEVE-03 %s rougit" % regle
     premiere = None
+    seule_vu = False
     exerces = 0
     for cas in cas_regle:
         args, _ = fabriquer(cas)
@@ -407,7 +576,9 @@ def executer_mutant_regle(regle, marqueurs):
         if cas.get("seule") and not (rc_m == 0 and derniere(sm).startswith("RELEVE-VERDICT armable ")):
             komut(ident, assertion + " (cas seul) : " + cas["nom"], "code 1, RELEVE-ECART %s" % regle, "le mutant devait laisser armer : " + decrire(rc_m, sm, regle))
             return
-        if premiere is None:
+        if cas.get("seule") and not seule_vu:  # la trace montre de préférence un cas « seul » : sous le mutant, le code devient 0
+            premiere, seule_vu = decrire(rc_m, sm, regle), True
+        elif premiere is None:
             premiere = decrire(rc_m, sm, regle)
     if exerces == 0:
         komut(ident, assertion, "au moins un cas exerçable", "aucun cas exerçable ici")
@@ -434,13 +605,86 @@ def sec_mutants():
             print("    obtenu    : aucun")
 
 
+def tous_les_cas():
+    """[(règle, cas, args)] de tous les cas exerçables de la table."""
+    sortie = []
+    for regle, cas_regle in CAS_NEGATIFS.items():
+        for cas in cas_regle:
+            args, _ = fabriquer(cas)
+            if args is not None:
+                sortie.append((regle, cas, args))
+    return sortie
+
+
+def mutant_toujours_armable():
+    ident = "RELEVE-TOUJOURS-ARMABLE"
+    chemin, raison = make_mutant(ident, lambda l: "# verdict-final" in l, "armable = True  # verdict-final")
+    if chemin is None:
+        komut(ident, "le mutant du verdict final se construit", "UNE ligne `armable = …  # verdict-final` remplacée", raison)
+        return
+    assertion = "R-RELEVE-03 chaque cas négatif est refusé"
+    cas = tous_les_cas()
+    survivants = []
+    premier = None
+    for regle, c, args in cas:
+        rc_o, out_o, err_o = lancer(SCRIPT, args)
+        if not cas_rouge(rc_o, out_o + err_o, regle, c):
+            komut(ident, assertion + " (original) : " + regle + " · " + c["nom"], "code 1, RELEVE-ECART %s" % regle, "l'original lui-même ne rougit pas : code %d" % rc_o)
+            return
+        rc_m, out_m, err_m = lancer(chemin, args)
+        if cas_rouge(rc_m, out_m + err_m, regle, c):
+            survivants.append(regle)
+        elif premier is None:
+            premier = "code %d, %s" % (rc_m, court(derniere(out_m + err_m), 80))
+    if survivants:
+        komut(ident, assertion, "code 1, RELEVE-VERDICT non-armable", "le mutant refuse encore : %s" % ", ".join(sorted(set(survivants))))
+        return
+    for etape in (5, 6):
+        rc_p, sortie_p = positif(chemin, etape)
+        if not armable(rc_p, sortie_p):
+            komut(ident, "mutant valide : le relevé conforme de l'étape %d reste armable" % etape, "code 0, RELEVE-VERDICT armable", "code %d" % rc_p)
+            return
+    okmut(ident, "%s (%d cas) · attendu (original) : code 1, RELEVE-VERDICT non-armable · obtenu (mutant) : %s" % (assertion, len(cas), premier))
+
+
+def mutant_toujours_refus():
+    ident = "RELEVE-TOUJOURS-REFUS"
+    chemin, raison = make_mutant(ident, lambda l: "# verdict-final" in l, "armable = False  # verdict-final")
+    if chemin is None:
+        komut(ident, "le mutant du verdict final se construit", "UNE ligne `armable = …  # verdict-final` remplacée", raison)
+        return
+    assertion = "R-RELEVE-01 le relevé conforme est armable"
+    premier = None
+    for etape in (5, 6):
+        rc_o, sortie_o = positif(SCRIPT, etape)
+        if not armable(rc_o, sortie_o):
+            komut(ident, assertion + " (original) : étape %d" % etape, "code 0, RELEVE-VERDICT armable", "l'original lui-même ne rend pas armable : code %d" % rc_o)
+            return
+        rc_m, sortie_m = positif(chemin, etape)
+        if armable(rc_m, sortie_m):
+            komut(ident, assertion + " : étape %d" % etape, "code 0, RELEVE-VERDICT armable", "le mutant arme encore : code %d" % rc_m)
+            return
+        if premier is None:
+            premier = "code %d, %s" % (rc_m, court(derniere(sortie_m), 80))
+    # mutant valide : les cas négatifs restent refusés sous un verdict toujours négatif (le défaut est de ne jamais armer, pas d'armer à tort)
+    for regle, c, args in tous_les_cas():
+        rc_m, out_m, err_m = lancer(chemin, args)
+        if not cas_rouge(rc_m, out_m + err_m, regle, c):
+            komut(ident, "mutant valide : le cas négatif %s reste refusé" % regle, "code 1", "code %d" % rc_m)
+            return
+    okmut(ident, "%s · attendu (original) : code 0, RELEVE-VERDICT armable · obtenu (mutant) : %s" % (assertion, premier))
+
+
 def main():
     global SCRIPT, WORK
     SCRIPT, WORK = sys.argv[1], sys.argv[2]
     controle_01()
     controle_02()
     controle_03()
+    controle_04()
     sec_mutants()
+    mutant_toujours_armable()
+    mutant_toujours_refus()
 
 
 main()
