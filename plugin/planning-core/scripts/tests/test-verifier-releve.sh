@@ -264,6 +264,7 @@ REFUS_UN = "REJEU-ETAPE-5 faux-refus=1 faux-accept=0 refus-conforme-modele=196"
 ACCEPT_UN = "REJEU-ETAPE-5 faux-refus=0 faux-accept=1 refus-conforme-modele=196"
 AUTRE_ETAPE = "REJEU-ETAPE-6 faux-refus=0 faux-accept=0 refus-conforme-modele=0"
 ID_A, ID_1 = "EMPREINTE-ARBRE-IDENTIQUE " + LAB_A, "EMPREINTE-ARBRE-IDENTIQUE " + LAB_1
+GROS = "1" * 4301  # plus de chiffres que la limite de conversion de Python >= 3.11 (4 300) : int() lèverait (fix-5b V1)
 # Les chemins de machine de la suite sont des PLACEHOLDERS admis par scripts/check-machine-paths.sh (compte `dev`, compte `runner`) :
 # la règle du script les refuse quand même, et la suite versionnée ne porte aucun vrai chemin.
 LIGNE_USERS = "NOTE rejeu lancé depuis /Users/dev/lab"
@@ -289,6 +290,9 @@ CAS_NEGATIFS = {
         {"nom": "ligne sans refus-conforme-modele, seule du relevé", "ops": [("remplace", "REJEU-ETAPE-5 ", "REJEU-ETAPE-5 faux-refus=0 faux-accept=0")]},
         {"nom": "ligne sans refus-conforme-modele, à côté d'une ligne conforme", "ops": [("ajoute", "REJEU-ETAPE-5 faux-refus=0 faux-accept=0")], "seule": True},
         {"nom": "ligne conforme suivie de \\r", "ops": [("crlf", "REJEU-ETAPE-5 ")]},
+        {"nom": "faux-refus à 4 301 chiffres, à côté de la ligne conforme", "tue": ("entier-borne",), "ops": [("ajoute", "REJEU-ETAPE-5 faux-refus=%s faux-accept=0 refus-conforme-modele=196" % GROS)], "seule": True},
+        {"nom": "numéro d'étape à 4 301 chiffres, à côté de la ligne conforme", "tue": ("entier-borne",), "ops": [("ajoute", "REJEU-ETAPE-%s faux-refus=0 faux-accept=0 refus-conforme-modele=196" % GROS)], "seule": True},
+        {"nom": "faux-accept à 10 chiffres, à côté de la ligne conforme", "tue": ("entier-borne",), "ops": [("ajoute", "REJEU-ETAPE-5 faux-refus=0 faux-accept=1234567890 refus-conforme-modele=196")], "seule": True},
     ],
     "etape-doublon": [
         {"nom": "la ligne REJEU-ETAPE-5 en double", "ops": [("double", "REJEU-ETAPE-5 ")], "seule": True},
@@ -343,6 +347,8 @@ CAS_NEGATIFS = {
         {"nom": "COUVERTURE-REJEU d'un gate inconnu, à côté des conformes", "ops": [("ajoute", "COUVERTURE-REJEU G9 n=1 plancher=1")], "seule": True},
         {"nom": "plancher=0, seule ligne de G4", "ops": [("remplace", "COUVERTURE-REJEU G4 ", "COUVERTURE-REJEU G4 n=44 plancher=0")]},
         {"nom": "COUVERTURE-REJEU conforme suivie de \\r", "ops": [("crlf", "COUVERTURE-REJEU G3 ")]},
+        {"nom": "n à 4 301 chiffres, à côté des conformes", "ops": [("ajoute", "COUVERTURE-REJEU G4 n=%s plancher=12" % GROS)], "seule": True},
+        {"nom": "plancher à 4 301 chiffres, à côté des conformes", "ops": [("ajoute", "COUVERTURE-REJEU G4 n=44 plancher=%s" % GROS)], "seule": True},
     ],
     "couverture-doublon": [
         {"nom": "la ligne COUVERTURE-REJEU G4 en double", "ops": [("double", "COUVERTURE-REJEU G4 ")], "seule": True},
@@ -704,6 +710,47 @@ def mutant_toujours_refus():
     okmut(ident, "%s · attendu (original) : code 0, RELEVE-VERDICT armable · obtenu (mutant) : %s" % (assertion, premier))
 
 
+def mutant_entier_borne():
+    """MUT-RELEVE-ENTIER-BORNE (fix-5b V1, revue-5b n°4, audit-5b F-4) : la grammaire de REJEU-ETAPE rendue à `[0-9]+` (nombre sans borne) -> les cas à nombre de plus de 9 chiffres ne sont plus
+    refusés pour `etape-malformee` (sous Python >= 3.11, int() lève sur 4 301 chiffres : une trace, aucune ligne de verdict ; sous Python < 3.11, le doublon et le faux-accept parlent à sa
+    place) ; l'original les refuse tous."""
+    ident = "RELEVE-ENTIER-BORNE"
+    regle = "etape-malformee"
+    ligne = next((l for l in open(SCRIPT, encoding="utf-8").read().split("\n") if l.startswith("RE_ETAPE = re.compile(")), "")
+    if "{1,9}" not in ligne:
+        komut(ident, "la grammaire de REJEU-ETAPE est bornée à 1 à 9 chiffres", "une ligne `RE_ETAPE = re.compile(…{1,9}…)`", "introuvable")
+        return
+    chemin, raison = make_mutant(ident, lambda l: l == ligne, ligne.replace("{1,9}", "+"))
+    if chemin is None:
+        komut(ident, "le mutant se construit", "UNE ligne RE_ETAPE rendue à `[0-9]+`", raison)
+        return
+    assertion = "R-RELEVE-03 %s rougit (nombres de plus de 9 chiffres)" % regle
+    cas = [c for c in CAS_NEGATIFS[regle] if "entier-borne" in c.get("tue", ())]
+    if not cas:
+        komut(ident, assertion, "au moins un cas étiqueté entier-borne", "aucun")
+        return
+    trace = None
+    for c in cas:
+        args, _ = fabriquer(c)
+        rc_o, out_o, err_o = lancer(SCRIPT, args)
+        if not cas_rouge(rc_o, out_o + err_o, regle, c):
+            komut(ident, assertion + " (original) : " + c["nom"], "code 1, RELEVE-ECART %s" % regle, "l'original lui-même ne rougit pas : code %d, écarts %s" % (rc_o, ecarts_de(out_o + err_o)))
+            return
+        rc_m, out_m, err_m = lancer(chemin, args)
+        sm = out_m + err_m
+        if cas_rouge(rc_m, sm, regle, c):
+            komut(ident, assertion + " : " + c["nom"], "le mutant ne refuse plus ce cas pour %s" % regle, "le mutant le refuse encore : " + decrire(rc_m, sm, regle))
+            return
+        if trace is None:
+            trace = decrire(rc_m, sm, regle) + (" (trace Python : %s)" % court(derniere(err_m), 60) if "Error" in derniere(err_m) else "")
+    for etape in (5, 6):
+        rc_p, sortie_p = positif(chemin, etape)
+        if not armable(rc_p, sortie_p):
+            komut(ident, "mutant valide : le relevé conforme de l'étape %d reste armable sous le mutant" % etape, "code 0, RELEVE-VERDICT armable", "code %d" % rc_p)
+            return
+    okmut(ident, "%s · attendu (original) : code 1, RELEVE-ECART %s · obtenu (mutant) : %s" % (assertion, regle, trace))
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # R-RELEVE-CHAINE : la vraie chaîne de rejeu sur un lab synthétique, composée au format des relevés de la phase (46.1-18, P461-D-06, P461-D-07)
 # ---------------------------------------------------------------------------------------------------------------------
@@ -971,6 +1018,7 @@ def main():
     sec_mutants()
     mutant_toujours_armable()
     mutant_toujours_refus()
+    mutant_entier_borne()
     controle_couverture()
 
 

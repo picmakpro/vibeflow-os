@@ -15,7 +15,8 @@
 #   reproduite telle quelle dans les relevés versionnés.
 # Lecture : O_NOFOLLOW (un lien est refusé), fichier régulier, 64 Mio au plus, UTF-8 strict ; un échec est l'écart `lecture`.
 #
-# Grammaire (lignes ENTIÈRES ; un `\r` final rend la ligne malformée ; « commence par le jeton » = la ligne rougit si elle ne suit pas la grammaire) :
+# Grammaire (lignes ENTIÈRES ; un `\r` final rend la ligne malformée ; « commence par le jeton » = la ligne rougit si elle ne suit pas la grammaire ; tout
+# nombre est écrit en 1 à 9 chiffres : un nombre plus long est une ligne malformée nommée, jamais une trace — fix-5b V1) :
 #   REJEU-ETAPE-<n> faux-refus=<a> faux-accept=<b> refus-conforme-modele=<c>   UNE seule pour l'étape demandée, a = b = 0 ; c est informatif
 #   COMMIT-REJOUE <40 hex minuscules>                                          UNE seule (le commit n'est pas vérifié contre le dépôt)
 #   EMPREINTE-ARBRE-(IDENTIQUE|DIVERGENTE) <lab>                               par lab : UNE ligne IDENTIQUE, aucune DIVERGENTE
@@ -67,10 +68,12 @@ BORNE_RELEVE = 64 * 1024 * 1024  # octets ; au-delà : écart lecture
 GATES_PAR_ETAPE = {5: ("G3", "G4"), 6: ("G3", "G4", "G4P")}
 MOTIFS_MACHINE = ("/Users/", "/home/")
 
-RE_ETAPE = re.compile(r"REJEU-ETAPE-([0-9]+) faux-refus=([0-9]+) faux-accept=([0-9]+) refus-conforme-modele=([0-9]+)")
+# Tout nombre de la grammaire tient en 1 à 9 chiffres (fix-5b V1) : int() n'est appelé que sur un groupe ainsi borné, jamais sur un entier que la limite de conversion de
+# Python >= 3.11 (4 300 chiffres) ferait lever ; un nombre plus long est une ligne malformée, nommée, comme sous toute version de Python.
+RE_ETAPE = re.compile(r"REJEU-ETAPE-([0-9]{1,9}) faux-refus=([0-9]{1,9}) faux-accept=([0-9]{1,9}) refus-conforme-modele=([0-9]{1,9})")
 RE_COMMIT = re.compile(r"COMMIT-REJOUE [0-9a-f]{40}")
 RE_EMPREINTE = re.compile(r"EMPREINTE-ARBRE-(IDENTIQUE|DIVERGENTE) (.+)")
-RE_COUVERTURE = re.compile(r"COUVERTURE-REJEU (G3|G4|G4P) n=([0-9]+) plancher=([0-9]+)")
+RE_COUVERTURE = re.compile(r"COUVERTURE-REJEU (G3|G4|G4P) n=([0-9]{1,9}) plancher=([0-9]{1,9})")
 RE_GATE = re.compile(r"[A-Z][A-Z0-9]*")
 
 ECARTS = []
