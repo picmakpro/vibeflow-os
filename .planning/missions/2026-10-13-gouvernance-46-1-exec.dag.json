@@ -39,12 +39,13 @@
       "step": "46.1-02 D1 N-5 et A5",
       "stage": "",
       "deps": [
-        "exec-01"
+        "exec-01",
+        "fix-outil-01"
       ],
       "scope": [
         "plugin/planning-core"
       ],
-      "status": "ready"
+      "status": "blocked"
     },
     {
       "id": "exec-03",
@@ -348,6 +349,18 @@
       ],
       "scope": [],
       "status": "blocked"
+    },
+    {
+      "id": "fix-outil-01",
+      "step": "correction ciblée 46.1-CONTROLES.sh : --detache inutilisable pour base >= 480 s",
+      "stage": "",
+      "deps": [
+        "exec-01"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases"
+      ],
+      "status": "running"
     }
   ]
 }
