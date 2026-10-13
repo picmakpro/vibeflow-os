@@ -102,7 +102,11 @@
 # script du depot (`bash release.sh`), un wrapper hors liste (`timeout 5 git commit`, `env -S "git commit"`), un `export`
 # dans un fichier source ou une fonction, `set -a`, `bash -c` dont la chaine est construite par substitution (categorie A).
 # Preuve A/B du lab plat : la copie gelee d avant la Phase 57 reste la reference ; la suite n en tolere que les ecarts
-# ENUMERES (GW_AB_ENUM de test-guard-driver-lock-ws.sh), tous des refus nouveaux sous le verrou d autrui.
+# ENUMERES (GW_AB_ENUM de test-guard-driver-lock-ws.sh, 37 formes), des refus nouveaux sous le verrou d autrui, et elle EPINGLE la
+# transcription du guard courant sur ces formes (fixtures/guard-ab-enum-37.txt : verdict, code, message, au bit pres). Hors
+# matrice A/B, le lab plat recoit aussi des refus nouveaux (`/usr/bin/git` et guillemets au-dela de 3 niveaux de bash -c ;
+# affectations += et [i]= en prefixe) ET un changement plus PERMISSIF : `bash -c "cd <hors lab> && git commit"`, refuse par la
+# copie gelee (decoupage grossier de la chaine), est permis (le cd interne d une chaine lue sert a la decision « hors du lab »).
 # AUCUN CROCHET DE TEST (R-6) : le guard ne lit aucune variable de test ; la suite provoque l exception fail-closed
 # dans une COPIE du guard qu elle fabrique elle-meme.
 # LIMITE (P57-D-20) : le guard isole des SESSIONS, pas des managers d'une même session (ils partagent le
@@ -293,6 +297,10 @@ def journal_override(lock_parent, lock_base, session_id, cmd_or_content):
 # segment qui ne contient QU un jeton de fermeture (ex. le second segment de `{ … ; }`).
 STRUCTURAL_SKIP = {"(", ")", "{", "}", "then", "do", "else"}
 
+# Affectation en prefixe de commande (AU2-06) : NOM=, NOM+=, NOM[i]=, NOM[i]+= . Le tableau et le += sont lus comme une
+# affectation, sinon `FOO+=1 git commit` laisse FOO+=1 en position de commande et le verbe git reste invisible.
+ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")
+
 def command_positions(toks):
     """CSL-04 (repris de guard-bash-registres.sh, non modifié à la source) : indices des tokens
     en position de COMMANDE — début de segment, après un jeton structurel (STRUCTURAL_SKIP), ou
@@ -304,7 +312,7 @@ def command_positions(toks):
     n = len(toks)
     while i < n:
         t = toks[i]
-        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t):
+        if ASSIGN_RE.match(t):
             i += 1
             continue
         if t in STRUCTURAL_SKIP:
@@ -379,7 +387,6 @@ def tokens(seg):
     except ValueError:
         return seg.split()
 
-ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 COARSE_VERBS = sorted(MUTATING_GIT_VERBS | RESUMABLE_SUBVERBS)
 
 def sets_git_target(toks):
@@ -425,8 +432,10 @@ def shell_c_string(toks, idx):
 
 def shell_c_inner(cmd):
     """Chaines `bash -c "..."` (SHELLS) de la commande, lues avec un decoupage qui respecte les guillemets : liste de
-    (chaine, incertain) ; incertain = un GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= du prefixe, ou pose plus haut dans
-    la commande, est herite par le shell fils. Illisible (guillemet non ferme) : liste vide."""
+    (chaine, incertain, cd_avant) ; incertain = un GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= du prefixe, ou pose plus haut
+    dans la commande, est herite par le shell fils ; cd_avant = un cd, pushd ou popd de la commande appelante figure AVANT
+    la chaine (AU2-01) : le dossier courant du shell fils est celui de l appelant, la recursion doit le savoir. Illisible
+    (guillemet non ferme) : liste vide."""
     try:
         import shlex
         flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
@@ -437,6 +446,7 @@ def shell_c_inner(cmd):
         return []
     out = []
     persist = False
+    cd_seen = False
     cur = []
     for t in toks + [";"]:
         if t not in SEG_OPS:
@@ -448,14 +458,31 @@ def shell_c_inner(cmd):
             if os.path.basename(cur[idx]) in SHELLS:
                 c = shell_c_string(cur, idx)
                 if c:
-                    out.append((c, persist or env_target_uncertain(cur[:idx])))
+                    out.append((c, persist or env_target_uncertain(cur[:idx]), cd_seen))
+        if any(os.path.basename(cur[idx]) in ("cd", "pushd", "popd") for idx in command_positions(cur)):
+            cd_seen = True
         cur = []
     return out
+
+# Refus grossier au-dela de MAX_SHELL_DEPTH (AU2-02, AU2-03). Lineaire : une seule recherche de `git`, une seule recherche
+# d un verbe mutant apres lui, aucun point-etoile (l ancienne expression `git`, point-etoile, verbes en re.S relisait la fin de
+# la chaine a chaque `git` : 32 Ko en 19 s). Guillemets et antislash sont retires avant la recherche (deux apostrophes dans `git`,
+# un guillemet double, un antislash : tous valent git) ; `git` derriere un `/` (`/usr/bin/git`) ou un guillemet compte. Une chaine
+# plus longue que COARSE_MAX_LEN n est pas lue : elle compte comme un geste a cible incertaine (refus sous le verrou d autrui
+# seulement, comme tout le refus grossier).
+COARSE_MAX_LEN = 65536
+COARSE_STRIP = str.maketrans("", "", "\x27\"\\")
+COARSE_GIT_RE = re.compile(r"(?<![A-Za-z0-9_])git\b")
+COARSE_VERB_RE = re.compile(r"\b(" + "|".join(COARSE_VERBS) + r")\b")
 
 def coarse_commit_like(c):
     """Au-dela de MAX_SHELL_DEPTH, la chaine n est plus decoupee : un `git` suivi plus loin d un verbe mutant la fait
     compter comme un geste a cible incertaine (refus sous le verrou d autrui seulement)."""
-    return re.search(r"(^|[^A-Za-z0-9_./-])git\b.*\b(" + "|".join(COARSE_VERBS) + r")\b", c, re.S) is not None
+    if len(c) > COARSE_MAX_LEN:
+        return True
+    c = c.translate(COARSE_STRIP)
+    m = COARSE_GIT_RE.search(c)
+    return m is not None and COARSE_VERB_RE.search(c, m.end()) is not None
 
 def strip_heredocs(cmd):
     """CSL-05 (durci -- correction juge #1) : ne tronque QUE le CORPS de chaque heredoc, jamais ce
@@ -532,7 +559,7 @@ def bash_command_concerned(cmd, depth=0):
                     sub = toks[idx + 1] if idx + 1 < len(toks) else ""
                     if sub in ("pr", "release"):
                         return True
-    for c, _unc in shell_c_inner(cmd):
+    for c, _unc, _cd in shell_c_inner(cmd):
         if depth + 1 > MAX_SHELL_DEPTH:
             if coarse_commit_like(c):
                 return True
@@ -1000,7 +1027,7 @@ def uncertain_global(t):
     """Option globale git qui deplace la cible du geste : -C, --git-dir, --work-tree (P57-D-33)."""
     return t == "-C" or (t.startswith("-C") and len(t) > 2) or t.startswith("--git-dir") or t.startswith("--work-tree")
 
-ENV_TARGET_RE = re.compile(r"^(GIT_DIR|GIT_INDEX_FILE|GIT_WORK_TREE)=")
+ENV_TARGET_RE = re.compile(r"^(GIT_DIR|GIT_INDEX_FILE|GIT_WORK_TREE)(\[[^\]]*\])?\+?=")
 
 def env_target_uncertain(pre):
     """Affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git (correction R-5,
@@ -1075,15 +1102,16 @@ def add_info(rest, seen_cd):
         paths.append(t)
     return {"wide": wide, "paths": paths}
 
-def gesture_classes(cmd, inherit=False, depth=0):
+def gesture_classes(cmd, inherit=False, depth=0, cd_before=False):
     """Gestes de la commande, meme segmentation que bash_command_concerned (heredocs retires, sauts de ligne puis
     operateurs, command_positions, skip_git_globals) et memes exemptions D-32-06 (aucune elargie, aucune
     retiree). Rend (gestes, ajouts). Classes : arbre, commit (a_flag, pathspec, amend), depot,
     retrait-worktree ; chaque geste porte uncertain (cible git incertaine). Les ajouts (git add/rm/mv/stage)
-    ne sont pas des gestes concernes : ils entrent dans le jugement du commit de la meme commande."""
+    ne sont pas des gestes concernes : ils entrent dans le jugement du commit de la meme commande. cd_before : la commande
+    appelante a change de dossier avant cette chaine (AU2-01) ; un git add y est lu comme forme large, comme apres un cd."""
     gestures = []
     adds = []
-    seen_cd = False
+    seen_cd = cd_before
     persist = inherit
     cmd0 = cmd
     cmd = strip_heredocs(cmd)
@@ -1128,12 +1156,12 @@ def gesture_classes(cmd, inherit=False, depth=0):
                     sub = toks[idx + 1] if idx + 1 < len(toks) else ""
                     if sub in ("pr", "release"):
                         gestures.append({"cls": "depot", "uncertain": False})
-    for c, unc_in in shell_c_inner(cmd0):
+    for c, unc_in, cd_in in shell_c_inner(cmd0):
         if depth + 1 > MAX_SHELL_DEPTH:
             if coarse_commit_like(c):
                 gestures.append({"cls": "arbre", "uncertain": True})
             continue
-        g2, a2 = gesture_classes(c, inherit or unc_in, depth + 1)
+        g2, a2 = gesture_classes(c, inherit or unc_in, depth + 1, cd_before or cd_in)
         gestures.extend(g2)
         adds.extend(a2)
     return gestures, adds

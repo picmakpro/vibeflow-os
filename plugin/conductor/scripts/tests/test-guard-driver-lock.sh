@@ -492,6 +492,15 @@ assert "C7ze — git commit à 4 niveaux de bash -c (au-delà de la profondeur l
 assert "C7zf — git commit à 6 niveaux de bash -c : deny" "$(run_guard "$(mk_bash "$(nest_bashc 6 'git commit -m x')" sess-intrus "$LAB")")" "$DENY"
 assert_empty "C7zg — 4 niveaux de bash -c SANS git commit-like : allow" "$(run_guard "$(mk_bash "$(nest_bashc 4 'echo hi')" sess-intrus "$LAB")")"
 assert_empty "C7zh — 4 niveaux de bash -c autour de git status (lecture) : allow" "$(run_guard "$(mk_bash "$(nest_bashc 4 'git status')" sess-intrus "$LAB")")"
+# Tour 3 de la mission q45 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) : le refus grossier lit /usr/bin/git et les guillemets (AU2-03),
+# NOM+= et NOM[i]= sont des affectations en préfixe (AU2-06). Les mutants de ces comportements vivent dans test-guard-driver-lock-ws.sh (GW-AU2-*).
+assert "C7zi — 4 niveaux autour de /usr/bin/git commit : deny" "$(run_guard "$(mk_bash "$(nest_bashc 4 '/usr/bin/git commit -m x')" sess-intrus "$LAB")")" "$DENY"
+assert "C7zj — 4 niveaux autour de g''it commit (guillemets dans le mot) : deny" "$(run_guard "$(mk_bash "$(nest_bashc 4 "g''it commit -m x")" sess-intrus "$LAB")")" "$DENY"
+assert_empty "C7zk — 4 niveaux autour de echo digit commit (git n'est pas un mot) : allow" "$(run_guard "$(mk_bash "$(nest_bashc 4 'echo digit commit -m x')" sess-intrus "$LAB")")"
+assert "C7zl — FOO+=1 git commit : deny" "$(run_guard "$(mk_bash 'FOO+=1 git commit -m x' sess-intrus "$LAB")")" "$DENY"
+assert "C7zm — A[0]=1 git commit : deny" "$(run_guard "$(mk_bash 'A[0]=1 git commit -m x' sess-intrus "$LAB")")" "$DENY"
+assert "C7zn — cd <hors-lab> && GIT_DIR+=x git commit (cible incertaine) : deny" "$(run_guard "$(mk_bash "cd $AUTRE && GIT_DIR+=x git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert_empty "C7zo — cd <hors-lab> && FOO+=1 git commit : allow" "$(run_guard "$(mk_bash "cd $AUTRE && FOO+=1 git commit -m x" sess-intrus "$LAB")")"
 # Voie Write/Edit : le .planning/ d un autre dépôt n est pas celui du lab
 assert_empty "C6a — Write dans le .planning/ d'un autre dépôt : allow" "$(run_guard "$(mk_write_cwd "$AUTRE/.planning/STATE.md" sess-intrus "$LAB")")"
 assert "C6b — Write dans le .planning/ du lab (chemin absolu) : deny" "$(run_guard "$(mk_write_cwd "$LAB/.planning/STATE.md" sess-intrus "$LAB")")" "$DENY"

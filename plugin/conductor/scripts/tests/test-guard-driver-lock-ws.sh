@@ -928,6 +928,114 @@ q45_unc O9 "cd <hors lab> && git --git-dir <p> commit (deux jetons)" "$LO" "cd $
 q45_deny O10 "bash -c \"cd <hors lab>\" ; git commit (le cd d'un shell fils ne bouge pas l'appelant)" "$LO" "bash -c \"cd $WORK_DIR\"; git commit -m x"
 
 echo
+echo "=== GW-AU2 — audit de la mission q45 (tour 3, 2026-10-13) : cd transmis à bash -c (AU2-01), refus grossier linéaire et borné (AU2-02), refus grossier qui lit /usr/bin/git et les guillemets (AU2-03), affectations += et [i]= en préfixe (AU2-06), deux régimes ==="
+# Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 (tour 3 de la mission q45). Chaque cas était ALLOW (ou, pour la durée, 20 s
+# et plus) avant la correction ; rouge constaté avant, vert après. Les mutants GW-M-au2_* en tuent chacun un comportement.
+au2_norm() { sed -E 's/depuis [0-9]+ min/depuis N min/g'; }
+au2_same() { # <id> <description> <lab> <commande> <canonique> : refus ET message identique à celui de la forme canonique
+  local o c
+  o="$(gb "$3" "$4" sess-B | au2_norm)"; c="$(gb "$3" "$5" sess-B | au2_norm)"
+  if [[ "$o" == *"$DENY"* && "$o" == "$c" ]]; then echo "  ✅ PASS — GW-AU2-$1 — $2 : deny, même message que la forme canonique"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-AU2-$1 — $2 : deny, même message que la forme canonique"; echo "     canonique: ${c:0:200}"; echo "     obtenu:    ${o:0:200}"; FAIL=$((FAIL+1)); fi
+}
+au2_unc() { # <id> <description> <lab> <commande> : refus d'une cible INCERTAINE (le motif ne porte aucun « Detail »)
+  local o
+  o="$(gb "$3" "$4" sess-B)"
+  if [[ "$o" == *"$DENY"* && "$o" != *"Detail :"* ]]; then echo "  ✅ PASS — GW-AU2-$1 — $2 : deny, motif d'une cible incertaine (aucun détail de commit)"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-AU2-$1 — $2 : deny, motif d'une cible incertaine (aucun détail de commit)"; echo "     obtenu: ${o:0:300}"; FAIL=$((FAIL+1)); fi
+}
+au2_deny() { assert "GW-AU2-$1 — $2 : deny" "$(gb "$3" "$4" "${5:-sess-B}")" "$DENY"; }   # <id> <description> <lab> <commande> [session]
+au2_pass() { assert_empty "GW-AU2-$1 — $2 : permis" "$(gb "$3" "$4" "${5:-sess-B}")"; }  # <id> <description> <lab> <commande> [session]
+# Coût du guard sur une commande : GB_MS = temps PROCESSEUR du guard et de ses enfants (millisecondes, getrusage), GB_OUT = stdout. Le temps processeur
+# ne bouge pas quand la machine est chargée (une suite de mutants fait tourner des dizaines de guards en parallèle : le temps d'horloge y est
+# multiplié par 30), l'horloge seule rendrait le cas fragile. Plafond d'horloge de 60 s : au-delà, GB_MS = 60000.
+gb_timed() { # <lab> <commande> <session>
+  local r
+  r="$(mk_bash "$2" "$3" "$1" | python3 -c '
+import resource, subprocess, sys
+lab, guard, shell = sys.argv[1:4]
+try:
+    p = subprocess.run([shell, guard], input=sys.stdin.read().encode(), cwd=lab, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60)
+    out = p.stdout.decode("utf-8", "replace")
+    ru = resource.getrusage(resource.RUSAGE_CHILDREN)
+    ms = int((ru.ru_utime + ru.ru_stime) * 1000)
+except subprocess.TimeoutExpired:
+    out, ms = "TIMEOUT", 60000
+print(ms)
+sys.stdout.write(out)' "$1" "$GUARD" "$BASH_BIN")"
+  GB_MS="${r%%$'\n'*}"
+  case "$r" in *$'\n'*) GB_OUT="${r#*$'\n'}" ;; *) GB_OUT="" ;; esac
+}
+# Une charge qui prenait plus de 10 s doit tenir sous 3 s de temps processeur (mesuré : 0,3 s, marge x3 de la réception tenue avec x10 de reste).
+au2_fast() { # <id> <description> <ms>
+  if [ "$3" -lt 3000 ]; then echo "  ✅ PASS — GW-AU2-$1 — $2 : ${3} ms de temps processeur (< 3000)"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-AU2-$1 — $2 : ${3} ms de temps processeur (attendu < 3000)"; FAIL=$((FAIL+1)); fi
+}
+
+# AU2-01 : un cd, pushd ou popd de l'appelant est transmis à la récursion bash -c. Lab C : alpha tenu par autrui, STATE.md MODIFIÉ et non indexé
+# (un `git add STATE.md` lu depuis alpha l'indexe, lu depuis la racine il vise un autre fichier).
+LC="$(mk_lab au2c)"
+dl "$LC" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LC" "$LC/.planning/workstreams/alpha/STATE.md"
+AL="$LC/.planning/workstreams/alpha"
+ADDC='git add STATE.md && git commit -m x'
+CANC="cd $AL && $ADDC"
+au2_deny 01.0 "témoin canonique : cd <alpha> && git add STATE.md && git commit" "$LC" "$CANC"
+au2_same 01.1 "cd <alpha> && bash -c '…'" "$LC" "cd $AL && bash -c '$ADDC'" "$CANC"
+au2_same 01.2 "cd <alpha> && env bash -c '…'" "$LC" "cd $AL && env bash -c '$ADDC'" "$CANC"
+au2_same 01.3 "pushd <alpha> && bash -c '…'" "$LC" "pushd $AL && bash -c '$ADDC'" "pushd $AL && $ADDC"
+au2_deny 01.4 "(cd <alpha> && bash -c '…') : sous-shell collé, non couvert pour la forme canonique (catégorie A), jamais permis pour bash -c" "$LC" "(cd $AL && bash -c '$ADDC')"
+au2_same 01.5 "cd <alpha> && bash -c \"bash -c '…'\" (2 niveaux)" "$LC" "cd $AL && bash -c \"bash -c '$ADDC'\"" "$CANC"
+au2_pass 01.6 "témoin : bash -c '…' sans cd, STATE.md désigne la racine du lab" "$LC" "bash -c '$ADDC'"
+au2_pass 01.7 "témoin : le cd vient APRÈS la chaîne bash -c (il ne la précède pas)" "$LC" "bash -c '$ADDC'; cd $AL"
+au2_pass 01.8 "cd <alpha> && bash -c '…' : le détenteur" "$LC" "cd $AL && bash -c '$ADDC'" sess-A
+
+# AU2-02 / AU2-03 : refus grossier au-delà de 3 niveaux de bash -c. Lab plat F : verrou unique tenu par sess-A.
+FL="$(mk_flat au2f)"
+legacy_acquire "$FL" sess-A old >/dev/null
+for regime in partitionné plat; do
+  if [ "$regime" = plat ]; then L="$FL"; r=F; else L="$LC"; r=P; fi
+  au2_deny "03.$r.1" "[$regime] 4 niveaux autour de /usr/bin/git commit" "$L" "$(nest_bashc 4 '/usr/bin/git commit -m x')"
+  au2_deny "03.$r.2" "[$regime] 4 niveaux autour de g''it commit (deux apostrophes dans le mot)" "$L" "$(nest_bashc 4 "g''it commit -m x")"
+  au2_deny "03.$r.3" "[$regime] 4 niveaux autour de g\"it commit (guillemet double dans le mot)" "$L" "$(nest_bashc 4 'g"it commit -m x')"
+  au2_deny "03.$r.4" "[$regime] 4 niveaux autour de g\\it commit (antislash dans le mot)" "$L" "$(nest_bashc 4 'g\it commit -m x')"
+  au2_pass "03.$r.5" "[$regime] 4 niveaux autour de echo digit commit (git n'est pas un mot)" "$L" "$(nest_bashc 4 'echo digit commit -m x')"
+  au2_pass "03.$r.6" "[$regime] 4 niveaux autour de echo github commit (git n'est pas un mot)" "$L" "$(nest_bashc 4 'echo github commit -m x')"
+  au2_pass "03.$r.7" "[$regime] 4 niveaux autour de /usr/bin/git commit : le détenteur" "$L" "$(nest_bashc 4 '/usr/bin/git commit -m x')" sess-A
+  # AU2-02 : 48 Ko de « git » sans verbe mutant APRÈS eux (le mot commit les précède) : l'ancienne expression relisait la fin de la chaîne
+  # à chaque git (30 s), la nouvelle ne lit qu'une fois.
+  gb_timed "$L" "$(nest_bashc 4 "echo commit $(python3 -c 'print("git " * 12000)')")" sess-B
+  au2_fast "02.$r.1" "[$regime] 48 Ko de git sans verbe après eux, 4 niveaux" "$GB_MS"
+  assert_empty "GW-AU2-02.$r.2 — [$regime] la même charge est permise (aucun verbe après un git)" "$GB_OUT"
+  au2_deny "02.$r.4" "[$regime] la même charge avec un verbe mutant après les git" "$L" "$(nest_bashc 4 "echo $(python3 -c 'print("git " * 8000)')commit")"
+  # Borne : une chaîne de plus de 64 Ko au-delà de la profondeur lue n'est pas lue ; sous le verrou d'autrui seulement elle est refusée.
+  BIG70="$(nest_bashc 4 "echo commit $(python3 -c 'print("x" * 70000)')")"
+  au2_deny "02.$r.5" "[$regime] 70 Ko au-delà de la profondeur lue : refus sous le verrou d'autrui" "$L" "$BIG70"
+  au2_pass "02.$r.6" "[$regime] 70 Ko au-delà de la profondeur lue : le détenteur passe" "$L" "$BIG70" sess-A
+  au2_pass "02.$r.7" "[$regime] 60 Ko au-delà de la profondeur lue, sans git : permis (sous la borne)" "$L" "$(nest_bashc 4 "echo commit $(python3 -c 'print("x" * 60000)')")"
+done
+
+# AU2-06 : NOM+=, NOM[i]= et NOM[i]+= sont des affectations en préfixe de commande, au même titre que NOM= ; GIT_*+= rend la cible incertaine.
+# Lab A (alpha indexé : un commit à cible certaine l'embarque), U (index vide : seule la cible incertaine refuse), O (geste précédé d'un cd hors du lab).
+au2_same 06.1 "FOO+=1 git commit" "$LA" 'FOO+=1 git commit -m x' 'git commit -m x'
+au2_same 06.2 "A[0]=1 git commit" "$LA" 'A[0]=1 git commit -m x' 'git commit -m x'
+au2_same 06.3 "FOO+=1 bash -c \"git commit\"" "$LA" 'FOO+=1 bash -c "git commit -m x"' 'git commit -m x'
+au2_unc 06.4 "GIT_DIR+=x git commit : cible incertaine" "$LU" 'GIT_DIR+=x git commit -m x'
+au2_unc 06.5 "GIT_INDEX_FILE+=x git commit : cible incertaine" "$LU" 'GIT_INDEX_FILE+=x git commit -m x'
+au2_unc 06.6 "GIT_DIR[0]=x git commit : cible incertaine" "$LU" 'GIT_DIR[0]=x git commit -m x'
+au2_unc 06.7 "GIT_WORK_TREE+=x ; git commit (affectation seule, autre segment)" "$LU" 'GIT_WORK_TREE+=x; git commit -m x'
+au2_unc 06.8 "export GIT_DIR+=x ; git commit (autre segment)" "$LU" 'export GIT_DIR+=x; git commit -m x'
+au2_pass 06.9 "témoin : FOO+=1 git commit, index vide (variable étrangère : aucune classe de refus neuve)" "$LU" 'FOO+=1 git commit -m x'
+au2_unc 06.10 "cd <hors lab> && GIT_DIR+=x git commit : cible incertaine" "$LO" "cd $WORK_DIR && GIT_DIR+=x git commit -m x"
+au2_pass 06.11 "témoin : cd <hors lab> && FOO+=1 git commit" "$LO" "cd $WORK_DIR && FOO+=1 git commit -m x"
+au2_pass 06.12 "FOO+=1 git commit : le détenteur" "$LA" 'FOO+=1 git commit -m x' sess-A
+au2_deny 06.F1 "[plat] FOO+=1 git commit" "$FL" 'FOO+=1 git commit -m x'
+au2_deny 06.F2 "[plat] A[0]=1 git commit" "$FL" 'A[0]=1 git commit -m x'
+au2_deny 06.F3 "[plat] cd <hors lab> && GIT_DIR+=x git commit : cible incertaine" "$FL" "cd $WORK_DIR && GIT_DIR+=x git commit -m x"
+au2_pass 06.F4 "[plat] témoin : cd <hors lab> && FOO+=1 git commit" "$FL" "cd $WORK_DIR && FOO+=1 git commit -m x"
+au2_pass 06.F5 "[plat] FOO+=1 git commit : le détenteur" "$FL" 'FOO+=1 git commit -m x' sess-A
+
+echo
 echo "=== GW-C-POS — un pathspec POSITIONNEL de commit compte comme pathspec (doute = union ; correction R-3 c) ==="
 LAB="$(mk_lab cpos)"
 dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
@@ -1079,21 +1187,39 @@ assert_empty "GW-SUB-7 — cwd portant son PROPRE .planning (P57-D-29, hors pér
 if [ "$GW_MODE" = full ]; then
 echo
 echo "=== GW-AB — lab PLAT : la copie gelée du guard d'avant la phase et le guard courant rendent la MÊME transcription, octet pour octet, SAUF sur la liste ÉNUMÉRÉE des formes nouvellement refusées (P57-D-03, P57-D-22 ; Q4 du 2026-10-13) ==="
-# RÉFÉRENCE REFAITE le 2026-10-13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q4 : « étends F-3 au lab plat.
-# Refais proprement la référence de comparaison au bit près, en traçant l'ancienne et la nouvelle empreinte »). Forme choisie : la
-# copie gelée d'avant la phase RESTE la référence (pas de seconde copie à entretenir) ; ce qui change est la RÈGLE de comparaison.
-#   - Empreinte de la référence (git hash-object de fixtures/guard-driver-lock-pre-cff1e2a.sh) : ANCIENNE 4d48e50c993520079052f9f2b4c5bc1a5619ba1b,
-#     NOUVELLE 4d48e50c993520079052f9f2b4c5bc1a5619ba1b (inchangée : GW_AB_BLOB plus bas, GW-AB-INTEGRITE.*).
-#   - Empreinte du guard courant (git hash-object de guard-driver-lock.sh) : ANCIENNE 5d949965bf62000eac0a37830322a657bdb66a9b (fc28dabf),
-#     NOUVELLE 543d36b85c8510fbaa8b20e537f59b8316adbfe0 (mission q45, 2026-10-13 ; elle change à chaque correction du guard, ce n'est pas
-#     une épingle de la suite : la référence gelée en est une).
+# RÈGLE DE COMPARAISON REFAITE le 2026-10-13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q4 : « étends F-3 au lab plat.
+# Refais proprement la référence de comparaison au bit près, en traçant l'ancienne et la nouvelle empreinte »), puis les 37 formes ÉPINGLÉES
+# le même jour (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, B option (b) : « Épingle les 37 formes : empreinte versionnée
+# de la transcription attendue (verdict, code de sortie, message), traçage de l'ancienne et de la nouvelle empreinte, et seen == GW_AB_ENUM_N »).
+# Ce qui a été refait est la RÈGLE de comparaison, pas la référence : la copie gelée d'avant la phase reste la référence (pas de seconde copie à
+# entretenir) et elle LAISSE PASSER les formes énumérées, elle ne peut donc pas dire ce que le guard courant doit en rendre ; cela, la
+# transcription épinglée plus bas le dit.
+#   - Empreinte de la copie gelée (git hash-object de fixtures/guard-driver-lock-pre-cff1e2a.sh) : 4d48e50c993520079052f9f2b4c5bc1a5619ba1b, inchangée
+#     (GW_AB_BLOB plus bas, GW-AB-INTEGRITE.*).
+#   - Empreinte de la transcription épinglée des 37 formes (git hash-object de fixtures/guard-ab-enum-37.txt : pour chaque identifiant de
+#     GW_AB_ENUM, les passages « tenu/<identifiant>.B » (intrus) puis « .A » (détenteur) du guard courant, code de sortie, stdout et stderr, âge
+#     normalisé) : ANCIENNE aucune (la règle ne vérifiait que la présence de « deny » sur la forme énumérée : un verdict conservé avec un message
+#     réécrit ou tronqué restait vert) ; NOUVELLE 7156daffcaec4c0b9c8039423615026e976af30e (GW_AB_PIN_BLOB, 2026-10-13). Elle change quand le verdict, le code ou le message d'une
+#     des 37 formes change ; la regénérer exige de modifier cette fixture ET cette ligne (GW_AB_PIN_DUMP=<chemin> écrit la transcription courante,
+#     jamais par défaut), donc deux fichiers que le marqueur Gate-Touche de G-2 surveille.
+#   - Le guard courant n'a AUCUNE empreinte écrite ici : elle change à chaque correction, un blob recopié dans un commentaire est faux à la correction
+#     suivante (RV3-07). La référence qui dure est la transcription épinglée ci-dessus.
 #   - Règle : la transcription du guard courant est identique à celle de la copie gelée, passage par passage, SAUF les passages
 #     « tenu/<identifiant>.B » (session non détentrice, verrou tenu) des identifiants de GW_AB_ENUM ; sur ces passages, la copie gelée LAISSE
-#     PASSER et le guard courant REFUSE (GW-AB.enum-*). Aucune autre divergence n'est tolérée : ni dans un autre état de verrou (aucun, périmé,
-#     sans session_ids, sans meta), ni pour le détenteur (.A), ni sur une forme hors liste.
+#     PASSER et le guard courant REFUSE (GW-AB.enum-*), et, pour CHACUN des GW_AB_ENUM_N identifiants (seen == GW_AB_ENUM_N : un payload énuméré
+#     retiré de la matrice fait rougir, F6), les passages « .B » et « .A » sont ceux de la transcription épinglée, au bit près. Aucune autre
+#     divergence n'est tolérée : ni dans un autre état de verrou (aucun, périmé, sans session_ids, sans meta), ni pour le détenteur (.A), ni sur
+#     une forme hors liste.
+#   - Écarts du lab plat HORS matrice (AU2-08), de DEUX sens, que cette comparaison ne voit pas et qui ne sont pas dans GW_AB_ENUM (l'allonger
+#     changerait l'effectif épinglé) : des refus nouveaux sous le verrou d'autrui (/usr/bin/git et guillemets au-delà de 3 niveaux de bash -c, AU2-03 ;
+#     affectations += et [i]= en préfixe, AU2-06 ; GW-AU2-*), ET un changement plus PERMISSIF, `bash -c "cd <hors lab> && git commit"` (refusé par la
+#     copie gelée, qui lit la chaîne d'un découpage grossier ; permis depuis le 2026-10-13 parce que le cd interne d'une chaîne lue sert à la décision
+#     « geste hors du lab », GW-Q45-O4). Leur preuve est GW-AU2-* et GW-Q45-*, pas GW-AB.
 # La liste est ÉPINGLÉE par son effectif (GW_AB_ENUM_N) : l'allonger pour absorber un écart exige de modifier le nombre, donc la ligne.
 GW_AB_ENUM="noarg-commit noarg-reset exec-commit env-out g2-gitdir-sp g2-worktree-sp g2-namespace-sp g2-namespace-eq g2-configenv-sp g2-configenv-eq g2-attrsrc-sp g2-attrsrc-eq g2-superprefix-eq wr-env-u wr-env-unset wr-env-iu wr-env-C wr-nice-n wr-exec-a wr-exec-c wr-sudo-u wr-xargs-n sh-bash sh-sh sh-zsh sh-bash-lc sh-nested2 sh-nested4 sh-sudo sh-envprefix ex-out-index ex-out-declare ex-out-assign ex-shell-inherit ex-out-sh ex-out-shell-env ex-out-shell-export"
 GW_AB_ENUM_N=37
+GW_AB_PIN="$HERE/fixtures/guard-ab-enum-37.txt"
+GW_AB_PIN_BLOB=7156daffcaec4c0b9c8039423615026e976af30e
 # Référence : copie gelée du guard d'avant la Phase 57 (dernier commit cff1e2af qui touchait le script), jamais
 # modifiée. Les deux copies sont posées dans un dossier jetable À CÔTÉ d'une copie de vf-portable.sh (le locator du
 # guard cherche d'abord $(dirname $0)/vf-portable.sh) : elles s'exécutent dans les mêmes conditions. Même matrice de
@@ -1299,24 +1425,47 @@ gw_ab_strip() {
   awk -v ids="$GW_AB_ENUM" 'BEGIN{n=split(ids,a," "); for(i=1;i<=n;i++) skip["tenu/" a[i] ".B"]=1}
        /^### /{split($2,h," "); on=!($2 in skip)} on{print}' "$1"
 }
-# gw_ab_check <transcription gelée> <transcription courante> : rend 0 si la règle tient, sinon 1 et écrit GW_AB_WHY.
+# gw_ab_blocks <transcription> <identifiants...> : pour chaque identifiant, dans l'ordre donné, les passages « tenu/<id>.B » puis « tenu/<id>.A »
+# tels quels (en-tête avec le code de sortie, stdout, stderr). Même extraction pour la fixture épinglée et pour une transcription.
+gw_ab_blocks() {
+  local f="$1" id side; shift
+  for id in "$@"; do
+    for side in B A; do   # l'ordre est celui de la liste puis B avant A, quel que soit l'ordre des passages dans la transcription
+      awk -v h="### tenu/$id.$side " 'index($0,h)==1 {on=1; print; next} /^### /{on=0} on{print}' "$f"
+    done
+  done
+}
+# gw_ab_check <transcription gelée> <transcription courante> [N | noenum] : rend 0 si la règle tient, sinon 1 et écrit GW_AB_WHY.
 #   (1) hors passages énumérés, les deux transcriptions sont identiques au bit près (cmp -s) ;
-#   (2) chaque passage énuméré PRÉSENT dans la transcription : stdout vide côté gelé (laisse passer), refus côté courant.
+#   (2) chaque passage énuméré PRÉSENT dans la transcription : stdout vide côté gelé (laisse passer), refus côté courant ;
+#   (3) seen == N (défaut GW_AB_ENUM_N : un payload énuméré retiré de la matrice fait rougir) et seen > 0 ; `noenum` : sous-matrice sans forme
+#       énumérée, ni le vert à vide ni l'effectif ne s'appliquent ; N : effectif d'une sous-matrice de mutant ;
+#   (4) les passages « .B » et « .A » de chaque forme énumérée présente sont ceux de la transcription épinglée GW_AB_PIN, au bit près.
 GW_AB_WHY=""
-gw_ab_check() { # <gelée> <courante> [noenum : sous-matrice sans forme énumérée, le vert à vide ne s applique pas]
-  local fz="$1" cu="$2" id n=0 seen=0
+gw_ab_check() {
+  local fz="$1" cu="$2" want="${3:-$GW_AB_ENUM_N}" id seen=0 present=""
   gw_ab_strip "$fz" > "$GWAB/strip-fz.txt"; gw_ab_strip "$cu" > "$GWAB/strip-cu.txt"
   if ! cmp -s "$GWAB/strip-fz.txt" "$GWAB/strip-cu.txt"; then
     GW_AB_WHY="divergence HORS liste énumérée : $(gw_ab_first_divergence "$GWAB/strip-fz.txt" "$GWAB/strip-cu.txt")"; return 1
   fi
   for id in $GW_AB_ENUM; do
     grep -q "^### tenu/$id.B rc=" "$cu" || continue
-    seen=$((seen+1))
+    seen=$((seen+1)); present="$present $id"
     if [ -n "$(gw_ab_stdout "$fz" "tenu/$id.B")" ]; then GW_AB_WHY="$id : la copie gelée REFUSE déjà (la forme n est pas nouvelle, la liste est fausse)"; return 1; fi
     if ! gw_ab_stdout "$cu" "tenu/$id.B" | grep -q '"permissionDecision": "deny"'; then GW_AB_WHY="$id : le guard courant ne refuse pas cette forme énumérée"; return 1; fi
   done
-  [ "$seen" -gt 0 ] || [ "${3:-}" = noenum ] || { GW_AB_WHY="aucun passage énuméré dans la transcription (vert à vide)"; return 1; }
-  GW_AB_WHY="$seen formes énumérées refusées, le reste identique"; return 0
+  if [ "$want" != noenum ]; then
+    [ "$seen" -gt 0 ] || { GW_AB_WHY="aucun passage énuméré dans la transcription (vert à vide)"; return 1; }
+    [ "$seen" = "$want" ] || { GW_AB_WHY="$seen passages énumérés dans la transcription, $want attendus (un payload énuméré a quitté la matrice, ou la liste a bougé)"; return 1; }
+  fi
+  if [ -n "$present" ]; then
+    [ -f "$GW_AB_PIN" ] || { GW_AB_WHY="transcription épinglée absente : $GW_AB_PIN"; return 1; }
+    gw_ab_blocks "$GW_AB_PIN" $present > "$GWAB/pin-ref.txt"; gw_ab_blocks "$cu" $present > "$GWAB/pin-cu.txt"
+    if ! cmp -s "$GWAB/pin-ref.txt" "$GWAB/pin-cu.txt"; then
+      GW_AB_WHY="une forme énumérée s écarte de la transcription épinglée (verdict, code ou message) : $(gw_ab_first_divergence "$GWAB/pin-ref.txt" "$GWAB/pin-cu.txt" | cut -c1-360)"; return 1
+    fi
+  fi
+  GW_AB_WHY="$seen formes énumérées refusées et conformes à la transcription épinglée, le reste identique"; return 0
 }
 
 gw_ab_ok=1
@@ -1328,6 +1477,7 @@ if [ -f "$FROZEN_GUARD" ]; then
     label="${mode%%:*}"; lockv="${mode#*:}"
     gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "$lockv" "$GWAB/ab-frozen.txt"
     gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "$lockv" "$GWAB/ab-current.txt"
+    [ -z "${GW_AB_PIN_DUMP:-}" ] || gw_ab_blocks "$GWAB/ab-current.txt" $GW_AB_ENUM > "$GW_AB_PIN_DUMP.$([ -n "$lockv" ] && echo pose || echo defaut)"
     if [ -s "$GWAB/ab-frozen.txt" ] && ! grep -q 'FIXTURE CASSÉE' "$GWAB/ab-frozen.txt" \
        && gw_ab_stdout "$GWAB/ab-frozen.txt" tenu/commit.B | grep -q '"permissionDecision": "deny"' \
        && gw_ab_stdout "$GWAB/ab-frozen.txt" tenu/w-planning.B | grep -q '"permissionDecision": "deny"' \
@@ -1352,6 +1502,7 @@ else
   assert_exit "GW-AB — la copie gelée $FROZEN_GUARD est absente" 1 0
   gw_ab_ok=0
 fi
+if [ -n "${GW_AB_PIN_DUMP:-}" ]; then echo "  transcription courante écrite dans $GW_AB_PIN_DUMP.pose et $GW_AB_PIN_DUMP.defaut : arrêt, rien de ce qui précède n'a valeur de verdict"; exit 0; fi
 if [ "$gw_ab_ok" = 1 ]; then echo "  A/B guard lab plat : IDENTIQUE hors liste énumérée ($GW_AB_ENUM_N formes)"; else echo "  A/B guard lab plat : DIFFÉRENT"; fi
 
 # GW-AB-MUT (réserve S1 de la revue Phase 57, refaite le 2026-10-13 avec la règle énumérée) : la règle de comparaison doit
@@ -1374,10 +1525,11 @@ gw_ab_mut() { # <id> <identifiants de la sous-matrice, séparés par des espaces
   GW_AB_MATRIX="$sub" GW_AB_STATES="tenu" gw_ab_pass "$d/guard-driver-lock.sh" "" "$d/ab.txt"
   GW_AB_MATRIX="$sub" GW_AB_STATES="tenu" gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "" "$d/ab-frozen.txt"
   # Témoin de la sous-matrice : le guard NON muté la satisfait (sinon le mutant rougirait pour la mauvaise raison).
-  local need=""; [ "$fam" = enum ] || need=noenum
+  local need=noenum one nn=0
+  if [ "$fam" = enum ]; then for one in $ids; do case " $GW_AB_ENUM " in *" $one "*) nn=$((nn+1)) ;; esac; done; need="$nn"; fi
   GW_AB_MATRIX="$sub" GW_AB_STATES="tenu" gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "" "$d/ab-ok.txt"
-  gw_ab_check "$d/ab-frozen.txt" "$d/ab-ok.txt" $need; assert_exit "GW-AB-MUT-$id.0 — témoin : le guard non muté satisfait la règle sur la sous-matrice ($GW_AB_WHY)" "$?" 0
-  if [ -s "$d/ab.txt" ] && ! gw_ab_check "$d/ab-frozen.txt" "$d/ab.txt" $need; then
+  gw_ab_check "$d/ab-frozen.txt" "$d/ab-ok.txt" "$need"; assert_exit "GW-AB-MUT-$id.0 — témoin : le guard non muté satisfait la règle sur la sous-matrice ($GW_AB_WHY)" "$?" 0
+  if [ -s "$d/ab.txt" ] && ! gw_ab_check "$d/ab-frozen.txt" "$d/ab.txt" "$need"; then
     assert_exit "GW-AB-MUT-$id — mutant tué : la règle de comparaison ROUGIT ($GW_AB_WHY)" 0 0
   else
     assert_exit "GW-AB-MUT-$id — la règle de comparaison reste VERTE sous ce mutant ($GW_AB_WHY)" 1 0
@@ -1395,8 +1547,16 @@ if [ -f "$FROZEN_GUARD" ]; then
   gw_ab_mut wrapperopts "wr-env-u wr-env-unset wr-env-iu wr-nice-n wr-sudo-u wr-xargs-n wr-exec-a" '^WRAPPER_ARG_OPTS = {' 's@^WRAPPER_ARG_OPTS = {@WRAPPER_ARG_OPTS = {}; WAO_UNUSED = {@' enum
   gw_ab_mut env-chdir "wr-env-C ex-out-sh" 'if b == "env" and any(' 's@if b == "env" and any(@if False and any(@' enum
   gw_ab_mut shells "sh-bash sh-sh sh-zsh sh-bash-lc sh-nested2 sh-sudo" '^SHELLS = {' 's@^SHELLS = {@SHELLS = set(); SH_UNUSED = {@' enum
-  gw_ab_mut coarse "sh-nested4" 'return re.search(r' 's@return re.search(@return None and re.search(@' enum
+  gw_ab_mut coarse "sh-nested4" '^    return m is not None and COARSE_VERB_RE' 's@return m is not None and@return None and@' enum
   gw_ab_mut inherit "ex-out-shell-env ex-out-shell-export" 'inn, cnt = outside_scan(c, root, base, depth + 1, persist or env_target_uncertain(seg\[:idx\]))' 's@depth + 1, persist or env_target_uncertain(seg\[:idx\]))@depth + 1, False)@' enum
+  # (i) un message de refus modifié sur UNE forme énumérée (git --no-pager) : le verdict reste deny, seule la transcription épinglée le voit
+  gw_ab_mut msg "noarg-commit exec-commit" '^owner = meta.get("owner", "?")$' 's@^owner = \(.*\)$@owner = \1 + ("!" if "--no-pager" in cmd else "")@' enum
+  # témoin de (i) : l'ANCIENNE règle (présence de deny sur la forme énumérée, rien d'autre) reste VERTE sous ce mutant, c'est le rouge constaté avant l'épingle
+  gw_ab_deny_only() { # <transcription courante> <identifiants...>
+    local f="$1" one; shift
+    for one in "$@"; do gw_ab_stdout "$f" "tenu/$one.B" | grep -q '"permissionDecision": "deny"' || return 1; done
+  }
+  gw_ab_deny_only "$GWAB/abmut-msg/ab.txt" noarg-commit exec-commit; assert_exit "GW-AB-MUT-msg.1 — l'ancienne règle (présence de deny seule) reste VERTE sous ce mutant : le message modifié lui échappait" "$?" 0
   # famille hors liste (iii) : changements du lab plat sur des formes que la copie gelée lisait autrement et que la liste ne contient pas
   gw_ab_mut hl-worktree-add "wt-add" 'continue  # exemption nomm.*e : porte de sortie prescrite' 's@continue  # exemption nomm.*$@return True@' hors-liste
   gw_ab_mut hl-nohup "wr-nohup" '^WRAPPERS = ' 's@"nohup", @@' hors-liste
@@ -1425,17 +1585,58 @@ if git -C "$HERE" cat-file -e "$GW_AB_REF:$GW_AB_PATH_IN_REF" 2>/dev/null; then
 else
   echo "  NOTE-INTEGRITE (objet absent) — $GW_AB_REF non disponible localement (clone superficiel) : comparaison à la référence non faite ici, l'empreinte épinglée est contrôlée par GW-AB-INTEGRITE.0"
 fi
+
+# (ii) F6 : un payload énuméré retiré de la matrice. Sous-matrice des seules formes énumérées (tenu, .B et .A) ; témoin : entière, la règle tient
+# (GW_AB_ENUM_N passages) ; amputée d'un identifiant, le guard est inchangé et la règle ROUGIT (un de moins qu'attendu), alors que la copie
+# gelée et le guard courant restent identiques hors liste : avant seen == GW_AB_ENUM_N, un payload retiré ne rougissait que si TOUS l'étaient.
+gw_ab_mut_amputee() { # <id> <identifiant retiré>
+  local id="$1" gone="$2" d="$GWAB/abmut-$1" one
+  mkdir -p "$d"; : > "$d/matrix-full.txt"
+  for one in $GW_AB_ENUM; do
+    grep -F "$(printf '%s.B\037' "$one")" "$GWAB/matrix.txt" >> "$d/matrix-full.txt"
+    grep -F "$(printf '%s.A\037' "$one")" "$GWAB/matrix.txt" >> "$d/matrix-full.txt"
+  done
+  grep -vF -e "$(printf '%s.B\037' "$gone")" -e "$(printf '%s.A\037' "$gone")" "$d/matrix-full.txt" > "$d/matrix-cut.txt"
+  GW_AB_MATRIX="$d/matrix-full.txt" GW_AB_STATES=tenu gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "" "$d/fz-full.txt"
+  GW_AB_MATRIX="$d/matrix-full.txt" GW_AB_STATES=tenu gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "" "$d/cu-full.txt"
+  GW_AB_MATRIX="$d/matrix-cut.txt" GW_AB_STATES=tenu gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "" "$d/fz-cut.txt"
+  GW_AB_MATRIX="$d/matrix-cut.txt" GW_AB_STATES=tenu gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "" "$d/cu-cut.txt"
+  gw_ab_check "$d/fz-full.txt" "$d/cu-full.txt"; assert_exit "GW-AB-MUT-$id.0 — témoin : les $GW_AB_ENUM_N formes énumérées satisfont la règle ($GW_AB_WHY)" "$?" 0
+  if gw_ab_check "$d/fz-cut.txt" "$d/cu-cut.txt"; then
+    assert_exit "GW-AB-MUT-$id — la règle reste VERTE quand $gone quitte la matrice ($GW_AB_WHY)" 1 0
+  else
+    assert "GW-AB-MUT-$id — $gone retiré de la matrice : la règle ROUGIT pour l'effectif ($GW_AB_WHY)" "$GW_AB_WHY" "attendus"
+  fi
+}
+if [ -f "$FROZEN_GUARD" ]; then
+  gw_ab_mut_amputee amputee wr-sudo-u
+  gw_ab_mut_amputee amputee-dernier ex-out-shell-export
+fi
+
+# Intégrité de la transcription épinglée (même patron que la copie gelée) : empreinte épinglée dans la suite, vérifiable sans historique ; un octet
+# de plus est rejeté ; et elle n'est pas vide de sens (chaque forme énumérée y est refusée pour l'intrus, passe pour le détenteur).
+gw_ab_pin_ok "$GW_AB_PIN" "$GW_AB_PIN_BLOB"; assert_exit "GW-AB-PIN.0 — la transcription épinglée porte l'empreinte épinglée (blob $GW_AB_PIN_BLOB)" "$?" 0
+cp "$GW_AB_PIN" "$GWAB/pin-alteree.txt"; printf '#' >> "$GWAB/pin-alteree.txt"
+gw_ab_pin_ok "$GWAB/pin-alteree.txt" "$GW_AB_PIN_BLOB"; assert_exit "GW-AB-PIN.0b — témoin négatif : la même transcription altérée d'un octet est REJETÉE" "$?" 1
+assert_exit "GW-AB-PIN.1 — la transcription épinglée porte $GW_AB_ENUM_N passages .B et $GW_AB_ENUM_N passages .A" "$(( $(grep -c '^### tenu/.*\.B rc=0$' "$GW_AB_PIN") + $(grep -c '^### tenu/.*\.A rc=0$' "$GW_AB_PIN") ))" "$(( 2 * GW_AB_ENUM_N ))"
+gw_ab_pin_deny=0; gw_ab_pin_hold=0
+for id in $GW_AB_ENUM; do
+  gw_ab_stdout "$GW_AB_PIN" "tenu/$id.B" | grep -q '"permissionDecision": "deny"' && gw_ab_pin_deny=$((gw_ab_pin_deny+1))
+  [ -z "$(gw_ab_stdout "$GW_AB_PIN" "tenu/$id.A")" ] && gw_ab_pin_hold=$((gw_ab_pin_hold+1))
+done
+assert_exit "GW-AB-PIN.2 — dans la transcription épinglée, chaque forme énumérée est refusée pour l'intrus ($gw_ab_pin_deny/$GW_AB_ENUM_N)" "$gw_ab_pin_deny" "$GW_AB_ENUM_N"
+assert_exit "GW-AB-PIN.3 — dans la transcription épinglée, chaque forme énumérée passe pour le détenteur ($gw_ab_pin_hold/$GW_AB_ENUM_N)" "$gw_ab_pin_hold" "$GW_AB_ENUM_N"
 fi   # GW_MODE = full (A/B)
 
 if [ "$GW_MODE" = full ]; then
 echo
-echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-target_noarg — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
+echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-au2_assignpersist — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du guard, posée à côté d'une
 # copie de vf-portable.sh (sinon le locator sortirait en code 17 pour la mauvaise raison). Le programme python
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=40; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=49; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 # a : GW-C-INC-1/2 (corrections F-3, R-5, C3) : sans -z, « .planning/workstreams\n » ne se lit plus comme le chemin incertain
@@ -1449,7 +1650,7 @@ MUT_E="GW-T-EXEMPT-1=1"
 MUT_F="GW-ENVT-9.1=1 GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
 # g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
 # g : GW-C-INC-3, GW-ENVT-7, GW-ENVT-OUT-7, GW-F3-17 (détenteur, discriminance des cas ajoutés)
-MUT_G="GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-Q45-H1=1 GW-Q45-H2=1 GW-Q45-H3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
+MUT_G="GW-AU2-01.8=1 GW-AU2-02.P.6=1 GW-AU2-03.P.7=1 GW-AU2-06.12=1 GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-Q45-H1=1 GW-Q45-H2=1 GW-Q45-H3=1 GW-LOC-2.3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
 # h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
 MUT_H="GW-C4-2=1 GW-C4-3=1 GW-MARK-W-4=1 GW-Q-PASS=1 GW-SUB-2=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
 MUT_I="GW-C-REL-tenu=2"
@@ -1484,9 +1685,9 @@ MUT_PSB="GW-C-PSB-1=1 GW-C-PSB-2=1 GW-C-PSB-3=1 GW-C-PSB-4=1"
 MUT_INC="GW-C-INC-1=1 GW-C-INC-2=1"
 MUT_TOP="GW-C-NOGITBIN-4=1"
 # (GW-ENVT-OUT-3 : le message de la forme --git-dir= hors lab porte « le commit embarque », celui du préfixe, sans la source, non)
-MUT_ENVT="GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1 GW-ENVT-1=1 GW-ENVT-2=1 GW-ENVT-3=1 GW-ENVT-4=1 GW-ENVT-5=1 GW-ENVT-8=1 GW-ENVT-9.2=1 GW-ENVT-OUT-3=1"
+MUT_ENVT="GW-AU2-06.10=1 GW-AU2-06.4=1 GW-AU2-06.5=1 GW-AU2-06.6=1 GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1 GW-ENVT-1=1 GW-ENVT-2=1 GW-ENVT-3=1 GW-ENVT-4=1 GW-ENVT-5=1 GW-ENVT-8=1 GW-ENVT-9.2=1 GW-ENVT-OUT-3=1"
 # envt_outside (AUD-1) : le préfixe GIT_*= du même segment ne rend plus la cible incertaine pour la décision « hors du lab »
-MUT_ENVOUT="GW-Q45-O6=1 GW-ENVT-OUT-1=1 GW-ENVT-OUT-3=1 GW-ENVT-OUT-4=1 GW-ENVT-OUT-5=1"
+MUT_ENVOUT="GW-AU2-06.10=1 GW-AU2-06.F3=1 GW-Q45-O6=1 GW-ENVT-OUT-1=1 GW-ENVT-OUT-3=1 GW-ENVT-OUT-4=1 GW-ENVT-OUT-5=1"
 MUT_NOARG="GW-F3-1=1 GW-F3-2=1 GW-F3-3=1 GW-F3-4=1 GW-F3-5=1 GW-F3-7=1 GW-F3-8=1 GW-F3-9=1 GW-F3-10=1 GW-F3-11=1 GW-F3-12=1 GW-F3-13=1 GW-F3-14=1 GW-F3-15=1 GW-F3-21=1"
 MUT_EXEC="GW-F3-15=1 GW-F3-6=1 GW-Q45-A15=1 GW-Q45-A16=1"
 MUT_TARGET="GW-F3-18=1"
@@ -1502,12 +1703,27 @@ MUT_TARGET="GW-F3-18=1"
 MUT_QARG="GW-Q45-A1=1 GW-Q45-A3=1 GW-Q45-A5=1 GW-Q45-O9=1 GW-Q45-U0c=1 GW-Q45-U1=1 GW-Q45-U2=1"
 MUT_QEQ="GW-Q45-A2=1 GW-Q45-A4=1 GW-Q45-A6=1 GW-Q45-A7=1"
 MUT_QWRAP="GW-Q45-A10=1 GW-Q45-A11=1 GW-Q45-A13=1 GW-Q45-A15=1 GW-Q45-A17=1 GW-Q45-A18=1 GW-Q45-A9=1 GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1"
-MUT_QSHELL="GW-Q45-A22=1 GW-Q45-A23=1 GW-Q45-A24=1 GW-Q45-A25=1 GW-Q45-A26=1 GW-Q45-A28=1 GW-Q45-A29=1 GW-Q45-A30=1 GW-Q45-A31=1 GW-Q45-C1=1 GW-Q45-C2=1 GW-Q45-O4=1 GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U9=1"
-MUT_QCOARSE="GW-Q45-C1=1 GW-Q45-C2=1"
-MUT_QPERSIST="GW-Q45-O7=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U5=1 GW-Q45-U6=1 GW-Q45-U7=1 GW-Q45-U8=1"
+MUT_QSHELL="GW-AU2-01.1=1 GW-AU2-01.2=1 GW-AU2-01.3=1 GW-AU2-01.4=1 GW-AU2-01.5=1 GW-AU2-02.F.4=1 GW-AU2-02.F.5=1 GW-AU2-02.P.4=1 GW-AU2-02.P.5=1 GW-AU2-03.F.1=1 GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.1=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-AU2-06.3=1 GW-Q45-A22=1 GW-Q45-A23=1 GW-Q45-A24=1 GW-Q45-A25=1 GW-Q45-A26=1 GW-Q45-A28=1 GW-Q45-A29=1 GW-Q45-A30=1 GW-Q45-A31=1 GW-Q45-C1=1 GW-Q45-C2=1 GW-Q45-O4=1 GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U9=1"
+MUT_QCOARSE="GW-AU2-02.F.4=1 GW-AU2-02.P.4=1 GW-AU2-03.F.1=1 GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.1=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-Q45-C1=1 GW-Q45-C2=1"
+MUT_QPERSIST="GW-AU2-06.7=1 GW-AU2-06.8=1 GW-Q45-O7=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U5=1 GW-Q45-U6=1 GW-Q45-U7=1 GW-Q45-U8=1"
 MUT_QINHERIT="GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U12=1 GW-Q45-U9=1"
 MUT_QENVCD="GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1"
 MUT_QOUTSH="GW-Q45-O1=1 GW-Q45-O4=1"
+# au2_* (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, tour 3 de la mission q45) : un mutant par comportement neuf ; ensembles
+# mesurés puis relus. cdprop = le cd de l'appelant n'est plus transmis à la récursion bash -c ; cdnames = pushd et popd ne comptent plus comme cd
+# (01.3 seul : pushd) ; quad = le refus grossier relit la fin de la chaîne à chaque git (même verdict, coût quadratique : seul le cas de durée rougit) ;
+# bound = plus de borne de longueur ; strip = guillemets et antislash ne sont plus retirés ; slash = git derrière / ou . ou - ne compte plus
+# (/usr/bin/git) ; assigncmd = NOM+= et NOM[i]= ne sont plus des affectations en position de commande ; envtarget = GIT_*+= ne rend plus la cible
+# incertaine ; assignpersist = une affectation seule NOM+=x ne pose plus la variable pour les segments suivants (06.7 seul).
+MUT_AU2CDPROP="GW-AU2-01.1=1 GW-AU2-01.2=1 GW-AU2-01.3=1 GW-AU2-01.4=1 GW-AU2-01.5=1"
+MUT_AU2CDNAMES="GW-AU2-01.3=1"
+MUT_AU2QUAD="GW-AU2-02.F.1=1 GW-AU2-02.P.1=1"
+MUT_AU2BOUND="GW-AU2-02.F.5=1 GW-AU2-02.P.5=1"
+MUT_AU2STRIP="GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1"
+MUT_AU2SLASH="GW-AU2-03.F.1=1 GW-AU2-03.P.1=1"
+MUT_AU2ASSIGN="GW-AU2-06.1=1 GW-AU2-06.10=1 GW-AU2-06.2=1 GW-AU2-06.3=1 GW-AU2-06.4=1 GW-AU2-06.5=1 GW-AU2-06.6=1 GW-AU2-06.F1=1 GW-AU2-06.F2=1 GW-AU2-06.F3=1"
+MUT_AU2ENVT="GW-AU2-06.10=1 GW-AU2-06.4=1 GW-AU2-06.5=1 GW-AU2-06.6=1 GW-AU2-06.7=1 GW-AU2-06.8=1 GW-AU2-06.F3=1"
+MUT_AU2PERSIST="GW-AU2-06.7=1"
 gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
   awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
 }
@@ -1645,11 +1861,21 @@ mutant q_argglobals '^GIT_ARG_GLOBALS = {' 's@^GIT_ARG_GLOBALS = {@GIT_ARG_GLOBA
 mutant q_eqglobals 'elif t.startswith(GIT_EQ_GLOBALS):' 's@elif t.startswith(GIT_EQ_GLOBALS):@elif t.startswith(("--git-dir=", "--work-tree=", "--exec-path=")):@' "$MUT_QEQ"
 mutant q_wrapperopts '^WRAPPER_ARG_OPTS = {' 's@^WRAPPER_ARG_OPTS = {@WRAPPER_ARG_OPTS = {}; WAO_UNUSED = {@' "$MUT_QWRAP"
 mutant q_shells '^SHELLS = {' 's@^SHELLS = {@SHELLS = set(); SH_UNUSED = {@' "$MUT_QSHELL"
-mutant q_coarse 'return re.search(r' 's@return re.search(@return None and re.search(@' "$MUT_QCOARSE"
+mutant q_coarse '^    return m is not None and COARSE_VERB_RE' 's@return m is not None and@return None and@' "$MUT_QCOARSE"
 mutant q_persist 'ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]' 's@ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]@ts = []@' "$MUT_QPERSIST"
-mutant q_inherit 'out.append((c, persist or env_target_uncertain(cur\[:idx\])))' 's@out.append((c, persist or env_target_uncertain(cur\[:idx\])))@out.append((c, False))@' "$MUT_QINHERIT"
+mutant q_inherit 'out.append((c, persist or env_target_uncertain(cur\[:idx\]), cd_seen))' 's@out.append((c, persist or env_target_uncertain(cur\[:idx\]), cd_seen))@out.append((c, False, cd_seen))@' "$MUT_QINHERIT"
 mutant q_envchdir 'if b == "env" and any(' 's@if b == "env" and any(@if False and any(@' "$MUT_QENVCD"
 mutant q_outside_shell '^                    if inn:$' 's@if inn:@if True:@' "$MUT_QOUTSH"
+# au2_* : un mutant par comportement neuf de la correction du tour 3 (2026-10-13)
+mutant au2_cdprop 'gesture_classes(c, inherit or unc_in, depth + 1, cd_before or cd_in)' 's@depth + 1, cd_before or cd_in)@depth + 1, cd_before)@' "$MUT_AU2CDPROP"
+mutant au2_cdnames 'in ("cd", "pushd", "popd") for idx in command_positions(cur)' 's@("cd", "pushd", "popd") for idx@("cd",) for idx@' "$MUT_AU2CDNAMES"
+mutant au2_quad '^    return m is not None and COARSE_VERB_RE' 's@^    return m is not None and .*$@    return any(COARSE_VERB_RE.search(c[k.end():]) is not None for k in COARSE_GIT_RE.finditer(c))@' "$MUT_AU2QUAD"
+mutant au2_bound '^    if len(c) > COARSE_MAX_LEN:$' 's@if len(c) > COARSE_MAX_LEN:@if False:@' "$MUT_AU2BOUND"
+mutant au2_strip '^    c = c.translate(COARSE_STRIP)$' 's@c = c.translate(COARSE_STRIP)@pass@' "$MUT_AU2STRIP"
+mutant au2_slash '^COARSE_GIT_RE = ' 's@9_]@9_./-]@' "$MUT_AU2SLASH"
+mutant au2_assign '^        if ASSIGN_RE.match(t):$' 's@ASSIGN_RE.match(t)@re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t)@' "$MUT_AU2ASSIGN"
+mutant au2_envtarget '^ENV_TARGET_RE = ' 's@^ENV_TARGET_RE = .*$@ENV_TARGET_RE = re.compile(r"^(GIT_DIR|GIT_INDEX_FILE|GIT_WORK_TREE)=")@' "$MUT_AU2ENVT"
+mutant au2_assignpersist 'if all(ASSIGN_RE.match(t) for t in ts):' 's@all(ASSIGN_RE.match(t) for t in ts)@all(re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t) for t in ts)@' "$MUT_AU2PERSIST"
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
