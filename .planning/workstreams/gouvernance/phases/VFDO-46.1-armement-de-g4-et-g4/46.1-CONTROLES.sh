@@ -189,7 +189,10 @@
 # (`rc=<n> fin=<epoch>`) EN DERNIER. Borne : suite = 3 × sa durée de base ; `toutes` = 2 × la durée murale de la
 # BASE-BILAN ; `imputer` = 9 × durée de base (46.1-17). Exception unique, déclarée : la mesure de la base
 # (`toutes --base`) n'a pas de base d'où dériver sa borne ; sa remontée de sondage est la constante
-# BORNE_MESURE_BASE, et `commande.txt` porte `exception=mesure-base`. La base est écrite par la copie à
+# BORNE_MESURE_BASE, et `commande.txt` porte `exception=mesure-base`. Le refus `detache-requis` (durée de base >=
+# SEUIL_DETACHE) est celui de l'appel EXTERNE sans --detache : la copie détachée (--detache-interne) ne le ré-applique
+# jamais, et l'`imputer` détaché passe --detache-herite=<dossier> (option INTERNE) aux rejeux de `suite` qu'il lance
+# (46.1 fix-outil-01). La base est écrite par la copie à
 # l'emplacement de l'outil d'origine (option interne --outil-origine), jamais dans le dossier du rejeu. Le code
 # de sortie de la copie est celui du mode (un `toutes --base` à suites rouges rend 1 : la base est écrite quand
 # même, les rouges y sont des faits préexistants).
@@ -299,6 +302,7 @@ CAS_AUTOTEST=(
   base-sans-mesure base-ajout-vert base-ajout-duree-murale base-ajout-connue base-ajout-rouge
   base-ajout-detache
   detache-sans-base detache-borne-derivee detache-toutes-borne detache-dossier-non-vide mesure-base-borne
+  detache-suite-base-longue detache-toutes-base-longue
   mesure-base-ecrit-par-la-copie sonder-termine-vert sonder-termine-rouge sonder-en-cours sonder-depasse
   sonder-mort sonder-dossier-absent sonder-tranche-trop-grande
   invariants-sains invariants-role-change invariants-version-change invariants-tag invariants-base-absente
@@ -330,7 +334,7 @@ CAS_AUTOTEST=(
   imputer-preexistant imputer-bilan-structurel imputer-imputable imputer-imputable-nouveau-ko imputer-instable
   imputer-parent-sans-depot imputer-parent-depot-preexistant imputer-suite-sensible-depot imputer-suite-neuve
   imputer-escalade-porteuse imputer-escalade-hors-liste imputer-sans-effet imputer-commit-inconnu
-  imputer-commit-sans-parent imputer-detache-borne
+  imputer-commit-sans-parent imputer-detache-borne imputer-detache-base-longue
   jalon-ok jalon-absent jalon-sans-ligne jalon-double jalon-forme jalon-imputables jalon-commit-non-ancetre
   jalon-comptes-incoherents jalon-decouverte-partielle jalon-perime jalon-numero-invalide
   empreinte-ok empreinte-absente empreinte-modifie empreinte-commit-apres-gel empreinte-gel-rouvert
@@ -610,7 +614,7 @@ EOF
 # ---------------------------------------------------------------------------------------------------------
 cmd_suite() {
   local suite="" duree_max="" dm_set=0 shells="bash" cle="" ajout="" aj_set=0 sh sorties entree
-  local b_kind="" b_rc="" b_s="" b_zero="" rcv plafond ajout_s="" premier=1 base_ok=0 detache="" a borne racine_export=""
+  local b_kind="" b_rc="" b_s="" b_zero="" rcv plafond ajout_s="" premier=1 base_ok=0 detache="" a borne racine_export="" herite=""
   local args_detache=()
   EXIGES=()
   MONTRES=()
@@ -629,6 +633,7 @@ cmd_suite() {
       --base-ajout=*) ajout=${1#--base-ajout=}; aj_set=1 ;;
       --base-fichier=*) option_base_fichier "${1#--base-fichier=}" ;;
       --racine-export=*) racine_export=${1#--racine-export=} ;;
+      --detache-herite=*) herite=${1#--detache-herite=} ;;
       -*) die_usage "suite : option inconnue : $1" ;;
       *) [ -z "$suite" ] || die_usage "suite : une seule suite par appel"; suite=$1 ;;
     esac
@@ -708,7 +713,13 @@ EOF
     detacher "$detache" "$borne" - 1 suite ${args_detache[@]+"${args_detache[@]}"}
     return $?
   fi
-  if [ -n "$b_kind" ] && [ "$b_rc" -eq 0 ] && [ "$b_zero" -eq 0 ] && [ "$b_s" -ge "$SEUIL_DETACHE" ]; then
+  # Une copie détachée (DETACHE_INTERNE) ou un rejeu qu'elle a lui-même lancé (--detache-herite=<dossier>, option
+  # INTERNE d'`imputer` : le dossier d'un rejeu détaché en cours) a déjà été décidé détaché par l'appel externe :
+  # le refus detache-requis ne s'y ré-applique pas (46.1 fix-outil-01).
+  if [ -n "$herite" ] && [ ! -f "$herite/commande.txt" ]; then
+    die_usage "suite : --detache-herite=<dossier d'un rejeu détaché>"
+  fi
+  if [ -z "$DETACHE_INTERNE" ] && [ -z "$herite" ] && [ -n "$b_kind" ] && [ "$b_rc" -eq 0 ] && [ "$b_zero" -eq 0 ] && [ "$b_s" -ge "$SEUIL_DETACHE" ]; then
     echo "SUITE-USAGE detache-requis $cle : durée de base $b_s s >= $SEUIL_DETACHE s, à lancer détaché (--detache=<dossier>) puis sonder" >&2
     exit 64
   fi
@@ -1402,7 +1413,7 @@ cmd_toutes() {
       echo "BASE-ABSENTE $BASE_FICHIER : --contre-base exige la base mesurée"
       exit 64
     fi
-    if [ "$base_ok" -eq 1 ] && [ -z "$detache" ]; then
+    if [ "$base_ok" -eq 1 ] && [ -z "$detache" ] && [ -z "$DETACHE_INTERNE" ]; then
       bs=$(base_bilan_s)
       if [ "$bs" -ge "$SEUIL_DETACHE" ]; then
         echo "TOUTES-USAGE detache-requis : la durée murale de la base ($bs s) atteint $SEUIL_DETACHE s, la découverte complète se lance détachée (--detache=<dossier>) puis sonder" >&2
@@ -2233,6 +2244,8 @@ imputer_rejeu() { # <sur> <n> <sortie> <exp> <suite>
     done
     args+=("--racine-export=$exp")
   fi
+  # Sous un imputer détaché, le rejeu hérite de la décision de détacher (sinon detache-requis le refuse).
+  [ -z "$DETACHE_INTERNE" ] || args+=("--detache-herite=$DETACHE_INTERNE")
   bash "$OUTIL" suite "$suite" ${args[@]+"${args[@]}"} "--outil-origine=$OUTIL_ORIGINE" > "$sortie" 2>&1 < /dev/null
   IR_RC=$?
   IR_REJEUX=$((IR_REJEUX + 1))
@@ -3060,7 +3073,7 @@ at_fichier_contient() { # <fichier> <motif fixe>
 }
 
 autotest_detache() {
-  local BF D1 D2 D3 D4 D5 D6 D7 S=plugin/m/tests/test-c.sh dead
+  local BF D1 D2 D3 D4 D5 D6 D7 D8 D9 S=plugin/m/tests/test-c.sh dead
   local CANON='echo "== Résultat : 3 OK · 0 KO =="'
   BF=$AT_TMP/base-d.txt
   at_depot
@@ -3097,6 +3110,28 @@ autotest_detache() {
   [ "$(cat "$D2/borne.txt" 2> /dev/null)" = 14 ] || at_echec "borne.txt vaut « $(cat "$D2/borne.txt" 2> /dev/null) » au lieu de 14 (2 × 7)"
   at_fichier_contient "$D2/commande.txt" "mode=toutes"
   at_attendre_fin "$D2" 60 || at_echec "fin.txt n'est jamais apparu"
+  at_fin 0
+
+  at_debut detache-suite-base-longue
+  mk_suite $S "sleep 1; $CANON"
+  mk_base "$BF" "$S:0:500"
+  D8=$AT_TMP/d-suite-longue
+  at_lancer suite $S --detache="$D8" --base-fichier="$BF"
+  at_compte "DETACHE " 1
+  at_attendre_fin "$D8" 60 || at_echec "fin.txt n'est jamais apparu"
+  at_lancer sonder "$D8"
+  at_contient "SUITE $S shell=bash rc=0"; at_contient "DETACHE-FIN rc=0"
+  at_fin 0
+
+  at_debut detache-toutes-base-longue
+  mk_suite $S "sleep 1; $CANON"
+  MK_BILAN_S=500 mk_base "$BF" "$S:0:2"
+  D9=$AT_TMP/d-toutes-longue
+  at_lancer toutes --detache="$D9" --base-fichier="$BF"
+  at_compte "DETACHE " 1
+  at_attendre_fin "$D9" 60 || at_echec "fin.txt n'est jamais apparu"
+  at_lancer sonder "$D9"
+  at_contient "TOUTES $S rc=0"; at_contient "DETACHE-FIN rc=0"
   at_fin 0
 
   at_debut detache-dossier-non-vide
@@ -4369,6 +4404,17 @@ autotest_imputer() {
   at_attendre_fin "$D" 120 || at_echec "fin.txt n'est jamais apparu"
   at_lancer sonder "$D"
   at_contient "IMPUTATION $S verdict=preexistant"
+  at_fin 0
+
+  at_debut imputer-detache-base-longue
+  imp_prepare $S "$ROUGE" "$ROUGE"
+  mk_base "$BF" "$S:0:500"
+  D=$AT_TMP/d-imputer-longue
+  at_lancer imputer $S --commit="$IMP_SHA" --detache="$D" --base-fichier="$BF"
+  at_attendre_fin "$D" 120 || at_echec "fin.txt n'est jamais apparu"
+  at_lancer sonder "$D"
+  at_contient "IMPUTATION $S verdict=preexistant"
+  at_absent "detache-requis"
   at_fin 0
 }
 
