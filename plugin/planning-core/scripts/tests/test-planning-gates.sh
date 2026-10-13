@@ -5430,6 +5430,7 @@ LIMITES_REFERENCE = (
     ("bs", ("G4′", "A2", "A3", "A4", "P1", "préalables à tout armement")),
     ("bt", ("N-2", "ecrit:", "PLAN.md", "G3")),
     ("bu", ("F-2", "COUVERTURE-REJEU", "plancher", "G4′")),
+    ("bx", ("verifier-releve.sh", "auto-déclaré", "--lab", "revue de PR")),
 )
 PLAGE_LIMITES = "(%s) à (%s)" % (LIMITES_REFERENCE[0][0], LIMITES_REFERENCE[-1][0])
 

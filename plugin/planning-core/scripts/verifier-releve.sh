@@ -44,6 +44,10 @@
 #
 # Ce que ce script ne fait PAS : il ne recalcule rien, ne lance aucun sous-processus, n'écrit aucun fichier, ne lit aucun lab, et ne
 # vérifie pas le commit rejoué contre le dépôt (il juge la forme du relevé, pas son histoire).
+# LIMITE (bx) (fix-5b, audit-5b F-2, revue-5b n°7, P461-D-06 ; modele-cycles.md) : le script juge la FORME d'un relevé AUTO-DÉCLARÉ, pas sa vérité. (1) Le plancher de COUVERTURE-REJEU est
+#   déclaré par le relevé lui-même (seuls p >= 1 et k >= p sont exigés). (2) Les lignes COMPTE ne sont pas recomptées sur les lignes de table : un relevé réécrit de façon cohérente
+#   (table, COMPTE, REJEU-ETAPE) passe. (3) COMMIT-REJOUE n'est pas confronté au dépôt (le mode `armement` de l'outil de phase le fait). (4) Les labs exigés sont l'union des --lab et des
+#   lignes de table : le prédicat des plans d'armement (46.1-05, 46.1-11) passe un --lab par lab réel. La revue de PR reste le contrôle du commit non recoupé.
 # Chaque règle tient sur UNE ligne `if <condition>:` portant le marqueur `# releve-<règle>` : c'est la ligne que les mutants de la suite neutralisent.
 set -uo pipefail
 
