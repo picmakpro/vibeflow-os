@@ -26,15 +26,20 @@
 #   COUVERTURE-REJEU (G3|G4|G4P) n=<k> plancher=<p>                            par gate visé (étape 5 : G3, G4 ; étape 6 : G3, G4, G4P) : UNE ligne, p ≥ 1, k ≥ p
 #   ligne de table `<gate> | <lab> | …`                                        au moins six champs séparés par « | », premier champ ^[A-Z][A-Z0-9]*$ : nomme un lab
 #                                                                              (labs = union des --lab et des labs de table, au moins un ; une ligne de tableau Markdown, qui commence par `|`, ne compte pas)
+#   COMPTE (?|<gate>) faux-refus=<a> faux-accept=<b> refus-conforme-modele=<c>[ hors-etape]   UNE ligne par gate des étapes jusqu'à n (ORDRE_ETAPES, copie de celui de rejeu-gates.sh) ; le suffixe
+#                                                                              ` hors-etape` est exigé si et seulement si l'étape de la gate dépasse n (gate inconnue : étape 0) ;
+#                                                                              REJEU-ETAPE-<n> est RECOUPÉ avec la somme des lignes COMPTE sans suffixe, selon la règle de l'émetteur
+#                                                                              (rejeu-gates.sh : les comptes des gates d'étapes ultérieures sont écartés ; la gate `-`, qui ne porte que des
+#                                                                              faux-accept, n'a pas de ligne) : faux-refus et refus-conforme-modele ÉGAUX à la somme, faux-accept SUPÉRIEUR OU ÉGAL
 #   aucune ligne ne porte un jeton de la grammaire ailleurs qu'en position 0 (REJEU-ETAPE-, COMMIT-REJOUE, EMPREINTE-ARBRE-, EMPREINTE-DIVERGENTE, MESURE-VIDE, COUVERTURE-REJEU, et la tête
 #   d'une ligne de compte `COMPTE <gate> faux-refus` : « COMPTE » seul est un mot courant) : une ligne décalée d'une espace ou citée est malformée, jamais ignorée (fix-5b V4 (a)) ;
 #   la SORTIE du script ne porte aucun de ces jetons (ses détails nomment la famille en minuscules) : reproduite dans un relevé versionné, elle ne change pas la décision
 #   aucune ligne ne porte de chemin ABSOLU de machine : un jeton de chemin (suite maximale de caractères de mot, `.~%+@/-`) qui commence par `/` et vaut, une fois normalisé
 #   lexicalement, `/Users` ou `/home` ou est dessous (`file:///Users/<c>`, `a=/home/<c>`, `//home/<c>`, `/tmp/../home/<c>` rougissent ; `src/pages/home/x`, `~/home/x` non — fix-5b V2)
-#   (les lignes `COMPTE …`, `EMPREINTE-IDENTIQUE …`, `RELEVE-ECART …`, `RELEVE-VERDICT …` d'un relevé ne sont JAMAIS lues pour décider)
-# Règles (23, une ligne `if` marquée chacune) : lecture, vide, etape-absente, etape-malformee, etape-doublon, etape-autre (une ligne REJEU-ETAPE-<m>, m ≠ n),
+#   (les lignes `EMPREINTE-IDENTIQUE …`, `RELEVE-ECART …`, `RELEVE-VERDICT …` d'un relevé ne sont JAMAIS lues pour décider ; les lignes COMPTE ne servent qu'au recoupement de REJEU-ETAPE)
+# Règles (26, une ligne `if` marquée chacune) : lecture, vide, etape-absente, etape-malformee, etape-doublon, etape-autre (une ligne REJEU-ETAPE-<m>, m ≠ n),
 #   faux-refus, faux-accept, commit-absent, commit-malforme, commit-doublon, labs-absents, empreinte-absente, empreinte-doublon, empreinte-divergente, rejeu-divergent,
-#   mesure-vide, couverture-absente, couverture-malformee (dont plancher=0), couverture-doublon, couverture-insuffisante, jeton-deplace, chemin-machine.
+#   mesure-vide, couverture-absente, couverture-malformee (dont plancher=0), couverture-doublon, couverture-insuffisante, jeton-deplace, chemin-machine, etape-recoupement (REJEU-ETAPE recoupé avec les lignes COMPTE), compte-malforme, compte-absent.
 # Une section « Non armé » n'a AUCUN effet sur la décision : aucune règle ne la lit.
 #
 # Ce que ce script ne fait PAS : il ne recalcule rien, ne lance aucun sous-processus, n'écrit aucun fichier, ne lit aucun lab, et ne
@@ -83,6 +88,11 @@ RE_COMMIT = re.compile(r"COMMIT-REJOUE [0-9a-f]{40}")
 RE_EMPREINTE = re.compile(r"EMPREINTE-ARBRE-(IDENTIQUE|DIVERGENTE) (.+)")
 RE_COUVERTURE = re.compile(r"COUVERTURE-REJEU (G3|G4|G4P) n=([0-9]{1,9}) plancher=([0-9]{1,9})")
 RE_GATE = re.compile(r"[A-Z][A-Z0-9]*")
+# Ordre des étapes de rejeu-gates.sh (R-RELEVE-07 garde la copie identique) : la gate d'une ligne COMPTE est « hors étape » si son étape dépasse celle du relevé ; une gate rangée sous
+# aucune étape (`?`, inconnue) est d'étape 0 : elle reste comptée, comme chez l'émetteur.
+ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",), ("G3", "G4"), ("G4P",))
+ETAPE_DE = dict((g, i + 1) for i, lot in enumerate(ORDRE_ETAPES) for g in lot)
+RE_COMPTE = re.compile(r"COMPTE (\?|[A-Z0-9]+) faux-refus=([0-9]{1,9}) faux-accept=([0-9]{1,9}) refus-conforme-modele=([0-9]{1,9})( hors-etape)?")
 # Jetons de la grammaire (fix-5b V4 (a)) : une ligne qui en porte un ailleurs qu'en position 0 est malformée (règle jeton-deplace) ; la SORTIE du script n'en porte jamais (elle est
 # reproduite dans les relevés versionnés, puis relue : un jeton y rougirait chaque relevé non armable). `COMPTE` est un mot courant (« COMPTE RENDU.md ») : son jeton est la tête
 # structurelle d'une ligne de compte, pas le mot seul.
@@ -226,13 +236,14 @@ def juger(texte, etape, labs_options):
     rejeux_divergents = []
     mesures_vides = []
     couvertures, couvertures_mal = {}, []
+    comptes, comptes_mal = {}, []
     for i, ligne in numerotees:
         if ligne.startswith("REJEU-ETAPE-"):
             m = conforme(RE_ETAPE, ligne)
             if m is None:
                 etapes_mal.append(i)
             else:
-                etapes_valides.append((i, int(m.group(1)), int(m.group(2)), int(m.group(3))))
+                etapes_valides.append((i, int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))))
         elif ligne.startswith("COMMIT-REJOUE"):
             (commits_valides if conforme(RE_COMMIT, ligne) else commits_mal).append(i)
         elif ligne.startswith("EMPREINTE-ARBRE-"):
@@ -245,6 +256,13 @@ def juger(texte, etape, labs_options):
                 divergentes.append((i, m.group(2)))
         elif ligne.startswith("EMPREINTE-DIVERGENTE"):
             rejeux_divergents.append((i, ligne[len("EMPREINTE-DIVERGENTE"):].strip()))  # tout ce qui commence par le jeton est un fait : le rejeu a modifié un lab
+        elif ligne.startswith("COMPTE "):
+            m = conforme(RE_COMPTE, ligne)
+            hors_etape = ETAPE_DE.get(m.group(1), 0) > etape if m else None
+            if m is None or (m.group(5) is not None) != hors_etape:
+                comptes_mal.append(i)  # hors grammaire, `\r` final, ou suffixe contraire à l'ordre des étapes
+            elif not hors_etape:
+                comptes.setdefault(m.group(1), []).append((i, int(m.group(2)), int(m.group(3)), int(m.group(4))))
         elif ligne.startswith("MESURE-VIDE"):
             mesures_vides.append(i)
         elif ligne.startswith("COUVERTURE-REJEU"):
@@ -256,6 +274,21 @@ def juger(texte, etape, labs_options):
 
     de_l_etape = [e for e in etapes_valides if e[1] == etape]
     autres_etapes = [e for e in etapes_valides if e[1] != etape]
+    gates_sans_compte = [g for lot in ORDRE_ETAPES[:etape] for g in lot if g not in comptes]
+    somme_fr = sum(c[1] for lignes_g in comptes.values() for c in lignes_g)
+    somme_fa = sum(c[2] for lignes_g in comptes.values() for c in lignes_g)
+    somme_cm = sum(c[3] for lignes_g in comptes.values() for c in lignes_g)
+    recoupements = []
+    for i, _, a, b, c in de_l_etape:
+        fautes_champs = []
+        if a != somme_fr:
+            fautes_champs.append("faux-refus=%d pour une somme des comptes de %d" % (a, somme_fr))
+        if c != somme_cm:
+            fautes_champs.append("refus-conforme-modele=%d pour une somme des comptes de %d" % (c, somme_cm))
+        if b < somme_fa:  # recoupement-fa
+            fautes_champs.append("faux-accept=%d sous la somme des comptes de %d" % (b, somme_fa))
+        if fautes_champs:
+            recoupements.append((i, " ; ".join(fautes_champs)))
     refus_non_nuls = [e for e in de_l_etape if e[2] != 0]
     accepts_non_nuls = [e for e in de_l_etape if e[3] != 0]
     labs_sans_empreinte = [lab for lab in labs if lab not in identiques]
@@ -275,14 +308,23 @@ def juger(texte, etape, labs_options):
     if len(de_l_etape) > 1:  # releve-etape-doublon
         ecart("etape-doublon", "%d lignes d'étape %d (lignes %s)" % (len(de_l_etape), etape, ",".join(str(e[0]) for e in de_l_etape)))
     if autres_etapes:  # releve-etape-autre
-        for i, m, _, _ in autres_etapes:
+        for i, m, _, _, _ in autres_etapes:
             ecart("etape-autre", "ligne %d : ligne d'étape %d alors que --etape=%d" % (i, m, etape))
     if refus_non_nuls:  # releve-faux-refus
-        for i, _, a, _ in refus_non_nuls:
+        for i, _, a, _, _ in refus_non_nuls:
             ecart("faux-refus", "ligne %d : faux-refus=%d" % (i, a))
     if accepts_non_nuls:  # releve-faux-accept
-        for i, _, _, b in accepts_non_nuls:
+        for i, _, _, b, _ in accepts_non_nuls:
             ecart("faux-accept", "ligne %d : faux-accept=%d" % (i, b))
+    if recoupements:  # releve-etape-recoupement
+        for i, detail in recoupements:
+            ecart("etape-recoupement", "ligne %d : %s" % (i, detail))
+    if comptes_mal:  # releve-compte-malforme
+        for i in comptes_mal:
+            ecart("compte-malforme", "ligne %d : ligne de compte hors grammaire, avec un retour chariot final ou au suffixe contraire à l'ordre des étapes" % i)
+    if gates_sans_compte:  # releve-compte-absent
+        for g in gates_sans_compte:
+            ecart("compte-absent", "gate %s : aucune ligne de compte conforme (gate d'une étape jusqu'à %d)" % (g, etape))
     if not commits_valides:  # releve-commit-absent
         ecart("commit-absent", "aucune ligne de commit rejoué conforme (40 hexadécimaux minuscules)")
     if commits_mal:  # releve-commit-malforme

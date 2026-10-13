@@ -9,8 +9,10 @@
 #                et une dernière ligne `RELEVE-VERDICT non-armable …`
 #   R-RELEVE-04  les bords : n = plancher armable (jumeau de n = plancher - 1), un faux-refus=343 avec une section « Non armé » refusé, seul
 #                EMPREINTE-IDENTIQUE (périmètre restreint) = empreinte-absente, lignes RELEVE-VERDICT / RELEVE-ECART reproduites inertes, lignes COMPTE
-#                jamais lues, gate non visé ignoré, labs (union des --lab et des lignes de table), CRLF, sortie déterministe sans la ligne fautive,
-#                aucun sous-processus ni écriture
+#                lues pour recouper REJEU-ETAPE (une ligne COMPTE à 343 faux refus non reportée dans REJEU-ETAPE = etape-recoupement ; gate `-` : faux-accept
+#                seul ; gate inconnue `?` comptée ; gate d'une étape ultérieure non comptée), gate non visé ignoré, labs (union des --lab et des lignes de table),
+#                CRLF, chemins relatifs nommés home ou Users armables, `COMPTE RENDU.md` armable, sortie déterministe sans la ligne fautive, aucun sous-processus
+#                ni écriture
 #   MUT-RELEVE-<RÈGLE>  un mutant par marqueur `# releve-<règle>` lu dans le script (la ligne `if …:` devient `if False:`), GÉNÉRÉ par une boucle :
 #                le cas négatif de la règle ne rend plus SA ligne (et, pour un cas « seul », le code 0), le cas positif reste vert sous le mutant.
 #                La trace est imprimée : assertion · attendu (original) · obtenu (mutant). Un marqueur sans cas dans la table est un `  ✗ `.
@@ -27,9 +29,17 @@
 #                VF_RELEVE_CHAINE_DEPOT (lue SEULEMENT par R-RELEVE-CHAINE, jamais pour décider d'un cas) : si elle désigne un dossier ABSOLU EXISTANT, les trois
 #                relevés composés y sont copiés sous chaine-etape-5.md, chaine-etape-6.md, chaine-etape-6-sans-agent.md — `46.1-CONTROLES.sh releve-chaine` les
 #                passe au contrôle de cohérence de la phase. Variable absente, vide ou relative : rien n'est écrit hors du mktemp de la suite.
+#   R-RELEVE-07  (fix-5b V4 (b)) la copie d'`ORDRE_ETAPES` du vérificateur est identique à celle de rejeu-gates.sh (ast.literal_eval des deux lignes) ; la confrontation voit une copie
+#                perturbée (G4 déplacée dans le dernier lot) ; mutant MUT-RELEVE-ORDRE
+#   R-RELEVE-08  (fix-5b V4 (a)) point fixe : pour chaque cas texte de la table, la SORTIE du script ne porte aucun jeton de la grammaire, et relevé + `## Décision mécanique` + sa sortie
+#                redonne le même code, la même dernière ligne et les mêmes écarts ; mutant MUT-RELEVE-SORTIE-JETON
+#   Mutants dédiés (hors marqueurs, fix-5b) : MUT-RELEVE-ENTIER-BORNE (V1), MUT-RELEVE-MACHINE-SOUS-CHAINE (V2), MUT-RELEVE-SORTIE-JETON (V4 (a)), MUT-RELEVE-ORDRE et
+#                MUT-RELEVE-RECOUPEMENT-FA-EGAL (V4 (b))
 #   R-RELEVE-05  (46.1-18) les deux relevés RÉELS de la Phase 46 (fixtures/releve-46-etape-5.txt et -6.txt, extraites par lignes ciblées, chaque ligne
 #                verbatim, jamais complétées) sont refusés : faux-refus=349 à l'étape 5 ; à l'étape 6 faux-refus=343 ET commit-absent, deux causes indépendantes
-#                (ce relevé ne porte aucune ligne COMMIT-REJOUE, il ne cite son commit qu'en prose)
+#                (ce relevé ne porte aucune ligne COMMIT-REJOUE, il ne cite son commit qu'en prose) ; `jeton-deplace` ne vise QUE la ligne 1 de chaque fixture (le commentaire d'extraction,
+#                non verbatim) ; deux retouches du relevé de l'étape 5 construites sur son texte (audit-5b F-2) sont refusées : (a) ligne REJEU-ETAPE-5 décalée d'une espace + ligne propre
+#                à 0 (etape-recoupement, jeton-deplace), (b) faux-refus=349 changé en 0 alors que COMPTE G4 faux-refus=343 reste (etape-recoupement)
 #   R-RELEVE-06  (46.1-18) contrôle statique (ast) du cœur Python : ni subprocess ni shutil importés, ni os.system ni os.remove appelés, aucun fichier ouvert
 #                en écriture ; l'analyseur est éprouvé sur des sources fautives (il ne rend pas un vert à vide)
 #   R-RELEVE-COUVERTURE  (46.1-18) la suite lit les marqueurs `# releve-<règle>` du script et exige pour chacun un cas négatif dans CAS_NEGATIFS ET un
@@ -152,8 +162,10 @@ def base(etape):
     for lab in (LAB_A, LAB_1):
         for gate in gates:
             lignes.append("%s | %s | .planning/cycles/01-c/phases/01-p/SUMMARY.md | doit-passer | passe | passe" % (gate, lab))
-    for gate in gates:
-        lignes.append("COMPTE %s faux-refus=0 faux-accept=0 refus-conforme-modele=0" % gate)
+    # lignes COMPTE à la forme de l'émetteur : toutes les gates des étapes <= n, plus G4P suffixée ` hors-etape` à l'étape 5 ; le refus conforme au modèle (196) est celui de G1 ;
+    # le total REJEU-ETAPE somme les gates de l'étape (faux-refus et refus-conforme-modele égaux à la somme, faux-accept au moins égal)
+    for gate in ("G6", "G5", "G1", "G7", "ROLE", "G3", "G4", "G4P"):
+        lignes.append("COMPTE %s faux-refus=0 faux-accept=0 refus-conforme-modele=%d%s" % (gate, 196 if gate == "G1" else 0, " hors-etape" if (gate == "G4P" and etape == 5) else ""))
     lignes.append("REJEU-ETAPE-%d faux-refus=0 faux-accept=0 refus-conforme-modele=196" % etape)
     lignes.append("COUVERTURE-REJEU G3 n=52 plancher=12")
     lignes.append("COUVERTURE-REJEU G4 n=44 plancher=12")
@@ -264,6 +276,8 @@ REFUS_UN = "REJEU-ETAPE-5 faux-refus=1 faux-accept=0 refus-conforme-modele=196"
 ACCEPT_UN = "REJEU-ETAPE-5 faux-refus=0 faux-accept=1 refus-conforme-modele=196"
 AUTRE_ETAPE = "REJEU-ETAPE-6 faux-refus=0 faux-accept=0 refus-conforme-modele=0"
 ID_A, ID_1 = "EMPREINTE-ARBRE-IDENTIQUE " + LAB_A, "EMPREINTE-ARBRE-IDENTIQUE " + LAB_1
+COMPTE_FR_UN = ("remplace", "COMPTE G4 ", "COMPTE G4 faux-refus=1 faux-accept=0 refus-conforme-modele=0")
+COMPTE_FA_UN = ("remplace", "COMPTE G4 ", "COMPTE G4 faux-refus=0 faux-accept=1 refus-conforme-modele=0")
 GROS = "1" * 4301  # plus de chiffres que la limite de conversion de Python >= 3.11 (4 300) : int() lèverait (fix-5b V1)
 # Les chemins de machine de la suite sont des PLACEHOLDERS admis par scripts/check-machine-paths.sh (compte `dev`, compte `runner`) :
 # la règle du script les refuse quand même, et la suite versionnée ne porte aucun vrai chemin.
@@ -302,10 +316,10 @@ CAS_NEGATIFS = {
         {"nom": "la seule ligne est REJEU-ETAPE-6 (--etape=5)", "ops": [("remplace", "REJEU-ETAPE-5 ", AUTRE_ETAPE)]},
     ],
     "faux-refus": [
-        {"nom": "faux-refus=1", "ops": [("remplace", "REJEU-ETAPE-5 ", REFUS_UN)], "seule": True},
+        {"nom": "faux-refus=1", "ops": [("remplace", "REJEU-ETAPE-5 ", REFUS_UN), COMPTE_FR_UN], "seule": True},
     ],
     "faux-accept": [
-        {"nom": "faux-accept=1", "ops": [("remplace", "REJEU-ETAPE-5 ", ACCEPT_UN)], "seule": True},
+        {"nom": "faux-accept=1", "ops": [("remplace", "REJEU-ETAPE-5 ", ACCEPT_UN), COMPTE_FA_UN], "seule": True},
     ],
     "commit-absent": [
         {"nom": "aucune ligne COMMIT-REJOUE", "ops": [("sans", "COMMIT-REJOUE")], "seule": True},
@@ -348,6 +362,29 @@ CAS_NEGATIFS = {
         {"nom": "EMPREINTE-ARBRE-IDENTIQUE précédé d'un préfixe", "ops": [("ajoute", "x-EMPREINTE-ARBRE-IDENTIQUE " + LAB_A)], "seule": True},
         {"nom": "MESURE-VIDE précédé d'une espace", "ops": [("ajoute", " MESURE-VIDE " + LAB_1)], "seule": True},
         {"nom": "EMPREINTE-DIVERGENTE précédé d'une espace", "ops": [("ajoute", " EMPREINTE-DIVERGENTE " + LAB_A)], "seule": True},
+    ],
+    "compte-malforme": [
+        {"nom": "COMPTE G3 suffixée hors-etape alors que G3 est de l'étape 5, à côté de la conforme",
+         "ops": [("ajoute", "COMPTE G3 faux-refus=0 faux-accept=0 refus-conforme-modele=0 hors-etape")], "seule": True},
+        {"nom": "COMPTE G4 sans refus-conforme-modele, à côté de la conforme", "ops": [("ajoute", "COMPTE G4 faux-refus=0 faux-accept=0")], "seule": True},
+        {"nom": "COMPTE G4P sans le suffixe hors-etape à l'étape 5 (G4P est de l'étape 6)",
+         "ops": [("remplace", "COMPTE G4P ", "COMPTE G4P faux-refus=0 faux-accept=0 refus-conforme-modele=0")], "seule": True},
+        {"nom": "COMPTE G4 à 4 301 chiffres, à côté de la conforme", "ops": [("ajoute", "COMPTE G4 faux-refus=%s faux-accept=0 refus-conforme-modele=0" % GROS)], "seule": True},
+        {"nom": "COMPTE G3 conforme suivie de \\r", "ops": [("crlf", "COMPTE G3 ")]},
+        {"nom": "COMPTE G4P suffixée hors-etape à l'étape 6 (G4P y est de l'étape)", "etape": 6,
+         "ops": [("remplace", "COMPTE G4P ", "COMPTE G4P faux-refus=0 faux-accept=0 refus-conforme-modele=0 hors-etape")]},
+    ],
+    "compte-absent": [
+        {"nom": "sans COMPTE G6 (gate de l'étape 1)", "ops": [("sans", "COMPTE G6 ")], "seule": True},
+        {"nom": "sans COMPTE G4P à l'étape 6", "etape": 6, "ops": [("sans", "COMPTE G4P ")], "seule": True},
+    ],
+    "etape-recoupement": [
+        {"nom": "COMPTE G4 à faux-refus=1 sous un REJEU-ETAPE à 0", "ops": [COMPTE_FR_UN], "seule": True},
+        {"nom": "COMPTE G1 à refus-conforme-modele=195 sous un REJEU-ETAPE à 196",
+         "ops": [("remplace", "COMPTE G1 ", "COMPTE G1 faux-refus=0 faux-accept=0 refus-conforme-modele=195")], "seule": True},
+        {"nom": "COMPTE G4 à faux-accept=1 sous un REJEU-ETAPE à 0", "ops": [COMPTE_FA_UN], "seule": True},
+        {"nom": "COMPTE G4P à faux-refus=1 sous un REJEU-ETAPE-6 à 0", "etape": 6,
+         "ops": [("remplace", "COMPTE G4P ", "COMPTE G4P faux-refus=1 faux-accept=0 refus-conforme-modele=0")], "seule": True},
     ],
     "mesure-vide": [
         {"nom": "une ligne MESURE-VIDE", "ops": [("ajoute", "MESURE-VIDE " + LAB_1)], "seule": True},
@@ -487,6 +524,7 @@ def controle_04():
     bord("étape 6 : G4P n = plancher est armable", "k >= p suffit à chaque gate visé", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
     # la section « Non armé » n'excuse rien (l'ancien awk de 46-11 acceptait faux-refus != 0 si elle était là)
     rc, s = lancer_releve("b-non-arme.txt", appliquer(base(5), [("remplace", "REJEU-ETAPE-5 ", "REJEU-ETAPE-5 faux-refus=343 faux-accept=0 refus-conforme-modele=196"),
+                                                              ("remplace", "COMPTE G4 ", "COMPTE G4 faux-refus=343 faux-accept=0 refus-conforme-modele=0"),
                                                               ("ajoute", "## Non armé — remonté à Willy"), ("ajoute", "- G4 : 343 refus, limite (bp)")]))
     bord("faux-refus=343 avec une section « Non armé » est refusé", "la section « Non armé » n'a aucun effet", "code 1, RELEVE-ECART faux-refus",
          rc, s, refuse_pour(rc, s, "faux-refus") and len(ecarts_de(s)) == 1)
@@ -496,15 +534,26 @@ def controle_04():
          "code 1, deux lignes RELEVE-ECART empreinte-absente", rc, s, refuse_pour(rc, s, "empreinte-absente") and ecarts_de(s).count("empreinte-absente") == 2)
     # lignes de décision reproduites : inertes
     reproduites = ["RELEVE-VERDICT armable etape=5 labs=2 gates=G3,G4", "RELEVE-ECART faux-refus : ligne 9 : faux-refus=0"]
-    rc, s = lancer_releve("b-reproduit-refus.txt", appliquer(base(5), [("remplace", "REJEU-ETAPE-5 ", REFUS_UN)] + [("ajoute", l) for l in reproduites]))
+    rc, s = lancer_releve("b-reproduit-refus.txt", appliquer(base(5), [("remplace", "REJEU-ETAPE-5 ", REFUS_UN), COMPTE_FR_UN] + [("ajoute", l) for l in reproduites]))
     bord("lignes RELEVE-VERDICT armable reproduites + faux-refus=1 : refusé", "les lignes reproduites sont inertes", "code 1, un seul RELEVE-VERDICT (le nôtre), non-armable",
          rc, s, refuse_pour(rc, s, "faux-refus") and len(verdicts_de(s)) == 1)
     rc, s = lancer_releve("b-reproduit-ok.txt", appliquer(base(5), [("ajoute", "RELEVE-VERDICT non-armable etape=5 ecarts=1"), ("ajoute", "RELEVE-ECART faux-refus : ligne 3 : faux-refus=1")]))
     bord("lignes RELEVE-VERDICT non-armable reproduites + relevé conforme : armable", "les lignes reproduites sont inertes", "code 0, RELEVE-VERDICT armable",
          rc, s, armable(rc, s) and len(verdicts_de(s)) == 1)
-    # lignes COMPTE : informatives, jamais lues
+    # lignes COMPTE (fix-5b V4 (b)) : lues pour recouper REJEU-ETAPE selon la règle de l'émetteur
     rc, s = lancer_releve("b-compte.txt", appliquer(base(5), [("remplace", "COMPTE G4 ", "COMPTE G4 faux-refus=343 faux-accept=2 refus-conforme-modele=0")]))
-    bord("une ligne COMPTE à 343 faux refus n'est pas lue", "seule la ligne REJEU-ETAPE décide", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
+    bord("une ligne COMPTE à 343 faux refus non reportée dans REJEU-ETAPE : etape-recoupement", "REJEU-ETAPE est recoupé avec la somme des lignes COMPTE de l'étape", "code 1, l'unique écart etape-recoupement",
+         rc, s, refuse_pour(rc, s, "etape-recoupement") and ecarts_de(s) == ["etape-recoupement"])
+    rc, s = lancer_releve("b-fa-sans-compte.txt", appliquer(base(5), [("remplace", "REJEU-ETAPE-5 ", ACCEPT_UN)]))
+    bord("REJEU-ETAPE à faux-accept=1 sans ligne COMPTE qui le porte (gate `-` de l'émetteur) : faux-accept seul, jamais etape-recoupement",
+         "faux-accept de REJEU-ETAPE est supérieur ou égal à la somme des lignes COMPTE", "code 1, l'unique écart faux-accept", rc, s, ecarts_de(s) == ["faux-accept"] and rc == 1)
+    rc, s = lancer_releve("b-compte-inconnue.txt", appliquer(base(5), [("ajoute", "COMPTE ? faux-refus=1 faux-accept=0 refus-conforme-modele=0")]))
+    bord("COMPTE ? (gate inconnue) à faux-refus=1 est compté : etape-recoupement", "une gate inconnue (`?`) reste comptée par l'émetteur", "code 1, l'unique écart etape-recoupement",
+         rc, s, ecarts_de(s) == ["etape-recoupement"] and rc == 1)
+    rc, s = lancer_releve("b-compte-inconnue-zero.txt", appliquer(base(5), [("ajoute", "COMPTE ? faux-refus=0 faux-accept=0 refus-conforme-modele=0")]))
+    bord("COMPTE ? à zéro est armable", "une gate inconnue à zéro ne change aucun total", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
+    rc, s = lancer_releve("b-g4p-hors-etape.txt", appliquer(base(5), [("remplace", "COMPTE G4P ", "COMPTE G4P faux-refus=5 faux-accept=0 refus-conforme-modele=0 hors-etape")]))
+    bord("étape 5 : COMPTE G4P suffixée hors-etape à faux-refus=5 n'est pas comptée", "les gates d'une étape ultérieure n'entrent pas dans le total", "code 0, RELEVE-VERDICT armable", rc, s, armable(rc, s))
     # couverture d'un gate non visé par l'étape : informative
     rc, s = lancer_releve("b-g4p-etape5.txt", appliquer(base(5), [("ajoute", "COUVERTURE-REJEU G4P n=0 plancher=8")]))
     bord("étape 5 : une couverture G4P insuffisante n'est pas lue (gate non visé)", "les gates visés dépendent de l'étape", "code 0, RELEVE-VERDICT armable gates=G3,G4",
@@ -780,6 +829,91 @@ def controle_08():
            "%d faute(s) : %s" % (len(fautes), "; ".join(fautes[:3]) or "aucun cas joué"))
 
 
+RE_ORDRE = re.compile(r"^ORDRE_ETAPES = (.+)$", re.M)
+
+
+def ordre_etapes_de(texte):
+    """La valeur de l'UNIQUE ligne `ORDRE_ETAPES = (…)` du texte (ast.literal_eval), ou None."""
+    trouves = RE_ORDRE.findall(texte)
+    if len(trouves) != 1:
+        return None
+    try:
+        return ast.literal_eval(trouves[0])
+    except (ValueError, SyntaxError):
+        return None
+
+
+def fautes_ordre(chemin_script):
+    """R-RELEVE-07 : l'ordre des étapes copié dans le vérificateur est celui de rejeu-gates.sh (lues toutes deux par ast.literal_eval). Rend la liste des fautes."""
+    emetteur = os.path.join(os.path.dirname(SCRIPT), "rejeu-gates.sh")
+    if not os.path.isfile(emetteur):
+        return ["rejeu-gates.sh absent à côté du script jugé : l'ordre des étapes n'est pas confronté (jamais un vert)"]
+    copie = ordre_etapes_de(open(chemin_script, encoding="utf-8").read())
+    origine = ordre_etapes_de(open(emetteur, encoding="utf-8").read())
+    if copie is None or origine is None:
+        return ["ligne `ORDRE_ETAPES = (…)` unique introuvable ou illisible (vérificateur : %s, rejeu-gates.sh : %s)" % (copie is not None, origine is not None)]
+    if copie != origine:
+        return ["ORDRE_ETAPES du vérificateur %s diffère de celui de rejeu-gates.sh %s" % (copie, origine)]
+    return []
+
+
+def controle_07():
+    fautes = fautes_ordre(SCRIPT)
+    # sensibilité : la même confrontation sur une copie PERTURBÉE (G4 déplacée dans le dernier lot) rougit
+    source = open(SCRIPT, encoding="utf-8").read()
+    perturbee = source.replace('("G3", "G4"), ("G4P",)', '("G3",), ("G4", "G4P")')
+    sensible = perturbee != source and ordre_etapes_de(perturbee) is not None and ordre_etapes_de(perturbee) != ordre_etapes_de(open(os.path.join(os.path.dirname(SCRIPT), "rejeu-gates.sh"), encoding="utf-8").read())
+    if not fautes and sensible:
+        ok("R-RELEVE-07 ORDRE_ETAPES du vérificateur est celui de rejeu-gates.sh (ast.literal_eval des deux lignes) ; la confrontation voit une copie perturbée", "%s" % (ordre_etapes_de(source),))
+    else:
+        ko("R-RELEVE-07", "l'ordre des étapes copié dans le vérificateur est identique à celui de rejeu-gates.sh, et la confrontation n'est pas aveugle", "ordres égaux, copie perturbée vue",
+           "fautes %s ; confrontation %s" % (fautes, "sensible" if sensible else "AVEUGLE"))
+
+
+def mutant_ordre():
+    """MUT-RELEVE-ORDRE (fix-5b V4 (b)) : G4 déplacée dans le dernier lot de la copie d'ORDRE_ETAPES -> R-RELEVE-07 rougit."""
+    ident = "RELEVE-ORDRE"
+    chemin, raison = make_mutant(ident, lambda l: l.startswith("ORDRE_ETAPES = "), 'ORDRE_ETAPES = (("G6", "G5"), ("G1",), ("G7",), ("ROLE",), ("G3",), ("G4", "G4P"))')
+    if chemin is None:
+        komut(ident, "le mutant se construit", "UNE ligne `ORDRE_ETAPES = …` modifiée", raison)
+        return
+    assertion = "R-RELEVE-07 l'ordre des étapes est celui de rejeu-gates.sh"
+    if fautes_ordre(SCRIPT):
+        komut(ident, assertion + " (original)", "aucune faute", "l'original lui-même rougit : %s" % court(fautes_ordre(SCRIPT)[0], 120))
+        return
+    fautes = fautes_ordre(chemin)
+    if not fautes:
+        komut(ident, assertion, "R-RELEVE-07 rougit sous le mutant", "le mutant passe encore")
+        return
+    okmut(ident, "%s · attendu (original) : aucune faute · obtenu (mutant) : %s" % (assertion, court(fautes[0], 130)))
+
+
+def mutant_recoupement_fa_egal():
+    """MUT-RELEVE-RECOUPEMENT-FA-EGAL (fix-5b V4 (b)) : le recoupement de faux-accept par ÉGALITÉ au lieu de « supérieur ou égal » -> le relevé dont REJEU-ETAPE porte un faux-accept sans
+    ligne COMPTE qui le porte (gate `-` de l'émetteur) lève aussi etape-recoupement."""
+    ident = "RELEVE-RECOUPEMENT-FA-EGAL"
+    chemin, raison = make_mutant(ident, lambda l: l.rstrip().endswith("# recoupement-fa"), "if b != somme_fa:  # recoupement-fa")
+    if chemin is None:
+        komut(ident, "le mutant se construit", "UNE ligne `if b < somme_fa:  # recoupement-fa` rendue à l'égalité", raison)
+        return
+    assertion = "R-RELEVE-04 REJEU-ETAPE à faux-accept=1 sans ligne COMPTE qui le porte : faux-accept seul"
+    releve = ecrire_releve("m-fa-egal.txt", appliquer(base(5), [("remplace", "REJEU-ETAPE-5 ", ACCEPT_UN)]))
+    rc_o, out_o, err_o = lancer(SCRIPT, ["--etape=5", releve])
+    if not (rc_o == 1 and ecarts_de(out_o + err_o) == ["faux-accept"]):
+        komut(ident, assertion + " (original)", "code 1, l'unique écart faux-accept", "l'original lui-même : code %d, écarts %s" % (rc_o, ecarts_de(out_o + err_o)))
+        return
+    rc_m, out_m, err_m = lancer(chemin, ["--etape=5", releve])
+    if "etape-recoupement" not in ecarts_de(out_m + err_m):
+        komut(ident, assertion, "le mutant lève etape-recoupement", "le mutant ne lève pas etape-recoupement : écarts %s" % ecarts_de(out_m + err_m))
+        return
+    for etape in (5, 6):
+        rc_p, sortie_p = positif(chemin, etape)
+        if not armable(rc_p, sortie_p):
+            komut(ident, "mutant valide : le relevé conforme de l'étape %d reste armable sous le mutant" % etape, "code 0, RELEVE-VERDICT armable", "code %d" % rc_p)
+            return
+    okmut(ident, "%s · attendu (original) : code 1, écarts [faux-accept] · obtenu (mutant) : code %d, écarts %s" % (assertion, rc_m, ecarts_de(out_m + err_m)))
+
+
 def mutant_sortie_jeton():
     """MUT-RELEVE-SORTIE-JETON (fix-5b V4 (a)) : le détail de `etape-malformee` recite un jeton de la grammaire (le libellé d'avant le correctif) -> R-RELEVE-08 rougit."""
     ident = "RELEVE-SORTIE-JETON"
@@ -1039,10 +1173,19 @@ def controle_05():
         retouchee = [(" " + l if l.startswith("REJEU-ETAPE-5 ") else l) for l in reelles] + ["REJEU-ETAPE-5 faux-refus=0 faux-accept=0 refus-conforme-modele=196"]
         rc, out, err = lancer(SCRIPT, ["--etape=5"] + ["--lab=" + lab for lab in LABS_46] + [ecrire_releve("retouche-a.txt", retouchee)])
         sortie = out + err
-        if rc == 1 and ecarts_de(sortie) == ["jeton-deplace"]:
-            ok("R-RELEVE-05 retouche (a) du relevé réel de l'étape 5 (ligne REJEU-ETAPE-5 décalée d'une espace + ligne propre à 0) est refusée", "code 1, RELEVE-ECART jeton-deplace")
+        if rc == 1 and sorted(ecarts_de(sortie)) == ["etape-recoupement", "jeton-deplace"]:
+            ok("R-RELEVE-05 retouche (a) du relevé réel de l'étape 5 (ligne REJEU-ETAPE-5 décalée d'une espace + ligne propre à 0) est refusée", "code 1, RELEVE-ECART etape-recoupement, RELEVE-ECART jeton-deplace")
         else:
-            ko("R-RELEVE-05 retouche (a)", "un relevé réel retouché (ligne REJEU-ETAPE décalée d'une espace, ligne propre ajoutée) n'est pas armable", "code 1, l'écart jeton-deplace",
+            ko("R-RELEVE-05 retouche (a)", "un relevé réel retouché (ligne REJEU-ETAPE décalée d'une espace, ligne propre ajoutée) n'est pas armable", "code 1, les écarts etape-recoupement et jeton-deplace",
+               "code %d, écarts %s, dernière ligne « %s »" % (rc, ecarts_de(sortie), court(derniere(sortie))))
+        # retouche (b) (audit-5b F-2 (b)) : faux-refus=349 changé en 0 alors que COMPTE G4 faux-refus=343 reste
+        retouchee_b = [("REJEU-ETAPE-5 faux-refus=0 faux-accept=0 refus-conforme-modele=196" if l.startswith("REJEU-ETAPE-5 ") else l) for l in reelles]
+        rc, out, err = lancer(SCRIPT, ["--etape=5"] + ["--lab=" + lab for lab in LABS_46] + [ecrire_releve("retouche-b.txt", retouchee_b)])
+        sortie = out + err
+        if rc == 1 and ecarts_de(sortie) == ["etape-recoupement"]:
+            ok("R-RELEVE-05 retouche (b) du relevé réel de l'étape 5 (faux-refus=349 changé en 0, COMPTE G4 faux-refus=343 gardée) est refusée", "code 1, RELEVE-ECART etape-recoupement")
+        else:
+            ko("R-RELEVE-05 retouche (b)", "un relevé réel dont REJEU-ETAPE ne reporte pas ses lignes COMPTE n'est pas armable", "code 1, l'unique écart etape-recoupement",
                "code %d, écarts %s, dernière ligne « %s »" % (rc, ecarts_de(sortie), court(derniere(sortie))))
 
 
@@ -1153,6 +1296,7 @@ def main():
     controle_02()
     controle_03()
     controle_04()
+    controle_07()
     controle_08()
     controle_chaine()
     controle_05()
@@ -1163,6 +1307,8 @@ def main():
     mutant_entier_borne()
     mutant_machine_sous_chaine()
     mutant_sortie_jeton()
+    mutant_ordre()
+    mutant_recoupement_fa_egal()
     controle_couverture()
 
 
