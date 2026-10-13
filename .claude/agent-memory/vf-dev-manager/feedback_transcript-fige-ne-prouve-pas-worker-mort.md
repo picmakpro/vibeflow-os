@@ -35,6 +35,8 @@ pour savoir *qui écrit encore*.
 heure et aucun processus n'était visible. Il n'a pas répondu à un `SendMessage` en 20 minutes (le message reste en file
 jusqu'au prochain tour d'outil). J'ai dispatché un remplaçant. Le premier a rendu bien plus tard, avec deux findings
 majeurs que le remplaçant n'avait pas (F1 : un mutant de la branche partitionnée qui survit). L'absence de processus ne
-prouve donc pas non plus la mort. Un remplaçant en LECTURE SEULE, sous un préfixe de scratchpad distinct, coûte peu :
+prouve donc pas non plus la mort : `ps` ne voit PAS les processus lancés par un agent (constaté par
+vf-auditer le même jour : un job cru mort a fini en exit 0 après 1 074 s). Délai minimal avant de remplacer : 90 min
+(consigne de la session principale, mandat du 2026-10-13). Un remplaçant en LECTURE SEULE, sous un préfixe de scratchpad distinct, coûte peu :
 c'est le bon compromis pour un juge. Mais il faut fusionner les DEUX rapports quand l'ancien rend, jamais ignorer le
 retardataire.
