@@ -160,6 +160,13 @@ mk_claim_lab() { # <nom> → positionne CLAIM_LAB (principal) et CLAIM_WT (lié)
   git -C "$CLAIM_LAB" checkout -q --ignore-other-worktrees b >/dev/null 2>&1
 }
 
+# Commit vide RECENT (maintenant - <secs>) dans un clone ou un worktree de fixture : le lab de mk_lab est antidate.
+fresh_commit() { # <dir> <secs>
+  local when=$(( $(date +%s) - $2 ))
+  GIT_COMMITTER_DATE="$when +0000" GIT_AUTHOR_DATE="$when +0000" \
+    git -C "$1" -c user.email=t@t -c user.name=t -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -q --allow-empty -m fresh >/dev/null 2>&1
+}
+
 matrice() {
   local LAB L1 L2 out n F e0 e1 d0 d1 ISO
 
@@ -232,6 +239,57 @@ matrice() {
   cexp "stdout vide" "[$out]" "[]"
   cend
   dl "$LAB" sess-A release --ws=alpha --owner=m1 >/dev/null 2>&1
+
+  echo "=== CW-Q-COMMIT — un commit recent ecarte le stall de CHAQUE entree de la famille (age effectif par entree) ==="
+  # Un seul verrou fige ne distingue pas le mutant « age brut dans le tri des entrees » (l'entree retenue est
+  # recalculee ensuite) : il faut un abandon (jamais ecarte par un commit) a cote d'un verrou fige — l'age brut
+  # compterait ce dernier comme un second signal et ajouterait le suffixe « (+1 autre(s) verrou(s)) ».
+  LAB="$(mk_lab qc)"
+  L1="$(lock_path_of "$LAB" alpha)"; L2="$(lock_path_of "$LAB" omega)"
+  dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s-alpha >/dev/null
+  dl "$LAB" sess-B acquire --ws=omega --owner=m2 --step=s-omega >/dev/null
+  backdate "$L2" progress_epoch 1000
+  fresh_commit "$LAB" 60
+  cbegin CW-Q-COMMIT-SAIN
+  cgh "$LAB" "$WORK_DIR/h-qc1"; out="$CGH_OUT"
+  cexp_rc "exit SAIN" "$CGH_RC" 3
+  cexp "stdout vide" "[$out]" "[]"
+  cend
+  backdate "$L1" heartbeat_epoch 2000
+  cbegin CW-Q-COMMIT-ABANDON
+  cgh "$LAB" "$WORK_DIR/h-qc2" --hook; out="$CGH_OUT"
+  cexp_rc "exit" "$CGH_RC" 0
+  cexp "abandon malgre le commit" "$out" "abandon detecte"
+  cexp "sujet de l'abandon" "$out" "ws=alpha"
+  cexp_not "le verrou fige, ecarte par le commit, n'est pas un second signal" "$out" "autre(s) verrou(s)"
+  n="$(printf '%s\n' "$out" | grep -c .)"; cexp_eq "une seule ligne" "$n" 1
+  cend
+  dl "$LAB" sess-A release --ws=alpha --owner=m1 >/dev/null 2>&1
+  dl "$LAB" sess-B release --ws=omega --owner=m2 >/dev/null 2>&1
+
+  echo "=== CW-Q-WT — le commit recent d'un AUTRE worktree du clone ecarte le stall d'un compartiment ==="
+  LAB="$(mk_lab qwt)"
+  L1="$(lock_path_of "$LAB" alpha)"
+  git -C "$LAB" worktree add -q -b qwt "$WORK_DIR/qwt-wt" >/dev/null 2>&1
+  fresh_commit "$WORK_DIR/qwt-wt" 60
+  dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s-alpha >/dev/null
+  backdate "$L1" progress_epoch 1000
+  cbegin CW-Q-WT
+  cgh "$LAB" "$WORK_DIR/h-qwt"; out="$CGH_OUT"
+  cexp_rc "exit SAIN" "$CGH_RC" 3
+  cexp "stdout vide" "[$out]" "[]"
+  cend
+  # Temoin : sans commit recent nulle part, le meme verrou fige reste un stall.
+  LAB="$(mk_lab qwt2)"
+  L1="$(lock_path_of "$LAB" alpha)"
+  git -C "$LAB" worktree add -q -b qwt2 "$WORK_DIR/qwt2-wt" >/dev/null 2>&1
+  dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s-alpha >/dev/null
+  backdate "$L1" progress_epoch 1000
+  cbegin CW-Q-WT-TEMOIN
+  cgh "$LAB" "$WORK_DIR/h-qwt2"; out="$CGH_OUT"
+  cexp_rc "exit" "$CGH_RC" 0
+  cexp "stall maintenu" "$out" "stall detecte"
+  cend
 
   # Partition illisible (dossier des compartiments remplacé par un lien) : status --all refuse, le watchdog
   # est INDÉTERMINÉ et BRUYANT, jamais SAIN.
@@ -420,7 +478,7 @@ echo "== mutants =="
 # ses voisins réels (driver-lock.sh, workstream-policy.sh, et check-guard-health.sh pour dag.sh : sinon la copie
 # rougirait pour la mauvaise raison). La matrice (tous les cas ci-dessus) est rejouée en sous-processus contre la
 # copie ; l'ensemble des cas dont le verdict bascule est comparé EXACTEMENT à l'attendu. Matrices en parallèle.
-MUT_KILLED=0; MUT_TOTAL=7; MUT_IDS=""; t0=$SECONDS
+MUT_KILLED=0; MUT_TOTAL=9; MUT_IDS=""; t0=$SECONDS
 mut_fail_ids() { LC_ALL=C sed -n 's/^  ✗ \(CW-[A-Za-z0-9-]*\) .*/\1/p' "$1" | LC_ALL=C sort -u; }
 mut_dir() { # <dossier> <cgh|dag|cbc> → pose les voisins réels dans le dossier d'une copie (cbc n'en source aucun)
   mkdir -p "$1"; cp "$DL" "$1/driver-lock.sh"; cp "$POLICY" "$1/workstream-policy.sh"
@@ -473,7 +531,7 @@ mut_dir "$WORK_DIR/mut-temoin-cbc" cbc; cp "$SCRIPTS/check-branch-claim.sh" "$WO
 ( mut_run dag "$WORK_DIR/mut-temoin-dag" "$WORK_DIR/mut-temoin-dag/matrice.log" ) &
 ( mut_run cbc "$WORK_DIR/mut-temoin-cbc" "$WORK_DIR/mut-temoin-cbc/matrice.log" ) &
 
-mutant a cgh 'DRIVER_LOCK_SH" status --all 2>' 's/status --all/status/' "CW-HEALTH-MULTI CW-Q-SIGNAL CW-TRACE-1 CW-TRACE-3"
+mutant a cgh 'DRIVER_LOCK_SH" status --all 2>' 's/status --all/status/' "CW-HEALTH-MULTI CW-Q-COMMIT-ABANDON CW-Q-SIGNAL CW-Q-WT-TEMOIN CW-TRACE-1 CW-TRACE-3"
 mutant b cgh 'if best is None or rank > best_rank:' 's/rank > best_rank/rank < best_rank/' "CW-HEALTH-MULTI"
 mutant f dag '"mark-progress", f"--owner={owner}"' 's/\] + ws_args,/],/' "CW-DAG-WS"
 mutant g dag 'init_dag\["ws"\] = ws_arg' 's/init_dag\["ws"\] = ws_arg/pass/' "CW-DAG-KEEP CW-DAG-WS"
@@ -481,6 +539,11 @@ mutant g dag 'init_dag\["ws"\] = ws_arg' 's/init_dag\["ws"\] = ws_arg/pass/' "CW
 mutant c cbc 'if \[ -n "\$COMMON" \]; then' 's/if \[ -n "\$COMMON" \]; then/if false; then/' "CW-CLAIM-META CW-CLAIM-SAME CW-CLAIM-WT CW-Q-CLAIM-INDET CW-Q-CLAIM-SIGNAL"
 mutant d cbc 'if \[ "\$(norm_path "\$claim_worktree")" = ' 's/if \[ "\$(norm_path "\$claim_worktree")" = .*; then$/if false; then/' "CW-CLAIM-SAME CW-Q-CLAIM-SAIN"
 mutant e cbc '\[ -z "\$INDET_MSG" \] || indetermine' 's/\[ -z "\$INDET_MSG" \] || indetermine "\$INDET_MSG"/:/' "CW-CLAIM-META CW-Q-CLAIM-INDET"
+
+# Age de progression effectif (REGLE DE PROGRESSION) : h = age brut dans le tri des entrees de `locks` ; i = lecture
+# limitee au HEAD du repertoire courant (les autres worktrees du clone ne comptent plus).
+mutant h cgh 'pa = eff(e.get("progress_age_seconds"))' 's/pa = eff(e.get("progress_age_seconds"))/pa = e.get("progress_age_seconds")/' "CW-Q-COMMIT-ABANDON"
+mutant i cgh 'wt="\$(cgh_git worktree list' 's/worktree list --porcelain/worktree list --nonexistent-flag/' "CW-Q-WT"
 
 wait
 for t in cgh dag cbc; do
@@ -491,9 +554,9 @@ done
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 7/7 tués =="
+  echo "== mutants : $MUT_TOTAL/$MUT_TOTAL tués =="
 else
-  echo "== mutants : $MUT_KILLED/7 tués =="
+  echo "== mutants : $MUT_KILLED/$MUT_TOTAL tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # CW_MODE = full (mutants)
