@@ -99,8 +99,9 @@ planning-core/
     recalc-planning.sh         # recalcul d'état dérivé du disque, modèle par cycles (Python embarqué)
     rejeu-gates.sh             # rejeu en lecture seule d'un lab sur copie : faux refus, faux accept (Phase 45)
     rejeu-reel.sh              # geste de rejeu sur lab réel, empreinte de tout l'arbre avant et après (Phase 45)
+    verifier-releve.sh         # prédicat d'armement : lit un relevé de rejeu et rend 0 (armable) ou 1, jamais d'awk dans un plan (Phase 46.1)
     workstream-policy.sh       # politique unique de nom de workstream, à sourcer (suite test-workstream-policy.sh)
-    tests/                     # 18 suites (planning-core, hooks, hardening, detect-*, recalc-planning, gates, rejeu, pré-filtre, G4′, D1, clôture, canary de juge)
+    tests/                     # 19 suites (planning-core, hooks, hardening, detect-*, recalc-planning, gates, rejeu, pré-filtre, G4′, D1, clôture, canary de juge, verifier-releve)
 ```
 
 ## Moteur par cycles (recalc-planning.sh)
