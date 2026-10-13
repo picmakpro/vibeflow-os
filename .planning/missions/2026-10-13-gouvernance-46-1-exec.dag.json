@@ -102,7 +102,7 @@
         "fix-5b"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-04",
@@ -111,7 +111,8 @@
       "deps": [
         "revue-5b",
         "audit-5b",
-        "nonreg-5b"
+        "nonreg-5b",
+        "fix-plans-restants"
       ],
       "scope": [
         "plugin/planning-core"
@@ -374,7 +375,30 @@
       "scope": [
         "plugin/planning-core"
       ],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-restants",
+      "step": "plan-check des plans 04-13 restants contre le code livré (fix-5b)",
+      "stage": "",
+      "deps": [
+        "fix-5b"
+      ],
+      "scope": [],
       "status": "ready"
+    },
+    {
+      "id": "fix-plans-restants",
+      "step": "correction des textes de plans restants",
+      "stage": "",
+      "deps": [
+        "plancheck-restants",
+        "nonreg-5b"
+      ],
+      "scope": [
+        ".planning/workstreams/gouvernance/phases"
+      ],
+      "status": "blocked"
     }
   ]
 }

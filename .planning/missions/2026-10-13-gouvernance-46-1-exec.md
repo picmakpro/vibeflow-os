@@ -129,3 +129,46 @@ exec-14 → exec-17 → exec-01 → exec-02 → exec-03 → exec-18
    qui ne sont pas armables), couverture 21/21/21, `BASE-AJOUT … test-verifier-releve.sh s=11 plan=18`
    inscrite par l'outil. Base de 11 s : plafond 3 × base étroit sous charge (règle `duree-plafond`
    seul = instable s'applique).
+8. **revue-5b ∥ audit-5b ∥ nonreg-5b** (diff `b73885c8..00d43cd2`, régime plein) :
+   - revue (vf-reviewer) : **PASS**, 7 mineurs (garde `d1-n5-forme` sans mutant ; faux signal A5
+     sur référence sortie de la fenêtre de 4 Mio ; exemption qui teste VERDICT/CLOTURE sous le nom
+     NFC ; `int()` > 4300 chiffres ; `chemin-machine` en sous-chaîne ; `EMPREINTE-DIVERGENTE` non
+     lue ; plancher auto-déclaré) ;
+   - audit (vf-auditer) : **OPEN_THREATS**, aucun HIGH — F-1 MEDIUM (ligne géante du journal :
+     SessionStart muet, rc 73, régression du diff), F-2 MEDIUM (relevé réel retouché rendu
+     armable), F-3 MEDIUM conditionnel (= revue n°3, fail-open sur FS sensible à la normalisation),
+     F-4 LOW (= revue n°4) ; 17 menaces des plans vérifiées (3 ouvertes ou partielles : F-1, F-2) ;
+   - jalon 1 lancé en parallèle puis **arrêté par le manager** (87/110 suites, 6 rouges tous
+     `rouge-sur-base=oui`) : le lot de correction touche `planning-hook.sh`, le jalon aurait été
+     périmé (`jalon-perime`) ; il sera rejoué sur le code corrigé.
+   **Décisions du manager (renversables)** : lot unique `fix-5b` (quick, vf-coder) qui ferme
+   H1 (forme validée avant toute E/S, F-1), H2 (I/O sur le nom du disque, F-3), H3 (mutant de
+   `d1-n5-forme`), H4 (faux signal de fenêtre mesuré et nommé), H5 (faux signaux et course
+   nommés), V1-V3, et V4 = F-2 (a) ligne qui contient un jeton sans le commencer = malformée,
+   (b) `REJEU-ETAPE` recoupé avec les `COMPTE` de l'émetteur, (c) plancher auto-déclaré nommé en
+   limite, un `--lab` par lab réel exigé au prédicat des plans 05 et 11. L'auditeur avait mis F-2
+   en `ask-user` (« le contrat de grammaire change ») : tranché par le manager, car (a) et (b)
+   appliquent la règle de P461-D-06 (« toute ligne malformée rougit ») sans en créer.
+9. **fix-5b** (quick `261013-t18`, planificateur + exécuteur inline, 12 commits `2ff2fa90..071c517b`
+   + docs `0cc5ad6a`) : H1-H5 et V1-V4 fermés, chacun avec un cas rouge avant / vert après et son
+   mutant (`MUT-D1-N5-FORME-CLE`, `MUT-D1-N5-FORME`, `MUT-G4-REECRITURE-DISQUE`, `MUT-D1-FENETRE`,
+   `MUT-RELEVE-ENTIER-BORNE`, `MUT-RELEVE-MACHINE-SOUS-CHAINE`, `MUT-RELEVE-REJEU-DIVERGENT`,
+   `MUT-RELEVE-JETON-DEPLACE`, …). Sonde d'attaque F-1 : `rc=73` avant, `rc=0 dt=1.1s` après (130 000
+   puis 520 000 composants). V4 (b) suit la règle réelle de l'émetteur (faux-refus et
+   refus-conforme-modèle égaux à la somme des `COMPTE`, faux-accept ≥). Limite neuve (bx) (plancher
+   auto-déclaré). Suites par l'outil : `test-d1-surveillance rc=0`, `test-cloture-gates rc=0`,
+   `test-planning-gates rc=0 duree=1488`, `test-verifier-releve rc=0` + `SUITE-ECART duree-plafond
+   86 > 33` (instable : la suite a grossi de 55 % et la base de 11 s est gelée ; règle du manager) ;
+   rejouée par le manager : 156 OK · 0 KO. `etat-reference` `ecarts=0`, `EMPREINTE ok … regels=1`.
+   **Décisions du manager sur les `ask-user` du lot :**
+   - coût de N-5 sur ~19 000 clés conformes forgées (SessionStart > 8 s, muet) : **accepté comme
+     limite nommée** dans (bn) (forge du journal par `Bash`, même classe que (bn)) ; D1 n'est jamais
+     armé ;
+   - les plans 04, 05, 11, 12 prescrivent de citer dans le relevé des lignes à jeton et le nom du
+     relevé, que la règle V4 (a) rougit (`jeton-deplace`) : **plans à corriger avant exécution**,
+     après un plan-check des plans restants contre le code livré (les plans 06 et 07 réservent aussi
+     (bv)/(bw), à insérer avant (bx)) ;
+   - `46.1-CONTROLES.sh releve` refuse encore `/home/` en sous-chaîne : **pas de regel** ; s'il
+     rougit sur un relevé réel, la correction se fera alors ;
+   - base gelée de `test-verifier-releve.sh` (11 s) : **non rebasée**, `duree-plafond` seul =
+     instable.
