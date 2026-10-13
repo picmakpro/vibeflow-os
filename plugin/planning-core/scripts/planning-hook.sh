@@ -3089,13 +3089,57 @@ def anomalie_journal(racine, source):
     return None
 
 
+def chemin_du_disque(racine, rel, cache):
+    """Chemin d'accès, sous le nom du DISQUE, d'une clé de journal `rel` (relative au lab, séparateur `/`, composants en forme NFC) : chaque composant est
+    cherché dans son dossier par sa forme NFC (le nom littéral d'abord), le nom du disque pouvant être en NFD ; un composant introuvable est gardé tel quel (le
+    fichier sera lu `absent`). `cache` (dict, un par réconciliation) : un dossier n'est listé qu'une fois. Règle NFC : forme et clé en NFC, I/O sur le nom du
+    disque (limite (bf))."""
+    courant = racine
+    for composant in rel.split("/"):
+        if courant not in cache:
+            try:
+                noms = sorted(os.listdir(courant))
+            except OSError:
+                noms = []
+            carte = {unicodedata.normalize("NFC", nom): nom for nom in noms}
+            carte.update({nom: nom for nom in noms})
+            cache[courant] = carte
+        courant = os.path.join(courant, cache[courant].get(composant, composant))
+    return courant
+
+
+def chemins_references_hors_liste(racine, par_chemin, liste):
+    """N-5 (46.1-02, P461-D-05 ; Willy, AskUserQuestion session principale, 2026-10-12, « (a) N-5 et A5 (Recommandé) ») : chemins ABSOLUS des fichiers d'unité
+    (les quatre noms de FICHIERS_UNITE_SURVEILLES, de la forme de `chemin_relatif_surveille`) DÉJÀ référencés dans la fenêtre lue du journal (`par_chemin`, aucune
+    lecture nouvelle) et absents de `liste` : une unité dont SUMMARY.md est apparu quitte la liste surveillée, et ce que Bash y écrit ensuite ne serait plus
+    jamais vu. Ordre déterministe : tri lexical des clés NFC du journal. La liste rendue par SessionStart n'en est pas changée : l'extension vit dans
+    `reconcilier`, qui les hache sous le MÊME compteur d'octets que la liste. Le nom de fichier est testé avant toute lecture du disque (un journal de
+    dizaines de milliers de chemins hors modèle ne coûte qu'un test de nom chacun)."""
+    en_liste = {"/".join(unicodedata.normalize("NFC", c) for c in os.path.relpath(chemin, racine).split(os.sep)) for chemin in liste}
+    cache, res = {}, []
+    for rel in sorted(par_chemin):
+        if rel in en_liste or rel.rsplit("/", 1)[-1] not in FICHIERS_UNITE_SURVEILLES:
+            continue
+        chemin = chemin_du_disque(racine, rel, cache)
+        if chemin_relatif_surveille(racine, chemin) != rel:  # d1-n5-forme
+            continue
+        res.append(chemin)
+    return res
+
+
 def reconcilier(racine, liste, tronquee, source=None):
     """Réconciliation par hash au SessionStart (P46-D-07) : chaque fichier de la liste est comparé au dernier état connu du journal (une lecture
     bornée du journal, une lecture de chaque fichier gardé). Plafond (D1, fix-46-a) : au plus BORNE_OCTETS_RECONCILIATION octets hachés (tailles
     annoncées cumulées) et aucun fichier de plus de BORNE_OCTETS_LIVRABLES ; un fichier écarté n'est pas réconcilié à ce SessionStart. Une borne
     (liste tronquée ou fichiers écartés) est tracée par une ligne `borne` dont le sha256 est l'empreinte de la liste, posée seulement quand cette
     empreinte change ; elle est signalée si une ligne `borne` est arrivée depuis la dernière ligne `signal` (même règle anti-répétition que les
-    contournements). Rend le texte du signal (contournements, borne) ou None ; la ligne `signal` est posée dès qu'un signal est rendu."""
+    contournements). Rend le texte du signal (contournements, borne) ou None ; la ligne `signal` est posée dès qu'un signal est rendu.
+
+    N-5 (46.1-02, P461-D-05 ; Willy, AskUserQuestion session principale, 2026-10-12, « (a) N-5 et A5 (Recommandé) ») : la réconciliation hache AUSSI les fichiers d'unité
+    déjà référencés dans la fenêtre lue du journal et absents de la liste (`chemins_references_hors_liste` : une unité dont SUMMARY.md est apparu en est sortie), à la
+    suite de la liste et dans le MÊME compteur d'octets, avec la même garde et le même traitement ; la liste rendue à SessionStart, elle, ne change pas. Un SUMMARY.md,
+    VERDICT.md ou CLOTURE.md posé par Bash dans une telle unité est tracé `contournement` (source=reconciliation) et signalé. D1 reste une détection : aucune sortie ne
+    refuse (P461-D-05a)."""
     import hashlib
     anomalie = anomalie_journal(racine, source)  # d1-journal-etat : AVANT toute inscription (la première référence recrée un journal absent)
     entrees = lire_surveillance(racine)
@@ -3112,10 +3156,12 @@ def reconcilier(racine, liste, tronquee, source=None):
         elif entree["genre"] == "borne":
             borne_en_attente = True
             derniere_borne = entree["sha"]
+    supplement = chemins_references_hors_liste(racine, par_chemin, liste)  # d1-n5-journal
     gardes, exclus, hache = [], [], 0
-    for chemin in liste:
+    for rang, chemin in enumerate(liste + supplement):
         rel = "/".join(unicodedata.normalize("NFC", c) for c in os.path.relpath(chemin, racine).split(os.sep))  # nfc-cle-d1
-        gardes.append(rel)
+        if rang < len(liste):
+            gardes.append(rel)
         taille = _taille_surveillee(chemin)
         if taille > BORNE_OCTETS_LIVRABLES or hache + taille > BORNE_OCTETS_RECONCILIATION:  # d1-octets-exclus
             exclus.append(rel)

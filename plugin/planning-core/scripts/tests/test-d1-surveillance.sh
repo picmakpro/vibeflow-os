@@ -40,6 +40,9 @@
 #            recalcul) : signal D1 au SessionStart, rien d'écrit ; jumeaux : première séance sans journal, journal sain, séance suivante (pas de répétition)
 #   R-D1-20  (Q-B, fix-46-c) `.planning/.gitignore` (une ligne `surveillance.log`) posé au SessionStart d'un lab adhérent : idempotent, existant préservé, hors adhésion rien,
 #            lien et dossier jamais suivis, aucun temporaire
+#   R-D1-21  (N-5, 46.1-02, P461-D-05) un SUMMARY.md posé hors séance dans une unité qui sort de la liste surveillée (SUMMARY.md présent) est tracé `contournement`
+#            (source=reconciliation) et signalé au SessionStart, la liste `watchPaths` rendue restant celle de R-D1-01 ; jumeaux : ligne `moteur` de même sha -> rien ; plafond
+#            d'octets abaissé -> chemin écarté, ligne `borne`, aucun contournement ; unité au nom de disque NFD -> clé NFC
 #   Le cas de canary R-CANG-D1 vit dans la section `cang` de test-planning-gates.sh.
 # Mutants (chacun tué par un contrôle, trace assertion · attendu (original) · obtenu (mutant)) :
 #   MUT-D1-ADHESION (adhésion ignorée, commande sans pré-filtre -> R-D1-03), MUT-D1-DOSSIER (le dossier de l'unité dans la liste -> R-D1-01), MUT-D1-GITIGNORE-APPEL / -IDEMPOTENT / -ATOMIQUE (Q-B -> R-D1-20), MUT-D1-GITIGNORE-MODELE (`.gitignore` retiré des noms du modèle du recalcul -> R-D1-05), MUT-D1-JAMAIS-UN-DOSSIER (filtre « absent ou fichier régulier » retiré -> R-D1-01, N-1),
@@ -52,6 +55,7 @@
 #   MUT-D1-MOTEUR-NFD (ligne moteur d'un verdict hachée sous la forme NFC -> R-D1-18 ; opposable sur un système SENSIBLE à la normalisation seulement : sur APFS ou HFS+
 #   la forme NFC désigne le même dossier, la suite rend `non applicable ici`), MUT-D1-JOURNAL-SIGNAL / -ETAT / -IRREGULIER / -DROITS / -ABSENT / -PREMIERE-SEANCE / -OUVERTURE
 #   (chaque contrôle d'`anomalie_journal` retiré seul, ou forcé -> R-D1-19 ; -OUVERTURE non applicable sans `chflags`).
+#   (46.1-02) MUT-D1-N5 (l'ajout des chemins déjà référencés retiré -> R-D1-21), MUT-D1-N5-PLAFOND (la garde d'octets de la liste retirée, éprouvée par le jumeau de plafond de R-D1-21).
 # Variables : VF_D1_SECTIONS=<liste> pour ne rejouer qu'une partie (sections : base, mutants_base, moteur, mutants_moteur, reconciliation, mutants_reconciliation).
 # Portable GNU/BSD (P45-D-16) : ni `stat -f/-c`, ni `sed -i`, ni `timeout`, ni `readlink -f` ; tout le travail fin est fait par Python (PYBIN).
 # Lançable depuis tout cwd. Piège CI (`bash -e {0}`) : jamais `cmd && { … }` nu.
@@ -1524,6 +1528,97 @@ def controle_d1_19(ctx, script):
                           "rien d'écrit ; jumeaux (première séance sans journal, journal sain, séance suivante) : aucun signal" % (", immuable" if "immuable" in vus else ""))
 
 
+def ajouter_ligne_journal(lab, genre, rel, empreinte, par):
+    """Ajoute à la main UNE ligne au journal de D1, au format d'`inscrire_surveillance` (chemin ASCII : le jeton le laisse tel quel) : une écriture du moteur
+    simulée que le hook doit reconnaître comme explication d'un changement."""
+    ligne = "%s  genre=%s  chemin=%s  sha256=%s  par=%s  source=-\n" % (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), genre, rel, empreinte, par)
+    with open(chemin_journal(lab), "a", encoding="utf-8") as fh:
+        fh.write(ligne)
+
+
+def controle_d1_21(ctx, script):
+    """N-5 (46.1-02, P461-D-05) : un SUMMARY.md posé hors séance dans une unité qui SORT de la liste surveillée (SUMMARY.md présent : l'unité n'est plus « non close »)
+    est tracé à la réconciliation. Références posées au SessionStart (SUMMARY.md absent, dans la liste) ; SUMMARY.md écrit hors séance ; SessionStart -> UNE ligne
+    `contournement` (source=reconciliation, sha256 du contenu) pour ce chemin, le signal D1 qui le nomme, une liste `watchPaths` qui ne porte plus l'unité (la
+    liste reste celle de R-D1-01 : l'extension vit dans la réconciliation) ; un SessionStart de plus : rien. Jumeaux : (a) une ligne `moteur` de même sha -> aucun
+    contournement ; (b) plafond d'octets abaissé sous la taille du fichier -> chemin écarté, une ligne `borne` qui le nomme, aucun contournement inventé ; (c) unité
+    au nom de DISQUE NFD : la clé du journal reste NFC, le fichier est lu sous son nom de disque."""
+    dossier_jugé = _dossier(ctx, script)
+    d = ctx.copie_forcee(dossier_jugé, "observe")
+    fautes = []
+    unite = ".planning/cycles/01-c/phases/01-u"
+    rel = unite + "/SUMMARY.md"
+    contenu = "bilan posé par Bash hors séance\n"
+
+    def sortie_de_liste(lab, hook, rel_summary, texte):
+        """Références posées, SUMMARY.md écrit hors séance, SessionStart de réconciliation : (rc, out, err) de ce dernier."""
+        rc0, out0, err0 = session(ctx, hook, lab)
+        chemins0, _doc0 = watch_paths(out0)
+        if rc0 != 0 or err0 or chemins0 is None or not any(c.endswith(rel_summary) for c in chemins0):
+            return None, "premier SessionStart : code 0 et SUMMARY.md encore dans la liste attendus — obtenu rc=%d %s" % (rc0, court(out0))
+        ecrire(os.path.join(lab, *rel_summary.split("/")), texte)
+        return session(ctx, hook, lab), None
+
+    # Scénario principal
+    lab = fabriquer_lab(ctx, "d1-21", ouvertes=("01-u",), closes=())
+    res, faute = sortie_de_liste(lab, d, rel, contenu)
+    if faute:
+        return False, faute
+    rc, out, err = res
+    if rc != 0 or err:
+        fautes.append("SessionStart de réconciliation : code 0 attendu — obtenu rc=%d %s" % (rc, court(err)))
+    ligne = contournements(lab, rel)
+    if len(ligne) != 1 or ligne[0]["source"] != "reconciliation" or ligne[0]["sha"] != sha(contenu.encode("utf-8")):
+        fautes.append("UNE ligne contournement (source=reconciliation, sha256 du contenu posé) attendue pour %s — obtenu %s" % (rel, [(l["source"], l["sha"][:12]) for l in ligne]))
+    signal = contexte_de(out)
+    if not isinstance(signal, str) or not signal.startswith("[planning-core] D1 : 1 écriture(s) non expliquée(s)") or rel not in signal:
+        fautes.append("additionalContext : le signal D1 qui nomme %s attendu — obtenu %r" % (rel, signal))
+    chemins, _doc = watch_paths(out)
+    if chemins is None or any("01-u" in c for c in chemins):
+        fautes.append("watchPaths : l'unité 01-u (SUMMARY.md présent) ne doit plus figurer dans la liste — obtenu %s" % (None if chemins is None else [c for c in chemins if "01-u" in c]))
+    avant = len(lignes_journal(lab))
+    rc, out, err = session(ctx, d, lab)
+    if rc != 0 or contexte_de(out) is not None or len(lignes_journal(lab)) != avant or len(contournements(lab, rel)) != 1:
+        fautes.append("SessionStart de plus, sans changement : aucun signal, aucune ligne de plus attendus — obtenu %r, %d ligne(s) de plus" % (contexte_de(out), len(lignes_journal(lab)) - avant))
+    # (a) jumeau négatif : le moteur a écrit le fichier (ligne `moteur` de même sha)
+    lab_m = fabriquer_lab(ctx, "d1-21-moteur", ouvertes=("01-u",), closes=())
+    session(ctx, d, lab_m)
+    ecrire(os.path.join(lab_m, *rel.split("/")), contenu)
+    ajouter_ligne_journal(lab_m, "moteur", rel, sha(contenu.encode("utf-8")), "poser-verdict.sh")
+    rc, out, err = session(ctx, d, lab_m)
+    if rc != 0 or contournements(lab_m, rel) or contexte_de(out) is not None:
+        fautes.append("jumeau moteur (ligne `moteur` de même sha) : aucun contournement ni signal attendus — obtenu %d contournement(s), %r" % (len(contournements(lab_m, rel)), contexte_de(out)))
+    # (b) jumeau de plafond : le chemin N-5 passe par LA garde d'octets de la liste (copie à BORNE_OCTETS_RECONCILIATION = 4096)
+    try:
+        dp = copie_plafond(ctx, dossier_jugé, 4096)
+    except RuntimeError as exc:
+        return False, str(exc)
+    lab_p = fabriquer_lab(ctx, "d1-21-plafond", ouvertes=("01-u",), closes=())
+    res, faute = sortie_de_liste(lab_p, dp, rel, "x" * 4999 + "\n")
+    if faute:
+        return False, faute
+    rc, out, err = res
+    signal = contexte_de(out)
+    if rc != 0 or contournements(lab_p, rel) or [e for e in entrees_journal(lab_p) if e["chemin"] == rel and e["genre"] == "reference" and e["sha"] != "absent"]:
+        fautes.append("jumeau de plafond : le chemin écarté ne reçoit ni contournement ni référence — obtenu %d contournement(s)" % len(contournements(lab_p, rel)))
+    if len(lignes_de(lab_p, "borne")) != 1 or not isinstance(signal, str) or "BORNE_OCTETS_RECONCILIATION" not in signal or rel not in signal:
+        fautes.append("jumeau de plafond : UNE ligne borne et un signal qui nomme BORNE_OCTETS_RECONCILIATION et %s attendus — obtenu %d borne(s), %r" % (rel, len(lignes_de(lab_p, "borne")), signal))
+    # (c) unité au nom de disque NFD : clé du journal NFC, lecture sous le nom du disque
+    nfd = unicodedata.normalize("NFD", "01-\u00e9t\u00e9")
+    rel_nfc = ".planning/cycles/01-c/phases/" + unicodedata.normalize("NFC", "01-\u00e9t\u00e9") + "/SUMMARY.md"
+    lab_n = fabriquer_lab(ctx, "d1-21-nfd", ouvertes=(nfd,), closes=())
+    session(ctx, d, lab_n)
+    ecrire(os.path.join(lab_n, ".planning", "cycles", "01-c", "phases", nfd, "SUMMARY.md"), contenu)
+    rc, out, err = session(ctx, d, lab_n)
+    ligne = [e for e in entrees_journal(lab_n) if e["genre"] == "contournement"]
+    if rc != 0 or [(e["chemin"], e["source"]) for e in ligne] != [(rel_nfc, "reconciliation")]:
+        fautes.append("unité au nom NFD : UN contournement de clé NFC attendu — obtenu rc=%d %s" % (rc, [(e["chemin"], e["source"]) for e in ligne]))
+    return (not fautes), ("; ".join(fautes[:3]) if fautes else
+                          "SUMMARY.md posé hors séance dans une unité sortie de la liste : un contournement (source=reconciliation) et le signal D1 qui nomme le chemin, watchPaths sans l'unité, "
+                          "rien de plus au SessionStart suivant ; jumeaux : ligne moteur de même sha -> rien ; plafond abaissé -> chemin écarté, une ligne borne, aucun contournement ; "
+                          "nom de disque NFD -> clé NFC")
+
+
 def original_de(ctx, ident, controle):
     """Résultat d'un contrôle sur le script réel, calculé une seule fois (les sections et les mutants lisent la même exécution)."""
     if ident not in ctx.originaux:
@@ -1617,6 +1712,7 @@ def sec_reconciliation(ctx):
     rendre("R-D1-16", "les unités les plus récentes d'abord, la borne signalée sans répétition", controle_d1_16, ctx)
     rendre("R-D1-17", "la réconciliation plafonne les octets hachés et le signale", controle_d1_17, ctx)
     rendre("R-D1-19", "A6 : un journal de D1 réduit au silence par Bash est signalé au SessionStart", controle_d1_19, ctx)
+    rendre("R-D1-21", "N-5 : un fichier d'unité posé hors séance dans une unité sortie de la liste est tracé", controle_d1_21, ctx)
 
 
 def sec_mutants_reconciliation(ctx):
@@ -1643,6 +1739,9 @@ def sec_mutants_reconciliation(ctx):
         tuer(ctx, "D1-JOURNAL-OUVERTURE", "# d1-journal-ouverture", "pass  # d1-journal-ouverture", "R-D1-19", controle_d1_19)
     else:
         ok("MUT-D1-JOURNAL-OUVERTURE non applicable ici : pas de `chflags` (aucun cas portable de journal aux droits intacts mais inscriptible en refus)")
+    # N-5 (46.1-02, P461-D-05) : l'ajout des chemins déjà référencés retiré ; la garde d'octets de la liste retirée, éprouvée cette fois par le jumeau de plafond de R-D1-21
+    tuer(ctx, "D1-N5", "# d1-n5-journal", "supplement = []  # d1-n5-journal", "R-D1-21", controle_d1_21)
+    tuer(ctx, "D1-N5-PLAFOND", "# d1-octets-exclus", "if False:  # d1-octets-exclus", "R-D1-21", controle_d1_21)
 
 
 SECTIONS = {
