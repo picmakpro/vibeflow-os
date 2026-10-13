@@ -21,6 +21,7 @@
 #   COMMIT-REJOUE <40 hex minuscules>                                          UNE seule (le commit n'est pas vérifié contre le dépôt)
 #   EMPREINTE-ARBRE-(IDENTIQUE|DIVERGENTE) <lab>                               par lab : UNE ligne IDENTIQUE, aucune DIVERGENTE
 #                                                                              (jamais EMPREINTE-IDENTIQUE, émise par rejeu-gates.sh sur son périmètre restreint)
+#   EMPREINTE-DIVERGENTE <lab>                                                 aucune (émise par rejeu-gates.sh : le rejeu a MODIFIÉ le lab ; toute ligne qui commence par ce jeton est un fait — fix-5b V3)
 #   MESURE-VIDE <lab>                                                          aucune
 #   COUVERTURE-REJEU (G3|G4|G4P) n=<k> plancher=<p>                            par gate visé (étape 5 : G3, G4 ; étape 6 : G3, G4, G4P) : UNE ligne, p ≥ 1, k ≥ p
 #   ligne de table `<gate> | <lab> | …`                                        au moins six champs séparés par « | », premier champ ^[A-Z][A-Z0-9]*$ : nomme un lab
@@ -28,8 +29,8 @@
 #   aucune ligne ne porte de chemin ABSOLU de machine : un jeton de chemin (suite maximale de caractères de mot, `.~%+@/-`) qui commence par `/` et vaut, une fois normalisé
 #   lexicalement, `/Users` ou `/home` ou est dessous (`file:///Users/<c>`, `a=/home/<c>`, `//home/<c>`, `/tmp/../home/<c>` rougissent ; `src/pages/home/x`, `~/home/x` non — fix-5b V2)
 #   (les lignes `COMPTE …`, `EMPREINTE-IDENTIQUE …`, `RELEVE-ECART …`, `RELEVE-VERDICT …` d'un relevé ne sont JAMAIS lues pour décider)
-# Règles (21, une ligne `if` marquée chacune) : lecture, vide, etape-absente, etape-malformee, etape-doublon, etape-autre (une ligne REJEU-ETAPE-<m>, m ≠ n),
-#   faux-refus, faux-accept, commit-absent, commit-malforme, commit-doublon, labs-absents, empreinte-absente, empreinte-doublon, empreinte-divergente,
+# Règles (22, une ligne `if` marquée chacune) : lecture, vide, etape-absente, etape-malformee, etape-doublon, etape-autre (une ligne REJEU-ETAPE-<m>, m ≠ n),
+#   faux-refus, faux-accept, commit-absent, commit-malforme, commit-doublon, labs-absents, empreinte-absente, empreinte-doublon, empreinte-divergente, rejeu-divergent,
 #   mesure-vide, couverture-absente, couverture-malformee (dont plancher=0), couverture-doublon, couverture-insuffisante, chemin-machine.
 # Une section « Non armé » n'a AUCUN effet sur la décision : aucune règle ne la lit.
 #
@@ -209,6 +210,7 @@ def juger(texte, etape, labs_options):
     etapes_valides, etapes_mal = [], []
     commits_valides, commits_mal = [], []
     identiques, divergentes, empreintes_mal = {}, [], []
+    rejeux_divergents = []
     mesures_vides = []
     couvertures, couvertures_mal = {}, []
     for i, ligne in numerotees:
@@ -228,6 +230,8 @@ def juger(texte, etape, labs_options):
                 identiques.setdefault(m.group(2), []).append(i)
             else:
                 divergentes.append((i, m.group(2)))
+        elif ligne.startswith("EMPREINTE-DIVERGENTE"):
+            rejeux_divergents.append((i, ligne[len("EMPREINTE-DIVERGENTE"):].strip()))  # tout ce qui commence par le jeton est un fait : le rejeu a modifié un lab
         elif ligne.startswith("MESURE-VIDE"):
             mesures_vides.append(i)
         elif ligne.startswith("COUVERTURE-REJEU"):
@@ -285,6 +289,9 @@ def juger(texte, etape, labs_options):
     if divergentes:  # releve-empreinte-divergente
         for i, lab in divergentes:
             ecart("empreinte-divergente", "ligne %d : EMPREINTE-ARBRE-DIVERGENTE pour le lab %s" % (i, sur(lab)))
+    if rejeux_divergents:  # releve-rejeu-divergent
+        for i, lab in rejeux_divergents:
+            ecart("rejeu-divergent", "ligne %d : le rejeu a modifié le lab %s" % (i, sur(lab) if lab else "(non nommé)"))
     if mesures_vides:  # releve-mesure-vide
         for i in mesures_vides:
             ecart("mesure-vide", "ligne %d : jeton MESURE-VIDE (un lab sans ligne mesurée n'est jamais un vert)" % i)

@@ -335,6 +335,10 @@ CAS_NEGATIFS = {
         {"nom": "une ligne DIVERGENTE à côté des IDENTIQUE", "ops": [("ajoute", "EMPREINTE-ARBRE-DIVERGENTE " + LAB_A)], "seule": True},
         {"nom": "l'empreinte d'un lab est DIVERGENTE", "ops": [("remplace", ID_1, "EMPREINTE-ARBRE-DIVERGENTE " + LAB_1)]},
     ],
+    "rejeu-divergent": [
+        {"nom": "une ligne EMPREINTE-DIVERGENTE (rejeu-gates.sh) à côté des conformes", "ops": [("ajoute", "EMPREINTE-DIVERGENTE " + LAB_A)], "seule": True},
+        {"nom": "une ligne EMPREINTE-DIVERGENTE sans nom de lab", "ops": [("ajoute", "EMPREINTE-DIVERGENTE")], "seule": True},
+    ],
     "mesure-vide": [
         {"nom": "une ligne MESURE-VIDE", "ops": [("ajoute", "MESURE-VIDE " + LAB_1)], "seule": True},
     ],
