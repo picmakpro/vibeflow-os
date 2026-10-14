@@ -232,6 +232,27 @@ lab). Rien arrêté, aucun lab lu.
   (dont des `claude` actifs) : les fermer lui-même évite de perdre un travail en cours ; (b) reste
   possible s'il le préfère.
 
+### Réponses de Willy au CKPT-5b (relayées par la session principale, 2026-10-14)
+
+Willy, AskUserQuestion session principale, 2026-10-14, mot pour mot :
+- Q-5b-A : « rejeu-5b-oui (Recommandé) ».
+- Q-5b-B : « (b) La mission arrête » — libellé de l'option présentée : « Tu autorises la mission à
+  arrêter ces processus, pour CE rejeu seulement. Une session Claude active peut y perdre son
+  travail en cours. »
+
+Cadre transmis avec les réponses (coordinateur, session principale, 2026-10-14) : arrêt borné à CE
+rejeu 5b et aux seuls processus dont le répertoire courant ou un fichier ouvert est sous
+`~/BusinessFlow-Lab` ; SIGTERM d'abord, fin propre attendue, SIGKILL seulement sur les restants et
+tracé ; jamais un processus hors de ce lab, jamais `~/jarvis-keystone` ; ne vaut pas pour le rejeu 6
+ni aucun autre ; liste exacte (PID, commande, répertoire courant) inscrite ici AVANT l'arrêt ;
+repos re-mesuré juste avant et après le rejeu ; sessions arrêtées non relancées (Willy les
+rouvrira) ; rejeu en lecture seule sur copies, empreintes sha256 avant/après, seconde lecture
+seulement sur divergence d'empreinte d'arbre, aucun attendu ajouté ; checkpoint d'armement de G4
+(plan 05) remonté à la session principale avant tout armement.
+
+Reprise : verrou ré-acquis (génération `DRIVER.lock.gen.1791969153.15231`, 0 orphelin),
+invariants 3 (SAIN), snapshot de budget reposé sous cette génération.
+
 ## État à la remise (2026-10-14)
 
 - **Plans livrés :** 14, 17, 01, 02, 03, 18 (6/18) + 46.1-04 Tâche 1. Lots quick : `261013-owa`
