@@ -3,7 +3,7 @@
 ## [v2.28.0] — 2026-10-10 (verrou de driver par compartiment : gate de sortie et doctrine, Phase 57)
 
 **Minor** (comportement neuf du gate de sortie et de la doctrine de dispatch, DLWS-04..06 ; arbitrages P57-D-34,
-D-36 et D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucune release, P57-D-30) :
+D-36 et D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; publiée dans v2.70.0, P57-D-30) :
 
 - **`scripts/check-mission-exit.sh`** : l'option `--ws <sujet>` désigne le compartiment dont le verrou est jugé
   (E1, identité d'E7, surcharge d'E4). Un lab partitionné sans `--ws` est INDÉTERMINÉ (E1) ou exit 4
@@ -19,7 +19,7 @@ D-36 et D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-1
   `agents/vf-reviewer.md` renvoient au protocole à instructions constantes (budget d'instructions tenu).
 
 - **Dette soldée avant la PR (2026-10-12)** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12 ;
-  P57-D-40 : rattachée à cette version non publiée, sans bump) :
+  P57-D-40 : rattachée à cette version, publiée dans v2.70.0, sans bump) :
   - **C1** (`fc763a72` RED EW-SRC, `dcba414d` GREEN) : `scripts/check-mission-exit.sh` préfère le module conductor voisin
     quand le gate est dans le dépôt source (plus de « génération du verrou : ? » causée par un `driver-lock.sh` d'avant la phase).
   - **`references/mission-flow.md`** : précision de prose (R-4) ; un ANCIEN verrou périmé rend le même `reason`

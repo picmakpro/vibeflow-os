@@ -175,7 +175,7 @@ Samuel pour veto par le même canal, à la même date. Réponse : « Aucun veto 
   `mark-progress`, `release`, `recover` et `status` appelés sans `--ws` visent le verrou de dépôt. Si
   celui-ci est absent et qu'un ancien `.planning/DRIVER.lock` est présent, ils visent ce dernier. Le JSON
   dit toujours `scope`. `status --all` agrège tous les verrous.
-- **P57-D-25 (partition illisible)** : un dossier `workstreams/` illisible (lien, fichier régulier, vide
+- **P57-D-25 (partition illisible ; le cas « vide » est révisé par P57-D-56)** : un dossier `workstreams/` illisible (lien, fichier régulier, vide
   au sens de `vf_ws_enumerate` rc 2) donne un **refus** `partition-unreadable`, jamais un repli plat. Le
   cas « fichier régulier », encore ouvert dans l'amendement d'ADR-069 du 2026-09-23, n'est pas figé
   au-delà de ce refus.
@@ -321,6 +321,15 @@ Sauf mention contraire, chaque décision est un arbitrage Samuel, AskUserQuestio
 - **P57-D-55 (`restore-failed`)** : nouvelle `reason` `restore-failed` quand la restitution du verrou antérieur échoue (chemin
   d'échec qui laissait auparavant un verrou fantôme ; `8fe96bd7`). Décision du MANAGER DE MISSION, prise dans le cadre de
   l'arbitrage du 2026-10-13 (Samuel, AskUserQuestion session principale).
+- **P57-D-56 (dossier des compartiments vide = lab plat ; révise P57-D-25)** : un `.planning/workstreams/` réel **sans aucun
+  compartiment** (vide, ou ne portant que des fichiers comme `.gitkeep`) se traite comme un lab plat, comme en v2.69.1, sur tous
+  les verbes (`status` et `release` compris) : il ne donne plus `partition-unreadable`. Un lien symbolique ou un fichier régulier à
+  la place du dossier, et un dossier illisible (droits), restent refusés. Même jugement partout où la détection existe :
+  `driver-lock.sh` (`vf_dl_ws_present`), `guard-driver-lock.sh` (sonde bash `vf_guard_ws_present` et `ws_present` du python) et
+  `check-mission-exit.sh` (`is_partitioned`). Un sous-dossier non caché ou un lien dans le dossier suffit à le dire partitionné
+  (leur jugement reste celui de `vf_ws_enumerate`, inchangé). Arbitrage Samuel, AskUserQuestion session principale, 2026-10-14
+  (« vide = lab plat »), pris sur le finding majeur de la relecture adverse SOBR-04. Preuves : `WS-VIDE-*`, `GW-VIDE-*`, mutants
+  `DL-M-vide`, `GW-M-vide_py`, `GW-M-vide_both`.
 
 </decisions>
 

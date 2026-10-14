@@ -251,6 +251,11 @@
   - Watchdog (`f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`, `8fe96bd7`, P57-D-45) : progression = commit le plus récent
     des HEAD de tous les worktrees du dossier git commun ; lecture des worktrees séparée par NUL (AU3-05), un seul `git log` (AU3-06).
   - Lows du guard AU2-01, AU2-02, AU2-03, AU2-06 (`560f4390`) et AU3-01, AU3-02 (`188d86e8`, P57-D-54).
+  - Relecture adverse avant le tag (arbitrage Samuel, AskUserQuestion session principale, 2026-10-14) : `GIT_DIR`/`GIT_WORK_TREE`/
+    `GIT_INDEX_FILE` hérités ne désignent plus le dépôt jugé par le guard ; un `.planning/workstreams/` vide ou ne portant qu'un
+    `.gitkeep` est un lab plat sur tous les verbes (P57-D-56, révise P57-D-25 : seuls le lien symbolique, le fichier régulier et le
+    dossier illisible donnent encore `partition-unreadable`). Les suites `-ws` ne dépendent plus d'un SIGPIPE actif ni d'un plafond
+    d'horloge de 60 s (le runner GitHub lance ses étapes avec SIGPIPE ignoré).
   **Restent OUVERTS** (sonde commune : payload `{"tool_name":"Bash","session_id":"autre","cwd":"<lab>","tool_input":{"command":"<cmd>"}}`
   sur `guard-driver-lock.sh`, depuis un lab dont le verrou est tenu par une autre session ; ALLOW = stdout vide, refus = JSON
   `permissionDecision: deny`). Pour chaque ligne, la sonde est la commande `<cmd>` citée ; elle rend ALLOW alors que le geste commit :

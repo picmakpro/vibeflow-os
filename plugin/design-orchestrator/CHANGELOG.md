@@ -4,7 +4,7 @@
 
 **Patch** — `agents/vf-design-manager.md` passe `--ws=<sujet du mandat>` (optionnel) à `acquire`, `takeover`, `heartbeat` et
 `release` du verrou de driver, et renvoie au protocole du kernel (`team-kernel.md` §Verrou par compartiment)
-à instructions constantes (30/30) ; aucun autre changement de comportement (P57-D-30, aucune release).
+à instructions constantes (30/30) ; aucun autre changement de comportement (P57-D-30, publiée dans v2.70.0).
 
 ## [v1.5.12] — 2026-10-06 (classe d'invocation des skills, Phase 41.4)
 

@@ -3,7 +3,7 @@
 ## [v1.49.0] — 2026-10-10 (verrou de driver par compartiment, Phase 57)
 
 **Minor** (comportement neuf : un verrou par compartiment de planning, DLWS-01..07 ; arbitrages P57-D-34, D-36 et
-D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucune release, P57-D-30 et ADR-073) :
+D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; publiée dans v2.70.0, P57-D-30 et ADR-073) :
 
 - **`scripts/driver-lock.sh`** : en lab partitionné, `--ws <sujet>` verrouille un compartiment et `--depot` (ou
   l'absence de `--ws`) le dépôt, sous `<git-common-dir>/vf-driver/` donc partagé entre worktrees, sur la mécanique
@@ -48,8 +48,25 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
   sans `--ws` sur l'ancien verrou (P57-D-24) — un manager lancé avant la mise à jour continue de viser le verrou de
   dépôt tant qu'il ne passe pas `--ws`.
 
+- **Relecture adverse avant le tag (2026-10-14)** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-14 ; toujours
+  dans cette version, sans bump) :
+  - **`GIT_DIR` hérité** : `git_hardened` du guard retire `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_COMMON_DIR`,
+    `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_NAMESPACE` et `GIT_PREFIX` de l'environnement, comme
+    `cgh_git` de `check-guard-health.sh`. Avant, un `GIT_DIR` vers un autre dépôt faisait passer un `Write` dans le
+    compartiment d'une autre session (1 refus sans `GIT_DIR`, 0 avec). Cas `GW-GITENV-*`, mutant `GW-M-gitenv`.
+  - **Dossier des compartiments vide = lab plat** (P57-D-56, révise P57-D-25) : un `.planning/workstreams/` présent sans
+    aucun compartiment (vide, ou seulement des fichiers comme `.gitkeep`) se traite comme en v2.69.1 sur tous les verbes,
+    `status` et `release` compris, dans `driver-lock.sh`, `guard-driver-lock.sh` (sonde bash et jugement python) et
+    `check-mission-exit.sh`. Un lien symbolique, un fichier régulier ou un dossier illisible à la place reste refusé
+    (`partition-unreadable`). Cas `WS-VIDE-*`, `GW-VIDE-*`, mutants `DL-M-vide`, `GW-M-vide_py`, `GW-M-vide_both`.
+  - **Suites indépendantes du runner** : le runner GitHub lance ses étapes avec SIGPIPE ignoré, ce que bash ne peut pas
+    défaire. Le mutant `DL-M-i` (pipeline à sortie anticipée sous `pipefail`) ne basculait alors qu'une famille sur 35 ;
+    `mut_run` relance désormais chaque matrice avec SIGPIPE à son action par défaut. Le plafond d'horloge de `gb_timed`
+    passe de 60 s à 600 s : sous 52 matrices parallèles, le mutant quadratique `GW-M-au2_quad` dépassait 60 s et basculait
+    `GW-AU2-02.x.2` en plus des deux cas attendus (le cas se juge au temps processeur).
+
 - **Dette soldée avant la PR (2026-10-12)** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12 ;
-  P57-D-40 : rattachée à cette version non publiée, sans bump) :
+  P57-D-40 : rattachée à cette version, publiée dans v2.70.0, sans bump) :
   - **F-3** (`c5ccbab7`, `63d5cc4c`, `08d25595`) : le guard reconnaît les 12 globaux git sans argument et `exec`
     (`git --no-pager commit -am x` refusé sous le verrou d'autrui) ; d'abord en lab partitionné seulement (P57-D-42),
     étendu au lab plat le 2026-10-13 (P57-D-47, voir ci-dessous).
@@ -65,7 +82,7 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
     l'arbre jugé) stabilisés, 20/30 rouges avant, 0/30 après.
 
 - **Arbitrages du 2026-10-13** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 ; toujours dans la
-  version non publiée, sans bump) :
+  version publiée dans v2.70.0, sans bump) :
   - **Watchdog, Q1 (b) et D (b)** (`f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`, P57-D-45) :
     `check-guard-health.sh` compte comme progression le commit le plus récent (`%ct`) parmi les HEAD de tous les
     worktrees du dossier git commun ; un commit futur, un worktree prunable ou illisible sont ignorés ; le git lancé est durci.

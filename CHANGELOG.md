@@ -29,6 +29,13 @@ demandée par Samuel, session principale Claude Code, 2026-10-12 : « corrige la
     2026-10-11 et 2026-10-13 ; P57-D-52 ratifiée le 2026-10-14).
   - Le watchdog compte un commit récent, sur n'importe quel worktree du clone, comme progression : fini le faux
     « stall » à chaque plan long (arbitrage Samuel, 2026-10-13).
+  - Deux corrections de la relecture adverse, avant le tag (arbitrage Samuel, AskUserQuestion session principale, 2026-10-14) :
+    le guard ne laisse plus un `GIT_DIR`, `GIT_WORK_TREE` ou `GIT_INDEX_FILE` hérité lui faire juger un autre dépôt (le
+    `Write` dans le compartiment d'un autre passait) ; et un dossier `.planning/workstreams/` présent mais sans aucun
+    compartiment (vide, ou seulement un `.gitkeep`) redevient un lab plat, comme en v2.69.1, pour tous les verbes
+    (P57-D-56, qui révise P57-D-25) ; un lien symbolique ou un fichier à sa place reste refusé.
+  - Suites de tests rendues indépendantes du runner : les mutants rejouent leur matrice avec SIGPIPE restauré (le runner
+    GitHub le lance ignoré), et le mutant quadratique du guard se juge au temps processeur sans plafond d'horloge de 60 s.
 - **Gate de sortie de mission et doctrine** (`dev-orchestrator` v2.27.1 → v2.28.0) : `check-mission-exit.sh --ws`,
   qui résout le `driver-lock.sh` du plugin avant la copie installée sur le dépôt source ; `mission-flow.md`, « un
   manager par compartiment ».
