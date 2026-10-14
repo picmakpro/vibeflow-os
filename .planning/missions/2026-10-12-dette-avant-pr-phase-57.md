@@ -260,6 +260,7 @@ Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, chaque fois su
 - **RV4-07** : P57-D-52 est une décision du manager, pas de Samuel. Elle rend PLUS PERMISSIF le cas
   `bash -c "cd <hors-lab> && git …"` (refusé avant, permis désormais), lab plat compris. L'audit n'y a trouvé aucun
   contournement. ADR-031 invite Samuel à le ratifier avant la release.
+  **Close** : P57-D-52 ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14.
 
 ## Preuves E6 (tour 3)
 

@@ -240,7 +240,7 @@
   - (b) **Globaux git à argument et wrappers à option-argument** (`719099dc`, `4fd77ed3`, P57-D-48) : `git --git-dir <p>`, `-C`,
     `--work-tree`, `--namespace=`, etc. ; `env -u/-C`, `nice -n`, `exec -a`, `sudo -u`, `xargs -n` ; `bash/sh/zsh -c` (récursion bornée
     à 3, refus grossier au-delà). `bash -c "cd <hors-lab> && git commit"` passe de deny à allow : verdict de sa forme canonique
-    (P57-D-52, décision du manager de mission).
+    (P57-D-52, décision du manager de mission, ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14).
   - (c) **`GIT_*` posé dans un segment précédent** (`719099dc`, `4fd77ed3`, P57-D-48) ; R-5 vaut aussi en lab plat.
   - (d) **Épingle R-7 : G-2 surveille les fixtures** (`f76de68b`, `3e426f02`, `42d490b1`, `46254135`, P57-D-50) : la co-modification
     de la fixture et de l'épingle reste possible, mais elle est tracée par le trailer `Gate-Touche` obligatoire.

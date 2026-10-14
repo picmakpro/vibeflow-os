@@ -79,7 +79,7 @@ D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; aucu
     globaux git à argument, wrappers à option-argument (`env -u/-C`, `nice -n`, `exec -a`, `sudo -u`, `xargs -n`…),
     `bash/sh/zsh -c` (récursion bornée à 3, refus grossier au-delà), `GIT_*` posé dans un segment précédent ; R-5 vaut aussi
     en lab plat. `bash -c "cd <hors-lab> && git commit"` passe de deny à allow : c'est le verdict de sa forme canonique
-    (P57-D-52, décision du manager de mission). Finitions du tour 3 (`560f4390`, `188d86e8`) : le `cd` de l'appelant est
+    (P57-D-52, décision du manager de mission, ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14). Finitions du tour 3 (`560f4390`, `188d86e8`) : le `cd` de l'appelant est
     propagé à `bash -c` (AU2-01) ; le refus grossier au-delà de la récursion est linéaire et la longueur bornée à 64 Ko
     (AU2-02) ; il lit `/usr/bin/git` et les guillemets (AU2-03, refus nouveau) ; préfixes `+=` et `[i]=` reconnus
     (AU2-06, refus nouveau). `188d86e8` : un séparateur collé à une parenthèse (`);`, `)&&`, `;(`), qui laissait `bash`

@@ -56,8 +56,8 @@ d'environnement prouvées, témoins DLWS-03 intacts), DLWS-01..08 cochées. Corr
 Next : vérification de phase, PR ; aucune release (P57-D-30).
 Dette soldée avant la PR le 2026-10-12/13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12) : C1, F-3,
 R-4 à R-7, C3 et la suite instable corrigés ; BACKLOG ramené à 31 sujets ouverts, sans prose dépassée ; P57-D-40 à D-43.
-Arbitrages Q1-Q7 puis A-D du 2026-10-13 appliqués (P57-D-44 à P57-D-55) ; rejeu de fin de mission vert ; une question
-ouverte (RV4-07, ratification de P57-D-52) : `.planning/missions/2026-10-12-dette-avant-pr-phase-57.md`.
+Arbitrages Q1-Q7 puis A-D du 2026-10-13 appliqués (P57-D-44 à P57-D-55) ; rejeu de fin de mission vert ; RV4-07 close
+(P57-D-52 ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14) : `.planning/missions/2026-10-12-dette-avant-pr-phase-57.md`.
 Last activity: 2026-10-12 — Phase 57 plan 57-16 complete (16/16)
 
 ## Accumulated Context

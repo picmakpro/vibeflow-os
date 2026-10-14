@@ -313,7 +313,7 @@ Sauf mention contraire, chaque décision est un arbitrage Samuel, AskUserQuestio
 - **P57-D-51 (managers et bumps)** : les managers content, business et growth nomment la commande à exécuter par le `hint`
   d'un refus de verrou périmé ; bumps patch (Q7). Commit `576ba249`.
 - **P57-D-52 (`bash -c "cd <hors-lab> && git …"`)** : passe de deny à allow, verdict de sa forme canonique. Décision du
-  MANAGER DE MISSION (pas de Samuel), constatée par l'audit sans contournement.
+  manager de mission, constatée par l'audit sans contournement ; ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14 (RV4-07 close).
 - **P57-D-53 (tri du BACKLOG)** : reporté après la release (Q3) ; la PR part avec 31/20.
 - **P57-D-54 (`);` collé)** : AU3-01, un séparateur collé à une parenthèse (`);`, `)&&`, `;(`) laissait `bash` hors position de
   commande ; rattaché à Q5 « fermer `bash -c` » et corrigé (`188d86e8`). Décision du MANAGER DE MISSION, prise dans le cadre de
