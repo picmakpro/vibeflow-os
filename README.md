@@ -15,7 +15,7 @@ A Claude Code plugin for spec-driven agentic development. One agent reads your i
 of agents challenges, plans, builds and proves the work, and machine gates check it.
 Nothing is done without proof, nothing merges without you.
 
-[![Version](https://img.shields.io/badge/version-2.69.1-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.70.0-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#other-runtimes)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -62,7 +62,7 @@ on disk, so a session can die without the project losing ground. The last step i
 </picture>
 
 A green that cannot turn red proves nothing. Tests are written red first, `check-*.sh` gates run
-in CI, and the judge is never the author. The repo holds itself to the same rule: 98 suites run
+in CI, and the judge is never the author. The repo holds itself to the same rule: 102 suites run
 on every push, and a "fresh lab" job installs the baseline into an empty lab that must pass its
 own gates with zero intervention.
 
@@ -150,9 +150,9 @@ The three latest are below; the full history lives in **[CHANGELOG.md](./CHANGEL
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.70.0` | 2026-10-14 | **Driver lock per planning subject (minor).** In a split lab, two missions on different subjects no longer block each other: `driver-lock.sh --ws <subject>` locks one subject, `--depot` the whole repo, shared across worktrees. The guard and the mission exit gate follow; flat labs are unchanged apart from a stricter guard (`conductor` v1.49.0, `dev-orchestrator` v2.28.0). |
 | `v2.69.1` | 2026-10-10 | **End-of-gesture guard fix (patch).** ROADMAP archiving no longer re-archives a block whose phase folders still exist (`conductor` v1.48.2). |
 | `v2.69.0` | 2026-10-08 | **Planning partition chosen when a lab starts (minor).** New `vf-split-planning` skill, plus Pocock borrowings: question frontier, lab glossary, two-axis review. Closes the `fiabilite-v1.0` milestone. |
-| `v2.68.0` | 2026-10-01 | **Method sobriety and cycle-based business planning (minor).** Method budgets with reversible automatic archiving, an end-of-gesture `Stop` hook, `recalc-planning.sh`. |
 
 <details>
 <summary><strong>Methodology references (ADR / LRN)</strong></summary>

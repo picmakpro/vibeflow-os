@@ -15,7 +15,7 @@ Un plugin Claude Code de développement agentique piloté par la spec. Un agent 
 une équipe d'agents challenge, planifie, construit et prouve le travail, et des gates machine le
 vérifient. Rien n'est fait sans preuve, rien n'est mergé sans toi.
 
-[![Version](https://img.shields.io/badge/version-2.69.1-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.70.0-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#autres-runtimes)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -64,7 +64,7 @@ projet recule. La dernière étape t'appartient.
 
 Un vert qui ne peut pas devenir rouge ne prouve rien. Les tests s'écrivent rouges d'abord, les
 gates `check-*.sh` tournent en CI, et le juge n'est jamais l'auteur. Le dépôt s'applique la même
-règle : 98 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
+règle : 102 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
 vierge qui doit passer ses propres gates sans intervention.
 
 → [Les gates machine](./manual/fr/07-sous-le-capot/les-gates-machine.md)
@@ -154,9 +154,9 @@ gate). Les trois dernières sont ci-dessous ; l'historique complet vit dans
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.70.0` | 2026-10-14 | **Verrou de driver par sujet de planning (minor).** Dans un lab partitionné, deux missions sur des sujets différents ne se bloquent plus : `driver-lock.sh --ws <sujet>` verrouille un sujet, `--depot` tout le dépôt, partagé entre worktrees. Le guard et le gate de sortie de mission suivent ; les labs plats sont inchangés, à un guard plus strict près (`conductor` v1.49.0, `dev-orchestrator` v2.28.0). |
 | `v2.69.1` | 2026-10-10 | **Correctif de la garde de fin de geste (patch).** L'archivage du ROADMAP ne réarchive plus un bloc dont les dossiers de phase existent encore (`conductor` v1.48.2). |
 | `v2.69.0` | 2026-10-08 | **Choix de la partition du planning au démarrage d'un lab (minor).** Nouveau skill `vf-split-planning`, et emprunts Pocock : frontière des questions, glossaire du lab, revue à deux axes. Clôt le jalon `fiabilite-v1.0`. |
-| `v2.68.0` | 2026-10-01 | **Sobriété de méthode et planning métier par cycles (minor).** Budgets de méthode avec archivage automatique réversible, hook `Stop` de fin de geste, `recalc-planning.sh`. |
 
 <details>
 <summary><strong>Références méthodologiques (ADR / LRN)</strong></summary>
