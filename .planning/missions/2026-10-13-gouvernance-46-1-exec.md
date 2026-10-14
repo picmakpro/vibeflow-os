@@ -253,6 +253,45 @@ seulement sur divergence d'empreinte d'arbre, aucun attendu ajouté ; checkpoint
 Reprise : verrou ré-acquis (génération `DRIVER.lock.gen.1791969153.15231`, 0 orphelin),
 invariants 3 (SAIN), snapshot de budget reposé sous cette génération.
 
+### Processus arrêtés au CKPT-5b
+
+Cadre : autorisation de Willy (AskUserQuestion session principale, 2026-10-14, Q-5b-B « (b) La mission arrête »), valable pour CE rejeu 5b seulement et pour les seuls processus dont le répertoire courant ou un fichier ouvert est sous `~/BusinessFlow-Lab`. Liste mesurée le 2026-10-14 (UTC 09:15:20) par `lsof -n -F pcfn` (LC_ALL=C), AVANT tout signal. Aucun ancêtre du processus de la mission n'y figure ; `~/jarvis-keystone` : 0 processus.
+
+| Rang | PID | Commande | Répertoire courant | Fichiers ouverts sous le lab |
+|------|-----|----------|--------------------|------------------------------|
+| 1 | 28786 | Code Helper (Plugin) | `~/BusinessFlow-Lab` | 0 |
+| 2 | 41066 | zsh | `~/BusinessFlow-Lab` | 0 |
+| 3 | 41508 | 2.1.292 | `~/BusinessFlow-Lab` | 0 |
+| 4 | 42249 | node | `~/BusinessFlow-Lab` | 0 |
+| 5 | 42266 | node | `~/BusinessFlow-Lab` | 0 |
+| 6 | 42515 | uv | `~/BusinessFlow-Lab` | 0 |
+| 7 | 42553 | node | `~/BusinessFlow-Lab` | 0 |
+| 8 | 43007 | node | `~/BusinessFlow-Lab` | 0 |
+| 9 | 43011 | python3.11 | `~/BusinessFlow-Lab` | 0 |
+| 10 | 56239 | zsh | `~/BusinessFlow-Lab` | 0 |
+| 11 | 57041 | 2.1.296 | `~/BusinessFlow-Lab` | 0 |
+| 12 | 57864 | node | `~/BusinessFlow-Lab` | 0 |
+| 13 | 57872 | node | `~/BusinessFlow-Lab` | 0 |
+| 14 | 58086 | node | `~/BusinessFlow-Lab` | 0 |
+| 15 | 58129 | node | `~/BusinessFlow-Lab` | 0 |
+| 16 | 58148 | node | `~/BusinessFlow-Lab` | 0 |
+| 17 | 58245 | node | `~/BusinessFlow-Lab` | 0 |
+| 18 | 58257 | uv | `~/BusinessFlow-Lab` | 0 |
+| 19 | 58354 | python3.11 | `~/BusinessFlow-Lab` | 0 |
+| 20 | 85454 | zsh | `~/BusinessFlow-Lab` | 0 |
+| 21 | 86082 | 2.1.296 | `~/BusinessFlow-Lab` | 0 |
+| 22 | 86940 | node | `~/BusinessFlow-Lab` | 0 |
+| 23 | 86957 | node | `~/BusinessFlow-Lab` | 0 |
+| 24 | 87208 | node | `~/BusinessFlow-Lab` | 0 |
+| 25 | 87233 | node | `~/BusinessFlow-Lab` | 0 |
+| 26 | 87255 | node | `~/BusinessFlow-Lab` | 0 |
+| 27 | 87357 | uv | `~/BusinessFlow-Lab` | 0 |
+| 28 | 87396 | node | `~/BusinessFlow-Lab` | 0 |
+| 29 | 87406 | python3.11 | `~/BusinessFlow-Lab` | 0 |
+| 30 | 97423 | Code Helper (Plugin) | `~/BusinessFlow-Lab` | 0 |
+
+Total : 30 processus. Plan d'arrêt : SIGTERM à ces PID exactement, sondage borné (~30 s), SIGKILL seulement sur ceux qui restent, tracé ci-dessous. Aucune session arrêtée n'est relancée.
+
 ## État à la remise (2026-10-14)
 
 - **Plans livrés :** 14, 17, 01, 02, 03, 18 (6/18) + 46.1-04 Tâche 1. Lots quick : `261013-owa`
