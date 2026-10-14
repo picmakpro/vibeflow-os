@@ -327,6 +327,8 @@ Cadre : mêmes autorisations de Willy (Q-5b-A « rejeu-5b-oui », Q-5b-B « (b) 
 
 Total : 2 processus. Plan : SIGTERM à ces deux PID exactement, sondage borné (~30 s), SIGKILL seulement sur les restants, tracé ci-dessous. Aucune application arrêtée n'est relancée.
 
+Signaux envoyés (liste ci-dessus commitée en `7e558889` avant le premier signal) : revalidation juste avant (parent launchd, un fichier ouvert sous le lab) puis SIGTERM aux PID 10138 et 32686, à eux seuls. Preview (32686) : fin propre dès le dernier sondage où il restait seul PID vivant (aucun relevé séparé à 2 s). QuickLookUIService (10138) : toujours en vie à 30 s (service XPC du système, parent launchd), mais il ne tient plus aucun fichier ouvert ni répertoire courant sous le lab (mesure juste après : 0 processus sous `~/BusinessFlow-Lab`, 0 sous `~/jarvis-keystone`) : il ne relève plus de l'autorisation, aucun SIGKILL n'a été envoyé. Bilan : SIGTERM 2, fin propre 1 (Preview) + 1 libéré du lab (QuickLookUIService), SIGKILL 0.
+
 ### Issue de la reprise du CKPT-5b (exec-04 Tâche 3, 2026-10-14) — rejeu 5b NON JOUÉ
 
 Liste des processus visés commitée avant chaque vague (`ada80476`, `55c4b602`, `26b0332d`,
