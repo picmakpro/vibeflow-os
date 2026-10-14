@@ -1425,7 +1425,11 @@ mut_trace() { # <journal> <famille> → première assertion violée de la famill
     { p=0 }' "$1"
 }
 mut_run() { # <script> <journal> → code de sortie du sous-processus
-  DLWS_MODE=matrice DLWS_SCRIPT="$1" bash "$SUITE" > "$2" 2>&1
+  # SIGPIPE RESTAURÉ à son action par défaut : le runner GitHub Actions lance ses étapes avec SIGPIPE IGNORÉ (hérité), et
+  # bash ne peut pas défaire une ignorance héritée. Le mutant i modélise précisément un pipeline à sortie anticipée
+  # sous pipefail (piège P1) : sans SIGPIPE vivant, le rédacteur n'est jamais tué et le mutant ne bascule presque rien
+  # (CI, 2026-10-14 : 1 famille sur 35). python3 est déjà requis ; os.execvp conserve l'action SIG_DFL.
+  DLWS_MODE=matrice DLWS_SCRIPT="$1" python3 -c 'import os, signal, sys; signal.signal(signal.SIGPIPE, signal.SIG_DFL); os.execvp(sys.argv[1], sys.argv[1:])' bash "$SUITE" > "$2" 2>&1
 }
 MUT_IDS=""
 mutant() { # <id> <ancre BRE> <expression sed s> <attendu : cas séparés par des espaces>

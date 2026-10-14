@@ -948,19 +948,22 @@ au2_deny() { assert "GW-AU2-$1 — $2 : deny" "$(gb "$3" "$4" "${5:-sess-B}")" "
 au2_pass() { assert_empty "GW-AU2-$1 — $2 : permis" "$(gb "$3" "$4" "${5:-sess-B}")"; }  # <id> <description> <lab> <commande> [session]
 # Coût du guard sur une commande : GB_MS = temps PROCESSEUR du guard et de ses enfants (millisecondes, getrusage), GB_OUT = stdout. Le temps processeur
 # ne bouge pas quand la machine est chargée (une suite de mutants fait tourner des dizaines de guards en parallèle : le temps d'horloge y est
-# multiplié par 30), l'horloge seule rendrait le cas fragile. Plafond d'horloge de 60 s : au-delà, GB_MS = 60000.
+# multiplié par 30), l'horloge seule rendrait le cas fragile. Plafond d'horloge de 600 s : au-delà, GB_MS = 600000.
+# (60 s jusqu'au 2026-10-14 : sur le runner GitHub, 52 matrices de mutants en parallèle ont fait dépasser 60 s d'horloge au mutant
+# quadratique GW-M-au2_quad, dont la sortie devenait « TIMEOUT » et basculait GW-AU2-02.x.2 en plus des deux cas attendus ; le cas
+# se juge au temps processeur, pas à l'horloge.)
 gb_timed() { # <lab> <commande> <session>
   local r
   r="$(mk_bash "$2" "$3" "$1" | python3 -c '
 import resource, subprocess, sys
 lab, guard, shell = sys.argv[1:4]
 try:
-    p = subprocess.run([shell, guard], input=sys.stdin.read().encode(), cwd=lab, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60)
+    p = subprocess.run([shell, guard], input=sys.stdin.read().encode(), cwd=lab, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=600)
     out = p.stdout.decode("utf-8", "replace")
     ru = resource.getrusage(resource.RUSAGE_CHILDREN)
     ms = int((ru.ru_utime + ru.ru_stime) * 1000)
 except subprocess.TimeoutExpired:
-    out, ms = "TIMEOUT", 60000
+    out, ms = "TIMEOUT", 600000
 print(ms)
 sys.stdout.write(out)' "$1" "$GUARD" "$BASH_BIN")"
   GB_MS="${r%%$'\n'*}"
