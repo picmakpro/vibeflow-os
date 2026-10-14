@@ -130,7 +130,18 @@ INPUT="$(cat 2>/dev/null || true)"
 # Racine git (P57-D-39) : un cwd sans .planning/ propre dont la racine git porte .planning/workstreams est un
 # sous-dossier d un lab partitionné ; remontée pure bash jusqu au premier .git, sans spawn. Un cwd avec son propre
 # .planning/ (P57-D-29) ou le lab plat gardent la ligne d avant : mêmes instructions, même latence.
-if [ -z "${VF_DRIVER_LOCK:-}" ] && { [ -e .planning/workstreams ] || [ -L .planning/workstreams ]; }; then
+# P57-D-56 (revise P57-D-25) : un .planning/workstreams présent mais SANS AUCUN compartiment (vide, ou ne portant
+# que des fichiers comme .gitkeep) est un lab plat, comme en v2.69.1 ; lien, fichier ou dossier illisible = présent.
+vf_guard_ws_present() { # <dossier workstreams> -> 0 = partitionné (ou illisible), 1 = absent ou vide
+  local w="$1" e
+  [ -e "$w" ] || [ -L "$w" ] || return 1
+  if [ -L "$w" ] || [ ! -d "$w" ] || [ ! -r "$w" ] || [ ! -x "$w" ]; then return 0; fi
+  for e in "$w"/*; do
+    if [ -L "$e" ] || [ -d "$e" ]; then return 0; fi
+  done
+  return 1  # D56-VIDE
+}
+if [ -z "${VF_DRIVER_LOCK:-}" ] && vf_guard_ws_present .planning/workstreams; then
   :
 else
   VF_GUARD_SUBLAB=0
@@ -138,7 +149,7 @@ else
     VF_GUARD_D="$PWD"
     while [ -n "$VF_GUARD_D" ] && [ "$VF_GUARD_D" != / ]; do
       if [ -e "$VF_GUARD_D/.git" ] || [ -L "$VF_GUARD_D/.git" ]; then
-        if [ -e "$VF_GUARD_D/.planning/workstreams" ] || [ -L "$VF_GUARD_D/.planning/workstreams" ]; then VF_GUARD_SUBLAB=1; fi
+        if vf_guard_ws_present "$VF_GUARD_D/.planning/workstreams"; then VF_GUARD_SUBLAB=1; fi
         break
       fi
       VF_GUARD_D="${VF_GUARD_D%/*}"
@@ -751,6 +762,26 @@ def top_by_marker(base):
         pass
     return None
 
+def ws_present(path):
+    """P57-D-56 (revise P57-D-25) : le dossier des compartiments est-il PRESENT au sens du verrou ? Absent -> False ;
+    lien, fichier regulier ou dossier illisible -> True (jugé fail-closed plus loin) ; dossier réel SANS AUCUN
+    compartiment (vide, ou seulement des fichiers comme .gitkeep) -> False : lab plat, comme en v2.69.1. Un lien
+    ou un sous-dossier non caché le rend présent. Même jugement que vf_guard_ws_present (bash) et driver-lock.sh."""
+    if not os.path.lexists(path):
+        return False
+    if os.path.islink(path) or not os.path.isdir(path) or not os.access(path, os.R_OK | os.X_OK):
+        return True
+    try:
+        for name in os.listdir(path):
+            if name.startswith("."):
+                continue
+            full = os.path.join(path, name)
+            if os.path.islink(full) or os.path.isdir(full):
+                return True
+    except OSError:
+        return True
+    return False  # D56-VIDE
+
 def partition_lab(payload):
     """Racine du lab partitionné, ou None. Partitionné : VF_DRIVER_LOCK vide ET .planning/workstreams présent
     (lexists, un lien compte) au cwd du payload quand c est une chaîne non vide, sinon au cwd du process ; à
@@ -767,17 +798,17 @@ def partition_lab(payload):
                 base = c
         if base is None:
             base = "."
-        if os.path.lexists(os.path.join(base, ".planning", "workstreams")):
+        if ws_present(os.path.join(base, ".planning", "workstreams")):
             return base
         if os.path.lexists(os.path.join(base, ".planning")):
             return None
         top = toplevel_of(base) or top_by_marker(base)
-        if top and os.path.lexists(os.path.join(top, ".planning", "workstreams")):
+        if top and ws_present(os.path.join(top, ".planning", "workstreams")):
             return top
         return None
     except Exception:
         try:
-            return "." if os.path.lexists(".planning/workstreams") else None
+            return "." if ws_present(".planning/workstreams") else None
         except Exception:
             return None
 
@@ -827,6 +858,11 @@ def git_hardened(args, cwd, raw=False):
     try:
         import subprocess
         env = dict(os.environ)
+        # Un GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE hérité désignerait un autre dépôt que celui du cwd
+        # (modèle : cgh_git de check-guard-health.sh) : le guard jugerait alors le mauvais lab.
+        for k in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+                  "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX"):
+            env.pop(k, None)
         env["GIT_CONFIG_NOSYSTEM"] = "1"
         env["GIT_TERMINAL_PROMPT"] = "0"
         env["GIT_OPTIONAL_LOCKS"] = "0"

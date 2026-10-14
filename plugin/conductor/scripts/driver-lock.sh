@@ -263,6 +263,20 @@ vf_dl_common_dir() {
   (cd "$d" 2>/dev/null && pwd -P)
 }
 
+# P57-D-56 (revise P57-D-25) : un dossier des compartiments PRESENT mais SANS AUCUN compartiment (vide, ou ne
+# portant que des fichiers comme .gitkeep) se traite comme un lab plat, comme en v2.69.1. Un lien symbolique ou un
+# fichier regulier a la place du dossier reste « present » (refuse plus loin : partition-unreadable). Un lien ou un
+# sous-dossier non cache dans le dossier suffit a le dire present : leur jugement revient a vf_ws_enumerate.
+vf_dl_ws_present() { # <chemin du dossier workstreams> -> 0 = partitionne (ou illisible), 1 = absent ou vide
+  local w="$1" e
+  [ -e "$w" ] || [ -L "$w" ] || return 1
+  if [ -L "$w" ] || [ ! -d "$w" ] || [ ! -r "$w" ] || [ ! -x "$w" ]; then return 0; fi
+  for e in "$w"/*; do
+    if [ -L "$e" ] || [ -d "$e" ]; then return 0; fi
+  done
+  return 1  # D56-VIDE
+}
+
 vf_dl_resolve() {
   [ -n "$ACTION" ] || return 0
   [ -z "${VF_DRIVER_LOCK:-}" ] || return 0
@@ -273,11 +287,11 @@ vf_dl_resolve() {
   if { [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; } && [ ! -e .planning ] && [ ! -L .planning ]; then
     local top=""
     top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
-    if [ -n "$top" ] && { [ -e "$top/.planning/workstreams" ] || [ -L "$top/.planning/workstreams" ]; }; then
+    if [ -n "$top" ] && vf_dl_ws_present "$top/.planning/workstreams"; then
       vf_dl_refuse not-at-lab-root "ce dossier n'est pas la racine du lab partitionne : lance driver-lock.sh depuis la racine du lab (le dossier qui porte .planning/workstreams), puis rejoue la commande avec la meme option --ws ou --depot"
     fi
   fi
-  [ -e .planning/workstreams ] || [ -L .planning/workstreams ] || return 0
+  vf_dl_ws_present .planning/workstreams || return 0
 
   local policy="" cand common rc=0
   for cand in "$(dirname "$0")/workstream-policy.sh" \
@@ -293,7 +307,7 @@ vf_dl_resolve() {
   case "$rc" in
     0) ;;
     3) return 0 ;;
-    *) vf_dl_refuse partition-unreadable "le dossier des compartiments est illisible (lien symbolique, fichier regulier ou vide) : le rendre a l'etat de dossier reel non vide puis rejouer la commande" ;;
+    *) vf_dl_refuse partition-unreadable "le dossier des compartiments est illisible (lien symbolique, fichier regulier ou compartiment en lien) : le rendre a l'etat de dossier reel puis rejouer la commande" ;;
   esac
   PARTITIONED=1
 

@@ -157,6 +157,56 @@ assert "GW-TRACE-4.3 — motif : verrou de dépôt, commande de reclaim --depot"
 out="$(run_guard_in "$LAB" "$(mk_write "$ROOT_F" "x" sess-A "$LAB")")"
 assert_empty "GW-TRACE-4.4 — fichier racine, détenteur du dépôt : stdout vide" "$out"
 
+# GW-GITENV — relecture adverse SOBR-04, 2026-10-14 : un GIT_DIR (ou GIT_WORK_TREE) HÉRITÉ qui désigne un autre dépôt ne doit pas
+# changer le lab que le guard juge. Sans le retrait, git_hardened lisait la racine du MAUVAIS dépôt et le Write dans le compartiment
+# d'autrui passait (1 refus sans GIT_DIR, 0 avec).
+GENV_OTHER="$WORK_DIR/gitenv-other"; mkdir -p "$GENV_OTHER"; git -C "$GENV_OTHER" init -q >/dev/null 2>&1
+out="$(run_guard_with "$LAB" "$(mk_write "$STATE_A" "x" sess-B "$LAB")")"
+assert "GW-GITENV-0 — témoin : sans GIT_DIR hérité, le Write dans le compartiment d'autrui est refusé" "$out" "$DENY"
+out="$(run_guard_with "$LAB" "$(mk_write "$STATE_A" "x" sess-B "$LAB")" "GIT_DIR=$GENV_OTHER/.git")"
+assert "GW-GITENV-1 — GIT_DIR hérité vers un autre dépôt : même refus" "$out" "$DENY"
+out="$(run_guard_with "$LAB" "$(mk_write "$STATE_A" "x" sess-B "$LAB")" "GIT_DIR=$GENV_OTHER/.git" "GIT_WORK_TREE=$GENV_OTHER")"
+assert "GW-GITENV-2 — GIT_DIR et GIT_WORK_TREE hérités vers un autre dépôt : même refus" "$out" "$DENY"
+out="$(run_guard_with "$LAB" "$(mk_write "$STATE_A" "x" sess-A "$LAB")" "GIT_DIR=$GENV_OTHER/.git")"
+assert_empty "GW-GITENV-3 — GIT_DIR hérité : le détenteur passe toujours (le retrait ne refuse rien de plus)" "$out"
+
+# GW-VIDE — P57-D-56 (révise P57-D-25) : un .planning/workstreams présent mais SANS AUCUN compartiment (vide, ou seulement
+# un .gitkeep) est un lab PLAT. Fixture : verrou de DÉPÔT tenu par sess-A, puis les compartiments retirés. Le guard plat ne
+# regarde que .planning/DRIVER.lock (absent) : le Write racine de sess-B passe ; en lab partitionné, le verrou de dépôt le refuse.
+VLAB="$(mk_lab vide)"
+out="$(dl "$VLAB" sess-A acquire --depot --owner=md --step=sd)"
+assert "GW-PRE — fixture GW-VIDE : verrou de dépôt acquis par sess-A" "$out" '"acquired": true'
+VROOT="$VLAB/.planning/PROJECT.md"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert "GW-VIDE-0 — témoin : avec ses compartiments, le Write racine de sess-B est refusé (verrou de dépôt)" "$out" "$DENY"
+rm -rf "$VLAB/.planning/workstreams"; mkdir "$VLAB/.planning/workstreams"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert_empty "GW-VIDE-1 — dossier des compartiments VIDE : lab plat, le Write passe" "$out"
+: > "$VLAB/.planning/workstreams/.gitkeep"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert_empty "GW-VIDE-2 — dossier des compartiments avec un seul .gitkeep : lab plat, le Write passe" "$out"
+mkdir "$VLAB/.planning/workstreams/alpha"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert "GW-VIDE-3 — un compartiment réapparaît (le .gitkeep reste) : lab partitionné, refus" "$out" "$DENY"
+rm -rf "$VLAB/.planning/workstreams"; printf 'pas un dossier\n' > "$VLAB/.planning/workstreams"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert "GW-VIDE-4 — un fichier régulier à la place du dossier : reste partitionné, refus" "$out" "$DENY"
+rm -f "$VLAB/.planning/workstreams"; ln -s "$WORK_DIR" "$VLAB/.planning/workstreams"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert "GW-VIDE-5 — un lien symbolique à la place du dossier : reste partitionné, refus" "$out" "$DENY"
+rm -f "$VLAB/.planning/workstreams"; mkdir "$VLAB/.planning/workstreams"
+# Même jugement depuis un sous-dossier du lab (racine git, P57-D-39) : un sous-dossier sans .planning propre
+mkdir -p "$VLAB/sub"
+out="$(run_guard_in "$VLAB/sub" "$(mk_write "$VROOT" "x" sess-B "$VLAB/sub")")"
+assert_empty "GW-VIDE-6 — depuis un sous-dossier, dossier des compartiments vide : lab plat aussi" "$out"
+# Verrou unique tenu (posé par le vrai driver-lock.sh, qui juge ce lab plat) : le guard rend le message du lab PLAT
+# (« Lock de driver ACTIF, tenu par »), pas celui de l'ancien verrou en lab partitionné (« ancien verrou unique »).
+VLAB2="$(mk_lab vide2)"; rm -rf "$VLAB2/.planning/workstreams"; mkdir "$VLAB2/.planning/workstreams"
+out="$(dl "$VLAB2" sess-A acquire --owner=mf --step=sf)"
+assert "GW-PRE — fixture GW-VIDE-7 : verrou unique acquis par sess-A (lab plat)" "$out" '"acquired": true'
+out="$(run_guard_in "$VLAB2" "$(mk_write "$VLAB2/.planning/PROJECT.md" "x" sess-B "$VLAB2")")"
+assert "GW-VIDE-7 — verrou unique tenu, compartiments vides : refus au message du lab plat" "$out" "Lock de driver ACTIF, tenu par 'mf'"
+
 # ---------------------------------------------------------------------------------------------------------------
 # Tâche 2 — écritures aux bords : ancien verrou, casse, chemin non cartographiable, worktrees, échappatoire,
 # quatre issues (QUAL-01), sondes de crash avant et pendant la décision.
@@ -1695,13 +1745,13 @@ fi   # GW_MODE = full (A/B)
 
 if [ "$GW_MODE" = full ]; then
 echo
-echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-au3_redir — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
+echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-vide_both — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
 # Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du guard, posée à côté d'une
 # copie de vf-portable.sh (sinon le locator sortirait en code 17 pour la mauvaise raison). Le programme python
 # embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
 # sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
 # est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
-MUT_TOTAL=52; MUT_KILLED=0; t0=$SECONDS
+MUT_TOTAL=55; MUT_KILLED=0; t0=$SECONDS
 # a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
 #     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
 # a : GW-C-INC-1/2 (corrections F-3, R-5, C3) : sans -z, « .planning/workstreams\n » ne se lit plus comme le chemin incertain
@@ -1715,7 +1765,7 @@ MUT_E="GW-T-EXEMPT-1=1"
 MUT_F="GW-ENVT-9.1=1 GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
 # g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
 # g : GW-C-INC-3, GW-ENVT-7, GW-ENVT-OUT-7, GW-F3-17 (détenteur, discriminance des cas ajoutés)
-MUT_G="GW-AU2-01.8=1 GW-AU2-02.P.6=1 GW-AU2-03.P.7=1 GW-AU2-06.12=1 GW-AU3-01.P.H1=1 GW-AU3-01.P.H2=1 GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-Q45-H1=1 GW-Q45-H2=1 GW-Q45-H3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
+MUT_G="GW-AU2-01.8=1 GW-AU2-02.P.6=1 GW-AU2-03.P.7=1 GW-AU2-06.12=1 GW-AU3-01.P.H1=1 GW-AU3-01.P.H2=1 GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-GITENV-3=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-Q45-H1=1 GW-Q45-H2=1 GW-Q45-H3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
 # h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
 MUT_H="GW-C4-2=1 GW-C4-3=1 GW-MARK-W-4=1 GW-Q-PASS=1 GW-SUB-2=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
 MUT_I="GW-C-REL-tenu=2"
@@ -1798,6 +1848,12 @@ MUT_AU2PERSIST="GW-AU2-06.7=1"
 MUT_AU3PUNCT="GW-AU3-01.F.10=1 GW-AU3-01.F.11=1 GW-AU3-01.F.1=1 GW-AU3-01.F.2=1 GW-AU3-01.F.3=1 GW-AU3-01.F.4=1 GW-AU3-01.F.5=1 GW-AU3-01.F.6=1 GW-AU3-01.F.7=1 GW-AU3-01.F.8=1 GW-AU3-01.F.9=1 GW-AU3-01.P.10=1 GW-AU3-01.P.11=1 GW-AU3-01.P.1=1 GW-AU3-01.P.2=1 GW-AU3-01.P.3=1 GW-AU3-01.P.4=1 GW-AU3-01.P.5=1 GW-AU3-01.P.6=1 GW-AU3-01.P.7=1 GW-AU3-01.P.8=1 GW-AU3-01.P.9=1"
 MUT_AU3COARSE="GW-AU3-02.F.1=1 GW-AU3-02.F.2=1 GW-AU3-02.F.3=1 GW-AU3-02.F.4=1 GW-AU3-02.F.6=1 GW-AU3-02.P.1=1 GW-AU3-02.P.2=1 GW-AU3-02.P.3=1 GW-AU3-02.P.4=1 GW-AU3-02.P.6=1"
 MUT_AU3REDIR="GW-AU3-01.R1=1 GW-AU3-01.R2=1"
+# gitenv = le retrait de GIT_DIR/GIT_WORK_TREE/... hérités disparaît (relecture SOBR-04, 2026-10-14) ; vide_py = le jugement python du dossier
+# des compartiments vide redevient « présent » (le message du lab plat devient celui de l'ancien verrou partitionné) ; vide_both = les DEUX
+# jugements (bash et python) le font, le Write racine est alors refusé par le verrou de dépôt (P57-D-56).
+MUT_GITENV="GW-GITENV-1=1 GW-GITENV-2=1"
+MUT_VIDEPY="GW-VIDE-7=1"
+MUT_VIDEBOTH="GW-VIDE-1=1 GW-VIDE-2=1 GW-VIDE-6=1 GW-VIDE-7=1"
 gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
   awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
 }
@@ -1955,6 +2011,9 @@ mutant au2_assignpersist 'if all(ASSIGN_RE.match(t) for t in ts):' 's@all(ASSIGN
 mutant au3_punct '^    if not t or any(ch not in PUNCT_CHARS for ch in t):$' 's@if not t or@if True or@' "$MUT_AU3PUNCT"
 mutant au3_coarse '^COARSE_GIT_RE = ' 's@9_\.\\-]@9_]@' "$MUT_AU3COARSE"
 mutant au3_redir '^        elif t\[i\] in "<>" or ' 's@elif t\[i\] in "<>" or .*:$@elif False:@' "$MUT_AU3REDIR"
+mutant gitenv '^            env.pop(k, None)$' 's@env.pop(k, None)@pass@' "$MUT_GITENV"
+mutant vide_py 'return False  # D56-VIDE' 's@return False  # D56-VIDE@return True  # D56-VIDE@' "$MUT_VIDEPY"
+mutant vide_both 'return 1  # D56-VIDE' 's@return 1  # D56-VIDE@return 0  # D56-VIDE@' "$MUT_VIDEBOTH" 'return False  # D56-VIDE' 's@return False  # D56-VIDE@return True  # D56-VIDE@'
 
 wait
 for id in $MUT_IDS; do mutant_eval "$id"; done

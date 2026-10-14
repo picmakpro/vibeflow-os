@@ -41,7 +41,7 @@ MUT_D="WS-LEG-1 WS-LEG-4 WS-R4A WS-R4B WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV"
 MUT_E="WS-ENV"
 MUT_F="WS-AB"
 MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-6 WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV WS-VFL"
-MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien WS-RC2-vide"
+MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien"
 # j (correction F-2, P57-D-39) : le refus hors racine du lab retiré — seuls les trois cas de refus de WS-ROOT basculent
 # (g y ajoute WS-ROOT-6, le cas VF_DRIVER_LOCK ; i y ajoute WS-ROOT-8, le témoin acquire depuis la racine)
 MUT_J="WS-ROOT-1 WS-ROOT-2 WS-ROOT-3"
@@ -70,7 +70,7 @@ MUT_TKGK="WS-TKB WS-TKR"          # tk_gen_kept : la génération posée reste a
 MUT_TKD2="WS-TKR WS-TKV"
 MUT_TKF="WS-TKP"
 MUT_TKV="WS-TKV"
-MUT_I="WS-ALL-1 WS-ALL-2 WS-ALL-5 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-R4A WS-R4B WS-R4C WS-ROOT-8 WS-TKA WS-TKB WS-TKC WS-TKD WS-TKP WS-TKR WS-TKV WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4"
+MUT_I="WS-ALL-1 WS-ALL-2 WS-ALL-5 WS-DEPOT WS-ENV WS-FIRST WS-HINT-1 WS-HINT-2 WS-INV-lien WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-LOC-1 WS-LOC-3 WS-NOGIT-1 WS-NOGIT-3 WS-R4A WS-R4B WS-R4C WS-ROOT-8 WS-TKA WS-TKB WS-TKC WS-TKD WS-TKP WS-TKR WS-TKV WS-TRACE-1 WS-TRACE-2 WS-TRACE-3 WS-VERBS-1 WS-VERBS-2 WS-VERBS-3 WS-VERBS-4 WS-VIDE-temoin"
 # Mode de la suite. `full` (défaut) : tout, concurrence et mutants compris. `matrice` : sous-processus d'un
 # mutant (DL-M-*), qui rejoue les cas WS-* hors concurrence contre une COPIE mutée du script (DLWS_SCRIPT)
 # posée à côté de sa politique ; il n'y a alors ni concurrence ni mutants (pas de récursion).
@@ -318,10 +318,46 @@ rc2_case() { # <id> <fabrique la panne dans $1>
 }
 brk_link()  { rm -rf "$1"; ln -s "$WORK_DIR/elsewhere" "$1"; }
 brk_file()  { rm -rf "$1"; printf 'pas un dossier\n' > "$1"; }
-brk_empty() { rm -rf "$1"; mkdir "$1"; }
 rc2_case lien  brk_link
 rc2_case file  brk_file
-rc2_case vide  brk_empty
+
+echo
+echo "=== WS-VIDE — dossier des compartiments présent mais SANS AUCUN compartiment : lab plat (P57-D-56, révise P57-D-25) ==="
+# Le dossier vide, ou qui ne porte qu'un .gitkeep, se traite comme en v2.69.1 : le verrou unique de .planning/DRIVER.lock,
+# sur TOUS les verbes (status et release compris). Le lien et le fichier à sa place restent refusés (WS-RC2-lien/file).
+brk_empty()   { rm -rf "$1"; mkdir "$1"; }
+brk_gitkeep() { rm -rf "$1"; mkdir "$1"; : > "$1/.gitkeep"; }
+vide_case() { # <id> <fabrique la panne dans $1>
+  local id="$1" breaker="$2" lab gc o r
+  lab="$(mk_lab "vide-$id")"; gc="$(fixture_common_dir "$lab")"
+  "$breaker" "$lab/.planning/workstreams"
+  o="$(dl "$lab" sess-A status)"; r=$?
+  assert_exit "WS-VIDE-$id.1 — status : exit 0 (jamais partition-unreadable)" "$r" 0
+  assert_not "WS-VIDE-$id.2 — status : pas d'erreur de partition" "$o" 'partition-unreadable'
+  assert "WS-VIDE-$id.3 — status : verrou libre" "$o" '"present": false'
+  o="$(dl "$lab" sess-A release --owner=m1)"; r=$?
+  assert_exit "WS-VIDE-$id.4 — release sans verrou : exit 0, comme un lab plat" "$r" 0
+  o="$(dl "$lab" sess-A acquire --owner=m1 --step=s)"; r=$?
+  assert_exit "WS-VIDE-$id.5 — acquire sans --ws : exit 0" "$r" 0
+  assert "WS-VIDE-$id.6 — acquired true" "$o" '"acquired": true'
+  assert_not "WS-VIDE-$id.7 — pas de portée de compartiment (sortie de lab plat)" "$o" '"scope"'
+  [ -e "$lab/.planning/DRIVER.lock" ] || [ -L "$lab/.planning/DRIVER.lock" ]
+  assert_exit "WS-VIDE-$id.8 — le verrou unique vit sous .planning/DRIVER.lock" "$?" 0
+  [ ! -e "$gc/vf-driver" ]; assert_exit "WS-VIDE-$id.9 — rien sous le dossier commun (aucun verrou de compartiment)" "$?" 0
+  o="$(dl "$lab" sess-A status)"; r=$?
+  assert_exit "WS-VIDE-$id.10 — status du verrou tenu : exit 0" "$r" 0
+  assert "WS-VIDE-$id.11 — propriétaire m1" "$o" '"owner": "m1"'
+  o="$(dl "$lab" sess-A release --owner=m1)"; r=$?
+  assert_exit "WS-VIDE-$id.12 — release : exit 0" "$r" 0
+  assert "WS-VIDE-$id.13 — released true" "$o" '"released": true'
+}
+vide_case vide    brk_empty
+vide_case gitkeep brk_gitkeep
+# Témoin discriminant : un .gitkeep à côté d'un VRAI compartiment ne rend pas le lab plat.
+lab="$(mk_lab vide-temoin)"; : > "$lab/.planning/workstreams/.gitkeep"
+o="$(dl "$lab" sess-A acquire --ws=alpha --owner=m1 --step=s)"; r=$?
+assert_exit "WS-VIDE-temoin.1 — .gitkeep + compartiment alpha : acquire --ws exit 0" "$r" 0
+assert "WS-VIDE-temoin.2 — toujours un verrou de compartiment" "$o" '"scope": "compartiment"'
 
 echo
 echo "=== WS-POL — politique introuvable : policy-missing en lab partitionné, jamais en lab plat ==="
@@ -1413,7 +1449,7 @@ echo "=== MUTANTS DL-M-a à DL-M-j, puis DL-M-acq_fallback à DL-M-tk_old_delete
 # d'une copie de workstream-policy.sh (sinon policy-missing rougirait pour la mauvaise raison). La matrice (les
 # cas WS-* hors concurrence, WS-AB compris) est rejouée en sous-processus contre la copie ; l'ensemble des cas
 # dont le verdict bascule est comparé EXACTEMENT à l'attendu (un cas basculé hors de l'ensemble fait échouer).
-MUT_KILLED=0; MUT_TOTAL=27; t0=$SECONDS
+MUT_KILLED=0; MUT_TOTAL=28; t0=$SECONDS
 mut_families() { # <journal> → familles de cas en échec, triées, une par ligne
   LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sed 's/\..*$//' | LC_ALL=C sort -u
 }
@@ -1484,6 +1520,8 @@ mutant g 'z "${VF_DRIVER_LOCK:-}" ] || return 0' 's@\[ -z "${VF_DRIVER_LOCK:-}" 
 mutant h 'vf_dl_refuse partition-unreadable' 's@\*) vf_dl_refuse partition-unreadable .*@*) return 0 ;;@' "$MUT_H"
 mutant i 'vf_ws_dir_resolve ".planning" "$WS"; rc=$?' 's@vf_ws_dir_resolve ".planning" "$WS"; rc=$?@_l="$(vf_ws_enumerate ".planning" 2>/dev/null)"; { for _e in $_l; do printf "%s\\n" "$_e"; sleep 0.3; done; } | grep -q -- "/$WS\$"; rc=$?@' "$MUT_I"
 
+# vide (P57-D-56, révise P57-D-25) : le dossier des compartiments VIDE redevient « partitionné » — seuls les cas WS-VIDE (hors témoin) basculent
+mutant vide 'return 1  # D56-VIDE' 's@return 1  # D56-VIDE@return 0  # D56-VIDE@' "WS-VIDE-vide WS-VIDE-gitkeep"
 mutant j 'vf_dl_refuse not-at-lab-root' 's@vf_dl_refuse not-at-lab-root .*$@:@' "$MUT_J"
 mutant acq_fallback 'if \[ "$ACTION" != acquire \] && \[ "$ALL" = 0 \]' 's@\[ "$ACTION" != acquire \] \&\& @@' "$MUT_ACQ"
 mutant fallback_depotpresent '\[ ! -L "$LOCK_DIR" \] && \[ ! -d "$LOCK_DIR" \]' 's@ \&\& \[ ! -L "$LOCK_DIR" \] \&\& \[ ! -d "$LOCK_DIR" \]@@' "$MUT_FDP"
@@ -1508,9 +1546,9 @@ wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 27/27 tués =="
+  echo "== mutants : 28/28 tués =="
 else
-  echo "== mutants : $MUT_KILLED/27 tués =="
+  echo "== mutants : $MUT_KILLED/28 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # DLWS_MODE = full (mutants)

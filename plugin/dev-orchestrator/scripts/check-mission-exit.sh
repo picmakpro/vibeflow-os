@@ -216,7 +216,17 @@ budget_snap_path() { # chemin absolu du snapshot, sous le répertoire git commun
 }
 # Lab partitionné (Phase 57) : le dossier des compartiments existe sous --root (dossier, lien ou
 # fichier : un état illisible est jugé par driver-lock.sh, jamais replié sur le lab plat ici).
-is_partitioned() { [ -e "$ROOT/.planning/workstreams" ] || [ -L "$ROOT/.planning/workstreams" ]; }
+# P57-D-56 (revise P57-D-25) : sans aucun compartiment (dossier vide, ou seulement des fichiers comme .gitkeep) le lab
+# est plat, comme pour driver-lock.sh ; lien, fichier regulier ou dossier illisible restent « partitionne ».
+is_partitioned() {
+  local w="$ROOT/.planning/workstreams" e
+  [ -e "$w" ] || [ -L "$w" ] || return 1
+  if [ -L "$w" ] || [ ! -d "$w" ] || [ ! -r "$w" ] || [ ! -x "$w" ]; then return 0; fi
+  for e in "$w"/*; do
+    if [ -L "$e" ] || [ -d "$e" ]; then return 0; fi
+  done
+  return 1  # D56-VIDE
+}
 BUDGET_TOK='RANGEABLE|ARCHIVABLE|ARCHIVAGE REFUSÉ'
 budget_lines() { { grep -E "$BUDGET_TOK" || true; } | sed 's/^\[budget\] *//' | LC_ALL=C sort -u; }
 # Identité de la mission : le NOM de la génération du verrou de driver courant (lien DRIVER.lock → DRIVER.lock.gen.<epoch>.<pid>),
