@@ -292,6 +292,15 @@ Cadre : autorisation de Willy (AskUserQuestion session principale, 2026-10-14, Q
 
 Total : 30 processus. Plan d'arrêt : SIGTERM à ces PID exactement, sondage borné (~30 s), SIGKILL seulement sur ceux qui restent, tracé ci-dessous. Aucune session arrêtée n'est relancée.
 
+#### Signaux envoyés (première vague)
+
+Chaque PID de la liste ci-dessus a été revalidé (même répertoire courant sous le lab) juste avant le signal.
+
+- SIGTERM envoyé à 28 PID de la liste. Deux autres n'ont pas reçu de signal : le PID 58148 (`node`) était déjà sorti à la revalidation, le PID 58354 (`python3.11`) est sorti entre la revalidation et le signal (`kill` en échec, processus absent).
+- Fin propre au SIGTERM dans le sondage de 30 s : 25 des 28 processus signalés.
+- Restants à 30 s : 3 shells interactifs `zsh` (PID 41066, 56239, 85454), qui ignorent SIGTERM. SIGKILL envoyé à ces trois PID, et à eux seuls.
+- Mesure de repos juste après : 0 processus sous `~/jarvis-keystone` ; 2 NOUVEAUX processus `Code Helper (Plugin)` sous `~/BusinessFlow-Lab` (PID 20255 et 20380, répertoire courant `~/BusinessFlow-Lab`, aucun fichier ouvert), absents de la liste d'origine : relancés par l'éditeur après l'arrêt des premiers. Même lab, même rejeu, même catégorie que la liste d'origine : ils sont consignés ici AVANT tout signal, puis traités de la même façon (SIGTERM, puis SIGKILL sur un éventuel restant).
+
 ## État à la remise (2026-10-14)
 
 - **Plans livrés :** 14, 17, 01, 02, 03, 18 (6/18) + 46.1-04 Tâche 1. Lots quick : `261013-owa`
