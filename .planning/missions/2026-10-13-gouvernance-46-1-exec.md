@@ -13,6 +13,9 @@ session (attente humaine).
 **Issue (reprise du 2026-10-14) :** `human_needed` — rejeu 5b non joué (repos non nul : VS Code
 relance des hôtes d'extensions sous `~/BusinessFlow-Lab`) ; CKPT-5b-bis relayé, sans réponse après
 ~1 h d'attente au premier plan ; verrou relâché.
+**Issue (reprise CKPT-5b-bis, 2026-10-14) :** `human_needed` — rejeu 5b joué, relevé armable (G3, G4
+0/0) ; CKPT-G4 (plan 05) relayé, sans réponse après ~1 h d'attente au premier plan ; rien armé ;
+verrou relâché.
 **Invariants :** `check-mission-invariants.sh` → 3 (SAIN).
 **Flags d'enchaînement :** `workflow.auto_advance` et `workflow._auto_chain_active` à `false`, vérifiés
 par lecture de `.planning/config.json` (`gsd_run` non résolu sur ce poste).
@@ -467,6 +470,6 @@ chaque sprint (aucun hook vu). `estimate`/`actuals` : absents (aucun plan ne por
 
 ## Next step
 
-Relayer CKPT-5b-bis à Willy ; sur (a) ou (b), nouveau `vf-coder` sur `exec-04` (Tâche 3 rejouée,
-relevé de repli remplacé par le relevé du rejeu) ; sur (c), `exec-05` au checkpoint « ne pas armer ».
-Puis checkpoint d'armement de G4 (plan 05) remonté à la session principale avant tout armement.
+Réponse de Willy au CKPT-G4 (`armer-g4` | `ne-pas-armer`) ; puis nouveau `vf-coder` sur `exec-05`
+(Tâche 2, étape 0 : aiguillage sur la réponse, champ `reprise` ; préalables déjà verts, sans commit),
+puis 06, 15, 07, 08, 09, 16, 10.

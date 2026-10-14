@@ -14,15 +14,15 @@ last_activity_desc: >-
   plans 14, 17, 01, 02, 03, 18 livrés, lots quick 261013-owa et 261013-t18, revue PASS, audit
   sans HIGH, plans restants re-validés et corrigés, jalon 1 vert, 46.1-04 Tâche 1 livrée.
 stopped_at: >-
-  Phase 46.1, plan 46.1-04 : rejeu 5b non joué (repos non nul, VS Code relance des hôtes sous
-  ~/BusinessFlow-Lab malgré l'arrêt autorisé) ; CKPT-5b-bis en attente de Willy. Rapport :
+  Phase 46.1 : plan 46.1-04 livré (rejeu 5b joué, relevé armable G3/G4 0/0) ; checkpoint
+  d'armement de G4 (plan 46.1-05) en attente de Willy ; rien armé. Rapport :
   .planning/missions/2026-10-13-gouvernance-46-1-exec.md.
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 58
-  completed_plans: 46
-  percent: 79
+  completed_plans: 47
+  percent: 81
 ---
 
 # Project State
