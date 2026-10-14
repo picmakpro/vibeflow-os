@@ -316,6 +316,17 @@ Chaque PID de la liste ci-dessus a été revalidé (même répertoire courant so
 - Mesure immédiate : 2 NOUVEAUX `Code Helper (Plugin)` sous `~/BusinessFlow-Lab` (PID 24759 et 24763), relancés par Visual Studio Code (processus parent hors du lab). Ces deux-là n'ont reçu AUCUN signal : la mission s'arrête là. Les arrêter plus loin ne ferait que les voir relancés, et viser le processus parent sort de l'autorisation (processus hors du lab).
 - Bilan des signaux de l'ensemble : SIGTERM 32 PID (28 + 2 + 2) ; fin propre 29 ; SIGKILL 3 (les `zsh` 41066, 56239, 85454) ; 2 PID sortis d'eux-mêmes avant signal (58148, 58354). Le rejeu 5b n'est pas joué (branche de repli, motif `repos-non-nul`) ; aucun lab n'a été lu ; aucune session arrêtée n'est relancée (Willy rouvrira les siennes).
 
+#### Nouvelle tentative (CKPT-5b-bis)
+
+Cadre : mêmes autorisations de Willy (Q-5b-A « rejeu-5b-oui », Q-5b-B « (b) La mission arrête », puis CKPT-5b-bis « (a) Je ferme VS Code », AskUserQuestion session principale, 2026-10-14, valant pour cette nouvelle tentative du MÊME rejeu 5b et pour lui seul), bornées aux processus dont le répertoire courant OU un fichier ouvert est sous `~/BusinessFlow-Lab`. L'option (b) du CKPT-5b-bis n'est PAS accordée : aucun signal à un processus dont le parent est VS Code. Mesure propre à `vf-coder` (exec-04), 2026-10-14 18:36 UTC, `lsof -n -F pcfn`, `LC_ALL=C`, filtre éprouvé d'abord sur l'entrée synthétique (2 rangs, 3 noms, voisin compté 0 fois), AVANT tout signal : `~/jarvis-keystone` 0 processus ; `~/BusinessFlow-Lab` 2 processus, plus aucun processus VS Code. Aucun ancêtre de la mission ou de la session principale parmi les cibles.
+
+| Rang | PID | Commande | Répertoire courant | Fichier ouvert sous le lab (anonymisé) | Parent |
+|------|-----|----------|--------------------|----------------------------------------|--------|
+| 1 | 10138 | QuickLookUIService | aucun | `~/BusinessFlow-Lab/…` (un PDF client) | launchd (PPID 1) |
+| 2 | 32686 | Preview | aucun | `~/BusinessFlow-Lab/…` (le même PDF client) | launchd (PPID 1) |
+
+Total : 2 processus. Plan : SIGTERM à ces deux PID exactement, sondage borné (~30 s), SIGKILL seulement sur les restants, tracé ci-dessous. Aucune application arrêtée n'est relancée.
+
 ### Issue de la reprise du CKPT-5b (exec-04 Tâche 3, 2026-10-14) — rejeu 5b NON JOUÉ
 
 Liste des processus visés commitée avant chaque vague (`ada80476`, `55c4b602`, `26b0332d`,
