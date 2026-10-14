@@ -313,6 +313,28 @@ Chaque PID de la liste ci-dessus a été revalidé (même répertoire courant so
 - Mesure immédiate : 2 NOUVEAUX `Code Helper (Plugin)` sous `~/BusinessFlow-Lab` (PID 24759 et 24763), relancés par Visual Studio Code (processus parent hors du lab). Ces deux-là n'ont reçu AUCUN signal : la mission s'arrête là. Les arrêter plus loin ne ferait que les voir relancés, et viser le processus parent sort de l'autorisation (processus hors du lab).
 - Bilan des signaux de l'ensemble : SIGTERM 32 PID (28 + 2 + 2) ; fin propre 29 ; SIGKILL 3 (les `zsh` 41066, 56239, 85454) ; 2 PID sortis d'eux-mêmes avant signal (58148, 58354). Le rejeu 5b n'est pas joué (branche de repli, motif `repos-non-nul`) ; aucun lab n'a été lu ; aucune session arrêtée n'est relancée (Willy rouvrira les siennes).
 
+### Issue de la reprise du CKPT-5b (exec-04 Tâche 3, 2026-10-14) — rejeu 5b NON JOUÉ
+
+Liste des processus visés commitée avant chaque vague (`ada80476`, `55c4b602`, `26b0332d`,
+`63224122`). Vague 1 : SIGTERM à 28 PID, 25 fins propres, SIGKILL sur 3 `zsh` interactifs (41066,
+56239, 85454) ; 2 PID sortis seuls avant le signal. Vagues 2 et 3 : VS Code (processus parent HORS
+du lab) relançait aussitôt deux hôtes d'extensions `Code Helper (Plugin)` dont le répertoire
+courant est sous `~/BusinessFlow-Lab` (20255, 20380 ; 23854, 23857, arrêtés par SIGTERM). Après la
+vague 3, deux nouveaux hôtes (24759, 24763, parent VS Code) : **non signalés** (le parent est hors de
+l'autorisation) ; ils restent en vie (constaté par le manager). Repos juste avant le rejeu :
+`~/BusinessFlow-Lab` 2, `~/jarvis-keystone` 0 → branche REPLI du plan, `REJEU-NON-JOUE repos-non-nul`
+(`c0898545`), aucune lecture des labs, aucune empreinte, aucune constante touchée. Sessions
+arrêtées non relancées. `test-planning-gates.sh rc=0`, `releve` → `RELEVE-COHERENCE ok`,
+`invariants` `ecarts=0`. SUMMARY `8db1e15d`.
+
+**CKPT-5b-bis (posé le 2026-10-14) — en attente de Willy** : (a) Willy ferme la fenêtre VS Code
+qui tient `~/BusinessFlow-Lab` ouvert (et tout autre outil qui y relance des processus), puis la
+mission rejoue la Tâche 3 du plan 04 sous ses réponses du 2026-10-14 (à confirmer : vaut-elle pour
+cette nouvelle tentative du même rejeu 5b ?) ; (b) Willy autorise l'arrêt de la fenêtre VS Code
+elle-même (processus hors du lab : autorisation plus large) ; (c) en rester au repli : le plan 05 ne
+présentera que « ne pas armer » G4, la phase continue vers G4′, P461-D-17 tranchera en fin de phase.
+Recommandation du manager : (a).
+
 ## État à la remise (2026-10-14)
 
 - **Plans livrés :** 14, 17, 01, 02, 03, 18 (6/18) + 46.1-04 Tâche 1. Lots quick : `261013-owa`
