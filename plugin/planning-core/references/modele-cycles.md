@@ -1133,7 +1133,7 @@ au mode `SubagentStop` : sa constante vaut `observe`.
 | G7 | 3 | armed | armé : fermé (deny) ; observe : journalise | G7-orphelin | 45-REJEU-ETAPE-3 |
 | ROLE | 4 | armed | armé : fermé (deny) ; observe : journalise | ROLE-juge, ROLE-worker-Agent, ROLE-worker-Task | 45-REJEU-ETAPE-4 |
 | G3 | 5 | armed | armé : fermé (deny) ; observe : journalise | G3-livrable-absent | 46-REJEU-ETAPE-5 |
-| G4 | 5 | observe | armé : fermé (deny) ; observe : journalise | G4-sans-verdict | 46-REJEU-ETAPE-5 |
+| G4 | 5 | observe | armé : fermé (deny) ; observe : journalise | G4-sans-verdict | 46.1-REJEU-ETAPE-5b |
 | G4P | 6 | observe | armé : fermé (deny en PreToolUse, block en SubagentStop) ; observe : journalise | G4P-handback, G4P-stop | 46-REJEU-ETAPE-6 |
 | G2 | - | avertit | ouvert : n'avertit pas, ne refuse jamais | aucun | aucun |
 

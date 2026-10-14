@@ -5508,8 +5508,15 @@ def ecarts_reference(texte, ns, texte_hook, canaris, commande, matcher):
         ids_code = {"aucun"} if (gate == "G2" or (etat == "observe" and not canaris.get(gate))) else canaris.get(gate, set())
         if ids != ids_code:
             ecarts.append("ECART %s : cas de canary %s dans la référence, %s dans CANARIS" % (gate, sorted(ids), sorted(ids_code)))
-        # relevé : « 45-REJEU-ETAPE-<n> » pour les étapes 1 à 4 (Phase 45), « 46-REJEU-ETAPE-<n> » pour les étapes 5 et 6 (Phase 46)
-        releve = "aucun" if gate == "G2" else ("46" if etape.get(gate) in ("5", "6") else "45") + "-REJEU-ETAPE-" + (etape.get(gate) or "?")
+        # relevé : « 45-REJEU-ETAPE-<n> » pour les étapes 1 à 4 (Phase 45), « 46-REJEU-ETAPE-<n> » pour les étapes 5 et 6 (Phase 46),
+        # sauf une table par gate : G4 prend le relevé de la Phase 46.1 (rejeu de l'étape 5b), G3 et G4P gardent ceux de la Phase 46
+        releves_par_gate = {"G3": "46-REJEU-ETAPE-5", "G4": "46.1-REJEU-ETAPE-5b", "G4P": "46-REJEU-ETAPE-6"}
+        if gate == "G2":
+            releve = "aucun"
+        elif gate in releves_par_gate:
+            releve = releves_par_gate[gate]
+        else:
+            releve = ("46" if etape.get(gate) in ("5", "6") else "45") + "-REJEU-ETAPE-" + (etape.get(gate) or "?")
         if cases[5] != releve:
             ecarts.append("ECART %s : relevé « %s » dans la référence, « %s » attendu" % (gate, cases[5], releve))
     toutes_observe = all(v == "observe" for v in table.values())
