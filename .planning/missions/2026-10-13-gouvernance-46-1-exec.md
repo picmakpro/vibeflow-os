@@ -338,6 +338,17 @@ elle-même (processus hors du lab : autorisation plus large) ; (c) en rester au 
 présentera que « ne pas armer » G4, la phase continue vers G4′, P461-D-17 tranchera en fin de phase.
 Recommandation du manager : (a).
 
+### Réponse de Willy au CKPT-5b-bis (relayée par la session principale, 2026-10-14)
+
+Willy, AskUserQuestion session principale, 2026-10-14 : « (a) Je ferme VS Code (Recommandé) » —
+libellé lu : « Tu fermes la fenêtre VS Code ouverte sur ~/BusinessFlow-Lab (et tout outil qui y
+relance des processus), puis la mission refait la tentative. Tes autorisations du 2026-10-14
+(rejeu-5b-oui et arrêt limité au lab) valent pour cette nouvelle tentative. » Elles valent pour le
+même rejeu 5b, et pour lui seulement ; (b) n'est PAS accordé : aucun signal aux hôtes d'extensions
+VS Code ni à leur parent. Consignes du coordinateur : attendre le repos du lab par mesures en
+lecture seule espacées d'au moins 120 s, attente bornée à 2 h ; au-delà, `human_needed` sans rien
+armer. Reprise : verrou ré-acquis (génération `DRIVER.lock.gen.1791998824.40917`), invariants 3.
+
 ## État à la remise (2026-10-14)
 
 - **Plans livrés :** 14, 17, 01, 02, 03, 18 (6/18) + 46.1-04 Tâche 1. Lots quick : `261013-owa`
