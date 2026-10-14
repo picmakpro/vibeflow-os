@@ -301,6 +301,12 @@ Chaque PID de la liste ci-dessus a été revalidé (même répertoire courant so
 - Restants à 30 s : 3 shells interactifs `zsh` (PID 41066, 56239, 85454), qui ignorent SIGTERM. SIGKILL envoyé à ces trois PID, et à eux seuls.
 - Mesure de repos juste après : 0 processus sous `~/jarvis-keystone` ; 2 NOUVEAUX processus `Code Helper (Plugin)` sous `~/BusinessFlow-Lab` (PID 20255 et 20380, répertoire courant `~/BusinessFlow-Lab`, aucun fichier ouvert), absents de la liste d'origine : relancés par l'éditeur après l'arrêt des premiers. Même lab, même rejeu, même catégorie que la liste d'origine : ils sont consignés ici AVANT tout signal, puis traités de la même façon (SIGTERM, puis SIGKILL sur un éventuel restant).
 
+#### Signaux envoyés (deuxième vague : les deux processus relancés)
+
+- SIGTERM aux PID 20255 et 20380 (`Code Helper (Plugin)`), fin propre au premier sondage (2 s), aucun SIGKILL.
+- Mesure de repos juste après : 2 NOUVEAUX `Code Helper (Plugin)` sous `~/BusinessFlow-Lab` (PID 23854 et 23857, répertoire courant `~/BusinessFlow-Lab`, aucun fichier ouvert), de nouveau absents de la liste. Leur processus parent n'est pas dans le lab : c'est Visual Studio Code, qui relance ses hôtes d'extensions tant que le dossier du lab est ouvert dans une fenêtre. Fermer cette fenêtre ou cette application sort de l'autorisation (processus hors du lab) : la mission n'y touche pas.
+- Dernière tentative avant repli : SIGTERM à ces deux PID puis mesure immédiate (troisième vague, tracée ci-dessous). Si le repos n'est pas nul à la mesure qui précède le rejeu, la branche REPLI du plan s'applique (motif `repos-non-nul`) et rien n'est lu.
+
 ## État à la remise (2026-10-14)
 
 - **Plans livrés :** 14, 17, 01, 02, 03, 18 (6/18) + 46.1-04 Tâche 1. Lots quick : `261013-owa`
