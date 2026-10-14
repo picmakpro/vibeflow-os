@@ -14,8 +14,8 @@ last_activity_desc: >-
   plans 14, 17, 01, 02, 03, 18 livrés, lots quick 261013-owa et 261013-t18, revue PASS, audit
   sans HIGH, plans restants re-validés et corrigés, jalon 1 vert, 46.1-04 Tâche 1 livrée.
 stopped_at: >-
-  Phase 46.1, checkpoint 5b du plan 46.1-04 (Tâche 2) en attente de Willy : rejeu réel 5b et
-  repos de ~/BusinessFlow-Lab (30 processus). Rapport :
+  Phase 46.1, plan 46.1-04 : rejeu 5b non joué (repos non nul, VS Code relance des hôtes sous
+  ~/BusinessFlow-Lab malgré l'arrêt autorisé) ; CKPT-5b-bis en attente de Willy. Rapport :
   .planning/missions/2026-10-13-gouvernance-46-1-exec.md.
 progress:
   total_phases: 10

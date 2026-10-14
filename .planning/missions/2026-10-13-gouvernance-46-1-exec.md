@@ -10,6 +10,9 @@ revu ») — exécution sans attendre la revue code owner de la pile ; aucun mer
 session (attente humaine).
 **Issue (session du 2026-10-13 → 2026-10-14) :** `human_needed` — DAG exécuté jusqu'au checkpoint 5b
 (plan 46.1-04, Tâche 2) ; `exec-04` (Tâches 2-3) et toute la suite attendent Willy (Q-5b-A, Q-5b-B).
+**Issue (reprise du 2026-10-14) :** `human_needed` — rejeu 5b non joué (repos non nul : VS Code
+relance des hôtes d'extensions sous `~/BusinessFlow-Lab`) ; CKPT-5b-bis relayé, sans réponse après
+~1 h d'attente au premier plan ; verrou relâché.
 **Invariants :** `check-mission-invariants.sh` → 3 (SAIN).
 **Flags d'enchaînement :** `workflow.auto_advance` et `workflow._auto_chain_active` à `false`, vérifiés
 par lecture de `.planning/config.json` (`gsd_run` non résolu sur ce poste).
@@ -410,5 +413,6 @@ chaque sprint (aucun hook vu). `estimate`/`actuals` : absents (aucun plan ne por
 
 ## Next step
 
-Relayer Q-5b-A et Q-5b-B à Willy (AskUserQuestion), puis relancer la mission sur ses réponses :
-reprise de `exec-04` (Tâche 3), puis checkpoint d'armement de G4 (plan 05).
+Relayer CKPT-5b-bis à Willy ; sur (a) ou (b), nouveau `vf-coder` sur `exec-04` (Tâche 3 rejouée,
+relevé de repli remplacé par le relevé du rejeu) ; sur (c), `exec-05` au checkpoint « ne pas armer ».
+Puis checkpoint d'armement de G4 (plan 05) remonté à la session principale avant tout armement.
