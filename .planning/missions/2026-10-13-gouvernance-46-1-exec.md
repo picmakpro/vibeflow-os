@@ -307,6 +307,12 @@ Chaque PID de la liste ci-dessus a été revalidé (même répertoire courant so
 - Mesure de repos juste après : 2 NOUVEAUX `Code Helper (Plugin)` sous `~/BusinessFlow-Lab` (PID 23854 et 23857, répertoire courant `~/BusinessFlow-Lab`, aucun fichier ouvert), de nouveau absents de la liste. Leur processus parent n'est pas dans le lab : c'est Visual Studio Code, qui relance ses hôtes d'extensions tant que le dossier du lab est ouvert dans une fenêtre. Fermer cette fenêtre ou cette application sort de l'autorisation (processus hors du lab) : la mission n'y touche pas.
 - Dernière tentative avant repli : SIGTERM à ces deux PID puis mesure immédiate (troisième vague, tracée ci-dessous). Si le repos n'est pas nul à la mesure qui précède le rejeu, la branche REPLI du plan s'applique (motif `repos-non-nul`) et rien n'est lu.
 
+#### Signaux envoyés (troisième vague) et arrêt de la tentative
+
+- SIGTERM aux PID 23854 et 23857 (`Code Helper (Plugin)`, listés et commités avant le signal), fin propre au premier sondage (2 s), aucun SIGKILL.
+- Mesure immédiate : 2 NOUVEAUX `Code Helper (Plugin)` sous `~/BusinessFlow-Lab` (PID 24759 et 24763), relancés par Visual Studio Code (processus parent hors du lab). Ces deux-là n'ont reçu AUCUN signal : la mission s'arrête là. Les arrêter plus loin ne ferait que les voir relancés, et viser le processus parent sort de l'autorisation (processus hors du lab).
+- Bilan des signaux de l'ensemble : SIGTERM 32 PID (28 + 2 + 2) ; fin propre 29 ; SIGKILL 3 (les `zsh` 41066, 56239, 85454) ; 2 PID sortis d'eux-mêmes avant signal (58148, 58354). Le rejeu 5b n'est pas joué (branche de repli, motif `repos-non-nul`) ; aucun lab n'a été lu ; aucune session arrêtée n'est relancée (Willy rouvrira les siennes).
+
 ## État à la remise (2026-10-14)
 
 - **Plans livrés :** 14, 17, 01, 02, 03, 18 (6/18) + 46.1-04 Tâche 1. Lots quick : `261013-owa`
