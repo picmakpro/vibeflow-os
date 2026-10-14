@@ -362,6 +362,36 @@ VS Code ni à leur parent. Consignes du coordinateur : attendre le repos du lab 
 lecture seule espacées d'au moins 120 s, attente bornée à 2 h ; au-delà, `human_needed` sans rien
 armer. Reprise : verrou ré-acquis (génération `DRIVER.lock.gen.1791998824.40917`), invariants 3.
 
+### Rejeu 5b joué (nouvelle tentative, 2026-10-14)
+
+Repos mesuré par le manager (lecture seule, mesures espacées de 150 s, `p461-repos.log`) : après la
+fermeture de VS Code, `~/BusinessFlow-Lab` gardait 2 processus avec un FICHIER OUVERT sous le lab
+(Preview 32686 et QuickLookUIService 10138, parent launchd, un PDF client) — le head n'avait mesuré
+que le cwd. Exécuteur : liste commitée avant signal (`7e558889`), SIGTERM aux 2 (`a5afff41`) :
+Preview terminé, QuickLookUIService libéré du lab (non tué, plus hors autorisation), SIGKILL 0.
+Repos 0/0 juste avant et après. Rejeu réel par `rejeu-reel.sh`, une lecture, 292 s, empreintes
+d'arbre identiques. Relevé `46.1-REJEU-ETAPE-5b.md` (`0034967a`, remplace le repli) :
+`RELEVE-VERDICT armable etape=5 labs=2 gates=G3,G4` (rejoué par le manager) — G3 0 faux refus /
+0 faux accept (n=52, plancher 12), G4 0/0 (n=50, plancher 12), G7 0/0, 202 refus conformes au
+modèle déjà arbitrés par les attendus de la 46. Colonne « Relevé » de G4 dans la référence
+(`c3fc7d64`, `Gate-Touche:`). `test-planning-gates.sh` : 1er rejeu 3 mutants non tués
+(MUT-PUCE-REGEX-CHAMP, MUT-ECHEANCE-ARMEE, MUT-ECHEANCE-DELAI ; 1178 s sous charge), imputation
+`instable` (2 rejeux verts, `escalade-willy=oui` : suite porteuse) ; rejoué vert ensuite au plan 05
+(canary, 873 s) ; CI Linux verte sur `218be525` (run 38627342155).
+
+### CKPT-G4 — plan 46.1-05, Tâche 1 (`gate="blocking-human"`), posé le 2026-10-14
+
+Préalables tous verts (exécuteur, sans commit) : `EMPREINTE ok … regels=1` ; `JALON-VERIF 1 ok` ;
+`verifier-releve.sh` armable ; `46.1-CONTROLES.sh releve` cohérent ; armement simulé
+`ARMEMENT-COHERENCE ok` ; repos re-mesuré 0/0 ; banc G4 0/0 (`test-cloture-gates.sh rc=0`) ; canary
+(`test-planning-gates.sh rc=0`) ; invariants `ecarts=0`. Options du plan (verbatim) : `armer-g4` —
+« Armer G4 » (ferme G4 sur preuve ; change le contrat de clôture de tout lab adhérent installé) ;
+`ne-pas-armer` (défaut) — « Repli sûr : G4 reste en observation, relevé remonté à Willy ». Sans
+réponse explicite : `ne-pas-armer`. Limite à dire : les plans 06 à 10 modifieront ensuite
+`planning-hook.sh` et `hooks.json` ; `evaluer_g4` est figée par la règle `g4-fige` ; le reste n'est
+remesuré sur le réel que par le relevé de l'étape 6 (P461-D-17 en fin de phase). Recommandation du
+manager : `armer-g4`.
+
 ## État à la remise (2026-10-14)
 
 - **Plans livrés :** 14, 17, 01, 02, 03, 18 (6/18) + 46.1-04 Tâche 1. Lots quick : `261013-owa`
