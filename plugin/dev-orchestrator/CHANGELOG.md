@@ -1,5 +1,14 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.28.2] — 2026-10-16 (clé `roles`, Phase 58)
+
+**Patch** (métadonnée de module seule, aucun script modifié ; décisions P58-D-01..14 : arbitrage Samuel,
+AskUserQuestion session principale, 2026-10-16 ; niveau P58-PL-14 ; non publiée, sans release dans la phase, P58-D-20 ; renumérotée v2.28.1 → v2.28.2 au rebase sur v2.70.1, qui a publié v2.28.1) :
+
+- **`module.json`** : la clé `roles: ["dev"]` (P58-D-06) rend le module invisible au poste `product`, au catalogue et à
+  `install --all` avec poste. Un module nommé explicitement s'installe toujours : un poste est une vue, pas un droit.
+- Sans release dans la phase (P58-D-20).
+
 ## [v2.28.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — non publiée
 
 **Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
