@@ -77,12 +77,12 @@ bash <hook> | python3 -c 'import json,sys; json.loads(sys.stdin.read() or "{}")'
 C'est exactement ce trou de vérification qui a laissé passer le défaut de l'entrée #18 : le §3
 ci-dessus n'avait été appliqué à cette entrée que sur son *code de sortie*, jamais sur son flux.
 
-## 4. L'inventaire — 31 entrées, recompte machine
+## 4. L'inventaire — 32 entrées, recompte machine
 
 Commande de recomptage (fait foi, D-08) :
 
 ```bash
-python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==31, n"
+python3 -c "import json,glob; n=sum(len(h.get('hooks',[])) for f in sorted(glob.glob('plugin/*/hooks/hooks.json')) for gs in json.load(open(f))['hooks'].values() for h in gs); print(n); assert n==32, n"
 ```
 
 Rendue le 2026-08-17 : `28` (27 recomptées plus tôt le même jour par le plan `32-03`, plus 1 :
@@ -103,7 +103,10 @@ d'idempotence cross-matcher que les entrées précédentes de ce module, jamais 
 2026-09-30 : `31` — les entrées n°30 et n°31, `guard-fin-de-geste.sh` (`SessionStart` sans matcher avec
 `--snapshot`, puis `Stop`), posées par le plan `41.3-04` (SOBR-07, ADR-076), chacune dans son propre
 groupe du module `conductor` (un seul script par groupe : aucune collision d'idempotence cross-matcher).
-Toute dérive future (une 32e entrée apparue, une entrée disparue) fait échouer cette assertion —
+Rendue le 2026-10-16 : `32` — l'entrée n°32, `check-role-consistency.sh` (`SessionStart` sans matcher,
+groupe propre), posée par le plan `58-04` (RLPO-03/08/09, P58-D-09/P58-D-10) ; numéro réattribué au
+rebase si la PR #136 est mergée avant (elle occupe n°32-37).
+Toute dérive future (une 33e entrée apparue, une entrée disparue) fait échouer cette assertion —
 bruyamment, jamais en silence — et impose de mettre à jour l'inventaire et l'assertion
 **ensemble**, jamais l'un sans l'autre.
 
@@ -113,7 +116,7 @@ rendu, quand c'est pertinent) · codes de sortie atteignables **aujourd'hui**, a
 exacte · classement **advisory** ou **bloquante**, avec le mécanisme · forme actuelle
 (shell/exec) · action requise par la Phase 30 (normalisation, migration, ou rien).
 
-### conductor — 10 entrées
+### conductor — 11 entrées
 
 | # | Événement · matcher | Script | Invocation (hors chemin script) | `--hook` | Codes atteignables aujourd'hui | Classement | Forme | Action (Phase 30) |
 |---|---|---|---|---|---|---|---|---|
@@ -127,6 +130,7 @@ exacte · classement **advisory** ou **bloquante**, avec le mécanisme · forme 
 | 28 | SessionStart · startup | `check-guard-health.sh` | `args: ["{{VF_SCRIPTS}}/check-guard-health.sh", "--hook"]`, `command: {{VF_BASH}}` | oui — `--hook` traduit SAIN (3) et INDÉTERMINÉ (4) vers 0 ; le signal (déjà 0) et l'usage (64) ne sont jamais traduits | 0 (silence STRICT si aucun marqueur récent, OU signal — une seule ligne — si au moins un garde du parc a écrit un marqueur récent), 64 (usage, jamais atteint via ce fragment) | **advisory** — le « hook doctor » de QUAL-01 : constate, ne corrige rien, ne bloque rien (ADR-031) ; lecture seule STRICTE du répertoire de santé | **exec** (né conforme, D-32-C, contrat PR #29 §5) | née à l'état cible (plan 32-05) — GÉNÉRIQUE : agrège les marqueurs de TOUS les gardes du parc écrits par `vf_guard_unavailable`, pas seulement ceux de `conductor` |
 | 30 | SessionStart (sans matcher) | `guard-fin-de-geste.sh` | `args: ["{{VF_SCRIPTS}}/guard-fin-de-geste.sh", "--snapshot"]`, `command: {{VF_BASH}}` | `--snapshot` (mode, pas `--hook`) | 0 (toujours ; hors dépôt armé par `.planning/.fin-de-geste-armed` : muet, aucun effet ; silence STRICT sur le chemin nominal, sinon UN document JSON `{"systemMessage": …}` pour un `NON VÉRIFIABLE` — fail-open bruyant) | **advisory** — photographie en lecture seule ce qui est déjà rangeable, ne bloque jamais le démarrage | **exec** (né conforme, contrat PR #29 §5) | née à l'état cible (plan 41.3-04) |
 | 31 | Stop | `guard-fin-de-geste.sh` | `args: ["{{VF_SCRIPTS}}/guard-fin-de-geste.sh"]`, `command: {{VF_BASH}}` | n/a | 0 (autorise ; hors dépôt armé par `.planning/.fin-de-geste-armed` : muet, aucun effet ; silence ou UN document JSON `systemMessage` pour ce qui doit être vu de l'utilisateur), 2 (bloque : du rangement attribué à la session reste ; au plus 3 blocages de suite sans progrès — progrès = plus petit que le plus bas atteint —, puis sortie visible ; toute écriture d'état ratée : sortie visible, exit 0) | **bloquante — par le code de sortie** (2, `Stop`), seule autre que #24 ; coupe-circuit à 3 blocages sans progrès (arbitrage Samuel, AskUserQuestion session principale, 2026-09-30) | **exec** (né conforme, contrat PR #29 §5) | née à l'état cible (plan 41.3-04) |
+| 32 | SessionStart (sans matcher) | `check-role-consistency.sh` | `args: ["{{VF_SCRIPTS}}/check-role-consistency.sh", "--hook"]`, `command: {{VF_BASH}}` | oui — traduit SEUL le silence (3) vers 0 ; 1, 5, 17 et 64 ne sont jamais traduits | 0 (poste présent dans `vf_roles`, ou silence 3 traduit : aucun poste posé, pas de `config.json`, pas de clé `vf_roles` ; UNE ligne `Poste : X` sur stdout hors `solo`), 1 (poste hors liste ou invalide, constat sur stderr), 5 (erreur d'analyse bruyante), 17 (Python indisponible), 64 (usage) | **advisory** — constate, ne corrige rien, ne bloque rien (ADR-031, ADR-074) ; lecture seule STRICTE ; seule la valeur validée entre dans le contexte du modèle | **exec** (né conforme, contrat PR #29 §5) | née à l'état cible (plan 58-04) |
 
 ### consolidator — 7 entrées
 
@@ -193,13 +197,13 @@ humain).
 
 | Module | Total | Reproduit par |
 |---|---|---|
-| conductor | 10 | `python3 -c "import json; d=json.load(open('plugin/conductor/hooks/hooks.json')); print(sum(len(h.get('hooks',[])) for gs in d['hooks'].values() for h in gs))"` |
+| conductor | 11 | `python3 -c "import json; d=json.load(open('plugin/conductor/hooks/hooks.json')); print(sum(len(h.get('hooks',[])) for gs in d['hooks'].values() for h in gs))"` |
 | consolidator | 7 | idem, `plugin/consolidator/hooks/hooks.json` |
 | dev-orchestrator | 6 | idem, `plugin/dev-orchestrator/hooks/hooks.json` |
 | infrastructure-audit | 1 | idem, `plugin/infrastructure-audit/hooks/hooks.json` |
 | planning-core | 6 | idem, `plugin/planning-core/hooks/hooks.json` |
 | software-architecture | 1 | idem, `plugin/software-architecture/hooks/hooks.json` |
-| **Total** | **31** | commande de recomptage globale, §4 ci-dessus |
+| **Total** | **32** | commande de recomptage globale, §4 ci-dessus |
 
 **Les deux entrées bloquantes mises en avant par le plan comme points de vigilance** (le
 classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.md Pitfall 4) :
@@ -214,11 +218,11 @@ classement n'est PAS déductible mécaniquement du type d'événement, RESEARCH.
 mécanisme JSON que #25 : `guard-agent-write.sh` (#1), `guard-read-registres.sh` (#7),
 `guard-bash-registres.sh` (#8) et **`guard-driver-lock.sh` (#27 PreToolUse·Bash\|Write\|Edit,
 plan `32-03`, LOCK-02/03/05)** — chacune sort toujours 0 et bloque via `permissionDecision: deny`.
-Soit **7 entrées bloquantes au total sur les 31** (5 via décision JSON + 2 via code de sortie : #24 et
-#31, `guard-fin-de-geste.sh` au Stop, plan `41.3-04`), et **24 entrées advisory** (dont #30, le snapshot
+Soit **7 entrées bloquantes au total sur les 32** (5 via décision JSON + 2 via code de sortie : #24 et
+#31, `guard-fin-de-geste.sh` au Stop, plan `41.3-04`), et **25 entrées advisory** (dont #30, le snapshot
 de début de session ; +1 : l'entrée #28, `check-guard-health.sh`, plan `32-05`, +1 : l'entrée
 #29, `check-requirements-survival.sh`, plan `18-01` — toutes deux advisory, elles ne bloquent rien,
-ADR-031).
+ADR-031 ; +1 : l'entrée #32, `check-role-consistency.sh`, plan `58-04`, advisory).
 
 ## 6. Ce qui reste à la polarité gouvernance
 
@@ -247,4 +251,5 @@ mis à jour par le plan VFDO-30-09 (26e entrée, `check-hook-paths.sh`), le 2026
 plan VFDO-32-03 (27e entrée, `guard-driver-lock.sh`, matcher combiné, LOCK-02/03/05), puis par le
 plan VFDO-32-05 (28e entrée, `check-guard-health.sh`, le « hook doctor » générique du parc,
 QUAL-01), le 2026-08-17, puis par le plan VFDO-18-01 (29e entrée, `check-requirements-survival.sh`,
-survie du ledger d'exigences à la clôture d'un jalon, LEDG-02), le 2026-08-18.*
+survie du ledger d'exigences à la clôture d'un jalon, LEDG-02), le 2026-08-18, puis par le plan
+VFDO-58-04 (32e entrée, `check-role-consistency.sh`), le 2026-10-16.*
