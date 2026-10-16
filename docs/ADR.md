@@ -43,6 +43,7 @@
 | ADR-073 | 2026-09-23 | Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag | Validée (non gatée machine) |
 | ADR-074 | 2026-09-23 | Portée des gates : bloquant pour l'intégrité technique, consultatif pour le jugement métier | Validée |
 | ADR-076 | 2026-09-30 | Sobriété de méthode : ce qu'on crée, on le range — un ajout, un retrait ; archiver est un déplacement tracé, pas une correction (précision d'ADR-031) | Validée |
+| ADR-077 | 2026-10-16 | Agentique first, ouvert à la collaboration humaine — un poste est une vue, pas un droit | Validée |
 
 > **`ADR-065` : numéro non attribué** — constaté le 2026-08-04. Le registre saute de `ADR-064` à
 > `ADR-066` ; aucune décision ne porte ce numéro et aucune n'a été retirée. Un registre qui saute
@@ -3138,3 +3139,48 @@ signalent ou déplacent ; le blocage de fin de geste porte sur ce que la session
 fait objectif, jamais sur la qualité d'un travail. Limite de fond (ADR-072) : ces gardes vivent
 dans le dépôt, et le trailer `Ajout-Retrait:` est déclaratif — sa forme est vérifiée, jamais sa
 véracité.
+
+---
+
+## ADR-077 : Agentique first, ouvert à la collaboration humaine — un poste est une vue, pas un droit
+
+**Date** : 2026-10-16 · **Statut** : Validée · **Décideur** : Samuel · **Voisines** : ADR-031
+(validation humaine, inchangée), ADR-074 (gardes consultatives), ADR-053 (un manager, un verrou :
+inchangé).
+Arbitrage de doctrine : arbitrage Samuel, AskUserQuestion session principale, 2026-09-16 (un rôle humain peut changer le comportement d'une front door ; le vocabulaire côté dev ne se renomme pas).
+Rédaction de cette ADR et décisions de la Phase 58 (P58-D-01 à P58-D-14, dont P58-D-11) : arbitrage Samuel, AskUserQuestion session principale, 2026-10-16.
+
+### Contexte
+
+La bascule agentique reste la doctrine par défaut : l'intelligence vit dans les agents, GSD est
+l'interface directe, aucun verbe-façade, aucune couche de synonymes. La note
+`.planning/notes/2026-09-16-doctrine-agentique-ouverte-collaboration-humaine.md` l'amende sans que
+l'amendement ait reçu de numéro : l'ADR était promise au cadrage du jalon et jamais écrite. La Phase 58
+introduit les trois postes `solo`, `product` et `dev` (SEED-001, A-02, A-04, A-11) ; il faut écrire la
+règle que ces postes incarnent, et ses limites.
+
+### Décision
+
+1. **« agentique first, ouvert à la collaboration humaine ».** Un poste humain change le catalogue de
+   modules posé, le contexte injecté en début de session et, à partir de la Phase 59, le routage des
+   front doors. Ce n'est pas une couche de synonymes : aucun verbe nouveau, le même agent lit un
+   contexte de plus. Le vocabulaire côté dev ne se renomme pas : head, manager et workers cloisonnés
+   restent tels quels, sans renommage ni migration de labs.
+2. **« un poste est une vue, pas un droit ».** Git ne cloisonne rien. Aucune décision de sécurité ne lit le
+   poste, et aucun contrôle d'accès n'est promis : le poste change ce que l'humain voit et ce que la
+   front door lui propose, jamais ce qu'il peut faire.
+
+### Ce que cette ADR ne change pas
+
+ADR-031 : toute validation reste humaine ; les gardes de poste constatent et ne bloquent pas (ADR-074).
+ADR-053 : un manager, un verrou de driver. Les artefacts que lisent les workers (`PROJECT`,
+`REQUIREMENTS`, `ROADMAP`, `STATE`, registres, digest de mission) sont identiques quel que soit le poste.
+
+### Limites
+
+Le filtre du catalogue ne joue qu'à la pose, par l'humain qui installe (P58-D-05). En scope project, les
+modules sont versionnés et partagés : l'autre humain du dépôt les reçoit, et n'est servi par le poste que
+via le contexte de session et les front doors. Un GSD déjà installé au scope user reste visible
+(P58-D-06). Le poste vit dans un fichier local non versionné ; la liste des postes d'un projet vit dans
+la clé `vf_roles` de la configuration de planning (P58-D-01, P58-D-02). Le trailer et les gardes de
+cette phase vivent dans le dépôt : ils signalent, ils ne verrouillent rien (ADR-072).
