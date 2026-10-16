@@ -4,7 +4,7 @@
 # Couvre : le tracer (fichier de poste, règle d'ignorance, .worktreeinclude, plan --dry-run égal à la
 # pose, rien sans poste), le refus à la pose (liste vf_roles), les arêtes de scope (user, --target,
 # solo), le volet usage (58-08 : filtre de install --all, registre, verbe role) et sept mutants de l'engine
-# (RV-M1, RV-M2, RV-M3, RV-M4, RV-M5, RV-M6, RV-M7). Suite NEUVE : jamais un ajout à
+# (RV-M1..RV-M14). Suite NEUVE : jamais un ajout à
 # test-vibeflow-update.sh (271 s, modifié aussi par la PR #136 de Willy). Étendue par le plan 58-08.
 #
 # ISOLATION : HOME jetable, cache jetable, chaque lab `mktemp -d` + `git init -q`. Comptages de lignes
@@ -371,6 +371,35 @@ lab_run "$LT" VF_SCOPE=project -- role product; RC=$?
   || ko "RV-REG : runs contrôlés=$REG_LABS (>= 10 attendus), registres fautifs :$REG_BAD"
 
 # ---------------------------------------------------------------------------
+# RV-GI-* / RV-GATE-* / RV-TMP-* — durcissement de la pose (revue S3..S7, audit M-2, L-1, L-2)
+# ---------------------------------------------------------------------------
+run_pose() { # <lab> : install validator en poste product, scope project ; rc dans PRC
+  lab_run "$1" VF_ROLE=product VF_SCOPE=project -- install validator; PRC=$?
+}
+etat_pose() { if [ -e "$1/.claude/vibeflow-role" ]; then printf 'oui'; else printf 'non'; fi; }
+
+mk_lab; LG1="$LAB"; printf '.env' > "$LG1/.gitignore"; run_pose "$LG1"
+if [ "$PRC" -eq 0 ] && same_bytes "$LG1/.gitignore" '.env\n.claude/vibeflow-role\n'; then ok "RV-GI-EOL (S4) : dernière ligne sans fin de ligne terminée avant la règle (.env intact)"; else ko "RV-GI-EOL : rc=$PRC, .gitignore = $(od -c "$LG1/.gitignore" | head -2 | tr '\n' ' ')"; fi
+
+mk_lab; LG2="$LAB"; printf 'a\r\n.claude/vibeflow-role\r\n' > "$LG2/.gitignore"; run_pose "$LG2"
+mk_lab; LG3="$LAB"; printf 'a\r\nb' > "$LG3/.gitignore"; run_pose "$LG3"
+if [ "$PRC" -eq 0 ] && same_bytes "$LG2/.gitignore" 'a\r\n.claude/vibeflow-role\r\n' && same_bytes "$LG3/.gitignore" 'a\r\nb\r\n.claude/vibeflow-role\r\n'; then ok "RV-GI-CRLF (S4) : règle CRLF reconnue sans doublon ; ajout en CRLF sur une dernière ligne sans fin de ligne"; else ko "RV-GI-CRLF : rc=$PRC, octets inattendus"; fi
+
+mk_lab; LG4="$LAB"; printf 'x\n' > "$WORK/cible-gitignore"; ln -s "$WORK/cible-gitignore" "$LG4/.gitignore"; run_pose "$LG4"
+if [ "$PRC" -eq 1 ] && "$GREP" -qF 'lien symbolique' "$WORK/err" && same_bytes "$WORK/cible-gitignore" 'x\n' && [ "$(etat_pose "$LG4")" = "non" ]; then ok "RV-GI-LIEN (S5) : .gitignore lien symbolique → refus nommé, cible intacte, aucun poste posé"; else ko "RV-GI-LIEN : rc=$PRC pose=$(etat_pose "$LG4")"; fi
+
+mk_lab; LG5="$LAB"; mkdir "$LG5/.gitignore"; run_pose "$LG5"
+if [ "$PRC" -eq 1 ] && [ "$(etat_pose "$LG5")" = "non" ]; then ok "RV-ORDRE (S7, T-58-20) : .gitignore dossier → refus, aucun .claude/vibeflow-role posé (règle AVANT fichier)"; else ko "RV-ORDRE : rc=$PRC pose=$(etat_pose "$LG5")"; fi
+
+mk_lab; LG6="$LAB"; rm -f "$LG6/cache/conductor/scripts/check-role-consistency.sh"
+mkdir -p "$LG6/.claude/scripts"; printf '#!/bin/bash\n: > "%s"\nexit 0\n' "$WORK/temoin-gate.$$" > "$LG6/.claude/scripts/check-role-consistency.sh"; rm -f "$WORK/temoin-gate.$$"
+run_pose "$LG6"
+if [ "$PRC" -eq 1 ] && "$GREP" -qF 'absent du cache du plugin' "$WORK/err" && [ ! -e "$WORK/temoin-gate.$$" ] && [ "$(etat_pose "$LG6")" = "non" ]; then ok "RV-GATE (S3, audit M-2) : porte absente du cache → échec fermé, la porte du dépôt n'est jamais exécutée"; else ko "RV-GATE : rc=$PRC témoin=$([ -e "$WORK/temoin-gate.$$" ] && echo ÉCRIT || echo absent)"; fi
+
+mk_lab; LG7="$LAB"; mkdir -p "$LG7/.claude/vibeflow-role"; run_pose "$LG7"
+if [ "$PRC" -eq 1 ] && [ -d "$LG7/.claude/vibeflow-role" ] && [ "$(ls -A "$LG7/.claude/vibeflow-role" | awk 'END { print NR }')" -eq 0 ]; then ok "RV-DEST-DIR (S6, audit L-2) : destination répertoire → refus, rien déplacé dedans"; else ko "RV-DEST-DIR : rc=$PRC contenu=$(ls -A "$LG7/.claude/vibeflow-role" | tr '\n' ' ')"; fi
+
+# ---------------------------------------------------------------------------
 # Mutants (QUAL-01) — copie de _internal, l'original n'est jamais touché
 # ---------------------------------------------------------------------------
 MUT="$WORK/mut"; mkdir -p "$MUT"; cp -R "$INTERNAL_DIR" "$MUT/_internal"; rm -rf "$MUT/_internal/tests"
@@ -384,6 +413,14 @@ mutate() { # <id> → écrit le mutant et rend son chemin ; 1 = identique à l'o
     MODE == "M3" && $0 == "        if role_visible \"$m\"; then" { print "        if true; then"; next }
     MODE == "M5" && $0 == "  role_write_file \"$poste\"" { print; print "  mkdir -p \"$(dirname \"$INSTALLED_REGISTRY\")\"; printf \"role=%s\\n\" \"$poste\" >> \"$INSTALLED_REGISTRY\""; next }
     MODE == "M6" && $0 == "    printf '"'"'%s'"'"' \"$hors\"" { print "    :"; next }
+    MODE == "M8" && $0 == "  [ -f \"$c\" ] && { echo \"$c\"; return 0; }" { print; print "  c=\"$TARGET_ROOT/scripts/check-role-consistency.sh\"; [ -f \"$c\" ] && { echo \"$c\"; return 0; }"; next }
+    MODE == "M9" && $0 == "  role_gitignore_rule" { held = $0; next }
+    MODE == "M9" && held != "" && index($0, "  role_write_file \"$poste\"") == 1 { print; print held; held = ""; next }
+    MODE == "M10" && $0 == "    if [ -s \"$f\" ] && [ \"$(tail -c 1 \"$f\" | wc -l | tr -d '"'"' '"'"')\" -eq 0 ]; then" { print "    if false; then"; next }
+    MODE == "M11" && $0 == "  if [ -L \"$f\" ]; then" { print "  if false; then"; next }
+    MODE == "M12" && index($0, "    if tr -d '"'"'\\r'"'"' < \"$f\" | grep -qxF -- \"$rule\"; then return 0; fi") == 1 { print "    if grep -qxF -- \"$rule\" \"$f\"; then return 0; fi"; next }
+    MODE == "M13" && index($0, "  tmp=\"$(mktemp ") == 1 { print "  tmp=\"$dest.tmp.$$\""; next }
+    MODE == "M14" && index($0, "  [ ! -d \"$dest\" ] ||") == 1 { next }
     { print }' "$INTERNAL_DIR/vibeflow-update.sh" > "$out"
   cmp -s "$out" "$INTERNAL_DIR/vibeflow-update.sh" && return 1
   bash -n "$out" || return 2
@@ -432,6 +469,39 @@ probe_avis() { # M6 : l'avis liste-t-il mobile-test ?
   if "$GREP" -qxF '  - mobile-test' "$WORK/out"; then printf 'liste'; else printf 'amputé'; fi
 }
 
+probe_gi_eol() { # M10 : dernière ligne sans fin de ligne
+  mk_lab; ENG="$1"; printf '.env' > "$LAB/.gitignore"
+  run_pose "$LAB"; tr '\n' '|' < "$LAB/.gitignore"
+}
+probe_gi_crlf() { # M12 : règle CRLF déjà présente → pas de doublon
+  mk_lab; ENG="$1"; printf 'a\r\n.claude/vibeflow-role\r\n' > "$LAB/.gitignore"
+  run_pose "$LAB"; printf 'lignes=%s' "$(nlines "$LAB/.gitignore")"
+}
+probe_gi_lien() { # M11 : .gitignore lien symbolique
+  mk_lab; ENG="$1"; printf 'x\n' > "$WORK/cible-m11"; ln -s "$WORK/cible-m11" "$LAB/.gitignore"
+  run_pose "$LAB"; printf 'rc=%s pose=%s' "$PRC" "$(etat_pose "$LAB")"
+}
+probe_gi_dir() { # M9 : .gitignore dossier — l'ordre règle/fichier
+  mk_lab; ENG="$1"; mkdir "$LAB/.gitignore"
+  run_pose "$LAB"; printf 'rc=%s pose=%s' "$PRC" "$(etat_pose "$LAB")"
+}
+probe_gate_repli() { # M8 : porte du cache absente, porte du dépôt témoin
+  mk_lab; ENG="$1"; rm -f "$LAB/cache/conductor/scripts/check-role-consistency.sh"
+  mkdir -p "$LAB/.claude/scripts"; rm -f "$WORK/temoin-m8"
+  printf '#!/bin/bash\n: > "%s"\nexit 0\n' "$WORK/temoin-m8" > "$LAB/.claude/scripts/check-role-consistency.sh"
+  run_pose "$LAB"; printf 'rc=%s temoin=%s pose=%s' "$PRC" "$([ -e "$WORK/temoin-m8" ] && echo oui || echo non)" "$(etat_pose "$LAB")"
+}
+probe_mktemp_nom() { # M13 : le temporaire vient-il de mktemp, dans le dossier de destination ?
+  mk_lab; ENG="$1"; mkdir -p "$WORK/fakebin"; rm -f "$WORK/mktemp.log"
+  printf '#!/bin/sh\necho "$*" >> "%s"\nexec "%s" "$@"\n' "$WORK/mktemp.log" "$(command -v mktemp)" > "$WORK/fakebin/mktemp"; chmod +x "$WORK/fakebin/mktemp"
+  lab_run "$LAB" VF_ROLE=product VF_SCOPE=project "PATH=$WORK/fakebin:$PATH" -- install validator
+  if [ -f "$WORK/mktemp.log" ] && "$GREP" -qF '/.vibeflow-role.' "$WORK/mktemp.log"; then printf 'mktemp'; else printf 'nom-prevu'; fi
+}
+probe_dest_dir() { # M14 : destination répertoire
+  mk_lab; ENG="$1"; mkdir -p "$LAB/.claude/vibeflow-role"
+  run_pose "$LAB"; printf 'rc=%s dedans=%s' "$PRC" "$(ls -A "$LAB/.claude/vibeflow-role" | awk 'END { print NR }')"
+}
+
 kill_mutant() { # <id> <sonde> <attendu sur l'original> <libellé>
   local id="$1" probe="$2" want="$3" label="$4" m orig got
   m="$(mutate "$id")"; local mrc=$?
@@ -453,6 +523,13 @@ REG_BAD_SAVE="$REG_BAD"
 kill_mutant M5 probe_registre_sans_poste 'lignes-role=0' "ligne role=<poste> écrite au registre"
 REG_BAD="$REG_BAD_SAVE"
 kill_mutant M6 probe_avis liste "ligne de l'avis amputée d'un module"
+kill_mutant M8 probe_gate_repli 'rc=1 temoin=non pose=non' "repli sur la porte du dépôt rétabli"
+kill_mutant M9 probe_gi_dir 'rc=1 pose=non' "fichier de poste posé AVANT la règle d'ignorance"
+kill_mutant M10 probe_gi_eol '.env|.claude/vibeflow-role|' "fin de ligne manquante non terminée avant la règle"
+kill_mutant M11 probe_gi_lien 'rc=1 pose=non' "refus du .gitignore lien symbolique retiré"
+kill_mutant M12 probe_gi_crlf 'lignes=2' "règle CRLF non reconnue (doublon)"
+kill_mutant M13 probe_mktemp_nom mktemp "temporaire à nom prévisible \$dest.tmp.\$\$"
+kill_mutant M14 probe_dest_dir 'rc=1 dedans=0' "refus de la destination répertoire retiré"
 ENG="$INSTALLER"
 
 echo ""

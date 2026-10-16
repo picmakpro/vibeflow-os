@@ -1206,22 +1206,54 @@ gitignore_add_one() {
 # role_gitignore_rule — la règle d'ignorance du fichier de poste, par une fonction SÉPARÉE de
 # gitignore_add_paths() (qui reste octet pour octet celle de la base, P58-D-13). Chemin relatif au cwd
 # du lab, comme les autres lignes. Posée AVANT le fichier (T-58-20).
+#
+# Ce que gitignore_add_one ne fait pas, et que cette fonction fait (revue S4, audit L-1, T-58-20) :
+#  - refuser un .gitignore qui est un lien symbolique ou qui n'est pas un fichier régulier (un dossier),
+#    par une erreur bruyante : l'appelant n'a encore rien posé, le fichier de poste vient APRÈS ;
+#  - terminer la dernière ligne si elle n'a pas de fin de ligne, avant d'ajouter la règle (sinon `.env`
+#    devient `.env.claude/vibeflow-role` : la règle n'existe plus et une ligne légitime est corrompue) ;
+#  - reconnaître la règle d'un .gitignore en CRLF (`\r` final) au lieu de la dupliquer, et écrire la
+#    règle dans la même fin de ligne.
 role_gitignore_rule() {
-  gitignore_add_one ".claude/vibeflow-role"
+  local rule=".claude/vibeflow-role" f="./.gitignore" eol=""
+  if vf_dry_run; then
+    gitignore_add_one "$rule"
+    return 0
+  fi
+  if [ -L "$f" ]; then
+    err "poste : ./.gitignore est un lien symbolique — règle d'ignorance non écrite, rien n'a été posé"
+  fi
+  if [ -e "$f" ] && [ ! -f "$f" ]; then
+    err "poste : ./.gitignore n'est pas un fichier régulier — règle d'ignorance non écrite, rien n'a été posé"
+  fi
+  if [ -f "$f" ]; then
+    if tr -d '\r' < "$f" | grep -qxF -- "$rule"; then return 0; fi
+    if LC_ALL=C grep -q "$(printf '\r')" "$f"; then eol="$(printf '\r')"; fi
+    if [ -s "$f" ] && [ "$(tail -c 1 "$f" | wc -l | tr -d ' ')" -eq 0 ]; then
+      printf '%s\n' "$eol" >> "$f" || err "poste : écriture de ./.gitignore échouée"
+    fi
+  fi
+  printf '%s%s\n' "$rule" "$eol" >> "$f" || err "poste : écriture de ./.gitignore échouée"
+  log "  gitignore += $rule"
 }
 
 # role_write_file <poste> — pose le fichier de poste : une ligne + LF, écriture tmp puis mv -f
 # (patron write_target_marker, T-58-23). En --dry-run : la ligne de plan avec sa note (aucun module
 # n'est ouvert, la note est obligatoire).
 role_write_file() {
-  local poste="$1" dest="$TARGET_ROOT/vibeflow-role" tmp
+  local poste="$1" dest="$TARGET_ROOT/vibeflow-role" tmp dir
   if vf_dry_run; then
     vf_declare_write + "$dest" "(poste du lab : $poste, fichier local non versionné)"
     return 0
   fi
-  mkdir -p "$(dirname "$dest")" 2>/dev/null || err "poste : impossible de créer $(dirname "$dest")"
-  tmp="$dest.tmp.$$"
-  if printf '%s\n' "$poste" > "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
+  dir="$(dirname "$dest")"
+  mkdir -p "$dir" 2>/dev/null || err "poste : impossible de créer $dir"
+  # Destination répertoire : `mv -f` y déplacerait le temporaire au lieu de le remplacer (audit L-2).
+  [ ! -d "$dest" ] || err "poste : $dest est un répertoire — écriture refusée"
+  # Temporaire créé par mktemp dans le dossier de destination (nom imprévisible, O_EXCL), jamais un
+  # nom prévisible `$dest.tmp.$$` qu'un lien posé d'avance ferait suivre (audit L-2).
+  tmp="$(mktemp "$dir/.vibeflow-role.XXXXXX" 2>/dev/null)" || err "poste : fichier temporaire non créable dans $dir"
+  if printf '%s\n' "$poste" > "$tmp" 2>/dev/null && chmod 644 "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
     vf_declare_write + "$dest"
     log "  [poste] $poste posé dans $dest"
     return 0
@@ -1230,11 +1262,11 @@ role_write_file() {
   err "poste : écriture de $dest échouée"
 }
 
-# find_role_gate — cascade : cache conductor d'abord (source à jour), puis le lab. Vide si introuvable.
+# find_role_gate — la porte du cache du plugin, et elle seule. Vide si absente. Aucun repli sur
+# $TARGET_ROOT/scripts : ce serait exécuter du code du dépôt jugé (audit M-2) ; l'échec est fermé.
 find_role_gate() {
-  local c
-  c="$CACHE_DIR/conductor/scripts/check-role-consistency.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
-  c="$TARGET_ROOT/scripts/check-role-consistency.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  local c="$CACHE_DIR/conductor/scripts/check-role-consistency.sh"
+  [ -f "$c" ] && { echo "$c"; return 0; }
   echo ""
 }
 
@@ -1309,7 +1341,7 @@ role_apply() {
     return 0
   fi
   gate="$(find_role_gate)"
-  [ -n "$gate" ] || err "poste : check-role-consistency.sh introuvable — un poste explicite ne se pose jamais sans son contrôle"
+  [ -n "$gate" ] || err "poste : check-role-consistency.sh absent du cache du plugin (conductor) — un poste explicite ne se pose jamais sans son contrôle, et le code du dépôt n'est jamais exécuté à sa place"
   bash "$gate" --role "$poste" --path "$(pwd -P)" >/dev/null 2>&1 || rc=$?
   case "$rc" in
     0|3) : ;;
