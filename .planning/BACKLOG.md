@@ -5,6 +5,10 @@
 **Modules concernés.** installer, planning-core, consolidator, infrastructure-audit, audit-architecture, kpi-analyst, mobile-test, software-architecture.
 **Issue de Q1 (plan 41.4-08).** Option (a), P414-D-17 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-06 ; 0 skill user aujourd'hui (26 classés `vf-invocation: model`), donc aucune dette Codex active ; elle le devient au premier skill Type 1 passé user.
 
+**Absorbé : A2 — collision de nom entre scripts de modules (consigné 2026-09-25, Phase 42).** `plugin/_internal/vibeflow-update.sh` pose les scripts
+de TOUS les modules à plat dans un seul `.claude/scripts/` : un même nom de `.sh` porté par deux modules en écrase un silencieusement, sans diagnostic (dette antérieure
+à la Phase 42, même famille que CR-01 côté agents). Piste : diagnostic avant écrasement, ou namespacing par module. Déclencheur : premier incident réel de collision, ou revue de fond de l'installeur.
+
 ## Routage « crée une PR / ship » vers gsd-ship contre « ouvrir une PR = geste VibeFlow » — consigné 2026-10-06
 
 **Statut : consigné par la Phase 41.4 (P414-D-16, décision du manager), non cadré — changer une route est hors périmètre de la phase.**
@@ -91,6 +95,13 @@ N OK / 0 KO` capté par erreur dans `résultat : N OK / 0 KO / 0 SKIP`).
 `RESULT: pass=N fail=N skip=N` commune aux 12 suites, imprimée en plus — jamais à la place — du
 libellé humain existant, cf. `feedback_libelles-ok-geles.md` : les libellés `ok` gelés s'ajoutent,
 ne se réécrivent jamais). Un collecteur se cale alors sur ce contrat unique, jamais sur la prose.
+
+**Absorbé : `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module (consigné 2026-09-15, Phase 40).** Le cas 22 de
+`plugin/conductor/scripts/tests/test-scaffold-docs.sh` compare à un littéral (corrigé 11 → 12 en Phase 40) et cassera à chaque renvoi ajouté. Piste : borne basse, ou N dérivé à l'exécution.
+Même principe que ci-dessus : un nombre transmis se re-dérive, il ne se fige pas dans le test qui le vérifie. Déclencheur : prochain cas cassé par un ajout légitime.
+**Absorbé : faux rouge local de `plugin/_internal/tests/test-vibeflow-update.sh` (constaté 2026-09-28, Phase 44).** Le garde-fou « `~/.claude` intact » compte
+`~/.claude/skills/synced/`, que le runtime réécrit pendant le test (`.last-complete-round`, `manifest.json`) : 1510/1509 puis 1509/1510 sur HEAD `72eb408`, vert sur un export figé à `424cb23`.
+Même classe : un verdict de suite lu sur un signal instable. Propriétaire : Samuel. Déclencheur : prochaine évolution de ce test ou de son garde-fou, ou un faux rouge bloquant une CI/un push.
 
 ## `save()` de `dag.sh` sans verrou ni écriture atomique — lost update silencieux — DIFFÉRÉ
 
@@ -202,7 +213,10 @@ du team-kernel ou de la chaîne validator.
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Notifications de progression des agents managers — CLOS -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## check-agents : périmètre des agents tiers (gsd-*, autres chaînes) — CLOS -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Skill-installer global (multi-agents) — CLOS -->
-## Template d'agent installable s'appuyant sur dev-orchestrator
+## Template d'agent installable s'appuyant sur dev-orchestrator — CLOS (2026-10-16)
+
+Clos : prémisse périmée (vibeflow-dev et les /vf-* ont disparu), le moule d'agent de domaine installable existe avec les bundles (`b03e17ec`), et la Phase 59 en porte le déclencheur (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16).
+
 **Capturé :** 2026-06-06 · **À explorer :** quand un besoin réel d'agent de domaine apparaît
 
 Fournir un **module « agent starter »** (type `agent-only`, ex. `dev-agent-starter`) qu'un
@@ -301,6 +315,10 @@ qui doit être durci au prochain protocole du même genre.
 protocole jetable (spike, sonde, plugin de mesure, agent de sonde) — reprendre cet item avant
 d'écrire ce gate, pas après.
 
+**Absorbé : blocs `<verify><automated>` qui écrasent un script réel sans `trap` (consigné 2026-09-15, Phase 25).** `25-02-PLAN.md:154` fait `cp`/écrasement/`mv`
+du gate réel `check-instruction-budget.sh` sans filet : une interruption laisse un stub de 27 octets à sa place. Même famille (vérification de plan qui ne protège pas ce qu'elle manipule).
+Déclencheur : prochaine révision de scripts de vérification de plan écrasant un fichier réel, durcir par `trap ... EXIT INT TERM`.
+
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Budget des SKILL.md et du bootstrap — sans enforcement machine (différé de la Phase 25, 2026-09-15) — CLOS (2026-10-12) -->
 ## Évasion de mesure du budget d'instructions par bloc de code fenced — DIFFÉRÉ (2026-09-15)
 
@@ -315,7 +333,9 @@ ratchet. Hors registre STRIDE actuel de ce script.
 **Déclencheur de reprise :** un incident constatant qu'une règle a été déplacée dans un bloc de
 code pour échapper au comptage.
 
-## Blocs `<verify><automated>` de plan qui écrasent un script réel sans `trap` — DIFFÉRÉ (2026-09-15)
+## Blocs `<verify><automated>` de plan qui écrasent un script réel sans `trap` — DIFFÉRÉ (2026-09-15) — CLOS (2026-10-16)
+
+Fusionné dans « check-agents.sh ne couvre que les chemins auto-déclarés par un protocole de spike, pas l'état réel du disque » (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16).
 
 **Capturé :** 2026-09-15, audit de la mission d'exécution du plan 25-03 (mandat vf-coder), au-delà
 du périmètre de ce plan (déviation déclarée minimale, non corrigée ici).
@@ -357,6 +377,10 @@ périmètre de la Phase 25 (budget d'instructions).
 patron F13/codes normalisés ; le point 4 à la prochaine édition de l'étape CI concernée, ou plus
 tôt si quelqu'un ajoute `shell: bash` à une étape du job `gates`.
 
+**Absorbé : lignes d'index absentes dans `docs/ADR.md` (mesuré 2026-09-17, re-mesuré 2026-10-16).** La table d'index saute ADR-071 (`## ADR-071` : l.2487) ET ADR-075
+(`## ADR-075` : l.3028) : après la ligne ADR-070 (l.41) vient ADR-072 (l.42), et après ADR-074 (l.44) vient ADR-076 (l.45). Hors périmètre des phases qui les ont posées.
+Déclencheur : prochain passage sur `docs/ADR.md`.
+
 ## Protection de `main` côté GitHub — DIFFÉRÉ, en attente d'un accès admin (2026-09-17)
 
 **Statut (re-mesuré le 2026-10-12) : rulesets POSÉS, PROT-01 clos ; reste un écart source↔serveur.** Le
@@ -394,7 +418,9 @@ PROT-01 (revue code owner + 4 checks requis, refus de merge hors bypass nommé).
 demander à GitHub Support pourquoi ce défaut est appliqué sans qu'il figure dans le payload de
 création envoyé.
 
-## Ligne d'index absente pour ADR-071 dans `docs/ADR.md` — DIFFÉRÉ (2026-09-18)
+## Ligne d'index absente pour ADR-071 dans `docs/ADR.md` — DIFFÉRÉ (2026-09-18) — CLOS (2026-10-16)
+
+Fusionné dans « Dérive documentaire et fragilité latente révélées par le gate de budget d'instructions — DIFFÉRÉ (2026-09-15) » (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16).
 
 **Constat mesuré le 2026-09-17**, en posant ADR-072 (Phase 41, plan 41-18) : la table d'index de
 `docs/ADR.md` s'arrête à la ligne ADR-070, alors que la section `## ADR-071` existe plus bas dans
@@ -405,7 +431,9 @@ doctrine. **Déclencheur de reprise** : prochain passage sur `docs/ADR.md`.
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15) — CLOS (2026-10-12) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## T-25-SC — journal de sécurité de la Phase 25 : TRANCHÉ, geste de clôture (2026-09-15) — CLOS (2026-10-12) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## `check-overlaps.sh` : `present()` aveugle à un agent local installé sous son nom de fichier canonique — DIFFÉRÉ — CLOS (2026-10-12) -->
-## `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module — DIFFÉRÉ
+## `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module — DIFFÉRÉ — CLOS (2026-10-16)
+
+Fusionné dans « Formats de sortie hétérogènes entre les 12 suites de `dev-orchestrator` — DIFFÉRÉ » (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16).
 
 **Capturé :** 2026-09-15, hygiène documentaire de clôture de la Phase 40 (mandat vf-coder).
 Fragilité de conception à traiter, pas un bug de la Phase 40.
@@ -465,6 +493,11 @@ scope projet pour le mode large, ou écrire l'addendum ADR-051-B qui assume l'un
 Tant que rien n'est tranché, tout lab dont `~/.claude.json` déclare context7 donne context7 à
 `vf-app-fixer` à l'installation.
 
+**Absorbé : faux vert de `inject-mcp-tools.sh --verify` sur un dossier mixte (consigné 2026-09-26, Phase 43).** `plugin/dev-orchestrator/scripts/inject-mcp-tools.sh:505` :
+la branche d'une valeur `vf-mcp-tools` malformée fait `continue` sans `indeterminate.append(base)` (l.509-513 le fait pour « serveur absent ») : `--verify` rend `rc=0` sur un dossier mixte.
+Impact actuel nul (`ensure-deps.sh` l'appelle fichier par fichier) ; la règle 4 de `check-capability-activation.sh` lit ce mode. Revue « majeur », audit sécurité « mineur », non tranché.
+Déclencheur : prochaine évolution de `inject-mcp-tools.sh` ou de `check-capability-activation.sh`.
+
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## ADPT-06 — canal `hooks`/`plugins` du dépôt jugé jamais répété — RÉSORBÉ (2026-09-24) -->
 ## Écart D-08(b) — digest du manager sans interdits du lab sur le chemin vf-dev-manager → vf-design-judge — DIFFÉRÉ (2026-09-25)
 
@@ -492,7 +525,9 @@ distincts de ceux déjà couverts). Détail : `42-05-SUMMARY.md` § Écart non r
 requise par D-12), ou la prochaine mission dev qui exerce réellement l'étage implémentation
 croisée avec `vf-design-judge`.
 
-## A2 — collision de nom entre scripts de modules non détectée à l'installation — DIFFÉRÉ (2026-09-25)
+## A2 — collision de nom entre scripts de modules non détectée à l'installation — DIFFÉRÉ (2026-09-25) — CLOS (2026-10-16)
+
+Fusionné dans « Équivalent Codex des skills de modules Type 1 — consigné 2026-10-06 » (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16).
 
 **Capturé :** 2026-09-25, audit final de la Phase 42 (même famille que CR-01 côté agents,
 jamais corrigée côté scripts installés).
@@ -566,7 +601,9 @@ ligne de baseline, et une baisse n'exige pas de citation.
 **Déclencheur de reprise :** exécution de la Phase 43 terminée (la ligne de baseline existe), ou
 tout ajout de skill au socle qui ferait rougir le ratchet.
 
-## FAUX VERT possible de `inject-mcp-tools.sh --verify` sur un dossier mixte — DIFFÉRÉ (2026-09-26)
+## FAUX VERT possible de `inject-mcp-tools.sh --verify` sur un dossier mixte — DIFFÉRÉ (2026-09-26) — CLOS (2026-10-16)
+
+Fusionné dans « Pour Samuel — le mode large `vf-mcp-consumer` injecte les serveurs du scope global, dont context7 chez `vf-app-fixer` (constaté 2026-09-24) » (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16).
 
 **Capturé :** 2026-09-26, correction ciblée des findings de revue de la Phase 43 (compartiment
 `gouvernance`, nœud 43-04/FABR-09). Décision : option B, « décision du head sous délégation
@@ -619,7 +656,9 @@ référence avant le câblage réel produirait une doc qui pointe vers une comma
 **Déclencheur de reprise :** Phase 48 (ou la phase qui câble effectivement `recalc-planning.sh` à
 un déclencheur).
 
-## Pour Samuel — faux rouge local de `test-vibeflow-update.sh` sur `~/.claude/skills/synced/` réécrit par le runtime (constaté 2026-09-28)
+## Pour Samuel — faux rouge local de `test-vibeflow-update.sh` sur `~/.claude/skills/synced/` réécrit par le runtime (constaté 2026-09-28) — CLOS (2026-10-16)
+
+Fusionné dans « Formats de sortie hétérogènes entre les 12 suites de `dev-orchestrator` — DIFFÉRÉ » (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16).
 
 **Capturé :** 2026-09-28, correction ciblée lot 2 de la Phase 44. Origine : manager de mission
 `vf-dev-manager-g44`, mesures du 2026-09-28. Hors périmètre de cette correction (jamais touché :
@@ -681,7 +720,14 @@ d'autres classes de noms piégés).
 **Déclencheur de reprise :** la prochaine évolution de `workstream-policy.sh` ou de
 `check-planning-state.sh`, ou un incident où ce trou a masqué un compartiment réel.
 
-## Pour Samuel — `vf_ws_enumerate` pose `found=1` même quand `cd` échoue (constaté 2026-09-28)
+**Absorbé : `vf_ws_enumerate` pose `found=1` même quand `cd` échoue (constaté 2026-09-28, lot 7, P44-D-01b).** `plugin/planning-core/scripts/workstream-policy.sh:305-306` :
+`printf` puis `found=1` s'exécutent sans condition ; sur un compartiment sans bit `x`, une ligne VIDE est émise et `detect-gsd-engine.sh` (priorité 2bis) rend le code 3 « terrain libre ».
+Même cause racine (énumération non fidèle, silence total), même fichier, même propriétaire ; un `STATE.md` illisible donne le même motif côté `has_frontmatter_key`.
+Piste : tester le code de retour de `cd` avant d'émettre, ne poser `found` que sur succès, code de sortie distinct. Détail et limites du lot 8 (volume, TOCTOU) : archive du 2026-10-12, § « Détail historique ».
+
+## Pour Samuel — `vf_ws_enumerate` pose `found=1` même quand `cd` échoue (constaté 2026-09-28) — CLOS (2026-10-16)
+
+Fusionné dans « Pour Samuel — `vf_ws_enumerate` ne restitue pas fidèlement un compartiment à saut de ligne (constaté 2026-09-28) » (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16).
 
 **Capturé :** 2026-09-28, pendant l'audit de la Phase 44 (worktree `gouvernance-44`), correction de
 classe lot 7 (`recalc-planning.sh`), reproduit dans l'environnement maîtrisé du moteur. Motif du report :
