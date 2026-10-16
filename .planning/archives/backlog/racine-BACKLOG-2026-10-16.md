@@ -196,3 +196,93 @@ et rendre un code de sortie DISTINCT (ni 0, ni le 3 nominal) sur échec. Même r
 `detect-gsd-engine.sh`, ou un incident où ce trou a masqué un compartiment réel dont les
 permissions étaient dégradées.
 
+
+# Détail historique des entrées condensées
+
+Texte INTÉGRAL d'origine, tel qu'il figurait dans `.planning/BACKLOG.md` (blob `e0829881f2a59a257aab3ca5053c4b1024f6d9d6`, restituable par `git cat-file blob e0829881f2a59a257aab3ca5053c4b1024f6d9d6`), des deux entrées condensées le 2026-10-16 pour rester sous le plafond de 40 lignes après les fusions (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16) : « Formats de sortie hétérogènes… » (fusion de `test-scaffold-docs.sh` cas 22 et du faux rouge de `test-vibeflow-update.sh`) et « check-agents.sh ne couvre que les chemins auto-déclarés… » (fusion des blocs `<verify><automated>` sans `trap`).
+
+## Formats de sortie hétérogènes entre les 12 suites de `dev-orchestrator` — DIFFÉRÉ
+
+**Capturé :** 2026-08-18, hygiène documentaire de clôture de la Phase 18 (mandat vf-coder). Hors
+périmètre de cette phase (aucun code de test n'est touché) — remonté sans corriger.
+
+**Le défaut :** chaque suite de `plugin/dev-orchestrator/scripts/tests/` imprime son bilan dans un
+format textuel différent. Mesuré en ré-exécutant les 12 suites (2026-08-18) :
+
+- `== résultat : N ok, 0 ko ==` (minuscules) — **7 suites** : `test-check-dev-bootstrap.sh`,
+  `test-check-doc-drift.sh`, `test-check-gsd-config.sh`, `test-check-gsd-engine.sh`,
+  `test-check-requirements-survival.sh`, `test-discover-unintegrated-docs.sh`,
+  `test-restore-requirements-ledger.sh`.
+- `== résultat : N OK / 0 KO ==` — **1 suite** : `test-hook-exit-contract.sh`.
+- `== résultat : N OK / 0 KO / 0 SKIP ==` — **1 suite** : `test-dev-orchestrator.sh` (sur-ensemble
+  textuel du format précédent : un collecteur qui grep la sous-chaîne `OK / 0 KO` capte les DEUX
+  formats à tort comme s'ils étaient identiques).
+- `== Résultat : N OK, 0 KO, 0 SKIP ==` (majuscule `R`, virgules) — **1 suite** :
+  `test-check-hook-paths.sh`.
+- `== bilan : N cas — N OK / 0 KO ==` — **1 suite** : `test-check-capability-activation.sh`.
+- `  Bilan : N OK, 0 KO` (indenté, majuscule `B`, sans délimiteurs `==`, virgule plutôt que `/`) —
+  **1 suite** : `test-inject-mcp-tools.sh`. Correction d'un a priori du mandat de cadrage : ce
+  script **imprime bien un compteur** (contrairement à l'hypothèse initiale « n'imprime aucun
+  compteur, ne se vérifie qu'au code de sortie ») — mais dans un 6ᵉ format textuel qui ne
+  correspond à aucun des cinq autres, donc tout aussi invisible à un collecteur calé sur l'un des
+  cinq.
+
+Soit **6 formats textuels distincts sur 12 suites**, toutes vertes à l'exécution directe
+(`bash <suite>.sh`, exit 0 partout, re-vérifié le 2026-08-18). Tout script de collecte qui filtre
+sur UN motif littéral (grep exact ou substring) classera à tort en échec — ou pire, en silence
+absent des deux côtés — les suites qui n'emploient pas ce motif précis. Le risque est bidirectionnel :
+faux KO sur une suite verte (motif absent) ET faux vert par sous-chaîne partagée (le cas `résultat :
+N OK / 0 KO` capté par erreur dans `résultat : N OK / 0 KO / 0 SKIP`).
+
+**Piste de fix :** un unique contrat de sortie machine-lisible (ex. une dernière ligne
+`RESULT: pass=N fail=N skip=N` commune aux 12 suites, imprimée en plus — jamais à la place — du
+libellé humain existant, cf. `feedback_libelles-ok-geles.md` : les libellés `ok` gelés s'ajoutent,
+ne se réécrivent jamais). Un collecteur se cale alors sur ce contrat unique, jamais sur la prose.
+
+**Absorbé : `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module (consigné 2026-09-15, Phase 40).** Le cas 22 de
+`plugin/conductor/scripts/tests/test-scaffold-docs.sh` compare à un littéral (corrigé 11 → 12 en Phase 40) et cassera à chaque renvoi ajouté. Piste : borne basse, ou N dérivé à l'exécution.
+Même principe que ci-dessus : un nombre transmis se re-dérive, il ne se fige pas dans le test qui le vérifie. Déclencheur : prochain cas cassé par un ajout légitime.
+**Absorbé : faux rouge local de `plugin/_internal/tests/test-vibeflow-update.sh` (constaté 2026-09-28, Phase 44).** Le garde-fou « `~/.claude` intact » compte
+`~/.claude/skills/synced/`, que le runtime réécrit pendant le test (`.last-complete-round`, `manifest.json`) : 1510/1509 puis 1509/1510 sur HEAD `72eb408`, vert sur un export figé à `424cb23`.
+Même classe : un verdict de suite lu sur un signal instable. Propriétaire : Samuel. Déclencheur : prochaine évolution de ce test ou de son garde-fou, ou un faux rouge bloquant une CI/un push.
+
+## check-agents.sh ne couvre que les chemins auto-déclarés par un protocole de spike, pas l'état réel du disque
+**Capturé :** 2026-09-15 (audit de la mission Phase 34, arbitrage Samuel, AskUserQuestion session
+principale, 2026-09-15) · **À explorer :** prochain durcissement de gate touchant au nettoyage
+d'un protocole jetable (spike, sonde, plugin de mesure)
+
+**Constat.** Le gate automatisé de nettoyage du spike SKIL-01 (`34-02-PLAN.md:237`, bloc
+`<automated>` de la tâche 2, référencé par `34-VALIDATION.md:55`) ne vérifie que les chemins
+**auto-déclarés par le protocole lui-même** (la liste « chemin supprimé : … » construite au fur
+et à mesure de la pose), jamais l'état réel du disque. Ce gate est passé **VERT** (commit
+`81dcc03`) alors que **trois résidus** subsistaient après la clôture initiale du spike : le cache
+disque du plugin sous `~/.claude/plugins/cache/`, une entrée orpheline dans `~/.claude.json`, et
+les transcripts de session sous `~/.claude/projects/`. Ils n'ont été trouvés que par une
+recherche élargie (`find ~/.claude -iname "*skil01*"`), hors protocole — détail complet et
+preuve machine : `34-SPIKE-SKIL.md` §§ « Résidus trouvés après le premier passage » et
+« Purge ».
+
+**Pourquoi c'est une dette structurelle, pas un incident clos.** Le résidu de ce spike précis a
+été purgé (deux gestes distincts, un troisième laissé intact sur arbitrage explicite de Samuel —
+voir `34-SPIKE-SKIL.md` § « Purge »). Mais le **gate lui-même** reste le même patron qu'avant :
+une liste auto-déclarée n'est pas une vérification, elle ne peut par construction jamais
+constater ce qu'elle n'a pas elle-même énuméré (« une preuve incapable de rendre rouge »). Un
+futur protocole du même patron (spike jetable, sonde, plugin de mesure) repasserait vert avec le
+même trou.
+
+**Forme attendue du correctif :** une vérification de nettoyage par **recherche élargie de
+l'état réel du disque** (cache plugins, `~/.claude.json`, registres) — jamais une liste
+auto-déclarée par le protocole qu'elle est censée vérifier — avec **mutation rouge prouvée** (un
+résidu injecté hors de la liste auto-déclarée doit faire échouer le gate).
+
+**Pourquoi différé :** le plan 34-02 reste une archive exécutée non modifiée (arbitrage explicite
+de Samuel, même canal et date) — ce n'est pas ce plan-là qui se corrige, c'est le patron de gate
+qui doit être durci au prochain protocole du même genre.
+
+**Déclencheur de resurgence :** prochain plan qui pose un gate de nettoyage automatisé pour un
+protocole jetable (spike, sonde, plugin de mesure, agent de sonde) — reprendre cet item avant
+d'écrire ce gate, pas après.
+
+**Absorbé : blocs `<verify><automated>` qui écrasent un script réel sans `trap` (consigné 2026-09-15, Phase 25).** `25-02-PLAN.md:154` fait `cp`/écrasement/`mv`
+du gate réel `check-instruction-budget.sh` sans filet : une interruption laisse un stub de 27 octets à sa place. Même famille (vérification de plan qui ne protège pas ce qu'elle manipule).
+Déclencheur : prochaine révision de scripts de vérification de plan écrasant un fichier réel, durcir par `trap ... EXIT INT TERM`.

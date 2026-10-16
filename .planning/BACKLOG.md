@@ -1,3 +1,9 @@
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## Template d'agent installable s'appuyant sur dev-orchestrator — CLOS (2026-10-16) -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## Ligne d'index absente pour ADR-071 dans `docs/ADR.md` — DIFFÉRÉ (2026-09-18) — CLOS (2026-10-16) -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module — DIFFÉRÉ — CLOS (2026-10-16) -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Combler les gaps de couverture inspirés du catalogue `agency-agents` — CLOS (2026-10-12) -->
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-08.md — ## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23) — CLOS (2026-10-08) -->
+
 ## Équivalent Codex des skills de modules Type 1 — consigné 2026-10-06
 
 **Statut : dette consignée par la Phase 41.4 (P414-D-03), non traitée : exige une modification de l'installeur.**
@@ -66,30 +72,9 @@ périmètre de cette phase (aucun code de test n'est touché) — remonté sans 
 **Le défaut :** chaque suite de `plugin/dev-orchestrator/scripts/tests/` imprime son bilan dans un
 format textuel différent. Mesuré en ré-exécutant les 12 suites (2026-08-18) :
 
-- `== résultat : N ok, 0 ko ==` (minuscules) — **7 suites** : `test-check-dev-bootstrap.sh`,
-  `test-check-doc-drift.sh`, `test-check-gsd-config.sh`, `test-check-gsd-engine.sh`,
-  `test-check-requirements-survival.sh`, `test-discover-unintegrated-docs.sh`,
-  `test-restore-requirements-ledger.sh`.
-- `== résultat : N OK / 0 KO ==` — **1 suite** : `test-hook-exit-contract.sh`.
-- `== résultat : N OK / 0 KO / 0 SKIP ==` — **1 suite** : `test-dev-orchestrator.sh` (sur-ensemble
-  textuel du format précédent : un collecteur qui grep la sous-chaîne `OK / 0 KO` capte les DEUX
-  formats à tort comme s'ils étaient identiques).
-- `== Résultat : N OK, 0 KO, 0 SKIP ==` (majuscule `R`, virgules) — **1 suite** :
-  `test-check-hook-paths.sh`.
-- `== bilan : N cas — N OK / 0 KO ==` — **1 suite** : `test-check-capability-activation.sh`.
-- `  Bilan : N OK, 0 KO` (indenté, majuscule `B`, sans délimiteurs `==`, virgule plutôt que `/`) —
-  **1 suite** : `test-inject-mcp-tools.sh`. Correction d'un a priori du mandat de cadrage : ce
-  script **imprime bien un compteur** (contrairement à l'hypothèse initiale « n'imprime aucun
-  compteur, ne se vérifie qu'au code de sortie ») — mais dans un 6ᵉ format textuel qui ne
-  correspond à aucun des cinq autres, donc tout aussi invisible à un collecteur calé sur l'un des
-  cinq.
-
-Soit **6 formats textuels distincts sur 12 suites**, toutes vertes à l'exécution directe
-(`bash <suite>.sh`, exit 0 partout, re-vérifié le 2026-08-18). Tout script de collecte qui filtre
-sur UN motif littéral (grep exact ou substring) classera à tort en échec — ou pire, en silence
-absent des deux côtés — les suites qui n'emploient pas ce motif précis. Le risque est bidirectionnel :
-faux KO sur une suite verte (motif absent) ET faux vert par sous-chaîne partagée (le cas `résultat :
-N OK / 0 KO` capté par erreur dans `résultat : N OK / 0 KO / 0 SKIP`).
+Six formats distincts sur 12 suites : `== résultat : N ok, 0 ko ==` (7 suites), `== résultat : N OK / 0 KO ==` (1), le même suivi de `/ 0 SKIP` (1, sur-ensemble textuel du précédent),
+`== Résultat : N OK, 0 KO, 0 SKIP ==` (1), `== bilan : N cas — N OK / 0 KO ==` (1), `  Bilan : N OK, 0 KO` (1, `test-inject-mcp-tools.sh`). Suites nommées : détail archivé.
+Toutes vertes à l'exécution directe (2026-08-18). Un collecteur calé sur UN motif littéral classe à tort en échec, ou en faux vert par sous-chaîne partagée (`OK / 0 KO` dans `OK / 0 KO / 0 SKIP`).
 
 **Piste de fix :** un unique contrat de sortie machine-lisible (ex. une dernière ligne
 `RESULT: pass=N fail=N skip=N` commune aux 12 suites, imprimée en plus — jamais à la place — du
@@ -99,6 +84,7 @@ ne se réécrivent jamais). Un collecteur se cale alors sur ce contrat unique, j
 **Absorbé : `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module (consigné 2026-09-15, Phase 40).** Le cas 22 de
 `plugin/conductor/scripts/tests/test-scaffold-docs.sh` compare à un littéral (corrigé 11 → 12 en Phase 40) et cassera à chaque renvoi ajouté. Piste : borne basse, ou N dérivé à l'exécution.
 Même principe que ci-dessus : un nombre transmis se re-dérive, il ne se fige pas dans le test qui le vérifie. Déclencheur : prochain cas cassé par un ajout légitime.
+
 **Absorbé : faux rouge local de `plugin/_internal/tests/test-vibeflow-update.sh` (constaté 2026-09-28, Phase 44).** Le garde-fou « `~/.claude` intact » compte
 `~/.claude/skills/synced/`, que le runtime réécrit pendant le test (`.last-complete-round`, `manifest.json`) : 1510/1509 puis 1509/1510 sur HEAD `72eb408`, vert sur un export figé à `424cb23`.
 Même classe : un verdict de suite lu sur un signal instable. Propriétaire : Samuel. Déclencheur : prochaine évolution de ce test ou de son garde-fou, ou un faux rouge bloquant une CI/un push.
@@ -213,8 +199,6 @@ du team-kernel ou de la chaîne validator.
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Notifications de progression des agents managers — CLOS -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## check-agents : périmètre des agents tiers (gsd-*, autres chaînes) — CLOS -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-09-30.md — ## Skill-installer global (multi-agents) — CLOS -->
-<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Combler les gaps de couverture inspirés du catalogue `agency-agents` — CLOS (2026-10-12) -->
-<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## Template d'agent installable s'appuyant sur dev-orchestrator — CLOS (2026-10-16) -->
 ## AGTS-02 — sortie d'expérimental de `mobile-test`(-team) : REPORTÉE avec trace
 
 **Capturé :** 2026-09-15 (Phase 34, run réel piloté par l'équipe, `34-RUN-MOBILE.md`) ·
@@ -263,13 +247,8 @@ recherche élargie (`find ~/.claude -iname "*skil01*"`), hors protocole — dét
 preuve machine : `34-SPIKE-SKIL.md` §§ « Résidus trouvés après le premier passage » et
 « Purge ».
 
-**Pourquoi c'est une dette structurelle, pas un incident clos.** Le résidu de ce spike précis a
-été purgé (deux gestes distincts, un troisième laissé intact sur arbitrage explicite de Samuel —
-voir `34-SPIKE-SKIL.md` § « Purge »). Mais le **gate lui-même** reste le même patron qu'avant :
-une liste auto-déclarée n'est pas une vérification, elle ne peut par construction jamais
-constater ce qu'elle n'a pas elle-même énuméré (« une preuve incapable de rendre rouge »). Un
-futur protocole du même patron (spike jetable, sonde, plugin de mesure) repasserait vert avec le
-même trou.
+**Pourquoi c'est une dette structurelle, pas un incident clos.** Le résidu de ce spike est purgé (`34-SPIKE-SKIL.md` § « Purge »), mais le **gate** reste du même patron :
+une liste auto-déclarée ne peut jamais constater ce qu'elle n'a pas énuméré (« une preuve incapable de rendre rouge ») ; un futur protocole du même patron repasserait vert.
 
 **Forme attendue du correctif :** une vérification de nettoyage par **recherche élargie de
 l'état réel du disque** (cache plugins, `~/.claude.json`, registres) — jamais une liste
@@ -376,9 +355,6 @@ création envoyé.
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Posture de protection de `main` — TRANCHÉ : phase dédiée à inscrire (2026-09-15) — CLOS (2026-10-12) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## T-25-SC — journal de sécurité de la Phase 25 : TRANCHÉ, geste de clôture (2026-09-15) — CLOS (2026-10-12) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## `check-overlaps.sh` : `present()` aveugle à un agent local installé sous son nom de fichier canonique — DIFFÉRÉ — CLOS (2026-10-12) -->
-<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## Ligne d'index absente pour ADR-071 dans `docs/ADR.md` — DIFFÉRÉ (2026-09-18) — CLOS (2026-10-16) -->
-<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-08.md — ## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23) — CLOS (2026-10-08) -->
-<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-16.md — ## `test-scaffold-docs.sh` cas 22 fige en dur le nombre de références d'un module — DIFFÉRÉ — CLOS (2026-10-16) -->
 ## Mise en conformité du corpus de skills en dérive procédurale non déclarée (différé de la Phase 43, 2026-09-24)
 
 **Capturé :** 2026-09-24, cadrage de la Phase 43 (compartiment `gouvernance`, `43-CONTEXT.md` D-Q5).
