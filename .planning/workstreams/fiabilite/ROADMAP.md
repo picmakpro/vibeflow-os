@@ -574,7 +574,7 @@ Plans:
 ### Phase 58: Rôles de poste — installeur, profils solo / product / dev
 
 **Goal:** `/vibeflow-install` demande le rôle sur ce projet, pré-coché « solo », avec un mode non interactif par `VF_ROLE`. `module.json` porte `roles` (absent = tous), et `build-module-catalog.sh` filtre le catalogue. Le rôle vit dans un fichier local non versionné (A-11) ; le projet ne porte que la liste des rôles autorisés, vérifiée par `check-role-consistency.sh`. Trois profils seulement (A-02).
-**Requirements**: TBD — famille `RLPO` réservée, posée au cadrage.
+**Requirements**: RLPO-01, RLPO-02, RLPO-03, RLPO-04, RLPO-05, RLPO-06, RLPO-07, RLPO-08, RLPO-09, RLPO-10, RLPO-11, RLPO-12
 **Depends on:** 57.
 **Sources:** spec §5.1, §5.4 ; SEED A-02, A-04, A-11 ; `plugin/installer/`, `plugin/_internal/vibeflow-update.sh`.
 **Hors périmètre :** les rôles architecte, QA et scrum master (A-02) ; tout contrôle d'accès.
