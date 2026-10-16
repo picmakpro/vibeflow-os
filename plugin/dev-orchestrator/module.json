@@ -6,5 +6,6 @@
   "requires": [
     "conductor",
     "design-orchestrator"
-  ]
+  ],
+  "roles": ["dev"]
 }
