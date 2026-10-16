@@ -5,6 +5,7 @@
 #   ./vibeflow-update.sh [--scope user|project|local] [--dry-run] install <module>   # Installe un module
 #   ./vibeflow-update.sh [--scope ...] [--dry-run] install --with-deps <module>      # Installe la fermeture transitive
 #   ./vibeflow-update.sh [--scope ...] [--dry-run] install --all                     # Installe tous les modules dispo
+#   ./vibeflow-update.sh [--role solo|product|dev] install <module>                  # idem, et pose le poste (Phase 58)
 #   ./vibeflow-update.sh [--scope ...] [--dry-run] update <module>                   # Met à jour un module installé
 #   ./vibeflow-update.sh [--scope ...] [--dry-run] update --all                      # Met à jour tous les modules installés
 #   ./vibeflow-update.sh [--scope ...] uninstall <module>                   # Désinstalle un module
@@ -23,6 +24,16 @@
 #   env VF_SCOPE            → idem ; --scope l'emporte sur VF_SCOPE.
 #   --dry-run                → n'écrit RIEN, rend le plan de pose fichier par fichier sur stdout.
 #                               Accepté seulement sur install/update ; refusé (exit 1) ailleurs.
+#
+# Poste (Phase 58, P58-D-01, P58-D-16, P58-D-18) :
+#   --role <solo|product|dev> | env VF_ROLE → sur `install` seulement, pose le poste de l'humain dans
+#   `<cible>/vibeflow-role` (une ligne, fichier LOCAL non versionné). --role l'emporte sur VF_ROLE ; un
+#   VF_ROLE hérité est ignoré par les autres verbes. La règle d'ignorance `.claude/vibeflow-role` est
+#   posée dans ./.gitignore AVANT le fichier, dans tous les scopes où un poste est posé (project compris),
+#   et la ligne est ajoutée à ./.worktreeinclude. Sans poste, rien de tout cela n'a lieu. Refus à la pose
+#   si le poste est hors de la liste `vf_roles` du projet ; l'engine n'écrit jamais `.planning/config.json`.
+#   Scope user : le poste vaut solo (aucun fichier). Sous --target : aucun fichier de poste.
+#   « Un poste est une vue, pas un droit » : aucune décision de sécurité ne lit ce fichier.
 #
 # Pré-requis : $VIBEFLOW_CACHE existe (dossier des modules + leurs module.json).
 
@@ -150,6 +161,10 @@ VF_TARGET_OVERRIDE="${VF_TARGET:-}"
 # jamais deviné. Aucun prompt ici (l'engine tourne sans humain sous la main) : c'est la skill
 # appelante qui interroge l'utilisateur et repasse ce drapeau.
 VF_TARGET_NONEMPTY_OK="0"
+# P58-D-18 : poste de l'humain, même forme que VF_SCOPE (env, puis --role qui l'emporte). Validation
+# fermée plus bas (sur `install` seulement) ; VF_ROLE_FLAG=1 dit que --role a été passé explicitement.
+VF_ROLE="${VF_ROLE:-}"
+VF_ROLE_FLAG="0"
 
 # Détecter `--scope <val>`/`--dry-run`/`--target <val>` AVANT cmd="$1" : on filtre les
 # positionnels et on override VF_SCOPE/VF_DRY_RUN/VF_TARGET_OVERRIDE.
@@ -163,6 +178,17 @@ while [ "$#" -gt 0 ]; do
       ;;
     --scope=*)
       VF_SCOPE="${1#--scope=}"
+      shift
+      ;;
+    --role)
+      [ "$#" -ge 2 ] || err "--role nécessite une valeur (solo|product|dev)"
+      VF_ROLE="$2"
+      VF_ROLE_FLAG="1"
+      shift 2
+      ;;
+    --role=*)
+      VF_ROLE="${1#--role=}"
+      VF_ROLE_FLAG="1"
       shift
       ;;
     --target)
@@ -207,6 +233,25 @@ case "$VF_SCOPE" in
   user|project|local) : ;;
   *) err "scope invalide : $VF_SCOPE (attendu user|project|local)" ;;
 esac
+
+# Poste (P58-D-18) : validation fermée AVANT tout usage de la valeur (jamais dans un chemin ni une
+# commande, jamais réimprimée). Un VF_ROLE hérité de l'environnement ne casse jamais update/status/
+# uninstall : seule l'install le lit. --role explicite sur un autre verbe = refus bruyant.
+if [ "$#" -gt 0 ]; then
+  case "$1" in
+    install)
+      case "$VF_ROLE" in
+        ""|solo|product|dev) : ;;
+        *) err "poste invalide (attendu solo|product|dev ; valeur non réimprimée)" ;;
+      esac
+      ;;
+    *)
+      if [ "$VF_ROLE_FLAG" = "1" ]; then
+        err "--role n'est accepté que sur install (update --all suit le registre)"
+      fi
+      ;;
+  esac
+fi
 
 # Surface du flag --dry-run (D-31-06), validée AVANT cmd="$1" (952) : borné à install/update/
 # rollback (ROLL-05, 38-03 — rollback a rejoint la liste, cf. rollback_module ci-dessous).
@@ -363,6 +408,10 @@ VF_MANIFEST_TMP=""
 # préexistant, mono-module inclus), puis mis à 1 dès qu'un module du run a mergé ses hooks — qu'il
 # ait trouvé le fichier déjà là ou que ce merge soit celui qui le crée pour le run.
 VF_SETTINGS_JSON_WILL_EXIST="0"
+# P58-PL-02 : même justification que F-01 ci-dessus. Miroir run-scoped du fichier de poste : 0 au départ,
+# 1 dès qu'un poste est posé par CE run (pose réelle ou --dry-run). ensure_worktreeinclude_entries le lit
+# pour déclarer au plan ce que la pose écrit ; un test disque seul serait faux en --dry-run (RV-M7).
+VF_ROLE_WILL_EXIST="0"
 [ -f "$TARGET_ROOT/settings.json" ] && VF_SETTINGS_JSON_WILL_EXIST="1"
 # Compteur de copies dégradées (D-31-11 point 4) de la pose EN COURS — remis à 0 par
 # vf_manifest_reset (appelée en tête d'install_module), lu en fin d'install_module pour le
@@ -459,6 +508,7 @@ vf_manifest_excluded() {
     scripts/vf-portable.sh)       return 0 ;;  # propriété exclusive de l'engine (copy_engine_lib), partagée entre modules
     scripts/runtime-cli-dispatch.sh) return 0 ;;  # idem, miroir (copy_runtime_dispatch, correction ciblée jointure 38)
     scripts/.vibeflow-target)     return 0 ;;  # idem, miroir (write_target_marker, TGT-04) — marqueur de cible engine-owned
+    vibeflow-role)                return 0 ;;  # idem (role_write_file, P58-D-01) — poste du lab, fichier local engine-owned
     memory/*)                     return 0 ;;  # contenu vivant du lab semé par seed-registres.sh, pas un artefact de pose
     scripts/.vibeflow-installed)  return 0 ;;  # état du moteur, pas contenu de module
     scripts/.vibeflow-manifest-*) return 0 ;;  # le manifeste ne se consigne jamais lui-même (boucle de convergence)
@@ -1132,6 +1182,74 @@ gitignore_add_one() {
     echo "$path" >> .gitignore
     log "  gitignore += $path"
   fi
+}
+
+# ---------- Poste de l'humain (Phase 58, P58-D-01, P58-D-09, P58-D-13, P58-D-16) ----------
+# role_gitignore_rule — la règle d'ignorance du fichier de poste, par une fonction SÉPARÉE de
+# gitignore_add_paths() (qui reste octet pour octet celle de la base, P58-D-13). Chemin relatif au cwd
+# du lab, comme les autres lignes. Posée AVANT le fichier (T-58-20).
+role_gitignore_rule() {
+  gitignore_add_one ".claude/vibeflow-role"
+}
+
+# role_write_file <poste> — pose le fichier de poste : une ligne + LF, écriture tmp puis mv -f
+# (patron write_target_marker, T-58-23). En --dry-run : la ligne de plan avec sa note (aucun module
+# n'est ouvert, la note est obligatoire).
+role_write_file() {
+  local poste="$1" dest="$TARGET_ROOT/vibeflow-role" tmp
+  if vf_dry_run; then
+    vf_declare_write + "$dest" "(poste du lab : $poste, fichier local non versionné)"
+    return 0
+  fi
+  mkdir -p "$(dirname "$dest")" 2>/dev/null || err "poste : impossible de créer $(dirname "$dest")"
+  tmp="$dest.tmp.$$"
+  if printf '%s\n' "$poste" > "$tmp" 2>/dev/null && mv -f "$tmp" "$dest" 2>/dev/null; then
+    vf_declare_write + "$dest"
+    log "  [poste] $poste posé dans $dest"
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  err "poste : écriture de $dest échouée"
+}
+
+# find_role_gate — cascade : cache conductor d'abord (source à jour), puis le lab. Vide si introuvable.
+find_role_gate() {
+  local c
+  c="$CACHE_DIR/conductor/scripts/check-role-consistency.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  c="$TARGET_ROOT/scripts/check-role-consistency.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
+  echo ""
+}
+
+# role_apply [--changement] — pose le poste VF_ROLE. Ordre, et AVANT toute écriture (P58-PL-07) :
+# scope user, --target, solo sans fichier, refus à la pose (P58-D-09), puis règle d'ignorance,
+# fichier, drapeau. --changement : réécriture inconditionnelle, même `solo` sans fichier (verbe
+# `role`, plan 58-08). Ne touche jamais .planning/config.json (P58-D-02).
+role_apply() {
+  local changement=0 poste="$VF_ROLE" gate rc=0
+  if [ "${1:-}" = "--changement" ]; then changement=1; fi
+  [ -n "$poste" ] || return 0
+  if [ "$VF_SCOPE" = "user" ]; then
+    [ "$poste" = "solo" ] && return 0
+    err "en scope user le poste vaut solo (P58-D-04) — poser le poste en scope project ou local"
+  fi
+  if [ -n "$VF_TARGET_OVERRIDE" ]; then
+    log "  [poste] $poste : fichier de poste non posé sous --target"
+    return 0
+  fi
+  if [ "$poste" = "solo" ] && [ "$changement" = "0" ] && [ ! -f "./.claude/vibeflow-role" ]; then
+    return 0
+  fi
+  gate="$(find_role_gate)"
+  [ -n "$gate" ] || err "poste : check-role-consistency.sh introuvable — un poste explicite ne se pose jamais sans son contrôle"
+  bash "$gate" --role "$poste" --path "$(pwd -P)" >/dev/null 2>&1 || rc=$?
+  case "$rc" in
+    0|3) : ;;
+    1) err "poste hors de la liste vf_roles du projet (.planning/config.json) — rien n'a été posé ; un poste est une vue, pas un droit" ;;
+    *) err "liste des postes du projet illisible — rien n'a été posé" ;;
+  esac
+  role_gitignore_rule
+  role_write_file "$poste"
+  VF_ROLE_WILL_EXIST="1"
 }
 
 # vf_gitignore_target_prefix — préfixe RELATIF AU CWD à écrire dans ./.gitignore (TGT-02).
@@ -1833,7 +1951,10 @@ ensure_worktreeinclude_entries() {
   # (le plan doit dire ce que l'install pose, test-manifest TD1 compare les deux ensembles).
   local f="./.worktreeinclude" line verb missing="" eol=""
   if [ -f "$f" ] && LC_ALL=C grep -q "$(printf '\r')" "$f"; then eol="$(printf '\r')"; fi
-  for line in ".claude/hooks/" ".claude/scripts/"; do
+  local candidates=".claude/hooks/ .claude/scripts/"
+  # P58-D-01 : la ligne du poste n'entre que si un poste est (ou sera, plan comme pose) posé, ou déjà là.
+  if [ "$VF_ROLE_WILL_EXIST" = "1" ] || [ -f "./.claude/vibeflow-role" ]; then candidates="$candidates .claude/vibeflow-role"; fi
+  for line in $candidates; do
     # Comparaison modulo fin de ligne CRLF : un fichier édité sous Windows ne reçoit pas de doublon.
     if [ -f "$f" ] && tr -d '\r' < "$f" | grep -qxF -- "$line"; then continue; fi
     missing="$missing$line
@@ -3236,6 +3357,12 @@ arg="${2:-}"
 
 case "$cmd" in
   install)
+    # P58 : le poste se pose UNE fois, en tête, avant les modules (les erreurs d'usage restent levées
+    # comme avant : pas de poste posé sans module visé).
+    if [ -n "$VF_ROLE" ] && [ -n "$arg" ] && { [ "$arg" != "--with-deps" ] || [ -n "${3:-}" ]; }; then
+      require_cache
+      role_apply
+    fi
     if [ "$arg" = "--all" ]; then
       require_cache
       for m in $(list_available_modules); do install_module "$m"; done
