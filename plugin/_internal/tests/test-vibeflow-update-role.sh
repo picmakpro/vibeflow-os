@@ -55,13 +55,14 @@ mk_lab() {
 
 # lab_run <lab> [VAR=val ...] -- <args engine...> — stdout et stderr du run : fichiers $WORK/out et $WORK/err.
 ENG="$INSTALLER"
+BPFX=()   # préfixe de borne de temps (vide par défaut) — voir bound_on
 lab_run() {
   local lab="$1"; shift
   local envs=()
   while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
   shift
   local rc=0
-  (cd "$lab" && env -u VF_ROLE -u VF_SCOPE -u VF_TARGET HOME="$FH" VF_RUNTIME=claude VIBEFLOW_CACHE="$lab/cache" \
+  (cd "$lab" && ${BPFX[@]+"${BPFX[@]}"} env -u VF_ROLE -u VF_SCOPE -u VF_TARGET HOME="$FH" VF_RUNTIME=claude VIBEFLOW_CACHE="$lab/cache" \
      ${envs[@]+"${envs[@]}"} "${BASH:-bash}" "$ENG" "$@") > "$WORK/out" 2> "$WORK/err" || rc=$?
   reg_check "$lab"
   return "$rc"
@@ -399,6 +400,39 @@ if [ "$PRC" -eq 1 ] && "$GREP" -qF 'absent du cache du plugin' "$WORK/err" && [ 
 mk_lab; LG7="$LAB"; mkdir -p "$LG7/.claude/vibeflow-role"; run_pose "$LG7"
 if [ "$PRC" -eq 1 ] && [ -d "$LG7/.claude/vibeflow-role" ] && [ "$(ls -A "$LG7/.claude/vibeflow-role" | awk 'END { print NR }')" -eq 0 ]; then ok "RV-DEST-DIR (S6, audit L-2) : destination répertoire → refus, rien déplacé dedans"; else ko "RV-DEST-DIR : rc=$PRC contenu=$(ls -A "$LG7/.claude/vibeflow-role" | tr '\n' ' ')"; fi
 
+# Borne de temps : la commande tourne dans son propre groupe de processus, l'expiration tue TOUT le
+# groupe (rc 142) et rien ne survit au retour normal non plus. Un FIFO ouvert en écriture bloque sans fin.
+cat > "$WORK/bound.sh" <<'BOUND'
+#!/bin/sh
+exec perl -e '
+  my $pid = fork(); die "fork: $!" unless defined $pid;
+  if (!$pid) { setpgrp(0, 0); exec @ARGV or exit 127; }
+  $SIG{ALRM} = sub { kill "KILL", -$pid; kill "KILL", $pid; waitpid($pid, 0); exit 142; };
+  alarm 6; waitpid($pid, 0); my $st = $?;
+  kill "KILL", -$pid;
+  exit($st & 127 ? 128 + ($st & 127) : $st >> 8);
+' "$@"
+BOUND
+chmod +x "$WORK/bound.sh"
+bound_on() { BPFX=("$WORK/bound.sh"); }
+bound_off() { BPFX=(); }
+survivants() { # processus encore vivants qui portent le dossier de travail de la suite
+  ps -axo command | awk -v w="$WORK" 'index($0, w) && index($0, "awk") == 0 { n++ } END { print n + 0 }'
+}
+
+mk_lab; LG8="$LAB"; mkfifo "$LG8/.gitignore"; bound_on; run_pose "$LG8"; bound_off; SURV="$(survivants)"
+if [ "$PRC" -eq 1 ] && "$GREP" -qF "pas un fichier régulier" "$WORK/err" && [ "$(etat_pose "$LG8")" = "non" ] && [ "$SURV" -eq 0 ]; then ok "RV-GI-FIFO (revue M2) : .gitignore FIFO → refus nommé sans blocage, aucun poste posé, aucun processus ne survit"; else ko "RV-GI-FIFO : rc=$PRC pose=$(etat_pose "$LG8") survivants=$SURV err[$(tail -1 "$WORK/err")]"; fi
+
+mk_lab; LG9="$LAB"; run_pose "$LG9"
+MODE_POSTE="$(ls -l "$LG9/.claude/vibeflow-role" | awk '{ print substr($1, 1, 10) }')"
+if [ "$PRC" -eq 0 ] && [ "$MODE_POSTE" = "-rw-r--r--" ]; then ok "RV-MODE (revue M2) : fichier de poste en 644 (mktemp le crée en 600)"; else ko "RV-MODE : rc=$PRC mode=$MODE_POSTE"; fi
+
+mk_lab; LGA="$LAB"
+{ printf '.claude/vibeflow-role\n'; awk 'BEGIN { for (i = 0; i < 6000; i++) print "fichier-" i ".log" }'; } > "$LGA/.gitignore"
+TAILLE_GI="$(wc -c < "$LGA/.gitignore" | tr -d ' ')"; AVANT_GI="$(cksum < "$LGA/.gitignore")"
+run_pose "$LGA"; run_pose "$LGA"
+if [ "$PRC" -eq 0 ] && [ "$TAILLE_GI" -gt 71680 ] && [ "$("$GREP" -cxF '.claude/vibeflow-role' "$LGA/.gitignore")" -eq 1 ] && [ "$(cksum < "$LGA/.gitignore")" = "$AVANT_GI" ]; then ok "RV-GI-GROS (revue M1) : .gitignore de $TAILLE_GI octets, règle en tête → reconnue deux fois, aucun doublon, octets intacts"; else ko "RV-GI-GROS : rc=$PRC taille=$TAILLE_GI règles=$("$GREP" -cxF '.claude/vibeflow-role' "$LGA/.gitignore")"; fi
+
 # ---------------------------------------------------------------------------
 # Mutants (QUAL-01) — copie de _internal, l'original n'est jamais touché
 # ---------------------------------------------------------------------------
@@ -418,7 +452,10 @@ mutate() { # <id> → écrit le mutant et rend son chemin ; 1 = identique à l'o
     MODE == "M9" && held != "" && index($0, "  role_write_file \"$poste\"") == 1 { print; print held; held = ""; next }
     MODE == "M10" && $0 == "    if [ -s \"$f\" ] && [ \"$(tail -c 1 \"$f\" | wc -l | tr -d '"'"' '"'"')\" -eq 0 ]; then" { print "    if false; then"; next }
     MODE == "M11" && $0 == "  if [ -L \"$f\" ]; then" { print "  if false; then"; next }
-    MODE == "M12" && index($0, "    if tr -d '"'"'\\r'"'"' < \"$f\" | grep -qxF -- \"$rule\"; then return 0; fi") == 1 { print "    if grep -qxF -- \"$rule\" \"$f\"; then return 0; fi"; next }
+    MODE == "M12" && index($0, "    if grep -qxF -e \"$rule\" -e \"$rule$cr\" \"$f\"; then return 0; fi") == 1 { print "    if grep -qxF -- \"$rule\" \"$f\"; then return 0; fi"; next }
+    MODE == "M15" && index($0, "    if grep -qxF -e \"$rule\" -e \"$rule$cr\" \"$f\"; then return 0; fi") == 1 { print "    if tr -d '"'"'\\r'"'"' < \"$f\" | grep -qxF -- \"$rule\"; then return 0; fi"; next }
+    MODE == "M16" && $0 == "  if [ -e \"$f\" ] && [ ! -f \"$f\" ]; then" { print "  if false; then"; next }
+    MODE == "M17" && index($0, "chmod 644 \"$tmp\"") > 0 { sub(/ && chmod 644 "[$]tmp" 2>[\/]dev[\/]null/, ""); print; next }
     MODE == "M13" && index($0, "  tmp=\"$(mktemp ") == 1 { print "  tmp=\"$dest.tmp.$$\""; next }
     MODE == "M14" && index($0, "  [ ! -d \"$dest\" ] ||") == 1 { next }
     { print }' "$INTERNAL_DIR/vibeflow-update.sh" > "$out"
@@ -502,6 +539,21 @@ probe_dest_dir() { # M14 : destination répertoire
   run_pose "$LAB"; printf 'rc=%s dedans=%s' "$PRC" "$(ls -A "$LAB/.claude/vibeflow-role" | awk 'END { print NR }')"
 }
 
+probe_gi_gros() { # M15 : .gitignore > 64 Kio, règle en tête, deux poses
+  mk_lab; ENG="$1"
+  { printf '.claude/vibeflow-role\n'; awk 'BEGIN { for (i = 0; i < 6000; i++) print "fichier-" i ".log" }'; } > "$LAB/.gitignore"
+  run_pose "$LAB"; run_pose "$LAB"; printf 'regles=%s' "$("$GREP" -cxF '.claude/vibeflow-role' "$LAB/.gitignore")"
+}
+probe_gi_fifo() { # M16 : .gitignore FIFO, sous borne ; le jeton dit aussi si un processus survit
+  mk_lab; ENG="$1"; mkfifo "$LAB/.gitignore"
+  bound_on; run_pose "$LAB"; bound_off
+  printf 'rc=%s pose=%s surv=%s' "$PRC" "$(etat_pose "$LAB")" "$(survivants)"
+}
+probe_mode() { # M17 : mode du fichier de poste
+  mk_lab; ENG="$1"; run_pose "$LAB"
+  ls -l "$LAB/.claude/vibeflow-role" 2>/dev/null | awk '{ print substr($1, 1, 10) }'
+}
+
 kill_mutant() { # <id> <sonde> <attendu sur l'original> <libellé>
   local id="$1" probe="$2" want="$3" label="$4" m orig got
   m="$(mutate "$id")"; local mrc=$?
@@ -528,6 +580,9 @@ kill_mutant M9 probe_gi_dir 'rc=1 pose=non' "fichier de poste posé AVANT la rè
 kill_mutant M10 probe_gi_eol '.env|.claude/vibeflow-role|' "fin de ligne manquante non terminée avant la règle"
 kill_mutant M11 probe_gi_lien 'rc=1 pose=non' "refus du .gitignore lien symbolique retiré"
 kill_mutant M12 probe_gi_crlf 'lignes=2' "règle CRLF non reconnue (doublon)"
+kill_mutant M15 probe_gi_gros 'regles=1' "recherche de la règle remise derrière un tube (SIGPIPE au-delà de ~16 Kio)"
+kill_mutant M16 probe_gi_fifo 'rc=1 pose=non surv=0' "refus du .gitignore non régulier retiré (le FIFO est ouvert)"
+kill_mutant M17 probe_mode '-rw-r--r--' "chmod 644 du fichier de poste retiré"
 kill_mutant M13 probe_mktemp_nom mktemp "temporaire à nom prévisible \$dest.tmp.\$\$"
 kill_mutant M14 probe_dest_dir 'rc=1 dedans=0' "refus de la destination répertoire retiré"
 ENG="$INSTALLER"

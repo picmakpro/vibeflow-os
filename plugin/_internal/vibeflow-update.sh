@@ -1227,8 +1227,11 @@ role_gitignore_rule() {
     err "poste : ./.gitignore n'est pas un fichier régulier — règle d'ignorance non écrite, rien n'a été posé"
   fi
   if [ -f "$f" ]; then
-    if tr -d '\r' < "$f" | grep -qxF -- "$rule"; then return 0; fi
-    if LC_ALL=C grep -q "$(printf '\r')" "$f"; then eol="$(printf '\r')"; fi
+    # Sans tube : `grep -q` sort au premier match et un `tr` en amont meurt de SIGPIPE au-delà de ~16 Kio
+    # — sous pipefail la condition devenait fausse et la règle était ré-ajoutée à chaque install.
+    local cr; cr="$(printf '\r')"
+    if grep -qxF -e "$rule" -e "$rule$cr" "$f"; then return 0; fi
+    if LC_ALL=C grep -q "$cr" "$f"; then eol="$cr"; fi
     if [ -s "$f" ] && [ "$(tail -c 1 "$f" | wc -l | tr -d ' ')" -eq 0 ]; then
       printf '%s\n' "$eol" >> "$f" || err "poste : écriture de ./.gitignore échouée"
     fi
