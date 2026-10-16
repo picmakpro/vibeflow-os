@@ -39,7 +39,22 @@ fp() { # <dir> : empreinte (noms + sommes) d'un arbre
 
 RC=0; ERR=""; OUT=""
 RUNPFX=""   # préfixe de commande (borne de temps) — vide par défaut
-printf '#!/bin/sh\nexec perl -e '"'"'alarm 8; exec @ARGV'"'"' "$@"\n' > "$TMP/bound.sh"; chmod +x "$TMP/bound.sh"
+# Borne de temps : la commande tourne dans son propre groupe de processus, et l'expiration tue TOUT le
+# groupe (un `alarm` + `exec` seul ne tuait que le processus de tête : le petit-enfant bloqué sur
+# l'open() d'un FIFO survivait, orphelin, en tenant les descripteurs hérités — un tube en aval ne
+# voyait jamais EOF). Expiration => rc 142, comme avant.
+cat > "$TMP/bound.sh" <<'BOUND'
+#!/bin/sh
+exec perl -e '
+  my $pid = fork(); die "fork: $!" unless defined $pid;
+  if (!$pid) { setpgrp(0, 0); exec @ARGV or exit 127; }
+  $SIG{ALRM} = sub { kill "KILL", -$pid; kill "KILL", $pid; waitpid($pid, 0); exit 142; };
+  alarm 8; waitpid($pid, 0); my $st = $?;
+  kill "KILL", -$pid;   # rien ne survit au retour normal non plus
+  exit($st & 127 ? 128 + ($st & 127) : $st >> 8);
+' "$@"
+BOUND
+chmod +x "$TMP/bound.sh"
 # runr <cwd> <assignations d'environnement|-> args... -> $RC, $TMP/out, $TMP/errf ; empreinte avant/après
 runr() {
   local cwd="$1" ev="$2" n; shift 2
