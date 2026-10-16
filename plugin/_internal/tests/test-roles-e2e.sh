@@ -191,10 +191,13 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# E2E-C1-DEPS — ni gsd-*, ni gsd-core, ni superpowers sous le HOME jetable
+# E2E-C1-DEPS — VRAI PAR CONSTRUCTION, non discriminant (revue S8)
+#   Ni gsd-*, ni gsd-core, ni superpowers sous le HOME jetable. L'engine n'appelle JAMAIS
+#   ensure-deps.sh : aucun mutant de l'engine ne peut rougir ce cas. Il constate un fait d'environnement
+#   (le HOME jetable reste vierge de dépendances), il ne prouve pas que le poste les évite.
 # ---------------------------------------------------------------------------
 N_DEPS="$(find "$HA" \( -iname 'gsd-*' -o -iname 'gsd-core' -o -iname '*superpowers*' \) 2>/dev/null | awk 'END { print NR }')"
-[ "$N_DEPS" -eq 0 ] && ok "E2E-C1-DEPS (P58-D-05) : aucune dépendance gsd-* ni superpowers sous le HOME jetable du lab product" \
+[ "$N_DEPS" -eq 0 ] && ok "E2E-C1-DEPS (P58-D-05, vrai par construction : l'engine n'appelle jamais ensure-deps.sh) : aucune dépendance gsd-* ni superpowers sous le HOME jetable du lab product" \
   || ko "E2E-C1-DEPS : $N_DEPS entrée(s) gsd-*/superpowers sous le HOME jetable"
 
 # ---------------------------------------------------------------------------

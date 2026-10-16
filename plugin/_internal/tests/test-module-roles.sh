@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Test de module-roles.sh (Phase 58, RLPO-04/05) — autonome.
 # Cas : MR-TRACE-1..4 (tracer), MR-VAL-1..3, MR-LIST, MR-REAL, MR-CLOS (+ témoin), MR-USAGE,
-# mutants MR-MUT-1 (garde « liste vide » retirée) et MR-MUT-2 (garde « ensemble fermé » retirée).
+# MR-MAND, mutants MR-MUT-1 (garde « liste vide » retirée), MR-MUT-2 (garde « ensemble fermé » retirée)
+# et MR-MUT-3 (garde « mandatory » retirée).
 set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/module-roles.sh"
@@ -63,6 +64,18 @@ run "$SCRIPT" "$FX" visible good1 product; v1="$OUT"
 run "$SCRIPT" "$FX" visible good2 product; v2="$OUT"
 [ $r -eq 0 ] && [ "$v1/$v2" = "yes/yes" ] && ok "MR-VAL-3 listes valides acceptées" || ko "MR-VAL-3 attendu rc 0 yes/yes obtenu rc $r $v1/$v2"
 
+# --- mandatory (audit L-3) : roles interdit sur un module mandatory:true
+mkdir -p "$FX/mand1" "$FX/mand2" "$FX/mand3"
+printf '{"name":"mand1","mandatory":true,"roles":["dev"],"requires":[]}\n' > "$FX/mand1/module.json"
+printf '{"name":"mand2","mandatory":true,"requires":[]}\n' > "$FX/mand2/module.json"
+printf '{"name":"mand3","mandatory":false,"roles":["dev"],"requires":[]}\n' > "$FX/mand3/module.json"
+run "$SCRIPT" "$FX" validate mand1; rv=$RC; ev="$ERR"
+run "$SCRIPT" "$FX" visible mand1 product; rs=$RC; os="$OUT"
+run "$SCRIPT" "$FX" validate mand2 mand3; rg=$RC
+if [ $rv -eq 1 ] && printf '%s' "$ev" | grep -q 'mand1' && printf '%s' "$ev" | grep -q 'mandatory' && [ $rs -eq 1 ] && [ -z "$os" ] && [ $rg -eq 0 ]; then
+  ok "MR-MAND roles sur mandatory:true refusé (validate+visible, module nommé) ; mandatory sans roles et roles sans mandatory acceptés"
+else ko "MR-MAND attendu rc 1/1 nom+mandatory cités, témoins rc 0 ; obtenu validate rc $rv [$ev] visible rc $rs [$os] témoins rc $rg"; fi
+
 # --- list / table réelle
 ALL="$(for f in "$PLUGIN"/*/module.json; do jq -r '.name' "$f"; done | LC_ALL=C sort)"
 DEVS="$(printf 'dev-orchestrator\nmobile-test\nmobile-test-team\n')"
@@ -114,6 +127,16 @@ mut_case() { # mut_case <id> <fragment> <valeur roles>
 }
 mut_case MR-MUT-1 '(.roles|length)==0' '[]'
 mut_case MR-MUT-2 '(.roles|any(.[]; (.=="product" or .=="dev")|not))' '["qa"]'
+# MR-MUT-3 : garde « mandatory » retirée. Le fragment est remplacé par `false` ; la fixture porte mandatory:true.
+mutate '(.mandatory == true)' "$TMPD/mut-3.sh"
+if cmp -s "$TMPD/mut-3.sh" "$SCRIPT"; then ko "MR-MUT-3 mutant NON OPPOSABLE"
+elif ! bash -n "$TMPD/mut-3.sh" 2>/dev/null; then ko "MR-MUT-3 le mutant n'est pas un script valide"
+else
+  run "$TMPD/mut-3.sh" "$FX" validate mand1; rm_=$RC
+  run "$SCRIPT" "$FX" validate mand1; ro=$RC
+  if [ $rm_ -eq 0 ] && [ $ro -eq 1 ]; then ok "MR-MUT-3 mutant tué : roles sur mandatory:true accepté par le mutant (rc 0), refusé par l'original (rc 1)"
+  else ko "MR-MUT-3 rc_mutant=$rm_ (devait être 0) rc_original=$ro (attendu 1)"; fi
+fi
 
 echo "== resultat : $pass ok, $fail ko =="
 [ "$fail" -eq 0 ]

@@ -10,6 +10,7 @@
 #   - absente        => visible à tous les postes ;
 #   - présente       => liste NON VIDE de valeurs parmi `product`, `dev` ;
 #   - `solo`         => sur-ensemble implicite : voit tout, n'apparaît JAMAIS dans une liste ;
+#   - jamais sur un module `mandatory: true` (un socle ne se masque pas : refus bruyant, audit L-3) ;
 #   - tout le reste (`[]`, valeur inconnue, chaîne, null) => refus BRUYANT (code 1, module nommé sur stderr),
 #     jamais traité comme « visible ».
 # Postes admis : solo | product | dev. Codes : 0 ok, 1 toute erreur (roles invalide, module/poste inconnu,
@@ -43,10 +44,11 @@ check_name() {
   esac
 }
 
-# verdict <manifeste> <poste> -> yes | no | invalid (sur stdout)
+# verdict <manifeste> <poste> -> yes | no | invalid | mandatory (sur stdout)
 verdict() {
   jqx -r --arg r "$2" 'def roles_verdict($r):
   if has("roles")|not then "yes"
+  elif (.mandatory == true) then "mandatory"
   elif (.roles|type)!="array" or (.roles|length)==0 or (.roles|any(.[]; (.=="product" or .=="dev")|not)) then "invalid"
   elif $r=="solo" then "yes"
   elif (.roles|any(.[]; .==$r)) then "yes" else "no" end;
@@ -82,6 +84,7 @@ case "$verb" in
     v="$(verdict "$m" "$2")"
     case "$v" in
       yes|no) printf '%s\n' "$v" ;;
+      mandatory) err "roles interdit dans $1 : module mandatory:true (un socle ne se masque pas)" ;;
       *) err "roles invalide dans $1 : attendu une liste non vide de product|dev" ;;
     esac
     ;;
@@ -99,6 +102,9 @@ case "$verb" in
       if [ "$v" = "invalid" ]; then
         echo "[module-roles] roles invalide dans $mod : attendu une liste non vide de product|dev" >&2
         bad=1
+      elif [ "$v" = "mandatory" ]; then
+        echo "[module-roles] roles interdit dans $mod : module mandatory:true (un socle ne se masque pas)" >&2
+        bad=1
       fi
     done <<< "$mods"
     [ "$bad" -eq 0 ] || exit 1
@@ -115,6 +121,7 @@ case "$verb" in
       case "$v" in
         yes) out="$out$mod"$'\n' ;;
         no) ;;
+        mandatory) err "roles interdit dans $mod : module mandatory:true (un socle ne se masque pas)" ;;
         *) err "roles invalide dans $mod : attendu une liste non vide de product|dev" ;;
       esac
     done <<< "$mods"
