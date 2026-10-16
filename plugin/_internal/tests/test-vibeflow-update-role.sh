@@ -3,7 +3,8 @@
 #
 # Couvre : le tracer (fichier de poste, règle d'ignorance, .worktreeinclude, plan --dry-run égal à la
 # pose, rien sans poste), le refus à la pose (liste vf_roles), les arêtes de scope (user, --target,
-# solo), et quatre mutants de l'engine (RV-M1, RV-M2, RV-M4, RV-M7). Suite NEUVE : jamais un ajout à
+# solo), le volet usage (58-08 : filtre de install --all, registre, verbe role) et sept mutants de l'engine
+# (RV-M1, RV-M2, RV-M3, RV-M4, RV-M5, RV-M6, RV-M7). Suite NEUVE : jamais un ajout à
 # test-vibeflow-update.sh (271 s, modifié aussi par la PR #136 de Willy). Étendue par le plan 58-08.
 #
 # ISOLATION : HOME jetable, cache jetable, chaque lab `mktemp -d` + `git init -q`. Comptages de lignes
@@ -45,6 +46,7 @@ mk_lab() {
   (cd "$LAB" && git init -q) || return 1
   prepare_module "$LAB/cache" conductor || return 1
   prepare_module "$LAB/cache" validator || return 1
+  prepare_module "$LAB/cache" mobile-test || return 1
   # Le gate de cohérence (lancé depuis le cache) remonte à $cache/_internal/lib/vf-portable.sh, comme dans
   # le cache réel du plugin ; sans lui il sort 1, indiscernable d'un « hors liste » (refus pour la mauvaise raison).
   mkdir -p "$LAB/cache/_internal/lib" && cp "$INTERNAL_DIR/lib/vf-portable.sh" "$LAB/cache/_internal/lib/" || return 1
@@ -58,8 +60,22 @@ lab_run() {
   local envs=()
   while [ "$#" -gt 0 ] && [ "$1" != "--" ]; do envs+=("$1"); shift; done
   shift
+  local rc=0
   (cd "$lab" && env -u VF_ROLE -u VF_SCOPE -u VF_TARGET HOME="$FH" VF_RUNTIME=claude VIBEFLOW_CACHE="$lab/cache" \
-     ${envs[@]+"${envs[@]}"} "${BASH:-bash}" "$ENG" "$@") > "$WORK/out" 2> "$WORK/err"
+     ${envs[@]+"${envs[@]}"} "${BASH:-bash}" "$ENG" "$@") > "$WORK/out" 2> "$WORK/err" || rc=$?
+  reg_check "$lab"
+  return "$rc"
+}
+
+# RV-REG (P58-D-08, T-58-22) : après CHAQUE run, chaque ligne du registre est `module=version` et aucune
+# ne commence par `role=`. Appelé par lab_run ; le bilan est rendu en fin de suite.
+REG_LABS=0; REG_BAD=""
+reg_check() {
+  local reg="$1/.claude/scripts/.vibeflow-installed" bad
+  [ -f "$reg" ] || return 0
+  REG_LABS=$((REG_LABS+1))
+  bad="$(awk '!/^[^=]+=.+$/ || /^role=/ { n++ } END { print n+0 }' "$reg")"
+  [ "$bad" -eq 0 ] || REG_BAD="$REG_BAD $1"
 }
 
 nlines() { awk 'END { print NR }' "$1"; }
@@ -238,6 +254,123 @@ lab_run "$L14" VF_ROLE=solo VF_SCOPE=project -- install validator; RC=$?
 [ "$miss" -eq 0 ] && ok "RV-SOLO : solo sans fichier = no-op, avec un fichier = réécrit solo"
 
 # ---------------------------------------------------------------------------
+# RV-ALL-* / RV-TARGET-ALL — filtre de install --all (P58-D-05, P58-D-08)
+# ---------------------------------------------------------------------------
+registre_a() { awk -F= -v m="$2" '$1 == m { f = 1 } END { exit !f }' "$1/.claude/scripts/.vibeflow-installed" 2>/dev/null; }
+
+mk_lab; LA="$LAB"; miss=0
+lab_run "$LA" VF_ROLE=product VF_SCOPE=project -- install --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "RV-ALL-1 : install --all rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+registre_a "$LA" conductor && registre_a "$LA" validator || { ko "RV-ALL-1 : conductor ou validator absent du registre"; miss=1; }
+registre_a "$LA" mobile-test && { ko "RV-ALL-1 : mobile-test posé en poste product"; miss=1; }
+"$GREP" -qF '[poste] mobile-test hors de la vue du poste product : non posé' "$WORK/err" || { ko "RV-ALL-1 : ligne de journal absente"; miss=1; }
+[ "$miss" -eq 0 ] && ok "RV-ALL-1 : product install --all saute mobile-test avec sa ligne de journal, pose conductor et validator"
+
+miss=0
+for P in "-" solo dev; do
+  mk_lab; LB="$LAB"
+  if [ "$P" = "-" ]; then lab_run "$LB" VF_SCOPE=project -- install --all; RC=$?
+  else lab_run "$LB" "VF_ROLE=$P" VF_SCOPE=project -- install --all; RC=$?; fi
+  { [ "$RC" -eq 0 ] && registre_a "$LB" conductor && registre_a "$LB" validator && registre_a "$LB" mobile-test; } \
+    || { ko "RV-ALL-2 : poste « $P » : les trois modules attendus (rc=$RC)"; miss=1; }
+  if "$GREP" -qF '[poste]' "$WORK/err" && "$GREP" -qF 'non posé' "$WORK/err"; then ko "RV-ALL-2 : poste « $P » : un module a été sauté"; miss=1; fi
+done
+[ "$miss" -eq 0 ] && ok "RV-ALL-2 : sans poste, en solo et en dev, install --all pose les trois modules"
+
+mk_lab; LC="$LAB"
+lab_run "$LC" VF_ROLE=product VF_SCOPE=project -- install mobile-test; RC=$?
+{ [ "$RC" -eq 0 ] && registre_a "$LC" mobile-test; } && ok "RV-ALL-3 : un module nommé s'installe en poste product (une vue, pas un droit)" \
+  || ko "RV-ALL-3 : mobile-test nommé non posé (rc=$RC)"
+
+mk_lab; LD="$LAB"; TGT2="$WORK/tgt-all"; miss=0
+lab_run "$LD" VF_ROLE=product -- --target "$TGT2" install --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "RV-TARGET-ALL : rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+N="$(find "$TGT2" "$LD" -name vibeflow-role 2>/dev/null | awk 'END { print NR }')"
+[ "$N" -eq 0 ] || { ko "RV-TARGET-ALL : un fichier de poste existe ($N)"; miss=1; }
+[ ! -e "$TGT2/scripts/.vibeflow-installed" ] || ! awk -F= '$1 == "mobile-test" { f = 1 } END { exit !f }' "$TGT2/scripts/.vibeflow-installed" \
+  || { ko "RV-TARGET-ALL : mobile-test posé sous --target en poste product"; miss=1; }
+"$GREP" -qF '[poste] mobile-test hors de la vue du poste product : non posé' "$WORK/err" || { ko "RV-TARGET-ALL : le filtre n'a pas joué sous --target"; miss=1; }
+[ "$miss" -eq 0 ] && ok "RV-TARGET-ALL : sous --target le filtre joue, aucun fichier de poste"
+
+# ---------------------------------------------------------------------------
+# RV-UPDATE / RV-REG — le registre et update --all ignorent le poste (P58-D-08, T-58-22)
+# ---------------------------------------------------------------------------
+mk_lab; LU="$LAB"; miss=0
+lab_run "$LU" VF_SCOPE=project -- install --all
+cp "$LU/.claude/scripts/.vibeflow-installed" "$WORK/reg.before"
+lab_run "$LU" VF_ROLE=product VF_SCOPE=project -- update --all; RC=$?
+[ "$RC" -eq 0 ] || { ko "RV-UPDATE : update --all rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+registre_a "$LU" mobile-test || { ko "RV-UPDATE : mobile-test disparu du registre"; miss=1; }
+[ ! -e "$LU/.claude/vibeflow-role" ] || { ko "RV-UPDATE : un fichier de poste a été créé par update --all"; miss=1; }
+"$GREP" -qF '[poste]' "$WORK/err" && { ko "RV-UPDATE : une ligne [poste] au journal d'update --all"; miss=1; }
+[ "$miss" -eq 0 ] && ok "RV-UPDATE : update --all sous VF_ROLE=product suit le registre, ne lit pas le poste, ne pose aucun fichier"
+
+# ---------------------------------------------------------------------------
+# RV-ROLE-1..5 — verbe role (P58-D-07, P58-D-04)
+# ---------------------------------------------------------------------------
+tree_fp() { ( cd "$1/.claude" && find . -type f ! -name vibeflow-role | LC_ALL=C sort | cksum ); }
+
+mk_lab; LR="$LAB"; miss=0
+lab_run "$LR" VF_SCOPE=project -- install --all
+cp "$LR/.claude/scripts/.vibeflow-installed" "$WORK/reg.avant"; FP_AVANT="$(tree_fp "$LR")"
+lab_run "$LR" VF_SCOPE=project -- role product; RC=$?
+cp "$WORK/out" "$WORK/role1.out"
+[ "$RC" -eq 0 ] || { ko "RV-ROLE-1 : rc=$RC — $(tail -3 "$WORK/err")"; miss=1; }
+printf 'Poste : product — un poste est une vue, pas un droit.\n' > "$WORK/exp1"
+[ "$(head -n 1 "$WORK/role1.out")" = "$(head -n 1 "$WORK/exp1")" ] || { ko "RV-ROLE-1 : première ligne de l'avis inattendue : $(head -n 1 "$WORK/role1.out")"; miss=1; }
+"$GREP" -qxF 'Avis : 1 module(s) installé(s) hors du poste product, conservé(s) — aucune désinstallation (ADR-031) :' "$WORK/role1.out" || { ko "RV-ROLE-1 : ligne d'avis absente"; miss=1; }
+"$GREP" -qxF '  - mobile-test' "$WORK/role1.out" || { ko "RV-ROLE-1 : « - mobile-test » absent de l'avis"; miss=1; }
+"$GREP" -qE '^  - (conductor|validator)$' "$WORK/role1.out" && { ko "RV-ROLE-1 : un module visible est listé hors poste"; miss=1; }
+same_bytes "$LR/.claude/vibeflow-role" 'product\n' || { ko "RV-ROLE-1 : fichier de poste != product"; miss=1; }
+"$GREP" -qxF '.claude/vibeflow-role' "$LR/.gitignore" || { ko "RV-ROLE-1 : règle d'ignorance absente"; miss=1; }
+"$GREP" -qxF '.claude/vibeflow-role' "$LR/.worktreeinclude" || { ko "RV-ROLE-1 : ligne .worktreeinclude absente"; miss=1; }
+cmp -s "$WORK/reg.avant" "$LR/.claude/scripts/.vibeflow-installed" || { ko "RV-ROLE-1 : registre modifié par le changement de poste"; miss=1; }
+[ "$FP_AVANT" = "$(tree_fp "$LR")" ] || { ko "RV-ROLE-1 : des fichiers de module ont changé (désinstallation ?)"; miss=1; }
+[ "$miss" -eq 0 ] && ok "RV-ROLE-1 : role product écrit le poste, avis exact (mobile-test seul hors vue), registre et fichiers de modules inchangés"
+
+lab_run "$LR" VF_SCOPE=project -- role dev; RC=$?
+{ [ "$RC" -eq 0 ] && "$GREP" -qxF 'Avis : aucun module installé hors du poste dev.' "$WORK/out" && same_bytes "$LR/.claude/vibeflow-role" 'dev\n'; } \
+  && ok "RV-ROLE-2 : role dev => « aucun module installé hors du poste dev », fichier dev" || ko "RV-ROLE-2 : rc=$RC out[$(tr '\n' '|' < "$WORK/out")]"
+
+miss=0
+lab_run "$LR" VF_SCOPE=project -- role solo; RC=$?
+{ [ "$RC" -eq 0 ] && same_bytes "$LR/.claude/vibeflow-role" 'solo\n' && "$GREP" -qxF 'Avis : aucun module installé hors du poste solo.' "$WORK/out"; } \
+  || { ko "RV-ROLE-3 : role solo : fichier réécrit solo et avis sans module attendus (rc=$RC)"; miss=1; }
+lab_run "$LR" VF_SCOPE=project -- role zzSECRETzz; RC=$?
+{ [ "$RC" -eq 1 ] && ! "$GREP" -q zzSECRETzz "$WORK/out" "$WORK/err"; } || { ko "RV-ROLE-3 : valeur invalide : rc=1 sans écho attendu (rc=$RC)"; miss=1; }
+lab_run "$LR" VF_SCOPE=project -- role; RC=$?
+{ [ "$RC" -eq 1 ] && "$GREP" -qF 'Usage: role <solo|product|dev>' "$WORK/err"; } || { ko "RV-ROLE-3 : role sans argument (rc=$RC)"; miss=1; }
+lab_run "$LR" VF_SCOPE=user -- role product; RC=$?
+[ "$RC" -eq 1 ] || { ko "RV-ROLE-3 : scope user non refusé (rc=$RC)"; miss=1; }
+lab_run "$LR" VF_SCOPE=project -- --dry-run role product; RC=$?
+[ "$RC" -eq 1 ] || { ko "RV-ROLE-3 : --dry-run non refusé (rc=$RC)"; miss=1; }
+lab_run "$LR" VF_SCOPE=project -- --target "$WORK/tgt-role" role product; RC=$?
+[ "$RC" -eq 1 ] || { ko "RV-ROLE-3 : --target non refusé (rc=$RC)"; miss=1; }
+lab_run "$LR" VF_SCOPE=project -- --role dev role product; RC=$?
+[ "$RC" -eq 1 ] || { ko "RV-ROLE-3 : --role sur le verbe role non refusé (rc=$RC)"; miss=1; }
+same_bytes "$LR/.claude/vibeflow-role" 'solo\n' || { ko "RV-ROLE-3 : un refus a modifié le fichier de poste"; miss=1; }
+[ "$miss" -eq 0 ] && ok "RV-ROLE-3 : solo réécrit ; valeur invalide, sans argument, scope user, --dry-run, --target, --role refusés (rc 1), fichier intact"
+
+mk_lab; LS="$LAB"; miss=0
+lab_run "$LS" VF_SCOPE=project -- install --all
+mkdir -p "$LS/.planning"; printf '%s' '{"vf_roles":["dev"]}' > "$LS/.planning/config.json"
+lab_run "$LS" VF_SCOPE=project -- role product; RC=$?
+{ [ "$RC" -eq 1 ] && "$GREP" -qF 'poste hors de la liste vf_roles' "$WORK/err"; } || { ko "RV-ROLE-4 : refus à la pose attendu (rc=$RC)"; miss=1; }
+[ ! -e "$LS/.claude/vibeflow-role" ] || { ko "RV-ROLE-4 : fichier de poste posé malgré le refus"; miss=1; }
+[ "$miss" -eq 0 ] && ok "RV-ROLE-4 : poste hors de la liste vf_roles => refus à la pose réutilisé, fichier inchangé"
+
+mk_lab; LT="$LAB"; miss=0
+lab_run "$LT" VF_SCOPE=project -- install conductor
+printf 'fantome=1.0.0\n' >> "$LT/.claude/scripts/.vibeflow-installed"
+lab_run "$LT" VF_SCOPE=project -- role product; RC=$?
+{ [ "$RC" -eq 0 ] && "$GREP" -qF 'fantome absent du cache, non jugé' "$WORK/err" && ! "$GREP" -qF '  - fantome' "$WORK/out"; } \
+  && ok "RV-ROLE-5 : un module du registre absent du cache est signalé sur stderr, non compté hors poste" \
+  || ko "RV-ROLE-5 : rc=$RC err[$(tail -2 "$WORK/err" | tr '\n' '|')] out[$(tr '\n' '|' < "$WORK/out")]"
+
+[ "$REG_LABS" -ge 10 ] && [ -z "$REG_BAD" ] && ok "RV-REG : $REG_LABS runs avec registre, chaque ligne module=version, aucune ligne role=" \
+  || ko "RV-REG : runs contrôlés=$REG_LABS (>= 10 attendus), registres fautifs :$REG_BAD"
+
+# ---------------------------------------------------------------------------
 # Mutants (QUAL-01) — copie de _internal, l'original n'est jamais touché
 # ---------------------------------------------------------------------------
 MUT="$WORK/mut"; mkdir -p "$MUT"; cp -R "$INTERNAL_DIR" "$MUT/_internal"; rm -rf "$MUT/_internal/tests"
@@ -248,6 +381,9 @@ mutate() { # <id> → écrit le mutant et rend son chemin ; 1 = identique à l'o
     MODE == "M2" && index($0, "  if [ \"$VF_ROLE_WILL_EXIST\" = \"1\" ] || [ -f \"./.claude/vibeflow-role\" ]; then candidates=") == 1 { sub(/^  if \[ .*\]; then candidates=/, "  if true; then candidates="); print; next }
     MODE == "M7" && index($0, "  if [ \"$VF_ROLE_WILL_EXIST\" = \"1\" ] || [ -f \"./.claude/vibeflow-role\" ]; then candidates=") == 1 { sub(/^  if \[ .*\]; then candidates=/, "  if [ -f \"./.claude/vibeflow-role\" ]; then candidates="); print; next }
     MODE == "M4" && index($0, "    1) err \"poste hors de la liste vf_roles") == 1 { print "    1) : ;;"; next }
+    MODE == "M3" && $0 == "        if role_visible \"$m\"; then" { print "        if true; then"; next }
+    MODE == "M5" && $0 == "  role_write_file \"$poste\"" { print; print "  mkdir -p \"$(dirname \"$INSTALLED_REGISTRY\")\"; printf \"role=%s\\n\" \"$poste\" >> \"$INSTALLED_REGISTRY\""; next }
+    MODE == "M6" && $0 == "    printf '"'"'%s'"'"' \"$hors\"" { print "    :"; next }
     { print }' "$INTERNAL_DIR/vibeflow-update.sh" > "$out"
   cmp -s "$out" "$INTERNAL_DIR/vibeflow-update.sh" && return 1
   bash -n "$out" || return 2
@@ -278,6 +414,24 @@ probe_refus() { # M4 : refus à la pose d'un poste hors liste
   if [ -e "$LAB/.claude/vibeflow-role" ]; then printf 'rc=%s pose=oui' "$rc"; else printf 'rc=%s pose=non' "$rc"; fi
 }
 
+probe_all_filtre() { # M3 : mobile-test posé par install --all en poste product ?
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_ROLE=product VF_SCOPE=project -- install --all
+  if registre_a "$LAB" mobile-test; then printf 'pose'; else printf 'saute'; fi
+}
+probe_registre_sans_poste() { # M5 : une ligne role= au registre après la pose d'un poste ?
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_ROLE=product VF_SCOPE=project -- install validator
+  local n; n="$(awk '/^role=/ { n++ } END { print n+0 }' "$LAB/.claude/scripts/.vibeflow-installed" 2>/dev/null)"
+  printf 'lignes-role=%s' "$n"
+}
+probe_avis() { # M6 : l'avis liste-t-il mobile-test ?
+  mk_lab; ENG="$1"
+  lab_run "$LAB" VF_SCOPE=project -- install --all
+  lab_run "$LAB" VF_SCOPE=project -- role product
+  if "$GREP" -qxF '  - mobile-test' "$WORK/out"; then printf 'liste'; else printf 'amputé'; fi
+}
+
 kill_mutant() { # <id> <sonde> <attendu sur l'original> <libellé>
   local id="$1" probe="$2" want="$3" label="$4" m orig got
   m="$(mutate "$id")"; local mrc=$?
@@ -294,6 +448,11 @@ kill_mutant M1 probe_gitignore '.claude/vibeflow-role|' "appel de role_gitignore
 kill_mutant M2 probe_wi_sans_poste 4 "condition de l'entrée .worktreeinclude retirée"
 kill_mutant M7 probe_dry_declare declare "drapeau VF_ROLE_WILL_EXIST remplacé par un test disque"
 kill_mutant M4 probe_refus 'rc=1 pose=non' "refus à la pose neutralisé"
+kill_mutant M3 probe_all_filtre saute "filtre de install --all neutralisé"
+REG_BAD_SAVE="$REG_BAD"
+kill_mutant M5 probe_registre_sans_poste 'lignes-role=0' "ligne role=<poste> écrite au registre"
+REG_BAD="$REG_BAD_SAVE"
+kill_mutant M6 probe_avis liste "ligne de l'avis amputée d'un module"
 ENG="$INSTALLER"
 
 echo ""

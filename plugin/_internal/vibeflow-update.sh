@@ -35,6 +35,14 @@
 #   Scope user : le poste vaut solo (aucun fichier). Sous --target : aucun fichier de poste.
 #   « Un poste est une vue, pas un droit » : aucune décision de sécurité ne lit ce fichier.
 #
+#   `install --all` ne filtre par le poste que si VF_ROLE/--role est posé explicitement : un module hors de
+#   la vue du poste est sauté (ligne `[poste] <module> hors de la vue du poste <p> : non posé`) ; un module
+#   nommé s'installe toujours. `update --all` suit le registre, ne lit pas le poste ; le registre ne porte
+#   jamais de ligne de poste.
+#   ./vibeflow-update.sh [--scope project|local] role <solo|product|dev>   # change de poste (réécrit le fichier,
+#       même refus à la pose) puis liste les modules installés hors du nouveau poste — AUCUNE désinstallation
+#       (ADR-031). Refusé en scope user, sous --target et sous --dry-run.
+#
 # Pré-requis : $VIBEFLOW_CACHE existe (dossier des modules + leurs module.json).
 
 set -euo pipefail
@@ -242,6 +250,16 @@ if [ "$#" -gt 0 ]; then
     install)
       case "$VF_ROLE" in
         ""|solo|product|dev) : ;;
+        *) err "poste invalide (attendu solo|product|dev ; valeur non réimprimée)" ;;
+      esac
+      ;;
+    role)
+      # P58-D-07 : le poste est l'ARGUMENT du verbe (il prime sur un VF_ROLE hérité) ; même validation fermée.
+      [ "$#" -ge 2 ] && [ -n "$2" ] || err "Usage: role <solo|product|dev>"
+      [ "$VF_ROLE_FLAG" = "0" ] || err "--role n'est accepté que sur install (le verbe role prend le poste en argument)"
+      VF_ROLE="$2"
+      case "$VF_ROLE" in
+        solo|product|dev) : ;;
         *) err "poste invalide (attendu solo|product|dev ; valeur non réimprimée)" ;;
       esac
       ;;
@@ -1218,6 +1236,57 @@ find_role_gate() {
   c="$CACHE_DIR/conductor/scripts/check-role-consistency.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
   c="$TARGET_ROOT/scripts/check-role-consistency.sh"; [ -f "$c" ] && { echo "$c"; return 0; }
   echo ""
+}
+
+# find_module_roles — cascade comme find_resolver : cache (prod), puis à côté de l'engine (source). Vide si absent.
+find_module_roles() {
+  local candidate
+  candidate="$CACHE_DIR/_internal/module-roles.sh"
+  if [ -f "$candidate" ]; then echo "$candidate"; return 0; fi
+  candidate="$(dirname "$0")/module-roles.sh"
+  if [ -f "$candidate" ]; then echo "$candidate"; return 0; fi
+  echo ""
+}
+
+# role_visible <module> — vrai si le module est dans la vue du poste VF_ROLE. Sans poste ou en solo : vrai,
+# aucun appel. Sinon le prédicat unique (module-roles.sh visible, P58-D-03) décide ; un code non nul
+# (roles invalide, module inconnu) est une ERREUR, jamais « visible » (T-58-37).
+role_visible() {
+  local mod="$1" mr out
+  case "${VF_ROLE:-}" in ""|solo) return 0 ;; esac
+  mr="$(find_module_roles)"
+  [ -n "$mr" ] || err "poste : module-roles.sh introuvable — un poste ne filtre jamais sans son prédicat"
+  out="$(VF_MODULES_ROOT="$CACHE_DIR" bash "$mr" visible "$mod" "$VF_ROLE" 2>/dev/null)" \
+    || err "poste : la vue du module $mod est illisible (clé roles invalide ?) — jamais traitée comme visible"
+  case "$out" in
+    yes) return 0 ;;
+    no) return 1 ;;
+    *) err "poste : réponse inattendue du prédicat de vue pour $mod" ;;
+  esac
+}
+
+# role_notice — avis du verbe role (P58-D-07) : sur stdout, les modules du registre hors du poste VF_ROLE.
+# Lecture seule : ni désinstallation, ni écriture du registre.
+role_notice() {
+  local mod _ver n=0 hors=""
+  printf 'Poste : %s — un poste est une vue, pas un droit.\n' "$VF_ROLE"
+  if [ -f "$INSTALLED_REGISTRY" ]; then
+    while IFS='=' read -r mod _ver || [ -n "$mod" ]; do
+      [ -n "$mod" ] || continue
+      if [ ! -f "$CACHE_DIR/$mod/module.json" ]; then
+        log "avis : $mod absent du cache, non jugé"
+        continue
+      fi
+      if ! role_visible "$mod"; then n=$((n+1)); hors="$hors  - $mod
+"; fi
+    done < "$INSTALLED_REGISTRY"
+  fi
+  if [ "$n" -eq 0 ]; then
+    printf 'Avis : aucun module installé hors du poste %s.\n' "$VF_ROLE"
+  else
+    printf 'Avis : %s module(s) installé(s) hors du poste %s, conservé(s) — aucune désinstallation (ADR-031) :\n' "$n" "$VF_ROLE"
+    printf '%s' "$hors"
+  fi
 }
 
 # role_apply [--changement] — pose le poste VF_ROLE. Ordre, et AVANT toute écriture (P58-PL-07) :
@@ -3365,7 +3434,14 @@ case "$cmd" in
     fi
     if [ "$arg" = "--all" ]; then
       require_cache
-      for m in $(list_available_modules); do install_module "$m"; done
+      # P58-D-08 : le filtre ne joue que sur --all et que si un poste est posé explicitement.
+      for m in $(list_available_modules); do
+        if role_visible "$m"; then
+          install_module "$m"
+        else
+          log "  [poste] $m hors de la vue du poste $VF_ROLE : non posé"
+        fi
+      done
     elif [ "$arg" = "--with-deps" ]; then
       # install --with-deps <mod> : installe la fermeture transitive (résolveur câblé).
       deps_target="${3:-}"
@@ -3434,6 +3510,16 @@ case "$cmd" in
   rollback)
     [ -n "$arg" ] || err "Usage: rollback <module>"
     rollback_module "$arg"
+    ;;
+  role)
+    # P58-D-07 : changement de poste. Même écrivain unique que la pose (refus à la pose, règle d'ignorance).
+    [ -n "$arg" ] || err "Usage: role <solo|product|dev>"
+    [ "$VF_SCOPE" != "user" ] || err "le verbe role n'a pas de sens en scope user (le poste y vaut solo, P58-D-04)"
+    [ -z "$VF_TARGET_OVERRIDE" ] || err "le verbe role n'a pas de sens sous --target"
+    require_cache
+    role_apply --changement
+    ensure_worktreeinclude_entries
+    role_notice
     ;;
   status)
     show_status
