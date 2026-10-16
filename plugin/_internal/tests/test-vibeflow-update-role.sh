@@ -195,6 +195,16 @@ refus_lab -; L11="$LAB"
 lab_run "$L11" VF_ROLE=product VF_SCOPE=project -- install validator; RC=$?
 { [ "$RC" -eq 0 ] && same_bytes "$L11/.claude/vibeflow-role" 'product\n'; } && ok "RV-REFUS-4 : pas de config.json → posé" || ko "RV-REFUS-4 : rc=$RC"
 
+# RV-REFUS-5 : outillage du gate absent (vf-portable.sh) = erreur d'outillage (rc 5 du gate), le refus
+# reste FERMÉ avec son propre message — jamais le « hors de la liste » du verdict 1, même poste listé.
+refus_lab '{"vf_roles":["product"]}'; L12="$LAB"; miss=0
+rm -rf "$L12/cache/_internal"
+lab_run "$L12" VF_ROLE=product VF_SCOPE=project -- install validator; RC=$?
+{ [ "$RC" -eq 1 ] && "$GREP" -qF 'liste des postes du projet illisible' "$WORK/err" && ! "$GREP" -qF 'hors de la liste' "$WORK/err"; } \
+  || { ko "RV-REFUS-5 : refus fermé attendu avec le message d'outillage (rc=$RC) : $(tail -2 "$WORK/err" | tr '\n' ' ')"; miss=1; }
+if posed "$L12"; then ko "RV-REFUS-5 : une trace a été posée malgré l'outillage absent"; miss=1; fi
+[ "$miss" -eq 0 ] && ok "RV-REFUS-5 (outillage absent) : refus fermé, message distinct de « hors de la liste », rien posé"
+
 # ---------------------------------------------------------------------------
 # RV-USER / RV-TARGET / RV-SOLO — arêtes de scope (P58-PL-07)
 # ---------------------------------------------------------------------------

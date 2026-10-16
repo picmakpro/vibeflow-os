@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Test de check-role-consistency.sh (Phase 58, RLPO-03, RLPO-08, RLPO-09) — autonome.
 # Cas CR-TRACE-1..3, CR-HOOK-POSE (câblage réel par l'engine), CR-0, CR-1a..d, CR-3a..d, CR-5a..e,
-# CR-BOM, CR-ENV, CR-RACINE, CR-PART, CR-64, CR-HELP, CR-RO, CR-CODES, CR-17 ;
-# mutants MUT-liste-hors, MUT-silence, MUT-analyse, MUT-hook, MUT-cle, MUT-brut, MUT-analyse-hook.
+# CR-5f, CR-OUTIL, CR-BOM, CR-ENV, CR-RACINE, CR-PART, CR-64, CR-HELP, CR-RO, CR-CODES, CR-17 ;
+# mutants MUT-liste-hors, MUT-silence, MUT-analyse, MUT-hook, MUT-cle, MUT-brut, MUT-analyse-hook, MUT-pendant, MUT-motif-lecteur(-d), MUT-outillage.
 # Chaque mutant : copie différente de l'original (cmp -s), valide (bash -n), rouge pour la bonne
 # raison (attendu/obtenu imprimés), original revérifié vert.
 set -uo pipefail
@@ -110,6 +110,37 @@ probe_bom() {  # CR-BOM : octets bruts jamais réimprimés
   runr "$L" - --path "$L" --hook
   LASTMSG="attendu stdout exactement « Poste : product », obtenu rc $RC [$(printf '%s' "$OUT" | od -c | head -3 | tr '\n' ' ')]"
   [ "$RC" -eq 0 ] && out_is 'Poste : product'
+}
+
+probe_5c() {  # CR-5c : lien symbolique => rc 5, motif du lecteur réaffiché, marqueur absent
+  local L; L="$(mklab)"; setcfg "$L" '{"vf_roles":["product","dev"]}'
+  printf 'product %s' "$MARK" > "$TMP/cible-lien"; ln -s "$TMP/cible-lien" "$L/.claude/vibeflow-role"
+  runr "$L" - --path "$L" --hook
+  LASTMSG="attendu rc 5 stdout vide, motif « fichier de poste illisible : lien symbolique » sur stderr, sans marqueur ; obtenu rc $RC out[$OUT] err[$ERR]"
+  [ "$RC" -eq 5 ] && out_empty && no_mark && printf '%s' "$ERR" | command grep -qF 'fichier de poste illisible : lien symbolique'
+}
+probe_5d() {  # CR-5d : deux lignes => rc 5, motif du lecteur réaffiché, marqueur absent
+  local L; L="$(mklab)"; setcfg "$L" '{"vf_roles":["product","dev"]}'; setrole "$L" "product\nconsigne-piege $MARK\n"
+  runr "$L" - --path "$L" --hook
+  LASTMSG="attendu rc 5 stdout vide, motif « fichier de poste illisible : plusieurs lignes » sur stderr, sans marqueur ; obtenu rc $RC out[$OUT] err[$ERR]"
+  [ "$RC" -eq 5 ] && out_empty && no_mark && printf '%s' "$ERR" | command grep -qF 'fichier de poste illisible : plusieurs lignes'
+}
+probe_pendant() {  # CR-5f : lien pendant (cible absente) => rc 5, jamais le silence de l'état 0
+  local L; L="$(mklab)"; setcfg "$L" '{"vf_roles":["product","dev"]}'
+  ln -s "$TMP/cible-inexistante-$$" "$L/.claude/vibeflow-role"
+  runr "$L" - --path "$L" --hook
+  LASTMSG="attendu rc 5 (lien pendant jugé illisible), obtenu rc $RC out[$OUT] err[$ERR]"
+  [ "$RC" -eq 5 ] && out_empty && [ -n "$ERR" ]
+}
+probe_outillage() {  # CR-OUTIL : vf-portable.sh absent => rc 5 (jamais 1), stderr nomme la cause, stdout vide
+  local L D; L="$(mklab)"; setrole "$L" 'product\n'; setcfg "$L" '{"vf_roles":["dev"]}'
+  D="$(mktemp -d "$TMP/sansportable.XXXXXX")"; cp "$TARGET" "$D/check-role-consistency.sh"; cp "$READER" "$D/vf-role.sh"
+  local save="$TARGET"; TARGET="$D/check-role-consistency.sh"
+  runr "$L" - --path "$L" --hook; local h="$RC" ho="$OUT"
+  runr "$L" - --path "$L"
+  TARGET="$save"
+  LASTMSG="attendu rc 5 en --hook et en CLI, stdout vide, stderr « vf-portable.sh introuvable » ; obtenu rc $h puis $RC out[$ho] err[$ERR]"
+  [ "$h" -eq 5 ] && [ "$RC" -eq 5 ] && [ -z "$ho" ] && printf '%s' "$ERR" | command grep -qF 'vf-portable.sh introuvable'
 }
 
 # === Tracer ======================================================================================
@@ -228,16 +259,10 @@ done
 [ -z "$bad" ] && ok "CR-5b vf_roles hors contrat (chaîne, vide, valeur inconnue, élément non chaîne) => rc 5" \
   || ko "CR-5b attendu rc 5 partout, obtenu$bad"
 
-L="$(mklab)"; setcfg "$L" '{"vf_roles":["product","dev"]}'
-printf 'product %s' "$MARK" > "$TMP/cible-lien"; ln -s "$TMP/cible-lien" "$L/.claude/vibeflow-role"
-runr "$L" - --path "$L" --hook
-{ [ "$RC" -eq 5 ] && out_empty && no_mark; } && ok "CR-5c fichier en lien symbolique => rc 5, marqueur absent" \
-  || ko "CR-5c attendu rc 5 sans marqueur, obtenu rc $RC out[$OUT] err[$ERR]"
-
-L="$(mklab)"; setcfg "$L" '{"vf_roles":["product","dev"]}'; setrole "$L" "product\nconsigne-piege $MARK\n"
-runr "$L" - --path "$L" --hook
-{ [ "$RC" -eq 5 ] && out_empty && no_mark; } && ok "CR-5d fichier sur deux lignes => rc 5, stdout vide, marqueur absent" \
-  || ko "CR-5d attendu rc 5 stdout vide sans marqueur, obtenu rc $RC out[$OUT] err[$ERR]"
+probe_5c && ok "CR-5c fichier en lien symbolique => rc 5, motif du lecteur sur stderr, marqueur absent" || ko "CR-5c $LASTMSG"
+probe_5d && ok "CR-5d fichier sur deux lignes => rc 5, stdout vide, motif du lecteur sur stderr, marqueur absent" || ko "CR-5d $LASTMSG"
+probe_pendant && ok "CR-5f lien pendant => rc 5 bruyant (jamais le silence de l'état 0)" || ko "CR-5f $LASTMSG"
+probe_outillage && ok "CR-OUTIL vf-portable.sh absent => rc 5 (CLI et --hook), jamais le verdict 1, stdout vide" || ko "CR-OUTIL $LASTMSG"
 
 L="$(mklab)"; setcfg "$L" '{"vf_roles":["product","dev"]}'; head -c 5000 /dev/zero | tr '\0' 'a' > "$L/.claude/vibeflow-role"
 runr "$L" - --path "$L"
@@ -341,6 +366,15 @@ mutant MUT-brut '{ if (index($0, "printf '"'"'Poste : %s\\n'"'"' \"$ROLE\"")) su
   probe_bom "octets bruts du fichier imprimés au lieu de la valeur validée"
 mutant MUT-analyse-hook '{ if (index($0, "[ \"$code\" -eq 3 ]; then exit 0; fi")) sub(/\[ "\$code" -eq 3 \]; then/, "{ [ \"$code\" -eq 3 ] || [ \"$code\" -eq 5 ]; }; then"); print }' \
   probe_5a_hook "code 5 traduit en 0 sous --hook"
+
+mutant MUT-pendant '{ if (index($0, "[ ! -L \"$ROLE_FILE\" ]")) sub(/ && \[ ! -L "\$ROLE_FILE" \]/, ""); print }' \
+  probe_pendant "garde « ! -L » de l'état 0 retirée (lien pendant pris pour une absence de source)"
+mutant MUT-motif-lecteur '{ if (index($0, "bash \"$READER\"")) gsub(/2>&1/, "2>/dev/null"); print }' \
+  probe_5c "sortie du lecteur jetée au lieu d'être réaffichée"
+mutant MUT-motif-lecteur-d '{ if (index($0, "bash \"$READER\"")) gsub(/2>&1/, "2>/dev/null"); print }' \
+  probe_5d "sortie du lecteur jetée au lieu d'être réaffichée (deux lignes)"
+mutant MUT-outillage '{ if ($0 == "trap _vf_locator_failed EXIT") print "true"; else print }' \
+  probe_outillage "filet d'outillage retiré : le bloc canonique sort 1, confondu avec « hors de la liste »"
 
 echo "== Résultat : $PASS ok, $FAIL ko, $SKIPPED skip =="
 [ "$FAIL" -eq 0 ]

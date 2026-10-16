@@ -46,8 +46,9 @@
 #   1  = poste hors de la liste, ou valeur de poste invalide.
 #   3  = SILENCE — aucune source de poste, ou pas de config.json, ou pas de clé vf_roles. Sous
 #        --hook, traduit en 0 (D-06/D-07).
-#   5  = erreur d'analyse BRUYANTE — fichier de poste illisible, config.json illisible, vf_roles
-#        hors contrat. Jamais traduite, jamais repliée sur 0 ni sur 3.
+#   5  = erreur d'analyse ou d'outillage BRUYANTE — fichier de poste illisible, config.json
+#        illisible, vf_roles hors contrat, lecteur ou vf-portable.sh introuvable. Jamais traduite,
+#        jamais repliée sur 0, 1 ni 3.
 #   17 = interpréteur Python indisponible (fail-open bruyant, marqueur de santé).
 #   64 = erreur d'usage (argument inconnu, option sans valeur) — jamais traduit.
 #   Le code 2 n'est jamais émis : il est réservé au blocage délibéré du harness.
@@ -154,6 +155,19 @@ verdict_exit() {
 CFG="$ROOT/.planning/config.json"
 [ -e "$CFG" ] || verdict_exit 3
 
+# Un outil de la chaîne absent (la bibliothèque vf-portable.sh) est une ERREUR D'OUTILLAGE, jamais
+# le verdict 1 « poste hors de la liste » : le bloc canonique ci-dessous sort 1 (son texte est figé
+# par somme de contrôle, on n'y touche pas), ce filet de sortie le traduit en 5 — le code bruyant
+# déjà employé plus haut pour le lecteur introuvable (état 2) — donc jamais traduit sous --hook et
+# jamais silencieux (P58-PL-10). Le refus à la pose de l'engine échoue ainsi fermé, avec le bon message.
+_vf_locator_done=0
+_vf_locator_failed() {
+  [ "$_vf_locator_done" -eq 1 ] && return 0
+  trap - EXIT
+  signal "erreur d'outillage : bibliothèque vf-portable.sh introuvable — cohérence du poste non vérifiable"
+  hook_exit 5
+}
+trap _vf_locator_failed EXIT
 # >>> vf-portable:locator (bloc canonique, contrat PR #29 §3 / D-04 — Phase 30 plan 30-05. Ne
 # pas retaper à la main : copier depuis plugin/_internal/lib/vf-portable.sh entre ces deux
 # marqueurs — seul le préfixe de message varie d'un consommateur à l'autre (identité vérifiée
@@ -191,6 +205,8 @@ fi
 . "$_vf_portable_lib"
 unset _vf_portable_lib _vf_portable_dir _vf_portable_cand _vf_portable_walk _vf_portable_i
 # <<< vf-portable:locator
+_vf_locator_done=1
+trap - EXIT
 
 if ! vf_resolve_python; then
   vf_guard_unavailable "check-role-consistency.sh" "aucun interpréteur Python joignable : cohérence du poste non vérifiable"

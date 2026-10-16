@@ -143,12 +143,34 @@ done
   || ko "CAT-COL3 attendu 0 ligne fautive sur plus de 5 sorties, obtenu $badcol sur $nfiles"
 
 # ---------- Intégrité de la copie gelée ------------------------------------------------------------
+# Empreinte ÉPINGLÉE dans la suite (cksum POSIX, identique sur macOS et Linux ; sha256 en plus quand
+# un outil est joignable) : vérifiée sans dépendre de .git — la CI ne clone pas l'historique
+# (fetch-depth 1), la comparaison à l'objet a2ed5094 y était toujours SKIP (P58-PL-03).
+FROZEN_CKSUM="1807606783 3426"
+FROZEN_SHA256="201efe46fd075df403fd23aca373de0c7c80a3287f85ba0db6359dd4b157860e"
+frozen_matches() { # <fichier> : empreinte conforme à l'épingle
+  local f="$1" ck sh=""
+  ck="$(cksum < "$f" | awk '{print $1" "$2}')"
+  [ "$ck" = "$FROZEN_CKSUM" ] || return 1
+  if command -v sha256sum >/dev/null 2>&1; then sh="$(sha256sum < "$f" | awk '{print $1}')"
+  elif command -v shasum >/dev/null 2>&1; then sh="$(shasum -a 256 < "$f" | awk '{print $1}')"; fi
+  [ -z "$sh" ] || [ "$sh" = "$FROZEN_SHA256" ]
+}
+frozen_matches "$FROZEN" && ok "CAT-INTEGRITE la copie gelée porte l'empreinte épinglée (cksum $FROZEN_CKSUM), sans dépendre de .git" \
+  || ko "CAT-INTEGRITE la copie gelée ne porte pas l'empreinte épinglée"
+# Témoin : un octet altéré (même longueur) fait rougir la vérification, l'original reste vert.
+ALTF="$TMP/frozen-alt.sh"; { head -c 100 "$FROZEN"; printf 'X'; tail -c +102 "$FROZEN"; } > "$ALTF"
+if cmp -s "$ALTF" "$FROZEN"; then ko "CAT-INTEGRITE-TEMOIN la copie altérée est identique à l'originale (octet 101 déjà X)"
+elif ! frozen_matches "$ALTF" && frozen_matches "$FROZEN"; then
+  ok "CAT-INTEGRITE-TEMOIN un octet altéré (même taille) rougit la vérification d'empreinte, l'original reste vert"
+else ko "CAT-INTEGRITE-TEMOIN la copie altérée d'un octet reste verte (empreinte incapable d'échouer)"; fi
+# Contrôle supplémentaire : comparaison à l'objet a2ed5094 quand l'historique est présent.
 if git -C "$REPO_ROOT" cat-file -e a2ed5094:plugin/installer/scripts/build-module-catalog.sh 2>/dev/null; then
   git -C "$REPO_ROOT" show a2ed5094:plugin/installer/scripts/build-module-catalog.sh > "$TMP/a2ed5094.sh" 2>/dev/null
-  cmp -s "$TMP/a2ed5094.sh" "$FROZEN" && ok "CAT-INTEGRITE la copie gelée est identique à l'objet a2ed5094" \
-    || ko "CAT-INTEGRITE la copie gelée diffère de a2ed5094"
+  cmp -s "$TMP/a2ed5094.sh" "$FROZEN" && ok "CAT-INTEGRITE-GIT la copie gelée est identique à l'objet a2ed5094" \
+    || ko "CAT-INTEGRITE-GIT la copie gelée diffère de a2ed5094"
 else
-  skip "CAT-INTEGRITE (clone superficiel : a2ed5094 illisible)"
+  skip "CAT-INTEGRITE-GIT (clone superficiel : a2ed5094 illisible ; l'empreinte épinglée a déjà jugé)"
 fi
 
 # ---------- Mutants ---------------------------------------------------------------------------------
