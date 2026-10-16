@@ -34,7 +34,7 @@
       },
       {
         "hooks": [
-          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-role-consistency.sh", "--hook"] }
+          { "type": "command", "command": "{{VF_BASH}}", "args": ["{{VF_SCRIPTS}}/check-role-consistency.sh", "--hook"], "timeout": 5 }
         ]
       }
     ],

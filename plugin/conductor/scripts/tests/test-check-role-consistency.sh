@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Test de check-role-consistency.sh (Phase 58, RLPO-03, RLPO-08, RLPO-09) — autonome.
 # Cas CR-TRACE-1..3, CR-HOOK-POSE (câblage réel par l'engine), CR-0, CR-1a..d, CR-3a..d, CR-5a..e,
-# CR-5f, CR-OUTIL, CR-BOM, CR-ENV, CR-RACINE, CR-PART, CR-64, CR-HELP, CR-RO, CR-CODES, CR-17 ;
-# mutants MUT-liste-hors, MUT-silence, MUT-analyse, MUT-hook, MUT-cle, MUT-brut, MUT-analyse-hook, MUT-pendant, MUT-motif-lecteur(-d), MUT-outillage.
+# CR-5f, CR-HOSTILE (audit H-1), CR-CFG-LIEN, CR-CFG-FIFO, CR-CFG-GROS, CR-CFG-BORNE (audit M-1), CR-OUTIL, CR-BOM, CR-ENV, CR-RACINE, CR-PART, CR-64, CR-HELP, CR-RO, CR-CODES, CR-17 ;
+# mutants MUT-liste-hors, MUT-silence, MUT-analyse, MUT-hook, MUT-cle, MUT-brut, MUT-analyse-hook, MUT-pendant, MUT-motif-lecteur(-d), MUT-outillage, MUT-isole, MUT-cfg-lien, MUT-cfg-fifo, MUT-cfg-taille.
 # Chaque mutant : copie différente de l'original (cmp -s), valide (bash -n), rouge pour la bonne
 # raison (attendu/obtenu imprimés), original revérifié vert.
 set -uo pipefail
@@ -38,6 +38,8 @@ fp() { # <dir> : empreinte (noms + sommes) d'un arbre
 }
 
 RC=0; ERR=""; OUT=""
+RUNPFX=""   # préfixe de commande (borne de temps) — vide par défaut
+printf '#!/bin/sh\nexec perl -e '"'"'alarm 8; exec @ARGV'"'"' "$@"\n' > "$TMP/bound.sh"; chmod +x "$TMP/bound.sh"
 # runr <cwd> <assignations d'environnement|-> args... -> $RC, $TMP/out, $TMP/errf ; empreinte avant/après
 runr() {
   local cwd="$1" ev="$2" n; shift 2
@@ -45,7 +47,7 @@ runr() {
   fp "$cwd" > "$TMP/fp-before"
   # shellcheck disable=SC2086
   (cd "$cwd" && env -u VF_ROLE -u CLAUDE_PROJECT_DIR HOME="$HOME_J" VF_GUARD_HEALTH_DIR="$HEALTH" $ev \
-      "$BASH_BIN" "$TARGET" "$@" >"$TMP/out" 2>"$TMP/errf"); RC=$?
+      $RUNPFX "$BASH_BIN" "$TARGET" "$@" >"$TMP/out" 2>"$TMP/errf"); RC=$?
   fp "$cwd" > "$TMP/fp-after"
   cmp -s "$TMP/fp-before" "$TMP/fp-after" || echo "$cwd" >> "$TMP/ro-bad"
   ERR="$(cat "$TMP/errf")"; OUT="$(cat "$TMP/out")"
@@ -104,6 +106,53 @@ probe_0() {  # CR-0 : poste listé => rc 0
   runr "$L" - --path "$L"
   LASTMSG="attendu rc 0 stdout vide, obtenu rc $RC out[$OUT] err[$ERR]"
   [ "$RC" -eq 0 ] && out_empty
+}
+probe_hostile() {  # CR-HOSTILE (audit H-1) : un json.py à la racine du dépôt n'est jamais importé
+  local L W; L="$(mklab)"; W="$TMP/temoin-json.$$"; rm -f "$W"
+  setrole "$L" 'product\n'; setcfg "$L" '{"vf_roles":["product"]}'
+  printf 'open(%s, "w").write("importe")\n' "\"$W\"" > "$L/json.py"
+  runr "$L" PYTHONDONTWRITEBYTECODE=1 --path "$L"
+  LASTMSG="attendu rc 0 et AUCUN témoin écrit, obtenu rc $RC, témoin $([ -e "$W" ] && echo ÉCRIT || echo absent)"
+  [ "$RC" -eq 0 ] && [ ! -e "$W" ]
+}
+probe_cfg_lien() {  # CR-CFG-LIEN (audit M-1) : config.json lien (valide ou pendant) => rc 5, non lu
+  local L1 L2 r1 r2; L1="$(mklab)"; L2="$(mklab)"
+  setrole "$L1" 'product\n'; setrole "$L2" 'product\n'
+  printf '%s' '{"vf_roles":["product"]}' > "$TMP/cible-valide.json"
+  mkdir -p "$L1/.planning" "$L2/.planning"
+  ln -s "$TMP/cible-valide.json" "$L1/.planning/config.json"
+  ln -s "$TMP/cible-inexistante.json" "$L2/.planning/config.json"
+  runr "$L1" - --path "$L1"; r1=$RC
+  runr "$L2" - --path "$L2"; r2=$RC
+  LASTMSG="attendu rc 5 pour un lien valide ET un lien pendant, obtenu rc $r1 / $r2"
+  [ "$r1" -eq 5 ] && [ "$r2" -eq 5 ]
+}
+probe_cfg_fifo() {  # CR-CFG-FIFO (audit M-1) : config.json FIFO => rc 5 sans blocage (jamais ouvert)
+  local L; L="$(mklab)"; setrole "$L" 'product\n'; mkdir -p "$L/.planning"; mkfifo "$L/.planning/config.json"
+  RUNPFX="$TMP/bound.sh"; runr "$L" - --path "$L"; RUNPFX=""
+  LASTMSG="attendu rc 5 sans blocage, obtenu rc $RC (142 = bloqué sur le FIFO)"
+  [ "$RC" -eq 5 ]
+}
+probe_cfg_gros() {  # CR-CFG-GROS / BORNE (audit M-1) : 65537 octets => rc 5 ; 65536 octets => rc 0
+  local L1 L2 r1 r2 base pad; L1="$(mklab)"; L2="$(mklab)"
+  setrole "$L1" 'product\n'; setrole "$L2" 'product\n'
+  base='{"vf_roles":["product"]}'
+  pad="$(awk -v n=$((65537 - ${#base})) 'BEGIN { s = sprintf("%" n "s", ""); printf "%s", s }')"
+  setcfg "$L1" "$base$pad"
+  pad="$(awk -v n=$((65536 - ${#base})) 'BEGIN { s = sprintf("%" n "s", ""); printf "%s", s }')"
+  setcfg "$L2" "$base$pad"
+  runr "$L1" - --path "$L1"; r1=$RC
+  runr "$L2" - --path "$L2"; r2=$RC
+  LASTMSG="attendu rc 5 à 65537 octets et rc 0 à 65536, obtenu rc $r1 / $r2"
+  [ "$r1" -eq 5 ] && [ "$r2" -eq 0 ]
+}
+HOOKS_JSON="$SCRIPTS_DIR/../hooks/hooks.json"
+probe_hook_timeout() {  # CR-HOOK-TIMEOUT (audit M-1) : l'entrée SessionStart du gate porte un timeout court (1..10 s)
+  local f="${1:-$HOOKS_JSON}" t
+  t="$(jq -r '[.hooks.SessionStart[].hooks[] | select((.args // []) | map(test("check-role-consistency\\.sh")) | any) | .timeout] | .[0] // "absent"' "$f" 2>/dev/null)"
+  LASTMSG="attendu un timeout entier entre 1 et 10 sur l'entrée check-role-consistency, obtenu [$t]"
+  case "$t" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$t" -ge 1 ] && [ "$t" -le 10 ]
 }
 probe_bom() {  # CR-BOM : octets bruts jamais réimprimés
   local L; L="$(mklab)"; setrole "$L" '\357\273\277product\r\n'
@@ -318,6 +367,13 @@ else
   if [ "$RC" -eq 17 ]; then ok "CR-17 sans interpréteur Python => rc 17 (fail-open bruyant)"; else ko "CR-17 attendu rc 17, obtenu rc $RC err[$ERR]"; fi
 fi
 
+# === Config.json non fiable : isolement de l'interpréteur et lecture bornée (audit H-1, M-1) =====
+probe_hostile && ok "CR-HOSTILE json.py à la racine du dépôt jamais importé (aucun témoin écrit, rc 0)" || ko "CR-HOSTILE — $LASTMSG"
+probe_cfg_lien && ok "CR-CFG-LIEN config.json lien symbolique (valide ou pendant) => rc 5, non lu" || ko "CR-CFG-LIEN — $LASTMSG"
+probe_cfg_fifo && ok "CR-CFG-FIFO config.json FIFO => rc 5 sans blocage" || ko "CR-CFG-FIFO — $LASTMSG"
+probe_cfg_gros && ok "CR-CFG-GROS config.json 65537 octets => rc 5 ; CR-CFG-BORNE 65536 octets => rc 0" || ko "CR-CFG-GROS — $LASTMSG"
+probe_hook_timeout && ok "CR-HOOK-TIMEOUT l'entrée SessionStart du gate porte un timeout court" || ko "CR-HOOK-TIMEOUT — $LASTMSG"
+
 # === Lecture seule, couverture des codes ========================================================
 [ ! -s "$TMP/ro-bad" ] && ok "CR-RO empreinte de chaque fixture identique avant/après (cmp -s)" \
   || ko "CR-RO fixture modifiée : $(sort -u "$TMP/ro-bad" | tr '\n' ' ')"
@@ -375,6 +431,23 @@ mutant MUT-motif-lecteur-d '{ if (index($0, "bash \"$READER\"")) gsub(/2>&1/, "2
   probe_5d "sortie du lecteur jetée au lieu d'être réaffichée (deux lignes)"
 mutant MUT-outillage '{ if ($0 == "trap _vf_locator_failed EXIT") print "true"; else print }' \
   probe_outillage "filet d'outillage retiré : le bloc canonique sort 1, confondu avec « hors de la liste »"
+
+mutant MUT-isole '{ if (index($0, "vf_python -I -c")) sub(/vf_python -I -c/, "vf_python -c"); print }' \
+  probe_hostile "mode isolé -I retiré : le json.py du dépôt est importé"
+mutant MUT-cfg-lien '{ if (index($0, "if [ -L \"$CFG\" ] || [ ! -f \"$CFG\" ]; then")) sub(/if \[ -L "\$CFG" \] \|\| \[ ! -f "\$CFG" \]; then/, "if false; then"); print }' \
+  probe_cfg_lien "refus du lien symbolique retiré"
+mutant MUT-cfg-fifo '{ if (index($0, "|| [ ! -f \"$CFG\" ]; then")) sub(/ \|\| \[ ! -f "\$CFG" \]; then/, "; then"); print }' \
+  probe_cfg_fifo "refus du fichier non régulier retiré (le FIFO est ouvert)"
+mutant MUT-cfg-taille '{ if (index($0, "-gt \"$CFG_MAX\"")) sub(/-gt "\$CFG_MAX"/, "-gt 99999999"); print }' \
+  probe_cfg_gros "plafond de taille relevé"
+mutant MUT-cfg-borne '{ if (index($0, "-gt \"$CFG_MAX\"")) sub(/-gt "\$CFG_MAX"/, "-ge \"$CFG_MAX\""); print }' \
+  probe_cfg_gros "borne exclusive devenue inclusive (65536 refusé)"
+
+# MUT-hook-timeout : le fichier hooks.json sans le champ timeout doit rougir la sonde.
+jq 'del(.hooks.SessionStart[].hooks[] | select((.args // []) | map(test("check-role-consistency\\.sh")) | any) | .timeout)' "$HOOKS_JSON" > "$MUTDIR/hooks.sans-timeout.json" 2>/dev/null
+if cmp -s "$MUTDIR/hooks.sans-timeout.json" "$HOOKS_JSON"; then ko "MUT-hook-timeout mutant NON OPPOSABLE"
+elif probe_hook_timeout "$MUTDIR/hooks.sans-timeout.json"; then ko "MUT-hook-timeout mutant SURVIVANT"
+else ok "MUT-hook-timeout tué (timeout retiré de l'entrée) — sur le mutant : $LASTMSG"; fi
 
 echo "== Résultat : $PASS ok, $FAIL ko, $SKIPPED skip =="
 [ "$FAIL" -eq 0 ]

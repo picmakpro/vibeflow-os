@@ -153,7 +153,24 @@ verdict_exit() {
 
 # --- États 3 et 4 : la liste du projet -----------------------------------------------------------
 CFG="$ROOT/.planning/config.json"
-[ -e "$CFG" ] || verdict_exit 3
+[ -e "$CFG" ] || [ -L "$CFG" ] || verdict_exit 3
+
+# Lecture BORNÉE (audit M-1, P58-D-10) : config.json vient du dépôt, donc d'un tiers possible. Un lien
+# symbolique, un fichier non régulier (FIFO, périphérique, dossier) ou plus gros que 64 Kio est refusé
+# SANS être ouvert : code 5, erreur d'analyse bruyante, jamais lu.
+CFG_MAX=65536
+if [ -L "$CFG" ] || [ ! -f "$CFG" ]; then
+  signal "erreur d'analyse : .planning/config.json est un lien symbolique ou n'est pas un fichier régulier — non lu"
+  hook_exit 5
+fi
+CFG_SIZE="$(wc -c < "$CFG" 2>/dev/null | tr -d ' ')"
+case "$CFG_SIZE" in
+  ''|*[!0-9]*) signal "erreur d'analyse : taille de .planning/config.json indéterminée — non lu"; hook_exit 5 ;;
+esac
+if [ "$CFG_SIZE" -gt "$CFG_MAX" ]; then
+  signal "erreur d'analyse : .planning/config.json dépasse $CFG_MAX octets — non lu"
+  hook_exit 5
+fi
 
 # Un outil de la chaîne absent (la bibliothèque vf-portable.sh) est une ERREUR D'OUTILLAGE, jamais
 # le verdict 1 « poste hors de la liste » : le bloc canonique ci-dessous sort 1 (son texte est figé
@@ -230,7 +247,10 @@ if isinstance(v, list) and v and all(isinstance(x, str) and x in ("solo", "produ
 else:
     print("illisible")
 '
-VERDICT="$(vf_python -c "$PY_PROG" "$CFG" 2>/dev/null)"; PRC=$?
+# `-I` (audit H-1) : mode isolé — ni le dossier courant ni le site utilisateur dans sys.path. Le
+# cwd d'un hook SessionStart est le dépôt ouvert, donc non fiable : un json.py posé à sa racine
+# serait importé et exécuté. Le programme n'importe que la stdlib.
+VERDICT="$(vf_python -I -c "$PY_PROG" "$CFG" 2>/dev/null)"; PRC=$?
 if [ "$PRC" -ne 0 ]; then
   signal "erreur d'analyse : lecture de la liste vf_roles impossible"
   hook_exit 5
