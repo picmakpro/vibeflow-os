@@ -84,7 +84,7 @@
       "scope": [
         ".planning/workstreams/fiabilite/phases/VFDO-58-roles-de-poste"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan-58",
@@ -94,7 +94,7 @@
         "context-58"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "plancheck-58",
@@ -104,7 +104,7 @@
         "plan-58"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-58",
@@ -122,7 +122,7 @@
         "plugin/mobile-test-team",
         "docs"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-58",
@@ -132,7 +132,8 @@
         "exec-58"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done",
+      "review_regime": "full"
     },
     {
       "id": "audit-58",
@@ -142,7 +143,7 @@
         "exec-58"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "docs",
@@ -152,7 +153,7 @@
         "exec-58"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-backlog",
@@ -162,7 +163,20 @@
         "backlog-application"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
+    },
+    {
+      "id": "revue-58a",
+      "step": "revue intermédiaire vagues 1-2",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/_internal/module-roles.sh",
+        "plugin/conductor/scripts/vf-role.sh",
+        "plugin/conductor/scripts/check-role-consistency.sh",
+        "plugin/installer/scripts/build-module-catalog.sh"
+      ],
+      "status": "done"
     }
   ],
   "ws": "fiabilite"

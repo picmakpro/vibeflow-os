@@ -3,18 +3,18 @@ gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
 current_phase: 58
 current_phase_name: Rôles de poste — installeur, profils solo / product / dev
-status: ready_to_execute
-last_updated: "2026-10-16T12:00:00.000Z"
-last_activity: 2026-10-16
-last_activity_desc: Phase 58 planifiée, 11 plans en 6 vagues (RLPO-01..12 posées ; recherche, carte des patterns, validation, plan-checker 0 BLOCKER)
+status: executing
+last_updated: "2026-10-17T01:30:00.000Z"
+last_activity: 2026-10-17
+last_activity_desc: Phase 58 — plans 58-01..58-10 exécutés (58-03 en relecture humaine), revue et audit passés après correctifs ; 58-11 (porte de phase) attend les arbitrages Q15-Q18 et la relecture d'ADR-077
 state_head: a2ed5094
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 27
-  completed_plans: 16
+  completed_plans: 25
 milestone_name: « l'équipe produit » — Phases 57-62 —
-stopped_at: "Phase 58 planifiée, 11 plans en 6 vagues (2026-10-16) — next : exécution de la Phase 58 (/gsd-execute-phase 58 --ws fiabilite), ADR-077 (58-03) sous verrou --depot du manager, liste de clients attendue pour 58-11."
+stopped_at: "Phase 58 : 9 plans sur 11 clos (2026-10-17), 58-03 au checkpoint de relecture d'ADR-077 — next : arbitrages Q15-Q18 de Samuel, puis 58-11 (porte de phase)."
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — PLANIFIÉE (11 plans, 6 vagues)
+Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EN EXÉCUTION (9/11 plans clos)
 Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 1 phase sur 6 close. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
@@ -45,8 +45,11 @@ Phase 58 cadrée le 2026-10-16 : `58-CONTEXT.md` (P58-D-01..14, arbitrage Samuel
 P58-D-15..20 à la discrétion du planificateur), branche `feat/phase-58-roles-de-poste` empilée sur `docs/cloture-phase-57`.
 
 Phase 58 planifiée le 2026-10-16 : 11 plans en 6 vagues (`58-01-PLAN.md` à `58-11-PLAN.md`), RLPO-01..12 posées, recherche `58-RESEARCH.md`, carte `58-PATTERNS.md`, stratégie `58-VALIDATION.md`, plan-checker sans BLOCKER après deux révisions ; registre du planificateur P58-PL-01..14 dans `58-01-PLAN.md`.
-Next : plan de la Phase 58 (`/gsd-plan-phase 58 --ws fiabilite`), famille d'exigences `RLPO` posée à l'ouverture.
-Last activity: 2026-10-16 — Phase 58 cadrée
+Phase 58 exécutée les 2026-10-16/17 : 58-01, 02, 04 à 10 clos avec SUMMARY ; ADR-077 écrite (58-03, `39499492`) et en relecture
+chez Samuel ; revue (majeur `.gitignore` fermé) et audit (H-1 `json.py` du dépôt au SessionStart fermé dans le code de la phase)
+passés après trois tours de correction. Rapport : `.planning/missions/2026-10-16-suite-v2700-phase-58.md`.
+Next : arbitrages Q15 (clients), Q16 (presets), Q17 (manuel), Q18 (faille `python -c` antérieure) et relecture d'ADR-077, puis 58-11.
+Last activity: 2026-10-17 — Phase 58, plans 58-01..58-10
 
 ## Accumulated Context
 
