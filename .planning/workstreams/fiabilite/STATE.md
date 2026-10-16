@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
 current_phase: 58
 current_phase_name: Rôles de poste — installeur, profils solo / product / dev
-status: not_started
+status: planning
 last_updated: "2026-10-16T12:00:00.000Z"
 last_activity: 2026-10-16
-last_activity_desc: Phase 57 close dans le suivi (PR #152 mergée en --admin sans revue @picmakpro, release v2.70.0) ; Phase 58 à cadrer
+last_activity_desc: Phase 58 cadrée (58-CONTEXT.md, P58-D-01..14 arbitrage Samuel, AskUserQuestion session principale, 2026-10-16)
 state_head: a2ed5094
 progress:
   total_phases: 6
@@ -14,7 +14,7 @@ progress:
   total_plans: 16
   completed_plans: 16
 milestone_name: « l'équipe produit » — Phases 57-62 —
-stopped_at: "Phase 57 close (PR #152, v2.70.0, 2026-10-16) — next : cadrage de la Phase 58 (/gsd-discuss-phase 58 --ws fiabilite)."
+stopped_at: "Phase 58 cadrée (58-CONTEXT.md, 2026-10-16) — next : plan de la Phase 58 (/gsd-plan-phase 58 --ws fiabilite), exigences RLPO posées à l'ouverture."
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — NON CADRÉE
+Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — CADRÉE
 Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 1 phase sur 6 close. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
@@ -41,8 +41,10 @@ principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »). Rel
 GitHub, `check-release-tag --remote` ✓). Registre : `57-CONTEXT.md` (P57-D-01..56) ; rapport de mission de la dette avant PR :
 `.planning/missions/2026-10-12-dette-avant-pr-phase-57.md`.
 
-Next : cadrage de la Phase 58 (`/gsd-discuss-phase 58 --ws fiabilite`), famille d'exigences `RLPO` à poser à ce moment.
-Last activity: 2026-10-16 — Phase 57 close dans le suivi
+Phase 58 cadrée le 2026-10-16 : `58-CONTEXT.md` (P58-D-01..14, arbitrage Samuel, AskUserQuestion session principale, 2026-10-16 ;
+P58-D-15..20 à la discrétion du planificateur), branche `feat/phase-58-roles-de-poste` empilée sur `docs/cloture-phase-57`.
+Next : plan de la Phase 58 (`/gsd-plan-phase 58 --ws fiabilite`), famille d'exigences `RLPO` posée à l'ouverture.
+Last activity: 2026-10-16 — Phase 58 cadrée
 
 ## Accumulated Context
 

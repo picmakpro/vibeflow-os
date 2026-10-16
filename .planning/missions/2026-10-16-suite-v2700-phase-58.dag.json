@@ -40,7 +40,7 @@
         "backlog-proposition"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "backlog-application",
@@ -53,7 +53,7 @@
       "scope": [
         ".planning/BACKLOG.md"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "eclaireur-58",
@@ -71,7 +71,98 @@
         "eclaireur-58"
       ],
       "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "context-58",
+      "step": "58-CONTEXT.md (manager, sur feat/phase-58)",
+      "stage": "",
+      "deps": [
+        "discuss-58",
+        "backlog-application"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-58-roles-de-poste"
+      ],
       "status": "ready"
+    },
+    {
+      "id": "plan-58",
+      "step": "plan Phase 58",
+      "stage": "",
+      "deps": [
+        "context-58"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "plancheck-58",
+      "step": "re-validation plans 58",
+      "stage": "",
+      "deps": [
+        "plan-58"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-58",
+      "step": "exécution Phase 58",
+      "stage": "",
+      "deps": [
+        "plancheck-58"
+      ],
+      "scope": [
+        "plugin/installer",
+        "plugin/_internal",
+        "plugin/conductor",
+        "plugin/dev-orchestrator",
+        "plugin/mobile-test",
+        "plugin/mobile-test-team",
+        "docs"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-58",
+      "step": "revue code 58",
+      "stage": "",
+      "deps": [
+        "exec-58"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-58",
+      "step": "audit sécurité 58 (installeur, hook)",
+      "stage": "",
+      "deps": [
+        "exec-58"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire",
+      "stage": "",
+      "deps": [
+        "exec-58"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-backlog",
+      "step": "revue tri BACKLOG",
+      "stage": "",
+      "deps": [
+        "backlog-application"
+      ],
+      "scope": [],
+      "status": "running"
     }
   ],
   "ws": "fiabilite"
