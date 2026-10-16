@@ -44,7 +44,10 @@ coordination.
 **Driver lock** — The mechanism that guarantees only one mission drives a step at a time. It
 carries a TTL and a heartbeat: if the driver disappears without releasing it, the lock gets
 recovered cleanly instead of staying stuck forever. The lock is enforced: a session that isn't
-registered under it has its commits and its writes to `.planning/` refused.
+registered under it has its commits and its writes to `.planning/` refused. In a lab split into
+topics, there is one lock per topic: one mission per topic at a time, and two topics move in
+parallel. A short repo lock also protects the gestures that touch shared files (release, BACKLOG,
+ADR, root planning files, partition). A single-planning lab keeps a single lock.
 
 **Topic (workstream)** — A planning line of work that moves in parallel with another, with its own
 phases and its own state. A lab has just one by default. Covered in

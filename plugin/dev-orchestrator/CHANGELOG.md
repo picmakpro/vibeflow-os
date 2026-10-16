@@ -1,5 +1,34 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.28.0] — 2026-10-10 (verrou de driver par compartiment : gate de sortie et doctrine, Phase 57)
+
+**Minor** (comportement neuf du gate de sortie et de la doctrine de dispatch, DLWS-04..06 ; arbitrages P57-D-34,
+D-36 et D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; publiée dans v2.70.0, P57-D-30) :
+
+- **`scripts/check-mission-exit.sh`** : l'option `--ws <sujet>` désigne le compartiment dont le verrou est jugé
+  (E1, identité d'E7, surcharge d'E4). Un lab partitionné sans `--ws` est INDÉTERMINÉ (E1) ou exit 4
+  (`--budget-snapshot`), jamais un vert ; lab plat inchangé. `--ws` est aussi transmis à `check-method-budget.sh`
+  dans E7 et dans `--budget-snapshot` (sans quoi E7 rendait « ARCHIVAGE NON TENTÉ » hors `GSD_WORKSTREAM`). Suite neuve
+  `scripts/tests/test-check-mission-exit-ws.sh` (61 assertions, mutants 7/7 tués) ; `test-dev-orchestrator.sh` 279 OK / 0 KO (T37 et T38 inclus).
+- **`references/mission-flow.md`** : nouvelle section « Verrou par compartiment » (acquire, snapshot, `dag.sh init`,
+  heartbeat, register / close, release, tous avec `--ws`, `takeover` avec l'option de cible du `hint` du refus, le refus nommé `not-at-lab-root` : lancer les verbes depuis la racine du lab, P57-D-39, et un `GSD_SESSION_KEY` distinct par session) ;
+  `references/mission-cross-team.md` et `references/head-governance.md` alignés : « un manager par compartiment », avec
+  sa limite (allowlists d'agents, pas verrou), et le paragraphe « Extension non livrée » remplacé par « mécanisme
+  livré (Phase 57) » ; `references/intent-routing.md` : l'intention « reprends le sujet X » passe `--ws X` aussi sur chaque verbe du verrou.
+- **Prompts** : `agents/vf-dev-manager.md` (250 lignes, instructions 46/46), `agents/vf-coder.md` et
+  `agents/vf-reviewer.md` renvoient au protocole à instructions constantes (budget d'instructions tenu).
+
+- **Dette soldée avant la PR (2026-10-12)** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12 ;
+  P57-D-40 : rattachée à cette version, publiée dans v2.70.0, sans bump) :
+  - **C1** (`fc763a72` RED EW-SRC, `dcba414d` GREEN) : `scripts/check-mission-exit.sh` préfère le module conductor voisin
+    quand le gate est dans le dépôt source (plus de « génération du verrou : ? » causée par un `driver-lock.sh` d'avant la phase).
+  - **`references/mission-flow.md`** : précision de prose (R-4) ; un ANCIEN verrou périmé rend le même `reason`
+    `stale-requires-takeover` avec un `hint` `recover` à exécuter tel quel, et `legacy-lock-held` peut aussi surgir juste après la pose.
+  - **2026-10-13** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 ; P57-D-49, P57-D-45) :
+    `takeover --ws` refuse lui aussi devant un ancien verrou : le refus est celui d'`acquire` dans le même état (vivant :
+    `legacy-lock-held`, `hint` `release --owner=…` ; périmé : `stale-requires-takeover`, `hint` `recover`), à exécuter tel qu'il est rendu ;
+    `mission-flow.md` dit la progression du watchdog (`progress_epoch` ou commit le plus récent des worktrees du dossier git commun) et sa limite.
+
 ## [v2.27.1] — 2026-10-08 (carte d'intention : choix du planning, Phase 41.2)
 
 **Patch** (routage, PR #130) :

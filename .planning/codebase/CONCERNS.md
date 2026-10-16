@@ -226,6 +226,75 @@
   il ne la fourche (Iron Law 2 révisée, ADR-069) ; (c) ne PAS désactiver le toggle pour faire taire
   le bruit : ce serait perdre la garde sur le dépôt, qui, elle, fonctionne.
 
+**Phase 57 — verrou de driver par compartiment : dette soldée les 2026-10-12 et 2026-10-13, limites restantes listées** — Sévérité : **LOW**
+- Issue: la Phase 57 est vérifiée `passed` (13/13). Les points de `57-VERIFICATION.md` (C1, C3, C4), `57-REVIEW.md` (R-4 à R-7)
+  et `57-SECURITY.md` (F-3) ont été soldés avant la PR (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12), puis
+  les limites ouvertes de l'audit ont été tranchées le 2026-10-13 (arbitrage Samuel, AskUserQuestion session principale,
+  2026-10-13 ; P57-D-44 à P57-D-53 dans `57-CONTEXT.md`). Corrections rattachées aux versions non publiées conductor v1.49.0 et
+  dev-orchestrator v2.28.0 sans bump (P57-D-40). Preuves : `57-REVIEW.md`, `57-SECURITY.md`, `57-VERIFICATION.md`, sections « Corrections ».
+  **Fermés le 2026-10-12** : R-4 (`6333d8e4`, `8689bbd7`), R-6 (`63d5cc4c`), R-7 intégrité de la copie gelée (`6333d8e4`, `8b957f62`),
+  C3 (`1f6b555b`), C1 (`fc763a72`, `dcba414d`), `check-description-fidelity.sh` sous `TMPDIR` (`c580b45e`).
+  **Fermés le 2026-10-13** :
+  - (a) **F-3 en lab plat** (`719099dc` RED, `4fd77ed3` GREEN, P57-D-47) : la référence A/B est la copie gelée `4d48e50c` plus une
+    empreinte versionnée de la transcription attendue des 37 formes, avec `seen == GW_AB_ENUM_N`.
+  - (b) **Globaux git à argument et wrappers à option-argument** (`719099dc`, `4fd77ed3`, P57-D-48) : `git --git-dir <p>`, `-C`,
+    `--work-tree`, `--namespace=`, etc. ; `env -u/-C`, `nice -n`, `exec -a`, `sudo -u`, `xargs -n` ; `bash/sh/zsh -c` (récursion bornée
+    à 3, refus grossier au-delà). `bash -c "cd <hors-lab> && git commit"` passe de deny à allow : verdict de sa forme canonique
+    (P57-D-52, décision du manager de mission, ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14).
+  - (c) **`GIT_*` posé dans un segment précédent** (`719099dc`, `4fd77ed3`, P57-D-48) ; R-5 vaut aussi en lab plat.
+  - (d) **Épingle R-7 : G-2 surveille les fixtures** (`f76de68b`, `3e426f02`, `42d490b1`, `46254135`, P57-D-50) : la co-modification
+    de la fixture et de l'épingle reste possible, mais elle est tracée par le trailer `Gate-Touche` obligatoire.
+  - (e) **`takeover --ws`** (`a038c8b6`, `6a43299e`, `8fe96bd7`, P57-D-49, P57-D-55) : applique la règle d'`acquire` devant un ancien
+    verrou (le refus est celui d'`acquire` dans le même état : vivant `legacy-lock-held`, périmé `stale-requires-takeover`) ; restitue
+    le verrou de compartiment antérieur sur un refus de la re-sonde (AU2-04), restitution vérifiée (AU3-04), nouvelle `reason`
+    `restore-failed` si elle échoue.
+  - Watchdog (`f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`, `8fe96bd7`, P57-D-45) : progression = commit le plus récent
+    des HEAD de tous les worktrees du dossier git commun ; lecture des worktrees séparée par NUL (AU3-05), un seul `git log` (AU3-06).
+  - Lows du guard AU2-01, AU2-02, AU2-03, AU2-06 (`560f4390`) et AU3-01, AU3-02 (`188d86e8`, P57-D-54).
+  - Relecture adverse avant le tag (arbitrage Samuel, AskUserQuestion session principale, 2026-10-14) : `GIT_DIR`/`GIT_WORK_TREE`/
+    `GIT_INDEX_FILE` hérités ne désignent plus le dépôt jugé par le guard ; un `.planning/workstreams/` vide ou ne portant qu'un
+    `.gitkeep` est un lab plat sur tous les verbes (P57-D-56, révise P57-D-25 : seuls le lien symbolique, le fichier régulier et le
+    dossier illisible donnent encore `partition-unreadable`). Les suites `-ws` ne dépendent plus d'un SIGPIPE actif ni d'un plafond
+    d'horloge de 60 s (le runner GitHub lance ses étapes avec SIGPIPE ignoré).
+  **Restent OUVERTS** (sonde commune : payload `{"tool_name":"Bash","session_id":"autre","cwd":"<lab>","tool_input":{"command":"<cmd>"}}`
+  sur `guard-driver-lock.sh`, depuis un lab dont le verrou est tenu par une autre session ; ALLOW = stdout vide, refus = JSON
+  `permissionDecision: deny`). Pour chaque ligne, la sonde est la commande `<cmd>` citée ; elle rend ALLOW alors que le geste commit :
+  - **Interpréteurs** : `eval "git commit -am x"`, un script du dépôt qui lance git, `python3 -c "import subprocess; …"`,
+    `node -e "…"`. Catégorie A de l'en-tête du guard.
+  - **Wrappers hors liste** : `timeout 5 git commit -am x`, `env -S "git commit -am x"`, `setsid`, `ionice -c3`, `chrt`, `taskset`,
+    `builtin`, `su -c`, `sudo -s`, `doas`, `flock f`, `script -c`, `arch`, `xcrun`, `direnv exec . git commit -am x`,
+    `find . -exec git commit -am x \;`, `env -P /usr/bin git commit -am x`.
+  - **Shells hors liste et formes indirectes** : `csh -c`, `tcsh -c`, `busybox sh -c`; un shell alimenté par stdin (`bash <<EOF` puis
+    `git commit -am x`, `echo "git commit -am x" | sh`) ; le trampoline `sh -c '"$@"' _ git commit -am x` ; l'alias git
+    `git -c alias.x=commit x -am y`.
+  - **Affectations venues d'ailleurs** : variable posée par un fichier sourcé, une fonction, `set -a`, `read`, `printf -v`, `for`
+    (`source env.sh; git commit -am x` avec `GIT_DIR` dans `env.sh`).
+  - **Chaîne `bash -c` construite** : `bash -c "$(printf 'git commit -am x')"`, `bash -c "$CMD"`, ou via un alias.
+  - **Mots-clés et formes devant `git`** : `if git commit -am x; then :; fi`, `while`, `until`, `! git commit -am x`, `$'git' commit -am x`,
+    `>/dev/null git commit -am x`.
+  - **Watchdog consultatif** : un commit sans rapport d'un autre worktree masque un vrai stall (limite acceptée, P57-D-45) ; aucun
+    timeout ne borne le git lancé par le hook (question ouverte). Sonde : heartbeat frais, progression figée, commit récent dans un
+    autre worktree, `check-guard-health.sh` rend SAIN (un verrou sans heartbeat donnerait ABANDON). Un montage gelé peut aussi bloquer
+    `git worktree list` (non mesuré).
+  - **AU3-03, la borne de 64 Ko ne borne pas le coût** : `env env … git commit` x4000 prend 26 s (quadratique, antérieur) ; une chaîne
+    d'1 Mo imbriquée à 4 niveaux dépasse 120 s ; le hook n'a pas de timeout.
+  - **AU3-07 (antérieur)** : `git -C <alpha> add STATE.md && git commit`, `builtin cd <alpha> && git add …` et
+    `eval 'cd <alpha>' && …` sont permis sous le verrou d'autrui.
+  - **Asymétrie conservatrice du guard** : `(cd X && git add … && git commit)` (forme collée) est permis, alors que
+    `(cd X && bash -c '…')` est refusé.
+  - **Résiduel d'AU3-04** : en forme dossier réel, un `acquire` concurrent peut gagner entre le `rm -f` du lien et le `mv -n` ; il
+    n'écrase plus rien, et le refus rend `restore-failed`.
+  - **Aucun timeout déclaré pour le hook guard dans `hooks.json`** : un guard bloqué par un git lent n'est borné que par la valeur
+    par défaut de Claude Code. Sonde : `jq '.hooks' plugin/conductor/hooks/hooks.json`, pas de champ `timeout` sur l'entrée du guard.
+- Files: `plugin/conductor/scripts/guard-driver-lock.sh`, `plugin/conductor/scripts/driver-lock.sh`,
+  `plugin/conductor/scripts/check-guard-health.sh`, `scripts/check-gate-touche.sh`,
+  `plugin/conductor/scripts/tests/test-driver-lock-ws.sh`, `plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh`,
+  `plugin/dev-orchestrator/scripts/check-mission-exit.sh`, `plugin/dev-orchestrator/references/mission-flow.md`
+- Impact: aucun critère de la Phase 57 n'en dépend. Les limites restantes sont des trous de l'anti-accident (pas du modèle de menace,
+  qui exclut l'écriture dans `.git` et les contournements de catégorie A de l'en-tête du guard).
+- Fix approach: à ne traiter que si un usage concurrent réel (Phase 61) les rend observables ; un wrapper de plus ne change rien à
+  la nature du matching par sous-chaîne, une borne de timeout du hook est le seul item peu coûteux.
+
 ## Known Bugs
 
 Aucun bug ouvert confirmé sur disque au 2026-07-26. Les comportements gênants connus (survie de
@@ -308,7 +377,7 @@ capturées au backlog — voir Tech Debt.
   qu'une entrée qui manque — elle éteint la vigilance.**
 - Files: `scripts/hooks/pre-push` (script appelé fermé, hook lui-même ouvert),
   `scripts/hooks/post-merge` (idem) ;
-  `.planning/phases/VFDO-39-workstreams-partition-du-planning-et-collaboration-concurren/39-01-PLAN.md`
+  `.planning/milestones/fiabilite-v1.0-phases/VFDO-39-workstreams-partition-du-planning-et-collaboration-concurren/39-01-PLAN.md`
   (registre STRIDE, T-39-01)
 - Current mitigation: les deux hooks résolvent l'exécutable **qu'ils appellent** via
   `--git-common-dir` — voir le détail par hook ci-dessus. Aucune mitigation ne couvre encore la
@@ -331,7 +400,7 @@ capturées au backlog — voir Tech Debt.
   arbitrages l'un de l'autre.
 - Files: `plugin/conductor/scripts/driver-lock.sh`, `plugin/conductor/scripts/guard-driver-lock.sh`,
   `plugin/conductor/scripts/check-guard-health.sh`
-- Fermeture (Phase 32, `.planning/phases/VFDO-32-durcissement-du-driver-lock/32-RELIQUATS.md`) :
+- Fermeture (Phase 32, `.planning/milestones/fiabilite-v1.0-phases/VFDO-32-durcissement-du-driver-lock/32-RELIQUATS.md`) :
   `acquire` refuse désormais un lock périmé (`stale-requires-takeover`, jamais de récupération
   implicite) ; guard `PreToolUse(Bash|Write|Edit)` distribué via `merge-hooks`, qui refuse un commit
   ou une écriture `.planning/` sous le lock d'autrui, armé et vérifié en lab jetable ; le
@@ -340,8 +409,8 @@ capturées au backlog — voir Tech Debt.
 - **Ce qui reste vrai — le guard est anti-accident, pas anti-adversaire** (`32-RELIQUATS.md` §6.2) :
   restent structurellement hors de sa portée une session **non armée**, un **terminal humain** direct
   hors Claude Code, un **IDE ou client git tiers**, un **processus en arrière-plan**, un appel **MCP**,
-  une **autre machine**, et `bash -c`/`eval` (passoires du matching par sous-chaîne de commande, nommées
-  explicitement). Une entrée qui se déclarerait entièrement close mentirait — catégorie C non traitée,
+  une **autre machine**, et `eval` (passoire du matching par sous-chaîne de commande, nommée
+  explicitement ; `bash -c` n'en fait plus partie depuis le 2026-10-13, P57-D-48). Une entrée qui se déclarerait entièrement close mentirait — catégorie C non traitée,
   hors du périmètre livré.
 - Recommendations (résiduel) : si la catégorie C devient un risque mesuré (pas seulement théorique),
   ré-ouvrir sur un mécanisme distinct (ex. hook git natif côté dépôt, hors du seul chemin Claude Code).
@@ -486,7 +555,7 @@ vrais dans le code mais sans impact observé — sévérité **LOW**, ne pas pri
 
 **`kimi doctor` est un VERT À VIDE sur les agents — il ne les regarde pas** — Sévérité : **HIGH**
 - Files: toute recette d'install/vérification ciblant kimi-code ; constat en
-  `.planning/phases/VFDO-38-*/38-MESURE-KIMI.md` (artefact `71-doctor-populated.txt`)
+  `.planning/milestones/fiabilite-v1.0-phases/VFDO-38-*/38-MESURE-KIMI.md` (artefact `71-doctor-populated.txt`)
 - Why fragile: mesuré le 2026-08-30 — sur un banc peuplé de **11 agents cassés sur 31**, `kimi
   doctor` rend **« All checked config files are valid »**. Il valide les fichiers de configuration
   et **jamais les agents**. Le seul signal est un WARN dans `<KIMI_CODE_HOME>/logs/kimi-code.log`,

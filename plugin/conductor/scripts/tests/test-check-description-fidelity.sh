@@ -25,9 +25,16 @@
 #         silence toléré).
 #   T8  — --inventory n'écrit rien : empreinte de l'arbre de fixture avant/après invocation,
 #         comparaison par comm sur listes triées de chemins ET par empreinte de contenu.
-#   T9  — garde-fou : aucun répertoire temporaire du gate ne fuit hors de mktemp -d.
-#   T10 — garde-fou : l'arbre du dépôt est resté byte-identique pendant toute la suite
-#         (git diff --stat sur plugin/, fichiers suivis, vide après exécution).
+#   T9  — garde-fou : aucun répertoire temporaire du gate ne fuit hors de mktemp -d. Le gate
+#         tourne sous un TMPDIR PRIVÉ au cas (jamais le répertoire temporaire global du poste,
+#         que les processus concurrents polluent) : tout ce qui reste sous ce répertoire est
+#         SA fuite.
+#   T10 — garde-fou : l'arbre jugé est resté byte-identique pendant toute la suite. L'arbre
+#         jugé est un MIROIR de plugin/ pris une fois en tête de suite (le gate tourne sur sa
+#         copie du miroir, jamais sur l'arbre vivant) ; la preuve compare l'empreinte
+#         chemin+contenu (TSV trié chemin<TAB>sha256) avant/après par `comm -3` : ajout,
+#         suppression ou modification rougissent. Plus de `git diff --stat` : il rougissait
+#         sur toute écriture tierce concurrente.
 #
 # Tâche 4 — les DEUX mutants discriminants OBLIGATOIRES, sur une COPIE d'un fichier RÉEL du
 # dépôt (jamais le fichier posé), ajoutés séparément de T0-T10 pour que leur preuve reste isolée
@@ -114,10 +121,43 @@ make_fixture_file() {
 EMPTY_EXC="$WORK/empty-exceptions.tsv"
 : > "$EMPTY_EXC"
 
+# --- Miroir de l'arbre réel, pris UNE fois en tête de suite. Cause d'instabilité mesurée
+# (flaky-base) : T1, T2, T10 et les copies des mutants lisaient l'arbre VIVANT du dépôt pendant
+# ~10 s ; tout autre processus qui y écrit (worker concurrent, éditeur, rebase) rougissait T10
+# (« git diff » non vide) sans que le gate ait rien écrit. On juge donc une copie fidèle de plugin/
+# (même contenu, même chemin relatif, copie du gate à sa place : sa racine par défaut dérive de
+# son emplacement, le chemin « racine par défaut » reste donc exercé) et T10 prouve que CETTE
+# copie reste byte-identique : même propriété (le gate n'écrit pas dans l'arbre qu'il juge),
+# sans dépendre d'un tiers. Le chemin d'un fichier réel utilisé comme source de mutant passe aussi
+# par le miroir : pas de lecture d'un fichier en cours d'édition ailleurs. ---
+MIRROR="$WORK/mirror"
+mkdir -p "$MIRROR"
+cp -R "$REPO/plugin" "$MIRROR/plugin"
+GATE_TREE="$MIRROR/plugin/conductor/scripts/check-description-fidelity.sh"
+# Toute invocation suivante du gate passe par sa copie du miroir : si le gate écrivait dans SA
+# racine de dépôt (REPO_ROOT dérivé de son emplacement), l'écriture atterrirait dans le miroir et
+# T10 la verrait. T0 a déjà prouvé que le gate du dépôt est présent et exécutable.
+GATE="$GATE_TREE"
+tree_fingerprint() {
+  # $1 = racine ; TSV trié chemin<TAB>sha256, une seule invocation node (portable macOS/Linux).
+  node -e '
+    const fs=require("fs"),path=require("path"),c=require("crypto");
+    const out=[];
+    (function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){
+      const f=path.join(d,e.name);
+      if(e.isDirectory())walk(f);
+      else if(e.isSymbolicLink())out.push(path.relative(process.argv[1],f)+"\tlink:"+fs.readlinkSync(f));
+      else out.push(path.relative(process.argv[1],f)+"\t"+c.createHash("sha256").update(fs.readFileSync(f)).digest("hex"));
+    }})(process.argv[1]);
+    process.stdout.write(out.sort().join("\n")+"\n");
+  ' "$1"
+}
+tree_fingerprint "$MIRROR/plugin" > "$WORK/mirror-before.tsv"
+
 # =====================================================================================
 # T1 — non-vacuité sur l'arbre réel.
 # =====================================================================================
-T1_OUT="$(bash "$GATE" --inventory 2>&1)"
+T1_OUT="$(bash "$GATE_TREE" --inventory 2>&1)"
 T1_COUNT="$(printf '%s\n' "$T1_OUT" | grep -oE 'inventaire — [0-9]+ découvert' | grep -oE '[0-9]+' | head -1)"
 T1_COUNT="${T1_COUNT:-0}"
 if [ "$T1_COUNT" -gt 10 ]; then
@@ -130,7 +170,7 @@ fi
 # T2 — gate en mode audit sur l'arbre réel : assertion sur la PROPRIÉTÉ (exit 0 attendu),
 # jamais sur un compte figé. Documenté KO tant que la Tâche 5 n'a pas converti.
 # =====================================================================================
-bash "$GATE" > "$WORK/t2.out" 2>&1
+bash "$GATE_TREE" > "$WORK/t2.out" 2>&1
 T2_RC=$?
 if [ "$T2_RC" -eq 0 ]; then
   ok "T2 : arbre réel conforme (exit 0) — aucun fichier non exempté ne viole les deux règles"
@@ -304,12 +344,16 @@ fi
 # =====================================================================================
 # T9 — garde-fou : aucun répertoire temporaire du gate ne fuit hors de mktemp -d.
 # =====================================================================================
-TMP_PARENT="$(dirname "$(mktemp -u)")"
-T9_BEFORE="$(find "$TMP_PARENT" -maxdepth 1 -type d 2>/dev/null | LC_ALL=C sort)"
-bash "$GATE" --root "$WORK/t8" > /dev/null 2>&1
-bash "$GATE" --inventory --root "$WORK/t8" > /dev/null 2>&1
-T9_AFTER="$(find "$TMP_PARENT" -maxdepth 1 -type d 2>/dev/null | LC_ALL=C sort)"
-T9_LEAK="$(comm -13 <(printf '%s\n' "$T9_BEFORE") <(printf '%s\n' "$T9_AFTER"))"
+# Répertoire temporaire PRIVÉ à ce cas (TMPDIR) : l'ancienne forme comparait le contenu du
+# répertoire temporaire GLOBAL du poste avant/après, donc tout répertoire créé par un autre
+# processus concurrent (autre worker, autre suite) pendant les deux invocations se lisait comme
+# une fuite du gate (cause d'instabilité mesurée, flaky-base : 12 rouges sur 30 passages). Le gate
+# crée son mktemp -d sous $TMPDIR : tout ce qui reste sous ce répertoire privé est SA fuite.
+T9_TMP="$WORK/t9-tmpdir"
+mkdir -p "$T9_TMP"
+TMPDIR="$T9_TMP" bash "$GATE" --root "$WORK/t8" > /dev/null 2>&1
+TMPDIR="$T9_TMP" bash "$GATE" --inventory --root "$WORK/t8" > /dev/null 2>&1
+T9_LEAK="$(find "$T9_TMP" -mindepth 1 2>/dev/null | LC_ALL=C sort)"
 if [ -z "$T9_LEAK" ]; then
   ok "T9 : aucun répertoire temporaire du gate n'a fui hors de mktemp -d"
 else
@@ -317,17 +361,17 @@ else
 fi
 
 # =====================================================================================
-# T10 — garde-fou : l'arbre du dépôt est resté byte-identique pendant les cas sur fixtures.
-# `git diff` (fichiers SUIVIS uniquement) — jamais `git status`, qui listerait aussi ce fichier
-# de suite lui-même (encore non suivi au moment où il s'exécute la première fois) comme un faux
-# positif ; la garde porte sur une MODIFICATION d'un fichier existant, pas sur un ajout légitime.
+# T10 — garde-fou : l'arbre jugé (miroir de plugin/, empreinte chemin+contenu avant/après) est
+# resté byte-identique pendant T1-T9. Ajout, suppression ou modification d'un fichier : toutes
+# trois rougissent (comm -3 sur listes triées). Plus de `git diff` sur l'arbre vivant : il rougissait
+# sur toute écriture tierce concurrente et sur tout arbre déjà modifié au lancement.
 # =====================================================================================
-T10_SELF="plugin/conductor/scripts/tests/test-check-description-fidelity.sh"
-T10_STATUS="$(cd "$REPO" && git diff --stat -- plugin ":(exclude)$T10_SELF" 2>/dev/null)"
+tree_fingerprint "$MIRROR/plugin" > "$WORK/mirror-after.tsv"
+T10_STATUS="$(comm -3 "$WORK/mirror-before.tsv" "$WORK/mirror-after.tsv")"
 if [ -z "$T10_STATUS" ]; then
-  ok "T10 : arbre du dépôt (plugin/, fichiers suivis) resté byte-identique pendant la suite"
+  ok "T10 : arbre jugé (miroir de plugin/, chemin+contenu) resté byte-identique pendant la suite"
 else
-  ko "T10 : l'arbre du dépôt a été modifié pendant la suite : $T10_STATUS"
+  ko "T10 : l'arbre jugé a été modifié pendant la suite : $T10_STATUS"
 fi
 
 # =====================================================================================
@@ -354,7 +398,7 @@ fs.writeFileSync(filePath, lines.join("\n"));
 ' "$1" "$2" "$3"
 }
 
-SRC_REAL="$REPO/plugin/validator/AGENT.md"
+SRC_REAL="$MIRROR/plugin/validator/AGENT.md"
 SRC_SHA_BEFORE="$(sha256_file "$SRC_REAL")"
 
 MUT_A_TEXT="Texte de test avec: un deux-points, pour le mutant scalaire replie."
@@ -421,7 +465,7 @@ fi
 # affichait PASS. Fixture : COPIE de plugin/consolidator/SKILL.md (une des deux exceptions
 # légitimes restantes — YAML valide aujourd'hui, jamais l'arbre du dépôt).
 # =====================================================================================
-SRC_EXC_REAL="$REPO/plugin/consolidator/SKILL.md"
+SRC_EXC_REAL="$MIRROR/plugin/consolidator/SKILL.md"
 SRC_EXC_SHA_BEFORE="$(sha256_file "$SRC_EXC_REAL")"
 
 # --- T16 : contrôle vert AVANT mutation — copie pristine déclarée exception -> exit 0. ---
@@ -534,7 +578,7 @@ CLASS_IDX=0
 for cf in "${CLASS_FILES[@]}"; do
   CLASS_IDX=$((CLASS_IDX + 1))
   n="2$CLASS_IDX"
-  src_real="$REPO/$cf"
+  src_real="$MIRROR/$cf"
   if [ ! -f "$src_real" ]; then
     skip "T$n : fichier de classe introuvable sur ce poste ('$src_real')"
     continue

@@ -175,7 +175,7 @@ Samuel pour veto par le même canal, à la même date. Réponse : « Aucun veto 
   `mark-progress`, `release`, `recover` et `status` appelés sans `--ws` visent le verrou de dépôt. Si
   celui-ci est absent et qu'un ancien `.planning/DRIVER.lock` est présent, ils visent ce dernier. Le JSON
   dit toujours `scope`. `status --all` agrège tous les verrous.
-- **P57-D-25 (partition illisible)** : un dossier `workstreams/` illisible (lien, fichier régulier, vide
+- **P57-D-25 (partition illisible ; le cas « vide » est révisé par P57-D-56)** : un dossier `workstreams/` illisible (lien, fichier régulier, vide
   au sens de `vf_ws_enumerate` rc 2) donne un **refus** `partition-unreadable`, jamais un repli plat. Le
   cas « fichier régulier », encore ouvert dans l'amendement d'ADR-069 du 2026-09-23, n'est pas figé
   au-delà de ce refus.
@@ -239,6 +239,97 @@ canal à la même date : aucun veto. Le détail de chaque décision vit dans les
   lab plat, puisque l'en-tête documente les nouvelles options. Elle est exclue du témoin A/B, et cette
   exclusion est écrite dans le témoin. Tous les verbes restent identiques octet pour octet. *Ratifiée par
   Samuel ; P57-D-03 est précisée, pas réécrite.*
+
+### Décisions nées après la planification (2026-10-11)
+
+Deux résiduels de l'audit de sécurité (F-1 et F-2, voir `57-SECURITY.md`) ont été soumis à Samuel, qui a
+retenu l'option (a) à chaque fois : **P57-D-38 et P57-D-39, arbitrage Samuel, AskUserQuestion session
+principale, 2026-10-11**.
+
+- **P57-D-38 (casse de `.planning` en lab partitionné, F-1, option a)** : en lab partitionné seulement, le
+  guard Write/Edit compare le segment `.planning` sans tenir compte de la casse, dans le préfiltre C4 et dans
+  la cartographie des chemins. `<lab>/.PLANNING/workstreams/<ws>/f` est donc refusé sous le verrou d'autrui,
+  comme `.planning/Workstreams/FIABILITE/f`. Le lab plat reste identique au bit près (A/B contre la copie
+  gelée IDENTIQUE, témoin DLWS-03 conservé). Complète P57-D-33 (casse du nom de compartiment).
+- **P57-D-39 (position du lanceur, F-2, option a)** : `driver-lock.sh` refuse avec la raison nommée
+  `not-at-lab-root` quand `--ws` ou `--depot` est passé depuis un dossier sans `.planning/` propre alors que
+  la racine git (`git rev-parse --show-toplevel`) porte `.planning/workstreams` ; le hint dit de lancer depuis
+  la racine du lab. Nom choisi dans la série des refus existants (`ws-invalid`, `unknown-ws`,
+  `partition-unreadable`, `policy-missing`, noms kebab de l'objet du défaut) : ici le défaut est la position du
+  lanceur, que le nom dit sans ambiguïté, et aucun des quatre autres ne la décrit. Le guard détecte la
+  partition depuis la racine git, plus depuis le cwd : un commit ou une écriture lancé d'un sous-dossier est
+  jugé comme en lab partitionné (même condition : pas de `.planning/` propre au cwd). Sans `--ws` ni `--depot`,
+  rien ne change ; le lab plat non plus. P57-D-29 (deux `.planning/` dans un même clone) reste hors périmètre et
+  intact.
+
+### Décisions du manager de mission (2026-10-12)
+
+Décisions du MANAGER DE MISSION (mission « dette avant PR Phase 57 »), pas des arbitrages de Samuel : elles sont
+prises dans le cadre de l'arbitrage Samuel (AskUserQuestion, session principale, 2026-10-12) de solder la dette de
+la Phase 57 avant sa PR.
+
+- **P57-D-40 (rattachement aux versions non publiées)** : les corrections rejoignent conductor v1.49.0 et
+  dev-orchestrator v2.28.0, non publiées (le dernier tag `v2.69.1` porte conductor v1.48.2 et dev-orchestrator
+  v2.27.1), sans nouveau bump. Précédent : `e97a4196` (entrées complétées sans bump). Aucune release dans la
+  Phase 57 (P57-D-30).
+- **P57-D-41 (compteurs `progress` du STATE fiabilite)** : ils incluent la Phase 57 sous le même `milestone:`
+  (commit `d0a2eb23`), parce que `equipe-produit-v1.0` est inscrit sans `gsd-new-milestone` (arbitrage Samuel,
+  AskUserQuestion session principale, 2026-10-08).
+- **P57-D-42 (F-3 en lab partitionné seulement)** : les globaux git sans argument et `exec` sont reconnus par le
+  guard en lab partitionné seulement ; le lab plat reste inchangé pour tenir l'A/B au bit près contre la copie
+  gelée. L'extension au lab plat est soumise à Samuel (CONCERNS, limite a).
+- **P57-D-43 (périmètre de R-5)** : en lab partitionné seulement (lab plat inchangé, comme P57-D-42), un préfixe
+  `GIT_DIR=`, `GIT_INDEX_FILE=` ou `GIT_WORK_TREE=` du même segment
+  que le geste git rend la cible incertaine, y compris pour la décision « geste hors du lab ». Une affectation
+  dans un AUTRE segment (`export GIT_INDEX_FILE=…; git commit`) reste non couverte : limite écrite dans CONCERNS
+  (limite c).
+
+### Arbitrages du 2026-10-13
+
+Sauf mention contraire, chaque décision est un arbitrage Samuel, AskUserQuestion session principale, 2026-10-13.
+
+- **P57-D-44 (STATE au jalon `equipe-produit-v1.0`)** : le STATE fiabilite passe au jalon `equipe-produit-v1.0` (6 phases,
+  0 terminée, 16/16 plans), commit `a6745526` (réponse A (b)). REMPLACE P57-D-41.
+- **P57-D-45 (progression du watchdog)** : la progression est le commit le plus récent (`%ct`) parmi les HEAD de tous les
+  worktrees du dossier git commun ; un commit futur, un worktree prunable ou illisible sont ignorés ; le git est durci
+  (Q1 (b) et D (b)). Commits `f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`. Limite acceptée : un commit sans
+  rapport peut masquer un stall, le watchdog est consultatif.
+- **P57-D-46 (archivage)** : les 17 dossiers de phase de fiabilite-v1.0 sont archivés sous
+  `.planning/milestones/fiabilite-v1.0-phases/` (étape `archive_phases` de gsd-cleanup), puis `--archive roadmap` ;
+  la ROADMAP fait 63 Ko (Q2 (a)). Commit `4a8535ee`.
+- **P57-D-47 (F-3 en lab plat, référence A/B épinglée)** : F-3 vaut aussi en lab plat ; la référence A/B est la copie gelée
+  `4d48e50c` plus une empreinte versionnée de la transcription attendue des 37 formes (verdict, code de sortie, message),
+  avec `seen == GW_AB_ENUM_N` (Q4 + B (b)). Commits `719099dc`, `4fd77ed3`. REMPLACE P57-D-42.
+- **P57-D-48 (contournements Q5)** : fermés dans les deux régimes, R-5 compris : globaux git à argument, wrappers à
+  option-argument (`env -u/-C`, `nice -n`, `exec -a`, `sudo -u`, `xargs -n`…), `bash/sh/zsh -c` (récursion bornée à 3, refus
+  grossier au-delà), `GIT_*` posé dans un segment précédent (Q5). Commits `719099dc`, `4fd77ed3`. PRÉCISE P57-D-43. Lecture
+  du manager : ces contournements existaient dans les deux régimes ; Samuel a ratifié sur recommandation.
+- **P57-D-49 (`takeover --ws`)** : applique la règle d'`acquire` devant un ancien verrou, vivant (`a038c8b6`) comme périmé
+  (`6a43299e`) : le refus est celui d'`acquire` dans le même état (vivant : `legacy-lock-held`, `hint` `release --owner=…` ; périmé : `stale-requires-takeover`, `hint` `recover`), à exécuter tel qu'il est rendu ; sur un refus de la re-sonde, le verrou de compartiment antérieur est
+  restitué (AU2-04) (Q5 + C (a)).
+- **P57-D-50 (G-2, classe 6)** : G-2 surveille une classe 6, les fixtures (`plugin/conductor/scripts/tests/fixtures/**`,
+  `scripts/tests/fixtures/**`) ; lecture en `git diff -z`, noms spéciaux compris (Q6). Commits `f76de68b`, `3e426f02`,
+  `42d490b1`, `46254135`. ADR-072 amendée le 2026-10-13.
+- **P57-D-51 (managers et bumps)** : les managers content, business et growth nomment la commande à exécuter par le `hint`
+  d'un refus de verrou périmé ; bumps patch (Q7). Commit `576ba249`.
+- **P57-D-52 (`bash -c "cd <hors-lab> && git …"`)** : passe de deny à allow, verdict de sa forme canonique. Décision du
+  manager de mission, constatée par l'audit sans contournement ; ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14 (RV4-07 close).
+- **P57-D-53 (tri du BACKLOG)** : reporté après la release (Q3) ; la PR part avec 31/20.
+- **P57-D-54 (`);` collé)** : AU3-01, un séparateur collé à une parenthèse (`);`, `)&&`, `;(`) laissait `bash` hors position de
+  commande ; rattaché à Q5 « fermer `bash -c` » et corrigé (`188d86e8`). Décision du MANAGER DE MISSION, prise dans le cadre de
+  l'arbitrage du 2026-10-13 (Samuel, AskUserQuestion session principale).
+- **P57-D-55 (`restore-failed`)** : nouvelle `reason` `restore-failed` quand la restitution du verrou antérieur échoue (chemin
+  d'échec qui laissait auparavant un verrou fantôme ; `8fe96bd7`). Décision du MANAGER DE MISSION, prise dans le cadre de
+  l'arbitrage du 2026-10-13 (Samuel, AskUserQuestion session principale).
+- **P57-D-56 (dossier des compartiments vide = lab plat ; révise P57-D-25)** : un `.planning/workstreams/` réel **sans aucun
+  compartiment** (vide, ou ne portant que des fichiers comme `.gitkeep`) se traite comme un lab plat, comme en v2.69.1, sur tous
+  les verbes (`status` et `release` compris) : il ne donne plus `partition-unreadable`. Un lien symbolique ou un fichier régulier à
+  la place du dossier, et un dossier illisible (droits), restent refusés. Même jugement partout où la détection existe :
+  `driver-lock.sh` (`vf_dl_ws_present`), `guard-driver-lock.sh` (sonde bash `vf_guard_ws_present` et `ws_present` du python) et
+  `check-mission-exit.sh` (`is_partitioned`). Un sous-dossier non caché ou un lien dans le dossier suffit à le dire partitionné
+  (leur jugement reste celui de `vf_ws_enumerate`, inchangé). Arbitrage Samuel, AskUserQuestion session principale, 2026-10-14
+  (« vide = lab plat »), pris sur le finding majeur de la relecture adverse SOBR-04. Preuves : `WS-VIDE-*`, `GW-VIDE-*`, mutants
+  `DL-M-vide`, `GW-M-vide_py`, `GW-M-vide_both`.
 
 </decisions>
 

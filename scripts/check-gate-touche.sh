@@ -21,13 +21,20 @@
 # reprise ici mot pour mot pour que la sonde ne signale plus ce script comme muet sur sa propre
 # limite de fond.
 #
-# CINQ CLASSES DE LA SURFACE SURVEILLEE, ecrites en toutes lettres, celle-la meme et aucune autre :
+# SIX CLASSES DE LA SURFACE SURVEILLEE, ecrites en toutes lettres, celle-la meme et aucune autre :
 #   1. plugin/conductor/scripts/check-*.sh   (un seul niveau, jamais un chemin plus profond)
 #   2. scripts/check-*.sh                    (un seul niveau, jamais un chemin plus profond)
 #   3. leurs suites : plugin/conductor/scripts/tests/test-*.sh ET scripts/tests/test-*.sh
 #      (une seule classe combinee — un mutant qui neutralise cette classe retire les DEUX chemins)
 #   4. .github/workflows/ci.yml              (chemin exact, pas un motif)
 #   5. tout chemin commencant par scripts/hooks/ (profondeur libre)
+#   6. les fixtures de ces suites : tout chemin commencant par plugin/conductor/scripts/tests/fixtures/
+#      OU scripts/tests/fixtures/ (profondeur libre ; une seule classe combinee — un mutant qui la
+#      neutralise retire les DEUX prefixes). Ajoutee sur arbitrage Samuel, AskUserQuestion session
+#      principale, 2026-10-13 (audit AUD-3) : une meme PR pouvait modifier une copie gelee sous
+#      tests/fixtures/ ET l'empreinte qui l'epingle sans que rien ne le trace. BORNE : seules les
+#      fixtures des suites DEJA surveillees (classe 3) sont visees, jamais celles des autres
+#      modules (plugin/_internal/tests/fixtures, plugin/consolidator/..., plugin/planning-core/...).
 # BORNE NOMMEE, JAMAIS UN OUBLI : les gates des AUTRES modules (par exemple
 # plugin/dev-orchestrator/scripts/check-*.sh, plugin/software-architecture/scripts/check-file-size.sh)
 # sont HORS SURFACE par l'arbitrage du perimetre du 2026-09-17 (sans acces admin, la phase 41 ne
@@ -187,41 +194,75 @@ SURFACE_TOUCHED="$TMPD/surface_touched"
 TRAILERS_OK="$TMPD/trailers_ok"
 trap 'rm -rf "$TMPD"' EXIT
 
-if ! git diff --name-status "$BASE" "$HEAD_SHA" > "$DIFF_RAW" 2>/dev/null; then
+# Lecture en -z (separateur NUL) : sans -z, git met entre guillemets et echappe tout nom non ASCII
+# ou portant `"`, une tabulation ou `\`, et le classement ancre ne les reconnaissait jamais
+# (RIEN-A-JUGER a tort ; revue AU2-05, 2026-10-13). En -z, le nom arrive brut, quel qu'il soit.
+if ! git diff -z --name-status "$BASE" "$HEAD_SHA" > "$DIFF_RAW" 2>/dev/null; then
   echo "[check-gate-touche] sortie de git diff --name-status illisible" >&2
   exit 2
 fi
 
-# --- Validation de forme des lignes de diff (statut reconnu) --------------------------------------
-if ! awk -F'\t' '
-  { if ($1 !~ /^[AMDTU]$/ && $1 !~ /^[RC][0-9]*$/) { exit 1 } }
-' "$DIFF_RAW"; then
-  echo "[check-gate-touche] sortie de git diff --name-status imparsable" >&2
-  exit 2
-fi
+# --- Classement d'un chemin (six classes) : CLASS = nom de classe, vide si hors surface -----------
+# Equivalent exact des motifs [^/]+ d'origine : un seul segment, au moins un caractere entre le
+# prefixe et le suffixe. `case` n'interprete jamais le sujet, quel que soit le nom du fichier.
+seg_ok() {  # <chemin> <prefixe> <minimum-de-longueur-du-reste> -> 0 si un seul segment assez long
+  local rest="${1#"$2"}"
+  case "$rest" in */*) return 1 ;; esac
+  [ "${#rest}" -gt "$3" ]
+}
+classify() {
+  CLASS=""
+  case "$1" in
+    plugin/conductor/scripts/check-*.sh) seg_ok "$1" plugin/conductor/scripts/ 9 && CLASS="gate-conductor" ;;
+  esac
+  [ -n "$CLASS" ] && return 0
+  case "$1" in
+    scripts/check-*.sh) seg_ok "$1" scripts/ 9 && CLASS="gate-scripts" ;;
+    plugin/conductor/scripts/tests/test-*.sh) seg_ok "$1" plugin/conductor/scripts/tests/ 8 && CLASS="suite" ;;
+    scripts/tests/test-*.sh) seg_ok "$1" scripts/tests/ 8 && CLASS="suite" ;;
+    .github/workflows/ci.yml) CLASS="ci" ;;
+    scripts/hooks/*) CLASS="hooks" ;;
+    plugin/conductor/scripts/tests/fixtures/*) CLASS="fixtures" ;;
+    scripts/tests/fixtures/*) CLASS="fixtures" ;;
+  esac
+  return 0
+}
 
-CHEMINS_DIFF=$(awk 'NF > 0 { c++ } END { print c + 0 }' "$DIFF_RAW")
-
-# --- Comparaison 1 — appartenance a la surface, cinq classes, une seule lecture du diff -----------
-awk -F'\t' '
-  function classify(p) {
-    if (p ~ /^plugin\/conductor\/scripts\/check-[^\/]+\.sh$/) return "gate-conductor"
-    if (p ~ /^scripts\/check-[^\/]+\.sh$/) return "gate-scripts"
-    if (p ~ /^plugin\/conductor\/scripts\/tests\/test-[^\/]+\.sh$/) return "suite"
-    if (p ~ /^scripts\/tests\/test-[^\/]+\.sh$/) return "suite"
-    if (p == ".github/workflows/ci.yml") return "ci"
-    if (p ~ /^scripts\/hooks\//) return "hooks"
-    return ""
-  }
-  {
-    status = $1
-    if (status ~ /^[RC]/) { old = $2; new = $3 } else { old = ""; new = $2 }
-    if (old != "") { c = classify(old); if (c != "") printf "%s\t%s\t%s\n", status, old, c }
-    if (new != "") { c = classify(new); if (c != "") printf "%s\t%s\t%s\n", status, new, c }
-  }
-' "$DIFF_RAW" > "$SURFACE_TOUCHED"
-
-CHEMINS_SURFACE=$(awk 'NF > 0 { c++ } END { print c + 0 }' "$SURFACE_TOUCHED")
+# --- Validation de forme + comparaison 1 — appartenance a la surface, six classes, une lecture ---
+# Enregistrements NUL : statut, chemin (et second chemin pour R/C). SURFACE_TOUCHED est lui aussi
+# NUL-separe (statut, chemin, classe) : un nom portant tabulation ou saut de ligne reste un seul champ.
+CHEMINS_DIFF=0
+CHEMINS_SURFACE=0
+: > "$SURFACE_TOUCHED"
+while IFS= read -r -d '' st; do
+  case "$st" in
+    [AMDTU]) paths=1 ;;
+    [RC]*)
+      case "${st#?}" in
+        *[!0-9]*) echo "[check-gate-touche] sortie de git diff --name-status imparsable" >&2; exit 2 ;;
+      esac
+      paths=2
+      ;;
+    *)
+      echo "[check-gate-touche] sortie de git diff --name-status imparsable" >&2
+      exit 2
+      ;;
+  esac
+  p1=""; p2=""
+  if ! IFS= read -r -d '' p1 || { [ "$paths" -eq 2 ] && ! IFS= read -r -d '' p2; }; then
+    echo "[check-gate-touche] sortie de git diff --name-status imparsable (enregistrement tronque)" >&2
+    exit 2
+  fi
+  CHEMINS_DIFF=$((CHEMINS_DIFF + 1))
+  for cand in "$p1" "$p2"; do
+    [ -z "$cand" ] && continue
+    classify "$cand"
+    if [ -n "$CLASS" ]; then
+      printf '%s\0%s\0%s\0' "$st" "$cand" "$CLASS" >> "$SURFACE_TOUCHED"
+      CHEMINS_SURFACE=$((CHEMINS_SURFACE + 1))
+    fi
+  done
+done < "$DIFF_RAW"
 
 # --- Comparaisons 2 et 3 — recolte des marqueurs Gate-Touche, portee branche, forme --------------
 MARQ_LUS=0
@@ -296,7 +337,7 @@ fi
 
 # --- Comparaison 4 — correspondance chemin <-> motif, case uniquement, jamais eval ----------------
 RC=0
-while IFS="$(printf '\t')" read -r status path class; do
+while IFS= read -r -d '' status && IFS= read -r -d '' path && IFS= read -r -d '' class; do
   [ -z "$path" ] && continue
   covered=0
   if [ -s "$TRAILERS_OK" ]; then

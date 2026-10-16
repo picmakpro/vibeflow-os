@@ -84,6 +84,15 @@ already driven from another tree. That's what [branches-and-worktrees.md](./bran
 covers in detail: the safest barrier against two simultaneous writers is still working in separate
 trees.
 
+In a lab **split into topics**, the lock is held **per topic**: a manager locks the topic it is
+explicitly given, never one guessed from the environment, and two managers on two topics move in
+parallel. Locks live at the clone level, so every working tree of one clone sees them. A repo lock,
+held for the span of one gesture and not of a mission, covers what is shared by all topics (release,
+BACKLOG, ADR, root planning files, partition). A refusal only concerns what another session holds:
+a write into someone else's topic, a commit that carries their files, a shared file during a repo
+gesture, a branch switch in the same tree. The limit: two managers of the same session are not
+separated by the guard, which isolates sessions and not managers.
+
 A word on recovery. Nothing guarantees that an agent that dies mid-run releases cleanly what it
 held — an LLM agent can stop without executing its last instruction. The safety net is therefore
 lifespan plus heartbeat. A lock whose heartbeat stalls too long is considered stale, but it is

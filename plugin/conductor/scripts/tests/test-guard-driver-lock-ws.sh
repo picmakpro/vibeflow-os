@@ -1,0 +1,2033 @@
+#!/usr/bin/env bash
+# test-guard-driver-lock-ws.sh — Suite NEUVE du guard de verrou de driver PAR COMPARTIMENT (Phase 57, plan 57-05).
+#
+# Jamais un ajout à test-guard-driver-lock.sh ni à test-driver-lock.sh : ces deux suites sont le témoin de
+# non-régression du lab PLAT (P57-D-03), elles ne bougent pas. Toute preuve neuve du chemin partitionné vit ici.
+#
+# TRACER (tâche 1) : une écriture dans le compartiment d'une autre session est refusée, le compartiment voisin
+# reste libre, le détenteur passe, la racine suit le verrou de dépôt — verrous posés par le VRAI driver-lock.sh,
+# guard réel, clone jetable.
+#   GW-TRACE-1 deny (motif : compartiment + commande de reclaim) · GW-TRACE-2 voisin libre
+#   GW-TRACE-3 détenteur (discriminance) · GW-TRACE-4 racine : libre sous verrou de dépôt libre, deny sinon
+#
+# Chaque payload porte `cwd` = le clone ; le guard est lancé depuis un sous-shell qui `cd` dans le clone (la
+# sonde bash lit le cwd du process). Les payloads sont construits par python, jamais concaténés.
+#
+# Plan 57-11 : GW-AB (le guard d'un lab PLAT rend, sur une matrice de payloads, les mêmes stdout/stderr/code que la
+# copie gelée d'avant la phase, au bit près, deux régimes de verrou), GW-AB-INTEGRITE (T-57-40) et les mutants
+# GW-M-* (leur nombre est MUT_TOTAL, en tête de la section des mutants ; QUAL-01 : chaque comportement neuf du guard
+# rougit sous sa mutation, ensemble basculé exact), puis GW-AB-MUT (la règle de comparaison A/B peut rougir : un mutant
+# par comportement énuméré, et des mutants du lab plat sur des formes hors liste).
+#
+# 2026-10-13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q4 et Q5) : F-3 et R-5 s'étendent au lab plat,
+# et les contournements restants (globaux git à argument, wrappers à option-argument, bash -c, GIT_* posée dans un autre
+# segment) se ferment dans les DEUX régimes. GW-Q45-* (lab partitionné) en prouvent le verdict et le message ; GW-AB compare le
+# lab plat à la copie gelée sauf sur la liste énumérée GW_AB_ENUM (règle et traçage des empreintes : en tête de la section).
+#
+# Exit 0 si tout passe, 1 sinon, 2 si la fixture est cassée (préflight).
+
+set -uo pipefail
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+SCRIPTS="$(cd "$HERE/.." && pwd)"
+GUARD="$SCRIPTS/guard-driver-lock.sh"
+DRIVER="$SCRIPTS/driver-lock.sh"
+BASH_BIN="${BASH:-bash}"
+# Mode de la suite. `full` (défaut) : tout, A/B et mutants compris. `matrice` : sous-processus d'un mutant (GW-M-*),
+# qui rejoue les cas GW-* (A/B exclu) contre une COPIE mutée du guard (GW_GUARD) posée à côté de vf-portable.sh ;
+# ni A/B ni mutants (pas de récursion).
+GW_MODE="${GW_MODE:-full}"
+SUITE="$HERE/$(basename "$0")"
+[ -z "${GW_GUARD:-}" ] || GUARD="$GW_GUARD"
+PORTABLE="$(cd "$SCRIPTS/../../_internal/lib" && pwd)/vf-portable.sh"
+
+# DÉSARMEMENT en tête (P57-D-22) : un VF_DRIVER_LOCK hérité forcerait le régime « verrou unique » et la suite ne
+# mesurerait plus rien du chemin partitionné.
+unset VF_DRIVER_LOCK VF_DRIVER_CHILDREN VF_DRIVER_TTL VF_DRIVER_SESSION_MAX VF_DRIVER_TEST_DIE_AFTER_MUTEX \
+      VF_DRIVER_LOCK_OVERRIDE VF_GUARD_TEST_RAISE GSD_WORKSTREAM VF_WORKSTREAM CLAUDE_CODE_SESSION_ID \
+      GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+
+WORK_DIR="$(mktemp -d)"
+WORK_DIR="$(cd "$WORK_DIR" && pwd -P)"   # macOS : /var → /private/var, comparé canonicalisé
+trap 'rm -rf "$WORK_DIR"' EXIT
+
+PASS=0; FAIL=0
+assert()       { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): $3"; echo "     obtenu:  $2"; FAIL=$((FAIL+1)); fi; }
+assert_empty() { if [ -z "$2" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (sortie non vide)"; echo "     obtenu:  $2"; FAIL=$((FAIL+1)); fi; }
+assert_exit()  { if [ "$2" -eq "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (exit $2 ≠ $3)"; FAIL=$((FAIL+1)); fi; }
+
+DENY='"permissionDecision": "deny"'
+
+# Dossier commun d'une fixture, canonicalisé (git rendu relatif au cwd, puis pwd -P).
+fixture_common_dir() { # <lab>
+  local gc
+  gc="$(cd "$1" && git rev-parse --git-common-dir 2>/dev/null)" || return 1
+  case "$gc" in /*) ;; *) gc="$1/$gc" ;; esac
+  (cd "$gc" 2>/dev/null && pwd -P)
+}
+
+# PRÉFLIGHT anti-pollution (piège P2) : le dossier commun de la fixture DOIT être sous $WORK_DIR, sinon une
+# écriture du driver irait dans le vrai .git du dépôt. Arrêt AVANT toute écriture, exit 2.
+lab_preflight() { # <lab>
+  local gc; gc="$(fixture_common_dir "$1")" || gc=""
+  case "$gc" in
+    "$WORK_DIR"/*) return 0 ;;
+    *) echo "PRÉFLIGHT FIXTURE CASSÉ — dossier commun '$gc' hors de '$WORK_DIR' : arrêt avant toute écriture" >&2
+       exit 2 ;;
+  esac
+}
+
+# Laboratoire PARTITIONNÉ jetable : dépôt git, deux compartiments (alpha = 1er, omega = dernier).
+mk_lab() { # <nom>
+  local d="$WORK_DIR/$1"
+  mkdir -p "$d/.planning/workstreams/alpha" "$d/.planning/workstreams/omega"
+  printf '# projet\n' > "$d/.planning/PROJECT.md"
+  printf -- '---\nstatus: active\n---\n' > "$d/.planning/workstreams/alpha/STATE.md"
+  printf -- '---\nstatus: active\n---\n' > "$d/.planning/workstreams/omega/STATE.md"
+  git -C "$d" init -q -b main >/dev/null 2>&1 || git -C "$d" init -q >/dev/null 2>&1
+  git -C "$d" add -A >/dev/null 2>&1
+  git -C "$d" -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -q -m init >/dev/null 2>&1
+  lab_preflight "$d"
+  printf '%s' "$d"
+}
+
+# Invocation du VRAI driver-lock.sh depuis la fixture, sous une session simulée. Jamais depuis le vrai dépôt.
+dl() { # <lab> <session> <args...>
+  local lab="$1" sid="$2"; shift 2
+  ( cd "$lab" && CLAUDE_CODE_SESSION_ID="$sid" "$DRIVER" "$@" )
+}
+
+# Payload Write/Edit : file_path absolu, contenu, session, cwd = le clone. `nul` en 5e argument : le chemin
+# porte un octet NUL (échappement JSON \u0000), construit par python.
+mk_write() { # file_path content session cwd [nul]
+  python3 -c '
+import json, sys
+fp = sys.argv[1] + ("\x00x" if len(sys.argv) > 5 else "")
+print(json.dumps({"tool_name": "Write", "tool_input": {"file_path": fp, "content": sys.argv[2]},
+                   "session_id": sys.argv[3], "cwd": sys.argv[4]}))' "$@"
+}
+
+mk_bash() { # cmd session cwd
+  python3 -c '
+import json, sys
+print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]},
+                   "session_id": sys.argv[2], "cwd": sys.argv[3]}))' "$1" "$2" "$3"
+}
+
+# Le guard réel, lancé DEPUIS le clone. Variables d'environnement éventuelles en arguments (NOM=valeur).
+run_guard_with() { # <lab> <payload> [NOM=valeur ...]
+  local lab="$1" payload="$2"; shift 2
+  ( cd "$lab" && printf '%s' "$payload" | env "$@" "$BASH_BIN" "$GUARD" 2>/dev/null )
+}
+run_guard_in() { run_guard_with "$1" "$2"; }
+
+echo "=== GW-TRACE — écriture sous un compartiment tenu par une autre session, verrous et guard réels ==="
+LAB="$(mk_lab trace)"
+GC="$(fixture_common_dir "$LAB")"
+case "$(bash -n "$GUARD" 2>&1)" in "") assert_exit "GW-PRE — guard syntaxiquement valide" 0 0 ;; *) assert_exit "GW-PRE — guard syntaxiquement valide" 1 0 ;; esac
+out="$(dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s1)"
+assert "GW-PRE — fixture : alpha acquis par sess-A" "$out" '"acquired": true'
+[ -L "$GC/vf-driver/ws/alpha/DRIVER.lock" ]; assert_exit "GW-PRE — fixture : lien du verrou sous le dossier commun du clone" "$?" 0
+
+STATE_A="$LAB/.planning/workstreams/alpha/STATE.md"
+STATE_O="$LAB/.planning/workstreams/omega/STATE.md"
+
+out="$(run_guard_in "$LAB" "$(mk_write "$STATE_A" "x" sess-B "$LAB")")"; rc=$?
+assert_exit "GW-TRACE-1.1 — Write dans le compartiment d'autrui : exit 0" "$rc" 0
+assert "GW-TRACE-1.2 — deny (permissionDecision)" "$out" "$DENY"
+assert "GW-TRACE-1.3 — motif : le compartiment alpha est nommé" "$out" "alpha"
+assert "GW-TRACE-1.4 — motif : commande exacte de reclaim ciblée" "$out" "driver-lock.sh reclaim --owner=m1 --ws=alpha"
+
+out="$(run_guard_in "$LAB" "$(mk_write "$STATE_O" "x" sess-B "$LAB")")"; rc=$?
+assert_exit "GW-TRACE-2.1 — Write dans le compartiment voisin : exit 0" "$rc" 0
+assert_empty "GW-TRACE-2.2 — compartiment voisin libre : stdout vide" "$out"
+
+out="$(run_guard_in "$LAB" "$(mk_write "$STATE_A" "x" sess-A "$LAB")")"; rc=$?
+assert_exit "GW-TRACE-3.1 — détenteur : exit 0" "$rc" 0
+assert_empty "GW-TRACE-3.2 — détenteur dans SON compartiment : stdout vide (discriminance)" "$out"
+
+ROOT_F="$LAB/.planning/PROJECT.md"
+out="$(run_guard_in "$LAB" "$(mk_write "$ROOT_F" "x" sess-B "$LAB")")"
+assert_empty "GW-TRACE-4.1 — fichier racine, verrou de dépôt libre (alpha tenu) : stdout vide" "$out"
+out="$(dl "$LAB" sess-A acquire --depot --owner=md --step=sd)"
+assert "GW-PRE — fixture : verrou de dépôt acquis par sess-A" "$out" '"acquired": true'
+out="$(run_guard_in "$LAB" "$(mk_write "$ROOT_F" "x" sess-B "$LAB")")"
+assert "GW-TRACE-4.2 — fichier racine, verrou de dépôt tenu par autrui : deny" "$out" "$DENY"
+assert "GW-TRACE-4.3 — motif : verrou de dépôt, commande de reclaim --depot" "$out" "driver-lock.sh reclaim --owner=md --depot"
+out="$(run_guard_in "$LAB" "$(mk_write "$ROOT_F" "x" sess-A "$LAB")")"
+assert_empty "GW-TRACE-4.4 — fichier racine, détenteur du dépôt : stdout vide" "$out"
+
+# GW-GITENV — relecture adverse SOBR-04, 2026-10-14 : un GIT_DIR (ou GIT_WORK_TREE) HÉRITÉ qui désigne un autre dépôt ne doit pas
+# changer le lab que le guard juge. Sans le retrait, git_hardened lisait la racine du MAUVAIS dépôt et le Write dans le compartiment
+# d'autrui passait (1 refus sans GIT_DIR, 0 avec).
+GENV_OTHER="$WORK_DIR/gitenv-other"; mkdir -p "$GENV_OTHER"; git -C "$GENV_OTHER" init -q >/dev/null 2>&1
+out="$(run_guard_with "$LAB" "$(mk_write "$STATE_A" "x" sess-B "$LAB")")"
+assert "GW-GITENV-0 — témoin : sans GIT_DIR hérité, le Write dans le compartiment d'autrui est refusé" "$out" "$DENY"
+out="$(run_guard_with "$LAB" "$(mk_write "$STATE_A" "x" sess-B "$LAB")" "GIT_DIR=$GENV_OTHER/.git")"
+assert "GW-GITENV-1 — GIT_DIR hérité vers un autre dépôt : même refus" "$out" "$DENY"
+out="$(run_guard_with "$LAB" "$(mk_write "$STATE_A" "x" sess-B "$LAB")" "GIT_DIR=$GENV_OTHER/.git" "GIT_WORK_TREE=$GENV_OTHER")"
+assert "GW-GITENV-2 — GIT_DIR et GIT_WORK_TREE hérités vers un autre dépôt : même refus" "$out" "$DENY"
+out="$(run_guard_with "$LAB" "$(mk_write "$STATE_A" "x" sess-A "$LAB")" "GIT_DIR=$GENV_OTHER/.git")"
+assert_empty "GW-GITENV-3 — GIT_DIR hérité : le détenteur passe toujours (le retrait ne refuse rien de plus)" "$out"
+
+# GW-VIDE — P57-D-56 (révise P57-D-25) : un .planning/workstreams présent mais SANS AUCUN compartiment (vide, ou seulement
+# un .gitkeep) est un lab PLAT. Fixture : verrou de DÉPÔT tenu par sess-A, puis les compartiments retirés. Le guard plat ne
+# regarde que .planning/DRIVER.lock (absent) : le Write racine de sess-B passe ; en lab partitionné, le verrou de dépôt le refuse.
+VLAB="$(mk_lab vide)"
+out="$(dl "$VLAB" sess-A acquire --depot --owner=md --step=sd)"
+assert "GW-PRE — fixture GW-VIDE : verrou de dépôt acquis par sess-A" "$out" '"acquired": true'
+VROOT="$VLAB/.planning/PROJECT.md"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert "GW-VIDE-0 — témoin : avec ses compartiments, le Write racine de sess-B est refusé (verrou de dépôt)" "$out" "$DENY"
+rm -rf "$VLAB/.planning/workstreams"; mkdir "$VLAB/.planning/workstreams"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert_empty "GW-VIDE-1 — dossier des compartiments VIDE : lab plat, le Write passe" "$out"
+: > "$VLAB/.planning/workstreams/.gitkeep"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert_empty "GW-VIDE-2 — dossier des compartiments avec un seul .gitkeep : lab plat, le Write passe" "$out"
+mkdir "$VLAB/.planning/workstreams/alpha"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert "GW-VIDE-3 — un compartiment réapparaît (le .gitkeep reste) : lab partitionné, refus" "$out" "$DENY"
+rm -rf "$VLAB/.planning/workstreams"; printf 'pas un dossier\n' > "$VLAB/.planning/workstreams"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert "GW-VIDE-4 — un fichier régulier à la place du dossier : reste partitionné, refus" "$out" "$DENY"
+rm -f "$VLAB/.planning/workstreams"; ln -s "$WORK_DIR" "$VLAB/.planning/workstreams"
+out="$(run_guard_in "$VLAB" "$(mk_write "$VROOT" "x" sess-B "$VLAB")")"
+assert "GW-VIDE-5 — un lien symbolique à la place du dossier : reste partitionné, refus" "$out" "$DENY"
+rm -f "$VLAB/.planning/workstreams"; mkdir "$VLAB/.planning/workstreams"
+# Même jugement depuis un sous-dossier du lab (racine git, P57-D-39) : un sous-dossier sans .planning propre
+mkdir -p "$VLAB/sub"
+out="$(run_guard_in "$VLAB/sub" "$(mk_write "$VROOT" "x" sess-B "$VLAB/sub")")"
+assert_empty "GW-VIDE-6 — depuis un sous-dossier, dossier des compartiments vide : lab plat aussi" "$out"
+# Verrou unique tenu (posé par le vrai driver-lock.sh, qui juge ce lab plat) : le guard rend le message du lab PLAT
+# (« Lock de driver ACTIF, tenu par »), pas celui de l'ancien verrou en lab partitionné (« ancien verrou unique »).
+VLAB2="$(mk_lab vide2)"; rm -rf "$VLAB2/.planning/workstreams"; mkdir "$VLAB2/.planning/workstreams"
+out="$(dl "$VLAB2" sess-A acquire --owner=mf --step=sf)"
+assert "GW-PRE — fixture GW-VIDE-7 : verrou unique acquis par sess-A (lab plat)" "$out" '"acquired": true'
+out="$(run_guard_in "$VLAB2" "$(mk_write "$VLAB2/.planning/PROJECT.md" "x" sess-B "$VLAB2")")"
+assert "GW-VIDE-7 — verrou unique tenu, compartiments vides : refus au message du lab plat" "$out" "Lock de driver ACTIF, tenu par 'mf'"
+
+# ---------------------------------------------------------------------------------------------------------------
+# Tâche 2 — écritures aux bords : ancien verrou, casse, chemin non cartographiable, worktrees, échappatoire,
+# quatre issues (QUAL-01), sondes de crash avant et pendant la décision.
+# ---------------------------------------------------------------------------------------------------------------
+
+# Laboratoire PLAT jetable : STATE.md racine, aucun dossier de compartiments.
+mk_flat() { # <nom>
+  local d="$WORK_DIR/$1"
+  mkdir -p "$d/.planning"
+  printf '# projet\n' > "$d/.planning/PROJECT.md"
+  printf -- '---\nstatus: active\n---\n' > "$d/.planning/STATE.md"
+  git -C "$d" init -q -b main >/dev/null 2>&1 || git -C "$d" init -q >/dev/null 2>&1
+  git -C "$d" add -A >/dev/null 2>&1
+  git -C "$d" -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -q -m init >/dev/null 2>&1
+  lab_preflight "$d"
+  printf '%s' "$d"
+}
+
+# Ancien verrou unique (.planning/DRIVER.lock) posé par le VRAI driver-lock.sh en régime « verrou unique ».
+legacy_acquire() { # <lab> <session> <owner>
+  ( cd "$1" && CLAUDE_CODE_SESSION_ID="$2" VF_DRIVER_LOCK=.planning/DRIVER.lock "$DRIVER" acquire --owner="$3" --step=leg )
+}
+
+echo
+echo "=== GW-W-LEG — ancien verrou unique d'autrui : la racine suit, le compartiment reste libre (P57-D-26) ==="
+LAB="$(mk_lab wleg)"
+out="$(legacy_acquire "$LAB" sess-A old)"
+assert "GW-PRE — fixture : ancien verrou acquis par sess-A" "$out" '"acquired": true'
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/PROJECT.md" x sess-B "$LAB")")"
+assert "GW-W-LEG-1 — Write racine sous l'ancien verrou d'autrui : deny" "$out" "$DENY"
+assert "GW-W-LEG-2 — motif : ancien verrou nommé, reclaim au régime VF_DRIVER_LOCK" "$out" "VF_DRIVER_LOCK=.planning/DRIVER.lock driver-lock.sh reclaim --owner=old"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-W-LEG-3 — Write de compartiment sous l'ancien verrou d'autrui : permis" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/PROJECT.md" x sess-A "$LAB")")"
+assert_empty "GW-W-LEG-4 — détenteur de l'ancien verrou : Write racine permis" "$out"
+
+echo
+echo "=== GW-W-CASE — le segment de compartiment s'apparie à l'égalité exacte ou casefold ==="
+LAB="$(mk_lab wcase)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/ALPHA/STATE.md" x sess-B "$LAB")")"
+assert "GW-W-CASE-1 — ALPHA sous le verrou alpha d'autrui : deny (casefold)" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/ALPHA/STATE.md" x sess-A "$LAB")")"
+assert_empty "GW-W-CASE-2 — le détenteur écrit sous ALPHA : permis (discriminance)" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/WORKSTREAMS/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-W-CASE-3 — le dossier workstreams lui-même en casse différente : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-W-UNMAP — chemin non cartographiable : refusé sous tout verrou d'autrui (T-57-14) ==="
+LAB="$(mk_lab wunmap)"
+mkdir -p "$LAB/elsewhere"
+mv "$LAB/.planning/workstreams/alpha" "$LAB/alpha-gone"
+ln -s ../../elsewhere "$LAB/.planning/workstreams/alpha"
+[ -L "$LAB/.planning/workstreams/alpha" ]; assert_exit "GW-PRE — fixture : alpha est un lien qui sort de .planning/ (reste dans le lab)" "$?" 0
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-W-UNMAP-0 — lien non cartographiable SANS verrou d'autrui : permis (le refus vient du verrou)" "$out"
+dl "$LAB" sess-A acquire --ws=omega --owner=m9 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-W-UNMAP-1 — lien qui sort de .planning/, un verrou d'autrui tenu ailleurs : deny" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-A "$LAB")")"
+assert_empty "GW-W-UNMAP-2 — le détenteur du seul verrou tenu : permis" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams" x sess-B "$LAB")")"
+assert "GW-W-UNMAP-3 — « workstreams » seul : non cartographiable, deny sous verrou d'autrui" "$out" "$DENY"
+
+echo
+echo "=== GW-LOC — les verrous se résolvent au même endroit que driver-lock.sh (P57-D-07, P57-D-08) ==="
+LAB="$(mk_lab loc)"
+WT="$WORK_DIR/loc-wt"
+git -C "$LAB" worktree add -q -b wtb "$WT" >/dev/null 2>&1
+lab_preflight "$WT"
+[ -d "$WT/.planning/workstreams" ]; assert_exit "GW-PRE — fixture : le worktree lié est partitionné" "$?" 0
+out="$(dl "$WT" sess-A acquire --ws=alpha --owner=mw --step=s)"
+assert "GW-PRE — fixture : alpha acquis DEPUIS le worktree" "$out" '"acquired": true'
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-LOC-1.1 — verrou pris depuis un worktree, vu depuis le checkout principal : deny" "$out" "$DENY"
+dl "$LAB" sess-A acquire --ws=omega --owner=mp --step=s >/dev/null
+out="$(run_guard_in "$WT" "$(mk_write "$WT/.planning/workstreams/omega/STATE.md" x sess-B "$WT")")"
+assert "GW-LOC-1.2 — verrou pris depuis le checkout principal, vu depuis le worktree : deny" "$out" "$DENY"
+out="$(run_guard_in "$WT" "$(mk_write "$WT/.planning/workstreams/omega/STATE.md" x sess-A "$WT")")"
+assert_empty "GW-LOC-1.3 — le détenteur, depuis le worktree : permis" "$out"
+
+# PATH sans git (python joignable) : la lecture documentée du layout `.git` doit retrouver le dossier commun.
+LOC_BIN="$WORK_DIR/loc-bin"; mkdir -p "$LOC_BIN"
+for t in cat dirname basename sed grep mkdir rm mv date readlink stat uname tr head awk env; do
+  p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$LOC_BIN/$t" 2>/dev/null
+done
+PYP="$(command -v python3 2>/dev/null)"; [ -n "$PYP" ] && ln -sf "$PYP" "$LOC_BIN/python3"
+LOC_PRE=1
+hash -r   # la table de hachage de bash garde « git » des appels précédents et fausserait le test de PATH
+PATH="$LOC_BIN" command -v git >/dev/null 2>&1 && LOC_PRE=0
+PATH="$LOC_BIN" command -v python3 >/dev/null 2>&1 || LOC_PRE=0
+for t in cat dirname; do [ -x "$LOC_BIN/$t" ] || LOC_PRE=0; done
+assert_exit "GW-PRE — fixture : PATH sans git, avec python3" "$LOC_PRE" 1
+if [ "$LOC_PRE" -eq 1 ]; then
+  out="$(run_guard_with "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")" PATH="$LOC_BIN")"
+  assert "GW-LOC-2.1 — PATH sans git, checkout principal : verrou toujours découvert, deny" "$out" "$DENY"
+  out="$(run_guard_with "$WT" "$(mk_write "$WT/.planning/workstreams/omega/STATE.md" x sess-B "$WT")" PATH="$LOC_BIN")"
+  assert "GW-LOC-2.2 — PATH sans git, worktree lié (.git fichier + commondir) : verrou toujours découvert, deny" "$out" "$DENY"
+  out="$(run_guard_with "$WT" "$(mk_write "$WT/.planning/workstreams/omega/STATE.md" x sess-A "$WT")" PATH="$LOC_BIN")"
+  assert_empty "GW-LOC-2.3 — PATH sans git, le détenteur : permis (discriminance)" "$out"
+fi
+
+echo
+echo "=== GW-MARK-W — l'échappatoire est évaluée APRÈS le calcul du refus, et journalisée à côté du verrou refusant ==="
+LAB="$(mk_lab mark)"
+GCM="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+EVLOG="$GCM/vf-driver/ws/alpha/DRIVER.lock.events.log"
+count_override() { if [ -f "$EVLOG" ]; then grep -c '"event": "override"' "$EVLOG" 2>/dev/null || true; else echo 0; fi; }
+n0="$(count_override)"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" "x vibeflow:allow-lock-override" sess-B "$LAB")")"
+assert_empty "GW-MARK-W-1 — marqueur dans le contenu d'un Write qui serait refusé : stdout vide" "$out"
+n1="$(count_override)"
+assert_exit "GW-MARK-W-2 — une ligne override apparaît dans le journal du verrou refusant" "$((n1 - n0))" 1
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/omega/STATE.md" "x vibeflow:allow-lock-override" sess-B "$LAB")")"
+assert_empty "GW-MARK-W-3 — Write permis avec marqueur : stdout vide" "$out"
+n2="$(count_override)"
+assert_exit "GW-MARK-W-4 — un Write qui serait permis sort sans journal" "$((n2 - n1))" 0
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" "x" sess-B "$LAB")")"
+assert "GW-MARK-W-5 — sans marqueur le même Write reste refusé (discriminance)" "$out" "$DENY"
+
+echo
+echo "=== GW-Q — QUAL-01 : quatre issues sur le chemin partitionné ==="
+LAB="$(mk_lab q)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/omega/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-Q-PASS — issue 1, PASS : silence (voir GW-TRACE-2)" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-Q-DENY — issue 2, DENY : JSON (voir GW-TRACE-1)" "$out" "$DENY"
+out="$(run_guard_with "$LAB" 'ceci n est pas du json mais ca contient le mot commit quelque part')"; rc=$?
+assert_exit "GW-Q-UNPARSE.1 — payload non JSON : exit 0" "$rc" 0
+assert_empty "GW-Q-UNPARSE.2 — payload non JSON : stdout STRICTEMENT vide (issue 3)" "$out"
+out="$(run_guard_with "$LAB" '["commit"]')"; rc=$?
+assert_exit "GW-Q-UNPARSE-OBJ.1 — JSON valide mais tableau : exit 0" "$rc" 0
+assert_empty "GW-Q-UNPARSE-OBJ.2 — JSON valide mais tableau : stdout vide" "$out"
+out="$(run_guard_with "$LAB" '')"; rc=$?
+assert_exit "GW-Q-EMPTY.1 — payload vide : exit 0" "$rc" 0
+assert_empty "GW-Q-EMPTY.2 — payload vide : stdout vide" "$out"
+Q_BIN="$WORK_DIR/q-bin"; mkdir -p "$Q_BIN"
+for t in cat dirname basename sed grep mkdir rm mv date readlink stat; do
+  p="$(command -v "$t" 2>/dev/null)" && ln -sf "$p" "$Q_BIN/$t" 2>/dev/null
+done
+Q_PRE=1
+for t in cat dirname mkdir mv rm date; do [ -x "$Q_BIN/$t" ] || Q_PRE=0; done
+if PATH="$Q_BIN" command -v python3 >/dev/null 2>&1 || PATH="$Q_BIN" command -v python >/dev/null 2>&1; then Q_PRE=0; fi
+assert_exit "GW-PRE — fixture : outils présents, aucun interprète joignable" "$Q_PRE" 1
+if [ "$Q_PRE" -eq 1 ]; then
+  Q_HEALTH="$WORK_DIR/q-health"
+  out="$(cd "$LAB" && printf '%s' "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")" | env PATH="$Q_BIN" VF_GUARD_HEALTH_DIR="$Q_HEALTH" "$BASH_BIN" "$GUARD" 2>"$WORK_DIR/q.err")"; rc=$?
+  assert_exit "GW-Q-NOPY.1 — interprète indisponible, lab partitionné : code de garde 17 (issue 4)" "$rc" 17
+  assert_empty "GW-Q-NOPY.2 — stdout vide" "$out"
+  assert "GW-Q-NOPY.3 — diagnostic préfixé sur stderr" "$(cat "$WORK_DIR/q.err" 2>/dev/null)" "guard-driver-lock.sh"
+  [ -f "$Q_HEALTH/guard-driver-lock.sh.marker" ] && mk=present || mk=absent
+  assert "GW-Q-NOPY.4 — marqueur de santé écrit" "$mk" "present"
+fi
+
+# R-6 : le guard de production ne porte AUCUN crochet de test. Les exceptions du chemin partitionné sont provoquées
+# dans une COPIE du guard fabriquée ici, dans le dossier temporaire de la suite (la copie est faite du guard sous
+# test, mutant éventuel compris) : une ligne `raise` est insérée à un point d'ancrage unique ; le reste du programme
+# (crochet fail-closed compris) est celui du guard mesuré.
+mk_raise_copy() { # <decide|dispatch> <dossier> : écrit <dossier>/guard-driver-lock.sh, côte à côte avec vf-portable.sh
+  mkdir -p "$2"; cp "$PORTABLE" "$2/vf-portable.sh"
+  python3 -I - "$GUARD" "$2/guard-driver-lock.sh" "$1" <<'PYRAISE'
+import sys
+src, dst, point = sys.argv[1], sys.argv[2], sys.argv[3]
+t = open(src, encoding="utf-8").read()
+if point == "decide":
+    a = '    if tool == "Bash":\n        if not bash_command_concerned(target):\n'
+    b = '    raise RuntimeError("sonde de la suite : exception de la decision")\n' + a
+else:
+    a = '\ntool = payload.get("tool_name") or ""\n'
+    b = '\nif PARTITIONED:\n    raise RuntimeError("sonde de la suite : exception du dispatch")\n' + a[1:]
+if t.count(a) != 1:
+    sys.stderr.write("ancre non unique (%d) pour %s\n" % (t.count(a), point)); sys.exit(3)
+open(dst, "w", encoding="utf-8").write(t.replace(a, b))
+PYRAISE
+  chmod +x "$2/guard-driver-lock.sh"
+}
+run_guard_copy() { # <guard> <lab> <payload>
+  ( cd "$2" && printf '%s' "$3" | env "$BASH_BIN" "$1" 2>/dev/null )
+}
+
+echo
+echo "=== GW-CRASH — fail-closed : une exception du chemin partitionné rend un refus (T-57-08 ; R-6 : exception injectée dans une copie, aucun crochet en production) ==="
+LAB="$(mk_lab crash)"
+PAY_W="$(mk_write "$LAB/.planning/workstreams/omega/STATE.md" x sess-B "$LAB")"
+mk_raise_copy decide "$WORK_DIR/raise-decide"; assert_exit "GW-CRASH.0 — copie « exception de la décision » fabriquée (ancre unique)" "$?" 0
+RAISE_DECIDE="$WORK_DIR/raise-decide/guard-driver-lock.sh"
+out="$(run_guard_copy "$RAISE_DECIDE" "$LAB" "$PAY_W")"; rc=$?
+assert_exit "GW-CRASH.1 — exception de la décision : exit 0 (le repli bash ramène le code)" "$rc" 0
+assert "GW-CRASH.2 — deny" "$out" "$DENY"
+assert "GW-CRASH.3 — motif « erreur interne du guard, fail-closed »" "$out" "erreur interne du guard, fail-closed"
+json_ok() { printf '%s' "$1" | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; }
+json_ok "$out"; assert_exit "GW-CRASH.4 — la sortie est un JSON valide, une seule décision" "$?" 0
+errout="$(cd "$LAB" && printf '%s' "$PAY_W" | env "$BASH_BIN" "$RAISE_DECIDE" 2>&1 >/dev/null)"
+assert_empty "GW-CRASH.5 — aucune trace sur stderr" "$errout"
+out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=decide)"
+assert_empty "GW-CRASH.6 — le guard de production ignore VF_GUARD_TEST_RAISE=decide (aucun crochet de test en production)" "$out"
+out="$(run_guard_with "$LAB" "$PAY_W" VF_GUARD_TEST_RAISE=dispatch)"
+assert_empty "GW-CRASH.7 — le guard de production ignore VF_GUARD_TEST_RAISE=dispatch" "$out"
+assert_exit "GW-CRASH.8 — le texte du guard ne contient plus aucune lecture de VF_GUARD_TEST_RAISE" "$(grep -c 'VF_GUARD_TEST_RAISE' "$GUARD" || true)" 0
+
+echo
+echo "=== GW-CRASH-PRE — exception AVANT la décision : dispatch, règle C6 (T-57-08) ==="
+mk_raise_copy dispatch "$WORK_DIR/raise-dispatch"; assert_exit "GW-CRASH-PRE-a.0 — copie « exception du dispatch » fabriquée (ancre unique)" "$?" 0
+RAISE_DISPATCH="$WORK_DIR/raise-dispatch/guard-driver-lock.sh"
+out="$(run_guard_copy "$RAISE_DISPATCH" "$LAB" "$PAY_W")"; rc=$?
+assert_exit "GW-CRASH-PRE-a.1 — exception du dispatch : exit 0" "$rc" 0
+assert "GW-CRASH-PRE-a.2 — deny « erreur interne » (verrou libre)" "$out" "erreur interne du guard, fail-closed"
+NUL_PAY="$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB" nul)"
+out="$(run_guard_in "$LAB" "$NUL_PAY")"; rc=$?
+assert_exit "GW-CRASH-PRE-b.1 — chemin à octet NUL : exit 0" "$rc" 0
+assert "GW-CRASH-PRE-b.2 — realpath lève dans la règle C6 : deny « erreur interne » (verrou libre)" "$out" "erreur interne du guard, fail-closed"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$NUL_PAY")"
+assert "GW-CRASH-PRE-b.3 — chemin à octet NUL, verrou tenu : deny « erreur interne »" "$out" "erreur interne du guard, fail-closed"
+FLAT="$(mk_flat flat)"
+legacy_acquire "$FLAT" sess-A old >/dev/null
+NUL_FLAT="$(mk_write "$FLAT/.planning/STATE.md" x sess-B "$FLAT" nul)"
+out="$(run_guard_in "$FLAT" "$NUL_FLAT")"; rc=$?
+assert_exit "GW-CRASH-PRE-c.1 — lab PLAT, même payload à octet NUL : exit 0" "$rc" 0
+assert_empty "GW-CRASH-PRE-c.2 — lab PLAT : comportement d'aujourd'hui, stdout vide (repli silencieux conservé)" "$out"
+out="$(run_guard_copy "$RAISE_DISPATCH" "$FLAT" "$(mk_write "$FLAT/.planning/STATE.md" x sess-B "$FLAT")")"
+assert "GW-CRASH-PRE-c.3 — lab PLAT : l'exception du dispatch n'est pas levée, le guard historique refuse (ancien verrou d'autrui)" "$out" "$DENY"
+assert_not_internal() { if [[ "$2" != *"erreur interne"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; FAIL=$((FAIL+1)); fi; }
+assert_not_internal "GW-CRASH-PRE-c.4 — lab PLAT : aucun refus « erreur interne »" "$out"
+
+# ---------------------------------------------------------------------------------------------------------------
+# Plan 57-08 — volet Bash : un commit est jugé sur ce qu'il embarque (P57-D-10, P57-D-18, P57-D-19, P57-D-33).
+# Tâche 1 (tracer) : GW-C-IDX, GW-C-EMPTY, GW-NOLOCK. Index RÉEL, guard RÉEL, clone jetable.
+# ---------------------------------------------------------------------------------------------------------------
+stage()   { git -C "$1" add -- "${@:2}" >/dev/null 2>&1; }   # <lab> <chemins...>
+unstage() { git -C "$1" reset -q >/dev/null 2>&1; git -C "$1" checkout -q -- . >/dev/null 2>&1; }   # <lab> : jetable, vide index et arbre suivi
+touch_file() { mkdir -p "$(dirname "$2")"; printf 'x %s\n' "$RANDOM" >> "$2"; }   # <lab> <chemin absolu>
+
+echo
+echo "=== GW-C-IDX — un commit est jugé sur son index (P57-D-10) ==="
+LAB="$(mk_lab cidx)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"; stage "$LAB" .planning/workstreams/alpha/STATE.md
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"
+assert "GW-C-IDX-1 — alpha indexé, alpha tenu par autrui : deny" "$out" "$DENY"
+assert "GW-C-IDX-2 — motif : le chemin indexé est cité" "$out" ".planning/workstreams/alpha/STATE.md"
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-A "$LAB")")"
+assert_empty "GW-C-IDX-3 — le détenteur commite son compartiment : stdout vide (discriminance)" "$out"
+unstage "$LAB"
+touch_file "$LAB" "$LAB/.planning/workstreams/omega/STATE.md"; stage "$LAB" .planning/workstreams/omega/STATE.md
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"
+assert_empty "GW-C-IDX-4 — seul omega indexé (alpha tenu par autrui) : stdout vide" "$out"
+unstage "$LAB"
+touch_file "$LAB" "$LAB/src/x.sh"; stage "$LAB" src/x.sh
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"
+assert_empty "GW-C-IDX-5 — un fichier de code seul : stdout vide (P57-D-10)" "$out"
+
+echo
+echo "=== GW-C-EMPTY — union des sources vide : le commit passe ==="
+LAB="$(mk_lab cempty)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"; rc=$?
+assert_exit "GW-C-EMPTY-1 — rien d'indexé : exit 0" "$rc" 0
+assert_empty "GW-C-EMPTY-2 — rien d'indexé, pas de -a, verrou alpha d'autrui : stdout vide" "$out"
+
+echo
+echo "=== GW-NOLOCK — partition sans verrou : aucun git diff n'est lancé ==="
+LAB="$(mk_lab nolock)"
+FAKE_BIN="$WORK_DIR/fake-bin"; FAKE_LOG="$WORK_DIR/fake-git.log"; mkdir -p "$FAKE_BIN"; : > "$FAKE_LOG"
+REAL_GIT="$(command -v git)"
+printf '#!/bin/bash\nprintf "%%s\\n" "$@" >> "%s"\nprintf -- "---\\n" >> "%s"\nexec "%s" "$@"\n' "$FAKE_LOG" "$FAKE_LOG" "$REAL_GIT" > "$FAKE_BIN/git"
+chmod +x "$FAKE_BIN/git"
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"; stage "$LAB" .planning/workstreams/alpha/STATE.md
+hash -r
+out="$(run_guard_with "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")" PATH="$FAKE_BIN:$PATH")"
+assert_empty "GW-NOLOCK-1 — aucun verrou : commit permis" "$out"
+out="$(run_guard_with "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")" PATH="$FAKE_BIN:$PATH")"
+assert_empty "GW-NOLOCK-2 — aucun verrou : Write permis" "$out"
+[ "$(grep -cx 'rev-parse' "$FAKE_LOG" 2>/dev/null || true)" -ge 1 ]; assert_exit "GW-NOLOCK-3 — témoin positif : au moins un rev-parse vu par la sonde" "$?" 0
+assert_exit "GW-NOLOCK-4 — aucun git diff lancé (DLWS-06 « empty », volet commit)" "$(grep -cx 'diff' "$FAKE_LOG" 2>/dev/null || true)" 0
+
+# ---------------------------------------------------------------------------------------------------------------
+# Tâche 2 — union des sources du commit, fichiers de forme de release, sources illisibles, trois classes de gestes,
+# même worktree, échappatoire Bash.
+# ---------------------------------------------------------------------------------------------------------------
+gb() { # <lab> <cmd> <session> [cwd]   : guard réel sur une commande Bash, lancé depuis le cwd donné (défaut : le lab)
+  local lab="$1" cwd="${4:-$1}"
+  run_guard_in "$cwd" "$(mk_bash "$2" "$3" "$cwd")"
+}
+
+echo
+echo "=== GW-C-REN / GW-C-NONASCII — la source est vue malgré le renommage et le nom non ASCII ==="
+LAB="$(mk_lab cren)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+git -C "$LAB" mv .planning/workstreams/alpha/STATE.md .planning/workstreams/omega/MOVED.md >/dev/null 2>&1
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-REN-1 — alpha/STATE.md renommé vers omega, alpha tenu par autrui : deny (--no-renames)" "$out" "$DENY"
+assert "GW-C-REN-2 — motif : la source alpha est citée" "$out" "workstreams/alpha/STATE.md"
+LAB="$(mk_lab cnonascii)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/é.md"; stage "$LAB" ".planning/workstreams/alpha/é.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-NONASCII-1 — alpha/é.md indexé : deny" "$out" "$DENY"
+unstage "$LAB"; git -C "$LAB" rm -q --cached -r -f .planning/workstreams/alpha/é.md >/dev/null 2>&1
+touch_file "$LAB" "$LAB/é.md"; stage "$LAB" "é.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-NONASCII-2 — é.md hors .planning/ : stdout vide (jamais une cause de refus)" "$out"
+
+echo
+echo "=== GW-C-ALL / GW-C-PATH / GW-C-AMEND — sources hors index (P57-D-19) ==="
+LAB="$(mk_lab call)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -am x' sess-B)"
+assert "GW-C-ALL-1 — modification non indexée d'alpha, git commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit --all -m x' sess-B)"
+assert "GW-C-ALL-2 — forme longue --all : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-ALL-3 — sans -a, la même modification non indexée n'est pas embarquée : stdout vide (discriminance)" "$out"
+out="$(gb "$LAB" 'git commit -m x -- .planning/workstreams/alpha/STATE.md' sess-B)"
+assert "GW-C-PATH-1 — pathspec sur alpha : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit -m x -- src/x.sh' sess-B)"
+assert "GW-C-PATH-2 — pathspec sur un autre chemin, même modification non indexée d'alpha : deny (doute = union)" "$out" "$DENY"
+LAB="$(mk_lab camend)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"
+GIT_T() { git -c user.email=t@t -c user.name=t -c commit.gpgsign=false "$@"; }
+git -C "$LAB" add -A >/dev/null 2>&1; GIT_T -C "$LAB" commit -q -m "touche alpha" >/dev/null 2>&1
+out="$(gb "$LAB" 'git commit --amend --no-edit' sess-B)"
+assert "GW-C-AMEND-1 — HEAD touche alpha, --amend : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-AMEND-2 — sans --amend, HEAD n'est pas embarqué : stdout vide (discriminance)" "$out"
+touch_file "$LAB" "$LAB/.planning/workstreams/omega/STATE.md"
+git -C "$LAB" add -A >/dev/null 2>&1; GIT_T -C "$LAB" commit -q -m "touche omega" >/dev/null 2>&1
+out="$(gb "$LAB" 'git commit --amend --no-edit' sess-B)"
+assert_empty "GW-C-AMEND-3 — HEAD ne touche qu'omega, --amend : stdout vide" "$out"
+
+echo
+echo "=== GW-C-ADD — un git add de la même commande entre dans le jugement (P57-D-33) ==="
+LAB="$(mk_lab cadd)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git add .planning/workstreams/alpha/STATE.md && git commit -m x' sess-B)"
+assert "GW-C-ADD-1 — add littéral d'alpha puis commit (index vide au moment du hook) : deny" "$out" "$DENY"
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/new.md"
+out="$(gb "$LAB" 'git add . && git commit -m x' sess-B)"
+assert "GW-C-ADD-2 — git add . avec un non-suivi dans alpha : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git add -A && git commit -m x' sess-B)"
+assert "GW-C-ADD-3 — git add -A : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git add src/x.sh && git commit -m x' sess-B)"
+assert_empty "GW-C-ADD-4 — add d'un fichier de code seul : stdout vide" "$out"
+out="$(gb "$LAB" 'git add .planning/workstreams/omega/STATE.md && git commit -m x' sess-B)"
+assert_empty "GW-C-ADD-5 — add littéral d'omega : stdout vide" "$out"
+out="$(gb "$LAB" 'git add .planning/workstreams/alpha/STATE.md && git commit -m x' sess-A)"
+assert_empty "GW-C-ADD-6 — le détenteur : stdout vide (discriminance)" "$out"
+
+echo
+echo "=== GW-C-REL — fichiers de forme de release = gestes de dépôt (P57-D-18) ==="
+LAB="$(mk_lab crel)"
+printf '1.0.0\n' > "$LAB/VERSION"; mkdir -p "$LAB/docs"; printf '# adr\n' > "$LAB/docs/ADR.md"; printf '# b\n' > "$LAB/.planning/BACKLOG.md"
+git -C "$LAB" add -A >/dev/null 2>&1; GIT_T -C "$LAB" commit -q -m "base" >/dev/null 2>&1
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+for f in VERSION docs/ADR.md .planning/BACKLOG.md; do
+  touch_file "$LAB" "$LAB/$f"; stage "$LAB" "$f"
+  out="$(gb "$LAB" 'git commit -m x' sess-B)"
+  assert_empty "GW-C-REL-libre — $f, aucun verrou de dépôt (alpha seul tenu) : stdout vide" "$out"
+  unstage "$LAB"
+done
+dl "$LAB" sess-A acquire --depot --owner=md --step=sd >/dev/null
+for f in VERSION docs/ADR.md .planning/BACKLOG.md; do
+  touch_file "$LAB" "$LAB/$f"; stage "$LAB" "$f"
+  out="$(gb "$LAB" 'git commit -m x' sess-B)"
+  assert "GW-C-REL-tenu — $f, verrou de dépôt d'autrui : deny" "$out" "$DENY"
+  out="$(gb "$LAB" 'git commit -m x' sess-A)"
+  assert_empty "GW-C-REL-detenteur — $f, détenteur du dépôt : stdout vide" "$out"
+  unstage "$LAB"
+done
+touch_file "$LAB" "$LAB/src/x.sh"; stage "$LAB" src/x.sh
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-REL-code — fichier de code seul sous verrou de dépôt d'autrui : stdout vide (P57-D-10)" "$out"
+
+echo
+echo "=== GW-C-CORRUPT / GW-C-NOGITBIN — source illisible = refus, jamais ouverture (P57-D-10, P57-D-33) ==="
+LAB="$(mk_lab ccorrupt)"
+GCC="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+printf 'ceci n est pas un index git' > "$GCC/index"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-CORRUPT-1 — index corrompu (rc 128), un verrou d'autrui : deny" "$out" "$DENY"
+assert "GW-C-CORRUPT-2 — motif : source illisible, source nommée" "$out" "source illisible : diff --cached"
+out="$(gb "$LAB" 'git commit -m x' sess-A)"
+assert_empty "GW-C-CORRUPT-3 — le détenteur n'est pas refusé par une source illisible : stdout vide" "$out"
+LAB="$(mk_lab cnogit)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+hash -r
+if [ "$LOC_PRE" -eq 1 ]; then
+  out="$(run_guard_with "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")" PATH="$LOC_BIN")"
+  assert "GW-C-NOGITBIN-1 — PATH sans git, un verrou d'autrui (découvert par le layout) : deny" "$out" "$DENY"
+  assert "GW-C-NOGITBIN-2 — motif : source illisible" "$out" "source illisible"
+  assert "GW-C-NOGITBIN-4 — motif : la source nommée est rev-parse --show-toplevel (pas une exception interne)" "$out" "source illisible : rev-parse --show-toplevel"
+  out="$(run_guard_with "$LAB" "$(mk_bash 'git commit -m x' sess-A "$LAB")" PATH="$LOC_BIN")"
+  assert_empty "GW-C-NOGITBIN-3 — PATH sans git, le détenteur : stdout vide" "$out"
+else
+  assert_exit "GW-C-NOGITBIN — fixture PATH sans git indisponible" 1 0
+fi
+
+echo
+echo "=== GW-T-SAME / GW-T-OTHERWT / GW-T-EXEMPT / GW-T-REMOVE / GW-T-C — gestes d'arbre, même worktree (P57-D-11, P57-D-16, P57-D-17) ==="
+LAB="$(mk_lab tree)"
+WTT="$WORK_DIR/tree-wt"
+git -C "$LAB" worktree add -q -b wtt "$WTT" >/dev/null 2>&1
+lab_preflight "$WTT"
+dl "$LAB" sess-A acquire --ws=omega --owner=m1 --step=s >/dev/null
+for c in 'git checkout -b x' 'git switch main' 'git reset --hard' 'git rebase main' 'git stash' 'git restore src/x.sh' 'git clean -fd' 'git merge main' 'git cherry-pick abc' 'git revert abc'; do
+  out="$(gb "$LAB" "$c" sess-B)"
+  assert "GW-T-SAME — « $c » depuis le checkout où le verrou a été pris : deny" "$out" "$DENY"
+done
+out="$(gb "$LAB" 'git reset --hard' sess-A)"
+assert_empty "GW-T-SAME-detenteur — le détenteur : stdout vide (discriminance)" "$out"
+for c in 'git checkout -b x' 'git switch main' 'git reset --hard' 'git rebase main' 'git stash' 'git clean -fd'; do
+  out="$(gb "$LAB" "$c" sess-B "$WTT")"
+  assert_empty "GW-T-OTHERWT — « $c » depuis un AUTRE worktree : stdout vide (P57-D-17)" "$out"
+done
+out="$(gb "$LAB" 'git worktree add ../w -b w' sess-B)"
+assert_empty "GW-T-EXEMPT-1 — git worktree add : exemption D-32-06 intacte" "$out"
+out="$(gb "$LAB" 'git rebase --abort' sess-B)"
+assert_empty "GW-T-EXEMPT-2 — git rebase --abort : exemption D-32-06 intacte" "$out"
+out="$(gb "$LAB" 'git rebase main' sess-B)"
+assert "GW-T-EXEMPT-3 — git rebase sans option de sortie reste refusé (exemption non élargie)" "$out" "$DENY"
+out="$(gb "$LAB" 'git worktree remove ../w' sess-B "$WTT")"
+assert "GW-T-REMOVE-1 — git worktree remove depuis un autre worktree : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git worktree remove ../w' sess-B)"
+assert "GW-T-REMOVE-2 — git worktree remove depuis le même checkout : deny" "$out" "$DENY"
+UNDER="$LAB/.wts/under"
+git -C "$LAB" worktree add -q -b under "$UNDER" >/dev/null 2>&1
+out="$(gb "$LAB" "git -C $UNDER reset --hard" sess-B)"
+assert "GW-T-C-1 — git -C vers un autre worktree rangé sous le lab : cible incertaine, deny" "$out" "$DENY"
+out="$(gb "$LAB" "git -C $UNDER reset --hard" sess-A)"
+assert_empty "GW-T-C-2 — le détenteur : stdout vide (discriminance)" "$out"
+out="$(gb "$LAB" "git -C $WORK_DIR reset --hard" sess-B)"
+assert_empty "GW-T-C-3 — git -C vers un dossier hors du lab : C7 inchangé, stdout vide" "$out"
+# verrou pris depuis un autre worktree : les gestes d'arbre du checkout principal ne sont pas refusés
+LAB="$(mk_lab tree2)"
+WT2="$WORK_DIR/tree2-wt"
+git -C "$LAB" worktree add -q -b wt2 "$WT2" >/dev/null 2>&1
+lab_preflight "$WT2"
+dl "$WT2" sess-A acquire --ws=omega --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git reset --hard' sess-B)"
+assert_empty "GW-T-OTHERWT-bis — verrou pris depuis un worktree lié, geste depuis le checkout principal : stdout vide" "$out"
+out="$(gb "$LAB" 'git reset --hard' sess-B "$WT2")"
+assert "GW-T-SAME-bis — même verrou, geste depuis le worktree qui l'a pris : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-D-PUSH / GW-D-TAG — gestes de dépôt (P57-D-16, P57-D-02) ==="
+LAB="$(mk_lab dpush)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+for c in 'git push' 'git branch -D x' 'gh pr create' 'git tag v1' 'gh release create v1'; do
+  out="$(gb "$LAB" "$c" sess-B)"
+  assert_empty "GW-D-PUSH — « $c » sous un verrou de compartiment d'autrui : stdout vide" "$out"
+done
+dl "$LAB" sess-A acquire --depot --owner=md --step=sd >/dev/null
+for c in 'git push' 'git branch -D x' 'gh pr create' 'git tag v1' 'gh release create v1'; do
+  out="$(gb "$LAB" "$c" sess-B)"
+  assert "GW-D-TAG — « $c » sous le verrou de dépôt d'autrui : deny" "$out" "$DENY"
+done
+out="$(gb "$LAB" 'git tag v1' sess-A)"
+assert_empty "GW-D-TAG-detenteur — le détenteur du dépôt : stdout vide (discriminance)" "$out"
+
+echo
+echo "=== GW-UNREAD — lab partitionné : un verrou, ou un dossier de verrous, qui EXISTE mais est illisible = refus nommé, jamais « pas de verrou » (P57-D-33, correction R-2) ==="
+LAB="$(mk_lab unread1)"; GCU="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+W_A="$LAB/.planning/workstreams/alpha/STATE.md"
+out="$(run_guard_in "$LAB" "$(mk_write "$W_A" x sess-B "$LAB")")"
+assert "GW-UNREAD-0 — témoin : alpha tenu par autrui, lisible : deny" "$out" "$DENY"
+chmod 000 "$GCU/vf-driver/ws"
+out="$(run_guard_in "$LAB" "$(mk_write "$W_A" x sess-B "$LAB")")"; rc=$?
+chmod 755 "$GCU/vf-driver/ws"
+assert_exit "GW-UNREAD-1.1 — dossier des verrous de compartiments illisible : exit 0" "$rc" 0
+assert "GW-UNREAD-1.2 — Write dans alpha : deny, jamais un allow silencieux" "$out" "$DENY"
+assert "GW-UNREAD-1.3 — le refus nomme l'illisibilité du verrou" "$out" "illisible"
+chmod 000 "$GCU/vf-driver/ws"
+out="$(run_guard_in "$LAB" "$(mk_bash 'git commit -m x' sess-B "$LAB")")"
+chmod 755 "$GCU/vf-driver/ws"
+assert "GW-UNREAD-1.4 — geste Bash concerné : deny aussi" "$out" "$DENY"
+assert "GW-UNREAD-1.5 — le refus nomme l'illisibilité du verrou" "$out" "illisible"
+chmod 000 "$GCU/vf-driver/ws/alpha/DRIVER.lock/meta"
+out="$(run_guard_in "$LAB" "$(mk_write "$W_A" x sess-B "$LAB")")"
+chmod 644 "$GCU/vf-driver/ws/alpha/DRIVER.lock/meta"
+assert "GW-UNREAD-2.1 — meta d'alpha illisible : deny, jamais un allow silencieux" "$out" "$DENY"
+assert "GW-UNREAD-2.2 — le refus nomme l'illisibilité du verrou" "$out" "illisible"
+out="$(run_guard_in "$LAB" "$(mk_write "$W_A" x sess-B "$LAB")")"
+assert "GW-UNREAD-2.3 — droits rendus : le refus redevient celui du verrou tenu (témoin)" "$out" "tenu par"
+LAB="$(mk_lab unread3)"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-UNREAD-3 — aucun verrou, aucun dossier de verrous : permis (pas de sur-refus)" "$out"
+LAB="$(mk_lab unread4)"; GCU="$(fixture_common_dir "$LAB")"
+mkdir -p "$GCU/vf-driver/ws/alpha/DRIVER.lock"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-UNREAD-4 — dossier de verrou sans meta (verrou en cours de pose) : permis, comportement historique" "$out"
+FLAT="$(mk_flat unread5)"
+legacy_acquire "$FLAT" sess-A old >/dev/null
+out="$(run_guard_in "$FLAT" "$(mk_write "$FLAT/.planning/STATE.md" x sess-B "$FLAT")")"
+assert "GW-UNREAD-5.1 — témoin lab PLAT : verrou d'autrui lisible, deny" "$out" "$DENY"
+chmod 000 "$FLAT/.planning/DRIVER.lock/meta"
+out="$(run_guard_in "$FLAT" "$(mk_write "$FLAT/.planning/STATE.md" x sess-B "$FLAT")")"
+chmod 644 "$FLAT/.planning/DRIVER.lock/meta"
+assert_empty "GW-UNREAD-5.2 — lab PLAT, meta illisible : allow, posture historique inchangée (Q3c)" "$out"
+
+echo
+echo "=== GW-TTL — un verrou PÉRIMÉ d'autrui n'est plus un verrou (règle 2 historique, chemin partitionné ; correction R-3 a) ==="
+backdate_ws() { # <dossier commun> <ws/alpha|repo> : antidate heartbeat ET progress (réécriture du meta)
+  local m="$1/vf-driver/$2/DRIVER.lock/meta"
+  sed -e 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' -e 's/^progress_epoch=.*/progress_epoch=1000/' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+}
+LAB="$(mk_lab ttl)"; GCT="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+dl "$LAB" sess-A acquire --depot --owner=md --step=sd >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert "GW-TTL-0.1 — témoin : alpha frais tenu par autrui : deny" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/PROJECT.md" x sess-B "$LAB")")"
+assert "GW-TTL-0.2 — témoin : dépôt frais tenu par autrui : deny" "$out" "$DENY"
+backdate_ws "$GCT" ws/alpha; backdate_ws "$GCT" repo
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")")"
+assert_empty "GW-TTL-1 — alpha périmé (TTL 1800 s dépassé) : Write permis" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/PROJECT.md" x sess-B "$LAB")")"
+assert_empty "GW-TTL-2 — verrou de dépôt périmé : Write racine permis" "$out"
+out="$(gb "$LAB" 'git reset --hard' sess-B)"
+assert_empty "GW-TTL-3 — geste d'arbre sous des verrous périmés : permis" "$out"
+out="$(run_guard_with "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/STATE.md" x sess-B "$LAB")" VF_DRIVER_TTL=99999999999)"
+assert "GW-TTL-4 — le même verrou sous un TTL élargi (VF_DRIVER_TTL) redevient vivant : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-UNC — cible git incertaine (-C, --git-dir, --work-tree) : refus sous tout verrou d'autrui, même quand le geste serait permis (P57-D-33 ; correction R-3 b) ==="
+LAB="$(mk_lab unc)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-UNC-0 — témoin : index vide, commit sans option de cible : permis" "$out"
+out="$(gb "$LAB" 'git --git-dir=.git commit -m x' sess-B)"
+assert "GW-UNC-1 — git --git-dir=.git commit (index vide) : deny, cible incertaine" "$out" "$DENY"
+out="$(gb "$LAB" 'git -C . commit -m x' sess-B)"
+assert "GW-UNC-2 — git -C . commit (index vide) : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --work-tree=. commit -m x' sess-B)"
+assert "GW-UNC-3 — git --work-tree=. commit (index vide) : deny" "$out" "$DENY"
+LAB="$(mk_lab unctree)"
+WTU="$WORK_DIR/unctree-wt"
+git -C "$LAB" worktree add -q -b wtu "$WTU" >/dev/null 2>&1
+lab_preflight "$WTU"
+dl "$WTU" sess-A acquire --ws=omega --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git reset --hard' sess-B)"
+assert_empty "GW-UNC-4.1 — verrou pris depuis un autre worktree, geste d'arbre ordinaire : permis (témoin)" "$out"
+out="$(gb "$LAB" 'git -C . reset --hard' sess-B)"
+assert "GW-T-C-1b — le même geste avec -C : deny, SEULE la cible incertaine le distingue" "$out" "$DENY"
+
+echo
+echo "=== GW-F3 — globaux git SANS argument et wrapper exec : reconnus comme le verbe qui suit (correction F-3, 57-SECURITY.md ; lab partitionné) ==="
+LAB="$(mk_lab f3)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -am x' sess-B)"
+assert "GW-F3-0 — témoin : git commit -am sans global, alpha tenu par autrui : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-pager commit -am x' sess-B)"
+assert "GW-F3-1 — git --no-pager commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --paginate commit -am x' sess-B)"
+assert "GW-F3-2 — git --paginate commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git -p commit -am x' sess-B)"
+assert "GW-F3-3 — git -p commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-optional-locks commit -am x' sess-B)"
+assert "GW-F3-4 — git --no-optional-locks commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --literal-pathspecs commit -am x' sess-B)"
+assert "GW-F3-5 — git --literal-pathspecs commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'exec git commit -am x' sess-B)"
+assert "GW-F3-6 — exec git commit -am (exec est un wrapper) : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --glob-pathspecs commit -am x' sess-B)"
+assert "GW-F3-7 — git --glob-pathspecs commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --noglob-pathspecs commit -am x' sess-B)"
+assert "GW-F3-8 — git --noglob-pathspecs commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --icase-pathspecs commit -am x' sess-B)"
+assert "GW-F3-9 — git --icase-pathspecs commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-replace-objects commit -am x' sess-B)"
+assert "GW-F3-10 — git --no-replace-objects commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-lazy-fetch commit -am x' sess-B)"
+assert "GW-F3-11 — git --no-lazy-fetch commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-advice commit -am x' sess-B)"
+assert "GW-F3-12 — git --no-advice commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --bare commit -am x' sess-B)"
+assert "GW-F3-13 — git --bare commit -am : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-pager -p --no-optional-locks commit -am x' sess-B)"
+assert "GW-F3-14 — plusieurs globaux sans argument enchaînés : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'sudo exec git --no-pager commit -am x' sess-B)"
+assert "GW-F3-15 — exec derrière un autre wrapper : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git --no-pager commit -m x' sess-B)"
+assert_empty "GW-F3-16 — sans -a, la modification non indexée n'est pas embarquée : stdout vide (discriminance)" "$out"
+out="$(gb "$LAB" 'git --no-pager commit -am x' sess-A)"
+assert_empty "GW-F3-17 — le détenteur : stdout vide (discriminance)" "$out"
+out="$(gb "$LAB" "git --no-pager -C $WORK_DIR commit -am x" sess-B)"
+assert_empty "GW-F3-18 — git --no-pager -C <dossier hors du lab> : C7 inchangé, stdout vide" "$out"
+out="$(gb "$LAB" 'echo exec git commit -am x' sess-B)"
+assert_empty "GW-F3-19 — exec en position d'ARGUMENT d'une autre commande : stdout vide (S3 intact)" "$out"
+out="$(gb "$LAB" 'git --no-pager log -1' sess-B)"
+assert_empty "GW-F3-20 — un global sans argument devant un verbe hors surface : stdout vide (aucun refus nouveau)" "$out"
+LAB="$(mk_lab f3tree)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git --no-pager reset --hard' sess-B)"
+assert "GW-F3-21 — geste d'arbre derrière --no-pager, verrou pris depuis le même worktree : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-ENVT — GIT_DIR / GIT_INDEX_FILE / GIT_WORK_TREE en préfixe d'affectation : cible INCERTAINE, comme --git-dir (correction R-5, P57-D-20 ; lab partitionné) ==="
+LAB="$(mk_lab envt)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-ENVT-0 — témoin : index vide, commit sans préfixe : permis" "$out"
+out="$(gb "$LAB" 'GIT_DIR=.git git commit -m x' sess-B)"
+assert "GW-ENVT-1 — GIT_DIR=.git git commit (index vide) : deny, cible incertaine" "$out" "$DENY"
+out="$(gb "$LAB" 'GIT_INDEX_FILE=.git/index git commit -m x' sess-B)"
+assert "GW-ENVT-2 — GIT_INDEX_FILE=… git commit (index vide) : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'GIT_WORK_TREE=. git commit -m x' sess-B)"
+assert "GW-ENVT-3 — GIT_WORK_TREE=. git commit (index vide) : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'env GIT_DIR=.git git commit -m x' sess-B)"
+assert "GW-ENVT-4 — env GIT_DIR=… git commit : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'FOO=1 GIT_INDEX_FILE=.git/index git commit -m x' sess-B)"
+assert "GW-ENVT-5 — affectation étrangère devant : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'GIT_AUTHOR_NAME=a git commit -m x' sess-B)"
+assert_empty "GW-ENVT-6 — une autre variable GIT_* ne déplace pas la cible : permis (aucune classe de refus nouvelle)" "$out"
+out="$(gb "$LAB" 'GIT_DIR=.git git commit -m x' sess-A)"
+assert_empty "GW-ENVT-7 — le détenteur : stdout vide (discriminance)" "$out"
+out="$(gb "$LAB" 'GIT_DIR=.git git commit -m x' sess-B)"
+out2="$(gb "$LAB" 'git --git-dir=.git commit -m x' sess-B)"
+[ "$out" = "$out2" ]; assert_exit "GW-ENVT-8 — MÊME verdict et MÊME message que --git-dir= (cible incertaine existante)" "$?" 0
+LAB="$(mk_lab envtree)"
+WTE="$WORK_DIR/envtree-wt"
+git -C "$LAB" worktree add -q -b wte "$WTE" >/dev/null 2>&1
+lab_preflight "$WTE"
+dl "$WTE" sess-A acquire --ws=omega --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git reset --hard' sess-B)"
+assert_empty "GW-ENVT-9.1 — verrou pris depuis un autre worktree, geste d'arbre ordinaire : permis (témoin)" "$out"
+out="$(gb "$LAB" 'git status && GIT_DIR=.git git reset --hard' sess-B)"
+assert "GW-ENVT-9.2 — le même geste avec GIT_DIR= en préfixe : deny, SEULE la cible incertaine le distingue" "$out" "$DENY"
+
+echo
+echo "=== GW-ENVT-OUT — le préfixe GIT_*= du MÊME segment rend la cible incertaine aussi pour la décision « geste hors du lab » (réserve AUD-1 de l'audit Phase 57 ; lab partitionné) ==="
+LAB="$(mk_lab envout)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"; stage "$LAB" .planning/workstreams/alpha/STATE.md
+out="$(gb "$LAB" "cd $WORK_DIR && git commit -m x" sess-B)"
+assert_empty "GW-ENVT-OUT-0 — témoin : cd <hors lab> && git commit, sans préfixe : permis (C7 intact)" "$out"
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_DIR=$LAB/.git GIT_WORK_TREE=$LAB git commit -m x" sess-B)"
+assert "GW-ENVT-OUT-1 — cd <hors lab> && GIT_DIR=<lab>/.git GIT_WORK_TREE=<lab> git commit : deny (le commit embarque alpha)" "$out" "$DENY"
+out2="$(gb "$LAB" "cd $WORK_DIR && git --git-dir=$LAB/.git --work-tree=$LAB commit -m x" sess-B)"
+assert "GW-ENVT-OUT-2 — témoin : la forme --git-dir=/--work-tree= équivalente est refusée" "$out2" "$DENY"
+[ "$out" = "$out2" ]; assert_exit "GW-ENVT-OUT-3 — MÊME verdict et MÊME message que la forme --git-dir=/--work-tree=" "$?" 0
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_INDEX_FILE=$LAB/.git/index git commit -m x" sess-B)"
+assert "GW-ENVT-OUT-4 — cd <hors lab> && GIT_INDEX_FILE=… git commit : deny" "$out" "$DENY"
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_WORK_TREE=$LAB git commit -m x" sess-B)"
+assert "GW-ENVT-OUT-5 — cd <hors lab> && GIT_WORK_TREE=… git commit : deny" "$out" "$DENY"
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_AUTHOR_NAME=a git commit -m x" sess-B)"
+assert_empty "GW-ENVT-OUT-6 — une autre variable GIT_* ne déplace pas la cible : permis (aucune classe de refus nouvelle)" "$out"
+out="$(gb "$LAB" "cd $WORK_DIR && GIT_DIR=$LAB/.git GIT_WORK_TREE=$LAB git commit -m x" sess-A)"
+assert_empty "GW-ENVT-OUT-7 — le détenteur : stdout vide (discriminance)" "$out"
+
+echo
+echo "=== GW-Q45 — contournements fermés (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q5) : globaux git à argument, wrappers à option-argument, bash -c, affectation GIT_* d'un autre segment (lab partitionné) ==="
+# Chaque forme avait le verdict ALLOW avant la correction (rouge constaté : voir le rapport de la mission q45) ; elle a désormais
+# le verdict ET le message de sa forme canonique. Trois laboratoires : A (alpha tenu par autrui, alpha INDEXÉ : un commit à cible
+# certaine l'embarque, donc la reconnaissance du verbe suffit à refuser), U (index vide : seule la cible incertaine refuse),
+# O (alpha indexé, geste précédé d'un cd hors du lab : la décision « hors du lab »).
+q45_norm() { sed -E 's/depuis [0-9]+ min/depuis N min/g'; }
+nest_bashc() { python3 -c '
+import shlex, sys
+c = sys.argv[2]
+for _ in range(int(sys.argv[1])):
+    c = "bash -c " + shlex.quote(c)
+print(c)' "$1" "$2"; }
+q45_same() { # <id> <description> <lab> <commande> <canonique> : refus ET message identique à celui de la forme canonique
+  local o c
+  o="$(gb "$3" "$4" sess-B | q45_norm)"; c="$(gb "$3" "$5" sess-B | q45_norm)"
+  if [[ "$o" == *"$DENY"* && "$o" == "$c" ]]; then echo "  ✅ PASS — GW-Q45-$1 — $2 : deny, même message que la forme canonique"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-Q45-$1 — $2 : deny, même message que la forme canonique"; echo "     canonique: ${c:0:200}"; echo "     obtenu:    ${o:0:200}"; FAIL=$((FAIL+1)); fi
+}
+q45_unc() { # <id> <description> <lab> <commande> : refus d'une cible INCERTAINE (le motif ne porte aucun « Detail », comme celui de --git-dir=)
+  local o
+  o="$(gb "$3" "$4" sess-B)"
+  if [[ "$o" == *"$DENY"* && "$o" != *"Detail :"* ]]; then echo "  ✅ PASS — GW-Q45-$1 — $2 : deny, motif d'une cible incertaine (aucun détail de commit)"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-Q45-$1 — $2 : deny, motif d'une cible incertaine (aucun détail de commit)"; echo "     obtenu: ${o:0:300}"; FAIL=$((FAIL+1)); fi
+}
+q45_deny() { # <id> <description> <lab> <commande>
+  assert "GW-Q45-$1 — $2 : deny" "$(gb "$3" "$4" sess-B)" "$DENY"
+}
+q45_pass() { # <id> <description> <lab> <commande> [session]
+  assert_empty "GW-Q45-$1 — $2 : permis" "$(gb "$3" "$4" "${5:-sess-B}")"
+}
+LA="$(mk_lab q45a)"
+dl "$LA" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LA" "$LA/.planning/workstreams/alpha/STATE.md"; stage "$LA" .planning/workstreams/alpha/STATE.md
+q45_deny A0 "témoin : git commit -m x, alpha indexé et tenu par autrui" "$LA" 'git commit -m x'
+CAN='git commit -m x'
+q45_same A1 "git --namespace ns commit (deux jetons)" "$LA" 'git --namespace ns commit -m x' "$CAN"
+q45_same A2 "git --namespace=ns commit" "$LA" 'git --namespace=ns commit -m x' "$CAN"
+q45_same A3 "git --config-env a.b=HOME commit (deux jetons)" "$LA" 'git --config-env a.b=HOME commit -m x' "$CAN"
+q45_same A4 "git --config-env=a.b=HOME commit" "$LA" 'git --config-env=a.b=HOME commit -m x' "$CAN"
+q45_same A5 "git --attr-source HEAD commit (deux jetons)" "$LA" 'git --attr-source HEAD commit -m x' "$CAN"
+q45_same A6 "git --attr-source=HEAD commit" "$LA" 'git --attr-source=HEAD commit -m x' "$CAN"
+q45_same A7 "git --super-prefix=x commit" "$LA" 'git --super-prefix=x commit -m x' "$CAN"
+q45_same A8 "git -c a.b=c commit (existant)" "$LA" 'git -c a.b=c commit -m x' "$CAN"
+q45_same A9 "env -u FOO git commit" "$LA" 'env -u FOO git commit -m x' "$CAN"
+q45_same A10 "env --unset FOO git commit" "$LA" 'env --unset FOO git commit -m x' "$CAN"
+q45_same A11 "env -iu FOO git commit (option groupée)" "$LA" 'env -iu FOO git commit -m x' "$CAN"
+q45_same A12 "env -i git commit" "$LA" 'env -i git commit -m x' "$CAN"
+q45_same A13 "nice -n 5 git commit" "$LA" 'nice -n 5 git commit -m x' "$CAN"
+q45_same A14 "nice -5 git commit" "$LA" 'nice -5 git commit -m x' "$CAN"
+q45_same A15 "exec -a nm git commit" "$LA" 'exec -a nm git commit -m x' "$CAN"
+q45_same A16 "exec -c git commit" "$LA" 'exec -c git commit -m x' "$CAN"
+q45_same A17 "sudo -u root git commit" "$LA" 'sudo -u root git commit -m x' "$CAN"
+q45_same A18 "xargs -n 1 git commit" "$LA" 'xargs -n 1 git commit -m x' "$CAN"
+q45_same A19 "command git commit" "$LA" 'command git commit -m x' "$CAN"
+q45_same A20 "nohup git commit" "$LA" 'nohup git commit -m x' "$CAN"
+q45_same A21 "time git commit" "$LA" 'time git commit -m x' "$CAN"
+q45_same A22 "bash -c \"git commit\"" "$LA" 'bash -c "git commit -m x"' "$CAN"
+q45_same A23 "sh -c 'git commit'" "$LA" "sh -c 'git commit -m x'" "$CAN"
+q45_same A24 "zsh -c \"git commit\"" "$LA" 'zsh -c "git commit -m x"' "$CAN"
+q45_same A25 "bash -lc \"git commit\" (option groupée)" "$LA" 'bash -lc "git commit -m x"' "$CAN"
+q45_same A26 "bash -ec 'git commit'" "$LA" "bash -ec 'git commit -m x'" "$CAN"
+q45_same A27 "/bin/bash -c \"git add -A && git commit\"" "$LA" '/bin/bash -c "git add -A && git commit -m x"' 'git add -A && git commit -m x'
+q45_same A28 "sudo bash -c \"git commit\"" "$LA" 'sudo bash -c "git commit -m x"' "$CAN"
+q45_same A29 "bash -c dans bash -c (2 niveaux)" "$LA" "$(nest_bashc 2 'git commit -m x')" "$CAN"
+q45_same A30 "bash -c à 3 niveaux (lu en entier)" "$LA" "$(nest_bashc 3 'git commit -m x')" "$CAN"
+q45_same A31 "env FOO=1 bash -c \"git commit\"" "$LA" 'env FOO=1 bash -c "git commit -m x"' "$CAN"
+q45_deny C1 "bash -c à 4 niveaux (au-delà de la profondeur lue : refus grossier, git commit-like)" "$LA" "$(nest_bashc 4 'git commit -m x')"
+q45_deny C2 "bash -c à 6 niveaux (git commit-like)" "$LA" "$(nest_bashc 6 'git commit -m x')"
+q45_pass P1 "bash -c \"git status\" (aucun geste concerné)" "$LA" 'bash -c "git status"'
+q45_pass P2 "bash release.sh (script du dépôt, hors de portée nommée)" "$LA" 'bash release.sh'
+q45_pass P3 "bash -c \"echo hi\"" "$LA" 'bash -c "echo hi"'
+q45_pass P4 "4 niveaux de bash -c autour d'un echo (aucun git commit-like)" "$LA" "$(nest_bashc 4 'echo hi')"
+q45_pass P5 "eval \"git commit\" (interprétation indirecte, hors de portée nommée)" "$LA" 'eval "git commit -m x"'
+q45_pass P6 "timeout 5 git commit (wrapper non reconnu, hors de portée nommée)" "$LA" 'timeout 5 git commit -m x'
+q45_pass H1 "env -u FOO git commit : le détenteur" "$LA" 'env -u FOO git commit -m x' sess-A
+q45_pass H2 "bash -c \"git commit\" : le détenteur" "$LA" 'bash -c "git commit -m x"' sess-A
+LU="$(mk_lab q45u)"
+dl "$LU" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+q45_pass U0 "témoin : index vide, git commit -m x" "$LU" 'git commit -m x'
+q45_same U0c "git --git-dir .git commit (deux jetons)" "$LU" 'git --git-dir .git commit -m x' 'git --git-dir=.git commit -m x'
+q45_unc U1 "git --git-dir .git commit (deux jetons) : cible incertaine" "$LU" 'git --git-dir .git commit -m x'
+q45_unc U2 "git --work-tree . commit (deux jetons) : cible incertaine" "$LU" 'git --work-tree . commit -m x'
+q45_unc U3 "env -C . git commit : cible incertaine" "$LU" 'env -C . git commit -m x'
+q45_unc U4 "env --chdir . git commit : cible incertaine" "$LU" 'env --chdir . git commit -m x'
+q45_unc U5 "export GIT_INDEX_FILE=… ; git commit (autre segment)" "$LU" 'export GIT_INDEX_FILE=/tmp/x; git commit -m x'
+q45_unc U6 "export GIT_DIR=… && git commit (autre segment)" "$LU" 'export GIT_DIR=/tmp/x && git commit -m x'
+q45_unc U7 "GIT_DIR=… ; git commit (affectation seule)" "$LU" 'GIT_DIR=/tmp/x; git commit -m x'
+q45_unc U8 "declare -x GIT_WORK_TREE=… ; git commit" "$LU" 'declare -x GIT_WORK_TREE=/tmp/x; git commit -m x'
+q45_unc U9 "GIT_DIR=… bash -c \"git commit\" (variable héritée par le shell fils)" "$LU" 'GIT_DIR=.git bash -c "git commit -m x"'
+q45_unc U10 "export GIT_DIR=… ; bash -c \"git commit\"" "$LU" 'export GIT_DIR=/tmp/x; bash -c "git commit -m x"'
+q45_unc U11 "bash -c \"export GIT_DIR=… ; git commit\" (posée dans la chaîne)" "$LU" 'bash -c "export GIT_DIR=/tmp/x; git commit -m x"'
+q45_unc U12 "export GIT_DIR=… ; bash -c dans bash -c" "$LU" "export GIT_DIR=/tmp/x; $(nest_bashc 2 'git commit -m x')"
+q45_pass V1 "export FOO=1 ; git commit (variable étrangère : aucune classe de refus nouvelle)" "$LU" 'export FOO=1; git commit -m x'
+q45_pass V2 "git commit ; export GIT_DIR=… (posée APRÈS le geste)" "$LU" 'git commit -m x; export GIT_DIR=/tmp/x'
+q45_pass V3 "bash -c \"git commit\" ; export GIT_DIR=… (l'héritage suit la position)" "$LU" 'bash -c "git commit -m x"; export GIT_DIR=/tmp/x'
+q45_pass V4 "bash -c \"git commit\" sans variable, index vide" "$LU" 'bash -c "git commit -m x"'
+q45_pass V5 "git --namespace ns commit, index vide (le global ne déplace pas la cible)" "$LU" 'git --namespace ns commit -m x'
+q45_pass V6 "nice -n 5 git commit, index vide" "$LU" 'nice -n 5 git commit -m x'
+q45_pass H3 "export GIT_INDEX_FILE=… ; git commit : le détenteur" "$LU" 'export GIT_INDEX_FILE=/tmp/x; git commit -m x' sess-A
+LO="$(mk_lab q45o)"
+dl "$LO" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LO" "$LO/.planning/workstreams/alpha/STATE.md"; stage "$LO" .planning/workstreams/alpha/STATE.md
+q45_pass O1 "cd <hors lab> && bash -c \"git commit\" (même verdict que la forme canonique)" "$LO" "cd $WORK_DIR && bash -c \"git commit -m x\""
+q45_pass O2 "cd <hors lab> && env -u FOO git commit" "$LO" "cd $WORK_DIR && env -u FOO git commit -m x"
+q45_pass O3 "cd <hors lab> && nice -n 5 git --no-pager commit" "$LO" "cd $WORK_DIR && nice -n 5 git --no-pager commit -m x"
+q45_pass O4 "bash -c \"cd <hors lab> && git commit\"" "$LO" "bash -c \"cd $WORK_DIR && git commit -m x\""
+q45_pass O5 "cd <hors lab> && git --namespace ns commit (le global ne déplace pas la cible)" "$LO" "cd $WORK_DIR && git --namespace ns commit -m x"
+q45_unc O6 "cd <hors lab> && env -C . git commit : cible incertaine" "$LO" "cd $WORK_DIR && env -C . git commit -m x"
+q45_unc O7 "cd <hors lab> && export GIT_INDEX_FILE=… && git commit" "$LO" "cd $WORK_DIR && export GIT_INDEX_FILE=$LO/.git/index && git commit -m x"
+q45_unc O8 "cd <hors lab> && GIT_DIR=… bash -c \"git commit\"" "$LO" "cd $WORK_DIR && GIT_DIR=$LO/.git bash -c \"git commit -m x\""
+q45_unc O9 "cd <hors lab> && git --git-dir <p> commit (deux jetons)" "$LO" "cd $WORK_DIR && git --git-dir $LO/.git commit -m x"
+q45_deny O10 "bash -c \"cd <hors lab>\" ; git commit (le cd d'un shell fils ne bouge pas l'appelant)" "$LO" "bash -c \"cd $WORK_DIR\"; git commit -m x"
+
+echo
+echo "=== GW-AU2 — audit de la mission q45 (tour 3, 2026-10-13) : cd transmis à bash -c (AU2-01), refus grossier linéaire et borné (AU2-02), refus grossier qui lit /usr/bin/git et les guillemets (AU2-03), affectations += et [i]= en préfixe (AU2-06), deux régimes ==="
+# Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 (tour 3 de la mission q45). Chaque cas était ALLOW (ou, pour la durée, 20 s
+# et plus) avant la correction ; rouge constaté avant, vert après. Les mutants GW-M-au2_* en tuent chacun un comportement.
+au2_norm() { sed -E 's/depuis [0-9]+ min/depuis N min/g'; }
+au2_same() { # <id> <description> <lab> <commande> <canonique> : refus ET message identique à celui de la forme canonique
+  local o c
+  o="$(gb "$3" "$4" sess-B | au2_norm)"; c="$(gb "$3" "$5" sess-B | au2_norm)"
+  if [[ "$o" == *"$DENY"* && "$o" == "$c" ]]; then echo "  ✅ PASS — GW-AU2-$1 — $2 : deny, même message que la forme canonique"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-AU2-$1 — $2 : deny, même message que la forme canonique"; echo "     canonique: ${c:0:200}"; echo "     obtenu:    ${o:0:200}"; FAIL=$((FAIL+1)); fi
+}
+au2_unc() { # <id> <description> <lab> <commande> : refus d'une cible INCERTAINE (le motif ne porte aucun « Detail »)
+  local o
+  o="$(gb "$3" "$4" sess-B)"
+  if [[ "$o" == *"$DENY"* && "$o" != *"Detail :"* ]]; then echo "  ✅ PASS — GW-AU2-$1 — $2 : deny, motif d'une cible incertaine (aucun détail de commit)"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-AU2-$1 — $2 : deny, motif d'une cible incertaine (aucun détail de commit)"; echo "     obtenu: ${o:0:300}"; FAIL=$((FAIL+1)); fi
+}
+au2_deny() { assert "GW-AU2-$1 — $2 : deny" "$(gb "$3" "$4" "${5:-sess-B}")" "$DENY"; }   # <id> <description> <lab> <commande> [session]
+au2_pass() { assert_empty "GW-AU2-$1 — $2 : permis" "$(gb "$3" "$4" "${5:-sess-B}")"; }  # <id> <description> <lab> <commande> [session]
+# Coût du guard sur une commande : GB_MS = temps PROCESSEUR du guard et de ses enfants (millisecondes, getrusage), GB_OUT = stdout. Le temps processeur
+# ne bouge pas quand la machine est chargée (une suite de mutants fait tourner des dizaines de guards en parallèle : le temps d'horloge y est
+# multiplié par 30), l'horloge seule rendrait le cas fragile. Plafond d'horloge de 600 s : au-delà, GB_MS = 600000.
+# (60 s jusqu'au 2026-10-14 : sur le runner GitHub, 52 matrices de mutants en parallèle ont fait dépasser 60 s d'horloge au mutant
+# quadratique GW-M-au2_quad, dont la sortie devenait « TIMEOUT » et basculait GW-AU2-02.x.2 en plus des deux cas attendus ; le cas
+# se juge au temps processeur, pas à l'horloge.)
+gb_timed() { # <lab> <commande> <session>
+  local r
+  r="$(mk_bash "$2" "$3" "$1" | python3 -c '
+import resource, subprocess, sys
+lab, guard, shell = sys.argv[1:4]
+try:
+    p = subprocess.run([shell, guard], input=sys.stdin.read().encode(), cwd=lab, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=600)
+    out = p.stdout.decode("utf-8", "replace")
+    ru = resource.getrusage(resource.RUSAGE_CHILDREN)
+    ms = int((ru.ru_utime + ru.ru_stime) * 1000)
+except subprocess.TimeoutExpired:
+    out, ms = "TIMEOUT", 600000
+print(ms)
+sys.stdout.write(out)' "$1" "$GUARD" "$BASH_BIN")"
+  GB_MS="${r%%$'\n'*}"
+  case "$r" in *$'\n'*) GB_OUT="${r#*$'\n'}" ;; *) GB_OUT="" ;; esac
+}
+# Une charge qui prenait plus de 10 s doit tenir sous 3 s de temps processeur (mesuré : 0,3 s, marge x3 de la réception tenue avec x10 de reste).
+au2_fast() { # <id> <description> <ms>
+  if [ "$3" -lt 3000 ]; then echo "  ✅ PASS — GW-AU2-$1 — $2 : ${3} ms de temps processeur (< 3000)"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-AU2-$1 — $2 : ${3} ms de temps processeur (attendu < 3000)"; FAIL=$((FAIL+1)); fi
+}
+
+# AU2-01 : un cd, pushd ou popd de l'appelant est transmis à la récursion bash -c. Lab C : alpha tenu par autrui, STATE.md MODIFIÉ et non indexé
+# (un `git add STATE.md` lu depuis alpha l'indexe, lu depuis la racine il vise un autre fichier).
+LC="$(mk_lab au2c)"
+dl "$LC" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LC" "$LC/.planning/workstreams/alpha/STATE.md"
+AL="$LC/.planning/workstreams/alpha"
+ADDC='git add STATE.md && git commit -m x'
+CANC="cd $AL && $ADDC"
+au2_deny 01.0 "témoin canonique : cd <alpha> && git add STATE.md && git commit" "$LC" "$CANC"
+au2_same 01.1 "cd <alpha> && bash -c '…'" "$LC" "cd $AL && bash -c '$ADDC'" "$CANC"
+au2_same 01.2 "cd <alpha> && env bash -c '…'" "$LC" "cd $AL && env bash -c '$ADDC'" "$CANC"
+au2_same 01.3 "pushd <alpha> && bash -c '…'" "$LC" "pushd $AL && bash -c '$ADDC'" "pushd $AL && $ADDC"
+au2_deny 01.4 "(cd <alpha> && bash -c '…') : sous-shell collé, non couvert pour la forme canonique (catégorie A), jamais permis pour bash -c" "$LC" "(cd $AL && bash -c '$ADDC')"
+au2_same 01.5 "cd <alpha> && bash -c \"bash -c '…'\" (2 niveaux)" "$LC" "cd $AL && bash -c \"bash -c '$ADDC'\"" "$CANC"
+au2_pass 01.6 "témoin : bash -c '…' sans cd, STATE.md désigne la racine du lab" "$LC" "bash -c '$ADDC'"
+au2_pass 01.7 "témoin : le cd vient APRÈS la chaîne bash -c (il ne la précède pas)" "$LC" "bash -c '$ADDC'; cd $AL"
+au2_pass 01.8 "cd <alpha> && bash -c '…' : le détenteur" "$LC" "cd $AL && bash -c '$ADDC'" sess-A
+
+# AU2-02 / AU2-03 : refus grossier au-delà de 3 niveaux de bash -c. Lab plat F : verrou unique tenu par sess-A.
+FL="$(mk_flat au2f)"
+legacy_acquire "$FL" sess-A old >/dev/null
+for regime in partitionné plat; do
+  if [ "$regime" = plat ]; then L="$FL"; r=F; else L="$LC"; r=P; fi
+  au2_deny "03.$r.1" "[$regime] 4 niveaux autour de /usr/bin/git commit" "$L" "$(nest_bashc 4 '/usr/bin/git commit -m x')"
+  au2_deny "03.$r.2" "[$regime] 4 niveaux autour de g''it commit (deux apostrophes dans le mot)" "$L" "$(nest_bashc 4 "g''it commit -m x")"
+  au2_deny "03.$r.3" "[$regime] 4 niveaux autour de g\"it commit (guillemet double dans le mot)" "$L" "$(nest_bashc 4 'g"it commit -m x')"
+  au2_deny "03.$r.4" "[$regime] 4 niveaux autour de g\\it commit (antislash dans le mot)" "$L" "$(nest_bashc 4 'g\it commit -m x')"
+  au2_pass "03.$r.5" "[$regime] 4 niveaux autour de echo digit commit (git n'est pas un mot)" "$L" "$(nest_bashc 4 'echo digit commit -m x')"
+  au2_pass "03.$r.6" "[$regime] 4 niveaux autour de echo github commit (git n'est pas un mot)" "$L" "$(nest_bashc 4 'echo github commit -m x')"
+  au2_pass "03.$r.7" "[$regime] 4 niveaux autour de /usr/bin/git commit : le détenteur" "$L" "$(nest_bashc 4 '/usr/bin/git commit -m x')" sess-A
+  # AU2-02 : 48 Ko de « git » sans verbe mutant APRÈS eux (le mot commit les précède) : l'ancienne expression relisait la fin de la chaîne
+  # à chaque git (30 s), la nouvelle ne lit qu'une fois.
+  gb_timed "$L" "$(nest_bashc 4 "echo commit $(python3 -c 'print("git " * 12000)')")" sess-B
+  au2_fast "02.$r.1" "[$regime] 48 Ko de git sans verbe après eux, 4 niveaux" "$GB_MS"
+  assert_empty "GW-AU2-02.$r.2 — [$regime] la même charge est permise (aucun verbe après un git)" "$GB_OUT"
+  au2_deny "02.$r.4" "[$regime] la même charge avec un verbe mutant après les git" "$L" "$(nest_bashc 4 "echo $(python3 -c 'print("git " * 8000)')commit")"
+  # Borne : une chaîne de plus de 64 Ko au-delà de la profondeur lue n'est pas lue ; sous le verrou d'autrui seulement elle est refusée.
+  BIG70="$(nest_bashc 4 "echo commit $(python3 -c 'print("x" * 70000)')")"
+  au2_deny "02.$r.5" "[$regime] 70 Ko au-delà de la profondeur lue : refus sous le verrou d'autrui" "$L" "$BIG70"
+  au2_pass "02.$r.6" "[$regime] 70 Ko au-delà de la profondeur lue : le détenteur passe" "$L" "$BIG70" sess-A
+  au2_pass "02.$r.7" "[$regime] 60 Ko au-delà de la profondeur lue, sans git : permis (sous la borne)" "$L" "$(nest_bashc 4 "echo commit $(python3 -c 'print("x" * 60000)')")"
+done
+
+# AU2-06 : NOM+=, NOM[i]= et NOM[i]+= sont des affectations en préfixe de commande, au même titre que NOM= ; GIT_*+= rend la cible incertaine.
+# Lab A (alpha indexé : un commit à cible certaine l'embarque), U (index vide : seule la cible incertaine refuse), O (geste précédé d'un cd hors du lab).
+au2_same 06.1 "FOO+=1 git commit" "$LA" 'FOO+=1 git commit -m x' 'git commit -m x'
+au2_same 06.2 "A[0]=1 git commit" "$LA" 'A[0]=1 git commit -m x' 'git commit -m x'
+au2_same 06.3 "FOO+=1 bash -c \"git commit\"" "$LA" 'FOO+=1 bash -c "git commit -m x"' 'git commit -m x'
+au2_unc 06.4 "GIT_DIR+=x git commit : cible incertaine" "$LU" 'GIT_DIR+=x git commit -m x'
+au2_unc 06.5 "GIT_INDEX_FILE+=x git commit : cible incertaine" "$LU" 'GIT_INDEX_FILE+=x git commit -m x'
+au2_unc 06.6 "GIT_DIR[0]=x git commit : cible incertaine" "$LU" 'GIT_DIR[0]=x git commit -m x'
+au2_unc 06.7 "GIT_WORK_TREE+=x ; git commit (affectation seule, autre segment)" "$LU" 'GIT_WORK_TREE+=x; git commit -m x'
+au2_unc 06.8 "export GIT_DIR+=x ; git commit (autre segment)" "$LU" 'export GIT_DIR+=x; git commit -m x'
+au2_pass 06.9 "témoin : FOO+=1 git commit, index vide (variable étrangère : aucune classe de refus neuve)" "$LU" 'FOO+=1 git commit -m x'
+au2_unc 06.10 "cd <hors lab> && GIT_DIR+=x git commit : cible incertaine" "$LO" "cd $WORK_DIR && GIT_DIR+=x git commit -m x"
+au2_pass 06.11 "témoin : cd <hors lab> && FOO+=1 git commit" "$LO" "cd $WORK_DIR && FOO+=1 git commit -m x"
+au2_pass 06.12 "FOO+=1 git commit : le détenteur" "$LA" 'FOO+=1 git commit -m x' sess-A
+au2_deny 06.F1 "[plat] FOO+=1 git commit" "$FL" 'FOO+=1 git commit -m x'
+au2_deny 06.F2 "[plat] A[0]=1 git commit" "$FL" 'A[0]=1 git commit -m x'
+au2_deny 06.F3 "[plat] cd <hors lab> && GIT_DIR+=x git commit : cible incertaine" "$FL" "cd $WORK_DIR && GIT_DIR+=x git commit -m x"
+au2_pass 06.F4 "[plat] témoin : cd <hors lab> && FOO+=1 git commit" "$FL" "cd $WORK_DIR && FOO+=1 git commit -m x"
+au2_pass 06.F5 "[plat] FOO+=1 git commit : le détenteur" "$FL" 'FOO+=1 git commit -m x' sess-A
+
+echo
+echo "=== GW-AU3 — audit de la mission q45 (tour 3, 2026-10-13) : séparateur collé à une parenthèse (AU3-01), refus grossier qui ne lit pas .git/ ni --git-dir= ni my-git (AU3-02), deux régimes ==="
+# Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 (Q5, « ferme les contournements restants … bash -c … »). Chaque cas AU3-01 était ALLOW
+# avant la correction (shlex rend `);`, `)&&`, `;(` en UN jeton absent des opérateurs), chaque cas AU3-02 « permis » était DENY ; rouge constaté avant,
+# vert après. Propriété AU3-01 : `X<sép>bash -c C` a le verdict ET le message de `X <sép> bash -c C` et de C. Labs : A (alpha indexé, tenu par autrui,
+# régime partitionné) et FL (verrou unique tenu par sess-A, régime plat).
+au3_norm() { sed -E 's/depuis [0-9]+ min/depuis N min/g'; }
+au3_same() { # <id> <description> <lab> <commande> <canonique> : refus ET message identique à celui de la forme canonique
+  local o c
+  o="$(gb "$3" "$4" sess-B | au3_norm)"; c="$(gb "$3" "$5" sess-B | au3_norm)"
+  if [[ "$o" == *"$DENY"* && "$o" == "$c" ]]; then echo "  ✅ PASS — GW-$1 — $2 : deny, même message que la forme canonique"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — GW-$1 — $2 : deny, même message que la forme canonique"; echo "     canonique: ${c:0:200}"; echo "     obtenu:    ${o:0:200}"; FAIL=$((FAIL+1)); fi
+}
+au3_deny() { assert "GW-$1 — $2 : deny" "$(gb "$3" "$4" "${5:-sess-B}")" "$DENY"; }   # <id> <description> <lab> <commande> [session]
+au3_pass() { assert_empty "GW-$1 — $2 : permis" "$(gb "$3" "$4" "${5:-sess-B}")"; }  # <id> <description> <lab> <commande> [session]
+AU3C='git commit -m x'
+AU3_FORMS=(
+  "x=\$(date); bash -c '$AU3C'"
+  "(true); bash -c '$AU3C'"
+  "(true)&&bash -c '$AU3C'"
+  "( true ); /bin/bash -c '$AU3C'"
+  "(true)|bash -c '$AU3C'"
+  "(true)||bash -c '$AU3C'"
+  "(true)&bash -c '$AU3C'"
+  "(true &); bash -c '$AU3C'"
+  "x=\$(date)&&bash -c '$AU3C'"
+  "true;(bash -c '$AU3C')"
+  "true&&(bash -c '$AU3C')"
+  "true;;bash -c '$AU3C'"
+  "(true) ; bash -c '$AU3C'"
+  "x=\$(date) ; bash -c '$AU3C'"
+)
+for regime in partitionné plat; do
+  if [ "$regime" = plat ]; then L="$FL"; r=F; else L="$LA"; r=P; fi
+  au3_i=0
+  for f in "${AU3_FORMS[@]}"; do
+    au3_i=$((au3_i+1))
+    au3_same "AU3-01.$r.$au3_i" "[$regime] $f" "$L" "$f" "$AU3C"
+  done
+  au3_i=0
+  for f in "(true); bash -c 'echo hi'" "x=\$(date)&&bash -c 'git status'" "true;(bash -c 'echo hi')"; do
+    au3_i=$((au3_i+1))
+    au3_pass "AU3-01.$r.P$au3_i" "[$regime] témoin sans geste concerné : $f" "$L" "$f"
+  done
+  au3_pass "AU3-01.$r.H1" "[$regime] (true); bash -c 'git commit' : le détenteur" "$L" "(true); bash -c '$AU3C'" sess-A
+  au3_pass "AU3-01.$r.H2" "[$regime] x=\$(date)&&bash -c 'git commit' : le détenteur" "$L" "x=\$(date)&&bash -c '$AU3C'" sess-A
+  # AU3-02 : à 4 niveaux de bash -c, git n'est un mot que s'il n'est précédé ni de . ni de - ni de _ (ni d'un alphanumérique).
+  au3_pass "AU3-02.$r.1" "[$regime] 4 niveaux autour de ls .git/hooks && echo commit" "$L" "$(nest_bashc 4 'ls .git/hooks && echo commit')"
+  au3_pass "AU3-02.$r.2" "[$regime] 4 niveaux autour de cat .git/config; grep branch x" "$L" "$(nest_bashc 4 'cat .git/config; grep branch x')"
+  au3_pass "AU3-02.$r.3" "[$regime] 4 niveaux autour de echo --git-dir=x; echo clean" "$L" "$(nest_bashc 4 'echo --git-dir=x; echo clean')"
+  au3_pass "AU3-02.$r.4" "[$regime] 4 niveaux autour de echo my-git tag" "$L" "$(nest_bashc 4 'echo my-git tag')"
+  au3_pass "AU3-02.$r.5" "[$regime] 4 niveaux autour de echo my_git reset" "$L" "$(nest_bashc 4 'echo my_git reset')"
+  au3_pass "AU3-02.$r.6" "[$regime] 5 niveaux autour de ls .git/hooks && echo commit" "$L" "$(nest_bashc 5 'ls .git/hooks && echo commit')"
+  au3_deny "AU3-02.$r.7" "[$regime] témoin : 4 niveaux autour de /usr/bin/git commit restent refusés" "$L" "$(nest_bashc 4 '/usr/bin/git commit -m x')"
+  au3_deny "AU3-02.$r.8" "[$regime] témoin : 4 niveaux autour de g''it commit restent refusés" "$L" "$(nest_bashc 4 "g''it commit -m x")"
+  au3_deny "AU3-02.$r.9" "[$regime] témoin : 4 niveaux autour de ls .git/hooks; git commit (un vrai git après un .git/)" "$L" "$(nest_bashc 4 'ls .git/hooks; git commit -m x')"
+done
+# Redirection collée : >& et &> restent UN jeton qui n'est pas un opérateur (outside_scan lit un & isolé comme un coupe-portée : le geste resterait dans le lab).
+au3_pass "AU3-01.R1" "cd <hors lab> && bash -c 'git commit' >&2 : la redirection n'est pas un coupe-portée" "$LO" "cd $WORK_DIR && bash -c 'git commit -m x' >&2"
+au3_pass "AU3-01.R2" "cd <hors lab> && bash -c 'git commit' &>/dev/null : la redirection n'est pas un coupe-portée" "$LO" "cd $WORK_DIR && bash -c 'git commit -m x' &>/dev/null"
+au3_deny "AU3-01.R3" "témoin : cd <hors lab> ; (bash -c 'git commit') : la parenthèse collée est un coupe-portée, le geste reste dans le lab" "$LO" "cd $WORK_DIR; (bash -c 'git commit -m x')"
+
+echo
+echo "=== GW-C-POS — un pathspec POSITIONNEL de commit compte comme pathspec (doute = union ; correction R-3 c) ==="
+LAB="$(mk_lab cpos)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-POS-0 — témoin : sans pathspec, la modification non indexée n'est pas embarquée : permis" "$out"
+out="$(gb "$LAB" 'git commit -m x .planning/workstreams/alpha/STATE.md' sess-B)"
+assert "GW-C-POS-1 — chemin d'alpha en position d'argument : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit -m x src/x.sh' sess-B)"
+assert "GW-C-POS-2 — autre chemin en position d'argument (doute = union) : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-C-PSB — --only, --include et --pathspec-from-file comptent comme pathspec : doute = union (réserve C3 de 57-VERIFICATION.md) ==="
+LAB="$(mk_lab cpsb)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-PSB-0 — témoin : sans option de pathspec, la modification non indexée n'est pas embarquée : stdout vide" "$out"
+out="$(gb "$LAB" 'git commit --only -m x' sess-B)"
+assert "GW-C-PSB-1 — git commit --only : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit --include -m x' sess-B)"
+assert "GW-C-PSB-2 — git commit --include : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit --pathspec-from-file=liste.txt -m x' sess-B)"
+assert "GW-C-PSB-3 — git commit --pathspec-from-file=<fichier> : deny" "$out" "$DENY"
+out="$(gb "$LAB" 'git commit --pathspec-from-file liste.txt -m x' sess-B)"
+assert "GW-C-PSB-4 — git commit --pathspec-from-file <fichier> (forme à deux jetons) : deny" "$out" "$DENY"
+
+echo
+echo "=== GW-C-INC — un chemin indexé qui est .planning/workstreams lui-même est « incertain » : refus sous tout verrou d'autrui (réserve C3) ==="
+LAB="$(mk_lab cinc)"
+git -C "$LAB" rm -r -q --cached .planning/workstreams >/dev/null 2>&1
+GIT_T -C "$LAB" commit -q -m "retire du suivi" >/dev/null 2>&1
+dl "$LAB" sess-A acquire --ws=omega --owner=m1 --step=s >/dev/null
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-INC-0 — témoin : index vide, commit sans chemin : permis" "$out"
+INC_BLOB="$(printf 'x\n' | git -C "$LAB" hash-object -w --stdin)"
+git -C "$LAB" update-index --add --cacheinfo "100644,$INC_BLOB,.planning/workstreams" >/dev/null 2>&1
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-INC-1 — .planning/workstreams indexé, omega tenu par autrui : deny" "$out" "$DENY"
+assert "GW-C-INC-2 — le refus cite le chemin incertain" "$out" ".planning/workstreams"
+out="$(gb "$LAB" 'git commit -m x' sess-A)"
+assert_empty "GW-C-INC-3 — le détenteur : stdout vide (discriminance)" "$out"
+
+echo
+echo "=== GW-C-CASE — la casse de .planning et de workstreams dans l'INDEX (comportement actuel du jugement de commit ; correction R-3 d) ==="
+LAB="$(mk_lab ccase)"
+git -C "$LAB" config core.ignorecase false   # sinon git ramène la casse du dossier sur un FS insensible à la casse
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+CASE_BLOB="$(printf 'x\n' | git -C "$LAB" hash-object -w --stdin)"
+idx_add() { git -C "$1" update-index --add --cacheinfo "100644,$CASE_BLOB,$2" >/dev/null 2>&1; }   # <lab> <chemin d'index>
+idx_add "$LAB" ".PLANNING/workstreams/omega/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert_empty "GW-C-CASE-0 — témoin : seul omega (casse différente) est indexé, alpha seul est tenu : permis" "$out"
+unstage "$LAB"
+idx_add "$LAB" ".PLANNING/workstreams/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-CASE-1 — .PLANNING/workstreams/alpha indexé : deny (casse de .planning ignorée)" "$out" "$DENY"
+unstage "$LAB"
+idx_add "$LAB" ".planning/WORKSTREAMS/alpha/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-CASE-2 — .planning/WORKSTREAMS/alpha indexé : deny (casse de workstreams ignorée)" "$out" "$DENY"
+unstage "$LAB"
+idx_add "$LAB" ".planning/workstreams/ALPHA/STATE.md"
+out="$(gb "$LAB" 'git commit -m x' sess-B)"
+assert "GW-C-CASE-3 — .planning/workstreams/ALPHA indexé : deny (nom de compartiment sans casse)" "$out" "$DENY"
+unstage "$LAB"
+
+echo
+echo "=== GW-C-GEN — une exception INATTENDUE du jugement de commit rend un refus nommé, et l'échappatoire reste honorée (correction R-3 e) ==="
+LAB="$(mk_lab cgen)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+mk_bash_sur() { # <suffixe> <session> <cwd> : un chemin à substitut isolé (\ud800), que os.fsencode ne sait pas encoder
+  python3 -c '
+import json, sys
+cmd = "git add a\ud800b && git commit -m x" + sys.argv[1]
+print(json.dumps({"tool_name": "Bash", "tool_input": {"command": cmd}, "session_id": sys.argv[2], "cwd": sys.argv[3]}))' "$1" "$2" "$3"
+}
+out="$(run_guard_in "$LAB" "$(mk_bash_sur '' sess-B "$LAB")")"
+assert "GW-C-GEN-1 — exception inattendue dans le jugement : deny" "$out" "$DENY"
+assert "GW-C-GEN-2 — le refus nomme la cause (source illisible : exception interne)" "$out" "source illisible : exception interne"
+assert "GW-C-GEN-3 — le refus nomme le verrou refusant (compartiment alpha)" "$out" "alpha"
+out="$(run_guard_in "$LAB" "$(mk_bash_sur ' # vibeflow:allow-lock-override' sess-B "$LAB")")"
+assert_empty "GW-C-GEN-4 — avec l'échappatoire, le geste passe : le refus n'est pas celui du crochet fail-closed" "$out"
+
+echo
+echo "=== GW-MARK-B — l'échappatoire Bash est évaluée APRÈS le calcul du refus, journal à côté de chaque verrou refusant ==="
+LAB="$(mk_lab markb)"
+GCB="$(fixture_common_dir "$LAB")"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+dl "$LAB" sess-A acquire --ws=omega --owner=m2 --step=s >/dev/null
+EV_A="$GCB/vf-driver/ws/alpha/DRIVER.lock.events.log"; EV_O="$GCB/vf-driver/ws/omega/DRIVER.lock.events.log"
+cnt() { if [ -f "$1" ]; then grep -c '"event": "override"' "$1" 2>/dev/null || true; else echo 0; fi; }
+a0="$(cnt "$EV_A")"; o0="$(cnt "$EV_O")"
+out="$(gb "$LAB" 'git reset --hard # vibeflow:allow-lock-override' sess-B)"
+assert_empty "GW-MARK-B-1 — marqueur dans un geste qui serait refusé : stdout vide" "$out"
+assert_exit "GW-MARK-B-2 — une ligne override à côté du verrou alpha" "$(( $(cnt "$EV_A") - a0 ))" 1
+assert_exit "GW-MARK-B-3 — une ligne override à côté du verrou omega" "$(( $(cnt "$EV_O") - o0 ))" 1
+a1="$(cnt "$EV_A")"
+out="$(gb "$LAB" 'git push # vibeflow:allow-lock-override' sess-B)"
+assert_empty "GW-MARK-B-4 — geste permis avec marqueur : stdout vide" "$out"
+assert_exit "GW-MARK-B-5 — un geste qui serait permis sort sans journal" "$(( $(cnt "$EV_A") - a1 ))" 0
+out="$(gb "$LAB" 'git reset --hard' sess-B)"
+assert "GW-MARK-B-6 — sans marqueur le même geste reste refusé (discriminance)" "$out" "$DENY"
+
+echo
+echo "=== GW-C4 — lab PARTITIONNÉ : le segment .planning se compare sans tenir compte de la casse, préfiltre C4 et cartographie (P57-D-38, correction F-1) ==="
+LAB="$(mk_lab c4case)"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-B "$LAB")")"
+assert "GW-C4-0 — témoin : .planning en minuscules sous le verrou alpha d'autrui : deny" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.PLANNING/workstreams/alpha/f" x sess-B "$LAB")")"
+assert "GW-C4-1 — .PLANNING/workstreams/alpha sous le verrou alpha d'autrui : deny (préfiltre C4)" "$out" "$DENY"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.PLANNING/workstreams/omega/f" x sess-B "$LAB")")"
+assert_empty "GW-C4-2 — .PLANNING/workstreams/omega, compartiment libre : permis (cartographie, pas un refus par défaut)" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.PLANNING/PROJECT.md" x sess-B "$LAB")")"
+assert_empty "GW-C4-3 — .PLANNING/PROJECT.md (racine) sans verrou de dépôt : permis" "$out"
+out="$(run_guard_in "$LAB" "$(mk_write "$LAB/.PLANNING/workstreams/alpha/f" x sess-A "$LAB")")"
+assert_empty "GW-C4-4 — le détenteur écrit sous .PLANNING/workstreams/alpha : permis (discriminance)" "$out"
+FLAT="$(mk_flat c4flat)"
+legacy_acquire "$FLAT" sess-A old >/dev/null
+out="$(run_guard_in "$FLAT" "$(mk_write "$FLAT/.PLANNING/STATE.md" x sess-B "$FLAT")")"
+assert_empty "GW-C4-5 — lab PLAT : .PLANNING reste hors du préfiltre C4 (comportement d'avant la phase, au bit près)" "$out"
+
+echo
+echo "=== GW-SUB — lab PARTITIONNÉ détecté depuis la racine git, plus depuis le cwd : un geste lancé d'un sous-dossier est jugé sous le verrou d'autrui (P57-D-39, correction F-2) ==="
+LAB="$(mk_lab sub)"
+mkdir -p "$LAB/plugin/sub" "$LAB/autre/.planning"
+SUBD="$LAB/plugin/sub"
+dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s >/dev/null
+out="$(run_guard_in "$SUBD" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-B "$SUBD")")"
+assert "GW-SUB-1 — Write dans alpha d'autrui depuis un sous-dossier : deny" "$out" "$DENY"
+out="$(run_guard_in "$SUBD" "$(mk_write "$LAB/.planning/workstreams/omega/f" x sess-B "$SUBD")")"
+assert_empty "GW-SUB-2 — Write dans omega (libre) depuis un sous-dossier : permis (discriminance)" "$out"
+out="$(run_guard_in "$SUBD" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-A "$SUBD")")"
+assert_empty "GW-SUB-3 — le détenteur depuis un sous-dossier : permis" "$out"
+out="$(gb "$LAB" 'git reset --hard' sess-B "$SUBD")"
+assert "GW-SUB-4 — geste d'arbre sous le verrou d'autrui depuis un sous-dossier : deny" "$out" "$DENY"
+touch_file "$LAB" "$LAB/.planning/workstreams/alpha/STATE.md"; stage "$LAB" .planning/workstreams/alpha/STATE.md
+out="$(gb "$LAB" 'git commit -m x' sess-B "$SUBD")"
+assert "GW-SUB-5 — commit qui embarque alpha, lancé d'un sous-dossier : deny (préfixe du lab = la racine, pas le sous-dossier)" "$out" "$DENY"
+unstage "$LAB"
+touch_file "$LAB" "$LAB/.planning/workstreams/omega/STATE.md"; stage "$LAB" .planning/workstreams/omega/STATE.md
+out="$(gb "$LAB" 'git commit -m x' sess-B "$SUBD")"
+assert_empty "GW-SUB-6 — commit qui n'embarque qu'omega depuis un sous-dossier : permis" "$out"
+unstage "$LAB"
+out="$(run_guard_in "$LAB/autre" "$(mk_write "$LAB/.planning/workstreams/alpha/f" x sess-B "$LAB/autre")")"
+assert_empty "GW-SUB-7 — cwd portant son PROPRE .planning (P57-D-29, hors périmètre) : jugé comme avant, permis" "$out"
+
+if [ "$GW_MODE" = full ]; then
+echo
+echo "=== GW-AB — lab PLAT : la copie gelée du guard d'avant la phase et le guard courant rendent la MÊME transcription, octet pour octet, SAUF sur la liste ÉNUMÉRÉE des formes nouvellement refusées (P57-D-03, P57-D-22 ; Q4 du 2026-10-13) ==="
+# RÈGLE DE COMPARAISON REFAITE le 2026-10-13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q4 : « étends F-3 au lab plat.
+# Refais proprement la référence de comparaison au bit près, en traçant l'ancienne et la nouvelle empreinte »), puis les 37 formes ÉPINGLÉES
+# le même jour (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, B option (b) : « Épingle les 37 formes : empreinte versionnée
+# de la transcription attendue (verdict, code de sortie, message), traçage de l'ancienne et de la nouvelle empreinte, et seen == GW_AB_ENUM_N »).
+# Ce qui a été refait est la RÈGLE de comparaison, pas la référence : la copie gelée d'avant la phase reste la référence (pas de seconde copie à
+# entretenir) et elle LAISSE PASSER les formes énumérées, elle ne peut donc pas dire ce que le guard courant doit en rendre ; cela, la
+# transcription épinglée plus bas le dit.
+#   - Empreinte de la copie gelée (git hash-object de fixtures/guard-driver-lock-pre-cff1e2a.sh) : 4d48e50c993520079052f9f2b4c5bc1a5619ba1b, inchangée
+#     (GW_AB_BLOB plus bas, GW-AB-INTEGRITE.*).
+#   - Empreinte de la transcription épinglée des 37 formes (git hash-object de fixtures/guard-ab-enum-37.txt : pour chaque identifiant de
+#     GW_AB_ENUM, les passages « tenu/<identifiant>.B » (intrus) puis « .A » (détenteur) du guard courant, code de sortie, stdout et stderr, âge
+#     normalisé) : ANCIENNE aucune (la règle ne vérifiait que la présence de « deny » sur la forme énumérée : un verdict conservé avec un message
+#     réécrit ou tronqué restait vert) ; NOUVELLE 7156daffcaec4c0b9c8039423615026e976af30e (GW_AB_PIN_BLOB, 2026-10-13). Elle change quand le verdict, le code ou le message d'une
+#     des 37 formes change ; la regénérer exige de modifier cette fixture ET cette ligne (GW_AB_PIN_DUMP=<chemin> écrit la transcription courante,
+#     jamais par défaut), donc deux fichiers que le marqueur Gate-Touche de G-2 surveille.
+#   - Le guard courant n'a AUCUNE empreinte écrite ici : elle change à chaque correction, un blob recopié dans un commentaire est faux à la correction
+#     suivante (RV3-07). La référence qui dure est la transcription épinglée ci-dessus.
+#   - Règle : la transcription du guard courant est identique à celle de la copie gelée, passage par passage, SAUF les passages
+#     « tenu/<identifiant>.B » (session non détentrice, verrou tenu) des identifiants de GW_AB_ENUM ; sur ces passages, la copie gelée LAISSE
+#     PASSER et le guard courant REFUSE (GW-AB.enum-*), et, pour CHACUN des GW_AB_ENUM_N identifiants (seen == GW_AB_ENUM_N : un payload énuméré
+#     retiré de la matrice fait rougir, F6), les passages « .B » et « .A » sont ceux de la transcription épinglée, au bit près. Aucune autre
+#     divergence n'est tolérée : ni dans un autre état de verrou (aucun, périmé, sans session_ids, sans meta), ni pour le détenteur (.A), ni sur
+#     une forme hors liste.
+#   - Écarts du lab plat HORS matrice (AU2-08), de DEUX sens, que cette comparaison ne voit pas et qui ne sont pas dans GW_AB_ENUM (l'allonger
+#     changerait l'effectif épinglé) : des refus nouveaux sous le verrou d'autrui (/usr/bin/git et guillemets au-delà de 3 niveaux de bash -c, AU2-03 ;
+#     affectations += et [i]= en préfixe, AU2-06 ; GW-AU2-*), ET un changement plus PERMISSIF, `bash -c "cd <hors lab> && git commit"` (refusé par la
+#     copie gelée, qui lit la chaîne d'un découpage grossier ; permis depuis le 2026-10-13 parce que le cd interne d'une chaîne lue sert à la décision
+#     « geste hors du lab », GW-Q45-O4). Leur preuve est GW-AU2-* et GW-Q45-*, pas GW-AB.
+# La liste est ÉPINGLÉE par son effectif (GW_AB_ENUM_N) : l'allonger pour absorber un écart exige de modifier le nombre, donc la ligne.
+GW_AB_ENUM="noarg-commit noarg-reset exec-commit env-out g2-gitdir-sp g2-worktree-sp g2-namespace-sp g2-namespace-eq g2-configenv-sp g2-configenv-eq g2-attrsrc-sp g2-attrsrc-eq g2-superprefix-eq wr-env-u wr-env-unset wr-env-iu wr-env-C wr-nice-n wr-exec-a wr-exec-c wr-sudo-u wr-xargs-n sh-bash sh-sh sh-zsh sh-bash-lc sh-nested2 sh-nested4 sh-sudo sh-envprefix ex-out-index ex-out-declare ex-out-assign ex-shell-inherit ex-out-sh ex-out-shell-env ex-out-shell-export"
+GW_AB_ENUM_N=37
+GW_AB_PIN="$HERE/fixtures/guard-ab-enum-37.txt"
+GW_AB_PIN_BLOB=7156daffcaec4c0b9c8039423615026e976af30e
+# Référence : copie gelée du guard d'avant la Phase 57 (dernier commit cff1e2af qui touchait le script), jamais
+# modifiée. Les deux copies sont posées dans un dossier jetable À CÔTÉ d'une copie de vf-portable.sh (le locator du
+# guard cherche d'abord $(dirname $0)/vf-portable.sh) : elles s'exécutent dans les mêmes conditions. Même matrice de
+# payloads jouée par chacune sur une fixture reconstruite à neuf AU MÊME CHEMIN, dans cinq états de verrou (aucun,
+# tenu, périmé, sans session_ids, sans meta), transcription (code, stdout, stderr) normalisée puis comparée par
+# `cmp -s` : une assertion de sous-chaîne ne prouve pas le bit près (piège P10). Verrous posés par la copie gelée de
+# driver-lock.sh de 57-04. Régimes : VF_DRIVER_LOCK posé, puis chemin par défaut .planning/DRIVER.lock.
+FROZEN_GUARD="$HERE/fixtures/guard-driver-lock-pre-cff1e2a.sh"
+FROZEN_DL="$HERE/fixtures/driver-lock-pre-e8771d9.sh"
+GW_AB_REF=cff1e2af
+GW_AB_PATH_IN_REF=plugin/conductor/scripts/guard-driver-lock.sh
+GWAB="$WORK_DIR/gwab"; mkdir -p "$GWAB"
+for who in frozen current; do mkdir -p "$GWAB/$who"; cp "$PORTABLE" "$GWAB/$who/vf-portable.sh"; done
+cp "$FROZEN_GUARD" "$GWAB/frozen/guard-driver-lock.sh" 2>/dev/null; cp "$GUARD" "$GWAB/current/guard-driver-lock.sh"
+
+# Matrice de payloads : une ligne « identifiant US charge-utile ». Construite UNE fois par python (jamais concaténée
+# en bash) ; le lab, l'autre dépôt et leurs chemins sont constants d'un passage à l'autre.
+cat > "$GWAB/matrix.py" <<'PYMATRIX'
+import json, sys
+lab, other = sys.argv[1], sys.argv[2]
+def bash(cmd, sid, cwd=None):
+    d = {"tool_name": "Bash", "tool_input": {"command": cmd}, "cwd": cwd or lab}
+    if sid is not None:
+        d["session_id"] = sid
+    return d
+def write(fp, content, sid, tool="Write"):
+    ti = {"file_path": fp, "content": content} if tool == "Write" else {"file_path": fp, "old_string": "a", "new_string": content}
+    return {"tool_name": tool, "tool_input": ti, "session_id": sid, "cwd": lab}
+def nest(n, c):  # n niveaux de bash -c, guillemetage produit par shlex.quote (jamais a la main)
+    import shlex
+    for _ in range(n):
+        c = "bash -c " + shlex.quote(c)
+    return c
+out = []
+for sid in ("sess-B", "sess-A"):
+    s = sid[-1]
+    out += [
+        ("commit." + s, bash("git commit -m x", sid)),
+        ("commit-am." + s, bash("git commit -am x", sid)),
+        ("amend." + s, bash("git commit --amend --no-edit", sid)),
+        ("checkout." + s, bash("git checkout -b x", sid)),
+        ("switch." + s, bash("git switch main", sid)),
+        ("reset." + s, bash("git reset --hard", sid)),
+        ("push." + s, bash("git push", sid)),
+        ("tag." + s, bash("git tag v1", sid)),
+        ("gh-pr." + s, bash("gh pr create", sid)),
+        ("wt-add." + s, bash("git worktree add ../w -b w", sid)),
+        ("wt-remove." + s, bash("git worktree remove ../w", sid)),
+        ("rebase." + s, bash("git rebase main", sid)),
+        ("rebase-abort." + s, bash("git rebase --abort", sid)),
+        ("cd-other." + s, bash("cd " + other + " && git commit -m x", sid)),
+        ("gitC-other." + s, bash("git -C " + other + " commit -m x", sid)),
+        ("popd." + s, bash("popd && git commit -m x", sid)),
+        # Formes que le lab plat lisait autrement avant le 2026-10-13 (F-3, R-5 et contournements de Q5) : voir la liste
+        # ENUMEREE GW_AB_ENUM plus bas ; les autres restent identiques a la copie gelee (GW-AB.*).
+        ("noarg-commit." + s, bash("git --no-pager commit -am x", sid)),
+        ("noarg-reset." + s, bash("git -p reset --hard", sid)),
+        ("exec-commit." + s, bash("exec git commit -am x", sid)),
+        ("env-dir." + s, bash("GIT_DIR=.git git commit -m x", sid)),
+        ("env-index." + s, bash("GIT_INDEX_FILE=.git/index git commit -m x", sid)),
+        ("env-wt." + s, bash("GIT_WORK_TREE=. git commit -m x", sid)),
+        ("env-out." + s, bash("cd " + other + " && GIT_DIR=.git git commit -m x", sid)),
+        ("chain." + s, bash("echo a; git add -A && git commit -m x", sid)),
+        ("heredoc." + s, bash("cat > f <<EOF\nx\nEOF\ngit commit -m x", sid)),
+        ("ls." + s, bash("ls -la", sid)),
+        # Arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 (Q4, Q5) : globaux git a argument, wrappers a
+        # option-argument, bash -c, affectation GIT_* d un autre segment. Les formes dont le verdict change en lab plat
+        # sont dans GW_AB_ENUM ; les autres sont des TEMOINS (formes voisines, reconnues ou non, qui ne bougent pas).
+        ("g2-gitdir-sp." + s, bash("git --git-dir .git commit -m x", sid)),
+        ("g2-gitdir-eq." + s, bash("git --git-dir=.git commit -m x", sid)),
+        ("g2-worktree-sp." + s, bash("git --work-tree . commit -m x", sid)),
+        ("g2-namespace-sp." + s, bash("git --namespace ns commit -m x", sid)),
+        ("g2-namespace-eq." + s, bash("git --namespace=ns commit -m x", sid)),
+        ("g2-configenv-sp." + s, bash("git --config-env a.b=HOME commit -m x", sid)),
+        ("g2-configenv-eq." + s, bash("git --config-env=a.b=HOME commit -m x", sid)),
+        ("g2-attrsrc-sp." + s, bash("git --attr-source HEAD commit -m x", sid)),
+        ("g2-attrsrc-eq." + s, bash("git --attr-source=HEAD commit -m x", sid)),
+        ("g2-superprefix-eq." + s, bash("git --super-prefix=x commit -m x", sid)),
+        ("g2-superprefix-sp." + s, bash("git --super-prefix commit -m x", sid)),
+        ("g2-c." + s, bash("git -c a.b=c commit -m x", sid)),
+        ("g2-C." + s, bash("git -C . commit -m x", sid)),
+        ("g2-execpath." + s, bash("git --exec-path x commit -m x", sid)),
+        ("wr-env-u." + s, bash("env -u FOO git commit -m x", sid)),
+        ("wr-env-unset." + s, bash("env --unset FOO git commit -m x", sid)),
+        ("wr-env-iu." + s, bash("env -iu FOO git commit -m x", sid)),
+        ("wr-env-C." + s, bash("env -C . git commit -m x", sid)),
+        ("wr-env-i." + s, bash("env -i git commit -m x", sid)),
+        ("wr-nice-n." + s, bash("nice -n 5 git commit -m x", sid)),
+        ("wr-nice-N." + s, bash("nice -5 git commit -m x", sid)),
+        ("wr-exec-a." + s, bash("exec -a nm git commit -m x", sid)),
+        ("wr-exec-c." + s, bash("exec -c git commit -m x", sid)),
+        ("wr-sudo-u." + s, bash("sudo -u root git commit -m x", sid)),
+        ("wr-xargs-n." + s, bash("xargs -n 1 git commit -m x", sid)),
+        ("wr-command." + s, bash("command git commit -m x", sid)),
+        ("wr-nohup." + s, bash("nohup git commit -m x", sid)),
+        ("wr-time." + s, bash("time git commit -m x", sid)),
+        ("wr-timeout." + s, bash("timeout 5 git commit -m x", sid)),
+        ("wr-env-S." + s, bash("env -S 'git commit -m x'", sid)),
+        ("sh-bash." + s, bash("bash -c \"git commit -m x\"", sid)),
+        ("sh-sh." + s, bash("sh -c 'git commit -m x'", sid)),
+        ("sh-zsh." + s, bash("zsh -c \"git commit -m x\"", sid)),
+        ("sh-bash-lc." + s, bash("bash -lc \"git commit -m x\"", sid)),
+        ("sh-bash-add." + s, bash("bash -c \"git add -A && git commit -m x\"", sid)),
+        ("sh-nested2." + s, bash("bash -c \"bash -c \\\"git commit -m x\\\"\"", sid)),
+        ("sh-nested4." + s, bash(nest(4, "git commit -m x"), sid)),
+        ("sh-nested4-nogit." + s, bash(nest(4, "echo hi"), sid)),
+        ("sh-sudo." + s, bash("sudo bash -c \"git commit -m x\"", sid)),
+        ("sh-envprefix." + s, bash("GIT_DIR=.git bash -c \"git commit -m x\"", sid)),
+        ("sh-cd-other." + s, bash("cd " + other + " && bash -c \"git commit -m x\"", sid)),
+        ("sh-nogesture." + s, bash("bash -c \"git status\"", sid)),
+        ("sh-script." + s, bash("bash release.sh", sid)),
+        ("sh-eval." + s, bash("eval \"git commit -m x\"", sid)),
+        ("ex-index." + s, bash("export GIT_INDEX_FILE=/tmp/x; git commit -m x", sid)),
+        ("ex-out-index." + s, bash("cd " + other + " && export GIT_INDEX_FILE=/tmp/x && git commit -m x", sid)),
+        ("ex-out-declare." + s, bash("cd " + other + " && declare -x GIT_DIR=/tmp/x && git commit -m x", sid)),
+        ("ex-out-assign." + s, bash("cd " + other + " && GIT_DIR=/tmp/x && git commit -m x", sid)),
+        ("ex-out-plain." + s, bash("cd " + other + " && export FOO=1 && git commit -m x", sid)),
+        ("ex-shell-inherit." + s, bash("export GIT_DIR=/tmp/x; bash -c \"git commit -m x\"", sid)),
+        ("ex-out-shell-env." + s, bash("cd " + other + " && GIT_DIR=/tmp/x bash -c \"git commit -m x\"", sid)),
+        ("ex-out-shell-export." + s, bash("cd " + other + " && export GIT_DIR=/tmp/x && bash -c \"git commit -m x\"", sid)),
+        ("ex-out-wr." + s, bash("cd " + other + " && env -u FOO git commit -m x", sid)),
+        ("ex-out-sh." + s, bash("cd " + other + " && env -C . git commit -m x", sid)),
+        ("marker-commit." + s, bash("git commit -m x # vibeflow:allow-lock-override", sid)),
+        ("w-planning." + s, write(lab + "/.planning/STATE.md", "x", sid)),
+        ("w-planning-rel." + s, write(".planning/STATE.md", "x", sid)),
+        ("w-planning-ws." + s, write(lab + "/.planning/workstreams/alpha/STATE.md", "x", sid)),
+        ("e-planning." + s, write(lab + "/.planning/STATE.md", "y", sid, "Edit")),
+        ("w-marker." + s, write(lab + "/.planning/STATE.md", "x vibeflow:allow-lock-override", sid)),
+        ("w-outside." + s, write(lab + "/src/x.sh", "x", sid)),
+        ("w-other-planning." + s, write(other + "/.planning/STATE.md", "x", sid)),
+        ("w-nul." + s, write(lab + "/.planning/STATE.md\x00x", "x", sid)),
+        ("w-nofp." + s, {"tool_name": "Write", "tool_input": {"content": "x"}, "session_id": sid, "cwd": lab}),
+        ("read-tool." + s, {"tool_name": "Read", "tool_input": {"file_path": lab + "/.planning/STATE.md"}, "session_id": sid, "cwd": lab}),
+        ("bash-empty." + s, bash("", sid)),
+        ("ti-nondict." + s, {"tool_name": "Bash", "tool_input": "git commit", "session_id": sid, "cwd": lab}),
+    ]
+out += [
+    ("commit.nosid", bash("git commit -m x", None)),
+    ("w-planning.nosid", {"tool_name": "Write", "tool_input": {"file_path": lab + "/.planning/STATE.md", "content": "x"}, "cwd": lab}),
+    ("commit.nocwd", {"tool_name": "Bash", "tool_input": {"command": "git commit -m x"}, "session_id": "sess-B"}),
+    ("notool", {"session_id": "sess-B", "cwd": lab, "tool_input": {"command": "git commit -m x"}}),
+]
+raw = [("unparse", "ceci n est pas du json mais ca contient le mot commit"), ("nonobj-array", "[\"commit\"]"),
+       ("nonobj-null", "null"), ("nonobj-str", "\"git commit\""), ("empty", "")]
+with open(sys.argv[3], "w", encoding="utf-8") as f:
+    for k, v in out:
+        f.write(k + "\x1f" + json.dumps(v, ensure_ascii=True) + "\n")
+    for k, v in raw:
+        f.write(k + "\x1f" + v + "\n")
+PYMATRIX
+python3 "$GWAB/matrix.py" "$GWAB/lab" "$GWAB/other" "$GWAB/matrix.txt"
+[ -s "$GWAB/matrix.txt" ]; assert_exit "GW-AB.matrice — $(wc -l < "$GWAB/matrix.txt" | tr -d ' ') payloads construits" "$?" 0
+
+# Normalisation : l'âge « depuis N min » du motif de refus (varie d'une minute à l'autre entre deux passages).
+gw_ab_norm() { sed -E -e 's/depuis [0-9]+ min/depuis N min/g'; }
+
+# gw_ab_pass <guard> <VF_DRIVER_LOCK ou vide> <fichier de transcription normalisée>
+gw_ab_pass() {
+  local g="$1" lockv="$2" out="$3" lab="$GWAB/lab" other="$GWAB/other" raw="$GWAB/raw" lockpath m
+  local mx="${GW_AB_MATRIX:-$GWAB/matrix.txt}" states=" ${GW_AB_STATES:-aucun tenu perime sans-session-ids sans-meta} "
+  rm -rf "$lab" "$other"; mkdir -p "$lab/.planning" "$other/.planning"
+  printf '# projet\n' > "$lab/.planning/PROJECT.md"
+  printf -- '---\nstatus: active\n---\n' > "$lab/.planning/STATE.md"
+  git -C "$lab" init -q -b main >/dev/null 2>&1 || git -C "$lab" init -q >/dev/null 2>&1
+  git -C "$lab" add -A >/dev/null 2>&1
+  git -C "$lab" -c user.email=t@t -c user.name=t -c commit.gpgsign=false commit -q -m init >/dev/null 2>&1
+  lab_preflight "$lab"
+  lockpath="${lockv:-.planning/DRIVER.lock}"
+  m="$lab/$lockpath/meta"
+  : > "$raw"
+  gw_ab_play() { # <état>
+    local id payload rc
+    while IFS=$'\x1f' read -r id payload; do
+      ( cd "$lab" && if [ -n "$lockv" ]; then export VF_DRIVER_LOCK="$lockv"; fi; printf '%s' "$payload" | "$BASH_BIN" "$g" ) >"$GWAB/so" 2>"$GWAB/se"; rc=$?
+      { echo "### $1/$id rc=$rc"; echo "--- stdout"; cat "$GWAB/so"; echo "--- stderr"; cat "$GWAB/se"; } >> "$raw"
+    done < "$mx"
+  }
+  gw_ab_dl() { ( cd "$lab" && export CLAUDE_CODE_SESSION_ID=sess-A && if [ -n "$lockv" ]; then export VF_DRIVER_LOCK="$lockv"; fi; "$FROZEN_DL" "$@" ) >/dev/null 2>&1; }
+  case "$states" in *" aucun "*) gw_ab_play aucun ;; esac
+  gw_ab_dl acquire --owner=m1 --step=s1
+  [ -f "$m" ] || echo "### FIXTURE CASSÉE : le verrou n'a pas été posé" >> "$raw"
+  case "$states" in *" tenu "*) gw_ab_play tenu ;; esac
+  sed 's/^heartbeat_epoch=.*/heartbeat_epoch=1000/' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+  case "$states" in *" perime "*) gw_ab_play perime ;; esac
+  sed -e "s/^heartbeat_epoch=.*/heartbeat_epoch=$(date +%s)/" -e '/^session_ids=/d' "$m" > "$m.tmp" && mv "$m.tmp" "$m"
+  case "$states" in *" sans-session-ids "*) gw_ab_play sans-session-ids ;; esac
+  rm -f "$m"
+  case "$states" in *" sans-meta "*) gw_ab_play sans-meta ;; esac
+  gw_ab_norm < "$raw" > "$out"
+}
+
+gw_ab_stdout() { # <transcription> <état/identifiant> : le bloc stdout d'un passage
+  awk -v want="### $2 " 'index($0, want)==1 {on=1; next} /^### /{on=0} on && /^--- stdout$/{o=1; next} on && /^--- stderr$/{o=0} on && o {print}' "$1"
+}
+
+gw_ab_first_divergence() { # <A> <B> : première ligne divergente (awk : jamais `diff`, qui ne sert pas à comparer des ensembles ici)
+  awk 'NR==FNR{a[FNR]=$0; na=FNR; next} {nb=FNR; if(!(FNR in a) || a[FNR]!=$0){print "ligne " FNR " : A=[" a[FNR] "] B=[" $0 "]"; found=1; exit}} END{if(!found && na!=nb) print "longueurs différentes : A=" na " B=" nb}' "$1" "$2"
+}
+
+# gw_ab_strip <transcription> : la transcription SANS les passages « tenu/<identifiant>.B » de la liste énumérée. awk : un bloc
+# commence à « ### » et dure jusqu au « ### » suivant.
+gw_ab_strip() {
+  awk -v ids="$GW_AB_ENUM" 'BEGIN{n=split(ids,a," "); for(i=1;i<=n;i++) skip["tenu/" a[i] ".B"]=1}
+       /^### /{split($2,h," "); on=!($2 in skip)} on{print}' "$1"
+}
+# gw_ab_blocks <transcription> <identifiants...> : pour chaque identifiant, dans l'ordre donné, les passages « tenu/<id>.B » puis « tenu/<id>.A »
+# tels quels (en-tête avec le code de sortie, stdout, stderr). Même extraction pour la fixture épinglée et pour une transcription.
+gw_ab_blocks() {
+  local f="$1" id side; shift
+  for id in "$@"; do
+    for side in B A; do   # l'ordre est celui de la liste puis B avant A, quel que soit l'ordre des passages dans la transcription
+      awk -v h="### tenu/$id.$side " 'index($0,h)==1 {on=1; print; next} /^### /{on=0} on{print}' "$f"
+    done
+  done
+}
+# gw_ab_check <transcription gelée> <transcription courante> [N | noenum] : rend 0 si la règle tient, sinon 1 et écrit GW_AB_WHY.
+#   (1) hors passages énumérés, les deux transcriptions sont identiques au bit près (cmp -s) ;
+#   (2) chaque passage énuméré PRÉSENT dans la transcription : stdout vide côté gelé (laisse passer), refus côté courant ;
+#   (3) seen == N (défaut GW_AB_ENUM_N : un payload énuméré retiré de la matrice fait rougir) et seen > 0 ; `noenum` : sous-matrice sans forme
+#       énumérée, ni le vert à vide ni l'effectif ne s'appliquent ; N : effectif d'une sous-matrice de mutant ;
+#   (4) les passages « .B » et « .A » de chaque forme énumérée présente sont ceux de la transcription épinglée GW_AB_PIN, au bit près.
+GW_AB_WHY=""
+gw_ab_check() {
+  local fz="$1" cu="$2" want="${3:-$GW_AB_ENUM_N}" id seen=0 present=""
+  gw_ab_strip "$fz" > "$GWAB/strip-fz.txt"; gw_ab_strip "$cu" > "$GWAB/strip-cu.txt"
+  if ! cmp -s "$GWAB/strip-fz.txt" "$GWAB/strip-cu.txt"; then
+    GW_AB_WHY="divergence HORS liste énumérée : $(gw_ab_first_divergence "$GWAB/strip-fz.txt" "$GWAB/strip-cu.txt")"; return 1
+  fi
+  for id in $GW_AB_ENUM; do
+    grep -q "^### tenu/$id.B rc=" "$cu" || continue
+    seen=$((seen+1)); present="$present $id"
+    if [ -n "$(gw_ab_stdout "$fz" "tenu/$id.B")" ]; then GW_AB_WHY="$id : la copie gelée REFUSE déjà (la forme n est pas nouvelle, la liste est fausse)"; return 1; fi
+    if ! gw_ab_stdout "$cu" "tenu/$id.B" | grep -q '"permissionDecision": "deny"'; then GW_AB_WHY="$id : le guard courant ne refuse pas cette forme énumérée"; return 1; fi
+  done
+  if [ "$want" != noenum ]; then
+    [ "$seen" -gt 0 ] || { GW_AB_WHY="aucun passage énuméré dans la transcription (vert à vide)"; return 1; }
+    [ "$seen" = "$want" ] || { GW_AB_WHY="$seen passages énumérés dans la transcription, $want attendus (un payload énuméré a quitté la matrice, ou la liste a bougé)"; return 1; }
+  fi
+  if [ -n "$present" ]; then
+    [ -f "$GW_AB_PIN" ] || { GW_AB_WHY="transcription épinglée absente : $GW_AB_PIN"; return 1; }
+    gw_ab_blocks "$GW_AB_PIN" $present > "$GWAB/pin-ref.txt"; gw_ab_blocks "$cu" $present > "$GWAB/pin-cu.txt"
+    if ! cmp -s "$GWAB/pin-ref.txt" "$GWAB/pin-cu.txt"; then
+      GW_AB_WHY="une forme énumérée s écarte de la transcription épinglée (verdict, code ou message) : $(gw_ab_first_divergence "$GWAB/pin-ref.txt" "$GWAB/pin-cu.txt" | cut -c1-360)"; return 1
+    fi
+  fi
+  GW_AB_WHY="$seen formes énumérées refusées et conformes à la transcription épinglée, le reste identique"; return 0
+}
+
+gw_ab_ok=1
+GW_AB_N=$(printf '%s\n' $GW_AB_ENUM | wc -l | tr -d ' ')
+[ "$GW_AB_N" = "$GW_AB_ENUM_N" ]; assert_exit "GW-AB.enum-effectif — la liste énumérée porte exactement $GW_AB_ENUM_N formes (obtenu $GW_AB_N)" "$?" 0
+[ "$(printf '%s\n' $GW_AB_ENUM | sort | uniq -d | wc -l | tr -d ' ')" = 0 ]; assert_exit "GW-AB.enum-unique — aucun identifiant en double dans la liste énumérée" "$?" 0
+if [ -f "$FROZEN_GUARD" ]; then
+  for mode in "VF_DRIVER_LOCK posé:.planning/alt/DRIVER.lock" "chemin par défaut:"; do
+    label="${mode%%:*}"; lockv="${mode#*:}"
+    gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "$lockv" "$GWAB/ab-frozen.txt"
+    gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "$lockv" "$GWAB/ab-current.txt"
+    [ -z "${GW_AB_PIN_DUMP:-}" ] || gw_ab_blocks "$GWAB/ab-current.txt" $GW_AB_ENUM > "$GW_AB_PIN_DUMP.$([ -n "$lockv" ] && echo pose || echo defaut)"
+    if [ -s "$GWAB/ab-frozen.txt" ] && ! grep -q 'FIXTURE CASSÉE' "$GWAB/ab-frozen.txt" \
+       && gw_ab_stdout "$GWAB/ab-frozen.txt" tenu/commit.B | grep -q '"permissionDecision": "deny"' \
+       && gw_ab_stdout "$GWAB/ab-frozen.txt" tenu/w-planning.B | grep -q '"permissionDecision": "deny"' \
+       && [ -z "$(gw_ab_stdout "$GWAB/ab-frozen.txt" tenu/commit.A)" ] \
+       && [ -z "$(gw_ab_stdout "$GWAB/ab-frozen.txt" perime/commit.B)" ] \
+       && grep -q '^### tenu/w-nul.B rc=' "$GWAB/ab-frozen.txt"; then
+      assert_exit "GW-AB.témoin — la transcription de référence ($label) contient un refus sous verrou tenu, le détenteur et le verrou périmé laissés passer" 0 0
+    else
+      assert_exit "GW-AB.témoin — la transcription de référence ($label) est vide ou incomplète" 1 0
+    fi
+    [ "$(grep -c '^### ' "$GWAB/ab-frozen.txt")" = "$(grep -c '^### ' "$GWAB/ab-current.txt")" ]; assert_exit "GW-AB.$label — même nombre de passages ($(grep -c '^### ' "$GWAB/ab-frozen.txt"))" "$?" 0
+    if gw_ab_check "$GWAB/ab-frozen.txt" "$GWAB/ab-current.txt"; then
+      assert_exit "GW-AB.$label — copie gelée et guard courant : transcriptions identiques hors liste énumérée ($GW_AB_WHY)" 0 0
+    else
+      assert_exit "GW-AB.$label — transcriptions DIFFÉRENTES hors règle" 1 0
+      echo "     $GW_AB_WHY"
+      gw_ab_ok=0
+    fi
+    cp "$GWAB/ab-frozen.txt" "$GWAB/ab-frozen-$([ -n "$lockv" ] && echo posé || echo défaut).txt"
+  done
+else
+  assert_exit "GW-AB — la copie gelée $FROZEN_GUARD est absente" 1 0
+  gw_ab_ok=0
+fi
+if [ -n "${GW_AB_PIN_DUMP:-}" ]; then echo "  transcription courante écrite dans $GW_AB_PIN_DUMP.pose et $GW_AB_PIN_DUMP.defaut : arrêt, rien de ce qui précède n'a valeur de verdict"; exit 0; fi
+if [ "$gw_ab_ok" = 1 ]; then echo "  A/B guard lab plat : IDENTIQUE hors liste énumérée ($GW_AB_ENUM_N formes)"; else echo "  A/B guard lab plat : DIFFÉRENT"; fi
+
+# GW-AB-MUT (réserve S1 de la revue Phase 57, refaite le 2026-10-13 avec la règle énumérée) : la règle de comparaison doit
+# POUVOIR rougir. Chaque mutant est une copie du guard courant ; sa transcription est comparée à celle de la copie gelée par
+# gw_ab_check, sur une sous-matrice (états « tenu » seul, identifiants nommés .A et .B) : la règle doit ÉCHOUER.
+#   - famille « énumérée » : le mutant retire la lecture d une forme énumérée (le guard courant ne la refuse plus) ;
+#   - famille « hors liste » (iii) : le mutant change le comportement du lab plat sur une forme NON énumérée (la copie gelée
+#     la lisait autrement) -> divergence hors liste.
+gw_ab_mut() { # <id> <identifiants de la sous-matrice, séparés par des espaces> <ancre BRE> <expression sed s> <famille: enum|hors-liste>
+  local id="$1" ids="$2" anchor="$3" expr="$4" fam="$5" d="$GWAB/abmut-$1" n sub saved_enum
+  mkdir -p "$d"; cp "$PORTABLE" "$d/vf-portable.sh"; cp "$GWAB/current/guard-driver-lock.sh" "$d/guard-driver-lock.sh"
+  n="$(grep -c -e "$anchor" "$d/guard-driver-lock.sh")"
+  if [ "$n" != "1" ]; then assert_exit "GW-AB-MUT-$id — ancre non unique ($n occurrences de [$anchor])" 1 0; return; fi
+  sed -i.bak -e "/$anchor/$expr" "$d/guard-driver-lock.sh"; rm -f "$d/guard-driver-lock.sh.bak"
+  if cmp -s "$d/guard-driver-lock.sh" "$GWAB/current/guard-driver-lock.sh"; then assert_exit "GW-AB-MUT-$id — mutant NON OPPOSABLE : la substitution n'a rien changé" 1 0; return; fi
+  if ! bash -n "$d/guard-driver-lock.sh" 2>/dev/null; then assert_exit "GW-AB-MUT-$id — le mutant n'est pas un script valide (il rougirait pour la mauvaise raison)" 1 0; return; fi
+  sub="$d/matrix-sub.txt"; : > "$sub"
+  for one in $ids; do grep -F "$(printf '%s.A\037' "$one")" "$GWAB/matrix.txt" >> "$sub"; grep -F "$(printf '%s.B\037' "$one")" "$GWAB/matrix.txt" >> "$sub"; done
+  [ -s "$sub" ] || { assert_exit "GW-AB-MUT-$id — sous-matrice vide (identifiants inconnus : $ids)" 1 0; return; }
+  GW_AB_MATRIX="$sub" GW_AB_STATES="tenu" gw_ab_pass "$d/guard-driver-lock.sh" "" "$d/ab.txt"
+  GW_AB_MATRIX="$sub" GW_AB_STATES="tenu" gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "" "$d/ab-frozen.txt"
+  # Témoin de la sous-matrice : le guard NON muté la satisfait (sinon le mutant rougirait pour la mauvaise raison).
+  local need=noenum one nn=0
+  if [ "$fam" = enum ]; then for one in $ids; do case " $GW_AB_ENUM " in *" $one "*) nn=$((nn+1)) ;; esac; done; need="$nn"; fi
+  GW_AB_MATRIX="$sub" GW_AB_STATES="tenu" gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "" "$d/ab-ok.txt"
+  gw_ab_check "$d/ab-frozen.txt" "$d/ab-ok.txt" "$need"; assert_exit "GW-AB-MUT-$id.0 — témoin : le guard non muté satisfait la règle sur la sous-matrice ($GW_AB_WHY)" "$?" 0
+  if [ -s "$d/ab.txt" ] && ! gw_ab_check "$d/ab-frozen.txt" "$d/ab.txt" "$need"; then
+    assert_exit "GW-AB-MUT-$id — mutant tué : la règle de comparaison ROUGIT ($GW_AB_WHY)" 0 0
+  else
+    assert_exit "GW-AB-MUT-$id — la règle de comparaison reste VERTE sous ce mutant ($GW_AB_WHY)" 1 0
+  fi
+}
+if [ -f "$FROZEN_GUARD" ]; then
+  # famille énumérée : un mutant par comportement neuf du lab plat
+  gw_ab_mut noarg "noarg-commit noarg-reset" 'elif t in NOARG_GIT_GLOBALS:' 's@elif t in NOARG_GIT_GLOBALS:@elif False:@' enum
+  gw_ab_mut exec "exec-commit wr-exec-a wr-exec-c" 'or os.path.basename(t) == "exec":' 's@ or os.path.basename(t) == "exec":@:@' enum
+  gw_ab_mut env-out "env-out ex-out-sh" 'if persist or env_target_uncertain(seg\[:idx\]):' 's@if persist or env_target_uncertain(seg\[:idx\]):@if persist:@' enum
+  gw_ab_mut persist-out "ex-out-index ex-out-declare ex-out-assign" 'if persist or env_target_uncertain(seg\[:idx\]):' 's@if persist or env_target_uncertain@if env_target_uncertain@' enum
+  gw_ab_mut persist "ex-out-index ex-out-declare ex-out-assign" 'ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]' 's@ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]@ts = []@' enum
+  gw_ab_mut argglobals "g2-gitdir-sp g2-worktree-sp g2-namespace-sp g2-configenv-sp g2-attrsrc-sp" '^GIT_ARG_GLOBALS = {' 's@^GIT_ARG_GLOBALS = {@GIT_ARG_GLOBALS = set(); GIT_ARG_UNUSED = {@' enum
+  gw_ab_mut eqglobals "g2-namespace-eq g2-configenv-eq g2-attrsrc-eq g2-superprefix-eq" 'elif t.startswith(GIT_EQ_GLOBALS):' 's@elif t.startswith(GIT_EQ_GLOBALS):@elif t.startswith(("--git-dir=", "--work-tree=", "--exec-path=")):@' enum
+  gw_ab_mut wrapperopts "wr-env-u wr-env-unset wr-env-iu wr-nice-n wr-sudo-u wr-xargs-n wr-exec-a" '^WRAPPER_ARG_OPTS = {' 's@^WRAPPER_ARG_OPTS = {@WRAPPER_ARG_OPTS = {}; WAO_UNUSED = {@' enum
+  gw_ab_mut env-chdir "wr-env-C ex-out-sh" 'if b == "env" and any(' 's@if b == "env" and any(@if False and any(@' enum
+  gw_ab_mut shells "sh-bash sh-sh sh-zsh sh-bash-lc sh-nested2 sh-sudo" '^SHELLS = {' 's@^SHELLS = {@SHELLS = set(); SH_UNUSED = {@' enum
+  gw_ab_mut coarse "sh-nested4" '^    return m is not None and COARSE_VERB_RE' 's@return m is not None and@return None and@' enum
+  gw_ab_mut inherit "ex-out-shell-env ex-out-shell-export" 'inn, cnt = outside_scan(c, root, base, depth + 1, persist or env_target_uncertain(seg\[:idx\]))' 's@depth + 1, persist or env_target_uncertain(seg\[:idx\]))@depth + 1, False)@' enum
+  # (i) un message de refus modifié sur UNE forme énumérée (git --no-pager) : le verdict reste deny, seule la transcription épinglée le voit
+  gw_ab_mut msg "noarg-commit exec-commit" '^owner = meta.get("owner", "?")$' 's@^owner = \(.*\)$@owner = \1 + ("!" if "--no-pager" in cmd else "")@' enum
+  # témoin de (i) : l'ANCIENNE règle (présence de deny sur la forme énumérée, rien d'autre) reste VERTE sous ce mutant, c'est le rouge constaté avant l'épingle
+  gw_ab_deny_only() { # <transcription courante> <identifiants...>
+    local f="$1" one; shift
+    for one in "$@"; do gw_ab_stdout "$f" "tenu/$one.B" | grep -q '"permissionDecision": "deny"' || return 1; done
+  }
+  gw_ab_deny_only "$GWAB/abmut-msg/ab.txt" noarg-commit exec-commit; assert_exit "GW-AB-MUT-msg.1 — l'ancienne règle (présence de deny seule) reste VERTE sous ce mutant : le message modifié lui échappait" "$?" 0
+  # famille hors liste (iii) : changements du lab plat sur des formes que la copie gelée lisait autrement et que la liste ne contient pas
+  gw_ab_mut hl-worktree-add "wt-add" 'continue  # exemption nomm.*e : porte de sortie prescrite' 's@continue  # exemption nomm.*$@return True@' hors-liste
+  gw_ab_mut hl-nohup "wr-nohup" '^WRAPPERS = ' 's@"nohup", @@' hors-liste
+  gw_ab_mut hl-tag "tag" '^MUTATING_GIT_VERBS = ' 's@, "tag"@@' hors-liste
+  gw_ab_mut hl-superprefix-sp "g2-superprefix-sp" '"--no-lazy-fetch", "--no-advice", "--bare"}' 's@"--bare"}@"--bare", "--super-prefix"}@' hors-liste
+  gw_ab_mut hl-export-plain "ex-out-plain" 'ts\[1:\]' 's@return any(ENV_TARGET_RE.match(t) for t in ts\[1:\])@return True@' hors-liste
+  gw_ab_mut hl-shell-outside "sh-cd-other" '^                    if inn:$' 's@if inn:@if True:@' hors-liste
+fi
+
+# Intégrité de la copie gelée (T-57-40, correction R-7). Empreinte ÉPINGLÉE dans la suite : le blob git de
+# `git rev-parse $GW_AB_REF:$GW_AB_PATH_IN_REF`, dérivé de l'objet de référence puis gelé ici. Elle se vérifie SANS
+# historique : un clone superficiel (le job `tests` de la CI fait un `actions/checkout` sans `fetch-depth`) ne
+# l'ignore plus. Quand l'objet est présent, la copie est en plus comparée au blob du dépôt et l'épingle à la
+# référence : un gel dérivé de la référence, jamais d'un vert muet.
+GW_AB_BLOB=4d48e50c993520079052f9f2b4c5bc1a5619ba1b
+gw_ab_pin_ok() { # <fichier> <blob attendu>
+  [ "$(git hash-object --no-filters "$1" 2>/dev/null)" = "$2" ]
+}
+gw_ab_pin_ok "$FROZEN_GUARD" "$GW_AB_BLOB"; assert_exit "GW-AB-INTEGRITE.0 — la copie gelée porte l'empreinte épinglée (blob $GW_AB_BLOB), historique présent ou non" "$?" 0
+cp "$FROZEN_GUARD" "$GWAB/alteree.sh"; printf '#' >> "$GWAB/alteree.sh"
+gw_ab_pin_ok "$GWAB/alteree.sh" "$GW_AB_BLOB"; assert_exit "GW-AB-INTEGRITE.0b — témoin négatif : la même copie altérée d'un octet est REJETÉE par la vérification" "$?" 1
+if git -C "$HERE" cat-file -e "$GW_AB_REF:$GW_AB_PATH_IN_REF" 2>/dev/null; then
+  git -C "$HERE" show "$GW_AB_REF:$GW_AB_PATH_IN_REF" > "$GWAB/ref.sh" 2>/dev/null
+  cmp -s "$FROZEN_GUARD" "$GWAB/ref.sh"; assert_exit "GW-AB-INTEGRITE.1 — la copie gelée est identique à git show $GW_AB_REF:$GW_AB_PATH_IN_REF" "$?" 0
+  assert "GW-AB-INTEGRITE.3 — l'empreinte épinglée est celle de la référence (git rev-parse $GW_AB_REF:$GW_AB_PATH_IN_REF)" "$(git -C "$HERE" rev-parse "$GW_AB_REF:$GW_AB_PATH_IN_REF" 2>/dev/null)" "$GW_AB_BLOB"
+else
+  echo "  NOTE-INTEGRITE (objet absent) — $GW_AB_REF non disponible localement (clone superficiel) : comparaison à la référence non faite ici, l'empreinte épinglée est contrôlée par GW-AB-INTEGRITE.0"
+fi
+
+# (ii) F6 : un payload énuméré retiré de la matrice. Sous-matrice des seules formes énumérées (tenu, .B et .A) ; témoin : entière, la règle tient
+# (GW_AB_ENUM_N passages) ; amputée d'un identifiant, le guard est inchangé et la règle ROUGIT (un de moins qu'attendu), alors que la copie
+# gelée et le guard courant restent identiques hors liste : avant seen == GW_AB_ENUM_N, un payload retiré ne rougissait que si TOUS l'étaient.
+gw_ab_mut_amputee() { # <id> <identifiant retiré>
+  local id="$1" gone="$2" d="$GWAB/abmut-$1" one
+  mkdir -p "$d"; : > "$d/matrix-full.txt"
+  for one in $GW_AB_ENUM; do
+    grep -F "$(printf '%s.B\037' "$one")" "$GWAB/matrix.txt" >> "$d/matrix-full.txt"
+    grep -F "$(printf '%s.A\037' "$one")" "$GWAB/matrix.txt" >> "$d/matrix-full.txt"
+  done
+  grep -vF -e "$(printf '%s.B\037' "$gone")" -e "$(printf '%s.A\037' "$gone")" "$d/matrix-full.txt" > "$d/matrix-cut.txt"
+  GW_AB_MATRIX="$d/matrix-full.txt" GW_AB_STATES=tenu gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "" "$d/fz-full.txt"
+  GW_AB_MATRIX="$d/matrix-full.txt" GW_AB_STATES=tenu gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "" "$d/cu-full.txt"
+  GW_AB_MATRIX="$d/matrix-cut.txt" GW_AB_STATES=tenu gw_ab_pass "$GWAB/frozen/guard-driver-lock.sh" "" "$d/fz-cut.txt"
+  GW_AB_MATRIX="$d/matrix-cut.txt" GW_AB_STATES=tenu gw_ab_pass "$GWAB/current/guard-driver-lock.sh" "" "$d/cu-cut.txt"
+  gw_ab_check "$d/fz-full.txt" "$d/cu-full.txt"; assert_exit "GW-AB-MUT-$id.0 — témoin : les $GW_AB_ENUM_N formes énumérées satisfont la règle ($GW_AB_WHY)" "$?" 0
+  if gw_ab_check "$d/fz-cut.txt" "$d/cu-cut.txt"; then
+    assert_exit "GW-AB-MUT-$id — la règle reste VERTE quand $gone quitte la matrice ($GW_AB_WHY)" 1 0
+  else
+    assert "GW-AB-MUT-$id — $gone retiré de la matrice : la règle ROUGIT pour l'effectif ($GW_AB_WHY)" "$GW_AB_WHY" "attendus"
+  fi
+}
+if [ -f "$FROZEN_GUARD" ]; then
+  gw_ab_mut_amputee amputee wr-sudo-u
+  gw_ab_mut_amputee amputee-dernier ex-out-shell-export
+fi
+
+# Intégrité de la transcription épinglée (même patron que la copie gelée) : empreinte épinglée dans la suite, vérifiable sans historique ; un octet
+# de plus est rejeté ; et elle n'est pas vide de sens (chaque forme énumérée y est refusée pour l'intrus, passe pour le détenteur).
+gw_ab_pin_ok "$GW_AB_PIN" "$GW_AB_PIN_BLOB"; assert_exit "GW-AB-PIN.0 — la transcription épinglée porte l'empreinte épinglée (blob $GW_AB_PIN_BLOB)" "$?" 0
+cp "$GW_AB_PIN" "$GWAB/pin-alteree.txt"; printf '#' >> "$GWAB/pin-alteree.txt"
+gw_ab_pin_ok "$GWAB/pin-alteree.txt" "$GW_AB_PIN_BLOB"; assert_exit "GW-AB-PIN.0b — témoin négatif : la même transcription altérée d'un octet est REJETÉE" "$?" 1
+assert_exit "GW-AB-PIN.1 — la transcription épinglée porte $GW_AB_ENUM_N passages .B et $GW_AB_ENUM_N passages .A" "$(( $(grep -c '^### tenu/.*\.B rc=0$' "$GW_AB_PIN") + $(grep -c '^### tenu/.*\.A rc=0$' "$GW_AB_PIN") ))" "$(( 2 * GW_AB_ENUM_N ))"
+gw_ab_pin_deny=0; gw_ab_pin_hold=0
+for id in $GW_AB_ENUM; do
+  gw_ab_stdout "$GW_AB_PIN" "tenu/$id.B" | grep -q '"permissionDecision": "deny"' && gw_ab_pin_deny=$((gw_ab_pin_deny+1))
+  [ -z "$(gw_ab_stdout "$GW_AB_PIN" "tenu/$id.A")" ] && gw_ab_pin_hold=$((gw_ab_pin_hold+1))
+done
+assert_exit "GW-AB-PIN.2 — dans la transcription épinglée, chaque forme énumérée est refusée pour l'intrus ($gw_ab_pin_deny/$GW_AB_ENUM_N)" "$gw_ab_pin_deny" "$GW_AB_ENUM_N"
+assert_exit "GW-AB-PIN.3 — dans la transcription épinglée, chaque forme énumérée passe pour le détenteur ($gw_ab_pin_hold/$GW_AB_ENUM_N)" "$gw_ab_pin_hold" "$GW_AB_ENUM_N"
+fi   # GW_MODE = full (A/B)
+
+if [ "$GW_MODE" = full ]; then
+echo
+echo "=== MUTANTS GW-M-a à GW-M-w, puis GW-M-pathspec_blind à GW-M-vide_both — chaque comportement neuf du guard rougit sous sa mutation (QUAL-01, P57-D-28) ==="
+# Chaque mutant = une substitution `sed` sur UNE ligne-ancre (compte = 1) d'une COPIE du guard, posée à côté d'une
+# copie de vf-portable.sh (sinon le locator sortirait en code 17 pour la mauvaise raison). Le programme python
+# embarqué de la copie est compilé (bash -n ne voit pas dedans). La matrice (les cas GW-* hors A/B) est rejouée en
+# sous-processus contre la copie ; l'ensemble des ASSERTIONS dont le verdict bascule (identifiant, nombre d'échecs)
+# est comparé EXACTEMENT à l'attendu : un cas basculé hors de l'ensemble, ou manquant, fait échouer.
+MUT_TOTAL=55; MUT_KILLED=0; t0=$SECONDS
+# a : en plus du cas nommé, GW-C-REL-tenu=2 (VERSION, docs/ADR.md) : sans -z, le « \n » reste collé au nom, qui ne correspond plus
+#     à la liste exacte des fichiers de forme de release (la prédiction du plan, NONASCII seul, ignorait cet effet de bord)
+# a : GW-C-INC-1/2 (corrections F-3, R-5, C3) : sans -z, « .planning/workstreams\n » ne se lit plus comme le chemin incertain
+MUT_A="GW-C-INC-1=1 GW-C-INC-2=1 GW-C-NONASCII-1=1 GW-C-REL-tenu=2"
+MUT_B="GW-C-REN-1=1 GW-C-REN-2=1"
+# c : les refus de verrou illisible (R-2) passent aussi par le crochet fail-closed : GW-UNREAD rougit avec lui
+MUT_C="GW-CRASH.2=1 GW-CRASH.3=1 GW-CRASH.4=1 GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1 GW-UNREAD-1.2=1 GW-UNREAD-1.3=1 GW-UNREAD-1.4=1 GW-UNREAD-1.5=1 GW-UNREAD-2.1=1 GW-UNREAD-2.2=1"
+MUT_D="GW-CRASH-PRE-a.2=1 GW-CRASH-PRE-b.2=1 GW-CRASH-PRE-b.3=1"
+MUT_E="GW-T-EXEMPT-1=1"
+# f : GW-ENVT-9.1 (témoin de GW-ENVT-9.2, même geste d'arbre depuis un autre worktree)
+MUT_F="GW-ENVT-9.1=1 GW-T-OTHERWT=6 GW-T-OTHERWT-bis=1 GW-UNC-4.1=1"
+# g : tous les cas « le détenteur passe » rougissent (le cas nommé par le plan, GW-TRACE-3, en fait partie)
+# g : GW-C-INC-3, GW-ENVT-7, GW-ENVT-OUT-7, GW-F3-17 (détenteur, discriminance des cas ajoutés)
+MUT_G="GW-AU2-01.8=1 GW-AU2-02.P.6=1 GW-AU2-03.P.7=1 GW-AU2-06.12=1 GW-AU3-01.P.H1=1 GW-AU3-01.P.H2=1 GW-C-ADD-6=1 GW-C-CORRUPT-3=1 GW-C-IDX-3=1 GW-C-INC-3=1 GW-C-NOGITBIN-3=1 GW-C-REL-detenteur=3 GW-C4-4=1 GW-D-TAG-detenteur=1 GW-ENVT-7=1 GW-ENVT-OUT-7=1 GW-F3-17=1 GW-GITENV-3=1 GW-LOC-1.3=1 GW-LOC-2.3=1 GW-Q45-H1=1 GW-Q45-H2=1 GW-Q45-H3=1 GW-SUB-3=1 GW-T-C-2=1 GW-T-SAME-detenteur=1 GW-TRACE-3.2=1 GW-TRACE-4.4=1 GW-W-CASE-2=1 GW-W-LEG-4=1 GW-W-UNMAP-2=1"
+# h : tout verrou d'autrui bloque : les cas « le voisin / la racine reste libre » rougissent (GW-TRACE-2 est le cas nommé)
+MUT_H="GW-C4-2=1 GW-C4-3=1 GW-MARK-W-4=1 GW-Q-PASS=1 GW-SUB-2=1 GW-TRACE-2.2=1 GW-TRACE-4.1=1 GW-W-LEG-3=1"
+MUT_I="GW-C-REL-tenu=2"
+# j : GW-F3-0 à 15 (cas -am, F-3) dépendent aussi de la source -a
+MUT_J="GW-C-ALL-1=1 GW-C-ALL-2=1 GW-F3-0=1 GW-F3-1=1 GW-F3-2=1 GW-F3-3=1 GW-F3-4=1 GW-F3-5=1 GW-F3-6=1 GW-F3-7=1 GW-F3-8=1 GW-F3-9=1 GW-F3-10=1 GW-F3-11=1 GW-F3-12=1 GW-F3-13=1 GW-F3-14=1 GW-F3-15=1"
+MUT_K="GW-C-ADD-1=1"
+MUT_L="GW-W-LEG-1=1 GW-W-LEG-2=1"
+# m à r (correction R-3 de la revue Phase 57) : ensembles mesurés puis relus un par un ; chacun contient le cas qui
+# discrimine le comportement, rien d'autre (GW-T-C-1b est le cas voisin de GW-T-C-1 qui isole la cible incertaine)
+MUT_M="GW-TTL-1=1 GW-TTL-2=1 GW-TTL-3=1"
+# n : GW-ENVT-8 compare le message de GW-ENVT-1 à celui de --git-dir= ; GW-ENVT-OUT-3 compare celui de la forme hors lab
+MUT_N="GW-ENVT-8=1 GW-ENVT-OUT-3=1 GW-Q45-O9=1 GW-Q45-U0c=1 GW-Q45-U1=1 GW-Q45-U2=1 GW-T-C-1b=1 GW-UNC-1=1 GW-UNC-2=1 GW-UNC-3=1"
+MUT_O="GW-C-POS-1=1 GW-C-POS-2=1"
+MUT_P="GW-C-CASE-1=1"
+MUT_Q="GW-C-GEN-2=1 GW-C-GEN-3=1 GW-C-GEN-4=1"
+MUT_R="GW-C-CASE-2=1"
+# s à w (corrections F-1 et F-2 de l'audit Phase 57, P57-D-38 et P57-D-39) : s = casse de .planning du préfiltre C4 ;
+# t = casse de .planning dans map_path ; u = partition détectée depuis le cwd au lieu de la racine git ; v = même
+# détection, sonde bash pure ; w = préfixe du lab pris sur le cwd au lieu de la racine du lab (commit d'un sous-dossier).
+MUT_S="GW-C4-1=1"
+MUT_T="GW-C4-2=1 GW-C4-3=1"
+MUT_U="GW-SUB-1=1 GW-SUB-4=1 GW-SUB-5=1"
+MUT_V="GW-SUB-1=1 GW-SUB-4=1 GW-SUB-5=1"
+MUT_W="GW-SUB-5=1"
+# pathspec_blind à target_noarg (corrections F-3, R-5 et réserve C3 de 57-VERIFICATION.md) : ensembles mesurés puis relus
+# un par un. pathspec_blind = --only/--include/--pathspec-from-file ne comptent plus comme pathspec ; incertain_none = un
+# chemin indexé « .planning/workstreams » ne bloque plus ; toplevel_none = l'absence de racine git n'est plus nommée
+# (l'exception interne la remplace dans le motif) ; envt_none = GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= ne rendent plus la
+# cible incertaine ; noarg_blind = plus aucun global sans argument n'est sauté ; exec_blind = exec n'est plus un wrapper ;
+# target_noarg = la cible d'un geste ne saute plus les globaux sans argument (git --no-pager -C <hors lab> est refusé).
+MUT_PSB="GW-C-PSB-1=1 GW-C-PSB-2=1 GW-C-PSB-3=1 GW-C-PSB-4=1"
+MUT_INC="GW-C-INC-1=1 GW-C-INC-2=1"
+MUT_TOP="GW-C-NOGITBIN-4=1"
+# (GW-ENVT-OUT-3 : le message de la forme --git-dir= hors lab porte « le commit embarque », celui du préfixe, sans la source, non)
+MUT_ENVT="GW-AU2-06.10=1 GW-AU2-06.4=1 GW-AU2-06.5=1 GW-AU2-06.6=1 GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1 GW-ENVT-1=1 GW-ENVT-2=1 GW-ENVT-3=1 GW-ENVT-4=1 GW-ENVT-5=1 GW-ENVT-8=1 GW-ENVT-9.2=1 GW-ENVT-OUT-3=1"
+# envt_outside (AUD-1) : le préfixe GIT_*= du même segment ne rend plus la cible incertaine pour la décision « hors du lab »
+MUT_ENVOUT="GW-AU2-06.10=1 GW-AU2-06.F3=1 GW-Q45-O6=1 GW-ENVT-OUT-1=1 GW-ENVT-OUT-3=1 GW-ENVT-OUT-4=1 GW-ENVT-OUT-5=1"
+MUT_NOARG="GW-F3-1=1 GW-F3-2=1 GW-F3-3=1 GW-F3-4=1 GW-F3-5=1 GW-F3-7=1 GW-F3-8=1 GW-F3-9=1 GW-F3-10=1 GW-F3-11=1 GW-F3-12=1 GW-F3-13=1 GW-F3-14=1 GW-F3-15=1 GW-F3-21=1"
+MUT_EXEC="GW-F3-15=1 GW-F3-6=1 GW-Q45-A15=1 GW-Q45-A16=1"
+MUT_TARGET="GW-F3-18=1"
+# q_* (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q5) : un mutant par comportement neuf ; ensembles mesurés puis relus.
+# q_argglobals = les globaux git à argument en DEUX jetons ne sont plus sautés ; q_eqglobals = leur forme `=` non plus ; q_wrapperopts = les
+# wrappers (env -u, nice -n, exec -a, sudo -u, xargs -n) ne sautent plus l'argument de leur option ; q_shells = bash/sh/zsh -c ne sont plus lus ;
+# q_coarse = au-delà de la profondeur lue, plus de refus grossier ; q_persist = export/declare/affectation seule GIT_* ne rend plus la suite
+# incertaine ; q_inherit = le shell fils n'hérite plus de la variable GIT_* du préfixe ou d'un segment précédent ; q_envchdir = env -C/--chdir ne
+# rend plus la cible incertaine ; q_outside_shell = une chaîne bash -c est toujours dans le lab pour la décision « hors du lab ».
+# Lectures : O9 (git --git-dir <p> hors lab) bascule aussi sous n et q_argglobals, parce que sa preuve est le motif SANS « Detail » d'une cible
+# incertaine ; O8 bascule sous q_inherit pour la même raison (le geste devient certain, il embarque alpha, le motif porte un « Detail ») ;
+# A27 (git add -A && git commit dans bash -c) ne bascule PAS sous q_shells : le découpage historique en lit une moitié, même motif.
+MUT_QARG="GW-Q45-A1=1 GW-Q45-A3=1 GW-Q45-A5=1 GW-Q45-O9=1 GW-Q45-U0c=1 GW-Q45-U1=1 GW-Q45-U2=1"
+MUT_QEQ="GW-Q45-A2=1 GW-Q45-A4=1 GW-Q45-A6=1 GW-Q45-A7=1"
+MUT_QWRAP="GW-Q45-A10=1 GW-Q45-A11=1 GW-Q45-A13=1 GW-Q45-A15=1 GW-Q45-A17=1 GW-Q45-A18=1 GW-Q45-A9=1 GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1"
+MUT_QSHELL="GW-AU2-01.1=1 GW-AU2-01.2=1 GW-AU2-01.3=1 GW-AU2-01.4=1 GW-AU2-01.5=1 GW-AU2-02.F.4=1 GW-AU2-02.F.5=1 GW-AU2-02.P.4=1 GW-AU2-02.P.5=1 GW-AU2-03.F.1=1 GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.1=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-AU2-06.3=1 GW-AU3-01.F.10=1 GW-AU3-01.F.11=1 GW-AU3-01.F.12=1 GW-AU3-01.F.13=1 GW-AU3-01.F.14=1 GW-AU3-01.F.1=1 GW-AU3-01.F.2=1 GW-AU3-01.F.3=1 GW-AU3-01.F.4=1 GW-AU3-01.F.5=1 GW-AU3-01.F.6=1 GW-AU3-01.F.7=1 GW-AU3-01.F.8=1 GW-AU3-01.F.9=1 GW-AU3-01.P.10=1 GW-AU3-01.P.11=1 GW-AU3-01.P.12=1 GW-AU3-01.P.13=1 GW-AU3-01.P.14=1 GW-AU3-01.P.1=1 GW-AU3-01.P.2=1 GW-AU3-01.P.3=1 GW-AU3-01.P.4=1 GW-AU3-01.P.5=1 GW-AU3-01.P.6=1 GW-AU3-01.P.7=1 GW-AU3-01.P.8=1 GW-AU3-01.P.9=1 GW-AU3-01.R3=1 GW-AU3-02.F.7=1 GW-AU3-02.F.8=1 GW-AU3-02.P.7=1 GW-AU3-02.P.8=1 GW-Q45-A22=1 GW-Q45-A23=1 GW-Q45-A24=1 GW-Q45-A25=1 GW-Q45-A26=1 GW-Q45-A28=1 GW-Q45-A29=1 GW-Q45-A30=1 GW-Q45-A31=1 GW-Q45-C1=1 GW-Q45-C2=1 GW-Q45-O4=1 GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U9=1"
+MUT_QCOARSE="GW-AU2-02.F.4=1 GW-AU2-02.P.4=1 GW-AU2-03.F.1=1 GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.1=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-AU3-02.F.7=1 GW-AU3-02.F.8=1 GW-AU3-02.P.7=1 GW-AU3-02.P.8=1 GW-Q45-C1=1 GW-Q45-C2=1"
+MUT_QPERSIST="GW-AU2-06.7=1 GW-AU2-06.8=1 GW-Q45-O7=1 GW-Q45-U10=1 GW-Q45-U11=1 GW-Q45-U12=1 GW-Q45-U5=1 GW-Q45-U6=1 GW-Q45-U7=1 GW-Q45-U8=1"
+MUT_QINHERIT="GW-Q45-O8=1 GW-Q45-U10=1 GW-Q45-U12=1 GW-Q45-U9=1"
+MUT_QENVCD="GW-Q45-O6=1 GW-Q45-U3=1 GW-Q45-U4=1"
+MUT_QOUTSH="GW-AU3-01.R1=1 GW-AU3-01.R2=1 GW-Q45-O1=1 GW-Q45-O4=1"
+# au2_* (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, tour 3 de la mission q45) : un mutant par comportement neuf ; ensembles
+# mesurés puis relus. cdprop = le cd de l'appelant n'est plus transmis à la récursion bash -c ; cdnames = pushd et popd ne comptent plus comme cd
+# (01.3 seul : pushd) ; quad = le refus grossier relit la fin de la chaîne à chaque git (même verdict, coût quadratique : seul le cas de durée rougit) ;
+# bound = plus de borne de longueur ; strip = guillemets et antislash ne sont plus retirés ; slash = git derrière / ne compte plus
+# (/usr/bin/git ; AU3-02 refuse aussi le cas 02.7 sous cette mutation) ; assigncmd = NOM+= et NOM[i]= ne sont plus des affectations en position de commande ; envtarget = GIT_*+= ne rend plus la cible
+# incertaine ; assignpersist = une affectation seule NOM+=x ne pose plus la variable pour les segments suivants (06.7 seul).
+MUT_AU2CDPROP="GW-AU2-01.1=1 GW-AU2-01.2=1 GW-AU2-01.3=1 GW-AU2-01.4=1 GW-AU2-01.5=1"
+MUT_AU2CDNAMES="GW-AU2-01.3=1"
+MUT_AU2QUAD="GW-AU2-02.F.1=1 GW-AU2-02.P.1=1"
+MUT_AU2BOUND="GW-AU2-02.F.5=1 GW-AU2-02.P.5=1"
+MUT_AU2STRIP="GW-AU2-03.F.2=1 GW-AU2-03.F.3=1 GW-AU2-03.F.4=1 GW-AU2-03.P.2=1 GW-AU2-03.P.3=1 GW-AU2-03.P.4=1 GW-AU3-02.F.8=1 GW-AU3-02.P.8=1"
+MUT_AU2SLASH="GW-AU2-03.F.1=1 GW-AU2-03.P.1=1 GW-AU3-02.F.7=1 GW-AU3-02.P.7=1"
+MUT_AU2ASSIGN="GW-AU2-06.1=1 GW-AU2-06.10=1 GW-AU2-06.2=1 GW-AU2-06.3=1 GW-AU2-06.4=1 GW-AU2-06.5=1 GW-AU2-06.6=1 GW-AU2-06.F1=1 GW-AU2-06.F2=1 GW-AU2-06.F3=1"
+MUT_AU2ENVT="GW-AU2-06.10=1 GW-AU2-06.4=1 GW-AU2-06.5=1 GW-AU2-06.6=1 GW-AU2-06.7=1 GW-AU2-06.8=1 GW-AU2-06.F3=1"
+MUT_AU2PERSIST="GW-AU2-06.7=1"
+# Les cas GW-AU3-* entrent aussi dans les ensembles de g (détenteur : H1, H2), q_shells (formes collées, témoins refusés), q_coarse et au2_strip (02.7, 02.8)
+# et q_outside_shell (R1, R2) : mesurés puis relus, chacun dépend du comportement que la mutation retire.
+# au3_* (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, tour 3 de la mission q45, audit AU3-01 et AU3-02) : punct = les suites de ponctuation
+# ne sont plus découpées (`);`, `)&&`, `;(` redeviennent un jeton absent des opérateurs : les 11 formes collées de chaque régime, jamais les formes isolées) ;
+# coarse = git derrière . ou - redevient un mot du refus grossier (AU3-02 .1 à .4 et .6 ; .5, my_git, n'est pas touché : _ était déjà exclu) ;
+# redir = >& et &> redeviennent deux jetons dont un & isolé, coupe-portée d'outside_scan (R1 et R2).
+MUT_AU3PUNCT="GW-AU3-01.F.10=1 GW-AU3-01.F.11=1 GW-AU3-01.F.1=1 GW-AU3-01.F.2=1 GW-AU3-01.F.3=1 GW-AU3-01.F.4=1 GW-AU3-01.F.5=1 GW-AU3-01.F.6=1 GW-AU3-01.F.7=1 GW-AU3-01.F.8=1 GW-AU3-01.F.9=1 GW-AU3-01.P.10=1 GW-AU3-01.P.11=1 GW-AU3-01.P.1=1 GW-AU3-01.P.2=1 GW-AU3-01.P.3=1 GW-AU3-01.P.4=1 GW-AU3-01.P.5=1 GW-AU3-01.P.6=1 GW-AU3-01.P.7=1 GW-AU3-01.P.8=1 GW-AU3-01.P.9=1"
+MUT_AU3COARSE="GW-AU3-02.F.1=1 GW-AU3-02.F.2=1 GW-AU3-02.F.3=1 GW-AU3-02.F.4=1 GW-AU3-02.F.6=1 GW-AU3-02.P.1=1 GW-AU3-02.P.2=1 GW-AU3-02.P.3=1 GW-AU3-02.P.4=1 GW-AU3-02.P.6=1"
+MUT_AU3REDIR="GW-AU3-01.R1=1 GW-AU3-01.R2=1"
+# gitenv = le retrait de GIT_DIR/GIT_WORK_TREE/... hérités disparaît (relecture SOBR-04, 2026-10-14) ; vide_py = le jugement python du dossier
+# des compartiments vide redevient « présent » (le message du lab plat devient celui de l'ancien verrou partitionné) ; vide_both = les DEUX
+# jugements (bash et python) le font, le Write racine est alors refusé par le verrou de dépôt (P57-D-56).
+MUT_GITENV="GW-GITENV-1=1 GW-GITENV-2=1"
+MUT_VIDEPY="GW-VIDE-7=1"
+MUT_VIDEBOTH="GW-VIDE-1=1 GW-VIDE-2=1 GW-VIDE-6=1 GW-VIDE-7=1"
+gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
+  awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
+}
+gw_py_compiles() { # <fichier python>
+  python3 -I -c 'import sys; compile(open(sys.argv[1], encoding="utf-8").read(), "guard-embarque", "exec")' "$1" 2>/dev/null
+}
+mut_ids() { # <journal> → « identifiant=nombre d'échecs », trié, une par ligne
+  LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sort | LC_ALL=C uniq -c | LC_ALL=C awk '{print $2 "=" $1}' | LC_ALL=C sort
+}
+mut_trace() { # <journal> <identifiant> → première assertion violée, attendu/obtenu (octets : LC_ALL=C, lignes tronquées)
+  LC_ALL=C awk -v f="$2" '
+    /^  ❌ FAIL — /{ t=$0; sub(/^  ❌ FAIL — /,"",t); k=t; sub(/ .*$/,"",k)
+                    if (!done && k==f) { print "      rouge " substr(t,1,170); p=1; done=1; next } p=0 }
+    p && /^     /{ print "        " substr($0,1,170); next }
+    { p=0 }' "$1"
+}
+mut_run() { # <guard> <journal> → code de sortie du sous-processus
+  GW_MODE=matrice GW_GUARD="$1" "$BASH_BIN" "$SUITE" > "$2" 2>&1 < /dev/null
+}
+MUT_IDS=""
+mutant() { # <id> <ancre BRE> <expression sed s> <attendu> [<ancre 2> <expression 2>]
+  # Prépare le mutant puis lance sa matrice EN ARRIÈRE-PLAN ; le verdict est rendu par mutant_eval, dans l'ordre,
+  # après `wait`. Chaque sous-processus a son propre WORK_DIR.
+  local id="$1" anchor="$2" expr="$3" expected="$4" anchor2="${5:-}" expr2="${6:-}" dir="$WORK_DIR/gw-mut-$1" n
+  mkdir -p "$dir"; MUT_IDS="$MUT_IDS $id"
+  printf '%s\n' $expected | LC_ALL=C sort -u > "$dir/attendu.txt"
+  cp "$GUARD" "$dir/guard-driver-lock.sh"; cp "$PORTABLE" "$dir/vf-portable.sh"
+  cp "$dir/guard-driver-lock.sh" "$dir/copie-temoin.sh"
+  n="$(grep -c -e "$anchor" "$dir/guard-driver-lock.sh")"
+  if [ "$n" != "1" ]; then echo "ancre non unique ($n occurrences de [$anchor])" > "$dir/prepko"; return; fi
+  sed -i.bak -e "/$anchor/$expr" "$dir/guard-driver-lock.sh"; rm -f "$dir/guard-driver-lock.sh.bak"
+  if [ -n "$anchor2" ]; then
+    n="$(grep -c -e "$anchor2" "$dir/guard-driver-lock.sh")"
+    if [ "$n" != "1" ]; then echo "ancre 2 non unique ($n occurrences de [$anchor2])" > "$dir/prepko"; return; fi
+    sed -i.bak -e "/$anchor2/$expr2" "$dir/guard-driver-lock.sh"; rm -f "$dir/guard-driver-lock.sh.bak"
+  fi
+  if cmp -s "$dir/guard-driver-lock.sh" "$dir/copie-temoin.sh"; then echo "mutant NON OPPOSABLE : la substitution n'a rien changé" > "$dir/prepko"; return; fi
+  if ! bash -n "$dir/guard-driver-lock.sh" 2>/dev/null; then echo "le mutant n'est pas un script valide (il rougirait pour la mauvaise raison)" > "$dir/prepko"; return; fi
+  gw_extract_py "$dir/guard-driver-lock.sh" "$dir/embarque.py"
+  if ! gw_py_compiles "$dir/embarque.py"; then echo "le programme python embarqué du mutant ne compile pas (il rougirait pour la mauvaise raison)" > "$dir/prepko"; return; fi
+  chmod +x "$dir/guard-driver-lock.sh"
+  ( mut_run "$dir/guard-driver-lock.sh" "$dir/matrice.log"; echo $? > "$dir/rc" ) &
+}
+mutant_eval() { # <id>
+  local id="$1" dir="$WORK_DIR/gw-mut-$1" rc got
+  if [ -f "$dir/prepko" ]; then assert_exit "GW-M-$id — $(cat "$dir/prepko")" 1 0; return; fi
+  rc="$(cat "$dir/rc" 2>/dev/null || echo absent)"
+  if [ "$rc" != 0 ] && [ "$rc" != 1 ]; then assert_exit "GW-M-$id — la matrice a planté (exit $rc), pas un échec de cas" 1 0; return; fi
+  grep -q '^=== Bilan : ' "$dir/matrice.log" || { assert_exit "GW-M-$id — la matrice n'a pas atteint son bilan" 1 0; return; }
+  mut_ids "$dir/matrice.log" > "$dir/obtenu.txt"
+  got="$(tr '\n' ' ' < "$dir/obtenu.txt")"
+  if [ ! -s "$dir/attendu.txt" ]; then
+    assert_exit "GW-M-$id — ensemble attendu vide (un mutant sans cas attendu ne prouve rien)" 1 0
+    echo "     obtenu:  {$got}"
+  elif cmp -s "$dir/attendu.txt" "$dir/obtenu.txt"; then
+    assert_exit "GW-M-$id — mutant tué : bascule exactement {$(tr '\n' ' ' < "$dir/attendu.txt")}" 0 0
+    while IFS= read -r one; do mut_trace "$dir/matrice.log" "${one%=*}"; done < "$dir/obtenu.txt"
+    MUT_KILLED=$((MUT_KILLED+1))
+  else
+    assert_exit "GW-M-$id — ensemble basculé INATTENDU" 1 0
+    echo "     attendu: {$(tr '\n' ' ' < "$dir/attendu.txt")}"
+    echo "     obtenu:  {$got}"
+  fi
+}
+
+# Témoin préalable : la copie NON mutée (guard + vf-portable.sh côte à côte) ne bascule AUCUN cas et son programme
+# embarqué compile.
+mkdir -p "$WORK_DIR/gw-mut-temoin"; cp "$GUARD" "$WORK_DIR/gw-mut-temoin/guard-driver-lock.sh"; cp "$PORTABLE" "$WORK_DIR/gw-mut-temoin/vf-portable.sh"
+chmod +x "$WORK_DIR/gw-mut-temoin/guard-driver-lock.sh"
+gw_extract_py "$WORK_DIR/gw-mut-temoin/guard-driver-lock.sh" "$WORK_DIR/gw-mut-temoin/embarque.py"
+gw_py_compiles "$WORK_DIR/gw-mut-temoin/embarque.py"; assert_exit "GW-M-témoin.1 — le programme python embarqué du guard non muté compile ($(wc -l < "$WORK_DIR/gw-mut-temoin/embarque.py" | tr -d ' ') lignes extraites)" "$?" 0
+mut_run "$WORK_DIR/gw-mut-temoin/guard-driver-lock.sh" "$WORK_DIR/gw-mut-temoin/matrice.log"; rc=$?
+tn="$(mut_ids "$WORK_DIR/gw-mut-temoin/matrice.log" | wc -l | tr -d ' ')"
+assert_exit "GW-M-témoin.2 — la copie non mutée rend zéro assertion en échec (exit $rc, $tn en échec, ${SECONDS}s écoulées)" "$((rc + tn))" 0
+
+# a : `-z` retiré de la source « diff --cached » -> la sortie n'est plus découpée sur NUL, un nom non ASCII sort cité
+mutant a 'srcs = \[("diff --cached"' 's@"--name-only", "-z"\])@"--name-only"])@' "$MUT_A"
+# b : `--no-renames` retiré -> un renommage ne montre plus que sa destination, la source d'un autre compartiment disparaît
+mutant b 'srcs = \[("diff --cached"' 's@"--cached", "--no-renames", @"--cached", @' "$MUT_B"
+# c : crochet d'exception fail-closed neutralisé (rend le silence) -> toute exception ré-ouvre par le repli bash
+mutant c '^    sys.excepthook = fail_closed_hook$' 's@fail_closed_hook$@lambda *a: None@' "$MUT_C"
+# d : crochet posé seulement à l'entrée de decide_partitioned, après le dispatch d'outil -> les exceptions du dispatch passent
+mutant d '^    sys.excepthook = fail_closed_hook$' 's@sys.excepthook = fail_closed_hook$@pass@' "$MUT_D" '57-08)\."""$' 's@"""$@"""; sys.excepthook = fail_closed_hook@'
+# e : exemption `git worktree add` retirée -> la porte de sortie prescrite par le verrou est refusée
+mutant e 'continue  # exemption nomm.*e : porte de sortie prescrite' 's@continue  # exemption nomm.*$@return True@' "$MUT_E"
+# f : condition de worktree retirée -> un geste d'arbre est refusé depuis un AUTRE worktree que celui du verrou
+mutant f 'if not wt or top is None or same_checkout(wt, top):' 's@if not wt or top is None or same_checkout(wt, top):@if True:@' "$MUT_F"
+# g : session courante traitée comme autrui -> le détenteur est refusé comme un tiers
+mutant g '^    if sid and sid in session_ids:$' 's@in session_ids:$@in session_ids and False:@' "$MUT_G"
+# h : cartographie par compartiment retirée -> tout verrou d'autrui bloque tout chemin
+mutant h 'kind, seg = map_path(abs_path, lab)' 's@map_path(abs_path, lab)@("incertain", "")@' "$MUT_H"
+# i : RELEASE_FORM_FILES vidée -> VERSION et docs/ADR.md ne sont plus des gestes de dépôt
+mutant i 'if pb in RELEASE_FORM_FILES:' 's@RELEASE_FORM_FILES:@():@' "$MUT_I"
+# j : source `-a` retirée -> `git commit -a` n'embarque plus les modifications non indexées
+mutant j 'if g\["a_flag"\] or g\["pathspec"\] or wide:' 's@g\["a_flag"\] or @@' "$MUT_J"
+# k : chemins d'ajout ignorés -> un `git add <littéral> && git commit` n'est plus jugé sur ce qu'il ajoute
+mutant k '^    paths.extend(lit)$' 's@paths.extend(lit)@pass@' "$MUT_K"
+# l : ancien verrou non lu -> .planning/DRIVER.lock d'autrui n'est plus vu en lab partitionné
+mutant l 'if os.path.lexists(legacy):' 's@lexists(legacy):@lexists(legacy) and False:@' "$MUT_L"
+# m (R-3 a) : test de péremption TTL retiré -> un verrou périmé d'autrui est de nouveau un verrou
+mutant m '^    if age > ttl:$' 's@if age > ttl:@if False:@' "$MUT_M"
+# n (R-3 b) : uncertain_global neutralisée -> -C, --git-dir, --work-tree ne rendent plus la cible incertaine
+mutant n 'return t == "-C" or' 's@return t == "-C" or .*@return False@' "$MUT_N"
+# o (R-3 c) : le jeton POSITIONNEL d'un commit ne compte plus comme pathspec (la ligne `pathspec = True` de la branche else)
+mutant o 'elif ch in "io":' '{n;n;n;s@pathspec = True@pass@;}' "$MUT_O"
+# p (R-3 d) : casse de .planning ignorée -> comparée à l'identique dans map_repo_path
+mutant p 'if parts\[0\].lower() == b".planning":' 's@parts\[0\].lower()@parts[0]@' "$MUT_P"
+# q (R-3 e) : l'`except Exception` générique du jugement de commit retiré (il n'attrape plus rien)
+mutant q 'except Unreadable as e:' '{n;n;n;n;s@except Exception:@except ZeroDivisionError:@;}' "$MUT_Q"
+# r (R-3 d) : casse de `workstreams` ignorée -> comparée à l'identique dans map_repo_path
+mutant r 'parts\[1\].lower() == b"workstreams"' 's@parts\[1\].lower()@parts[1]@' "$MUT_R"
+mutant s 're.I if PARTITIONED else 0' 's@re.I if PARTITIONED else 0@0@' "$MUT_S"
+mutant t 'rp\[len(pp) - 1\].casefold()' 's@rp\[len(pp) - 1\].casefold() == pp\[-1\].casefold()@False@' "$MUT_T"
+mutant u 'top = toplevel_of(base) or top_by_marker(base)' 's@toplevel_of(base) or top_by_marker(base)@None@' "$MUT_U"
+mutant v 'VF_GUARD_SUBLAB=1; fi' 's@VF_GUARD_SUBLAB=1; fi@VF_GUARD_SUBLAB=0; fi@' "$MUT_V"
+mutant w 'cwd if lab is None else lab' 's@cwd if lab is None else lab@cwd@' "$MUT_W"
+# pathspec_blind (C3) : les trois options qui désignent un pathspec ne comptent plus
+mutant pathspec_blind 'elif nm in ("--include", "--only", "--pathspec-from-file"):' 's@("--include", "--only", "--pathspec-from-file")@("--zzz",)@' "$MUT_PSB"
+# incertain_none (C3) : un chemin « incertain » embarqué par le commit ne bloque plus
+mutant incertain_none 'elif kind == "incertain":' '{n;s@hs = list(held)@hs = []@;}' "$MUT_INC"
+# toplevel_none (C3) : l'absence de racine git ne lève plus Unreadable (l'exception interne la remplace dans le motif)
+mutant toplevel_none 'raise Unreadable("rev-parse --show-toplevel")' 's@raise Unreadable("rev-parse --show-toplevel")@pass@' "$MUT_TOP"
+# envt_none (R-5) : l'affectation GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= ne rend plus la cible incertaine
+mutant envt_none 'unc = unc or env_target_uncertain(toks\[:idx\])' 's@unc = unc or env_target_uncertain(toks\[:idx\])@unc = unc@' "$MUT_ENVT"
+# envt_outside (AUD-1) : le préfixe GIT_*= du même segment est ignoré par la décision « geste hors du lab »
+mutant envt_outside 'if persist or env_target_uncertain(seg\[:idx\]):' 's@if persist or env_target_uncertain(seg\[:idx\]):@if persist:@' "$MUT_ENVOUT"
+# noarg_blind (F-3) : l'ensemble des globaux sans argument est vide
+mutant noarg_blind '^NOARG_GIT_GLOBALS = {' 's@NOARG_GIT_GLOBALS = {@NOARG_GIT_GLOBALS = set(); NOARG_UNUSED = {@' "$MUT_NOARG"
+# exec_blind (F-3) : exec n'est plus un wrapper
+mutant exec_blind 'or os.path.basename(t) == "exec":' 's@ or os.path.basename(t) == "exec":@:@' "$MUT_EXEC"
+# target_noarg (F-3) : la cible d'un geste ne saute plus les globaux sans argument
+mutant target_noarg 'elif noarg_global(t):' 's@elif noarg_global(t):@elif False:@' "$MUT_TARGET"
+# q_* : un mutant par comportement neuf de la correction du 2026-10-13
+mutant q_argglobals '^GIT_ARG_GLOBALS = {' 's@^GIT_ARG_GLOBALS = {@GIT_ARG_GLOBALS = set(); GIT_ARG_UNUSED = {@' "$MUT_QARG"
+mutant q_eqglobals 'elif t.startswith(GIT_EQ_GLOBALS):' 's@elif t.startswith(GIT_EQ_GLOBALS):@elif t.startswith(("--git-dir=", "--work-tree=", "--exec-path=")):@' "$MUT_QEQ"
+mutant q_wrapperopts '^WRAPPER_ARG_OPTS = {' 's@^WRAPPER_ARG_OPTS = {@WRAPPER_ARG_OPTS = {}; WAO_UNUSED = {@' "$MUT_QWRAP"
+mutant q_shells '^SHELLS = {' 's@^SHELLS = {@SHELLS = set(); SH_UNUSED = {@' "$MUT_QSHELL"
+mutant q_coarse '^    return m is not None and COARSE_VERB_RE' 's@return m is not None and@return None and@' "$MUT_QCOARSE"
+mutant q_persist 'ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]' 's@ts = \[t for t in toks if t not in STRUCTURAL_SKIP\]@ts = []@' "$MUT_QPERSIST"
+mutant q_inherit 'out.append((c, persist or env_target_uncertain(cur\[:idx\]), cd_seen))' 's@out.append((c, persist or env_target_uncertain(cur\[:idx\]), cd_seen))@out.append((c, False, cd_seen))@' "$MUT_QINHERIT"
+mutant q_envchdir 'if b == "env" and any(' 's@if b == "env" and any(@if False and any(@' "$MUT_QENVCD"
+mutant q_outside_shell '^                    if inn:$' 's@if inn:@if True:@' "$MUT_QOUTSH"
+# au2_* : un mutant par comportement neuf de la correction du tour 3 (2026-10-13)
+mutant au2_cdprop 'gesture_classes(c, inherit or unc_in, depth + 1, cd_before or cd_in)' 's@depth + 1, cd_before or cd_in)@depth + 1, cd_before)@' "$MUT_AU2CDPROP"
+mutant au2_cdnames 'in ("cd", "pushd", "popd") for idx in command_positions(cur)' 's@("cd", "pushd", "popd") for idx@("cd",) for idx@' "$MUT_AU2CDNAMES"
+mutant au2_quad '^    return m is not None and COARSE_VERB_RE' 's@^    return m is not None and .*$@    return any(COARSE_VERB_RE.search(c[k.end():]) is not None for k in COARSE_GIT_RE.finditer(c))@' "$MUT_AU2QUAD"
+mutant au2_bound '^    if len(c) > COARSE_MAX_LEN:$' 's@if len(c) > COARSE_MAX_LEN:@if False:@' "$MUT_AU2BOUND"
+mutant au2_strip '^    c = c.translate(COARSE_STRIP)$' 's@c = c.translate(COARSE_STRIP)@pass@' "$MUT_AU2STRIP"
+mutant au2_slash '^COARSE_GIT_RE = ' 's@9_\.\\-]@9_./\\-]@' "$MUT_AU2SLASH"
+mutant au2_assign '^        if ASSIGN_RE.match(t):$' 's@ASSIGN_RE.match(t)@re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t)@' "$MUT_AU2ASSIGN"
+mutant au2_envtarget '^ENV_TARGET_RE = ' 's@^ENV_TARGET_RE = .*$@ENV_TARGET_RE = re.compile(r"^(GIT_DIR|GIT_INDEX_FILE|GIT_WORK_TREE)=")@' "$MUT_AU2ENVT"
+mutant au2_assignpersist 'if all(ASSIGN_RE.match(t) for t in ts):' 's@all(ASSIGN_RE.match(t) for t in ts)@all(re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t) for t in ts)@' "$MUT_AU2PERSIST"
+
+# au3_* : un mutant par comportement neuf de la correction du tour 3, suite (2026-10-13)
+mutant au3_punct '^    if not t or any(ch not in PUNCT_CHARS for ch in t):$' 's@if not t or@if True or@' "$MUT_AU3PUNCT"
+mutant au3_coarse '^COARSE_GIT_RE = ' 's@9_\.\\-]@9_]@' "$MUT_AU3COARSE"
+mutant au3_redir '^        elif t\[i\] in "<>" or ' 's@elif t\[i\] in "<>" or .*:$@elif False:@' "$MUT_AU3REDIR"
+mutant gitenv '^            env.pop(k, None)$' 's@env.pop(k, None)@pass@' "$MUT_GITENV"
+mutant vide_py 'return False  # D56-VIDE' 's@return False  # D56-VIDE@return True  # D56-VIDE@' "$MUT_VIDEPY"
+mutant vide_both 'return 1  # D56-VIDE' 's@return 1  # D56-VIDE@return 0  # D56-VIDE@' "$MUT_VIDEBOTH" 'return False  # D56-VIDE' 's@return False  # D56-VIDE@return True  # D56-VIDE@'
+
+wait
+for id in $MUT_IDS; do mutant_eval "$id"; done
+echo "  durée des mutants : $((SECONDS-t0))s"
+if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
+  echo "== mutants : $MUT_TOTAL/$MUT_TOTAL tués =="
+else
+  echo "== mutants : $MUT_KILLED/$MUT_TOTAL tués =="
+  FAIL=$((FAIL+1))
+fi
+fi   # GW_MODE = full (mutants)
+
+echo
+echo "=== Bilan : $PASS PASS · $FAIL FAIL ==="
+echo "== resultat : $PASS ok, $FAIL ko =="
+[ "$PASS" -gt 0 ] || { echo "❌ FAIL — zéro assertion exécutée"; exit 1; }
+[ "$FAIL" -eq 0 ]

@@ -92,18 +92,16 @@ périmètres et les plafonds de budget (`autonomous-guardrails.md`). La formule 
 ou trois agents d'un coup » est un signal d'alerte sur l'**ajout d'agents au catalogue** dans une
 PR — jamais une limite d'orchestration à l'exécution.
 
-**Extension non livrée — un manager par workstream.** Un lab réellement partitionné
-(`workstreams.md` §5 « La condition dure ») pourrait vouloir plusieurs managers en parallèle, un
-par compartiment. Cette voie exigerait, avant d'être livrée, quatre choses :
-
-- un `driver-lock.sh` **compartiment-aware** (lock nommé par workstream), avec amendement daté
-  de l'ADR du socle d'équipe pour que l'invariant devienne « un manager **par compartiment** » ;
-- une `guard-driver-lock.sh` alignée sur ce même compartimentage ;
-- un pointeur de workstream **et** une clé de session **distincts par manager** ;
-- une preuve d'usage concurrent **réel**, pas une preuve de mécanisme sur clone jetable.
-
-**Déclencheur** : la partition effective d'un lab — elle-même gatée humain. Tant qu'il n'est pas
-franchi, le head sérialise (D-02).
+**Un manager par compartiment — mécanisme livré (Phase 57), usage réel à prouver (Phase 61).** Un lab
+réellement partitionné (`workstreams.md` §5 « La condition dure ») peut avoir plusieurs managers en parallèle,
+un par compartiment. Les points 1 à 3 du spec head §6 sont livrés : verrou nommé par compartiment
+(`driver-lock.sh --ws`, amendement daté d'ADR-053), `guard-driver-lock.sh` aligné, `--ws` et
+`GSD_SESSION_KEY` distincts par manager. Le quatrième, la preuve d'usage concurrent **réel** (deux humains, deux
+terminaux), est porté par la Phase 61. D'ici là le head sérialise SES propres managers (D-02 du registre de la
+Phase 40, inchangée ; P57-D-34) et chaque mandat porte `--ws <sujet>` et `GSD_SESSION_KEY=vf-<sujet>-<owner>` :
+le verrou par compartiment sert d'abord des sessions distinctes, qui ne se bloquent plus d'un compartiment à
+l'autre. Limite assumée : les managers d'une même session partagent son identifiant, le guard ne les sépare pas
+(P57-D-20).
 
 ## 3. Contrat de sortie (vérifier le témoin, pas refaire le travail)
 
@@ -116,7 +114,7 @@ Résolution du gate de sortie par la **cascade des scripts frères** documentée
 
 Sept contrôles, chacun bon marché et déterministe :
 
-- **E1** — verrou de driver relâché.
+- **E1** — verrou de driver relâché, jugé sur le compartiment du mandat (`check-mission-exit.sh --ws <sujet>`) ; lab partitionné sans `--ws` : INDÉTERMINÉ, jamais un vert (P57-D-35).
 - **E2** — arbre propre (hors artefacts gitignorés attendus).
 - **E3** — branche dédiée, PR ouverte (ADR-059), dont le corps porte un merge-danger call conforme
   (POCK-06) : forme exacte dans `mission-contracts.md` §Isolation de branche. Un MANQUE E3 peut donc

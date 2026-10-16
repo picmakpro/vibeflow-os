@@ -13,6 +13,39 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.70.0] — 2026-10-14
+
+**Minor** (verrou de driver par compartiment, Phase 57, premier livrable du jalon `equipe-produit-v1.0` ; release
+demandée par Samuel, session principale Claude Code, 2026-10-12 : « corrige la dette, puis PR puis merge/release ») :
+
+- **Un verrou par compartiment de planning** (`conductor` v1.48.2 → v1.49.0, DLWS-01..08).
+  - `driver-lock.sh --ws <sujet>` verrouille un compartiment, `--depot` le dépôt, sous `<git-common-dir>/vf-driver/`,
+    donc partagé entre worktrees. Le compartiment ne vient que de `--ws`. Refus nommés avec `hint` rejouable
+    (`ws-invalid`, `unknown-ws`, `legacy-lock-held`, `stale-requires-takeover`, `not-at-lab-root`, `restore-failed`).
+    `takeover --ws` refuse comme `acquire` devant un ancien verrou (P57-D-49).
+  - `guard-driver-lock.sh` résout le verrou du compartiment visé. Il reconnaît désormais les options globales de git,
+    les lanceurs (`env`, `nice`, `exec`, `sudo`, `xargs`), `bash -c` à récursion bornée et les `GIT_*` posés dans un
+    segment précédent, en lab plat comme partitionné (arbitrages Samuel, AskUserQuestion session principale,
+    2026-10-11 et 2026-10-13 ; P57-D-52 ratifiée le 2026-10-14).
+  - Le watchdog compte un commit récent, sur n'importe quel worktree du clone, comme progression : fini le faux
+    « stall » à chaque plan long (arbitrage Samuel, 2026-10-13).
+  - Deux corrections de la relecture adverse, avant le tag (arbitrage Samuel, AskUserQuestion session principale, 2026-10-14) :
+    le guard ne laisse plus un `GIT_DIR`, `GIT_WORK_TREE` ou `GIT_INDEX_FILE` hérité lui faire juger un autre dépôt (le
+    `Write` dans le compartiment d'un autre passait) ; et un dossier `.planning/workstreams/` présent mais sans aucun
+    compartiment (vide, ou seulement un `.gitkeep`) redevient un lab plat, comme en v2.69.1, pour tous les verbes
+    (P57-D-56, qui révise P57-D-25) ; un lien symbolique ou un fichier à sa place reste refusé.
+  - Suites de tests rendues indépendantes du runner : les mutants rejouent leur matrice avec SIGPIPE restauré (le runner
+    GitHub le lance ignoré), et le mutant quadratique du guard se juge au temps processeur sans plafond d'horloge de 60 s.
+- **Gate de sortie de mission et doctrine** (`dev-orchestrator` v2.27.1 → v2.28.0) : `check-mission-exit.sh --ws`,
+  qui résout le `driver-lock.sh` du plugin avant la copie installée sur le dépôt source ; `mission-flow.md`, « un
+  manager par compartiment ».
+- **Managers des autres équipes** (`design-orchestrator` v1.5.13, `content-bundle` v2.0.16, `business-pilot-bundle`
+  v2.0.16, `growth-bundle` v2.0.15) : `--ws` passé au verrou ; sur un refus, ils exécutent le `hint` tel qu'il est rendu.
+- **Dépôt (non distribué)** : la garde G-2 surveille aussi `tests/fixtures/` (six classes) ; ROADMAP fiabilite
+  ramené de 167 Ko à 62 Ko (dossiers de `fiabilite-v1.0` archivés sous `.planning/milestones/`) ; STATE fiabilite
+  passé au jalon `equipe-produit-v1.0` ; BACKLOG sans entrée trop longue (37 → 31 sujets, tri après la release) ;
+  `test-check-description-fidelity` stabilisé (20/30 échecs → 0/30).
+
 ## [v2.69.1] — 2026-10-10
 
 **Patch** (garde de fin de geste et mineurs de relecture ; release demandée par Samuel, AskUserQuestion session

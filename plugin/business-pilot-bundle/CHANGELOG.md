@@ -1,5 +1,19 @@
 # CHANGELOG — business-pilot-bundle
 
+## [v2.0.16] — 2026-10-13 (verrou de driver périmé : cas `recover`)
+
+**Patch** — `agents/vf-business-manager.md` : sur `reason: stale-requires-takeover`, le manager exécute la commande nommée par le champ
+`hint` du refus JSON (`takeover` pour un compartiment ou un lab plat, `recover` pour un ancien verrou d'avant la mise à jour),
+au lieu de prescrire `takeover` seul ; formulation alignée sur `vf-dev-manager` (ce172d64). Arbitrage Samuel, AskUserQuestion
+session principale, 2026-10-13 (Q7). Publiée dans v2.70.0. Précision (revue RV4-04, même version) : le `hint` d'un ANCIEN verrou
+vivant est `release --owner=<id>` (`legacy-lock-held`), non `recover` ; le manager exécute le `hint` tel qu'il est rendu.
+
+## [v2.0.15] — 2026-10-10 (verrou de driver par compartiment, Phase 57)
+
+**Patch** — `agents/vf-business-manager.md` passe `--ws=<sujet du mandat>` (optionnel) à `acquire`, `takeover` et `release` du
+verrou de driver, et renvoie au protocole du kernel (`team-kernel.md` §Verrou par compartiment) à instructions
+constantes ; aucun autre changement de comportement (P57-D-30, publiée dans v2.70.0).
+
 ## [v2.0.14] — 2026-10-06 (classe d'invocation du skill, Phase 41.4)
 
 **Patch** — le `SKILL.md` déclare sa classe d'invocation (`vf-invocation: model`, vérifiée par

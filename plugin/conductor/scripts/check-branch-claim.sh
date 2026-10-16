@@ -43,6 +43,7 @@
 set -uo pipefail
 
 LOCK_DIR="${VF_DRIVER_LOCK:-.planning/DRIVER.lock}"
+LOCK_GIVEN=0; [ -n "${VF_DRIVER_LOCK:-}" ] && LOCK_GIVEN=1
 TTL="${VF_DRIVER_TTL:-1800}"
 case "$TTL" in ''|*[!0-9]*) TTL=1800 ;; esac
 ROOT="."
@@ -53,7 +54,7 @@ for arg in "$@"; do
   case "$arg" in
     --hook)    HOOK=1 ;;
     --quiet)   QUIET=1 ;;
-    --lock=*)  LOCK_DIR="${arg#*=}" ;;
+    --lock=*)  LOCK_DIR="${arg#*=}"; LOCK_GIVEN=1 ;;
     --path=*)  ROOT="${arg#*=}" ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-branch-claim] argument inconnu : $arg" >&2; exit 64 ;;
@@ -95,42 +96,6 @@ CUR_BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 CUR_WORKTREE="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 [ -n "$CUR_WORKTREE" ] || indetermine "arbre de travail courant illisible"
 
-META="$LOCK_DIR/meta"
-# Pas de lock du tout = personne ne pilote. C'est un etat VERIFIE, donc SAIN — pas indetermine.
-if [ ! -d "$LOCK_DIR" ]; then
-  diag "SAIN — aucun lock de driver actif (${LOCK_DIR} absent)."
-  hook_exit 3
-fi
-[ -r "$META" ] || indetermine "lock present mais son meta est illisible ($META)"
-
-meta_get() { grep "^$1=" "$META" 2>/dev/null | head -1 | cut -d= -f2- || true; }
-
-CLAIM_BRANCH="$(meta_get branch)"
-CLAIM_WORKTREE="$(meta_get worktree)"
-CLAIM_OWNER="$(meta_get owner)"
-CLAIM_STEP="$(meta_get step)"
-HB="$(meta_get heartbeat_epoch)"
-
-# Lock pose par une version anterieure du script (sans les champs branch/worktree) : on ne peut
-# rien affirmer sur la branche. INDETERMINE, jamais un SAIN de complaisance.
-[ -n "$CLAIM_BRANCH" ] || indetermine "le lock ne porte pas de champ 'branch' (pose par une version anterieure de driver-lock.sh)"
-
-case "$HB" in ''|*[!0-9]*) HB="" ;; esac
-if [ -n "$HB" ]; then
-  AGE=$(( $(date +%s) - HB ))
-  if [ "$AGE" -gt "$TTL" ]; then
-    diag "SAIN — un lock existe mais il est perime (age ${AGE}s > ${TTL}s), traite comme absent."
-    hook_exit 3
-  fi
-else
-  AGE=""
-fi
-
-if [ "$CLAIM_BRANCH" != "$CUR_BRANCH" ]; then
-  diag "SAIN — le lock actif pilote '${CLAIM_BRANCH}', pas la branche courante '${CUR_BRANCH}'."
-  hook_exit 3
-fi
-
 # Comparaison de chemins NORMALISEE (`pwd -P`), jamais litterale : sur macOS `/tmp` est un lien
 # vers `/private/tmp`, si bien que le meme arbre se presente sous deux ecritures selon qui
 # l'interroge. Une comparaison brute criait alors a la collision sur son PROPRE arbre — le faux
@@ -141,21 +106,134 @@ norm_path() {
   [ -d "$1" ] && (cd "$1" 2>/dev/null && pwd -P) || printf '%s' "$1"
 }
 
-# Meme branche ET meme arbre : les deux sessions partagent physiquement leur arbre de travail,
-# elles se voient. Rien a signaler.
-if [ "$(norm_path "$CLAIM_WORKTREE")" = "$(norm_path "$CUR_WORKTREE")" ]; then
-  diag "SAIN — la branche '${CUR_BRANCH}' est pilotee depuis CET arbre de travail."
-  hook_exit 3
+# claim_check_lock <dossier-de-verrou> : juge UN verrou, sans rien imprimer (Phase 57, P57-D-15).
+# Rend 0 = signal (CL_DETAIL positionne), 3 = SAIN, 4 = INDETERMINE ; CL_MSG porte le diagnostic
+# (sans prefixe INDETERMINE : l'appelant le pose). Meme logique que le verrou unique d'avant.
+CL_MSG=""; CL_DETAIL=""; CL_META=""
+meta_get() { grep "^$1=" "$CL_META" 2>/dev/null | head -1 | cut -d= -f2- || true; }
+claim_check_lock() {
+  local dir="$1" claim_branch claim_worktree claim_owner claim_step hb age
+  CL_MSG=""; CL_DETAIL=""; CL_META="$dir/meta"
+  # Pas de lock du tout = personne ne pilote. C'est un etat VERIFIE, donc SAIN — pas indetermine.
+  if [ ! -d "$dir" ]; then
+    CL_MSG="SAIN — aucun lock de driver actif (${dir} absent)."
+    return 3
+  fi
+  if [ ! -r "$CL_META" ]; then
+    CL_MSG="lock present mais son meta est illisible ($CL_META)"
+    return 4
+  fi
+
+  claim_branch="$(meta_get branch)"
+  claim_worktree="$(meta_get worktree)"
+  claim_owner="$(meta_get owner)"
+  claim_step="$(meta_get step)"
+  hb="$(meta_get heartbeat_epoch)"
+
+  # Lock pose par une version anterieure du script (sans les champs branch/worktree) : on ne peut
+  # rien affirmer sur la branche. INDETERMINE, jamais un SAIN de complaisance.
+  if [ -z "$claim_branch" ]; then
+    CL_MSG="le lock ne porte pas de champ 'branch' (pose par une version anterieure de driver-lock.sh)"
+    return 4
+  fi
+
+  case "$hb" in ''|*[!0-9]*) hb="" ;; esac
+  if [ -n "$hb" ]; then
+    age=$(( $(date +%s) - hb ))
+    if [ "$age" -gt "$TTL" ]; then
+      CL_MSG="SAIN — un lock existe mais il est perime (age ${age}s > ${TTL}s), traite comme absent."
+      return 3
+    fi
+  else
+    age=""
+  fi
+
+  if [ "$claim_branch" != "$CUR_BRANCH" ]; then
+    CL_MSG="SAIN — le lock actif pilote '${claim_branch}', pas la branche courante '${CUR_BRANCH}'."
+    return 3
+  fi
+
+  # Meme branche ET meme arbre : les deux sessions partagent physiquement leur arbre de travail,
+  # elles se voient. Rien a signaler.
+  if [ "$(norm_path "$claim_worktree")" = "$(norm_path "$CUR_WORKTREE")" ]; then
+    CL_MSG="SAIN — la branche '${CUR_BRANCH}' est pilotee depuis CET arbre de travail."
+    return 3
+  fi
+
+  CL_DETAIL="owner ${claim_owner:-?}"
+  [ -n "$claim_step" ] && CL_DETAIL="$CL_DETAIL, etape ${claim_step}"
+  [ -n "$age" ] && CL_DETAIL="$CL_DETAIL, depuis $(( age / 60 )) min"
+  [ -n "$claim_worktree" ] && CL_DETAIL="$CL_DETAIL, arbre ${claim_worktree}"
+  return 0
+}
+
+emit_signal() { # <detail>
+  if [ "$HOOK" -eq 1 ]; then
+    echo "[branch-claim] '${CUR_BRANCH}' est deja pilotee depuis un autre arbre de travail ($1) — un ecrivain = un worktree (ADR-064)."
+  else
+    diag "la branche '${CUR_BRANCH}' est revendiquee par un lock actif pose ailleurs ($1)."
+  fi
+  exit 0
+}
+
+# --- Verrous du clone (Phase 57, P57-D-07, P57-D-15) ---------------------------------------------
+# Dans un lab partitionne, les verrous vivent au niveau du CLONE (un dossier par verrou, partage entre
+# worktrees) : le seul .planning/DRIVER.lock du checkout courant est alors toujours absent, donc un faux
+# SAIN. On lit les dossiers de verrous du clone tels qu'ils sont, sans detecter la partition ni nommer
+# le dossier des compartiments. --lock / VF_DRIVER_LOCK designe UN verrou : seul celui-la est examine.
+CLONE_N=0
+CLONE_LIST=""
+if [ "$LOCK_GIVEN" -eq 0 ]; then
+  COMMON="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+  [ -n "$COMMON" ] && COMMON="$(cd "$COMMON" 2>/dev/null && pwd -P || true)"
+  add_cand() { # <dossier> : retenu s'il existe (un motif non developpe n'est pas un dossier)
+    if [ -d "$1" ]; then
+      CLONE_N=$((CLONE_N+1))
+      CLONE_LIST="$CLONE_LIST$1
+"
+    fi
+  }
+  if [ -n "$COMMON" ]; then
+    add_cand "$COMMON/vf-driver/repo/DRIVER.lock"
+    for cand in "$COMMON/vf-driver/ws/"*/DRIVER.lock; do add_cand "$cand"; done
+  fi
+  add_cand "$CUR_WORKTREE/.planning/DRIVER.lock.d/repo/DRIVER.lock"
+  for cand in "$CUR_WORKTREE/.planning/DRIVER.lock.d/ws/"*/DRIVER.lock; do add_cand "$cand"; done
 fi
 
-DETAIL="owner ${CLAIM_OWNER:-?}"
-[ -n "$CLAIM_STEP" ] && DETAIL="$DETAIL, etape ${CLAIM_STEP}"
-[ -n "$AGE" ] && DETAIL="$DETAIL, depuis $(( AGE / 60 )) min"
-[ -n "$CLAIM_WORKTREE" ] && DETAIL="$DETAIL, arbre ${CLAIM_WORKTREE}"
-
-if [ "$HOOK" -eq 1 ]; then
-  echo "[branch-claim] '${CUR_BRANCH}' est deja pilotee depuis un autre arbre de travail (${DETAIL}) — un ecrivain = un worktree (ADR-064)."
-else
-  diag "la branche '${CUR_BRANCH}' est revendiquee par un lock actif pose ailleurs (${DETAIL})."
+# Aucun verrou du clone : le chemin d'avant, rejoue tel quel (lab plat inchange, P57-D-03).
+if [ "$CLONE_N" -eq 0 ]; then
+  claim_check_lock "$LOCK_DIR"; rc=$?
+  case "$rc" in
+    0) emit_signal "$CL_DETAIL" ;;
+    3) diag "$CL_MSG"; hook_exit 3 ;;
+    *) indetermine "$CL_MSG" ;;
+  esac
 fi
-exit 0
+
+# Agregation : un signal l'emporte, sinon un indetermine, sinon SAIN. Le verrou du checkout, s'il
+# existe, est examine avec les autres.
+if [ -d "$LOCK_DIR" ]; then
+  CLONE_N=$((CLONE_N+1))
+  CLONE_LIST="$CLONE_LIST$LOCK_DIR
+"
+fi
+INDET_MSG=""
+while IFS= read -r lk; do
+  [ -n "$lk" ] || continue
+  claim_check_lock "$lk"; rc=$?
+  case "$rc" in
+    0)
+      case "$lk" in
+        */ws/*/DRIVER.lock) sj="${lk%/DRIVER.lock}"; CL_DETAIL="$CL_DETAIL, compartiment ${sj##*/}" ;;
+        */repo/DRIVER.lock) CL_DETAIL="$CL_DETAIL, verrou de depot" ;;
+      esac
+      emit_signal "$CL_DETAIL" ;;
+    4) [ -n "$INDET_MSG" ] || INDET_MSG="$CL_MSG ($lk)" ;;
+  esac
+done <<EOF2
+$CLONE_LIST
+EOF2
+[ -z "$INDET_MSG" ] || indetermine "$INDET_MSG"
+diag "SAIN — ${CLONE_N} lock(s) de driver examine(s), aucun ne revendique '${CUR_BRANCH}' depuis un autre arbre de travail."
+hook_exit 3

@@ -34,6 +34,15 @@ case "$WORK_DIR" in
 esac
 [ -d "$WORK_DIR" ] || { echo "PRÉFLIGHT FIXTURE CASSÉ — WORK_DIR introuvable : $WORK_DIR" >&2; exit 2; }
 
+# --- Repertoire courant NEUTRE (Q1, 2026-10-13) : check-guard-health.sh lit le dernier commit du depot git
+# du repertoire courant ; un cas D14-D25 lance depuis le depot qui execute la suite lirait SES commits
+# (frais) et perdrait son stall. La suite tourne donc dans $WORK_DIR, hors de tout depot git (preflight).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE   # une suite jouee depuis un hook git heriterait du depot du hook
+cd "$WORK_DIR" || { echo "PRÉFLIGHT FIXTURE CASSÉ — cd $WORK_DIR impossible" >&2; exit 2; }
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "PRÉFLIGHT FIXTURE CASSÉ — $WORK_DIR est dans un depot git (TMPDIR sous un depot ?)" >&2; exit 2
+fi
+
 # --- Isolation VF_DRIVER_LOCK, PAR DÉFAUT, pour TOUTE la suite (correctif ciblé, mandat 2026-08-17,
 # Bloquant 2) : check_driver_stall() dans check-guard-health.sh lit TOUJOURS `driver-lock.sh
 # status`, y compris pour les cas hérités D1-D7/D9-D11 qui ne le savent pas. Sans cet export, ces
@@ -528,6 +537,350 @@ print(json.dumps({"tool_name": "Bash", "tool_input": {"command": "git commit -m 
 
   VF_DRIVER_LOCK="$D13_LOCK" "$DRIVER_LOCK" release --owner=mission-d13 >/dev/null 2>&1
 fi
+
+# === Q1 — le commit de la branche courante compte comme progression (arbitrage Samuel, AskUserQuestion
+# session principale, 2026-10-13, Q1 option b) ====================================================
+# Pendant un plan plus long que STALL_WINDOW aucun noeud n'est marque : sans cette regle, faux stall a
+# chaque plan (constate a 1587 s et 1589 s le 2026-10-12). Le script lit le dernier commit (%ct, date de
+# COMMIT) de la branche courante du depot git du repertoire courant ; chaque cas tourne dans un depot
+# fictif sous $WORK_DIR, jamais dans le depot qui execute la suite.
+q1_repo() { # <dir> <secs-d-anciennete-du-commit> — depot git avec UN commit dont %ct = maintenant - secs
+  local d="$1" secs="$2" when
+  mkdir -p "$d" && git -C "$d" init -q 2>/dev/null || return 1
+  when=$(( $(date +%s) - secs ))
+  GIT_COMMITTER_DATE="$when +0000" GIT_AUTHOR_DATE="$when +0000" \
+    git -C "$d" -c user.name=q1 -c user.email=q1@example.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null \
+    commit -q --allow-empty -m q1 2>/dev/null
+}
+q1_commit() { # <dir> <secs-commit> <secs-auteur> <msg> — commit vide dont %ct = maintenant - secs-commit et %at = maintenant - secs-auteur
+  local d="$1" now cwhen awhen
+  now="$(date +%s)"; cwhen=$(( now - $2 )); awhen=$(( now - $3 ))
+  GIT_COMMITTER_DATE="$cwhen +0000" GIT_AUTHOR_DATE="$awhen +0000" \
+    git -C "$d" -c user.name=q1 -c user.email=q1@example.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null \
+    commit -q --allow-empty -m "$4" 2>/dev/null
+}
+q1_wt_repo() { # <repo> <worktree> <secs-commit-principal> <secs-commit-secondaire> — depot + worktree secondaire (branche q1wt)
+  q1_repo "$1" "$3" || return 1
+  git -C "$1" worktree add -q -b q1wt "$2" >/dev/null 2>&1 || return 1
+  q1_commit "$2" "$4" "$4" q1wt
+}
+# Age extrait de « depuis <N>s » dans la sortie, vide si absent. Encadrement numerique (jamais une chaine litterale
+# d'age : sous charge la mesure derive de plusieurs secondes — constate 1004 s et 1009 s pour 1000 s attendues).
+q1_age_of() { printf '%s' "$1" | sed -n 's/.*depuis \([0-9][0-9]*\)s.*/\1/p' | head -1; }
+q1_age_in() { # <sortie> <attendu> — vrai si age extrait dans [attendu, attendu + 60]
+  local a; a="$(q1_age_of "$1")"
+  case "$a" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$a" -ge "$2" ] && [ "$a" -le $(( $2 + 60 )) ]
+}
+q1_run() { # <repo-ou-dir> <lock> <health> — le script tourne DANS <repo-ou-dir>, lock backdate fait par l'appelant
+  ( cd "$1" && VF_DRIVER_LOCK="$2" bash "$SCRIPT" --dir="$3" 2>/dev/null )
+}
+
+echo ""
+echo "=== Q1a — progress_epoch fige a 1000 s, heartbeat frais, commit de branche RECENT -> SAIN (pas de faux stall) ==="
+Q1A_LOCK="$WORK_DIR/q1a-lock"; Q1A_REPO="$WORK_DIR/q1a-repo"
+q1_repo "$Q1A_REPO" 60 || ko "Q1a fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1A_LOCK" "$DRIVER_LOCK" acquire --owner=q1a-owner --step=q1a-step >/dev/null 2>&1
+progress_backdate "$Q1A_LOCK" 1000
+Q1A_OUT="$(q1_run "$Q1A_REPO" "$Q1A_LOCK" "$WORK_DIR/q1a-health")"; Q1A_RC=$?
+[ "$Q1A_RC" -eq 3 ] && ok "Q1a : commit de branche a 60 s -> exit 3 (SAIN)" || ko "Q1a exit" "rc=$Q1A_RC attendu 3 (faux stall malgre un commit recent)"
+[ -z "$Q1A_OUT" ] && ok "Q1a : stdout strictement vide" || ko "Q1a stdout" "out=[$Q1A_OUT]"
+VF_DRIVER_LOCK="$Q1A_LOCK" "$DRIVER_LOCK" release --owner=q1a-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1b — TEMOIN : meme verrou, commit de branche ANCIEN (2000 s) -> STALL maintenu, age effectif imprime ==="
+Q1B_LOCK="$WORK_DIR/q1b-lock"; Q1B_REPO="$WORK_DIR/q1b-repo"
+q1_repo "$Q1B_REPO" 2000 || ko "Q1b fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1B_LOCK" "$DRIVER_LOCK" acquire --owner=q1b-owner --step=q1b-step >/dev/null 2>&1
+progress_backdate "$Q1B_LOCK" 1000
+Q1B_OUT="$(q1_run "$Q1B_REPO" "$Q1B_LOCK" "$WORK_DIR/q1b-health")"; Q1B_RC=$?
+[ "$Q1B_RC" -eq 0 ] && ok "Q1b : commit ancien -> exit 0 (signal)" || ko "Q1b exit" "rc=$Q1B_RC attendu 0"
+case "$Q1B_OUT" in
+  *"stall"*"q1b-owner"*"q1b-step"*"seuil=900s"*) ok "Q1b : ligne de stall, owner, step, seuil inchange" ;;
+  *) ko "Q1b contenu" "out=[$Q1B_OUT]" ;;
+esac
+if q1_age_in "$Q1B_OUT" 1000; then ok "Q1b : age imprime = celui du verrou (le plus recent des deux, ici progress_epoch), dans [1000, 1060]"
+else ko "Q1b age" "attendu dans [1000, 1060], obtenu [$(q1_age_of "$Q1B_OUT")] out=[$Q1B_OUT]"; fi
+VF_DRIVER_LOCK="$Q1B_LOCK" "$DRIVER_LOCK" release --owner=q1b-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1c — commit a 1000 s (> seuil), progress_epoch a 1700 s -> STALL, age effectif = celui du COMMIT ==="
+Q1C_LOCK="$WORK_DIR/q1c-lock"; Q1C_REPO="$WORK_DIR/q1c-repo"
+q1_repo "$Q1C_REPO" 1000 || ko "Q1c fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1C_LOCK" "$DRIVER_LOCK" acquire --owner=q1c-owner --step=q1c-step >/dev/null 2>&1
+progress_backdate "$Q1C_LOCK" 1700
+Q1C_OUT="$(q1_run "$Q1C_REPO" "$Q1C_LOCK" "$WORK_DIR/q1c-health")"; Q1C_RC=$?
+[ "$Q1C_RC" -eq 0 ] && ok "Q1c : exit 0 (signal)" || ko "Q1c exit" "rc=$Q1C_RC attendu 0"
+if q1_age_in "$Q1C_OUT" 1000; then ok "Q1c : age effectif = depuis le dernier commit (plus recent que progress_epoch), dans [1000, 1060]"
+else ko "Q1c age" "attendu dans [1000, 1060] (et non 1700), obtenu [$(q1_age_of "$Q1C_OUT")] out=[$Q1C_OUT]"; fi
+VF_DRIVER_LOCK="$Q1C_LOCK" "$DRIVER_LOCK" release --owner=q1c-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1d — pas de depot git (repertoire courant hors git) -> comportement d'avant : STALL, jamais SAIN fabrique ==="
+Q1D_LOCK="$WORK_DIR/q1d-lock"; Q1D_DIR="$WORK_DIR/q1d-nogit"; mkdir -p "$Q1D_DIR"
+VF_DRIVER_LOCK="$Q1D_LOCK" "$DRIVER_LOCK" acquire --owner=q1d-owner --step=q1d-step >/dev/null 2>&1
+progress_backdate "$Q1D_LOCK" 1000
+Q1D_OUT="$(q1_run "$Q1D_DIR" "$Q1D_LOCK" "$WORK_DIR/q1d-health")"; Q1D_RC=$?
+[ "$Q1D_RC" -eq 0 ] && ok "Q1d : hors git -> exit 0 (stall maintenu)" || ko "Q1d exit" "rc=$Q1D_RC attendu 0"
+case "$Q1D_OUT" in *"stall"*"q1d-owner"*) ok "Q1d : ligne de stall" ;; *) ko "Q1d contenu" "out=[$Q1D_OUT]" ;; esac
+VF_DRIVER_LOCK="$Q1D_LOCK" "$DRIVER_LOCK" release --owner=q1d-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1e — lecture git qui ECHOUE (depot sans aucun commit) -> comportement d'avant : STALL, pas de crash ==="
+Q1E_LOCK="$WORK_DIR/q1e-lock"; Q1E_REPO="$WORK_DIR/q1e-repo"
+mkdir -p "$Q1E_REPO" && git -C "$Q1E_REPO" init -q 2>/dev/null
+VF_DRIVER_LOCK="$Q1E_LOCK" "$DRIVER_LOCK" acquire --owner=q1e-owner --step=q1e-step >/dev/null 2>&1
+progress_backdate "$Q1E_LOCK" 1000
+Q1E_OUT="$(q1_run "$Q1E_REPO" "$Q1E_LOCK" "$WORK_DIR/q1e-health")"; Q1E_RC=$?
+[ "$Q1E_RC" -eq 0 ] && ok "Q1e : git log en echec -> exit 0 (stall maintenu)" || ko "Q1e exit" "rc=$Q1E_RC attendu 0"
+case "$Q1E_OUT" in *"stall"*"q1e-owner"*) ok "Q1e : ligne de stall" ;; *) ko "Q1e contenu" "out=[$Q1E_OUT]" ;; esac
+VF_DRIVER_LOCK="$Q1E_LOCK" "$DRIVER_LOCK" release --owner=q1e-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1f — commit date dans le FUTUR (horloge decalee) -> ignore, STALL maintenu (un commit futur ne masque jamais un stall) ==="
+Q1F_LOCK="$WORK_DIR/q1f-lock"; Q1F_REPO="$WORK_DIR/q1f-repo"
+q1_repo "$Q1F_REPO" -86400 || ko "Q1f fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1F_LOCK" "$DRIVER_LOCK" acquire --owner=q1f-owner --step=q1f-step >/dev/null 2>&1
+progress_backdate "$Q1F_LOCK" 1000
+Q1F_OUT="$(q1_run "$Q1F_REPO" "$Q1F_LOCK" "$WORK_DIR/q1f-health")"; Q1F_RC=$?
+[ "$Q1F_RC" -eq 0 ] && ok "Q1f : commit futur -> exit 0 (stall maintenu)" || ko "Q1f exit" "rc=$Q1F_RC attendu 0"
+VF_DRIVER_LOCK="$Q1F_LOCK" "$DRIVER_LOCK" release --owner=q1f-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1g — ABANDON inchange : heartbeat mort + commit recent -> abandon (le commit n'efface jamais un heartbeat mort) ==="
+Q1G_LOCK="$WORK_DIR/q1g-lock"; Q1G_REPO="$WORK_DIR/q1g-repo"
+q1_repo "$Q1G_REPO" 30 || ko "Q1g fixture" "depot git non cree"
+VF_DRIVER_LOCK="$Q1G_LOCK" "$DRIVER_LOCK" acquire --owner=q1g-owner --step=q1g-step >/dev/null 2>&1
+heartbeat_backdate "$Q1G_LOCK" 2000
+Q1G_OUT="$(q1_run "$Q1G_REPO" "$Q1G_LOCK" "$WORK_DIR/q1g-health")"; Q1G_RC=$?
+[ "$Q1G_RC" -eq 0 ] && ok "Q1g : exit 0 (signal)" || ko "Q1g exit" "rc=$Q1G_RC attendu 0"
+case "$Q1G_OUT" in *"abandon"*"q1g-owner"*) ok "Q1g : ligne d'abandon malgre le commit recent" ;; *) ko "Q1g contenu" "out=[$Q1G_OUT]" ;; esac
+VF_DRIVER_LOCK="$Q1G_LOCK" "$DRIVER_LOCK" release --owner=q1g-owner >/dev/null 2>&1
+
+# === Q1h-Q1m — la progression est le commit le plus recent parmi les HEAD de TOUS les worktrees du dossier git
+# commun (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, D option b) ======================
+# Un verrou partage entre worktrees (vf-driver/ sous le git-common-dir) est travaille depuis un autre worktree que
+# celui ou tourne le watchdog : lire le seul HEAD courant le declarait fige alors que son proprietaire commitait.
+echo ""
+echo "=== Q1h — commit recent SEULEMENT dans le worktree secondaire, verrou fige -> SAIN (le watchdog tourne dans le principal) ==="
+Q1H_LOCK="$WORK_DIR/q1h-lock"; Q1H_REPO="$WORK_DIR/q1h-repo"; Q1H_WT="$WORK_DIR/q1h-wt"
+q1_wt_repo "$Q1H_REPO" "$Q1H_WT" 2000 60 || ko "Q1h fixture" "depot ou worktree non cree"
+VF_DRIVER_LOCK="$Q1H_LOCK" "$DRIVER_LOCK" acquire --owner=q1h-owner --step=q1h-step >/dev/null 2>&1
+progress_backdate "$Q1H_LOCK" 1000
+Q1H_OUT="$(q1_run "$Q1H_REPO" "$Q1H_LOCK" "$WORK_DIR/q1h-health")"; Q1H_RC=$?
+[ "$Q1H_RC" -eq 3 ] && ok "Q1h : HEAD recent dans un autre worktree -> exit 3 (SAIN)" || ko "Q1h exit" "rc=$Q1H_RC attendu 3 (faux stall : seul le HEAD courant est lu)"
+[ -z "$Q1H_OUT" ] && ok "Q1h : stdout strictement vide" || ko "Q1h stdout" "out=[$Q1H_OUT]"
+VF_DRIVER_LOCK="$Q1H_LOCK" "$DRIVER_LOCK" release --owner=q1h-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1i — TEMOIN : tous les HEAD anciens (2000 s et 1500 s) -> STALL maintenu ==="
+Q1I_LOCK="$WORK_DIR/q1i-lock"; Q1I_REPO="$WORK_DIR/q1i-repo"; Q1I_WT="$WORK_DIR/q1i-wt"
+q1_wt_repo "$Q1I_REPO" "$Q1I_WT" 2000 1500 || ko "Q1i fixture" "depot ou worktree non cree"
+VF_DRIVER_LOCK="$Q1I_LOCK" "$DRIVER_LOCK" acquire --owner=q1i-owner --step=q1i-step >/dev/null 2>&1
+progress_backdate "$Q1I_LOCK" 1000
+Q1I_OUT="$(q1_run "$Q1I_REPO" "$Q1I_LOCK" "$WORK_DIR/q1i-health")"; Q1I_RC=$?
+[ "$Q1I_RC" -eq 0 ] && ok "Q1i : tous les HEAD anciens -> exit 0 (signal)" || ko "Q1i exit" "rc=$Q1I_RC attendu 0"
+case "$Q1I_OUT" in *"stall"*"q1i-owner"*) ok "Q1i : ligne de stall" ;; *) ko "Q1i contenu" "out=[$Q1I_OUT]" ;; esac
+if q1_age_in "$Q1I_OUT" 1000; then ok "Q1i : age effectif = celui du verrou (1000), les deux HEAD etant plus vieux"
+else ko "Q1i age" "attendu dans [1000, 1060], obtenu [$(q1_age_of "$Q1I_OUT")]"; fi
+VF_DRIVER_LOCK="$Q1I_LOCK" "$DRIVER_LOCK" release --owner=q1i-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1j — worktree secondaire PRUNABLE (repertoire disparu) a HEAD recent -> ignore, STALL maintenu ==="
+Q1J_LOCK="$WORK_DIR/q1j-lock"; Q1J_REPO="$WORK_DIR/q1j-repo"; Q1J_WT="$WORK_DIR/q1j-wt"
+q1_wt_repo "$Q1J_REPO" "$Q1J_WT" 2000 60 || ko "Q1j fixture" "depot ou worktree non cree"
+rm -rf "$Q1J_WT"
+# Controle positif : git declare bien le worktree prunable AVANT l'appel, sinon le cas ne prouverait rien.
+case "$(git -C "$Q1J_REPO" worktree list --porcelain 2>/dev/null)" in
+  *prunable*) ok "Q1j : controle positif — git marque le worktree disparu 'prunable'" ;;
+  *) ko "Q1j controle positif" "worktree non marque prunable — fixture cassee" ;;
+esac
+VF_DRIVER_LOCK="$Q1J_LOCK" "$DRIVER_LOCK" acquire --owner=q1j-owner --step=q1j-step >/dev/null 2>&1
+progress_backdate "$Q1J_LOCK" 1000
+Q1J_OUT="$(q1_run "$Q1J_REPO" "$Q1J_LOCK" "$WORK_DIR/q1j-health")"; Q1J_RC=$?
+[ "$Q1J_RC" -eq 0 ] && ok "Q1j : worktree prunable ignore -> exit 0 (stall maintenu)" || ko "Q1j exit" "rc=$Q1J_RC attendu 0"
+case "$Q1J_OUT" in *"stall"*"q1j-owner"*) ok "Q1j : ligne de stall" ;; *) ko "Q1j contenu" "out=[$Q1J_OUT]" ;; esac
+VF_DRIVER_LOCK="$Q1J_LOCK" "$DRIVER_LOCK" release --owner=q1j-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1k — commit FUTUR dans le worktree secondaire, commit RECENT dans le principal -> le futur est ignore, le recent compte (SAIN) ==="
+# Si le futur etait retenu comme « le plus recent » puis rejete en bloc, le commit recent du principal serait perdu
+# et le watchdog declarerait un faux stall : chaque HEAD est donc juge pour son compte avant le choix du maximum.
+Q1K_LOCK="$WORK_DIR/q1k-lock"; Q1K_REPO="$WORK_DIR/q1k-repo"; Q1K_WT="$WORK_DIR/q1k-wt"
+q1_wt_repo "$Q1K_REPO" "$Q1K_WT" 60 -86400 || ko "Q1k fixture" "depot ou worktree non cree"
+VF_DRIVER_LOCK="$Q1K_LOCK" "$DRIVER_LOCK" acquire --owner=q1k-owner --step=q1k-step >/dev/null 2>&1
+progress_backdate "$Q1K_LOCK" 1000
+Q1K_OUT="$(q1_run "$Q1K_REPO" "$Q1K_LOCK" "$WORK_DIR/q1k-health")"; Q1K_RC=$?
+[ "$Q1K_RC" -eq 3 ] && ok "Q1k : futur ignore, recent du principal retenu -> exit 3 (SAIN)" || ko "Q1k exit" "rc=$Q1K_RC attendu 3 (le commit futur a masque le commit recent)"
+[ -z "$Q1K_OUT" ] && ok "Q1k : stdout strictement vide" || ko "Q1k stdout" "out=[$Q1K_OUT]"
+VF_DRIVER_LOCK="$Q1K_LOCK" "$DRIVER_LOCK" release --owner=q1k-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1l — date d'AUTEUR ancienne (5 j), date de COMMIT recente (30 s) -> SAIN : %ct et non %at ==="
+Q1L_LOCK="$WORK_DIR/q1l-lock"; Q1L_REPO="$WORK_DIR/q1l-repo"
+mkdir -p "$Q1L_REPO" && git -C "$Q1L_REPO" init -q 2>/dev/null
+q1_commit "$Q1L_REPO" 30 432000 q1l || ko "Q1l fixture" "commit non cree"
+# Controle positif : les deux dates divergent bien dans le depot de fixture.
+Q1L_AT="$(git -C "$Q1L_REPO" log -1 --format=%at 2>/dev/null)"; Q1L_CT="$(git -C "$Q1L_REPO" log -1 --format=%ct 2>/dev/null)"
+case "$Q1L_AT:$Q1L_CT" in
+  *[!0-9:]*|:*|*:) ko "Q1l controle positif" "dates illisibles at=[$Q1L_AT] ct=[$Q1L_CT]" ;;
+  *) [ $(( Q1L_CT - Q1L_AT )) -gt 400000 ] && ok "Q1l : controle positif — %ct est plus recent que %at de plus de 400000 s" || ko "Q1l controle positif" "at=$Q1L_AT ct=$Q1L_CT : dates non divergentes" ;;
+esac
+VF_DRIVER_LOCK="$Q1L_LOCK" "$DRIVER_LOCK" acquire --owner=q1l-owner --step=q1l-step >/dev/null 2>&1
+progress_backdate "$Q1L_LOCK" 1000
+Q1L_OUT="$(q1_run "$Q1L_REPO" "$Q1L_LOCK" "$WORK_DIR/q1l-health")"; Q1L_RC=$?
+[ "$Q1L_RC" -eq 3 ] && ok "Q1l : commit rebase a l'instant (auteur ancien) -> exit 3 (SAIN)" || ko "Q1l exit" "rc=$Q1L_RC attendu 3 (la date d'auteur a ete lue)"
+[ -z "$Q1L_OUT" ] && ok "Q1l : stdout strictement vide" || ko "Q1l stdout" "out=[$Q1L_OUT]"
+VF_DRIVER_LOCK="$Q1L_LOCK" "$DRIVER_LOCK" release --owner=q1l-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1m — GIT_DIR herite (hook git, shell parent) pointant un AUTRE depot ancien -> ignore : git durci, depot du cwd lu (SAIN) ==="
+Q1M_LOCK="$WORK_DIR/q1m-lock"; Q1M_REPO="$WORK_DIR/q1m-repo"; Q1M_OTHER="$WORK_DIR/q1m-other"
+q1_repo "$Q1M_REPO" 60 || ko "Q1m fixture" "depot recent non cree"
+q1_repo "$Q1M_OTHER" 2000 || ko "Q1m fixture" "depot ancien non cree"
+VF_DRIVER_LOCK="$Q1M_LOCK" "$DRIVER_LOCK" acquire --owner=q1m-owner --step=q1m-step >/dev/null 2>&1
+progress_backdate "$Q1M_LOCK" 1000
+Q1M_OUT="$( cd "$Q1M_REPO" && GIT_DIR="$Q1M_OTHER/.git" GIT_WORK_TREE="$Q1M_OTHER" VF_DRIVER_LOCK="$Q1M_LOCK" bash "$SCRIPT" --dir="$WORK_DIR/q1m-health" 2>/dev/null )"; Q1M_RC=$?
+[ "$Q1M_RC" -eq 3 ] && ok "Q1m : GIT_DIR/GIT_WORK_TREE herites ignores -> exit 3 (SAIN)" || ko "Q1m exit" "rc=$Q1M_RC attendu 3 (git lit le depot ancien designe par l'environnement)"
+[ -z "$Q1M_OUT" ] && ok "Q1m : stdout strictement vide" || ko "Q1m stdout" "out=[$Q1M_OUT]"
+VF_DRIVER_LOCK="$Q1M_LOCK" "$DRIVER_LOCK" release --owner=q1m-owner >/dev/null 2>&1
+
+# === Q1n-Q1q — lecture des worktrees SEPAREE PAR NUL, et un seul `git log` (AU3-05, AU3-06) ================
+# AU3-05 : un chemin de worktree peut contenir des sauts de ligne ; lu par lignes, il forgeait un bloc `HEAD <sha>` (age
+# 214 082 152 s -> 0 s). Le HEAD du seul worktree reel est ANCIEN (2000 s) ; le sha recent n'existe que sur une branche
+# sans worktree et dans le NOM du chemin : le verdict juste est STALL.
+q1n_repo() { # <repo> <worktree-forge> — rend 0 si le depot est pret ; ecrit le sha recent dans <repo>.rec
+  local repo="$1" wt="$2" tmp="$1-recwt" sha
+  q1_repo "$repo" 2000 || return 1
+  git -C "$repo" worktree add -q -b q1nrec "$tmp" >/dev/null 2>&1 || return 1
+  q1_commit "$tmp" 60 60 q1nrec || return 1
+  sha="$(git -C "$tmp" rev-parse HEAD 2>/dev/null)"; [ -n "$sha" ] || return 1
+  git -C "$repo" worktree remove --force "$tmp" >/dev/null 2>&1 || return 1
+  printf '%s' "$sha" > "$repo.rec"
+  wt="${wt}
+ 
+HEAD ${sha}
+
+x"
+  git -C "$repo" worktree add -q -b q1n "$wt" >/dev/null 2>&1
+}
+# Shim `git` : journalise les appels `log`, refuse `-z` (git < 2.36 : exit 129) quand Q1_SHIM_NOZ=1, fait echouer
+# `log --no-walk` quand Q1_SHIM_NOWALK_FAIL=1 ; le reste est delegue au vrai git.
+Q1_REALGIT="$(command -v git)"
+mkdir -p "$WORK_DIR/q1shim"
+cat > "$WORK_DIR/q1shim/git" <<EOSHIM
+#!/bin/bash
+for a in "\$@"; do
+  [ "\$a" = "worktree" ] && [ -n "\${Q1_SHIM_WTOUT:-}" ] && { cat "\$Q1_SHIM_WTOUT"; exit 0; }
+  [ "\$a" = "log" ] && echo "log" >> "\${Q1_SHIM_LOG:-/dev/null}"
+  [ "\$a" = "-z" ] && [ "\${Q1_SHIM_NOZ:-0}" = 1 ] && { echo "error: unknown switch 'z'" >&2; exit 129; }
+  [ "\$a" = "--no-walk=unsorted" ] && [ "\${Q1_SHIM_NOWALK_FAIL:-0}" = 1 ] && exit 1
+done
+exec "$Q1_REALGIT" "\$@"
+EOSHIM
+chmod +x "$WORK_DIR/q1shim/git"
+
+echo ""
+echo "=== Q1n — chemin de worktree a sauts de ligne forgeant un HEAD recent -> ignore, STALL maintenu ==="
+Q1N_LOCK="$WORK_DIR/q1n-lock"; Q1N_REPO="$WORK_DIR/q1n-repo"; Q1N_WT="$WORK_DIR/q1n-wt"
+q1n_repo "$Q1N_REPO" "$Q1N_WT" || ko "Q1n fixture" "depot ou worktree a chemin forge non cree"
+# Controle positif : la lecture PAR LIGNES de git verrait bien une ligne `HEAD <sha recent>` forgee ; sans cela le cas ne prouverait rien.
+Q1N_SHA="$(cat "$Q1N_REPO.rec" 2>/dev/null)"
+[ -n "$Q1N_SHA" ] && git -C "$Q1N_REPO" worktree list --porcelain 2>/dev/null | grep -qx "HEAD $Q1N_SHA" \
+  && ok "Q1n : controle positif — la sortie par lignes de git contient la ligne HEAD forgee" \
+  || ko "Q1n controle positif" "ligne HEAD forgee absente de la sortie par lignes — fixture cassee"
+VF_DRIVER_LOCK="$Q1N_LOCK" "$DRIVER_LOCK" acquire --owner=q1n-owner --step=q1n-step >/dev/null 2>&1
+progress_backdate "$Q1N_LOCK" 1000
+Q1N_OUT="$(q1_run "$Q1N_REPO" "$Q1N_LOCK" "$WORK_DIR/q1n-health")"; Q1N_RC=$?
+[ "$Q1N_RC" -eq 0 ] && ok "Q1n : HEAD forge ignore -> exit 0 (stall maintenu)" || ko "Q1n exit" "rc=$Q1N_RC attendu 0 (un nom de chemin a forge un HEAD recent)"
+if q1_age_in "$Q1N_OUT" 1000; then ok "Q1n : age effectif = celui du verrou (1000)"; else ko "Q1n age" "attendu dans [1000, 1060], obtenu [$(q1_age_of "$Q1N_OUT")]"; fi
+VF_DRIVER_LOCK="$Q1N_LOCK" "$DRIVER_LOCK" release --owner=q1n-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1o — git sans -z (exit 129) : repli SUR sur le HEAD courant, jamais une lecture par lignes (STALL, aucun HEAD forge lu) ==="
+Q1O_LOCK="$WORK_DIR/q1o-lock"; Q1O_SHIMLOG="$WORK_DIR/q1o-shim.log"; : > "$Q1O_SHIMLOG"
+VF_DRIVER_LOCK="$Q1O_LOCK" "$DRIVER_LOCK" acquire --owner=q1o-owner --step=q1o-step >/dev/null 2>&1
+progress_backdate "$Q1O_LOCK" 1000
+Q1O_OUT="$( cd "$Q1N_REPO" && PATH="$WORK_DIR/q1shim:$PATH" Q1_SHIM_NOZ=1 Q1_SHIM_LOG="$Q1O_SHIMLOG" VF_DRIVER_LOCK="$Q1O_LOCK" bash "$SCRIPT" --dir="$WORK_DIR/q1o-health" 2>/dev/null )"; Q1O_RC=$?
+[ "$Q1O_RC" -eq 0 ] && ok "Q1o : sans -z -> exit 0 (stall, HEAD courant seul)" || ko "Q1o exit" "rc=$Q1O_RC attendu 0"
+if q1_age_in "$Q1O_OUT" 1000; then ok "Q1o : age effectif = celui du verrou (1000)"; else ko "Q1o age" "attendu dans [1000, 1060], obtenu [$(q1_age_of "$Q1O_OUT")]"; fi
+VF_DRIVER_LOCK="$Q1O_LOCK" "$DRIVER_LOCK" release --owner=q1o-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1p — un seul processus git log pour tous les HEAD (3 worktrees) ==="
+Q1P_LOCK="$WORK_DIR/q1p-lock"; Q1P_REPO="$WORK_DIR/q1p-repo"; Q1P_WT="$WORK_DIR/q1p-wt"; Q1P_WT2="$WORK_DIR/q1p-wt2"; Q1P_SHIMLOG="$WORK_DIR/q1p-shim.log"; : > "$Q1P_SHIMLOG"
+q1_wt_repo "$Q1P_REPO" "$Q1P_WT" 2000 60 && git -C "$Q1P_REPO" worktree add -q -b q1wt2 "$Q1P_WT2" >/dev/null 2>&1 || ko "Q1p fixture" "depot ou worktrees non crees"
+VF_DRIVER_LOCK="$Q1P_LOCK" "$DRIVER_LOCK" acquire --owner=q1p-owner --step=q1p-step >/dev/null 2>&1
+progress_backdate "$Q1P_LOCK" 1000
+Q1P_OUT="$( cd "$Q1P_REPO" && PATH="$WORK_DIR/q1shim:$PATH" Q1_SHIM_LOG="$Q1P_SHIMLOG" VF_DRIVER_LOCK="$Q1P_LOCK" bash "$SCRIPT" --dir="$WORK_DIR/q1p-health" 2>/dev/null )"; Q1P_RC=$?
+[ "$Q1P_RC" -eq 3 ] && ok "Q1p : verdict inchange (HEAD recent du worktree secondaire) -> exit 3" || ko "Q1p exit" "rc=$Q1P_RC attendu 3"
+Q1P_N="$(grep -c '^log$' "$Q1P_SHIMLOG" 2>/dev/null)"
+[ "$Q1P_N" = 1 ] && ok "Q1p : un seul appel git log pour 3 worktrees" || ko "Q1p nombre de git log" "obtenu [$Q1P_N] attendu 1"
+VF_DRIVER_LOCK="$Q1P_LOCK" "$DRIVER_LOCK" release --owner=q1p-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1q — git log --no-walk refuse (un HEAD illisible) : repli par HEAD, verdict inchange (SAIN) ==="
+Q1Q_LOCK="$WORK_DIR/q1q-lock"; Q1Q_REPO="$WORK_DIR/q1q-repo"; Q1Q_WT="$WORK_DIR/q1q-wt"
+q1_wt_repo "$Q1Q_REPO" "$Q1Q_WT" 2000 60 || ko "Q1q fixture" "depot ou worktree non cree"
+VF_DRIVER_LOCK="$Q1Q_LOCK" "$DRIVER_LOCK" acquire --owner=q1q-owner --step=q1q-step >/dev/null 2>&1
+progress_backdate "$Q1Q_LOCK" 1000
+Q1Q_OUT="$( cd "$Q1Q_REPO" && PATH="$WORK_DIR/q1shim:$PATH" Q1_SHIM_NOWALK_FAIL=1 VF_DRIVER_LOCK="$Q1Q_LOCK" bash "$SCRIPT" --dir="$WORK_DIR/q1q-health" 2>/dev/null )"; Q1Q_RC=$?
+[ "$Q1Q_RC" -eq 3 ] && ok "Q1q : repli par HEAD -> exit 3 (SAIN)" || ko "Q1q exit" "rc=$Q1Q_RC attendu 3"
+VF_DRIVER_LOCK="$Q1Q_LOCK" "$DRIVER_LOCK" release --owner=q1q-owner >/dev/null 2>&1
+
+echo ""
+echo "=== Q1r — sortie -z dont un bloc ne commence pas par « worktree » (HEAD recent seul) -> bloc rejete, STALL maintenu ==="
+Q1R_LOCK="$WORK_DIR/q1r-lock"; Q1R_WTOUT="$WORK_DIR/q1r-wtout"
+printf 'HEAD %s\0\0' "$Q1N_SHA" > "$Q1R_WTOUT"
+VF_DRIVER_LOCK="$Q1R_LOCK" "$DRIVER_LOCK" acquire --owner=q1r-owner --step=q1r-step >/dev/null 2>&1
+progress_backdate "$Q1R_LOCK" 1000
+Q1R_OUT="$( cd "$Q1N_REPO" && PATH="$WORK_DIR/q1shim:$PATH" Q1_SHIM_WTOUT="$Q1R_WTOUT" VF_DRIVER_LOCK="$Q1R_LOCK" bash "$SCRIPT" --dir="$WORK_DIR/q1r-health" 2>/dev/null )"; Q1R_RC=$?
+[ "$Q1R_RC" -eq 0 ] && ok "Q1r : bloc sans en-tete rejete -> exit 0 (stall maintenu)" || ko "Q1r exit" "rc=$Q1R_RC attendu 0"
+VF_DRIVER_LOCK="$Q1R_LOCK" "$DRIVER_LOCK" release --owner=q1r-owner >/dev/null 2>&1
+
+# --- Mutants de la lecture des worktrees (AU3-05, AU3-06) : chaque mutation doit faire rougir SON cas. Copie du module
+# (conductor/scripts + planning-core/scripts, memes positions relatives) sous $WORK_DIR, le script y est muté puis rejoué
+# sur le cas Q1n (lecture par lignes forgee), Q1h (seul HEAD d'un autre worktree), Q1p (un seul git log).
+Q1_MUTBASE="$WORK_DIR/q1mut"
+mkdir -p "$Q1_MUTBASE/conductor" "$Q1_MUTBASE/planning-core"
+cp -R "$(cd "$(dirname "$SCRIPT")" && pwd)" "$Q1_MUTBASE/conductor/scripts"
+cp -R "$(cd "$(dirname "$SCRIPT")/../../planning-core/scripts" && pwd)" "$Q1_MUTBASE/planning-core/scripts"
+q1_mut_rc() { # <script> <repo> <lock-nom> [VAR=valeur] -> rc du script, depot <repo>
+  local s="$1" repo="$2" lk="$WORK_DIR/q1mut-$3-lock" extra="${4:-Q1_UNUSED=1}"
+  VF_DRIVER_LOCK="$lk" "$DRIVER_LOCK" acquire --owner=q1mut --step=q1mut >/dev/null 2>&1
+  progress_backdate "$lk" 1000
+  ( cd "$repo" && env "$extra" PATH="$WORK_DIR/q1shim:$PATH" Q1_SHIM_LOG="$WORK_DIR/q1mut-$3.log" VF_DRIVER_LOCK="$lk" bash "$s" --dir="$WORK_DIR/q1mut-$3-health" >/dev/null 2>&1 ); local rc=$?
+  VF_DRIVER_LOCK="$lk" "$DRIVER_LOCK" release --owner=q1mut >/dev/null 2>&1
+  return $rc
+}
+q1_mutant() { # <id> <ancre BRE> <expr sed> <cas qui doit basculer : n|h|p>
+  local id="$1" anchor="$2" expr="$3" kind="$4" d="$Q1_MUTBASE/$1" n rc cnt
+  mkdir -p "$d"; cp "$Q1_MUTBASE/conductor/scripts/check-guard-health.sh" "$d/check-guard-health.sh.orig"
+  cp "$d/check-guard-health.sh.orig" "$d/m.sh"
+  n="$(grep -c -e "$anchor" "$d/m.sh")"
+  [ "$n" = 1 ] || { ko "Q1-M-$id" "ancre non unique ($n)"; return; }
+  sed -i.bak -e "/$anchor/$expr" "$d/m.sh"; rm -f "$d/m.sh.bak"
+  cmp -s "$d/m.sh" "$d/check-guard-health.sh.orig" && { ko "Q1-M-$id" "mutant NON OPPOSABLE (rien change)"; return; }
+  bash -n "$d/m.sh" 2>/dev/null || { ko "Q1-M-$id" "le mutant n'est pas un script valide"; return; }
+  cp "$d/m.sh" "$Q1_MUTBASE/conductor/scripts/check-guard-health.sh"   # le module copie porte le mutant
+  case "$kind" in
+    n) q1_mut_rc "$Q1_MUTBASE/conductor/scripts/check-guard-health.sh" "$Q1N_REPO" "$id"; rc=$?
+       [ "$rc" -eq 3 ] && ok "Q1-M-$id : mutant tue (le HEAD forge est lu : exit 3 au lieu de 0)" || ko "Q1-M-$id" "mutant survivant : rc=$rc attendu 3" ;;
+    h) q1_mut_rc "$Q1_MUTBASE/conductor/scripts/check-guard-health.sh" "$Q1H_REPO" "$id"; rc=$?
+       [ "$rc" -eq 0 ] && ok "Q1-M-$id : mutant tue (le HEAD d'un autre worktree n'est plus lu : exit 0 au lieu de 3)" || ko "Q1-M-$id" "mutant survivant : rc=$rc attendu 0" ;;
+    r) q1_mut_rc "$Q1_MUTBASE/conductor/scripts/check-guard-health.sh" "$Q1N_REPO" "$id" Q1_SHIM_WTOUT="$Q1R_WTOUT"; rc=$?
+       [ "$rc" -eq 3 ] && ok "Q1-M-$id : mutant tue (le bloc sans en-tete worktree est lu : exit 3 au lieu de 0)" || ko "Q1-M-$id" "mutant survivant : rc=$rc attendu 3" ;;
+    p) : > "$WORK_DIR/q1mut-$id.log"; q1_mut_rc "$Q1_MUTBASE/conductor/scripts/check-guard-health.sh" "$Q1P_REPO" "$id"
+       cnt="$(grep -c '^log$' "$WORK_DIR/q1mut-$id.log" 2>/dev/null)"
+       [ "$cnt" != 1 ] && ok "Q1-M-$id : mutant tue ($cnt appels git log au lieu de 1)" || ko "Q1-M-$id" "mutant survivant : toujours 1 appel git log" ;;
+  esac
+  cp "$d/check-guard-health.sh.orig" "$Q1_MUTBASE/conductor/scripts/check-guard-health.sh"
+}
+# DRIVER_LOCK de la suite (script du depot) reste utilise pour poser/lever les verrous ; seul check-guard-health.sh est muté.
+q1_mutant lecture_par_lignes 'cgh_git worktree list --porcelain -z 2>' "s@ -z 2>/dev/null;@ 2>/dev/null | tr '\\\\n' '\\\\0';@" n
+q1_mutant sans_z 'cgh_git worktree list --porcelain -z 2>' 's@ -z 2>/dev/null;@ 2>/dev/null;@' h
+q1_mutant bloc_non_rejete '\*) bad=1 ;; esac' 's@bad=1@bad=0@' r
+q1_mutant un_git_log_par_head 'if out="$(cgh_git log --no-walk=unsorted' 's@if out=.*; then$@if false; then@' p
 
 echo ""
 echo "=== D12 — anti-vert-à-vide : le compteur d'assertions exécutées n'est jamais zéro ==="

@@ -83,6 +83,9 @@ move only destroys the lock entry itself, never a commit or file produced by the
 it. If it's **not** stale, don't force it: another mission holds it legitimately, let it finish or
 release it on its own.
 
+Split lab: `driver-lock.sh status --all` shows every lock. After an update, `legacy-lock-held` says
+an old single lock is still held: its holder releases it with the command in the refusal.
+
 **Check.** The status reports absent, or a new owner if another mission has since taken over.
 
 ### The branch claim is refused
@@ -132,7 +135,10 @@ the holder, but your session's identifier changed (after a `/clear`, or an ambig
 `driver-lock.sh reclaim --owner=<holder>`, then retry. Otherwise: wait for the mandate to end, or
 work in a separate tree (`git worktree add`), which isn't subject to the lock. As a last resort, for
 one specific action you take responsibility for, the message describes an explicit override marker;
-it is recorded as far as possible (a failed write is ignored), and never set "just in case".
+it is recorded as far as possible (a failed write is ignored), and never set "just in case". Split
+lab: the message names the topic, and the way back is
+`driver-lock.sh reclaim --owner=<holder> --ws=<topic>`. Always run `driver-lock.sh` from the lab root:
+with `--ws` or `--depot` from a subfolder it refuses (`not-at-lab-root`) instead of placing a lock elsewhere.
 
 **Check.** The same action goes through, or a new attempt names the same holder for as long as its
 mission isn't over. The safeguard sees neither a terminal outside Claude Code nor a disguised

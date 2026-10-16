@@ -22,10 +22,14 @@ Une version sans tag n'est ni traçable ni installable par référence (historiq
 
 1. **Bump cohérent** du même numéro dans les trois fichiers : `VERSION`,
    `plugin/.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json` — plus l'historique des
-   deux README (`README.md` **et** `README.fr.md`, badges inclus).
+   deux README (`README.md` **et** `README.fr.md`, badges inclus). Geste de dépôt court : prends le
+   verrou avant (`bash plugin/conductor/scripts/driver-lock.sh acquire --depot --owner=<id> --step=release-bump`)
+   et relâche-le dès le commit de bump fait (`bash plugin/conductor/scripts/driver-lock.sh release --depot --owner=<id>`).
 2. **Relecture adverse avant le tag** (SOBR-04) : `git diff <tag précédent>..<commit de release> -- plugin/`
    relu par qui ne l'a pas écrit, ≥ 1 sonde exécutée, commande et sortie dans les notes de release.
-3. **Après le merge sur `main`**, crée et pousse le tag annoté :
+3. **Après le merge sur `main`**, prends le verrou de dépôt
+   (`bash plugin/conductor/scripts/driver-lock.sh acquire --depot --owner=<id> --step=release-tag`),
+   puis crée et pousse le tag annoté :
    ```bash
    git tag -a vX.Y.Z -m "vX.Y.Z — <résumé>" <commit-de-release>
    git push origin vX.Y.Z
@@ -35,6 +39,8 @@ Une version sans tag n'est ni traçable ni installable par référence (historiq
    gh release create vX.Y.Z --title "vX.Y.Z — <résumé court>" --notes "<résumé + commits depuis le tag précédent + commande et sortie de la sonde, étape 2>" --verify-tag
    ```
    Un tag sans release GitHub rend la page Releases mensongère (historique : même en-tête).
+   Relâche le verrou de dépôt ensuite (`bash plugin/conductor/scripts/driver-lock.sh release --depot --owner=<id>`) :
+   il n'est jamais tenu pendant la relecture adverse, la PR, une attente de CI ou le merge (TTL de 1 800 s).
 5. **Vérifie** : `bash scripts/check-release-tag.sh --remote` → doit sortir `✓` (le gate vérifie
    le tag local, le tag poussé **et** la release GitHub).
 
@@ -113,11 +119,12 @@ section précédente (ADR-072).
   instructions de la baseline du budget d'instructions, ou sur une sentinelle d'armement
   neutralisée, sans citation d'arbitrage conforme dans le commit qui porte le changement.
 - `scripts/check-gate-touche.sh` (G-2) : rougit quand un gate, sa suite, `.github/workflows/ci.yml`
-  ou un hook sont touchés sans marqueur déclaratif dans un commit de la branche.
+  ou un hook sont touchés, ou une fixture des suites surveillées (`plugin/conductor/scripts/tests/fixtures/**`,
+  `scripts/tests/fixtures/**`, six classes, ADR-072 amendement du 2026-10-13), sans marqueur déclaratif dans un commit de la branche.
 - `scripts/check-push-sans-pr.sh` (G-3) : alarme après coup, un commit arrivé sur `main` sans PR
   associée — quand elle rougit, le commit est déjà sur `main`.
 
-**Marqueur** : tout commit qui touche un gate, sa suite, le workflow CI ou un hook porte un trailer
+**Marqueur** : tout commit qui touche un gate, sa suite, les fixtures de ces suites, le workflow CI ou un hook porte un trailer
 `Gate-Touche: <chemin-ou-motif> — <raison>`. Déclaratif — forme et présence vérifiées, jamais la
 véracité de la raison — de portée branche : un commit ultérieur peut couvrir un chemin touché plus
 tôt.

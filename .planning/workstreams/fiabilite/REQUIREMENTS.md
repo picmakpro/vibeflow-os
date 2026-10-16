@@ -893,14 +893,14 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | POCK-06 | Phase 41.4 | Complete — 2026-10-06, plans 41.4-06, 41.4-10 (correctifs de revue 2026-10-06) : section `## Merge-danger call` au contrat de PR de mission, lue par E3 de `check-mission-exit.sh` (SAIN, MANQUE nommé, INDÉTERMINÉ), 135 assertions dont 35 lignes « TUE » (mutants E3a-E3z, E3x, E3x2, E15, E18), tour 4 du 2026-10-06 |
 | POCK-07 | Phase 41.4 | Complete — 2026-10-06, plans 41.4-01, 41.4-08, 41.4-09 (correctifs de revue 2026-10-06) : `check-skills.sh --callers-root`, 26 skills classés `vf-invocation: model` (aucun user-invoked, arbitrage Samuel, AskUserQuestion session principale, 2026-10-06, P414-D-17), étape CI propre avec quatre bascules |
 | POCK-08 | Phase 41.4 | Complete — 2026-10-06, plans 41.4-02, 41.4-09 (correctifs de revue 2026-10-06) : segment `défaillance :` obligatoire (contenu jugé : date calendaire ou SHA) et `SKILL.md` surveillés dans `check-ajout-retrait.sh`, 83 cas dont 29 lignes « TUE », consultatif en CI |
-| DLWS-01 | Phase 57 | Pending — posée au cadrage le 2026-10-10, dérivée de `57-CONTEXT.md` |
-| DLWS-02 | Phase 57 | Pending — posée au cadrage le 2026-10-10, dérivée de `57-CONTEXT.md` |
-| DLWS-03 | Phase 57 | Pending — posée au cadrage le 2026-10-10, dérivée de `57-CONTEXT.md` |
-| DLWS-04 | Phase 57 | Pending — posée au cadrage le 2026-10-10, dérivée de `57-CONTEXT.md` |
-| DLWS-05 | Phase 57 | Pending — posée au cadrage le 2026-10-10, dérivée de `57-CONTEXT.md` |
-| DLWS-06 | Phase 57 | Pending — posée au cadrage le 2026-10-10, dérivée de `57-CONTEXT.md` |
-| DLWS-07 | Phase 57 | Pending — posée au cadrage le 2026-10-10, dérivée de `57-CONTEXT.md` |
-| DLWS-08 | Phase 57 | Pending — posée au cadrage le 2026-10-10, dérivée de `57-CONTEXT.md` |
+| DLWS-01 | Phase 57 | Complete — 2026-10-12, plans 57-01, 57-03, 57-04 : `test-driver-lock-ws.sh` 528/0, un verrou par compartiment, refus sur le même compartiment, concurrence 24×5 (porte de phase `57-16-SUMMARY.md`) |
+| DLWS-02 | Phase 57 | Complete — 2026-10-12, plans 57-01, 57-02, 57-04, 57-08, 57-12, 57-13 : verrou de dépôt distinct, release et partition en gestes de dépôt courts (porte de phase `57-16-SUMMARY.md`) |
+| DLWS-03 | Phase 57 | Complete — 2026-10-12, plans 57-01, 57-04, 57-05, 57-11 : `test-driver-lock.sh` 243/0 et `test-guard-driver-lock.sh` 103/0 au diff vide contre la base, A/B `WS-AB-INTEGRITE` et `GW-AB-INTEGRITE` IDENTIQUES sans SKIP (porte de phase `57-16-SUMMARY.md`) |
+| DLWS-04 | Phase 57 | Complete — 2026-10-12, plans 57-01, 57-02 + P57-D-39 : `--ws` explicite seul, repli `scope: depot` dit au JSON, refus `not-at-lab-root` (porte de phase `57-16-SUMMARY.md`) |
+| DLWS-05 | Phase 57 | Complete — 2026-10-12, plans 57-02, 57-04, 57-05, 57-15 : verrous sous `git-common-dir`, partage entre worktrees, repli hors git (porte de phase `57-16-SUMMARY.md`) |
+| DLWS-06 | Phase 57 | Complete — 2026-10-12, plans 57-05, 57-08, 57-11 + P57-D-38 : `test-guard-driver-lock-ws.sh` 240/0, commits jugés sur l'index, `checkout`/`switch` refusés (porte de phase `57-16-SUMMARY.md`) |
+| DLWS-07 | Phase 57 | Complete — 2026-10-12, plans 57-03, 57-06, 57-07, 57-09, 57-10, 57-12 à 57-15 : consommateurs, doctrine, amendement daté d'ADR-053 (porte de phase `57-16-SUMMARY.md`) |
+| DLWS-08 | Phase 57 | Complete — 2026-10-12, plans 57-04 à 57-07, 57-09, 57-11 : mutants DL-M-*, GW-M-*, consommateurs, A/B ; usage concurrent réel reste à la Phase 61 (porte de phase `57-16-SUMMARY.md`) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1317,14 +1317,14 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 > s'applique de plein droit.
 
 ### Verrou de driver par compartiment (Phase 57 — posées au cadrage, 2026-10-10)
-- [ ] **DLWS-01**: Verrou par compartiment — dans un lab partitionné, `driver-lock.sh acquire --ws=<sujet>` pose un verrou propre à ce compartiment ; deux managers sur deux compartiments distincts l'acquièrent tous deux, deux sur le même compartiment se refusent (P57-D-01, P57-D-06).
-- [ ] **DLWS-02**: Verrou de dépôt — release, écriture de `BACKLOG.md`/`docs/ADR.md`, fichiers racine de `.planning/` et partition/bascule prennent un verrou de dépôt court, distinct des verrous de compartiment ; deux gestes de dépôt ne se tiennent jamais en même temps (P57-D-01, P57-D-02).
-- [ ] **DLWS-03**: Lab plat inchangé au bit près — même chemin `.planning/DRIVER.lock`, même JSON, même comportement du guard ; les suites existantes de `driver-lock.sh` et `guard-driver-lock.sh` passent sans modification (P57-D-03).
-- [ ] **DLWS-04**: Résolution explicite — le compartiment vient d'un `--ws` explicite, jamais de `VF_WORKSTREAM`, `GSD_WORKSTREAM` ni du pointeur `active-workstream` ; sans `--ws` dans un lab partitionné, `acquire` prend le verrou de dépôt et le JSON le dit (`scope: depot`, raison) (P57-D-04, P57-D-05).
-- [ ] **DLWS-05**: Emplacement au niveau du clone — les verrous d'un lab partitionné vivent sous `git rev-parse --git-common-dir`, partagés par les worktrees d'un même clone ; hors git, repli relatif au checkout déclaré dans le JSON ; le guard résout au même endroit que `driver-lock.sh` (P57-D-07, P57-D-08).
-- [ ] **DLWS-06**: Guard par compartiment — Write/Edit sous `.planning/` et commits ne sont refusés que sur ce qui est tenu par autrui (commits jugés sur `git diff --cached --name-only`, index illisible = refus) ; `checkout`/`switch` restent toujours refusés sous un verrou d'autrui, exemptions D-32-06 inchangées (P57-D-09, P57-D-10, P57-D-11).
-- [ ] **DLWS-07**: Doctrine et consommateurs — ADR-053 reçoit un amendement daté (« un manager par compartiment, un seul geste de dépôt à la fois ») ; le head passe `--ws` et un `GSD_SESSION_KEY` distinct par manager ; les consommateurs recensés du verrou (`status`, E1 de `check-mission-exit.sh`, watchdog, `check-branch-claim.sh`, `check-guard-health.sh`, `dag.sh`, managers, `mission-flow.md`) sont alignés, chacun vérifié (P57-D-13, P57-D-15).
-- [ ] **DLWS-08**: Preuve de mécanisme — acquisitions concurrentes sur clone jetable (deux compartiments, partage entre worktrees, repli `scope: depot`, refus du guard selon l'index) mesurées ; QUAL-01 : chaque comportement neuf des deux scripts naît avec ses trois issues et sa mutation rouge prouvée ; l'usage concurrent réel reste à la Phase 61 (P57-D-12).
+- [x] **DLWS-01**: Verrou par compartiment — dans un lab partitionné, `driver-lock.sh acquire --ws=<sujet>` pose un verrou propre à ce compartiment ; deux managers sur deux compartiments distincts l'acquièrent tous deux, deux sur le même compartiment se refusent (P57-D-01, P57-D-06).
+- [x] **DLWS-02**: Verrou de dépôt — release, écriture de `BACKLOG.md`/`docs/ADR.md`, fichiers racine de `.planning/` et partition/bascule prennent un verrou de dépôt court, distinct des verrous de compartiment ; deux gestes de dépôt ne se tiennent jamais en même temps (P57-D-01, P57-D-02).
+- [x] **DLWS-03**: Lab plat inchangé au bit près — même chemin `.planning/DRIVER.lock`, même JSON, même comportement du guard ; les suites existantes de `driver-lock.sh` et `guard-driver-lock.sh` passent sans modification (P57-D-03).
+- [x] **DLWS-04**: Résolution explicite — le compartiment vient d'un `--ws` explicite, jamais de `VF_WORKSTREAM`, `GSD_WORKSTREAM` ni du pointeur `active-workstream` ; sans `--ws` dans un lab partitionné, `acquire` prend le verrou de dépôt et le JSON le dit (`scope: depot`, raison) (P57-D-04, P57-D-05).
+- [x] **DLWS-05**: Emplacement au niveau du clone — les verrous d'un lab partitionné vivent sous `git rev-parse --git-common-dir`, partagés par les worktrees d'un même clone ; hors git, repli relatif au checkout déclaré dans le JSON ; le guard résout au même endroit que `driver-lock.sh` (P57-D-07, P57-D-08).
+- [x] **DLWS-06**: Guard par compartiment — Write/Edit sous `.planning/` et commits ne sont refusés que sur ce qui est tenu par autrui (commits jugés sur `git diff --cached --name-only`, index illisible = refus) ; `checkout`/`switch` restent toujours refusés sous un verrou d'autrui, exemptions D-32-06 inchangées (P57-D-09, P57-D-10, P57-D-11).
+- [x] **DLWS-07**: Doctrine et consommateurs — ADR-053 reçoit un amendement daté (« un manager par compartiment, un seul geste de dépôt à la fois ») ; le head passe `--ws` et un `GSD_SESSION_KEY` distinct par manager ; les consommateurs recensés du verrou (`status`, E1 de `check-mission-exit.sh`, watchdog, `check-branch-claim.sh`, `check-guard-health.sh`, `dag.sh`, managers, `mission-flow.md`) sont alignés, chacun vérifié (P57-D-13, P57-D-15).
+- [x] **DLWS-08**: Preuve de mécanisme — acquisitions concurrentes sur clone jetable (deux compartiments, partage entre worktrees, repli `scope: depot`, refus du guard selon l'index) mesurées ; QUAL-01 : chaque comportement neuf des deux scripts naît avec ses trois issues et sa mutation rouge prouvée ; l'usage concurrent réel reste à la Phase 61 (P57-D-12).
 
 ---
 *Requirements defined: 2026-06-04*

@@ -46,14 +46,14 @@ parmi `$HOME/.claude/scripts` → `./.claude/scripts` → `${CLAUDE_PLUGIN_ROOT}
 gestes **non négociables** :
 
 1. **Verrou de driver (avant TOUT dispatch)** :
-   `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<mission design>`.
+   `"$S"/driver-lock.sh acquire --owner=<session|task_id> --step=<mission design> [--ws=<sujet du mandat>]`.
    `acquired:false` avec `reason: held` (`held_by`) → une autre mission pilote déjà : ne dispatche
    pas, remonte à l'humain. `reason: stale-requires-takeover` → PAS une remontée systématique :
-   exécute `"$S"/driver-lock.sh takeover --owner=<id> --step=<mission design>` (commande nommée par
+   exécute `"$S"/driver-lock.sh takeover --owner=<id> --step=<mission design> [--ws=<sujet>]` (commande nommée par
    le champ `hint` du refus), consigne la reprise (STATE `### Decisions`). `reclaim --owner=<id>` si
    ton identité de session a changé (`/clear`, reprise) sur un lock que tu tiens encore — jamais
-   traité comme périmé. Doctrine complète et convention `Fence:` : `conductor-references/team-kernel.md`.
-   **Heartbeat** entre les écrans (`driver-lock.sh heartbeat --owner=…`) ; **release** garanti
+   traité comme périmé. Doctrine, convention `Fence:` : `conductor-references/team-kernel.md` §Verrou par compartiment (lab partitionné).
+   **Heartbeat** entre les écrans (`driver-lock.sh heartbeat --owner=… [--ws=<sujet>]`) ; **release** garanti
    à la clôture (succès/échec/abandon) — dernière action avant le rapport, jamais oubliée.
 2. **Plan de bataille = DAG** (`"$S"/dag.sh` : `init`, `add --deps=…`) dans
    `.planning/missions/<AAAA-MM-JJ>-<sujet>.dag.json`. Par écran/composant : un nœud
@@ -192,5 +192,5 @@ design — même doctrine, mêmes déclencheurs, même nœud que côté dev.
 - Écris le détail dans `.planning/missions/<AAAA-MM-JJ>-<sujet>.md` (scores par écran et par
   tour, findings résiduels) et rends au dispatcheur le **rapport compact** (verdict global,
   scores finaux par écran, décisions autonomes, blocages).
-- **Avant de rendre le rapport, relâche le verrou** : `"$S"/driver-lock.sh release --owner=<id>`
+- **Avant de rendre le rapport, relâche le verrou** : `"$S"/driver-lock.sh release --owner=<id> [--ws=<sujet>]`
   (geste de clôture garanti, quel que soit l'issue).

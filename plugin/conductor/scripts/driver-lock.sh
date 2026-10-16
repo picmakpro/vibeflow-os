@@ -21,7 +21,7 @@
 #
 # Usage:
 #   driver-lock.sh acquire   --owner=<id> --step=<etape>   # pose le lock (refuse si perime, D-32-02)
-#   driver-lock.sh takeover  --owner=<id> [--step=<etape>] # reprend un lock PERIME (geste explicite)
+#   driver-lock.sh takeover  --owner=<id> [--step=<etape>] # reprend un lock PERIME (geste explicite) ; avec --ws, refuse comme acquire si l'ancien verrou est tenu (vivant : legacy-lock-held ; perime : stale-requires-takeover)
 #   driver-lock.sh reclaim   --owner=<id>                  # re-rattache la session courante a un lock VIVANT dont on est deja owner
 #   driver-lock.sh heartbeat --owner=<id> [--step=<etape>] # rafraichit le heartbeat entre etapes
 #   driver-lock.sh mark-progress --owner=<id>              # avance progress_epoch (D-33-A), JAMAIS heartbeat_epoch
@@ -40,6 +40,57 @@
 #             VF_DRIVER_SESSION_MAX (defaut 8, plafond LRU de session_ids),
 #             VF_DRIVER_CHILDREN (defaut <lock>.children.jsonl, registre des agents dispatches).
 # Reference : ADR-053 + .planning/phases/VFDO-09-*/09-CADRAGE-swarm.md §2.
+#
+# LAB PARTITIONNE (Phase 57) — un verrou NOMME par cible, au lieu du verrou unique :
+#   --ws=<sujet>   le verrou du compartiment <sujet> (un manager par compartiment, en parallele)
+#   --depot        le verrou de DEPOT (gestes qui touchent l'ensemble : release, fichiers racine…)
+#   sans --ws      = verrou de depot ; le JSON porte alors "scope_reason": "ws-absent"
+# Le compartiment ne vient JAMAIS que d'un --ws explicite : ni GSD_WORKSTREAM, ni VF_WORKSTREAM, ni
+# le pointeur active-workstream ne deplacent la cible (un export oublie ne verrouille pas le mauvais
+# sujet en silence). Un lab est partitionne quand .planning/workstreams existe (dossier, lien ou
+# fichier : un etat illisible est un refus nomme "partition-unreadable", jamais un repli plat).
+# Emplacement : <git-common-dir>/vf-driver/{ws/<sujet>,repo}/DRIVER.lock, un dossier par verrou,
+# partage entre les worktrees du clone. Le JSON des verbes porte "scope" (compartiment|depot),
+# "ws" ("" pour le depot) et "location" (git-common-dir). Refus nommes, chacun avec un "hint" :
+# unknown-ws, ws-invalid, partition-unreadable, policy-missing, not-at-lab-root (P57-D-39 : --ws ou
+# --depot lance d'un dossier sans .planning/ propre alors que la racine git en porte les compartiments ;
+# hint « lance depuis la racine du lab »). Le nom du sujet est valide par
+# vf_ws_name_valid puis vf_ws_dir_resolve AVANT d'entrer dans un chemin ou un JSON.
+# ANCIEN VERROU (P57-D-14, P57-D-24, P57-D-26) : en lab partitionne, un .planning/DRIVER.lock tenu
+# vaut verrou de depot. Tout acquire (compartiment ou depot), et takeover --ws sur un ancien verrou VIVANT
+# ou PERIME (Q5 puis C option (a), arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 : meme sonde
+# avant la reprise, meme re-sonde apres la pose, meme refus octet pour octet ; un refus sur la re-sonde restitue
+# le verrou de compartiment anterieur, sa suppression ne vient qu'apres), refuse "legacy-lock-held" avec en hint la
+# commande de release exacte ; perime, "stale-requires-takeover" avec le recover cible. Rien n'est
+# repris, relache ni supprime en silence, et aucun verbe n'est neuf : l'ancien verrou se manie par
+# VF_DRIVER_LOCK=.planning/DRIVER.lock. Les verbes autres qu'acquire, appeles sans --ws ni --depot
+# quand le verrou de depot est absent, retombent sur l'ancien verrou ("scope_reason":
+# "legacy-fallback", "legacy_lock": true) : un manager en vol pendant la mise a jour garde son verrou.
+# status porte toujours "legacy_lock" (true|false) en lab partitionne. Un ancien verrou qui apparait ENTRE la
+# sonde et la pose (R-4) est re-sonde apres la pose : le processus retire sa propre pose et rend le MEME refus.
+# Un ancien verrou perime rend le meme reason "stale-requires-takeover" qu'un compartiment perime, avec un hint
+# different (VF_DRIVER_LOCK=<ancien verrou> driver-lock.sh recover) : c'est le hint qui les distingue.
+# HORS GIT (P57-D-07) : sans dossier commun, le repli est .planning/DRIVER.lock.d/{ws/<sujet>,repo}/
+# DRIVER.lock, sous le motif .planning/DRIVER.lock* du .gitignore ; le JSON dit "location": "checkout".
+# LIMITE ECRITE (A4, T-57-37) : un worktree sur une branche d'avant la partition n'a pas de dossier
+# de compartiments, il bascule donc en regime plat (verrou historique) alors que le clone est
+# partitionne ; non mesure ici, l'usage reel releve de la Phase 61.
+# STATUS --ALL (P57-D-24, P57-D-31, P57-D-32) : en lab partitionne, une ligne JSON {"present": <au moins
+# une entree presente>, "scope": "lab", "location", "legacy_lock", "locks": [ une entree par verrou ],
+# "children_running": <somme>}. Entrees dans l'ordre depot, ancien verrou (s'il existe), chaque
+# compartiment du disque, puis tout verrou de compartiment present sous le dossier commun sans dossier
+# de compartiment. Chaque entree est la ligne de status de CE verrou (ttl compris pour une entree
+# presente). Un nom de dossier ecarte par vf_ws_name_valid n'entre jamais dans le JSON : il est
+# compte sur stderr. --all n'est accepte que par status ; avec --ws ou --depot en lab partitionne
+# -> ws-invalid. Mode verrou unique : exactement la sortie de status.
+# REGISTRE PAR VERROU (P57-D-31) : en lab partitionne le registre des agents est le frere du verrou
+# resolu (vf-driver/ws/<sujet>/DRIVER.lock.children.jsonl) ; VF_DRIVER_CHILDREN n'est honoree qu'en
+# mode verrou unique. Tous les verbes portent --ws et le suffixe de portee (scope, ws, location).
+# VF_DRIVER_LOCK non vide, ou lab plat : mode verrou unique, --ws/--depot acceptes et sans effet
+# (P57-D-22, P57-D-31) ; vf_dl_resolve rend la main avant toute lecture de ces options.
+# LAB PLAT, ou VF_DRIVER_LOCK pose : comportement historique, au bit pres — la politique de noms
+# n'est meme pas chargee. LIMITE ECRITE (P57-D-29) : deux .planning/ dans un meme clone partagent
+# vf-driver/, hors perimetre.
 
 set -uo pipefail
 
@@ -51,12 +102,16 @@ SESSION_MAX="${VF_DRIVER_SESSION_MAX:-8}"
 case "$SESSION_MAX" in ''|*[!0-9]*) SESSION_MAX=8 ;; esac  # meme garde que TTL (D-32-03, plafond LRU)
 
 ACTION=""; OWNER=""; STEP=""
+WS=""; WS_GIVEN=0; DEPOT=0; ALL=0
 AGENT=""; ROLE=""; NODE=""; PARENT=""; DEPTH=""; CSTATUS=""
 for arg in "$@"; do
   case "$arg" in
     acquire|heartbeat|release|status|recover|takeover|reclaim|mark-progress|register|close|orphans) ACTION="$arg" ;;
     --owner=*)  OWNER="${arg#*=}" ;;
     --step=*)   STEP="${arg#*=}" ;;
+    --ws=*)     WS="${arg#*=}"; WS_GIVEN=1 ;;
+    --depot)    DEPOT=1 ;;
+    --all)      ALL=1 ;;
     --agent=*)  AGENT="${arg#*=}" ;;
     --role=*)   ROLE="${arg#*=}" ;;
     --node=*)   NODE="${arg#*=}" ;;
@@ -67,6 +122,12 @@ for arg in "$@"; do
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
+
+# --all n'est accepte que par status (P57-D-31) : message d'usage sur stderr, rien sur stdout, exit 1.
+if [ "$ALL" = 1 ] && [ "$ACTION" != status ]; then
+  echo "Usage: $0 status --all (--all n'est accepte que par status)" >&2
+  exit 1
+fi
 
 log() { echo "[driver-lock.sh] $*" >&2; }
 now() { date +%s; }
@@ -151,6 +212,161 @@ session_ids_append() {
   printf '%s' "$out"
 }
 
+# ---------------------------------------------------------------------------------------------
+# RESOLUTION DU VERROU NOMME (Phase 57) — UN SEUL point d'insertion. LOCK_DIR et META sont
+# reassignes ICI, avant que LOCK_PARENT, LOCK_BASE, REG, les mutex `.rec.*`, le journal
+# `.events.log` et la generation n'en soient derives : toute la mecanique d'acquisition (lien
+# remplace par rename(2), mutex nomme d'apres la generation observee) est PARAMETREE par
+# l'emplacement, jamais retouchee (en-tete l.15-17 : deux correctifs de fenetre mesures pires).
+#
+# LAB PLAT, ou VF_DRIVER_LOCK pose et non vide : la fonction ne fait RIEN — ni `source`, ni `git`,
+# ni test de plus que `-e`/`-L` sur le dossier des compartiments (P57-D-03, comportement historique
+# au bit pres). Le lab est dit partitionne quand .planning/workstreams existe ou est un lien : le
+# test nu `-d` ignorerait un lien et un fichier regulier, qui seraient alors pris pour un lab plat
+# en silence (P57-D-25) ; la detection fine est vf_ws_enumerate, rc 0/2/3.
+# ---------------------------------------------------------------------------------------------
+PARTITIONED=0; SCOPE=""; LOCATION=""; SCOPE_JSON=""; LOCK_ROOT=""
+# Option de cible a rejouer avec une commande nommee par un hint (R-1) : " --ws=<sujet>" ou " --depot"
+# en lab partitionne, vide ailleurs (le hint du lab plat reste celui d'avant la phase, octet pour octet).
+HINT_TARGET=""
+# Ancien verrou unique (P57-D-26) : le chemin historique, evalue par rapport au cwd comme le defaut
+# de LOCK_DIR. Lu seulement en lab partitionne ; jamais cree, jamais supprime par la resolution.
+LEGACY_DIR=".planning/DRIVER.lock"; LEGACY_PRESENT=false
+
+# Refus nomme, rejouable. La cle de tete suit le verbe (`error` pour status/orphans : JAMAIS une
+# cle `present`, qui se lirait « relache »). $3 = nom de sujet DEJA valide (jamais une valeur brute).
+vf_dl_refuse() { # <raison> <hint> [sujet-valide]
+  local reason="$1" hint="$2" extra="" key
+  [ -n "${3:-}" ] && extra=", \"ws\": \"$3\""
+  case "$ACTION" in
+    acquire|takeover)        key='"acquired": false' ;;
+    reclaim)                 key='"reclaimed": false' ;;
+    heartbeat|mark-progress) key='"ok": false' ;;
+    release)                 key='"released": false' ;;
+    recover)                 key='"recovered": false' ;;
+    register)                key='"registered": false' ;;
+    close)                   key='"closed": false' ;;
+    *)                       key="\"error\": \"$reason\"" ;;
+  esac
+  printf '{%s, "reason": "%s", "hint": "%s"%s}\n' "$key" "$reason" "$hint" "$extra"
+  exit 1
+}
+
+# Dossier commun du clone, CANONICALISE (`cd` + `pwd -P`, jamais comparé brut : `--git-common-dir`
+# rend un chemin relatif au cwd dans un checkout simple, absolu dans un worktree lie ; jamais
+# `--path-format=absolute`, absent des git anciens). Rend 1 hors depot git.
+vf_dl_common_dir() {
+  local d
+  d="$(git rev-parse --git-common-dir 2>/dev/null)" || return 1
+  [ -n "$d" ] || return 1
+  case "$d" in /*) ;; *) d="$PWD/$d" ;; esac
+  (cd "$d" 2>/dev/null && pwd -P)
+}
+
+# P57-D-56 (revise P57-D-25) : un dossier des compartiments PRESENT mais SANS AUCUN compartiment (vide, ou ne
+# portant que des fichiers comme .gitkeep) se traite comme un lab plat, comme en v2.69.1. Un lien symbolique ou un
+# fichier regulier a la place du dossier reste « present » (refuse plus loin : partition-unreadable). Un lien ou un
+# sous-dossier non cache dans le dossier suffit a le dire present : leur jugement revient a vf_ws_enumerate.
+vf_dl_ws_present() { # <chemin du dossier workstreams> -> 0 = partitionne (ou illisible), 1 = absent ou vide
+  local w="$1" e
+  [ -e "$w" ] || [ -L "$w" ] || return 1
+  if [ -L "$w" ] || [ ! -d "$w" ] || [ ! -r "$w" ] || [ ! -x "$w" ]; then return 0; fi
+  for e in "$w"/*; do
+    if [ -L "$e" ] || [ -d "$e" ]; then return 0; fi
+  done
+  return 1  # D56-VIDE
+}
+
+vf_dl_resolve() {
+  [ -n "$ACTION" ] || return 0
+  [ -z "${VF_DRIVER_LOCK:-}" ] || return 0
+  # HORS RACINE DU LAB (P57-D-39, correction F-2) : `--ws` ou `--depot` lance d'un dossier qui ne porte pas son
+  # propre `.planning/` alors que la racine git en porte les compartiments. Sans ce refus la detection (relative
+  # au cwd) rendrait le lab « plat », le verrou d'autrui ne serait pas vu et un `.planning/DRIVER.lock` parasite
+  # serait cree dans le sous-dossier. Un dossier portant SON `.planning/` (P57-D-29) n'est pas concerne.
+  if { [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; } && [ ! -e .planning ] && [ ! -L .planning ]; then
+    local top=""
+    top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
+    if [ -n "$top" ] && vf_dl_ws_present "$top/.planning/workstreams"; then
+      vf_dl_refuse not-at-lab-root "ce dossier n'est pas la racine du lab partitionne : lance driver-lock.sh depuis la racine du lab (le dossier qui porte .planning/workstreams), puis rejoue la commande avec la meme option --ws ou --depot"
+    fi
+  fi
+  vf_dl_ws_present .planning/workstreams || return 0
+
+  local policy="" cand common rc=0
+  for cand in "$(dirname "$0")/workstream-policy.sh" \
+              "$(dirname "$0")/../../planning-core/scripts/workstream-policy.sh"; do
+    [ -f "$cand" ] && { policy="$cand"; break; }
+  done
+  [ -n "$policy" ] || vf_dl_refuse policy-missing "script workstream-policy.sh introuvable : /vf-update reinstalle le module planning-core puis rejouer la commande"
+  # shellcheck source=/dev/null
+  . "$policy"
+
+  # Detection fine du regime. rc 3 = le dossier a disparu entre les deux tests : regime plat.
+  vf_ws_enumerate ".planning" >/dev/null 2>&1; rc=$?
+  case "$rc" in
+    0) ;;
+    3) return 0 ;;
+    *) vf_dl_refuse partition-unreadable "le dossier des compartiments est illisible (lien symbolique, fichier regulier ou compartiment en lien) : le rendre a l'etat de dossier reel puis rejouer la commande" ;;
+  esac
+  PARTITIONED=1
+
+  # Emplacement (P57-D-07, P57-D-21) : le dossier commun du clone, partage par tous ses worktrees ;
+  # hors depot git, repli sous .planning/DRIVER.lock.d (couvert par le motif .planning/DRIVER.lock*
+  # du .gitignore), que le JSON declare ("location": "checkout").
+  if common="$(vf_dl_common_dir)"; then
+    LOCK_ROOT="$common/vf-driver"; LOCATION="git-common-dir"
+  else
+    LOCK_ROOT=".planning/DRIVER.lock.d"; LOCATION="checkout"
+  fi
+
+  # status --all vise le lab entier : une cible designee en plus est une erreur (P57-D-32).
+  if [ "$ALL" = 1 ] && { [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; }; then
+    vf_dl_refuse ws-invalid "--all lit tous les verrous du lab : rejouer sans --ws ni --depot, ou avec --ws=<sujet> sans --all"
+  fi
+  if [ "$WS_GIVEN" = 1 ]; then
+    # Validation AVANT tout chemin ou JSON (T-57-01, T-57-06). La liste n'est jamais passee dans
+    # un pipeline vers une recherche a sortie anticipee (SIGPIPE sous pipefail, piege P1).
+    [ "$DEPOT" = 0 ] || vf_dl_refuse ws-invalid "--ws et --depot s'excluent : choisir l'un ou l'autre"
+    [ -n "$WS" ] && vf_ws_name_valid "$WS" || vf_dl_refuse ws-invalid "--ws attend un nom de sujet (lettres, chiffres, point, souligne, tiret) : rejouer avec --ws=<sujet>, ou --depot pour le verrou de depot"
+    vf_ws_dir_resolve ".planning" "$WS"; rc=$?
+    case "$rc" in
+      0) ;;
+      2) vf_dl_refuse ws-invalid "le compartiment designe est un lien symbolique, refuse : rejouer avec un compartiment reel" ;;
+      *) vf_dl_refuse unknown-ws "aucun compartiment de ce nom : lister les compartiments avec driver-lock.sh status --all puis rejouer" "$WS" ;;
+    esac
+    LOCK_DIR="$LOCK_ROOT/ws/$WS/DRIVER.lock"
+    SCOPE="compartiment"
+    HINT_TARGET=" --ws=$WS"
+    SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"$WS\", \"location\": \"$LOCATION\""
+  else
+    # Cible = DEPOT : un emplacement distinct (`repo/`, jamais `ws/…`), independant de tout verrou
+    # de compartiment (P57-D-01, P57-D-02). Sans --ws NI --depot, la cible n'a pas ete designee :
+    # le JSON le dit (`scope_reason`), un export oublie ne se transforme jamais en verrou de sujet.
+    LOCK_DIR="$LOCK_ROOT/repo/DRIVER.lock"
+    SCOPE="depot"
+    HINT_TARGET=" --depot"
+    SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"\", \"location\": \"$LOCATION\""
+    [ "$DEPOT" = 1 ] || SCOPE_JSON="$SCOPE_JSON, \"scope_reason\": \"ws-absent\""
+    # Repli sur l'ancien verrou (P57-D-24) : un verbe autre qu'acquire, sans --ws ni --depot, quand
+    # le verrou de depot est absent et l'ancien present, vise l'ancien. C'est ce qui garde un manager
+    # en vol pendant la mise a jour : ses verbes sans --ws retombent sur SON verrou.
+    if [ "$ACTION" != acquire ] && [ "$ALL" = 0 ] && [ "$DEPOT" = 0 ] && [ ! -L "$LOCK_DIR" ] && [ ! -d "$LOCK_DIR" ] \
+       && { [ -L "$LEGACY_DIR" ] || [ -d "$LEGACY_DIR" ]; }; then
+      LOCK_DIR="$LEGACY_DIR"
+      LOCATION="checkout"
+      SCOPE_JSON=", \"scope\": \"$SCOPE\", \"ws\": \"\", \"location\": \"$LOCATION\", \"scope_reason\": \"legacy-fallback\", \"legacy_lock\": true"
+    fi
+  fi
+  # status expose toujours legacy_lock en lab partitionne (P57-D-26, P57-D-32), cible ou non.
+  if [ -L "$LEGACY_DIR" ] || [ -d "$LEGACY_DIR" ]; then LEGACY_PRESENT=true; fi
+  if [ "$ACTION" = status ]; then
+    case "$SCOPE_JSON" in *'"legacy_lock"'*) ;; *) SCOPE_JSON="$SCOPE_JSON, \"legacy_lock\": $LEGACY_PRESENT" ;; esac
+  fi
+  META="$LOCK_DIR/meta"
+}
+vf_dl_resolve
+
 LOCK_PARENT="$(dirname "$LOCK_DIR")"
 LOCK_BASE="$(basename "$LOCK_DIR")"
 
@@ -159,6 +375,14 @@ LOCK_BASE="$(basename "$LOCK_DIR")"
 # serait alors intact et le nouveau claim invisible. BSD/macOS : -h ; GNU/Linux : -T.
 mv_link() {
   mv -h "$1" "$2" 2>/dev/null || mv -T "$1" "$2" 2>/dev/null
+}
+
+# Deplacement SANS ECRASER ET SANS SUIVRE un lien (AU3-04) : `mv -n` seul, si la destination est un lien vers un
+# dossier, y deplacerait la source (elle serait enterree dans la generation d'un autre tenant). BSD/macOS : -nh ;
+# GNU/Linux : -nT. Le code de sortie n'est pas fiable (BSD rend 0 devant une destination prise) : l'appelant VERIFIE
+# le resultat (lock_gen), jamais ce code.
+mv_noclobber() {
+  mv -nh "$1" "$2" 2>/dev/null || mv -nT "$1" "$2" 2>/dev/null
 }
 
 # Creation ATOMIQUE d'un lien, qui ECHOUE si le nom est deja pris — c'est le primitif qui
@@ -358,7 +582,11 @@ journal_event() {
 # de vie d'un agent reste `ListAgents` cote Claude Code ; `orphans` liste ce qu'il faut ALLER
 # verifier, et `close --status=stopped` se pose apres la verification, jamais avant.
 # ---------------------------------------------------------------------------------------------
-REG="${VF_DRIVER_CHILDREN:-$LOCK_PARENT/${LOCK_BASE}.children.jsonl}"
+if [ "$PARTITIONED" = 1 ]; then
+  REG="$LOCK_PARENT/${LOCK_BASE}.children.jsonl"   # frere du verrou resolu ; VF_DRIVER_CHILDREN ignoree (P57-D-31)
+else
+  REG="${VF_DRIVER_CHILDREN:-$LOCK_PARENT/${LOCK_BASE}.children.jsonl}"
+fi
 TAB="$(printf '\t')"
 
 # Champ libre du registre (role, node) : meme classe que sanitize_field, plus la tabulation, qui
@@ -445,7 +673,7 @@ json_status() {
   # exactement le cas « manager termine, enfant jamais ferme » que le gate de sortie doit voir.
   local children; children="$(orphans_count)"
   if [ "$1" = false ]; then
-    printf '{"present": false, "lock": "%s", "children_running": %s}\n' "$LOCK_DIR" "$children"; return
+    printf '{"present": false, "lock": "%s", "children_running": %s%s}\n' "$LOCK_DIR" "$children" "$SCOPE_JSON"; return
   fi
   local o s age stale gen sids lease guard_eff pe page
   o="$(meta_get owner)"; s="$(meta_get step)"; age="$(lock_age)"
@@ -466,17 +694,122 @@ json_status() {
   pe="$(meta_get progress_epoch)"
   case "$pe" in ''|*[!0-9]*) pe="null" ;; esac
   page="$(progress_age)" && : || page="null"
-  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s, "children_running": %s}\n' \
-    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page" "$children"
+  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s, "children_running": %s%s}\n' \
+    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page" "$children" "$SCOPE_JSON"
+}
+
+# Une entree de status --all : la ligne de json_status d'UN verrou, dans un sous-shell qui reassigne les
+# globales derivees du verrou (LOCK_DIR, META, LOCK_PARENT, LOCK_BASE, REG, SCOPE_JSON). Jamais une
+# seconde mise en forme du JSON. Rend trois lignes : presence (true|false), children_running, JSON.
+vf_dl_entry() { # <dossier du verrou> <suffixe de portee>
+  (
+    LOCK_DIR="$1"; SCOPE_JSON="$2"; META="$LOCK_DIR/meta"
+    LOCK_PARENT="$(dirname "$LOCK_DIR")"; LOCK_BASE="$(basename "$LOCK_DIR")"
+    REG="$LOCK_PARENT/${LOCK_BASE}.children.jsonl"
+    if lock_present; then echo true; else echo false; fi
+    orphans_count
+    if lock_present; then json_status true; else json_status false; fi
+  )
+}
+
+# Aggregat de status --all en lab partitionne (P57-D-24, P57-D-32). Ajoute une entree a ALL_LOCKS,
+# somme les enfants, retient la presence. $3 = "optionnel" : une entree absente est alors ecartee.
+ALL_LOCKS=""; ALL_CHILDREN=0; ALL_PRESENT=false; ALL_SKIPPED=0
+vf_dl_all_add() { # <dossier du verrou> <suffixe de portee> [optionnel]
+  local e pres kids json
+  e="$(vf_dl_entry "$1" "$2")"
+  pres="$(printf '%s\n' "$e" | sed -n 1p)"; kids="$(printf '%s\n' "$e" | sed -n 2p)"; json="$(printf '%s\n' "$e" | sed -n 3p)"
+  if [ "${3:-}" = optionnel ] && [ "$pres" != true ]; then return 0; fi
+  [ "$pres" = true ] && ALL_PRESENT=true
+  ALL_CHILDREN=$((ALL_CHILDREN + kids))
+  if [ -z "$ALL_LOCKS" ]; then ALL_LOCKS="$json"; else ALL_LOCKS="$ALL_LOCKS, $json"; fi
+}
+
+vf_dl_status_all() {
+  local ws_list p name known=" " d lp
+  # depot
+  vf_dl_all_add "$LOCK_ROOT/repo/DRIVER.lock" ", \"scope\": \"depot\", \"ws\": \"\", \"location\": \"$LOCATION\""
+  # ancien verrou, s'il existe
+  if [ "$LEGACY_PRESENT" = true ]; then
+    vf_dl_all_add "$LEGACY_DIR" ", \"scope\": \"depot\", \"ws\": \"\", \"location\": \"checkout\", \"scope_reason\": \"legacy-fallback\", \"legacy_lock\": true"
+  fi
+  # compartiments du disque : sortie capturee en variable, jamais un pipeline vers une recherche a sortie
+  # anticipee (piege P1) ; chaque nom revalide avant d'entrer dans un chemin ou le JSON
+  ws_list="$(vf_ws_enumerate ".planning" 2>/dev/null)"
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    name="$(basename "$p")"
+    if ! vf_ws_name_valid "$name"; then ALL_SKIPPED=$((ALL_SKIPPED + 1)); continue; fi
+    known="$known$name "
+    vf_dl_all_add "$LOCK_ROOT/ws/$name/DRIVER.lock" ", \"scope\": \"compartiment\", \"ws\": \"$name\", \"location\": \"$LOCATION\""
+  done <<EOF
+$ws_list
+EOF
+  # verrous de compartiment presents sans dossier de compartiment sur le disque
+  for d in "$LOCK_ROOT"/ws/*/; do
+    [ -e "$d" ] || continue
+    d="${d%/}"; name="$(basename "$d")"
+    if [ -L "$d" ] || ! vf_ws_name_valid "$name"; then ALL_SKIPPED=$((ALL_SKIPPED + 1)); continue; fi
+    case "$known" in *" $name "*) continue ;; esac
+    lp="$d/DRIVER.lock"
+    { [ -L "$lp" ] || [ -d "$lp" ]; } || continue
+    vf_dl_all_add "$lp" ", \"scope\": \"compartiment\", \"ws\": \"$name\", \"location\": \"$LOCATION\"" optionnel
+  done
+  [ "$ALL_SKIPPED" -eq 0 ] || log "status --all : $ALL_SKIPPED nom(s) de dossier ecarte(s) (nom invalide ou lien symbolique), jamais imprime(s) dans le JSON"
+  printf '{"present": %s, "scope": "lab", "location": "%s", "legacy_lock": %s, "locks": [%s], "children_running": %s}\n' \
+    "$ALL_PRESENT" "$LOCATION" "$LEGACY_PRESENT" "$ALL_LOCKS" "$ALL_CHILDREN"
+}
+
+# Sonde de l'ancien verrou unique (P57-D-26), appelee en tete d'acquire en lab partitionne. Evalue
+# l'ancien verrou en REUTILISANT lock_present, lock_age et meta_get dans un sous-shell qui reassigne
+# LOCK_DIR/META : aucune copie de leur logique, et le shell appelant garde sa cible. Rend trois
+# lignes (etat vivant|perime, age, owner) ou rien si l'ancien verrou est absent. Lecture seule :
+# ni reprise, ni suppression, ni relachement.
+vf_dl_legacy_probe() {
+  (
+    LOCK_DIR="$LEGACY_DIR"; META="$LOCK_DIR/meta"
+    lock_present || exit 0
+    _age="$(lock_age)"
+    if [ "$_age" -le "$TTL" ]; then echo vivant; else echo perime; fi
+    echo "$_age"
+    sanitize_field "$(meta_get owner)"; echo
+  )
+}
+
+# Refus d'acquisition devant un ancien verrou tenu (P57-D-26) : UN SEUL texte, qu'il soit rendu avant la pose ou
+# apres (correction R-4, re-sonde). Argument : la sortie de vf_dl_legacy_probe (etat, age, owner). Sort en 1.
+vf_dl_legacy_refuse() { # <sortie de vf_dl_legacy_probe>
+  local st age owner
+  st="$(printf '%s\n' "$1" | sed -n 1p)"
+  age="$(printf '%s\n' "$1" | sed -n 2p)"
+  owner="$(printf '%s\n' "$1" | sed -n 3p)"
+  if [ "$st" = vivant ]; then
+    printf '{"acquired": false, "reason": "legacy-lock-held", "held_by": "%s", "age_seconds": %s, "hint": "VF_DRIVER_LOCK=%s driver-lock.sh release --owner=%s"%s}\n' \
+      "$owner" "$age" "$LEGACY_DIR" "$owner" "$SCOPE_JSON"
+  else
+    printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "VF_DRIVER_LOCK=%s driver-lock.sh recover"%s}\n' \
+      "$owner" "$age" "$LEGACY_DIR" "$SCOPE_JSON"
+  fi
+  exit 1
 }
 
 require_owner() {
-  [ -n "$OWNER" ] || { log "--owner requis pour '$ACTION'"; echo '{"error": "owner-required"}'; exit 1; }
+  [ -n "$OWNER" ] || { log "--owner requis pour '$ACTION'"; printf '{"error": "owner-required"%s}\n' "$SCOPE_JSON"; exit 1; }
 }
 
 case "$ACTION" in
   acquire)
     require_owner
+    # 0. ANCIEN VERROU (P57-D-26) : en lab partitionne, un .planning/DRIVER.lock tenu vaut verrou de
+    #    depot, donc il refuse toute acquisition neuve, compartiment compris. Refus nomme avec la
+    #    commande exacte a rejouer ; JAMAIS de reprise, de relachement ni de suppression ici. Place
+    #    AVANT new_generation : un refus ne laisse aucun dechet de generation.
+    if [ "$PARTITIONED" = 1 ]; then
+      _leg="$(vf_dl_legacy_probe)"
+      if [ -n "$_leg" ]; then
+        vf_dl_legacy_refuse "$_leg"
+      fi
+    fi
     # 1. VOIE LIBRE — generation complete d'abord, publication par `ln -s` ensuite. `ln -s` echoue
     #    si le nom existe : c'est le primitif atomique qui departage, et il ne publie qu'un lock
     #    deja complet.
@@ -491,16 +824,27 @@ case "$ACTION" in
     # `"acquired": true`, DEUX detenteurs actifs simultanement. Cette garde ne touche NI la
     # creation de generation candidate, NI le mutex de reprise, NI sa revalidation : elle ferme un
     # trou de la voie LIBRE, elle ne rouvre pas le protocole de reprise (T0, T12.2).
-    gen="$(new_generation)" || { echo '{"acquired": false, "reason": "generation-failed"}'; exit 1; }
+    gen="$(new_generation)" || { printf '{"acquired": false, "reason": "generation-failed"%s}\n' "$SCOPE_JSON"; exit 1; }
     if ! lock_present && ln_atomic "$gen" "$LOCK_DIR"; then
+      # R-4 : l'ancien verrou a pu apparaitre ENTRE la sonde de l'etape 0 et la pose ci-dessus. Re-sonde apres la
+      # pose ; s'il est la, on retire SA propre pose (le lien, puis sa generation) et on refuse exactement comme
+      # si l'ancien verrou avait ete la avant : meme reason, meme hint, aucun champ neuf. Lab partitionne seulement.
+      if [ "$PARTITIONED" = 1 ]; then
+        _leg_after="$(vf_dl_legacy_probe)"
+        if [ -n "$_leg_after" ]; then
+          [ "$(readlink "$LOCK_DIR" 2>/dev/null)" = "$gen" ] && rm -f "$LOCK_DIR"
+          rm -rf "${LOCK_PARENT:?}/${gen:?}"
+          vf_dl_legacy_refuse "$_leg_after"
+        fi
+      fi
       _lease="$(lease_age)" && : || _lease="null"
       # orphans_count (issue #82) : un registre laisse par une mission precedente (release avec
       # enfants ouverts, ou lock elague par `recover`) est signale des l'acquisition, le nouveau
       # manager inventorie et arrete AVANT son premier dispatch (mission-flow.md §Pattern I).
       _orph="$(orphans_count)"
       [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running avant cette acquisition. Inventorier (orphans) avant tout dispatch"
-      printf '{"acquired": true, "owner": "%s", "step": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s}\n' \
-        "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)"
+      printf '{"acquired": true, "owner": "%s", "step": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s%s}\n' \
+        "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
       exit 0
     fi
     # 2. OCCUPE — notre generation ne sert pas encore ; on la garde pour une eventuelle
@@ -513,11 +857,11 @@ case "$ACTION" in
         [ -z "$STEP" ] && STEP="$(meta_get step)"
         rewrite_meta "$(now)"
         _lease="$(lease_age)" && : || _lease="null"
-        printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true, "generation": "%s", "session_ids": %s, "lease_seconds": %s}\n' \
-          "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease"
+        printf '{"acquired": true, "owner": "%s", "step": "%s", "reentrant": true, "generation": "%s", "session_ids": %s, "lease_seconds": %s%s}\n' \
+          "$OWNER" "$STEP" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$SCOPE_JSON"
         exit 0
       fi
-      printf '{"acquired": false, "reason": "held", "held_by": "%s", "age_seconds": %s}\n' "$held" "$age"
+      printf '{"acquired": false, "reason": "held", "held_by": "%s", "age_seconds": %s%s}\n' "$held" "$age" "$SCOPE_JSON"
       exit 1
     fi
     # 3. PERIME (D-32-02, LOCK-04) — la reprise d'un lock perime est desormais un geste EXPLICITE,
@@ -527,25 +871,34 @@ case "$ACTION" in
     #    `takeover` ci-dessous.
     rm -rf "${LOCK_PARENT:?}/$gen"
     log "lock perime (age ${age}s > ${TTL}s, owner=$held) — takeover requis"
-    printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "driver-lock.sh takeover --owner=%s --step=<etape>"}\n' \
-      "$held" "$age" "$OWNER"
+    printf '{"acquired": false, "reason": "stale-requires-takeover", "held_by": "%s", "age_seconds": %s, "hint": "driver-lock.sh takeover --owner=%s --step=<etape>%s"%s}\n' \
+      "$held" "$age" "$OWNER" "$HINT_TARGET" "$SCOPE_JSON"
     exit 1
     ;;
 
   takeover)
     require_owner
-    lock_present || { echo '{"acquired": false, "reason": "no-lock"}'; exit 1; }
+    # ANCIEN VERROU (P57-D-26, meme regle qu'`acquire`, arbitrage Samuel, AskUserQuestion session
+    # principale, 2026-10-13) : en lab partitionne, un ancien verrou tenu vaut verrou de depot, donc
+    # une reprise de compartiment ne passe pas non plus. Sonde AVANT toute generation ; meme refus,
+    # meme reason, meme hint (vf_dl_legacy_refuse) qu'acquire dans le meme etat : vivant, legacy-lock-held ;
+    # PERIME, stale-requires-takeover avec le recover cible. Rien n'est repris ni supprime.
+    if [ "$PARTITIONED" = 1 ]; then
+      _leg="$(vf_dl_legacy_probe)"
+      [ -n "$_leg" ] && vf_dl_legacy_refuse "$_leg"
+    fi
+    lock_present || { printf '{"acquired": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     age="$(lock_age)"; held="$(meta_get owner)"; observed_gen="$(lock_gen)"
     if [ "$age" -le "$TTL" ]; then
-      printf '{"acquired": false, "reason": "still-fresh", "held_by": "%s", "age_seconds": %s, "ttl": %s}\n' \
-        "$held" "$age" "$TTL"
+      printf '{"acquired": false, "reason": "still-fresh", "held_by": "%s", "age_seconds": %s, "ttl": %s%s}\n' \
+        "$held" "$age" "$TTL" "$SCOPE_JSON"
       exit 1
     fi
     # L'ORDRE compte : dans l'ancien bloc PERIME d'`acquire`, la generation candidate etait creee
     # AVANT de savoir si la voie etait libre (necessaire a la voie libre elle-meme). Ici, elle n'a
     # de sens qu'une fois la peremption etablie — creer d'abord et tester ensuite laisserait un
     # dechet de generation a chaque refus (still-fresh, no-lock).
-    gen="$(new_generation)" || { echo '{"acquired": false, "reason": "generation-failed"}'; exit 1; }
+    gen="$(new_generation)" || { printf '{"acquired": false, "reason": "generation-failed"%s}\n' "$SCOPE_JSON"; exit 1; }
     # DEPLACE tel quel depuis l'ancien bloc 3 « PERIME » d'`acquire` (D-32-02) — un SEUL
     # recuperateur par generation. Le mutex porte le nom de la generation observee : `ln -s`
     # echoue si un concurrent l'a deja pris, et une generation neuve donnerait un autre nom (donc
@@ -553,7 +906,7 @@ case "$ACTION" in
     mutex="${LOCK_DIR}.rec.$(printf '%s' "$observed_gen" | tr -c 'A-Za-z0-9._-' '_')"
     if ! ln_atomic "$$" "$mutex"; then
       rm -rf "${LOCK_PARENT:?}/$gen"
-      printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
+      printf '{"acquired": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     # BL-3 (fuite de mutex sous panne) : liberation GARANTIE, meme si ce process est tue entre la
     # prise du mutex et sa liberation normale. Aujourd'hui ce mutex est pris sur une generation
@@ -574,18 +927,49 @@ case "$ACTION" in
     if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -le "$TTL" ]; then
       rm -rf "${LOCK_PARENT:?}/$gen"
       rm -f "$mutex"; trap - EXIT INT TERM
-      printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
+      printf '{"acquired": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     old_gen="$observed_gen"
     if [ -L "$LOCK_DIR" ]; then
       ln_atomic "$gen" "${LOCK_DIR}.new.$$" && mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"
     else
-      # lock legacy (dossier reel) : pas de lien a remplacer, on elague puis on publie.
-      rm -rf "$LOCK_DIR" && ln_atomic "$gen" "$LOCK_DIR"
+      # lock legacy (dossier reel) : pas de lien a remplacer. On le met de cote (jamais supprime avant la
+      # re-sonde : il est restitue si elle refuse), puis on publie.
+      mv "$LOCK_DIR" "${LOCK_DIR}.old.$$" && ln_atomic "$gen" "$LOCK_DIR"
     fi
     if [ "$(lock_gen)" = "$gen" ]; then
       rm -f "${LOCK_DIR}.new.$$"
+      # R-4 (meme re-sonde qu'`acquire`) : un ancien verrou, vivant OU perime, apparu ENTRE la sonde de tete
+      # et la pose. On retire SA propre pose (lien puis generation) et on RESTITUE le verrou de compartiment
+      # anterieur (lien vers old_gen, generation et registre intacts) : la suppression de old_gen vient
+      # APRES la re-sonde, jamais avant, sinon le refus detruirait ce qu'il pretend ne pas avoir repris (AU2-04).
+      # Le mutex reste tenu jusqu'a la restitution.
+      if [ "$PARTITIONED" = 1 ]; then
+        _tk_after="$(vf_dl_legacy_probe)"
+        if [ -n "$_tk_after" ]; then
+          if [ -e "${LOCK_DIR}.old.$$" ]; then
+            # Dossier reel (lock legacy du compartiment) : un seul `mv -n`, apres le retrait de NOTRE lien. Si un
+            # tenant concurrent a pris le nom dans l'intervalle, rien n'est ecrase et rien n'est enterre : la
+            # verification ci-dessous le constate.
+            rm -f "$LOCK_DIR"; mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"
+          else
+            ln_atomic "$old_gen" "${LOCK_DIR}.new.$$" && mv_link "${LOCK_DIR}.new.$$" "$LOCK_DIR"
+            rm -f "${LOCK_DIR}.new.$$"
+          fi
+          # La generation posee ne se supprime QU'APRES avoir constate la restitution (lock_gen == old_gen, et plus
+          # de `.old.$$`) ; sinon elle reste en place avec le dossier mis de cote, et le refus le dit (AU3-04).
+          if [ "$(lock_gen)" = "$old_gen" ] && [ ! -e "${LOCK_DIR}.old.$$" ]; then
+            rm -rf "${LOCK_PARENT:?}/$gen" # retire sa pose
+            rm -f "$mutex"; trap - EXIT INT TERM # mutex-refus
+            vf_dl_legacy_refuse "$_tk_after"
+          fi
+          rm -f "$mutex"; trap - EXIT INT TERM
+          log "restitution du verrou anterieur impossible : generation posee et ${LOCK_DIR}.old.$$ laisses en place"
+          printf '{"acquired": false, "reason": "restore-failed", "detail": "le verrou anterieur n a pas pu etre restitue ; la generation posee et son dossier mis de cote sont laisses en place"%s}\n' "$SCOPE_JSON"; exit 1
+        fi
+      fi
       case "$old_gen" in */*|''|legacy) ;; *) rm -rf "${LOCK_PARENT:?}/$old_gen" ;; esac
+      rm -rf "${LOCK_DIR}.old.$$"
       rm -f "$mutex"; trap - EXIT INT TERM
       _lease="$(lease_age)" && : || _lease="null"
       journal_event takeover "$held" "$OWNER" "" "$age" "$(lock_gen)"
@@ -593,32 +977,33 @@ case "$ACTION" in
       # racine, parce que c'est le moment ou le repreneur decide de son premier dispatch.
       _orph="$(orphans_count)"
       [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) par l'ancien tenant encore running. Les arreter (feuille -> racine) avant tout dispatch"
-      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s}\n' \
-        "$OWNER" "$STEP" "$held" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)"
+      printf '{"acquired": true, "owner": "%s", "step": "%s", "recovered": true, "previous_owner": "%s", "generation": "%s", "session_ids": %s, "lease_seconds": %s, "orphans_count": %s, "orphans": %s%s}\n' \
+        "$OWNER" "$STEP" "$held" "$(lock_gen)" "$(json_session_ids "$(lock_session_ids)")" "$_lease" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
       exit 0
     fi
     rm -f "${LOCK_DIR}.new.$$"; rm -rf "${LOCK_PARENT:?}/$gen"
+    [ -e "${LOCK_DIR}.old.$$" ] && [ ! -e "$LOCK_DIR" ] && [ ! -L "$LOCK_DIR" ] && mv_noclobber "${LOCK_DIR}.old.$$" "$LOCK_DIR"
     rm -f "$mutex"; trap - EXIT INT TERM
-    printf '{"acquired": false, "reason": "race-during-recovery"}\n'; exit 1
+    printf '{"acquired": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
     ;;
 
   reclaim)
     require_owner
-    lock_present || { echo '{"reclaimed": false, "reason": "no-lock"}'; exit 1; }
+    lock_present || { printf '{"reclaimed": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     sid="$(sanitize_session_id "${CLAUDE_CODE_SESSION_ID:-}")"
-    [ -n "$sid" ] || { echo '{"reclaimed": false, "reason": "no-session-id"}'; exit 1; }
+    [ -n "$sid" ] || { printf '{"reclaimed": false, "reason": "no-session-id"%s}\n' "$SCOPE_JSON"; exit 1; }
     age="$(lock_age)"; held="$(meta_get owner)"; observed_gen="$(lock_gen)"
     if [ "$age" -gt "$TTL" ]; then
-      echo '{"reclaimed": false, "reason": "stale-requires-takeover"}'; exit 1
+      printf '{"reclaimed": false, "reason": "stale-requires-takeover"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     if [ "$held" != "$OWNER" ]; then
-      printf '{"reclaimed": false, "reason": "not-owner", "held_by": "%s"}\n' "$held"; exit 1
+      printf '{"reclaimed": false, "reason": "not-owner", "held_by": "%s"%s}\n' "$held" "$SCOPE_JSON"; exit 1
     fi
     # (D-32-03(f)) MEME mutex, MEME construction de nom que `takeover` — `reclaim` ne reinvente
     # PAS un patron de concurrence separe, il reutilise mot pour mot celui mesure correct.
     mutex="${LOCK_DIR}.rec.$(printf '%s' "$observed_gen" | tr -c 'A-Za-z0-9._-' '_')"
     if ! ln_atomic "$$" "$mutex"; then
-      echo '{"reclaimed": false, "reason": "race-during-reclaim"}'; exit 1
+      printf '{"reclaimed": false, "reason": "race-during-reclaim"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     # BL-3 : MEME trap que `takeover`. C'est ICI, sur `reclaim`, que la fuite mesuree est la plus
     # grave — ce mutex se prend sur une generation VIVANTE et DURABLE (a chaque `/clear`), jamais
@@ -640,7 +1025,7 @@ case "$ACTION" in
     # lock VIVANT, dont l'owner peut changer par release puis acquire pendant la fenetre.
     if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -gt "$TTL" ] || [ "$(meta_get owner)" != "$OWNER" ]; then
       rm -f "$mutex"; trap - EXIT INT TERM
-      echo '{"reclaimed": false, "reason": "race-during-reclaim"}'; exit 1
+      printf '{"reclaimed": false, "reason": "race-during-reclaim"%s}\n' "$SCOPE_JSON"; exit 1
     fi
     new_sids="$(session_ids_append "$(lock_session_ids)" "$sid")"
     hb="$(meta_get heartbeat_epoch)"
@@ -655,28 +1040,28 @@ case "$ACTION" in
     # revient (ou son remplacant, meme owner) voit d'un coup ce qui tourne encore en son nom.
     _orph="$(orphans_count)"
     [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running sous ce lock. Verifier ListAgents, arreter feuille -> racine, puis close --status=stopped"
-    printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s, "orphans_count": %s, "orphans": %s}\n' \
-      "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease" "$_orph" "$(orphans_ids_json)"
+    printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s, "orphans_count": %s, "orphans": %s%s}\n' \
+      "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
     exit 0
     ;;
 
   heartbeat)
     require_owner
-    lock_present || { echo '{"ok": false, "reason": "no-lock"}'; exit 1; }
+    lock_present || { printf '{"ok": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     if [ "$(meta_get owner)" = "$OWNER" ]; then
       # rafraichit l'horodatage (maj step si --step fourni) — un seul ts pour meta + rapport
       [ -z "$STEP" ] && STEP="$(meta_get step)"
       ts="$(now)"
       rewrite_meta "$ts"
-      printf '{"ok": true, "owner": "%s", "heartbeat_epoch": %s}\n' "$OWNER" "$ts"
+      printf '{"ok": true, "owner": "%s", "heartbeat_epoch": %s%s}\n' "$OWNER" "$ts" "$SCOPE_JSON"
       exit 0
     fi
-    printf '{"ok": false, "reason": "not-owner", "held_by": "%s"}\n' "$(meta_get owner)"; exit 1
+    printf '{"ok": false, "reason": "not-owner", "held_by": "%s"%s}\n' "$(meta_get owner)" "$SCOPE_JSON"; exit 1
     ;;
 
   mark-progress)
     require_owner
-    lock_present || { echo '{"ok": false, "reason": "no-lock"}'; exit 1; }
+    lock_present || { printf '{"ok": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 1; }
     if [ "$(meta_get owner)" = "$OWNER" ]; then
       # (D-33-A) Garde OBLIGATOIRE, EXACTEMENT le meme patron que heartbeat/reclaim ci-dessus :
       # mark-progress n'a PAS de flag --step=, donc $STEP est TOUJOURS vide a ce point. Sans cette
@@ -689,15 +1074,15 @@ case "$ACTION" in
       # seule, qui garantit que heartbeat_epoch ne bouge JAMAIS sous mark-progress. Le 3e argument
       # ($ts) est le SEUL champ que ce verbe avance.
       rewrite_meta "$(meta_get heartbeat_epoch)" "$(lock_session_ids)" "$ts"
-      printf '{"ok": true, "owner": "%s", "progress_epoch": %s}\n' "$OWNER" "$ts"
+      printf '{"ok": true, "owner": "%s", "progress_epoch": %s%s}\n' "$OWNER" "$ts" "$SCOPE_JSON"
       exit 0
     fi
-    printf '{"ok": false, "reason": "not-owner", "held_by": "%s"}\n' "$(meta_get owner)"; exit 1
+    printf '{"ok": false, "reason": "not-owner", "held_by": "%s"%s}\n' "$(meta_get owner)" "$SCOPE_JSON"; exit 1
     ;;
 
   release)
     require_owner
-    lock_present || { echo '{"released": false, "reason": "no-lock"}'; exit 0; }
+    lock_present || { printf '{"released": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 0; }
     held="$(meta_get owner)"
     if [ "$held" = "$OWNER" ]; then
       drop_lock
@@ -708,29 +1093,30 @@ case "$ACTION" in
       _orph="$(orphans_count)"
       if [ "$_orph" -gt 0 ]; then
         log "release avec $_orph agent(s) consigne(s) encore running : registre conserve ($REG), a inventorier (orphans)"
-        printf '{"released": true, "owner": "%s", "children_running": %s, "orphans": %s}\n' "$OWNER" "$_orph" "$(orphans_ids_json)"
+        printf '{"released": true, "owner": "%s", "children_running": %s, "orphans": %s%s}\n' "$OWNER" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
       else
         rm -f "$REG"
-        printf '{"released": true, "owner": "%s", "children_running": 0}\n' "$OWNER"
+        printf '{"released": true, "owner": "%s", "children_running": 0%s}\n' "$OWNER" "$SCOPE_JSON"
       fi
       exit 0
     fi
-    printf '{"released": false, "reason": "not-owner", "held_by": "%s"}\n' "$held"; exit 1
+    printf '{"released": false, "reason": "not-owner", "held_by": "%s"%s}\n' "$held" "$SCOPE_JSON"; exit 1
     ;;
 
   status)
+    if [ "$ALL" = 1 ] && [ "$PARTITIONED" = 1 ]; then vf_dl_status_all; exit 0; fi
     lock_present && json_status true || json_status false
     exit 0
     ;;
 
   recover)
-    lock_present || { echo '{"recovered": false, "reason": "no-lock"}'; exit 0; }
+    lock_present || { printf '{"recovered": false, "reason": "no-lock"%s}\n' "$SCOPE_JSON"; exit 0; }
     age="$(lock_age)"; held="$(meta_get owner)"
     if [ "$age" -gt "$TTL" ]; then
       observed_gen="$(lock_gen)"
       mutex="${LOCK_DIR}.rec.$(printf '%s' "$observed_gen" | tr -c 'A-Za-z0-9._-' '_')"
       if ! ln_atomic "$$" "$mutex"; then
-        printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
+        printf '{"recovered": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
       fi
       # BL-3 (correction juge #2, meme patron EXACT que takeover et reclaim) : `recover` prend le
       # MEME mutex, sur la MEME construction de nom, dans le MEME espace de noms que les deux
@@ -745,7 +1131,7 @@ case "$ACTION" in
       [ -n "${VF_DRIVER_TEST_DIE_AFTER_MUTEX:-}" ] && exit 137
       if [ "$(lock_gen)" != "$observed_gen" ] || [ "$(lock_age)" -le "$TTL" ]; then
         rm -f "$mutex"; trap - EXIT INT TERM
-        printf '{"recovered": false, "reason": "race-during-recovery"}\n'; exit 1
+        printf '{"recovered": false, "reason": "race-during-recovery"%s}\n' "$SCOPE_JSON"; exit 1
       fi
       drop_lock; rm -f "$mutex"; trap - EXIT INT TERM
       # (correction juge #7) new_owner/session_id journalises quand CONNUS : `recover` n'exige pas
@@ -755,9 +1141,9 @@ case "$ACTION" in
       # couvre QUE les TROIS natures de reprise — takeover/reclaim/recover — jamais l'acquisition
       # ordinaire, meme apres un takeover : voir le docstring de journal_event ci-dessus).
       journal_event recover "$held" "$OWNER" "$(sanitize_session_id "${CLAUDE_CODE_SESSION_ID:-}")" "$age" "$observed_gen"
-      printf '{"recovered": true, "previous_owner": "%s", "age_seconds": %s}\n' "$held" "$age"; exit 0
+      printf '{"recovered": true, "previous_owner": "%s", "age_seconds": %s%s}\n' "$held" "$age" "$SCOPE_JSON"; exit 0
     fi
-    printf '{"recovered": false, "reason": "still-fresh", "age_seconds": %s, "ttl": %s}\n' "$age" "$TTL"
+    printf '{"recovered": false, "reason": "still-fresh", "age_seconds": %s, "ttl": %s%s}\n' "$age" "$TTL" "$SCOPE_JSON"
     exit 1
     ;;
 
@@ -767,9 +1153,9 @@ case "$ACTION" in
     # meme, c'est tout l'objet. owner/generation sont RELEVES sur le lock courant s'il existe
     # (sauf --owner explicite), pour que l'inventaire puisse dire « consigne sous quel mandat ».
     AGENT="$(sanitize_session_id "$AGENT")"
-    [ -n "$AGENT" ] || { log "--agent requis pour 'register'"; echo '{"registered": false, "reason": "agent-required"}'; exit 1; }
+    [ -n "$AGENT" ] || { log "--agent requis pour 'register'"; printf '{"registered": false, "reason": "agent-required"%s}\n' "$SCOPE_JSON"; exit 1; }
     ROLE="$(sanitize_reg_field "$ROLE")"
-    [ -n "$ROLE" ] || { log "--role requis pour 'register'"; echo '{"registered": false, "reason": "role-required"}'; exit 1; }
+    [ -n "$ROLE" ] || { log "--role requis pour 'register'"; printf '{"registered": false, "reason": "role-required"%s}\n' "$SCOPE_JSON"; exit 1; }
     NODE="$(sanitize_reg_field "$NODE")"; PARENT="$(sanitize_session_id "$PARENT")"
     case "$DEPTH" in ''|*[!0-9]*) DEPTH="" ;; esac
     _reg_owner="$OWNER"; _reg_gen=""
@@ -786,10 +1172,10 @@ case "$ACTION" in
       # BRUYANT et non nul, a l'inverse du journal des reprises : un dispatch non consigne est
       # precisement l'orphelin introuvable que ce registre existe pour empecher.
       log "registre inaccessible en ecriture ($REG) : dispatch NON consigne"
-      printf '{"registered": false, "reason": "registry-unwritable", "registry": "%s"}\n' "$REG"; exit 1
+      printf '{"registered": false, "reason": "registry-unwritable", "registry": "%s"%s}\n' "$REG" "$SCOPE_JSON"; exit 1
     fi
-    printf '{"registered": true, "agent_id": "%s", "role": "%s", "node": "%s", "parent": "%s", "owner": "%s", "registry": "%s"}\n' \
-      "$AGENT" "$ROLE" "$NODE" "$PARENT" "$_reg_owner" "$REG"
+    printf '{"registered": true, "agent_id": "%s", "role": "%s", "node": "%s", "parent": "%s", "owner": "%s", "registry": "%s"%s}\n' \
+      "$AGENT" "$ROLE" "$NODE" "$PARENT" "$_reg_owner" "$REG" "$SCOPE_JSON"
     exit 0
     ;;
 
@@ -798,25 +1184,25 @@ case "$ACTION" in
     # normal d'un agent, `stopped` apres un arret verifie par ListAgents (jamais sur la seule
     # reponse de TaskStop, qui peut etre sans effet immediat).
     AGENT="$(sanitize_session_id "$AGENT")"
-    [ -n "$AGENT" ] || { log "--agent requis pour 'close'"; echo '{"closed": false, "reason": "agent-required"}'; exit 1; }
+    [ -n "$AGENT" ] || { log "--agent requis pour 'close'"; printf '{"closed": false, "reason": "agent-required"%s}\n' "$SCOPE_JSON"; exit 1; }
     case "$CSTATUS" in
       done|failed|stopped) ;;
-      *) log "--status attendu parmi done|failed|stopped pour 'close'"; printf '{"closed": false, "reason": "invalid-status", "status": "%s"}\n' "$(sanitize_reg_field "$CSTATUS")"; exit 1 ;;
+      *) log "--status attendu parmi done|failed|stopped pour 'close'"; printf '{"closed": false, "reason": "invalid-status", "status": "%s"%s}\n' "$(sanitize_reg_field "$CSTATUS")" "$SCOPE_JSON"; exit 1 ;;
     esac
-    [ -f "$REG" ] || { echo '{"closed": false, "reason": "no-registry"}'; exit 1; }
+    [ -f "$REG" ] || { printf '{"closed": false, "reason": "no-registry"%s}\n' "$SCOPE_JSON"; exit 1; }
     _known="$(registry_fold | awk -F'\t' -v a="$AGENT" '$1 == a { print $10; exit }')"
-    [ -n "$_known" ] || { printf '{"closed": false, "reason": "unknown-agent", "agent_id": "%s"}\n' "$AGENT"; exit 1; }
+    [ -n "$_known" ] || { printf '{"closed": false, "reason": "unknown-agent", "agent_id": "%s"%s}\n' "$AGENT" "$SCOPE_JSON"; exit 1; }
     if ! printf '{"event": "close", "agent_id": "%s", "status": "%s", "closed_at": "%s", "epoch": %s}\n' \
         "$AGENT" "$CSTATUS" "$(iso)" "$(now)" >> "$REG" 2>/dev/null; then
       log "registre inaccessible en ecriture ($REG) : fermeture NON consignee"
-      printf '{"closed": false, "reason": "registry-unwritable", "registry": "%s"}\n' "$REG"; exit 1
+      printf '{"closed": false, "reason": "registry-unwritable", "registry": "%s"%s}\n' "$REG" "$SCOPE_JSON"; exit 1
     fi
     # children_running : ce que ce parent laisse derriere lui. Un parent ferme avec un enfant
     # encore running est le motif exact du reveil d'un parent « completed » (issue #82, cas 2 et 3).
     _kids="$(children_running_of_json "$AGENT")"
     [ "$_kids" != "[]" ] && log "close $AGENT : des enfants consignes tournent encore ($_kids). Les fermer ou les arreter, sinon ils restent orphelins"
-    printf '{"closed": true, "agent_id": "%s", "status": "%s", "previous_status": "%s", "children_running": %s}\n' \
-      "$AGENT" "$CSTATUS" "$_known" "$_kids"
+    printf '{"closed": true, "agent_id": "%s", "status": "%s", "previous_status": "%s", "children_running": %s%s}\n' \
+      "$AGENT" "$CSTATUS" "$_known" "$_kids" "$SCOPE_JSON"
     exit 0
     ;;
 
@@ -824,9 +1210,9 @@ case "$ACTION" in
     # Lecture seule, exit 0 dans tous les cas (registre absent compris) : c'est un inventaire, pas
     # un verdict. Ordre FEUILLE -> RACINE, l'ordre d'arret impose par la reprise.
     if [ -f "$REG" ]; then
-      printf '{"present": true, "registry": "%s", "count": %s, "orphans": %s}\n' "$REG" "$(orphans_count)" "$(orphans_json)"
+      printf '{"present": true, "registry": "%s", "count": %s, "orphans": %s%s}\n' "$REG" "$(orphans_count)" "$(orphans_json)" "$SCOPE_JSON"
     else
-      printf '{"present": false, "registry": "%s", "count": 0, "orphans": []}\n' "$REG"
+      printf '{"present": false, "registry": "%s", "count": 0, "orphans": []%s}\n' "$REG" "$SCOPE_JSON"
     fi
     exit 0
     ;;

@@ -299,10 +299,51 @@ for c in "${S11_CASES[@]}"; do
   OUT="$(run_guard "$(mk_bash "$c" sess-intrus .)")"
   assert "S11 — '$c' → deny (angle mort de segmentation fermé)" "$OUT" '"permissionDecision": "deny"'
 done
-echo "  (hors de portée, NOMMÉ, pas couvert : 'bash -c \"…\"' et 'eval …' — interprétation indirecte,"
-echo "   catégorie A de la clause de limite assumée, jamais un pattern-matching syntaxique.)"
-OUT_S11_BASHC="$(run_guard "$(mk_bash 'bash -c "git commit -m x"' sess-intrus .)")"
-assert_empty "S11 — 'bash -c \"git commit -m x\"' → allow (HORS DE PORTÉE ASSUMÉE, nommé, pas corrigé)" "$OUT_S11_BASHC"
+echo "  (hors de portée, NOMMÉ, pas couvert : 'eval …' et un script du dépôt — interprétation indirecte,"
+echo "   catégorie A de la clause de limite assumée. 'bash -c \"…\"' est, lui, lu depuis le 2026-10-13 (S13).)"
+OUT_S11_EVAL="$(run_guard "$(mk_bash 'eval "git commit -m x"' sess-intrus .)")"
+assert_empty "S11 — 'eval \"git commit -m x\"' → allow (HORS DE PORTÉE ASSUMÉE, nommé, pas corrigé)" "$OUT_S11_EVAL"
+
+echo ""
+echo "=== S13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13, Q5) — contournements fermés en lab plat ==="
+# Chaque forme avait le verdict ALLOW (rouge constaté avant la correction) ; elle a désormais celui de sa forme canonique
+# (git commit sous le verrou d'autrui : deny). Le détenteur passe toujours. Pas de refus hors du verrou d'autrui.
+declare -a S13_CASES=(
+  "git --git-dir .git commit -m x"
+  "git --work-tree . commit -m x"
+  "git --namespace ns commit -m x"
+  "git --config-env a.b=HOME commit -m x"
+  "git --attr-source HEAD commit -m x"
+  "git --namespace=ns commit -m x"
+  "git --no-pager commit -m x"
+  "env -u FOO git commit -m x"
+  "env -C . git commit -m x"
+  "env -i git commit -m x"
+  "nice -n 5 git commit -m x"
+  "nice -5 git commit -m x"
+  "exec -a nm git commit -m x"
+  "exec -c git commit -m x"
+  "sudo -u root git commit -m x"
+  "xargs -n 1 git commit -m x"
+  "bash -c \"git commit -m x\""
+  "sh -c 'git commit -m x'"
+  "zsh -c \"git commit -m x\""
+  "bash -lc \"git add -A && git commit -m x\""
+  "bash -c \"bash -c \\\"git commit -m x\\\"\""
+  "GIT_DIR=.git git commit -m x"
+  "export GIT_INDEX_FILE=/tmp/x; git commit -m x"
+  "export GIT_DIR=/tmp/x && git commit -m x"
+  "GIT_DIR=/tmp/x; git commit -m x"
+  "GIT_DIR=/tmp/x bash -c \"git commit -m x\""
+)
+for c in "${S13_CASES[@]}"; do
+  OUT="$(run_guard "$(mk_bash "$c" sess-intrus .)")"
+  assert "S13 — $c → deny (contournement fermé)" "$OUT" '"permissionDecision": "deny"'
+  OUT="$(run_guard "$(mk_bash "$c" sess-holder .)")"
+  assert_empty "S13 — $c : le détenteur passe" "$OUT"
+done
+assert_empty "S13 — bash -c sans geste concerné → allow" "$(run_guard "$(mk_bash 'bash -c "git status"' sess-intrus .)")"
+assert_empty "S13 — bash script.sh (script du dépôt, hors de portée) → allow" "$(run_guard "$(mk_bash 'bash release.sh' sess-intrus .)")"
 
 echo ""
 echo "=== S12 (contrepoints de S11, discriminance des exemptions préservée) ==="
@@ -430,6 +471,36 @@ assert "C7q — cd sans argument (HOME) : deny" "$(run_guard "$(mk_bash "cd && g
 assert "C7r — pushd <hors-lab> && git commit && popd && git commit : deny" "$(run_guard "$(mk_bash "pushd $AUTRE && git commit -m a && popd && git commit -m b" sess-intrus "$LAB")")" "$DENY"
 assert "C7s — cd <hors-lab> && popd && git commit : deny" "$(run_guard "$(mk_bash "cd $AUTRE && popd && git commit -m x" sess-intrus "$LAB")")" "$DENY"
 assert_empty "C7t — contrôle : pushd <hors-lab> && git commit sans popd : allow" "$(run_guard "$(mk_bash "pushd $AUTRE && git commit -m a" sess-intrus "$LAB")")"
+# Q5 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) : la cible incertaine et les wrappers à option-argument, lab plat
+assert "C7u — cd <hors-lab> && GIT_DIR=x git commit (préfixe, R-5) : deny" "$(run_guard "$(mk_bash "cd $AUTRE && GIT_DIR=x git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7v — cd <hors-lab> && export GIT_INDEX_FILE=x && git commit (autre segment) : deny" "$(run_guard "$(mk_bash "cd $AUTRE && export GIT_INDEX_FILE=x && git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7w — cd <hors-lab> && GIT_DIR=x bash -c \"git commit\" (variable héritée) : deny" "$(run_guard "$(mk_bash "cd $AUTRE && GIT_DIR=x bash -c \"git commit -m x\"" sess-intrus "$LAB")")" "$DENY"
+assert "C7x — cd <hors-lab> && env -C . git commit (le -C déplace la cible) : deny" "$(run_guard "$(mk_bash "cd $AUTRE && env -C . git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert "C7y — cd <hors-lab> && git --git-dir x commit (deux jetons) : deny" "$(run_guard "$(mk_bash "cd $AUTRE && git --git-dir x commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert_empty "C7z — cd <hors-lab> && bash -c \"git commit\" : allow (même verdict que la forme canonique)" "$(run_guard "$(mk_bash "cd $AUTRE && bash -c \"git commit -m x\"" sess-intrus "$LAB")")"
+assert_empty "C7za — cd <hors-lab> && env -u FOO git commit : allow" "$(run_guard "$(mk_bash "cd $AUTRE && env -u FOO git commit -m x" sess-intrus "$LAB")")"
+assert_empty "C7zb — cd <hors-lab> && nice -n 5 git --no-pager commit : allow" "$(run_guard "$(mk_bash "cd $AUTRE && nice -n 5 git --no-pager commit -m x" sess-intrus "$LAB")")"
+assert "C7zc — bash -c \"cd <hors-lab>\"; git commit (le cd interne ne bouge pas l'appelant) : deny" "$(run_guard "$(mk_bash "bash -c \"cd $AUTRE\"; git commit -m x" sess-intrus "$LAB")")" "$DENY"
+nest_bashc() { python3 -c '
+import shlex, sys
+c = sys.argv[2]
+for _ in range(int(sys.argv[1])):
+    c = "bash -c " + shlex.quote(c)
+print(c)' "$1" "$2"; }
+assert "C7zd — git commit à 3 niveaux de bash -c (lu en entier) : deny" "$(run_guard "$(mk_bash "$(nest_bashc 3 'git commit -m x')" sess-intrus "$LAB")")" "$DENY"
+assert "C7ze — git commit à 4 niveaux de bash -c (au-delà de la profondeur lue, refus grossier) : deny" "$(run_guard "$(mk_bash "$(nest_bashc 4 'git commit -m x')" sess-intrus "$LAB")")" "$DENY"
+assert "C7zf — git commit à 6 niveaux de bash -c : deny" "$(run_guard "$(mk_bash "$(nest_bashc 6 'git commit -m x')" sess-intrus "$LAB")")" "$DENY"
+assert_empty "C7zg — 4 niveaux de bash -c SANS git commit-like : allow" "$(run_guard "$(mk_bash "$(nest_bashc 4 'echo hi')" sess-intrus "$LAB")")"
+assert_empty "C7zh — 4 niveaux de bash -c autour de git status (lecture) : allow" "$(run_guard "$(mk_bash "$(nest_bashc 4 'git status')" sess-intrus "$LAB")")"
+# Tour 3 de la mission q45 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13) : le refus grossier lit /usr/bin/git et les guillemets (AU2-03),
+# NOM+= et NOM[i]= sont des affectations en préfixe (AU2-06). Les mutants de ces comportements vivent dans test-guard-driver-lock-ws.sh (GW-AU2-*).
+assert "C7zi — 4 niveaux autour de /usr/bin/git commit : deny" "$(run_guard "$(mk_bash "$(nest_bashc 4 '/usr/bin/git commit -m x')" sess-intrus "$LAB")")" "$DENY"
+assert "C7zj — 4 niveaux autour de g''it commit (guillemets dans le mot) : deny" "$(run_guard "$(mk_bash "$(nest_bashc 4 "g''it commit -m x")" sess-intrus "$LAB")")" "$DENY"
+assert_empty "C7zk — 4 niveaux autour de echo digit commit (git n'est pas un mot) : allow" "$(run_guard "$(mk_bash "$(nest_bashc 4 'echo digit commit -m x')" sess-intrus "$LAB")")"
+assert "C7zl — FOO+=1 git commit : deny" "$(run_guard "$(mk_bash 'FOO+=1 git commit -m x' sess-intrus "$LAB")")" "$DENY"
+assert "C7zm — A[0]=1 git commit : deny" "$(run_guard "$(mk_bash 'A[0]=1 git commit -m x' sess-intrus "$LAB")")" "$DENY"
+assert "C7zn — cd <hors-lab> && GIT_DIR+=x git commit (cible incertaine) : deny" "$(run_guard "$(mk_bash "cd $AUTRE && GIT_DIR+=x git commit -m x" sess-intrus "$LAB")")" "$DENY"
+assert_empty "C7zo — cd <hors-lab> && FOO+=1 git commit : allow" "$(run_guard "$(mk_bash "cd $AUTRE && FOO+=1 git commit -m x" sess-intrus "$LAB")")"
 # Voie Write/Edit : le .planning/ d un autre dépôt n est pas celui du lab
 assert_empty "C6a — Write dans le .planning/ d'un autre dépôt : allow" "$(run_guard "$(mk_write_cwd "$AUTRE/.planning/STATE.md" sess-intrus "$LAB")")"
 assert "C6b — Write dans le .planning/ du lab (chemin absolu) : deny" "$(run_guard "$(mk_write_cwd "$LAB/.planning/STATE.md" sess-intrus "$LAB")")" "$DENY"

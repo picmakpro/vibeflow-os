@@ -28,7 +28,7 @@
 # une garde ANTI-ADVERSAIRE (même formule que guard-agent-write.sh, même statut de garantie).
 # DEUX catégories de contournement CONNUES et NON couvertes :
 #   Catégorie A (pattern-matching, l'analyse syntaxique ne peut pas les voir) — interprétation
-#   indirecte (eval, interprète inline python -c/node -e, `bash -c "…"`), alias shell, substitution
+#   indirecte (eval, interprète inline python -c/node -e ; `bash -c "…"` est LU depuis le 2026-10-13, voir plus bas), alias shell, substitution
 #   de commande, un script DU DÉPÔT qui commite en interne (`bash release.sh`), toute commande dont
 #   le verbe git n'apparaît pas LITTÉRALEMENT en position de commande, et — mesurées en revue,
 #   32-JUGE-* — les formes composites non normalisées : `(`/`)` et `{`/`}` non séparés par un
@@ -65,6 +65,54 @@
 # imparsable → fail-open SILENCIEUX (exit 0, stdout vide) / interprète indisponible → fail-open
 # BRUYANT (vf_guard_unavailable : marqueur de santé + stderr + code de garde, JAMAIS écrasé par 0).
 
+# LAB PARTITIONNÉ (Phase 57, P57-D-07/09/10/26/28/33) — `.planning/workstreams` présent ET VF_DRIVER_LOCK vide :
+# le guard juge les ÉCRITURES (Write/Edit) sur ce qu'elles touchent. Un chemin sous
+# `.planning/workstreams/<sujet>/` n'est refusé que si le verrou HOMONYME du compartiment est tenu par une
+# autre session ; un fichier racine de `.planning/` que si le verrou de dépôt (ou l'ancien verrou unique
+# `.planning/DRIVER.lock`) l'est ; un chemin non cartographiable (lien qui sort de `.planning/`, `workstreams`
+# seul) l'est sous tout verrou d'autrui. Les verrous sont cherchés au MÊME endroit que driver-lock.sh
+# (<git-common-dir>/vf-driver/{repo,ws/*}, repli .planning/DRIVER.lock.d) par une résolution PROPRE au guard
+# (git durci, puis lecture documentée du layout `.git` quand git est absent du PATH du hook). Le segment de
+# compartiment s'apparie au nom du verrou à l'égalité exacte ou casefold ; le guard ne valide aucun nom et ne
+# recopie aucune politique. Un geste Bash concerné y est jugé par la règle historique (refus sous tout verrou
+# tenu par autrui) ; le jugement par classes de gestes est livré par le plan 57-08.
+# FAIL-CLOSED : en lab partitionné, toute exception entre le parse du payload et la décision (dispatch d'outil,
+# règles C4/C5/C6, décision) est captée par un crochet sys.excepthook posé juste après l'aiguillage : il écrit,
+# sur stdout, un refus JSON « erreur interne du guard, fail-closed » — jamais l'ouverture du repli
+# ` 2>/dev/null || exit 0` du bas de ce fichier (python sort en 1, le repli ramène le code à 0, le refus est
+# déjà lu). Le silence reste réservé au payload vide, imparsable ou qui n'est pas un objet. Un lab plat (ou
+# VF_DRIVER_LOCK posé) n'évalue ni l'aiguillage, ni le crochet, ni le chemin partitionné : le code d'avant la
+# Phase 57 s'exécute ligne pour ligne (P57-D-03), à l'exception des lectures étendues au lab plat le 2026-10-13 (bloc GLOBAUX GIT, ci-dessous).
+# VERROU ILLISIBLE (R-2) : en lab partitionne, un dossier de verrous ou un meta qui EXISTE mais ne se lit pas vaut
+# un refus nomme (« verrou de driver existe mais est illisible »), jamais « pas de verrou » ; seul un meta absent
+# reste « pas de verrou ». Le lab plat garde sa posture historique (meta illisible = allow, Q3c).
+# GLOBAUX GIT, WRAPPERS, SHELLS ET CIBLE (F-3, R-5 ; Q4 et Q5 du 2026-10-13, arbitrage Samuel, AskUserQuestion session
+# principale, 2026-10-13) : en lab partitionne COMME EN LAB PLAT, `exec` est un wrapper ; les options globales de git sans
+# argument (--no-pager, --paginate, -p, --no-optional-locks, --literal-pathspecs, --glob-pathspecs, --noglob-pathspecs,
+# --icase-pathspecs, --no-replace-objects, --no-lazy-fetch, --no-advice, --bare) et celles qui prennent un argument en
+# deux jetons ou en forme `=` (--git-dir, --work-tree, --namespace, --config-env, --attr-source ; -c, -C ; --super-prefix=)
+# sont sautees avant le sous-verbe ; les wrappers sautent l argument de leur option (`env -u NAME`, `nice -n 5`, `exec -a
+# nom`, `sudo -u`, `xargs -n`) ; `bash|sh|zsh|dash|ksh -c "…"` est re-decoupe et juge comme une commande (WRAPPER_ARG_OPTS,
+# SHELLS, MAX_SHELL_DEPTH = 3 niveaux lus, au-dela un git suivi d un verbe mutant compte comme un geste a cible incertaine).
+# Une affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git DU MEME SEGMENT, un `env -C
+# <dir>`, ou la meme affectation POSEE dans un segment PRECEDENT de la meme commande (`export GIT_INDEX_FILE=x; git commit`,
+# `declare -x`, `GIT_DIR=x; git commit`), heritee par un shell fils, est une cible INCERTAINE, au meme titre que --git-dir
+# : meme verdict, meme message, aussi bien pour la classe du geste que pour la decision « geste hors du lab ». Chaque forme
+# a le verdict de sa forme canonique ; aucun refus n est ajoute hors du verrou d autrui. NON COUVERT, nomme : `eval`, un
+# script du depot (`bash release.sh`), un wrapper hors liste (`timeout 5 git commit`, `env -S "git commit"`), un `export`
+# dans un fichier source ou une fonction, `set -a`, `bash -c` dont la chaine est construite par substitution (categorie A).
+# Preuve A/B du lab plat : la copie gelee d avant la Phase 57 reste la reference ; la suite n en tolere que les ecarts
+# ENUMERES (GW_AB_ENUM de test-guard-driver-lock-ws.sh, 37 formes), des refus nouveaux sous le verrou d autrui, et elle EPINGLE la
+# transcription du guard courant sur ces formes (fixtures/guard-ab-enum-37.txt : verdict, code, message, au bit pres). Hors
+# matrice A/B, le lab plat recoit aussi des refus nouveaux (`/usr/bin/git` et guillemets au-dela de 3 niveaux de bash -c ;
+# affectations += et [i]= en prefixe) ET un changement plus PERMISSIF : `bash -c "cd <hors lab> && git commit"`, refuse par la
+# copie gelee (decoupage grossier de la chaine), est permis (le cd interne d une chaine lue sert a la decision « hors du lab »).
+# AUCUN CROCHET DE TEST (R-6) : le guard ne lit aucune variable de test ; la suite provoque l exception fail-closed
+# dans une COPIE du guard qu elle fabrique elle-meme.
+# LIMITE (P57-D-20) : le guard isole des SESSIONS, pas des managers d'une même session (ils partagent le
+# session_id, règle 3) ; aucun refus actif neuf n'est ajouté pour les séparer. Latence ajoutée, chemin
+# partitionné seulement : un interprète python + un `git rev-parse` durci (hypothèse A5 de la recherche).
+
 set -uo pipefail
 
 INPUT="$(cat 2>/dev/null || true)"
@@ -76,7 +124,39 @@ INPUT="$(cat 2>/dev/null || true)"
 # situation normale, la grande majorité du temps sur ce dépôt même. Un faux négatif sur ce chemin
 # (lock créé entre la sonde et l'évaluation réelle, fenêtre de quelques millisecondes) reste un
 # ALLOW, jamais une perte de sûreté : la revalidation réelle se fait plus loin, sur le `meta`.
-[ -e "${VF_DRIVER_LOCK:-.planning/DRIVER.lock}" ] || exit 0
+# Lab partitionné (VF_DRIVER_LOCK vide ET .planning/workstreams présent ou lien) : les verrous vivent sous le
+# dossier commun de git, pas dans .planning/ — la sonde ne sort plus ici, la décision revient au python. Tout
+# autre cas (lab plat, VF_DRIVER_LOCK posé) : la ligne d'avant la Phase 57, mêmes instructions, même latence.
+# Racine git (P57-D-39) : un cwd sans .planning/ propre dont la racine git porte .planning/workstreams est un
+# sous-dossier d un lab partitionné ; remontée pure bash jusqu au premier .git, sans spawn. Un cwd avec son propre
+# .planning/ (P57-D-29) ou le lab plat gardent la ligne d avant : mêmes instructions, même latence.
+# P57-D-56 (revise P57-D-25) : un .planning/workstreams présent mais SANS AUCUN compartiment (vide, ou ne portant
+# que des fichiers comme .gitkeep) est un lab plat, comme en v2.69.1 ; lien, fichier ou dossier illisible = présent.
+vf_guard_ws_present() { # <dossier workstreams> -> 0 = partitionné (ou illisible), 1 = absent ou vide
+  local w="$1" e
+  [ -e "$w" ] || [ -L "$w" ] || return 1
+  if [ -L "$w" ] || [ ! -d "$w" ] || [ ! -r "$w" ] || [ ! -x "$w" ]; then return 0; fi
+  for e in "$w"/*; do
+    if [ -L "$e" ] || [ -d "$e" ]; then return 0; fi
+  done
+  return 1  # D56-VIDE
+}
+if [ -z "${VF_DRIVER_LOCK:-}" ] && vf_guard_ws_present .planning/workstreams; then
+  :
+else
+  VF_GUARD_SUBLAB=0
+  if [ -z "${VF_DRIVER_LOCK:-}" ] && [ ! -e .planning ] && [ ! -L .planning ]; then
+    VF_GUARD_D="$PWD"
+    while [ -n "$VF_GUARD_D" ] && [ "$VF_GUARD_D" != / ]; do
+      if [ -e "$VF_GUARD_D/.git" ] || [ -L "$VF_GUARD_D/.git" ]; then
+        if vf_guard_ws_present "$VF_GUARD_D/.planning/workstreams"; then VF_GUARD_SUBLAB=1; fi
+        break
+      fi
+      VF_GUARD_D="${VF_GUARD_D%/*}"
+    done
+  fi
+  [ "$VF_GUARD_SUBLAB" = 1 ] || [ -e "${VF_DRIVER_LOCK:-.planning/DRIVER.lock}" ] || exit 0
+fi
 
 # PRÉFILTRE PUR-BASH (surenset strict du domaine de deny — le python ne peut denier que si l'une
 # de ces sous-chaînes figure dans le payload) : les verbes git mutants de la surface A du rejeu,
@@ -140,10 +220,17 @@ fi
 # UN SEUL spawn d'interprète ; le payload est rejoué sur son entrée standard. Le bash ne fait que
 # router — la décision (allow silencieux / deny JSON) est entièrement émise par python.
 printf '%s' "$INPUT" | vf_python -c '
-import json, os, re, sys, time
+import json, os, re, shlex, sys, time
 
 MARKER = "vibeflow:allow-lock-override"
 WRAPPERS = {"sudo", "env", "command", "nohup", "time", "xargs", "nice", "stdbuf", "caffeinate"}
+# Correction F-3 (57-SECURITY.md) etendue au lab plat le 2026-10-13 (arbitrage Samuel, AskUserQuestion session
+# principale, 2026-10-13, Q4) : `exec` est un wrapper, et les options globales de git SANS argument (git help git)
+# sont sautees avant le sous-verbe, en lab plat comme en lab partitionne. La preuve A/B du lab plat (suite
+# test-guard-driver-lock-ws.sh, GW-AB) ne tolere plus que les ecarts ENUMERES de ces formes nouvellement refusees.
+NOARG_GIT_GLOBALS = {"--no-pager", "--paginate", "-p", "--no-optional-locks", "--literal-pathspecs",
+                     "--glob-pathspecs", "--noglob-pathspecs", "--icase-pathspecs", "--no-replace-objects",
+                     "--no-lazy-fetch", "--no-advice", "--bare"}
 # Surface A du rejeu (D-32-06) — verbes git mutants dont on ne cherche PAS à sous-analyser
 # davantage (checkout de branche vs de fichier, branch -D vs autre usage…) : les deux mutent
 # l arbre partagé sous le lock d autrui, sous-analyser n ajouterait que de la surface de
@@ -153,6 +240,41 @@ WRAPPERS = {"sudo", "env", "command", "nohup", "time", "xargs", "nice", "stdbuf"
 MUTATING_GIT_VERBS = {"commit", "checkout", "switch", "restore", "reset", "clean", "push", "tag", "branch"}
 RESUMABLE_SUBVERBS = {"rebase", "merge", "cherry-pick", "revert", "stash"}
 RESUME_EXIT_OPTIONS = {"--abort", "--continue", "--skip", "--quit"}
+
+def noarg_global(t):
+    return t in NOARG_GIT_GLOBALS
+
+# Options globales de git qui PRENNENT un argument en deux jetons (`--git-dir <p>`, mesure sur git 2.50.1 : seuls
+# ces cinq l acceptent ; `--exec-path <v>` n en prend pas, `--super-prefix` est refuse par git y compris en forme
+# `=`). Leur forme `=` est sautee sur un seul jeton. --git-dir et --work-tree rendent en plus la cible incertaine
+# (uncertain_global, git_target).
+GIT_ARG_GLOBALS = {"--git-dir", "--work-tree", "--namespace", "--config-env", "--attr-source"}
+GIT_EQ_GLOBALS = ("--git-dir=", "--work-tree=", "--exec-path=", "--namespace=", "--config-env=", "--attr-source=",
+                  "--super-prefix=", "--list-cmds=")
+
+# Wrappers a option-argument : le jeton qui suit l option n est PAS la commande. Sans cette table `env -u NAME git
+# commit` lit NAME comme la commande et le verbe git reste invisible. Une option courte groupee dont la derniere
+# lettre prend un argument (`-iu NAME`) consomme le jeton suivant ; une lettre qui prend un argument au milieu du
+# groupe l a deja attache (`-n1`).
+WRAPPER_ARG_OPTS = {
+    "env": {"-u", "-C", "--unset", "--chdir"},
+    "nice": {"-n", "--adjustment"},
+    "exec": {"-a"},
+    "sudo": {"-u", "-g", "-h", "-p", "-C", "-D", "-r", "-t", "-U", "-T", "-R", "--user", "--group", "--host",
+             "--prompt", "--close-from", "--chdir", "--role", "--type", "--other-user", "--command-timeout",
+             "--chroot"},
+    "xargs": {"-a", "-d", "-E", "-I", "-J", "-L", "-n", "-P", "-R", "-S", "-s", "--arg-file", "--delimiter",
+              "--max-args", "--max-lines", "--max-procs", "--max-chars", "--max-replace-args"},
+    "stdbuf": {"-i", "-o", "-e", "--input", "--output", "--error"},
+    "time": {"-f", "-o", "--format", "--output"},
+    "caffeinate": {"-t", "-w"},
+}
+
+# Interpreteurs de commande : `bash -c "..."` est re-decoupe et juge comme une commande (profondeur bornee).
+SHELLS = {"bash", "sh", "zsh", "dash", "ksh", "ash", "fish"}
+SHELL_ARG_OPTS = {"-o", "-O", "+o", "+O", "--rcfile", "--init-file"}
+MAX_SHELL_DEPTH = 3
+SEG_OPS = {"&&", "||", ";", "|", "&", "|&", "(", ")", ";;", ";&"}
 
 def sanitize(s):
     return "".join(c for c in (s or "") if c.isalnum() or c in "._-")
@@ -186,6 +308,10 @@ def journal_override(lock_parent, lock_base, session_id, cmd_or_content):
 # segment qui ne contient QU un jeton de fermeture (ex. le second segment de `{ … ; }`).
 STRUCTURAL_SKIP = {"(", ")", "{", "}", "then", "do", "else"}
 
+# Affectation en prefixe de commande (AU2-06) : NOM=, NOM+=, NOM[i]=, NOM[i]+= . Le tableau et le += sont lus comme une
+# affectation, sinon `FOO+=1 git commit` laisse FOO+=1 en position de commande et le verbe git reste invisible.
+ASSIGN_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(\[[^\]]*\])?\+?=")
+
 def command_positions(toks):
     """CSL-04 (repris de guard-bash-registres.sh, non modifié à la source) : indices des tokens
     en position de COMMANDE — début de segment, après un jeton structurel (STRUCTURAL_SKIP), ou
@@ -197,24 +323,51 @@ def command_positions(toks):
     n = len(toks)
     while i < n:
         t = toks[i]
-        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", t):
+        if ASSIGN_RE.match(t):
             i += 1
             continue
         if t in STRUCTURAL_SKIP:
             i += 1
             continue
         out.append(i)
-        if os.path.basename(t) in WRAPPERS:
-            i += 1
-            while i < n and toks[i].startswith("-"):
-                i += 1
+        if os.path.basename(t) in WRAPPERS or os.path.basename(t) == "exec":
+            i = skip_wrapper_options(os.path.basename(t), toks, i + 1)
             continue
         break
     return out
 
+def skip_wrapper_options(name, toks, i):
+    """Saute les options d un wrapper (env, nice, exec, sudo...) APRES son nom, y compris l argument des options qui
+    en prennent un (WRAPPER_ARG_OPTS) : `env -u NAME git commit`, `nice -n 5 git commit`, `exec -a x git commit`.
+    Rend l indice du premier jeton qui n est plus une option du wrapper."""
+    argopts = WRAPPER_ARG_OPTS.get(name, ())
+    n = len(toks)
+    while i < n and toks[i].startswith("-"):
+        t = toks[i]
+        if t == "--":
+            return i + 1
+        if t in argopts:
+            i += 2
+        elif t.startswith("--"):
+            i += 1  # --long=valeur, ou option longue sans argument
+        elif len(t) > 2:
+            k = -1
+            for pos in range(1, len(t)):
+                if ("-" + t[pos]) in argopts:
+                    k = pos
+                    break
+            if k == -1 or k < len(t) - 1:
+                i += 1  # aucune lettre a argument, ou valeur deja attachee (-n1)
+            else:
+                i += 2  # derniere lettre a argument (-iu NAME)
+        else:
+            i += 1
+    return i
+
 def skip_git_globals(toks, i):
     """(BL-2) Saute les options GLOBALES connues de `git` (-C <path>, -c <k>=<v>, --git-dir=…,
-    --work-tree=…, --exec-path=…, -P) avant de lire le sous-verbe — sans ce saut, `git -C /repo
+    --work-tree=…, --exec-path=…, -P ; les options a argument en deux jetons, GIT_ARG_GLOBALS ; les options sans
+    argument, NOARG_GIT_GLOBALS) avant de lire le sous-verbe — sans ce saut, `git -C /repo
     commit` et `git -c core.hooksPath=/dev/null commit` (qui neutralise précisément les hooks
     git) ne sont jamais reconnus comme un commit (A6)."""
     n = len(toks)
@@ -226,9 +379,13 @@ def skip_git_globals(toks, i):
             i += 1
         elif t.startswith("-c") and len(t) > 2:
             i += 1
-        elif t.startswith("--git-dir=") or t.startswith("--work-tree=") or t.startswith("--exec-path="):
+        elif t in GIT_ARG_GLOBALS:
+            i += 2  # --git-dir <p>, --work-tree <p>, --namespace <n>, --config-env <k=v>, --attr-source <t>
+        elif t.startswith(GIT_EQ_GLOBALS):
             i += 1
         elif t == "-P":
+            i += 1
+        elif t in NOARG_GIT_GLOBALS:
             i += 1
         else:
             break
@@ -240,6 +397,139 @@ def tokens(seg):
         return shlex.split(seg, posix=True)
     except ValueError:
         return seg.split()
+
+# AU3-01 : shlex en mode punctuation_chars rend une SUITE de signes de ponctuation comme UN seul jeton (`);`, `)&&`, `;(`, `&)`),
+# absent de SEG_OPS : le separateur collé a une parenthese ne terminait plus le segment et `bash` n etait plus en position de
+# commande. Un separateur collé a une parenthese termine le segment exactement comme le meme separateur isole. Les
+# redirections (`>`, `>>`, `>&`, `&>`, `<&`, `>|`) restent UN jeton qui n est pas un operateur : `&` isole est un coupe-portee de
+# outside_scan, `>&2` ne doit pas le devenir.
+PUNCT_CHARS = "();<>|&"
+PUNCT_OPS2 = ("&&", "||", ";;", ";&", "|&")
+
+def split_punct(t):
+    """Decoupe un jeton fait UNIQUEMENT de signes de ponctuation en operateurs (SEG_OPS) et redirections ; tout autre
+    jeton est rendu tel quel."""
+    if not t or any(ch not in PUNCT_CHARS for ch in t):
+        return [t]
+    out = []
+    i = 0
+    n = len(t)
+    while i < n:
+        if t[i:i + 2] in PUNCT_OPS2:
+            out.append(t[i:i + 2])
+            i += 2
+        elif t[i] in "<>" or (t[i] == "&" and t[i + 1:i + 2] == ">"):
+            j = i + 1
+            while j < n and t[j] in "<>":
+                j += 1
+            if j < n and t[j] in "&|":
+                j += 1
+            out.append(t[i:j])
+            i = j
+        else:
+            out.append(t[i])
+            i += 1
+    return out
+
+def lex_ops(flat):
+    """Jetons de `flat` (shlex posix, ponctuation separee), les suites de ponctuation decoupees par split_punct."""
+    lex = shlex.shlex(flat, posix=True, punctuation_chars=True)
+    lex.whitespace_split = True
+    return [u for t in lex for u in split_punct(t)]
+
+COARSE_VERBS = sorted(MUTATING_GIT_VERBS | RESUMABLE_SUBVERBS)
+
+def sets_git_target(toks):
+    """True si ce segment POSE GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= pour la suite de la commande, sans lancer
+    de commande : `export GIT_INDEX_FILE=x`, `declare -x GIT_DIR=x`, ou une affectation seule `GIT_DIR=x`. La cible
+    des segments SUIVANTS devient incertaine (meme verdict que le prefixe du meme segment, R-5)."""
+    ts = [t for t in toks if t not in STRUCTURAL_SKIP]
+    if not ts:
+        return False
+    if all(ASSIGN_RE.match(t) for t in ts):
+        return any(ENV_TARGET_RE.match(t) for t in ts)
+    if ts[0] in ("export", "declare", "typeset", "readonly"):
+        return any(ENV_TARGET_RE.match(t) for t in ts[1:])
+    return False
+
+def shell_c_string(toks, idx):
+    """toks[idx] est un interpreteur (SHELLS) : la chaine de `-c`, ou None. Les options sont lues jusqu au premier
+    jeton qui n en est pas une (-o/-O/--rcfile prennent un argument) ; `-c` peut etre groupe (-lc, -ec). Sans -c,
+    le premier jeton est un SCRIPT (`bash release.sh`, hors de portee, categorie A)."""
+    i = idx + 1
+    n = len(toks)
+    c_seen = False
+    while i < n:
+        t = toks[i]
+        if t == "--":
+            i += 1
+            break
+        if t in SHELL_ARG_OPTS:
+            i += 2
+            continue
+        if t.startswith("--"):
+            i += 1
+            continue
+        if len(t) > 1 and t[0] in "-+":
+            if t[0] == "-" and "c" in t[1:]:
+                c_seen = True
+            i += 2 if t[-1] in "oO" else 1
+            continue
+        break
+    if c_seen and i < n:
+        return toks[i]
+    return None
+
+def shell_c_inner(cmd):
+    """Chaines `bash -c "..."` (SHELLS) de la commande, lues avec un decoupage qui respecte les guillemets : liste de
+    (chaine, incertain, cd_avant) ; incertain = un GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= du prefixe, ou pose plus haut
+    dans la commande, est herite par le shell fils ; cd_avant = un cd, pushd ou popd de la commande appelante figure AVANT
+    la chaine (AU2-01) : le dossier courant du shell fils est celui de l appelant, la recursion doit le savoir. Illisible
+    (guillemet non ferme) : liste vide."""
+    try:
+        flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
+        toks = lex_ops(flat)
+    except ValueError:
+        return []
+    out = []
+    persist = False
+    cd_seen = False
+    cur = []
+    for t in toks + [";"]:
+        if t not in SEG_OPS:
+            cur.append(t)
+            continue
+        if sets_git_target(cur):
+            persist = True
+        for idx in command_positions(cur):
+            if os.path.basename(cur[idx]) in SHELLS:
+                c = shell_c_string(cur, idx)
+                if c:
+                    out.append((c, persist or env_target_uncertain(cur[:idx]), cd_seen))
+        if any(os.path.basename(cur[idx]) in ("cd", "pushd", "popd") for idx in command_positions(cur)):
+            cd_seen = True
+        cur = []
+    return out
+
+# Refus grossier au-dela de MAX_SHELL_DEPTH (AU2-02, AU2-03). Lineaire : une seule recherche de `git`, une seule recherche
+# d un verbe mutant apres lui, aucun point-etoile (l ancienne expression `git`, point-etoile, verbes en re.S relisait la fin de
+# la chaine a chaque `git` : 32 Ko en 19 s). Guillemets et antislash sont retires avant la recherche (deux apostrophes dans `git`,
+# un guillemet double, un antislash : tous valent git) ; `git` derriere un `/` (`/usr/bin/git`) ou un guillemet compte. Une chaine
+# plus longue que COARSE_MAX_LEN n est pas lue : elle compte comme un geste a cible incertaine (refus sous le verrou d autrui
+# seulement, comme tout le refus grossier).
+COARSE_MAX_LEN = 65536
+COARSE_STRIP = str.maketrans("", "", "\x27\"\\")
+COARSE_GIT_RE = re.compile(r"(?<![A-Za-z0-9_.\-])git\b")
+COARSE_VERB_RE = re.compile(r"\b(" + "|".join(COARSE_VERBS) + r")\b")
+
+def coarse_commit_like(c):
+    """Au-dela de MAX_SHELL_DEPTH, la chaine n est plus decoupee : un `git` suivi plus loin d un verbe mutant la fait
+    compter comme un geste a cible incertaine (refus sous le verrou d autrui seulement)."""
+    if len(c) > COARSE_MAX_LEN:
+        return True
+    c = c.translate(COARSE_STRIP)
+    m = COARSE_GIT_RE.search(c)
+    return m is not None and COARSE_VERB_RE.search(c, m.end()) is not None
 
 def strip_heredocs(cmd):
     """CSL-05 (durci -- correction juge #1) : ne tronque QUE le CORPS de chaque heredoc, jamais ce
@@ -274,7 +564,7 @@ def strip_heredocs(cmd):
         # tout ce qui suit (i inchangé après le break) reste dans `lines` et sera traité normalement
     return "\n".join(out)
 
-def bash_command_concerned(cmd):
+def bash_command_concerned(cmd, depth=0):
     """True si `cmd` porte, EN POSITION DE COMMANDE, un geste concerné (surface A du rejeu, verbes
     git mutants + outil de PR). (BL-1) Le payload est d abord découpé sur \\n et \\r AVANT la
     segmentation sur les opérateurs de chaînage — un `git commit` qui n est pas le premier segment
@@ -316,6 +606,12 @@ def bash_command_concerned(cmd):
                     sub = toks[idx + 1] if idx + 1 < len(toks) else ""
                     if sub in ("pr", "release"):
                         return True
+    for c, _unc, _cd in shell_c_inner(cmd):
+        if depth + 1 > MAX_SHELL_DEPTH:
+            if coarse_commit_like(c):
+                return True
+        elif bash_command_concerned(c, depth + 1):
+            return True
     return False
 
 # PÉRIMÈTRE DU LOCK (budgets de méthode, v2.67.0) : le lock protège le lab dont la session est
@@ -359,25 +655,37 @@ def git_target(toks, i, base):
             return None
         elif t == "-c":
             i += 2
-        elif (t.startswith("-c") and len(t) > 2) or t.startswith("--exec-path=") or t == "-P":
+        elif t in GIT_ARG_GLOBALS:
+            i += 2
+        elif (t.startswith("-c") and len(t) > 2) or t.startswith(GIT_EQ_GLOBALS) or t == "-P":
+            i += 1
+        elif noarg_global(t):
             i += 1
         else:
             break
     return target
 
-def bash_targets_outside_lab(cmd, root):
+def bash_targets_outside_lab(cmd, root, start=None):
     """True si TOUS les gestes concernés de `cmd` visent avec certitude un dossier hors de `root`
-    (et qu il y en a au moins un). Toute incertitude rend False : le lock s applique."""
+    (et qu il y en a au moins un). Toute incertitude rend False : le lock s applique. `start` : dossier de
+    départ de la commande quand il diffère de `root` (lab partitionné lancé d un sous-dossier, P57-D-39) ;
+    par défaut `root`, comportement d avant la phase."""
+    start = root if start is None else start
+    inside, outside = outside_scan(cmd, root, start, 0, False)
+    return (not inside) and outside > 0
+
+def outside_scan(cmd, root, base, depth, inherit):
+    """Parcours de bash_targets_outside_lab : rend (un geste est DANS le lab ou incertain, nombre de gestes hors du
+    lab). `base` : dossier courant au depart (None = indetermine). `inherit` : la cible est deja incertaine (variable
+    GIT_* heritee d un shell parent). Une chaine `bash -c "..."` est parcourue a part (depth + 1), depuis le dossier
+    courant de la commande : un cd INTERNE a la chaine ne bouge pas le dossier de la commande appelante."""
     try:
-        import shlex
         flat = re.sub(r"[\n\r]+", " ; ", strip_heredocs(cmd))
-        lex = shlex.shlex(flat, posix=True, punctuation_chars=True)
-        lex.whitespace_split = True
-        toks = list(lex)
+        toks = lex_ops(flat)
     except ValueError:
-        return False
+        return True, 0
     if "`" in cmd or any(t in SCOPE_BREAKERS for t in toks):
-        return False
+        return True, 0
     segs, ops, cur = [], [], []
     for t in toks:
         if t in ("&&", "||", ";"):
@@ -388,9 +696,12 @@ def bash_targets_outside_lab(cmd, root):
             cur.append(t)
     segs.append(cur)
     ops.append("")
-    base = root
+    start = base
     outside = 0
+    persist = inherit
     for seg, op in zip(segs, ops):
+        if sets_git_target(seg):
+            persist = True
         positions = command_positions(seg)
         if positions:
             idx = positions[-1]
@@ -403,24 +714,753 @@ def bash_targets_outside_lab(cmd, root):
             if name == "popd":
                 base = None  # la pile de pushd n est pas suivie : dossier indéterminé, le lock s applique
                 continue
-            if bash_command_concerned(" ".join(shlex.quote(t) for t in seg)):
+            if bash_command_concerned(" ".join(shlex.quote(t) for t in seg), depth):
+                if name in SHELLS:
+                    c = shell_c_string(seg, idx)
+                    if not c or depth + 1 > MAX_SHELL_DEPTH:
+                        return True, 0  # chaine non lue ou trop profonde : le lock s applique
+                    inn, cnt = outside_scan(c, root, base, depth + 1, persist or env_target_uncertain(seg[:idx]))
+                    if inn:
+                        return True, 0
+                    outside += cnt
+                    if op in (";", "||") and base != start:
+                        base = None
+                    continue
                 if name == "git":
                     target = git_target(seg, idx + 1, base)
+                    if persist or env_target_uncertain(seg[:idx]):
+                        target = None  # GIT_DIR=/GIT_INDEX_FILE=/GIT_WORK_TREE= du meme segment, ou pose plus haut : cible incertaine (R-5)
                 elif any(t in ("-R", "--repo") or t.startswith("--repo=") for t in seg):
                     target = None
                 else:
                     target = base
                 if is_inside(target, root):
-                    return False
+                    return True, 0
                 outside += 1
-        if op in (";", "||") and base != root:
+        if op in (";", "||") and base != start:
             base = None  # la chaîne a pu s arrêter avant ou après le cd : dossier indéterminé
-    return outside > 0
+    return False, outside
+
+# ---------------------------------------------------------------------------------------------------
+# LAB PARTITIONNE (Phase 57, plan 57-05). Aucune apostrophe dans ce bloc : il vit dans un programme
+# python embarque dans une chaine bash a guillemets simples (les apostrophes des chaines passent par
+# \x27). Rien de ce qui suit ne tourne en lab plat ni sous VF_DRIVER_LOCK.
+# ---------------------------------------------------------------------------------------------------
+def top_by_marker(base):
+    """Racine git par remontée des parents jusqu au premier `.git` (dossier ou fichier) : repli quand git n est
+    pas utilisable. Rend None si aucun."""
+    try:
+        d = os.path.realpath(base)
+        for _ in range(40):
+            if os.path.lexists(os.path.join(d, ".git")):
+                return d
+            parent = os.path.dirname(d)
+            if parent == d:
+                break
+            d = parent
+    except Exception:
+        pass
+    return None
+
+def ws_present(path):
+    """P57-D-56 (revise P57-D-25) : le dossier des compartiments est-il PRESENT au sens du verrou ? Absent -> False ;
+    lien, fichier regulier ou dossier illisible -> True (jugé fail-closed plus loin) ; dossier réel SANS AUCUN
+    compartiment (vide, ou seulement des fichiers comme .gitkeep) -> False : lab plat, comme en v2.69.1. Un lien
+    ou un sous-dossier non caché le rend présent. Même jugement que vf_guard_ws_present (bash) et driver-lock.sh."""
+    if not os.path.lexists(path):
+        return False
+    if os.path.islink(path) or not os.path.isdir(path) or not os.access(path, os.R_OK | os.X_OK):
+        return True
+    try:
+        for name in os.listdir(path):
+            if name.startswith("."):
+                continue
+            full = os.path.join(path, name)
+            if os.path.islink(full) or os.path.isdir(full):
+                return True
+    except OSError:
+        return True
+    return False  # D56-VIDE
+
+def partition_lab(payload):
+    """Racine du lab partitionné, ou None. Partitionné : VF_DRIVER_LOCK vide ET .planning/workstreams présent
+    (lexists, un lien compte) au cwd du payload quand c est une chaîne non vide, sinon au cwd du process ; à
+    défaut, ET seulement si ce dossier ne porte pas son PROPRE .planning/ (P57-D-29, hors périmètre), à la
+    racine git (P57-D-39 : un geste lancé d un sous-dossier est jugé comme en lab partitionné). Ne lève JAMAIS :
+    toute exception replie sur la condition même de la sonde bash (cwd du process)."""
+    try:
+        if os.environ.get("VF_DRIVER_LOCK"):
+            return None
+        base = None
+        if isinstance(payload, dict):
+            c = payload.get("cwd")
+            if isinstance(c, str) and c:
+                base = c
+        if base is None:
+            base = "."
+        if ws_present(os.path.join(base, ".planning", "workstreams")):
+            return base
+        if os.path.lexists(os.path.join(base, ".planning")):
+            return None
+        top = toplevel_of(base) or top_by_marker(base)
+        if top and ws_present(os.path.join(top, ".planning", "workstreams")):
+            return top
+        return None
+    except Exception:
+        try:
+            return "." if ws_present(".planning/workstreams") else None
+        except Exception:
+            return None
+
+FAIL_CLOSED_REASON = (
+    "Refus : erreur interne du guard, fail-closed (verrou de driver par compartiment). Le geste est "
+    "REFUSE par precaution plutot que laisse passer sans jugement. Rejouer le geste ; si l\x27erreur "
+    "persiste, la signaler (guard-driver-lock.sh)."
+)
+
+class LockUnreadable(Exception):
+    """Un verrou, ou le dossier des verrous de compartiments, EXISTE mais ne se lit pas (droits, type inattendu) :
+    en lab partitionne ce n est jamais « pas de verrou » (P57-D-33, correction R-2). Le crochet fail-closed
+    rend un refus qui nomme le chemin. Le lab plat ne leve jamais cette exception (posture historique Q3c)."""
+
+LOCK_UNREADABLE_REASON = (
+    "Refus : un verrou de driver existe mais est illisible (%s). Le geste est REFUSE par precaution "
+    "(fail-closed) plutot que laisse passer comme s il n y avait aucun verrou. Rendre le verrou lisible, "
+    "ou le liberer avec driver-lock.sh, puis rejouer le geste."
+)
+
+def fail_closed_hook(etype, value, tb):
+    """sys.excepthook du chemin partitionne : ecrit le refus JSON sur stdout et le vide. Aucune trace sur
+    stderr. Python sort ensuite en 1 ; le repli bash ramene le code du guard a 0, le refus est deja lu."""
+    try:
+        try:
+            reason = FAIL_CLOSED_REASON
+            if etype is LockUnreadable:
+                reason = LOCK_UNREADABLE_REASON % (str(value),)
+            out = json.dumps({
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }, ensure_ascii=True)
+        except Exception:
+            out = "{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"erreur interne du guard, fail-closed\"}}"
+        sys.stdout.write(out + "\n")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+def git_hardened(args, cwd, raw=False):
+    """git durci (check-mission-exit.sh) : pas de fsmonitor ni de hooks du dépôt, pas de verrou optionnel,
+    pas de configuration système, pas d invite, 2 s maximum. Rend la sortie standard (octets si raw, sinon
+    texte), ou None."""
+    try:
+        import subprocess
+        env = dict(os.environ)
+        # Un GIT_DIR / GIT_WORK_TREE / GIT_INDEX_FILE hérité désignerait un autre dépôt que celui du cwd
+        # (modèle : cgh_git de check-guard-health.sh) : le guard jugerait alors le mauvais lab.
+        for k in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_OBJECT_DIRECTORY",
+                  "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_PREFIX"):
+            env.pop(k, None)
+        env["GIT_CONFIG_NOSYSTEM"] = "1"
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GIT_OPTIONAL_LOCKS"] = "0"
+        r = subprocess.run(
+            ["git", "-C", cwd, "-c", "core.fsmonitor=", "-c", "core.hooksPath=/dev/null", "--no-optional-locks"] + list(args),
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=2, env=env)
+        if r.returncode != 0:
+            return None
+        if raw:
+            return r.stdout
+        return r.stdout.decode("utf-8", "replace")
+    except Exception:
+        return None
+
+def first_line(path):
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return f.readline().strip()
+
+def common_dir_from_layout(cwd):
+    """Lecture documentee du layout quand git est indisponible : `.git` dossier -> le dossier commun ; `.git`
+    fichier `gitdir: <chemin>` -> ce dossier, puis `commondir` s il existe. Remonte les parents (bornee)."""
+    try:
+        d = os.path.realpath(cwd)
+        for _ in range(40):
+            g = os.path.join(d, ".git")
+            if os.path.isdir(g):
+                return os.path.realpath(g)
+            if os.path.isfile(g):
+                first = first_line(g)
+                if not first.startswith("gitdir:"):
+                    return None
+                gd = first[len("gitdir:"):].strip()
+                if not os.path.isabs(gd):
+                    gd = os.path.join(d, gd)
+                gd = os.path.realpath(gd)
+                cf = os.path.join(gd, "commondir")
+                if os.path.isfile(cf):
+                    cd = first_line(cf)
+                    if cd:
+                        if not os.path.isabs(cd):
+                            cd = os.path.join(gd, cd)
+                        return os.path.realpath(cd)
+                return gd
+            parent = os.path.dirname(d)
+            if parent == d:
+                break
+            d = parent
+    except Exception:
+        pass
+    return None
+
+def present_strict(path):
+    """Existence d un verrou, SANS avaler les erreurs : absent (ENOENT, ENOTDIR) -> False ; toute autre erreur
+    (droits…) -> le verrou est peut-etre la mais indechiffrable : LockUnreadable (R-2). os.path.lexists rendrait
+    False pour les deux."""
+    try:
+        os.lstat(path)
+        return True
+    except (FileNotFoundError, NotADirectoryError, ValueError):
+        return False
+    except OSError:
+        raise LockUnreadable(path)
+
+def discover_locks(cwd):
+    """Verrous du lab, cherches AU MEME ENDROIT que driver-lock.sh mais par une resolution propre au guard :
+    <git-common-dir>/vf-driver/{repo,ws/*}/DRIVER.lock, repli .planning/DRIVER.lock.d/{repo,ws/*}, et
+    l ancien verrou unique .planning/DRIVER.lock (traité comme verrou de dépôt, P57-D-26). Racines
+    dedoublonnees par realpath. Chaque verrou : {path, scope, ws}."""
+    roots = []
+    seen = set()
+    def add_root(r):
+        try:
+            rr = os.path.realpath(r)
+        except Exception:
+            return
+        if rr not in seen:
+            seen.add(rr)
+            roots.append(rr)
+    common = None
+    out = git_hardened(["rev-parse", "--git-common-dir", "--show-toplevel"], cwd)
+    if out:
+        lines = out.split("\n")
+        c = lines[0].strip() if lines else ""
+        if c:
+            common = c if os.path.isabs(c) else os.path.join(cwd, c)
+    if common is None:
+        common = common_dir_from_layout(cwd)
+    if common:
+        add_root(os.path.join(common, "vf-driver"))
+    add_root(os.path.join(cwd, ".planning", "DRIVER.lock.d"))
+    locks = []
+    for r in roots:
+        depot = os.path.join(r, "repo", "DRIVER.lock")
+        if present_strict(depot):
+            locks.append({"path": depot, "scope": "depot", "ws": ""})
+        wsdir = os.path.join(r, "ws")
+        try:
+            names = sorted(os.listdir(wsdir))
+        except (FileNotFoundError, NotADirectoryError, ValueError):
+            names = []
+        except OSError:
+            raise LockUnreadable(wsdir)
+        for n in names:
+            p = os.path.join(wsdir, n, "DRIVER.lock")
+            if present_strict(p):
+                locks.append({"path": p, "scope": "compartiment", "ws": n})
+    legacy = os.path.join(cwd, ".planning", "DRIVER.lock")
+    if os.path.lexists(legacy):
+        locks.append({"path": legacy, "scope": "ancien", "ws": ""})
+    return locks
+
+def held_by_other(lk, sid):
+    """Meta du verrou et regles 1-2 historiques : absent, illisible, perime ou sans session_ids -> None
+    (le verrou ne tient pas). Sinon, tenu par autrui si sid n est pas dans ses session_ids : rend le meta
+    enrichi (owner, step, branch, age), sinon None."""
+    meta_path = os.path.join(lk["path"], "meta")
+    # Lab partitionne : un meta ABSENT (verrou en cours de pose ou deja libere) reste « pas de verrou » ; un meta
+    # qui existe mais ne se lit pas (droits, pas un fichier) est un refus nomme (R-2, P57-D-33).
+    try:
+        os.stat(meta_path)
+    except (FileNotFoundError, NotADirectoryError, ValueError):
+        return None
+    except OSError:
+        raise LockUnreadable(meta_path)
+    if not os.path.isfile(meta_path):
+        raise LockUnreadable(meta_path)
+    try:
+        with open(meta_path, encoding="utf-8", errors="replace") as f:
+            meta_lines = f.readlines()
+    except FileNotFoundError:
+        return None
+    except Exception:
+        raise LockUnreadable(meta_path)
+    meta = {}
+    for ln in meta_lines:
+        if "=" in ln:
+            k, v = ln.rstrip("\n").split("=", 1)
+            meta[k] = v
+    try:
+        ttl = int(os.environ.get("VF_DRIVER_TTL", "1800"))
+    except ValueError:
+        ttl = 1800
+    try:
+        hb = int(meta.get("heartbeat_epoch", ""))
+    except ValueError:
+        try:
+            hb = int(os.stat(lk["path"]).st_mtime)
+        except Exception:
+            return None
+    age = now_epoch() - hb
+    if age > ttl:
+        return None
+    session_ids = [x for x in meta.get("session_ids", "").split(",") if x]
+    if not session_ids:
+        return None
+    if sid and sid in session_ids:
+        return None
+    out = dict(lk)
+    out["owner"] = meta.get("owner", "?")
+    out["step"] = meta.get("step", "")
+    out["branch"] = meta.get("branch", "")
+    out["worktree"] = meta.get("worktree", "")
+    out["age"] = age
+    return out
+
+def map_path(abs_path, cwd):
+    """Cartographie un chemin vers ce qu il touche, sur son realpath relatif a <cwd>/.planning :
+    workstreams/<seg>/... -> ("compartiment", seg) ; autre chemin sous .planning/ -> ("racine", "") ;
+    chemin qui sort de .planning/, ou `workstreams` seul -> ("incertain", ""). Ne valide aucun nom."""
+    planning = os.path.realpath(os.path.join(os.path.realpath(cwd), ".planning"))
+    real = os.path.realpath(abs_path)
+    # Le segment .planning se compare sans tenir compte de la casse (P57-D-38) : sur un FS insensible a la casse,
+    # .PLANNING est le meme dossier, et realpath ne rend pas la casse du disque. Seul ce segment est replie.
+    pp = planning.split(os.sep)
+    rp = real.split(os.sep)
+    if len(rp) >= len(pp) and rp[:len(pp) - 1] == pp[:-1] and rp[len(pp) - 1].casefold() == pp[-1].casefold():
+        real = os.sep.join(pp + rp[len(pp):])
+    rel = os.path.relpath(real, planning)
+    if rel == ".." or rel.startswith(".." + os.sep):
+        return ("incertain", "")
+    parts = [x for x in rel.split(os.sep) if x and x != "."]
+    if parts and parts[0].casefold() == "workstreams":
+        if len(parts) < 2:
+            return ("incertain", "")
+        return ("compartiment", parts[1])
+    return ("racine", "")
+
+def scope_label(lk):
+    if lk["scope"] == "compartiment":
+        return "compartiment « " + lk["ws"] + " »"
+    if lk["scope"] == "depot":
+        return "verrou de dépôt"
+    return "ancien verrou unique (.planning/DRIVER.lock)"
+
+def reclaim_command(lk):
+    base = "driver-lock.sh reclaim --owner=" + lk["owner"]
+    if lk["scope"] == "compartiment":
+        return base + " --ws=" + lk["ws"]
+    if lk["scope"] == "depot":
+        return base + " --depot"
+    return "VF_DRIVER_LOCK=.planning/DRIVER.lock " + base
+
+# ---------------------------------------------------------------------------------------------------
+# Plan 57-08 : volet Bash du guard partitionne. Un commit est juge sur ce quil embarque (P57-D-10).
+# ---------------------------------------------------------------------------------------------------
+class Unreadable(Exception):
+    """Une source du jugement de commit est illisible : le geste est REFUSE (fail-closed, P57-D-10)."""
+
+def toplevel_of(cwd):
+    out = git_hardened(["rev-parse", "--show-toplevel"], cwd)
+    if not out:
+        return None
+    t = out.rstrip("\n")
+    return os.path.realpath(t) if t else None
+
+# Fichiers de la forme de release VF (P57-D-18) : un commit qui en embarque un est juge comme un geste de
+# depot. Liste par defaut codee en dur, aucun fichier de configuration. Chemins relatifs au lab.
+RELEASE_FORM_FILES = (
+    b"VERSION", b"plugin/.claude-plugin/plugin.json", b".claude-plugin/marketplace.json",
+    b"README.md", b"README.fr.md", b"CHANGELOG.md", b"docs/ADR.md",
+)
+COMMIT_VALUE_LONG = ("--author", "--date", "--file", "--message", "--template", "--reuse-message",
+                     "--reedit-message", "--fixup", "--squash", "--trailer", "--cleanup",
+                     "--pathspec-from-file")
+COMMIT_VALUE_SHORT = "mFCct"
+TREE_GIT_VERBS = {"checkout", "switch", "restore", "reset", "clean"}
+DEPOT_GIT_VERBS = {"push", "branch", "tag"}
+ADD_GIT_VERBS = {"add", "rm", "mv", "stage"}
+
+def uncertain_global(t):
+    """Option globale git qui deplace la cible du geste : -C, --git-dir, --work-tree (P57-D-33)."""
+    return t == "-C" or (t.startswith("-C") and len(t) > 2) or t.startswith("--git-dir") or t.startswith("--work-tree")
+
+ENV_TARGET_RE = re.compile(r"^(GIT_DIR|GIT_INDEX_FILE|GIT_WORK_TREE)(\[[^\]]*\])?\+?=")
+
+def env_target_uncertain(pre):
+    """Affectation GIT_DIR=, GIT_INDEX_FILE= ou GIT_WORK_TREE= en prefixe de la commande git (correction R-5,
+    P57-D-20) : comme --git-dir ou --work-tree, elle deplace la cible du geste, donc cible INCERTAINE. Un `env -C
+    <dir>` / `env --chdir` (ou `sudo -D <dir>`) devant la commande la deplace de meme."""
+    if any(ENV_TARGET_RE.match(t) for t in pre):
+        return True
+    for k, t in enumerate(pre):
+        b = os.path.basename(t)
+        if b == "env" and any(x == "--chdir" or x.startswith("--chdir=") or re.match(r"^-[^-]*C", x) for x in pre[k + 1:]):
+            return True
+        if b == "sudo" and any(x == "--chdir" or x.startswith("--chdir=") or re.match(r"^-[^-]*D", x) for x in pre[k + 1:]):
+            return True
+    return False
+
+def commit_flags(rest):
+    """Drapeaux du commit : a_flag (-a, --all, grappe courte avec a), pathspec (jeton non-option apres les
+    options connues pour prendre une valeur, --, -i, -o, --pathspec-from-file : un doute de lecture compte
+    comme un pathspec present), amend."""
+    a_flag = False
+    pathspec = False
+    amend = False
+    i = 0
+    n = len(rest)
+    while i < n:
+        t = rest[i]
+        if t == "--":
+            pathspec = True
+            break
+        if t.startswith("--"):
+            nm = t.split("=", 1)[0]
+            if nm == "--all":
+                a_flag = True
+            elif nm == "--amend":
+                amend = True
+            elif nm in ("--include", "--only", "--pathspec-from-file"):
+                pathspec = True
+            if nm in COMMIT_VALUE_LONG and "=" not in t:
+                i += 1
+        elif t.startswith("-") and len(t) > 1:
+            cl = t[1:]
+            for k, ch in enumerate(cl):
+                if ch in COMMIT_VALUE_SHORT:
+                    if k == len(cl) - 1:
+                        i += 1
+                    break
+                if ch == "a":
+                    a_flag = True
+                elif ch in "io":
+                    pathspec = True
+        else:
+            pathspec = True
+        i += 1
+    return a_flag, pathspec, amend
+
+def add_info(rest, seen_cd):
+    """git add/rm/mv/stage : chemins litteraux, ou forme large (., -A, --all, -u, --update, :/, glob, jeton non
+    resolu, cd precedent) dont les chemins reels ne se lisent que dans l arbre de travail."""
+    wide = bool(seen_cd)
+    paths = []
+    for t in rest:
+        if t == "--":
+            continue
+        if t.startswith("-"):
+            if t in ("--all", "--update") or t.startswith("--pathspec-from-file") or \
+               (not t.startswith("--") and ("A" in t[1:] or "u" in t[1:])):
+                wide = True
+            continue
+        if t in (".", ":/", "") or t.startswith(":") or any(c in t for c in "*?[$`~"):
+            wide = True
+            continue
+        paths.append(t)
+    return {"wide": wide, "paths": paths}
+
+def gesture_classes(cmd, inherit=False, depth=0, cd_before=False):
+    """Gestes de la commande, meme segmentation que bash_command_concerned (heredocs retires, sauts de ligne puis
+    operateurs, command_positions, skip_git_globals) et memes exemptions D-32-06 (aucune elargie, aucune
+    retiree). Rend (gestes, ajouts). Classes : arbre, commit (a_flag, pathspec, amend), depot,
+    retrait-worktree ; chaque geste porte uncertain (cible git incertaine). Les ajouts (git add/rm/mv/stage)
+    ne sont pas des gestes concernes : ils entrent dans le jugement du commit de la meme commande. cd_before : la commande
+    appelante a change de dossier avant cette chaine (AU2-01) ; un git add y est lu comme forme large, comme apres un cd."""
+    gestures = []
+    adds = []
+    seen_cd = cd_before
+    persist = inherit
+    cmd0 = cmd
+    cmd = strip_heredocs(cmd)
+    for line in re.split(r"[\n\r]+", cmd):
+        for seg in re.split(r"\|\||&&|;|\||&", line):
+            toks = tokens(seg)
+            if sets_git_target(toks):
+                persist = True
+            for idx in command_positions(toks):
+                name = os.path.basename(toks[idx])
+                if name in ("cd", "pushd", "popd"):
+                    seen_cd = True
+                elif name == "git":
+                    j = skip_git_globals(toks, idx + 1)
+                    unc = any(uncertain_global(t) for t in toks[idx + 1:j])
+                    unc = unc or env_target_uncertain(toks[:idx])
+                    unc = unc or persist
+                    if j >= len(toks):
+                        continue
+                    sub = toks[j]
+                    rest = toks[j + 1:]
+                    if sub == "worktree":
+                        s2 = rest[0] if rest else ""
+                        if s2 == "remove":
+                            gestures.append({"cls": "retrait-worktree", "uncertain": unc})
+                        continue
+                    if sub in RESUMABLE_SUBVERBS:
+                        if any(o in rest for o in RESUME_EXIT_OPTIONS):
+                            continue
+                        gestures.append({"cls": "arbre", "uncertain": unc})
+                    elif sub in TREE_GIT_VERBS:
+                        gestures.append({"cls": "arbre", "uncertain": unc})
+                    elif sub == "commit":
+                        a_flag, pathspec, amend = commit_flags(rest)
+                        gestures.append({"cls": "commit", "uncertain": unc, "a_flag": a_flag,
+                                         "pathspec": pathspec, "amend": amend})
+                    elif sub in DEPOT_GIT_VERBS:
+                        gestures.append({"cls": "depot", "uncertain": unc})
+                    elif sub in ADD_GIT_VERBS and not unc:
+                        adds.append(add_info(rest, seen_cd))
+                elif name == "gh":
+                    sub = toks[idx + 1] if idx + 1 < len(toks) else ""
+                    if sub in ("pr", "release"):
+                        gestures.append({"cls": "depot", "uncertain": False})
+    for c, unc_in, cd_in in shell_c_inner(cmd0):
+        if depth + 1 > MAX_SHELL_DEPTH:
+            if coarse_commit_like(c):
+                gestures.append({"cls": "arbre", "uncertain": True})
+            continue
+        g2, a2 = gesture_classes(c, inherit or unc_in, depth + 1, cd_before or cd_in)
+        gestures.extend(g2)
+        adds.extend(a2)
+    return gestures, adds
+
+def split_z(raw):
+    return [x for x in raw.split(b"\x00") if x]
+
+def literal_add_paths(adds, cwd, top):
+    """Chemins litteraux des ajouts, ramenes au toplevel (octets). Un chemin qui couvre .planning ou
+    .planning/workstreams entier est une forme large : rend (chemins, large)."""
+    out = []
+    wide = False
+    base = os.path.realpath(cwd)
+    for a in adds:
+        for p in a["paths"]:
+            full = os.path.normpath(os.path.join(base, os.path.expanduser(p)))
+            rel = os.path.relpath(full, top)
+            if rel == ".." or rel.startswith(".." + os.sep):
+                continue
+            parts = [x for x in rel.split(os.sep) if x and x != "."]
+            low = [x.lower() for x in parts]
+            if not parts or low == [".planning"] or low == [".planning", "workstreams"]:
+                wide = True
+                continue
+            out.append(os.fsencode("/".join(parts)))
+    return out, wide
+
+def commit_paths(g, adds, cwd, top):
+    """Chemins (octets, relatifs au toplevel) que le commit embarque, union (P57-D-10, P57-D-19, P57-D-33) :
+    l index ; les modifications de l arbre si -a/--all, un pathspec ou un ajout large ; les non-suivis si
+    ajout large ; les fichiers de HEAD sous --amend ; les chemins litteraux d un git add de la meme commande.
+    Sorties -z decoupees sur NUL, aucune normalisation. Toute source illisible leve Unreadable (nom de la
+    source) ; la fonction entiere est fail-closed."""
+    lit, lit_wide = literal_add_paths(adds, cwd, top)
+    wide = lit_wide or any(a["wide"] for a in adds)
+    srcs = [("diff --cached", ["diff", "--cached", "--no-renames", "--name-only", "-z"])]
+    if g["a_flag"] or g["pathspec"] or wide:
+        srcs.append(("diff", ["diff", "--no-renames", "--name-only", "-z"]))
+    if wide:
+        srcs.append(("ls-files -o", ["ls-files", "-o", "--exclude-standard", "-z"]))
+    if g["amend"]:
+        srcs.append(("diff-tree HEAD", ["diff-tree", "--root", "--no-commit-id", "--no-renames",
+                                         "--name-only", "-r", "-z", "HEAD"]))
+    paths = []
+    for name, args in srcs:
+        out = git_hardened(args, top, raw=True)
+        if out is None:
+            raise Unreadable(name)
+        paths.extend(split_z(out))
+    paths.extend(lit)
+    return paths
+
+def map_repo_path(pb, prefix):
+    """Chemin (octets, relatif au toplevel) -> ("compartiment", segment) | ("commun", b"") | ("incertain", b"")
+    | ("hors", b""). prefix : chemin du lab sous le toplevel (octets, vide si le lab est le toplevel).
+    Commun : racine de .planning/ ou membre de RELEASE_FORM_FILES (P57-D-18)."""
+    if prefix:
+        if not pb.startswith(prefix + b"/"):
+            return ("hors", b"")
+        pb = pb[len(prefix) + 1:]
+    parts = pb.split(b"/")
+    if parts[0].lower() == b".planning":
+        if len(parts) >= 2 and parts[1].lower() == b"workstreams":
+            if len(parts) < 3:
+                return ("incertain", b"")
+            return ("compartiment", parts[2])
+        return ("commun", b"")
+    if pb in RELEASE_FORM_FILES:
+        return ("commun", b"")
+    return ("hors", b"")
+
+def cite_paths(paths):
+    shown = []
+    for pb in paths[:3]:
+        shown.append(json.dumps(os.fsdecode(pb)[:120], ensure_ascii=True))
+    return ", ".join(shown)
+
+def same_checkout(wt, top):
+    try:
+        return os.path.realpath(wt) == os.path.realpath(top)
+    except Exception:
+        return True
+
+def judge_bash(cmd, held, cwd, lab=None):
+    """Jugement du geste Bash, apres le court-circuit aucun verrou tenu par autrui. Rend (verrous refusants,
+    notes de motif). Cible incertaine : refus sous tout verrou d autrui. arbre : refus si un verrou d autrui
+    a ete pris depuis le MEME worktree (verrou ancien ou toplevel inconnu : refus, prudence). retrait-worktree :
+    refus sous tout verrou d autrui. depot : refus sous le verrou de depot ou l ancien verrou. commit : union
+    des sources."""
+    gestures, adds = gesture_classes(cmd)
+    blockers = []
+    notes = []
+    def add(hs):
+        for h in hs:
+            if all(b["path"] != h["path"] for b in blockers):
+                blockers.append(h)
+    if not gestures:
+        add(held)
+    top = None
+    top_done = False
+    for g in gestures:
+        cls = g["cls"]
+        if g["uncertain"] or cls == "retrait-worktree":
+            add(held)
+        elif cls == "arbre":
+            if not top_done:
+                top = toplevel_of(cwd)
+                top_done = True
+            for h in held:
+                wt = h.get("worktree", "")
+                if not wt or top is None or same_checkout(wt, top):
+                    add([h])
+        elif cls == "depot":
+            add([h for h in held if h["scope"] in ("depot", "ancien")])
+        elif cls == "commit":
+            try:
+                if not top_done:
+                    top = toplevel_of(cwd)
+                    top_done = True
+                if top is None:
+                    raise Unreadable("rev-parse --show-toplevel")
+                rel = os.path.relpath(os.path.realpath(cwd if lab is None else lab), top)
+                prefix = b"" if rel == "." else os.fsencode(rel)
+                paths = commit_paths(g, adds, cwd, top)
+            except Unreadable as e:
+                add(held)
+                notes.append("source illisible : " + str(e))
+                continue
+            except Exception:
+                add(held)
+                notes.append("source illisible : exception interne")
+                continue
+            hit = []
+            for pb in paths:
+                kind, seg = map_repo_path(pb, prefix)
+                if kind == "compartiment":
+                    sd = os.fsdecode(seg)
+                    hs = [h for h in held if h["scope"] == "compartiment"
+                          and (h["ws"] == sd or h["ws"].casefold() == sd.casefold())]
+                elif kind == "commun":
+                    hs = [h for h in held if h["scope"] in ("depot", "ancien")]
+                elif kind == "incertain":
+                    hs = list(held)
+                else:
+                    hs = []
+                if hs:
+                    add(hs)
+                    hit.append(pb)
+            if hit:
+                note = "le commit embarque : " + cite_paths(hit)
+                if note not in notes:  # une chaine bash -c est aussi lue par le decoupage historique : meme note, une seule fois
+                    notes.append(note)
+        else:
+            add(held)
+    return blockers, notes
+
+def decide_partitioned(tool, target, abs_path, sid, cwd, text_for_marker, lab):
+    """Decision du chemin partitionne. SORT TOUJOURS (allow silencieux, echappatoire journalisee, ou deny).
+    Write/Edit : jugement par ce que le chemin touche (P57-D-09). Bash : regle historique, refus sous tout
+    verrou tenu par autrui (le jugement par classes de gestes arrive en 57-08)."""
+    if tool == "Bash":
+        if not bash_command_concerned(target):
+            sys.exit(0)
+        if bash_targets_outside_lab(target, os.path.realpath(lab), os.path.realpath(cwd)):
+            sys.exit(0)
+    locks = discover_locks(lab)
+    held = [h for h in (held_by_other(lk, sid) for lk in locks) if h is not None]
+    notes = []
+    if not held:
+        sys.exit(0)  # aucun verrou tenu par autrui : allow SANS lancer le moindre git diff (DLWS-06, empty)
+    if tool == "Bash":
+        blockers, notes = judge_bash(target, held, cwd, lab)
+    else:
+        kind, seg = map_path(abs_path, lab)
+        if kind == "compartiment":
+            blockers = [h for h in held if h["scope"] == "compartiment"
+                        and (h["ws"] == seg or h["ws"].casefold() == seg.casefold())]
+        elif kind == "racine":
+            blockers = [h for h in held if h["scope"] in ("depot", "ancien")]
+        else:
+            blockers = held
+    if not blockers:
+        sys.exit(0)
+    # Echappatoire (D-32-06), evaluee APRES le calcul des refus : un geste permis sort sans journal ; un
+    # geste refuse journalise une ligne override a cote de CHAQUE verrou refusant (best-effort).
+    if os.environ.get("VF_DRIVER_LOCK_OVERRIDE") == "1" or MARKER in text_for_marker:
+        for h in blockers:
+            journal_override(os.path.dirname(h["path"]) or ".", os.path.basename(h["path"]), sid, text_for_marker)
+        sys.exit(0)
+    parts = []
+    for h in blockers:
+        parts.append(
+            scope_label(h) + " tenu par \x27" + h["owner"] + "\x27"
+            + (" (étape : " + h["step"] + ")" if h["step"] else "")
+            + (", branche \x27" + h["branch"] + "\x27" if h["branch"] else "")
+            + ", depuis " + str(h["age"] // 60) + " min"
+            + " ; re-rattachement : `" + reclaim_command(h) + "`")
+    reason = (
+        "Verrou de driver ACTIF : " + " | ".join(parts) + ". Ce geste est REFUSÉ (session non enregistrée sous"
+        + " ce verrou). Si tu ES le détenteur avec un identifiant de session neuf (/clear, --continue ambigu) :"
+        + " la commande de re-rattachement ci-dessus, puis réessaie. Sinon : attends la fin du mandat, travaille"
+        + " dans un arbre séparé (`git worktree add`), ou pose le marqueur " + MARKER + " sur CE geste précis"
+        + " pour passer outre exceptionnellement."
+    )
+    if notes:
+        reason += " Detail : " + " ; ".join(notes) + "."
+    print(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }, ensure_ascii=False))
+    sys.exit(0)
 
 try:
     payload = json.load(sys.stdin)
 except Exception:
     sys.exit(0)  # imparsable -> fail-open SILENCIEUX (QUAL-01 issue 3)
+
+# AIGUILLAGE (P57-D-10, P57-D-33) : lab partitionné ou non. Hors lab partitionne, rien de ce qui suit
+# jusqu au dispatch n est évalué : le code d avant la Phase 57 s exécute ligne pour ligne.
+LAB_ROOT = partition_lab(payload)
+PARTITIONED = LAB_ROOT is not None
+if PARTITIONED:
+    if not isinstance(payload, dict):
+        sys.exit(0)  # payload qui n est pas un objet -> classe imparsable, SILENCIEUSE (comme le lab plat)
+    # Crochet fail-closed, posé AVANT tout le dispatch : une exception du dispatch d outil, des règles
+    # C4/C5/C6 ou de la decision devient un refus JSON, jamais l ouverture du repli bash.
+    sys.excepthook = fail_closed_hook
 
 tool = payload.get("tool_name") or ""
 ti = payload.get("tool_input") or {}
@@ -446,11 +1486,14 @@ elif tool in ("Write", "Edit"):
     # guard-bash-registres.sh:40-42) — sans ces deux formes la garde est inerte sous Windows en
     # PARAISSANT installée. Frontière EXACTE (jamais un suffixe, guard-agent-write.sh:64-67).
     norm = fp.replace("\\\\", "/").replace("\\", "/")
-    if not re.search(r"(^|/)\.planning/", norm):
+    # Lab partitionné : le segment .planning se compare SANS tenir compte de la casse (P57-D-38, F-1 : sur un
+    # système de fichiers insensible à la casse, .PLANNING est le même dossier). Lab plat : inchangé, au bit près.
+    if not re.search(r"(^|/)\.planning/", norm, re.I if PARTITIONED else 0):
         sys.exit(0)  # C4 : hors du dossier de planification -> allow, quel que soit le lock
     root_w = os.path.realpath(cwd)
     abs_w = norm if os.path.isabs(norm) else os.path.join(root_w, norm)
-    if not is_inside(os.path.realpath(abs_w), root_w):
+    # Lab partitionné : la borne est la racine du lab, pas le cwd (P57-D-39) ; lab plat : le cwd, inchangé.
+    if not is_inside(os.path.realpath(abs_w), os.path.realpath(LAB_ROOT) if PARTITIONED else root_w):
         sys.exit(0)  # C6 : le .planning/ d un AUTRE dépôt que le lab -> hors du périmètre du lock
     if tool == "Write":
         content = ti.get("content")
@@ -459,6 +1502,12 @@ elif tool in ("Write", "Edit"):
     text_for_marker = content if isinstance(content, str) else ""
 else:
     sys.exit(0)  # C5 : outil hors périmètre (ni Bash, ni Write, ni Edit) -> allow
+
+# Lab partitionné : la décision (verrous par compartiment, dépôt, ancien verrou) remplace tout ce qui
+# suit, qui n est lu que pour un lab plat ou sous VF_DRIVER_LOCK. decide_partitioned() sort toujours.
+if PARTITIONED:
+    decide_partitioned(tool, cmd if tool == "Bash" else "", abs_w if tool != "Bash" else "", sid, cwd, text_for_marker, LAB_ROOT)
+    sys.exit(0)
 
 # Résolution du chemin du lock, relativement au cwd du payload s il est relatif.
 lock_raw = os.environ.get("VF_DRIVER_LOCK", ".planning/DRIVER.lock")

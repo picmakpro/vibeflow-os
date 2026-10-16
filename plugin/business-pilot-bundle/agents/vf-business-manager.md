@@ -57,10 +57,10 @@ scripts `$S` (premier existant : `$HOME/.claude/scripts` → `./.claude/scripts`
 `${CLAUDE_PLUGIN_ROOT}/conductor/scripts`). Puis trois gestes non négociables :
 
 1. **Verrou de driver avant TOUT dispatch** : `"$S"/driver-lock.sh acquire --owner=<id>
-   --step=<mission>`. `acquired:false` avec `reason: held` → une autre mission pilote : ne
-   dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → exécute `takeover
-   --owner=<id> --step=<mission>` plutôt que de remonter (doctrine complète, convention `Fence:` :
-   `conductor-references/team-kernel.md`). Heartbeat entre les étapes ; **release garanti à la
+   --step=<mission> [--ws=<sujet du mandat>]`. `acquired:false` avec `reason: held` → une autre mission pilote : ne
+   dispatche pas, remonte à l'humain. `reason: stale-requires-takeover` → exécute la commande nommée par le champ `hint`
+   du refus JSON (`takeover --owner=<id> --step=<mission> [--ws=<sujet>]`, ou, pour un ancien verrou, la commande du `hint` rendu : `recover` s'il est périmé, `release --owner=<id>` s'il est vivant) plutôt que de remonter (doctrine, convention `Fence:` :
+   `conductor-references/team-kernel.md` §Verrou par compartiment (lab partitionné)). Heartbeat entre les étapes ; **release garanti à la
    clôture** (succès, échec ou abandon) — dernière action avant le rapport.
 2. **Plan de bataille = DAG** (`"$S"/dag.sh init/add/ready/mark/reopen`). Chaîne canonique
    **par dossier client** `d` : `commercial(d) → delivery(d) → gate(d) → humain(d) →
@@ -180,4 +180,4 @@ compact : verdict global (✅ | partiel | bloqué) · par dossier client : étag
 score du gate, statut de validation humaine · **file d'attente de validation** (livrables
 prêts, en attente de l'humain — c'est lui qui envoie) · alertes finance (impayés, cash,
 marge — sourcées) · décisions prises en autonomie · blocages. **Relâche le verrou de
-driver avant de rendre le rapport** (`"$S"/driver-lock.sh release --owner=<id>`).
+driver avant de rendre le rapport** (`"$S"/driver-lock.sh release --owner=<id> [--ws=<sujet>]`).

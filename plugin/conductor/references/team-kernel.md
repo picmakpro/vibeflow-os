@@ -15,12 +15,12 @@
 
 | Brique | Script / contrat | Garantie |
 |---|---|---|
-| **Verrou de driver** | `driver-lock.sh` (acquire / heartbeat / release / status / recover / takeover / reclaim, TTL ; register / close / orphans pour le registre des agents dispatchés) | une seule mission pilote à la fois ; la reprise d'un lock périmé est un geste EXPLICITE et tracé (`takeover`), jamais un effet de bord d'une acquisition ordinaire (`acquire` refuse et nomme la marche à suivre) ; `reclaim` re-rattache une session légitime sans jamais prolonger la fraîcheur du lock (Phase 32) ; chaque dispatch (manager ET worker) est consigné à côté du verrou (`<lock>.children.jsonl`, append-only), `reclaim`/`takeover` rendent l'inventaire des agents encore `running` (feuille vers racine) et un manager de remplacement les arrête avant tout dispatch (issue #82, doctrine `dev-orchestrator-references/mission-flow.md` §Pattern I) |
+| **Verrou de driver** | `driver-lock.sh` (acquire / heartbeat / release / status / recover / takeover / reclaim, TTL ; register / close / orphans pour le registre des agents dispatchés) | une seule mission pilote par compartiment dans un lab partitionné (un seul verrou dans un lab plat), un seul geste de dépôt à la fois ; la reprise d'un lock périmé est un geste EXPLICITE et tracé (`takeover`), jamais un effet de bord d'une acquisition ordinaire (`acquire` refuse et nomme la marche à suivre) ; `reclaim` re-rattache une session légitime sans jamais prolonger la fraîcheur du lock (Phase 32) ; chaque dispatch (manager ET worker) est consigné à côté du verrou (`<lock>.children.jsonl`, append-only), `reclaim`/`takeover` rendent l'inventaire des agents encore `running` (feuille vers racine) et un manager de remplacement les arrête avant tout dispatch (issue #82, doctrine `dev-orchestrator-references/mission-flow.md` §Pattern I) |
 | **Plan de bataille** | `dag.sh` (init / add --deps **--scope** / ready / mark / reopen / status) | contrôle de flux déterministe ; la frontière `ready` est une **liste à dispatcher en parallèle** quand les périmètres sont disjoints ; `reopen` force `review_regime=full` sur tout nœud de revue/jointure rouvert — aucun allègement ne s'applique jamais à un diff de comblement (D-14, Phase 20) |
 | **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[{severity, action: auto-fix\|no-op\|ask-user, ref, confiance?}], noeuds_debloques[], confiance? }` | fin de l'interprétation de prose ; escalade humaine impérative sur `ask-user` ; `confiance` (0–1, optionnel, 2026-09-24) ne qualifie qu'un **jugement** — jamais une preuve machine — et un `passed` de jugement sous `SEUIL_CONFIANCE` est requalifié `gaps_found` + `ask-user` par le manager (doctrine et seuil : `dev-orchestrator-references/mission-contracts.md` §Confiance d'un jugement, implémentation de référence) |
 | **Halt conditions** | 5 codes (P11) : boucle sans progrès · action destructive · ressource manquante · budget épuisé · drift de scope | l'humain arbitre en 30 s sur un message structuré |
 | **Digest de mission** | ≤ 30 lignes injectées dans chaque mandat (le disque fait foi) | amortit les relectures de contexte par étage |
-| **Cloisonnement par tools** (P12) | juges via `disallowedTools: Write, Edit` (contrainte runtime, Phase 20 — pas une simple absence dans `tools:`) ; la plupart des workers sans Task ; allowlist `Agent(...)` sur les managers ; `vf-internal: true` | anti-triche vérifié par un gate transverse, PAS par les suites de test de chaque module (aucune n'y touche) : `check-agents.sh --strict`, qui linte le contenu de `tools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`) en plus du frontmatter (ADR-044, Phase 16) et exige `disallowedTools: Write, Edit` sur tout agent `memory:` sans Write/Edit déclaré — passé par la CI sur les 6 dossiers `plugin/*/agents` (découverte non vide, monde clos) et à l'écriture par le hook `guard-agent-write.sh` ; les deux mécanismes sont eux-mêmes testés par la suite **conductor** (`test-check-agents.sh`, `test-guard-agent-write.sh`). C'est un CONTRAT documenté, pas un cloisonnement runtime : le runtime n'applique la liste de noms entre parenthèses qu'en incarnation fenêtre principale (`claude --agent`), jamais pour un agent dispatché en sous-agent (doc officielle sub-agents ; **confirmé par mesure le 2026-09-17** : `vf-coder` a lancé des agents absents de sa liste). La vraie limite d'exécution est ailleurs : les outils `Agent` et `Task` sont **absents à la profondeur 3** — limite observée, non documentée par Anthropic, qui peut changer avec une version de Claude Code (§Marge de profondeur de dispatch ci-dessous). Le garant machine réel de « un seul manager actif » est le verrou de driver, pas l'allowlist (cf. « Étages croisés » ci-dessous) |
+| **Cloisonnement par tools** (P12) | juges via `disallowedTools: Write, Edit` (contrainte runtime, Phase 20 — pas une simple absence dans `tools:`) ; la plupart des workers sans Task ; allowlist `Agent(...)` sur les managers ; `vf-internal: true` | anti-triche vérifié par un gate transverse, PAS par les suites de test de chaque module (aucune n'y touche) : `check-agents.sh --strict`, qui linte le contenu de `tools:` (syntaxe des allowlists `Agent(...)`/`Task(...)`) en plus du frontmatter (ADR-044, Phase 16) et exige `disallowedTools: Write, Edit` sur tout agent `memory:` sans Write/Edit déclaré — passé par la CI sur les 6 dossiers `plugin/*/agents` (découverte non vide, monde clos) et à l'écriture par le hook `guard-agent-write.sh` ; les deux mécanismes sont eux-mêmes testés par la suite **conductor** (`test-check-agents.sh`, `test-guard-agent-write.sh`). C'est un CONTRAT documenté, pas un cloisonnement runtime : le runtime n'applique la liste de noms entre parenthèses qu'en incarnation fenêtre principale (`claude --agent`), jamais pour un agent dispatché en sous-agent (doc officielle sub-agents ; **confirmé par mesure le 2026-09-17** : `vf-coder` a lancé des agents absents de sa liste). La vraie limite d'exécution est ailleurs : les outils `Agent` et `Task` sont **absents à la profondeur 3** — limite observée, non documentée par Anthropic, qui peut changer avec une version de Claude Code (§Marge de profondeur de dispatch ci-dessous). Le garant machine réel de « un seul manager actif » sur un même compartiment est le verrou de driver, pas l'allowlist (cf. « Étages croisés » ci-dessous) |
 | **Écart déclaré ↔ runtime** (sens fermeture) | un outil **PRÉSENT** dans le champ `tools:` déclaré peut être **ABSENT** au runtime une fois l'agent dispatché en sous-agent | cas établi et daté : un agent déclarait `AskUserQuestion` mais ne le recevait pas en dispatch sous-agent, ce qui a gelé une mission — filet de repli : le besoin humain remonte dans le rapport typé, il n'est **jamais** auto-répondu en silence (patron `vf-coder.md`) |
 | **Dispatch nommé** (hypothèse datée, jamais construite en mécanisme) | `Agent(...)`/`Task` natif Claude Code, allowlists des managers | tient tant que VibeFlow reste Claude-Code-exclusif (`mission-contracts.md` §Seuil de bascule D5(a)) : chaque rôle nommé (`vf-coder`, `vf-reviewer`…) est résolu par un runtime à dispatch nommé. **Mesuré le 2026-08-29 (Phase 38) sur `@moonshot-ai/kimi-code@0.39.1` réellement installé, le descripteur `namedDispatch: false` de kimi-code — et donc la ligne précédente de cette référence — est PÉRIMÉ** : le schéma de profil d'agent porte `subagents: array(string())`, `delegatableSubagents(callerProfileName)` résout par nom, et `load()` fusionne les agent-files du disque (`userRoots`/`extraRoots`/`projectRoots`/`pluginRoots`, priorités `plugin:5 < user:10 < extra:20 < project:30 < explicit:40`) dans une Map clé=nom — kimi-code enregistre bien des sous-agents nommés custom, via `Agent` et `AgentSwarm`. **Périmé par la suite de la même Phase 38** : l'installeur cible désormais aussi Codex
 (`--target`, `plugin/_internal/runtime-cli-dispatch.sh`) — install fonctionnelle, agents
@@ -252,10 +252,12 @@ sont un CONTRAT déclaré et lint-vérifié (`check-agents.sh` linte désormais 
 pas seulement sa présence, Phase 16) : l'intention « pas de manager→manager » est écrite noir sur
 blanc et testée, mais ce n'est **pas un cloisonnement runtime** — le runtime ignore la liste de noms
 entre parenthèses pour tout agent dispatché en sous-agent (doc officielle sub-agents), managers
-inclus ; (2) le **verrou de driver** est donc le SEUL garant machine réel de l'invariant, en toutes
-circonstances, y compris par chemin **indirect** (`manager → worker → manager`) : un second manager
-tentant `acquire` se le voit refusé tant que le premier pilote (T1 ; couvert en continu par
-`test-driver-lock.sh` T2). Le lock, le DAG et le rapport restent uniques, portés par le seul manager
+inclus ; (2) le **verrou de driver** est donc le SEUL garant machine réel de l'invariant sur un même
+compartiment (le lab entier tant qu'il est plat), y compris par chemin **indirect** (`manager → worker →
+manager`) : un second manager tentant `acquire` sur ce compartiment se le voit refusé tant que le premier
+pilote (T1 ; couvert en continu par `test-driver-lock.sh` T2). Vers un AUTRE compartiment, la chaîne
+`manager → worker → manager` n'est tenue que par les allowlists `Agent(...)` (un lint), et le guard isole
+des sessions, pas des managers d'une même session (P57-D-20). Le lock, le DAG et le rapport restent uniques, portés par le seul manager
 de la mission. Le garant machine s'étend désormais au-delà de la seule acquisition : le guard
 `PreToolUse` du plan 32-03 (`guard-driver-lock.sh`) porte l'invariant jusqu'aux gestes git (et aux
 écritures directes sous `.planning/`) émis par une session TIERCE pendant qu'un lock est vivant.
@@ -267,6 +269,32 @@ Doctrine détaillée côté dev (le protocole complet de mission) :
 `dev-orchestrator-references/mission-flow.md` — c'est la référence d'usage du kernel. Doctrine
 des étages croisés (quand les insérer, forme DAG, budgets, invariants) :
 `dev-orchestrator-references/mission-cross-team.md`.
+
+## Verrou par compartiment (lab partitionné)
+
+Un dépôt est partitionné quand `.planning/workstreams/` existe. Le verrou se nomme alors par compartiment :
+une seule mission pilote par compartiment, des missions de compartiments différents en parallèle, un seul
+geste de dépôt à la fois (P57-D-01, P57-D-02). Il vit au niveau du clone, `<git-common-dir>/vf-driver/{ws/<sujet>,repo}`
+(P57-D-07, P57-D-21). `--ws=<sujet du mandat>` se passe à chaque verbe ; `--depot` désigne les gestes de dépôt
+(release du plugin, `BACKLOG.md`, `docs/ADR.md`, fichiers racine de `.planning/`, partition) ; un verbe sans
+`--ws` vise le dépôt (P57-D-05, P57-D-24) ; l'ancien `.planning/DRIVER.lock` vaut verrou de dépôt jusqu'à son
+relâchement (P57-D-26) ; `status --all` lit tout le lab ; un lab plat est inchangé (P57-D-03). Les verbes se
+lancent depuis la racine du lab : `--ws` ou `--depot` depuis un sous-dossier sans `.planning/` propre est refusé
+`not-at-lab-root` (P57-D-39), et le guard détecte le lab partitionné depuis la racine git, pas depuis le cwd ; sa
+comparaison du segment `.planning` ignore la casse en lab partitionné (P57-D-38).
+
+```bash
+"$S"/driver-lock.sh acquire --owner="<id>" --step="mission" --ws="<sujet>"
+"$S"/driver-lock.sh heartbeat --owner="<id>" --ws="<sujet>"
+"$S"/driver-lock.sh status --ws="<sujet>" | jq -r .generation   # jeton de fence du compartiment
+"$S"/driver-lock.sh release --owner="<id>" --ws="<sujet>"
+"$S"/driver-lock.sh acquire --depot --owner="<id>" --step="<geste>"
+"$S"/driver-lock.sh release --depot --owner="<id>"
+"$S"/driver-lock.sh status --all
+```
+
+Protocole complet (registre, snapshot de budget, DAG, refus nommés) : `dev-orchestrator-references/mission-flow.md`
+§Verrou par compartiment (lab partitionné).
 
 ## Jeton de fence — quel commit sous quel mandat (LOCK-05)
 
@@ -280,7 +308,7 @@ désigne une session, pas un mandat — et elle change sur certains gestes du ha
 motif d'être du verbe `reclaim`).
 
 **Comment l'obtenir.** `driver-lock.sh status` rend un JSON une ligne portant la clé
-`generation` (Phase 32). Lecture recommandée par un interprète JSON (`jq -r .generation`), jamais
+`generation` (Phase 32). En lab partitionné : `status --ws=<sujet> | jq -r .generation`. Lecture recommandée par un interprète JSON (`jq -r .generation`), jamais
 par découpage de texte — la forme de la ligne n'est pas garantie stable colonne par colonne. Un
 lock absent (`"present": false`) ne porte pas de `generation` : un commit hors mandat n'a alors
 pas de trailer à poser, c'est un cas normal, pas une omission.

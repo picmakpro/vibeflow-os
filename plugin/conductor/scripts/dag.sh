@@ -40,6 +40,11 @@
 #
 # Glyphes de statut (rendu `tree`) : ● done · ◐ running · ○ ready · · blocked · ✗ failed.
 #
+# ws (Phase 57, P57-D-23) : `init --ws=<sujet>` ecrit un champ additif `ws` dans le DAG ; add/mark/reopen le
+# conservent, et `mark` avance alors `progress_epoch` du verrou de CE compartiment (`status --ws`,
+# `mark-progress --ws`). Un DAG sans `ws` garde le comportement d'avant, octet pour octet (lecture
+# tolerante, P-02). `--ws` est refuse hors `init`.
+#
 # progress_epoch (D-33-A, WTCH-01, plan 33-02) : `mark` avance `progress_epoch` sur le driver-lock
 # COURANT s'il existe, en best-effort APRES save(dag), sans jamais bloquer ni faire echouer le DAG
 # (ADR-031 — degradation silencieuse, sauf le seul cas ou le lock est confirme present+detenu mais
@@ -68,7 +73,7 @@
 
 set -uo pipefail
 
-ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""; SCOPE=""
+ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""; SCOPE=""; WS=""; WS_GIVEN=0
 for arg in "$@"; do
   case "$arg" in
     init|add|ready|mark|reopen|status|tree) ACTION="$arg" ;;
@@ -79,6 +84,7 @@ for arg in "$@"; do
     --deps=*)   DEPS="${arg#*=}" ;;
     --scope=*)  SCOPE="${arg#*=}" ;;
     --status=*) STATUS="${arg#*=}" ;;
+    --ws=*)     WS="${arg#*=}"; WS_GIVEN=1 ;;
     -h|--help)  grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
@@ -86,6 +92,12 @@ done
 
 [ -n "$FILE" ] || { echo '{"error": "file-required"}' >&2; exit 1; }
 [ -n "$ACTION" ] || { echo "Usage: $0 {init|add|ready|mark|reopen|status|tree} --file=F [...]" >&2; exit 1; }
+# --ws=<sujet> lie le DAG au verrou d'un compartiment (Phase 57, P57-D-23) : admis par `init` seulement, le DAG
+# le porte ensuite dans son champ `ws`. Ailleurs, une erreur d'usage nette plutot qu'une option ignoree.
+if [ "$WS_GIVEN" = 1 ] && [ "$ACTION" != "init" ]; then
+  echo "dag.sh: --ws n'est admis que par init (action : $ACTION) ; le DAG porte son compartiment dans le champ ws" >&2
+  exit 1
+fi
 
 # Sibling driver-lock.sh (WTCH-01, 33-02) : resolu par le REPERTOIRE DU SCRIPT dag.sh lui-meme,
 # jamais par le cwd — les scripts de conductor/scripts/ sont poses par le meme glob d'installation
@@ -100,12 +112,13 @@ DRIVER_LOCK_SH="$SCRIPT_DIR/driver-lock.sh"
 CHECK_GUARD_HEALTH_SH="$SCRIPT_DIR/check-guard-health.sh"
 NOTIFY_SH="$SCRIPT_DIR/notify.sh"
 
-python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" "$DRIVER_LOCK_SH" "$CHECK_GUARD_HEALTH_SH" "$NOTIFY_SH" <<'PYEOF'
+python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" "$DRIVER_LOCK_SH" "$CHECK_GUARD_HEALTH_SH" "$NOTIFY_SH" "$WS" <<'PYEOF'
 import sys, os, json, subprocess, tempfile, shutil
 
 action, file, nid, step, stage, deps_raw, status, scope_raw = sys.argv[1:9]
 driver_lock_sh = sys.argv[9]
 check_guard_health_sh, notify_sh = sys.argv[10:12]
+ws_arg = sys.argv[12]
 VALID = {"blocked", "ready", "running", "done", "failed"}
 
 def load():
@@ -186,7 +199,7 @@ def resolve_gsd_tools_cmd():
         return [node_bin, resolved] if node_bin else None
     return [resolved]
 
-def record_progress(driver_lock_sh):
+def record_progress(driver_lock_sh, ws=None):
     """Cable `driver-lock.sh mark-progress` (plan 33-01, WTCH-01) au point `mark` de dag.sh, APRES
     save(dag) (jamais avant) ET APRES check_stall_signal() (33-05-correctif D-33-G) — cet appel
     rafraichit `progress_epoch` du lock courant, donc doit lire APRES que le verdict de stall ait
@@ -197,11 +210,14 @@ def record_progress(driver_lock_sh):
     SEULE exception au silence (4e issue QUAL-01) : lock CONFIRME present + detenu (owner non vide)
     mais l'appel mark-progress lui-meme echoue -> ligne bruyante sur stderr, best-effort, jamais un
     exit non nul, car ce cas gelerait progress_epoch sur une mission SAINE sans qu'aucun signal ne
-    le montre (33-03 lirait un faux stall en silence)."""
+    le montre (33-03 lirait un faux stall en silence).
+    Phase 57 (P57-D-23) : `ws` (champ du DAG, lecture tolerante P-02) cible le verrou DE CE compartiment,
+    en un seul element d'argv ; absent, vide ou non-chaine -> comportement d'avant, sans --ws."""
     try:
         if not os.path.isfile(driver_lock_sh):
             return
-        st = subprocess.run([driver_lock_sh, "status"], capture_output=True, text=True,
+        ws_args = [f"--ws={ws}"] if isinstance(ws, str) and ws else []
+        st = subprocess.run([driver_lock_sh, "status"] + ws_args, capture_output=True, text=True,
                              timeout=2, check=False)
         if st.returncode != 0:
             return
@@ -211,7 +227,7 @@ def record_progress(driver_lock_sh):
         owner = payload.get("owner", "")
         if not owner:
             return
-        mp = subprocess.run([driver_lock_sh, "mark-progress", f"--owner={owner}"],
+        mp = subprocess.run([driver_lock_sh, "mark-progress", f"--owner={owner}"] + ws_args,
                              capture_output=True, text=True, timeout=2, check=False)
         if mp.returncode != 0:
             print(f"[dag.sh mark] avertissement : mark-progress a échoué (owner={owner}) — "
@@ -316,8 +332,13 @@ def compute_stages(ready_nodes):
         return None
 
 if action == "init":
-    save({"nodes": []})
-    emit({"file": file, "initialized": True, "nodes": 0})
+    init_dag = {"nodes": []}
+    init_out = {"file": file, "initialized": True, "nodes": 0}
+    if ws_arg:  # champ additif : ecrit seulement si --ws est donne (sinon octets d'avant)
+        init_dag["ws"] = ws_arg
+        init_out["ws"] = ws_arg
+    save(init_dag)
+    emit(init_out)
     sys.exit(0)
 
 dag = load()
@@ -375,7 +396,7 @@ if action == "mark":
     # WTCH-02 (33-05, D-33-F) : relais best-effort du verdict check-guard-health.sh --hook, a
     # CHAQUE mark, sans filtre de statut, LU AVANT tout rafraichissement de progress_epoch.
     check_stall_signal(check_guard_health_sh)
-    record_progress(driver_lock_sh)
+    record_progress(driver_lock_sh, dag.get("ws"))
     # WTCH-03 (33-05) : notification best-effort via notify.sh, UNIQUEMENT sur done/failed.
     record_milestone(notify_sh, nid, status, file)
     emit({"id": nid, "status": status,

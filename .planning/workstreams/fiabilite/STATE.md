@@ -1,24 +1,20 @@
 ---
 gsd_state_version: "1.0"
-milestone: fiabilite-v1.0
-milestone_name: « ce qui survit » — Phases 30-35 + Phases 18 et 25 héritées —
-current_phase_name: Emprunts Pocock — disciplines de cadrage, de revue et de skills
-status: completed
-stopped_at: >-
-  Phase 57 planned (2026-10-10) — 16 plans en 10 vagues, plan-checker passé (2 tours), DLWS-01..08 et
-  P57-D-01..37 couverts ; next /gsd-execute-phase 57 --ws fiabilite.
-  Ancien texte de ce champ : `git show 102f7bab:.planning/workstreams/fiabilite/STATE.md`.
-last_updated: "2026-10-10T18:50:00.000Z"
-last_activity: 2026-10-10
-last_activity_desc: >-
-  Planification de la Phase 57 (verrou de driver par compartiment) ; détail : § Current Position.
+milestone: equipe-produit-v1.0
+current_phase: 57
+current_phase_name: Verrou de driver par compartiment
+status: executing
+last_updated: "2026-10-12T12:00:00.000Z"
+last_activity: 2026-10-13
+last_activity_desc: Phase 57 plan 16 complete (porte de phase rejouée depuis ci.yml : gates 19/19, 102 suites dont 2 rouges environnementales prouvées, témoins DLWS-03 intacts ; DLWS-01..08 cochées ; ledger à la main)
+state_head: 1413af28
 progress:
-  total_phases: 18
-  completed_phases: 18
-  total_plans: 115
-  completed_plans: 105
-  percent: 100
-current_phase: 41.4
+  total_phases: 6
+  completed_phases: 0
+  total_plans: 16
+  completed_plans: 16
+milestone_name: « l'équipe produit » — Phases 57-62 —
+stopped_at: "Completed 57-16-PLAN.md (2026-10-12) — porte de phase verte, ledger à jour (P57-D-12, P57-D-30) ; next : vérification de phase 57, PR, jamais de release dans la 57."
 ---
 
 # Project State
@@ -34,10 +30,13 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: **41.4** (Emprunts Pocock), dernière phase du jalon — complete, mergée PR #135.
+Phase: 57 (Verrou de driver par compartiment) — EXECUTING
 Jalon **`fiabilite-v1.0` CLOS le 2026-10-08** (arbitrage Samuel, session principale, 2026-10-08). 18 phases livrées,
-de la 18 à la 41.4. Les compteurs de plans restent à 105/115 : les 7 plans 41-07 à 41-13 sont confiés à Willy, hors
-clôture, et la Phase 40 a 5 plans pour un seul `40-SUMMARY.md` consolidé. Bilan et réserves :
+de la 18 à la 41.4. Les 7 plans 41-07 à 41-13 sont confiés à Willy, hors clôture, et la Phase 40 a 5 plans pour un
+seul `40-SUMMARY.md` consolidé. Depuis le 2026-10-13, le frontmatter porte le jalon `equipe-produit-v1.0` (Phases 57-62) et ses
+propres compteurs : 6 phases, 0 terminée (la case ROADMAP de la 57 reste ouverte jusqu'à la PR), 16 plans sur 16 exécutés.
+Les dossiers de `fiabilite-v1.0` sont archivés sous `.planning/milestones/fiabilite-v1.0-phases/` (P57-D-44, qui remplace
+P57-D-41 ; arbitrage Samuel, AskUserQuestion session principale, 2026-10-13). Bilan et réserves :
 `.planning/MILESTONES.md` § fiabilite-v1.0.
 Dernières entrées : la 41.2 a été mergée le 2026-10-02 (PR #130) ; WSCH-01 est coché avec une réserve de recette en
 session, tracée au BACKLOG. La 41.4 a été mergée le 2026-10-08 (PR #135, en `--admin`).
@@ -52,25 +51,20 @@ P57-D-22..33 et D-35 sont sans veto (même canal, même date).
 
 Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
 inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Last activity: 2026-10-10 — planification de la Phase 57.
+Phase 57 : 16/16 plans exécutés le 2026-10-12, porte de phase rejouée depuis `ci.yml` (job `gates` 19/19, 102 suites, deux rouges
+d'environnement prouvées, témoins DLWS-03 intacts), DLWS-01..08 cochées. Correctifs hors plan : revue R-1 à R-3, F-1/F-2 = P57-D-38 et P57-D-39 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-11 ; registre `57-CONTEXT.md`).
+Next : vérification de phase, PR ; aucune release (P57-D-30).
+Dette soldée avant la PR le 2026-10-12/13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12) : C1, F-3,
+R-4 à R-7, C3 et la suite instable corrigés ; BACKLOG ramené à 31 sujets ouverts, sans prose dépassée ; P57-D-40 à D-43.
+Arbitrages Q1-Q7 puis A-D du 2026-10-13 appliqués (P57-D-44 à P57-D-55) ; rejeu de fin de mission vert ; RV4-07 close
+(P57-D-52 ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14) : `.planning/missions/2026-10-12-dette-avant-pr-phase-57.md`.
+Last activity: 2026-10-12 — Phase 57 plan 57-16 complete (16/16)
 
 ## Accumulated Context
 
 ### Decisions
 
-Historique complet (jalons, décisions, arbitrages 2026-07 à 2026-09) : voir l'archive ci-dessus.
-
-- 2026-10-01/02 — Phase 41.2 : P412-D-01 à D-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-01),
-  P412-D-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02) ; P412-D-04, D-06, D-07, D-08 =
-  décisions du manager. Registre : `41.2-CONTEXT.md` du dossier de phase.
-- 2026-10-08 — Clôture de `fiabilite-v1.0` : #135 mergée en `--admin` (arbitrage Samuel, AskUserQuestion session
-  principale, 2026-10-08 : « Merger #135 en --admin ») ; réserve WSCH-01 tracée au BACKLOG (même canal, même date :
-  « Dette tracée, on clôt »).
-- 2026-10-06 — Phase 41.4 : P414-D-01..D-11, D-17..D-22 (arbitrage Samuel, AskUserQuestion session principale,
-  2026-10-06) ; D-12..D-16 = décisions du manager ; interprétation de D-22 (axe `skipped` hors conjonction) à
-  ratifier. Registre : `41.4-CONTEXT.md` du dossier de phase.
-
-- 2026-10-02 — Plans 41-07 à 41-13 (chaîne des mesures de la protection serveur) confiés à Willy, hors clôture de `fiabilite-v1.0` (arbitrage Samuel, AskUserQuestion session principale, 2026-10-02 : « Les confier à Willy » pour 41-07 à 41-09, puis « Toute la chaîne à Willy » pour 41-10 à 41-13) ; PROT-01 cochée le 2026-09-24 sur la pose des rulesets, complément attendu : mesure du refus réel d'un push direct (41-09, complément en 41-13) confiée à Willy ; 41-07 partiellement entamé (`PR-R-*`, 2026-09-24).
+<!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-10-12.md -->
 
 ### Pending Todos
 
@@ -96,6 +90,9 @@ Tableau complet dans l'archive (section `### Quick Tasks Completed`) ; les nouve
 
 ## Session Continuity
 
-**Resume file:** .planning/workstreams/fiabilite/phases/VFDO-41.4-emprunts-pocock-disciplines-de-cadrage-de-revue-et-de-skills/41.4-CONTEXT.md
+**Resume file:** .planning/milestones/fiabilite-v1.0-phases/VFDO-41.4-emprunts-pocock-disciplines-de-cadrage-de-revue-et-de-skills/41.4-CONTEXT.md
 
 Last session: 2026-10-06 — Phase 41.4 exécutée (11 plans), PR en brouillon, 4 majeurs de revue ouverts.
+
+## Performance Metrics
+

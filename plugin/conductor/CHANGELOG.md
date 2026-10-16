@@ -1,5 +1,125 @@
 # Changelog — conductor
 
+## [v1.49.0] — 2026-10-10 (verrou de driver par compartiment, Phase 57)
+
+**Minor** (comportement neuf : un verrou par compartiment de planning, DLWS-01..07 ; arbitrages P57-D-34, D-36 et
+D-37 ratifiés par Samuel, AskUserQuestion session principale, 2026-10-10 ; publiée dans v2.70.0, P57-D-30 et ADR-073) :
+
+- **`scripts/driver-lock.sh`** : en lab partitionné, `--ws <sujet>` verrouille un compartiment et `--depot` (ou
+  l'absence de `--ws`) le dépôt, sous `<git-common-dir>/vf-driver/` donc partagé entre worktrees, sur la mécanique
+  d'acquisition inchangée. Le compartiment ne vient que de `--ws` : `GSD_WORKSTREAM`, `VF_WORKSTREAM` et
+  `active-workstream` ne déplacent rien. Refus nommés avec `hint` : `ws-invalid`, `unknown-ws`,
+  `partition-unreadable`, `policy-missing`, et `legacy-lock-held` / `stale-requires-takeover` tant qu'un ancien
+  `.planning/DRIVER.lock` est tenu (rien n'est repris en silence). Le `hint` d'un `stale-requires-takeover` sur un
+  compartiment ou sur le dépôt porte l'option de la cible (`--ws=<sujet>` ou `--depot`) : rejoué littéralement, il
+  reprend le verrou du refus qui le porte, jamais celui d'une autre cible. Refus nommé `not-at-lab-root` : `--ws`
+  ou `--depot` lancé d'un dossier sans `.planning/` propre alors que la racine git porte `.planning/workstreams`
+  (hint : lancer depuis la racine du lab ; plus de verrou posé ailleurs ni de `.planning/DRIVER.lock` parasite,
+  arbitrage P57-D-39, Samuel, AskUserQuestion session principale, 2026-10-11). `status --all` rend en une ligne l'état de tous
+  les verrous du lab ; tous les verbes portent `--ws` et le suffixe `scope`/`ws`/`location`, avec un registre frère
+  par verrou. Repli hors git sous `.planning/DRIVER.lock.d`. Lab plat : A/B contre la copie gelée `e8771d94` (20 étapes, IDENTIQUE) pour le verrou ;
+  le guard, lui, a changé en lab plat le 2026-10-13 (F-3, R-5, Q5 : voir « Arbitrages du 2026-10-13 »).
+- **`scripts/guard-driver-lock.sh`** : le guard refuse une écriture sous un compartiment tenu par une autre session
+  et laisse le voisin libre. Volet Bash : un commit est jugé sur ce qu'il embarque (index, `-a`/pathspec, HEAD sous
+  `--amend`, `git add` de la même commande) ; gestes git répartis en arbre / commit / dépôt. Fail-closed : toute
+  exception ou source illisible du chemin partitionné rend un refus JSON, jamais une ouverture ; un verrou ou un
+  dossier de verrous qui existe mais ne se lit pas (droits) donne un refus qui le nomme, seul un meta absent reste
+  « pas de verrou ». Le lab partitionné est détecté depuis la racine git, plus depuis le cwd : un commit ou une
+  écriture lancé d'un sous-dossier est jugé comme en lab partitionné (P57-D-39), et le segment `.planning` se compare
+  sans tenir compte de la casse (`.PLANNING/workstreams/<ws>/f` est refusé sous le verrou d'autrui, P57-D-38, même
+  arbitrage du 2026-10-11). Lab plat inchangé (meta illisible = allow, posture historique)
+  (A/B contre la copie gelée `cff1e2af` : identique hors les 37 formes énumérées, épinglées par une transcription
+  versionnée, blob `7156daff`, matrice de 195 payloads à HEAD ; écarts hors matrice nommés ci-dessous : refus neufs
+  AU2-03, AU2-06 et AU3-01, changement plus permissif P57-D-52).
+- **Consommateurs** : `check-guard-health.sh` voit un stall ou un abandon par compartiment (`ws=<sujet>`, une seule
+  ligne, abandon prioritaire) ; `dag.sh init --ws` lie le DAG à un compartiment et `dag.sh mark` avance le
+  `progress_epoch` de son verrou ; `check-branch-claim.sh` signale une branche revendiquée par un verrou de
+  compartiment depuis un autre worktree (`[branch-claim] … compartiment <sujet>`).
+- **Références et skill** : `references/team-kernel.md` (une mission pilote par compartiment, un geste de dépôt à la
+  fois, limite P57-D-20), `references/workstream-planning-consumers.md` (recensement). `skills/vf-split-planning`
+  acquiert `--depot` avant la partition et le relâche après.
+- **Suites** (état à HEAD `188d86e8`) : `test-driver-lock-ws.sh` (642 assertions, concurrence 24 x 5 tours à 0 tour hors
+  contrat, A/B, mutants 27/27 tués), `test-guard-driver-lock-ws.sh` (563 assertions, A/B sur 195 payloads, mutants
+  52/52 tués : péremption, cible git incertaine, pathspec positionnel, casse de l'index, exception générique du jugement
+  de commit, casse de `.planning` et détection depuis la racine git y sont mutés),
+  `test-driver-lock-consumers-ws.sh` (36 OK, mutants 9/9 tués), `test-check-guard-health.sh` (120 PASS) ; copies gelées `tests/fixtures/driver-lock-pre-e8771d9.sh`
+  et `guard-driver-lock-pre-cff1e2a.sh`.
+- **Manager en vol pendant la mise à jour** : les scripts sont remplacés sous ses pieds ; d'où le repli des verbes
+  sans `--ws` sur l'ancien verrou (P57-D-24) — un manager lancé avant la mise à jour continue de viser le verrou de
+  dépôt tant qu'il ne passe pas `--ws`.
+
+- **Relecture adverse avant le tag (2026-10-14)** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-14 ; toujours
+  dans cette version, sans bump) :
+  - **`GIT_DIR` hérité** : `git_hardened` du guard retire `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_COMMON_DIR`,
+    `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_NAMESPACE` et `GIT_PREFIX` de l'environnement, comme
+    `cgh_git` de `check-guard-health.sh`. Avant, un `GIT_DIR` vers un autre dépôt faisait passer un `Write` dans le
+    compartiment d'une autre session (1 refus sans `GIT_DIR`, 0 avec). Cas `GW-GITENV-*`, mutant `GW-M-gitenv`.
+  - **Dossier des compartiments vide = lab plat** (P57-D-56, révise P57-D-25) : un `.planning/workstreams/` présent sans
+    aucun compartiment (vide, ou seulement des fichiers comme `.gitkeep`) se traite comme en v2.69.1 sur tous les verbes,
+    `status` et `release` compris, dans `driver-lock.sh`, `guard-driver-lock.sh` (sonde bash et jugement python) et
+    `check-mission-exit.sh`. Un lien symbolique, un fichier régulier ou un dossier illisible à la place reste refusé
+    (`partition-unreadable`). Cas `WS-VIDE-*`, `GW-VIDE-*`, mutants `DL-M-vide`, `GW-M-vide_py`, `GW-M-vide_both`.
+  - **Suites indépendantes du runner** : le runner GitHub lance ses étapes avec SIGPIPE ignoré, ce que bash ne peut pas
+    défaire. Le mutant `DL-M-i` (pipeline à sortie anticipée sous `pipefail`) ne basculait alors qu'une famille sur 35 ;
+    `mut_run` relance désormais chaque matrice avec SIGPIPE à son action par défaut. Le plafond d'horloge de `gb_timed`
+    passe de 60 s à 600 s : sous 52 matrices parallèles, le mutant quadratique `GW-M-au2_quad` dépassait 60 s et basculait
+    `GW-AU2-02.x.2` en plus des deux cas attendus (le cas se juge au temps processeur).
+
+- **Dette soldée avant la PR (2026-10-12)** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12 ;
+  P57-D-40 : rattachée à cette version, publiée dans v2.70.0, sans bump) :
+  - **F-3** (`c5ccbab7`, `63d5cc4c`, `08d25595`) : le guard reconnaît les 12 globaux git sans argument et `exec`
+    (`git --no-pager commit -am x` refusé sous le verrou d'autrui) ; d'abord en lab partitionné seulement (P57-D-42),
+    étendu au lab plat le 2026-10-13 (P57-D-47, voir ci-dessous).
+  - **R-5** (`c5ccbab7`, `63d5cc4c`, `b66a7dbe`) : en lab partitionné, un préfixe `GIT_DIR=`, `GIT_INDEX_FILE=` ou
+    `GIT_WORK_TREE=` du segment du geste = cible incertaine, aussi pour la décision « geste hors du lab » ; l'affectation
+    dans un autre segment, d'abord non couverte, l'est depuis le 2026-10-13, lab plat compris (P57-D-48, voir ci-dessous).
+  - **R-6** (`63d5cc4c`) : crochet `VF_GUARD_TEST_RAISE` retiré de la production.
+  - **R-4** (`6333d8e4`, `8689bbd7`) : `driver-lock.sh` re-sonde l'ancien verrou après la pose ; la pose du processus est retirée.
+  - **C3** (`6333d8e4`, `1f6b555b`) : six mutants (`acq_fallback`, `fallback_depotpresent`, `skip_link_d`, `pathspec_blind`,
+    `incertain_none`, `toplevel_none`), total driver 16.
+  - **R-7** (`6333d8e4`, `8b957f62`) : empreinte épinglée de la copie gelée ; l'intégrité face à la référence est établie aussi en clone shallow.
+  - **`check-description-fidelity.sh`** et sa suite (`c580b45e`) : le gate respecte `TMPDIR` ; T9 (tmpdir privé) et T10 (miroir de
+    l'arbre jugé) stabilisés, 20/30 rouges avant, 0/30 après.
+
+- **Arbitrages du 2026-10-13** (arbitrage Samuel, AskUserQuestion session principale, 2026-10-13 ; toujours dans la
+  version publiée dans v2.70.0, sans bump) :
+  - **Watchdog, Q1 (b) et D (b)** (`f162a9c3`, `070fe50d`, `6d63fb54`, `42d490b1`, `3aa399fc`, P57-D-45) :
+    `check-guard-health.sh` compte comme progression le commit le plus récent (`%ct`) parmi les HEAD de tous les
+    worktrees du dossier git commun ; un commit futur, un worktree prunable ou illisible sont ignorés ; le git lancé est durci.
+    Limite acceptée : un commit sans rapport d'un autre worktree peut masquer un vrai stall, le watchdog reste consultatif.
+  - **F-3 et A/B, Q4 et B (b)** (`719099dc`, `4fd77ed3`, P57-D-47, remplace P57-D-42) : F-3 vaut aussi en lab plat ; la
+    référence A/B est la copie gelée `4d48e50c` plus une empreinte versionnée de la transcription attendue des 37 formes
+    (verdict, code de sortie, message), avec `seen == GW_AB_ENUM_N` ; l'empreinte est épinglée depuis `560f4390` (`fixtures/guard-ab-enum-37.txt`, blob `7156daff` :
+    verdict, code de sortie, message, âge normalisé, `GW-AB-PIN.0..3`) et trois mutants la gardent (`msg`, `amputee`,
+    `amputee-dernier`).
+  - **Contournements du guard, Q5** (`719099dc`, `4fd77ed3`, P57-D-48, précise P57-D-43) : fermés dans les deux régimes :
+    globaux git à argument, wrappers à option-argument (`env -u/-C`, `nice -n`, `exec -a`, `sudo -u`, `xargs -n`…),
+    `bash/sh/zsh -c` (récursion bornée à 3, refus grossier au-delà), `GIT_*` posé dans un segment précédent ; R-5 vaut aussi
+    en lab plat. `bash -c "cd <hors-lab> && git commit"` passe de deny à allow : c'est le verdict de sa forme canonique
+    (P57-D-52, décision du manager de mission, ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14). Finitions du tour 3 (`560f4390`, `188d86e8`) : le `cd` de l'appelant est
+    propagé à `bash -c` (AU2-01) ; le refus grossier au-delà de la récursion est linéaire et la longueur bornée à 64 Ko
+    (AU2-02) ; il lit `/usr/bin/git` et les guillemets (AU2-03, refus nouveau) ; préfixes `+=` et `[i]=` reconnus
+    (AU2-06, refus nouveau). `188d86e8` : un séparateur collé à une parenthèse (`);`, `)&&`, `;(`), qui laissait `bash`
+    hors position de commande (`x=$(date); bash -c 'git commit'` passait) est découpé (AU3-01, rattaché à Q5 « fermer
+    `bash -c` », P57-D-54, refus nouveau) ; le refus grossier ne prend plus pour `git` les mots `.git/`, `--git-dir=` ni
+    `my-git` (AU3-02).
+  - **`takeover --ws`, Q5 et C (a)** (`a038c8b6`, `6a43299e`, `8fe96bd7`, P57-D-49, P57-D-55) : applique la règle
+    d'`acquire` devant un ancien verrou ; le refus est celui d'`acquire` dans le même état (vivant : `legacy-lock-held`,
+    `hint` `release --owner=…` ; périmé : `stale-requires-takeover`, `hint` `recover`), à exécuter tel qu'il est rendu.
+    Sur un refus de la re-sonde, le verrou de compartiment antérieur est restitué (AU2-04), puis vérifié (`8fe96bd7`) :
+    un seul `mv -n` qui ne suit pas le lien (AU3-04, jamais enterré dans la génération d'un tenant concurrent), la
+    génération posée n'est supprimée qu'après constat `lock_gen == old_gen`, le mutex est libéré par le refus (RV4-01).
+    **Nouvelle `reason` `restore-failed`** quand la restitution échoue (chemin qui laissait auparavant un verrou
+    fantôme ; P57-D-55) : la génération posée reste en place et le refus le dit.
+  - **Watchdog, lecture des worktrees** (`8fe96bd7`) : `git worktree list --porcelain -z` (git >= 2.36), un chemin à saut
+    de ligne ne forge plus de ligne `HEAD` (repli sur le HEAD courant sans `-z`, AU3-05) ; un seul `git log --no-walk`
+    pour tous les HEAD, repli par HEAD (AU3-06) ; quatre mutants de plus côté santé.
+  - **G-2, classe 6, Q6** (`f76de68b`, `3e426f02`, `42d490b1`, `46254135`, P57-D-50) : `check-gate-touche.sh` surveille les
+    fixtures (`plugin/conductor/scripts/tests/fixtures/**`, `scripts/tests/fixtures/**`) ; lecture en `git diff -z`, noms
+    non ASCII et spéciaux compris (AU2-05).
+  - **Archivage, Q2 (a)** (`4a8535ee`, P57-D-46) : les 17 dossiers de phase de fiabilite-v1.0 sont archivés sous
+    `.planning/milestones/fiabilite-v1.0-phases/`, puis `--archive roadmap`.
+
 ## [v1.48.2] — 2026-10-10 (l'archivage roadmap ne retire plus les phases dont les dossiers existent)
 
 **Patch** (correctif ; arbitrage Samuel « Revert + correctif d'abord », AskUserQuestion session principale, 2026-10-10) :

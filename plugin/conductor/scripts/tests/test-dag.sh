@@ -946,6 +946,16 @@ t49_progress_backdate() { # <lock> <secs>
   sed -i.bak "s/^progress_epoch=.*/progress_epoch=$old/" "$meta" && rm -f "${meta}.bak"
 }
 
+# Depot de fixture dont le DERNIER COMMIT est ANCIEN (2000 s) : check-guard-health.sh compte le dernier
+# commit de la branche courante comme progression (arbitrage Samuel, AskUserQuestion session principale,
+# 2026-10-13, Q1 option b) — lance depuis le depot qui execute la suite (commits frais), T49 perdrait son
+# stall. Les appels qui portent le verdict (T49.0, mark) tournent donc DANS ce depot, jamais dans le vrai.
+LAB49="$ISO49/lab"; mkdir -p "$LAB49" && git -C "$LAB49" init -q 2>/dev/null
+T49_WHEN=$(( $(date +%s) - 2000 ))
+GIT_COMMITTER_DATE="$T49_WHEN +0000" GIT_AUTHOR_DATE="$T49_WHEN +0000" \
+  git -C "$LAB49" -c user.name=t49 -c user.email=t49@example.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null \
+  commit -q --allow-empty -m t49 2>/dev/null
+
 L49="$ISO49/lock"
 export VF_DRIVER_LOCK="$L49"
 export VF_GUARD_HEALTH_DIR="$ISO49/health"   # vide : isole le signal a la seule voie stall (pas de marqueur de garde)
@@ -953,14 +963,14 @@ export VF_GUARD_HEALTH_DIR="$ISO49/health"   # vide : isole le signal a la seule
 t49_progress_backdate "$L49" 1303   # > 900 (STALL_WINDOW defaut, meme grandeur que la mesure du mandat), heartbeat_epoch INCHANGE (reste frais)
 # Controle positif (T49.0) : le VRAI check-guard-health.sh, invoque seul hors dag.sh, produit bien
 # le verdict stall sur ce lock backdate.
-fx49="$("$ISO49/check-guard-health.sh" --hook)"
+fx49="$(cd "$LAB49" && "$ISO49/check-guard-health.sh" --hook)"
 assert "T49.0 — controle positif : le vrai check-guard-health.sh --hook signale bien le stall (lock backdate)" "$fx49" "[mission-watchdog] stall detecte"
 
 F49="$WORK_DIR/t49.dag.json"
 "$ISO49/dag.sh" init --file="$F49" >/dev/null
 "$ISO49/dag.sh" add --file="$F49" --id=n1 --step=n1 >/dev/null
 ERR49="$WORK_DIR/t49.stderr"
-out49="$("$ISO49/dag.sh" mark --file="$F49" --id=n1 --status=running 2>"$ERR49")"; rc49=$?
+out49="$(cd "$LAB49" && "$ISO49/dag.sh" mark --file="$F49" --id=n1 --status=running 2>"$ERR49")"; rc49=$?
 assert_exit "T49.1 — dag.sh mark rend rc=0 malgre le stall relaye (best-effort, jamais bloquant)" "$rc49" 0
 assert      "T49.2 — la ligne '[mission-watchdog] stall detecte' arrive bien SUR STDERR de dag.sh mark (le bloquant corrige)" "$(cat "$ERR49")" "[mission-watchdog] stall detecte"
 

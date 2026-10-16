@@ -1,0 +1,259 @@
+### tenu/noarg-commit.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/noarg-commit.A rc=0
+--- stdout
+--- stderr
+### tenu/noarg-reset.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/noarg-reset.A rc=0
+--- stdout
+--- stderr
+### tenu/exec-commit.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/exec-commit.A rc=0
+--- stdout
+--- stderr
+### tenu/env-out.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/env-out.A rc=0
+--- stdout
+--- stderr
+### tenu/g2-gitdir-sp.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/g2-gitdir-sp.A rc=0
+--- stdout
+--- stderr
+### tenu/g2-worktree-sp.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/g2-worktree-sp.A rc=0
+--- stdout
+--- stderr
+### tenu/g2-namespace-sp.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/g2-namespace-sp.A rc=0
+--- stdout
+--- stderr
+### tenu/g2-namespace-eq.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/g2-namespace-eq.A rc=0
+--- stdout
+--- stderr
+### tenu/g2-configenv-sp.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/g2-configenv-sp.A rc=0
+--- stdout
+--- stderr
+### tenu/g2-configenv-eq.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/g2-configenv-eq.A rc=0
+--- stdout
+--- stderr
+### tenu/g2-attrsrc-sp.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/g2-attrsrc-sp.A rc=0
+--- stdout
+--- stderr
+### tenu/g2-attrsrc-eq.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/g2-attrsrc-eq.A rc=0
+--- stdout
+--- stderr
+### tenu/g2-superprefix-eq.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/g2-superprefix-eq.A rc=0
+--- stdout
+--- stderr
+### tenu/wr-env-u.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/wr-env-u.A rc=0
+--- stdout
+--- stderr
+### tenu/wr-env-unset.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/wr-env-unset.A rc=0
+--- stdout
+--- stderr
+### tenu/wr-env-iu.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/wr-env-iu.A rc=0
+--- stdout
+--- stderr
+### tenu/wr-env-C.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/wr-env-C.A rc=0
+--- stdout
+--- stderr
+### tenu/wr-nice-n.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/wr-nice-n.A rc=0
+--- stdout
+--- stderr
+### tenu/wr-exec-a.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/wr-exec-a.A rc=0
+--- stdout
+--- stderr
+### tenu/wr-exec-c.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/wr-exec-c.A rc=0
+--- stdout
+--- stderr
+### tenu/wr-sudo-u.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/wr-sudo-u.A rc=0
+--- stdout
+--- stderr
+### tenu/wr-xargs-n.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/wr-xargs-n.A rc=0
+--- stdout
+--- stderr
+### tenu/sh-bash.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/sh-bash.A rc=0
+--- stdout
+--- stderr
+### tenu/sh-sh.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/sh-sh.A rc=0
+--- stdout
+--- stderr
+### tenu/sh-zsh.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/sh-zsh.A rc=0
+--- stdout
+--- stderr
+### tenu/sh-bash-lc.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/sh-bash-lc.A rc=0
+--- stdout
+--- stderr
+### tenu/sh-nested2.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/sh-nested2.A rc=0
+--- stdout
+--- stderr
+### tenu/sh-nested4.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/sh-nested4.A rc=0
+--- stdout
+--- stderr
+### tenu/sh-sudo.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/sh-sudo.A rc=0
+--- stdout
+--- stderr
+### tenu/sh-envprefix.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/sh-envprefix.A rc=0
+--- stdout
+--- stderr
+### tenu/ex-out-index.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/ex-out-index.A rc=0
+--- stdout
+--- stderr
+### tenu/ex-out-declare.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/ex-out-declare.A rc=0
+--- stdout
+--- stderr
+### tenu/ex-out-assign.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/ex-out-assign.A rc=0
+--- stdout
+--- stderr
+### tenu/ex-shell-inherit.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/ex-shell-inherit.A rc=0
+--- stdout
+--- stderr
+### tenu/ex-out-sh.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/ex-out-sh.A rc=0
+--- stdout
+--- stderr
+### tenu/ex-out-shell-env.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/ex-out-shell-env.A rc=0
+--- stdout
+--- stderr
+### tenu/ex-out-shell-export.B rc=0
+--- stdout
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "Lock de driver ACTIF, tenu par 'm1' (étape : s1), branche 'main', depuis N min. Ce geste est REFUSÉ (session non enregistrée sous ce lock). Si tu ES 'm1' avec un identifiant de session neuf (/clear, --continue ambigu) : `driver-lock.sh reclaim --owner=m1` puis réessaie. Sinon : attends la fin du mandat, travaille dans un arbre séparé (`git worktree add`), ou pose le marqueur vibeflow:allow-lock-override sur CE geste précis pour passer outre exceptionnellement."}}
+--- stderr
+### tenu/ex-out-shell-export.A rc=0
+--- stdout
+--- stderr

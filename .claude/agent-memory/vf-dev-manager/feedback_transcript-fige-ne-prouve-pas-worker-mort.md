@@ -30,3 +30,13 @@ l'ancien comme une anomalie système. Corollaire pour les mandats : quand je cro
 « un seul agent travaille sur ce dépôt : toi » — et ne l'écrire que si je l'ai vérifié.
 Voir [[relire-le-disque-avant-tout-rapport]] : le disque fait foi pour ce qui *a été écrit*, jamais
 pour savoir *qui écrit encore*.
+
+**Deuxième cas, 2026-10-13 (tour 2 de la dette de la Phase 57).** Aucun fichier du réviseur n'avait bougé depuis une
+heure et aucun processus n'était visible. Il n'a pas répondu à un `SendMessage` en 20 minutes (le message reste en file
+jusqu'au prochain tour d'outil). J'ai dispatché un remplaçant. Le premier a rendu bien plus tard, avec deux findings
+majeurs que le remplaçant n'avait pas (F1 : un mutant de la branche partitionnée qui survit). L'absence de processus ne
+prouve donc pas non plus la mort : `ps` ne voit PAS les processus lancés par un agent (constaté par
+vf-auditer le même jour : un job cru mort a fini en exit 0 après 1 074 s). Délai minimal avant de remplacer : 90 min
+(consigne de la session principale, mandat du 2026-10-13). Un remplaçant en LECTURE SEULE, sous un préfixe de scratchpad distinct, coûte peu :
+c'est le bon compromis pour un juge. Mais il faut fusionner les DEUX rapports quand l'ancien rend, jamais ignorer le
+retardataire.
