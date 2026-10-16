@@ -1,5 +1,14 @@
 # Changelog — mobile-test-team
 
+## [v1.4.7] — 2026-10-16 (clé `roles`, Phase 58)
+
+**Patch** (métadonnée de module seule, aucun agent modifié ; décisions P58-D-01..14 : arbitrage Samuel,
+AskUserQuestion session principale, 2026-10-16 ; niveau P58-PL-14 ; non publiée, sans release dans la phase, P58-D-20) :
+
+- **`module.json`** : la clé `roles: ["dev"]` (P58-D-06) rend le module invisible au poste `product`, au catalogue et à
+  `install --all` avec poste. Un module nommé explicitement s'installe toujours : un poste est une vue, pas un droit.
+- Sans release dans la phase (P58-D-20).
+
 ## [v1.4.6] — 2026-09-24 (Phase 42 — invariants de doctrine du gate des agents)
 
 **Patch** :
