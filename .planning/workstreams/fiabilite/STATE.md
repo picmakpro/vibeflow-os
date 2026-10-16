@@ -38,7 +38,7 @@ depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilit
 Phase 57 (Verrou de driver par compartiment) CLOSE : 16/16 plans exécutés le 2026-10-12, DLWS-01..08 cochées, mergée par la
 PR #152 le 2026-10-16 (`a2ed5094`) en `--admin`, revue `@picmakpro` contournée sur demande explicite de Samuel (session
 principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »). Release `v2.70.0` publiée (tag annoté, release
-GitHub, `check-release-tag --remote` ✓). Registre : `57-CONTEXT.md` (P57-D-01..55) ; rapport de mission de la dette avant PR :
+GitHub, `check-release-tag --remote` ✓). Registre : `57-CONTEXT.md` (P57-D-01..56) ; rapport de mission de la dette avant PR :
 `.planning/missions/2026-10-12-dette-avant-pr-phase-57.md`.
 
 Next : cadrage de la Phase 58 (`/gsd-discuss-phase 58 --ws fiabilite`), famille d'exigences `RLPO` à poser à ce moment.
@@ -70,7 +70,6 @@ Tableau complet dans l'archive (section `### Quick Tasks Completed`) ; les nouve
 - Recette humaine WINDOWS #3 : `test_sim`/`build_sim`/`clean` contre un XcodeBuildMCP vivant, sur un lab iOS (open, 2026-07-31).
 - Geste humain : secret `TRAFFIC_PAT` non posé, snapshot traffic dormant (quick 260815-tl6, 2026-08-15).
 - Dette outillage WINDOWS #4 : `inject-mcp-tools.sh` ne valide pas l'existence d'un serveur cité (repris Phase 21).
-- Clôture du jalon `fiabilite-v1.0` : ledger REQUIREMENTS.md à trancher par Samuel (constat 2026-09-24).
 
 ## Session Continuity
 
