@@ -578,11 +578,32 @@ Plans:
 **Depends on:** 57.
 **Sources:** spec §5.1, §5.4 ; SEED A-02, A-04, A-11 ; `plugin/installer/`, `plugin/_internal/vibeflow-update.sh`.
 **Hors périmètre :** les rôles architecte, QA et scrum master (A-02) ; tout contrôle d'accès.
-**Plans:** 0 plans
+**Plans:** 11 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 58 to break down)
+**Wave 1**
+- [ ] 58-01-PLAN.md — vague 1 : clé `roles` des `module.json`, validateur unique `module-roles.sh`, table minimale (3 modules `["dev"]`), invariant de fermeture `product` ; contrat de phase et registre P58-PL-01..14
+- [ ] 58-02-PLAN.md — vague 1 : lecteur unique du poste `vf-role.sh get` (interface des Phases 59 à 61), suite à mutants
+- [ ] 58-03-PLAN.md — vague 1 : ADR-077 sous verrou de dépôt court du manager, relue par Samuel (non autonome)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 58-04-PLAN.md — vague 2 : gate `check-role-consistency.sh` (0/1/3/5), ligne « Poste : X » au SessionStart, entrée de hook exec, inventaire des hooks à 32
+- [ ] 58-05-PLAN.md — vague 2 : catalogue filtré par `--role`/`VF_ROLE`, sortie sans poste identique à l'octet (copie gelée)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 58-06-PLAN.md — vague 3 : engine, volet pose — `--role`/`VF_ROLE`, fichier de poste, règle d'ignorance séparée, `.worktreeinclude` conditionnel, refus à la pose, arêtes de scope
+- [ ] 58-07-PLAN.md — vague 3 : skill installeur (étape 2 bis, repli sans fuite, note des bundles, « statut »), glossaire, README de conductor
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 58-08-PLAN.md — vague 4 : engine, volet usage — filtre de `install --all`, registre et `update --all` intacts, verbe `role` et avis
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 58-09-PLAN.md — vague 5 : suite e2e des critères 1, 2 et 5, outil de livraison (`base`, `gitignore-intact`, `fichiers-intacts`, `clients`)
+- [ ] 58-10-PLAN.md — vague 5 : bumps sans release (conductor v1.50.0, dev-orchestrator v2.28.1, mobile-test v1.0.4, mobile-test-team v1.4.7)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 58-11-PLAN.md — vague 6 : compte de suites, porte de phase rejouée depuis `ci.yml`, critère 6 avec la liste de Samuel (non autonome), ledger à la main
 
 ### Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
 

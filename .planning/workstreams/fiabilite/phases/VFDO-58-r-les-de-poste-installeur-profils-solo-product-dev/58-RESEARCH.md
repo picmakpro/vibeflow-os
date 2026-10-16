@@ -625,7 +625,10 @@ Signalés, **non corrigés**. Chacun est une lecture littérale qui échoue ou u
 | A9 | Ordre de résolution de racine du lecteur : `--path` > `CLAUDE_PROJECT_DIR` > `git rev-parse --show-toplevel` > `.` | Lecteur | En lab racine non-git (Scroll-Off) ou worktree d'agent, une autre racine lirait un poste absent = `solo` en silence (précisément le défaut que D-16 veut éviter) |
 | A10 | Un BOM UTF-8 en tête du fichier (PowerShell 5 `Set-Content`) doit être toléré | Lecteur | `test-check-hook-paths.sh` T13 traite le BOM comme cas légitime sous Windows ; sinon « valeur invalide » bruyant (acceptable) |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> Résolutions du planificateur, 2026-10-16 (conséquences de P58-D-15..20, aucune n'ouvre un arbitrage neuf ; registre P58-PL-01..14 dans `58-01-PLAN.md`) :
+> Q1 (presets) → **DÉFÉRÉE hors périmètre**, P58-PL-04 : le repli du SKILL est réécrit, `resolve-preset.sh` n'est pas touché ; la question du filtre de presets par poste est remontée au manager (finding). Q2 → P58-PL-06 (l'engine seul écrit le fichier). Q3 → P58-PL-07 (arêtes `--target` et scope `user`). Q4 → P58-PL-08 (groupe propre sans matcher). Q5 → P58-PL-09 (`solo` doit figurer dans `vf_roles`). Q6 → P58-PL-11 (liste fournie à l'exécution, NON-VÉRIFIABLE sans elle). Q7 (manuel FR+EN) → **DÉFÉRÉE hors périmètre**, P58-PL-12 : remontée au manager (finding). Q8 → P58-PL-13 (étape « 2 bis »).
 
 1. **Presets sensibles au poste ?** (hors CONTEXT)
    - Know: les trois presets contiennent `dev-orchestrator` ; pour `product` la liste est vide et SKILL.md retombe sur `dev-orchestrator`.
