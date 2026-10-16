@@ -178,5 +178,57 @@ mutant CAT-MUT-2 '{ if (!d && $0 == "case \"$POSTE\" in") { print "POSTE=\"${VF_
 mutant CAT-MUT-3 '{ if ($0 == "  product|dev)") print "  solo|product|dev)"; else if (index($0, "bash \"$ROLES_SH\" list \"$POSTE\"")) { sub(/list "\$POSTE"/, "list product"); print } else print }' \
   probe_solo "solo filtré comme product"
 
+# ---------- Assertions statiques sur le skill installeur (58-07, SKILL-1..7) ------------------------
+# Chaque assertion est une fonction qui prend un chemin de fichier : rejouée sur une copie altérée par
+# SKILL-TEMOIN (la preuve peut rougir). Jamais d'ancre sur un numéro de ligne.
+SKILL_MD="$PLUGIN/installer/SKILL.md"
+# skill_block <fichier> <regex début> <regex fin> : de la ligne de début (incluse) à celle de fin (exclue)
+skill_block() { awk -v a="$2" -v b="$3" '$0 ~ a { f = 1 } f && $0 ~ b && !($0 ~ a) { exit } f { print }' "$1"; }
+has_all() { # <texte> <fragment>... : tous présents (littéraux)
+  local txt="$1" frag; shift
+  for frag in "$@"; do printf '%s\n' "$txt" | command grep -qF -- "$frag" || return 1; done
+}
+skill_1() { awk '/^2\. / && !a { a = NR } /^2 bis\. / { n++; b = NR } /^3\. / && !c { c = NR } END { exit !(n == 1 && a && c && a < b && b < c) }' "$1"; }
+skill_2() { has_all "$(skill_block "$1" '^2 bis\. ' '^3\. ')" 'VF_ROLE' 'solo' 'product' 'dev' 'user' 'un poste est une vue, pas un droit'; }
+skill_3() {
+  command grep -E '^\| Catalogue' "$1" | command grep -qF -- '--role' || return 1
+  command grep -E '^\| Engine' "$1" | command grep -qF 'VF_ROLE' || return 1
+  command grep -qF ' role <poste>' "$1"
+}
+skill_4() { ! command grep -qF "comme s'il était prêt" "$1"; }
+skill_5() { has_all "$(skill_block "$1" '^4\. ' '^5\. ')" 'seulement si dev-orchestrator figure au catalogue filtré par le poste'; }
+skill_6() { has_all "$(skill_block "$1" '^5\. ' '^6\. ')" 'jamais en poste product'; }
+skill_7() {
+  ! command grep -qF 'role == mandatory' "$1" && ! command grep -qF 'role=mandatory' "$1" \
+    && ! command grep -qF 'description<TAB>role' "$1" \
+    && has_all "$(skill_block "$1" '^3\. ' '^4\. ')" 'statut'
+}
+for n in 1 2 3 4 5 6 7; do
+  if "skill_$n" "$SKILL_MD"; then ok "SKILL-$n assertion statique tenue sur plugin/installer/SKILL.md"
+  else ko "SKILL-$n assertion statique fausse sur plugin/installer/SKILL.md"; fi
+done
+# SKILL-TEMOIN : deux copies altérées font rougir SKILL-1 et SKILL-4 (et l'original reste vert sur les deux).
+ALT="$TMP/skill-alt"; mkdir -p "$ALT"
+awk '!/^2 bis\. /' "$SKILL_MD" > "$ALT/sans-2bis.md"
+{ cat "$SKILL_MD"; printf '%s\n' "Les bundles métier incomplets : ne JAMAIS proposer un métier figé comme s'il était prêt."; } > "$ALT/phrase-perimee.md"
+if ! skill_1 "$ALT/sans-2bis.md" && skill_1 "$SKILL_MD" && ! skill_4 "$ALT/phrase-perimee.md" && skill_4 "$SKILL_MD"; then
+  ok "SKILL-TEMOIN la copie sans « 2 bis. » rougit SKILL-1, la copie à phrase périmée rougit SKILL-4, l'original reste vert"
+else
+  ko "SKILL-TEMOIN une assertion ne rougit pas sur la copie altérée (SKILL-1 ou SKILL-4 incapable d'échouer)"
+fi
+
+# SKILL-TEMOIN-2 : une copie altérée par propriété gardée (2, 3, 5, 6, 7) rougit l'assertion qui la tient.
+sed 's/un poste est une vue, pas un droit/un poste est un droit/' "$SKILL_MD" > "$ALT/a2.md"
+sed 's/ --role <poste>` |/` |/' "$SKILL_MD" > "$ALT/a3.md"
+sed 's/seulement si dev-orchestrator figure/toujours si dev-orchestrator figure/' "$SKILL_MD" > "$ALT/a5.md"
+sed 's/jamais en poste product/parfois en poste product/' "$SKILL_MD" > "$ALT/a6.md"
+{ cat "$SKILL_MD"; printf '%s\n' 'Les entrées `role == mandatory` sont posées.'; } > "$ALT/a7.md"
+badt=0
+for n in 2 3 5 6 7; do
+  if cmp -s "$ALT/a$n.md" "$SKILL_MD"; then ko "SKILL-TEMOIN-2 la copie altérée de SKILL-$n est identique à l'original"; badt=1; continue; fi
+  if "skill_$n" "$ALT/a$n.md"; then ko "SKILL-TEMOIN-2 SKILL-$n reste vert sur sa copie altérée (incapable d'échouer)"; badt=1; fi
+done
+[ "$badt" -eq 0 ] && ok "SKILL-TEMOIN-2 chacune des assertions SKILL-2, 3, 5, 6, 7 rougit sur sa copie altérée"
+
 echo "== Résultat : $pass OK, $fail KO, $skipped SKIP =="
 [ "$fail" -eq 0 ]

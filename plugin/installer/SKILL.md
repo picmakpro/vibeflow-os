@@ -47,10 +47,11 @@ bug d'install vécu sur le terrain, ADR-054) :
 | Brique | Invocation exacte |
 |---|---|
 | Préflight prérequis (étape 0) | `bash "$VIBEFLOW_CACHE/installer/scripts/preflight.sh"` |
-| Catalogue modules (étapes 3–4) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/installer/scripts/build-module-catalog.sh"` |
+| Catalogue modules (étapes 3–4) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/installer/scripts/build-module-catalog.sh" --role <poste>` |
 | Résolveur de deps (étape 5) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/resolve-deps.sh" <modules…>` |
 | Presets (étape 4) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/resolve-preset.sh" list` puis `… resolve-preset.sh <preset>` |
-| Engine status/install/uninstall | `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" …` |
+| Engine status/install/uninstall | `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" …` ; en scope project ou local, chaque `install` est préfixé par `VF_ROLE=<poste>` |
+| Changement de poste | `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> role <poste>` |
 | Bootstrap GSD/Superpowers (étape 5, branche dev) | `VF_SCOPE=<s> bash "$VIBEFLOW_CACHE/dev-orchestrator/scripts/ensure-deps.sh"` |
 
 `_internal/resolve-deps.sh` est **bundlé dans le plugin** (présent dans le cache `${CLAUDE_PLUGIN_ROOT}`)
@@ -85,14 +86,23 @@ bug d'install vécu sur le terrain, ADR-054) :
    (cohérence **ID4** : le même scope s'applique à tout — modules VibeFlow + GSD + Superpowers).
    Reframe pour l'utilisateur : compte (user) / projet (project) / projet sans commit (local).
 
+2 bis. **Poste de l'humain (Phase 58, P58-D-18) — scope `project` ou `local` seulement.** Si `VF_ROLE`
+   est déjà posé dans l'environnement : aucune question, la valeur est reprise (l'engine la valide). En
+   scope `user` : aucune question, le poste vaut `solo` (P58-D-04). Sinon, une question via l'UI de
+   questions du terminal (AskUserQuestion / toggles, **PAS** un TUI bash), `solo` pré-coché en première
+   option avec une ligne d'explication (« seul sur ce projet : tu vois tout, comme aujourd'hui »), puis
+   `product` et `dev` d'une ligne chacun. Dire en une phrase : un poste est une vue, pas un droit — git
+   ne cloisonne rien, le filtre ne joue qu'à la pose. Le poste retenu est propagé tel quel : `--role
+   <poste>` au catalogue (étapes 3 et 4), `VF_ROLE=<poste>` à chaque install de l'engine (étape 5).
+
 3. **Baseline obligatoire — posée d'office (INST-02a).** Lire le catalogue
-   (invocation exacte dans la table « Chemins réels » ci-dessus) : il émet `name<TAB>description<TAB>role`.
-   Les entrées **`role == mandatory`** (aujourd'hui : `conductor`, le gardien méta du lab, et
+   (invocation exacte dans la table « Chemins réels » ci-dessus) : il émet `name<TAB>description<TAB>statut`.
+   Les entrées dont le **statut vaut `mandatory`** (aujourd'hui : `conductor`, le gardien méta du lab, et
    `consolidator`, le socle de mémoire) sont posées **automatiquement** avec leurs deps — **on ne
    les met PAS dans un toggle** : un lab sans son orchestrateur méta n'a pas de filet de cohérence,
    et un lab sans registres ne capitalise rien (principe 1 de VibeFlow). On **informe** l'utilisateur
    (« je pose le socle de gouvernance et de mémoire »), on ne lui demande pas de choisir.
-   **Aucun nom de module en dur** : la liste des mandatory sort du catalogue (`role`).
+   **Aucun nom de module en dur** : la liste des mandatory sort du catalogue (colonne `statut`).
 
 4. **Choix du type de lab (INST-02b — single-select).** Une fois le socle posé, **un seul** choix
    structurant, via l'UI de questions (pas un TUI bash) :
@@ -104,14 +114,16 @@ bug d'install vécu sur le terrain, ADR-054) :
      (un module par ligne, fermeture des `requires` déjà calculée) est la liste à poser à l'étape 5.
      Un preset qui référencerait un module WIP est **refusé** par le résolveur, jamais élagué.
      Sans réponse exploitable, ou si la liste des presets est vide, retomber sur le seul module
-     `dev-orchestrator` (entrée `optional` du catalogue) + amorcer ses dépendances de dev.
+     `dev-orchestrator` (entrée `optional` du catalogue) + amorcer ses dépendances de dev —
+     seulement si dev-orchestrator figure au catalogue filtré par le poste ; sinon (poste `product`),
+     ne rien poser de plus et orienter vers `/vf-new-lab`.
    - **Nouveau lab (autre métier)** → ne rien poser de plus ici : la suite passe par **`/vf-new-lab`**
      (porté par `conductor`, déjà posé), qui mène la clarification du métier et **câble lui-même**
      les modules pertinents (auditeurs, planning, etc.). On ne présume jamais « dev ».
 
-   > **Ne JAMAIS proposer un métier figé (growth, content, business…) comme s'il était prêt.** Les
-   > bundles métier incomplets sont marqués `proposable:false` → ils n'apparaissent même pas au
-   > catalogue. Le seul chemin métier offert est `vf-new-lab`, qui construit le lab sur mesure.
+   > **Les bundles métier (growth, content, business) sont au catalogue** depuis le 2026-07-25 ; seul un
+   > module marqué `proposable:false` (WIP) n'y apparaît pas. Au premier usage, le seul chemin métier
+   > offert reste `vf-new-lab`, qui construit le lab sur mesure.
    >
    > **À-la-carte avancé (optionnel).** Un utilisateur averti qui demande explicitement un module
    > `optional` précis (ex. « ajoute kpi-analyst ») peut l'obtenir — on liste alors les entrées
@@ -130,13 +142,18 @@ bug d'install vécu sur le terrain, ADR-054) :
      quels, un par argument).
      `--with-deps` recâble lui-même le résolveur côté engine.
    - **GSD + Superpowers** → `VF_SCOPE=<s> bash "$VIBEFLOW_CACHE/dev-orchestrator/scripts/ensure-deps.sh"`
-     (uniquement si `dev-orchestrator` est posé, ou sur demande).
+     (uniquement si `dev-orchestrator` est réellement posé — jamais en poste product ; « sur demande »
+     ne vaut que pour les autres postes).
      **PASSER TOUJOURS un VF_SCOPE explicite** = `<s>` (cohérence **ID4**).
+   - **Refus de l'engine** (poste hors de la liste `vf_roles` du projet, ou liste illisible) : montrer
+     son message tel quel et s'arrêter.
    - Scope `local` → le `.gitignore` est géré **par l'engine** (SCOPE-04, déjà fait) : ne pas le
      réimplémenter, juste le mentionner à l'utilisateur (« rien ne sera committé »).
 
-6. **Récap final + prochaine étape (context-aware).** Confirmer ce qui a été posé et où, puis amorcer
-   la suite selon la branche choisie :
+6. **Récap final + prochaine étape (context-aware).** Confirmer ce qui a été posé et où — le poste posé
+   inclus, et comment le changer plus tard (verbe `role` de l'engine : réécrit le poste, affiche les
+   modules installés hors du nouveau poste, ne désinstalle rien) — puis amorcer la suite selon la
+   branche choisie :
    - **Branche dev** → « dis "aide-moi à dev" pour démarrer ».
    - **Branche nouveau lab** → enchaîner sur **`/vf-new-lab [métier]`** (ou inviter l'utilisateur à le
      lancer) pour la phase de clarification et la construction du lab sur mesure.
@@ -175,11 +192,14 @@ correspondre à celui où les modules ont été posés (sinon l'engine cherche a
 - **Scope pré-sélectionné, jamais un choix à froid** : la détection (repo git → `project`, sinon
   `user`, scope précédent prioritaire) pré-coche ; l'utilisateur **confirme en une touche** avec
   une ligne d'explication — il garde toujours la main pour choisir un autre scope.
-- **Baseline non négociable** : tout module `role=mandatory` du catalogue (conductor, consolidator)
+- **Baseline non négociable** : tout module au statut `mandatory` du catalogue (conductor, consolidator)
   est posé d'office, jamais soumis à un toggle. Le premier usage offre **un seul** choix structurant —
   *lab de développement* vs *nouveau lab métier (`vf-new-lab`)* — pas une liste brute de modules.
 - **Jamais proposer un module `proposable:false`** : exclu du catalogue par construction (bundles
   métier WIP). Ne le reproposer qu'une fois finalisé (repasser `proposable` à true / l'omettre).
+- **Poste = vue, pas droit** : la question n'est posée qu'en `project`/`local` ; `VF_ROLE` explicite
+  s'utilise comme `VF_SCOPE` ; aucun contrôle d'accès ; le changement passe par le verbe `role`, sans
+  désinstallation.
 - **Presets = données, pas prose** : les presets proposés sortent de `resolve-preset.sh list`
   (`_internal/presets.json`) ; en ajouter un = éditer ce fichier, jamais ce skill.
 - **Ne réimplémente jamais** une brique : route et délègue (catalogue, `resolve-preset.sh`, `resolve-deps.sh`,
