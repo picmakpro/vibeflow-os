@@ -1,5 +1,19 @@
 # Changelog — conductor
 
+## [v1.50.0] — 2026-10-16 (rôles de poste : lecteur, gate et contexte de session, Phase 58)
+
+**Minor** (capacité neuve installée chez l'utilisateur, RLPO-01..12 ; décisions P58-D-01..14 : arbitrage Samuel,
+AskUserQuestion session principale, 2026-10-16 ; niveau P58-PL-14 ; non publiée, sans release dans la phase, P58-D-20) :
+
+- **`scripts/vf-role.sh get`** : lecteur unique du poste (`solo`, `product` ou `dev`), contrat de stdout et de codes
+  figé, interface des Phases 59 à 61 (P58-D-15).
+- **`scripts/check-role-consistency.sh`** : gate consultatif sur la cohérence du poste (issues 0, 1 et 3, erreur
+  d'analyse 5), il constate et ne bloque jamais (P58-D-09).
+- **Entrée SessionStart en forme exec** (`hooks/hooks.json`) : injecte `Poste : X` hors poste solo, muette à 0 octet
+  sans poste (P58-D-10).
+- Un poste est une vue, pas un droit : rien n'est désinstallé ni interdit (ADR-077).
+- Sans release dans la phase : les labs reçoivent ces éléments avec la prochaine release fonctionnelle (P58-D-20).
+
 ## [v1.49.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — non publiée
 
 **Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
