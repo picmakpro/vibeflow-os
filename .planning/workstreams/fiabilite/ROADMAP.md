@@ -104,7 +104,7 @@
 - [ ] Phase 54: Audit du harness comme surface d'attaque (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 55: Installeur et mémoire portables entre runtimes (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 56: Packs de règles par langage (module optionnel) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
-- [ ] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — 16/16 plans exécutés 2026-10-12, porte de phase verte (`57-16-SUMMARY.md`), DLWS-01..08 cochées ; PR et vérification de phase à venir, aucune release (P57-D-30)
+- [x] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-12, mergée PR #152 le 2026-10-16 en `--admin`, revue `@picmakpro` contournée (demande explicite de Samuel, session principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »), release `v2.70.0` ; 16/16 plans, DLWS-01..08 cochées
 - [ ] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0)
@@ -175,6 +175,7 @@
 | 41.2. Choisir la partition du planning au démarrage d'un lab | fiabilite-v1.0 | 6/6 | Complete — PR #130, release `v2.69.0` ; WSCH-01 avec réserve (recette en session au BACKLOG) | 2026-10-02 |
 | 41.3. Sobriété de méthode — ce qu'on crée, on le range | fiabilite-v1.0 | 4/4 | Complete — PR #123, release `v2.68.0` | 2026-09-30 |
 | 41.4. Emprunts Pocock — disciplines de cadrage, de revue et de skills | fiabilite-v1.0 | 11/11 | Complete — PR #135 (merge `--admin`, 2026-10-08), release `v2.69.0` | 2026-10-06 |
+| 57. Verrou de driver par compartiment | equipe-produit-v1.0 | 16/16 | Complete — PR #152 (merge `--admin`, 2026-10-16), release `v2.70.0` | 2026-10-12 |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 
@@ -531,7 +532,7 @@ forme exec (ADR-071).
 **Depends on:** aucune. Première du jalon.
 **Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
 **Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
-**Plans:** 16/16 plans executed (10 vagues)
+**Plans:** 16/16 plans exécutés en 10 vagues (2026-10-12) ; mergée PR #152 le 2026-10-16, release `v2.70.0`
 
 Plans:
 **Wave 1**

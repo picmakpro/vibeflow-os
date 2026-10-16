@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
-current_phase: 57
-current_phase_name: Verrou de driver par compartiment
-status: executing
-last_updated: "2026-10-12T12:00:00.000Z"
-last_activity: 2026-10-13
-last_activity_desc: Phase 57 plan 16 complete (porte de phase rejouée depuis ci.yml : gates 19/19, 102 suites dont 2 rouges environnementales prouvées, témoins DLWS-03 intacts ; DLWS-01..08 cochées ; ledger à la main)
-state_head: 1413af28
+current_phase: 58
+current_phase_name: Rôles de poste — installeur, profils solo / product / dev
+status: not_started
+last_updated: "2026-10-16T12:00:00.000Z"
+last_activity: 2026-10-16
+last_activity_desc: Phase 57 close dans le suivi (PR #152 mergée en --admin sans revue @picmakpro, release v2.70.0) ; Phase 58 à cadrer
+state_head: a2ed5094
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 16
   completed_plans: 16
 milestone_name: « l'équipe produit » — Phases 57-62 —
-stopped_at: "Completed 57-16-PLAN.md (2026-10-12) — porte de phase verte, ledger à jour (P57-D-12, P57-D-30) ; next : vérification de phase 57, PR, jamais de release dans la 57."
+stopped_at: "Phase 57 close (PR #152, v2.70.0, 2026-10-16) — next : cadrage de la Phase 58 (/gsd-discuss-phase 58 --ws fiabilite)."
 ---
 
 # Project State
@@ -30,35 +30,19 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 57 (Verrou de driver par compartiment) — EXECUTING
-Jalon **`fiabilite-v1.0` CLOS le 2026-10-08** (arbitrage Samuel, session principale, 2026-10-08). 18 phases livrées,
-de la 18 à la 41.4. Les 7 plans 41-07 à 41-13 sont confiés à Willy, hors clôture, et la Phase 40 a 5 plans pour un
-seul `40-SUMMARY.md` consolidé. Depuis le 2026-10-13, le frontmatter porte le jalon `equipe-produit-v1.0` (Phases 57-62) et ses
-propres compteurs : 6 phases, 0 terminée (la case ROADMAP de la 57 reste ouverte jusqu'à la PR), 16 plans sur 16 exécutés.
-Les dossiers de `fiabilite-v1.0` sont archivés sous `.planning/milestones/fiabilite-v1.0-phases/` (P57-D-44, qui remplace
-P57-D-41 ; arbitrage Samuel, AskUserQuestion session principale, 2026-10-13). Bilan et réserves :
-`.planning/MILESTONES.md` § fiabilite-v1.0.
-Dernières entrées : la 41.2 a été mergée le 2026-10-02 (PR #130) ; WSCH-01 est coché avec une réserve de recette en
-session, tracée au BACKLOG. La 41.4 a été mergée le 2026-10-08 (PR #135, en `--admin`).
-Release `v2.69.0` publiée le 2026-10-08 (tag, release GitHub, gate ✓).
+Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — NON CADRÉE
+Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 1 phase sur 6 close. `fiabilite-v1.0` est CLOS
+depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
+`.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
 
-Phase 57 cadrée le 2026-10-10 (`57-CONTEXT.md`, P57-D-01..11 arbitrage Samuel, AskUserQuestion session principale,
-2026-10-10 ; P57-D-12..15 à la discrétion du planificateur).
-Phase 57 planifiée le 2026-10-10 : 16 plans en 10 vagues (`57-01-PLAN.md` à `57-16-PLAN.md`), avec recherche,
-validation Nyquist et carte des patterns. Le plan-checker est passé au 2ᵉ tour. Les questions ouvertes ont été
-tranchées en P57-D-16..21 et P57-D-34/36/37 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10) ;
-P57-D-22..33 et D-35 sont sans veto (même canal, même date).
+Phase 57 (Verrou de driver par compartiment) CLOSE : 16/16 plans exécutés le 2026-10-12, DLWS-01..08 cochées, mergée par la
+PR #152 le 2026-10-16 (`a2ed5094`) en `--admin`, revue `@picmakpro` contournée sur demande explicite de Samuel (session
+principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »). Release `v2.70.0` publiée (tag annoté, release
+GitHub, `check-release-tag --remote` ✓). Registre : `57-CONTEXT.md` (P57-D-01..55) ; rapport de mission de la dette avant PR :
+`.planning/missions/2026-10-12-dette-avant-pr-phase-57.md`.
 
-Next: `/gsd-execute-phase 57 --ws fiabilite`, première phase de `equipe-produit-v1.0` (Phases 57-62,
-inscrit 2026-10-08) ; `ecc-inspiration-v1.0` est reporté après ce jalon (arbitrage Samuel, AskUserQuestion session principale, 2026-10-08).
-Phase 57 : 16/16 plans exécutés le 2026-10-12, porte de phase rejouée depuis `ci.yml` (job `gates` 19/19, 102 suites, deux rouges
-d'environnement prouvées, témoins DLWS-03 intacts), DLWS-01..08 cochées. Correctifs hors plan : revue R-1 à R-3, F-1/F-2 = P57-D-38 et P57-D-39 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-11 ; registre `57-CONTEXT.md`).
-Next : vérification de phase, PR ; aucune release (P57-D-30).
-Dette soldée avant la PR le 2026-10-12/13 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12) : C1, F-3,
-R-4 à R-7, C3 et la suite instable corrigés ; BACKLOG ramené à 31 sujets ouverts, sans prose dépassée ; P57-D-40 à D-43.
-Arbitrages Q1-Q7 puis A-D du 2026-10-13 appliqués (P57-D-44 à P57-D-55) ; rejeu de fin de mission vert ; RV4-07 close
-(P57-D-52 ratifiée par Samuel, AskUserQuestion session principale, 2026-10-14) : `.planning/missions/2026-10-12-dette-avant-pr-phase-57.md`.
-Last activity: 2026-10-12 — Phase 57 plan 57-16 complete (16/16)
+Next : cadrage de la Phase 58 (`/gsd-discuss-phase 58 --ws fiabilite`), famille d'exigences `RLPO` à poser à ce moment.
+Last activity: 2026-10-16 — Phase 57 close dans le suivi
 
 ## Accumulated Context
 
