@@ -1,0 +1,78 @@
+{
+  "nodes": [
+    {
+      "id": "cloture-57",
+      "step": "clôture Phase 57 (ROADMAP+STATE fiabilite, gates)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/fiabilite/ROADMAP.md",
+        ".planning/workstreams/fiabilite/STATE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-cloture-57",
+      "step": "revue clôture 57",
+      "stage": "",
+      "deps": [
+        "cloture-57"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/ROADMAP.md",
+        ".planning/workstreams/fiabilite/STATE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "backlog-proposition",
+      "step": "proposition de tri BACKLOG (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "backlog-arbitrage",
+      "step": "arbitrage Samuel tri BACKLOG",
+      "stage": "",
+      "deps": [
+        "backlog-proposition"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "backlog-application",
+      "step": "application tri BACKLOG",
+      "stage": "",
+      "deps": [
+        "backlog-arbitrage",
+        "revue-cloture-57"
+      ],
+      "scope": [
+        ".planning/BACKLOG.md"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "eclaireur-58",
+      "step": "éclaireur cadrage 58 (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss-58",
+      "step": "cadrage 58 (manager, arbitrages Samuel)",
+      "stage": "",
+      "deps": [
+        "eclaireur-58"
+      ],
+      "scope": [],
+      "status": "ready"
+    }
+  ],
+  "ws": "fiabilite"
+}
