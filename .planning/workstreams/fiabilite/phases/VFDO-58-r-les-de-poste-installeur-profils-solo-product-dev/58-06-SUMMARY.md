@@ -13,3 +13,7 @@ requirements: [RLPO-01, RLPO-03, RLPO-06]
 - `test-vibeflow-update.sh` : 93 OK / 0 KO, 415 s (alarme 600 s). `test-manifest.sh` 62/0 (17 s), `test-merge-hooks.sh` 39/0 (7 s), les deux sous bash courant et 3.2.
 - Constat (hors périmètre, gate de 58-04) : `check-role-consistency.sh` lancé depuis un cache sans `_internal/lib/vf-portable.sh` sort 1, indiscernable d'un « hors liste » ; l'engine refuse (échec fermé) avec le message « hors de la liste ». Le cache réel du plugin porte `_internal/` ; la suite copie `vf-portable.sh` dans son cache pour que RV-REFUS-1 refuse pour la bonne raison (témoin positif RV-REFUS-2).
 - Les deux tâches sont livrées en un commit (le refus à la pose partage les fonctions du tracer).
+
+## Écarts au plan
+
+`58-06-PLAN.md:29`, `:101` et `:141` décrivent encore la cascade « cache puis `$TARGET_ROOT/scripts` » pour trouver la porte de cohérence, et l'appel à `gitignore_add_one` pour la règle d'ignorance. Ces deux points ont été remplacés volontairement après coup : la porte est celle du cache seule, sans repli sur le dépôt (425ff437, 17358eba ; audit M-2, revue S4), et la règle passe par `role_gitignore_rule`, qui reconnaît le CRLF et refuse un `.gitignore` lien ou non régulier. Le PLAN n'est pas réécrit : il reste le témoin de ce qui avait été prévu.
