@@ -5,14 +5,14 @@ current_phase: 58
 current_phase_name: Rôles de poste — installeur, profils solo / product / dev
 status: executing
 last_updated: "2026-10-17T01:30:00.000Z"
-last_activity: 2026-10-17
-last_activity_desc: Phase 58 — plans 58-01..58-10 exécutés (58-03 en relecture humaine), revue et audit passés après correctifs ; 58-11 (porte de phase) attend les arbitrages Q15-Q18 et la relecture d'ADR-077
+last_activity: 2026-10-20
+last_activity_desc: Phase 58 — ADR-077 approuvée (58-03 close), plan 58-12 ajouté (presets filtrés par poste), 58-11 en vague 7 ; 10 plans sur 12 clos
 state_head: a2ed5094
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 27
-  completed_plans: 25
+  total_plans: 28
+  completed_plans: 26
 milestone_name: « l'équipe produit » — Phases 57-62 —
 stopped_at: "Phase 58 : 9 plans sur 11 clos (2026-10-17), 58-03 au checkpoint de relecture d'ADR-077 — next : arbitrages Q15-Q18 de Samuel, puis 58-11 (porte de phase)."
 ---
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EN EXÉCUTION (9/11 plans clos)
+Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EN EXÉCUTION (10/12 plans clos)
 Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 1 phase sur 6 close. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
@@ -48,8 +48,9 @@ Phase 58 planifiée le 2026-10-16 : 11 plans en 6 vagues (`58-01-PLAN.md` à `58
 Phase 58 exécutée les 2026-10-16/17 : 58-01, 02, 04 à 10 clos avec SUMMARY ; ADR-077 écrite (58-03, `39499492`) et en relecture
 chez Samuel ; revue (majeur `.gitignore` fermé) et audit (H-1 `json.py` du dépôt au SessionStart fermé dans le code de la phase)
 passés après trois tours de correction. Rapport : `.planning/missions/2026-10-16-suite-v2700-phase-58.md`.
-Next : arbitrages Q15 (clients), Q16 (presets), Q17 (manuel), Q18 (faille `python -c` antérieure) et relecture d'ADR-077, puis 58-11.
-Last activity: 2026-10-17 — Phase 58, plans 58-01..58-10
+Replanification 2026-10-20 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 pour ADR-077 et Q16 ; Q15 et Q17 : 2026-10-16) : ADR-077 approuvée (58-03 close, SUMMARY posé) ; plan 58-12 ajouté (presets filtrés par poste, P58-D-21, vague 6) ; 58-11 passe en vague 7 (manuel « Poste » FR+EN, liste de clients par `VF_CLIENT_NAMES_FILE`).
+Next : exécuter 58-12 puis 58-11 ; Q18 (faille `python -c` antérieure) hors cette phase, hotfix en parallèle.
+Last activity: 2026-10-20 — Phase 58, replanification (58-12)
 
 ## Accumulated Context
 

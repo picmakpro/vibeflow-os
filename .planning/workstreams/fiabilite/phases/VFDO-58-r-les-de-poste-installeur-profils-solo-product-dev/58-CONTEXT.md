@@ -162,6 +162,19 @@ La 58 fige seulement l'**interface de lecture** du poste dont ces phases auront 
   mobile-test-team, plus installer s'il porte une VERSION, avec CHANGELOG et README touchés. La release reste un
   geste humain hors phase.
 
+### Arbitrages de reprise (2026-10-20)
+- **P58-D-21 (filtrage des presets)** : arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 (Q16 corrigée).
+  - En 58, un poste `product` ne se voit plus proposer un preset dont la **fermeture de dépendances** contient un module
+    `roles: ["dev"]` ; le preset reste proposé en `solo` et en `dev`. Il s'agit d'un retrait du CHOIX, jamais d'un droit
+    (ADR-077) : la résolution nommée d'un preset ne change pas, l'engine refuse déjà à la pose.
+  - Emplacement : `resolve-preset.sh list --role <poste>` (`plugin/_internal/resolve-preset.sh`, branche `list`),
+    délégation à `resolve-deps.sh` (fermeture) et `module-roles.sh` (prédicat) ; sortie sans poste identique à l'octet
+    (critère 2). Plan 58-12, exigence RLPO-06 (l'installeur propose à chaque poste ce qui lui est proposable).
+  - Annule le report de P58-PL-04 (le filtre des presets était renvoyé à Samuel).
+- **Q15 / Q17 (2026-10-16)** : liste des clients lue par `VF_CLIENT_NAMES_FILE`, défaut `~/.config/vibeflow/clients.txt`,
+  absence = code 2 et critère 6 « en attente de la liste », jamais un échec de phase ; sous-section « Poste » du manuel
+  FR+EN. Réalisés par 58-11 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-16).
+
 </decisions>
 
 <canonical_refs>

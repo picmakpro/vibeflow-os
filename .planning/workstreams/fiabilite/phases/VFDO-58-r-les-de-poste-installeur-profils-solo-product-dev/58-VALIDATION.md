@@ -45,7 +45,7 @@ Baselines vertes avant modification : `test-build-module-catalog.sh` 14 OK · `t
 | RLPO-03 | `plugin/conductor/scripts/tests/test-check-role-consistency.sh` | mauvaise clé lue (`vf_role`) | ❌ W0 | ⬜ pending |
 | RLPO-04 | `plugin/_internal/tests/test-module-roles.sh` | `[]` accepté ; `["qa"]` accepté | ❌ W0 | ⬜ pending |
 | RLPO-05 | `plugin/installer/scripts/tests/test-build-module-catalog-role.sh` + les 14 cas existants | filtre inversé ; fermeture `product` contenant un module dev | ❌ W0 | ⬜ pending |
-| RLPO-06 | `test-vibeflow-update-role.sh` | filtre `--all` neutralisé | ❌ W0 | ⬜ pending |
+| RLPO-06 | `test-vibeflow-update-role.sh`, `test-resolve-preset-role.sh` (58-12) | filtre `--all` neutralisé ; PRE-MUT-1..4 (filtre des presets neutralisé, inversé, solo filtré, priorité inversée) | ❌ W0 | ⬜ pending |
 | RLPO-07 | `test-vibeflow-update-role.sh` | avis omettant un module hors poste | ❌ W0 | ⬜ pending |
 | RLPO-08 | `test-check-role-consistency.sh` | un mutant rouge par issue 0 / 1 / 3 / erreur d'analyse | ❌ W0 | ⬜ pending |
 | RLPO-09 | `test-check-role-consistency.sh` + `test-check-hook-paths.sh` (T12) | contenu brut imprimé ; traduction 3→0 retirée | ✅ / ❌ W0 | ⬜ pending |

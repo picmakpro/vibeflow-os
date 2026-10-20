@@ -578,7 +578,7 @@ Plans:
 **Depends on:** 57.
 **Sources:** spec §5.1, §5.4 ; SEED A-02, A-04, A-11 ; `plugin/installer/`, `plugin/_internal/vibeflow-update.sh`.
 **Hors périmètre :** les rôles architecte, QA et scrum master (A-02) ; tout contrôle d'accès.
-**Plans:** 11 plans
+**Plans:** 12 plans
 
 Plans:
 
@@ -603,7 +603,10 @@ Plans:
 - [ ] 58-10-PLAN.md — vague 5 : bumps sans release (conductor v1.50.0, dev-orchestrator v2.28.1, mobile-test v1.0.4, mobile-test-team v1.4.7)
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 58-11-PLAN.md — vague 6 : compte de suites, porte de phase rejouée depuis `ci.yml`, critère 6 avec la liste de Samuel (non autonome), ledger à la main
+- [ ] 58-12-PLAN.md — vague 6 : presets filtrés par poste (`resolve-preset.sh list --role`, fermeture de dépendances), sortie sans poste identique à l'octet, suite à mutants, ligne du skill installeur (P58-D-21)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [ ] 58-11-PLAN.md — vague 7 : sous-section « Poste » du manuel FR+EN, liste de clients lue par défaut dans le dossier de configuration, compte de suites, porte de phase rejouée depuis `ci.yml`, critère 6 (« en attente de la liste » si absente), ledger à la main
 
 ### Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
 
