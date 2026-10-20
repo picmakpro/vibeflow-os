@@ -210,7 +210,13 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo "[check-description-fidelity] INDÉTERMINÉ : python3 introuvable (passe A, parseur YAML strict)" >&2
   exit 3
 fi
-if ! python3 -c 'import sys; sys.path[:] = [p for p in sys.path if p]; import yaml' >/dev/null 2>&1; then
+# Isolation (H5, audit 2026-10-20) : la purge de sys.path retire le cwd, `-E` ignore PYTHONPATH et
+# PYTHONHOME (un lab hostile y poserait un sitecustomize/yaml), `env -u PYTHONUSERBASE` retire le
+# redirecteur du site utilisateur que `-E` ne couvre pas (site.py lit cette variable sans regarder le
+# drapeau). PyYAML reste trouvé dans le site utilisateur PAR DÉFAUT (mesuré : ~/Library/Python/3.x) ;
+# un PYTHONUSERBASE posé par l'utilisateur pour y loger PyYAML est ignoré => INDÉTERMINÉ bruyant (3).
+# `-I` aurait coupé aussi le site utilisateur et perdu PyYAML sur les postes où il y vit.
+if ! env -u PYTHONUSERBASE python3 -E -c 'import sys; sys.path[:] = [p for p in sys.path if p]; import yaml' >/dev/null 2>&1; then
   echo "[check-description-fidelity] INDÉTERMINÉ : module PyYAML introuvable pour python3 (passe A)" >&2
   exit 3
 fi
@@ -336,7 +342,7 @@ JSEOF
 
 A_TSV="$TMPDIR_GATE/pass_a.tsv"
 B_TSV="$TMPDIR_GATE/pass_b.tsv"
-python3 "$PASS_A_PY" < "$FILELIST" > "$A_TSV" 2>"$TMPDIR_GATE/pass_a.err"
+env -u PYTHONUSERBASE python3 -E "$PASS_A_PY" < "$FILELIST" > "$A_TSV" 2>"$TMPDIR_GATE/pass_a.err"
 PY_RC=$?
 node "$PASS_B_JS" < "$FILELIST" > "$B_TSV" 2>"$TMPDIR_GATE/pass_b.err"
 ND_RC=$?
@@ -559,7 +565,7 @@ run_inventory() {
   local synth_a="$out_dir/synth_a.tsv"
   local synth_b="$out_dir/synth_b.tsv"
   if [ -s "$synth_list" ]; then
-    python3 "$PASS_A_PY" < "$synth_list" > "$synth_a" 2>"$out_dir/synth_a.err"
+    env -u PYTHONUSERBASE python3 -E "$PASS_A_PY" < "$synth_list" > "$synth_a" 2>"$out_dir/synth_a.err"
     node "$PASS_B_JS" < "$synth_list" > "$synth_b" 2>"$out_dir/synth_b.err"
   else
     : > "$synth_a"
@@ -699,7 +705,7 @@ JSEOF
   STAGE_A="$TMPDIR_GATE/fix_stage_a.tsv"
   STAGE_B="$TMPDIR_GATE/fix_stage_b.tsv"
   if [ -s "$STAGE_LIST" ]; then
-    python3 "$PASS_A_PY" < "$STAGE_LIST" > "$STAGE_A" 2>"$TMPDIR_GATE/fix_stage_a.err"
+    env -u PYTHONUSERBASE python3 -E "$PASS_A_PY" < "$STAGE_LIST" > "$STAGE_A" 2>"$TMPDIR_GATE/fix_stage_a.err"
     node "$PASS_B_JS" < "$STAGE_LIST" > "$STAGE_B" 2>"$TMPDIR_GATE/fix_stage_b.err"
   else
     : > "$STAGE_A"
@@ -738,7 +744,7 @@ JSEOF
   if [ -s "$REAL_CONVERTED_LIST" ]; then
     POST_A="$TMPDIR_GATE/fix_post_a.tsv"
     POST_B="$TMPDIR_GATE/fix_post_b.tsv"
-    python3 "$PASS_A_PY" < "$REAL_CONVERTED_LIST" > "$POST_A" 2>"$TMPDIR_GATE/fix_post_a.err"
+    env -u PYTHONUSERBASE python3 -E "$PASS_A_PY" < "$REAL_CONVERTED_LIST" > "$POST_A" 2>"$TMPDIR_GATE/fix_post_a.err"
     node "$PASS_B_JS" < "$REAL_CONVERTED_LIST" > "$POST_B" 2>"$TMPDIR_GATE/fix_post_b.err"
     while IFS= read -r realp; do
       [ -n "$realp" ] || continue

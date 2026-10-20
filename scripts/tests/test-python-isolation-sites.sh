@@ -34,15 +34,22 @@ PASS=0; FAIL=0
 ok() { PASS=$((PASS + 1)); echo "  ok  $1"; }
 ko() { FAIL=$((FAIL + 1)); echo "  KO  $1 — $2"; }
 
+RHOME="$HOME"
 REAL_PY="$(command -v python3 || true)"
 if [ -z "$REAL_PY" ]; then echo "[test-python-isolation-sites] python3 introuvable — NON VÉRIFIABLE" >&2; exit 3; fi
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/vf-pyiso.XXXXXX")" || exit 3
+STDLIB="$("$REAL_PY" -I -c 'import sysconfig;print(sysconfig.get_path("stdlib"))')"
+PYVER="$("$REAL_PY" -I -c 'import sys;print("%d.%d" % sys.version_info[:2])')"
 trap 'rm -rf "$TMP"' EXIT
+# La passe A (lancement du FICHIER pass_a.py) n'est atteinte que si PyYAML est visible dans le HOME réel :
+# sans lui le vecteur est NON EXERCÉ (annoncé, jamais compté vert).
+HAVE_YAML=""
+HOME="$RHOME" "$REAL_PY" -c 'import yaml' >/dev/null 2>&1 && HAVE_YAML=1
 SHIM="$TMP/shim"; mkdir -p "$SHIM" "$TMP/home"
 for n in python3 python; do
   cat > "$SHIM/$n" <<SH
 #!/bin/bash
-printf 'A %s %.80s\n' "\$1" "\$2" | tr '\n' ' ' >> "\$WITNESS_LOG"; echo >> "\$WITNESS_LOG"
+printf 'A %s %.80s %.80s\n' "\$1" "\$2" "\$3" | tr '\n' ' ' >> "\$WITNESS_LOG"; echo >> "\$WITNESS_LOG"
 exec "$REAL_PY" "\$@"
 SH
   chmod +x "$SHIM/$n"
@@ -55,9 +62,15 @@ mkhostile() { # <dir> <root>
            "$d/root/scripts" "$d/root/plugin/.claude-plugin" "$d/root/.claude-plugin" "$TMP/home/.claude/plugins"
   for m in json re base64 datetime subprocess hashlib glob shutil tempfile argparse collections textwrap \
            pathlib time yaml fnmatch shlex calendar urllib getpass random uuid string itertools functools \
-           hmac difflib traceback errno stat locale copy enum typing dataclasses contextlib io codecs ast tokenize; do
+           hmac difflib traceback errno stat locale copy enum typing dataclasses contextlib io codecs ast tokenize \
+           sitecustomize usercustomize; do
     printf 'import os\nopen(os.environ["WITNESS_HIT"],"a").write("%s\\n")\n' "$m" > "$d/$m.py"
   done
+  # PYTHONHOME hostile : la vraie stdlib (liens) + un site-packages qui porte un sitecustomize piège.
+  local ph="$d/pyhome/lib/python$PYVER" e b
+  mkdir -p "$ph/site-packages"
+  for e in "$STDLIB"/*; do b="${e##*/}"; [ "$b" = site-packages ] || ln -s "$e" "$ph/$b"; done
+  printf 'import os\nopen(os.environ["WITNESS_HIT"],"a").write("pythonhome-sitecustomize\\n")\n' > "$ph/site-packages/sitecustomize.py"
   printf '# idx\n' > "$d/.claude/memory/MEMORY.md"
   printf '## ADR-001 — Un titre\n\nCorps un.\n\n## ADR-002 — Un titre\n\nCorps deux.\n' > "$d/.claude/memory/ADR.md"
   printf '## LRN-001 — Un titre\n- Category: operational\n\nCorps.\n' > "$d/.claude/memory/LEARNINGS.md"
@@ -79,7 +92,7 @@ run_site() {
   ( cd "$d" && HOME="$TMP/home" PATH="$SHIM:$PATH" WT="$r" H="$d" PYTHONDONTWRITEBYTECODE=1 \
       perl -e 'alarm 40; exec @ARGV' bash -c "$cmd" <<<"$in" >/dev/null 2>&1 )
   R_SPAWNS=$(awk 'NF' "$WITNESS_LOG" | awk 'END{print NR+0}')
-  R_NONISO=$(awk 'NF && !/^A -[A-Za-z]*[IP] / && !/sys\.path\[:\]/ && !/^A \//' "$WITNESS_LOG" | awk 'END{print NR+0}')
+  R_NONISO=$(awk 'NF && !/^A -[A-Za-z]*[IP] / && !/sys\.path\[:\]/ && !/^A \// && !/^A -E \//' "$WITNESS_LOG" | awk 'END{print NR+0}')
   R_HIT="non"; [ -s "$WITNESS_HIT" ] && R_HIT="oui($(tr '\n' ',' < "$WITNESS_HIT" | head -c 24))"
 }
 
@@ -104,6 +117,9 @@ update-banner|bash $G/conductor/scripts/update-banner.sh|
 check-guard-health|bash $G/conductor/scripts/check-guard-health.sh|
 dag|bash $G/conductor/scripts/dag.sh init --file=.planning/x.dag.json|
 check-description-fidelity|bash $G/conductor/scripts/check-description-fidelity.sh|
+fidelity-env-pythonpath|PYTHONPATH="\$H" bash $G/conductor/scripts/check-description-fidelity.sh|
+fidelity-env-userbase|US=\$(PYTHONUSERBASE="\$H" "$REAL_PY" -c 'import site;print(site.getusersitepackages())'); mkdir -p "\$US"; cp "\$H/usercustomize.py" "\$H/yaml.py" "\$US/"; PYTHONUSERBASE="\$H" bash $G/conductor/scripts/check-description-fidelity.sh|
+fidelity-env-pythonhome|PYTHONHOME="\$H/pyhome" bash $G/conductor/scripts/check-description-fidelity.sh|
 reindex|bash $G/consolidator/scripts/reindex.sh --register=ADR --dry-run|
 decay-pass|bash $G/consolidator/scripts/decay-pass.sh --dry-run|
 detect-duplicates|bash $G/consolidator/scripts/detect-duplicates.sh|
@@ -119,6 +135,9 @@ merge-hooks|bash $G/_internal/merge-hooks.sh merge frag.json --settings .claude/
 vf-portable|source $G/_internal/lib/vf-portable.sh; vf_python -c 'import json'|
 bump|bash root/scripts/bump.sh 99.0.0|
 EOF
+  if [ -n "$HAVE_YAML" ]; then
+    echo "fidelity-env-passa|HOME=\"$RHOME\" PYTHONPATH=\"\$H\" bash $G/conductor/scripts/check-description-fidelity.sh|"
+  fi
 }
 
 echo "== témoin par site (dossier courant hostile, spawns réels) =="
@@ -132,7 +151,8 @@ while IFS='|' read -r name cmd in; do
   elif [ "$R_NONISO" -ne 0 ]; then ko "$name" "$R_NONISO spawn(s) sans -I (spawns=$R_SPAWNS)"
   else ok "$name : $R_SPAWNS spawn(s), tous isolés, aucun piège exécuté"; fi
 done < <(sites "$ROOT")
-[ "$N" -ge 29 ] || ko "recensement" "seulement $N sites listés (attendu >= 29)"
+[ -n "$HAVE_YAML" ] || echo "  --  fidelity-env-passa NON EXERCÉ : PyYAML absent de $REAL_PY (vecteur de la passe A non compté)"
+[ "$N" -ge 32 ] || ko "recensement" "seulement $N sites listés (attendu >= 32)"
 
 # ------------------------------------------------------------------------------------------------
 # MUTATION : l'isolation retirée → le piège doit s'exécuter de nouveau (sinon « hit=non » est à vide).
@@ -157,6 +177,12 @@ mutate_case() { # <site> <fichier relatif> <motif sed s///>
 mutate_case guard-driver-lock plugin/_internal/lib/vf-portable.sh 's/\$VF_PYTHON_INVOKE -I "\$@"/$VF_PYTHON_INVOKE "$@"/'
 mutate_case guard-bash-registres plugin/consolidator/scripts/guard-bash-registres.sh 's/"\$PYBIN" -I -c/"$PYBIN" -c/'
 mutate_case dag plugin/conductor/scripts/dag.sh 's/python3 -I - /python3 - /'
+for v in pythonpath userbase pythonhome; do
+  mutate_case "fidelity-env-$v" plugin/conductor/scripts/check-description-fidelity.sh 's/env -u PYTHONUSERBASE python3 -E -c/python3 -c/'
+done
+if [ -n "$HAVE_YAML" ]; then
+  mutate_case fidelity-env-passa plugin/conductor/scripts/check-description-fidelity.sh 's/python3 -E "\$PASS_A_PY"/python3 "\$PASS_A_PY"/'
+fi
 
 echo ""
 echo "== bilan : $PASS OK / $FAIL KO =="
