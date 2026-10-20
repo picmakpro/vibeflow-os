@@ -67,22 +67,22 @@ py_probe() {
     resolved="$(command -v "$cand" 2>/dev/null)"
     case "$resolved" in *WindowsApps*) return 1 ;; esac   # stub Store : peut pendre en non-TTY
     if command -v timeout >/dev/null 2>&1; then
-      timeout 5 "$cand" -I -c "$PY3_PROBE" >/dev/null 2>&1 || return 1
+      timeout 5 "$cand" -I -c "$PY3_PROBE" >/dev/null 2>&1 || return 1 # vf-pyx-ok (sonde de version, sortie jetée)
     else
-      "$cand" -I -c "$PY3_PROBE" >/dev/null 2>&1 || return 1
+      "$cand" -I -c "$PY3_PROBE" >/dev/null 2>&1 || return 1 # vf-pyx-ok (sonde de version, sortie jetée)
     fi
   else
-    "$cand" -I -c "$PY3_PROBE" >/dev/null 2>&1 || return 1
+    "$cand" -I -c "$PY3_PROBE" >/dev/null 2>&1 || return 1 # vf-pyx-ok (sonde de version, sortie jetée)
   fi
   return 0
 }
-py_version() { local py="$1"; "$py" -I -c 'import sys;print(".".join(map(str,sys.version_info[:3])))' 2>/dev/null | tr -d '\r'; }
+py_version() { local py="$1"; "$py" -I -c 'import sys;print(".".join(map(str,sys.version_info[:3])))' 2>/dev/null | tr -d '\r'; } # vf-pyx-ok (sonde de version)
 
 if py_probe python3; then
   ok "python3 $(py_version python3)"
 elif py_probe python; then
   warn "python3 indisponible mais python $(py_version python) utilisable — l'install s'adapte (merge-hooks), MAIS les hooks de gouvernance runtime invoquent 'python3' (fail-open : protections inactives tant que python3 n'est pas exposé dans le PATH de Git Bash)."
-elif [ "$IS_WINDOWS" -eq 1 ] && command -v py >/dev/null 2>&1 && py -3 -I -c '' >/dev/null 2>&1; then
+elif [ "$IS_WINDOWS" -eq 1 ] && command -v py >/dev/null 2>&1 && py -3 -I -c '' >/dev/null 2>&1; then # vf-pyx-ok (sonde de version, sortie jetée)
   # KO et pas warn : l'engine invoque `python3`/`python`, jamais `py` — l'install perdrait ses
   # hooks de gouvernance en silence (cause n°5 de l'ADR-054).
   ko "Python présent uniquement via le lanceur 'py' — INSUFFISANT : l'engine invoque 'python3'/'python'. Réinstaller depuis python.org en cochant « Add to PATH » (ou exposer python.exe dans le PATH de Git Bash)."

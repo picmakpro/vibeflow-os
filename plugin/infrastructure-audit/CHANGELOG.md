@@ -6,6 +6,7 @@
 
 - **`scripts/audit-infra.sh`** : les trois invocations inline (validation JSON, parse des hooks, comptage) isolées (`-I`). `python3 -c`/`python3 -` mettent le dossier courant en tête de `sys.path` : un `json.py` posé à la racine d'un lab cloné était importé et exécuté. `-I` (mode isolé) corrige ; témoin par site `scripts/tests/test-python-isolation-sites.sh` et gate `scripts/check-python-isolation.sh` (racine du dépôt).
 - **`references/hooks-contract.md`** (correctif de revue H6) : la commande de validation JSON citée en prose est `python3 -I -c …` (instruction exécutée par un modèle, hors du balayage du gate).
+- **Restitution de `PYTHONUTF8=1`** (correctif de revue R2, hotfix-py tour 3) : `-I` impliquant `-E`, un `PYTHONUTF8=1` posé par l'utilisateur était perdu en silence sur `audit-infra.sh` ; chaque invocation isolée porte désormais `$PYX` (`-Xutf8` si et seulement si la variable vaut `1`, définition canonique une fois par fichier). Exigé par `scripts/check-python-isolation.sh`, vérifié sur spawns réels par `scripts/tests/test-python-isolation-sites.sh`.
 
 ## [v1.3.3] — 2026-10-06 (classe d'invocation du skill, Phase 41.4)
 

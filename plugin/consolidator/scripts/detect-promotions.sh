@@ -25,6 +25,8 @@
 # Reference : ADR-032 pilier 4 (Promotion)
 
 set -euo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
 LEARNINGS_FILE="$MEMORY_DIR/LEARNINGS.md"
@@ -36,7 +38,7 @@ RULES_DIR="${RULES_DIR:-.claude/rules}"
 # Extract LRN entries and print one JSON candidate per line (json.dumps : un titre ne casse jamais le JSON
 # ni ne decale un champ). Operational singles d'abord, puis clusters par categorie.
 extract_candidates() {
-  python3 -I - <<PYEOF 2>/dev/null
+  python3 -I $PYX - <<PYEOF 2>/dev/null
 import json
 import re
 from collections import defaultdict
@@ -148,7 +150,7 @@ echo "  ],"
 # L'instruction sans effet (no-op) est du JUGEMENT : doctrine de references/promotion.md, jamais calculee ici.
 hook_declare() {  # <settings.json> : au moins une entree de hook non vide dans le JSON parse
   [ -f "$1" ] || return 1
-  python3 -I - "$1" <<'PYEOF' 2>/dev/null
+  python3 -I $PYX - "$1" <<'PYEOF' 2>/dev/null
 import json
 import sys
 

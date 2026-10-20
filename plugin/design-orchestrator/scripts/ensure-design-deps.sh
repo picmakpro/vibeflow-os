@@ -70,6 +70,8 @@
 # Pas de `-e` : les détections (command -v, grep, claude plugin …) doivent pouvoir échouer sans
 # tuer le script — c'est précisément la dégradation gracieuse attendue.
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 # ---------- Résolution de runtime-cli-dispatch.sh (RUNT-01) ----------
 # Cascade EXACTE de find_hooks_merger() (plugin/_internal/vibeflow-update.sh) — DUPLICATION
@@ -235,7 +237,7 @@ detect_all() {
 
   s1_usable=0
   if [ -n "$PYBIN" ] && [ -s "$json_tmp" ]; then
-    SOURCE_LINES="$("$PYBIN" -I - "$json_tmp" <<'PY'
+    SOURCE_LINES="$("$PYBIN" -I $PYX - "$json_tmp" <<'PY'
 import json, sys
 try:
     data = json.load(open(sys.argv[1]))

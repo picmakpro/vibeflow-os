@@ -45,11 +45,31 @@ trap 'rm -rf "$TMP"' EXIT
 # sans lui le vecteur est NON EXERCÉ (annoncé, jamais compté vert).
 HAVE_YAML=""
 HOME="$RHOME" "$REAL_PY" -c 'import yaml' >/dev/null 2>&1 && HAVE_YAML=1
+# …et que `node` soit dans le PATH : le gate de fidélité sort (3) AVANT la passe A sans lui, le vecteur
+# serait alors « exercé » à un seul spawn (la sonde) et son mutant aveugle.
+command -v node >/dev/null 2>&1 || HAVE_YAML=""
 SHIM="$TMP/shim"; mkdir -p "$SHIM" "$TMP/home"
+# Fausses CLI `claude` et `codex` (R1a) : `ensure-design-deps.sh` ne lance Python que si un runtime est
+# détecté dans le PATH (`command -v claude`) puis lit `plugin list --json`. Sans cale, le site est
+# « NON EXERCÉ » sur un poste sans CLI (CI) et exercé sur un poste de dev : un témoin dépendant de la
+# machine. Les fausses commandes passent devant les vraies (PATH), rendent un JSON valide pour
+# `plugin list --json` et rien (code 0) pour tout autre verbe.
+for n in claude codex; do
+  cat > "$SHIM/$n" <<'SH'
+#!/bin/bash
+case "$*" in
+  *"plugin list --json"*) printf '[{"id":"superpowers@claude-plugins-official","enabled":true},{"id":"ui-ux-pro-max@x","enabled":false}]\n' ;;
+esac
+exit 0
+SH
+  chmod +x "$SHIM/$n"
+done
 for n in python3 python; do
   cat > "$SHIM/$n" <<SH
 #!/bin/bash
-printf 'A %s %.80s %.80s\n' "\$1" "\$2" "\$3" | tr '\n' ' ' >> "\$WITNESS_LOG"; echo >> "\$WITNESS_LOG"
+u=-; case " \$* " in *" -Xutf8 "*|*" -X utf8 "*) u=U;; esac
+v=-; case "\$*" in *version_info*) v=V;; esac
+printf 'A %s %.80s %.80s @@%s%s' "\$1" "\$2" "\$3" "\$u" "\$v" | tr '\n' ' ' >> "\$WITNESS_LOG"; echo >> "\$WITNESS_LOG"
 exec "$REAL_PY" "\$@"
 SH
   chmod +x "$SHIM/$n"
@@ -70,6 +90,11 @@ mkhostile() { # <dir> <root>
   local ph="$d/pyhome/lib/python$PYVER" e b
   mkdir -p "$ph/site-packages"
   for e in "$STDLIB"/*; do b="${e##*/}"; [ "$b" = site-packages ] || ln -s "$e" "$ph/$b"; done
+  # R1b : sur un Python Debian/Ubuntu, `sitecustomize.py` de la stdlib (lien vers /etc/python3.X) est
+  # importé AVANT celui de site-packages et MASQUE le piège posé là. Le piège est donc aussi posé à
+  # `lib/pythonX.Y/sitecustomize.py`, en REMPLAÇANT le lien (jamais d'écriture à travers lui).
+  rm -f "$ph/sitecustomize.py"
+  printf 'import os\nopen(os.environ["WITNESS_HIT"],"a").write("pythonhome-sitecustomize\\n")\n' > "$ph/sitecustomize.py"
   printf 'import os\nopen(os.environ["WITNESS_HIT"],"a").write("pythonhome-sitecustomize\\n")\n' > "$ph/site-packages/sitecustomize.py"
   mkdir -p "$d/pp"
   for m in sitecustomize usercustomize yaml; do
@@ -88,15 +113,19 @@ mkhostile() { # <dir> <root>
   printf '{"plugins":{}}' > "$TMP/home/.claude/plugins/installed_plugins.json"
 }
 
-# run_site <nom> <racine> <commande> [stdin] → renseigne R_SPAWNS R_HIT R_NONISO
+# run_site <nom> <racine> <commande> [stdin] → renseigne R_SPAWNS R_HIT R_NONISO R_NOUTF8
+# U8=1 (variable du suite) pose PYTHONUTF8=1 dans l'environnement du site ; R_NOUTF8 compte alors les spawns
+# isolés (`-I`) lancés sans `-X utf8` — hors sondes de version (programme mentionnant `version_info`, la
+# sortie est jetée ou ne porte que des chiffres).
 run_site() {
   local name="$1" r="$2" cmd="$3" in="${4:-}" d
   d="$(mktemp -d "$TMP/h.XXXXXX")"; mkhostile "$d" "$r"
   export WITNESS_LOG="$d.log" WITNESS_HIT="$d.hit"; : > "$WITNESS_LOG"; rm -f "$WITNESS_HIT"
-  ( cd "$d" && HOME="$TMP/home" PATH="$SHIM:$PATH" WT="$r" H="$d" PYTHONDONTWRITEBYTECODE=1 \
+  ( cd "$d" && HOME="$TMP/home" PATH="$SHIM:$PATH" PYTHONUTF8="${U8:-}" WT="$r" H="$d" PYTHONDONTWRITEBYTECODE=1 \
       perl -e 'alarm 40; exec @ARGV' bash -c "$cmd" <<<"$in" >/dev/null 2>&1 )
   R_SPAWNS=$(awk 'NF' "$WITNESS_LOG" | awk 'END{print NR+0}')
   R_NONISO=$(awk 'NF && !/^A -[A-Za-z]*[IP] / && !/sys\.path\[:\]/ && !/^A \// && !/^A -E \//' "$WITNESS_LOG" | awk 'END{print NR+0}')
+  R_NOUTF8=$(awk 'NF && /^A -[A-Za-z]*I / && /@@--/' "$WITNESS_LOG" | awk 'END{print NR+0}')
   R_HIT="non"; [ -s "$WITNESS_HIT" ] && R_HIT="oui($(tr '\n' ',' < "$WITNESS_HIT" | head -c 24))"
 }
 
@@ -155,8 +184,25 @@ while IFS='|' read -r name cmd in; do
   else ok "$name : $R_SPAWNS spawn(s), tous isolés, aucun piège exécuté"; fi
 done < <(sites "$ROOT")
 echo "  --  fidelity-env-userbase HORS PÉRIMÈTRE (documenté, non compté) : PYTHONUSERBASE est une variable de l'environnement de l'utilisateur, du même niveau de confiance que PATH — honorée par le gate (décision du manager, hotfix-py tour 2, 2026-10-20)"
-[ -n "$HAVE_YAML" ] || echo "  --  fidelity-env-passa NON EXERCÉ : PyYAML absent de $REAL_PY (vecteur de la passe A non compté)"
+[ -n "$HAVE_YAML" ] || echo "  --  fidelity-env-passa NON EXERCÉ : PyYAML absent de $REAL_PY ou node absent du PATH (vecteur de la passe A non compté)"
 [ "$N" -ge 32 ] || ko "recensement" "seulement $N sites listés (attendu >= 32)"
+
+# ------------------------------------------------------------------------------------------------
+# H7 / R2 : `-I` implique `-E` — un PYTHONUTF8=1 posé par l'utilisateur (Windows, locale non UTF-8)
+# serait perdu en silence. Chaque spawn isolé doit le restituer (`-X utf8`). Le gate statique
+# (check-python-isolation.sh) le vérifie à la lecture ; ici, sur les spawns RÉELS.
+# ------------------------------------------------------------------------------------------------
+echo ""
+echo "== PYTHONUTF8=1 restitué sur chaque spawn isolé =="
+U8=1
+while IFS='|' read -r name cmd in; do
+  [ -n "$name" ] || continue
+  run_site "$name" "$ROOT" "$cmd" "$in"
+  if [ "$R_SPAWNS" -lt 1 ]; then ko "utf8 $name" "site NON EXERCÉ (0 spawn)"
+  elif [ "$R_NOUTF8" -ne 0 ]; then ko "utf8 $name" "$R_NOUTF8 spawn(s) isolé(s) sans -X utf8 sous PYTHONUTF8=1"
+  else ok "utf8 $name : $R_SPAWNS spawn(s), aucun sans -X utf8"; fi
+done < <(sites "$ROOT")
+U8=""
 
 # ------------------------------------------------------------------------------------------------
 # MUTATION : l'isolation retirée → le piège doit s'exécuter de nouveau (sinon « hit=non » est à vide).
@@ -166,26 +212,34 @@ echo "== mutation : retirer -I doit rendre le piège opérant =="
 MR="$TMP/mutroot"; mkdir -p "$MR"
 cp -R "$ROOT/plugin" "$ROOT/scripts" "$MR/" ; cp "$ROOT/VERSION" "$ROOT/README.md" "$ROOT/README.fr.md" "$ROOT/CHANGELOG.md" "$MR/"
 mkdir -p "$MR/.claude-plugin"; cp "$ROOT/.claude-plugin/marketplace.json" "$MR/.claude-plugin/"
-mutate_case() { # <site> <fichier relatif> <motif sed s///>
-  local site="$1" rel="$2" prog="$3" line cmd in
+mutate_case() { # <site> <fichier relatif> <motif sed s///> [utf8]
+  local site="$1" rel="$2" prog="$3" mode="${4:-}" line cmd in
   cp "$ROOT/$rel" "$MR/$rel"
   sed "$prog" "$ROOT/$rel" > "$MR/$rel.new" && mv "$MR/$rel.new" "$MR/$rel"
   if cmp -s "$ROOT/$rel" "$MR/$rel"; then ko "MUT $site" "la mutation n'a RIEN changé ($rel) — mutant NON OPPOSABLE"; return; fi
   line="$(sites "$MR" | awk -F'|' -v n="$site" '$1==n')"
   cmd="$(printf '%s' "$line" | awk -F'|' '{print $2}')"; in="$(printf '%s' "$line" | awk -F'|' '{print $3}')"
+  if [ "$mode" = utf8 ]; then
+    U8=1; run_site "$site" "$MR" "$cmd" "$in"; U8=""
+    if [ "$R_NOUTF8" -gt 0 ]; then ok "MUT utf8 $site : restitution retirée → $R_NOUTF8 spawn(s) sans -X utf8"
+    else ko "MUT utf8 $site" "restitution retirée mais aucun spawn sans -X utf8 — le témoin ne discrimine pas"; fi
+    cp "$ROOT/$rel" "$MR/$rel"; return
+  fi
   run_site "$site" "$MR" "$cmd" "$in"
   if [ "$R_HIT" != "non" ]; then ok "MUT $site : -I retiré → piège exécuté ($R_HIT)"
   else ko "MUT $site" "isolation retirée mais aucun piège exécuté — le témoin ne discrimine pas"; fi
   cp "$ROOT/$rel" "$MR/$rel"
 }
 mutate_case guard-driver-lock plugin/_internal/lib/vf-portable.sh 's/\$VF_PYTHON_INVOKE -I "\$@"/$VF_PYTHON_INVOKE "$@"/'
-mutate_case guard-bash-registres plugin/consolidator/scripts/guard-bash-registres.sh 's/"\$PYBIN" -I -c/"$PYBIN" -c/'
-mutate_case dag plugin/conductor/scripts/dag.sh 's/python3 -I - /python3 - /'
+mutate_case guard-bash-registres plugin/consolidator/scripts/guard-bash-registres.sh 's/"\$PYBIN" -I \$PYX -c/"$PYBIN" -c/'
+mutate_case dag plugin/conductor/scripts/dag.sh 's/python3 -I \$PYX - /python3 - /'
 for v in pythonpath pythonhome; do
   mutate_case "fidelity-env-$v" plugin/conductor/scripts/check-description-fidelity.sh 's/python3 -E -c/python3 -c/'
 done
+mutate_case guard-bash-registres plugin/consolidator/scripts/guard-bash-registres.sh 's/"\$PYBIN" -I \$PYX -c/"$PYBIN" -I -c/' utf8
+mutate_case vf-portable plugin/_internal/lib/vf-portable.sh 's/-I -X utf8 "\$@"/-I "$@"/' utf8
 if [ -n "$HAVE_YAML" ]; then
-  mutate_case fidelity-env-passa plugin/conductor/scripts/check-description-fidelity.sh 's/python3 -E "\$PASS_A_PY"/python3 "\$PASS_A_PY"/'
+  mutate_case fidelity-env-passa plugin/conductor/scripts/check-description-fidelity.sh 's/python3 -E \$PYX "\$PASS_A_PY"/python3 "\$PASS_A_PY"/'
 fi
 
 echo ""

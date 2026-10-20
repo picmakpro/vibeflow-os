@@ -15,6 +15,8 @@
 # Reference : ADR-032 pilier 3 (Fusion)
 
 set -euo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
 TARGET_REGISTER=""
@@ -92,7 +94,7 @@ detect_similar_titles() {
 
   # Compare pairs using a simple Python-style tokenization in awk
   # For each pair, compute Jaccard similarity on word tokens (lowercased)
-  python3 -I - <<'PYEOF' 2>/dev/null || true
+  python3 -I $PYX - <<'PYEOF' 2>/dev/null || true
 import os
 try:
     with open('/tmp/.consolidator-titles.tmp') as f:

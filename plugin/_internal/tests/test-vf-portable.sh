@@ -80,24 +80,38 @@ fi
 # `-I` implique `-E` : sans `-X utf8` explicite, un PYTHONUTF8=1 (Windows) serait ignoré en silence.
 # Mutant : la branche `-X utf8` retirée dans une copie de la lib => le témoin DOIT rendre 0 (donc
 # la branche est bien ce qui fait passer le cas de 0 à 1).
-T3B_PROG="import sys; print(sys.flags.utf8_mode)"
-T3B_ON=$(PYTHONUTF8=1 LC_ALL=en_US.UTF-8 bash -c ". '$LIB'; vf_python -c '$T3B_PROG'" 2>/dev/null)
-T3B_OFF=$(env -u PYTHONUTF8 LC_ALL=en_US.UTF-8 bash -c ". '$LIB'; vf_python -c '$T3B_PROG'" 2>/dev/null)
-if [ "$T3B_ON" = "1" ] && [ "$T3B_OFF" = "0" ]; then
-  ok "T3b PYTHONUTF8=1 restitué par -X utf8 (mode UTF-8 = 1), absent sinon (= 0)"
+# R4 : le cas ne dépend d'AUCUNE locale précise. Le mode UTF-8 de Python s'active d'office en locale C/POSIX
+# (PEP 540) — en conteneur, `LC_ALL=en_US.UTF-8` absente retombe en C et rendrait 1 là où l'on attend 0.
+# On cherche donc une locale RÉELLEMENT disponible qui laisse `utf8_mode` à 0 (sondée avec le même Python,
+# sans PYTHONUTF8) ; aucune → SKIP annoncé, jamais un vert silencieux.
+T3B_LOC=""
+for T3B_CAND in en_US.UTF-8 en_US.utf8 C.UTF-8 C.utf8 $(locale -a 2>/dev/null); do
+  case "$T3B_CAND" in C|POSIX) continue ;; esac
+  T3B_M=$(env -u PYTHONUTF8 LC_ALL="$T3B_CAND" python3 -c 'import sys; print(sys.flags.utf8_mode)' 2>/dev/null)
+  if [ "$T3B_M" = "0" ]; then T3B_LOC="$T3B_CAND"; break; fi
+done
+if [ -z "$T3B_LOC" ]; then
+  skip "T3b aucune locale non-C disponible (locale -a) : le mode UTF-8 est actif d'office, le cas ne peut rien prouver"
 else
-  ko "T3b attendu on=1 off=0, obtenu on=[$T3B_ON] off=[$T3B_OFF]"
-fi
-T3B_MUT="$WORK/vf-portable-mut-utf8.sh"
-sed 's/\$VF_PYTHON_INVOKE -I -X utf8 "\$@"/$VF_PYTHON_INVOKE -I "$@"/' "$LIB" > "$T3B_MUT"
-if cmp -s "$LIB" "$T3B_MUT"; then
-  ko "T3b mutant NON OPPOSABLE : la mutation n'a rien changé"
-else
-  T3B_MUT_ON=$(PYTHONUTF8=1 LC_ALL=en_US.UTF-8 bash -c ". '$T3B_MUT'; vf_python -c '$T3B_PROG'" 2>/dev/null)
-  if [ "$T3B_MUT_ON" = "0" ]; then
-    ok "T3b mutant (branche -X utf8 retirée) => mode UTF-8 = 0 : le témoin discrimine"
+  T3B_PROG="import sys; print(sys.flags.utf8_mode)"
+  T3B_ON=$(PYTHONUTF8=1 LC_ALL="$T3B_LOC" bash -c ". '$LIB'; vf_python -c '$T3B_PROG'" 2>/dev/null)
+  T3B_OFF=$(env -u PYTHONUTF8 LC_ALL="$T3B_LOC" bash -c ". '$LIB'; vf_python -c '$T3B_PROG'" 2>/dev/null)
+  if [ "$T3B_ON" = "1" ] && [ "$T3B_OFF" = "0" ]; then
+    ok "T3b PYTHONUTF8=1 restitué par -X utf8 (mode UTF-8 = 1), absent sinon (= 0)"
   else
-    ko "T3b mutant : attendu 0, obtenu [$T3B_MUT_ON] — la branche n'est pas ce qui restitue PYTHONUTF8"
+    ko "T3b attendu on=1 off=0, obtenu on=[$T3B_ON] off=[$T3B_OFF]"
+  fi
+  T3B_MUT="$WORK/vf-portable-mut-utf8.sh"
+  sed 's/\$VF_PYTHON_INVOKE -I -X utf8 "\$@"/$VF_PYTHON_INVOKE -I "$@"/' "$LIB" > "$T3B_MUT"
+  if cmp -s "$LIB" "$T3B_MUT"; then
+    ko "T3b mutant NON OPPOSABLE : la mutation n'a rien changé"
+  else
+    T3B_MUT_ON=$(PYTHONUTF8=1 LC_ALL="$T3B_LOC" bash -c ". '$T3B_MUT'; vf_python -c '$T3B_PROG'" 2>/dev/null)
+    if [ "$T3B_MUT_ON" = "0" ]; then
+      ok "T3b mutant (branche -X utf8 retirée) => mode UTF-8 = 0 : le témoin discrimine"
+    else
+      ko "T3b mutant : attendu 0, obtenu [$T3B_MUT_ON] — la branche n'est pas ce qui restitue PYTHONUTF8"
+    fi
   fi
 fi
 

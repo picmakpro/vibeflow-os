@@ -3480,7 +3480,7 @@ cat > "$T105_PROBE" <<'PYEOF'
 import os, sys
 src_path, manifest_path, dir_a, dir_b = sys.argv[1:5]
 text = open(src_path, encoding="utf-8").read()
-start_marker = '"$PYBIN" -I -c "'
+start_marker = '"$PYBIN" -I $PYX -c "'
 start = text.index(start_marker) + len(start_marker)
 end = text.index('\nPY_RC=$?')
 body = text[start:end].rstrip()

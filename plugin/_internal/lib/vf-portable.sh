@@ -92,9 +92,9 @@ vf_py_probe() {
   if command -v timeout >/dev/null 2>&1; then
     # shellcheck disable=SC2086 — $cand est un token interne contrôlé ("python3"/"python"/"py -3"),
     # le word-splitting volontaire est ce qui permet à "py -3" de porter son argument de lanceur.
-    timeout 5 $cand -I -c "$probe" >/dev/null 2>&1 || return 1
+    timeout 5 $cand -I -c "$probe" >/dev/null 2>&1 || return 1 # vf-pyx-ok (sonde de version, sortie jetée)
   else
-    $cand -I -c "$probe" >/dev/null 2>&1 || return 1
+    $cand -I -c "$probe" >/dev/null 2>&1 || return 1 # vf-pyx-ok (sonde de version, sortie jetée)
   fi
   return 0
 }
@@ -137,8 +137,9 @@ vf_python() {
   # json.py posé à la racine d'un lab cloné serait importé et exécuté par chaque hook. `-I` ôte aussi
   # PYTHON* et le site utilisateur : les programmes passés à vf_python n'importent que la stdlib.
   # `-I` implique `-E` : un PYTHONUTF8=1 posé par l'utilisateur (Windows) serait ignoré en silence.
-  # Ce seul réglage est restitué, en option (`-X utf8`, comportement antérieur préservé). LIMITE :
-  # PYTHONIOENCODING n'a pas d'équivalent en option — il est ignoré (CHANGELOG _internal).
+  # Ce seul réglage est restitué, en option (`-X utf8`). Les invocations directes `python3 -I …` des scripts
+  # livrés font la même restitution par `$PYX` (check-python-isolation.sh l'exige). LIMITE :
+  # PYTHONIOENCODING n'a pas d'équivalent en option — il est ignoré (plugin/conductor/CHANGELOG.md).
   # shellcheck disable=SC2086 — même raison que vf_py_probe : VF_PYTHON_INVOKE peut porter "py -3".
   if [ "${PYTHONUTF8:-}" = "1" ]; then
     $VF_PYTHON_INVOKE -I -X utf8 "$@"

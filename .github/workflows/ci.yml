@@ -2116,13 +2116,15 @@ jobs:
         # partir du même code, donc aucun des deux ne peut se satisfaire lui-même à vide.
         run: |
           set -eu
+          # Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+          PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
           closure=$(bash plugin/_internal/resolve-deps.sh dev-orchestrator)
           if ! printf '%s\n' "$closure" | awk '$0=="dev-orchestrator"{f=1} END{exit !f}'; then
             echo "::error::fermeture résolue sans dev-orchestrator — attendu non fiable, refus de continuer"
             exit 1
           fi
           echo "== fermeture (source de l'attendu, indépendante du posé) : $closure =="
-          expect_total=$(python3 -I - <<PYEOF
+          expect_total=$(python3 -I $PYX - <<PYEOF
           import json, glob
           closure = """$closure""".split()
           n = 0
@@ -2144,7 +2146,7 @@ jobs:
           echo "== attendu dérivé des hooks.json de la fermeture : $expect_total entrée(s) VF =="
 
           cd "$LAB_ARME"
-          python3 -I - "$expect_total" <<'PYEOF'
+          python3 -I $PYX - "$expect_total" <<'PYEOF'
           import json, os, re, sys
 
           EXPECT_TOTAL = int(sys.argv[1])

@@ -8,6 +8,8 @@
 #      bonne version de plugin peut avoir des modules non migrés (pré ADR-052/053). Nudge /vf-update.
 # Émet le JSON seulement s'il y a quelque chose à dire — sinon rien. Toujours exit 0.
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 CACHE_FILE="${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow/update-check.json"
@@ -23,7 +25,7 @@ case "$(command -v python3 2>/dev/null)" in
   ''|*WindowsApps*) command -v python >/dev/null 2>&1 && PYBIN=python || PYBIN="" ;;
 esac
 if [ -n "$PYBIN" ]; then
-  CACHE_FILE="$CACHE_FILE" LEGACY_JSON="$LEGACY_JSON" "$PYBIN" -I <<'PY' 2>/dev/null || true
+  CACHE_FILE="$CACHE_FILE" LEGACY_JSON="$LEGACY_JSON" "$PYBIN" -I $PYX <<'PY' 2>/dev/null || true
 import json, os
 msgs = []
 # 1) mise à jour du plugin (depuis le cache)

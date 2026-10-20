@@ -70,6 +70,8 @@
 #   3 = INDÉTERMINÉ bruyant — python3, le module YAML strict ou node indisponible, OU zéro fichier
 #       découvert sous --root. Un vert sur une cible vide serait un faux vert : refusé explicitement.
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 MODE="audit"
 ROOT=""
@@ -343,7 +345,7 @@ JSEOF
 
 A_TSV="$TMPDIR_GATE/pass_a.tsv"
 B_TSV="$TMPDIR_GATE/pass_b.tsv"
-python3 -E "$PASS_A_PY" < "$FILELIST" > "$A_TSV" 2>"$TMPDIR_GATE/pass_a.err"
+python3 -E $PYX "$PASS_A_PY" < "$FILELIST" > "$A_TSV" 2>"$TMPDIR_GATE/pass_a.err"
 PY_RC=$?
 node "$PASS_B_JS" < "$FILELIST" > "$B_TSV" 2>"$TMPDIR_GATE/pass_b.err"
 ND_RC=$?
@@ -566,7 +568,7 @@ run_inventory() {
   local synth_a="$out_dir/synth_a.tsv"
   local synth_b="$out_dir/synth_b.tsv"
   if [ -s "$synth_list" ]; then
-    python3 -E "$PASS_A_PY" < "$synth_list" > "$synth_a" 2>"$out_dir/synth_a.err"
+    python3 -E $PYX "$PASS_A_PY" < "$synth_list" > "$synth_a" 2>"$out_dir/synth_a.err"
     node "$PASS_B_JS" < "$synth_list" > "$synth_b" 2>"$out_dir/synth_b.err"
   else
     : > "$synth_a"
@@ -706,7 +708,7 @@ JSEOF
   STAGE_A="$TMPDIR_GATE/fix_stage_a.tsv"
   STAGE_B="$TMPDIR_GATE/fix_stage_b.tsv"
   if [ -s "$STAGE_LIST" ]; then
-    python3 -E "$PASS_A_PY" < "$STAGE_LIST" > "$STAGE_A" 2>"$TMPDIR_GATE/fix_stage_a.err"
+    python3 -E $PYX "$PASS_A_PY" < "$STAGE_LIST" > "$STAGE_A" 2>"$TMPDIR_GATE/fix_stage_a.err"
     node "$PASS_B_JS" < "$STAGE_LIST" > "$STAGE_B" 2>"$TMPDIR_GATE/fix_stage_b.err"
   else
     : > "$STAGE_A"
@@ -745,7 +747,7 @@ JSEOF
   if [ -s "$REAL_CONVERTED_LIST" ]; then
     POST_A="$TMPDIR_GATE/fix_post_a.tsv"
     POST_B="$TMPDIR_GATE/fix_post_b.tsv"
-    python3 -E "$PASS_A_PY" < "$REAL_CONVERTED_LIST" > "$POST_A" 2>"$TMPDIR_GATE/fix_post_a.err"
+    python3 -E $PYX "$PASS_A_PY" < "$REAL_CONVERTED_LIST" > "$POST_A" 2>"$TMPDIR_GATE/fix_post_a.err"
     node "$PASS_B_JS" < "$REAL_CONVERTED_LIST" > "$POST_B" 2>"$TMPDIR_GATE/fix_post_b.err"
     while IFS= read -r realp; do
       [ -n "$realp" ] || continue

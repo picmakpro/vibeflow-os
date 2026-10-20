@@ -22,6 +22,8 @@
 # Reference : ADR-032 pilier 1 (Indexation) + LRN-106 (audit before fix)
 
 set -euo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
 
@@ -134,7 +136,7 @@ extract_body_ids() {
 extract_body_sections() {
   local file="$1"
   local pat="$2"
-  "$PYBIN" -I - "$file" "$pat" <<'PYEOF' 2>/dev/null
+  "$PYBIN" -I $PYX - "$file" "$pat" <<'PYEOF' 2>/dev/null
 import re
 import sys
 
@@ -375,7 +377,7 @@ reindex_one() {
   local orphans_tmp
   orphans_tmp=$(mktemp)
   if [ -n "$orphans" ]; then
-    "$PYBIN" -I - "$file" "$orphans_tmp" <<PYEOF
+    "$PYBIN" -I $PYX - "$file" "$orphans_tmp" <<PYEOF
 import re
 import sys
 

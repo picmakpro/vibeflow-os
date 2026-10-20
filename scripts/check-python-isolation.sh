@@ -20,16 +20,19 @@
 #
 # CE QU'IL RECONNAÎT COMME INVOCATION : un mot-interpréteur suivi, après d'éventuelles options,
 # d'un programme INLINE (`-c`, `-m`, `-` ou une redirection `<`/`<<`/`<<<`). Mot-interpréteur :
-#   - le BASENAME vaut `py`, `python`, `python3`, `python3.12`… (`/usr/bin/python3`,
-#     `"$HOME/.venv/bin/python"`), ou `py -3` ;
+#   - le BASENAME vaut `py`, `python`, `python3`, `python3.12`, `python3.14t`, `python.exe`, `pypy3`…
+#     (`/usr/bin/python3`, `"$HOME/.venv/bin/python"`), ou `py -3` ;
 #   - une variable dont le nom contient `py` sans casse, chiffres admis (`$PYBIN`, `$py_invoke`,
 #     `$PYTHON3`, `$PY3`, `${PYTHON:-python3}`), ou `$cand` (sondes) ;
 #   - une variable SANS « py » dont le MÊME fichier affecte une valeur qui est un python
 #     (`INTERP=python3`, `RUNTIME="$(command -v python3)"`, `for runner in python3 python`) ou dont
 #     le défaut `${NOM:-python3}` en est un. Une valeur qui LANCE python (`out=$(python3 -c …)`)
 #     capture une sortie : ce n'est pas un interpréteur.
-# Les options `-W`/`-X`/`-Q` consomment leur argument (`python3 -W ignore -c`), les lignes jointes par
-# `\` sont lues comme une seule (`python3 \` puis `-c` à la ligne suivante). `-m` met aussi le cwd
+# Les options `-W`/`-X`/`-Q` et `--check-hash-based-pycs` consomment leur argument (`python3 -W ignore
+# -c`), les lignes jointes par `\` sont lues comme une seule (`python3 \` puis `-c` à la ligne
+# suivante). Les opérateurs collés au mot suivant sont séparés avant lecture (`echo x|python3 -c`,
+# `;python3`, `&&python3`, `$(…|python3 -c …)`, `<(python3 -c …)`) : `PYBIN=python3; "$PYBIN" -c …` et
+# `[ -n "$PYBIN" ] || PYBIN=python3; "$PYBIN" -c …` sont donc lus en deux commandes. `-m` met aussi le cwd
 # en tête de `sys.path` : c'est une invocation à isoler. Ce qui rend une invocation conforme :
 #   - `-I` (en grappe aussi : `-Ic`) ;
 #   - `-P` SEULEMENT si l'invocation porte le marqueur `vf-py311` (le site garantit Python >= 3.11 ;
@@ -38,10 +41,21 @@
 #     prochain interpréteur de la ligne, pas la ligne entière) et placée AVANT le premier import
 #     d'un module autre que `sys` (`import json, sys; sys.path[:] = …` reste refusé) ;
 #   - le marqueur `vf-py-isolation-ok` dans l'invocation — réservé au cas où le littéral EST le sujet.
+# RESTITUTION DE PYTHONUTF8 (H7). `-I` implique `-E` : un `PYTHONUTF8=1` posé par l'utilisateur (Windows,
+# locale non UTF-8) serait perdu en silence. Toute invocation isolée par `-I` doit donc porter `$PYX`,
+# NON quoté (un `"$PYX"` vide serait un argument vide), après `-I` :
+#   `python3 -I $PYX -c …`, avec, une fois par fichier, la définition canonique
+#   `PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"` (sans elle, `set -u` est fatal : refusé).
+# Exemption : le marqueur `vf-pyx-ok` SUR LA LIGNE (sonde de version, sortie jetée). `vf_python` (lib
+# vf-portable.sh) fait la même restitution elle-même ; les invocations à purge de `sys.path` ne sont pas
+# visées (elles ne portent pas `-I`, l'environnement leur reste).
 # Les lignes de commentaire pur sont ignorées.
 #
 # HORS PORTÉE (dit, pas promis) : une variable sans « py » dont l'affectation vit hors du fichier
-# (environnement, fichier sourcé) ; `python3` nu en bout de tube (programme lu sur stdin sans `-`) ;
+# (environnement, fichier sourcé) ; un opérateur ou un nom de commande reconstruit à l'exécution
+# (`eval`, `$(printf …)`), un alias, un interpréteur nommé autrement (`python3.14-x`, `cpython`) ; un
+# `;`/`|` figurant DANS un littéral entre guillemets (la normalisation ne lit pas les guillemets : au pire
+# un faux positif de comptage, jamais un trou) ; l'exigence `$PYX` des lancements de FICHIER (`-E`) ; `python3` nu en bout de tube (programme lu sur stdin sans `-`) ;
 # `__import__` avant la purge ; les instructions EN PROSE exécutées par un modèle (`*.md` — liste
 # connue : plugin/skill-creator/skills/skill-creator/SKILL.md l.238, 391, 422, `python -m scripts.*`,
 # skill VENDU en amont, non modifié ici) ; les skills vendus en général ; les suites `*/tests/*`.
@@ -100,7 +114,7 @@ function strip(w) {
 # Un chemin/mot est un interpréteur si son BASENAME vaut py, python, python3, python3.12…
 function is_pyword(s,   b) {
   b = s; sub(/.*\//, "", b)
-  return (b ~ /^py(thon)?[0-9.]*$/)
+  return (b ~ /^(py|python|pypy)[0-9.]*[tdm]*(\.exe)?$/)
 }
 # Une variable est un interpréteur si : son nom contient « py » (sans casse, chiffres admis :
 # $PY3, $PYTHON3), OU c'est $cand (sondes), OU le même fichier lui affecte une valeur qui est un
@@ -111,6 +125,7 @@ function var_is_interp(w,   inner, name, rest) {
   inner = w; sub(/^\$\{?/, "", inner); sub(/\}$/, "", inner)
   name = inner; sub(/[^A-Za-z0-9_].*$/, "", name)
   rest = substr(inner, length(name) + 1)
+  if (name == "PYX") return 0   # restitution de PYTHONUTF8 (H7) : une option, pas un interpréteur
   if (name ~ /[Pp][Yy]/) return 1
   if (name == "cand") return 1
   if (name in PYVARS) return 1
@@ -154,22 +169,34 @@ function purge_ok(span,   idx) {
   if (idx == 0) return 0
   return !pre_import_bad(substr(span, 1, idx - 1))
 }
-function scan_line(f, ln, line,   n, w, i, j, k, word, iso, pflag, prog, skip, x, c, m, span, len) {
+# Sépare les opérateurs collés au mot suivant (`echo x|python3 -c`, `;python3`, `&&python3`,
+# `<(python3 -c …)`) : sans cela le mot-interpréteur est invisible, collé à son voisin. `&` seul
+# (`2>&1`) n'est pas touché.
+function normalize(line) {
+  gsub(/[<>]\(/, " ( ", line)
+  gsub(/&&/, " \\&\\& ", line)
+  gsub(/[|;]/, " & ", line)
+  return line
+}
+function scan_line(f, ln, line,   n, w, i, j, k, word, iso, pflag, prog, skip, x, c, m, span, len, hasx, qx) {
   if (line ~ /^[ \t]*#/) return
-  n = split(line, w, /[ \t]+/)
+  n = split(normalize(line), w, /[ \t]+/)
   for (i = 1; i <= n; i++) {
     word = strip(w[i])
     if (!is_interp(word)) continue
     if (i > 1 && w[i - 1] ~ /^[0-9]*(>|>>|<|<<)$/) continue   # cible d'une redirection, pas un interpreteur
     j = i + 1
     if (word == "py" && w[j] == "-3") j++
-    iso = 0; pflag = 0; prog = 0; skip = 0
+    iso = 0; pflag = 0; prog = 0; skip = 0; hasx = 0; qx = 0
     for (; j <= n; j++) {
       x = w[j]
       if (skip) { skip = 0; continue }
+      if (x ~ /^\$(\{PYX\}|PYX)$/) { hasx = 1; continue }  # restitution de PYTHONUTF8=1 (H7), NON quotée
+      if (x ~ /^"\$(\{PYX\}|PYX)"$/) { qx = 1; continue }   # quotée : un argument vide casserait l'appel
       if (x ~ /^[0-9]*>/) continue                            # 2>/dev/null intercalé
       if (x ~ /^</) { prog = 1; break }                       # stdin : < f, <<EOF, <<<
       if (x == "-") { prog = 1; break }                       # programme sur stdin
+      if (x == "--check-hash-based-pycs") { skip = 1; continue }   # seule option longue à argument
       if (x ~ /^--/) continue                                 # --version…
       if (x !~ /^-/) break                                    # un fichier : sys.path[0] = son dossier
       len = length(x)
@@ -191,7 +218,16 @@ function scan_line(f, ln, line,   n, w, i, j, k, word, iso, pflag, prog, skip, x
     }
     span = ""
     for (k = i; k < m; k++) span = span " " w[k]
-    if (iso) continue
+    if (qx) { BAD++; printf "%s:%d: $PYX quoté (argument vide) : %s\n", f, ln, substr(line, 1, 140) > "/dev/stderr"; break }
+    if (iso) {
+      # H7 : -I ignore PYTHONUTF8 ; chaque invocation isolée doit le restituer ($PYX) ou déclarer
+      # `vf-pyx-ok` SUR LA LIGNE (sonde de version dont la sortie est jetée ; la ligne, pas l'invocation :
+      # `$PY3_PROBE` est lui-même vu comme un interpréteur et couperait l'invocation avant le marqueur).
+      if (hasx || index(line, "vf-pyx-ok") > 0) continue
+      BAD++
+      printf "%s:%d: -I sans $PYX (PYTHONUTF8=1 perdu) : %s\n", f, ln, substr(line, 1, 140) > "/dev/stderr"
+      break
+    }
     if (pflag && index(span, "vf-py311") > 0) continue   # -P (Python >= 3.11) : le site déclare la garantie
     if (index(span, "vf-py-isolation-ok") > 0) continue
     if (purge_ok(span)) continue
@@ -200,7 +236,7 @@ function scan_line(f, ln, line,   n, w, i, j, k, word, iso, pflag, prog, skip, x
     break
   }
 }
-function scan_file(f,   nl, raw, acc, start, cnt, k, L, LN) {
+function scan_file(f,   nl, raw, acc, start, cnt, k, L, LN, uses, hasdef) {
   delete PYVARS
   nl = 0; acc = ""; start = 0; cnt = 0
   while ((getline raw < f) > 0) {
@@ -211,13 +247,24 @@ function scan_file(f,   nl, raw, acc, start, cnt, k, L, LN) {
   }
   if (acc != "") { nl++; L[nl] = acc; LN[nl] = start }
   close(f)
+  uses = 0; hasdef = 0
+  for (k = 1; k <= nl; k++) {
+    if (L[k] ~ /^[ \t]*#/) continue
+    if (L[k] ~ /\$\{?PYX\}?/) uses = 1
+    if (index(L[k], CANON) > 0) hasdef = 1
+  }
+  if (uses && !hasdef) {
+    BAD++
+    printf "%s:1: $PYX utilisé sans la définition canonique (%s) — set -u fatal\n", f, CANON > "/dev/stderr"
+  }
   for (k = 1; k <= nl; k++) collect_vars(L[k])
   for (k = 1; k <= nl; k++) scan_line(f, LN[k], L[k])
 }
 BEGIN {
   PYVARS["_"] = 1; delete PYVARS
   PURGE = "sys.path[:] = [p for p in sys.path if p]"
-  PYWORD_RE = "(^|[^A-Za-z0-9_])(python[0-9.]*|py)([^A-Za-z0-9_]|$)"
+  CANON = "PYX=\"\"; [ \"${PYTHONUTF8:-}\" != \"1\" ] || PYX=\"-Xutf8\""
+  PYWORD_RE = "(^|[^A-Za-z0-9_])(python[0-9.]*[tdm]*(\\.exe)?|pypy[0-9.]*|py)([^A-Za-z0-9_]|$)"
 }
 FNR == 1 { scan_file(FILENAME) }
 { next }

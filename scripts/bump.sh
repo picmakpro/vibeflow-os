@@ -23,6 +23,8 @@
 # l'entrée CHANGELOG). Échoue bruyamment si un fichier attendu manque.
 # Codes de sortie : 0 = ok · 1 = fichier attendu manquant / écriture impossible · 2 = usage
 set -euo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 # Racine dérivée de l'emplacement du script (scripts/ vit à la racine) — PAS du cwd.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -105,7 +107,7 @@ for rel in "plugin/.claude-plugin/plugin.json" "plugin/.codex-plugin/plugin.json
   [ -n "$old" ] || { echo "[bump] ✗ aucune clé \"version\" trouvée dans $rel" >&2; exit 1; }
   apply "$rel" "$old" "$NEW"
   [ "$old" = "$NEW" ] && continue
-  $DRY || python3 -I - "$f" "$old" "$NEW" <<'PY'
+  $DRY || python3 -I $PYX - "$f" "$old" "$NEW" <<'PY'
 import re, sys
 path, old, new = sys.argv[1:4]
 s = open(path, encoding="utf-8").read()
@@ -134,7 +136,7 @@ else
   if $DRY; then
     echo "[bump] ~ CHANGELOG.md : insertion du squelette « ## [$TAG] — $(date +%F) » (dry-run)"
   else
-    python3 -I - "$CHANGELOG" "$TAG" "$(date +%F)" <<'PY'
+    python3 -I $PYX - "$CHANGELOG" "$TAG" "$(date +%F)" <<'PY'
 import sys
 path, tag, date = sys.argv[1:4]
 lines = open(path, encoding="utf-8").read().splitlines(keepends=True)

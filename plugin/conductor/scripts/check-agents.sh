@@ -164,6 +164,8 @@
 #   avertissement, jamais un exit 3 ni un exit 1.
 
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 AGENTS_DIR=".claude/agents"
 SKILLS_DIR=".claude/skills"
@@ -260,7 +262,7 @@ VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
 VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" \
 VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" VF_RESOLVE_AGENTS="$RESOLVE_AGENTS" \
 VF_REGISTRY_DIRS="$REGISTRY_DIRS" VF_MANIFEST="$VF_MANIFEST" \
-VF_MANIFEST_FRESHNESS="$MANIFEST_FRESHNESS" "$PYBIN" -I -c "
+VF_MANIFEST_FRESHNESS="$MANIFEST_FRESHNESS" "$PYBIN" -I $PYX -c "
 import glob, json, os, re, sys
 from datetime import date
 
