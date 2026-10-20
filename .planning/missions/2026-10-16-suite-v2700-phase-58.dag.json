@@ -132,7 +132,7 @@
         "exec-58"
       ],
       "scope": [],
-      "status": "done",
+      "status": "ready",
       "review_regime": "full"
     },
     {
@@ -153,7 +153,7 @@
         "exec-58"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-backlog",
@@ -176,6 +176,67 @@
         "plugin/conductor/scripts/check-role-consistency.sh",
         "plugin/installer/scripts/build-module-catalog.sh"
       ],
+      "status": "done"
+    },
+    {
+      "id": "plan-58b",
+      "step": "plan 58-12 presets + amendement 58-11 + SUMMARY 58-03",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-58-r-les-de-poste-installeur-profils-solo-product-dev"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "hotfix-py",
+      "step": "hotfix isolation python (worktree fix/vf-python-isolation)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/_internal/lib/vf-portable.sh",
+        "plugin/_internal/merge-hooks.sh",
+        "plugin/conductor/scripts/guard-driver-lock.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-58c",
+      "step": "revue 58-12",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-hotfix",
+      "step": "revue-hotfix",
+      "stage": "",
+      "deps": [
+        "hotfix-py"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-hotfix",
+      "step": "audit-hotfix",
+      "stage": "",
+      "deps": [
+        "hotfix-py"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "verif-58",
+      "step": "vérification de phase 58",
+      "stage": "",
+      "deps": [
+        "exec-58"
+      ],
+      "scope": [],
       "status": "done"
     }
   ],
