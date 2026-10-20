@@ -12,9 +12,9 @@ progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 28
-  completed_plans: 26
+  completed_plans: 27
 milestone_name: « l'équipe produit » — Phases 57-62 —
-stopped_at: "Phase 58 : 9 plans sur 11 clos (2026-10-17), 58-03 au checkpoint de relecture d'ADR-077 — next : arbitrages Q15-Q18 de Samuel, puis 58-11 (porte de phase)."
+stopped_at: "Phase 58 : 11 plans sur 12 clos (2026-10-20), 58-12 close (presets filtrés par poste, P58-D-21) — next : 58-11 (vague 7, porte de phase ; retire resolve-preset.sh de la liste des fichiers interdits de check-livraison-58)."
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EN EXÉCUTION (10/12 plans clos)
+Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EN EXÉCUTION (11/12 plans clos)
 Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 1 phase sur 6 close. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
