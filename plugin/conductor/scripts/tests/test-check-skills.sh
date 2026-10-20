@@ -192,7 +192,7 @@ make_gate_mutant() { # <id> <motif> <remplacement>
   fi
   local pybody pyerr pyrc
   pybody="$dir/mutant-body.py"
-  awk '/^"\$PYBIN" - <<.PY_CHECK_SKILLS_EOF.$/{f=1;next} /^PY_CHECK_SKILLS_EOF$/{f=0} f' "$tmp" > "$pybody"
+  awk '/^"\$PYBIN" -I - <<.PY_CHECK_SKILLS_EOF.$/{f=1;next} /^PY_CHECK_SKILLS_EOF$/{f=0} f' "$tmp" > "$pybody"
   pyerr="$("$PYBIN" -c "
 import sys
 f = sys.argv[1]
