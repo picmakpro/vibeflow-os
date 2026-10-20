@@ -71,6 +71,10 @@ mkhostile() { # <dir> <root>
   mkdir -p "$ph/site-packages"
   for e in "$STDLIB"/*; do b="${e##*/}"; [ "$b" = site-packages ] || ln -s "$e" "$ph/$b"; done
   printf 'import os\nopen(os.environ["WITNESS_HIT"],"a").write("pythonhome-sitecustomize\\n")\n' > "$ph/site-packages/sitecustomize.py"
+  mkdir -p "$d/pp"
+  for m in sitecustomize usercustomize yaml; do
+    printf 'import os\nopen(os.environ["WITNESS_HIT"],"a").write("%s\\n")\n' "$m" > "$d/pp/$m.py"
+  done
   printf '# idx\n' > "$d/.claude/memory/MEMORY.md"
   printf '## ADR-001 — Un titre\n\nCorps un.\n\n## ADR-002 — Un titre\n\nCorps deux.\n' > "$d/.claude/memory/ADR.md"
   printf '## LRN-001 — Un titre\n- Category: operational\n\nCorps.\n' > "$d/.claude/memory/LEARNINGS.md"
@@ -117,8 +121,8 @@ update-banner|bash $G/conductor/scripts/update-banner.sh|
 check-guard-health|bash $G/conductor/scripts/check-guard-health.sh|
 dag|bash $G/conductor/scripts/dag.sh init --file=.planning/x.dag.json|
 check-description-fidelity|bash $G/conductor/scripts/check-description-fidelity.sh|
-fidelity-env-pythonpath|PYTHONPATH="\$H" bash $G/conductor/scripts/check-description-fidelity.sh|
-fidelity-env-userbase|US=\$(PYTHONUSERBASE="\$H" "$REAL_PY" -c 'import site;print(site.getusersitepackages())'); mkdir -p "\$US"; cp "\$H/usercustomize.py" "\$H/yaml.py" "\$US/"; PYTHONUSERBASE="\$H" bash $G/conductor/scripts/check-description-fidelity.sh|
+fidelity-env-pythonpath|PYTHONPATH="\$H/pp" bash $G/conductor/scripts/check-description-fidelity.sh|
+fidelity-env-userbase|US=\$(PYTHONUSERBASE="\$H" "$REAL_PY" -c 'import site;print(site.getusersitepackages())'); mkdir -p "\$US"; cp "\$H/pp/usercustomize.py" "\$H/pp/yaml.py" "\$US/"; PYTHONUSERBASE="\$H" bash $G/conductor/scripts/check-description-fidelity.sh|
 fidelity-env-pythonhome|PYTHONHOME="\$H/pyhome" bash $G/conductor/scripts/check-description-fidelity.sh|
 reindex|bash $G/consolidator/scripts/reindex.sh --register=ADR --dry-run|
 decay-pass|bash $G/consolidator/scripts/decay-pass.sh --dry-run|
@@ -136,7 +140,7 @@ vf-portable|source $G/_internal/lib/vf-portable.sh; vf_python -c 'import json'|
 bump|bash root/scripts/bump.sh 99.0.0|
 EOF
   if [ -n "$HAVE_YAML" ]; then
-    echo "fidelity-env-passa|HOME=\"$RHOME\" PYTHONPATH=\"\$H\" bash $G/conductor/scripts/check-description-fidelity.sh|"
+    echo "fidelity-env-passa|HOME=\"$RHOME\" PYTHONPATH=\"\$H/pp\" bash $G/conductor/scripts/check-description-fidelity.sh|"
   fi
 }
 
