@@ -122,7 +122,6 @@ check-guard-health|bash $G/conductor/scripts/check-guard-health.sh|
 dag|bash $G/conductor/scripts/dag.sh init --file=.planning/x.dag.json|
 check-description-fidelity|bash $G/conductor/scripts/check-description-fidelity.sh|
 fidelity-env-pythonpath|PYTHONPATH="\$H/pp" bash $G/conductor/scripts/check-description-fidelity.sh|
-fidelity-env-userbase|US=\$(PYTHONUSERBASE="\$H" "$REAL_PY" -c 'import site;print(site.getusersitepackages())'); mkdir -p "\$US"; cp "\$H/pp/usercustomize.py" "\$H/pp/yaml.py" "\$US/"; PYTHONUSERBASE="\$H" bash $G/conductor/scripts/check-description-fidelity.sh|
 fidelity-env-pythonhome|PYTHONHOME="\$H/pyhome" bash $G/conductor/scripts/check-description-fidelity.sh|
 reindex|bash $G/consolidator/scripts/reindex.sh --register=ADR --dry-run|
 decay-pass|bash $G/consolidator/scripts/decay-pass.sh --dry-run|
@@ -155,6 +154,7 @@ while IFS='|' read -r name cmd in; do
   elif [ "$R_NONISO" -ne 0 ]; then ko "$name" "$R_NONISO spawn(s) sans -I (spawns=$R_SPAWNS)"
   else ok "$name : $R_SPAWNS spawn(s), tous isolés, aucun piège exécuté"; fi
 done < <(sites "$ROOT")
+echo "  --  fidelity-env-userbase HORS PÉRIMÈTRE (documenté, non compté) : PYTHONUSERBASE est une variable de l'environnement de l'utilisateur, du même niveau de confiance que PATH — honorée par le gate (décision du manager, hotfix-py tour 2, 2026-10-20)"
 [ -n "$HAVE_YAML" ] || echo "  --  fidelity-env-passa NON EXERCÉ : PyYAML absent de $REAL_PY (vecteur de la passe A non compté)"
 [ "$N" -ge 32 ] || ko "recensement" "seulement $N sites listés (attendu >= 32)"
 
@@ -181,8 +181,8 @@ mutate_case() { # <site> <fichier relatif> <motif sed s///>
 mutate_case guard-driver-lock plugin/_internal/lib/vf-portable.sh 's/\$VF_PYTHON_INVOKE -I "\$@"/$VF_PYTHON_INVOKE "$@"/'
 mutate_case guard-bash-registres plugin/consolidator/scripts/guard-bash-registres.sh 's/"\$PYBIN" -I -c/"$PYBIN" -c/'
 mutate_case dag plugin/conductor/scripts/dag.sh 's/python3 -I - /python3 - /'
-for v in pythonpath userbase pythonhome; do
-  mutate_case "fidelity-env-$v" plugin/conductor/scripts/check-description-fidelity.sh 's/env -u PYTHONUSERBASE python3 -E -c/python3 -c/'
+for v in pythonpath pythonhome; do
+  mutate_case "fidelity-env-$v" plugin/conductor/scripts/check-description-fidelity.sh 's/python3 -E -c/python3 -c/'
 done
 if [ -n "$HAVE_YAML" ]; then
   mutate_case fidelity-env-passa plugin/conductor/scripts/check-description-fidelity.sh 's/python3 -E "\$PASS_A_PY"/python3 "\$PASS_A_PY"/'
