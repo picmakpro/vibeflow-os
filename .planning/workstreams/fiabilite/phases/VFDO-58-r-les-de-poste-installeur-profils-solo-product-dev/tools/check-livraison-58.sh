@@ -10,8 +10,8 @@
 #                                       gitignore_add_paths() identique octet pour octet à celle de la base (P58-D-13)
 #   fichiers-intacts [--base <ref>] [--liste-fichiers <fichier>]
 #                                       aucun fichier interdit modifié par la branche, archives intactes (P58-D-13, P58-D-20)
-#   clients [--base <ref>]              aucun nom de la liste VF_CLIENT_NAMES_FILE dans le diff, les chemins et les
-#                                       messages de commit de la phase (critère 6, P58-PL-11)
+#   clients [--base <ref>]              aucun nom de la liste VF_CLIENT_NAMES_FILE (défaut ~/.config/vibeflow/clients.txt)
+#                                       dans le diff, les chemins et les messages de commit de la phase (critère 6, P58-PL-11)
 # Codes : 0 conforme · 1 écart trouvé · 2 NON-VÉRIFIABLE · 64 usage.
 #
 # BASE DE PHASE (documentée ici, avec sa raison). `--base <ref>` sinon : le parent du premier commit de
@@ -23,7 +23,8 @@
 # cadrage `docs(58): cadrage…` dans le balayage du critère 6.
 #
 # CRITÈRE 6 : la liste de noms n'existe PAS dans le dépôt. Elle est fournie à l'exécution par
-# VF_CLIENT_NAMES_FILE (fichier régulier, lisible, non vide, HORS du dépôt). Le script n'imprime JAMAIS un nom
+# VF_CLIENT_NAMES_FILE, défaut ~/.config/vibeflow/clients.txt (fichier régulier, lisible, non vide, HORS du dépôt ;
+# variable posée mais vide = liste absente, code 2). Le script n'imprime JAMAIS un nom
 # ni la ligne qui le contient : compteurs, chemins de fichiers et hashs de commit seulement.
 set -uo pipefail
 
@@ -115,7 +116,8 @@ case "$SUB" in
         .github/*) return 0 ;;
         .planning/workstreams/gouvernance/*) return 0 ;; # vf-allow-unregistered-planning-path
         VERSION|plugin/.claude-plugin/plugin.json|.claude-plugin/marketplace.json) return 0 ;;
-        plugin/_internal/resolve-deps.sh|plugin/_internal/resolve-preset.sh|plugin/_internal/presets.json) return 0 ;;
+        # resolve-preset.sh n'est plus interdit : le plan 58-12 le modifie par arbitrage (P58-D-21).
+        plugin/_internal/resolve-deps.sh|plugin/_internal/presets.json) return 0 ;;
         plugin/_internal/tests/test-vibeflow-update.sh) return 0 ;;
         plugin/installer/scripts/tests/test-build-module-catalog.sh) return 0 ;;
         .planning/instruction-budget-baselines.tsv) return 0 ;;
@@ -139,8 +141,8 @@ case "$SUB" in
 
   clients)
     [ -z "$ARG_ENGINE$ARG_LISTE" ] || die_usage
-    NV="NON-VÉRIFIABLE : liste de noms absente, vide, illisible ou située dans le dépôt — critère 6 non vérifié, jamais vert"
-    F="${VF_CLIENT_NAMES_FILE-}"
+    NV="NON-VÉRIFIABLE : liste de noms absente (en attente de la liste), vide, illisible ou située dans le dépôt — critère 6 non vérifié, jamais vert"
+    F="${VF_CLIENT_NAMES_FILE-$HOME/.config/vibeflow/clients.txt}"
     [ -n "$F" ] && [ -f "$F" ] && [ -r "$F" ] && [ -s "$F" ] || { echo "$NV"; exit 2; }
     FDIR="$(cd "$(dirname "$F")" 2>/dev/null && pwd -P)" || { echo "$NV"; exit 2; }
     FPHYS="$FDIR/$(basename "$F")"

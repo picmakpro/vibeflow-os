@@ -33,6 +33,15 @@ Detail in [choosing-your-scope.md](../01-get-started/choosing-your-scope.md).
 work, instead of a single capability. Covered in
 [modules-and-bundles.md](./modules-and-bundles.md).
 
+**Role (poste)** — Your position on a project (`solo`, `product` or `dev`), chosen at install time: it
+filters the modules and presets you are offered. It is neither an agent's job in a team nor an access
+right: a role is a view, not a right. Covered in
+[installation.md](../01-get-started/installation.md#your-role).
+
+**Status (statut)** — For a module, its column in the catalog (`mandatory` or `optional`): what is laid
+down by default and what stays your choice. Do not confuse it with the role, which qualifies the person,
+nor with the status of a typed report. See [installation.md](../01-get-started/installation.md#your-role) for the role.
+
 **Baseline (socle)** — The set of mandatory modules of a lab (`conductor` and its transitive
 dependency closure). Covered in [modules-and-bundles.md](./modules-and-bundles.md).
 

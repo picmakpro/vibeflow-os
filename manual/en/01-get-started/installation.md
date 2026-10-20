@@ -100,6 +100,22 @@ everything that's about to be installed (the module you chose sometimes pulls in
 depends on) — you see exactly what's going to happen before it happens. Once confirmed, the
 chosen modules are installed at the location (the scope) you settled on in step 2.
 
+### Your role
+
+In project or local scope, step 2 also asks for your **role**: `solo` (pre-checked: you see everything,
+as before), `product` or `dev`. The step is skipped in account scope, where the role is `solo`, and as
+soon as `VF_ROLE` is set.
+
+- **Non-interactive**: `VF_ROLE=solo|product|dev`; the `--role` flag wins over the variable.
+- **Where it lives**: the local file `.claude/vibeflow-role`, not versioned, a single value.
+- **Project list**: the `vf_roles` key of `.planning/config.json`, edited by hand, says which roles
+  the project admits; VibeFlow writes nothing there.
+- **Changing later**: `vibeflow-update.sh role <role>`.
+
+A role is a view, not a right: it filters what you are offered at install time, nothing is walled
+off — git, the project scope and a GSD already installed at account scope stay visible. See the
+[glossary](../02-concepts/glossary.md).
+
 ### What you see on screen when it works
 
 At the end of setup, you get a final summary telling you what was installed and where, and it
