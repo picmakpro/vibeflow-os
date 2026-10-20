@@ -45,7 +45,7 @@ case "$(command -v python3 2>/dev/null)" in
   ''|*WindowsApps*) command -v python >/dev/null 2>&1 && PYBIN=python || PYBIN="" ;;
 esac
 if [ -f "$IP" ] && [ -n "$PYBIN" ]; then
-  installed="$("$PYBIN" - "$IP" "$PLUGIN_ID" <<'PY' 2>/dev/null
+  installed="$("$PYBIN" -I - "$IP" "$PLUGIN_ID" <<'PY' 2>/dev/null
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))

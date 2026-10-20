@@ -235,7 +235,7 @@ detect_all() {
 
   s1_usable=0
   if [ -n "$PYBIN" ] && [ -s "$json_tmp" ]; then
-    SOURCE_LINES="$("$PYBIN" - "$json_tmp" <<'PY'
+    SOURCE_LINES="$("$PYBIN" -I - "$json_tmp" <<'PY'
 import json, sys
 try:
     data = json.load(open(sys.argv[1]))

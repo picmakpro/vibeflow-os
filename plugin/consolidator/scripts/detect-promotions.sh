@@ -36,7 +36,7 @@ RULES_DIR="${RULES_DIR:-.claude/rules}"
 # Extract LRN entries and print one JSON candidate per line (json.dumps : un titre ne casse jamais le JSON
 # ni ne decale un champ). Operational singles d'abord, puis clusters par categorie.
 extract_candidates() {
-  python3 - <<PYEOF 2>/dev/null
+  python3 -I - <<PYEOF 2>/dev/null
 import json
 import re
 from collections import defaultdict
@@ -148,7 +148,7 @@ echo "  ],"
 # L'instruction sans effet (no-op) est du JUGEMENT : doctrine de references/promotion.md, jamais calculee ici.
 hook_declare() {  # <settings.json> : au moins une entree de hook non vide dans le JSON parse
   [ -f "$1" ] || return 1
-  python3 - "$1" <<'PYEOF' 2>/dev/null
+  python3 -I - "$1" <<'PYEOF' 2>/dev/null
 import json
 import sys
 

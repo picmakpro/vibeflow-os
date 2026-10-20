@@ -339,7 +339,7 @@ check_driver_stall() {
 
   local parsed rc_py
   # shellcheck disable=SC2086
-  parsed="$(STATUS_JSON="$out" STALL_WINDOW="$STALL_WINDOW" COMMIT_AGE="$commit_age" $py_invoke <<'PYEOF'
+  parsed="$(STATUS_JSON="$out" STALL_WINDOW="$STALL_WINDOW" COMMIT_AGE="$commit_age" $py_invoke -I <<'PYEOF'
 import json, os, sys
 raw = os.environ.get("STATUS_JSON", "")
 ca_raw = os.environ.get("COMMIT_AGE", "")

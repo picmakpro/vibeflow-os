@@ -16,6 +16,8 @@
 #   vf_resolve_python [--fast]   — résout un interpréteur utilisable (cascade python3→python→py -3).
 #   vf_python <args…>            — INVOQUE l'interpréteur résolu. Fonction, pas variable : porte le
 #                                   lanceur à argument `py -3` qu'un `PYBIN=` ne peut pas exprimer.
+#                                   ISOLÉ (`-I`) : ni dossier courant, ni PYTHON*, ni site utilisateur — un
+#                                   `json.py` du lab n'est jamais importé. Stdlib seule (hotfix 2026-10-20).
 #   vf_py_probe <candidat> [--fast] — sonde un candidat : présent, pas le stub *WindowsApps*,
 #                                   s'exécute réellement (profil complet), Python 3.
 #   jqx <args…>                  — wrapper jq qui neutralise le CRLF du jq natif Windows.
@@ -90,9 +92,9 @@ vf_py_probe() {
   if command -v timeout >/dev/null 2>&1; then
     # shellcheck disable=SC2086 — $cand est un token interne contrôlé ("python3"/"python"/"py -3"),
     # le word-splitting volontaire est ce qui permet à "py -3" de porter son argument de lanceur.
-    timeout 5 $cand -c "$probe" >/dev/null 2>&1 || return 1
+    timeout 5 $cand -I -c "$probe" >/dev/null 2>&1 || return 1
   else
-    $cand -c "$probe" >/dev/null 2>&1 || return 1
+    $cand -I -c "$probe" >/dev/null 2>&1 || return 1
   fi
   return 0
 }
@@ -131,8 +133,11 @@ vf_resolve_python() {
 # résolution mémorisée est réutilisée telle quelle (pas de re-sonde forcée en profil complet).
 vf_python() {
   vf_resolve_python || return 1
+  # `-I` (mode isolé, Python >= 3.4) : `-c`/`-` mettent '' (le dossier courant) en tête de sys.path — un
+  # json.py posé à la racine d'un lab cloné serait importé et exécuté par chaque hook. `-I` ôte aussi
+  # PYTHON* et le site utilisateur : les programmes passés à vf_python n'importent que la stdlib.
   # shellcheck disable=SC2086 — même raison que vf_py_probe : VF_PYTHON_INVOKE peut porter "py -3".
-  $VF_PYTHON_INVOKE "$@"
+  $VF_PYTHON_INVOKE -I "$@"
 }
 
 # jqx <args…>

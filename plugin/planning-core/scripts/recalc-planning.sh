@@ -64,7 +64,7 @@ case "$(command -v python3 2>/dev/null)" in
     ;;
 esac
 
-"$PYBIN" - "$PLANNING_DIR" "$READ_ONLY" "$DETECT_GSD_SH" <<'PY_RECALC_PLANNING_EOF'
+"$PYBIN" -I - "$PLANNING_DIR" "$READ_ONLY" "$DETECT_GSD_SH" <<'PY_RECALC_PLANNING_EOF'
 import errno
 import hashlib
 import json

@@ -30,7 +30,7 @@ esac
 
 INPUT="$(cat)"
 
-printf '%s' "$INPUT" | "$PYBIN" -c '
+printf '%s' "$INPUT" | "$PYBIN" -I -c '
 import json, sys, glob, os, re
 
 MAX_LINES = 40

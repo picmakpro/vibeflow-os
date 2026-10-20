@@ -37,7 +37,7 @@ case "$(command -v python3 2>/dev/null)" in
   ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
 esac
 
-FILE_PATH="$(printf '%s' "$PAYLOAD" | "$PYBIN" -c '
+FILE_PATH="$(printf '%s' "$PAYLOAD" | "$PYBIN" -I -c '
 import json, os, re, sys
 try:
     p = json.load(sys.stdin)

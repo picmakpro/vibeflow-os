@@ -105,7 +105,7 @@ for rel in "plugin/.claude-plugin/plugin.json" "plugin/.codex-plugin/plugin.json
   [ -n "$old" ] || { echo "[bump] ✗ aucune clé \"version\" trouvée dans $rel" >&2; exit 1; }
   apply "$rel" "$old" "$NEW"
   [ "$old" = "$NEW" ] && continue
-  $DRY || python3 - "$f" "$old" "$NEW" <<'PY'
+  $DRY || python3 -I - "$f" "$old" "$NEW" <<'PY'
 import re, sys
 path, old, new = sys.argv[1:4]
 s = open(path, encoding="utf-8").read()
@@ -134,7 +134,7 @@ else
   if $DRY; then
     echo "[bump] ~ CHANGELOG.md : insertion du squelette « ## [$TAG] — $(date +%F) » (dry-run)"
   else
-    python3 - "$CHANGELOG" "$TAG" "$(date +%F)" <<'PY'
+    python3 -I - "$CHANGELOG" "$TAG" "$(date +%F)" <<'PY'
 import sys
 path, tag, date = sys.argv[1:4]
 lines = open(path, encoding="utf-8").read().splitlines(keepends=True)

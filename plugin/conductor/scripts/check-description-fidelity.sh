@@ -210,7 +210,7 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo "[check-description-fidelity] INDÉTERMINÉ : python3 introuvable (passe A, parseur YAML strict)" >&2
   exit 3
 fi
-if ! python3 -c 'import yaml' >/dev/null 2>&1; then
+if ! python3 -c 'import sys; sys.path[:] = [p for p in sys.path if p]; import yaml' >/dev/null 2>&1; then
   echo "[check-description-fidelity] INDÉTERMINÉ : module PyYAML introuvable pour python3 (passe A)" >&2
   exit 3
 fi

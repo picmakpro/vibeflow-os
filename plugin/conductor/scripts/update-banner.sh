@@ -23,7 +23,7 @@ case "$(command -v python3 2>/dev/null)" in
   ''|*WindowsApps*) command -v python >/dev/null 2>&1 && PYBIN=python || PYBIN="" ;;
 esac
 if [ -n "$PYBIN" ]; then
-  CACHE_FILE="$CACHE_FILE" LEGACY_JSON="$LEGACY_JSON" "$PYBIN" <<'PY' 2>/dev/null || true
+  CACHE_FILE="$CACHE_FILE" LEGACY_JSON="$LEGACY_JSON" "$PYBIN" -I <<'PY' 2>/dev/null || true
 import json, os
 msgs = []
 # 1) mise à jour du plugin (depuis le cache)

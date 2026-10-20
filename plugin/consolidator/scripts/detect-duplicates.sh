@@ -92,7 +92,7 @@ detect_similar_titles() {
 
   # Compare pairs using a simple Python-style tokenization in awk
   # For each pair, compute Jaccard similarity on word tokens (lowercased)
-  python3 - <<'PYEOF' 2>/dev/null || true
+  python3 -I - <<'PYEOF' 2>/dev/null || true
 import os
 try:
     with open('/tmp/.consolidator-titles.tmp') as f:

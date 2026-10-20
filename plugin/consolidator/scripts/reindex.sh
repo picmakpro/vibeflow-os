@@ -134,7 +134,7 @@ extract_body_ids() {
 extract_body_sections() {
   local file="$1"
   local pat="$2"
-  "$PYBIN" - "$file" "$pat" <<'PYEOF' 2>/dev/null
+  "$PYBIN" -I - "$file" "$pat" <<'PYEOF' 2>/dev/null
 import re
 import sys
 
@@ -375,7 +375,7 @@ reindex_one() {
   local orphans_tmp
   orphans_tmp=$(mktemp)
   if [ -n "$orphans" ]; then
-    "$PYBIN" - "$file" "$orphans_tmp" <<PYEOF
+    "$PYBIN" -I - "$file" "$orphans_tmp" <<PYEOF
 import re
 import sys
 

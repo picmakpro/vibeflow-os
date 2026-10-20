@@ -16,7 +16,7 @@ set -uo pipefail
 
 MODE="human"; [ "${1:-}" = "--print" ] && MODE="json"
 
-python3 - "$MODE" "${HOME:-}" <<'PY'
+python3 -I - "$MODE" "${HOME:-}" <<'PY'
 import sys, os, json
 
 mode, home = sys.argv[1], sys.argv[2]

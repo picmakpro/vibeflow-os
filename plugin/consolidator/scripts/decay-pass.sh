@@ -58,7 +58,7 @@ if [ ! -d "$KNOWLEDGE_DIR" ]; then
 fi
 
 # ---------- Coeur (Python inline — pattern du module, cf. reindex.sh) ----------
-python3 - "$KNOWLEDGE_DIR" "$APPLY_MODE" "$TODAY" "$REVIEW_THRESHOLD" "$BACKUP_KEEP" <<'PYEOF'
+python3 -I - "$KNOWLEDGE_DIR" "$APPLY_MODE" "$TODAY" "$REVIEW_THRESHOLD" "$BACKUP_KEEP" <<'PYEOF'
 import sys, os, re, json, datetime, shutil, glob
 
 lab        = sys.argv[1]
