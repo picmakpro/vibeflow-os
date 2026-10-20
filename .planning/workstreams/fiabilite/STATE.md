@@ -3,18 +3,18 @@ gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
 current_phase: 58
 current_phase_name: Rôles de poste — installeur, profils solo / product / dev
-status: executing
-last_updated: "2026-10-17T01:30:00.000Z"
+status: verifying
+last_updated: "2026-10-20T18:00:00.000Z"
 last_activity: 2026-10-20
-last_activity_desc: Phase 58 — ADR-077 approuvée (58-03 close), plan 58-12 ajouté (presets filtrés par poste), 58-11 en vague 7 ; 10 plans sur 12 clos
+last_activity_desc: Phase 58 — 58-11 close, 12 plans sur 12 exécutés, porte de phase rejouée verte ; RLPO-11 en attente du critère 6 (liste de clients)
 state_head: a2ed5094
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 28
-  completed_plans: 27
+  completed_plans: 28
 milestone_name: « l'équipe produit » — Phases 57-62 —
-stopped_at: "Phase 58 : 11 plans sur 12 clos (2026-10-20), 58-12 close (presets filtrés par poste, P58-D-21) — next : 58-11 (vague 7, porte de phase ; retire resolve-preset.sh de la liste des fichiers interdits de check-livraison-58)."
+stopped_at: "Phase 58 : 12 plans sur 12 exécutés (2026-10-20), porte de phase rejouée verte (gates 19/0, tests 109 suites/0 échec, e2e armée 14/0) — next : vérification de phase puis PR ; critère 6 en attente de la liste de clients de Samuel, aucune release."
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EN EXÉCUTION (11/12 plans clos)
+Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EXÉCUTÉE (12/12 plans), en attente de vérification de phase et de PR
 Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 1 phase sur 6 close. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).
@@ -49,14 +49,17 @@ Phase 58 exécutée les 2026-10-16/17 : 58-01, 02, 04 à 10 clos avec SUMMARY ; 
 chez Samuel ; revue (majeur `.gitignore` fermé) et audit (H-1 `json.py` du dépôt au SessionStart fermé dans le code de la phase)
 passés après trois tours de correction. Rapport : `.planning/missions/2026-10-16-suite-v2700-phase-58.md`.
 Replanification 2026-10-20 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 pour ADR-077 et Q16 ; Q15 et Q17 : 2026-10-16) : ADR-077 approuvée (58-03 close, SUMMARY posé) ; plan 58-12 ajouté (presets filtrés par poste, P58-D-21, vague 6) ; 58-11 passe en vague 7 (manuel « Poste » FR+EN, liste de clients par `VF_CLIENT_NAMES_FILE`).
-Next : exécuter 58-12 puis 58-11 ; Q18 (faille `python -c` antérieure) hors cette phase, hotfix en parallèle.
-Last activity: 2026-10-20 — Phase 58, replanification (58-12)
+Phase 58 : 58-11 close le 2026-10-20 (porte de phase rejouée depuis `ci.yml`, RLPO-01..10 et 12 cochées, RLPO-11 en attente du critère 6) ; rapport : `58-11-SUMMARY.md`.
+Next : vérification de phase puis PR (rebase sur main = geste du manager) ; Q18 (faille `python -c` antérieure) hors cette phase, hotfix en parallèle.
+Last activity: 2026-10-20 — Phase 58, 58-11 close (12/12 plans)
 
 ## Accumulated Context
 
 ### Decisions
 
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-10-12.md -->
+
+- P58-PL-01 à P58-PL-14 : décisions de planificateur (discrétion P58-D-15..20), réalisées par les plans 58-01 à 58-12, plus P58-D-21 (filtrage des presets, plan 58-12).
 
 ### Pending Todos
 

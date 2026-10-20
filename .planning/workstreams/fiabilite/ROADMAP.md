@@ -105,7 +105,7 @@
 - [ ] Phase 55: Installeur et mémoire portables entre runtimes (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 56: Packs de règles par langage (module optionnel) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [x] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-12, mergée PR #152 le 2026-10-16 en `--admin`, revue `@picmakpro` contournée (demande explicite de Samuel, session principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »), release `v2.70.0` ; 16/16 plans, DLWS-01..08 cochées
-- [ ] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [ ] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0) — 12/12 plans exécutés le 2026-10-20 (porte de phase rejouée verte, RLPO-01..10 et 12 cochées ; RLPO-11 en attente du critère 6 : liste de clients à déposer par Samuel), PR à venir, aucune release
 - [ ] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
@@ -583,30 +583,30 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 58-01-PLAN.md — vague 1 : clé `roles` des `module.json`, validateur unique `module-roles.sh`, table minimale (3 modules `["dev"]`), invariant de fermeture `product` ; contrat de phase et registre P58-PL-01..14
-- [ ] 58-02-PLAN.md — vague 1 : lecteur unique du poste `vf-role.sh get` (interface des Phases 59 à 61), suite à mutants
-- [ ] 58-03-PLAN.md — vague 1 : ADR-077 sous verrou de dépôt court du manager, relue par Samuel (non autonome)
+- [x] 58-01-PLAN.md — vague 1 : clé `roles` des `module.json`, validateur unique `module-roles.sh`, table minimale (3 modules `["dev"]`), invariant de fermeture `product` ; contrat de phase et registre P58-PL-01..14
+- [x] 58-02-PLAN.md — vague 1 : lecteur unique du poste `vf-role.sh get` (interface des Phases 59 à 61), suite à mutants
+- [x] 58-03-PLAN.md — vague 1 : ADR-077 sous verrou de dépôt court du manager, relue par Samuel (non autonome)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 58-04-PLAN.md — vague 2 : gate `check-role-consistency.sh` (0/1/3/5), ligne « Poste : X » au SessionStart, entrée de hook exec, inventaire des hooks à 32
-- [ ] 58-05-PLAN.md — vague 2 : catalogue filtré par `--role`/`VF_ROLE`, sortie sans poste identique à l'octet (copie gelée)
+- [x] 58-04-PLAN.md — vague 2 : gate `check-role-consistency.sh` (0/1/3/5), ligne « Poste : X » au SessionStart, entrée de hook exec, inventaire des hooks à 32
+- [x] 58-05-PLAN.md — vague 2 : catalogue filtré par `--role`/`VF_ROLE`, sortie sans poste identique à l'octet (copie gelée)
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 58-06-PLAN.md — vague 3 : engine, volet pose — `--role`/`VF_ROLE`, fichier de poste, règle d'ignorance séparée, `.worktreeinclude` conditionnel, refus à la pose, arêtes de scope
-- [ ] 58-07-PLAN.md — vague 3 : skill installeur (étape 2 bis, repli sans fuite, note des bundles, « statut »), glossaire, README de conductor
+- [x] 58-06-PLAN.md — vague 3 : engine, volet pose — `--role`/`VF_ROLE`, fichier de poste, règle d'ignorance séparée, `.worktreeinclude` conditionnel, refus à la pose, arêtes de scope
+- [x] 58-07-PLAN.md — vague 3 : skill installeur (étape 2 bis, repli sans fuite, note des bundles, « statut »), glossaire, README de conductor
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 58-08-PLAN.md — vague 4 : engine, volet usage — filtre de `install --all`, registre et `update --all` intacts, verbe `role` et avis
+- [x] 58-08-PLAN.md — vague 4 : engine, volet usage — filtre de `install --all`, registre et `update --all` intacts, verbe `role` et avis
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 58-09-PLAN.md — vague 5 : suite e2e des critères 1, 2 et 5, outil de livraison (`base`, `gitignore-intact`, `fichiers-intacts`, `clients`)
-- [ ] 58-10-PLAN.md — vague 5 : bumps sans release (conductor v1.50.0, dev-orchestrator v2.28.1, mobile-test v1.0.4, mobile-test-team v1.4.7)
+- [x] 58-09-PLAN.md — vague 5 : suite e2e des critères 1, 2 et 5, outil de livraison (`base`, `gitignore-intact`, `fichiers-intacts`, `clients`)
+- [x] 58-10-PLAN.md — vague 5 : bumps sans release (conductor v1.50.0, dev-orchestrator v2.28.1, mobile-test v1.0.4, mobile-test-team v1.4.7)
 
 **Wave 6** *(blocked on Wave 5 completion)*
-- [ ] 58-12-PLAN.md — vague 6 : presets filtrés par poste (`resolve-preset.sh list --role`, fermeture de dépendances), sortie sans poste identique à l'octet, suite à mutants, ligne du skill installeur (P58-D-21)
+- [x] 58-12-PLAN.md — vague 6 : presets filtrés par poste (`resolve-preset.sh list --role`, fermeture de dépendances), sortie sans poste identique à l'octet, suite à mutants, ligne du skill installeur (P58-D-21)
 
 **Wave 7** *(blocked on Wave 6 completion)*
-- [ ] 58-11-PLAN.md — vague 7 : sous-section « Poste » du manuel FR+EN, liste de clients lue par défaut dans le dossier de configuration, compte de suites, porte de phase rejouée depuis `ci.yml`, critère 6 (« en attente de la liste » si absente), ledger à la main
+- [x] 58-11-PLAN.md — vague 7 : sous-section « Poste » du manuel FR+EN, liste de clients lue par défaut dans le dossier de configuration, compte de suites, porte de phase rejouée depuis `ci.yml`, critère 6 (« en attente de la liste » si absente), ledger à la main
 
 ### Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
 
