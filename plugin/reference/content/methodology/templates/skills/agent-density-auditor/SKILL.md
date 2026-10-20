@@ -105,8 +105,10 @@ Classification :
 ### Mode plan — Planifier la migration
 
 ```bash
-python3 scripts/plan_migration.py .claude/agents/backend.md > /tmp/plan-backend.md
+python3 -I "${CLAUDE_SKILL_DIR}/scripts/plan_migration.py" .claude/agents/backend.md > /tmp/plan-backend.md
 ```
+
+`${CLAUDE_SKILL_DIR}` = le dossier du skill : on lance son script par ce chemin, jamais un `scripts/` relatif au dossier courant du lab (un lab cloné pourrait y poser le sien) ; `-I` ôte aussi le cwd et `PYTHON*`.
 
 Le script genere un plan d'extraction par sections detectees (headings markdown, code blocks, checklists). L'utilisateur revoit le plan avant `apply`. Le plan distingue :
 

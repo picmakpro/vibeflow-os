@@ -11,7 +11,7 @@ Pour chaque fichier dans `.claude/`:
 - `settings.local.json`
 
 Verifier qu'ils sont :
-- du JSON valide (`python3 -c 'import json; json.load(open(f))'`)
+- du JSON valide (`python3 -I -c 'import json; json.load(open(f))'`)
 - non vides (au moins un objet `{}`)
 - accessibles en lecture
 

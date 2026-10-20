@@ -5,6 +5,7 @@
 **Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
 
 - **`scripts/audit-infra.sh`** : les trois invocations inline (validation JSON, parse des hooks, comptage) isolées (`-I`). `python3 -c`/`python3 -` mettent le dossier courant en tête de `sys.path` : un `json.py` posé à la racine d'un lab cloné était importé et exécuté. `-I` (mode isolé) corrige ; témoin par site `scripts/tests/test-python-isolation-sites.sh` et gate `scripts/check-python-isolation.sh` (racine du dépôt).
+- **`references/hooks-contract.md`** (correctif de revue H6) : la commande de validation JSON citée en prose est `python3 -I -c …` (instruction exécutée par un modèle, hors du balayage du gate).
 
 ## [v1.3.3] — 2026-10-06 (classe d'invocation du skill, Phase 41.4)
 
