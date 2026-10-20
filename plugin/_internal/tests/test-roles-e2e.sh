@@ -191,14 +191,32 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# E2E-C1-DEPS — VRAI PAR CONSTRUCTION, non discriminant (revue S8)
-#   Ni gsd-*, ni gsd-core, ni superpowers sous le HOME jetable. L'engine n'appelle JAMAIS
-#   ensure-deps.sh : aucun mutant de l'engine ne peut rougir ce cas. Il constate un fait d'environnement
-#   (le HOME jetable reste vierge de dépendances), il ne prouve pas que le poste les évite.
+# E2E-C1-DEPS-DECISION — la DÉCISION d'amorçage des dépendances, lue dans le journal de l'install product
+#   (Phase 58, arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 — Q19, option a, amendement de P58-D-06)
+#   On ne prouve PAS le succès d'une install de plugin (sous HOME jetable la marketplace officielle est absente,
+#   l'install échoue sans bruit) : on prouve ce que l'engine DÉCIDE, tel que son journal le dit. Deux moitiés :
+#   (1) design-orchestrator, ouvert à product (P58-D-06), fait lancer ensure-design-deps.sh, qui prend la
+#       décision de poser superpowers : le journal le dit (ligne de l'engine + ligne de superpowers) ;
+#   (2) aucun module dev n'est posé (l'amorçage gsd-*/ensure-deps.sh de l'installeur est conditionné à
+#       dev-orchestrator posé, plugin/installer/SKILL.md) : ni ligne « Installation » d'un module dev, ni ligne
+#       [ensure-deps], et le saut des trois modules dev est écrit au journal (témoin positif de la moitié 2).
+#   Mutants (VF_ROLE_E2E_INTERNAL) : filtre de poste neutralisé -> moitié 2 rouge ; hook ensure-design-deps
+#   neutralisé -> moitié 1 rouge. L'ancien cas (« aucune dépendance sous le HOME jetable ») était vrai par
+#   construction et ne pouvait rougir : il est remplacé, non conservé.
 # ---------------------------------------------------------------------------
-N_DEPS="$(find "$HA" \( -iname 'gsd-*' -o -iname 'gsd-core' -o -iname '*superpowers*' \) 2>/dev/null | awk 'END { print NR }')"
-[ "$N_DEPS" -eq 0 ] && ok "E2E-C1-DEPS (P58-D-05, vrai par construction : l'engine n'appelle jamais ensure-deps.sh) : aucune dépendance gsd-* ni superpowers sous le HOME jetable du lab product" \
-  || ko "E2E-C1-DEPS : $N_DEPS entrée(s) gsd-*/superpowers sous le HOME jetable"
+cat "$WORK/out.A" "$WORK/err.A" > "$WORK/journal.A" 2>/dev/null
+miss=0
+"$GREP" -Eq '^\[vibeflow-update\] .*ensure-design-deps\.sh' "$WORK/journal.A" \
+  || { ko "E2E-C1-DEPS-DECISION : le journal ne dit pas que l'engine a lancé ensure-design-deps.sh (superpowers ne serait pas posé en product)"; miss=1; }
+"$GREP" -Eq '^\[ensure-design-deps\].*superpowers' "$WORK/journal.A" \
+  || { ko "E2E-C1-DEPS-DECISION : aucune décision sur superpowers dans le journal de la chaîne design"; miss=1; }
+N_DEVINST="$("$GREP" -Ec '^\[vibeflow-update\] Installation (dev-orchestrator|mobile-test|mobile-test-team) ' "$WORK/journal.A")"
+[ "$N_DEVINST" -eq 0 ] || { ko "E2E-C1-DEPS-DECISION : $N_DEVINST module(s) dev installé(s) au journal du lab product"; miss=1; }
+N_ENS="$("$GREP" -Ec '^\[ensure-deps\]' "$WORK/journal.A")"
+[ "$N_ENS" -eq 0 ] || { ko "E2E-C1-DEPS-DECISION : $N_ENS ligne(s) [ensure-deps] (amorçage dev) au journal du lab product"; miss=1; }
+N_SKIP="$("$GREP" -Ec '^\[vibeflow-update\] +\[poste\] (dev-orchestrator|mobile-test|mobile-test-team) hors de la vue du poste product' "$WORK/journal.A")"
+[ "$N_SKIP" -eq 3 ] || { ko "E2E-C1-DEPS-DECISION : $N_SKIP saut(s) de module dev écrit(s) au journal (attendu 3) — témoin positif absent"; miss=1; }
+[ "$miss" -eq 0 ] && ok "E2E-C1-DEPS-DECISION (P58-D-06 amendée, Q19) : en product, l'engine lance la chaîne design qui décide de superpowers ; aucun module dev installé, aucun amorçage [ensure-deps], 3 sauts journalisés"
 
 # ---------------------------------------------------------------------------
 # E2E-C1-CATALOGUE — le catalogue du poste product ne porte aucune ligne dev
