@@ -3,7 +3,7 @@
 #
 # CRITÈRES COUVERTS (P58-D-19) :
 #   critère 1 — un lab NEUF posé en poste `product` n'expose aucune commande dev
-#               (E2E-C1, -ARTEFACTS, -TEMOIN, -DEPS, -CATALOGUE, -SESSION) ;
+#               (E2E-C1, -ARTEFACTS, -TEMOIN, -DEPS-DECISION, -CATALOGUE, -SESSION) ;
 #   critère 2 — une install SANS poste est identique à celle d'avant la phase :
 #               invariants permanents (E2E-C2-INV, E2E-C2-TEMOIN) et comparaison des deux engines,
 #               ancien (git archive de la base) contre nouveau, sur le MÊME cache de modules
