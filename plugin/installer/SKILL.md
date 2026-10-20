@@ -49,7 +49,7 @@ bug d'install vécu sur le terrain, ADR-054) :
 | Préflight prérequis (étape 0) | `bash "$VIBEFLOW_CACHE/installer/scripts/preflight.sh"` |
 | Catalogue modules (étapes 3–4) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/installer/scripts/build-module-catalog.sh" --role <poste>` |
 | Résolveur de deps (étape 5) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/resolve-deps.sh" <modules…>` |
-| Presets (étape 4) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/resolve-preset.sh" list` puis `… resolve-preset.sh <preset>` |
+| Presets (étape 4) | `VF_MODULES_ROOT="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/resolve-preset.sh" list --role <poste>` puis `… resolve-preset.sh <preset>` |
 | Engine status/install/uninstall | `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" …` ; en scope project ou local, chaque `install` est préfixé par `VF_ROLE=<poste>` |
 | Changement de poste | `VIBEFLOW_CACHE="$VIBEFLOW_CACHE" bash "$VIBEFLOW_CACHE/_internal/vibeflow-update.sh" --scope <s> role <poste>` |
 | Bootstrap GSD/Superpowers (étape 5, branche dev) | `VF_SCOPE=<s> bash "$VIBEFLOW_CACHE/dev-orchestrator/scripts/ensure-deps.sh"` |
@@ -106,7 +106,7 @@ bug d'install vécu sur le terrain, ADR-054) :
 
 4. **Choix du type de lab (INST-02b — single-select).** Une fois le socle posé, **un seul** choix
    structurant, via l'UI de questions (pas un TUI bash) :
-   - **Lab de développement** → un **preset** (INST-02c). Lister les presets (invocation exacte
+   - **Lab de développement** → un **preset** (INST-02c). Lister les presets du poste (invocation exacte
      dans la table « Chemins réels ») : chaque ligne `name<TAB>titre<TAB>description<TAB>modules`
      devient une option de la question, le preset `dev` pré-coché (titre + description telle
      quelle — **aucun nom de preset ni de module en dur dans ce skill**, tout sort de

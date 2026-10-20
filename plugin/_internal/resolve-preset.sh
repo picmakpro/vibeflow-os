@@ -96,6 +96,8 @@ if [ "$1" = "list" ]; then
   VISIBLES="$(VF_MODULES_ROOT="$ROOT" bash "$ROLES_SH" list "$POSTE")" \
     || err "filtre du poste $POSTE impossible (voir le message de module-roles.sh ci-dessus)"
   count="$(jqx -r '.presets | length' "$PRESETS")" || err "lecture de presets.json impossible"
+  # Sortie accumulée puis émise d'un bloc : une erreur en cours de route ne laisse aucune liste partielle.
+  res=""
   i=0
   while [ "$i" -lt "$count" ]; do
     pname="$(jqx -r --argjson i "$i" '.presets[$i].name' "$PRESETS")" || err "lecture de presets.json impossible"
@@ -111,10 +113,13 @@ if [ "$1" = "list" ]; then
       printf '%s\n' "$VISIBLES" | grep -qxF -- "$mod" || { keep=0; break; }
     done <<< "$closure"
     if [ "$keep" -eq 1 ]; then
-      jqx -r --argjson i "$i" '.presets[$i] | [.name, .titre, .description, (.modules | join(" "))] | @tsv' "$PRESETS"
+      line="$(jqx -r --argjson i "$i" '.presets[$i] | [.name, .titre, .description, (.modules | join(" "))] | @tsv' "$PRESETS")" \
+        || err "lecture de presets.json impossible"
+      res="$res$line"$'\n'
     fi
     i=$((i+1))
   done
+  printf '%s' "$res"
   exit 0
 fi
 
