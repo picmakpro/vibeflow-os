@@ -5,6 +5,7 @@
 # T1  — chargement sous `set -u` sans erreur, aucun effet de bord.
 # T2  — les 5 symboles du contrat sont bien des fonctions après chargement.
 # T3  — vf_python exécute réellement un programme Python trivial.
+# T3b — PYTHONUTF8=1 de l'utilisateur restitué par `-X utf8` malgré `-I` (H7), avec mutant.
 # T4  — un candidat stub *WindowsApps* est REJETÉ par la sonde (profil complet).
 # T5  — le profil rapide (--fast) ne lance AUCUN processus (compteur de shim).
 # T6  — vf_guard_unavailable : marqueur écrit, motif sur stderr, code rendu non nul ET != 2.
@@ -73,6 +74,31 @@ if [ "$T3_OUT" = "3" ]; then
   ok "T3 vf_python invoque réellement l'interpréteur (version majeure = 3)"
 else
   ko "T3 vf_python n'a pas rendu '3' — sortie=[$T3_OUT]"
+fi
+
+# ---------- T3b : PYTHONUTF8=1 posé par l'utilisateur est restitué malgré -I (H7) ----------
+# `-I` implique `-E` : sans `-X utf8` explicite, un PYTHONUTF8=1 (Windows) serait ignoré en silence.
+# Mutant : la branche `-X utf8` retirée dans une copie de la lib => le témoin DOIT rendre 0 (donc
+# la branche est bien ce qui fait passer le cas de 0 à 1).
+T3B_PROG="import sys; print(sys.flags.utf8_mode)"
+T3B_ON=$(PYTHONUTF8=1 LC_ALL=en_US.UTF-8 bash -c ". '$LIB'; vf_python -c '$T3B_PROG'" 2>/dev/null)
+T3B_OFF=$(env -u PYTHONUTF8 LC_ALL=en_US.UTF-8 bash -c ". '$LIB'; vf_python -c '$T3B_PROG'" 2>/dev/null)
+if [ "$T3B_ON" = "1" ] && [ "$T3B_OFF" = "0" ]; then
+  ok "T3b PYTHONUTF8=1 restitué par -X utf8 (mode UTF-8 = 1), absent sinon (= 0)"
+else
+  ko "T3b attendu on=1 off=0, obtenu on=[$T3B_ON] off=[$T3B_OFF]"
+fi
+T3B_MUT="$WORK/vf-portable-mut-utf8.sh"
+sed 's/\$VF_PYTHON_INVOKE -I -X utf8 "\$@"/$VF_PYTHON_INVOKE -I "$@"/' "$LIB" > "$T3B_MUT"
+if cmp -s "$LIB" "$T3B_MUT"; then
+  ko "T3b mutant NON OPPOSABLE : la mutation n'a rien changé"
+else
+  T3B_MUT_ON=$(PYTHONUTF8=1 LC_ALL=en_US.UTF-8 bash -c ". '$T3B_MUT'; vf_python -c '$T3B_PROG'" 2>/dev/null)
+  if [ "$T3B_MUT_ON" = "0" ]; then
+    ok "T3b mutant (branche -X utf8 retirée) => mode UTF-8 = 0 : le témoin discrimine"
+  else
+    ko "T3b mutant : attendu 0, obtenu [$T3B_MUT_ON] — la branche n'est pas ce qui restitue PYTHONUTF8"
+  fi
 fi
 
 # ---------- T4 : candidat stub *WindowsApps* rejeté par la sonde ----------

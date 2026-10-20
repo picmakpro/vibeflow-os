@@ -136,8 +136,15 @@ vf_python() {
   # `-I` (mode isolé, Python >= 3.4) : `-c`/`-` mettent '' (le dossier courant) en tête de sys.path — un
   # json.py posé à la racine d'un lab cloné serait importé et exécuté par chaque hook. `-I` ôte aussi
   # PYTHON* et le site utilisateur : les programmes passés à vf_python n'importent que la stdlib.
+  # `-I` implique `-E` : un PYTHONUTF8=1 posé par l'utilisateur (Windows) serait ignoré en silence.
+  # Ce seul réglage est restitué, en option (`-X utf8`, comportement antérieur préservé). LIMITE :
+  # PYTHONIOENCODING n'a pas d'équivalent en option — il est ignoré (CHANGELOG _internal).
   # shellcheck disable=SC2086 — même raison que vf_py_probe : VF_PYTHON_INVOKE peut porter "py -3".
-  $VF_PYTHON_INVOKE -I "$@"
+  if [ "${PYTHONUTF8:-}" = "1" ]; then
+    $VF_PYTHON_INVOKE -I -X utf8 "$@"
+  else
+    $VF_PYTHON_INVOKE -I "$@"
+  fi
 }
 
 # jqx <args…>
