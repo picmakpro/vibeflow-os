@@ -17,6 +17,8 @@
 #   - spawns >= 1  : le site a bien été EXERCÉ (un témoin qui ne spawne rien est aveugle, pas vert) ;
 #   - hit = non    : aucun module du dossier courant n'a été exécuté ;
 #   - non-isolés=0 : aucun spawn n'a été lancé sans `-I`/`-P` (ou sans la purge de `sys.path`).
+#     Un spawn dont le premier argument est un CHEMIN (`python3 /tmp/…/pass_a.py`, lancement d'un
+#     fichier) est exempt : sys.path[0] y est le dossier du script, jamais le cwd.
 # Les sondes de version (`import sys`) n'importent que des modules déjà chargés au démarrage : elles
 # ne sont pas détournables, mais la colonne « non-isolés » les couvre quand même.
 #
@@ -77,7 +79,7 @@ run_site() {
   ( cd "$d" && HOME="$TMP/home" PATH="$SHIM:$PATH" WT="$r" H="$d" PYTHONDONTWRITEBYTECODE=1 \
       perl -e 'alarm 40; exec @ARGV' bash -c "$cmd" <<<"$in" >/dev/null 2>&1 )
   R_SPAWNS=$(awk 'NF' "$WITNESS_LOG" | awk 'END{print NR+0}')
-  R_NONISO=$(awk 'NF && !/^A -[A-Za-z]*[IP] / && !/sys\.path\[:\]/' "$WITNESS_LOG" | awk 'END{print NR+0}')
+  R_NONISO=$(awk 'NF && !/^A -[A-Za-z]*[IP] / && !/sys\.path\[:\]/ && !/^A \//' "$WITNESS_LOG" | awk 'END{print NR+0}')
   R_HIT="non"; [ -s "$WITNESS_HIT" ] && R_HIT="oui($(tr '\n' ',' < "$WITNESS_HIT" | head -c 24))"
 }
 
