@@ -1,5 +1,11 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.28.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — non publiée
+
+**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
+
+- **`scripts/check-hook-paths.sh`**, **`inject-mcp-tools.sh`** : leurs appels passent par `vf_python`, désormais isolée (`-I`, `plugin/_internal/lib/vf-portable.sh`). `python3 -c`/`python3 -` mettent le dossier courant en tête de `sys.path` : un `json.py` posé à la racine d'un lab cloné était importé et exécuté. `-I` (mode isolé) corrige ; témoin par site `scripts/tests/test-python-isolation-sites.sh` et gate `scripts/check-python-isolation.sh` (racine du dépôt).
+
 ## [v2.28.0] — 2026-10-10 (verrou de driver par compartiment : gate de sortie et doctrine, Phase 57)
 
 **Minor** (comportement neuf du gate de sortie et de la doctrine de dispatch, DLWS-04..06 ; arbitrages P57-D-34,

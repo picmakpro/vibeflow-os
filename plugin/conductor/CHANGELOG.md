@@ -1,5 +1,12 @@
 # Changelog — conductor
 
+## [v1.49.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — non publiée
+
+**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
+
+- **`scripts/guard-driver-lock.sh`** (hook PreToolUse, via `vf_python`), **`guard-agent-write.sh`**, **`check-agents.sh`**, **`check-skills.sh`**, **`check-debug-research.sh`**, **`check-legacy.sh`**, **`check-plugin-update.sh`**, **`update-banner.sh`**, **`check-guard-health.sh`**, **`dag.sh`** : chaque invocation inline de l'interpréteur passe en `-I`. `python3 -c`/`python3 -` mettent le dossier courant en tête de `sys.path` : un `json.py` posé à la racine d'un lab cloné était importé et exécuté. `-I` (mode isolé) corrige ; témoin par site `scripts/tests/test-python-isolation-sites.sh` et gate `scripts/check-python-isolation.sh` (racine du dépôt).
+- **`scripts/check-description-fidelity.sh`** : la sonde `import yaml` purge `sys.path` (`sys.path[:] = [p for p in sys.path if p]`) au lieu de `-I`, qui masquerait le PyYAML installé en `--user` ; les passes lancent un fichier de dossier temporaire, déjà hors du cwd.
+
 ## [v1.49.0] — 2026-10-10 (verrou de driver par compartiment, Phase 57)
 
 **Minor** (comportement neuf : un verrou par compartiment de planning, DLWS-01..07 ; arbitrages P57-D-34, D-36 et

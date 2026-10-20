@@ -1,5 +1,11 @@
 # CHANGELOG — consolidator
 
+## [v1.11.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — non publiée
+
+**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
+
+- **`guard-bash-registres.sh`**, **`guard-read-registres.sh`**, **`post-edit-reindex.sh`** (hooks), **`reindex.sh`**, **`decay-pass.sh`**, **`detect-duplicates.sh`**, **`detect-promotions.sh`**, **`probe-memory-guards.sh`** : invocations inline isolées (`-I`). `python3 -c`/`python3 -` mettent le dossier courant en tête de `sys.path` : un `json.py` posé à la racine d'un lab cloné était importé et exécuté. `-I` (mode isolé) corrige ; témoin par site `scripts/tests/test-python-isolation-sites.sh` et gate `scripts/check-python-isolation.sh` (racine du dépôt).
+
 ## [v1.11.0] — 2026-10-06 (grille de tri de la promotion, Phase 41.4)
 
 **Minor** (POCK-05, P414-D-10) :
