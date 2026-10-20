@@ -20,7 +20,7 @@ ok() { PASS=$((PASS + 1)); echo "  ok  $1"; }
 ko() { FAIL=$((FAIL + 1)); echo "  KO  $1 — $2"; }
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/test-cpi.XXXXXX")" || exit 3
 trap 'rm -rf "$TMP"' EXIT
-PY="py""thon3"
+PYB="py""thon"; PY="${PYB}3"
 
 mkrepo() { # <nom> → crée $TMP/<nom> (dépôt git avec plugin/x/scripts/)
   local d="$TMP/$1"; mkdir -p "$d/plugin/x/scripts" "$d/scripts" "$d/.github"
@@ -40,7 +40,7 @@ expect() { # <libellé> <rc attendu> <script> <repo>
 echo "== formes fautives (chacune doit rougir : 1) =="
 i=0
 while IFS= read -r line; do
-  i=$((i + 1)); r="$(mkrepo "bad$i")"; put "$r" plugin/x/scripts/a.sh "$line"
+  i=$((i + 1)); r="$(mkrepo "bad$i")"; put "$r" plugin/x/scripts/a.sh "$line"; put "$r" plugin/x/scripts/b.sh "$PY -I -c 'import json'"
   expect "fautif : $line" 1 "$SCRIPT" "$r"
 done <<EOF
 $PY -c 'import json'
@@ -53,7 +53,40 @@ py -3 -c ''
 $PY -u -c 'import json'
 timeout 5 \$cand -c "\$probe"
 "\$PYBIN" - "\$f"
+/usr/bin/$PY -c 'import json'
+"\$HOME/.venv/bin/${PYB}" -c 'import json'
+${PYB}3.12 -c 'import json'
+${PYB}3.14 - <<'P'
+$PY -W ignore -c 'import json'
+$PY -X utf8 -c 'import json'
+$PY -Wignore -X dev -c 'import json'
+\${PYTHON:-$PY} -c 'import json'
+"\${PYBIN:-$PY}" -c 'import json'
+"\${RUNTIME:-$PY}" -c 'import json'
+\$PYTHON3 -c 'import json'
+\$PY3 -c 'import json'
+$PY -m json.tool x.json
+$PY -u -m http.server
+$PY <script.py
+$PY -c 'import json, sys; sys.path[:] = [p for p in sys.path if p]'
+$PY -c 'import sys; sys.path[:] = [p for p in sys.path if p]; import yaml' ; $PY -c 'import json'
+$PY -P -c 'import json'
+$PY -Pc 'import json'
 EOF
+
+echo "== formes fautives multi-lignes (variable affectée, continuation) =="
+nl='
+'
+badml() { # <libellé> <contenu>
+  i=$((i + 1)); r="$(mkrepo "ml$i")"; put "$r" plugin/x/scripts/a.sh "$2"; put "$r" plugin/x/scripts/b.sh "$PY -I -c 'import json'"
+  expect "fautif : $1" 1 "$SCRIPT" "$r"
+}
+badml "variable sans py affectée à un python (INTERP)" "INTERP=$PY${nl}\"\$INTERP\" -c 'import json'"
+badml "variable sans py (RUNTIME = command -v)" "RUNTIME=\"\$(command -v $PY)\"${nl}\$RUNTIME -c 'import json'"
+badml "variable sans py (bin, stdin)" "bin=$PY${nl}printf x | \$bin - <<'P'"
+badml "variable de boucle for … in" "for runner in $PY python; do${nl}  \$runner -c 'import json'${nl}done"
+badml "continuation interpréteur puis -c à la ligne suivante" "$PY \\${nl}  -c 'import json'"
+badml "continuation après -W" "$PY -W ignore \\${nl}  -c 'import json'"
 
 echo "== formes conformes (chacune doit rester verte : 0) =="
 i=0
@@ -64,8 +97,14 @@ while IFS= read -r line; do
 done <<EOF
 $PY -I -c 'import json'
 "\$PYBIN" -I - "\$f" <<'P'
-$PY -P -c 'import json'
+$PY -P -c 'import json' # vf-py311 : le site vérifie sys.version_info >= (3, 11) avant
 $PY -Ic 'import json'
+$PY -I -W ignore -c 'import json'
+$PY -W ignore -I -c 'import json'
+$PY -I -m json.tool x.json
+/usr/bin/$PY -I -c 'import json'
+$PY "\$script" -c 'import json'
+$PY -u "\$script" -m x
 timeout 5 \$cand -I -c "\$probe"
 py -3 -I -c ''
 $PY "\$PASS_A_PY" < "\$LIST" > out
@@ -76,7 +115,16 @@ echo "$PY requis"
 vf_python -c 'import json'
 $PY -c 'import sys; sys.path[:] = [p for p in sys.path if p]; import yaml'
 $PY -c 'import json' # vf-py-isolation-ok : le littéral est le sujet
+$PY -c 'import sys; sys.path[:] = [p for p in sys.path if p]; import yaml' ; $PY -I -c 'import json'
 EOF
+
+echo "== formes conformes multi-lignes =="
+goodml() { # <libellé> <contenu>
+  i=$((i + 1)); r="$(mkrepo "gml$i")"; put "$r" plugin/x/scripts/a.sh "$2"; put "$r" plugin/x/scripts/b.sh "$PY -I -c 'import json'"
+  expect "conforme : $1" 0 "$SCRIPT" "$r"
+}
+goodml "une variable qui capture la SORTIE d'un python n'est pas un interpréteur" "out=\$($PY -I -c 'print(1)')${nl}printf x | \$out -c y"
+goodml "continuation avec -I" "$PY -I \\${nl}  -c 'import json'"
 
 echo "== exclusions =="
 r="$(mkrepo excl)"
@@ -133,10 +181,33 @@ if mutate MUT4 's/^    if (!prog) { i = j; continue }/    if (!prog) { continue 
   [ "$rc" -eq 1 ] && ok "MUT4 saut du fichier retiré → rouge (1)" || ko "MUT4" "rc=$rc (attendu 1) — le saut n'est pas appliqué"
 fi
 
+# Mutants de l'élargissement du détecteur (H1-H3, revue + audit 2026-10-20). Chaque mutant désarme UN
+# organe ; le dépôt fautif correspondant (rouge avec le script réel, cf. « formes fautives ») doit
+# cesser d'être rouge. mut_green <nom> <sed> <contenu> <organe>.
+mut_green() {
+  local name="$1" prog="$2" content="$3" what="$4" d
+  d="$(mkrepo "m$name")"; put "$d" plugin/x/scripts/a.sh "$content"; put "$d" plugin/x/scripts/b.sh "$PY -I -c 'x'"
+  expect "témoin $name : dépôt fautif → rouge" 1 "$SCRIPT" "$d"
+  if mutate "$name" "$prog"; then
+    run "$TMP/$name.sh" "$d"; rc=$?
+    [ "$rc" -ne 1 ] && ok "$name $what → le dépôt fautif n'est plus rouge (rc=$rc)" || ko "$name" "toujours rouge — $what n'est pas l'organe qui rougit"
+  fi
+}
+mut_green MUT5 's#sub(/\.\*\\//, "", b)#b = b#' "/usr/bin/$PY -c 'import json'" "basename du chemin retiré"
+mut_green MUT6 's/c == "W" || c == "X" || c == "Q"/c == "Z"/' "$PY -W ignore -c 'import json'" "options à argument (-W/-X/-Q) non consommées"
+mut_green MUT7 's/purge_ok(span)/purge_ok(line)/' "$PY -c 'import sys; sys.path[:] = [p for p in sys.path if p]; import yaml' ; $PY -c 'import json'" "exemption de purge étendue à la ligne"
+mut_green MUT8 's/c == "c" || c == "m"/c == "c"/' "$PY -m json.tool x.json" "-m non traité comme programme inline"
+mut_green MUT9 's/acc = acc raw; continue/acc = ""; continue/' "$PY \\${nl}  -c 'import json'" "jonction des continuations retirée"
+mut_green MUT10 's/if (name in PYVARS) return 1/if (0) return 1/' "INTERP=$PY${nl}\"\$INTERP\" -c 'import json'" "variables affectées à un python non reconnues"
+mut_green MUT11 's/return !pre_import_bad(substr(span, 1, idx - 1))/return 1/' "$PY -c 'import json, sys; sys.path[:] = [p for p in sys.path if p]'" "précédence de la purge non vérifiée"
+mut_green MUT12 's/if (pflag \&\& index(span, "vf-py311") > 0) continue/if (pflag) continue/' "$PY -P -c 'import json'" "-P accepté sans garantie 3.11"
+mut_green MUT13 's/if (rest ~ PYWORD_RE) return 1/if (0) return 1/' "\"\${RUNTIME:-$PY}\" -c 'import json'" "défaut \${NOM:-python3} non lu"
+mut_green MUT14 's/name = line; sub(/name = "zz"; sub(/' "for runner in $PY python; do${nl}  \$runner -c 'import json'${nl}done" "variable de boucle for non reconnue"
+
 echo "== contrôle final (arbre réel, non discriminant) =="
 REAL="$(cd "$(dirname "$0")/../.." && pwd)"
-bash "$SCRIPT" --path "$REAL" --min-sites 25 >/dev/null 2>"$TMP/err"; rc=$?
-[ "$rc" -eq 0 ] && ok "arbre réel : toutes les invocations inline sont isolées (>= 25 inspectées)" || ko "arbre réel" "rc=$rc — $(head -c 300 "$TMP/err")"
+bash "$SCRIPT" --path "$REAL" --min-sites 40 >/dev/null 2>"$TMP/err"; rc=$?
+[ "$rc" -eq 0 ] && ok "arbre réel : toutes les invocations inline sont isolées (>= 40 inspectées)" || ko "arbre réel" "rc=$rc — $(head -c 300 "$TMP/err")"
 
 echo ""
 echo "== bilan : $PASS OK / $FAIL KO =="
