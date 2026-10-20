@@ -256,6 +256,27 @@ mutant PRE-MUT-3 '{ if ($0 == "    product|dev) ;;") print "    solo|product|dev
 mutant PRE-MUT-4 '{ print; if ($0 == "  set -- list") print "  POSTE=\"${VF_ROLE:-$POSTE}\"" }' \
   probe_prio "priorité inversée (VF_ROLE l emporte sur --role)"
 
+# Fixture PRE-MUT-5 : module caché `dev` (réservé au poste dev), module visible `dev-x` dont le nom CONTIENT `dev`.
+# Sous product, la liste visible est `dev-x` ; un preset qui requiert `dev` doit être retiré (égalité de ligne,
+# grep -qxF) — un grep -qF le garderait, `dev` étant sous-chaîne de `dev-x`.
+FIX5="$TMP/fix5"; mkdir -p "$FIX5/mods/dev" "$FIX5/mods/dev-x"
+echo '{"name":"dev","requires":[],"roles":["dev"]}' > "$FIX5/mods/dev/module.json"
+echo '{"name":"dev-x","requires":[]}' > "$FIX5/mods/dev-x/module.json"
+cat > "$FIX5/presets.json" <<'JSON'
+{"presets":[
+  {"name":"p-dev","titre":"Dev","description":"requiert le module caché dev","modules":["dev"]},
+  {"name":"p-devx","titre":"DevX","description":"requiert le seul dev-x","modules":["dev-x"]}
+]}
+JSON
+printf 'p-devx\n' > "$TMP/exp-sub"
+probe_sub() {
+  run "$FIX5/mods" "$FIX5/presets.json" - list --role product; local rc="$RC"
+  names "$TMP/o" > "$TMP/n-sub"
+  [ "$rc" -eq 0 ] && cmp -s "$TMP/n-sub" "$TMP/exp-sub"
+}
+mutant PRE-MUT-5 '{ if (index($0, "grep -qxF -- \"$mod\"")) sub(/grep -qxF/, "grep -qF"); print }' \
+  probe_sub "égalité de ligne relâchée en sous-chaîne (dev visible via dev-x) ; attendu product=[p-devx], le mutant rend aussi p-dev"
+
 echo "== Résultat : $pass OK, $fail KO =="
 [ "$skipped" -eq 0 ] || echo "   ($skipped SKIP)"
 [ "$fail" -eq 0 ]
