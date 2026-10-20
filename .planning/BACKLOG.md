@@ -89,6 +89,8 @@ Même principe que ci-dessus : un nombre transmis se re-dérive, il ne se fige p
 `~/.claude/skills/synced/`, que le runtime réécrit pendant le test (`.last-complete-round`, `manifest.json`) : 1510/1509 puis 1509/1510 sur HEAD `72eb408`, vert sur un export figé à `424cb23`.
 Même classe : un verdict de suite lu sur un signal instable. Propriétaire : Samuel. Déclencheur : prochaine évolution de ce test ou de son garde-fou, ou un faux rouge bloquant une CI/un push.
 
+Texte intégral : `.planning/archives/backlog/racine-BACKLOG-2026-10-16.md` § Détail historique des entrées condensées.
+
 ## `save()` de `dag.sh` sans verrou ni écriture atomique — lost update silencieux — DIFFÉRÉ
 
 **Capturé :** 2026-08-17, demande explicite de Samuel après le rapport d'exécution de la
@@ -266,6 +268,8 @@ d'écrire ce gate, pas après.
 **Absorbé : blocs `<verify><automated>` qui écrasent un script réel sans `trap` (consigné 2026-09-15, Phase 25).** `25-02-PLAN.md:154` fait `cp`/écrasement/`mv`
 du gate réel `check-instruction-budget.sh` sans filet : une interruption laisse un stub de 27 octets à sa place. Même famille (vérification de plan qui ne protège pas ce qu'elle manipule).
 Déclencheur : prochaine révision de scripts de vérification de plan écrasant un fichier réel, durcir par `trap ... EXIT INT TERM`.
+
+Texte intégral : `.planning/archives/backlog/racine-BACKLOG-2026-10-16.md` § Détail historique des entrées condensées.
 
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Budget des SKILL.md et du bootstrap — sans enforcement machine (différé de la Phase 25, 2026-09-15) — CLOS (2026-10-12) -->
 ## Évasion de mesure du budget d'instructions par bloc de code fenced — DIFFÉRÉ (2026-09-15)

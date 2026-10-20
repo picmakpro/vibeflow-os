@@ -3184,3 +3184,9 @@ via le contexte de session et les front doors. Un GSD déjà installé au scope 
 (P58-D-06). Le poste vit dans un fichier local non versionné ; la liste des postes d'un projet vit dans
 la clé `vf_roles` de la configuration de planning (P58-D-01, P58-D-02). Le trailer et les gardes de
 cette phase vivent dans le dépôt : ils signalent, ils ne verrouillent rien (ADR-072).
+
+Amendement du 2026-10-20 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-20, Q19) : en poste `product`, la chaîne design (design-orchestrator,
+ouvert à ce poste) pose superpowers, qui apporte aussi des skills orientés dev (TDD, débogage) ; un poste
+est une vue, pas un droit. Une « commande dev » désigne les skills et agents des trois modules
+`roles:["dev"]` plus gsd-* ; superpowers n'en fait pas partie. Les ADR sont immuables hors amendement daté :
+celui-ci précise P58-D-06, il ne réécrit pas la décision.

@@ -113,7 +113,9 @@ Le poste de l'humain (`solo`, `product` ou `dev`) est posé par l'engine à l'in
 liste des postes admis par le projet, `vf_roles`, s'édite **À LA MAIN** dans le `.planning/config.json`
 racine : VibeFlow n'en écrit aucune ligne. gsd-core avertit sur stderr d'une clé inconnue : avertissement
 attendu, ignorable. Rappel : un poste est une vue, pas un droit — git ne cloisonne rien, le filtre ne joue qu'à
-la pose, aucun contrôle d'accès n'y est adossé.
+la pose, aucun contrôle d'accès n'y est adossé. En poste `product`, la chaîne design (design-orchestrator,
+ouvert à ce poste) pose superpowers, qui apporte aussi des skills orientés dev (TDD, débogage) : « commande dev »
+désigne les skills et agents des trois modules `roles:["dev"]` plus gsd-*, pas superpowers.
 
 ## Scripts (38) — par famille
 

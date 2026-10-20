@@ -115,7 +115,8 @@ que `VF_ROLE` est posée.
 - **Changer plus tard** : `vibeflow-update.sh role <poste>`.
 
 Un poste est une vue, pas un droit : il filtre ce qu'on te propose à la pose, rien n'est cloisonné —
-git, le scope projet et un GSD déjà installé au scope compte restent visibles. Voir le
+git, le scope projet et un GSD déjà installé au scope compte restent visibles. En poste `product`, la chaîne
+design pose superpowers, qui apporte aussi des skills orientés dev (TDD, débogage). Voir le
 [glossaire](../02-concepts/glossaire.md).
 
 ### Ce que tu vois à l'écran quand ça marche

@@ -507,6 +507,8 @@ sont posées au cadrage, jamais avant, dans les familles réservées et vérifi�
 
 **Critères de succès du jalon** (spec §9) :
 1. Une install `VF_ROLE=product` n'expose aucune commande dev et pose `conductor` et `consolidator`.
+   (Précisé le 2026-10-20, Q19, arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 : « commande dev » = skills et agents des 3 modules `roles:["dev"]` + gsd-* ;
+   superpowers reste posé en product par la chaîne design.)
 2. Une install sans rôle reste **identique** à aujourd'hui : non-régression, suites existantes vertes.
 3. Depuis un lab vide, le rôle product produit `BRIEF.md` et un PRD (`PROJECT.md` + `REQUIREMENTS.md`) jugés
    au-dessus du seuil par `prd-gate`. Le head refuse ensuite le découpage tant que l'architecture n'est pas validée.

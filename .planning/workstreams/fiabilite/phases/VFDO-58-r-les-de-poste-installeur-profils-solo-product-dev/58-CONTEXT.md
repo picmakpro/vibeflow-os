@@ -80,6 +80,10 @@ La 58 fige seulement l'**interface de lecture** du poste dont ces phases auront 
   - Aucune fuite de fermeture mesurée : aucun module non dev ne requiert un module dev (`resolve-deps.sh` reste
     inchangé, spec §5.4).
   - design-orchestrator reste ouvert à product, qui écrit l'UI-SPEC en binôme (spec §5.1).
+  - Amendée le 2026-10-20 (Q19, arbitrage Samuel, AskUserQuestion session principale, 2026-10-20) : « commande dev » = skills et agents des 3 modules `roles:["dev"]` +
+    gsd-* ; superpowers reste posé en `product` par la chaîne design (design-orchestrator, `ensure-design-deps.sh`).
+    Né du constat de vérification de phase (`58-VERIFICATION.md`, `gaps_found` 12/14) : l'engine lance cette chaîne
+    en product, et superpowers apporte aussi des skills orientés dev (TDD, débogage) ; un poste est une vue, pas un droit.
   - **Limite actée** : un GSD déjà installé au scope user de la machine reste visible, et le poste n'y peut rien.
 - **P58-D-07 (changement de poste sur un lab installé)** : réécrire le fichier de poste, puis afficher un **avis**
   listant les modules installés hors du nouveau poste. Aucune désinstallation : ADR-031, et en scope project elle

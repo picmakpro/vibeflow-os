@@ -9,8 +9,11 @@ AskUserQuestion session principale, 2026-10-16 ; niveau P58-PL-14 ; non publiée
   figé, interface des Phases 59 à 61 (P58-D-15).
 - **`scripts/check-role-consistency.sh`** : gate consultatif sur la cohérence du poste (issues 0, 1 et 3, erreur
   d'analyse 5), il constate et ne bloque jamais (P58-D-09).
+  Durcissement de lecture : l'analyse de `config.json` tourne sous l'interpréteur isolé (`-I` : ni variables `PYTHON*`, ni
+  dossier courant, ni site utilisateur) ; le fichier est borné à 64 Kio, et un lien symbolique ou
+  un fichier non régulier est refusé en erreur d'analyse 5.
 - **Entrée SessionStart en forme exec** (`hooks/hooks.json`) : injecte `Poste : X` hors poste solo, muette à 0 octet
-  sans poste (P58-D-10).
+  sans poste, bornée par un `timeout` de 5 s (P58-D-10).
 - Un poste est une vue, pas un droit : rien n'est désinstallé ni interdit (ADR-077).
 - Sans release dans la phase : les labs reçoivent ces éléments avec la prochaine release fonctionnelle (P58-D-20).
 

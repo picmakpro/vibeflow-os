@@ -911,7 +911,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | RLPO-08 | Phase 58 | Complete — 2026-10-20, plans 58-04 (preuves : SUMMARY des plans et porte de phase `58-11-SUMMARY.md`) |
 | RLPO-09 | Phase 58 | Complete — 2026-10-20, plans 58-04 (preuves : SUMMARY des plans et porte de phase `58-11-SUMMARY.md`) |
 | RLPO-10 | Phase 58 | Complete — 2026-10-20, plans 58-03, 58-07, 58-11 (preuves : SUMMARY des plans et porte de phase `58-11-SUMMARY.md`) |
-| RLPO-11 | Phase 58 | Pending — critères 1, 2 et 5 verts (58-09, porte de phase 58-11) ; critère 6 en attente de la liste de clients de Samuel (code 2, jamais coché) |
+| RLPO-11 | Phase 58 | Pending — critères 1, 2 et 5 verts (58-09, porte de phase 58-11 ; critère 1 re-prouvé le 2026-10-20 par `E2E-C1-DEPS-DECISION`, deux mutants rouges, après la vérification de phase) ; critère 6 en attente de la liste de clients de Samuel (code 2, jamais coché) |
 | RLPO-12 | Phase 58 | Complete — 2026-10-20, plans 58-09, 58-10, 58-11 (preuves : SUMMARY des plans et porte de phase `58-11-SUMMARY.md`) |
 
 **Coverage:**
@@ -1350,7 +1350,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **RLPO-08**: Gate `check-role-consistency.sh` — forme exec, consultatif, issues 0 (poste dans la liste) / 1 (hors liste ou invalide) / 3 (silence) et erreur d'analyse bruyante sur un code distinct de 2 ; hook SessionStart de conductor et refus à la pose ; QUAL-01 : une mutation rouge prouvée par issue (P58-D-09).
 - [x] **RLPO-09**: Contexte de session — le stdout du même hook SessionStart injecte une ligne « Poste : X » hors `solo`, rien en `solo`, aucun hook neuf (P58-D-10).
 - [x] **RLPO-10**: Doctrine et vocabulaire — ADR-077 (« agentique first, ouvert à la collaboration humaine » ; « un poste est une vue, pas un droit ») écrit sous verrou `--depot` court ; colonne « statut » en doc seulement, sortie machine inchangée ; entrée de glossaire poste / rôle d'agent / statut (P58-D-11, P58-D-12).
-- [ ] **RLPO-11**: Preuves du jalon — critère 1 sur lab neuf (`VF_ROLE=product`, HOME temporaire), critère 2 par comparaison sortie et arbre posé à une install de référence, critère 5 (`check-agents.sh --strict`, aucun agent > 250 lignes), critère 6 (aucun nom de client) (P58-D-19).
+- [ ] **RLPO-11**: Preuves du jalon — critère 1 sur lab neuf (`VF_ROLE=product`, HOME temporaire), critère 2 par comparaison sortie et arbre posé à une install de référence, critère 5 (`check-agents.sh --strict`, aucun agent > 250 lignes), critère 6 (aucun nom de client) (P58-D-19). Définition précisée le 2026-10-20 (Q19, arbitrage Samuel, AskUserQuestion session principale, 2026-10-20) : « commande dev » = skills et agents des 3 modules `roles:["dev"]` + gsd-* ; superpowers reste posé en product par la chaîne design.
 - [x] **RLPO-12**: Livraison — branche `feat/phase-58-roles-de-poste` empilée sur `docs/cloture-phase-57`, `plugin/planning-core/module.json` et `gitignore_add_paths()` non touchés, bumps de modules (conductor, dev-orchestrator, mobile-test, mobile-test-team, installer s'il porte une VERSION) avec CHANGELOG et README, sans release (P58-D-13, P58-D-14, P58-D-20).
 
 ---

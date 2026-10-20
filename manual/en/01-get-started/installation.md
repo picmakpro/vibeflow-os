@@ -113,7 +113,8 @@ soon as `VF_ROLE` is set.
 - **Changing later**: `vibeflow-update.sh role <role>`.
 
 A role is a view, not a right: it filters what you are offered at install time, nothing is walled
-off — git, the project scope and a GSD already installed at account scope stay visible. See the
+off — git, the project scope and a GSD already installed at account scope stay visible. In the `product`
+role the design chain installs superpowers, which also brings dev-oriented skills (TDD, debugging). See the
 [glossary](../02-concepts/glossary.md).
 
 ### What you see on screen when it works
