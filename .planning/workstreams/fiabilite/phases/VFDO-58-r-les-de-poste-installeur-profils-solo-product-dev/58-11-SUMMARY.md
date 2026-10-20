@@ -12,7 +12,7 @@ Arbitrages : P58-D-01..14, arbitrage Samuel, AskUserQuestion session principale,
 
 - Étape 0 (correction ciblée de `revue-58c`) : `PRE-MUT-5` dans `test-resolve-preset-role.sh` (module caché `dev`, module visible `dev-x`) tue le mutant `grep -qxF` -> `grep -qF` : original = `p-devx` seul, mutant = `p-dev` et `p-devx` (85 octets), suite 22 OK / 0 KO.
 - Manuel : H3 « Ton poste » / « Your role » (FR+EN), entrées de glossaire Poste et Statut / Role and Status ; `check-manual.sh` vert, `toc.yml` inchangé.
-- Outil de livraison : liste de clients lue dans `VF_CLIENT_NAMES_FILE`, défaut `~/.config/vibeflow/clients.txt` ; `resolve-preset.sh` sort de `is_forbidden` (témoins : liste avec `resolve-preset.sh` 0, avec `presets.json` 1).
+- Outil de livraison : liste de clients lue dans `VF_CLIENT_NAMES_FILE`, défaut dans le dossier de configuration de VibeFlow ; `resolve-preset.sh` sort de `is_forbidden` (témoins : liste avec `resolve-preset.sh` 0, avec `presets.json` 1).
 - Compte de suites des README racine : 102 -> 109 (mesuré par la commande de la CI), `check-version-sync.sh` exit 0.
 
 ## Porte de phase
