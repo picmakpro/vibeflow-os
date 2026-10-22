@@ -278,7 +278,7 @@ STATE3EOF
     *) status_human="$s" ;;
   esac
   printf '[gsd-engine] Projet piloté par GSD — milestone %s, phase %s %s.\n' "$m" "$p" "$status_human"
-  printf '            → cadrage : gsd-discuss-phase · plan : gsd-plan-phase · état : gsd-progress.\n'
+  printf '            → /vf-dev (cadrage, plan, état).\n'
 }
 
 HAS_SOURCE=0
@@ -297,7 +297,7 @@ fi
 if [ "$HAS_SOURCE" -eq 1 ] && [ "$HAS_PLANNING" -eq 0 ]; then
   say "code source présent, $PLANNING_DIR absent — projet non cadré."
   printf '%s\n' "[onboard]   Code présent, aucun .planning/ — projet non cadré."
-  printf '%s\n' "            → propose gsd-onboard (confirmation requise)."
+  printf '%s\n' "            → propose /vf-dev pour : cadrer le projet existant (confirmation requise)."
   exit 0
 fi
 
@@ -308,23 +308,23 @@ if [ -f "$PLANNING_DIR/PROJECT.md" ]; then
 
   if config_missing; then
     ITEMS_CONSTAT="${ITEMS_CONSTAT:+${ITEMS_CONSTAT}, }config.json absent"
-    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }gsd-config"
+    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }configurer le moteur"
   fi
 
   if [ "$HAS_SOURCE" -eq 1 ] && codebase_missing; then
     ITEMS_CONSTAT="${ITEMS_CONSTAT:+${ITEMS_CONSTAT}, }codebase non cartographié"
-    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }gsd-map-codebase"
+    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }cartographier le code"
   fi
 
   if roadmap_missing; then
     ITEMS_CONSTAT="${ITEMS_CONSTAT:+${ITEMS_CONSTAT}, }feuille de route absente"
-    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }gsd-plan-phase"
+    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }planifier l'étape"
   fi
 
   if [ -n "$ITEMS_CONSTAT" ]; then
     say "démarrage inachevé : ${ITEMS_CONSTAT}."
     printf '%s\n' "[bootstrap] Projet initialisé, démarrage inachevé : ${ITEMS_CONSTAT}."
-    printf '%s\n' "            → propose ${ITEMS_GESTE} (confirmation requise)."
+    printf '%s\n' "            → propose /vf-dev pour : ${ITEMS_GESTE} (confirmation requise)."
     exit 0
   fi
 
