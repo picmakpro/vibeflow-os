@@ -56,10 +56,10 @@
 # que le moteur les connaît : le moteur peut en avertir de son côté, c'est amont. Seconde exception
 # au « jamais en dur », avec engineExtra ; le cas 38 de la suite la tient dans les deux sens.
 #
-# UNE EXCEPTION, ASSUMÉE ET NOMMÉE : la liste engineExtra (voir plus bas) recopie en dur une poignée
+# PREMIÈRE EXCEPTION, ASSUMÉE ET NOMMÉE (la seconde, VF_OWN, est décrite ci-dessus) : la liste engineExtra (voir plus bas) recopie en dur une poignée
 # de littéraux de premier niveau que le moteur ajoute à son propre KNOWN_TOP_LEVEL sans les exporter
 # nulle part (config-loader.cjs) — aucun module de bin/lib ne les expose, ils ne sont donc pas
-# lisibles dynamiquement. C'est le SEUL endroit du script où des noms de clés sont écrits à la main,
+# lisibles dynamiquement. C'est, avec VF_OWN, l'un des DEUX endroits du script où des noms de clés sont écrits à la main,
 # et c'est le seul point par lequel le gate peut dériver à la montée de version du moteur. Le cas 26
 # de la suite dédiée exerce ce mirroir contre le moteur réel, précisément pour qu'une telle dérive
 # se voie en test rouge au lieu de passer en silence.
@@ -565,7 +565,7 @@ const KNOWN = new Set([].concat(validArr, ck, flatten(DEFAULTS, '', [], true)));
 // Miroir exact du KNOWN_TOP_LEVEL du moteur (config-loader.cjs) : premiers segments des clés
 // connues + topLevel des motifs dynamiques + les littéraux que le moteur ajoute en dur.
 //
-// engineExtra est la SEULE liste écrite à la main de ce script (exception nommée en en-tête) : ces
+// engineExtra est l'une des DEUX listes écrites à la main de ce script, avec VF_OWN (exceptions nommées en en-tête) : ces
 // littéraux ne sont exportés par aucun module de bin/lib, donc pas lisibles dynamiquement. Plusieurs
 // d'entre eux (depth, multiRepo, branching_strategy, research en premier niveau) n'existent dans
 // AUCUNE des trois sources dynamiques : les retirer parce qu'ils « semblent redondants » rouvrirait
@@ -591,6 +591,7 @@ for (const k of KNOWN) { const i = k.indexOf('.'); if (i > 0) hasChildren.add(k.
 //   vf_runtimes      plugin/conductor/scripts/runtime-registry.sh (set-active écrit la clé)
 //   vf_roles         liste des postes du projet, éditée À LA MAIN (plugin/conductor/README.md, P58-D-01) et
 //                    lue par plugin/conductor/scripts/check-role-consistency.sh — pas posée par un script
+//                    gardée dans la liste par arbitrage Samuel, AskUserQuestion session principale, 2026-10-23
 // Le moteur peut garder son propre avertissement : il reste amont, hors de ce gate.
 const VF_OWN = new Set(['profile', 'planning_version', 'scope', 'type', 'domain', 'domain_extension',
   'options', 'compartments', 'memory_bridge', 'vf_runtimes', 'vf_roles']);
