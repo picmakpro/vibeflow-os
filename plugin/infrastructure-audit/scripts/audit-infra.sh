@@ -41,6 +41,8 @@
 # Reference : skill infrastructure-audit + ADR-031
 
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 CLAUDE_DIR="${CLAUDE_DIR:-.claude}"
 SCRIPTS_DIR="$CLAUDE_DIR/scripts"
@@ -108,7 +110,7 @@ hook_render() { # <buffer>
     ''|*WindowsApps*) command -v python >/dev/null 2>&1 && pybin=python || pybin="" ;;
   esac
   [ -n "$pybin" ] || return 0
-  "$pybin" - "$buf" 2>/dev/null <<'PYEOF' || true
+  "$pybin" -I $PYX - "$buf" 2>/dev/null <<'PYEOF' || true
 import json, sys
 
 try:
@@ -273,7 +275,7 @@ audit_hooks() {
     files_audited+=("$sf")
 
     # JSON valide ?
-    if ! python3 -c "import json; json.load(open('$sf'))" 2>/dev/null; then
+    if ! python3 -I $PYX -c "import json; json.load(open('$sf'))" 2>/dev/null; then
       errors_count=$((errors_count + 1))
       det_add "ERR json_invalid : $sf"
       continue
@@ -282,7 +284,7 @@ audit_hooks() {
     # Parse hooks via python — sortie CAPTUREE puis comptee (INF-02) : avant, les
     # lignes ERR|/WARN| fuyaient brutes sur stdout et errors_count restait a 0
     # (l'audit mentait). Le format d'echange reste SEV|code|detail|source.
-    py_out="$(python3 - "$sf" "$known_events" 2>/dev/null <<'PYEOF'
+    py_out="$(python3 -I $PYX - "$sf" "$known_events" 2>/dev/null <<'PYEOF'
 import json
 import sys
 import os
@@ -341,7 +343,7 @@ EOF_DET
   # Count hooks
   if [ ${#files_audited[@]} -gt 0 ]; then
     for sf in "${files_audited[@]}"; do
-      hc=$(python3 -c "
+      hc=$(python3 -I $PYX -c "
 import json
 try:
     d = json.load(open('$sf'))

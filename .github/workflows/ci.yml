@@ -614,6 +614,16 @@ jobs:
         # un gate qui n'a pas pu regarder n'est pas un gate vert.
         run: bash scripts/check-machine-paths.sh
 
+      - name: check-python-isolation (aucune invocation inline de Python non isolée — hotfix H-1)
+        # POURQUOI. `python3 -c`/`python3 -` mettent le dossier courant en tête de sys.path : un
+        # json.py posé à la racine d'un lab cloné serait exécuté par chaque hook. Le gate refuse
+        # toute invocation inline sans `-I` (ou la purge de sys.path avant tout import) sous plugin/,
+        # scripts/ et .github/. Exit 1 = au moins une, exit 3 = rien inspecté ou dépôt illisible :
+        # les deux échouent le job (un balayage qui n'a rien vu n'est pas un vert).
+        # `--min-sites 40` : 42 invocations réelles mesurées ; un détecteur aveugle ou un parc dégradé
+        # sous 40 rend exit 3 au lieu d'un vert à vide (H4, revue 2026-10-20).
+        run: bash scripts/check-python-isolation.sh --min-sites 40
+
       - name: check-instruction-budget (BUDG-01/02/04/05, ADR-029 machine-enforced)
         # POURQUOI CE GATE EXISTE. Gate distribué depuis la Phase 25 : plafond de lignes des
         # agents (D-05) et charge d'instructions (D-01/D-02), tous deux hors du seul module
@@ -2106,13 +2116,15 @@ jobs:
         # partir du même code, donc aucun des deux ne peut se satisfaire lui-même à vide.
         run: |
           set -eu
+          # Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+          PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
           closure=$(bash plugin/_internal/resolve-deps.sh dev-orchestrator)
           if ! printf '%s\n' "$closure" | awk '$0=="dev-orchestrator"{f=1} END{exit !f}'; then
             echo "::error::fermeture résolue sans dev-orchestrator — attendu non fiable, refus de continuer"
             exit 1
           fi
           echo "== fermeture (source de l'attendu, indépendante du posé) : $closure =="
-          expect_total=$(python3 - <<PYEOF
+          expect_total=$(python3 -I $PYX - <<PYEOF
           import json, glob
           closure = """$closure""".split()
           n = 0
@@ -2134,7 +2146,7 @@ jobs:
           echo "== attendu dérivé des hooks.json de la fermeture : $expect_total entrée(s) VF =="
 
           cd "$LAB_ARME"
-          python3 - "$expect_total" <<'PYEOF'
+          python3 -I $PYX - "$expect_total" <<'PYEOF'
           import json, os, re, sys
 
           EXPECT_TOTAL = int(sys.argv[1])

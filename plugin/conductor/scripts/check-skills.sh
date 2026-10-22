@@ -147,6 +147,8 @@
 # jamais un vert à vide ; sous --hook, 3 devient 0 à la frontière du shell comme ailleurs.
 
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 SKILLS_DIR=".claude/skills"
 STRICT=false
@@ -227,7 +229,7 @@ esac
 VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" \
 VF_ALLOW_EMPTY="$ALLOW_EMPTY" VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" VF_MANIFEST="$VF_MANIFEST" \
 VF_CALLERS_ROOT="$CALLERS_ROOT" \
-"$PYBIN" - <<'PY_CHECK_SKILLS_EOF'
+"$PYBIN" -I $PYX - <<'PY_CHECK_SKILLS_EOF'
 import glob, json, os, re, sys
 from datetime import date
 

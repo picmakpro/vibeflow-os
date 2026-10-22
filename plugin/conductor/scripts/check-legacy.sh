@@ -13,10 +13,12 @@
 #   ./check-legacy.sh --print    # JSON {verdict, scopes[]} pour câblage (banner, vf-update)
 # Exit 0 toujours (préflight informatif — ne bloque jamais).
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 MODE="human"; [ "${1:-}" = "--print" ] && MODE="json"
 
-python3 - "$MODE" "${HOME:-}" <<'PY'
+python3 -I $PYX - "$MODE" "${HOME:-}" <<'PY'
 import sys, os, json
 
 mode, home = sys.argv[1], sys.argv[2]

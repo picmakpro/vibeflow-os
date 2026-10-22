@@ -24,6 +24,8 @@
 # l'identique (0 archivage parasite). Backup isole ADR-049 avant --apply. Reference : ADR-052.
 
 set -euo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 KNOWLEDGE_DIR="${KNOWLEDGE_DIR:-.claude/memory/knowledge}"
 DRY_RUN=true
@@ -58,7 +60,7 @@ if [ ! -d "$KNOWLEDGE_DIR" ]; then
 fi
 
 # ---------- Coeur (Python inline — pattern du module, cf. reindex.sh) ----------
-python3 - "$KNOWLEDGE_DIR" "$APPLY_MODE" "$TODAY" "$REVIEW_THRESHOLD" "$BACKUP_KEEP" <<'PYEOF'
+python3 -I $PYX - "$KNOWLEDGE_DIR" "$APPLY_MODE" "$TODAY" "$REVIEW_THRESHOLD" "$BACKUP_KEEP" <<'PYEOF'
 import sys, os, re, json, datetime, shutil, glob
 
 lab        = sys.argv[1]

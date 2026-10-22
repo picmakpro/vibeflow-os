@@ -72,6 +72,8 @@
 # Reference : ADR-053 + .planning/phases/VFDO-09-*/09-CADRAGE-swarm.md §3.
 
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""; SCOPE=""; WS=""; WS_GIVEN=0
 for arg in "$@"; do
@@ -112,7 +114,7 @@ DRIVER_LOCK_SH="$SCRIPT_DIR/driver-lock.sh"
 CHECK_GUARD_HEALTH_SH="$SCRIPT_DIR/check-guard-health.sh"
 NOTIFY_SH="$SCRIPT_DIR/notify.sh"
 
-python3 - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" "$DRIVER_LOCK_SH" "$CHECK_GUARD_HEALTH_SH" "$NOTIFY_SH" "$WS" <<'PYEOF'
+python3 -I $PYX - "$ACTION" "$FILE" "$ID" "$STEP" "$STAGE" "$DEPS" "$STATUS" "$SCOPE" "$DRIVER_LOCK_SH" "$CHECK_GUARD_HEALTH_SH" "$NOTIFY_SH" "$WS" <<'PYEOF'
 import sys, os, json, subprocess, tempfile, shutil
 
 action, file, nid, step, stage, deps_raw, status, scope_raw = sys.argv[1:9]

@@ -43,6 +43,8 @@
 # Fail-open : python3 absent → exit 0 silencieux (ne bloque pas la session).
 
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 AGENTS_DIR=".claude/agents"
 SKILLS_DIR=".claude/skills"
@@ -83,7 +85,7 @@ esac
 
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
 VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" \
-VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" "$PYBIN" -c "
+VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" "$PYBIN" -I $PYX -c "
 import glob, os, re, sys
 
 agents_dir = os.environ[\"VF_AGENTS_DIR\"]

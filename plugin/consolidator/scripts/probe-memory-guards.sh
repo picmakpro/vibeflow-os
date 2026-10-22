@@ -31,9 +31,9 @@ probe() {
   command -v "$cand" >/dev/null 2>&1 || return 1
   case "$(command -v "$cand" 2>/dev/null)" in *WindowsApps*) return 1 ;; esac
   if command -v timeout >/dev/null 2>&1; then
-    timeout 5 "$cand" -c 'import sys; sys.exit(0 if sys.version_info[0]>=3 else 1)' >/dev/null 2>&1
+    timeout 5 "$cand" -I -c 'import sys; sys.exit(0 if sys.version_info[0]>=3 else 1)' >/dev/null 2>&1 # vf-pyx-ok (sonde de version, sortie jetée)
   else
-    "$cand" -c 'import sys; sys.exit(0 if sys.version_info[0]>=3 else 1)' >/dev/null 2>&1
+    "$cand" -I -c 'import sys; sys.exit(0 if sys.version_info[0]>=3 else 1)' >/dev/null 2>&1 # vf-pyx-ok (sonde de version, sortie jetée)
   fi
 }
 

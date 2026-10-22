@@ -70,6 +70,8 @@
 #   3 = INDÉTERMINÉ bruyant — python3, le module YAML strict ou node indisponible, OU zéro fichier
 #       découvert sous --root. Un vert sur une cible vide serait un faux vert : refusé explicitement.
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 MODE="audit"
 ROOT=""
@@ -210,7 +212,14 @@ if ! command -v python3 >/dev/null 2>&1; then
   echo "[check-description-fidelity] INDÉTERMINÉ : python3 introuvable (passe A, parseur YAML strict)" >&2
   exit 3
 fi
-if ! python3 -c 'import yaml' >/dev/null 2>&1; then
+# Isolation (H5, audit 2026-10-20) : la purge de sys.path retire le cwd, `-E` ignore PYTHONPATH,
+# PYTHONHOME et PYTHONSTARTUP (un lab hostile y poserait un sitecustomize/yaml). PYTHONUSERBASE
+# reste HONORÉE (décision du manager, hotfix-py tour 2, arbitrage Samuel, AskUserQuestion session
+# principale, 2026-10-20) : c'est une variable de l'environnement de l'utilisateur, du même niveau de
+# confiance que PATH (hors périmètre de l'audit) ; l'ignorer rendrait le gate INDÉTERMINÉ (3) pour
+# quiconque loge PyYAML dans ce site (rejeux CI sous HOME jetable inclus). `-I` aurait coupé aussi le
+# site utilisateur et perdu PyYAML sur les postes où il y vit.
+if ! python3 -E -c 'import sys; sys.path[:] = [p for p in sys.path if p]; import yaml' >/dev/null 2>&1; then
   echo "[check-description-fidelity] INDÉTERMINÉ : module PyYAML introuvable pour python3 (passe A)" >&2
   exit 3
 fi
@@ -336,7 +345,7 @@ JSEOF
 
 A_TSV="$TMPDIR_GATE/pass_a.tsv"
 B_TSV="$TMPDIR_GATE/pass_b.tsv"
-python3 "$PASS_A_PY" < "$FILELIST" > "$A_TSV" 2>"$TMPDIR_GATE/pass_a.err"
+python3 -E $PYX "$PASS_A_PY" < "$FILELIST" > "$A_TSV" 2>"$TMPDIR_GATE/pass_a.err"
 PY_RC=$?
 node "$PASS_B_JS" < "$FILELIST" > "$B_TSV" 2>"$TMPDIR_GATE/pass_b.err"
 ND_RC=$?
@@ -559,7 +568,7 @@ run_inventory() {
   local synth_a="$out_dir/synth_a.tsv"
   local synth_b="$out_dir/synth_b.tsv"
   if [ -s "$synth_list" ]; then
-    python3 "$PASS_A_PY" < "$synth_list" > "$synth_a" 2>"$out_dir/synth_a.err"
+    python3 -E $PYX "$PASS_A_PY" < "$synth_list" > "$synth_a" 2>"$out_dir/synth_a.err"
     node "$PASS_B_JS" < "$synth_list" > "$synth_b" 2>"$out_dir/synth_b.err"
   else
     : > "$synth_a"
@@ -699,7 +708,7 @@ JSEOF
   STAGE_A="$TMPDIR_GATE/fix_stage_a.tsv"
   STAGE_B="$TMPDIR_GATE/fix_stage_b.tsv"
   if [ -s "$STAGE_LIST" ]; then
-    python3 "$PASS_A_PY" < "$STAGE_LIST" > "$STAGE_A" 2>"$TMPDIR_GATE/fix_stage_a.err"
+    python3 -E $PYX "$PASS_A_PY" < "$STAGE_LIST" > "$STAGE_A" 2>"$TMPDIR_GATE/fix_stage_a.err"
     node "$PASS_B_JS" < "$STAGE_LIST" > "$STAGE_B" 2>"$TMPDIR_GATE/fix_stage_b.err"
   else
     : > "$STAGE_A"
@@ -738,7 +747,7 @@ JSEOF
   if [ -s "$REAL_CONVERTED_LIST" ]; then
     POST_A="$TMPDIR_GATE/fix_post_a.tsv"
     POST_B="$TMPDIR_GATE/fix_post_b.tsv"
-    python3 "$PASS_A_PY" < "$REAL_CONVERTED_LIST" > "$POST_A" 2>"$TMPDIR_GATE/fix_post_a.err"
+    python3 -E $PYX "$PASS_A_PY" < "$REAL_CONVERTED_LIST" > "$POST_A" 2>"$TMPDIR_GATE/fix_post_a.err"
     node "$PASS_B_JS" < "$REAL_CONVERTED_LIST" > "$POST_B" 2>"$TMPDIR_GATE/fix_post_b.err"
     while IFS= read -r realp; do
       [ -n "$realp" ] || continue

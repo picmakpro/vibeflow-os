@@ -12,6 +12,8 @@
 #   check-plugin-update.sh            # met à jour le cache, silencieux
 #   check-plugin-update.sh --print    # met à jour le cache ET imprime le JSON sur stdout
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 REPO_URL="${VF_REPO_URL:-https://github.com/picmakpro/vibeflow-os}"
 PLUGIN_ID="${VF_PLUGIN_ID:-vibeflow@vibeflow-os}"
@@ -45,7 +47,7 @@ case "$(command -v python3 2>/dev/null)" in
   ''|*WindowsApps*) command -v python >/dev/null 2>&1 && PYBIN=python || PYBIN="" ;;
 esac
 if [ -f "$IP" ] && [ -n "$PYBIN" ]; then
-  installed="$("$PYBIN" - "$IP" "$PLUGIN_ID" <<'PY' 2>/dev/null
+  installed="$("$PYBIN" -I $PYX - "$IP" "$PLUGIN_ID" <<'PY' 2>/dev/null
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))

@@ -31,6 +31,8 @@
 # planning tenu par le moteur GSD, détecté ou non concluant (P44-D-02a). Toute combinaison de
 # signaux non prévue sur le contenu rend `indéterminé`, jamais un refus.
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 PLANNING_DIR=".planning"
 READ_ONLY=0
@@ -64,7 +66,7 @@ case "$(command -v python3 2>/dev/null)" in
     ;;
 esac
 
-"$PYBIN" - "$PLANNING_DIR" "$READ_ONLY" "$DETECT_GSD_SH" <<'PY_RECALC_PLANNING_EOF'
+"$PYBIN" -I $PYX - "$PLANNING_DIR" "$READ_ONLY" "$DETECT_GSD_SH" <<'PY_RECALC_PLANNING_EOF'
 import errno
 import hashlib
 import json

@@ -44,6 +44,8 @@
 # Codes de sortie : 0 = OK · 1 = erreur (args, JSON invalide, écriture impossible)
 
 set -euo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 err() { echo "[merge-hooks] ERROR: $*" >&2; exit 1; }
 
@@ -86,9 +88,9 @@ for cand in python3 python; do
   command -v "$cand" >/dev/null 2>&1 || continue
   case "$(command -v "$cand" 2>/dev/null)" in *WindowsApps*) continue ;; esac
   if command -v timeout >/dev/null 2>&1; then
-    timeout 5 "$cand" -c "$PY3_PROBE" >/dev/null 2>&1 || continue
+    timeout 5 "$cand" -I -c "$PY3_PROBE" >/dev/null 2>&1 || continue # vf-pyx-ok (sonde de version, sortie jetée)
   else
-    "$cand" -c "$PY3_PROBE" >/dev/null 2>&1 || continue
+    "$cand" -I -c "$PY3_PROBE" >/dev/null 2>&1 || continue # vf-pyx-ok (sonde de version, sortie jetée)
   fi
   PYBIN="$cand"; break
 done
@@ -152,7 +154,7 @@ PREFIX_FILE="$(mktemp "${TMPDIR:-/tmp}/vf-merge-hooks-prefix.XXXXXX")" \
 printf '%s' "$PREFIX" > "$PREFIX_FILE" \
   || err "écriture du fichier temporaire de transport du préfixe impossible : $PREFIX_FILE"
 
-MODE="$MODE" FRAGMENT="$FRAGMENT" SETTINGS="$SETTINGS" SETTINGS_LOCAL="$SETTINGS_LOCAL" PREFIX_FILE="$PREFIX_FILE" BASH_ABS="$BASH_ABS" "$PYBIN" - <<'PYEOF'
+MODE="$MODE" FRAGMENT="$FRAGMENT" SETTINGS="$SETTINGS" SETTINGS_LOCAL="$SETTINGS_LOCAL" PREFIX_FILE="$PREFIX_FILE" BASH_ABS="$BASH_ABS" "$PYBIN" -I $PYX - <<'PYEOF'
 import json, os, re, sys, tempfile
 
 mode = os.environ["MODE"]

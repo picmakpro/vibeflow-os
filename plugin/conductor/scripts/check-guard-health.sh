@@ -107,6 +107,8 @@
 # est inferieur a celui d'un faux stall a chaque plan multi-worktrees.
 
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 DEFAULT_HEALTH_DIR="${VF_GUARD_HEALTH_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow/guard-health}"
 HEALTH_DIR="$DEFAULT_HEALTH_DIR"
@@ -339,7 +341,7 @@ check_driver_stall() {
 
   local parsed rc_py
   # shellcheck disable=SC2086
-  parsed="$(STATUS_JSON="$out" STALL_WINDOW="$STALL_WINDOW" COMMIT_AGE="$commit_age" $py_invoke <<'PYEOF'
+  parsed="$(STATUS_JSON="$out" STALL_WINDOW="$STALL_WINDOW" COMMIT_AGE="$commit_age" $py_invoke -I $PYX <<'PYEOF'
 import json, os, sys
 raw = os.environ.get("STATUS_JSON", "")
 ca_raw = os.environ.get("COMMIT_AGE", "")

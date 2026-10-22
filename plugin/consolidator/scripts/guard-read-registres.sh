@@ -29,6 +29,8 @@
 # ne doit jamais bloquer le travail.
 
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 # CSL-13 : préfiltre pur bash AVANT le spawn python3 (~80-120 ms payés sinon sur CHAQUE
 # Read, même hors registres). SURENSEMBLE STRICT du domaine de deny du python : celui-ci
@@ -53,7 +55,7 @@ case "$(command -v python3 2>/dev/null)" in
   ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
 esac
 
-printf '%s' "$PAYLOAD" | "$PYBIN" -c '
+printf '%s' "$PAYLOAD" | "$PYBIN" -I $PYX -c '
 import json, os, sys
 
 try:

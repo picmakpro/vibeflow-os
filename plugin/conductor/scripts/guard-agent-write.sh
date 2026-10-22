@@ -30,6 +30,8 @@
 # SessionStart suivant et en CI) — la difference entre une garantie et un avertissement.
 
 set -uo pipefail
+# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
 
 
 # Préfiltre pur-bash (latence : ce hook tourne sur CHAQUE Write du lab) : le deny n'est
@@ -49,7 +51,7 @@ case "$(command -v python3 2>/dev/null)" in
   ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else exit 0; fi ;;
 esac
 
-printf '%s' "$INPUT" | CHECKER="$(dirname "$0")/check-agents.sh" VF_GUARD=1 "$PYBIN" -c "
+printf '%s' "$INPUT" | CHECKER="$(dirname "$0")/check-agents.sh" VF_GUARD=1 "$PYBIN" -I $PYX -c "
 import json, os, subprocess, sys, tempfile
 
 try:

@@ -170,7 +170,7 @@ skills:
 
 1. `bash scripts/measure.sh .claude/agents/` → identifier les agents > 300L
 2. Pour chaque agent en depassement :
-   - `python3 scripts/plan_migration.py .claude/agents/<agent>.md > /tmp/plan-<agent>.md`
+   - `python3 -I "${CLAUDE_SKILL_DIR}/scripts/plan_migration.py" .claude/agents/<agent>.md > /tmp/plan-<agent>.md`
    - Lire le plan, ajuster si certaines sections sont mal classees
    - Appliquer section par section (extraire/transformer)
    - Re-lancer `measure.sh` pour valider
