@@ -52,6 +52,7 @@ Ce skill orchestre un audit en 4 axes complementaires.
 audit-infra.sh                    # audit complet (4 axes)
 audit-infra.sh --quick            # audit minimal (~5s, juste version + JSON valide)
 audit-infra.sh --axis=runtime     # un seul axe
+audit-infra.sh --no-tests         # sans executer les suites (ou VF_SKIP_TESTS=1) ; + --strict : exit 3
 audit-infra.sh --snapshot         # genere INFRASTRUCTURE_SNAPSHOT.md
 audit-infra.sh --diff             # compare avec snapshot precedent
 ```

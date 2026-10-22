@@ -350,6 +350,11 @@ run_in "$LAB_BAD" "$BASH_BIN" "$SCRIPT" --strict --axis=scripts --no-tests >/dev
 run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --quick --no-tests >/dev/null 2>&1; rc1=$?
 run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --axis=hooks --no-tests >/dev/null 2>&1; rc2=$?
 [ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && ok "T15g --strict --no-tests sur --quick / --axis=hooks (axe scripts non évalué) → exit 0 inchangé" || ko "T15g rc attendus 0/0, obtenus quick=$rc1 hooks=$rc2"
+# Même arbitrage (F2) via l'ENVIRONNEMENT : VF_SKIP_TESTS=1 hérité + --strict sur un mode qui n'exécute pas les suites → rc=0.
+run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --quick >/dev/null 2>&1; rcq=$?
+run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --axis=hooks >/dev/null 2>&1; rch=$?
+run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --axis=runtime >/dev/null 2>&1; rcr=$?
+[ "$rcq" -eq 0 ] && [ "$rch" -eq 0 ] && [ "$rcr" -eq 0 ] && ok "T15g' VF_SKIP_TESTS=1 hérité + --strict sur --quick / --axis=hooks / --axis=runtime → exit 0" || ko "T15g' VF_SKIP_TESTS hérité : rc attendus 0/0/0, obtenus quick=$rcq hooks=$rch runtime=$rcr"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
