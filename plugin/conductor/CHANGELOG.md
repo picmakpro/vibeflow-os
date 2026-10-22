@@ -3,7 +3,7 @@
 ## [v1.50.0] — 2026-10-16 (rôles de poste : lecteur, gate et contexte de session, Phase 58)
 
 **Minor** (capacité neuve installée chez l'utilisateur, RLPO-01..12 ; décisions P58-D-01..14 : arbitrage Samuel,
-AskUserQuestion session principale, 2026-10-16 ; niveau P58-PL-14 ; non publiée, sans release dans la phase, P58-D-20) :
+AskUserQuestion session principale, 2026-10-16 ; niveau P58-PL-14 ; sans release dans la phase (P58-D-20), publiée dans v2.71.0) :
 
 - **`scripts/vf-role.sh get`** : lecteur unique du poste (`solo`, `product` ou `dev`), contrat de stdout et de codes
   figé, interface des Phases 59 à 61 (P58-D-15).
@@ -17,9 +17,9 @@ AskUserQuestion session principale, 2026-10-16 ; niveau P58-PL-14 ; non publiée
 - Un poste est une vue, pas un droit : rien n'est désinstallé ni interdit (ADR-077).
 - Sans release dans la phase : les labs reçoivent ces éléments avec la prochaine release fonctionnelle (P58-D-20).
 
-## [v1.49.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — non publiée
+## [v1.49.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — publiée dans v2.70.1
 
-**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
+**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :
 
 - **`scripts/guard-driver-lock.sh`** (hook PreToolUse, via `vf_python`), **`guard-agent-write.sh`**, **`check-agents.sh`**, **`check-skills.sh`**, **`check-debug-research.sh`**, **`check-legacy.sh`**, **`check-plugin-update.sh`**, **`update-banner.sh`**, **`check-guard-health.sh`**, **`dag.sh`** : chaque invocation inline de l'interpréteur passe en `-I`. `python3 -c`/`python3 -` mettent le dossier courant en tête de `sys.path` : un `json.py` posé à la racine d'un lab cloné était importé et exécuté. `-I` (mode isolé) corrige ; témoin par site `scripts/tests/test-python-isolation-sites.sh` et gate `scripts/check-python-isolation.sh` (racine du dépôt).
 - **`scripts/check-description-fidelity.sh`** : la sonde `import yaml` purge `sys.path` (`sys.path[:] = [p for p in sys.path if p]`) au lieu de `-I`, qui masquerait le PyYAML installé en `--user`. Sonde et lancements de la passe A (`pass_a.py`) passent en `python3 -E` (correctif de revue H5) : `-E` ôte `PYTHONPATH`/`PYTHONHOME`/`PYTHONSTARTUP` (un `sitecustomize`/`yaml` de lab n'est plus exécuté). **Limite assumée** (décision du manager, tour 2, arbitrage Samuel, AskUserQuestion session principale, 2026-10-20) : `PYTHONUSERBASE` reste honorée — variable de l'environnement de l'utilisateur, du même niveau de confiance que `PATH` (hors périmètre de l'audit) ; l'ignorer rendait le gate INDÉTERMINÉ (exit 3) pour quiconque loge PyYAML dans ce site, rejeux CI sous HOME jetable inclus.

@@ -1,8 +1,8 @@
 # Changelog — software-architecture
 
-## [v1.6.3] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — non publiée
+## [v1.6.3] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — publiée dans v2.70.1
 
-**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
+**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :
 
 - **`scripts/guard-file-size.sh`** (hook) : l'appel passe par `vf_python`, désormais isolée (`-I`, `plugin/_internal/lib/vf-portable.sh`). `python3 -c`/`python3 -` mettent le dossier courant en tête de `sys.path` : un `json.py` posé à la racine d'un lab cloné était importé et exécuté. `-I` (mode isolé) corrige ; témoin par site `scripts/tests/test-python-isolation-sites.sh` et gate `scripts/check-python-isolation.sh` (racine du dépôt).
 

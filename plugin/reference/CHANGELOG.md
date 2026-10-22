@@ -2,7 +2,7 @@
 
 ## [v2.5.8] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1, correctif de revue H6) — non publiée
 
-**Patch** (correctif de sécurité ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
+**Patch** (correctif de sécurité ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :
 
 - **Template `methodology/templates/skills/agent-density-auditor`** (`SKILL.md`, `references/migration_patterns.md`) : le script `plan_migration.py` se lance par le chemin du skill (`"${CLAUDE_SKILL_DIR}/scripts/…"`) avec `-I`, jamais un `scripts/` relatif au dossier courant du lab (un lab cloné pourrait y poser le sien). Instruction en prose exécutée par un modèle, hors du balayage du gate.
 
