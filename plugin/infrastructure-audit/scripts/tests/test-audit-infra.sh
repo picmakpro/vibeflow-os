@@ -10,6 +10,11 @@
 # T5 — INF-05 : version listée → known ; plus récente que la dernière validée → known + note ;
 #               ancienne non listée → false
 # T6 — INF-05 : la whitelist couvre bien 2.1.215
+# T7-T9 — VG-5 : --strict (exit 3 sans cible, exit 1 sur ERROR, exit 0 sur lab propre)
+# T10 — contrat de flux sous --hook (HOOKS-CONTRAT-SORTIE.md §3)
+# T11 — #153 §3 : forme "$CLAUDE_PROJECT_DIR"/x.sh ; T12 — #153 §6.7 : CR retirés du JSON (Windows)
+# T13 — #153 §6.4 : événements connus (SubagentStop, FileChanged)
+# T14 — #153 §6.3 : --no-tests / VF_SKIP_TESTS=1 ; T15 — --strict + suites sautées → exit 3
 
 set -uo pipefail
 
@@ -301,6 +306,50 @@ if grep -q '^\*\*Tests\*\* : exécutés' "$LAB_T/.claude/INFRASTRUCTURE_SNAPSHOT
 else
   ko "T14d ligne '**Tests** : exécutés' attendue dans le snapshot"
 fi
+
+# T15 — #153 §6.3, revue adverse : --strict + suites sautées = vert PAR ABSENCE → exit 3 INDÉTERMINÉ
+# (arbitrage Samuel, AskUserQuestion session principale, 2026-10-22). rc ET champ JSON asserés.
+for variant in "--no-tests" "VF_SKIP_TESTS=1"; do
+  if [ "$variant" = "--no-tests" ]; then
+    OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --axis=scripts --no-tests 2>/dev/null)"; rc=$?
+  else
+    OUT="$(run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --axis=scripts 2>/dev/null)"; rc=$?
+  fi
+  if [ "$rc" -eq 3 ] && echo "$OUT" | grep -q '"strict_indeterminate": true'; then
+    ok "T15a #153 §6.3 : --strict + $variant → exit 3 INDÉTERMINÉ, strict_indeterminate=true"
+  else
+    ko "T15a --strict + $variant : rc=3 et strict_indeterminate=true attendus, obtenu rc=$rc, sortie : $OUT"
+  fi
+done
+# Mode complet : même verdict (l'axe scripts est évalué).
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --no-tests >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 3 ] && ok "T15b #153 §6.3 : --strict --no-tests (mode complet) → exit 3" || ko "T15b mode complet : rc=3 attendu, obtenu rc=$rc"
+# Non-régression : --strict SANS saut garde son comportement (suite exécutée, vert = 0, champ false).
+OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --axis=scripts 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && echo "$OUT" | grep -q '"strict_indeterminate": false' && echo "$OUT" | grep -q '"tests_pass": 1'; then
+  ok "T15c non-régression : --strict sans saut → suite exécutée, exit 0, strict_indeterminate=false"
+else
+  ko "T15c --strict sans saut : rc=0, tests_pass=1, strict_indeterminate=false attendus, rc=$rc, sortie : $OUT"
+fi
+# Sans --strict, le saut reste advisory (exit 0, champ false : pas de gate, pas d'indéterminé).
+OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && echo "$OUT" | grep -q '"strict_indeterminate": false'; then
+  ok "T15d --no-tests sans --strict → exit 0 advisory, strict_indeterminate=false"
+else
+  ko "T15d --no-tests sans --strict : rc=0 + strict_indeterminate=false attendus, rc=$rc, sortie : $OUT"
+fi
+# Priorité : une suite en échec EXÉCUTÉE reste exit 1 ; un script à syntaxe cassée avec saut → exit 1 (rouge établi > indéterminé).
+LAB_BAD="$WORK/lab-bad"; mkdir -p "$LAB_BAD/.claude/scripts/tests"
+printf '#!/bin/sh\nexit 1\n' > "$LAB_BAD/.claude/scripts/tests/test-rouge.sh"; chmod +x "$LAB_BAD/.claude/scripts/tests/test-rouge.sh"
+run_in "$LAB_BAD" "$BASH_BIN" "$SCRIPT" --strict --axis=scripts >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 1 ] && ok "T15e --strict + suite rouge exécutée → exit 1 (inchangé)" || ko "T15e suite rouge : rc=1 attendu, obtenu rc=$rc"
+printf '#!/bin/sh\nif then\n' > "$LAB_BAD/.claude/scripts/casse.sh"
+run_in "$LAB_BAD" "$BASH_BIN" "$SCRIPT" --strict --axis=scripts --no-tests >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 1 ] && ok "T15f --strict --no-tests + syntaxe cassée → exit 1 (finding établi prioritaire sur l'indéterminé)" || ko "T15f syntaxe cassée + saut : rc=1 attendu, obtenu rc=$rc"
+# Axes qui n'évaluent pas l'axe scripts : inchangés (documenté en tête de audit-infra.sh).
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --quick --no-tests >/dev/null 2>&1; rc1=$?
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --axis=hooks --no-tests >/dev/null 2>&1; rc2=$?
+[ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && ok "T15g --strict --no-tests sur --quick / --axis=hooks (axe scripts non évalué) → exit 0 inchangé" || ko "T15g rc attendus 0/0, obtenus quick=$rc1 hooks=$rc2"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="

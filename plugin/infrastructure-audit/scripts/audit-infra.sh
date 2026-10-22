@@ -14,14 +14,21 @@
 #   ./audit-infra.sh --snapshot                 # genere INFRASTRUCTURE_SNAPSHOT.md
 #   ./audit-infra.sh --no-tests                 # axe scripts sans executer les suites tests/test-*.sh
 #                                               #   (ou VF_SKIP_TESTS=1) — utile sous Git Bash, ou chaque
-#                                               #   fork coute 50-200 ms ; JSON : "tests_skipped": true
+#                                               #   fork coute 50-200 ms ; JSON : "tests_skipped": true.
+#                                               #   Combine a --strict : exit 3 INDETERMINE (voir ci-dessous)
 #   ./audit-infra.sh --diff                     # compare snapshot courant vs .prev
 #   ./audit-infra.sh --if-older-than=14d        # skip si dernier audit (stamp ou snapshot) < 14j
 #   ./audit-infra.sh --strict                   # GATE (VG-5, F13) : cible absente → exit 3 ·
 #                                               #   findings ERROR/tests KO → exit 1 (sinon advisory exit 0)
 #
 # Codes de sortie : 0 = OK (ou advisory) · 1 = findings bloquants (--strict) ·
-#   3 = INDÉTERMINÉ (--strict et $CLAUDE_DIR absent : rien d'audité, aucun verdict)
+#   3 = INDÉTERMINÉ (--strict et $CLAUDE_DIR absent : rien d'audité, aucun verdict ; OU --strict
+#       avec l'axe scripts évalué et ses suites sautées par --no-tests / VF_SKIP_TESTS=1 : le gate
+#       ne peut pas dire « conforme » sans avoir exécuté les suites — JSON : "strict_indeterminate": true.
+#       Arbitrage Samuel, AskUserQuestion session principale, 2026-10-22. Un finding bloquant
+#       (exit 1) reste prioritaire sur l'indéterminé : un rouge établi n'est pas dilué.
+#       Le saut compte dès que audit_scripts s'exécute (modes full et --axis=scripts) ; --quick,
+#       --axis=hooks|runtime, --snapshot et --diff n'évaluent pas cet axe : inchangés.)
 # NB : --strict s'applique aux modes full/quick/axis (pas snapshot/diff, qui restent advisory).
 #
 # --hook (D-06/D-07, Portabilité Windows II) — PARITÉ D'INTERFACE avec les autres scripts de hook
@@ -67,6 +74,8 @@ SKIP_TESTS=false; [ "${VF_SKIP_TESTS:-}" != "1" ] || SKIP_TESTS=true
 # Accumulateur strict (VG-5) : les axes y versent leurs findings bloquants. Portée globale —
 # valable pour les modes qui appellent les axes DANS le shell courant (full/quick/axis).
 STRICT_ERRORS=0
+# Verdict indéterminé (--strict + suites sautées) : posé par audit_scripts, lu au verdict final.
+STRICT_INDETERMINATE=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -432,6 +441,14 @@ audit_scripts() {
     done
   fi
 
+  # Suites sautées sous --strict : le vert serait obtenu par absence → verdict indéterminé (exit 3).
+  local strict_indet=false
+  if [ "$STRICT" = true ] && [ "$SKIP_TESTS" = true ]; then
+    strict_indet=true
+    STRICT_INDETERMINATE=true
+    log "✗ INDÉTERMINÉ : --strict avec suites sautées (--no-tests / VF_SKIP_TESTS=1) — aucun verdict conforme possible (exit 3)"
+  fi
+
   local deps_json="[]"
   if [ ${#deps_missing[@]} -gt 0 ]; then
     deps_json="[$(printf '"%s",' "${deps_missing[@]}" | sed 's/,$//')]"
@@ -447,6 +464,7 @@ audit_scripts() {
   "executable_ok": $exec_ok,
   "deps_missing": $deps_json,
   "tests_skipped": $SKIP_TESTS,
+  "strict_indeterminate": $strict_indet,
   "tests_pass": $tests_pass,
   "tests_fail": $tests_fail
 }
@@ -582,4 +600,9 @@ fi
 if $STRICT && [ "$STRICT_ERRORS" -gt 0 ]; then
   log "✗ --strict : $STRICT_ERRORS finding(s) bloquant(s) (voir JSON ci-dessus)"
   exit 1
+fi
+
+# Verdict INDÉTERMINÉ (--strict + suites sautées) : après les findings bloquants, qui restent prioritaires.
+if $STRICT && [ "$STRICT_INDETERMINATE" = true ]; then
+  hook_exit 3
 fi
