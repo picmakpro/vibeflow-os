@@ -1855,7 +1855,8 @@ MUT_GITENV="GW-GITENV-1=1 GW-GITENV-2=1"
 MUT_VIDEPY="GW-VIDE-7=1"
 MUT_VIDEBOTH="GW-VIDE-1=1 GW-VIDE-2=1 GW-VIDE-6=1 GW-VIDE-7=1"
 gw_extract_py() { # <guard> <fichier python de sortie> : le programme embarqué, tel que python le reçoit
-  awk 'f && /^'"'"' 2>\/dev\/null \|\| exit 0$/ {exit} f {print} /^printf .%s. "\$INPUT" \| vf_python -c .$/ {f=1}' "$1" > "$2"
+  # #149 : le programme vit dans GDL_PY='…' (passé en tête de stdin, plus par -c) ; il s'arrête à la ligne « ' » seule.
+  awk 'f && /^'"'"'$/ {exit} f {print} /^GDL_PY='"'"'$/ {f=1}' "$1" > "$2"
 }
 gw_py_compiles() { # <fichier python>
   python3 -I -c 'import sys; compile(open(sys.argv[1], encoding="utf-8").read(), "guard-embarque", "exec")' "$1" 2>/dev/null

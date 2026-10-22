@@ -54,6 +54,13 @@
 # vf-portable.sh) passe toujours `-X utf8` elle-même ; les invocations à purge de `sys.path` ne sont pas
 # visées (elles ne portent pas `-I`).
 # Les lignes de commentaire pur sont ignorées.
+# TAILLE DES PROGRAMMES `-c` LITTÉRAUX (#149). Windows plafonne la ligne de commande d'un processus à
+# 32 767 caractères : un `python3 -c "…"` de 60 Ko y échoue (`Argument list too long`, rc 126), et un hook
+# câblé en `|| true` ou `|| exit 0` devient inerte en silence. Tout littéral entre guillemets qui suit `-c`
+# (simples ou doubles, sur plusieurs lignes, fichier entier hors `*/tests/*`) est mesuré en OCTETS
+# (majorant des caractères UTF-16) et refusé au-delà de ARGMAX = 30 000. Un gros programme passe par
+# l'entrée standard (`python3 -I $PYX - <<<"…"`) ou, si l'entrée standard porte déjà une charge, en tête
+# de celle-ci (guard-driver-lock.sh). HORS PORTÉE : un programme tenu dans une variable (`-c "$PROG"`).
 #
 # HORS PORTÉE (dit, pas promis) : une variable sans « py » dont l'affectation vit hors du fichier
 # (environnement, fichier sourcé) ; un opérateur ou un nom de commande reconstruit à l'exécution
@@ -240,10 +247,31 @@ function scan_line(f, ln, line,   n, w, i, j, k, word, iso, pflag, prog, skip, x
     break
   }
 }
-function scan_file(f,   nl, raw, acc, start, cnt, k, L, LN, uses, hasdef, t) {
+# #149 : un littéral `-c "…"` / `-c '…'` de plus de ARGMAX octets ne passe pas la ligne de commande Windows.
+function scan_argmax(f, txt,   base, rest, q, i, n, c, len, pre) {
+  base = 0; rest = txt
+  while (match(rest, /-c[ \t]+["']/)) {
+    q = substr(rest, RSTART + RLENGTH - 1, 1)
+    i = RSTART + RLENGTH; n = 0; len = length(rest)
+    while (i <= len) {
+      c = substr(rest, i, 1)
+      if (q == "\"" && c == "\\") { i += 2; n += 2; continue }
+      if (c == q) break
+      i++; n++
+    }
+    if (n > ARGMAX) {
+      BAD++
+      pre = substr(txt, 1, base + RSTART)
+      printf "%s:%d: programme -c de %d octets (> %d) : Argument list too long sous Windows — le passer par l'entrée standard\n", f, gsub(/\n/, "", pre) + 1, n, ARGMAX > "/dev/stderr"
+    }
+    base += i; rest = substr(rest, i + 1)
+  }
+}
+function scan_file(f,   nl, raw, acc, start, cnt, k, L, LN, uses, hasdef, t, TXT) {
   delete PYVARS
-  nl = 0; acc = ""; start = 0; cnt = 0
+  nl = 0; acc = ""; start = 0; cnt = 0; TXT = ""
   while ((getline raw < f) > 0) {
+    TXT = TXT raw "\n"
     cnt++
     if (acc == "") start = cnt
     if (raw !~ /^[ \t]*#/ && raw ~ /\\[ \t]*$/) { sub(/\\[ \t]*$/, " ", raw); acc = acc raw; continue }
@@ -266,6 +294,7 @@ function scan_file(f,   nl, raw, acc, start, cnt, k, L, LN, uses, hasdef, t) {
     BAD++
     printf "%s:1: $PYX utilisé sans la définition canonique (%s) — set -u fatal\n", f, CANON > "/dev/stderr"
   }
+  scan_argmax(f, TXT)
   for (k = 1; k <= nl; k++) collect_vars(L[k])
   for (k = 1; k <= nl; k++) scan_line(f, LN[k], L[k])
 }
@@ -273,6 +302,7 @@ BEGIN {
   PYVARS["_"] = 1; delete PYVARS
   PURGE = "sys.path[:] = [p for p in sys.path if p]"
   CANON = "PYX=\"-Xutf8\""
+  ARGMAX = 30000
   PYWORD_RE = "(^|[^A-Za-z0-9_])(python[0-9.]*[tdm]*(\\.exe)?|pypy[0-9.]*|py)([^A-Za-z0-9_]|$)"
 }
 FNR == 1 { scan_file(FILENAME) }
@@ -296,7 +326,7 @@ if [ "$SITES" -lt "$MIN_SITES" ]; then
 fi
 if [ "$BAD" -gt 0 ]; then
   sed '$d' "$PROG.out" >&2
-  echo "[check-python-isolation] ÉCHEC : $BAD invocation(s) inline non isolée(s) sur $SITES inspectée(s) — ajouter -I (ou la purge de sys.path avant tout import, ou -P + vf-py311)" >&2
+  echo "[check-python-isolation] ÉCHEC : $BAD violation(s) sur $SITES invocation(s) inspectée(s) — isolation : ajouter -I (ou la purge de sys.path avant tout import, ou -P + vf-py311) ; taille -c : passer le programme par l'entrée standard" >&2
   exit 1
 fi
 echo "[check-python-isolation] OK : $SITES invocation(s) inline inspectée(s), toutes isolées (${#FILES[@]} fichiers)"

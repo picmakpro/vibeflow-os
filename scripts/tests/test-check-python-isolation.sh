@@ -286,6 +286,39 @@ if mutate MUT30 's#else if (L\[k\] ~ /(^|\[^A-Za-z0-9_\])PYX=/) {#else if (0) {#
   [ "$rc" -ne 1 ] && ok "MUT30 autre définition de PYX non refusée → la surcharge passe (rc=$rc)" || ko "MUT30" "toujours rouge — la règle n'est pas ce qui refuse la surcharge"
 fi
 
+# #149 : un programme `-c` littéral de plus de 30 000 octets ne passe pas la ligne de commande Windows
+# (32 767 caractères, `Argument list too long`). Les corps sont fabriqués à l'exécution (pas de littéral
+# géant versionné) : une ligne de commentaire Python répétée.
+echo "== taille des programmes -c (#149) =="
+body() { # <n lignes> → programme Python de n × 100 octets (commentaires), plus un import
+  awk -v n="$1" 'BEGIN { printf "import json\n"; for (i = 0; i < n; i++) printf "# %097d\n", i }'
+}
+d="$(mkrepo argbig)"; put "$d" plugin/x/scripts/b.sh "$PY -I \$PYX -c 'import json'"
+{ printf '%s\n' "$CANON"; printf '%s -I $PYX -c "\n' "$PY"; body 310; printf '"\n'; } > "$d/plugin/x/scripts/a.sh"
+git -C "$d" add -- plugin/x/scripts/a.sh
+expect "-c \"…\" de ~31 000 octets → rouge" 1 "$SCRIPT" "$d"
+grep -q 'a.sh:2: programme -c de' "$TMP/err" && ok "ligne du -c géant citée (a.sh:2)" || ko "ligne citée" "$(head -c 200 "$TMP/err")"
+d2="$(mkrepo argbigsq)"; put "$d2" plugin/x/scripts/b.sh "$PY -I \$PYX -c 'import json'"
+{ printf '%s\n' "$CANON"; printf "%s -I \$PYX -c '\n" "$PY"; body 310; printf "'\n"; } > "$d2/plugin/x/scripts/a.sh"
+git -C "$d2" add -- plugin/x/scripts/a.sh
+expect "-c '…' (guillemets simples) de ~31 000 octets → rouge" 1 "$SCRIPT" "$d2"
+d3="$(mkrepo argsmall)"; put "$d3" plugin/x/scripts/b.sh "$PY -I \$PYX -c 'import json'"
+{ printf '%s\n' "$CANON"; printf '%s -I $PYX -c "\n' "$PY"; body 290; printf '"\n'; } > "$d3/plugin/x/scripts/a.sh"
+git -C "$d3" add -- plugin/x/scripts/a.sh
+expect "-c \"…\" de ~29 000 octets → vert" 0 "$SCRIPT" "$d3"
+d4="$(mkrepo argstdin)"; put "$d4" plugin/x/scripts/b.sh "$PY -I \$PYX -c 'import json'"
+{ printf '%s\n' "$CANON"; printf '%s -I $PYX - <<<"\n' "$PY"; body 600; printf '"\n'; } > "$d4/plugin/x/scripts/a.sh"
+git -C "$d4" add -- plugin/x/scripts/a.sh
+expect "programme de ~60 000 octets par l'entrée standard (- <<<) → vert" 0 "$SCRIPT" "$d4"
+if mutate MUT31 's#^  ARGMAX = 30000$#  ARGMAX = 1000000#'; then
+  run "$TMP/MUT31.sh" "$d"; rc=$?
+  [ "$rc" -eq 0 ] && ok "MUT31 plafond relevé → le -c géant passe (rc=0) : le plafond est ce qui rougit" || ko "MUT31" "rc=$rc (attendu 0)"
+fi
+if mutate MUT32 's#^  scan_argmax(f, TXT)$#  #'; then
+  run "$TMP/MUT32.sh" "$d2"; rc=$?
+  [ "$rc" -eq 0 ] && ok "MUT32 mesure non appelée → le -c géant passe (rc=0)" || ko "MUT32" "rc=$rc (attendu 0)"
+fi
+
 echo "== contrôle final (arbre réel, non discriminant) =="
 REAL="$(cd "$(dirname "$0")/../.." && pwd)"
 bash "$SCRIPT" --path "$REAL" --min-sites 40 >/dev/null 2>"$TMP/err"; rc=$?

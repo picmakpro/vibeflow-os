@@ -3470,7 +3470,7 @@ memory: project
 corps
 EOF
 
-# Sonde blanche (WR-01) : extrait le corps python embarque de check-agents.sh (entre le "-c \""
+# Sonde blanche (WR-01) : extrait le corps python embarque de check-agents.sh (entre le "- <<<\""
 # d'ouverture et le "\nPY_RC=$?" de fermeture, deseachappe \" -> "), le tronque AVANT "if single:"
 # (aucune instruction executable de tete, seulement des def/assignations), l'exec() dans un
 # namespace prive puis appelle index_agents() deux fois de suite avec des dossiers DIFFERENTS —
@@ -3480,7 +3480,7 @@ cat > "$T105_PROBE" <<'PYEOF'
 import os, sys
 src_path, manifest_path, dir_a, dir_b = sys.argv[1:5]
 text = open(src_path, encoding="utf-8").read()
-start_marker = '"$PYBIN" -I $PYX -c "'
+start_marker = '"$PYBIN" -I $PYX - <<<"'
 start = text.index(start_marker) + len(start_marker)
 end = text.index('\nPY_RC=$?')
 body = text[start:end].rstrip()

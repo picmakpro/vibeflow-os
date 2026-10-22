@@ -258,11 +258,15 @@ case "$(command -v python3 2>/dev/null)" in
   ''|*WindowsApps*) if command -v python >/dev/null 2>&1; then PYBIN=python; else echo "[check-agents] python3 requis" >&2; exit 0; fi ;;
 esac
 
+# #149 : le programme (~60 Ko) passe par l'ENTRÉE STANDARD (here-string), jamais par `-c` : Windows plafonne
+# la ligne de commande à 32 767 caractères (`Argument list too long`, rc 126, hook inerte en silence). Le
+# programme ne lit pas stdin (l'entrée du hook --hook n'est consommée par personne) ; même texte, mêmes
+# expansions qu'avec `-c "…"`. Taille gardée par scripts/check-python-isolation.sh (ARGMAX).
 VF_AGENTS_DIR="$AGENTS_DIR" VF_SKILLS_DIR="$SKILLS_DIR" VF_STRICT="$STRICT" \
 VF_HOOK="$HOOK_MODE" VF_SINGLE="$SINGLE_FILE" VF_ALLOW_EMPTY="$ALLOW_EMPTY" \
 VF_THIRD_PARTY_PREFIXES="$THIRD_PARTY_PREFIXES" VF_RESOLVE_AGENTS="$RESOLVE_AGENTS" \
 VF_REGISTRY_DIRS="$REGISTRY_DIRS" VF_MANIFEST="$VF_MANIFEST" \
-VF_MANIFEST_FRESHNESS="$MANIFEST_FRESHNESS" "$PYBIN" -I $PYX -c "
+VF_MANIFEST_FRESHNESS="$MANIFEST_FRESHNESS" "$PYBIN" -I $PYX - <<<"
 import glob, json, os, re, sys
 from datetime import date
 
