@@ -284,11 +284,25 @@ vf_dl_resolve() {
   # propre `.planning/` alors que la racine git en porte les compartiments. Sans ce refus la detection (relative
   # au cwd) rendrait le lab « plat », le verrou d'autrui ne serait pas vu et un `.planning/DRIVER.lock` parasite
   # serait cree dans le sous-dossier. Un dossier portant SON `.planning/` (P57-D-29) n'est pas concerne.
-  if { [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; } && [ ! -e .planning ] && [ ! -L .planning ]; then
-    local top=""
-    top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
-    if [ -n "$top" ] && vf_dl_ws_present "$top/.planning/workstreams"; then
-      vf_dl_refuse not-at-lab-root "ce dossier n'est pas la racine du lab partitionne : lance driver-lock.sh depuis la racine du lab (le dossier qui porte .planning/workstreams), puis rejoue la commande avec la meme option --ws ou --depot"
+  # #58 : meme refus SANS option, en lab partitionne comme en lab plat, des que la racine git porte un `.planning/`
+  # que le cwd n'a pas — sinon le chemin relatif cree un verrou fantome `<sous-dossier>/.planning/DRIVER.lock` et deux
+  # missions croient chacune tenir le verrou. `status` et `orphans` sans option (lecture seule, ne creent rien) restent
+  # inchanges : check-guard-health.sh lit `status --all` depuis un cwd quelconque et ne doit pas devenir bruyant.
+  if [ ! -e .planning ] && [ ! -L .planning ]; then
+    local top="" named=0 mutating=1
+    if [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; then named=1; fi
+    case "$ACTION" in status|orphans) mutating=0 ;; esac
+    if [ "$named" = 1 ] || [ "$mutating" = 1 ]; then
+      top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
+      local why=""
+      if [ -n "$top" ] && vf_dl_ws_present "$top/.planning/workstreams"; then
+        why="ce dossier n'est pas la racine du lab partitionne : lance driver-lock.sh depuis la racine du lab (le dossier qui porte .planning/workstreams), puis rejoue la commande avec la meme option --ws ou --depot"
+      elif [ -n "$top" ] && [ "$named" = 0 ] && { [ -d "$top/.planning" ] || [ -L "$top/.planning" ]; }; then
+        why="ce dossier ne porte pas son propre .planning/ alors que la racine git en porte un : lance driver-lock.sh depuis la racine du lab (le dossier qui porte .planning), puis rejoue la commande"
+      fi
+      if [ -n "$why" ]; then
+        vf_dl_refuse not-at-lab-root "$why"
+      fi
     fi
   fi
   vf_dl_ws_present .planning/workstreams || return 0

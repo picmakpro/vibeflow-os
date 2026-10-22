@@ -40,11 +40,11 @@ MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ALL-5 WS-ENV WS-HINT-3 WS-LEG-1 WS-LEG-2 WS
 MUT_D="WS-LEG-1 WS-LEG-4 WS-R4A WS-R4B WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV"
 MUT_E="WS-ENV"
 MUT_F="WS-AB"
-MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-6 WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV WS-VFL"
+MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-13 WS-ROOT-6 WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV WS-VFL"
 MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien"
 # j (correction F-2, P57-D-39) : le refus hors racine du lab retiré — seuls les trois cas de refus de WS-ROOT basculent
 # (g y ajoute WS-ROOT-6, le cas VF_DRIVER_LOCK ; i y ajoute WS-ROOT-8, le témoin acquire depuis la racine)
-MUT_J="WS-ROOT-1 WS-ROOT-2 WS-ROOT-3"
+MUT_J="WS-ROOT-1 WS-ROOT-10 WS-ROOT-11 WS-ROOT-2 WS-ROOT-3 WS-ROOT-9"
 # acq_fallback à gen_kept (réserve C3 de 57-VERIFICATION.md et correction R-4) : acq_fallback = acquire sans cible
 # retombe sur le repli de l'ancien verrou (le suffixe JSON du refus change) ; fallback_depotpresent = le repli ne
 # regarde plus si le verrou de dépôt existe ; skip_link_d = un lien symbolique n'est plus écarté par status --all ;
@@ -1217,6 +1217,34 @@ out="$(dl_in "$FLATR/plugin/sub" sess-A status --ws=alpha)"
 assert_not "WS-ROOT-7 — lab PLAT : --ws depuis un sous-dossier reste sans effet (P57-D-03), pas de refus" "$out" 'not-at-lab-root'
 out="$(dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s)"
 assert "WS-ROOT-8 — témoin : depuis la racine du lab, le même acquire réussit" "$out" '"acquired": true'
+# #58 : le même refus SANS option, en lab partitionné comme en lab plat (verrou fantôme <sous-dossier>/.planning/DRIVER.lock)
+LAB9="$(mk_lab root9)"; GC9="$(fixture_common_dir "$LAB9")"; mkdir -p "$LAB9/plugin/sub"; SUB9="$LAB9/plugin/sub"
+out="$(dl_in "$SUB9" sess-A acquire --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-ROOT-9.1 — lab partitionné : acquire SANS option depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-9.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+assert "WS-ROOT-9.3 — clé de tête acquired false" "$out" '"acquired": false'
+[ ! -e "$GC9/vf-driver" ] && [ ! -e "$SUB9/.planning" ] && [ ! -e "$LAB9/.planning/DRIVER.lock" ]; assert_exit "WS-ROOT-9.4 — ni verrou ni .planning fantôme créés" "$?" 0
+FLAT10="$(mk_flat root10)"; mkdir -p "$FLAT10/plugin/sub"; SUB10="$FLAT10/plugin/sub"
+out="$(dl_in "$SUB10" sess-A acquire --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-ROOT-10.1 — lab plat : acquire depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-10.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+json_ok "$out"; assert_exit "WS-ROOT-10.3 — JSON valide" "$?" 0
+[ ! -e "$SUB10/.planning" ] && [ ! -e "$FLAT10/.planning/DRIVER.lock" ]; assert_exit "WS-ROOT-10.4 — ni verrou ni .planning fantôme créés" "$?" 0
+out="$(dl_in "$SUB10" sess-A heartbeat --owner=m1)"; rc=$?
+assert_exit "WS-ROOT-11.1 — lab plat : heartbeat depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-11.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+out="$(dl_in "$SUB10" sess-A status)"
+assert_not "WS-ROOT-12 — lab plat : status (lecture seule) depuis un sous-dossier reste sans refus" "$out" 'not-at-lab-root'
+out="$(cd "$SUB10" && CLAUDE_CODE_SESSION_ID=sess-A VF_DRIVER_LOCK="$WORK_DIR/root-unique10/DRIVER.lock" "${DL_SCRIPT:-$SCRIPT}" acquire --owner=m1 --step=s)"
+assert "WS-ROOT-13 — VF_DRIVER_LOCK posé : comportement historique, acquire depuis un sous-dossier réussit" "$out" '"acquired": true'
+mkdir -p "$LAB9/autre/.planning"; out="$(dl_in "$LAB9/autre" sess-A acquire --owner=m1 --step=s)"
+assert_not "WS-ROOT-14 — dossier portant son PROPRE .planning (P57-D-29) : acquire sans option, pas de refus" "$out" 'not-at-lab-root'
+mkdir -p "$WORK_DIR/root15-git/sub"; git -C "$WORK_DIR/root15-git" init -q >/dev/null 2>&1
+out="$(dl_in "$WORK_DIR/root15-git/sub" sess-A acquire --owner=m1 --step=s)"
+assert_not "WS-ROOT-15 — dépôt git dont la racine ne porte aucun .planning : pas de refus" "$out" 'not-at-lab-root'
+mkdir -p "$WORK_DIR/root16-nogit/sub"
+out="$(cd "$WORK_DIR/root16-nogit/sub" && GIT_CEILING_DIRECTORIES="$WORK_DIR" CLAUDE_CODE_SESSION_ID=sess-A "${DL_SCRIPT:-$SCRIPT}" acquire --owner=m1 --step=s)"
+assert_not "WS-ROOT-16 — hors dépôt git : inchangé, pas de refus" "$out" 'not-at-lab-root'
 
 if [ "$DLWS_MODE" = full ]; then
 echo
