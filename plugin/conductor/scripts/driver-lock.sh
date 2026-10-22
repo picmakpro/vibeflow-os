@@ -54,6 +54,7 @@
 # "ws" ("" pour le depot) et "location" (git-common-dir). Refus nommes, chacun avec un "hint" :
 # unknown-ws, ws-invalid, partition-unreadable, policy-missing, not-at-lab-root (P57-D-39, #58 : verbe ecrivant,
 # avec ou sans --ws/--depot, lance d'un dossier sans .planning/ propre alors que la racine git en porte un ;
+# status/orphans exceptes, sauf avec --ws/--depot en lab partitionne ;
 # hint « lance depuis la racine du lab »). Le nom du sujet est valide par
 # vf_ws_name_valid puis vf_ws_dir_resolve AVANT d'entrer dans un chemin ou un JSON.
 # ANCIEN VERROU (P57-D-14, P57-D-24, P57-D-26) : en lab partitionne, un .planning/DRIVER.lock tenu
