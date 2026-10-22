@@ -105,7 +105,7 @@
 - [ ] Phase 55: Installeur et mémoire portables entre runtimes (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 56: Packs de règles par langage (module optionnel) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [x] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-12, mergée PR #152 le 2026-10-16 en `--admin`, revue `@picmakpro` contournée (demande explicite de Samuel, session principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »), release `v2.70.0` ; 16/16 plans, DLWS-01..08 cochées
-- [ ] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0) — 12/12 plans exécutés le 2026-10-20 (porte de phase rejouée verte, RLPO-01..10 et 12 cochées ; RLPO-11 en attente du critère 6 : liste de clients à déposer par Samuel), PR à venir, aucune release
+- [x] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-22 : 12/12 plans, porte de phase verte, RLPO-01..12 cochées dont RLPO-11 par override (critère 6 et recette installeur non mesurés, Samuel, session principale, 2026-10-22 — dette dans 58-VERIFICATION.md), branche rebasée sur v2.70.1, release `v2.71.0` à venir
 - [ ] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
@@ -176,6 +176,7 @@
 | 41.3. Sobriété de méthode — ce qu'on crée, on le range | fiabilite-v1.0 | 4/4 | Complete — PR #123, release `v2.68.0` | 2026-09-30 |
 | 41.4. Emprunts Pocock — disciplines de cadrage, de revue et de skills | fiabilite-v1.0 | 11/11 | Complete — PR #135 (merge `--admin`, 2026-10-08), release `v2.69.0` | 2026-10-06 |
 | 57. Verrou de driver par compartiment | equipe-produit-v1.0 | 16/16 | Complete — PR #152 (merge `--admin`, 2026-10-16), release `v2.70.0` | 2026-10-12 |
+| 58. Rôles de poste — installeur, profils solo / product / dev | equipe-produit-v1.0 | 12/12 | Complete (2 overrides, Samuel 2026-10-22) — release `v2.71.0` à venir | 2026-10-22 |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 

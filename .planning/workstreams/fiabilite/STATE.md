@@ -3,18 +3,18 @@ gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
 current_phase: 58
 current_phase_name: Rôles de poste — installeur, profils solo / product / dev
-status: verifying
+status: complete
 last_updated: "2026-10-20T18:00:00.000Z"
-last_activity: 2026-10-20
-last_activity_desc: Phase 58 vérifiée human_needed 13/14 (critère 6 en attente de la liste de clients) — next : dépôt de la liste par Samuel puis `check-livraison-58.sh clients`, puis PR
-state_head: a2ed5094
+last_activity: 2026-10-22
+last_activity_desc: Phase 58 passée avec 2 overrides (critère 6 et recette installeur, Samuel 2026-10-22), branche rebasée sur v2.70.1 — next : PR + release v2.71.0, puis Phase 59
+state_head: 45ee80db
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 28
   completed_plans: 28
 milestone_name: « l'équipe produit » — Phases 57-62 —
-stopped_at: "Phase 58 vérifiée human_needed 13/14 (critère 6 en attente de la liste de clients) — next : dépôt de la liste par Samuel puis `check-livraison-58.sh clients`, puis PR"
+stopped_at: "Phase 58 passée avec 2 overrides (dette : check-livraison-58.sh clients, recette /vibeflow-install) — next : PR + release v2.71.0, puis cadrage Phase 59"
 ---
 
 # Project State
