@@ -447,8 +447,10 @@ mutant MUT-motif-lecteur-d '{ if (index($0, "bash \"$READER\"")) gsub(/2>&1/, "2
 mutant MUT-outillage '{ if ($0 == "trap _vf_locator_failed EXIT") print "true"; else print }' \
   probe_outillage "filet d'outillage retiré : le bloc canonique sort 1, confondu avec « hors de la liste »"
 
-mutant MUT-isole '{ if (index($0, "vf_python -I -c")) sub(/vf_python -I -c/, "vf_python -c"); print }' \
-  probe_hostile "mode isolé -I retiré : le json.py du dépôt est importé"
+# MUT-isole : depuis v2.70.1, vf_python pose -I lui-même (vf-portable.sh) — retirer le seul -I du site ne
+# rouvre plus rien. Le mutant contourne donc vf_python : interpréteur résolu appelé en direct, sans -I.
+mutant MUT-isole '{ if (index($0, "vf_python -I -c")) sub(/vf_python -I -c/, "$VF_PYTHON_INVOKE -c"); print }' \
+  probe_hostile "isolation retirée (vf_python contourné, sans -I) : le json.py du dépôt est importé"
 mutant MUT-cfg-lien '{ if (index($0, "if [ -L \"$CFG\" ] || [ ! -f \"$CFG\" ]; then")) sub(/if \[ -L "\$CFG" \] \|\| \[ ! -f "\$CFG" \]; then/, "if false; then"); print }' \
   probe_cfg_lien "refus du lien symbolique retiré"
 mutant MUT-cfg-fifo '{ if (index($0, "|| [ ! -f \"$CFG\" ]; then")) sub(/ \|\| \[ ! -f "\$CFG" \]; then/, "; then"); print }' \
