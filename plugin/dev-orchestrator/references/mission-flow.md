@@ -142,8 +142,9 @@ valeurs du mandat (P57-D-23, P57-D-35) :
 - **Gestes de dépôt courts** (P57-D-01, P57-D-02) : `acquire --depot`, le geste, puis `release --depot` aussitôt,
   jamais gardé pendant la mission.
 - **Refus nommés** (JSON, `reason` + `hint`, exit 1) : `unknown-ws`, `ws-invalid`, `partition-unreadable`,
-  `policy-missing` → corriger le mandat, jamais deviner un sujet. `not-at-lab-root` (`--ws` ou `--depot` lancé
-  d'un sous-dossier sans `.planning/` propre, alors que la racine git porte `.planning/workstreams`, P57-D-39) →
+  `policy-missing` → corriger le mandat, jamais deviner un sujet. `not-at-lab-root` (tout verbe qui écrit, avec
+  ou sans `--ws`/`--depot`, lancé d'un sous-dossier sans `.planning/` propre alors que la racine git en porte un,
+  lab plat comme partitionné, P57-D-39, #58) →
   relancer depuis la racine du lab, jamais poser le verrou « là où on est ». `legacy-lock-held` (un ancien
   `.planning/DRIVER.lock` est tenu, il vaut verrou de dépôt) → remonter à l'humain avec le `hint`, qui nomme la
   commande de release : l'ancien verrou se relâche par son détenteur, rien ne le reprend en silence (P57-D-26) ;
