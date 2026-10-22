@@ -539,9 +539,12 @@ probe_dest_dir() { # M14 : destination répertoire
   run_pose "$LAB"; printf 'rc=%s dedans=%s' "$PRC" "$(ls -A "$LAB/.claude/vibeflow-role" | awk 'END { print NR }')"
 }
 
-probe_gi_gros() { # M15 : .gitignore > 64 Kio, règle en tête, deux poses
+probe_gi_gros() { # M15 : .gitignore ~2,6 Mio, règle en tête, deux poses
+  # 200 000 lignes, pas 6 000 : à ~84 Kio (à peine plus qu'un tampon de pipe Linux de 64 Kio), `tr` finissait parfois
+  # d'écrire avant que `grep -q` ne sorte — ni SIGPIPE ni EPIPE, mutant survivant sur le runner (CI PR #156,
+  # 2026-10-22), tué en local. À ~2,6 Mio, `grep -q` sort au premier match bien avant la fin de l'écriture.
   mk_lab; ENG="$1"
-  { printf '.claude/vibeflow-role\n'; awk 'BEGIN { for (i = 0; i < 6000; i++) print "fichier-" i ".log" }'; } > "$LAB/.gitignore"
+  { printf '.claude/vibeflow-role\n'; awk 'BEGIN { for (i = 0; i < 200000; i++) print "fichier-" i ".log" }'; } > "$LAB/.gitignore"
   run_pose "$LAB"; run_pose "$LAB"; printf 'regles=%s' "$("$GREP" -cxF '.claude/vibeflow-role' "$LAB/.gitignore")"
 }
 probe_gi_fifo() { # M16 : .gitignore FIFO, sous borne ; le jeton dit aussi si un processus survit
