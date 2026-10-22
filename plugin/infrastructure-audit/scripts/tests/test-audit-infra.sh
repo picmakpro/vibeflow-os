@@ -262,6 +262,46 @@ else
   ko "T13 warnings_count: 0 + 2 événements runtime attendus, hooks : $OUT · runtime : $RT"
 fi
 
+# T14 — #153 §6.3 : --no-tests / VF_SKIP_TESTS=1 saute la boucle des suites de l'axe scripts
+# (plusieurs heures sous Git Bash). Sans l'option : suites exécutées, "tests_skipped": false.
+LAB_T="$WORK/lab-tests"; mkdir -p "$LAB_T/.claude/scripts/tests"
+printf '#!/bin/sh\ntouch "%s/ran-marker"\nexit 0\n' "$WORK" > "$LAB_T/.claude/scripts/tests/test-sonde.sh"
+chmod +x "$LAB_T/.claude/scripts/tests/test-sonde.sh"
+rm -f "$WORK/ran-marker"
+OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --axis=scripts 2>/dev/null)"
+if [ -f "$WORK/ran-marker" ] && echo "$OUT" | grep -q '"tests_skipped": false' && echo "$OUT" | grep -q '"tests_pass": 1'; then
+  ok "T14a #153 §6.3 : sans option, la suite tourne, tests_skipped=false, tests_pass=1"
+else
+  ko "T14a suite exécutée + tests_skipped=false + tests_pass=1 attendus (marker=$([ -f "$WORK/ran-marker" ] && echo oui || echo non)), sortie : $OUT"
+fi
+for variant in "--no-tests" "VF_SKIP_TESTS=1"; do
+  rm -f "$WORK/ran-marker"
+  if [ "$variant" = "--no-tests" ]; then
+    OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"
+  else
+    OUT="$(run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --axis=scripts 2>/dev/null)"
+  fi
+  V="$(printf '%s' "$OUT" | verdict_stdout)"
+  if [ ! -f "$WORK/ran-marker" ] && [ "$V" = "VALIDE" ] && echo "$OUT" | grep -q '"tests_skipped": true' \
+     && echo "$OUT" | grep -q '"tests_pass": 0' && echo "$OUT" | grep -q '"tests_fail": 0'; then
+    ok "T14b #153 §6.3 : $variant → suite non exécutée, tests_skipped=true, JSON valide"
+  else
+    ko "T14b $variant : aucune suite, tests_skipped=true, JSON valide attendus (verdict=$V), sortie : $OUT"
+  fi
+done
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --snapshot --no-tests >/dev/null 2>&1
+if grep -q '^\*\*Tests\*\* : non exécutés' "$LAB_T/.claude/INFRASTRUCTURE_SNAPSHOT.md" 2>/dev/null; then
+  ok "T14c #153 §6.3 : --snapshot --no-tests → ligne **Tests** : non exécutés"
+else
+  ko "T14c ligne '**Tests** : non exécutés' attendue dans le snapshot"
+fi
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --snapshot >/dev/null 2>&1
+if grep -q '^\*\*Tests\*\* : exécutés' "$LAB_T/.claude/INFRASTRUCTURE_SNAPSHOT.md" 2>/dev/null; then
+  ok "T14d #153 §6.3 : --snapshot sans option → ligne **Tests** : exécutés"
+else
+  ko "T14d ligne '**Tests** : exécutés' attendue dans le snapshot"
+fi
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
