@@ -246,7 +246,7 @@ audit_runtime() {
   "version_ref_present": $version_ref_present,
   "version_note": "$version_note",
   "tools_natifs_hardcoded": ["Read", "Write", "Edit", "Bash", "Skill", "Task", "WebFetch"],
-  "hooks_events_hardcoded": ["SessionStart", "SessionEnd", "PreCompact", "Stop", "PreToolUse", "PostToolUse", "Notification", "UserPromptSubmit"]
+  "hooks_events_hardcoded": ["SessionStart", "SessionEnd", "PreCompact", "Stop", "PreToolUse", "PostToolUse", "Notification", "UserPromptSubmit", "SubagentStop", "FileChanged"]
 }
 EOF
 }
@@ -262,7 +262,7 @@ det_add() {
 audit_hooks() {
   log "Axe 2 — Hooks contract"
 
-  local known_events="SessionStart SessionEnd PreCompact Stop PreToolUse PostToolUse Notification UserPromptSubmit"
+  local known_events="SessionStart SessionEnd PreCompact Stop PreToolUse PostToolUse Notification UserPromptSubmit SubagentStop FileChanged"
   local errors_count=0
   local warnings_count=0
   local detections=""

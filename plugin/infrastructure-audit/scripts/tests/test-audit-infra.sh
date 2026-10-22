@@ -246,6 +246,22 @@ else
   ko "T12 JSON attendu VALIDE avec errors_count 3 (verdict=$V), sortie : $(printf '%s' "$OUT" | cat -v | head -12)"
 fi
 
+# T13 — #153 §6.4 : SubagentStop et FileChanged sont des événements documentés de Claude Code ;
+# ni l'axe hooks (event_unknown) ni la liste de l'axe runtime ne doivent les ignorer.
+LAB_EV="$WORK/lab-events"; mkdir -p "$LAB_EV/.claude/scripts"
+cat > "$LAB_EV/.claude/settings.json" <<'JSON'
+{ "hooks": {
+  "SubagentStop": [ { "hooks": [ { "type": "command", "command": "echo ok" } ] } ],
+  "FileChanged":  [ { "hooks": [ { "type": "command", "command": "echo ok" } ] } ] } }
+JSON
+OUT="$(run_in "$LAB_EV" "$BASH_BIN" "$SCRIPT" --axis=hooks 2>/dev/null)"
+RT="$(run_in "$LAB_EV" "$BASH_BIN" "$SCRIPT" --axis=runtime 2>/dev/null)"
+if echo "$OUT" | grep -q '"warnings_count": 0' && echo "$RT" | grep -q '"SubagentStop"' && echo "$RT" | grep -q '"FileChanged"'; then
+  ok "T13 #153 §6.4 : SubagentStop/FileChanged connus (axe hooks 0 WARN, axe runtime les liste)"
+else
+  ko "T13 warnings_count: 0 + 2 événements runtime attendus, hooks : $OUT · runtime : $RT"
+fi
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
