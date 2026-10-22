@@ -106,6 +106,15 @@ output=$(cd "$WORK_DIR" && MEMORY_DIR=".claude/memory" "$WORK_DIR/.claude/script
 assert "T5.1 — collision LRN-001 détectée" "$output" '"id": "LRN-001"'
 assert "T5.2 — occurrences 2" "$output" '"occurrences": 2'
 
+# T5.3 — #153 §4 : registre SANS entrée → `grep -n` rend 1, et sous pipefail le script sortait en
+# rc=1 avec un JSON tronqué après `"collisions": [`.
+mkdir -p "$WORK_DIR/vide/.claude/memory"
+printf '# LEARNINGS\n\nAucune entree.\n' > "$WORK_DIR/vide/.claude/memory/LEARNINGS.md"
+output=$(cd "$WORK_DIR/vide" && MEMORY_DIR=".claude/memory" "$WORK_DIR/.claude/scripts/detect-duplicates.sh" --register=LEARNINGS 2>/dev/null); rc_vide=$?
+assert "T5.3a — registre vide : rc=0" "rc=$rc_vide" "rc=0"
+verdict_vide=$(printf '%s' "$output" | python3 -I -c 'import json,sys; json.loads(sys.stdin.read()); print("json-valide")' 2>/dev/null || echo "json-invalide")
+assert "T5.3b — registre vide : JSON complet et valide" "$verdict_vide" "json-valide"
+
 echo ""
 echo "=== T6 — detect-promotions.sh sort candidats ==="
 output=$(cd "$WORK_DIR" && MEMORY_DIR=".claude/memory" "$WORK_DIR/.claude/scripts/detect-promotions.sh" 2>&1)
