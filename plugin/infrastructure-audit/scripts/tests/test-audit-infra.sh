@@ -18,6 +18,10 @@
 
 set -uo pipefail
 
+# Herméticité : un VF_SKIP_TESTS hérité de l'appelant (README, Git Bash) fausserait les cas qui
+# attendent des suites exécutées ; les cas qui le veulent le posent eux-mêmes (env VF_SKIP_TESTS=1).
+unset VF_SKIP_TESTS
+
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$(cd "$TESTS_DIR/.." && pwd)/audit-infra.sh"
 SRC_KNOWN="$(cd "$TESTS_DIR/.." && pwd)/known-versions.txt"
