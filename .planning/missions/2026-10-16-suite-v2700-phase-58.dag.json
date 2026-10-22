@@ -1,0 +1,244 @@
+{
+  "nodes": [
+    {
+      "id": "cloture-57",
+      "step": "clôture Phase 57 (ROADMAP+STATE fiabilite, gates)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/fiabilite/ROADMAP.md",
+        ".planning/workstreams/fiabilite/STATE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-cloture-57",
+      "step": "revue clôture 57",
+      "stage": "",
+      "deps": [
+        "cloture-57"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/ROADMAP.md",
+        ".planning/workstreams/fiabilite/STATE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "backlog-proposition",
+      "step": "proposition de tri BACKLOG (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "backlog-arbitrage",
+      "step": "arbitrage Samuel tri BACKLOG",
+      "stage": "",
+      "deps": [
+        "backlog-proposition"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "backlog-application",
+      "step": "application tri BACKLOG",
+      "stage": "",
+      "deps": [
+        "backlog-arbitrage",
+        "revue-cloture-57"
+      ],
+      "scope": [
+        ".planning/BACKLOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "eclaireur-58",
+      "step": "éclaireur cadrage 58 (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "discuss-58",
+      "step": "cadrage 58 (manager, arbitrages Samuel)",
+      "stage": "",
+      "deps": [
+        "eclaireur-58"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "context-58",
+      "step": "58-CONTEXT.md (manager, sur feat/phase-58)",
+      "stage": "",
+      "deps": [
+        "discuss-58",
+        "backlog-application"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-58-roles-de-poste"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-58",
+      "step": "plan Phase 58",
+      "stage": "",
+      "deps": [
+        "context-58"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "plancheck-58",
+      "step": "re-validation plans 58",
+      "stage": "",
+      "deps": [
+        "plan-58"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-58",
+      "step": "exécution Phase 58",
+      "stage": "",
+      "deps": [
+        "plancheck-58"
+      ],
+      "scope": [
+        "plugin/installer",
+        "plugin/_internal",
+        "plugin/conductor",
+        "plugin/dev-orchestrator",
+        "plugin/mobile-test",
+        "plugin/mobile-test-team",
+        "docs"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-58",
+      "step": "revue code 58",
+      "stage": "",
+      "deps": [
+        "exec-58"
+      ],
+      "scope": [],
+      "status": "ready",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-58",
+      "step": "audit sécurité 58 (installeur, hook)",
+      "stage": "",
+      "deps": [
+        "exec-58"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire",
+      "stage": "",
+      "deps": [
+        "exec-58"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-backlog",
+      "step": "revue tri BACKLOG",
+      "stage": "",
+      "deps": [
+        "backlog-application"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-58a",
+      "step": "revue intermédiaire vagues 1-2",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/_internal/module-roles.sh",
+        "plugin/conductor/scripts/vf-role.sh",
+        "plugin/conductor/scripts/check-role-consistency.sh",
+        "plugin/installer/scripts/build-module-catalog.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "plan-58b",
+      "step": "plan 58-12 presets + amendement 58-11 + SUMMARY 58-03",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-58-r-les-de-poste-installeur-profils-solo-product-dev"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "hotfix-py",
+      "step": "hotfix isolation python (worktree fix/vf-python-isolation)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "plugin/_internal/lib/vf-portable.sh",
+        "plugin/_internal/merge-hooks.sh",
+        "plugin/conductor/scripts/guard-driver-lock.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-58c",
+      "step": "revue 58-12",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "revue-hotfix",
+      "step": "revue-hotfix",
+      "stage": "",
+      "deps": [
+        "hotfix-py"
+      ],
+      "scope": [],
+      "status": "done",
+      "review_regime": "full"
+    },
+    {
+      "id": "audit-hotfix",
+      "step": "audit-hotfix",
+      "stage": "",
+      "deps": [
+        "hotfix-py"
+      ],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "verif-58",
+      "step": "vérification de phase 58",
+      "stage": "",
+      "deps": [
+        "exec-58"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ],
+  "ws": "fiabilite"
+}

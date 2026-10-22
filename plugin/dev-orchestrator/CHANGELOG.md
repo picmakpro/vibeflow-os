@@ -1,8 +1,17 @@
 # CHANGELOG — dev-orchestrator
 
-## [v2.28.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — non publiée
+## [v2.28.2] — 2026-10-16 (clé `roles`, Phase 58)
 
-**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
+**Patch** (métadonnée de module seule, aucun script modifié ; décisions P58-D-01..14 : arbitrage Samuel,
+AskUserQuestion session principale, 2026-10-16 ; niveau P58-PL-14 ; sans release dans la phase (P58-D-20), publiée dans v2.71.0 ; renumérotée v2.28.1 → v2.28.2 au rebase sur v2.70.1, qui a publié v2.28.1) :
+
+- **`module.json`** : la clé `roles: ["dev"]` (P58-D-06) rend le module invisible au poste `product`, au catalogue et à
+  `install --all` avec poste. Un module nommé explicitement s'installe toujours : un poste est une vue, pas un droit.
+- Sans release dans la phase (P58-D-20).
+
+## [v2.28.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — publiée dans v2.70.1
+
+**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :
 
 - **`scripts/check-hook-paths.sh`**, **`inject-mcp-tools.sh`** : leurs appels passent par `vf_python`, désormais isolée (`-I`, `plugin/_internal/lib/vf-portable.sh`). `python3 -c`/`python3 -` mettent le dossier courant en tête de `sys.path` : un `json.py` posé à la racine d'un lab cloné était importé et exécuté. `-I` (mode isolé) corrige ; témoin par site `scripts/tests/test-python-isolation-sites.sh` et gate `scripts/check-python-isolation.sh` (racine du dépôt).
 

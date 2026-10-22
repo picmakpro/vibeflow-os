@@ -1,8 +1,8 @@
 # CHANGELOG — design-orchestrator
 
-## [v1.5.14] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — non publiée
+## [v1.5.14] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — publiée dans v2.70.1
 
-**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; NON PUBLIÉE — destinée à v2.70.1, geste de release humain) :
+**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :
 
 - **`scripts/ensure-design-deps.sh`** : invocation inline isolée (`-I`). `python3 -c`/`python3 -` mettent le dossier courant en tête de `sys.path` : un `json.py` posé à la racine d'un lab cloné était importé et exécuté. `-I` (mode isolé) corrige ; témoin par site `scripts/tests/test-python-isolation-sites.sh` et gate `scripts/check-python-isolation.sh` (racine du dépôt).
 - **Restitution de `PYTHONUTF8=1`** (correctif de revue R2, hotfix-py tour 3) : `-I` impliquant `-E`, un `PYTHONUTF8=1` posé par l'utilisateur était perdu en silence sur `ensure-design-deps.sh` ; chaque invocation isolée porte désormais `$PYX` (`-Xutf8` si et seulement si la variable vaut `1`, définition canonique une fois par fichier). Exigé par `scripts/check-python-isolation.sh`, vérifié sur spawns réels par `scripts/tests/test-python-isolation-sites.sh`.

@@ -1,5 +1,13 @@
 # Changelog — mobile-test
 
+## v1.0.4 — 2026-10-16
+
+### Modifié
+- **Patch** — la clé `roles: ["dev"]` de `module.json` (P58-D-06) rend le module invisible au poste `product`, au
+  catalogue et à `install --all` avec poste ; un module nommé explicitement s'installe toujours (un poste est une
+  vue, pas un droit) ; décisions P58-D-01..14 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-16 ;
+  sans release dans la phase (P58-D-20), publiée dans v2.71.0 ; aucun changement de comportement du skill.
+
 ## v1.0.3 — 2026-10-06
 
 ### Modifié

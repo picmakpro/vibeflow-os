@@ -35,6 +35,15 @@ plutôt qu'une seule capacité. Développé dans [modules-et-bundles.md](./modul
 **Socle** — L'ensemble des modules obligatoires d'un lab (`conductor` et sa fermeture transitive de
 dépendances). Développé dans [modules-et-bundles.md](./modules-et-bundles.md).
 
+**Poste** — Ta position sur un projet (`solo`, `product` ou `dev`), choisie à l'installation : elle filtre
+les modules et les presets qu'on te propose. Ce n'est ni le rôle d'un agent dans une équipe, ni un
+droit d'accès : un poste est une vue, pas un droit. Développé dans
+[installation.md](../01-demarrer/installation.md#ton-poste).
+
+**Statut** — Pour un module, sa colonne dans le catalogue (`mandatory` ou `optional`) : ce qui est posé
+d'office et ce qui reste ton choix. Ne le confonds pas avec le poste, qui qualifie la personne, ni avec
+le statut d'un rapport typé. Voir [installation.md](../01-demarrer/installation.md#ton-poste) pour le poste.
+
 **Team-kernel** — Le noyau d'orchestration d'équipe réutilisable dans n'importe quel métier
 (verrou de driver, DAG, rapports typés, halt conditions, digest de mission, cloisonnement par
 outils). Hébergé par le module `conductor`, il est ce que chaque bundle métier instancie plutôt

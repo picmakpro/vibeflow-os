@@ -13,6 +13,24 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.71.0] — 2026-10-22
+
+**Minor** (rôles de poste, Phase 58, deuxième livrable du jalon `equipe-produit-v1.0` ; ordre « hotfix v2.70.1 d'abord,
+puis 57+58 en v2.71.0 » : arbitrage Samuel, AskUserQuestion session principale, 2026-10-22) :
+
+- **Poste par projet** (`solo`, `product`, `dev` ; ADR-077 : un poste est une vue, pas un droit). `/vibeflow-install`
+  demande le poste après le scope, `solo` pré-coché, mode non interactif par `VF_ROLE` / `--role`. Le poste vit dans un
+  fichier local non versionné ; le projet ne porte que la liste des postes autorisés.
+- **`module.json` porte `roles`** (absent = tous) : `build-module-catalog.sh`, `resolve-preset.sh list` et
+  `install --all` filtrent par poste ; un module nommé explicitement s'installe toujours ; sortie sans poste identique à
+  l'octet.
+- **`conductor` v1.50.0** : lecteur unique `vf-role.sh get`, gate consultatif `check-role-consistency.sh`, ligne
+  « Poste : X » au SessionStart (forme exec, timeout 5 s). `dev-orchestrator` v2.28.2, `mobile-test` v1.0.4,
+  `mobile-test-team` v1.4.7 : clé `roles: ["dev"]`.
+- **Clôture documentaire de la Phase 57** et tri du BACKLOG.
+- **Limites écrites** : le critère 6 (aucun nom de client) et la recette manuelle de l'installeur sont acceptés sans
+  mesure (overrides, Samuel, 2026-10-22), en dette dans `58-VERIFICATION.md`. **111 suites.**
+
 ## [v2.70.1] — 2026-10-22
 
 **Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session

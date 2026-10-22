@@ -2,7 +2,8 @@
 # resolve-preset.sh — Presets d'installation : un nom stable → la fermeture de modules à poser.
 #
 # Usage :
-#   resolve-preset.sh list            émet `name<TAB>titre<TAB>description<TAB>modules racines`
+#   resolve-preset.sh list [--role <poste>]
+#                                     émet `name<TAB>titre<TAB>description<TAB>modules racines`
 #                                     (un preset par ligne, ordre du fichier)
 #   resolve-preset.sh <preset>        émet la fermeture transitive des modules du preset
 #                                     (un module par ligne, triée, dédupliquée) — même format
@@ -19,6 +20,15 @@
 #   - preset qui référence un module `proposable: false` — un preset n'expose JAMAIS un module
 #     WIP que le catalogue cache (INST-02bis) ; on refuse le preset entier, on ne l'élague pas
 #     en silence.
+#
+# POSTE (Phase 58, P58-D-21) : `list --role <poste>` (ou `--role=<poste>`), à défaut `VF_ROLE`
+# (le drapeau l'emporte), avec `product` ou `dev`, retire de la liste tout preset dont la
+# fermeture de dépendances (resolve-deps.sh) contient un module que `module-roles.sh` déclare
+# invisible à ce poste. Le prédicat n'existe que dans module-roles.sh : appelé, jamais recopié.
+# `solo` et « sans poste » : le code d'avant, sortie identique à l'octet. Poste invalide, option
+# sans valeur, argument inconnu, `roles` invalide, fermeture irrésoluble : erreur bruyante (code 1),
+# jamais un preset élagué en silence. La résolution NOMMÉE ne lit jamais le poste : c'est le CHOIX
+# qui se filtre. Un poste est une vue, pas un droit (ADR-077).
 #
 # Racine des modules : ${VF_MODULES_ROOT:-<parent du dossier du script>} (cohérent avec
 # resolve-deps.sh). Fichier de presets : ${VF_PRESETS_FILE:-<dossier du script>/presets.json}
@@ -39,7 +49,32 @@ ROOT="${VF_MODULES_ROOT:-$(cd "$HERE/.." && pwd)}"
 PRESETS="${VF_PRESETS_FILE:-$HERE/presets.json}"
 RESOLVE_DEPS="$HERE/resolve-deps.sh"
 
-[ "$#" -eq 1 ] || err "usage: resolve-preset.sh list | resolve-preset.sh <preset>"
+USAGE="usage: resolve-preset.sh list [--role <poste>] | resolve-preset.sh <preset>"
+[ "$#" -ge 1 ] || err "$USAGE"
+POSTE=""
+if [ "$1" = "list" ]; then
+  POSTE="${VF_ROLE:-}"
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --role)
+        [ "$#" -ge 2 ] && [ -n "$2" ] || err "--role nécessite une valeur"
+        POSTE="$2"; shift 2 ;;
+      --role=*)
+        POSTE="${1#--role=}"
+        [ -n "$POSTE" ] || err "--role nécessite une valeur"
+        shift ;;
+      *) err "argument inconnu" ;;
+    esac
+  done
+  case "$POSTE" in
+    ""|solo|product|dev) ;;
+    *) err "poste invalide (attendu solo|product|dev ; valeur non réimprimée)" ;;
+  esac
+  set -- list
+else
+  [ "$#" -eq 1 ] || err "$USAGE"
+fi
 [ -f "$PRESETS" ] || err "fichier de presets introuvable : $PRESETS"
 [ -f "$RESOLVE_DEPS" ] || err "résolveur de deps introuvable : $RESOLVE_DEPS"
 
@@ -48,7 +83,43 @@ jqx -e '.presets | type == "array"' "$PRESETS" >/dev/null 2>&1 \
   || err "presets.json invalide (tableau .presets attendu) : $PRESETS"
 
 if [ "$1" = "list" ]; then
-  jqx -r '.presets[] | [.name, .titre, .description, (.modules | join(" "))] | @tsv' "$PRESETS"
+  case "$POSTE" in
+    product|dev) ;;
+    *)
+      jqx -r '.presets[] | [.name, .titre, .description, (.modules | join(" "))] | @tsv' "$PRESETS"
+      exit 0 ;;
+  esac
+  # Filtre du poste : visibles calculés AVANT la boucle par le prédicat unique, puis la fermeture de
+  # chaque preset (même délégation que la résolution nommée) doit y figurer tout entière.
+  ROLES_SH="$HERE/module-roles.sh"
+  [ -f "$ROLES_SH" ] || err "module-roles.sh introuvable : $ROLES_SH"
+  VISIBLES="$(VF_MODULES_ROOT="$ROOT" bash "$ROLES_SH" list "$POSTE")" \
+    || err "filtre du poste $POSTE impossible (voir le message de module-roles.sh ci-dessus)"
+  count="$(jqx -r '.presets | length' "$PRESETS")" || err "lecture de presets.json impossible"
+  # Sortie accumulée puis émise d'un bloc : une erreur en cours de route ne laisse aucune liste partielle.
+  res=""
+  i=0
+  while [ "$i" -lt "$count" ]; do
+    pname="$(jqx -r --argjson i "$i" '.presets[$i].name' "$PRESETS")" || err "lecture de presets.json impossible"
+    pmods="$(jqx -r --argjson i "$i" '.presets[$i].modules[]?' "$PRESETS")" || err "lecture de presets.json impossible"
+    closure=""
+    if [ -n "$pmods" ]; then
+      closure="$(printf '%s\n' "$pmods" | xargs bash "$RESOLVE_DEPS")" \
+        || err "preset '$pname' : fermeture de dépendances irrésoluble (voir le message ci-dessus)"
+    fi
+    keep=1
+    while IFS= read -r mod; do
+      [ -n "$mod" ] || continue
+      printf '%s\n' "$VISIBLES" | grep -qxF -- "$mod" || { keep=0; break; }
+    done <<< "$closure"
+    if [ "$keep" -eq 1 ]; then
+      line="$(jqx -r --argjson i "$i" '.presets[$i] | [.name, .titre, .description, (.modules | join(" "))] | @tsv' "$PRESETS")" \
+        || err "lecture de presets.json impossible"
+      res="$res$line"$'\n'
+    fi
+    i=$((i+1))
+  done
+  printf '%s' "$res"
   exit 0
 fi
 

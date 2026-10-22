@@ -96,3 +96,4 @@
 - [Escalade vers main inactif](project_escalade-vers-main-inactif-attente-sans-fin.md) — SendMessage(main) attend le prochain tour : 5 h sans réponse en Phase 57 ; borner ~1 h puis rendre human_needed
 - [Budget ROADMAP en octets : <details> inerte](project_roadmap-budget-octets-details-inerte.md) — replier ne réduit rien ; fiabilite déjà replié, levier = archivage bloqué par S4(a)
 - [CI tests shallow, PyYAML user site](project_ci-tests-shallow-pyyaml-user-site.md) — job tests sans fetch-depth = SKIP des preuves historiques ; HOME temp = PyYAML perdu, garder PYTHONUSERBASE
+- [Orphelins de test bloquent les juges](feedback_orphelins-de-test-bloquent-les-juges.md) — mutant bloqué sur FIFO survit à perl alarm et gèle un juge derrière `| tail` : interdire les tubes, borne par groupe

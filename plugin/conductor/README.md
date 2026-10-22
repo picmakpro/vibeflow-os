@@ -6,7 +6,7 @@
 > et de migration. Module **mandatory** : posé d'office à chaque install, c'est lui qui porte les
 > gates machine (hooks) et le noyau d'orchestration d'équipe réutilisé par tous les autres modules.
 
-**Type** : `agent + skills + scripts + references` · **Version** : v1.49.1 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
+**Type** : `agent + skills + scripts + references` · **Version** : v1.50.0 · **Dépend de** : `planning-core`, `validator`, `skill-creator`.
 
 > `skill-creator` est une dépendance **dure** depuis ADR-047 : c'est le canal unique de création de
 > skills, invoqué par `vf-new-lab` en fan-out (Phase 5) et exigé par le Gate C. Le conductor étant
@@ -91,6 +91,10 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
 - **SessionStart (sans matcher)** → `guard-fin-de-geste.sh --snapshot` (**advisory**, Phase 41.3,
   SOBR-07) : photographie en lecture seule ce qui est déjà rangeable ; stdout vide sur le chemin
   nominal.
+- **SessionStart (sans matcher)** → `check-role-consistency.sh --hook` (**advisory**, Phase 58) : sur
+  stdout la ligne `Poste : X` dès que le poste de l'humain n'est pas `solo`, un constat sur stderr si ce
+  poste sort de la liste `vf_roles` du projet ; silence à 0 octet sans fichier de poste. Ce hook ne décide
+  rien de sécurité : un poste est une vue, pas un droit.
 - **Stop** → `guard-fin-de-geste.sh` (**bloquant par le code de sortie**, Phase 41.3, ADR-076) :
   archive seul ce qu'un budget dépassé désigne, puis bloque à chaque arrêt tant qu'il reste du
   rangement **apparu depuis le snapshot de la session** ; après 3 blocages de suite sans progrès (l'ensemble
@@ -102,9 +106,22 @@ première instanciation non-dev) et les **bundles métier** (business-pilot, con
   2026-10-01) : les deux hooks ne font RIEN (exit 0, muets, aucun fichier créé, aucun archivage) tant que la racine git du cwd
   ne porte pas `.planning/.fin-de-geste-armed` ; câblé en scope user, le hook agissait sinon dans tous les dépôts.
 
-## Scripts (33) — par famille
+## Poste (Phase 58)
 
-*(Compte re-dérivé au 2026-09-30 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
+Le poste de l'humain (`solo`, `product` ou `dev`) est posé par l'engine à l'install (`--role` ou
+`VF_ROLE`, scope project ou local) dans un fichier local non versionné, lu par `vf-role.sh get`. La
+liste des postes admis par le projet, `vf_roles`, s'édite **À LA MAIN** dans le `.planning/config.json`
+racine : VibeFlow n'en écrit aucune ligne. gsd-core avertit sur stderr d'une clé inconnue : avertissement
+attendu, ignorable. Rappel : un poste est une vue, pas un droit — git ne cloisonne rien, le filtre ne joue qu'à
+la pose, aucun contrôle d'accès n'y est adossé. En poste `product`, la chaîne design (design-orchestrator,
+ouvert à ce poste) pose superpowers, qui apporte aussi des skills orientés dev (TDD, débogage) : « commande dev »
+désigne les skills et agents des trois modules `roles:["dev"]` plus gsd-*, pas superpowers.
+
+## Scripts (38) — par famille
+
+*(Compte re-dérivé au 2026-10-16, Phase 58 : même commande → 38 ; il gagne `check-role-consistency.sh`
+et `vf-role.sh` (+2) au-dessus du compte 36 de `origin/main`. Parenthèse historique ci-dessous,
+inchangée : compte re-dérivé au 2026-09-30 : `find plugin/conductor/scripts -maxdepth 1 -type f -name
 '*.sh' | awk 'END{print NR}'` → 33 ; il gagne `check-ajout-retrait.sh` et `guard-fin-de-geste.sh`
 (+2, Phase 41.3) au-dessus du compte 31 de `origin/main` (dont `check-method-budget.sh`, v2.67.0).
 Le compte du 2026-09-26 était 30, croisé par `git ls-files`. Il gagne `check-skills.sh` (+1,
@@ -183,6 +200,15 @@ correction — non catalogués ici faute de mandat pour le faire correctement.)*
   rien.
 - `guard-fin-de-geste.sh` — hooks `SessionStart --snapshot` et `Stop` du nettoyage de fin de geste
   (voir § Hooks ci-dessus).
+- `check-role-consistency.sh` — gate du poste (Phase 58, P58-D-09, P58-D-10) : le poste de l'humain
+  figure-t-il dans la liste `vf_roles` du `.planning/config.json` de la racine ? Lecture seule, codes
+  0 (listé), 1 (hors liste ou valeur invalide), 3 (silence : aucune source de poste, pas de liste),
+  5 (illisible, bruyant). `--role <poste>` juge un poste candidat avant toute pose (refus à la pose de
+  l'engine) ; `--hook` est l'entrée SessionStart (voir § Hooks).
+- `vf-role.sh` — lecteur UNIQUE du poste (P58-D-15), interface des Phases 59 à 61 :
+  `vf-role.sh get [--path <dir>]` imprime exactement une ligne `solo|product|dev` (priorité `VF_ROLE`,
+  puis `<racine>/.claude/vibeflow-role`, puis `solo`), codes 0 / 1 (invalide) / 5 (fichier illisible) /
+  64 (usage) ; lecture seule, l'engine est l'unique écrivain du fichier.
 - `check-map-drift.sh` — gate anti-drift carte↔disque (contrat de routage par dossier).
 - `check-guard-health.sh` — lecteur générique `SessionStart` des marqueurs de santé écrits par
   `vf_guard_unavailable` (tout le parc de gardes, pas seulement le lock) : fail-open bruyant plutôt

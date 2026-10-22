@@ -102,6 +102,23 @@ de tout ce qui va être installé (le module que tu as choisi entraîne parfois 
 il dépend) — tu vois exactement ce qui va se passer avant que ça se passe. Une fois confirmé, les
 modules choisis sont posés à l'emplacement (le scope) que tu as retenu à l'étape 2.
 
+### Ton poste
+
+En scope projet ou local, l'étape 2 te demande aussi ton **poste** : `solo` (pré-coché : tu vois tout,
+comme avant), `product` ou `dev`. L'étape est sautée en scope compte, où le poste vaut `solo`, et dès
+que `VF_ROLE` est posée.
+
+- **Non interactif** : `VF_ROLE=solo|product|dev` ; le drapeau `--role` l'emporte sur la variable.
+- **Où il vit** : le fichier local `.claude/vibeflow-role`, non versionné, une seule valeur.
+- **Liste du projet** : la clé `vf_roles` de `.planning/config.json`, éditée à la main, dit quels postes
+  le projet admet ; VibeFlow n'y écrit rien.
+- **Changer plus tard** : `vibeflow-update.sh role <poste>`.
+
+Un poste est une vue, pas un droit : il filtre ce qu'on te propose à la pose, rien n'est cloisonné —
+git, le scope projet et un GSD déjà installé au scope compte restent visibles. En poste `product`, la chaîne
+design pose superpowers, qui apporte aussi des skills orientés dev (TDD, débogage). Voir le
+[glossaire](../02-concepts/glossaire.md).
+
 ### Ce que tu vois à l'écran quand ça marche
 
 À la fin de la configuration, tu obtiens un récapitulatif final qui te dit ce qui a été posé et

@@ -104,8 +104,8 @@
 - [ ] Phase 54: Audit du harness comme surface d'attaque (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 55: Installeur et mémoire portables entre runtimes (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
 - [ ] Phase 56: Packs de règles par langage (module optionnel) (inscrite 2026-09-25, jalon ecc-inspiration-v1.0)
-- [ ] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — 16/16 plans exécutés 2026-10-12, porte de phase verte (`57-16-SUMMARY.md`), DLWS-01..08 cochées ; PR et vérification de phase à venir, aucune release (P57-D-30)
-- [ ] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0)
+- [x] Phase 57: Verrou de driver par compartiment (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-12, mergée PR #152 le 2026-10-16 en `--admin`, revue `@picmakpro` contournée (demande explicite de Samuel, session principale Claude Code, 2026-10-16 : « merge sans willy, release + tag »), release `v2.70.0` ; 16/16 plans, DLWS-01..08 cochées
+- [x] Phase 58: Rôles de poste — installeur, profils solo / product / dev (inscrite 2026-10-08, jalon equipe-produit-v1.0) — complete 2026-10-22 : 12/12 plans, porte de phase verte, RLPO-01..12 cochées dont RLPO-11 par override (critère 6 et recette installeur non mesurés, Samuel, session principale, 2026-10-22 — dette dans 58-VERIFICATION.md), branche rebasée sur v2.70.1, release `v2.71.0` à venir
 - [ ] Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 60: Gate architecture avant découpage et validation des phases proposées (inscrite 2026-10-08, jalon equipe-produit-v1.0)
 - [ ] Phase 61: Collaboration à deux humains — divergence armée, preuve sur lab réel (inscrite 2026-10-08, jalon equipe-produit-v1.0)
@@ -175,6 +175,8 @@
 | 41.2. Choisir la partition du planning au démarrage d'un lab | fiabilite-v1.0 | 6/6 | Complete — PR #130, release `v2.69.0` ; WSCH-01 avec réserve (recette en session au BACKLOG) | 2026-10-02 |
 | 41.3. Sobriété de méthode — ce qu'on crée, on le range | fiabilite-v1.0 | 4/4 | Complete — PR #123, release `v2.68.0` | 2026-09-30 |
 | 41.4. Emprunts Pocock — disciplines de cadrage, de revue et de skills | fiabilite-v1.0 | 11/11 | Complete — PR #135 (merge `--admin`, 2026-10-08), release `v2.69.0` | 2026-10-06 |
+| 57. Verrou de driver par compartiment | equipe-produit-v1.0 | 16/16 | Complete — PR #152 (merge `--admin`, 2026-10-16), release `v2.70.0` | 2026-10-12 |
+| 58. Rôles de poste — installeur, profils solo / product / dev | equipe-produit-v1.0 | 12/12 | Complete (2 overrides, Samuel 2026-10-22) — release `v2.71.0` à venir | 2026-10-22 |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 
@@ -506,6 +508,8 @@ sont posées au cadrage, jamais avant, dans les familles réservées et vérifi�
 
 **Critères de succès du jalon** (spec §9) :
 1. Une install `VF_ROLE=product` n'expose aucune commande dev et pose `conductor` et `consolidator`.
+   (Précisé le 2026-10-20, Q19, arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 : « commande dev » = skills et agents des 3 modules `roles:["dev"]` + gsd-* ;
+   superpowers reste posé en product par la chaîne design.)
 2. Une install sans rôle reste **identique** à aujourd'hui : non-régression, suites existantes vertes.
 3. Depuis un lab vide, le rôle product produit `BRIEF.md` et un PRD (`PROJECT.md` + `REQUIREMENTS.md`) jugés
    au-dessus du seuil par `prd-gate`. Le head refuse ensuite le découpage tant que l'architecture n'est pas validée.
@@ -531,7 +535,7 @@ forme exec (ADR-071).
 **Depends on:** aucune. Première du jalon.
 **Sources:** spec head `docs/superpowers/specs/2026-09-15-vibeflow-head-design.md` §6, points (1) à (3) ; ADR-053 ; `plugin/conductor/scripts/driver-lock.sh` et `guard-driver-lock.sh` ; BACKLOG « guard-driver-lock.sh sous EnterWorktree vise le checkout principal ».
 **Hors périmètre :** la preuve d'usage concurrent réel (§6, point 4), portée par la Phase 61.
-**Plans:** 16/16 plans executed (10 vagues)
+**Plans:** 16/16 plans exécutés en 10 vagues (2026-10-12) ; mergée PR #152 le 2026-10-16, release `v2.70.0`
 
 Plans:
 **Wave 1**
@@ -573,15 +577,39 @@ Plans:
 ### Phase 58: Rôles de poste — installeur, profils solo / product / dev
 
 **Goal:** `/vibeflow-install` demande le rôle sur ce projet, pré-coché « solo », avec un mode non interactif par `VF_ROLE`. `module.json` porte `roles` (absent = tous), et `build-module-catalog.sh` filtre le catalogue. Le rôle vit dans un fichier local non versionné (A-11) ; le projet ne porte que la liste des rôles autorisés, vérifiée par `check-role-consistency.sh`. Trois profils seulement (A-02).
-**Requirements**: TBD — famille `RLPO` réservée, posée au cadrage.
+**Requirements**: RLPO-01, RLPO-02, RLPO-03, RLPO-04, RLPO-05, RLPO-06, RLPO-07, RLPO-08, RLPO-09, RLPO-10, RLPO-11, RLPO-12
 **Depends on:** 57.
 **Sources:** spec §5.1, §5.4 ; SEED A-02, A-04, A-11 ; `plugin/installer/`, `plugin/_internal/vibeflow-update.sh`.
 **Hors périmètre :** les rôles architecte, QA et scrum master (A-02) ; tout contrôle d'accès.
-**Plans:** 0 plans
+**Plans:** 12 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 58 to break down)
+**Wave 1**
+- [x] 58-01-PLAN.md — vague 1 : clé `roles` des `module.json`, validateur unique `module-roles.sh`, table minimale (3 modules `["dev"]`), invariant de fermeture `product` ; contrat de phase et registre P58-PL-01..14
+- [x] 58-02-PLAN.md — vague 1 : lecteur unique du poste `vf-role.sh get` (interface des Phases 59 à 61), suite à mutants
+- [x] 58-03-PLAN.md — vague 1 : ADR-077 sous verrou de dépôt court du manager, relue par Samuel (non autonome)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [x] 58-04-PLAN.md — vague 2 : gate `check-role-consistency.sh` (0/1/3/5), ligne « Poste : X » au SessionStart, entrée de hook exec, inventaire des hooks à 32
+- [x] 58-05-PLAN.md — vague 2 : catalogue filtré par `--role`/`VF_ROLE`, sortie sans poste identique à l'octet (copie gelée)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [x] 58-06-PLAN.md — vague 3 : engine, volet pose — `--role`/`VF_ROLE`, fichier de poste, règle d'ignorance séparée, `.worktreeinclude` conditionnel, refus à la pose, arêtes de scope
+- [x] 58-07-PLAN.md — vague 3 : skill installeur (étape 2 bis, repli sans fuite, note des bundles, « statut »), glossaire, README de conductor
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [x] 58-08-PLAN.md — vague 4 : engine, volet usage — filtre de `install --all`, registre et `update --all` intacts, verbe `role` et avis
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [x] 58-09-PLAN.md — vague 5 : suite e2e des critères 1, 2 et 5, outil de livraison (`base`, `gitignore-intact`, `fichiers-intacts`, `clients`)
+- [x] 58-10-PLAN.md — vague 5 : bumps sans release (conductor v1.50.0, dev-orchestrator v2.28.1, mobile-test v1.0.4, mobile-test-team v1.4.7)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [x] 58-12-PLAN.md — vague 6 : presets filtrés par poste (`resolve-preset.sh list --role`, fermeture de dépendances), sortie sans poste identique à l'octet, suite à mutants, ligne du skill installeur (P58-D-21)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+- [x] 58-11-PLAN.md — vague 7 : sous-section « Poste » du manuel FR+EN, liste de clients lue par défaut dans le dossier de configuration, compte de suites, porte de phase rejouée depuis `ci.yml`, critère 6 (« en attente de la liste » si absente), ledger à la main
 
 ### Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
 
