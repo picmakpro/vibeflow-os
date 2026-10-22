@@ -64,7 +64,7 @@ projet recule. La dernière étape t'appartient.
 
 Un vert qui ne peut pas devenir rouge ne prouve rien. Les tests s'écrivent rouges d'abord, les
 gates `check-*.sh` tournent en CI, et le juge n'est jamais l'auteur. Le dépôt s'applique la même
-règle : 109 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
+règle : 111 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
 vierge qui doit passer ses propres gates sans intervention.
 
 → [Les gates machine](./manual/fr/07-sous-le-capot/les-gates-machine.md)
