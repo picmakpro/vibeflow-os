@@ -22,8 +22,8 @@
 # Reference : ADR-032 pilier 1 (Indexation) + LRN-106 (audit before fix)
 
 set -euo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
 
@@ -143,7 +143,7 @@ import sys
 file_path = sys.argv[1]
 pat_str = sys.argv[2]
 
-with open(file_path) as f:
+with open(file_path, encoding="utf-8") as f:
     lines = f.readlines()
 
 pat = re.compile(r'^## (' + pat_str + r')[^\n]*')
@@ -385,7 +385,7 @@ file_path = sys.argv[1]
 out_path = sys.argv[2]
 orphan_ids = """$orphans""".strip().split('\n')
 
-with open(file_path) as f:
+with open(file_path, encoding="utf-8") as f:
     lines = f.readlines()
 
 out_lines = []
@@ -412,7 +412,7 @@ for orphan_id in orphan_ids:
                 out_lines.append(f"{old_id}|—|{old_date}|{old_title}|[body non redige - voir BLK-005]")
             break
 
-with open(out_path, 'w') as f:
+with open(out_path, 'w', encoding='utf-8') as f:
     for ol in out_lines:
         f.write(ol + '\n')
 PYEOF

@@ -2116,8 +2116,8 @@ jobs:
         # partir du même code, donc aucun des deux ne peut se satisfaire lui-même à vide.
         run: |
           set -eu
-          # Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-          PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+          # Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+          PYX="-Xutf8"
           closure=$(bash plugin/_internal/resolve-deps.sh dev-orchestrator)
           if ! printf '%s\n' "$closure" | awk '$0=="dev-orchestrator"{f=1} END{exit !f}'; then
             echo "::error::fermeture résolue sans dev-orchestrator — attendu non fiable, refus de continuer"

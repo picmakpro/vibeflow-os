@@ -26,9 +26,10 @@ mkrepo() { # <nom> → crée $TMP/<nom> (dépôt git avec plugin/x/scripts/)
   local d="$TMP/$1"; mkdir -p "$d/plugin/x/scripts" "$d/scripts" "$d/.github"
   git -C "$d" init -q; printf '%s\n' "$d"
 }
-# Définition canonique de PYX (H7) : posée en tête de tout fixture qui l'utilise, comme le fait chaque
+# Définition canonique de PYX (mode UTF-8 inconditionnel, #153) : posée en tête de tout fixture qui l'utilise, comme le fait chaque
 # script livré — sans elle le gate refuse le fichier (set -u fatal).
-CANON='PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"'
+CANON='PYX="-Xutf8"'
+OLDCANON='PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"'   # forme conditionnelle d'avant #153 : REFUSÉE
 put() { # <repo> <chemin relatif> <contenu>
   mkdir -p "$(dirname "$1/$2")"
   case "$3" in *PYX*) printf '%s\n%s\n' "$CANON" "$3" > "$1/$2" ;; *) printf '%s\n' "$3" > "$1/$2" ;; esac
@@ -155,6 +156,17 @@ r="$(mkrepo pyxnodef)"; put "$r" plugin/x/scripts/b.sh "$PY -I -c 'import json' 
 printf '%s\n' "$PY -I \$PYX -c 'import json'" > "$r/plugin/x/scripts/a.sh"; git -C "$r" add -- plugin/x/scripts/a.sh
 expect "\$PYX utilisé sans la définition canonique de PYX → 1" 1 "$SCRIPT" "$r"
 
+echo "== ancienne définition conditionnelle de PYX (#153) → rouge =="
+r="$(mkrepo pyxold)"; put "$r" plugin/x/scripts/b.sh "$PY -I -c 'import json' # vf-pyx-ok"
+printf '%s\n%s\n' "$OLDCANON" "$PY -I \$PYX -c 'import json'" > "$r/plugin/x/scripts/a.sh"; git -C "$r" add -- plugin/x/scripts/a.sh
+expect "définition conditionnelle (PYTHONUTF8) de PYX → 1" 1 "$SCRIPT" "$r"
+r="$(mkrepo pyxneutre)"; put "$r" plugin/x/scripts/b.sh "$PY -I -c 'import json' # vf-pyx-ok"
+printf '%s\n%s\n' 'PYX=""' "$PY -I \$PYX -c 'import json'" > "$r/plugin/x/scripts/a.sh"; git -C "$r" add -- plugin/x/scripts/a.sh
+expect "PYX vidé (UTF-8 non restitué) → 1" 1 "$SCRIPT" "$r"
+r="$(mkrepo pyxsurcharge)"; put "$r" plugin/x/scripts/b.sh "$PY -I -c 'import json' # vf-pyx-ok"
+printf '%s\n%s\n%s\n' "$CANON" "$OLDCANON" "$PY -I \$PYX -c 'import json'" > "$r/plugin/x/scripts/a.sh"; git -C "$r" add -- plugin/x/scripts/a.sh
+expect "canon puis redéfinition conditionnelle de PYX (surcharge) → 1" 1 "$SCRIPT" "$r"
+
 echo "== exclusions =="
 r="$(mkrepo excl)"
 put "$r" plugin/x/scripts/ok.sh "$PY -I \$PYX -c 'import json'"
@@ -263,6 +275,15 @@ expect "témoin MUT29 : marqueur vf-pyx-ok → vert" 0 "$SCRIPT" "$d"
 if mutate MUT29 's#hasx || index(line, "vf-pyx-ok") > 0#hasx#'; then
   run "$TMP/MUT29.sh" "$d"; rc=$?
   [ "$rc" -eq 1 ] && ok "MUT29 marqueur vf-pyx-ok non lu → rouge (1)" || ko "MUT29" "rc=$rc (attendu 1)"
+fi
+
+# #153 : toute définition de PYX autre que la canonique est refusée (une surcharge rendrait l'UTF-8 conditionnel).
+d="$(mkrepo mpyxold)"; put "$d" plugin/x/scripts/b.sh "$PY -I -c 'import json' # vf-pyx-ok"
+printf '%s\n%s\n%s\n' "$CANON" "$OLDCANON" "$PY -I \$PYX -c 'import json'" > "$d/plugin/x/scripts/a.sh"; git -C "$d" add -- plugin/x/scripts/a.sh
+expect "témoin MUT30 : canon puis redéfinition conditionnelle → rouge" 1 "$SCRIPT" "$d"
+if mutate MUT30 's#else if (L\[k\] ~ /(^|\[^A-Za-z0-9_\])PYX=/) {#else if (0) {#'; then
+  run "$TMP/MUT30.sh" "$d"; rc=$?
+  [ "$rc" -ne 1 ] && ok "MUT30 autre définition de PYX non refusée → la surcharge passe (rc=$rc)" || ko "MUT30" "toujours rouge — la règle n'est pas ce qui refuse la surcharge"
 fi
 
 echo "== contrôle final (arbre réel, non discriminant) =="

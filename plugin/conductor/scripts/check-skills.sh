@@ -147,8 +147,8 @@
 # jamais un vert à vide ; sous --hook, 3 devient 0 à la frontière du shell comme ailleurs.
 
 set -uo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 SKILLS_DIR=".claude/skills"
 STRICT=false

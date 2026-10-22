@@ -15,8 +15,8 @@
 # Reference : ADR-032 pilier 3 (Fusion)
 
 set -euo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
 TARGET_REGISTER=""
@@ -97,7 +97,7 @@ detect_similar_titles() {
   python3 -I $PYX - <<'PYEOF' 2>/dev/null || true
 import os
 try:
-    with open('/tmp/.consolidator-titles.tmp') as f:
+    with open('/tmp/.consolidator-titles.tmp', encoding='utf-8') as f:
         rows = [line.strip().split('|') for line in f if line.strip()]
 except FileNotFoundError:
     rows = []

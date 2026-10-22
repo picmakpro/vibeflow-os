@@ -13,8 +13,8 @@
 #   ./check-legacy.sh --print    # JSON {verdict, scopes[]} pour câblage (banner, vf-update)
 # Exit 0 toujours (préflight informatif — ne bloque jamais).
 set -uo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 MODE="human"; [ "${1:-}" = "--print" ] && MODE="json"
 

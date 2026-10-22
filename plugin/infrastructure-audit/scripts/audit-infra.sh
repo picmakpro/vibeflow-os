@@ -41,8 +41,8 @@
 # Reference : skill infrastructure-audit + ADR-031
 
 set -uo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 CLAUDE_DIR="${CLAUDE_DIR:-.claude}"
 SCRIPTS_DIR="$CLAUDE_DIR/scripts"
@@ -275,7 +275,7 @@ audit_hooks() {
     files_audited+=("$sf")
 
     # JSON valide ?
-    if ! python3 -I $PYX -c "import json; json.load(open('$sf'))" 2>/dev/null; then
+    if ! python3 -I $PYX -c "import json; json.load(open('$sf', encoding='utf-8'))" 2>/dev/null; then
       errors_count=$((errors_count + 1))
       det_add "ERR json_invalid : $sf"
       continue
@@ -292,7 +292,7 @@ import os
 sf = sys.argv[1]
 known = sys.argv[2].split()
 
-with open(sf) as f:
+with open(sf, encoding='utf-8') as f:
     data = json.load(f)
 
 hooks = data.get("hooks", {})
@@ -346,7 +346,7 @@ EOF_DET
       hc=$(python3 -I $PYX -c "
 import json
 try:
-    d = json.load(open('$sf'))
+    d = json.load(open('$sf', encoding='utf-8'))
     h = d.get('hooks', {})
     if isinstance(h, dict):
         print(sum(len(v) if isinstance(v, list) else 0 for v in h.values()))

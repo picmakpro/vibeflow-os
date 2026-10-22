@@ -23,8 +23,8 @@
 # l'entrée CHANGELOG). Échoue bruyamment si un fichier attendu manque.
 # Codes de sortie : 0 = ok · 1 = fichier attendu manquant / écriture impossible · 2 = usage
 set -euo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 # Racine dérivée de l'emplacement du script (scripts/ vit à la racine) — PAS du cwd.
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
