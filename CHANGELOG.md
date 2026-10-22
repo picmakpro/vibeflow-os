@@ -13,6 +13,23 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.70.1] — 2026-10-22
+
+**Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session
+principale, 2026-10-20 ; ordre de livraison « hotfix d'abord » tranché par arbitrage Samuel, AskUserQuestion session
+principale, 2026-10-22) :
+
+- **Isolation de l'interpréteur Python** (`conductor` v1.49.1, `consolidator` v1.11.1, `design-orchestrator` v1.5.14,
+  `dev-orchestrator` v2.28.1, `infrastructure-audit` v1.3.4, `planning-core` v2.8.2, `reference` v2.5.8,
+  `software-architecture` v1.6.3). Depuis v2.70.0, `python3 -c` / `python3 -` mettaient le dossier courant en tête de
+  `sys.path` : un `json.py` posé à la racine d'un lab cloné était exécuté par les hooks (`vf_python`,
+  `guard-driver-lock`, `merge-hooks`), et le guard du verrou cessait de refuser (fail-open). Chaque invocation inline
+  passe en `-I` (`-E` pour la sonde PyYAML de `check-description-fidelity.sh`), `PYTHONUTF8=1` restitué par `-X utf8`.
+- **Gate `scripts/check-python-isolation.sh`** (étape du job CI `gates`, `--min-sites 40`) et témoins par site
+  `scripts/tests/test-python-isolation-sites.sh` / `test-check-python-isolation.sh`.
+- **Manifeste `check-agents-manifest.json` relu et re-daté au 2026-10-22** (il expirait le 2026-10-23) : ajout du champ
+  `autoCompactWindow` et du type natif `claude`.
+
 ## [v2.70.0] — 2026-10-14
 
 **Minor** (verrou de driver par compartiment, Phase 57, premier livrable du jalon `equipe-produit-v1.0` ; release
