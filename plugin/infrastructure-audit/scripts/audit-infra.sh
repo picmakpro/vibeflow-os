@@ -318,7 +318,8 @@ for event, configs in hooks.items():
                 tokens = cmd.split()
                 for tok in tokens:
                     if tok.endswith(".sh") and "/" in tok:
-                        path = tok.replace("$CLAUDE_PROJECT_DIR/", "")
+                        # #153 §3 : la forme "$CLAUDE_PROJECT_DIR"/x.sh garde ses guillemets dans le jeton.
+                        path = tok.replace('"', "").replace("'", "").replace("$CLAUDE_PROJECT_DIR/", "")
                         if not os.path.exists(path):
                             print(f"ERR|script_missing|{path}|{sf}")
                         elif not os.access(path, os.X_OK):

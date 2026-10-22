@@ -195,6 +195,25 @@ N="$(run_in "$LAB_ERR" "$BASH_BIN" "$SCRIPT" --quick 2>/dev/null | grep -c '^{')
 [ "$N" -eq 2 ] && ok "T10d non-régression : sans --hook, --quick rend toujours 2 objets (runtime+hooks)" \
   || ko "T10d la sortie CLI a changé : $N objet(s) au lieu de 2"
 
+# T11 — #153 §3 : `bash "$CLAUDE_PROJECT_DIR"/.claude/scripts/x.sh` (forme à guillemets, celle
+# qui survit aux espaces d'un chemin Windows) : le jeton garde ses guillemets, le chemin n'était
+# jamais résolu → faux script_missing. Le script existe ici : zéro détection attendue.
+LAB_Q="$WORK/lab-quote"; mkdir -p "$LAB_Q/.claude/scripts"
+printf '#!/bin/sh\nexit 0\n' > "$LAB_Q/.claude/scripts/present.sh"; chmod +x "$LAB_Q/.claude/scripts/present.sh"
+cat > "$LAB_Q/.claude/settings.json" <<'JSON'
+{ "hooks": { "SessionStart": [ { "hooks": [
+  { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/scripts/present.sh" },
+  { "type": "command", "command": "bash '$CLAUDE_PROJECT_DIR'/.claude/scripts/present.sh --x" } ] } ] } }
+JSON
+OUT="$(run_in "$LAB_Q" "$BASH_BIN" "$SCRIPT" --axis=hooks 2>/dev/null)"
+if echo "$OUT" | grep -q 'script_missing'; then
+  ko "T11 #153 §3 : faux script_missing sur la forme à guillemets, sortie : $OUT"
+elif echo "$OUT" | grep -q '"errors_count": 0'; then
+  ok "T11 #153 §3 : jetons \"\$CLAUDE_PROJECT_DIR\"/… (guillemets doubles et simples) résolus, 0 erreur"
+else
+  ko "T11 errors_count: 0 attendu, sortie : $OUT"
+fi
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
