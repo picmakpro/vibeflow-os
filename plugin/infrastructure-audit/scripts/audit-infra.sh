@@ -327,6 +327,9 @@ for event, configs in hooks.items():
                         break
 PYEOF
 )"
+    # #153 §6.7 : sous Windows print() termine par CRLF et $(…) ne retire que le \n final —
+    # un \r resterait dans `src` et rendrait le JSON des détections invalide.
+    py_out="${py_out//$'\r'/}"
 
     # Comptage + formatage des detections (boucle dans le shell courant via heredoc,
     # pas de pipe : un `| while` perdrait les compteurs dans un sous-shell).

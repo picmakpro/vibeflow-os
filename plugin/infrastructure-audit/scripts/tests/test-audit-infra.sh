@@ -214,6 +214,38 @@ else
   ko "T11 errors_count: 0 attendu, sortie : $OUT"
 fi
 
+# T12 — #153 §6.7 : sous Windows, print() termine chaque ligne par CRLF ; $(…) ne retire que la
+# fin de la DERNIÈRE ligne, donc les lignes intermédiaires de py_out gardaient un \r → JSON
+# invalide dès 2 détections. Simulé par un faux python3 qui réécrit en CRLF la sortie du
+# programme lu sur stdin (l'invocation `python3 - …` de py_out), et seulement elle.
+CRLF_BIN="$WORK/bin-crlf"; mkdir -p "$CRLF_BIN"
+REAL_PY="$(command -v python3)"
+cat > "$CRLF_BIN/python3" <<SH
+#!/bin/sh
+for a in "\$@"; do
+  if [ "\$a" = "-" ]; then
+    "$REAL_PY" "\$@" | awk '{ printf "%s\r\n", \$0 }'
+    exit 0
+  fi
+done
+exec "$REAL_PY" "\$@"
+SH
+chmod +x "$CRLF_BIN/python3"
+LAB_CR="$WORK/lab-crlf"; mkdir -p "$LAB_CR/.claude/scripts"
+cat > "$LAB_CR/.claude/settings.json" <<'JSON'
+{ "hooks": { "SessionStart": [ { "hooks": [
+  { "type": "command", "command": "bash .claude/scripts/fantome-un.sh" },
+  { "type": "command", "command": "bash .claude/scripts/fantome-deux.sh" },
+  { "type": "command", "command": "bash .claude/scripts/fantome-trois.sh" } ] } ] } }
+JSON
+OUT="$(run_in "$LAB_CR" env PATH="$CRLF_BIN:$PATH" "$BASH_BIN" "$SCRIPT" --axis=hooks 2>/dev/null)"
+V="$(printf '%s' "$OUT" | verdict_stdout)"
+if [ "$V" = "VALIDE" ] && printf '%s' "$OUT" | grep -q '"errors_count": 3'; then
+  ok "T12 #153 §6.7 : sortie Python en CRLF, 3 détections → JSON valide, errors_count 3"
+else
+  ko "T12 JSON attendu VALIDE avec errors_count 3 (verdict=$V), sortie : $(printf '%s' "$OUT" | cat -v | head -12)"
+fi
+
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
 [ "$fail" -eq 0 ]
