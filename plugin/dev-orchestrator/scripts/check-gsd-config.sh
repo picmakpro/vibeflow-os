@@ -50,6 +50,12 @@
 # Inversement workflow.node_repair et workflow.node_repair_budget ne vivent que dans la source 1.
 # Les trois sources sont donc lues et unies ; aucune n'est suffisante seule.
 #
+# CLÉS PROPRES À VIBEFLOW (#154 §3) : une liste blanche en dur, VF_OWN dans le programme node, épargne
+# les clés de premier niveau que VibeFlow pose lui-même dans le fichier (profile, gabarit
+# planning-core, vf_runtimes, vf_roles) — chacune cite sa source dans le programme. Elle ne dit pas
+# que le moteur les connaît : le moteur peut en avertir de son côté, c'est amont. Seconde exception
+# au « jamais en dur », avec engineExtra ; le cas 38 de la suite la tient dans les deux sens.
+#
 # UNE EXCEPTION, ASSUMÉE ET NOMMÉE : la liste engineExtra (voir plus bas) recopie en dur une poignée
 # de littéraux de premier niveau que le moteur ajoute à son propre KNOWN_TOP_LEVEL sans les exporter
 # nulle part (config-loader.cjs) — aucun module de bin/lib ne les expose, ils ne sont donc pas
@@ -575,8 +581,22 @@ const KNOWN_TOP = new Set([].concat(
 const hasChildren = new Set();
 for (const k of KNOWN) { const i = k.indexOf('.'); if (i > 0) hasChildren.add(k.slice(0, i)); }
 
+// Clés de premier niveau PROPRES À VIBEFLOW (#154 §3 ; arbitrage Samuel, AskUserQuestion session
+// principale, 2026-10-22, option b) : VibeFlow les pose dans .planning/config.json, le moteur ne
+// les connaît pas, et les signaler « inconnues » était un faux positif sur un lab sain. Liste
+// blanche en dur, SECONDE exception nommée en en-tête ; chaque entrée cite sa source.
+//   profile          plugin/planning-core/references/PROFILES.md (canonique) + config.template.json
+//   planning_version, scope, type, domain, domain_extension, options, compartments, memory_bridge
+//                    plugin/planning-core/references/templates/config.template.json (posé à l'init)
+//   vf_runtimes      plugin/conductor/scripts/runtime-registry.sh (set-active écrit la clé)
+//   vf_roles         liste des postes du projet, éditée À LA MAIN (plugin/conductor/README.md, P58-D-01) et
+//                    lue par plugin/conductor/scripts/check-role-consistency.sh — pas posée par un script
+// Le moteur peut garder son propre avertissement : il reste amont, hors de ce gate.
+const VF_OWN = new Set(['profile', 'planning_version', 'scope', 'type', 'domain', 'domain_extension',
+  'options', 'compartments', 'memory_bridge', 'vf_runtimes', 'vf_roles']);
+
 for (const k of Object.keys(cfg)) {
-  if (!KNOWN_TOP.has(k)) out.push('UNKNOWN_BLOCK\t' + J(k));
+  if (!KNOWN_TOP.has(k) && !VF_OWN.has(k)) out.push('UNKNOWN_BLOCK\t' + J(k));
 }
 
 for (const k of Object.keys(cfg)) {

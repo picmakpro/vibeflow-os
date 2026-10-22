@@ -1204,6 +1204,26 @@ if [ "$n_swept" -ge 20 ] && [ -z "$hors_contrat" ] \
   ok "33 BALAYAGE — $n_swept exécutions (toutes les fixtures × moteur présent/absent + toutes les formes d'invocation) : aucun rc hors de {0, 3, 64}, ET les codes de sortie ÉCRITS dans le script forment exactement cet ensemble"
 else ko "33 BALAYAGE — aucun rc hors du contrat {0, 3, 64}, et codes écrits égaux à cet ensemble" "n_swept=$n_swept (plancher 20) hors_contrat=[$hors_contrat] codes_ecrits=$n_exits en_trop=[$exits_seuls] manquants=[$contrat_seuls]"; fi
 
+# === Cas 38 — CLÉS PROPRES À VIBEFLOW (#154 §3) : jamais signalées, la vraie inconnue l'est ======
+# `profile` est la clé canonique de PROFILES.md, posée par vf-planning : la signaler « inconnue du
+# moteur » était un faux positif. Deux sens, sinon la liste blanche pourrait tout épargner :
+#   (a) ALIGNED + toutes les clés VibeFlow de la liste blanche → aucun signal « clés inconnues », exit 3 ;
+#   (b) ALIGNED + profile + UNE vraie clé inconnue → elle SEULE est nommée, profile ne l'est pas.
+VFKEYS='"planning_version": "2.0", "scope": "lab", "type": null, "profile": "standard", "domain": "dev", "domain_extension": null, "options": { "gates": false }, "compartments": { "enabled": false }, "memory_bridge": { "enabled": true }, "vf_runtimes": { "installed": ["claude"], "active": "claude" }, "vf_roles": ["dev"]'
+CFG38A="$(mk_config c38a "${ALIGNED%\}}, $VFKEYS }")"
+out38a="$(VF_GSD_CORE_LIB="$ENG" VF_CONFIG_PATH="$CFG38A" bash "$SCRIPT" 2>/dev/null)"; rc38a=$?
+CFG38B="$(mk_config c38b "${ALIGNED%\}}, \"profile\": \"standard\", \"cle_bidon_vf\": 1 }")"
+out38b="$(VF_GSD_CORE_LIB="$ENG" VF_CONFIG_PATH="$CFG38B" bash "$SCRIPT" 2>/dev/null)"; rc38b=$?
+ligne38b="$(printf '%s\n' "$out38b" | grep 'clés inconnues' | head -1)"
+ec38=""
+[ "$rc38a" -eq 3 ] || ec38="$ec38 [a rc=$rc38a]"
+[ -z "$out38a" ] || ec38="$ec38 [a sortie=[$out38a]]"
+[ "$rc38b" -eq 0 ] || ec38="$ec38 [b rc=$rc38b]"
+case "$ligne38b" in *cle_bidon_vf*) : ;; *) ec38="$ec38 [b cle_bidon_vf non signalée]" ;; esac
+case "$ligne38b" in *profile*) ec38="$ec38 [b profile signalée]" ;; esac
+if [ -z "$ec38" ]; then ok "38 clés VibeFlow (profile, vf_runtimes, gabarit planning-core…) épargnées ; une vraie clé inconnue reste seule signalée"
+else ko "38 clés VibeFlow épargnées, vraie inconnue signalée" "$ec38 | ligne=[$ligne38b]"; fi
+
 # === Mutants (--mutants) — le filet est-il capable de rougir ? ==================================
 # Chaque mutant est une réécriture MÉCANIQUE du script, rejouable, qui déclare les cas qu'elle doit
 # faire rougir. Deux garde-fous avant tout verdict, parce qu'un mutant qui ne mute rien « passe » :
@@ -1302,6 +1322,14 @@ AWK
   cat > "$MUTD/m12.awk" <<'AWK'
 { sub(/out\.push\('TOGGLE_UNREADABLE/, "out.push('TOGGLE_ABSENT"); print }
 AWK
+  # m13 / m14 tiennent le cas 38 dans les deux sens (#154 §3) : liste blanche VIDÉE (profile de nouveau
+  # signalée -> 38a rougit) ; liste blanche qui épargne TOUT (la vraie inconnue se tait -> 38b rougit).
+  cat > "$MUTD/m13.awk" <<'AWK'
+{ sub(/const VF_OWN = new Set\(\['profile', /, "const VF_OWN = new Set(["); print }
+AWK
+  cat > "$MUTD/m14.awk" <<'AWK'
+{ sub(/!KNOWN_TOP\.has\(k\) && !VF_OWN\.has\(k\)/, "false"); print }
+AWK
 
   mutant m1 "34 35" "$MUTD/m1.awk" "require() rétabli dans readLiteral — la RCE d'origine"
   mutant m2 "34"    "$MUTD/m2.awk" "readLiteral n'accepte plus rien — le gate devient muet"
@@ -1315,6 +1343,8 @@ AWK
   mutant m10 "36" "$MUTD/m10.awk" "O_NONBLOCK retiré — l'attente reprend DANS l'ouverture, avant tout fstat"
   mutant m11 "36 37" "$MUTD/m11.awk" "gate périmé re-rendu MUET — retour au 3 indistinguable de « rien à signaler »"
   mutant m12 "37"    "$MUTD/m12.awk" "absence AFFIRMÉE là où les défauts n'ont pas pu être lus"
+  mutant m13 "38" "$MUTD/m13.awk" "liste blanche VibeFlow vidée des clés profile/gabarit — le faux positif #154 revient"
+  mutant m14 "38" "$MUTD/m14.awk" "liste blanche qui épargne TOUT — une vraie clé inconnue se tait"
 fi
 
 echo ""
