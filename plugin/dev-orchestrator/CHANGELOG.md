@@ -1,5 +1,11 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.28.4] — 2026-10-23 (tableau des signaux de démarrage aligné) — publiée dans v2.71.2
+
+**Patch** (#160 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :
+
+- **Tableau « Signaux de démarrage » de `AGENT.md` aligné sur le texte réel des hooks** (#160, 2a79238e) ; la ligne `[ledger-absent]` décrit ses deux branches (avec archive : `restore-requirements-ledger.sh` ; sans archive : recréer le ledger manuellement).
+
 ## [v2.28.3] — 2026-10-23 (bootstrap vers /vf-dev, clés VibeFlow de check-gsd-config) — publiée dans v2.71.1
 
 **Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :

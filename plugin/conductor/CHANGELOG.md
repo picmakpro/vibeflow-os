@@ -1,5 +1,11 @@
 # Changelog — conductor
 
+## [v1.50.2] — 2026-10-23 (commentaires de driver-lock) — publiée dans v2.71.2
+
+**Patch** (#159 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :
+
+- **Commentaires de `driver-lock.sh`** (#159, 0328f9da) : ils décrivent la garde hors racine en lab plat. Aucun changement de comportement.
+
 ## [v1.50.1] — 2026-10-23 (UTF-8 inconditionnel, programmes hors ligne de commande, garde hors racine) — publiée dans v2.71.1
 
 **Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :

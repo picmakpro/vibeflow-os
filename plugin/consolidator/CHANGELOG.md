@@ -1,5 +1,11 @@
 # CHANGELOG — consolidator
 
+## [v1.11.3] — 2026-10-23 (detect-duplicates, échecs signalés) — publiée dans v2.71.2
+
+**Patch** (#153 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :
+
+- **`detect-duplicates.sh` : titres par entrée standard, échecs signalés** (#153, 15c8ba5c) : plus de fichier temporaire `/tmp` codé en dur ; un échec Python est bruyant (stderr, champ JSON `errors`, code de sortie 2) au lieu d'un faux « aucun doublon ». README et `references/fusion.md` documentent `errors` et le code 2.
+
 ## [v1.11.2] — 2026-10-23 (UTF-8 inconditionnel, registre sans entrée) — publiée dans v2.71.1
 
 **Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :

@@ -13,6 +13,19 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.71.2] — 2026-10-23
+
+**Patch** (quatre correctifs mergés depuis v2.71.1, #153, #159, #160 ; release patch préparée sur demande de la session
+principale, 2026-10-23) :
+
+- **`infrastructure-audit` v1.3.6** (#153) : `--strict --no-tests` ne rend plus INDÉTERMINÉ quand aucune suite n'existe
+  (exit 3 seulement si une suite aurait tourné ; champs JSON `strict_indeterminate_reason`, `suites_found`).
+- **`consolidator` v1.11.3** (#153) : `detect-duplicates.sh` passe les titres à Python par l'entrée standard (plus de
+  `/tmp` codé en dur) et signale ses échecs (stderr, champ `errors`, code de sortie 2).
+- **`dev-orchestrator` v2.28.4** (#160) : le tableau « Signaux de démarrage » d'`AGENT.md` suit le texte réel des hooks,
+  y compris les deux branches de `[ledger-absent]`.
+- **`conductor` v1.50.2** (#159) : commentaires de `driver-lock.sh` sur la garde hors racine en lab plat.
+
 ## [v2.71.1] — 2026-10-23
 
 **Patch** (cinq correctifs mergés depuis v2.71.0, #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel,
