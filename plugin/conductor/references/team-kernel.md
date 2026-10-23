@@ -279,8 +279,9 @@ geste de dépôt à la fois (P57-D-01, P57-D-02). Il vit au niveau du clone, `<g
 (release du plugin, `BACKLOG.md`, `docs/ADR.md`, fichiers racine de `.planning/`, partition) ; un verbe sans
 `--ws` vise le dépôt (P57-D-05, P57-D-24) ; l'ancien `.planning/DRIVER.lock` vaut verrou de dépôt jusqu'à son
 relâchement (P57-D-26) ; `status --all` lit tout le lab ; un lab plat est inchangé (P57-D-03). Les verbes se
-lancent depuis la racine du lab : `--ws` ou `--depot` depuis un sous-dossier sans `.planning/` propre est refusé
-`not-at-lab-root` (P57-D-39), et le guard détecte le lab partitionné depuis la racine git, pas depuis le cwd ; sa
+lancent depuis la racine du lab : un verbe qui écrit, avec ou sans `--ws`/`--depot`, depuis un sous-dossier sans
+`.planning/` propre alors que la racine git en porte un, est refusé `not-at-lab-root` (P57-D-39, #58 ; lab plat comme
+partitionné ; `status`/`orphans` exceptés, sauf avec `--ws`/`--depot` en lab partitionné), et le guard détecte le lab partitionné depuis la racine git, pas depuis le cwd ; sa
 comparaison du segment `.planning` ignore la casse en lab partitionné (P57-D-38).
 
 ```bash
