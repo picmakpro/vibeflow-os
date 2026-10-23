@@ -13,8 +13,8 @@
 # Fail-open : toute erreur → exit 0 silencieux (un hook de maintenance ne casse jamais le flux).
 
 set -uo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 # CSL-13 : préfiltre pur bash AVANT le spawn python3 (~80-120 ms payés sinon sur CHAQUE
 # Edit/Write/Bash, même hors registres). SURENSEMBLE STRICT du domaine d'action du

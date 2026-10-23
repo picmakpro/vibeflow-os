@@ -136,16 +136,14 @@ vf_python() {
   # `-I` (mode isolé, Python >= 3.4) : `-c`/`-` mettent '' (le dossier courant) en tête de sys.path — un
   # json.py posé à la racine d'un lab cloné serait importé et exécuté par chaque hook. `-I` ôte aussi
   # PYTHON* et le site utilisateur : les programmes passés à vf_python n'importent que la stdlib.
-  # `-I` implique `-E` : un PYTHONUTF8=1 posé par l'utilisateur (Windows) serait ignoré en silence.
-  # Ce seul réglage est restitué, en option (`-X utf8`). Les invocations directes `python3 -I …` des scripts
-  # livrés font la même restitution par `$PYX` (check-python-isolation.sh l'exige). LIMITE :
-  # PYTHONIOENCODING n'a pas d'équivalent en option — il est ignoré (plugin/conductor/CHANGELOG.md).
+  # `-I` implique `-E` : un PYTHONUTF8=1 posé par l'utilisateur serait ignoré en silence, et sous Windows
+  # (CPython, cp1252 par défaut) un `print("✓")` ou la lecture d'un JSON accentué échouerait. Le mode UTF-8
+  # est donc posé SANS condition (`-X utf8`, agit malgré `-I` ; PEP 540, défaut en Python 3.15 — PEP 686,
+  # #153). Sans effet pratique sous macOS/Linux en locale UTF-8 ou C/POSIX. Les invocations directes
+  # `python3 -I …` des scripts livrés font la même chose par `$PYX` (check-python-isolation.sh l'exige).
+  # LIMITE : PYTHONIOENCODING n'a pas d'équivalent en option — il est ignoré (plugin/conductor/CHANGELOG.md).
   # shellcheck disable=SC2086 — même raison que vf_py_probe : VF_PYTHON_INVOKE peut porter "py -3".
-  if [ "${PYTHONUTF8:-}" = "1" ]; then
-    $VF_PYTHON_INVOKE -I -X utf8 "$@"
-  else
-    $VF_PYTHON_INVOKE -I "$@"
-  fi
+  $VF_PYTHON_INVOKE -I -X utf8 "$@"
 }
 
 # jqx <args…>

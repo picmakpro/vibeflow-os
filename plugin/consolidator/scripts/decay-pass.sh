@@ -24,8 +24,8 @@
 # l'identique (0 archivage parasite). Backup isole ADR-049 avant --apply. Reference : ADR-052.
 
 set -euo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 KNOWLEDGE_DIR="${KNOWLEDGE_DIR:-.claude/memory/knowledge}"
 DRY_RUN=true
@@ -177,7 +177,7 @@ def ensure_backup_dir():
     os.makedirs(backup_dir, exist_ok=True)
     gi = os.path.join(backup_dir, ".gitignore")
     if not os.path.exists(gi):
-        with open(gi, "w") as fh:
+        with open(gi, "w", encoding="utf-8") as fh:
             fh.write("*\n!.gitignore\n")
 
 def backup_file(path):

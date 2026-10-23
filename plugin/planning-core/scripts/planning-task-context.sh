@@ -16,8 +16,8 @@
 #
 # Câblage (posé à l'install du module) : UserPromptSubmit → bash planning-task-context.sh
 set -uo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 # Lab à compartiments uniquement (sinon le digest mono du SessionStart suffit).
 [ -f ".planning/INDEX.md" ] || exit 0

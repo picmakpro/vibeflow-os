@@ -8,8 +8,8 @@
 #      bonne version de plugin peut avoir des modules non migrés (pré ADR-052/053). Nudge /vf-update.
 # Émet le JSON seulement s'il y a quelque chose à dire — sinon rien. Toujours exit 0.
 set -uo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 CACHE_FILE="${XDG_CACHE_HOME:-$HOME/.cache}/vibeflow/update-check.json"
@@ -32,7 +32,7 @@ msgs = []
 try:
     cf = os.environ.get("CACHE_FILE", "")
     if cf and os.path.isfile(cf):
-        c = json.load(open(cf))
+        c = json.load(open(cf, encoding="utf-8"))
         if c.get("update_available"):
             msgs.append(f"mise à jour disponible {c.get('installed','?')} → {c.get('latest','?')}")
 except Exception:

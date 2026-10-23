@@ -72,8 +72,8 @@
 # Reference : ADR-053 + .planning/phases/VFDO-09-*/09-CADRAGE-swarm.md §3.
 
 set -uo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 ACTION=""; FILE=""; ID=""; STEP=""; STAGE=""; DEPS=""; STATUS=""; SCOPE=""; WS=""; WS_GIVEN=0
 for arg in "$@"; do

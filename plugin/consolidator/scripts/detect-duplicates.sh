@@ -15,8 +15,8 @@
 # Reference : ADR-032 pilier 3 (Fusion)
 
 set -euo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
 TARGET_REGISTER=""
@@ -50,7 +50,9 @@ detect_collisions() {
   [ -f "$file" ] || return 0
 
   # Extract IDs from body headers, count occurrences
-  grep -n "^## [A-Z]\+-[0-9]\+" "$file" | \
+  # #153 §4 : `|| true` — un registre sans entrée fait rendre 1 à grep ; sous pipefail le script sortait
+  # en rc=1 avec un JSON tronqué après `"collisions": [`.
+  { grep -n "^## [A-Z]\+-[0-9]\+" "$file" || true; } | \
     awk -F: '{
       line = $1
       $1 = ""
@@ -78,7 +80,7 @@ detect_similar_titles() {
   [ -f "$file" ] || return 0
 
   # Extract headers as "ID|title"
-  grep -n "^## [A-Z]\+-[0-9]\+" "$file" | \
+  { grep -n "^## [A-Z]\+-[0-9]\+" "$file" || true; } | \
     awk -F: '{
       line = $1
       $1 = ""
@@ -97,7 +99,7 @@ detect_similar_titles() {
   python3 -I $PYX - <<'PYEOF' 2>/dev/null || true
 import os
 try:
-    with open('/tmp/.consolidator-titles.tmp') as f:
+    with open('/tmp/.consolidator-titles.tmp', encoding='utf-8') as f:
         rows = [line.strip().split('|') for line in f if line.strip()]
 except FileNotFoundError:
     rows = []

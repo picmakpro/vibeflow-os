@@ -70,8 +70,8 @@
 # Pas de `-e` : les détections (command -v, grep, claude plugin …) doivent pouvoir échouer sans
 # tuer le script — c'est précisément la dégradation gracieuse attendue.
 set -uo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 # ---------- Résolution de runtime-cli-dispatch.sh (RUNT-01) ----------
 # Cascade EXACTE de find_hooks_merger() (plugin/_internal/vibeflow-update.sh) — DUPLICATION
@@ -240,7 +240,7 @@ detect_all() {
     SOURCE_LINES="$("$PYBIN" -I $PYX - "$json_tmp" <<'PY'
 import json, sys
 try:
-    data = json.load(open(sys.argv[1]))
+    data = json.load(open(sys.argv[1], encoding="utf-8"))
 except Exception:
     sys.exit(1)
 if not isinstance(data, list):

@@ -219,7 +219,13 @@ fi
 
 # UN SEUL spawn d'interprète ; le payload est rejoué sur son entrée standard. Le bash ne fait que
 # router — la décision (allow silencieux / deny JSON) est entièrement émise par python.
-printf '%s' "$INPUT" | vf_python -c '
+# #149 : le programme (~64 Ko) ne passe PAS par `-c` — Windows plafonne la ligne de commande à 32 767
+# caractères (`Argument list too long`, rc 126 avalé par `|| exit 0` : garde inerte en silence). Il voyage
+# EN TÊTE de l'entrée standard, séparé du payload par un octet NUL (absent de toute variable bash) ; un
+# amorceur de quatre lignes le sépare, rend le payload à `sys.stdin` (UTF-8, surrogateescape, comme sous
+# `-X utf8`) et l'exécute comme module principal. Zéro spawn ajouté (printf est un builtin). Taille de `-c`
+# gardée par scripts/check-python-isolation.sh (ARGMAX).
+GDL_PY='
 import json, os, re, shlex, sys, time
 
 MARKER = "vibeflow:allow-lock-override"
@@ -1594,5 +1600,9 @@ print(json.dumps({
     }
 }, ensure_ascii=False))
 sys.exit(0)
-' 2>/dev/null || exit 0
+'
+{ printf '%s\0' "$GDL_PY"; printf '%s' "$INPUT"; } | vf_python -c 'import io, sys
+_vf_src, _vf_sep, _vf_in = sys.stdin.buffer.read().partition(b"\0")
+sys.stdin = io.TextIOWrapper(io.BytesIO(_vf_in), encoding="utf-8", errors="surrogateescape")
+exec(compile(_vf_src.decode("utf-8"), "guard-driver-lock", "exec"), {"__name__": "__main__"})' 2>/dev/null || exit 0
 exit 0

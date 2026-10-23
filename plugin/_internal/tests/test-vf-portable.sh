@@ -5,7 +5,8 @@
 # T1  — chargement sous `set -u` sans erreur, aucun effet de bord.
 # T2  — les 5 symboles du contrat sont bien des fonctions après chargement.
 # T3  — vf_python exécute réellement un programme Python trivial.
-# T3b — PYTHONUTF8=1 de l'utilisateur restitué par `-X utf8` malgré `-I` (H7), avec mutant.
+# T3b — mode UTF-8 inconditionnel (`-X utf8`) malgré `-I`, avec ou sans PYTHONUTF8 (H7, #153), avec mutant
+#       et cas comportemental (un « ✓ » imprimé sous une locale non UTF-8).
 # T4  — un candidat stub *WindowsApps* est REJETÉ par la sonde (profil complet).
 # T5  — le profil rapide (--fast) ne lance AUCUN processus (compteur de shim).
 # T6  — vf_guard_unavailable : marqueur écrit, motif sur stderr, code rendu non nul ET != 2.
@@ -76,16 +77,17 @@ else
   ko "T3 vf_python n'a pas rendu '3' — sortie=[$T3_OUT]"
 fi
 
-# ---------- T3b : PYTHONUTF8=1 posé par l'utilisateur est restitué malgré -I (H7) ----------
-# `-I` implique `-E` : sans `-X utf8` explicite, un PYTHONUTF8=1 (Windows) serait ignoré en silence.
-# Mutant : la branche `-X utf8` retirée dans une copie de la lib => le témoin DOIT rendre 0 (donc
-# la branche est bien ce qui fait passer le cas de 0 à 1).
+# ---------- T3b : mode UTF-8 INCONDITIONNEL malgré -I (H7, #153) ----------
+# `-I` implique `-E` : PYTHONUTF8 est ignoré, et sous Windows (cp1252) un `print("✓")` plante. `vf_python`
+# passe donc toujours `-X utf8`, que l'utilisateur ait posé PYTHONUTF8=1 ou non.
+# Mutant : `-X utf8` retiré dans une copie de la lib => le témoin DOIT rendre 0 (donc l'option est bien ce qui
+# fait passer le cas de 0 à 1) ET le « ✓ » plante de nouveau sous la locale non UTF-8.
 # R4 : le cas ne dépend d'AUCUNE locale précise. Le mode UTF-8 de Python s'active d'office en locale C/POSIX
 # (PEP 540) — en conteneur, `LC_ALL=en_US.UTF-8` absente retombe en C et rendrait 1 là où l'on attend 0.
 # On cherche donc une locale RÉELLEMENT disponible qui laisse `utf8_mode` à 0 (sondée avec le même Python,
 # sans PYTHONUTF8) ; aucune → SKIP annoncé, jamais un vert silencieux.
 T3B_LOC=""
-for T3B_CAND in en_US.UTF-8 en_US.utf8 C.UTF-8 C.utf8 $(locale -a 2>/dev/null); do
+for T3B_CAND in en_US.UTF-8 en_US.utf8 C.UTF-8 C.utf8 $(locale -a 2>/dev/null | grep -i '8859\|1252\|latin1' ) $(locale -a 2>/dev/null); do
   case "$T3B_CAND" in C|POSIX) continue ;; esac
   T3B_M=$(env -u PYTHONUTF8 LC_ALL="$T3B_CAND" python3 -c 'import sys; print(sys.flags.utf8_mode)' 2>/dev/null)
   if [ "$T3B_M" = "0" ]; then T3B_LOC="$T3B_CAND"; break; fi
@@ -96,21 +98,39 @@ else
   T3B_PROG="import sys; print(sys.flags.utf8_mode)"
   T3B_ON=$(PYTHONUTF8=1 LC_ALL="$T3B_LOC" bash -c ". '$LIB'; vf_python -c '$T3B_PROG'" 2>/dev/null)
   T3B_OFF=$(env -u PYTHONUTF8 LC_ALL="$T3B_LOC" bash -c ". '$LIB'; vf_python -c '$T3B_PROG'" 2>/dev/null)
-  if [ "$T3B_ON" = "1" ] && [ "$T3B_OFF" = "0" ]; then
-    ok "T3b PYTHONUTF8=1 restitué par -X utf8 (mode UTF-8 = 1), absent sinon (= 0)"
+  if [ "$T3B_ON" = "1" ] && [ "$T3B_OFF" = "1" ]; then
+    ok "T3b mode UTF-8 = 1 avec ET sans PYTHONUTF8 (locale $T3B_LOC)"
   else
-    ko "T3b attendu on=1 off=0, obtenu on=[$T3B_ON] off=[$T3B_OFF]"
+    ko "T3b attendu on=1 off=1, obtenu on=[$T3B_ON] off=[$T3B_OFF]"
+  fi
+  # Cas comportemental : une locale à encodage étroit (ISO-8859-x) où un « ✓ » nu plante. Aucune → SKIP annoncé.
+  T3B_PRINT='print("\u2713")'
+  T3B_NARROW=""
+  for T3B_CAND in $(locale -a 2>/dev/null | grep -i '8859\|1252\|latin1'); do
+    T3B_RAW=$(env -u PYTHONUTF8 LC_ALL="$T3B_CAND" python3 -I -c "$T3B_PRINT" 2>&1 >/dev/null)
+    case "$T3B_RAW" in *UnicodeEncodeError*) T3B_NARROW="$T3B_CAND"; break ;; esac
+  done
+  if [ -z "$T3B_NARROW" ]; then
+    skip "T3b aucune locale à encodage étroit où « ✓ » plante (locale -a | grep 8859) : cas comportemental non exercé"
+  else
+    T3B_RUN=$(env -u PYTHONUTF8 LC_ALL="$T3B_NARROW" bash -c ". '$LIB'; vf_python -c '$T3B_PRINT'" 2>/dev/null)
+    if [ "$T3B_RUN" = "$(printf '\342\234\223')" ]; then ok "T3b « ✓ » sous $T3B_NARROW : plante sans l'option (-I seul), passe par vf_python"
+    else ko "T3b « ✓ » sous $T3B_NARROW : sortie vf_python=[$T3B_RUN]"; fi
+    T3B_MUT0="$WORK/vf-portable-mut-utf8-narrow.sh"
+    sed 's/\$VF_PYTHON_INVOKE -I -X utf8 "\$@"/$VF_PYTHON_INVOKE -I "$@"/' "$LIB" > "$T3B_MUT0"
+    T3B_MRUN=$(env -u PYTHONUTF8 LC_ALL="$T3B_NARROW" bash -c ". '$T3B_MUT0'; vf_python -c '$T3B_PRINT'" 2>&1)
+    case "$T3B_MRUN" in *UnicodeEncodeError*) ok "T3b mutant (-X utf8 retiré) : le « ✓ » replante sous $T3B_NARROW" ;; *) ko "T3b mutant comportemental : pas d'erreur d'encodage [$T3B_MRUN]" ;; esac
   fi
   T3B_MUT="$WORK/vf-portable-mut-utf8.sh"
   sed 's/\$VF_PYTHON_INVOKE -I -X utf8 "\$@"/$VF_PYTHON_INVOKE -I "$@"/' "$LIB" > "$T3B_MUT"
   if cmp -s "$LIB" "$T3B_MUT"; then
     ko "T3b mutant NON OPPOSABLE : la mutation n'a rien changé"
   else
-    T3B_MUT_ON=$(PYTHONUTF8=1 LC_ALL="$T3B_LOC" bash -c ". '$T3B_MUT'; vf_python -c '$T3B_PROG'" 2>/dev/null)
+    T3B_MUT_ON=$(env -u PYTHONUTF8 LC_ALL="$T3B_LOC" bash -c ". '$T3B_MUT'; vf_python -c '$T3B_PROG'" 2>/dev/null)
     if [ "$T3B_MUT_ON" = "0" ]; then
-      ok "T3b mutant (branche -X utf8 retirée) => mode UTF-8 = 0 : le témoin discrimine"
+      ok "T3b mutant (-X utf8 retiré) => mode UTF-8 = 0 : le témoin discrimine"
     else
-      ko "T3b mutant : attendu 0, obtenu [$T3B_MUT_ON] — la branche n'est pas ce qui restitue PYTHONUTF8"
+      ko "T3b mutant : attendu 0, obtenu [$T3B_MUT_ON] — l'option n'est pas ce qui pose le mode UTF-8"
     fi
   fi
 fi

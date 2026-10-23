@@ -25,8 +25,8 @@
 # Reference : ADR-032 pilier 4 (Promotion)
 
 set -euo pipefail
-# Restitue PYTHONUTF8=1 sous -I (qui ignore PYTHON*) : forme courte commune, vérifiée par check-python-isolation.sh.
-PYX=""; [ "${PYTHONUTF8:-}" != "1" ] || PYX="-Xutf8"
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, vérifiée par check-python-isolation.sh.
+PYX="-Xutf8"
 
 MEMORY_DIR="${MEMORY_DIR:-.claude/memory}"
 LEARNINGS_FILE="$MEMORY_DIR/LEARNINGS.md"
@@ -43,7 +43,7 @@ import json
 import re
 from collections import defaultdict
 
-with open("$LEARNINGS_FILE") as f:
+with open("$LEARNINGS_FILE", encoding="utf-8") as f:
     content = f.read()
 
 # Split by "## LRN-XXX" headers
@@ -171,7 +171,7 @@ def declare(h):
     return False
 
 try:
-    with open(sys.argv[1]) as fh:
+    with open(sys.argv[1], encoding="utf-8") as fh:
         data = json.load(fh)
 except Exception:
     sys.exit(1)
