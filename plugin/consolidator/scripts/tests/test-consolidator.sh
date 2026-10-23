@@ -115,6 +115,47 @@ assert "T5.3a — registre vide : rc=0" "rc=$rc_vide" "rc=0"
 verdict_vide=$(printf '%s' "$output" | python3 -I -c 'import json,sys; json.loads(sys.stdin.read()); print("json-valide")' 2>/dev/null || echo "json-invalide")
 assert "T5.3b — registre vide : JSON complet et valide" "$verdict_vide" "json-valide"
 
+# T5.4/T5.5 — #153 : le /tmp de Python n'est pas celui de bash (Windows, Git Bash). Un `python3`
+# factice en tête de PATH réécrit tout `/tmp/` en `<dossier>/autre-tmp/` dans ses arguments ET sur
+# son entrée standard, puis exécute le vrai python3. Un script qui passe ses données par un
+# fichier /tmp ne les retrouve plus (FileNotFoundError avalé -> « aucun doublon » muet) ; un script
+# qui les passe par stdin n'est pas touché. DUP_SCRIPT permet de rejouer la sonde sur une version
+# de base (preuve du rouge).
+DUP_SCRIPT="${DUP_SCRIPT:-$WORK_DIR/.claude/scripts/detect-duplicates.sh}"
+REAL_PY3="$(command -v python3)"
+SIM="$WORK_DIR/sim-win"; mkdir -p "$SIM/bin" "$SIM/autre-tmp" "$SIM/lab/.claude/memory"
+cat > "$SIM/lab/.claude/memory/LEARNINGS.md" <<'REG'
+# LEARNINGS
+
+## LRN-101 — Toujours valider la sortie JSON des scripts
+Corps un.
+
+## LRN-102 — Toujours valider la sortie JSON des scripts shell
+Corps deux.
+REG
+cat > "$SIM/bin/python3" <<FAKE
+#!/usr/bin/env bash
+# Faux python3 : le /tmp vu par Python differe de celui de bash.
+mode="\${FAKE_PY_MODE:-remap}"
+[ "\$mode" = "fail" ] && { echo "faux python3 : echec force" >&2; exit 1; }
+args=()
+for a in "\$@"; do args+=("\${a//\/tmp\//$SIM/autre-tmp/}"); done
+sed "s#/tmp/#$SIM/autre-tmp/#g" > "$SIM/stdin.txt"
+exec "$REAL_PY3" "\${args[@]}" < "$SIM/stdin.txt"
+FAKE
+chmod +x "$SIM/bin/python3"
+output=$(cd "$SIM/lab" && PATH="$SIM/bin:$PATH" MEMORY_DIR=".claude/memory" "$DUP_SCRIPT" --register=LEARNINGS 2>/dev/null); rc_sim=$?
+assert "T5.4a — /tmp de Python différent : la paire LRN-101/LRN-102 est signalée" "$output" '"ids": ["LRN-101", "LRN-102"]'
+assert "T5.4b — /tmp de Python différent : rc=0" "rc=$rc_sim" "rc=0"
+
+err_file="$SIM/stderr.txt"
+output=$(cd "$SIM/lab" && FAKE_PY_MODE=fail PATH="$SIM/bin:$PATH" MEMORY_DIR=".claude/memory" "$DUP_SCRIPT" --register=LEARNINGS 2>"$err_file"); rc_fail=$?
+assert "T5.5a — Python en échec : rc non nul (2)" "rc=$rc_fail" "rc=2"
+assert "T5.5b — Python en échec : message sur stderr" "$(cat "$err_file")" "echec de la detection des titres similaires"
+assert "T5.5c — Python en échec : champ errors dans le JSON" "$output" '"errors": ["similar_titles: echec Python sur LEARNINGS'
+verdict_fail=$(printf '%s' "$output" | python3 -I -c 'import json,sys; json.loads(sys.stdin.read()); print("json-valide")' 2>/dev/null || echo "json-invalide")
+assert "T5.5d — Python en échec : JSON complet et valide" "$verdict_fail" "json-valide"
+
 echo ""
 echo "=== T6 — detect-promotions.sh sort candidats ==="
 output=$(cd "$WORK_DIR" && MEMORY_DIR=".claude/memory" "$WORK_DIR/.claude/scripts/detect-promotions.sh" 2>&1)
