@@ -50,6 +50,8 @@ Output :
 }
 ```
 
+Le JSON porte aussi `errors` (liste vide si tout va bien). Un échec de l'analyse des titres remplit `errors`, écrit sur stderr et fait sortir le script en code 2 : le résultat n'est alors pas à lire comme « aucun doublon ».
+
 ### Phase B — Proposition (LLM)
 
 L'agent (Claude) lit les candidats et propose pour chacun :

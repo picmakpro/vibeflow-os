@@ -74,38 +74,16 @@ detect_collisions() {
     }'
 }
 
-# Detect title similarities (Jaccard tokens > 0.5)
-detect_similar_titles() {
-  local file="$1"
-  [ -f "$file" ] || return 0
+# Programme Python de comparaison des titres (Jaccard sur tokens). Les donnees "ID|titre|ligne"
+# arrivent par l'ENTREE STANDARD, jamais par un fichier temporaire : sous Windows (Git Bash) le
+# Python natif ne voit pas le /tmp MSYS, et un chemin transmis a Python casse de la meme facon (#153).
+# Aucun `2>/dev/null` : un echec de Python doit etre bruyant (stderr + rc non nul propage).
+IFS= read -r -d '' SIMILAR_TITLES_PY <<'PYEOF' || true
+import re, sys
 
-  # Extract headers as "ID|title"
-  { grep -n "^## [A-Z]\+-[0-9]\+" "$file" || true; } | \
-    awk -F: '{
-      line = $1
-      $1 = ""
-      header = substr($0, 2)
-      sub(/^## /, "", header)
-      if (match(header, /^[A-Z]+-[0-9]+/)) {
-        id = substr(header, 1, RLENGTH)
-        title = substr(header, RLENGTH + 1)
-        sub(/^[[:space:]]*[:—-][[:space:]]*/, "", title)
-        printf "%s|%s|%s\n", id, title, line
-      }
-    }' | sort > /tmp/.consolidator-titles.tmp
-
-  # Compare pairs using a simple Python-style tokenization in awk
-  # For each pair, compute Jaccard similarity on word tokens (lowercased)
-  python3 -I $PYX - <<'PYEOF' 2>/dev/null || true
-import os
-try:
-    with open('/tmp/.consolidator-titles.tmp', encoding='utf-8') as f:
-        rows = [line.strip().split('|') for line in f if line.strip()]
-except FileNotFoundError:
-    rows = []
+rows = [line.strip().split('|') for line in sys.stdin.read().splitlines() if line.strip()]
 
 def tokens(s):
-    import re
     return set(re.findall(r'\w+', s.lower())) - {
         'le','la','les','un','une','des','de','du','et','ou','dans','sur','pour','par',
         'que','qui','est','en','au','aux','a','the','of','and','or','to','in','on','for',
@@ -128,9 +106,30 @@ for i in range(len(rows)):
 for p in sorted(pairs, key=lambda x: -x[2]):
     print(f"{p[0]}|{p[1]}|{p[2]:.2f}|{p[3]}|{p[4]}")
 PYEOF
+
+# Detect title similarities (Jaccard tokens > 0.5)
+detect_similar_titles() {
+  local file="$1"
+  [ -f "$file" ] || return 0
+
+  # Extract headers as "ID|title"
+  { grep -n "^## [A-Z]\+-[0-9]\+" "$file" || true; } | \
+    awk -F: '{
+      line = $1
+      $1 = ""
+      header = substr($0, 2)
+      sub(/^## /, "", header)
+      if (match(header, /^[A-Z]+-[0-9]+/)) {
+        id = substr(header, 1, RLENGTH)
+        title = substr(header, RLENGTH + 1)
+        sub(/^[[:space:]]*[:—-][[:space:]]*/, "", title)
+        printf "%s|%s|%s\n", id, title, line
+      }
+    }' | sort | python3 -I $PYX -c "$SIMILAR_TITLES_PY"
 }
 
 # ---------- Main ----------
+errors=""
 echo "{"
 echo "  \"timestamp\": \"$(date -Iseconds 2>/dev/null || date)\","
 echo "  \"collisions\": ["
@@ -161,7 +160,14 @@ for r in DECISIONS ADR LEARNINGS BLOCKERS EVALS; do
   f=$(register_file "$r")
   [ -f "$f" ] || continue
 
-  similar=$(detect_similar_titles "$f" || true)
+  # Echec de la detection : stderr + champ "errors" + rc non nul en sortie, jamais un faux « aucun doublon ».
+  similar_rc=0
+  similar=$(detect_similar_titles "$f") || similar_rc=$?
+  if [ "$similar_rc" -ne 0 ]; then
+    echo "detect-duplicates.sh : echec de la detection des titres similaires ($r, rc=$similar_rc)" >&2
+    errors="${errors:+$errors, }\"similar_titles: echec Python sur $r (rc=$similar_rc)\""
+    similar=""
+  fi
   if [ -n "$similar" ]; then
     while IFS='|' read -r id1 id2 score t1 t2; do
       [ -z "$id1" ] && continue
@@ -173,5 +179,7 @@ for r in DECISIONS ADR LEARNINGS BLOCKERS EVALS; do
   fi
 done
 echo ""
-echo "  ]"
+echo "  ],"
+echo "  \"errors\": [${errors:-}]"
 echo "}"
+[ -z "$errors" ] || exit 2

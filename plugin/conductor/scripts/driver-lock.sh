@@ -89,8 +89,12 @@
 # mode verrou unique. Tous les verbes portent --ws et le suffixe de portee (scope, ws, location).
 # VF_DRIVER_LOCK non vide, ou lab plat : mode verrou unique, --ws/--depot acceptes et sans effet
 # (P57-D-22, P57-D-31) ; vf_dl_resolve rend la main avant toute lecture de ces options.
-# LAB PLAT, ou VF_DRIVER_LOCK pose : comportement historique, au bit pres — la politique de noms
-# n'est meme pas chargee. LIMITE ECRITE (P57-D-29) : deux .planning/ dans un meme clone partagent
+# VF_DRIVER_LOCK non vide : comportement historique, au bit pres (vf_dl_resolve rend la main
+# d'emblee, garde hors racine comprise). LAB PLAT sans VF_DRIVER_LOCK : emplacement, noms et
+# sorties d'avant la phase, au bit pres — la politique de noms n'est meme pas chargee — a UNE
+# exception depuis #58 (#159) : un verbe ecrivant lance d'un sous-dossier sans .planning/ propre,
+# alors que la racine git en porte un, est refuse (not-at-lab-root), avec ou sans --ws/--depot ;
+# status/orphans restent lisibles en lab plat. LIMITE ECRITE (P57-D-29) : deux .planning/ dans un meme clone partagent
 # vf-driver/, hors perimetre.
 
 set -uo pipefail
@@ -220,9 +224,12 @@ session_ids_append() {
 # remplace par rename(2), mutex nomme d'apres la generation observee) est PARAMETREE par
 # l'emplacement, jamais retouchee (en-tete l.15-17 : deux correctifs de fenetre mesures pires).
 #
-# LAB PLAT, ou VF_DRIVER_LOCK pose et non vide : la fonction ne fait RIEN — ni `source`, ni `git`,
-# ni test de plus que `-e`/`-L` sur le dossier des compartiments (P57-D-03, comportement historique
-# au bit pres). Le lab est dit partitionne quand .planning/workstreams existe ou est un lien : le
+# VF_DRIVER_LOCK non vide : la fonction ne fait RIEN (rend la main avant toute lecture). LAB PLAT
+# sans VF_DRIVER_LOCK : ni `source` de la politique, ni test de plus que `-e`/`-L` sur le dossier
+# des compartiments (P57-D-03, comportement historique au bit pres), SAUF la garde hors racine
+# (#58, #159) : si le cwd n'a pas de .planning/ propre et que le verbe est ecrivant (ou porte
+# --ws/--depot), elle appelle `git rev-parse --show-toplevel` et peut refuser not-at-lab-root
+# avant la detection du lab plat. Le lab est dit partitionne quand .planning/workstreams existe ou est un lien : le
 # test nu `-d` ignorerait un lien et un fichier regulier, qui seraient alors pris pour un lab plat
 # en silence (P57-D-25) ; la detection fine est vf_ws_enumerate, rc 0/2/3.
 # ---------------------------------------------------------------------------------------------

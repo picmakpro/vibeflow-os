@@ -23,10 +23,17 @@
 #
 # Codes de sortie : 0 = OK (ou advisory) · 1 = findings bloquants (--strict) ·
 #   3 = INDÉTERMINÉ (--strict et $CLAUDE_DIR absent : rien d'audité, aucun verdict ; OU --strict
-#       avec l'axe scripts évalué et ses suites sautées par --no-tests / VF_SKIP_TESTS=1 : le gate
-#       ne peut pas dire « conforme » sans avoir exécuté les suites — JSON : "strict_indeterminate": true.
-#       Arbitrage Samuel, AskUserQuestion session principale, 2026-10-22. Un finding bloquant
-#       (exit 1) reste prioritaire sur l'indéterminé : un rouge établi n'est pas dilué.
+#       avec l'axe scripts évalué, au moins une suite découverte ($SCRIPTS_DIR/tests/test-*.sh,
+#       fichiers réguliers — la même découverte que l'exécution) et ces suites sautées par
+#       --no-tests / VF_SKIP_TESTS=1 : le gate ne peut pas dire « conforme » sans avoir exécuté
+#       les suites — JSON : "strict_indeterminate": true, "strict_indeterminate_reason": "tests_skipped".
+#       Arbitrage Samuel, AskUserQuestion session principale, 2026-10-22, précisé par délégation
+#       explicite (« corrige et prends les meilleures décisions »), session principale, 2026-10-23
+#       (#153) : SANS suite découverte (pas de tests/, ou aucun test-*.sh) rien n'est sauté, le
+#       verdict est normal (0, ou 1 sur finding bloquant) — "strict_indeterminate": false,
+#       "strict_indeterminate_reason": "no_suites". Raison : "ran" (suites exécutées), null hors
+#       --strict ; "suites_found" donne le compte. Un finding bloquant (exit 1) reste prioritaire
+#       sur l'indéterminé : un rouge établi n'est pas dilué.
 #       Le saut compte dès que audit_scripts s'exécute (modes full et --axis=scripts) ; --quick,
 #       --axis=hooks|runtime, --snapshot et --diff n'évaluent pas cet axe : inchangés.)
 # NB : --strict s'applique aux modes full/quick/axis (pas snapshot/diff, qui restent advisory).
@@ -402,6 +409,19 @@ EOF
 }
 
 # ---------- Axe 3 : Scripts ----------
+# Decouverte des suites de l'axe scripts : source unique pour le decompte et l'execution
+# (fichiers reguliers $SCRIPTS_DIR/tests/test-*.sh). Remplit le tableau global SUITES.
+SUITES=()
+discover_suites() {
+  SUITES=()
+  [ -d "$SCRIPTS_DIR/tests" ] || return 0
+  local t
+  for t in "$SCRIPTS_DIR/tests/"test-*.sh; do
+    [ -f "$t" ] || continue
+    SUITES+=("$t")
+  done
+}
+
 audit_scripts() {
   log "Axe 3 — Scripts integrite"
 
@@ -425,14 +445,17 @@ audit_scripts() {
     command -v "$cmd" >/dev/null 2>&1 || deps_missing+=("$cmd")
   done
 
-  # Run tests si presents
+  # Suites decouvertes (UNE seule decouverte, partagee avec la boucle d'execution : « decouvertes »
+  # et « executees » ne peuvent pas diverger) ; executees sauf --no-tests / VF_SKIP_TESTS=1.
+  discover_suites
+  local suites_found=${#SUITES[@]}
   local tests_pass=0
   local tests_fail=0
   if [ "$SKIP_TESTS" = true ]; then
     log "axe tests : non execute (--no-tests)"
-  elif [ -d "$SCRIPTS_DIR/tests" ]; then
-    for t in "$SCRIPTS_DIR/tests/"test-*.sh; do
-      [ -f "$t" ] || continue
+  else
+    local t
+    for t in ${SUITES[@]+"${SUITES[@]}"}; do
       if "$t" >/dev/null 2>&1; then
         tests_pass=$((tests_pass + 1))
       else
@@ -441,12 +464,22 @@ audit_scripts() {
     done
   fi
 
-  # Suites sautées sous --strict : le vert serait obtenu par absence → verdict indéterminé (exit 3).
+  # --strict : INDETERMINE seulement si au moins une suite AURAIT tourne et a ete sautee (vert par
+  # absence). Sans suite decouverte rien n'est saute : verdict normal, raison "no_suites".
+  # strict_reason : null hors --strict · "ran" (suites executees) · "no_suites" · "tests_skipped".
   local strict_indet=false
-  if [ "$STRICT" = true ] && [ "$SKIP_TESTS" = true ]; then
-    strict_indet=true
-    STRICT_INDETERMINATE=true
-    log "✗ INDÉTERMINÉ : --strict avec suites sautées (--no-tests / VF_SKIP_TESTS=1) — aucun verdict conforme possible (exit 3)"
+  local strict_reason="null"
+  if [ "$STRICT" = true ]; then
+    if [ "$suites_found" -eq 0 ]; then
+      strict_reason='"no_suites"'
+    elif [ "$SKIP_TESTS" = true ]; then
+      strict_indet=true
+      strict_reason='"tests_skipped"'
+      STRICT_INDETERMINATE=true
+      log "✗ INDÉTERMINÉ : --strict avec $suites_found suite(s) sautée(s) (--no-tests / VF_SKIP_TESTS=1) — aucun verdict conforme possible (exit 3)"
+    else
+      strict_reason='"ran"'
+    fi
   fi
 
   local deps_json="[]"
@@ -465,6 +498,8 @@ audit_scripts() {
   "deps_missing": $deps_json,
   "tests_skipped": $SKIP_TESTS,
   "strict_indeterminate": $strict_indet,
+  "strict_indeterminate_reason": $strict_reason,
+  "suites_found": $suites_found,
   "tests_pass": $tests_pass,
   "tests_fail": $tests_fail
 }
@@ -602,7 +637,7 @@ if $STRICT && [ "$STRICT_ERRORS" -gt 0 ]; then
   exit 1
 fi
 
-# Verdict INDÉTERMINÉ (--strict + suites sautées) : après les findings bloquants, qui restent prioritaires.
+# Verdict INDÉTERMINÉ (--strict + suites découvertes sautées) : après les findings bloquants, qui restent prioritaires.
 if $STRICT && [ "$STRICT_INDETERMINATE" = true ]; then
   hook_exit 3
 fi

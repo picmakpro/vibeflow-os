@@ -2,7 +2,7 @@
 
 > Skill VibeFlow qui maintient les registres mémoire structurés (DECISIONS / LEARNINGS / BLOCKERS / EVALS / JOURNAL) scalables et propres au fil des sessions, plus la couche « mémoire vivante » fichier-par-entrée.
 
-**Version** : v1.11.2
+**Version** : v1.11.3
 **Référence** : ADR-032 (piliers 1-4) + ADR-052 (pilier 5) du Lab VibeFlow
 **Iron Law** : *"La lecture d'un registre = lecture de l'index uniquement par défaut."*
 
@@ -93,6 +93,8 @@ compte en laissant chaque projet vide. Un hook `SessionStart` appelle `seed-regi
 .claude/scripts/detect-duplicates.sh    # → candidats fusion (collisions + titres similaires)
 .claude/scripts/detect-promotions.sh    # → candidats learning → rule
 ```
+
+`detect-duplicates.sh` signale ses échecs : si l'analyse des titres échoue (Python), message sur stderr, champ JSON `errors` (liste non vide) et code de sortie 2 — jamais un faux « aucun doublon ». `errors: []` et code 0 = détection complète.
 
 ### Passe de mémoire vivante (pilier 5)
 

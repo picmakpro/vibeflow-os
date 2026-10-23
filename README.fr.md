@@ -15,7 +15,7 @@ Un plugin Claude Code de développement agentique piloté par la spec. Un agent 
 une équipe d'agents challenge, planifie, construit et prouve le travail, et des gates machine le
 vérifient. Rien n'est fait sans preuve, rien n'est mergé sans toi.
 
-[![Version](https://img.shields.io/badge/version-2.71.1-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.71.2-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#autres-runtimes)
 [![Modules](https://img.shields.io/badge/modules-17-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -154,9 +154,9 @@ gate). Les trois dernières sont ci-dessous ; l'historique complet vit dans
 
 | Version | Date | Changement |
 |---------|------|------------|
+| `v2.71.2` | 2026-10-23 | **Correctifs d'audit, de doublons et de doc (patch).** `infrastructure-audit` ne rend plus INDÉTERMINÉ sous `--strict --no-tests` quand aucune suite n'existe ; `detect-duplicates.sh` passe les titres à Python par l'entrée standard et signale ses échecs (champ `errors`, code de sortie 2) ; le tableau des signaux de démarrage de l'agent `dev-orchestrator` suit le texte réel des hooks ; les commentaires de `driver-lock` décrivent la garde hors racine (`conductor` v1.50.2, `consolidator` v1.11.3, `dev-orchestrator` v2.28.4, `infrastructure-audit` v1.3.6). |
 | `v2.71.1` | 2026-10-23 | **Correctifs Windows, audit et bootstrap (patch).** Le mode UTF-8 est posé sans condition sous `-I` et les deux gros programmes de hooks ne passent plus par la ligne de commande (Windows la plafonne à 32 767 caractères) ; `infrastructure-audit` gagne `--no-tests` et rend INDÉTERMINÉ sous `--strict` quand les suites sont sautées ; `driver-lock` refuse un sous-dossier sans `.planning/` propre ; le bootstrap de session oriente vers `/vf-dev` ; `check-gsd-config` épargne les clés propres à VibeFlow (`conductor` v1.50.1, `consolidator` v1.11.2, `design-orchestrator` v1.5.15, `dev-orchestrator` v2.28.3, `infrastructure-audit` v1.3.5, `planning-core` v2.8.3). |
 | `v2.71.0` | 2026-10-22 | **Postes par projet (minor).** `/vibeflow-install` demande le poste sur ce projet (`solo` pré-coché, `product`, `dev` ; non interactif par `VF_ROLE`). `module.json` porte `roles`, et le catalogue, les presets et `install --all` filtrent par poste, tandis qu'un module nommé explicitement s'installe toujours : un poste est une vue, pas un droit (ADR-077). `conductor` v1.50.0 ajoute le lecteur `vf-role.sh get`, le gate consultatif `check-role-consistency.sh` et une ligne « Poste : X » au SessionStart. **111 suites.** |
-| `v2.70.1` | 2026-10-22 | **Correctif de sécurité : interpréteur Python isolé (patch).** Depuis v2.70.0, les `python3 -c` / `python3 -` inline mettaient le dossier courant en tête de `sys.path` : un `json.py` à la racine d'un lab cloné était exécuté par les hooks, et la garde du verrou de driver cessait de refuser (fail-open). Chaque invocation inline passe en `-I` (huit modules corrigés), `PYTHONUTF8=1` est restitué par `-X utf8`, et un nouveau gate CI `check-python-isolation.sh` le tient. Le manifeste de référence de `check-agents` est relu et re-daté (`autoCompactWindow`, `claude`). |
 
 <details>
 <summary><strong>Références méthodologiques (ADR / LRN)</strong></summary>

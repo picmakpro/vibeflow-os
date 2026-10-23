@@ -1,5 +1,11 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.3.6] — 2026-10-23 (--strict --no-tests sans suite découverte) — publiée dans v2.71.2
+
+**Patch** (#153 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :
+
+- **`--strict --no-tests` ne rend plus INDÉTERMINÉ quand aucune suite n'existe** (#153, 92e38b4d) : sans suite découverte, le verdict est normal ; exit 3 seulement si au moins une suite aurait tourné. Le JSON gagne `strict_indeterminate_reason` et `suites_found`.
+
 ## [v1.3.5] — 2026-10-23 (audit Windows, --no-tests, --strict INDÉTERMINÉ) — publiée dans v2.71.1
 
 **Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :

@@ -15,6 +15,7 @@
 # T11 — #153 §3 : forme "$CLAUDE_PROJECT_DIR"/x.sh ; T12 — #153 §6.7 : CR retirés du JSON (Windows)
 # T13 — #153 §6.4 : événements connus (SubagentStop, FileChanged)
 # T14 — #153 §6.3 : --no-tests / VF_SKIP_TESTS=1 ; T15 — --strict + suites sautées → exit 3
+# T16 — #153 : --strict + saut SANS suite découverte (pas de tests/, tests/ vide de test-*.sh) → verdict normal
 
 set -uo pipefail
 
@@ -359,6 +360,47 @@ run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --quick >/dev
 run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --axis=hooks >/dev/null 2>&1; rch=$?
 run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --axis=runtime >/dev/null 2>&1; rcr=$?
 [ "$rcq" -eq 0 ] && [ "$rch" -eq 0 ] && [ "$rcr" -eq 0 ] && ok "T15g' VF_SKIP_TESTS=1 hérité + --strict sur --quick / --axis=hooks / --axis=runtime → exit 0" || ko "T15g' VF_SKIP_TESTS hérité : rc attendus 0/0/0, obtenus quick=$rcq hooks=$rch runtime=$rcr"
+
+# T16 — #153 (précision de l'arbitrage du 2026-10-22, délégation explicite, session principale, 2026-10-23) :
+# sans suite découverte, rien n'est sauté → pas d'indéterminé ; les cas T15 (suites présentes) restent exit 3.
+# SCRIPT_UNDER_TEST permet de rejouer ces cas contre une autre version du script (preuve du rouge sur la base).
+LAB_NOTESTS="$WORK/lab-notests"; mkdir -p "$LAB_NOTESTS/.claude/scripts"
+LAB_EMPTY="$WORK/lab-emptytests"; mkdir -p "$LAB_EMPTY/.claude/scripts/tests"
+printf 'lisez-moi\n' > "$LAB_EMPTY/.claude/scripts/tests/README.txt"
+mkdir -p "$LAB_EMPTY/.claude/scripts/tests/test-dossier.sh"   # dossier nommé test-*.sh : pas une suite (fichier régulier requis)
+for lab in "$LAB_NOTESTS" "$LAB_EMPTY"; do
+  for variant in "--no-tests" "VF_SKIP_TESTS=1"; do
+    if [ "$variant" = "--no-tests" ]; then
+      OUT="$(run_in "$lab" "$BASH_BIN" "${SCRIPT_UNDER_TEST:-$SCRIPT}" --strict --axis=scripts --no-tests 2>/dev/null)"; rc=$?
+    else
+      OUT="$(run_in "$lab" env VF_SKIP_TESTS=1 "$BASH_BIN" "${SCRIPT_UNDER_TEST:-$SCRIPT}" --strict --axis=scripts 2>/dev/null)"; rc=$?
+    fi
+    if [ "$rc" -eq 0 ] && echo "$OUT" | grep -q '"strict_indeterminate": false' \
+       && echo "$OUT" | grep -q '"strict_indeterminate_reason": "no_suites"' && echo "$OUT" | grep -q '"suites_found": 0'; then
+      ok "T16a #153 : $(basename "$lab") + --strict + $variant → exit 0, strict_indeterminate=false, raison no_suites"
+    else
+      ko "T16a $(basename "$lab") + --strict + $variant : rc=0, strict_indeterminate=false, raison no_suites, suites_found=0 attendus, obtenu rc=$rc, sortie : $OUT"
+    fi
+  done
+done
+# Mode complet sans suite : même verdict (hors findings d'autres axes, lab propre).
+run_in "$LAB_NOTESTS" "$BASH_BIN" "${SCRIPT_UNDER_TEST:-$SCRIPT}" --strict --axis=scripts --no-tests >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 0 ] && ok "T16b #153 : sans suite, --strict --no-tests → exit 0" || ko "T16b sans suite : rc=0 attendu, obtenu rc=$rc"
+# Un finding bloquant reste exit 1 même sans suite (rouge établi).
+LAB_NOTESTS_BAD="$WORK/lab-notests-bad"; mkdir -p "$LAB_NOTESTS_BAD/.claude/scripts"
+printf '#!/bin/sh\nif then\n' > "$LAB_NOTESTS_BAD/.claude/scripts/casse.sh"
+run_in "$LAB_NOTESTS_BAD" "$BASH_BIN" "${SCRIPT_UNDER_TEST:-$SCRIPT}" --strict --axis=scripts --no-tests >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 1 ] && ok "T16c #153 : sans suite + syntaxe cassée → exit 1 (finding bloquant)" || ko "T16c sans suite + syntaxe cassée : rc=1 attendu, obtenu rc=$rc"
+# Suites présentes + sautées : raison tests_skipped et compte (garde la lettre de T15a, n'affaiblit rien).
+OUT="$(run_in "$LAB_T" "$BASH_BIN" "${SCRIPT_UNDER_TEST:-$SCRIPT}" --strict --axis=scripts --no-tests 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 3 ] && echo "$OUT" | grep -q '"strict_indeterminate_reason": "tests_skipped"' && echo "$OUT" | grep -q '"suites_found": 1'; then
+  ok "T16d #153 : suites présentes + sautées → exit 3, raison tests_skipped, suites_found=1"
+else
+  ko "T16d suites présentes + sautées : rc=3, raison tests_skipped, suites_found=1 attendus, obtenu rc=$rc, sortie : $OUT"
+fi
+# Hors --strict la raison est null.
+OUT="$(run_in "$LAB_NOTESTS" "$BASH_BIN" "${SCRIPT_UNDER_TEST:-$SCRIPT}" --axis=scripts --no-tests 2>/dev/null)"
+echo "$OUT" | grep -q '"strict_indeterminate_reason": null' && ok "T16e #153 : hors --strict → raison null" || ko "T16e hors --strict : raison null attendue, sortie : $OUT"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
