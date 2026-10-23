@@ -101,7 +101,7 @@ Le hook `SessionStart` du module constate des faits et les injecte dans le conte
 session principale (pas seulement à mon invocation). Un 5e fait (documents de cadrage hors
 feuille de route) est déjà couvert par la ligne « intègre cette spec… » ci-dessus
 (`ingestion-flow.md`) — pas dupliqué ici. Colonne « Geste proposé » : ce que le hook dit réellement
-depuis #160 (A1) — la porte `/vf-dev` plus la nature du geste en mots, jamais un skill `gsd-*`
+depuis #160 (A1) — la porte `/vf-dev` plus la nature du geste en mots, sans skill `gsd-*`
 nommé à la session ; l'équipe dispatchée par `/vf-dev` porte la brique, pas un geste que
 j'exécute. Deux lignes nomment encore un outil dans le texte du hook : `[doc-drift]`
 (`gsd-docs-update`) et `[ledger-absent]` (script outillé `restore-requirements-ledger.sh`, nommé seulement quand une archive est présente ; sans archive, le hook dit de recréer le ledger à la main).
