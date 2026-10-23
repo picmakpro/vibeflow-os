@@ -52,8 +52,9 @@
 # Emplacement : <git-common-dir>/vf-driver/{ws/<sujet>,repo}/DRIVER.lock, un dossier par verrou,
 # partage entre les worktrees du clone. Le JSON des verbes porte "scope" (compartiment|depot),
 # "ws" ("" pour le depot) et "location" (git-common-dir). Refus nommes, chacun avec un "hint" :
-# unknown-ws, ws-invalid, partition-unreadable, policy-missing, not-at-lab-root (P57-D-39 : --ws ou
-# --depot lance d'un dossier sans .planning/ propre alors que la racine git en porte les compartiments ;
+# unknown-ws, ws-invalid, partition-unreadable, policy-missing, not-at-lab-root (P57-D-39, #58 : verbe ecrivant,
+# avec ou sans --ws/--depot, lance d'un dossier sans .planning/ propre alors que la racine git en porte un ;
+# status/orphans exceptes, sauf avec --ws/--depot en lab partitionne ;
 # hint « lance depuis la racine du lab »). Le nom du sujet est valide par
 # vf_ws_name_valid puis vf_ws_dir_resolve AVANT d'entrer dans un chemin ou un JSON.
 # ANCIEN VERROU (P57-D-14, P57-D-24, P57-D-26) : en lab partitionne, un .planning/DRIVER.lock tenu
@@ -284,11 +285,26 @@ vf_dl_resolve() {
   # propre `.planning/` alors que la racine git en porte les compartiments. Sans ce refus la detection (relative
   # au cwd) rendrait le lab « plat », le verrou d'autrui ne serait pas vu et un `.planning/DRIVER.lock` parasite
   # serait cree dans le sous-dossier. Un dossier portant SON `.planning/` (P57-D-29) n'est pas concerne.
-  if { [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; } && [ ! -e .planning ] && [ ! -L .planning ]; then
-    local top=""
-    top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
-    if [ -n "$top" ] && vf_dl_ws_present "$top/.planning/workstreams"; then
-      vf_dl_refuse not-at-lab-root "ce dossier n'est pas la racine du lab partitionne : lance driver-lock.sh depuis la racine du lab (le dossier qui porte .planning/workstreams), puis rejoue la commande avec la meme option --ws ou --depot"
+  # #58 : meme refus AVEC ou SANS option, en lab partitionne comme en lab plat (`--ws`/`--depot` sont inertes en lab
+  # plat, P57-D-03, mais l'ecriture d'un verrou dans le sous-dossier ne l'est pas), des que la racine git porte un
+  # `.planning/` que le cwd n'a pas — sinon le chemin relatif cree un verrou fantome `<sous-dossier>/.planning/DRIVER.lock` et deux
+  # missions croient chacune tenir le verrou. `status` et `orphans` sans option (lecture seule, ne creent rien) restent
+  # inchanges : check-guard-health.sh lit `status --all` depuis un cwd quelconque et ne doit pas devenir bruyant.
+  if [ ! -e .planning ] && [ ! -L .planning ]; then
+    local top="" named=0 mutating=1
+    if [ "$WS_GIVEN" = 1 ] || [ "$DEPOT" = 1 ]; then named=1; fi
+    case "$ACTION" in status|orphans) mutating=0 ;; esac
+    if [ "$named" = 1 ] || [ "$mutating" = 1 ]; then
+      top="$(git rev-parse --show-toplevel 2>/dev/null)" || top=""
+      local why=""
+      if [ -n "$top" ] && vf_dl_ws_present "$top/.planning/workstreams"; then
+        why="ce dossier n'est pas la racine du lab partitionne : lance driver-lock.sh depuis la racine du lab (le dossier qui porte .planning/workstreams), puis rejoue la commande avec la meme option --ws ou --depot"
+      elif [ -n "$top" ] && [ "$mutating" = 1 ] && { [ -d "$top/.planning" ] || [ -L "$top/.planning" ]; }; then
+        why="ce dossier ne porte pas son propre .planning/ alors que la racine git en porte un : lance driver-lock.sh depuis la racine du lab (le dossier qui porte .planning), puis rejoue la commande avec la meme option --ws ou --depot si tu en passais une"
+      fi
+      if [ -n "$why" ]; then
+        vf_dl_refuse not-at-lab-root "$why"
+      fi
     fi
   fi
   vf_dl_ws_present .planning/workstreams || return 0
