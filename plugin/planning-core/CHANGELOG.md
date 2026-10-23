@@ -1,5 +1,12 @@
 # Changelog — planning-core
 
+## [v2.8.3] — 2026-10-23 (UTF-8 inconditionnel, clé profile) — publiée dans v2.71.1
+
+**Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :
+
+- **Mode UTF-8 inconditionnel sous `-I`** (#157, #153 §1) : `$PYX` vaut `-Xutf8` sans condition dans `planning-task-context.sh` et `recalc-planning.sh`.
+- **`references/PROFILES.md`** (#161, #154 point 3) : précise que `check-gsd-config.sh` connaît la clé `profile` (liste blanche des clés propres à VibeFlow) et ne la signale plus comme inconnue du moteur.
+
 ## [v2.8.2] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — publiée dans v2.70.1
 
 **Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :

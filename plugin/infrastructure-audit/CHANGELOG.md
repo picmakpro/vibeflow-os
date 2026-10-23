@@ -1,5 +1,13 @@
 # CHANGELOG — infrastructure-audit
 
+## [v1.3.5] — 2026-10-23 (audit Windows, --no-tests, --strict INDÉTERMINÉ) — publiée dans v2.71.1
+
+**Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :
+
+- **Axe hooks** (#158, issue #153 §3, §6.4) : la forme `"$CLAUDE_PROJECT_DIR"/x.sh` est résolue sans ses guillemets ; `SubagentStop` et `FileChanged` rejoignent les événements connus (`hooks_events_hardcoded`).
+- **JSON valide sous Windows** (#158, #153 §6.7) : les CR de `py_out` sont retirés, le JSON des détections reste valide dès 2 détections ; les lectures de `settings` se font en `utf-8` et `$PYX` vaut `-Xutf8` sans condition (#157, #153 §1).
+- **Option `--no-tests` / `VF_SKIP_TESTS=1`** (#158, #153 §6.3) : saute l'exécution des suites de l'axe scripts (seule la valeur `1` saute) ; JSON `"tests_skipped": true`. Avec `--strict` sur un mode qui exécute les suites (full, `--axis=scripts`), le verdict est INDÉTERMINÉ, exit 3 (`"strict_indeterminate": true`) : le gate ne dit pas « conforme » sans avoir exécuté les suites ; exit 1 l'emporte sur 3 (arbitrage Samuel, AskUserQuestion session principale, 2026-10-22). `--quick`, `--axis=hooks|runtime`, `--snapshot` et `--diff` inchangés. README, SKILL.md et suite `test-audit-infra.sh` (cas T15g et suivants, suite hermétique à un `VF_SKIP_TESTS` hérité) alignés.
+
 ## [v1.3.4] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — publiée dans v2.70.1
 
 **Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :

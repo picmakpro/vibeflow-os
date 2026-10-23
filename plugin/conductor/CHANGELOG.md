@@ -1,5 +1,13 @@
 # Changelog — conductor
 
+## [v1.50.1] — 2026-10-23 (UTF-8 inconditionnel, programmes hors ligne de commande, garde hors racine) — publiée dans v2.71.1
+
+**Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :
+
+- **Mode UTF-8 inconditionnel sous `-I`** (#157, issues #149 et #153 §1, §6.1) : `vf_python` (`_internal/lib/vf-portable.sh`) passe `-X utf8` sans condition, plus seulement quand `PYTHONUTF8=1` ; `$PYX` vaut `-Xutf8` dans `merge-hooks.sh`, `check-agents.sh` et les scripts du module. Sous Windows (cp1252) un `print("✓")` ou la lecture d'un JSON accentué n'échoue plus ; sans effet sous macOS/Linux en locale UTF-8. `PYTHONIOENCODING` reste ignoré (limite inchangée).
+- **Programmes Python hors de la ligne de commande** (#157, #149) : `check-agents.sh` (~60 Ko) passe son programme par l'entrée standard (here-string) et `guard-driver-lock.sh` (~64 Ko) le fait voyager en tête de l'entrée standard, séparé du payload par un octet NUL ; Windows plafonne la ligne de commande à 32 767 caractères (`Argument list too long`, rc 126, garde inerte en silence). Taille gardée par `scripts/check-python-isolation.sh`.
+- **`driver-lock.sh` refuse un sous-dossier sans `.planning/` propre** (#159, issue #58) : tout verbe qui écrit, avec ou sans `--ws`/`--depot`, lancé d'un dossier sans `.planning/` alors que la racine git en porte un, est refusé `not-at-lab-root` (lab plat comme partitionné) ; `status`/`orphans` exceptés, sauf avec `--ws`/`--depot` en lab partitionné. Évite le verrou fantôme `<sous-dossier>/.planning/DRIVER.lock` où deux missions croyaient chacune tenir le verrou. `references/team-kernel.md` et les suites `test-driver-lock-ws.sh` / `test-guard-driver-lock-ws.sh` alignées.
+
 ## [v1.50.0] — 2026-10-16 (rôles de poste : lecteur, gate et contexte de session, Phase 58)
 
 **Minor** (capacité neuve installée chez l'utilisateur, RLPO-01..12 ; décisions P58-D-01..14 : arbitrage Samuel,

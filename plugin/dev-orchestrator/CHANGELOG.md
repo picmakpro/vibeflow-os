@@ -1,5 +1,13 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.28.3] — 2026-10-23 (bootstrap vers /vf-dev, clés VibeFlow de check-gsd-config) — publiée dans v2.71.1
+
+**Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :
+
+- **Le bootstrap oriente vers `/vf-dev`** (#160, issue #154 point 1) : `check-dev-bootstrap.sh` ne nomme plus de geste `gsd-*` à la session. Chaque item garde son constat et porte un geste en langage courant (« configurer le moteur », « cartographier le code », « planifier l'étape ») ; l'orientation est `→ propose /vf-dev pour : <gestes> (confirmation requise)` (états 1 et 2) ou `→ /vf-dev (cadrage, plan, état).` (état 3). Le hook propose, il ne déclenche rien. Suite `test-check-dev-bootstrap.sh` étendue.
+- **`check-gsd-config.sh` épargne les clés propres à VibeFlow** (#161, issue #154 point 3) : liste blanche en dur `VF_OWN` (`profile`, `planning_version`, `scope`, `type`, `domain`, `domain_extension`, `options`, `compartments`, `memory_bridge`, `vf_runtimes`, `vf_roles`), chaque entrée citant sa source ; ces clés ne sont plus signalées `UNKNOWN_BLOCK` sur un lab sain. Seconde exception nommée au « jamais en dur » avec `engineExtra` ; le cas 38 de `test-check-gsd-config.sh` la tient dans les deux sens. Le moteur peut garder son propre avertissement (amont, hors de ce gate).
+- **`references/mission-flow.md`** (#159, #58) : le refus `not-at-lab-root` du verrou couvre tout verbe qui écrit, lab plat comme partitionné.
+
 ## [v2.28.2] — 2026-10-16 (clé `roles`, Phase 58)
 
 **Patch** (métadonnée de module seule, aucun script modifié ; décisions P58-D-01..14 : arbitrage Samuel,
