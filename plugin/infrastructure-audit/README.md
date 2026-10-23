@@ -112,9 +112,14 @@ bash .claude/scripts/audit-infra.sh --snapshot   # → .claude/INFRASTRUCTURE_SN
   bloquants, 3 = INDÉTERMINÉ : `$CLAUDE_DIR` absent, rien d'audité, ou suites sautées, voir
   ci-dessous). S'applique aux modes full/quick/axis.
 - **Sauter les suites** : `--no-tests` ou `VF_SKIP_TESTS=1` (seule la valeur `1` saute). Avec
-  `--strict` sur un mode qui exécute les suites (full, `--axis=scripts`), c'est une seconde cause
-  d'exit 3 : l'audit a eu lieu, pas les suites. Exit 1 l'emporte sur 3 ; `--quick`,
-  `--axis=hooks` et `--axis=runtime` n'évaluent pas les suites : le saut n'y change pas le verdict.
+  `--strict` sur un mode qui exécute les suites (full, `--axis=scripts`) **et au moins une suite
+  découverte** (`$CLAUDE_DIR/scripts/tests/test-*.sh`, fichiers réguliers), c'est une seconde cause
+  d'exit 3 : l'audit a eu lieu, pas les suites. **Sans aucune suite découverte** (pas de `tests/`,
+  ou aucun `test-*.sh`), rien n'est sauté : verdict normal (0, ou 1 sur finding bloquant). Le JSON
+  de l'axe scripts le dit : `strict_indeterminate` (booléen), `strict_indeterminate_reason`
+  (`"tests_skipped"` · `"no_suites"` · `"ran"` ; `null` hors `--strict`) et `suites_found`.
+  Exit 1 l'emporte sur 3 ; `--quick`, `--axis=hooks` et `--axis=runtime` n'évaluent pas les suites :
+  le saut n'y change pas le verdict.
 - **Maintenance whitelist** : `echo "2.1.216" >> .claude/scripts/known-versions.txt` après avoir
   validé que la nouvelle version ne casse rien. Depuis v1.2.0, une version **plus récente** que
   la dernière validée est considérée `known` avec une note explicite (pas de faux négatif
