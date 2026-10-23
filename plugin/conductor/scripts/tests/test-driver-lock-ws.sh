@@ -40,16 +40,21 @@ MUT_C="WS-ALL-1 WS-ALL-2 WS-ALL-3 WS-ALL-5 WS-ENV WS-HINT-3 WS-LEG-1 WS-LEG-2 WS
 MUT_D="WS-LEG-1 WS-LEG-4 WS-R4A WS-R4B WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV"
 MUT_E="WS-ENV"
 MUT_F="WS-AB"
-MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-6 WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV WS-VFL"
+MUT_G="WS-ALL-2 WS-ALL-3 WS-LEG-1 WS-LEG-2 WS-LEG-3 WS-LEG-4 WS-R4A WS-R4B WS-ROOT-13 WS-ROOT-6 WS-TKA WS-TKB WS-TKD WS-TKR WS-TKV WS-VFL"
 MUT_H="WS-ALL-4 WS-RC2-file WS-RC2-lien"
 # j (correction F-2, P57-D-39) : le refus hors racine du lab retiré — seuls les trois cas de refus de WS-ROOT basculent
-# (g y ajoute WS-ROOT-6, le cas VF_DRIVER_LOCK ; i y ajoute WS-ROOT-8, le témoin acquire depuis la racine)
-MUT_J="WS-ROOT-1 WS-ROOT-2 WS-ROOT-3"
+# (g y ajoute WS-ROOT-6, le cas VF_DRIVER_LOCK ; i y ajoute WS-ROOT-8, le témoin acquire depuis la racine) ;
+# WS-ROOT-12b bascule aussi : sans refus, les acquire 11/17/18 réussissent depuis le sous-dossier et y posent un verrou fantôme que le status voit
+MUT_J="WS-ROOT-1 WS-ROOT-10 WS-ROOT-11 WS-ROOT-12b WS-ROOT-17 WS-ROOT-18 WS-ROOT-2 WS-ROOT-3 WS-ROOT-9"
 # acq_fallback à gen_kept (réserve C3 de 57-VERIFICATION.md et correction R-4) : acq_fallback = acquire sans cible
 # retombe sur le repli de l'ancien verrou (le suffixe JSON du refus change) ; fallback_depotpresent = le repli ne
 # regarde plus si le verrou de dépôt existe ; skip_link_d = un lien symbolique n'est plus écarté par status --all ;
 # reprobe_none = la re-sonde après la pose est neutralisée ; pose_kept = la pose du processus n'est pas retirée ;
 # gen_kept = sa génération n'est pas retirée.
+# k (revue adverse de #58) : status et orphans deviennent mutants — la garde « la racine git a .planning/, le cwd non »
+# refuse alors aussi la lecture seule depuis un sous-dossier ; basculent les cas de non-refus de status : WS-ROOT-4 (lab
+# partitionné), WS-ROOT-7 (lab plat, --ws), WS-ROOT-12 (assert_not) et WS-ROOT-12b (positif)
+MUT_K="WS-ROOT-12 WS-ROOT-12b WS-ROOT-4 WS-ROOT-7"
 MUT_ACQ="WS-LEG-1"
 MUT_FDP="WS-LEG-5"
 MUT_SKL="WS-ALL-5"
@@ -1217,6 +1222,49 @@ out="$(dl_in "$FLATR/plugin/sub" sess-A status --ws=alpha)"
 assert_not "WS-ROOT-7 — lab PLAT : --ws depuis un sous-dossier reste sans effet (P57-D-03), pas de refus" "$out" 'not-at-lab-root'
 out="$(dl "$LAB" sess-A acquire --ws=alpha --owner=m1 --step=s)"
 assert "WS-ROOT-8 — témoin : depuis la racine du lab, le même acquire réussit" "$out" '"acquired": true'
+# #58 : le même refus SANS option, en lab partitionné comme en lab plat (verrou fantôme <sous-dossier>/.planning/DRIVER.lock)
+LAB9="$(mk_lab root9)"; GC9="$(fixture_common_dir "$LAB9")"; mkdir -p "$LAB9/plugin/sub"; SUB9="$LAB9/plugin/sub"
+out="$(dl_in "$SUB9" sess-A acquire --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-ROOT-9.1 — lab partitionné : acquire SANS option depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-9.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+assert "WS-ROOT-9.3 — clé de tête acquired false" "$out" '"acquired": false'
+[ ! -e "$GC9/vf-driver" ] && [ ! -e "$SUB9/.planning" ] && [ ! -e "$LAB9/.planning/DRIVER.lock" ]; assert_exit "WS-ROOT-9.4 — ni verrou ni .planning fantôme créés" "$?" 0
+FLAT10="$(mk_flat root10)"; mkdir -p "$FLAT10/plugin/sub"; SUB10="$FLAT10/plugin/sub"
+out="$(dl_in "$SUB10" sess-A acquire --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-ROOT-10.1 — lab plat : acquire depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-10.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+json_ok "$out"; assert_exit "WS-ROOT-10.3 — JSON valide" "$?" 0
+[ ! -e "$SUB10/.planning" ] && [ ! -e "$FLAT10/.planning/DRIVER.lock" ]; assert_exit "WS-ROOT-10.4 — ni verrou ni .planning fantôme créés" "$?" 0
+out="$(dl_in "$SUB10" sess-A heartbeat --owner=m1)"; rc=$?
+assert_exit "WS-ROOT-11.1 — lab plat : heartbeat depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-11.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+out="$(dl_in "$SUB10" sess-A status)"
+assert_not "WS-ROOT-12 — lab plat : status (lecture seule) depuis un sous-dossier reste sans refus" "$out" 'not-at-lab-root'
+assert "WS-ROOT-12b — positif : le status rendu est bien la lecture du verrou, pas une autre erreur" "$out" '"present": false'
+out="$(cd "$SUB10" && CLAUDE_CODE_SESSION_ID=sess-A VF_DRIVER_LOCK="$WORK_DIR/root-unique10/DRIVER.lock" "${DL_SCRIPT:-$SCRIPT}" acquire --owner=m1 --step=s)"
+assert "WS-ROOT-13 — VF_DRIVER_LOCK posé : comportement historique, acquire depuis un sous-dossier réussit" "$out" '"acquired": true'
+# revue adverse de #58 : `--ws` et `--depot` en lab PLAT depuis un sous-dossier créaient encore <sous-dossier>/.planning
+# (options inertes en lab plat, P57-D-03, mais l'écriture du verrou ne l'est pas)
+out="$(dl_in "$SUB10" sess-A acquire --ws=alpha --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-ROOT-17.1 — lab plat : acquire --ws depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-17.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+json_ok "$out"; assert_exit "WS-ROOT-17.3 — JSON valide" "$?" 0
+[ ! -e "$SUB10/.planning" ] && [ ! -e "$FLAT10/.planning/DRIVER.lock" ]; assert_exit "WS-ROOT-17.4 — ni verrou ni .planning fantôme créés" "$?" 0
+out="$(dl_in "$SUB10" sess-A acquire --depot --owner=m1 --step=s)"; rc=$?
+assert_exit "WS-ROOT-18.1 — lab plat : acquire --depot depuis un sous-dossier : exit 1" "$rc" 1
+assert "WS-ROOT-18.2 — reason not-at-lab-root" "$out" '"reason": "not-at-lab-root"'
+[ ! -e "$SUB10/.planning" ] && [ ! -e "$FLAT10/.planning/DRIVER.lock" ]; assert_exit "WS-ROOT-18.3 — ni verrou ni .planning fantôme créés" "$?" 0
+mkdir -p "$LAB9/autre/.planning"; out="$(dl_in "$LAB9/autre" sess-A acquire --owner=m1 --step=s)"
+assert_not "WS-ROOT-14 — dossier portant son PROPRE .planning (P57-D-29) : acquire sans option, pas de refus" "$out" 'not-at-lab-root'
+assert "WS-ROOT-14b — positif : l'acquire a réellement réussi" "$out" '"acquired": true'
+mkdir -p "$WORK_DIR/root15-git/sub"; git -C "$WORK_DIR/root15-git" init -q >/dev/null 2>&1
+out="$(dl_in "$WORK_DIR/root15-git/sub" sess-A acquire --owner=m1 --step=s)"
+assert_not "WS-ROOT-15 — dépôt git dont la racine ne porte aucun .planning : pas de refus" "$out" 'not-at-lab-root'
+assert "WS-ROOT-15b — positif : l'acquire a réellement réussi" "$out" '"acquired": true'
+mkdir -p "$WORK_DIR/root16-nogit/sub"
+out="$(cd "$WORK_DIR/root16-nogit/sub" && GIT_CEILING_DIRECTORIES="$WORK_DIR" CLAUDE_CODE_SESSION_ID=sess-A "${DL_SCRIPT:-$SCRIPT}" acquire --owner=m1 --step=s)"
+assert_not "WS-ROOT-16 — hors dépôt git : inchangé, pas de refus" "$out" 'not-at-lab-root'
+assert "WS-ROOT-16b — positif : l'acquire a réellement réussi" "$out" '"acquired": true'
 
 if [ "$DLWS_MODE" = full ]; then
 echo
@@ -1449,7 +1497,7 @@ echo "=== MUTANTS DL-M-a à DL-M-j, puis DL-M-acq_fallback à DL-M-tk_old_delete
 # d'une copie de workstream-policy.sh (sinon policy-missing rougirait pour la mauvaise raison). La matrice (les
 # cas WS-* hors concurrence, WS-AB compris) est rejouée en sous-processus contre la copie ; l'ensemble des cas
 # dont le verdict bascule est comparé EXACTEMENT à l'attendu (un cas basculé hors de l'ensemble fait échouer).
-MUT_KILLED=0; MUT_TOTAL=28; t0=$SECONDS
+MUT_KILLED=0; MUT_TOTAL=29; t0=$SECONDS
 mut_families() { # <journal> → familles de cas en échec, triées, une par ligne
   LC_ALL=C sed -n 's/^  ❌ FAIL — \([^ ]*\) .*/\1/p' "$1" | LC_ALL=C sed 's/\..*$//' | LC_ALL=C sort -u
 }
@@ -1523,6 +1571,7 @@ mutant i 'vf_ws_dir_resolve ".planning" "$WS"; rc=$?' 's@vf_ws_dir_resolve ".pla
 # vide (P57-D-56, révise P57-D-25) : le dossier des compartiments VIDE redevient « partitionné » — seuls les cas WS-VIDE (hors témoin) basculent
 mutant vide 'return 1  # D56-VIDE' 's@return 1  # D56-VIDE@return 0  # D56-VIDE@' "WS-VIDE-vide WS-VIDE-gitkeep"
 mutant j 'vf_dl_refuse not-at-lab-root' 's@vf_dl_refuse not-at-lab-root .*$@:@' "$MUT_J"
+mutant k 'status|orphans) mutating=0 ;; esac' 's@status|orphans) mutating=0 ;; esac@status|orphans) mutating=1 ;; esac@' "$MUT_K"
 mutant acq_fallback 'if \[ "$ACTION" != acquire \] && \[ "$ALL" = 0 \]' 's@\[ "$ACTION" != acquire \] \&\& @@' "$MUT_ACQ"
 mutant fallback_depotpresent '\[ ! -L "$LOCK_DIR" \] && \[ ! -d "$LOCK_DIR" \]' 's@ \&\& \[ ! -L "$LOCK_DIR" \] \&\& \[ ! -d "$LOCK_DIR" \]@@' "$MUT_FDP"
 mutant skip_link_d 'if \[ -L "$d" \] || ! vf_ws_name_valid "$name"; then' 's@\[ -L "$d" \] || @@' "$MUT_SKL"
@@ -1546,9 +1595,9 @@ wait
 for id in $MUT_IDS; do mutant_eval "$id"; done
 echo "  durée des mutants : $((SECONDS-t0))s"
 if [ "$MUT_KILLED" -eq "$MUT_TOTAL" ]; then
-  echo "== mutants : 28/28 tués =="
+  echo "== mutants : 29/29 tués =="
 else
-  echo "== mutants : $MUT_KILLED/28 tués =="
+  echo "== mutants : $MUT_KILLED/29 tués =="
   FAIL=$((FAIL+1))
 fi
 fi   # DLWS_MODE = full (mutants)

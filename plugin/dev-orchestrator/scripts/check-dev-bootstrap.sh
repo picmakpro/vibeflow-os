@@ -9,7 +9,7 @@
 #   2. .planning/PROJECT.md présent, ≥1 item de démarrage manquant→ signal [bootstrap],  exit 0
 #   3. .planning/PROJECT.md présent, tous les items posés         → signal [gsd-engine],  exit 3
 #
-# L'état 3 est une ORIENTATION, pas une dette : il imprime UNE ligne (contre le risque qu'une
+# L'état 3 est une ORIENTATION, pas une dette : il imprime un constat de deux lignes — état puis porte /vf-dev (contre le risque qu'une
 # demande de conception parte sur une chaîne générique alors que le projet est piloté par GSD)
 # mais reste en exit 3 — rupture assumée de la convention « exit 3 ⇔ silence » que suivent les
 # états 0 et les autres scripts de la phase (D-14). Sortie et code de sortie ne se déduisent
@@ -22,10 +22,16 @@
 #
 # Items de démarrage vérifiés à l'état 2, dans cet ORDRE DE RESTITUTION FIGÉ (D-03, produit par
 # la séquence du code, jamais par un parcours de filesystem — deux exécutions sur la même
-# fixture donnent un stdout identique octet pour octet) :
-#   config   — .planning/config.json absent                                  → geste gsd-config
-#   codebase — code présent ET .planning/codebase/ absent ou vide            → geste gsd-map-codebase
-#   roadmap  — .planning/ROADMAP.md absent, ou sans aucune ligne d'en-tête de phase → geste gsd-plan-phase
+# fixture donnent un stdout identique octet pour octet). Chaque item porte un CONSTAT (conservé
+# tel quel) et un GESTE nommé en langage courant, jamais un nom de skill :
+#   config   — .planning/config.json absent                                  → « configurer le moteur »
+#   codebase — code présent ET .planning/codebase/ absent ou vide            → « cartographier le code »
+#   roadmap  — .planning/ROADMAP.md absent, ou sans aucune ligne d'en-tête de phase → « planifier l'étape »
+#
+# Porte /vf-dev et règle A1 : le hook ne nomme plus de geste gsd-* à la session. Il émet le constat
+# puis `→ propose /vf-dev pour : <gestes> (confirmation requise)` (états 1 et 2) ou, à l'état 3,
+# `→ /vf-dev (cadrage, plan, état).` — c'est /vf-dev qui route vers l'équipe. A1 : le hook PROPOSE,
+# il ne déclenche ni n'enchaîne aucun geste ; rien ne part sans la confirmation de l'utilisateur.
 #
 # État 3 — lecture du frontmatter de .planning/STATE.md (milestone, current_phase, status) :
 # SEUL endroit où du contenu de dépôt traverse vers le contexte de la session principale
@@ -278,7 +284,7 @@ STATE3EOF
     *) status_human="$s" ;;
   esac
   printf '[gsd-engine] Projet piloté par GSD — milestone %s, phase %s %s.\n' "$m" "$p" "$status_human"
-  printf '            → cadrage : gsd-discuss-phase · plan : gsd-plan-phase · état : gsd-progress.\n'
+  printf '            → /vf-dev (cadrage, plan, état).\n'
 }
 
 HAS_SOURCE=0
@@ -297,7 +303,7 @@ fi
 if [ "$HAS_SOURCE" -eq 1 ] && [ "$HAS_PLANNING" -eq 0 ]; then
   say "code source présent, $PLANNING_DIR absent — projet non cadré."
   printf '%s\n' "[onboard]   Code présent, aucun .planning/ — projet non cadré."
-  printf '%s\n' "            → propose gsd-onboard (confirmation requise)."
+  printf '%s\n' "            → propose /vf-dev pour : cadrer le projet existant (confirmation requise)."
   exit 0
 fi
 
@@ -308,23 +314,23 @@ if [ -f "$PLANNING_DIR/PROJECT.md" ]; then
 
   if config_missing; then
     ITEMS_CONSTAT="${ITEMS_CONSTAT:+${ITEMS_CONSTAT}, }config.json absent"
-    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }gsd-config"
+    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }configurer le moteur"
   fi
 
   if [ "$HAS_SOURCE" -eq 1 ] && codebase_missing; then
     ITEMS_CONSTAT="${ITEMS_CONSTAT:+${ITEMS_CONSTAT}, }codebase non cartographié"
-    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }gsd-map-codebase"
+    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }cartographier le code"
   fi
 
   if roadmap_missing; then
     ITEMS_CONSTAT="${ITEMS_CONSTAT:+${ITEMS_CONSTAT}, }feuille de route absente"
-    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }gsd-plan-phase"
+    ITEMS_GESTE="${ITEMS_GESTE:+${ITEMS_GESTE} puis }planifier l'étape"
   fi
 
   if [ -n "$ITEMS_CONSTAT" ]; then
     say "démarrage inachevé : ${ITEMS_CONSTAT}."
     printf '%s\n' "[bootstrap] Projet initialisé, démarrage inachevé : ${ITEMS_CONSTAT}."
-    printf '%s\n' "            → propose ${ITEMS_GESTE} (confirmation requise)."
+    printf '%s\n' "            → propose /vf-dev pour : ${ITEMS_GESTE} (confirmation requise)."
     exit 0
   fi
 

@@ -10,8 +10,17 @@
 # T5 — INF-05 : version listée → known ; plus récente que la dernière validée → known + note ;
 #               ancienne non listée → false
 # T6 — INF-05 : la whitelist couvre bien 2.1.215
+# T7-T9 — VG-5 : --strict (exit 3 sans cible, exit 1 sur ERROR, exit 0 sur lab propre)
+# T10 — contrat de flux sous --hook (HOOKS-CONTRAT-SORTIE.md §3)
+# T11 — #153 §3 : forme "$CLAUDE_PROJECT_DIR"/x.sh ; T12 — #153 §6.7 : CR retirés du JSON (Windows)
+# T13 — #153 §6.4 : événements connus (SubagentStop, FileChanged)
+# T14 — #153 §6.3 : --no-tests / VF_SKIP_TESTS=1 ; T15 — --strict + suites sautées → exit 3
 
 set -uo pipefail
+
+# Herméticité : un VF_SKIP_TESTS hérité de l'appelant (README, Git Bash) fausserait les cas qui
+# attendent des suites exécutées ; les cas qui le veulent le posent eux-mêmes (env VF_SKIP_TESTS=1).
+unset VF_SKIP_TESTS
 
 TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$(cd "$TESTS_DIR/.." && pwd)/audit-infra.sh"
@@ -194,6 +203,162 @@ V="$(printf '%s' "$OUT" | verdict_stdout)"
 N="$(run_in "$LAB_ERR" "$BASH_BIN" "$SCRIPT" --quick 2>/dev/null | grep -c '^{')"
 [ "$N" -eq 2 ] && ok "T10d non-régression : sans --hook, --quick rend toujours 2 objets (runtime+hooks)" \
   || ko "T10d la sortie CLI a changé : $N objet(s) au lieu de 2"
+
+# T11 — #153 §3 : `bash "$CLAUDE_PROJECT_DIR"/.claude/scripts/x.sh` (forme à guillemets, celle
+# qui survit aux espaces d'un chemin Windows) : le jeton garde ses guillemets, le chemin n'était
+# jamais résolu → faux script_missing. Le script existe ici : zéro détection attendue.
+LAB_Q="$WORK/lab-quote"; mkdir -p "$LAB_Q/.claude/scripts"
+printf '#!/bin/sh\nexit 0\n' > "$LAB_Q/.claude/scripts/present.sh"; chmod +x "$LAB_Q/.claude/scripts/present.sh"
+cat > "$LAB_Q/.claude/settings.json" <<'JSON'
+{ "hooks": { "SessionStart": [ { "hooks": [
+  { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/scripts/present.sh" },
+  { "type": "command", "command": "bash '$CLAUDE_PROJECT_DIR'/.claude/scripts/present.sh --x" } ] } ] } }
+JSON
+OUT="$(run_in "$LAB_Q" "$BASH_BIN" "$SCRIPT" --axis=hooks 2>/dev/null)"
+if echo "$OUT" | grep -q 'script_missing'; then
+  ko "T11 #153 §3 : faux script_missing sur la forme à guillemets, sortie : $OUT"
+elif echo "$OUT" | grep -q '"errors_count": 0'; then
+  ok "T11 #153 §3 : jetons \"\$CLAUDE_PROJECT_DIR\"/… (guillemets doubles et simples) résolus, 0 erreur"
+else
+  ko "T11 errors_count: 0 attendu, sortie : $OUT"
+fi
+
+# T12 — #153 §6.7 : sous Windows, print() termine chaque ligne par CRLF ; $(…) ne retire que la
+# fin de la DERNIÈRE ligne, donc les lignes intermédiaires de py_out gardaient un \r → JSON
+# invalide dès 2 détections. Simulé par un faux python3 qui réécrit en CRLF la sortie du
+# programme lu sur stdin (l'invocation `python3 - …` de py_out), et seulement elle.
+CRLF_BIN="$WORK/bin-crlf"; mkdir -p "$CRLF_BIN"
+REAL_PY="$(command -v python3)"
+cat > "$CRLF_BIN/python3" <<SH
+#!/bin/sh
+for a in "\$@"; do
+  if [ "\$a" = "-" ]; then
+    "$REAL_PY" "\$@" | awk '{ printf "%s\r\n", \$0 }'
+    exit 0
+  fi
+done
+exec "$REAL_PY" "\$@"
+SH
+chmod +x "$CRLF_BIN/python3"
+LAB_CR="$WORK/lab-crlf"; mkdir -p "$LAB_CR/.claude/scripts"
+cat > "$LAB_CR/.claude/settings.json" <<'JSON'
+{ "hooks": { "SessionStart": [ { "hooks": [
+  { "type": "command", "command": "bash .claude/scripts/fantome-un.sh" },
+  { "type": "command", "command": "bash .claude/scripts/fantome-deux.sh" },
+  { "type": "command", "command": "bash .claude/scripts/fantome-trois.sh" } ] } ] } }
+JSON
+OUT="$(run_in "$LAB_CR" env PATH="$CRLF_BIN:$PATH" "$BASH_BIN" "$SCRIPT" --axis=hooks 2>/dev/null)"
+V="$(printf '%s' "$OUT" | verdict_stdout)"
+if [ "$V" = "VALIDE" ] && printf '%s' "$OUT" | grep -q '"errors_count": 3'; then
+  ok "T12 #153 §6.7 : sortie Python en CRLF, 3 détections → JSON valide, errors_count 3"
+else
+  ko "T12 JSON attendu VALIDE avec errors_count 3 (verdict=$V), sortie : $(printf '%s' "$OUT" | cat -v | head -12)"
+fi
+
+# T13 — #153 §6.4 : SubagentStop et FileChanged sont des événements documentés de Claude Code ;
+# ni l'axe hooks (event_unknown) ni la liste de l'axe runtime ne doivent les ignorer.
+LAB_EV="$WORK/lab-events"; mkdir -p "$LAB_EV/.claude/scripts"
+cat > "$LAB_EV/.claude/settings.json" <<'JSON'
+{ "hooks": {
+  "SubagentStop": [ { "hooks": [ { "type": "command", "command": "echo ok" } ] } ],
+  "FileChanged":  [ { "hooks": [ { "type": "command", "command": "echo ok" } ] } ] } }
+JSON
+OUT="$(run_in "$LAB_EV" "$BASH_BIN" "$SCRIPT" --axis=hooks 2>/dev/null)"
+RT="$(run_in "$LAB_EV" "$BASH_BIN" "$SCRIPT" --axis=runtime 2>/dev/null)"
+if echo "$OUT" | grep -q '"warnings_count": 0' && echo "$RT" | grep -q '"SubagentStop"' && echo "$RT" | grep -q '"FileChanged"'; then
+  ok "T13 #153 §6.4 : SubagentStop/FileChanged connus (axe hooks 0 WARN, axe runtime les liste)"
+else
+  ko "T13 warnings_count: 0 + 2 événements runtime attendus, hooks : $OUT · runtime : $RT"
+fi
+
+# T14 — #153 §6.3 : --no-tests / VF_SKIP_TESTS=1 saute la boucle des suites de l'axe scripts
+# (plusieurs heures sous Git Bash). Sans l'option : suites exécutées, "tests_skipped": false.
+LAB_T="$WORK/lab-tests"; mkdir -p "$LAB_T/.claude/scripts/tests"
+printf '#!/bin/sh\ntouch "%s/ran-marker"\nexit 0\n' "$WORK" > "$LAB_T/.claude/scripts/tests/test-sonde.sh"
+chmod +x "$LAB_T/.claude/scripts/tests/test-sonde.sh"
+rm -f "$WORK/ran-marker"
+OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --axis=scripts 2>/dev/null)"
+if [ -f "$WORK/ran-marker" ] && echo "$OUT" | grep -q '"tests_skipped": false' && echo "$OUT" | grep -q '"tests_pass": 1'; then
+  ok "T14a #153 §6.3 : sans option, la suite tourne, tests_skipped=false, tests_pass=1"
+else
+  ko "T14a suite exécutée + tests_skipped=false + tests_pass=1 attendus (marker=$([ -f "$WORK/ran-marker" ] && echo oui || echo non)), sortie : $OUT"
+fi
+for variant in "--no-tests" "VF_SKIP_TESTS=1"; do
+  rm -f "$WORK/ran-marker"
+  if [ "$variant" = "--no-tests" ]; then
+    OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"
+  else
+    OUT="$(run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --axis=scripts 2>/dev/null)"
+  fi
+  V="$(printf '%s' "$OUT" | verdict_stdout)"
+  if [ ! -f "$WORK/ran-marker" ] && [ "$V" = "VALIDE" ] && echo "$OUT" | grep -q '"tests_skipped": true' \
+     && echo "$OUT" | grep -q '"tests_pass": 0' && echo "$OUT" | grep -q '"tests_fail": 0'; then
+    ok "T14b #153 §6.3 : $variant → suite non exécutée, tests_skipped=true, JSON valide"
+  else
+    ko "T14b $variant : aucune suite, tests_skipped=true, JSON valide attendus (verdict=$V), sortie : $OUT"
+  fi
+done
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --snapshot --no-tests >/dev/null 2>&1
+if grep -q '^\*\*Tests\*\* : non exécutés' "$LAB_T/.claude/INFRASTRUCTURE_SNAPSHOT.md" 2>/dev/null; then
+  ok "T14c #153 §6.3 : --snapshot --no-tests → ligne **Tests** : non exécutés"
+else
+  ko "T14c ligne '**Tests** : non exécutés' attendue dans le snapshot"
+fi
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --snapshot >/dev/null 2>&1
+if grep -q '^\*\*Tests\*\* : exécutés' "$LAB_T/.claude/INFRASTRUCTURE_SNAPSHOT.md" 2>/dev/null; then
+  ok "T14d #153 §6.3 : --snapshot sans option → ligne **Tests** : exécutés"
+else
+  ko "T14d ligne '**Tests** : exécutés' attendue dans le snapshot"
+fi
+
+# T15 — #153 §6.3, revue adverse : --strict + suites sautées = vert PAR ABSENCE → exit 3 INDÉTERMINÉ
+# (arbitrage Samuel, AskUserQuestion session principale, 2026-10-22). rc ET champ JSON asserés.
+for variant in "--no-tests" "VF_SKIP_TESTS=1"; do
+  if [ "$variant" = "--no-tests" ]; then
+    OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --axis=scripts --no-tests 2>/dev/null)"; rc=$?
+  else
+    OUT="$(run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --axis=scripts 2>/dev/null)"; rc=$?
+  fi
+  if [ "$rc" -eq 3 ] && echo "$OUT" | grep -q '"strict_indeterminate": true'; then
+    ok "T15a #153 §6.3 : --strict + $variant → exit 3 INDÉTERMINÉ, strict_indeterminate=true"
+  else
+    ko "T15a --strict + $variant : rc=3 et strict_indeterminate=true attendus, obtenu rc=$rc, sortie : $OUT"
+  fi
+done
+# Mode complet : même verdict (l'axe scripts est évalué).
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --no-tests >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 3 ] && ok "T15b #153 §6.3 : --strict --no-tests (mode complet) → exit 3" || ko "T15b mode complet : rc=3 attendu, obtenu rc=$rc"
+# Non-régression : --strict SANS saut garde son comportement (suite exécutée, vert = 0, champ false).
+OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --axis=scripts 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && echo "$OUT" | grep -q '"strict_indeterminate": false' && echo "$OUT" | grep -q '"tests_pass": 1'; then
+  ok "T15c non-régression : --strict sans saut → suite exécutée, exit 0, strict_indeterminate=false"
+else
+  ko "T15c --strict sans saut : rc=0, tests_pass=1, strict_indeterminate=false attendus, rc=$rc, sortie : $OUT"
+fi
+# Sans --strict, le saut reste advisory (exit 0, champ false : pas de gate, pas d'indéterminé).
+OUT="$(run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --axis=scripts --no-tests 2>/dev/null)"; rc=$?
+if [ "$rc" -eq 0 ] && echo "$OUT" | grep -q '"strict_indeterminate": false'; then
+  ok "T15d --no-tests sans --strict → exit 0 advisory, strict_indeterminate=false"
+else
+  ko "T15d --no-tests sans --strict : rc=0 + strict_indeterminate=false attendus, rc=$rc, sortie : $OUT"
+fi
+# Priorité : une suite en échec EXÉCUTÉE reste exit 1 ; un script à syntaxe cassée avec saut → exit 1 (rouge établi > indéterminé).
+LAB_BAD="$WORK/lab-bad"; mkdir -p "$LAB_BAD/.claude/scripts/tests"
+printf '#!/bin/sh\nexit 1\n' > "$LAB_BAD/.claude/scripts/tests/test-rouge.sh"; chmod +x "$LAB_BAD/.claude/scripts/tests/test-rouge.sh"
+run_in "$LAB_BAD" "$BASH_BIN" "$SCRIPT" --strict --axis=scripts >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 1 ] && ok "T15e --strict + suite rouge exécutée → exit 1 (inchangé)" || ko "T15e suite rouge : rc=1 attendu, obtenu rc=$rc"
+printf '#!/bin/sh\nif then\n' > "$LAB_BAD/.claude/scripts/casse.sh"
+run_in "$LAB_BAD" "$BASH_BIN" "$SCRIPT" --strict --axis=scripts --no-tests >/dev/null 2>&1; rc=$?
+[ "$rc" -eq 1 ] && ok "T15f --strict --no-tests + syntaxe cassée → exit 1 (finding établi prioritaire sur l'indéterminé)" || ko "T15f syntaxe cassée + saut : rc=1 attendu, obtenu rc=$rc"
+# Axes qui n'évaluent pas l'axe scripts : inchangés (documenté en tête de audit-infra.sh).
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --quick --no-tests >/dev/null 2>&1; rc1=$?
+run_in "$LAB_T" "$BASH_BIN" "$SCRIPT" --strict --axis=hooks --no-tests >/dev/null 2>&1; rc2=$?
+[ "$rc1" -eq 0 ] && [ "$rc2" -eq 0 ] && ok "T15g --strict --no-tests sur --quick / --axis=hooks (axe scripts non évalué) → exit 0 inchangé" || ko "T15g rc attendus 0/0, obtenus quick=$rc1 hooks=$rc2"
+# Même arbitrage (F2) via l'ENVIRONNEMENT : VF_SKIP_TESTS=1 hérité + --strict sur un mode qui n'exécute pas les suites → rc=0.
+run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --quick >/dev/null 2>&1; rcq=$?
+run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --axis=hooks >/dev/null 2>&1; rch=$?
+run_in "$LAB_T" env VF_SKIP_TESTS=1 "$BASH_BIN" "$SCRIPT" --strict --axis=runtime >/dev/null 2>&1; rcr=$?
+[ "$rcq" -eq 0 ] && [ "$rch" -eq 0 ] && [ "$rcr" -eq 0 ] && ok "T15g' VF_SKIP_TESTS=1 hérité + --strict sur --quick / --axis=hooks / --axis=runtime → exit 0" || ko "T15g' VF_SKIP_TESTS hérité : rc attendus 0/0/0, obtenus quick=$rcq hooks=$rch runtime=$rcr"
 
 echo ""
 echo "== Résultat : $pass OK · $fail KO =="
