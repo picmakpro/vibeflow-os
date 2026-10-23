@@ -1,5 +1,11 @@
 # CHANGELOG — design-orchestrator
 
+## [v1.5.15] — 2026-10-23 (UTF-8 inconditionnel) — publiée dans v2.71.1
+
+**Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :
+
+- **Mode UTF-8 inconditionnel sous `-I`** (#157, #153 §1, §6.1) : `ensure-design-deps.sh` pose `$PYX=-Xutf8` sans condition et lit le JSON avec `encoding="utf-8"` (Windows cp1252).
+
 ## [v1.5.14] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — publiée dans v2.70.1
 
 **Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :

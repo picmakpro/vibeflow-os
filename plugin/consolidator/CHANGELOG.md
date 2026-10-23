@@ -1,5 +1,12 @@
 # CHANGELOG — consolidator
 
+## [v1.11.2] — 2026-10-23 (UTF-8 inconditionnel, registre sans entrée) — publiée dans v2.71.1
+
+**Patch** (correctifs #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-23 ; publiée dans v2.71.1) :
+
+- **Mode UTF-8 inconditionnel sous `-I`** (#157, #153 §1) : `$PYX` vaut `-Xutf8` sans condition dans `decay-pass.sh`, `detect-duplicates.sh`, `detect-promotions.sh`, `guard-bash-registres.sh`, `guard-read-registres.sh`, `post-edit-reindex.sh` et `reindex.sh`  ; `detect-duplicates.sh` lit ses fichiers temporaires en `utf-8` explicite.
+- **`detect-duplicates.sh` rend un JSON complet sur un registre sans entrée** (#157, #153 §4) : `grep` rendait 1 sans correspondance et, sous `pipefail`, le script sortait en rc=1 avec un JSON tronqué après `"collisions": [` ; le `grep` est protégé par `|| true`. Cas ajouté à `test-consolidator.sh`.
+
 ## [v1.11.1] — 2026-10-20 (isolation de l'interpréteur Python, hotfix H-1) — publiée dans v2.70.1
 
 **Patch** (correctif de sécurité H-1, audit Phase 58 ; hotfix décidé par arbitrage Samuel, AskUserQuestion session principale, 2026-10-20 ; publiée dans v2.70.1) :

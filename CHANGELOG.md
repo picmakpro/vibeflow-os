@@ -13,6 +13,29 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.71.1] — 2026-10-23
+
+**Patch** (cinq correctifs mergés depuis v2.71.0, #157 à #161 ; release patch unique couvrant #157 à #161 : arbitrage Samuel,
+AskUserQuestion session principale, 2026-10-23) :
+
+- **Windows : UTF-8 inconditionnel et programmes hors ligne de commande** (#157, issues #149 et #153 §1, §4) —
+  `conductor` v1.50.1, `consolidator` v1.11.2, `design-orchestrator` v1.5.15, `infrastructure-audit` v1.3.5,
+  `planning-core` v2.8.3. Le mode `-X utf8` est posé sans condition sous `-I` (cp1252 : `print("✓")` et JSON accentués
+  n'échouent plus), les programmes Python de ~60 Ko des hooks `check-agents` et `guard-driver-lock` voyagent par
+  l'entrée standard (Windows plafonne la ligne de commande à 32 767 caractères : garde inerte en silence), et
+  `detect-duplicates.sh` rend un JSON complet sur un registre sans entrée. Nouvelles règles de
+  `scripts/check-python-isolation.sh` (règle de taille, forme canonique de `$PYX`). Mergée en `--admin` sur demande
+  explicite de Samuel, sans revue de Willy.
+- **`infrastructure-audit` v1.3.5** (#158, issue #153) : audit Windows (guillemets de `"$CLAUDE_PROJECT_DIR"/x.sh`,
+  `SubagentStop` et `FileChanged` connus, JSON sans CR), option `--no-tests` / `VF_SKIP_TESTS=1`, et `--strict` rend
+  INDÉTERMINÉ (exit 3) quand les suites sont sautées.
+- **`conductor` v1.50.1** (#159, issue #58) : `driver-lock.sh` refuse (`not-at-lab-root`) tout verbe qui écrit depuis un
+  sous-dossier sans `.planning/` propre quand la racine git en porte un — plus de verrou fantôme.
+- **`dev-orchestrator` v2.28.3** (#160, issue #154 point 1) : le bootstrap de session oriente vers `/vf-dev` au lieu de
+  nommer des gestes `gsd-*`.
+- **`dev-orchestrator` v2.28.3** (#161, issue #154 point 3) : `check-gsd-config.sh` épargne les clés propres à VibeFlow
+  (`profile`, `vf_runtimes`, `vf_roles`, …), `planning-core` v2.8.3 documente la clé `profile`.
+
 ## [v2.71.0] — 2026-10-22
 
 **Minor** (rôles de poste, Phase 58, deuxième livrable du jalon `equipe-produit-v1.0` ; ordre « hotfix v2.70.1 d'abord,
