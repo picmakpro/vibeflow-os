@@ -343,6 +343,29 @@ GSD_WORKSTREAM=dev bash "$SCRIPT" --path "$D" >/dev/null 2>&1
 after="$(find "$D" | LC_ALL=C sort)"
 if [ "$before" = "$after" ]; then ok "29 lecture seule sous workstream — empreinte find identique"; else ko "29 lecture seule sous workstream" "arbre modifié"; fi
 
+# === Cas 30 — #154 : la ligne de conseil (→) nomme /vf-dev, jamais un skill gsd-* (règle A1) =====
+# Un test par état ; les constats (contexte) restent affichés, seule la ligne « → » est jugée.
+advice_ok() { # <nom> <répertoire> <rc attendu> -> ok/ko ; échec si pas de ligne →, pas de /vf-dev, ou un gsd-*
+  local nom="$1" dir="$2" want="$3" o r adv nadv
+  o="$(bash "$SCRIPT" --path "$dir" 2>/dev/null)"; r=$?
+  adv="$(printf '%s\n' "$o" | grep '→')"
+  nadv="$(printf '%s\n' "$adv" | grep -c '→')"
+  if [ "$r" -eq "$want" ] && [ "$nadv" -eq 1 ] && printf '%s' "$adv" | grep -qF '/vf-dev' && ! printf '%s' "$adv" | grep -q 'gsd-'; then
+    ok "$nom — la ligne de conseil nomme /vf-dev et aucun skill gsd-*"
+  else
+    ko "$nom — la ligne de conseil nomme /vf-dev et aucun skill gsd-*" "rc=$r lignes→=$nadv adv=[$adv]"
+  fi
+}
+D="$(mk_root c30a)"; printf 'print(1)\n' > "$D/main.py"
+advice_ok "30a état 1" "$D" 0
+D="$(mk_root c30b)"; mkdir -p "$D/.planning"; printf '# proj\n' > "$D/.planning/PROJECT.md"; printf 'code\n' > "$D/main.py"
+advice_ok "30b état 2 (config + codebase + roadmap manquants)" "$D" 0
+out="$(bash "$SCRIPT" --path "$D" 2>/dev/null)"
+ctx=0; case "$out" in *"config.json absent"*"codebase non cartographié"*"feuille de route absente"*) ctx=1 ;; esac
+if [ "$ctx" -eq 1 ]; then ok "30b' état 2 — les constats restent affichés comme contexte"; else ko "30b' état 2 — les constats restent affichés comme contexte" "out=[$out]"; fi
+D="$(mk_complete_planning c30c)"
+advice_ok "30c état 3" "$D" 3
+
 # === Cas 22 — bash -n passe sur le script (syntaxe) =============================================
 if bash -n "$SCRIPT" 2>/dev/null; then ok "22 bash -n passe sur check-dev-bootstrap.sh"; else ko "22 bash -n passe sur check-dev-bootstrap.sh" "syntax error"; fi
 
