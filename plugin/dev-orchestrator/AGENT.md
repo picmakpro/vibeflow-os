@@ -100,15 +100,18 @@ dominants :
 Le hook `SessionStart` du module constate des faits et les injecte dans le contexte de la
 session principale (pas seulement à mon invocation). Un 5e fait (documents de cadrage hors
 feuille de route) est déjà couvert par la ligne « intègre cette spec… » ci-dessus
-(`ingestion-flow.md`) — pas dupliqué ici. Colonne « Geste proposé » : brique `gsd-*` portée par
-l'équipe dispatchée (A1), pas un geste que j'exécute.
+(`ingestion-flow.md`) — pas dupliqué ici. Colonne « Geste proposé » : ce que le hook dit réellement
+depuis #160 (A1) — la porte `/vf-dev` plus la nature du geste en mots, jamais un skill `gsd-*`
+nommé à la session ; l'équipe dispatchée par `/vf-dev` porte la brique, pas un geste que
+j'exécute. Deux lignes nomment encore un outil dans le texte du hook : `[doc-drift]`
+(`gsd-docs-update`) et `[ledger-absent]` (script outillé `restore-requirements-ledger.sh`).
 
 | Signal | Geste proposé | Confirmation |
 |---|---|---|
-| `[bootstrap]` | `gsd-config` puis `gsd-map-codebase` (items manquants listés) | requise avant toute écriture (ADR-031) |
-| `[onboard]` | `gsd-onboard` | requise avant toute écriture (ADR-031) |
-| `[gsd-engine]` | oriente vers `gsd-discuss-phase` / `gsd-plan-phase` / `gsd-progress` — pas un correctif | orientation seule, rien à écrire |
-| `[doc-drift]` | `gsd-docs-update --verify-only` d'abord (read-only), génération ensuite — doctrine `docs-flow.md` | requise avant toute écriture (ADR-031) |
+| `[bootstrap]` | propose `/vf-dev` pour : configurer le moteur, cartographier le code, planifier l'étape (items manquants seuls, dans cet ordre) | requise avant toute écriture (ADR-031) |
+| `[onboard]` | propose `/vf-dev` pour : cadrer le projet existant | requise avant toute écriture (ADR-031) |
+| `[gsd-engine]` | oriente vers `/vf-dev` (cadrage, plan, état) — pas un correctif | orientation seule, rien à écrire |
+| `[doc-drift]` | le hook propose `gsd-docs-update` ; je passe par `/vf-dev` : vérification read-only d'abord, génération ensuite — doctrine `docs-flow.md` | requise avant toute écriture (ADR-031) |
 | `[ledger-absent]` | jalon clos, `.planning/REQUIREMENTS.md` disparu → `restore-requirements-ledger.sh` (rattrapage outillé) | requise avant toute écriture (ADR-031) |
 | `[ledger-exigences-disparues]` | ledger présent mais ≥1 ID d'exigence garanti/voyageur disparu sans trace → vérifier livrée/reportée/abandonnée | requise avant toute écriture (ADR-031) |
 | `[ledger-illisible]` / `[ledger-outil-absent]` | constat BRUYANT (MILESTONES.md/traces malformés, ou outillage manquant) — jamais un vert | orientation seule, rien à écrire |
