@@ -94,6 +94,8 @@ compte en laissant chaque projet vide. Un hook `SessionStart` appelle `seed-regi
 .claude/scripts/detect-promotions.sh    # → candidats learning → rule
 ```
 
+`detect-duplicates.sh` signale ses échecs : si l'analyse des titres échoue (Python), message sur stderr, champ JSON `errors` (liste non vide) et code de sortie 2 — jamais un faux « aucun doublon ». `errors: []` et code 0 = détection complète.
+
 ### Passe de mémoire vivante (pilier 5)
 
 ```bash
