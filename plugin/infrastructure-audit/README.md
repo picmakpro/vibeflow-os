@@ -104,11 +104,17 @@ bash .claude/scripts/audit-infra.sh --snapshot   # → .claude/INFRASTRUCTURE_SN
 .claude/scripts/audit-infra.sh --snapshot         # snapshot daté + backup .prev
 .claude/scripts/audit-infra.sh --diff             # diff vs snapshot précédent
 .claude/scripts/audit-infra.sh --strict           # mode GATE : ERROR → exit 1, lab absent → exit 3
+.claude/scripts/audit-infra.sh --no-tests         # axe scripts sans exécuter les suites (ou VF_SKIP_TESTS=1)
 ```
 
 - **Après un update Claude Code** : `--snapshot` avant/après, puis `--diff`.
 - **En CI / pre-commit** : `--strict` transforme l'advisory en gate (exit 0 = OK, 1 = findings
-  bloquants, 3 = INDÉTERMINÉ, rien d'audité). S'applique aux modes full/quick/axis.
+  bloquants, 3 = INDÉTERMINÉ : `$CLAUDE_DIR` absent, rien d'audité, ou suites sautées, voir
+  ci-dessous). S'applique aux modes full/quick/axis.
+- **Sauter les suites** : `--no-tests` ou `VF_SKIP_TESTS=1` (seule la valeur `1` saute). Avec
+  `--strict` sur un mode qui exécute les suites (full, `--axis=scripts`), c'est une seconde cause
+  d'exit 3 : l'audit a eu lieu, pas les suites. Exit 1 l'emporte sur 3 ; `--quick`,
+  `--axis=hooks` et `--axis=runtime` n'évaluent pas les suites : le saut n'y change pas le verdict.
 - **Maintenance whitelist** : `echo "2.1.216" >> .claude/scripts/known-versions.txt` après avoir
   validé que la nouvelle version ne casse rien. Depuis v1.2.0, une version **plus récente** que
   la dernière validée est considérée `known` avec une note explicite (pas de faux négatif

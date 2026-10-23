@@ -12,13 +12,23 @@
 #   ./audit-infra.sh --quick                    # audit minimal (~5s)
 #   ./audit-infra.sh --axis=runtime|hooks|scripts|drift
 #   ./audit-infra.sh --snapshot                 # genere INFRASTRUCTURE_SNAPSHOT.md
+#   ./audit-infra.sh --no-tests                 # axe scripts sans executer les suites tests/test-*.sh
+#                                               #   (ou VF_SKIP_TESTS=1) — utile sous Git Bash, ou chaque
+#                                               #   fork coute 50-200 ms ; JSON : "tests_skipped": true.
+#                                               #   Combine a --strict : exit 3 INDETERMINE (voir ci-dessous)
 #   ./audit-infra.sh --diff                     # compare snapshot courant vs .prev
 #   ./audit-infra.sh --if-older-than=14d        # skip si dernier audit (stamp ou snapshot) < 14j
 #   ./audit-infra.sh --strict                   # GATE (VG-5, F13) : cible absente → exit 3 ·
 #                                               #   findings ERROR/tests KO → exit 1 (sinon advisory exit 0)
 #
 # Codes de sortie : 0 = OK (ou advisory) · 1 = findings bloquants (--strict) ·
-#   3 = INDÉTERMINÉ (--strict et $CLAUDE_DIR absent : rien d'audité, aucun verdict)
+#   3 = INDÉTERMINÉ (--strict et $CLAUDE_DIR absent : rien d'audité, aucun verdict ; OU --strict
+#       avec l'axe scripts évalué et ses suites sautées par --no-tests / VF_SKIP_TESTS=1 : le gate
+#       ne peut pas dire « conforme » sans avoir exécuté les suites — JSON : "strict_indeterminate": true.
+#       Arbitrage Samuel, AskUserQuestion session principale, 2026-10-22. Un finding bloquant
+#       (exit 1) reste prioritaire sur l'indéterminé : un rouge établi n'est pas dilué.
+#       Le saut compte dès que audit_scripts s'exécute (modes full et --axis=scripts) ; --quick,
+#       --axis=hooks|runtime, --snapshot et --diff n'évaluent pas cet axe : inchangés.)
 # NB : --strict s'applique aux modes full/quick/axis (pas snapshot/diff, qui restent advisory).
 #
 # --hook (D-06/D-07, Portabilité Windows II) — PARITÉ D'INTERFACE avec les autres scripts de hook
@@ -59,9 +69,13 @@ AXIS=""
 IF_OLDER_THAN=""
 STRICT=false
 HOOK=false
+# #153 §6.3 : saute la boucle des suites de l'axe scripts (--no-tests ou VF_SKIP_TESTS=1).
+SKIP_TESTS=false; [ "${VF_SKIP_TESTS:-}" != "1" ] || SKIP_TESTS=true
 # Accumulateur strict (VG-5) : les axes y versent leurs findings bloquants. Portée globale —
 # valable pour les modes qui appellent les axes DANS le shell courant (full/quick/axis).
 STRICT_ERRORS=0
+# Verdict indéterminé (--strict + suites sautées) : posé par audit_scripts, lu au verdict final.
+STRICT_INDETERMINATE=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -70,6 +84,7 @@ for arg in "$@"; do
     --diff)              MODE="diff" ;;
     --strict)            STRICT=true ;;
     --hook)              HOOK=true ;;
+    --no-tests)          SKIP_TESTS=true ;;
     --axis=*)            AXIS="${arg#*=}"; MODE="axis" ;;
     --if-older-than=*)   IF_OLDER_THAN="${arg#*=}" ;;
     -h|--help)
@@ -246,7 +261,7 @@ audit_runtime() {
   "version_ref_present": $version_ref_present,
   "version_note": "$version_note",
   "tools_natifs_hardcoded": ["Read", "Write", "Edit", "Bash", "Skill", "Task", "WebFetch"],
-  "hooks_events_hardcoded": ["SessionStart", "SessionEnd", "PreCompact", "Stop", "PreToolUse", "PostToolUse", "Notification", "UserPromptSubmit"]
+  "hooks_events_hardcoded": ["SessionStart", "SessionEnd", "PreCompact", "Stop", "PreToolUse", "PostToolUse", "Notification", "UserPromptSubmit", "SubagentStop", "FileChanged"]
 }
 EOF
 }
@@ -262,7 +277,7 @@ det_add() {
 audit_hooks() {
   log "Axe 2 — Hooks contract"
 
-  local known_events="SessionStart SessionEnd PreCompact Stop PreToolUse PostToolUse Notification UserPromptSubmit"
+  local known_events="SessionStart SessionEnd PreCompact Stop PreToolUse PostToolUse Notification UserPromptSubmit SubagentStop FileChanged"
   local errors_count=0
   local warnings_count=0
   local detections=""
@@ -318,7 +333,8 @@ for event, configs in hooks.items():
                 tokens = cmd.split()
                 for tok in tokens:
                     if tok.endswith(".sh") and "/" in tok:
-                        path = tok.replace("$CLAUDE_PROJECT_DIR/", "")
+                        # #153 §3 : la forme "$CLAUDE_PROJECT_DIR"/x.sh garde ses guillemets dans le jeton.
+                        path = tok.replace('"', "").replace("'", "").replace("$CLAUDE_PROJECT_DIR/", "")
                         if not os.path.exists(path):
                             print(f"ERR|script_missing|{path}|{sf}")
                         elif not os.access(path, os.X_OK):
@@ -326,6 +342,9 @@ for event, configs in hooks.items():
                         break
 PYEOF
 )"
+    # #153 §6.7 : sous Windows print() termine par CRLF et $(…) ne retire que le \n final —
+    # un \r resterait dans `src` et rendrait le JSON des détections invalide.
+    py_out="${py_out//$'\r'/}"
 
     # Comptage + formatage des detections (boucle dans le shell courant via heredoc,
     # pas de pipe : un `| while` perdrait les compteurs dans un sous-shell).
@@ -409,7 +428,9 @@ audit_scripts() {
   # Run tests si presents
   local tests_pass=0
   local tests_fail=0
-  if [ -d "$SCRIPTS_DIR/tests" ]; then
+  if [ "$SKIP_TESTS" = true ]; then
+    log "axe tests : non execute (--no-tests)"
+  elif [ -d "$SCRIPTS_DIR/tests" ]; then
     for t in "$SCRIPTS_DIR/tests/"test-*.sh; do
       [ -f "$t" ] || continue
       if "$t" >/dev/null 2>&1; then
@@ -418,6 +439,14 @@ audit_scripts() {
         tests_fail=$((tests_fail + 1))
       fi
     done
+  fi
+
+  # Suites sautées sous --strict : le vert serait obtenu par absence → verdict indéterminé (exit 3).
+  local strict_indet=false
+  if [ "$STRICT" = true ] && [ "$SKIP_TESTS" = true ]; then
+    strict_indet=true
+    STRICT_INDETERMINATE=true
+    log "✗ INDÉTERMINÉ : --strict avec suites sautées (--no-tests / VF_SKIP_TESTS=1) — aucun verdict conforme possible (exit 3)"
   fi
 
   local deps_json="[]"
@@ -434,6 +463,8 @@ audit_scripts() {
   "syntax_errors": $syntax_errs_count,
   "executable_ok": $exec_ok,
   "deps_missing": $deps_json,
+  "tests_skipped": $SKIP_TESTS,
+  "strict_indeterminate": $strict_indet,
   "tests_pass": $tests_pass,
   "tests_fail": $tests_fail
 }
@@ -462,6 +493,7 @@ generate_snapshot() {
 **Date** : $ts
 **Generated by** : audit-infra.sh
 **Mode** : full snapshot
+**Tests** : $([ "$SKIP_TESTS" = true ] && echo "non exécutés (--no-tests)" || echo "exécutés")
 
 ## Runtime Claude Code
 
@@ -568,4 +600,9 @@ fi
 if $STRICT && [ "$STRICT_ERRORS" -gt 0 ]; then
   log "✗ --strict : $STRICT_ERRORS finding(s) bloquant(s) (voir JSON ci-dessus)"
   exit 1
+fi
+
+# Verdict INDÉTERMINÉ (--strict + suites sautées) : après les findings bloquants, qui restent prioritaires.
+if $STRICT && [ "$STRICT_INDETERMINATE" = true ]; then
+  hook_exit 3
 fi
