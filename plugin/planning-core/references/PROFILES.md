@@ -24,7 +24,7 @@
 | `BOARD.md` (compartiment `continuous`) | ⚑ selon type | ⚑ selon type | ⚑ selon type |
 
 > **Où vit le profil, qui le lit** : la source canonique est la clé `"profile"` de
-> `.planning/config.json` (posée à l'init, miroir informatif dans le frontmatter de `STATE.md`).
+> `.planning/config.json` (posée à l'init, miroir informatif dans le frontmatter de `STATE.md`). Le contrôle `check-gsd-config.sh` connaît cette clé (liste blanche des clés propres à VibeFlow) et ne la signale pas comme inconnue du moteur GSD (#154).
 > Les garde-fous machine la lisent directement — le hook Stop `guard-planning-updated.sh` passe en
 > `warn` quand tous les `.planning/` du lab sont en profil `leger`, et reste en `block` sinon
 > (config absente ou illisible → `block`, fallback sûr). `VF_PLANNING_STOP=block|warn|off` prime
