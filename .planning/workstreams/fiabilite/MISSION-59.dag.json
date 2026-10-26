@@ -1,0 +1,101 @@
+{
+  "nodes": [
+    {
+      "id": "scout-code",
+      "step": "éclaireur faits dépôt (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "scout-spec",
+      "step": "éclaireur sources spec/SEED/BMAD (lecture seule)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "cadrage-59",
+      "step": "cadrage Phase 59 (manager + Samuel)",
+      "stage": "",
+      "deps": [
+        "scout-code",
+        "scout-spec"
+      ],
+      "scope": [],
+      "status": "running"
+    },
+    {
+      "id": "plan-59",
+      "step": "plan Phase 59 (vf-coder, gsd-plan-phase)",
+      "stage": "",
+      "deps": [
+        "cadrage-59"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-59",
+      "step": "exécution Phase 59 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "plan-59"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-59",
+      "step": "revue (vf-reviewer)",
+      "stage": "",
+      "deps": [
+        "exec-59"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "verif-59",
+      "step": "vérification de phase + porte ci.yml",
+      "stage": "",
+      "deps": [
+        "exec-59"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire",
+      "stage": "",
+      "deps": [
+        "revue-59",
+        "verif-59"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "pr-59",
+      "step": "push + PR + CI verte",
+      "stage": "",
+      "deps": [
+        "docs"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "scout-bmad",
+      "step": "éclaireur noms BMAD courants (web, A-10)",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    }
+  ],
+  "ws": "fiabilite"
+}
