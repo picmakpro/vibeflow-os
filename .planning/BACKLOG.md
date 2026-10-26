@@ -4,6 +4,47 @@
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-12.md — ## Combler les gaps de couverture inspirés du catalogue `agency-agents` — CLOS (2026-10-12) -->
 <!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-10-08.md — ## Un gate câblé sur un seul compartiment de workstream laisse les autres sans garde — DIFFÉRÉ (2026-09-23) — CLOS (2026-10-08) -->
 
+## Emprunts qualité de code à Ponytail, pstack et thermo-nuclear review — INVESTIGUÉ 2026-10-10
+**Capturé :** 2026-10-10 (demande de Samuel, session principale : « rapport complet des frameworks,
+puis l'appliquer à VibeFlow, au backlog avec un audit poussé des bénéfices ») · **Investigué :**
+2026-10-10 (7 agents : 3 lecteurs à la source, 1 inventaire VibeFlow, 1 chasse aux défaillances
+observées, 1 vérification de chargement silencieux, 1 relecture adverse) →
+**étude : `.planning/research/2026-10-10-qualite-code-tiers-etude.md`** (annexes A1 à A7 dans
+`.planning/research/2026-10-10-qualite-code-tiers/`).
+
+**Sources** : [Ponytail](https://github.com/DietrichGebert/ponytail) (un prompt anti
+sur-ingénierie, 159 666 étoiles, seule source mesurée indépendamment : −10 % de tokens de sortie,
+code et qualité non significatifs) ; [pstack](https://github.com/cursor/plugins/tree/main/pstack)
+et son [portage Claude Code](https://github.com/michael-denyer/pstack-claude) (catalogue de
+playbooks, aucune mesure) ; la grille « thermo-nuclear code quality review » de Cursor (code judo,
+aucune éval).
+
+**Verdict** : rien à installer. Le trou le mieux prouvé chez nous n'est pas la sur-ingénierie mais
+**l'honnêteté du vert** (des `passed` sur un périmètre implicite, 2026-07-28 et 2026-08-16 ×2) et
+**le bruit de la grille** (6 faux positifs sur 15, ancres décalées de +437 lignes). La sobriété se
+traite en audit périodique, pas en revue de diff (un axe de revue contredit la règle amont « DO NOT
+flag style preferences » et finirait en mineurs).
+
+**Lot A (une phase courte, recommandé)** : un bloc « Hygiène » joint par `vf-reviewer` à chaque
+brief + champ `non_verifie` obligatoire. QCT-01 ce que ce vert ne prouve pas · QCT-02 hygiène de
+grille (cas concret, ligne relue, constat ≠ correction, écartés visibles, appelants, table des
+sévérités amont) · QCT-03 réimplémentation d'une primitive existante cadrée comme risque de
+divergence · QCT-04 test qui passerait à vide · QCT-08 sonde à trois bras avant toute retouche. Tous
+adossés à des défaillances observées datées (étude §3), sauf QCT-08 (extension de P414-D-07). Coût :
+1 à 2 instructions dans `vf-reviewer` (marge 0 → **arbitrage G-1 requis**), ~30 lignes de
+référence, aucun agent, aucune dépendance, aucun dispatch ajouté.
+**Lot B** : QCT-05, lentille sobriété et code judo dans l'audit transverse, une décision par
+constat, judo toujours avec injection de panne (contre-indice Phase 31).
+**Lot C** : QCT-06 jamais juger de mémoire (`agent_skills` qui saute en silence un skill
+introuvable en tête) ; QCT-07 échelle de réutilisation de Ponytail à l'exécution, **spike** à
+arbitrer avec Willy (collision forte avec la Phase 45, hook central par rôle).
+**Réserve** : QCT-09 (profondeur, `fallow`, allowlist), QCT-10 (dette `shortcut:`).
+
+**Collisions** : Phase 46 (format des verdicts, Willy) pour le lot A ; Phase 45 pour QCT-07.
+**Reste ouvert** : l'arbitrage du lot A (phase, numéro, G-1) ; rien n'est engagé.
+**Déclencheur de resurgence** : prochaine retouche de `vf-reviewer` ou du contrat de revue, ou
+décision explicite.
+
 ## Équivalent Codex des skills de modules Type 1 — consigné 2026-10-06
 
 **Statut : dette consignée par la Phase 41.4 (P414-D-03), non traitée : exige une modification de l'installeur.**
