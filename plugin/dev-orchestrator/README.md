@@ -8,7 +8,7 @@
 > d'intention unique**. Plus de façade de verbes : GSD est l'interface directe des équipes,
 > l'agent est l'entrée conversationnelle optionnelle.
 
-**Version** : v2.28.5
+**Version** : v2.29.0
 **Type** : agent + équipe d'agents + 2 skills + scripts
 
 ---
@@ -112,7 +112,8 @@ dev-orchestrator/
     ├── head-governance.md          # échelle d'allocation, séquencement, gate de sortie (Phase 40)
     ├── ingestion-flow.md           # ingestion BRDG-01/03, chargée on-demand
     ├── docs-flow.md                # sortie doc DOCF-01/04, chargée on-demand (Phase 22)
-    └── autonomous-guardrails.md    # garde-fous des boucles autonomes
+    ├── autonomous-guardrails.md    # garde-fous des boucles autonomes
+    └── product-routing.md          # redirection par poste, porte produit (Phase 59)
 ```
 
 > **`intent-routing.md` vs `gsd-skills-index.md`** — l'index est un **inventaire factuel**

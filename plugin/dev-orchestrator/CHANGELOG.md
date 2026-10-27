@@ -1,5 +1,14 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.29.0] — 2026-10-27 (redirection du poste product)
+
+**Minor** (Phase 59, PRDT-07 ; aucune release racine) :
+
+- **Le head lit le poste et oriente vers `/vf-product`** : `vibeflow-head` lit le poste par `vf-role.sh get` ; au poste `product`, une intention de dev n'est plus dispatchée, il dit pourquoi en une phrase et oriente vers `/vf-product` (une demande explicite réitérée est servie : un poste est une vue, pas un droit) ; aux postes `solo` et `dev`, une intention produit fait proposer `/vf-product`. Poste illisible (codes 1, 5, 64) : une phrase bruyante et une seule question, aucun repli silencieux sur `solo`.
+- **Nouvelle référence `references/product-routing.md`**, chargée à la demande ; `AGENT.md` ne gagne qu'une ligne-pointeur dans le garde-fou premier usage (avant FIRST-02), une ligne de Carte d'intention et une ligne de Références. Instructions d'`AGENT.md` inchangées (33).
+- **Carte exhaustive et index** : ligne `vf-product` dans `intent-routing.md`, ligne `product-routing.md` dans `_index.md`.
+- **Test T44** (`test-dev-orchestrator.sh`) : présence et ordre du pointeur, contenu de la référence, ligne de carte, index et Références, avec sept mutants d'ablation et d'ordre.
+
 ## [v2.28.5] — 2026-10-29 (gsd-run.sh, scope dérivé, doctrine d'attente, description vf-dev) — à publier dans la prochaine release
 
 **Patch** (#47, #165, #81, #154 point 2 ; correctifs hors feuille de route) :
