@@ -77,6 +77,7 @@ Tableau complet dans l'archive (section `### Quick Tasks Completed`) ; les nouve
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
+| 261027-rzy | Correction ciblée revue-59 F2-F6 (check-prd, sondes, ancres, redirection) | 2026-10-27 | bd9a3ef1 | [261027-rzy](./quick/261027-rzy-correction-ciblee-revue-59-f2-f6-check-p/) |
 
 ## Deferred Items
 
