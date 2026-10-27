@@ -4,11 +4,13 @@
 # octets CRLF et BOM produits par printf. Le script se retrouve par ../check-prd.sh, en source comme une fois
 # copié à plat par l'engine (la suite se pose sous scripts/tests/).
 # Cas CPRD-TRACE-1..4 (exigence sans critère jusqu'au code 1, aucune exigence, usage).
-# Cas CPRD-GABARIT, CPRD-COURT, CPRD-TBD, CPRD-ANCRE, CPRD-FENCE, CPRD-CRLF, CPRD-BOM, CPRD-PRIO,
-# CPRD-BRIEF-OK, CPRD-BRIEF-MANQUE, CPRD-BRIEF-VIDE, CPRD-BRIEF-FENCE, CPRD-BRIEF-NUM, CPRD-BRIEF-SEUL,
+# Cas CPRD-GABARIT, CPRD-COURT, CPRD-TBD, CPRD-TBD-MOT, CPRD-POINTS, CPRD-ANCRE, CPRD-FENCE, CPRD-CRLF, CPRD-BOM,
+# CPRD-PRIO, CPRD-BRIEF-OK, CPRD-BRIEF-MANQUE, CPRD-BRIEF-VIDE, CPRD-BRIEF-FENCE, CPRD-BRIEF-NUM, CPRD-BRIEF-SEUL,
 # CPRD-MIX, CPRD-NOECHO.
 # Cas CPRD-ABSENT, CPRD-LIEN, CPRD-FIFO, CPRD-DOSSIER, CPRD-GROS, CPRD-ILLISIBLE, CPRD-MIX5, CPRD-EXEC (sans
 # évaluation de chaîne, chemin hostile inerte), CPRD-RO, CPRD-CODES (ensemble observé = {0, 1, 3, 5, 64}, jamais 2).
+# Mutants CPRD-MUT-1..8 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
+# (bash -n), rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -48,7 +50,7 @@ has() { printf '%s\n' "$OUT" | command grep -qF -- "$1"; }
 last() { printf '%s\n' "$OUT" | tail -1; }
 # case_ <id> <sonde> : une sonde rend 0 quand le comportement attendu est observé.
 case_() { if "$2"; then ok "$1"; else ko "$1 — $LASTMSG"; fi; }
-msg() { LASTMSG="$1, obtenu rc $RC out[$OUT] err[$ERR]"; }
+msg() { LASTMSG="$1, obtenu rc $RC out[$(printf '%s' "$OUT" | tr '\n' '|' | cut -c1-200)] err[$(printf '%s' "$ERR" | tr '\n' '|' | cut -c1-200)]"; }
 
 A1="- [ ] **PRD-01**: Afficher le tarif. Acceptation : le tarif s'affiche en moins de 2 secondes. Priorité : must"
 A2="- [ ] **PRD-02**: Exporter la liste. Acceptation : un fichier CSV est téléchargé en moins de 5 secondes. Priorité : should"
@@ -100,7 +102,7 @@ CRIT="un fichier CSV est téléchargé en moins de 5 secondes"
 req1() { # <nom> <ligne d'acceptation> : une exigence PRD-01 dont l'acceptation est donnée
   w "$1" "# Exigences\n\n- [ ] **PRD-01**: Exporter la liste\n  %s\n  Priorité : must\n" "$2"
 }
-probe_gabarit() { req1 gabarit.md "Acceptation : [critère mesurable : …]"; run --requirements "$FX/gabarit.md"
+probe_gabarit() { req1 gabarit.md "Acceptation : [critère mesurable : quoi, combien, en combien de temps]"; run --requirements "$FX/gabarit.md"
   msg "critère entre crochets attendu rc 1 + exigence nommée"; [ "$RC" -eq 1 ] && has 'ELIMINATOIRE exigence PRD-01'; }
 probe_court() { req1 court.md "Acceptation : ok vite"; run --requirements "$FX/court.md"
   msg "critère de moins de 10 caractères non blancs attendu rc 1"; [ "$RC" -eq 1 ]; }
@@ -129,7 +131,15 @@ probe_prio() {
     && ! has 'AVERTISSEMENT exigence PRD-03'; }
 case_ CPRD-GABARIT probe_gabarit
 case_ CPRD-COURT probe_court
+probe_points() { req1 points.md "Acceptation : le tarif s'affiche vite et bien ..."; run --requirements "$FX/points.md"
+  msg "trois points attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  req1 ellipse.md "Acceptation : le tarif s'affiche vite et bien …"; run --requirements "$FX/ellipse.md"
+  msg "points de suspension attendu rc 1"; [ "$RC" -eq 1 ]; }
+probe_tbd_mot() { req1 tbd-mot.md "Acceptation : l'autodocumentation complète est livrée en 3 jours"; run --requirements "$FX/tbd-mot.md"
+  msg "todo à l'intérieur d'un mot (autodocumentation) attendu rc 0 : seuls les mots entiers TBD/TODO comptent"; [ "$RC" -eq 0 ]; }
 case_ CPRD-TBD probe_tbd
+case_ CPRD-POINTS probe_points
+case_ CPRD-TBD-MOT probe_tbd_mot
 case_ CPRD-ANCRE probe_ancre
 case_ CPRD-FENCE probe_fence
 case_ CPRD-CRLF probe_crlf
@@ -249,6 +259,51 @@ probe_codes() {
   LASTMSG="codes manquants [$manq] en trop [$extra]"; [ -z "$manq" ] && [ -z "$extra" ]
 }
 case_ CPRD-CODES probe_codes
+
+# === Mutants (QUAL-01) ===============================================================================
+MUTDIR="$TMP/mut"; mkdir -p "$MUTDIR"
+MUTBIN="$MUTDIR/check-prd.sh"
+
+# mutant <id> <ligne repère> <ancien> <nouveau> <sonde> <description> : dans UNE ligne du script (celle qui
+# contient le repère), remplace la première occurrence littérale de <ancien> par <nouveau> (chaînes passées par
+# l'environnement : aucune séquence d'échappement interprétée). La sonde doit échouer sur le mutant, réussir sur l'original.
+mutant() {
+  local id="$1" needle="$2" old="$3" new="$4" probe="$5" desc="$6"
+  NEEDLE="$needle" OLD="$old" NEW="$new" awk 'BEGIN { n = ENVIRON["NEEDLE"]; o = ENVIRON["OLD"]; w = ENVIRON["NEW"] }
+    { if (index($0, n)) { i = index($0, o); if (i) $0 = substr($0, 1, i - 1) w substr($0, i + length(o)) } print }' \
+    "$SCRIPT" > "$MUTBIN"
+  if cmp -s "$MUTBIN" "$SCRIPT"; then ko "$id mutant NON OPPOSABLE (copie identique à l'original) — $desc"; return; fi
+  if ! bash -n "$MUTBIN" 2>/dev/null; then ko "$id mutant invalide (bash -n) — $desc"; return; fi
+  local nl; nl="$(diff "$SCRIPT" "$MUTBIN" | command grep -c '^<')"
+  if [ "$nl" != 1 ]; then ko "$id mutant mal ciblé ($nl lignes changées au lieu de 1) — $desc"; return; fi
+  TARGET="$MUTBIN"; "$probe"; local mrc=$?; local mmsg="$LASTMSG"
+  TARGET="$SCRIPT"; "$probe"; local orc=$?
+  if [ "$mrc" -ne 0 ] && [ "$orc" -eq 0 ]; then
+    ok "$id tué ($desc) — sur le mutant : $mmsg"
+  elif [ "$mrc" -eq 0 ]; then
+    ko "$id mutant SURVIVANT ($desc) — la sonde ${probe#probe_} reste verte sur le mutant"
+  else
+    ko "$id original rouge après mutation ($desc) — $LASTMSG"
+  fi
+  TARGET="$SCRIPT"
+}
+
+mutant CPRD-MUT-1 'if (!hascrit) {' '!hascrit' '0' probe_trace2 \
+  "FAIL : branche « aucun critère » neutralisée"
+mutant CPRD-MUT-2 'if (c == "[" || c == "<") return 0' 'c == "[" || c == "<"' '0' probe_gabarit \
+  "FAIL : filtre de gabarit (crochet en tête) retiré"
+mutant CPRD-MUT-3 'if [ "$NREQ" -eq 0 ]; then' '[ "$NREQ" -eq 0 ]' 'false' probe_trace3 \
+  "INDÉTERMINÉ : zéro exigence rendu 0"
+mutant CPRD-MUT-4 'if [ -L "$f" ]; then illisible' '[ -L "$f" ]' 'false' probe_lien \
+  "BRUYANT : refus du lien symbolique retiré"
+mutant CPRD-MUT-5 'n = split("probleme utilisateurs' ' hors_perimetre' '' probe_brief_sans_hp \
+  "FAIL BRIEF : rubrique hors périmètre non exigée"
+mutant CPRD-MUT-6 'close_block(); infence = 1' 'f3 == "```" || f3 == "~~~"' '0' probe_fence \
+  "FAIL : bascule des blocs de code retirée"
+mutant CPRD-MUT-7 '"$size" -gt "$PRD_MAX_OCTETS"' '"$PRD_MAX_OCTETS"' '99999999999' probe_gros \
+  "BRUYANT : borne de taille retirée"
+mutant CPRD-MUT-8 'if (match(s, /[Aa]cceptation' '[Aa]cceptation' 'Acceptation' probe_ancre \
+  "PASS : ancre du critère rendue sensible à la casse"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]
