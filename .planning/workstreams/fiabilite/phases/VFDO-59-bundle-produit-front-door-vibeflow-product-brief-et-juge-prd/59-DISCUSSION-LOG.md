@@ -56,4 +56,4 @@
 
 ## Note de canal
 
-Willy n'était pas prévenu de la collision `planning-core` au 2026-10-27. Samuel s'en charge, hors session.
+Le 2026-10-27, la session principale a d'abord indiqué que Willy n'était pas prévenu et que Samuel s'en chargeait. Samuel a ensuite précisé, par un message en session principale le même jour : « pas besoin de prévenir Willy + on attend pas sa phase pour merge et release » (P59-D-23). Il n'y a donc ni coordination ni rebase sur la Phase 45.

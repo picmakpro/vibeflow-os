@@ -8,6 +8,7 @@ Cadrage porté par `vf-dev-manager` (mission-flow §Pattern F).
 - Onze questions ont suivi, groupées en quatre zones et escaladées à la session principale par `SendMessage(main)` le 2026-10-26.
 - **P59-D-01 à P59-D-12 : arbitrage Samuel, AskUserQuestion session principale, 2026-10-27.** Les questions Q1 à Q4 ont été posées le 2026-10-26 ; la réponse est arrivée à la reprise de session, le 2026-10-27. L'option recommandée a été retenue à chaque fois.
 - P59-D-13 est un fait établi (A-10 soldée), pas un arbitrage.
+- **P59-D-23 : précision de Samuel, message en session principale, 2026-10-27**, relayée au manager pendant la planification.
 - P59-D-14 à P59-D-22 sont laissées à la discrétion du planificateur. Ce sont des conséquences des décisions arbitrées, aucune n'ouvre un choix neuf.
 
 **Exigences :** famille `PRDT`.
@@ -66,9 +67,7 @@ Hors de cette phase :
   - Contenu : nouveaux fichiers PROJECT et REQUIREMENTS produit.
   - Le gabarit REQUIREMENTS produit ajoute un **critère d'acceptation** et une **priorité** à chaque exigence.
   - Il garde la forme de ligne que GSD sait lire (`- [ ] **ID**: …`), pour que le dev reprenne la main sans conversion.
-  - **Collision avec Willy :** la Phase 45 du compartiment `gouvernance` touche aussi `planning-core` (`module.json`, `VERSION`, `CHANGELOG`, hook).
-    - Rebase sur la Phase 45 avant le merge si elle est mergée d'ici là.
-    - Willy est prévenu par Samuel, hors session : la mission ne le contacte pas.
+  - **Phase 45 de Willy :** elle touche aussi `planning-core` (`module.json`, `VERSION`, `CHANGELOG`, hook). Ce n'est PAS un préalable : voir P59-D-23, qui remplace la consigne de rebase initiale.
     - La 59 n'ajoute que des fichiers neufs dans `planning-core`, plus le bump et le changelog.
 - **P59-D-04 (BRIEF, Q4) :** `.planning/BRIEF.md`, à côté de `PROJECT.md`. Il est de niveau produit, y compris dans un lab partitionné.
   - Cinq rubriques (spec §5.2) : problème, utilisateurs, valeur, contraintes, hors périmètre.
@@ -108,6 +107,12 @@ Hors de cette phase :
   - bump des modules touchés dans la PR, sans `VERSION` racine ni release (v2.72.0 décidée à part) ;
   - pas de preset produit (`resolve-preset.sh` refuse un module `proposable:false`) ;
   - `PROJECT.md` racine périmé et table Coverage de `REQUIREMENTS.md` sans DLWS ni RLPO : en dette, hors 59.
+
+- **P59-D-23 (Phase 45 non bloquante ; précision de Samuel, message en session principale, 2026-10-27 : « pas besoin de prévenir Willy + on attend pas sa phase pour merge et release ») :**
+  - aucune coordination avec Willy n'est requise ;
+  - la Phase 45 du compartiment `gouvernance` n'est pas un préalable : pas de rebase sur elle, et elle n'est citée nulle part comme bloquante ;
+  - la PR 59 se merge et se releasera sur `main` telle quelle.
+  - Cette décision précise P59-D-03 sans en changer le fond : le gabarit reste dans `planning-core`.
 
 ### Fait établi (pas un arbitrage)
 
