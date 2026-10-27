@@ -13,7 +13,7 @@ la table de routage, l'aiguillage et le passage de main :
 - écrire ou mettre à jour le brief → geste simple, BRIEF produit en session depuis son gabarit
 - retoucher une exigence, ajouter un critère d'acceptation → geste simple, PRD produit en session
 - rédiger le PRD, cadrer ce produit (brief et PRD) → mission : l'agent propose `Task(vf-product-manager)`
-- juger le PRD, « est-ce prêt pour le dev » → mission : verdict du juge `prd-gate`
+- faire évaluer le PRD, « est-ce prêt pour le dev » → mission : verdict noté par un évaluateur frais, indépendant du rédacteur
 
 Un geste simple touche un seul fichier du rôle et passe toujours par `check-prd.sh` avant d'être
 annoncé : jamais déclaré vert sans lui. Une mission est proposée à l'humain, jamais lancée d'office.
