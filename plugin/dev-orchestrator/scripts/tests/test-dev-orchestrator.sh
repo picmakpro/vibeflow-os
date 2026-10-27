@@ -7541,6 +7541,31 @@ T44_REF_CODES_ZS='^## 1[.] Lire le poste'
 T44_REF_CODES_ZE='^## 2[.]'
 T44_REF_CODES=('Code 0' 'Codes 1, 5 et 64' 'vibeflow-update.sh role')
 
+# revue-59 F5/F6 : les clauses SÉMANTIQUES se gardent dans leur section (ablation bornée à la section),
+# pas sur le fichier entier où un autre passage les porte déjà ; une clause inversée est refusée.
+T44_P2_ZS='^## 2[.] Poste product'
+T44_P2_ZE='^## 3[.]'
+T44_P2_LIT=('ne lance aucune équipe' 'oriente vers `/vf-product`' 'Sur une **demande explicite réitérée**, le head exécute le routage normal' 'Aucun refus mécanique : l'"'"'humain tranche' 'Si le skill `/vf-product` est absent' 'ne redirige pas vers une commande qui n'"'"'existe pas' 'proposable:false' 'installation nominale' 'product-team-bundle')
+T44_P2_INTERDIT=('Refus systématique' 'sans rien dire' 'lance l'"'"'équipe normale')
+T44_P3_ZS='^## 3[.]'
+T44_P3_ZE='^## 4[.]'
+T44_P3_LIT=('**proposer** `/vf-product`' 'ne le lance pas à la place de l'"'"'humain' 'Si le skill est absent' 'product-team-bundle')
+
+t44_sem_check() { # <product-routing.md> — clauses sémantiques de §2 (poste product) et §3 (absence du skill)
+  local z out
+  z="$(t414_zone "$1" "$T44_P2_ZS" "$T44_P2_ZE")"
+  [ -n "$z" ] || { printf 'section « Poste product » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T44_P2_LIT[@]}")" || { printf 'clauses absentes de §2 : %s' "$out"; return 1; }
+  out="$(t44_forbidden "$z" "${T44_P2_INTERDIT[@]}")" || { printf 'clause inversée dans §2 : %s' "$out"; return 1; }
+  z="$(t414_zone "$1" "$T44_P3_ZS" "$T44_P3_ZE")"
+  [ -n "$z" ] || { printf 'section « Postes solo et dev » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T44_P3_LIT[@]}")" || { printf 'clauses absentes de §3 : %s' "$out"; return 1; }
+}
+t44_forbidden() { # <zone> <littéral>... — rc 1 si un littéral est PRÉSENT
+  local z="$1" lit bad=0; shift
+  for lit in "$@"; do case "$z" in *"$lit"*) printf '« %s » ' "$lit"; bad=1 ;; esac; done
+  [ "$bad" -eq 0 ]
+}
 t44_agent_check() { # <AGENT.md> — contrôle (a) : pointeur présent, avant FIRST-02
   local z out; z="$(t414_zone "$1" "$T44_AG_ZS" "$T44_AG_ZE")"
   [ -n "$z" ] || { printf 'zone « Garde-fou premier usage » introuvable ou vide'; return 1; }
@@ -7559,6 +7584,29 @@ t44_out="$(t44_agent_check "$AGENT_FILE")" && ok "T44 (a) AGENT.md : pointeur pr
   || ko "T44 (a) AGENT.md : attendu — pointeur product-routing.md avant FIRST-02 ; obtenu — $t44_out"
 t44_out="$(t44_ref_check "$T44_REF")" && ok "T44 (b) product-routing.md : lecture par vf-role.sh get, codes 0/1/5/64, phrase ADR-077, demande réitérée (${#T44_REF_LIT[@]} ancres)" \
   || ko "T44 (b) product-routing.md : attendu — règle de redirection par poste ; obtenu — $t44_out"
+
+t44_out="$(t44_sem_check "$T44_REF")" && ok "T44 (b2) product-routing.md : §2 ne lance aucune équipe, demande réitérée, aucun refus mécanique, skill absent → install nominale ; §3 propose sans lancer (${#T44_P2_LIT[@]} + ${#T44_P3_LIT[@]} clauses)" \
+  || ko "T44 (b2) product-routing.md : attendu — clauses sémantiques de redirection ; obtenu — $t44_out"
+t44_k=0
+for t44_a in "${T44_P2_LIT[@]}"; do
+  t44_k=$((t44_k+1))
+  t414_ablate "$T44_REF" "$T414_TMP/t44-p2-$t44_k.md" "$t44_a" "$T44_P2_ZS" "$T44_P2_ZE"
+  t414_mutant "T44 mutant §2 : product-routing.md privé de « $t44_a » dans §Poste product" t44_sem_check "$T44_REF" "$T414_TMP/t44-p2-$t44_k.md"
+done
+for t44_a in "${T44_P3_LIT[@]}"; do
+  t44_k=$((t44_k+1))
+  t414_ablate "$T44_REF" "$T414_TMP/t44-p3-$t44_k.md" "$t44_a" "$T44_P3_ZS" "$T44_P3_ZE"
+  t414_mutant "T44 mutant §3 : product-routing.md privé de « $t44_a » dans §Postes solo et dev" t44_sem_check "$T44_REF" "$T414_TMP/t44-p3-$t44_k.md"
+done
+# Inversion de sens : la phrase de redirection remplacée par son contraire doit rougir (rien à retirer, tout à lire).
+sed -e 's/ne lance aucune équipe/lance l'"'"'équipe normale sans rien dire/' -e 's/Aucun refus mécanique/Refus systématique/' "$T44_REF" > "$T414_TMP/t44-inv.md"
+t414_mutant "T44 mutant inversion : §2 dit « lance l'équipe normale sans rien dire » et « Refus systématique »" t44_sem_check "$T44_REF" "$T414_TMP/t44-inv.md"
+# La clause du skill absent doit exister en §2 (poste product) : sa disparition de §2 rougit même si §3 la porte.
+awk -v zs="$T44_P2_ZS" -v ze="$T44_P2_ZE" '$0 ~ zs { on = 1 } $0 ~ ze { on = 0 }
+  on && index($0, "- Si le skill `/vf-product` est absent") { skip = 1; next }
+  skip && /^(- |[ \t]*$)/ { skip = 0 }
+  skip { next } { print }' "$T44_REF" > "$T414_TMP/t44-p2-abs.md"
+t414_mutant "T44 mutant §2 : clause du skill absent retirée du seul poste product (§3 intacte)" t44_sem_check "$T44_REF" "$T414_TMP/t44-p2-abs.md"
 
 t414_ablate "$AGENT_FILE" "$T414_TMP/t44-ptr.md" 'product-routing.md' "$T44_AG_ZS" "$T44_AG_ZE"
 t414_mutant "T44 mutant pointeur : copie d'AGENT.md privée de « product-routing.md » dans le garde-fou premier usage" t44_agent_check "$AGENT_FILE" "$T414_TMP/t44-ptr.md"

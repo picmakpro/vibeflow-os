@@ -8,6 +8,7 @@
 - **Nouvelle référence `references/product-routing.md`**, chargée à la demande ; `AGENT.md` ne gagne qu'une ligne-pointeur dans le garde-fou premier usage (avant FIRST-02), une ligne de Carte d'intention et une ligne de Références. Instructions d'`AGENT.md` inchangées (33).
 - **Carte exhaustive et index** : ligne `vf-product` dans `intent-routing.md`, ligne `product-routing.md` dans `_index.md`.
 - **Test T44** (`test-dev-orchestrator.sh`) : présence et ordre du pointeur, contenu de la référence, ligne de carte, index et Références, avec sept mutants d'ablation et d'ordre.
+- **Correction ciblée de la revue 59 (F5, F6 ; pas de nouveau bump)** : `product-routing.md` §2 dit aussi, au poste `product`, que le head ne redirige pas vers `/vf-product` quand le skill est absent et comment poser le module `proposable:false` (installation nominale qui nomme `product-team-bundle`). T44 garde désormais les clauses sémantiques de §2 et §3 dans leur section (« ne lance aucune équipe », demande explicite réitérée, « Aucun refus mécanique », skill absent), avec un mutant d'ablation par clause et un mutant d'inversion de sens.
 
 ## [v2.28.5] — 2026-10-29 (gsd-run.sh, scope dérivé, doctrine d'attente, description vf-dev) — à publier dans la prochaine release
 

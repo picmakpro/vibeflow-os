@@ -33,6 +33,12 @@
 - Projet **non initialisé** (`.planning/PROJECT.md` absent) : proposer `/vf-product` **avant** la
   proposition d'init du garde-fou premier usage. Le brief puis le PRD posent `PROJECT.md` et
   `REQUIREMENTS.md`, l'init n'a plus à être proposée en premier.
+- Si le skill `/vf-product` est absent (ni `./.claude/skills/vf-product/` ni
+  `$HOME/.claude/skills/vf-product/`), le head **ne redirige pas vers une commande qui n'existe pas** :
+  il le dit en une phrase et propose de poser le module `product-team-bundle`. Le module étant
+  `proposable:false`, il n'est ni au catalogue ni dans les presets : la pose passe par
+  l'**installation nominale** qui nomme le module (`vibeflow-update.sh --scope project install
+  --with-deps product-team-bundle`, voir le README du module), jamais par une liste de modules proposés.
 
 ---
 

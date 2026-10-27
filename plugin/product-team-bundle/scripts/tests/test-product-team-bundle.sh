@@ -180,8 +180,13 @@ ctl_front() {
 
 # Ancres : « identifiant|texte exact ». Un même tableau sert le contrôle ET le balayage de mutants :
 # chaque ancre est retirée à son tour d'une copie, qui doit rougir avec l'identifiant de CETTE ancre.
+# Une clause de seuil se compte OCCURRENCE PAR OCCURRENCE (revue-59 F5) : l'ablation retire toutes les
+# occurrences du texte exact, donc chaque occurrence porteuse a son propre texte de contexte, unique
+# dans son fichier — un seuil changé sur UNE ligne seulement laisse sa propre ancre introuvable.
 JUGE_ANCHORS='79|79 n'"'"'est pas 80
-seuil|≥ 80
+description-seuil|passe à 80 sans éliminatoire
+seuil-entete|Seuil de passage : score ≥ 80/100 ET aucun
+seuil-passed|`passed` si le score est ≥ 80 ET
 contrat-requirements|check-prd.sh --requirements
 contrat-brief|--brief
 human_needed|human_needed
@@ -195,7 +200,9 @@ detail-tracabilite|"tracabilite"'
 MANAGER_ANCHORS='verrou|driver-lock.sh acquire
 digest|DIGEST
 human_needed|human_needed
-seuil|≥ 80
+seuil-vert|score ≥ 80, `eliminatoire: false`
+seuil-verdict|score ≥ 80/100, `eliminatoire: false`
+seuil-sous|score < 80
 next_step_propose|next_step_propose
 jamais-lance|jamais lancé
 override|override'
