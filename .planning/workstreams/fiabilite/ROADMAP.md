@@ -632,8 +632,8 @@ Plans:
 - [x] 59-05-PLAN.md — vague 2 : front door, skill `/vf-product`, gabarit BRIEF, README du bundle
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 59-06-PLAN.md — vague 3 : suite du bundle, baselines, compteurs des README racine
-- [ ] 59-07-PLAN.md — vague 3 : manuel FR et EN
+- [x] 59-06-PLAN.md — vague 3 : suite du bundle, baselines, compteurs des README racine
+- [x] 59-07-PLAN.md — vague 3 : manuel FR et EN
 
 **Wave 4** *(blocked on Wave 3 completion)*
 - [ ] 59-08-PLAN.md — vague 4 : porte de phase rejouée depuis `ci.yml`, ledger à la main
