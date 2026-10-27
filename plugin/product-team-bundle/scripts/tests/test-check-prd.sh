@@ -7,6 +7,8 @@
 # Cas CPRD-GABARIT, CPRD-COURT, CPRD-TBD, CPRD-ANCRE, CPRD-FENCE, CPRD-CRLF, CPRD-BOM, CPRD-PRIO,
 # CPRD-BRIEF-OK, CPRD-BRIEF-MANQUE, CPRD-BRIEF-VIDE, CPRD-BRIEF-FENCE, CPRD-BRIEF-NUM, CPRD-BRIEF-SEUL,
 # CPRD-MIX, CPRD-NOECHO.
+# Cas CPRD-ABSENT, CPRD-LIEN, CPRD-FIFO, CPRD-DOSSIER, CPRD-GROS, CPRD-ILLISIBLE, CPRD-MIX5, CPRD-EXEC (sans
+# évaluation de chaîne, chemin hostile inerte), CPRD-RO, CPRD-CODES (ensemble observé = {0, 1, 3, 5, 64}, jamais 2).
 set -uo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -21,13 +23,20 @@ skip() { echo "  ⊘ SKIP $1"; SKIPPED=$((SKIPPED+1)); }
 TMP="$(mktemp -d)"
 trap 'chmod -R u+rwx "$TMP" 2>/dev/null; rm -rf "$TMP"' EXIT
 FX="$TMP/fx"; mkdir -p "$FX"
-: > "$TMP/rcs"; : > "$TMP/fxlist"
+: > "$TMP/rcs"; : > "$TMP/fxlist"; : > "$TMP/fxsum"
+mkdir "$TMP/cwd"; cd "$TMP/cwd" || exit 1   # cwd jetable : une évaluation de nom de fichier y laisserait une trace
 MARK="zzSECRETzz"
 LASTMSG=""; RC=0; OUT=""; ERR=""
 
 # w <relatif> <format printf> [args] : écrit une fixture sous $FX et l'inscrit à l'empreinte de lecture seule.
-reg() { echo "$FX/$1" >> "$TMP/fxlist"; }
-w() { local rel="$1" fmt="$2"; shift 2; mkdir -p "$(dirname "$FX/$rel")"; printf -- "$fmt" "$@" > "$FX/$rel"; reg "$rel"; }
+reg() {
+  echo "$FX/$1" >> "$TMP/fxlist"
+  if [ -f "$FX/$1" ] && [ ! -L "$FX/$1" ]; then echo "$(cksum < "$FX/$1") $FX/$1" >> "$TMP/fxsum"; fi
+}
+w() { local rel="$1" fmt="$2"; shift 2; mkdir -p "$(dirname "$FX/$rel")"; printf -- "$fmt" "$@" > "$FX/$rel"
+  case "$rel" in */*) reg "$(dirname "$rel")" ;; esac
+  reg "$rel"
+}
 
 # run <arguments séparés> -> RC, OUT, ERR ; appel borné (une attente devient un échec du cas, rc 142).
 run() {
@@ -174,6 +183,72 @@ probe_noecho() {
   [ "$RC" -eq 1 ] && ! has "$MARK" && ! printf '%s' "$ERR" | command grep -qF "$MARK"; }
 case_ CPRD-MIX probe_mix
 case_ CPRD-NOECHO probe_noecho
+
+# === Entrées non fiables : refus bruyant AVANT lecture (T-59-03) ====================================
+probe_absent() { run --requirements "$FX/n-existe-pas.md"
+  msg "cible absente attendu rc 3 + INDETERMINE"; [ "$RC" -eq 3 ] && has 'INDETERMINE exigences'; }
+probe_lien() {
+  w okA.md '# Exigences\n\n%s\n%s\n' "$A1" "$A2"; ln -sf "$FX/okA.md" "$FX/lien.md"; reg lien.md
+  run --requirements "$FX/lien.md"
+  msg "lien symbolique vers un fichier conforme attendu rc 5 + ILLISIBLE lien symbolique sur stdout et stderr"
+  [ "$RC" -eq 5 ] && has 'ILLISIBLE exigences : lien symbolique' \
+    && printf '%s' "$ERR" | command grep -qF 'ILLISIBLE exigences : lien symbolique'; }
+probe_fifo() { [ -p "$FX/fifo" ] || mkfifo "$FX/fifo"; reg fifo; run --requirements "$FX/fifo"
+  msg "FIFO attendu rc 5 sans blocage (142 = lue)"; [ "$RC" -eq 5 ]; }
+probe_dossier() { mkdir -p "$FX/dossier"; reg dossier; run --requirements "$FX/dossier"
+  msg "dossier attendu rc 5"; [ "$RC" -eq 5 ]; }
+probe_gros() {
+  [ -f "$FX/gros.md" ] || { dd if=/dev/zero bs=1048577 count=1 2>/dev/null | tr '\0' 'x' > "$FX/gros.md"; reg gros.md; }
+  run --requirements "$FX/gros.md"
+  msg "1048577 octets attendu rc 5"; [ "$RC" -eq 5 ] || return 1
+  [ -f "$FX/borne.md" ] || { dd if=/dev/zero bs=1048576 count=1 2>/dev/null | tr '\0' 'x' > "$FX/borne.md"; reg borne.md; }
+  run --requirements "$FX/borne.md"
+  msg "1048576 octets (la borne incluse) attendu rc 3, pas 5"; [ "$RC" -eq 3 ]; }
+probe_illisible() { w ferme.md '# Exigences\n\n%s\n' "$A1"; chmod 000 "$FX/ferme.md"; run --requirements "$FX/ferme.md"
+  local r=$RC; chmod 600 "$FX/ferme.md"; RC=$r
+  msg "fichier illisible attendu rc 5"; [ "$RC" -eq 5 ]; }
+case_ CPRD-ABSENT probe_absent
+case_ CPRD-LIEN probe_lien
+case_ CPRD-FIFO probe_fifo
+case_ CPRD-DOSSIER probe_dossier
+case_ CPRD-GROS probe_gros
+if [ "$(id -u)" -eq 0 ]; then skip "CPRD-ILLISIBLE (suite jouée en root : chmod 000 n'interdit rien)"
+else case_ CPRD-ILLISIBLE probe_illisible; fi
+probe_mix5() { w brief-ok.md "# Brief produit\n\n$BR_PB$BR_US$BR_VA$BR_CO$BR_HP"; ln -sf "$FX/brief-ok.md" "$FX/lien-brief.md"; reg lien-brief.md
+  run --requirements "$FX/okA.md" --brief "$FX/lien-brief.md"
+  msg "exigences conformes + BRIEF en lien symbolique attendu rc 5 (5 l'emporte sur 0)"; [ "$RC" -eq 5 ]; }
+case_ CPRD-MIX5 probe_mix5
+
+# === Forme exec : aucune évaluation de chaîne, arguments séparés =====================================
+probe_exec() {
+  local n; n="$(awk '!/^[[:space:]]*#/ && /(^|[^A-Za-z_])eval([^A-Za-z_]|$)/{n++} END{print n+0}' "$SCRIPT")"
+  LASTMSG="le script appelle une évaluation dynamique de chaîne ($n ligne(s))"; [ "$n" = 0 ] || return 1
+  w "dossier avec espace/a b'c \$(touch pwned).md" '# Exigences\n\n%s\n' "$A1"
+  run --requirements "$FX/dossier avec espace/a b'c \$(touch pwned).md"
+  msg "chemin à espaces, apostrophe et substitution de commande attendu rc 0 sans exécution"
+  [ "$RC" -eq 0 ] && [ ! -e "$TMP/cwd/pwned" ]; }
+case_ CPRD-EXEC probe_exec
+
+# === Lecture seule, couverture des codes ===========================================================
+probe_ro() {
+  LC_ALL=C sort -u "$TMP/fxlist" > "$TMP/fxl"; find "$FX" -mindepth 1 | LC_ALL=C sort > "$TMP/fxnow"
+  LASTMSG="le dossier de fixtures a changé de contenu (fichier créé ou supprimé par le script)"
+  cmp -s "$TMP/fxl" "$TMP/fxnow" || return 1
+  local a b p
+  while read -r a b p; do
+    LASTMSG="fixture modifiée : $p"
+    [ "$(cksum < "$p")" = "$a $b" ] || return 1
+  done < "$TMP/fxsum"
+  return 0
+}
+case_ CPRD-RO probe_ro
+probe_codes() {
+  LC_ALL=C sort -u "$TMP/rcs" > "$TMP/obs"; printf '0\n1\n3\n5\n64\n' > "$TMP/exp-codes"
+  local manq extra
+  manq="$(comm -13 "$TMP/obs" "$TMP/exp-codes" | tr '\n' ' ')"; extra="$(comm -23 "$TMP/obs" "$TMP/exp-codes" | tr '\n' ' ')"
+  LASTMSG="codes manquants [$manq] en trop [$extra]"; [ -z "$manq" ] && [ -z "$extra" ]
+}
+case_ CPRD-CODES probe_codes
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]
