@@ -629,7 +629,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 59-04-PLAN.md — vague 2 : module, visibilité par poste, manager, workers, `prd-gate`
-- [ ] 59-05-PLAN.md — vague 2 : front door, skill `/vf-product`, gabarit BRIEF, README du bundle
+- [x] 59-05-PLAN.md — vague 2 : front door, skill `/vf-product`, gabarit BRIEF, README du bundle
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 59-06-PLAN.md — vague 3 : suite du bundle, baselines, compteurs des README racine
