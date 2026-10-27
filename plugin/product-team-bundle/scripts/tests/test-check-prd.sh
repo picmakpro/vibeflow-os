@@ -9,7 +9,9 @@
 # CPRD-MIX, CPRD-NOECHO.
 # Cas CPRD-ABSENT, CPRD-LIEN, CPRD-FIFO, CPRD-DOSSIER, CPRD-GROS, CPRD-ILLISIBLE, CPRD-MIX5, CPRD-EXEC (sans
 # évaluation de chaîne, chemin hostile inerte), CPRD-RO, CPRD-CODES (ensemble observé = {0, 1, 3, 5, 64}, jamais 2).
-# Mutants CPRD-MUT-1..8 (QUAL-01) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
+# Cas revue-59 (F2, F3, F4) : CPRD-TODO, CPRD-REMPLISSAGE, CPRD-REMPLISSAGE-MOT, CPRD-LONGUEUR, CPRD-COMMENTAIRE,
+# CPRD-FERME-BLANC, CPRD-SOUS-PUCE, CPRD-FENCE-OUVERTE, CPRD-CASE-INCONNUE, CPRD-BRIEF-REMPLISSAGE, CPRD-BRIEF-CRLF.
+# Mutants CPRD-MUT-1..8 (QUAL-01), puis CPRD-MUT-9..26 (revue-59 F4 : un mutant par comportement documenté) : une ligne du script altérée, chacun différent de l'original (cmp -s), valide
 # (bash -n), rouge pour la raison attendue (code attendu/obtenu imprimé), original revérifié vert.
 set -uo pipefail
 
@@ -182,6 +184,110 @@ case_ CPRD-BRIEF-FENCE probe_brief_fence
 case_ CPRD-BRIEF-NUM probe_brief_num
 case_ CPRD-BRIEF-SEUL probe_brief_seul
 
+# === revue-59 F2/F3/F4 : marqueurs de remplissage, longueur en caractères, commentaires, fences, cases ===
+probe_todo() { req1 todo.md "Acceptation : todo avec le client avant la livraison"; run --requirements "$FX/todo.md"
+  msg "critère portant TODO attendu rc 1"; [ "$RC" -eq 1 ]; }
+probe_remplissage() {
+  local v i=0
+  while IFS= read -r v; do
+    i=$((i+1)); req1 "rempl-$i.md" "Acceptation : $v"; run --requirements "$FX/rempl-$i.md"
+    msg "critère de remplissage « $v » attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  done <<'EOF'
+à définir
+à préciser plus tard
+a definir
+À DÉFINIR avec le client avant la livraison
+À Préciser avec le client plus tard
+n/a pour l'instant sur ce point
+à compléter avec le client
+à venir dans une version ultérieure
+TBA avec le client avant la livraison
+EOF
+  local nfd=$'a de\xcc\x81finir avec le client'   # « é » décomposé (e + accent combinant) : mêmes verdicts
+  req1 rempl-nfd.md "Acceptation : $nfd"; run --requirements "$FX/rempl-nfd.md"
+  msg "« à définir » en forme décomposée attendu rc 1"; [ "$RC" -eq 1 ]; }
+probe_remplissage_mot() {
+  local v i=0
+  while IFS= read -r v; do
+    i=$((i+1)); req1 "mot-$i.md" "Acceptation : $v"; run --requirements "$FX/mot-$i.md"
+    msg "« $v » (marqueur au sein d'un mot) attendu rc 0 : seuls les mots entiers comptent"; [ "$RC" -eq 0 ] || return 1
+  done <<'EOF'
+le tarif de mesa definir en moins de 3 secondes
+ça definiras toujours le résultat en 3 secondes
+l'avenir du produit se mesure en 3 mois de suivi
+EOF
+}
+probe_longueur() {
+  req1 l9.md "Acceptation : ééééééééé"; run --requirements "$FX/l9.md"
+  msg "9 caractères accentués (18 octets) attendu rc 1 : la longueur se mesure en caractères"; [ "$RC" -eq 1 ] || return 1
+  req1 l9b.md "Acceptation : é é é é é é é é é"; run --requirements "$FX/l9b.md"
+  msg "9 caractères non blancs séparés par des blancs attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  req1 l10.md "Acceptation : éééééééééé"; run --requirements "$FX/l10.md"
+  msg "10 caractères accentués attendu rc 0 (borne incluse)"; [ "$RC" -eq 0 ]; }
+probe_commentaire() {
+  req1 com1.md "  <!-- Acceptation : $CRIT -->"; run --requirements "$FX/com1.md"
+  msg "critère placé dans un commentaire HTML indenté attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  w com2.md "# Exigences\n\n- [ ] **PRD-01**: Exporter\n  <!--\n  Acceptation : %s\n  -->\n  Priorité : must\n" "$CRIT"
+  run --requirements "$FX/com2.md"
+  msg "critère dans un commentaire multi-ligne attendu rc 1"; [ "$RC" -eq 1 ] || return 1
+  w com3.md "# Exigences\n\n- [ ] **PRD-01**: Exporter\n  <!--\n  une note\n  -->\n  Acceptation : %s\n  Priorité : must\n" "$CRIT"
+  run --requirements "$FX/com3.md"
+  msg "commentaire multi-ligne au milieu d'une exigence attendu rc 0 (il ne ferme pas l'exigence)"
+  { [ "$RC" -eq 0 ] && last | command grep -q 'BILAN exigences=1 sans_critere=0 '; } || return 1
+  w com4.md "# Exigences\n\n<!-- - [ ] **PRD-09**: exemple commenté -->\n%s\n" "$A1"
+  run --requirements "$FX/com4.md"
+  msg "exigence en commentaire HTML non comptée, BILAN exigences=1"
+  [ "$RC" -eq 0 ] && last | command grep -q 'BILAN exigences=1 '; }
+probe_ferme_blanc() {
+  w blanc.md "# Exigences\n\n- [ ] **PRD-01**: Exporter\n  \n  Acceptation : %s\n  Priorité : must\n" "$CRIT"
+  run --requirements "$FX/blanc.md"
+  msg "ligne indentée après une ligne faite de blancs attendu rc 1 (elle ferme l'exigence)"
+  [ "$RC" -eq 1 ] && has 'ELIMINATOIRE exigence PRD-01'; }
+probe_sous_puce() {
+  w puce.md "# Exigences\n\n- [ ] **PRD-01**: Exporter\n  - Acceptation : %s\n  Priorité : must\n" "$CRIT"
+  run --requirements "$FX/puce.md"
+  msg "critère porté par une sous-puce attendu rc 1 (une puce ouvre un nouvel élément)"
+  [ "$RC" -eq 1 ] && has 'ELIMINATOIRE exigence PRD-01'; }
+probe_fence_ouverte() {
+  w fo1.md "# Exigences\n\n%s\n\n\`\`\`markdown\n$NOCRIT\n" "$A1"
+  run --requirements "$FX/fo1.md"
+  msg "bloc de code non fermé avalant une exigence sans critère attendu rc 3 + INDETERMINE, jamais rc 0"
+  { [ "$RC" -eq 3 ] && has 'INDETERMINE exigences : bloc de code non ferme'; } || return 1
+  w fo2.md "# Exigences\n\n$NOCRIT\n\n~~~\n%s\n" "$A1"
+  run --requirements "$FX/fo2.md"
+  msg "éliminatoire lu avant un bloc non fermé attendu rc 1 (1 l'emporte sur 3)"
+  [ "$RC" -eq 1 ] && has 'INDETERMINE exigences : bloc de code non ferme'; }
+probe_case_inconnue() {
+  w ci.md "# Exigences\n\n%s\n- [ ] **PRD.02**: $MARK ID pointé\n- [x] **prd-03**: minuscules\n* [ ] **PRD-04**: puce étoile\n" "$A1"
+  run --requirements "$FX/ci.md"
+  msg "3 cases non reconnues attendu rc 0 + AVERTISSEMENT lignes 4 à 6 (stdout ET stderr) + non_reconnues=3, contenu jamais réimprimé"
+  [ "$RC" -eq 0 ] || return 1
+  has 'AVERTISSEMENT ligne 4 :' && has 'AVERTISSEMENT ligne 5 :' && has 'AVERTISSEMENT ligne 6 :' || return 1
+  last | command grep -q 'BILAN exigences=1 .*non_reconnues=3 ' || return 1
+  printf '%s' "$ERR" | command grep -qF 'AVERTISSEMENT ligne 5 :' || return 1
+  ! has "$MARK" && ! printf '%s' "$ERR" | command grep -qF "$MARK"; }
+probe_brief_remplissage() {
+  w brief-rempl.md "# Brief produit\n\n$BR_PB$BR_US## Valeur\ntbd\n\n## Contraintes\ntodo : voir le client\n\n$BR_HP"
+  run --brief "$FX/brief-rempl.md"
+  msg "rubriques ne portant que TBD ou TODO attendu rc 1 + valeur : vide + contraintes : vide"
+  [ "$RC" -eq 1 ] && has 'rubrique BRIEF valeur : vide' && has 'rubrique BRIEF contraintes : vide'; }
+probe_brief_crlf() {
+  w brief-crlf.md '# Brief\r\n\r\n## Problème\r\nUn.\r\n## Utilisateurs\r\nDeux.\r\n## Valeur\r\nTrois.\r\n## Contraintes\r\n\r\n## Hors périmètre\r\nCinq.\r\n'
+  run --brief "$FX/brief-crlf.md"
+  msg "BRIEF CRLF dont la rubrique Contraintes est vide attendu rc 1 + contraintes : vide"
+  [ "$RC" -eq 1 ] && has 'rubrique BRIEF contraintes : vide'; }
+case_ CPRD-TODO probe_todo
+case_ CPRD-REMPLISSAGE probe_remplissage
+case_ CPRD-REMPLISSAGE-MOT probe_remplissage_mot
+case_ CPRD-LONGUEUR probe_longueur
+case_ CPRD-COMMENTAIRE probe_commentaire
+case_ CPRD-FERME-BLANC probe_ferme_blanc
+case_ CPRD-SOUS-PUCE probe_sous_puce
+case_ CPRD-FENCE-OUVERTE probe_fence_ouverte
+case_ CPRD-CASE-INCONNUE probe_case_inconnue
+case_ CPRD-BRIEF-REMPLISSAGE probe_brief_remplissage
+case_ CPRD-BRIEF-CRLF probe_brief_crlf
+
 # === Combinaison des entrées, contenu jamais réimprimé =============================================
 probe_mix() { run --requirements "$FX/trois.md" --brief "$FX/n-existe-pas.md"
   msg "éliminatoire + BRIEF absent attendu rc 1 (1 l'emporte sur 3)"; [ "$RC" -eq 1 ] && has 'INDETERMINE brief'; }
@@ -304,6 +410,44 @@ mutant CPRD-MUT-7 '"$size" -gt "$PRD_MAX_OCTETS"' '"$PRD_MAX_OCTETS"' '999999999
   "BRUYANT : borne de taille retirée"
 mutant CPRD-MUT-8 'if (match(s, /[Aa]cceptation' '[Aa]cceptation' 'Acceptation' probe_ancre \
   "PASS : ancre du critère rendue sensible à la casse"
+
+# --- revue-59 F4 : un mutant par comportement documenté (une ligne, un fragment retiré).
+mutant CPRD-MUT-9 'n = split("tbd|todo|tba' 'todo|' '' probe_todo \
+  "FAIL : TODO retiré de la liste des marqueurs de remplissage (exigence)"
+mutant CPRD-MUT-10 'n = split("tbd|todo|tba' 'tbd|' '' probe_tbd \
+  "FAIL : TBD retiré de la liste des marqueurs de remplissage (exigence)"
+mutant CPRD-MUT-11 'hasword(tolower(t), "tbd")' ' || hasword(tolower(t), "todo")' '' probe_brief_remplissage \
+  "FAIL BRIEF : TODO retiré du filtre de remplissage"
+mutant CPRD-MUT-12 'hasword(tolower(t), "tbd")' 'hasword(tolower(t), "tbd") || ' '' probe_brief_remplissage \
+  "FAIL BRIEF : TBD retiré du filtre de remplissage"
+mutant CPRD-MUT-13 'line ~ /^[ \t]*$/ || line ~ /^#/' 'line ~ /^[ \t]*$/ || ' '' probe_ferme_blanc \
+  "FAIL : la ligne blanche ne ferme plus l'exigence"
+mutant CPRD-MUT-14 'line ~ /^[ \t]*$/ || line ~ /^#/' ' || line ~ /^[ \t]*([-*+]|[0-9]+\.)[ \t]/' '' probe_sous_puce \
+  "FAIL : la sous-puce ne ferme plus l'exigence"
+mutant CPRD-MUT-15 "OUT_TXT=\$(tr -d" "tr -d '\\r' < \"\$1\"" "cat < \"\$1\"" probe_brief_crlf \
+  "FAIL BRIEF : retrait des CR retiré (fichier CRLF)"
+mutant CPRD-MUT-16 'n = split("tbd|todo|tba' 'a preciser|' '' probe_remplissage \
+  "FAIL : « à préciser » retiré de la liste des marqueurs"
+mutant CPRD-MUT-17 'gsub(/é|É' 'gsub(/é|É|è|È|ê|Ê|ë|Ë/, "e", s)' 's = s' probe_remplissage \
+  "FAIL : repli des accents (é, è, ê) retiré"
+mutant CPRD-MUT-18 'gsub(/à|À' 'gsub(/à|À|â|Â/, "a", s)' 's = s' probe_remplissage \
+  "FAIL : repli de « à » retiré"
+mutant CPRD-MUT-19 'gsub(/\314[\200-\277]|\315[\200-\257]/, "", s)' 'gsub(/\314[\200-\277]|\315[\200-\257]/, "", s)' 's = s' probe_remplissage \
+  "FAIL : marques combinantes non retirées (la repli porte aussi la forme décomposée)"
+mutant CPRD-MUT-20 'gsub(/[\200-\277]/, "", s)' 'gsub(/[\200-\277]/, "", s)' 's = s' probe_longueur \
+  "FAIL : la longueur se mesure de nouveau en octets"
+mutant CPRD-MUT-21 'pre = line; line = strip_comments(line)' 'line = strip_comments(line)' 'line = line' probe_commentaire \
+  "FAIL : commentaires HTML non retirés dans la passe exigences"
+mutant CPRD-MUT-22 'if (line ~ /^[ \t]*$/ && pre !~' ') next' ') pre = pre' probe_commentaire \
+  "FAIL : un commentaire multi-ligne ferme l'exigence"
+mutant CPRD-MUT-23 'if [ "$NFENCE" -ne 0 ]; then' '[ "$NFENCE" -ne 0 ]' 'false' probe_fence_ouverte \
+  "INDÉTERMINÉ : bloc de code non fermé rendu 0"
+mutant CPRD-MUT-24 'nunk++' 'nunk++' 'nxx++' probe_case_inconnue \
+  "BILAN : cases non reconnues non comptées"
+mutant CPRD-MUT-25 'if (nunk <= 50) printf' 'if (nunk <= 50)' 'if (0)' probe_case_inconnue \
+  "AVERTISSEMENT : cases non reconnues non signalées"
+mutant CPRD-MUT-26 "command grep -F 'AVERTISSEMENT ligne '" '>&2' '>/dev/null' probe_case_inconnue \
+  "AVERTISSEMENT : copie sur stderr retirée"
 
 echo "== resultat : $PASS ok, $FAIL ko ($SKIPPED skip) =="
 [ "$FAIL" -eq 0 ]

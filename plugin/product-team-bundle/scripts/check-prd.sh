@@ -21,9 +21,18 @@
 #
 # Éliminatoire 1 : une exigence `- [ ] **ID**: ...` sans critère d'acceptation utilisable. Le
 # critère est une ligne (celle de l'exigence ou une continuation indentée) `Acceptation :` suivie
-# d'une valeur qui ne commence pas par `[` ou `<`, sans TBD ni TODO (mots entiers), sans trois
-# points ni points de suspension, d'au moins 10 caractères non blancs (mesurés en octets). La
-# qualité « testable » du critère reste au juge. Les blocs de code sont ignorés.
+# d'une valeur qui ne commence pas par `[` ou `<`, sans marqueur de remplissage en mot entier (TBD,
+# TODO, TBA, FIXME, n/a, « à définir », « à préciser », « à compléter », « à venir », « à déterminer »,
+# « à remplir », « à renseigner », « à confirmer », « à décider » ; casse et accents indifférents, y compris
+# les marques combinantes), sans trois points ni points de suspension, d'au moins 10 CARACTÈRES non
+# blancs (UTF-8 compté en caractères, en awk pur sous LC_ALL=C : aucune locale UTF-8 requise). La
+# qualité « testable » du critère reste au juge. Les blocs de code et les commentaires HTML sont
+# ignorés (un commentaire multi-ligne au milieu d'une exigence ne la ferme pas). Une puce, même
+# indentée, ouvre un nouvel élément : elle ne porte pas le critère de l'exigence qui précède.
+# Bloc de code non fermé en fin de fichier : les exigences suivantes sont illisibles pour le gate,
+# donc INDÉTERMINÉ (code 3). Ligne à case `[ ]`/`[x]` qui n'a pas la forme d'exigence (ID pointé,
+# minuscules, puce `*`, numérotée) : AVERTISSEMENT par numéro de ligne (stdout et stderr), jamais
+# réimprimée ; l'effet sur le code reste nul, le BILAN la compte (`non_reconnues`).
 # Éliminatoire 2 : une rubrique du BRIEF manque ou n'a aucune ligne de corps (hors commentaire
 # HTML, hors ligne commençant par `[`, hors TBD/TODO) : probleme, utilisateurs, valeur,
 # contraintes, hors_perimetre (titres Markdown reconnus par préfixe ASCII, casse indifférente).
@@ -32,7 +41,8 @@
 # Codes de sortie (chacun énuméré, aucun implicite) :
 #   0 = conforme : aucun éliminatoire et au moins une exigence lue si --requirements est fourni.
 #   1 = éliminatoire : exigence sans critère utilisable, ou rubrique du BRIEF absente ou vide.
-#   3 = INDÉTERMINÉ : cible absente, ou zéro exigence détectée. Jamais un vert à vide.
+#   3 = INDÉTERMINÉ : cible absente, zéro exigence détectée, ou bloc de code non fermé en fin de
+#       fichier. Jamais un vert à vide.
 #   5 = entrée illisible, BRUYANTE : lien symbolique, non régulier (FIFO, dossier), illisible,
 #       taille non numérique, au-delà de 1048576 octets, analyse en échec. Refus AVANT lecture.
 #   64 = erreur d'usage (aucune entrée, option inconnue ou sans valeur).
@@ -43,8 +53,9 @@
 #   ELIMINATOIRE exigence <ID> : aucun critere d'acceptation utilisable
 #   ELIMINATOIRE rubrique BRIEF <nom> : absente | vide
 #   AVERTISSEMENT exigence <ID> : priorite absente | priorite hors {must, should, could}
+#   AVERTISSEMENT ligne <n> : case a cocher non reconnue comme exigence (aussi sur stderr)
 #   INDETERMINE <entree> : <raison>        ILLISIBLE <entree> : <raison> (aussi sur stderr)
-#   BILAN exigences=<n> sans_critere=<n> avertissements=<n> rubriques_manquantes=<n> code=<rc>
+#   BILAN exigences=<n> sans_critere=<n> avertissements=<n> rubriques_manquantes=<n> non_reconnues=<n> code=<rc>
 # Au plus 50 lignes par catégorie ; les compteurs du BILAN restent exacts.
 set -uo pipefail
 export LC_ALL=C
@@ -93,18 +104,50 @@ function hasword(t, w,   p, b, a, off) {
   }
   return 0
 }
+# Minuscules ASCII, accents français repliés (UTF-8 lu en octets), marques combinantes retirées.
+function fold(s) {
+  s = tolower(s)
+  gsub(/\314[\200-\277]|\315[\200-\257]/, "", s)
+  gsub(/à|À|â|Â/, "a", s); gsub(/é|É|è|È|ê|Ê|ë|Ë/, "e", s)
+  gsub(/î|Î|ï|Ï/, "i", s); gsub(/ô|Ô/, "o", s); gsub(/ù|Ù|û|Û/, "u", s); gsub(/ç|Ç/, "c", s)
+  return s
+}
+# Caractères non blancs : octets de continuation UTF-8 (0x80-0xBF) et marques combinantes retirés.
+function nchars(s) {
+  gsub(/[ \t]/, "", s)
+  gsub(/\314[\200-\277]/, "", s); gsub(/\315[\200-\257]/, "", s)
+  gsub(/[\200-\277]/, "", s)
+  return length(s)
+}
+function isfiller(v,   t, i, n, F) {
+  t = fold(v)
+  n = split("tbd|todo|tba|fixme|n/a|a definir|a preciser|a completer|a venir|a determiner|a remplir|a renseigner|a confirmer|a decider", F, "|")
+  for (i = 1; i <= n; i++) if (hasword(t, F[i])) return 1
+  return 0
+}
+function strip_comments(s,   a, b) {
+  if (incom) {
+    b = index(s, "-->")
+    if (!b) return ""
+    s = substr(s, b + 3); incom = 0
+  }
+  while ((a = index(s, "<!--")) > 0) {
+    b = index(substr(s, a + 4), "-->")
+    if (!b) { incom = 1; return substr(s, 1, a - 1) }
+    s = substr(s, 1, a - 1) substr(s, a + b + 6)
+  }
+  return s
+}
 AWKEOF
 
 # --- Exigences : un enregistrement par ligne, tout est imprimé par awk, dernière ligne `@ n s a`.
 read -r -d '' AWK_REQ <<'AWKEOF'
-function nonblank(s) { gsub(/[ \t]/, "", s); return length(s) }
-function usable(v,   c, t) {
+function usable(v,   c) {
   c = substr(v, 1, 1)
   if (c == "[" || c == "<") return 0
-  t = tolower(v)
-  if (hasword(t, "tbd") || hasword(t, "todo")) return 0
+  if (isfiller(v)) return 0
   if (index(v, "...") || index(v, ell)) return 0
-  if (nonblank(v) < 10) return 0
+  if (nchars(v) < 10) return 0
   return 1
 }
 function scan(s,   v, w) {
@@ -139,6 +182,10 @@ function close_block() {
 {
   line = $0
   if (NR == 1 && substr(line, 1, 3) == bom) line = substr(line, 4)
+  if (!infence) {
+    pre = line; line = strip_comments(line)
+    if (line ~ /^[ \t]*$/ && pre !~ /^[ \t]*$/) next
+  }
   t = line; sub(/^[ \t]+/, "", t)
   f3 = substr(t, 1, 3)
   if (infence) { if (f3 == fch) infence = 0; next }
@@ -152,28 +199,19 @@ function close_block() {
     scan(substr(line, RSTART + RLENGTH))
     next
   }
+  if (line ~ /^[ \t]*([-*+]|[0-9]+[.)])[ \t]+\[[ xX]\]/) {
+    nunk++
+    if (nunk <= 50) printf "[check-prd] AVERTISSEMENT ligne %d : case a cocher non reconnue comme exigence\n", NR
+  }
   if (!inblk) next
   if (line ~ /^[ \t]*$/ || line ~ /^#/ || line ~ /^[ \t]*([-*+]|[0-9]+\.)[ \t]/ || line !~ /^[ \t]/) { close_block(); next }
   scan(line)
 }
-END { close_block(); printf "@ %d %d %d\n", nreq + 0, nsans + 0, nav + 0 }
+END { close_block(); printf "@ %d %d %d %d %d\n", nreq + 0, nsans + 0, nav + 0, nunk + 0, infence + 0 }
 AWKEOF
 
 # --- BRIEF : cinq rubriques, chacune avec au moins une ligne de corps ; dernière ligne `@ m`.
 read -r -d '' AWK_BRIEF <<'AWKEOF'
-function strip_comments(s,   a, b) {
-  if (incom) {
-    b = index(s, "-->")
-    if (!b) return ""
-    s = substr(s, b + 3); incom = 0
-  }
-  while ((a = index(s, "<!--")) > 0) {
-    b = index(substr(s, a + 4), "-->")
-    if (!b) { incom = 1; return substr(s, 1, a - 1) }
-    s = substr(s, 1, a - 1) substr(s, a + b + 6)
-  }
-  return s
-}
 {
   line = $0
   if (NR == 1 && substr(line, 1, 3) == bom) line = substr(line, 4)
@@ -215,7 +253,7 @@ END {
 }
 AWKEOF
 
-WORST=0; NREQ=0; NSANS=0; NAV=0; NMANQ=0
+WORST=0; NREQ=0; NSANS=0; NAV=0; NMANQ=0; NUNK=0; NFENCE=0
 bump() { # <code> : ordre 5 > 1 > 3 > 0
   case "$1" in
     5) WORST=5 ;;
@@ -264,10 +302,15 @@ if [ "$HAS_REQ" -eq 1 ] && guard exigences "$REQ"; then
     illisible exigences "analyse en echec"
   else
     set -- $LAST
-    NREQ=$2; NSANS=$3; NAV=$4
+    NREQ=$2; NSANS=$3; NAV=$4; NUNK=$5; NFENCE=$6
+    printf '%s\n' "$OUT_TXT" | command grep -F 'AVERTISSEMENT ligne ' >&2
+    if [ "$NFENCE" -ne 0 ]; then
+      indetermine exigences "bloc de code non ferme en fin de fichier (exigences suivantes non lues)"
+    fi
     if [ "$NREQ" -eq 0 ]; then
       indetermine exigences "aucune exigence detectee (forme attendue - [ ] **ID**: ...)"
-    elif [ "$NSANS" -gt 0 ]; then
+    fi
+    if [ "$NSANS" -gt 0 ]; then
       bump 1
     fi
   fi
@@ -289,5 +332,5 @@ if [ "$HAS_BRIEF" -eq 1 ] && guard brief "$BRIEF"; then
   fi
 fi
 
-say "BILAN exigences=${NREQ} sans_critere=${NSANS} avertissements=${NAV} rubriques_manquantes=${NMANQ} code=${WORST}"
+say "BILAN exigences=${NREQ} sans_critere=${NSANS} avertissements=${NAV} rubriques_manquantes=${NMANQ} non_reconnues=${NUNK} code=${WORST}"
 exit "$WORST"
