@@ -11,27 +11,27 @@ appears below, anywhere.
 
 ## Which model runs, and why
 
-VibeFlow's [31 agents](./agents.md) don't all run on the same model. The split isn't "judge versus
+VibeFlow's [36 agents](./agents.md) don't all run on the same model. The split isn't "judge versus
 executor" — on this repo, quality judges run on sonnet, exactly like the workers they evaluate.
 The real split tracks the **nature of the judgment being asked for**:
 
-- **Face agents and mission managers** (opus, ten agents total) — routing a request whose intent
+- **Face agents and mission managers** (opus, twelve agents total) — routing a request whose intent
   isn't yet clear, planning a task graph with cross-dependencies across several independent
   tracks, arbitrating a call that no explicit rubric can make for you. That's open-ended judgment,
   over a scope that can shift mid-mission.
-- **Workers and judges** (sonnet, twenty-one agents) — producing a specific deliverable against an
+- **Workers and judges** (sonnet, twenty-four agents) — producing a specific deliverable against an
   already-framed mandate, scoring a result against a rubric written out in black and white,
   executing a step already identified. That's a bounded scope, known ahead of time.
 
 One notable exception proves the rule rather than breaking it: `vf-test-orchestrator` drives a
-mission like the other five managers, but stays on sonnet — its loop (test, fix, re-test until
+mission like the other six managers, but stays on sonnet — its loop (test, fix, re-test until
 budget runs out) is a bounded scope from the start, without the open-ended trade-offs of a
 multi-domain battle plan.
 
 The full breakdown, agent by agent, lives on [agents.md](./agents.md).
 
 You never have to guess this: each agent file's `model:` frontmatter field states it explicitly,
-and the [agent reference](./agents.md) reproduces it for all 31. To read it yourself on disk,
+and the [agent reference](./agents.md) reproduces it for all 36. To read it yourself on disk,
 `grep model: plugin/*/agents/*.md plugin/*/AGENT.md` from the repo root gives the full list — the
 same command a maintainer would run before touching any of this page's claims.
 
