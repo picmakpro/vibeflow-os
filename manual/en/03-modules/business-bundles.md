@@ -40,6 +40,13 @@ dependencies as the others in its `module.json`. Nothing technically stops you f
 several, but [choosing-your-modules.md](./choosing-your-modules.md) explains why that's rarely a good
 idea at the start.
 
+A note on **`product-team-bundle`**, the product team (BRIEF, PRD, `prd-gate` judge at eighty out of
+a hundred). It follows the same skeleton but isn't counted among these three bundles: it doesn't
+run a line of business, it frames a product before dev breaks it down. It ships but is
+`proposable:false`, so absent from the catalog and the presets, and will only flip after a full
+real run (BRIEF, PRD, judge above the threshold). What the [catalog](./catalog.md) says about it
+applies to how to install it.
+
 ## What tells them apart from a bundle of prompts
 
 That's the real question, and it deserves a clear answer. You could assume a bundle is just a
