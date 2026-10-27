@@ -7567,6 +7567,55 @@ t414_mutant "T44 mutant ordre : copie d'AGENT.md où la ligne FIRST-02 précède
 t414_ablate "$T44_REF" "$T414_TMP/t44-lec.md" 'vf-role.sh get'
 t414_mutant "T44 mutant lecture : copie de product-routing.md privée de « vf-role.sh get »" t44_ref_check "$T44_REF" "$T414_TMP/t44-lec.md"
 
+# T44 (c)(d)(e) : la ligne de carte, l'index et la ligne de Références disent la même chose que le pointeur.
+T44_CARTE_ZS='^## Carte d.intention'
+T44_CARTE_ZE='^## Next steps'
+T44_CARTE_LIT=('brief produit / PRD' 'skill `vf-product` (module product-team-bundle)' 'agent `vibeflow-product`')
+T44_REFS_ZS='^## Références'
+T44_ROUTE_ZS='^## Design'
+T44_ROUTE_ZE='^## Mission multi-étapes'
+T44_INDEX="$REFS_DIR/_index.md"
+T44_ROUTE="$REFS_DIR/intent-routing.md"
+
+t44_carte_check() { # <AGENT.md> — (c) ligne de la Carte d'intention
+  local z out; z="$(t414_zone "$1" "$T44_CARTE_ZS" "$T44_CARTE_ZE")"
+  [ -n "$z" ] || { printf 'zone « Carte d%sintention » introuvable ou vide' "'"; return 1; }
+  out="$(t414_missing "$z" "${T44_CARTE_LIT[@]}")" || { printf 'ligne vf-product absente de la carte : %s' "$out"; return 1; }
+}
+t44_index_check() { # <_index.md> — (d) ligne d'index
+  local z out; z="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf '_index.md absent ou vide'; return 1; }
+  out="$(t414_missing "$z" '[product-routing.md](product-routing.md)')" || { printf 'index : %s' "$out"; return 1; }
+}
+t44_refs_check() { # <AGENT.md> — (d) ligne de Références
+  local z out; z="$(t414_zone "$1" "$T44_REFS_ZS")"
+  [ -n "$z" ] || { printf 'section « Références » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" 'dev-orchestrator-references/product-routing.md')" || { printf 'Références : %s' "$out"; return 1; }
+}
+t44_route_check() { # <intent-routing.md> — (e) carte exhaustive
+  local z out; z="$(t414_zone "$1" "$T44_ROUTE_ZS" "$T44_ROUTE_ZE")"
+  [ -n "$z" ] || { printf 'section « Design » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T44_CARTE_LIT[@]}")" || { printf 'ligne vf-product absente de intent-routing.md : %s' "$out"; return 1; }
+}
+
+t44_out="$(t44_carte_check "$AGENT_FILE")" && ok "T44 (c) AGENT.md : ligne de carte vf-product → vibeflow-product dans la Carte d'intention" \
+  || ko "T44 (c) AGENT.md : attendu — ligne de carte vf-product ; obtenu — $t44_out"
+t44_out="$(t44_index_check "$T44_INDEX")" && ok "T44 (d) _index.md : ligne product-routing.md" \
+  || ko "T44 (d) _index.md : attendu — ligne product-routing.md ; obtenu — $t44_out"
+t44_out="$(t44_refs_check "$AGENT_FILE")" && ok "T44 (d) AGENT.md §Références : product-routing.md" \
+  || ko "T44 (d) AGENT.md §Références : attendu — product-routing.md ; obtenu — $t44_out"
+t44_out="$(t44_route_check "$T44_ROUTE")" && ok "T44 (e) intent-routing.md : ligne vf-product → vibeflow-product" \
+  || ko "T44 (e) intent-routing.md : attendu — ligne vf-product ; obtenu — $t44_out"
+
+t414_ablate "$AGENT_FILE" "$T414_TMP/t44-carte.md" 'vf-product' "$T44_CARTE_ZS" "$T44_CARTE_ZE"
+t414_mutant "T44 mutant carte : copie d'AGENT.md privée de « vf-product » dans la Carte d'intention" t44_carte_check "$AGENT_FILE" "$T414_TMP/t44-carte.md"
+t414_ablate "$T44_INDEX" "$T414_TMP/t44-index.md" '[product-routing.md](product-routing.md)'
+t414_mutant "T44 mutant index : copie de _index.md privée de la ligne product-routing.md" t44_index_check "$T44_INDEX" "$T414_TMP/t44-index.md"
+t414_ablate "$AGENT_FILE" "$T414_TMP/t44-refs.md" 'dev-orchestrator-references/product-routing.md' "$T44_REFS_ZS"
+t414_mutant "T44 mutant Références : copie d'AGENT.md privée de product-routing.md dans §Références" t44_refs_check "$AGENT_FILE" "$T414_TMP/t44-refs.md"
+t414_ablate "$T44_ROUTE" "$T414_TMP/t44-route.md" 'vf-product' "$T44_ROUTE_ZS" "$T44_ROUTE_ZE"
+t414_mutant "T44 mutant carte exhaustive : copie d'intent-routing.md privée de « vf-product » dans §Design" t44_route_check "$T44_ROUTE" "$T414_TMP/t44-route.md"
+
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
 [ "$fail" -eq 0 ]
