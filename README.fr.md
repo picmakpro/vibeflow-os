@@ -17,7 +17,7 @@ vérifient. Rien n'est fait sans preuve, rien n'est mergé sans toi.
 
 [![Version](https://img.shields.io/badge/version-2.71.2-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#autres-runtimes)
-[![Modules](https://img.shields.io/badge/modules-17-16a34a)](#modules)
+[![Modules](https://img.shields.io/badge/modules-18-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [Le cycle](#comment-ça-marche) · [La preuve](#fait--prouvé) · [L'équipe](#une-équipe-pas-un-chatbot) · [La mémoire](#la-mémoire-qui-tient) · [Les labs](#un-lab-pour-chaque-métier) · [Installation](#installation) · [Manuel](./manual/README.md)
@@ -64,7 +64,7 @@ projet recule. La dernière étape t'appartient.
 
 Un vert qui ne peut pas devenir rouge ne prouve rien. Les tests s'écrivent rouges d'abord, les
 gates `check-*.sh` tournent en CI, et le juge n'est jamais l'auteur. Le dépôt s'applique la même
-règle : 113 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
+règle : 115 suites tournent à chaque push, et un job « lab frais » installe le socle dans un lab
 vierge qui doit passer ses propres gates sans intervention.
 
 → [Les gates machine](./manual/fr/07-sous-le-capot/les-gates-machine.md)
@@ -113,7 +113,7 @@ avec une boucle d'évals.
 
 ## Modules
 
-17 modules, chacun versionné avec son `CHANGELOG.md`. `conductor` est le socle obligatoire ;
+18 modules, chacun versionné avec son `CHANGELOG.md`. `conductor` est le socle obligatoire ;
 ensuite tu choisis un lab de dev parmi des presets (`dev`, `dev-mobile`, `dev-audite`, les
 dépendances résolues pour toi) ou un lab métier sur mesure. Le README de chaque module est sa
 documentation complète, avec la même structure partout.

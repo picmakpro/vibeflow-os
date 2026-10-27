@@ -17,7 +17,7 @@ Nothing is done without proof, nothing merges without you.
 
 [![Version](https://img.shields.io/badge/version-2.71.2-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#other-runtimes)
-[![Modules](https://img.shields.io/badge/modules-17-16a34a)](#modules)
+[![Modules](https://img.shields.io/badge/modules-18-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
 
 [How it works](#how-it-works) · [Proof](#done-means-proven) · [Team](#a-team-not-a-chatbot) · [Memory](#memory-that-holds) · [Labs](#a-lab-for-any-domain) · [Install](#install) · [Manual](./manual/README.md)
@@ -62,7 +62,7 @@ on disk, so a session can die without the project losing ground. The last step i
 </picture>
 
 A green that cannot turn red proves nothing. Tests are written red first, `check-*.sh` gates run
-in CI, and the judge is never the author. The repo holds itself to the same rule: 113 suites run
+in CI, and the judge is never the author. The repo holds itself to the same rule: 115 suites run
 on every push, and a "fresh lab" job installs the baseline into an empty lab that must pass its
 own gates with zero intervention.
 
@@ -111,7 +111,7 @@ and its skills are built by `skill-creator` with an eval loop.
 
 ## Modules
 
-17 modules, each versioned with its own `CHANGELOG.md`. `conductor` is the mandatory baseline;
+18 modules, each versioned with its own `CHANGELOG.md`. `conductor` is the mandatory baseline;
 then you pick a dev lab from a preset (`dev`, `dev-mobile`, `dev-audite`, dependencies resolved
 for you) or a tailor-made domain lab. Each module's README is its full documentation, with the
 same structure everywhere.
