@@ -614,7 +614,7 @@ Plans:
 ### Phase 59: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
 
 **Goal:** Un bundle produit sur le moule de `business-pilot-bundle`. La front door `vibeflow-product`, sur le moule de `vibeflow-design`, produit `BRIEF.md` (le seul fichier nouveau, A-06) et le PRD (`PROJECT.md` + `REQUIREMENTS.md`, gabarit `product` de `planning-core`). Un juge frais `prd-gate`, en lecture seule et sur rubric /100, rend éliminatoire toute exigence sans critère d'acceptation. `vibeflow-head` lit le rôle pour rediriger au lieu de dispatcher `vf-coder` (A-05). Le bundle reste `proposable: false` jusqu'à preuve sur un lab réel (Q-09, défaut probable).
-**Requirements**: TBD — famille `PRDT` réservée, posée au cadrage.
+**Requirements**: PRDT-01..PRDT-12 (posées à la planification, 2026-10-27).
 **Depends on:** 58.
 **Sources:** spec §5.2 ; SEED A-05, A-06, A-10 (vocabulaire : on garde l'existant, aucun renommage) ; `plugin/business-pilot-bundle/`, `plugin/design-orchestrator/`.
 **Hors périmètre :** un fichier PRD.md séparé (A-06) ; les termes « epic » et « story » (Q-11, fermée par doctrine).
