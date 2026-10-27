@@ -623,9 +623,9 @@ Plans:
 Plans:
 
 **Wave 1**
-- [ ] 59-01-PLAN.md — vague 1 : gabarits produit de planning-core (PROJECT, REQUIREMENTS), minor
-- [ ] 59-02-PLAN.md — vague 1 : `check-prd.sh` et sa suite à mutants
-- [ ] 59-03-PLAN.md — vague 1 : redirection du head au poste product, minor de dev-orchestrator
+- [x] 59-01-PLAN.md — vague 1 : gabarits produit de planning-core (PROJECT, REQUIREMENTS), minor
+- [x] 59-02-PLAN.md — vague 1 : `check-prd.sh` et sa suite à mutants
+- [x] 59-03-PLAN.md — vague 1 : redirection du head au poste product, minor de dev-orchestrator
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 59-04-PLAN.md — vague 2 : module, visibilité par poste, manager, workers, `prd-gate`
