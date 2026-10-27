@@ -92,6 +92,9 @@
 #   T81 — #81 : doctrine d'attente des managers — scanner des blocs de code (```) des .md livrés ;
 #         boucle until/while à corps vide, sans sleep ou sans borne = rouge ; boucles de lecture exclues ;
 #         5 cas dont 3 fixtures rouges.
+#   T44 — PRDT-07 (P59-D-08, P59-PL-11) : le head lit le poste et redirige vers /vf-product ; pointeur
+#         AVANT FIRST-02 dans le garde-fou premier usage, contenu de product-routing.md, ligne de carte,
+#         index et Références ; mutants d'ablation et d'ordre.
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -7526,6 +7529,43 @@ t81_out="$(t81_scan "$T81_TMP/mut-sans-garde.md")"; t81_rc=$?
 { [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'temporisation non gardée'; } && ok "T81 mutant mission-flow.md sleep sans garde : rouge" || ko "T81 mutant sans garde : attendu — rc=1 « temporisation non gardée » ; obtenu — rc=$t81_rc : $t81_out"
 t81_out="$(t81_scan "$T81_TMP/mut-sans-borne.md")"; t81_rc=$?
 { [ "$t81_rc" -eq 1 ] && printf '%s' "$t81_out" | grep -qF 'sans borne'; } && ok "T81 mutant mission-flow.md sans TIMEOUT : rouge" || ko "T81 mutant sans TIMEOUT : attendu — rc=1 « sans borne » ; obtenu — rc=$t81_rc : $t81_out"
+# ---- T44 : redirection du head par poste (PRDT-07, P59-D-08, P59-D-20, P59-PL-11) ---------------
+# Garde la PRÉSENCE et l'ORDRE du pointeur dans le garde-fou premier usage (avant FIRST-02 : la porte
+# produit prime sur la proposition d'init), puis le contenu de product-routing.md. Une redirection
+# prouvée par présence seule ne peut pas rougir : chaque ancre a son mutant (ablation, ordre).
+T44_AG_ZS='^## Garde-fou premier usage'
+T44_AG_ZE='^## Carte d.intention'
+T44_REF="$REFS_DIR/product-routing.md"
+T44_REF_LIT=('vf-role.sh get' '/vf-product' 'Un poste est une vue, pas un droit' 'product' 'solo' 'dev' 'réitér')
+T44_REF_CODES_ZS='^## 1[.] Lire le poste'
+T44_REF_CODES_ZE='^## 2[.]'
+T44_REF_CODES=('Code 0' 'Codes 1, 5 et 64' 'vibeflow-update.sh role')
+
+t44_agent_check() { # <AGENT.md> — contrôle (a) : pointeur présent, avant FIRST-02
+  local z out; z="$(t414_zone "$1" "$T44_AG_ZS" "$T44_AG_ZE")"
+  [ -n "$z" ] || { printf 'zone « Garde-fou premier usage » introuvable ou vide'; return 1; }
+  out="$(t414_order "$z" 'product-routing.md' 'FIRST-02')" || { printf 'pointeur de poste : %s' "$out"; return 1; }
+}
+t44_ref_check() { # <product-routing.md> — contrôle (b) : contenu de la règle de redirection
+  local z zc out; z="$(t414_zone "$1" '^')"
+  [ -n "$z" ] || { printf 'product-routing.md absent ou vide'; return 1; }
+  out="$(t414_missing "$z" "${T44_REF_LIT[@]}")" || { printf 'ancres absentes de la référence : %s' "$out"; return 1; }
+  zc="$(t414_zone "$1" "$T44_REF_CODES_ZS" "$T44_REF_CODES_ZE")"
+  [ -n "$zc" ] || { printf 'section « Lire le poste » introuvable ou vide'; return 1; }
+  out="$(t414_missing "$zc" "${T44_REF_CODES[@]}")" || { printf 'codes de lecture absents de §1 : %s' "$out"; return 1; }
+}
+
+t44_out="$(t44_agent_check "$AGENT_FILE")" && ok "T44 (a) AGENT.md : pointeur product-routing.md dans le garde-fou premier usage, avant FIRST-02" \
+  || ko "T44 (a) AGENT.md : attendu — pointeur product-routing.md avant FIRST-02 ; obtenu — $t44_out"
+t44_out="$(t44_ref_check "$T44_REF")" && ok "T44 (b) product-routing.md : lecture par vf-role.sh get, codes 0/1/5/64, phrase ADR-077, demande réitérée (${#T44_REF_LIT[@]} ancres)" \
+  || ko "T44 (b) product-routing.md : attendu — règle de redirection par poste ; obtenu — $t44_out"
+
+t414_ablate "$AGENT_FILE" "$T414_TMP/t44-ptr.md" 'product-routing.md' "$T44_AG_ZS" "$T44_AG_ZE"
+t414_mutant "T44 mutant pointeur : copie d'AGENT.md privée de « product-routing.md » dans le garde-fou premier usage" t44_agent_check "$AGENT_FILE" "$T414_TMP/t44-ptr.md"
+t414_move_before "$AGENT_FILE" "$T414_TMP/t44-ord.md" "$T44_AG_ZS" 'FIRST-02' 'product-routing.md'
+t414_mutant "T44 mutant ordre : copie d'AGENT.md où la ligne FIRST-02 précède le pointeur" t44_agent_check "$AGENT_FILE" "$T414_TMP/t44-ord.md"
+t414_ablate "$T44_REF" "$T414_TMP/t44-lec.md" 'vf-role.sh get'
+t414_mutant "T44 mutant lecture : copie de product-routing.md privée de « vf-role.sh get »" t44_ref_check "$T44_REF" "$T414_TMP/t44-lec.md"
 
 # ---------------------------------------------------------------------------
 echo "== résultat : $pass OK / $fail KO / $skipped SKIP =="
