@@ -628,7 +628,7 @@ Plans:
 - [ ] 59-03-PLAN.md — vague 1 : redirection du head au poste product, minor de dev-orchestrator
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 59-04-PLAN.md — vague 2 : module, visibilité par poste, manager, workers, `prd-gate`
+- [x] 59-04-PLAN.md — vague 2 : module, visibilité par poste, manager, workers, `prd-gate`
 - [ ] 59-05-PLAN.md — vague 2 : front door, skill `/vf-product`, gabarit BRIEF, README du bundle
 
 **Wave 3** *(blocked on Wave 2 completion)*
