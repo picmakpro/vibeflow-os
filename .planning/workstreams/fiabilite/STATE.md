@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: equipe-produit-v1.0
-current_phase: 58
-current_phase_name: Rôles de poste — installeur, profils solo / product / dev
-status: complete
+current_phase: 59
+current_phase_name: Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate
+status: ready_to_execute
 last_updated: "2026-10-20T18:00:00.000Z"
-last_activity: 2026-10-22
-last_activity_desc: Phase 58 passée avec 2 overrides (critère 6 et recette installeur, Samuel 2026-10-22), branche rebasée sur v2.70.1 — next : PR + release v2.71.0, puis Phase 59
+last_activity: 2026-10-27
+last_activity_desc: Phase 59 planifiée (8 plans en 4 vagues, PRDT-01..12 posées, plan-checker sans BLOCKER) — next : exécution (exec-59), arrêt avant merge/tag/release
 state_head: 45ee80db
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 28
+  total_plans: 36
   completed_plans: 28
 milestone_name: « l'équipe produit » — Phases 57-62 —
-stopped_at: "Phase 58 passée avec 2 overrides (dette : check-livraison-58.sh clients, recette /vibeflow-install) — next : PR + release v2.71.0, puis cadrage Phase 59"
+stopped_at: "Phase 59 planifiée le 2026-10-27 (8 plans, 4 vagues) — next : execute-phase 59"
 ---
 
 # Project State
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 58 (Rôles de poste — installeur, profils solo / product / dev) — EXÉCUTÉE (12/12 plans), VÉRIFIÉE human_needed 13/14 (critère 6 en attente de la liste de clients), puis PR
+Phase: 59 (Bundle produit — front door vibeflow-product, BRIEF et juge prd-gate) — PLANIFIÉE (8 plans, 4 vagues, plan-checker sans BLOCKER) ; la Phase 58 reste close (12/12 plans)
 Jalon courant : `equipe-produit-v1.0` (Phases 57-62, inscrit 2026-10-08) ; 1 phase sur 6 close. `fiabilite-v1.0` est CLOS
 depuis le 2026-10-08 (bilan et réserves : `.planning/MILESTONES.md` § fiabilite-v1.0 ; dossiers de phase archivés sous
 `.planning/milestones/fiabilite-v1.0-phases/`, P57-D-44).

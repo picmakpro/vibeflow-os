@@ -618,11 +618,25 @@ Plans:
 **Depends on:** 58.
 **Sources:** spec §5.2 ; SEED A-05, A-06, A-10 (vocabulaire : on garde l'existant, aucun renommage) ; `plugin/business-pilot-bundle/`, `plugin/design-orchestrator/`.
 **Hors périmètre :** un fichier PRD.md séparé (A-06) ; les termes « epic » et « story » (Q-11, fermée par doctrine).
-**Plans:** 0 plans
+**Plans:** 8 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 59 to break down)
+**Wave 1**
+- [ ] 59-01-PLAN.md — vague 1 : gabarits produit de planning-core (PROJECT, REQUIREMENTS), minor
+- [ ] 59-02-PLAN.md — vague 1 : `check-prd.sh` et sa suite à mutants
+- [ ] 59-03-PLAN.md — vague 1 : redirection du head au poste product, minor de dev-orchestrator
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 59-04-PLAN.md — vague 2 : module, visibilité par poste, manager, workers, `prd-gate`
+- [ ] 59-05-PLAN.md — vague 2 : front door, skill `/vf-product`, gabarit BRIEF, README du bundle
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 59-06-PLAN.md — vague 3 : suite du bundle, baselines, compteurs des README racine
+- [ ] 59-07-PLAN.md — vague 3 : manuel FR et EN
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 59-08-PLAN.md — vague 4 : porte de phase rejouée depuis `ci.yml`, ledger à la main
 
 ### Phase 60: Gate architecture avant découpage et validation des phases proposées
 
