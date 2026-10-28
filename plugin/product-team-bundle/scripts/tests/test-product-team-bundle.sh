@@ -39,7 +39,13 @@ TMPW="$TMP/w.out"
 AGENTS="vf-product-manager vf-product-analyst vf-product-pm prd-gate"
 CORPUS="AGENT.md agents/vf-product-manager.md agents/vf-product-analyst.md agents/vf-product-pm.md agents/prd-gate.md"
 
+# Disposition : DÉPÔT (le module est un dossier complet : AGENT.md, module.json, VERSION) ou LAB (suite posée à
+# plat sous .claude/scripts/tests/ par l'installeur : le module n'existe plus comme dossier). Les contrôles qui
+# lisent le module entier ou les dossiers voisins du dépôt sont sautés AUDIBLEMENT en lab (SKIP compté, jamais OK).
+if [ -f "$MOD/module.json" ] && [ -f "$MOD/AGENT.md" ]; then LAB=0; else LAB=1; fi
+
 echo "== test-product-team-bundle (module: $MOD) =="
+[ "$LAB" = 1 ] && echo "  (disposition lab : contrôles propres au dépôt sautés — composition du module, lignes, front matter AGENT.md, noms, gabarits)"
 
 # --- Outils de mutation (aucune écriture hors de $TMP)
 has() { "$GREP" -qF -- "$2" "$1"; }                       # fichier, motif fixe
@@ -132,26 +138,32 @@ ctl_lignes() {
 }
 
 # --- PTB-COMPO / PTB-MODULE / PTB-LIGNES — cas directs puis mutants
-case_ctl "PTB-COMPO : fichiers, frontmatters (description/model/memory) et noms du module" ctl_compo "$MOD"
-case_ctl "PTB-MODULE : version=VERSION, proposable:false, roles=[product], requires fermé" ctl_module "$MOD"
-case_ctl "PTB-LIGNES : corpus <= 250 lignes, skill <= 500 (P59-D-12)" ctl_lignes "$MOD"
+if [ "$LAB" = 1 ]; then
+  skip "PTB-COMPO disposition lab : le module n'est pas un dossier complet (contrôle propre au dépôt)"
+  skip "PTB-MODULE disposition lab : module.json et VERSION ne sont pas posés (contrôle propre au dépôt)"
+  skip "PTB-LIGNES disposition lab : corpus non regroupé sous la racine du module (contrôle propre au dépôt)"
+else
+  case_ctl "PTB-COMPO : fichiers, frontmatters (description/model/memory) et noms du module" ctl_compo "$MOD"
+  case_ctl "PTB-MODULE : version=VERSION, proposable:false, roles=[product], requires fermé" ctl_module "$MOD"
+  case_ctl "PTB-LIGNES : corpus <= 250 lignes, skill <= 500 (P59-D-12)" ctl_lignes "$MOD"
 
-M="$(mkmut compo)"; dropline "$M/agents/vf-product-analyst.md" "memory:"
-mutant_ptb COMPO-MEMORY "KO-COMPO:vf-product-analyst sans memory" ctl_compo "$MOD" "$M"
+  M="$(mkmut compo)"; dropline "$M/agents/vf-product-analyst.md" "memory:"
+  mutant_ptb COMPO-MEMORY "KO-COMPO:vf-product-analyst sans memory" ctl_compo "$MOD" "$M"
 
-M="$(mkmut proposable)"; jq '.proposable = true' "$M/module.json" > "$TMPW" && cp "$TMPW" "$M/module.json"
-mutant_ptb MODULE-PROPOSABLE "KO-MODULE:proposable" ctl_module "$MOD" "$M"
+  M="$(mkmut proposable)"; jq '.proposable = true' "$M/module.json" > "$TMPW" && cp "$TMPW" "$M/module.json"
+  mutant_ptb MODULE-PROPOSABLE "KO-MODULE:proposable" ctl_module "$MOD" "$M"
 
-M="$(mkmut roles)"; jq 'del(.roles)' "$M/module.json" > "$TMPW" && cp "$TMPW" "$M/module.json"
-mutant_ptb MODULE-ROLES "KO-MODULE:roles" ctl_module "$MOD" "$M"
+  M="$(mkmut roles)"; jq 'del(.roles)' "$M/module.json" > "$TMPW" && cp "$TMPW" "$M/module.json"
+  mutant_ptb MODULE-ROLES "KO-MODULE:roles" ctl_module "$MOD" "$M"
 
-M="$(mkmut requires)"; jq '.requires += ["design-orchestrator"]' "$M/module.json" > "$TMPW" && cp "$TMPW" "$M/module.json"
-mutant_ptb MODULE-REQUIRES "KO-MODULE:requires" ctl_module "$MOD" "$M"
+  M="$(mkmut requires)"; jq '.requires += ["design-orchestrator"]' "$M/module.json" > "$TMPW" && cp "$TMPW" "$M/module.json"
+  mutant_ptb MODULE-REQUIRES "KO-MODULE:requires" ctl_module "$MOD" "$M"
 
-M="$(mkmut lignes)"
-n="$(wc -l < "$M/agents/prd-gate.md" | tr -d ' ')"
-awk -v k="$((251 - n))" '{ print } END { for (i = 0; i < k; i++) print "<!-- mutant -->" }' "$M/agents/prd-gate.md" > "$TMPW" && cp "$TMPW" "$M/agents/prd-gate.md"
-mutant_ptb LIGNES-251 "KO-LIGNES:agents/prd-gate.md 251 >250" ctl_lignes "$MOD" "$M"
+  M="$(mkmut lignes)"
+  n="$(wc -l < "$M/agents/prd-gate.md" | tr -d ' ')"
+  awk -v k="$((251 - n))" '{ print } END { for (i = 0; i < k; i++) print "<!-- mutant -->" }' "$M/agents/prd-gate.md" > "$TMPW" && cp "$TMPW" "$M/agents/prd-gate.md"
+  mutant_ptb LIGNES-251 "KO-LIGNES:agents/prd-gate.md 251 >250" ctl_lignes "$MOD" "$M"
+fi
 
 CHECK_AGENTS=""
 for cand in "$REPO/conductor/scripts/check-agents.sh" "$HOME/.claude/scripts/check-agents.sh"; do
@@ -205,6 +217,10 @@ seuil-verdict|score ≥ 80/100, `eliminatoire: false`
 seuil-sous|score < 80
 next_step_propose|next_step_propose
 jamais-lance|jamais lancé
+vert-juge|Un vert ne vient que de `prd-gate`
+halte-humaine|Sous le seuil, halte humaine
+pas-de-passage-de-main|ni relance silencieuse, ni passage de main au head
+aucun-passage-de-main|Aucun passage de main au head
 override|override'
 
 # anchors <CAS> <fichier> <liste> : toutes les ancres de la liste doivent figurer dans le fichier.
@@ -304,16 +320,20 @@ else
   M="$(mkmut i2)"; subst "$M/agents/vf-product-manager.md" ", prd-gate)" ")" "tools:"
   mutant_ptb AGENTS-I2 "invariant I2" ctl_agents "$MOD" "$M"
 
-  case_ctl "PTB-FRONT : check-agents --file AGENT.md rend 0 avec exactement 3 avertissements nommés" ctl_front "$MOD"
+if [ "$LAB" = 1 ]; then
+  skip "PTB-FRONT disposition lab : AGENT.md est posé sous agents/product-team-bundle.md (contrôle propre au dépôt)"
+else
+    case_ctl "PTB-FRONT : check-agents --file AGENT.md rend 0 avec exactement 3 avertissements nommés" ctl_front "$MOD"
 
-  M="$(mkmut front)"
-  awk '{ print } !d && /^memory:/ { print "tools: Read"; d = 1 }' "$M/AGENT.md" > "$TMPW" && cp "$TMPW" "$M/AGENT.md"
-  mutant_ptb FRONT-TOOLS "KO-FRONT:avertissement tools absent" ctl_front "$MOD" "$M"
+    M="$(mkmut front)"
+    awk '{ print } !d && /^memory:/ { print "tools: Read"; d = 1 }' "$M/AGENT.md" > "$TMPW" && cp "$TMPW" "$M/AGENT.md"
+    mutant_ptb FRONT-TOOLS "KO-FRONT:avertissement tools absent" ctl_front "$MOD" "$M"
 
-  # Un champ inconnu ajoute un 4e avertissement : le COMPTE change (même falsification que T20 du head).
-  M="$(mkmut frontchamp)"
-  awk '{ print } !d && /^memory:/ { print "champ-inconnu: x"; d = 1 }' "$M/AGENT.md" > "$TMPW" && cp "$TMPW" "$M/AGENT.md"
-  mutant_ptb FRONT-COMPTE "KO-FRONT:rc=0 avertissements=4" ctl_front "$MOD" "$M"
+    # Un champ inconnu ajoute un 4e avertissement : le COMPTE change (même falsification que T20 du head).
+    M="$(mkmut frontchamp)"
+    awk '{ print } !d && /^memory:/ { print "champ-inconnu: x"; d = 1 }' "$M/AGENT.md" > "$TMPW" && cp "$TMPW" "$M/AGENT.md"
+    mutant_ptb FRONT-COMPTE "KO-FRONT:rc=0 avertissements=4" ctl_front "$MOD" "$M"
+fi
 fi
 
 # --- PTB-JUGE / PTB-MANAGER / PTB-BLOC / PTB-SKILL / PTB-NOMS — clauses de seuil et doctrine
@@ -325,6 +345,12 @@ sweep JUGE ctl_juge agents/prd-gate.md "$JUGE_ANCHORS"
 case_ctl "PTB-MANAGER : verrou, DIGEST, human_needed sous le seuil, proposition jamais lancée, override tracé" ctl_manager "$MOD"
 sweep MANAGER ctl_manager agents/vf-product-manager.md "$MANAGER_ANCHORS"
 
+# PRDT-06 : inversion de la clause de halte et de l'interdiction de passage de main (pas seulement leur ablation).
+M="$(mkmut halte)"; subst "$M/agents/vf-product-manager.md" "Sous le seuil, halte humaine" "Sous le seuil, relance libre"
+mutant_ptb MANAGER-HALTE-INVERSEE "KO-MANAGER:halte-humaine" ctl_manager "$MOD" "$M"
+M="$(mkmut passage)"; subst "$M/agents/vf-product-manager.md" "ni relance silencieuse, ni passage de main au head" "puis relance silencieuse, puis passage de main au head"
+mutant_ptb MANAGER-PASSAGE-INVERSE "KO-MANAGER:pas-de-passage-de-main" ctl_manager "$MOD" "$M"
+
 case_ctl "PTB-BLOC : bloc typé passed|gaps_found|human_needed|blocked dans les quatre agents" ctl_bloc "$MOD"
 M="$(mkmut bloc)"; subst "$M/agents/vf-product-analyst.md" "passed|gaps_found|human_needed|blocked" "ok|ko"
 mutant_ptb BLOC-ANALYSTE "KO-BLOC:vf-product-analyst" ctl_bloc "$MOD" "$M"
@@ -333,11 +359,15 @@ case_ctl "PTB-SKILL : /vf-product incarne vibeflow-product, jamais dispatché en
 M="$(mkmut skill)"; subst "$M/skills/vf-product/SKILL.md" "jamais dispatché en" "dispatché en"
 mutant_ptb SKILL-JAMAIS-TASK "KO-SKILL:jamais" ctl_skill "$MOD" "$M"
 
-case_ctl "PTB-NOMS : aucune marque protégée dans les noms, aucun terme de découpage agile exclu (Q-11)" ctl_noms "$MOD"
-M="$(mkmut nagile)"; printf '\nLe découpage en epic puis en story est exclu.\n' >> "$M/agents/vf-product-pm.md"
-mutant_ptb NOMS-AGILE "KO-NOMS:agile" ctl_noms "$MOD" "$M"
-M="$(mkmut nmarque)"; subst "$M/agents/vf-product-pm.md" "name: vf-product-pm" "name: bmad-pm" "name:"
-mutant_ptb NOMS-MARQUE "KO-NOMS:marque dans un champ name:" ctl_noms "$MOD" "$M"
+if [ "$LAB" = 1 ]; then
+  skip "PTB-NOMS disposition lab : balayage du module entier et des gabarits de planning-core impossible (contrôle propre au dépôt)"
+else
+  case_ctl "PTB-NOMS : aucune marque protégée dans les noms, aucun terme de découpage agile exclu (Q-11)" ctl_noms "$MOD"
+  M="$(mkmut nagile)"; printf '\nLe découpage en epic puis en story est exclu.\n' >> "$M/agents/vf-product-pm.md"
+  mutant_ptb NOMS-AGILE "KO-NOMS:agile" ctl_noms "$MOD" "$M"
+  M="$(mkmut nmarque)"; subst "$M/agents/vf-product-pm.md" "name: vf-product-pm" "name: bmad-pm" "name:"
+  mutant_ptb NOMS-MARQUE "KO-NOMS:marque dans un champ name:" ctl_noms "$MOD" "$M"
+fi
 
 # --- PTB-GABARITS / PTB-GSD / PTB-CATALOG — preuves croisées (gabarits <-> script, gabarit <-> moteur, filtre)
 REQ_TPL="$REPO/planning-core/references/templates/product/REQUIREMENTS.template.md"
@@ -412,7 +442,9 @@ ctl_catalog() { # <racine de module>
   return $r
 }
 
-if [ ! -f "$REQ_TPL" ] || [ ! -f "$BRIEF_TPL" ]; then
+if [ "$LAB" = 1 ]; then
+  skip "PTB-GABARITS disposition lab : gabarits non posés à cet endroit (contrôle propre au dépôt)"
+elif [ ! -f "$REQ_TPL" ] || [ ! -f "$BRIEF_TPL" ]; then
   ko "PTB-GABARITS gabarit introuvable ($REQ_TPL ou $BRIEF_TPL)"
 else
   if run_ctl ctl_gab_req "$REQ_TPL"; then ok "PTB-GABARITS : REQUIREMENTS produit brut -> check-prd 1, rempli -> 0"; else ko "PTB-GABARITS requirements — $(brief)"; fi
