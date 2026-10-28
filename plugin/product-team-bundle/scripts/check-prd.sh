@@ -20,29 +20,39 @@
 # tube qui masquerait le code ; le script porte seul la sémantique de son code ; aucun hook.
 #
 # Éliminatoire 1 : une exigence `- [ ] **ID**: ...` sans critère d'acceptation utilisable. Le
-# critère est une ligne (celle de l'exigence ou une continuation indentée) `Acceptation :` suivie
-# d'une valeur qui ne commence pas par `[` ou `<`, sans marqueur de remplissage en mot entier (TBD,
-# TODO, TBA, FIXME, n/a, « à définir », « à préciser », « à compléter », « à venir », « à déterminer »,
-# « à remplir », « à renseigner », « à confirmer », « à décider » ; casse et accents indifférents, y compris
-# les marques combinantes), sans trois points ni points de suspension, d'au moins 10 CARACTÈRES non
-# blancs (UTF-8 compté en caractères, en awk pur sous LC_ALL=C : aucune locale UTF-8 requise). La
-# qualité « testable » du critère reste au juge. Les blocs de code et les commentaires HTML sont
-# ignorés (un commentaire multi-ligne au milieu d'une exigence ne la ferme pas). Une puce, même
-# indentée, ouvre un nouvel élément : elle ne porte pas le critère de l'exigence qui précède.
-# Bloc de code non fermé en fin de fichier : les exigences suivantes sont illisibles pour le gate,
-# donc INDÉTERMINÉ (code 3). Ligne à case `[ ]`/`[x]` qui n'a pas la forme d'exigence (ID pointé,
-# minuscules, puce `*`, numérotée) : AVERTISSEMENT par numéro de ligne (stdout et stderr), jamais
-# réimprimée ; l'effet sur le code reste nul, le BILAN la compte (`non_reconnues`).
-# Éliminatoire 2 : une rubrique du BRIEF manque ou n'a aucune ligne de corps (hors commentaire
-# HTML, hors ligne commençant par `[`, hors TBD/TODO) : probleme, utilisateurs, valeur,
-# contraintes, hors_perimetre (titres Markdown reconnus par préfixe ASCII, casse indifférente).
+# critère est un CHAMP `Acceptation :` (ou `Critère d'acceptation :`, casse indifférente, blanc ou
+# espace insécable admis avant les deux-points) : en début de ligne de continuation indentée, ou sur la
+# ligne de l'exigence après une ponctuation de phrase ; le mot « acceptation » au fil d'une phrase
+# n'est pas un champ. Sa valeur est utilisable si, marques de mise en forme en tête retirées (puce,
+# citation, emphase, code, guillemets, soulignés) et blancs Unicode ramenés à l'espace (largeur nulle
+# ignorée), elle ne commence pas par `[` ou `<`, n'est pas vide, ne porte ni trois points ni points de
+# suspension, ne porte aucun marqueur de remplissage et compte au moins 10 CARACTÈRES non blancs (UTF-8
+# compté en caractères, en awk pur sous LC_ALL=C : aucune locale UTF-8 requise). Marqueurs FORTS (en
+# mot entier, partout dans la valeur) : TBD, TBA, FIXME, n/a, « à définir », « à préciser », « à compléter »,
+# « à déterminer », « à remplir », « à renseigner », « à confirmer », « à décider » ; marqueurs FAIBLES, mots
+# légitimes en phrase : TODO et « à venir », rouges seulement ISOLÉS (en début ou fin de valeur, ou collés à
+# une ponctuation), verts au sein d'une phrase (« la todo list affiche dix éléments »). Casse et accents
+# indifférents, marques combinantes comprises. Faux rouge ASSUMÉ, plutôt qu'un faux vert : un faible isolé
+# dans une phrase légitime (« les évolutions à venir. »). La qualité « testable » reste au juge. Les blocs de
+# code et les commentaires HTML sont ignorés (un commentaire multi-ligne, lignes blanches comprises, au
+# milieu d'une exigence ne la ferme pas). Une puce, même indentée, ouvre un nouvel élément : elle ne porte
+# pas le critère de l'exigence qui précède. Fins de ligne CRLF et CR seules traitées comme des fins de ligne.
+# Bloc de code OU commentaire HTML non fermé en fin de fichier (exigences ou rubriques) : la suite est
+# illisible pour le gate, donc INDÉTERMINÉ (code 3). Ligne à case `[ ]`/`[x]` qui n'a pas la forme
+# d'exigence (ID pointé, minuscules, puce `*`, numérotée) : AVERTISSEMENT par numéro de ligne (stdout et
+# stderr), jamais réimprimée ; l'effet sur le code reste nul, le BILAN la compte (`non_reconnues`).
+# Éliminatoire 2 : une rubrique du BRIEF manque ou n'a aucune ligne de corps (hors commentaire HTML,
+# hors ligne de remplissage selon la MÊME règle que les critères : entre crochets ou chevrons après
+# puce/citation/emphase, points de suspension, marqueurs ci-dessus ; sans seuil de longueur) :
+# probleme, utilisateurs, valeur, contraintes, hors_perimetre (titres Markdown reconnus par préfixe
+# ASCII, casse indifférente).
 # Avertissement (jamais d'effet sur le code) : priorité absente ou hors {must, should, could}.
-#
+
 # Codes de sortie (chacun énuméré, aucun implicite) :
 #   0 = conforme : aucun éliminatoire et au moins une exigence lue si --requirements est fourni.
 #   1 = éliminatoire : exigence sans critère utilisable, ou rubrique du BRIEF absente ou vide.
-#   3 = INDÉTERMINÉ : cible absente, zéro exigence détectée, ou bloc de code non fermé en fin de
-#       fichier. Jamais un vert à vide.
+#   3 = INDÉTERMINÉ : cible absente, zéro exigence détectée, ou bloc de code / commentaire HTML non
+#       fermé en fin de fichier. Jamais un vert à vide.
 #   5 = entrée illisible, BRUYANTE : lien symbolique, non régulier (FIFO, dossier), illisible,
 #       taille non numérique, au-delà de 1048576 octets, analyse en échec. Refus AVANT lecture.
 #   64 = erreur d'usage (aucune entrée, option inconnue ou sans valeur).
@@ -65,6 +75,7 @@ REQ=""; BRIEF=""; HAS_REQ=0; HAS_BRIEF=0
 NL=$'\n'
 BOM=$(printf '\357\273\277')
 ELL=$(printf '\342\200\246')
+CR=$(printf '\r')
 
 usage_err() { printf '[check-prd] %s\n' "$1" >&2; exit 64; }
 say() { printf '[check-prd] %s\n' "$*"; }
@@ -112,18 +123,56 @@ function fold(s) {
   gsub(/î|Î|ï|Ï/, "i", s); gsub(/ô|Ô/, "o", s); gsub(/ù|Ù|û|Û/, "u", s); gsub(/ç|Ç/, "c", s)
   return s
 }
-# Caractères non blancs : octets de continuation UTF-8 (0x80-0xBF) et marques combinantes retirés.
+# Caractères non blancs (valeur déjà normalisée par lead) : octets de continuation UTF-8 (0x80-0xBF) et marques combinantes retirés.
 function nchars(s) {
   gsub(/[ \t]/, "", s)
   gsub(/\314[\200-\277]/, "", s); gsub(/\315[\200-\257]/, "", s)
   gsub(/[\200-\277]/, "", s)
   return length(s)
 }
-function isfiller(v,   t, i, n, F) {
-  t = fold(v)
-  n = split("tbd|todo|tba|fixme|n/a|a definir|a preciser|a completer|a venir|a determiner|a remplir|a renseigner|a confirmer|a decider", F, "|")
-  for (i = 1; i <= n; i++) if (hasword(t, F[i])) return 1
+# Largeur nulle retirée, blancs Unicode (insécables, fines, ID, etc.) ramenés à l'espace simple.
+function norm(s) {
+  gsub(/\342\200[\213-\217]|\342\201\240|\357\273\277|\302\255|\341\240\216/, "", s)
+  gsub(/\302\240|\342\200[\200-\212]|\342\200[\250\251]|\342\200\257|\342\201\237|\343\200\200|\341\232\200/, " ", s)
+  return s
+}
+# Marques de mise en forme et de liste en tête (puce, citation, emphase, code, guillemets) retirées.
+function lead(v) {
+  v = norm(v)
+  while (v != "" && match(v, /^([ \t*_`"'>+#~=|-]|\302\253|\342\200[\230\234]|\342\200\242)/)) v = substr(v, RLENGTH + 1)
+  return v
+}
+# Marqueur « faible » (todo, à venir) : mot légitime dans une phrase, rouge seulement s'il est isolé
+# (début, fin, ou collé à une ponctuation) ; au sein d'une phrase de mots, il reste vert.
+function isolated(t, w,   p, off, pre, post) {
+  off = 0
+  while ((p = index(substr(t, off + 1), w)) > 0) {
+    p += off
+    pre = substr(t, 1, p - 1); post = substr(t, p + length(w))
+    if (pre !~ /[a-z0-9_]$/ && post !~ /^[a-z0-9_]/) {
+      sub(/[ \t]+$/, "", pre); sub(/^[ \t]+/, "", post)
+      if (pre == "" || pre !~ /[a-z0-9]$/ || post == "" || post !~ /^[a-z0-9]/) return 1
+    }
+    off = p
+  }
   return 0
+}
+function fillword(t,   i, n, S, W) {
+  n = split("tbd|tba|fixme|n/a|a definir|a preciser|a completer|a determiner|a remplir|a renseigner|a confirmer|a decider", S, "|")
+  for (i = 1; i <= n; i++) if (hasword(t, S[i])) return 1
+  n = split("todo|a venir", W, "|")
+  for (i = 1; i <= n; i++) if (isolated(t, W[i])) return 1
+  return 0
+}
+# Règle de remplissage UNIQUE (critères d'acceptation ET corps de rubrique du BRIEF) : valeur vide, entre
+# crochets ou chevrons (après marques de mise en forme), points de suspension, ou marqueur de remplissage.
+function isfill(v,   c) {
+  v = lead(v)
+  if (v == "") return 1
+  c = substr(v, 1, 1)
+  if (c == "[" || c == "<") return 1
+  if (index(v, "...") || index(v, ell)) return 1
+  return fillword(fold(v))
 }
 function strip_comments(s,   a, b) {
   if (incom) {
@@ -142,19 +191,28 @@ AWKEOF
 
 # --- Exigences : un enregistrement par ligne, tout est imprimé par awk, dernière ligne `@ n s a`.
 read -r -d '' AWK_REQ <<'AWKEOF'
-function usable(v,   c) {
-  c = substr(v, 1, 1)
-  if (c == "[" || c == "<") return 0
-  if (isfiller(v)) return 0
-  if (index(v, "...") || index(v, ell)) return 0
+function usable(v) {
+  v = lead(v)
+  if (isfill(v)) return 0
   if (nchars(v) < 10) return 0
   return 1
 }
-function scan(s,   v, w) {
-  if (match(s, /[Aa]cceptation[ \t]*:/)) {
-    v = trim(substr(s, RSTART + RLENGTH))
-    if (usable(v)) hascrit = 1
+# Critère : seulement comme CHAMP (début de ligne après indentation/marques, ou après une ponctuation de
+# phrase sur la ligne de l'exigence), avec ou sans « Critère d' », casse indifférente, blanc avant les deux-points.
+function critval(s,   low, p, off, pre, rest) {
+  s = norm(s); low = tolower(s); off = 0
+  while ((p = index(substr(low, off + 1), "acceptation")) > 0) {
+    p += off
+    pre = substr(low, 1, p - 1); rest = substr(s, p + 11)
+    if (pre ~ /(^|[:.;|!?)])[ \t*_]*(crit[^ \t]*[ \t]+d('|\342\200\231)[ \t]*)?$/ && match(rest, /^[ \t]*[*_]*[ \t]*:/)) {
+      if (usable(substr(rest, RLENGTH + 1))) return 1
+    }
+    off = p
   }
+  return 0
+}
+function scan(s,   v, w) {
+  if (critval(s)) hascrit = 1
   if (prio == "" && match(s, /(^|[^A-Za-z])[Pp]riorit[^:]*:/)) {
     v = trim(substr(s, RSTART + RLENGTH))
     sub(/^[*`_ \t]+/, "", v)
@@ -183,8 +241,8 @@ function close_block() {
   line = $0
   if (NR == 1 && substr(line, 1, 3) == bom) line = substr(line, 4)
   if (!infence) {
-    pre = line; line = strip_comments(line)
-    if (line ~ /^[ \t]*$/ && pre !~ /^[ \t]*$/) next
+    inc0 = incom; pre = line; line = strip_comments(line)
+    if (line ~ /^[ \t]*$/ && (pre !~ /^[ \t]*$/ || inc0)) next
   }
   t = line; sub(/^[ \t]+/, "", t)
   f3 = substr(t, 1, 3)
@@ -207,7 +265,7 @@ function close_block() {
   if (line ~ /^[ \t]*$/ || line ~ /^#/ || line ~ /^[ \t]*([-*+]|[0-9]+\.)[ \t]/ || line !~ /^[ \t]/) { close_block(); next }
   scan(line)
 }
-END { close_block(); printf "@ %d %d %d %d %d\n", nreq + 0, nsans + 0, nav + 0, nunk + 0, infence + 0 }
+END { close_block(); printf "@ %d %d %d %d %d %d\n", nreq + 0, nsans + 0, nav + 0, nunk + 0, infence + 0, incom + 0 }
 AWKEOF
 
 # --- BRIEF : cinq rubriques, chacune avec au moins une ligne de corps ; dernière ligne `@ m`.
@@ -237,9 +295,7 @@ read -r -d '' AWK_BRIEF <<'AWKEOF'
     next
   }
   if (cur == "" || t == "") next
-  if (substr(t, 1, 1) == "[") next
-  if (hasword(tolower(t), "tbd") || hasword(tolower(t), "todo")) next
-  if (t !~ /[^-*_=|#> \t]/) next
+  if (isfill(t)) next
   body[cur]++
 }
 END {
@@ -249,7 +305,7 @@ END {
     if (!(k in seen)) { m++; printf "[check-prd] ELIMINATOIRE rubrique BRIEF %s : absente\n", k }
     else if (body[k] + 0 == 0) { m++; printf "[check-prd] ELIMINATOIRE rubrique BRIEF %s : vide\n", k }
   }
-  printf "@ %d\n", m + 0
+  printf "@ %d %d %d\n", m + 0, infence + 0, incom + 0
 }
 AWKEOF
 
@@ -281,7 +337,7 @@ guard() { # <entree> <chemin>
 
 # Analyse : $OUT_TXT = sortie d'awk ; le code rendu est celui du tube (tr | awk) sous pipefail.
 analyse() { # <chemin> <programme>
-  OUT_TXT=$(tr -d '\r' < "$1" | awk -v bom="$BOM" -v ell="$ELL" "$AWK_LIB$NL$2")
+  OUT_TXT=$(sed "s/$CR\$//" "$1" | tr '\r' '\n' | awk -v bom="$BOM" -v ell="$ELL" "$AWK_LIB$NL$2")
 }
 # Sépare les lignes imprimées de la ligne de compteurs ; imprime les premières, range la seconde.
 split_out() {
@@ -302,10 +358,13 @@ if [ "$HAS_REQ" -eq 1 ] && guard exigences "$REQ"; then
     illisible exigences "analyse en echec"
   else
     set -- $LAST
-    NREQ=$2; NSANS=$3; NAV=$4; NUNK=$5; NFENCE=$6
+    NREQ=$2; NSANS=$3; NAV=$4; NUNK=$5; NFENCE=$6; NCOM=$7
     printf '%s\n' "$OUT_TXT" | command grep -F 'AVERTISSEMENT ligne ' >&2
     if [ "$NFENCE" -ne 0 ]; then
       indetermine exigences "bloc de code non ferme en fin de fichier (exigences suivantes non lues)"
+    fi
+    if [ "$NCOM" -ne 0 ]; then
+      indetermine exigences "commentaire HTML non ferme en fin de fichier (exigences suivantes non lues)"
     fi
     if [ "$NREQ" -eq 0 ]; then
       indetermine exigences "aucune exigence detectee (forme attendue - [ ] **ID**: ...)"
@@ -328,6 +387,12 @@ if [ "$HAS_BRIEF" -eq 1 ] && guard brief "$BRIEF"; then
   else
     set -- $LAST
     NMANQ=$2
+    if [ "$3" -ne 0 ]; then
+      indetermine brief "bloc de code non ferme en fin de fichier (rubriques suivantes non lues)"
+    fi
+    if [ "$4" -ne 0 ]; then
+      indetermine brief "commentaire HTML non ferme en fin de fichier (rubriques suivantes non lues)"
+    fi
     if [ "$NMANQ" -gt 0 ]; then bump 1; fi
   fi
 fi
