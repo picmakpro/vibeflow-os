@@ -509,34 +509,35 @@ côté head (A1, `head-governance.md`).
 
 `SEUIL_EQUIPE = 3` — N = étapes restantes ciblées, comptées via `gsd-tools roadmap analyze`.
 
-Résolution — cascade de résolution, jamais un chemin en dur (D1 ; forme **dérivée**, pas reprise
-telle quelle, de `gsd-core/workflows/_runtime-launcher.snippet.sh`, gsd-core 1.9.0 — divergences
-listées en D5 ci-dessous) :
-```sh
-GSD_TOOLS="${GSD_TOOLS:-}"
-if   [ -n "$GSD_TOOLS" ] && [ -f "$GSD_TOOLS" ]; then gsd_run() { node "$GSD_TOOLS" "$@"; }
-elif [ -f "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs" ]; then
-     GSD_TOOLS="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs"
-     gsd_run() { node "$GSD_TOOLS" "$@"; }
-elif command -v gsd-tools >/dev/null 2>&1; then GSD_TOOLS="$(command -v gsd-tools)"; gsd_run() { "$GSD_TOOLS" "$@"; }
-else echo "ERROR: gsd-tools.cjs introuvable. Installer : npx -y "@opengsd/gsd-core@^1" --claude --global" >&2; exit 1; fi
-```
-`gsd_run roadmap analyze` remplace l'ancien appel direct. **Prérequis non garanti** : si
-`gsd_run` ne peut pas se résoudre (bloc `else` ci-dessus), fallback documenté — compter les cases
-non cochées du périmètre dans `.planning/ROADMAP.md` : `grep -c '^- \[ \]'` ou équivalent ; jamais
-de blocage silencieux sur l'outil manquant.
+Résolution — un script livré, jamais un chemin en dur ni un nom nu (D1) : `"$S"/gsd-run.sh`
+(`scripts/gsd-run.sh`, posé à plat avec les autres scripts du module ; `$S` : cascade du manager,
+`mission-flow.md` §Résolution). `gsd_run` n'est PAS un binaire : c'est une fonction du préambule
+des workflows amont, absente du bash d'un agent (issue #47). Forme **dérivée**, pas reprise telle
+quelle, de `gsd-core/workflows/_runtime-launcher.snippet.sh` (gsd-core 1.9.0 ; divergences en D5).
+Cascade, premier existant parmi : (1) `$GSD_TOOLS` (fichier régulier non vide) ; (2)
+`./.claude/gsd-core/bin/gsd-tools.cjs` (scope projet) ; (3)
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/gsd-core/bin/gsd-tools.cjs` (scope user) ; (4) `command -v
+gsd-tools` en dernier. Les arguments sont transmis tels quels (`--ws <nom>` compris). Sortie : le
+code de l'outil s'il a tourné ; **64 = défaut d'outillage** (aucun candidat, ou `node` absent), avec
+sur stderr les candidats essayés et `npx -y "@opengsd/gsd-core@^1" --claude --local|--global`.
+
+`"$S"/gsd-run.sh roadmap analyze` remplace l'ancien appel direct. **Prérequis non garanti** : si
+le script rend 64, fallback documenté — compter les cases non cochées du périmètre dans
+`.planning/ROADMAP.md` : `grep -c '^- \[ \]'` ou équivalent ; jamais de blocage silencieux sur
+l'outil manquant. (Le reset des flags d'enchaînement du manager, lui, ne se replie pas : un 64 y est
+un `human_needed`, `vf-dev-manager.md` point 5.)
 
 **Test du succès sur le JSON, jamais sur `$?` (D2)** : `gsd-tools` sort exit 0 même en erreur
-métier. Le fallback grep ci-dessus se déclenche donc aussi si la sortie JSON de `gsd_run roadmap
+métier. Le fallback grep ci-dessus se déclenche donc aussi si la sortie JSON de `"$S"/gsd-run.sh roadmap
 analyze` contient un champ `.error` — pas seulement si le binaire est introuvable. Ne jamais tester
 uniquement le code de sortie du processus.
 
 **Rester sur le dist-tag stable, jamais le canal de pré-version amont (D4)** : le canal de
-pré-version est périmé (1.7.0-rc.6, antérieur au tag stable = 1.9.0) — n'utiliser que `@latest`
-dans le message d'erreur ci-dessus et partout ailleurs dans ce document.
+pré-version est périmé (1.7.0-rc.6, antérieur au tag stable = 1.9.0) — ne viser que le dist-tag
+stable (`@^1`, jamais `@next`) dans le message d'erreur du script et partout ailleurs dans ce document.
 
 Écarts assumés vs le snippet officiel amont (D5) : (a) les runtimes non-Claude du snippet sont
-retirés (VibeFlow est un plugin Claude Code) ; (b) `command -v gsd-tools` est placé après les
+retirés (VibeFlow est un plugin Claude Code) ; (b) le scope projet précède le scope user, et `command -v gsd-tools` est placé après les
 chemins fichiers (le payload installé prime sur un bin npm global potentiellement d'une autre
 version) — **divergence connue** : `dag.sh` (`resolve_gsd_tools_cmd()`, ~l. 129-138) place `PATH`
 *avant* `CLAUDE_CONFIG_DIR`, ordre inverse de cette cascade-ci ; sur un poste où plusieurs versions
@@ -544,7 +545,10 @@ sont installées, le manager (shell) et `dag.sh` (Python) peuvent donc résoudre
 différents pour « la même » cascade — aucun des deux ordres n'est corrigé ici, seule la divergence
 est actée ; (c) ce document n'écrit jamais dans `CLAUDE_ENV_FILE` ; (d) **aucun candidat dérivé
 d'une racine de dépôt** (`git rev-parse --show-toplevel`, `pwd`, ou toute variable qui en hérite,
-p. ex. l'ancien `_GSD_ROOT`) — un tel candidat résout un chemin **tracké dans l'arbre de travail
+p. ex. l'ancien `_GSD_ROOT`), **sauf le `.claude/gsd-core` du lab, accepté** (borné : même
+frontière de confiance que `./.claude/scripts`, que le manager exécute déjà via `$S` ; sans lui, un
+lab en scope projet n'a aucune résolution et la mission ne peut jamais démarrer ; ancré au CWD, sans
+`git rev-parse` ni repli) — la racine **nue** `<racine>/gsd-core` (sans `.claude/`) reste exclue : un tel candidat résout un chemin **tracké dans l'arbre de travail
 courant**, donc posable par quiconque peut y écrire un fichier (checkout d'une branche ou d'une PR
 hostile). `git rev-parse --show-toplevel` n'est **pas** une frontière de confiance : c'est un autre
 chemin dérivé de l'endroit où l'on se trouve, et son repli `|| pwd` retombait littéralement sur le
