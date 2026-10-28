@@ -15,7 +15,7 @@ A Claude Code plugin for spec-driven agentic development. One agent reads your i
 of agents challenges, plans, builds and proves the work, and machine gates check it.
 Nothing is done without proof, nothing merges without you.
 
-[![Version](https://img.shields.io/badge/version-2.71.2-2563eb)](./VERSION)
+[![Version](https://img.shields.io/badge/version-2.72.0-2563eb)](./VERSION)
 [![Runtimes](https://img.shields.io/badge/runtimes-Claude%20Code%20%7C%20Codex%20%7C%20kimi--code-7c3aed)](#other-runtimes)
 [![Modules](https://img.shields.io/badge/modules-18-16a34a)](#modules)
 [![License](https://img.shields.io/badge/license-source--available-64748b)](./LICENSE)
@@ -150,9 +150,9 @@ The three latest are below; the full history lives in **[CHANGELOG.md](./CHANGEL
 
 | Version | Date | Change |
 |---------|------|--------|
+| `v2.72.0` | 2026-10-29 | **Product bundle (minor).** New module `product-team-bundle` v1.0.0: product team (manager, BRIEF analyst, PRD PM, `prd-gate` judge with threshold 80, `check-prd.sh` gate), `vibeflow-product` front door and `/vf-product` skill, visible to the `product` and `solo` roles. Stays `proposable: false` until a real run. `planning-core` v2.9.0 (product template), `dev-orchestrator` v2.29.0 (the head points to `/vf-product` at the `product` role). |
 | `v2.71.2` | 2026-10-23 | **Audit, duplicates and doc fixes (patch).** `infrastructure-audit` no longer returns INDETERMINATE under `--strict --no-tests` when no suite exists; `detect-duplicates.sh` passes titles to Python on standard input and reports failures (`errors` field, exit code 2); the start-up signals table of the `dev-orchestrator` agent follows the real hook text; `driver-lock` comments describe the guard outside the root (`conductor` v1.50.2, `consolidator` v1.11.3, `dev-orchestrator` v2.28.4, `infrastructure-audit` v1.3.6). |
 | `v2.71.1` | 2026-10-23 | **Windows fixes, audit and bootstrap (patch).** UTF-8 mode is now unconditional under `-I` and the two large hook programs no longer go through the command line (Windows caps it at 32,767 characters); `infrastructure-audit` gains `--no-tests` and returns INDETERMINATE under `--strict` when suites are skipped; `driver-lock` refuses a sub-folder with no `.planning/` of its own; the session bootstrap points to `/vf-dev`; `check-gsd-config` spares VibeFlow's own keys (`conductor` v1.50.1, `consolidator` v1.11.2, `design-orchestrator` v1.5.15, `dev-orchestrator` v2.28.3, `infrastructure-audit` v1.3.5, `planning-core` v2.8.3). |
-| `v2.71.0` | 2026-10-22 | **Job roles per project (minor).** `/vibeflow-install` asks for the role on this project (`solo` pre-selected, `product`, `dev`; non-interactive with `VF_ROLE`). `module.json` carries `roles`, and the catalogue, presets and `install --all` filter by role, while a module named explicitly always installs: a role is a view, not a permission (ADR-077). `conductor` v1.50.0 adds the `vf-role.sh get` reader, the advisory `check-role-consistency.sh` gate and a `Poste : X` line at SessionStart. **111 suites.** |
 
 <details>
 <summary><strong>Methodology references (ADR / LRN)</strong></summary>

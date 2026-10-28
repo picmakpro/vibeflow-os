@@ -13,6 +13,16 @@ entre crochets se retrouverait publiée SOUS la version suivante.*
 
 *(vide)*
 
+## [v2.72.0] — 2026-10-29
+
+**Minor** (Phase 59, bundle produit ; release minor sur mandat Samuel, /vf-auto session principale, 2026-10-29) :
+
+- **`product-team-bundle` v1.0.0** (module neuf, 18ᵉ) : équipe produit en monde fermé — manager `vf-product-manager`, workers internes `vf-product-analyst` (BRIEF à cinq rubriques) et `vf-product-pm` (PRD), juge `prd-gate` (rubric /100, seuil 80), gate déterministe `check-prd.sh` ; front door `vibeflow-product` et skill `/vf-product`. Visibilité par poste (`roles: ["product"]`, visible aux postes `product` et `solo`).
+- **Le bundle reste `proposable: false`** jusqu'à un run réel complet sur un lab désigné par Samuel : posé par `install --all`, jamais proposé.
+- **`planning-core` v2.9.0** : gabarit produit (`references/templates/product/` : `PROJECT.template.md`, `REQUIREMENTS.template.md`), lisible par GSD, postes `solo` et `dev` inchangés.
+- **`dev-orchestrator` v2.29.0** : `vibeflow-head` lit le poste et oriente vers `/vf-product` au poste `product` (nouvelle référence `product-routing.md`, instructions d'`AGENT.md` inchangées).
+- Manuel FR/EN, README racine (18 modules, 113 suites) et baselines mis à jour ; correctifs de revue sur `check-prd.sh` (remplissage, longueur en caractères, commentaires, blocs de code, cases non reconnues).
+
 ## [v2.71.2] — 2026-10-23
 
 **Patch** (quatre correctifs mergés depuis v2.71.1, #153, #159, #160 ; release patch préparée sur demande de la session
