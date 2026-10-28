@@ -1002,6 +1002,45 @@ assert "T66.5, ag-b seul dans l'inventaire" "$out" '"agent_id": "ag-b"'
 "$SCRIPT" close --agent=ag-b --status=done >/dev/null
 "$SCRIPT" release --owner=M66 >/dev/null 2>&1
 
+echo "=== T67, outillage uutils coreutils : -h vaut --help (aide sur stdout, rc 0, rien fait) ==="
+# Hypothèse SIMULÉE (aucun uutils réel n'est disponible dans cette suite) : des faux `ln` et `mv`, posés en
+# tête d'un PATH temporaire, traitent toute option contenant `h` comme --help (aide, rc 0, aucun effet) ;
+# `mv` comprend en plus -T (il le traduit en -h BSD avant de déléguer, comme le ferait un mv qui le gère).
+# Tout le reste est délégué au vrai binaire, résolu par chemin absolu AVANT de modifier le PATH. Sur le code
+# où `ln -sh`/`mv -h` passaient en premier, le repli `||` ne jouait jamais : le second propriétaire recevait
+# "acquired": true, et la reprise d'un lock périmé ne remplaçait pas le lien.
+_t67_ln="$(command -v ln)"; _t67_mv="$(command -v mv)"
+_t67_bin="$WORK_DIR/fakebin67"; mkdir -p "$_t67_bin"
+cat > "$_t67_bin/ln" <<FAKE
+#!/bin/sh
+case "\$1" in -*h*) echo "Usage: ln [OPTION]... TARGET LINK_NAME (faux uutils)"; exit 0 ;; esac
+exec "$_t67_ln" "\$@"
+FAKE
+cat > "$_t67_bin/mv" <<FAKE
+#!/bin/sh
+case "\$1" in
+  -*h*) echo "Usage: mv [OPTION]... SOURCE DEST (faux uutils)"; exit 0 ;;
+  -*T*) o="\$1"; shift; exec "$_t67_mv" "\$(printf '%s' "\$o" | tr T h)" "\$@" ;;
+esac
+exec "$_t67_mv" "\$@"
+FAKE
+chmod +x "$_t67_bin/ln" "$_t67_bin/mv"
+_t67_binmv="$WORK_DIR/fakebin67mv"; mkdir -p "$_t67_binmv"; cp "$_t67_bin/mv" "$_t67_binmv/mv"  # mv seul : isole mv_link/mv_noclobber de ln_atomic
+rm -rf "$VF_DRIVER_LOCK"
+PATH="$_t67_bin:$PATH" "$SCRIPT" acquire --owner=A67 --step=x >/dev/null 2>&1
+out=$(PATH="$_t67_bin:$PATH" "$SCRIPT" acquire --owner=B67 --step=y 2>&1); rc=$?
+assert "T67.1, ln qui prend -h pour --help : le second propriétaire est refusé" "$out" '"acquired": false'
+assert_exit "T67.2, refus : exit 1" "$rc" 1
+assert "T67.3, le verrou reste à A67" "$("$SCRIPT" status)" '"owner": "A67"'
+rm -rf "$VF_DRIVER_LOCK"
+"$SCRIPT" acquire --owner=DEAD67 --step=x >/dev/null
+age_stale "$VF_DRIVER_LOCK"
+out=$(PATH="$_t67_binmv:$PATH" "$SCRIPT" takeover --owner=B67 --step=y 2>&1); rc=$?
+assert "T67.4, mv qui prend -h pour --help : la reprise d'un lock périmé aboutit" "$out" '"acquired": true'
+assert "T67.5, le lien a réellement été remplacé (status = B67)" "$("$SCRIPT" status)" '"owner": "B67"'
+"$SCRIPT" release --owner=B67 >/dev/null 2>&1
+rm -rf "$VF_DRIVER_LOCK" "$_t67_bin" "$_t67_binmv"
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
