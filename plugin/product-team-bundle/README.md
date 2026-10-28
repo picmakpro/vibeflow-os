@@ -87,7 +87,7 @@ un sélecteur de gabarit), puis sert la demande. Première demande type :
 | `scripts/check-prd.sh` | gate déterministe, lecture seule | — |
 
 Codes de `check-prd.sh` : `0` conforme · `1` éliminatoire · `3` indéterminé (cible absente, zéro
-exigence) · `5` entrée illisible · `64` erreur d'usage. Le code 2 n'est jamais émis.
+exigence, bloc de code ou commentaire HTML non fermé) · `5` entrée illisible · `64` erreur d'usage. Le code 2 n'est jamais émis.
 
 Chemins installés : front door `.claude/agents/product-team-bundle.md` (commande
 `/product-team-bundle`), gabarit `.claude/agents/product-team-bundle-references/BRIEF.template.md`,

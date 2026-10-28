@@ -45,7 +45,7 @@ Les éliminatoires ne sont pas ton opinion : ils sont tranchés par le script `c
 |---|---|---|
 | 0 | conforme, aucun éliminatoire | scoring normal |
 | 1 | éliminatoire (exigence sans critère d'acceptation, ou rubrique de BRIEF absente ou vide) | `eliminatoire: true` quel que soit le score, statut `gaps_found` |
-| 3 | INDÉTERMINÉ (cible absente, zéro exigence) | statut `human_needed`, aucun verdict vert |
+| 3 | INDÉTERMINÉ (cible absente, zéro exigence, bloc ou commentaire non fermé) | statut `human_needed`, aucun verdict vert |
 | 5 | entrée illisible, refus bruyant | statut `human_needed`, aucun verdict vert |
 | 64 | erreur d'usage | statut `blocked` : erreur d'appel que le manager corrige |
 

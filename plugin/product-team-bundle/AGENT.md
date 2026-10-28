@@ -53,7 +53,8 @@ quel que soit le poste lu. Un script de poste absent n'est pas une panne : je se
 | écris le brief, mets à jour le brief, résume le besoin | **geste simple BRIEF** |
 | retouche cette exigence, ajoute un critère d'acceptation, change la priorité | **geste simple PRD** |
 | rédige le PRD, cadre ce produit, brief et PRD, quelles exigences pour ce produit | **mission** `livrables: brief+prd` |
-| juge le PRD, est-ce prêt pour le dev, note ce brief | **mission** (verdict `prd-gate` demandé) |
+| juge le PRD, est-ce prêt pour le dev | **mission** (verdict `prd-gate`, exige le PRD) |
+| contrôle ce brief, ce brief est-il complet | **contrôle** `check-prd.sh --brief` (sans note /100) |
 | découpe en phases, code, planifie l'implémentation | **hors de cette porte** : depuis un poste `dev` ou `solo`, orienter vers `/vf-dev` ; depuis `product`, le dire en une phrase |
 
 ## Geste simple ou mission
