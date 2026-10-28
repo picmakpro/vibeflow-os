@@ -25,7 +25,7 @@
         "scout-spec"
       ],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plan-59",
@@ -35,37 +35,38 @@
         "cadrage-59"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-59",
-      "step": "exécution Phase 59 (vf-coder)",
+      "step": "agrégat exécution (vagues 1-4, 59-08 = porte de phase)",
       "stage": "",
       "deps": [
-        "plan-59"
+        "exec-59-w4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-59",
       "step": "revue (vf-reviewer)",
       "stage": "",
       "deps": [
-        "exec-59"
+        "fix-revue-59"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready",
+      "review_regime": "full"
     },
     {
       "id": "verif-59",
       "step": "vérification de phase + porte ci.yml",
       "stage": "",
       "deps": [
-        "exec-59"
+        "fix-revue-59"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     },
     {
       "id": "docs",
@@ -93,6 +94,56 @@
       "step": "éclaireur noms BMAD courants (web, A-10)",
       "stage": "",
       "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-59-w1",
+      "step": "exécution vague 1",
+      "stage": "",
+      "deps": [
+        "plan-59"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-59-w2",
+      "step": "exécution vague 2",
+      "stage": "",
+      "deps": [
+        "exec-59-w1"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-59-w3",
+      "step": "exécution vague 3",
+      "stage": "",
+      "deps": [
+        "exec-59-w2"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "exec-59-w4",
+      "step": "exécution vague 4",
+      "stage": "",
+      "deps": [
+        "exec-59-w3"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-revue-59",
+      "step": "correction ciblée F1-F6 (vf-coder)",
+      "stage": "",
+      "deps": [
+        "exec-59"
+      ],
       "scope": [],
       "status": "done"
     }
