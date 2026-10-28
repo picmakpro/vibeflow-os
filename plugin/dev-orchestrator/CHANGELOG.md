@@ -1,5 +1,14 @@
 # CHANGELOG — dev-orchestrator
 
+## [v2.28.5] — 2026-10-29 (gsd-run.sh, scope dérivé, doctrine d'attente, description vf-dev) — à publier dans la prochaine release
+
+**Patch** (#47, #165, #81, #154 point 2 ; correctifs hors feuille de route) :
+
+- **`scripts/gsd-run.sh`, lanceur de gsd-tools appelable par chemin** (#47, 489ad6bd, 3b3389e9, bf6fffbf) : `gsd_run` n'existe que dans le préambule des workflows GSD, pas dans le bash d'un agent. Le script résout le moteur (`GSD_TOOLS`, `./.claude/gsd-core`, scope user, `PATH` en dernier), transmet les arguments tels quels et rend 64 sur défaut d'outillage ; le candidat `<racine>/gsd-core` nu reste exclu (ADR-070). Suite `test-gsd-run.sh`. `vf-dev-manager` (point 5) appelle `"$S"/gsd-run.sh config-set …` et relit le `config.json` par `jq` : un rc 64 ou une clé encore vraie rend `human_needed`, plus de repli best-effort. `mission-contracts.md` §Seuil de bascule renvoie au script ; le README du module le liste.
+- **`ensure-deps.sh` dérive le scope projet** (#165, 99f49bc2) : sans `VF_SCOPE`, un moteur installé dans `<racine>/.claude/gsd-core` fait lire et écrire au même endroit (`SCOPE=project`, message stderr au seul point d'install) au lieu de poser une seconde copie dans `~/.claude`. `VF_SCOPE` explicite reste prioritaire, une valeur invalide reste rejetée. Cinq cas T2b-165.
+- **`references/mission-flow.md`, doctrine d'attente** (#81, d13e8a19, be9f0a9c) : trois invariants (jamais de boucle shell d'attente sur un worker ; poll borné et temporisé, forme canonique unique ; attente non bornable remontée) et heartbeat à chaque réveil du manager, en remplacement de « à chaque itération d'une boucle d'attente » (D-33-E). Test T81 : scanner des blocs de code livrés.
+- **Description de `vf-dev` élargie** (#154 point 2, partie description seule ; 7ec396d9) : elle couvre les demandes de dev précises (« ajoute X », « corrige Y ») sur un projet piloté par GSD ; copie du manuel alignée. Le hook d'aiguillage reste hors périmètre.
+
 ## [v2.28.4] — 2026-10-23 (tableau des signaux de démarrage aligné) — publiée dans v2.71.2
 
 **Patch** (#160 ; release patch préparée sur demande de la session principale, 2026-10-23 ; publiée dans v2.71.2) :

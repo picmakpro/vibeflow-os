@@ -62,7 +62,7 @@ on disk, so a session can die without the project losing ground. The last step i
 </picture>
 
 A green that cannot turn red proves nothing. Tests are written red first, `check-*.sh` gates run
-in CI, and the judge is never the author. The repo holds itself to the same rule: 111 suites run
+in CI, and the judge is never the author. The repo holds itself to the same rule: 112 suites run
 on every push, and a "fresh lab" job installs the baseline into an empty lab that must pass its
 own gates with zero intervention.
 
